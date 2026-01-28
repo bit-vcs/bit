@@ -1,0 +1,16 @@
+import {
+  "mizchi/zlib",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/x/fs",
+  "moonbitlang/async/http" as @http,
+}
+
+options(
+  targets: {
+    "integration_test.mbt": [ "wasm-gc", "wasm" ],
+    "pack_index_write_test.mbt": [ "native" ],
+    "remote.mbt": [ "wasm-gc", "wasm" ],
+    "remote_test.mbt": [ "wasm-gc", "wasm" ],
+    "upload_pack_http.mbt": [ "wasm-gc", "wasm" ],
+  },
+)
