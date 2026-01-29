@@ -201,6 +201,53 @@ fn normalize_repo_root(path : String) -> String {
 }
 
 ///|
+fn parse_upload_pack_args(args : Array[String]) -> (Bool, String)? {
+  let mut advertise = false
+  let mut repo : String? = None
+  for arg in args {
+    if arg == "--advertise-refs" {
+      advertise = true
+      continue
+    }
+    if arg == "--stateless-rpc" {
+      continue
+    }
+    if arg.has_prefix("--") {
+      continue
+    }
+    if repo is None {
+      repo = Some(arg)
+    }
+  }
+  match repo {
+    None => None
+    Some(path) => Some((advertise, path))
+  }
+}
+
+///|
+async fn handle_upload_pack(args : Array[String]) -> Unit {
+  guard parse_upload_pack_args(args) is Some((advertise, repo_path)) else {
+    raise @git.GitError::ProtocolError("missing repository path")
+  }
+  if repo_path.has_suffix(".git") && !repo_path.has_suffix("/.git") {
+    run_system_git(prepend_arg("upload-pack", args))
+    return ()
+  }
+  let root = normalize_repo_root(repo_path)
+  let fs = OsFs::new()
+  if advertise {
+    let out = @gitlib.build_upload_pack_advertisement(fs, root)
+    @stdio.stdout.write(out)
+  } else {
+    let input = read_all_stdin()
+    let req = @gitlib.parse_upload_pack_request(input)
+    let out = @gitlib.upload_pack(fs, root, req)
+    @stdio.stdout.write(out)
+  }
+}
+
+///|
 async fn handle_receive_pack(args : Array[String]) -> Unit {
   guard parse_receive_pack_args(args) is Some((advertise, repo_path)) else {
     raise @git.GitError::ProtocolError("missing repository path")
@@ -357,6 +404,24 @@ async fn main_async() -> Unit {
             err => {
               @stdio.stderr.write(
                 "index-pack failed: " + err.to_string() + "\n",
+              )
+              @sys.exit(1)
+            }
+          }
+        "upload-pack" =>
+          handle_upload_pack(rest) catch {
+            err => {
+              @stdio.stderr.write(
+                "upload-pack failed: " + err.to_string() + "\n",
+              )
+              @sys.exit(1)
+            }
+          }
+        "git-upload-pack" =>
+          handle_upload_pack(rest) catch {
+            err => {
+              @stdio.stderr.write(
+                "upload-pack failed: " + err.to_string() + "\n",
               )
               @sys.exit(1)
             }

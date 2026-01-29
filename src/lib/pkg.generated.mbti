@@ -12,6 +12,8 @@ pub fn apply_receive_pack(&@git.FileSystem, &@git.RepoFileSystem, String, Receiv
 
 pub fn build_receive_pack_advertisement(&@git.RepoFileSystem, String, agent? : String) -> Bytes raise @git.GitError
 
+pub fn build_upload_pack_advertisement(&@git.RepoFileSystem, String, agent? : String) -> Bytes raise @git.GitError
+
 pub fn checkout(&@git.FileSystem, &@git.RepoFileSystem, String, String, detach? : Bool, update_worktree? : Bool, update_index? : Bool) -> @git.ObjectId raise @git.GitError
 
 pub fn collect_reachable_objects(ObjectDb, &@git.RepoFileSystem, @git.ObjectId) -> Array[@git.PackObject] raise @git.GitError
@@ -56,6 +58,8 @@ pub fn merge(&@git.FileSystem, &@git.RepoFileSystem, String, @git.ObjectId, Stri
 
 pub fn parse_receive_pack_request(Bytes) -> ReceivePackRequest raise @git.GitError
 
+pub fn parse_upload_pack_request(Bytes) -> UploadPackRequest raise @git.GitError
+
 pub fn prune_repo(&@git.FileSystem, &@git.RepoFileSystem, String) -> PruneResult raise @git.GitError
 
 pub fn read_head_ref(&@git.RepoFileSystem, String) -> HeadRef raise @git.GitError
@@ -97,6 +101,8 @@ pub fn switch_branch(&@git.FileSystem, &@git.RepoFileSystem, String, String, cre
 pub fn tree_files_to_index(ObjectDb, &@git.RepoFileSystem, Map[String, TreeFileEntry]) -> Array[IndexEntry] raise @git.GitError
 
 pub fn update_head_ref(&@git.FileSystem, &@git.RepoFileSystem, String, @git.ObjectId) -> Unit raise @git.GitError
+
+pub fn upload_pack(&@git.RepoFileSystem, String, UploadPackRequest) -> Bytes raise @git.GitError
 
 pub fn write_index_entries(&@git.FileSystem, String, Array[IndexEntry]) -> Unit raise @git.GitError
 
@@ -233,6 +239,13 @@ pub struct Status {
 pub struct TreeFileEntry {
   id : @git.ObjectId
   mode : Int
+}
+
+pub struct UploadPackRequest {
+  wants : Array[@git.ObjectId]
+  haves : Array[@git.ObjectId]
+  capabilities : Array[String]
+  done : Bool
 }
 
 // Type aliases
