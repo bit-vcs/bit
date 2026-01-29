@@ -1,0 +1,14 @@
+import {
+  "mizchi/git" as @git,
+  "mizchi/git/lib" as @gitlib,
+  "moonbitlang/async" as @async,
+  "moonbitlang/async/process" as @process,
+  "moonbitlang/async/stdio" as @stdio,
+  "moonbitlang/x/fs" as @fs,
+  "moonbitlang/x/path" as @path,
+  "moonbitlang/x/sys" as @sys,
+}
+
+options(
+  is_main: true,
+)

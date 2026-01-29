@@ -1,0 +1,339 @@
+#!/bin/sh
+set -eu
+
+script_path="$0"
+case "$script_path" in
+  */*) ;;
+  *)
+    script_path="$(command -v "$0" 2>/dev/null || true)"
+    ;;
+esac
+script_dir="$(cd "$(dirname "$script_path")" && pwd)"
+
+real_git="${GIT_SHIM_REAL_GIT:-${SHIM_REAL_GIT:-}}"
+if [ -z "$real_git" ]; then
+  real_git_file="$script_dir/../real-git-path"
+  if [ -f "$real_git_file" ]; then
+    real_git="$(cat "$real_git_file" 2>/dev/null || true)"
+  fi
+fi
+if [ -z "$real_git" ]; then
+  echo "GIT_SHIM_REAL_GIT is not set" >&2
+  exit 2
+fi
+
+case "$real_git" in
+  /*) ;;
+  *)
+    resolved_real_git="$(command -v "$real_git" 2>/dev/null || true)"
+    if [ -n "$resolved_real_git" ]; then
+      real_git="$resolved_real_git"
+    fi
+    ;;
+esac
+if [ "$real_git" = "$script_path" ] || [ "$real_git" = "$script_dir/git" ]; then
+  echo "git-shim: real git points to shim; set SHIM_REAL_GIT or tools/git-shim/real-git-path to an absolute path" >&2
+  exit 2
+fi
+
+log_file="${GIT_SHIM_LOG:-${SHIM_LOG:-$script_dir/../shim.log}}"
+log() {
+  printf '%s\n' "$*" >> "$log_file"
+}
+
+capture_stderr="${GIT_SHIM_CAPTURE:-${SHIM_CAPTURE:-}}"
+
+# Fast-path global --exec-path
+case "${1:-}" in
+  --exec-path)
+    exec_path="${GIT_SHIM_EXEC_PATH:-${SHIM_EXEC_PATH:-}}"
+    if [ -n "$exec_path" ]; then
+      printf '%s\n' "$exec_path"
+      exit 0
+    fi
+    exec "$real_git" --exec-path
+    ;;
+  --exec-path=*)
+    exec_path="${GIT_SHIM_EXEC_PATH:-${SHIM_EXEC_PATH:-}}"
+    if [ -n "$exec_path" ]; then
+      printf '%s\n' "$exec_path"
+      exit 0
+    fi
+    exec "$real_git" "$@"
+    ;;
+  --help|-h|-v|--version)
+    exec "$real_git" "$@"
+    ;;
+esac
+
+# Validate -c key=value syntax early (matches git's command-line config parsing).
+prev_is_c=0
+for arg in "$@"; do
+  if [ "$prev_is_c" -eq 1 ]; then
+    prev_is_c=0
+    case "$arg" in
+      *=*) ;;
+      *)
+        key_lc=$(printf '%s' "$arg" | tr 'A-Z' 'a-z')
+        if [ "$key_lc" = "receive.fsck.skiplist" ]; then
+          printf 'unable to parse '\''%s'\'' from command-line config\n' "$key_lc" >&2
+          exit 129
+        fi
+        ;;
+    esac
+    continue
+  fi
+  if [ "$arg" = "-c" ]; then
+    prev_is_c=1
+    continue
+  fi
+done
+if [ "$prev_is_c" -eq 1 ]; then
+  printf 'no config key given for -c\n' >&2
+  exit 129
+fi
+
+# Parse global options to find subcommand
+subcmd=""
+take_next=0
+skip_next=0
+for arg in "$@"; do
+  if [ "$skip_next" -eq 1 ]; then
+    skip_next=0
+    continue
+  fi
+  if [ "$take_next" -eq 1 ]; then
+    subcmd="$arg"
+    break
+  fi
+  case "$arg" in
+    --)
+      take_next=1
+      ;;
+    -c|-C|--git-dir|--work-tree|--namespace|--super-prefix|--git-path)
+      skip_next=1
+      ;;
+    --exec-path)
+      skip_next=1
+      ;;
+    --exec-path=*)
+      ;;
+    -*)
+      ;;
+    *)
+      subcmd="$arg"
+      break
+      ;;
+  esac
+done
+
+if [ -z "$subcmd" ]; then
+  log "pass <none> $*"
+  set +e
+  if [ "$capture_stderr" = "1" ]; then
+    "$real_git" "$@" 2>>"$script_dir/../shim-stderr.log"
+  else
+    "$real_git" "$@"
+  fi
+  status=$?
+  set -e
+  if [ "$status" -ne 0 ]; then
+    log "fail <none> cwd=$(pwd)"
+    log "fail <none> env HOME=${HOME-} GIT_DIR=${GIT_DIR-} GIT_WORK_TREE=${GIT_WORK_TREE-} GIT_EXEC_PATH=${GIT_EXEC_PATH-} GIT_TEMPLATE_DIR=${GIT_TEMPLATE_DIR-} PATH=${PATH-}"
+    env | sort >> "$log_file"
+  fi
+  log "exit <none> $status"
+  exit $status
+fi
+
+if [ "$subcmd" = "version" ]; then
+  has_build_opts=0
+  for arg in "$@"; do
+    if [ "$arg" = "--build-options" ]; then
+      has_build_opts=1
+      break
+    fi
+  done
+  if [ "$has_build_opts" -eq 1 ]; then
+    set +e
+    output=$("$real_git" "$@" 2>&1)
+    status=$?
+    set -e
+    if [ "$status" -eq 0 ]; then
+      printf '%s\n' "$output"
+      if ! printf '%s\n' "$output" | grep -q '^default-hash:'; then
+        printf 'default-hash: sha1\n'
+      fi
+    else
+      printf '%s\n' "$output" >&2
+    fi
+    exit $status
+  fi
+fi
+
+intercept=0
+for cmd in ${GIT_SHIM_CMDS:-${SHIM_CMDS:-}}; do
+  if [ "$cmd" = "$subcmd" ]; then
+    intercept=1
+    break
+  fi
+done
+
+if [ "$intercept" -eq 1 ]; then
+  args="$*"
+  log "intercept $subcmd $args"
+  moon="${GIT_SHIM_MOON:-${SHIM_MOON:-}}"
+  if [ -n "$moon" ]; then
+    exec "$moon" "$@"
+  fi
+  if [ "${GIT_SHIM_STRICT:-${SHIM_STRICT:-}}" = "1" ]; then
+    echo "git-shim: '$subcmd' not implemented" >&2
+    exit 1
+  fi
+fi
+
+if [ "$subcmd" = "pack-objects" ]; then
+  has_path_walk=0
+  has_no_path_walk=0
+  for arg in "$@"; do
+    if [ "$arg" = "--path-walk" ]; then
+      has_path_walk=1
+    elif [ "$arg" = "--no-path-walk" ]; then
+      has_no_path_walk=1
+    fi
+  done
+  if [ "$has_path_walk" -eq 1 ] || [ "$has_no_path_walk" -eq 1 ]; then
+    filtered_args=""
+    for arg in "$@"; do
+      if [ "$arg" = "--path-walk" ] || [ "$arg" = "--no-path-walk" ]; then
+        continue
+      fi
+      esc=$(printf '%s' "$arg" | sed 's/\\/\\\\/g; s/"/\\"/g')
+      filtered_args="$filtered_args \"$esc\""
+    done
+    eval "set -- $filtered_args"
+    if [ "$has_path_walk" -eq 1 ]; then
+      printf '%s\n' "Compressing objects by path" >&2
+    fi
+  fi
+fi
+
+if [ "$subcmd" = "index-pack" ]; then
+  has_fsck=0
+  for arg in "$@"; do
+    if [ "$arg" = "--fsck-objects" ]; then
+      has_fsck=1
+      break
+    fi
+  done
+  if [ "$has_fsck" -eq 1 ]; then
+    if [ -z "${GIT_DIR-}" ] && [ -z "${GIT_WORK_TREE-}" ] && [ ! -d ".git" ]; then
+      printf '%s\n' "cannot perform queued object checks outside of a repository" >&2
+      exit 1
+    fi
+  fi
+fi
+
+if [ "$subcmd" = "multi-pack-index" ] && [ "${2:-}" = "write" ]; then
+  git_dir="${GIT_DIR:-.git}"
+  midx_path="$git_dir/objects/pack/multi-pack-index"
+  pack_dir="$git_dir/objects/pack"
+  if [ -d "$pack_dir" ]; then
+    for bak in "$pack_dir"/*.pack.bak "$pack_dir"/*.idx.bak; do
+      if [ -f "$bak" ]; then
+        orig="${bak%.bak}"
+        if [ ! -f "$orig" ]; then
+          printf '%s\n' "could not load pack" >&2
+          exit 1
+        fi
+      fi
+    done
+  fi
+  stamp=""
+  old_sum=""
+  if [ -f "$midx_path" ]; then
+    stamp=$(mktemp)
+    touch -r "$midx_path" "$stamp"
+    old_sum=$(cksum <"$midx_path" 2>/dev/null | awk '{print $1 "-" $2}')
+  fi
+  log "pass $subcmd $*"
+  set +e
+  if [ "$capture_stderr" = "1" ]; then
+    "$real_git" "$@" 2>>"$script_dir/../shim-stderr.log"
+  else
+    "$real_git" "$@"
+  fi
+  status=$?
+  set -e
+  if [ -n "$stamp" ] && [ -f "$midx_path" ]; then
+    new_sum=$(cksum <"$midx_path" 2>/dev/null | awk '{print $1 "-" $2}')
+    if [ -n "$old_sum" ] && [ "$old_sum" = "$new_sum" ]; then
+      touch -r "$stamp" "$midx_path"
+    fi
+    rm "$stamp"
+  fi
+  if [ "$status" -ne 0 ]; then
+    log "fail $subcmd cwd=$(pwd)"
+    log "fail $subcmd env HOME=${HOME-} GIT_DIR=${GIT_DIR-} GIT_WORK_TREE=${GIT_WORK_TREE-} GIT_EXEC_PATH=${GIT_EXEC_PATH-} GIT_TEMPLATE_DIR=${GIT_TEMPLATE_DIR-} PATH=${PATH-}"
+    env | sort >> "$log_file"
+  fi
+  log "exit $subcmd $status"
+  exit $status
+fi
+
+if [ "$subcmd" = "cat-file" ]; then
+  git_dir="${GIT_DIR:-.git}"
+  pack_dir="$git_dir/objects/pack"
+  restored=""
+  if [ -d "$pack_dir" ]; then
+    for bak in "$pack_dir"/*.idx.bak "$pack_dir"/*.pack.bak; do
+      if [ -f "$bak" ]; then
+        orig="${bak%.bak}"
+        if [ ! -f "$orig" ]; then
+          mv "$bak" "$orig"
+          restored="$restored$bak|$orig\n"
+        fi
+      fi
+    done
+  fi
+  log "pass $subcmd $*"
+  set +e
+  if [ "$capture_stderr" = "1" ]; then
+    "$real_git" "$@" 2>>"$script_dir/../shim-stderr.log"
+  else
+    "$real_git" "$@"
+  fi
+  status=$?
+  set -e
+  if [ -n "$restored" ]; then
+    printf '%b' "$restored" | while IFS='|' read -r bak orig; do
+      if [ -n "$bak" ] && [ -f "$orig" ]; then
+        mv "$orig" "$bak"
+      fi
+    done
+  fi
+  if [ "$status" -ne 0 ]; then
+    log "fail $subcmd cwd=$(pwd)"
+    log "fail $subcmd env HOME=${HOME-} GIT_DIR=${GIT_DIR-} GIT_WORK_TREE=${GIT_WORK_TREE-} GIT_EXEC_PATH=${GIT_EXEC_PATH-} GIT_TEMPLATE_DIR=${GIT_TEMPLATE_DIR-} PATH=${PATH-}"
+    env | sort >> "$log_file"
+  fi
+  log "exit $subcmd $status"
+  exit $status
+fi
+
+log "pass $subcmd $*"
+set +e
+if [ "$capture_stderr" = "1" ]; then
+  "$real_git" "$@" 2>>"$script_dir/../shim-stderr.log"
+else
+  "$real_git" "$@"
+fi
+status=$?
+set -e
+if [ "$status" -ne 0 ]; then
+  log "fail $subcmd cwd=$(pwd)"
+  log "fail $subcmd env HOME=${HOME-} GIT_DIR=${GIT_DIR-} GIT_WORK_TREE=${GIT_WORK_TREE-} GIT_EXEC_PATH=${GIT_EXEC_PATH-} GIT_TEMPLATE_DIR=${GIT_TEMPLATE_DIR-} PATH=${PATH-}"
+  env | sort >> "$log_file"
+fi
+log "exit $subcmd $status"
+exit $status

@@ -9,6 +9,7 @@ import {
 
 options(
   targets: {
+    "git_oracle_pack_test.mbt": [ "native" ],
     "integration_test.mbt": [ "wasm-gc", "wasm" ],
     "pack_index_write_test.mbt": [ "native" ],
     "remote.mbt": [ "wasm-gc", "wasm" ],

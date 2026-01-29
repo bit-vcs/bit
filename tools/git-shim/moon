@@ -1,0 +1,7 @@
+#!/bin/sh
+set -eu
+
+script_dir=$(cd "$(dirname "$0")" && pwd)
+repo_root=$(cd "$script_dir/../.." && pwd)
+
+exec moon -C "$repo_root" run cmd/git_shim --target native -- "$@"
