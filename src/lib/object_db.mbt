@@ -8,7 +8,7 @@ pub struct PackIndex {
 }
 
 ///|
-pub fn PackIndex::find_offset(self : PackIndex, id : ObjectId) -> Int64? {
+pub fn PackIndex::find_offset(self : PackIndex, id : @git.ObjectId) -> Int64? {
   let target = id.to_hex()
   PackIndex::find_offset_hex(self, target)
 }
@@ -33,15 +33,15 @@ pub fn PackIndex::find_offset_hex(self : PackIndex, hex : String) -> Int64? {
 
 ///|
 pub struct ObjectDb {
-  loose : Map[String, PackObject]
+  loose : Map[String, @git.PackObject]
   packs : Array[PackIndex]
 }
 
 ///|
 pub fn ObjectDb::load(
-  fs : &RepoFileSystem,
+  fs : &@git.RepoFileSystem,
   git_dir : String,
-) -> ObjectDb raise GitError {
+) -> ObjectDb raise @git.GitError {
   let objects_dir = join_path(git_dir, "objects")
   let loose = if fs.is_dir(objects_dir) {
     load_loose_map(fs, objects_dir)
@@ -64,9 +64,9 @@ pub fn ObjectDb::load(
 ///|
 pub fn ObjectDb::get(
   self : ObjectDb,
-  fs : &RepoFileSystem,
-  id : ObjectId,
-) -> PackObject? raise GitError {
+  fs : &@git.RepoFileSystem,
+  id : @git.ObjectId,
+) -> @git.PackObject? raise @git.GitError {
   let seen : Map[String, Bool] = {}
   get_by_hex(self, fs, id.to_hex(), seen)
 }
@@ -74,12 +74,12 @@ pub fn ObjectDb::get(
 ///|
 fn get_by_hex(
   db : ObjectDb,
-  fs : &RepoFileSystem,
+  fs : &@git.RepoFileSystem,
   hex : String,
   seen : Map[String, Bool],
-) -> PackObject? raise GitError {
+) -> @git.PackObject? raise @git.GitError {
   if seen.contains(hex) {
-    raise GitError::InvalidObject("Delta cycle detected: \{hex}")
+    raise @git.GitError::InvalidObject("Delta cycle detected: \{hex}")
   }
   seen[hex] = true
   match db.loose.get(hex) {
@@ -101,10 +101,10 @@ fn get_by_hex(
 
 ///|
 pub fn load_object_store_from_fs(
-  fs : &RepoFileSystem,
+  fs : &@git.RepoFileSystem,
   git_dir : String,
-) -> ObjectStore raise GitError {
-  let store = ObjectStore::new()
+) -> @git.ObjectStore raise @git.GitError {
+  let store = @git.ObjectStore::new()
   let objects_dir = join_path(git_dir, "objects")
   if fs.is_dir(objects_dir) {
     let loose = load_loose_objects(fs, objects_dir)
@@ -124,10 +124,10 @@ pub fn load_object_store_from_fs(
 
 ///|
 fn load_loose_map(
-  fs : &RepoFileSystem,
+  fs : &@git.RepoFileSystem,
   objects_dir : String,
-) -> Map[String, PackObject] raise GitError {
-  let result : Map[String, PackObject] = {}
+) -> Map[String, @git.PackObject] raise @git.GitError {
+  let result : Map[String, @git.PackObject] = {}
   let entries = fs.readdir(objects_dir)
   for entry in entries {
     if entry.length() != 2 {
@@ -149,12 +149,12 @@ fn load_loose_map(
       let hex = entry + name
       let compressed = fs.read_file(path)
       let raw = @zlib.zlib_decompress(compressed) catch {
-        e => raise GitError::InvalidObject("Zlib error: \{e}")
+        e => raise @git.GitError::InvalidObject("Zlib error: \{e}")
       }
       let obj = parse_loose_object(raw)
-      let computed = hash_object_content(obj.obj_type, obj.data).to_hex()
+      let computed = @git.hash_object_content(obj.obj_type, obj.data).to_hex()
       if computed != hex {
-        raise GitError::HashMismatch(computed, hex)
+        raise @git.GitError::HashMismatch(computed, hex)
       }
       result[hex] = obj
     }
@@ -164,10 +164,10 @@ fn load_loose_map(
 
 ///|
 fn load_loose_objects(
-  fs : &RepoFileSystem,
+  fs : &@git.RepoFileSystem,
   objects_dir : String,
-) -> Array[PackObject] raise GitError {
-  let result : Array[PackObject] = []
+) -> Array[@git.PackObject] raise @git.GitError {
+  let result : Array[@git.PackObject] = []
   let map = load_loose_map(fs, objects_dir)
   for item in map.to_array() {
     let (_, obj) = item
@@ -178,9 +178,9 @@ fn load_loose_objects(
 
 ///|
 fn load_pack_indexes(
-  fs : &RepoFileSystem,
+  fs : &@git.RepoFileSystem,
   pack_dir : String,
-) -> Array[PackIndex] raise GitError {
+) -> Array[PackIndex] raise @git.GitError {
   let result : Array[PackIndex] = []
   let entries = fs.readdir(pack_dir)
   for entry in entries {
@@ -205,10 +205,10 @@ fn load_pack_indexes(
 
 ///|
 fn load_pack_objects(
-  fs : &RepoFileSystem,
+  fs : &@git.RepoFileSystem,
   pack_dir : String,
-) -> Array[PackObject] raise GitError {
-  let result : Array[PackObject] = []
+) -> Array[@git.PackObject] raise @git.GitError {
+  let result : Array[@git.PackObject] = []
   let entries = fs.readdir(pack_dir)
   for entry in entries {
     if not(entry.has_suffix(".pack")) {
@@ -219,7 +219,7 @@ fn load_pack_objects(
       continue
     }
     let data = fs.read_file(path)
-    let objects = parse_packfile(data)
+    let objects = @git.parse_packfile(data)
     for obj in objects {
       result.push(obj)
     }
@@ -231,17 +231,19 @@ fn load_pack_objects(
 fn parse_pack_index(
   data : Bytes,
   pack_path : String,
-) -> PackIndex raise GitError {
+) -> PackIndex raise @git.GitError {
   if data.length() < 8 {
-    raise GitError::InvalidObject("Index file too short")
+    raise @git.GitError::InvalidObject("Index file too short")
   }
   let magic = read_u32_be_at64(data, 0)
   if magic != 0xff744f63L {
-    raise GitError::InvalidObject("Unsupported pack index version")
+    raise @git.GitError::InvalidObject("Unsupported pack index version")
   }
   let version = read_u32_be_at64(data, 4)
   if version != 2L {
-    raise GitError::InvalidObject("Unsupported pack index version: \{version}")
+    raise @git.GitError::InvalidObject(
+      "Unsupported pack index version: \{version}",
+    )
   }
   let mut offset = 8
   let fanout : Array[Int64] = []
@@ -251,25 +253,25 @@ fn parse_pack_index(
   }
   let count64 = fanout[255]
   if count64 > 2147483647L {
-    raise GitError::InvalidObject("Too many objects in index")
+    raise @git.GitError::InvalidObject("Too many objects in index")
   }
   let count = count64.to_int()
   let ids : Array[String] = []
   for _ in 0..<count {
     if offset + 20 > data.length() {
-      raise GitError::InvalidObject("Index file truncated (ids)")
+      raise @git.GitError::InvalidObject("Index file truncated (ids)")
     }
     let bytes : FixedArray[Byte] = FixedArray::make(20, b'\x00')
     for i = 0; i < 20; i = i + 1 {
       bytes[i] = data[offset + i]
     }
     offset += 20
-    ids.push(ObjectId::new(bytes).to_hex())
+    ids.push(@git.ObjectId::new(bytes).to_hex())
   }
   // Skip CRC32 table
   offset += count * 4
   if offset + count * 4 > data.length() {
-    raise GitError::InvalidObject("Index file truncated (offsets)")
+    raise @git.GitError::InvalidObject("Index file truncated (offsets)")
   }
   let offsets : Array[Int64] = []
   let large_indices : Array[Int] = []
@@ -287,7 +289,9 @@ fn parse_pack_index(
     let mut large_idx = 0
     while large_idx < large_indices.length() {
       if offset + 8 > data.length() {
-        raise GitError::InvalidObject("Index file truncated (large offsets)")
+        raise @git.GitError::InvalidObject(
+          "Index file truncated (large offsets)",
+        )
       }
       let v = read_u64_be_at64(data, offset)
       offset += 8
@@ -305,35 +309,39 @@ fn read_pack_object_at(
   pack : PackIndex,
   offset : Int64,
   db : ObjectDb,
-  fs : &RepoFileSystem,
+  fs : &@git.RepoFileSystem,
   seen : Map[String, Bool],
-) -> PackObject raise GitError {
+) -> @git.PackObject raise @git.GitError {
   let offset_i = offset_to_int(offset)
-  let (type_id, size, next_offset) = decode_type_and_size_at(data, offset_i)
+  let (type_id, size, next_offset) = @git.decode_type_and_size_at(
+    data, offset_i,
+  )
   match type_id {
     1 | 2 | 3 | 4 => {
-      let obj_type = packfile_type_to_object_type(type_id)
+      let obj_type = @git.packfile_type_to_object_type(type_id)
       let (content, _after) = @zlib.zlib_decompress_at(data, next_offset) catch {
-        e => raise GitError::PackfileError("Zlib error: \{e}")
+        e => raise @git.GitError::PackfileError("Zlib error: \{e}")
       }
       if content.length() != size {
-        raise GitError::PackfileError(
+        raise @git.GitError::PackfileError(
           "Object size mismatch: expected=\{size}, got=\{content.length()}",
         )
       }
-      PackObject::new(obj_type, content)
+      @git.PackObject::new(obj_type, content)
     }
     6 => {
-      let (back_offset, after_ref) = read_ofs_delta_offset(data, next_offset)
+      let (back_offset, after_ref) = @git.read_ofs_delta_offset(
+        data, next_offset,
+      )
       let base_offset = offset_i - back_offset
       if base_offset < 0 {
-        raise GitError::PackfileError("Invalid OFS_DELTA base offset")
+        raise @git.GitError::PackfileError("Invalid OFS_DELTA base offset")
       }
       let (delta, _after) = @zlib.zlib_decompress_at(data, after_ref) catch {
-        e => raise GitError::PackfileError("Zlib error: \{e}")
+        e => raise @git.GitError::PackfileError("Zlib error: \{e}")
       }
       if delta.length() != size {
-        raise GitError::PackfileError(
+        raise @git.GitError::PackfileError(
           "Delta size mismatch: expected=\{size}, got=\{delta.length()}",
         )
       }
@@ -345,16 +353,16 @@ fn read_pack_object_at(
         fs,
         seen,
       )
-      let content = apply_delta(base.data, delta)
-      PackObject::new(base.obj_type, content)
+      let content = @git.apply_delta(base.data, delta)
+      @git.PackObject::new(base.obj_type, content)
     }
     7 => {
-      let (base_hex, after_ref) = read_ref_delta_id(data, next_offset)
+      let (base_hex, after_ref) = @git.read_ref_delta_id(data, next_offset)
       let (delta, _after) = @zlib.zlib_decompress_at(data, after_ref) catch {
-        e => raise GitError::PackfileError("Zlib error: \{e}")
+        e => raise @git.GitError::PackfileError("Zlib error: \{e}")
       }
       if delta.length() != size {
-        raise GitError::PackfileError(
+        raise @git.GitError::PackfileError(
           "Delta size mismatch: expected=\{size}, got=\{delta.length()}",
         )
       }
@@ -365,22 +373,26 @@ fn read_pack_object_at(
           match get_by_hex(db, fs, base_hex, seen) {
             Some(obj) => obj
             None =>
-              raise GitError::PackfileError("Missing base object for REF_DELTA")
+              raise @git.GitError::PackfileError(
+                "Missing base object for REF_DELTA",
+              )
           }
       }
-      let content = apply_delta(base.data, delta)
-      PackObject::new(base.obj_type, content)
+      let content = @git.apply_delta(base.data, delta)
+      @git.PackObject::new(base.obj_type, content)
     }
     _ =>
-      raise GitError::PackfileError("Unknown packfile object type: \{type_id}")
+      raise @git.GitError::PackfileError(
+        "Unknown packfile object type: \{type_id}",
+      )
   }
 }
 
 ///|
-fn parse_loose_object(data : Bytes) -> PackObject raise GitError {
+fn parse_loose_object(data : Bytes) -> @git.PackObject raise @git.GitError {
   let len = data.length()
   if len == 0 {
-    raise GitError::InvalidObject("Empty loose object")
+    raise @git.GitError::InvalidObject("Empty loose object")
   }
   let type_buf = StringBuilder::new()
   let mut i = 0
@@ -389,25 +401,25 @@ fn parse_loose_object(data : Bytes) -> PackObject raise GitError {
     i += 1
   }
   if i >= len || data[i] != b' ' {
-    raise GitError::InvalidObject("Invalid loose object header")
+    raise @git.GitError::InvalidObject("Invalid loose object header")
   }
   i += 1
   let mut size = 0
   while i < len && data[i] != b'\x00' {
     let b = data[i]
     if b < b'0' || b > b'9' {
-      raise GitError::InvalidObject("Invalid loose object size")
+      raise @git.GitError::InvalidObject("Invalid loose object size")
     }
     size = size * 10 + (b.to_int() - b'0'.to_int())
     i += 1
   }
   if i >= len || data[i] != b'\x00' {
-    raise GitError::InvalidObject("Invalid loose object header")
+    raise @git.GitError::InvalidObject("Invalid loose object header")
   }
   i += 1
   let content_len = len - i
   if content_len != size {
-    raise GitError::InvalidObject(
+    raise @git.GitError::InvalidObject(
       "Loose object size mismatch: expected=\{size}, got=\{content_len}",
     )
   }
@@ -415,28 +427,28 @@ fn parse_loose_object(data : Bytes) -> PackObject raise GitError {
     FixedArray::makei(content_len, fn(j) { data[i + j] }),
   )
   let obj_type = object_type_from_string(type_buf.to_string())
-  PackObject::new(obj_type, content)
+  @git.PackObject::new(obj_type, content)
 }
 
 ///|
-fn object_type_from_string(s : String) -> ObjectType raise GitError {
+fn object_type_from_string(s : String) -> @git.ObjectType raise @git.GitError {
   if s == "blob" {
-    ObjectType::Blob
+    @git.ObjectType::Blob
   } else if s == "tree" {
-    ObjectType::Tree
+    @git.ObjectType::Tree
   } else if s == "commit" {
-    ObjectType::Commit
+    @git.ObjectType::Commit
   } else if s == "tag" {
-    ObjectType::Tag
+    @git.ObjectType::Tag
   } else {
-    raise GitError::InvalidObject("Unknown object type: \{s}")
+    raise @git.GitError::InvalidObject("Unknown object type: \{s}")
   }
 }
 
 ///|
-fn read_u32_be_at64(data : Bytes, start : Int) -> Int64 raise GitError {
+fn read_u32_be_at64(data : Bytes, start : Int) -> Int64 raise @git.GitError {
   if start + 4 > data.length() {
-    raise GitError::InvalidObject("Unexpected end of index data")
+    raise @git.GitError::InvalidObject("Unexpected end of index data")
   }
   let b0 = data[start].to_int64()
   let b1 = data[start + 1].to_int64()
@@ -446,9 +458,9 @@ fn read_u32_be_at64(data : Bytes, start : Int) -> Int64 raise GitError {
 }
 
 ///|
-fn read_u64_be_at64(data : Bytes, start : Int) -> Int64 raise GitError {
+fn read_u64_be_at64(data : Bytes, start : Int) -> Int64 raise @git.GitError {
   if start + 8 > data.length() {
-    raise GitError::InvalidObject("Unexpected end of index data")
+    raise @git.GitError::InvalidObject("Unexpected end of index data")
   }
   let hi = read_u32_be_at64(data, start)
   let lo = read_u32_be_at64(data, start + 4)
@@ -456,9 +468,9 @@ fn read_u64_be_at64(data : Bytes, start : Int) -> Int64 raise GitError {
 }
 
 ///|
-fn offset_to_int(offset : Int64) -> Int raise GitError {
+fn offset_to_int(offset : Int64) -> Int raise @git.GitError {
   if offset < 0L || offset > 2147483647L {
-    raise GitError::InvalidObject("Pack offset exceeds Int range")
+    raise @git.GitError::InvalidObject("Pack offset exceeds Int range")
   }
   offset.to_int()
 }

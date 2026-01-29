@@ -2,9 +2,7 @@
 package "mizchi/git"
 
 // Values
-pub fn add_paths(&FileSystem, &RepoFileSystem, String, Array[String]) -> Unit raise GitError
-
-pub fn apply_receive_pack(&FileSystem, &RepoFileSystem, String, ReceivePackRequest) -> ReceivePackResult raise GitError
+pub fn apply_delta(Bytes, Bytes) -> Bytes raise GitError
 
 pub fn build_fetch_request_v0(String, Array[ObjectId], Array[String]) -> Bytes
 
@@ -20,8 +18,6 @@ pub fn build_ref_update(ObjectId, ObjectId, String, String) -> String
 
 pub fn build_ref_update_simple(ObjectId, ObjectId, String) -> String
 
-pub fn checkout(&FileSystem, &RepoFileSystem, String, String, detach? : Bool, update_worktree? : Bool, update_index? : Bool) -> ObjectId raise GitError
-
 pub fn checkout_commit(ObjectStore, ObjectId) -> Map[String, Bytes] raise GitError
 
 pub fn checkout_commit_to_fs(ObjectStore, ObjectId, &FileSystem, String) -> Unit raise GitError
@@ -34,23 +30,11 @@ pub async fn clone_remote(String, Bool) -> (Array[(ObjectId, String)], Array[Pac
 
 pub async fn clone_remote_to_fs(String, Bool, &FileSystem, String) -> Array[(ObjectId, String)] raise GitError
 
-pub fn collect_reachable_objects(ObjectDb, &RepoFileSystem, ObjectId) -> Array[PackObject] raise GitError
-
-pub fn collect_reachable_objects_from_commits(ObjectDb, &RepoFileSystem, Array[ObjectId]) -> Array[PackObject] raise GitError
-
-pub fn collect_tree_files(ObjectDb, &RepoFileSystem, ObjectId) -> Map[String, TreeFileEntry] raise GitError
-
-pub fn collect_tree_files_from_commit(ObjectDb, &RepoFileSystem, ObjectId) -> Map[String, TreeFileEntry] raise GitError
-
-pub fn commit(&FileSystem, &RepoFileSystem, String, String, String, Int64) -> ObjectId raise GitError
-
 pub fn create_blob(Bytes) -> (ObjectId, Bytes)
 
 pub fn create_blob_packfile(Bytes) -> Bytes
 
 pub fn create_blob_string(String) -> (ObjectId, Bytes)
-
-pub fn create_branch(&FileSystem, &RepoFileSystem, String, String) -> Unit raise GitError
 
 pub fn create_commit(Commit) -> (ObjectId, Bytes)
 
@@ -62,13 +46,9 @@ pub fn create_packfile(Array[PackObject]) -> Bytes
 
 pub fn create_tree(Array[TreeEntry]) -> (ObjectId, Bytes)
 
+pub fn decode_type_and_size_at(Bytes, Int) -> (Int, Int, Int) raise GitError
+
 pub fn detect_protocol_version(Bytes) -> ProtocolVersion raise GitError
-
-pub fn diff_index(&RepoFileSystem, String) -> Array[DiffFile] raise GitError
-
-pub fn diff_text(Array[DiffFile]) -> Array[String]
-
-pub fn diff_worktree(&RepoFileSystem, String) -> Array[DiffFile] raise GitError
 
 pub async fn discover_upload_refs(String, Bool) -> (Array[(ObjectId, String)], Array[String], ProtocolVersion, Map[String, String]) raise GitError
 
@@ -80,8 +60,6 @@ pub fn extract_pack_from_v0_response(Bytes) -> Bytes raise GitError
 
 pub fn extract_pack_from_v2_response(Bytes) -> Bytes raise GitError
 
-pub fn fast_forward_to(&FileSystem, &RepoFileSystem, String, ObjectId) -> Unit raise GitError
-
 pub async fn fetch_objects(String, Array[ObjectId], Bool) -> Array[PackObject] raise GitError
 
 pub async fn fetch_objects_process(String, Array[ObjectId], Bool) -> Array[PackObject] raise GitError
@@ -89,8 +67,6 @@ pub async fn fetch_objects_process(String, Array[ObjectId], Bool) -> Array[PackO
 pub async fn fetch_pack(String, Array[ObjectId], Bool) -> Bytes raise GitError
 
 pub async fn fetch_pack_process(String, Array[ObjectId], Bool) -> Bytes raise GitError
-
-pub fn gc_repo(&FileSystem, &RepoFileSystem, String) -> GcResult raise GitError
 
 pub fn generate_commit_packfile() -> (ObjectId, Bytes)
 
@@ -104,25 +80,9 @@ pub fn hash_object_content(ObjectType, Bytes) -> ObjectId
 
 pub fn hex_dump(Bytes) -> String
 
-pub fn init_repo(&FileSystem, String, default_branch? : String) -> Unit raise GitError
-
-pub fn is_ignored_path(&RepoFileSystem, String, String, Bool) -> Bool raise GitError
-
-pub fn list_branches(&RepoFileSystem, String) -> (HeadRef, Array[BranchInfo]) raise GitError
-
-pub fn list_branches_text(&RepoFileSystem, String) -> Array[String] raise GitError
-
-pub fn list_working_files(&RepoFileSystem, String) -> Array[String] raise GitError
-
-pub fn load_object_store_from_fs(&RepoFileSystem, String) -> ObjectStore raise GitError
-
-pub fn log_head(&RepoFileSystem, String, max_count? : Int) -> Array[LogEntry] raise GitError
-
-pub fn log_head_oneline(&RepoFileSystem, String, max_count? : Int) -> Array[String] raise GitError
-
 pub fn materialize_clone_to_fs(ObjectStore, ObjectId, String, String, &FileSystem, String) -> Unit raise GitError
 
-pub fn merge(&FileSystem, &RepoFileSystem, String, ObjectId, String, String, Int64) -> MergeResult raise GitError
+pub fn packfile_type_to_object_type(Int) -> ObjectType raise GitError
 
 pub fn parse_commit(Bytes) -> CommitInfo raise GitError
 
@@ -135,8 +95,6 @@ pub fn parse_packfile_stream(Bytes, (PackObject) -> Unit) -> Unit raise GitError
 pub fn parse_packfile_stream_with_bases(Bytes, Array[PackObject], (PackObject) -> Unit) -> Unit raise GitError
 
 pub fn parse_packfile_with_bases(Bytes, Array[PackObject]) -> Array[PackObject] raise GitError
-
-pub fn parse_receive_pack_request(Bytes) -> ReceivePackRequest raise GitError
 
 pub fn parse_refs(Bytes) -> Array[(ObjectId, String)] raise GitError
 
@@ -158,25 +116,9 @@ pub fn pktline_encode_bytes(Bytes) -> Bytes
 
 pub fn pktline_flush() -> Bytes
 
-pub fn prune_repo(&FileSystem, &RepoFileSystem, String) -> PruneResult raise GitError
+pub fn read_ofs_delta_offset(Bytes, Int) -> (Int, Int) raise GitError
 
-pub fn read_head_ref(&RepoFileSystem, String) -> HeadRef raise GitError
-
-pub fn read_index_entries(&RepoFileSystem, String) -> Array[IndexEntry] raise GitError
-
-pub fn rebase_onto(&FileSystem, &RepoFileSystem, String, ObjectId) -> ObjectId raise GitError
-
-pub fn receive_pack(&FileSystem, &RepoFileSystem, String, Bytes) -> Bytes raise GitError
-
-pub fn repack_repo(&FileSystem, &RepoFileSystem, String) -> RepackResult? raise GitError
-
-pub fn reset(&FileSystem, &RepoFileSystem, String, String, ResetMode) -> ObjectId raise GitError
-
-pub fn resolve_head_commit(&RepoFileSystem, String) -> ObjectId? raise GitError
-
-pub fn resolve_ref(&RepoFileSystem, String, String) -> ObjectId? raise GitError
-
-pub fn rev_parse(&RepoFileSystem, String, String) -> ObjectId? raise GitError
+pub fn read_ref_delta_id(Bytes, Int) -> (String, Int) raise GitError
 
 pub fn select_default_ref(Array[(ObjectId, String)], Map[String, String]) -> (String, ObjectId)?
 
@@ -190,24 +132,6 @@ pub fn sha1_array_prefix(Array[Byte], Int) -> ObjectId
 
 pub fn sha1_prefix(Bytes, Int) -> ObjectId
 
-pub fn show_ref(&RepoFileSystem, String) -> Array[(String, ObjectId)] raise GitError
-
-pub fn show_ref_text(&RepoFileSystem, String) -> Array[String] raise GitError
-
-pub fn status(&RepoFileSystem, String) -> Status raise GitError
-
-pub fn status_porcelain(&RepoFileSystem, String) -> Array[String] raise GitError
-
-pub fn status_porcelain_from(Status) -> Array[String]
-
-pub fn status_text(&RepoFileSystem, String) -> String raise GitError
-
-pub fn switch_branch(&FileSystem, &RepoFileSystem, String, String, create? : Bool, checkout? : Bool) -> Unit raise GitError
-
-pub fn tree_files_to_index(ObjectDb, &RepoFileSystem, Map[String, TreeFileEntry]) -> Array[IndexEntry] raise GitError
-
-pub fn update_head_ref(&FileSystem, &RepoFileSystem, String, ObjectId) -> Unit raise GitError
-
 pub async fn upload_pack_info_refs(String, Bool) -> Bytes raise GitError
 
 pub async fn upload_pack_info_refs_process(String, Bool) -> Bytes raise GitError
@@ -218,21 +142,11 @@ pub async fn upload_pack_request_process(String, Bytes, Bool) -> Bytes raise Git
 
 pub fn write_git_metadata(ObjectStore, ObjectId, String, String, &FileSystem, String) -> Unit raise GitError
 
-pub fn write_index_entries(&FileSystem, String, Array[IndexEntry]) -> Unit raise GitError
-
-pub fn write_loose_object(&FileSystem, String, ObjectType, Bytes) -> ObjectId raise GitError
-
-pub fn write_object_bytes(&FileSystem, String, ObjectId, Bytes) -> Unit raise GitError
-
 pub fn write_pack_index(&FileSystem, String, Bytes) -> Unit raise GitError
 
 pub fn write_pack_index_from_objects(&FileSystem, String, Bytes, Array[PackObject]) -> Unit raise GitError
 
 pub fn write_packfile_with_index(&FileSystem, String, Bytes, Array[PackObject]) -> Unit raise GitError
-
-pub fn write_tree_from_index(&FileSystem, String, Array[IndexEntry]) -> ObjectId raise GitError
-
-pub fn write_worktree_from_files(ObjectDb, &FileSystem, &RepoFileSystem, String, String, Map[String, TreeFileEntry], remove_missing? : Bool) -> Unit raise GitError
 
 // Errors
 pub(all) suberror GitError {
@@ -246,12 +160,6 @@ pub impl Eq for GitError
 pub impl Show for GitError
 
 // Types and methods
-pub struct BranchInfo {
-  name : String
-  id : ObjectId
-  current : Bool
-}
-
 pub struct Commit {
   tree : ObjectId
   parents : Array[ObjectId]
@@ -270,67 +178,10 @@ pub struct CommitInfo {
   parents : Array[ObjectId]
 }
 
-pub struct DiffFile {
-  path : String
-  kind : DiffKind
-  old_content : Bytes?
-  new_content : Bytes?
-}
-
-pub enum DiffKind {
-  Added
-  Modified
-  Deleted
-}
-
-pub struct GcResult {
-  pack : RepackResult?
-  dangling : Array[ObjectId]
-}
-
-pub enum HeadRef {
-  Branch(String)
-  Detached(ObjectId)
-}
-
-pub struct IndexEntry {
-  path : String
-  id : ObjectId
-  mode : Int
-  size : Int
-}
-
-pub struct LogEntry {
-  id : ObjectId
-  message : String
-  author : String
-  timestamp : Int64
-}
-
 pub struct LsRefsResult {
   refs : Array[(ObjectId, String)]
   symrefs : Map[String, String]
 }
-
-pub struct MergeResult {
-  status : MergeStatus
-  commit_id : ObjectId?
-  conflicts : Array[String]
-}
-
-pub enum MergeStatus {
-  AlreadyUpToDate
-  FastForward
-  Merged
-  Conflicted
-}
-
-pub struct ObjectDb {
-  loose : Map[String, PackObject]
-  packs : Array[PackIndex]
-}
-pub fn ObjectDb::get(Self, &RepoFileSystem, ObjectId) -> PackObject? raise GitError
-pub fn ObjectDb::load(&RepoFileSystem, String) -> Self raise GitError
 
 pub struct ObjectId {
   bytes : FixedArray[Byte]
@@ -362,14 +213,6 @@ pub fn ObjectType::to_string(Self) -> String
 pub impl Eq for ObjectType
 pub impl Show for ObjectType
 
-pub struct PackIndex {
-  pack_path : String
-  ids : Array[String]
-  offsets : Array[Int64]
-}
-pub fn PackIndex::find_offset(Self, ObjectId) -> Int64?
-pub fn PackIndex::find_offset_hex(Self, String) -> Int64?
-
 pub struct PackObject {
   obj_type : ObjectType
   data : Bytes
@@ -381,27 +224,6 @@ pub(all) enum ProtocolVersion {
   V2
 }
 pub impl Eq for ProtocolVersion
-
-pub struct PruneResult {
-  pruned : Array[ObjectId]
-}
-
-pub struct ReceivePackRequest {
-  updates : Array[RefUpdate]
-  capabilities : Array[String]
-  pack : Bytes
-}
-
-pub struct ReceivePackResult {
-  updated : Array[String]
-  rejected : Array[(String, String)]
-}
-
-pub struct RefUpdate {
-  old_id : ObjectId
-  new_id : ObjectId
-  refname : String
-}
 
 pub(all) enum RemoteKind {
   Http
@@ -416,27 +238,6 @@ pub struct RemoteSpec {
   host : String?
   path : String
   base_url : String?
-}
-
-pub struct RepackResult {
-  pack_id : ObjectId
-  object_count : Int
-  pack_bytes : Int
-}
-
-pub(all) enum ResetMode {
-  Soft
-  Mixed
-  Hard
-}
-
-pub struct Status {
-  staged_added : Array[String]
-  staged_modified : Array[String]
-  staged_deleted : Array[String]
-  unstaged_modified : Array[String]
-  unstaged_deleted : Array[String]
-  untracked : Array[String]
 }
 
 pub struct TestFs {
@@ -463,11 +264,6 @@ pub struct TreeEntry {
   id : ObjectId
 }
 pub fn TreeEntry::new(String, String, ObjectId) -> Self
-
-pub struct TreeFileEntry {
-  id : ObjectId
-  mode : Int
-}
 
 // Type aliases
 

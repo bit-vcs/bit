@@ -2,11 +2,11 @@
 
 ///|
 pub fn fast_forward_to(
-  fs : &FileSystem,
-  rfs : &RepoFileSystem,
+  fs : &@git.FileSystem,
+  rfs : &@git.RepoFileSystem,
   root : String,
-  target : ObjectId,
-) -> Unit raise GitError {
+  target : @git.ObjectId,
+) -> Unit raise @git.GitError {
   let git_dir = join_path(root, ".git")
   let db = ObjectDb::load(rfs, git_dir)
   let tree_map = rebase_tree_map(db, rfs, target)
@@ -19,11 +19,11 @@ pub fn fast_forward_to(
 ///|
 /// Rebase current HEAD onto upstream commit (linear, no conflicts).
 pub fn rebase_onto(
-  fs : &FileSystem,
-  rfs : &RepoFileSystem,
+  fs : &@git.FileSystem,
+  rfs : &@git.RepoFileSystem,
   root : String,
-  upstream : ObjectId,
-) -> ObjectId raise GitError {
+  upstream : @git.ObjectId,
+) -> @git.ObjectId raise @git.GitError {
   let git_dir = join_path(root, ".git")
   let head = resolve_head_commit(rfs, git_dir)
   match head {
@@ -44,14 +44,14 @@ pub fn rebase_onto(
         let parent_id = if info.parents.length() > 0 {
           info.parents[0]
         } else {
-          raise GitError::InvalidObject("Cannot rebase root commit")
+          raise @git.GitError::InvalidObject("Cannot rebase root commit")
         }
         let parent_map = rebase_tree_map(db, rfs, parent_id)
         let commit_map = rebase_tree_map(db, rfs, info.tree)
         let changes = rebase_diff_maps(parent_map, commit_map)
         rebase_apply_changes(base_map, parent_map, changes)
         let new_tree = rebase_write_tree_from_map(fs, git_dir, base_map)
-        let new_commit = Commit::new(
+        let new_commit = @git.Commit::new(
           new_tree,
           [parent],
           info.author,
@@ -62,7 +62,7 @@ pub fn rebase_onto(
           info.committer_tz,
           info.message,
         )
-        let (new_id, compressed) = create_commit(new_commit)
+        let (new_id, compressed) = @git.create_commit(new_commit)
         rebase_write_object(fs, git_dir, new_id, compressed)
         parent = new_id
       }
@@ -77,8 +77,8 @@ pub fn rebase_onto(
 
 ///|
 priv struct RebaseCommitInfo {
-  tree : ObjectId
-  parents : Array[ObjectId]
+  tree : @git.ObjectId
+  parents : Array[@git.ObjectId]
   author : String
   author_time : Int64
   author_tz : String
@@ -90,7 +90,7 @@ priv struct RebaseCommitInfo {
 
 ///|
 priv struct TreeEntryInfo {
-  id : ObjectId
+  id : @git.ObjectId
   mode : Int
 }
 
@@ -111,11 +111,11 @@ priv enum ChangeKind {
 ///|
 fn rebase_collect_chain(
   db : ObjectDb,
-  fs : &RepoFileSystem,
-  head : ObjectId,
-  upstream : ObjectId,
-) -> Array[ObjectId] raise GitError {
-  let list : Array[ObjectId] = []
+  fs : &@git.RepoFileSystem,
+  head : @git.ObjectId,
+  upstream : @git.ObjectId,
+) -> Array[@git.ObjectId] raise @git.GitError {
+  let list : Array[@git.ObjectId] = []
   let mut current = head
   while true {
     if current == upstream {
@@ -124,14 +124,14 @@ fn rebase_collect_chain(
     list.push(current)
     let obj = db.get(fs, current)
     match obj {
-      None => raise GitError::InvalidObject("Missing commit object")
+      None => raise @git.GitError::InvalidObject("Missing commit object")
       Some(o) => {
-        if o.obj_type != ObjectType::Commit {
-          raise GitError::InvalidObject("Object is not a commit")
+        if o.obj_type != @git.ObjectType::Commit {
+          raise @git.GitError::InvalidObject("Object is not a commit")
         }
-        let info = parse_commit(o.data)
+        let info = @git.parse_commit(o.data)
         if info.parents.length() == 0 {
-          raise GitError::InvalidObject("Upstream not found in history")
+          raise @git.GitError::InvalidObject("Upstream not found in history")
         }
         current = info.parents[0]
       }
@@ -143,18 +143,18 @@ fn rebase_collect_chain(
 ///|
 fn rebase_tree_map(
   db : ObjectDb,
-  fs : &RepoFileSystem,
-  commit_id : ObjectId,
-) -> Map[String, TreeEntryInfo] raise GitError {
+  fs : &@git.RepoFileSystem,
+  commit_id : @git.ObjectId,
+) -> Map[String, TreeEntryInfo] raise @git.GitError {
   let result : Map[String, TreeEntryInfo] = {}
   let commit_obj = db.get(fs, commit_id)
   match commit_obj {
-    None => raise GitError::InvalidObject("Missing commit object")
+    None => raise @git.GitError::InvalidObject("Missing commit object")
     Some(obj) => {
-      if obj.obj_type != ObjectType::Commit {
-        raise GitError::InvalidObject("Object is not a commit")
+      if obj.obj_type != @git.ObjectType::Commit {
+        raise @git.GitError::InvalidObject("Object is not a commit")
       }
-      let info = parse_commit(obj.data)
+      let info = @git.parse_commit(obj.data)
       rebase_collect_tree(db, fs, info.tree, "", result)
     }
   }
@@ -164,19 +164,19 @@ fn rebase_tree_map(
 ///|
 fn rebase_collect_tree(
   db : ObjectDb,
-  fs : &RepoFileSystem,
-  tree_id : ObjectId,
+  fs : &@git.RepoFileSystem,
+  tree_id : @git.ObjectId,
   prefix : String,
   out : Map[String, TreeEntryInfo],
-) -> Unit raise GitError {
+) -> Unit raise @git.GitError {
   let tree_obj = db.get(fs, tree_id)
   match tree_obj {
-    None => raise GitError::InvalidObject("Missing tree object")
+    None => raise @git.GitError::InvalidObject("Missing tree object")
     Some(obj) => {
-      if obj.obj_type != ObjectType::Tree {
-        raise GitError::InvalidObject("Object is not a tree")
+      if obj.obj_type != @git.ObjectType::Tree {
+        raise @git.GitError::InvalidObject("Object is not a tree")
       }
-      let entries = parse_tree(obj.data)
+      let entries = @git.parse_tree(obj.data)
       for entry in entries {
         let path = if prefix.length() == 0 {
           entry.name
@@ -236,13 +236,13 @@ fn rebase_apply_changes(
   base : Map[String, TreeEntryInfo],
   parent_map : Map[String, TreeEntryInfo],
   changes : Array[Change],
-) -> Unit raise GitError {
+) -> Unit raise @git.GitError {
   for ch in changes {
     let path = ch.path
     match ch.kind {
       ChangeKind::Added => {
         if base.contains(path) {
-          raise GitError::InvalidObject("Rebase conflict: \{path}")
+          raise @git.GitError::InvalidObject("Rebase conflict: \{path}")
         }
         base[path] = ch.entry.unwrap()
       }
@@ -250,24 +250,24 @@ fn rebase_apply_changes(
         match (base.get(path), parent_map.get(path)) {
           (Some(b), Some(p)) => {
             if b.id != p.id || b.mode != p.mode {
-              raise GitError::InvalidObject("Rebase conflict: \{path}")
+              raise @git.GitError::InvalidObject("Rebase conflict: \{path}")
             }
             base.remove(path)
           }
           (None, None) => ()
-          _ => raise GitError::InvalidObject("Rebase conflict: \{path}")
+          _ => raise @git.GitError::InvalidObject("Rebase conflict: \{path}")
         }
       ChangeKind::Modified => {
         let entry = ch.entry.unwrap()
         match (base.get(path), parent_map.get(path)) {
           (Some(b), Some(p)) => {
             if b.id != p.id || b.mode != p.mode {
-              raise GitError::InvalidObject("Rebase conflict: \{path}")
+              raise @git.GitError::InvalidObject("Rebase conflict: \{path}")
             }
             base[path] = entry
           }
           (None, None) => base[path] = entry
-          _ => raise GitError::InvalidObject("Rebase conflict: \{path}")
+          _ => raise @git.GitError::InvalidObject("Rebase conflict: \{path}")
         }
       }
     }
@@ -276,10 +276,10 @@ fn rebase_apply_changes(
 
 ///|
 fn rebase_write_tree_from_map(
-  fs : &FileSystem,
+  fs : &@git.FileSystem,
   git_dir : String,
   map : Map[String, TreeEntryInfo],
-) -> ObjectId raise GitError {
+) -> @git.ObjectId raise @git.GitError {
   let entries : Array[IndexEntry] = []
   for item in map.to_array() {
     let (path, e) = item
@@ -291,17 +291,17 @@ fn rebase_write_tree_from_map(
 
 ///|
 fn rebase_write_tree_recursive(
-  fs : &FileSystem,
+  fs : &@git.FileSystem,
   git_dir : String,
   entries : Array[IndexEntry],
-) -> ObjectId raise GitError {
-  let file_entries : Array[TreeEntry] = []
+) -> @git.ObjectId raise @git.GitError {
+  let file_entries : Array[@git.TreeEntry] = []
   let dir_map : Map[String, Array[IndexEntry]] = {}
   for e in entries {
     match rebase_split_first(e.path) {
       (name, None) => {
         let mode = rebase_mode_to_string(e.mode)
-        file_entries.push(TreeEntry::new(mode, name, e.id))
+        file_entries.push(@git.TreeEntry::new(mode, name, e.id))
       }
       (name, Some(rest)) =>
         match dir_map.get(name) {
@@ -317,36 +317,36 @@ fn rebase_write_tree_recursive(
   for item in dir_map.to_array() {
     let (dir_name, list) = item
     let sub_id = rebase_write_tree_recursive(fs, git_dir, list)
-    file_entries.push(TreeEntry::new("040000", dir_name, sub_id))
+    file_entries.push(@git.TreeEntry::new("040000", dir_name, sub_id))
   }
   file_entries.sort_by(fn(a, b) { String::compare(a.name, b.name) })
-  let (tree_id, compressed) = create_tree(file_entries)
+  let (tree_id, compressed) = @git.create_tree(file_entries)
   rebase_write_object(fs, git_dir, tree_id, compressed)
   tree_id
 }
 
 ///|
 fn rebase_write_worktree(
-  fs : &FileSystem,
+  fs : &@git.FileSystem,
   db : ObjectDb,
-  rfs : &RepoFileSystem,
+  rfs : &@git.RepoFileSystem,
   root : String,
   map : Map[String, TreeEntryInfo],
-) -> Unit raise GitError {
+) -> Unit raise @git.GitError {
   for item in map.to_array() {
     let (path, info) = item
     let obj = db.get(rfs, info.id)
     match obj {
       Some(o) => {
-        if o.obj_type != ObjectType::Blob {
-          raise GitError::InvalidObject("Object is not a blob")
+        if o.obj_type != @git.ObjectType::Blob {
+          raise @git.GitError::InvalidObject("Object is not a blob")
         }
         let full = join_path(root, path)
         let dir = rebase_parent_dir(full)
         fs.mkdir_p(dir)
         fs.write_file(full, o.data)
       }
-      None => raise GitError::InvalidObject("Missing blob object")
+      None => raise @git.GitError::InvalidObject("Missing blob object")
     }
   }
 }
@@ -354,21 +354,21 @@ fn rebase_write_worktree(
 ///|
 fn rebase_map_to_index(
   db : ObjectDb,
-  fs : &RepoFileSystem,
+  fs : &@git.RepoFileSystem,
   map : Map[String, TreeEntryInfo],
-) -> Array[IndexEntry] raise GitError {
+) -> Array[IndexEntry] raise @git.GitError {
   let entries : Array[IndexEntry] = []
   for item in map.to_array() {
     let (path, e) = item
     let obj = db.get(fs, e.id)
     match obj {
       Some(o) => {
-        if o.obj_type != ObjectType::Blob {
-          raise GitError::InvalidObject("Object is not a blob")
+        if o.obj_type != @git.ObjectType::Blob {
+          raise @git.GitError::InvalidObject("Object is not a blob")
         }
         entries.push({ path, id: e.id, mode: e.mode, size: o.data.length() })
       }
-      None => raise GitError::InvalidObject("Missing blob object")
+      None => raise @git.GitError::InvalidObject("Missing blob object")
     }
   }
   entries.sort_by(fn(a, b) { String::compare(a.path, b.path) })
@@ -377,11 +377,11 @@ fn rebase_map_to_index(
 
 ///|
 fn rebase_update_head(
-  fs : &FileSystem,
-  rfs : &RepoFileSystem,
+  fs : &@git.FileSystem,
+  rfs : &@git.RepoFileSystem,
   git_dir : String,
-  commit_id : ObjectId,
-) -> Unit raise GitError {
+  commit_id : @git.ObjectId,
+) -> Unit raise @git.GitError {
   let head_path = join_path(git_dir, "HEAD")
   let head = read_head_ref(rfs, git_dir) catch {
     _ => HeadRef::Detached(commit_id)
@@ -400,15 +400,15 @@ fn rebase_update_head(
 ///|
 fn rebase_parse_commit_full(
   db : ObjectDb,
-  fs : &RepoFileSystem,
-  commit_id : ObjectId,
-) -> RebaseCommitInfo raise GitError {
+  fs : &@git.RepoFileSystem,
+  commit_id : @git.ObjectId,
+) -> RebaseCommitInfo raise @git.GitError {
   let obj = db.get(fs, commit_id)
   match obj {
-    None => raise GitError::InvalidObject("Missing commit object")
+    None => raise @git.GitError::InvalidObject("Missing commit object")
     Some(o) => {
-      if o.obj_type != ObjectType::Commit {
-        raise GitError::InvalidObject("Object is not a commit")
+      if o.obj_type != @git.ObjectType::Commit {
+        raise @git.GitError::InvalidObject("Object is not a commit")
       }
       rebase_parse_commit_content(o.data)
     }
@@ -416,7 +416,9 @@ fn rebase_parse_commit_full(
 }
 
 ///|
-fn rebase_parse_commit_content(data : Bytes) -> RebaseCommitInfo raise GitError {
+fn rebase_parse_commit_content(
+  data : Bytes,
+) -> RebaseCommitInfo raise @git.GitError {
   let text = @utf8.decode_lossy(data[:])
   let mut header = text
   let mut message = ""
@@ -427,8 +429,8 @@ fn rebase_parse_commit_content(data : Bytes) -> RebaseCommitInfo raise GitError 
       message = String::unsafe_substring(text, start=idx + 2, end=text.length())
     }
   }
-  let mut tree_id : ObjectId? = None
-  let parents : Array[ObjectId] = []
+  let mut tree_id : @git.ObjectId? = None
+  let parents : Array[@git.ObjectId] = []
   let mut author = ""
   let mut author_time = 0L
   let mut author_tz = "+0000"
@@ -439,10 +441,10 @@ fn rebase_parse_commit_content(data : Bytes) -> RebaseCommitInfo raise GitError 
     let line = line_view.to_string()
     if line.has_prefix("tree ") {
       let hex = String::unsafe_substring(line, start=5, end=line.length())
-      tree_id = Some(ObjectId::from_hex(hex))
+      tree_id = Some(@git.ObjectId::from_hex(hex))
     } else if line.has_prefix("parent ") {
       let hex = String::unsafe_substring(line, start=7, end=line.length())
-      parents.push(ObjectId::from_hex(hex))
+      parents.push(@git.ObjectId::from_hex(hex))
     } else if line.has_prefix("author ") {
       let rest = String::unsafe_substring(line, start=7, end=line.length())
       let (name, time, tz) = rebase_parse_sig_line(rest)
@@ -458,7 +460,7 @@ fn rebase_parse_commit_content(data : Bytes) -> RebaseCommitInfo raise GitError 
     }
   }
   match tree_id {
-    None => raise GitError::InvalidObject("Missing tree in commit")
+    None => raise @git.GitError::InvalidObject("Missing tree in commit")
     Some(tree) =>
       {
         tree,
@@ -513,11 +515,11 @@ fn rebase_parse_int64(s : String) -> Int64 {
 
 ///|
 fn rebase_write_object(
-  fs : &FileSystem,
+  fs : &@git.FileSystem,
   git_dir : String,
-  id : ObjectId,
+  id : @git.ObjectId,
   compressed : Bytes,
-) -> Unit raise GitError {
+) -> Unit raise @git.GitError {
   let hex = id.to_hex()
   let dir = join_path(
     git_dir,

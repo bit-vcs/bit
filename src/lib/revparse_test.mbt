@@ -1,8 +1,8 @@
 ///| Tests for rev-parse/show-ref/log/diff/status porcelain
 
 ///|
-fn setup_rev_repo() -> TestFs {
-  let fs = TestFs::new()
+fn setup_rev_repo() -> @git.TestFs {
+  let fs = @git.TestFs::new()
   fs.mkdir_p("/repo/.git/refs/heads")
   fs.write_string("/repo/.git/HEAD", "ref: refs/heads/main\n")
   fs

@@ -3,22 +3,22 @@
 ///|
 pub enum HeadRef {
   Branch(String)
-  Detached(ObjectId)
+  Detached(@git.ObjectId)
 }
 
 ///|
 pub struct BranchInfo {
   name : String
-  id : ObjectId
+  id : @git.ObjectId
   current : Bool
 }
 
 ///|
 /// Read HEAD and return its reference.
 pub fn read_head_ref(
-  fs : &RepoFileSystem,
+  fs : &@git.RepoFileSystem,
   git_dir : String,
-) -> HeadRef raise GitError {
+) -> HeadRef raise @git.GitError {
   let head_path = join_path(git_dir, "HEAD")
   let line = read_ref_line(fs, head_path)
   if line.has_prefix("ref: ") {
@@ -30,7 +30,7 @@ pub fn read_head_ref(
     }
     HeadRef::Branch(name)
   } else {
-    let id = ObjectId::from_hex(line)
+    let id = @git.ObjectId::from_hex(line)
     HeadRef::Detached(id)
   }
 }
@@ -38,11 +38,11 @@ pub fn read_head_ref(
 ///|
 /// List local branches with current flag.
 pub fn list_branches(
-  fs : &RepoFileSystem,
+  fs : &@git.RepoFileSystem,
   git_dir : String,
-) -> (HeadRef, Array[BranchInfo]) raise GitError {
+) -> (HeadRef, Array[BranchInfo]) raise @git.GitError {
   let head = read_head_ref(fs, git_dir)
-  let map : Map[String, ObjectId] = {}
+  let map : Map[String, @git.ObjectId] = {}
   let heads_dir = join_path(git_dir, "refs/heads")
   if fs.is_dir(heads_dir) {
     collect_loose_heads(fs, heads_dir, "", map)
@@ -67,9 +67,9 @@ pub fn list_branches(
 ///|
 /// Format like `git branch` output.
 pub fn list_branches_text(
-  fs : &RepoFileSystem,
+  fs : &@git.RepoFileSystem,
   git_dir : String,
-) -> Array[String] raise GitError {
+) -> Array[String] raise @git.GitError {
   let (head, branches) = list_branches(fs, git_dir)
   let lines : Array[String] = []
   match head {
@@ -89,11 +89,11 @@ pub fn list_branches_text(
 ///|
 /// Create a local branch pointing at current HEAD.
 pub fn create_branch(
-  fs : &FileSystem,
-  rfs : &RepoFileSystem,
+  fs : &@git.FileSystem,
+  rfs : &@git.RepoFileSystem,
   root : String,
   name : String,
-) -> Unit raise GitError {
+) -> Unit raise @git.GitError {
   let git_dir = join_path(root, ".git")
   let refname = branch_ref_name(name)
   let ref_path = join_path(git_dir, refname)
@@ -109,13 +109,13 @@ pub fn create_branch(
 ///|
 /// Switch HEAD to a branch, optionally creating it and checking out files.
 pub fn switch_branch(
-  fs : &FileSystem,
-  rfs : &RepoFileSystem,
+  fs : &@git.FileSystem,
+  rfs : &@git.RepoFileSystem,
   root : String,
   name : String,
   create? : Bool = false,
   checkout? : Bool = true,
-) -> Unit raise GitError {
+) -> Unit raise @git.GitError {
   let git_dir = join_path(root, ".git")
   let refname = branch_ref_name(name)
   let ref_path = join_path(git_dir, refname)
@@ -123,7 +123,7 @@ pub fn switch_branch(
     create_branch(fs, rfs, root, name)
   } else if not(rfs.is_file(ref_path)) {
     match resolve_ref(rfs, git_dir, refname) {
-      None => raise GitError::InvalidObject("Invalid ref: \{name}")
+      None => raise @git.GitError::InvalidObject("Invalid ref: \{name}")
       Some(_) => ()
     }
   }
@@ -134,7 +134,7 @@ pub fn switch_branch(
       None => ()
       Some(id) => {
         let store = load_object_store_from_fs(rfs, git_dir)
-        checkout_commit_to_fs(store, id, fs, root)
+        @git.checkout_commit_to_fs(store, id, fs, root)
       }
     }
   }
@@ -143,14 +143,14 @@ pub fn switch_branch(
 ///|
 /// Resolve a ref to an object id.
 pub fn resolve_ref(
-  fs : &RepoFileSystem,
+  fs : &@git.RepoFileSystem,
   git_dir : String,
   refname : String,
-) -> ObjectId? raise GitError {
+) -> @git.ObjectId? raise @git.GitError {
   let path = join_path(git_dir, refname)
   if fs.is_file(path) {
     let line = read_ref_line(fs, path)
-    return Some(ObjectId::from_hex(line))
+    return Some(@git.ObjectId::from_hex(line))
   }
   let packed = join_path(git_dir, "packed-refs")
   if fs.is_file(packed) {
@@ -161,11 +161,11 @@ pub fn resolve_ref(
 
 ///|
 fn collect_loose_heads(
-  fs : &RepoFileSystem,
+  fs : &@git.RepoFileSystem,
   dir : String,
   prefix : String,
-  out : Map[String, ObjectId],
-) -> Unit raise GitError {
+  out : Map[String, @git.ObjectId],
+) -> Unit raise @git.GitError {
   let entries = fs.readdir(dir)
   for name in entries {
     let path = join_path(dir, name)
@@ -174,7 +174,7 @@ fn collect_loose_heads(
       collect_loose_heads(fs, path, rel, out)
     } else if fs.is_file(path) {
       let line = read_ref_line(fs, path)
-      let id = ObjectId::from_hex(line)
+      let id = @git.ObjectId::from_hex(line)
       out[rel] = id
     }
   }
@@ -182,10 +182,10 @@ fn collect_loose_heads(
 
 ///|
 fn collect_packed_heads(
-  fs : &RepoFileSystem,
+  fs : &@git.RepoFileSystem,
   packed_path : String,
-  out : Map[String, ObjectId],
-) -> Unit raise GitError {
+  out : Map[String, @git.ObjectId],
+) -> Unit raise @git.GitError {
   let text = @utf8.decode_lossy(fs.read_file(packed_path)[:])
   for line_view in text.split("\n") {
     let line = trim_line(line_view.to_string())
@@ -217,7 +217,7 @@ fn collect_packed_heads(
           end=refname.length(),
         )
         if not(out.contains(name)) {
-          out[name] = ObjectId::from_hex(id_hex)
+          out[name] = @git.ObjectId::from_hex(id_hex)
         }
       }
     }
@@ -235,10 +235,10 @@ fn branch_ref_name(name : String) -> String {
 
 ///|
 fn resolve_packed_ref(
-  fs : &RepoFileSystem,
+  fs : &@git.RepoFileSystem,
   packed_path : String,
   refname : String,
-) -> ObjectId? raise GitError {
+) -> @git.ObjectId? raise @git.GitError {
   let text = @utf8.decode_lossy(fs.read_file(packed_path)[:])
   for line_view in text.split("\n") {
     let line = trim_line(line_view.to_string())
@@ -262,7 +262,7 @@ fn resolve_packed_ref(
           end=line.length(),
         )
         if name == refname {
-          return Some(ObjectId::from_hex(id_hex))
+          return Some(@git.ObjectId::from_hex(id_hex))
         }
       }
     }
@@ -271,7 +271,10 @@ fn resolve_packed_ref(
 }
 
 ///|
-fn read_ref_line(fs : &RepoFileSystem, path : String) -> String raise GitError {
+fn read_ref_line(
+  fs : &@git.RepoFileSystem,
+  path : String,
+) -> String raise @git.GitError {
   let text = @utf8.decode_lossy(fs.read_file(path)[:])
   for line_view in text.split("\n") {
     let line = trim_line(line_view.to_string())
@@ -279,7 +282,7 @@ fn read_ref_line(fs : &RepoFileSystem, path : String) -> String raise GitError {
       return line
     }
   }
-  raise GitError::InvalidObject("Empty ref: \{path}")
+  raise @git.GitError::InvalidObject("Empty ref: \{path}")
 }
 
 ///|

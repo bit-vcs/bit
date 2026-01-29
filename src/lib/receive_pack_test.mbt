@@ -2,17 +2,17 @@
 
 ///|
 fn build_receive_request(
-  old_id : ObjectId,
-  new_id : ObjectId,
+  old_id : @git.ObjectId,
+  new_id : @git.ObjectId,
   refname : String,
   pack : Bytes,
 ) -> Bytes {
   let out : Array[Byte] = []
-  let cmd = build_ref_update(old_id, new_id, refname, "report-status")
-  for b in pktline_encode(cmd) {
+  let cmd = @git.build_ref_update(old_id, new_id, refname, "report-status")
+  for b in @git.pktline_encode(cmd) {
     out.push(b)
   }
-  for b in pktline_flush() {
+  for b in @git.pktline_flush() {
     out.push(b)
   }
   for b in pack {
@@ -23,7 +23,7 @@ fn build_receive_request(
 
 ///|
 test "receive-pack: push to empty repo" {
-  let fs = TestFs::new()
+  let fs = @git.TestFs::new()
   ignore(try? init_repo(fs, "/src"))
   ignore(try? init_repo(fs, "/dst"))
   fs.write_string("/src/a.txt", "hello\n")
@@ -33,9 +33,9 @@ test "receive-pack: push to empty repo" {
   )
   let db = ObjectDb::load(fs, "/src/.git")
   let objects = collect_reachable_objects(db, fs, commit_id)
-  let pack = create_packfile(objects)
+  let pack = @git.create_packfile(objects)
   let req = build_receive_request(
-    ObjectId::zero(),
+    @git.ObjectId::zero(),
     commit_id,
     "refs/heads/main",
     pack,

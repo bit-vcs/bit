@@ -2,17 +2,17 @@
 
 ///|
 pub fn checkout(
-  fs : &FileSystem,
-  rfs : &RepoFileSystem,
+  fs : &@git.FileSystem,
+  rfs : &@git.RepoFileSystem,
   root : String,
   spec : String,
   detach? : Bool = false,
   update_worktree? : Bool = true,
   update_index? : Bool = true,
-) -> ObjectId raise GitError {
+) -> @git.ObjectId raise @git.GitError {
   let git_dir = join_path(root, ".git")
   let head_path = join_path(git_dir, "HEAD")
-  let mut target : ObjectId? = None
+  let mut target : @git.ObjectId? = None
   let mut refname : String? = None
   if not(detach) {
     let name = if spec.has_prefix("refs/") {
@@ -32,14 +32,14 @@ pub fn checkout(
     None => {
       let resolved = rev_parse(rfs, git_dir, spec)
       match resolved {
-        None => raise GitError::InvalidObject("Invalid ref: \{spec}")
+        None => raise @git.GitError::InvalidObject("Invalid ref: \{spec}")
         Some(id) => target = Some(id)
       }
     }
     Some(_) => ()
   }
   let commit_id = match target {
-    None => raise GitError::InvalidObject("Invalid ref: \{spec}")
+    None => raise @git.GitError::InvalidObject("Invalid ref: \{spec}")
     Some(id) => id
   }
   match refname {

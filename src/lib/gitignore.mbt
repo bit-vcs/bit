@@ -52,11 +52,11 @@ fn IgnoreMatcher::is_ignored(
 /// Check if a relative path is ignored by .gitignore files under root.
 /// This mimics `git ls-files --others --exclude-standard` behavior for ignores.
 pub fn is_ignored_path(
-  fs : &RepoFileSystem,
+  fs : &@git.RepoFileSystem,
   root : String,
   rel_path : String,
   is_dir : Bool,
-) -> Bool raise GitError {
+) -> Bool raise @git.GitError {
   let matcher = IgnoreMatcher::new()
   let segments = split_path(rel_path)
   let mut base = ""
@@ -84,9 +84,9 @@ pub fn is_ignored_path(
 ///|
 /// List files under root, excluding ignored paths and .git.
 pub fn list_working_files(
-  fs : &RepoFileSystem,
+  fs : &@git.RepoFileSystem,
   root : String,
-) -> Array[String] raise GitError {
+) -> Array[String] raise @git.GitError {
   let matcher = IgnoreMatcher::new()
   let out : Array[String] = []
   walk_dir(fs, root, "", matcher, out)
@@ -95,12 +95,12 @@ pub fn list_working_files(
 
 ///|
 fn walk_dir(
-  fs : &RepoFileSystem,
+  fs : &@git.RepoFileSystem,
   root : String,
   rel : String,
   matcher : IgnoreMatcher,
   out : Array[String],
-) -> Unit raise GitError {
+) -> Unit raise @git.GitError {
   let dir = if rel == "" { root } else { join_path(root, rel) }
   let prev_len = matcher.rules.length()
   let ignore_path = join_path(dir, ".gitignore")

@@ -2,10 +2,10 @@
 
 ///|
 pub fn rev_parse(
-  fs : &RepoFileSystem,
+  fs : &@git.RepoFileSystem,
   git_dir : String,
   spec : String,
-) -> ObjectId? raise GitError {
+) -> @git.ObjectId? raise @git.GitError {
   if spec == "HEAD" {
     return resolve_head_commit(fs, git_dir)
   }
@@ -13,7 +13,7 @@ pub fn rev_parse(
     return resolve_ref(fs, git_dir, spec)
   }
   if spec.length() == 40 {
-    match ObjectId::from_hex(spec) {
+    match @git.ObjectId::from_hex(spec) {
       id => return Some(id)
     }
   }
@@ -31,10 +31,10 @@ pub fn rev_parse(
 ///|
 /// List all refs (loose + packed).
 pub fn show_ref(
-  fs : &RepoFileSystem,
+  fs : &@git.RepoFileSystem,
   git_dir : String,
-) -> Array[(String, ObjectId)] raise GitError {
-  let out : Map[String, ObjectId] = {}
+) -> Array[(String, @git.ObjectId)] raise @git.GitError {
+  let out : Map[String, @git.ObjectId] = {}
   let refs_dir = join_path(git_dir, "refs")
   if fs.is_dir(refs_dir) {
     ref_collect_loose(fs, refs_dir, "refs", out)
@@ -43,7 +43,7 @@ pub fn show_ref(
   if fs.is_file(packed) {
     ref_collect_packed(fs, packed, out)
   }
-  let result : Array[(String, ObjectId)] = []
+  let result : Array[(String, @git.ObjectId)] = []
   for item in out.to_array() {
     let (name, id) = item
     result.push((name, id))
@@ -55,9 +55,9 @@ pub fn show_ref(
 ///|
 /// Format like `git show-ref` output.
 pub fn show_ref_text(
-  fs : &RepoFileSystem,
+  fs : &@git.RepoFileSystem,
   git_dir : String,
-) -> Array[String] raise GitError {
+) -> Array[String] raise @git.GitError {
   let refs = show_ref(fs, git_dir)
   let lines : Array[String] = []
   for item in refs {
@@ -69,11 +69,11 @@ pub fn show_ref_text(
 
 ///|
 fn ref_collect_loose(
-  fs : &RepoFileSystem,
+  fs : &@git.RepoFileSystem,
   dir : String,
   prefix : String,
-  out : Map[String, ObjectId],
-) -> Unit raise GitError {
+  out : Map[String, @git.ObjectId],
+) -> Unit raise @git.GitError {
   let entries = fs.readdir(dir)
   for name in entries {
     let path = join_path(dir, name)
@@ -82,17 +82,17 @@ fn ref_collect_loose(
       ref_collect_loose(fs, path, rel, out)
     } else if fs.is_file(path) {
       let line = ref_read_line(fs, path)
-      out[rel] = ObjectId::from_hex(line)
+      out[rel] = @git.ObjectId::from_hex(line)
     }
   }
 }
 
 ///|
 fn ref_collect_packed(
-  fs : &RepoFileSystem,
+  fs : &@git.RepoFileSystem,
   packed_path : String,
-  out : Map[String, ObjectId],
-) -> Unit raise GitError {
+  out : Map[String, @git.ObjectId],
+) -> Unit raise @git.GitError {
   let text = @utf8.decode_lossy(fs.read_file(packed_path)[:])
   for line_view in text.split("\n") {
     let line = ref_trim_line(line_view.to_string())
@@ -116,7 +116,7 @@ fn ref_collect_packed(
           end=line.length(),
         )
         if not(out.contains(name)) {
-          out[name] = ObjectId::from_hex(id_hex)
+          out[name] = @git.ObjectId::from_hex(id_hex)
         }
       }
     }
@@ -124,7 +124,10 @@ fn ref_collect_packed(
 }
 
 ///|
-fn ref_read_line(fs : &RepoFileSystem, path : String) -> String raise GitError {
+fn ref_read_line(
+  fs : &@git.RepoFileSystem,
+  path : String,
+) -> String raise @git.GitError {
   let text = @utf8.decode_lossy(fs.read_file(path)[:])
   for line_view in text.split("\n") {
     let line = ref_trim_line(line_view.to_string())
@@ -132,7 +135,7 @@ fn ref_read_line(fs : &RepoFileSystem, path : String) -> String raise GitError {
       return line
     }
   }
-  raise GitError::InvalidObject("Empty ref: \{path}")
+  raise @git.GitError::InvalidObject("Empty ref: \{path}")
 }
 
 ///|

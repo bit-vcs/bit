@@ -1,8 +1,8 @@
 ///| Tests for prune
 
 ///|
-fn setup_repo_prune() -> TestFs {
-  let fs = TestFs::new()
+fn setup_repo_prune() -> @git.TestFs {
+  let fs = @git.TestFs::new()
   ignore(try? init_repo(fs, "/repo"))
   fs
 }
@@ -26,7 +26,7 @@ test "prune: removes unreachable loose objects" {
   let orphan = write_loose_object(
     fs,
     git_dir,
-    ObjectType::Blob,
+    @git.ObjectType::Blob,
     Bytes::from_array([b'a', b'b', b'c']),
   )
   let hex = orphan.to_hex()

@@ -1,0 +1,9 @@
+import {
+  "mizchi/git" as @git,
+  "moonbitlang/async" as @async,
+  "mizchi/zlib",
+  "moonbitlang/async/process" as @process,
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/x/fs",
+  "moonbitlang/async/http" as @http,
+}

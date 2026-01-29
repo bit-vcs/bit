@@ -11,23 +11,23 @@ pub enum MergeStatus {
 ///|
 pub struct MergeResult {
   status : MergeStatus
-  commit_id : ObjectId?
+  commit_id : @git.ObjectId?
   conflicts : Array[String]
 }
 
 ///|
 pub fn merge(
-  fs : &FileSystem,
-  rfs : &RepoFileSystem,
+  fs : &@git.FileSystem,
+  rfs : &@git.RepoFileSystem,
   root : String,
-  target : ObjectId,
+  target : @git.ObjectId,
   message : String,
   author : String,
   timestamp : Int64,
-) -> MergeResult raise GitError {
+) -> MergeResult raise @git.GitError {
   let git_dir = join_path(root, ".git")
   let head = match resolve_head_commit(rfs, git_dir) {
-    None => raise GitError::InvalidObject("HEAD not found")
+    None => raise @git.GitError::InvalidObject("HEAD not found")
     Some(id) => id
   }
   if head == target {
@@ -65,7 +65,7 @@ pub fn merge(
   let entries = tree_files_to_index(db, rfs, merged)
   write_index_entries(fs, git_dir, entries)
   let tree_id = write_tree_from_index(fs, git_dir, entries)
-  let commit = Commit::new(
+  let commit = @git.Commit::new(
     tree_id,
     [head, target],
     author,
@@ -76,7 +76,7 @@ pub fn merge(
     "+0000",
     message,
   )
-  let (commit_id, compressed) = create_commit(commit)
+  let (commit_id, compressed) = @git.create_commit(commit)
   write_object_bytes(fs, git_dir, commit_id, compressed)
   update_head_ref(fs, rfs, git_dir, commit_id)
   { status: Merged, commit_id: Some(commit_id), conflicts: [] }
@@ -85,15 +85,15 @@ pub fn merge(
 ///|
 fn merge_is_ancestor(
   db : ObjectDb,
-  fs : &RepoFileSystem,
-  ancestor : ObjectId,
-  commit_id : ObjectId,
-) -> Bool raise GitError {
-  let stack : Array[ObjectId] = [commit_id]
+  fs : &@git.RepoFileSystem,
+  ancestor : @git.ObjectId,
+  commit_id : @git.ObjectId,
+) -> Bool raise @git.GitError {
+  let stack : Array[@git.ObjectId] = [commit_id]
   let seen : Map[String, Bool] = {}
   while stack.length() > 0 {
     let id = match stack.pop() {
-      None => raise GitError::InvalidObject("Empty stack")
+      None => raise @git.GitError::InvalidObject("Empty stack")
       Some(v) => v
     }
     let hex = id.to_hex()
@@ -115,15 +115,15 @@ fn merge_is_ancestor(
 ///|
 fn merge_find_base(
   db : ObjectDb,
-  fs : &RepoFileSystem,
-  a : ObjectId,
-  b : ObjectId,
-) -> ObjectId? raise GitError {
+  fs : &@git.RepoFileSystem,
+  a : @git.ObjectId,
+  b : @git.ObjectId,
+) -> @git.ObjectId? raise @git.GitError {
   let seen : Map[String, Bool] = {}
-  let stack_a : Array[ObjectId] = [a]
+  let stack_a : Array[@git.ObjectId] = [a]
   while stack_a.length() > 0 {
     let id = match stack_a.pop() {
-      None => raise GitError::InvalidObject("Empty stack")
+      None => raise @git.GitError::InvalidObject("Empty stack")
       Some(v) => v
     }
     let hex = id.to_hex()
@@ -136,10 +136,10 @@ fn merge_find_base(
       stack_a.push(p)
     }
   }
-  let stack_b : Array[ObjectId] = [b]
+  let stack_b : Array[@git.ObjectId] = [b]
   while stack_b.length() > 0 {
     let id = match stack_b.pop() {
-      None => raise GitError::InvalidObject("Empty stack")
+      None => raise @git.GitError::InvalidObject("Empty stack")
       Some(v) => v
     }
     let hex = id.to_hex()
@@ -157,17 +157,17 @@ fn merge_find_base(
 ///|
 fn merge_commit_parents(
   db : ObjectDb,
-  fs : &RepoFileSystem,
-  commit_id : ObjectId,
-) -> Array[ObjectId] raise GitError {
+  fs : &@git.RepoFileSystem,
+  commit_id : @git.ObjectId,
+) -> Array[@git.ObjectId] raise @git.GitError {
   let obj = db.get(fs, commit_id)
   match obj {
-    None => raise GitError::InvalidObject("Missing commit object")
+    None => raise @git.GitError::InvalidObject("Missing commit object")
     Some(o) => {
-      if o.obj_type != ObjectType::Commit {
-        raise GitError::InvalidObject("Object is not a commit")
+      if o.obj_type != @git.ObjectType::Commit {
+        raise @git.GitError::InvalidObject("Object is not a commit")
       }
-      let info = parse_commit(o.data)
+      let info = @git.parse_commit(o.data)
       info.parents
     }
   }

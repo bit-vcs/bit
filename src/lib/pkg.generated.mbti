@@ -1,0 +1,229 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/git/lib"
+
+import {
+  "mizchi/git",
+}
+
+// Values
+pub fn add_paths(&@git.FileSystem, &@git.RepoFileSystem, String, Array[String]) -> Unit raise @git.GitError
+
+pub fn apply_receive_pack(&@git.FileSystem, &@git.RepoFileSystem, String, ReceivePackRequest) -> ReceivePackResult raise @git.GitError
+
+pub fn checkout(&@git.FileSystem, &@git.RepoFileSystem, String, String, detach? : Bool, update_worktree? : Bool, update_index? : Bool) -> @git.ObjectId raise @git.GitError
+
+pub fn collect_reachable_objects(ObjectDb, &@git.RepoFileSystem, @git.ObjectId) -> Array[@git.PackObject] raise @git.GitError
+
+pub fn collect_reachable_objects_from_commits(ObjectDb, &@git.RepoFileSystem, Array[@git.ObjectId]) -> Array[@git.PackObject] raise @git.GitError
+
+pub fn collect_tree_files(ObjectDb, &@git.RepoFileSystem, @git.ObjectId) -> Map[String, TreeFileEntry] raise @git.GitError
+
+pub fn collect_tree_files_from_commit(ObjectDb, &@git.RepoFileSystem, @git.ObjectId) -> Map[String, TreeFileEntry] raise @git.GitError
+
+pub fn commit(&@git.FileSystem, &@git.RepoFileSystem, String, String, String, Int64) -> @git.ObjectId raise @git.GitError
+
+pub fn create_branch(&@git.FileSystem, &@git.RepoFileSystem, String, String) -> Unit raise @git.GitError
+
+pub fn diff_index(&@git.RepoFileSystem, String) -> Array[DiffFile] raise @git.GitError
+
+pub fn diff_text(Array[DiffFile]) -> Array[String]
+
+pub fn diff_worktree(&@git.RepoFileSystem, String) -> Array[DiffFile] raise @git.GitError
+
+pub fn fast_forward_to(&@git.FileSystem, &@git.RepoFileSystem, String, @git.ObjectId) -> Unit raise @git.GitError
+
+pub fn gc_repo(&@git.FileSystem, &@git.RepoFileSystem, String) -> GcResult raise @git.GitError
+
+pub fn init_repo(&@git.FileSystem, String, default_branch? : String) -> Unit raise @git.GitError
+
+pub fn is_ignored_path(&@git.RepoFileSystem, String, String, Bool) -> Bool raise @git.GitError
+
+pub fn list_branches(&@git.RepoFileSystem, String) -> (HeadRef, Array[BranchInfo]) raise @git.GitError
+
+pub fn list_branches_text(&@git.RepoFileSystem, String) -> Array[String] raise @git.GitError
+
+pub fn list_working_files(&@git.RepoFileSystem, String) -> Array[String] raise @git.GitError
+
+pub fn load_object_store_from_fs(&@git.RepoFileSystem, String) -> @git.ObjectStore raise @git.GitError
+
+pub fn log_head(&@git.RepoFileSystem, String, max_count? : Int) -> Array[LogEntry] raise @git.GitError
+
+pub fn log_head_oneline(&@git.RepoFileSystem, String, max_count? : Int) -> Array[String] raise @git.GitError
+
+pub fn merge(&@git.FileSystem, &@git.RepoFileSystem, String, @git.ObjectId, String, String, Int64) -> MergeResult raise @git.GitError
+
+pub fn parse_receive_pack_request(Bytes) -> ReceivePackRequest raise @git.GitError
+
+pub fn prune_repo(&@git.FileSystem, &@git.RepoFileSystem, String) -> PruneResult raise @git.GitError
+
+pub fn read_head_ref(&@git.RepoFileSystem, String) -> HeadRef raise @git.GitError
+
+pub fn read_index_entries(&@git.RepoFileSystem, String) -> Array[IndexEntry] raise @git.GitError
+
+pub fn rebase_onto(&@git.FileSystem, &@git.RepoFileSystem, String, @git.ObjectId) -> @git.ObjectId raise @git.GitError
+
+pub fn receive_pack(&@git.FileSystem, &@git.RepoFileSystem, String, Bytes) -> Bytes raise @git.GitError
+
+pub fn repack_repo(&@git.FileSystem, &@git.RepoFileSystem, String) -> RepackResult? raise @git.GitError
+
+pub fn reset(&@git.FileSystem, &@git.RepoFileSystem, String, String, ResetMode) -> @git.ObjectId raise @git.GitError
+
+pub fn resolve_head_commit(&@git.RepoFileSystem, String) -> @git.ObjectId? raise @git.GitError
+
+pub fn resolve_ref(&@git.RepoFileSystem, String, String) -> @git.ObjectId? raise @git.GitError
+
+pub fn rev_parse(&@git.RepoFileSystem, String, String) -> @git.ObjectId? raise @git.GitError
+
+pub fn show_ref(&@git.RepoFileSystem, String) -> Array[(String, @git.ObjectId)] raise @git.GitError
+
+pub fn show_ref_text(&@git.RepoFileSystem, String) -> Array[String] raise @git.GitError
+
+pub fn status(&@git.RepoFileSystem, String) -> Status raise @git.GitError
+
+pub fn status_porcelain(&@git.RepoFileSystem, String) -> Array[String] raise @git.GitError
+
+pub fn status_porcelain_from(Status) -> Array[String]
+
+pub fn status_text(&@git.RepoFileSystem, String) -> String raise @git.GitError
+
+pub fn switch_branch(&@git.FileSystem, &@git.RepoFileSystem, String, String, create? : Bool, checkout? : Bool) -> Unit raise @git.GitError
+
+pub fn tree_files_to_index(ObjectDb, &@git.RepoFileSystem, Map[String, TreeFileEntry]) -> Array[IndexEntry] raise @git.GitError
+
+pub fn update_head_ref(&@git.FileSystem, &@git.RepoFileSystem, String, @git.ObjectId) -> Unit raise @git.GitError
+
+pub fn write_index_entries(&@git.FileSystem, String, Array[IndexEntry]) -> Unit raise @git.GitError
+
+pub fn write_loose_object(&@git.FileSystem, String, @git.ObjectType, Bytes) -> @git.ObjectId raise @git.GitError
+
+pub fn write_object_bytes(&@git.FileSystem, String, @git.ObjectId, Bytes) -> Unit raise @git.GitError
+
+pub fn write_tree_from_index(&@git.FileSystem, String, Array[IndexEntry]) -> @git.ObjectId raise @git.GitError
+
+pub fn write_worktree_from_files(ObjectDb, &@git.FileSystem, &@git.RepoFileSystem, String, String, Map[String, TreeFileEntry], remove_missing? : Bool) -> Unit raise @git.GitError
+
+// Errors
+
+// Types and methods
+pub struct BranchInfo {
+  name : String
+  id : @git.ObjectId
+  current : Bool
+}
+
+pub struct DiffFile {
+  path : String
+  kind : DiffKind
+  old_content : Bytes?
+  new_content : Bytes?
+}
+
+pub enum DiffKind {
+  Added
+  Modified
+  Deleted
+}
+
+pub struct GcResult {
+  pack : RepackResult?
+  dangling : Array[@git.ObjectId]
+}
+
+pub enum HeadRef {
+  Branch(String)
+  Detached(@git.ObjectId)
+}
+
+pub struct IndexEntry {
+  path : String
+  id : @git.ObjectId
+  mode : Int
+  size : Int
+}
+
+pub struct LogEntry {
+  id : @git.ObjectId
+  message : String
+  author : String
+  timestamp : Int64
+}
+
+pub struct MergeResult {
+  status : MergeStatus
+  commit_id : @git.ObjectId?
+  conflicts : Array[String]
+}
+
+pub enum MergeStatus {
+  AlreadyUpToDate
+  FastForward
+  Merged
+  Conflicted
+}
+
+pub struct ObjectDb {
+  loose : Map[String, @git.PackObject]
+  packs : Array[PackIndex]
+}
+pub fn ObjectDb::get(Self, &@git.RepoFileSystem, @git.ObjectId) -> @git.PackObject? raise @git.GitError
+pub fn ObjectDb::load(&@git.RepoFileSystem, String) -> Self raise @git.GitError
+
+pub struct PackIndex {
+  pack_path : String
+  ids : Array[String]
+  offsets : Array[Int64]
+}
+pub fn PackIndex::find_offset(Self, @git.ObjectId) -> Int64?
+pub fn PackIndex::find_offset_hex(Self, String) -> Int64?
+
+pub struct PruneResult {
+  pruned : Array[@git.ObjectId]
+}
+
+pub struct ReceivePackRequest {
+  updates : Array[RefUpdate]
+  capabilities : Array[String]
+  pack : Bytes
+}
+
+pub struct ReceivePackResult {
+  updated : Array[String]
+  rejected : Array[(String, String)]
+}
+
+pub struct RefUpdate {
+  old_id : @git.ObjectId
+  new_id : @git.ObjectId
+  refname : String
+}
+
+pub struct RepackResult {
+  pack_id : @git.ObjectId
+  object_count : Int
+  pack_bytes : Int
+}
+
+pub(all) enum ResetMode {
+  Soft
+  Mixed
+  Hard
+}
+
+pub struct Status {
+  staged_added : Array[String]
+  staged_modified : Array[String]
+  staged_deleted : Array[String]
+  unstaged_modified : Array[String]
+  unstaged_deleted : Array[String]
+  untracked : Array[String]
+}
+
+pub struct TreeFileEntry {
+  id : @git.ObjectId
+  mode : Int
+}
+
+// Type aliases
+
+// Traits
+

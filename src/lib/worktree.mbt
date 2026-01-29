@@ -12,7 +12,10 @@ pub struct Status {
 
 ///|
 /// Get status similar to `git status --porcelain` buckets.
-pub fn status(fs : &RepoFileSystem, root : String) -> Status raise GitError {
+pub fn status(
+  fs : &@git.RepoFileSystem,
+  root : String,
+) -> Status raise @git.GitError {
   let git_dir = join_path(root, ".git")
   let index_entries = read_index_entries(fs, git_dir)
   let index_map : Map[String, IndexEntry] = {}
@@ -31,7 +34,7 @@ pub fn status(fs : &RepoFileSystem, root : String) -> Status raise GitError {
       Some(entry) => {
         let abs = join_path(root, path)
         let content = fs.read_file(abs)
-        let id = hash_blob(content)
+        let id = @git.hash_blob(content)
         if id != entry.id {
           unstaged_modified.push(path)
         }
@@ -86,9 +89,9 @@ pub fn status(fs : &RepoFileSystem, root : String) -> Status raise GitError {
 ///|
 /// Format status in porcelain-like lines.
 pub fn status_porcelain(
-  fs : &RepoFileSystem,
+  fs : &@git.RepoFileSystem,
   root : String,
-) -> Array[String] raise GitError {
+) -> Array[String] raise @git.GitError {
   let s = status(fs, root)
   status_porcelain_from(s)
 }
@@ -155,11 +158,11 @@ pub fn status_porcelain_from(s : Status) -> Array[String] {
 ///|
 /// Add files to index (like `git add`).
 pub fn add_paths(
-  fs : &FileSystem,
-  rfs : &RepoFileSystem,
+  fs : &@git.FileSystem,
+  rfs : &@git.RepoFileSystem,
   root : String,
   paths : Array[String],
-) -> Unit raise GitError {
+) -> Unit raise @git.GitError {
   let git_dir = join_path(root, ".git")
   let entries = read_index_entries(rfs, git_dir)
   let map : Map[String, IndexEntry] = {}
@@ -171,7 +174,7 @@ pub fn add_paths(
     let abs = join_path(root, path)
     if rfs.is_file(abs) {
       let content = rfs.read_file(abs)
-      let id = write_loose_object(fs, git_dir, ObjectType::Blob, content)
+      let id = write_loose_object(fs, git_dir, @git.ObjectType::Blob, content)
       let size = content.length()
       map[path] = { path, id, mode: default_file_mode(), size }
     } else {
@@ -187,19 +190,19 @@ pub fn add_paths(
 }
 
 ///|
-/// Commit current index and update HEAD.
+/// @git.Commit current index and update HEAD.
 pub fn commit(
-  fs : &FileSystem,
-  rfs : &RepoFileSystem,
+  fs : &@git.FileSystem,
+  rfs : &@git.RepoFileSystem,
   root : String,
   message : String,
   author : String,
   timestamp : Int64,
-) -> ObjectId raise GitError {
+) -> @git.ObjectId raise @git.GitError {
   let git_dir = join_path(root, ".git")
   let entries = read_index_entries(rfs, git_dir)
   if entries.length() == 0 {
-    raise GitError::InvalidObject("Empty index")
+    raise @git.GitError::InvalidObject("Empty index")
   }
   let tree_id = write_tree_from_index(fs, git_dir, entries)
   let parent = resolve_head_commit(rfs, git_dir)
@@ -207,10 +210,10 @@ pub fn commit(
     Some(p) => [p]
     None => []
   }
-  let commit = Commit::new(
+  let commit = @git.Commit::new(
     tree_id, parents, author, timestamp, "+0000", author, timestamp, "+0000", message,
   )
-  let (commit_id, compressed) = create_commit(commit)
+  let (commit_id, compressed) = @git.create_commit(commit)
   write_object_bytes(fs, git_dir, commit_id, compressed)
   update_head_ref(fs, rfs, git_dir, commit_id)
   commit_id
@@ -218,10 +221,10 @@ pub fn commit(
 
 ///|
 fn expand_paths(
-  fs : &RepoFileSystem,
+  fs : &@git.RepoFileSystem,
   root : String,
   paths : Array[String],
-) -> Array[String] raise GitError {
+) -> Array[String] raise @git.GitError {
   let result : Array[String] = []
   let all = list_working_files(fs, root)
   for p in paths {
@@ -257,23 +260,23 @@ fn default_file_mode() -> Int {
 
 ///|
 pub fn write_loose_object(
-  fs : &FileSystem,
+  fs : &@git.FileSystem,
   git_dir : String,
-  obj_type : ObjectType,
+  obj_type : @git.ObjectType,
   content : Bytes,
-) -> ObjectId raise GitError {
-  let (id, compressed) = create_object(obj_type, content)
+) -> @git.ObjectId raise @git.GitError {
+  let (id, compressed) = @git.create_object(obj_type, content)
   write_object_bytes(fs, git_dir, id, compressed)
   id
 }
 
 ///|
 pub fn write_object_bytes(
-  fs : &FileSystem,
+  fs : &@git.FileSystem,
   git_dir : String,
-  id : ObjectId,
+  id : @git.ObjectId,
   compressed : Bytes,
-) -> Unit raise GitError {
+) -> Unit raise @git.GitError {
   let hex = id.to_hex()
   let dir = join_path(
     git_dir,
@@ -292,9 +295,9 @@ pub fn write_object_bytes(
 
 ///|
 pub fn resolve_head_commit(
-  fs : &RepoFileSystem,
+  fs : &@git.RepoFileSystem,
   git_dir : String,
-) -> ObjectId? raise GitError {
+) -> @git.ObjectId? raise @git.GitError {
   match read_head_ref(fs, git_dir) {
     Branch(name) => resolve_ref(fs, git_dir, "refs/heads/" + name)
     Detached(id) => Some(id)
@@ -303,11 +306,11 @@ pub fn resolve_head_commit(
 
 ///|
 pub fn update_head_ref(
-  fs : &FileSystem,
-  rfs : &RepoFileSystem,
+  fs : &@git.FileSystem,
+  rfs : &@git.RepoFileSystem,
   git_dir : String,
-  commit_id : ObjectId,
-) -> Unit raise GitError {
+  commit_id : @git.ObjectId,
+) -> Unit raise @git.GitError {
   let head_path = join_path(git_dir, "HEAD")
   let head = read_head_ref(rfs, git_dir) catch {
     _ => HeadRef::Detached(commit_id)
@@ -325,27 +328,27 @@ pub fn update_head_ref(
 
 ///|
 pub fn write_tree_from_index(
-  fs : &FileSystem,
+  fs : &@git.FileSystem,
   git_dir : String,
   entries : Array[IndexEntry],
-) -> ObjectId raise GitError {
+) -> @git.ObjectId raise @git.GitError {
   let rel_entries = entries.map(fn(e) { e })
   write_tree_from_entries(fs, git_dir, rel_entries)
 }
 
 ///|
 fn write_tree_from_entries(
-  fs : &FileSystem,
+  fs : &@git.FileSystem,
   git_dir : String,
   entries : Array[IndexEntry],
-) -> ObjectId raise GitError {
-  let file_entries : Array[TreeEntry] = []
+) -> @git.ObjectId raise @git.GitError {
+  let file_entries : Array[@git.TreeEntry] = []
   let dir_map : Map[String, Array[IndexEntry]] = {}
   for e in entries {
     match split_first(e.path) {
       (name, None) => {
         let mode = mode_to_string(e.mode)
-        file_entries.push(TreeEntry::new(mode, name, e.id))
+        file_entries.push(@git.TreeEntry::new(mode, name, e.id))
       }
       (name, Some(rest)) =>
         match dir_map.get(name) {
@@ -361,10 +364,10 @@ fn write_tree_from_entries(
   for item in dir_map.to_array() {
     let (dir_name, list) = item
     let sub_id = write_tree_from_entries(fs, git_dir, list)
-    file_entries.push(TreeEntry::new("040000", dir_name, sub_id))
+    file_entries.push(@git.TreeEntry::new("040000", dir_name, sub_id))
   }
   file_entries.sort_by(fn(a, b) { String::compare(a.name, b.name) })
-  let (tree_id, compressed) = create_tree(file_entries)
+  let (tree_id, compressed) = @git.create_tree(file_entries)
   write_object_bytes(fs, git_dir, tree_id, compressed)
   tree_id
 }
@@ -416,9 +419,9 @@ fn to_octal_string(value : Int) -> String {
 
 ///|
 fn read_head_tree_entries(
-  fs : &RepoFileSystem,
+  fs : &@git.RepoFileSystem,
   git_dir : String,
-) -> Map[String, HeadEntry] raise GitError {
+) -> Map[String, HeadEntry] raise @git.GitError {
   let result : Map[String, HeadEntry] = {}
   let head = resolve_head_commit(fs, git_dir)
   match head {
@@ -429,10 +432,10 @@ fn read_head_tree_entries(
       match commit_obj {
         None => return result
         Some(obj) => {
-          if obj.obj_type != ObjectType::Commit {
-            raise GitError::InvalidObject("Object is not a commit")
+          if obj.obj_type != @git.ObjectType::Commit {
+            raise @git.GitError::InvalidObject("Object is not a commit")
           }
-          let info = parse_commit(obj.data)
+          let info = @git.parse_commit(obj.data)
           collect_tree_entries_db(db, fs, info.tree, "", result)
         }
       }
@@ -443,26 +446,26 @@ fn read_head_tree_entries(
 
 ///|
 priv struct HeadEntry {
-  id : ObjectId
+  id : @git.ObjectId
   mode : Int
 }
 
 ///|
 fn collect_tree_entries_db(
   db : ObjectDb,
-  fs : &RepoFileSystem,
-  tree_id : ObjectId,
+  fs : &@git.RepoFileSystem,
+  tree_id : @git.ObjectId,
   prefix : String,
   out : Map[String, HeadEntry],
-) -> Unit raise GitError {
+) -> Unit raise @git.GitError {
   let tree_obj = db.get(fs, tree_id)
   match tree_obj {
-    None => raise GitError::InvalidObject("Missing tree object")
+    None => raise @git.GitError::InvalidObject("Missing tree object")
     Some(obj) => {
-      if obj.obj_type != ObjectType::Tree {
-        raise GitError::InvalidObject("Object is not a tree")
+      if obj.obj_type != @git.ObjectType::Tree {
+        raise @git.GitError::InvalidObject("Object is not a tree")
       }
-      let entries = parse_tree(obj.data)
+      let entries = @git.parse_tree(obj.data)
       for entry in entries {
         let path = if prefix.length() == 0 {
           entry.name

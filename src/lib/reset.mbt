@@ -9,15 +9,15 @@ pub(all) enum ResetMode {
 
 ///|
 pub fn reset(
-  fs : &FileSystem,
-  rfs : &RepoFileSystem,
+  fs : &@git.FileSystem,
+  rfs : &@git.RepoFileSystem,
   root : String,
   spec : String,
   mode : ResetMode,
-) -> ObjectId raise GitError {
+) -> @git.ObjectId raise @git.GitError {
   let git_dir = join_path(root, ".git")
   let target = match rev_parse(rfs, git_dir, spec) {
-    None => raise GitError::InvalidObject("Invalid ref: \{spec}")
+    None => raise @git.GitError::InvalidObject("Invalid ref: \{spec}")
     Some(id) => id
   }
   update_head_ref(fs, rfs, git_dir, target)

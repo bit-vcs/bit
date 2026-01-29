@@ -1,8 +1,8 @@
 ///| Tests for merge
 
 ///|
-fn setup_repo_merge() -> TestFs {
-  let fs = TestFs::new()
+fn setup_repo_merge() -> @git.TestFs {
+  let fs = @git.TestFs::new()
   ignore(try? init_repo(fs, "/repo"))
   fs
 }
@@ -49,7 +49,7 @@ test "merge: file-level merge without conflicts" {
       match obj {
         None => assert_true(false)
         Some(o) => {
-          let info = parse_commit(o.data)
+          let info = @git.parse_commit(o.data)
           assert_true(info.parents.length() == 2)
           assert_true(info.parents.contains(main_commit))
           assert_true(info.parents.contains(feature_commit))

@@ -2,16 +2,16 @@
 
 ///|
 pub struct TreeFileEntry {
-  id : ObjectId
+  id : @git.ObjectId
   mode : Int
 }
 
 ///|
 pub fn collect_tree_files(
   db : ObjectDb,
-  fs : &RepoFileSystem,
-  tree_id : ObjectId,
-) -> Map[String, TreeFileEntry] raise GitError {
+  fs : &@git.RepoFileSystem,
+  tree_id : @git.ObjectId,
+) -> Map[String, TreeFileEntry] raise @git.GitError {
   let out : Map[String, TreeFileEntry] = {}
   collect_tree_files_inner(db, fs, tree_id, "", out)
   out
@@ -20,17 +20,17 @@ pub fn collect_tree_files(
 ///|
 pub fn collect_tree_files_from_commit(
   db : ObjectDb,
-  fs : &RepoFileSystem,
-  commit_id : ObjectId,
-) -> Map[String, TreeFileEntry] raise GitError {
+  fs : &@git.RepoFileSystem,
+  commit_id : @git.ObjectId,
+) -> Map[String, TreeFileEntry] raise @git.GitError {
   let commit_obj = db.get(fs, commit_id)
   match commit_obj {
-    None => raise GitError::InvalidObject("Missing commit object")
+    None => raise @git.GitError::InvalidObject("Missing commit object")
     Some(obj) => {
-      if obj.obj_type != ObjectType::Commit {
-        raise GitError::InvalidObject("Object is not a commit")
+      if obj.obj_type != @git.ObjectType::Commit {
+        raise @git.GitError::InvalidObject("Object is not a commit")
       }
-      let info = parse_commit(obj.data)
+      let info = @git.parse_commit(obj.data)
       collect_tree_files(db, fs, info.tree)
     }
   }
@@ -39,18 +39,18 @@ pub fn collect_tree_files_from_commit(
 ///|
 pub fn tree_files_to_index(
   db : ObjectDb,
-  fs : &RepoFileSystem,
+  fs : &@git.RepoFileSystem,
   files : Map[String, TreeFileEntry],
-) -> Array[IndexEntry] raise GitError {
+) -> Array[IndexEntry] raise @git.GitError {
   let entries : Array[IndexEntry] = []
   for item in files.to_array() {
     let (path, info) = item
     let obj = db.get(fs, info.id)
     match obj {
-      None => raise GitError::InvalidObject("Missing blob object")
+      None => raise @git.GitError::InvalidObject("Missing blob object")
       Some(o) => {
-        if o.obj_type != ObjectType::Blob {
-          raise GitError::InvalidObject("Object is not a blob")
+        if o.obj_type != @git.ObjectType::Blob {
+          raise @git.GitError::InvalidObject("Object is not a blob")
         }
         entries.push({
           path,
@@ -68,13 +68,13 @@ pub fn tree_files_to_index(
 ///|
 pub fn write_worktree_from_files(
   db : ObjectDb,
-  fs : &FileSystem,
-  rfs : &RepoFileSystem,
+  fs : &@git.FileSystem,
+  rfs : &@git.RepoFileSystem,
   root : String,
   git_dir : String,
   files : Map[String, TreeFileEntry],
   remove_missing? : Bool = false,
-) -> Unit raise GitError {
+) -> Unit raise @git.GitError {
   if remove_missing {
     let entries = read_index_entries(rfs, git_dir)
     for entry in entries {
@@ -90,10 +90,10 @@ pub fn write_worktree_from_files(
     let (path, info) = item
     let obj = db.get(rfs, info.id)
     match obj {
-      None => raise GitError::InvalidObject("Missing blob object")
+      None => raise @git.GitError::InvalidObject("Missing blob object")
       Some(o) => {
-        if o.obj_type != ObjectType::Blob {
-          raise GitError::InvalidObject("Object is not a blob")
+        if o.obj_type != @git.ObjectType::Blob {
+          raise @git.GitError::InvalidObject("Object is not a blob")
         }
         let full_path = join_path(root, path)
         let dir = parent_dir(full_path)
@@ -107,19 +107,19 @@ pub fn write_worktree_from_files(
 ///|
 fn collect_tree_files_inner(
   db : ObjectDb,
-  fs : &RepoFileSystem,
-  tree_id : ObjectId,
+  fs : &@git.RepoFileSystem,
+  tree_id : @git.ObjectId,
   prefix : String,
   out : Map[String, TreeFileEntry],
-) -> Unit raise GitError {
+) -> Unit raise @git.GitError {
   let tree_obj = db.get(fs, tree_id)
   match tree_obj {
-    None => raise GitError::InvalidObject("Missing tree object")
+    None => raise @git.GitError::InvalidObject("Missing tree object")
     Some(obj) => {
-      if obj.obj_type != ObjectType::Tree {
-        raise GitError::InvalidObject("Object is not a tree")
+      if obj.obj_type != @git.ObjectType::Tree {
+        raise @git.GitError::InvalidObject("Object is not a tree")
       }
-      let entries = parse_tree(obj.data)
+      let entries = @git.parse_tree(obj.data)
       for entry in entries {
         let path = if prefix.length() == 0 {
           entry.name

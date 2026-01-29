@@ -18,9 +18,9 @@ pub struct DiffFile {
 ///|
 /// Diff working tree against index (default `git diff`).
 pub fn diff_worktree(
-  fs : &RepoFileSystem,
+  fs : &@git.RepoFileSystem,
   root : String,
-) -> Array[DiffFile] raise GitError {
+) -> Array[DiffFile] raise @git.GitError {
   let git_dir = join_path(root, ".git")
   let index_entries = read_index_entries(fs, git_dir)
   let index_map : Map[String, IndexEntry] = {}
@@ -44,7 +44,7 @@ pub fn diff_worktree(
           new_content: Some(content),
         })
       Some(entry) => {
-        let id = hash_blob(content)
+        let id = @git.hash_blob(content)
         if id != entry.id {
           let old = diff_read_blob(db, fs, entry.id)
           out.push({
@@ -79,9 +79,9 @@ pub fn diff_worktree(
 ///|
 /// Diff index against HEAD (`git diff --cached`).
 pub fn diff_index(
-  fs : &RepoFileSystem,
+  fs : &@git.RepoFileSystem,
   root : String,
-) -> Array[DiffFile] raise GitError {
+) -> Array[DiffFile] raise @git.GitError {
   let git_dir = join_path(root, ".git")
   let index_entries = read_index_entries(fs, git_dir)
   let index_map : Map[String, IndexEntry] = {}
@@ -183,15 +183,15 @@ fn diff_emit_lines(out : Array[String], data : Bytes, prefix : String) -> Unit {
 ///|
 fn diff_read_blob(
   db : ObjectDb,
-  fs : &RepoFileSystem,
-  id : ObjectId,
-) -> Bytes raise GitError {
+  fs : &@git.RepoFileSystem,
+  id : @git.ObjectId,
+) -> Bytes raise @git.GitError {
   let obj = db.get(fs, id)
   match obj {
-    None => raise GitError::InvalidObject("Missing blob object")
+    None => raise @git.GitError::InvalidObject("Missing blob object")
     Some(o) => {
-      if o.obj_type != ObjectType::Blob {
-        raise GitError::InvalidObject("Object is not a blob")
+      if o.obj_type != @git.ObjectType::Blob {
+        raise @git.GitError::InvalidObject("Object is not a blob")
       }
       o.data
     }
@@ -200,14 +200,14 @@ fn diff_read_blob(
 
 ///|
 priv struct DiffHeadEntry {
-  id : ObjectId
+  id : @git.ObjectId
 }
 
 ///|
 fn diff_read_head_entries(
-  fs : &RepoFileSystem,
+  fs : &@git.RepoFileSystem,
   git_dir : String,
-) -> Map[String, DiffHeadEntry] raise GitError {
+) -> Map[String, DiffHeadEntry] raise @git.GitError {
   let result : Map[String, DiffHeadEntry] = {}
   let head = resolve_head_commit(fs, git_dir)
   match head {
@@ -218,10 +218,10 @@ fn diff_read_head_entries(
       match commit_obj {
         None => return result
         Some(obj) => {
-          if obj.obj_type != ObjectType::Commit {
-            raise GitError::InvalidObject("Object is not a commit")
+          if obj.obj_type != @git.ObjectType::Commit {
+            raise @git.GitError::InvalidObject("Object is not a commit")
           }
-          let info = parse_commit(obj.data)
+          let info = @git.parse_commit(obj.data)
           diff_collect_tree(db, fs, info.tree, "", result)
         }
       }
@@ -233,19 +233,19 @@ fn diff_read_head_entries(
 ///|
 fn diff_collect_tree(
   db : ObjectDb,
-  fs : &RepoFileSystem,
-  tree_id : ObjectId,
+  fs : &@git.RepoFileSystem,
+  tree_id : @git.ObjectId,
   prefix : String,
   out : Map[String, DiffHeadEntry],
-) -> Unit raise GitError {
+) -> Unit raise @git.GitError {
   let tree_obj = db.get(fs, tree_id)
   match tree_obj {
-    None => raise GitError::InvalidObject("Missing tree object")
+    None => raise @git.GitError::InvalidObject("Missing tree object")
     Some(obj) => {
-      if obj.obj_type != ObjectType::Tree {
-        raise GitError::InvalidObject("Object is not a tree")
+      if obj.obj_type != @git.ObjectType::Tree {
+        raise @git.GitError::InvalidObject("Object is not a tree")
       }
-      let entries = parse_tree(obj.data)
+      let entries = @git.parse_tree(obj.data)
       for entry in entries {
         let path = if prefix.length() == 0 {
           entry.name

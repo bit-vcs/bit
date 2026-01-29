@@ -2,7 +2,7 @@
 
 ///|
 pub struct LogEntry {
-  id : ObjectId
+  id : @git.ObjectId
   message : String
   author : String
   timestamp : Int64
@@ -11,10 +11,10 @@ pub struct LogEntry {
 ///|
 /// Read commit history from HEAD.
 pub fn log_head(
-  fs : &RepoFileSystem,
+  fs : &@git.RepoFileSystem,
   git_dir : String,
   max_count? : Int = 100,
-) -> Array[LogEntry] raise GitError {
+) -> Array[LogEntry] raise @git.GitError {
   let result : Array[LogEntry] = []
   let mut current = resolve_head_commit(fs, git_dir)
   let mut count = 0
@@ -27,12 +27,12 @@ pub fn log_head(
         match obj {
           None => break
           Some(o) => {
-            if o.obj_type != ObjectType::Commit {
-              raise GitError::InvalidObject("Object is not a commit")
+            if o.obj_type != @git.ObjectType::Commit {
+              raise @git.GitError::InvalidObject("Object is not a commit")
             }
             let entry = parse_log_entry(id, o.data)
             result.push(entry)
-            let info = parse_commit(o.data)
+            let info = @git.parse_commit(o.data)
             current = if info.parents.length() > 0 {
               Some(info.parents[0])
             } else {
@@ -50,10 +50,10 @@ pub fn log_head(
 ///|
 /// Format like `git log --oneline`.
 pub fn log_head_oneline(
-  fs : &RepoFileSystem,
+  fs : &@git.RepoFileSystem,
   git_dir : String,
   max_count? : Int = 100,
-) -> Array[String] raise GitError {
+) -> Array[String] raise @git.GitError {
   let entries = log_head(fs, git_dir, max_count~)
   let lines : Array[String] = []
   for e in entries {
@@ -64,7 +64,7 @@ pub fn log_head_oneline(
 }
 
 ///|
-fn parse_log_entry(id : ObjectId, data : Bytes) -> LogEntry {
+fn parse_log_entry(id : @git.ObjectId, data : Bytes) -> LogEntry {
   let text = @utf8.decode_lossy(data[:])
   let lines = text.split("\n")
   let mut author = ""

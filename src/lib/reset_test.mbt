@@ -1,8 +1,8 @@
 ///| Tests for reset
 
 ///|
-fn setup_repo_reset() -> TestFs {
-  let fs = TestFs::new()
+fn setup_repo_reset() -> @git.TestFs {
+  let fs = @git.TestFs::new()
   ignore(try? init_repo(fs, "/repo"))
   fs
 }
@@ -20,7 +20,7 @@ test "reset: hard to previous commit" {
   ignore(
     commit(fs, fs, "/repo", "second\n", "Test <t@example.com>", 1700000001L),
   )
-  let target = reset(fs, fs, "/repo", first.to_hex(), @git.ResetMode::Hard)
+  let target = reset(fs, fs, "/repo", first.to_hex(), ResetMode::Hard)
   assert_true(target == first)
   let content = fs.read_string("/repo/a.txt")
   assert_true(content == "one\n")
@@ -41,7 +41,7 @@ test "reset: soft keeps worktree" {
   ignore(
     commit(fs, fs, "/repo", "second\n", "Test <t@example.com>", 1700000001L),
   )
-  ignore(reset(fs, fs, "/repo", first.to_hex(), @git.ResetMode::Soft))
+  ignore(reset(fs, fs, "/repo", first.to_hex(), ResetMode::Soft))
   let content = fs.read_string("/repo/a.txt")
   assert_true(content == "two\n")
 }
@@ -59,7 +59,7 @@ test "reset: mixed keeps worktree" {
   ignore(
     commit(fs, fs, "/repo", "second\n", "Test <t@example.com>", 1700000001L),
   )
-  ignore(reset(fs, fs, "/repo", first.to_hex(), @git.ResetMode::Mixed))
+  ignore(reset(fs, fs, "/repo", first.to_hex(), ResetMode::Mixed))
   let content = fs.read_string("/repo/a.txt")
   assert_true(content == "two\n")
 }

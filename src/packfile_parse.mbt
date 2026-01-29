@@ -418,7 +418,7 @@ fn parse_packfile_stream_internal(
 
 ///|
 /// Decode packfile object header and return (type_id, size, next_offset).
-fn decode_type_and_size_at(
+pub fn decode_type_and_size_at(
   data : Bytes,
   start : Int,
 ) -> (Int, Int, Int) raise GitError {
@@ -446,7 +446,7 @@ fn decode_type_and_size_at(
 
 ///|
 /// Convert packfile type id to ObjectType.
-fn packfile_type_to_object_type(type_id : Int) -> ObjectType raise GitError {
+pub fn packfile_type_to_object_type(type_id : Int) -> ObjectType raise GitError {
   match type_id {
     1 => ObjectType::Commit
     2 => ObjectType::Tree
@@ -458,7 +458,7 @@ fn packfile_type_to_object_type(type_id : Int) -> ObjectType raise GitError {
 }
 
 ///|
-fn read_ofs_delta_offset(
+pub fn read_ofs_delta_offset(
   data : Bytes,
   start : Int,
 ) -> (Int, Int) raise GitError {
@@ -482,7 +482,10 @@ fn read_ofs_delta_offset(
 }
 
 ///|
-fn read_ref_delta_id(data : Bytes, start : Int) -> (String, Int) raise GitError {
+pub fn read_ref_delta_id(
+  data : Bytes,
+  start : Int,
+) -> (String, Int) raise GitError {
   if start + 20 > data.length() {
     raise GitError::PackfileError("Unexpected end of packfile delta")
   }
@@ -495,7 +498,7 @@ fn read_ref_delta_id(data : Bytes, start : Int) -> (String, Int) raise GitError 
 }
 
 ///|
-fn apply_delta(base : Bytes, delta : Bytes) -> Bytes raise GitError {
+pub fn apply_delta(base : Bytes, delta : Bytes) -> Bytes raise GitError {
   let mut offset = 0
   let (base_size, off1) = read_delta_size(delta, offset)
   offset = off1

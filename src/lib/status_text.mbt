@@ -3,9 +3,9 @@
 ///|
 /// Format status output similar to `git status`.
 pub fn status_text(
-  fs : &RepoFileSystem,
+  fs : &@git.RepoFileSystem,
   root : String,
-) -> String raise GitError {
+) -> String raise @git.GitError {
   let git_dir = join_path(root, ".git")
   let sb = StringBuilder::new()
   let head = read_head_ref(fs, git_dir)

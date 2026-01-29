@@ -1,8 +1,8 @@
 ///| Tests for git branch listing
 
 ///|
-fn setup_branch_fs() -> TestFs {
-  let fs = TestFs::new()
+fn setup_branch_fs() -> @git.TestFs {
+  let fs = @git.TestFs::new()
   fs.mkdir_p("/repo/.git")
   fs.mkdir_p("/repo/.git/refs/heads")
   fs

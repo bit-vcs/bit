@@ -2,8 +2,8 @@
 
 ///|
 pub struct RefUpdate {
-  old_id : ObjectId
-  new_id : ObjectId
+  old_id : @git.ObjectId
+  new_id : @git.ObjectId
   refname : String
 }
 
@@ -21,7 +21,9 @@ pub struct ReceivePackResult {
 }
 
 ///|
-pub fn parse_receive_pack_request(data : Bytes) -> ReceivePackRequest raise GitError {
+pub fn parse_receive_pack_request(
+  data : Bytes,
+) -> ReceivePackRequest raise @git.GitError {
   let updates : Array[RefUpdate] = []
   let capabilities : Array[String] = []
   let mut i = 0
@@ -33,7 +35,7 @@ pub fn parse_receive_pack_request(data : Bytes) -> ReceivePackRequest raise GitE
       break
     }
     if len < 4 || i + len > data.length() {
-      raise GitError::ProtocolError("Invalid pkt-line length")
+      raise @git.GitError::ProtocolError("Invalid pkt-line length")
     }
     let line = receive_bytes_to_string_range(data, i + 4, i + len)
     let mut line = receive_trim_line(line)
@@ -59,10 +61,10 @@ pub fn parse_receive_pack_request(data : Bytes) -> ReceivePackRequest raise GitE
     }
     let parts = receive_split_by_space(line)
     if parts.length() < 3 {
-      raise GitError::ProtocolError("Invalid receive-pack command")
+      raise @git.GitError::ProtocolError("Invalid receive-pack command")
     }
-    let old_id = ObjectId::from_hex(parts[0])
-    let new_id = ObjectId::from_hex(parts[1])
+    let old_id = @git.ObjectId::from_hex(parts[0])
+    let new_id = @git.ObjectId::from_hex(parts[1])
     let refname = parts[2]
     updates.push({ old_id, new_id, refname })
     i += len
@@ -73,29 +75,29 @@ pub fn parse_receive_pack_request(data : Bytes) -> ReceivePackRequest raise GitE
 
 ///|
 pub fn apply_receive_pack(
-  fs : &FileSystem,
-  rfs : &RepoFileSystem,
+  fs : &@git.FileSystem,
+  rfs : &@git.RepoFileSystem,
   root : String,
   req : ReceivePackRequest,
-) -> ReceivePackResult raise GitError {
+) -> ReceivePackResult raise @git.GitError {
   let git_dir = join_path(root, ".git")
   if req.pack.length() > 0 {
-    let objects = parse_packfile(req.pack)
-    write_packfile_with_index(fs, git_dir, req.pack, objects)
+    let objects = @git.parse_packfile(req.pack)
+    @git.write_packfile_with_index(fs, git_dir, req.pack, objects)
   }
   let updated : Array[String] = []
   let rejected : Array[(String, String)] = []
   for upd in req.updates {
     let current = resolve_ref(rfs, git_dir, upd.refname)
     let current_id = match current {
-      None => ObjectId::zero()
+      None => @git.ObjectId::zero()
       Some(id) => id
     }
     if current_id != upd.old_id {
       rejected.push((upd.refname, "old id mismatch"))
       continue
     }
-    if upd.new_id == ObjectId::zero() {
+    if upd.new_id == @git.ObjectId::zero() {
       if not(receive_delete_ref(fs, rfs, git_dir, upd.refname)) {
         rejected.push((upd.refname, "ref not found"))
         continue
@@ -113,11 +115,11 @@ pub fn apply_receive_pack(
 
 ///|
 pub fn receive_pack(
-  fs : &FileSystem,
-  rfs : &RepoFileSystem,
+  fs : &@git.FileSystem,
+  rfs : &@git.RepoFileSystem,
   root : String,
   data : Bytes,
-) -> Bytes raise GitError {
+) -> Bytes raise @git.GitError {
   let req = parse_receive_pack_request(data)
   let result = apply_receive_pack(fs, rfs, root, req)
   receive_build_status_response(result)
@@ -126,24 +128,24 @@ pub fn receive_pack(
 ///|
 fn receive_build_status_response(result : ReceivePackResult) -> Bytes {
   let out : Array[Byte] = []
-  let unpack = pktline_encode("unpack ok\n")
+  let unpack = @git.pktline_encode("unpack ok\n")
   for b in unpack {
     out.push(b)
   }
   for refname in result.updated {
-    let line = pktline_encode("ok \{refname}\n")
+    let line = @git.pktline_encode("ok \{refname}\n")
     for b in line {
       out.push(b)
     }
   }
   for item in result.rejected {
     let (refname, msg) = item
-    let line = pktline_encode("ng \{refname} \{msg}\n")
+    let line = @git.pktline_encode("ng \{refname} \{msg}\n")
     for b in line {
       out.push(b)
     }
   }
-  let flush = pktline_flush()
+  let flush = @git.pktline_flush()
   for b in flush {
     out.push(b)
   }
@@ -152,11 +154,11 @@ fn receive_build_status_response(result : ReceivePackResult) -> Bytes {
 
 ///|
 fn receive_delete_ref(
-  fs : &FileSystem,
-  rfs : &RepoFileSystem,
+  fs : &@git.FileSystem,
+  rfs : &@git.RepoFileSystem,
   git_dir : String,
   refname : String,
-) -> Bool raise GitError {
+) -> Bool raise @git.GitError {
   let ref_path = join_path(git_dir, refname)
   if rfs.is_file(ref_path) {
     fs.remove_file(ref_path)
@@ -216,9 +218,9 @@ fn receive_delete_ref(
 }
 
 ///|
-fn receive_parse_pkt_len(data : Bytes, start : Int) -> Int raise GitError {
+fn receive_parse_pkt_len(data : Bytes, start : Int) -> Int raise @git.GitError {
   if start + 4 > data.length() {
-    raise GitError::ProtocolError("Invalid pkt-line length")
+    raise @git.GitError::ProtocolError("Invalid pkt-line length")
   }
   let mut v = 0
   for i in 0..<4 {
@@ -229,7 +231,7 @@ fn receive_parse_pkt_len(data : Bytes, start : Int) -> Int raise GitError {
 }
 
 ///|
-fn receive_hex_char_to_int(c : Char) -> Int raise GitError {
+fn receive_hex_char_to_int(c : Char) -> Int raise @git.GitError {
   if c >= '0' && c <= '9' {
     return c.to_int() - '0'.to_int()
   }
@@ -239,11 +241,15 @@ fn receive_hex_char_to_int(c : Char) -> Int raise GitError {
   if c >= 'A' && c <= 'F' {
     return 10 + (c.to_int() - 'A'.to_int())
   }
-  raise GitError::ProtocolError("Invalid hex char")
+  raise @git.GitError::ProtocolError("Invalid hex char")
 }
 
 ///|
-fn receive_bytes_to_string_range(data : Bytes, start : Int, end : Int) -> String {
+fn receive_bytes_to_string_range(
+  data : Bytes,
+  start : Int,
+  end : Int,
+) -> String {
   let buf = StringBuilder::new()
   let mut i = start
   while i < end {

@@ -3,39 +3,39 @@
 ///|
 pub struct IndexEntry {
   path : String
-  id : ObjectId
+  id : @git.ObjectId
   mode : Int
   size : Int
 }
 
 ///|
 pub fn read_index_entries(
-  fs : &RepoFileSystem,
+  fs : &@git.RepoFileSystem,
   git_dir : String,
-) -> Array[IndexEntry] raise GitError {
+) -> Array[IndexEntry] raise @git.GitError {
   let path = join_path(git_dir, "index")
   if not(fs.is_file(path)) {
     return []
   }
   let data = fs.read_file(path)
   if data.length() < 12 + 20 {
-    raise GitError::InvalidObject("Index file too short")
+    raise @git.GitError::InvalidObject("Index file too short")
   }
   if not(
       data[0] == b'D' && data[1] == b'I' && data[2] == b'R' && data[3] == b'C',
     ) {
-    raise GitError::InvalidObject("Invalid index header")
+    raise @git.GitError::InvalidObject("Invalid index header")
   }
   let version = index_read_u32_be(data, 4)
   if version != 2 {
-    raise GitError::InvalidObject("Unsupported index version: \{version}")
+    raise @git.GitError::InvalidObject("Unsupported index version: \{version}")
   }
   let count = index_read_u32_be(data, 8)
   let mut offset = 12
   let entries : Array[IndexEntry] = []
   for _ in 0..<count {
     if offset + 62 > data.length() {
-      raise GitError::InvalidObject("Index entry truncated")
+      raise @git.GitError::InvalidObject("Index entry truncated")
     }
     // skip ctime/mtime/dev/ino/uid/gid (8 u32)
     offset += 32
@@ -51,7 +51,7 @@ pub fn read_index_entries(
     offset = next
     while offset % 8 != 0 {
       if offset >= data.length() {
-        raise GitError::InvalidObject("Index padding out of range")
+        raise @git.GitError::InvalidObject("Index padding out of range")
       }
       offset += 1
     }
@@ -62,10 +62,10 @@ pub fn read_index_entries(
 
 ///|
 pub fn write_index_entries(
-  fs : &FileSystem,
+  fs : &@git.FileSystem,
   git_dir : String,
   entries : Array[IndexEntry],
-) -> Unit raise GitError {
+) -> Unit raise @git.GitError {
   let sorted = entries.copy()
   sorted.sort_by(fn(a, b) { String::compare(a.path, b.path) })
   let out : Array[Byte] = []
@@ -108,7 +108,7 @@ pub fn write_index_entries(
     }
   }
   let content = index_bytes_from_array(out)
-  let checksum = sha1(content)
+  let checksum = @git.sha1(content)
   for b in checksum.bytes {
     out.push(b)
   }
@@ -118,9 +118,9 @@ pub fn write_index_entries(
 }
 
 ///|
-fn index_read_u32_be(data : Bytes, start : Int) -> Int raise GitError {
+fn index_read_u32_be(data : Bytes, start : Int) -> Int raise @git.GitError {
   if start < 0 || start + 4 > data.length() {
-    raise GitError::InvalidObject("Unexpected end of index data")
+    raise @git.GitError::InvalidObject("Unexpected end of index data")
   }
   (data[start].to_int() << 24) |
   (data[start + 1].to_int() << 16) |
@@ -129,28 +129,31 @@ fn index_read_u32_be(data : Bytes, start : Int) -> Int raise GitError {
 }
 
 ///|
-fn index_read_object_id(data : Bytes, start : Int) -> ObjectId raise GitError {
+fn index_read_object_id(
+  data : Bytes,
+  start : Int,
+) -> @git.ObjectId raise @git.GitError {
   if start + 20 > data.length() {
-    raise GitError::InvalidObject("Unexpected end of index data")
+    raise @git.GitError::InvalidObject("Unexpected end of index data")
   }
   let bytes : FixedArray[Byte] = FixedArray::make(20, b'\x00')
   for i = 0; i < 20; i = i + 1 {
     bytes[i] = data[start + i]
   }
-  ObjectId::new(bytes)
+  @git.ObjectId::new(bytes)
 }
 
 ///|
 fn index_read_cstring(
   data : Bytes,
   start : Int,
-) -> (String, Int) raise GitError {
+) -> (String, Int) raise @git.GitError {
   let mut i = start
   while i < data.length() && data[i] != b'\x00' {
     i += 1
   }
   if i >= data.length() {
-    raise GitError::InvalidObject("Missing NUL in index entry")
+    raise @git.GitError::InvalidObject("Missing NUL in index entry")
   }
   let bytes : Array[Byte] = []
   for j = start; j < i; j = j + 1 {

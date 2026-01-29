@@ -3,11 +3,11 @@
 ///|
 pub fn collect_reachable_objects(
   db : ObjectDb,
-  fs : &RepoFileSystem,
-  commit_id : ObjectId,
-) -> Array[PackObject] raise GitError {
+  fs : &@git.RepoFileSystem,
+  commit_id : @git.ObjectId,
+) -> Array[@git.PackObject] raise @git.GitError {
   let seen : Map[String, Bool] = {}
-  let out : Array[PackObject] = []
+  let out : Array[@git.PackObject] = []
   collect_commit_objects(db, fs, commit_id, seen, out)
   out
 }
@@ -16,11 +16,11 @@ pub fn collect_reachable_objects(
 /// Collect reachable objects from multiple commits (deduplicated).
 pub fn collect_reachable_objects_from_commits(
   db : ObjectDb,
-  fs : &RepoFileSystem,
-  commits : Array[ObjectId],
-) -> Array[PackObject] raise GitError {
+  fs : &@git.RepoFileSystem,
+  commits : Array[@git.ObjectId],
+) -> Array[@git.PackObject] raise @git.GitError {
   let seen : Map[String, Bool] = {}
-  let out : Array[PackObject] = []
+  let out : Array[@git.PackObject] = []
   for commit_id in commits {
     collect_commit_objects(db, fs, commit_id, seen, out)
   }
@@ -30,11 +30,11 @@ pub fn collect_reachable_objects_from_commits(
 ///|
 fn collect_commit_objects(
   db : ObjectDb,
-  fs : &RepoFileSystem,
-  commit_id : ObjectId,
+  fs : &@git.RepoFileSystem,
+  commit_id : @git.ObjectId,
   seen : Map[String, Bool],
-  out : Array[PackObject],
-) -> Unit raise GitError {
+  out : Array[@git.PackObject],
+) -> Unit raise @git.GitError {
   let hex = commit_id.to_hex()
   if seen.contains(hex) {
     return
@@ -42,13 +42,13 @@ fn collect_commit_objects(
   seen[hex] = true
   let obj = db.get(fs, commit_id)
   match obj {
-    None => raise GitError::InvalidObject("Missing commit object")
+    None => raise @git.GitError::InvalidObject("Missing commit object")
     Some(o) => {
-      if o.obj_type != ObjectType::Commit {
-        raise GitError::InvalidObject("Object is not a commit")
+      if o.obj_type != @git.ObjectType::Commit {
+        raise @git.GitError::InvalidObject("Object is not a commit")
       }
       out.push(o)
-      let info = parse_commit(o.data)
+      let info = @git.parse_commit(o.data)
       collect_tree_objects(db, fs, info.tree, seen, out)
       for p in info.parents {
         collect_commit_objects(db, fs, p, seen, out)
@@ -60,11 +60,11 @@ fn collect_commit_objects(
 ///|
 fn collect_tree_objects(
   db : ObjectDb,
-  fs : &RepoFileSystem,
-  tree_id : ObjectId,
+  fs : &@git.RepoFileSystem,
+  tree_id : @git.ObjectId,
   seen : Map[String, Bool],
-  out : Array[PackObject],
-) -> Unit raise GitError {
+  out : Array[@git.PackObject],
+) -> Unit raise @git.GitError {
   let hex = tree_id.to_hex()
   if seen.contains(hex) {
     return
@@ -72,13 +72,13 @@ fn collect_tree_objects(
   seen[hex] = true
   let obj = db.get(fs, tree_id)
   match obj {
-    None => raise GitError::InvalidObject("Missing tree object")
+    None => raise @git.GitError::InvalidObject("Missing tree object")
     Some(o) => {
-      if o.obj_type != ObjectType::Tree {
-        raise GitError::InvalidObject("Object is not a tree")
+      if o.obj_type != @git.ObjectType::Tree {
+        raise @git.GitError::InvalidObject("Object is not a tree")
       }
       out.push(o)
-      let entries = parse_tree(o.data)
+      let entries = @git.parse_tree(o.data)
       for entry in entries {
         if collect_is_tree_mode(entry.mode) {
           collect_tree_objects(db, fs, entry.id, seen, out)
@@ -93,11 +93,11 @@ fn collect_tree_objects(
 ///|
 fn collect_blob_object(
   db : ObjectDb,
-  fs : &RepoFileSystem,
-  blob_id : ObjectId,
+  fs : &@git.RepoFileSystem,
+  blob_id : @git.ObjectId,
   seen : Map[String, Bool],
-  out : Array[PackObject],
-) -> Unit raise GitError {
+  out : Array[@git.PackObject],
+) -> Unit raise @git.GitError {
   let hex = blob_id.to_hex()
   if seen.contains(hex) {
     return
@@ -105,10 +105,10 @@ fn collect_blob_object(
   seen[hex] = true
   let obj = db.get(fs, blob_id)
   match obj {
-    None => raise GitError::InvalidObject("Missing blob object")
+    None => raise @git.GitError::InvalidObject("Missing blob object")
     Some(o) => {
-      if o.obj_type != ObjectType::Blob {
-        raise GitError::InvalidObject("Object is not a blob")
+      if o.obj_type != @git.ObjectType::Blob {
+        raise @git.GitError::InvalidObject("Object is not a blob")
       }
       out.push(o)
     }

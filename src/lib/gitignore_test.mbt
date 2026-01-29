@@ -1,8 +1,8 @@
 ///| Tests for gitignore and ls-files behavior
 
 ///|
-fn setup_repo_fs() -> TestFs {
-  let fs = TestFs::new()
+fn setup_repo_fs() -> @git.TestFs {
+  let fs = @git.TestFs::new()
   fs.mkdir_p("/repo")
   fs
 }
