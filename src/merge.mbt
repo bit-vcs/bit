@@ -1,0 +1,231 @@
+///| Merge implementation (file-level, no conflict resolution)
+
+///|
+pub enum MergeStatus {
+  AlreadyUpToDate
+  FastForward
+  Merged
+  Conflicted
+}
+
+///|
+pub struct MergeResult {
+  status : MergeStatus
+  commit_id : ObjectId?
+  conflicts : Array[String]
+}
+
+///|
+pub fn merge(
+  fs : &FileSystem,
+  rfs : &RepoFileSystem,
+  root : String,
+  target : ObjectId,
+  message : String,
+  author : String,
+  timestamp : Int64,
+) -> MergeResult raise GitError {
+  let git_dir = join_path(root, ".git")
+  let head = match resolve_head_commit(rfs, git_dir) {
+    None => raise GitError::InvalidObject("HEAD not found")
+    Some(id) => id
+  }
+  if head == target {
+    return { status: AlreadyUpToDate, commit_id: Some(head), conflicts: [] }
+  }
+  let db = ObjectDb::load(rfs, git_dir)
+  if merge_is_ancestor(db, rfs, head, target) {
+    ignore(reset(fs, rfs, root, target.to_hex(), ResetMode::Hard))
+    return { status: FastForward, commit_id: Some(target), conflicts: [] }
+  }
+  if merge_is_ancestor(db, rfs, target, head) {
+    return { status: AlreadyUpToDate, commit_id: Some(head), conflicts: [] }
+  }
+  let base = merge_find_base(db, rfs, head, target)
+  let base_files = match base {
+    None => {}
+    Some(id) => collect_tree_files_from_commit(db, rfs, id)
+  }
+  let ours = collect_tree_files_from_commit(db, rfs, head)
+  let theirs = collect_tree_files_from_commit(db, rfs, target)
+  let (merged, conflicts) = merge_files(base_files, ours, theirs)
+  if conflicts.length() > 0 {
+    conflicts.sort()
+    return { status: Conflicted, commit_id: None, conflicts }
+  }
+  write_worktree_from_files(
+    db,
+    fs,
+    rfs,
+    root,
+    git_dir,
+    merged,
+    remove_missing=true,
+  )
+  let entries = tree_files_to_index(db, rfs, merged)
+  write_index_entries(fs, git_dir, entries)
+  let tree_id = write_tree_from_index(fs, git_dir, entries)
+  let commit = Commit::new(
+    tree_id,
+    [head, target],
+    author,
+    timestamp,
+    "+0000",
+    author,
+    timestamp,
+    "+0000",
+    message,
+  )
+  let (commit_id, compressed) = create_commit(commit)
+  write_object_bytes(fs, git_dir, commit_id, compressed)
+  update_head_ref(fs, rfs, git_dir, commit_id)
+  { status: Merged, commit_id: Some(commit_id), conflicts: [] }
+}
+
+///|
+fn merge_is_ancestor(
+  db : ObjectDb,
+  fs : &RepoFileSystem,
+  ancestor : ObjectId,
+  commit_id : ObjectId,
+) -> Bool raise GitError {
+  let stack : Array[ObjectId] = [commit_id]
+  let seen : Map[String, Bool] = {}
+  while stack.length() > 0 {
+    let id = match stack.pop() {
+      None => raise GitError::InvalidObject("Empty stack")
+      Some(v) => v
+    }
+    let hex = id.to_hex()
+    if seen.contains(hex) {
+      continue
+    }
+    seen[hex] = true
+    if id == ancestor {
+      return true
+    }
+    let parents = merge_commit_parents(db, fs, id)
+    for p in parents {
+      stack.push(p)
+    }
+  }
+  false
+}
+
+///|
+fn merge_find_base(
+  db : ObjectDb,
+  fs : &RepoFileSystem,
+  a : ObjectId,
+  b : ObjectId,
+) -> ObjectId? raise GitError {
+  let seen : Map[String, Bool] = {}
+  let stack_a : Array[ObjectId] = [a]
+  while stack_a.length() > 0 {
+    let id = match stack_a.pop() {
+      None => raise GitError::InvalidObject("Empty stack")
+      Some(v) => v
+    }
+    let hex = id.to_hex()
+    if seen.contains(hex) {
+      continue
+    }
+    seen[hex] = true
+    let parents = merge_commit_parents(db, fs, id)
+    for p in parents {
+      stack_a.push(p)
+    }
+  }
+  let stack_b : Array[ObjectId] = [b]
+  while stack_b.length() > 0 {
+    let id = match stack_b.pop() {
+      None => raise GitError::InvalidObject("Empty stack")
+      Some(v) => v
+    }
+    let hex = id.to_hex()
+    if seen.contains(hex) {
+      return Some(id)
+    }
+    let parents = merge_commit_parents(db, fs, id)
+    for p in parents {
+      stack_b.push(p)
+    }
+  }
+  None
+}
+
+///|
+fn merge_commit_parents(
+  db : ObjectDb,
+  fs : &RepoFileSystem,
+  commit_id : ObjectId,
+) -> Array[ObjectId] raise GitError {
+  let obj = db.get(fs, commit_id)
+  match obj {
+    None => raise GitError::InvalidObject("Missing commit object")
+    Some(o) => {
+      if o.obj_type != ObjectType::Commit {
+        raise GitError::InvalidObject("Object is not a commit")
+      }
+      let info = parse_commit(o.data)
+      info.parents
+    }
+  }
+}
+
+///|
+fn merge_files(
+  base : Map[String, TreeFileEntry],
+  ours : Map[String, TreeFileEntry],
+  theirs : Map[String, TreeFileEntry],
+) -> (Map[String, TreeFileEntry], Array[String]) {
+  let merged : Map[String, TreeFileEntry] = {}
+  let conflicts : Array[String] = []
+  let all_paths : Map[String, Bool] = {}
+  for item in base.to_array() {
+    let (path, _) = item
+    all_paths[path] = true
+  }
+  for item in ours.to_array() {
+    let (path, _) = item
+    all_paths[path] = true
+  }
+  for item in theirs.to_array() {
+    let (path, _) = item
+    all_paths[path] = true
+  }
+  for item in all_paths.to_array() {
+    let (path, _) = item
+    let b = base.get(path)
+    let o = ours.get(path)
+    let t = theirs.get(path)
+    if merge_entry_eq(o, t) {
+      match o {
+        None => ()
+        Some(v) => merged[path] = v
+      }
+    } else if merge_entry_eq(o, b) {
+      match t {
+        None => ()
+        Some(v) => merged[path] = v
+      }
+    } else if merge_entry_eq(t, b) {
+      match o {
+        None => ()
+        Some(v) => merged[path] = v
+      }
+    } else {
+      conflicts.push(path)
+    }
+  }
+  (merged, conflicts)
+}
+
+///|
+fn merge_entry_eq(a : TreeFileEntry?, b : TreeFileEntry?) -> Bool {
+  match (a, b) {
+    (None, None) => true
+    (Some(x), Some(y)) => x.id == y.id && x.mode == y.mode
+    _ => false
+  }
+}
