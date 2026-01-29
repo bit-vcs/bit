@@ -21,6 +21,37 @@ pub struct ReceivePackResult {
 }
 
 ///|
+/// Build receive-pack advertisement (info/refs payload).
+pub fn build_receive_pack_advertisement(
+  fs : &@git.RepoFileSystem,
+  root : String,
+  agent? : String = "git/moonbit",
+) -> Bytes raise @git.GitError {
+  let git_dir = join_path(root, ".git")
+  let refs = show_ref(fs, git_dir)
+  refs.sort_by(fn(a, b) { String::compare(a.0, b.0) })
+  let caps = receive_default_caps(agent)
+  let out : Array[Byte] = []
+  if refs.length() == 0 {
+    let zero = @git.ObjectId::zero().to_hex()
+    let line = "\{zero} capabilities^{}\u0000\{caps}\n"
+    receive_push_bytes(out, @git.pktline_encode(line))
+    receive_push_bytes(out, @git.pktline_flush())
+    return Bytes::from_array(FixedArray::makei(out.length(), fn(i) { out[i] }))
+  }
+  let (first_name, first_id) = refs[0]
+  let first_line = "\{first_id.to_hex()} \{first_name}\u0000\{caps}\n"
+  receive_push_bytes(out, @git.pktline_encode(first_line))
+  for i in 1..<refs.length() {
+    let (name, id) = refs[i]
+    let line = "\{id.to_hex()} \{name}\n"
+    receive_push_bytes(out, @git.pktline_encode(line))
+  }
+  receive_push_bytes(out, @git.pktline_flush())
+  Bytes::from_array(FixedArray::makei(out.length(), fn(i) { out[i] }))
+}
+
+///|
 pub fn parse_receive_pack_request(
   data : Bytes,
 ) -> ReceivePackRequest raise @git.GitError {
@@ -128,27 +159,15 @@ pub fn receive_pack(
 ///|
 fn receive_build_status_response(result : ReceivePackResult) -> Bytes {
   let out : Array[Byte] = []
-  let unpack = @git.pktline_encode("unpack ok\n")
-  for b in unpack {
-    out.push(b)
-  }
+  receive_push_bytes(out, @git.pktline_encode("unpack ok\n"))
   for refname in result.updated {
-    let line = @git.pktline_encode("ok \{refname}\n")
-    for b in line {
-      out.push(b)
-    }
+    receive_push_bytes(out, @git.pktline_encode("ok \{refname}\n"))
   }
   for item in result.rejected {
     let (refname, msg) = item
-    let line = @git.pktline_encode("ng \{refname} \{msg}\n")
-    for b in line {
-      out.push(b)
-    }
+    receive_push_bytes(out, @git.pktline_encode("ng \{refname} \{msg}\n"))
   }
-  let flush = @git.pktline_flush()
-  for b in flush {
-    out.push(b)
-  }
+  receive_push_bytes(out, @git.pktline_flush())
   Bytes::from_array(FixedArray::makei(out.length(), fn(i) { out[i] }))
 }
 
@@ -301,4 +320,25 @@ fn receive_chars_to_string(chars : Array[Char]) -> String {
     buf.write_char(c)
   }
   buf.to_string()
+}
+
+///|
+fn receive_push_bytes(out : Array[Byte], data : Bytes) -> Unit {
+  for b in data {
+    out.push(b)
+  }
+}
+
+///|
+fn receive_default_caps(agent : String) -> String {
+  let caps : Array[String] = [
+    "report-status",
+    "report-status-v2",
+    "delete-refs",
+    "side-band-64k",
+    "ofs-delta",
+    "object-format=sha1",
+    "agent=\{agent}",
+  ]
+  caps.join(" ")
 }

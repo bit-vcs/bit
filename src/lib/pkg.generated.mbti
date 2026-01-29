@@ -10,6 +10,8 @@ pub fn add_paths(&@git.FileSystem, &@git.RepoFileSystem, String, Array[String]) 
 
 pub fn apply_receive_pack(&@git.FileSystem, &@git.RepoFileSystem, String, ReceivePackRequest) -> ReceivePackResult raise @git.GitError
 
+pub fn build_receive_pack_advertisement(&@git.RepoFileSystem, String, agent? : String) -> Bytes raise @git.GitError
+
 pub fn checkout(&@git.FileSystem, &@git.RepoFileSystem, String, String, detach? : Bool, update_worktree? : Bool, update_index? : Bool) -> @git.ObjectId raise @git.GitError
 
 pub fn collect_reachable_objects(ObjectDb, &@git.RepoFileSystem, @git.ObjectId) -> Array[@git.PackObject] raise @git.GitError

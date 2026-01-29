@@ -50,3 +50,16 @@ test "receive-pack: push to empty repo" {
   let files = fs.readdir(pack_dir)
   assert_true(files.length() > 0)
 }
+
+///|
+test "receive-pack: advertise empty repo" {
+  let fs = @git.TestFs::new()
+  ignore(try? init_repo(fs, "/repo"))
+  let adv = build_receive_pack_advertisement(fs, "/repo")
+  let decoded = @git.pktline_decode(adv) catch { _ => [] }
+  assert_true(decoded.length() > 0)
+  let (line_bytes, _) = decoded[0]
+  let line = @utf8.decode_lossy(line_bytes[:])
+  assert_true(line.contains("capabilities^{}"))
+  assert_true(line.contains("report-status"))
+}
