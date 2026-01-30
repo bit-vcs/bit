@@ -132,10 +132,7 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
 }
 
 ///|
-fn get_head_commit_message(
-  fs : &@git.RepoFileSystem,
-  root : String,
-) -> String? {
+fn get_head_commit_message(fs : &@git.RepoFileSystem, root : String) -> String? {
   let git_dir = root + "/.git"
   let head = @gitlib.resolve_head_commit(fs, git_dir) catch { _ => return None }
   guard head is Some(commit_id) else { return None }

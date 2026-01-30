@@ -18,12 +18,12 @@ trap cleanup EXIT
 echo "=== Git HTTP Backend Test ==="
 echo ""
 
-# Build git-shim
-echo "[1/7] Building git-shim..."
+# Build moongit
+echo "[1/7] Building moongit..."
 cd "$REPO_ROOT"
 moon build --target native 2>/dev/null
 mkdir -p tools/git-shim
-cp _build/native/release/build/cmd/git_shim/git_shim.exe tools/git-shim/moon
+cp _build/native/release/build/cmd/moongit/moongit.exe tools/git-shim/moon
 echo "       Done."
 
 # Create test repository

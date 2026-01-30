@@ -30,7 +30,18 @@ test "merge: file-level merge without conflicts" {
   )
   match result.status {
     Merged => ()
-    _ => assert_true(false)
+    Conflicted => {
+      println("CONFLICT: \{result.conflicts}")
+      assert_true(false)
+    }
+    AlreadyUpToDate => {
+      println("AlreadyUpToDate merge")
+      assert_true(false)
+    }
+    FastForward => {
+      println("FastForward merge")
+      assert_true(false)
+    }
   }
   let head = fs.read_string("/repo/.git/refs/heads/main")
   match result.commit_id {

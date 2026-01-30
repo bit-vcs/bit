@@ -26,9 +26,12 @@ async fn handle_diff(args : Array[String]) -> Unit raise Error {
   }
   // Filter by paths if specified
   let files = if paths.length() > 0 {
-    all_files.iter().filter(fn(f) {
+    all_files
+    .iter()
+    .filter(fn(f) {
       paths.iter().any(fn(p) { f.path == p || f.path.has_prefix(p + "/") })
-    }).collect()
+    })
+    .collect()
   } else {
     all_files
   }
@@ -371,9 +374,10 @@ async fn handle_sparse_checkout(args : Array[String]) -> Unit raise Error {
       print_line("Sparse checkout initialized")
     }
     "set" => {
-      let patterns = rest.iter().filter(fn(arg) {
-        not(arg.has_prefix("-"))
-      }).collect()
+      let patterns = rest
+        .iter()
+        .filter(fn(arg) { not(arg.has_prefix("-")) })
+        .collect()
       if patterns.length() == 0 {
         raise @git.GitError::InvalidObject("patterns required for set")
       }
@@ -381,9 +385,10 @@ async fn handle_sparse_checkout(args : Array[String]) -> Unit raise Error {
       print_line("Sparse checkout patterns set")
     }
     "add" => {
-      let patterns = rest.iter().filter(fn(arg) {
-        not(arg.has_prefix("-"))
-      }).collect()
+      let patterns = rest
+        .iter()
+        .filter(fn(arg) { not(arg.has_prefix("-")) })
+        .collect()
       if patterns.length() == 0 {
         raise @git.GitError::InvalidObject("patterns required for add")
       }

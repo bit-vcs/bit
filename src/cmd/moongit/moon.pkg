@@ -20,6 +20,8 @@ options(
     "main_wasm.mbt": [ "wasm-gc", "wasm" ],
     "pack_helpers.mbt": [ "native" ],
     "pack_objects.mbt": [ "native" ],
+    "time_js.mbt": [ "js" ],
     "time_native.mbt": [ "native" ],
+    "time_wasm.mbt": [ "wasm-gc", "wasm" ],
   },
 )

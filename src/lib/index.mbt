@@ -34,27 +34,39 @@ pub fn read_index_entries(
   let mut offset = 12
   let entries : Array[IndexEntry] = []
   for _ in 0..<count {
+    let entry_start = offset
     if offset + 62 > data.length() {
       raise @git.GitError::InvalidObject("Index entry truncated")
     }
-    // skip ctime/mtime/dev/ino/uid/gid (8 u32)
-    offset += 32
+    // Index entry format (40 bytes stat data):
+    // ctime_seconds, ctime_nanoseconds, mtime_seconds, mtime_nanoseconds,
+    // dev, ino, mode, uid, gid, file_size
+    offset += 24 // skip ctime, mtime, dev, ino (6 u32)
     let mode = index_read_u32_be(data, offset)
     offset += 4
+    offset += 8 // skip uid, gid (2 u32)
     let size = index_read_u32_be(data, offset)
     offset += 4
     let id = index_read_object_id(data, offset)
     offset += 20
     // flags (u16)
+    let flags = index_read_u16_be(data, offset)
     offset += 2
-    let (path_str, next) = index_read_cstring(data, offset)
-    offset = next
-    while offset % 8 != 0 {
-      if offset >= data.length() {
-        raise @git.GitError::InvalidObject("Index padding out of range")
-      }
-      offset += 1
+    // Check extended flag (bit 14) - if set, skip 2 more bytes
+    let has_extended = (flags & 0x4000) != 0
+    if has_extended {
+      offset += 2
     }
+    let (path_str, next) = index_read_cstring(data, offset)
+    let path_len = path_str.length()
+    // Calculate next entry position: entry size must be a multiple of 8
+    // Fixed part: 62 bytes (or 64 with extended flags)
+    // Variable part: path_len + NUL + padding
+    let fixed_size = if has_extended { 64 } else { 62 }
+    let entry_size_without_padding = fixed_size + path_len + 1
+    let entry_size = (entry_size_without_padding + 7) / 8 * 8
+    offset = entry_start + entry_size
+    ignore(next)
     entries.push({ path: path_str, id, mode, size })
   }
   entries
@@ -77,18 +89,20 @@ pub fn write_index_entries(
   index_push_u32_be(out, 2)
   index_push_u32_be(out, sorted.length())
   for e in sorted {
-    // ctime/mtime/dev/ino/uid/gid all zeros
-    index_push_u32_be(out, 0)
-    index_push_u32_be(out, 0)
-    index_push_u32_be(out, 0)
-    index_push_u32_be(out, 0)
-    index_push_u32_be(out, 0)
-    index_push_u32_be(out, 0)
-    index_push_u32_be(out, 0)
-    index_push_u32_be(out, 0)
-    // mode + size
-    index_push_u32_be(out, e.mode)
-    index_push_u32_be(out, e.size)
+    let entry_start = out.length()
+    // Index entry format (40 bytes stat data):
+    // ctime_seconds, ctime_nanoseconds, mtime_seconds, mtime_nanoseconds,
+    // dev, ino, mode, uid, gid, file_size
+    index_push_u32_be(out, 0) // ctime_seconds
+    index_push_u32_be(out, 0) // ctime_nanoseconds
+    index_push_u32_be(out, 0) // mtime_seconds
+    index_push_u32_be(out, 0) // mtime_nanoseconds
+    index_push_u32_be(out, 0) // dev
+    index_push_u32_be(out, 0) // ino
+    index_push_u32_be(out, e.mode) // mode
+    index_push_u32_be(out, 0) // uid
+    index_push_u32_be(out, 0) // gid
+    index_push_u32_be(out, e.size) // file_size
     // object id
     for b in e.id.bytes {
       out.push(b)
@@ -103,7 +117,8 @@ pub fn write_index_entries(
       out.push(c.to_int().to_byte())
     }
     out.push(b'\x00')
-    while out.length() % 8 != 0 {
+    // Pad to 8-byte alignment from entry start
+    while (out.length() - entry_start) % 8 != 0 {
       out.push(b'\x00')
     }
   }
@@ -126,6 +141,14 @@ fn index_read_u32_be(data : Bytes, start : Int) -> Int raise @git.GitError {
   (data[start + 1].to_int() << 16) |
   (data[start + 2].to_int() << 8) |
   data[start + 3].to_int()
+}
+
+///|
+fn index_read_u16_be(data : Bytes, start : Int) -> Int raise @git.GitError {
+  if start < 0 || start + 2 > data.length() {
+    raise @git.GitError::InvalidObject("Unexpected end of index data")
+  }
+  (data[start].to_int() << 8) | data[start + 1].to_int()
 }
 
 ///|

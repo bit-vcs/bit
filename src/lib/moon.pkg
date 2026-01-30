@@ -1,5 +1,6 @@
 import {
   "mizchi/git" as @git,
+  "mizchi/git/ignore" as @ignore,
   "moonbitlang/async" as @async,
   "mizchi/zlib",
   "moonbitlang/async/process" as @process,

@@ -270,7 +270,7 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
 ///|
 async fn print_rebase_result(result : @gitlib.RebaseResult) -> Unit {
   match result.status {
-    @gitlib.RebaseStatus::Complete => {
+    @gitlib.RebaseStatus::Complete =>
       match result.commit_id {
         Some(id) => {
           let short = String::unsafe_substring(id.to_hex(), start=0, end=7)
@@ -278,7 +278,6 @@ async fn print_rebase_result(result : @gitlib.RebaseResult) -> Unit {
         }
         None => print_line("Successfully rebased.")
       }
-    }
     @gitlib.RebaseStatus::NothingToRebase =>
       print_line("Current branch is up to date.")
     @gitlib.RebaseStatus::Conflict => {
@@ -288,7 +287,9 @@ async fn print_rebase_result(result : @gitlib.RebaseResult) -> Unit {
       }
       print_line("")
       print_line("Resolve all conflicts, then run \"git rebase --continue\".")
-      print_line("To abort and return to the original state, run \"git rebase --abort\".")
+      print_line(
+        "To abort and return to the original state, run \"git rebase --abort\".",
+      )
       print_line("To skip this commit, run \"git rebase --skip\".")
     }
   }

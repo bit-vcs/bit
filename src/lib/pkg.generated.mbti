@@ -242,7 +242,7 @@ pub enum MergeStatus {
 }
 
 pub struct ObjectDb {
-  loose : Map[String, @git.PackObject]
+  loose_paths : Map[String, String]
   packs : Array[PackIndex]
 }
 pub fn ObjectDb::get(Self, &@git.RepoFileSystem, @git.ObjectId) -> @git.PackObject? raise @git.GitError

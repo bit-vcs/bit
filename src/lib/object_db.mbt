@@ -33,7 +33,7 @@ pub fn PackIndex::find_offset_hex(self : PackIndex, hex : String) -> Int64? {
 
 ///|
 pub struct ObjectDb {
-  loose : Map[String, @git.PackObject]
+  loose_paths : Map[String, String] // hex -> path (lazy loading)
   packs : Array[PackIndex]
 }
 
@@ -43,8 +43,8 @@ pub fn ObjectDb::load(
   git_dir : String,
 ) -> ObjectDb raise @git.GitError {
   let objects_dir = join_path(git_dir, "objects")
-  let loose = if fs.is_dir(objects_dir) {
-    load_loose_map(fs, objects_dir)
+  let loose_paths = if fs.is_dir(objects_dir) {
+    collect_loose_paths(fs, objects_dir)
   } else {
     {}
   }
@@ -58,7 +58,7 @@ pub fn ObjectDb::load(
   } else {
     []
   }
-  { loose, packs }
+  { loose_paths, packs }
 }
 
 ///|
@@ -82,10 +82,24 @@ fn get_by_hex(
     raise @git.GitError::InvalidObject("Delta cycle detected: \{hex}")
   }
   seen[hex] = true
-  match db.loose.get(hex) {
-    Some(obj) => return Some(obj)
+  // Try to load from loose objects (lazy)
+  match db.loose_paths.get(hex) {
+    Some(path) => {
+      let compressed = fs.read_file(path)
+      let raw = @zlib.zlib_decompress(compressed) catch {
+        e => raise @git.GitError::InvalidObject("Zlib error: \{e}")
+      }
+      let obj = parse_loose_object(raw)
+      // Verify hash
+      let computed = @git.hash_object_content(obj.obj_type, obj.data).to_hex()
+      if computed != hex {
+        raise @git.GitError::HashMismatch(computed, hex)
+      }
+      return Some(obj)
+    }
     None => ()
   }
+  // Try pack files
   for pack in db.packs {
     match PackIndex::find_offset_hex(pack, hex) {
       None => ()
@@ -123,11 +137,14 @@ pub fn load_object_store_from_fs(
 }
 
 ///|
-fn load_loose_map(
+
+///|
+/// Collect paths to loose objects without loading content (lazy loading)
+fn collect_loose_paths(
   fs : &@git.RepoFileSystem,
   objects_dir : String,
-) -> Map[String, @git.PackObject] raise @git.GitError {
-  let result : Map[String, @git.PackObject] = {}
+) -> Map[String, String] raise @git.GitError {
+  let result : Map[String, String] = {}
   let entries = fs.readdir(objects_dir)
   for entry in entries {
     if entry.length() != 2 {
@@ -147,16 +164,7 @@ fn load_loose_map(
         continue
       }
       let hex = entry + name
-      let compressed = fs.read_file(path)
-      let raw = @zlib.zlib_decompress(compressed) catch {
-        e => raise @git.GitError::InvalidObject("Zlib error: \{e}")
-      }
-      let obj = parse_loose_object(raw)
-      let computed = @git.hash_object_content(obj.obj_type, obj.data).to_hex()
-      if computed != hex {
-        raise @git.GitError::HashMismatch(computed, hex)
-      }
-      result[hex] = obj
+      result[hex] = path
     }
   }
   result
@@ -168,9 +176,14 @@ fn load_loose_objects(
   objects_dir : String,
 ) -> Array[@git.PackObject] raise @git.GitError {
   let result : Array[@git.PackObject] = []
-  let map = load_loose_map(fs, objects_dir)
-  for item in map.to_array() {
-    let (_, obj) = item
+  let paths = collect_loose_paths(fs, objects_dir)
+  for item in paths.to_array() {
+    let (_, path) = item
+    let compressed = fs.read_file(path)
+    let raw = @zlib.zlib_decompress(compressed) catch {
+      e => raise @git.GitError::InvalidObject("Zlib error: \{e}")
+    }
+    let obj = parse_loose_object(raw)
     result.push(obj)
   }
   result

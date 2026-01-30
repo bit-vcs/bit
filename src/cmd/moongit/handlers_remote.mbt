@@ -17,9 +17,7 @@ async fn handle_remote(args : Array[String]) -> Unit raise Error {
   match subcmd {
     "add" => {
       if args.length() < 3 {
-        raise @git.GitError::InvalidObject(
-          "usage: git remote add <name> <url>",
-        )
+        raise @git.GitError::InvalidObject("usage: git remote add <name> <url>")
       }
       let name = args[1]
       let url = args[2]
@@ -28,9 +26,7 @@ async fn handle_remote(args : Array[String]) -> Unit raise Error {
     }
     "remove" | "rm" => {
       if args.length() < 2 {
-        raise @git.GitError::InvalidObject(
-          "usage: git remote remove <name>",
-        )
+        raise @git.GitError::InvalidObject("usage: git remote remove <name>")
       }
       let name = args[1]
       remote_remove(fs, fs, git_dir, name)
@@ -47,9 +43,7 @@ async fn handle_remote(args : Array[String]) -> Unit raise Error {
     }
     "get-url" => {
       if args.length() < 2 {
-        raise @git.GitError::InvalidObject(
-          "usage: git remote get-url <name>",
-        )
+        raise @git.GitError::InvalidObject("usage: git remote get-url <name>")
       }
       let name = args[1]
       let url = get_remote_url(fs, git_dir, name)
@@ -68,15 +62,13 @@ async fn handle_remote(args : Array[String]) -> Unit raise Error {
       let url = args[2]
       remote_set_url(fs, fs, git_dir, name, url)
     }
-    _ => raise @git.GitError::InvalidObject("Unknown remote subcommand: \{subcmd}")
+    _ =>
+      raise @git.GitError::InvalidObject("Unknown remote subcommand: \{subcmd}")
   }
 }
 
 ///|
-fn list_remotes(
-  fs : &@git.RepoFileSystem,
-  git_dir : String,
-) -> Array[String] {
+fn list_remotes(fs : &@git.RepoFileSystem, git_dir : String) -> Array[String] {
   let config_path = git_dir + "/config"
   if not(fs.is_file(config_path)) {
     return []
@@ -86,11 +78,7 @@ fn list_remotes(
   for line_view in content.split("\n") {
     let line = trim_string(line_view.to_string())
     if line.has_prefix("[remote \"") && line.has_suffix("\"]") {
-      let name = String::unsafe_substring(
-        line,
-        start=9,
-        end=line.length() - 2,
-      )
+      let name = String::unsafe_substring(line, start=9, end=line.length() - 2)
       remotes.push(name)
     }
   }
@@ -142,7 +130,11 @@ fn get_remote_url(
   if not(fs.is_file(config_path)) {
     return None
   }
-  let content = decode_bytes(fs.read_file(config_path) catch { _ => return None })
+  let content = decode_bytes(
+    fs.read_file(config_path) catch {
+      _ => return None
+    },
+  )
   let target_section = "[remote \"\{name}\"]"
   let mut in_section = false
   for line_view in content.split("\n") {
@@ -230,9 +222,16 @@ fn remote_remove(
     let _ = lines.pop()
 
   }
-  let new_content = lines.iter().fold(init="", fn(acc, line) {
-    if acc == "" { line } else { acc + "\n" + line }
-  }) + "\n"
+  let new_content = lines
+    .iter()
+    .fold(init="", fn(acc, line) {
+      if acc == "" {
+        line
+      } else {
+        acc + "\n" + line
+      }
+    }) +
+    "\n"
   fs.write_string(config_path, new_content)
 }
 
@@ -276,9 +275,15 @@ fn remote_set_url(
   if not(found) {
     raise @git.GitError::InvalidObject("No such remote '\{name}'")
   }
-  let new_content = lines.iter().fold(init="", fn(acc, line) {
-    if acc == "" { line } else { acc + "\n" + line }
-  })
+  let new_content = lines
+    .iter()
+    .fold(init="", fn(acc, line) {
+      if acc == "" {
+        line
+      } else {
+        acc + "\n" + line
+      }
+    })
   fs.write_string(config_path, new_content)
 }
 
@@ -291,10 +296,7 @@ fn parse_pack_args(args : Array[String]) -> (Bool, String)? {
       "--advertise-refs" => advertise = true
       "--stateless-rpc" => continue
       _ if arg.has_prefix("--") => continue
-      _ =>
-        if repo is None {
-          repo = Some(arg)
-        }
+      _ => if repo is None { repo = Some(arg) }
     }
   }
   match repo {
@@ -369,12 +371,17 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
     Some(d) => d
     None => {
       let name = if remote_url.has_suffix(".git") {
-        String::unsafe_substring(remote_url, start=0, end=remote_url.length() - 4)
+        String::unsafe_substring(
+          remote_url,
+          start=0,
+          end=remote_url.length() - 4,
+        )
       } else {
         remote_url
       }
       match name.rev_find("/") {
-        Some(i) => String::unsafe_substring(name, start=i + 1, end=name.length())
+        Some(i) =>
+          String::unsafe_substring(name, start=i + 1, end=name.length())
         None => name
       }
     }
@@ -489,7 +496,9 @@ fn read_remote_url_from_config(
     return None
   }
   let config_content = decode_bytes(
-    fs.read_file(config_path) catch { _ => return None },
+    fs.read_file(config_path) catch {
+      _ => return None
+    },
   )
   let mut in_remote_section = false
   for line_view in config_content.split("\n") {

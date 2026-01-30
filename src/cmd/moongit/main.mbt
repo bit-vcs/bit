@@ -1,16 +1,71 @@
 ///| Git-shim main entry point and command dispatcher
 
 ///|
+async fn show_help() -> Unit {
+  let help =
+    #|usage: moongit [-v | --version] [-h | --help] [-C <path>]
+    #|               <command> [<args>]
+    #|
+    #|moongit is a Git implementation in MoonBit.
+    #|Unsupported commands automatically fallback to system git.
+    #|
+    #|start a working area
+    #|   clone      Clone a repository into a new directory
+    #|   init       Create an empty Git repository
+    #|
+    #|work on the current change
+    #|   add        Add file contents to the index
+    #|   mv         Move or rename a file, a directory, or a symlink
+    #|   rm         Remove files from the working tree and from the index
+    #|
+    #|examine the history and state
+    #|   diff       Show changes between commits, commit and working tree, etc
+    #|   log        Show commit logs
+    #|   show       Show various types of objects
+    #|   status     Show the working tree status
+    #|
+    #|grow, mark and tweak your common history
+    #|   branch     List, create, or delete branches
+    #|   commit     Record changes to the repository
+    #|   checkout   Switch branches or restore working tree files
+    #|   merge      Join two or more development histories together
+    #|   rebase     Reapply commits on top of another base tip
+    #|   reset      Reset current HEAD to the specified state
+    #|   switch     Switch branches
+    #|   tag        Create, list, delete tag objects
+    #|
+    #|collaborate
+    #|   fetch      Download objects and refs from another repository
+    #|   pull       Fetch from and integrate with another repository
+    #|   remote     Manage set of tracked repositories
+    #|
+    #|low-level / plumbing
+    #|   config          Get and set repository options
+    #|   rev-parse       Parse revision specifications
+    #|   pack-objects    Create a packed archive of objects
+    #|   index-pack      Build pack index file for an existing packed archive
+    #|   upload-pack     Send objects packed back to git-fetch-pack
+    #|   receive-pack    Receive what is pushed into the repository
+    #|
+    #|See 'git help <command>' for more information on a specific command.
+  print_line(help)
+}
+
+///|
 async fn main_async() -> Unit {
   let args = @sys.get_cli_args()
   if args.length() < 2 {
-    eprint_line("git-shim: missing subcommand")
-    @sys.exit(2)
+    show_help()
+    return ()
   }
-  // Handle --version early
+  // Handle --version and --help early
   match args {
     [_, "--version" | "version", ..] => {
-      print_line("git version 2.47.0 (git-shim)")
+      print_line("git version 2.47.0 (moongit)")
+      return ()
+    }
+    [_, "-h" | "--help" | "help", ..] => {
+      show_help()
       return ()
     }
     _ => ()
@@ -63,9 +118,9 @@ fn parse_global_options(
         if raw.has_prefix("/") {
           raw
         } else {
-          @sys.get_env_var("GIT_SHIM_PWD").map(fn(base) { base + "/" + raw }).unwrap_or(
-            raw,
-          )
+          @sys.get_env_var("GIT_SHIM_PWD")
+          .map(fn(base) { base + "/" + raw })
+          .unwrap_or(raw)
         },
       )
       i += 2
@@ -131,35 +186,45 @@ async fn dispatch_command(
         err => exit_with_error("pack-objects", err)
       }
     "index-pack" =>
-      handle_index_pack(rest) catch { err => exit_with_error("index-pack", err) }
+      handle_index_pack(rest) catch {
+        err => exit_with_error("index-pack", err)
+      }
     // Remote operations
     "remote" =>
-      handle_remote(rest) catch { err => exit_with_error("remote", err) }
-    "clone" =>
-      handle_clone(rest) catch { err => exit_with_error("clone", err) }
-    "fetch" =>
-      handle_fetch(rest) catch { err => exit_with_error("fetch", err) }
+      handle_remote(rest) catch {
+        err => exit_with_error("remote", err)
+      }
+    "clone" => handle_clone(rest) catch { err => exit_with_error("clone", err) }
+    "fetch" => handle_fetch(rest) catch { err => exit_with_error("fetch", err) }
     "pull" => handle_pull(rest) catch { err => exit_with_error("pull", err) }
     // Core operations
     "init" => handle_init(rest) catch { err => exit_with_error("init", err) }
+    // DEBUG: Testing native status handler
     "status" =>
-      handle_status(rest) catch { err => exit_with_error("status", err) }
+      handle_status(rest) catch {
+        err => exit_with_error("status", err)
+      }
     "add" => handle_add(rest) catch { err => exit_with_error("add", err) }
     "commit" =>
-      handle_commit(rest) catch { err => exit_with_error("commit", err) }
-    "log" => handle_log(rest) catch { err => exit_with_error("log", err) }
-    "show" => handle_show(rest) catch { err => exit_with_error("show", err) }
+      handle_commit(rest) catch {
+        err => exit_with_error("commit", err)
+      }
+    "log" => run_system_git(prepend_arg("log", rest))
+    "show" => run_system_git(prepend_arg("show", rest))
     // Branch operations
     "branch" =>
-      handle_branch(rest) catch { _ => run_system_git(prepend_arg("branch", rest))
+      handle_branch(rest) catch {
+        _ => run_system_git(prepend_arg("branch", rest))
       }
     "checkout" => {
       // For -b/-B options, don't fallback to system git
-      let has_create_branch = rest.iter().any(fn(arg) {
-        arg == "-b" || arg == "-B"
-      })
+      let has_create_branch = rest
+        .iter()
+        .any(fn(arg) { arg == "-b" || arg == "-B" })
       if has_create_branch {
-        handle_checkout(rest) catch { err => exit_with_error("checkout", err) }
+        handle_checkout(rest) catch {
+          err => exit_with_error("checkout", err)
+        }
       } else {
         handle_checkout(rest) catch {
           _ => run_system_git(prepend_arg("checkout", rest))
@@ -167,22 +232,26 @@ async fn dispatch_command(
       }
     }
     "switch" =>
-      handle_switch(rest) catch { _ => run_system_git(prepend_arg("switch", rest))
+      handle_switch(rest) catch {
+        _ => run_system_git(prepend_arg("switch", rest))
       }
-    "reset" =>
-      handle_reset(rest) catch { err => exit_with_error("reset", err) }
+    "reset" => handle_reset(rest) catch { err => exit_with_error("reset", err) }
     "rebase" =>
-      handle_rebase(rest) catch { err => exit_with_error("rebase", err) }
+      handle_rebase(rest) catch {
+        err => exit_with_error("rebase", err)
+      }
     // Misc operations
-    "diff" => handle_diff(rest) catch { err => exit_with_error("diff", err) }
+    "diff" => run_system_git(prepend_arg("diff", rest))
     "merge" =>
-      handle_merge(rest) catch { _ => run_system_git(prepend_arg("merge", rest))
+      handle_merge(rest) catch {
+        _ => run_system_git(prepend_arg("merge", rest))
       }
     "tag" => handle_tag(rest) catch { err => exit_with_error("tag", err) }
     "rm" => handle_rm(rest) catch { err => exit_with_error("rm", err) }
     "mv" => handle_mv(rest) catch { err => exit_with_error("mv", err) }
     "config" =>
-      handle_config(rest) catch { _ => run_system_git(prepend_arg("config", rest))
+      handle_config(rest) catch {
+        _ => run_system_git(prepend_arg("config", rest))
       }
     "sparse-checkout" =>
       handle_sparse_checkout(rest) catch {
@@ -192,7 +261,7 @@ async fn dispatch_command(
       handle_rev_parse(rest) catch {
         _ => run_system_git(prepend_arg("rev-parse", rest))
       }
-    "version" | "--version" => print_line("git version 2.47.0 (git-shim)")
+    "version" | "--version" => print_line("git version 2.47.0 (moongit)")
     // Fallback to system git
     _ => run_system_git(prepend_arg(cmd, rest))
   }

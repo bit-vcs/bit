@@ -59,10 +59,14 @@ pub impl @git.RepoFileSystem for OsFs with readdir(_self, path) {
 
 ///|
 pub impl @git.RepoFileSystem for OsFs with is_dir(_self, path) {
-  @fs.is_dir(path) catch { _ => false }
+  @fs.is_dir(path) catch {
+    _ => false
+  }
 }
 
 ///|
 pub impl @git.RepoFileSystem for OsFs with is_file(_self, path) {
-  @fs.is_file(path) catch { _ => false }
+  @fs.is_file(path) catch {
+    _ => false
+  }
 }

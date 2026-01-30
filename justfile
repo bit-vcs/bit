@@ -34,6 +34,22 @@ info:
 clean:
     moon clean
 
+# Build native binary
+build:
+    moon build --target native
+
+# Install moongit to ~/.local/bin
+install: build
+    @mkdir -p ~/.local/bin
+    @cp _build/native/release/build/cmd/moongit/moongit.exe ~/.local/bin/moongit
+    @chmod +x ~/.local/bin/moongit
+    @echo "Installed moongit to ~/.local/bin/moongit"
+
+# Uninstall moongit
+uninstall:
+    @rm -f ~/.local/bin/moongit
+    @echo "Removed ~/.local/bin/moongit"
+
 # Pre-release check
 release-check: fmt info check test
 
