@@ -28,6 +28,8 @@ pub fn commit(&@git.FileSystem, &@git.RepoFileSystem, String, String, String, In
 
 pub fn create_branch(&@git.FileSystem, &@git.RepoFileSystem, String, String) -> Unit raise @git.GitError
 
+pub fn delete_branch(&@git.FileSystem, &@git.RepoFileSystem, String, String, force? : Bool) -> Unit raise @git.GitError
+
 pub fn diff_index(&@git.RepoFileSystem, String) -> Array[DiffFile] raise @git.GitError
 
 pub fn diff_text(Array[DiffFile]) -> Array[String]
@@ -61,6 +63,10 @@ pub fn parse_receive_pack_request(Bytes) -> ReceivePackRequest raise @git.GitErr
 pub fn parse_upload_pack_request(Bytes) -> UploadPackRequest raise @git.GitError
 
 pub fn prune_repo(&@git.FileSystem, &@git.RepoFileSystem, String) -> PruneResult raise @git.GitError
+
+pub async fn pull_http(&@git.FileSystem, &@git.RepoFileSystem, String, String, Bool, rebase? : Bool) -> @git.ObjectId? raise @git.GitError
+
+pub async fn push_http(&@git.RepoFileSystem, String, String, String) -> String raise @git.GitError
 
 pub fn read_head_ref(&@git.RepoFileSystem, String) -> HeadRef raise @git.GitError
 

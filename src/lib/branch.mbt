@@ -107,6 +107,95 @@ pub fn create_branch(
 }
 
 ///|
+/// Delete a local branch. Fails if it's the current branch.
+pub fn delete_branch(
+  fs : &@git.FileSystem,
+  rfs : &@git.RepoFileSystem,
+  root : String,
+  name : String,
+  force? : Bool = false,
+) -> Unit raise @git.GitError {
+  let git_dir = join_path(root, ".git")
+  let head = read_head_ref(rfs, git_dir)
+  match head {
+    Branch(current) =>
+      if current == name {
+        raise @git.GitError::InvalidObject(
+          "Cannot delete branch '\{name}' checked out at '\{root}'",
+        )
+      }
+    Detached(_) => ()
+  }
+  let refname = branch_ref_name(name)
+  let ref_path = join_path(git_dir, refname)
+  // Check if branch exists
+  let exists = rfs.is_file(ref_path) ||
+    resolve_packed_ref(rfs, join_path(git_dir, "packed-refs"), refname)
+    is Some(_)
+  if not(exists) {
+    raise @git.GitError::InvalidObject("branch '\{name}' not found")
+  }
+  // Check if branch is fully merged (unless force)
+  if not(force) {
+    // TODO: implement merge check
+    // For now, skip this check
+    ()
+  }
+  // Delete loose ref if it exists
+  if rfs.is_file(ref_path) {
+    fs.remove_file(ref_path)
+  }
+  // Remove from packed-refs if present
+  let packed_path = join_path(git_dir, "packed-refs")
+  if rfs.is_file(packed_path) {
+    remove_from_packed_refs(fs, rfs, packed_path, refname)
+  }
+}
+
+///|
+fn remove_from_packed_refs(
+  fs : &@git.FileSystem,
+  rfs : &@git.RepoFileSystem,
+  packed_path : String,
+  refname : String,
+) -> Unit raise @git.GitError {
+  let text = @utf8.decode_lossy(rfs.read_file(packed_path)[:])
+  let lines : Array[String] = []
+  let mut found = false
+  for line_view in text.split("\n") {
+    let line = line_view.to_string()
+    if line.length() == 0 {
+      continue
+    }
+    // Check if this line is for the ref we want to remove
+    let space = line.find(" ")
+    match space {
+      None => lines.push(line)
+      Some(idx) => {
+        if idx + 1 >= line.length() {
+          lines.push(line)
+          continue
+        }
+        let name = String::unsafe_substring(
+          line,
+          start=idx + 1,
+          end=line.length(),
+        )
+        if name == refname {
+          found = true
+        } else {
+          lines.push(line)
+        }
+      }
+    }
+  }
+  if found {
+    let new_content = lines.join("\n") + "\n"
+    fs.write_string(packed_path, new_content)
+  }
+}
+
+///|
 /// Switch HEAD to a branch, optionally creating it and checking out files.
 pub fn switch_branch(
   fs : &@git.FileSystem,

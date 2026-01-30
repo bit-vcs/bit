@@ -17,7 +17,9 @@ options(
     "index_pack.mbt": [ "native" ],
     "main.mbt": [ "native" ],
     "main_js.mbt": [ "js" ],
+    "main_wasm.mbt": [ "wasm-gc", "wasm" ],
     "pack_helpers.mbt": [ "native" ],
     "pack_objects.mbt": [ "native" ],
+    "time_native.mbt": [ "native" ],
   },
 )

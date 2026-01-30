@@ -1448,8 +1448,10 @@ async test "git oracle: MoonBit packfile unpack with git unpack-objects" {
   }
 
   // Verify content matches
-  assert_true(bytes_to_string_lossy(cat1_out) == "first file content\n")
-  assert_true(bytes_to_string_lossy(cat2_out) == "second file content\n")
+  let got1 = bytes_to_string_lossy(cat1_out)
+  let got2 = bytes_to_string_lossy(cat2_out)
+  inspect(got1, content="first file content\n")
+  inspect(got2, content="second file content\n")
   remove_dir_recursive(temp_dir)
 }
 
