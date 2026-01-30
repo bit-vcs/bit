@@ -88,6 +88,8 @@ pub fn resolve_head_commit(&@git.RepoFileSystem, String) -> @git.ObjectId? raise
 
 pub fn resolve_ref(&@git.RepoFileSystem, String, String) -> @git.ObjectId? raise @git.GitError
 
+pub fn restore_paths(&@git.FileSystem, &@git.RepoFileSystem, String, Array[String]) -> Unit raise @git.GitError
+
 pub fn rev_parse(&@git.RepoFileSystem, String, String) -> @git.ObjectId? raise @git.GitError
 
 pub fn show_ref(&@git.RepoFileSystem, String) -> Array[(String, @git.ObjectId)] raise @git.GitError

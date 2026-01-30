@@ -525,19 +525,51 @@ async fn handle_diff(args : Array[String]) -> Unit raise Error {
 ///|
 fn handle_checkout(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
+  let git_dir = root + "/.git"
   let fs = OsFs::new()
-  let mut target : String? = None
+  // Parse arguments: look for -- separator
+  let mut saw_separator = false
+  let targets : Array[String] = []
   for arg in args {
-    if not(arg.has_prefix("-")) {
-      target = Some(arg)
-      break
+    if arg == "--" {
+      saw_separator = true
+      continue
     }
+    if arg.has_prefix("-") {
+      continue
+    }
+    targets.push(arg)
   }
-  guard target is Some(t) else {
+  if targets.length() == 0 {
     raise @git.GitError::InvalidObject("No target specified for checkout")
   }
-  let _ = @gitlib.checkout(fs, fs, root, t)
+  // If -- was used, treat all targets as file paths
+  if saw_separator {
+    @gitlib.restore_paths(fs, fs, root, targets)
+    return ()
+  }
+  // Single target: determine if it's a branch or file
+  if targets.length() == 1 {
+    let target = targets[0]
+    let is_file = fs.is_file(root + "/" + target)
+    let is_branch = @gitlib.resolve_ref(fs, git_dir, "refs/heads/" + target)
+      is Some(_)
+    if is_file && is_branch {
+      // Ambiguous - default to branch (like git)
+      let _ = @gitlib.checkout(fs, fs, root, target)
 
+    } else if is_file {
+      // Restore single file
+      @gitlib.restore_paths(fs, fs, root, [target])
+    } else {
+      // Try as branch/commit
+      let _ = @gitlib.checkout(fs, fs, root, target)
+
+    }
+  } else {
+    // Multiple targets: treat as file paths
+    @gitlib.restore_paths(fs, fs, root, targets)
+  }
 }
 
 ///|
