@@ -44,7 +44,7 @@ git test suite で厳密テスト（SHIM_STRICT=1）した結果：
 | init | 47/102 失敗 | --bare 対応済み、template/shared/separate-git-dir 未対応 |
 | config | 36/102 失敗 | 多くのオプション未対応 |
 | show | t0000 通過 | `--pretty=raw` のみ対応、他フォーマット未対応 |
-| write-tree | 11/92 失敗 | `--prefix` 対応済み、tree ID 不一致問題あり |
+| write-tree | git 互換 ✅ | `--prefix` 対応、tree ID 一致問題修正 |
 | ls-files | 2/92 失敗 | |
 | ls-tree | 1/92 失敗 | |
 
@@ -57,7 +57,10 @@ receive-pack upload-pack pack-objects index-pack
 ### 修正内容
 - `init`: `--bare`、`-b`/`--initial-branch`、reinit 対応
 - `show`: `--pretty=raw` 対応
-- `write-tree`: `--prefix` オプション対応
+- `write-tree`: `--prefix` オプション対応、tree ID 一致問題修正
+  - tree mode を "040000" → "40000" に修正（git 互換）
+  - tree エントリのソート順を git 互換に修正
+  - 既存オブジェクトのスキップ（読み取り専用ファイル対応）
 
 ---
 

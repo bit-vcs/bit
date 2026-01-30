@@ -285,11 +285,6 @@ pub fn write_object_bytes(
   compressed : Bytes,
 ) -> Unit raise @git.GitError {
   let hex = id.to_hex()
-  let dir = join_path(
-    git_dir,
-    "objects/" + String::unsafe_substring(hex, start=0, end=2),
-  )
-  fs.mkdir_p(dir)
   let path = join_path(
     git_dir,
     "objects/" +
@@ -297,6 +292,15 @@ pub fn write_object_bytes(
     "/" +
     String::unsafe_substring(hex, start=2, end=hex.length()),
   )
+  // Skip if object already exists (Git objects are immutable and read-only)
+  if @fs.path_exists(path) {
+    return ()
+  }
+  let dir = join_path(
+    git_dir,
+    "objects/" + String::unsafe_substring(hex, start=0, end=2),
+  )
+  fs.mkdir_p(dir)
   fs.write_file(path, compressed)
 }
 
@@ -392,9 +396,14 @@ fn write_tree_from_entries(
   for item in dir_map.to_array() {
     let (dir_name, list) = item
     let sub_id = write_tree_from_entries(fs, git_dir, list)
-    file_entries.push(@git.TreeEntry::new("040000", dir_name, sub_id))
+    file_entries.push(@git.TreeEntry::new("40000", dir_name, sub_id))
   }
-  file_entries.sort_by(fn(a, b) { String::compare(a.name, b.name) })
+  // Git sorts tree entries by name, with directories having "/" appended for comparison
+  file_entries.sort_by(fn(a, b) {
+    let a_key = if a.mode == "40000" { a.name + "/" } else { a.name }
+    let b_key = if b.mode == "40000" { b.name + "/" } else { b.name }
+    compare_strings_lexicographic(a_key, b_key)
+  })
   let (tree_id, compressed) = @git.create_tree(file_entries)
   write_object_bytes(fs, git_dir, tree_id, compressed)
   tree_id
@@ -413,6 +422,31 @@ fn split_first(path : String) -> (String, String?) {
       )
       (name, Some(rest))
     }
+  }
+}
+
+///|
+/// Lexicographic string comparison (byte-by-byte ASCII order)
+fn compare_strings_lexicographic(a : String, b : String) -> Int {
+  let a_len = a.length()
+  let b_len = b.length()
+  let min_len = if a_len < b_len { a_len } else { b_len }
+  for i in 0..<min_len {
+    let a_char = a.unsafe_get(i).to_int()
+    let b_char = b.unsafe_get(i).to_int()
+    if a_char < b_char {
+      return -1
+    } else if a_char > b_char {
+      return 1
+    }
+  }
+  // If all characters are equal, shorter string comes first
+  if a_len < b_len {
+    -1
+  } else if a_len > b_len {
+    1
+  } else {
+    0
   }
 }
 
