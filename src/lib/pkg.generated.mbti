@@ -8,6 +8,8 @@ import {
 // Values
 pub fn add_paths(&@git.FileSystem, &@git.RepoFileSystem, String, Array[String]) -> Unit raise @git.GitError
 
+pub fn append_reflog(&@git.FileSystem, &@git.RepoFileSystem, String, String, @git.ObjectId, @git.ObjectId, String, String, Int64, String, String) -> Unit raise @git.GitError
+
 pub fn apply_receive_pack(&@git.FileSystem, &@git.RepoFileSystem, String, ReceivePackRequest) -> ReceivePackResult raise @git.GitError
 
 pub fn build_receive_pack_advertisement(&@git.RepoFileSystem, String, agent? : String) -> Bytes raise @git.GitError
@@ -42,7 +44,11 @@ pub fn create_branch_at(&@git.FileSystem, &@git.RepoFileSystem, String, String, 
 
 pub fn create_lightweight_tag(&@git.FileSystem, String, String, @git.ObjectId) -> Unit raise @git.GitError
 
+pub fn create_reflog(&@git.FileSystem, &@git.RepoFileSystem, String, String) -> Unit raise @git.GitError
+
 pub fn delete_branch(&@git.FileSystem, &@git.RepoFileSystem, String, String, force? : Bool) -> Unit raise @git.GitError
+
+pub fn delete_reflog(&@git.FileSystem, &@git.RepoFileSystem, String, String) -> Unit raise @git.GitError
 
 pub fn delete_tag(&@git.FileSystem, String, String) -> Unit raise @git.GitError
 
@@ -57,6 +63,8 @@ pub fn diff_worktree(&@git.RepoFileSystem, String) -> Array[DiffFile] raise @git
 pub fn fast_forward_to(&@git.FileSystem, &@git.RepoFileSystem, String, @git.ObjectId) -> Unit raise @git.GitError
 
 pub fn gc_repo(&@git.FileSystem, &@git.RepoFileSystem, String) -> GcResult raise @git.GitError
+
+pub fn get_reflog_path(String, String) -> String
 
 pub fn init_repo(&@git.FileSystem, String, default_branch? : String, bare? : Bool) -> Unit raise @git.GitError
 
@@ -106,6 +114,8 @@ pub fn read_head_ref(&@git.RepoFileSystem, String) -> HeadRef raise @git.GitErro
 
 pub fn read_index_entries(&@git.RepoFileSystem, String) -> Array[IndexEntry] raise @git.GitError
 
+pub fn read_reflog(&@git.RepoFileSystem, String, String) -> Array[ReflogEntry] raise @git.GitError
+
 pub fn read_sparse_patterns(&@git.RepoFileSystem, String) -> Array[String] raise @git.GitError
 
 pub fn rebase_abort(&@git.FileSystem, &@git.RepoFileSystem, String) -> Unit raise @git.GitError
@@ -124,6 +134,8 @@ pub fn receive_pack_info_refs_response(&@git.RepoFileSystem, String, String?, St
 
 pub fn receive_pack_response(&@git.FileSystem, &@git.RepoFileSystem, String, String?, String, Bytes) -> HttpResponse raise @git.GitError
 
+pub fn reflog_exists(&@git.RepoFileSystem, String, String) -> Bool
+
 pub fn repack_repo(&@git.FileSystem, &@git.RepoFileSystem, String) -> RepackResult? raise @git.GitError
 
 pub fn reset(&@git.FileSystem, &@git.RepoFileSystem, String, String, ResetMode) -> @git.ObjectId raise @git.GitError
@@ -137,6 +149,8 @@ pub fn restore_paths(&@git.FileSystem, &@git.RepoFileSystem, String, Array[Strin
 pub fn rev_parse(&@git.RepoFileSystem, String, String) -> @git.ObjectId? raise @git.GitError
 
 pub fn rm_paths(&@git.FileSystem, &@git.RepoFileSystem, String, Array[String], cached? : Bool, force? : Bool, recursive? : Bool) -> Unit raise @git.GitError
+
+pub fn should_log_ref(&@git.RepoFileSystem, String, String, Bool) -> (Bool, Bool) raise @git.GitError
 
 pub fn show_ref(&@git.RepoFileSystem, String) -> Array[(String, @git.ObjectId)] raise @git.GitError
 
@@ -321,6 +335,16 @@ pub struct RefUpdate {
   old_id : @git.ObjectId
   new_id : @git.ObjectId
   refname : String
+}
+
+pub struct ReflogEntry {
+  old_id : @git.ObjectId
+  new_id : @git.ObjectId
+  author : String
+  email : String
+  timestamp : Int64
+  timezone : String
+  message : String
 }
 
 pub struct RepackResult {

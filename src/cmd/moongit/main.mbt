@@ -324,6 +324,10 @@ async fn dispatch_command(
       handle_symbolic_ref(rest) catch {
         err => exit_with_error("symbolic-ref", err)
       }
+    "reflog" =>
+      handle_reflog(rest) catch {
+        err => exit_with_error("reflog", err)
+      }
     "version" | "--version" => print_line("git version 2.47.0 (moongit)")
     // Fallback to system git for unknown commands
     _ =>

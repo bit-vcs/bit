@@ -273,12 +273,18 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
   // Parse arguments
   let mut get_mode = false
   let mut get_bool = false
+  let mut list_mode = false
+  let mut unset_mode = false
+  let mut add_mode = false
   let mut key : String? = None
   let mut value : String? = None
   for arg in args {
     match arg {
       "--get" => get_mode = true
       "--bool" => get_bool = true
+      "--list" | "-l" => list_mode = true
+      "--unset" => unset_mode = true
+      "--add" => add_mode = true
       _ if arg.has_prefix("-") => ()
       _ =>
         if key is None {
@@ -288,68 +294,396 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
         }
     }
   }
+  // Handle --list
+  if list_mode {
+    if fs.is_file(config_path) {
+      list_config(fs, config_path)
+    }
+    return
+  }
   guard key is Some(k) else {
     raise @git.GitError::InvalidObject("key required")
+  }
+  // Handle --unset
+  if unset_mode {
+    unset_config(fs, config_path, k)
+    return
   }
   if get_mode || value is None {
     // Read config
     if not(fs.is_file(config_path)) {
-      raise @git.GitError::InvalidObject("config not found")
+      @sys.exit(1)
     }
-    let content = decode_bytes(fs.read_file(config_path))
-    let parts = k.split(".").map(fn(v) { v.to_string() }).collect()
-    if parts.length() != 2 {
-      raise @git.GitError::InvalidObject("invalid key format")
-    }
-    let section = parts[0]
-    let name = parts[1]
-    let mut in_section = false
-    for line_view in content.split("\n") {
-      let line = trim_string(line_view.to_string())
-      if line.has_prefix("[") && line.has_suffix("]") {
-        let sec_name = String::unsafe_substring(
-          line,
-          start=1,
-          end=line.length() - 1,
-        )
-        in_section = sec_name == section ||
-          sec_name.has_prefix(section + " ") ||
-          sec_name.has_prefix(section + "\t")
-        continue
-      }
-      if in_section && line.has_prefix(name + " = ") {
-        let val = String::unsafe_substring(
-          line,
-          start=name.length() + 3,
-          end=line.length(),
-        )
+    let result = get_config_value(fs, config_path, k)
+    match result {
+      Some(val) =>
         if get_bool {
-          print_line(if val == "true" || val == "1" { "true" } else { "false" })
+          print_line(
+            if val == "true" || val == "1" || val == "yes" {
+              "true"
+            } else {
+              "false"
+            },
+          )
         } else {
           print_line(val)
         }
-        return
-      }
-      if in_section && line.has_prefix(name + "=") {
-        let val = String::unsafe_substring(
-          line,
-          start=name.length() + 1,
-          end=line.length(),
-        )
-        if get_bool {
-          print_line(if val == "true" || val == "1" { "true" } else { "false" })
-        } else {
-          print_line(val)
-        }
-        return
-      }
+      None =>
+        // Key not found - exit silently with code 1 (git behavior)
+        @sys.exit(1)
     }
-    // Key not found - exit silently with code 1 (git behavior)
-    @sys.exit(1)
   } else {
-    // Write config - fallback to system git for now
-    raise @git.GitError::InvalidObject("config write not implemented")
+    // Write config
+    guard value is Some(v) else { return }
+    set_config(fs, config_path, k, v, add_mode)
   }
+}
+
+///|
+fn trim_chars(s : String, chars : String) -> String {
+  let mut start = 0
+  let mut end = s.length()
+  while start < end {
+    let c = s.unsafe_get(start)
+    if chars.contains(c.to_string()) {
+      start += 1
+    } else {
+      break
+    }
+  }
+  while end > start {
+    let c = s.unsafe_get(end - 1)
+    if chars.contains(c.to_string()) {
+      end -= 1
+    } else {
+      break
+    }
+  }
+  String::unsafe_substring(s, start~, end~)
+}
+
+///|
+async fn list_config(
+  fs : &@git.RepoFileSystem,
+  config_path : String,
+) -> Unit raise Error {
+  if not(fs.is_file(config_path)) {
+    return
+  }
+  let content = decode_bytes(fs.read_file(config_path))
+  let mut current_section = ""
+  for line_view in content.split("\n") {
+    let line = trim_string(line_view.to_string())
+    if line.length() == 0 || line.has_prefix("#") || line.has_prefix(";") {
+      continue
+    }
+    if line.has_prefix("[") && line.has_suffix("]") {
+      current_section = String::unsafe_substring(
+        line,
+        start=1,
+        end=line.length() - 1,
+      )
+      // Handle subsections like [remote "origin"]
+      let space_idx = current_section.find(" ")
+      match space_idx {
+        Some(i) => {
+          let main = String::unsafe_substring(current_section, start=0, end=i)
+          let sub = trim_chars(
+            String::unsafe_substring(
+              current_section,
+              start=i + 1,
+              end=current_section.length(),
+            ),
+            "\" ",
+          )
+          current_section = main + "." + sub
+        }
+        None => ()
+      }
+      continue
+    }
+    // Parse key=value or key = value
+    let eq_idx = line.find("=")
+    match eq_idx {
+      Some(i) => {
+        let key_part = trim_chars(
+          String::unsafe_substring(line, start=0, end=i),
+          " \t",
+        )
+        let val_part = trim_chars(
+          String::unsafe_substring(line, start=i + 1, end=line.length()),
+          " \t",
+        )
+        print_line("\{current_section}.\{key_part}=\{val_part}")
+      }
+      None => ()
+    }
+  }
+}
+
+///|
+fn get_config_value(
+  fs : &@git.RepoFileSystem,
+  config_path : String,
+  key : String,
+) -> String? raise Error {
+  if not(fs.is_file(config_path)) {
+    return None
+  }
+  let content = decode_bytes(fs.read_file(config_path))
+  let parts : Array[String] = []
+  for p in key.split(".") {
+    parts.push(p.to_string())
+  }
+  if parts.length() < 2 {
+    return None
+  }
+  // Handle section.subsection.key format (e.g., remote.origin.url)
+  let (section, subsection, name) = if parts.length() == 2 {
+    (parts[0], (None : String?), parts[1])
+  } else {
+    // section.subsection.key
+    let sub : Array[String] = []
+    for i in 1..<(parts.length() - 1) {
+      sub.push(parts[i])
+    }
+    (parts[0], Some(sub.join(".")), parts[parts.length() - 1])
+  }
+  let mut in_section = false
+  for line_view in content.split("\n") {
+    let line = trim_string(line_view.to_string())
+    if line.has_prefix("[") && line.has_suffix("]") {
+      let sec_content = String::unsafe_substring(
+        line,
+        start=1,
+        end=line.length() - 1,
+      )
+      match subsection {
+        Some(sub) => {
+          // Looking for [section "subsection"]
+          let expected = section + " \"" + sub + "\""
+          in_section = sec_content == expected ||
+            sec_content == section + " " + sub
+        }
+        None =>
+          in_section = sec_content == section ||
+            sec_content.has_prefix(section + " ") ||
+            sec_content.has_prefix(section + "\t")
+      }
+      continue
+    }
+    if in_section {
+      // Check for key = value
+      let eq_idx = line.find("=")
+      match eq_idx {
+        Some(i) => {
+          let key_part = trim_chars(
+            String::unsafe_substring(line, start=0, end=i),
+            " \t",
+          )
+          if key_part == name {
+            return Some(
+              trim_chars(
+                String::unsafe_substring(line, start=i + 1, end=line.length()),
+                " \t",
+              ),
+            )
+          }
+        }
+        None => ()
+      }
+    }
+  }
+  None
+}
+
+///|
+fn set_config(
+  fs : OsFs,
+  config_path : String,
+  key : String,
+  value : String,
+  add_mode : Bool,
+) -> Unit raise Error {
+  let rfs : &@git.RepoFileSystem = fs
+  let wfs : &@git.FileSystem = fs
+  let parts : Array[String] = []
+  for p in key.split(".") {
+    parts.push(p.to_string())
+  }
+  if parts.length() < 2 {
+    return
+  }
+  let (section, subsection, name) = if parts.length() == 2 {
+    (parts[0], (None : String?), parts[1])
+  } else {
+    let sub : Array[String] = []
+    for i in 1..<(parts.length() - 1) {
+      sub.push(parts[i])
+    }
+    (parts[0], Some(sub.join(".")), parts[parts.length() - 1])
+  }
+  let section_header = match subsection {
+    Some(sub) => "[\{section} \"\{sub}\"]"
+    None => "[\{section}]"
+  }
+  if not(rfs.is_file(config_path)) {
+    // Create new config file
+    wfs.write_string(
+      config_path,
+      section_header + "\n\t" + name + " = " + value + "\n",
+    )
+    return
+  }
+  let content = decode_bytes(rfs.read_file(config_path))
+  let lines : Array[String] = []
+  for line_view in content.split("\n") {
+    lines.push(line_view.to_string())
+  }
+  let mut in_section = false
+  let mut found = false
+  let mut section_end = -1
+  let result : Array[String] = []
+  for i, line in lines {
+    let trimmed = trim_string(line)
+    if trimmed.has_prefix("[") && trimmed.has_suffix("]") {
+      if in_section && not(found) {
+        // Insert at end of previous section
+        result.push("\t" + name + " = " + value)
+        found = true
+      }
+      let sec_content = String::unsafe_substring(
+        trimmed,
+        start=1,
+        end=trimmed.length() - 1,
+      )
+      match subsection {
+        Some(sub) => {
+          let expected = section + " \"" + sub + "\""
+          in_section = sec_content == expected ||
+            sec_content == section + " " + sub
+        }
+        None => in_section = sec_content == section
+      }
+      if in_section {
+        section_end = i
+      }
+      result.push(line)
+      continue
+    }
+    if in_section && not(add_mode) {
+      let eq_idx = trimmed.find("=")
+      match eq_idx {
+        Some(idx) => {
+          let key_part = trim_chars(
+            String::unsafe_substring(trimmed, start=0, end=idx),
+            " \t",
+          )
+          if key_part == name {
+            result.push("\t" + name + " = " + value)
+            found = true
+            continue
+          }
+        }
+        None => ()
+      }
+      section_end = i
+    }
+    result.push(line)
+  }
+  if not(found) {
+    if section_end >= 0 {
+      // Insert after section header
+      let new_result : Array[String] = []
+      for i, line in result {
+        new_result.push(line)
+        if i == section_end && not(found) {
+          new_result.push("\t" + name + " = " + value)
+          found = true
+        }
+      }
+      wfs.write_string(config_path, new_result.join("\n"))
+      return
+    }
+    // Add new section at end
+    result.push(section_header)
+    result.push("\t" + name + " = " + value)
+  }
+  wfs.write_string(config_path, result.join("\n"))
+}
+
+///|
+fn unset_config(
+  fs : OsFs,
+  config_path : String,
+  key : String,
+) -> Unit raise Error {
+  let rfs : &@git.RepoFileSystem = fs
+  let wfs : &@git.FileSystem = fs
+  if not(rfs.is_file(config_path)) {
+    return
+  }
+  let parts : Array[String] = []
+  for p in key.split(".") {
+    parts.push(p.to_string())
+  }
+  if parts.length() < 2 {
+    return
+  }
+  let (section, subsection, name) = if parts.length() == 2 {
+    (parts[0], (None : String?), parts[1])
+  } else {
+    let sub : Array[String] = []
+    for i in 1..<(parts.length() - 1) {
+      sub.push(parts[i])
+    }
+    (parts[0], Some(sub.join(".")), parts[parts.length() - 1])
+  }
+  let content = decode_bytes(rfs.read_file(config_path))
+  let lines : Array[String] = []
+  for line_view in content.split("\n") {
+    lines.push(line_view.to_string())
+  }
+  let mut in_section = false
+  let result : Array[String] = []
+  for line in lines {
+    let trimmed = trim_string(line)
+    if trimmed.has_prefix("[") && trimmed.has_suffix("]") {
+      let sec_content = String::unsafe_substring(
+        trimmed,
+        start=1,
+        end=trimmed.length() - 1,
+      )
+      match subsection {
+        Some(sub) => {
+          let expected = section + " \"" + sub + "\""
+          in_section = sec_content == expected ||
+            sec_content == section + " " + sub
+        }
+        None => in_section = sec_content == section
+      }
+      result.push(line)
+      continue
+    }
+    if in_section {
+      let eq_idx = trimmed.find("=")
+      match eq_idx {
+        Some(idx) => {
+          let key_part = trim_chars(
+            String::unsafe_substring(trimmed, start=0, end=idx),
+            " \t",
+          )
+          if key_part == name {
+            // Skip this line (unset)
+            continue
+          }
+        }
+        None => ()
+      }
+    }
+    result.push(line)
+  }
+  wfs.write_string(config_path, result.join("\n"))
 }
 
 ///|
@@ -747,7 +1081,9 @@ async fn handle_ls_tree(args : Array[String]) -> Unit raise Error {
   let db = @gitlib.ObjectDb::load(fs, git_dir)
   // Resolve to tree if it's a commit
   let actual_tree_id = resolve_to_tree(db, fs, tid)
-  print_tree_entries(db, fs, actual_tree_id, "", recursive, show_trees, name_only)
+  print_tree_entries(
+    db, fs, actual_tree_id, "", recursive, show_trees, name_only,
+  )
 }
 
 ///|
@@ -804,7 +1140,15 @@ async fn print_tree_entries(
       }
     }
     if recursive && is_tree {
-      print_tree_entries(db, fs, entry.id, path, recursive, show_trees, name_only)
+      print_tree_entries(
+        db,
+        fs,
+        entry.id,
+        path,
+        recursive,
+        show_trees,
+        name_only,
+      )
     }
   }
 }
@@ -854,48 +1198,265 @@ async fn handle_show_ref(args : Array[String]) -> Unit raise Error {
 }
 
 ///|
-fn handle_update_ref(args : Array[String]) -> Unit raise Error {
+async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let git_dir = root + "/.git"
   let fs = OsFs::new()
   let mut delete_mode = false
+  let mut create_reflog = false
+  let mut no_deref = false
+  let mut message : String? = None
   let positional : Array[String] = []
-  for arg in args {
+  let mut i = 0
+  while i < args.length() {
+    let arg = args[i]
     match arg {
       "-d" | "--delete" => delete_mode = true
+      "--create-reflog" => create_reflog = true
+      "--no-deref" => no_deref = true
+      "-m" if i + 1 < args.length() => {
+        message = Some(args[i + 1])
+        i += 1
+      }
       _ if not(arg.has_prefix("-")) => positional.push(arg)
       _ => ()
     }
+    i += 1
   }
+  ignore(no_deref)
+  // Check if bare repo
+  let is_bare = fs.is_file(git_dir + "/config") &&
+    not(fs.is_dir(root + "/.git"))
+  let actual_git_dir = if is_bare { root } else { git_dir }
+  // Get current timestamp for reflog
+  let timestamp = get_current_timestamp()
+  let timezone = "+0000"
+  let (author, email) = get_author_info(fs, actual_git_dir)
   if delete_mode {
     if positional.length() < 1 {
       raise @git.GitError::InvalidObject("usage: git update-ref -d <refname>")
     }
     let refname = positional[0]
-    let ref_path = git_dir + "/" + refname
+    let old_value : String? = if positional.length() >= 2 {
+      Some(positional[1])
+    } else {
+      None
+    }
+    let ref_path = actual_git_dir + "/" + refname
+    // Check oldvalue if specified
+    if old_value is Some(ov) {
+      let current = read_ref_value(fs, actual_git_dir, refname)
+      match current {
+        Some(cur_id) =>
+          if cur_id.to_hex() != ov {
+            eprint_line(
+              "error: cannot lock ref '\{refname}': is at \{cur_id.to_hex()} but expected \{ov}",
+            )
+            @sys.exit(1)
+          }
+        None => {
+          eprint_line(
+            "error: cannot lock ref '\{refname}': unable to resolve reference",
+          )
+          @sys.exit(1)
+        }
+      }
+    }
+    // Get old value for reflog before deleting
+    let old_id = read_ref_value(fs, actual_git_dir, refname).unwrap_or(
+      @git.ObjectId::zero(),
+    )
+    // Delete the ref
     if fs.is_file(ref_path) {
       fs.remove_file(ref_path)
+    }
+    // Write reflog entry for deletion
+    let rfs : &@git.RepoFileSystem = fs
+    let wfs : &@git.FileSystem = fs
+    let (should_log, _) = @gitlib.should_log_ref(
+      rfs, actual_git_dir, refname, is_bare,
+    )
+    if should_log || @gitlib.reflog_exists(rfs, actual_git_dir, refname) {
+      let msg = message.unwrap_or("update-ref: delete")
+      @gitlib.append_reflog(
+        wfs,
+        rfs,
+        actual_git_dir,
+        refname,
+        old_id,
+        @git.ObjectId::zero(),
+        author,
+        email,
+        timestamp,
+        timezone,
+        msg,
+      )
     }
     return ()
   }
   if positional.length() < 2 {
     raise @git.GitError::InvalidObject(
-      "usage: git update-ref <refname> <newvalue>",
+      "usage: git update-ref <refname> <newvalue> [<oldvalue>]",
     )
   }
   let refname = positional[0]
   let new_value = positional[1]
+  let old_value : String? = if positional.length() >= 3 {
+    Some(positional[2])
+  } else {
+    None
+  }
   let new_id = @git.ObjectId::from_hex(new_value)
-  let ref_path = git_dir + "/" + refname
+  // Get current value
+  let current_id = read_ref_value(fs, actual_git_dir, refname)
+  // Check oldvalue if specified
+  match old_value {
+    Some(ov) => {
+      let expected_id = @git.ObjectId::from_hex(ov)
+      match current_id {
+        Some(cur_id) =>
+          if cur_id.to_hex() != expected_id.to_hex() {
+            eprint_line(
+              "error: cannot lock ref '\{refname}': is at \{cur_id.to_hex()} but expected \{expected_id.to_hex()}",
+            )
+            @sys.exit(1)
+          }
+        None =>
+          if expected_id.to_hex() != @git.ObjectId::zero().to_hex() {
+            eprint_line(
+              "error: cannot lock ref '\{refname}': unable to resolve reference '\{refname}'",
+            )
+            @sys.exit(1)
+          }
+      }
+    }
+    None => ()
+  }
+  let ref_path = actual_git_dir + "/" + refname
   // Ensure parent directory exists
   let dir = match ref_path.rev_find("/") {
     None => ""
     Some(i) => String::unsafe_substring(ref_path, start=0, end=i)
   }
-  if dir.length() > 0 {
+  if dir.length() > 0 && not(fs.is_dir(dir)) {
     fs.mkdir_p(dir)
   }
+  // Write the ref
   fs.write_string(ref_path, new_id.to_hex() + "\n")
+  // Handle reflog
+  let rfs : &@git.RepoFileSystem = fs
+  let wfs : &@git.FileSystem = fs
+  let (should_log, always) = @gitlib.should_log_ref(
+    rfs, actual_git_dir, refname, is_bare,
+  )
+  if create_reflog {
+    // Create reflog if requested
+    @gitlib.create_reflog(wfs, rfs, actual_git_dir, refname)
+  }
+  if should_log ||
+    always ||
+    create_reflog ||
+    @gitlib.reflog_exists(rfs, actual_git_dir, refname) {
+    let old_id = current_id.unwrap_or(@git.ObjectId::zero())
+    let msg = message.unwrap_or("update-ref: updating")
+    @gitlib.append_reflog(
+      wfs, rfs, actual_git_dir, refname, old_id, new_id, author, email, timestamp,
+      timezone, msg,
+    )
+  }
+}
+
+///|
+fn read_ref_value(
+  fs : &@git.RepoFileSystem,
+  git_dir : String,
+  refname : String,
+) -> @git.ObjectId? {
+  let ref_path = git_dir + "/" + refname
+  if fs.is_file(ref_path) {
+    let content = decode_bytes(fs.read_file(ref_path)) catch {
+      _ => return None
+    }
+    let hex = trim_chars(content, " \t\r\n")
+    if hex.has_prefix("ref: ") {
+      // Symbolic ref - resolve it
+      let target = String::unsafe_substring(hex, start=5, end=hex.length())
+      return read_ref_value(fs, git_dir, target)
+    }
+    Some(@git.ObjectId::from_hex(hex)) catch {
+      _ => None
+    }
+  } else {
+    // Check packed-refs
+    @gitlib.resolve_ref(fs, git_dir, refname) catch {
+      _ => None
+    }
+  }
+}
+
+///|
+fn get_author_info(
+  fs : &@git.RepoFileSystem,
+  git_dir : String,
+) -> (String, String) {
+  // Try to get from config or environment
+  let config_path = git_dir + "/config"
+  let mut name = "Unknown"
+  let mut email = "unknown@unknown"
+  // Check environment variables first
+  match @sys.get_env_var("GIT_COMMITTER_NAME") {
+    Some(n) => name = n
+    None => ()
+  }
+  match @sys.get_env_var("GIT_COMMITTER_EMAIL") {
+    Some(e) => email = e
+    None => ()
+  }
+  // If not in env, try config
+  if name == "Unknown" || email == "unknown@unknown" {
+    if fs.is_file(config_path) {
+      let content = decode_bytes(fs.read_file(config_path)) catch {
+        _ => return (name, email)
+      }
+      let mut in_user = false
+      for line_view in content.split("\n") {
+        let line = trim_chars(line_view.to_string(), " \t\r")
+        if line.has_prefix("[user]") {
+          in_user = true
+          continue
+        }
+        if line.has_prefix("[") {
+          in_user = false
+          continue
+        }
+        if in_user {
+          if line.has_prefix("name") {
+            let eq_idx = line.find("=")
+            match eq_idx {
+              Some(i) =>
+                name = trim_chars(
+                  String::unsafe_substring(line, start=i + 1, end=line.length()),
+                  " \t",
+                )
+              None => ()
+            }
+          }
+          if line.has_prefix("email") {
+            let eq_idx = line.find("=")
+            match eq_idx {
+              Some(i) =>
+                email = trim_chars(
+                  String::unsafe_substring(line, start=i + 1, end=line.length()),
+                  " \t",
+                )
+              None => ()
+            }
+          }
+        }
+      }
+    }
+  }
+  (name, email)
 }
 
 ///|
@@ -956,5 +1517,77 @@ async fn handle_symbolic_ref(args : Array[String]) -> Unit raise Error {
     // Write mode
     let target = positional[1]
     fs.write_string(ref_path, "ref: \{target}\n")
+  }
+}
+
+///|
+async fn handle_reflog(args : Array[String]) -> Unit raise Error {
+  let root = get_work_root()
+  let git_dir = root + "/.git"
+  let fs = OsFs::new()
+  let rfs : &@git.RepoFileSystem = fs
+  let wfs : &@git.FileSystem = fs
+  if args.length() == 0 {
+    // Default to show HEAD
+    show_reflog(rfs, git_dir, "HEAD")
+    return
+  }
+  let subcmd = args[0]
+  let rest : Array[String] = []
+  for i in 1..<args.length() {
+    rest.push(args[i])
+  }
+  match subcmd {
+    "show" => {
+      let refname = if rest.length() > 0 { rest[0] } else { "HEAD" }
+      show_reflog(rfs, git_dir, refname)
+    }
+    "exists" => {
+      if rest.length() == 0 {
+        eprint_line("usage: git reflog exists <ref>")
+        @sys.exit(1)
+      }
+      let refname = rest[0]
+      if @gitlib.reflog_exists(rfs, git_dir, refname) {
+        @sys.exit(0)
+      } else {
+        @sys.exit(1)
+      }
+    }
+    "delete" => {
+      if rest.length() == 0 {
+        eprint_line("usage: git reflog delete <ref>")
+        @sys.exit(1)
+      }
+      let refname = rest[0]
+      @gitlib.delete_reflog(wfs, rfs, git_dir, refname)
+    }
+    "expire" =>
+      // For now, just a no-op (would need to implement expiry logic)
+      ()
+    _ =>
+      // Treat as a ref name for show
+      show_reflog(rfs, git_dir, subcmd)
+  }
+}
+
+///|
+async fn show_reflog(
+  fs : &@git.RepoFileSystem,
+  git_dir : String,
+  refname : String,
+) -> Unit raise Error {
+  let entries = @gitlib.read_reflog(fs, git_dir, refname)
+  // Show in reverse order (newest first)
+  let len = entries.length()
+  for i in 0..<len {
+    let idx = len - 1 - i
+    let entry = entries[idx]
+    let short_sha = String::unsafe_substring(
+      entry.new_id.to_hex(),
+      start=0,
+      end=7,
+    )
+    print_line("\{short_sha} \{refname}@{\{i}}: \{entry.message}")
   }
 }
