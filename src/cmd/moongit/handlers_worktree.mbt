@@ -102,10 +102,7 @@ async fn handle_worktree_list(args : Array[String]) -> Unit raise Error {
       }
       match wt.branch {
         Some(b) => print_str("branch refs/heads/\{b}\{sep}")
-        None =>
-          if wt.head_id is Some(_) {
-            print_str("detached\{sep}")
-          }
+        None => if wt.head_id is Some(_) { print_str("detached\{sep}") }
       }
       if wt.locked {
         // Get lock reason if available
@@ -149,10 +146,7 @@ async fn handle_worktree_list(args : Array[String]) -> Unit raise Error {
       if wt.locked {
         let reason = @gitlib.get_worktree_lock_reason(fs, root, wt.path)
         match reason {
-          Some(r) =>
-            if r.length() > 0 {
-              print_line("\tlocked: \{r}")
-            }
+          Some(r) => if r.length() > 0 { print_line("\tlocked: \{r}") }
           None => ()
         }
       }
@@ -243,9 +237,7 @@ async fn handle_worktree_add(args : Array[String]) -> Unit raise Error {
         i += 2
         continue
       }
-      _ if arg.has_prefix("-b") => {
-        new_branch = Some((try! arg[2:]).to_string())
-      }
+      _ if arg.has_prefix("-b") => new_branch = Some((try! arg[2:]).to_string())
       _ if arg.has_prefix("-") => () // Ignore unknown flags
       _ =>
         if path is None {
@@ -345,9 +337,8 @@ async fn handle_worktree_lock(args : Array[String]) -> Unit raise Error {
         i += 2
         continue
       }
-      _ if arg.has_prefix("--reason=") => {
+      _ if arg.has_prefix("--reason=") =>
         reason = Some((try! arg[9:]).to_string())
-      }
       _ if not(arg.has_prefix("-")) => path = Some(arg)
       _ => ()
     }

@@ -292,11 +292,25 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
   let committer_timestamp = default_timestamp
   let commit_id = if amend {
     @gitlib.commit_amend(
-      fs, fs, root, msg, author, author_timestamp, committer~, committer_timestamp~,
+      fs,
+      fs,
+      root,
+      msg,
+      author,
+      author_timestamp,
+      committer~,
+      committer_timestamp~,
     )
   } else {
     @gitlib.commit(
-      fs, fs, root, msg, author, author_timestamp, committer~, committer_timestamp~,
+      fs,
+      fs,
+      root,
+      msg,
+      author,
+      author_timestamp,
+      committer~,
+      committer_timestamp~,
     )
   }
   let short_id = (try! commit_id.to_hex()[:7]).to_string()

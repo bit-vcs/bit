@@ -60,10 +60,7 @@ pub fn is_branch_checked_out(
   let worktrees = list_worktrees(fs, root)
   for wt in worktrees {
     match wt.branch {
-      Some(b) =>
-        if b == branch {
-          return Some(wt.path)
-        }
+      Some(b) => if b == branch { return Some(wt.path) }
       None => continue
     }
   }
@@ -134,7 +131,9 @@ pub fn create_worktree(
       match commit_id {
         Some(id) => fs.write_string(head_path, id.to_hex() + "\n")
         None =>
-          raise @git.GitError::InvalidObject("No commit to create worktree from")
+          raise @git.GitError::InvalidObject(
+            "No commit to create worktree from",
+          )
       }
   }
   // Write commondir file
@@ -146,7 +145,8 @@ pub fn create_worktree(
   fs.write_string(wt_git_file, "gitdir: " + admin_dir + "\n")
   // Checkout files to worktree
   match commit_id {
-    Some(id) => checkout_to_worktree(fs, rfs, git_dir, abs_wt_path, admin_dir, id)
+    Some(id) =>
+      checkout_to_worktree(fs, rfs, git_dir, abs_wt_path, admin_dir, id)
     None => ()
   }
 }
@@ -170,7 +170,9 @@ pub fn remove_worktree(
   // Find the admin directory for this worktree
   let admin_dir = find_worktree_admin_dir(rfs, git_dir, abs_wt_path)
   guard admin_dir is Some(admin) else {
-    raise @git.GitError::InvalidObject("'\{worktree_path}' is not a valid worktree")
+    raise @git.GitError::InvalidObject(
+      "'\{worktree_path}' is not a valid worktree",
+    )
   }
   // Check if locked
   let locked_path = join_path(admin, "locked")
@@ -260,7 +262,9 @@ pub fn lock_worktree(
   // Find admin directory
   let admin_dir = find_worktree_admin_dir(rfs, git_dir, abs_wt_path)
   guard admin_dir is Some(admin) else {
-    raise @git.GitError::InvalidObject("'\{worktree_path}' is not a valid worktree")
+    raise @git.GitError::InvalidObject(
+      "'\{worktree_path}' is not a valid worktree",
+    )
   }
   // Check if already locked
   let locked_path = join_path(admin, "locked")
@@ -293,7 +297,9 @@ pub fn unlock_worktree(
   // Find admin directory
   let admin_dir = find_worktree_admin_dir(rfs, git_dir, abs_wt_path)
   guard admin_dir is Some(admin) else {
-    raise @git.GitError::InvalidObject("'\{worktree_path}' is not a valid worktree")
+    raise @git.GitError::InvalidObject(
+      "'\{worktree_path}' is not a valid worktree",
+    )
   }
   // Check if locked
   let locked_path = join_path(admin, "locked")
@@ -356,7 +362,9 @@ pub fn move_worktree(
   // Find admin directory
   let admin_dir = find_worktree_admin_dir(rfs, git_dir, abs_src)
   guard admin_dir is Some(admin) else {
-    raise @git.GitError::InvalidObject("'\{source_path}' is not a valid worktree")
+    raise @git.GitError::InvalidObject(
+      "'\{source_path}' is not a valid worktree",
+    )
   }
   // Check if locked (unless force)
   let locked_path = join_path(admin, "locked")
@@ -421,7 +429,11 @@ pub fn repair_worktree(
   // If specific paths given, repair only those
   let paths_to_check = if worktree_paths.length() > 0 {
     worktree_paths.map(fn(p) {
-      if p.has_prefix("/") { p } else { normalize_path(join_path(root, p)) }
+      if p.has_prefix("/") {
+        p
+      } else {
+        normalize_path(join_path(root, p))
+      }
     })
   } else {
     // Repair all worktrees
@@ -513,7 +525,10 @@ pub fn get_worktree_prunable_reason(
 
 ///|
 /// Resolve the actual git directory, handling .git files (for worktrees).
-fn resolve_git_dir(fs : &@git.RepoFileSystem, root : String) -> String raise @git.GitError {
+fn resolve_git_dir(
+  fs : &@git.RepoFileSystem,
+  root : String,
+) -> String raise @git.GitError {
   let git_path = join_path(root, ".git")
   if fs.is_dir(git_path) {
     return git_path
@@ -522,7 +537,11 @@ fn resolve_git_dir(fs : &@git.RepoFileSystem, root : String) -> String raise @gi
     // .git is a file pointing to the real git directory
     let content = read_trimmed_file(fs, git_path)
     if content.has_prefix("gitdir: ") {
-      let target = String::unsafe_substring(content, start=8, end=content.length())
+      let target = String::unsafe_substring(
+        content,
+        start=8,
+        end=content.length(),
+      )
       // Resolve relative paths
       if target.has_prefix("/") {
         return resolve_commondir(fs, target)
@@ -647,7 +666,9 @@ fn resolve_worktree_target(
         None => resolve_head_commit(rfs, git_dir)
       }
       guard target is Some(id) else {
-        raise @git.GitError::InvalidObject("Cannot resolve commit for new branch")
+        raise @git.GitError::InvalidObject(
+          "Cannot resolve commit for new branch",
+        )
       }
       create_branch_at(fs, rfs, root, branch_name, id)
       return (Some(branch_name), Some(id))
@@ -742,9 +763,8 @@ fn find_worktree_admin_dir(
     }
     let gitdir_content = read_trimmed_file(fs, gitdir_path)
     let wt_path = parent_dir(gitdir_content)
-    if wt_path == worktree_path || normalize_path(wt_path) == normalize_path(
-        worktree_path,
-      ) {
+    if wt_path == worktree_path ||
+      normalize_path(wt_path) == normalize_path(worktree_path) {
       return Some(admin_dir)
     }
   }
@@ -779,7 +799,10 @@ fn remove_dir_recursive(
 }
 
 ///|
-fn read_trimmed_file(fs : &@git.RepoFileSystem, path : String) -> String raise @git.GitError {
+fn read_trimmed_file(
+  fs : &@git.RepoFileSystem,
+  path : String,
+) -> String raise @git.GitError {
   let content = @utf8.decode_lossy(fs.read_file(path)[:])
   worktree_trim_whitespace(content)
 }
@@ -836,6 +859,7 @@ fn normalize_path(path : String) -> String {
     } else if part == ".." {
       if parts.length() > 0 && parts[parts.length() - 1] != ".." {
         let _ = parts.pop()
+
       } else if not(path.has_prefix("/")) {
         parts.push(part)
       }
@@ -919,13 +943,15 @@ fn write_index_entries_to_path(
     buf.push(0) // NUL terminator
     // Pad to 8-byte boundary (62 = fixed part before path)
     let entry_len = 62 + entry.path.length() + 1
-    let padding = (8 - (entry_len % 8)) % 8
+    let padding = (8 - entry_len % 8) % 8
     for _ in 0..<padding {
       buf.push(0)
     }
   }
   // Compute checksum
-  let data = Bytes::from_array(FixedArray::makei(buf.length(), fn(i) { buf[i] }))
+  let data = Bytes::from_array(
+    FixedArray::makei(buf.length(), fn(i) { buf[i] }),
+  )
   let checksum = @git.sha1(data)
   for b in checksum.bytes {
     buf.push(b)

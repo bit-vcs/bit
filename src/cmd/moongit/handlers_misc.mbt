@@ -977,7 +977,6 @@ struct SubmoduleInfo {
   name : String
   path : String
   url : String
-  branch : String?
 }
 
 ///|
@@ -997,15 +996,12 @@ fn parse_gitmodules(
   let mut current_name = ""
   let mut current_path = ""
   let mut current_url = ""
-  let mut current_branch : String? = None
   for line_view in content.split("\n") {
     let line = trim_string(line_view.to_string())
     if line.has_prefix("[submodule \"") && line.has_suffix("\"]") {
       // Save previous submodule if any
       if current_name.length() > 0 && current_path.length() > 0 {
-        result.push(
-          { name: current_name, path: current_path, url: current_url, branch: current_branch },
-        )
+        result.push({ name: current_name, path: current_path, url: current_url })
       }
       // Extract name from [submodule "name"]
       current_name = String::unsafe_substring(
@@ -1015,7 +1011,6 @@ fn parse_gitmodules(
       )
       current_path = ""
       current_url = ""
-      current_branch = None
     } else if line.has_prefix("path") {
       let eq_idx = line.find("=")
       match eq_idx {
@@ -1034,24 +1029,11 @@ fn parse_gitmodules(
           )
         None => ()
       }
-    } else if line.has_prefix("branch") {
-      let eq_idx = line.find("=")
-      match eq_idx {
-        Some(i) =>
-          current_branch = Some(
-            trim_string(
-              String::unsafe_substring(line, start=i + 1, end=line.length()),
-            ),
-          )
-        None => ()
-      }
     }
   }
   // Don't forget the last one
   if current_name.length() > 0 && current_path.length() > 0 {
-    result.push(
-      { name: current_name, path: current_path, url: current_url, branch: current_branch },
-    )
+    result.push({ name: current_name, path: current_path, url: current_url })
   }
   result
 }
@@ -1260,18 +1242,8 @@ async fn handle_ls_tree(args : Array[String]) -> Unit raise Error {
     []
   }
   print_tree_entries(
-    db,
-    fs,
-    actual_tree_id,
-    "",
-    recursive,
-    show_trees,
-    only_trees,
-    name_only,
-    recurse_submodules,
-    root,
-    submodules,
-    path_filters,
+    db, fs, actual_tree_id, "", recursive, show_trees, only_trees, name_only, recurse_submodules,
+    root, submodules, path_filters,
   )
 }
 
@@ -2009,29 +1981,27 @@ async fn handle_clean(args : Array[String]) -> Unit raise Error {
     let abs_path = root + "/" + path
     if dry_run {
       print_line("Would remove \{path}")
-    } else {
-      if fs.is_file(abs_path) {
-        fs.remove_file(abs_path)
-        if not(quiet) {
-          print_line("Removing \{path}")
-        }
-        // Track parent directory for potential removal
-        if remove_dirs {
-          match path.rev_find("/") {
-            Some(idx) => {
-              let parent = String::unsafe_substring(path, start=0, end=idx)
-              if not(dirs_to_check.contains(parent)) {
-                dirs_to_check.push(parent)
-              }
+    } else if fs.is_file(abs_path) {
+      fs.remove_file(abs_path)
+      if not(quiet) {
+        print_line("Removing \{path}")
+      }
+      // Track parent directory for potential removal
+      if remove_dirs {
+        match path.rev_find("/") {
+          Some(idx) => {
+            let parent = String::unsafe_substring(path, start=0, end=idx)
+            if not(dirs_to_check.contains(parent)) {
+              dirs_to_check.push(parent)
             }
-            None => ()
           }
+          None => ()
         }
-      } else if fs.is_dir(abs_path) && remove_dirs {
-        remove_dir_recursive(fs, abs_path)
-        if not(quiet) {
-          print_line("Removing \{path}/")
-        }
+      }
+    } else if fs.is_dir(abs_path) && remove_dirs {
+      remove_dir_recursive(fs, abs_path)
+      if not(quiet) {
+        print_line("Removing \{path}/")
       }
     }
   }
@@ -2046,7 +2016,9 @@ async fn handle_clean(args : Array[String]) -> Unit raise Error {
         let entries = rfs.readdir(abs_dir) catch { _ => continue }
         if entries.length() == 0 {
           let wfs : &@git.FileSystem = fs
-          wfs.remove_dir(abs_dir) catch { _ => () }
+          wfs.remove_dir(abs_dir) catch {
+            _ => ()
+          }
           if not(quiet) {
             print_line("Removing \{dir}/")
           }
@@ -2067,10 +2039,14 @@ fn remove_dir_recursive(fs : OsFs, path : String) -> Unit {
     if rfs.is_dir(full) {
       remove_dir_recursive(fs, full)
     } else {
-      wfs.remove_file(full) catch { _ => () }
+      wfs.remove_file(full) catch {
+        _ => ()
+      }
     }
   }
-  wfs.remove_dir(path) catch { _ => () }
+  wfs.remove_dir(path) catch {
+    _ => ()
+  }
 }
 
 ///|
@@ -2268,7 +2244,9 @@ fn get_submodule_index_id(
   git_dir : String,
   path : String,
 ) -> @git.ObjectId? {
-  let entries = @gitlib.read_index_entries(fs, git_dir) catch { _ => return None }
+  let entries = @gitlib.read_index_entries(fs, git_dir) catch {
+    _ => return None
+  }
   for e in entries {
     if e.path == path {
       return Some(e.id)
@@ -2356,9 +2334,12 @@ async fn handle_submodule_update(
       print_line("Cloning into '\{sub.path}'...")
       wfs.mkdir_p(modules_dir)
       // Use system git for clone
-      let clone_result = run_git_command(
-        ["clone", "--bare", sub.url, modules_dir],
-      )
+      let clone_result = run_git_command([
+        "clone",
+        "--bare",
+        sub.url,
+        modules_dir,
+      ])
       if clone_result != 0 {
         eprint_line("Failed to clone \{sub.url}")
         continue
@@ -2430,7 +2411,9 @@ fn checkout_tree_recursive(
     let full_path = work_tree + "/" + path
     if entry.mode == "40000" {
       // Directory - recurse
-      wfs.mkdir_p(full_path) catch { _ => () }
+      wfs.mkdir_p(full_path) catch {
+        _ => ()
+      }
       let sub_obj = db.get(rfs, entry.id) catch { _ => continue }
       guard sub_obj is Some(so) else { continue }
       checkout_tree_recursive(wfs, rfs, db, work_tree, path, so.data)
@@ -2445,11 +2428,15 @@ fn checkout_tree_recursive(
       match full_path.rev_find("/") {
         Some(idx) => {
           let parent = String::unsafe_substring(full_path, start=0, end=idx)
-          wfs.mkdir_p(parent) catch { _ => () }
+          wfs.mkdir_p(parent) catch {
+            _ => ()
+          }
         }
         None => ()
       }
-      wfs.write_file(full_path, o.data) catch { _ => () }
+      wfs.write_file(full_path, o.data) catch {
+        _ => ()
+      }
     }
   }
 }
@@ -2546,7 +2533,9 @@ async fn handle_submodule_deinit(
         if rfs.is_dir(full) {
           remove_dir_recursive(fs, full)
         } else {
-          wfs.remove_file(full) catch { _ => () }
+          wfs.remove_file(full) catch {
+            _ => ()
+          }
         }
       }
     }
@@ -2684,6 +2673,9 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
   let mut no_commit = false
   let mut mainline : Int? = None
+  let mut do_continue = false
+  let mut do_abort = false
+  let mut do_skip = false
   let commits : Array[String] = []
   let mut i = 0
   while i < args.length() {
@@ -2700,20 +2692,116 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
             String::unsafe_substring(arg, start=2, end=arg.length()),
           ),
         )
-      "--continue" | "--abort" | "--skip" => {
-        eprint_line("revert --continue/--abort/--skip not yet implemented")
-        @sys.exit(1)
-      }
+      "--continue" => do_continue = true
+      "--abort" => do_abort = true
+      "--skip" => do_skip = true
       _ if not(arg.has_prefix("-")) => commits.push(arg)
       _ => ()
     }
     i += 1
   }
+  let rfs : &@git.RepoFileSystem = fs
+  let wfs : &@git.FileSystem = fs
+  let revert_head_path = git_dir + "/REVERT_HEAD"
+  let merge_msg_path = git_dir + "/MERGE_MSG"
+  let orig_head_path = git_dir + "/ORIG_HEAD"
+  // Handle --abort
+  if do_abort {
+    if not(rfs.is_file(revert_head_path)) {
+      eprint_line("error: no revert in progress")
+      @sys.exit(1)
+    }
+    // Restore ORIG_HEAD if exists
+    if rfs.is_file(orig_head_path) {
+      let orig_hex = trim_chars(
+        decode_bytes(rfs.read_file(orig_head_path)),
+        " \t\r\n",
+      )
+      // Reset to ORIG_HEAD
+      ignore(@gitlib.reset(wfs, rfs, root, orig_hex, @gitlib.ResetMode::Hard))
+      wfs.remove_file(orig_head_path) catch {
+        _ => ()
+      }
+    }
+    // Clean up state files
+    wfs.remove_file(revert_head_path) catch {
+      _ => ()
+    }
+    wfs.remove_file(merge_msg_path) catch {
+      _ => ()
+    }
+    print_line("Revert aborted.")
+    return
+  }
+  // Handle --skip
+  if do_skip {
+    if not(rfs.is_file(revert_head_path)) {
+      eprint_line("error: no revert in progress")
+      @sys.exit(1)
+    }
+    // Clean up state files (skip current revert)
+    wfs.remove_file(revert_head_path) catch {
+      _ => ()
+    }
+    wfs.remove_file(merge_msg_path) catch {
+      _ => ()
+    }
+    // Reset index to HEAD
+    ignore(@gitlib.reset(wfs, rfs, root, "HEAD", @gitlib.ResetMode::Mixed))
+    print_line("Revert skipped.")
+    return
+  }
+  // Handle --continue
+  if do_continue {
+    if not(rfs.is_file(revert_head_path)) {
+      eprint_line("error: no revert in progress")
+      @sys.exit(1)
+    }
+    // Read the commit message from MERGE_MSG
+    let msg = if rfs.is_file(merge_msg_path) {
+      decode_bytes(rfs.read_file(merge_msg_path))
+    } else {
+      "Revert commit\n"
+    }
+    // Create the commit
+    let author = get_author_string()
+    let timestamp = get_commit_timestamp()
+    let new_commit_id = @gitlib.commit(wfs, rfs, root, msg, author, timestamp)
+    let short_id = (try! new_commit_id.to_hex()[:7]).to_string()
+    let first_line = match msg.find("\n") {
+      Some(idx) => String::unsafe_substring(msg, start=0, end=idx)
+      None => msg
+    }
+    print_line("[\{short_id}] \{first_line}")
+    // Clean up state files
+    wfs.remove_file(revert_head_path) catch {
+      _ => ()
+    }
+    wfs.remove_file(merge_msg_path) catch {
+      _ => ()
+    }
+    wfs.remove_file(orig_head_path) catch {
+      _ => ()
+    }
+    return
+  }
+  // Normal revert
   if commits.length() == 0 {
     raise @git.GitError::InvalidObject("usage: git revert <commit>...")
   }
-  let rfs : &@git.RepoFileSystem = fs
-  let wfs : &@git.FileSystem = fs
+  // Check if revert already in progress
+  if rfs.is_file(revert_head_path) {
+    eprint_line(
+      "error: revert already in progress, use --continue, --abort, or --skip",
+    )
+    @sys.exit(1)
+  }
+  // Save ORIG_HEAD
+  let current_head = @gitlib.resolve_head_commit(rfs, git_dir)
+  match current_head {
+    Some(hid) => wfs.write_string(orig_head_path, hid.to_hex() + "\n")
+    None => ()
+  }
   let db = @gitlib.ObjectDb::load(rfs, git_dir)
   for commit_ref in commits {
     // Resolve commit
@@ -2753,7 +2841,9 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
     }
     // Get trees for commit and parent
     let commit_files = @gitlib.collect_tree_files_from_commit(db, rfs, cid)
-    let parent_files = @gitlib.collect_tree_files_from_commit(db, rfs, parent_id)
+    let parent_files = @gitlib.collect_tree_files_from_commit(
+      db, rfs, parent_id,
+    )
     // Apply reverse changes
     let mut has_conflicts = false
     // Files that were added in commit -> delete them
@@ -2816,26 +2906,39 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
         None => ()
       }
     }
+    // Prepare revert message
+    let original_msg = extract_commit_message(o.data)
+    let first_line = match original_msg.find("\n") {
+      Some(idx) => String::unsafe_substring(original_msg, start=0, end=idx)
+      None => original_msg
+    }
+    let revert_msg = "Revert \"\{first_line}\"\n\nThis reverts commit \{cid.to_hex()}.\n"
     if has_conflicts {
+      // Save state for --continue
+      wfs.write_string(revert_head_path, cid.to_hex() + "\n")
+      wfs.write_string(merge_msg_path, revert_msg)
       eprint_line("error: could not revert \{commit_ref}")
-      eprint_line("hint: resolve conflicts and run 'git revert --continue'")
+      eprint_line(
+        "hint: after resolving conflicts, run 'git revert --continue'",
+      )
+      eprint_line("hint: to skip this commit, run 'git revert --skip'")
+      eprint_line("hint: to abort, run 'git revert --abort'")
       @sys.exit(1)
     }
     // Create revert commit unless --no-commit
     if not(no_commit) {
-      let original_msg = extract_commit_message(o.data)
-      let first_line = match original_msg.find("\n") {
-        Some(idx) =>
-          String::unsafe_substring(original_msg, start=0, end=idx)
-        None => original_msg
-      }
-      let revert_msg = "Revert \"\{first_line}\"\n\nThis reverts commit \{cid.to_hex()}.\n"
       let author = get_author_string()
       let timestamp = get_commit_timestamp()
-      let new_commit_id = @gitlib.commit(wfs, rfs, root, revert_msg, author, timestamp)
+      let new_commit_id = @gitlib.commit(
+        wfs, rfs, root, revert_msg, author, timestamp,
+      )
       let short_id = (try! new_commit_id.to_hex()[:7]).to_string()
       print_line("[\{short_id}] Revert \"\{first_line}\"")
     }
+  }
+  // Clean up ORIG_HEAD on success
+  wfs.remove_file(orig_head_path) catch {
+    _ => ()
   }
 }
 
@@ -2871,5 +2974,7 @@ fn remove_from_index(
       new_entries.push(e)
     }
   }
-  @gitlib.write_index_entries(wfs, git_dir, new_entries) catch { _ => () }
+  @gitlib.write_index_entries(wfs, git_dir, new_entries) catch {
+    _ => ()
+  }
 }

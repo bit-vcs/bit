@@ -9,8 +9,7 @@ fn setup_worktree_admin_fs() -> @git.TestFs {
   fs.mkdir_p("/repo/.git/objects/pack")
   fs.write_string("/repo/.git/HEAD", "ref: refs/heads/main\n")
   fs.write_string(
-    "/repo/.git/refs/heads/main",
-    "1111111111111111111111111111111111111111\n",
+    "/repo/.git/refs/heads/main", "1111111111111111111111111111111111111111\n",
   )
   fs
 }
@@ -35,8 +34,7 @@ test "worktree admin: list with linked worktree" {
   fs.write_string("/repo/.git/worktrees/wt1/HEAD", "ref: refs/heads/feature\n")
   fs.write_string("/repo/.git/worktrees/wt1/commondir", "../..\n")
   fs.write_string(
-    "/repo/.git/refs/heads/feature",
-    "2222222222222222222222222222222222222222\n",
+    "/repo/.git/refs/heads/feature", "2222222222222222222222222222222222222222\n",
   )
   let worktrees = list_worktrees(fs, "/repo")
   assert_eq(worktrees.length(), 2)
@@ -53,10 +51,11 @@ test "worktree admin: list with linked worktree" {
 test "worktree admin: list detached head worktree" {
   let fs = setup_worktree_admin_fs()
   fs.mkdir_p("/repo/.git/worktrees/wt-detached")
-  fs.write_string("/repo/.git/worktrees/wt-detached/gitdir", "/detached-wt/.git\n")
   fs.write_string(
-    "/repo/.git/worktrees/wt-detached/HEAD",
-    "3333333333333333333333333333333333333333\n",
+    "/repo/.git/worktrees/wt-detached/gitdir", "/detached-wt/.git\n",
+  )
+  fs.write_string(
+    "/repo/.git/worktrees/wt-detached/HEAD", "3333333333333333333333333333333333333333\n",
   )
   fs.write_string("/repo/.git/worktrees/wt-detached/commondir", "../..\n")
   let worktrees = list_worktrees(fs, "/repo")
@@ -69,10 +68,11 @@ test "worktree admin: list detached head worktree" {
 test "worktree admin: list locked worktree" {
   let fs = setup_worktree_admin_fs()
   fs.mkdir_p("/repo/.git/worktrees/locked-wt")
-  fs.write_string("/repo/.git/worktrees/locked-wt/gitdir", "/locked-path/.git\n")
   fs.write_string(
-    "/repo/.git/worktrees/locked-wt/HEAD",
-    "4444444444444444444444444444444444444444\n",
+    "/repo/.git/worktrees/locked-wt/gitdir", "/locked-path/.git\n",
+  )
+  fs.write_string(
+    "/repo/.git/worktrees/locked-wt/HEAD", "4444444444444444444444444444444444444444\n",
   )
   fs.write_string("/repo/.git/worktrees/locked-wt/commondir", "../..\n")
   fs.write_string("/repo/.git/worktrees/locked-wt/locked", "")
@@ -103,8 +103,7 @@ test "worktree admin: is_branch_checked_out in linked worktree" {
   fs.write_string("/repo/.git/worktrees/wt1/HEAD", "ref: refs/heads/feature\n")
   fs.write_string("/repo/.git/worktrees/wt1/commondir", "../..\n")
   fs.write_string(
-    "/repo/.git/refs/heads/feature",
-    "2222222222222222222222222222222222222222\n",
+    "/repo/.git/refs/heads/feature", "2222222222222222222222222222222222222222\n",
   )
   let result = is_branch_checked_out(fs, "/repo", "feature")
   assert_eq(result, Some("/worktree1"))
@@ -117,8 +116,7 @@ test "worktree admin: prune missing worktree" {
   fs.mkdir_p("/repo/.git/worktrees/missing")
   fs.write_string("/repo/.git/worktrees/missing/gitdir", "/nonexistent/.git\n")
   fs.write_string(
-    "/repo/.git/worktrees/missing/HEAD",
-    "5555555555555555555555555555555555555555\n",
+    "/repo/.git/worktrees/missing/HEAD", "5555555555555555555555555555555555555555\n",
   )
   fs.write_string("/repo/.git/worktrees/missing/commondir", "../..\n")
   // Prune should remove it
@@ -135,8 +133,7 @@ test "worktree admin: prune dry run" {
   fs.mkdir_p("/repo/.git/worktrees/missing")
   fs.write_string("/repo/.git/worktrees/missing/gitdir", "/nonexistent/.git\n")
   fs.write_string(
-    "/repo/.git/worktrees/missing/HEAD",
-    "5555555555555555555555555555555555555555\n",
+    "/repo/.git/worktrees/missing/HEAD", "5555555555555555555555555555555555555555\n",
   )
   fs.write_string("/repo/.git/worktrees/missing/commondir", "../..\n")
   // Dry run should not remove
@@ -151,12 +148,10 @@ test "worktree admin: prune locked worktree not pruned" {
   let fs = setup_worktree_admin_fs()
   fs.mkdir_p("/repo/.git/worktrees/locked-missing")
   fs.write_string(
-    "/repo/.git/worktrees/locked-missing/gitdir",
-    "/nonexistent-locked/.git\n",
+    "/repo/.git/worktrees/locked-missing/gitdir", "/nonexistent-locked/.git\n",
   )
   fs.write_string(
-    "/repo/.git/worktrees/locked-missing/HEAD",
-    "6666666666666666666666666666666666666666\n",
+    "/repo/.git/worktrees/locked-missing/HEAD", "6666666666666666666666666666666666666666\n",
   )
   fs.write_string("/repo/.git/worktrees/locked-missing/commondir", "../..\n")
   fs.write_string("/repo/.git/worktrees/locked-missing/locked", "")
@@ -165,4 +160,3 @@ test "worktree admin: prune locked worktree not pruned" {
   assert_eq(pruned.length(), 0)
   assert_true(fs.is_dir("/repo/.git/worktrees/locked-missing"))
 }
-

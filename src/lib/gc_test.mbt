@@ -265,7 +265,10 @@ test "gc_repo handles annotated tags" {
     commit_id.to_hex() +
     "\ntype commit\ntag v1.0\ntagger Test <test@example.com> 0 +0000\n\nrelease\n"
   let tag_bytes = @utf8.encode(tag_content)
-  let (tag_id, tag_compressed) = @git.create_object(@git.ObjectType::Tag, tag_bytes)
+  let (tag_id, tag_compressed) = @git.create_object(
+    @git.ObjectType::Tag,
+    tag_bytes,
+  )
   write_object_bytes(fs, git_dir, tag_id, tag_compressed)
   fs.mkdir_p(git_dir + "/refs/tags")
   fs.write_string(git_dir + "/refs/tags/v1.0", tag_id.to_hex() + "\n")
