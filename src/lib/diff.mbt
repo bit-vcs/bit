@@ -33,17 +33,12 @@ pub fn diff_worktree(
   let seen : Map[String, Bool] = {}
   for path in files {
     seen[path] = true
-    let abs = join_path(root, path)
-    let content = fs.read_file(abs)
+    // Only diff files that are in the index (skip untracked files)
     match index_map.get(path) {
-      None =>
-        out.push({
-          path,
-          kind: DiffKind::Added,
-          old_content: None,
-          new_content: Some(content),
-        })
+      None => () // untracked files are not shown in `git diff`
       Some(entry) => {
+        let abs = join_path(root, path)
+        let content = fs.read_file(abs)
         let id = @git.hash_blob(content)
         if id != entry.id {
           let old = diff_read_blob(db, fs, entry.id)
@@ -178,6 +173,69 @@ fn diff_emit_lines(out : Array[String], data : Bytes, prefix : String) -> Unit {
     let line = line_view.to_string()
     out.push(prefix + line)
   }
+}
+
+///|
+/// Format diff as stat summary (like git diff --stat).
+pub fn diff_stat(files : Array[DiffFile]) -> Array[String] {
+  let lines : Array[String] = []
+  let mut total_add = 0
+  let mut total_del = 0
+  let mut max_name_len = 0
+  for f in files {
+    if f.path.length() > max_name_len {
+      max_name_len = f.path.length()
+    }
+  }
+  for f in files {
+    let (add, del) = count_line_changes(f.old_content, f.new_content)
+    total_add = total_add + add
+    total_del = total_del + del
+    let total = add + del
+    let bar_len = if total > 50 { 50 } else { total }
+    let add_bar = "+".repeat(if total > 0 { add * bar_len / total } else { 0 })
+    let del_bar = "-".repeat(if total > 0 { del * bar_len / total } else { 0 })
+    let padding = " ".repeat(max_name_len - f.path.length())
+    lines.push(" \{f.path}\{padding} | \{total} \{add_bar}\{del_bar}")
+  }
+  if files.length() > 0 {
+    let files_changed = files.length()
+    lines.push(
+      " \{files_changed} file(s) changed, \{total_add} insertions(+), \{total_del} deletions(-)",
+    )
+  }
+  lines
+}
+
+///|
+fn count_line_changes(old : Bytes?, new : Bytes?) -> (Int, Int) {
+  let old_lines = match old {
+    Some(data) => count_lines(data)
+    None => 0
+  }
+  let new_lines = match new {
+    Some(data) => count_lines(data)
+    None => 0
+  }
+  if new_lines >= old_lines {
+    (new_lines - old_lines, 0)
+  } else {
+    (0, old_lines - new_lines)
+  }
+}
+
+///|
+fn count_lines(data : Bytes) -> Int {
+  let mut count = 0
+  for b in data {
+    if b == b'\n' {
+      count = count + 1
+    }
+  }
+  if data.length() > 0 && data[data.length() - 1] != b'\n' {
+    count = count + 1
+  }
+  count
 }
 
 ///|

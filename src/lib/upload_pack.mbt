@@ -64,8 +64,8 @@ pub fn parse_upload_pack_request(
     // Parse capabilities from first want line
     if first_want && line.has_prefix("want ") {
       first_want = false
+      // Try NUL separator first (git protocol)
       match line.find("\u0000") {
-        None => ()
         Some(idx) => {
           let caps_str = String::unsafe_substring(
             line,
@@ -80,15 +80,38 @@ pub fn parse_upload_pack_request(
             }
           }
         }
+        None => {
+          // HTTP stateless-rpc: caps are space-separated after SHA
+          // Format: "want <sha40> <cap1> <cap2> ..."
+          let rest = String::unsafe_substring(line, start=5, end=line.length())
+          let rest = upload_trim_line(rest)
+          if rest.length() > 40 {
+            let caps_str = String::unsafe_substring(
+              rest,
+              start=41,
+              end=rest.length(),
+            )
+            let caps = upload_split_by_space(caps_str)
+            for c in caps {
+              if c.length() > 0 {
+                capabilities.push(c)
+              }
+            }
+          }
+        }
       }
     }
     if line.has_prefix("want ") {
       let hex = String::unsafe_substring(line, start=5, end=line.length())
       let hex = upload_trim_line(hex)
-      // Strip capabilities suffix if any
-      let hex = match hex.find(" ") {
-        None => hex
-        Some(idx) => String::unsafe_substring(hex, start=0, end=idx)
+      // Extract just the SHA (first 40 chars or until space)
+      let hex = if hex.length() > 40 {
+        String::unsafe_substring(hex, start=0, end=40)
+      } else {
+        match hex.find(" ") {
+          None => hex
+          Some(idx) => String::unsafe_substring(hex, start=0, end=idx)
+        }
       }
       if hex.length() >= 40 {
         let hex40 = String::unsafe_substring(hex, start=0, end=40)
@@ -119,6 +142,9 @@ pub fn upload_pack(
   let db = ObjectDb::load(fs, git_dir)
   // Collect objects reachable from wants
   let objects = collect_reachable_objects_from_commits(db, fs, req.wants)
+  // Check if client wants side-band
+  let use_side_band = req.capabilities.contains("side-band-64k") ||
+    req.capabilities.contains("side-band")
   // If client has some objects, filter them out
   if req.haves.length() > 0 {
     let have_set : Map[String, Bool] = {}
@@ -134,29 +160,72 @@ pub fn upload_pack(
         filtered.push(obj)
       }
     }
-    return build_upload_pack_response(filtered)
+    return build_upload_pack_response(filtered, use_side_band)
   }
-  build_upload_pack_response(objects)
+  build_upload_pack_response(objects, use_side_band)
 }
 
 ///|
-fn build_upload_pack_response(objects : Array[@git.PackObject]) -> Bytes {
+fn build_upload_pack_response(
+  objects : Array[@git.PackObject],
+  use_side_band : Bool,
+) -> Bytes {
   let out : Array[Byte] = []
   // NAK (no common commits)
   upload_push_bytes(out, @git.pktline_encode("NAK\n"))
   // Create packfile
   let pack = @git.create_packfile(objects)
-  // Send packfile
-  for b in pack {
-    out.push(b)
+  if use_side_band {
+    // Send packfile via side-band-64k (band 1)
+    let chunk_size = 65515 // 65520 - 4 (pkt-line header) - 1 (band byte)
+    let mut offset = 0
+    while offset < pack.length() {
+      let end = if offset + chunk_size > pack.length() {
+        pack.length()
+      } else {
+        offset + chunk_size
+      }
+      let data_len = end - offset
+      let pkt_len = data_len + 5 // 4 (header) + 1 (band byte)
+      let len_hex = upload_int_to_hex4(pkt_len)
+      for c in len_hex {
+        out.push(c.to_int().to_byte())
+      }
+      out.push(b'\x01') // band 1 = packfile data
+      for i in offset..<end {
+        out.push(pack[i])
+      }
+      offset = end
+    }
+    // Send flush to indicate end of packfile
+    upload_push_bytes(out, @git.pktline_flush())
+  } else {
+    // Send packfile directly (no side-band)
+    for b in pack {
+      out.push(b)
+    }
   }
   Bytes::from_array(FixedArray::makei(out.length(), fn(i) { out[i] }))
+}
+
+///|
+fn upload_int_to_hex4(n : Int) -> String {
+  let digits = "0123456789abcdef"
+  let mut result = ""
+  let mut v = n
+  for _ in 0..<4 {
+    let d = v % 16
+    result = String::make(1, digits[d].to_int().unsafe_to_char()) + result
+    v = v / 16
+  }
+  result
 }
 
 ///|
 fn upload_default_caps(agent : String) -> String {
   let caps : Array[String] = [
     "multi_ack",
+    "multi_ack_detailed",
     "thin-pack",
     "side-band",
     "side-band-64k",
@@ -164,6 +233,7 @@ fn upload_default_caps(agent : String) -> String {
     "shallow",
     "no-progress",
     "include-tag",
+    "no-done",
     "object-format=sha1",
     "agent=\{agent}",
   ]

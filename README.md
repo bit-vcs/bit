@@ -45,7 +45,7 @@ src/
 │   ├── object_db.mbt     # Object database
 │   └── ...
 └── cmd/
-    └── git_shim/         # Native git command interceptor
+    └── moongit/          # Native git command interceptor
         ├── main.mbt
         ├── pack_objects.mbt
         ├── index_pack.mbt
@@ -62,16 +62,19 @@ just test         # run tests (js + native)
 just release-check # fmt + info + check + test
 ```
 
-## Git-Shim
+## Moongit
 
-The `git-shim` is a native binary that intercepts specific Git commands and handles them in MoonBit:
+`moongit` is a native binary that intercepts specific Git commands and handles them in MoonBit:
 
 ```bash
-# Build the shim
+# Build moongit
 moon build --target native
 
 # Copy to tools directory
-cp _build/native/release/build/cmd/git_shim/git_shim.exe tools/git-shim/moon
+cp _build/native/release/build/cmd/moongit/moongit.exe tools/git-shim/moon
+
+# Or install to ~/.local/bin
+just install
 ```
 
 ### Supported Commands

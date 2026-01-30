@@ -87,6 +87,61 @@ pub fn list_branches_text(
 }
 
 ///|
+/// List branches with commit hash (verbose mode).
+pub fn list_branches_verbose(
+  fs : &@git.RepoFileSystem,
+  git_dir : String,
+) -> Array[String] raise @git.GitError {
+  let lines : Array[String] = []
+  let (head, branches) = list_branches(fs, git_dir)
+  for b in branches {
+    let marker = match head {
+      Branch(name) => if name == b.name { "* " } else { "  " }
+      Detached(_) => "  "
+    }
+    let short_hash = (try! b.id.to_hex()[:7]).to_string()
+    lines.push("\{marker}\{b.name} \{short_hash}")
+  }
+  lines
+}
+
+///|
+/// List remote tracking branches.
+pub fn list_remote_branches(
+  fs : &@git.RepoFileSystem,
+  git_dir : String,
+) -> Array[String] {
+  let lines : Array[String] = []
+  let refs_dir = join_path(git_dir, "refs/remotes")
+  if not(fs.is_dir(refs_dir)) {
+    return lines
+  }
+  // Walk refs/remotes directory
+  collect_remote_refs(fs, refs_dir, "", lines)
+  lines.sort()
+  lines
+}
+
+///|
+fn collect_remote_refs(
+  fs : &@git.RepoFileSystem,
+  base_dir : String,
+  prefix : String,
+  out : Array[String],
+) -> Unit {
+  let entries = fs.readdir(base_dir) catch { _ => return () }
+  for entry in entries {
+    let path = join_path(base_dir, entry)
+    let name = if prefix.length() > 0 { prefix + "/" + entry } else { entry }
+    if fs.is_dir(path) {
+      collect_remote_refs(fs, path, name, out)
+    } else if fs.is_file(path) {
+      out.push("  remotes/" + name)
+    }
+  }
+}
+
+///|
 /// Create a local branch pointing at current HEAD.
 pub fn create_branch(
   fs : &@git.FileSystem,
@@ -103,6 +158,113 @@ pub fn create_branch(
   match head {
     None => fs.write_string(ref_path, "")
     Some(id) => fs.write_string(ref_path, id.to_hex() + "\n")
+  }
+}
+
+///|
+/// Create a local branch pointing at a specific commit.
+pub fn create_branch_at(
+  fs : &@git.FileSystem,
+  rfs : &@git.RepoFileSystem,
+  root : String,
+  name : String,
+  commit_id : @git.ObjectId,
+) -> Unit raise @git.GitError {
+  let git_dir = join_path(root, ".git")
+  let refname = branch_ref_name(name)
+  let ref_path = join_path(git_dir, refname)
+  let dir = parent_dir(ref_path)
+  fs.mkdir_p(dir)
+  ignore(rfs)
+  fs.write_string(ref_path, commit_id.to_hex() + "\n")
+}
+
+///|
+/// Delete a local branch. Fails if it's the current branch.
+pub fn delete_branch(
+  fs : &@git.FileSystem,
+  rfs : &@git.RepoFileSystem,
+  root : String,
+  name : String,
+  force? : Bool = false,
+) -> Unit raise @git.GitError {
+  let git_dir = join_path(root, ".git")
+  let head = read_head_ref(rfs, git_dir)
+  match head {
+    Branch(current) =>
+      if current == name {
+        raise @git.GitError::InvalidObject(
+          "Cannot delete branch '\{name}' checked out at '\{root}'",
+        )
+      }
+    Detached(_) => ()
+  }
+  let refname = branch_ref_name(name)
+  let ref_path = join_path(git_dir, refname)
+  // Check if branch exists
+  let exists = rfs.is_file(ref_path) ||
+    resolve_packed_ref(rfs, join_path(git_dir, "packed-refs"), refname)
+    is Some(_)
+  if not(exists) {
+    raise @git.GitError::InvalidObject("branch '\{name}' not found")
+  }
+  // Check if branch is fully merged (unless force)
+  if not(force) {
+    // TODO: implement merge check
+    // For now, skip this check
+    ()
+  }
+  // Delete loose ref if it exists
+  if rfs.is_file(ref_path) {
+    fs.remove_file(ref_path)
+  }
+  // Remove from packed-refs if present
+  let packed_path = join_path(git_dir, "packed-refs")
+  if rfs.is_file(packed_path) {
+    remove_from_packed_refs(fs, rfs, packed_path, refname)
+  }
+}
+
+///|
+fn remove_from_packed_refs(
+  fs : &@git.FileSystem,
+  rfs : &@git.RepoFileSystem,
+  packed_path : String,
+  refname : String,
+) -> Unit raise @git.GitError {
+  let text = @utf8.decode_lossy(rfs.read_file(packed_path)[:])
+  let lines : Array[String] = []
+  let mut found = false
+  for line_view in text.split("\n") {
+    let line = line_view.to_string()
+    if line.length() == 0 {
+      continue
+    }
+    // Check if this line is for the ref we want to remove
+    let space = line.find(" ")
+    match space {
+      None => lines.push(line)
+      Some(idx) => {
+        if idx + 1 >= line.length() {
+          lines.push(line)
+          continue
+        }
+        let name = String::unsafe_substring(
+          line,
+          start=idx + 1,
+          end=line.length(),
+        )
+        if name == refname {
+          found = true
+        } else {
+          lines.push(line)
+        }
+      }
+    }
+  }
+  if found {
+    let new_content = lines.join("\n") + "\n"
+    fs.write_string(packed_path, new_content)
   }
 }
 
@@ -301,4 +463,130 @@ fn shorten_hex(hex : String, n : Int) -> String {
   } else {
     String::unsafe_substring(hex, start=0, end=n)
   }
+}
+
+///|
+/// List all tags.
+pub fn list_tags(fs : &@git.RepoFileSystem, git_dir : String) -> Array[String] {
+  let tags : Array[String] = []
+  let refs_dir = join_path(git_dir, "refs/tags")
+  if fs.is_dir(refs_dir) {
+    collect_tag_names(fs, refs_dir, "", tags)
+  }
+  // Also check packed-refs
+  let packed_path = join_path(git_dir, "packed-refs")
+  if fs.is_file(packed_path) {
+    collect_packed_tags(fs, packed_path, tags)
+  }
+  tags.sort()
+  tags
+}
+
+///|
+fn collect_tag_names(
+  fs : &@git.RepoFileSystem,
+  dir : String,
+  prefix : String,
+  out : Array[String],
+) -> Unit {
+  let entries = fs.readdir(dir) catch { _ => return () }
+  for entry in entries {
+    let path = join_path(dir, entry)
+    let name = if prefix.length() > 0 { prefix + "/" + entry } else { entry }
+    if fs.is_dir(path) {
+      collect_tag_names(fs, path, name, out)
+    } else if fs.is_file(path) {
+      if not(out.contains(name)) {
+        out.push(name)
+      }
+    }
+  }
+}
+
+///|
+fn collect_packed_tags(
+  fs : &@git.RepoFileSystem,
+  packed_path : String,
+  out : Array[String],
+) -> Unit {
+  let text = @utf8.decode_lossy(
+    (fs.read_file(packed_path) catch { _ => return () })[:],
+  )
+  for line_view in text.split("\n") {
+    let line = trim_line(line_view.to_string())
+    if line.length() == 0 || line.has_prefix("#") || line.has_prefix("^") {
+      continue
+    }
+    let space = line.find(" ")
+    match space {
+      None => continue
+      Some(idx) => {
+        let refname = String::unsafe_substring(
+          line,
+          start=idx + 1,
+          end=line.length(),
+        )
+        if refname.has_prefix("refs/tags/") {
+          let name = String::unsafe_substring(
+            refname,
+            start=10,
+            end=refname.length(),
+          )
+          if not(out.contains(name)) {
+            out.push(name)
+          }
+        }
+      }
+    }
+  }
+}
+
+///|
+/// Delete a tag.
+pub fn delete_tag(
+  fs : &@git.FileSystem,
+  git_dir : String,
+  name : String,
+) -> Unit raise @git.GitError {
+  let ref_path = join_path(git_dir, "refs/tags/" + name)
+  fs.remove_file(ref_path)
+}
+
+///|
+/// Create a lightweight tag.
+pub fn create_lightweight_tag(
+  fs : &@git.FileSystem,
+  git_dir : String,
+  name : String,
+  target : @git.ObjectId,
+) -> Unit raise @git.GitError {
+  let tags_dir = join_path(git_dir, "refs/tags")
+  fs.mkdir_p(tags_dir)
+  let ref_path = join_path(git_dir, "refs/tags/" + name)
+  fs.write_string(ref_path, target.to_hex() + "\n")
+}
+
+///|
+/// Create an annotated tag.
+pub fn create_annotated_tag(
+  fs : &@git.FileSystem,
+  rfs : &@git.RepoFileSystem,
+  git_dir : String,
+  name : String,
+  target : @git.ObjectId,
+  message : String,
+  tagger : String,
+  timestamp : Int64,
+) -> Unit raise @git.GitError {
+  // Create tag object
+  let tag_content = "object \{target.to_hex()}\ntype commit\ntag \{name}\ntagger \{tagger} \{timestamp} +0000\n\n\{message}\n"
+  let tag_bytes = @utf8.encode(tag_content)
+  let (tag_id, compressed) = @git.create_object(@git.ObjectType::Tag, tag_bytes)
+  write_object_bytes(fs, git_dir, tag_id, compressed)
+  // Create ref pointing to tag object
+  ignore(rfs)
+  let tags_dir = join_path(git_dir, "refs/tags")
+  fs.mkdir_p(tags_dir)
+  let ref_path = join_path(git_dir, "refs/tags/" + name)
+  fs.write_string(ref_path, tag_id.to_hex() + "\n")
 }
