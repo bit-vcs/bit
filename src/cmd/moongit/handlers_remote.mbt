@@ -307,6 +307,14 @@ fn parse_pack_args(args : Array[String]) -> (Bool, String)? {
 
 ///|
 async fn handle_upload_pack(args : Array[String]) -> Unit {
+  // Handle -h option
+  for arg in args {
+    if arg == "-h" {
+      print_line("usage: git upload-pack [--[no-]strict] [--timeout=<n>] [--stateless-rpc]")
+      print_line("                       [--advertise-refs] <dir>")
+      @sys.exit(129)
+    }
+  }
   guard parse_pack_args(args) is Some((advertise, repo_path)) else {
     raise @git.GitError::ProtocolError("missing repository path")
   }
@@ -329,6 +337,13 @@ async fn handle_upload_pack(args : Array[String]) -> Unit {
 
 ///|
 async fn handle_receive_pack(args : Array[String]) -> Unit {
+  // Handle -h option
+  for arg in args {
+    if arg == "-h" {
+      print_line("usage: git receive-pack <git-dir>")
+      @sys.exit(129)
+    }
+  }
   guard parse_pack_args(args) is Some((advertise, repo_path)) else {
     raise @git.GitError::ProtocolError("missing repository path")
   }
