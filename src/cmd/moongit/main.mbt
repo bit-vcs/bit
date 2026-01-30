@@ -336,6 +336,8 @@ async fn dispatch_command(
         err => exit_with_error("worktree", err)
       }
     "gc" => handle_gc(rest) catch { err => exit_with_error("gc", err) }
+    "clean" => handle_clean(rest) catch { err => exit_with_error("clean", err) }
+    "grep" => handle_grep(rest) catch { err => exit_with_error("grep", err) }
     "version" | "--version" => print_line("git version 2.47.0 (moongit)")
     // Fallback to system git for unknown commands
     _ =>
