@@ -1,6 +1,24 @@
 ///| Git repository initialization
 
 ///|
+pub(all) struct InitOptions {
+  default_branch : String
+  bare : Bool
+  separate_git_dir : String?
+  template_dir : String?
+}
+
+///|
+pub fn InitOptions::new() -> InitOptions {
+  {
+    default_branch: "main",
+    bare: false,
+    separate_git_dir: None,
+    template_dir: None,
+  }
+}
+
+///|
 /// Initialize a repository at `root` with a default branch.
 /// If `bare` is true, creates a bare repository (no working tree).
 /// If the repository already exists, this is a reinit and preserves existing HEAD.
@@ -10,9 +28,29 @@ pub fn init_repo(
   default_branch? : String = "main",
   bare? : Bool = false,
 ) -> Unit raise @git.GitError {
-  // For bare repos, git_dir is the root itself; otherwise it's root/.git
-  let git_dir = if bare { root } else { join_path(root, ".git") }
+  init_repo_with_options(fs, root, {
+    default_branch,
+    bare,
+    separate_git_dir: None,
+    template_dir: None,
+  })
+}
+
+///|
+/// Initialize a repository with full options including separate-git-dir and template.
+pub fn init_repo_with_options(
+  fs : &@git.FileSystem,
+  root : String,
+  opts : InitOptions,
+) -> Unit raise @git.GitError {
+  let bare = opts.bare
+  // Determine git directory location
+  let git_dir = match opts.separate_git_dir {
+    Some(sep_dir) => sep_dir
+    None => if bare { root } else { join_path(root, ".git") }
+  }
   let head_path = join_path(git_dir, "HEAD")
+  // Create git directory structure
   fs.mkdir_p(git_dir)
   fs.mkdir_p(join_path(git_dir, "objects"))
   fs.mkdir_p(join_path(git_dir, "objects/info"))
@@ -21,8 +59,13 @@ pub fn init_repo(
   fs.mkdir_p(join_path(git_dir, "refs/tags"))
   fs.mkdir_p(join_path(git_dir, "info"))
   fs.mkdir_p(join_path(git_dir, "hooks"))
+  // If separate-git-dir, create .git file pointing to actual git dir
+  if opts.separate_git_dir is Some(_) && not(bare) {
+    let gitfile_path = join_path(root, ".git")
+    fs.write_string(gitfile_path, "gitdir: " + git_dir + "\n")
+  }
   // Always write HEAD (git init always updates HEAD with default branch)
-  fs.write_string(head_path, "ref: refs/heads/" + default_branch + "\n")
+  fs.write_string(head_path, "ref: refs/heads/" + opts.default_branch + "\n")
   // Create/update config file with appropriate bare setting
   let bare_str = if bare { "true" } else { "false" }
   let config = "[core]\n\trepositoryformatversion = 0\n\tfilemode = true\n\tbare = " +
@@ -36,4 +79,46 @@ pub fn init_repo(
   )
   // Create info/exclude
   fs.write_string(join_path(git_dir, "info/exclude"), "")
+}
+
+///|
+/// Copy template directory contents to git directory.
+/// This should be called after init_repo_with_options if template_dir is specified.
+pub fn apply_template(
+  wfs : &@git.FileSystem,
+  rfs : &@git.RepoFileSystem,
+  git_dir : String,
+  template_dir : String,
+) -> Unit raise @git.GitError {
+  copy_dir_recursive(wfs, rfs, template_dir, git_dir)
+}
+
+///|
+fn copy_dir_recursive(
+  wfs : &@git.FileSystem,
+  rfs : &@git.RepoFileSystem,
+  src : String,
+  dst : String,
+) -> Unit raise @git.GitError {
+  if not(rfs.is_dir(src)) {
+    return
+  }
+  wfs.mkdir_p(dst)
+  let entries = rfs.readdir(src)
+  for entry in entries {
+    if entry == "." || entry == ".." {
+      continue
+    }
+    let src_path = join_path(src, entry)
+    let dst_path = join_path(dst, entry)
+    if rfs.is_dir(src_path) {
+      copy_dir_recursive(wfs, rfs, src_path, dst_path)
+    } else if rfs.is_file(src_path) {
+      // Don't overwrite existing files
+      if not(rfs.is_file(dst_path)) {
+        let content = rfs.read_file(src_path)
+        wfs.write_file(dst_path, content)
+      }
+    }
+  }
 }

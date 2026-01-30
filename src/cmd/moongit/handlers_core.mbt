@@ -6,19 +6,35 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
   // Parse options
   let mut bare = false
+  let mut quiet = false
   let mut initial_branch : String? = None
   let mut target_dir : String? = None
+  let mut separate_git_dir : String? = None
+  let mut template_dir : String? = None
   let mut i = 0
   while i < args.length() {
     let arg = args[i]
     match arg {
       "--bare" => bare = true
+      "-q" | "--quiet" => quiet = true
       "-b" if i + 1 < args.length() => {
         initial_branch = Some(args[i + 1])
         i += 1
       }
+      "--separate-git-dir" if i + 1 < args.length() => {
+        separate_git_dir = Some(args[i + 1])
+        i += 1
+      }
+      "--template" if i + 1 < args.length() => {
+        template_dir = Some(args[i + 1])
+        i += 1
+      }
       _ if arg.has_prefix("--initial-branch=") =>
         initial_branch = Some((try! arg[17:]).to_string())
+      _ if arg.has_prefix("--separate-git-dir=") =>
+        separate_git_dir = Some((try! arg[19:]).to_string())
+      _ if arg.has_prefix("--template=") =>
+        template_dir = Some((try! arg[11:]).to_string())
       _ if not(arg.has_prefix("-")) => target_dir = Some(arg)
       _ => () // Ignore other options
     }
@@ -27,6 +43,10 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
   // Check GIT_DIR and GIT_WORK_TREE environment variables
   let git_dir_env = @sys.get_env_var("GIT_DIR")
   let work_tree_env = @sys.get_env_var("GIT_WORK_TREE")
+  // Check GIT_TEMPLATE_DIR environment variable
+  if template_dir is None {
+    template_dir = @sys.get_env_var("GIT_TEMPLATE_DIR")
+  }
   // Determine the target path and git directory
   let (path, effective_git_dir) : (String, String?) = match
     (target_dir, git_dir_env) {
@@ -58,30 +78,49 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
     )
     @sys.exit(128)
   }
+  // Resolve separate_git_dir to absolute path
+  let resolved_sep_git_dir : String? = match separate_git_dir {
+    Some(d) => Some(if d.has_prefix("/") { d } else { root + "/" + d })
+    None => None
+  }
   // Determine default branch
   let branch = match initial_branch {
     Some(b) => b
     None => "main"
   }
   // Determine actual git directory path for output message
-  let actual_git_dir = match effective_git_dir {
-    Some(gd) => gd
-    None => if bare { path } else { path + "/.git" }
+  let actual_git_dir = match (resolved_sep_git_dir, effective_git_dir) {
+    (Some(sep), _) => sep
+    (None, Some(gd)) => gd
+    (None, None) => if bare { path } else { path + "/.git" }
   }
   // Check if this is a reinit (repository already exists)
   let is_reinit = fs.is_dir(actual_git_dir) &&
     fs.is_file(actual_git_dir + "/HEAD")
-  // Initialize repository (init_repo handles both new and reinit)
-  @gitlib.init_repo(fs, path, default_branch=branch, bare~)
-  // Print appropriate message
-  let verb = if is_reinit {
-    "Reinitialized existing"
-  } else {
-    "Initialized empty"
+  // Build init options
+  let opts : @gitlib.InitOptions = {
+    default_branch: branch,
+    bare,
+    separate_git_dir: resolved_sep_git_dir,
+    template_dir,
   }
-  if bare {
-    print_line(verb + " Git repository in " + actual_git_dir + "/")
-  } else {
+  // Initialize repository
+  @gitlib.init_repo_with_options(fs, path, opts)
+  // Apply template if specified
+  match template_dir {
+    Some(tpl) =>
+      if fs.is_dir(tpl) {
+        @gitlib.apply_template(fs, fs, actual_git_dir, tpl)
+      }
+    None => ()
+  }
+  // Print appropriate message (unless quiet)
+  if not(quiet) {
+    let verb = if is_reinit {
+      "Reinitialized existing"
+    } else {
+      "Initialized empty"
+    }
     print_line(verb + " Git repository in " + actual_git_dir + "/")
   }
 }

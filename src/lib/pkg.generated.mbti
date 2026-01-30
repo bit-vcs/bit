@@ -12,6 +12,8 @@ pub fn append_reflog(&@git.FileSystem, &@git.RepoFileSystem, String, String, @gi
 
 pub fn apply_receive_pack(&@git.FileSystem, &@git.RepoFileSystem, String, ReceivePackRequest) -> ReceivePackResult raise @git.GitError
 
+pub fn apply_template(&@git.FileSystem, &@git.RepoFileSystem, String, String) -> Unit raise @git.GitError
+
 pub fn build_receive_pack_advertisement(&@git.RepoFileSystem, String, agent? : String) -> Bytes raise @git.GitError
 
 pub fn build_upload_pack_advertisement(&@git.RepoFileSystem, String, agent? : String) -> Bytes raise @git.GitError
@@ -67,6 +69,8 @@ pub fn gc_repo(&@git.FileSystem, &@git.RepoFileSystem, String) -> GcResult raise
 pub fn get_reflog_path(String, String) -> String
 
 pub fn init_repo(&@git.FileSystem, String, default_branch? : String, bare? : Bool) -> Unit raise @git.GitError
+
+pub fn init_repo_with_options(&@git.FileSystem, String, InitOptions) -> Unit raise @git.GitError
 
 pub fn is_ignored_path(&@git.RepoFileSystem, String, String, Bool) -> Bool raise @git.GitError
 
@@ -255,6 +259,14 @@ pub struct IndexEntry {
   mode : Int
   size : Int
 }
+
+pub(all) struct InitOptions {
+  default_branch : String
+  bare : Bool
+  separate_git_dir : String?
+  template_dir : String?
+}
+pub fn InitOptions::new() -> Self
 
 pub struct LogEntry {
   id : @git.ObjectId
