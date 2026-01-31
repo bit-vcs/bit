@@ -32,6 +32,7 @@ pub fn GitFs::checkout_snapshot(Self, &@git.RepoFileSystem, @git.ObjectId) -> Un
 pub fn GitFs::clear_layers(Self) -> Unit
 pub fn GitFs::discard_changes(Self) -> Unit
 pub fn GitFs::empty(String, config? : GitFsConfig) -> Self
+pub fn GitFs::exists_in_base(Self, &@git.RepoFileSystem, String) -> Bool
 pub fn GitFs::flatten_layers(Self, &@git.FileSystem, &@git.RepoFileSystem) -> @git.ObjectId raise @git.GitError
 pub fn GitFs::from_branch(&@git.RepoFileSystem, String, String, config? : GitFsConfig) -> Self raise @git.GitError
 pub fn GitFs::from_commit(&@git.RepoFileSystem, String, @git.ObjectId, config? : GitFsConfig) -> Self raise @git.GitError

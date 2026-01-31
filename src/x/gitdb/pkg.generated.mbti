@@ -1,0 +1,124 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/git/x/gitdb"
+
+import {
+  "mizchi/git",
+  "mizchi/git/x/gitfs",
+}
+
+// Values
+
+// Errors
+
+// Types and methods
+pub struct GitDb {
+  node_id : NodeId
+  gitfs : @gitfs.GitFs
+  mut clock : VectorClock
+  mut head : @git.ObjectId
+  peers : Map[String, PeerInfo]
+  pending_objects : Map[String, GitObject]
+}
+pub fn GitDb::add_peer(Self, PeerInfo) -> Unit
+pub fn GitDb::apply_pending_objects(Self, &@git.FileSystem, String) -> Int raise @git.GitError
+pub fn GitDb::clock(Self) -> VectorClock
+pub fn GitDb::commit(Self, &@git.FileSystem, &@git.RepoFileSystem, String, Int64) -> @git.ObjectId raise @git.GitError
+pub fn GitDb::delete(Self, String) -> Unit
+pub fn GitDb::empty(NodeId, String) -> Self
+pub fn GitDb::get(Self, &@git.RepoFileSystem, String) -> Bytes?
+pub fn GitDb::get_gossip_state(Self, Int64) -> GossipState
+pub fn GitDb::get_peers(Self) -> Array[PeerInfo]
+pub fn GitDb::handle_gossip(Self, &@git.RepoFileSystem, GossipMessage, Int64) -> GossipMessage?
+pub fn GitDb::has(Self, &@git.RepoFileSystem, String) -> Bool
+pub fn GitDb::has_pending_objects(Self) -> Bool
+pub fn GitDb::head(Self) -> @git.ObjectId
+pub fn GitDb::is_dirty(Self) -> Bool
+pub fn GitDb::list(Self, &@git.RepoFileSystem, String) -> Array[String]
+pub fn GitDb::list_recursive(Self, &@git.RepoFileSystem, String) -> Array[String]
+pub fn GitDb::merge(Self, &@git.FileSystem, &@git.RepoFileSystem, @git.ObjectId, VectorClock, MergeStrategy, Int64) -> MergeResult raise @git.GitError
+pub fn GitDb::new(NodeId, @gitfs.GitFs, @git.ObjectId) -> Self
+pub fn GitDb::node_id(Self) -> NodeId
+pub fn GitDb::pending_object_count(Self) -> Int
+pub fn GitDb::remove_peer(Self, NodeId) -> Bool
+pub fn GitDb::rollback(Self) -> Unit
+pub fn GitDb::select_gossip_peers(Self, Int, Int64) -> Array[PeerInfo]
+pub fn GitDb::set(Self, String, Bytes) -> Unit
+pub fn GitDb::set_string(Self, String, String) -> Unit
+
+pub(all) struct GitDbConfig {
+  node_id : NodeId
+  gitfs_config : @gitfs.GitFsConfig
+  max_peers : Int
+  gossip_interval_ms : Int
+  sync_batch_size : Int
+}
+pub fn GitDbConfig::default(NodeId) -> Self
+
+pub(all) struct GitObject {
+  id : @git.ObjectId
+  obj_type : @git.ObjectType
+  data : Bytes
+}
+
+pub(all) enum GossipMessage {
+  Announce(GossipState)
+  WantObjects(Array[@git.ObjectId])
+  HaveObjects(Array[GitObject])
+  SyncRequest(NodeId, @git.ObjectId)
+  SyncResponse(Array[GitObject], @git.ObjectId)
+}
+
+pub(all) struct GossipState {
+  node_id : NodeId
+  head : @git.ObjectId
+  clock : VectorClock
+  timestamp : Int64
+}
+
+pub(all) enum MergeResult {
+  NoOp
+  FastForward(@git.ObjectId)
+  Merged(@git.ObjectId, Array[String])
+  Conflict(Array[String])
+}
+
+pub(all) enum MergeStrategy {
+  LastWriteWins
+  KeepBoth
+  Custom((Bytes, Bytes) -> Bytes)
+}
+
+pub(all) struct NodeId {
+  id : String
+}
+pub fn NodeId::new(String) -> Self
+pub impl Eq for NodeId
+pub impl Hash for NodeId
+pub impl Show for NodeId
+
+pub(all) struct PeerInfo {
+  node_id : NodeId
+  last_seen : Int64
+  head : @git.ObjectId
+  endpoint : String
+}
+
+pub(all) struct SyncResult {
+  objects_sent : Int
+  objects_received : Int
+  conflicts : Array[String]
+  new_head : @git.ObjectId
+}
+
+pub(all) struct VectorClock {
+  clocks : Map[String, Int64]
+}
+pub fn VectorClock::compare(Self, Self) -> Int
+pub fn VectorClock::increment(Self, NodeId) -> Self
+pub fn VectorClock::merge(Self, Self) -> Self
+pub fn VectorClock::new() -> Self
+
+// Type aliases
+
+// Traits
+

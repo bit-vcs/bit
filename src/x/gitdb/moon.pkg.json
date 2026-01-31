@@ -1,0 +1,7 @@
+{
+  "import": [
+    "mizchi/git",
+    { "path": "mizchi/git/lib", "alias": "lib" },
+    { "path": "mizchi/git/x/gitfs", "alias": "gitfs" }
+  ]
+}
