@@ -1,4 +1,5 @@
 {
+  "warn-list": "-29",
   "import": [
     "mizchi/git",
     { "path": "mizchi/git/lib", "alias": "lib" },
@@ -6,5 +7,17 @@
   ],
   "test-import": [
     { "path": "mizchi/git/lib", "alias": "lib" }
-  ]
+  ],
+  "targets": {
+    "comment.mbt": ["native"],
+    "den.mbt": ["native"],
+    "den_test.mbt": ["native"],
+    "format.mbt": ["native"],
+    "issue.mbt": ["native"],
+    "merge.mbt": ["native"],
+    "notes.mbt": ["native"],
+    "review.mbt": ["native"],
+    "sync.mbt": ["native"],
+    "types.mbt": ["native"]
+  }
 }

@@ -11,5 +11,8 @@ import {
 }
 
 options(
-  targets: { "sync_http.mbt": [ "native" ] },
+  targets: {
+    "sync_http.mbt": [ "native" ],
+    "promisor.mbt": [ "native" ],
+  },
 )

@@ -25,6 +25,7 @@ options(
     "handlers_plumbing.mbt": [ "native" ],
     "handlers_remote.mbt": [ "native" ],
     "handlers_subdir.mbt": [ "native" ],
+    "handlers_subdir_wbtest.mbt": [ "native" ],
     "handlers_worktree.mbt": [ "native" ],
     "helpers.mbt": [ "native" ],
     "index_pack.mbt": [ "native" ],
