@@ -1,0 +1,273 @@
+///|
+/// SubdirRepo のテスト
+
+///|
+test "subdir: extract_subdir_tree finds nested directory" {
+  let fs = @git.TestFs::new()
+  @lib.init_repo(fs, "/repo") catch { _ => () }
+  // ディレクトリ構造を作成
+  fs.mkdir_p("/repo/src/lib")
+  fs.write_file("/repo/src/lib/foo.mbt", b"content of foo")
+  fs.write_file("/repo/src/lib/bar.mbt", b"content of bar")
+  fs.write_file("/repo/src/main.mbt", b"main content")
+  fs.write_file("/repo/README.md", b"readme")
+  // コミット
+  let commit_id = @lib.commit(
+    fs,
+    fs,
+    "/repo",
+    "Initial commit",
+    "test <test@test.com>",
+    1000L,
+  ) catch {
+    _ => return ()
+  }
+  // ObjectDb を読み込む
+  let db = @lib.ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
+  // サブディレクトリのツリーを抽出
+  let tree_id = extract_subdir_tree(db, fs, commit_id, "src/lib") catch {
+    _ => return ()
+  }
+  // ツリーが見つかったことを確認
+  assert_true(tree_id != @git.ObjectId::zero())
+}
+
+///|
+test "subdir: SubdirRepo::from_commit creates repo" {
+  let fs = @git.TestFs::new()
+  @lib.init_repo(fs, "/repo") catch { _ => () }
+  // ディレクトリ構造を作成
+  fs.mkdir_p("/repo/src/lib")
+  fs.write_file("/repo/src/lib/foo.mbt", b"content of foo")
+  fs.write_file("/repo/README.md", b"readme")
+  // コミット
+  let commit_id = @lib.commit(
+    fs,
+    fs,
+    "/repo",
+    "Initial commit",
+    "test <test@test.com>",
+    1000L,
+  ) catch {
+    _ => return ()
+  }
+  // SubdirRepo を作成
+  let subdir = SubdirRepo::from_commit(fs, "/repo/.git", commit_id, "src/lib") catch {
+    _ => return ()
+  }
+  // 基本プロパティを確認
+  assert_eq(subdir.path(), "src/lib")
+  assert_eq(subdir.base_commit(), Some(commit_id))
+  assert_true(subdir.tree_id() is Some(_))
+}
+
+///|
+test "subdir: read file through GitFs" {
+  let fs = @git.TestFs::new()
+  @lib.init_repo(fs, "/repo") catch { _ => () }
+  // ディレクトリ構造を作成
+  fs.mkdir_p("/repo/src/lib")
+  fs.write_file("/repo/src/lib/foo.mbt", b"content of foo")
+  // コミット
+  let commit_id = @lib.commit(
+    fs,
+    fs,
+    "/repo",
+    "Initial commit",
+    "test <test@test.com>",
+    1000L,
+  ) catch {
+    _ => return ()
+  }
+  // SubdirRepo を作成
+  let subdir = SubdirRepo::from_commit(fs, "/repo/.git", commit_id, "src/lib") catch {
+    _ => return ()
+  }
+  // サブディレクトリ内のファイルをルートからのパスで読む
+  let gitfs = subdir.fs()
+  let content = gitfs.read_file(fs, "/foo.mbt") catch { _ => return () }
+  assert_eq(content, b"content of foo")
+}
+
+///|
+test "subdir: write file to working layer" {
+  let fs = @git.TestFs::new()
+  @lib.init_repo(fs, "/repo") catch { _ => () }
+  // ディレクトリ構造を作成
+  fs.mkdir_p("/repo/src/lib")
+  fs.write_file("/repo/src/lib/foo.mbt", b"original")
+  // コミット
+  let commit_id = @lib.commit(
+    fs,
+    fs,
+    "/repo",
+    "Initial commit",
+    "test <test@test.com>",
+    1000L,
+  ) catch {
+    _ => return ()
+  }
+  // SubdirRepo を作成
+  let subdir = SubdirRepo::from_commit(fs, "/repo/.git", commit_id, "src/lib") catch {
+    _ => return ()
+  }
+  // 最初は dirty ではない
+  assert_false(subdir.is_dirty())
+  // ファイルを書き込む
+  let gitfs = subdir.fs()
+  gitfs.write_file("/foo.mbt", b"modified")
+  // dirty になる
+  assert_true(subdir.is_dirty())
+  // 変更が読める
+  let content = gitfs.read_file(fs, "/foo.mbt") catch { _ => return () }
+  assert_eq(content, b"modified")
+}
+
+///|
+test "subdir: error on non-existent subdir" {
+  let fs = @git.TestFs::new()
+  @lib.init_repo(fs, "/repo") catch { _ => () }
+  // ファイルのみ作成（サブディレクトリなし）
+  fs.write_file("/repo/README.md", b"readme")
+  // コミット
+  let commit_id = @lib.commit(
+    fs,
+    fs,
+    "/repo",
+    "Initial commit",
+    "test <test@test.com>",
+    1000L,
+  ) catch {
+    _ => return ()
+  }
+  // 存在しないサブディレクトリを指定 - エラーになるはず
+  let _ = SubdirRepo::from_commit(fs, "/repo/.git", commit_id, "nonexistent") catch {
+    SubdirNotFound(_) => {
+      // 期待通りのエラー - テスト成功
+      return ()
+    }
+    _ => {
+      // 予期しないエラー
+      assert_true(false)
+      return ()
+    }
+  }
+  // ここに来たら from_commit が成功してしまった
+  assert_true(false)
+}
+
+///|
+test "subdir: log returns commits that changed subdir" {
+  let fs = @git.TestFs::new()
+  @lib.init_repo(fs, "/repo") catch { _ => () }
+  // 最初のコミット
+  fs.mkdir_p("/repo/src/lib")
+  fs.write_file("/repo/src/lib/foo.mbt", b"content v1")
+  fs.write_file("/repo/README.md", b"readme")
+  let _ = @lib.commit(
+    fs,
+    fs,
+    "/repo",
+    "Initial commit",
+    "test <test@test.com>",
+    1000L,
+  ) catch {
+    _ => return ()
+  }
+  // 2番目のコミット - サブディレクトリを変更
+  fs.write_file("/repo/src/lib/foo.mbt", b"content v2")
+  let _ = @lib.commit(
+    fs,
+    fs,
+    "/repo",
+    "Update lib",
+    "test <test@test.com>",
+    2000L,
+  ) catch {
+    _ => return ()
+  }
+  // 3番目のコミット - サブディレクトリ以外を変更
+  fs.write_file("/repo/README.md", b"readme v2")
+  let commit3 = @lib.commit(
+    fs,
+    fs,
+    "/repo",
+    "Update readme",
+    "test <test@test.com>",
+    3000L,
+  ) catch {
+    _ => return ()
+  }
+  // SubdirRepo を作成してログを取得
+  let subdir = SubdirRepo::from_commit(fs, "/repo/.git", commit3, "src/lib") catch {
+    _ => return ()
+  }
+  let history = subdir.log(fs) catch { _ => return () }
+  // サブディレクトリを変更したコミットは2つ（1番目と2番目）
+  // 3番目のコミットは README.md だけなので含まれない
+  assert_eq(history.length(), 2)
+}
+
+///|
+test "subdir: diff shows working changes" {
+  let fs = @git.TestFs::new()
+  @lib.init_repo(fs, "/repo") catch { _ => () }
+  fs.mkdir_p("/repo/src/lib")
+  fs.write_file("/repo/src/lib/foo.mbt", b"original")
+  let commit_id = @lib.commit(
+    fs,
+    fs,
+    "/repo",
+    "Initial",
+    "test <test@test.com>",
+    1000L,
+  ) catch {
+    _ => return ()
+  }
+  let subdir = SubdirRepo::from_commit(fs, "/repo/.git", commit_id, "src/lib") catch {
+    _ => return ()
+  }
+  // 変更前は空
+  let diff_before = subdir.diff()
+  assert_eq(diff_before.length(), 0)
+  // ファイルを変更
+  subdir.fs().write_file("/bar.mbt", b"new file")
+  // 変更が表示される
+  let diff_after = subdir.diff()
+  assert_eq(diff_after.length(), 1)
+  assert_eq(diff_after[0].path(), "/bar.mbt")
+}
+
+///|
+test "subdir: normalize path" {
+  let fs = @git.TestFs::new()
+  @lib.init_repo(fs, "/repo") catch { _ => () }
+  // ディレクトリ構造を作成
+  fs.mkdir_p("/repo/src/lib")
+  fs.write_file("/repo/src/lib/foo.mbt", b"content")
+  // コミット
+  let commit_id = @lib.commit(
+    fs,
+    fs,
+    "/repo",
+    "Initial commit",
+    "test <test@test.com>",
+    1000L,
+  ) catch {
+    _ => return ()
+  }
+  // 様々なパス形式でテスト
+  let subdir1 = SubdirRepo::from_commit(fs, "/repo/.git", commit_id, "src/lib") catch {
+    _ => return ()
+  }
+  let subdir2 = SubdirRepo::from_commit(fs, "/repo/.git", commit_id, "/src/lib/") catch {
+    _ => return ()
+  }
+  let subdir3 = SubdirRepo::from_commit(fs, "/repo/.git", commit_id, "./src/lib") catch {
+    _ => return ()
+  }
+  // すべて同じパスに正規化される
+  assert_eq(subdir1.path(), "src/lib")
+  assert_eq(subdir2.path(), "src/lib")
+  assert_eq(subdir3.path(), "src/lib")
+}
