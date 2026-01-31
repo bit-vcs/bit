@@ -9,7 +9,9 @@ fn find_git_dir(fs : OsFs) -> String {
   }
   // Check if current directory is a .git directory (bare repo or inside .git)
   let cwd = get_work_root()
-  if fs.is_file(cwd + "/config") && fs.is_file(cwd + "/HEAD") && fs.is_dir(cwd + "/refs") {
+  if fs.is_file(cwd + "/config") &&
+    fs.is_file(cwd + "/HEAD") &&
+    fs.is_dir(cwd + "/refs") {
     return cwd
   }
   // Standard case: .git subdirectory
@@ -28,7 +30,13 @@ fn get_config_override(key : String) -> String? {
             let k = String::unsafe_substring(line, start=0, end=eq_idx)
             // Case-insensitive comparison for config keys
             if k.to_lower() == key.to_lower() {
-              return Some(String::unsafe_substring(line, start=eq_idx + 1, end=line.length()))
+              return Some(
+                String::unsafe_substring(
+                  line,
+                  start=eq_idx + 1,
+                  end=line.length(),
+                ),
+              )
             }
           }
           None => ()
@@ -178,7 +186,9 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
       }
       print_line("Merge aborted.")
     } else {
-      @stdio.stderr.write("fatal: There is no merge to abort (ORIG_HEAD missing).")
+      @stdio.stderr.write(
+        "fatal: There is no merge to abort (ORIG_HEAD missing).",
+      )
       @sys.exit(128)
     }
     return
@@ -188,7 +198,9 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
     let merge_head_path = git_dir + "/MERGE_HEAD"
     let merge_msg_path = git_dir + "/MERGE_MSG"
     if not(rfs.is_file(merge_head_path)) {
-      @stdio.stderr.write("fatal: There is no merge in progress (MERGE_HEAD missing).")
+      @stdio.stderr.write(
+        "fatal: There is no merge in progress (MERGE_HEAD missing).",
+      )
       @sys.exit(128)
     }
     // Commit the merge
@@ -2232,7 +2244,9 @@ async fn handle_clean(args : Array[String]) -> Unit raise Error {
   let mut files_to_clean : Array[String] = []
   if remove_only_ignored {
     // -X: only ignored files (not implemented - need gitignore parsing)
-    @stdio.stderr.write("warning: -X (remove only ignored) not fully implemented")
+    @stdio.stderr.write(
+      "warning: -X (remove only ignored) not fully implemented",
+    )
   } else {
     // Regular untracked files
     for p in status.untracked {
@@ -3307,7 +3321,9 @@ async fn handle_notes(args : Array[String]) -> Unit raise Error {
     }
     "prune" => notes_prune(wfs, rfs, git_dir, notes_ref_path)
     _ => {
-      @stdio.stderr.write("usage: git notes [list | show | add | remove | prune]")
+      @stdio.stderr.write(
+        "usage: git notes [list | show | add | remove | prune]",
+      )
       @sys.exit(1)
     }
   }
@@ -3435,7 +3451,9 @@ async fn notes_add(
             for e in existing {
               if e.name == target_hex {
                 if not(force) {
-                  @stdio.stderr.write("error: note already exists for \{target_hex}")
+                  @stdio.stderr.write(
+                    "error: note already exists for \{target_hex}",
+                  )
                   @stdio.stderr.write("Use -f to overwrite existing note")
                   @sys.exit(1)
                 }

@@ -46,6 +46,7 @@ async fn show_help() -> Unit {
     #|   worktree    Manage multiple working trees
     #|
     #|low-level / plumbing
+    #|   bundle          Create, verify, list-heads, and unbundle Git bundles
     #|   cat-file        Provide content or type info for repository objects
     #|   config          Get and set repository options
     #|   hash-object     Compute object ID and optionally creates a blob
@@ -54,11 +55,14 @@ async fn show_help() -> Unit {
     #|   ls-tree         List the contents of a tree object
     #|   pack-objects    Create a packed archive of objects
     #|   receive-pack    Receive what is pushed into the repository
+    #|   rev-list        List commit objects in reverse chronological order
     #|   rev-parse       Parse revision specifications
     #|   show-ref        List references in a local repository
     #|   symbolic-ref    Read, modify and delete symbolic refs
+    #|   unpack-objects  Unpack objects from a packed archive
     #|   update-ref      Update the object name stored in a ref safely
     #|   upload-pack     Send objects packed back to git-fetch-pack
+    #|   verify-pack     Validate packed Git archive files
     #|   write-tree      Create a tree object from the current index
     #|
     #|See 'git help <command>' for more information on a specific command.
@@ -394,6 +398,22 @@ async fn dispatch_command(cmd : String, rest : Array[String]) -> Unit {
     "maintenance" =>
       handle_maintenance(rest) catch {
         err => exit_with_error("maintenance", err)
+      }
+    "rev-list" =>
+      handle_rev_list(rest) catch {
+        err => exit_with_error("rev-list", err)
+      }
+    "verify-pack" =>
+      handle_verify_pack(rest) catch {
+        err => exit_with_error("verify-pack", err)
+      }
+    "unpack-objects" =>
+      handle_unpack_objects(rest) catch {
+        err => exit_with_error("unpack-objects", err)
+      }
+    "bundle" =>
+      handle_bundle(rest) catch {
+        err => exit_with_error("bundle", err)
       }
     "version" | "--version" => print_line("git version 2.47.0 (moongit)")
     // Error for unknown commands

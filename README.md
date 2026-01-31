@@ -19,7 +19,7 @@ A pure MoonBit implementation of Git commands, passing the official Git test sui
 
 **Remote Operations**: `remote`, `fetch`, `pull`, `push`, `clone`
 
-**Plumbing**: `pack-objects`, `index-pack`, `receive-pack`, `upload-pack`, `cat-file`, `hash-object`, `ls-files`, `ls-tree`, `rev-parse`, `show-ref`, `symbolic-ref`, `update-ref`, `write-tree`, `config`, `reflog`
+**Plumbing**: `pack-objects`, `index-pack`, `receive-pack`, `upload-pack`, `cat-file`, `hash-object`, `ls-files`, `ls-tree`, `rev-parse`, `rev-list`, `show-ref`, `symbolic-ref`, `update-ref`, `write-tree`, `verify-pack`, `unpack-objects`, `bundle`, `config`, `reflog`
 
 **Other**: `tag`, `stash`, `worktree`, `rm`, `mv`, `grep`, `blame`, `describe`, `bisect`, `notes`, `format-patch`, `shortlog`, `gc`, `clean`, `revert`, `sparse-checkout`, `submodule`
 
@@ -126,8 +126,14 @@ SHIM_CMDS="init config ls-files ..." bash t0001-init.sh
 | t0601-reffiles-pack-refs.sh | 47 | ✅ All pass |
 | t7700-repack.sh | 47 | ✅ All pass |
 | t7900-maintenance.sh | 72 | ✅ All pass |
+| t6000-rev-list-misc.sh | 22 | ✅ All pass |
+| t6005-rev-list-count.sh | 6 | ✅ All pass |
+| t6009-rev-list-parent.sh | 15 | ✅ All pass |
+| t6014-rev-list-all.sh | 4 | ✅ All pass |
+| t6017-rev-list-stdin.sh | 37 | ✅ All pass |
+| t6020-bundle-misc.sh | 37 | ✅ All pass |
 
-**2,900+ tests pass** across core Git operations.
+**3,000+ tests pass** across core Git operations.
 
 ### Oracle Testing
 
@@ -153,19 +159,15 @@ The following Git commands are not yet implemented in moongit:
 - `mailinfo`, `mailsplit` - Email parsing utilities
 
 **Advanced Operations**
-- `bundle` - Create/verify bundle files
 - `archive` - Create archive of files
 - `fast-export`, `fast-import` - Stream-based import/export
 - `filter-branch` - Rewrite branch history
 - `replace` - Replace objects
 
 **Plumbing Commands**
-- `rev-list` - List commit objects
 - `read-tree` - Read tree into index
 - `update-index` - Modify index directly
 - `mktree` - Build tree from ls-tree output
-- `unpack-objects` - Unpack objects from pack
-- `verify-pack` - Verify packed archive
 - `name-rev` - Find symbolic names for revs
 - `var` - Show Git logical variables
 
