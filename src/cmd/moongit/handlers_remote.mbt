@@ -489,8 +489,8 @@ async fn handle_fetch(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let git_dir = root + "/.git"
   let fs = OsFs::new()
-  // Read remote URL from config
-  let mut remote_url : String? = read_remote_url_from_config(fs, git_dir)
+  // Read remote URL - prefer subdir-clone remote, then config
+  let mut remote_url : String? = get_effective_remote_url(fs, git_dir)
   // Override with command line argument
   for arg in args {
     if not(arg.has_prefix("-")) {
@@ -546,7 +546,8 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let git_dir = root + "/.git"
   let fs = OsFs::new()
-  let mut remote_url : String? = read_remote_url_from_config(fs, git_dir)
+  // Read remote URL - prefer subdir-clone remote, then config
+  let mut remote_url : String? = get_effective_remote_url(fs, git_dir)
   let mut rebase = false
   for arg in args {
     match arg {
@@ -574,6 +575,11 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let git_dir = root + "/.git"
   let fs = OsFs::new()
+  // Check if this is a subdir-clone
+  let subdir_remote = match get_subdir_info(fs, git_dir) {
+    Some((remote, _, _)) => Some(remote)
+    None => None
+  }
   // Parse arguments
   let mut remote_name = "origin"
   let mut refspec : String? = None
@@ -600,8 +606,11 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
         }
     }
   }
-  // Get remote URL
-  let remote_url = get_remote_url(fs, git_dir, remote_name)
+  // Get remote URL - prefer subdir-clone remote
+  let remote_url = match subdir_remote {
+    Some(url) => Some(url)
+    None => get_remote_url(fs, git_dir, remote_name)
+  }
   guard remote_url is Some(url) else {
     raise @git.GitError::InvalidObject("No such remote: \{remote_name}")
   }

@@ -145,6 +145,17 @@ async fn handle_status(args : Array[String]) -> Unit raise Error {
       _ => ()
     }
   }
+  // Show subdir-clone info if applicable (only in non-porcelain mode)
+  if not(porcelain) && not(short) {
+    match get_subdir_info(fs, git_dir) {
+      Some((remote, path, base)) => {
+        print_line("# subdir-clone: \{path} from \{remote}")
+        print_line("# base: \{base[:7].to_string()}")
+        print_line("")
+      }
+      None => ()
+    }
+  }
   if porcelain || short {
     if show_branch {
       let head = @gitlib.read_head_ref(fs, git_dir) catch { _ => return () }
@@ -318,7 +329,12 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
     Some(idx) => (try! msg[:idx]).to_string()
     None => msg
   }
-  print_line("[" + short_id + "] " + first_line)
+  let git_dir = root + "/.git"
+  // Show subdir-clone context if applicable
+  match get_subdir_info(fs, git_dir) {
+    Some((_, path, _)) => print_line("[" + short_id + " (subdir: " + path + ")] " + first_line)
+    None => print_line("[" + short_id + "] " + first_line)
+  }
 }
 
 ///|
@@ -409,6 +425,17 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         max_count = @strconv.parse_int(num_str)
       }
       _ => ()
+    }
+  }
+  // Show subdir-clone info if applicable (only in full format)
+  if not(oneline) {
+    match get_subdir_info(fs, git_dir) {
+      Some((remote, path, base)) => {
+        print_line("# subdir-clone: \{path} from \{remote}")
+        print_line("# base: \{base[:7].to_string()}")
+        print_line("")
+      }
+      None => ()
     }
   }
   if graph {

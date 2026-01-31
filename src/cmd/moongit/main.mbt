@@ -47,7 +47,7 @@ async fn show_help() -> Unit {
     #|   worktree    Manage multiple working trees
     #|
     #|experimental
-    #|   subdir      Work with subdirectory as independent repository
+    #|   subdir-clone  Clone subdirectory as independent repository
     #|
     #|low-level / plumbing
     #|   bundle          Create, verify, list-heads, and unbundle Git bundles
@@ -314,8 +314,8 @@ async fn dispatch_command(cmd : String, rest : Array[String]) -> Unit {
       handle_config(rest) catch {
         err => exit_with_error("config", err)
       }
-    "subdir" =>
-      handle_subdir(rest) catch {
+    "subdir-clone" =>
+      handle_subdir_clone(rest) catch {
         err => exit_with_error("subdir", err)
       }
     "sparse-checkout" =>

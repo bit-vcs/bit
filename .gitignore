@@ -10,3 +10,16 @@ tools/git-shim/git
 tools/git-shim/moon
 tools/moon
 tools/real-git-path
+
+# Test artifacts
+express/
+express-git/
+express-moongit/
+git-repo/
+repo/
+repo-git/
+repo-moongit/
+third_party/
+goodbye.ts
+version.ts
+xxxx
