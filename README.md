@@ -119,8 +119,15 @@ SHIM_CMDS="init config ls-files ..." bash t0001-init.sh
 | t5601-clone.sh | 115 | ✅ All pass |
 | t7004-tag.sh | 231 | ✅ All pass |
 | t7600-merge.sh | 83 | ✅ All pass |
+| t4150-am.sh | 87 | ✅ All pass |
+| t4100-apply-stat.sh | 19 | ✅ All pass |
+| t1450-fsck.sh | 95 | ✅ All pass |
+| t5304-prune.sh | 32 | ✅ All pass |
+| t0601-reffiles-pack-refs.sh | 47 | ✅ All pass |
+| t7700-repack.sh | 47 | ✅ All pass |
+| t7900-maintenance.sh | 72 | ✅ All pass |
 
-**2,500+ tests pass** across core Git operations.
+**2,900+ tests pass** across core Git operations.
 
 ### Oracle Testing
 
@@ -141,18 +148,9 @@ Native tests use Git as an oracle to verify correctness:
 The following Git commands are not yet implemented in moongit:
 
 **Patch/Email Workflow**
-- `am` - Apply patches from mailbox
-- `apply` - Apply patches to files
 - `send-email` - Send patches as emails
 - `format-patch` - Prepare patches for email (partial)
 - `mailinfo`, `mailsplit` - Email parsing utilities
-
-**Repository Maintenance**
-- `fsck` - Verify repository integrity
-- `prune` - Remove unreachable objects
-- `pack-refs` - Pack refs for efficiency
-- `repack` - Repack objects (uses system git)
-- `maintenance` - Repository maintenance tasks
 
 **Advanced Operations**
 - `bundle` - Create/verify bundle files
