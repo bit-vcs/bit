@@ -1,0 +1,10 @@
+{
+  "import": [
+    "mizchi/git",
+    { "path": "mizchi/git/lib", "alias": "lib" },
+    { "path": "moonbitlang/core/encoding/utf8", "alias": "utf8" }
+  ],
+  "test-import": [
+    { "path": "mizchi/git/lib", "alias": "lib" }
+  ]
+}
