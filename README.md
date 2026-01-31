@@ -28,6 +28,8 @@ A pure MoonBit implementation of Git commands, passing the official Git test sui
 - Smart HTTP transport
 - Pkt-line encoding/decoding
 - `.gitignore` parsing
+- Partial clone (`--filter=blob:none`)
+- On-demand object fetching (promisor remote)
 
 ## Project Structure
 
@@ -90,12 +92,14 @@ just install
 
 ### Unit Tests
 ```bash
-just test  # Runs 260 tests (116 js + 144 native)
+just test  # Runs 380+ tests (js + native)
 ```
 
 ### Git Upstream Test Suite Compatibility
 
-The implementation passes Git's official test suite with pure MoonBit (no fallback to system git):
+The implementation passes Git's official test suite with pure MoonBit (no fallback to system git).
+
+**Total: 4,205 tests pass** across 130+ test files.
 
 ```bash
 cd third_party/git/t
@@ -133,7 +137,7 @@ SHIM_CMDS="init config ls-files ..." bash t0001-init.sh
 | t6017-rev-list-stdin.sh | 37 | ✅ All pass |
 | t6020-bundle-misc.sh | 37 | ✅ All pass |
 
-**3,000+ tests pass** across core Git operations.
+Run `just git-t-allowlist` to execute the full test suite.
 
 ### Oracle Testing
 
