@@ -25,7 +25,8 @@ async fn show_help() -> Unit {
     #|   status     Show the working tree status
     #|
     #|grow, mark and tweak your common history
-    #|   branch      List, create, or delete branches
+    #|   branch        List, create, or delete branches
+    #|   show-branches Show branches and their commits
     #|   cherry-pick Apply the changes from some existing commits
     #|   commit      Record changes to the repository
     #|   checkout    Switch branches or restore working tree files
@@ -295,6 +296,10 @@ async fn dispatch_command(cmd : String, rest : Array[String]) -> Unit {
     "cherry-pick" =>
       handle_cherry_pick(rest) catch {
         err => exit_with_error("cherry-pick", err)
+      }
+    "show-branches" | "show-branch" =>
+      handle_show_branches(rest) catch {
+        err => exit_with_error("show-branches", err)
       }
     // Misc operations
     "diff" => handle_diff(rest) catch { err => exit_with_error("diff", err) }
