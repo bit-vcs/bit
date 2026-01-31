@@ -12,6 +12,8 @@ async fn handle_subdir(args : Array[String]) -> Unit raise Error {
   match subcommand {
     "init" => handle_subdir_init(rest) catch { e => raise e }
     "deinit" => handle_subdir_deinit(rest) catch { e => raise e }
+    "list" => handle_subdir_list(rest) catch { e => raise e }
+    "sync" => handle_subdir_sync(rest) catch { e => raise e }
     "shell" => handle_subdir_shell(rest) catch { e => raise e }
     "show" => handle_subdir_show(rest) catch { e => raise e }
     "log" => handle_subdir_log(rest) catch { e => raise e }
@@ -43,8 +45,10 @@ async fn print_subdir_usage() -> Unit raise Error {
   print_line("Usage: moongit subdir <command> [options]")
   print_line("")
   print_line("Commands:")
-  print_line("  init <path>      Initialize subdirectory for transparent git operations")
-  print_line("  deinit <path>    Remove subdirectory initialization")
+  print_line("  init <path>      Initialize subdirectory as git module")
+  print_line("  deinit <path>    Remove subdirectory module")
+  print_line("  list             List initialized subdirectory modules")
+  print_line("  sync <path>      Sync subdirectory with parent repository")
   print_line("  shell <path>     Start a shell with git scoped to subdirectory")
   print_line("  show <path>      Show subdirectory info")
   print_line("  log <path>       Show commits that affected the subdirectory")
@@ -54,6 +58,8 @@ async fn print_subdir_usage() -> Unit raise Error {
   print_line("  push <path>      Push subdirectory to remote repository")
   print_line("  pull <path>      Pull subdirectory from remote repository")
   print_line("  extract <path> <target>  Extract subdirectory to target directory")
+  print_line("")
+  print_line("After 'init', standard git commands work from within the subdirectory.")
 }
 
 ///|
@@ -265,20 +271,10 @@ fn format_timestamp_simple(timestamp : Int64) -> String {
 ///|
 async fn handle_subdir_init(args : Array[String]) -> Unit raise Error {
   if args.length() < 1 {
-    print_line("Usage: moongit subdir init <path> [--no-wrapper]")
+    print_line("Usage: moongit subdir init <path>")
     return
   }
   let subdir_path = args[0]
-  let mut create_wrapper = true
-  // オプション解析
-  let mut i = 1
-  while i < args.length() {
-    let arg = args[i]
-    if arg == "--no-wrapper" {
-      create_wrapper = false
-    }
-    i += 1
-  }
   let root = get_work_root()
   let git_dir = root + "/.git"
   let fs = OsFs::new()
@@ -288,20 +284,26 @@ async fn handle_subdir_init(args : Array[String]) -> Unit raise Error {
     print_line("Error: subdirectory does not exist: " + subdir_path)
     return
   }
-  // 初期化
-  let config = @gitsubdir.SubdirInitConfig::new(create_wrapper~)
-  let info = @gitsubdir.init_subdir(fs, git_dir, root, subdir_path, config) catch {
+  // 既に初期化済みか確認
+  if @gitsubdir.is_module_initialized(fs, git_dir, subdir_path) {
+    print_line("Subdirectory already initialized: " + subdir_path)
+    return
+  }
+  // git modules 構造で初期化
+  @gitsubdir.init_module(fs, fs, git_dir, root, subdir_path) catch {
     err => raise @git.GitError::IoError("Failed to init: " + err.to_string())
   }
-  print_line("Initialized subdirectory: " + info.path)
-  print_line("Config: " + info.config_path)
-  if create_wrapper {
-    print_line("Wrapper script: " + subdir_abs + "/git-subdir")
-  }
+  print_line("Initialized subdirectory as git module: " + subdir_path)
   print_line("")
-  print_line("You can now:")
-  print_line("  - Run 'moongit subdir shell " + subdir_path + "' to enter scoped shell")
-  print_line("  - Use ./git-subdir in the subdirectory for scoped git commands")
+  print_line("Structure created:")
+  print_line("  .git/modules/" + subdir_path_to_safe_name(subdir_path) + "/")
+  print_line("  " + subdir_path + "/.git (file)")
+  print_line("")
+  print_line("You can now use standard git commands from within the subdirectory:")
+  print_line("  cd " + subdir_path)
+  print_line("  git status    # shows only subdirectory changes")
+  print_line("  git log       # shows commits affecting subdirectory")
+  print_line("  git add/commit  # commits to parent repository")
 }
 
 ///|
@@ -314,16 +316,17 @@ async fn handle_subdir_deinit(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let git_dir = root + "/.git"
   let fs = OsFs::new()
-  // 初期化済みか確認
-  if not(@gitsubdir.is_subdir_initialized(fs, git_dir, subdir_path)) {
+  // モジュールとして初期化されているか確認
+  if not(@gitsubdir.is_module_initialized(fs, git_dir, subdir_path)) {
     print_line("Subdirectory is not initialized: " + subdir_path)
     return
   }
-  // 初期化解除
-  @gitsubdir.deinit_subdir(fs, fs, git_dir, root, subdir_path) catch {
+  // モジュール構造を削除
+  @gitsubdir.deinit_module(fs, fs, git_dir, root, subdir_path) catch {
     err => raise @git.GitError::IoError("Failed to deinit: " + err.to_string())
   }
   print_line("Deinitialized subdirectory: " + subdir_path)
+  print_line("Removed .git/modules/" + subdir_path_to_safe_name(subdir_path) + "/")
 }
 
 ///|
@@ -776,4 +779,56 @@ fn bytes_to_string_handler(bytes : Bytes) -> String {
     result.write_char(bytes[i].to_int().unsafe_to_char())
   }
   result.to_string()
+}
+
+///|
+async fn handle_subdir_list(_args : Array[String]) -> Unit raise Error {
+  let root = get_work_root()
+  let git_dir = root + "/.git"
+  let fs = OsFs::new()
+  let modules = @gitsubdir.list_modules(fs, git_dir)
+  if modules.length() == 0 {
+    print_line("No subdirectory modules initialized.")
+    print_line("Use 'moongit subdir init <path>' to initialize a subdirectory.")
+    return
+  }
+  print_line("Initialized subdirectory modules:")
+  print_line("")
+  for path in modules {
+    print_line("  " + path)
+  }
+}
+
+///|
+async fn handle_subdir_sync(args : Array[String]) -> Unit raise Error {
+  if args.length() < 1 {
+    print_line("Usage: moongit subdir sync <path>")
+    print_line("       moongit subdir sync --all")
+    return
+  }
+  let root = get_work_root()
+  let git_dir = root + "/.git"
+  let fs = OsFs::new()
+  if args[0] == "--all" {
+    // 全モジュールを同期
+    let modules = @gitsubdir.list_modules(fs, git_dir)
+    if modules.length() == 0 {
+      print_line("No subdirectory modules to sync.")
+      return
+    }
+    for path in modules {
+      @gitsubdir.sync_module(fs, fs, git_dir, path) catch { _ => () }
+      print_line("Synced: " + path)
+    }
+  } else {
+    let subdir_path = args[0]
+    if not(@gitsubdir.is_module_initialized(fs, git_dir, subdir_path)) {
+      print_line("Subdirectory is not initialized: " + subdir_path)
+      return
+    }
+    @gitsubdir.sync_module(fs, fs, git_dir, subdir_path) catch {
+      err => raise @git.GitError::IoError("Failed to sync: " + err.to_string())
+    }
+    print_line("Synced: " + subdir_path)
+  }
 }

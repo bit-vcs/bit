@@ -637,6 +637,135 @@ fn bytes_to_string_test(bytes : Bytes) -> String {
 }
 
 ///|
+test "module: init creates git module structure" {
+  let fs = @git.TestFs::new()
+  @lib.init_repo(fs, "/repo") catch { _ => () }
+  fs.mkdir_p("/repo/src/lib")
+  fs.write_file("/repo/src/lib/foo.mbt", b"content")
+  // モジュールとして初期化
+  init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch { _ => return () }
+  // modules ディレクトリが作成されている
+  assert_true(fs.is_dir("/repo/.git/modules/src_lib"))
+  // HEAD ファイルが作成されている
+  assert_true(fs.is_file("/repo/.git/modules/src_lib/HEAD"))
+  // config ファイルが作成されている
+  assert_true(fs.is_file("/repo/.git/modules/src_lib/config"))
+  // alternates が設定されている
+  assert_true(fs.is_file("/repo/.git/modules/src_lib/objects/info/alternates"))
+  // サブディレクトリに .git ファイルが作成されている
+  assert_true(fs.is_file("/repo/src/lib/.git"))
+}
+
+///|
+test "module: .git file contains correct gitdir path" {
+  let fs = @git.TestFs::new()
+  @lib.init_repo(fs, "/repo") catch { _ => () }
+  fs.mkdir_p("/repo/src/lib")
+  init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch { _ => return () }
+  // .git ファイルの内容を確認
+  let content = fs.read_file("/repo/src/lib/.git") catch { _ => return () }
+  let content_str = bytes_to_string_test(content)
+  assert_true(content_str.has_prefix("gitdir:"))
+  assert_true(content_str.contains(".git/modules/src_lib"))
+}
+
+///|
+test "module: config contains worktree path" {
+  let fs = @git.TestFs::new()
+  @lib.init_repo(fs, "/repo") catch { _ => () }
+  fs.mkdir_p("/repo/src/lib")
+  init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch { _ => return () }
+  // config ファイルの内容を確認
+  let content = fs.read_file("/repo/.git/modules/src_lib/config") catch {
+    _ => return ()
+  }
+  let content_str = bytes_to_string_test(content)
+  assert_true(content_str.contains("[core]"))
+  assert_true(content_str.contains("worktree ="))
+  assert_true(content_str.contains("[subdir]"))
+  assert_true(content_str.contains("path = src/lib"))
+}
+
+///|
+test "module: alternates points to parent objects" {
+  let fs = @git.TestFs::new()
+  @lib.init_repo(fs, "/repo") catch { _ => () }
+  fs.mkdir_p("/repo/src/lib")
+  init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch { _ => return () }
+  // alternates ファイルの内容を確認
+  let content = fs.read_file("/repo/.git/modules/src_lib/objects/info/alternates") catch {
+    _ => return ()
+  }
+  let content_str = bytes_to_string_test(content)
+  assert_true(content_str.contains("/repo/.git/objects"))
+}
+
+///|
+test "module: is_module_initialized returns correct status" {
+  let fs = @git.TestFs::new()
+  @lib.init_repo(fs, "/repo") catch { _ => () }
+  fs.mkdir_p("/repo/src/lib")
+  // 初期化前
+  assert_false(is_module_initialized(fs, "/repo/.git", "src/lib"))
+  // 初期化
+  init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch { _ => return () }
+  // 初期化後
+  assert_true(is_module_initialized(fs, "/repo/.git", "src/lib"))
+}
+
+///|
+test "module: deinit removes module structure" {
+  let fs = @git.TestFs::new()
+  @lib.init_repo(fs, "/repo") catch { _ => () }
+  fs.mkdir_p("/repo/src/lib")
+  // 初期化
+  init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch { _ => return () }
+  assert_true(is_module_initialized(fs, "/repo/.git", "src/lib"))
+  // 削除
+  deinit_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch { _ => () }
+  // 確認
+  assert_false(is_module_initialized(fs, "/repo/.git", "src/lib"))
+  assert_false(fs.is_file("/repo/src/lib/.git"))
+}
+
+///|
+test "module: list_modules returns initialized modules" {
+  let fs = @git.TestFs::new()
+  @lib.init_repo(fs, "/repo") catch { _ => () }
+  fs.mkdir_p("/repo/src/lib")
+  fs.mkdir_p("/repo/src/cli")
+  // 初期状態では空
+  let modules_before = list_modules(fs, "/repo/.git")
+  assert_eq(modules_before.length(), 0)
+  // lib を初期化
+  init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch { _ => return () }
+  let modules_one = list_modules(fs, "/repo/.git")
+  assert_eq(modules_one.length(), 1)
+  // cli も初期化
+  init_module(fs, fs, "/repo/.git", "/repo", "src/cli") catch { _ => return () }
+  let modules_two = list_modules(fs, "/repo/.git")
+  assert_eq(modules_two.length(), 2)
+}
+
+///|
+test "module: nested path creates correct structure" {
+  let fs = @git.TestFs::new()
+  @lib.init_repo(fs, "/repo") catch { _ => () }
+  fs.mkdir_p("/repo/packages/core/lib")
+  init_module(fs, fs, "/repo/.git", "/repo", "packages/core/lib") catch {
+    _ => return ()
+  }
+  // モジュール名が正しく変換されている
+  assert_true(fs.is_dir("/repo/.git/modules/packages_core_lib"))
+  // .git ファイルのパスが正しい（3階層分の ../）
+  let content = fs.read_file("/repo/packages/core/lib/.git") catch {
+    _ => return ()
+  }
+  let content_str = bytes_to_string_test(content)
+  assert_true(content_str.contains("../../../.git/modules/"))
+}
+
+///|
 test "subdir: commit creates new commit in parent repo" {
   let fs = @git.TestFs::new()
   @lib.init_repo(fs, "/repo") catch { _ => () }
