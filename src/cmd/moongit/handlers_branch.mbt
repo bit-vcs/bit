@@ -1078,6 +1078,7 @@ fn parse_stash_index(args : Array[String]) -> Int {
 }
 
 ///|
+
 ///|
 /// Show branches and their commits (git show-branch)
 async fn handle_show_branches(args : Array[String]) -> Unit raise Error {

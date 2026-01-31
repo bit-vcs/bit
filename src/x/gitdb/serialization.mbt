@@ -1,6 +1,9 @@
 ///| Serialization for hot/cold storage transfer
+
 ///|
+
 ///| Hot layer: In-memory or Durable Objects (fast, limited capacity)
+
 ///| Cold layer: R2 or NativeFS (slow, unlimited capacity)
 
 ///|
@@ -57,7 +60,7 @@ fn int_to_object_type(n : Int) -> @git.ObjectType {
 /// Create a serialized snapshot from GitDb state
 pub fn GitDb::serialize_snapshot(
   self : GitDb,
-  backing_fs : &@git.RepoFileSystem
+  backing_fs : &@git.RepoFileSystem,
 ) -> SerializedSnapshot {
   // Collect clock entries
   let clock_entries : Array[(String, Int64)] = []
@@ -67,7 +70,9 @@ pub fn GitDb::serialize_snapshot(
   // Collect reachable objects
   let objects : Array[SerializedObject] = []
   if self.head != @git.ObjectId::zero() {
-    let db = self.gitfs.get_db(backing_fs) catch { _ => return make_empty_snapshot(self) }
+    let db = self.gitfs.get_db(backing_fs) catch {
+      _ => return make_empty_snapshot(self)
+    }
     collect_objects_for_serialization(db, backing_fs, self.head, objects, {})
   }
   {
@@ -100,7 +105,7 @@ fn collect_objects_for_serialization(
   backing_fs : &@git.RepoFileSystem,
   id : @git.ObjectId,
   objects : Array[SerializedObject],
-  visited : Map[String, Bool]
+  visited : Map[String, Bool],
 ) -> Unit {
   if id == @git.ObjectId::zero() {
     return
@@ -122,15 +127,29 @@ fn collect_objects_for_serialization(
   match o.obj_type {
     Commit => {
       let commit = @git.parse_commit(o.data) catch { _ => return }
-      collect_objects_for_serialization(db, backing_fs, commit.tree, objects, visited)
+      collect_objects_for_serialization(
+        db,
+        backing_fs,
+        commit.tree,
+        objects,
+        visited,
+      )
       for parent in commit.parents {
-        collect_objects_for_serialization(db, backing_fs, parent, objects, visited)
+        collect_objects_for_serialization(
+          db, backing_fs, parent, objects, visited,
+        )
       }
     }
     Tree => {
       let entries = @git.parse_tree(o.data) catch { _ => return }
       for entry in entries {
-        collect_objects_for_serialization(db, backing_fs, entry.id, objects, visited)
+        collect_objects_for_serialization(
+          db,
+          backing_fs,
+          entry.id,
+          objects,
+          visited,
+        )
       }
     }
     Blob | Tag => ()
@@ -267,9 +286,9 @@ fn string_to_bytes(s : String) -> Bytes {
 ///|
 fn read_u32_le(data : Bytes, pos : Int) -> Int {
   data[pos].to_int() |
-    (data[pos + 1].to_int() << 8) |
-    (data[pos + 2].to_int() << 16) |
-    (data[pos + 3].to_int() << 24)
+  (data[pos + 1].to_int() << 8) |
+  (data[pos + 2].to_int() << 16) |
+  (data[pos + 3].to_int() << 24)
 }
 
 ///|
@@ -321,7 +340,9 @@ pub(all) struct SerializationStats {
 }
 
 ///|
-pub fn SerializedSnapshot::stats(self : SerializedSnapshot) -> SerializationStats {
+pub fn SerializedSnapshot::stats(
+  self : SerializedSnapshot,
+) -> SerializationStats {
   let mut commits = 0
   let mut trees = 0
   let mut blobs = 0

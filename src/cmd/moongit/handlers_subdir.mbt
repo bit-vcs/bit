@@ -23,6 +23,10 @@ async fn handle_subdir(args : Array[String]) -> Unit raise Error {
     "push" => handle_subdir_push(rest) catch { e => raise e }
     "pull" => handle_subdir_pull(rest) catch { e => raise e }
     "extract" => handle_subdir_extract(rest) catch { e => raise e }
+    "sparse-checkout" =>
+      handle_subdir_sparse_checkout(rest) catch {
+        e => raise e
+      }
     _ => {
       print_line("Unknown subdir subcommand: " + subcommand)
       print_subdir_usage()
@@ -53,13 +57,35 @@ async fn print_subdir_usage() -> Unit raise Error {
   print_line("  show <path>      Show subdirectory info")
   print_line("  log <path>       Show commits that affected the subdirectory")
   print_line("  diff <path>      Show working changes in subdirectory")
-  print_line("  commit <path>    Commit subdirectory changes to parent repository")
-  print_line("  checkout <path> <commit>  Checkout specific commit of subdirectory")
+  print_line(
+    "  commit <path>    Commit subdirectory changes to parent repository",
+  )
+  print_line(
+    "  checkout <path> <commit>  Checkout specific commit of subdirectory",
+  )
   print_line("  push <path>      Push subdirectory to remote repository")
   print_line("  pull <path>      Pull subdirectory from remote repository")
-  print_line("  extract <path> <target>  Extract subdirectory to target directory")
+  print_line(
+    "  extract <path> <target>  Extract subdirectory to target directory",
+  )
+  print_line(
+    "  sparse-checkout <cmd>    Manage sparse checkout for subdirectory",
+  )
   print_line("")
-  print_line("After 'init', standard git commands work from within the subdirectory.")
+  print_line("Sparse-checkout commands:")
+  print_line(
+    "  sparse-checkout init <path> [--cone]     Enable sparse checkout",
+  )
+  print_line("  sparse-checkout set <path> <patterns>    Set sparse patterns")
+  print_line("  sparse-checkout add <path> <patterns>    Add sparse patterns")
+  print_line("  sparse-checkout list <path>              List sparse patterns")
+  print_line(
+    "  sparse-checkout disable <path>           Disable sparse checkout",
+  )
+  print_line("")
+  print_line(
+    "After 'init', standard git commands work from within the subdirectory.",
+  )
 }
 
 ///|
@@ -74,8 +100,13 @@ async fn handle_subdir_show(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
   // SubdirRepo を作成
   let subdir = @gitsubdir.SubdirRepo::from_head(fs, git_dir, subdir_path) catch {
-    err => raise @git.GitError::IoError("Failed to open subdirectory: " + err.to_string())
+    err =>
+      raise @git.GitError::IoError(
+        "Failed to open subdirectory: " + err.to_string(),
+      )
   }
+  // ワーキングディレクトリの変更を読み込む
+  subdir.load_workdir(fs, root)
   print_line("Subdirectory: " + subdir.path())
   match subdir.base_commit() {
     Some(id) => print_line("Base commit: " + id.to_hex())
@@ -113,7 +144,10 @@ async fn handle_subdir_log(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
   // SubdirRepo を作成
   let subdir = @gitsubdir.SubdirRepo::from_head(fs, git_dir, subdir_path) catch {
-    err => raise @git.GitError::IoError("Failed to open subdirectory: " + err.to_string())
+    err =>
+      raise @git.GitError::IoError(
+        "Failed to open subdirectory: " + err.to_string(),
+      )
   }
   // 履歴を取得
   let history = subdir.log(fs, max_count~) catch {
@@ -154,8 +188,13 @@ async fn handle_subdir_diff(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
   // SubdirRepo を作成
   let subdir = @gitsubdir.SubdirRepo::from_head(fs, git_dir, subdir_path) catch {
-    err => raise @git.GitError::IoError("Failed to open subdirectory: " + err.to_string())
+    err =>
+      raise @git.GitError::IoError(
+        "Failed to open subdirectory: " + err.to_string(),
+      )
   }
+  // ワーキングディレクトリの変更を読み込む
+  subdir.load_workdir(fs, root)
   let diff = subdir.diff()
   if diff.length() == 0 {
     print_line("No changes in " + subdir_path)
@@ -180,10 +219,15 @@ async fn handle_subdir_extract(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
   // SubdirRepo を作成
   let subdir = @gitsubdir.SubdirRepo::from_head(fs, git_dir, subdir_path) catch {
-    err => raise @git.GitError::IoError("Failed to open subdirectory: " + err.to_string())
+    err =>
+      raise @git.GitError::IoError(
+        "Failed to open subdirectory: " + err.to_string(),
+      )
   }
   // ターゲットディレクトリを作成
-  fs.mkdir_p(target_dir) catch { _ => () }
+  fs.mkdir_p(target_dir) catch {
+    _ => ()
+  }
   // ファイルを展開
   let gitfs = subdir.fs()
   let files = gitfs.readdir(fs, "/") catch {
@@ -191,7 +235,9 @@ async fn handle_subdir_extract(args : Array[String]) -> Unit raise Error {
   }
   let mut count = 0
   for file in files {
-    extract_file_recursive(fs, gitfs, "/", file, target_dir) catch { e => raise e }
+    extract_file_recursive(fs, gitfs, "/", file, target_dir) catch {
+      e => raise e
+    }
     count += 1
   }
   print_line("Extracted " + count.to_string() + " items to " + target_dir)
@@ -203,13 +249,15 @@ async fn extract_file_recursive(
   gitfs : @gitfs.GitFs,
   base_path : String,
   name : String,
-  target_dir : String
+  target_dir : String,
 ) -> Unit raise Error {
   let path = if base_path == "/" { "/" + name } else { base_path + "/" + name }
   if gitfs.is_dir(fs, path) {
     // ディレクトリの場合は再帰
     let subdir_target = target_dir + "/" + name
-    fs.mkdir_p(subdir_target) catch { _ => () }
+    fs.mkdir_p(subdir_target) catch {
+      _ => ()
+    }
     let children = gitfs.readdir(fs, path) catch { _ => return () }
     for child in children {
       extract_file_recursive(fs, gitfs, path, child, subdir_target) catch {
@@ -220,7 +268,9 @@ async fn extract_file_recursive(
     // ファイルの場合は内容を書き出し
     let content = gitfs.read_file(fs, path) catch { _ => return () }
     let target_path = target_dir + "/" + name
-    fs.write_file(target_path, content) catch { _ => () }
+    fs.write_file(target_path, content) catch {
+      _ => ()
+    }
   }
 }
 
@@ -293,13 +343,21 @@ async fn handle_subdir_init(args : Array[String]) -> Unit raise Error {
   @gitsubdir.init_module(fs, fs, git_dir, root, subdir_path) catch {
     err => raise @git.GitError::IoError("Failed to init: " + err.to_string())
   }
+  // pre-commit hook に実行権限を付与
+  let hook_path = git_dir + "/hooks/pre-commit"
+  if fs.is_file(hook_path) {
+    let _ = @process.run("chmod", ["+x", hook_path])
+
+  }
   print_line("Initialized subdirectory as git module: " + subdir_path)
   print_line("")
   print_line("Structure created:")
   print_line("  .git/modules/" + subdir_path_to_safe_name(subdir_path) + "/")
   print_line("  " + subdir_path + "/.git (file)")
   print_line("")
-  print_line("You can now use standard git commands from within the subdirectory:")
+  print_line(
+    "You can now use standard git commands from within the subdirectory:",
+  )
   print_line("  cd " + subdir_path)
   print_line("  git status    # shows only subdirectory changes")
   print_line("  git log       # shows commits affecting subdirectory")
@@ -326,7 +384,9 @@ async fn handle_subdir_deinit(args : Array[String]) -> Unit raise Error {
     err => raise @git.GitError::IoError("Failed to deinit: " + err.to_string())
   }
   print_line("Deinitialized subdirectory: " + subdir_path)
-  print_line("Removed .git/modules/" + subdir_path_to_safe_name(subdir_path) + "/")
+  print_line(
+    "Removed .git/modules/" + subdir_path_to_safe_name(subdir_path) + "/",
+  )
 }
 
 ///|
@@ -351,7 +411,9 @@ async fn handle_subdir_shell(args : Array[String]) -> Unit raise Error {
   let rc_script = @gitsubdir.generate_shell_rc(subdir_path)
   // 一時ファイルに RC を書き込み
   let rc_path = "/tmp/moongit-subdir-rc-" + subdir_path_to_id(subdir_path)
-  fs.write_file(rc_path, string_to_bytes_subdir(rc_script)) catch { _ => () }
+  fs.write_file(rc_path, string_to_bytes_subdir(rc_script)) catch {
+    _ => ()
+  }
   // シェルを起動
   print_line("Starting subdir shell for: " + subdir_path)
   print_line("git commands will be scoped to this directory.")
@@ -371,7 +433,9 @@ async fn handle_subdir_shell(args : Array[String]) -> Unit raise Error {
     print_line("Shell exited with code: " + exit_code.to_string())
   }
   // 一時ファイルを削除
-  fs.remove_file(rc_path) catch { _ => () }
+  fs.remove_file(rc_path) catch {
+    _ => ()
+  }
   print_line("Exited subdir shell.")
 }
 
@@ -402,7 +466,9 @@ fn subdir_path_to_id(path : String) -> String {
   for c in path {
     if c == '/' {
       result.write_char('-')
-    } else if c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' {
+    } else if (c >= 'a' && c <= 'z') ||
+      (c >= 'A' && c <= 'Z') ||
+      (c >= '0' && c <= '9') {
       result.write_char(c)
     }
   }
@@ -421,7 +487,9 @@ fn string_to_bytes_subdir(s : String) -> Bytes {
 ///|
 async fn handle_subdir_commit(args : Array[String]) -> Unit raise Error {
   if args.length() < 1 {
-    print_line("Usage: moongit subdir commit <path> [-m <message>] [--author <author>]")
+    print_line(
+      "Usage: moongit subdir commit <path> [-m <message>] [--author <author>]",
+    )
     return
   }
   let subdir_path = args[0]
@@ -451,8 +519,13 @@ async fn handle_subdir_commit(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
   // SubdirRepo を作成
   let subdir = @gitsubdir.SubdirRepo::from_head(fs, git_dir, subdir_path) catch {
-    err => raise @git.GitError::IoError("Failed to open subdirectory: " + err.to_string())
+    err =>
+      raise @git.GitError::IoError(
+        "Failed to open subdirectory: " + err.to_string(),
+      )
   }
+  // ワーキングディレクトリの変更を読み込む
+  subdir.load_workdir(fs, root)
   // 変更があるか確認
   if not(subdir.is_dirty()) {
     print_line("Nothing to commit in " + subdir_path)
@@ -481,11 +554,19 @@ async fn handle_subdir_checkout(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
   // コミットIDを解決
   let commit_id = resolve_commit_ref(fs, git_dir, commit_ref) catch {
-    err => raise @git.GitError::IoError("Failed to resolve commit: " + err.to_string())
+    err =>
+      raise @git.GitError::IoError(
+        "Failed to resolve commit: " + err.to_string(),
+      )
   }
   // SubdirRepo を作成
-  let subdir = @gitsubdir.SubdirRepo::from_commit(fs, git_dir, commit_id, subdir_path) catch {
-    err => raise @git.GitError::IoError("Failed to open subdirectory: " + err.to_string())
+  let subdir = @gitsubdir.SubdirRepo::from_commit(
+    fs, git_dir, commit_id, subdir_path,
+  ) catch {
+    err =>
+      raise @git.GitError::IoError(
+        "Failed to open subdirectory: " + err.to_string(),
+      )
   }
   // サブディレクトリの絶対パス
   let subdir_abs = root + "/" + subdir_path
@@ -495,11 +576,15 @@ async fn handle_subdir_checkout(args : Array[String]) -> Unit raise Error {
     _ => raise @git.GitError::IoError("Failed to read subdirectory")
   }
   // 既存のファイルを削除（.gitsubdir と git-subdir は保持）
-  clear_subdir_worktree(fs, subdir_abs) catch { _ => () }
+  clear_subdir_worktree(fs, subdir_abs) catch {
+    _ => ()
+  }
   // ファイルを展開
   let mut count = 0
   for file in files {
-    extract_file_recursive(fs, gitfs, "/", file, subdir_abs) catch { e => raise e }
+    extract_file_recursive(fs, gitfs, "/", file, subdir_abs) catch {
+      e => raise e
+    }
     count += 1
   }
   print_line("Checked out " + subdir_path + " at " + commit_ref)
@@ -510,7 +595,9 @@ async fn handle_subdir_checkout(args : Array[String]) -> Unit raise Error {
 ///|
 async fn handle_subdir_push(args : Array[String]) -> Unit raise Error {
   if args.length() < 1 {
-    print_line("Usage: moongit subdir push <path> [<remote-url>] [--branch <branch>]")
+    print_line(
+      "Usage: moongit subdir push <path> [<remote-url>] [--branch <branch>]",
+    )
     print_line("")
     print_line("Push subdirectory to a remote repository.")
     print_line("If remote-url is not specified, uses configured remote.")
@@ -544,7 +631,9 @@ async fn handle_subdir_push(args : Array[String]) -> Unit raise Error {
         Some(u) => u
         None => {
           print_line("Error: No remote URL specified and no remote configured.")
-          print_line("Use: moongit subdir push " + subdir_path + " <remote-url>")
+          print_line(
+            "Use: moongit subdir push " + subdir_path + " <remote-url>",
+          )
           return
         }
       }
@@ -552,7 +641,10 @@ async fn handle_subdir_push(args : Array[String]) -> Unit raise Error {
   }
   // SubdirRepo を作成
   let subdir = @gitsubdir.SubdirRepo::from_head(fs, git_dir, subdir_path) catch {
-    err => raise @git.GitError::IoError("Failed to open subdirectory: " + err.to_string())
+    err =>
+      raise @git.GitError::IoError(
+        "Failed to open subdirectory: " + err.to_string(),
+      )
   }
   // サブディレクトリのコミット履歴を取得
   let history = subdir.log(fs, max_count=1) catch {
@@ -567,23 +659,33 @@ async fn handle_subdir_push(args : Array[String]) -> Unit raise Error {
   print_line("  Branch: " + branch)
   print_line("  Commit: " + latest.id.to_hex())
   // git push を実行（real git を使用）
-  let push_result = @process.run(
-    "git",
-    ["push", url, "HEAD:" + branch, "--force"],
-  )
+  let push_result = @process.run("git", [
+    "push",
+    url,
+    "HEAD:" + branch,
+    "--force",
+  ])
   if push_result != 0 {
-    print_line("Warning: git push may have failed (exit code: " + push_result.to_string() + ")")
+    print_line(
+      "Warning: git push may have failed (exit code: " +
+      push_result.to_string() +
+      ")",
+    )
   } else {
     print_line("Push completed.")
     // リモートURLを設定に保存
-    save_subdir_remote(fs, git_dir, subdir_path, url) catch { _ => () }
+    save_subdir_remote(fs, git_dir, subdir_path, url) catch {
+      _ => ()
+    }
   }
 }
 
 ///|
 async fn handle_subdir_pull(args : Array[String]) -> Unit raise Error {
   if args.length() < 1 {
-    print_line("Usage: moongit subdir pull <path> [<remote-url>] [--branch <branch>]")
+    print_line(
+      "Usage: moongit subdir pull <path> [<remote-url>] [--branch <branch>]",
+    )
     print_line("")
     print_line("Pull subdirectory from a remote repository.")
     print_line("If remote-url is not specified, uses configured remote.")
@@ -616,7 +718,9 @@ async fn handle_subdir_pull(args : Array[String]) -> Unit raise Error {
         Some(u) => u
         None => {
           print_line("Error: No remote URL specified and no remote configured.")
-          print_line("Use: moongit subdir pull " + subdir_path + " <remote-url>")
+          print_line(
+            "Use: moongit subdir pull " + subdir_path + " <remote-url>",
+          )
           return
         }
       }
@@ -626,12 +730,13 @@ async fn handle_subdir_pull(args : Array[String]) -> Unit raise Error {
   print_line("  Branch: " + branch)
   // 一時ディレクトリにクローン
   let temp_dir = "/tmp/moongit-subdir-pull-" + subdir_path_to_id(subdir_path)
-  fs.mkdir_p(temp_dir) catch { _ => () }
+  fs.mkdir_p(temp_dir) catch {
+    _ => ()
+  }
   // git clone
-  let clone_result = @process.run(
-    "git",
-    ["clone", "--depth=1", "--branch", branch, url, temp_dir],
-  )
+  let clone_result = @process.run("git", [
+    "clone", "--depth=1", "--branch", branch, url, temp_dir,
+  ])
   if clone_result != 0 {
     print_line("Error: Failed to clone from " + url)
     return
@@ -639,21 +744,29 @@ async fn handle_subdir_pull(args : Array[String]) -> Unit raise Error {
   // サブディレクトリにコピー
   let subdir_abs = root + "/" + subdir_path
   // 既存ファイルをクリア
-  clear_subdir_worktree(fs, subdir_abs) catch { _ => () }
+  clear_subdir_worktree(fs, subdir_abs) catch {
+    _ => ()
+  }
   // ファイルをコピー（.git を除く）
-  copy_dir_recursive(fs, temp_dir, subdir_abs) catch { e => raise e }
+  copy_dir_recursive(fs, temp_dir, subdir_abs) catch {
+    e => raise e
+  }
   // 一時ディレクトリを削除
-  remove_dir_recursive(fs, temp_dir) catch { _ => () }
+  remove_dir_recursive(fs, temp_dir) catch {
+    _ => ()
+  }
   print_line("Pull completed.")
   // リモートURLを設定に保存
-  save_subdir_remote(fs, git_dir, subdir_path, url) catch { _ => () }
+  save_subdir_remote(fs, git_dir, subdir_path, url) catch {
+    _ => ()
+  }
 }
 
 ///|
 fn resolve_commit_ref(
   fs : OsFs,
   git_dir : String,
-  ref_str : String
+  ref_str : String,
 ) -> @git.ObjectId raise @git.GitError {
   // まず HEAD かブランチ名として解決を試みる
   if ref_str == "HEAD" {
@@ -678,7 +791,8 @@ fn resolve_commit_ref(
   }
   // 直接SHA-1として解釈
   @git.ObjectId::from_hex(ref_str) catch {
-    _ => raise @git.GitError::InvalidObject("Invalid commit reference: " + ref_str)
+    _ =>
+      raise @git.GitError::InvalidObject("Invalid commit reference: " + ref_str)
   }
 }
 
@@ -692,9 +806,13 @@ fn clear_subdir_worktree(fs : OsFs, subdir_abs : String) -> Unit raise Error {
     }
     let path = subdir_abs + "/" + entry
     if fs.is_dir(path) {
-      subdir_remove_dir_recursive(fs, path) catch { _ => () }
+      subdir_remove_dir_recursive(fs, path) catch {
+        _ => ()
+      }
     } else {
-      fs.remove_file(path) catch { _ => () }
+      fs.remove_file(path) catch {
+        _ => ()
+      }
     }
   }
 }
@@ -705,21 +823,29 @@ fn subdir_remove_dir_recursive(fs : OsFs, path : String) -> Unit raise Error {
   for entry in entries {
     let child_path = path + "/" + entry
     if fs.is_dir(child_path) {
-      subdir_remove_dir_recursive(fs, child_path) catch { _ => () }
+      subdir_remove_dir_recursive(fs, child_path) catch {
+        _ => ()
+      }
     } else {
-      fs.remove_file(child_path) catch { _ => () }
+      fs.remove_file(child_path) catch {
+        _ => ()
+      }
     }
   }
-  fs.remove_dir(path) catch { _ => () }
+  fs.remove_dir(path) catch {
+    _ => ()
+  }
 }
 
 ///|
 fn copy_dir_recursive(
   fs : OsFs,
   src : String,
-  dst : String
+  dst : String,
 ) -> Unit raise Error {
-  fs.mkdir_p(dst) catch { _ => () }
+  fs.mkdir_p(dst) catch {
+    _ => ()
+  }
   let entries = fs.readdir(src) catch { _ => return () }
   for entry in entries {
     // .git ディレクトリはスキップ
@@ -729,16 +855,24 @@ fn copy_dir_recursive(
     let src_path = src + "/" + entry
     let dst_path = dst + "/" + entry
     if fs.is_dir(src_path) {
-      copy_dir_recursive(fs, src_path, dst_path) catch { e => raise e }
+      copy_dir_recursive(fs, src_path, dst_path) catch {
+        e => raise e
+      }
     } else {
       let content = fs.read_file(src_path) catch { _ => continue }
-      fs.write_file(dst_path, content) catch { _ => () }
+      fs.write_file(dst_path, content) catch {
+        _ => ()
+      }
     }
   }
 }
 
 ///|
-fn get_subdir_remote(fs : OsFs, git_dir : String, subdir_path : String) -> String? {
+fn get_subdir_remote(
+  fs : OsFs,
+  git_dir : String,
+  subdir_path : String,
+) -> String? {
   let safe_name = subdir_path_to_safe_name(subdir_path)
   let config_path = git_dir + "/subdir/" + safe_name + "/remote"
   let content = fs.read_file(config_path) catch { _ => return None }
@@ -750,13 +884,17 @@ fn save_subdir_remote(
   fs : OsFs,
   git_dir : String,
   subdir_path : String,
-  url : String
+  url : String,
 ) -> Unit raise Error {
   let safe_name = subdir_path_to_safe_name(subdir_path)
   let config_dir = git_dir + "/subdir/" + safe_name
-  fs.mkdir_p(config_dir) catch { _ => () }
+  fs.mkdir_p(config_dir) catch {
+    _ => ()
+  }
   let config_path = config_dir + "/remote"
-  fs.write_file(config_path, string_to_bytes_subdir(url)) catch { _ => () }
+  fs.write_file(config_path, string_to_bytes_subdir(url)) catch {
+    _ => ()
+  }
 }
 
 ///|
@@ -817,7 +955,9 @@ async fn handle_subdir_sync(args : Array[String]) -> Unit raise Error {
       return
     }
     for path in modules {
-      @gitsubdir.sync_module(fs, fs, git_dir, path) catch { _ => () }
+      @gitsubdir.sync_module(fs, fs, git_dir, path) catch {
+        _ => ()
+      }
       print_line("Synced: " + path)
     }
   } else {
@@ -831,4 +971,241 @@ async fn handle_subdir_sync(args : Array[String]) -> Unit raise Error {
     }
     print_line("Synced: " + subdir_path)
   }
+}
+
+///|
+/// sparse-checkout サブコマンドのハンドラ
+async fn handle_subdir_sparse_checkout(
+  args : Array[String],
+) -> Unit raise Error {
+  if args.length() < 1 {
+    print_sparse_checkout_usage()
+    return
+  }
+  let cmd = args[0]
+  let rest = array_view_to_array(args[1:])
+  match cmd {
+    "init" => handle_sparse_init(rest) catch { e => raise e }
+    "set" => handle_sparse_set(rest) catch { e => raise e }
+    "add" => handle_sparse_add(rest) catch { e => raise e }
+    "list" => handle_sparse_list(rest) catch { e => raise e }
+    "disable" => handle_sparse_disable(rest) catch { e => raise e }
+    _ => {
+      print_line("Unknown sparse-checkout command: " + cmd)
+      print_sparse_checkout_usage()
+    }
+  }
+}
+
+///|
+async fn print_sparse_checkout_usage() -> Unit raise Error {
+  print_line("Usage: moongit subdir sparse-checkout <command> [options]")
+  print_line("")
+  print_line("Commands:")
+  print_line(
+    "  init <path> [--cone]     Enable sparse checkout for subdirectory",
+  )
+  print_line(
+    "  set <path> <patterns>    Set sparse checkout patterns (replaces existing)",
+  )
+  print_line("  add <path> <patterns>    Add patterns to sparse checkout")
+  print_line("  list <path>              List current sparse checkout patterns")
+  print_line("  disable <path>           Disable sparse checkout")
+  print_line("")
+  print_line("Patterns:")
+  print_line("  *.mbt        Match files with .mbt extension")
+  print_line("  src/         Include src directory and its contents")
+  print_line("  !tests/      Exclude tests directory")
+  print_line("  **/test*.mbt Match test files in any directory")
+}
+
+///|
+async fn handle_sparse_init(args : Array[String]) -> Unit raise Error {
+  if args.length() < 1 {
+    print_line("Usage: moongit subdir sparse-checkout init <path> [--cone]")
+    return
+  }
+  let subdir_path = args[0]
+  let mut cone = false
+  for i = 1; i < args.length(); i = i + 1 {
+    if args[i] == "--cone" {
+      cone = true
+    }
+  }
+  let root = get_work_root()
+  let git_dir = root + "/.git"
+  let fs = OsFs::new()
+  // モジュールが初期化されているか確認
+  if not(@gitsubdir.is_module_initialized(fs, git_dir, subdir_path)) {
+    print_line(
+      "Error: subdirectory not initialized. Run 'moongit subdir init " +
+      subdir_path +
+      "' first.",
+    )
+    return
+  }
+  // sparse checkout を初期化
+  @gitsubdir.init_module_sparse(fs, fs, git_dir, subdir_path, cone~) catch {
+    err =>
+      raise @git.GitError::IoError("Failed to init sparse: " + err.to_string())
+  }
+  print_line("Sparse checkout enabled for: " + subdir_path)
+  if cone {
+    print_line("  Mode: cone (directory-based)")
+  } else {
+    print_line("  Mode: pattern-based")
+  }
+  print_line("")
+  print_line(
+    "Use 'moongit subdir sparse-checkout set " +
+    subdir_path +
+    " <patterns>' to specify files.",
+  )
+}
+
+///|
+async fn handle_sparse_set(args : Array[String]) -> Unit raise Error {
+  if args.length() < 2 {
+    print_line(
+      "Usage: moongit subdir sparse-checkout set <path> <pattern1> [pattern2] ...",
+    )
+    return
+  }
+  let subdir_path = args[0]
+  let patterns : Array[String] = []
+  for i = 1; i < args.length(); i = i + 1 {
+    patterns.push(args[i])
+  }
+  let root = get_work_root()
+  let git_dir = root + "/.git"
+  let fs = OsFs::new()
+  // モジュールが初期化されているか確認
+  if not(@gitsubdir.is_module_initialized(fs, git_dir, subdir_path)) {
+    print_line(
+      "Error: subdirectory not initialized. Run 'moongit subdir init " +
+      subdir_path +
+      "' first.",
+    )
+    return
+  }
+  // パターンを設定
+  @gitsubdir.set_module_sparse_patterns(fs, fs, git_dir, subdir_path, patterns) catch {
+    err =>
+      raise @git.GitError::IoError("Failed to set patterns: " + err.to_string())
+  }
+  print_line("Sparse checkout patterns set for: " + subdir_path)
+  print_line("")
+  for p in patterns {
+    print_line("  " + p)
+  }
+  print_line("")
+  print_line(
+    "Use 'moongit subdir checkout " + subdir_path + " HEAD' to apply patterns.",
+  )
+}
+
+///|
+async fn handle_sparse_add(args : Array[String]) -> Unit raise Error {
+  if args.length() < 2 {
+    print_line(
+      "Usage: moongit subdir sparse-checkout add <path> <pattern1> [pattern2] ...",
+    )
+    return
+  }
+  let subdir_path = args[0]
+  let patterns : Array[String] = []
+  for i = 1; i < args.length(); i = i + 1 {
+    patterns.push(args[i])
+  }
+  let root = get_work_root()
+  let git_dir = root + "/.git"
+  let fs = OsFs::new()
+  // モジュールが初期化されているか確認
+  if not(@gitsubdir.is_module_initialized(fs, git_dir, subdir_path)) {
+    print_line(
+      "Error: subdirectory not initialized. Run 'moongit subdir init " +
+      subdir_path +
+      "' first.",
+    )
+    return
+  }
+  // パターンを追加
+  @gitsubdir.add_module_sparse_patterns(fs, fs, git_dir, subdir_path, patterns) catch {
+    err =>
+      raise @git.GitError::IoError("Failed to add patterns: " + err.to_string())
+  }
+  print_line("Patterns added to sparse checkout for: " + subdir_path)
+  // 現在のパターンを表示
+  let all_patterns = @gitsubdir.read_module_sparse_patterns(
+    fs, git_dir, subdir_path,
+  )
+  print_line("")
+  print_line("Current patterns:")
+  for p in all_patterns {
+    print_line("  " + p)
+  }
+}
+
+///|
+async fn handle_sparse_list(args : Array[String]) -> Unit raise Error {
+  if args.length() < 1 {
+    print_line("Usage: moongit subdir sparse-checkout list <path>")
+    return
+  }
+  let subdir_path = args[0]
+  let root = get_work_root()
+  let git_dir = root + "/.git"
+  let fs = OsFs::new()
+  // モジュールが初期化されているか確認
+  if not(@gitsubdir.is_module_initialized(fs, git_dir, subdir_path)) {
+    print_line("Error: subdirectory not initialized.")
+    return
+  }
+  // sparse checkout が有効かチェック
+  if not(@gitsubdir.is_module_sparse_enabled(fs, git_dir, subdir_path)) {
+    print_line("Sparse checkout is not enabled for: " + subdir_path)
+    print_line(
+      "Use 'moongit subdir sparse-checkout init " + subdir_path + "' to enable.",
+    )
+    return
+  }
+  // パターンを表示
+  let patterns = @gitsubdir.read_module_sparse_patterns(
+    fs, git_dir, subdir_path,
+  )
+  if patterns.length() == 0 {
+    print_line("No sparse checkout patterns set for: " + subdir_path)
+    return
+  }
+  print_line("Sparse checkout patterns for: " + subdir_path)
+  print_line("")
+  for p in patterns {
+    print_line("  " + p)
+  }
+}
+
+///|
+async fn handle_sparse_disable(args : Array[String]) -> Unit raise Error {
+  if args.length() < 1 {
+    print_line("Usage: moongit subdir sparse-checkout disable <path>")
+    return
+  }
+  let subdir_path = args[0]
+  let root = get_work_root()
+  let git_dir = root + "/.git"
+  let fs = OsFs::new()
+  // モジュールが初期化されているか確認
+  if not(@gitsubdir.is_module_initialized(fs, git_dir, subdir_path)) {
+    print_line("Error: subdirectory not initialized.")
+    return
+  }
+  // sparse checkout を無効化
+  @gitsubdir.disable_module_sparse(fs, fs, git_dir, subdir_path) catch {
+    err =>
+      raise @git.GitError::IoError(
+        "Failed to disable sparse: " + err.to_string(),
+      )
+  }
+  print_line("Sparse checkout disabled for: " + subdir_path)
+  print_line("All files will now be checked out.")
 }

@@ -19,7 +19,9 @@ fn TestNetwork::new(node_count : Int) -> TestNetwork {
   let nodes : Array[TestNode] = []
   for i = 0; i < node_count; i = i + 1 {
     let fs = @git.TestFs::new()
-    @lib.init_repo(fs, "/repo") catch { _ => () }
+    @lib.init_repo(fs, "/repo") catch {
+      _ => ()
+    }
     let node_id = NodeId::new("node-" + i.to_string())
     let db = GitDb::empty(node_id, "/repo/.git")
     nodes.push({ db, fs })
@@ -33,7 +35,7 @@ fn TestNetwork::send(
   self : TestNetwork,
   from : Int,
   to : Int,
-  msg : GossipMessage
+  msg : GossipMessage,
 ) -> Unit {
   self.message_queue.push((from, to, msg))
 }
@@ -111,6 +113,7 @@ test "sync: two nodes basic sync" {
   let node1 = net.node(1)
   if node1.db.has_pending_objects() {
     let _ = node1.db.apply_pending_objects(node1.fs, "/repo/.git")
+
   }
   // Node 1 should have received the objects
   assert_true(node1.db.pending_object_count() >= 0)
@@ -136,7 +139,8 @@ test "sync: three nodes chain sync" {
   // All nodes should have pending objects or be synced
   let node2 = net.node(2)
   assert_true(
-    node2.db.pending_object_count() > 0 || node2.db.head() != @git.ObjectId::zero(),
+    node2.db.pending_object_count() > 0 ||
+    node2.db.head() != @git.ObjectId::zero(),
   )
 }
 
@@ -148,7 +152,12 @@ test "sync: concurrent writes from multiple nodes" {
   for i = 0; i < 3; i = i + 1 {
     let node = net.node(i)
     node.db.set("node-" + i.to_string(), Bytes::make(10, (i + 65).to_byte()))
-    let _ = node.db.commit(node.fs, node.fs, "Commit from " + i.to_string(), net.tick)
+    let _ = node.db.commit(
+      node.fs,
+      node.fs,
+      "Commit from " + i.to_string(),
+      net.tick,
+    )
     net.advance_time(100L)
   }
   // Each node broadcasts
@@ -162,7 +171,8 @@ test "sync: concurrent writes from multiple nodes" {
     let node = net.node(i)
     // Either has pending objects or has a non-zero HEAD
     assert_true(
-      node.db.pending_object_count() >= 0 || node.db.head() != @git.ObjectId::zero(),
+      node.db.pending_object_count() >= 0 ||
+      node.db.head() != @git.ObjectId::zero(),
     )
   }
 }
@@ -197,6 +207,7 @@ test "sync: random operations simulation" {
           "Round " + round.to_string(),
           net.tick,
         )
+
       }
     } else if op < 8 {
       // 20% chance: broadcast
@@ -204,6 +215,7 @@ test "sync: random operations simulation" {
     } else {
       // 20% chance: process messages
       let _ = net.process_all()
+
     }
   }
   // Final sync: all nodes broadcast and process
@@ -212,18 +224,21 @@ test "sync: random operations simulation" {
     let node = net.node(i)
     if node.db.is_dirty() {
       let _ = node.db.commit(node.fs, node.fs, "Final commit", net.tick)
+
     }
     net.broadcast_announce(i)
   }
   for round = 0; round < 5; round = round + 1 {
     let _ = net.process_all()
+
   }
   // Verify all nodes have some state
   for idx = 0; idx < 4; idx = idx + 1 {
     let node = net.node(idx)
     // Each node should have done something
     assert_true(
-      node.db.head() != @git.ObjectId::zero() || node.db.pending_object_count() > 0,
+      node.db.head() != @git.ObjectId::zero() ||
+      node.db.pending_object_count() > 0,
     )
   }
 }
@@ -250,6 +265,7 @@ test "sync: vector clock ordering" {
   net.broadcast_announce(0)
   net.broadcast_announce(1)
   let _ = net.process_all()
+
 }
 
 ///|

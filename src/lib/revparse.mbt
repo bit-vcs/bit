@@ -6,7 +6,118 @@ pub fn rev_parse(
   git_dir : String,
   spec : String,
 ) -> @git.ObjectId? raise @git.GitError {
-  if spec == "HEAD" {
+  // Parse suffix (^, ^^, ~n, ^n)
+  let (base_spec, ancestor_count) = parse_rev_suffix(spec)
+  // Resolve base reference
+  let base_id = match resolve_base_ref(fs, git_dir, base_spec) {
+    Some(id) => id
+    None => return None
+  }
+  // Walk up parent chain
+  if ancestor_count == 0 {
+    return Some(base_id)
+  }
+  walk_ancestors(fs, git_dir, base_id, ancestor_count)
+}
+
+///|
+/// Parse revision suffix like ^, ^^, ~n
+fn parse_rev_suffix(spec : String) -> (String, Int) {
+  let chars = spec.to_array()
+  let len = chars.length()
+  if len == 0 {
+    return (spec, 0)
+  }
+  // Find where suffix starts - must start with ^ or ~
+  let mut suffix_start = -1
+  for i = 0; i < len; i = i + 1 {
+    let c = chars[i]
+    if c == '^' || c == '~' {
+      suffix_start = i
+      break
+    }
+  }
+  if suffix_start < 0 {
+    return (spec, 0)
+  }
+  // Validate suffix - only ^, ~, and digits after the first ^ or ~
+  for i = suffix_start; i < len; i = i + 1 {
+    let c = chars[i]
+    if not(c == '^' || c == '~' || (c >= '0' && c <= '9')) {
+      // Invalid suffix character - no suffix
+      return (spec, 0)
+    }
+  }
+  let base = substring_revparse(spec, 0, suffix_start)
+  let suffix = substring_revparse(spec, suffix_start, len)
+  // Parse suffix
+  let count = parse_ancestor_count(suffix)
+  (base, count)
+}
+
+///|
+/// Parse ancestor count from suffix like ^, ^^, ~3
+fn parse_ancestor_count(suffix : String) -> Int {
+  let chars = suffix.to_array()
+  if chars.length() == 0 {
+    return 0
+  }
+  // Count consecutive ^
+  let mut caret_count = 0
+  let mut i = 0
+  while i < chars.length() && chars[i] == '^' {
+    caret_count += 1
+    i += 1
+  }
+  if caret_count > 0 && i == chars.length() {
+    return caret_count
+  }
+  // Handle ~n
+  if chars[0] == '~' {
+    if chars.length() == 1 {
+      return 1
+    }
+    let num_str = substring_revparse(suffix, 1, chars.length())
+    return parse_int_simple(num_str)
+  }
+  // Handle ^n (first parent n times is same as ~n for our purposes)
+  if chars[0] == '^' && chars.length() > 1 {
+    let num_str = substring_revparse(suffix, 1, chars.length())
+    return parse_int_simple(num_str)
+  }
+  0
+}
+
+///|
+fn parse_int_simple(s : String) -> Int {
+  let chars = s.to_array()
+  let mut result = 0
+  for c in chars {
+    if c >= '0' && c <= '9' {
+      result = result * 10 + (c.to_int() - '0'.to_int())
+    }
+  }
+  result
+}
+
+///|
+fn substring_revparse(s : String, start : Int, end : Int) -> String {
+  let chars = s.to_array()
+  let result = StringBuilder::new()
+  for i = start; i < end && i < chars.length(); i = i + 1 {
+    result.write_char(chars[i])
+  }
+  result.to_string()
+}
+
+///|
+/// Resolve base reference (without suffix)
+fn resolve_base_ref(
+  fs : &@git.RepoFileSystem,
+  git_dir : String,
+  spec : String,
+) -> @git.ObjectId? raise @git.GitError {
+  if spec == "HEAD" || spec == "" {
     return resolve_head_commit(fs, git_dir)
   }
   if spec.has_prefix("refs/") {
@@ -26,6 +137,33 @@ pub fn rev_parse(
     None => ()
   }
   None
+}
+
+///|
+/// Walk up the parent chain n times
+fn walk_ancestors(
+  fs : &@git.RepoFileSystem,
+  git_dir : String,
+  start : @git.ObjectId,
+  count : Int,
+) -> @git.ObjectId? raise @git.GitError {
+  let db = ObjectDb::load(fs, git_dir)
+  let mut current = start
+  for _i = 0; _i < count; _i = _i + 1 {
+    let obj = match db.get(fs, current) {
+      Some(o) => o
+      None => return None
+    }
+    if obj.obj_type != @git.ObjectType::Commit {
+      raise @git.GitError::InvalidObject("Not a commit object")
+    }
+    let commit_info = @git.parse_commit(obj.data)
+    if commit_info.parents.length() == 0 {
+      return None // No more parents
+    }
+    current = commit_info.parents[0]
+  }
+  Some(current)
 }
 
 ///|

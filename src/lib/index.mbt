@@ -9,6 +9,16 @@ pub struct IndexEntry {
 }
 
 ///|
+pub fn IndexEntry::new(
+  path : String,
+  id : @git.ObjectId,
+  mode : Int,
+  size : Int,
+) -> IndexEntry {
+  { path, id, mode, size }
+}
+
+///|
 pub fn read_index_entries(
   fs : &@git.RepoFileSystem,
   git_dir : String,

@@ -85,8 +85,10 @@ pub fn stash_push(
   // Create tree from current index
   let index_entries = read_index_entries(rfs, git_dir)
   let index_tree = write_tree_from_index(fs, git_dir, index_entries)
-  // Create tree from worktree
-  let worktree_entries = build_worktree_index(rfs, root, index_entries)
+  // Create tree from worktree (also writes blobs to object store)
+  let worktree_entries = build_worktree_index(
+    fs, rfs, git_dir, root, index_entries,
+  )
   let worktree_tree = write_tree_from_index(fs, git_dir, worktree_entries)
   // Create index commit (index state)
   let index_commit = @git.Commit::new(
@@ -144,7 +146,7 @@ pub fn stash_push(
   // Reset worktree to HEAD
   let db = ObjectDb::load(rfs, git_dir)
   let head_files = collect_tree_files_from_commit(db, rfs, head_id)
-  write_worktree_from_files(db, fs, rfs, git_dir, root, head_files)
+  write_worktree_from_files(db, fs, rfs, root, git_dir, head_files)
   // Reset index to HEAD
   let head_entries = tree_files_to_index(db, rfs, head_files)
   write_index_entries(fs, git_dir, head_entries)
@@ -153,7 +155,9 @@ pub fn stash_push(
 
 ///|
 fn build_worktree_index(
+  fs : &@git.FileSystem,
   rfs : &@git.RepoFileSystem,
+  git_dir : String,
   root : String,
   index_entries : Array[IndexEntry],
 ) -> Array[IndexEntry] raise @git.GitError {
@@ -162,7 +166,8 @@ fn build_worktree_index(
     let abs = join_path(root, e.path)
     if rfs.is_file(abs) {
       let content = rfs.read_file(abs)
-      let id = @git.hash_blob(content)
+      // Write blob to object store
+      let id = write_loose_object(fs, git_dir, @git.ObjectType::Blob, content)
       result.push({ path: e.path, id, mode: e.mode, size: content.length() })
     }
     // Skip deleted files
@@ -201,8 +206,8 @@ pub fn stash_apply(
     db,
     fs,
     rfs,
-    git_dir,
     root,
+    git_dir,
     stash_files,
     remove_missing=false,
   )

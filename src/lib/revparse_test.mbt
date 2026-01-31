@@ -38,6 +38,88 @@ test "log: oneline" {
 }
 
 ///|
+test "rev-parse: HEAD^ parent reference" {
+  let fs = setup_rev_repo()
+  // First commit
+  fs.write_string("/repo/a.txt", "first\n")
+  add_paths(fs, fs, "/repo", ["a.txt"])
+  let first = commit(
+    fs, fs, "/repo", "first\n", "Test <test@example.com>", 1700000000L,
+  )
+  // Second commit
+  fs.write_string("/repo/a.txt", "second\n")
+  add_paths(fs, fs, "/repo", ["a.txt"])
+  let second = commit(
+    fs, fs, "/repo", "second\n", "Test <test@example.com>", 1700000001L,
+  )
+  // HEAD should be second commit
+  let head = rev_parse(fs, "/repo/.git", "HEAD")
+  assert_eq(head.unwrap().to_hex(), second.to_hex())
+  // HEAD^ should be first commit
+  let parent = rev_parse(fs, "/repo/.git", "HEAD^")
+  assert_eq(parent.unwrap().to_hex(), first.to_hex())
+}
+
+///|
+test "rev-parse: HEAD^^ and HEAD~2 are equivalent" {
+  let fs = setup_rev_repo()
+  // Three commits
+  fs.write_string("/repo/a.txt", "first\n")
+  add_paths(fs, fs, "/repo", ["a.txt"])
+  let first = commit(
+    fs, fs, "/repo", "first\n", "Test <test@example.com>", 1700000000L,
+  )
+  fs.write_string("/repo/a.txt", "second\n")
+  add_paths(fs, fs, "/repo", ["a.txt"])
+  ignore(
+    commit(fs, fs, "/repo", "second\n", "Test <test@example.com>", 1700000001L),
+  )
+  fs.write_string("/repo/a.txt", "third\n")
+  add_paths(fs, fs, "/repo", ["a.txt"])
+  ignore(
+    commit(fs, fs, "/repo", "third\n", "Test <test@example.com>", 1700000002L),
+  )
+  // HEAD^^ should be first commit
+  let caret_caret = rev_parse(fs, "/repo/.git", "HEAD^^")
+  assert_eq(caret_caret.unwrap().to_hex(), first.to_hex())
+  // HEAD~2 should also be first commit
+  let tilde_2 = rev_parse(fs, "/repo/.git", "HEAD~2")
+  assert_eq(tilde_2.unwrap().to_hex(), first.to_hex())
+}
+
+///|
+test "rev-parse: 40-char hex without suffix" {
+  let fs = setup_rev_repo()
+  fs.write_string("/repo/a.txt", "hello\n")
+  add_paths(fs, fs, "/repo", ["a.txt"])
+  let id = commit(
+    fs, fs, "/repo", "msg\n", "Test <test@example.com>", 1700000000L,
+  )
+  // Parse by full hex should work
+  let parsed = rev_parse(fs, "/repo/.git", id.to_hex())
+  assert_eq(parsed.unwrap().to_hex(), id.to_hex())
+}
+
+///|
+test "rev-parse: HEAD~1 equals HEAD^" {
+  let fs = setup_rev_repo()
+  fs.write_string("/repo/a.txt", "first\n")
+  add_paths(fs, fs, "/repo", ["a.txt"])
+  let first = commit(
+    fs, fs, "/repo", "first\n", "Test <test@example.com>", 1700000000L,
+  )
+  fs.write_string("/repo/a.txt", "second\n")
+  add_paths(fs, fs, "/repo", ["a.txt"])
+  ignore(
+    commit(fs, fs, "/repo", "second\n", "Test <test@example.com>", 1700000001L),
+  )
+  let caret = rev_parse(fs, "/repo/.git", "HEAD^")
+  let tilde_1 = rev_parse(fs, "/repo/.git", "HEAD~1")
+  assert_eq(caret.unwrap().to_hex(), first.to_hex())
+  assert_eq(tilde_1.unwrap().to_hex(), first.to_hex())
+}
+
+///|
 test "status porcelain + diff" {
   let fs = setup_rev_repo()
   fs.write_string("/repo/a.txt", "hello\n")

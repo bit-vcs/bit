@@ -5,7 +5,7 @@
 pub fn GitDb::new(
   node_id : NodeId,
   gitfs : @gitfs.GitFs,
-  head : @git.ObjectId
+  head : @git.ObjectId,
 ) -> GitDb {
   {
     node_id,
@@ -21,7 +21,14 @@ pub fn GitDb::new(
 /// Create an empty GitDb
 pub fn GitDb::empty(node_id : NodeId, git_dir : String) -> GitDb {
   let gitfs = @gitfs.GitFs::empty(git_dir)
-  { node_id, gitfs, clock: VectorClock::new(), head: @git.ObjectId::zero(), peers: {}, pending_objects: {} }
+  {
+    node_id,
+    gitfs,
+    clock: VectorClock::new(),
+    head: @git.ObjectId::zero(),
+    peers: {},
+    pending_objects: {},
+  }
 }
 
 ///|
@@ -54,7 +61,7 @@ pub fn GitDb::is_dirty(self : GitDb) -> Bool {
 pub fn GitDb::get(
   self : GitDb,
   backing_fs : &@git.RepoFileSystem,
-  key : String
+  key : String,
 ) -> Bytes? {
   let path = normalize_key(key)
   let result = self.gitfs.read_file(backing_fs, path) catch { _ => return None }
@@ -71,7 +78,10 @@ pub fn GitDb::set(self : GitDb, key : String, value : Bytes) -> Unit {
 ///|
 /// Set string value
 pub fn GitDb::set_string(self : GitDb, key : String, value : String) -> Unit {
-  self.set(key, Bytes::from_array(value.to_array().map(fn(c) { c.to_int().to_byte() })))
+  self.set(
+    key,
+    Bytes::from_array(value.to_array().map(fn(c) { c.to_int().to_byte() })),
+  )
 }
 
 ///|
@@ -86,7 +96,7 @@ pub fn GitDb::delete(self : GitDb, key : String) -> Unit {
 pub fn GitDb::has(
   self : GitDb,
   backing_fs : &@git.RepoFileSystem,
-  key : String
+  key : String,
 ) -> Bool {
   let path = normalize_key(key)
   self.gitfs.is_file(backing_fs, path)
@@ -97,7 +107,7 @@ pub fn GitDb::has(
 pub fn GitDb::list(
   self : GitDb,
   backing_fs : &@git.RepoFileSystem,
-  prefix : String
+  prefix : String,
 ) -> Array[String] {
   let path = normalize_key(prefix)
   let entries = self.gitfs.readdir(backing_fs, path) catch { _ => return [] }
@@ -109,7 +119,7 @@ pub fn GitDb::list(
 pub fn GitDb::list_recursive(
   self : GitDb,
   backing_fs : &@git.RepoFileSystem,
-  prefix : String
+  prefix : String,
 ) -> Array[String] {
   let results : Array[String] = []
   collect_keys_recursive(self, backing_fs, prefix, results)
@@ -121,7 +131,7 @@ fn collect_keys_recursive(
   db : GitDb,
   backing_fs : &@git.RepoFileSystem,
   prefix : String,
-  results : Array[String]
+  results : Array[String],
 ) -> Unit {
   let path = normalize_key(prefix)
   let entries = db.gitfs.readdir(backing_fs, path) catch { _ => return }
@@ -142,13 +152,15 @@ pub fn GitDb::commit(
   write_fs : &@git.FileSystem,
   backing_fs : &@git.RepoFileSystem,
   message : String,
-  timestamp : Int64
+  timestamp : Int64,
 ) -> @git.ObjectId raise @git.GitError {
   // Increment our clock
   self.clock = self.clock.increment(self.node_id)
   // Create snapshot
   let author = self.node_id.id
-  let snapshot = self.gitfs.snapshot(write_fs, backing_fs, message, author, timestamp)
+  let snapshot = self.gitfs.snapshot(
+    write_fs, backing_fs, message, author, timestamp,
+  )
   self.head = snapshot.commit_id
   snapshot.commit_id
 }

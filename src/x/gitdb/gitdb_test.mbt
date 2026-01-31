@@ -1,5 +1,5 @@
-///| Tests for GitDb
-
+///|
+/// Tests for GitDb
 test "VectorClock: increment and merge" {
   let node1 = NodeId::new("node1")
   let node2 = NodeId::new("node2")
@@ -14,6 +14,7 @@ test "VectorClock: increment and merge" {
   assert_eq(merged.clocks.get("node2"), Some(1L))
 }
 
+///|
 test "VectorClock: compare" {
   let node1 = NodeId::new("node1")
   let node2 = NodeId::new("node2")
@@ -29,6 +30,7 @@ test "VectorClock: compare" {
   assert_eq(clock1.compare(clock3), 0) // Concurrent
 }
 
+///|
 test "normalize_key" {
   // Test internal function via public API
   let db = GitDb::empty(NodeId::new("test"), "/tmp/test")
@@ -39,6 +41,7 @@ test "normalize_key" {
   assert_true(files.contains("path/to/key"))
 }
 
+///|
 test "GitDb: basic KV operations" {
   let fs = @git.TestFs::new()
   let db = GitDb::empty(NodeId::new("test"), "/repo/.git")
@@ -58,6 +61,7 @@ test "GitDb: basic KV operations" {
   assert_eq(v4, None)
 }
 
+///|
 test "GitDb: list keys" {
   let fs = @git.TestFs::new()
   let db = GitDb::empty(NodeId::new("test"), "/repo/.git")
@@ -75,6 +79,7 @@ test "GitDb: list keys" {
   assert_true(alice_keys.contains("email"))
 }
 
+///|
 test "GitDb: gossip state" {
   let db = GitDb::empty(NodeId::new("node1"), "/repo/.git")
   let state = db.get_gossip_state(1000L)
@@ -83,6 +88,7 @@ test "GitDb: gossip state" {
   assert_eq(state.timestamp, 1000L)
 }
 
+///|
 test "GitDb: peer management" {
   let db = GitDb::empty(NodeId::new("node1"), "/repo/.git")
   // Add peers
@@ -109,6 +115,7 @@ test "GitDb: peer management" {
   assert_eq(peers2.length(), 1)
 }
 
+///|
 test "GitDb: select gossip peers" {
   let db = GitDb::empty(NodeId::new("node1"), "/repo/.git")
   // Add several peers
@@ -142,6 +149,7 @@ test "GitDb: select gossip peers" {
   assert_true(same_count < 3 || selected.length() < 3)
 }
 
+///|
 test "GitDb: commit and rollback" {
   let fs = @git.TestFs::new()
   @lib.init_repo(fs, "/repo")

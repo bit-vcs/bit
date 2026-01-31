@@ -115,8 +115,8 @@ pub fn SubdirInitConfig::default() -> SubdirInitConfig {
 
 ///|
 pub fn SubdirInitConfig::new(
-  create_wrapper~ : Bool = true,
-  verbose_marker~ : Bool = true
+  create_wrapper? : Bool = true,
+  verbose_marker? : Bool = true,
 ) -> SubdirInitConfig {
   { create_wrapper, verbose_marker }
 }

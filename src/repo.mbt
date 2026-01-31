@@ -76,6 +76,7 @@ pub fn parse_tree(content : Bytes) -> Array[TreeEntry] raise GitError {
   let entries : Array[TreeEntry] = []
   let mut i = 0
   while i < content.length() {
+    // Parse mode (ASCII only, so byte-by-byte is fine)
     let mode_buf = StringBuilder::new()
     while i < content.length() && content[i] != b' ' {
       mode_buf.write_char(content[i].to_int().unsafe_to_char())
@@ -85,14 +86,17 @@ pub fn parse_tree(content : Bytes) -> Array[TreeEntry] raise GitError {
       raise GitError::InvalidObject("Truncated tree entry mode")
     }
     i += 1 // skip space
-    let name_buf = StringBuilder::new()
+    // Parse name - collect bytes and decode as UTF-8
+    let name_start = i
     while i < content.length() && content[i] != b'\x00' {
-      name_buf.write_char(content[i].to_int().unsafe_to_char())
       i += 1
     }
     if i >= content.length() {
       raise GitError::InvalidObject("Truncated tree entry name")
     }
+    let name_len = i - name_start
+    let name_bytes = FixedArray::makei(name_len, fn(j) { content[name_start + j] })
+    let name = @utf8.decode_lossy(Bytes::from_array(name_bytes)[:])
     i += 1 // skip NUL
     if i + 20 > content.length() {
       raise GitError::InvalidObject("Truncated tree entry id")
@@ -103,7 +107,7 @@ pub fn parse_tree(content : Bytes) -> Array[TreeEntry] raise GitError {
     }
     i += 20
     let id = ObjectId::new(bytes)
-    entries.push(TreeEntry::new(mode_buf.to_string(), name_buf.to_string(), id))
+    entries.push(TreeEntry::new(mode_buf.to_string(), name, id))
   }
   entries
 }

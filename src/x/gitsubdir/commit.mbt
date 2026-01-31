@@ -13,8 +13,8 @@ pub fn SubdirRepo::commit(
   fs : &@git.FileSystem,
   rfs : &@git.RepoFileSystem,
   message : String,
-  author~ : String = "author <author@example.com>",
-  timestamp~ : Int64 = 0L
+  author? : String = "author <author@example.com>",
+  timestamp? : Int64 = 0L,
 ) -> @git.ObjectId raise SubdirError {
   // 変更がなければエラー
   if not(self.is_dirty()) {
@@ -73,6 +73,14 @@ pub fn SubdirRepo::commit(
   ) catch {
     e => raise e
   }
+  // HEAD（またはブランチ参照）を更新
+  update_head_ref(fs, rfs, self.git_dir, new_commit_id) catch {
+    e => raise e
+  }
+  // インデックスを新しいコミットに合わせて更新
+  update_index_from_commit(fs, rfs, self.git_dir, new_commit_id) catch {
+    e => raise e
+  }
   // ワーキング層をクリア
   self.gitfs.discard_changes()
   new_commit_id
@@ -87,7 +95,7 @@ fn replace_subdir_tree(
   git_dir : String,
   root_tree : @git.ObjectId,
   subdir_path : String,
-  new_subdir_tree : @git.ObjectId
+  new_subdir_tree : @git.ObjectId,
 ) -> @git.ObjectId raise SubdirError {
   let path_parts = split_subdir_path(subdir_path)
   if path_parts.length() == 0 {
@@ -96,14 +104,7 @@ fn replace_subdir_tree(
   }
   // 再帰的にツリーを置換
   replace_tree_recursive(
-    fs,
-    rfs,
-    db,
-    git_dir,
-    root_tree,
-    path_parts,
-    0,
-    new_subdir_tree,
+    fs, rfs, db, git_dir, root_tree, path_parts, 0, new_subdir_tree,
   )
 }
 
@@ -117,7 +118,7 @@ fn replace_tree_recursive(
   current_tree : @git.ObjectId,
   path_parts : Array[String],
   depth : Int,
-  new_leaf_tree : @git.ObjectId
+  new_leaf_tree : @git.ObjectId,
 ) -> @git.ObjectId raise SubdirError {
   // 現在のツリーを読み込む
   let tree_obj = db.get(rfs, current_tree) catch {
@@ -139,7 +140,9 @@ fn replace_tree_recursive(
       // 対象のエントリを置換
       if is_last {
         // 最後のパス要素なら、新しいツリーで置換
-        new_entries.push(@git.TreeEntry::new(entry.mode, entry.name, new_leaf_tree))
+        new_entries.push(
+          @git.TreeEntry::new(entry.mode, entry.name, new_leaf_tree),
+        )
       } else {
         // まだパスが続く場合は再帰
         let new_child_tree = replace_tree_recursive(
@@ -154,7 +157,9 @@ fn replace_tree_recursive(
         ) catch {
           e => raise e
         }
-        new_entries.push(@git.TreeEntry::new(entry.mode, entry.name, new_child_tree))
+        new_entries.push(
+          @git.TreeEntry::new(entry.mode, entry.name, new_child_tree),
+        )
       }
     } else {
       // 対象外のエントリはそのまま
@@ -236,7 +241,7 @@ fn write_object(
   fs : &@git.FileSystem,
   git_dir : String,
   obj_type : String,
-  content : Bytes
+  content : Bytes,
 ) -> @git.ObjectId raise SubdirError {
   // ヘッダー: "type size\0"
   let header = obj_type + " " + content.length().to_string()
@@ -253,7 +258,9 @@ fn write_object(
   let dir_path = git_dir + "/objects/" + dir_name
   let file_path = dir_path + "/" + file_name
   // ディレクトリ作成
-  fs.mkdir_p(dir_path) catch { _ => () }
+  fs.mkdir_p(dir_path) catch {
+    _ => ()
+  }
   // zlib 圧縮して書き込み
   let compressed = @zlib.zlib_compress(full_data)
   fs.write_file(file_path, compressed) catch {
@@ -282,7 +289,7 @@ fn create_commit_object(
   parent_id : @git.ObjectId,
   message : String,
   author : String,
-  timestamp : Int64
+  timestamp : Int64,
 ) -> @git.ObjectId raise SubdirError {
   // コミット内容を構築
   let content = StringBuilder::new()
@@ -307,4 +314,119 @@ fn create_commit_object(
   content.write_string("\n")
   let content_bytes = string_to_bytes_local(content.to_string())
   write_object(fs, git_dir, "commit", content_bytes)
+}
+
+///|
+/// HEAD（またはブランチ参照）を新しいコミットに更新
+fn update_head_ref(
+  fs : &@git.FileSystem,
+  rfs : &@git.RepoFileSystem,
+  git_dir : String,
+  commit_id : @git.ObjectId,
+) -> Unit raise SubdirError {
+  let head_path = git_dir + "/HEAD"
+  let head_bytes = rfs.read_file(head_path) catch {
+    _ => raise IoError("failed to read HEAD")
+  }
+  let head_content = bytes_to_string_commit(head_bytes)
+  // HEAD が "ref: refs/heads/..." 形式かチェック
+  let trimmed = trim_head_content(head_content)
+  if trimmed.has_prefix("ref: ") {
+    // シンボリック参照の場合、参照先のファイルを更新
+    let ref_path = skip_prefix_commit(trimmed, 5) // "ref: " を除去
+    let ref_file = git_dir + "/" + ref_path
+    // 親ディレクトリが存在することを確認
+    let ref_dir = get_parent_dir(ref_file)
+    fs.mkdir_p(ref_dir) catch {
+      _ => ()
+    }
+    // 参照を更新
+    let commit_hex = commit_id.to_hex() + "\n"
+    fs.write_string(ref_file, commit_hex) catch {
+      _ => raise IoError("failed to update ref")
+    }
+  } else {
+    // detached HEAD の場合、HEAD を直接更新
+    let commit_hex = commit_id.to_hex() + "\n"
+    fs.write_string(head_path, commit_hex) catch {
+      _ => raise IoError("failed to update HEAD")
+    }
+  }
+}
+
+///|
+fn bytes_to_string_commit(data : Bytes) -> String {
+  let result = StringBuilder::new()
+  for b in data {
+    result.write_char(b.to_int().unsafe_to_char())
+  }
+  result.to_string()
+}
+
+///|
+fn trim_head_content(s : String) -> String {
+  let chars = s.to_array()
+  let mut end = chars.length()
+  while end > 0 && (chars[end - 1] == '\n' || chars[end - 1] == '\r') {
+    end -= 1
+  }
+  let result = StringBuilder::new()
+  for i = 0; i < end; i = i + 1 {
+    result.write_char(chars[i])
+  }
+  result.to_string()
+}
+
+///|
+fn skip_prefix_commit(s : String, n : Int) -> String {
+  let chars = s.to_array()
+  if n >= chars.length() {
+    return ""
+  }
+  let result = StringBuilder::new()
+  for i = n; i < chars.length(); i = i + 1 {
+    result.write_char(chars[i])
+  }
+  result.to_string()
+}
+
+///|
+fn get_parent_dir(path : String) -> String {
+  let chars = path.to_array()
+  let mut last_slash = -1
+  for i = 0; i < chars.length(); i = i + 1 {
+    if chars[i] == '/' {
+      last_slash = i
+    }
+  }
+  if last_slash <= 0 {
+    return "/"
+  }
+  let result = StringBuilder::new()
+  for i = 0; i < last_slash; i = i + 1 {
+    result.write_char(chars[i])
+  }
+  result.to_string()
+}
+
+///|
+/// インデックスを新しいコミットに合わせて更新
+fn update_index_from_commit(
+  fs : &@git.FileSystem,
+  rfs : &@git.RepoFileSystem,
+  git_dir : String,
+  commit_id : @git.ObjectId,
+) -> Unit raise SubdirError {
+  let db = @lib.ObjectDb::load(rfs, git_dir) catch {
+    _ => raise IoError("failed to load object db")
+  }
+  let files = @lib.collect_tree_files_from_commit(db, rfs, commit_id) catch {
+    _ => raise IoError("failed to collect tree files")
+  }
+  let entries = @lib.tree_files_to_index(db, rfs, files) catch {
+    _ => raise IoError("failed to convert to index entries")
+  }
+  @lib.write_index_entries(fs, git_dir, entries) catch {
+    _ => raise IoError("failed to write index")
+  }
 }

@@ -13,13 +13,15 @@ pub fn init_subdir(
   git_dir : String,
   repo_root : String,
   subdir_path : String,
-  config : SubdirInitConfig
+  config : SubdirInitConfig,
 ) -> SubdirInfo raise SubdirError {
   let normalized_path = normalize_subdir_path(subdir_path)
   // サブディレクトリの絶対パス
   let subdir_abs = repo_root + "/" + normalized_path
   // .git/subdir/<path>/ ディレクトリを作成
-  let subdir_config_dir = git_dir + "/subdir/" + path_to_safe_name(normalized_path)
+  let subdir_config_dir = git_dir +
+    "/subdir/" +
+    path_to_safe_name(normalized_path)
   fs.mkdir_p(subdir_config_dir) catch {
     _ => raise IoError("failed to create subdir config directory")
   }
@@ -41,14 +43,11 @@ pub fn init_subdir(
   }
   // git ラッパースクリプトを生成
   if config.create_wrapper {
-    create_wrapper_script(fs, subdir_abs, normalized_path) catch { e => raise e }
+    create_wrapper_script(fs, subdir_abs, normalized_path) catch {
+      e => raise e
+    }
   }
-  {
-    path: normalized_path,
-    git_dir,
-    config_path,
-    initialized: true,
-  }
+  { path: normalized_path, git_dir, config_path, initialized: true }
 }
 
 ///|
@@ -56,7 +55,7 @@ pub fn init_subdir(
 pub fn is_subdir_initialized(
   rfs : &@git.RepoFileSystem,
   git_dir : String,
-  subdir_path : String
+  subdir_path : String,
 ) -> Bool {
   let normalized_path = normalize_subdir_path(subdir_path)
   let config_dir = git_dir + "/subdir/" + path_to_safe_name(normalized_path)
@@ -70,18 +69,13 @@ pub fn get_subdir_info(
   rfs : &@git.RepoFileSystem,
   git_dir : String,
   repo_root : String,
-  subdir_path : String
+  subdir_path : String,
 ) -> SubdirInfo? {
   let normalized_path = normalize_subdir_path(subdir_path)
   let config_dir = git_dir + "/subdir/" + path_to_safe_name(normalized_path)
   let config_path = config_dir + "/config"
   if rfs.is_file(config_path) {
-    Some({
-      path: normalized_path,
-      git_dir,
-      config_path,
-      initialized: true,
-    })
+    Some({ path: normalized_path, git_dir, config_path, initialized: true })
   } else {
     None
   }
@@ -94,7 +88,7 @@ pub fn deinit_subdir(
   rfs : &@git.RepoFileSystem,
   git_dir : String,
   repo_root : String,
-  subdir_path : String
+  subdir_path : String,
 ) -> Unit raise SubdirError {
   let normalized_path = normalize_subdir_path(subdir_path)
   let subdir_abs = repo_root + "/" + normalized_path
@@ -102,15 +96,23 @@ pub fn deinit_subdir(
   let config_dir = git_dir + "/subdir/" + path_to_safe_name(normalized_path)
   if rfs.is_dir(config_dir) {
     // config ファイルを削除
-    fs.remove_file(config_dir + "/config") catch { _ => () }
-    fs.remove_dir(config_dir) catch { _ => () }
+    fs.remove_file(config_dir + "/config") catch {
+      _ => ()
+    }
+    fs.remove_dir(config_dir) catch {
+      _ => ()
+    }
   }
   // マーカーファイルを削除
   let marker_path = subdir_abs + "/.gitsubdir"
-  fs.remove_file(marker_path) catch { _ => () }
+  fs.remove_file(marker_path) catch {
+    _ => ()
+  }
   // ラッパースクリプトを削除
   let wrapper_path = subdir_abs + "/git-subdir"
-  fs.remove_file(wrapper_path) catch { _ => () }
+  fs.remove_file(wrapper_path) catch {
+    _ => ()
+  }
 }
 
 ///|
@@ -118,7 +120,7 @@ pub fn deinit_subdir(
 pub fn generate_shell_env(
   git_dir : String,
   repo_root : String,
-  subdir_path : String
+  subdir_path : String,
 ) -> Array[(String, String)] {
   let normalized_path = normalize_subdir_path(subdir_path)
   [
@@ -232,7 +234,7 @@ fn build_verbose_marker(subdir_path : String, git_dir : String) -> String {
 fn create_wrapper_script(
   fs : &@git.FileSystem,
   subdir_abs : String,
-  subdir_path : String
+  subdir_path : String,
 ) -> Unit raise SubdirError {
   let script_path = subdir_abs + "/git-subdir"
   let script = StringBuilder::new()

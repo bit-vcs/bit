@@ -26,9 +26,10 @@ pub fn write_git_metadata(
   fs.mkdir_p(git_dir)
   fs.mkdir_p(join_path(git_dir, "objects"))
   fs.mkdir_p(join_path(git_dir, "objects/info"))
+  fs.mkdir_p(join_path(git_dir, "objects/pack"))
   fs.mkdir_p(join_path(git_dir, "refs/heads"))
   fs.mkdir_p(join_path(git_dir, "refs/tags"))
-  write_loose_objects(store, fs, git_dir)
+  // Note: loose objects are not written here - pack file is used instead
   write_head_and_refs(fs, git_dir, refname, commit_id)
   write_config(fs, git_dir, remote_url)
   write_packed_refs(fs, git_dir)
@@ -94,35 +95,6 @@ fn write_alternates(fs : &FileSystem, git_dir : String) -> Unit raise GitError {
 }
 
 ///|
-fn write_loose_objects(
-  store : ObjectStore,
-  fs : &FileSystem,
-  git_dir : String,
-) -> Unit raise GitError {
-  for item in store.objects.to_array() {
-    let (id_hex, obj) = item
-    let (id, compressed) = create_object(obj.obj_type, obj.data)
-    let hex = id.to_hex()
-    if hex != id_hex {
-      raise GitError::InvalidObject("Object id mismatch")
-    }
-    let dir = join_path(
-      git_dir,
-      "objects/" + String::unsafe_substring(hex, start=0, end=2),
-    )
-    fs.mkdir_p(dir)
-    let file = join_path(
-      git_dir,
-      "objects/" +
-      String::unsafe_substring(hex, start=0, end=2) +
-      "/" +
-      String::unsafe_substring(hex, start=2, end=hex.length()),
-    )
-    fs.write_file(file, compressed)
-  }
-}
-
-///|
 /// Write a packfile and its index under .git/objects/pack.
 pub fn write_packfile_with_index(
   fs : &FileSystem,
@@ -162,35 +134,43 @@ fn write_index_v2(
   push_u32_be(out, 2)
   push_u32_be(out, entries.length())
   for e in entries {
-    // ctime/mtime/dev/ino/uid/gid all zeros
+    // Git index v2 entry format (62 bytes fixed + variable name):
+    // ctime_sec (4) + ctime_nsec (4)
     push_u32_be(out, 0)
     push_u32_be(out, 0)
+    // mtime_sec (4) + mtime_nsec (4)
     push_u32_be(out, 0)
     push_u32_be(out, 0)
+    // dev (4) + ino (4)
     push_u32_be(out, 0)
     push_u32_be(out, 0)
-    push_u32_be(out, 0)
-    push_u32_be(out, 0)
-    // mode
+    // mode (4) - comes BEFORE uid/gid
     push_u32_be(out, e.mode)
-    // size
+    // uid (4) + gid (4)
+    push_u32_be(out, 0)
+    push_u32_be(out, 0)
+    // file_size (4)
     push_u32_be(out, e.size)
     // object id
     for b in e.id.bytes {
       out.push(b)
     }
-    let name_len = if e.path.length() < 0x0fff {
-      e.path.length()
-    } else {
-      0x0fff
-    }
+    // Convert path to UTF-8 bytes
+    let path_bytes = @utf8.encode(e.path)
+    let name_byte_len = path_bytes.length()
+    let name_len = if name_byte_len < 0x0fff { name_byte_len } else { 0x0fff }
     push_u16_be(out, name_len)
-    for c in e.path {
-      out.push(c.to_int().to_byte())
+    for i = 0; i < path_bytes.length(); i = i + 1 {
+      out.push(path_bytes[i])
     }
     out.push(b'\x00')
-    // pad to 8-byte alignment
-    while out.length() % 8 != 0 {
+    // Pad to 8-byte alignment from entry start
+    // Entry fixed part = 62 bytes, then name bytes + NUL + padding
+    // Total entry size must be multiple of 8
+    let entry_len = 62 + name_byte_len + 1 // fixed + name bytes + NUL
+    let padded_len = (entry_len + 7) & (0xFFFFFFFF - 7) // round up to 8
+    let padding = padded_len - entry_len
+    for _i = 0; _i < padding; _i = _i + 1 {
       out.push(b'\x00')
     }
   }

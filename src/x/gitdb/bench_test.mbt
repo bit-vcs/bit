@@ -5,7 +5,7 @@
 fn create_test_db(
   fs : @git.TestFs,
   file_count : Int,
-  file_size : Int
+  file_size : Int,
 ) -> GitDb raise @git.GitError {
   @lib.init_repo(fs, "/repo")
   let db = GitDb::empty(NodeId::new("bench-node"), "/repo/.git")
@@ -177,5 +177,7 @@ test "demo: serialization overhead" {
   println("Raw data: \{raw_size} bytes")
   println("Serialized: \{bytes.length()} bytes")
   println("Overhead: \{overhead}%")
-  println("Objects: \{stats.object_count} (commits: \{stats.commit_count}, trees: \{stats.tree_count}, blobs: \{stats.blob_count})")
+  println(
+    "Objects: \{stats.object_count} (commits: \{stats.commit_count}, trees: \{stats.tree_count}, blobs: \{stats.blob_count})",
+  )
 }

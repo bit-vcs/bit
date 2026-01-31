@@ -11,13 +11,19 @@
 pub fn SubdirRepo::log(
   self : SubdirRepo,
   rfs : &@git.RepoFileSystem,
-  max_count~ : Int = 100
+  max_count? : Int = 100,
 ) -> Array[SubdirCommit] raise SubdirError {
   let start_commit = match self.current_commit {
     Some(id) => id
     None => return []
   }
-  filter_subdir_history(rfs, self.git_dir, start_commit, self.subdir_path, max_count)
+  filter_subdir_history(
+    rfs,
+    self.git_dir,
+    start_commit,
+    self.subdir_path,
+    max_count,
+  )
 }
 
 ///|
@@ -132,7 +138,7 @@ fn filter_subdir_history(
   git_dir : String,
   start_commit : @git.ObjectId,
   subdir_path : String,
-  max_count : Int
+  max_count : Int,
 ) -> Array[SubdirCommit] raise SubdirError {
   let db = @lib.ObjectDb::load(rfs, git_dir) catch {
     _ => raise IoError("failed to load object db")
@@ -150,18 +156,19 @@ fn filter_subdir_history(
     }
     visited[commit_hex] = true
     // コミット情報を取得
-    let commit_obj = db.get(rfs, commit_id) catch {
-      _ => continue
-    }
+    let commit_obj = db.get(rfs, commit_id) catch { _ => continue }
     let obj = match commit_obj {
       Some(o) => o
       None => continue
     }
-    let commit_info = @git.parse_commit(obj.data) catch {
-      _ => continue
-    }
+    let commit_info = @git.parse_commit(obj.data) catch { _ => continue }
     // サブディレクトリのツリーIDを取得
-    let subdir_tree = get_subdir_tree_from_tree(db, rfs, commit_info.tree, subdir_path)
+    let subdir_tree = get_subdir_tree_from_tree(
+      db,
+      rfs,
+      commit_info.tree,
+      subdir_path,
+    )
     // 前のコミットとツリーIDが異なる場合、このコミットを結果に追加
     let tree_changed = match (prev_tree, subdir_tree) {
       (None, Some(_)) => true // サブディレクトリが初めて現れた
@@ -207,7 +214,7 @@ fn get_subdir_tree_from_tree(
   db : @lib.ObjectDb,
   rfs : &@git.RepoFileSystem,
   root_tree : @git.ObjectId,
-  subdir_path : String
+  subdir_path : String,
 ) -> @git.ObjectId? {
   let path_parts = split_subdir_path(subdir_path)
   if path_parts.length() == 0 {
@@ -215,16 +222,12 @@ fn get_subdir_tree_from_tree(
   }
   let mut current_tree = root_tree
   for part in path_parts {
-    let tree_obj = db.get(rfs, current_tree) catch {
-      _ => return None
-    }
+    let tree_obj = db.get(rfs, current_tree) catch { _ => return None }
     let tobj = match tree_obj {
       Some(o) => o
       None => return None
     }
-    let entries = @git.parse_tree(tobj.data) catch {
-      _ => return None
-    }
+    let entries = @git.parse_tree(tobj.data) catch { _ => return None }
     let mut found_id : @git.ObjectId? = None
     for entry in entries {
       if entry.name == part && (entry.mode == "040000" || entry.mode == "40000") {

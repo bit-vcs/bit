@@ -1,0 +1,123 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/git/x/gitsubdir"
+
+import {
+  "mizchi/git",
+  "mizchi/git/lib",
+  "mizchi/git/x/gitfs",
+}
+
+// Values
+pub fn add_module_sparse_patterns(&@git.FileSystem, &@git.RepoFileSystem, String, String, Array[String]) -> Unit raise SubdirError
+
+pub fn deinit_module(&@git.FileSystem, &@git.RepoFileSystem, String, String, String) -> Unit raise SubdirError
+
+pub fn deinit_subdir(&@git.FileSystem, &@git.RepoFileSystem, String, String, String) -> Unit raise SubdirError
+
+pub fn disable_module_sparse(&@git.FileSystem, &@git.RepoFileSystem, String, String) -> Unit raise SubdirError
+
+pub fn extract_subdir_tree(@lib.ObjectDb, &@git.RepoFileSystem, @git.ObjectId, String) -> @git.ObjectId raise SubdirError
+
+pub fn generate_shell_env(String, String, String) -> Array[(String, String)]
+
+pub fn generate_shell_rc(String) -> String
+
+pub fn get_subdir_info(&@git.RepoFileSystem, String, String, String) -> SubdirInfo?
+
+pub fn init_module(&@git.FileSystem, &@git.RepoFileSystem, String, String, String) -> Unit raise SubdirError
+
+pub fn init_module_sparse(&@git.FileSystem, &@git.RepoFileSystem, String, String, cone? : Bool) -> Unit raise SubdirError
+
+pub fn init_subdir(&@git.FileSystem, String, String, String, SubdirInitConfig) -> SubdirInfo raise SubdirError
+
+pub fn is_module_initialized(&@git.RepoFileSystem, String, String) -> Bool
+
+pub fn is_module_sparse_enabled(&@git.RepoFileSystem, String, String) -> Bool
+
+pub fn is_subdir_initialized(&@git.RepoFileSystem, String, String) -> Bool
+
+pub fn list_modules(&@git.RepoFileSystem, String) -> Array[String]
+
+pub fn matches_module_sparse(String, Array[String]) -> Bool
+
+pub fn read_module_sparse_patterns(&@git.RepoFileSystem, String, String) -> Array[String]
+
+pub fn set_module_sparse_patterns(&@git.FileSystem, &@git.RepoFileSystem, String, String, Array[String]) -> Unit raise SubdirError
+
+pub fn sync_module(&@git.FileSystem, &@git.RepoFileSystem, String, String) -> Unit raise SubdirError
+
+pub fn write_module_sparse_patterns(&@git.FileSystem, String, String, Array[String]) -> Unit raise SubdirError
+
+// Errors
+pub suberror SubdirError {
+  SubdirNotFound(String)
+  InvalidPath(String)
+  CommitNotFound(@git.ObjectId)
+  TreeNotFound(@git.ObjectId)
+  IoError(String)
+}
+pub fn SubdirError::to_string(Self) -> String
+
+// Types and methods
+pub enum DiffEntry {
+  Added(String, @git.ObjectId)
+  Modified(String, @git.ObjectId, @git.ObjectId)
+  Deleted(String, @git.ObjectId)
+}
+pub fn DiffEntry::path(Self) -> String
+pub fn DiffEntry::to_string(Self) -> String
+
+pub struct SubdirCommit {
+  id : @git.ObjectId
+  subdir_tree : @git.ObjectId
+  message : String
+  author : String
+  timestamp : Int64
+  prev_commit : @git.ObjectId?
+}
+
+pub struct SubdirConfig {
+  worktree_path : String?
+  track_history : Bool
+}
+pub fn SubdirConfig::default() -> Self
+
+pub struct SubdirInfo {
+  path : String
+  git_dir : String
+  config_path : String
+  initialized : Bool
+}
+
+pub struct SubdirInitConfig {
+  create_wrapper : Bool
+  verbose_marker : Bool
+}
+pub fn SubdirInitConfig::default() -> Self
+pub fn SubdirInitConfig::new(create_wrapper? : Bool, verbose_marker? : Bool) -> Self
+
+pub struct SubdirRepo {
+  git_dir : String
+  subdir_path : String
+  current_commit : @git.ObjectId?
+  subdir_tree : @git.ObjectId?
+  gitfs : @gitfs.GitFs
+  config : SubdirConfig
+}
+pub fn SubdirRepo::base_commit(Self) -> @git.ObjectId?
+pub fn SubdirRepo::commit(Self, &@git.FileSystem, &@git.RepoFileSystem, String, author? : String, timestamp? : Int64) -> @git.ObjectId raise SubdirError
+pub fn SubdirRepo::diff(Self) -> Array[DiffEntry]
+pub fn SubdirRepo::from_branch(&@git.RepoFileSystem, String, String, String, config? : SubdirConfig) -> Self raise SubdirError
+pub fn SubdirRepo::from_commit(&@git.RepoFileSystem, String, @git.ObjectId, String, config? : SubdirConfig) -> Self raise SubdirError
+pub fn SubdirRepo::from_head(&@git.RepoFileSystem, String, String, config? : SubdirConfig) -> Self raise SubdirError
+pub fn SubdirRepo::fs(Self) -> @gitfs.GitFs
+pub fn SubdirRepo::is_dirty(Self) -> Bool
+pub fn SubdirRepo::load_workdir(Self, &@git.RepoFileSystem, String) -> Unit
+pub fn SubdirRepo::log(Self, &@git.RepoFileSystem, max_count? : Int) -> Array[SubdirCommit] raise SubdirError
+pub fn SubdirRepo::path(Self) -> String
+pub fn SubdirRepo::tree_id(Self) -> @git.ObjectId?
+
+// Type aliases
+
+// Traits
+

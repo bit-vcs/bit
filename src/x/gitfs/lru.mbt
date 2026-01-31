@@ -1,12 +1,21 @@
 ///| Efficient LRU cache using two-generation approach
+
 ///|
+
 ///| Instead of tracking exact order (O(n) operations), we use two maps:
+
 ///| - "hot": recently accessed items
+
 ///| - "cold": older items
+
 ///|
+
 ///| On access: move from cold to hot if needed
+
 ///| On eviction: clear cold, swap hot->cold
+
 ///|
+
 ///| This gives O(1) operations with approximate LRU semantics.
 
 ///|
@@ -20,12 +29,12 @@ pub struct LruCache[V] {
 }
 
 ///|
-pub fn LruCache::new[V](max_bytes : Int, size_fn : (V) -> Int) -> LruCache[V] {
+pub fn[V] LruCache::new(max_bytes : Int, size_fn : (V) -> Int) -> LruCache[V] {
   { hot: {}, cold: {}, hot_bytes: 0, cold_bytes: 0, max_bytes, size_fn }
 }
 
 ///|
-pub fn LruCache::get[V](self : LruCache[V], key : String) -> V? {
+pub fn[V] LruCache::get(self : LruCache[V], key : String) -> V? {
   // Check hot first
   match self.hot.get(key) {
     Some(v) => Some(v)
@@ -47,7 +56,7 @@ pub fn LruCache::get[V](self : LruCache[V], key : String) -> V? {
 }
 
 ///|
-pub fn LruCache::set[V](self : LruCache[V], key : String, value : V) -> Unit {
+pub fn[V] LruCache::set(self : LruCache[V], key : String, value : V) -> Unit {
   let size = (self.size_fn)(value)
   // Don't cache items larger than max
   if size > self.max_bytes {
@@ -73,7 +82,7 @@ pub fn LruCache::set[V](self : LruCache[V], key : String, value : V) -> Unit {
 }
 
 ///|
-fn LruCache::evict[V](self : LruCache[V]) -> Unit {
+fn[V] LruCache::evict(self : LruCache[V]) -> Unit {
   if self.cold.length() > 0 {
     // Clear cold generation
     self.cold.clear()
@@ -90,7 +99,7 @@ fn LruCache::evict[V](self : LruCache[V]) -> Unit {
 }
 
 ///|
-pub fn LruCache::remove[V](self : LruCache[V], key : String) -> Unit {
+pub fn[V] LruCache::remove(self : LruCache[V], key : String) -> Unit {
   if self.hot.get(key) is Some(v) {
     self.hot_bytes -= (self.size_fn)(v)
     self.hot.remove(key)
@@ -102,7 +111,7 @@ pub fn LruCache::remove[V](self : LruCache[V], key : String) -> Unit {
 }
 
 ///|
-pub fn LruCache::clear[V](self : LruCache[V]) -> Unit {
+pub fn[V] LruCache::clear(self : LruCache[V]) -> Unit {
   self.hot.clear()
   self.cold.clear()
   self.hot_bytes = 0
@@ -110,16 +119,16 @@ pub fn LruCache::clear[V](self : LruCache[V]) -> Unit {
 }
 
 ///|
-pub fn LruCache::total_bytes[V](self : LruCache[V]) -> Int {
+pub fn[V] LruCache::total_bytes(self : LruCache[V]) -> Int {
   self.hot_bytes + self.cold_bytes
 }
 
 ///|
-pub fn LruCache::length[V](self : LruCache[V]) -> Int {
+pub fn[V] LruCache::length(self : LruCache[V]) -> Int {
   self.hot.length() + self.cold.length()
 }
 
 ///|
-pub fn LruCache::contains[V](self : LruCache[V], key : String) -> Bool {
+pub fn[V] LruCache::contains(self : LruCache[V], key : String) -> Bool {
   self.hot.contains(key) || self.cold.contains(key)
 }

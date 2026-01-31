@@ -1,9 +1,15 @@
 ///| Gossip protocol implementation
+
 ///|
+
 ///| Gossip protocol flow:
+
 ///| 1. Each node periodically broadcasts its state (Announce)
+
 ///| 2. When receiving an Announce, compare HEADs
+
 ///| 3. If different, initiate sync (SyncRequest/SyncResponse)
+
 ///| 4. Merge received objects and update local state
 
 ///|
@@ -44,7 +50,7 @@ pub fn GitDb::get_peers(self : GitDb) -> Array[PeerInfo] {
 pub fn GitDb::select_gossip_peers(
   self : GitDb,
   count : Int,
-  seed : Int64
+  seed : Int64,
 ) -> Array[PeerInfo] {
   let peers = self.get_peers()
   if peers.length() <= count {
@@ -72,7 +78,7 @@ pub fn GitDb::handle_gossip(
   self : GitDb,
   backing_fs : &@git.RepoFileSystem,
   msg : GossipMessage,
-  timestamp : Int64
+  timestamp : Int64,
 ) -> GossipMessage? {
   match msg {
     Announce(state) => self.handle_announce(state, timestamp)
@@ -94,7 +100,7 @@ pub fn GitDb::handle_gossip(
 fn GitDb::handle_announce(
   self : GitDb,
   state : GossipState,
-  timestamp : Int64
+  timestamp : Int64,
 ) -> GossipMessage? {
   // Update peer info
   let peer : PeerInfo = {
@@ -126,7 +132,7 @@ fn GitDb::handle_announce(
 fn GitDb::handle_want_objects(
   self : GitDb,
   backing_fs : &@git.RepoFileSystem,
-  ids : Array[@git.ObjectId]
+  ids : Array[@git.ObjectId],
 ) -> GossipMessage? {
   let objects : Array[GitObject] = []
   let db = self.gitfs.get_db(backing_fs) catch { _ => return None }
@@ -154,7 +160,7 @@ fn GitDb::handle_sync_request(
   self : GitDb,
   backing_fs : &@git.RepoFileSystem,
   _from : NodeId,
-  their_head : @git.ObjectId
+  their_head : @git.ObjectId,
 ) -> GossipMessage? {
   // Find objects they don't have
   let missing = self.find_missing_objects(backing_fs, their_head)
@@ -169,7 +175,7 @@ fn GitDb::handle_sync_request(
 fn GitDb::handle_sync_response(
   self : GitDb,
   objects : Array[GitObject],
-  _new_head : @git.ObjectId
+  _new_head : @git.ObjectId,
 ) -> Unit {
   // Store received objects for later processing
   for obj in objects {
@@ -184,7 +190,7 @@ fn GitDb::handle_sync_response(
 fn GitDb::find_missing_objects(
   self : GitDb,
   backing_fs : &@git.RepoFileSystem,
-  their_head : @git.ObjectId
+  their_head : @git.ObjectId,
 ) -> Array[GitObject] {
   let result : Array[GitObject] = []
   if self.head == their_head || self.head == @git.ObjectId::zero() {
@@ -216,7 +222,7 @@ fn collect_reachable_objects(
   db : @lib.ObjectDb,
   backing_fs : &@git.RepoFileSystem,
   start : @git.ObjectId,
-  result : Map[String, Bool]
+  result : Map[String, Bool],
 ) -> Unit {
   if start == @git.ObjectId::zero() {
     return
@@ -252,7 +258,7 @@ fn collect_reachable_objects(
 pub fn GitDb::apply_pending_objects(
   self : GitDb,
   write_fs : &@git.FileSystem,
-  git_dir : String
+  git_dir : String,
 ) -> Int raise @git.GitError {
   let mut count = 0
   for entry in self.pending_objects {

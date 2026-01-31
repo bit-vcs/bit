@@ -1,6 +1,9 @@
 ///| Merge strategies for GitDb
+
 ///|
+
 ///| When two nodes have concurrent changes, we need a merge strategy.
+
 ///| Default is Last-Write-Wins (LWW) based on vector clock + timestamp.
 
 ///|
@@ -25,7 +28,7 @@ pub fn GitDb::merge(
   their_head : @git.ObjectId,
   their_clock : VectorClock,
   strategy : MergeStrategy,
-  timestamp : Int64
+  timestamp : Int64,
 ) -> MergeResult raise @git.GitError {
   // Same head, no merge needed
   if self.head == their_head {
@@ -69,10 +72,7 @@ pub fn GitDb::merge(
       LastWriteWins | Custom(_) => {
         // Auto-resolved, create merge commit
         let new_head = self.create_merge_commit(
-          write_fs,
-          backing_fs,
-          their_head,
-          timestamp,
+          write_fs, backing_fs, their_head, timestamp,
         )
         self.clock = self.clock.merge(their_clock).increment(self.node_id)
         Merged(new_head, conflicts)
@@ -82,10 +82,7 @@ pub fn GitDb::merge(
   } else {
     // No conflicts, create merge commit
     let new_head = self.create_merge_commit(
-      write_fs,
-      backing_fs,
-      their_head,
-      timestamp,
+      write_fs, backing_fs, their_head, timestamp,
     )
     self.clock = self.clock.merge(their_clock).increment(self.node_id)
     Merged(new_head, [])
@@ -99,7 +96,7 @@ fn GitDb::do_merge(
   backing_fs : &@git.RepoFileSystem,
   base : @git.ObjectId,
   their_head : @git.ObjectId,
-  strategy : MergeStrategy
+  strategy : MergeStrategy,
 ) -> Array[String] {
   let conflicts : Array[String] = []
   let db = self.gitfs.get_db(backing_fs) catch { _ => return conflicts }
@@ -117,9 +114,7 @@ fn GitDb::do_merge(
     }
   }
   let their_tree = {
-    let obj = db.get(backing_fs, their_head) catch {
-      _ => return conflicts
-    }
+    let obj = db.get(backing_fs, their_head) catch { _ => return conflicts }
     match obj {
       Some(o) => {
         let commit = @git.parse_commit(o.data) catch { _ => return conflicts }
@@ -185,26 +180,14 @@ fn GitDb::do_merge(
             // Both changed - conflict
             conflicts.push(path)
             resolve_conflict(
-              self,
-              db,
-              backing_fs,
-              path,
-              our_content,
-              their_hash,
-              strategy,
+              self, db, backing_fs, path, our_content, their_hash, strategy,
             )
           }
         } else {
           // Both added - conflict
           conflicts.push(path)
           resolve_conflict(
-            self,
-            db,
-            backing_fs,
-            path,
-            our_content,
-            their_hash,
-            strategy,
+            self, db, backing_fs, path, our_content, their_hash, strategy,
           )
         }
       }
@@ -242,7 +225,7 @@ fn resolve_conflict(
   path : String,
   our_content : Bytes,
   their_hash : @git.ObjectId,
-  strategy : MergeStrategy
+  strategy : MergeStrategy,
 ) -> Unit {
   match strategy {
     LastWriteWins => {
@@ -255,12 +238,16 @@ fn resolve_conflict(
     }
     KeepBoth => {
       // Create conflict markers
-      let their_content = get_blob_content(obj_db, backing_fs, their_hash).unwrap_or(Bytes::new(0))
+      let their_content = get_blob_content(obj_db, backing_fs, their_hash).unwrap_or(
+        Bytes::new(0),
+      )
       let merged = create_conflict_markers(our_content, their_content)
       db.gitfs.write_file(path, merged)
     }
     Custom(resolver) => {
-      let their_content = get_blob_content(obj_db, backing_fs, their_hash).unwrap_or(Bytes::new(0))
+      let their_content = get_blob_content(obj_db, backing_fs, their_hash).unwrap_or(
+        Bytes::new(0),
+      )
       let resolved = resolver(our_content, their_content)
       db.gitfs.write_file(path, resolved)
     }
@@ -271,7 +258,7 @@ fn resolve_conflict(
 fn get_blob_content(
   db : @lib.ObjectDb,
   backing_fs : &@git.RepoFileSystem,
-  id : @git.ObjectId
+  id : @git.ObjectId,
 ) -> Bytes? {
   if id == @git.ObjectId::zero() {
     return None
@@ -315,7 +302,7 @@ fn GitDb::create_merge_commit(
   write_fs : &@git.FileSystem,
   backing_fs : &@git.RepoFileSystem,
   their_head : @git.ObjectId,
-  timestamp : Int64
+  timestamp : Int64,
 ) -> @git.ObjectId raise @git.GitError {
   let hex = their_head.to_hex()
   let short_hex = String::unsafe_substring(hex, start=0, end=8)
@@ -340,7 +327,7 @@ fn find_merge_base(
   db : @lib.ObjectDb,
   backing_fs : &@git.RepoFileSystem,
   commit1 : @git.ObjectId,
-  commit2 : @git.ObjectId
+  commit2 : @git.ObjectId,
 ) -> @git.ObjectId? {
   if commit1 == @git.ObjectId::zero() || commit2 == @git.ObjectId::zero() {
     return None
@@ -358,7 +345,7 @@ fn collect_ancestors(
   backing_fs : &@git.RepoFileSystem,
   commit_id : @git.ObjectId,
   depth : Int,
-  result : Map[String, Int]
+  result : Map[String, Int],
 ) -> Unit {
   if commit_id == @git.ObjectId::zero() {
     return
@@ -382,7 +369,7 @@ fn find_common_ancestor(
   backing_fs : &@git.RepoFileSystem,
   commit_id : @git.ObjectId,
   _depth : Int,
-  ancestors1 : Map[String, Int]
+  ancestors1 : Map[String, Int],
 ) -> @git.ObjectId? {
   if commit_id == @git.ObjectId::zero() {
     return None
@@ -395,7 +382,13 @@ fn find_common_ancestor(
   guard obj is Some(o) else { return None }
   let commit = @git.parse_commit(o.data) catch { _ => return None }
   for parent in commit.parents {
-    let found = find_common_ancestor(db, backing_fs, parent, _depth + 1, ancestors1)
+    let found = find_common_ancestor(
+      db,
+      backing_fs,
+      parent,
+      _depth + 1,
+      ancestors1,
+    )
     if found is Some(_) {
       return found
     }
@@ -409,7 +402,7 @@ fn collect_tree_files_flat(
   backing_fs : &@git.RepoFileSystem,
   tree_id : @git.ObjectId,
   prefix : String,
-  result : Map[String, @git.ObjectId]
+  result : Map[String, @git.ObjectId],
 ) -> Unit {
   if tree_id == @git.ObjectId::zero() {
     return

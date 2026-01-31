@@ -1,9 +1,15 @@
 ///| GitDb - Git-based distributed KV store with Gossip sync
+
 ///|
+
 ///| Architecture:
+
 ///| - Hierarchical keys mapped to Git tree structure
+
 ///| - Values stored as Git blobs
+
 ///| - Gossip protocol for P2P sync (Cloudflare Workers compatible)
+
 ///| - CRDT-style merge for conflict resolution
 
 ///|
@@ -54,7 +60,7 @@ pub fn VectorClock::increment(self : VectorClock, node : NodeId) -> VectorClock 
 ///|
 pub fn VectorClock::merge(
   self : VectorClock,
-  other : VectorClock
+  other : VectorClock,
 ) -> VectorClock {
   let clocks : Map[String, Int64] = {}
   for entry in self.clocks {

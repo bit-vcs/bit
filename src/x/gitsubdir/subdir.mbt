@@ -100,7 +100,7 @@ pub fn extract_subdir_tree(
   db : @lib.ObjectDb,
   rfs : &@git.RepoFileSystem,
   commit_id : @git.ObjectId,
-  subdir_path : String
+  subdir_path : String,
 ) -> @git.ObjectId raise SubdirError {
   // コミットを取得
   let commit_obj = db.get(rfs, commit_id) catch {
@@ -160,7 +160,7 @@ pub fn SubdirRepo::from_commit(
   git_dir : String,
   commit_id : @git.ObjectId,
   subdir_path : String,
-  config~ : SubdirConfig = SubdirConfig::default()
+  config? : SubdirConfig = SubdirConfig::default(),
 ) -> SubdirRepo raise SubdirError {
   let normalized_path = normalize_subdir_path(subdir_path)
   if normalized_path == "" {
@@ -171,12 +171,7 @@ pub fn SubdirRepo::from_commit(
     _ => raise IoError("failed to load object db")
   }
   // サブディレクトリのツリーを抽出
-  let tree_id = extract_subdir_tree(
-    db,
-    rfs,
-    commit_id,
-    normalized_path,
-  ) catch {
+  let tree_id = extract_subdir_tree(db, rfs, commit_id, normalized_path) catch {
     e => raise e
   }
   // サブディレクトリのツリーをベースとした GitFs を作成
@@ -197,7 +192,7 @@ pub fn SubdirRepo::from_head(
   rfs : &@git.RepoFileSystem,
   git_dir : String,
   subdir_path : String,
-  config~ : SubdirConfig = SubdirConfig::default()
+  config? : SubdirConfig = SubdirConfig::default(),
 ) -> SubdirRepo raise SubdirError {
   // HEAD を読み取る
   let head_content = rfs.read_file(git_dir + "/HEAD") catch {
@@ -230,7 +225,7 @@ pub fn SubdirRepo::from_branch(
   git_dir : String,
   branch : String,
   subdir_path : String,
-  config~ : SubdirConfig = SubdirConfig::default()
+  config? : SubdirConfig = SubdirConfig::default(),
 ) -> SubdirRepo raise SubdirError {
   // ブランチリファレンスを読み取る
   let ref_path = git_dir + "/refs/heads/" + branch
@@ -275,4 +270,59 @@ pub fn SubdirRepo::is_dirty(self : SubdirRepo) -> Bool {
 /// GitFs を取得（内部アクセス用）
 pub fn SubdirRepo::fs(self : SubdirRepo) -> @gitfs.GitFs {
   self.gitfs
+}
+
+///|
+/// ワーキングディレクトリの変更を gitfs に読み込む
+/// rfs: 実際のファイルシステム（OsFs など）
+/// workdir: ワーキングディレクトリのルートパス
+pub fn SubdirRepo::load_workdir(
+  self : SubdirRepo,
+  rfs : &@git.RepoFileSystem,
+  workdir : String,
+) -> Unit {
+  // サブディレクトリのパスを取得
+  let subdir_abs = workdir + "/" + self.subdir_path
+  // ディレクトリスタック（base_path, rel_path）
+  let stack : Array[(String, String)] = [(subdir_abs, "/")]
+  while stack.length() > 0 {
+    let (base_path, rel_path) = stack.pop().unwrap()
+    let dir_path = if rel_path == "/" {
+      base_path
+    } else {
+      base_path + rel_path
+    }
+    let entries = rfs.readdir(dir_path) catch {
+      _ => continue // ディレクトリが読めなければスキップ
+    }
+    for entry in entries {
+      // .git ファイル/ディレクトリはスキップ
+      if entry == ".git" {
+        continue
+      }
+      let full_path = dir_path + "/" + entry
+      let gitfs_path = if rel_path == "/" {
+        "/" + entry
+      } else {
+        rel_path + "/" + entry
+      }
+      if rfs.is_dir(full_path) {
+        // ディレクトリの場合はスタックに追加
+        stack.push((base_path, gitfs_path))
+      } else {
+        // ファイルの場合は読み込んで比較
+        let content = rfs.read_file(full_path) catch {
+          _ => continue // 読めなければスキップ
+        }
+        // 既存の内容と比較
+        let existing = self.gitfs.read_file(rfs, gitfs_path) catch {
+          _ => b"" // ファイルが存在しない場合は空
+        }
+        // 異なる場合のみ書き込み
+        if content != existing {
+          self.gitfs.write_file(gitfs_path, content)
+        }
+      }
+    }
+  }
 }

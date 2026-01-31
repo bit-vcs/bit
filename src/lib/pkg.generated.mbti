@@ -281,6 +281,7 @@ pub struct IndexEntry {
   mode : Int
   size : Int
 }
+pub fn IndexEntry::new(String, @git.ObjectId, Int, Int) -> Self
 
 pub(all) struct InitOptions {
   default_branch : String

@@ -1,5 +1,5 @@
-///| Tests for LruCache
-
+///|
+/// Tests for LruCache
 test "lru: basic get/set" {
   let cache : LruCache[Int] = LruCache::new(100, fn(x) { x })
   cache.set("a", 10)
@@ -9,6 +9,7 @@ test "lru: basic get/set" {
   assert_eq(cache.get("c"), None)
 }
 
+///|
 test "lru: eviction" {
   let cache : LruCache[Int] = LruCache::new(50, fn(x) { x })
   // Fill cache
@@ -22,6 +23,7 @@ test "lru: eviction" {
   assert_true(cache.total_bytes() <= 50)
 }
 
+///|
 test "lru: promotion from cold to hot" {
   let cache : LruCache[Int] = LruCache::new(100, fn(x) { x })
   cache.set("a", 10)
@@ -34,6 +36,7 @@ test "lru: promotion from cold to hot" {
   assert_eq(cache.get("c"), Some(90))
 }
 
+///|
 test "lru: remove" {
   let cache : LruCache[Int] = LruCache::new(100, fn(x) { x })
   cache.set("a", 10)
@@ -44,6 +47,7 @@ test "lru: remove" {
   assert_eq(cache.total_bytes(), 20)
 }
 
+///|
 test "lru: clear" {
   let cache : LruCache[Int] = LruCache::new(100, fn(x) { x })
   cache.set("a", 10)
@@ -54,6 +58,7 @@ test "lru: clear" {
   assert_eq(cache.total_bytes(), 0)
 }
 
+///|
 test "lru: oversized item rejected" {
   let cache : LruCache[Int] = LruCache::new(10, fn(x) { x })
   cache.set("a", 20) // Too large
@@ -61,6 +66,7 @@ test "lru: oversized item rejected" {
   assert_eq(cache.total_bytes(), 0)
 }
 
+///|
 test "lru: update existing key" {
   let cache : LruCache[Int] = LruCache::new(100, fn(x) { x })
   cache.set("a", 10)
@@ -69,6 +75,7 @@ test "lru: update existing key" {
   assert_eq(cache.total_bytes(), 30)
 }
 
+///|
 test "lru: contains" {
   let cache : LruCache[Int] = LruCache::new(100, fn(x) { x })
   cache.set("a", 10)
@@ -76,6 +83,7 @@ test "lru: contains" {
   assert_false(cache.contains("b"))
 }
 
+///|
 test "lru: length" {
   let cache : LruCache[Int] = LruCache::new(100, fn(x) { x })
   assert_eq(cache.length(), 0)
