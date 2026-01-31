@@ -10,6 +10,8 @@ async fn handle_subdir(args : Array[String]) -> Unit raise Error {
   let subcommand = args[0]
   let rest = array_view_to_array(args[1:])
   match subcommand {
+    "clone" => handle_subdir_clone(rest) catch { e => raise e }
+    "status" => handle_subdir_status(rest) catch { e => raise e }
     "init" => handle_subdir_init(rest) catch { e => raise e }
     "deinit" => handle_subdir_deinit(rest) catch { e => raise e }
     "list" => handle_subdir_list(rest) catch { e => raise e }
@@ -48,8 +50,23 @@ fn array_view_to_array(view : ArrayView[String]) -> Array[String] {
 async fn print_subdir_usage() -> Unit raise Error {
   print_line("Usage: moongit subdir <command> [options]")
   print_line("")
-  print_line("Commands:")
-  print_line("  init <path>      Initialize subdirectory as git module")
+  print_line("Clone and manage subdirectories as independent git repositories.")
+  print_line("")
+  print_line("Main commands:")
+  print_line("  clone <url> <path> [<dest>]  Clone subdirectory from remote")
+  print_line("  status [<path>]              Show status (default: current dir)")
+  print_line("  commit <path> -m <msg>       Commit changes")
+  print_line("  push <path> [<url>]          Push to remote")
+  print_line("  pull <path> [<url>]          Pull from remote")
+  print_line("")
+  print_line("Example workflow:")
+  print_line("  moongit subdir clone https://github.com/user/repo src/lib mylib")
+  print_line("  cd mylib")
+  print_line("  git status          # or: moongit subdir status")
+  print_line("  git add . && git commit -m 'changes'")
+  print_line("")
+  print_line("Other commands:")
+  print_line("  init <path>      Initialize existing subdirectory as git module")
   print_line("  deinit <path>    Remove subdirectory module")
   print_line("  list             List initialized subdirectory modules")
   print_line("  sync <path>      Sync subdirectory with parent repository")
@@ -58,34 +75,115 @@ async fn print_subdir_usage() -> Unit raise Error {
   print_line("  log <path>       Show commits that affected the subdirectory")
   print_line("  diff <path>      Show working changes in subdirectory")
   print_line(
-    "  commit <path>    Commit subdirectory changes to parent repository",
-  )
-  print_line(
     "  checkout <path> <commit>  Checkout specific commit of subdirectory",
   )
-  print_line("  push <path>      Push subdirectory to remote repository")
-  print_line("  pull <path>      Pull subdirectory from remote repository")
   print_line(
     "  extract <path> <target>  Extract subdirectory to target directory",
   )
-  print_line(
-    "  sparse-checkout <cmd>    Manage sparse checkout for subdirectory",
-  )
-  print_line("")
-  print_line("Sparse-checkout commands:")
-  print_line(
-    "  sparse-checkout init <path> [--cone]     Enable sparse checkout",
-  )
-  print_line("  sparse-checkout set <path> <patterns>    Set sparse patterns")
-  print_line("  sparse-checkout add <path> <patterns>    Add sparse patterns")
-  print_line("  sparse-checkout list <path>              List sparse patterns")
-  print_line(
-    "  sparse-checkout disable <path>           Disable sparse checkout",
-  )
-  print_line("")
-  print_line(
-    "After 'init', standard git commands work from within the subdirectory.",
-  )
+}
+
+///|
+/// Show status of a subdir clone (works from within the cloned directory)
+async fn handle_subdir_status(args : Array[String]) -> Unit raise Error {
+  // Determine which directory to use
+  // For subdir status, use path as-is (relative to actual cwd, not git work root)
+  let target_dir = if args.length() > 0 { args[0] } else { "." }
+  let git_dir = target_dir + "/.git"
+  let fs = OsFs::new()
+  // Check if this is a valid git repository
+  if not(fs.is_dir(git_dir)) {
+    print_line("Error: not a git repository: " + target_dir)
+    print_line("Hint: use absolute path or run from within the repository")
+    return
+  }
+  // Check if this is a subdir clone
+  let info_path = git_dir + "/subdir-clone-info"
+  let is_subdir_clone = fs.is_file(info_path)
+  if is_subdir_clone {
+    // Show subdir clone info
+    let info = fs.read_file(info_path) catch { _ => b"" }
+    let info_text = bytes_to_string_handler(info)
+    print_line("Subdir clone repository")
+    for line in info_text.split("\n") {
+      let l = line.to_string()
+      if l.length() > 0 {
+        print_line("  " + l)
+      }
+    }
+    print_line("")
+  }
+  // Show git status using native git (most reliable)
+  let exit_code = @process.run("git", ["-C", target_dir, "status"])
+  if exit_code != 0 {
+    // Fall back to our own status implementation
+    show_simple_status(fs, target_dir, git_dir) catch { e => raise e }
+  }
+}
+
+///|
+/// Simple status implementation when git command fails
+async fn show_simple_status(
+  fs : OsFs,
+  worktree : String,
+  git_dir : String,
+) -> Unit raise Error {
+  // Load index
+  let index = @gitlib.read_index_entries(fs, git_dir)
+  let index_map : Map[String, @gitlib.IndexEntry] = {}
+  for entry in index {
+    index_map[entry.path] = entry
+  }
+  // Scan working directory
+  let worktree_files = scan_worktree_files(fs, worktree, "")
+  // Compare
+  let mut changes = false
+  // Check for modified/deleted files
+  for path, _entry in index_map {
+    let full_path = worktree + "/" + path
+    if not(fs.is_file(full_path)) {
+      print_line("D  " + path)
+      changes = true
+    }
+  }
+  // Check for new files
+  for path in worktree_files {
+    if not(index_map.contains(path)) {
+      print_line("?? " + path)
+      changes = true
+    }
+  }
+  if not(changes) {
+    print_line("nothing to commit, working tree clean")
+  }
+}
+
+///|
+/// Scan working directory for files
+fn scan_worktree_files(
+  fs : OsFs,
+  base : String,
+  prefix : String,
+) -> Array[String] {
+  let files : Array[String] = []
+  let dir_path = if prefix.length() == 0 { base } else { base + "/" + prefix }
+  let entries = fs.readdir(dir_path) catch { _ => return files }
+  for entry in entries {
+    // Skip .git directory
+    if entry == ".git" {
+      continue
+    }
+    let rel_path = if prefix.length() == 0 { entry } else { prefix + "/" + entry }
+    let full_path = base + "/" + rel_path
+    if fs.is_dir(full_path) {
+      let subfiles = scan_worktree_files(fs, base, rel_path)
+      for f in subfiles {
+        files.push(f)
+      }
+    } else {
+      files.push(rel_path)
+    }
+  }
+  files
 }
 
 ///|
@@ -316,6 +414,362 @@ fn subdir_short_hex(hex : String) -> String {
 fn format_timestamp_simple(timestamp : Int64) -> String {
   // Unix タイムスタンプを簡易的に表示
   timestamp.to_string()
+}
+
+///|
+/// Clone a subdirectory from remote repository
+///
+/// Usage: moongit subdir clone <url> <remote-path> [<dest>]
+///
+/// Creates a new directory with:
+///   - Contents of <remote-path> directly in <dest>/
+///   - <dest>/.git for independent git management
+///
+/// Example:
+///   moongit subdir clone https://github.com/user/repo src/lib mylib
+///   → mylib/ contains contents of repo's src/lib/
+///   → mylib/.git exists, git commands work from mylib/
+async fn handle_subdir_clone(args : Array[String]) -> Unit raise Error {
+  let mut url : String? = None
+  let mut subdir : String? = None
+  let mut dest : String? = None
+  let mut i = 0
+  while i < args.length() {
+    let arg = args[i]
+    if arg.has_prefix("-") {
+      i += 1
+      continue
+    }
+    if url is None {
+      url = Some(arg)
+    } else if subdir is None {
+      subdir = Some(arg)
+    } else if dest is None {
+      dest = Some(arg)
+    }
+    i += 1
+  }
+  guard url is Some(remote_url) else {
+    print_line("Usage: moongit subdir clone <url> <remote-path> [<dest>]")
+    print_line("")
+    print_line("Clone only a subdirectory from a remote repository.")
+    print_line("The subdirectory becomes an independent git repository.")
+    print_line("")
+    print_line("  <url>         Remote repository URL")
+    print_line("  <remote-path> Path within the remote repo (e.g., src/lib)")
+    print_line("  <dest>        Local directory name (default: last component of path)")
+    print_line("")
+    print_line("Examples:")
+    print_line("  moongit subdir clone https://github.com/user/repo src")
+    print_line("    → Creates src/ with contents of repo's src/")
+    print_line("")
+    print_line("  moongit subdir clone https://github.com/user/repo src/lib mylib")
+    print_line("    → Creates mylib/ with contents of repo's src/lib/")
+    print_line("")
+    print_line("After cloning, standard git commands work from the directory:")
+    print_line("  cd mylib && git status")
+    return
+  }
+  guard subdir is Some(subdir_path) else {
+    raise @git.GitError::InvalidObject("subdirectory path required")
+  }
+  // Derive destination from subdir or explicit dest
+  let relative_target = match dest {
+    Some(d) => d
+    None => {
+      // Use last component of subdir path
+      match subdir_path.rev_find("/") {
+        Some(idx) =>
+          String::unsafe_substring(subdir_path, start=idx + 1, end=subdir_path.length())
+        None => subdir_path
+      }
+    }
+  }
+  let root = get_work_root()
+  let target = if relative_target.has_prefix("/") {
+    relative_target
+  } else {
+    root + "/" + relative_target
+  }
+  let git_dir = target + "/.git"
+  print_line(
+    "Cloning '\{subdir_path}' from '\{remote_url}' into '\{relative_target}'...",
+  )
+  let fs = OsFs::new()
+  // Step 1: Create target directory and initialize git repo
+  fs.mkdir_p(target) catch {
+    _ => raise @git.GitError::IoError("Failed to create directory: " + target)
+  }
+  // Step 2: Clone with blob:none filter to a temp location
+  print_line("  Fetching repository metadata...")
+  let temp_clone = target + "/.git-temp"
+  let refs = @git.clone_http_to_fs(
+    remote_url,
+    true,
+    fs,
+    temp_clone,
+    filter=@git.FilterSpec::BlobNone,
+  )
+  if refs.length() == 0 {
+    raise @git.GitError::InvalidObject("Clone failed: no refs found")
+  }
+  // Step 3: Move .git to target location
+  let temp_git_dir = temp_clone + "/.git"
+  // Read HEAD commit from temp
+  let head_ref = fs.read_file(temp_git_dir + "/HEAD") catch {
+    _ => raise @git.GitError::IoError("Failed to read HEAD")
+  }
+  let head_text = @utf8.decode_lossy(head_ref[:]).trim(chars=" \n\r\t").to_string()
+  let commit_id = if head_text.has_prefix("ref: ") {
+    let ref_name = String::unsafe_substring(head_text, start=5, end=head_text.length())
+    let ref_path = temp_git_dir + "/" + ref_name
+    let ref_content = fs.read_file(ref_path) catch {
+      _ => raise @git.GitError::IoError("Failed to read ref: " + ref_name)
+    }
+    let ref_text = @utf8.decode_lossy(ref_content[:]).trim(chars=" \n\r\t").to_string()
+    @git.ObjectId::from_hex(ref_text) catch {
+      _ => raise @git.GitError::InvalidObject("Invalid commit ID in ref")
+    }
+  } else {
+    @git.ObjectId::from_hex(head_text) catch {
+      _ => raise @git.GitError::InvalidObject("Invalid HEAD")
+    }
+  }
+  // Load object database and get tree
+  let db = @gitlib.ObjectDb::load_lazy(fs, temp_git_dir)
+  let commit_obj = db.get(fs, commit_id)
+  guard commit_obj is Some(obj) else {
+    raise @git.GitError::InvalidObject("Commit not found")
+  }
+  let commit_info = @git.parse_commit(obj.data)
+  // Navigate to subdirectory tree
+  print_line("  Finding subdirectory '\{subdir_path}'...")
+  let subdir_tree_id = find_subtree_clone(db, fs, commit_info.tree, subdir_path)
+  guard subdir_tree_id is Some(tree_id) else {
+    // Cleanup temp
+    remove_dir_recursive(fs, temp_clone)
+    raise @git.GitError::InvalidObject(
+      "Subdirectory not found: " + subdir_path,
+    )
+  }
+  // Fetch blobs for the subdirectory (on-demand fetch)
+  print_line("  Fetching files...")
+  let needed_blobs = collect_tree_blobs_clone(db, fs, tree_id)
+  if needed_blobs.length() > 0 {
+    // Fetch missing blobs from remote
+    let missing : Array[@git.ObjectId] = []
+    for blob_id in needed_blobs {
+      let exists = db.get(fs, blob_id)
+      if exists is None {
+        missing.push(blob_id)
+      }
+    }
+    if missing.length() > 0 {
+      let pack = @git.fetch_pack_http(remote_url, missing, true)
+      let objects = @git.parse_packfile(pack)
+      @git.write_packfile_with_index(fs, temp_git_dir, pack, objects)
+    }
+  }
+  // Reload object database to include newly fetched blobs
+  let db2 = @gitlib.ObjectDb::load_lazy(fs, temp_git_dir)
+  // Step 4: Write files directly to target (not target/subdir_path)
+  print_line("  Writing files...")
+  write_tree_to_worktree_clone(db2, fs, tree_id, target)
+  // Step 5: Move .git to target and set up for subdirectory-only management
+  print_line("  Setting up git repository...")
+  // Move temp/.git to target/.git
+  move_git_directory(fs, temp_git_dir, git_dir)
+  // Clean up temp directory
+  remove_dir_recursive(fs, temp_clone)
+  // Step 6: Create a new orphan commit with subdirectory as root tree
+  // This makes HEAD, index, and worktree all consistent
+  print_line("  Creating initial commit...")
+  let timestamp = get_current_timestamp()
+  let author = "subdir-clone <subdir-clone@moongit>"
+  let message = "Initial commit (cloned from " + subdir_path + ")\n"
+  // Create commit: new(tree, parents, author, author_time, author_tz, committer, commit_time, committer_tz, message)
+  let parents : Array[@git.ObjectId] = []
+  let commit = @git.Commit::new(
+    tree_id,
+    parents,
+    author,
+    timestamp,
+    "+0000",
+    author,
+    timestamp,
+    "+0000",
+    message,
+  )
+  // Create commit object and write to object database
+  let (new_commit_id, commit_bytes) = @git.create_commit(commit)
+  @gitlib.write_object_bytes(fs, git_dir, new_commit_id, commit_bytes) catch {
+    _ => raise @git.GitError::IoError("Failed to write commit object")
+  }
+  // Update HEAD to point to new commit on main branch
+  let head_path = git_dir + "/HEAD"
+  fs.write_file(head_path, string_to_bytes_subdir("ref: refs/heads/main\n")) catch { _ => () }
+  let ref_path = git_dir + "/refs/heads/main"
+  fs.mkdir_p(git_dir + "/refs/heads") catch { _ => () }
+  fs.write_file(ref_path, string_to_bytes_subdir(new_commit_id.to_hex() + "\n")) catch { _ => () }
+  // Step 7: Reset index to match the new HEAD
+  // Using git reset is more reliable than writing index manually
+  let _ = @process.run("git", ["-C", target, "reset", "HEAD"])
+  // Step 8: Store metadata about the original repo and subdir
+  save_subdir_clone_metadata(fs, git_dir, remote_url, subdir_path, commit_id)
+  print_line("done.")
+  print_line("")
+  print_line("Cloned '\{subdir_path}' to '\{relative_target}/'")
+  print_line("")
+  print_line("The directory is a standalone git repository:")
+  print_line("  cd \{relative_target}")
+  print_line("  git status    # shows changes in this directory")
+  print_line("  git log       # shows commit history")
+  print_line("  git add/commit/push  # manage independently")
+  print_line("")
+  print_line("To sync with upstream:")
+  print_line("  moongit subdir pull \{relative_target}")
+}
+
+///|
+/// Move git directory from source to destination
+fn move_git_directory(fs : OsFs, src : String, dst : String) -> Unit {
+  // Create destination directory
+  fs.mkdir_p(dst) catch { _ => () }
+  // Copy all contents
+  let entries = fs.readdir(src) catch { _ => return () }
+  for entry in entries {
+    let src_path = src + "/" + entry
+    let dst_path = dst + "/" + entry
+    if fs.is_dir(src_path) {
+      move_git_directory(fs, src_path, dst_path)
+    } else {
+      let content = fs.read_file(src_path) catch { _ => continue }
+      fs.write_file(dst_path, content) catch { _ => () }
+    }
+  }
+}
+
+///|
+/// Save metadata about the subdir clone origin
+fn save_subdir_clone_metadata(
+  fs : OsFs,
+  git_dir : String,
+  remote_url : String,
+  subdir_path : String,
+  commit_id : @git.ObjectId,
+) -> Unit {
+  // Store in .git/subdir-clone-info
+  let info = StringBuilder::new()
+  info.write_string("remote=")
+  info.write_string(remote_url)
+  info.write_string("\n")
+  info.write_string("path=")
+  info.write_string(subdir_path)
+  info.write_string("\n")
+  info.write_string("commit=")
+  info.write_string(commit_id.to_hex())
+  info.write_string("\n")
+  let info_path = git_dir + "/subdir-clone-info"
+  fs.write_file(info_path, string_to_bytes_subdir(info.to_string())) catch { _ => () }
+}
+
+///|
+/// Find a subtree by path (for subdir clone)
+fn find_subtree_clone(
+  db : @gitlib.ObjectDb,
+  rfs : &@git.RepoFileSystem,
+  tree_id : @git.ObjectId,
+  path : String,
+) -> @git.ObjectId? raise @git.GitError {
+  let parts : Array[String] = []
+  for p in path.split("/") {
+    let s = p.to_string()
+    if s.length() > 0 {
+      parts.push(s)
+    }
+  }
+  let mut current = tree_id
+  for part in parts {
+    let obj = db.get(rfs, current)
+    guard obj is Some(tree_obj) else {
+      return None
+    }
+    let entries = @git.parse_tree(tree_obj.data) catch { err => raise err }
+    let mut found = false
+    for entry in entries {
+      if entry.name == part {
+        current = entry.id
+        found = true
+        break
+      }
+    }
+    if not(found) {
+      return None
+    }
+  }
+  Some(current)
+}
+
+///|
+/// Collect all blob IDs from a tree (for subdir clone)
+fn collect_tree_blobs_clone(
+  db : @gitlib.ObjectDb,
+  rfs : &@git.RepoFileSystem,
+  tree_id : @git.ObjectId,
+) -> Array[@git.ObjectId] raise @git.GitError {
+  let blobs : Array[@git.ObjectId] = []
+  let obj = db.get(rfs, tree_id)
+  guard obj is Some(tree_obj) else {
+    return blobs
+  }
+  let entries = @git.parse_tree(tree_obj.data) catch { err => raise err }
+  for entry in entries {
+    if entry.mode == "40000" || entry.mode == "040000" {
+      // Directory - recurse
+      let sub_blobs = collect_tree_blobs_clone(db, rfs, entry.id) catch {
+        err => raise err
+      }
+      for b in sub_blobs {
+        blobs.push(b)
+      }
+    } else {
+      // File - add blob
+      blobs.push(entry.id)
+    }
+  }
+  blobs
+}
+
+///|
+/// Write tree contents to worktree directory (for subdir clone)
+fn write_tree_to_worktree_clone(
+  db : @gitlib.ObjectDb,
+  fs : OsFs,
+  tree_id : @git.ObjectId,
+  dir : String,
+) -> Unit raise @git.GitError {
+  let obj = db.get(fs, tree_id)
+  guard obj is Some(tree_obj) else {
+    return
+  }
+  let entries = @git.parse_tree(tree_obj.data) catch { err => raise err }
+  for entry in entries {
+    let path = dir + "/" + entry.name
+    if entry.mode == "40000" || entry.mode == "040000" {
+      // Directory
+      fs.mkdir_p(path) catch { _ => () }
+      write_tree_to_worktree_clone(db, fs, entry.id, path) catch {
+        err => raise err
+      }
+    } else {
+      // File
+      let blob_obj = db.get(fs, entry.id)
+      guard blob_obj is Some(blob) else {
+        continue
+      }
+      fs.write_file(path, blob.data) catch { _ => () }
+    }
+  }
 }
 
 ///|
