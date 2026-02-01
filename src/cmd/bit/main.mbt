@@ -48,6 +48,7 @@ async fn show_help() -> Unit {
     #|
     #|experimental
     #|   subdir-clone  Clone subdirectory as independent repository
+    #|   hq            ghq-compatible repository management (~/bhq)
     #|
     #|low-level / plumbing
     #|   bundle          Create, verify, list-heads, and unbundle Git bundles
@@ -318,6 +319,7 @@ async fn dispatch_command(cmd : String, rest : Array[String]) -> Unit {
       handle_subdir_clone(rest) catch {
         err => exit_with_error("subdir", err)
       }
+    "hq" => handle_hq(rest) catch { err => exit_with_error("hq", err) }
     "sparse-checkout" =>
       handle_sparse_checkout(rest) catch {
         err => exit_with_error("sparse-checkout", err)
