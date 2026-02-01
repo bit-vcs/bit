@@ -1,4 +1,4 @@
-///| Read operations for GitFs (RepoFileSystem trait implementation)
+///| Read operations for BitFs (RepoFileSystem trait implementation)
 
 ///|
 fn is_tree_mode(mode : String) -> Bool {
@@ -6,8 +6,8 @@ fn is_tree_mode(mode : String) -> Bool {
 }
 
 ///|
-pub fn GitFs::read_file(
-  self : GitFs,
+pub fn BitFs::read_file(
+  self : BitFs,
   backing_fs : &@git.RepoFileSystem,
   path : String,
 ) -> Bytes raise @git.GitError {
@@ -38,8 +38,8 @@ pub fn GitFs::read_file(
 }
 
 ///|
-pub fn GitFs::readdir(
-  self : GitFs,
+pub fn BitFs::readdir(
+  self : BitFs,
   backing_fs : &@git.RepoFileSystem,
   path : String,
 ) -> Array[String] raise @git.GitError {
@@ -98,8 +98,8 @@ pub fn GitFs::readdir(
 }
 
 ///|
-fn GitFs::readdir_from_layers(
-  self : GitFs,
+fn BitFs::readdir_from_layers(
+  self : BitFs,
   backing_fs : &@git.RepoFileSystem,
   norm : String,
   entries : Map[String, Bool],
@@ -112,8 +112,8 @@ fn GitFs::readdir_from_layers(
 }
 
 ///|
-fn GitFs::readdir_from_tree(
-  self : GitFs,
+fn BitFs::readdir_from_tree(
+  self : BitFs,
   backing_fs : &@git.RepoFileSystem,
   path : String,
   tree_id : @git.ObjectId,
@@ -155,8 +155,8 @@ fn GitFs::readdir_from_tree(
 }
 
 ///|
-pub fn GitFs::is_dir(
-  self : GitFs,
+pub fn BitFs::is_dir(
+  self : BitFs,
   backing_fs : &@git.RepoFileSystem,
   path : String,
 ) -> Bool {
@@ -180,8 +180,8 @@ pub fn GitFs::is_dir(
 }
 
 ///|
-fn GitFs::is_dir_in_tree(
-  self : GitFs,
+fn BitFs::is_dir_in_tree(
+  self : BitFs,
   backing_fs : &@git.RepoFileSystem,
   path : String,
 ) -> Bool {
@@ -194,8 +194,8 @@ fn GitFs::is_dir_in_tree(
 }
 
 ///|
-fn GitFs::check_dir_in_tree(
-  self : GitFs,
+fn BitFs::check_dir_in_tree(
+  self : BitFs,
   backing_fs : &@git.RepoFileSystem,
   tree_id : @git.ObjectId,
   path : String,
@@ -233,8 +233,8 @@ fn GitFs::check_dir_in_tree(
 }
 
 ///|
-pub fn GitFs::is_file(
-  self : GitFs,
+pub fn BitFs::is_file(
+  self : BitFs,
   backing_fs : &@git.RepoFileSystem,
   path : String,
 ) -> Bool {
@@ -250,8 +250,8 @@ pub fn GitFs::is_file(
 
 ///|
 /// Check if file exists in base tree (ignoring working layer)
-pub fn GitFs::exists_in_base(
-  self : GitFs,
+pub fn BitFs::exists_in_base(
+  self : BitFs,
   backing_fs : &@git.RepoFileSystem,
   path : String,
 ) -> Bool {
@@ -266,8 +266,8 @@ pub fn GitFs::exists_in_base(
 }
 
 ///|
-fn GitFs::resolve_path(
-  self : GitFs,
+fn BitFs::resolve_path(
+  self : BitFs,
   backing_fs : &@git.RepoFileSystem,
   path : String,
 ) -> @git.ObjectId? {
@@ -286,8 +286,8 @@ fn GitFs::resolve_path(
 }
 
 ///|
-fn GitFs::find_in_tree(
-  self : GitFs,
+fn BitFs::find_in_tree(
+  self : BitFs,
   backing_fs : &@git.RepoFileSystem,
   tree_id : @git.ObjectId,
   path : String,
@@ -331,8 +331,8 @@ fn GitFs::find_in_tree(
 }
 
 ///|
-fn GitFs::get_tree_entries(
-  self : GitFs,
+fn BitFs::get_tree_entries(
+  self : BitFs,
   backing_fs : &@git.RepoFileSystem,
   tree_id : @git.ObjectId,
 ) -> Array[@git.TreeEntry] raise @git.GitError {
@@ -359,8 +359,8 @@ fn GitFs::get_tree_entries(
 ///|
 /// Read file content, fetching from remote if not available locally (async).
 /// This is the primary method for partial clone repositories.
-pub async fn GitFs::read_file_async(
-  self : GitFs,
+pub async fn BitFs::read_file_async(
+  self : BitFs,
   read_fs : &@git.RepoFileSystem,
   write_fs : &@git.FileSystem,
   path : String,
@@ -396,8 +396,8 @@ pub async fn GitFs::read_file_async(
 
 ///|
 /// Get an object, fetching from promisor remote if not available locally (async).
-async fn GitFs::get_object_async(
-  self : GitFs,
+async fn BitFs::get_object_async(
+  self : BitFs,
   read_fs : &@git.RepoFileSystem,
   write_fs : &@git.FileSystem,
   id : @git.ObjectId,
@@ -428,8 +428,8 @@ async fn GitFs::get_object_async(
 ///|
 /// Prefetch multiple objects from promisor remote (async).
 /// Useful for batch fetching before accessing many files.
-pub async fn GitFs::prefetch(
-  self : GitFs,
+pub async fn BitFs::prefetch(
+  self : BitFs,
   read_fs : &@git.RepoFileSystem,
   write_fs : &@git.FileSystem,
   paths : Array[String],
@@ -473,8 +473,8 @@ pub async fn GitFs::prefetch(
 
 ///|
 /// Check if a file requires fetching from remote
-pub fn GitFs::needs_fetch(
-  self : GitFs,
+pub fn BitFs::needs_fetch(
+  self : BitFs,
   read_fs : &@git.RepoFileSystem,
   path : String,
 ) -> Bool raise @git.GitError {
@@ -573,8 +573,8 @@ fn glob_match_impl(pattern : String, pi : Int, path : String, si : Int) -> Bool 
 ///|
 /// Prefetch files matching a glob pattern.
 /// Example patterns: "*.rs", "src/**/*.mbt", "README.*"
-pub async fn GitFs::prefetch_glob(
-  self : GitFs,
+pub async fn BitFs::prefetch_glob(
+  self : BitFs,
   read_fs : &@git.RepoFileSystem,
   write_fs : &@git.FileSystem,
   pattern : String,
@@ -591,8 +591,8 @@ pub async fn GitFs::prefetch_glob(
 
 ///|
 /// Recursively collect files matching a glob pattern
-fn GitFs::collect_matching_files(
-  self : GitFs,
+fn BitFs::collect_matching_files(
+  self : BitFs,
   read_fs : &@git.RepoFileSystem,
   dir : String,
   pattern : String,
@@ -615,8 +615,8 @@ fn GitFs::collect_matching_files(
 ///|
 /// Collect files in breadth-first order up to a limit.
 /// Useful for progressive preloading.
-pub fn GitFs::collect_files_bfs(
-  self : GitFs,
+pub fn BitFs::collect_files_bfs(
+  self : BitFs,
   read_fs : &@git.RepoFileSystem,
   limit : Int,
 ) -> Array[String] raise @git.GitError {
@@ -646,8 +646,8 @@ pub fn GitFs::collect_files_bfs(
 ///|
 /// Prefetch files in breadth-first order.
 /// Prioritizes shallow files (root level first, then subdirs).
-pub async fn GitFs::prefetch_bfs(
-  self : GitFs,
+pub async fn BitFs::prefetch_bfs(
+  self : BitFs,
   read_fs : &@git.RepoFileSystem,
   write_fs : &@git.FileSystem,
   limit : Int,
@@ -659,8 +659,8 @@ pub async fn GitFs::prefetch_bfs(
 ///|
 /// Get list of files that need fetching, in BFS order.
 /// Useful for showing progress or prioritizing fetches.
-pub fn GitFs::get_pending_fetches(
-  self : GitFs,
+pub fn BitFs::get_pending_fetches(
+  self : BitFs,
   read_fs : &@git.RepoFileSystem,
   limit : Int,
 ) -> Array[String] raise @git.GitError {

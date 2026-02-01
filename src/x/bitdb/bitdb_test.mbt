@@ -1,5 +1,5 @@
 ///|
-/// Tests for GitDb
+/// Tests for BitDb
 test "VectorClock: increment and merge" {
   let node1 = NodeId::new("node1")
   let node2 = NodeId::new("node2")
@@ -33,18 +33,18 @@ test "VectorClock: compare" {
 ///|
 test "normalize_key" {
   // Test internal function via public API
-  let db = GitDb::empty(NodeId::new("test"), "/tmp/test")
+  let db = BitDb::empty(NodeId::new("test"), "/tmp/test")
   // Leading and trailing slashes should be removed
   db.set("/path/to/key/", b"value")
   // The key should be stored as "path/to/key"
-  let files = db.gitfs.get_working_files()
+  let files = db.bitfs.get_working_files()
   assert_true(files.contains("path/to/key"))
 }
 
 ///|
-test "GitDb: basic KV operations" {
+test "BitDb: basic KV operations" {
   let fs = @git.TestFs::new()
-  let db = GitDb::empty(NodeId::new("test"), "/repo/.git")
+  let db = BitDb::empty(NodeId::new("test"), "/repo/.git")
   // Set and get
   db.set("key1", b"value1")
   db.set("nested/path/key2", b"value2")
@@ -62,9 +62,9 @@ test "GitDb: basic KV operations" {
 }
 
 ///|
-test "GitDb: list keys" {
+test "BitDb: list keys" {
   let fs = @git.TestFs::new()
-  let db = GitDb::empty(NodeId::new("test"), "/repo/.git")
+  let db = BitDb::empty(NodeId::new("test"), "/repo/.git")
   db.set("users/alice/name", b"Alice")
   db.set("users/alice/email", b"alice@example.com")
   db.set("users/bob/name", b"Bob")
@@ -80,8 +80,8 @@ test "GitDb: list keys" {
 }
 
 ///|
-test "GitDb: gossip state" {
-  let db = GitDb::empty(NodeId::new("node1"), "/repo/.git")
+test "BitDb: gossip state" {
+  let db = BitDb::empty(NodeId::new("node1"), "/repo/.git")
   let state = db.get_gossip_state(1000L)
   assert_eq(state.node_id.id, "node1")
   assert_eq(state.head, @git.ObjectId::zero())
@@ -89,8 +89,8 @@ test "GitDb: gossip state" {
 }
 
 ///|
-test "GitDb: peer management" {
-  let db = GitDb::empty(NodeId::new("node1"), "/repo/.git")
+test "BitDb: peer management" {
+  let db = BitDb::empty(NodeId::new("node1"), "/repo/.git")
   // Add peers
   let peer1 : PeerInfo = {
     node_id: NodeId::new("peer1"),
@@ -116,8 +116,8 @@ test "GitDb: peer management" {
 }
 
 ///|
-test "GitDb: select gossip peers" {
-  let db = GitDb::empty(NodeId::new("node1"), "/repo/.git")
+test "BitDb: select gossip peers" {
+  let db = BitDb::empty(NodeId::new("node1"), "/repo/.git")
   // Add several peers
   for i = 0; i < 10; i = i + 1 {
     let peer : PeerInfo = {
@@ -150,10 +150,10 @@ test "GitDb: select gossip peers" {
 }
 
 ///|
-test "GitDb: commit and rollback" {
+test "BitDb: commit and rollback" {
   let fs = @git.TestFs::new()
   @lib.init_repo(fs, "/repo")
-  let db = GitDb::empty(NodeId::new("test"), "/repo/.git")
+  let db = BitDb::empty(NodeId::new("test"), "/repo/.git")
   // Make some changes
   db.set("key1", b"value1")
   db.set("key2", b"value2")

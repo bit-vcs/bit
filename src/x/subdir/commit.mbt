@@ -2,7 +2,7 @@
 /// サブディレクトリでのコミット機能
 ///
 /// サブディレクトリの変更を元リポジトリにコミットする。
-/// 1. サブディレクトリの GitFs から新しいツリーを構築
+/// 1. サブディレクトリの BitFs から新しいツリーを構築
 /// 2. 元リポジトリのルートツリーでサブディレクトリ部分を置換
 /// 3. 新しいコミットを作成
 
@@ -25,13 +25,13 @@ pub fn SubdirRepo::commit(
     Some(id) => id
     None => raise IoError("no parent commit")
   }
-  // GitFs からサブディレクトリの新しいツリーを構築
-  let new_subdir_tree = @gitfs.build_tree_from_working(
+  // BitFs からサブディレクトリの新しいツリーを構築
+  let new_subdir_tree = @bitfs.build_tree_from_working(
     fs,
     rfs,
     self.git_dir,
-    self.gitfs.base_tree(),
-    self.gitfs.working,
+    self.bitfs.base_tree(),
+    self.bitfs.working,
   ) catch {
     _ => raise IoError("failed to build tree")
   }
@@ -82,7 +82,7 @@ pub fn SubdirRepo::commit(
     e => raise e
   }
   // ワーキング層をクリア
-  self.gitfs.discard_changes()
+  self.bitfs.discard_changes()
   new_commit_id
 }
 

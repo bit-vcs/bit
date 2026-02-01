@@ -1,14 +1,14 @@
-///| GitFs construction and initialization
+///| BitFs construction and initialization
 
 ///|
-/// Create GitFs from a commit.
+/// Create BitFs from a commit.
 /// Uses config.lazy_load to determine loading strategy (default: lazy).
-pub fn GitFs::from_commit(
+pub fn BitFs::from_commit(
   backing_fs : &@git.RepoFileSystem,
   git_dir : String,
   commit_id : @git.ObjectId,
-  config? : GitFsConfig = GitFsConfig::default(),
-) -> GitFs raise @git.GitError {
+  config? : BitFsConfig = BitFsConfig::default(),
+) -> BitFs raise @git.GitError {
   let db = if config.lazy_load {
     @lib.ObjectDb::load_lazy(backing_fs, git_dir)
   } else {
@@ -37,13 +37,13 @@ pub fn GitFs::from_commit(
 }
 
 ///|
-/// Create GitFs from a tree ID.
+/// Create BitFs from a tree ID.
 /// Uses config.lazy_load to determine loading strategy (default: lazy).
-pub fn GitFs::from_tree(
+pub fn BitFs::from_tree(
   git_dir : String,
   tree_id : @git.ObjectId,
-  config? : GitFsConfig = GitFsConfig::default(),
-) -> GitFs {
+  config? : BitFsConfig = BitFsConfig::default(),
+) -> BitFs {
   {
     git_dir,
     base_tree: tree_id,
@@ -59,17 +59,17 @@ pub fn GitFs::from_tree(
 }
 
 ///|
-/// Create GitFs from a branch name.
+/// Create BitFs from a branch name.
 /// Uses config.lazy_load to determine loading strategy (default: lazy).
-pub fn GitFs::from_branch(
+pub fn BitFs::from_branch(
   backing_fs : &@git.RepoFileSystem,
   git_dir : String,
   branch : String,
-  config? : GitFsConfig = GitFsConfig::default(),
-) -> GitFs raise @git.GitError {
+  config? : BitFsConfig = BitFsConfig::default(),
+) -> BitFs raise @git.GitError {
   let commit_id = @lib.resolve_ref(backing_fs, git_dir, "refs/heads/" + branch)
   match commit_id {
-    Some(id) => GitFs::from_commit(backing_fs, git_dir, id, config~)
+    Some(id) => BitFs::from_commit(backing_fs, git_dir, id, config~)
     None =>
       raise @git.GitError::InvalidObject(
         "Branch not found: refs/heads/" + branch,
@@ -78,12 +78,12 @@ pub fn GitFs::from_branch(
 }
 
 ///|
-/// Create an empty GitFs (no base tree).
+/// Create an empty BitFs (no base tree).
 /// Uses config.lazy_load to determine loading strategy (default: lazy).
-pub fn GitFs::empty(
+pub fn BitFs::empty(
   git_dir : String,
-  config? : GitFsConfig = GitFsConfig::default(),
-) -> GitFs {
+  config? : BitFsConfig = BitFsConfig::default(),
+) -> BitFs {
   {
     git_dir,
     base_tree: @git.ObjectId::zero(),
@@ -101,8 +101,8 @@ pub fn GitFs::empty(
 ///|
 /// Get or load the ObjectDb (cached for performance).
 /// Respects lazy_mode: uses lazy loading when true, eager loading when false.
-pub fn GitFs::get_db(
-  self : GitFs,
+pub fn BitFs::get_db(
+  self : BitFs,
   backing_fs : &@git.RepoFileSystem,
 ) -> @lib.ObjectDb raise @git.GitError {
   match self.cached_db {
@@ -122,8 +122,8 @@ pub fn GitFs::get_db(
 ///|
 /// Get or load the PromisorDb (cached for performance).
 /// Returns None if promisor support is disabled in config.
-pub fn GitFs::get_promisor_db(
-  self : GitFs,
+pub fn BitFs::get_promisor_db(
+  self : BitFs,
   backing_fs : &@git.RepoFileSystem,
 ) -> @lib.PromisorDb? raise @git.GitError {
   if not(self.config.enable_promisor) {
@@ -144,9 +144,9 @@ pub fn GitFs::get_promisor_db(
 }
 
 ///|
-/// Check if this GitFs is backed by a partial clone with promisor remote
-pub fn GitFs::has_promisor(
-  self : GitFs,
+/// Check if this BitFs is backed by a partial clone with promisor remote
+pub fn BitFs::has_promisor(
+  self : BitFs,
   backing_fs : &@git.RepoFileSystem,
 ) -> Bool {
   if not(self.config.enable_promisor) {
@@ -157,8 +157,8 @@ pub fn GitFs::has_promisor(
 
 ///|
 /// Get the promisor remote URL if available
-pub fn GitFs::get_promisor_remote(
-  self : GitFs,
+pub fn BitFs::get_promisor_remote(
+  self : BitFs,
   backing_fs : &@git.RepoFileSystem,
 ) -> String? {
   if not(self.config.enable_promisor) {
@@ -168,33 +168,33 @@ pub fn GitFs::get_promisor_remote(
 }
 
 ///|
-pub fn GitFs::is_dirty(self : GitFs) -> Bool {
+pub fn BitFs::is_dirty(self : BitFs) -> Bool {
   self.working.is_dirty()
 }
 
 ///|
-pub fn GitFs::git_dir(self : GitFs) -> String {
+pub fn BitFs::git_dir(self : BitFs) -> String {
   self.git_dir
 }
 
 ///|
-pub fn GitFs::base_tree(self : GitFs) -> @git.ObjectId {
+pub fn BitFs::base_tree(self : BitFs) -> @git.ObjectId {
   self.base_tree
 }
 
 ///|
-pub fn GitFs::base_commit(self : GitFs) -> @git.ObjectId? {
+pub fn BitFs::base_commit(self : BitFs) -> @git.ObjectId? {
   self.base_commit
 }
 
 ///|
 /// Check if lazy loading is enabled
-pub fn GitFs::is_lazy(self : GitFs) -> Bool {
+pub fn BitFs::is_lazy(self : BitFs) -> Bool {
   self.lazy_mode
 }
 
 ///|
 /// Check if promisor support is enabled
-pub fn GitFs::is_promisor_enabled(self : GitFs) -> Bool {
+pub fn BitFs::is_promisor_enabled(self : BitFs) -> Bool {
   self.config.enable_promisor
 }

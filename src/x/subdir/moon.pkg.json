@@ -1,9 +1,9 @@
 {
   "warn-list": "-unused_constructor-29",
   "import": [
-    "mizchi/git",
-    "mizchi/git/lib",
-    "mizchi/git/x/gitfs",
+    { "path": "mizchi/bit", "alias": "git" },
+    "mizchi/bit/lib",
+    "mizchi/bit/x/bitfs",
     "mizchi/zlib"
   ],
   "targets": {

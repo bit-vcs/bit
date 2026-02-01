@@ -42,22 +42,22 @@ test "integration: mount helix repo (lazy)" {
   let commit_id = get_helix_head()
 
   // Create lazy snapshot - should be fast (default config uses lazy_load: true)
-  let gitfs = GitFs::from_commit(osfs, git_dir, commit_id)
-  assert_true(gitfs.is_lazy()) // Verify lazy mode is enabled
-  assert_false(gitfs.is_dirty())
+  let bitfs = BitFs::from_commit(osfs, git_dir, commit_id)
+  assert_true(bitfs.is_lazy()) // Verify lazy mode is enabled
+  assert_false(bitfs.is_dirty())
 
   // Read root directory
-  let root_entries = gitfs.readdir(osfs, "")
+  let root_entries = bitfs.readdir(osfs, "")
   assert_true(root_entries.length() > 0)
   assert_true(root_entries.contains("Cargo.toml"))
   assert_true(root_entries.contains("README.md"))
 
   // Read README
-  let readme = gitfs.read_file(osfs, "README.md")
+  let readme = bitfs.read_file(osfs, "README.md")
   assert_true(readme.length() > 0)
 
   // Read nested file
-  let cargo_toml = gitfs.read_file(osfs, "Cargo.toml")
+  let cargo_toml = bitfs.read_file(osfs, "Cargo.toml")
   assert_true(cargo_toml.length() > 0)
 }
 
@@ -74,15 +74,15 @@ test "integration: mount helix repo (eager)" {
   let commit_id = get_helix_head()
 
   // Create eager snapshot - loads all pack indexes upfront
-  let config = GitFsConfig::eager()
-  let gitfs = GitFs::from_commit(osfs, git_dir, commit_id, config~)
-  assert_false(gitfs.is_lazy()) // Verify eager mode
-  assert_false(gitfs.is_dirty())
+  let config = BitFsConfig::eager()
+  let bitfs = BitFs::from_commit(osfs, git_dir, commit_id, config~)
+  assert_false(bitfs.is_lazy()) // Verify eager mode
+  assert_false(bitfs.is_dirty())
 
   // Should work the same as lazy
-  let root_entries = gitfs.readdir(osfs, "")
+  let root_entries = bitfs.readdir(osfs, "")
   assert_true(root_entries.length() > 0)
-  let readme = gitfs.read_file(osfs, "README.md")
+  let readme = bitfs.read_file(osfs, "README.md")
   assert_true(readme.length() > 0)
 }
 
@@ -95,49 +95,49 @@ test "integration: mount, modify, get changes" {
     return
   }
   let commit_id = get_helix_head()
-  let gitfs = GitFs::from_commit(osfs, git_dir, commit_id)
+  let bitfs = BitFs::from_commit(osfs, git_dir, commit_id)
 
   // Read original content
-  let original = gitfs.read_file(osfs, "README.md")
+  let original = bitfs.read_file(osfs, "README.md")
   let original_str = @utf8.decode_lossy(original[:])
 
   // Modify in memory
-  let modified = original_str + "\n\n## Added by GitFs test\n"
-  gitfs.write_string("README.md", modified)
+  let modified = original_str + "\n\n## Added by BitFs test\n"
+  bitfs.write_string("README.md", modified)
 
   // Create a new file
-  gitfs.write_string("test_file.txt", "Hello from GitFs!")
+  bitfs.write_string("test_file.txt", "Hello from BitFs!")
 
   // Delete a file (mark as deleted)
-  gitfs.remove_file("CHANGELOG.md")
+  bitfs.remove_file("CHANGELOG.md")
 
   // Check dirty state
-  assert_true(gitfs.is_dirty())
+  assert_true(bitfs.is_dirty())
 
   // Get changed files
-  let working_files = gitfs.get_working_files()
+  let working_files = bitfs.get_working_files()
   assert_true(working_files.contains("README.md"))
   assert_true(working_files.contains("test_file.txt"))
 
   // Get deleted files
-  let deleted_files = gitfs.get_deleted_files()
+  let deleted_files = bitfs.get_deleted_files()
   assert_true(deleted_files.contains("CHANGELOG.md"))
 
   // Read modified content (should come from working layer)
-  let read_back = gitfs.read_file(osfs, "README.md")
+  let read_back = bitfs.read_file(osfs, "README.md")
   let read_str = @utf8.decode_lossy(read_back[:])
-  assert_true(read_str.has_suffix("## Added by GitFs test\n"))
+  assert_true(read_str.has_suffix("## Added by BitFs test\n"))
 
   // Read new file
-  let new_file = gitfs.read_file(osfs, "test_file.txt")
-  assert_eq(@utf8.decode_lossy(new_file[:]), "Hello from GitFs!")
+  let new_file = bitfs.read_file(osfs, "test_file.txt")
+  assert_eq(@utf8.decode_lossy(new_file[:]), "Hello from BitFs!")
 
   // Rollback changes
-  gitfs.rollback()
-  assert_false(gitfs.is_dirty())
+  bitfs.rollback()
+  assert_false(bitfs.is_dirty())
 
   // Verify original content is back
-  let after_rollback = gitfs.read_file(osfs, "README.md")
+  let after_rollback = bitfs.read_file(osfs, "README.md")
   assert_eq(after_rollback.length(), original.length())
 }
 
@@ -150,16 +150,16 @@ test "integration: generate diff" {
     return
   }
   let commit_id = get_helix_head()
-  let gitfs = GitFs::from_commit(osfs, git_dir, commit_id)
+  let bitfs = BitFs::from_commit(osfs, git_dir, commit_id)
 
   // Make some changes
-  gitfs.write_string(
+  bitfs.write_string(
     "new_file.rs", "fn main() {\n    println!(\"Hello!\");\n}\n",
   )
-  gitfs.write_string("another.txt", "Some content")
+  bitfs.write_string("another.txt", "Some content")
 
   // Get all changes as a simple diff representation
-  let changes = collect_changes(gitfs, osfs)
+  let changes = collect_changes(bitfs, osfs)
 
   // Verify changes are collected
   assert_true(changes.length() >= 2)
@@ -192,23 +192,23 @@ struct FileChange {
 ///|
 /// Collect all changes from the working layer
 fn collect_changes(
-  gitfs : GitFs,
+  bitfs : BitFs,
   osfs : &@git.RepoFileSystem,
 ) -> Array[FileChange] {
   let changes : Array[FileChange] = []
 
   // Get modified/added files
-  let working_files = gitfs.get_working_files()
+  let working_files = bitfs.get_working_files()
   for path in working_files {
-    let content = gitfs.read_file(osfs, path) catch { _ => Bytes::new(0) }
+    let content = bitfs.read_file(osfs, path) catch { _ => Bytes::new(0) }
     // Check if file existed before
-    let is_new = not(file_exists_in_base(gitfs, osfs, path))
+    let is_new = not(file_exists_in_base(bitfs, osfs, path))
     let change_type = if is_new { "added" } else { "modified" }
     changes.push({ path, change_type, _content: Some(content) })
   }
 
   // Get deleted files
-  let deleted_files = gitfs.get_deleted_files()
+  let deleted_files = bitfs.get_deleted_files()
   for path in deleted_files {
     changes.push({ path, change_type: "deleted", _content: None })
   }
@@ -216,13 +216,13 @@ fn collect_changes(
 }
 
 ///|
-/// Check if file exists in base tree (without creating new GitFs)
+/// Check if file exists in base tree (without creating new BitFs)
 fn file_exists_in_base(
-  gitfs : GitFs,
+  bitfs : BitFs,
   osfs : &@git.RepoFileSystem,
   path : String,
 ) -> Bool {
-  gitfs.exists_in_base(osfs, path)
+  bitfs.exists_in_base(osfs, path)
 }
 
 ///|
@@ -257,25 +257,25 @@ test "integration: demo workflow output" {
   println("HEAD: \{commit_id.to_hex()}")
 
   // Mount
-  let gitfs = GitFs::from_commit(osfs, git_dir, commit_id)
+  let bitfs = BitFs::from_commit(osfs, git_dir, commit_id)
   println("Mounted helix repo (lazy)")
 
   // Read some files
-  let entries = gitfs.readdir(osfs, "")
+  let entries = bitfs.readdir(osfs, "")
   println("Root entries: \{entries.length()} files/dirs")
 
   // Make changes
-  gitfs.write_string("NEW_FILE.md", "# New File\n\nCreated by GitFs\n")
-  gitfs.write_string("test/example.rs", "fn main() {}\n")
-  gitfs.remove_file("CHANGELOG.md")
+  bitfs.write_string("NEW_FILE.md", "# New File\n\nCreated by BitFs\n")
+  bitfs.write_string("test/example.rs", "fn main() {}\n")
+  bitfs.remove_file("CHANGELOG.md")
 
   // Show changes
-  let changes = collect_changes(gitfs, osfs)
+  let changes = collect_changes(bitfs, osfs)
   println(format_changes(changes))
 
   // Rollback
-  gitfs.rollback()
-  assert_false(gitfs.is_dirty())
+  bitfs.rollback()
+  assert_false(bitfs.is_dirty())
   println("Rolled back changes")
 }
 
@@ -288,7 +288,7 @@ test "bench_integration: helix lazy mount" (b : @bench.T) {
     return
   }
   let commit_id = try! get_helix_head()
-  b.bench(fn() { b.keep(try! GitFs::from_commit(osfs, git_dir, commit_id)) })
+  b.bench(fn() { b.keep(try! BitFs::from_commit(osfs, git_dir, commit_id)) })
 }
 
 ///|
@@ -300,14 +300,14 @@ test "bench_integration: helix read files" (b : @bench.T) {
     return
   }
   let commit_id = try! get_helix_head()
-  let gitfs = try! GitFs::from_commit(osfs, git_dir, commit_id)
+  let bitfs = try! BitFs::from_commit(osfs, git_dir, commit_id)
 
   // Warm up cache
-  let _ = try! gitfs.read_file(osfs, "README.md")
-  let _ = try! gitfs.read_file(osfs, "Cargo.toml")
+  let _ = try! bitfs.read_file(osfs, "README.md")
+  let _ = try! bitfs.read_file(osfs, "Cargo.toml")
   b.bench(fn() {
-    b.keep(try! gitfs.read_file(osfs, "README.md"))
-    b.keep(try! gitfs.read_file(osfs, "Cargo.toml"))
+    b.keep(try! bitfs.read_file(osfs, "README.md"))
+    b.keep(try! bitfs.read_file(osfs, "Cargo.toml"))
   })
 }
 
@@ -323,18 +323,18 @@ test "bench_integration: helix full workflow" (b : @bench.T) {
   let content = Bytes::make(1000, b'x')
   b.bench(fn() {
     // Mount
-    let gitfs = try! GitFs::from_commit(osfs, git_dir, commit_id)
+    let bitfs = try! BitFs::from_commit(osfs, git_dir, commit_id)
 
     // Read
-    let _ = try! gitfs.readdir(osfs, "")
-    let _ = try! gitfs.read_file(osfs, "README.md")
+    let _ = try! bitfs.readdir(osfs, "")
+    let _ = try! bitfs.read_file(osfs, "README.md")
 
     // Write (COW)
     for i in 0..<10 {
-      gitfs.write_file("test/file\{i}.txt", content)
+      bitfs.write_file("test/file\{i}.txt", content)
     }
 
     // Collect changes
-    b.keep(collect_changes(gitfs, osfs))
+    b.keep(collect_changes(bitfs, osfs))
   })
 }

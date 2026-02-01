@@ -1,4 +1,4 @@
-///| GitDb - Git-based distributed KV store with Gossip sync
+///| BitDb - Git-based distributed KV store with Gossip sync
 
 ///|
 
@@ -152,10 +152,10 @@ pub(all) struct PeerInfo {
 }
 
 ///|
-/// Main GitDb structure
-pub struct GitDb {
+/// Main BitDb structure
+pub struct BitDb {
   node_id : NodeId
-  gitfs : @gitfs.GitFs
+  bitfs : @bitfs.BitFs
   mut clock : VectorClock
   mut head : @git.ObjectId
   peers : Map[String, PeerInfo] // node_id -> peer
@@ -163,20 +163,20 @@ pub struct GitDb {
 }
 
 ///|
-/// Configuration for GitDb
-pub(all) struct GitDbConfig {
+/// Configuration for BitDb
+pub(all) struct BitDbConfig {
   node_id : NodeId
-  gitfs_config : @gitfs.GitFsConfig
+  bitfs_config : @bitfs.BitFsConfig
   max_peers : Int
   gossip_interval_ms : Int
   sync_batch_size : Int
 }
 
 ///|
-pub fn GitDbConfig::default(node_id : NodeId) -> GitDbConfig {
+pub fn BitDbConfig::default(node_id : NodeId) -> BitDbConfig {
   {
     node_id,
-    gitfs_config: @gitfs.GitFsConfig::default(),
+    bitfs_config: @bitfs.BitFsConfig::default(),
     max_peers: 32,
     gossip_interval_ms: 5000,
     sync_batch_size: 100,

@@ -1,7 +1,7 @@
 ///| Git-backed Virtual Filesystem types
 
 ///|
-pub struct GitFsConfig {
+pub struct BitFsConfig {
   max_cache_bytes : Int
   max_cache_entries : Int
   lazy_load : Bool // If true, defer object/pack loading until first access
@@ -9,7 +9,7 @@ pub struct GitFsConfig {
 }
 
 ///|
-pub fn GitFsConfig::default() -> GitFsConfig {
+pub fn BitFsConfig::default() -> BitFsConfig {
   {
     max_cache_bytes: 64 * 1024 * 1024,
     max_cache_entries: 1000,
@@ -20,7 +20,7 @@ pub fn GitFsConfig::default() -> GitFsConfig {
 
 ///|
 /// Create config with eager loading (load all packs upfront)
-pub fn GitFsConfig::eager() -> GitFsConfig {
+pub fn BitFsConfig::eager() -> BitFsConfig {
   {
     max_cache_bytes: 64 * 1024 * 1024,
     max_cache_entries: 1000,
@@ -31,7 +31,7 @@ pub fn GitFsConfig::eager() -> GitFsConfig {
 
 ///|
 /// Create config for local-only access (no network fetches)
-pub fn GitFsConfig::local_only() -> GitFsConfig {
+pub fn BitFsConfig::local_only() -> BitFsConfig {
   {
     max_cache_bytes: 64 * 1024 * 1024,
     max_cache_entries: 1000,
@@ -41,14 +41,14 @@ pub fn GitFsConfig::local_only() -> GitFsConfig {
 }
 
 ///|
-pub struct GitFs {
+pub struct BitFs {
   git_dir : String
   mut base_tree : @git.ObjectId
   mut base_commit : @git.ObjectId?
   working : WorkingLayer
   layers : Array[Layer]
   cache : ObjectCache
-  config : GitFsConfig
+  config : BitFsConfig
   mut cached_db : @lib.ObjectDb?
   mut cached_promisor_db : @lib.PromisorDb?
   lazy_mode : Bool // If true, use lazy object loading

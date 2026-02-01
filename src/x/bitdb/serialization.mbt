@@ -57,9 +57,9 @@ fn _int_to_object_type(n : Int) -> @git.ObjectType {
 }
 
 ///|
-/// Create a serialized snapshot from GitDb state
-pub fn GitDb::serialize_snapshot(
-  self : GitDb,
+/// Create a serialized snapshot from BitDb state
+pub fn BitDb::serialize_snapshot(
+  self : BitDb,
   backing_fs : &@git.RepoFileSystem,
 ) -> SerializedSnapshot {
   // Collect clock entries
@@ -70,7 +70,7 @@ pub fn GitDb::serialize_snapshot(
   // Collect reachable objects
   let objects : Array[SerializedObject] = []
   if self.head != @git.ObjectId::zero() {
-    let db = self.gitfs.get_db(backing_fs) catch {
+    let db = self.bitfs.get_db(backing_fs) catch {
       _ => return make_empty_snapshot(self)
     }
     collect_objects_for_serialization(db, backing_fs, self.head, objects, {})
@@ -85,7 +85,7 @@ pub fn GitDb::serialize_snapshot(
 }
 
 ///|
-fn make_empty_snapshot(db : GitDb) -> SerializedSnapshot {
+fn make_empty_snapshot(db : BitDb) -> SerializedSnapshot {
   let clock_entries : Array[(String, Int64)] = []
   for entry in db.clock.clocks {
     clock_entries.push((entry.0, entry.1))

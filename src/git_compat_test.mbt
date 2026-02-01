@@ -56,10 +56,10 @@ test "git compat: blob hash empty" {
 test "git compat: tree with single file" {
   // Tree containing: hello.txt -> "hello\n"
   // git write-tree after: echo "hello" > hello.txt && git add hello.txt
-  let blob_id = @git.ObjectId::from_hex(
+  let blob_id = ObjectId::from_hex(
     "ce013625030ba8dba906f756967f9e9ca394464a",
   )
-  let entry = @git.TreeEntry::new("100644", "hello.txt", blob_id)
+  let entry = TreeEntry::new("100644", "hello.txt", blob_id)
   let (tree_id, _) = create_tree([entry])
   inspect(tree_id.to_hex(), content="aaa96ced2d9a1c8e72c56b253a0e2fe78393feb7")
 }
@@ -70,15 +70,15 @@ test "git compat: tree with two files" {
   //   hello.txt -> "hello\n"
   //   world.txt -> "world\n"
   // Entries must be sorted by name
-  let hello_id = @git.ObjectId::from_hex(
+  let hello_id = ObjectId::from_hex(
     "ce013625030ba8dba906f756967f9e9ca394464a",
   )
-  let world_id = @git.ObjectId::from_hex(
+  let world_id = ObjectId::from_hex(
     "cc628ccd10742baea8241c5924df992b5c019f71",
   )
   let entries = [
-    @git.TreeEntry::new("100644", "hello.txt", hello_id),
-    @git.TreeEntry::new("100644", "world.txt", world_id),
+    TreeEntry::new("100644", "hello.txt", hello_id),
+    TreeEntry::new("100644", "world.txt", world_id),
   ]
   let (tree_id, _) = create_tree(entries)
   inspect(tree_id.to_hex(), content="88e38705fdbd3608cddbe904b67c731f3234c45b")
@@ -95,10 +95,10 @@ test "git compat: initial commit" {
   //   author: Test <test@example.com> 1700000000 +0000
   //   committer: Test <test@example.com> 1700000000 +0000
   //   message: Initial commit
-  let tree_id = @git.ObjectId::from_hex(
+  let tree_id = ObjectId::from_hex(
     "88e38705fdbd3608cddbe904b67c731f3234c45b",
   )
-  let commit = @git.Commit::new(
+  let commit = Commit::new(
     tree_id,
     [], // no parents
     "Test <test@example.com>",
@@ -179,8 +179,8 @@ test "git compat: packfile header" {
 ///|
 test "git compat: packfile with 3 objects" {
   let blob_content = Bytes::from_array([b'h', b'e', b'l', b'l', b'o', b'\n'])
-  let commit = @git.Commit::new(
-    @git.ObjectId::zero(),
+  let commit = Commit::new(
+    ObjectId::zero(),
     [],
     "Test <test@example.com>",
     1700000000L,
@@ -243,14 +243,14 @@ test "git compat: pktline delim" {
 
 ///|
 test "git compat: ObjectId zero" {
-  let id = @git.ObjectId::zero()
+  let id = ObjectId::zero()
   inspect(id.to_hex(), content="0000000000000000000000000000000000000000")
 }
 
 ///|
 test "git compat: ObjectId from_hex roundtrip" {
   let hex = "ce013625030ba8dba906f756967f9e9ca394464a"
-  let id = @git.ObjectId::from_hex(hex)
+  let id = ObjectId::from_hex(hex)
   inspect(id.to_hex(), content="ce013625030ba8dba906f756967f9e9ca394464a")
 }
 
@@ -295,10 +295,10 @@ test "git compat: SHA-1 quick brown fox" {
 test "git compat: subtree with single file" {
   // Tree containing: world.txt -> "world\n"
   // This is the "subdir" tree in a nested structure
-  let world_id = @git.ObjectId::from_hex(
+  let world_id = ObjectId::from_hex(
     "cc628ccd10742baea8241c5924df992b5c019f71",
   )
-  let entry = @git.TreeEntry::new("100644", "world.txt", world_id)
+  let entry = TreeEntry::new("100644", "world.txt", world_id)
   let (tree_id, _) = create_tree([entry])
   inspect(tree_id.to_hex(), content="b032d4b998c65562e088abaa88fdd859476c089e")
 }
@@ -313,15 +313,15 @@ test "git compat: nested tree with subdirectory" {
   //   ├── hello.txt
   //   └── subdir/
   //       └── world.txt
-  let hello_id = @git.ObjectId::from_hex(
+  let hello_id = ObjectId::from_hex(
     "ce013625030ba8dba906f756967f9e9ca394464a",
   )
-  let subdir_id = @git.ObjectId::from_hex(
+  let subdir_id = ObjectId::from_hex(
     "b032d4b998c65562e088abaa88fdd859476c089e",
   )
   let entries = [
-    @git.TreeEntry::new("100644", "hello.txt", hello_id),
-    @git.TreeEntry::new("40000", "subdir", subdir_id),
+    TreeEntry::new("100644", "hello.txt", hello_id),
+    TreeEntry::new("40000", "subdir", subdir_id),
   ]
   let (tree_id, _) = create_tree(entries)
   inspect(tree_id.to_hex(), content="117040856e0066e76d38c559f9d2127fd6a10858")
@@ -338,13 +338,13 @@ test "git compat: commit with parent" {
   // parent: 681226a87c4a64f59b7b47bd497af25e16ac4635 (initial commit)
   // author/committer: Test <test@example.com> 1700000100 +0000
   // message: Second commit
-  let tree_id = @git.ObjectId::from_hex(
+  let tree_id = ObjectId::from_hex(
     "88e38705fdbd3608cddbe904b67c731f3234c45b",
   )
-  let parent_id = @git.ObjectId::from_hex(
+  let parent_id = ObjectId::from_hex(
     "681226a87c4a64f59b7b47bd497af25e16ac4635",
   )
-  let commit = @git.Commit::new(
+  let commit = Commit::new(
     tree_id,
     [parent_id],
     "Test <test@example.com>",
@@ -371,7 +371,7 @@ test "git compat: commit with parent" {
 test "blob integrity: null bytes preserved" {
   // Verify null bytes are not truncated or corrupted
   let data = Bytes::from_array([b'\x00', b'a', b'\x00', b'b', b'\x00'])
-  let (id, compressed) = @git.create_blob(data)
+  let (id, compressed) = create_blob(data)
   let decompressed = @zlib.zlib_decompress(compressed)
   // Skip header "blob 5\0" (7 bytes)
   let header_len = 7
@@ -380,7 +380,7 @@ test "blob integrity: null bytes preserved" {
     assert_true(decompressed[header_len + i] == data[i])
   }
   // Verify hash is consistent
-  let id2 = @git.hash_blob(data)
+  let id2 = hash_blob(data)
   assert_true(id == id2)
 }
 
@@ -388,14 +388,14 @@ test "blob integrity: null bytes preserved" {
 test "blob integrity: high bytes (0x80-0xFF)" {
   // Verify bytes > 127 are handled correctly
   let data = Bytes::from_array([b'\x80', b'\xFF', b'\xFE', b'\xAB', b'\xCD'])
-  let (id, compressed) = @git.create_blob(data)
+  let (id, compressed) = create_blob(data)
   let decompressed = @zlib.zlib_decompress(compressed)
   let header_len = 7 // "blob 5\0"
   assert_true(decompressed.length() == header_len + data.length())
   for i = 0; i < data.length(); i = i + 1 {
     assert_true(decompressed[header_len + i] == data[i])
   }
-  let id2 = @git.hash_blob(data)
+  let id2 = hash_blob(data)
   assert_true(id == id2)
 }
 
@@ -407,7 +407,7 @@ test "blob integrity: all byte values roundtrip" {
     data.push(i.to_byte())
   }
   let bytes = Bytes::from_array(FixedArray::makei(256, fn(i) { data[i] }))
-  let (id, compressed) = @git.create_blob(bytes)
+  let (id, compressed) = create_blob(bytes)
   let decompressed = @zlib.zlib_decompress(compressed)
   let header_len = 9 // "blob 256\0"
   assert_true(decompressed.length() == header_len + 256)
@@ -415,19 +415,19 @@ test "blob integrity: all byte values roundtrip" {
     assert_true(decompressed[header_len + i] == i.to_byte())
   }
   // Verify hash consistency
-  let id2 = @git.hash_blob(bytes)
+  let id2 = hash_blob(bytes)
   assert_true(id == id2)
 }
 
 ///|
 test "blob integrity: single byte" {
   let data = Bytes::from_array([b'X'])
-  let (id, compressed) = @git.create_blob(data)
+  let (id, compressed) = create_blob(data)
   let decompressed = @zlib.zlib_decompress(compressed)
   let header_len = 7 // "blob 1\0"
   assert_true(decompressed.length() == header_len + 1)
   assert_true(decompressed[header_len] == b'X')
-  let id2 = @git.hash_blob(data)
+  let id2 = hash_blob(data)
   assert_true(id == id2)
 }
 
@@ -440,7 +440,7 @@ test "blob integrity: 1KB binary data" {
     data.push((i % 256).to_byte())
   }
   let bytes = Bytes::from_array(FixedArray::makei(size, fn(i) { data[i] }))
-  let (id, compressed) = @git.create_blob(bytes)
+  let (id, compressed) = create_blob(bytes)
   let decompressed = @zlib.zlib_decompress(compressed)
   // header: "blob 1024\0" = 10 bytes
   let header_len = 10
@@ -448,7 +448,7 @@ test "blob integrity: 1KB binary data" {
   for i = 0; i < size; i = i + 1 {
     assert_true(decompressed[header_len + i] == (i % 256).to_byte())
   }
-  let id2 = @git.hash_blob(bytes)
+  let id2 = hash_blob(bytes)
   assert_true(id == id2)
 }
 
@@ -461,7 +461,7 @@ test "blob integrity: 100KB binary data" {
     data.push((i % 256).to_byte())
   }
   let bytes = Bytes::from_array(FixedArray::makei(size, fn(i) { data[i] }))
-  let (id, compressed) = @git.create_blob(bytes)
+  let (id, compressed) = create_blob(bytes)
   let decompressed = @zlib.zlib_decompress(compressed)
   // header: "blob 102400\0" = 12 bytes
   let header_len = 12
@@ -472,7 +472,7 @@ test "blob integrity: 100KB binary data" {
   assert_true(
     decompressed[header_len + size - 1] == ((size - 1) % 256).to_byte(),
   )
-  let id2 = @git.hash_blob(bytes)
+  let id2 = hash_blob(bytes)
   assert_true(id == id2)
 }
 
@@ -494,8 +494,8 @@ test "blob integrity: zlib compress/decompress roundtrip" {
 test "blob integrity: create_object and hash_object_content consistent" {
   // Verify create_object and hash_object_content produce same ID
   let data = Bytes::from_array([b'h', b'e', b'l', b'l', b'o'])
-  let (id1, _) = @git.create_object(@git.ObjectType::Blob, data)
-  let id2 = @git.hash_object_content(@git.ObjectType::Blob, data)
+  let (id1, _) = create_object(ObjectType::Blob, data)
+  let id2 = hash_object_content(ObjectType::Blob, data)
   assert_true(id1 == id2)
 }
 
@@ -503,9 +503,9 @@ test "blob integrity: create_object and hash_object_content consistent" {
 test "blob integrity: repeated creation yields same ID" {
   // Verify idempotency
   let data = Bytes::from_array([b't', b'e', b's', b't'])
-  let (id1, _) = @git.create_blob(data)
-  let (id2, _) = @git.create_blob(data)
-  let (id3, _) = @git.create_blob(data)
+  let (id1, _) = create_blob(data)
+  let (id2, _) = create_blob(data)
+  let (id3, _) = create_blob(data)
   assert_true(id1 == id2)
   assert_true(id2 == id3)
 }
@@ -517,15 +517,15 @@ test "blob integrity: repeated creation yields same ID" {
 ///|
 test "ObjectId: equality for same hex" {
   let hex = "ce013625030ba8dba906f756967f9e9ca394464a"
-  let id1 = @git.ObjectId::from_hex(hex)
-  let id2 = @git.ObjectId::from_hex(hex)
+  let id1 = ObjectId::from_hex(hex)
+  let id2 = ObjectId::from_hex(hex)
   assert_true(id1 == id2)
 }
 
 ///|
 test "ObjectId: inequality for different hex" {
-  let id1 = @git.ObjectId::from_hex("ce013625030ba8dba906f756967f9e9ca394464a")
-  let id2 = @git.ObjectId::from_hex("cc628ccd10742baea8241c5924df992b5c019f71")
+  let id1 = ObjectId::from_hex("ce013625030ba8dba906f756967f9e9ca394464a")
+  let id2 = ObjectId::from_hex("cc628ccd10742baea8241c5924df992b5c019f71")
   assert_true(id1 != id2)
 }
 
@@ -537,7 +537,7 @@ test "ObjectId: inequality for different hex" {
 test "git compat: blob hash binary 0x00 0x01 0x7f 0x80 0xff" {
   // printf '\x00\x01\x7f\x80\xff' | git hash-object --stdin
   let data = Bytes::from_array([b'\x00', b'\x01', b'\x7F', b'\x80', b'\xFF'])
-  let id = @git.hash_blob(data)
+  let id = hash_blob(data)
   inspect(id.to_hex(), content="3f841d7e56eef5a4d10f557d3db2228bb9948b2b")
 }
 
@@ -549,7 +549,7 @@ test "git compat: blob hash all 256 byte values" {
     data.push(i.to_byte())
   }
   let bytes = Bytes::from_array(FixedArray::makei(256, fn(i) { data[i] }))
-  let id = @git.hash_blob(bytes)
+  let id = hash_blob(bytes)
   inspect(id.to_hex(), content="c86626638e0bc8cf47ca49bb1525b40e9737ee64")
 }
 
@@ -583,7 +583,7 @@ test "roundtrip: binary blob create -> compress -> decompress" {
   let original = Bytes::from_array([
     b'\x00', b'\x01', b'\x7F', b'\x80', b'\xFE', b'\xFF',
   ])
-  let (expected_id, compressed) = @git.create_blob(original)
+  let (expected_id, compressed) = create_blob(original)
 
   // Decompress
   let raw = @zlib.zlib_decompress(compressed)
@@ -604,18 +604,18 @@ test "roundtrip: binary blob create -> compress -> decompress" {
   }
 
   // Verify re-hashing gives same ID
-  let computed_id = @git.hash_blob(original)
+  let computed_id = hash_blob(original)
   assert_true(computed_id == expected_id)
 }
 
 ///|
 test "roundtrip: tree create -> compress -> decompress" {
   // Create tree
-  let blob_id = @git.ObjectId::from_hex(
+  let blob_id = ObjectId::from_hex(
     "ce013625030ba8dba906f756967f9e9ca394464a",
   )
-  let entries = [@git.TreeEntry::new("100644", "test.txt", blob_id)]
-  let (expected_id, compressed) = @git.create_tree(entries)
+  let entries = [TreeEntry::new("100644", "test.txt", blob_id)]
+  let (expected_id, compressed) = create_tree(entries)
 
   // Decompress
   let raw = @zlib.zlib_decompress(compressed)
@@ -631,23 +631,23 @@ test "roundtrip: tree create -> compress -> decompress" {
   )
 
   // Verify tree can be parsed
-  let parsed_entries = @git.parse_tree(content)
+  let parsed_entries = parse_tree(content)
   assert_true(parsed_entries.length() == 1)
   assert_true(parsed_entries[0].name == "test.txt")
   assert_true(parsed_entries[0].mode == "100644")
   assert_true(parsed_entries[0].id == blob_id)
 
   // Verify re-hashing gives same ID
-  let computed_id = @git.hash_object_content(@git.ObjectType::Tree, content)
+  let computed_id = hash_object_content(ObjectType::Tree, content)
   assert_true(computed_id == expected_id)
 }
 
 ///|
 test "roundtrip: commit create -> compress -> decompress" {
-  let tree_id = @git.ObjectId::from_hex(
+  let tree_id = ObjectId::from_hex(
     "88e38705fdbd3608cddbe904b67c731f3234c45b",
   )
-  let commit = @git.Commit::new(
+  let commit = Commit::new(
     tree_id,
     [],
     "Test <test@example.com>",
@@ -658,7 +658,7 @@ test "roundtrip: commit create -> compress -> decompress" {
     "+0000",
     "Test commit\n",
   )
-  let (expected_id, compressed) = @git.create_commit(commit)
+  let (expected_id, compressed) = create_commit(commit)
 
   // Decompress
   let raw = @zlib.zlib_decompress(compressed)
@@ -674,12 +674,12 @@ test "roundtrip: commit create -> compress -> decompress" {
   )
 
   // Verify commit can be parsed
-  let parsed = @git.parse_commit(content)
+  let parsed = parse_commit(content)
   assert_true(parsed.tree == tree_id)
   assert_true(parsed.parents.length() == 0)
 
   // Verify re-hashing gives same ID
-  let computed_id = @git.hash_object_content(@git.ObjectType::Commit, content)
+  let computed_id = hash_object_content(ObjectType::Commit, content)
   assert_true(computed_id == expected_id)
 }
 
@@ -690,11 +690,11 @@ test "roundtrip: commit create -> compress -> decompress" {
 ///|
 test "git compat: parse_tree single entry" {
   // Create tree and extract content
-  let blob_id = @git.ObjectId::from_hex(
+  let blob_id = ObjectId::from_hex(
     "ce013625030ba8dba906f756967f9e9ca394464a",
   )
-  let entries = [@git.TreeEntry::new("100644", "hello.txt", blob_id)]
-  let (_, compressed) = @git.create_tree(entries)
+  let entries = [TreeEntry::new("100644", "hello.txt", blob_id)]
+  let (_, compressed) = create_tree(entries)
   let raw = @zlib.zlib_decompress(compressed)
   let (_, content_start) = parse_loose_header(raw)
   let content = Bytes::from_array(
@@ -704,7 +704,7 @@ test "git compat: parse_tree single entry" {
   )
 
   // Parse and verify
-  let parsed = @git.parse_tree(content)
+  let parsed = parse_tree(content)
   assert_true(parsed.length() == 1)
   assert_true(parsed[0].mode == "100644")
   assert_true(parsed[0].name == "hello.txt")
@@ -714,17 +714,17 @@ test "git compat: parse_tree single entry" {
 ///|
 test "git compat: parse_tree multiple entries sorted" {
   // Create tree with multiple files
-  let hello_id = @git.ObjectId::from_hex(
+  let hello_id = ObjectId::from_hex(
     "ce013625030ba8dba906f756967f9e9ca394464a",
   )
-  let world_id = @git.ObjectId::from_hex(
+  let world_id = ObjectId::from_hex(
     "cc628ccd10742baea8241c5924df992b5c019f71",
   )
   let entries = [
-    @git.TreeEntry::new("100644", "hello.txt", hello_id),
-    @git.TreeEntry::new("100644", "world.txt", world_id),
+    TreeEntry::new("100644", "hello.txt", hello_id),
+    TreeEntry::new("100644", "world.txt", world_id),
   ]
-  let (_, compressed) = @git.create_tree(entries)
+  let (_, compressed) = create_tree(entries)
   let raw = @zlib.zlib_decompress(compressed)
   let (_, content_start) = parse_loose_header(raw)
   let content = Bytes::from_array(
@@ -734,7 +734,7 @@ test "git compat: parse_tree multiple entries sorted" {
   )
 
   // Parse and verify order is preserved
-  let parsed = @git.parse_tree(content)
+  let parsed = parse_tree(content)
   assert_true(parsed.length() == 2)
   assert_true(parsed[0].name == "hello.txt")
   assert_true(parsed[1].name == "world.txt")
@@ -743,17 +743,17 @@ test "git compat: parse_tree multiple entries sorted" {
 ///|
 test "git compat: parse_tree with directory entry" {
   // Tree with file and subdirectory
-  let blob_id = @git.ObjectId::from_hex(
+  let blob_id = ObjectId::from_hex(
     "ce013625030ba8dba906f756967f9e9ca394464a",
   )
-  let tree_id = @git.ObjectId::from_hex(
+  let tree_id = ObjectId::from_hex(
     "b032d4b998c65562e088abaa88fdd859476c089e",
   )
   let entries = [
-    @git.TreeEntry::new("100644", "hello.txt", blob_id),
-    @git.TreeEntry::new("40000", "subdir", tree_id),
+    TreeEntry::new("100644", "hello.txt", blob_id),
+    TreeEntry::new("40000", "subdir", tree_id),
   ]
-  let (_, compressed) = @git.create_tree(entries)
+  let (_, compressed) = create_tree(entries)
   let raw = @zlib.zlib_decompress(compressed)
   let (_, content_start) = parse_loose_header(raw)
   let content = Bytes::from_array(
@@ -763,7 +763,7 @@ test "git compat: parse_tree with directory entry" {
   )
 
   // Parse and verify
-  let parsed = @git.parse_tree(content)
+  let parsed = parse_tree(content)
   assert_true(parsed.length() == 2)
   // Files and dirs should be in sorted order
   assert_true(parsed[0].name == "hello.txt")
@@ -775,11 +775,11 @@ test "git compat: parse_tree with directory entry" {
 ///|
 test "git compat: parse_tree with executable file" {
   // Tree with executable file (mode 100755)
-  let blob_id = @git.ObjectId::from_hex(
+  let blob_id = ObjectId::from_hex(
     "ce013625030ba8dba906f756967f9e9ca394464a",
   )
-  let entries = [@git.TreeEntry::new("100755", "script.sh", blob_id)]
-  let (_, compressed) = @git.create_tree(entries)
+  let entries = [TreeEntry::new("100755", "script.sh", blob_id)]
+  let (_, compressed) = create_tree(entries)
   let raw = @zlib.zlib_decompress(compressed)
   let (_, content_start) = parse_loose_header(raw)
   let content = Bytes::from_array(
@@ -787,7 +787,7 @@ test "git compat: parse_tree with executable file" {
       raw[content_start + i]
     }),
   )
-  let parsed = @git.parse_tree(content)
+  let parsed = parse_tree(content)
   assert_true(parsed.length() == 1)
   assert_true(parsed[0].mode == "100755")
   assert_true(parsed[0].name == "script.sh")
@@ -800,10 +800,10 @@ test "git compat: parse_tree with executable file" {
 ///|
 test "git compat: parse_commit initial commit" {
   // Create initial commit (no parents)
-  let tree_id = @git.ObjectId::from_hex(
+  let tree_id = ObjectId::from_hex(
     "88e38705fdbd3608cddbe904b67c731f3234c45b",
   )
-  let commit = @git.Commit::new(
+  let commit = Commit::new(
     tree_id,
     [],
     "Author <author@example.com>",
@@ -814,7 +814,7 @@ test "git compat: parse_commit initial commit" {
     "+0900",
     "Initial commit\n",
   )
-  let (_, compressed) = @git.create_commit(commit)
+  let (_, compressed) = create_commit(commit)
   let raw = @zlib.zlib_decompress(compressed)
   let (_, content_start) = parse_loose_header(raw)
   let content = Bytes::from_array(
@@ -822,20 +822,20 @@ test "git compat: parse_commit initial commit" {
       raw[content_start + i]
     }),
   )
-  let parsed = @git.parse_commit(content)
+  let parsed = parse_commit(content)
   assert_true(parsed.tree == tree_id)
   assert_true(parsed.parents.length() == 0)
 }
 
 ///|
 test "git compat: parse_commit with one parent" {
-  let tree_id = @git.ObjectId::from_hex(
+  let tree_id = ObjectId::from_hex(
     "88e38705fdbd3608cddbe904b67c731f3234c45b",
   )
-  let parent_id = @git.ObjectId::from_hex(
+  let parent_id = ObjectId::from_hex(
     "681226a87c4a64f59b7b47bd497af25e16ac4635",
   )
-  let commit = @git.Commit::new(
+  let commit = Commit::new(
     tree_id,
     [parent_id],
     "Test <test@example.com>",
@@ -846,7 +846,7 @@ test "git compat: parse_commit with one parent" {
     "+0000",
     "Second commit\n",
   )
-  let (_, compressed) = @git.create_commit(commit)
+  let (_, compressed) = create_commit(commit)
   let raw = @zlib.zlib_decompress(compressed)
   let (_, content_start) = parse_loose_header(raw)
   let content = Bytes::from_array(
@@ -854,7 +854,7 @@ test "git compat: parse_commit with one parent" {
       raw[content_start + i]
     }),
   )
-  let parsed = @git.parse_commit(content)
+  let parsed = parse_commit(content)
   assert_true(parsed.tree == tree_id)
   assert_true(parsed.parents.length() == 1)
   assert_true(parsed.parents[0] == parent_id)
@@ -862,16 +862,16 @@ test "git compat: parse_commit with one parent" {
 
 ///|
 test "git compat: parse_commit with merge (two parents)" {
-  let tree_id = @git.ObjectId::from_hex(
+  let tree_id = ObjectId::from_hex(
     "88e38705fdbd3608cddbe904b67c731f3234c45b",
   )
-  let parent1 = @git.ObjectId::from_hex(
+  let parent1 = ObjectId::from_hex(
     "681226a87c4a64f59b7b47bd497af25e16ac4635",
   )
-  let parent2 = @git.ObjectId::from_hex(
+  let parent2 = ObjectId::from_hex(
     "2fe96b04b8c1f081765898435f0d2497cfef21ea",
   )
-  let commit = @git.Commit::new(
+  let commit = Commit::new(
     tree_id,
     [parent1, parent2],
     "Test <test@example.com>",
@@ -882,7 +882,7 @@ test "git compat: parse_commit with merge (two parents)" {
     "+0000",
     "Merge branch 'feature'\n",
   )
-  let (_, compressed) = @git.create_commit(commit)
+  let (_, compressed) = create_commit(commit)
   let raw = @zlib.zlib_decompress(compressed)
   let (_, content_start) = parse_loose_header(raw)
   let content = Bytes::from_array(
@@ -890,7 +890,7 @@ test "git compat: parse_commit with merge (two parents)" {
       raw[content_start + i]
     }),
   )
-  let parsed = @git.parse_commit(content)
+  let parsed = parse_commit(content)
   assert_true(parsed.tree == tree_id)
   assert_true(parsed.parents.length() == 2)
   assert_true(parsed.parents[0] == parent1)
@@ -930,7 +930,7 @@ test "git compat: delta copy instruction" {
        b'\x0b',
     ], // size: 11
   )
-  let result = @git.apply_delta(base, delta)
+  let result = apply_delta(base, delta)
   assert_true(result.length() == 11)
   for i = 0; i < base.length(); i = i + 1 {
     assert_true(result[i] == base[i])
@@ -954,7 +954,7 @@ test "git compat: delta insert instruction" {
      b'\x08', // insert 8 bytes (bit 7 clear, lower 7 bits = length)
      b'n', b'e', b'w', b' ', b'd', b'a', b't', b'a',
   ])
-  let result = @git.apply_delta(base, delta)
+  let result = apply_delta(base, delta)
   assert_true(result.length() == 8)
   // Verify "new data"
   assert_true(result[0] == b'n')
@@ -986,7 +986,7 @@ test "git compat: delta mixed copy and insert" {
      b'\x06', // insert 6 bytes
      b' ', b'w', b'o', b'r', b'l', b'd',
   ])
-  let result = @git.apply_delta(base, delta)
+  let result = apply_delta(base, delta)
   assert_true(result.length() == 11)
   // Check "hello world"
   assert_true(result[0] == b'h')
@@ -1016,7 +1016,7 @@ test "git compat: delta copy with offset" {
        b'\x05',
     ], // size: 5
   )
-  let result = @git.apply_delta(base, delta)
+  let result = apply_delta(base, delta)
   assert_true(result.length() == 5)
   // Check "world"
   assert_true(result[0] == b'w')
@@ -1072,9 +1072,9 @@ test "git compat: parse git-generated packfile (single blob)" {
   assert_true(packfile[3] == b'K')
 
   // Parse packfile
-  let objects = @git.parse_packfile(packfile)
+  let objects = parse_packfile(packfile)
   assert_true(objects.length() == 1)
-  assert_true(objects[0].obj_type == @git.ObjectType::Blob)
+  assert_true(objects[0].obj_type == ObjectType::Blob)
 
   // Verify content
   let content = objects[0].data
@@ -1087,7 +1087,7 @@ test "git compat: parse git-generated packfile (single blob)" {
   assert_true(content[5] == b'\n')
 
   // Verify hash matches expected
-  let id = @git.hash_blob(content)
+  let id = hash_blob(content)
   inspect(id.to_hex(), content="ce013625030ba8dba906f756967f9e9ca394464a")
 }
 
@@ -1095,11 +1095,11 @@ test "git compat: parse git-generated packfile (single blob)" {
 test "git compat: packfile create and parse roundtrip" {
   // Create a blob object
   let content = Bytes::from_array([b't', b'e', b's', b't', b'\n'])
-  let (blob_id, _) = @git.create_blob(content)
-  let obj = @git.PackObject::new(@git.ObjectType::Blob, content)
+  let (blob_id, _) = create_blob(content)
+  let obj = PackObject::new(ObjectType::Blob, content)
 
   // Create packfile
-  let packfile = @git.create_packfile([obj])
+  let packfile = create_packfile([obj])
 
   // Verify header
   assert_true(packfile[0] == b'P')
@@ -1108,9 +1108,9 @@ test "git compat: packfile create and parse roundtrip" {
   assert_true(packfile[3] == b'K')
 
   // Parse back
-  let parsed = @git.parse_packfile(packfile)
+  let parsed = parse_packfile(packfile)
   assert_true(parsed.length() == 1)
-  assert_true(parsed[0].obj_type == @git.ObjectType::Blob)
+  assert_true(parsed[0].obj_type == ObjectType::Blob)
 
   // Verify content preserved
   assert_true(parsed[0].data.length() == content.length())
@@ -1119,7 +1119,7 @@ test "git compat: packfile create and parse roundtrip" {
   }
 
   // Verify hash matches
-  let parsed_id = @git.hash_blob(parsed[0].data)
+  let parsed_id = hash_blob(parsed[0].data)
   assert_true(parsed_id == blob_id)
 }
 
@@ -1128,11 +1128,11 @@ test "git compat: packfile with multiple objects roundtrip" {
   // Create multiple objects
   let blob1 = Bytes::from_array([b'a', b'\n'])
   let blob2 = Bytes::from_array([b'b', b'\n'])
-  let obj1 = @git.PackObject::new(@git.ObjectType::Blob, blob1)
-  let obj2 = @git.PackObject::new(@git.ObjectType::Blob, blob2)
+  let obj1 = PackObject::new(ObjectType::Blob, blob1)
+  let obj2 = PackObject::new(ObjectType::Blob, blob2)
 
   // Create packfile
-  let packfile = @git.create_packfile([obj1, obj2])
+  let packfile = create_packfile([obj1, obj2])
 
   // Verify object count in header
   assert_true(packfile[8] == b'\x00')
@@ -1141,7 +1141,7 @@ test "git compat: packfile with multiple objects roundtrip" {
   assert_true(packfile[11] == b'\x02') // 2 objects
 
   // Parse back
-  let parsed = @git.parse_packfile(packfile)
+  let parsed = parse_packfile(packfile)
   assert_true(parsed.length() == 2)
 }
 
@@ -1153,20 +1153,20 @@ test "git compat: packfile with multiple objects roundtrip" {
 test "git compat: tree entry order preserved" {
   // create_tree preserves entry order (caller must sort)
   // Verify entries are written and read back in given order
-  let blob_id = @git.ObjectId::from_hex(
+  let blob_id = ObjectId::from_hex(
     "ce013625030ba8dba906f756967f9e9ca394464a",
   )
-  let tree_id = @git.ObjectId::from_hex(
+  let tree_id = ObjectId::from_hex(
     "b032d4b998c65562e088abaa88fdd859476c089e",
   )
 
   // Create tree with entries in specific order
   let entries = [
-    @git.TreeEntry::new("100644", "aaa", blob_id),
-    @git.TreeEntry::new("40000", "bbb", tree_id),
-    @git.TreeEntry::new("100644", "ccc", blob_id),
+    TreeEntry::new("100644", "aaa", blob_id),
+    TreeEntry::new("40000", "bbb", tree_id),
+    TreeEntry::new("100644", "ccc", blob_id),
   ]
-  let (_, compressed) = @git.create_tree(entries)
+  let (_, compressed) = create_tree(entries)
   let raw = @zlib.zlib_decompress(compressed)
   let (_, content_start) = parse_loose_header(raw)
   let content = Bytes::from_array(
@@ -1176,7 +1176,7 @@ test "git compat: tree entry order preserved" {
   )
 
   // Parse and verify order is preserved
-  let parsed = @git.parse_tree(content)
+  let parsed = parse_tree(content)
   assert_true(parsed.length() == 3)
   assert_true(parsed[0].name == "aaa")
   assert_true(parsed[1].name == "bbb")
@@ -1186,19 +1186,19 @@ test "git compat: tree entry order preserved" {
 ///|
 test "git compat: tree special characters in filename" {
   // Test filenames with special characters
-  let blob_id = @git.ObjectId::from_hex(
+  let blob_id = ObjectId::from_hex(
     "ce013625030ba8dba906f756967f9e9ca394464a",
   )
 
   // Files with special characters (but no null bytes or slashes)
   let entries = [
-    @git.TreeEntry::new("100644", "file with spaces.txt", blob_id),
-    @git.TreeEntry::new("100644", "file-with-dashes.txt", blob_id),
-    @git.TreeEntry::new("100644", "file_with_underscores.txt", blob_id),
+    TreeEntry::new("100644", "file with spaces.txt", blob_id),
+    TreeEntry::new("100644", "file-with-dashes.txt", blob_id),
+    TreeEntry::new("100644", "file_with_underscores.txt", blob_id),
   ]
 
   // Should create tree without error
-  let (_, compressed) = @git.create_tree(entries)
+  let (_, compressed) = create_tree(entries)
   let raw = @zlib.zlib_decompress(compressed)
 
   // Should parse back correctly
@@ -1208,7 +1208,7 @@ test "git compat: tree special characters in filename" {
       raw[content_start + i]
     }),
   )
-  let parsed = @git.parse_tree(content)
+  let parsed = parse_tree(content)
   assert_true(parsed.length() == 3)
 }
 
@@ -1220,7 +1220,7 @@ test "git compat: tree special characters in filename" {
 test "git compat: varint encoding small values" {
   // Test encode_type_and_size for small values
   let out : Array[Byte] = []
-  @git.encode_type_and_size(3, 5, out) // type=blob, size=5
+  encode_type_and_size(3, 5, out) // type=blob, size=5
 
   // For size 5:
   // First byte: (type << 4) | (size & 0x0F) = (3 << 4) | 5 = 0x35
@@ -1233,7 +1233,7 @@ test "git compat: varint encoding small values" {
 test "git compat: varint encoding larger values" {
   // Test encode_type_and_size for values requiring continuation
   let out : Array[Byte] = []
-  @git.encode_type_and_size(3, 100, out) // type=blob, size=100
+  encode_type_and_size(3, 100, out) // type=blob, size=100
 
   // size=100 in binary: 0110 0100
   // First 4 bits of size: 0100 = 4

@@ -1,8 +1,8 @@
 ///| Layer management (overlayfs-style)
 
 ///|
-pub fn GitFs::add_layer(
-  self : GitFs,
+pub fn BitFs::add_layer(
+  self : BitFs,
   backing_fs : &@git.RepoFileSystem,
   tree_id : @git.ObjectId,
   name : String,
@@ -21,8 +21,8 @@ pub fn GitFs::add_layer(
 }
 
 ///|
-pub fn GitFs::add_layer_from_commit(
-  self : GitFs,
+pub fn BitFs::add_layer_from_commit(
+  self : BitFs,
   backing_fs : &@git.RepoFileSystem,
   commit_id : @git.ObjectId,
   name : String,
@@ -40,7 +40,7 @@ pub fn GitFs::add_layer_from_commit(
 }
 
 ///|
-pub fn GitFs::remove_layer(self : GitFs, name : String) -> Bool {
+pub fn BitFs::remove_layer(self : BitFs, name : String) -> Bool {
   let mut i = 0
   while i < self.layers.length() {
     if self.layers[i].name == name {
@@ -54,13 +54,13 @@ pub fn GitFs::remove_layer(self : GitFs, name : String) -> Bool {
 }
 
 ///|
-pub fn GitFs::list_layers(self : GitFs) -> Array[Layer] {
+pub fn BitFs::list_layers(self : BitFs) -> Array[Layer] {
   self.layers.copy()
 }
 
 ///|
-pub fn GitFs::flatten_layers(
-  self : GitFs,
+pub fn BitFs::flatten_layers(
+  self : BitFs,
   backing_fs : &@git.FileSystem,
   rfs : &@git.RepoFileSystem,
 ) -> @git.ObjectId raise @git.GitError {
@@ -129,12 +129,12 @@ fn merge_tree_into(
 }
 
 ///|
-pub fn GitFs::clear_layers(self : GitFs) -> Unit {
+pub fn BitFs::clear_layers(self : BitFs) -> Unit {
   self.layers.clear()
   self.cache.clear()
 }
 
 ///|
-pub fn GitFs::has_layer(self : GitFs, name : String) -> Bool {
+pub fn BitFs::has_layer(self : BitFs, name : String) -> Bool {
   self.layers.iter().any(fn(layer) { layer.name == name })
 }

@@ -1,4 +1,4 @@
-///| Path utilities for GitFs
+///| Path utilities for BitFs
 
 ///|
 pub fn join_path(root : String, path : String) -> String {

@@ -1,8 +1,8 @@
-///| GitFs benchmarks
+///| BitFs benchmarks
 
 ///|
 /// Run with:
-/// - moon bench -p mizchi/git/x/gitfs --target native
+/// - moon bench -p mizchi/git/x/bitfs --target native
 
 ///|
 let bench_1kb : Bytes = Bytes::make(1024, b'x')
@@ -71,26 +71,26 @@ test "bench ObjectId from_hex" (b : @bench.T) {
 }
 
 ///|
-test "bench gitfs write 100 files" (b : @bench.T) {
+test "bench bitfs write 100 files" (b : @bench.T) {
   let content = Bytes::make(100, b'a')
   b.bench(fn() {
-    let gitfs = GitFs::empty("/repo/.git")
+    let bitfs = BitFs::empty("/repo/.git")
     for i in 0..<100 {
-      gitfs.write_file("file\{i}.txt", content)
+      bitfs.write_file("file\{i}.txt", content)
     }
-    b.keep(gitfs)
+    b.keep(bitfs)
   })
 }
 
 ///|
-test "bench gitfs write 1000 files" (b : @bench.T) {
+test "bench bitfs write 1000 files" (b : @bench.T) {
   let content = Bytes::make(100, b'a')
   b.bench(fn() {
-    let gitfs = GitFs::empty("/repo/.git")
+    let bitfs = BitFs::empty("/repo/.git")
     for i in 0..<1000 {
-      gitfs.write_file("file\{i}.txt", content)
+      bitfs.write_file("file\{i}.txt", content)
     }
-    b.keep(gitfs)
+    b.keep(bitfs)
   })
 }
 
@@ -118,68 +118,68 @@ let bench_repo_100 : (@git.TestFs, @git.ObjectId) = try! setup_repo_with_files(
 )
 
 ///|
-test "bench gitfs read 100 files (cold)" (b : @bench.T) {
+test "bench bitfs read 100 files (cold)" (b : @bench.T) {
   let (fs, commit) = bench_repo_100
   b.bench(fn() {
-    let gitfs = try! GitFs::from_commit(fs, "/repo/.git", commit)
+    let bitfs = try! BitFs::from_commit(fs, "/repo/.git", commit)
     for i in 0..<100 {
-      b.keep(try! gitfs.read_file(fs, "file\{i}.txt"))
+      b.keep(try! bitfs.read_file(fs, "file\{i}.txt"))
     }
   })
 }
 
 ///|
-test "bench gitfs read 100 files (cached)" (b : @bench.T) {
+test "bench bitfs read 100 files (cached)" (b : @bench.T) {
   let (fs, commit) = bench_repo_100
-  let gitfs = try! GitFs::from_commit(fs, "/repo/.git", commit)
+  let bitfs = try! BitFs::from_commit(fs, "/repo/.git", commit)
   for i in 0..<100 {
-    let _ = try! gitfs.read_file(fs, "file\{i}.txt")
+    let _ = try! bitfs.read_file(fs, "file\{i}.txt")
 
   }
   b.bench(fn() {
     for i in 0..<100 {
-      b.keep(try! gitfs.read_file(fs, "file\{i}.txt"))
+      b.keep(try! bitfs.read_file(fs, "file\{i}.txt"))
     }
   })
 }
 
 ///|
-test "bench gitfs snapshot 100 files" (b : @bench.T) {
+test "bench bitfs snapshot 100 files" (b : @bench.T) {
   let content = Bytes::make(100, b'a')
   b.bench(fn() {
     let fs = @git.TestFs::new()
     try! @lib.init_repo(fs, "/repo")
-    let gitfs = GitFs::empty("/repo/.git")
+    let bitfs = BitFs::empty("/repo/.git")
     for i in 0..<100 {
-      gitfs.write_file("file\{i}.txt", content)
+      bitfs.write_file("file\{i}.txt", content)
     }
-    b.keep(try! gitfs.snapshot(fs, fs, "test", "Author <a@b.com>", 1700000000L))
+    b.keep(try! bitfs.snapshot(fs, fs, "test", "Author <a@b.com>", 1700000000L))
   })
 }
 
 ///|
-test "bench gitfs snapshot 500 files" (b : @bench.T) {
+test "bench bitfs snapshot 500 files" (b : @bench.T) {
   let content = Bytes::make(100, b'a')
   b.bench(fn() {
     let fs = @git.TestFs::new()
     try! @lib.init_repo(fs, "/repo")
-    let gitfs = GitFs::empty("/repo/.git")
+    let bitfs = BitFs::empty("/repo/.git")
     for i in 0..<500 {
-      gitfs.write_file("file\{i}.txt", content)
+      bitfs.write_file("file\{i}.txt", content)
     }
-    b.keep(try! gitfs.snapshot(fs, fs, "test", "Author <a@b.com>", 1700000000L))
+    b.keep(try! bitfs.snapshot(fs, fs, "test", "Author <a@b.com>", 1700000000L))
   })
 }
 
 ///|
-test "bench gitfs from_commit only" (b : @bench.T) {
+test "bench bitfs from_commit only" (b : @bench.T) {
   let (fs, commit) = bench_repo_100
-  b.bench(fn() { b.keep(try! GitFs::from_commit(fs, "/repo/.git", commit)) })
+  b.bench(fn() { b.keep(try! BitFs::from_commit(fs, "/repo/.git", commit)) })
 }
 
 ///|
-test "bench gitfs read_single_file" (b : @bench.T) {
+test "bench bitfs read_single_file" (b : @bench.T) {
   let (fs, commit) = bench_repo_100
-  let gitfs = try! GitFs::from_commit(fs, "/repo/.git", commit)
-  b.bench(fn() { b.keep(try! gitfs.read_file(fs, "file50.txt")) })
+  let bitfs = try! BitFs::from_commit(fs, "/repo/.git", commit)
+  b.bench(fn() { b.keep(try! bitfs.read_file(fs, "file50.txt")) })
 }

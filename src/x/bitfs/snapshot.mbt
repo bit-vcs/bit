@@ -1,8 +1,8 @@
 ///| Snapshot operations: commit, checkout, rollback
 
 ///|
-pub fn GitFs::snapshot(
-  self : GitFs,
+pub fn BitFs::snapshot(
+  self : BitFs,
   backing_fs : &@git.FileSystem,
   rfs : &@git.RepoFileSystem,
   message : String,
@@ -37,8 +37,8 @@ pub fn GitFs::snapshot(
 }
 
 ///|
-pub fn GitFs::checkout_snapshot(
-  self : GitFs,
+pub fn BitFs::checkout_snapshot(
+  self : BitFs,
   backing_fs : &@git.RepoFileSystem,
   commit_id : @git.ObjectId,
 ) -> Unit raise @git.GitError {
@@ -58,14 +58,14 @@ pub fn GitFs::checkout_snapshot(
 }
 
 ///|
-pub fn GitFs::rollback(self : GitFs) -> Unit {
+pub fn BitFs::rollback(self : BitFs) -> Unit {
   self.working.clear()
   self.cache.clear()
 }
 
 ///|
-pub fn GitFs::list_snapshots(
-  self : GitFs,
+pub fn BitFs::list_snapshots(
+  self : BitFs,
   backing_fs : &@git.RepoFileSystem,
   max_count? : Int = 100,
 ) -> Array[Snapshot] raise @git.GitError {
@@ -158,19 +158,19 @@ fn parse_int64(s : String) -> Int64 {
 }
 
 ///|
-pub fn GitFs::discard_changes(self : GitFs) -> Unit {
+pub fn BitFs::discard_changes(self : BitFs) -> Unit {
   self.rollback()
 }
 
 ///|
-pub fn GitFs::get_working_files(self : GitFs) -> Array[String] {
+pub fn BitFs::get_working_files(self : BitFs) -> Array[String] {
   let out = self.working.files.keys().collect()
   out.sort()
   out
 }
 
 ///|
-pub fn GitFs::get_deleted_files(self : GitFs) -> Array[String] {
+pub fn BitFs::get_deleted_files(self : BitFs) -> Array[String] {
   let out = self.working.deleted.keys().collect()
   out.sort()
   out

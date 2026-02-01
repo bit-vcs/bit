@@ -1,12 +1,12 @@
 {
   "warn-list": "-29",
   "import": [
-    "mizchi/git",
-    { "path": "mizchi/git/lib", "alias": "lib" },
+    { "path": "mizchi/bit", "alias": "git" },
+    { "path": "mizchi/bit/lib", "alias": "lib" },
     { "path": "moonbitlang/core/encoding/utf8", "alias": "utf8" }
   ],
   "test-import": [
-    { "path": "mizchi/git/lib", "alias": "lib" }
+    { "path": "mizchi/bit/lib", "alias": "lib" }
   ],
   "targets": {
     "comment.mbt": ["native"],

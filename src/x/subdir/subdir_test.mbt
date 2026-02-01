@@ -56,7 +56,7 @@ test "subdir: SubdirRepo::from_commit creates repo" {
 }
 
 ///|
-test "subdir: read file through GitFs" {
+test "subdir: read file through BitFs" {
   let fs = @git.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
@@ -75,8 +75,8 @@ test "subdir: read file through GitFs" {
     _ => return ()
   }
   // サブディレクトリ内のファイルをルートからのパスで読む
-  let gitfs = subdir.fs()
-  let content = gitfs.read_file(fs, "/foo.mbt") catch { _ => return () }
+  let bitfs = subdir.fs()
+  let content = bitfs.read_file(fs, "/foo.mbt") catch { _ => return () }
   assert_eq(content, b"content of foo")
 }
 
@@ -102,12 +102,12 @@ test "subdir: write file to working layer" {
   // 最初は dirty ではない
   assert_false(subdir.is_dirty())
   // ファイルを書き込む
-  let gitfs = subdir.fs()
-  gitfs.write_file("/foo.mbt", b"modified")
+  let bitfs = subdir.fs()
+  bitfs.write_file("/foo.mbt", b"modified")
   // dirty になる
   assert_true(subdir.is_dirty())
   // 変更が読める
-  let content = gitfs.read_file(fs, "/foo.mbt") catch { _ => return () }
+  let content = bitfs.read_file(fs, "/foo.mbt") catch { _ => return () }
   assert_eq(content, b"modified")
 }
 
@@ -1440,11 +1440,11 @@ test "misc: subdirectory with nested directories" {
     _ => return ()
   }
   // ネストしたディレクトリも読める
-  let gitfs = subdir.fs()
-  assert_true(gitfs.is_dir(fs, "/internal"))
-  assert_true(gitfs.is_dir(fs, "/internal/deep"))
-  assert_true(gitfs.is_file(fs, "/internal/helper.mbt"))
-  assert_true(gitfs.is_file(fs, "/internal/deep/util.mbt"))
+  let bitfs = subdir.fs()
+  assert_true(bitfs.is_dir(fs, "/internal"))
+  assert_true(bitfs.is_dir(fs, "/internal/deep"))
+  assert_true(bitfs.is_file(fs, "/internal/helper.mbt"))
+  assert_true(bitfs.is_file(fs, "/internal/deep/util.mbt"))
 }
 
 ///|

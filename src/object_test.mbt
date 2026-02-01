@@ -29,10 +29,10 @@ test "create blob world" {
 ///|
 test "create tree single entry" {
   // Tree with single blob entry
-  let blob_id = @git.ObjectId::from_hex(
+  let blob_id = ObjectId::from_hex(
     "ce013625030ba8dba906f756967f9e9ca394464a",
   )
-  let entry = @git.TreeEntry::new("100644", "hello.txt", blob_id)
+  let entry = TreeEntry::new("100644", "hello.txt", blob_id)
   let (tree_id, _) = create_tree([entry])
 
   // Verify the tree ID is computed correctly
@@ -43,15 +43,15 @@ test "create tree single entry" {
 ///|
 test "create tree multiple entries" {
   // Tree with multiple entries (must be sorted by name)
-  let hello_id = @git.ObjectId::from_hex(
+  let hello_id = ObjectId::from_hex(
     "ce013625030ba8dba906f756967f9e9ca394464a",
   )
-  let world_id = @git.ObjectId::from_hex(
+  let world_id = ObjectId::from_hex(
     "cc628ccd10742baea8241c5924df992b5c019f71",
   )
   let entries = [
-    @git.TreeEntry::new("100644", "hello.txt", hello_id),
-    @git.TreeEntry::new("100644", "world.txt", world_id),
+    TreeEntry::new("100644", "hello.txt", hello_id),
+    TreeEntry::new("100644", "world.txt", world_id),
   ]
   let (tree_id, compressed) = create_tree(entries)
 
@@ -64,10 +64,10 @@ test "create tree multiple entries" {
 
 ///|
 test "create commit" {
-  let tree_id = @git.ObjectId::from_hex(
+  let tree_id = ObjectId::from_hex(
     "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
   )
-  let commit = @git.Commit::new(
+  let commit = Commit::new(
     tree_id,
     [], // no parents
     "Test Author <test@example.com>",
@@ -89,13 +89,13 @@ test "create commit" {
 
 ///|
 test "create commit with parent" {
-  let tree_id = @git.ObjectId::from_hex(
+  let tree_id = ObjectId::from_hex(
     "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
   )
-  let parent_id = @git.ObjectId::from_hex(
+  let parent_id = ObjectId::from_hex(
     "0000000000000000000000000000000000000001",
   )
-  let commit = @git.Commit::new(
+  let commit = Commit::new(
     tree_id,
     [parent_id],
     "Test Author <test@example.com>",
@@ -112,16 +112,16 @@ test "create commit with parent" {
 
 ///|
 test "ObjectType to_string" {
-  inspect(@git.ObjectType::Blob.to_string(), content="blob")
-  inspect(@git.ObjectType::Tree.to_string(), content="tree")
-  inspect(@git.ObjectType::Commit.to_string(), content="commit")
-  inspect(@git.ObjectType::Tag.to_string(), content="tag")
+  inspect(ObjectType::Blob.to_string(), content="blob")
+  inspect(ObjectType::Tree.to_string(), content="tree")
+  inspect(ObjectType::Commit.to_string(), content="commit")
+  inspect(ObjectType::Tag.to_string(), content="tag")
 }
 
 ///|
 test "ObjectType to_packfile_type" {
-  inspect(@git.ObjectType::Commit.to_packfile_type(), content="1")
-  inspect(@git.ObjectType::Tree.to_packfile_type(), content="2")
-  inspect(@git.ObjectType::Blob.to_packfile_type(), content="3")
-  inspect(@git.ObjectType::Tag.to_packfile_type(), content="4")
+  inspect(ObjectType::Commit.to_packfile_type(), content="1")
+  inspect(ObjectType::Tree.to_packfile_type(), content="2")
+  inspect(ObjectType::Blob.to_packfile_type(), content="3")
+  inspect(ObjectType::Tag.to_packfile_type(), content="4")
 }

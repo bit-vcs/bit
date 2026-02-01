@@ -174,14 +174,14 @@ pub fn SubdirRepo::from_commit(
   let tree_id = extract_subdir_tree(db, rfs, commit_id, normalized_path) catch {
     e => raise e
   }
-  // サブディレクトリのツリーをベースとした GitFs を作成
-  let gitfs = @gitfs.GitFs::from_tree(git_dir, tree_id)
+  // サブディレクトリのツリーをベースとした BitFs を作成
+  let bitfs = @bitfs.BitFs::from_tree(git_dir, tree_id)
   {
     git_dir,
     subdir_path: normalized_path,
     current_commit: Some(commit_id),
     subdir_tree: Some(tree_id),
-    gitfs,
+    bitfs,
     config,
   }
 }
@@ -263,17 +263,17 @@ pub fn SubdirRepo::tree_id(self : SubdirRepo) -> @git.ObjectId? {
 ///|
 /// 変更があるかどうか
 pub fn SubdirRepo::is_dirty(self : SubdirRepo) -> Bool {
-  self.gitfs.is_dirty()
+  self.bitfs.is_dirty()
 }
 
 ///|
-/// GitFs を取得（内部アクセス用）
-pub fn SubdirRepo::fs(self : SubdirRepo) -> @gitfs.GitFs {
-  self.gitfs
+/// BitFs を取得（内部アクセス用）
+pub fn SubdirRepo::fs(self : SubdirRepo) -> @bitfs.BitFs {
+  self.bitfs
 }
 
 ///|
-/// ワーキングディレクトリの変更を gitfs に読み込む
+/// ワーキングディレクトリの変更を bitfs に読み込む
 /// rfs: 実際のファイルシステム（OsFs など）
 /// workdir: ワーキングディレクトリのルートパス
 pub fn SubdirRepo::load_workdir(
@@ -301,26 +301,26 @@ pub fn SubdirRepo::load_workdir(
         continue
       }
       let full_path = dir_path + "/" + entry
-      let gitfs_path = if rel_path == "/" {
+      let bitfs_path = if rel_path == "/" {
         "/" + entry
       } else {
         rel_path + "/" + entry
       }
       if rfs.is_dir(full_path) {
         // ディレクトリの場合はスタックに追加
-        stack.push((base_path, gitfs_path))
+        stack.push((base_path, bitfs_path))
       } else {
         // ファイルの場合は読み込んで比較
         let content = rfs.read_file(full_path) catch {
           _ => continue // 読めなければスキップ
         }
         // 既存の内容と比較
-        let existing = self.gitfs.read_file(rfs, gitfs_path) catch {
+        let existing = self.bitfs.read_file(rfs, bitfs_path) catch {
           _ => b"" // ファイルが存在しない場合は空
         }
         // 異なる場合のみ書き込み
         if content != existing {
-          self.gitfs.write_file(gitfs_path, content)
+          self.bitfs.write_file(bitfs_path, content)
         }
       }
     }

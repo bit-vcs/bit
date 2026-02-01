@@ -1,17 +1,17 @@
 {
   "warn-list": "-29",
   "import": [
-    "mizchi/git",
-    { "path": "mizchi/git/lib", "alias": "lib" },
-    { "path": "mizchi/git/x/gitfs", "alias": "gitfs" }
+    { "path": "mizchi/bit", "alias": "git" },
+    { "path": "mizchi/bit/lib", "alias": "lib" },
+    { "path": "mizchi/bit/x/bitfs", "alias": "bitfs" }
   ],
   "test-import": [
     { "path": "moonbitlang/core/bench", "alias": "bench" }
   ],
   "targets": {
     "bench_test.mbt": ["native"],
-    "gitdb.mbt": ["native"],
-    "gitdb_test.mbt": ["native"],
+    "bitdb.mbt": ["native"],
+    "bitdb_test.mbt": ["native"],
     "gossip.mbt": ["native"],
     "merge.mbt": ["native"],
     "serialization.mbt": ["native"],

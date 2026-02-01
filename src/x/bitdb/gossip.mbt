@@ -14,19 +14,19 @@
 
 ///|
 /// Get current gossip state
-pub fn GitDb::get_gossip_state(self : GitDb, timestamp : Int64) -> GossipState {
+pub fn BitDb::get_gossip_state(self : BitDb, timestamp : Int64) -> GossipState {
   { node_id: self.node_id, head: self.head, clock: self.clock, timestamp }
 }
 
 ///|
 /// Add or update a peer
-pub fn GitDb::add_peer(self : GitDb, peer : PeerInfo) -> Unit {
+pub fn BitDb::add_peer(self : BitDb, peer : PeerInfo) -> Unit {
   self.peers[peer.node_id.id] = peer
 }
 
 ///|
 /// Remove a peer
-pub fn GitDb::remove_peer(self : GitDb, node_id : NodeId) -> Bool {
+pub fn BitDb::remove_peer(self : BitDb, node_id : NodeId) -> Bool {
   if self.peers.contains(node_id.id) {
     self.peers.remove(node_id.id)
     true
@@ -37,7 +37,7 @@ pub fn GitDb::remove_peer(self : GitDb, node_id : NodeId) -> Bool {
 
 ///|
 /// Get all peers
-pub fn GitDb::get_peers(self : GitDb) -> Array[PeerInfo] {
+pub fn BitDb::get_peers(self : BitDb) -> Array[PeerInfo] {
   let result : Array[PeerInfo] = []
   for entry in self.peers {
     result.push(entry.1)
@@ -47,8 +47,8 @@ pub fn GitDb::get_peers(self : GitDb) -> Array[PeerInfo] {
 
 ///|
 /// Select random peers for gossip (anti-entropy)
-pub fn GitDb::select_gossip_peers(
-  self : GitDb,
+pub fn BitDb::select_gossip_peers(
+  self : BitDb,
   count : Int,
   seed : Int64,
 ) -> Array[PeerInfo] {
@@ -74,8 +74,8 @@ pub fn GitDb::select_gossip_peers(
 ///|
 /// Handle incoming gossip message
 /// Returns optional response message
-pub fn GitDb::handle_gossip(
-  self : GitDb,
+pub fn BitDb::handle_gossip(
+  self : BitDb,
   backing_fs : &@git.RepoFileSystem,
   msg : GossipMessage,
   timestamp : Int64,
@@ -97,8 +97,8 @@ pub fn GitDb::handle_gossip(
 }
 
 ///|
-fn GitDb::handle_announce(
-  self : GitDb,
+fn BitDb::handle_announce(
+  self : BitDb,
   state : GossipState,
   timestamp : Int64,
 ) -> GossipMessage? {
@@ -129,13 +129,13 @@ fn GitDb::handle_announce(
 }
 
 ///|
-fn GitDb::handle_want_objects(
-  self : GitDb,
+fn BitDb::handle_want_objects(
+  self : BitDb,
   backing_fs : &@git.RepoFileSystem,
   ids : Array[@git.ObjectId],
 ) -> GossipMessage? {
   let objects : Array[GitObject] = []
-  let db = self.gitfs.get_db(backing_fs) catch { _ => return None }
+  let db = self.bitfs.get_db(backing_fs) catch { _ => return None }
   for id in ids {
     let obj = db.get(backing_fs, id) catch { _ => continue }
     guard obj is Some(o) else { continue }
@@ -149,15 +149,15 @@ fn GitDb::handle_want_objects(
 }
 
 ///|
-fn GitDb::handle_have_objects(self : GitDb, objects : Array[GitObject]) -> Unit {
+fn BitDb::handle_have_objects(self : BitDb, objects : Array[GitObject]) -> Unit {
   for obj in objects {
     self.pending_objects[obj.id.to_hex()] = obj
   }
 }
 
 ///|
-fn GitDb::handle_sync_request(
-  self : GitDb,
+fn BitDb::handle_sync_request(
+  self : BitDb,
   backing_fs : &@git.RepoFileSystem,
   _from : NodeId,
   their_head : @git.ObjectId,
@@ -172,8 +172,8 @@ fn GitDb::handle_sync_request(
 }
 
 ///|
-fn GitDb::handle_sync_response(
-  self : GitDb,
+fn BitDb::handle_sync_response(
+  self : BitDb,
   objects : Array[GitObject],
   _new_head : @git.ObjectId,
 ) -> Unit {
@@ -187,8 +187,8 @@ fn GitDb::handle_sync_response(
 ///|
 /// Find objects that the peer is missing
 /// This does a simple walk from our HEAD to their HEAD
-fn GitDb::find_missing_objects(
-  self : GitDb,
+fn BitDb::find_missing_objects(
+  self : BitDb,
   backing_fs : &@git.RepoFileSystem,
   their_head : @git.ObjectId,
 ) -> Array[GitObject] {
@@ -196,7 +196,7 @@ fn GitDb::find_missing_objects(
   if self.head == their_head || self.head == @git.ObjectId::zero() {
     return result
   }
-  let db = self.gitfs.get_db(backing_fs) catch { _ => return result }
+  let db = self.bitfs.get_db(backing_fs) catch { _ => return result }
   // Collect objects reachable from our HEAD
   let our_objects : Map[String, Bool] = {}
   collect_reachable_objects(db, backing_fs, self.head, our_objects)
@@ -255,8 +255,8 @@ fn collect_reachable_objects(
 ///|
 /// Apply pending objects from sync
 /// Returns number of objects applied
-pub fn GitDb::apply_pending_objects(
-  self : GitDb,
+pub fn BitDb::apply_pending_objects(
+  self : BitDb,
   write_fs : &@git.FileSystem,
   git_dir : String,
 ) -> Int raise @git.GitError {
@@ -272,12 +272,12 @@ pub fn GitDb::apply_pending_objects(
 
 ///|
 /// Check if we have pending objects to apply
-pub fn GitDb::has_pending_objects(self : GitDb) -> Bool {
+pub fn BitDb::has_pending_objects(self : BitDb) -> Bool {
   self.pending_objects.length() > 0
 }
 
 ///|
 /// Get count of pending objects
-pub fn GitDb::pending_object_count(self : GitDb) -> Int {
+pub fn BitDb::pending_object_count(self : BitDb) -> Int {
   self.pending_objects.length()
 }

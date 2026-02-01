@@ -46,15 +46,15 @@ test "partial_clone: mount and list files" {
   }
   println("Commit: \{commit_id}")
 
-  // Mount with GitFs
-  let gitfs = GitFs::from_commit(osfs, git_dir, commit_id)
-  println("GitFs mounted")
-  println("  is_lazy: \{gitfs.is_lazy()}")
-  println("  is_promisor_enabled: \{gitfs.is_promisor_enabled()}")
-  println("  has_promisor: \{gitfs.has_promisor(osfs)}")
+  // Mount with BitFs
+  let bitfs = BitFs::from_commit(osfs, git_dir, commit_id)
+  println("BitFs mounted")
+  println("  is_lazy: \{bitfs.is_lazy()}")
+  println("  is_promisor_enabled: \{bitfs.is_promisor_enabled()}")
+  println("  has_promisor: \{bitfs.has_promisor(osfs)}")
 
   // List root directory (this should work - tree objects are available)
-  let root = gitfs.readdir(osfs, "")
+  let root = bitfs.readdir(osfs, "")
   println("Root entries: \{root.length()}")
   for entry in root {
     println("  \{entry}")
@@ -63,8 +63,8 @@ test "partial_clone: mount and list files" {
 
   // Check if files need fetching
   for entry in root {
-    if gitfs.is_file(osfs, entry) {
-      let needs = gitfs.needs_fetch(osfs, entry)
+    if bitfs.is_file(osfs, entry) {
+      let needs = bitfs.needs_fetch(osfs, entry)
       println("  \{entry}: needs_fetch=\{needs}")
     }
   }
@@ -96,18 +96,18 @@ async test "partial_clone: on-demand fetch" {
   } else {
     @git.ObjectId::from_hex(head_str)
   }
-  let gitfs = GitFs::from_commit(osfs, git_dir, commit_id)
+  let bitfs = BitFs::from_commit(osfs, git_dir, commit_id)
 
   // Try to read a file - this should trigger on-demand fetch
   println("\n=== On-demand Fetch Test ===")
   println("Attempting to read README.md...")
 
   // Check if needs fetch first
-  let needs = gitfs.needs_fetch(osfs, "README.md")
+  let needs = bitfs.needs_fetch(osfs, "README.md")
   println("needs_fetch: \{needs}")
 
   // Use async read to fetch
-  let content = gitfs.read_file_async(osfs, osfs, "README.md")
+  let content = bitfs.read_file_async(osfs, osfs, "README.md")
   println("README.md: \{content.length()} bytes")
   assert_true(content.length() > 0)
 
@@ -125,7 +125,7 @@ async test "partial_clone: on-demand fetch" {
 
   // Verify file is now locally available (written as loose object)
   // After fetch, the sync read should work
-  let content2 = gitfs.read_file(osfs, "README.md")
+  let content2 = bitfs.read_file(osfs, "README.md")
   println("Sync read after fetch: \{content2.length()} bytes")
   assert_eq(content.length(), content2.length())
   println("\n=== On-demand Fetch Test Passed ===")
@@ -156,11 +156,11 @@ test "partial_clone: glob pattern matching" {
   } else {
     @git.ObjectId::from_hex(head_str)
   }
-  let gitfs = GitFs::from_commit(osfs, git_dir, commit_id)
+  let bitfs = BitFs::from_commit(osfs, git_dir, commit_id)
   println("\n=== Glob Pattern Test ===")
 
   // Test collect_files_bfs
-  let bfs_files = gitfs.collect_files_bfs(osfs, 50)
+  let bfs_files = bitfs.collect_files_bfs(osfs, 50)
   println("BFS files (limit 50): \{bfs_files.length()}")
   println("First 5 files:")
   for i in 0..<5 {
@@ -181,7 +181,7 @@ test "partial_clone: glob pattern matching" {
   }
 
   // Test get_pending_fetches
-  let pending = gitfs.get_pending_fetches(osfs, 100)
+  let pending = bitfs.get_pending_fetches(osfs, 100)
   println("\nPending fetches: \{pending.length()}")
   for i in 0..<3 {
     if i < pending.length() {
@@ -215,15 +215,15 @@ async test "partial_clone: prefetch with glob" {
   } else {
     @git.ObjectId::from_hex(head_str)
   }
-  let gitfs = GitFs::from_commit(osfs, git_dir, commit_id)
+  let bitfs = BitFs::from_commit(osfs, git_dir, commit_id)
   println("\n=== Prefetch Glob Test ===")
 
   // Prefetch all .json files
-  let fetched = gitfs.prefetch_glob(osfs, osfs, "*.json")
+  let fetched = bitfs.prefetch_glob(osfs, osfs, "*.json")
   println("Prefetched *.json files: \{fetched}")
 
   // Now they should be available locally
-  let package_json = gitfs.read_file(osfs, "package.json")
+  let package_json = bitfs.read_file(osfs, "package.json")
   println("package.json: \{package_json.length()} bytes")
   assert_true(package_json.length() > 0)
   println("\n=== Prefetch Glob Test Passed ===")
@@ -253,19 +253,19 @@ async test "partial_clone: prefetch BFS" {
   } else {
     @git.ObjectId::from_hex(head_str)
   }
-  let gitfs = GitFs::from_commit(osfs, git_dir, commit_id)
+  let bitfs = BitFs::from_commit(osfs, git_dir, commit_id)
   println("\n=== Prefetch BFS Test ===")
 
   // Get pending before prefetch
-  let pending_before = gitfs.get_pending_fetches(osfs, 100)
+  let pending_before = bitfs.get_pending_fetches(osfs, 100)
   println("Pending before: \{pending_before.length()}")
 
   // Prefetch first 10 files in BFS order
-  let fetched = gitfs.prefetch_bfs(osfs, osfs, 10)
+  let fetched = bitfs.prefetch_bfs(osfs, osfs, 10)
   println("Prefetched (BFS limit 10): \{fetched}")
 
   // Get pending after prefetch
-  let pending_after = gitfs.get_pending_fetches(osfs, 100)
+  let pending_after = bitfs.get_pending_fetches(osfs, 100)
   println("Pending after: \{pending_after.length()}")
 
   // Should have reduced pending count
@@ -297,14 +297,14 @@ async test "partial_clone: prefetch multiple files" {
   } else {
     @git.ObjectId::from_hex(head_str)
   }
-  let gitfs = GitFs::from_commit(osfs, git_dir, commit_id)
+  let bitfs = BitFs::from_commit(osfs, git_dir, commit_id)
   println("\n=== Prefetch Test ===")
 
   // Get list of files to prefetch
-  let root = gitfs.readdir(osfs, "")
+  let root = bitfs.readdir(osfs, "")
   let files_to_fetch : Array[String] = []
   for entry in root {
-    if gitfs.is_file(osfs, entry) && gitfs.needs_fetch(osfs, entry) {
+    if bitfs.is_file(osfs, entry) && bitfs.needs_fetch(osfs, entry) {
       files_to_fetch.push(entry)
     }
   }
@@ -317,12 +317,12 @@ async test "partial_clone: prefetch multiple files" {
       files_to_fetch
     }
     println("Prefetching: \{to_prefetch}")
-    let fetched = gitfs.prefetch(osfs, osfs, to_prefetch)
+    let fetched = bitfs.prefetch(osfs, osfs, to_prefetch)
     println("Fetched \{fetched} objects")
 
     // Verify they can now be read synchronously
     for file in to_prefetch {
-      let content = gitfs.read_file(osfs, file)
+      let content = bitfs.read_file(osfs, file)
       println("  \{file}: \{content.length()} bytes")
     }
   }

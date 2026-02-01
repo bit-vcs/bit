@@ -1,14 +1,14 @@
-# moonbit-git
+# bit
 
 **Git as a library** - A Git implementation in [MoonBit](https://docs.moonbitlang.com) that you can embed, extend, and use programmatically.
 
-## Why moonbit-git?
+## Why bit?
 
-| | Git CLI | moonbit-git |
+| | Git CLI | bit |
 |---|---------|-------------|
 | Compatibility | - | ✅ 4,205 tests pass |
 | Use as library | ❌ | ✅ Embed in your app |
-| Virtual filesystem | ❌ | ✅ GitFs API |
+| Virtual filesystem | ❌ | ✅ BitFs API |
 | Lazy loading | ❌ | ✅ Instant mount |
 | Partial clone | ✅ | ✅ + on-demand fetch API |
 | Target platforms | Native | Native, WASM, JS |
@@ -19,16 +19,16 @@
 
 ```moonbit
 // Mount and browse without checkout
-let gitfs = GitFs::from_commit(fs, ".git", commit_id)
+let bitfs = BitFs::from_commit(fs, ".git", commit_id)
 
 // List files (instant - no blob loading)
-let files = gitfs.readdir(fs, "src")
+let files = bitfs.readdir(fs, "src")
 
 // Read file (fetches blob on-demand if partial clone)
-let content = gitfs.read_file(fs, "src/main.mbt")
+let content = bitfs.read_file(fs, "src/main.mbt")
 
 // Check what needs fetching
-let pending = gitfs.get_pending_fetches(fs, 100)
+let pending = bitfs.get_pending_fetches(fs, 100)
 ```
 
 ### 2. Partial Clone with Smart Prefetch
@@ -40,10 +40,10 @@ moongit clone --filter=blob:none https://github.com/user/repo
 
 ```moonbit
 // Prefetch files matching pattern
-gitfs.prefetch_glob(fs, fs, "src/**/*.mbt")
+bitfs.prefetch_glob(fs, fs, "src/**/*.mbt")
 
 // Or prefetch in breadth-first order (shallow files first)
-gitfs.prefetch_bfs(fs, fs, limit=50)
+bitfs.prefetch_bfs(fs, fs, limit=50)
 ```
 
 ### 3. Full Git Compatibility
@@ -131,7 +131,7 @@ moongit subdir pull vendor/lib https://github.com/user/lib-repo --branch main
 ## Performance
 
 ```
-GitFs Access Pattern:
+BitFs Access Pattern:
 ─────────────────────────────────────────
 Mount:        Instant (HEAD ref only)
 readdir:      Local (tree from pack)
@@ -171,7 +171,7 @@ moon build --target native
 just install
 
 # Use as library
-moon add mizchi/git
+moon add mizchi/bit
 ```
 
 ## Supported Commands
@@ -188,14 +188,14 @@ moon add mizchi/git
 
 Experimental features built on top of the core Git implementation.
 
-### GitFs - Virtual Filesystem
+### BitFs - Virtual Filesystem
 
 Mount any commit as a filesystem with lazy blob loading:
 
 ```moonbit
-let gitfs = GitFs::from_commit(fs, ".git", commit_id)
-let files = gitfs.readdir(fs, "src")      // Instant (tree only)
-let content = gitfs.read_file(fs, "src/main.mbt")  // Fetches on-demand
+let bitfs = BitFs::from_commit(fs, ".git", commit_id)
+let files = bitfs.readdir(fs, "src")      // Instant (tree only)
+let content = bitfs.read_file(fs, "src/main.mbt")  // Fetches on-demand
 ```
 
 ### Subdir-Clone - Clone Subdirectory as Independent Repo
@@ -236,12 +236,12 @@ den.push(fs, fs, remote_url)
 den.fetch(fs, fs, remote_url)
 ```
 
-### GitDb - Distributed KV Store (WIP)
+### BitDb - Distributed KV Store (WIP)
 
 Git-backed key-value store with Gossip protocol sync:
 
 ```moonbit
-let db = GitDb::init(fs, fs, git_dir, node_id)
+let db = BitDb::init(fs, fs, git_dir, node_id)
 
 // Hierarchical keys → Git tree structure
 db.set(fs, fs, "users/alice/profile", value, ts)
@@ -257,7 +257,7 @@ db.sync_with_peer(fs, fs, peer_url)
 ┌─────────────────────────────────────────────────┐
 │  Your Application                               │
 ├─────────────────────────────────────────────────┤
-│  GitFs (Virtual Filesystem)                     │
+│  BitFs (Virtual Filesystem)                     │
 │  - Mount any commit as filesystem               │
 │  - Lazy blob loading                            │
 │  - Prefetch APIs (glob, BFS)                    │

@@ -52,21 +52,21 @@ test "sha1 git blob hello" {
 ///|
 test "ObjectId from_hex to_hex roundtrip" {
   let hex = "ce013625030ba8dba906f756967f9e9ca394464a"
-  let id = @git.ObjectId::from_hex(hex)
+  let id = ObjectId::from_hex(hex)
   inspect(id.to_hex(), content="ce013625030ba8dba906f756967f9e9ca394464a")
 }
 
 ///|
 test "ObjectId zero" {
-  let id = @git.ObjectId::zero()
+  let id = ObjectId::zero()
   inspect(id.to_hex(), content="0000000000000000000000000000000000000000")
 }
 
 ///|
 test "ObjectId equality" {
-  let id1 = @git.ObjectId::from_hex("ce013625030ba8dba906f756967f9e9ca394464a")
-  let id2 = @git.ObjectId::from_hex("ce013625030ba8dba906f756967f9e9ca394464a")
-  let id3 = @git.ObjectId::from_hex("da39a3ee5e6b4b0d3255bfef95601890afd80709")
+  let id1 = ObjectId::from_hex("ce013625030ba8dba906f756967f9e9ca394464a")
+  let id2 = ObjectId::from_hex("ce013625030ba8dba906f756967f9e9ca394464a")
+  let id3 = ObjectId::from_hex("da39a3ee5e6b4b0d3255bfef95601890afd80709")
   assert_true(id1 == id2)
   assert_true(id1 != id3)
 }

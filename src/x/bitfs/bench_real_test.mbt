@@ -4,7 +4,7 @@
 
 ///| Run with:
 
-///| - moon bench -p mizchi/git/x/gitfs --target native -f "bench_real"
+///| - moon bench -p mizchi/git/x/bitfs --target native -f "bench_real"
 
 ///|
 
@@ -12,7 +12,7 @@
 
 ///| 1. Create a snapshot from a real .git directory
 
-///| 2. Load it into memory (GitFs)
+///| 2. Load it into memory (BitFs)
 
 ///| 3. Work in memory with COW
 
@@ -77,8 +77,8 @@ test "real_git: can read HEAD" {
 }
 
 ///|
-/// Simple test to verify GitFs from real git works
-test "real_git: can create GitFs from HEAD" {
+/// Simple test to verify BitFs from real git works
+test "real_git: can create BitFs from HEAD" {
   if not(bench_git_dir_exists()) {
     println("Skipping: bench git dir not found")
     return
@@ -86,8 +86,8 @@ test "real_git: can create GitFs from HEAD" {
   let osfs = @osfs.OsFs::new()
   let git_dir = get_bench_git_dir()
   let commit_id = get_head_commit(osfs, git_dir)
-  let gitfs = GitFs::from_commit(osfs, git_dir, commit_id)
-  assert_false(gitfs.is_dirty())
+  let bitfs = BitFs::from_commit(osfs, git_dir, commit_id)
+  assert_false(bitfs.is_dirty())
 }
 
 ///|
@@ -100,8 +100,8 @@ test "real_git: can read files" {
   let osfs = @osfs.OsFs::new()
   let git_dir = get_bench_git_dir()
   let commit_id = get_head_commit(osfs, git_dir)
-  let gitfs = GitFs::from_commit(osfs, git_dir, commit_id)
-  let entries = gitfs.readdir(osfs, "")
+  let bitfs = BitFs::from_commit(osfs, git_dir, commit_id)
+  let entries = bitfs.readdir(osfs, "")
   assert_true(entries.length() > 0)
 }
 
@@ -126,11 +126,11 @@ test "bench_real: ObjectDb load" (b : @bench.T) {
 }
 
 ///|
-/// Benchmark: Create GitFs snapshot from real .git (full load)
+/// Benchmark: Create BitFs snapshot from real .git (full load)
 test "bench_real: snapshot from .git" (b : @bench.T) {
   b.bench(fn() {
     b.keep(
-      try! GitFs::from_commit(
+      try! BitFs::from_commit(
         bench_real_osfs, bench_real_git_dir, bench_real_commit,
       ),
     )
@@ -138,21 +138,21 @@ test "bench_real: snapshot from .git" (b : @bench.T) {
 }
 
 ///|
-/// Benchmark: Read file list from root (cached gitfs)
+/// Benchmark: Read file list from root (cached bitfs)
 test "bench_real: readdir root" (b : @bench.T) {
-  let gitfs = try! GitFs::from_commit(
+  let bitfs = try! BitFs::from_commit(
     bench_real_osfs, bench_real_git_dir, bench_real_commit,
   )
-  b.bench(fn() { b.keep(try! gitfs.readdir(bench_real_osfs, "")) })
+  b.bench(fn() { b.keep(try! bitfs.readdir(bench_real_osfs, "")) })
 }
 
 ///|
 /// Benchmark: Read README.md (cold then cached)
 test "bench_real: read README.md" (b : @bench.T) {
-  let gitfs = try! GitFs::from_commit(
+  let bitfs = try! BitFs::from_commit(
     bench_real_osfs, bench_real_git_dir, bench_real_commit,
   )
-  b.bench(fn() { b.keep(try! gitfs.read_file(bench_real_osfs, "README.md")) })
+  b.bench(fn() { b.keep(try! bitfs.read_file(bench_real_osfs, "README.md")) })
 }
 
 ///|
@@ -160,13 +160,13 @@ test "bench_real: read README.md" (b : @bench.T) {
 test "bench_real: write 100 files in memory" (b : @bench.T) {
   let content = Bytes::make(100, b'x')
   b.bench(fn() {
-    let gitfs = try! GitFs::from_commit(
+    let bitfs = try! BitFs::from_commit(
       bench_real_osfs, bench_real_git_dir, bench_real_commit,
     )
     for i in 0..<100 {
-      gitfs.write_file("test/file\{i}.txt", content)
+      bitfs.write_file("test/file\{i}.txt", content)
     }
-    b.keep(gitfs)
+    b.keep(bitfs)
   })
 }
 
@@ -183,7 +183,7 @@ test "bench_real: ObjectDb load_lazy" (b : @bench.T) {
 test "bench_real: snapshot_lazy from .git" (b : @bench.T) {
   b.bench(fn() {
     b.keep(
-      try! GitFs::from_commit(
+      try! BitFs::from_commit(
         bench_real_osfs, bench_real_git_dir, bench_real_commit,
       ),
     )
@@ -193,10 +193,10 @@ test "bench_real: snapshot_lazy from .git" (b : @bench.T) {
 ///|
 /// Benchmark: read files after lazy snapshot
 test "bench_real: read README.md (lazy)" (b : @bench.T) {
-  let gitfs = try! GitFs::from_commit(
+  let bitfs = try! BitFs::from_commit(
     bench_real_osfs, bench_real_git_dir, bench_real_commit,
   )
-  b.bench(fn() { b.keep(try! gitfs.read_file(bench_real_osfs, "README.md")) })
+  b.bench(fn() { b.keep(try! bitfs.read_file(bench_real_osfs, "README.md")) })
 }
 
 ///|
@@ -205,16 +205,16 @@ test "bench_real: full workflow (lazy)" (b : @bench.T) {
   let content = Bytes::make(100, b'x')
   b.bench(fn() {
     // 1. Create lazy snapshot from HEAD
-    let gitfs = try! GitFs::from_commit(
+    let bitfs = try! BitFs::from_commit(
       bench_real_osfs, bench_real_git_dir, bench_real_commit,
     )
     // 2. Read some files
-    let _ = try! gitfs.readdir(bench_real_osfs, "")
-    let _ = try! gitfs.read_file(bench_real_osfs, "README.md")
+    let _ = try! bitfs.readdir(bench_real_osfs, "")
+    let _ = try! bitfs.read_file(bench_real_osfs, "README.md")
     // 3. Write changes (COW)
     for i in 0..<10 {
-      gitfs.write_file("test/file\{i}.txt", content)
+      bitfs.write_file("test/file\{i}.txt", content)
     }
-    b.keep(gitfs.is_dirty())
+    b.keep(bitfs.is_dirty())
   })
 }

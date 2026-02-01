@@ -41,9 +41,9 @@ test "perf: partial clone access pattern verification" {
   println("  - Parsing HEAD reference only")
   println("  - No pack file parsing yet")
   println("  - No network activity")
-  let gitfs = GitFs::from_commit(osfs, git_dir, commit_id)
+  let bitfs = BitFs::from_commit(osfs, git_dir, commit_id)
   println(
-    "  → Mounted: lazy=\{gitfs.is_lazy()}, promisor=\{gitfs.is_promisor_enabled()}",
+    "  → Mounted: lazy=\{bitfs.is_lazy()}, promisor=\{bitfs.is_promisor_enabled()}",
   )
   println("")
 
@@ -53,15 +53,15 @@ test "perf: partial clone access pattern verification" {
   println("  - Resolves root tree object (local)")
   println("  - Returns file names from tree entries")
   println("  - NO blob resolution yet")
-  let entries = gitfs.readdir(osfs, "")
+  let entries = bitfs.readdir(osfs, "")
   println("  → Found \{entries.length()} entries")
 
   // Count what needs fetch vs what's local
   let mut local_count = 0
   let mut fetch_needed = 0
   for entry in entries {
-    if gitfs.is_file(osfs, entry) {
-      if gitfs.needs_fetch(osfs, entry) {
+    if bitfs.is_file(osfs, entry) {
+      if bitfs.needs_fetch(osfs, entry) {
         fetch_needed += 1
       } else {
         local_count += 1
@@ -74,9 +74,9 @@ test "perf: partial clone access pattern verification" {
   // Phase 3: Read local file (no network)
   println("Phase 3: read_file('README.md') - already local")
   println("  - Blob exists locally (small files often included)")
-  let readme_needs = gitfs.needs_fetch(osfs, "README.md")
+  let readme_needs = bitfs.needs_fetch(osfs, "README.md")
   println("  - needs_fetch: \{readme_needs}")
-  let readme = gitfs.read_file(osfs, "README.md")
+  let readme = bitfs.read_file(osfs, "README.md")
   println("  → Read \{readme.length()} bytes (no network)")
   println("")
 
@@ -84,14 +84,14 @@ test "perf: partial clone access pattern verification" {
   println("Phase 4: readdir('/src')")
   println("  - Resolves src/ tree object (local)")
   println("  - Still no blob resolution")
-  let src_entries = gitfs.readdir(osfs, "src")
+  let src_entries = bitfs.readdir(osfs, "src")
   println("  → Found \{src_entries.length()} entries in src/")
   println("")
 
   // Phase 5: Check a file that needs fetch
   println("Phase 5: Check file needing fetch")
   for entry in entries {
-    if gitfs.is_file(osfs, entry) && gitfs.needs_fetch(osfs, entry) {
+    if bitfs.is_file(osfs, entry) && bitfs.needs_fetch(osfs, entry) {
       println("  - \{entry} needs_fetch=true")
       println("  - Reading this would trigger network fetch")
       break
@@ -142,9 +142,9 @@ test "perf: verify lazy vs eager difference" {
   println("Lazy Mode (default):")
   println("  - Pack index: parsed on-demand")
   println("  - Objects: resolved when accessed")
-  let gitfs_lazy = GitFs::from_commit(osfs, git_dir, commit_id)
-  println("  → is_lazy: \{gitfs_lazy.is_lazy()}")
-  let entries_lazy = gitfs_lazy.readdir(osfs, "")
+  let bitfs_lazy = BitFs::from_commit(osfs, git_dir, commit_id)
+  println("  → is_lazy: \{bitfs_lazy.is_lazy()}")
+  let entries_lazy = bitfs_lazy.readdir(osfs, "")
   println("  → readdir works: \{entries_lazy.length()} entries")
   println("")
 

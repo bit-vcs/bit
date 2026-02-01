@@ -1,4 +1,4 @@
-///| Merge strategies for GitDb
+///| Merge strategies for BitDb
 
 ///|
 
@@ -21,8 +21,8 @@ pub(all) enum MergeResult {
 
 ///|
 /// Perform a three-way merge
-pub fn GitDb::merge(
-  self : GitDb,
+pub fn BitDb::merge(
+  self : BitDb,
   write_fs : &@git.FileSystem,
   backing_fs : &@git.RepoFileSystem,
   their_head : @git.ObjectId,
@@ -38,7 +38,7 @@ pub fn GitDb::merge(
   if self.head == @git.ObjectId::zero() {
     self.head = their_head
     self.clock = self.clock.merge(their_clock)
-    self.gitfs.checkout_snapshot(backing_fs, their_head)
+    self.bitfs.checkout_snapshot(backing_fs, their_head)
     return FastForward(their_head)
   }
   // They have no commits
@@ -46,7 +46,7 @@ pub fn GitDb::merge(
     return NoOp
   }
   // Find common ancestor
-  let db = self.gitfs.get_db(backing_fs)
+  let db = self.bitfs.get_db(backing_fs)
   let base = find_merge_base(db, backing_fs, self.head, their_head)
   // If their head is ancestor of ours, we're already up to date
   if base is Some(b) && b == their_head {
@@ -56,7 +56,7 @@ pub fn GitDb::merge(
   if base is Some(b) && b == self.head {
     self.head = their_head
     self.clock = self.clock.merge(their_clock)
-    self.gitfs.checkout_snapshot(backing_fs, their_head)
+    self.bitfs.checkout_snapshot(backing_fs, their_head)
     return FastForward(their_head)
   }
   // Need to do a real merge
@@ -90,8 +90,8 @@ pub fn GitDb::merge(
 }
 
 ///|
-fn GitDb::do_merge(
-  self : GitDb,
+fn BitDb::do_merge(
+  self : BitDb,
   _write_fs : &@git.FileSystem,
   backing_fs : &@git.RepoFileSystem,
   base : @git.ObjectId,
@@ -99,7 +99,7 @@ fn GitDb::do_merge(
   strategy : MergeStrategy,
 ) -> Array[String] {
   let conflicts : Array[String] = []
-  let db = self.gitfs.get_db(backing_fs) catch { _ => return conflicts }
+  let db = self.bitfs.get_db(backing_fs) catch { _ => return conflicts }
   // Get trees
   let base_tree = if base == @git.ObjectId::zero() {
     @git.ObjectId::zero()
@@ -129,7 +129,7 @@ fn GitDb::do_merge(
   collect_tree_files_flat(db, backing_fs, base_tree, "", base_files)
   collect_tree_files_flat(db, backing_fs, their_tree, "", their_files)
   // Get our current files
-  let our_files = self.gitfs.get_working_files()
+  let our_files = self.bitfs.get_working_files()
   let our_file_set : Map[String, Bool] = {}
   for f in our_files {
     our_file_set[f] = true
@@ -151,13 +151,13 @@ fn GitDb::do_merge(
     let in_base = base_files.contains(path)
     let in_theirs = their_files.contains(path)
     let in_ours = our_file_set.contains(path) ||
-      self.gitfs.is_file(backing_fs, path)
+      self.bitfs.is_file(backing_fs, path)
     let base_id = base_files.get(path)
     let their_id = their_files.get(path)
     // Determine if there's a conflict
     if in_theirs && in_ours {
       // Both have the file
-      let our_content = self.gitfs.read_file(backing_fs, path) catch {
+      let our_content = self.bitfs.read_file(backing_fs, path) catch {
         _ => continue
       }
       let our_hash = @git.hash_blob(our_content)
@@ -170,7 +170,7 @@ fn GitDb::do_merge(
             // We didn't change, take theirs
             let their_content = get_blob_content(db, backing_fs, their_hash)
             match their_content {
-              Some(c) => self.gitfs.write_file(path, c)
+              Some(c) => self.bitfs.write_file(path, c)
               None => ()
             }
           } else if base_hash == their_hash {
@@ -198,7 +198,7 @@ fn GitDb::do_merge(
         let their_hash = their_id.unwrap_or(@git.ObjectId::zero())
         let content = get_blob_content(db, backing_fs, their_hash)
         match content {
-          Some(c) => self.gitfs.write_file(path, c)
+          Some(c) => self.bitfs.write_file(path, c)
           None => ()
         }
       }
@@ -219,7 +219,7 @@ fn GitDb::do_merge(
 
 ///|
 fn resolve_conflict(
-  db : GitDb,
+  db : BitDb,
   obj_db : @lib.ObjectDb,
   backing_fs : &@git.RepoFileSystem,
   path : String,
@@ -232,7 +232,7 @@ fn resolve_conflict(
       // Take theirs (they're "newer" in this context)
       let content = get_blob_content(obj_db, backing_fs, their_hash)
       match content {
-        Some(c) => db.gitfs.write_file(path, c)
+        Some(c) => db.bitfs.write_file(path, c)
         None => ()
       }
     }
@@ -242,14 +242,14 @@ fn resolve_conflict(
         Bytes::new(0),
       )
       let merged = create_conflict_markers(our_content, their_content)
-      db.gitfs.write_file(path, merged)
+      db.bitfs.write_file(path, merged)
     }
     Custom(resolver) => {
       let their_content = get_blob_content(obj_db, backing_fs, their_hash).unwrap_or(
         Bytes::new(0),
       )
       let resolved = resolver(our_content, their_content)
-      db.gitfs.write_file(path, resolved)
+      db.bitfs.write_file(path, resolved)
     }
   }
 }
@@ -297,8 +297,8 @@ fn create_conflict_markers(ours : Bytes, theirs : Bytes) -> Bytes {
 }
 
 ///|
-fn GitDb::create_merge_commit(
-  self : GitDb,
+fn BitDb::create_merge_commit(
+  self : BitDb,
   write_fs : &@git.FileSystem,
   backing_fs : &@git.RepoFileSystem,
   their_head : @git.ObjectId,
@@ -308,7 +308,7 @@ fn GitDb::create_merge_commit(
   let short_hex = String::unsafe_substring(hex, start=0, end=8)
   let message = "Merge " + short_hex
   // First commit the current working state
-  let snapshot = self.gitfs.snapshot(
+  let snapshot = self.bitfs.snapshot(
     write_fs,
     backing_fs,
     message,

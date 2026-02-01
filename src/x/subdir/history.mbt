@@ -272,11 +272,11 @@ fn split_subdir_path(path : String) -> Array[String] {
 ///|
 /// サブディレクトリの差分を取得
 pub fn SubdirRepo::diff(self : SubdirRepo) -> Array[DiffEntry] {
-  let gitfs = self.gitfs
+  let bitfs = self.bitfs
   let result : Array[DiffEntry] = []
   // ワーキング層の変更を収集
-  let working = gitfs.get_working_files()
-  let deleted = gitfs.get_deleted_files()
+  let working = bitfs.get_working_files()
+  let deleted = bitfs.get_deleted_files()
   // 追加・変更されたファイル
   for path in working {
     // 追加されたファイルとして扱う（変更と追加の区別は簡略化）

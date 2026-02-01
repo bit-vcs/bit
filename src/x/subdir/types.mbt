@@ -15,7 +15,7 @@ pub struct SubdirRepo {
   /// サブディレクトリのツリーID
   subdir_tree : @git.ObjectId?
   /// 仮想ファイルシステム（サブディレクトリがルートとして見える）
-  gitfs : @gitfs.GitFs
+  bitfs : @bitfs.BitFs
   /// 設定
   config : SubdirConfig
 }

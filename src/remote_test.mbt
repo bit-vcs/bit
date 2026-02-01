@@ -1,7 +1,7 @@
 ///|
 /// Tests for Git HTTP push protocol
 test "Remote info_refs_url" {
-  let remote = @git.Remote::new("https://github.com/user/repo.git")
+  let remote = Remote::new("https://github.com/user/repo.git")
   inspect(
     remote.info_refs_url(),
     content="https://github.com/user/repo/info/refs?service=git-receive-pack",
@@ -10,7 +10,7 @@ test "Remote info_refs_url" {
 
 ///|
 test "Remote info_refs_url without .git" {
-  let remote = @git.Remote::new("https://github.com/user/repo")
+  let remote = Remote::new("https://github.com/user/repo")
   inspect(
     remote.info_refs_url(),
     content="https://github.com/user/repo/info/refs?service=git-receive-pack",
@@ -19,7 +19,7 @@ test "Remote info_refs_url without .git" {
 
 ///|
 test "Remote receive_pack_url" {
-  let remote = @git.Remote::new("https://github.com/user/repo.git")
+  let remote = Remote::new("https://github.com/user/repo.git")
   inspect(
     remote.receive_pack_url(),
     content="https://github.com/user/repo/git-receive-pack",
@@ -28,12 +28,12 @@ test "Remote receive_pack_url" {
 
 ///|
 test "build_receive_pack_body" {
-  let old_id = @git.ObjectId::zero()
-  let new_id = @git.ObjectId::from_hex(
+  let old_id = ObjectId::zero()
+  let new_id = ObjectId::from_hex(
     "ce013625030ba8dba906f756967f9e9ca394464a",
   )
   let packfile = Bytes::from_array([b'P', b'A', b'C', b'K'])
-  let req = @git.PushRequest::new(old_id, new_id, "refs/heads/main", packfile)
+  let req = PushRequest::new(old_id, new_id, "refs/heads/main", packfile)
   let body = build_receive_pack_body(req)
 
   // Should start with pkt-line
@@ -101,7 +101,7 @@ test "parse_receive_pack_response failure" {
   let result = parse_receive_pack_response(data)
   match result {
     Ok(_) => assert_true(false)
-    Err(@git.GitError::ProtocolError(msg)) =>
+    Err(GitError::ProtocolError(msg)) =>
       assert_true(msg.find("unpack error") is Some(_))
     Err(_) => assert_true(false)
   }

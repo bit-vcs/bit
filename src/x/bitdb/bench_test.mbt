@@ -6,9 +6,9 @@ fn create_test_db(
   fs : @git.TestFs,
   file_count : Int,
   file_size : Int,
-) -> GitDb raise @git.GitError {
+) -> BitDb raise @git.GitError {
   @lib.init_repo(fs, "/repo")
-  let db = GitDb::empty(NodeId::new("bench-node"), "/repo/.git")
+  let db = BitDb::empty(NodeId::new("bench-node"), "/repo/.git")
   // Create files with different content to avoid dedup
   for i = 0; i < file_count; i = i + 1 {
     let path = "dir" +
@@ -119,7 +119,7 @@ test "bench: round-trip (100 files x 1KB)" (b : @bench.T) {
 test "serialization: round-trip preserves data" {
   let fs = @git.TestFs::new()
   @lib.init_repo(fs, "/repo")
-  let db = GitDb::empty(NodeId::new("test-node"), "/repo/.git")
+  let db = BitDb::empty(NodeId::new("test-node"), "/repo/.git")
   // Add some data
   db.set("users/alice", b"Alice")
   db.set("users/bob", b"Bob")
@@ -143,7 +143,7 @@ test "serialization: round-trip preserves data" {
 test "serialization: stats" {
   let fs = @git.TestFs::new()
   @lib.init_repo(fs, "/repo")
-  let db = GitDb::empty(NodeId::new("test-node"), "/repo/.git")
+  let db = BitDb::empty(NodeId::new("test-node"), "/repo/.git")
   db.set("file1.txt", Bytes::make(100, b'a'))
   db.set("file2.txt", Bytes::make(200, b'b'))
   let _ = db.commit(fs, fs, "Test", 1000L)
@@ -161,7 +161,7 @@ test "serialization: stats" {
 test "demo: serialization overhead" {
   let fs = @git.TestFs::new()
   @lib.init_repo(fs, "/repo")
-  let db = GitDb::empty(NodeId::new("demo-node"), "/repo/.git")
+  let db = BitDb::empty(NodeId::new("demo-node"), "/repo/.git")
   // Create 50 files of 2KB each = 100KB raw data
   for i = 0; i < 50; i = i + 1 {
     // Use different content for each file to avoid dedup

@@ -1,6 +1,6 @@
 {
   "import": [
-    "mizchi/git",
+    { "path": "mizchi/bit", "alias": "git" },
     "moonbitlang/x/fs"
   ],
   "targets": {

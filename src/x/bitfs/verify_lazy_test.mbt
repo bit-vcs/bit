@@ -30,52 +30,52 @@ test "verify: lazy loading on helix repo" {
 
   // Test lazy loading (default)
   println("\n=== Lazy Loading (default) ===")
-  let gitfs_lazy = GitFs::from_commit(osfs, git_dir, commit_id)
-  println("is_lazy: \{gitfs_lazy.is_lazy()}")
+  let bitfs_lazy = BitFs::from_commit(osfs, git_dir, commit_id)
+  println("is_lazy: \{bitfs_lazy.is_lazy()}")
 
   // Read root directory
-  let root = gitfs_lazy.readdir(osfs, "")
+  let root = bitfs_lazy.readdir(osfs, "")
   println("Root entries: \{root.length()}")
 
   // Read some files
-  let readme = gitfs_lazy.read_file(osfs, "README.md")
+  let readme = bitfs_lazy.read_file(osfs, "README.md")
   println("README.md: \{readme.length()} bytes")
-  let cargo = gitfs_lazy.read_file(osfs, "Cargo.toml")
+  let cargo = bitfs_lazy.read_file(osfs, "Cargo.toml")
   println("Cargo.toml: \{cargo.length()} bytes")
 
   // Read nested files
-  let helix_term = gitfs_lazy.readdir(osfs, "helix-term")
+  let helix_term = bitfs_lazy.readdir(osfs, "helix-term")
   println("helix-term/: \{helix_term.length()} entries")
-  let src_files = gitfs_lazy.readdir(osfs, "helix-term/src")
+  let src_files = bitfs_lazy.readdir(osfs, "helix-term/src")
   println("helix-term/src/: \{src_files.length()} entries")
 
   // Read a deeply nested file
   if src_files.contains("main.rs") {
-    let main_rs = gitfs_lazy.read_file(osfs, "helix-term/src/main.rs")
+    let main_rs = bitfs_lazy.read_file(osfs, "helix-term/src/main.rs")
     println("helix-term/src/main.rs: \{main_rs.length()} bytes")
   }
 
   // Test COW write
   println("\n=== COW Write Test ===")
-  gitfs_lazy.write_string("TEST_FILE.txt", "Hello from lazy GitFs!")
-  let test_content = gitfs_lazy.read_file(osfs, "TEST_FILE.txt")
+  bitfs_lazy.write_string("TEST_FILE.txt", "Hello from lazy BitFs!")
+  let test_content = bitfs_lazy.read_file(osfs, "TEST_FILE.txt")
   println("Written TEST_FILE.txt: \{test_content.length()} bytes")
-  println("is_dirty: \{gitfs_lazy.is_dirty()}")
+  println("is_dirty: \{bitfs_lazy.is_dirty()}")
 
   // Verify original file unchanged in git
-  let readme2 = gitfs_lazy.read_file(osfs, "README.md")
+  let readme2 = bitfs_lazy.read_file(osfs, "README.md")
   assert_eq(readme.length(), readme2.length())
   println("README.md unchanged: OK")
 
   // Test eager loading for comparison
   println("\n=== Eager Loading ===")
-  let config = GitFsConfig::eager()
-  let gitfs_eager = GitFs::from_commit(osfs, git_dir, commit_id, config~)
-  println("is_lazy: \{gitfs_eager.is_lazy()}")
-  let root_eager = gitfs_eager.readdir(osfs, "")
+  let config = BitFsConfig::eager()
+  let bitfs_eager = BitFs::from_commit(osfs, git_dir, commit_id, config~)
+  println("is_lazy: \{bitfs_eager.is_lazy()}")
+  let root_eager = bitfs_eager.readdir(osfs, "")
   println("Root entries: \{root_eager.length()}")
   assert_eq(root.length(), root_eager.length())
-  let readme_eager = gitfs_eager.read_file(osfs, "README.md")
+  let readme_eager = bitfs_eager.read_file(osfs, "README.md")
   assert_eq(readme.length(), readme_eager.length())
   println("README.md matches lazy version: OK")
   println("\n=== All Checks Passed ===")
@@ -114,11 +114,11 @@ test "verify: lazy loading on this repo" {
     @git.ObjectId::from_hex(head_str)
   }
   println("HEAD: \{commit_id}")
-  let gitfs = GitFs::from_commit(osfs, git_dir, commit_id)
-  println("is_lazy: \{gitfs.is_lazy()}")
+  let bitfs = BitFs::from_commit(osfs, git_dir, commit_id)
+  println("is_lazy: \{bitfs.is_lazy()}")
 
   // Read root
-  let root = gitfs.readdir(osfs, "")
+  let root = bitfs.readdir(osfs, "")
   println("Root entries: \{root.length()}")
   for entry in root {
     println("  \{entry}")
@@ -126,13 +126,13 @@ test "verify: lazy loading on this repo" {
 
   // Read moon.mod.json
   if root.contains("moon.mod.json") {
-    let moon_mod = gitfs.read_file(osfs, "moon.mod.json")
+    let moon_mod = bitfs.read_file(osfs, "moon.mod.json")
     println("moon.mod.json: \{moon_mod.length()} bytes")
   }
 
   // Read src directory
   if root.contains("src") {
-    let src = gitfs.readdir(osfs, "src")
+    let src = bitfs.readdir(osfs, "src")
     println("src/: \{src.length()} entries")
   }
   println("\n=== This Repo Check Passed ===")

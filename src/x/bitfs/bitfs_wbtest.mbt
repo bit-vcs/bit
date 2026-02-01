@@ -1,5 +1,5 @@
 ///|
-/// GitFs whitebox tests
+/// BitFs whitebox tests
 test "path: normalize_path removes leading and trailing slashes" {
   assert_eq(normalize_path("/foo/bar/"), "foo/bar")
   assert_eq(normalize_path("./foo"), "foo")

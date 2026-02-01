@@ -1,7 +1,7 @@
-///| Write operations for GitFs (FileSystem trait implementation)
+///| Write operations for BitFs (FileSystem trait implementation)
 
 ///|
-pub fn GitFs::write_file(self : GitFs, path : String, content : Bytes) -> Unit {
+pub fn BitFs::write_file(self : BitFs, path : String, content : Bytes) -> Unit {
   let norm = normalize_path(path)
   ensure_parent_dirs(self.working, norm)
   self.working.files[norm] = content
@@ -11,8 +11,8 @@ pub fn GitFs::write_file(self : GitFs, path : String, content : Bytes) -> Unit {
 }
 
 ///|
-pub fn GitFs::write_string(
-  self : GitFs,
+pub fn BitFs::write_string(
+  self : BitFs,
   path : String,
   content : String,
 ) -> Unit {
@@ -21,7 +21,7 @@ pub fn GitFs::write_string(
 }
 
 ///|
-pub fn GitFs::mkdir_p(self : GitFs, path : String) -> Unit {
+pub fn BitFs::mkdir_p(self : BitFs, path : String) -> Unit {
   let norm = normalize_path(path)
   if norm.length() == 0 {
     return
@@ -37,7 +37,7 @@ pub fn GitFs::mkdir_p(self : GitFs, path : String) -> Unit {
 }
 
 ///|
-pub fn GitFs::remove_file(self : GitFs, path : String) -> Unit {
+pub fn BitFs::remove_file(self : BitFs, path : String) -> Unit {
   let norm = normalize_path(path)
   self.working.files.remove(norm)
   self.working.deleted[norm] = true
@@ -46,7 +46,7 @@ pub fn GitFs::remove_file(self : GitFs, path : String) -> Unit {
 }
 
 ///|
-pub fn GitFs::remove_dir(self : GitFs, path : String) -> Unit {
+pub fn BitFs::remove_dir(self : BitFs, path : String) -> Unit {
   let norm = normalize_path(path)
   self.working.dirs.remove(norm)
   let prefix = norm + "/"
@@ -86,26 +86,26 @@ fn string_to_bytes(s : String) -> Bytes {
 }
 
 ///|
-impl @git.FileSystem for GitFs with mkdir_p(self, path) {
-  GitFs::mkdir_p(self, path)
+impl @git.FileSystem for BitFs with mkdir_p(self, path) {
+  BitFs::mkdir_p(self, path)
 }
 
 ///|
-impl @git.FileSystem for GitFs with write_file(self, path, content) {
-  GitFs::write_file(self, path, content)
+impl @git.FileSystem for BitFs with write_file(self, path, content) {
+  BitFs::write_file(self, path, content)
 }
 
 ///|
-impl @git.FileSystem for GitFs with write_string(self, path, content) {
-  GitFs::write_string(self, path, content)
+impl @git.FileSystem for BitFs with write_string(self, path, content) {
+  BitFs::write_string(self, path, content)
 }
 
 ///|
-impl @git.FileSystem for GitFs with remove_file(self, path) {
-  GitFs::remove_file(self, path)
+impl @git.FileSystem for BitFs with remove_file(self, path) {
+  BitFs::remove_file(self, path)
 }
 
 ///|
-impl @git.FileSystem for GitFs with remove_dir(self, path) {
-  GitFs::remove_dir(self, path)
+impl @git.FileSystem for BitFs with remove_dir(self, path) {
+  BitFs::remove_dir(self, path)
 }

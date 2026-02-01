@@ -10,7 +10,7 @@ struct TestNetwork {
 
 ///|
 struct TestNode {
-  db : GitDb
+  db : BitDb
   fs : @git.TestFs
 }
 
@@ -23,7 +23,7 @@ fn TestNetwork::new(node_count : Int) -> TestNetwork {
       _ => ()
     }
     let node_id = NodeId::new("node-" + i.to_string())
-    let db = GitDb::empty(node_id, "/repo/.git")
+    let db = BitDb::empty(node_id, "/repo/.git")
     nodes.push({ db, fs })
   }
   { nodes, message_queue: [], tick: 0L }
