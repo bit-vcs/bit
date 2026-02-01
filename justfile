@@ -54,6 +54,10 @@ uninstall:
 e2e:
     bash e2e/run-tests.sh
 
+# Run subdir-clone/push integration tests (t/ directory)
+test-subdir:
+    @bash t/run-tests.sh
+
 # Pre-release check
 release-check: fmt info check test e2e
 
