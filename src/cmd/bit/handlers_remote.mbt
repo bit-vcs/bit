@@ -1,6 +1,73 @@
 ///| Remote operation handlers: remote, upload-pack, receive-pack, fetch, pull, push, clone
 
 ///|
+/// Parse GitHub subdir shorthand: user/repo/path/to/subdir
+/// Returns Some((github_url, subdir_path)) if detected, None otherwise.
+///
+/// Shorthand is detected when:
+/// - URL doesn't contain "://" (not a full URL)
+/// - URL doesn't contain "@" (not SSH URL like git@github.com:...)
+/// - URL doesn't end with ".git"
+/// - URL has 3+ path components (user/repo/path)
+///
+/// Examples that ARE shorthand:
+/// - "user/repo/src" → ("https://github.com/user/repo", "src")
+/// - "user/repo/src/lib" → ("https://github.com/user/repo", "src/lib")
+///
+/// Examples that are NOT shorthand (standard git URLs):
+/// - "https://github.com/user/repo" → None (full URL)
+/// - "git@github.com:user/repo.git" → None (SSH URL)
+/// - "user/repo" → None (only 2 components, could be gh shorthand)
+/// - "user/repo.git" → None (ends with .git)
+/// - "github.com/user/repo" → None (looks like hostname)
+pub fn parse_subdir_shorthand(url : String) -> (String, String)? {
+  // Skip if it's a full URL
+  if url.contains("://") {
+    return None
+  }
+  // Skip if it's an SSH URL
+  if url.contains("@") {
+    return None
+  }
+  // Skip if it ends with .git (standard repo reference)
+  if url.has_suffix(".git") {
+    return None
+  }
+  // Skip absolute paths
+  if url.has_prefix("/") {
+    return None
+  }
+  // Skip relative paths starting with . or ..
+  if url.has_prefix("./") || url.has_prefix("../") || url == "." || url == ".." {
+    return None
+  }
+  // Split into parts
+  let parts : Array[String] = url
+    .split("/")
+    .filter(fn(s) { s.length() > 0 })
+    .map(fn(s) { s.to_string() })
+    .collect()
+  // Need at least 3 components: user/repo/path
+  if parts.length() < 3 {
+    return None
+  }
+  // First component shouldn't look like a hostname (contain a dot)
+  if parts[0].contains(".") {
+    return None
+  }
+  // Build github URL and subdir path
+  let owner = parts[0]
+  let repo = parts[1]
+  let subdir_parts : Array[String] = []
+  for j = 2; j < parts.length(); j = j + 1 {
+    subdir_parts.push(parts[j])
+  }
+  let subdir = subdir_parts.join("/")
+  let github_url = "https://github.com/\{owner}/\{repo}"
+  Some((github_url, subdir))
+}
+
+///|
 async fn handle_remote(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let git_dir = root + "/.git"
@@ -434,35 +501,18 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
   guard url is Some(remote_url) else {
     raise @git.GitError::InvalidObject("repository URL required")
   }
-  // Check for subdir shorthand: user/repo/path/to/subdir
-  // Detected when: no "://", no "@", and 3+ path components
-  if not(remote_url.contains("://")) &&
-    not(remote_url.contains("@")) &&
-    not(remote_url.has_suffix(".git")) {
-    let parts : Array[String] = remote_url
-      .split("/")
-      .filter(fn(s) { s.length() > 0 })
-      .map(fn(s) { s.to_string() })
-      .collect()
-    if parts.length() >= 3 {
-      // Shorthand detected: owner/repo/subdir/path
-      let owner = parts[0]
-      let repo = parts[1]
-      let subdir_parts : Array[String] = []
-      for j = 2; j < parts.length(); j = j + 1 {
-        subdir_parts.push(parts[j])
-      }
-      let subdir = subdir_parts.join("/")
-      let github_url = "https://github.com/\{owner}/\{repo}"
-      // Build args for subdir-clone: [url, subdir, optional dest]
+  // Check for subdir shorthand and delegate if detected
+  match parse_subdir_shorthand(remote_url) {
+    Some((github_url, subdir)) => {
       let subdir_args : Array[String] = [github_url, subdir]
       match dest {
         Some(d) => subdir_args.push(d)
         None => ()
       }
-      print_line("Detected subdir shorthand: \{owner}/\{repo} → \{subdir}")
+      print_line("Detected subdir shorthand: \{github_url} → \{subdir}")
       return handle_subdir_clone(subdir_args)
     }
+    None => ()
   }
   // Derive destination from URL if not specified
   let relative_target = match dest {

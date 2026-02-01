@@ -27,6 +27,7 @@ options(
     "handlers_subdir.mbt": [ "native" ],
     "handlers_subdir_wbtest.mbt": [ "native" ],
     "handlers_worktree.mbt": [ "native" ],
+    "subdir_shorthand_test.mbt": [ "native" ],
     "helpers.mbt": [ "native" ],
     "index_pack.mbt": [ "native" ],
     "main.mbt": [ "native" ],
