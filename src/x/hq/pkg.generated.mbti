@@ -1,0 +1,70 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/bit/x/hq"
+
+// Values
+pub fn build_clone_command(RepoPath, String, HqGetOptions) -> String
+
+pub fn contract_home(String, String) -> String
+
+pub fn expand_home(String) -> String
+
+pub fn hq_get(RepoPath, HqConfig, HqGetOptions, (String) -> (Int, String, String), (String) -> Bool) -> HqGetResult
+
+pub fn hq_list(HqConfig, String?, (String) -> Array[(String, Bool)], (String) -> Bool) -> Array[String]
+
+pub fn hq_list_full_paths(HqConfig, String?, (String) -> Array[(String, Bool)], (String) -> Bool) -> Array[String]
+
+pub fn hq_root(HqConfig) -> String
+
+pub fn hq_roots((String) -> String?, (String) -> Array[String]) -> Array[String]
+
+pub fn load_config((String) -> String?, (String) -> String?, ghq_compat? : Bool) -> HqConfig
+
+pub fn parse_repo_path(String) -> RepoPath?
+
+pub fn parse_repo_url(String) -> RepoPath?
+
+// Errors
+
+// Types and methods
+pub struct HqConfig {
+  root : String
+  ghq_compat : Bool
+}
+pub fn HqConfig::new(String, ghq_compat? : Bool) -> Self
+
+pub struct HqGetOptions {
+  update : Bool
+  shallow : Bool
+  ssh : Bool
+  branch : String?
+}
+pub fn HqGetOptions::default() -> Self
+pub fn HqGetOptions::new(update? : Bool, shallow? : Bool, ssh? : Bool, branch? : String?) -> Self
+
+pub(all) enum HqGetResult {
+  Cloned(String)
+  Updated(String)
+  Skipped(String)
+  Error(String)
+}
+pub impl Eq for HqGetResult
+pub impl Show for HqGetResult
+
+pub struct RepoPath {
+  host : String?
+  user : String
+  repo : String
+  subdir : String?
+}
+pub fn RepoPath::clone_url(Self, ssh? : Bool) -> String
+pub fn RepoPath::local_path(Self, String) -> String
+pub fn RepoPath::needs_sparse(Self) -> Bool
+pub fn RepoPath::new(String, String, host? : String?, subdir? : String?) -> Self
+pub impl Eq for RepoPath
+pub impl Show for RepoPath
+
+// Type aliases
+
+// Traits
+
