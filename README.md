@@ -184,6 +184,73 @@ moon add mizchi/git
 
 **Plumbing**: `pack-objects`, `index-pack`, `receive-pack`, `upload-pack`, `cat-file`, `hash-object`, `ls-files`, `ls-tree`, `rev-parse`, `verify-pack`, `bundle`, `config`
 
+## Extensions (src/x/)
+
+Experimental features built on top of the core Git implementation.
+
+### GitFs - Virtual Filesystem
+
+Mount any commit as a filesystem with lazy blob loading:
+
+```moonbit
+let gitfs = GitFs::from_commit(fs, ".git", commit_id)
+let files = gitfs.readdir(fs, "src")      // Instant (tree only)
+let content = gitfs.read_file(fs, "src/main.mbt")  // Fetches on-demand
+```
+
+### Subdir-Clone - Clone Subdirectory as Independent Repo
+
+Clone a subdirectory from a remote repository as a standalone git repo:
+
+```bash
+# Clone only src/lib from a monorepo
+moongit subdir-clone https://github.com/user/monorepo src/lib
+
+# Creates mylib/ with src/lib contents at root
+moongit subdir-clone https://github.com/user/monorepo src/lib mylib
+cd mylib
+
+# Standard commands detect subdir-clone automatically
+moongit status      # Shows subdir-clone info
+moongit fetch       # Fetches from original remote
+moongit rebase origin/main  # Rebases only subdir changes
+```
+
+### Den - Git-Native Collaboration (WIP)
+
+Pull Requests, Issues, and Notes stored as Git objects in `_den` branch:
+
+```moonbit
+let den = Den::init(fs, fs, git_dir)
+
+// Create PR
+let pr = den.create_pr(fs, fs, "Fix bug", "Description",
+  "refs/heads/fix", "refs/heads/main", "alice@example.com", ts)
+
+// Add review
+den.submit_review(fs, fs, pr.id, "bob@example.com",
+  Approved, "LGTM", commit_id, ts)
+
+// Sync with remote (standard git push/fetch)
+den.push(fs, fs, remote_url)
+den.fetch(fs, fs, remote_url)
+```
+
+### GitDb - Distributed KV Store (WIP)
+
+Git-backed key-value store with Gossip protocol sync:
+
+```moonbit
+let db = GitDb::init(fs, fs, git_dir, node_id)
+
+// Hierarchical keys → Git tree structure
+db.set(fs, fs, "users/alice/profile", value, ts)
+let data = db.get(fs, "users/alice/profile")
+
+// P2P sync via Gossip protocol
+db.sync_with_peer(fs, fs, peer_url)
+```
+
 ## Architecture
 
 ```
