@@ -43,11 +43,9 @@ detect_platform() {
         *) error "Unsupported architecture: $(uname -m)" ;;
     esac
 
-    # macOS arm64 fallback to x64 via Rosetta if needed
-    if [[ "$os" == "darwin" && "$arch" == "arm64" ]]; then
+    # macOS: use arm64 binary (works on Intel via Rosetta)
+    if [[ "$os" == "darwin" ]]; then
         echo "darwin-arm64"
-    elif [[ "$os" == "darwin" ]]; then
-        echo "darwin-x64"
     elif [[ "$os" == "linux" ]]; then
         if [[ "$arch" == "arm64" ]]; then
             error "Linux arm64 is not yet supported"

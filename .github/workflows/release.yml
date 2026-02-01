@@ -17,10 +17,6 @@ jobs:
             target: linux-x64
             binary: bit.exe
             asset: bit-linux-x64
-          - os: macos-15-large
-            target: darwin-x64
-            binary: bit.exe
-            asset: bit-darwin-x64
           - os: macos-latest
             target: darwin-arm64
             binary: bit.exe
