@@ -31,6 +31,8 @@ fi
 cleanup_http() {
 	if test -n "${SERVER_PID:-}"; then
 		kill "$SERVER_PID" 2>/dev/null || true
+		wait "$SERVER_PID" 2>/dev/null || true
+		SERVER_PID=""
 	fi
 }
 trap 'cleanup_http; cleanup' EXIT
