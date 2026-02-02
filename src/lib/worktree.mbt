@@ -12,7 +12,7 @@ pub struct Status {
 
 ///|
 /// Get status similar to `git status --porcelain` buckets.
-pub fn status(
+pub async fn status(
   fs : &@git.RepoFileSystem,
   root : String,
 ) -> Status raise @git.GitError {
@@ -33,15 +33,29 @@ pub fn status(
     match index_map.get(path) {
       None => untracked.push(path)
       Some(entry) => {
-        if is_gitlink_mode_int(entry.mode) || is_symlink_mode_int(entry.mode) {
+        if is_gitlink_mode_int(entry.mode) {
           continue
         }
         let abs = join_path(root, path)
-        let content = fs.read_file(abs)
-        let normalized = normalize_worktree_content(content, autocrlf)
-        let id = @git.hash_blob(normalized)
-        if id != entry.id {
-          unstaged_modified.push(path)
+        match worktree_entry(fs, abs) {
+          None => ()
+          Some(info) =>
+            match info.kind {
+              WorktreeKind::Regular => {
+                let content = fs.read_file(abs)
+                let normalized = normalize_worktree_content(content, autocrlf)
+                let id = @git.hash_blob(normalized)
+                if id != entry.id || info.mode != entry.mode {
+                  unstaged_modified.push(path)
+                }
+              }
+              WorktreeKind::Symlink(target=target) => {
+                let id = @git.hash_blob(@utf8.encode(target))
+                if id != entry.id || info.mode != entry.mode {
+                  unstaged_modified.push(path)
+                }
+              }
+            }
         }
       }
     }
@@ -52,12 +66,12 @@ pub fn status(
       let abs = join_path(root, path)
       match index_map.get(path) {
         Some(entry) =>
-          if is_gitlink_mode_int(entry.mode) || is_symlink_mode_int(entry.mode) {
+          if is_gitlink_mode_int(entry.mode) {
             continue
           }
         None => ()
       }
-      if not(fs.is_file(abs)) {
+      if worktree_entry(fs, abs) is None {
         unstaged_deleted.push(path)
       }
     }
@@ -100,7 +114,7 @@ pub fn status(
 
 ///|
 /// Format status in porcelain-like lines.
-pub fn status_porcelain(
+pub async fn status_porcelain(
   fs : &@git.RepoFileSystem,
   root : String,
 ) -> Array[String] raise @git.GitError {
@@ -198,6 +212,62 @@ pub fn add_paths(
       map[path] = { path, id, mode: default_file_mode(), size }
     } else {
       map.remove(path)
+    }
+  }
+  let out : Array[IndexEntry] = []
+  for item in map.to_array() {
+    let (_, entry) = item
+    out.push(entry)
+  }
+  write_index_entries(fs, git_dir, out)
+}
+
+///|
+/// Add files to index with worktree mode detection (native).
+pub async fn add_paths_async(
+  fs : &@git.FileSystem,
+  rfs : &@git.RepoFileSystem,
+  root : String,
+  paths : Array[String],
+) -> Unit raise @git.GitError {
+  let git_dir = join_path(root, ".git")
+  let autocrlf = read_autocrlf_setting(rfs, git_dir)
+  let entries = read_index_entries(rfs, git_dir)
+  let map : Map[String, IndexEntry] = {}
+  for e in entries {
+    map[e.path] = e
+  }
+  let all_paths = expand_paths(rfs, root, paths)
+  for path in all_paths {
+    let abs = join_path(root, path)
+    match worktree_entry(rfs, abs) {
+      None => map.remove(path)
+      Some(info) =>
+        match info.kind {
+          WorktreeKind::Regular => {
+            let content = rfs.read_file(abs)
+            let normalized = normalize_worktree_content(content, autocrlf)
+            let id = write_loose_object(
+              fs,
+              git_dir,
+              @git.ObjectType::Blob,
+              normalized,
+            )
+            let size = content.length()
+            map[path] = { path, id, mode: info.mode, size }
+          }
+          WorktreeKind::Symlink(target=target) => {
+            let bytes = @utf8.encode(target)
+            let id = write_loose_object(
+              fs,
+              git_dir,
+              @git.ObjectType::Blob,
+              bytes,
+            )
+            let size = bytes.length()
+            map[path] = { path, id, mode: info.mode, size }
+          }
+        }
     }
   }
   let out : Array[IndexEntry] = []

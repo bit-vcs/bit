@@ -1121,7 +1121,7 @@ fn get_config_value_simple(
 }
 
 ///|
-fn stage_all_changes(fs : OsFs, root : String) -> Unit {
+async fn stage_all_changes(fs : OsFs, root : String) -> Unit {
   let status = @gitlib.status(fs, root) catch { _ => return }
   let all_paths : Array[String] = []
   for p in status.untracked {
@@ -1134,7 +1134,7 @@ fn stage_all_changes(fs : OsFs, root : String) -> Unit {
     all_paths.push(p)
   }
   if all_paths.length() > 0 {
-    let _ = @gitlib.add_paths(fs, fs, root, all_paths) catch { _ => () }
+    let _ = @gitlib.add_paths_async(fs, fs, root, all_paths) catch { _ => () }
 
   }
 }

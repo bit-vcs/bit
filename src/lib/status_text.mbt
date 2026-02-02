@@ -2,7 +2,7 @@
 
 ///|
 /// Format status output similar to `git status`.
-pub fn status_text(
+pub async fn status_text(
   fs : &@git.RepoFileSystem,
   root : String,
 ) -> String raise @git.GitError {

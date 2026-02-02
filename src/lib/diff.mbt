@@ -13,11 +13,13 @@ pub struct DiffFile {
   kind : DiffKind
   old_content : Bytes?
   new_content : Bytes?
+  old_mode : Int?
+  new_mode : Int?
 }
 
 ///|
 /// Diff working tree against index (default `git diff`).
-pub fn diff_worktree(
+pub async fn diff_worktree(
   fs : &@git.RepoFileSystem,
   root : String,
 ) -> Array[DiffFile] raise @git.GitError {
@@ -38,23 +40,57 @@ pub fn diff_worktree(
     match index_map.get(path) {
       None => () // untracked files are not shown in `git diff`
       Some(entry) => {
-        if is_gitlink_mode_int(entry.mode) || is_symlink_mode_int(entry.mode) {
+        if is_gitlink_mode_int(entry.mode) {
           continue
         }
         let abs = join_path(root, path)
-        let content = fs.read_file(abs)
-        let normalized = normalize_worktree_content(content, autocrlf)
-        let id = @git.hash_blob(normalized)
-        if id != entry.id {
-          let old = diff_read_blob(db, fs, entry.id)
-          // Skip if blob not found (e.g., submodule)
-          if old is Some(_) {
-            out.push({
-              path,
-              kind: DiffKind::Modified,
-              old_content: old,
-              new_content: Some(normalized),
-            })
+        match worktree_entry(fs, abs) {
+          None => ()
+          Some(info) => {
+            let mut content_changed = false
+            let mode_changed = info.mode != entry.mode
+            let mut old_content : Bytes? = None
+            let mut new_content : Bytes? = None
+            match info.kind {
+              WorktreeKind::Regular => {
+                let content = fs.read_file(abs)
+                let normalized = normalize_worktree_content(content, autocrlf)
+                let id = @git.hash_blob(normalized)
+                content_changed = id != entry.id
+                if content_changed {
+                  let old = diff_read_blob(db, fs, entry.id)
+                  if old is Some(_) {
+                    old_content = old
+                    new_content = Some(normalized)
+                  }
+                }
+              }
+              WorktreeKind::Symlink(target=target) => {
+                let bytes = @utf8.encode(target)
+                let id = @git.hash_blob(bytes)
+                content_changed = id != entry.id
+                if content_changed {
+                  let old = diff_read_blob(db, fs, entry.id)
+                  if old is Some(_) {
+                    old_content = old
+                    new_content = Some(bytes)
+                  }
+                }
+              }
+            }
+            if (content_changed && old_content is None) {
+              continue
+            }
+            if content_changed || mode_changed {
+              out.push({
+                path,
+                kind: DiffKind::Modified,
+                old_content,
+                new_content,
+                old_mode: Some(entry.mode),
+                new_mode: Some(info.mode),
+              })
+            }
           }
         }
       }
@@ -63,11 +99,11 @@ pub fn diff_worktree(
   for item in index_map.to_array() {
     let (path, entry) = item
     if not(seen.contains(path)) {
-      if is_gitlink_mode_int(entry.mode) || is_symlink_mode_int(entry.mode) {
+      if is_gitlink_mode_int(entry.mode) {
         continue
       }
       let abs = join_path(root, path)
-      if not(fs.is_file(abs)) {
+      if worktree_entry(fs, abs) is None {
         let old = diff_read_blob(db, fs, entry.id)
         // Skip if blob not found (e.g., submodule)
         if old is Some(_) {
@@ -76,6 +112,8 @@ pub fn diff_worktree(
             kind: DiffKind::Deleted,
             old_content: old,
             new_content: None,
+            old_mode: Some(entry.mode),
+            new_mode: None,
           })
         }
       }
@@ -112,22 +150,32 @@ pub fn diff_index(
             kind: DiffKind::Added,
             old_content: None,
             new_content: new,
+            old_mode: None,
+            new_mode: Some(entry.mode),
           })
         }
       }
       Some(h) =>
-        if h.id != entry.id {
-          let old = diff_read_blob(db, fs, h.id)
-          let new = diff_read_blob(db, fs, entry.id)
-          // Skip if either blob not found (e.g., submodule)
-          if old is Some(_) && new is Some(_) {
-            out.push({
-              path,
-              kind: DiffKind::Modified,
-              old_content: old,
-              new_content: new,
-            })
+        if h.id != entry.id || h.mode != entry.mode {
+          let content_changed = h.id != entry.id
+          let mut old : Bytes? = None
+          let mut new : Bytes? = None
+          if content_changed {
+            old = diff_read_blob(db, fs, h.id)
+            new = diff_read_blob(db, fs, entry.id)
+            // Skip if either blob not found (e.g., submodule)
+            if old is None || new is None {
+              continue
+            }
           }
+          out.push({
+            path,
+            kind: DiffKind::Modified,
+            old_content: old,
+            new_content: new,
+            old_mode: Some(h.mode),
+            new_mode: Some(entry.mode),
+          })
         }
     }
   }
@@ -142,6 +190,8 @@ pub fn diff_index(
           kind: DiffKind::Deleted,
           old_content: old,
           new_content: None,
+          old_mode: Some(h.mode),
+          new_mode: None,
         })
       }
     }
@@ -156,6 +206,7 @@ pub fn diff_text(files : Array[DiffFile]) -> Array[String] {
   let lines : Array[String] = []
   for f in files {
     lines.push("diff --git a/\{f.path} b/\{f.path}")
+    diff_emit_modes(lines, f)
     match f.kind {
       Added => {
         lines.push("--- /dev/null")
@@ -174,10 +225,10 @@ pub fn diff_text(files : Array[DiffFile]) -> Array[String] {
         }
       }
       Modified => {
-        lines.push("--- a/\{f.path}")
-        lines.push("+++ b/\{f.path}")
         match (f.old_content, f.new_content) {
           (Some(old), Some(new)) => {
+            lines.push("--- a/\{f.path}")
+            lines.push("+++ b/\{f.path}")
             diff_emit_lines(lines, old, "-")
             diff_emit_lines(lines, new, "+")
           }
@@ -187,6 +238,30 @@ pub fn diff_text(files : Array[DiffFile]) -> Array[String] {
     }
   }
   lines
+}
+
+///|
+fn diff_emit_modes(out : Array[String], f : DiffFile) -> Unit {
+  match f.kind {
+    Added =>
+      match f.new_mode {
+        Some(mode) => out.push("new file mode " + mode_to_string(mode))
+        None => ()
+      }
+    Deleted =>
+      match f.old_mode {
+        Some(mode) => out.push("deleted file mode " + mode_to_string(mode))
+        None => ()
+      }
+    Modified =>
+      match (f.old_mode, f.new_mode) {
+        (Some(old), Some(new)) if old != new => {
+          out.push("old mode " + mode_to_string(old))
+          out.push("new mode " + mode_to_string(new))
+        }
+        _ => ()
+      }
+  }
 }
 
 ///|
@@ -282,6 +357,7 @@ fn diff_read_blob(
 ///|
 priv struct DiffHeadEntry {
   id : @git.ObjectId
+  mode : Int
 }
 
 ///|
@@ -336,7 +412,7 @@ fn diff_collect_tree(
         if diff_is_tree_mode(entry.mode) {
           diff_collect_tree(db, fs, entry.id, path, out)
         } else {
-          out[path] = { id: entry.id }
+          out[path] = { id: entry.id, mode: worktree_parse_octal(entry.mode) }
         }
       }
     }

@@ -59,7 +59,7 @@ pub fn stash_list(
 
 ///|
 /// Push current changes to stash.
-pub fn stash_push(
+pub async fn stash_push(
   fs : &@git.FileSystem,
   rfs : &@git.RepoFileSystem,
   root : String,

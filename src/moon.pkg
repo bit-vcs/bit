@@ -8,6 +8,7 @@ import {
   "moonbitlang/core/strconv" as @strconv,
   "moonbitlang/x/fs",
   "moonbitlang/async/http" as @http,
+  "moonbitlang/x/codec/base64" as @base64,
 }
 
 options(

@@ -246,14 +246,14 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
       all_paths.push(p)
     }
     if all_paths.length() > 0 {
-      @gitlib.add_paths(fs, fs, root, all_paths)
+      @gitlib.add_paths_async(fs, fs, root, all_paths)
     }
     return
   }
   if paths.length() == 0 {
     raise @git.GitError::InvalidObject("Nothing specified, nothing added.")
   }
-  @gitlib.add_paths(fs, fs, root, paths)
+  @gitlib.add_paths_async(fs, fs, root, paths)
 }
 
 ///|
@@ -322,7 +322,7 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
       paths_to_add.push(p)
     }
     if paths_to_add.length() > 0 {
-      @gitlib.add_paths(fs, fs, root, paths_to_add)
+      @gitlib.add_paths_async(fs, fs, root, paths_to_add)
     }
   }
   // For amend, get previous message if none specified

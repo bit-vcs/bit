@@ -8,7 +8,7 @@ fn setup_stash_repo() -> @git.TestFs {
 }
 
 ///|
-test "stash: push saves changes and restores worktree" {
+async test "stash: push saves changes and restores worktree" {
   let fs = setup_stash_repo()
   // Create initial commit
   fs.write_string("/repo/file.txt", "original\n")
@@ -29,7 +29,7 @@ test "stash: push saves changes and restores worktree" {
 }
 
 ///|
-test "stash: list shows stashed entries" {
+async test "stash: list shows stashed entries" {
   let fs = setup_stash_repo()
   // Create initial commit
   fs.write_string("/repo/file.txt", "original\n")
@@ -51,7 +51,7 @@ test "stash: list shows stashed entries" {
 }
 
 ///|
-test "stash: apply restores stashed changes" {
+async test "stash: apply restores stashed changes" {
   let fs = setup_stash_repo()
   // Create initial commit
   fs.write_string("/repo/file.txt", "original\n")
@@ -80,7 +80,7 @@ test "stash: apply restores stashed changes" {
 }
 
 ///|
-test "stash: pop restores and drops stash" {
+async test "stash: pop restores and drops stash" {
   let fs = setup_stash_repo()
   // Create initial commit
   fs.write_string("/repo/file.txt", "original\n")
@@ -106,7 +106,7 @@ test "stash: pop restores and drops stash" {
 }
 
 ///|
-test "stash: drop removes entry" {
+async test "stash: drop removes entry" {
   let fs = setup_stash_repo()
   // Create initial commit
   fs.write_string("/repo/file.txt", "original\n")
@@ -129,7 +129,7 @@ test "stash: drop removes entry" {
 }
 
 ///|
-test "stash: push with no changes returns None" {
+async test "stash: push with no changes returns None" {
   let fs = setup_stash_repo()
   // Create initial commit
   fs.write_string("/repo/file.txt", "original\n")
@@ -145,7 +145,7 @@ test "stash: push with no changes returns None" {
 }
 
 ///|
-test "stash: multiple stashes stack correctly" {
+async test "stash: multiple stashes stack correctly" {
   let fs = setup_stash_repo()
   // Create initial commit
   fs.write_string("/repo/file.txt", "original\n")

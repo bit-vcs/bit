@@ -120,7 +120,7 @@ test "rev-parse: HEAD~1 equals HEAD^" {
 }
 
 ///|
-test "status porcelain + diff" {
+async test "status porcelain + diff" {
   let fs = setup_rev_repo()
   fs.write_string("/repo/a.txt", "hello\n")
   let st1 = status_porcelain(fs, "/repo")

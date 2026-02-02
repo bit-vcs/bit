@@ -8,7 +8,7 @@ fn setup_repo() -> @git.TestFs {
 }
 
 ///|
-test "worktree: status/add/commit" {
+async test "worktree: status/add/commit" {
   let fs = setup_repo()
   fs.write_string("/repo/a.txt", "hello\n")
   let st1 = status(fs, "/repo")
@@ -29,7 +29,7 @@ test "worktree: status/add/commit" {
 }
 
 ///|
-test "worktree: modified after commit" {
+async test "worktree: modified after commit" {
   let fs = setup_repo()
   fs.write_string("/repo/a.txt", "hello\n")
   add_paths(fs, fs, "/repo", ["a.txt"])
@@ -42,7 +42,7 @@ test "worktree: modified after commit" {
 }
 
 ///|
-test "worktree: status text" {
+async test "worktree: status text" {
   let fs = setup_repo()
   let text1 = status_text(fs, "/repo")
   assert_true(text1.contains("On branch main"))

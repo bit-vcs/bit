@@ -222,7 +222,7 @@ async fn handle_update_index(args : Array[String]) -> Unit raise Error {
       }
       // Use gitlib functions
       if add_paths.length() > 0 {
-        @gitlib.add_paths(fs, fs, root, add_paths)
+        @gitlib.add_paths_async(fs, fs, root, add_paths)
       }
       // For removals, filter out from index
       if remove_paths.length() > 0 {

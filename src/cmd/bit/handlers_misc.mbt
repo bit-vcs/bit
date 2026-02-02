@@ -3429,7 +3429,7 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
         }
         wfs.write_file(abs_path, bo.data)
         // Add to index
-        @gitlib.add_paths(wfs, rfs, root, [path])
+        @gitlib.add_paths_async(wfs, rfs, root, [path])
       }
     }
     // Files that were modified in commit -> restore parent version
@@ -3453,7 +3453,7 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
             let blob_obj = db.get(rfs, parent_entry.id)
             guard blob_obj is Some(bo) else { continue }
             wfs.write_file(abs_path, bo.data)
-            @gitlib.add_paths(wfs, rfs, root, [path])
+            @gitlib.add_paths_async(wfs, rfs, root, [path])
           }
         None => ()
       }
@@ -6269,7 +6269,7 @@ async fn handle_subdir_merge(
     paths_to_add.push(p)
   }
   if paths_to_add.length() > 0 {
-    @gitlib.add_paths(fs, fs, root, paths_to_add)
+    @gitlib.add_paths_async(fs, fs, root, paths_to_add)
   }
   // Commit
   let commit_id = @gitlib.commit(fs, fs, root, msg, author, timestamp)
