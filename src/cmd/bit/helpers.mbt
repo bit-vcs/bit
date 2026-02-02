@@ -140,13 +140,94 @@ async fn read_all_stdin() -> Bytes {
 }
 
 ///|
+fn normalize_path(path : String) -> String {
+  let parts : Array[String] = []
+  for part_view in path.split("/") {
+    let part = part_view.to_string()
+    if part == "" || part == "." {
+      continue
+    } else if part == ".." {
+      if parts.length() > 0 && parts[parts.length() - 1] != ".." {
+        let _ = parts.pop()
+
+      } else if not(path.has_prefix("/")) {
+        parts.push(part)
+      }
+    } else {
+      parts.push(part)
+    }
+  }
+  let result = parts.join("/")
+  if path.has_prefix("/") {
+    if result.length() == 0 {
+      "/"
+    } else {
+      "/" + result
+    }
+  } else if result.length() == 0 {
+    "."
+  } else {
+    result
+  }
+}
+
+///|
+fn find_repo_root(start : String) -> String? {
+  let mut current = normalize_path(start)
+  if current.length() == 0 {
+    current = "."
+  }
+  let mut last = ""
+  while true {
+    let git_path = if current == "/" {
+      "/.git"
+    } else if current == "." {
+      ".git"
+    } else {
+      current + "/.git"
+    }
+    let is_git_dir = @fs.is_dir(git_path) catch { _ => false }
+    let is_git_file = if is_git_dir {
+      false
+    } else {
+      @fs.is_file(git_path) catch {
+        _ => false
+      }
+    }
+    if is_git_dir || is_git_file {
+      return Some(current)
+    }
+    let parent = parent_dir(current)
+    let next = if parent.length() == 0 { "." } else { parent }
+    if next == current || next == last {
+      break
+    }
+    last = current
+    current = next
+  }
+  None
+}
+
+///|
 fn get_work_root() -> String {
   match @sys.get_env_var("GIT_SHIM_CWD") {
     Some(dir) => dir
     None =>
       match @sys.get_env_var("GIT_WORK_TREE") {
         Some(dir) => dir
-        None => "."
+        None =>
+          match @sys.get_env_var("GIT_DIR") {
+            Some(dir) => normalize_repo_root(dir)
+            None =>
+              match @sys.get_env_var("GIT_SHIM_PWD") {
+                Some(pwd) =>
+                  match find_repo_root(pwd) {
+                    Some(root) => root
+                    None => "."
+                  }
+                None => "."
+              }
+          }
       }
   }
 }

@@ -4,7 +4,7 @@
 fn find_git_dir(fs : OsFs) -> String {
   // Check GIT_DIR environment variable first
   match @sys.get_env_var("GIT_DIR") {
-    Some(dir) => return dir
+    Some(dir) => if fs.is_dir(dir) || fs.is_file(dir) { return dir }
     None => ()
   }
   // Check if current directory is a .git directory (bare repo or inside .git)
@@ -580,16 +580,24 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
   let mut get_bool = false
   let mut list_mode = false
   let mut unset_mode = false
+  let mut unset_all = false
   let mut add_mode = false
+  let mut remove_section_mode = false
+  let mut fixed_value_mode = false
+  let mut local_mode = false
   let mut key : String? = None
   let mut value : String? = None
   for arg in args {
     match arg {
+      "--local" => local_mode = true
       "--get" => get_mode = true
       "--bool" => get_bool = true
       "--list" | "-l" => list_mode = true
       "--unset" => unset_mode = true
+      "--unset-all" => unset_all = true
       "--add" => add_mode = true
+      "--remove-section" => remove_section_mode = true
+      "--fixed-value" => fixed_value_mode = true
       _ if arg.has_prefix("-") => warn_unimplemented_arg("config", arg)
       _ =>
         if key is None {
@@ -599,6 +607,9 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
         }
     }
   }
+  if local_mode {
+    ()
+  }
   // Handle --list
   if list_mode {
     if fs.is_file(config_path) {
@@ -606,12 +617,23 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
     }
     return
   }
+  if remove_section_mode {
+    guard key is Some(section_key) else {
+      raise @git.GitError::InvalidObject("section name required")
+    }
+    remove_config_section_file(fs, config_path, section_key)
+    return
+  }
   guard key is Some(k) else {
     raise @git.GitError::InvalidObject("key required")
   }
-  // Handle --unset
-  if unset_mode {
-    unset_config(fs, config_path, k)
+  // Handle --unset / --unset-all
+  if unset_mode || unset_all {
+    if fixed_value_mode && value is None {
+      raise @git.GitError::InvalidObject("value required for --fixed-value")
+    }
+    let fixed = if fixed_value_mode { value } else { None }
+    unset_config(fs, config_path, k, fixed, unset_all)
     return
   }
   if get_mode || value is None {
@@ -937,6 +959,8 @@ fn unset_config(
   fs : OsFs,
   config_path : String,
   key : String,
+  fixed_value : String?,
+  unset_all : Bool,
 ) -> Unit raise Error {
   let rfs : &@git.RepoFileSystem = fs
   let wfs : &@git.FileSystem = fs
@@ -965,6 +989,7 @@ fn unset_config(
     lines.push(line_view.to_string())
   }
   let mut in_section = false
+  let mut removed = false
   let result : Array[String] = []
   for line in lines {
     let trimmed = trim_string(line)
@@ -994,12 +1019,90 @@ fn unset_config(
             " \t",
           )
           if key_part == name {
-            // Skip this line (unset)
-            continue
+            let value_part = trim_chars(
+              String::unsafe_substring(
+                trimmed,
+                start=idx + 1,
+                end=trimmed.length(),
+              ),
+              " \t",
+            )
+            if fixed_value is Some(fv) && value_part != fv {
+              ()
+            } else if unset_all {
+              continue
+            } else if not(removed) {
+              removed = true
+              continue
+            }
           }
         }
         None => ()
       }
+    }
+    result.push(line)
+  }
+  wfs.write_string(config_path, result.join("\n"))
+}
+
+///|
+fn remove_config_section_file(
+  fs : OsFs,
+  config_path : String,
+  section_key : String,
+) -> Unit raise Error {
+  let rfs : &@git.RepoFileSystem = fs
+  let wfs : &@git.FileSystem = fs
+  if not(rfs.is_file(config_path)) {
+    return
+  }
+  let parts : Array[String] = []
+  for p in section_key.split(".") {
+    parts.push(p.to_string())
+  }
+  if parts.length() == 0 {
+    return
+  }
+  let (section, subsection) = if parts.length() == 1 {
+    (parts[0], (None : String?))
+  } else {
+    let sub : Array[String] = []
+    for i in 1..<parts.length() {
+      sub.push(parts[i])
+    }
+    (parts[0], Some(sub.join(".")))
+  }
+  let content = decode_bytes(rfs.read_file(config_path))
+  let lines : Array[String] = []
+  for line_view in content.split("\n") {
+    lines.push(line_view.to_string())
+  }
+  let mut in_section = false
+  let result : Array[String] = []
+  for line in lines {
+    let trimmed = trim_string(line)
+    if trimmed.has_prefix("[") && trimmed.has_suffix("]") {
+      let sec_content = String::unsafe_substring(
+        trimmed,
+        start=1,
+        end=trimmed.length() - 1,
+      )
+      let matched = match subsection {
+        Some(sub) => {
+          let expected = section + " \"" + sub + "\""
+          sec_content == expected || sec_content == section + " " + sub
+        }
+        None => sec_content == section
+      }
+      in_section = matched
+      if matched {
+        continue
+      }
+      result.push(line)
+      continue
+    }
+    if in_section {
+      continue
     }
     result.push(line)
   }
@@ -1390,6 +1493,126 @@ fn resolve_gitdir(fs : &@git.RepoFileSystem, git_path : String) -> String {
 }
 
 ///|
+fn parse_pathspec_magic(filter : String) -> (String, Bool) {
+  if filter.has_prefix(":!") {
+    let rest = String::unsafe_substring(filter, start=2, end=filter.length())
+    return (rest, true)
+  }
+  if filter.has_prefix(":(") {
+    match filter.find(")") {
+      Some(idx) => {
+        let magic = String::unsafe_substring(filter, start=2, end=idx)
+        let rest = String::unsafe_substring(
+          filter,
+          start=idx + 1,
+          end=filter.length(),
+        )
+        let is_exclude = magic.contains("exclude") || magic.contains("!")
+        (rest, is_exclude)
+      }
+      None => (filter, false)
+    }
+  } else {
+    (filter, false)
+  }
+}
+
+///|
+fn normalize_ls_tree_filters(
+  filters : Array[String],
+  cwd_prefix : String,
+) -> Array[String] raise Error {
+  let out : Array[String] = []
+  for filter in filters {
+    let (raw, is_exclude) = parse_pathspec_magic(filter)
+    if is_exclude {
+      raise @git.GitError::InvalidObject(
+        "pathspec magic not supported by this command: 'exclude' (mnemonic: '!')",
+      )
+    }
+    let mut clean = raw
+    if clean.has_suffix("/") && clean.length() > 1 {
+      clean = String::unsafe_substring(clean, start=0, end=clean.length() - 1)
+    }
+    let base = if clean == "" || clean == "." {
+      cwd_prefix
+    } else if clean.has_prefix("/") {
+      String::unsafe_substring(clean, start=1, end=clean.length())
+    } else if cwd_prefix.length() == 0 {
+      clean
+    } else {
+      cwd_prefix + "/" + clean
+    }
+    let normalized = normalize_path(base)
+    if normalized != "." && normalized.length() > 0 {
+      out.push(normalized)
+    }
+  }
+  out
+}
+
+///|
+fn compute_cwd_prefix(root : String) -> String {
+  match @sys.get_env_var("GIT_SHIM_PWD") {
+    None => ""
+    Some(cwd) => {
+      let cwd_abs = normalize_path(cwd)
+      let root_abs = if root.has_prefix("/") {
+        normalize_path(root)
+      } else {
+        normalize_path(cwd_abs + "/" + root)
+      }
+      if cwd_abs == root_abs {
+        ""
+      } else {
+        let root_prefix = if root_abs == "/" { "/" } else { root_abs + "/" }
+        if cwd_abs.has_prefix(root_prefix) {
+          String::unsafe_substring(
+            cwd_abs,
+            start=root_prefix.length(),
+            end=cwd_abs.length(),
+          )
+        } else {
+          ""
+        }
+      }
+    }
+  }
+}
+
+///|
+fn count_path_segments(path : String) -> Int {
+  let mut count = 0
+  for part_view in path.split("/") {
+    let part = part_view.to_string()
+    if part.length() > 0 {
+      count += 1
+    }
+  }
+  count
+}
+
+///|
+fn make_display_path(path : String, cwd_prefix : String) -> String {
+  if cwd_prefix.length() == 0 {
+    return path
+  }
+  if path == cwd_prefix {
+    return "."
+  }
+  let prefix = cwd_prefix + "/"
+  if path.has_prefix(prefix) {
+    return (try! path[prefix.length():]).to_string()
+  }
+  let depth = count_path_segments(cwd_prefix)
+  let mut rel = ""
+  for _ in 0..<depth {
+    rel = rel + "../"
+  }
+  rel + path
+}
+
+///|
 /// Collect untracked directories at the top level
 fn collect_untracked_dirs(
   fs : &@git.RepoFileSystem,
@@ -1551,6 +1774,8 @@ async fn handle_ls_tree(args : Array[String]) -> Unit raise Error {
   for i in 1..<positional.length() {
     path_filters.push(positional[i])
   }
+  let cwd_prefix = compute_cwd_prefix(root)
+  let normalized_filters = normalize_ls_tree_filters(path_filters, cwd_prefix)
   let tree_id = @gitlib.rev_parse(fs, git_dir, spec)
   guard tree_id is Some(tid) else {
     raise @git.GitError::InvalidObject("Not a valid object name: \{spec}")
@@ -1566,7 +1791,7 @@ async fn handle_ls_tree(args : Array[String]) -> Unit raise Error {
   }
   print_tree_entries(
     db, fs, actual_tree_id, "", recursive, show_trees, only_trees, name_only, recurse_submodules,
-    root, submodules, path_filters,
+    root, submodules, cwd_prefix, normalized_filters,
   )
 }
 
@@ -1603,6 +1828,7 @@ async fn print_tree_entries(
   recurse_submodules : Bool,
   root : String,
   submodules : Array[SubmoduleInfo],
+  cwd_prefix : String,
   path_filters : Array[String],
 ) -> Unit raise Error {
   let obj = db.get(fs, tree_id)
@@ -1626,49 +1852,11 @@ async fn print_tree_entries(
       let mut match_found = false
       let mut recurse_needed = false
       for filter in path_filters {
-        let has_trailing_slash = filter.has_suffix("/")
-        let filter_clean = if has_trailing_slash {
-          String::unsafe_substring(filter, start=0, end=filter.length() - 1)
-        } else {
-          filter
-        }
-        // Exact match (without trailing slash)
-        if path == filter_clean {
-          if has_trailing_slash {
-            // "path2/" means list contents of path2, so recurse but don't print path2 itself
-            if is_tree {
-              recurse_needed = true
-            }
-            // If it's a file with trailing slash filter, it's a no-match (file has no children)
-          } else {
-            // "path2" means show path2 entry itself, don't recurse further
-            match_found = true
-          }
-          continue
-        }
-        // Entry is under the filter path (filter is prefix of path)
-        // e.g., filter="path2/" and path="path2/baz"
-        if path.has_prefix(filter_clean + "/") {
-          // Only show descendants if filter has trailing slash
-          // Without trailing slash, exact match only (handled above)
-          if has_trailing_slash {
-            // Check if this is a direct child of the filter
-            let rest = String::unsafe_substring(
-              path,
-              start=filter_clean.length() + 1,
-              end=path.length(),
-            )
-            let is_direct_child = rest.find("/") == None
-            // "path2/" means show only direct children
-            if is_direct_child {
-              match_found = true
-            }
-          }
-          continue
+        if path == filter || path.has_prefix(filter + "/") {
+          match_found = true
         }
         // Filter is under the entry path (need to recurse into this tree to find it)
-        // e.g., path="path2" and filter="path2/baz"
-        if filter_clean.has_prefix(path + "/") {
+        if filter.has_prefix(path + "/") {
           recurse_needed = true
         }
       }
@@ -1712,6 +1900,7 @@ async fn print_tree_entries(
           recurse_submodules,
           root + "/" + path,
           [], // No nested submodules for now
+          cwd_prefix,
           path_filters,
         )
       }
@@ -1729,8 +1918,9 @@ async fn print_tree_entries(
       not(recursive) || not(is_tree) || show_trees
     }
     if should_print {
+      let display_path = make_display_path(path, cwd_prefix)
       if name_only {
-        print_line(path)
+        print_line(display_path)
       } else {
         let mode_str = if entry.mode == "40000" { "040000" } else { entry.mode }
         let type_str = if is_tree {
@@ -1740,7 +1930,9 @@ async fn print_tree_entries(
         } else {
           "blob"
         }
-        print_line("\{mode_str} \{type_str} \{entry.id.to_hex()}\t\{path}")
+        print_line(
+          "\{mode_str} \{type_str} \{entry.id.to_hex()}\t\{display_path}",
+        )
       }
     }
     // Recurse if -r is set, or if we need to look deeper for path filters
@@ -1760,6 +1952,7 @@ async fn print_tree_entries(
         recurse_submodules,
         root,
         submodules,
+        cwd_prefix,
         path_filters,
       )
     }

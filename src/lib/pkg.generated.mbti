@@ -174,6 +174,8 @@ pub fn reflog_exists(&@bit.RepoFileSystem, String, String) -> Bool
 
 pub fn remove_worktree(&@bit.FileSystem, &@bit.RepoFileSystem, String, String, force? : Bool) -> Unit raise @bit.GitError
 
+pub fn rename_branch(&@bit.FileSystem, &@bit.RepoFileSystem, String, String, String, force? : Bool) -> Unit raise @bit.GitError
+
 pub fn repack_repo(&@bit.FileSystem, &@bit.RepoFileSystem, String) -> RepackResult? raise @bit.GitError
 
 pub fn repair_worktree(&@bit.FileSystem, &@bit.RepoFileSystem, String, worktree_paths? : Array[String]) -> Array[String] raise @bit.GitError

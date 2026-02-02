@@ -2,7 +2,18 @@
 
 ///|
 async fn handle_init(args : Array[String]) -> Unit raise Error {
-  let root = get_work_root()
+  let root = match @sys.get_env_var("GIT_SHIM_CWD") {
+    Some(dir) => dir
+    None =>
+      match @sys.get_env_var("GIT_WORK_TREE") {
+        Some(dir) => dir
+        None =>
+          match @sys.get_env_var("GIT_SHIM_PWD") {
+            Some(dir) => dir
+            None => "."
+          }
+      }
+  }
   let fs = OsFs::new()
   // Parse options
   let mut bare = false

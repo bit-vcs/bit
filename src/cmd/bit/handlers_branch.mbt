@@ -8,6 +8,9 @@ async fn handle_branch(args : Array[String]) -> Unit raise Error {
   let mut list_mode = true
   let mut new_branch : String? = None
   let mut delete_branch : String? = None
+  let mut rename_from : String? = None
+  let mut rename_to : String? = None
+  let mut rename_force = false
   let mut force_delete = false
   let mut show_all = false
   let mut show_remotes = false
@@ -16,6 +19,14 @@ async fn handle_branch(args : Array[String]) -> Unit raise Error {
   while i < args.length() {
     let arg = args[i]
     match arg {
+      "-m" | "-M" if i + 2 < args.length() => {
+        rename_from = Some(args[i + 1])
+        rename_to = Some(args[i + 2])
+        rename_force = arg == "-M"
+        list_mode = false
+        i += 3
+        continue
+      }
       "-d" | "--delete" if i + 1 < args.length() => {
         delete_branch = Some(args[i + 1])
         list_mode = false
@@ -47,28 +58,44 @@ async fn handle_branch(args : Array[String]) -> Unit raise Error {
       print_line("Deleted branch \{name}")
     }
     None =>
-      match new_branch {
-        Some(name) => @gitlib.create_branch(fs, fs, root, name)
+      match rename_from {
+        Some(from_name) =>
+          match rename_to {
+            Some(to_name) =>
+              @gitlib.rename_branch(
+                fs,
+                fs,
+                root,
+                from_name,
+                to_name,
+                force=rename_force,
+              )
+            None => ()
+          }
         None =>
-          if list_mode {
-            // List local branches
-            if not(show_remotes) {
-              let lines = if verbose {
-                @gitlib.list_branches_verbose(fs, git_dir)
-              } else {
-                @gitlib.list_branches_text(fs, git_dir)
+          match new_branch {
+            Some(name) => @gitlib.create_branch(fs, fs, root, name)
+            None =>
+              if list_mode {
+                // List local branches
+                if not(show_remotes) {
+                  let lines = if verbose {
+                    @gitlib.list_branches_verbose(fs, git_dir)
+                  } else {
+                    @gitlib.list_branches_text(fs, git_dir)
+                  }
+                  for line in lines {
+                    print_line(line)
+                  }
+                }
+                // List remote branches
+                if show_all || show_remotes {
+                  let remotes = @gitlib.list_remote_branches(fs, git_dir)
+                  for line in remotes {
+                    print_line(line)
+                  }
+                }
               }
-              for line in lines {
-                print_line(line)
-              }
-            }
-            // List remote branches
-            if show_all || show_remotes {
-              let remotes = @gitlib.list_remote_branches(fs, git_dir)
-              for line in remotes {
-                print_line(line)
-              }
-            }
           }
       }
   }

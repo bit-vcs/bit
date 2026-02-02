@@ -226,6 +226,68 @@ pub fn delete_branch(
 }
 
 ///|
+/// Rename a local branch.
+pub fn rename_branch(
+  fs : &@git.FileSystem,
+  rfs : &@git.RepoFileSystem,
+  root : String,
+  old_name : String,
+  new_name : String,
+  force? : Bool = false,
+) -> Unit raise @git.GitError {
+  let git_dir = join_path(root, ".git")
+  let old_ref = branch_ref_name(old_name)
+  let new_ref = branch_ref_name(new_name)
+  let old_path = join_path(git_dir, old_ref)
+  let new_path = join_path(git_dir, new_ref)
+  let old_id = match resolve_ref(rfs, git_dir, old_ref) {
+    Some(id) => id
+    None => raise @git.GitError::InvalidObject("branch '\{old_name}' not found")
+  }
+  let packed_path = join_path(git_dir, "packed-refs")
+  let new_exists = rfs.is_file(new_path) ||
+    resolve_packed_ref(rfs, packed_path, new_ref) is Some(_)
+  if new_exists {
+    if not(force) {
+      raise @git.GitError::InvalidObject("branch '\{new_name}' already exists")
+    }
+    if rfs.is_file(new_path) {
+      fs.remove_file(new_path)
+    }
+    if rfs.is_file(packed_path) {
+      remove_from_packed_refs(fs, rfs, packed_path, new_ref)
+    }
+  }
+  let dir = parent_dir(new_path)
+  fs.mkdir_p(dir)
+  fs.write_string(new_path, old_id.to_hex() + "\n")
+  if rfs.is_file(old_path) {
+    fs.remove_file(old_path)
+  }
+  if rfs.is_file(packed_path) {
+    remove_from_packed_refs(fs, rfs, packed_path, old_ref)
+  }
+  let head = read_head_ref(rfs, git_dir)
+  match head {
+    Branch(name) =>
+      if name == old_name {
+        let head_path = join_path(git_dir, "HEAD")
+        fs.write_string(head_path, "ref: \{new_ref}\n")
+      }
+    Detached(_) => ()
+  }
+  let old_log = join_path(git_dir, "logs/" + old_ref)
+  if rfs.is_file(old_log) {
+    let new_log = join_path(git_dir, "logs/" + new_ref)
+    let parent = parent_dir(new_log)
+    fs.mkdir_p(parent)
+    let data = rfs.read_file(old_log)
+    fs.write_file(new_log, data)
+    fs.remove_file(old_log)
+  }
+}
+
+///|
 fn remove_from_packed_refs(
   fs : &@git.FileSystem,
   rfs : &@git.RepoFileSystem,

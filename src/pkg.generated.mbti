@@ -60,6 +60,8 @@ pub fn create_packfile_with_delta(Array[PackObject], PackDeltaMode) -> Bytes
 
 pub fn create_packfile_with_delta_stats(Array[PackObject], PackDeltaMode) -> (Bytes, Int)
 
+pub fn create_packfile_with_delta_stats_compression(Array[PackObject], PackDeltaMode, PackCompression) -> (Bytes, Int)
+
 pub fn create_tree(Array[TreeEntry]) -> (ObjectId, Bytes)
 
 pub fn decode_type_and_size_at(Bytes, Int) -> (Int, Int, Int) raise GitError
@@ -304,6 +306,11 @@ pub fn ObjectType::to_packfile_type(Self) -> Int
 pub fn ObjectType::to_string(Self) -> String
 pub impl Eq for ObjectType
 pub impl Show for ObjectType
+
+pub(all) enum PackCompression {
+  Default
+  Stored
+}
 
 pub(all) enum PackDeltaMode {
   NoDelta
