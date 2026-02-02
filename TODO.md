@@ -149,7 +149,19 @@ sha256 フォーマットの pack ファイルを repository 外で処理でき�
 
 ---
 
-## 新機能: Git-Native PR システム (src/x/pr)
+## 追加タスク（メモ）
+
+- [ ] bit mount: ファイルシステムにマウントする機能
+- [ ] bit mcp: MCP 対応
+- [ ] gitconfig サポート
+- [ ] BIT~ 環境変数の対応
+- [ ] .bitignore 対応
+- [ ] .bit 対応
+- [ ] bit jj: jj 相当の対応
+
+---
+
+## 新機能: Git-Native PR システム (src/x/collab)
 
 **計画ファイル:** `~/.claude/plans/lexical-beaming-valley.md`
 
@@ -181,7 +193,7 @@ GitHub/GitLab に依存しない、Git ネイティブな Pull Request システ
 ### ファイル構成
 
 ```
-src/x/pr/
+src/x/collab/
 ├── moon.pkg.json
 ├── types.mbt          # 型定義
 ├── format.mbt         # シリアライズ/デシリアライズ
@@ -197,5 +209,5 @@ src/x/pr/
 
 ```bash
 moon check
-moon test --target native -p mizchi/git/x/pr
+moon test --target native -p mizchi/git/x/collab
 ```

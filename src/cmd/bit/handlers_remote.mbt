@@ -2017,6 +2017,10 @@ fn clone_local_repo(
       }
       copy_tree(fs, src_path + "/" + entry, dest_path + "/" + entry)
     }
+    let db = @gitlib.ObjectDb::load(fs, dest_git_dir)
+    let files = @gitlib.collect_tree_files_from_commit(db, fs, head_id)
+    let index_entries = @gitlib.tree_files_to_index(db, fs, files)
+    @gitlib.write_index_entries(fs, dest_git_dir, index_entries)
   }
 }
 
@@ -3060,6 +3064,20 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
         normalize_path(local_root + "/" + remote_url)
       }
       clone_local_repo(fs, src_path, target, remote_display, bare, filter)
+      if not(bare) && not(filter.is_partial()) {
+        let git_dir = target + "/.git"
+        match @gitlib.resolve_head_commit(fs, git_dir) {
+          Some(commit_id) =>
+            @gitlib.apply_worktree_modes_from_commit(
+              fs,
+              fs,
+              target,
+              git_dir,
+              commit_id,
+            )
+          None => ()
+        }
+      }
       print_line("done.")
     }
     None => {
@@ -3071,6 +3089,20 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
         depth~,
         filter~,
       )
+      if not(bare) && not(filter.is_partial()) {
+        let git_dir = target + "/.git"
+        match @gitlib.resolve_head_commit(fs, git_dir) {
+          Some(commit_id) =>
+            @gitlib.apply_worktree_modes_from_commit(
+              fs,
+              fs,
+              target,
+              git_dir,
+              commit_id,
+            )
+          None => ()
+        }
+      }
       if refs.length() > 0 {
         print_line("done.")
       } else {

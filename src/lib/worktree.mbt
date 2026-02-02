@@ -17,6 +17,7 @@ pub fn status(
   root : String,
 ) -> Status raise @git.GitError {
   let git_dir = join_path(root, ".git")
+  let autocrlf = read_autocrlf_setting(fs, git_dir)
   let index_entries = read_index_entries(fs, git_dir)
   let index_map : Map[String, IndexEntry] = {}
   for e in index_entries {
@@ -32,9 +33,13 @@ pub fn status(
     match index_map.get(path) {
       None => untracked.push(path)
       Some(entry) => {
+        if is_gitlink_mode_int(entry.mode) || is_symlink_mode_int(entry.mode) {
+          continue
+        }
         let abs = join_path(root, path)
         let content = fs.read_file(abs)
-        let id = @git.hash_blob(content)
+        let normalized = normalize_worktree_content(content, autocrlf)
+        let id = @git.hash_blob(normalized)
         if id != entry.id {
           unstaged_modified.push(path)
         }
@@ -45,6 +50,13 @@ pub fn status(
     let (path, _) = item
     if not(visited.contains(path)) {
       let abs = join_path(root, path)
+      match index_map.get(path) {
+        Some(entry) =>
+          if is_gitlink_mode_int(entry.mode) || is_symlink_mode_int(entry.mode) {
+            continue
+          }
+        None => ()
+      }
       if not(fs.is_file(abs)) {
         unstaged_deleted.push(path)
       }
@@ -164,6 +176,7 @@ pub fn add_paths(
   paths : Array[String],
 ) -> Unit raise @git.GitError {
   let git_dir = join_path(root, ".git")
+  let autocrlf = read_autocrlf_setting(rfs, git_dir)
   let entries = read_index_entries(rfs, git_dir)
   let map : Map[String, IndexEntry] = {}
   for e in entries {
@@ -174,7 +187,13 @@ pub fn add_paths(
     let abs = join_path(root, path)
     if rfs.is_file(abs) {
       let content = rfs.read_file(abs)
-      let id = write_loose_object(fs, git_dir, @git.ObjectType::Blob, content)
+      let normalized = normalize_worktree_content(content, autocrlf)
+      let id = write_loose_object(
+        fs,
+        git_dir,
+        @git.ObjectType::Blob,
+        normalized,
+      )
       let size = content.length()
       map[path] = { path, id, mode: default_file_mode(), size }
     } else {
@@ -266,6 +285,173 @@ fn normalize_rel_path(path : String) -> String {
 ///|
 fn default_file_mode() -> Int {
   33188 // 0o100644
+}
+
+///|
+priv enum AutoCrlf {
+  Off
+  Input
+  On
+}
+
+///|
+fn read_autocrlf_setting(
+  fs : &@git.RepoFileSystem,
+  git_dir : String,
+) -> AutoCrlf {
+  let mut value : AutoCrlf? = None
+  match @sys.get_env_var("HOME") {
+    None => ()
+    Some(home) => {
+      let candidates : Array[String] = []
+      match @sys.get_env_var("XDG_CONFIG_HOME") {
+        Some(base) => candidates.push(base + "/git/config")
+        None => ()
+      }
+      candidates.push(home + "/.gitconfig")
+      for path in candidates {
+        if fs.is_file(path) {
+          value = read_autocrlf_from_config(fs, path)
+          break
+        }
+      }
+    }
+  }
+  let local_path = join_path(git_dir, "config")
+  if fs.is_file(local_path) {
+    match read_autocrlf_from_config(fs, local_path) {
+      Some(v) => value = Some(v)
+      None => ()
+    }
+  }
+  match value {
+    Some(v) => v
+    None => AutoCrlf::Off
+  }
+}
+
+///|
+fn read_autocrlf_from_config(
+  fs : &@git.RepoFileSystem,
+  path : String,
+) -> AutoCrlf? {
+  let bytes = try fs.read_file(path) catch { _ => return None }
+  let content = @utf8.decode_lossy(bytes[:])
+  parse_autocrlf_from_content(content)
+}
+
+///|
+fn parse_autocrlf_from_content(content : String) -> AutoCrlf? {
+  let mut section = ""
+  let mut value : AutoCrlf? = None
+  for line_view in content.split("\n") {
+    let line = line_view.trim().to_string()
+    if line.length() == 0 {
+      continue
+    }
+    if line.has_prefix("#") || line.has_prefix(";") {
+      continue
+    }
+    if line.has_prefix("[") && line.has_suffix("]") {
+      let inner = String::unsafe_substring(
+        line,
+        start=1,
+        end=line.length() - 1,
+      )
+      let inner_trim = inner.trim().to_string()
+      let section_name = match inner_trim.find(" ") {
+        Some(i) => String::unsafe_substring(inner_trim, start=0, end=i)
+        None => inner_trim
+      }
+      section = section_name.to_lower()
+      continue
+    }
+    if section != "core" {
+      continue
+    }
+    match line.find("=") {
+      None => ()
+      Some(idx) => {
+        let key = String::unsafe_substring(line, start=0, end=idx)
+          .trim()
+          .to_string()
+          .to_lower()
+        if key != "autocrlf" {
+          continue
+        }
+        let raw_value = String::unsafe_substring(
+          line,
+          start=idx + 1,
+          end=line.length(),
+        )
+          .trim()
+          .to_string()
+          .to_lower()
+        value = Some(parse_autocrlf_value(raw_value))
+      }
+    }
+  }
+  value
+}
+
+///|
+fn parse_autocrlf_value(value : String) -> AutoCrlf {
+  match value {
+    "true" | "yes" | "1" => AutoCrlf::On
+    "input" => AutoCrlf::Input
+    _ => AutoCrlf::Off
+  }
+}
+
+///|
+fn normalize_worktree_content(
+  content : Bytes,
+  autocrlf : AutoCrlf,
+) -> Bytes {
+  match autocrlf {
+    Off => content
+    Input | On =>
+      if is_binary_bytes(content) {
+        content
+      } else {
+        normalize_crlf_to_lf(content)
+      }
+  }
+}
+
+///|
+fn is_binary_bytes(content : Bytes) -> Bool {
+  let limit = if content.length() > 8000 { 8000 } else { content.length() }
+  for i in 0..<limit {
+    if content[i] == b'\x00' {
+      return true
+    }
+  }
+  false
+}
+
+
+///|
+fn normalize_crlf_to_lf(content : Bytes) -> Bytes {
+  let out : Array[Byte] = []
+  let mut i = 0
+  let mut changed = false
+  while i < content.length() {
+    if content[i] == b'\r' &&
+      i + 1 < content.length() &&
+      content[i + 1] == b'\n' {
+      out.push(b'\n')
+      i += 2
+      changed = true
+      continue
+    }
+    out.push(content[i])
+    i += 1
+  }
+  if not(changed) {
+    return content
+  }
+  Bytes::from_array(FixedArray::makei(out.length(), fn(i) { out[i] }))
 }
 
 ///|

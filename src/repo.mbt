@@ -147,13 +147,16 @@ pub fn checkout_commit_to_fs(
   fs : &FileSystem,
   root : String,
 ) -> Unit raise GitError {
-  let files = checkout_commit(store, commit_id)
-  for item in files.to_array() {
-    let (path, data) = item
-    let full_path = join_path(root, path)
-    let dir = parent_dir(full_path)
-    fs.mkdir_p(dir)
-    fs.write_file(full_path, data)
+  let commit_obj = store.get(commit_id)
+  match commit_obj {
+    None => raise GitError::InvalidObject("Missing commit object")
+    Some(obj) => {
+      if obj.obj_type != ObjectType::Commit {
+        raise GitError::InvalidObject("Object is not a commit")
+      }
+      let info = parse_commit(obj.data)
+      walk_tree_to_fs(store, info.tree, "", fs, root)
+    }
   }
 }
 
@@ -180,6 +183,8 @@ fn walk_tree(
         }
         if is_tree_mode(entry.mode) {
           walk_tree(store, entry.id, path, files)
+        } else if is_gitlink_mode(entry.mode) {
+          // Skip gitlinks (submodules) when materializing file contents.
         } else {
           let blob_obj = store.get(entry.id)
           match blob_obj {
@@ -198,8 +203,60 @@ fn walk_tree(
 }
 
 ///|
+fn walk_tree_to_fs(
+  store : ObjectStore,
+  tree_id : ObjectId,
+  prefix : String,
+  fs : &FileSystem,
+  root : String,
+) -> Unit raise GitError {
+  let tree_obj = store.get(tree_id)
+  match tree_obj {
+    None => raise GitError::InvalidObject("Missing tree object")
+    Some(obj) => {
+      if obj.obj_type != ObjectType::Tree {
+        raise GitError::InvalidObject("Object is not a tree")
+      }
+      let entries = parse_tree(obj.data)
+      for entry in entries {
+        let path = if prefix.length() == 0 {
+          entry.name
+        } else {
+          prefix + "/" + entry.name
+        }
+        if is_tree_mode(entry.mode) {
+          walk_tree_to_fs(store, entry.id, path, fs, root)
+        } else if is_gitlink_mode(entry.mode) {
+          let full_path = join_path(root, path)
+          fs.mkdir_p(full_path)
+        } else {
+          let blob_obj = store.get(entry.id)
+          match blob_obj {
+            None => raise GitError::InvalidObject("Missing blob object")
+            Some(b) => {
+              if b.obj_type != ObjectType::Blob {
+                raise GitError::InvalidObject("Object is not a blob")
+              }
+              let full_path = join_path(root, path)
+              let dir = parent_dir(full_path)
+              fs.mkdir_p(dir)
+              fs.write_file(full_path, b.data)
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+///|
 fn is_tree_mode(mode : String) -> Bool {
   mode == "40000" || mode == "040000"
+}
+
+///|
+fn is_gitlink_mode(mode : String) -> Bool {
+  mode == "160000" || mode == "0160000"
 }
 
 ///|

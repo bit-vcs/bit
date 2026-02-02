@@ -22,6 +22,7 @@ pub fn diff_worktree(
   root : String,
 ) -> Array[DiffFile] raise @git.GitError {
   let git_dir = join_path(root, ".git")
+  let autocrlf = read_autocrlf_setting(fs, git_dir)
   let index_entries = read_index_entries(fs, git_dir)
   let index_map : Map[String, IndexEntry] = {}
   for e in index_entries {
@@ -37,9 +38,13 @@ pub fn diff_worktree(
     match index_map.get(path) {
       None => () // untracked files are not shown in `git diff`
       Some(entry) => {
+        if is_gitlink_mode_int(entry.mode) || is_symlink_mode_int(entry.mode) {
+          continue
+        }
         let abs = join_path(root, path)
         let content = fs.read_file(abs)
-        let id = @git.hash_blob(content)
+        let normalized = normalize_worktree_content(content, autocrlf)
+        let id = @git.hash_blob(normalized)
         if id != entry.id {
           let old = diff_read_blob(db, fs, entry.id)
           // Skip if blob not found (e.g., submodule)
@@ -48,7 +53,7 @@ pub fn diff_worktree(
               path,
               kind: DiffKind::Modified,
               old_content: old,
-              new_content: Some(content),
+              new_content: Some(normalized),
             })
           }
         }
@@ -58,6 +63,9 @@ pub fn diff_worktree(
   for item in index_map.to_array() {
     let (path, entry) = item
     if not(seen.contains(path)) {
+      if is_gitlink_mode_int(entry.mode) || is_symlink_mode_int(entry.mode) {
+        continue
+      }
       let abs = join_path(root, path)
       if not(fs.is_file(abs)) {
         let old = diff_read_blob(db, fs, entry.id)

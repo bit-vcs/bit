@@ -2874,6 +2874,9 @@ async fn handle_submodule_update(
       let rel_path = get_rel_path(sub_path, modules_dir)
       wfs.write_string(sub_git, "gitdir: \{rel_path}\n")
     }
+    if rfs.is_dir(modules_dir) {
+      ensure_submodule_gitdir_config(fs, modules_dir, sub_path)
+    }
     // Checkout target commit
     let sub_git_dir = resolve_gitdir(rfs, sub_git)
     print_line(
@@ -2881,6 +2884,18 @@ async fn handle_submodule_update(
     )
     // Use checkout command
     run_checkout_in_submodule(wfs, rfs, sub_path, sub_git_dir, target_id)
+    @gitlib.apply_worktree_modes_from_commit(
+      fs,
+      fs,
+      sub_path,
+      sub_git_dir,
+      target_id,
+    ) catch {
+      err =>
+        eprint_line(
+          "warning: failed to apply worktree modes in submodule '\{sub.path}': \{err}",
+        )
+    }
     // Handle recursive
     if recursive {
       let nested = sub_path + "/.gitmodules"
@@ -2896,6 +2911,17 @@ async fn run_git_command(args : Array[String]) -> Int {
   // Find real git
   let real_git = @sys.get_env_var("SHIM_REAL_GIT").unwrap_or("git")
   @process.run(real_git, args)
+}
+
+///|
+fn ensure_submodule_gitdir_config(
+  fs : OsFs,
+  modules_dir : String,
+  work_tree : String,
+) -> Unit raise Error {
+  let config_path = modules_dir + "/config"
+  set_config(fs, config_path, "core.worktree", work_tree, false)
+  set_config(fs, config_path, "core.bare", "false", false)
 }
 
 ///|

@@ -92,6 +92,11 @@ pub fn write_worktree_from_files(
   }
   for item in files.to_array() {
     let (path, info) = item
+    if is_gitlink_mode_int(info.mode) {
+      let full_path = join_path(root, path)
+      fs.mkdir_p(full_path)
+      continue
+    }
     let obj = db.get(rfs, info.id)
     match obj {
       None => raise @git.GitError::InvalidObject("Missing blob object")

@@ -2,14 +2,20 @@ import {
   "mizchi/bit" as @git,
   "mizchi/bit/ignore" as @ignore,
   "moonbitlang/async" as @async,
+  "moonbitlang/async/fs" as @afs,
   "mizchi/zlib",
   "moonbitlang/async/process" as @process,
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/strconv",
   "moonbitlang/x/fs",
+  "moonbitlang/x/sys" as @sys,
   "moonbitlang/async/http" as @http,
 }
 
 options(
-  targets: { "promisor.mbt": [ "native" ], "sync_http.mbt": [ "native" ] },
+  targets: {
+    "promisor.mbt": [ "native" ],
+    "sync_http.mbt": [ "native" ],
+    "worktree_modes.mbt": [ "native" ],
+  },
 )

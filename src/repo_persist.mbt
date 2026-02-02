@@ -239,6 +239,9 @@ fn collect_tree_entries(
         }
         if is_tree_mode(entry.mode) {
           collect_tree_entries(store, entry.id, path, out)
+        } else if is_gitlink_mode(entry.mode) {
+          let mode = parse_octal(entry.mode)
+          out.push({ path, id: entry.id, size: 0, mode })
         } else {
           let blob = store.get(entry.id)
           match blob {
