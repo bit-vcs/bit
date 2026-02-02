@@ -45,6 +45,10 @@ pub fn tree_files_to_index(
   let entries : Array[IndexEntry] = []
   for item in files.to_array() {
     let (path, info) = item
+    if is_gitlink_mode_int(info.mode) {
+      entries.push({ path, id: info.id, mode: info.mode, size: 0 })
+      continue
+    }
     let obj = db.get(fs, info.id)
     match obj {
       None => raise @git.GitError::InvalidObject("Missing blob object")

@@ -1,6 +1,7 @@
 # Git upstream test allowlist for this repo (strict mode compatible)
 # One test script per line; blank lines and comments are ignored.
 # These tests pass with SHIM_CMDS="pack-objects index-pack upload-pack receive-pack" SHIM_STRICT=1
+# Note: allowlist may include tests with known breakages (broken) and is still accepted.
 # Note: SHA-256 related subtests are skipped (SHA-1 only).
 
 # basic / init
@@ -82,6 +83,7 @@ t5306-pack-nobase.sh
 t5307-pack-missing-commit.sh
 t5308-pack-detect-duplicates.sh
 t5313-pack-bounds-checks.sh
+t5315-pack-objects-compression.sh
 
 # fetch / push / refs (strict mode compatible)
 t5500-fetch-pack.sh
@@ -152,5 +154,6 @@ t2401-worktree-prune.sh
 t2402-worktree-list.sh
 t2403-worktree-move.sh
 t2404-worktree-config.sh
+t2405-worktree-submodule.sh
 t2406-worktree-repair.sh
 t2407-worktree-heads.sh

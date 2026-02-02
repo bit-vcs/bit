@@ -142,6 +142,40 @@ fn get_pack_size_limit(git_dir : String) -> Int64? {
 }
 
 ///|
+fn parse_compression_level(value : String) -> Int? {
+  let parsed = @strconv.parse_int(value) catch { _ => return None }
+  let mut level = parsed
+  if level < 0 {
+    level = 0
+  }
+  if level > 9 {
+    level = 9
+  }
+  Some(level)
+}
+
+///|
+fn get_pack_compression_level(git_dir : String) -> Int? {
+  match get_config_override("pack.compression") {
+    Some(value) => return parse_compression_level(value)
+    None => ()
+  }
+  match get_config_override("core.compression") {
+    Some(value) => return parse_compression_level(value)
+    None => ()
+  }
+  match git_config_get(git_dir, "pack", "compression") {
+    Some(value) => return parse_compression_level(value)
+    None => ()
+  }
+  match git_config_get(git_dir, "core", "compression") {
+    Some(value) => return parse_compression_level(value)
+    None => ()
+  }
+  None
+}
+
+///|
 /// Check if repository uses SHA256 (returns true if SHA256, false if SHA1)
 fn is_sha256_repo(git_dir : String) -> Bool {
   // Check extensions.objectFormat in config

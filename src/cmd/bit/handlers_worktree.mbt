@@ -4,9 +4,13 @@
 /// Get absolute work root path for worktree operations
 fn get_absolute_work_root() -> String {
   let root = get_work_root()
+  let base = match @sys.get_env_var("GIT_SHIM_PWD") {
+    Some(pwd) => Some(pwd)
+    None => @sys.get_env_var("PWD")
+  }
   if root == "." {
-    // Use GIT_SHIM_PWD if available
-    match @sys.get_env_var("GIT_SHIM_PWD") {
+    // Use GIT_SHIM_PWD or PWD if available
+    match base {
       Some(pwd) => pwd
       None => "."
     }
@@ -14,7 +18,7 @@ fn get_absolute_work_root() -> String {
     root
   } else {
     // Relative path, try to make it absolute
-    match @sys.get_env_var("GIT_SHIM_PWD") {
+    match base {
       Some(pwd) => pwd + "/" + root
       None => root
     }
@@ -261,6 +265,16 @@ async fn handle_worktree_add(args : Array[String]) -> Unit raise Error {
     detach~,
     new_branch~,
   )
+  let abs_wt_path = if wt_path.has_prefix("/") {
+    wt_path
+  } else {
+    root + "/" + wt_path
+  }
+  let gitmodules_path = abs_wt_path + "/.gitmodules"
+  if fs.is_file(gitmodules_path) {
+    let wt_git_dir = resolve_gitdir(fs, abs_wt_path + "/.git")
+    handle_submodule_update(fs, abs_wt_path, wt_git_dir, ["--init"])
+  }
   // Print success message
   match (new_branch, detach, commit_ish) {
     (Some(b), _, _) => print_line("Preparing worktree (new branch '\{b}')")

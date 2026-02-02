@@ -486,6 +486,11 @@ async fn handle_pack_objects(args : Array[String]) -> Unit {
       }
       // Read pack.packSizeLimit from config
       let pack_size_limit = get_pack_size_limit(git_dir)
+      let pack_compression_level = get_pack_compression_level(git_dir)
+      let pack_compression = match pack_compression_level {
+        Some(level) if level == 0 => @git.PackCompression::Stored
+        _ => @git.PackCompression::Default
+      }
       let db = @gitlib.ObjectDb::load(fs, git_dir)
       let mut objects : Array[@git.PackObject] = []
       if cfg.all {
@@ -615,9 +620,10 @@ async fn handle_pack_objects(args : Array[String]) -> Unit {
       let object_groups = split_objects_by_size_limit(objects, effective_limit)
       let mut total_delta_count = 0
       for group in object_groups {
-        let (pack, delta_count) = @git.create_packfile_with_delta_stats(
+        let (pack, delta_count) = @git.create_packfile_with_delta_stats_compression(
           group,
           cfg.delta_mode,
+          pack_compression,
         )
         total_delta_count += delta_count
         if cfg.stdout {

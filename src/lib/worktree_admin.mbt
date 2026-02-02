@@ -722,6 +722,10 @@ fn checkout_to_worktree(
   for item in files.to_array() {
     let (path, entry) = item
     let abs_path = join_path(worktree_path, path)
+    if is_gitlink_mode_int(entry.mode) {
+      fs.mkdir_p(abs_path)
+      continue
+    }
     let dir = parent_dir(abs_path)
     if dir != worktree_path {
       fs.mkdir_p(dir)
