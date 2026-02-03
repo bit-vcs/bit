@@ -65,75 +65,6 @@ fn make_temp_dir(fs : OsFs, prefix : String) -> String raise @git.GitError {
 }
 
 ///|
-fn normalize_repo_path(path : String) -> String raise @git.GitError {
-  let normalized = normalize_path(path)
-  let stripped = if normalized.has_prefix("/") && normalized.length() > 1 {
-    (try! normalized[1:]).to_string()
-  } else {
-    normalized
-  }
-  if stripped == "." || stripped == "/" || stripped.length() == 0 {
-    raise @git.GitError::InvalidObject("path required")
-  }
-  if stripped == ".." || stripped.has_prefix("../") {
-    raise @git.GitError::InvalidObject(
-      "path must not traverse outside repository",
-    )
-  }
-  stripped
-}
-
-///|
-fn split_path_parts(path : String) -> Array[String] {
-  path
-  .split("/")
-  .filter(fn(s) { s.length() > 0 })
-  .map(fn(s) { s.to_string() })
-  .collect()
-}
-
-///|
-fn find_tree_entry(
-  db : @gitlib.ObjectDb,
-  fs : &@git.RepoFileSystem,
-  tree_id : @git.ObjectId,
-  path : String,
-) -> @git.TreeEntry? raise @git.GitError {
-  let parts = split_path_parts(path)
-  if parts.length() == 0 {
-    return None
-  }
-  let mut current = tree_id
-  for i in 0..<parts.length() {
-    let name = parts[i]
-    let obj = db.get(fs, current)
-    guard obj is Some(o) else { return None }
-    let entries = @git.parse_tree(o.data)
-    let mut found : @git.TreeEntry? = None
-    for entry in entries {
-      if entry.name == name {
-        found = Some(entry)
-        break
-      }
-    }
-    match found {
-      None => return None
-      Some(entry) =>
-        if i == parts.length() - 1 {
-          return Some(entry)
-        } else {
-          let is_tree = entry.mode == "40000" || entry.mode == "040000"
-          if not(is_tree) {
-            return None
-          }
-          current = entry.id
-        }
-    }
-  }
-  None
-}
-
-///|
 async fn handle_tree(args : Array[String]) -> Unit raise Error {
   let mut recursive = true
   let mut show_trees = false
@@ -336,7 +267,7 @@ async fn handle_cat(args : Array[String]) -> Unit raise Error {
         )
       }
   }
-  let path = normalize_repo_path(raw_path)
+  let path = @gitlib.normalize_repo_path(raw_path)
   let temp_dir = make_temp_dir(fs, "bit-cat")
   try {
     let _ = @git.clone_http_to_fs(
@@ -372,7 +303,7 @@ async fn handle_cat(args : Array[String]) -> Unit raise Error {
       db = @gitlib.ObjectDb::load_lazy(fs, git_dir)
     }
     let tree_id = resolve_to_tree(db, fs, commit_id)
-    let entry = find_tree_entry(db, fs, tree_id, path)
+    let entry = @gitlib.find_tree_entry(db, fs, tree_id, path)
     guard entry is Some(found) else {
       raise @git.GitError::InvalidObject("path not found: " + path)
     }

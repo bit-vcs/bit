@@ -2,6 +2,15 @@
 /// Tests for subdir-clone functionality
 
 ///|
+fn bytes_to_string(bytes : Bytes) -> String {
+  let result = StringBuilder::new()
+  for i = 0; i < bytes.length(); i = i + 1 {
+    result.write_char(bytes[i].to_int().unsafe_to_char())
+  }
+  result.to_string()
+}
+
+///|
 test "subdir: write and read attributes" {
   let fs = OsFs::new()
   let test_dir = "/tmp/bit-test-subdir-" + get_current_timestamp().to_string()

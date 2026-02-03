@@ -76,6 +76,24 @@ fn trim_string(s : String) -> String {
 }
 
 ///|
+fn is_hex_char(c : Char) -> Bool {
+  (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
+}
+
+///|
+fn is_hex_string(s : String) -> Bool {
+  if s.length() == 0 {
+    return false
+  }
+  for c in s {
+    if not(is_hex_char(c)) {
+      return false
+    }
+  }
+  true
+}
+
+///|
 fn parent_dir(path : String) -> String {
   if path.length() == 0 || path == "/" {
     return "/"

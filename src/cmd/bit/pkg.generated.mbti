@@ -24,7 +24,7 @@ pub fn load_global_aliases(OsFs) -> Map[String, String]
 
 pub fn parse_gitconfig_aliases(String) -> Map[String, String]
 
-pub fn parse_github_shorthand(String) -> GitHubShorthand?
+pub fn parse_github_shorthand(String) -> @lib.GitHubShorthand?
 
 pub fn read_subdir_attributes(OsFs, String) -> (String, String, String)?
 
@@ -55,14 +55,6 @@ type CherryPickResult
 type ConfigBlock
 
 type FetchRefspec
-
-pub(all) enum GitHubShorthand {
-  Repo(String, String?)
-  Subdir(String, String, String?)
-  File(String, String)
-}
-pub impl Eq for GitHubShorthand
-pub impl Show for GitHubShorthand
 
 type GlobalOptions
 
