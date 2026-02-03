@@ -2855,8 +2855,10 @@ async fn handle_submodule_update(
     let expected_id = get_submodule_index_id(rfs, git_dir, sub.path)
     guard expected_id is Some(target_id) else { continue }
     let sub_git = sub_path + "/.git"
+    let sub_git_is_dir = rfs.is_dir(sub_git)
+    let mut has_modules = rfs.is_dir(modules_dir)
     // Clone if needed
-    if not(rfs.is_file(sub_git)) && not(rfs.is_dir(sub_git)) {
+    if not(sub_git_is_dir) && not(has_modules) {
       print_line("Cloning into '\{sub.path}'...")
       wfs.mkdir_p(modules_dir)
       // Use system git for clone
@@ -2870,11 +2872,14 @@ async fn handle_submodule_update(
         @stdio.stderr.write("Failed to clone \{sub.url}")
         continue
       }
-      // Create .git file
+      has_modules = true
+    }
+    if not(sub_git_is_dir) && has_modules {
+      // Create or refresh .git file to point to modules dir
       let rel_path = get_rel_path(sub_path, modules_dir)
       wfs.write_string(sub_git, "gitdir: \{rel_path}\n")
     }
-    if rfs.is_dir(modules_dir) {
+    if has_modules {
       ensure_submodule_gitdir_config(fs, modules_dir, sub_path)
     }
     // Checkout target commit
@@ -2916,7 +2921,8 @@ fn ensure_submodule_gitdir_config(
   work_tree : String,
 ) -> Unit raise Error {
   let config_path = modules_dir + "/config"
-  set_config(fs, config_path, "core.worktree", work_tree, false)
+  let rel_work_tree = get_rel_path(modules_dir, work_tree)
+  set_config(fs, config_path, "core.worktree", rel_work_tree, false)
   set_config(fs, config_path, "core.bare", "false", false)
 }
 

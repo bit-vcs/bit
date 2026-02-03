@@ -410,6 +410,7 @@ fn rebase_write_tree_from_map(
       mtime_nsec: 0,
     })
   }
+  entries.sort_by(fn(a, b) { String::lexical_compare(a.path, b.path) })
   let rel_entries = entries.map(fn(e) { e })
   rebase_write_tree_recursive(fs, git_dir, rel_entries)
 }
@@ -458,7 +459,7 @@ fn rebase_write_tree_recursive(
     let sub_id = rebase_write_tree_recursive(fs, git_dir, list)
     file_entries.push(@git.TreeEntry::new("040000", dir_name, sub_id))
   }
-  file_entries.sort_by(fn(a, b) { String::compare(a.name, b.name) })
+  file_entries.sort_by(fn(a, b) { String::lexical_compare(a.name, b.name) })
   let (tree_id, compressed) = @git.create_tree(file_entries)
   rebase_write_object(fs, git_dir, tree_id, compressed)
   tree_id
