@@ -22,6 +22,16 @@ pub fn RepoPath::new(
 }
 
 ///|
+pub fn RepoPath::full_name(self : RepoPath) -> String {
+  "\{self.user}/\{self.repo}"
+}
+
+///|
+pub fn RepoPath::host_name(self : RepoPath) -> String {
+  self.host.unwrap_or("github.com")
+}
+
+///|
 /// Get the clone URL (always includes host)
 pub fn RepoPath::clone_url(self : RepoPath, ssh? : Bool = false) -> String {
   let host = self.host.unwrap_or("github.com")

@@ -48,6 +48,8 @@ pub async fn Collab::fetch(Self, &@bit.FileSystem, &@bit.RepoFileSystem, String)
 pub fn Collab::get_issue(Self, &@bit.RepoFileSystem, String) -> Issue? raise @bit.GitError
 pub fn Collab::get_note(Self, &@bit.RepoFileSystem, @bit.ObjectId, ns? : String) -> Note? raise @bit.GitError
 pub fn Collab::get_pr(Self, &@bit.RepoFileSystem, String) -> PullRequest? raise @bit.GitError
+pub fn Collab::import_issues(Self, &@bit.FileSystem, &@bit.RepoFileSystem, Array[Issue]) -> ImportStats raise @bit.GitError
+pub fn Collab::import_prs(Self, &@bit.FileSystem, &@bit.RepoFileSystem, Array[PullRequest]) -> ImportStats raise @bit.GitError
 pub fn Collab::init(&@bit.FileSystem, &@bit.RepoFileSystem, String) -> Self raise @bit.GitError
 pub fn Collab::is_approved(Self, &@bit.RepoFileSystem, String) -> Bool raise @bit.GitError
 pub fn Collab::link_pr_to_issue(Self, &@bit.FileSystem, &@bit.RepoFileSystem, String, String, Int64) -> Unit raise @bit.GitError
@@ -64,6 +66,14 @@ pub fn Collab::remove_note(Self, &@bit.FileSystem, &@bit.RepoFileSystem, @bit.Ob
 pub fn Collab::submit_review(Self, &@bit.FileSystem, &@bit.RepoFileSystem, String, String, ReviewVerdict, String, @bit.ObjectId, Int64) -> PrReview raise @bit.GitError
 pub fn Collab::update_issue(Self, &@bit.FileSystem, &@bit.RepoFileSystem, String, Int64, title? : String?, body? : String?, labels? : Array[String]?, assignees? : Array[String]?) -> Issue raise @bit.GitError
 pub fn Collab::update_pr(Self, &@bit.FileSystem, &@bit.RepoFileSystem, String, Int64, title? : String?, body? : String?, labels? : Array[String]?) -> PullRequest raise @bit.GitError
+
+pub struct ImportStats {
+  created : Int
+  updated : Int
+}
+pub fn ImportStats::created(Self) -> Int
+pub fn ImportStats::new(Int, Int) -> Self
+pub fn ImportStats::updated(Self) -> Int
 
 pub struct Issue {
   id : String

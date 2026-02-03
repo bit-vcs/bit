@@ -60,6 +60,8 @@ pub struct RepoPath {
   subdir : String?
 }
 pub fn RepoPath::clone_url(Self, ssh? : Bool) -> String
+pub fn RepoPath::full_name(Self) -> String
+pub fn RepoPath::host_name(Self) -> String
 pub fn RepoPath::local_path(Self, String) -> String
 pub fn RepoPath::needs_sparse(Self) -> Bool
 pub fn RepoPath::new(String, String, host? : String?, subdir? : String?) -> Self

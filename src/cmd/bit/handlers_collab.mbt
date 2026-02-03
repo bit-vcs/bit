@@ -19,6 +19,9 @@ fn print_collab_pr_usage() -> Unit {
   println("")
   println("Subcommands:")
   println("  list [--state <open|closed|merged>]")
+  println(
+    "  import [--repo <owner/repo>] [--state <open|closed|merged|all>] [--limit <n>]",
+  )
   println("  get <id>")
   println(
     "  create --title <title> [--body <body>] --source <branch> --target <branch>",
@@ -44,6 +47,9 @@ fn print_collab_issue_usage() -> Unit {
   println("")
   println("Subcommands:")
   println("  list [--state <open|closed>]")
+  println(
+    "  import [--repo <owner/repo>] [--state <open|closed|all>] [--limit <n>]",
+  )
   println("  get <id>")
   println(
     "  create --title <title> [--body <body>] [--label <label>...] [--assignee <user>...]",
@@ -125,6 +131,7 @@ async fn handle_collab_pr(args : Array[String]) -> Unit raise Error {
   match subcmd {
     "list" => handle_collab_pr_list(rest)
     "get" => handle_collab_pr_get(rest)
+    "import" => handle_collab_pr_import(rest)
     "create" => handle_collab_pr_create(rest)
     "update" => handle_collab_pr_update(rest)
     "close" => handle_collab_pr_close(rest)
@@ -184,6 +191,86 @@ async fn handle_collab_pr_list(args : Array[String]) -> Unit raise Error {
   for pr in prs {
     print_line(format_pr_summary(pr))
   }
+}
+
+///|
+async fn handle_collab_pr_import(args : Array[String]) -> Unit raise Error {
+  let mut repo : String? = None
+  let mut state = "all"
+  let mut limit = 100
+  let mut i = 0
+  while i < args.length() {
+    let arg = args[i]
+    match arg {
+      "-h" | "--help" | "help" => {
+        print_collab_pr_usage()
+        return ()
+      }
+      "--repo" if i + 1 < args.length() => {
+        repo = Some(args[i + 1])
+        i += 2
+        continue
+      }
+      _ if arg.has_prefix("--repo=") => {
+        repo = Some(String::unsafe_substring(arg, start=7, end=arg.length()))
+        i += 1
+        continue
+      }
+      "--state" if i + 1 < args.length() => {
+        state = args[i + 1]
+        i += 2
+        continue
+      }
+      _ if arg.has_prefix("--state=") => {
+        state = String::unsafe_substring(arg, start=8, end=arg.length())
+        i += 1
+        continue
+      }
+      "--limit" if i + 1 < args.length() => {
+        limit = @strconv.parse_int(args[i + 1]) catch {
+          _ =>
+            raise @git.GitError::InvalidObject("Invalid limit: \{args[i + 1]}")
+        }
+        i += 2
+        continue
+      }
+      _ if arg.has_prefix("--limit=") => {
+        let value = String::unsafe_substring(arg, start=8, end=arg.length())
+        limit = @strconv.parse_int(value) catch {
+          _ => raise @git.GitError::InvalidObject("Invalid limit: \{value}")
+        }
+        i += 1
+        continue
+      }
+      _ if arg.has_prefix("-") =>
+        warn_unimplemented_arg("collab pr import", arg)
+      _ => warn_unimplemented_arg("collab pr import", arg)
+    }
+    i += 1
+  }
+  let state_value = state.to_lower()
+  match state_value {
+    "open" | "closed" | "merged" | "all" => ()
+    _ => raise @git.GitError::InvalidObject("Unknown PR state: \{state}")
+  }
+  if limit <= 0 {
+    raise @git.GitError::InvalidObject("Limit must be positive")
+  }
+  let root = get_work_root()
+  let git_dir = root + "/.git"
+  let fs = OsFs::new()
+  let repo_name = resolve_github_repo(fs, git_dir, repo)
+  let (stdout, _stderr) = gh_pr_list(repo_name, state_value, limit)
+  let prs = parse_gh_prs(stdout)
+  if prs.length() == 0 {
+    print_line("No pull requests to import")
+    return ()
+  }
+  let collab = @collab.Collab::init(fs, fs, git_dir)
+  let stats = collab.import_prs(fs, fs, prs)
+  print_line(
+    "Imported PRs: created \{stats.created()}, updated \{stats.updated()}",
+  )
 }
 
 ///|
@@ -877,6 +964,7 @@ async fn handle_collab_issue(args : Array[String]) -> Unit raise Error {
   match subcmd {
     "list" => handle_collab_issue_list(rest)
     "get" => handle_collab_issue_get(rest)
+    "import" => handle_collab_issue_import(rest)
     "create" => handle_collab_issue_create(rest)
     "update" => handle_collab_issue_update(rest)
     "close" => handle_collab_issue_close(rest)
@@ -936,6 +1024,86 @@ async fn handle_collab_issue_list(args : Array[String]) -> Unit raise Error {
   for issue in issues {
     print_line(format_issue_summary(issue))
   }
+}
+
+///|
+async fn handle_collab_issue_import(args : Array[String]) -> Unit raise Error {
+  let mut repo : String? = None
+  let mut state = "all"
+  let mut limit = 100
+  let mut i = 0
+  while i < args.length() {
+    let arg = args[i]
+    match arg {
+      "-h" | "--help" | "help" => {
+        print_collab_issue_usage()
+        return ()
+      }
+      "--repo" if i + 1 < args.length() => {
+        repo = Some(args[i + 1])
+        i += 2
+        continue
+      }
+      _ if arg.has_prefix("--repo=") => {
+        repo = Some(String::unsafe_substring(arg, start=7, end=arg.length()))
+        i += 1
+        continue
+      }
+      "--state" if i + 1 < args.length() => {
+        state = args[i + 1]
+        i += 2
+        continue
+      }
+      _ if arg.has_prefix("--state=") => {
+        state = String::unsafe_substring(arg, start=8, end=arg.length())
+        i += 1
+        continue
+      }
+      "--limit" if i + 1 < args.length() => {
+        limit = @strconv.parse_int(args[i + 1]) catch {
+          _ =>
+            raise @git.GitError::InvalidObject("Invalid limit: \{args[i + 1]}")
+        }
+        i += 2
+        continue
+      }
+      _ if arg.has_prefix("--limit=") => {
+        let value = String::unsafe_substring(arg, start=8, end=arg.length())
+        limit = @strconv.parse_int(value) catch {
+          _ => raise @git.GitError::InvalidObject("Invalid limit: \{value}")
+        }
+        i += 1
+        continue
+      }
+      _ if arg.has_prefix("-") =>
+        warn_unimplemented_arg("collab issue import", arg)
+      _ => warn_unimplemented_arg("collab issue import", arg)
+    }
+    i += 1
+  }
+  let state_value = state.to_lower()
+  match state_value {
+    "open" | "closed" | "all" => ()
+    _ => raise @git.GitError::InvalidObject("Unknown issue state: \{state}")
+  }
+  if limit <= 0 {
+    raise @git.GitError::InvalidObject("Limit must be positive")
+  }
+  let root = get_work_root()
+  let git_dir = root + "/.git"
+  let fs = OsFs::new()
+  let repo_name = resolve_github_repo(fs, git_dir, repo)
+  let (stdout, _stderr) = gh_issue_list(repo_name, state_value, limit)
+  let issues = parse_gh_issues(stdout)
+  if issues.length() == 0 {
+    print_line("No issues to import")
+    return ()
+  }
+  let collab = @collab.Collab::init(fs, fs, git_dir)
+  let stats = collab.import_issues(fs, fs, issues)
+  print_line(
+    "Imported issues: created \{stats.created()}, updated \{stats.updated()}",
+  )
 }
 
 ///|
@@ -1665,6 +1833,268 @@ async fn handle_collab_sync_fetch(args : Array[String]) -> Unit raise Error {
     eprint_line(result.message())
     @sys.exit(1)
   }
+}
+
+///|
+fn resolve_github_repo(
+  fs : OsFs,
+  git_dir : String,
+  repo : String?,
+) -> String raise @git.GitError {
+  match repo {
+    Some(name) => name
+    None => {
+      let remote_url = get_effective_remote_url(fs, git_dir)
+      guard remote_url is Some(url) else {
+        raise @git.GitError::InvalidObject("No remote configured; use --repo")
+      }
+      match @hq.parse_repo_url(url) {
+        Some(parsed) => {
+          let host = parsed.host_name()
+          if host != "github.com" {
+            raise @git.GitError::InvalidObject(
+              "Only github.com is supported for gh import",
+            )
+          }
+          parsed.full_name()
+        }
+        None =>
+          raise @git.GitError::InvalidObject("Cannot parse remote URL: \{url}")
+      }
+    }
+  }
+}
+
+///|
+async fn gh_pr_list(
+  repo : String,
+  state : String,
+  limit : Int,
+) -> (String, String) raise @git.GitError {
+  let fields = "number,title,body,headRefName,headRefOid,baseRefName,baseRefOid,author,createdAt,updatedAt,state,labels"
+  let jq = "[.[] | {id:(.number|tostring), title:.title, body:(.body // \"\"), source_branch:.headRefName, source_commit:.headRefOid, target_branch:.baseRefName, target_commit:.baseRefOid, author:(.author.login // \"unknown\"), created_at:(.createdAt|fromdateiso8601), updated_at:(.updatedAt|fromdateiso8601), state:(.state|ascii_downcase), labels:(.labels|map(.name))}]"
+  let args = [
+    "pr",
+    "list",
+    "--state",
+    state,
+    "--limit",
+    limit.to_string(),
+    "--json",
+    fields,
+    "--jq",
+    jq,
+    "--repo",
+    repo,
+  ]
+  gh_collect_output(args)
+}
+
+///|
+async fn gh_issue_list(
+  repo : String,
+  state : String,
+  limit : Int,
+) -> (String, String) raise @git.GitError {
+  let fields = "number,title,body,author,createdAt,updatedAt,state,labels,assignees"
+  let jq = "[.[] | {id:(.number|tostring), title:.title, body:(.body // \"\"), author:(.author.login // \"unknown\"), created_at:(.createdAt|fromdateiso8601), updated_at:(.updatedAt|fromdateiso8601), state:(.state|ascii_downcase), labels:(.labels|map(.name)), assignees:(.assignees|map(.login))}]"
+  let args = [
+    "issue",
+    "list",
+    "--state",
+    state,
+    "--limit",
+    limit.to_string(),
+    "--json",
+    fields,
+    "--jq",
+    jq,
+    "--repo",
+    repo,
+  ]
+  gh_collect_output(args)
+}
+
+///|
+async fn gh_collect_output(
+  args : Array[String],
+) -> (String, String) raise @git.GitError {
+  let (code, stdout, stderr) = @process.collect_output(
+    "gh",
+    args,
+    inherit_env=true,
+  ) catch {
+    err => raise @git.GitError::IoError("gh failed: \{err}")
+  }
+  let out = stdout.text() catch { _ => "" }
+  let err_text = stderr.text() catch { _ => "" }
+  if code != 0 {
+    let message = trim_string(err_text)
+    raise @git.GitError::InvalidObject("gh failed (\{code}): \{message}")
+  }
+  (out, err_text)
+}
+
+///|
+fn parse_json_array(text : String) -> Array[Json] raise @git.GitError {
+  let parsed = @json.parse(text) catch {
+    err =>
+      raise @git.GitError::InvalidObject(
+        "Invalid JSON from gh: \{err.to_string()}",
+      )
+  }
+  match parsed {
+    Json::Array(items) => items
+    _ => raise @git.GitError::InvalidObject("Expected JSON array from gh")
+  }
+}
+
+///|
+fn json_get_string(
+  obj : Map[String, Json],
+  key : String,
+  fallback : String,
+) -> String {
+  match obj.get(key) {
+    Some(Json::String(value)) => value
+    Some(Json::Number(value, ..)) => value.to_string()
+    Some(Json::True) => "true"
+    Some(Json::False) => "false"
+    _ => fallback
+  }
+}
+
+///|
+fn json_get_int64(
+  obj : Map[String, Json],
+  key : String,
+  fallback : Int64,
+) -> Int64 {
+  match obj.get(key) {
+    Some(Json::Number(value, ..)) => value.to_int64()
+    Some(Json::String(value)) =>
+      @strconv.parse_int64(value) catch {
+        _ => fallback
+      }
+    _ => fallback
+  }
+}
+
+///|
+fn json_get_string_array(
+  obj : Map[String, Json],
+  key : String,
+) -> Array[String] {
+  match obj.get(key) {
+    Some(Json::Array(items)) => {
+      let out : Array[String] = []
+      for item in items {
+        match item {
+          Json::String(value) => out.push(value)
+          _ => ()
+        }
+      }
+      out
+    }
+    _ => []
+  }
+}
+
+///|
+fn parse_gh_prs(
+  text : String,
+) -> Array[@collab.PullRequest] raise @git.GitError {
+  let items = parse_json_array(text)
+  let out : Array[@collab.PullRequest] = []
+  for item in items {
+    match item {
+      Json::Object(obj) => {
+        let id = json_get_string(obj, "id", "")
+        if id.length() == 0 {
+          continue
+        }
+        let title = json_get_string(obj, "title", "")
+        let body = json_get_string(obj, "body", "")
+        let source_branch = json_get_string(obj, "source_branch", "")
+        let target_branch = json_get_string(obj, "target_branch", "")
+        let source_hex = json_get_string(obj, "source_commit", "")
+        let target_hex = json_get_string(obj, "target_commit", "")
+        if source_branch.length() == 0 || target_branch.length() == 0 {
+          raise @git.GitError::InvalidObject("Missing branch name for PR \{id}")
+        }
+        let source_commit = @git.ObjectId::from_hex(source_hex) catch {
+          _ =>
+            raise @git.GitError::InvalidObject(
+              "Invalid source commit for PR \{id}",
+            )
+        }
+        let target_commit = @git.ObjectId::from_hex(target_hex) catch {
+          _ =>
+            raise @git.GitError::InvalidObject(
+              "Invalid target commit for PR \{id}",
+            )
+        }
+        let author = json_get_string(obj, "author", "unknown")
+        let created_at = json_get_int64(obj, "created_at", 0L)
+        let updated_at = json_get_int64(obj, "updated_at", created_at)
+        let labels = json_get_string_array(obj, "labels")
+        let state_raw = json_get_string(obj, "state", "open").to_lower()
+        let state = match parse_pr_state(state_raw) {
+          Some(s) => s
+          None => @collab.PrState::Open
+        }
+        let pr = @collab.PullRequest::new(
+          id, title, body, source_branch, source_commit, target_branch, target_commit,
+          author, created_at, updated_at, state, labels,
+        )
+        out.push(pr)
+      }
+      _ => ()
+    }
+  }
+  out
+}
+
+///|
+fn parse_gh_issues(text : String) -> Array[@collab.Issue] raise @git.GitError {
+  let items = parse_json_array(text)
+  let out : Array[@collab.Issue] = []
+  for item in items {
+    match item {
+      Json::Object(obj) => {
+        let id = json_get_string(obj, "id", "")
+        if id.length() == 0 {
+          continue
+        }
+        let title = json_get_string(obj, "title", "")
+        let body = json_get_string(obj, "body", "")
+        let author = json_get_string(obj, "author", "unknown")
+        let created_at = json_get_int64(obj, "created_at", 0L)
+        let updated_at = json_get_int64(obj, "updated_at", created_at)
+        let labels = json_get_string_array(obj, "labels")
+        let assignees = json_get_string_array(obj, "assignees")
+        let state_raw = json_get_string(obj, "state", "open").to_lower()
+        let state = match parse_issue_state(state_raw) {
+          Some(s) => s
+          None => @collab.IssueState::Open
+        }
+        let issue = @collab.Issue::new(
+          id,
+          title,
+          body,
+          author,
+          created_at,
+          updated_at,
+          state,
+          labels~,
+          assignees~,
+        )
+        out.push(issue)
+      }
+      _ => ()
+    }
+  }
+  out
 }
 
 ///|

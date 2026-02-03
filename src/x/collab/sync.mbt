@@ -55,7 +55,9 @@ pub async fn Collab::push(
   // Push
   let req = @git.PushRequest::new(old_id, local_id, ref_name, pack)
   let result = @git.push(remote, req)
-  if result.has_prefix("unpack ok") || result.has_prefix("ok ") {
+  if result.has_prefix("unpack ok") ||
+    result.has_prefix("ok ") ||
+    result.has_prefix("Push successful") {
     {
       success: true,
       message: "Push successful",
@@ -246,6 +248,13 @@ fn merge_collab_trees(
     fs, rfs, git_dir, db, local_collab, remote_collab,
   )
   merged.push(@git.TreeEntry::new("040000", "prs", merged_collab))
+  // Process 'issues' - union of all issues
+  let local_issues = local_map.get("issues")
+  let remote_issues = remote_map.get("issues")
+  let merged_issues = merge_issues_dir(
+    fs, rfs, git_dir, db, local_issues, remote_issues,
+  )
+  merged.push(@git.TreeEntry::new("040000", "issues", merged_issues))
   // Process 'index' - take local for now
   let local_index = local_map.get("index")
   match local_index {
@@ -280,19 +289,63 @@ fn merge_meta_trees(
     Some(m) => read_counter_from_meta(db, rfs, m.id)
     None => 1
   }
-  // Use max + 1 to avoid collisions
+  let local_issue_counter = match local_meta {
+    Some(m) => read_issue_counter_from_meta(db, rfs, m.id)
+    None => 1
+  }
+  let remote_issue_counter = match remote_meta {
+    Some(m) => read_issue_counter_from_meta(db, rfs, m.id)
+    None => 1
+  }
+  // Use max to avoid collisions
   let merged_counter = if local_counter > remote_counter {
     local_counter
   } else {
     remote_counter
   }
-  // Create new meta tree
+  let merged_issue_counter = if local_issue_counter > remote_issue_counter {
+    local_issue_counter
+  } else {
+    remote_issue_counter
+  }
+  // Build merged meta entries (preserve unknown keys)
+  let local_entries = match local_meta {
+    Some(m) => read_tree_entries(db, rfs, m.id)
+    None => []
+  }
+  let remote_entries = match remote_meta {
+    Some(m) => read_tree_entries(db, rfs, m.id)
+    None => []
+  }
+  let meta_map : Map[String, @git.TreeEntry] = {}
+  for e in local_entries {
+    meta_map[e.name] = e
+  }
+  for e in remote_entries {
+    if not(meta_map.contains(e.name)) {
+      meta_map[e.name] = e
+    }
+  }
   let counter_content = merged_counter.to_string() + "\n"
   let (counter_id, counter_compressed) = @git.create_blob_string(
     counter_content,
   )
   write_object_bytes(fs, git_dir, counter_id, counter_compressed)
-  let meta_entries = [@git.TreeEntry::new("100644", "counter", counter_id)]
+  let issue_counter_content = merged_issue_counter.to_string() + "\n"
+  let (issue_counter_id, issue_counter_compressed) = @git.create_blob_string(
+    issue_counter_content,
+  )
+  write_object_bytes(fs, git_dir, issue_counter_id, issue_counter_compressed)
+  meta_map["counter"] = @git.TreeEntry::new("100644", "counter", counter_id)
+  meta_map["issue_counter"] = @git.TreeEntry::new(
+    "100644", "issue_counter", issue_counter_id,
+  )
+  let meta_entries : Array[@git.TreeEntry] = []
+  for item in meta_map.to_array() {
+    let (_, entry) = item
+    meta_entries.push(entry)
+  }
+  meta_entries.sort_by(fn(a, b) { String::compare(a.name, b.name) })
   let (meta_id, meta_compressed) = @git.create_tree(meta_entries)
   write_object_bytes(fs, git_dir, meta_id, meta_compressed)
   meta_id
@@ -305,6 +358,20 @@ fn read_counter_from_meta(
   meta_tree : @git.ObjectId,
 ) -> Int raise @git.GitError {
   let counter_id = find_tree_entry(db, rfs, meta_tree, "counter")
+  guard counter_id is Some(cid) else { return 1 }
+  let obj = db.get(rfs, cid)
+  guard obj is Some(blob) else { return 1 }
+  let text = @utf8.decode_lossy(blob.data[:])
+  parse_int(trim_whitespace(text))
+}
+
+///|
+fn read_issue_counter_from_meta(
+  db : @lib.ObjectDb,
+  rfs : &@git.RepoFileSystem,
+  meta_tree : @git.ObjectId,
+) -> Int raise @git.GitError {
+  let counter_id = find_tree_entry(db, rfs, meta_tree, "issue_counter")
   guard counter_id is Some(cid) else { return 1 }
   let obj = db.get(rfs, cid)
   guard obj is Some(blob) else { return 1 }
@@ -363,6 +430,62 @@ fn merge_collab_dir(
       (None, None) => continue
     }
     merged.push(@git.TreeEntry::new("040000", pr_id, merged_pr_tree))
+  }
+  merged.sort_by(fn(a, b) { String::compare(a.name, b.name) })
+  let (tree_id, compressed) = @git.create_tree(merged)
+  write_object_bytes(fs, git_dir, tree_id, compressed)
+  tree_id
+}
+
+///|
+fn merge_issues_dir(
+  fs : &@git.FileSystem,
+  rfs : &@git.RepoFileSystem,
+  git_dir : String,
+  db : @lib.ObjectDb,
+  local_issues : @git.TreeEntry?,
+  remote_issues : @git.TreeEntry?,
+) -> @git.ObjectId raise @git.GitError {
+  let local_entries = match local_issues {
+    Some(p) => read_tree_entries(db, rfs, p.id)
+    None => []
+  }
+  let remote_entries = match remote_issues {
+    Some(p) => read_tree_entries(db, rfs, p.id)
+    None => []
+  }
+  let local_map : Map[String, @git.TreeEntry] = {}
+  for e in local_entries {
+    local_map[e.name] = e
+  }
+  let remote_map : Map[String, @git.TreeEntry] = {}
+  for e in remote_entries {
+    remote_map[e.name] = e
+  }
+  let all_ids : Map[String, Bool] = {}
+  for e in local_entries {
+    all_ids[e.name] = true
+  }
+  for e in remote_entries {
+    all_ids[e.name] = true
+  }
+  let merged : Array[@git.TreeEntry] = []
+  for item in all_ids.to_array() {
+    let (issue_id, _) = item
+    let local_issue = local_map.get(issue_id)
+    let remote_issue = remote_map.get(issue_id)
+    let merged_issue_tree = match (local_issue, remote_issue) {
+      (Some(l), None) => l.id
+      (None, Some(r)) => r.id
+      (Some(l), Some(r)) =>
+        if l.id == r.id {
+          l.id
+        } else {
+          merge_issue_dir(fs, rfs, git_dir, db, l.id, r.id)
+        }
+      (None, None) => continue
+    }
+    merged.push(@git.TreeEntry::new("040000", issue_id, merged_issue_tree))
   }
   merged.sort_by(fn(a, b) { String::compare(a.name, b.name) })
   let (tree_id, compressed) = @git.create_tree(merged)
@@ -433,6 +556,58 @@ fn merge_pr_dir(
 }
 
 ///|
+fn merge_issue_dir(
+  fs : &@git.FileSystem,
+  rfs : &@git.RepoFileSystem,
+  git_dir : String,
+  db : @lib.ObjectDb,
+  local_issue : @git.ObjectId,
+  remote_issue : @git.ObjectId,
+) -> @git.ObjectId raise @git.GitError {
+  let local_entries = read_tree_entries(db, rfs, local_issue)
+  let remote_entries = read_tree_entries(db, rfs, remote_issue)
+  let local_map : Map[String, @git.TreeEntry] = {}
+  for e in local_entries {
+    local_map[e.name] = e
+  }
+  let remote_map : Map[String, @git.TreeEntry] = {}
+  for e in remote_entries {
+    remote_map[e.name] = e
+  }
+  let merged : Array[@git.TreeEntry] = []
+  let local_issue_data = local_map.get("issue.data")
+  let remote_issue_data = remote_map.get("issue.data")
+  let issue_data_id = match (local_issue_data, remote_issue_data) {
+    (Some(l), Some(r)) =>
+      if l.id == r.id {
+        l.id
+      } else {
+        let local_updated = get_issue_updated_at(db, rfs, l.id)
+        let remote_updated = get_issue_updated_at(db, rfs, r.id)
+        if local_updated >= remote_updated {
+          l.id
+        } else {
+          r.id
+        }
+      }
+    (Some(l), None) => l.id
+    (None, Some(r)) => r.id
+    (None, None) => raise @git.GitError::InvalidObject("Missing issue.data")
+  }
+  merged.push(@git.TreeEntry::new("100644", "issue.data", issue_data_id))
+  let local_comments = local_map.get("comments")
+  let remote_comments = remote_map.get("comments")
+  let comments_id = merge_content_addressed_dir(
+    fs, rfs, git_dir, db, local_comments, remote_comments,
+  )
+  merged.push(@git.TreeEntry::new("040000", "comments", comments_id))
+  merged.sort_by(fn(a, b) { String::compare(a.name, b.name) })
+  let (tree_id, compressed) = @git.create_tree(merged)
+  write_object_bytes(fs, git_dir, tree_id, compressed)
+  tree_id
+}
+
+///|
 fn merge_content_addressed_dir(
   fs : &@git.FileSystem,
   _rfs : &@git.RepoFileSystem,
@@ -490,6 +665,25 @@ fn get_pr_updated_at(
   guard obj is Some(blob) else { return 0L }
   let text = @utf8.decode_lossy(blob.data[:])
   // Parse updated field
+  for line_view in text.split("\n") {
+    let line = line_view.to_string()
+    if line.has_prefix("updated ") {
+      let value = String::unsafe_substring(line, start=8, end=line.length())
+      return parse_int64(value)
+    }
+  }
+  0L
+}
+
+///|
+fn get_issue_updated_at(
+  db : @lib.ObjectDb,
+  rfs : &@git.RepoFileSystem,
+  issue_data_id : @git.ObjectId,
+) -> Int64 raise @git.GitError {
+  let obj = db.get(rfs, issue_data_id)
+  guard obj is Some(blob) else { return 0L }
+  let text = @utf8.decode_lossy(blob.data[:])
   for line_view in text.split("\n") {
     let line = line_view.to_string()
     if line.has_prefix("updated ") {
