@@ -704,6 +704,26 @@ fn pack_idx_path(pack_path : String) -> String {
 }
 
 ///|
+fn corrupt_pack_file(fs : OsFs, pack_path : String) -> Unit {
+  try {
+    let data = fs.read_file(pack_path)
+    if data.length() == 0 {
+      return
+    }
+    let bytes : FixedArray[Byte] = FixedArray::makei(
+      data.length(),
+      fn(i) { data[i] },
+    )
+    let last = data.length() - 1
+    let v = bytes[last].to_int()
+    bytes[last] = (v ^ 1).to_byte()
+    fs.write_file(pack_path, Bytes::from_array(bytes))
+  } catch {
+    _ => ()
+  }
+}
+
+///|
 fn is_promisor_pack(fs : OsFs, pack_path : String) -> Bool {
   let base = if pack_path.has_suffix(".pack") {
     (try! pack_path[:pack_path.length() - 5]).to_string()
@@ -1360,6 +1380,9 @@ async fn handle_pack_objects(args : Array[String]) -> Unit {
             group,
             cfg.index_version,
           )
+          if db.saw_corrupt_pack {
+            corrupt_pack_file(fs, pack_path)
+          }
           @stdio.stdout.write(hash_hex + "\n")
         }
       }

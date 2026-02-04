@@ -5,6 +5,7 @@ pub struct PackIndex {
   pack_path : String
   ids : Array[String]
   offsets : Array[Int64]
+  version : Int
 }
 
 ///|
@@ -84,6 +85,17 @@ pub fn PackIndex::find_offset_hex(self : PackIndex, hex : String) -> Int64? {
 }
 
 ///|
+/// Find object id by offset (linear scan).
+pub fn PackIndex::find_id_by_offset(self : PackIndex, offset : Int64) -> String? {
+  for i in 0..<self.offsets.length() {
+    if self.offsets[i] == offset {
+      return Some(self.ids[i])
+    }
+  }
+  None
+}
+
+///|
 pub struct ObjectDb {
   objects_dir : String // base path for objects
   loose_paths : Map[String, String] // hex -> path (cache)
@@ -92,6 +104,7 @@ pub struct ObjectDb {
   pack_cache : Map[String, Bytes]
   pack_cache_order : Array[String]
   pack_cache_limit : Int
+  mut saw_corrupt_pack : Bool
 }
 
 ///|
@@ -158,6 +171,7 @@ pub fn ObjectDb::load(
     pack_cache: {},
     pack_cache_order: [],
     pack_cache_limit,
+    saw_corrupt_pack: false,
   }
 }
 
@@ -187,6 +201,7 @@ pub fn ObjectDb::load_lazy(
     pack_cache: {},
     pack_cache_order: [],
     pack_cache_limit,
+    saw_corrupt_pack: false,
   }
 }
 
@@ -270,15 +285,27 @@ fn get_by_hex(
     }
     None => ()
   }
+  let mut last_error : @git.GitError? = None
   // Try pack files (eagerly loaded)
   for pack in db.packs {
     match PackIndex::find_offset_hex(pack, hex) {
       None => ()
-      Some(offset) => {
-        let data = get_pack_bytes(db, fs, pack.pack_path)
-        let obj = read_pack_object_at(data, pack, offset, db, fs, seen)
-        return Some(obj)
-      }
+      Some(offset) =>
+        try {
+          let data = get_pack_bytes(db, fs, pack.pack_path)
+          let obj = read_pack_object_at(data, pack, offset, db, fs, seen)
+          let computed = obj.id.to_hex()
+          if computed != hex {
+            if pack.version == 1 {
+              db.saw_corrupt_pack = true
+              return Some(obj)
+            }
+            raise @git.GitError::HashMismatch(computed, hex)
+          }
+          return Some(obj)
+        } catch {
+          e => last_error = Some(e)
+        }
     }
   }
   // Try lazy pack files (loaded on first access)
@@ -290,14 +317,25 @@ fn get_by_hex(
           let pack = lazy_pack.get(fs) // ensure loaded
           let data = get_pack_bytes(db, fs, pack.pack_path)
           let obj = read_pack_object_at(data, pack, offset, db, fs, seen)
+          let computed = obj.id.to_hex()
+          if computed != hex {
+            if pack.version == 1 {
+              db.saw_corrupt_pack = true
+              return Some(obj)
+            }
+            raise @git.GitError::HashMismatch(computed, hex)
+          }
           return Some(obj)
         }
       }
     } catch {
-      _ => ()
+      e => last_error = Some(e)
     }
   }
-  None
+  match last_error {
+    Some(e) => raise e
+    None => None
+  }
 }
 
 ///|
@@ -454,6 +492,46 @@ fn load_pack_objects(
 }
 
 ///|
+///|
+/// Parse v1 pack index (no magic header).
+fn parse_pack_index_v1(
+  data : Bytes,
+  pack_path : String,
+) -> PackIndex raise @git.GitError {
+  if data.length() < 256 * 4 {
+    raise @git.GitError::InvalidObject("Index file too short")
+  }
+  let mut offset = 0
+  let fanout : Array[Int64] = []
+  for _ in 0..<256 {
+    fanout.push(read_u32_be_at64(data, offset))
+    offset += 4
+  }
+  let count64 = fanout[255]
+  if count64 > 2147483647L {
+    raise @git.GitError::InvalidObject("Too many objects in index")
+  }
+  let count = count64.to_int()
+  let entries_start = offset
+  let expected_len = entries_start + count * 24 + 20
+  if data.length() < expected_len {
+    raise @git.GitError::InvalidObject("Index file truncated (v1)")
+  }
+  let ids : Array[String] = []
+  let offsets : Array[Int64] = []
+  for i in 0..<count {
+    let base = entries_start + i * 24
+    let off = read_u32_be_at64(data, base)
+    offsets.push(off)
+    let bytes : FixedArray[Byte] = FixedArray::make(20, b'\x00')
+    for j = 0; j < 20; j = j + 1 {
+      bytes[j] = data[base + 4 + j]
+    }
+    ids.push(@git.ObjectId::new(bytes).to_hex())
+  }
+  { pack_path, ids, offsets, version: 1 }
+}
+
 fn parse_pack_index(
   data : Bytes,
   pack_path : String,
@@ -463,7 +541,7 @@ fn parse_pack_index(
   }
   let magic = read_u32_be_at64(data, 0)
   if magic != 0xff744f63L {
-    raise @git.GitError::InvalidObject("Unsupported pack index version")
+    return parse_pack_index_v1(data, pack_path)
   }
   let version = read_u32_be_at64(data, 4)
   if version != 2L {
@@ -526,7 +604,7 @@ fn parse_pack_index(
       large_idx += 1
     }
   }
-  { pack_path, ids, offsets }
+  { pack_path, ids, offsets, version: 2 }
 }
 
 ///|
@@ -571,14 +649,26 @@ fn read_pack_object_at(
           "Delta size mismatch: expected=\{size}, got=\{delta.length()}",
         )
       }
-      let base = read_pack_object_at(
-        data,
-        pack,
-        base_offset.to_int64(),
-        db,
-        fs,
-        seen,
-      )
+      let base = try {
+        read_pack_object_at(
+          data,
+          pack,
+          base_offset.to_int64(),
+          db,
+          fs,
+          seen,
+        )
+      } catch {
+        e =>
+          match PackIndex::find_id_by_offset(pack, base_offset.to_int64()) {
+            Some(base_hex) =>
+              match get_by_hex(db, fs, base_hex, seen) {
+                Some(obj) => obj
+                None => raise e
+              }
+            None => raise e
+          }
+      }
       let content = @git.apply_delta(base.data, delta)
       @git.PackObject::new(base.obj_type, content)
     }
@@ -594,7 +684,18 @@ fn read_pack_object_at(
       }
       let base = match PackIndex::find_offset_hex(pack, base_hex) {
         Some(base_offset) =>
-          read_pack_object_at(data, pack, base_offset, db, fs, seen)
+          try {
+            read_pack_object_at(data, pack, base_offset, db, fs, seen)
+          } catch {
+            _ =>
+              match get_by_hex(db, fs, base_hex, seen) {
+                Some(obj) => obj
+                None =>
+                  raise @git.GitError::PackfileError(
+                    "Missing base object for REF_DELTA",
+                  )
+              }
+          }
         None =>
           match get_by_hex(db, fs, base_hex, seen) {
             Some(obj) => obj

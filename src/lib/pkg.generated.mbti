@@ -547,6 +547,7 @@ pub struct ObjectDb {
   pack_cache : Map[String, Bytes]
   pack_cache_order : Array[String]
   pack_cache_limit : Int
+  mut saw_corrupt_pack : Bool
 }
 pub fn ObjectDb::get(Self, &@bit.RepoFileSystem, @bit.ObjectId) -> @bit.PackObject? raise @bit.GitError
 pub fn ObjectDb::load(&@bit.RepoFileSystem, String) -> Self raise @bit.GitError
@@ -556,7 +557,9 @@ pub struct PackIndex {
   pack_path : String
   ids : Array[String]
   offsets : Array[Int64]
+  version : Int
 }
+pub fn PackIndex::find_id_by_offset(Self, Int64) -> String?
 pub fn PackIndex::find_offset(Self, @bit.ObjectId) -> Int64?
 pub fn PackIndex::find_offset_hex(Self, String) -> Int64?
 

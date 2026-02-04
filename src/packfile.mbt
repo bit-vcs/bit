@@ -33,6 +33,22 @@ pub(all) enum PackCompression {
 }
 
 ///|
+/// Compress pack data. Use stored when compression expands data.
+fn compress_pack_data(data : Bytes, compression : PackCompression) -> Bytes {
+  match compression {
+    PackCompression::Stored => @zlib.zlib_compress_stored(data)
+    PackCompression::Default => {
+      let compressed = @zlib.zlib_compress(data)
+      if compressed.length() > data.length() {
+        @zlib.zlib_compress_stored(data)
+      } else {
+        compressed
+      }
+    }
+  }
+}
+
+///|
 pub fn PackObject::new(obj_type : ObjectType, data : Bytes) -> PackObject {
   let id = hash_object_content(obj_type, data)
   { obj_type, data, id, offset: -1, crc32: 0U }
@@ -384,10 +400,7 @@ fn pack_object_with_delta(
 ) -> (Int, Bool) {
   let obj_type = obj.obj_type.to_packfile_type()
   let data = obj.data
-  let compressed = match compression {
-    PackCompression::Stored => @zlib.zlib_compress_stored(data)
-    PackCompression::Default => @zlib.zlib_compress(data)
-  }
+  let compressed = compress_pack_data(data, compression)
   let normal_len = type_and_size_len(data.length()) + compressed.length()
   match delta_mode {
     PackDeltaMode::NoDelta => {
@@ -410,10 +423,7 @@ fn pack_object_with_delta(
     Some((base_offset, base_obj)) => {
       if base_offset < obj_offset && base_obj.obj_type == obj.obj_type {
         let delta = build_delta(base_obj.data, data)
-        let compressed_delta = match compression {
-          PackCompression::Stored => @zlib.zlib_compress_stored(delta)
-          PackCompression::Default => @zlib.zlib_compress(delta)
-        }
+        let compressed_delta = compress_pack_data(delta, compression)
         match delta_mode {
           PackDeltaMode::OfsDelta => {
             let back_offset = obj_offset - base_offset

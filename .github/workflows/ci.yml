@@ -28,6 +28,10 @@ jobs:
 
   git-compat:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -69,7 +73,8 @@ jobs:
           shim_dir="$(pwd)/tools/git-shim/bin"
           echo "$real_git" > tools/git-shim/real-git-path
 
-          tests=$(grep -v '^[[:space:]]*#' tools/git-test-allowlist.txt | grep -v '^[[:space:]]*$' | tr '\n' ' ')
+          tests=$(tools/select-git-tests.sh "${{ matrix.shard }}" 5 tools/git-test-allowlist.txt)
+          echo "Shard ${{ matrix.shard }}: $(echo "$tests" | wc -w | tr -d ' ') tests"
 
           SHIM_REAL_GIT="$real_git" SHIM_EXEC_PATH="$exec_path" \
           SHIM_MOON="$(pwd)/tools/git-shim/moon" SHIM_CMDS="receive-pack upload-pack pack-objects index-pack" \
@@ -80,12 +85,12 @@ jobs:
       - name: Generate compat table
         if: always()
         run: |
-          bash tools/generate-compat-table.sh > compat-results.md
-          cat compat-results.md
+          bash tools/generate-compat-table.sh > "compat-results-shard-${{ matrix.shard }}.md"
+          cat "compat-results-shard-${{ matrix.shard }}.md"
 
       - name: Upload compat results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: compat-results
-          path: compat-results.md
+          name: compat-results-shard-${{ matrix.shard }}
+          path: compat-results-shard-${{ matrix.shard }}.md
