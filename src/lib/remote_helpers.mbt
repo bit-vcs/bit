@@ -577,7 +577,11 @@ pub fn build_upload_pack_config_with_overrides(
         // Actually git requires a non-empty value, so empty means disabled
         None
       }
-    None => read_config_value(fs, config_path, "uploadpack", "blobpackfileuri")
+    None =>
+      match read_config_value(fs, config_path, "uploadpack", "blobpackfileuri") {
+        Some(v) => if v.length() > 0 { Some(v) } else { None }
+        None => None
+      }
   }
   UploadPackConfig::new(allow_filter, blob_packfile_uri, allow_ref_in_want)
 }
