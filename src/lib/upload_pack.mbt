@@ -444,7 +444,7 @@ fn collect_have_acks_v0(
   db : ObjectDb,
   fs : &@git.RepoFileSystem,
   haves : Array[@git.ObjectId],
-) -> Array[@git.ObjectId] raise @git.GitError {
+) -> Array[@git.ObjectId] {
   let out : Array[@git.ObjectId] = []
   for id in haves {
     let res : Result[@git.PackObject?, Error] = try? db.get(fs, id)
@@ -461,7 +461,7 @@ fn collect_have_acks_v2(
   db : ObjectDb,
   fs : &@git.RepoFileSystem,
   haves : Array[@git.ObjectId],
-) -> Array[@git.ObjectId] raise @git.GitError {
+) -> Array[@git.ObjectId] {
   let out : Array[@git.ObjectId] = []
   let seen : Map[String, Bool] = {}
   for id in haves {
