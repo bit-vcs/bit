@@ -175,7 +175,7 @@ pub fn show_ref(
   let out : Map[String, @git.ObjectId] = {}
   let refs_dir = join_path(git_dir, "refs")
   if fs.is_dir(refs_dir) {
-    ref_collect_loose(fs, refs_dir, "refs", out)
+    ref_collect_loose(fs, git_dir, refs_dir, "refs", out)
   }
   let packed = join_path(git_dir, "packed-refs")
   if fs.is_file(packed) {
@@ -208,6 +208,7 @@ pub fn show_ref_text(
 ///|
 fn ref_collect_loose(
   fs : &@git.RepoFileSystem,
+  git_dir : String,
   dir : String,
   prefix : String,
   out : Map[String, @git.ObjectId],
@@ -217,10 +218,19 @@ fn ref_collect_loose(
     let path = join_path(dir, name)
     let rel = if prefix == "" { name } else { prefix + "/" + name }
     if fs.is_dir(path) {
-      ref_collect_loose(fs, path, rel, out)
+      ref_collect_loose(fs, git_dir, path, rel, out)
     } else if fs.is_file(path) {
       let line = ref_read_line(fs, path)
-      out[rel] = @git.ObjectId::from_hex(line)
+      if line.has_prefix("ref: ") {
+        let target = String::unsafe_substring(line, start=5, end=line.length())
+        let resolved = try resolve_ref(fs, git_dir, target) catch { _ => None }
+        match resolved {
+          Some(id) => out[rel] = id
+          None => ()
+        }
+      } else {
+        out[rel] = @git.ObjectId::from_hex(line)
+      }
     }
   }
 }
