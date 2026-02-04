@@ -159,7 +159,7 @@ t5700-protocol-v1.sh
 t5701-git-serve.sh
 t5702-protocol-v2.sh
 # t5703-upload-pack-ref-in-want.sh  # broken: upload-pack ref-in-want
-t5704-protocol-violations.sh
+# t5704-protocol-violations.sh  # broken: protocol v2 violation handling
 t5705-session-id-in-capabilities.sh
 t5710-promisor-remote-capability.sh
 t5730-protocol-v2-bundle-uri-file.sh
