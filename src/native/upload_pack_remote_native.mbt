@@ -2,8 +2,8 @@
 
 ///|
 fn ensure_process_remote(remote : String) -> Unit raise @git.GitError {
-  let spec = @git.parse_remote(remote)
-  if spec.kind == @git.RemoteKind::Http {
+  let spec = @protocol.parse_remote(remote)
+  if spec.kind == @protocol.RemoteKind::Http {
     raise @git.GitError::ProtocolError("HTTP transport requires wasm targets")
   }
 }
@@ -34,7 +34,7 @@ pub async fn discover_upload_refs(
 ) -> (
   Array[(@git.ObjectId, String)],
   Array[String],
-  @git.ProtocolVersion,
+  @protocol.ProtocolVersion,
   Map[String, String],
 ) raise @git.GitError {
   ensure_process_remote(remote)

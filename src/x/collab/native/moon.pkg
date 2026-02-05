@@ -1,12 +1,12 @@
 import {
   "mizchi/bit" as @git,
+  "mizchi/bit/pack" as @pack,
+  "mizchi/bit/protocol" as @protocol,
   "mizchi/bit/native" as @gitnative,
   "mizchi/bit/lib" as @lib,
   "mizchi/bit/x/collab" as @collab,
 }
 
 options(
-  targets: {
-    "sync_native.mbt": [ "native" ],
-  },
+  targets: { "sync_native.mbt": [ "native" ] },
 )

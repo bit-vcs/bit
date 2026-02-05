@@ -21,13 +21,13 @@ pub async fn clone_http(
   let (refs, _caps, _version, symrefs) = @gitnative.discover_upload_refs_http(
     remote_url, prefer_v2,
   )
-  let default_ref = @git.select_default_ref(refs, symrefs)
+  let default_ref = @protocol.select_default_ref(refs, symrefs)
   match default_ref {
     None => return None
     Some((refname, commit_id)) => {
       let pack = @gitnative.fetch_pack_http(remote_url, [commit_id], prefer_v2)
-      let objects = @git.parse_packfile(pack)
-      @git.write_packfile_with_index(fs, git_dir, pack, objects)
+      let objects = @pack.parse_packfile(pack)
+      @pack.write_packfile_with_index(fs, git_dir, pack, objects)
       // 4. Update refs
       // Set HEAD to point to default branch
       let branch_name = if refname.has_prefix("refs/heads/") {
@@ -67,14 +67,14 @@ pub async fn pull_http(
   let (refs, _caps, _version, symrefs) = @gitnative.discover_upload_refs_http(
     remote, prefer_v2,
   )
-  let default_ref = @git.select_default_ref(refs, symrefs)
+  let default_ref = @protocol.select_default_ref(refs, symrefs)
   match default_ref {
     None => return None
     Some((refname, commit_id)) => {
       let pack = @gitnative.fetch_pack_http(remote, [commit_id], prefer_v2)
-      let objects = @git.parse_packfile(pack)
+      let objects = @pack.parse_packfile(pack)
       let git_dir = sync_join_path(root, ".git")
-      @git.write_packfile_with_index(fs, git_dir, pack, objects)
+      @pack.write_packfile_with_index(fs, git_dir, pack, objects)
       // update remote tracking ref
       let remote_ref = sync_remote_refname(refname)
       let remote_path = sync_join_path(git_dir, remote_ref)
@@ -120,11 +120,11 @@ pub async fn push_http(
     Some(head_id) => {
       let db = @gitlib.ObjectDb::load(rfs, actual_git_dir)
       let objects = @gitlib.collect_reachable_objects(db, rfs, head_id)
-      let pack = @git.create_packfile(objects)
-      let remote = @git.Remote::new(remote_url)
+      let pack = @pack.create_packfile(objects)
+      let remote = @protocol.Remote::new(remote_url)
       let refs = @gitnative.discover_receive_refs_http(remote)
       let old_id = sync_find_ref(refs, refname)
-      let req = @git.PushRequest::new(old_id, head_id, refname, pack)
+      let req = @protocol.PushRequest::new(old_id, head_id, refname, pack)
       @gitnative.push(remote, req)
     }
   }
@@ -142,11 +142,11 @@ pub async fn push_http_from_commit(
   let git_dir = sync_join_path(root, ".git")
   let db = @gitlib.ObjectDb::load(rfs, git_dir)
   let objects = @gitlib.collect_reachable_objects(db, rfs, commit_id)
-  let pack = @git.create_packfile(objects)
-  let remote = @git.Remote::new(remote_url)
+  let pack = @pack.create_packfile(objects)
+  let remote = @protocol.Remote::new(remote_url)
   let refs = @gitnative.discover_receive_refs_http(remote)
   let old_id = sync_find_ref(refs, refname)
-  let req = @git.PushRequest::new(old_id, commit_id, refname, pack)
+  let req = @protocol.PushRequest::new(old_id, commit_id, refname, pack)
   @gitnative.push(remote, req)
 }
 
@@ -166,9 +166,9 @@ pub async fn push_http_tree_only(
   let db = @gitlib.ObjectDb::load(rfs, git_dir)
   // Collect only the diff objects (new/modified since base)
   let objects = @gitlib.collect_diff_objects(db, rfs, old_commit_id, commit_id)
-  let pack = @git.create_packfile(objects)
-  let remote = @git.Remote::new(remote_url)
-  let req = @git.PushRequest::new(old_commit_id, commit_id, refname, pack)
+  let pack = @pack.create_packfile(objects)
+  let remote = @protocol.Remote::new(remote_url)
+  let req = @protocol.PushRequest::new(old_commit_id, commit_id, refname, pack)
   @gitnative.push(remote, req)
 }
 

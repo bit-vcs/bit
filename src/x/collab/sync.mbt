@@ -15,7 +15,7 @@ pub fn PrSyncResult::new(
   local_commit : @git.ObjectId?,
   remote_commit : @git.ObjectId?,
 ) -> PrSyncResult {
-  { success, message, local_commit, remote_commit, }
+  { success, message, local_commit, remote_commit }
 }
 
 ///|

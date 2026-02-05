@@ -717,7 +717,7 @@ async fn handle_index_pack(args : Array[String]) -> Unit {
             Bytes::default()
           }
         }
-        let max_depth = @git.max_delta_chain_length(pack) catch {
+        let max_depth = @pack.max_delta_chain_length(pack) catch {
           err => {
             @stdio.stderr.write("fatal: " + err.to_string() + "\n")
             @sys.exit(1)
@@ -786,9 +786,9 @@ async fn handle_index_pack(args : Array[String]) -> Unit {
           []
         }
         let objects = if cfg.fix_thin {
-          @git.parse_packfile_with_bases(pack, bases)
+          @pack.parse_packfile_with_bases(pack, bases)
         } else {
-          @git.parse_packfile(pack)
+          @pack.parse_packfile(pack)
         }
         check_sha1_collisions_with_repo(fs, git_dir, objects)
         check_pack_strict_and_fsck(
@@ -807,7 +807,7 @@ async fn handle_index_pack(args : Array[String]) -> Unit {
           None => pack_dir + "/pack-" + hash_hex + ".idx"
         }
         fs.write_file(pack_path, pack)
-        @git.write_pack_index_from_objects(fs, idx_path, pack, objects)
+        @pack.write_pack_index_from_objects(fs, idx_path, pack, objects)
         let keep_path = pack_dir + "/pack-" + hash_hex + ".keep"
         write_keep_file(fs, keep_path, cfg.keep_msg)
         @stdio.stdout.write(hash_hex + "\n")
@@ -841,7 +841,7 @@ async fn handle_index_pack(args : Array[String]) -> Unit {
             pack_path + ".idx"
           }
       }
-      let objects = @git.parse_packfile(pack)
+      let objects = @pack.parse_packfile(pack)
       let git_dir_opt = if fs.is_dir(git_dir) { Some(git_dir) } else { None }
       match git_dir_opt {
         Some(dir) => check_sha1_collisions_with_repo(fs, dir, objects)
@@ -855,7 +855,7 @@ async fn handle_index_pack(args : Array[String]) -> Unit {
         cfg.fsck_objects,
         cfg.ignore_missing_email,
       )
-      @git.write_pack_index_from_objects(fs, idx_path, pack, objects)
+      @pack.write_pack_index_from_objects(fs, idx_path, pack, objects)
       if cfg.keep_msg is Some(_) {
         let keep_path = if pack_path.has_suffix(".pack") {
           let base = (try! pack_path[:pack_path.length() - 5]).to_string()

@@ -28,8 +28,10 @@ test "Remote receive_pack_url" {
 
 ///|
 test "build_receive_pack_body" {
-  let old_id = ObjectId::zero()
-  let new_id = ObjectId::from_hex("ce013625030ba8dba906f756967f9e9ca394464a")
+  let old_id = @git.ObjectId::zero()
+  let new_id = @git.ObjectId::from_hex(
+    "ce013625030ba8dba906f756967f9e9ca394464a",
+  )
   let packfile = Bytes::from_array([b'P', b'A', b'C', b'K'])
   let req = PushRequest::new(old_id, new_id, "refs/heads/main", packfile)
   let body = build_receive_pack_body(req)
@@ -99,7 +101,7 @@ test "parse_receive_pack_response failure" {
   let result = parse_receive_pack_response(data)
   match result {
     Ok(_) => assert_true(false)
-    Err(GitError::ProtocolError(msg)) =>
+    Err(@git.GitError::ProtocolError(msg)) =>
       assert_true(msg.find("unpack error") is Some(_))
     Err(_) => assert_true(false)
   }

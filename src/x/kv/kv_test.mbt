@@ -52,8 +52,19 @@ impl @lib.WorkingTree for TestWorkingTree with get_working_files(self) {
 }
 
 ///|
-impl @lib.WorkingTree for TestWorkingTree with snapshot(self, message, author, timestamp) {
-  let snapshot = self.fs.snapshot(self.write_fs, self.backing_fs, message, author, timestamp)
+impl @lib.WorkingTree for TestWorkingTree with snapshot(
+  self,
+  message,
+  author,
+  timestamp,
+) {
+  let snapshot = self.fs.snapshot(
+    self.write_fs,
+    self.backing_fs,
+    message,
+    author,
+    timestamp,
+  )
   snapshot.commit_id
 }
 
@@ -98,16 +109,8 @@ fn make_test_kv(
   let fs = @git.TestFs::new()
   @lib.init_repo(fs, "/repo")
   let bitfs = @fs.Fs::empty(git_dir)
-  let tree : TestWorkingTree = {
-    fs: bitfs,
-    backing_fs: fs,
-    write_fs: fs,
-  }
-  let store : TestObjectStore = {
-    backing_fs: fs,
-    write_fs: fs,
-    git_dir,
-  }
+  let tree : TestWorkingTree = { fs: bitfs, backing_fs: fs, write_fs: fs }
+  let store : TestObjectStore = { backing_fs: fs, write_fs: fs, git_dir }
   let kv = Kv::new(NodeId::new(node_id), tree, store, @git.ObjectId::zero())
   (kv, fs)
 }
@@ -116,11 +119,7 @@ fn make_test_kv(
 fn make_test_kv_simple(node_id : String) -> Kv {
   let fs = @git.TestFs::new()
   let bitfs = @fs.Fs::empty("/repo/.git")
-  let tree : TestWorkingTree = {
-    fs: bitfs,
-    backing_fs: fs,
-    write_fs: fs,
-  }
+  let tree : TestWorkingTree = { fs: bitfs, backing_fs: fs, write_fs: fs }
   let store : TestObjectStore = {
     backing_fs: fs,
     write_fs: fs,

@@ -174,12 +174,7 @@ pub(all) struct KvConfig {
 
 ///|
 pub fn KvConfig::default(node_id : NodeId) -> KvConfig {
-  {
-    node_id,
-    max_peers: 32,
-    gossip_interval_ms: 5000,
-    sync_batch_size: 100,
-  }
+  { node_id, max_peers: 32, gossip_interval_ms: 5000, sync_batch_size: 100 }
 }
 
 ///|

@@ -35,19 +35,19 @@ pub fn build_receive_pack_advertisement(
   if refs.length() == 0 {
     let zero = @git.ObjectId::zero().to_hex()
     let line = "\{zero} capabilities^{}\u0000\{caps}\n"
-    receive_push_bytes(out, @git.pktline_encode(line))
-    receive_push_bytes(out, @git.pktline_flush())
+    receive_push_bytes(out, @protocol.pktline_encode(line))
+    receive_push_bytes(out, @protocol.pktline_flush())
     return Bytes::from_array(FixedArray::makei(out.length(), fn(i) { out[i] }))
   }
   let (first_name, first_id) = refs[0]
   let first_line = "\{first_id.to_hex()} \{first_name}\u0000\{caps}\n"
-  receive_push_bytes(out, @git.pktline_encode(first_line))
+  receive_push_bytes(out, @protocol.pktline_encode(first_line))
   for i in 1..<refs.length() {
     let (name, id) = refs[i]
     let line = "\{id.to_hex()} \{name}\n"
-    receive_push_bytes(out, @git.pktline_encode(line))
+    receive_push_bytes(out, @protocol.pktline_encode(line))
   }
-  receive_push_bytes(out, @git.pktline_flush())
+  receive_push_bytes(out, @protocol.pktline_flush())
   Bytes::from_array(FixedArray::makei(out.length(), fn(i) { out[i] }))
 }
 
@@ -113,8 +113,8 @@ pub fn apply_receive_pack(
 ) -> ReceivePackResult raise @git.GitError {
   let git_dir = join_path(root, ".git")
   if req.pack.length() > 0 {
-    let objects = @git.parse_packfile(req.pack)
-    @git.write_packfile_with_index(fs, git_dir, req.pack, objects)
+    let objects = @pack.parse_packfile(req.pack)
+    @pack.write_packfile_with_index(fs, git_dir, req.pack, objects)
   }
   let db = ObjectDb::load(rfs, git_dir)
   let updated : Array[String] = []
@@ -172,15 +172,15 @@ pub fn receive_pack(
 ///|
 fn receive_build_status_response(result : ReceivePackResult) -> Bytes {
   let out : Array[Byte] = []
-  receive_push_bytes(out, @git.pktline_encode("unpack ok\n"))
+  receive_push_bytes(out, @protocol.pktline_encode("unpack ok\n"))
   for refname in result.updated {
-    receive_push_bytes(out, @git.pktline_encode("ok \{refname}\n"))
+    receive_push_bytes(out, @protocol.pktline_encode("ok \{refname}\n"))
   }
   for item in result.rejected {
     let (refname, msg) = item
-    receive_push_bytes(out, @git.pktline_encode("ng \{refname} \{msg}\n"))
+    receive_push_bytes(out, @protocol.pktline_encode("ng \{refname} \{msg}\n"))
   }
-  receive_push_bytes(out, @git.pktline_flush())
+  receive_push_bytes(out, @protocol.pktline_flush())
   Bytes::from_array(FixedArray::makei(out.length(), fn(i) { out[i] }))
 }
 

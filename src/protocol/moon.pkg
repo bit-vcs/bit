@@ -1,0 +1,16 @@
+import {
+  "mizchi/bit" as @git,
+  "mizchi/bit/pack" as @pack,
+}
+
+import "test" {
+  "mizchi/bit" as @git,
+  "mizchi/bit/pack" as @pack,
+}
+
+options(
+  targets: {
+    "remote_test.mbt": [ "native" ],
+    "upload_pack_remote_wasm.mbt": [ "wasm-gc", "wasm" ],
+  },
+)

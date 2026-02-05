@@ -24,9 +24,9 @@ test "packfile fixture: oracle.pack" {
   let packfile = load_fixture("oracle.pack", oracle_pack_hex)
   let objects = parse_packfile(packfile)
   assert_true(objects.length() == 4)
-  assert_true(count_type(objects, ObjectType::Commit) == 1)
-  assert_true(count_type(objects, ObjectType::Tree) == 1)
-  assert_true(count_type(objects, ObjectType::Blob) == 2)
+  assert_true(count_type(objects, @git.ObjectType::Commit) == 1)
+  assert_true(count_type(objects, @git.ObjectType::Tree) == 1)
+  assert_true(count_type(objects, @git.ObjectType::Blob) == 2)
   let ids = collect_object_ids(objects)
   assert_true(ids.contains("4332a3d7c17f1ce072e6691f6856d1c9bf9d2f9d"))
   assert_true(ids.contains("88e38705fdbd3608cddbe904b67c731f3234c45b"))
@@ -39,9 +39,9 @@ test "packfile fixture: oracle_deflate.pack" {
   let packfile = load_fixture("oracle_deflate.pack", oracle_deflate_hex)
   let objects = parse_packfile(packfile)
   assert_true(objects.length() == 4)
-  assert_true(count_type(objects, ObjectType::Commit) == 1)
-  assert_true(count_type(objects, ObjectType::Tree) == 1)
-  assert_true(count_type(objects, ObjectType::Blob) == 2)
+  assert_true(count_type(objects, @git.ObjectType::Commit) == 1)
+  assert_true(count_type(objects, @git.ObjectType::Tree) == 1)
+  assert_true(count_type(objects, @git.ObjectType::Blob) == 2)
   let ids = collect_object_ids(objects)
   assert_true(ids.contains("4332a3d7c17f1ce072e6691f6856d1c9bf9d2f9d"))
   assert_true(ids.contains("88e38705fdbd3608cddbe904b67c731f3234c45b"))
@@ -54,9 +54,9 @@ test "packfile fixture: oracle_delta.pack" {
   let packfile = load_fixture("oracle_delta.pack", oracle_delta_hex)
   let objects = parse_packfile(packfile)
   assert_true(objects.length() == 4)
-  assert_true(count_type(objects, ObjectType::Commit) == 1)
-  assert_true(count_type(objects, ObjectType::Tree) == 1)
-  assert_true(count_type(objects, ObjectType::Blob) == 2)
+  assert_true(count_type(objects, @git.ObjectType::Commit) == 1)
+  assert_true(count_type(objects, @git.ObjectType::Tree) == 1)
+  assert_true(count_type(objects, @git.ObjectType::Blob) == 2)
   let ids = collect_object_ids(objects)
   assert_true(ids.contains("8fddbcdcd14623cc3b31587df65e562f53cf5554"))
   assert_true(ids.contains("fb4c40472d4d08ee02871e4fdfbf8efb41ecd194"))
@@ -70,11 +70,11 @@ test "packfile fixture: oracle_delta.pack" {
 ///|
 test "packfile fixture: oracle_thin.pack (missing base)" {
   let packfile = load_fixture("oracle_thin.pack", oracle_thin_hex)
-  let result : Result[Array[PackObject], GitError] = try? parse_packfile(
+  let result : Result[Array[@git.PackObject], @git.GitError] = try? parse_packfile(
     packfile,
   )
   match result {
-    Err(GitError::PackfileError(_)) => ()
+    Err(@git.GitError::PackfileError(_)) => ()
     _ => assert_true(false)
   }
 }
@@ -97,9 +97,9 @@ test "packfile fixture: oracle_after_delta.pack (base after delta)" {
   let packfile = load_fixture("oracle_after_delta.pack", oracle_after_delta_hex)
   let objects = parse_packfile(packfile)
   assert_true(objects.length() == 6)
-  assert_true(count_type(objects, ObjectType::Commit) == 2)
-  assert_true(count_type(objects, ObjectType::Tree) == 2)
-  assert_true(count_type(objects, ObjectType::Blob) == 2)
+  assert_true(count_type(objects, @git.ObjectType::Commit) == 2)
+  assert_true(count_type(objects, @git.ObjectType::Tree) == 2)
+  assert_true(count_type(objects, @git.ObjectType::Blob) == 2)
   let ids = collect_object_ids(objects)
   assert_true(ids.contains("3a76cfa1c53d259541847fc7f35de3d6a673ef1d"))
   assert_true(ids.contains("733caf0bc80be6e7627acc1b718e6f4d2f183363"))
@@ -110,7 +110,7 @@ test "packfile fixture: oracle_after_delta.pack (base after delta)" {
 }
 
 ///|
-fn collect_object_ids(objects : Array[PackObject]) -> Map[String, Bool] {
+fn collect_object_ids(objects : Array[@git.PackObject]) -> Map[String, Bool] {
   let ids : Map[String, Bool] = {}
   for obj in objects {
     let id = hash_object_content(obj.obj_type, obj.data)
@@ -120,10 +120,10 @@ fn collect_object_ids(objects : Array[PackObject]) -> Map[String, Bool] {
 }
 
 ///|
-fn collect_blob_sizes(objects : Array[PackObject]) -> Map[Int, Bool] {
+fn collect_blob_sizes(objects : Array[@git.PackObject]) -> Map[Int, Bool] {
   let sizes : Map[Int, Bool] = {}
   for obj in objects {
-    if obj.obj_type == ObjectType::Blob {
+    if obj.obj_type == @git.ObjectType::Blob {
       sizes[obj.data.length()] = true
     }
   }
@@ -131,7 +131,7 @@ fn collect_blob_sizes(objects : Array[PackObject]) -> Map[Int, Bool] {
 }
 
 ///|
-fn count_type(objects : Array[PackObject], t : ObjectType) -> Int {
+fn count_type(objects : Array[@git.PackObject], t : @git.ObjectType) -> Int {
   let mut count = 0
   for obj in objects {
     if obj.obj_type == t {
@@ -176,7 +176,10 @@ fn hex_char_to_int(c : Char) -> Int {
 }
 
 ///|
-fn hash_object_content(obj_type : ObjectType, content : Bytes) -> ObjectId {
+fn hash_object_content(
+  obj_type : @git.ObjectType,
+  content : Bytes,
+) -> @git.ObjectId {
   let header = "\{obj_type.to_string()} \{content.length()}\u0000"
   let bytes : Array[Byte] = []
   for c in header {
@@ -185,5 +188,7 @@ fn hash_object_content(obj_type : ObjectType, content : Bytes) -> ObjectId {
   for b in content {
     bytes.push(b)
   }
-  sha1(Bytes::from_array(FixedArray::makei(bytes.length(), fn(i) { bytes[i] })))
+  @git.sha1(
+    Bytes::from_array(FixedArray::makei(bytes.length(), fn(i) { bytes[i] })),
+  )
 }

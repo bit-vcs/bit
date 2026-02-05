@@ -69,8 +69,14 @@ test "packfile trailer is 20 bytes" {
 
 ///|
 test "packfile multiple objects" {
-  let obj1 = PackObject::new(ObjectType::Blob, Bytes::from_array([b'a']))
-  let obj2 = PackObject::new(ObjectType::Blob, Bytes::from_array([b'b']))
+  let obj1 = @git.PackObject::new(
+    @git.ObjectType::Blob,
+    Bytes::from_array([b'a']),
+  )
+  let obj2 = @git.PackObject::new(
+    @git.ObjectType::Blob,
+    Bytes::from_array([b'b']),
+  )
   let packfile = create_packfile([obj1, obj2])
 
   // Check object count: 2
@@ -83,8 +89,8 @@ test "packfile multiple objects" {
 ///|
 test "create commit packfile" {
   let content = Bytes::from_array([b'h', b'e', b'l', b'l', b'o', b'\n'])
-  let commit = Commit::new(
-    ObjectId::zero(), // Will be replaced
+  let commit = @git.Commit::new(
+    @git.ObjectId::zero(), // Will be replaced
     [],
     "Test <test@example.com>",
     1700000000L,
@@ -153,11 +159,11 @@ test "packfile: OFS_DELTA mode creates delta" {
   // Two similar blobs should produce delta
   let base = @utf8.encode("Hello, World! This is a test content.\n")
   let target = @utf8.encode("Hello, World! This is a test changed.\n")
-  let obj1 = PackObject::new(ObjectType::Blob, base)
-  let obj2 = PackObject::new(ObjectType::Blob, target)
+  let obj1 = @git.PackObject::new(@git.ObjectType::Blob, base)
+  let obj2 = @git.PackObject::new(@git.ObjectType::Blob, target)
   let (pack, delta_count) = create_packfile_with_delta_stats(
     [obj1, obj2],
-    PackDeltaMode::OfsDelta,
+    @git.PackDeltaMode::OfsDelta,
   )
   // Should have at least 1 delta if content is similar enough
   // (depends on delta efficiency)
@@ -174,11 +180,11 @@ test "packfile: OFS_DELTA mode creates delta" {
 test "packfile: REF_DELTA mode creates delta" {
   let base = @utf8.encode("Hello, World! This is a test content.\n")
   let target = @utf8.encode("Hello, World! This is a test changed.\n")
-  let obj1 = PackObject::new(ObjectType::Blob, base)
-  let obj2 = PackObject::new(ObjectType::Blob, target)
+  let obj1 = @git.PackObject::new(@git.ObjectType::Blob, base)
+  let obj2 = @git.PackObject::new(@git.ObjectType::Blob, target)
   let (pack, _) = create_packfile_with_delta_stats(
     [obj1, obj2],
-    PackDeltaMode::RefDelta,
+    @git.PackDeltaMode::RefDelta,
   )
   assert_true(pack.length() > 32)
   let objects = parse_packfile(pack)
@@ -191,11 +197,11 @@ test "packfile: REF_DELTA mode creates delta" {
 test "packfile: NoDelta mode preserves all objects" {
   let base = @utf8.encode("Hello, World! This is a test content.\n")
   let target = @utf8.encode("Hello, World! This is a test changed.\n")
-  let obj1 = PackObject::new(ObjectType::Blob, base)
-  let obj2 = PackObject::new(ObjectType::Blob, target)
+  let obj1 = @git.PackObject::new(@git.ObjectType::Blob, base)
+  let obj2 = @git.PackObject::new(@git.ObjectType::Blob, target)
   let (pack, delta_count) = create_packfile_with_delta_stats(
     [obj1, obj2],
-    PackDeltaMode::NoDelta,
+    @git.PackDeltaMode::NoDelta,
   )
   assert_true(delta_count == 0)
   let objects = parse_packfile(pack)

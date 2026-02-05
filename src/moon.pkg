@@ -9,14 +9,10 @@ import "test" {
   "moonbitlang/async/process" as @process,
   "moonbitlang/x/fs",
   "mizchi/tempfile",
+  "mizchi/bit/pack" as @pack,
+  "mizchi/bit/protocol" as @protocol,
 }
 
 options(
-  targets: {
-    "git_oracle_pack_test.mbt": [ "native" ],
-    "integration_test.mbt": [ "wasm-gc", "wasm" ],
-    "pack_index_write_test.mbt": [ "native" ],
-    "remote_test.mbt": [ "native" ],
-    "upload_pack_remote_wasm.mbt": [ "wasm-gc", "wasm" ],
-  },
+  targets: { "integration_test.mbt": [ "wasm-gc", "wasm" ] },
 )

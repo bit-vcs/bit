@@ -147,7 +147,7 @@ test "git compat: zlib header" {
 ///|
 test "git compat: packfile header" {
   let content = Bytes::from_array([b'h', b'e', b'l', b'l', b'o'])
-  let packfile = create_blob_packfile(content)
+  let packfile = @pack.create_blob_packfile(content)
 
   // Magic: "PACK"
   inspect(packfile[0], content="b'\\x50'") // 'P'
@@ -182,7 +182,9 @@ test "git compat: packfile with 3 objects" {
     "+0000",
     "Test\n",
   )
-  let (_, packfile) = create_commit_packfile(blob_content, "hello.txt", commit)
+  let (_, packfile) = @pack.create_commit_packfile(
+    blob_content, "hello.txt", commit,
+  )
 
   // Object count should be 3 (blob, tree, commit)
   inspect(packfile[8], content="b'\\x00'")
@@ -199,7 +201,7 @@ test "git compat: packfile with 3 objects" {
 test "git compat: pktline encode" {
   // "hello\n" with 4-byte length prefix
   // Length = 6 + 4 = 10 = 0x000a
-  let encoded = pktline_encode("hello\n")
+  let encoded = @protocol.pktline_encode("hello\n")
   inspect(encoded[0], content="b'\\x30'") // '0'
   inspect(encoded[1], content="b'\\x30'") // '0'
   inspect(encoded[2], content="b'\\x30'") // '0'
@@ -210,7 +212,7 @@ test "git compat: pktline encode" {
 ///|
 test "git compat: pktline flush" {
   // Flush packet: 0000
-  let flush = pktline_flush()
+  let flush = @protocol.pktline_flush()
   inspect(flush.length(), content="4")
   inspect(flush[0], content="b'\\x30'")
   inspect(flush[1], content="b'\\x30'")
@@ -221,7 +223,7 @@ test "git compat: pktline flush" {
 ///|
 test "git compat: pktline delim" {
   // Delimiter packet: 0001
-  let delim = pktline_delim()
+  let delim = @protocol.pktline_delim()
   inspect(delim.length(), content="4")
   inspect(delim[0], content="b'\\x30'")
   inspect(delim[1], content="b'\\x30'")
@@ -884,7 +886,7 @@ test "git compat: delta copy instruction" {
        b'\x0b',
     ], // size: 11
   )
-  let result = apply_delta(base, delta)
+  let result = @pack.apply_delta(base, delta)
   assert_true(result.length() == 11)
   for i = 0; i < base.length(); i = i + 1 {
     assert_true(result[i] == base[i])
@@ -908,7 +910,7 @@ test "git compat: delta insert instruction" {
      b'\x08', // insert 8 bytes (bit 7 clear, lower 7 bits = length)
      b'n', b'e', b'w', b' ', b'd', b'a', b't', b'a',
   ])
-  let result = apply_delta(base, delta)
+  let result = @pack.apply_delta(base, delta)
   assert_true(result.length() == 8)
   // Verify "new data"
   assert_true(result[0] == b'n')
@@ -940,7 +942,7 @@ test "git compat: delta mixed copy and insert" {
      b'\x06', // insert 6 bytes
      b' ', b'w', b'o', b'r', b'l', b'd',
   ])
-  let result = apply_delta(base, delta)
+  let result = @pack.apply_delta(base, delta)
   assert_true(result.length() == 11)
   // Check "hello world"
   assert_true(result[0] == b'h')
@@ -970,7 +972,7 @@ test "git compat: delta copy with offset" {
        b'\x05',
     ], // size: 5
   )
-  let result = apply_delta(base, delta)
+  let result = @pack.apply_delta(base, delta)
   assert_true(result.length() == 5)
   // Check "world"
   assert_true(result[0] == b'w')
@@ -1026,7 +1028,7 @@ test "git compat: parse git-generated packfile (single blob)" {
   assert_true(packfile[3] == b'K')
 
   // Parse packfile
-  let objects = parse_packfile(packfile)
+  let objects = @pack.parse_packfile(packfile)
   assert_true(objects.length() == 1)
   assert_true(objects[0].obj_type == ObjectType::Blob)
 
@@ -1053,7 +1055,7 @@ test "git compat: packfile create and parse roundtrip" {
   let obj = PackObject::new(ObjectType::Blob, content)
 
   // Create packfile
-  let packfile = create_packfile([obj])
+  let packfile = @pack.create_packfile([obj])
 
   // Verify header
   assert_true(packfile[0] == b'P')
@@ -1062,7 +1064,7 @@ test "git compat: packfile create and parse roundtrip" {
   assert_true(packfile[3] == b'K')
 
   // Parse back
-  let parsed = parse_packfile(packfile)
+  let parsed = @pack.parse_packfile(packfile)
   assert_true(parsed.length() == 1)
   assert_true(parsed[0].obj_type == ObjectType::Blob)
 
@@ -1086,7 +1088,7 @@ test "git compat: packfile with multiple objects roundtrip" {
   let obj2 = PackObject::new(ObjectType::Blob, blob2)
 
   // Create packfile
-  let packfile = create_packfile([obj1, obj2])
+  let packfile = @pack.create_packfile([obj1, obj2])
 
   // Verify object count in header
   assert_true(packfile[8] == b'\x00')
@@ -1095,7 +1097,7 @@ test "git compat: packfile with multiple objects roundtrip" {
   assert_true(packfile[11] == b'\x02') // 2 objects
 
   // Parse back
-  let parsed = parse_packfile(packfile)
+  let parsed = @pack.parse_packfile(packfile)
   assert_true(parsed.length() == 2)
 }
 
@@ -1168,7 +1170,7 @@ test "git compat: tree special characters in filename" {
 test "git compat: varint encoding small values" {
   // Test encode_type_and_size for small values
   let out : Array[Byte] = []
-  encode_type_and_size(3, 5, out) // type=blob, size=5
+  @pack.encode_type_and_size(3, 5, out) // type=blob, size=5
 
   // For size 5:
   // First byte: (type << 4) | (size & 0x0F) = (3 << 4) | 5 = 0x35
@@ -1181,7 +1183,7 @@ test "git compat: varint encoding small values" {
 test "git compat: varint encoding larger values" {
   // Test encode_type_and_size for values requiring continuation
   let out : Array[Byte] = []
-  encode_type_and_size(3, 100, out) // type=blob, size=100
+  @pack.encode_type_and_size(3, 100, out) // type=blob, size=100
 
   // size=100 in binary: 0110 0100
   // First 4 bits of size: 0100 = 4

@@ -14,7 +14,11 @@ impl @lib.ObjectStore for TestCollabObjectStore with get(self, id) {
 }
 
 ///|
-impl @lib.ObjectStore for TestCollabObjectStore with put(self, obj_type, content) {
+impl @lib.ObjectStore for TestCollabObjectStore with put(
+  self,
+  obj_type,
+  content,
+) {
   let (id, compressed) = @git.create_object(obj_type, content)
   write_object_bytes(self.fs, self.git_dir, id, compressed)
   id

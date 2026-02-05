@@ -11,7 +11,7 @@ priv struct PackObjectsConfig {
   path_walk : Bool
   sparse_mode : Bool?
   index_version : Int
-  filter : @git.FilterSpec
+  filter : @protocol.FilterSpec
   object_format : String?
   stdin_packs : Bool
   stdin_packs_follow : Bool
@@ -53,7 +53,7 @@ fn parse_pack_objects_args(args : Array[String]) -> PackObjectsParse {
   let mut path_walk = false
   let mut sparse_mode : Bool? = None
   let index_version = 2
-  let mut filter = @git.FilterSpec::NoFilter
+  let mut filter = @protocol.FilterSpec::NoFilter
   let mut object_format : String? = None
   let mut stdin_packs = false
   let mut stdin_packs_follow = false
@@ -307,7 +307,7 @@ fn parse_pack_objects_args(args : Array[String]) -> PackObjectsParse {
     delta_mode = @git.PackDeltaMode::NoDelta
   }
   let has_filter = match filter {
-    @git.FilterSpec::NoFilter => false
+    @protocol.FilterSpec::NoFilter => false
     _ => true
   }
   if stdin_packs && has_filter {
@@ -354,19 +354,19 @@ fn parse_pack_objects_args(args : Array[String]) -> PackObjectsParse {
 
 ///|
 /// Parse filter specification for pack-objects
-fn parse_pack_filter_spec(spec : String) -> @git.FilterSpec {
+fn parse_pack_filter_spec(spec : String) -> @protocol.FilterSpec {
   if spec == "blob:none" {
-    @git.FilterSpec::BlobNone
+    @protocol.FilterSpec::BlobNone
   } else if spec.has_prefix("blob:limit=") {
     let limit_str = String::unsafe_substring(spec, start=11, end=spec.length())
     let limit = @strconv.parse_int64(limit_str) catch { _ => 0L }
-    @git.FilterSpec::BlobLimit(limit)
+    @protocol.FilterSpec::BlobLimit(limit)
   } else if spec.has_prefix("tree:") {
     let depth_str = String::unsafe_substring(spec, start=5, end=spec.length())
     let depth = @strconv.parse_int(depth_str) catch { _ => 0 }
-    @git.FilterSpec::TreeDepth(depth)
+    @protocol.FilterSpec::TreeDepth(depth)
   } else {
-    @git.FilterSpec::NoFilter
+    @protocol.FilterSpec::NoFilter
   }
 }
 
@@ -374,7 +374,7 @@ fn parse_pack_filter_spec(spec : String) -> @git.FilterSpec {
 /// Apply filter specification to objects
 fn apply_pack_filter_spec(
   objects : Array[@git.PackObject],
-  filter : @git.FilterSpec,
+  filter : @protocol.FilterSpec,
 ) -> Array[@git.PackObject] {
   match filter {
     NoFilter => objects
@@ -864,7 +864,7 @@ fn resolve_pack_path(
 ///|
 fn read_pack_objects(fs : OsFs, pack_path : String) -> Array[@git.PackObject] {
   let data = fs.read_file(pack_path) catch { _ => return [] }
-  @git.parse_packfile(data) catch {
+  @pack.parse_packfile(data) catch {
     _ => []
   }
 }
@@ -2038,7 +2038,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit {
       let object_groups = split_objects_by_size_limit(objects, effective_limit)
       let mut total_delta_count = 0
       for group in object_groups {
-        let (pack, delta_count) = @git.create_packfile_with_delta_stats_compression_reuse(
+        let (pack, delta_count) = @pack.create_packfile_with_delta_stats_compression_reuse(
           group,
           cfg.delta_mode,
           pack_compression,
@@ -2062,7 +2062,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit {
           let pack_path = base_name + "-" + hash_hex + ".pack"
           let idx_path = base_name + "-" + hash_hex + ".idx"
           fs.write_file(pack_path, pack)
-          @git.write_pack_index_from_objects_versioned(
+          @pack.write_pack_index_from_objects_versioned(
             fs,
             idx_path,
             pack,

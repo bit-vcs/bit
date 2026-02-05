@@ -16,11 +16,11 @@ pub fn generate_test_packfile() -> Bytes {
 }
 
 ///|
-pub fn generate_commit_packfile() -> (ObjectId, Bytes) {
+pub fn generate_commit_packfile() -> (@git.ObjectId, Bytes) {
   // Create a full commit packfile with blob, tree, and commit
   let blob_content = Bytes::from_array([b'h', b'e', b'l', b'l', b'o', b'\n'])
-  let commit = Commit::new(
-    ObjectId::zero(), // placeholder
+  let commit = @git.Commit::new(
+    @git.ObjectId::zero(), // placeholder
     [],
     "Test Author <test@example.com>",
     1700000000L,

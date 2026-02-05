@@ -9,8 +9,6 @@ import "test" {
 }
 
 options(
-  targets: {
-    "sync_wbtest.mbt": [ "native" ],
-  },
+  targets: { "sync_wbtest.mbt": [ "native" ] },
   "warn-list": "-29",
 )

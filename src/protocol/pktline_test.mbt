@@ -82,8 +82,10 @@ test "pktline encode decode roundtrip" {
 
 ///|
 test "build ref update" {
-  let old_id = ObjectId::zero()
-  let new_id = ObjectId::from_hex("ce013625030ba8dba906f756967f9e9ca394464a")
+  let old_id = @git.ObjectId::zero()
+  let new_id = @git.ObjectId::from_hex(
+    "ce013625030ba8dba906f756967f9e9ca394464a",
+  )
   let cmd = build_ref_update(old_id, new_id, "refs/heads/main", "report-status")
   assert_true(cmd.has_prefix("0000000000000000000000000000000000000000"))
   assert_true(cmd.find("ce013625030ba8dba906f756967f9e9ca394464a") is Some(_))
@@ -93,8 +95,10 @@ test "build ref update" {
 
 ///|
 test "build ref update simple" {
-  let old_id = ObjectId::zero()
-  let new_id = ObjectId::from_hex("ce013625030ba8dba906f756967f9e9ca394464a")
+  let old_id = @git.ObjectId::zero()
+  let new_id = @git.ObjectId::from_hex(
+    "ce013625030ba8dba906f756967f9e9ca394464a",
+  )
   let cmd = build_ref_update_simple(old_id, new_id, "refs/heads/main")
   inspect(
     cmd,

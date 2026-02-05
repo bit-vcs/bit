@@ -187,19 +187,19 @@ pub fn build_upload_pack_advertisement(
   if refs.length() == 0 {
     let zero = @git.ObjectId::zero().to_hex()
     let line = "\{zero} capabilities^{}\u0000\{caps}\n"
-    upload_push_bytes(out, @git.pktline_encode(line))
-    upload_push_bytes(out, @git.pktline_flush())
+    upload_push_bytes(out, @protocol.pktline_encode(line))
+    upload_push_bytes(out, @protocol.pktline_flush())
     return Bytes::from_array(FixedArray::makei(out.length(), fn(i) { out[i] }))
   }
   let (first_name, first_id) = refs[0]
   let first_line = "\{first_id.to_hex()} \{first_name}\u0000\{caps}\n"
-  upload_push_bytes(out, @git.pktline_encode(first_line))
+  upload_push_bytes(out, @protocol.pktline_encode(first_line))
   for i in 1..<refs.length() {
     let (name, id) = refs[i]
     let line = "\{id.to_hex()} \{name}\n"
-    upload_push_bytes(out, @git.pktline_encode(line))
+    upload_push_bytes(out, @protocol.pktline_encode(line))
   }
-  upload_push_bytes(out, @git.pktline_flush())
+  upload_push_bytes(out, @protocol.pktline_flush())
   Bytes::from_array(FixedArray::makei(out.length(), fn(i) { out[i] }))
 }
 
@@ -335,7 +335,7 @@ pub fn upload_pack(
 
   // Stateless clients may terminate after wants; respond with flush only
   if not(req.done) && req.haves.length() == 0 {
-    return @git.pktline_flush()
+    return @protocol.pktline_flush()
   }
 
   // Check if client wants side-band
@@ -383,12 +383,15 @@ fn build_upload_pack_ack_response(ack_ids : Array[@git.ObjectId]) -> Bytes {
   let out : Array[Byte] = []
   if ack_ids.length() > 0 {
     for id in ack_ids {
-      upload_push_bytes(out, @git.pktline_encode("ACK " + id.to_hex() + "\n"))
+      upload_push_bytes(
+        out,
+        @protocol.pktline_encode("ACK " + id.to_hex() + "\n"),
+      )
     }
   } else {
-    upload_push_bytes(out, @git.pktline_encode("NAK\n"))
+    upload_push_bytes(out, @protocol.pktline_encode("NAK\n"))
   }
-  upload_push_bytes(out, @git.pktline_flush())
+  upload_push_bytes(out, @protocol.pktline_flush())
   Bytes::from_array(FixedArray::makei(out.length(), fn(i) { out[i] }))
 }
 
@@ -401,13 +404,16 @@ fn build_upload_pack_response(
   let out : Array[Byte] = []
   if ack_ids.length() > 0 {
     for id in ack_ids {
-      upload_push_bytes(out, @git.pktline_encode("ACK " + id.to_hex() + "\n"))
+      upload_push_bytes(
+        out,
+        @protocol.pktline_encode("ACK " + id.to_hex() + "\n"),
+      )
     }
   }
   // NAK (no common commits)
-  upload_push_bytes(out, @git.pktline_encode("NAK\n"))
+  upload_push_bytes(out, @protocol.pktline_encode("NAK\n"))
   // Create packfile
-  let pack = @git.create_packfile_with_delta(
+  let pack = @pack.create_packfile_with_delta(
     objects,
     @git.PackDeltaMode::NoDelta,
   )
@@ -434,7 +440,7 @@ fn build_upload_pack_response(
       offset = end
     }
     // Send flush to indicate end of packfile
-    upload_push_bytes(out, @git.pktline_flush())
+    upload_push_bytes(out, @protocol.pktline_flush())
   } else {
     // Send packfile directly (no side-band)
     for b in pack {
@@ -735,7 +741,7 @@ pub fn upload_pack_v2(
   // Apply partial clone filter (blob:none, blob:limit, tree:depth)
   let filter_spec = match req.filter {
     Some(f) => parse_filter_spec(f)
-    None => @git.FilterSpec::NoFilter
+    None => @protocol.FilterSpec::NoFilter
   }
   let objects = apply_filter_spec(objects, filter_spec)
 
@@ -765,19 +771,19 @@ pub fn upload_pack_v2(
 
 ///|
 /// Parse filter specification string (e.g., "blob:none", "blob:limit=1000")
-fn parse_filter_spec(spec : String) -> @git.FilterSpec {
+fn parse_filter_spec(spec : String) -> @protocol.FilterSpec {
   if spec == "blob:none" {
-    @git.FilterSpec::BlobNone
+    @protocol.FilterSpec::BlobNone
   } else if spec.has_prefix("blob:limit=") {
     let limit_str = String::unsafe_substring(spec, start=11, end=spec.length())
     let limit = @strconv.parse_int64(limit_str) catch { _ => 0L }
-    @git.FilterSpec::BlobLimit(limit)
+    @protocol.FilterSpec::BlobLimit(limit)
   } else if spec.has_prefix("tree:") {
     let depth_str = String::unsafe_substring(spec, start=5, end=spec.length())
     let depth = @strconv.parse_int(depth_str) catch { _ => 0 }
-    @git.FilterSpec::TreeDepth(depth)
+    @protocol.FilterSpec::TreeDepth(depth)
   } else {
-    @git.FilterSpec::NoFilter
+    @protocol.FilterSpec::NoFilter
   }
 }
 
@@ -785,7 +791,7 @@ fn parse_filter_spec(spec : String) -> @git.FilterSpec {
 /// Apply filter specification to objects
 fn apply_filter_spec(
   objects : Array[@git.PackObject],
-  filter : @git.FilterSpec,
+  filter : @protocol.FilterSpec,
 ) -> Array[@git.PackObject] {
   match filter {
     NoFilter => objects
@@ -824,21 +830,27 @@ fn build_upload_pack_response_v2_ack(
 ) -> Bytes {
   let out : Array[Byte] = []
   if ack_ids.length() > 0 {
-    upload_push_bytes(out, @git.pktline_encode("acknowledgments\n"))
+    upload_push_bytes(out, @protocol.pktline_encode("acknowledgments\n"))
     for id in ack_ids {
-      upload_push_bytes(out, @git.pktline_encode("ACK " + id.to_hex() + "\n"))
+      upload_push_bytes(
+        out,
+        @protocol.pktline_encode("ACK " + id.to_hex() + "\n"),
+      )
     }
-    upload_push_bytes(out, @git.pktline_delim())
+    upload_push_bytes(out, @protocol.pktline_delim())
   }
   if wanted_refs.length() > 0 {
-    upload_push_bytes(out, @git.pktline_encode("wanted-refs\n"))
+    upload_push_bytes(out, @protocol.pktline_encode("wanted-refs\n"))
     for item in wanted_refs {
       let (name, id) = item
-      upload_push_bytes(out, @git.pktline_encode("\{id.to_hex()} \{name}\n"))
+      upload_push_bytes(
+        out,
+        @protocol.pktline_encode("\{id.to_hex()} \{name}\n"),
+      )
     }
-    upload_push_bytes(out, @git.pktline_delim())
+    upload_push_bytes(out, @protocol.pktline_delim())
   }
-  upload_push_bytes(out, @git.pktline_flush())
+  upload_push_bytes(out, @protocol.pktline_flush())
   Bytes::from_array(FixedArray::makei(out.length(), fn(i) { out[i] }))
 }
 
@@ -850,26 +862,32 @@ fn build_upload_pack_response_v2(
 ) -> Bytes {
   let out : Array[Byte] = []
   if ack_ids.length() > 0 {
-    upload_push_bytes(out, @git.pktline_encode("acknowledgments\n"))
+    upload_push_bytes(out, @protocol.pktline_encode("acknowledgments\n"))
     for id in ack_ids {
-      upload_push_bytes(out, @git.pktline_encode("ACK " + id.to_hex() + "\n"))
+      upload_push_bytes(
+        out,
+        @protocol.pktline_encode("ACK " + id.to_hex() + "\n"),
+      )
     }
-    upload_push_bytes(out, @git.pktline_delim())
+    upload_push_bytes(out, @protocol.pktline_delim())
   }
   if wanted_refs.length() > 0 {
-    upload_push_bytes(out, @git.pktline_encode("wanted-refs\n"))
+    upload_push_bytes(out, @protocol.pktline_encode("wanted-refs\n"))
     for item in wanted_refs {
       let (name, id) = item
-      upload_push_bytes(out, @git.pktline_encode("\{id.to_hex()} \{name}\n"))
+      upload_push_bytes(
+        out,
+        @protocol.pktline_encode("\{id.to_hex()} \{name}\n"),
+      )
     }
-    upload_push_bytes(out, @git.pktline_delim())
+    upload_push_bytes(out, @protocol.pktline_delim())
   }
 
   // Send packfile-section header
-  upload_push_bytes(out, @git.pktline_encode("packfile\n"))
+  upload_push_bytes(out, @protocol.pktline_encode("packfile\n"))
 
   // Create packfile
-  let pack = @git.create_packfile_with_delta(
+  let pack = @pack.create_packfile_with_delta(
     objects,
     @git.PackDeltaMode::NoDelta,
   )
@@ -897,6 +915,6 @@ fn build_upload_pack_response_v2(
   }
 
   // Flush packet to end
-  upload_push_bytes(out, @git.pktline_flush())
+  upload_push_bytes(out, @protocol.pktline_flush())
   Bytes::from_array(FixedArray::makei(out.length(), fn(i) { out[i] }))
 }

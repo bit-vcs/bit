@@ -48,7 +48,7 @@ test "repack_repo writes pack with reachable objects" {
         ".pack"
       assert_true(fs.is_file(pack_path))
       let pack = fs.read_file(pack_path)
-      let objects = @git.parse_packfile(pack)
+      let objects = @pack.parse_packfile(pack)
       assert_true(objects.length() == 3)
     }
   }
@@ -176,7 +176,7 @@ test "gc_repo preserves all reachable objects after multiple commits" {
     result.pack.unwrap().pack_id.to_hex() +
     ".pack"
   let pack = fs.read_file(pack_path)
-  let objects = @git.parse_packfile(pack)
+  let objects = @pack.parse_packfile(pack)
   let ids : Array[String] = []
   for obj in objects {
     let id = @git.hash_object_content(obj.obj_type, obj.data)

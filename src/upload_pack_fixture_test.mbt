@@ -1,6 +1,35 @@
 ///| Upload-pack fixture tests (git oracle)
 
 ///|
+fn hex_char_val(c : Char) -> Int {
+  if c >= '0' && c <= '9' {
+    c.to_int() - '0'.to_int()
+  } else if c >= 'a' && c <= 'f' {
+    c.to_int() - 'a'.to_int() + 10
+  } else if c >= 'A' && c <= 'F' {
+    c.to_int() - 'A'.to_int() + 10
+  } else {
+    0
+  }
+}
+
+///|
+fn hex_to_bytes(hex : String) -> Bytes {
+  let chars = hex.to_array()
+  let len = hex.length()
+  if len % 2 != 0 {
+    return Bytes::from_array([])
+  }
+  let out : Array[Byte] = []
+  for i in 0..<(len / 2) {
+    let hi = hex_char_val(chars[i * 2])
+    let lo = hex_char_val(chars[i * 2 + 1])
+    out.push(((hi << 4) | lo).to_byte())
+  }
+  Bytes::from_array(FixedArray::makei(out.length(), fn(i) { out[i] }))
+}
+
+///|
 let adv_v2_hex : String = "3030306576657273696f6e20320a303031636167656e743d6769742f322e35302e312d44617277696e0a303031336c732d726566733d756e626f726e0a3030323066657463683d7368616c6c6f7720776169742d666f722d646f6e650a303031327365727665722d6f7074696f6e0a303031376f626a6563742d666f726d61743d736861310a30303030"
 
 ///|
@@ -21,8 +50,10 @@ let fixture_blob : String = "ce013625030ba8dba906f756967f9e9ca394464a"
 ///|
 test "upload-pack v2: advertised capabilities" {
   let adv = hex_to_bytes(adv_v2_hex)
-  assert_true(detect_protocol_version(adv) == ProtocolVersion::V2)
-  let caps = parse_v2_advertised_caps(adv)
+  assert_true(
+    @protocol.detect_protocol_version(adv) == @protocol.ProtocolVersion::V2,
+  )
+  let caps = @protocol.parse_v2_advertised_caps(adv)
   assert_true(caps.contains("ls-refs=unborn"))
   assert_true(caps.contains("fetch=shallow wait-for-done"))
   assert_true(caps.contains("object-format=sha1"))
@@ -31,7 +62,7 @@ test "upload-pack v2: advertised capabilities" {
 ///|
 test "upload-pack v2: ls-refs response" {
   let resp = hex_to_bytes(lsrefs_hex)
-  let result = parse_ls_refs_response(resp)
+  let result = @protocol.parse_ls_refs_response(resp)
   assert_true(result.refs.length() == 2)
   match result.symrefs.get("HEAD") {
     Some(target) => assert_true(target == "refs/heads/main")
@@ -51,8 +82,8 @@ test "upload-pack v2: ls-refs response" {
 ///|
 test "upload-pack v2: fetch response packfile" {
   let resp = hex_to_bytes(fetch_hex)
-  let pack = extract_pack_from_v2_response(resp)
-  let objects = parse_packfile(pack)
+  let pack = @protocol.extract_pack_from_v2_response(resp)
+  let objects = @pack.parse_packfile(pack)
   let store = ObjectStore::from_pack(objects)
   let commit_id = ObjectId::from_hex(fixture_commit)
   let tree_id = ObjectId::from_hex(fixture_tree)
@@ -73,8 +104,8 @@ test "upload-pack v2: fetch response packfile" {
 ///|
 test "upload-pack v2: materialize clone to fs" {
   let resp = hex_to_bytes(fetch_hex)
-  let pack = extract_pack_from_v2_response(resp)
-  let objects = parse_packfile(pack)
+  let pack = @protocol.extract_pack_from_v2_response(resp)
+  let objects = @pack.parse_packfile(pack)
   let store = ObjectStore::from_pack(objects)
   let commit_id = ObjectId::from_hex(fixture_commit)
   let fs = TestFs::new()

@@ -173,9 +173,7 @@ fn Kv::do_merge(
         } else {
           // Both added - conflict
           conflicts.push(path)
-          resolve_conflict(
-            self, store, path, our_content, their_hash, strategy,
-          )
+          resolve_conflict(self, store, path, our_content, their_hash, strategy)
         }
       }
     } else if in_theirs && not(in_ours) {
@@ -241,10 +239,7 @@ fn resolve_conflict(
 }
 
 ///|
-fn get_blob_content(
-  store : &@lib.ObjectStore,
-  id : @git.ObjectId,
-) -> Bytes? {
+fn get_blob_content(store : &@lib.ObjectStore, id : @git.ObjectId) -> Bytes? {
   if id == @git.ObjectId::zero() {
     return None
   }

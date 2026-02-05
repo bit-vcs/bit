@@ -8,7 +8,9 @@ priv struct ProcessSpec {
 }
 
 ///|
-fn ensure_remote_path(spec : @git.RemoteSpec) -> String raise @git.GitError {
+fn ensure_remote_path(
+  spec : @protocol.RemoteSpec,
+) -> String raise @git.GitError {
   if spec.path.length() == 0 {
     raise @git.GitError::ProtocolError("Remote path is empty")
   }
@@ -16,7 +18,7 @@ fn ensure_remote_path(spec : @git.RemoteSpec) -> String raise @git.GitError {
 }
 
 ///|
-fn ssh_remote_path(spec : @git.RemoteSpec, path : String) -> String {
+fn ssh_remote_path(spec : @protocol.RemoteSpec, path : String) -> String {
   if spec.raw.has_prefix("ssh://") && not(path.has_prefix("/")) {
     "/\{path}"
   } else {
@@ -26,17 +28,17 @@ fn ssh_remote_path(spec : @git.RemoteSpec, path : String) -> String {
 
 ///|
 fn build_upload_pack_process_spec(
-  spec : @git.RemoteSpec,
+  spec : @protocol.RemoteSpec,
   advertise_refs~ : Bool,
   prefer_v2~ : Bool,
 ) -> ProcessSpec raise @git.GitError {
   let path = ensure_remote_path(spec)
   match spec.kind {
-    @git.RemoteKind::Http =>
+    @protocol.RemoteKind::Http =>
       raise @git.GitError::ProtocolError(
         "HTTP transport is not supported by process client",
       )
-    @git.RemoteKind::File => {
+    @protocol.RemoteKind::File => {
       let args : Array[String] = []
       args.push("--stateless-rpc")
       if advertise_refs {
@@ -50,10 +52,9 @@ fn build_upload_pack_process_spec(
       }
       { cmd: "git-upload-pack", args, extra_env }
     }
-    @git.RemoteKind::Ssh => {
+    @protocol.RemoteKind::Ssh => {
       let host = match spec.host {
-        None =>
-          raise @git.GitError::ProtocolError("SSH remote missing host")
+        None => raise @git.GitError::ProtocolError("SSH remote missing host")
         Some(v) => v
       }
       let args : Array[String] = [host]
@@ -213,7 +214,7 @@ pub async fn upload_pack_info_refs_process(
   remote : String,
   prefer_v2 : Bool,
 ) -> Bytes raise @git.GitError {
-  let spec = @git.parse_remote(remote)
+  let spec = @protocol.parse_remote(remote)
   let proc = build_upload_pack_process_spec(
     spec,
     advertise_refs=true,
@@ -228,7 +229,7 @@ pub async fn upload_pack_request_process(
   body : Bytes,
   prefer_v2 : Bool,
 ) -> Bytes raise @git.GitError {
-  let spec = @git.parse_remote(remote)
+  let spec = @protocol.parse_remote(remote)
   let proc = build_upload_pack_process_spec(
     spec,
     advertise_refs=false,
@@ -244,23 +245,23 @@ pub async fn discover_upload_refs_process(
 ) -> (
   Array[(@git.ObjectId, String)],
   Array[String],
-  @git.ProtocolVersion,
+  @protocol.ProtocolVersion,
   Map[String, String],
 ) raise @git.GitError {
   let adv = upload_pack_info_refs_process(remote, prefer_v2)
-  let version = @git.detect_protocol_version(adv)
-  if version == @git.ProtocolVersion::V2 {
-    let caps = @git.parse_v2_advertised_caps(adv)
-    let req = @git.build_ls_refs_request("git/moonbit", [
+  let version = @protocol.detect_protocol_version(adv)
+  if version == @protocol.ProtocolVersion::V2 {
+    let caps = @protocol.parse_v2_advertised_caps(adv)
+    let req = @protocol.build_ls_refs_request("git/moonbit", [
       "refs/heads/", "refs/tags/", "HEAD",
     ])
     let resp = upload_pack_request_process(remote, req, true)
-    let parsed = @git.parse_ls_refs_response(resp)
+    let parsed = @protocol.parse_ls_refs_response(resp)
     return (parsed.refs, caps, version, parsed.symrefs)
   }
-  let refs = @git.parse_refs(adv)
-  let caps = @git.parse_v0_advertised_caps(adv)
-  (refs, caps, @git.ProtocolVersion::V0, {})
+  let refs = @protocol.parse_refs(adv)
+  let caps = @protocol.parse_v0_advertised_caps(adv)
+  (refs, caps, @protocol.ProtocolVersion::V0, {})
 }
 
 ///|
@@ -282,15 +283,15 @@ pub async fn fetch_pack_process(
   } else {
     wants
   }
-  if version == @git.ProtocolVersion::V2 {
+  if version == @protocol.ProtocolVersion::V2 {
     // Note: depth=0 means full clone (process transport doesn't support shallow yet)
-    let req = @git.build_fetch_request_v2("git/moonbit", wants, 0)
+    let req = @protocol.build_fetch_request_v2("git/moonbit", wants, 0)
     let resp = upload_pack_request_process(remote, req, true)
-    return @git.extract_pack_from_v2_response(resp)
+    return @protocol.extract_pack_from_v2_response(resp)
   }
-  let req = @git.build_fetch_request_v0("git/moonbit", wants, caps)
+  let req = @protocol.build_fetch_request_v0("git/moonbit", wants, caps)
   let resp = upload_pack_request_process(remote, req, false)
-  @git.extract_pack_from_v0_response(resp)
+  @protocol.extract_pack_from_v0_response(resp)
 }
 
 ///|
@@ -300,7 +301,7 @@ pub async fn fetch_objects_process(
   prefer_v2 : Bool,
 ) -> Array[@git.PackObject] raise @git.GitError {
   let pack = fetch_pack_process(remote, wants, prefer_v2)
-  @git.parse_packfile(pack)
+  @pack.parse_packfile(pack)
 }
 
 ///|
@@ -311,9 +312,9 @@ pub async fn clone_process(
   let (refs, _caps, _version, symrefs) = discover_upload_refs_process(
     remote, prefer_v2,
   )
-  let wants = @git.select_default_wants(refs, symrefs)
+  let wants = @protocol.select_default_wants(refs, symrefs)
   let pack = fetch_pack_process(remote, wants, prefer_v2)
-  let objects = @git.parse_packfile(pack)
+  let objects = @pack.parse_packfile(pack)
   (refs, objects)
 }
 
@@ -328,8 +329,8 @@ pub async fn clone_process_to_fs(
   let (refs, _caps, _version, symrefs) = discover_upload_refs_process(
     remote, prefer_v2,
   )
-  let wants = @git.select_default_wants(refs, symrefs)
-  let default_ref = @git.select_default_ref(refs, symrefs)
+  let wants = @protocol.select_default_wants(refs, symrefs)
+  let default_ref = @protocol.select_default_ref(refs, symrefs)
   match default_ref {
     None => return refs
     Some(_) => ()
@@ -338,14 +339,14 @@ pub async fn clone_process_to_fs(
     return refs
   }
   let pack = fetch_pack_process(remote, wants, prefer_v2)
-  let objects = @git.parse_packfile(pack)
+  let objects = @pack.parse_packfile(pack)
   let store = @git.ObjectStore::from_pack(objects)
   match default_ref {
     None => ()
     Some((refname, commit_id)) => {
       @git.materialize_clone_to_fs(store, commit_id, refname, remote, fs, root)
       let git_dir = @git.join_path(root, ".git")
-      @git.write_packfile_with_index(fs, git_dir, pack, objects)
+      @pack.write_packfile_with_index(fs, git_dir, pack, objects)
     }
   }
   refs

@@ -1,0 +1,26 @@
+import {
+  "mizchi/bit" as @git,
+  "mizchi/zlib",
+}
+
+import "test" {
+  "mizchi/bit" as @git,
+  "mizchi/bit/protocol" as @protocol,
+  "moonbitlang/async" as @async,
+  "moonbitlang/async/process" as @process,
+  "moonbitlang/x/fs",
+  "mizchi/tempfile",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/strconv" as @strconv,
+}
+
+import "wbtest" {
+  "moonbitlang/core/encoding/utf8",
+}
+
+options(
+  targets: {
+    "git_oracle_pack_test.mbt": [ "native" ],
+    "pack_index_write_test.mbt": [ "native" ],
+  },
+)

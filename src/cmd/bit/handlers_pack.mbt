@@ -303,7 +303,7 @@ async fn verify_single_pack(
   }
   let data = fs.read_file(pack_file)
   // Parse and verify the packfile
-  let objects = @git.parse_packfile(data)
+  let objects = @pack.parse_packfile(data)
   // Count object types
   let mut _commits = 0
   let mut _trees = 0
@@ -375,7 +375,7 @@ async fn handle_unpack_objects(args : Array[String]) -> Unit raise Error {
     raise @git.GitError::PackfileError("Packfile too short")
   }
   // Parse the packfile
-  let objects = @git.parse_packfile(data)
+  let objects = @pack.parse_packfile(data)
   if not(quiet) {
     print_line(
       "Unpacking objects: 100% (\{objects.length()}/\{objects.length()}), done.",
@@ -528,7 +528,7 @@ async fn handle_bundle_create(args : Array[String]) -> Unit raise Error {
   // Collect all reachable objects
   let objects = collect_bundle_objects(fs, git_dir, start_ids, exclude_ids)
   // Create packfile
-  let pack_data = @git.create_packfile(objects)
+  let pack_data = @pack.create_packfile(objects)
   // Write bundle
   let bundle_data = Bytes::from_array(
     FixedArray::makei(header_bytes.length() + pack_data.length(), fn(i) {
@@ -705,7 +705,7 @@ async fn handle_bundle_unbundle(args : Array[String]) -> Unit raise Error {
   }
   let (_, _, refs, pack_data) = parse_bundle_file(fs, path)
   // Unpack objects
-  let objects = @git.parse_packfile(pack_data)
+  let objects = @pack.parse_packfile(pack_data)
   for obj in objects {
     let _ = @gitlib.write_loose_object(fs, git_dir, obj.obj_type, obj.data)
 

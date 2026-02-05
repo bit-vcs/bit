@@ -1,0 +1,72 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/bit/pack"
+
+import {
+  "mizchi/bit",
+}
+
+// Values
+pub fn apply_delta(Bytes, Bytes) -> Bytes raise @bit.GitError
+
+pub fn build_pack_index(Bytes) -> Bytes raise @bit.GitError
+
+pub fn build_pack_index_from_objects(Bytes, Array[@bit.PackObject]) -> Bytes raise @bit.GitError
+
+pub fn crc32_range(Bytes, Int, Int) -> UInt raise @bit.GitError
+
+pub fn create_blob_packfile(Bytes) -> Bytes
+
+pub fn create_commit_packfile(Bytes, String, @bit.Commit) -> (@bit.ObjectId, Bytes)
+
+pub fn create_packfile(Array[@bit.PackObject]) -> Bytes
+
+pub fn create_packfile_with_delta(Array[@bit.PackObject], @bit.PackDeltaMode) -> Bytes
+
+pub fn create_packfile_with_delta_stats(Array[@bit.PackObject], @bit.PackDeltaMode) -> (Bytes, Int)
+
+pub fn create_packfile_with_delta_stats_compression(Array[@bit.PackObject], @bit.PackDeltaMode, @bit.PackCompression) -> (Bytes, Int)
+
+pub fn create_packfile_with_delta_stats_compression_reuse(Array[@bit.PackObject], @bit.PackDeltaMode, @bit.PackCompression, Bool, Int) -> (Bytes, Int)
+
+pub fn decode_type_and_size_at(Bytes, Int) -> (Int, Int, Int) raise @bit.GitError
+
+pub fn encode_type_and_size(Int, Int, Array[Byte]) -> Unit
+
+pub fn generate_commit_packfile() -> (@bit.ObjectId, Bytes)
+
+pub fn generate_test_packfile() -> Bytes
+
+pub fn hex_dump(Bytes) -> String
+
+pub fn max_delta_chain_length(Bytes) -> Int raise @bit.GitError
+
+pub fn packfile_type_to_object_type(Int) -> @bit.ObjectType raise @bit.GitError
+
+pub fn parse_packfile(Bytes) -> Array[@bit.PackObject] raise @bit.GitError
+
+pub fn parse_packfile_stream(Bytes, (@bit.PackObject) -> Unit) -> Unit raise @bit.GitError
+
+pub fn parse_packfile_stream_with_bases(Bytes, Array[@bit.PackObject], (@bit.PackObject) -> Unit) -> Unit raise @bit.GitError
+
+pub fn parse_packfile_with_bases(Bytes, Array[@bit.PackObject]) -> Array[@bit.PackObject] raise @bit.GitError
+
+pub fn read_ofs_delta_offset(Bytes, Int) -> (Int, Int) raise @bit.GitError
+
+pub fn read_ref_delta_id(Bytes, Int) -> (String, Int) raise @bit.GitError
+
+pub fn write_pack_index(&@bit.FileSystem, String, Bytes) -> Unit raise @bit.GitError
+
+pub fn write_pack_index_from_objects(&@bit.FileSystem, String, Bytes, Array[@bit.PackObject]) -> Unit raise @bit.GitError
+
+pub fn write_pack_index_from_objects_versioned(&@bit.FileSystem, String, Bytes, Array[@bit.PackObject], Int) -> Unit raise @bit.GitError
+
+pub fn write_packfile_with_index(&@bit.FileSystem, String, Bytes, Array[@bit.PackObject]) -> Unit raise @bit.GitError
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits
+

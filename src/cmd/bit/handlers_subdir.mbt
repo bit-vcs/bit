@@ -107,7 +107,7 @@ async fn subdir_clone(
     true,
     fs,
     temp_clone,
-    filter=@git.FilterSpec::BlobNone,
+    filter=@protocol.FilterSpec::BlobNone,
   )
   if refs.length() == 0 {
     raise @git.GitError::InvalidObject("Clone failed: no refs found")
@@ -156,8 +156,8 @@ async fn subdir_clone(
   let mut db = @gitlib.ObjectDb::load_lazy(fs, temp_git_dir)
   if db.get(fs, commit_id) is None {
     let pack = @gitnative.fetch_pack_http(remote_url, [commit_id], true)
-    let objects = @git.parse_packfile(pack)
-    @git.write_packfile_with_index(fs, temp_git_dir, pack, objects)
+    let objects = @pack.parse_packfile(pack)
+    @pack.write_packfile_with_index(fs, temp_git_dir, pack, objects)
     db = @gitlib.ObjectDb::load_lazy(fs, temp_git_dir)
   }
   let commit_obj = db.get(fs, commit_id)
@@ -189,8 +189,8 @@ async fn subdir_clone(
     }
     if missing.length() > 0 {
       let pack = @gitnative.fetch_pack_http(remote_url, missing, true)
-      let objects = @git.parse_packfile(pack)
-      @git.write_packfile_with_index(fs, temp_git_dir, pack, objects)
+      let objects = @pack.parse_packfile(pack)
+      @pack.write_packfile_with_index(fs, temp_git_dir, pack, objects)
     }
   }
   // Reload object database

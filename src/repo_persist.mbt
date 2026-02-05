@@ -95,28 +95,6 @@ fn write_alternates(fs : &FileSystem, git_dir : String) -> Unit raise GitError {
 }
 
 ///|
-/// Write a packfile and its index under .git/objects/pack.
-pub fn write_packfile_with_index(
-  fs : &FileSystem,
-  git_dir : String,
-  pack : Bytes,
-  objects : Array[PackObject],
-) -> Unit raise GitError {
-  if pack.length() < 20 {
-    raise GitError::PackfileError("Packfile too short")
-  }
-  let pack_dir = join_path(git_dir, "objects/pack")
-  fs.mkdir_p(pack_dir)
-  let trailer_offset = pack.length() - 20
-  let pack_id = read_trailer_id(pack, trailer_offset)
-  let base = "pack-\{pack_id.to_hex()}"
-  let pack_path = join_path(pack_dir, base + ".pack")
-  let idx_path = join_path(pack_dir, base + ".idx")
-  fs.write_file(pack_path, pack)
-  write_pack_index_from_objects(fs, idx_path, pack, objects)
-}
-
-///|
 fn write_index_v2(
   store : ObjectStore,
   fs : &FileSystem,

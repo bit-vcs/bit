@@ -9,7 +9,7 @@ test "fuzz: pktline decode" {
   for _ in 0..<128 {
     let len = rng.next_int() % 512
     let data = build_bytes(rng, len)
-    ignore(try? @git.pktline_decode(data))
+    ignore(try? @protocol.pktline_decode(data))
   }
 }
 
@@ -19,7 +19,7 @@ test "fuzz: packfile parse stream" {
   for _ in 0..<64 {
     let len = rng.next_int() % 2048
     let data = build_bytes(rng, len)
-    ignore(try? @git.parse_packfile_stream(data, fn(_obj) { () }))
+    ignore(try? @pack.parse_packfile_stream(data, fn(_obj) { () }))
   }
 }
 

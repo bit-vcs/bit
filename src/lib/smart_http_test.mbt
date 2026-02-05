@@ -13,7 +13,7 @@ test "smart http: info/refs auth" {
     "token",
   )
   assert_true(ok.status == 200)
-  let decoded = @git.pktline_decode(ok.body) catch { _ => [] }
+  let decoded = @protocol.pktline_decode(ok.body) catch { _ => [] }
   assert_true(decoded.length() > 0)
   let (line_bytes, _) = decoded[0]
   let line = @utf8.decode_lossy(line_bytes[:])

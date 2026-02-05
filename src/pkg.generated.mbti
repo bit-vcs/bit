@@ -2,81 +2,19 @@
 package "mizchi/bit"
 
 // Values
-pub fn apply_delta(Bytes, Bytes) -> Bytes raise GitError
-
-pub fn build_fetch_request_v0(String, Array[ObjectId], Array[String]) -> Bytes
-
-pub fn build_fetch_request_v2(String, Array[ObjectId], Int, filter? : FilterSpec) -> Bytes
-
-pub fn build_ls_refs_request(String, Array[String]) -> Bytes
-
-pub fn build_pack_index(Bytes) -> Bytes raise GitError
-
-pub fn build_pack_index_from_objects(Bytes, Array[PackObject]) -> Bytes raise GitError
-
-pub fn build_receive_pack_body(PushRequest) -> Bytes
-
-pub fn build_ref_update(ObjectId, ObjectId, String, String) -> String
-
-pub fn build_ref_update_simple(ObjectId, ObjectId, String) -> String
-
 pub fn checkout_commit(ObjectStore, ObjectId) -> Map[String, Bytes] raise GitError
 
 pub fn checkout_commit_to_fs(ObjectStore, ObjectId, &FileSystem, String) -> Unit raise GitError
 
-pub async fn clone_to_fs_with_http(String, Bool, Int, FilterSpec, &FileSystem, String, async (String, Map[String, String]) -> (HttpResponse, Bytes) raise GitError, async (String, Bytes, Map[String, String]) -> (HttpResponse, Bytes) raise GitError) -> Array[(ObjectId, String)] raise GitError
-
-pub async fn clone_with_http(String, Bool, Int, FilterSpec, async (String, Map[String, String]) -> (HttpResponse, Bytes) raise GitError, async (String, Bytes, Map[String, String]) -> (HttpResponse, Bytes) raise GitError) -> (Array[(ObjectId, String)], Array[PackObject]) raise GitError
-
-pub fn crc32_range(Bytes, Int, Int) -> UInt raise GitError
-
 pub fn create_blob(Bytes) -> (ObjectId, Bytes)
-
-pub fn create_blob_packfile(Bytes) -> Bytes
 
 pub fn create_blob_string(String) -> (ObjectId, Bytes)
 
 pub fn create_commit(Commit) -> (ObjectId, Bytes)
 
-pub fn create_commit_packfile(Bytes, String, Commit) -> (ObjectId, Bytes)
-
 pub fn create_object(ObjectType, Bytes) -> (ObjectId, Bytes)
 
-pub fn create_packfile(Array[PackObject]) -> Bytes
-
-pub fn create_packfile_with_delta(Array[PackObject], PackDeltaMode) -> Bytes
-
-pub fn create_packfile_with_delta_stats(Array[PackObject], PackDeltaMode) -> (Bytes, Int)
-
-pub fn create_packfile_with_delta_stats_compression(Array[PackObject], PackDeltaMode, PackCompression) -> (Bytes, Int)
-
-pub fn create_packfile_with_delta_stats_compression_reuse(Array[PackObject], PackDeltaMode, PackCompression, Bool, Int) -> (Bytes, Int)
-
 pub fn create_tree(Array[TreeEntry]) -> (ObjectId, Bytes)
-
-pub fn decode_type_and_size_at(Bytes, Int) -> (Int, Int, Int) raise GitError
-
-pub fn detect_protocol_version(Bytes) -> ProtocolVersion raise GitError
-
-pub async fn discover_refs_with_http(Remote, async (String, Map[String, String]) -> (HttpResponse, Bytes) raise GitError) -> (Array[(ObjectId, String)], Array[String]) raise GitError
-
-pub async fn discover_upload_refs_with_http(String, Bool, async (String, Map[String, String]) -> (HttpResponse, Bytes) raise GitError, async (String, Bytes, Map[String, String]) -> (HttpResponse, Bytes) raise GitError) -> (Array[(ObjectId, String)], Array[String], ProtocolVersion, Map[String, String]) raise GitError
-
-pub fn encode_type_and_size(Int, Int, Array[Byte]) -> Unit
-
-pub fn extract_capabilities(Bytes) -> Array[String]
-
-pub fn extract_pack_from_v0_response(Bytes) -> Bytes raise GitError
-
-pub fn extract_pack_from_v2_response(Bytes) -> Bytes raise GitError
-
-pub async fn fetch_objects_with_http(String, Array[ObjectId], Bool, Int, FilterSpec, async (String, Map[String, String]) -> (HttpResponse, Bytes) raise GitError, async (String, Bytes, Map[String, String]) -> (HttpResponse, Bytes) raise GitError) -> Array[PackObject] raise GitError
-
-pub async fn fetch_pack_with_http(String, Array[ObjectId], Bool, Int, FilterSpec, async (String, Map[String, String]) -> (HttpResponse, Bytes) raise GitError, async (String, Bytes, Map[String, String]) -> (HttpResponse, Bytes) raise GitError) -> Bytes raise GitError
-
-pub fn generate_commit_packfile() -> (ObjectId, Bytes)
-
-pub fn generate_test_packfile() -> Bytes
 
 pub fn hash_blob(Bytes) -> ObjectId
 
@@ -84,61 +22,13 @@ pub fn hash_blob_string(String) -> ObjectId
 
 pub fn hash_object_content(ObjectType, Bytes) -> ObjectId
 
-pub fn hex_dump(Bytes) -> String
-
 pub fn join_path(String, String) -> String
 
 pub fn materialize_clone_to_fs(ObjectStore, ObjectId, String, String, &FileSystem, String) -> Unit raise GitError
 
-pub fn max_delta_chain_length(Bytes) -> Int raise GitError
-
-pub fn packfile_type_to_object_type(Int) -> ObjectType raise GitError
-
 pub fn parse_commit(Bytes) -> CommitInfo raise GitError
 
-pub fn parse_ls_refs_response(Bytes) -> LsRefsResult raise GitError
-
-pub fn parse_packfile(Bytes) -> Array[PackObject] raise GitError
-
-pub fn parse_packfile_stream(Bytes, (PackObject) -> Unit) -> Unit raise GitError
-
-pub fn parse_packfile_stream_with_bases(Bytes, Array[PackObject], (PackObject) -> Unit) -> Unit raise GitError
-
-pub fn parse_packfile_with_bases(Bytes, Array[PackObject]) -> Array[PackObject] raise GitError
-
-pub fn parse_receive_pack_response(Bytes) -> Result[String, GitError]
-
-pub fn parse_refs(Bytes) -> Array[(ObjectId, String)] raise GitError
-
-pub fn parse_remote(String) -> RemoteSpec
-
-pub fn parse_sideband(Bytes) -> (Int, Bytes)
-
 pub fn parse_tree(Bytes) -> Array[TreeEntry] raise GitError
-
-pub fn parse_v0_advertised_caps(Bytes) -> Array[String] raise GitError
-
-pub fn parse_v2_advertised_caps(Bytes) -> Array[String] raise GitError
-
-pub fn pktline_decode(Bytes) -> Array[(Bytes, Bool)] raise GitError
-
-pub fn pktline_delim() -> Bytes
-
-pub fn pktline_encode(String) -> Bytes
-
-pub fn pktline_encode_bytes(Bytes) -> Bytes
-
-pub fn pktline_flush() -> Bytes
-
-pub async fn push_with_http(Remote, PushRequest, async (String, Map[String, String]) -> (HttpResponse, Bytes) raise GitError, async (String, Bytes, Map[String, String]) -> (HttpResponse, Bytes) raise GitError) -> String raise GitError
-
-pub fn read_ofs_delta_offset(Bytes, Int) -> (Int, Int) raise GitError
-
-pub fn read_ref_delta_id(Bytes, Int) -> (String, Int) raise GitError
-
-pub fn select_default_ref(Array[(ObjectId, String)], Map[String, String]) -> (String, ObjectId)?
-
-pub fn select_default_wants(Array[(ObjectId, String)], Map[String, String]) -> Array[ObjectId]
 
 pub fn serialize_commit_content(Commit) -> Bytes
 
@@ -152,19 +42,7 @@ pub fn sha1_array_prefix(Array[Byte], Int) -> ObjectId
 
 pub fn sha1_prefix(Bytes, Int) -> ObjectId
 
-pub async fn upload_pack_info_refs_with_http(String, Bool, async (String, Map[String, String]) -> (HttpResponse, Bytes) raise GitError) -> Bytes raise GitError
-
-pub async fn upload_pack_request_with_http(String, Bytes, Bool, async (String, Bytes, Map[String, String]) -> (HttpResponse, Bytes) raise GitError) -> Bytes raise GitError
-
 pub fn write_git_metadata(ObjectStore, ObjectId, String, String, &FileSystem, String) -> Unit raise GitError
-
-pub fn write_pack_index(&FileSystem, String, Bytes) -> Unit raise GitError
-
-pub fn write_pack_index_from_objects(&FileSystem, String, Bytes, Array[PackObject]) -> Unit raise GitError
-
-pub fn write_pack_index_from_objects_versioned(&FileSystem, String, Bytes, Array[PackObject], Int) -> Unit raise GitError
-
-pub fn write_packfile_with_index(&FileSystem, String, Bytes, Array[PackObject]) -> Unit raise GitError
 
 // Errors
 pub(all) suberror GitError {
@@ -196,26 +74,12 @@ pub struct CommitInfo {
   parents : Array[ObjectId]
 }
 
-pub(all) enum FilterSpec {
-  NoFilter
-  BlobNone
-  BlobLimit(Int64)
-  TreeDepth(Int)
-}
-pub fn FilterSpec::is_partial(Self) -> Bool
-pub fn FilterSpec::to_string(Self) -> String
-
 pub struct HttpResponse {
   code : Int
   headers : Map[String, String]
 }
 pub fn HttpResponse::new(Int) -> Self
 pub fn HttpResponse::with_headers(Int, Map[String, String]) -> Self
-
-pub struct LsRefsResult {
-  refs : Array[(ObjectId, String)]
-  symrefs : Map[String, String]
-}
 
 pub struct MockHttpClient {
   responses : Map[String, (Int, Bytes)]
@@ -278,42 +142,6 @@ pub struct PackObject {
 }
 pub fn PackObject::new(ObjectType, Bytes) -> Self
 pub fn PackObject::with_metadata(ObjectType, Bytes, ObjectId, Int, UInt) -> Self
-
-pub(all) enum ProtocolVersion {
-  V0
-  V2
-}
-pub impl Eq for ProtocolVersion
-
-pub struct PushRequest {
-  old_id : ObjectId
-  new_id : ObjectId
-  refname : String
-  packfile : Bytes
-}
-pub fn PushRequest::new(ObjectId, ObjectId, String, Bytes) -> Self
-
-pub struct Remote {
-  url : String
-}
-pub fn Remote::info_refs_url(Self) -> String
-pub fn Remote::new(String) -> Self
-pub fn Remote::receive_pack_url(Self) -> String
-
-pub(all) enum RemoteKind {
-  Http
-  Ssh
-  File
-}
-pub impl Eq for RemoteKind
-
-pub struct RemoteSpec {
-  kind : RemoteKind
-  raw : String
-  host : String?
-  path : String
-  base_url : String?
-}
 
 pub struct Sha1State {
   h : FixedArray[Int]

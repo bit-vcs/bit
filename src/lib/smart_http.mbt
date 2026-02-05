@@ -66,11 +66,11 @@ pub fn receive_pack_response(
 ///|
 fn build_smart_advertisement(service : String, adv : Bytes) -> Bytes {
   let out : Array[Byte] = []
-  let line = @git.pktline_encode("# service=\{service}\n")
+  let line = @protocol.pktline_encode("# service=\{service}\n")
   for b in line {
     out.push(b)
   }
-  for b in @git.pktline_flush() {
+  for b in @protocol.pktline_flush() {
     out.push(b)
   }
   for b in adv {

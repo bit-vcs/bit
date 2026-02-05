@@ -1424,7 +1424,7 @@ fn clone_local_repo(
   dest_path : String,
   remote_url : String,
   bare : Bool,
-  filter : @git.FilterSpec,
+  filter : @protocol.FilterSpec,
 ) -> Unit raise Error {
   guard @gitlib.detect_git_dir(fs, src_path) is Some((src_git_dir, _)) else {
     raise @git.GitError::InvalidObject("Not a git repository: \{src_path}")
@@ -1684,7 +1684,7 @@ async fn fetch_from_remote(
   let (refs, _caps, _version, symrefs) = @gitnative.discover_upload_refs_http(
     remote_url, true,
   )
-  let default_ref = @git.select_default_ref(refs, symrefs)
+  let default_ref = @protocol.select_default_ref(refs, symrefs)
   match default_ref {
     None => {
       print_line("No refs to fetch")
@@ -1719,8 +1719,8 @@ async fn fetch_from_remote(
       }
       print_line("Fetching from \{remote_url}...")
       let pack = @gitnative.fetch_pack_http(remote_url, [commit_id], true)
-      let objects = @git.parse_packfile(pack)
-      @git.write_packfile_with_index(fs, git_dir, pack, objects)
+      let objects = @pack.parse_packfile(pack)
+      @pack.write_packfile_with_index(fs, git_dir, pack, objects)
       let dir = match remote_path.rev_find("/") {
         None => ""
         Some(i) => String::unsafe_substring(remote_path, start=0, end=i)
@@ -2320,7 +2320,7 @@ async fn upload_pack_fail(
   let msg = upload_pack_error_text(err)
   if not(advertise) {
     let line = upload_pack_first_line(msg)
-    let pkt = @git.pktline_encode("ERR " + line + "\n")
+    let pkt = @protocol.pktline_encode("ERR " + line + "\n")
     @stdio.stdout.write(pkt)
   }
   @stdio.stderr.write(msg + "\n")
@@ -2416,19 +2416,19 @@ async fn handle_receive_pack(args : Array[String]) -> Unit {
 
 ///|
 /// Parse filter specification from command line
-fn parse_filter_spec(spec : String) -> @git.FilterSpec {
+fn parse_filter_spec(spec : String) -> @protocol.FilterSpec {
   if spec == "blob:none" {
-    @git.FilterSpec::BlobNone
+    @protocol.FilterSpec::BlobNone
   } else if spec.has_prefix("blob:limit=") {
     let limit_str = String::unsafe_substring(spec, start=11, end=spec.length())
     let limit = @strconv.parse_int64(limit_str) catch { _ => 0L }
-    @git.FilterSpec::BlobLimit(limit)
+    @protocol.FilterSpec::BlobLimit(limit)
   } else if spec.has_prefix("tree:") {
     let depth_str = String::unsafe_substring(spec, start=5, end=spec.length())
     let depth = @strconv.parse_int(depth_str) catch { _ => 0 }
-    @git.FilterSpec::TreeDepth(depth)
+    @protocol.FilterSpec::TreeDepth(depth)
   } else {
-    @git.FilterSpec::NoFilter
+    @protocol.FilterSpec::NoFilter
   }
 }
 
@@ -2438,7 +2438,7 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
   let mut url : String? = None
   let mut dest : String? = None
   let mut depth = 0
-  let mut filter = @git.FilterSpec::NoFilter
+  let mut filter = @protocol.FilterSpec::NoFilter
   let mut has_filter_flag = false
   let mut bare = false
   let mut ref_spec : String? = None
@@ -2630,9 +2630,13 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
               let git_dir = target + "/.git"
               let mut db = @gitlib.ObjectDb::load_lazy(fs, git_dir)
               if db.get(fs, commit_id) is None {
-                let pack = @gitnative.fetch_pack_http(remote_url, [commit_id], true)
-                let objects = @git.parse_packfile(pack)
-                @git.write_packfile_with_index(fs, git_dir, pack, objects)
+                let pack = @gitnative.fetch_pack_http(
+                  remote_url,
+                  [commit_id],
+                  true,
+                )
+                let objects = @pack.parse_packfile(pack)
+                @pack.write_packfile_with_index(fs, git_dir, pack, objects)
                 db = @gitlib.ObjectDb::load_lazy(fs, git_dir)
               }
               match branch {
@@ -2878,8 +2882,8 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
         match resolve_remote_ref_id(url, upstream_ref) {
           Some((id, _)) => {
             let pack = @gitnative.fetch_pack_http(url, [id], true)
-            let objects = @git.parse_packfile(pack)
-            @git.write_packfile_with_index(fs, git_dir, pack, objects)
+            let objects = @pack.parse_packfile(pack)
+            @pack.write_packfile_with_index(fs, git_dir, pack, objects)
             write_ref_file(fs, git_dir, target_ref, id)
             target_id = Some(id)
           }
@@ -3088,8 +3092,8 @@ async fn handle_subdir_push(
   // Step 5: Fetch upstream base commit and its tree from remote
   print_line("  Fetching upstream objects...")
   let pack = @gitnative.fetch_pack_http(remote_url, [upstream_base], true)
-  let objects = @git.parse_packfile(pack)
-  @git.write_packfile_with_index(fs, git_dir, pack, objects)
+  let objects = @pack.parse_packfile(pack)
+  @pack.write_packfile_with_index(fs, git_dir, pack, objects)
   print_line("  Fetched \{objects.length()} objects")
   // Step 6: Reload ObjectDb to pick up new packfile, then transform commits
   let db = @gitlib.ObjectDb::load(fs, git_dir)

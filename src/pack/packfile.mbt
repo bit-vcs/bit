@@ -7,37 +7,14 @@ fn pack_array_to_bytes(arr : Array[Byte]) -> Bytes {
 }
 
 ///|
-/// A Git object ready for packing
-pub struct PackObject {
-  obj_type : ObjectType
-  data : Bytes // Uncompressed object content (without header)
-  // Cached metadata for performance (computed during pack parsing)
-  id : ObjectId // Object hash (cached)
-  offset : Int // Offset in packfile (-1 if not from pack)
-  crc32 : UInt // CRC32 of compressed data (0 if not computed)
-}
-
-///|
-/// Delta encoding mode for packfile generation
-pub(all) enum PackDeltaMode {
-  NoDelta
-  RefDelta
-  OfsDelta
-}
-
-///|
-/// Compression mode for packfile entries
-pub(all) enum PackCompression {
-  Default
-  Stored
-}
-
-///|
 /// Compress pack data. Use stored when compression expands data.
-fn compress_pack_data(data : Bytes, compression : PackCompression) -> Bytes {
+fn compress_pack_data(
+  data : Bytes,
+  compression : @git.PackCompression,
+) -> Bytes {
   match compression {
-    PackCompression::Stored => @zlib.zlib_compress_stored(data)
-    PackCompression::Default => {
+    @git.PackCompression::Stored => @zlib.zlib_compress_stored(data)
+    @git.PackCompression::Default => {
       let compressed = @zlib.zlib_compress(data)
       if compressed.length() > data.length() {
         @zlib.zlib_compress_stored(data)
@@ -46,23 +23,6 @@ fn compress_pack_data(data : Bytes, compression : PackCompression) -> Bytes {
       }
     }
   }
-}
-
-///|
-pub fn PackObject::new(obj_type : ObjectType, data : Bytes) -> PackObject {
-  let id = hash_object_content(obj_type, data)
-  { obj_type, data, id, offset: -1, crc32: 0U }
-}
-
-///|
-pub fn PackObject::with_metadata(
-  obj_type : ObjectType,
-  data : Bytes,
-  id : ObjectId,
-  offset : Int,
-  crc32 : UInt,
-) -> PackObject {
-  { obj_type, data, id, offset, crc32 }
 }
 
 ///|
@@ -391,19 +351,19 @@ fn build_delta(base : Bytes, target : Bytes) -> Bytes {
 
 ///|
 fn pack_object_with_delta(
-  obj : PackObject,
-  base : (Int, PackObject)?,
+  obj : @git.PackObject,
+  base : (Int, @git.PackObject)?,
   obj_offset : Int,
   result : Array[Byte],
-  delta_mode : PackDeltaMode,
-  compression : PackCompression,
+  delta_mode : @git.PackDeltaMode,
+  compression : @git.PackCompression,
 ) -> (Int, Bool) {
   let obj_type = obj.obj_type.to_packfile_type()
   let data = obj.data
   let compressed = compress_pack_data(data, compression)
   let normal_len = type_and_size_len(data.length()) + compressed.length()
   match delta_mode {
-    PackDeltaMode::NoDelta => {
+    @git.PackDeltaMode::NoDelta => {
       encode_type_and_size(obj_type, data.length(), result)
       for b in compressed {
         result.push(b)
@@ -425,7 +385,7 @@ fn pack_object_with_delta(
         let delta = build_delta(base_obj.data, data)
         let compressed_delta = compress_pack_data(delta, compression)
         match delta_mode {
-          PackDeltaMode::OfsDelta => {
+          @git.PackDeltaMode::OfsDelta => {
             let back_offset = obj_offset - base_offset
             let delta_len = type_and_size_len(delta.length()) +
               ofs_delta_len(back_offset) +
@@ -439,8 +399,11 @@ fn pack_object_with_delta(
               return (delta_len, true)
             }
           }
-          PackDeltaMode::RefDelta => {
-            let base_id = hash_object_content(base_obj.obj_type, base_obj.data)
+          @git.PackDeltaMode::RefDelta => {
+            let base_id = @git.hash_object_content(
+              base_obj.obj_type,
+              base_obj.data,
+            )
             let delta_len = type_and_size_len(delta.length()) +
               base_id.bytes.length() +
               compressed_delta.length()
@@ -455,7 +418,7 @@ fn pack_object_with_delta(
               return (delta_len, true)
             }
           }
-          PackDeltaMode::NoDelta => ()
+          @git.PackDeltaMode::NoDelta => ()
         }
       }
       encode_type_and_size(obj_type, data.length(), result)
@@ -475,15 +438,15 @@ fn pack_object_with_delta(
 ///   [object count]   4 bytes (big-endian)
 ///   [...objects...]  variable
 ///   [SHA-1 trailer]  20 bytes
-pub fn create_packfile(objects : Array[PackObject]) -> Bytes {
-  create_packfile_with_delta(objects, PackDeltaMode::OfsDelta)
+pub fn create_packfile(objects : Array[@git.PackObject]) -> Bytes {
+  create_packfile_with_delta(objects, @git.PackDeltaMode::OfsDelta)
 }
 
 ///|
 /// Create a packfile from a list of objects with a chosen delta mode
 pub fn create_packfile_with_delta(
-  objects : Array[PackObject],
-  delta_mode : PackDeltaMode,
+  objects : Array[@git.PackObject],
+  delta_mode : @git.PackDeltaMode,
 ) -> Bytes {
   let (pack, _) = create_packfile_with_delta_stats(objects, delta_mode)
   pack
@@ -492,22 +455,22 @@ pub fn create_packfile_with_delta(
 ///|
 /// Create a packfile with delta statistics (delta object count)
 pub fn create_packfile_with_delta_stats(
-  objects : Array[PackObject],
-  delta_mode : PackDeltaMode,
+  objects : Array[@git.PackObject],
+  delta_mode : @git.PackDeltaMode,
 ) -> (Bytes, Int) {
   create_packfile_with_delta_stats_compression(
     objects,
     delta_mode,
-    PackCompression::Default,
+    @git.PackCompression::Default,
   )
 }
 
 ///|
 /// Create a packfile with delta statistics and compression mode
 pub fn create_packfile_with_delta_stats_compression(
-  objects : Array[PackObject],
-  delta_mode : PackDeltaMode,
-  compression : PackCompression,
+  objects : Array[@git.PackObject],
+  delta_mode : @git.PackDeltaMode,
+  compression : @git.PackCompression,
 ) -> (Bytes, Int) {
   let result : Array[Byte] = []
 
@@ -532,7 +495,7 @@ pub fn create_packfile_with_delta_stats_compression(
 
   // Pack each object (delta against the last object of the same type)
   let mut offset = 12
-  let last_by_type : Map[Int, (Int, PackObject)] = {}
+  let last_by_type : Map[Int, (Int, @git.PackObject)] = {}
   let mut delta_count = 0
   for obj in objects {
     let obj_offset = offset
@@ -549,7 +512,7 @@ pub fn create_packfile_with_delta_stats_compression(
   }
 
   // Compute SHA-1 of everything so far
-  let trailer = sha1_array_prefix(result, result.length())
+  let trailer = @git.sha1_array_prefix(result, result.length())
 
   // Append trailer
   for b in trailer.bytes {
@@ -561,9 +524,9 @@ pub fn create_packfile_with_delta_stats_compression(
 ///|
 /// Create a packfile with delta stats, optional delta reuse, and depth limit
 pub fn create_packfile_with_delta_stats_compression_reuse(
-  objects : Array[PackObject],
-  delta_mode : PackDeltaMode,
-  compression : PackCompression,
+  objects : Array[@git.PackObject],
+  delta_mode : @git.PackDeltaMode,
+  compression : @git.PackCompression,
   reuse_only : Bool,
   max_depth : Int,
 ) -> (Bytes, Int) {
@@ -590,12 +553,12 @@ pub fn create_packfile_with_delta_stats_compression_reuse(
 
   // Pack each object with optional delta reuse / depth limit
   let mut offset = 12
-  let last_by_type : Map[Int, (Int, PackObject, Int)] = {}
+  let last_by_type : Map[Int, (Int, @git.PackObject, Int)] = {}
   let mut delta_count = 0
   for obj in objects {
     let obj_offset = offset
     let key = obj.obj_type.to_packfile_type()
-    let mut base : (Int, PackObject)? = None
+    let mut base : (Int, @git.PackObject)? = None
     let mut base_depth = 0
     match last_by_type.get(key) {
       Some((base_offset, base_obj, depth)) => {
@@ -610,12 +573,16 @@ pub fn create_packfile_with_delta_stats_compression_reuse(
         max_depth > 0 &&
         base_depth < max_depth &&
         (match delta_mode {
-          PackDeltaMode::NoDelta => false
+          @git.PackDeltaMode::NoDelta => false
           _ => true
         }) &&
         (!reuse_only || (obj.offset >= 0 && base_obj.offset >= 0))
     }
-    let mode = if allow_delta { delta_mode } else { PackDeltaMode::NoDelta }
+    let mode = if allow_delta {
+      delta_mode
+    } else {
+      @git.PackDeltaMode::NoDelta
+    }
     let (written, used_delta) = pack_object_with_delta(
       obj, base, obj_offset, result, mode, compression,
     )
@@ -628,7 +595,7 @@ pub fn create_packfile_with_delta_stats_compression_reuse(
   }
 
   // Compute SHA-1 of everything so far
-  let trailer = sha1_array_prefix(result, result.length())
+  let trailer = @git.sha1_array_prefix(result, result.length())
 
   // Append trailer
   for b in trailer.bytes {
@@ -669,7 +636,7 @@ pub fn encode_type_and_size(
 ///|
 /// Create a packfile containing a single blob
 pub fn create_blob_packfile(content : Bytes) -> Bytes {
-  let obj = PackObject::new(ObjectType::Blob, content)
+  let obj = @git.PackObject::new(@git.ObjectType::Blob, content)
   create_packfile([obj])
 }
 
@@ -678,17 +645,17 @@ pub fn create_blob_packfile(content : Bytes) -> Bytes {
 pub fn create_commit_packfile(
   blob_content : Bytes,
   filename : String,
-  commit : Commit,
-) -> (ObjectId, Bytes) {
+  commit : @git.Commit,
+) -> (@git.ObjectId, Bytes) {
   // Create blob
-  let (blob_id, _) = create_blob(blob_content)
+  let (blob_id, _) = @git.create_blob(blob_content)
 
   // Create tree with single entry
-  let entry = TreeEntry::new("100644", filename, blob_id)
-  let (tree_id, _) = create_tree([entry])
+  let entry = @git.TreeEntry::new("100644", filename, blob_id)
+  let (tree_id, _) = @git.create_tree([entry])
 
   // Update commit with correct tree
-  let final_commit = Commit::new(
+  let final_commit = @git.Commit::new(
     tree_id,
     commit.parents,
     commit.author,
@@ -699,13 +666,16 @@ pub fn create_commit_packfile(
     commit.committer_tz,
     commit.message,
   )
-  let (commit_id, _) = create_commit(final_commit)
+  let (commit_id, _) = @git.create_commit(final_commit)
 
   // Build pack objects (raw content, not git object format)
   let pack_objects = [
-    PackObject::new(ObjectType::Blob, blob_content),
-    PackObject::new(ObjectType::Tree, build_tree_content([entry])),
-    PackObject::new(ObjectType::Commit, build_commit_content(final_commit)),
+    @git.PackObject::new(@git.ObjectType::Blob, blob_content),
+    @git.PackObject::new(@git.ObjectType::Tree, build_tree_content([entry])),
+    @git.PackObject::new(
+      @git.ObjectType::Commit,
+      build_commit_content(final_commit),
+    ),
   ]
   let packfile = create_packfile(pack_objects)
   (commit_id, packfile)
@@ -713,7 +683,7 @@ pub fn create_commit_packfile(
 
 ///|
 /// Build raw tree content (without "tree {size}\0" header)
-fn build_tree_content(entries : Array[TreeEntry]) -> Bytes {
+fn build_tree_content(entries : Array[@git.TreeEntry]) -> Bytes {
   let content : Array[Byte] = []
   for entry in entries {
     for c in entry.mode {
@@ -733,7 +703,7 @@ fn build_tree_content(entries : Array[TreeEntry]) -> Bytes {
 
 ///|
 /// Build raw commit content (without "commit {size}\0" header)
-fn build_commit_content(commit : Commit) -> Bytes {
+fn build_commit_content(commit : @git.Commit) -> Bytes {
   let content = StringBuilder::new()
   content.write_string("tree ")
   content.write_string(commit.tree.to_hex())

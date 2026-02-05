@@ -23,11 +23,7 @@ fn TestNetwork::new(node_count : Int) -> TestNetwork {
     }
     let node_id = NodeId::new("node-" + i.to_string())
     let bitfs = @fs.Fs::empty("/repo/.git")
-    let tree : TestWorkingTree = {
-      fs: bitfs,
-      backing_fs: fs,
-      write_fs: fs,
-    }
+    let tree : TestWorkingTree = { fs: bitfs, backing_fs: fs, write_fs: fs }
     let store : TestObjectStore = {
       backing_fs: fs,
       write_fs: fs,
@@ -162,10 +158,7 @@ test "sync: concurrent writes from multiple nodes" {
   for i = 0; i < 3; i = i + 1 {
     let node = net.node(i)
     node.db.set("node-" + i.to_string(), Bytes::make(10, (i + 65).to_byte()))
-    let _ = node.db.commit(
-      "Commit from " + i.to_string(),
-      net.tick,
-    )
+    let _ = node.db.commit("Commit from " + i.to_string(), net.tick)
     net.advance_time(100L)
   }
   // Each node broadcasts
@@ -209,10 +202,7 @@ test "sync: random operations simulation" {
       node.db.set(key, value)
       if next_random() % 3 == 0 {
         // 33% chance to commit
-        let _ = node.db.commit(
-          "Round " + round.to_string(),
-          net.tick,
-        )
+        let _ = node.db.commit("Round " + round.to_string(), net.tick)
 
       }
     } else if op < 8 {

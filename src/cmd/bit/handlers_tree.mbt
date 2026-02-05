@@ -149,7 +149,7 @@ async fn handle_tree(args : Array[String]) -> Unit raise Error {
       fs,
       temp_dir,
       depth=1,
-      filter=@git.FilterSpec::BlobNone,
+      filter=@protocol.FilterSpec::BlobNone,
     )
     let git_dir = temp_dir + "/.git"
     let commit_id = match ref_spec {
@@ -171,8 +171,8 @@ async fn handle_tree(args : Array[String]) -> Unit raise Error {
     let mut db = @gitlib.ObjectDb::load_lazy(fs, git_dir)
     if db.get(fs, commit_id) is None {
       let pack = @gitnative.fetch_pack_http(remote_url, [commit_id], true)
-      let objects = @git.parse_packfile(pack)
-      @git.write_packfile_with_index(fs, git_dir, pack, objects)
+      let objects = @pack.parse_packfile(pack)
+      @pack.write_packfile_with_index(fs, git_dir, pack, objects)
       db = @gitlib.ObjectDb::load_lazy(fs, git_dir)
     }
     let tree_id = resolve_to_tree(db, fs, commit_id)
@@ -276,7 +276,7 @@ async fn handle_cat(args : Array[String]) -> Unit raise Error {
       fs,
       temp_dir,
       depth=1,
-      filter=@git.FilterSpec::BlobNone,
+      filter=@protocol.FilterSpec::BlobNone,
     )
     let git_dir = temp_dir + "/.git"
     let commit_id = match ref_spec {
@@ -298,8 +298,8 @@ async fn handle_cat(args : Array[String]) -> Unit raise Error {
     let mut db = @gitlib.ObjectDb::load_lazy(fs, git_dir)
     if db.get(fs, commit_id) is None {
       let pack = @gitnative.fetch_pack_http(remote_url, [commit_id], true)
-      let objects = @git.parse_packfile(pack)
-      @git.write_packfile_with_index(fs, git_dir, pack, objects)
+      let objects = @pack.parse_packfile(pack)
+      @pack.write_packfile_with_index(fs, git_dir, pack, objects)
       db = @gitlib.ObjectDb::load_lazy(fs, git_dir)
     }
     let tree_id = resolve_to_tree(db, fs, commit_id)
@@ -319,8 +319,8 @@ async fn handle_cat(args : Array[String]) -> Unit raise Error {
     if obj is None {
       let wants : Array[@git.ObjectId] = [found.id]
       let pack = @gitnative.fetch_pack_http(remote_url, wants, true)
-      let objects = @git.parse_packfile(pack)
-      @git.write_packfile_with_index(fs, git_dir, pack, objects)
+      let objects = @pack.parse_packfile(pack)
+      @pack.write_packfile_with_index(fs, git_dir, pack, objects)
       let db2 = @gitlib.ObjectDb::load_lazy(fs, git_dir)
       obj = db2.get(fs, found.id)
     }

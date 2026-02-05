@@ -86,8 +86,7 @@ pub fn Kv::handle_gossip(
       self.handle_have_objects(objects)
       None
     }
-    SyncRequest(from, their_head) =>
-      self.handle_sync_request(from, their_head)
+    SyncRequest(from, their_head) => self.handle_sync_request(from, their_head)
     SyncResponse(objects, new_head) => {
       self.handle_sync_response(objects, new_head)
       None

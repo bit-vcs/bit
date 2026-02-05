@@ -536,7 +536,7 @@ fn load_pack_objects(
       continue
     }
     let data = fs.read_file(path)
-    let objects = @git.parse_packfile(data)
+    let objects = @pack.parse_packfile(data)
     for obj in objects {
       result.push(obj)
     }
@@ -672,12 +672,12 @@ fn read_pack_object_at(
   seen : Map[String, Bool],
 ) -> @git.PackObject raise @git.GitError {
   let offset_i = offset_to_int(offset)
-  let (type_id, size, next_offset) = @git.decode_type_and_size_at(
+  let (type_id, size, next_offset) = @pack.decode_type_and_size_at(
     data, offset_i,
   )
   match type_id {
     1 | 2 | 3 | 4 => {
-      let obj_type = @git.packfile_type_to_object_type(type_id)
+      let obj_type = @pack.packfile_type_to_object_type(type_id)
       let (content, _after) = @zlib.zlib_decompress_at(data, next_offset) catch {
         e => raise @git.GitError::PackfileError("Zlib error: \{e}")
       }
@@ -690,7 +690,7 @@ fn read_pack_object_at(
       @git.PackObject::with_metadata(obj_type, content, id, offset_i, 0U)
     }
     6 => {
-      let (back_offset, after_ref) = @git.read_ofs_delta_offset(
+      let (back_offset, after_ref) = @pack.read_ofs_delta_offset(
         data, next_offset,
       )
       let base_offset = offset_i - back_offset
@@ -723,12 +723,12 @@ fn read_pack_object_at(
             None => raise e
           }
       }
-      let content = @git.apply_delta(base.data, delta)
+      let content = @pack.apply_delta(base.data, delta)
       let id = @git.hash_object_content(base.obj_type, content)
       @git.PackObject::with_metadata(base.obj_type, content, id, offset_i, 0U)
     }
     7 => {
-      let (base_hex, after_ref) = @git.read_ref_delta_id(data, next_offset)
+      let (base_hex, after_ref) = @pack.read_ref_delta_id(data, next_offset)
       let (delta, _after) = @zlib.zlib_decompress_at(data, after_ref) catch {
         e => raise @git.GitError::PackfileError("Zlib error: \{e}")
       }
@@ -758,7 +758,7 @@ fn read_pack_object_at(
               )
           }
       }
-      let content = @git.apply_delta(base.data, delta)
+      let content = @pack.apply_delta(base.data, delta)
       let id = @git.hash_object_content(base.obj_type, content)
       @git.PackObject::with_metadata(base.obj_type, content, id, offset_i, 0U)
     }

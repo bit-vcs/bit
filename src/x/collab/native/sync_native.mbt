@@ -105,11 +105,11 @@ pub async fn collab_push(
   }
   let db = @lib.ObjectDb::load(rfs, git_dir)
   let objects = @lib.collect_reachable_objects(db, rfs, local_id)
-  let pack = @git.create_packfile(objects)
-  let remote = @git.Remote::new(remote_url)
+  let pack = @pack.create_packfile(objects)
+  let remote = @protocol.Remote::new(remote_url)
   let refs = @gitnative.discover_receive_refs_http(remote)
   let (old_id, push_ref) = @collab.find_remote_notes_ref(refs)
-  let req = @git.PushRequest::new(old_id, local_id, push_ref, pack)
+  let req = @protocol.PushRequest::new(old_id, local_id, push_ref, pack)
   let result = @gitnative.push(remote, req)
   if result.has_prefix("unpack ok") ||
     result.has_prefix("ok ") ||
@@ -151,8 +151,8 @@ pub async fn collab_fetch(
     )
   }
   let pack = @gitnative.fetch_pack_http(remote_url, [rid], true)
-  let objects = @git.parse_packfile(pack)
-  @git.write_packfile_with_index(fs, git_dir, pack, objects)
+  let objects = @pack.parse_packfile(pack)
+  @pack.write_packfile_with_index(fs, git_dir, pack, objects)
   let remote_short = @collab.short_ref_name(remote_ref)
   let remote_ref_path = join_path(
     git_dir,

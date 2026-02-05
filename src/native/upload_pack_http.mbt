@@ -7,7 +7,7 @@ pub async fn upload_pack_info_refs_http(
   remote : String,
   prefer_v2 : Bool,
 ) -> Bytes raise @git.GitError {
-  @git.upload_pack_info_refs_with_http(remote, prefer_v2, native_http_get)
+  upload_pack_info_refs_with_http(remote, prefer_v2, native_http_get)
 }
 
 ///|
@@ -16,7 +16,7 @@ pub async fn upload_pack_request_http(
   body : Bytes,
   prefer_v2 : Bool,
 ) -> Bytes raise @git.GitError {
-  @git.upload_pack_request_with_http(remote, body, prefer_v2, native_http_post)
+  upload_pack_request_with_http(remote, body, prefer_v2, native_http_post)
 }
 
 ///|
@@ -26,10 +26,10 @@ pub async fn discover_upload_refs_http(
 ) -> (
   Array[(@git.ObjectId, String)],
   Array[String],
-  @git.ProtocolVersion,
+  @protocol.ProtocolVersion,
   Map[String, String],
 ) raise @git.GitError {
-  @git.discover_upload_refs_with_http(
+  discover_upload_refs_with_http(
     remote, prefer_v2, native_http_get, native_http_post,
   )
 }
@@ -40,9 +40,9 @@ pub async fn fetch_pack_http(
   wants : Array[@git.ObjectId],
   prefer_v2 : Bool,
   depth? : Int = 0,
-  filter? : @git.FilterSpec = @git.FilterSpec::NoFilter,
+  filter? : @protocol.FilterSpec = @protocol.FilterSpec::NoFilter,
 ) -> Bytes raise @git.GitError {
-  @git.fetch_pack_with_http(
+  fetch_pack_with_http(
     remote, wants, prefer_v2, depth, filter, native_http_get, native_http_post,
   )
 }
@@ -53,9 +53,9 @@ pub async fn fetch_objects_http(
   wants : Array[@git.ObjectId],
   prefer_v2 : Bool,
   depth? : Int = 0,
-  filter? : @git.FilterSpec = @git.FilterSpec::NoFilter,
+  filter? : @protocol.FilterSpec = @protocol.FilterSpec::NoFilter,
 ) -> Array[@git.PackObject] raise @git.GitError {
-  @git.fetch_objects_with_http(
+  fetch_objects_with_http(
     remote, wants, prefer_v2, depth, filter, native_http_get, native_http_post,
   )
 }
@@ -65,9 +65,9 @@ pub async fn clone_http(
   remote : String,
   prefer_v2 : Bool,
   depth? : Int = 0,
-  filter? : @git.FilterSpec = @git.FilterSpec::NoFilter,
+  filter? : @protocol.FilterSpec = @protocol.FilterSpec::NoFilter,
 ) -> (Array[(@git.ObjectId, String)], Array[@git.PackObject]) raise @git.GitError {
-  @git.clone_with_http(
+  clone_with_http(
     remote, prefer_v2, depth, filter, native_http_get, native_http_post,
   )
 }
@@ -82,9 +82,9 @@ pub async fn clone_http_to_fs(
   fs : &@git.FileSystem,
   root : String,
   depth? : Int = 0,
-  filter? : @git.FilterSpec = @git.FilterSpec::NoFilter,
+  filter? : @protocol.FilterSpec = @protocol.FilterSpec::NoFilter,
 ) -> Array[(@git.ObjectId, String)] raise @git.GitError {
-  @git.clone_to_fs_with_http(
+  clone_to_fs_with_http(
     remote, prefer_v2, depth, filter, fs, root, native_http_get, native_http_post,
   )
 }

@@ -1,0 +1,117 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/bit/protocol"
+
+import {
+  "mizchi/bit",
+}
+
+// Values
+pub fn build_fetch_request_v0(String, Array[@bit.ObjectId], Array[String]) -> Bytes
+
+pub fn build_fetch_request_v2(String, Array[@bit.ObjectId], Int, filter? : FilterSpec) -> Bytes
+
+pub fn build_ls_refs_request(String, Array[String]) -> Bytes
+
+pub fn build_receive_pack_body(PushRequest) -> Bytes
+
+pub fn build_ref_update(@bit.ObjectId, @bit.ObjectId, String, String) -> String
+
+pub fn build_ref_update_simple(@bit.ObjectId, @bit.ObjectId, String) -> String
+
+pub fn detect_protocol_version(Bytes) -> ProtocolVersion raise @bit.GitError
+
+pub async fn discover_refs_with_http(Remote, async (String, Map[String, String]) -> (@bit.HttpResponse, Bytes) raise @bit.GitError) -> (Array[(@bit.ObjectId, String)], Array[String]) raise @bit.GitError
+
+pub fn extract_capabilities(Bytes) -> Array[String]
+
+pub fn extract_pack_from_v0_response(Bytes) -> Bytes raise @bit.GitError
+
+pub fn extract_pack_from_v2_response(Bytes) -> Bytes raise @bit.GitError
+
+pub fn parse_ls_refs_response(Bytes) -> LsRefsResult raise @bit.GitError
+
+pub fn parse_receive_pack_response(Bytes) -> Result[String, @bit.GitError]
+
+pub fn parse_refs(Bytes) -> Array[(@bit.ObjectId, String)] raise @bit.GitError
+
+pub fn parse_remote(String) -> RemoteSpec
+
+pub fn parse_sideband(Bytes) -> (Int, Bytes)
+
+pub fn parse_v0_advertised_caps(Bytes) -> Array[String] raise @bit.GitError
+
+pub fn parse_v2_advertised_caps(Bytes) -> Array[String] raise @bit.GitError
+
+pub fn pktline_decode(Bytes) -> Array[(Bytes, Bool)] raise @bit.GitError
+
+pub fn pktline_delim() -> Bytes
+
+pub fn pktline_encode(String) -> Bytes
+
+pub fn pktline_encode_bytes(Bytes) -> Bytes
+
+pub fn pktline_flush() -> Bytes
+
+pub async fn push_with_http(Remote, PushRequest, async (String, Map[String, String]) -> (@bit.HttpResponse, Bytes) raise @bit.GitError, async (String, Bytes, Map[String, String]) -> (@bit.HttpResponse, Bytes) raise @bit.GitError) -> String raise @bit.GitError
+
+pub fn select_default_ref(Array[(@bit.ObjectId, String)], Map[String, String]) -> (String, @bit.ObjectId)?
+
+pub fn select_default_wants(Array[(@bit.ObjectId, String)], Map[String, String]) -> Array[@bit.ObjectId]
+
+// Errors
+
+// Types and methods
+pub(all) enum FilterSpec {
+  NoFilter
+  BlobNone
+  BlobLimit(Int64)
+  TreeDepth(Int)
+}
+pub fn FilterSpec::is_partial(Self) -> Bool
+pub fn FilterSpec::to_string(Self) -> String
+
+pub struct LsRefsResult {
+  refs : Array[(@bit.ObjectId, String)]
+  symrefs : Map[String, String]
+}
+
+pub(all) enum ProtocolVersion {
+  V0
+  V2
+}
+pub impl Eq for ProtocolVersion
+
+pub struct PushRequest {
+  old_id : @bit.ObjectId
+  new_id : @bit.ObjectId
+  refname : String
+  packfile : Bytes
+}
+pub fn PushRequest::new(@bit.ObjectId, @bit.ObjectId, String, Bytes) -> Self
+
+pub struct Remote {
+  url : String
+}
+pub fn Remote::info_refs_url(Self) -> String
+pub fn Remote::new(String) -> Self
+pub fn Remote::receive_pack_url(Self) -> String
+
+pub(all) enum RemoteKind {
+  Http
+  Ssh
+  File
+}
+pub impl Eq for RemoteKind
+
+pub struct RemoteSpec {
+  kind : RemoteKind
+  raw : String
+  host : String?
+  path : String
+  base_url : String?
+}
+
+// Type aliases
+
+// Traits
+

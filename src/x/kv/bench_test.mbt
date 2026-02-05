@@ -9,17 +9,18 @@ fn create_test_db(
   let fs = @git.TestFs::new()
   @lib.init_repo(fs, "/repo")
   let bitfs = @fs.Fs::empty("/repo/.git")
-  let tree : TestWorkingTree = {
-    fs: bitfs,
-    backing_fs: fs,
-    write_fs: fs,
-  }
+  let tree : TestWorkingTree = { fs: bitfs, backing_fs: fs, write_fs: fs }
   let store : TestObjectStore = {
     backing_fs: fs,
     write_fs: fs,
     git_dir: "/repo/.git",
   }
-  let db = Kv::new(NodeId::new("bench-node"), tree, store, @git.ObjectId::zero())
+  let db = Kv::new(
+    NodeId::new("bench-node"),
+    tree,
+    store,
+    @git.ObjectId::zero(),
+  )
   // Create files with different content to avoid dedup
   for i = 0; i < file_count; i = i + 1 {
     let path = "dir" +

@@ -8,11 +8,11 @@ fn build_receive_request(
   pack : Bytes,
 ) -> Bytes {
   let out : Array[Byte] = []
-  let cmd = @git.build_ref_update(old_id, new_id, refname, "report-status")
-  for b in @git.pktline_encode(cmd) {
+  let cmd = @protocol.build_ref_update(old_id, new_id, refname, "report-status")
+  for b in @protocol.pktline_encode(cmd) {
     out.push(b)
   }
-  for b in @git.pktline_flush() {
+  for b in @protocol.pktline_flush() {
     out.push(b)
   }
   for b in pack {
@@ -33,7 +33,7 @@ test "receive-pack: push to empty repo" {
   )
   let db = ObjectDb::load(fs, "/src/.git")
   let objects = collect_reachable_objects(db, fs, commit_id)
-  let pack = @git.create_packfile(objects)
+  let pack = @pack.create_packfile(objects)
   let req = build_receive_request(
     @git.ObjectId::zero(),
     commit_id,
@@ -56,7 +56,7 @@ test "receive-pack: advertise empty repo" {
   let fs = @git.TestFs::new()
   ignore(try? init_repo(fs, "/repo"))
   let adv = build_receive_pack_advertisement(fs, "/repo")
-  let decoded = @git.pktline_decode(adv) catch { _ => [] }
+  let decoded = @protocol.pktline_decode(adv) catch { _ => [] }
   assert_true(decoded.length() > 0)
   let (line_bytes, _) = decoded[0]
   let line = @utf8.decode_lossy(line_bytes[:])
@@ -81,7 +81,7 @@ test "receive-pack: reject non-fast-forward" {
   )
   let db = ObjectDb::load(fs, "/src/.git")
   let objects = collect_reachable_objects(db, fs, commit_src)
-  let pack = @git.create_packfile(objects)
+  let pack = @pack.create_packfile(objects)
   let req = build_receive_request(
     commit_dst, commit_src, "refs/heads/main", pack,
   )

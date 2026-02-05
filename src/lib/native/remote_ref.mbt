@@ -68,7 +68,7 @@ pub async fn resolve_remote_ref_id(
     }
   }
   if ref_spec == "HEAD" {
-    match @git.select_default_ref(refs, symrefs) {
+    match @protocol.select_default_ref(refs, symrefs) {
       Some((refname, id)) =>
         if refname.has_prefix("refs/heads/") {
           let branch = String::unsafe_substring(

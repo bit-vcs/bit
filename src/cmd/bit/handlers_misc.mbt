@@ -3102,8 +3102,8 @@ async fn fetch_submodule_objects(
     None => ()
   }
   let pack = @gitnative.fetch_pack_http(url, [target_id], true)
-  let objects = @git.parse_packfile(pack)
-  @git.write_packfile_with_index(fs, modules_dir, pack, objects)
+  let objects = @pack.parse_packfile(pack)
+  @pack.write_packfile_with_index(fs, modules_dir, pack, objects)
 }
 
 ///|

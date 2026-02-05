@@ -1,6 +1,15 @@
 ///| Git pkt-line protocol implementation
 
 ///|
+fn int_to_hex_char(i : Int) -> Char {
+  if i < 10 {
+    (i + '0'.to_int()).unsafe_to_char()
+  } else {
+    (i - 10 + 'a'.to_int()).unsafe_to_char()
+  }
+}
+
+///|
 /// Helper to convert Array[Byte] to Bytes
 fn pkt_array_to_bytes(arr : Array[Byte]) -> Bytes {
   Bytes::from_array(FixedArray::makei(arr.length(), fn(i) { arr[i] }))
@@ -61,12 +70,12 @@ pub fn pktline_delim() -> Bytes {
 ///|
 /// Decode pkt-lines from bytes
 /// Returns array of (data, is_flush)
-pub fn pktline_decode(data : Bytes) -> Array[(Bytes, Bool)] raise GitError {
+pub fn pktline_decode(data : Bytes) -> Array[(Bytes, Bool)] raise @git.GitError {
   let result : Array[(Bytes, Bool)] = []
   let mut offset = 0
   while offset < data.length() {
     if offset + 4 > data.length() {
-      raise GitError::ProtocolError("Incomplete pkt-line header")
+      raise @git.GitError::ProtocolError("Incomplete pkt-line header")
     }
 
     // Read 4-byte hex length
@@ -88,7 +97,7 @@ pub fn pktline_decode(data : Bytes) -> Array[(Bytes, Bool)] raise GitError {
     }
     let payload_len = len - 4
     if offset + payload_len > data.length() {
-      raise GitError::ProtocolError("Incomplete pkt-line payload")
+      raise @git.GitError::ProtocolError("Incomplete pkt-line payload")
     }
     let payload : Array[Byte] = []
     for i = 0; i < payload_len; i = i + 1 {
@@ -128,8 +137,8 @@ fn pkt_hex_char_to_int(c : Char) -> Int {
 /// Build a ref update command for git-receive-pack
 /// Format: {old_sha} {new_sha} {refname}\0{capabilities}\n
 pub fn build_ref_update(
-  old_id : ObjectId,
-  new_id : ObjectId,
+  old_id : @git.ObjectId,
+  new_id : @git.ObjectId,
   refname : String,
   capabilities : String,
 ) -> String {
@@ -139,8 +148,8 @@ pub fn build_ref_update(
 ///|
 /// Build a ref update command (without capabilities)
 pub fn build_ref_update_simple(
-  old_id : ObjectId,
-  new_id : ObjectId,
+  old_id : @git.ObjectId,
+  new_id : @git.ObjectId,
   refname : String,
 ) -> String {
   "\{old_id.to_hex()} \{new_id.to_hex()} \{refname}\n"
@@ -150,9 +159,11 @@ pub fn build_ref_update_simple(
 /// Parse refs from git-receive-pack response
 /// Format: {sha} {refname}\0{capabilities}\n (for first line)
 ///         {sha} {refname}\n (for subsequent lines)
-pub fn parse_refs(data : Bytes) -> Array[(ObjectId, String)] raise GitError {
+pub fn parse_refs(
+  data : Bytes,
+) -> Array[(@git.ObjectId, String)] raise @git.GitError {
   let lines = pktline_decode(data)
-  let result : Array[(ObjectId, String)] = []
+  let result : Array[(@git.ObjectId, String)] = []
   for item in lines {
     let (line_bytes, is_flush) = item
     if is_flush || line_bytes.length() == 0 {
@@ -193,7 +204,7 @@ pub fn parse_refs(data : Bytes) -> Array[(ObjectId, String)] raise GitError {
       }
       refname.write_char(chars[i])
     }
-    let id = ObjectId::from_hex(sha_str.to_string())
+    let id = @git.ObjectId::from_hex(sha_str.to_string())
     result.push((id, refname.to_string()))
   }
   result

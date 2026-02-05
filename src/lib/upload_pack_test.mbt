@@ -43,9 +43,9 @@ test "parse_upload_pack_request: simple want" {
   // Build a simple want request
   let want_line = "want ce013625030ba8dba906f756967f9e9ca394464a\n"
   let req_bytes = test_concat_bytes([
-    @git.pktline_encode(want_line),
-    @git.pktline_flush(),
-    @git.pktline_encode("done\n"),
+    @protocol.pktline_encode(want_line),
+    @protocol.pktline_flush(),
+    @protocol.pktline_encode("done\n"),
   ])
   let req = parse_upload_pack_request(req_bytes)
   assert_true(req.wants.length() == 1)
@@ -60,9 +60,9 @@ test "parse_upload_pack_request: want with capabilities" {
   // Build a want request with capabilities
   let want_line = "want ce013625030ba8dba906f756967f9e9ca394464a\u0000ofs-delta side-band-64k\n"
   let req_bytes = test_concat_bytes([
-    @git.pktline_encode(want_line),
-    @git.pktline_flush(),
-    @git.pktline_encode("done\n"),
+    @protocol.pktline_encode(want_line),
+    @protocol.pktline_flush(),
+    @protocol.pktline_encode("done\n"),
   ])
   let req = parse_upload_pack_request(req_bytes)
   assert_true(req.wants.length() == 1)
@@ -77,11 +77,11 @@ test "parse_upload_pack_request: multiple wants and haves" {
   let want2 = "want cc628ccd10742baea8241c5924df992b5c019f71\n"
   let have1 = "have 88e38705fdbd3608cddbe904b67c731f3234c45b\n"
   let req_bytes = test_concat_bytes([
-    @git.pktline_encode(want1),
-    @git.pktline_encode(want2),
-    @git.pktline_flush(),
-    @git.pktline_encode(have1),
-    @git.pktline_encode("done\n"),
+    @protocol.pktline_encode(want1),
+    @protocol.pktline_encode(want2),
+    @protocol.pktline_flush(),
+    @protocol.pktline_encode(have1),
+    @protocol.pktline_encode("done\n"),
   ])
   let req = parse_upload_pack_request(req_bytes)
   assert_true(req.wants.length() == 2)
@@ -127,8 +127,8 @@ fn test_delimiter() -> Bytes {
 test "detect_protocol_version: v1 format (want line)" {
   let want_line = "want ce013625030ba8dba906f756967f9e9ca394464a\n"
   let req_bytes = test_concat_bytes([
-    @git.pktline_encode(want_line),
-    @git.pktline_flush(),
+    @protocol.pktline_encode(want_line),
+    @protocol.pktline_flush(),
   ])
   let version = detect_protocol_version(req_bytes)
   inspect(version, content="1")
@@ -141,7 +141,7 @@ test "detect_protocol_version: v2 format (command=fetch)" {
     test_pktline_v2("object-format=sha1"),
     test_delimiter(),
     test_pktline_v2("done"),
-    @git.pktline_flush(),
+    @protocol.pktline_flush(),
   ])
   let version = detect_protocol_version(req_bytes)
   inspect(version, content="2")
@@ -155,7 +155,7 @@ test "parse_upload_pack_request_v2: simple fetch" {
     test_delimiter(),
     test_pktline_v2("want ce013625030ba8dba906f756967f9e9ca394464a"),
     test_pktline_v2("done"),
-    @git.pktline_flush(),
+    @protocol.pktline_flush(),
   ])
   let req = parse_upload_pack_request_v2(req_bytes)
   inspect(req.command, content="fetch")
@@ -171,7 +171,7 @@ test "parse_upload_pack_request_v2: with packfile-uris" {
     test_delimiter(),
     test_pktline_v2("packfile-uris https"),
     test_pktline_v2("done"),
-    @git.pktline_flush(),
+    @protocol.pktline_flush(),
   ])
   let req = parse_upload_pack_request_v2(req_bytes)
   inspect(req.command, content="fetch")
@@ -186,7 +186,7 @@ test "parse_upload_pack_request_v2: with filter" {
     test_delimiter(),
     test_pktline_v2("filter blob:none"),
     test_pktline_v2("done"),
-    @git.pktline_flush(),
+    @protocol.pktline_flush(),
   ])
   let req = parse_upload_pack_request_v2(req_bytes)
   inspect(req.filter, content="Some(\"blob:none\")")
@@ -200,7 +200,7 @@ test "parse_upload_pack_request_v2: want-ref" {
     test_delimiter(),
     test_pktline_v2("want-ref refs/heads/main"),
     test_pktline_v2("done"),
-    @git.pktline_flush(),
+    @protocol.pktline_flush(),
   ])
   let req = parse_upload_pack_request_v2(req_bytes)
   inspect(req.want_refs.length(), content="1")
