@@ -54,12 +54,18 @@ type GlobalOptions
 
 type MboxPatch
 
+type OsClock
+
 pub struct OsFs {
   dummy : Int
 }
 pub fn OsFs::new() -> Self
 pub impl @mizchi/bit.FileSystem for OsFs
 pub impl @mizchi/bit.RepoFileSystem for OsFs
+
+type OsObjectStore
+
+type OsRefStore
 
 type RebaseTodoEntry
 

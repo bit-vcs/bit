@@ -34,9 +34,7 @@ pub fn init_worktree_probe() -> Unit {
             ),
           )
         }
-        Ok(@afs.FileKind::Regular) => {
-          Some(native_regular_meta(abs_path, true))
-        }
+        Ok(@afs.FileKind::Regular) => Some(native_regular_meta(abs_path, true))
         Ok(_) => None
         Err(_) =>
           if fs.is_file(abs_path) {

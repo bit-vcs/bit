@@ -39,25 +39,17 @@ pub fn PrMergeResult::message(self : PrMergeResult) -> String {
 /// Check if a PR can be merged (no conflicts, PR is open)
 pub fn Collab::can_merge(
   self : Collab,
-  backing_fs : &@git.RepoFileSystem,
+  objects : &@lib.ObjectStore,
+  refs : &@lib.RefStore,
   pr_id : String,
 ) -> Bool raise @git.GitError {
-  let pr = self.get_pr(backing_fs, pr_id)
+  let pr = self.get_pr(objects, pr_id)
   guard pr is Some(existing) else { return false }
   if existing.state != PrState::Open {
     return false
   }
-  // Check if source commit is reachable and target exists
-  let source_commit = @lib.resolve_ref(
-    backing_fs,
-    self.git_dir,
-    existing.source_branch,
-  )
-  let target_commit = @lib.resolve_ref(
-    backing_fs,
-    self.git_dir,
-    existing.target_branch,
-  )
+  let source_commit = refs.resolve(existing.source_branch)
+  let target_commit = refs.resolve(existing.target_branch)
   guard source_commit is Some(_) else { return false }
   guard target_commit is Some(_) else { return false }
   true
@@ -67,15 +59,16 @@ pub fn Collab::can_merge(
 /// Merge a Pull Request
 pub fn Collab::merge_pr(
   self : Collab,
-  fs : &@git.FileSystem,
-  backing_fs : &@git.RepoFileSystem,
+  objects : &@lib.ObjectStore,
+  refs : &@lib.RefStore,
+  clock : &@lib.Clock,
   pr_id : String,
   merger : String,
-  timestamp : Int64,
   strategy? : PrMergeStrategy = PrMergeStrategy::Merge,
 ) -> PrMergeResult raise @git.GitError {
+  let timestamp = clock.now()
   // Get and validate PR
-  let pr = self.get_pr(backing_fs, pr_id)
+  let pr = self.get_pr(objects, pr_id)
   guard pr is Some(existing) else {
     return {
       success: false,
@@ -93,11 +86,7 @@ pub fn Collab::merge_pr(
     }
   }
   // Resolve current commits
-  let source_commit = @lib.resolve_ref(
-    backing_fs,
-    self.git_dir,
-    existing.source_branch,
-  )
+  let source_commit = refs.resolve(existing.source_branch)
   guard source_commit is Some(source_id) else {
     return {
       success: false,
@@ -106,11 +95,7 @@ pub fn Collab::merge_pr(
       message: "Source branch not found: \{existing.source_branch}",
     }
   }
-  let target_commit = @lib.resolve_ref(
-    backing_fs,
-    self.git_dir,
-    existing.target_branch,
-  )
+  let target_commit = refs.resolve(existing.target_branch)
   guard target_commit is Some(target_id) else {
     return {
       success: false,
@@ -121,19 +106,13 @@ pub fn Collab::merge_pr(
   }
   // Create merge message
   let merge_message = "Merge PR #\{pr_id}: \{existing.title}\n\nMerged-by: \{merger}\n"
-  // Use lib.merge to perform the actual merge
-  let db = @lib.ObjectDb::load(backing_fs, self.git_dir)
   // Check for fast-forward possibility
-  if is_ancestor(db, backing_fs, target_id, source_id) {
+  if is_ancestor(objects, target_id, source_id) {
     // Fast-forward is possible
     match strategy {
       FastForward => {
-        // Update target branch to point to source
-        update_branch_ref(fs, self.git_dir, existing.target_branch, source_id)
-        // Mark PR as merged
-        mark_pr_merged(
-          self, fs, backing_fs, pr_id, existing, source_id, timestamp,
-        )
+        update_branch_ref(refs, existing.target_branch, source_id)
+        mark_pr_merged(self, objects, refs, clock, pr_id, existing, source_id)
         return {
           success: true,
           commit_id: Some(source_id),
@@ -142,8 +121,7 @@ pub fn Collab::merge_pr(
         }
       }
       Merge => {
-        // Create merge commit even if fast-forward is possible
-        let source_tree = get_commit_tree_id(db, backing_fs, source_id)
+        let source_tree = get_commit_tree_id(objects, source_id)
         guard source_tree is Some(tree_id) else {
           return {
             success: false,
@@ -163,12 +141,10 @@ pub fn Collab::merge_pr(
           "+0000",
           merge_message,
         )
-        let (commit_id, commit_compressed) = @git.create_commit(commit)
-        write_object_bytes(fs, self.git_dir, commit_id, commit_compressed)
-        update_branch_ref(fs, self.git_dir, existing.target_branch, commit_id)
-        mark_pr_merged(
-          self, fs, backing_fs, pr_id, existing, commit_id, timestamp,
-        )
+        let commit_bytes = @git.serialize_commit_content(commit)
+        let commit_id = objects.put(@git.ObjectType::Commit, commit_bytes)
+        update_branch_ref(refs, existing.target_branch, commit_id)
+        mark_pr_merged(self, objects, refs, clock, pr_id, existing, commit_id)
         return {
           success: true,
           commit_id: Some(commit_id),
@@ -177,8 +153,7 @@ pub fn Collab::merge_pr(
         }
       }
       Squash => {
-        // Create squash commit (single parent, all changes combined)
-        let source_tree = get_commit_tree_id(db, backing_fs, source_id)
+        let source_tree = get_commit_tree_id(objects, source_id)
         guard source_tree is Some(tree_id) else {
           return {
             success: false,
@@ -190,7 +165,7 @@ pub fn Collab::merge_pr(
         let squash_message = "Squash PR #\{pr_id}: \{existing.title}\n\nSquashed-by: \{merger}\n"
         let commit = @git.Commit::new(
           tree_id,
-          [target_id], // Single parent for squash
+          [target_id],
           merger,
           timestamp,
           "+0000",
@@ -199,12 +174,10 @@ pub fn Collab::merge_pr(
           "+0000",
           squash_message,
         )
-        let (commit_id, commit_compressed) = @git.create_commit(commit)
-        write_object_bytes(fs, self.git_dir, commit_id, commit_compressed)
-        update_branch_ref(fs, self.git_dir, existing.target_branch, commit_id)
-        mark_pr_merged(
-          self, fs, backing_fs, pr_id, existing, commit_id, timestamp,
-        )
+        let commit_bytes = @git.serialize_commit_content(commit)
+        let commit_id = objects.put(@git.ObjectType::Commit, commit_bytes)
+        update_branch_ref(refs, existing.target_branch, commit_id)
+        mark_pr_merged(self, objects, refs, clock, pr_id, existing, commit_id)
         return {
           success: true,
           commit_id: Some(commit_id),
@@ -215,7 +188,7 @@ pub fn Collab::merge_pr(
     }
   }
   // Check if already up to date
-  if is_ancestor(db, backing_fs, source_id, target_id) {
+  if is_ancestor(objects, source_id, target_id) {
     return {
       success: false,
       commit_id: None,
@@ -224,14 +197,14 @@ pub fn Collab::merge_pr(
     }
   }
   // Find merge base
-  let base = find_merge_base(db, backing_fs, target_id, source_id)
+  let base = find_merge_base(objects, target_id, source_id)
   // Collect files from each tree
   let base_files = match base {
     None => {}
-    Some(id) => collect_files_from_commit(db, backing_fs, id)
+    Some(id) => collect_files_from_commit(objects, id)
   }
-  let target_files = collect_files_from_commit(db, backing_fs, target_id)
-  let source_files = collect_files_from_commit(db, backing_fs, source_id)
+  let target_files = collect_files_from_commit(objects, target_id)
+  let source_files = collect_files_from_commit(objects, source_id)
   // Perform three-way merge
   let (merged_files, conflicts) = three_way_merge(
     base_files, target_files, source_files,
@@ -245,7 +218,7 @@ pub fn Collab::merge_pr(
     }
   }
   // Create merged tree
-  let tree_id = create_tree_from_files(fs, self.git_dir, merged_files)
+  let tree_id = create_tree_from_files(objects, merged_files)
   // Create merge commit
   let parents = match strategy {
     Squash => [target_id]
@@ -254,12 +227,12 @@ pub fn Collab::merge_pr(
   let commit = @git.Commit::new(
     tree_id, parents, merger, timestamp, "+0000", merger, timestamp, "+0000", merge_message,
   )
-  let (commit_id, commit_compressed) = @git.create_commit(commit)
-  write_object_bytes(fs, self.git_dir, commit_id, commit_compressed)
+  let commit_bytes = @git.serialize_commit_content(commit)
+  let commit_id = objects.put(@git.ObjectType::Commit, commit_bytes)
   // Update target branch
-  update_branch_ref(fs, self.git_dir, existing.target_branch, commit_id)
+  update_branch_ref(refs, existing.target_branch, commit_id)
   // Mark PR as merged
-  mark_pr_merged(self, fs, backing_fs, pr_id, existing, commit_id, timestamp)
+  mark_pr_merged(self, objects, refs, clock, pr_id, existing, commit_id)
   {
     success: true,
     commit_id: Some(commit_id),
@@ -270,11 +243,10 @@ pub fn Collab::merge_pr(
 
 ///|
 fn get_commit_tree_id(
-  db : @lib.ObjectDb,
-  fs : &@git.RepoFileSystem,
+  objects : &@lib.ObjectStore,
   commit_id : @git.ObjectId,
 ) -> @git.ObjectId? raise @git.GitError {
-  let obj = db.get(fs, commit_id)
+  let obj = objects.get(commit_id)
   guard obj is Some(commit_obj) else { return None }
   if commit_obj.obj_type != @git.ObjectType::Commit {
     return None
@@ -285,8 +257,7 @@ fn get_commit_tree_id(
 
 ///|
 fn is_ancestor(
-  db : @lib.ObjectDb,
-  fs : &@git.RepoFileSystem,
+  objects : &@lib.ObjectStore,
   ancestor : @git.ObjectId,
   commit_id : @git.ObjectId,
 ) -> Bool raise @git.GitError {
@@ -306,7 +277,7 @@ fn is_ancestor(
     if current == ancestor {
       return true
     }
-    let obj = db.get(fs, current)
+    let obj = objects.get(current)
     guard obj is Some(commit_obj) else { continue }
     if commit_obj.obj_type != @git.ObjectType::Commit {
       continue
@@ -321,12 +292,10 @@ fn is_ancestor(
 
 ///|
 fn find_merge_base(
-  db : @lib.ObjectDb,
-  fs : &@git.RepoFileSystem,
+  objects : &@lib.ObjectStore,
   a : @git.ObjectId,
   b : @git.ObjectId,
 ) -> @git.ObjectId? raise @git.GitError {
-  // Collect all ancestors of 'a'
   let seen_a : Map[String, Bool] = {}
   let stack_a : Array[@git.ObjectId] = [a]
   while stack_a.length() > 0 {
@@ -337,7 +306,7 @@ fn find_merge_base(
       continue
     }
     seen_a[hex] = true
-    let obj = db.get(fs, current)
+    let obj = objects.get(current)
     guard obj is Some(commit_obj) else { continue }
     if commit_obj.obj_type != @git.ObjectType::Commit {
       continue
@@ -347,7 +316,6 @@ fn find_merge_base(
       stack_a.push(parent)
     }
   }
-  // Find first ancestor of 'b' that's also an ancestor of 'a'
   let stack_b : Array[@git.ObjectId] = [b]
   while stack_b.length() > 0 {
     let id = stack_b.pop()
@@ -356,7 +324,7 @@ fn find_merge_base(
     if seen_a.contains(hex) {
       return Some(current)
     }
-    let obj = db.get(fs, current)
+    let obj = objects.get(current)
     guard obj is Some(commit_obj) else { continue }
     if commit_obj.obj_type != @git.ObjectType::Commit {
       continue
@@ -377,30 +345,28 @@ priv struct FileEntry {
 
 ///|
 fn collect_files_from_commit(
-  db : @lib.ObjectDb,
-  fs : &@git.RepoFileSystem,
+  objects : &@lib.ObjectStore,
   commit_id : @git.ObjectId,
 ) -> Map[String, FileEntry] raise @git.GitError {
   let result : Map[String, FileEntry] = {}
-  let obj = db.get(fs, commit_id)
+  let obj = objects.get(commit_id)
   guard obj is Some(commit_obj) else { return result }
   if commit_obj.obj_type != @git.ObjectType::Commit {
     return result
   }
   let info = @git.parse_commit(commit_obj.data)
-  collect_tree_files(db, fs, info.tree, "", result)
+  collect_tree_files(objects, info.tree, "", result)
   result
 }
 
 ///|
 fn collect_tree_files(
-  db : @lib.ObjectDb,
-  fs : &@git.RepoFileSystem,
+  objects : &@lib.ObjectStore,
   tree_id : @git.ObjectId,
   prefix : String,
   out : Map[String, FileEntry],
 ) -> Unit raise @git.GitError {
-  let obj = db.get(fs, tree_id)
+  let obj = objects.get(tree_id)
   guard obj is Some(tree_obj) else { return () }
   if tree_obj.obj_type != @git.ObjectType::Tree {
     return ()
@@ -413,10 +379,8 @@ fn collect_tree_files(
       prefix + "/" + entry.name
     }
     if entry.mode.has_prefix("04") {
-      // Directory
-      collect_tree_files(db, fs, entry.id, path, out)
+      collect_tree_files(objects, entry.id, path, out)
     } else {
-      // File
       out[path] = { id: entry.id, mode: entry.mode }
     }
   }
@@ -430,7 +394,6 @@ fn three_way_merge(
 ) -> (Map[String, FileEntry], Array[String]) {
   let merged : Map[String, FileEntry] = {}
   let conflicts : Array[String] = []
-  // Collect all paths
   let all_paths : Map[String, Bool] = {}
   for item in base.to_array() {
     let (path, _) = item
@@ -450,25 +413,21 @@ fn three_way_merge(
     let o = ours.get(path)
     let t = theirs.get(path)
     if entry_eq(o, t) {
-      // Both sides are the same
       match o {
         None => ()
         Some(v) => merged[path] = v
       }
     } else if entry_eq(o, b) {
-      // Ours unchanged, take theirs
       match t {
         None => ()
         Some(v) => merged[path] = v
       }
     } else if entry_eq(t, b) {
-      // Theirs unchanged, take ours
       match o {
         None => ()
         Some(v) => merged[path] = v
       }
     } else {
-      // Conflict
       conflicts.push(path)
     }
   }
@@ -486,11 +445,9 @@ fn entry_eq(a : FileEntry?, b : FileEntry?) -> Bool {
 
 ///|
 fn create_tree_from_files(
-  fs : &@git.FileSystem,
-  git_dir : String,
+  objects : &@lib.ObjectStore,
   files : Map[String, FileEntry],
 ) -> @git.ObjectId raise @git.GitError {
-  // Build tree structure
   let tree_map : Map[String, Array[(String, FileEntry)]] = {}
   for item in files.to_array() {
     let (path, entry) = item
@@ -512,25 +469,21 @@ fn create_tree_from_files(
       None => ()
     }
   }
-  // Build trees bottom-up
   let tree_ids : Map[String, @git.ObjectId] = {}
-  // Get all directories sorted by depth (deepest first)
   let dirs = tree_map.keys().to_array()
   dirs.sort_by(fn(a, b) {
     let a_depth = count_slashes(a)
     let b_depth = count_slashes(b)
-    b_depth - a_depth // Deepest first
+    b_depth - a_depth
   })
   for dir in dirs {
     let entries_arr = tree_map.get(dir)
     guard entries_arr is Some(file_entries) else { continue }
     let tree_entries : Array[@git.TreeEntry] = []
-    // Add file entries
     for item in file_entries {
       let (name, entry) = item
       tree_entries.push(@git.TreeEntry::new(entry.mode, name, entry.id))
     }
-    // Add subdirectory entries
     for item in tree_ids.to_array() {
       let (subdir, id) = item
       let parent_dir = get_parent_dir(subdir)
@@ -540,11 +493,10 @@ fn create_tree_from_files(
       }
     }
     tree_entries.sort_by(fn(a, b) { String::compare(a.name, b.name) })
-    let (tree_id, compressed) = @git.create_tree(tree_entries)
-    write_object_bytes(fs, git_dir, tree_id, compressed)
+    let tree_bytes = @git.serialize_tree(tree_entries)
+    let tree_id = objects.put(@git.ObjectType::Tree, tree_bytes)
     tree_ids[dir] = tree_id
   }
-  // Return root tree
   tree_ids.get("") |> Option::unwrap()
 }
 
@@ -578,55 +530,51 @@ fn get_base_name(path : String) -> String {
 
 ///|
 fn update_branch_ref(
-  fs : &@git.FileSystem,
-  git_dir : String,
+  refs : &@lib.RefStore,
   branch : String,
   commit_id : @git.ObjectId,
 ) -> Unit raise @git.GitError {
-  let ref_path = if branch.has_prefix("refs/") {
-    join_path(git_dir, branch)
+  let ref_name = if branch.has_prefix("refs/") {
+    branch
   } else {
-    join_path(git_dir, "refs/heads/" + branch)
+    "refs/heads/" + branch
   }
-  let dir = get_parent_dir(ref_path)
-  fs.mkdir_p(dir)
-  fs.write_string(ref_path, commit_id.to_hex() + "\n")
+  refs.update(ref_name, Some(commit_id))
 }
 
 ///|
 fn mark_pr_merged(
   prs : Collab,
-  fs : &@git.FileSystem,
-  backing_fs : &@git.RepoFileSystem,
+  objects : &@lib.ObjectStore,
+  refs : &@lib.RefStore,
+  clock : &@lib.Clock,
   pr_id : String,
   existing : PullRequest,
   merge_commit : @git.ObjectId,
-  timestamp : Int64,
 ) -> Unit raise @git.GitError {
-  // Create updated PR with Merged state
   let updated = PullRequest::new(
     existing.id,
     existing.title,
     existing.body,
     existing.source_branch,
-    merge_commit, // Update source_commit to merge commit
+    merge_commit,
     existing.target_branch,
     existing.target_commit,
     existing.author,
     existing.created_at,
-    timestamp,
+    clock.now(),
     PrState::Merged,
     existing.labels,
   )
   ignore(
     prs.store.put_record(
-      fs,
-      backing_fs,
+      objects,
+      refs,
+      clock,
       pr_meta_key(pr_id),
       "pr",
       updated.serialize(),
       existing.author,
-      timestamp,
     ),
   )
 }

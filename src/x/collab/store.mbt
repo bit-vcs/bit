@@ -1,4 +1,4 @@
-///| Collab notes storage (git notes + kv-friendly)
+///| Collab notes storage (ObjectStore + RefStore based)
 
 ///|
 let collab_notes_ns : String = "bit-collab"
@@ -279,28 +279,36 @@ pub fn merge_record_bytes(ours : Bytes, theirs : Bytes) -> Bytes {
 
 ///|
 pub struct CollabStore {
-  git_dir : String
   node_id : String
-  kv : @kv.Kv
+  entries : Map[String, @git.ObjectId] // entry_name -> blob_id
+  mut head : @git.ObjectId? // current notes commit
 }
 
 ///|
 pub fn CollabStore::load(
-  backing_fs : &@git.RepoFileSystem,
-  git_dir : String,
+  objects : &@lib.ObjectStore,
+  refs : &@lib.RefStore,
   node_id? : String = "local",
 ) -> CollabStore raise @git.GitError {
   let node = node_id
-  let kv_node = @kv.NodeId::new(node)
-  let commit = @lib.resolve_ref(backing_fs, git_dir, collab_notes_ref)
-  let kv = match commit {
+  let commit = refs.resolve(collab_notes_ref)
+  let entries : Map[String, @git.ObjectId] = {}
+  let head = match commit {
     Some(cid) => {
-      let bitfs = @fs.Fs::from_commit(backing_fs, git_dir, cid)
-      @kv.Kv::new(kv_node, bitfs, cid)
+      let obj = objects.get(cid)
+      guard obj is Some(commit_obj) else { None }
+      let info = @git.parse_commit(commit_obj.data)
+      let tree_obj = objects.get(info.tree)
+      guard tree_obj is Some(tobj) else { None }
+      let tree_entries = @git.parse_tree(tobj.data)
+      for entry in tree_entries {
+        entries[entry.name] = entry.id
+      }
+      Some(cid)
     }
-    None => @kv.Kv::empty(kv_node, git_dir)
+    None => None
   }
-  { git_dir, node_id: node, kv }
+  { node_id: node, entries, head }
 }
 
 ///|
@@ -311,20 +319,27 @@ pub fn CollabStore::node_id(self : CollabStore) -> String {
 ///|
 pub fn CollabStore::get_record(
   self : CollabStore,
-  backing_fs : &@git.RepoFileSystem,
+  objects : &@lib.ObjectStore,
   key : String,
 ) -> CollabRecord? {
   let target_id = key_to_target_id(key)
-  let value = self.kv.get(backing_fs, target_id.to_hex())
-  match value {
+  let entry_name = target_id.to_hex()
+  let blob_id = self.entries.get(entry_name)
+  match blob_id {
     None => None
-    Some(bytes) => {
-      let text = @utf8.decode_lossy(bytes[:])
-      let record = parse_collab_record(text)
-      if record.deleted {
-        None
-      } else {
-        Some(record)
+    Some(bid) => {
+      let obj = objects.get(bid) catch { _ => None }
+      match obj {
+        None => None
+        Some(blob_obj) => {
+          let text = @utf8.decode_lossy(blob_obj.data[:])
+          let record = parse_collab_record(text)
+          if record.deleted {
+            None
+          } else {
+            Some(record)
+          }
+        }
       }
     }
   }
@@ -333,15 +348,16 @@ pub fn CollabStore::get_record(
 ///|
 pub fn CollabStore::put_record(
   self : CollabStore,
-  fs : &@git.FileSystem,
-  backing_fs : &@git.RepoFileSystem,
+  objects : &@lib.ObjectStore,
+  refs : &@lib.RefStore,
+  clock : &@lib.Clock,
   key : String,
   kind : String,
   payload : String,
   node : String,
-  timestamp : Int64,
 ) -> CollabRecord raise @git.GitError {
-  let existing = self.get_record(backing_fs, key)
+  let timestamp = clock.now()
+  let existing = self.get_record(objects, key)
   let base_clock = match existing {
     Some(r) => r.clock
     None => {}
@@ -356,24 +372,31 @@ pub fn CollabStore::put_record(
     clock=next_clock,
     deleted=false,
   )
-  let target_id = ensure_key_object(fs, self.git_dir, key)
+  let target_id = key_to_target_id(key)
+  // Store the key blob
+  let key_bytes = @utf8.encode(key)
+  ignore(objects.put(@git.ObjectType::Blob, key_bytes))
+  // Store the record blob
   let record_text = record.serialize()
-  self.kv.set(target_id.to_hex(), @utf8.encode(record_text))
-  let _ = commit_notes(self, fs, backing_fs, "Update " + kind, timestamp)
+  let record_bytes = @utf8.encode(record_text)
+  let record_blob_id = objects.put(@git.ObjectType::Blob, record_bytes)
+  self.entries[target_id.to_hex()] = record_blob_id
+  let _ = commit_notes(self, objects, refs, "Update " + kind, timestamp)
   record
 }
 
 ///|
 pub fn CollabStore::delete_record(
   self : CollabStore,
-  fs : &@git.FileSystem,
-  backing_fs : &@git.RepoFileSystem,
+  objects : &@lib.ObjectStore,
+  refs : &@lib.RefStore,
+  clock : &@lib.Clock,
   key : String,
   kind : String,
   node : String,
-  timestamp : Int64,
 ) -> CollabRecord raise @git.GitError {
-  let existing = self.get_record(backing_fs, key)
+  let timestamp = clock.now()
+  let existing = self.get_record(objects, key)
   let base_clock = match existing {
     Some(r) => r.clock
     None => {}
@@ -388,29 +411,35 @@ pub fn CollabStore::delete_record(
     clock=next_clock,
     deleted=true,
   )
-  let target_id = ensure_key_object(fs, self.git_dir, key)
+  let target_id = key_to_target_id(key)
+  // Store the key blob
+  let key_bytes = @utf8.encode(key)
+  ignore(objects.put(@git.ObjectType::Blob, key_bytes))
+  // Store the record blob
   let record_text = record.serialize()
-  self.kv.set(target_id.to_hex(), @utf8.encode(record_text))
-  let _ = commit_notes(self, fs, backing_fs, "Delete " + kind, timestamp)
+  let record_bytes = @utf8.encode(record_text)
+  let record_blob_id = objects.put(@git.ObjectType::Blob, record_bytes)
+  self.entries[target_id.to_hex()] = record_blob_id
+  let _ = commit_notes(self, objects, refs, "Delete " + kind, timestamp)
   record
 }
 
 ///|
 pub fn CollabStore::list_records(
   self : CollabStore,
-  backing_fs : &@git.RepoFileSystem,
+  objects : &@lib.ObjectStore,
   prefix : String,
   include_deleted? : Bool = false,
 ) -> Array[CollabRecord] {
-  let keys = self.kv.list(backing_fs, "")
   let result : Array[CollabRecord] = []
   let include_deleted_val = include_deleted
-  for key in keys {
-    let value = self.kv.get(backing_fs, key)
-    match value {
+  for item in self.entries.to_array() {
+    let (_, blob_id) = item
+    let obj = objects.get(blob_id) catch { _ => None }
+    match obj {
       None => ()
-      Some(bytes) => {
-        let text = @utf8.decode_lossy(bytes[:])
+      Some(blob_obj) => {
+        let text = @utf8.decode_lossy(blob_obj.data[:])
         let record = parse_collab_record(text)
         if not(record.key.has_prefix(prefix)) {
           continue
@@ -446,30 +475,41 @@ fn key_to_target_id(key : String) -> @git.ObjectId {
 }
 
 ///|
-fn ensure_key_object(
-  fs : &@git.FileSystem,
-  git_dir : String,
-  key : String,
-) -> @git.ObjectId raise @git.GitError {
-  let (id, compressed) = @git.create_blob_string(key)
-  write_object_bytes(fs, git_dir, id, compressed)
-  id
-}
-
-///|
 fn commit_notes(
   store : CollabStore,
-  fs : &@git.FileSystem,
-  backing_fs : &@git.RepoFileSystem,
+  objects : &@lib.ObjectStore,
+  refs : &@lib.RefStore,
   message : String,
   timestamp : Int64,
 ) -> @git.ObjectId raise @git.GitError {
-  let commit_id = store.kv.commit(fs, backing_fs, message, timestamp)
-  let notes_dir = join_path(store.git_dir, "refs/notes")
-  fs.mkdir_p(notes_dir)
-  fs.write_string(
-    join_path(store.git_dir, collab_notes_ref),
-    commit_id.to_hex() + "\n",
+  // Build tree from entries
+  let tree_entries : Array[@git.TreeEntry] = []
+  for item in store.entries.to_array() {
+    let (name, blob_id) = item
+    tree_entries.push(@git.TreeEntry::new("100644", name, blob_id))
+  }
+  tree_entries.sort_by(fn(a, b) { String::compare(a.name, b.name) })
+  let tree_bytes = @git.serialize_tree(tree_entries)
+  let tree_id = objects.put(@git.ObjectType::Tree, tree_bytes)
+  // Create commit
+  let parents = match store.head {
+    Some(p) => [p]
+    None => []
+  }
+  let commit = @git.Commit::new(
+    tree_id,
+    parents,
+    "Collab <collab@local>",
+    timestamp,
+    "+0000",
+    "Collab <collab@local>",
+    timestamp,
+    "+0000",
+    message + "\n",
   )
+  let commit_bytes = @git.serialize_commit_content(commit)
+  let commit_id = objects.put(@git.ObjectType::Commit, commit_bytes)
+  store.head = Some(commit_id)
+  refs.update(collab_notes_ref, Some(commit_id))
   commit_id
 }

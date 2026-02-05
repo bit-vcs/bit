@@ -3,48 +3,46 @@
 ///|
 /// Collab manages Pull Requests and Issues stored in git notes
 pub struct Collab {
-  git_dir : String
   mut store : CollabStore
 }
 
 ///|
 /// Load an existing Collab from git notes
 pub fn Collab::load(
-  backing_fs : &@git.RepoFileSystem,
-  git_dir : String,
+  objects : &@lib.ObjectStore,
+  refs : &@lib.RefStore,
   node_id? : String = "local",
 ) -> Collab raise @git.GitError {
-  let store = CollabStore::load(backing_fs, git_dir, node_id~)
-  { git_dir, store }
+  let store = CollabStore::load(objects, refs, node_id~)
+  { store, }
 }
 
 ///|
 /// Initialize a new Collab
 pub fn Collab::init(
-  fs : &@git.FileSystem,
-  backing_fs : &@git.RepoFileSystem,
-  git_dir : String,
+  objects : &@lib.ObjectStore,
+  refs : &@lib.RefStore,
   node_id? : String = "local",
 ) -> Collab raise @git.GitError {
-  ignore(fs)
-  Collab::load(backing_fs, git_dir, node_id~)
+  Collab::load(objects, refs, node_id~)
 }
 
 ///|
 /// Create a new Pull Request
 pub fn Collab::create_pr(
   self : Collab,
-  fs : &@git.FileSystem,
-  backing_fs : &@git.RepoFileSystem,
+  objects : &@lib.ObjectStore,
+  refs : &@lib.RefStore,
+  clock : &@lib.Clock,
   title : String,
   body : String,
   source_branch : String,
   target_branch : String,
   author : String,
-  timestamp : Int64,
 ) -> PullRequest raise @git.GitError {
+  let timestamp = clock.now()
   // Resolve source and target commits
-  let source_commit = @lib.resolve_ref(backing_fs, self.git_dir, source_branch) catch {
+  let source_commit = refs.resolve(source_branch) catch {
     _ =>
       raise @git.GitError::InvalidObject(
         "Cannot resolve source branch: \{source_branch}",
@@ -55,7 +53,7 @@ pub fn Collab::create_pr(
       "Source branch not found: \{source_branch}",
     )
   }
-  let target_commit = @lib.resolve_ref(backing_fs, self.git_dir, target_branch) catch {
+  let target_commit = refs.resolve(target_branch) catch {
     _ =>
       raise @git.GitError::InvalidObject(
         "Cannot resolve target branch: \{target_branch}",
@@ -90,13 +88,13 @@ pub fn Collab::create_pr(
   )
   ignore(
     self.store.put_record(
-      fs,
-      backing_fs,
+      objects,
+      refs,
+      clock,
       pr_meta_key(pr_id),
       "pr",
       pr.serialize(),
       author,
-      timestamp,
     ),
   )
   pr
@@ -106,10 +104,10 @@ pub fn Collab::create_pr(
 /// Get a Pull Request by ID
 pub fn Collab::get_pr(
   self : Collab,
-  backing_fs : &@git.RepoFileSystem,
+  objects : &@lib.ObjectStore,
   pr_id : String,
 ) -> PullRequest? {
-  let record = self.store.get_record(backing_fs, pr_meta_key(pr_id))
+  let record = self.store.get_record(objects, pr_meta_key(pr_id))
   match record {
     None => None
     Some(r) => {
@@ -128,11 +126,11 @@ pub fn Collab::get_pr(
 /// List Pull Requests, optionally filtered by state
 pub fn Collab::list_prs(
   self : Collab,
-  backing_fs : &@git.RepoFileSystem,
+  objects : &@lib.ObjectStore,
   state? : PrState? = None,
 ) -> Array[PullRequest] {
   let result : Array[PullRequest] = []
-  let records = self.store.list_records(backing_fs, "collab/pr/")
+  let records = self.store.list_records(objects, "collab/pr/")
   for record in records {
     if not(record.key.has_suffix("/meta")) || record.kind != "pr" {
       continue
@@ -159,15 +157,15 @@ pub fn Collab::list_prs(
 /// Update a Pull Request (title, body, labels)
 pub fn Collab::update_pr(
   self : Collab,
-  fs : &@git.FileSystem,
-  backing_fs : &@git.RepoFileSystem,
+  objects : &@lib.ObjectStore,
+  refs : &@lib.RefStore,
+  clock : &@lib.Clock,
   pr_id : String,
-  timestamp : Int64,
   title? : String? = None,
   body? : String? = None,
   labels? : Array[String]? = None,
 ) -> PullRequest raise @git.GitError {
-  let pr = self.get_pr(backing_fs, pr_id)
+  let pr = self.get_pr(objects, pr_id)
   guard pr is Some(existing) else {
     raise @git.GitError::InvalidObject("PR not found: \{pr_id}")
   }
@@ -193,19 +191,19 @@ pub fn Collab::update_pr(
     existing.target_commit,
     existing.author,
     existing.created_at,
-    timestamp,
+    clock.now(),
     existing.state,
     new_labels,
   )
   ignore(
     self.store.put_record(
-      fs,
-      backing_fs,
+      objects,
+      refs,
+      clock,
       pr_meta_key(pr_id),
       "pr",
       updated.serialize(),
       existing.author,
-      timestamp,
     ),
   )
   updated
@@ -215,12 +213,12 @@ pub fn Collab::update_pr(
 /// Close a Pull Request
 pub fn Collab::close_pr(
   self : Collab,
-  fs : &@git.FileSystem,
-  backing_fs : &@git.RepoFileSystem,
+  objects : &@lib.ObjectStore,
+  refs : &@lib.RefStore,
+  clock : &@lib.Clock,
   pr_id : String,
-  timestamp : Int64,
 ) -> Unit raise @git.GitError {
-  let pr = self.get_pr(backing_fs, pr_id)
+  let pr = self.get_pr(objects, pr_id)
   guard pr is Some(existing) else {
     raise @git.GitError::InvalidObject("PR not found: \{pr_id}")
   }
@@ -238,19 +236,19 @@ pub fn Collab::close_pr(
     existing.target_commit,
     existing.author,
     existing.created_at,
-    timestamp,
+    clock.now(),
     PrState::Closed,
     existing.labels,
   )
   ignore(
     self.store.put_record(
-      fs,
-      backing_fs,
+      objects,
+      refs,
+      clock,
       pr_meta_key(pr_id),
       "pr",
       updated.serialize(),
       existing.author,
-      timestamp,
     ),
   )
 }
@@ -273,46 +271,5 @@ fn short_hex_id(hex : String, n : Int) -> String {
     hex
   } else {
     String::unsafe_substring(hex, start=0, end=n)
-  }
-}
-
-///|
-fn get_commit_tree(
-  db : @lib.ObjectDb,
-  backing_fs : &@git.RepoFileSystem,
-  commit_id : @git.ObjectId,
-) -> @git.ObjectId? raise @git.GitError {
-  let obj = db.get(backing_fs, commit_id)
-  guard obj is Some(commit_obj) else { return None }
-  if commit_obj.obj_type != @git.ObjectType::Commit {
-    return None
-  }
-  let info = @git.parse_commit(commit_obj.data)
-  Some(info.tree)
-}
-
-///|
-fn write_object_bytes(
-  fs : &@git.FileSystem,
-  git_dir : String,
-  id : @git.ObjectId,
-  compressed : Bytes,
-) -> Unit raise @git.GitError {
-  let hex = id.to_hex()
-  let dir = join_path(
-    git_dir,
-    "objects/" + String::unsafe_substring(hex, start=0, end=2),
-  )
-  let path = join_path(dir, String::unsafe_substring(hex, start=2, end=40))
-  fs.mkdir_p(dir)
-  fs.write_file(path, compressed)
-}
-
-///|
-fn join_path(a : String, b : String) -> String {
-  if a.has_suffix("/") {
-    a + b
-  } else {
-    a + "/" + b
   }
 }

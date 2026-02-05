@@ -24,12 +24,12 @@ import "wbtest" {
 
 options(
   targets: {
+    "env_native.mbt": [ "native" ],
+    "gitignore_async_test.mbt": [ "native" ],
     "promisor.mbt": [ "native" ],
     "remote_ref.mbt": [ "native" ],
     "sync_http.mbt": [ "native" ],
     "worktree_modes.mbt": [ "native" ],
     "worktree_probe_native.mbt": [ "native" ],
-    "env_native.mbt": [ "native" ],
-    "gitignore_async_test.mbt": [ "native" ],
   },
 )

@@ -4,30 +4,30 @@
 /// Submit a review for a Pull Request
 pub fn Collab::submit_review(
   self : Collab,
-  fs : &@git.FileSystem,
-  backing_fs : &@git.RepoFileSystem,
+  objects : &@lib.ObjectStore,
+  refs : &@lib.RefStore,
+  clock : &@lib.Clock,
   pr_id : String,
   author : String,
   verdict : ReviewVerdict,
   body : String,
   commit_id : @git.ObjectId,
-  timestamp : Int64,
 ) -> PrReview raise @git.GitError {
   // Verify PR exists and is open
-  let pr = self.get_pr(backing_fs, pr_id)
+  let pr = self.get_pr(objects, pr_id)
   guard pr is Some(existing) else {
     raise @git.GitError::InvalidObject("PR not found: \{pr_id}")
   }
   if existing.state != PrState::Open {
     raise @git.GitError::InvalidObject("PR is not open: \{pr_id}")
   }
+  let timestamp = clock.now()
   // Generate review ID from content hash
   let review = PrReview::new(
-    "", // Will be set after hashing
-     pr_id, author, verdict, body, timestamp, commit_id,
+    "", pr_id, author, verdict, body, timestamp, commit_id,
   )
   let review_data = review.serialize()
-  let (blob_id, compressed) = @git.create_blob_string(review_data)
+  let (blob_id, _compressed) = @git.create_blob_string(review_data)
   let review_id = short_hex(blob_id.to_hex(), 8)
   // Create final review with ID
   let final_review = PrReview::new(
@@ -35,16 +35,15 @@ pub fn Collab::submit_review(
   )
   ignore(
     self.store.put_record(
-      fs,
-      backing_fs,
+      objects,
+      refs,
+      clock,
       pr_review_key(pr_id, review_id),
       "pr.review",
       final_review.serialize(),
       author,
-      timestamp,
     ),
   )
-  ignore(compressed)
   final_review
 }
 
@@ -52,11 +51,11 @@ pub fn Collab::submit_review(
 /// List reviews for a Pull Request
 pub fn Collab::list_reviews(
   self : Collab,
-  backing_fs : &@git.RepoFileSystem,
+  objects : &@lib.ObjectStore,
   pr_id : String,
 ) -> Array[PrReview] {
   let result : Array[PrReview] = []
-  let records = self.store.list_records(backing_fs, pr_review_prefix(pr_id))
+  let records = self.store.list_records(objects, pr_review_prefix(pr_id))
   for record in records {
     if record.kind != "pr.review" {
       continue
@@ -80,19 +79,17 @@ pub fn Collab::list_reviews(
 /// Check if a PR is approved (has at least one Approved review with no RequestChanges after it)
 pub fn Collab::is_approved(
   self : Collab,
-  backing_fs : &@git.RepoFileSystem,
+  objects : &@lib.ObjectStore,
   pr_id : String,
 ) -> Bool {
-  let reviews = self.list_reviews(backing_fs, pr_id)
+  let reviews = self.list_reviews(objects, pr_id)
   if reviews.length() == 0 {
     return false
   }
-  // Track latest verdict per author
   let latest_verdicts : Map[String, ReviewVerdict] = {}
   for review in reviews {
     latest_verdicts[review.author] = review.verdict
   }
-  // Check if there's at least one approval and no pending request-changes
   let mut has_approval = false
   for item in latest_verdicts.to_array() {
     let (_, verdict) = item

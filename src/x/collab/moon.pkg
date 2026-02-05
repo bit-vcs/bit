@@ -1,7 +1,5 @@
 import {
   "mizchi/bit" as @git,
-  "mizchi/bit/x/fs" as @fs,
-  "mizchi/bit/x/kv" as @kv,
   "mizchi/bit/lib" as @lib,
   "moonbitlang/core/encoding/utf8" as @utf8,
 }

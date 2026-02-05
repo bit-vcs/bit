@@ -24,8 +24,9 @@ pub fn ImportStats::updated(self : ImportStats) -> Int {
 ///|
 pub fn Collab::import_prs(
   self : Collab,
-  fs : &@git.FileSystem,
-  backing_fs : &@git.RepoFileSystem,
+  objects : &@lib.ObjectStore,
+  refs : &@lib.RefStore,
+  clock : &@lib.Clock,
   prs : Array[PullRequest],
 ) -> ImportStats raise @git.GitError {
   if prs.length() == 0 {
@@ -34,7 +35,7 @@ pub fn Collab::import_prs(
   let mut created = 0
   let mut updated = 0
   for pr in prs {
-    let existing = self.store.get_record(backing_fs, pr_meta_key(pr.id()))
+    let existing = self.store.get_record(objects, pr_meta_key(pr.id()))
     match existing {
       Some(r) =>
         if r.timestamp >= pr.updated_at {
@@ -46,13 +47,13 @@ pub fn Collab::import_prs(
     }
     ignore(
       self.store.put_record(
-        fs,
-        backing_fs,
+        objects,
+        refs,
+        clock,
         pr_meta_key(pr.id()),
         "pr",
         pr.serialize(),
         pr.author(),
-        pr.updated_at,
       ),
     )
   }
@@ -62,8 +63,9 @@ pub fn Collab::import_prs(
 ///|
 pub fn Collab::import_issues(
   self : Collab,
-  fs : &@git.FileSystem,
-  backing_fs : &@git.RepoFileSystem,
+  objects : &@lib.ObjectStore,
+  refs : &@lib.RefStore,
+  clock : &@lib.Clock,
   issues : Array[Issue],
 ) -> ImportStats raise @git.GitError {
   if issues.length() == 0 {
@@ -72,7 +74,7 @@ pub fn Collab::import_issues(
   let mut created = 0
   let mut updated = 0
   for issue in issues {
-    let existing = self.store.get_record(backing_fs, issue_meta_key(issue.id()))
+    let existing = self.store.get_record(objects, issue_meta_key(issue.id()))
     match existing {
       Some(r) =>
         if r.timestamp >= issue.updated_at {
@@ -84,13 +86,13 @@ pub fn Collab::import_issues(
     }
     ignore(
       self.store.put_record(
-        fs,
-        backing_fs,
+        objects,
+        refs,
+        clock,
         issue_meta_key(issue.id()),
         "issue",
         issue.serialize(),
         issue.author(),
-        issue.updated_at,
       ),
     )
   }

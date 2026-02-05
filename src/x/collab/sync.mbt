@@ -29,14 +29,100 @@ pub fn PrSyncResult::remote_commit(self : PrSyncResult) -> @git.ObjectId? {
 }
 
 ///|
+/// Native adapter: ObjectDb + RepoFileSystem -> ObjectStore
+priv struct NativeObjectStore {
+  db : @lib.ObjectDb
+  rfs : &@git.RepoFileSystem
+  fs : &@git.FileSystem
+  git_dir : String
+}
+
+///|
+impl @lib.ObjectStore for NativeObjectStore with get(self, id) {
+  self.db.get(self.rfs, id)
+}
+
+///|
+impl @lib.ObjectStore for NativeObjectStore with put(self, obj_type, content) {
+  let (id, compressed) = @git.create_object(obj_type, content)
+  write_object_bytes(self.fs, self.git_dir, id, compressed)
+  id
+}
+
+///|
+impl @lib.ObjectStore for NativeObjectStore with has(self, id) {
+  let obj = self.db.get(self.rfs, id)
+  obj is Some(_)
+}
+
+///|
+/// Native adapter: FileSystem + git_dir -> RefStore
+priv struct NativeRefStore {
+  fs : &@git.FileSystem
+  rfs : &@git.RepoFileSystem
+  git_dir : String
+}
+
+///|
+impl @lib.RefStore for NativeRefStore with resolve(self, ref_name) {
+  @lib.resolve_ref(self.rfs, self.git_dir, ref_name)
+}
+
+///|
+impl @lib.RefStore for NativeRefStore with update(self, ref_name, id) {
+  match id {
+    Some(commit_id) => {
+      let ref_path = join_path(self.git_dir, ref_name)
+      let dir = parent_path(ref_path)
+      self.fs.mkdir_p(dir)
+      self.fs.write_string(ref_path, commit_id.to_hex() + "\n")
+    }
+    None => ()
+  }
+}
+
+///|
+impl @lib.RefStore for NativeRefStore with list(self, _prefix) {
+  ignore(self)
+  []
+}
+
+///|
+fn write_object_bytes(
+  fs : &@git.FileSystem,
+  git_dir : String,
+  id : @git.ObjectId,
+  compressed : Bytes,
+) -> Unit raise @git.GitError {
+  let hex = id.to_hex()
+  let dir = join_path(
+    git_dir,
+    "objects/" + String::unsafe_substring(hex, start=0, end=2),
+  )
+  let path = join_path(dir, String::unsafe_substring(hex, start=2, end=40))
+  fs.mkdir_p(dir)
+  fs.write_file(path, compressed)
+}
+
+///|
+fn join_path(a : String, b : String) -> String {
+  if a.has_suffix("/") {
+    a + b
+  } else {
+    a + "/" + b
+  }
+}
+
+///|
 /// Push collab notes ref to remote
 pub async fn Collab::push(
-  self : Collab,
+  _self : Collab,
   rfs : &@git.RepoFileSystem,
+  git_dir : String,
   remote_url : String,
 ) -> PrSyncResult raise @git.GitError {
   let ref_name = collab_notes_ref_name()
-  let local_commit = @lib.resolve_ref(rfs, self.git_dir, ref_name)
+  let local_commit = @lib.resolve_ref(rfs, git_dir, ref_name)
   guard local_commit is Some(local_id) else {
     return {
       success: false,
@@ -46,7 +132,7 @@ pub async fn Collab::push(
     }
   }
   // Collect all objects reachable from notes ref
-  let db = @lib.ObjectDb::load(rfs, self.git_dir)
+  let db = @lib.ObjectDb::load(rfs, git_dir)
   let objects = @lib.collect_reachable_objects(db, rfs, local_id)
   let pack = @git.create_packfile(objects)
   // Discover remote refs
@@ -81,6 +167,7 @@ pub async fn Collab::fetch(
   self : Collab,
   fs : &@git.FileSystem,
   rfs : &@git.RepoFileSystem,
+  git_dir : String,
   remote_url : String,
 ) -> PrSyncResult raise @git.GitError {
   let ref_name = collab_notes_ref_name()
@@ -91,31 +178,37 @@ pub async fn Collab::fetch(
     return {
       success: false,
       message: "No remote collab notes ref found",
-      local_commit: @lib.resolve_ref(rfs, self.git_dir, ref_name),
+      local_commit: @lib.resolve_ref(rfs, git_dir, ref_name),
       remote_commit: None,
     }
   }
   // Fetch pack
   let pack = @git.fetch_pack_http(remote_url, [rid], true)
   let objects = @git.parse_packfile(pack)
-  @git.write_packfile_with_index(fs, self.git_dir, pack, objects)
+  @git.write_packfile_with_index(fs, git_dir, pack, objects)
   // Update remote tracking ref (best-effort)
   let remote_short = short_ref_name(remote_ref)
   let remote_ref_path = join_path(
-    self.git_dir,
+    git_dir,
     "refs/remotes/origin/" + remote_short,
   )
   let dir = parent_path(remote_ref_path)
   fs.mkdir_p(dir)
   fs.write_string(remote_ref_path, rid.to_hex() + "\n")
   // Get local commit
-  let local_commit = @lib.resolve_ref(rfs, self.git_dir, ref_name)
+  let local_commit = @lib.resolve_ref(rfs, git_dir, ref_name)
+  // Create native adapters
+  let db = @lib.ObjectDb::load(rfs, git_dir)
+  let native_objects : NativeObjectStore = { db, rfs, fs, git_dir }
+  let native_refs : NativeRefStore = { fs, rfs, git_dir }
+  let obj_store : &@lib.ObjectStore = native_objects
+  let ref_store : &@lib.RefStore = native_refs
   match local_commit {
     None => {
-      write_notes_ref(fs, self.git_dir, rid)
+      ref_store.update(collab_notes_ref_name(), Some(rid))
       self.store = CollabStore::load(
-        rfs,
-        self.git_dir,
+        obj_store,
+        ref_store,
         node_id=self.store.node_id(),
       )
       {
@@ -134,24 +227,39 @@ pub async fn Collab::fetch(
           remote_commit: Some(rid),
         }
       } else {
-        merge_notes_commits(self, fs, rfs, lid, rid)
+        merge_notes_commits(self, fs, git_dir, obj_store, ref_store, lid, rid)
       }
   }
+}
+
+///|
+fn get_commit_tree(
+  objects : &@lib.ObjectStore,
+  commit_id : @git.ObjectId,
+) -> @git.ObjectId? raise @git.GitError {
+  let obj = objects.get(commit_id)
+  guard obj is Some(commit_obj) else { return None }
+  if commit_obj.obj_type != @git.ObjectType::Commit {
+    return None
+  }
+  let info = @git.parse_commit(commit_obj.data)
+  Some(info.tree)
 }
 
 ///|
 fn merge_notes_commits(
   prs : Collab,
   fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  git_dir : String,
+  objects : &@lib.ObjectStore,
+  refs : &@lib.RefStore,
   local_id : @git.ObjectId,
   remote_id : @git.ObjectId,
 ) -> PrSyncResult raise @git.GitError {
-  let db = @lib.ObjectDb::load(rfs, prs.git_dir)
   // Fast-forward if possible
-  if is_commit_ancestor(db, rfs, local_id, remote_id) {
-    write_notes_ref(fs, prs.git_dir, remote_id)
-    prs.store = CollabStore::load(rfs, prs.git_dir, node_id=prs.store.node_id())
+  if is_commit_ancestor_store(objects, local_id, remote_id) {
+    refs.update(collab_notes_ref_name(), Some(remote_id))
+    prs.store = CollabStore::load(objects, refs, node_id=prs.store.node_id())
     return {
       success: true,
       message: "Fast-forward to remote",
@@ -159,7 +267,7 @@ fn merge_notes_commits(
       remote_commit: Some(remote_id),
     }
   }
-  if is_commit_ancestor(db, rfs, remote_id, local_id) {
+  if is_commit_ancestor_store(objects, remote_id, local_id) {
     return {
       success: true,
       message: "Local is ahead of remote",
@@ -167,15 +275,17 @@ fn merge_notes_commits(
       remote_commit: Some(remote_id),
     }
   }
-  let local_tree = get_commit_tree(db, rfs, local_id)
+  let local_tree = get_commit_tree(objects, local_id)
   guard local_tree is Some(ltree) else {
     raise @git.GitError::InvalidObject("Cannot read local notes tree")
   }
-  let remote_tree = get_commit_tree(db, rfs, remote_id)
+  let remote_tree = get_commit_tree(objects, remote_id)
   guard remote_tree is Some(rtree) else {
     raise @git.GitError::InvalidObject("Cannot read remote notes tree")
   }
-  let merged_tree_id = merge_notes_trees(fs, rfs, prs.git_dir, db, ltree, rtree)
+  let merged_tree_id = merge_notes_trees_store(
+    objects, fs, git_dir, ltree, rtree,
+  )
   let commit = @git.Commit::new(
     merged_tree_id,
     [local_id, remote_id],
@@ -188,9 +298,9 @@ fn merge_notes_commits(
     "Merge collab notes\n",
   )
   let (commit_id, commit_compressed) = @git.create_commit(commit)
-  write_object_bytes(fs, prs.git_dir, commit_id, commit_compressed)
-  write_notes_ref(fs, prs.git_dir, commit_id)
-  prs.store = CollabStore::load(rfs, prs.git_dir, node_id=prs.store.node_id())
+  write_object_bytes(fs, git_dir, commit_id, commit_compressed)
+  refs.update(collab_notes_ref_name(), Some(commit_id))
+  prs.store = CollabStore::load(objects, refs, node_id=prs.store.node_id())
   {
     success: true,
     message: "Merged remote collab notes",
@@ -200,16 +310,38 @@ fn merge_notes_commits(
 }
 
 ///|
-fn merge_notes_trees(
+fn is_commit_ancestor_store(
+  objects : &@lib.ObjectStore,
+  ancestor : @git.ObjectId,
+  commit : @git.ObjectId,
+) -> Bool raise @git.GitError {
+  if ancestor == commit {
+    return true
+  }
+  let obj = objects.get(commit)
+  guard obj is Some(commit_obj) else { return false }
+  if commit_obj.obj_type != @git.ObjectType::Commit {
+    return false
+  }
+  let info = @git.parse_commit(commit_obj.data)
+  for parent in info.parents {
+    if is_commit_ancestor_store(objects, ancestor, parent) {
+      return true
+    }
+  }
+  false
+}
+
+///|
+fn merge_notes_trees_store(
+  objects : &@lib.ObjectStore,
   fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
   git_dir : String,
-  db : @lib.ObjectDb,
   local_tree : @git.ObjectId,
   remote_tree : @git.ObjectId,
 ) -> @git.ObjectId raise @git.GitError {
-  let local_entries = read_tree_entries(db, rfs, local_tree)
-  let remote_entries = read_tree_entries(db, rfs, remote_tree)
+  let local_entries = read_tree_entries_store(objects, local_tree)
+  let remote_entries = read_tree_entries_store(objects, remote_tree)
   let local_map : Map[String, @git.ObjectId] = {}
   for entry in local_entries {
     local_map[entry.name] = entry.id
@@ -235,8 +367,8 @@ fn merge_notes_trees(
         if lid == rid {
           merged_entries.push(@git.TreeEntry::new("100644", key, lid))
         } else {
-          let ours = db.get(rfs, lid)
-          let theirs = db.get(rfs, rid)
+          let ours = objects.get(lid)
+          let theirs = objects.get(rid)
           match (ours, theirs) {
             (Some(o), Some(t)) => {
               let merged_bytes = merge_record_bytes(o.data, t.data)
@@ -262,40 +394,15 @@ fn merge_notes_trees(
 }
 
 ///|
-fn read_tree_entries(
-  db : @lib.ObjectDb,
-  rfs : &@git.RepoFileSystem,
+fn read_tree_entries_store(
+  objects : &@lib.ObjectStore,
   tree_id : @git.ObjectId,
 ) -> Array[@git.TreeEntry] {
-  let obj = db.get(rfs, tree_id) catch { _ => None }
+  let obj = objects.get(tree_id) catch { _ => None }
   match obj {
     Some(tree_obj) => @git.parse_tree(tree_obj.data) catch { _ => [] }
     None => []
   }
-}
-
-///|
-fn is_commit_ancestor(
-  db : @lib.ObjectDb,
-  rfs : &@git.RepoFileSystem,
-  ancestor : @git.ObjectId,
-  commit : @git.ObjectId,
-) -> Bool raise @git.GitError {
-  if ancestor == commit {
-    return true
-  }
-  let obj = db.get(rfs, commit)
-  guard obj is Some(commit_obj) else { return false }
-  if commit_obj.obj_type != @git.ObjectType::Commit {
-    return false
-  }
-  let info = @git.parse_commit(commit_obj.data)
-  for parent in info.parents {
-    if is_commit_ancestor(db, rfs, ancestor, parent) {
-      return true
-    }
-  }
-  false
 }
 
 ///|
@@ -324,20 +431,6 @@ fn find_upload_notes_ref(
     }
   }
   None
-}
-
-///|
-fn write_notes_ref(
-  fs : &@git.FileSystem,
-  git_dir : String,
-  commit_id : @git.ObjectId,
-) -> Unit raise @git.GitError {
-  let refs_dir = join_path(git_dir, "refs/notes")
-  fs.mkdir_p(refs_dir)
-  fs.write_string(
-    join_path(git_dir, collab_notes_ref_name()),
-    commit_id.to_hex() + "\n",
-  )
 }
 
 ///|

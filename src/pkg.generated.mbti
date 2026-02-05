@@ -180,6 +180,10 @@ pub fn select_default_ref(Array[(ObjectId, String)], Map[String, String]) -> (St
 
 pub fn select_default_wants(Array[(ObjectId, String)], Map[String, String]) -> Array[ObjectId]
 
+pub fn serialize_commit_content(Commit) -> Bytes
+
+pub fn serialize_tree(Array[TreeEntry]) -> Bytes
+
 pub fn sha1(Bytes) -> ObjectId
 
 pub fn sha1_array(Array[Byte]) -> ObjectId

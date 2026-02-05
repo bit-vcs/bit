@@ -14,19 +14,20 @@ let notes_ref_prefix : String = "refs/notes/"
 /// Add a note to a commit (Git compatible)
 pub fn Collab::add_note(
   self : Collab,
-  fs : &@git.FileSystem,
-  backing_fs : &@git.RepoFileSystem,
+  objects : &@lib.ObjectStore,
+  refs : &@lib.RefStore,
   commit_id : @git.ObjectId,
   body : String,
   author : String,
   timestamp : Int64,
   ns? : String = "commits",
 ) -> Note raise @git.GitError {
+  ignore(self)
   let note = Note::new(commit_id, body, author, timestamp, ns~)
   let note_text = note.serialize()
-  let (blob_id, compressed) = @git.create_blob_string(note_text)
-  write_object_bytes(fs, self.git_dir, blob_id, compressed)
-  update_notes_tree(fs, backing_fs, self.git_dir, commit_id, blob_id, ns)
+  let note_bytes = @utf8.encode(note_text)
+  let blob_id = objects.put(@git.ObjectType::Blob, note_bytes)
+  update_notes_tree(objects, refs, commit_id, blob_id, ns)
   note
 }
 
@@ -34,26 +35,29 @@ pub fn Collab::add_note(
 /// Add a plain note (Git standard, no metadata)
 pub fn Collab::add_note_plain(
   self : Collab,
-  fs : &@git.FileSystem,
-  backing_fs : &@git.RepoFileSystem,
+  objects : &@lib.ObjectStore,
+  refs : &@lib.RefStore,
   commit_id : @git.ObjectId,
   body : String,
   ns? : String = "commits",
 ) -> Unit raise @git.GitError {
-  let (blob_id, compressed) = @git.create_blob_string(body)
-  write_object_bytes(fs, self.git_dir, blob_id, compressed)
-  update_notes_tree(fs, backing_fs, self.git_dir, commit_id, blob_id, ns)
+  ignore(self)
+  let body_bytes = @utf8.encode(body)
+  let blob_id = objects.put(@git.ObjectType::Blob, body_bytes)
+  update_notes_tree(objects, refs, commit_id, blob_id, ns)
 }
 
 ///|
 /// Get a note for a commit
 pub fn Collab::get_note(
   self : Collab,
-  backing_fs : &@git.RepoFileSystem,
+  objects : &@lib.ObjectStore,
+  refs : &@lib.RefStore,
   commit_id : @git.ObjectId,
   ns? : String = "commits",
 ) -> Note? raise @git.GitError {
-  let text = read_note_blob(backing_fs, self.git_dir, commit_id, ns)
+  ignore(self)
+  let text = read_note_blob(objects, refs, commit_id, ns)
   match text {
     None => None
     Some(t) => {
@@ -71,21 +75,22 @@ pub fn Collab::get_note(
 /// List all notes in a ns
 pub fn Collab::list_notes(
   self : Collab,
-  backing_fs : &@git.RepoFileSystem,
+  objects : &@lib.ObjectStore,
+  refs : &@lib.RefStore,
   ns? : String = "commits",
 ) -> Array[Note] raise @git.GitError {
+  ignore(self)
   let result : Array[Note] = []
-  let tree_id = get_notes_tree(backing_fs, self.git_dir, ns)
+  let tree_id = get_notes_tree(objects, refs, ns)
   match tree_id {
     None => ()
     Some(tid) => {
-      let db = @lib.ObjectDb::load_lazy(backing_fs, self.git_dir)
-      let obj = db.get(backing_fs, tid)
+      let obj = objects.get(tid)
       match obj {
         Some(tree_obj) => {
           let entries = @git.parse_tree(tree_obj.data)
           for entry in entries {
-            let blob = db.get(backing_fs, entry.id)
+            let blob = objects.get(entry.id)
             match blob {
               Some(blob_obj) => {
                 let text = @utf8.decode_lossy(blob_obj.data[:])
@@ -118,14 +123,15 @@ pub fn Collab::list_notes(
 /// Remove a note from a commit
 pub fn Collab::remove_note(
   self : Collab,
-  fs : &@git.FileSystem,
-  backing_fs : &@git.RepoFileSystem,
+  objects : &@lib.ObjectStore,
+  refs : &@lib.RefStore,
   commit_id : @git.ObjectId,
   timestamp : Int64,
   ns? : String = "commits",
 ) -> Unit raise @git.GitError {
+  ignore(self)
   ignore(timestamp)
-  remove_notes_tree_entry(fs, backing_fs, self.git_dir, commit_id, ns)
+  remove_notes_tree_entry(objects, refs, commit_id, ns)
 }
 
 ///|
@@ -139,24 +145,22 @@ fn short_hex_note(hex : String, n : Int) -> String {
 
 ///|
 fn get_notes_commit(
-  backing_fs : &@git.RepoFileSystem,
-  git_dir : String,
+  refs : &@lib.RefStore,
   ns : String,
 ) -> @git.ObjectId? raise @git.GitError {
   let ref_name = notes_ref_prefix + ns
-  @lib.resolve_ref(backing_fs, git_dir, ref_name)
+  refs.resolve(ref_name)
 }
 
 ///|
 fn get_notes_tree(
-  backing_fs : &@git.RepoFileSystem,
-  git_dir : String,
+  objects : &@lib.ObjectStore,
+  refs : &@lib.RefStore,
   ns : String,
 ) -> @git.ObjectId? raise @git.GitError {
-  let commit_id = get_notes_commit(backing_fs, git_dir, ns)
+  let commit_id = get_notes_commit(refs, ns)
   guard commit_id is Some(cid) else { return None }
-  let db = @lib.ObjectDb::load_lazy(backing_fs, git_dir)
-  let obj = db.get(backing_fs, cid)
+  let obj = objects.get(cid)
   guard obj is Some(commit_obj) else { return None }
   let info = @git.parse_commit(commit_obj.data)
   Some(info.tree)
@@ -164,21 +168,20 @@ fn get_notes_tree(
 
 ///|
 fn read_note_blob(
-  backing_fs : &@git.RepoFileSystem,
-  git_dir : String,
+  objects : &@lib.ObjectStore,
+  refs : &@lib.RefStore,
   commit_id : @git.ObjectId,
   ns : String,
 ) -> String? raise @git.GitError {
-  let tree_id = get_notes_tree(backing_fs, git_dir, ns)
+  let tree_id = get_notes_tree(objects, refs, ns)
   guard tree_id is Some(tid) else { return None }
-  let db = @lib.ObjectDb::load_lazy(backing_fs, git_dir)
-  let tree_obj = db.get(backing_fs, tid)
+  let tree_obj = objects.get(tid)
   guard tree_obj is Some(tree) else { return None }
   let entries = @git.parse_tree(tree.data)
   let commit_hex = commit_id.to_hex()
   for entry in entries {
     if entry.name == commit_hex {
-      let blob = db.get(backing_fs, entry.id)
+      let blob = objects.get(entry.id)
       match blob {
         Some(blob_obj) => return Some(@utf8.decode_lossy(blob_obj.data[:]))
         None => return None
@@ -189,23 +192,19 @@ fn read_note_blob(
 }
 
 ///|
-
-///|
 fn update_notes_tree(
-  fs : &@git.FileSystem,
-  backing_fs : &@git.RepoFileSystem,
-  git_dir : String,
+  objects : &@lib.ObjectStore,
+  refs : &@lib.RefStore,
   commit_id : @git.ObjectId,
   blob_id : @git.ObjectId,
   ns : String,
 ) -> Unit raise @git.GitError {
-  let db = @lib.ObjectDb::load_lazy(backing_fs, git_dir)
   let commit_hex = commit_id.to_hex()
   // Get existing tree or create empty
-  let existing_tree_id = get_notes_tree(backing_fs, git_dir, ns)
+  let existing_tree_id = get_notes_tree(objects, refs, ns)
   let entries : Array[@git.TreeEntry] = match existing_tree_id {
     Some(tid) => {
-      let obj = db.get(backing_fs, tid)
+      let obj = objects.get(tid)
       match obj {
         Some(tree_obj) => @git.parse_tree(tree_obj.data)
         None => []
@@ -213,7 +212,7 @@ fn update_notes_tree(
     }
     None => []
   }
-  // Add or update entry (direct mode, no fanout for simplicity)
+  // Add or update entry
   let new_entries : Array[@git.TreeEntry] = []
   let mut found = false
   for entry in entries {
@@ -228,10 +227,10 @@ fn update_notes_tree(
     new_entries.push(@git.TreeEntry::new("100644", commit_hex, blob_id))
   }
   new_entries.sort_by(fn(a, b) { String::compare(a.name, b.name) })
-  let (new_tree_id, tree_compressed) = @git.create_tree(new_entries)
-  write_object_bytes(fs, git_dir, new_tree_id, tree_compressed)
+  let tree_bytes = @git.serialize_tree(new_entries)
+  let new_tree_id = objects.put(@git.ObjectType::Tree, tree_bytes)
   // Create commit
-  let parents = match get_notes_commit(backing_fs, git_dir, ns) {
+  let parents = match get_notes_commit(refs, ns) {
     Some(p) => [p]
     None => []
   }
@@ -246,28 +245,24 @@ fn update_notes_tree(
     "+0000",
     "Add note for \{short_hex_note(commit_hex, 8)}...\n",
   )
-  let (new_commit_id, commit_compressed) = @git.create_commit(commit)
-  write_object_bytes(fs, git_dir, new_commit_id, commit_compressed)
+  let commit_bytes = @git.serialize_commit_content(commit)
+  let new_commit_id = objects.put(@git.ObjectType::Commit, commit_bytes)
   // Update ref
-  let ref_path = join_path(git_dir, notes_ref_prefix + ns)
-  let refs_dir = join_path(git_dir, "refs/notes")
-  fs.mkdir_p(refs_dir)
-  fs.write_string(ref_path, new_commit_id.to_hex() + "\n")
+  let ref_name = notes_ref_prefix + ns
+  refs.update(ref_name, Some(new_commit_id))
 }
 
 ///|
 fn remove_notes_tree_entry(
-  fs : &@git.FileSystem,
-  backing_fs : &@git.RepoFileSystem,
-  git_dir : String,
+  objects : &@lib.ObjectStore,
+  refs : &@lib.RefStore,
   commit_id : @git.ObjectId,
   ns : String,
 ) -> Unit raise @git.GitError {
-  let db = @lib.ObjectDb::load_lazy(backing_fs, git_dir)
   let commit_hex = commit_id.to_hex()
-  let existing_tree_id = get_notes_tree(backing_fs, git_dir, ns)
+  let existing_tree_id = get_notes_tree(objects, refs, ns)
   guard existing_tree_id is Some(tid) else { return () }
-  let obj = db.get(backing_fs, tid)
+  let obj = objects.get(tid)
   guard obj is Some(tree_obj) else { return () }
   let entries = @git.parse_tree(tree_obj.data)
   let new_entries : Array[@git.TreeEntry] = []
@@ -283,9 +278,9 @@ fn remove_notes_tree_entry(
     return ()
   }
   new_entries.sort_by(fn(a, b) { String::compare(a.name, b.name) })
-  let (new_tree_id, tree_compressed) = @git.create_tree(new_entries)
-  write_object_bytes(fs, git_dir, new_tree_id, tree_compressed)
-  let parents = match get_notes_commit(backing_fs, git_dir, ns) {
+  let tree_bytes = @git.serialize_tree(new_entries)
+  let new_tree_id = objects.put(@git.ObjectType::Tree, tree_bytes)
+  let parents = match get_notes_commit(refs, ns) {
     Some(p) => [p]
     None => []
   }
@@ -300,10 +295,8 @@ fn remove_notes_tree_entry(
     "+0000",
     "Remove note for \{short_hex_note(commit_hex, 8)}...\n",
   )
-  let (new_commit_id, commit_compressed) = @git.create_commit(commit)
-  write_object_bytes(fs, git_dir, new_commit_id, commit_compressed)
-  let ref_path = join_path(git_dir, notes_ref_prefix + ns)
-  let refs_dir = join_path(git_dir, "refs/notes")
-  fs.mkdir_p(refs_dir)
-  fs.write_string(ref_path, new_commit_id.to_hex() + "\n")
+  let commit_bytes = @git.serialize_commit_content(commit)
+  let new_commit_id = objects.put(@git.ObjectType::Commit, commit_bytes)
+  let ref_name = notes_ref_prefix + ns
+  refs.update(ref_name, Some(new_commit_id))
 }

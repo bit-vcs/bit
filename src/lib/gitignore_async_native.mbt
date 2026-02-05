@@ -254,10 +254,7 @@ fn parse_mtime_line(line : StringView) -> PathMtime? {
 }
 
 ///|
-fn validate_cache(
-  root : String,
-  cache : WorkingFilesCache,
-) -> Bool noraise {
+fn validate_cache(root : String, cache : WorkingFilesCache) -> Bool noraise {
   let _ = root
   let _ = cache.dirs
   let _ = cache.ignores
@@ -275,6 +272,7 @@ fn write_cache(
   let _ = dirs
   let _ = ignores
   let _ = files
+
 }
 
 ///|

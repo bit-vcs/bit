@@ -1,4 +1,98 @@
 ///|
+struct OsObjectStore {
+  git_dir : String
+}
+
+///|
+impl @gitlib.ObjectStore for OsObjectStore with get(self, id) {
+  let fs = OsFs::new()
+  let db = @gitlib.ObjectDb::load_lazy(fs, self.git_dir)
+  db.get(fs, id)
+}
+
+///|
+impl @gitlib.ObjectStore for OsObjectStore with put(self, obj_type, content) {
+  let fs = OsFs::new()
+  let (id, compressed) = @git.create_object(obj_type, content)
+  let hex = id.to_hex()
+  let dir = self.git_dir +
+    "/objects/" +
+    String::unsafe_substring(hex, start=0, end=2)
+  let path = dir + "/" + String::unsafe_substring(hex, start=2, end=40)
+  fs.mkdir_p(dir)
+  fs.write_file(path, compressed)
+  id
+}
+
+///|
+impl @gitlib.ObjectStore for OsObjectStore with has(self, id) {
+  let fs = OsFs::new()
+  let db = @gitlib.ObjectDb::load_lazy(fs, self.git_dir)
+  let obj = db.get(fs, id)
+  obj is Some(_)
+}
+
+///|
+struct OsRefStore {
+  git_dir : String
+}
+
+///|
+impl @gitlib.RefStore for OsRefStore with resolve(self, ref_name) {
+  let fs = OsFs::new()
+  @gitlib.resolve_ref(fs, self.git_dir, ref_name)
+}
+
+///|
+impl @gitlib.RefStore for OsRefStore with update(self, ref_name, id) {
+  let fs = OsFs::new()
+  match id {
+    Some(commit_id) => {
+      let ref_path = self.git_dir + "/" + ref_name
+      let dir = os_parent_path(ref_path)
+      fs.mkdir_p(dir)
+      fs.write_string(ref_path, commit_id.to_hex() + "\n")
+    }
+    None => ()
+  }
+}
+
+///|
+impl @gitlib.RefStore for OsRefStore with list(self, _prefix) {
+  ignore(self)
+  []
+}
+
+///|
+fn os_parent_path(path : String) -> String {
+  match path.rev_find("/") {
+    None => "."
+    Some(0) => "."
+    Some(idx) => String::unsafe_substring(path, start=0, end=idx)
+  }
+}
+
+///|
+struct OsClock {
+  time : Int64
+}
+
+///|
+impl @gitlib.Clock for OsClock with now(self) {
+  self.time
+}
+
+///|
+fn make_collab_stores(
+  git_dir : String,
+) -> (&@gitlib.ObjectStore, &@gitlib.RefStore, &@gitlib.Clock) {
+  let objects : OsObjectStore = { git_dir, }
+  let refs : OsRefStore = { git_dir, }
+  let clock : OsClock = { time: get_commit_timestamp() }
+  (objects, refs, clock)
+}
+
+///|
 fn print_collab_usage() -> Unit {
   println("Usage: bit collab <subcommand> [<args>]")
   println("")
@@ -115,8 +209,8 @@ async fn handle_collab_init(args : Array[String]) -> Unit raise Error {
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
-  let fs = OsFs::new()
-  let _ = @collab.Collab::init(fs, fs, git_dir)
+  let (objects, refs, _clock) = make_collab_stores(git_dir)
+  let _ = @collab.Collab::init(objects, refs)
   print_line("Initialized collab metadata")
 }
 
@@ -181,9 +275,9 @@ async fn handle_collab_pr_list(args : Array[String]) -> Unit raise Error {
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
-  let fs = OsFs::new()
-  let collab = @collab.Collab::load(fs, git_dir)
-  let prs = collab.list_prs(fs, state~)
+  let (objects, refs, _clock) = make_collab_stores(git_dir)
+  let collab = @collab.Collab::load(objects, refs)
+  let prs = collab.list_prs(objects, state~)
   if prs.length() == 0 {
     print_line("No pull requests")
     return ()
@@ -266,8 +360,9 @@ async fn handle_collab_pr_import(args : Array[String]) -> Unit raise Error {
     print_line("No pull requests to import")
     return ()
   }
-  let collab = @collab.Collab::init(fs, fs, git_dir)
-  let stats = collab.import_prs(fs, fs, prs)
+  let (objects, refs, clock) = make_collab_stores(git_dir)
+  let collab = @collab.Collab::init(objects, refs)
+  let stats = collab.import_prs(objects, refs, clock, prs)
   print_line(
     "Imported PRs: created \{stats.created()}, updated \{stats.updated()}",
   )
@@ -301,9 +396,9 @@ async fn handle_collab_pr_get(args : Array[String]) -> Unit raise Error {
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
-  let fs = OsFs::new()
-  let collab = @collab.Collab::load(fs, git_dir)
-  let pr = collab.get_pr(fs, id)
+  let (objects, refs, _clock) = make_collab_stores(git_dir)
+  let collab = @collab.Collab::load(objects, refs)
+  let pr = collab.get_pr(objects, id)
   guard pr is Some(val) else {
     raise @git.GitError::InvalidObject("PR not found: \{id}")
   }
@@ -403,17 +498,17 @@ async fn handle_collab_pr_create(args : Array[String]) -> Unit raise Error {
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
-  let fs = OsFs::new()
-  let collab = @collab.Collab::init(fs, fs, git_dir)
+  let (objects, refs, clock) = make_collab_stores(git_dir)
+  let collab = @collab.Collab::init(objects, refs)
   let pr = collab.create_pr(
-    fs,
-    fs,
+    objects,
+    refs,
+    clock,
     t,
     pr_body,
     src,
     tgt,
     get_author_string(),
-    get_commit_timestamp(),
   )
   print_line(pr.serialize())
 }
@@ -489,13 +584,13 @@ async fn handle_collab_pr_update(args : Array[String]) -> Unit raise Error {
   let label_option = if labels.length() > 0 { Some(labels) } else { None }
   let root = get_work_root()
   let git_dir = root + "/.git"
-  let fs = OsFs::new()
-  let collab = @collab.Collab::init(fs, fs, git_dir)
+  let (objects, refs, clock) = make_collab_stores(git_dir)
+  let collab = @collab.Collab::init(objects, refs)
   let pr = collab.update_pr(
-    fs,
-    fs,
+    objects,
+    refs,
+    clock,
     id,
-    get_commit_timestamp(),
     title~,
     body~,
     labels=label_option,
@@ -526,9 +621,9 @@ async fn handle_collab_pr_close(args : Array[String]) -> Unit raise Error {
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
-  let fs = OsFs::new()
-  let collab = @collab.Collab::init(fs, fs, git_dir)
-  collab.close_pr(fs, fs, id, get_commit_timestamp())
+  let (objects, refs, clock) = make_collab_stores(git_dir)
+  let collab = @collab.Collab::init(objects, refs)
+  collab.close_pr(objects, refs, clock, id)
   print_line("Closed PR #\{id}")
 }
 
@@ -589,20 +684,12 @@ async fn handle_collab_pr_merge(args : Array[String]) -> Unit raise Error {
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
-  let fs = OsFs::new()
-  let collab = @collab.Collab::init(fs, fs, git_dir)
+  let (objects, refs, clock) = make_collab_stores(git_dir)
+  let collab = @collab.Collab::init(objects, refs)
   let result = match strategy {
     Some(s) =>
-      collab.merge_pr(
-        fs,
-        fs,
-        id,
-        get_author_string(),
-        get_commit_timestamp(),
-        strategy=s,
-      )
-    None =>
-      collab.merge_pr(fs, fs, id, get_author_string(), get_commit_timestamp())
+      collab.merge_pr(objects, refs, clock, id, get_author_string(), strategy=s)
+    None => collab.merge_pr(objects, refs, clock, id, get_author_string())
   }
   if result.success() {
     print_line(result.message())
@@ -736,15 +823,15 @@ async fn handle_collab_pr_comment_add(args : Array[String]) -> Unit raise Error 
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
-  let fs = OsFs::new()
-  let collab = @collab.Collab::init(fs, fs, git_dir)
+  let (objects, refs, clock) = make_collab_stores(git_dir)
+  let collab = @collab.Collab::init(objects, refs)
   let comment = collab.add_comment(
-    fs,
-    fs,
+    objects,
+    refs,
+    clock,
     id,
     get_author_string(),
     msg,
-    get_commit_timestamp(),
     reply_to~,
     file_path~,
     line_number~,
@@ -778,9 +865,9 @@ async fn handle_collab_pr_comment_list(
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
-  let fs = OsFs::new()
-  let collab = @collab.Collab::load(fs, git_dir)
-  let comments = collab.list_comments(fs, id)
+  let (objects, refs, _clock) = make_collab_stores(git_dir)
+  let collab = @collab.Collab::load(objects, refs)
+  let comments = collab.list_comments(objects, id)
   if comments.length() == 0 {
     print_line("No comments")
     return ()
@@ -903,17 +990,17 @@ async fn handle_collab_pr_review_submit(
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
-  let fs = OsFs::new()
-  let collab = @collab.Collab::init(fs, fs, git_dir)
+  let (objects, refs, clock) = make_collab_stores(git_dir)
+  let collab = @collab.Collab::init(objects, refs)
   let review = collab.submit_review(
-    fs,
-    fs,
+    objects,
+    refs,
+    clock,
     id,
     get_author_string(),
     v,
     review_body,
     cid,
-    get_commit_timestamp(),
   )
   print_line(review.serialize())
 }
@@ -941,9 +1028,9 @@ async fn handle_collab_pr_review_list(args : Array[String]) -> Unit raise Error 
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
-  let fs = OsFs::new()
-  let collab = @collab.Collab::load(fs, git_dir)
-  let reviews = collab.list_reviews(fs, id)
+  let (objects, refs, _clock) = make_collab_stores(git_dir)
+  let collab = @collab.Collab::load(objects, refs)
+  let reviews = collab.list_reviews(objects, id)
   if reviews.length() == 0 {
     print_line("No reviews")
     return ()
@@ -1014,9 +1101,9 @@ async fn handle_collab_issue_list(args : Array[String]) -> Unit raise Error {
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
-  let fs = OsFs::new()
-  let collab = @collab.Collab::load(fs, git_dir)
-  let issues = collab.list_issues(fs, state~)
+  let (objects, refs, _clock) = make_collab_stores(git_dir)
+  let collab = @collab.Collab::load(objects, refs)
+  let issues = collab.list_issues(objects, state~)
   if issues.length() == 0 {
     print_line("No issues")
     return ()
@@ -1099,8 +1186,9 @@ async fn handle_collab_issue_import(args : Array[String]) -> Unit raise Error {
     print_line("No issues to import")
     return ()
   }
-  let collab = @collab.Collab::init(fs, fs, git_dir)
-  let stats = collab.import_issues(fs, fs, issues)
+  let (objects, refs, clock) = make_collab_stores(git_dir)
+  let collab = @collab.Collab::init(objects, refs)
+  let stats = collab.import_issues(objects, refs, clock, issues)
   print_line(
     "Imported issues: created \{stats.created()}, updated \{stats.updated()}",
   )
@@ -1129,9 +1217,9 @@ async fn handle_collab_issue_get(args : Array[String]) -> Unit raise Error {
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
-  let fs = OsFs::new()
-  let collab = @collab.Collab::load(fs, git_dir)
-  let issue = collab.get_issue(fs, id)
+  let (objects, refs, _clock) = make_collab_stores(git_dir)
+  let collab = @collab.Collab::load(objects, refs)
+  let issue = collab.get_issue(objects, id)
   guard issue is Some(val) else {
     raise @git.GitError::InvalidObject("Issue not found: \{id}")
   }
@@ -1216,15 +1304,15 @@ async fn handle_collab_issue_create(args : Array[String]) -> Unit raise Error {
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
-  let fs = OsFs::new()
-  let collab = @collab.Collab::init(fs, fs, git_dir)
+  let (objects, refs, clock) = make_collab_stores(git_dir)
+  let collab = @collab.Collab::init(objects, refs)
   let issue = collab.create_issue(
-    fs,
-    fs,
+    objects,
+    refs,
+    clock,
     t,
     issue_body,
     get_author_string(),
-    get_commit_timestamp(),
     labels~,
     assignees~,
   )
@@ -1320,13 +1408,13 @@ async fn handle_collab_issue_update(args : Array[String]) -> Unit raise Error {
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
-  let fs = OsFs::new()
-  let collab = @collab.Collab::init(fs, fs, git_dir)
+  let (objects, refs, clock) = make_collab_stores(git_dir)
+  let collab = @collab.Collab::init(objects, refs)
   let issue = collab.update_issue(
-    fs,
-    fs,
+    objects,
+    refs,
+    clock,
     id,
-    get_commit_timestamp(),
     title~,
     body~,
     labels=label_option,
@@ -1358,9 +1446,9 @@ async fn handle_collab_issue_close(args : Array[String]) -> Unit raise Error {
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
-  let fs = OsFs::new()
-  let collab = @collab.Collab::init(fs, fs, git_dir)
-  collab.close_issue(fs, fs, id, get_commit_timestamp())
+  let (objects, refs, clock) = make_collab_stores(git_dir)
+  let collab = @collab.Collab::init(objects, refs)
+  collab.close_issue(objects, refs, clock, id)
   print_line("Closed issue #\{id}")
 }
 
@@ -1446,15 +1534,15 @@ async fn handle_collab_issue_comment_add(
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
-  let fs = OsFs::new()
-  let collab = @collab.Collab::init(fs, fs, git_dir)
+  let (objects, refs, clock) = make_collab_stores(git_dir)
+  let collab = @collab.Collab::init(objects, refs)
   let comment = collab.add_issue_comment(
-    fs,
-    fs,
+    objects,
+    refs,
+    clock,
     id,
     get_author_string(),
     msg,
-    get_commit_timestamp(),
     reply_to~,
   )
   print_line(comment.serialize())
@@ -1485,9 +1573,9 @@ async fn handle_collab_issue_comment_list(
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
-  let fs = OsFs::new()
-  let collab = @collab.Collab::load(fs, git_dir)
-  let comments = collab.list_issue_comments(fs, id)
+  let (objects, refs, _clock) = make_collab_stores(git_dir)
+  let collab = @collab.Collab::load(objects, refs)
+  let comments = collab.list_issue_comments(objects, id)
   if comments.length() == 0 {
     print_line("No comments")
     return ()
@@ -1507,9 +1595,9 @@ async fn handle_collab_issue_link(args : Array[String]) -> Unit raise Error {
   let pr_id = args[1]
   let root = get_work_root()
   let git_dir = root + "/.git"
-  let fs = OsFs::new()
-  let collab = @collab.Collab::init(fs, fs, git_dir)
-  collab.link_pr_to_issue(fs, fs, issue_id, pr_id, get_commit_timestamp())
+  let (objects, refs, clock) = make_collab_stores(git_dir)
+  let collab = @collab.Collab::init(objects, refs)
+  collab.link_pr_to_issue(objects, refs, clock, issue_id, pr_id)
   print_line("Linked PR #\{pr_id} to issue #\{issue_id}")
 }
 
@@ -1605,11 +1693,11 @@ async fn handle_collab_note_add(args : Array[String]) -> Unit raise Error {
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
-  let fs = OsFs::new()
-  let collab = @collab.Collab::init(fs, fs, git_dir)
+  let (objects, refs, _clock) = make_collab_stores(git_dir)
+  let collab = @collab.Collab::init(objects, refs)
   let note = collab.add_note(
-    fs,
-    fs,
+    objects,
+    refs,
     @git.ObjectId::from_hex(hex),
     note_body,
     get_author_string(),
@@ -1662,9 +1750,14 @@ async fn handle_collab_note_get(args : Array[String]) -> Unit raise Error {
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
-  let fs = OsFs::new()
-  let collab = @collab.Collab::load(fs, git_dir)
-  let note = collab.get_note(fs, @git.ObjectId::from_hex(hex), ns=note_ns(ns))
+  let (objects, refs, _clock) = make_collab_stores(git_dir)
+  let collab = @collab.Collab::load(objects, refs)
+  let note = collab.get_note(
+    objects,
+    refs,
+    @git.ObjectId::from_hex(hex),
+    ns=note_ns(ns),
+  )
   guard note is Some(val) else {
     raise @git.GitError::InvalidObject("Note not found for \{hex}")
   }
@@ -1702,9 +1795,9 @@ async fn handle_collab_note_list(args : Array[String]) -> Unit raise Error {
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
-  let fs = OsFs::new()
-  let collab = @collab.Collab::load(fs, git_dir)
-  let notes = collab.list_notes(fs, ns=note_ns(ns))
+  let (objects, refs, _clock) = make_collab_stores(git_dir)
+  let collab = @collab.Collab::load(objects, refs)
+  let notes = collab.list_notes(objects, refs, ns=note_ns(ns))
   if notes.length() == 0 {
     print_line("No notes")
     return ()
@@ -1757,12 +1850,12 @@ async fn handle_collab_note_remove(args : Array[String]) -> Unit raise Error {
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
-  let fs = OsFs::new()
-  let collab = @collab.Collab::init(fs, fs, git_dir)
+  let (objects, refs, _clock) = make_collab_stores(git_dir)
+  let collab = @collab.Collab::init(objects, refs)
   let timestamp = get_commit_timestamp()
   collab.remove_note(
-    fs,
-    fs,
+    objects,
+    refs,
     @git.ObjectId::from_hex(hex),
     timestamp,
     ns=note_ns(ns),
@@ -1806,8 +1899,9 @@ async fn handle_collab_sync_push(args : Array[String]) -> Unit raise Error {
   guard remote_url is Some(url) else {
     raise @git.GitError::InvalidObject("No remote configured")
   }
-  let collab = @collab.Collab::load(fs, git_dir)
-  let result = collab.push(fs, url)
+  let (objects, refs, _clock) = make_collab_stores(git_dir)
+  let collab = @collab.Collab::load(objects, refs)
+  let result = collab.push(fs, git_dir, url)
   if result.success() {
     print_line(result.message())
   } else {
@@ -1832,8 +1926,9 @@ async fn handle_collab_sync_fetch(args : Array[String]) -> Unit raise Error {
   guard remote_url is Some(url) else {
     raise @git.GitError::InvalidObject("No remote configured")
   }
-  let collab = @collab.Collab::load(fs, git_dir)
-  let result = collab.fetch(fs, fs, url)
+  let (objects, refs, _clock) = make_collab_stores(git_dir)
+  let collab = @collab.Collab::load(objects, refs)
+  let result = collab.fetch(fs, fs, git_dir, url)
   if result.success() {
     print_line(result.message())
   } else {

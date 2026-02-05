@@ -144,6 +144,57 @@ pub fn hash_blob(content : Bytes) -> ObjectId {
 }
 
 ///|
+/// Serialize tree entries to raw content bytes (without git object header)
+pub fn serialize_tree(entries : Array[TreeEntry]) -> Bytes {
+  let content : Array[Byte] = []
+  for entry in entries {
+    for c in entry.mode {
+      content.push(c.to_int().to_byte())
+    }
+    content.push(b' ')
+    for c in entry.name {
+      content.push(c.to_int().to_byte())
+    }
+    content.push(b'\x00')
+    for b in entry.id.bytes {
+      content.push(b)
+    }
+  }
+  array_to_bytes(content)
+}
+
+///|
+/// Serialize commit to raw content bytes (without git object header)
+pub fn serialize_commit_content(commit : Commit) -> Bytes {
+  let content = StringBuilder::new()
+  content.write_string("tree ")
+  content.write_string(commit.tree.to_hex())
+  content.write_char('\n')
+  for parent in commit.parents {
+    content.write_string("parent ")
+    content.write_string(parent.to_hex())
+    content.write_char('\n')
+  }
+  content.write_string("author ")
+  content.write_string(commit.author)
+  content.write_string(" ")
+  content.write_string(commit.author_time.to_string())
+  content.write_string(" ")
+  content.write_string(commit.author_tz)
+  content.write_char('\n')
+  content.write_string("committer ")
+  content.write_string(commit.committer)
+  content.write_string(" ")
+  content.write_string(commit.commit_time.to_string())
+  content.write_string(" ")
+  content.write_string(commit.committer_tz)
+  content.write_char('\n')
+  content.write_char('\n')
+  content.write_string(commit.message)
+  array_to_bytes(string_to_byte_array(content.to_string()))
+}
+
+///|
 /// Hash a blob from string - optimized with incremental SHA1
 pub fn hash_blob_string(content : String) -> ObjectId {
   let state = Sha1State::new()
