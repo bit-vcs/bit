@@ -18,6 +18,16 @@ pub fn Collab::load(
 }
 
 ///|
+/// Reload store from current object/ref state
+pub fn Collab::reload_store(
+  self : Collab,
+  objects : &@lib.ObjectStore,
+  refs : &@lib.RefStore,
+) -> Unit raise @git.GitError {
+  self.store = CollabStore::load(objects, refs, node_id=self.store.node_id())
+}
+
+///|
 /// Initialize a new Collab
 pub fn Collab::init(
   objects : &@lib.ObjectStore,

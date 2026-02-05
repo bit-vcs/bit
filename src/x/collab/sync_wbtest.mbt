@@ -1,6 +1,32 @@
 ///| Whitebox tests for collab notes merge logic
 
 ///|
+priv struct TestCollabObjectStore {
+  db : @lib.ObjectDb
+  rfs : &@git.RepoFileSystem
+  fs : &@git.FileSystem
+  git_dir : String
+}
+
+///|
+impl @lib.ObjectStore for TestCollabObjectStore with get(self, id) {
+  self.db.get(self.rfs, id)
+}
+
+///|
+impl @lib.ObjectStore for TestCollabObjectStore with put(self, obj_type, content) {
+  let (id, compressed) = @git.create_object(obj_type, content)
+  write_object_bytes(self.fs, self.git_dir, id, compressed)
+  id
+}
+
+///|
+impl @lib.ObjectStore for TestCollabObjectStore with has(self, id) {
+  let obj = self.db.get(self.rfs, id)
+  obj is Some(_)
+}
+
+///|
 fn setup_sync_repo() -> (@git.TestFs, String) {
   let fs = @git.TestFs::new()
   fs.mkdir_p("/repo/.git")
@@ -8,10 +34,10 @@ fn setup_sync_repo() -> (@git.TestFs, String) {
 }
 
 ///|
-fn make_native_object_store(
+fn make_test_object_store(
   fs : @git.TestFs,
   git_dir : String,
-) -> NativeObjectStore raise @git.GitError {
+) -> TestCollabObjectStore raise @git.GitError {
   let db = @lib.ObjectDb::load_lazy(fs, git_dir)
   { db, rfs: fs, fs, git_dir }
 }
@@ -30,7 +56,10 @@ fn write_tree(
 }
 
 ///|
-fn read_blob_string(objects : NativeObjectStore, id : @git.ObjectId) -> String {
+fn read_blob_string(
+  objects : TestCollabObjectStore,
+  id : @git.ObjectId,
+) -> String {
   let obj = objects.db.get(objects.rfs, id) catch { _ => None }
   guard obj is Some(blob) else { return "" }
   @utf8.decode_lossy(blob.data[:])
@@ -51,7 +80,7 @@ fn write_record_blob(
 
 ///|
 fn find_tree_entry(
-  objects : NativeObjectStore,
+  objects : TestCollabObjectStore,
   tree_id : @git.ObjectId,
   name : String,
 ) -> @git.ObjectId? {
@@ -68,7 +97,7 @@ fn find_tree_entry(
 ///|
 test "sync: merge notes unions entries" {
   let (fs, git_dir) = setup_sync_repo()
-  let objects = make_native_object_store(fs, git_dir)
+  let objects = make_test_object_store(fs, git_dir)
   let key1 = "collab/pr/1/meta"
   let key2 = "collab/pr/2/meta"
   let (key1_id, key1_compressed) = @git.create_blob_string(key1)
@@ -100,7 +129,7 @@ test "sync: merge notes unions entries" {
 ///|
 test "sync: merge notes uses LWW by clock and timestamp" {
   let (fs, git_dir) = setup_sync_repo()
-  let objects = make_native_object_store(fs, git_dir)
+  let objects = make_test_object_store(fs, git_dir)
   let key = "collab/pr/1/meta"
   let (key_id, key_compressed) = @git.create_blob_string(key)
   write_object_bytes(fs, git_dir, key_id, key_compressed) catch {

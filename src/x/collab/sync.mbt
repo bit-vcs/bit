@@ -1,4 +1,4 @@
-///| Collab notes sync operations (fetch/push)
+///| Collab notes sync operations (pure merge logic)
 
 ///|
 pub struct PrSyncResult {
@@ -6,6 +6,16 @@ pub struct PrSyncResult {
   message : String
   local_commit : @git.ObjectId?
   remote_commit : @git.ObjectId?
+}
+
+///|
+pub fn PrSyncResult::new(
+  success : Bool,
+  message : String,
+  local_commit : @git.ObjectId?,
+  remote_commit : @git.ObjectId?,
+) -> PrSyncResult {
+  { success, message, local_commit, remote_commit, }
 }
 
 ///|
@@ -29,66 +39,7 @@ pub fn PrSyncResult::remote_commit(self : PrSyncResult) -> @git.ObjectId? {
 }
 
 ///|
-/// Native adapter: ObjectDb + RepoFileSystem -> ObjectStore
-priv struct NativeObjectStore {
-  db : @lib.ObjectDb
-  rfs : &@git.RepoFileSystem
-  fs : &@git.FileSystem
-  git_dir : String
-}
-
-///|
-impl @lib.ObjectStore for NativeObjectStore with get(self, id) {
-  self.db.get(self.rfs, id)
-}
-
-///|
-impl @lib.ObjectStore for NativeObjectStore with put(self, obj_type, content) {
-  let (id, compressed) = @git.create_object(obj_type, content)
-  write_object_bytes(self.fs, self.git_dir, id, compressed)
-  id
-}
-
-///|
-impl @lib.ObjectStore for NativeObjectStore with has(self, id) {
-  let obj = self.db.get(self.rfs, id)
-  obj is Some(_)
-}
-
-///|
-/// Native adapter: FileSystem + git_dir -> RefStore
-priv struct NativeRefStore {
-  fs : &@git.FileSystem
-  rfs : &@git.RepoFileSystem
-  git_dir : String
-}
-
-///|
-impl @lib.RefStore for NativeRefStore with resolve(self, ref_name) {
-  @lib.resolve_ref(self.rfs, self.git_dir, ref_name)
-}
-
-///|
-impl @lib.RefStore for NativeRefStore with update(self, ref_name, id) {
-  match id {
-    Some(commit_id) => {
-      let ref_path = join_path(self.git_dir, ref_name)
-      let dir = parent_path(ref_path)
-      self.fs.mkdir_p(dir)
-      self.fs.write_string(ref_path, commit_id.to_hex() + "\n")
-    }
-    None => ()
-  }
-}
-
-///|
-impl @lib.RefStore for NativeRefStore with list(self, _prefix) {
-  ignore(self)
-  []
-}
-
-///|
-fn write_object_bytes(
+pub fn write_object_bytes(
   fs : &@git.FileSystem,
   git_dir : String,
   id : @git.ObjectId,
@@ -114,125 +65,6 @@ fn join_path(a : String, b : String) -> String {
 }
 
 ///|
-/// Push collab notes ref to remote
-pub async fn Collab::push(
-  _self : Collab,
-  rfs : &@git.RepoFileSystem,
-  git_dir : String,
-  remote_url : String,
-) -> PrSyncResult raise @git.GitError {
-  let ref_name = collab_notes_ref_name()
-  let local_commit = @lib.resolve_ref(rfs, git_dir, ref_name)
-  guard local_commit is Some(local_id) else {
-    return {
-      success: false,
-      message: "No local collab notes ref found",
-      local_commit: None,
-      remote_commit: None,
-    }
-  }
-  // Collect all objects reachable from notes ref
-  let db = @lib.ObjectDb::load(rfs, git_dir)
-  let objects = @lib.collect_reachable_objects(db, rfs, local_id)
-  let pack = @git.create_packfile(objects)
-  // Discover remote refs
-  let remote = @git.Remote::new(remote_url)
-  let refs = @gitnative.discover_receive_refs_http(remote)
-  let (old_id, push_ref) = find_remote_notes_ref(refs)
-  // Push
-  let req = @git.PushRequest::new(old_id, local_id, push_ref, pack)
-  let result = @gitnative.push(remote, req)
-  if result.has_prefix("unpack ok") ||
-    result.has_prefix("ok ") ||
-    result.has_prefix("Push successful") {
-    {
-      success: true,
-      message: "Push successful",
-      local_commit: Some(local_id),
-      remote_commit: Some(local_id),
-    }
-  } else {
-    {
-      success: false,
-      message: "Push failed: \{result}",
-      local_commit: Some(local_id),
-      remote_commit: None,
-    }
-  }
-}
-
-///|
-/// Fetch collab notes ref from remote and merge
-pub async fn Collab::fetch(
-  self : Collab,
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
-  git_dir : String,
-  remote_url : String,
-) -> PrSyncResult raise @git.GitError {
-  let ref_name = collab_notes_ref_name()
-  // Discover remote refs
-  let (refs, _, _, _) = @gitnative.discover_upload_refs_http(remote_url, true)
-  let remote_id = find_upload_notes_ref(refs)
-  guard remote_id is Some((rid, remote_ref)) else {
-    return {
-      success: false,
-      message: "No remote collab notes ref found",
-      local_commit: @lib.resolve_ref(rfs, git_dir, ref_name),
-      remote_commit: None,
-    }
-  }
-  // Fetch pack
-  let pack = @gitnative.fetch_pack_http(remote_url, [rid], true)
-  let objects = @git.parse_packfile(pack)
-  @git.write_packfile_with_index(fs, git_dir, pack, objects)
-  // Update remote tracking ref (best-effort)
-  let remote_short = short_ref_name(remote_ref)
-  let remote_ref_path = join_path(
-    git_dir,
-    "refs/remotes/origin/" + remote_short,
-  )
-  let dir = parent_path(remote_ref_path)
-  fs.mkdir_p(dir)
-  fs.write_string(remote_ref_path, rid.to_hex() + "\n")
-  // Get local commit
-  let local_commit = @lib.resolve_ref(rfs, git_dir, ref_name)
-  // Create native adapters
-  let db = @lib.ObjectDb::load(rfs, git_dir)
-  let native_objects : NativeObjectStore = { db, rfs, fs, git_dir }
-  let native_refs : NativeRefStore = { fs, rfs, git_dir }
-  let obj_store : &@lib.ObjectStore = native_objects
-  let ref_store : &@lib.RefStore = native_refs
-  match local_commit {
-    None => {
-      ref_store.update(collab_notes_ref_name(), Some(rid))
-      self.store = CollabStore::load(
-        obj_store,
-        ref_store,
-        node_id=self.store.node_id(),
-      )
-      {
-        success: true,
-        message: "Fetched remote collab notes ref",
-        local_commit: Some(rid),
-        remote_commit: Some(rid),
-      }
-    }
-    Some(lid) =>
-      if lid == rid {
-        {
-          success: true,
-          message: "Already up to date",
-          local_commit: Some(lid),
-          remote_commit: Some(rid),
-        }
-      } else {
-        merge_notes_commits(self, fs, git_dir, obj_store, ref_store, lid, rid)
-      }
-  }
-}
-
-///|
 fn get_commit_tree(
   objects : &@lib.ObjectStore,
   commit_id : @git.ObjectId,
@@ -247,7 +79,7 @@ fn get_commit_tree(
 }
 
 ///|
-fn merge_notes_commits(
+pub fn merge_notes_commits(
   prs : Collab,
   fs : &@git.FileSystem,
   git_dir : String,
@@ -406,7 +238,7 @@ fn read_tree_entries_store(
 }
 
 ///|
-fn find_remote_notes_ref(
+pub fn find_remote_notes_ref(
   refs : Array[(@git.ObjectId, String)],
 ) -> (@git.ObjectId, String) {
   let ref_name = collab_notes_ref_name()
@@ -420,7 +252,7 @@ fn find_remote_notes_ref(
 }
 
 ///|
-fn find_upload_notes_ref(
+pub fn find_upload_notes_ref(
   refs : Array[(@git.ObjectId, String)],
 ) -> (@git.ObjectId, String)? {
   let ref_name = collab_notes_ref_name()
@@ -434,27 +266,10 @@ fn find_upload_notes_ref(
 }
 
 ///|
-fn short_ref_name(refname : String) -> String {
+pub fn short_ref_name(refname : String) -> String {
   if refname.has_prefix("refs/") {
     String::unsafe_substring(refname, start=5, end=refname.length())
   } else {
     refname
   }
-}
-
-///|
-fn parent_path(path : String) -> String {
-  let chars = path.to_array()
-  let mut i = chars.length()
-  while i > 0 {
-    let idx = i - 1
-    if chars[idx] == '/' {
-      if idx == 0 {
-        return "."
-      }
-      return String::unsafe_substring(path, start=0, end=idx)
-    }
-    i = i - 1
-  }
-  "."
 }

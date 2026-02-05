@@ -1,0 +1,21 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/bit/x/collab/native"
+
+import {
+  "mizchi/bit",
+  "mizchi/bit/x/collab",
+}
+
+// Values
+pub async fn collab_fetch(@collab.Collab, &@bit.FileSystem, &@bit.RepoFileSystem, String, String) -> @collab.PrSyncResult raise @bit.GitError
+
+pub async fn collab_push(@collab.Collab, &@bit.RepoFileSystem, String, String) -> @collab.PrSyncResult raise @bit.GitError
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits
+

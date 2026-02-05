@@ -4,6 +4,7 @@ import {
   "mizchi/bit/lib" as @gitlib,
   "mizchi/bit/lib/native" as @gitlibnative,
   "mizchi/bit/x/collab" as @collab,
+  "mizchi/bit/x/collab/native" as @collab_native,
   "mizchi/bit/x/fs" as @bitfs,
   "mizchi/bit/x/hq" as @hq,
   "mizchi/bit/x/subdir" as @subdir,

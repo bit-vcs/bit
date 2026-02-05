@@ -1901,7 +1901,7 @@ async fn handle_collab_sync_push(args : Array[String]) -> Unit raise Error {
   }
   let (objects, refs, _clock) = make_collab_stores(git_dir)
   let collab = @collab.Collab::load(objects, refs)
-  let result = collab.push(fs, git_dir, url)
+  let result = @collab_native.collab_push(collab, fs, git_dir, url)
   if result.success() {
     print_line(result.message())
   } else {
@@ -1928,7 +1928,7 @@ async fn handle_collab_sync_fetch(args : Array[String]) -> Unit raise Error {
   }
   let (objects, refs, _clock) = make_collab_stores(git_dir)
   let collab = @collab.Collab::load(objects, refs)
-  let result = collab.fetch(fs, fs, git_dir, url)
+  let result = @collab_native.collab_fetch(collab, fs, fs, git_dir, url)
   if result.success() {
     print_line(result.message())
   } else {

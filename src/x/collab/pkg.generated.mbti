@@ -11,11 +11,17 @@ pub fn collab_notes_ns_name() -> String
 
 pub fn collab_notes_ref_name() -> String
 
+pub fn find_remote_notes_ref(Array[(@bit.ObjectId, String)]) -> (@bit.ObjectId, String)
+
+pub fn find_upload_notes_ref(Array[(@bit.ObjectId, String)]) -> (@bit.ObjectId, String)?
+
 pub fn issue_comment_key(String, String) -> String
 
 pub fn issue_comment_prefix(String) -> String
 
 pub fn issue_meta_key(String) -> String
+
+pub fn merge_notes_commits(Collab, &@bit.FileSystem, String, &@lib.ObjectStore, &@lib.RefStore, @bit.ObjectId, @bit.ObjectId) -> PrSyncResult raise @bit.GitError
 
 pub fn merge_record_bytes(Bytes, Bytes) -> Bytes
 
@@ -45,6 +51,10 @@ pub fn pr_review_key(String, String) -> String
 
 pub fn pr_review_prefix(String) -> String
 
+pub fn short_ref_name(String) -> String
+
+pub fn write_object_bytes(&@bit.FileSystem, String, @bit.ObjectId, Bytes) -> Unit raise @bit.GitError
+
 // Errors
 pub(all) suberror PrError {
   NotFound(String)
@@ -68,7 +78,6 @@ pub fn Collab::close_issue(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock,
 pub fn Collab::close_pr(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String) -> Unit raise @bit.GitError
 pub fn Collab::create_issue(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, String, labels? : Array[String], assignees? : Array[String]) -> Issue raise @bit.GitError
 pub fn Collab::create_pr(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, String, String, String) -> PullRequest raise @bit.GitError
-pub async fn Collab::fetch(Self, &@bit.FileSystem, &@bit.RepoFileSystem, String, String) -> PrSyncResult raise @bit.GitError
 pub fn Collab::get_issue(Self, &@lib.ObjectStore, String) -> Issue?
 pub fn Collab::get_note(Self, &@lib.ObjectStore, &@lib.RefStore, @bit.ObjectId, ns? : String) -> Note? raise @bit.GitError
 pub fn Collab::get_pr(Self, &@lib.ObjectStore, String) -> PullRequest?
@@ -85,7 +94,7 @@ pub fn Collab::list_prs(Self, &@lib.ObjectStore, state? : PrState?) -> Array[Pul
 pub fn Collab::list_reviews(Self, &@lib.ObjectStore, String) -> Array[PrReview]
 pub fn Collab::load(&@lib.ObjectStore, &@lib.RefStore, node_id? : String) -> Self raise @bit.GitError
 pub fn Collab::merge_pr(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, strategy? : PrMergeStrategy) -> PrMergeResult raise @bit.GitError
-pub async fn Collab::push(Self, &@bit.RepoFileSystem, String, String) -> PrSyncResult raise @bit.GitError
+pub fn Collab::reload_store(Self, &@lib.ObjectStore, &@lib.RefStore) -> Unit raise @bit.GitError
 pub fn Collab::remove_note(Self, &@lib.ObjectStore, &@lib.RefStore, @bit.ObjectId, Int64, ns? : String) -> Unit raise @bit.GitError
 pub fn Collab::submit_review(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, ReviewVerdict, String, @bit.ObjectId) -> PrReview raise @bit.GitError
 pub fn Collab::update_issue(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, title? : String?, body? : String?, labels? : Array[String]?, assignees? : Array[String]?) -> Issue raise @bit.GitError
@@ -265,6 +274,7 @@ pub struct PrSyncResult {
 }
 pub fn PrSyncResult::local_commit(Self) -> @bit.ObjectId?
 pub fn PrSyncResult::message(Self) -> String
+pub fn PrSyncResult::new(Bool, String, @bit.ObjectId?, @bit.ObjectId?) -> Self
 pub fn PrSyncResult::remote_commit(Self) -> @bit.ObjectId?
 pub fn PrSyncResult::success(Self) -> Bool
 
