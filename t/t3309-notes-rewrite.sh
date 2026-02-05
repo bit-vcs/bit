@@ -59,4 +59,30 @@ test_expect_success 'rewrite -f overwrites dest' '
 	 test_cmp expect actual)
 '
 
+test_expect_success 'rewrite --stdin applies multiple lines' '
+	(cd repo &&
+	 echo "three" >> file.txt &&
+	 $BIT add file.txt &&
+	 $BIT commit -m "c3" &&
+	 c1=$(cat c1) &&
+	 c2=$(cat c2) &&
+	 c3=$( $BIT rev-parse HEAD ) &&
+	 $BIT notes add -f -m "note-c1" "$c1" &&
+	 $BIT notes add -f -m "note-c2" "$c2" &&
+	 printf "%s %s\n%s %s\n" "$c1" "$c3" "$c2" "$c1" | $BIT notes rewrite --stdin -f &&
+	 echo "note-c1" > expect1 &&
+	 $BIT notes show "$c3" > actual1 &&
+	 test_cmp expect1 actual1 &&
+	 echo "note-c2" > expect2 &&
+	 $BIT notes show "$c1" > actual2 &&
+	 test_cmp expect2 actual2 &&
+	 ! $BIT notes show "$c2")
+'
+
+test_expect_failure 'rewrite --stdin fails on invalid line' '
+	(cd repo &&
+	 c1=$(cat c1) &&
+	 printf "%s\n" "$c1" | $BIT notes rewrite --stdin)
+'
+
 test_done

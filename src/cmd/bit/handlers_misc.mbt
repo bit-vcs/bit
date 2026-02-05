@@ -3906,6 +3906,11 @@ async fn handle_notes(args : Array[String]) -> Unit raise Error {
       while i < subargs.length() {
         let arg = subargs[i]
         match arg {
+          "-s" if i + 1 < subargs.length() => {
+            strategy = Some(subargs[i + 1])
+            i += 2
+            continue
+          }
           "--strategy" if i + 1 < subargs.length() => {
             strategy = Some(subargs[i + 1])
             i += 2
@@ -3944,12 +3949,18 @@ async fn handle_notes(args : Array[String]) -> Unit raise Error {
     }
     "rewrite" => {
       let mut force = false
+      let mut use_stdin = false
       let mut from_ref : String? = None
       let mut to_ref : String? = None
       let mut i = 0
       while i < subargs.length() {
         let arg = subargs[i]
         match arg {
+          "--stdin" => {
+            use_stdin = true
+            i += 1
+            continue
+          }
           "-f" | "--force" => {
             force = true
             i += 1
@@ -3966,6 +3977,28 @@ async fn handle_notes(args : Array[String]) -> Unit raise Error {
           }
           _ => i += 1
         }
+      }
+      if use_stdin {
+        if from_ref is Some(_) || to_ref is Some(_) {
+          @stdio.stderr.write(
+            "usage: git notes rewrite [--stdin] [-f] [<from> <to>]",
+          )
+          @sys.exit(1)
+        }
+        let data = read_all_stdin()
+        let text = decode_bytes(data)
+        let lines = split_lines(text)
+        for line in lines {
+          let parts = split_whitespace_tokens(line)
+          if parts.length() != 2 {
+            @stdio.stderr.write("error: invalid rewrite line: \{line}")
+            @sys.exit(1)
+          }
+          let from = parts[0]
+          let to = parts[1]
+          notes_rewrite(wfs, rfs, git_dir, notes_ref_path, from, to, force)
+        }
+        return
       }
       guard from_ref is Some(from_commit) else {
         @stdio.stderr.write("usage: git notes rewrite <from> <to>")
@@ -4580,6 +4613,29 @@ fn merge_notes_cat_sort_uniq(ours : String, theirs : String) -> String {
     }
   }
   join_lines(uniq)
+}
+
+///|
+fn split_whitespace_tokens(line : String) -> Array[String] {
+  let tokens : Array[String] = []
+  let mut current = StringBuilder::new()
+  let mut in_token = false
+  for c in line {
+    if c == ' ' || c == '\t' {
+      if in_token {
+        tokens.push(current.to_string())
+        current = StringBuilder::new()
+        in_token = false
+      }
+    } else {
+      current.write_char(c)
+      in_token = true
+    }
+  }
+  if in_token {
+    tokens.push(current.to_string())
+  }
+  tokens
 }
 
 ///|

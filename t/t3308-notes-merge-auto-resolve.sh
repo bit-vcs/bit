@@ -56,6 +56,17 @@ test_expect_success 'merge --strategy=union concatenates' '
 	 test_cmp expect actual)
 '
 
+test_expect_success 'merge -s union works' '
+	(cd repo &&
+	 c1=$(cat c1) &&
+	 $BIT notes add -f -m "ours-2" "$c1" &&
+	 $BIT notes --ref=other add -f -m "theirs-2" "$c1" &&
+	 $BIT notes merge -s union other &&
+	 printf "ours-2\ntheirs-2\n" > expect &&
+	 $BIT notes show "$c1" > actual &&
+	 test_cmp expect actual)
+'
+
 test_expect_success 'merge --strategy=cat_sort_uniq sorts unique lines' '
 	(cd repo &&
 	 c1=$(cat c1) &&
