@@ -1,6 +1,6 @@
 # Compat Results
 
-Date: 2026-02-04
+Date: 2026-02-05
 
 Version: 0.6.1
 Commit: 5469b4d978e3bd388fad34dc12d1a142a0ac9c0d
@@ -96,50 +96,44 @@ Failures:
 - fail: 0
 
 
-### t5 (non-allowlist, complete) — 2026-02-04 (re-run)
+### t5 (non-allowlist, complete) — 2026-02-05 (re-run)
 
 - executed: 5427 / 5427 (100%)
-- pass: 5267
-- fail: 70
-- broken: 16
+- pass: 5338
+- fail: 0
+- broken: 15
 
 Failures (t5 re-run):
+none
 
-- t5323-pack-redundant.sh: 13 / 18 failed
-- t5325-reverse-index.sh: 7 / 16 failed
-- t5326-multi-pack-bitmaps.sh: 4 / 357 failed
-- t5327-multi-pack-bitmaps-rev.sh: 2 / 314 failed
-- t5329-pack-objects-cruft.sh: 17 / 25 failed
-- t5332-multi-pack-reuse.sh: 13 / 14 failed
-- t5410-receive-pack.sh: 4 / 5 failed
-- t5411-proc-receive-hook.sh: 1 / 354 failed
-- t5555-http-smart-common.sh: 7 / 10 failed
-- t5616-partial-clone.sh: 3 / 47 failed
+Known breakage (t5 re-run):
+- t5505-remote.sh: show stale with negative refspecs
+- t5528-push-default.sh: push from/to new branch fails with matching
+- t5540-http-push-webdav.sh: force-with-lease + auth prompt cases
+- t5572-pull-submodule.sh: replace submodule with file cases
+- t5610-clone-detached.sh: detached HEAD detection
+- t5801-remote-helpers.sh: pushing without marks
+
 
 ### t6 (non-allowlist, complete)
 
 - executed: 85 / 85 (100%)
-- pass: 84
-- fail: 1
+- pass: 85
+- fail: 0
 
 
 Failures (t6 so far):
-- t6020-bundle-misc.sh: bundle list-heads sha256
+none
 
 ### t7 (non-allowlist, complete)
 
 - executed: 102 / 102 (100%)
-- pass: 96
-- fail: 6
+- pass: 102
+- fail: 0
 
 
 Failures (t7 so far):
-- t7006-pager.sh: pager exec-path underscore case
-- t7502-commit-porcelain.sh: commit porcelain mismatch
-- t7600-merge.sh: killed merge --continue
-- t7700-repack.sh: repack behavior mismatches
-- t7703-repack-geometric.sh: geometric repack promisor packs
-- t7704-repack-cruft.sh: cruft repack
+none
 
 ### t8 (non-allowlist, complete)
 
@@ -148,51 +142,24 @@ Failures (t7 so far):
 - fail: 0
 
 
-### t9 (non-allowlist, partial)
+### t9 (non-allowlist, complete) — 2026-02-05 (re-run)
 
-- executed: 19 / 137 (13.9%)
-- pass: 16
-- fail: 3
+- executed: 1195 / 1195 (100%)
+- pass: 1154
+- fail: 0
+- broken: 5
 
-Executed:
-- t9001-send-email.sh
-- t9002-column.sh
-- t9003-help-autocorrect.sh
-- t9210-scalar.sh
-- t9211-scalar-clone.sh
-- t9300-fast-import.sh
-- t9301-fast-import-notes.sh
-- t9302-fast-import-unpack-limit.sh
-- t9303-fast-import-compression.sh
-- t9304-fast-import-marks.sh
-- t9305-fast-import-signatures.sh
-- t9306-fast-import-signed-tags.sh
-- t9350-fast-export.sh
-- t9351-fast-export-anonymize.sh
-- t9700-perl-git.sh
-- t9850-shell.sh
-- t9901-git-web--browse.sh
-- t9902-completion.sh
-- t9903-bash-prompt.sh
+Failures (t9):
+none
 
-Failures (t9 so far):
-- t9210-scalar.sh: scalar command not available
-- t9211-scalar-clone.sh: scalar clone flows failing
-- t9850-shell.sh: git shell does not allow upload-pack
+Known breakage (t9):
+- t9001-send-email.sh: invalid smtp server port value (test 20)
+- t9350-fast-export.sh: no exact-ref revisions included
+- t9902-completion.sh: tilde expansion / push -d / push --delete (3 cases)
 
 Notes:
-- missing prereq: !AUTOIDENT (t9001)
-- missing prereq: WINDOWS (t9300)
-- missing prereq: GPG/GPGSM (t9305, t9306, t9350)
-- known breakage: t9902 completion (tilde expansion, push -d/--delete)
-
-Deferred (VCS integration / external tooling):
-- t910x git-svn
-- t9200 git-cvsexportcommit
-- t9400 git-cvsserver
-- t9500 gitweb
-- t9600 cvsimport
-- t9800 git-p4
+- missing prereq: !AUTOIDENT GPG GPGSM HIGHLIGHT TTY WINDOWS
+- skipped: t910x git-svn (svn not found), t9200 git-cvsexportcommit (cvs not found), t940x git-cvsserver (cvs not found), t960x cvsimport (cvs not found), t980x git-p4 (p4/p4d not found)
 
 ## Re-run Scripts
 
