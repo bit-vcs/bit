@@ -76,7 +76,7 @@ fn build_smart_advertisement(service : String, adv : Bytes) -> Bytes {
   for b in adv {
     out.push(b)
   }
-  Bytes::from_array(FixedArray::makei(out.length(), fn(i) { out[i] }))
+  Bytes::from_array(FixedArray::makei(out.length(), i => out[i]))
 }
 
 ///|

@@ -492,7 +492,7 @@ fn create_tree_from_files(
         tree_entries.push(@git.TreeEntry::new("040000", name, id))
       }
     }
-    tree_entries.sort_by(fn(a, b) { String::compare(a.name, b.name) })
+    tree_entries.sort_by((a, b) => String::compare(a.name, b.name))
     let tree_bytes = @git.serialize_tree(tree_entries)
     let tree_id = objects.put(@git.ObjectType::Tree, tree_bytes)
     tree_ids[dir] = tree_id

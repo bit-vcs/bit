@@ -436,7 +436,7 @@ fn sparse_trim(s : String) -> String {
 ///|
 fn bytes_to_string_sparse(bytes : Bytes) -> String {
   let result = StringBuilder::new()
-  for i = 0; i < bytes.length(); i = i + 1 {
+  for i in 0..<bytes.length() {
     result.write_char(bytes[i].to_int().unsafe_to_char())
   }
   result.to_string()

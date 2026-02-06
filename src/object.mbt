@@ -62,7 +62,7 @@ pub fn create_blob(content : Bytes) -> (ObjectId, Bytes) {
 ///|
 /// Create a blob from string content
 pub fn create_blob_string(content : String) -> (ObjectId, Bytes) {
-  create_blob(array_to_bytes(string_to_byte_array(content)))
+  content |> string_to_byte_array |> array_to_bytes |> create_blob
 }
 
 ///|
@@ -191,7 +191,7 @@ pub fn serialize_commit_content(commit : Commit) -> Bytes {
   content.write_char('\n')
   content.write_char('\n')
   content.write_string(commit.message)
-  array_to_bytes(string_to_byte_array(content.to_string()))
+  content.to_string() |> string_to_byte_array |> array_to_bytes
 }
 
 ///|

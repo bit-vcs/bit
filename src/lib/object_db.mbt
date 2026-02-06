@@ -126,9 +126,8 @@ fn pack_cache_limit_from_env() -> Int {
 
 ///|
 fn touch_pack_cache(db : ObjectDb, pack_path : String) -> Unit {
-  match db.pack_cache_order.search(pack_path) {
-    Some(idx) => ignore(db.pack_cache_order.remove(idx))
-    None => ()
+  if db.pack_cache_order.search(pack_path) is Some(idx) {
+    ignore(db.pack_cache_order.remove(idx))
   }
   db.pack_cache_order.push(pack_path)
 }
@@ -578,7 +577,7 @@ fn parse_pack_index_v1(
     let off = read_u32_be_at64(data, base)
     offsets.push(off)
     let bytes : FixedArray[Byte] = FixedArray::make(20, b'\x00')
-    for j = 0; j < 20; j = j + 1 {
+    for j in 0..<20 {
       bytes[j] = data[base + 4 + j]
     }
     ids.push(@git.ObjectId::new(bytes).to_hex())
@@ -621,7 +620,7 @@ fn parse_pack_index(
       raise @git.GitError::InvalidObject("Index file truncated (ids)")
     }
     let bytes : FixedArray[Byte] = FixedArray::make(20, b'\x00')
-    for i = 0; i < 20; i = i + 1 {
+    for i in 0..<20 {
       bytes[i] = data[offset + i]
     }
     offset += 20
@@ -805,7 +804,7 @@ fn parse_loose_object(data : Bytes) -> @git.PackObject raise @git.GitError {
     )
   }
   let content = Bytes::from_array(
-    FixedArray::makei(content_len, fn(j) { data[i + j] }),
+    FixedArray::makei(content_len, j => data[i + j]),
   )
   let obj_type = object_type_from_string(type_buf.to_string())
   @git.PackObject::new(obj_type, content)

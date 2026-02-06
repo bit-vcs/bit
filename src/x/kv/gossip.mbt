@@ -139,7 +139,7 @@ fn Kv::handle_want_objects(
     objects.push({ id, obj_type: o.obj_type, data: o.data })
   }
   if objects.length() > 0 {
-    Some(HaveObjects(objects))
+    objects |> HaveObjects |> Some
   } else {
     None
   }

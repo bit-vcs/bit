@@ -309,7 +309,7 @@ fn Fs::find_in_tree(
     for entry in entries {
       if entry.name == part {
         if i == parts.length() - 1 {
-          if not(is_tree_mode(entry.mode)) {
+          if (entry.mode |> is_tree_mode |> not) {
             return Some(entry.id)
           } else {
             return None

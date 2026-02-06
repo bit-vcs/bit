@@ -153,10 +153,7 @@ pub fn max_delta_chain_length(data : Bytes) -> Int raise @git.GitError {
             )
             objects[idx] = obj
             resolved[idx] = true
-            let base_depth = match by_id_depth.get(base_id) {
-              Some(d) => d
-              None => 0
-            }
+            let base_depth = by_id_depth.get(base_id).unwrap_or(0)
             let depth = base_depth + 1
             depths[idx] = depth
             if depth > max_depth {
@@ -240,10 +237,7 @@ pub fn max_delta_chain_length(data : Bytes) -> Int raise @git.GitError {
               )
               objects[p.index] = obj
               resolved[p.index] = true
-              let base_depth = match by_id_depth.get(base_id) {
-                Some(d) => d
-                None => 0
-              }
+              let base_depth = by_id_depth.get(base_id).unwrap_or(0)
               let depth = base_depth + 1
               depths[p.index] = depth
               if depth > max_depth {
@@ -844,7 +838,7 @@ pub fn read_ref_delta_id(
     raise @git.GitError::PackfileError("Unexpected end of packfile delta")
   }
   let bytes : FixedArray[Byte] = FixedArray::make(20, b'\x00')
-  for i = 0; i < 20; i = i + 1 {
+  for i in 0..<20 {
     bytes[i] = data[start + i]
   }
   let id = @git.ObjectId::new(bytes)
@@ -902,7 +896,7 @@ pub fn apply_delta(base : Bytes, delta : Bytes) -> Bytes raise @git.GitError {
       if cp_off < 0 || cp_off + cp_size > base.length() {
         raise @git.GitError::PackfileError("Delta copy out of range")
       }
-      for i = 0; i < cp_size; i = i + 1 {
+      for i in 0..<cp_size {
         out.push(base[cp_off + i])
       }
     } else {
@@ -913,7 +907,7 @@ pub fn apply_delta(base : Bytes, delta : Bytes) -> Bytes raise @git.GitError {
       if offset + literal_len > delta.length() {
         raise @git.GitError::PackfileError("Delta literal out of range")
       }
-      for i = 0; i < literal_len; i = i + 1 {
+      for i in 0..<literal_len {
         out.push(delta[offset + i])
       }
       offset += literal_len
@@ -922,7 +916,7 @@ pub fn apply_delta(base : Bytes, delta : Bytes) -> Bytes raise @git.GitError {
   if out.length() != result_size {
     raise @git.GitError::PackfileError("Delta result size mismatch")
   }
-  Bytes::from_array(FixedArray::makei(out.length(), fn(i) { out[i] }))
+  Bytes::from_array(FixedArray::makei(out.length(), i => out[i]))
 }
 
 ///|
@@ -959,7 +953,7 @@ fn read_u32_be(data : Bytes, start : Int) -> Int raise @git.GitError {
 ///|
 fn read_trailer_id(data : Bytes, start : Int) -> @git.ObjectId {
   let bytes : FixedArray[Byte] = FixedArray::make(20, b'\x00')
-  for i = 0; i < 20; i = i + 1 {
+  for i in 0..<20 {
     bytes[i] = data[start + i]
   }
   @git.ObjectId::new(bytes)

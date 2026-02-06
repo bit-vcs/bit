@@ -183,7 +183,7 @@ fn read_note_blob(
     if entry.name == commit_hex {
       let blob = objects.get(entry.id)
       match blob {
-        Some(blob_obj) => return Some(@utf8.decode_lossy(blob_obj.data[:]))
+        Some(blob_obj) => return blob_obj.data[:] |> @utf8.decode_lossy |> Some
         None => return None
       }
     }
@@ -226,7 +226,7 @@ fn update_notes_tree(
   if not(found) {
     new_entries.push(@git.TreeEntry::new("100644", commit_hex, blob_id))
   }
-  new_entries.sort_by(fn(a, b) { String::compare(a.name, b.name) })
+  new_entries.sort_by((a, b) => String::compare(a.name, b.name))
   let tree_bytes = @git.serialize_tree(new_entries)
   let new_tree_id = objects.put(@git.ObjectType::Tree, tree_bytes)
   // Create commit
@@ -277,7 +277,7 @@ fn remove_notes_tree_entry(
   if not(found) {
     return ()
   }
-  new_entries.sort_by(fn(a, b) { String::compare(a.name, b.name) })
+  new_entries.sort_by((a, b) => String::compare(a.name, b.name))
   let tree_bytes = @git.serialize_tree(new_entries)
   let new_tree_id = objects.put(@git.ObjectType::Tree, tree_bytes)
   let parents = match get_notes_commit(refs, ns) {

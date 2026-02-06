@@ -1024,11 +1024,11 @@ fn interactive_rebase_abort(
   let head_name_path = rebase_dir + "/head-name"
   // Restore original HEAD
   if rfs.is_file(orig_head_path) {
-    let orig_hex = trim_string(decode_bytes(rfs.read_file(orig_head_path)))
+    let orig_hex = rfs.read_file(orig_head_path) |> decode_bytes |> trim_string
     ignore(@gitlib.checkout(wfs, rfs, root, orig_hex, detach=true))
     // Restore branch if was on one
     if rfs.is_file(head_name_path) {
-      let branch = trim_string(decode_bytes(rfs.read_file(head_name_path)))
+      let branch = rfs.read_file(head_name_path) |> decode_bytes |> trim_string
       if branch != "HEAD" {
         wfs.write_string(git_dir + "/refs/heads/" + branch, orig_hex + "\n")
         wfs.write_string(git_dir + "/HEAD", "ref: refs/heads/" + branch + "\n")
@@ -1077,7 +1077,7 @@ async fn interactive_rebase_finish(
   guard head is Some(h) else { return }
   // Restore branch pointer
   if rfs.is_file(head_name_path) {
-    let branch = trim_string(decode_bytes(rfs.read_file(head_name_path)))
+    let branch = rfs.read_file(head_name_path) |> decode_bytes |> trim_string
     if branch != "HEAD" {
       wfs.write_string(git_dir + "/refs/heads/" + branch, h.to_hex() + "\n")
       wfs.write_string(git_dir + "/HEAD", "ref: refs/heads/" + branch + "\n")
@@ -1257,13 +1257,19 @@ async fn handle_show_branches(args : Array[String]) -> Unit raise Error {
       "-a" | "--all" => show_all = true
       "-r" | "--remotes" => show_remotes = true
       "--more" if i + 1 < args.length() => {
-        max_count = @strconv.parse_int(args[i + 1]) catch { _ => 10 }
+        max_count = @strconv.parse_int(args[i + 1]) catch {
+          err if @async.is_cancellation_error(err) => raise err
+          _ => 10
+        }
         i += 2
         continue
       }
       _ if arg.has_prefix("--more=") => {
         let val = String::unsafe_substring(arg, start=7, end=arg.length())
-        max_count = @strconv.parse_int(val) catch { _ => 10 }
+        max_count = @strconv.parse_int(val) catch {
+          err if @async.is_cancellation_error(err) => raise err
+          _ => 10
+        }
       }
       _ if not(arg.has_prefix("-")) => specific_branches.push(arg)
       _ if arg.has_prefix("-") => warn_unimplemented_arg("show-branch", arg)
@@ -1276,7 +1282,7 @@ async fn handle_show_branches(args : Array[String]) -> Unit raise Error {
   let (head_ref, all_branches) = @gitlib.list_branches(fs, git_dir)
   let branches_to_show : Array[@gitlib.BranchInfo] = if specific_branches.length() >
     0 {
-    all_branches.filter(fn(b) { specific_branches.contains(b.name) })
+    all_branches.filter(b => specific_branches.contains(b.name))
   } else {
     all_branches
   }
@@ -1458,6 +1464,7 @@ async fn handle_subdir_rebase(
   // Step 2: Resolve upstream ref
   let upstream_path = git_dir + "/refs/remotes/" + target_ref
   let upstream_bytes = fs.read_file(upstream_path) catch {
+    err if @async.is_cancellation_error(err) => raise err
     _ => {
       print_line("Error: cannot resolve ref: \{target_ref}")
       print_line("Make sure it exists (e.g., origin/main)")
@@ -1783,7 +1790,7 @@ fn subdir_write_tree(
 ///|
 fn subdir_bytes_to_string(bytes : Bytes) -> String {
   let result = StringBuilder::new()
-  for i = 0; i < bytes.length(); i = i + 1 {
+  for i in 0..<bytes.length() {
     result.write_char(bytes[i].to_int().unsafe_to_char())
   }
   result.to_string()
@@ -1889,6 +1896,7 @@ async fn handle_subdir_cherry_pick(
   let commit_info = @git.parse_commit(co.data) catch { err => raise err }
   let parent_tree = if commit_info.parents.length() > 0 {
     get_subdir_tree_from_commit(db, fs, commit_info.parents[0], subdir_path) catch {
+      err if @async.is_cancellation_error(err) => raise err
       _ => None
     }
   } else {

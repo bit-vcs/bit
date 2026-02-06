@@ -241,7 +241,7 @@ pub fn read_local_remote_head_state(
   match content {
     Err(_) => RemoteHeadState::Missing
     Ok(data) => {
-      let line = remote_trim_string(remote_decode_bytes_lossy(data))
+      let line = data |> remote_decode_bytes_lossy |> remote_trim_string
       if line.has_prefix("ref: ") {
         let target = String::unsafe_substring(line, start=5, end=line.length())
         let prefix = "refs/remotes/" + remote_name + "/"
@@ -275,7 +275,7 @@ pub fn read_remote_head_branch(
   match content {
     Err(_) => None
     Ok(data) => {
-      let line = remote_trim_string(remote_decode_bytes_lossy(data))
+      let line = data |> remote_decode_bytes_lossy |> remote_trim_string
       if line.has_prefix("ref: ") {
         let refname = String::unsafe_substring(line, start=5, end=line.length())
         if refname.has_prefix("refs/heads/") {

@@ -176,7 +176,7 @@ pub async fn diff_worktree(
     }
   }
   t0 = profile_lap(profile, "diff_worktree scan_entries", t0)
-  out.sort_by(fn(a, b) { String::compare(a.path, b.path) })
+  out.sort_by((a, b) => String::compare(a.path, b.path))
   ignore(profile_lap(profile, "diff_worktree sort", t0))
   out
 }
@@ -254,7 +254,7 @@ pub fn diff_index(
       }
     }
   }
-  out.sort_by(fn(a, b) { String::compare(a.path, b.path) })
+  out.sort_by((a, b) => String::compare(a.path, b.path))
   out
 }
 

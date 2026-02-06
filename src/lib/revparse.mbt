@@ -139,17 +139,14 @@ fn resolve_base_ref(
       id => return Some(id)
     }
   }
-  match resolve_ref(fs, git_dir, "refs/heads/" + spec) {
-    Some(id) => return Some(id)
-    None => ()
+  if resolve_ref(fs, git_dir, "refs/heads/" + spec) is Some(id) {
+    return Some(id)
   }
-  match resolve_ref(fs, git_dir, "refs/remotes/" + spec) {
-    Some(id) => return Some(id)
-    None => ()
+  if resolve_ref(fs, git_dir, "refs/remotes/" + spec) is Some(id) {
+    return Some(id)
   }
-  match resolve_ref(fs, git_dir, "refs/tags/" + spec) {
-    Some(id) => return Some(id)
-    None => ()
+  if resolve_ref(fs, git_dir, "refs/tags/" + spec) is Some(id) {
+    return Some(id)
   }
   None
 }
@@ -231,7 +228,7 @@ pub fn show_ref(
     let (name, id) = item
     result.push((name, id))
   }
-  result.sort_by(fn(a, b) { String::compare(a.0, b.0) })
+  result.sort_by((a, b) => String::compare(a.0, b.0))
   result
 }
 

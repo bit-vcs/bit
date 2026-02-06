@@ -51,11 +51,7 @@ pub fn normalize_repo_path(path : String) -> String raise @git.GitError {
 
 ///|
 fn split_path_parts(path : String) -> Array[String] {
-  path
-  .split("/")
-  .filter(fn(s) { s.length() > 0 })
-  .map(fn(s) { s.to_string() })
-  .collect()
+  path.split("/").filter(s => s.length() > 0).map(s => s.to_string()).collect()
 }
 
 ///|

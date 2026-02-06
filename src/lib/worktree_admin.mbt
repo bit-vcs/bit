@@ -272,10 +272,7 @@ pub fn lock_worktree(
     raise @git.GitError::InvalidObject("'\{worktree_path}' is already locked")
   }
   // Write lock file
-  let content = match reason {
-    Some(r) => r
-    None => ""
-  }
+  let content = reason.unwrap_or("")
   fs.write_string(locked_path, content)
 }
 
@@ -447,7 +444,7 @@ pub fn repair_worktree(
       let gitdir_path = join_path(admin_dir, "gitdir")
       if rfs.is_file(gitdir_path) {
         let content = read_trimmed_file(rfs, gitdir_path)
-        all.push(normalize_path(parent_dir(content)))
+        all.push(content |> parent_dir |> normalize_path)
       }
     }
     all
@@ -598,7 +595,7 @@ fn get_linked_worktree_info(
   }
   let gitdir_content = read_trimmed_file(fs, gitdir_path)
   // gitdir points to worktree/.git file, get parent for worktree path
-  let wt_path = normalize_path(parent_dir(gitdir_content))
+  let wt_path = gitdir_content |> parent_dir |> normalize_path
   // Read HEAD
   let head_path = join_path(admin_dir, "HEAD")
   if not(fs.is_file(head_path)) {
@@ -887,7 +884,7 @@ fn write_index_entries_to_path(
   entries : Array[IndexEntry],
 ) -> Unit raise @git.GitError {
   let sorted = entries.copy()
-  sorted.sort_by(fn(a, b) { String::compare(a.path, b.path) })
+  sorted.sort_by((a, b) => String::compare(a.path, b.path))
   // Serialize index
   let buf : Array[Byte] = []
   // Header: DIRC + version 2 + entry count
@@ -953,15 +950,13 @@ fn write_index_entries_to_path(
     }
   }
   // Compute checksum
-  let data = Bytes::from_array(
-    FixedArray::makei(buf.length(), fn(i) { buf[i] }),
-  )
+  let data = Bytes::from_array(FixedArray::makei(buf.length(), i => buf[i]))
   let checksum = @git.sha1(data)
   for b in checksum.bytes {
     buf.push(b)
   }
   let final_data = Bytes::from_array(
-    FixedArray::makei(buf.length(), fn(i) { buf[i] }),
+    FixedArray::makei(buf.length(), i => buf[i]),
   )
   fs.write_file(path, final_data)
 }

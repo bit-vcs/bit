@@ -62,7 +62,7 @@ fn clone_normal(
   }
   args.push(url)
   args.push(local_path)
-  let cmd = args.iter().map(fn(s) { s }).join(" ")
+  let cmd = args.iter().map(s => s).join(" ")
   let (code, _stdout, stderr) = exec(cmd)
   if code == 0 {
     Ok(())
@@ -96,7 +96,7 @@ fn clone_sparse(
   }
   clone_args.push(url)
   clone_args.push(local_path)
-  let clone_cmd = clone_args.iter().map(fn(s) { s }).join(" ")
+  let clone_cmd = clone_args.iter().map(s => s).join(" ")
   let (code1, _stdout1, stderr1) = exec(clone_cmd)
   if code1 != 0 {
     return Err("Clone failed: \{stderr1}")
@@ -147,6 +147,6 @@ pub fn build_clone_command(
     }
     args.push(url)
     args.push(local_path)
-    args.iter().map(fn(s) { s }).join(" ")
+    args.iter().map(s => s).join(" ")
   }
 }

@@ -32,7 +32,7 @@ fn pack_hash_id(pack : Bytes) -> @git.ObjectId raise @git.GitError {
   }
   let start = pack.length() - 20
   let bytes : FixedArray[Byte] = FixedArray::make(20, b'\x00')
-  for i = 0; i < 20; i = i + 1 {
+  for i in 0..<20 {
     bytes[i] = pack[start + i]
   }
   @git.ObjectId::new(bytes)
@@ -206,11 +206,7 @@ fn get_pack_size_limit(git_dir : String) -> Int64? {
 ///|
 fn get_pack_use_sparse(git_dir : String) -> Bool {
   match git_config_get(git_dir, "pack", "useSparse") {
-    Some(value) =>
-      match parse_bool_value(value) {
-        Some(flag) => flag
-        None => false
-      }
+    Some(value) => parse_bool_value(value).unwrap_or(false)
     None => false
   }
 }
@@ -230,21 +226,17 @@ fn parse_compression_level(value : String) -> Int? {
 
 ///|
 fn get_pack_compression_level(git_dir : String) -> Int? {
-  match get_config_override("pack.compression") {
-    Some(value) => return parse_compression_level(value)
-    None => ()
+  if get_config_override("pack.compression") is Some(value) {
+    return parse_compression_level(value)
   }
-  match get_config_override("core.compression") {
-    Some(value) => return parse_compression_level(value)
-    None => ()
+  if get_config_override("core.compression") is Some(value) {
+    return parse_compression_level(value)
   }
-  match git_config_get(git_dir, "pack", "compression") {
-    Some(value) => return parse_compression_level(value)
-    None => ()
+  if git_config_get(git_dir, "pack", "compression") is Some(value) {
+    return parse_compression_level(value)
   }
-  match git_config_get(git_dir, "core", "compression") {
-    Some(value) => return parse_compression_level(value)
-    None => ()
+  if git_config_get(git_dir, "core", "compression") is Some(value) {
+    return parse_compression_level(value)
   }
   None
 }

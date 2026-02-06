@@ -10,10 +10,7 @@ fn get_absolute_work_root() -> String {
   }
   if root == "." {
     // Use GIT_SHIM_PWD or PWD if available
-    match base {
-      Some(pwd) => pwd
-      None => "."
-    }
+    base.unwrap_or(".")
   } else if root.has_prefix("/") {
     root
   } else {
@@ -100,13 +97,13 @@ async fn handle_worktree_list(args : Array[String]) -> Unit raise Error {
       let sep = if nul_terminated { "\u{00}" } else { "\n" }
       let end = if nul_terminated { "\u{00}" } else { "\n" }
       print_str("worktree \{wt.path}\{sep}")
-      match wt.head_id {
-        Some(id) => print_str("HEAD \{id.to_hex()}\{sep}")
-        None => ()
+      if wt.head_id is Some(id) {
+        print_str("HEAD \{id.to_hex()}\{sep}")
       }
-      match wt.branch {
-        Some(b) => print_str("branch refs/heads/\{b}\{sep}")
-        None => if wt.head_id is Some(_) { print_str("detached\{sep}") }
+      if wt.branch is Some(b) {
+        print_str("branch refs/heads/\{b}\{sep}")
+      } else if wt.head_id is Some(_) {
+        print_str("detached\{sep}")
       }
       if wt.locked {
         // Get lock reason if available

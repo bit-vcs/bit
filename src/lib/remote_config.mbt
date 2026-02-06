@@ -95,7 +95,7 @@ pub fn parse_section_header(line : String) -> (String, String?) {
         start=idx + 1,
         end=body.length(),
       )
-      (sec, Some(config_strip_quotes(name_part)))
+      (sec, name_part |> config_strip_quotes |> Some)
     }
     None => (body.to_lower(), None)
   }
@@ -160,9 +160,8 @@ pub fn parse_config_blocks(content : String) -> Array[ConfigBlock] {
 pub fn render_config_blocks(blocks : Array[ConfigBlock]) -> String {
   let lines : Array[String] = []
   for block in blocks {
-    match block.header {
-      Some(h) => lines.push(h)
-      None => ()
+    if block.header is Some(h) {
+      lines.push(h)
     }
     for line in block.lines {
       lines.push(line)

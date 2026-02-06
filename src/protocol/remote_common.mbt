@@ -5,7 +5,7 @@
 ///|
 /// Helper to convert Array[Byte] to Bytes
 fn remote_array_to_bytes(arr : Array[Byte]) -> Bytes {
-  Bytes::from_array(FixedArray::makei(arr.length(), fn(i) { arr[i] }))
+  Bytes::from_array(FixedArray::makei(arr.length(), i => arr[i]))
 }
 
 ///|
@@ -25,7 +25,7 @@ fn normalize_url(url : String) -> String {
   if url.has_suffix(".git") {
     let chars = url.to_array()
     let result = StringBuilder::new()
-    for i = 0; i < chars.length() - 4; i = i + 1 {
+    for i in 0..<(chars.length() - 4) {
       result.write_char(chars[i])
     }
     result.to_string()
@@ -138,7 +138,7 @@ pub fn parse_receive_pack_response(
   }
   if sideband {
     if error_msg.length() > 0 {
-      return Err(@git.GitError::ProtocolError(error_msg))
+      return error_msg |> @git.GitError::ProtocolError |> Err
     }
     let band1 = remote_array_to_bytes(band1_bytes)
     let band_decoded = pktline_decode(band1) catch { e => return Err(e) }
@@ -165,9 +165,9 @@ pub fn parse_receive_pack_response(
   if unpack_ok && ref_ok {
     Ok("Push successful")
   } else if error_msg.length() > 0 {
-    Err(@git.GitError::ProtocolError(error_msg))
+    error_msg |> @git.GitError::ProtocolError |> Err
   } else {
-    Err(@git.GitError::ProtocolError("Unknown response"))
+    "Unknown response" |> @git.GitError::ProtocolError |> Err
   }
 }
 
@@ -179,7 +179,7 @@ pub fn parse_sideband(data : Bytes) -> (Int, Bytes) {
   }
   let channel = data[0].to_int()
   let content : Array[Byte] = []
-  for i = 1; i < data.length(); i = i + 1 {
+  for i in 1..<data.length() {
     content.push(data[i])
   }
   (channel, remote_array_to_bytes(content))
@@ -236,7 +236,7 @@ fn remote_substring_from(s : String, start : Int) -> String {
     return ""
   }
   let result = StringBuilder::new()
-  for i = start; i < chars.length(); i = i + 1 {
+  for i in start..<chars.length() {
     result.write_char(chars[i])
   }
   result.to_string()

@@ -70,7 +70,7 @@ pub fn list_branches(
     }
     branches.push({ name, id, current })
   }
-  branches.sort_by(fn(a, b) { String::compare(a.name, b.name) })
+  branches.sort_by((a, b) => String::compare(a.name, b.name))
   (head, branches)
 }
 
@@ -379,7 +379,7 @@ pub fn resolve_ref(
   let path = join_path(git_dir, refname)
   if fs.is_file(path) {
     let line = read_ref_line(fs, path)
-    return Some(@git.ObjectId::from_hex(line))
+    return line |> @git.ObjectId::from_hex |> Some
   }
   let packed = join_path(git_dir, "packed-refs")
   if fs.is_file(packed) {
@@ -491,7 +491,7 @@ fn resolve_packed_ref(
           end=line.length(),
         )
         if name == refname {
-          return Some(@git.ObjectId::from_hex(id_hex))
+          return id_hex |> @git.ObjectId::from_hex |> Some
         }
       }
     }

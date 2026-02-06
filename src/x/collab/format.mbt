@@ -223,7 +223,7 @@ pub fn parse_pr_comment(text : String) -> PrComment raise PrError {
           "created" => created_at = parse_int64(value)
           "reply-to" => reply_to = Some(value)
           "file" => file_path = Some(value)
-          "line" => line_number = Some(parse_int(value))
+          "line" => line_number = value |> parse_int |> Some
           "commit" =>
             commit_id = Some(
               @git.ObjectId::from_hex(value) catch {

@@ -102,7 +102,7 @@ fn write_index_v2(
   commit_id : ObjectId,
 ) -> Unit raise GitError {
   let entries = collect_commit_entries(store, commit_id)
-  entries.sort_by(fn(a, b) { String::compare(a.path, b.path) })
+  entries.sort_by((a, b) => String::compare(a.path, b.path))
   let out : Array[Byte] = []
   // Header: "DIRC" + version(2) + count
   out.push(b'D')
@@ -138,7 +138,7 @@ fn write_index_v2(
     let name_byte_len = path_bytes.length()
     let name_len = if name_byte_len < 0x0fff { name_byte_len } else { 0x0fff }
     push_u16_be(out, name_len)
-    for i = 0; i < path_bytes.length(); i = i + 1 {
+    for i in 0..<path_bytes.length() {
       out.push(path_bytes[i])
     }
     out.push(b'\x00')
@@ -148,19 +148,17 @@ fn write_index_v2(
     let entry_len = 62 + name_byte_len + 1 // fixed + name bytes + NUL
     let padded_len = (entry_len + 7) & (0xFFFFFFFF - 7) // round up to 8
     let padding = padded_len - entry_len
-    for _i = 0; _i < padding; _i = _i + 1 {
+    for _i in 0..<padding {
       out.push(b'\x00')
     }
   }
-  let content = Bytes::from_array(
-    FixedArray::makei(out.length(), fn(i) { out[i] }),
-  )
+  let content = Bytes::from_array(FixedArray::makei(out.length(), i => out[i]))
   let checksum = sha1(content)
   for b in checksum.bytes {
     out.push(b)
   }
   let index_bytes = Bytes::from_array(
-    FixedArray::makei(out.length(), fn(i) { out[i] }),
+    FixedArray::makei(out.length(), i => out[i]),
   )
   let index_path = join_path(git_dir, "index")
   fs.write_file(index_path, index_bytes)

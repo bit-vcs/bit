@@ -12,7 +12,7 @@ fn int_to_hex_char(i : Int) -> Char {
 ///|
 /// Helper to convert Array[Byte] to Bytes
 fn pkt_array_to_bytes(arr : Array[Byte]) -> Bytes {
-  Bytes::from_array(FixedArray::makei(arr.length(), fn(i) { arr[i] }))
+  Bytes::from_array(FixedArray::makei(arr.length(), i => arr[i]))
 }
 
 ///|
@@ -80,7 +80,7 @@ pub fn pktline_decode(data : Bytes) -> Array[(Bytes, Bool)] raise @git.GitError 
 
     // Read 4-byte hex length
     let len_str = StringBuilder::new()
-    for i = 0; i < 4; i = i + 1 {
+    for i in 0..<4 {
       len_str.write_char(data[offset + i].to_int().unsafe_to_char())
     }
     offset += 4
@@ -100,7 +100,7 @@ pub fn pktline_decode(data : Bytes) -> Array[(Bytes, Bool)] raise @git.GitError 
       raise @git.GitError::ProtocolError("Incomplete pkt-line payload")
     }
     let payload : Array[Byte] = []
-    for i = 0; i < payload_len; i = i + 1 {
+    for i in 0..<payload_len {
       payload.push(data[offset + i])
     }
     offset += payload_len
@@ -187,7 +187,7 @@ pub fn parse_refs(
     }
     let chars = line.to_array()
     let sha_str = StringBuilder::new()
-    for i = 0; i < 40; i = i + 1 {
+    for i in 0..<40 {
       sha_str.write_char(chars[i])
     }
 

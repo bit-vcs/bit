@@ -29,7 +29,7 @@ pub fn build_receive_pack_advertisement(
 ) -> Bytes raise @git.GitError {
   let git_dir = join_path(root, ".git")
   let refs = show_ref(fs, git_dir)
-  refs.sort_by(fn(a, b) { String::compare(a.0, b.0) })
+  refs.sort_by((a, b) => String::compare(a.0, b.0))
   let caps = receive_default_caps(agent)
   let out : Array[Byte] = []
   if refs.length() == 0 {
@@ -37,7 +37,7 @@ pub fn build_receive_pack_advertisement(
     let line = "\{zero} capabilities^{}\u0000\{caps}\n"
     receive_push_bytes(out, @protocol.pktline_encode(line))
     receive_push_bytes(out, @protocol.pktline_flush())
-    return Bytes::from_array(FixedArray::makei(out.length(), fn(i) { out[i] }))
+    return Bytes::from_array(FixedArray::makei(out.length(), i => out[i]))
   }
   let (first_name, first_id) = refs[0]
   let first_line = "\{first_id.to_hex()} \{first_name}\u0000\{caps}\n"
@@ -48,7 +48,7 @@ pub fn build_receive_pack_advertisement(
     receive_push_bytes(out, @protocol.pktline_encode(line))
   }
   receive_push_bytes(out, @protocol.pktline_flush())
-  Bytes::from_array(FixedArray::makei(out.length(), fn(i) { out[i] }))
+  Bytes::from_array(FixedArray::makei(out.length(), i => out[i]))
 }
 
 ///|
@@ -181,7 +181,7 @@ fn receive_build_status_response(result : ReceivePackResult) -> Bytes {
     receive_push_bytes(out, @protocol.pktline_encode("ng \{refname} \{msg}\n"))
   }
   receive_push_bytes(out, @protocol.pktline_flush())
-  Bytes::from_array(FixedArray::makei(out.length(), fn(i) { out[i] }))
+  Bytes::from_array(FixedArray::makei(out.length(), i => out[i]))
 }
 
 ///|
@@ -349,7 +349,7 @@ fn receive_bytes_slice(data : Bytes, start : Int, end : Int) -> Bytes {
   if len <= 0 {
     return Bytes::from_array([])
   }
-  let fixed = FixedArray::makei(len, fn(i) { data[start + i] })
+  let fixed = FixedArray::makei(len, i => data[start + i])
   Bytes::from_array(fixed)
 }
 

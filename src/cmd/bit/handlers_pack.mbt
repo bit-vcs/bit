@@ -19,7 +19,12 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
     let arg = args[i]
     match arg {
       "-n" | "--max-count" if i + 1 < args.length() => {
-        max_count = Some(@strconv.parse_int(args[i + 1]) catch { _ => 0 })
+        max_count = Some(
+          @strconv.parse_int(args[i + 1]) catch {
+            err if @async.is_cancellation_error(err) => raise err
+            _ => 0
+          },
+        )
         i += 2
         continue
       }
@@ -48,7 +53,12 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
       }
       _ if arg.has_prefix("--max-count=") => {
         let val = String::unsafe_substring(arg, start=12, end=arg.length())
-        max_count = Some(@strconv.parse_int(val) catch { _ => 0 })
+        max_count = Some(
+          @strconv.parse_int(val) catch {
+            err if @async.is_cancellation_error(err) => raise err
+            _ => 0
+          },
+        )
       }
       _ if arg.has_prefix("^") =>
         excludes.push(String::unsafe_substring(arg, start=1, end=arg.length()))
@@ -108,10 +118,7 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
   let visited : Map[String, Bool] = {}
   let result : Array[@git.ObjectId] = []
   let object_ids : Array[@git.ObjectId] = []
-  let limit = match max_count {
-    Some(n) => n
-    None => 2147483647 // Max int
-  }
+  let limit = max_count.unwrap_or(2147483647)
   // BFS/DFS traversal
   let queue : Array[@git.ObjectId] = []
   for id in start_ids {
@@ -349,7 +356,7 @@ fn get_pack_checksum(data : Bytes) -> String {
     return "invalid"
   }
   let start = data.length() - 20
-  let bytes : FixedArray[Byte] = FixedArray::makei(20, fn(i) { data[start + i] })
+  let bytes : FixedArray[Byte] = FixedArray::makei(20, i => data[start + i])
   @git.ObjectId::new(bytes).to_hex()
 }
 
@@ -427,9 +434,8 @@ async fn handle_bundle_create(args : Array[String]) -> Unit raise Error {
         real_args.push(item)
       }
       let extra_env : Map[String, String] = {}
-      match @sys.get_env_var("SHIM_EXEC_PATH") {
-        Some(path) => extra_env["GIT_EXEC_PATH"] = path
-        None => ()
+      if @sys.get_env_var("SHIM_EXEC_PATH") is Some(path) {
+        extra_env["GIT_EXEC_PATH"] = path
       }
       let code = @process.run(real_git, real_args, extra_env~, inherit_env=true)
       if code != 0 {
@@ -741,8 +747,8 @@ fn parse_bundle_file(
   if header_end == 0 {
     raise @git.GitError::PackfileError("Invalid bundle: no header found")
   }
-  let header_bytes = FixedArray::makei(header_end, fn(j) { data[j] })
-  let header = decode_bytes(Bytes::from_array(header_bytes))
+  let header_bytes = FixedArray::makei(header_end, j => data[j])
+  let header = header_bytes |> Bytes::from_array |> decode_bytes
   let prereqs : Array[String] = []
   let refs : Array[(String, String)] = []
   for line_view in header.split("\n") {
@@ -768,7 +774,7 @@ fn parse_bundle_file(
     }
   }
   let pack_data = Bytes::from_array(
-    FixedArray::makei(data.length() - header_end, fn(j) { data[header_end + j] }),
+    FixedArray::makei(data.length() - header_end, j => data[header_end + j]),
   )
   (header, prereqs, refs, pack_data)
 }

@@ -38,7 +38,7 @@ pub fn parse_v2_advertised_caps(
     if is_flush || line_bytes.length() == 0 {
       continue
     }
-    let line = trim_newline(bytes_to_string(line_bytes))
+    let line = line_bytes |> bytes_to_string |> trim_newline
     if line.has_prefix("#") || line.has_prefix("version ") {
       continue
     }
@@ -109,7 +109,7 @@ pub fn parse_ls_refs_response(data : Bytes) -> LsRefsResult raise @git.GitError 
     if is_flush || line_bytes.length() == 0 {
       continue
     }
-    let line = trim_newline(bytes_to_string(line_bytes))
+    let line = line_bytes |> bytes_to_string |> trim_newline
     let parts = split_by_space(line)
     if parts.length() < 2 {
       continue
@@ -286,7 +286,7 @@ pub fn extract_pack_from_v2_response(data : Bytes) -> Bytes raise @git.GitError 
       continue
     }
     if not(in_pack) {
-      let line = trim_newline(bytes_to_string(line_bytes))
+      let line = line_bytes |> bytes_to_string |> trim_newline
       if line == "packfile" {
         in_pack = true
       }
@@ -303,7 +303,7 @@ pub fn extract_pack_from_v2_response(data : Bytes) -> Bytes raise @git.GitError 
       raise @git.GitError::ProtocolError("upload-pack error: \{msg}")
     }
   }
-  Bytes::from_array(FixedArray::makei(chunks.length(), fn(i) { chunks[i] }))
+  Bytes::from_array(FixedArray::makei(chunks.length(), i => chunks[i]))
 }
 
 ///|
@@ -325,7 +325,7 @@ pub fn extract_pack_from_v0_response(data : Bytes) -> Bytes raise @git.GitError 
       raise @git.GitError::ProtocolError("upload-pack error: \{msg}")
     }
   }
-  Bytes::from_array(FixedArray::makei(chunks.length(), fn(i) { chunks[i] }))
+  Bytes::from_array(FixedArray::makei(chunks.length(), i => chunks[i]))
 }
 
 ///|
@@ -399,5 +399,5 @@ fn concat_bytes(chunks : Array[Bytes]) -> Bytes {
       result.push(b)
     }
   }
-  Bytes::from_array(FixedArray::makei(result.length(), fn(i) { result[i] }))
+  Bytes::from_array(FixedArray::makei(result.length(), i => result[i]))
 }

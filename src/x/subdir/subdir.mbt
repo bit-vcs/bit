@@ -25,7 +25,7 @@ fn trim_newlines(s : String) -> String {
     }
   }
   let result = StringBuilder::new()
-  for i = 0; i < end; i = i + 1 {
+  for i in 0..<end {
     result.write_char(chars[i])
   }
   result.to_string()
@@ -39,7 +39,7 @@ fn skip_chars(s : String, n : Int) -> String {
     return ""
   }
   let result = StringBuilder::new()
-  for i = n; i < chars.length(); i = i + 1 {
+  for i in n..<chars.length() {
     result.write_char(chars[i])
   }
   result.to_string()
@@ -64,7 +64,7 @@ fn normalize_subdir_path(path : String) -> String {
   }
   // 結果を構築
   let result = StringBuilder::new()
-  for i = start; i < end; i = i + 1 {
+  for i in start..<end {
     result.write_char(chars[i])
   }
   result.to_string()
@@ -115,7 +115,7 @@ pub fn extract_subdir_tree(
   }
   // ルートツリーから開始
   let mut current_tree = commit.tree
-  let path_parts = split_path(normalize_subdir_path(subdir_path))
+  let path_parts = subdir_path |> normalize_subdir_path |> split_path
   if path_parts.length() == 0 {
     // ルートディレクトリの場合
     return current_tree
@@ -198,14 +198,14 @@ pub fn SubdirRepo::from_head(
   let head_content = rfs.read_file(git_dir + "/HEAD") catch {
     _ => raise IoError("failed to read HEAD")
   }
-  let head_str = trim_newlines(bytes_to_string(head_content))
+  let head_str = head_content |> bytes_to_string |> trim_newlines
   let head_id : @git.ObjectId = if head_str.has_prefix("ref: ") {
     // シンボリックリファレンス
     let ref_path = skip_chars(head_str, 5)
     let ref_content = rfs.read_file(git_dir + "/" + ref_path) catch {
       _ => raise IoError("failed to read ref: " + ref_path)
     }
-    @git.ObjectId::from_hex(trim_newlines(bytes_to_string(ref_content))) catch {
+    (ref_content |> bytes_to_string |> trim_newlines |> @git.ObjectId::from_hex) catch {
       _ => raise IoError("invalid commit id in ref")
     }
   } else {

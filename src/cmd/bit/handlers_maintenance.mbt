@@ -51,7 +51,9 @@ async fn handle_am(args : Array[String]) -> Unit raise Error {
       // Restore original HEAD
       let orig_head_file = am_dir + "/orig-head"
       if fs.is_file(orig_head_file) {
-        let orig_head = trim_string(decode_bytes(fs.read_file(orig_head_file)))
+        let orig_head = fs.read_file(orig_head_file)
+          |> decode_bytes
+          |> trim_string
         fs.write_string(git_dir + "/HEAD", orig_head + "\n")
       }
       remove_dir_recursive(fs, am_dir)
@@ -68,8 +70,11 @@ async fn handle_am(args : Array[String]) -> Unit raise Error {
     }
     let next_file = am_dir + "/next"
     if fs.is_file(next_file) {
-      let next = trim_string(decode_bytes(fs.read_file(next_file)))
-      let n = @strconv.parse_int(next) catch { _ => 1 }
+      let next = fs.read_file(next_file) |> decode_bytes |> trim_string
+      let n = @strconv.parse_int(next) catch {
+        err if @async.is_cancellation_error(err) => raise err
+        _ => 1
+      }
       fs.write_string(next_file, (n + 1).to_string())
     }
     continue_am = true
@@ -96,9 +101,8 @@ async fn handle_am(args : Array[String]) -> Unit raise Error {
         raise @git.GitError::InvalidObject("No patches found in input")
       }
       let head = @gitlib.resolve_ref(fs, git_dir, "HEAD")
-      match head {
-        Some(id) => fs.write_string(am_dir + "/orig-head", id.to_hex())
-        None => ()
+      if head is Some(id) {
+        fs.write_string(am_dir + "/orig-head", id.to_hex())
       }
       fs.write_string(am_dir + "/last", patches.length().to_string())
       fs.write_string(am_dir + "/next", "1")
@@ -130,9 +134,8 @@ async fn handle_am(args : Array[String]) -> Unit raise Error {
       raise @git.GitError::InvalidObject("No patches found")
     }
     let head = @gitlib.resolve_ref(fs, git_dir, "HEAD")
-    match head {
-      Some(id) => fs.write_string(am_dir + "/orig-head", id.to_hex())
-      None => ()
+    if head is Some(id) {
+      fs.write_string(am_dir + "/orig-head", id.to_hex())
     }
     fs.write_string(am_dir + "/last", all_patches.length().to_string())
     fs.write_string(am_dir + "/next", "1")
@@ -272,10 +275,16 @@ async fn apply_remaining_patches(
   signoff : Bool,
   quiet : Bool,
 ) -> Unit raise Error {
-  let last_str = trim_string(decode_bytes(fs.read_file(am_dir + "/last")))
-  let next_str = trim_string(decode_bytes(fs.read_file(am_dir + "/next")))
-  let last = @strconv.parse_int(last_str) catch { _ => 0 }
-  let mut next = @strconv.parse_int(next_str) catch { _ => 1 }
+  let last_str = fs.read_file(am_dir + "/last") |> decode_bytes |> trim_string
+  let next_str = fs.read_file(am_dir + "/next") |> decode_bytes |> trim_string
+  let last = @strconv.parse_int(last_str) catch {
+    err if @async.is_cancellation_error(err) => raise err
+    _ => 0
+  }
+  let mut next = @strconv.parse_int(next_str) catch {
+    err if @async.is_cancellation_error(err) => raise err
+    _ => 1
+  }
   while next <= last {
     let patch_file = am_dir + "/" + zero_pad(next, 4)
     let msg_file = am_dir + "/msg-" + zero_pad(next, 4)
@@ -287,7 +296,7 @@ async fn apply_remaining_patches(
     }
     let patch_content = decode_bytes(fs.read_file(patch_file))
     let message = if fs.is_file(msg_file) {
-      trim_string(decode_bytes(fs.read_file(msg_file)))
+      fs.read_file(msg_file) |> decode_bytes |> trim_string
     } else {
       ""
     }
@@ -401,7 +410,7 @@ fn apply_patch_to_worktree(
           end=line.length(),
         )
         .split(" ")
-        .map(fn(v) { v.to_string() })
+        .map(v => v.to_string())
         .collect()
       if parts.length() >= 2 {
         old_file = parts[0]
@@ -477,7 +486,7 @@ fn parse_hunk_header(line : String) -> (Int, Int, Int, Int)? {
       let range_part = String::unsafe_substring(content, start=0, end~)
       let parts : Array[String] = range_part
         .split(" ")
-        .map(fn(v) { v.to_string() })
+        .map(v => v.to_string())
         .collect()
       if parts.length() < 2 {
         return None
@@ -525,7 +534,7 @@ fn apply_hunks_to_file(
   let original_lines : Array[String] = if fs.is_file(path) {
     decode_bytes(fs.read_file(path))
     .split("\n")
-    .map(fn(v) { v.to_string() })
+    .map(v => v.to_string())
     .collect()
   } else {
     match file.rev_find("/") {
@@ -838,7 +847,7 @@ fn handle_pack_refs(args : Array[String]) -> Unit raise Error {
         not(line.has_prefix("^")) {
         let parts : Array[String] = line
           .split(" ")
-          .map(fn(v) { v.to_string() })
+          .map(v => v.to_string())
           .collect()
         if parts.length() >= 2 {
           let sha = parts[0]
@@ -858,7 +867,7 @@ fn handle_pack_refs(args : Array[String]) -> Unit raise Error {
   // Write packed-refs
   let lines : Array[String] = ["# pack-refs with: peeled fully-peeled sorted"]
   let sorted_refs : Array[(String, String)] = packed.iter().collect()
-  sorted_refs.sort_by(fn(a, b) { a.0.compare(b.0) })
+  sorted_refs.sort_by((a, b) => a.0.compare(b.0))
   for entry in sorted_refs {
     lines.push("\{entry.1} \{entry.0}")
   }
@@ -892,7 +901,7 @@ fn collect_refs_to_pack(
     let ref_name = prefix + "/" + entry
     if fs.is_file(path) {
       if all || ref_name.has_prefix("refs/tags/") {
-        let sha = trim_string(decode_bytes(fs.read_file(path))) catch {
+        let sha = (fs.read_file(path) |> decode_bytes |> trim_string) catch {
           _ => ""
         }
         if sha.length() == 40 {
@@ -913,7 +922,7 @@ fn cleanup_empty_dirs(
 ) -> Unit raise Error {
   let parts : Array[String] = ref_path
     .split("/")
-    .map(fn(v) { v.to_string() })
+    .map(v => v.to_string())
     .collect()
   let mut current = git_dir
   let dirs : Array[String] = []
@@ -1121,8 +1130,11 @@ fn get_config_value_simple(
 }
 
 ///|
-async fn stage_all_changes(fs : OsFs, root : String) -> Unit {
-  let status = @gitlib.status(fs, root) catch { _ => return }
+async fn stage_all_changes(fs : OsFs, root : String) -> Unit raise Error {
+  let status = @gitlib.status(fs, root) catch {
+    err if @async.is_cancellation_error(err) => raise err
+    _ => return
+  }
   let all_paths : Array[String] = []
   for p in status.untracked {
     all_paths.push(p)
@@ -1134,7 +1146,10 @@ async fn stage_all_changes(fs : OsFs, root : String) -> Unit {
     all_paths.push(p)
   }
   if all_paths.length() > 0 {
-    let _ = @gitlib.add_paths_async(fs, fs, root, all_paths) catch { _ => () }
+    let _ = @gitlib.add_paths_async(fs, fs, root, all_paths) catch {
+      err if @async.is_cancellation_error(err) => raise err
+      _ => ()
+    }
 
   }
 }

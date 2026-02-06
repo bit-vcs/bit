@@ -41,11 +41,7 @@ fn temp_root_dir() -> String {
       } else {
         dir
       }
-    None =>
-      match @sys.get_env_var("TMP") {
-        Some(dir) => dir
-        None => "/tmp"
-      }
+    None => @sys.get_env_var("TMP").unwrap_or("/tmp")
   }
 }
 
@@ -89,7 +85,7 @@ async fn handle_tree(args : Array[String]) -> Unit raise Error {
   }
   let spec = positional[0]
   let fs = OsFs::new()
-  match check_shorthand_ambiguity(spec, fn(p) { fs.is_dir(p) }) {
+  match check_shorthand_ambiguity(spec, p => fs.is_dir(p)) {
     Some(conflict_path) =>
       raise @git.GitError::InvalidObject(
         "Ambiguous: '\{conflict_path}' exists locally. Use full URL or ./\{spec} for local path.",
@@ -131,9 +127,8 @@ async fn handle_tree(args : Array[String]) -> Unit raise Error {
       }
   }
   let path_filters : Array[String] = []
-  match path_from_spec {
-    Some(path) => path_filters.push(path)
-    None => ()
+  if path_from_spec is Some(path) {
+    path_filters.push(path)
   }
   if positional.length() > 1 {
     for i in 1..<positional.length() {
@@ -216,7 +211,7 @@ async fn handle_cat(args : Array[String]) -> Unit raise Error {
   }
   let spec = positional[0]
   let fs = OsFs::new()
-  match check_shorthand_ambiguity(spec, fn(p) { fs.is_dir(p) }) {
+  match check_shorthand_ambiguity(spec, p => fs.is_dir(p)) {
     Some(conflict_path) =>
       raise @git.GitError::InvalidObject(
         "Ambiguous: '\{conflict_path}' exists locally. Use full URL or ./\{spec} for local path.",

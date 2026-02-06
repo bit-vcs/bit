@@ -66,5 +66,5 @@ pub fn EnvProvider::new(
 
 ///|
 pub fn EnvProvider::none() -> EnvProvider {
-  { get: fn(_ : String) { None }, current_dir: fn() { None } }
+  { get: fn(_ : String) { None }, current_dir: () => None }
 }

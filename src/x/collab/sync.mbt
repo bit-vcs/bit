@@ -219,7 +219,7 @@ fn merge_notes_trees_store(
       _ => ()
     }
   }
-  merged_entries.sort_by(fn(a, b) { String::compare(a.name, b.name) })
+  merged_entries.sort_by((a, b) => String::compare(a.name, b.name))
   let (new_tree_id, tree_compressed) = @git.create_tree(merged_entries)
   write_object_bytes(fs, git_dir, new_tree_id, tree_compressed)
   new_tree_id

@@ -101,7 +101,7 @@ pub fn write_index_entries(
   entries : Array[IndexEntry],
 ) -> Unit raise @git.GitError {
   let sorted = entries.copy()
-  sorted.sort_by(fn(a, b) { String::compare(a.path, b.path) })
+  sorted.sort_by((a, b) => String::compare(a.path, b.path))
   let out : Array[Byte] = []
   // Header: "DIRC" + version(2) + count
   out.push(b'D')
@@ -182,7 +182,7 @@ fn index_read_object_id(
     raise @git.GitError::InvalidObject("Unexpected end of index data")
   }
   let bytes : FixedArray[Byte] = FixedArray::make(20, b'\x00')
-  for i = 0; i < 20; i = i + 1 {
+  for i in 0..<20 {
     bytes[i] = data[start + i]
   }
   @git.ObjectId::new(bytes)
@@ -201,7 +201,7 @@ fn index_read_cstring(
     raise @git.GitError::InvalidObject("Missing NUL in index entry")
   }
   let bytes : Array[Byte] = []
-  for j = start; j < i; j = j + 1 {
+  for j in start..<i {
     bytes.push(data[j])
   }
   let s = index_bytes_to_string(bytes)
@@ -219,7 +219,7 @@ fn index_bytes_to_string(bytes : Array[Byte]) -> String {
 
 ///|
 fn index_bytes_from_array(arr : Array[Byte]) -> Bytes {
-  Bytes::from_array(FixedArray::makei(arr.length(), fn(i) { arr[i] }))
+  Bytes::from_array(FixedArray::makei(arr.length(), i => arr[i]))
 }
 
 ///|

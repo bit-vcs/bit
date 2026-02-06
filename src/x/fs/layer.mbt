@@ -136,5 +136,5 @@ pub fn Fs::clear_layers(self : Fs) -> Unit {
 
 ///|
 pub fn Fs::has_layer(self : Fs, name : String) -> Bool {
-  self.layers.iter().any(fn(layer) { layer.name == name })
+  self.layers.iter().any(layer => layer.name == name)
 }

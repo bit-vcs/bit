@@ -65,7 +65,7 @@ pub fn resolve_local_repo_path(
     return None
   }
   if fs.is_dir(raw) {
-    return Some(normalize_local_path(raw))
+    return raw |> normalize_local_path |> Some
   }
   let candidate = normalize_local_path(root + "/" + raw)
   if fs.is_dir(candidate) {
@@ -85,11 +85,7 @@ pub fn resolve_local_repo_path(
       None =>
         match env_get("PWD") {
           Some(dir) => dir
-          None =>
-            match env_get("GIT_SHIM_PWD") {
-              Some(dir) => dir
-              None => "."
-            }
+          None => env_get("GIT_SHIM_PWD").unwrap_or(".")
         }
     }
     let alt = normalize_local_path(base + "/" + raw)

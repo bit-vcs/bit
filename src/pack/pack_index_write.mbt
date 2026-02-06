@@ -39,7 +39,7 @@ pub fn build_pack_index_from_objects(
   for obj in objects {
     entries.push({ id: obj.id, offset: obj.offset, crc: obj.crc32 })
   }
-  entries.sort_by(fn(a, b) { compare_object_id(a.id, b.id) })
+  entries.sort_by((a, b) => compare_object_id(a.id, b.id))
   let counts : Array[Int] = Array::make(256, 0)
   for entry in entries {
     let first = entry.id.bytes[0].to_int()
@@ -164,7 +164,7 @@ fn build_pack_index_v1_from_objects(
   for obj in objects {
     entries.push({ id: obj.id, offset: obj.offset, crc: obj.crc32 })
   }
-  entries.sort_by(fn(a, b) { compare_object_id(a.id, b.id) })
+  entries.sort_by((a, b) => compare_object_id(a.id, b.id))
 
   // Build fanout table (counts per first byte)
   let counts : Array[Int] = Array::make(256, 0)
@@ -284,7 +284,7 @@ fn _scan_pack_entry_offsets(
     raise @git.GitError::PackfileError("Packfile length mismatch")
   }
   let pack_bytes = Bytes::from_array(
-    FixedArray::makei(trailer_offset, fn(i) { data[i] }),
+    FixedArray::makei(trailer_offset, i => data[i]),
   )
   let computed = @git.sha1(pack_bytes)
   let trailer = read_trailer_id(data, trailer_offset)
@@ -316,14 +316,14 @@ pub fn crc32_range(
     raise @git.GitError::PackfileError("Invalid CRC range")
   }
   let slice = Bytes::from_array(
-    FixedArray::makei(end - start, fn(i) { data[start + i] }),
+    FixedArray::makei(end - start, i => data[start + i]),
   )
   @zlib.crc32(slice)
 }
 
 ///|
 fn bytes_from_array(arr : Array[Byte]) -> Bytes {
-  Bytes::from_array(FixedArray::makei(arr.length(), fn(i) { arr[i] }))
+  Bytes::from_array(FixedArray::makei(arr.length(), i => arr[i]))
 }
 
 ///|

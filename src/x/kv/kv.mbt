@@ -64,7 +64,7 @@ pub fn Kv::set(self : Kv, key : String, value : Bytes) -> Unit {
 pub fn Kv::set_string(self : Kv, key : String, value : String) -> Unit {
   self.set(
     key,
-    Bytes::from_array(value.to_array().map(fn(c) { c.to_int().to_byte() })),
+    Bytes::from_array(value.to_array().map(c => c.to_int().to_byte())),
   )
 }
 

@@ -74,7 +74,7 @@ pub fn tree_files_to_index(
       }
     }
   }
-  entries.sort_by(fn(a, b) { String::compare(a.path, b.path) })
+  entries.sort_by((a, b) => String::compare(a.path, b.path))
   entries
 }
 

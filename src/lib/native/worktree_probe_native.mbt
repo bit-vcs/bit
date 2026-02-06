@@ -63,7 +63,10 @@ async fn native_regular_meta(
       None,
     )
   }
-  let exec = @afs.can_execute(abs_path) catch { _ => false }
+  let exec = @afs.can_execute(abs_path) catch {
+    err if @async.is_cancellation_error(err) => abort("cancelled")
+    _ => false
+  }
   let mode = if exec { 0o100755 } else { 0o100644 }
   let mut size : Int? = None
   let mut mtime_sec : Int? = None
@@ -116,7 +119,7 @@ fn native_try_readlink(path : String) -> String? {
       return None
     }
     if read_len < buf.length() {
-      return Some(@utf8.decode_lossy(buf[:read_len]))
+      return buf[:read_len] |> @utf8.decode_lossy |> Some
     }
     buf_len *= 2
   }
@@ -125,7 +128,7 @@ fn native_try_readlink(path : String) -> String? {
   if read_len < 0 {
     None
   } else {
-    Some(@utf8.decode_lossy(buf[:read_len]))
+    buf[:read_len] |> @utf8.decode_lossy |> Some
   }
 }
 

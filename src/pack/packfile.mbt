@@ -3,7 +3,7 @@
 ///|
 /// Helper to convert Array[Byte] to Bytes
 fn pack_array_to_bytes(arr : Array[Byte]) -> Bytes {
-  Bytes::from_array(FixedArray::makei(arr.length(), fn(i) { arr[i] }))
+  Bytes::from_array(FixedArray::makei(arr.length(), i => arr[i]))
 }
 
 ///|
@@ -93,7 +93,7 @@ fn encode_delta_insert(
   while remaining > 0 {
     let chunk = if remaining > 0x7f { 0x7f } else { remaining }
     out.push(chunk.to_byte())
-    for i = 0; i < chunk; i = i + 1 {
+    for i in 0..<chunk {
       out.push(data[offset + i])
     }
     offset = offset + chunk
@@ -173,7 +173,7 @@ fn uint_from_int(v : Int) -> UInt {
 fn rolling_hash_init(data : Bytes, start : Int, len : Int) -> UInt {
   let base = uint_from_int(257)
   let mut h = uint_from_int(0)
-  for i = 0; i < len; i = i + 1 {
+  for i in 0..<len {
     h = h * base + byte_to_uint(data[start + i])
   }
   h
@@ -283,11 +283,11 @@ fn build_delta(base : Bytes, target : Bytes) -> Bytes {
   encode_delta_size(base_len, out)
   encode_delta_size(target_len, out)
   if target_len == 0 {
-    return Bytes::from_array(FixedArray::makei(out.length(), fn(i) { out[i] }))
+    return Bytes::from_array(FixedArray::makei(out.length(), i => out[i]))
   }
   if base_len < delta_block_size || target_len < delta_block_size {
     encode_delta_insert(target, 0, target_len, out)
-    return Bytes::from_array(FixedArray::makei(out.length(), fn(i) { out[i] }))
+    return Bytes::from_array(FixedArray::makei(out.length(), i => out[i]))
   }
   let (index, base_pow) = build_block_index(base, delta_block_size)
   let mut t = 0
@@ -346,7 +346,7 @@ fn build_delta(base : Bytes, target : Bytes) -> Bytes {
   if literal_len > 0 {
     encode_delta_insert(target, literal_start, literal_len, out)
   }
-  Bytes::from_array(FixedArray::makei(out.length(), fn(i) { out[i] }))
+  Bytes::from_array(FixedArray::makei(out.length(), i => out[i]))
 }
 
 ///|

@@ -7,11 +7,7 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
     None =>
       match @sys.get_env_var("GIT_WORK_TREE") {
         Some(dir) => dir
-        None =>
-          match @sys.get_env_var("GIT_SHIM_PWD") {
-            Some(dir) => dir
-            None => "."
-          }
+        None => @sys.get_env_var("GIT_SHIM_PWD").unwrap_or(".")
       }
   }
   let fs = OsFs::new()
@@ -96,10 +92,7 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
     None => None
   }
   // Determine default branch
-  let branch = match initial_branch {
-    Some(b) => b
-    None => "main"
-  }
+  let branch = initial_branch.unwrap_or("main")
   // Determine actual git directory path for output message
   let actual_git_dir = match (resolved_sep_git_dir, effective_git_dir) {
     (Some(sep), _) => sep
@@ -192,7 +185,10 @@ async fn handle_status(args : Array[String]) -> Unit raise Error {
   }
   if porcelain || short {
     if show_branch {
-      let head = @gitlib.read_head_ref(fs, git_dir) catch { _ => return () }
+      let head = @gitlib.read_head_ref(fs, git_dir) catch {
+        err if @async.is_cancellation_error(err) => raise err
+        _ => return ()
+      }
       match head {
         @gitlib.HeadRef::Branch(name) => print_line("## \{name}")
         @gitlib.HeadRef::Detached(id) =>
@@ -389,7 +385,7 @@ fn parse_commit_date(date_str : String) -> Int64 {
     return parse_int64(ts_str)
   }
   // Try parsing as unix timestamp
-  if date_str.iter().all(fn(c) { c >= '0' && c <= '9' }) {
+  if date_str.iter().all(c => c >= '0' && c <= '9') {
     return parse_int64(date_str)
   }
   // Fallback to current time if format not recognized
@@ -512,11 +508,14 @@ async fn log_with_graph(
     // Add all branches
     let heads_dir = git_dir + "/refs/heads"
     if rfs.is_dir(heads_dir) {
-      let branches = rfs.readdir(heads_dir) catch { _ => [] }
+      let branches = rfs.readdir(heads_dir) catch {
+        err if @async.is_cancellation_error(err) => raise err
+        _ => []
+      }
       for branch in branches {
         let ref_path = heads_dir + "/" + branch
         if rfs.is_file(ref_path) {
-          let hex = trim_string(decode_bytes(rfs.read_file(ref_path)))
+          let hex = rfs.read_file(ref_path) |> decode_bytes |> trim_string
           let id = @git.ObjectId::from_hex(hex)
           starts.push(id)
           match ref_names.get(hex) {
@@ -535,7 +534,9 @@ async fn log_with_graph(
           // Get current branch name
           let head_path = git_dir + "/HEAD"
           if rfs.is_file(head_path) {
-            let content = trim_string(decode_bytes(rfs.read_file(head_path)))
+            let content = rfs.read_file(head_path)
+              |> decode_bytes
+              |> trim_string
             if content.has_prefix("ref: refs/heads/") {
               let branch = String::unsafe_substring(
                 content,
@@ -568,7 +569,7 @@ async fn log_with_graph(
   let mut count = 0
   while queue.length() > 0 && count < max_count {
     // Sort queue by column to process in order
-    queue.sort_by(fn(a, b) { a.1.compare(b.1) })
+    queue.sort_by((a, b) => a.1.compare(b.1))
     let (current, col) = queue[0]
     // Remove first element
     let new_queue : Array[(@git.ObjectId, Int)] = []
@@ -615,9 +616,7 @@ async fn log_with_graph(
   // Output with graph
   let max_col = get_max_column(commits)
   for entry in commits {
-    let commit_id = entry.0
-    let parents = entry.1
-    let col = entry.2
+    let (commit_id, parents, col) = entry
     let hex = commit_id.to_hex()
     let short_hex = String::unsafe_substring(hex, start=0, end=7)
     // Build graph line

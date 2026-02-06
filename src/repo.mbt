@@ -64,7 +64,7 @@ pub fn parse_commit(content : Bytes) -> CommitInfo raise GitError {
     }
     if line.has_prefix("tree ") {
       let hex = String::unsafe_substring(line, start=5, end=line.length())
-      tree_id = Some(ObjectId::from_hex(hex))
+      tree_id = hex |> ObjectId::from_hex |> Some
     } else if line.has_prefix("parent ") {
       let hex = String::unsafe_substring(line, start=7, end=line.length())
       parents.push(ObjectId::from_hex(hex))
@@ -109,7 +109,7 @@ pub fn parse_tree(content : Bytes) -> Array[TreeEntry] raise GitError {
       raise GitError::InvalidObject("Truncated tree entry id")
     }
     let bytes : FixedArray[Byte] = FixedArray::make(20, b'\x00')
-    for j = 0; j < 20; j = j + 1 {
+    for j in 0..<20 {
       bytes[j] = content[i + j]
     }
     i += 20

@@ -67,7 +67,7 @@ async fn handle_hq(args : Array[String]) -> Unit raise Error {
     return
   }
   let subcmd = args[0]
-  let rest : Array[String] = args[1:].iter().map(fn(s) { s }).collect()
+  let rest : Array[String] = args[1:].iter().map(s => s).collect()
   match subcmd {
     "get" => handle_hq_get(rest)
     "list" => handle_hq_list(rest)
@@ -82,7 +82,7 @@ async fn handle_hq(args : Array[String]) -> Unit raise Error {
 
 ///|
 /// hq get command handler
-async fn handle_hq_get(args : Array[String]) -> Unit {
+async fn handle_hq_get(args : Array[String]) -> Unit raise Error {
   let mut url : String? = None
   let mut update = false
   let mut shallow = false
@@ -150,6 +150,7 @@ async fn handle_hq_get(args : Array[String]) -> Unit {
   // Create parent directories
   let parent = get_parent_dir(local_path)
   fs.mkdir_p(parent) catch {
+    err if @async.is_cancellation_error(err) => raise err
     _ => ()
   }
   let clone_args : Array[String] = ["clone"]
@@ -250,7 +251,7 @@ fn list_repos_recursive(
 /// hq root command handler
 async fn handle_hq_root(_args : Array[String]) -> Unit {
   let config = @hq.load_config(get_env_hq, get_git_config_hq)
-  print_line(contract_path_hq(config.root))
+  config.root |> contract_path_hq |> print_line
 }
 
 ///|

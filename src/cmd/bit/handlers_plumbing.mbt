@@ -856,12 +856,18 @@ async fn handle_multi_pack_index(args : Array[String]) -> Unit raise Error {
       "--progress" => progress = true
       "--no-progress" => progress = false
       "--batch-size" if i + 1 < args.length() => {
-        batch_size = @strconv.parse_int(args[i + 1]) catch { _ => 0 }
+        batch_size = @strconv.parse_int(args[i + 1]) catch {
+          err if @async.is_cancellation_error(err) => raise err
+          _ => 0
+        }
         i += 2
         continue
       }
       _ if arg.has_prefix("--batch-size=") =>
-        batch_size = @strconv.parse_int(arg[13:].to_string()) catch { _ => 0 }
+        batch_size = @strconv.parse_int(arg[13:].to_string()) catch {
+          err if @async.is_cancellation_error(err) => raise err
+          _ => 0
+        }
       "--preferred-pack" if i + 1 < args.length() => {
         preferred_pack = Some(args[i + 1])
         i += 2
@@ -1033,11 +1039,11 @@ async fn midx_verify(fs : OsFs, pack_dir : String) -> Unit raise Error {
   // Verify checksum
   let checksum_offset = data.length() - 20
   let content = Bytes::from_array(
-    FixedArray::makei(checksum_offset, fn(i) { data[i] }),
+    FixedArray::makei(checksum_offset, i => data[i]),
   )
   let computed = @git.sha1(content)
   let stored = @git.ObjectId::new(
-    FixedArray::makei(20, fn(i) { data[checksum_offset + i] }),
+    FixedArray::makei(20, i => data[checksum_offset + i]),
   )
   if computed != stored {
     raise @git.GitError::HashMismatch(computed.to_hex(), stored.to_hex())
@@ -1110,9 +1116,11 @@ async fn midx_expire(
         String::unsafe_substring(pack_name, start=0, end=pack_name.length() - 5) +
         ".idx"
       fs.remove_file(pack_path) catch {
+        err if @async.is_cancellation_error(err) => raise err
         _ => ()
       }
       fs.remove_file(idx_path) catch {
+        err if @async.is_cancellation_error(err) => raise err
         _ => ()
       }
       expired += 1
@@ -1169,7 +1177,7 @@ fn midx_find_pack_files(fs : OsFs, pack_dir : String) -> Array[String] {
       files.push(entry)
     }
   }
-  files.sort_by(fn(a, b) { a.compare(b) })
+  files.sort_by((a, b) => a.compare(b))
   files
 }
 
@@ -1206,9 +1214,7 @@ fn midx_read_pack_index(
   let offsets_offset = names_offset + object_count * 20 + object_count * 4
   for i in 0..<object_count {
     let id_offset = names_offset + i * 20
-    let id = @git.ObjectId::new(
-      FixedArray::makei(20, fn(j) { data[id_offset + j] }),
-    )
+    let id = @git.ObjectId::new(FixedArray::makei(20, j => data[id_offset + j]))
     let offset = midx_read_u32(data, offsets_offset + i * 4)
     entries.push({ id, pack_idx, offset })
   }
@@ -1292,14 +1298,12 @@ fn midx_build(pack_files : Array[String], entries : Array[MidxEntry]) -> Bytes {
     out.push(b)
   }
   // Checksum
-  let content = Bytes::from_array(
-    FixedArray::makei(out.length(), fn(i) { out[i] }),
-  )
+  let content = Bytes::from_array(FixedArray::makei(out.length(), i => out[i]))
   let checksum = @git.sha1(content)
   for b in checksum.bytes {
     out.push(b)
   }
-  Bytes::from_array(FixedArray::makei(out.length(), fn(i) { out[i] }))
+  Bytes::from_array(FixedArray::makei(out.length(), i => out[i]))
 }
 
 ///|
@@ -1503,10 +1507,7 @@ async fn handle_cherry(args : Array[String]) -> Unit raise Error {
     }
   }
   // Default head to HEAD
-  let effective_head = match head {
-    Some(h) => h
-    None => "HEAD"
-  }
+  let effective_head = head.unwrap_or("HEAD")
   // Resolve revisions
   let upstream_id = match @gitlib.rev_parse(fs, git_dir, effective_upstream) {
     Some(id) => id
@@ -1636,7 +1637,7 @@ fn cherry_compute_patch_id(
       // Compute diff: files that changed between parent and commit
       let diff = cherry_compute_tree_diff(parent_entries, tree_entries)
       // Sort diff for consistent ordering
-      diff.sort_by(fn(a, b) { a.0.compare(b.0) })
+      diff.sort_by((a, b) => a.0.compare(b.0))
       // Hash the diff content (path + blob id pairs)
       let content_parts : Array[String] = []
       for item in diff {

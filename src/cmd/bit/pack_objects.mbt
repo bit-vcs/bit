@@ -489,7 +489,7 @@ fn parse_object_id_bytes(line : BytesView) -> @git.ObjectId? {
       _ => return None
     }
   }
-  Some(@git.ObjectId::new(bytes))
+  bytes |> @git.ObjectId::new |> Some
 }
 
 ///|
@@ -681,7 +681,7 @@ fn parse_pack_index_ids(data : Bytes) -> Array[String]? {
       return None
     }
     let bytes : FixedArray[Byte] = FixedArray::make(20, b'\x00')
-    for i = 0; i < 20; i = i + 1 {
+    for i in 0..<20 {
       bytes[i] = data[offset + i]
     }
     offset += 20
@@ -780,7 +780,7 @@ fn collect_loose_object_ids(
     if name == "info" || name == "pack" {
       continue
     }
-    if name.length() != 2 || not(is_hex_string(name)) {
+    if name.length() != 2 || (name |> is_hex_string |> not) {
       continue
     }
     let subdir = objects_dir + "/" + name
@@ -790,7 +790,7 @@ fn collect_loose_object_ids(
     let files = fs.readdir(subdir) catch { _ => [] }
     for file in files {
       let filename = normalize_dir_entry(file)
-      if filename.length() != 38 || not(is_hex_string(filename)) {
+      if filename.length() != 38 || (filename |> is_hex_string |> not) {
         continue
       }
       out[name + filename] = true
@@ -1554,7 +1554,7 @@ async fn try_reuse_single_stdin_pack(
   cfg : PackObjectsConfig,
   include_names : Array[String],
   exclude_names : Array[String],
-) -> Bool {
+) -> Bool raise Error {
   if include_names.length() != 1 || exclude_names.length() != 0 {
     return false
   }
@@ -1573,13 +1573,19 @@ async fn try_reuse_single_stdin_pack(
     Some(path) => path
     None => return false
   }
-  let pack = fs.read_file(pack_path) catch { _ => return false }
+  let pack = fs.read_file(pack_path) catch {
+    err if @async.is_cancellation_error(err) => raise err
+    _ => return false
+  }
   if cfg.stdout {
     @stdio.stdout.write(pack)
     return true
   }
   let idx_path = pack_idx_path(pack_path)
-  let idx = fs.read_file(idx_path) catch { _ => return false }
+  let idx = fs.read_file(idx_path) catch {
+    err if @async.is_cancellation_error(err) => raise err
+    _ => return false
+  }
   let hash_hex = pack_hash_hex(pack)
   let base_name = match cfg.base_name {
     Some(name) => name
@@ -1599,7 +1605,7 @@ async fn try_reuse_single_stdin_pack(
 }
 
 ///|
-async fn handle_pack_objects(args : Array[String]) -> Unit {
+async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
   match parse_pack_objects_args(args) {
     PackObjectsParse::Unsupported => {
       @stdio.stderr.write("moongit pack-objects: unsupported options\n")
@@ -1725,7 +1731,10 @@ async fn handle_pack_objects(args : Array[String]) -> Unit {
           fs, git_dir, db, cfg, include_names, exclude_names,
         )
       } else if cfg.all {
-        let refs = @gitlib.show_ref(fs, git_dir) catch { _ => [] }
+        let refs = @gitlib.show_ref(fs, git_dir) catch {
+          err if @async.is_cancellation_error(err) => raise err
+          _ => []
+        }
         let blocked : Map[String, Bool] = {}
         let seen : Map[String, Bool] = {}
         let out : Array[@git.PackObject] = []
@@ -1874,6 +1883,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit {
             @gitlib.collect_reachable_objects_from_commits(
               db, fs, include_commits,
             ) catch {
+              err if @async.is_cancellation_error(err) => raise err
               err => {
                 report_collect_error(err)
                 []
@@ -1954,7 +1964,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit {
             match parse_object_id_bytes(line) {
               None => {
                 @stdio.stderr.write(
-                  invalid_object_line_message(line_to_string(line)),
+                  line |> line_to_string |> invalid_object_line_message,
                 )
                 @sys.exit(1)
               }

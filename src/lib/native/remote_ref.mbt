@@ -18,7 +18,7 @@ fn is_hex_string(s : String) -> Bool {
     return false
   }
   for c in s {
-    if not(is_hex_char(c)) {
+    if (c |> is_hex_char |> not) {
       return false
     }
   }
@@ -44,9 +44,8 @@ pub async fn resolve_remote_ref_id(
   remote_url : String,
   ref_spec : String,
 ) -> (@git.ObjectId, String?)? raise @git.GitError {
-  match parse_object_id_hex(ref_spec) {
-    Some(id) => return Some((id, None))
-    None => ()
+  if parse_object_id_hex(ref_spec) is Some(id) {
+    return Some((id, None))
   }
   let (refs, _caps, _version, symrefs) = @gitnative.discover_upload_refs_http(
     remote_url, true,

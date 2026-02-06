@@ -88,7 +88,7 @@ fn skip_prefix(s : String, n : Int) -> String {
     return ""
   }
   let result = StringBuilder::new()
-  for i = n; i < chars.length(); i = i + 1 {
+  for i in n..<chars.length() {
     result.write_char(chars[i])
   }
   result.to_string()

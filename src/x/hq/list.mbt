@@ -12,7 +12,7 @@ pub fn hq_list(
   scan_repos(config.root, "", list_dir, is_git_repo, repos)
   // Filter by query if provided
   match query {
-    Some(q) => repos.filter(fn(path) { path.contains(q) })
+    Some(q) => repos.filter(path => path.contains(q))
     None => repos
   }
 }

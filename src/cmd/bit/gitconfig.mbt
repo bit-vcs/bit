@@ -16,7 +16,7 @@ pub fn load_global_aliases(fs : OsFs) -> Map[String, String] {
         return empty
       }
       let bytes = fs.read_file(p) catch { _ => return empty }
-      return parse_gitconfig_aliases(decode_bytes(bytes))
+      return bytes |> decode_bytes |> parse_gitconfig_aliases
     }
     None => ()
   }

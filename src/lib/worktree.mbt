@@ -113,7 +113,7 @@ pub async fn status(
                 } else if not(stat_matches) {
                   match read_symlink_target_path(abs) {
                     Some(target) => {
-                      let id = @git.hash_blob(@utf8.encode(target))
+                      let id = target |> @utf8.encode |> @git.hash_blob
                       if id != entry.id {
                         unstaged_modified.push(path)
                       }
@@ -123,7 +123,7 @@ pub async fn status(
                 } else if racy_git {
                   match read_symlink_target_path(abs) {
                     Some(target) => {
-                      let id = @git.hash_blob(@utf8.encode(target))
+                      let id = target |> @utf8.encode |> @git.hash_blob
                       if id != entry.id {
                         unstaged_modified.push(path)
                       }
@@ -142,9 +142,10 @@ pub async fn status(
     let (path, _) = item
     if not(visited.contains(path)) {
       let abs = join_path(root, path)
-      match index_map.get(path) {
-        Some(entry) => if is_gitlink_mode_int(entry.mode) { continue }
-        None => ()
+      if index_map.get(path) is Some(entry) {
+        if is_gitlink_mode_int(entry.mode) {
+          continue
+        }
       }
       if worktree_entry_meta(fs, abs) is None {
         unstaged_deleted.push(path)
@@ -243,14 +244,8 @@ pub fn status_porcelain_from(s : Status) -> Array[String] {
   }
   list.sort()
   for p in list {
-    let x = match xmap.get(p) {
-      Some(c) => c
-      None => ' '
-    }
-    let y = match ymap.get(p) {
-      Some(c) => c
-      None => ' '
-    }
+    let x = xmap.get(p).unwrap_or(' ')
+    let y = ymap.get(p).unwrap_or(' ')
     out.push("\{x}\{y} \{p}")
   }
   for p in s.untracked {
@@ -349,14 +344,8 @@ pub async fn add_paths_async(
               normalized,
             )
             let size = content.length()
-            let mtime_sec = match info.mtime_sec {
-              Some(v) => v
-              None => 0
-            }
-            let mtime_nsec = match info.mtime_nsec {
-              Some(v) => v
-              None => 0
-            }
+            let mtime_sec = info.mtime_sec.unwrap_or(0)
+            let mtime_nsec = info.mtime_nsec.unwrap_or(0)
             map[path] = {
               path,
               id,
@@ -375,14 +364,8 @@ pub async fn add_paths_async(
               bytes,
             )
             let size = bytes.length()
-            let mtime_sec = match info.mtime_sec {
-              Some(v) => v
-              None => 0
-            }
-            let mtime_nsec = match info.mtime_nsec {
-              Some(v) => v
-              None => 0
-            }
+            let mtime_sec = info.mtime_sec.unwrap_or(0)
+            let mtime_nsec = info.mtime_nsec.unwrap_or(0)
             map[path] = {
               path,
               id,
@@ -536,9 +519,8 @@ fn read_autocrlf_setting(
     None => ()
     Some(home) => {
       let candidates : Array[String] = []
-      match env_get("XDG_CONFIG_HOME") {
-        Some(base) => candidates.push(base + "/git/config")
-        None => ()
+      if env_get("XDG_CONFIG_HOME") is Some(base) {
+        candidates.push(base + "/git/config")
       }
       candidates.push(home + "/.gitconfig")
       for path in candidates {
@@ -615,7 +597,7 @@ fn parse_autocrlf_from_content(content : String) -> AutoCrlf? {
           .trim()
           .to_string()
           .to_lower()
-        value = Some(parse_autocrlf_value(raw_value))
+        value = raw_value |> parse_autocrlf_value |> Some
       }
     }
   }
@@ -683,7 +665,7 @@ fn normalize_crlf_to_lf(content : Bytes) -> Bytes {
   if not(changed) {
     return content
   }
-  Bytes::from_array(FixedArray::makei(out.length(), fn(i) { out[i] }))
+  Bytes::from_array(FixedArray::makei(out.length(), i => out[i]))
 }
 
 ///|
@@ -785,7 +767,7 @@ pub fn write_tree_from_index(
       }
       result
     }
-    None => entries.map(fn(e) { e })
+    None => entries.map(e => e)
   }
   write_tree_from_entries(fs, git_dir, rel_entries)
 }

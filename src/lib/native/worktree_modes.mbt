@@ -81,7 +81,10 @@ async fn apply_file_mode(path : String, mode : Int) -> Unit raise @git.GitError 
 
 ///|
 async fn remove_path_if_exists(path : String) -> Unit raise @git.GitError {
-  let exists = @afs.exists(path) catch { _ => false }
+  let exists = @afs.exists(path) catch {
+    err if @async.is_cancellation_error(err) => abort("cancelled")
+    _ => false
+  }
   if not(exists) {
     return
   }

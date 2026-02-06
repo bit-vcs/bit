@@ -176,7 +176,7 @@ fn string_to_bytes(s : String) -> Bytes {
   for c in s {
     out.push(c.to_int().to_byte())
   }
-  Bytes::from_array(FixedArray::makei(out.length(), fn(i) { out[i] }))
+  Bytes::from_array(FixedArray::makei(out.length(), i => out[i]))
 }
 
 ///|

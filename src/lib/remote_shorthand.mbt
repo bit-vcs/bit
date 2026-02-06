@@ -69,8 +69,8 @@ pub fn parse_github_shorthand(url : String) -> GitHubShorthand? {
   // Split repo part by /
   let parts : Array[String] = repo_base
     .split("/")
-    .filter(fn(s) { s.length() > 0 })
-    .map(fn(s) { s.to_string() })
+    .filter(s => s.length() > 0)
+    .map(s => s.to_string())
     .collect()
   // Determine host and user/repo
   let (host, owner, repo) = if parts.length() == 2 {
@@ -132,8 +132,8 @@ pub fn check_shorthand_ambiguity(
   // Check full repo path (user/repo part)
   let parts : Array[String] = repo_base
     .split("/")
-    .filter(fn(s) { s.length() > 0 })
-    .map(fn(s) { s.to_string() })
+    .filter(s => s.length() > 0)
+    .map(s => s.to_string())
     .collect()
   if parts.length() >= 2 {
     let two_parts = parts[0] + "/" + parts[1]
@@ -153,8 +153,8 @@ fn parse_github_browser_url(url : String) -> GitHubShorthand? {
   let path = String::unsafe_substring(url, start=19, end=url.length())
   let parts : Array[String] = path
     .split("/")
-    .filter(fn(s) { s.length() > 0 })
-    .map(fn(s) { s.to_string() })
+    .filter(s => s.length() > 0)
+    .map(s => s.to_string())
     .collect()
   // Need at least: user/repo/tree|blob/branch/path
   // parts[0] = user, parts[1] = repo, parts[2] = tree|blob, parts[3] = branch, parts[4+] = path
@@ -167,7 +167,7 @@ fn parse_github_browser_url(url : String) -> GitHubShorthand? {
   let branch = parts[3]
   // Build path from remaining parts
   let path_parts : Array[String] = []
-  for i = 4; i < parts.length(); i = i + 1 {
+  for i in 4..<parts.length() {
     path_parts.push(parts[i])
   }
   let subpath = path_parts.join("/")

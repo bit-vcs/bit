@@ -7,7 +7,7 @@ fn io_error(err : @fs.IOError) -> @git.GitError {
 
 ///|
 fn bytes_from_array(arr : Array[Byte]) -> Bytes {
-  Bytes::from_array(FixedArray::makei(arr.length(), fn(i) { arr[i] }))
+  Bytes::from_array(FixedArray::makei(arr.length(), i => arr[i]))
 }
 
 ///|
@@ -86,7 +86,7 @@ fn is_hex_string(s : String) -> Bool {
     return false
   }
   for c in s {
-    if not(is_hex_char(c)) {
+    if (c |> is_hex_char |> not) {
       return false
     }
   }
@@ -254,16 +254,18 @@ fn find_repo_root(start : String) -> String? {
 
 ///|
 fn get_work_root() -> String {
-  match @env.current_dir() {
-    Some(dir) => if is_bare_repo_dir(dir) { return dir }
-    None => ()
+  if @env.current_dir() is Some(dir) {
+    if is_bare_repo_dir(dir) {
+      return dir
+    }
   }
   if is_bare_repo_dir(".") {
     return "."
   }
-  match @sys.get_env_var("PWD") {
-    Some(pwd) => if is_bare_repo_dir(pwd) { return pwd }
-    None => ()
+  if @sys.get_env_var("PWD") is Some(pwd) {
+    if is_bare_repo_dir(pwd) {
+      return pwd
+    }
   }
   match @sys.get_env_var("GIT_SHIM_CWD") {
     Some(dir) => dir
@@ -279,10 +281,7 @@ fn get_work_root() -> String {
                   if is_bare_repo_dir(pwd) {
                     pwd
                   } else {
-                    match find_repo_root(pwd) {
-                      Some(root) => root
-                      None => "."
-                    }
+                    find_repo_root(pwd).unwrap_or(".")
                   }
                 None => "."
               }

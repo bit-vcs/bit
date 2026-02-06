@@ -181,7 +181,7 @@ pub fn build_upload_pack_advertisement(
 ) -> Bytes raise @git.GitError {
   let git_dir = join_path(root, ".git")
   let refs = show_ref(fs, git_dir)
-  refs.sort_by(fn(a, b) { String::compare(a.0, b.0) })
+  refs.sort_by((a, b) => String::compare(a.0, b.0))
   let caps = upload_default_caps(agent)
   let out : Array[Byte] = []
   if refs.length() == 0 {
@@ -189,7 +189,7 @@ pub fn build_upload_pack_advertisement(
     let line = "\{zero} capabilities^{}\u0000\{caps}\n"
     upload_push_bytes(out, @protocol.pktline_encode(line))
     upload_push_bytes(out, @protocol.pktline_flush())
-    return Bytes::from_array(FixedArray::makei(out.length(), fn(i) { out[i] }))
+    return Bytes::from_array(FixedArray::makei(out.length(), i => out[i]))
   }
   let (first_name, first_id) = refs[0]
   let first_line = "\{first_id.to_hex()} \{first_name}\u0000\{caps}\n"
@@ -200,7 +200,7 @@ pub fn build_upload_pack_advertisement(
     upload_push_bytes(out, @protocol.pktline_encode(line))
   }
   upload_push_bytes(out, @protocol.pktline_flush())
-  Bytes::from_array(FixedArray::makei(out.length(), fn(i) { out[i] }))
+  Bytes::from_array(FixedArray::makei(out.length(), i => out[i]))
 }
 
 ///|
@@ -392,7 +392,7 @@ fn build_upload_pack_ack_response(ack_ids : Array[@git.ObjectId]) -> Bytes {
     upload_push_bytes(out, @protocol.pktline_encode("NAK\n"))
   }
   upload_push_bytes(out, @protocol.pktline_flush())
-  Bytes::from_array(FixedArray::makei(out.length(), fn(i) { out[i] }))
+  Bytes::from_array(FixedArray::makei(out.length(), i => out[i]))
 }
 
 ///|
@@ -447,7 +447,7 @@ fn build_upload_pack_response(
       out.push(b)
     }
   }
-  Bytes::from_array(FixedArray::makei(out.length(), fn(i) { out[i] }))
+  Bytes::from_array(FixedArray::makei(out.length(), i => out[i]))
 }
 
 ///|
@@ -851,7 +851,7 @@ fn build_upload_pack_response_v2_ack(
     upload_push_bytes(out, @protocol.pktline_delim())
   }
   upload_push_bytes(out, @protocol.pktline_flush())
-  Bytes::from_array(FixedArray::makei(out.length(), fn(i) { out[i] }))
+  Bytes::from_array(FixedArray::makei(out.length(), i => out[i]))
 }
 
 ///|
@@ -916,5 +916,5 @@ fn build_upload_pack_response_v2(
 
   // Flush packet to end
   upload_push_bytes(out, @protocol.pktline_flush())
-  Bytes::from_array(FixedArray::makei(out.length(), fn(i) { out[i] }))
+  Bytes::from_array(FixedArray::makei(out.length(), i => out[i]))
 }

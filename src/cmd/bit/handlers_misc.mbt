@@ -3,9 +3,10 @@
 ///|
 fn find_git_dir(fs : OsFs) -> String {
   // Check GIT_DIR environment variable first
-  match @sys.get_env_var("GIT_DIR") {
-    Some(dir) => if fs.is_dir(dir) || fs.is_file(dir) { return dir }
-    None => ()
+  if @sys.get_env_var("GIT_DIR") is Some(dir) {
+    if fs.is_dir(dir) || fs.is_file(dir) {
+      return dir
+    }
   }
   // Check if current directory is a .git directory (bare repo or inside .git)
   let cwd = get_work_root()
@@ -98,7 +99,7 @@ async fn handle_diff(args : Array[String]) -> Unit raise Error {
     all_files
     .iter()
     .filter(fn(f) {
-      paths.iter().any(fn(p) { f.path == p || f.path.has_prefix(p + "/") })
+      paths.iter().any(p => f.path == p || f.path.has_prefix(p + "/"))
     })
     .collect()
   } else {
@@ -195,15 +196,20 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
     let orig_head_path = git_dir + "/ORIG_HEAD"
     let merge_head_path = git_dir + "/MERGE_HEAD"
     if rfs.is_file(orig_head_path) {
-      let orig_hex = trim_string(decode_bytes(rfs.read_file(orig_head_path)))
+      let orig_hex = rfs.read_file(orig_head_path)
+        |> decode_bytes
+        |> trim_string
       ignore(@gitlib.reset(wfs, rfs, root, orig_hex, @gitlib.ResetMode::Hard))
       wfs.remove_file(orig_head_path) catch {
+        err if @async.is_cancellation_error(err) => raise err
         _ => ()
       }
       wfs.remove_file(merge_head_path) catch {
+        err if @async.is_cancellation_error(err) => raise err
         _ => ()
       }
       wfs.remove_file(git_dir + "/MERGE_MSG") catch {
+        err if @async.is_cancellation_error(err) => raise err
         _ => ()
       }
       print_line("Merge aborted.")
@@ -227,7 +233,7 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
     }
     // Commit the merge
     let msg = if rfs.is_file(merge_msg_path) {
-      trim_string(decode_bytes(rfs.read_file(merge_msg_path)))
+      rfs.read_file(merge_msg_path) |> decode_bytes |> trim_string
     } else {
       "Merge commit"
     }
@@ -237,12 +243,15 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
     let short = String::unsafe_substring(commit_id.to_hex(), start=0, end=7)
     // Clean up merge state
     wfs.remove_file(merge_head_path) catch {
+      err if @async.is_cancellation_error(err) => raise err
       _ => ()
     }
     wfs.remove_file(merge_msg_path) catch {
+      err if @async.is_cancellation_error(err) => raise err
       _ => ()
     }
     wfs.remove_file(git_dir + "/ORIG_HEAD") catch {
+      err if @async.is_cancellation_error(err) => raise err
       _ => ()
     }
     print_line("[\{short}] \{msg}")
@@ -345,7 +354,7 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
     @gitlib.write_object_bytes(wfs, git_dir, commit_id, commit_data)
     // Update HEAD
     let head_path = git_dir + "/HEAD"
-    let head_content = trim_string(decode_bytes(rfs.read_file(head_path)))
+    let head_content = rfs.read_file(head_path) |> decode_bytes |> trim_string
     if head_content.has_prefix("ref: ") {
       let ref_path = git_dir +
         "/" +
@@ -1133,7 +1142,7 @@ async fn handle_sparse_checkout(args : Array[String]) -> Unit raise Error {
     "set" => {
       let patterns = rest
         .iter()
-        .filter(fn(arg) { not(arg.has_prefix("-")) })
+        .filter(arg => not(arg.has_prefix("-")))
         .collect()
       if patterns.length() == 0 {
         raise @git.GitError::InvalidObject("patterns required for set")
@@ -1144,7 +1153,7 @@ async fn handle_sparse_checkout(args : Array[String]) -> Unit raise Error {
     "add" => {
       let patterns = rest
         .iter()
-        .filter(fn(arg) { not(arg.has_prefix("-")) })
+        .filter(arg => not(arg.has_prefix("-")))
         .collect()
       if patterns.length() == 0 {
         raise @git.GitError::InvalidObject("patterns required for add")
@@ -1648,7 +1657,7 @@ fn format_mode(mode : Int) -> String {
     digits.push("0")
   }
   digits.rev_in_place()
-  digits.iter().fold(init="", fn(acc, d) { acc + d })
+  digits.iter().fold(init="", (acc, d) => acc + d)
 }
 
 ///|
@@ -1866,6 +1875,7 @@ async fn print_tree_entries(
         // entry.id is the commit SHA in the submodule
         // Resolve it to a tree
         let sub_tree_id = resolve_to_tree(sub_db, fs, entry.id) catch {
+          err if @async.is_cancellation_error(err) => raise err
           _ => continue // Skip if can't resolve submodule tree
         }
         // Recursively print submodule tree entries
@@ -2174,7 +2184,7 @@ fn read_ref_value(
       let target = String::unsafe_substring(hex, start=5, end=hex.length())
       return read_ref_value(fs, git_dir, target)
     }
-    Some(@git.ObjectId::from_hex(hex)) catch {
+    (hex |> @git.ObjectId::from_hex |> Some) catch {
       _ => None
     }
   } else {
@@ -2195,13 +2205,11 @@ fn get_author_info(
   let mut name = "Unknown"
   let mut email = "unknown@unknown"
   // Check environment variables first
-  match @sys.get_env_var("GIT_COMMITTER_NAME") {
-    Some(n) => name = n
-    None => ()
+  if @sys.get_env_var("GIT_COMMITTER_NAME") is Some(n) {
+    name = n
   }
-  match @sys.get_env_var("GIT_COMMITTER_EMAIL") {
-    Some(e) => email = e
-    None => ()
+  if @sys.get_env_var("GIT_COMMITTER_EMAIL") is Some(e) {
+    email = e
   }
   // If not in env, try config
   if name == "Unknown" || email == "unknown@unknown" {
@@ -2476,9 +2484,7 @@ async fn handle_clean(args : Array[String]) -> Unit raise Error {
   if paths.length() > 0 {
     files_to_clean = files_to_clean
       .iter()
-      .filter(fn(f) {
-        paths.iter().any(fn(p) { f == p || f.has_prefix(p + "/") })
-      })
+      .filter(fn(f) { paths.iter().any(p => f == p || f.has_prefix(p + "/")) })
       .collect()
   }
   // Process files
@@ -2514,15 +2520,19 @@ async fn handle_clean(args : Array[String]) -> Unit raise Error {
   // Remove empty directories if -d flag
   if remove_dirs && not(dry_run) {
     // Sort by depth (deepest first)
-    dirs_to_check.sort_by(fn(a, b) { b.length() - a.length() })
+    dirs_to_check.sort_by((a, b) => b.length() - a.length())
     for dir in dirs_to_check {
       let abs_dir = root + "/" + dir
       if fs.is_dir(abs_dir) {
         let rfs : &@git.RepoFileSystem = fs
-        let entries = rfs.readdir(abs_dir) catch { _ => continue }
+        let entries = rfs.readdir(abs_dir) catch {
+          err if @async.is_cancellation_error(err) => raise err
+          _ => continue
+        }
         if entries.length() == 0 {
           let wfs : &@git.FileSystem = fs
           wfs.remove_dir(abs_dir) catch {
+            err if @async.is_cancellation_error(err) => raise err
             _ => ()
           }
           if not(quiet) {
@@ -2620,7 +2630,10 @@ async fn handle_grep(args : Array[String]) -> Unit raise Error {
     if not(fs.is_file(abs_path)) {
       continue
     }
-    let content = decode_bytes(fs.read_file(abs_path)) catch { _ => continue }
+    let content = decode_bytes(fs.read_file(abs_path)) catch {
+      err if @async.is_cancellation_error(err) => raise err
+      _ => continue
+    }
     let lines = content.split("\n")
     let mut match_count = 0
     let mut line_num = 0
@@ -2736,10 +2749,8 @@ async fn handle_submodule_add(
   let config_path = git_dir + "/config"
   set_config(fs, config_path, "submodule." + name + ".url", url, false)
   set_config(fs, config_path, "submodule." + name + ".path", path, false)
-  match branch {
-    Some(b) =>
-      set_config(fs, config_path, "submodule." + name + ".branch", b, false)
-    None => ()
+  if branch is Some(b) {
+    set_config(fs, config_path, "submodule." + name + ".branch", b, false)
   }
   let target_id = resolve_submodule_head_id(fs, root, url)
   let modules_dir = git_dir + "/modules/" + name
@@ -2764,6 +2775,7 @@ async fn handle_submodule_add(
   @gitlibnative.apply_worktree_modes_from_commit(
     fs, fs, sub_path, modules_dir, target_id,
   ) catch {
+    err if @async.is_cancellation_error(err) => raise err
     err =>
       eprint_line(
         "warning: failed to apply worktree modes in submodule '\{path}': \{err}",
@@ -2809,9 +2821,8 @@ fn write_gitmodules_entry(
     return
   }
   let mut entry = section + "\n\tpath = " + path + "\n\turl = " + url + "\n"
-  match branch {
-    Some(b) => entry = entry + "\tbranch = " + b + "\n"
-    None => ()
+  if branch is Some(b) {
+    entry = entry + "\tbranch = " + b + "\n"
   }
   if content.length() > 0 && not(content.has_suffix("\n")) {
     content = content + "\n"
@@ -2908,6 +2919,7 @@ async fn handle_submodule_status(
     // Get HEAD of submodule
     let sub_git_dir = @gitlib.resolve_gitdir(rfs, sub_git)
     let head_id = @gitlib.resolve_head_commit(rfs, sub_git_dir) catch {
+      err if @async.is_cancellation_error(err) => raise err
       _ => {
         print_line("-\{String::make(40, '0')} \{sub.path}")
         continue
@@ -3068,6 +3080,7 @@ async fn handle_submodule_update(
     @gitlibnative.apply_worktree_modes_from_commit(
       fs, fs, sub_path, sub_git_dir, target_id,
     ) catch {
+      err if @async.is_cancellation_error(err) => raise err
       err =>
         eprint_line(
           "warning: failed to apply worktree modes in submodule '\{sub.path}': \{err}",
@@ -3159,13 +3172,13 @@ fn run_checkout_in_submodule(
 fn get_rel_path(from : String, to : String) -> String {
   let from_parts : Array[String] = from
     .split("/")
-    .filter(fn(s) { s.to_string().length() > 0 })
-    .map(fn(s) { s.to_string() })
+    .filter(s => s.to_string().length() > 0)
+    .map(s => s.to_string())
     .collect()
   let to_parts : Array[String] = to
     .split("/")
-    .filter(fn(s) { s.to_string().length() > 0 })
-    .map(fn(s) { s.to_string() })
+    .filter(s => s.to_string().length() > 0)
+    .map(s => s.to_string())
     .collect()
   // Find common prefix
   let mut common = 0
@@ -3220,7 +3233,10 @@ async fn handle_submodule_deinit(
     if not(force) && rfs.is_dir(sub_path) {
       let sub_git_dir = @gitlib.resolve_gitdir(rfs, sub_path + "/.git")
       if rfs.is_dir(sub_git_dir) {
-        let status = @gitlib.status(rfs, sub_path) catch { _ => continue }
+        let status = @gitlib.status(rfs, sub_path) catch {
+          err if @async.is_cancellation_error(err) => raise err
+          _ => continue
+        }
         if status.unstaged_modified.length() > 0 {
           @stdio.stderr.write(
             "error: '\{sub.path}' has local modifications (use --force)",
@@ -3238,7 +3254,10 @@ async fn handle_submodule_deinit(
     }
     // Clear working directory
     if rfs.is_dir(sub_path) {
-      let entries = rfs.readdir(sub_path) catch { _ => continue }
+      let entries = rfs.readdir(sub_path) catch {
+        err if @async.is_cancellation_error(err) => raise err
+        _ => continue
+      }
       for e in entries {
         if e == ".git" {
           continue
@@ -3248,6 +3267,7 @@ async fn handle_submodule_deinit(
           remove_dir_recursive(fs, full)
         } else {
           wfs.remove_file(full) catch {
+            err if @async.is_cancellation_error(err) => raise err
             _ => ()
           }
         }
@@ -3397,7 +3417,7 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
     match arg {
       "-n" | "--no-commit" => no_commit = true
       "-m" if i + 1 < args.length() => {
-        mainline = Some(@strconv.parse_int(args[i + 1]))
+        mainline = args[i + 1] |> @strconv.parse_int |> Some
         i += 1
       }
       _ if arg.has_prefix("-m") =>
@@ -3434,14 +3454,17 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
       // Reset to ORIG_HEAD
       ignore(@gitlib.reset(wfs, rfs, root, orig_hex, @gitlib.ResetMode::Hard))
       wfs.remove_file(orig_head_path) catch {
+        err if @async.is_cancellation_error(err) => raise err
         _ => ()
       }
     }
     // Clean up state files
     wfs.remove_file(revert_head_path) catch {
+      err if @async.is_cancellation_error(err) => raise err
       _ => ()
     }
     wfs.remove_file(merge_msg_path) catch {
+      err if @async.is_cancellation_error(err) => raise err
       _ => ()
     }
     print_line("Revert aborted.")
@@ -3455,9 +3478,11 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
     }
     // Clean up state files (skip current revert)
     wfs.remove_file(revert_head_path) catch {
+      err if @async.is_cancellation_error(err) => raise err
       _ => ()
     }
     wfs.remove_file(merge_msg_path) catch {
+      err if @async.is_cancellation_error(err) => raise err
       _ => ()
     }
     // Reset index to HEAD
@@ -3489,12 +3514,15 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
     print_line("[\{short_id}] \{first_line}")
     // Clean up state files
     wfs.remove_file(revert_head_path) catch {
+      err if @async.is_cancellation_error(err) => raise err
       _ => ()
     }
     wfs.remove_file(merge_msg_path) catch {
+      err if @async.is_cancellation_error(err) => raise err
       _ => ()
     }
     wfs.remove_file(orig_head_path) catch {
+      err if @async.is_cancellation_error(err) => raise err
       _ => ()
     }
     return
@@ -3512,9 +3540,8 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
   }
   // Save ORIG_HEAD
   let current_head = @gitlib.resolve_head_commit(rfs, git_dir)
-  match current_head {
-    Some(hid) => wfs.write_string(orig_head_path, hid.to_hex() + "\n")
-    None => ()
+  if current_head is Some(hid) {
+    wfs.write_string(orig_head_path, hid.to_hex() + "\n")
   }
   let db = @gitlib.ObjectDb::load(rfs, git_dir)
   for commit_ref in commits {
@@ -3603,7 +3630,10 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
             // File was modified, restore parent version
             let abs_path = root + "/" + path
             // Check if current file matches commit version (clean revert)
-            let current_content = rfs.read_file(abs_path) catch { _ => b"" }
+            let current_content = rfs.read_file(abs_path) catch {
+              err if @async.is_cancellation_error(err) => raise err
+              _ => b""
+            }
             let current_id = @git.hash_blob(current_content)
             if current_id.to_hex() != commit_entry.id.to_hex() {
               // Current file differs from commit, potential conflict
@@ -3652,6 +3682,7 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
   }
   // Clean up ORIG_HEAD on success
   wfs.remove_file(orig_head_path) catch {
+    err if @async.is_cancellation_error(err) => raise err
     _ => ()
   }
 }
@@ -3944,7 +3975,9 @@ async fn handle_notes(args : Array[String]) -> Unit raise Error {
           }
         None => ()
       }
-      let other_ref_path = git_dir + "/" + normalize_notes_ref(Some(other_name))
+      let other_ref_path = git_dir +
+        "/" +
+        (other_name |> Some |> normalize_notes_ref)
       notes_merge(wfs, rfs, git_dir, notes_ref_path, other_ref_path, strategy)
     }
     "rewrite" => {
@@ -4094,7 +4127,7 @@ async fn notes_show(
         @stdio.stderr.write("error: note blob corrupt")
         @sys.exit(1)
       }
-      print_line(decode_bytes(no.data))
+      no.data |> decode_bytes |> print_line
       return
     }
   }
@@ -4120,7 +4153,7 @@ async fn notes_add(
   let target_hex = tid.to_hex()
   // Create blob for note content
   let note_content = Bytes::from_array(
-    message.to_array().map(fn(c) { c.to_int().to_byte() }),
+    message.to_array().map(c => c.to_int().to_byte()),
   )
   let note_id = @gitlib.write_loose_object(
     wfs,
@@ -4169,14 +4202,14 @@ async fn notes_add(
   // Add new note entry
   entries.push(@git.TreeEntry::new("100644", target_hex, note_id))
   // Sort entries by name (git requires sorted trees)
-  entries.sort_by(fn(a, b) { a.name.compare(b.name) })
+  entries.sort_by((a, b) => a.name.compare(b.name))
   // Create tree
   let (tree_id, tree_data) = @git.create_tree(entries)
   @gitlib.write_object_bytes(wfs, git_dir, tree_id, tree_data)
   // Create commit
   let author = get_author_string()
   let timestamp = @sys.get_env_var("GIT_COMMITTER_DATE")
-    .map(fn(d) { parse_commit_date(d) })
+    .map(parse_commit_date)
     .unwrap_or(get_current_timestamp())
   let parents = match parent_commit {
     Some(p) => [p]
@@ -4237,7 +4270,7 @@ async fn notes_append(
           @stdio.stderr.write("error: note blob corrupt")
           @sys.exit(1)
         }
-        existing_text = Some(decode_bytes(no.data))
+        existing_text = no.data |> decode_bytes |> Some
       } else {
         entries.push(e)
       }
@@ -4252,7 +4285,7 @@ async fn notes_append(
   }
   // Create blob for note content
   let note_content = Bytes::from_array(
-    new_text.to_array().map(fn(c) { c.to_int().to_byte() }),
+    new_text.to_array().map(c => c.to_int().to_byte()),
   )
   let note_id = @gitlib.write_loose_object(
     wfs,
@@ -4263,7 +4296,7 @@ async fn notes_append(
   // Add new note entry
   entries.push(@git.TreeEntry::new("100644", target_hex, note_id))
   // Sort entries by name (git requires sorted trees)
-  entries.sort_by(fn(a, b) { a.name.compare(b.name) })
+  entries.sort_by((a, b) => a.name.compare(b.name))
   // Create tree
   let (tree_id, tree_data) = @git.create_tree(entries)
   @gitlib.write_object_bytes(wfs, git_dir, tree_id, tree_data)
@@ -4358,7 +4391,7 @@ async fn notes_copy(
     @sys.exit(1)
   }
   entries.push(@git.TreeEntry::new("100644", to_hex, src.id))
-  entries.sort_by(fn(a, b) { a.name.compare(b.name) })
+  entries.sort_by((a, b) => a.name.compare(b.name))
   let (tree_id, tree_data) = @git.create_tree(entries)
   @gitlib.write_object_bytes(wfs, git_dir, tree_id, tree_data)
   let author = get_author_string()
@@ -4479,7 +4512,10 @@ async fn notes_prune(
   let mut pruned = 0
   for e in existing {
     let ref_id = @git.ObjectId::from_hex(e.name)
-    let ref_obj = db.get(rfs, ref_id) catch { _ => None }
+    let ref_obj = db.get(rfs, ref_id) catch {
+      err if @async.is_cancellation_error(err) => raise err
+      _ => None
+    }
     match ref_obj {
       Some(_) => entries.push(e)
       None => pruned += 1
@@ -4681,7 +4717,7 @@ async fn notes_merge(
               let theirs = note_text(db, rfs, e)
               let merged = merge_notes_union(ours, theirs)
               let merged_content = Bytes::from_array(
-                merged.to_array().map(fn(c) { c.to_int().to_byte() }),
+                merged.to_array().map(c => c.to_int().to_byte()),
               )
               let merged_id = @gitlib.write_loose_object(
                 wfs,
@@ -4698,7 +4734,7 @@ async fn notes_merge(
               let theirs = note_text(db, rfs, e)
               let merged = merge_notes_cat_sort_uniq(ours, theirs)
               let merged_content = Bytes::from_array(
-                merged.to_array().map(fn(c) { c.to_int().to_byte() }),
+                merged.to_array().map(c => c.to_int().to_byte()),
               )
               let merged_id = @gitlib.write_loose_object(
                 wfs,
@@ -4720,8 +4756,8 @@ async fn notes_merge(
         @sys.exit(1)
       }
       let merged_entries : Array[@git.TreeEntry] = []
-      entries.each(fn(_k, v) { merged_entries.push(v) })
-      merged_entries.sort_by(fn(a, b) { a.name.compare(b.name) })
+      entries.each((_k, v) => merged_entries.push(v))
+      merged_entries.sort_by((a, b) => a.name.compare(b.name))
       let (tree_id, tree_data) = @git.create_tree(merged_entries)
       @gitlib.write_object_bytes(wfs, git_dir, tree_id, tree_data)
       let author = get_author_string()
@@ -4791,8 +4827,8 @@ async fn notes_rewrite(
   entries.remove(from_hex)
   entries.set(to_hex, @git.TreeEntry::new("100644", to_hex, src.id))
   let rewritten_entries : Array[@git.TreeEntry] = []
-  entries.each(fn(_k, v) { rewritten_entries.push(v) })
-  rewritten_entries.sort_by(fn(a, b) { a.name.compare(b.name) })
+  entries.each((_k, v) => rewritten_entries.push(v))
+  rewritten_entries.sort_by((a, b) => a.name.compare(b.name))
   let (tree_id, tree_data) = @git.create_tree(rewritten_entries)
   @gitlib.write_object_bytes(wfs, git_dir, tree_id, tree_data)
   let author = get_author_string()
@@ -4963,6 +4999,7 @@ async fn bisect_mark(
   // Append to log
   let log_entry = "# \{mark_type}: [\{commit_hex}] \{commit_msg}\ngit bisect \{mark_type} \{commit_hex}\n"
   let existing_log = decode_bytes(rfs.read_file(bisect_log_path)) catch {
+    err if @async.is_cancellation_error(err) => raise err
     _ => ""
   }
   wfs.write_string(bisect_log_path, existing_log + log_entry)
@@ -4997,6 +5034,7 @@ async fn bisect_skip(
   // Append to log
   let log_entry = "git bisect skip \{commit_hex}\n"
   let existing_log = decode_bytes(rfs.read_file(bisect_log_path)) catch {
+    err if @async.is_cancellation_error(err) => raise err
     _ => ""
   }
   wfs.write_string(bisect_log_path, existing_log + log_entry)
@@ -5018,11 +5056,12 @@ async fn bisect_next(
     print_line("status: waiting for bad commit")
     return
   }
-  let bad_hex = trim_string(decode_bytes(rfs.read_file(bad_path)))
+  let bad_hex = rfs.read_file(bad_path) |> decode_bytes |> trim_string
   let bad_id = @git.ObjectId::from_hex(bad_hex)
   // Read good commits
   let good_commits : Array[@git.ObjectId] = []
   let bisect_entries = (rfs : &@git.RepoFileSystem).readdir(bisect_refs_dir) catch {
+    err if @async.is_cancellation_error(err) => raise err
     _ => []
   }
   for entry in bisect_entries {
@@ -5206,7 +5245,7 @@ async fn bisect_reset(
   let checkout_ref = if args.length() > 1 {
     args[1]
   } else if rfs.is_file(bisect_start_path) {
-    trim_string(decode_bytes(rfs.read_file(bisect_start_path)))
+    rfs.read_file(bisect_start_path) |> decode_bytes |> trim_string
   } else {
     "HEAD"
   }
@@ -5228,33 +5267,42 @@ async fn bisect_reset(
   }
   // Clean up bisect state files
   wfs.remove_file(bisect_start_path) catch {
+    err if @async.is_cancellation_error(err) => raise err
     _ => ()
   }
   wfs.remove_file(bisect_log_path) catch {
+    err if @async.is_cancellation_error(err) => raise err
     _ => ()
   }
   wfs.remove_file(bisect_terms_path) catch {
+    err if @async.is_cancellation_error(err) => raise err
     _ => ()
   }
   wfs.remove_file(bisect_expected_path) catch {
+    err if @async.is_cancellation_error(err) => raise err
     _ => ()
   }
   wfs.remove_file(bisect_ancestors_path) catch {
+    err if @async.is_cancellation_error(err) => raise err
     _ => ()
   }
   wfs.remove_file(bisect_names_path) catch {
+    err if @async.is_cancellation_error(err) => raise err
     _ => ()
   }
   // Clean up refs/bisect
   let entries = (rfs : &@git.RepoFileSystem).readdir(bisect_refs_dir) catch {
+    err if @async.is_cancellation_error(err) => raise err
     _ => []
   }
   for entry in entries {
     wfs.remove_file(bisect_refs_dir + "/" + entry) catch {
+      err if @async.is_cancellation_error(err) => raise err
       _ => ()
     }
   }
   wfs.remove_file(bisect_refs_dir) catch {
+    err if @async.is_cancellation_error(err) => raise err
     _ => ()
   }
   print_line("Bisect reset")
@@ -5365,7 +5413,7 @@ fn get_all_tags(
   for entry in entries {
     let tag_path = tags_dir + "/" + entry
     if rfs.is_file(tag_path) {
-      let ref_hex = trim_string(decode_bytes(rfs.read_file(tag_path)))
+      let ref_hex = rfs.read_file(tag_path) |> decode_bytes |> trim_string
       let ref_id = @git.ObjectId::from_hex(ref_hex)
       // Check if it's an annotated tag (tag object) or lightweight (commit)
       let obj = db.get(rfs, ref_id)
@@ -5401,7 +5449,7 @@ fn parse_tag_object(data : String) -> @git.ObjectId? raise Error {
     let line = line_view.to_string()
     if line.has_prefix("object ") {
       let hex = String::unsafe_substring(line, start=7, end=line.length())
-      return Some(@git.ObjectId::from_hex(trim_string(hex)))
+      return hex |> trim_string |> @git.ObjectId::from_hex |> Some
     }
   }
   None
@@ -6073,9 +6121,10 @@ async fn handle_shortlog(args : Array[String]) -> Unit raise Error {
         }
         let message = extract_commit_message(o.data)
         let subject = get_first_line(message)
-        match author_commits.get(author_key) {
-          Some(arr) => arr.push(subject)
-          None => author_commits[author_key] = [subject]
+        if author_commits.get(author_key) is Some(arr) {
+          arr.push(subject)
+        } else {
+          author_commits[author_key] = [subject]
         }
         let info = @git.parse_commit(o.data)
         for p in info.parents {
@@ -6092,15 +6141,14 @@ async fn handle_shortlog(args : Array[String]) -> Unit raise Error {
   }
   if numbered {
     // Sort by commit count descending
-    authors.sort_by(fn(a, b) { b.1.length().compare(a.1.length()) })
+    authors.sort_by((a, b) => b.1.length().compare(a.1.length()))
   } else {
     // Sort alphabetically
-    authors.sort_by(fn(a, b) { a.0.compare(b.0) })
+    authors.sort_by((a, b) => a.0.compare(b.0))
   }
   // Output
   for entry in authors {
-    let author = entry.0
-    let commits = entry.1
+    let (author, commits) = entry
     print_line("\{author} (\{commits.length()}):")
     if not(summary) {
       for commit in commits {
@@ -6359,8 +6407,7 @@ fn collect_other_files(
       _ => continue
     }
     for file_entry in files {
-      let path = file_entry.0
-      let blob_id = file_entry.1
+      let (path, blob_id) = file_entry
       if path != exclude_path {
         let hex = commit_id.to_hex()
         match result.get(hex) {
@@ -6418,7 +6465,7 @@ fn get_file_at_commit(
   guard blob_id is Some(bid) else { return None }
   let blob = db.get(rfs, bid)
   guard blob is Some(b) else { return None }
-  Some(decode_bytes(b.data))
+  b.data |> decode_bytes |> Some
 }
 
 ///|
@@ -6584,8 +6631,7 @@ fn find_line_origin_with_opts(
             match other_files.get(hex) {
               Some(files) =>
                 for file_entry in files {
-                  let other_path = file_entry.0
-                  let blob_id = file_entry.1
+                  let (other_path, blob_id) = file_entry
                   let other_content = get_blob_content(db, rfs, blob_id)
                   match other_content {
                     Some(oc) => {
@@ -6665,7 +6711,7 @@ fn get_blob_content(
 ) -> String? raise Error {
   let blob = db.get(rfs, blob_id)
   guard blob is Some(b) else { return None }
-  Some(decode_bytes(b.data))
+  b.data |> decode_bytes |> Some
 }
 
 ///|
@@ -6715,7 +6761,7 @@ fn parse_author_info(author : String) -> (String, Int64, String) {
             start=space_idx + 1,
             end=time_part.length(),
           )
-          let timestamp = parse_int64(trim_string(ts_str))
+          let timestamp = ts_str |> trim_string |> parse_int64
           (name, timestamp, trim_string(tz))
         }
         None => (name, 0L, "+0000")

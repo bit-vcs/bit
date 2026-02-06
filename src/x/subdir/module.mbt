@@ -35,10 +35,7 @@ pub fn init_module(
   }
   // 2. HEAD を作成（親の HEAD を参照）
   let parent_head = read_parent_head(rfs, git_dir)
-  let head_content = match parent_head {
-    Some(ref_str) => ref_str
-    None => "ref: refs/heads/main\n"
-  }
+  let head_content = parent_head.unwrap_or("ref: refs/heads/main\n")
   fs.write_file(module_dir + "/HEAD", string_to_bytes_mod(head_content)) catch {
     _ => raise IoError("failed to write HEAD")
   }
@@ -580,18 +577,18 @@ fn resolve_head_commit_for_module(
 ) -> @git.ObjectId? {
   let head_path = git_dir + "/HEAD"
   let content = rfs.read_file(head_path) catch { _ => return None }
-  let head_str = trim_newlines_mod(bytes_to_string_mod(content))
+  let head_str = content |> bytes_to_string_mod |> trim_newlines_mod
   if head_str.has_prefix("ref: ") {
     let ref_path = skip_chars_mod(head_str, 5)
     let ref_content = rfs.read_file(git_dir + "/" + ref_path) catch {
       _ => return None
     }
-    let hex = trim_newlines_mod(bytes_to_string_mod(ref_content))
-    Some(@git.ObjectId::from_hex(hex)) catch {
+    let hex = ref_content |> bytes_to_string_mod |> trim_newlines_mod
+    (hex |> @git.ObjectId::from_hex |> Some) catch {
       _ => None
     }
   } else {
-    Some(@git.ObjectId::from_hex(head_str)) catch {
+    (head_str |> @git.ObjectId::from_hex |> Some) catch {
       _ => None
     }
   }
@@ -909,7 +906,7 @@ fn count_path_depth(path : String) -> Int {
 /// 相対パスを構築（../ を depth 回）
 fn _build_relative_path(depth : Int, subdir_path : String) -> String {
   let result = StringBuilder::new()
-  for i = 0; i < depth; i = i + 1 {
+  for i in 0..<depth {
     result.write_string("../")
   }
   result.write_string(subdir_path)
@@ -920,7 +917,7 @@ fn _build_relative_path(depth : Int, subdir_path : String) -> String {
 /// gitdir パスを構築
 fn build_gitdir_path(depth : Int, module_name : String) -> String {
   let result = StringBuilder::new()
-  for i = 0; i < depth; i = i + 1 {
+  for i in 0..<depth {
     result.write_string("../")
   }
   result.write_string(".git/modules/")
@@ -952,7 +949,7 @@ fn build_module_config(worktree_path : String, subdir_path : String) -> String {
 fn read_parent_head(rfs : &@git.RepoFileSystem, git_dir : String) -> String? {
   let head_path = git_dir + "/HEAD"
   let content = rfs.read_file(head_path) catch { _ => return None }
-  Some(bytes_to_string_mod(content))
+  content |> bytes_to_string_mod |> Some
 }
 
 ///|
@@ -990,7 +987,7 @@ fn string_to_bytes_mod(s : String) -> Bytes {
 ///|
 fn bytes_to_string_mod(bytes : Bytes) -> String {
   let result = StringBuilder::new()
-  for i = 0; i < bytes.length(); i = i + 1 {
+  for i in 0..<bytes.length() {
     result.write_char(bytes[i].to_int().unsafe_to_char())
   }
   result.to_string()

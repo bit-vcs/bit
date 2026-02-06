@@ -217,7 +217,7 @@ fn build_tree_content(entries : Array[@git.TreeEntry]) -> Bytes {
 fn concat_bytes(parts : Array[Bytes]) -> Bytes {
   let bytes : Array[Byte] = []
   for part in parts {
-    for i = 0; i < part.length(); i = i + 1 {
+    for i in 0..<part.length() {
       bytes.push(part[i])
     }
   }
@@ -229,7 +229,7 @@ fn concat_bytes(parts : Array[Bytes]) -> Bytes {
 fn string_to_bytes_local(s : String) -> Bytes {
   let chars = s.to_array()
   let bytes : Array[Byte] = []
-  for i = 0; i < chars.length(); i = i + 1 {
+  for i in 0..<chars.length() {
     bytes.push(chars[i].to_int().to_byte())
   }
   Bytes::from_array(bytes)
@@ -371,7 +371,7 @@ fn trim_head_content(s : String) -> String {
     end -= 1
   }
   let result = StringBuilder::new()
-  for i = 0; i < end; i = i + 1 {
+  for i in 0..<end {
     result.write_char(chars[i])
   }
   result.to_string()
@@ -384,7 +384,7 @@ fn skip_prefix_commit(s : String, n : Int) -> String {
     return ""
   }
   let result = StringBuilder::new()
-  for i = n; i < chars.length(); i = i + 1 {
+  for i in n..<chars.length() {
     result.write_char(chars[i])
   }
   result.to_string()
@@ -403,7 +403,7 @@ fn get_parent_dir(path : String) -> String {
     return "/"
   }
   let result = StringBuilder::new()
-  for i = 0; i < last_slash; i = i + 1 {
+  for i in 0..<last_slash {
     result.write_char(chars[i])
   }
   result.to_string()

@@ -118,9 +118,8 @@ fn parse_http_url(url : String) -> (String, String, String, String?, String?)? {
 ///|
 fn normalize_credential_path(path : String) -> String {
   let mut out = path
-  match out.find("?") {
-    Some(q) => out = String::unsafe_substring(out, start=0, end=q)
-    None => ()
+  if out.find("?") is Some(q) {
+    out = String::unsafe_substring(out, start=0, end=q)
   }
   let suffix_info = "/info/refs"
   if out.has_suffix(suffix_info) {
@@ -169,7 +168,11 @@ async fn git_credential_fill(
     ignore(stderr)
     return None
   }
-  let text = stdout.text() catch { _ => "" }
+  let text = stdout.text() catch {
+    err if @async.is_cancellation_error(err) =>
+      raise @git.GitError::IoError(err.to_string())
+    _ => ""
+  }
   let mut user : String? = None
   let mut pass : String? = None
   for line_view in text.split("\n") {
@@ -210,9 +213,8 @@ fn build_credential_input(
   if path.length() > 0 {
     sb.write_string("path=" + path + "\n")
   }
-  match username {
-    Some(u) => sb.write_string("username=" + u + "\n")
-    None => ()
+  if username is Some(u) {
+    sb.write_string("username=" + u + "\n")
   }
   sb.write_string("\n")
   sb.to_string()
@@ -229,7 +231,11 @@ pub async fn native_http_get(
   }
   let chunks : Array[Byte] = []
   while true {
-    let chunk = client.read_some() catch { _ => break }
+    let chunk = client.read_some() catch {
+      err if @async.is_cancellation_error(err) =>
+        raise @git.GitError::IoError(err.to_string())
+      _ => break
+    }
     match chunk {
       Some(b) =>
         for byte in b {
@@ -240,7 +246,7 @@ pub async fn native_http_get(
   }
   client.close()
   let data = Bytes::from_array(
-    FixedArray::makei(chunks.length(), fn(i) { chunks[i] }),
+    FixedArray::makei(chunks.length(), i => chunks[i]),
   )
   (@git.HttpResponse::new(response.code), data)
 }
@@ -263,7 +269,11 @@ pub async fn native_http_post(
   }
   let chunks : Array[Byte] = []
   while true {
-    let chunk = client.read_some() catch { _ => break }
+    let chunk = client.read_some() catch {
+      err if @async.is_cancellation_error(err) =>
+        raise @git.GitError::IoError(err.to_string())
+      _ => break
+    }
     match chunk {
       Some(b) =>
         for byte in b {
@@ -274,7 +284,7 @@ pub async fn native_http_post(
   }
   client.close()
   let data = Bytes::from_array(
-    FixedArray::makei(chunks.length(), fn(i) { chunks[i] }),
+    FixedArray::makei(chunks.length(), i => chunks[i]),
   )
   (@git.HttpResponse::new(response.code), data)
 }

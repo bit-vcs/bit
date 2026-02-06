@@ -176,7 +176,7 @@ fn pack_trailer_id(pack : Bytes) -> @git.ObjectId raise @git.GitError {
     raise @git.GitError::PackfileError("Packfile too short")
   }
   let start = pack.length() - 20
-  let bytes = FixedArray::makei(20, fn(i) { pack[start + i] })
+  let bytes = FixedArray::makei(20, i => pack[start + i])
   @git.ObjectId::new(bytes)
 }
 

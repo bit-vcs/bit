@@ -146,7 +146,7 @@ pub fn SerializedSnapshot::to_bytes(self : SerializedSnapshot) -> Bytes {
   // Node ID
   write_string(buf, self.node_id)
   // Head
-  for i = 0; i < 20; i = i + 1 {
+  for i in 0..<20 {
     buf.push(self.head[i])
   }
   // Clock entries
@@ -158,12 +158,12 @@ pub fn SerializedSnapshot::to_bytes(self : SerializedSnapshot) -> Bytes {
   // Objects
   write_u32_le(buf, self.objects.length())
   for obj in self.objects {
-    for i = 0; i < 20; i = i + 1 {
+    for i in 0..<20 {
       buf.push(obj.id[i])
     }
     buf.push(obj.obj_type.to_byte())
     write_u32_le(buf, obj.data.length())
-    for i = 0; i < obj.data.length(); i = i + 1 {
+    for i in 0..<obj.data.length() {
       buf.push(obj.data[i])
     }
   }
@@ -224,7 +224,7 @@ fn write_u32_le(buf : Array[Byte], value : Int) -> Unit {
 
 ///|
 fn write_i64_le(buf : Array[Byte], value : Int64) -> Unit {
-  for i = 0; i < 8; i = i + 1 {
+  for i in 0..<8 {
     buf.push(((value >> (i * 8)) & 0xFFL).to_byte())
   }
 }
@@ -233,7 +233,7 @@ fn write_i64_le(buf : Array[Byte], value : Int64) -> Unit {
 fn write_string(buf : Array[Byte], s : String) -> Unit {
   let bytes = string_to_bytes(s)
   write_u32_le(buf, bytes.length())
-  for i = 0; i < bytes.length(); i = i + 1 {
+  for i in 0..<bytes.length() {
     buf.push(bytes[i])
   }
 }
@@ -242,7 +242,7 @@ fn write_string(buf : Array[Byte], s : String) -> Unit {
 fn string_to_bytes(s : String) -> Bytes {
   let arr = s.to_array()
   let result : Array[Byte] = []
-  for i = 0; i < arr.length(); i = i + 1 {
+  for i in 0..<arr.length() {
     result.push(arr[i].to_int().to_byte())
   }
   Bytes::from_array(result)
@@ -259,7 +259,7 @@ fn read_u32_le(data : Bytes, pos : Int) -> Int {
 ///|
 fn read_i64_le(data : Bytes, pos : Int) -> Int64 {
   let mut result = 0L
-  for i = 0; i < 8; i = i + 1 {
+  for i in 0..<8 {
     result = result | (data[pos + i].to_int64() << (i * 8))
   }
   result
@@ -269,7 +269,7 @@ fn read_i64_le(data : Bytes, pos : Int) -> Int64 {
 fn read_string(data : Bytes, pos : Int) -> (String, Int) {
   let len = read_u32_le(data, pos)
   let chars : Array[Char] = []
-  for i = 0; i < len; i = i + 1 {
+  for i in 0..<len {
     chars.push(data[pos + 4 + i].to_int().unsafe_to_char())
   }
   (String::from_array(chars), pos + 4 + len)

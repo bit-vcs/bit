@@ -250,20 +250,20 @@ async fn handle_collab_pr_list(args : Array[String]) -> Unit raise Error {
     match arg {
       "--state" if i + 1 < args.length() => {
         let value = args[i + 1]
-        match parse_pr_state(value) {
-          Some(s) => state = Some(s)
-          None =>
-            raise @git.GitError::InvalidObject("Unknown PR state: \{value}")
+        if parse_pr_state(value) is Some(s) {
+          state = Some(s)
+        } else {
+          raise @git.GitError::InvalidObject("Unknown PR state: \{value}")
         }
         i += 2
         continue
       }
       _ if arg.has_prefix("--state=") => {
         let value = String::unsafe_substring(arg, start=8, end=arg.length())
-        match parse_pr_state(value) {
-          Some(s) => state = Some(s)
-          None =>
-            raise @git.GitError::InvalidObject("Unknown PR state: \{value}")
+        if parse_pr_state(value) is Some(s) {
+          state = Some(s)
+        } else {
+          raise @git.GitError::InvalidObject("Unknown PR state: \{value}")
         }
         i += 1
         continue
@@ -283,7 +283,7 @@ async fn handle_collab_pr_list(args : Array[String]) -> Unit raise Error {
     return ()
   }
   for pr in prs {
-    print_line(format_pr_summary(pr))
+    pr |> format_pr_summary |> print_line
   }
 }
 
@@ -492,10 +492,7 @@ async fn handle_collab_pr_create(args : Array[String]) -> Unit raise Error {
   guard target_branch is Some(tgt) else {
     raise @git.GitError::InvalidObject("Missing --target")
   }
-  let pr_body = match body {
-    Some(b) => b
-    None => ""
-  }
+  let pr_body = body.unwrap_or("")
   let root = get_work_root()
   let git_dir = root + "/.git"
   let (objects, refs, clock) = make_collab_stores(git_dir)
@@ -754,12 +751,12 @@ async fn handle_collab_pr_comment_add(args : Array[String]) -> Unit raise Error 
         continue
       }
       "--line" if i + 1 < args.length() => {
-        line_number = Some(@strconv.parse_int(args[i + 1]))
+        line_number = args[i + 1] |> @strconv.parse_int |> Some
         i += 2
         continue
       }
       "--commit" if i + 1 < args.length() => {
-        commit_id = Some(@git.ObjectId::from_hex(args[i + 1]))
+        commit_id = args[i + 1] |> @git.ObjectId::from_hex |> Some
         i += 2
         continue
       }
@@ -789,13 +786,13 @@ async fn handle_collab_pr_comment_add(args : Array[String]) -> Unit raise Error 
       }
       _ if arg.has_prefix("--line=") => {
         let value = String::unsafe_substring(arg, start=7, end=arg.length())
-        line_number = Some(@strconv.parse_int(value))
+        line_number = value |> @strconv.parse_int |> Some
         i += 1
         continue
       }
       _ if arg.has_prefix("--commit=") => {
         let value = String::unsafe_substring(arg, start=9, end=arg.length())
-        commit_id = Some(@git.ObjectId::from_hex(value))
+        commit_id = value |> @git.ObjectId::from_hex |> Some
         i += 1
         continue
       }
@@ -922,7 +919,7 @@ async fn handle_collab_pr_review_submit(
         continue
       }
       "--commit" if i + 1 < args.length() => {
-        commit_id = Some(@git.ObjectId::from_hex(args[i + 1]))
+        commit_id = args[i + 1] |> @git.ObjectId::from_hex |> Some
         i += 2
         continue
       }
@@ -945,7 +942,7 @@ async fn handle_collab_pr_review_submit(
       }
       _ if arg.has_prefix("--commit=") => {
         let value = String::unsafe_substring(arg, start=9, end=arg.length())
-        commit_id = Some(@git.ObjectId::from_hex(value))
+        commit_id = value |> @git.ObjectId::from_hex |> Some
         i += 1
         continue
       }
@@ -984,10 +981,7 @@ async fn handle_collab_pr_review_submit(
   guard commit_id is Some(cid) else {
     raise @git.GitError::InvalidObject("Missing --commit")
   }
-  let review_body = match body {
-    Some(b) => b
-    None => ""
-  }
+  let review_body = body.unwrap_or("")
   let root = get_work_root()
   let git_dir = root + "/.git"
   let (objects, refs, clock) = make_collab_stores(git_dir)
@@ -1075,20 +1069,20 @@ async fn handle_collab_issue_list(args : Array[String]) -> Unit raise Error {
     match arg {
       "--state" if i + 1 < args.length() => {
         let value = args[i + 1]
-        match parse_issue_state(value) {
-          Some(s) => state = Some(s)
-          None =>
-            raise @git.GitError::InvalidObject("Unknown issue state: \{value}")
+        if parse_issue_state(value) is Some(s) {
+          state = Some(s)
+        } else {
+          raise @git.GitError::InvalidObject("Unknown issue state: \{value}")
         }
         i += 2
         continue
       }
       _ if arg.has_prefix("--state=") => {
         let value = String::unsafe_substring(arg, start=8, end=arg.length())
-        match parse_issue_state(value) {
-          Some(s) => state = Some(s)
-          None =>
-            raise @git.GitError::InvalidObject("Unknown issue state: \{value}")
+        if parse_issue_state(value) is Some(s) {
+          state = Some(s)
+        } else {
+          raise @git.GitError::InvalidObject("Unknown issue state: \{value}")
         }
         i += 1
         continue
@@ -1109,7 +1103,7 @@ async fn handle_collab_issue_list(args : Array[String]) -> Unit raise Error {
     return ()
   }
   for issue in issues {
-    print_line(format_issue_summary(issue))
+    issue |> format_issue_summary |> print_line
   }
 }
 
@@ -1298,10 +1292,7 @@ async fn handle_collab_issue_create(args : Array[String]) -> Unit raise Error {
   guard title is Some(t) else {
     raise @git.GitError::InvalidObject("Missing --title")
   }
-  let issue_body = match body {
-    Some(b) => b
-    None => ""
-  }
+  let issue_body = body.unwrap_or("")
   let root = get_work_root()
   let git_dir = root + "/.git"
   let (objects, refs, clock) = make_collab_stores(git_dir)
@@ -2028,8 +2019,16 @@ async fn gh_collect_output(
   ) catch {
     err => raise @git.GitError::IoError("gh failed: \{err}")
   }
-  let out = stdout.text() catch { _ => "" }
-  let err_text = stderr.text() catch { _ => "" }
+  let out = stdout.text() catch {
+    err if @async.is_cancellation_error(err) =>
+      raise @git.GitError::IoError(err.to_string())
+    _ => ""
+  }
+  let err_text = stderr.text() catch {
+    err if @async.is_cancellation_error(err) =>
+      raise @git.GitError::IoError(err.to_string())
+    _ => ""
+  }
   if code != 0 {
     let message = trim_string(err_text)
     raise @git.GitError::InvalidObject("gh failed (\{code}): \{message}")
@@ -2258,8 +2257,5 @@ fn format_issue_summary(issue : @collab.Issue) -> String {
 
 ///|
 fn note_ns(ns : String?) -> String {
-  match ns {
-    Some(value) => value
-    None => "commits"
-  }
+  ns.unwrap_or("commits")
 }

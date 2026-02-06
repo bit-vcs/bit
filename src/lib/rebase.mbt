@@ -410,8 +410,8 @@ fn rebase_write_tree_from_map(
       mtime_nsec: 0,
     })
   }
-  entries.sort_by(fn(a, b) { String::lexical_compare(a.path, b.path) })
-  let rel_entries = entries.map(fn(e) { e })
+  entries.sort_by((a, b) => String::lexical_compare(a.path, b.path))
+  let rel_entries = entries.map(e => e)
   rebase_write_tree_recursive(fs, git_dir, rel_entries)
 }
 
@@ -459,7 +459,7 @@ fn rebase_write_tree_recursive(
     let sub_id = rebase_write_tree_recursive(fs, git_dir, list)
     file_entries.push(@git.TreeEntry::new("040000", dir_name, sub_id))
   }
-  file_entries.sort_by(fn(a, b) { String::lexical_compare(a.name, b.name) })
+  file_entries.sort_by((a, b) => String::lexical_compare(a.name, b.name))
   let (tree_id, compressed) = @git.create_tree(file_entries)
   rebase_write_object(fs, git_dir, tree_id, compressed)
   tree_id
@@ -561,7 +561,7 @@ fn rebase_map_to_index(
       None => raise @git.GitError::InvalidObject("Missing blob object")
     }
   }
-  entries.sort_by(fn(a, b) { String::compare(a.path, b.path) })
+  entries.sort_by((a, b) => String::compare(a.path, b.path))
   entries
 }
 
@@ -631,7 +631,7 @@ fn rebase_parse_commit_content(
     let line = line_view.to_string()
     if line.has_prefix("tree ") {
       let hex = String::unsafe_substring(line, start=5, end=line.length())
-      tree_id = Some(@git.ObjectId::from_hex(hex))
+      tree_id = hex |> @git.ObjectId::from_hex |> Some
     } else if line.has_prefix("parent ") {
       let hex = String::unsafe_substring(line, start=7, end=line.length())
       parents.push(@git.ObjectId::from_hex(hex))
@@ -827,13 +827,13 @@ fn save_rebase_state(
   )
   fs.write_string(join_path(state_dir, "head-name"), state.head_name + "\n")
   // Write todo list
-  let todo_lines = state.todo.map(fn(id) { "pick " + id.to_hex() })
+  let todo_lines = state.todo.map(id => "pick " + id.to_hex())
   fs.write_string(
     join_path(state_dir, "git-rebase-todo"),
     todo_lines.join("\n") + "\n",
   )
   // Write done list
-  let done_lines = state.done.map(fn(id) { "pick " + id.to_hex() })
+  let done_lines = state.done.map(id => "pick " + id.to_hex())
   fs.write_string(
     join_path(state_dir, "done"),
     if done_lines.length() > 0 {
@@ -873,7 +873,7 @@ pub fn load_rebase_state(
   let done = parse_todo_file(fs, join_path(state_dir, "done"))
   let current = if fs.is_file(join_path(state_dir, "stopped-sha")) {
     let hex = read_file_trimmed(fs, join_path(state_dir, "stopped-sha"))
-    Some(@git.ObjectId::from_hex(hex))
+    hex |> @git.ObjectId::from_hex |> Some
   } else {
     None
   }
@@ -931,7 +931,7 @@ fn parse_todo_file(
       continue
     }
     // Format: "pick <sha>" or just "<sha>"
-    let parts = line.split(" ").map(fn(v) { v.to_string() }).collect()
+    let parts = line.split(" ").map(v => v.to_string()).collect()
     if parts.length() >= 2 && parts[0] == "pick" {
       let id = @git.ObjectId::from_hex(parts[1]) catch { _ => continue }
       result.push(id)

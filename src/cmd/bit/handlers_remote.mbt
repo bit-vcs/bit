@@ -150,7 +150,7 @@ async fn handle_remote(args : Array[String]) -> Unit raise Error {
       }
       let name = positional[0]
       let url = positional[1]
-      if not(@gitlib.is_valid_remote_name(name)) {
+      if (name |> @gitlib.is_valid_remote_name |> not) {
         die_remote(1, "fatal: '\{name}' is not a valid remote name")
       }
       let blocks = @gitlib.parse_config_blocks(
@@ -245,7 +245,7 @@ async fn handle_remote(args : Array[String]) -> Unit raise Error {
       }
       let old_name = positional[0]
       let new_name = positional[1]
-      if not(@gitlib.is_valid_remote_name(new_name)) {
+      if (new_name |> @gitlib.is_valid_remote_name |> not) {
         die_remote(1, "fatal: '\{new_name}' is not a valid remote name")
       }
       let blocks = @gitlib.parse_config_blocks(
@@ -263,6 +263,7 @@ async fn handle_remote(args : Array[String]) -> Unit raise Error {
       }
       if progress {
         emit_trace_region("progress", "Renaming remote references") catch {
+          err if @async.is_cancellation_error(err) => raise err
           _ => ()
         }
       }
@@ -562,9 +563,8 @@ fn remote_add(
   if mirror {
     lines.push("\tmirror = true")
   }
-  match tagopt {
-    Some(val) => lines.push("\ttagOpt = " + val)
-    None => ()
+  if tagopt is Some(val) {
+    lines.push("\ttagOpt = " + val)
   }
   let new_blocks = blocks
   new_blocks.push({
@@ -582,7 +582,7 @@ async fn remote_remove(
   rfs : &@git.RepoFileSystem,
   git_dir : String,
   name : String,
-) -> Unit raise @git.GitError {
+) -> Unit raise Error {
   let config_path = git_dir + "/config"
   if not(rfs.is_file(config_path)) {
     raise @git.GitError::InvalidObject("No such remote '\{name}'")
@@ -679,6 +679,7 @@ async fn remote_remove(
     @gitlib.sort_strings_lex(warn_branches)
     let msg = @gitlib.format_remove_warning(warn_branches)
     @stdio.stderr.write(str_to_bytes(msg)) catch {
+      err if @async.is_cancellation_error(err) => raise err
       _ => ()
     }
   }
@@ -801,7 +802,7 @@ async fn remote_rename(
   git_dir : String,
   old_name : String,
   new_name : String,
-) -> Unit raise @git.GitError {
+) -> Unit raise Error {
   let config_path = git_dir + "/config"
   let content = @gitlib.read_config_content(rfs, git_dir)
   let blocks = @gitlib.parse_config_blocks(content)
@@ -912,6 +913,7 @@ async fn remote_rename(
           lines,
         })
         fs.remove_file(legacy_remotes) catch {
+          err if @async.is_cancellation_error(err) => raise err
           _ => ()
         }
         found_remote = true
@@ -948,6 +950,7 @@ async fn remote_rename(
         lines,
       })
       fs.remove_file(legacy_branches) catch {
+        err if @async.is_cancellation_error(err) => raise err
         _ => ()
       }
       found_remote = true
@@ -986,11 +989,13 @@ async fn remote_rename(
     }
     if has_conflict {
       eprint_line("error: renaming remote references failed") catch {
+        err if @async.is_cancellation_error(err) => raise err
         _ => ()
       }
       eprint_line(
         "error: The remote you are trying to rename has conflicting references",
       ) catch {
+        err if @async.is_cancellation_error(err) => raise err
         _ => ()
       }
       rename_failed = true
@@ -1087,7 +1092,7 @@ async fn remote_prune(
   }
   let remote_path = @gitlib.resolve_local_repo_path(fs, local_root, url)
   guard remote_path is Some(path) else { return () }
-  let remote_git_dir = @gitlib.detect_git_dir(fs, path).map(fn(pair) { pair.0 })
+  let remote_git_dir = @gitlib.detect_git_dir(fs, path).map(pair => pair.0)
   guard remote_git_dir is Some(rgd) else { return () }
   let remote_refs = @gitlib.list_refs_with_ids(fs, rgd, Some("refs/"))
   let fetch_specs = @gitlib.parse_fetch_refspecs(rc.fetch)
@@ -1313,7 +1318,7 @@ async fn remote_set_head_auto(
   }
   let remote_path = @gitlib.resolve_local_repo_path(fs, local_root, url)
   guard remote_path is Some(path) else { return () }
-  let remote_git_dir = @gitlib.detect_git_dir(fs, path).map(fn(pair) { pair.0 })
+  let remote_git_dir = @gitlib.detect_git_dir(fs, path).map(pair => pair.0)
   guard remote_git_dir is Some(rgd) else { return () }
   let new_branch = @gitlib.read_remote_head_branch(fs, rgd).unwrap_or("")
   if new_branch.length() == 0 {
@@ -1356,11 +1361,7 @@ async fn remote_set_head_auto(
 fn get_committer_identity() -> (String, String, Int64, String) {
   let name = match @sys.get_env_var("GIT_COMMITTER_NAME") {
     Some(n) => n
-    None =>
-      match @sys.get_env_var("USER") {
-        Some(u) => u
-        None => "Unknown"
-      }
+    None => @sys.get_env_var("USER").unwrap_or("Unknown")
   }
   let email = match @sys.get_env_var("GIT_COMMITTER_EMAIL") {
     Some(e) => e
@@ -1706,12 +1707,16 @@ async fn fetch_from_remote(
       if fs.is_file(remote_path) {
         let content = decode_bytes(
           fs.read_file(remote_path) catch {
+            err if @async.is_cancellation_error(err) => raise err
             _ => Bytes::default()
           },
         )
         let hex = trim_string(content)
         if hex.length() > 0 {
-          prev_id = Some(@git.ObjectId::from_hex(hex)) catch { _ => None }
+          prev_id = (hex |> @git.ObjectId::from_hex |> Some) catch {
+            err if @async.is_cancellation_error(err) => raise err
+            _ => None
+          }
         }
       }
       if prev_id is Some(pid) && pid == commit_id {
@@ -1893,7 +1898,7 @@ async fn remote_show(
     @gitlib.resolve_local_repo_path(fs, local_root, fetch_url)
   }
   let remote_git_dir = match remote_path {
-    Some(p) => @gitlib.detect_git_dir(fs, p).map(fn(pair) { pair.0 })
+    Some(p) => @gitlib.detect_git_dir(fs, p).map(pair => pair.0)
     None => None
   }
   let head_branch = match remote_git_dir {
@@ -2187,7 +2192,7 @@ fn parse_pack_args(args : Array[String]) -> (Bool, String)? {
 }
 
 ///|
-async fn handle_upload_pack(args : Array[String]) -> Unit {
+async fn handle_upload_pack(args : Array[String]) -> Unit raise Error {
   // Handle -h option
   for arg in args {
     if arg == "-h" {
@@ -2247,20 +2252,12 @@ async fn handle_upload_pack(args : Array[String]) -> Unit {
     }
     let allow_filter = match
       git_config_get(config_git_dir, "uploadpack", "allowfilter") {
-      Some(value) =>
-        match parse_bool_value(value) {
-          Some(flag) => flag
-          None => false
-        }
+      Some(value) => parse_bool_value(value).unwrap_or(false)
       None => false
     }
     let allow_any_want = match
       git_config_get(config_git_dir, "uploadpack", "allowanysha1inwant") {
-      Some(value) =>
-        match parse_bool_value(value) {
-          Some(flag) => flag
-          None => false
-        }
+      Some(value) => parse_bool_value(value).unwrap_or(false)
       None => false
     }
     if has_uploadpackfilter || allow_filter || allow_any_want {
@@ -2306,6 +2303,7 @@ async fn handle_upload_pack(args : Array[String]) -> Unit {
       }
     }
   } catch {
+    err if @async.is_cancellation_error(err) => raise err
     err => upload_pack_fail(err, protocol_version, advertise)
   }
 }
@@ -2448,13 +2446,19 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
     if arg == "--depth" && i + 1 < args.length() {
       // Parse depth value
       let depth_str = args[i + 1]
-      depth = @strconv.parse_int(depth_str) catch { _ => 0 }
+      depth = @strconv.parse_int(depth_str) catch {
+        err if @async.is_cancellation_error(err) => raise err
+        _ => 0
+      }
       i += 2
       continue
     }
     if arg.has_prefix("--depth=") {
       let depth_str = String::unsafe_substring(arg, start=8, end=arg.length())
-      depth = @strconv.parse_int(depth_str) catch { _ => 0 }
+      depth = @strconv.parse_int(depth_str) catch {
+        err if @async.is_cancellation_error(err) => raise err
+        _ => 0
+      }
       i += 1
       continue
     }
@@ -2504,7 +2508,7 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
   }
   // Check for ambiguity with local directories
   let fs = OsFs::new()
-  match check_shorthand_ambiguity(remote_url, fn(p) { fs.is_dir(p) }) {
+  match check_shorthand_ambiguity(remote_url, p => fs.is_dir(p)) {
     Some(conflict_path) =>
       raise @git.GitError::InvalidObject(
         "Ambiguous: '\{conflict_path}' exists locally. Use full URL or ./\{remote_url} for local path.",
@@ -2642,12 +2646,14 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
               match branch {
                 Some(name) => {
                   fs.mkdir_p(git_dir + "/refs/heads") catch {
+                    err if @async.is_cancellation_error(err) => raise err
                     _ => ()
                   }
                   fs.write_string(
                     git_dir + "/refs/heads/" + name,
                     commit_id.to_hex() + "\n",
                   ) catch {
+                    err if @async.is_cancellation_error(err) => raise err
                     _ => ()
                   }
                   let _ = @gitlib.checkout(fs, fs, target, name)
@@ -3062,6 +3068,7 @@ async fn handle_subdir_push(
 ) -> Unit raise Error {
   // Step 1: Get local HEAD commit
   let local_head_opt = @gitlib.rev_parse(fs, git_dir, "HEAD") catch {
+    err if @async.is_cancellation_error(err) => raise err
     _ => raise @git.GitError::InvalidObject("Cannot resolve HEAD")
   }
   guard local_head_opt is Some(local_head) else {
@@ -3070,6 +3077,7 @@ async fn handle_subdir_push(
   print_line("  Local HEAD: \{local_head.to_hex()}")
   // Step 2: Get the initial commit (first commit in the subdir-clone)
   let initial_commit = find_initial_subdir_commit(fs, git_dir) catch {
+    err if @async.is_cancellation_error(err) => raise err
     _ => raise @git.GitError::InvalidObject("Cannot find initial commit")
   }
   print_line("  Initial commit: \{initial_commit.to_hex()}")
@@ -3086,6 +3094,7 @@ async fn handle_subdir_push(
   print_line("  Found \{local_commits.length()} local commits to transform")
   // Step 4: Get upstream base commit
   let upstream_base = @git.ObjectId::from_hex(base_hex) catch {
+    err if @async.is_cancellation_error(err) => raise err
     _ => raise @git.GitError::InvalidObject("Cannot parse base commit")
   }
   print_line("  Upstream base: \{upstream_base.to_hex()}")
@@ -3238,8 +3247,8 @@ fn replace_tree_at_path(
 ) -> @git.ObjectId raise @git.GitError {
   let path_parts : Array[String] = path
     .split("/")
-    .filter(fn(s) { s.length() > 0 })
-    .map(fn(s) { s.to_string() })
+    .filter(s => s.length() > 0)
+    .map(s => s.to_string())
     .collect()
   if path_parts.length() == 0 {
     return new_subtree

@@ -190,7 +190,7 @@ fn clock_to_string(clock : Map[String, Int64]) -> String {
     return ""
   }
   let items = clock.to_array()
-  items.sort_by(fn(a, b) { String::compare(a.0, b.0) })
+  items.sort_by((a, b) => String::compare(a.0, b.0))
   let parts : Array[String] = []
   for item in items {
     let (key, value) = item
@@ -214,14 +214,8 @@ fn compare_clock(a : Map[String, Int64], b : Map[String, Int64]) -> Int {
   let mut b_gt = false
   for item in keys.to_array() {
     let (key, _) = item
-    let va = match a.get(key) {
-      Some(v) => v
-      None => 0
-    }
-    let vb = match b.get(key) {
-      Some(v) => v
-      None => 0
-    }
+    let va = a.get(key).unwrap_or(0)
+    let vb = b.get(key).unwrap_or(0)
     if va > vb {
       a_gt = true
     } else if vb > va {
@@ -263,10 +257,10 @@ pub fn merge_record_bytes(ours : Bytes, theirs : Bytes) -> Bytes {
   let theirs_text = @utf8.decode_lossy(theirs[:])
   let ours_record = parse_collab_record(ours_text)
   let theirs_record = parse_collab_record(theirs_text)
-  if not(is_valid_record(ours_record)) && is_valid_record(theirs_record) {
+  if (ours_record |> is_valid_record |> not) && is_valid_record(theirs_record) {
     return theirs
   }
-  if not(is_valid_record(theirs_record)) {
+  if (theirs_record |> is_valid_record |> not) {
     return ours
   }
   let winner = if record_is_newer(theirs_record, ours_record) {
@@ -460,10 +454,7 @@ fn increment_clock(
   node : String,
 ) -> Map[String, Int64] {
   let next = clock
-  let current = match next.get(node) {
-    Some(v) => v
-    None => 0
-  }
+  let current = next.get(node).unwrap_or(0)
   next[node] = current + 1
   next
 }
@@ -488,7 +479,7 @@ fn commit_notes(
     let (name, blob_id) = item
     tree_entries.push(@git.TreeEntry::new("100644", name, blob_id))
   }
-  tree_entries.sort_by(fn(a, b) { String::compare(a.name, b.name) })
+  tree_entries.sort_by((a, b) => String::compare(a.name, b.name))
   let tree_bytes = @git.serialize_tree(tree_entries)
   let tree_id = objects.put(@git.ObjectType::Tree, tree_bytes)
   // Create commit

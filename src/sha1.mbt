@@ -79,7 +79,7 @@ fn Sha1State::process_block(self : Sha1State) -> Unit {
       (block[i * 4 + 2].to_int() << 8) |
       block[i * 4 + 3].to_int()
   }
-  for i = 16; i < 80; i = i + 1 {
+  for i in 16..<80 {
     w[i] = rotl32(w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16], 1)
   }
   let mut a = h[0]
@@ -148,7 +148,7 @@ pub fn Sha1State::update_slice(
   while pos < end {
     let space = 64 - self.block_len
     let to_copy = if end - pos < space { end - pos } else { space }
-    for i = 0; i < to_copy; i = i + 1 {
+    for i in 0..<to_copy {
       self.block[self.block_len + i] = data[pos + i]
     }
     self.block_len += to_copy
@@ -246,7 +246,7 @@ pub fn sha1_array_prefix(data : Array[Byte], len : Int) -> ObjectId {
     len
   }
   let state = Sha1State::new()
-  for i = 0; i < msg_len; i = i + 1 {
+  for i in 0..<msg_len {
     state.update_byte(data[i])
   }
   state.finish()

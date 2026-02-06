@@ -29,7 +29,7 @@ pub fn ObjectId::from_bytes(data : Bytes) -> ObjectId raise GitError {
     raise GitError::InvalidObject("Invalid ObjectId length: \{data.length()}")
   }
   let bytes = FixedArray::make(20, b'\x00')
-  for i = 0; i < 20; i = i + 1 {
+  for i in 0..<20 {
     bytes[i] = data[i]
   }
   { bytes, }
@@ -39,7 +39,7 @@ pub fn ObjectId::from_bytes(data : Bytes) -> ObjectId raise GitError {
 /// Create ObjectId from Bytes at offset (for parsing packed data)
 pub fn ObjectId::from_bytes_at(data : Bytes, offset : Int) -> ObjectId {
   let bytes = FixedArray::make(20, b'\x00')
-  for i = 0; i < 20; i = i + 1 {
+  for i in 0..<20 {
     bytes[i] = data[offset + i]
   }
   { bytes, }
@@ -113,7 +113,7 @@ pub impl Eq for ObjectId with equal(self, other) {
 /// Hash implementation for using ObjectId as Map key
 pub impl Hash for ObjectId with hash_combine(self, hasher) {
   // Use first 8 bytes as hash (sufficient for distribution)
-  for i = 0; i < 8; i = i + 1 {
+  for i in 0..<8 {
     self.bytes[i].hash_combine(hasher)
   }
 }

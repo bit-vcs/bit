@@ -123,9 +123,10 @@ pub fn checkout(
     None => raise @git.GitError::InvalidObject("Invalid ref: \{spec}")
     Some(id) => id
   }
-  match refname {
-    Some(name) => fs.write_string(head_path, "ref: \{name}\n")
-    None => fs.write_string(head_path, commit_id.to_hex() + "\n")
+  if refname is Some(name) {
+    fs.write_string(head_path, "ref: \{name}\n")
+  } else {
+    fs.write_string(head_path, commit_id.to_hex() + "\n")
   }
   if update_worktree || update_index {
     let db = ObjectDb::load(rfs, actual_git_dir)

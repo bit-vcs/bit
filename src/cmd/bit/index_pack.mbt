@@ -290,7 +290,7 @@ fn parse_tag_object_id(data : Bytes) -> @git.ObjectId? raise @git.GitError {
   }
   match object_hex {
     None => None
-    Some(hex) => Some(@git.ObjectId::from_hex(hex))
+    Some(hex) => hex |> @git.ObjectId::from_hex |> Some
   }
 }
 
@@ -415,9 +415,7 @@ fn verify_pack_index(idx : Bytes, pack : Bytes) -> String? {
     return Some("index file truncated")
   }
   let idx_data_len = idx.length() - 20
-  let idx_data = Bytes::from_array(
-    FixedArray::makei(idx_data_len, fn(i) { idx[i] }),
-  )
+  let idx_data = Bytes::from_array(FixedArray::makei(idx_data_len, i => idx[i]))
   let computed_idx_checksum = @git.sha1(idx_data)
   let stored_idx_checksum = read_sha1_at(idx, idx_data_len)
   if computed_idx_checksum != stored_idx_checksum {
@@ -459,7 +457,7 @@ fn verify_pack_index(idx : Bytes, pack : Bytes) -> String? {
     return Some("pack file too short")
   }
   let pack_data = Bytes::from_array(
-    FixedArray::makei(pack_data_len, fn(i) { pack[i] }),
+    FixedArray::makei(pack_data_len, i => pack[i]),
   )
   let computed_pack_checksum = @git.sha1(pack_data)
   if computed_pack_checksum != stored_pack_checksum {
@@ -565,7 +563,7 @@ fn verify_pack_index_v1(idx : Bytes, pack : Bytes) -> String? {
     return Some("pack file too short")
   }
   let pack_data = Bytes::from_array(
-    FixedArray::makei(pack_data_len, fn(i) { pack[i] }),
+    FixedArray::makei(pack_data_len, i => pack[i]),
   )
   let computed_pack_checksum = @git.sha1(pack_data)
   if computed_pack_checksum != stored_pack_checksum {
@@ -632,7 +630,7 @@ fn read_sha1_at(data : Bytes, offset : Int) -> @git.ObjectId {
 }
 
 ///|
-async fn handle_index_pack(args : Array[String]) -> Unit {
+async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
   match parse_index_pack_args(args) {
     IndexPackParse::Unsupported => {
       @stdio.stderr.write("bit index-pack: unsupported options\n")
@@ -711,6 +709,7 @@ async fn handle_index_pack(args : Array[String]) -> Unit {
           }
         }
         let pack = @fs.read_file_to_bytes(pack_path) catch {
+          err if @async.is_cancellation_error(err) => raise err
           err => {
             @stdio.stderr.write("fatal: " + err.to_string() + "\n")
             @sys.exit(1)
@@ -718,6 +717,7 @@ async fn handle_index_pack(args : Array[String]) -> Unit {
           }
         }
         let max_depth = @pack.max_delta_chain_length(pack) catch {
+          err if @async.is_cancellation_error(err) => raise err
           err => {
             @stdio.stderr.write("fatal: " + err.to_string() + "\n")
             @sys.exit(1)
@@ -739,6 +739,7 @@ async fn handle_index_pack(args : Array[String]) -> Unit {
           }
         }
         let pack = @fs.read_file_to_bytes(pack_path) catch {
+          err if @async.is_cancellation_error(err) => raise err
           err => {
             @stdio.stderr.write("fatal: " + err.to_string() + "\n")
             @sys.exit(1)
@@ -752,6 +753,7 @@ async fn handle_index_pack(args : Array[String]) -> Unit {
           pack_path + ".idx"
         }
         let idx = @fs.read_file_to_bytes(idx_path) catch {
+          err if @async.is_cancellation_error(err) => raise err
           err => {
             @stdio.stderr.write("fatal: " + err.to_string() + "\n")
             @sys.exit(1)
@@ -780,6 +782,7 @@ async fn handle_index_pack(args : Array[String]) -> Unit {
         }
         let bases = if cfg.fix_thin {
           @gitlib.load_all_objects_from_fs(fs, git_dir) catch {
+            err if @async.is_cancellation_error(err) => raise err
             _ => []
           }
         } else {
@@ -824,6 +827,7 @@ async fn handle_index_pack(args : Array[String]) -> Unit {
       }
       let pack_path = resolve_in_cwd(pack_path)
       let pack = @fs.read_file_to_bytes(pack_path) catch {
+        err if @async.is_cancellation_error(err) => raise err
         err => {
           @stdio.stderr.write("fatal: " + err.to_string() + "\n")
           @sys.exit(1)
@@ -843,9 +847,8 @@ async fn handle_index_pack(args : Array[String]) -> Unit {
       }
       let objects = @pack.parse_packfile(pack)
       let git_dir_opt = if fs.is_dir(git_dir) { Some(git_dir) } else { None }
-      match git_dir_opt {
-        Some(dir) => check_sha1_collisions_with_repo(fs, dir, objects)
-        None => ()
+      if git_dir_opt is Some(dir) {
+        check_sha1_collisions_with_repo(fs, dir, objects)
       }
       check_pack_strict_and_fsck(
         fs,
