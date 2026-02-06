@@ -68,7 +68,7 @@ pub fn Kv::serialize_snapshot(self : Kv) -> SerializedSnapshot {
   let objects : Array[SerializedObject] = []
   if self.head != @git.ObjectId::zero() {
     let store : &@lib.ObjectStore = self.store
-    collect_objects_for_serialization(store, self.head, objects, {})
+    collect_objects_for_serialization(store, self.head, objects, Set::new())
   }
   {
     version: 1,
@@ -84,16 +84,15 @@ fn collect_objects_for_serialization(
   store : &@lib.ObjectStore,
   id : @git.ObjectId,
   objects : Array[SerializedObject],
-  visited : Map[String, Bool],
+  visited : Set[@git.ObjectId],
 ) -> Unit {
   if id == @git.ObjectId::zero() {
     return
   }
-  let hex = id.to_hex()
-  if visited.contains(hex) {
+  if visited.contains(id) {
     return
   }
-  visited[hex] = true
+  visited.add(id)
   let obj = store.get(id) catch { _ => return }
   guard obj is Some(o) else { return }
   // Add this object
@@ -140,34 +139,38 @@ fn collect_objects_for_serialization(
 ///     4 bytes: data length
 ///     N bytes: data
 pub fn SerializedSnapshot::to_bytes(self : SerializedSnapshot) -> Bytes {
-  let buf : Array[Byte] = []
+  let buf = @buffer.new(size_hint=self.byte_size())
   // Version
-  write_u32_le(buf, self.version)
+  buf.write_int_le(self.version)
   // Node ID
-  write_string(buf, self.node_id)
+  buf_write_ascii_string(buf, self.node_id)
   // Head
-  for i in 0..<20 {
-    buf.push(self.head[i])
-  }
+  buf.write_bytes(self.head)
   // Clock entries
-  write_u32_le(buf, self.clock.length())
+  buf.write_int_le(self.clock.length())
   for entry in self.clock {
-    write_string(buf, entry.0)
-    write_i64_le(buf, entry.1)
+    buf_write_ascii_string(buf, entry.0)
+    buf.write_int64_le(entry.1)
   }
   // Objects
-  write_u32_le(buf, self.objects.length())
+  buf.write_int_le(self.objects.length())
   for obj in self.objects {
-    for i in 0..<20 {
-      buf.push(obj.id[i])
-    }
-    buf.push(obj.obj_type.to_byte())
-    write_u32_le(buf, obj.data.length())
-    for i in 0..<obj.data.length() {
-      buf.push(obj.data[i])
-    }
+    buf.write_bytes(obj.id)
+    buf.write_byte(obj.obj_type.to_byte())
+    buf.write_int_le(obj.data.length())
+    buf.write_bytes(obj.data)
   }
-  Bytes::from_array(buf)
+  buf.to_bytes()
+}
+
+///|
+/// Write ASCII string as length-prefixed bytes (1 byte per char, compatible with read_string)
+fn buf_write_ascii_string(buf : @buffer.Buffer, s : String) -> Unit {
+  let chars = s.to_array()
+  buf.write_int_le(chars.length())
+  for c in chars {
+    buf.write_byte(c.to_int().to_byte())
+  }
 }
 
 ///|
@@ -212,40 +215,6 @@ pub fn SerializedSnapshot::from_bytes(data : Bytes) -> SerializedSnapshot {
     objects.push({ id, obj_type, data: obj_data })
   }
   { version, node_id, head, clock, objects }
-}
-
-///|
-fn write_u32_le(buf : Array[Byte], value : Int) -> Unit {
-  buf.push((value & 0xFF).to_byte())
-  buf.push(((value >> 8) & 0xFF).to_byte())
-  buf.push(((value >> 16) & 0xFF).to_byte())
-  buf.push(((value >> 24) & 0xFF).to_byte())
-}
-
-///|
-fn write_i64_le(buf : Array[Byte], value : Int64) -> Unit {
-  for i in 0..<8 {
-    buf.push(((value >> (i * 8)) & 0xFFL).to_byte())
-  }
-}
-
-///|
-fn write_string(buf : Array[Byte], s : String) -> Unit {
-  let bytes = string_to_bytes(s)
-  write_u32_le(buf, bytes.length())
-  for i in 0..<bytes.length() {
-    buf.push(bytes[i])
-  }
-}
-
-///|
-fn string_to_bytes(s : String) -> Bytes {
-  let arr = s.to_array()
-  let result : Array[Byte] = []
-  for i in 0..<arr.length() {
-    result.push(arr[i].to_int().to_byte())
-  }
-  Bytes::from_array(result)
 }
 
 ///|

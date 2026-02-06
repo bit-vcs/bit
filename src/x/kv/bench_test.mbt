@@ -1,8 +1,33 @@
 ///| Benchmarks for hot/cold serialization
 
 ///|
-/// Create test data with specified size
-fn create_test_db(
+/// Cached ObjectStore that loads ObjectDb once (for benchmarks)
+priv struct CachedTestObjectStore {
+  db : @lib.ObjectDb
+  backing_fs : &@git.RepoFileSystem
+  write_fs : &@git.FileSystem
+  git_dir : String
+}
+
+///|
+impl @lib.ObjectStore for CachedTestObjectStore with get(self, id) {
+  self.db.get(self.backing_fs, id)
+}
+
+///|
+impl @lib.ObjectStore for CachedTestObjectStore with put(self, obj_type, data) {
+  @lib.write_loose_object(self.write_fs, self.git_dir, obj_type, data)
+}
+
+///|
+impl @lib.ObjectStore for CachedTestObjectStore with has(self, id) {
+  let obj = self.db.get(self.backing_fs, id) catch { _ => return false }
+  obj is Some(_)
+}
+
+///|
+/// Create bench Kv with CachedTestObjectStore (ObjectDb loaded once)
+fn create_bench_db(
   file_count : Int,
   file_size : Int,
 ) -> (Kv, @git.TestFs) raise @git.GitError {
@@ -33,34 +58,48 @@ fn create_test_db(
   }
   // Commit
   let _ = db.commit("Initial commit", 1000L)
-  (db, fs)
+  // Now build a cached store with ObjectDb loaded once
+  let obj_db = @lib.ObjectDb::load(fs, "/repo/.git")
+  let cached_store : CachedTestObjectStore = {
+    db: obj_db,
+    backing_fs: fs,
+    write_fs: fs,
+    git_dir: "/repo/.git",
+  }
+  let cached_kv = Kv::new(
+    NodeId::new("bench-node"),
+    tree,
+    cached_store,
+    db.head,
+  )
+  (cached_kv, fs)
 }
 
 ///|
 /// Benchmark: Serialize small snapshot (10 files, 1KB each)
 test "bench: serialize small snapshot (10 files x 1KB)" (b : @bench.T) {
-  let (db, _fs) = try! create_test_db(10, 1024)
+  let (db, _fs) = try! create_bench_db(10, 1024)
   b.bench(fn() { b.keep(db.serialize_snapshot()) })
 }
 
 ///|
 /// Benchmark: Serialize medium snapshot (100 files, 1KB each)
 test "bench: serialize medium snapshot (100 files x 1KB)" (b : @bench.T) {
-  let (db, _fs) = try! create_test_db(100, 1024)
+  let (db, _fs) = try! create_bench_db(100, 1024)
   b.bench(fn() { b.keep(db.serialize_snapshot()) })
 }
 
 ///|
 /// Benchmark: Serialize large snapshot (100 files, 10KB each)
 test "bench: serialize large snapshot (100 files x 10KB)" (b : @bench.T) {
-  let (db, _fs) = try! create_test_db(100, 10240)
+  let (db, _fs) = try! create_bench_db(100, 10240)
   b.bench(fn() { b.keep(db.serialize_snapshot()) })
 }
 
 ///|
 /// Benchmark: Snapshot to bytes (full pipeline)
 test "bench: snapshot to bytes (10 files x 1KB)" (b : @bench.T) {
-  let (db, _fs) = try! create_test_db(10, 1024)
+  let (db, _fs) = try! create_bench_db(10, 1024)
   b.bench(fn() {
     let snapshot = db.serialize_snapshot()
     b.keep(snapshot.to_bytes())
@@ -70,7 +109,7 @@ test "bench: snapshot to bytes (10 files x 1KB)" (b : @bench.T) {
 ///|
 /// Benchmark: Snapshot to bytes (100 files)
 test "bench: snapshot to bytes (100 files x 1KB)" (b : @bench.T) {
-  let (db, _fs) = try! create_test_db(100, 1024)
+  let (db, _fs) = try! create_bench_db(100, 1024)
   b.bench(fn() {
     let snapshot = db.serialize_snapshot()
     b.keep(snapshot.to_bytes())
@@ -78,9 +117,17 @@ test "bench: snapshot to bytes (100 files x 1KB)" (b : @bench.T) {
 }
 
 ///|
+/// Benchmark: to_bytes only (100 files)
+test "bench: to_bytes only (100 files x 1KB)" (b : @bench.T) {
+  let (db, _fs) = try! create_bench_db(100, 1024)
+  let snapshot = db.serialize_snapshot()
+  b.bench(fn() { b.keep(snapshot.to_bytes()) })
+}
+
+///|
 /// Benchmark: Bytes to snapshot (deserialization)
 test "bench: bytes to snapshot (10 files x 1KB)" (b : @bench.T) {
-  let (db, _fs) = try! create_test_db(10, 1024)
+  let (db, _fs) = try! create_bench_db(10, 1024)
   let snapshot = db.serialize_snapshot()
   let bytes = snapshot.to_bytes()
   b.bench(fn() { b.keep(SerializedSnapshot::from_bytes(bytes)) })
@@ -89,7 +136,7 @@ test "bench: bytes to snapshot (10 files x 1KB)" (b : @bench.T) {
 ///|
 /// Benchmark: Bytes to snapshot (100 files)
 test "bench: bytes to snapshot (100 files x 1KB)" (b : @bench.T) {
-  let (db, _fs) = try! create_test_db(100, 1024)
+  let (db, _fs) = try! create_bench_db(100, 1024)
   let snapshot = db.serialize_snapshot()
   let bytes = snapshot.to_bytes()
   b.bench(fn() { b.keep(SerializedSnapshot::from_bytes(bytes)) })
@@ -98,7 +145,7 @@ test "bench: bytes to snapshot (100 files x 1KB)" (b : @bench.T) {
 ///|
 /// Benchmark: Round-trip (serialize + deserialize)
 test "bench: round-trip (10 files x 1KB)" (b : @bench.T) {
-  let (db, _fs) = try! create_test_db(10, 1024)
+  let (db, _fs) = try! create_bench_db(10, 1024)
   b.bench(fn() {
     let snapshot = db.serialize_snapshot()
     let bytes = snapshot.to_bytes()
@@ -109,7 +156,7 @@ test "bench: round-trip (10 files x 1KB)" (b : @bench.T) {
 ///|
 /// Benchmark: Round-trip (100 files)
 test "bench: round-trip (100 files x 1KB)" (b : @bench.T) {
-  let (db, _fs) = try! create_test_db(100, 1024)
+  let (db, _fs) = try! create_bench_db(100, 1024)
   b.bench(fn() {
     let snapshot = db.serialize_snapshot()
     let bytes = snapshot.to_bytes()
