@@ -1,0 +1,18 @@
+import {
+  "mizchi/bit" as @git,
+  "mizchi/bit/lib" as @lib,
+  "mizchi/bit/native" as @gitnative,
+  "mizchi/bit/osfs" as @osfs,
+  "mizchi/bit/x/collab" as @collab,
+  "mizchi/bit/x/collab/native" as @collab_native,
+  "mizchi/bit/x/agent" as @agent,
+  "mizchi/bit/x/fs" as @bitfs,
+  "mizchi/bit/protocol" as @protocol,
+  "mizchi/bit/pack" as @pack,
+  "moonbitlang/async" as @async,
+  "moonbitlang/async/process" as @process,
+}
+
+options(
+  targets: { "runner.mbt": [ "native" ], "server.mbt": [ "native" ] },
+)

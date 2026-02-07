@@ -50,6 +50,7 @@ async fn show_help() -> Unit {
     #|
     #|experimental
     #|   collab       Manage pull requests and issues
+    #|   agent        P2P agent for automated PR collaboration
     #|   subdir-clone  Clone subdirectory as independent repository
     #|   hq            ghq-compatible repository management (~/bhq)
     #|
@@ -106,6 +107,10 @@ async fn show_command_help(cmd : String) -> Bool {
     }
     "collab" => {
       print_collab_usage()
+      true
+    }
+    "agent" => {
+      print_agent_usage()
       true
     }
     "clone" => {
@@ -997,6 +1002,11 @@ async fn dispatch_command(
       handle_collab(rest) catch {
         err if @async.is_cancellation_error(err) => raise err
         err => exit_with_error("collab", err)
+      }
+    "agent" =>
+      handle_agent(rest) catch {
+        err if @async.is_cancellation_error(err) => raise err
+        err => exit_with_error("agent", err)
       }
     "hq" =>
       handle_hq(rest) catch {

@@ -1,0 +1,14 @@
+import {
+  "moonbitlang/core/json" as @json,
+}
+
+options(
+  is_main: true,
+  "native-stub": [ "native_stub.c" ],
+  targets: {
+    "io.mbt": [ "native" ],
+    "main.mbt": [ "native" ],
+    "main_js.mbt": [ "js" ],
+    "server.mbt": [ "native" ],
+  },
+)

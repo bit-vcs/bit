@@ -1,0 +1,13 @@
+import {
+  "mizchi/bit" as @git,
+  "mizchi/bit/lib" as @lib,
+  "mizchi/bit/x/collab" as @collab,
+}
+
+import "test" {
+  "mizchi/bit/lib" as @lib,
+}
+
+options(
+  targets: { "agent_test.mbt": [ "native" ] },
+)
