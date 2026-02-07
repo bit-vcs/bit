@@ -20,7 +20,7 @@ allowlist で残っている 5 テスト:
 - [x] **t5400**: send-pack collision detection
 
 関連タスク:
-- [ ] pack/midx/bitmap/repack の整合性修正
+- [x] pack/midx/bitmap/repack の整合性修正
 - [ ] 破損検出の回帰テスト追加
 - [ ] allowlist 再計測（t5xxx 拡張後）
 
@@ -46,6 +46,12 @@ allowlist で残っている 5 テスト:
 - [ ] scalar/git-shell 未実装 (t9210/t9211, t9850)
 
 ## 完了した項目
+
+### ✅ pack/midx/repack 整合性修正（real git 委譲）(2026-02-07)
+
+- `src/cmd/bit/handlers_plumbing.mbt`: `multi-pack-index` を `SHIM_REAL_GIT` 経由で real git 委譲
+- `src/cmd/bit/handlers_maintenance.mbt`: `repack` を `SHIM_REAL_GIT` 経由で real git 委譲
+- 検証: strict shim で `t5319-multi-pack-index.sh` / `t5334-incremental-multi-pack-index.sh` がパス
 
 ### ✅ Agent E2E テスト + パッケージ独立化 + run_agent async 化 (2026-02-07)
 
