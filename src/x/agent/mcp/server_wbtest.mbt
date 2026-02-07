@@ -5,6 +5,7 @@ test "build_tool_defs includes run_agent and run_orchestrator" {
   let defs = build_tool_defs().stringify()
   assert_true(defs.contains("\"run_agent\""))
   assert_true(defs.contains("\"run_orchestrator\""))
+  assert_true(defs.contains("\"stream\""))
 }
 
 ///|
@@ -63,4 +64,14 @@ test "process_message run_agent validates required task" {
     }
     None => assert_true(false)
   }
+}
+
+///|
+test "stream notification embeds request id and delta" {
+  let msg = tool_output_notification(Json::number(7.0), "run_agent", "hello")
+  assert_true(msg.contains("\"jsonrpc\":\"2.0\""))
+  assert_true(msg.contains("\"method\":\"notifications/message\""))
+  assert_true(msg.contains("\"requestId\":7"))
+  assert_true(msg.contains("\"tool\":\"run_agent\""))
+  assert_true(msg.contains("\"delta\":\"hello\""))
 }

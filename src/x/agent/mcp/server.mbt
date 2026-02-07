@@ -57,6 +57,41 @@ fn jsonrpc_error(id : Json, code : Int, message : String) -> String {
 }
 
 ///|
+fn jsonrpc_notification(meth : String, params : Json) -> String {
+  let msg : Map[String, Json] = {}
+  msg["jsonrpc"] = "2.0".to_json()
+  msg["method"] = meth.to_json()
+  msg["params"] = params
+  Json::object(msg).stringify()
+}
+
+///|
+fn tool_output_notification(id : Json, tool : String, delta : String) -> String {
+  let payload : Map[String, Json] = {}
+  payload["type"] = "tool_output".to_json()
+  payload["requestId"] = id
+  payload["tool"] = tool.to_json()
+  payload["delta"] = delta.to_json()
+  let params : Map[String, Json] = {}
+  params["level"] = "info".to_json()
+  params["logger"] = "bit-agent".to_json()
+  params["data"] = Json::object(payload)
+  jsonrpc_notification("notifications/message", Json::object(params))
+}
+
+///|
+fn maybe_stream_tool_output(
+  stream : Bool,
+  id : Json,
+  tool : String,
+  delta : String,
+) -> Unit {
+  if stream && not(delta.is_empty()) {
+    write_message(tool_output_notification(id, tool, delta))
+  }
+}
+
+///|
 fn tool_result_text(text : String) -> Json {
   let content : Map[String, Json] = {}
   content["type"] = "text".to_json()
@@ -120,6 +155,10 @@ fn build_tool_defs() -> Json {
     "type": "boolean".to_json(),
     "description": "Skip auto-commit (default: false)".to_json(),
   })
+  ra_props["stream"] = Json::object({
+    "type": "boolean".to_json(),
+    "description": "Stream progress via notifications/message (default: true)".to_json(),
+  })
   run_agent_schema["properties"] = Json::object(ra_props)
   run_agent_schema["required"] = Json::array(["task".to_json()])
   let run_agent_tool : Map[String, Json] = {}
@@ -149,6 +188,10 @@ fn build_tool_defs() -> Json {
   o_props["max_workers"] = Json::object({
     "type": "integer".to_json(),
     "description": "Max parallel workers (default: 3)".to_json(),
+  })
+  o_props["stream"] = Json::object({
+    "type": "boolean".to_json(),
+    "description": "Stream progress via notifications/message (default: true)".to_json(),
   })
   orch_schema["properties"] = Json::object(o_props)
   orch_schema["required"] = Json::array(["task".to_json()])
@@ -208,6 +251,7 @@ fn handle_run_agent(id : Json, args : Json) -> String {
   let model = json_get_str(args, "model")
   let max_steps = json_get_int(args, "max_steps", 20)
   let no_commit = json_get_bool(args, "no_commit", false)
+  let stream = json_get_bool(args, "stream", true)
   let ts = @agent_llm.strip_trailing_whitespace(
     @llm_ffi.exec_sync("date +%s", 5000),
   )
@@ -237,6 +281,7 @@ fn handle_run_agent(id : Json, args : Json) -> String {
   log("[mcp] Running agent: task=" + task)
   @agent_llm.run_llm_agent(config, on_output=fn(s) {
     buf.write_string(s)
+    maybe_stream_tool_output(stream, id, "run_agent", s)
     log("[agent] " + s)
   })
   jsonrpc_response(id, tool_result_text(buf.to_string()))
@@ -252,6 +297,7 @@ fn handle_run_orchestrator(id : Json, args : Json) -> String {
   let provider = json_get_str(args, "provider")
   let model = json_get_str(args, "model")
   let max_workers = json_get_int(args, "max_workers", 3)
+  let stream = json_get_bool(args, "stream", true)
   let config : @agent_llm.OrchestratorConfig = {
     work_dir,
     task,
@@ -271,6 +317,7 @@ fn handle_run_orchestrator(id : Json, args : Json) -> String {
   log("[mcp] Orchestrating: task=" + task)
   @agent_llm.run_orchestrator(config, on_output=fn(s) {
     buf.write_string(s)
+    maybe_stream_tool_output(stream, id, "run_orchestrator", s)
     log("[orch] " + s)
   })
   jsonrpc_response(id, tool_result_text(buf.to_string()))
