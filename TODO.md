@@ -6,7 +6,7 @@
 |--------|-------|
 | MoonBit tests | 617 passing |
 | Git compatibility | 95.5% (744/779) |
-| Allowlist pass | 97.7% (4650/4760) |
+| Allowlist pass | 97.6% (24273/24858, failed 0 / broken 178) |
 | Pure化 coverage | ~85% |
 | CI | 5 shards all green |
 
@@ -22,7 +22,7 @@ allowlist で残っている 5 テスト:
 関連タスク:
 - [x] pack/midx/bitmap/repack の整合性修正
 - [x] 破損検出の回帰テスト追加
-- [ ] allowlist 再計測（t5xxx 拡張後）
+- [x] allowlist 再計測（t5xxx 拡張後）
 
 ## Tier 2: Agent Features (High)
 
@@ -53,6 +53,7 @@ allowlist で残っている 5 テスト:
 - `src/cmd/bit/handlers_maintenance.mbt`: `repack` を `SHIM_REAL_GIT` 経由で real git 委譲
 - `t/t1301-midx-corruption.sh`: checksum/chunk table/pack 欠損の回帰テスト追加
 - 検証: strict shim で `t5319-multi-pack-index.sh` / `t5334-incremental-multi-pack-index.sh` がパス
+- allowlist 再計測（`just git-t-allowlist-shim-strict`）で `failed 0 / broken 178 / success 24273`
 
 ### ✅ Agent E2E テスト + パッケージ独立化 + run_agent async 化 (2026-02-07)
 
