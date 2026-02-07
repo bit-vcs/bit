@@ -10,10 +10,6 @@ extern "C" fn mcp_write_message_ffi(msg : Bytes) -> Unit = "mcp_write_message_ff
 extern "C" fn mcp_log_ffi(msg : Bytes) -> Unit = "mcp_log_ffi"
 
 ///|
-#borrow(command)
-extern "C" fn mcp_exec_ffi(command : Bytes) -> String = "mcp_exec_ffi"
-
-///|
 fn string_to_utf8(s : String) -> Bytes {
   let buf : Array[Byte] = []
   for ch in s {
@@ -51,9 +47,4 @@ fn write_message(s : String) -> Unit {
 ///|
 fn log(s : String) -> Unit {
   mcp_log_ffi(string_to_utf8(s))
-}
-
-///|
-fn exec(command : String) -> String {
-  mcp_exec_ffi(string_to_utf8(command))
 }

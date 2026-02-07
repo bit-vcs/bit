@@ -87,30 +87,3 @@ void mcp_log_ffi(moonbit_bytes_t msg) {
     fflush(stderr);
 }
 
-/* Shell command via popen (same as llm_popen_ffi). */
-MOONBIT_FFI_EXPORT
-moonbit_string_t mcp_exec_ffi(moonbit_bytes_t command) {
-    const char *cmd = (const char *)command;
-    FILE *fp = popen(cmd, "r");
-    if (!fp) {
-        const char *err = "ERROR: popen failed";
-        return utf8_to_moonbit_string(err, strlen(err));
-    }
-    size_t capacity = 4096, length = 0;
-    char *buf = (char *)malloc(capacity);
-    if (!buf) { pclose(fp); return utf8_to_moonbit_string("", 0); }
-    size_t n;
-    while ((n = fread(buf + length, 1, capacity - length, fp)) > 0) {
-        length += n;
-        if (length == capacity) {
-            capacity *= 2;
-            char *newbuf = (char *)realloc(buf, capacity);
-            if (!newbuf) { free(buf); pclose(fp); return utf8_to_moonbit_string("", 0); }
-            buf = newbuf;
-        }
-    }
-    pclose(fp);
-    moonbit_string_t result = utf8_to_moonbit_string(buf, length);
-    free(buf);
-    return result;
-}

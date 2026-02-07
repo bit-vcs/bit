@@ -1,5 +1,7 @@
 import {
   "moonbitlang/core/json" as @json,
+  "mizchi/bit/x/agent/llm" as @agent_llm,
+  "mizchi/llm/ffi" as @llm_ffi,
 }
 
 options(

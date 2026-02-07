@@ -14,6 +14,7 @@ fn print_agent_usage() -> Unit {
   println("Usage: bit agent <subcommand> [<args>]")
   println("")
   println("Subcommands:")
+  println("  llm     Run LLM-driven coding agent")
   println("  serve   Start polling daemon for PR review/merge")
   println("  run     Execute a task from JSON file")
   println("  status  Show open PRs and agent status")
@@ -39,6 +40,7 @@ async fn handle_agent(args : Array[String]) -> Unit raise Error {
   let subcmd = args[0]
   let rest = collect_args(args, 1)
   match subcmd {
+    "llm" => handle_agent_llm(rest)
     "serve" => handle_agent_serve(rest)
     "run" => handle_agent_run(rest)
     "status" => handle_agent_status(rest)
@@ -279,5 +281,160 @@ async fn handle_agent_status(args : Array[String]) -> Unit raise Error {
     println(
       "\{pr.id()} [\{state}]\{approved} \{pr.title()} (by \{pr.author()})",
     )
+  }
+}
+
+///|
+fn print_agent_llm_usage() -> Unit {
+  println("Usage: bit agent llm --task <text> [options]")
+  println("")
+  println("Options:")
+  println("  --task <text>          Task description (required)")
+  println("  --orchestrate          Run as orchestrator (parallel subtasks)")
+  println("  --work-dir <path>      Working directory (default: cwd)")
+  println("  --provider <name>      openrouter|anthropic|openai|claude_code")
+  println("  --model <name>         Model name (default: provider default)")
+  println("  --max-steps <n>        Max agent steps (default: 20)")
+  println("  --max-workers <n>      Max parallel workers (default: 3)")
+  println("  --branch <name>        Git branch (default: agent/<timestamp>)")
+  println("  --target-branch <name> PR target branch (default: main)")
+  println("  --no-commit            Skip auto-commit")
+  println("  --pr                   Create PR after commit")
+  println("  --pr-title <text>      PR title")
+  println("  --quiet                Suppress verbose output")
+}
+
+///|
+fn parse_llm_int(s : String, default_ : Int) -> Int {
+  @strconv.parse_int(s) catch {
+    _ => default_
+  }
+}
+
+///|
+fn handle_agent_llm(args : Array[String]) -> Unit {
+  let mut task = ""
+  let mut work_dir = ""
+  let mut provider = "openrouter"
+  let mut model = ""
+  let mut max_steps = 20
+  let mut max_workers = 3
+  let mut branch = ""
+  let mut target_branch = "main"
+  let mut auto_commit = true
+  let mut auto_pr = false
+  let mut pr_title = ""
+  let mut verbose = true
+  let mut orchestrate = false
+  let mut i = 0
+  while i < args.length() {
+    match args[i] {
+      "--orchestrate" => orchestrate = true
+      "--task" => {
+        i += 1
+        if i < args.length() {
+          task = args[i]
+        }
+      }
+      "--work-dir" => {
+        i += 1
+        if i < args.length() {
+          work_dir = args[i]
+        }
+      }
+      "--provider" => {
+        i += 1
+        if i < args.length() {
+          provider = args[i]
+        }
+      }
+      "--model" => {
+        i += 1
+        if i < args.length() {
+          model = args[i]
+        }
+      }
+      "--max-steps" => {
+        i += 1
+        if i < args.length() {
+          max_steps = parse_llm_int(args[i], 20)
+        }
+      }
+      "--max-workers" => {
+        i += 1
+        if i < args.length() {
+          max_workers = parse_llm_int(args[i], 3)
+        }
+      }
+      "--branch" => {
+        i += 1
+        if i < args.length() {
+          branch = args[i]
+        }
+      }
+      "--target-branch" => {
+        i += 1
+        if i < args.length() {
+          target_branch = args[i]
+        }
+      }
+      "--no-commit" => auto_commit = false
+      "--pr" => auto_pr = true
+      "--pr-title" => {
+        i += 1
+        if i < args.length() {
+          pr_title = args[i]
+        }
+      }
+      "--quiet" => verbose = false
+      "-h" | "--help" => {
+        print_agent_llm_usage()
+        return
+      }
+      _ => ()
+    }
+    i += 1
+  }
+  if task.is_empty() {
+    print_agent_llm_usage()
+    return
+  }
+  if work_dir.is_empty() {
+    work_dir = get_work_root()
+  }
+  let output = fn(s : String) { println(s) }
+  if orchestrate {
+    let config : @agent_llm.OrchestratorConfig = {
+      work_dir,
+      task,
+      provider_name: provider,
+      model,
+      max_workers,
+      target_branch,
+      auto_pr,
+      verbose,
+    }
+    @agent_llm.run_orchestrator(config, on_output=output)
+  } else {
+    let branch_name = if branch.is_empty() {
+      "agent/" +
+      @agent_llm.strip_trailing_whitespace(@llm_ffi.exec_sync("date +%s", 5000))
+    } else {
+      branch
+    }
+    let config : @agent_llm.LlmAgentConfig = {
+      work_dir,
+      task,
+      branch_name,
+      target_branch,
+      provider_name: provider,
+      model,
+      max_steps,
+      auto_commit,
+      auto_pr,
+      pr_title,
+      verbose,
+    }
+    @agent_llm.run_llm_agent(config, on_output=output)
   }
 }

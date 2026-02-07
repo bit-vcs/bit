@@ -1,5 +1,5 @@
 ///|
-pub struct LlmAgentConfig {
+pub(all) struct LlmAgentConfig {
   work_dir : String
   task : String
   branch_name : String
@@ -33,7 +33,7 @@ fn build_system_prompt(work_dir : String, task : String) -> String {
 }
 
 ///|
-fn create_provider(
+pub fn create_provider(
   name : String,
   model : String,
   system_prompt : String,
@@ -93,15 +93,16 @@ fn create_provider(
       )
       @llmlib.BoxedProvider::new(provider)
     }
-    _ => {
-      println("Unknown provider: " + name + ", falling back to anthropic")
-      create_provider("anthropic", model, system_prompt)
-    }
+    _ => create_provider("anthropic", model, system_prompt)
   }
 }
 
 ///|
-pub fn run_llm_agent(config : LlmAgentConfig) -> Unit {
+pub fn run_llm_agent(
+  config : LlmAgentConfig,
+  on_output~ : (String) -> Unit,
+) -> Unit {
+  let log = fn(s : String) { on_output(s + "\n") }
   let system_prompt = build_system_prompt(config.work_dir, config.task)
   let provider = create_provider(
     config.provider_name,
@@ -112,12 +113,10 @@ pub fn run_llm_agent(config : LlmAgentConfig) -> Unit {
   let messages : Array[@llmlib.Message] = [@llmlib.Message::user(config.task)]
   let verbose = config.verbose
   if verbose {
-    println(
-      "[agent] provider=" + config.provider_name + " model=" + config.model,
-    )
-    println("[agent] work_dir=" + config.work_dir)
-    println("[agent] task=" + config.task)
-    println("")
+    log("[agent] provider=" + config.provider_name + " model=" + config.model)
+    log("[agent] work_dir=" + config.work_dir)
+    log("[agent] task=" + config.task)
+    log("")
   }
   let text_buf = StringBuilder::new()
   @llmlib.run_agent(
@@ -136,10 +135,10 @@ pub fn run_llm_agent(config : LlmAgentConfig) -> Unit {
           if verbose {
             let text = text_buf.to_string()
             if not(text.is_empty()) {
-              println(text)
+              on_output(text)
               text_buf.reset()
             }
-            println("\n[tool] " + name + " " + input.stringify())
+            log("\n[tool] " + name + " " + input.stringify())
           }
         ToolResult(name~, result~, is_error~) =>
           if verbose {
@@ -158,24 +157,24 @@ pub fn run_llm_agent(config : LlmAgentConfig) -> Unit {
             } else {
               result
             }
-            println("[result] " + name + status + ": " + preview)
+            log("[result] " + name + status + ": " + preview)
           }
         StepComplete(step~) => {
           let text = text_buf.to_string()
           if not(text.is_empty()) {
-            println(text)
+            on_output(text)
             text_buf.reset()
           }
           if verbose {
-            println("[step " + step.to_string() + " complete]")
+            log("[step " + step.to_string() + " complete]")
           }
         }
         Done(reason~) => {
           let text = text_buf.to_string()
           if not(text.is_empty()) {
-            println(text)
+            on_output(text)
           }
-          println("\n[done] " + reason)
+          log("\n[done] " + reason)
         }
       }
     },
@@ -185,7 +184,7 @@ pub fn run_llm_agent(config : LlmAgentConfig) -> Unit {
     let branch = config.branch_name
     let wd = config.work_dir
     if verbose {
-      println("[git] creating branch: " + branch)
+      log("[git] creating branch: " + branch)
     }
     ignore(
       exec(
@@ -198,7 +197,7 @@ pub fn run_llm_agent(config : LlmAgentConfig) -> Unit {
       exec("cd " + shell_escape(wd) + " && git commit -m " + shell_escape(msg)),
     )
     if verbose {
-      println("[git] committed on branch: " + branch)
+      log("[git] committed on branch: " + branch)
     }
   }
   // Auto-PR
@@ -228,6 +227,6 @@ pub fn run_llm_agent(config : LlmAgentConfig) -> Unit {
       shell_escape(config.target_branch),
       60000,
     )
-    println("[pr] " + result)
+    log("[pr] " + result)
   }
 }

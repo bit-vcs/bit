@@ -6,7 +6,7 @@ priv struct WorkerTask {
 }
 
 ///|
-pub struct OrchestratorConfig {
+pub(all) struct OrchestratorConfig {
   work_dir : String
   task : String
   provider_name : String
@@ -65,7 +65,10 @@ fn extract_json_array(text : String) -> Array[String] {
 }
 
 ///|
-fn plan_subtasks(config : OrchestratorConfig) -> Array[String] {
+fn plan_subtasks(
+  config : OrchestratorConfig,
+  log : (String) -> Unit,
+) -> Array[String] {
   let file_listing = exec(
     "find " +
     shell_escape(config.work_dir) +
@@ -92,11 +95,10 @@ fn plan_subtasks(config : OrchestratorConfig) -> Array[String] {
   let messages : Array[@llmlib.Message] = [@llmlib.Message::user(user_msg)]
   let response = @llmlib.collect_text(provider.inner, messages)
   if config.verbose {
-    println("[planner] LLM response:\n" + response)
+    log("[planner] LLM response:\n" + response)
   }
   let tasks = extract_json_array(response)
   if tasks.is_empty() {
-    // Fallback: run the entire task as a single subtask
     [config.task]
   } else {
     tasks
@@ -104,26 +106,30 @@ fn plan_subtasks(config : OrchestratorConfig) -> Array[String] {
 }
 
 ///|
-pub fn run_orchestrator(config : OrchestratorConfig) -> Unit {
+pub fn run_orchestrator(
+  config : OrchestratorConfig,
+  on_output~ : (String) -> Unit,
+) -> Unit {
   let verbose = config.verbose
   let wd = config.work_dir
+  let log = fn(s : String) { on_output(s + "\n") }
   // Step 1: Plan subtasks
   if verbose {
-    println("[orchestrator] Planning subtasks...")
+    log("[orchestrator] Planning subtasks...")
   }
-  let subtasks = plan_subtasks(config)
+  let subtasks = plan_subtasks(config, log)
   if verbose {
-    println(
+    log(
       "[orchestrator] Planned " + subtasks.length().to_string() + " subtasks:",
     )
     for i, task in subtasks {
-      println("  " + (i + 1).to_string() + ". " + task)
+      log("  " + (i + 1).to_string() + ". " + task)
     }
   }
-  // If only 1 subtask, run directly without worktree overhead
+  // If only 1 subtask, run directly
   if subtasks.length() == 1 {
     if verbose {
-      println("[orchestrator] Single subtask, running directly...")
+      log("[orchestrator] Single subtask, running directly...")
     }
     let agent_config : LlmAgentConfig = {
       work_dir: wd,
@@ -138,27 +144,10 @@ pub fn run_orchestrator(config : OrchestratorConfig) -> Unit {
       pr_title: "",
       verbose: config.verbose,
     }
-    run_llm_agent(agent_config)
+    run_llm_agent(agent_config, on_output~)
     return
   }
-  // Step 2: Build agent binary
-  if verbose {
-    println("\n[orchestrator] Building agent binary...")
-  }
-  ignore(
-    exec(
-      "cd " +
-      shell_escape(wd) +
-      " && moon build src/x/agent/llm --target native 2>&1",
-    ),
-  )
-  let binary = wd + "/_build/native/release/build/x/agent/llm/llm"
-  let binary_exists = exec("test -x " + shell_escape(binary) + " && echo ok")
-  if not(binary_exists.has_prefix("ok")) {
-    println("[orchestrator] ERROR: Failed to build binary at " + binary)
-    return
-  }
-  // Step 3: Create worktrees
+  // Step 2: Create worktrees for isolation
   let ts = strip_trailing_whitespace(exec("date +%s"))
   let workers : Array[WorkerTask] = []
   for i, task in subtasks {
@@ -177,58 +166,44 @@ pub fn run_orchestrator(config : OrchestratorConfig) -> Unit {
     )
     workers.push({ task, work_dir: wt_dir, branch })
     if verbose {
-      println("[orchestrator] Worktree: " + wt_dir + " -> " + branch)
+      log("[orchestrator] Worktree: " + wt_dir + " -> " + branch)
     }
   }
-  // Step 4: Run agents in parallel
+  // Step 3: Run agents sequentially in each worktree
   if verbose {
-    println(
-      "\n[orchestrator] Launching " +
+    log(
+      "\n[orchestrator] Running " +
       workers.length().to_string() +
-      " agents in parallel...",
+      " agents sequentially...",
     )
   }
-  let cmd = StringBuilder::new()
   for i, w in workers {
-    if i > 0 {
-      cmd.write_string(" ")
-    }
-    cmd.write_string("(")
-    cmd.write_string(shell_escape(binary))
-    cmd.write_string(" --task ")
-    cmd.write_string(shell_escape(w.task))
-    cmd.write_string(" --work-dir ")
-    cmd.write_string(shell_escape(w.work_dir))
-    cmd.write_string(" --provider ")
-    cmd.write_string(shell_escape(config.provider_name))
-    if not(config.model.is_empty()) {
-      cmd.write_string(" --model ")
-      cmd.write_string(shell_escape(config.model))
-    }
-    cmd.write_string(" --no-commit --quiet")
-    cmd.write_string(" > ")
-    cmd.write_string(shell_escape(w.work_dir + "/agent.log"))
-    cmd.write_string(" 2>&1) &")
-  }
-  cmd.write_string(" wait")
-  let timeout = 600000 // 10 min total
-  ignore(exec_with_timeout(cmd.to_string(), timeout))
-  if verbose {
-    println("[orchestrator] All agents completed.")
-  }
-  // Step 5: Show logs and commit in each worktree
-  for w in workers {
     if verbose {
-      let log = exec(
-        "cat " +
-        shell_escape(w.work_dir + "/agent.log") +
-        " 2>/dev/null | tail -20",
+      log(
+        "\n--- [subtask " +
+        (i + 1).to_string() +
+        "/" +
+        workers.length().to_string() +
+        "] " +
+        w.task +
+        " ---",
       )
-      if not(log.is_empty()) {
-        println("\n--- [" + w.branch + "] log ---")
-        println(log)
-      }
     }
+    let agent_config : LlmAgentConfig = {
+      work_dir: w.work_dir,
+      task: w.task,
+      branch_name: w.branch,
+      target_branch: config.target_branch,
+      provider_name: config.provider_name,
+      model: config.model,
+      max_steps: 20,
+      auto_commit: false,
+      auto_pr: false,
+      pr_title: "",
+      verbose: config.verbose,
+    }
+    run_llm_agent(agent_config, on_output~)
+    // Commit changes in this worktree
     let changes = exec(
       "cd " +
       shell_escape(w.work_dir) +
@@ -245,13 +220,13 @@ pub fn run_orchestrator(config : OrchestratorConfig) -> Unit {
         ),
       )
       if verbose {
-        println("[orchestrator] Committed on " + w.branch)
+        log("[orchestrator] Committed on " + w.branch)
       }
     } else if verbose {
-      println("[orchestrator] No changes on " + w.branch)
+      log("[orchestrator] No changes on " + w.branch)
     }
   }
-  // Step 6: Merge all branches
+  // Step 4: Merge all branches
   let merge_branch = "agent/combined-" + ts
   ignore(
     exec(
@@ -270,10 +245,10 @@ pub fn run_orchestrator(config : OrchestratorConfig) -> Unit {
       " 2>&1",
     )
     if verbose {
-      println("[orchestrator] Merge " + w.branch + ": " + result)
+      log("[orchestrator] Merge " + w.branch + ": " + result)
     }
   }
-  // Step 7: Cleanup worktrees and temp branches
+  // Step 5: Cleanup worktrees
   for w in workers {
     ignore(
       exec(
@@ -295,9 +270,9 @@ pub fn run_orchestrator(config : OrchestratorConfig) -> Unit {
     )
   }
   if verbose {
-    println("[orchestrator] Cleaned up worktrees")
+    log("[orchestrator] Cleaned up worktrees")
   }
-  // Step 8: PR
+  // Step 6: PR
   if config.auto_pr {
     ignore(
       exec_with_timeout(
@@ -317,7 +292,7 @@ pub fn run_orchestrator(config : OrchestratorConfig) -> Unit {
       shell_escape(config.target_branch),
       60000,
     )
-    println("[pr] " + result)
+    log("[pr] " + result)
   }
-  println("\n[orchestrator] Done. Branch: " + merge_branch)
+  log("\n[orchestrator] Done. Branch: " + merge_branch)
 }

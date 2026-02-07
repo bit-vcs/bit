@@ -5,14 +5,10 @@ import {
   "mizchi/llm/openai" as @openai,
   "mizchi/llm/claude_code" as @claude_code,
   "moonbitlang/core/json" as @json,
-  "moonbitlang/x/sys" as @sys,
 }
 
 options(
-  is_main: true,
   targets: {
-    "main.mbt": [ "native" ],
-    "main_js.mbt": [ "js" ],
     "orchestrator.mbt": [ "native" ],
     "runner.mbt": [ "native" ],
     "tools.mbt": [ "native" ],

@@ -1,19 +1,4 @@
 ///|
-fn shell_escape(s : String) -> String {
-  let buf = StringBuilder::new()
-  buf.write_char('\'')
-  for ch in s {
-    if ch == '\'' {
-      buf.write_string("'\\''")
-    } else {
-      buf.write_char(ch)
-    }
-  }
-  buf.write_char('\'')
-  buf.to_string()
-}
-
-///|
 fn json_get_str(j : Json, field : String) -> String {
   match j {
     Object(m) =>
@@ -185,27 +170,13 @@ fn handle_tools_list(id : Json) -> String {
 }
 
 ///|
-fn find_agent_binary() -> String {
-  // Try to find the pre-built agent binary (.exe on macOS/Windows, no ext on Linux)
-  let cwd = exec("pwd 2>/dev/null").trim_end().to_string()
-  let base = cwd + "/_build/native/release/build/x/agent/llm/llm"
-  let candidates = [base + ".exe", base]
-  for path in candidates {
-    let check = exec("test -x " + shell_escape(path) + " && echo ok")
-    if check.has_prefix("ok") {
-      return path
-    }
+fn get_work_dir(args : Json) -> String {
+  let wd = json_get_str(args, "work_dir")
+  if wd.is_empty() {
+    @agent_llm.strip_trailing_whitespace(@llm_ffi.exec_sync("pwd", 5000))
+  } else {
+    wd
   }
-  // Try to build it
-  log("[mcp] Building agent binary...")
-  ignore(exec("moon build src/x/agent/llm --target native 2>&1"))
-  for path in candidates {
-    let check = exec("test -x " + shell_escape(path) + " && echo ok")
-    if check.has_prefix("ok") {
-      return path
-    }
-  }
-  ""
 }
 
 ///|
@@ -228,75 +199,75 @@ fn handle_tools_call(id : Json, params : Json) -> String {
 
 ///|
 fn handle_run_agent(id : Json, args : Json) -> String {
-  let binary = find_agent_binary()
-  if binary.is_empty() {
-    return jsonrpc_response(
-      id,
-      tool_result_error("Failed to find/build agent binary"),
-    )
-  }
   let task = json_get_str(args, "task")
   if task.is_empty() {
     return jsonrpc_response(id, tool_result_error("task is required"))
   }
-  let work_dir = json_get_str(args, "work_dir")
+  let work_dir = get_work_dir(args)
   let provider = json_get_str(args, "provider")
   let model = json_get_str(args, "model")
   let max_steps = json_get_int(args, "max_steps", 20)
   let no_commit = json_get_bool(args, "no_commit", false)
-  let mut cmd = shell_escape(binary) + " --task " + shell_escape(task)
-  if not(work_dir.is_empty()) {
-    cmd = cmd + " --work-dir " + shell_escape(work_dir)
+  let ts = @agent_llm.strip_trailing_whitespace(
+    @llm_ffi.exec_sync("date +%s", 5000),
+  )
+  let config : @agent_llm.LlmAgentConfig = {
+    work_dir,
+    task,
+    branch_name: "agent/" + ts,
+    target_branch: "main",
+    provider_name: if provider.is_empty() {
+      "openrouter"
+    } else {
+      provider
+    },
+    model,
+    max_steps,
+    auto_commit: not(no_commit),
+    auto_pr: false,
+    pr_title: "",
+    verbose: true,
   }
-  if not(provider.is_empty()) {
-    cmd = cmd + " --provider " + shell_escape(provider)
-  }
-  if not(model.is_empty()) {
-    cmd = cmd + " --model " + shell_escape(model)
-  }
-  cmd = cmd + " --max-steps " + max_steps.to_string()
-  if no_commit {
-    cmd = cmd + " --no-commit"
-  }
-  cmd = cmd + " 2>&1"
-  log("[mcp] Running: " + cmd)
-  let result = exec(cmd)
-  jsonrpc_response(id, tool_result_text(result))
+  let buf = StringBuilder::new()
+  log("[mcp] Running agent: task=" + task)
+  @agent_llm.run_llm_agent(config, on_output=fn(s) {
+    buf.write_string(s)
+    log("[agent] " + s)
+  })
+  jsonrpc_response(id, tool_result_text(buf.to_string()))
 }
 
 ///|
 fn handle_run_orchestrator(id : Json, args : Json) -> String {
-  let binary = find_agent_binary()
-  if binary.is_empty() {
-    return jsonrpc_response(
-      id,
-      tool_result_error("Failed to find/build agent binary"),
-    )
-  }
   let task = json_get_str(args, "task")
   if task.is_empty() {
     return jsonrpc_response(id, tool_result_error("task is required"))
   }
-  let work_dir = json_get_str(args, "work_dir")
+  let work_dir = get_work_dir(args)
   let provider = json_get_str(args, "provider")
   let model = json_get_str(args, "model")
   let max_workers = json_get_int(args, "max_workers", 3)
-  let mut cmd = shell_escape(binary) +
-    " --orchestrate --task " +
-    shell_escape(task)
-  if not(work_dir.is_empty()) {
-    cmd = cmd + " --work-dir " + shell_escape(work_dir)
+  let config : @agent_llm.OrchestratorConfig = {
+    work_dir,
+    task,
+    provider_name: if provider.is_empty() {
+      "openrouter"
+    } else {
+      provider
+    },
+    model,
+    max_workers,
+    target_branch: "main",
+    auto_pr: false,
+    verbose: true,
   }
-  if not(provider.is_empty()) {
-    cmd = cmd + " --provider " + shell_escape(provider)
-  }
-  if not(model.is_empty()) {
-    cmd = cmd + " --model " + shell_escape(model)
-  }
-  cmd = cmd + " --max-workers " + max_workers.to_string() + " 2>&1"
-  log("[mcp] Orchestrating: " + cmd)
-  let result = exec(cmd)
-  jsonrpc_response(id, tool_result_text(result))
+  let buf = StringBuilder::new()
+  log("[mcp] Orchestrating: task=" + task)
+  @agent_llm.run_orchestrator(config, on_output=fn(s) {
+    buf.write_string(s)
+    log("[orch] " + s)
+  })
+  jsonrpc_response(id, tool_result_text(buf.to_string()))
 }
 
 ///|

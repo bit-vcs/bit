@@ -9,6 +9,8 @@ import {
   "mizchi/bit/x/collab/native" as @collab_native,
   "mizchi/bit/x/agent" as @agent,
   "mizchi/bit/x/agent/native" as @agent_native,
+  "mizchi/bit/x/agent/llm" as @agent_llm,
+  "mizchi/llm/ffi" as @llm_ffi,
   "mizchi/bit/x/fs" as @bitfs,
   "mizchi/bit/x/hq" as @hq,
   "mizchi/bit/x/subdir" as @subdir,

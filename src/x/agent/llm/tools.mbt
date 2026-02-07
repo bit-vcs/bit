@@ -47,6 +47,32 @@ fn json_get_int_opt(j : Json, field : String) -> Int? {
 }
 
 ///|
+pub fn strip_trailing_whitespace(s : String) -> String {
+  let chars : Array[Char] = []
+  for ch in s {
+    chars.push(ch)
+  }
+  let mut end = chars.length()
+  while end > 0 {
+    let ch = chars[end - 1]
+    if ch == '\n' || ch == '\r' || ch == ' ' || ch == '\t' {
+      end = end - 1
+    } else {
+      break
+    }
+  }
+  if end == chars.length() {
+    s
+  } else {
+    let buf = StringBuilder::new()
+    for j = 0; j < end; j = j + 1 {
+      buf.write_char(chars[j])
+    }
+    buf.to_string()
+  }
+}
+
+///|
 fn exec(command : String) -> String {
   @ffi.exec_sync(command, 30000)
 }
