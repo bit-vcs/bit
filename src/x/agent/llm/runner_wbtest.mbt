@@ -90,3 +90,64 @@ test "build_system_prompt contains anti-patterns" {
   assert_true(prompt.contains("Do NOT"))
   assert_true(prompt.contains("Anti-patterns"))
 }
+
+///|
+test "run_auto_commit_steps stops on checkout failure" {
+  let calls : Array[String] = []
+  let logs = StringBuilder::new()
+  let ok = run_auto_commit_steps(
+    "/repo",
+    "agent/test",
+    "msg",
+    fn(cmd) {
+      calls.push(cmd)
+      if calls.length() == 1 {
+        "ERROR: exit code 1: checkout failed"
+      } else {
+        ""
+      }
+    },
+    fn(s) { logs.write_string(s + "\n") },
+  )
+  assert_false(ok)
+  assert_eq(calls.length(), 1)
+  assert_true(logs.to_string().contains("git checkout -b"))
+}
+
+///|
+test "run_auto_commit_steps stops on git add failure" {
+  let calls : Array[String] = []
+  let ok = run_auto_commit_steps(
+    "/repo",
+    "agent/test",
+    "msg",
+    fn(cmd) {
+      calls.push(cmd)
+      if calls.length() == 2 {
+        "ERROR: exit code 1: add failed"
+      } else {
+        ""
+      }
+    },
+    fn(_s) {  },
+  )
+  assert_false(ok)
+  assert_eq(calls.length(), 2)
+}
+
+///|
+test "run_auto_commit_steps succeeds when all commands succeed" {
+  let calls : Array[String] = []
+  let ok = run_auto_commit_steps(
+    "/repo",
+    "agent/test",
+    "msg",
+    fn(cmd) {
+      calls.push(cmd)
+      ""
+    },
+    fn(_s) {  },
+  )
+  assert_true(ok)
+  assert_eq(calls.length(), 3)
+}

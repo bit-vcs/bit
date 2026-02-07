@@ -17,6 +17,7 @@ options(
     "loop_detect.mbt": [ "native" ],
     "loop_detect_wbtest.mbt": [ "native" ],
     "orchestrator.mbt": [ "native" ],
+    "orchestrator_wbtest.mbt": [ "native" ],
     "runner.mbt": [ "native" ],
     "runner_wbtest.mbt": [ "native" ],
     "tool_env.mbt": [ "native" ],

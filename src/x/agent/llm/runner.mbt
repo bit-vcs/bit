@@ -154,6 +154,46 @@ pub fn create_provider(
 }
 
 ///|
+fn is_exec_error(output : String) -> Bool {
+  output.has_prefix("ERROR:")
+}
+
+///|
+fn run_auto_commit_steps(
+  work_dir : String,
+  branch : String,
+  message : String,
+  exec_cmd : (String) -> String,
+  log : (String) -> Unit,
+) -> Bool {
+  let checkout_cmd = "cd " +
+    shell_escape(work_dir) +
+    " && git checkout -b " +
+    shell_escape(branch)
+  let checkout_out = exec_cmd(checkout_cmd)
+  if is_exec_error(checkout_out) {
+    log("[git] ERROR: git checkout -b failed: " + checkout_out)
+    return false
+  }
+  let add_cmd = "cd " + shell_escape(work_dir) + " && git add -A"
+  let add_out = exec_cmd(add_cmd)
+  if is_exec_error(add_out) {
+    log("[git] ERROR: git add failed: " + add_out)
+    return false
+  }
+  let commit_cmd = "cd " +
+    shell_escape(work_dir) +
+    " && git commit -m " +
+    shell_escape(message)
+  let commit_out = exec_cmd(commit_cmd)
+  if is_exec_error(commit_out) {
+    log("[git] ERROR: git commit failed: " + commit_out)
+    return false
+  }
+  true
+}
+
+///|
 pub fn run_llm_agent(
   config : LlmAgentConfig,
   on_output~ : (String) -> Unit,
@@ -300,16 +340,14 @@ pub fn run_llm_agent(
     if verbose {
       log("[git] creating branch: " + branch)
     }
-    ignore(
-      exec(
-        "cd " + shell_escape(wd) + " && git checkout -b " + shell_escape(branch),
-      ),
-    )
-    ignore(exec("cd " + shell_escape(wd) + " && git add -A"))
     let msg = "agent: " + config.task
-    ignore(
-      exec("cd " + shell_escape(wd) + " && git commit -m " + shell_escape(msg)),
-    )
+    let ok = run_auto_commit_steps(wd, branch, msg, exec, log)
+    if not(ok) {
+      if verbose {
+        log("[git] auto-commit aborted")
+      }
+      return
+    }
     if verbose {
       log("[git] committed on branch: " + branch)
     }

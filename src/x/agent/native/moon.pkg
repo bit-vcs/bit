@@ -14,5 +14,9 @@ import {
 }
 
 options(
-  targets: { "runner.mbt": [ "native" ], "server.mbt": [ "native" ] },
+  targets: {
+    "cancellation_wbtest.mbt": [ "native" ],
+    "runner.mbt": [ "native" ],
+    "server.mbt": [ "native" ],
+  },
 )

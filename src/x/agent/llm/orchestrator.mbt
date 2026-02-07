@@ -208,6 +208,21 @@ impl AgentRunner for InProcessAgentRunner with cancel_agent(self, handle) {
 }
 
 ///|
+fn exec_checked(
+  command : String,
+  action : String,
+  exec_cmd : (String) -> String,
+  log : (String) -> Unit,
+) -> String? {
+  let output = exec_cmd(command)
+  if is_exec_error(output) {
+    log("[orchestrator] ERROR " + action + ": " + output)
+    return None
+  }
+  Some(output)
+}
+
+///|
 fn extract_subtask_plans(text : String) -> Array[SubtaskPlan] {
   // Try to find JSON array in the text
   let chars : Array[Char] = []
@@ -428,6 +443,40 @@ fn evaluate_progress(
 }
 
 ///|
+fn cleanup_worktrees(
+  wd : String,
+  workers : Array[WorkerTask],
+  log : (String) -> Unit,
+) -> Unit {
+  for w in workers {
+    ignore(
+      exec_checked(
+        "git -C " +
+        shell_escape(wd) +
+        " worktree remove --force " +
+        shell_escape(w.work_dir) +
+        " 2>/dev/null",
+        "worktree remove " + w.work_dir,
+        exec,
+        log,
+      ),
+    )
+    ignore(
+      exec_checked(
+        "git -C " +
+        shell_escape(wd) +
+        " branch -d " +
+        shell_escape(w.branch) +
+        " 2>/dev/null",
+        "branch delete " + w.branch,
+        exec,
+        log,
+      ),
+    )
+  }
+}
+
+///|
 pub fn run_orchestrator(
   config : OrchestratorConfig,
   on_output~ : (String) -> Unit,
@@ -488,17 +537,19 @@ pub fn run_orchestrator(
     coord_init_agent(session_dir, agent_id)
     coord_write_status(session_dir, agent_id, Pending)
     coord_write_branch(session_dir, agent_id, branch)
-    ignore(
-      exec(
-        "git -C " +
-        shell_escape(wd) +
-        " worktree add " +
-        shell_escape(wt_dir) +
-        " -b " +
-        shell_escape(branch) +
-        " 2>&1",
-      ),
-    )
+    let worktree_cmd = "git -C " +
+      shell_escape(wd) +
+      " worktree add " +
+      shell_escape(wt_dir) +
+      " -b " +
+      shell_escape(branch) +
+      " 2>&1"
+    if exec_checked(worktree_cmd, "worktree add " + wt_dir, exec, log) is None {
+      coord_write_status(session_dir, agent_id, Cancelled)
+      cleanup_worktrees(wd, workers, log)
+      coord_cleanup(session_dir)
+      return
+    }
     workers.push({ task, work_dir: wt_dir, branch, agent_id })
     if verbose {
       log("[orchestrator] Worktree: " + wt_dir + " -> " + branch)
@@ -586,16 +637,30 @@ pub fn run_orchestrator(
       shell_escape(w.work_dir) +
       " && git status --porcelain 2>/dev/null",
     )
-    if not(changes.is_empty()) {
-      ignore(exec("cd " + shell_escape(w.work_dir) + " && git add -A"))
-      ignore(
-        exec(
-          "cd " +
-          shell_escape(w.work_dir) +
-          " && git commit -m " +
-          shell_escape("agent: " + w.task),
-        ),
+    if is_exec_error(changes) {
+      coord_write_status(session_dir, w.agent_id, Cancelled)
+      log(
+        "[orchestrator] ERROR git status failed for " +
+        w.agent_id +
+        ": " +
+        changes,
       )
+      continue
+    }
+    if not(changes.is_empty()) {
+      let add_cmd = "cd " + shell_escape(w.work_dir) + " && git add -A"
+      if exec_checked(add_cmd, "git add " + w.agent_id, exec, log) is None {
+        coord_write_status(session_dir, w.agent_id, Cancelled)
+        continue
+      }
+      let commit_cmd = "cd " +
+        shell_escape(w.work_dir) +
+        " && git commit -m " +
+        shell_escape("agent: " + w.task)
+      if exec_checked(commit_cmd, "git commit " + w.agent_id, exec, log) is None {
+        coord_write_status(session_dir, w.agent_id, Cancelled)
+        continue
+      }
       if verbose {
         log("[orchestrator] Committed on " + w.branch)
       }
@@ -605,14 +670,22 @@ pub fn run_orchestrator(
   }
   // Step 6: Merge all branches
   let merge_branch = "agent/combined-" + ts
-  ignore(
-    exec(
-      "cd " +
-      shell_escape(wd) +
-      " && git checkout -b " +
-      shell_escape(merge_branch),
-    ),
-  )
+  let create_merge_branch_cmd = "cd " +
+    shell_escape(wd) +
+    " && git checkout -b " +
+    shell_escape(merge_branch)
+  if exec_checked(
+      create_merge_branch_cmd,
+      "git checkout -b " + merge_branch,
+      exec,
+      log,
+    )
+    is None {
+    cleanup_worktrees(wd, workers, log)
+    coord_cleanup(session_dir)
+    return
+  }
+  let mut merge_failed = false
   for w in workers {
     let status = coord_read_status(session_dir, w.agent_id)
     if status != Done && status != Running {
@@ -625,46 +698,39 @@ pub fn run_orchestrator(
       shell_escape(w.branch) +
       " 2>&1",
     )
+    if is_exec_error(result) {
+      merge_failed = true
+      log("[orchestrator] ERROR merge failed for " + w.branch + ": " + result)
+      continue
+    }
     if verbose {
       log("[orchestrator] Merge " + w.branch + ": " + result)
     }
   }
-  // Step 7: Cleanup worktrees + coordination dir
-  for w in workers {
-    ignore(
-      exec(
-        "git -C " +
-        shell_escape(wd) +
-        " worktree remove --force " +
-        shell_escape(w.work_dir) +
-        " 2>/dev/null",
-      ),
-    )
-    ignore(
-      exec(
-        "git -C " +
-        shell_escape(wd) +
-        " branch -d " +
-        shell_escape(w.branch) +
-        " 2>/dev/null",
-      ),
-    )
+  if merge_failed {
+    cleanup_worktrees(wd, workers, log)
+    coord_cleanup(session_dir)
+    return
   }
+  // Step 7: Cleanup worktrees + coordination dir
+  cleanup_worktrees(wd, workers, log)
   coord_cleanup(session_dir)
   if verbose {
     log("[orchestrator] Cleaned up worktrees and coordination dir")
   }
   // Step 8: PR
   if config.auto_pr {
-    ignore(
-      exec_with_timeout(
-        "cd " +
-        shell_escape(wd) +
-        " && git push -u origin " +
-        shell_escape(merge_branch),
-        60000,
-      ),
+    let push_result = exec_with_timeout(
+      "cd " +
+      shell_escape(wd) +
+      " && git push -u origin " +
+      shell_escape(merge_branch),
+      60000,
     )
+    if is_exec_error(push_result) {
+      log("[orchestrator] ERROR git push failed: " + push_result)
+      return
+    }
     let result = exec_with_timeout(
       "cd " +
       shell_escape(wd) +
@@ -674,6 +740,10 @@ pub fn run_orchestrator(
       shell_escape(config.target_branch),
       60000,
     )
+    if is_exec_error(result) {
+      log("[orchestrator] ERROR gh pr create failed: " + result)
+      return
+    }
     log("[pr] " + result)
   }
   log("\n[orchestrator] Done. Branch: " + merge_branch)

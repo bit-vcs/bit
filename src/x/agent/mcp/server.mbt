@@ -277,6 +277,61 @@ fn handle_run_orchestrator(id : Json, args : Json) -> String {
 }
 
 ///|
+fn extract_request_id(json : Json) -> Json {
+  match json {
+    Object(m) =>
+      match m.get("id") {
+        Some(v) => v
+        _ => Json::null()
+      }
+    _ => Json::null()
+  }
+}
+
+///|
+fn extract_request_params(json : Json) -> Json {
+  match json {
+    Object(m) =>
+      match m.get("params") {
+        Some(v) => v
+        _ => Json::object({})
+      }
+    _ => Json::object({})
+  }
+}
+
+///|
+fn dispatch_request(meth : String, id : Json, params : Json) -> String {
+  match meth {
+    "initialize" => handle_initialize(id)
+    "tools/list" => handle_tools_list(id)
+    "tools/call" => handle_tools_call(id, params)
+    _ => jsonrpc_error(id, -32601, "Method not found: " + meth)
+  }
+}
+
+///|
+fn process_message(msg : String) -> String? {
+  let json = @json.parse(msg) catch {
+    _ => {
+      log("[mcp] Failed to parse JSON: " + msg)
+      return Some(jsonrpc_error(Json::null(), -32700, "Parse error"))
+    }
+  }
+  let meth = json_get_str(json, "method")
+  let id = extract_request_id(json)
+  let params = extract_request_params(json)
+  if meth.is_empty() {
+    return Some(jsonrpc_error(id, -32600, "Invalid Request"))
+  }
+  log("[mcp] method=" + meth)
+  if meth == "notifications/initialized" || meth == "initialized" {
+    return None
+  }
+  Some(dispatch_request(meth, id, params))
+}
+
+///|
 pub fn run_mcp_server() -> Unit {
   log("[mcp] bit-agent MCP server started")
   while true {
@@ -284,40 +339,10 @@ pub fn run_mcp_server() -> Unit {
     if msg.is_empty() {
       break
     }
-    let json = @json.parse(msg) catch {
-      _ => {
-        log("[mcp] Failed to parse JSON: " + msg)
-        continue
-      }
+    match process_message(msg) {
+      Some(response) => write_message(response)
+      None => ()
     }
-    let meth = json_get_str(json, "method")
-    let id = match json {
-      Object(m) =>
-        match m.get("id") {
-          Some(v) => v
-          _ => Json::null()
-        }
-      _ => Json::null()
-    }
-    let params = match json {
-      Object(m) =>
-        match m.get("params") {
-          Some(v) => v
-          _ => Json::object({})
-        }
-      _ => Json::object({})
-    }
-    log("[mcp] method=" + meth)
-    if meth == "notifications/initialized" || meth == "initialized" {
-      continue
-    }
-    let response = match meth {
-      "initialize" => handle_initialize(id)
-      "tools/list" => handle_tools_list(id)
-      "tools/call" => handle_tools_call(id, params)
-      _ => jsonrpc_error(id, -32601, "Method not found: " + meth)
-    }
-    write_message(response)
   }
   log("[mcp] Server stopped")
 }

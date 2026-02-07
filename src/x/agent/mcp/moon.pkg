@@ -12,5 +12,6 @@ options(
     "main.mbt": [ "native" ],
     "main_js.mbt": [ "js" ],
     "server.mbt": [ "native" ],
+    "server_wbtest.mbt": [ "native" ],
   },
 )

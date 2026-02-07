@@ -26,7 +26,7 @@ allowlist で残っている 5 テスト:
 
 ## Tier 2: Agent Features (High)
 
-- [ ] **MCP server dispatch**: run_agent/orchestrate ツール呼び出しの実装完了 (`src/x/agent/mcp/server.mbt`)
+- [x] **MCP server dispatch**: run_agent/orchestrate ツール呼び出しの実装完了 (`src/x/agent/mcp/server.mbt`)
 - [ ] **MCP streaming**: 長時間実行エージェントの出力をクライアントにストリーミング
 - [ ] **Process agent signal handling**: タイムアウト/キャンセル時のクリーンアップ改善
 - [ ] **Agent output capture**: ProcessAgentRunner の per-agent stdout 取得
@@ -54,6 +54,12 @@ allowlist で残っている 5 テスト:
 - E2E テスト 5 件 (read/write, max_steps, loop detection, coordination, no_tool_calls)
 - mizchi/llm に pub MockProvider + run_agent_cancellable 追加
 - run_llm_agent に should_cancel パラメータ追加、InProcessAgentRunner にキャンセルフラグ
+
+### ✅ MCP server dispatch テスト整備 + JSON-RPC パースエラーハンドリング (2026-02-07)
+
+- `src/x/agent/mcp/server.mbt` を `process_message` + `dispatch_request` に分離
+- 不正 JSON で `-32700 Parse error` を返すよう修正
+- `src/x/agent/mcp/server_wbtest.mbt` 追加（tools/list, initialize, tools/call, parse error）
 
 ### ✅ Agent Inner Loop 改善 + Orchestrator リファクタ (2026-02-07)
 

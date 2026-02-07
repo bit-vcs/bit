@@ -171,6 +171,14 @@ fn make_native_stores(
 }
 
 ///|
+fn[X] return_or_raise_cancellation(err : Error, fallback : X) -> X raise {
+  if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+    raise err
+  }
+  fallback
+}
+
+///|
 /// Run a task: create sandbox Fs, apply edits, snapshot, create PR, push.
 pub async fn run_task(
   task : @agent.AgentTask,
@@ -180,7 +188,15 @@ pub async fn run_task(
   let (fs, rfs, objects, refs, clock) = make_native_stores(git_dir)
   // 1. Create sandbox Fs from target branch
   let sandbox = @bitfs.Fs::from_branch(rfs, git_dir, config.target_branch) catch {
-    err => return @agent.TaskResult::Error(err.to_string())
+    err => {
+      if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+        raise err
+      }
+      return return_or_raise_cancellation(
+        err,
+        @agent.TaskResult::Error(err.to_string()),
+      )
+    }
   }
   let tree : FsWorkingTree = { fs: sandbox, backing_fs: fs, rfs }
   let working_tree : &@lib.WorkingTree = tree
@@ -188,7 +204,15 @@ pub async fn run_task(
   let collab = @collab.Collab::load(objects, refs) catch {
     _ =>
       @collab.Collab::init(objects, refs) catch {
-        err => return @agent.TaskResult::Error(err.to_string())
+        err => {
+          if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+            raise err
+          }
+          return return_or_raise_cancellation(
+            err,
+            @agent.TaskResult::Error(err.to_string()),
+          )
+        }
       }
   }
   // 3. Execute pure workflow
@@ -201,12 +225,29 @@ pub async fn run_task(
       // Push the source branch
       let source_ref = "refs/heads/" + task.source_branch
       let commit_id = refs.resolve(source_ref) catch {
-        err => return @agent.TaskResult::Error(err.to_string())
+        err => {
+          if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+            raise err
+          }
+          return return_or_raise_cancellation(
+            err,
+            @agent.TaskResult::Error(err.to_string()),
+          )
+        }
       }
       match commit_id {
         Some(id) => {
           let db = @lib.ObjectDb::load(rfs, git_dir) catch {
-            err => return @agent.TaskResult::Error(err.to_string())
+            err => {
+              if @async.is_being_cancelled() ||
+                @async.is_cancellation_error(err) {
+                raise err
+              }
+              return return_or_raise_cancellation(
+                err,
+                @agent.TaskResult::Error(err.to_string()),
+              )
+            }
           }
           let reachable = @lib.collect_reachable_objects(db, rfs, id)
           let pack = @pack.create_packfile(reachable)
@@ -219,13 +260,31 @@ pub async fn run_task(
           )
           ignore(
             @gitnative.push(remote, req) catch {
-              err => return @agent.TaskResult::Error(err.to_string())
+              err => {
+                if @async.is_being_cancelled() ||
+                  @async.is_cancellation_error(err) {
+                  raise err
+                }
+                return return_or_raise_cancellation(
+                  err,
+                  @agent.TaskResult::Error(err.to_string()),
+                )
+              }
             },
           )
           // Push collab notes
           ignore(
             @collab_native.collab_push(collab, rfs, git_dir, config.remote_url) catch {
-              err => return @agent.TaskResult::Error(err.to_string())
+              err => {
+                if @async.is_being_cancelled() ||
+                  @async.is_cancellation_error(err) {
+                  raise err
+                }
+                return return_or_raise_cancellation(
+                  err,
+                  @agent.TaskResult::Error(err.to_string()),
+                )
+              }
             },
           )
         }
@@ -250,7 +309,15 @@ pub async fn validate_pr(
   let (_fs, rfs, _objects, _refs, _clock) = make_native_stores(git_dir)
   // Checkout PR source commit into sandbox
   let sandbox = @bitfs.Fs::from_commit(rfs, git_dir, pr.source_commit()) catch {
-    err => return @agent.ReviewResult::ValidationError(err.to_string())
+    err => {
+      if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+        raise err
+      }
+      return return_or_raise_cancellation(
+        err,
+        @agent.ReviewResult::ValidationError(err.to_string()),
+      )
+    }
   }
   ignore(sandbox)
   // Run validation command
@@ -259,10 +326,32 @@ pub async fn validate_pr(
     ["-c", config.validation_cmd],
     inherit_env=true,
   ) catch {
-    err => return @agent.ReviewResult::ValidationError(err.to_string())
+    err => {
+      if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+        raise err
+      }
+      return return_or_raise_cancellation(
+        err,
+        @agent.ReviewResult::ValidationError(err.to_string()),
+      )
+    }
   }
-  let out = stdout.text() catch { _ => "" }
-  let err_text = stderr.text() catch { _ => "" }
+  let out = stdout.text() catch {
+    err => {
+      if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+        raise err
+      }
+      return_or_raise_cancellation(err, "")
+    }
+  }
+  let err_text = stderr.text() catch {
+    err => {
+      if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+        raise err
+      }
+      return_or_raise_cancellation(err, "")
+    }
+  }
   let output = if out.length() > 0 { out } else { err_text }
   @agent.evaluate_validation(exit_code, output)
 }

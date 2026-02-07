@@ -42,9 +42,12 @@ pub async fn poll_once(
     }
     // 4. Validate and submit review
     let result = validate_pr(pr, config, git_dir) catch {
-      err if @async.is_cancellation_error(err) =>
-        raise @git.GitError::IoError(err.to_string())
-      err => @agent.ReviewResult::ValidationError(err.to_string())
+      err => {
+        if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+          raise @git.GitError::IoError(err.to_string())
+        }
+        @agent.ReviewResult::ValidationError(err.to_string())
+      }
     }
     @agent.submit_validation_review(
       collab,
@@ -115,17 +118,23 @@ pub async fn serve(
 ) -> Unit raise @git.GitError {
   while true {
     poll_once(config, git_dir) catch {
-      err if @async.is_cancellation_error(err) =>
-        raise @git.GitError::IoError(err.to_string())
-      _ => ()
+      err => {
+        if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+          raise @git.GitError::IoError(err.to_string())
+        }
+        ()
+      }
     }
     // Sleep using process
     let interval_secs = config.poll_interval_ms / 1000
     let secs = if interval_secs < 1 { 1 } else { interval_secs }
     ignore(@process.run("sleep", [secs.to_string()], inherit_env=true)) catch {
-      err if @async.is_cancellation_error(err) =>
-        raise @git.GitError::IoError(err.to_string())
-      _ => ()
+      err => {
+        if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+          raise @git.GitError::IoError(err.to_string())
+        }
+        ()
+      }
     }
   }
 }
