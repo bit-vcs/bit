@@ -640,7 +640,9 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
           @sys.exit(code)
         }
         None => {
-          @stdio.stdout.write("usage: git index-pack [<options>] <pack> [<idx>]\n")
+          @stdio.stdout.write(
+            "usage: git index-pack [<options>] <pack> [<idx>]\n",
+          )
           @sys.exit(129)
         }
       }

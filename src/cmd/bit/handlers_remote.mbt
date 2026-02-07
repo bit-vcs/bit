@@ -1518,10 +1518,7 @@ fn clone_local_repo(
 }
 
 ///|
-fn has_promisor_source_repo(
-  fs : OsFs,
-  src_path : String,
-) -> Bool {
+fn has_promisor_source_repo(fs : OsFs, src_path : String) -> Bool {
   guard @gitlib.detect_git_dir(fs, src_path) is Some((src_git_dir, _)) else {
     return false
   }
@@ -2799,11 +2796,8 @@ async fn handle_fetch(args : Array[String]) -> Unit raise Error {
     Some(dir) => dir
     None => root
   }
-  let local_promisor_remote = match @gitlib.resolve_local_repo_path(
-    fs,
-    local_root,
-    url,
-  ) {
+  let local_promisor_remote = match
+    @gitlib.resolve_local_repo_path(fs, local_root, url) {
     Some(src_path) => has_promisor_source_repo(fs, src_path)
     None => false
   }

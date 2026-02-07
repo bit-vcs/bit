@@ -188,10 +188,7 @@ fn resolve_abbrev_ref_id(
     if hex.has_prefix(needle) {
       match matched {
         None => matched = Some(id)
-        Some(prev) =>
-          if prev != id {
-            return None
-          }
+        Some(prev) => if prev != id { return None }
       }
     }
     match db.get(fs, id) {

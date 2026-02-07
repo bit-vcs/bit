@@ -1615,7 +1615,9 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
           @sys.exit(code)
         }
         None => {
-          @stdio.stdout.write("usage: git pack-objects [<options>] <base-name>\n")
+          @stdio.stdout.write(
+            "usage: git pack-objects [<options>] <base-name>\n",
+          )
           @sys.exit(129)
         }
       }

@@ -226,8 +226,7 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
     git_dir
   }
   for arg in args {
-    if arg == "--recurse-submodules" ||
-      arg.has_prefix("--recurse-submodules=") {
+    if arg == "--recurse-submodules" || arg.has_prefix("--recurse-submodules=") {
       match real_git_path() {
         Some(real_git) => {
           let real_args = real_git_args_from_cli()

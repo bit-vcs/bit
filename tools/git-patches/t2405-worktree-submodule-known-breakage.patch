@@ -1,0 +1,25 @@
+diff --git a/t/t2405-worktree-submodule.sh b/t/t2405-worktree-submodule.sh
+index 11018f3..10a08e1 100755
+--- a/t/t2405-worktree-submodule.sh
++++ b/t/t2405-worktree-submodule.sh
+@@ -30,11 +30,19 @@ test_expect_success 'setup: clone superproject to create main worktree' '
+ rev1_hash_main=$(git --git-dir=origin/main/.git show --pretty=format:%h -q "HEAD~1")
+ rev1_hash_sub=$(git --git-dir=origin/sub/.git show --pretty=format:%h -q "HEAD~1")
+ 
++submodule_checked_out_after_add_expect=test_expect_failure
++shim_cmds="${SHIM_CMDS:-${GIT_SHIM_CMDS:-}}"
++case " $shim_cmds " in
++*" diff "*)
++	submodule_checked_out_after_add_expect=test_expect_success
++	;;
++esac
++
+ test_expect_success 'add superproject worktree' '
+ 	git -C main worktree add "$base_path/worktree" "$rev1_hash_main"
+ '
+ 
+-test_expect_failure 'submodule is checked out just after worktree add' '
++$submodule_checked_out_after_add_expect 'submodule is checked out just after worktree add' '
+ 	git -C worktree diff --submodule main"^!" >out &&
+ 	grep "file1 updated" out
+ '

@@ -45,7 +45,7 @@ allowlist で残っている 5 テスト:
 - [x] t0012-help.sh
 - [x] t0450-txt-doc-vs-help.sh
 - [x] t1517-outside-repo.sh
-- [ ] t2405-worktree-submodule.sh
+- [x] t2405-worktree-submodule.sh
 - [ ] t5505-remote.sh
 - [ ] t5572-pull-submodule.sh
 - [ ] t5610-clone-detached.sh
@@ -87,8 +87,24 @@ allowlist で残っている 5 テスト:
 - `src/cmd/bit/handlers_misc_wbtest.mbt`: config 値エスケープの whitebox テストを追加
 - 検証:
   - `moon test --target native -p mizchi/bit/cmd/bit`
-  - `just check` / `just test`
-  - `just git-t-full t0411-clone-from-partial.sh` => 7/7 pass
+- `just check` / `just test`
+- `just git-t-full t0411-clone-from-partial.sh` => 7/7 pass
+
+### ✅ t2405 worktree + submodule known breakage 互換改善 (2026-02-08)
+
+- `src/cmd/bit/handlers_misc.mbt`: `diff --submodule <range>` の最小互換実装を追加
+  - linked worktree でも `.git/modules/<submodule>` をフォールバック参照し、submodule commit subject を表示
+  - `main^!` / `A..B` の範囲解決を追加（対応できないケースは従来どおり real git 委譲）
+- `tools/git-patches/t2405-worktree-submodule-known-breakage.patch`:
+  - `SHIM_CMDS` に `diff` を含む実行（`git-t-full`）では test 4 を `test_expect_success` 扱い
+  - strict shim（`git-t-one`）では従来どおり `test_expect_failure` のまま
+- `justfile`:
+  - `git-t-full` 実行前にも `tools/apply-git-test-patches.sh` を適用
+- 検証:
+  - `moon test --target native -p mizchi/bit/cmd/bit`
+  - `moon check --target native`
+  - `just git-t-full t2405-worktree-submodule.sh` => `failed 0 / broken 0`
+  - `just git-t-one t2405-worktree-submodule.sh` => `failed 0 / broken 1`（従来互換）
 
 ### ✅ cat-file batch/all/unordered 互換修正 (2026-02-07)
 
