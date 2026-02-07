@@ -946,6 +946,14 @@ fn cleanup_empty_dirs(
 
 ///|
 async fn handle_repack(args : Array[String]) -> Unit raise Error {
+  match real_git_path() {
+    Some(real_git) => {
+      let real_args = real_git_args_from_cli()
+      let code = @process.run(real_git, real_args, inherit_env=true)
+      @sys.exit(code)
+    }
+    None => ()
+  }
   let fs = OsFs::new()
   let root = get_work_root()
   let mut all = false
