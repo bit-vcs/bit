@@ -3,6 +3,7 @@ priv struct WorkerTask {
   task : String
   work_dir : String
   branch : String
+  agent_id : String
 }
 
 ///|
@@ -19,10 +20,8 @@ pub(all) struct OrchestratorConfig {
 
 ///|
 fn extract_json_array(text : String) -> Array[String] {
-  // Try parsing entire text as JSON
   let json = @json.parse(text) catch {
     _ => {
-      // Extract JSON array substring [...]
       let chars : Array[Char] = []
       for ch in text {
         chars.push(ch)
@@ -106,6 +105,74 @@ fn plan_subtasks(
 }
 
 ///|
+/// Find the bit binary path for spawning sub-agents
+fn find_bit_binary() -> String {
+  let env = @ffi.get_env("BIT_PATH")
+  if not(env.is_empty()) {
+    return env
+  }
+  let which = strip_trailing_whitespace(exec("which bit 2>/dev/null"))
+  if not(which.is_empty()) {
+    return which
+  }
+  "bit"
+}
+
+///|
+/// Monitor decision
+priv enum MonitorDecision {
+  Continue
+  CancelAgent(id~ : String, reason~ : String)
+  AllDone
+}
+
+///|
+/// Evaluate progress of all agents and decide next action
+fn evaluate_progress(
+  snapshots : Array[AgentSnapshot],
+  session_dir : String,
+  now : Int64,
+  _log : (String) -> Unit,
+) -> MonitorDecision {
+  let mut all_done = true
+  for s in snapshots {
+    match s.status {
+      Running | Pending => {
+        all_done = false
+        // Check for excessive errors (3+ consecutive error events)
+        let events = coord_read_events_since(session_dir, s.agent_id, 0)
+        let mut consecutive_errors = 0
+        for ev in events {
+          if ev.contains("\"type\":\"error\"") {
+            consecutive_errors += 1
+          } else {
+            consecutive_errors = 0
+          }
+        }
+        if consecutive_errors >= 3 {
+          return CancelAgent(
+            id=s.agent_id,
+            reason="3+ consecutive errors detected",
+          )
+        }
+        // Check for stall: no progress for 5 minutes
+        if s.step > 0 && s.last_step_time > 0L && now - s.last_step_time > 300L {
+          return CancelAgent(
+            id=s.agent_id,
+            reason="stalled: no progress for 5 minutes",
+          )
+        }
+      }
+      _ => ()
+    }
+  }
+  if all_done {
+    return AllDone
+  }
+  Continue
+}
+
+///|
 pub fn run_orchestrator(
   config : OrchestratorConfig,
   on_output~ : (String) -> Unit,
@@ -126,7 +193,7 @@ pub fn run_orchestrator(
       log("  " + (i + 1).to_string() + ". " + task)
     }
   }
-  // If only 1 subtask, run directly
+  // If only 1 subtask, run directly (no need for parallel overhead)
   if subtasks.length() == 1 {
     if verbose {
       log("[orchestrator] Single subtask, running directly...")
@@ -143,16 +210,28 @@ pub fn run_orchestrator(
       auto_pr: config.auto_pr,
       pr_title: "",
       verbose: config.verbose,
+      coord_dir: "",
+      agent_id: "",
+      env: None,
+      coord: None,
     }
     run_llm_agent(agent_config, on_output~)
     return
   }
-  // Step 2: Create worktrees for isolation
+  // Step 2: Setup coordination directory + worktrees
   let ts = strip_trailing_whitespace(exec("date +%s"))
+  let session_dir = coord_init("/tmp", ts)
+  if verbose {
+    log("[orchestrator] Coordination dir: " + session_dir)
+  }
   let workers : Array[WorkerTask] = []
   for i, task in subtasks {
+    let agent_id = "agent-" + i.to_string()
     let branch = "agent/" + ts + "-" + i.to_string()
     let wt_dir = "/tmp/bit-agent-" + ts + "-" + i.to_string()
+    coord_init_agent(session_dir, agent_id)
+    coord_write_status(session_dir, agent_id, Pending)
+    coord_write_branch(session_dir, agent_id, branch)
     ignore(
       exec(
         "git -C " +
@@ -164,46 +243,140 @@ pub fn run_orchestrator(
         " 2>&1",
       ),
     )
-    workers.push({ task, work_dir: wt_dir, branch })
+    workers.push({ task, work_dir: wt_dir, branch, agent_id })
     if verbose {
       log("[orchestrator] Worktree: " + wt_dir + " -> " + branch)
     }
   }
-  // Step 3: Run agents sequentially in each worktree
+  // Step 3: Spawn agents as background processes
+  let bit = find_bit_binary()
   if verbose {
     log(
-      "\n[orchestrator] Running " +
+      "\n[orchestrator] Spawning " +
       workers.length().to_string() +
-      " agents sequentially...",
+      " agents in parallel...",
     )
+    log("[orchestrator] Using binary: " + bit)
   }
-  for i, w in workers {
+  for w in workers {
+    let log_file = session_dir + "/agents/" + w.agent_id + "/log.txt"
+    let cmd = "nohup " +
+      shell_escape(bit) +
+      " agent llm" +
+      " --task " +
+      shell_escape(w.task) +
+      " --work-dir " +
+      shell_escape(w.work_dir) +
+      " --branch " +
+      shell_escape(w.branch) +
+      " --provider " +
+      shell_escape(config.provider_name) +
+      (if config.model.is_empty() {
+        ""
+      } else {
+        " --model " + shell_escape(config.model)
+      }) +
+      " --coord-dir " +
+      shell_escape(session_dir) +
+      " --agent-id " +
+      shell_escape(w.agent_id) +
+      " --no-commit" +
+      " > " +
+      shell_escape(log_file) +
+      " 2>&1 & echo $!"
+    let pid_str = strip_trailing_whitespace(exec(cmd))
+    let pid = @strconv.parse_int(pid_str) catch { _ => 0 }
+    coord_write_pid(session_dir, w.agent_id, pid)
     if verbose {
       log(
-        "\n--- [subtask " +
-        (i + 1).to_string() +
-        "/" +
-        workers.length().to_string() +
-        "] " +
-        w.task +
-        " ---",
+        "[orchestrator] Spawned " +
+        w.agent_id +
+        " (PID " +
+        pid.to_string() +
+        "): " +
+        w.task,
       )
     }
-    let agent_config : LlmAgentConfig = {
-      work_dir: w.work_dir,
-      task: w.task,
-      branch_name: w.branch,
-      target_branch: config.target_branch,
-      provider_name: config.provider_name,
-      model: config.model,
-      max_steps: 20,
-      auto_commit: false,
-      auto_pr: false,
-      pr_title: "",
-      verbose: config.verbose,
+  }
+  // Step 4: Monitor loop - poll coordination directory
+  if verbose {
+    log("\n[orchestrator] Monitoring agents...")
+  }
+  let mut iteration = 0
+  let max_iterations = 600 // 600 * 2s = 20 minutes max
+  while iteration < max_iterations {
+    ignore(exec("sleep 2"))
+    iteration += 1
+    let snapshots = coord_read_all_agents(session_dir)
+    let now_str = strip_trailing_whitespace(exec("date +%s"))
+    let now = (@strconv.parse_int(now_str) catch { _ => 0 }).to_int64()
+    let decision = evaluate_progress(snapshots, session_dir, now, log)
+    match decision {
+      AllDone => {
+        if verbose {
+          log("[orchestrator] All agents completed.")
+        }
+        break
+      }
+      CancelAgent(id~, reason~) => {
+        if verbose {
+          log("[orchestrator] Cancelling " + id + ": " + reason)
+        }
+        // Find and kill the agent
+        for s in snapshots {
+          if s.agent_id == id && s.pid > 0 {
+            ignore(exec("kill " + s.pid.to_string() + " 2>/dev/null"))
+            coord_write_status(session_dir, id, Cancelled)
+          }
+        }
+      }
+      Continue =>
+        if verbose && iteration % 5 == 0 {
+          // Log progress every 10 seconds
+          for s in snapshots {
+            let elapsed = if s.last_step_time > 0L && now > s.last_step_time {
+              " elapsed=" + (now - s.last_step_time).to_string() + "s"
+            } else {
+              ""
+            }
+            log(
+              "  " +
+              s.agent_id +
+              ": " +
+              s.status.to_string() +
+              " step=" +
+              s.step.to_string() +
+              elapsed,
+            )
+          }
+        }
     }
-    run_llm_agent(agent_config, on_output~)
-    // Commit changes in this worktree
+  }
+  if iteration >= max_iterations {
+    log("[orchestrator] Timeout reached, killing remaining agents...")
+    let snapshots = coord_read_all_agents(session_dir)
+    for s in snapshots {
+      if s.status == Running && s.pid > 0 {
+        ignore(exec("kill " + s.pid.to_string() + " 2>/dev/null"))
+        coord_write_status(session_dir, s.agent_id, Cancelled)
+      }
+    }
+  }
+  // Step 5: Commit changes in each completed worktree
+  for w in workers {
+    let status = coord_read_status(session_dir, w.agent_id)
+    if status != Done && status != Running {
+      if verbose {
+        log(
+          "[orchestrator] Skipping " +
+          w.agent_id +
+          " (status: " +
+          status.to_string() +
+          ")",
+        )
+      }
+      continue
+    }
     let changes = exec(
       "cd " +
       shell_escape(w.work_dir) +
@@ -226,7 +399,7 @@ pub fn run_orchestrator(
       log("[orchestrator] No changes on " + w.branch)
     }
   }
-  // Step 4: Merge all branches
+  // Step 6: Merge all branches
   let merge_branch = "agent/combined-" + ts
   ignore(
     exec(
@@ -237,6 +410,10 @@ pub fn run_orchestrator(
     ),
   )
   for w in workers {
+    let status = coord_read_status(session_dir, w.agent_id)
+    if status != Done && status != Running {
+      continue
+    }
     let result = exec(
       "cd " +
       shell_escape(wd) +
@@ -248,7 +425,7 @@ pub fn run_orchestrator(
       log("[orchestrator] Merge " + w.branch + ": " + result)
     }
   }
-  // Step 5: Cleanup worktrees
+  // Step 7: Cleanup worktrees + coordination dir
   for w in workers {
     ignore(
       exec(
@@ -269,10 +446,11 @@ pub fn run_orchestrator(
       ),
     )
   }
+  coord_cleanup(session_dir)
   if verbose {
-    log("[orchestrator] Cleaned up worktrees")
+    log("[orchestrator] Cleaned up worktrees and coordination dir")
   }
-  // Step 6: PR
+  // Step 8: PR
   if config.auto_pr {
     ignore(
       exec_with_timeout(

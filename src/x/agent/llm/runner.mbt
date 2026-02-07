@@ -11,6 +11,10 @@ pub(all) struct LlmAgentConfig {
   auto_pr : Bool
   pr_title : String
   verbose : Bool
+  coord_dir : String // empty = no coordination
+  agent_id : String // empty = no coordination
+  env : &ToolEnvironment? // None = use NativeToolEnvironment
+  coord : &CoordinationBackend? // None = use FileCoordinationBackend
 }
 
 ///|
@@ -109,9 +113,27 @@ pub fn run_llm_agent(
     config.model,
     system_prompt,
   )
-  let registry = create_tool_registry(config.work_dir)
+  let env : &ToolEnvironment = match config.env {
+    Some(e) => e
+    None => native_tool_env(config.work_dir)
+  }
+  let registry = create_tool_registry(env)
   let messages : Array[@llmlib.Message] = [@llmlib.Message::user(config.task)]
   let verbose = config.verbose
+  let has_coord = not(config.coord_dir.is_empty()) &&
+    not(config.agent_id.is_empty())
+  let coord : &CoordinationBackend? = if has_coord {
+    match config.coord {
+      Some(c) => Some(c)
+      None => Some(file_coordination_backend(""))
+    }
+  } else {
+    None
+  }
+  if has_coord {
+    guard coord is Some(c) else { () }
+    c.write_status(config.coord_dir, config.agent_id, Running)
+  }
   if verbose {
     log("[agent] provider=" + config.provider_name + " model=" + config.model)
     log("[agent] work_dir=" + config.work_dir)
@@ -119,6 +141,7 @@ pub fn run_llm_agent(
     log("")
   }
   let text_buf = StringBuilder::new()
+  let mut tools_in_step = 0
   @llmlib.run_agent(
     provider,
     registry,
@@ -140,7 +163,25 @@ pub fn run_llm_agent(
             }
             log("\n[tool] " + name + " " + input.stringify())
           }
-        ToolResult(name~, result~, is_error~) =>
+        ToolResult(name~, result~, is_error~) => {
+          tools_in_step += 1
+          if has_coord {
+            guard coord is Some(c) else { () }
+            if name == "write_file" {
+              c.append_event(
+                config.coord_dir,
+                config.agent_id,
+                FileChanged(path=result),
+              )
+            }
+            if is_error {
+              c.append_event(
+                config.coord_dir,
+                config.agent_id,
+                Error(message=name + ": " + result),
+              )
+            }
+          }
           if verbose {
             let status = if is_error { " ERROR" } else { " ok" }
             let preview = if result.length() > 200 {
@@ -159,7 +200,18 @@ pub fn run_llm_agent(
             }
             log("[result] " + name + status + ": " + preview)
           }
+        }
         StepComplete(step~) => {
+          if has_coord {
+            guard coord is Some(c) else { () }
+            c.write_step(config.coord_dir, config.agent_id, step)
+            c.append_event(
+              config.coord_dir,
+              config.agent_id,
+              StepCompleted(step~, tools_called=tools_in_step),
+            )
+          }
+          tools_in_step = 0
           let text = text_buf.to_string()
           if not(text.is_empty()) {
             on_output(text)
@@ -170,6 +222,15 @@ pub fn run_llm_agent(
           }
         }
         Done(reason~) => {
+          if has_coord {
+            guard coord is Some(c) else { () }
+            c.write_status(config.coord_dir, config.agent_id, Done)
+            c.append_event(
+              config.coord_dir,
+              config.agent_id,
+              Finished(summary=reason),
+            )
+          }
           let text = text_buf.to_string()
           if not(text.is_empty()) {
             on_output(text)

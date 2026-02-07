@@ -83,7 +83,7 @@ fn exec_with_timeout(command : String, timeout_ms : Int) -> String {
 }
 
 ///|
-pub fn create_tool_registry(work_dir : String) -> @llmlib.ToolRegistry {
+pub fn create_tool_registry(env : &ToolEnvironment) -> @llmlib.ToolRegistry {
   let registry = @llmlib.ToolRegistry::new()
 
   // read_file
@@ -98,8 +98,9 @@ pub fn create_tool_registry(work_dir : String) -> @llmlib.ToolRegistry {
     )
     .build(),
     fn(input) {
-      let path = resolve_path(work_dir, json_get_str(input, "path"))
-      exec("cat " + shell_escape(path))
+      env.read_file(json_get_str(input, "path")) catch {
+        e => "error: " + e.to_string()
+      }
     },
   )
 
@@ -116,13 +117,12 @@ pub fn create_tool_registry(work_dir : String) -> @llmlib.ToolRegistry {
     .string("content", "Content to write to the file", required=true)
     .build(),
     fn(input) {
-      let path = resolve_path(work_dir, json_get_str(input, "path"))
-      let content = json_get_str(input, "content")
-      ignore(
-        exec(
-          "printf '%s' " + shell_escape(content) + " > " + shell_escape(path),
-        ),
-      )
+      env.write_file(
+        json_get_str(input, "path"),
+        json_get_str(input, "content"),
+      ) catch {
+        e => return "error: " + e.to_string()
+      }
       "ok"
     },
   )
@@ -135,9 +135,9 @@ pub fn create_tool_registry(work_dir : String) -> @llmlib.ToolRegistry {
     .string("path", "Directory path (default: work_dir)")
     .build(),
     fn(input) {
-      let p = json_get_str(input, "path")
-      let path = if p.is_empty() { work_dir } else { resolve_path(work_dir, p) }
-      exec("ls -1a " + shell_escape(path))
+      env.list_directory(json_get_str(input, "path")) catch {
+        e => "error: " + e.to_string()
+      }
     },
   )
 
@@ -150,18 +150,13 @@ pub fn create_tool_registry(work_dir : String) -> @llmlib.ToolRegistry {
     .integer("max_depth", "Max directory depth (default: 3)")
     .build(),
     fn(input) {
-      let p = json_get_str(input, "path")
-      let path = if p.is_empty() { work_dir } else { resolve_path(work_dir, p) }
       let depth = match json_get_int_opt(input, "max_depth") {
         Some(d) => d
         None => 3
       }
-      let cmd = "find " +
-        shell_escape(path) +
-        " -maxdepth " +
-        depth.to_string() +
-        " -not -path '*/.*' | head -200"
-      exec(cmd)
+      env.list_files_recursive(json_get_str(input, "path"), depth) catch {
+        e => "error: " + e.to_string()
+      }
     },
   )
 
@@ -176,18 +171,11 @@ pub fn create_tool_registry(work_dir : String) -> @llmlib.ToolRegistry {
     .build(),
     fn(input) {
       let pattern = json_get_str(input, "pattern")
-      let p = json_get_str(input, "path")
-      let path = if p.is_empty() { work_dir } else { resolve_path(work_dir, p) }
+      let path = json_get_str(input, "path")
       let glob = json_get_str(input, "glob")
-      let mut cmd = "rg --no-heading -n " +
-        shell_escape(pattern) +
-        " " +
-        shell_escape(path)
-      if not(glob.is_empty()) {
-        cmd = cmd + " -g " + shell_escape(glob)
+      env.search_text(pattern, path, glob, 100) catch {
+        e => "error: " + e.to_string()
       }
-      cmd = cmd + " | head -100"
-      exec(cmd)
     },
   )
 
@@ -205,7 +193,9 @@ pub fn create_tool_registry(work_dir : String) -> @llmlib.ToolRegistry {
         Some(ms) => ms
         None => 30000
       }
-      exec_with_timeout("cd " + shell_escape(work_dir) + " && " + command, t)
+      env.run_command(command, "", t) catch {
+        e => "error: " + e.to_string()
+      }
     },
   )
 
@@ -217,8 +207,9 @@ pub fn create_tool_registry(work_dir : String) -> @llmlib.ToolRegistry {
     .string("path", "File path to remove", required=true)
     .build(),
     fn(input) {
-      let path = resolve_path(work_dir, json_get_str(input, "path"))
-      ignore(exec("rm " + shell_escape(path)))
+      env.remove_file(json_get_str(input, "path")) catch {
+        e => return "error: " + e.to_string()
+      }
       "ok"
     },
   )

@@ -1,0 +1,138 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/bit/x/agent/llm"
+
+import {
+  "mizchi/bit/lib",
+}
+
+// Values
+pub fn coord_append_event(String, String, CoordEvent) -> Unit
+
+pub fn coord_cleanup(String) -> Unit
+
+pub fn coord_init(String, String) -> String
+
+pub fn coord_init_agent(String, String) -> Unit
+
+pub fn coord_read_all_agents(String) -> Array[AgentSnapshot]
+
+pub fn coord_read_events_since(String, String, Int) -> Array[String]
+
+pub fn coord_read_status(String, String) -> AgentStatus
+
+pub fn coord_write_branch(String, String, String) -> Unit
+
+pub fn coord_write_pid(String, String, Int) -> Unit
+
+pub fn coord_write_status(String, String, AgentStatus) -> Unit
+
+pub fn coord_write_step(String, String, Int) -> Unit
+
+pub fn create_provider(String, String, String) -> @mizchi/llm.BoxedProvider
+
+pub fn create_tool_registry(&ToolEnvironment) -> @mizchi/llm.ToolRegistry
+
+pub fn file_coordination_backend(String) -> &CoordinationBackend
+
+pub fn kv_coordination_backend(String, &@lib.WorkingTree, &@lib.ObjectStore) -> &CoordinationBackend
+
+pub fn native_tool_env(String) -> &ToolEnvironment
+
+pub fn run_llm_agent(LlmAgentConfig, on_output~ : (String) -> Unit) -> Unit
+
+pub fn run_orchestrator(OrchestratorConfig, on_output~ : (String) -> Unit) -> Unit
+
+pub fn strip_trailing_whitespace(String) -> String
+
+// Errors
+
+// Types and methods
+pub(all) struct AgentSnapshot {
+  agent_id : String
+  status : AgentStatus
+  pid : Int
+  step : Int
+  branch : String
+  last_step_time : Int64
+}
+
+pub(all) enum AgentStatus {
+  Pending
+  Running
+  Done
+  Failed
+  Cancelled
+}
+pub fn AgentStatus::parse(String) -> Self
+pub fn AgentStatus::to_string(Self) -> String
+pub impl Eq for AgentStatus
+
+pub(all) enum CoordEvent {
+  StepCompleted(step~ : Int, tools_called~ : Int)
+  FileChanged(path~ : String)
+  TestResult(passed~ : Bool, output~ : String)
+  Error(message~ : String)
+  Finished(summary~ : String)
+}
+
+pub(all) struct FileCoordinationBackend {
+  base_dir : String
+}
+pub fn FileCoordinationBackend::new(String) -> Self
+
+pub(all) struct LlmAgentConfig {
+  work_dir : String
+  task : String
+  branch_name : String
+  target_branch : String
+  provider_name : String
+  model : String
+  max_steps : Int
+  auto_commit : Bool
+  auto_pr : Bool
+  pr_title : String
+  verbose : Bool
+  coord_dir : String
+  agent_id : String
+  env : &ToolEnvironment?
+  coord : &CoordinationBackend?
+}
+
+pub(all) struct OrchestratorConfig {
+  work_dir : String
+  task : String
+  provider_name : String
+  model : String
+  max_workers : Int
+  target_branch : String
+  auto_pr : Bool
+  verbose : Bool
+}
+
+// Type aliases
+
+// Traits
+pub(open) trait CoordinationBackend {
+  init_session(Self, String) -> String
+  init_agent(Self, String, String) -> Unit
+  write_status(Self, String, String, AgentStatus) -> Unit
+  write_step(Self, String, String, Int) -> Unit
+  write_pid(Self, String, String, Int) -> Unit
+  write_branch(Self, String, String, String) -> Unit
+  append_event(Self, String, String, CoordEvent) -> Unit
+  read_status(Self, String, String) -> AgentStatus
+  read_all_agents(Self, String) -> Array[AgentSnapshot]
+  read_events_since(Self, String, String, Int) -> Array[String]
+  cleanup(Self, String) -> Unit
+}
+
+pub(open) trait ToolEnvironment {
+  read_file(Self, String) -> String raise
+  write_file(Self, String, String) -> Unit raise
+  remove_file(Self, String) -> Unit raise
+  list_directory(Self, String) -> String raise
+  list_files_recursive(Self, String, Int) -> String raise
+  search_text(Self, String, String, String, Int) -> String raise
+  run_command(Self, String, String, Int) -> String raise
+}
+

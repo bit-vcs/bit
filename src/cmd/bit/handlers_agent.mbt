@@ -301,6 +301,8 @@ fn print_agent_llm_usage() -> Unit {
   println("  --no-commit            Skip auto-commit")
   println("  --pr                   Create PR after commit")
   println("  --pr-title <text>      PR title")
+  println("  --coord-dir <path>     Coordination directory (for orchestrator)")
+  println("  --agent-id <id>        Agent ID (for orchestrator)")
   println("  --quiet                Suppress verbose output")
 }
 
@@ -326,6 +328,8 @@ fn handle_agent_llm(args : Array[String]) -> Unit {
   let mut pr_title = ""
   let mut verbose = true
   let mut orchestrate = false
+  let mut coord_dir = ""
+  let mut agent_id_flag = ""
   let mut i = 0
   while i < args.length() {
     match args[i] {
@@ -386,6 +390,18 @@ fn handle_agent_llm(args : Array[String]) -> Unit {
           pr_title = args[i]
         }
       }
+      "--coord-dir" => {
+        i += 1
+        if i < args.length() {
+          coord_dir = args[i]
+        }
+      }
+      "--agent-id" => {
+        i += 1
+        if i < args.length() {
+          agent_id_flag = args[i]
+        }
+      }
       "--quiet" => verbose = false
       "-h" | "--help" => {
         print_agent_llm_usage()
@@ -434,6 +450,10 @@ fn handle_agent_llm(args : Array[String]) -> Unit {
       auto_pr,
       pr_title,
       verbose,
+      coord_dir,
+      agent_id: agent_id_flag,
+      env: None,
+      coord: None,
     }
     @agent_llm.run_llm_agent(config, on_output=output)
   }
