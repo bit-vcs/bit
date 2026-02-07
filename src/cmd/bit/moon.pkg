@@ -44,6 +44,7 @@ options(
     "handlers_interactive_wbtest.mbt": [ "native" ],
     "handlers_maintenance.mbt": [ "native" ],
     "handlers_misc.mbt": [ "native" ],
+    "handlers_misc_wbtest.mbt": [ "native" ],
     "handlers_pack.mbt": [ "native" ],
     "handlers_plumbing.mbt": [ "native" ],
     "handlers_remote.mbt": [ "native" ],

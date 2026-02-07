@@ -631,6 +631,21 @@ fn read_sha1_at(data : Bytes, offset : Int) -> @git.ObjectId {
 
 ///|
 async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
+  for arg in args {
+    if arg == "-h" || arg == "--help" || arg == "--help-all" {
+      match real_git_path() {
+        Some(real_git) => {
+          let real_args = real_git_args_from_cli()
+          let code = @process.run(real_git, real_args, inherit_env=true)
+          @sys.exit(code)
+        }
+        None => {
+          @stdio.stdout.write("usage: git index-pack [<options>] <pack> [<idx>]\n")
+          @sys.exit(129)
+        }
+      }
+    }
+  }
   match parse_index_pack_args(args) {
     IndexPackParse::Unsupported => {
       @stdio.stderr.write("bit index-pack: unsupported options\n")

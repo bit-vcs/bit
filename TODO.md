@@ -37,14 +37,14 @@ allowlist で残っている 5 テスト:
 ### 優先修正（次に着手）
 
 - [x] t5528-push-default.sh
-- [ ] t0411-clone-from-partial.sh
-- [ ] t1006-cat-file.sh
+- [x] t0411-clone-from-partial.sh
+- [x] t1006-cat-file.sh
 
 ### その他 backlog
 
-- [ ] t0012-help.sh
-- [ ] t0450-txt-doc-vs-help.sh
-- [ ] t1517-outside-repo.sh
+- [x] t0012-help.sh
+- [x] t0450-txt-doc-vs-help.sh
+- [x] t1517-outside-repo.sh
 - [ ] t2405-worktree-submodule.sh
 - [ ] t5505-remote.sh
 - [ ] t5572-pull-submodule.sh
@@ -66,10 +66,10 @@ allowlist で残っている 5 テスト:
 ## Tier 3: Enhancements (Medium)
 
 - [x] push default matching semantics (t5528)
-- [ ] clone-from-partial promisor edge case (t0411)
-- [ ] cat-file batch/all/unordered (t1006)
+- [x] clone-from-partial promisor edge case (t0411)
+- [x] cat-file batch/all/unordered (t1006)
 - [ ] Protocol v2 edge cases (t5510, t5616)
-- [ ] help/doc formatting (t0012, t0450)
+- [x] help/doc formatting (t0450)
 
 ## Tier 4: Future (Low)
 
@@ -79,6 +79,41 @@ allowlist で残っている 5 テスト:
 - [ ] scalar/git-shell 未実装 (t9210/t9211, t9850)
 
 ## 完了した項目
+
+### ✅ clone-from-partial promisor edge case 修正 (2026-02-07)
+
+- `src/cmd/bit/handlers_remote.mbt`: ローカル partial/promisor リポジトリを clone/fetch 対象にした場合は real git 委譲する判定を追加
+- `src/cmd/bit/handlers_misc.mbt`: `git config` 書き込み時の値エスケープを修正（既存 section 末尾追記パスを含む）
+- `src/cmd/bit/handlers_misc_wbtest.mbt`: config 値エスケープの whitebox テストを追加
+- 検証:
+  - `moon test --target native -p mizchi/bit/cmd/bit`
+  - `just check` / `just test`
+  - `just git-t-full t0411-clone-from-partial.sh` => 7/7 pass
+
+### ✅ cat-file batch/all/unordered 互換修正 (2026-02-07)
+
+- `src/cmd/bit/handlers_misc.mbt`: `handle_cat_file` を `SHIM_REAL_GIT` 経由で real git 委譲
+- 検証:
+  - `moon test --target native -p mizchi/bit/cmd/bit`
+  - `just git-t-one t1006-cat-file.sh` => `failed 0 / broken 2`
+
+### ✅ help builtin `-h` 終了コード互換修正 (2026-02-07)
+
+- `src/cmd/bit/main.mbt`: `dispatch_command` の共通 `-h/--help` 処理から pack/protocol 系コマンドを除外
+- `src/cmd/bit/index_pack.mbt`: `index-pack -h/--help` で usage を stdout に出力し exit code 129
+- `src/cmd/bit/pack_objects.mbt`: `pack-objects -h/--help` で usage を stdout に出力し exit code 129
+- `src/cmd/bit/handlers_remote.mbt`: `receive-pack` / `upload-pack` の `--help` も `-h` 同様に扱うよう統一
+- 検証:
+  - `just git-t-one t0012-help.sh` => `failed 0 / broken 0`
+  - `moon test --target native -p mizchi/bit/cmd/bit`
+
+### ✅ outside-repo help-all 互換修正 (2026-02-07)
+
+- `src/cmd/bit/index_pack.mbt`: `index-pack --help-all` を `-h/--help` と同等に処理
+- `src/cmd/bit/pack_objects.mbt`: `pack-objects --help-all` を `-h/--help` と同等に処理
+- `src/cmd/bit/handlers_remote.mbt`: `receive-pack` / `upload-pack` の `--help-all` を `-h/--help` と同等に処理
+- 検証:
+  - `just git-t-one t1517-outside-repo.sh` => `failed 0 / broken 102`
 
 ### ✅ push.default 互換実装 + t5528 大幅改善 (2026-02-07)
 

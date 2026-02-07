@@ -844,12 +844,19 @@ async fn dispatch_command(
   cmd : String,
   rest : Array[String],
 ) -> Unit raise Error {
-  for arg in rest {
-    if arg == "-h" || arg == "--help" {
-      if (cmd |> show_command_help |> not) {
-        eprint_line("warning: help for '\{cmd}' is not implemented")
+  let cmd_handles_help = match cmd {
+    "receive-pack" | "git-receive-pack" | "upload-pack" | "git-upload-pack" |
+    "pack-objects" | "index-pack" => true
+    _ => false
+  }
+  if not(cmd_handles_help) {
+    for arg in rest {
+      if arg == "-h" || arg == "--help" {
+        if (cmd |> show_command_help |> not) {
+          eprint_line("warning: help for '\{cmd}' is not implemented")
+        }
+        return ()
       }
-      return ()
     }
   }
   match cmd {

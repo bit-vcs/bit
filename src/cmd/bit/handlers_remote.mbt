@@ -1518,6 +1518,26 @@ fn clone_local_repo(
 }
 
 ///|
+fn has_promisor_source_repo(
+  fs : OsFs,
+  src_path : String,
+) -> Bool {
+  guard @gitlib.detect_git_dir(fs, src_path) is Some((src_git_dir, _)) else {
+    return false
+  }
+  if @gitlib.is_partial_clone(fs, src_git_dir) {
+    return true
+  }
+  let (remotes, _) = @gitlib.read_repo_config(fs, src_git_dir)
+  for _, rc in remotes {
+    if rc.promisor || rc.partial_clone_filter is Some(_) {
+      return true
+    }
+  }
+  false
+}
+
+///|
 async fn fetch_local_repo(
   fs : OsFs,
   src_path : String,
@@ -2193,14 +2213,23 @@ fn parse_pack_args(args : Array[String]) -> (Bool, String)? {
 
 ///|
 async fn handle_upload_pack(args : Array[String]) -> Unit raise Error {
-  // Handle -h option
+  // Handle -h/--help/--help-all option
   for arg in args {
-    if arg == "-h" {
-      print_line(
-        "usage: git upload-pack [--[no-]strict] [--timeout=<n>] [--stateless-rpc]",
-      )
-      print_line("                       [--advertise-refs] <dir>")
-      @sys.exit(129)
+    if arg == "-h" || arg == "--help" || arg == "--help-all" {
+      match real_git_path() {
+        Some(real_git) => {
+          let real_args = real_git_args_from_cli()
+          let code = @process.run(real_git, real_args, inherit_env=true)
+          @sys.exit(code)
+        }
+        None => {
+          print_line(
+            "usage: git upload-pack [--[no-]strict] [--timeout=<n>] [--stateless-rpc]",
+          )
+          print_line("                       [--advertise-refs] <dir>")
+          @sys.exit(129)
+        }
+      }
     }
   }
   let mut advertise = false
@@ -2347,11 +2376,20 @@ fn upload_pack_first_line(msg : String) -> String {
 
 ///|
 async fn handle_receive_pack(args : Array[String]) -> Unit {
-  // Handle -h option
+  // Handle -h/--help/--help-all option
   for arg in args {
-    if arg == "-h" {
-      print_line("usage: git receive-pack <git-dir>")
-      @sys.exit(129)
+    if arg == "-h" || arg == "--help" || arg == "--help-all" {
+      match real_git_path() {
+        Some(real_git) => {
+          let real_args = real_git_args_from_cli()
+          let code = @process.run(real_git, real_args, inherit_env=true)
+          @sys.exit(code)
+        }
+        None => {
+          print_line("usage: git receive-pack <git-dir>")
+          @sys.exit(129)
+        }
+      }
     }
   }
   guard parse_pack_args(args) is Some((advertise, repo_path)) else {
@@ -2584,6 +2622,16 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
   }
   match @gitlib.resolve_local_repo_path(fs, local_root, remote_url) {
     Some(src_path) => {
+      if has_promisor_source_repo(fs, src_path) {
+        match real_git_path() {
+          Some(real_git) => {
+            let real_args = real_git_args_from_cli()
+            let code = @process.run(real_git, real_args)
+            @sys.exit(code)
+          }
+          None => ()
+        }
+      }
       let remote_display = if remote_url.has_prefix("file://") {
         remote_url
       } else if remote_url.has_prefix("/") {
@@ -2731,7 +2779,19 @@ async fn handle_fetch(args : Array[String]) -> Unit raise Error {
       }
     None => ()
   }
-  if has_filter_flag || is_partial_clone {
+  let local_root = match @sys.get_env_var("GIT_SHIM_CWD") {
+    Some(dir) => dir
+    None => root
+  }
+  let local_promisor_remote = match @gitlib.resolve_local_repo_path(
+    fs,
+    local_root,
+    url,
+  ) {
+    Some(src_path) => has_promisor_source_repo(fs, src_path)
+    None => false
+  }
+  if has_filter_flag || is_partial_clone || local_promisor_remote {
     match real_git_path() {
       Some(real_git) => {
         let real_args = real_git_args_from_cli()

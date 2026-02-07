@@ -1606,6 +1606,21 @@ async fn try_reuse_single_stdin_pack(
 
 ///|
 async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
+  for arg in args {
+    if arg == "-h" || arg == "--help" || arg == "--help-all" {
+      match real_git_path() {
+        Some(real_git) => {
+          let real_args = real_git_args_from_cli()
+          let code = @process.run(real_git, real_args, inherit_env=true)
+          @sys.exit(code)
+        }
+        None => {
+          @stdio.stdout.write("usage: git pack-objects [<options>] <base-name>\n")
+          @sys.exit(129)
+        }
+      }
+    }
+  }
   match parse_pack_objects_args(args) {
     PackObjectsParse::Unsupported => {
       @stdio.stderr.write("moongit pack-objects: unsupported options\n")

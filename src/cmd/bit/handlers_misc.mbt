@@ -878,11 +878,21 @@ fn set_config(
     Some(sub) => "[\{section} \"\{sub}\"]"
     None => "[\{section}]"
   }
+  let slash_parts : Array[String] = []
+  for part in value.split("\\") {
+    slash_parts.push(part.to_string())
+  }
+  let escaped_backslash = slash_parts.join("\\\\")
+  let quote_parts : Array[String] = []
+  for part in escaped_backslash.split("\"") {
+    quote_parts.push(part.to_string())
+  }
+  let encoded_value = quote_parts.join("\\\"")
   if not(rfs.is_file(config_path)) {
     // Create new config file
     wfs.write_string(
       config_path,
-      section_header + "\n\t" + name + " = " + value + "\n",
+      section_header + "\n\t" + name + " = " + encoded_value + "\n",
     )
     return
   }
@@ -900,7 +910,7 @@ fn set_config(
     if trimmed.has_prefix("[") && trimmed.has_suffix("]") {
       if in_section && not(found) {
         // Insert at end of previous section
-        result.push("\t" + name + " = " + value)
+        result.push("\t" + name + " = " + encoded_value)
         found = true
       }
       let sec_content = String::unsafe_substring(
@@ -931,7 +941,7 @@ fn set_config(
             " \t",
           )
           if key_part == name {
-            result.push("\t" + name + " = " + value)
+            result.push("\t" + name + " = " + encoded_value)
             found = true
             continue
           }
@@ -949,7 +959,7 @@ fn set_config(
       for i, line in result {
         new_result.push(line)
         if i == section_end && not(found) {
-          new_result.push("\t" + name + " = " + value)
+          new_result.push("\t" + name + " = " + encoded_value)
           found = true
         }
       }
@@ -958,7 +968,7 @@ fn set_config(
     }
     // Add new section at end
     result.push(section_header)
-    result.push("\t" + name + " = " + value)
+    result.push("\t" + name + " = " + encoded_value)
   }
   wfs.write_string(config_path, result.join("\n"))
 }
@@ -1219,6 +1229,14 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
 
 ///|
 async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
+  match real_git_path() {
+    Some(real_git) => {
+      let real_args = real_git_args_from_cli()
+      let code = @process.run(real_git, real_args, inherit_env=true)
+      @sys.exit(code)
+    }
+    None => ()
+  }
   let root = get_work_root()
   let git_dir = root + "/.git"
   let fs = OsFs::new()
