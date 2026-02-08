@@ -1,0 +1,27 @@
+diff --git a/t/t5801-remote-helpers.sh b/t/t5801-remote-helpers.sh
+index c7a73826cb..f3f62bcaf4 100755
+--- a/t/t5801-remote-helpers.sh
++++ b/t/t5801-remote-helpers.sh
+@@ -189,7 +189,15 @@ test_expect_success 'pulling without marks' '
+ 	(cd local2 &&
+ 	GIT_REMOTE_TESTGIT_NO_MARKS=1 git pull) &&
+ 	compare_refs local2 HEAD server HEAD
+ '
+ 
+-test_expect_failure 'pushing without marks' '
++push_without_marks_expect=test_expect_failure
++shim_cmds="${SHIM_CMDS:-${GIT_SHIM_CMDS:-}}"
++case " $shim_cmds " in
++*" push "*)
++	push_without_marks_expect=test_expect_success
++	;;
++esac
++
++$push_without_marks_expect 'pushing without marks' '
+ 	test_when_finished "(cd local2 && git reset --hard origin)" &&
+ 	(cd local2 &&
+ 	echo content >>file &&
+ 	git commit -a -m twelve &&
+ 	GIT_REMOTE_TESTGIT_NO_MARKS=1 git push) &&
+ 	compare_refs local2 HEAD server HEAD
+ '

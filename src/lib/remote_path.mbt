@@ -14,6 +14,22 @@ fn strip_file_scheme(url : String) -> String? {
 }
 
 ///|
+fn strip_remote_helper_path(url : String) -> String? {
+  match url.find("::") {
+    Some(idx) => {
+      let start = idx + 2
+      if start >= url.length() {
+        None
+      } else {
+        let path = String::unsafe_substring(url, start=start, end=url.length())
+        if path.length() == 0 { None } else { Some(path) }
+      }
+    }
+    None => None
+  }
+}
+
+///|
 fn normalize_local_path(path : String) -> String {
   let parts : Array[String] = []
   for part_view in path.split("/") {
@@ -51,9 +67,13 @@ pub fn resolve_local_repo_path(
   root : String,
   url : String,
 ) -> String? {
-  let raw = match strip_file_scheme(url) {
+  let raw0 = match strip_file_scheme(url) {
     Some(path) => path
     None => url
+  }
+  let raw = match strip_remote_helper_path(raw0) {
+    Some(path) => path
+    None => raw0
   }
   if is_http_url(raw) || raw.has_prefix("git@") {
     return None

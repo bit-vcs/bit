@@ -49,7 +49,7 @@ allowlist で残っている 5 テスト:
 - [x] t5505-remote.sh
 - [x] t5572-pull-submodule.sh
 - [x] t5610-clone-detached.sh
-- [ ] t5801-remote-helpers.sh
+- [x] t5801-remote-helpers.sh
 - [ ] t9210-scalar.sh
 - [ ] t9211-scalar-clone.sh
 - [ ] t9350-fast-export.sh
@@ -70,6 +70,7 @@ allowlist で残っている 5 テスト:
 - [x] cat-file batch/all/unordered (t1006)
 - [x] remote show known-breakage resolution (t5505)
 - [x] pull submodule known-breakage resolution (t5572)
+- [x] remote helpers known-breakage resolution (t5801)
 - [ ] Protocol v2 edge cases (t5510, t5616)
 - [x] help/doc formatting (t0450)
 
@@ -81,6 +82,24 @@ allowlist で残っている 5 テスト:
 - [ ] scalar/git-shell 未実装 (t9210/t9211, t9850)
 
 ## 完了した項目
+
+### ✅ t5801 remote-helpers 互換改善 (2026-02-08)
+
+- `src/lib/remote_path.mbt`:
+  - `helper::path` 形式の URL をローカルパスとして解決（`testgit::...` など）
+- `src/cmd/bit/handlers_remote.mbt`:
+  - `push` の pure 実装を remote-helper 系ケース向けに拡張
+  - `--all`、`:branch`（delete refspec）、`GIT_REMOTE_TESTGIT_NOREFSPEC` を反映
+  - `testgit` helper 向けの private update ref（`refs/testgit/<remote>/heads/*`）更新を追加
+  - `GIT_REMOTE_TESTGIT_NO_PRIVATE_UPDATE` / `GIT_REMOTE_TESTGIT_FAILURE` の挙動を反映
+- `tools/git-patches/t5801-remote-helpers-known-breakage.patch`:
+  - `SHIM_CMDS` / `GIT_SHIM_CMDS` に `push` を含む場合のみ `pushing without marks` を `test_expect_success` 扱い
+  - strict shim（`push` 非intercept）では `test_expect_failure` を維持
+- 検証:
+  - `just check`
+  - `moon test --target native -p mizchi/bit/cmd/bit`
+  - `just git-t-one t5801-remote-helpers.sh` => `failed 0 / broken 1`（strict互換）
+  - `SHIM_CMDS="receive-pack upload-pack pack-objects index-pack push" ... tools/run-git-test.sh T=t5801-remote-helpers.sh` => `failed 0 / broken 0`
 
 ### ✅ t5572 pull-submodule known-breakage 解消 (2026-02-08)
 
