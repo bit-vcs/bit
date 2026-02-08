@@ -959,23 +959,6 @@ fn count_pack_reused_objects(
 }
 
 ///|
-async fn run_real_git_pack_objects_with_input(
-  real_git : String,
-  args : Array[String],
-  input : Bytes,
-) -> Unit {
-  let fs = OsFs::new()
-  let tmp_dir = @sys.get_env_var("TMPDIR").unwrap_or("/tmp")
-  let tmp_name = "moongit-pack-objects-" + @git.sha1(input).to_hex()
-  let tmp_path = tmp_dir + "/" + tmp_name
-  fs.write_file(tmp_path, input)
-  let stdin = @process.redirect_from_file(tmp_path)
-  let code = @process.run(real_git, args, inherit_env=true, stdin~)
-  fs.remove_file(tmp_path)
-  @sys.exit(code)
-}
-
-///|
 fn pack_idx_path(pack_path : String) -> String {
   if pack_path.has_suffix(".pack") {
     let base = (try! pack_path[:pack_path.length() - 5]).to_string()
@@ -1608,19 +1591,10 @@ async fn try_reuse_single_stdin_pack(
 async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
   for arg in args {
     if arg == "-h" || arg == "--help" || arg == "--help-all" {
-      match real_git_path() {
-        Some(real_git) => {
-          let real_args = real_git_args_from_cli()
-          let code = @process.run(real_git, real_args, inherit_env=true)
-          @sys.exit(code)
-        }
-        None => {
-          @stdio.stdout.write(
-            "usage: git pack-objects [<options>] <base-name>\n",
-          )
-          @sys.exit(129)
-        }
-      }
+      @stdio.stdout.write(
+        "usage: git pack-objects [<options>] <base-name>\n",
+      )
+      @sys.exit(129)
     }
   }
   match parse_pack_objects_args(args) {
@@ -1636,98 +1610,32 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
       let fs = OsFs::new()
       let git_dir = find_git_dir(fs)
       match @sys.get_env_var("GIT_TEST_NAME_HASH_VERSION") {
-        Some(_) =>
-          match real_git_path() {
-            Some(real_git) => {
-              let real_args = real_git_args_from_cli()
-              let code = @process.run(real_git, real_args, inherit_env=true)
-              @sys.exit(code)
-            }
-            None => ()
-          }
+        Some(_) => ()
         None => ()
       }
       if cfg.object_format is Some(format) && format == "sha256" {
-        match real_git_path() {
-          Some(real_git) => {
-            let real_args = real_git_args_from_cli()
-            let code = @process.run(real_git, real_args, inherit_env=true)
-            @sys.exit(code)
-          }
-          None => {
-            @stdio.stderr.write("bit: SHA256 object format is not supported\n")
-            @sys.exit(1)
-          }
-        }
+        @stdio.stderr.write("bit: SHA256 object format is not supported\n")
+        @sys.exit(1)
       }
       if is_sha256_repo_from_env() {
-        match real_git_path() {
-          Some(real_git) => {
-            let real_args = real_git_args_from_cli()
-            let code = @process.run(real_git, real_args, inherit_env=true)
-            @sys.exit(code)
-          }
-          None => {
-            @stdio.stderr.write("bit: SHA256 repositories are not supported\n")
-            @sys.exit(1)
-          }
-        }
+        @stdio.stderr.write("bit: SHA256 repositories are not supported\n")
+        @sys.exit(1)
       }
       if cfg.delegate_to_real_git {
-        match real_git_path() {
-          Some(real_git) => {
-            let real_args = real_git_args_from_cli()
-            let code = @process.run(real_git, real_args, inherit_env=true)
-            @sys.exit(code)
-          }
-          None =>
-            if cfg.delegate_to_real_git {
-              @stdio.stderr.write("bit: unsupported pack-objects options\n")
-              @sys.exit(1)
-            }
-        }
-      }
-      if !cfg.stdout {
-        match real_git_path() {
-          Some(real_git) => {
-            let real_args = real_git_args_from_cli()
-            let code = @process.run(real_git, real_args, inherit_env=true)
-            @sys.exit(code)
-          }
-          None => ()
-        }
+        @stdio.stderr.write("bit: unsupported pack-objects options\n")
+        @sys.exit(1)
       }
       let trace2_event = @sys.get_env_var("GIT_TRACE2_EVENT")
-      if trace2_event is Some(_) || is_pack_reuse_config_enabled(git_dir) {
-        match real_git_path() {
-          Some(real_git) => {
-            let real_args = real_git_args_from_cli()
-            let code = @process.run(real_git, real_args, inherit_env=true)
-            @sys.exit(code)
-          }
-          None => {
-            @stdio.stderr.write("bit: unsupported pack-objects options\n")
-            @sys.exit(1)
-          }
-        }
-      }
-      // Delta reuse / depth semantics (e.g. --window=0 or explicit --depth) are
-      // still delegated to real git for compatibility.
+      ignore(trace2_event)
+      ignore(is_pack_reuse_config_enabled(git_dir))
+      // Keep these flags visible for future compatibility tuning.
       let needs_real_git_delta = cfg.window == 0 || cfg.depth != 50
       let needs_real_git_stdin_object_mode = cfg.stdout &&
         !cfg.revs &&
         !cfg.all &&
         !cfg.stdin_packs
-      if needs_real_git_delta || needs_real_git_stdin_object_mode {
-        match real_git_path() {
-          Some(real_git) => {
-            let real_args = real_git_args_from_cli()
-            let code = @process.run(real_git, real_args, inherit_env=true)
-            @sys.exit(code)
-          }
-          None => ()
-        }
-      }
+      ignore(needs_real_git_delta)
+      ignore(needs_real_git_stdin_object_mode)
       let pack_dir = git_dir + "/objects/pack"
       if cfg.name_hash_version is Some(version) &&
         cfg.write_bitmap &&
@@ -1889,15 +1797,6 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
               None => default_sparse
             }
         }
-        if use_sparse && cfg.missing_mode is MissingMode::Error {
-          match real_git_path() {
-            Some(real_git) => {
-              let real_args = real_git_args_from_cli()
-              run_real_git_pack_objects_with_input(real_git, real_args, input)
-            }
-            None => ()
-          }
-        }
         if use_sparse {
           objects = collect_sparse_objects_from_commits(
             db, fs, include_commits, exclude_commits,
@@ -1955,15 +1854,6 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
         }
       } else {
         let input = read_all_stdin()
-        if input.length() == 0 {
-          match real_git_path() {
-            Some(real_git) => {
-              let real_args = real_git_args_from_cli()
-              run_real_git_pack_objects_with_input(real_git, real_args, input)
-            }
-            None => ()
-          }
-        }
         if input.length() > 0 {
           let lines = split_lines_bytes(input)
           let mut has_sha256 = false
@@ -1974,18 +1864,8 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
             }
           }
           if has_sha256 {
-            match real_git_path() {
-              Some(real_git) => {
-                let real_args = real_git_args_from_cli()
-                run_real_git_pack_objects_with_input(real_git, real_args, input)
-              }
-              None => {
-                @stdio.stderr.write(
-                  "bit: SHA256 object format is not supported\n",
-                )
-                @sys.exit(1)
-              }
-            }
+            @stdio.stderr.write("bit: SHA256 object format is not supported\n")
+            @sys.exit(1)
           }
           let ends_with_newline = input.length() > 0 &&
             input[input.length() - 1] == b'\n'

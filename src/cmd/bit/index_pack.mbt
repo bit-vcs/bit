@@ -625,19 +625,10 @@ fn read_sha1_at(data : Bytes, offset : Int) -> @git.ObjectId {
 async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
   for arg in args {
     if arg == "-h" || arg == "--help" || arg == "--help-all" {
-      match real_git_path() {
-        Some(real_git) => {
-          let real_args = real_git_args_from_cli()
-          let code = @process.run(real_git, real_args, inherit_env=true)
-          @sys.exit(code)
-        }
-        None => {
-          @stdio.stdout.write(
-            "usage: git index-pack [<options>] <pack> [<idx>]\n",
-          )
-          @sys.exit(129)
-        }
-      }
+      @stdio.stdout.write(
+        "usage: git index-pack [<options>] <pack> [<idx>]\n",
+      )
+      @sys.exit(129)
     }
   }
   match parse_index_pack_args(args) {
@@ -651,60 +642,24 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
     }
     IndexPackParse::Ok(cfg) => {
       if cfg.delegate_to_real_git {
-        match real_git_path() {
-          Some(real_git) => {
-            let real_args = real_git_args_from_cli()
-            let code = @process.run(real_git, real_args)
-            @sys.exit(code)
-          }
-          None => {
-            @stdio.stderr.write("bit: unsupported index-pack options\n")
-            @sys.exit(1)
-          }
-        }
+        @stdio.stderr.write("bit: unsupported index-pack options\n")
+        @sys.exit(1)
       }
       if cfg.fix_thin {
-        match real_git_path() {
-          Some(real_git) => {
-            let real_args = real_git_args_from_cli()
-            let code = @process.run(real_git, real_args)
-            @sys.exit(code)
-          }
-          None => {
-            @stdio.stderr.write("bit: --fix-thin is not supported\n")
-            @sys.exit(1)
-          }
-        }
+        @stdio.stderr.write("bit: --fix-thin is not supported\n")
+        @sys.exit(1)
       }
       let fs = OsFs::new()
       let git_dir = find_git_dir(fs)
       let wants_sha256 = cfg.object_format is Some(format) && format == "sha256"
       let repo_is_sha256 = is_sha256_repo_from_env()
       if wants_sha256 || repo_is_sha256 {
-        match real_git_path() {
-          Some(real_git) => {
-            let real_args = real_git_args_from_cli()
-            let code = @process.run(real_git, real_args)
-            @sys.exit(code)
-          }
-          None => {
-            @stdio.stderr.write("bit: SHA256 object format is not supported\n")
-            @sys.exit(1)
-          }
-        }
+        @stdio.stderr.write("bit: SHA256 object format is not supported\n")
+        @sys.exit(1)
       }
       if pack_write_reverse_index_enabled(git_dir) {
-        match real_git_path() {
-          Some(real_git) => {
-            let real_args = real_git_args_from_cli()
-            let code = @process.run(real_git, real_args)
-            @sys.exit(code)
-          }
-          None => {
-            @stdio.stderr.write("bit: unsupported index-pack options\n")
-            @sys.exit(1)
-          }
-        }
+        @stdio.stderr.write("bit: unsupported index-pack options\n")
+        @sys.exit(1)
       }
       if cfg.verify_stat_only {
         let pack_path = match cfg.pack_path {

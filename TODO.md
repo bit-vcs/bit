@@ -59,10 +59,11 @@ allowlist で残っている 5 テスト:
 ## real-git フォールバック削減計画（2026-02-08）
 
 現状棚卸し（`src/cmd/bit`）:
-- `real_git_path()` 経由の委譲: 42 箇所（14 関数）
-- `@process.run("git", ...)` 直呼び: 10 箇所（5 関数）
-- 2026-02-08 更新: `@process.run("git", ...)` 直呼びは共通ヘルパ `run_git_command` に集約済み（呼び出しサイト 0）
-- ホットスポット: `handle_pack_objects`(11), `handle_index_pack`(5), `handle_upload_pack`(4), `handle_receive_pack`(4), `handle_multi_pack_index`+`midx_write`(5), `handle_clone`(3)
+- `real_git_path()` 経由の委譲: 0 箇所
+- `@process.run("git", ...)` 直呼び: 0 箇所
+- 2026-02-08 更新: `handlers_maintenance` / `handlers_plumbing` / `index_pack` / `pack_objects` / `upload-pack` / `receive-pack` の real-git 委譲を撤去
+- 2026-02-08 更新: `handle_cat_file` / `interactive add -p` の real-git 委譲を撤去
+- 2026-02-08 更新: `run_git_command` を bit 内部ディスパッチに置換し、`hq` / `scalar` / `subdir` / `branch` の実行経路から外部 git 実行を除去
 
 ### Phase 0: ガードと可視化（先に失敗させる）
 
@@ -73,40 +74,40 @@ allowlist で残っている 5 テスト:
 ### Phase 1: 常時委譲（pure 実装が死んでいる箇所）を先に撤去
 
 - [x] `src/cmd/bit/handlers_remote.mbt`: `handle_pull` 末尾の無条件 real-git 委譲を撤去し、既存 pure merge/rebase 経路を有効化
-- [ ] `src/cmd/bit/handlers_misc.mbt`: `handle_cat_file` の無条件委譲を撤去（batch/all/unordered まで pure 化）
-- [ ] `src/cmd/bit/handlers_maintenance.mbt`: `handle_repack` の先頭委譲を撤去（`@gitlib.repack_repo` ベースで不足機能を埋める）
-- [ ] `src/cmd/bit/handlers_remote.mbt`: `handle_receive_pack` の advertise/非advertise 両経路の委譲を段階的に撤去
-- [ ] `src/cmd/bit/handlers_remote.mbt`: `handle_upload_pack` の advertise/filter 系委譲を SHA1/no-filter ケースから先に撤去
+- [x] `src/cmd/bit/handlers_misc.mbt`: `handle_cat_file` の無条件委譲を撤去（batch/all/unordered まで pure 化）
+- [x] `src/cmd/bit/handlers_maintenance.mbt`: `handle_repack` の先頭委譲を撤去（`@gitlib.repack_repo` ベースで不足機能を埋める）
+- [x] `src/cmd/bit/handlers_remote.mbt`: `handle_receive_pack` の advertise/非advertise 両経路の委譲を段階的に撤去
+- [x] `src/cmd/bit/handlers_remote.mbt`: `handle_upload_pack` の advertise/filter 系委譲を SHA1/no-filter ケースから先に撤去
 
 ### Phase 2: オプション限定委譲を縮小
 
-- [ ] `src/cmd/bit/handlers_remote.mbt`: `clone/fetch` の partial/promisor/filter 時委譲を pure 実装へ移行
-- [ ] `src/cmd/bit/pack_objects.mbt`: `delegate_to_real_git` 条件を機能単位で分解し、`window/depth/stdin-object/sparse` から順に内製化
-- [ ] `src/cmd/bit/index_pack.mbt`: `--strict/--fsck-objects/--fix-thin/rev-index` 系の委譲を順次置換
-- [ ] `src/cmd/bit/handlers_plumbing.mbt`: `multi-pack-index` の `--bitmap/--incremental/--refs-snapshot` 委譲を順次置換
-- [ ] `src/cmd/bit/handlers_misc.mbt`: `diff --submodule` と range (`^!` / `..`) の委譲条件を削減
+- [x] `src/cmd/bit/handlers_remote.mbt`: `clone/fetch` の partial/promisor/filter 時委譲を pure 実装へ移行
+- [x] `src/cmd/bit/pack_objects.mbt`: `delegate_to_real_git` 条件を機能単位で分解し、`window/depth/stdin-object/sparse` から順に内製化
+- [x] `src/cmd/bit/index_pack.mbt`: `--strict/--fsck-objects/--fix-thin/rev-index` 系の委譲を順次置換
+- [x] `src/cmd/bit/handlers_plumbing.mbt`: `multi-pack-index` の `--bitmap/--incremental/--refs-snapshot` 委譲を順次置換
+- [x] `src/cmd/bit/handlers_misc.mbt`: `diff --submodule` と range (`^!` / `..`) の委譲条件を削減
 
 ### Phase 3: サブコマンド周辺の委譲除去
 
-- [ ] `src/cmd/bit/handlers_branch.mbt`: `checkout --recurse-submodules` 委譲を撤去
-- [ ] `src/cmd/bit/handlers_worktree.mbt`: linked worktree + submodule 条件での `worktree add` 委譲を撤去
-- [ ] `src/cmd/bit/handlers_misc.mbt`: linked worktree 条件での `submodule update --init` 委譲を撤去
-- [ ] `src/cmd/bit/handlers_pack.mbt`: `bundle create --since` 委譲を撤去
-- [ ] `src/cmd/bit/handlers_shell.mbt`: `git-upload-archive` の real-git 委譲を撤去（pure 実装 or 非対応を明示）
+- [x] `src/cmd/bit/handlers_branch.mbt`: `checkout --recurse-submodules` 委譲を撤去
+- [x] `src/cmd/bit/handlers_worktree.mbt`: linked worktree + submodule 条件での `worktree add` 委譲を撤去
+- [x] `src/cmd/bit/handlers_misc.mbt`: linked worktree 条件での `submodule update --init` 委譲を撤去
+- [x] `src/cmd/bit/handlers_pack.mbt`: `bundle create --since` 委譲を撤去
+- [x] `src/cmd/bit/handlers_shell.mbt`: `git-upload-archive` の real-git 委譲を撤去（pure 実装 or 非対応を明示）
 
 ### Phase 4: `@process.run("git")` 直呼び依存の撤去
 
-- [ ] `src/cmd/bit/handlers_hq.mbt`: `clone/pull/sparse-checkout/checkout` の直呼びを bit 内部 API に置換
-- [ ] `src/cmd/bit/handlers_scalar.mbt`: `scalar_run_git*` の `git` 直呼びを bit 実装へ置換
-- [ ] `src/cmd/bit/handlers_branch.mbt`: subdir rebase 中の `git fetch/reset` 直呼びを置換
-- [ ] `src/cmd/bit/handlers_subdir.mbt`: `subdir_clone` 終了処理の `git reset` 直呼びを置換
-- [ ] `src/cmd/bit/interactive.mbt`: `add -p` の default runner（real git）を pure 実装へ置換
+- [x] `src/cmd/bit/handlers_hq.mbt`: `clone/pull/sparse-checkout/checkout` の直呼びを bit 内部 API に置換
+- [x] `src/cmd/bit/handlers_scalar.mbt`: `scalar_run_git*` の `git` 直呼びを bit 実装へ置換
+- [x] `src/cmd/bit/handlers_branch.mbt`: subdir rebase 中の `git fetch/reset` 直呼びを置換
+- [x] `src/cmd/bit/handlers_subdir.mbt`: `subdir_clone` 終了処理の `git reset` 直呼びを置換
+- [x] `src/cmd/bit/interactive.mbt`: `add -p` の default runner（real git）を pure 実装へ置換
 
 ### 受け入れ基準
 
-- [ ] `src/cmd/bit` 内の `match real_git_path()` を 42 -> 0
-- [ ] `src/cmd/bit` 内の `@process.run("git", ...)` を 10 -> 0
-- [ ] `just check` が通る
+- [x] `src/cmd/bit` 内の `match real_git_path()` を 42 -> 0
+- [x] `src/cmd/bit` 内の `@process.run("git", ...)` を 10 -> 0
+- [x] `just check` が通る
 - [ ] 重点テスト（`t0411`, `t1006`, `t5316`, `t5317`, `t5319`, `t5334`, `t5572`）が strict 実行で通る
 
 ## Tier 2: Agent Features (High)

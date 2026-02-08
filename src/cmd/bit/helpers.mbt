@@ -44,45 +44,173 @@ async fn eprint_line(s : String) -> Unit {
 }
 
 ///|
-fn env_flag_enabled(name : String) -> Bool {
-  match @sys.get_env_var(name) {
-    Some(raw) => {
-      let value = trim_string(raw).to_lower()
-      match value {
-        "" | "0" | "false" | "no" | "off" => false
-        "1" | "true" | "yes" | "on" => true
-        _ => {
-          let parsed = @strconv.parse_int(value) catch {
-            _ => return false
-          }
-          parsed != 0
-        }
+struct RunGitCommandInvocation {
+  cwd : String?
+  git_dir : String?
+  cmd : String
+  rest : Array[String]
+}
+
+///|
+struct RunGitEnvSnapshot {
+  shim_cwd : String?
+  git_dir : String?
+  git_work_tree : String?
+}
+
+///|
+fn resolve_run_git_path(path : String, cwd : String?) -> String {
+  if path.has_prefix("/") {
+    return path
+  }
+  match cwd {
+    Some(base) => normalize_path(base + "/" + path)
+    None =>
+      @sys.get_env_var("GIT_SHIM_PWD")
+      .map(base => normalize_path(base + "/" + path))
+      .unwrap_or(path)
+  }
+}
+
+///|
+fn parse_run_git_invocation(
+  args : Array[String],
+  cwd : String?,
+) -> RunGitCommandInvocation? {
+  let mut i = 0
+  let mut resolved_cwd = cwd
+  let mut resolved_git_dir : String? = None
+  while i < args.length() {
+    let arg = args[i]
+    if arg == "-C" && i + 1 < args.length() {
+      resolved_cwd = Some(resolve_run_git_path(args[i + 1], resolved_cwd))
+      i += 2
+      continue
+    }
+    if arg == "--git-dir" && i + 1 < args.length() {
+      resolved_git_dir = Some(resolve_run_git_path(args[i + 1], resolved_cwd))
+      i += 2
+      continue
+    }
+    if arg.has_prefix("--git-dir=") {
+      let raw = String::unsafe_substring(arg, start=10, end=arg.length())
+      resolved_git_dir = Some(resolve_run_git_path(raw, resolved_cwd))
+      i += 1
+      continue
+    }
+    if arg == "-c" && i + 1 < args.length() {
+      i += 2
+      continue
+    }
+    if arg == "--version" || arg == "-v" {
+      return Some({
+        cwd: resolved_cwd,
+        git_dir: resolved_git_dir,
+        cmd: "version",
+        rest: collect_args(args, i + 1),
+      })
+    }
+    if arg.has_prefix("-") {
+      i += 1
+      continue
+    }
+    return Some({
+      cwd: resolved_cwd,
+      git_dir: resolved_git_dir,
+      cmd: arg,
+      rest: collect_args(args, i + 1),
+    })
+  }
+  None
+}
+
+///|
+fn restore_env_var(name : String, value : String?) -> Unit {
+  match value {
+    Some(v) => @sys.set_env_var(name, v)
+    None => @sys.unset_env_var(name)
+  }
+}
+
+///|
+fn enter_run_git_env(cwd : String?, git_dir : String?) -> RunGitEnvSnapshot {
+  let snapshot = {
+    shim_cwd: @sys.get_env_var("GIT_SHIM_CWD"),
+    git_dir: @sys.get_env_var("GIT_DIR"),
+    git_work_tree: @sys.get_env_var("GIT_WORK_TREE"),
+  }
+  let fs = OsFs::new()
+  match git_dir {
+    Some(dir) => @sys.set_env_var("GIT_DIR", dir)
+    None => ()
+  }
+  match cwd {
+    Some(dir) => {
+      @sys.set_env_var("GIT_SHIM_CWD", dir)
+      if @sys.get_env_var("GIT_DIR") is None {
+        @sys.set_env_var("GIT_DIR", default_repo_marker_path(fs, dir))
+      }
+      if @sys.get_env_var("GIT_WORK_TREE") is None {
+        @sys.set_env_var("GIT_WORK_TREE", dir)
       }
     }
-    None => false
+    None => ()
   }
+  snapshot
 }
 
 ///|
-fn real_git_strict_enabled() -> Bool {
-  env_flag_enabled("BIT_STRICT_NO_REAL_GIT")
+fn restore_run_git_env(snapshot : RunGitEnvSnapshot) -> Unit {
+  restore_env_var("GIT_SHIM_CWD", snapshot.shim_cwd)
+  restore_env_var("GIT_DIR", snapshot.git_dir)
+  restore_env_var("GIT_WORK_TREE", snapshot.git_work_tree)
 }
 
 ///|
-fn real_git_trace_enabled() -> Bool {
-  env_flag_enabled("BIT_TRACE_REAL_GIT")
-}
-
-///|
-async fn trace_real_git_exec(bin : String, args : Array[String]) -> Unit {
-  if not(real_git_trace_enabled()) {
-    return
+async fn run_git_internal_command(cmd : String, rest : Array[String]) -> Int raise Error {
+  match cmd {
+    "version" => {
+      print_line("git version 2.47.0 (bit)")
+      0
+    }
+    "clone" => {
+      handle_clone(rest)
+      0
+    }
+    "pull" => {
+      handle_pull(rest)
+      0
+    }
+    "fetch" => {
+      handle_fetch(rest)
+      0
+    }
+    "sparse-checkout" => {
+      handle_sparse_checkout(rest)
+      0
+    }
+    "checkout" => {
+      handle_checkout(rest)
+      0
+    }
+    "reset" => {
+      handle_reset(rest)
+      0
+    }
+    "config" => {
+      handle_config(rest)
+      0
+    }
+    "maintenance" => {
+      handle_maintenance(rest)
+      0
+    }
+    "fsmonitor--daemon" => 0
+    _ => {
+      eprint_line("fatal: unsupported delegated command '\{cmd}'")
+      1
+    }
   }
-  let parts : Array[String] = [bin]
-  for arg in args {
-    parts.push(arg)
-  }
-  @stdio.stderr.write(str_to_bytes("trace: real-git exec: " + parts.join(" ") + "\n"))
 }
 
 ///|
@@ -91,26 +219,24 @@ async fn run_git_command(
   cwd? : String? = None,
   inherit_env? : Bool = true,
 ) -> Int {
-  trace_real_git_exec("git", args)
-  if real_git_strict_enabled() {
-    eprint_line("fatal: real git execution is disabled (BIT_STRICT_NO_REAL_GIT=1)")
+  ignore(inherit_env)
+  guard parse_run_git_invocation(args, cwd) is Some(invocation) else {
+    eprint_line("fatal: missing subcommand")
     return 1
   }
-  match cwd {
-    Some(dir) => @process.run("git", args, inherit_env=inherit_env, cwd=dir)
-    None => @process.run("git", args, inherit_env=inherit_env)
+  let snapshot = enter_run_git_env(invocation.cwd, invocation.git_dir)
+  let code = run_git_internal_command(invocation.cmd, invocation.rest) catch {
+    err if @async.is_cancellation_error(err) => {
+      restore_run_git_env(snapshot)
+      raise err
+    }
+    err => {
+      eprint_line("\{invocation.cmd} failed: \{err}")
+      1
+    }
   }
-}
-
-///|
-fn real_git_path() -> String? {
-  if real_git_strict_enabled() {
-    return None
-  }
-  match @sys.get_env_var("SHIM_REAL_GIT") {
-    Some(path) => Some(path)
-    None => @sys.get_env_var("GIT_SHIM_REAL_GIT")
-  }
+  restore_run_git_env(snapshot)
+  code
 }
 
 ///|

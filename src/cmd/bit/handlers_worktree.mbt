@@ -217,25 +217,6 @@ fn escape_lock_reason(reason : String) -> String {
 async fn handle_worktree_add(args : Array[String]) -> Unit raise Error {
   let root = get_absolute_work_root()
   let fs = OsFs::new()
-  let rfs : &@git.RepoFileSystem = fs
-  let gitfile = root + "/.git"
-  if rfs.is_file(gitfile) {
-    let content = decode_bytes(
-      rfs.read_file(gitfile) catch {
-        _ => Bytes::default()
-      },
-    )
-    if content.contains("modules/") {
-      match real_git_path() {
-        Some(real_git) => {
-          let real_args = real_git_args_from_cli()
-          let code = @process.run(real_git, real_args, inherit_env=true)
-          @sys.exit(code)
-        }
-        None => ()
-      }
-    }
-  }
   // Parse arguments
   let mut detach = false
   let mut new_branch : String? = None

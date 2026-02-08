@@ -826,23 +826,10 @@ async fn handle_multi_pack_index(args : Array[String]) -> Unit raise Error {
       _ => ()
     }
   }
-  match subcommand {
-    Some("expire") | Some("repack") =>
-      match real_git_path() {
-        Some(real_git) => {
-          let real_args = real_git_args_from_cli()
-          let code = @process.run(real_git, real_args, inherit_env=true)
-          @sys.exit(code)
-        }
-        None => ()
-      }
-    _ => ()
-  }
   let mut object_dir : String? = None
   let mut progress = false
   let mut preferred_pack : String? = None
   let mut batch_size = 0
-  let mut requires_real_git = false
   let mut unsupported_opt : String? = None
   let mut i = 0
   while i < args.length() {
@@ -878,41 +865,26 @@ async fn handle_multi_pack_index(args : Array[String]) -> Unit raise Error {
       _ if arg.has_prefix("--preferred-pack=") =>
         preferred_pack = Some(arg[17:].to_string())
       "--stdin-packs" | "--bitmap" | "--incremental" => {
-        requires_real_git = true
         unsupported_opt = Some(arg)
       }
       _ if arg.has_prefix("--refs-snapshot") => {
-        requires_real_git = true
         unsupported_opt = Some(arg)
       }
       "write" | "verify" | "expire" | "repack" => subcommand = Some(arg)
       _ if arg.has_prefix("-") => {
         warn_unimplemented_arg("multi-pack-index", arg)
-        requires_real_git = true
         unsupported_opt = Some(arg)
       }
       _ => ()
     }
     i += 1
   }
-  if requires_real_git {
-    match real_git_path() {
-      Some(real_git) => {
-        let real_args = real_git_args_from_cli()
-        let code = @process.run(real_git, real_args, inherit_env=true)
-        @sys.exit(code)
-      }
-      None =>
-        match unsupported_opt {
-          Some(opt) => {
-            eprint_line(
-              "error: unsupported option for multi-pack-index: " + opt,
-            )
-            @sys.exit(1)
-          }
-          None => ()
-        }
+  match unsupported_opt {
+    Some(opt) => {
+      eprint_line("error: unsupported option for multi-pack-index: " + opt)
+      @sys.exit(1)
     }
+    None => ()
   }
   match subcommand {
     Some("write") | Some("verify") =>
@@ -927,16 +899,6 @@ async fn handle_multi_pack_index(args : Array[String]) -> Unit raise Error {
   let effective_pack_dir = match object_dir {
     Some(dir) => dir + "/pack"
     None => pack_dir
-  }
-  if subcommand == Some("write") && effective_pack_dir != pack_dir {
-    match real_git_path() {
-      Some(real_git) => {
-        let real_args = real_git_args_from_cli()
-        let code = @process.run(real_git, real_args, inherit_env=true)
-        @sys.exit(code)
-      }
-      None => ()
-    }
   }
   match subcommand {
     Some("write") =>
@@ -993,20 +955,10 @@ async fn midx_write(
   let has_alternates = midx_has_alternates(fs, pack_dir)
   let non_sha1_repo = midx_repo_is_non_sha1(pack_dir)
   let prefer_requested = preferred_pack is Some(_)
-  if pack_files.length() > 2 ||
-    prefer_requested ||
-    has_existing_midx ||
-    has_alternates ||
-    non_sha1_repo {
-    match real_git_path() {
-      Some(real_git) => {
-        let real_args = real_git_args_from_cli()
-        let code = @process.run(real_git, real_args, inherit_env=true)
-        @sys.exit(code)
-      }
-      None => ()
-    }
-  }
+  ignore(has_existing_midx)
+  ignore(has_alternates)
+  ignore(non_sha1_repo)
+  ignore(prefer_requested)
   let normalized_preferred = match preferred_pack {
     Some(name) => {
       let mut value = name
@@ -1048,17 +1000,8 @@ async fn midx_write(
       }
     }
     if has_large_offsets {
-      match real_git_path() {
-        Some(real_git) => {
-          let real_args = real_git_args_from_cli()
-          let code = @process.run(real_git, real_args, inherit_env=true)
-          @sys.exit(code)
-        }
-        None => {
-          eprint_line("error: unsupported 64-bit pack offset")
-          @sys.exit(1)
-        }
-      }
+      eprint_line("error: unsupported 64-bit pack offset")
+      @sys.exit(1)
       return
     }
     if normalized_preferred.length() > 0 &&

@@ -2246,20 +2246,11 @@ async fn handle_upload_pack(args : Array[String]) -> Unit raise Error {
   // Handle -h/--help/--help-all option
   for arg in args {
     if arg == "-h" || arg == "--help" || arg == "--help-all" {
-      match real_git_path() {
-        Some(real_git) => {
-          let real_args = real_git_args_from_cli()
-          let code = @process.run(real_git, real_args, inherit_env=true)
-          @sys.exit(code)
-        }
-        None => {
-          print_line(
-            "usage: git upload-pack [--[no-]strict] [--timeout=<n>] [--stateless-rpc]",
-          )
-          print_line("                       [--advertise-refs] <dir>")
-          @sys.exit(129)
-        }
-      }
+      print_line(
+        "usage: git upload-pack [--[no-]strict] [--timeout=<n>] [--stateless-rpc]",
+      )
+      print_line("                       [--advertise-refs] <dir>")
+      @sys.exit(129)
     }
   }
   let mut advertise = false
@@ -2289,17 +2280,8 @@ async fn handle_upload_pack(args : Array[String]) -> Unit raise Error {
       git_dir
     }
     if is_sha256_repo(config_git_dir) {
-      match real_git_path() {
-        Some(real_git) => {
-          let real_args = real_git_args_from_cli()
-          let code = @process.run(real_git, real_args)
-          @sys.exit(code)
-        }
-        None => {
-          @stdio.stderr.write("bit: SHA256 repositories are not supported\n")
-          @sys.exit(1)
-        }
-      }
+      @stdio.stderr.write("bit: SHA256 repositories are not supported\n")
+      @sys.exit(1)
     }
     let mut has_uploadpackfilter = false
     for entry in cmdline_config {
@@ -2320,24 +2302,8 @@ async fn handle_upload_pack(args : Array[String]) -> Unit raise Error {
       None => false
     }
     if has_uploadpackfilter || allow_filter || allow_any_want {
-      match real_git_path() {
-        Some(real_git) => {
-          let real_args = real_git_args_from_cli()
-          let code = @process.run(real_git, real_args)
-          @sys.exit(code)
-        }
-        None => ()
-      }
-    }
-    if advertise {
-      match real_git_path() {
-        Some(real_git) => {
-          let real_args = real_git_args_from_cli()
-          let code = @process.run(real_git, real_args)
-          @sys.exit(code)
-        }
-        None => ()
-      }
+      @stdio.stderr.write("bit: upload-pack filter options are not supported\n")
+      @sys.exit(1)
     }
     if advertise {
       let out = @gitlib.build_upload_pack_advertisement(fs, root)
@@ -2409,17 +2375,8 @@ async fn handle_receive_pack(args : Array[String]) -> Unit {
   // Handle -h/--help/--help-all option
   for arg in args {
     if arg == "-h" || arg == "--help" || arg == "--help-all" {
-      match real_git_path() {
-        Some(real_git) => {
-          let real_args = real_git_args_from_cli()
-          let code = @process.run(real_git, real_args, inherit_env=true)
-          @sys.exit(code)
-        }
-        None => {
-          print_line("usage: git receive-pack <git-dir>")
-          @sys.exit(129)
-        }
-      }
+      print_line("usage: git receive-pack <git-dir>")
+      @sys.exit(129)
     }
   }
   guard parse_pack_args(args) is Some((advertise, repo_path)) else {
@@ -2438,37 +2395,8 @@ async fn handle_receive_pack(args : Array[String]) -> Unit {
     root + "/.git"
   }
   if is_sha256_repo(git_dir) {
-    match real_git_path() {
-      Some(real_git) => {
-        let real_args = real_git_args_from_cli()
-        let code = @process.run(real_git, real_args)
-        @sys.exit(code)
-      }
-      None => {
-        @stdio.stderr.write("bit: SHA256 repositories are not supported\n")
-        @sys.exit(1)
-      }
-    }
-  }
-  if not(advertise) {
-    match real_git_path() {
-      Some(real_git) => {
-        let real_args = real_git_args_from_cli()
-        let code = @process.run(real_git, real_args)
-        @sys.exit(code)
-      }
-      None => ()
-    }
-  }
-  if advertise {
-    match real_git_path() {
-      Some(real_git) => {
-        let real_args = real_git_args_from_cli()
-        let code = @process.run(real_git, real_args)
-        @sys.exit(code)
-      }
-      None => ()
-    }
+    @stdio.stderr.write("bit: SHA256 repositories are not supported\n")
+    @sys.exit(1)
   }
   if advertise {
     let out = @gitlib.build_receive_pack_advertisement(fs, root)
@@ -2570,25 +2498,10 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
   guard url is Some(remote_url) else {
     raise @git.GitError::InvalidObject("repository URL required")
   }
-  if has_filter_flag {
-    match real_git_path() {
-      Some(real_git) => {
-        let real_args = real_git_args_from_cli()
-        let code = @process.run(real_git, real_args)
-        @sys.exit(code)
-      }
-      None => ()
-    }
-  }
+  ignore(has_filter_flag)
   if recursive {
-    match real_git_path() {
-      Some(real_git) => {
-        let real_args = real_git_args_from_cli()
-        let code = @process.run(real_git, real_args)
-        @sys.exit(code)
-      }
-      None => ()
-    }
+    @stdio.stderr.write("fatal: --recursive is not supported yet\n")
+    @sys.exit(1)
   }
   // Check for ambiguity with local directories
   let fs = OsFs::new()
@@ -2669,14 +2582,7 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
   match @gitlib.resolve_local_repo_path(fs, local_root, remote_url) {
     Some(src_path) => {
       if has_promisor_source_repo(fs, src_path) {
-        match real_git_path() {
-          Some(real_git) => {
-            let real_args = real_git_args_from_cli()
-            let code = @process.run(real_git, real_args)
-            @sys.exit(code)
-          }
-          None => ()
-        }
+        ()
       }
       let remote_display = if remote_url.has_prefix("file://") {
         remote_url
@@ -2835,14 +2741,7 @@ async fn handle_fetch(args : Array[String]) -> Unit raise Error {
     None => false
   }
   if has_filter_flag || is_partial_clone || local_promisor_remote {
-    match real_git_path() {
-      Some(real_git) => {
-        let real_args = real_git_args_from_cli()
-        let code = @process.run(real_git, real_args)
-        @sys.exit(code)
-      }
-      None => ()
-    }
+    ()
   }
   fetch_from_remote(fs, git_dir, root, remote_name, url)
 }
@@ -2890,16 +2789,7 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
         _ => Bytes::default()
       },
     )
-    if gitfile.contains("modules/") {
-      match real_git_path() {
-        Some(real_git) => {
-          let real_args = real_git_args_from_cli()
-          let code = @process.run(real_git, real_args, inherit_env=true)
-          @sys.exit(code)
-        }
-        None => ()
-      }
-    }
+    ignore(gitfile)
   }
   let git_dir = if rfs.is_file(git_dir) {
     @gitlib.resolve_gitdir(rfs, git_dir)

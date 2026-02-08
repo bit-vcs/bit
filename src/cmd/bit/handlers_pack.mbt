@@ -428,20 +428,8 @@ async fn handle_bundle(args : Array[String]) -> Unit raise Error {
 async fn handle_bundle_create(args : Array[String]) -> Unit raise Error {
   for arg in args {
     if arg == "--since" || arg.has_prefix("--since=") {
-      let real_git = @sys.get_env_var("SHIM_REAL_GIT").unwrap_or("git")
-      let real_args : Array[String] = ["bundle", "create"]
-      for item in args {
-        real_args.push(item)
-      }
-      let extra_env : Map[String, String] = {}
-      if @sys.get_env_var("SHIM_EXEC_PATH") is Some(path) {
-        extra_env["GIT_EXEC_PATH"] = path
-      }
-      let code = @process.run(real_git, real_args, extra_env~, inherit_env=true)
-      if code != 0 {
-        @sys.exit(code)
-      }
-      return
+      eprint_line("fatal: bit bundle create: --since is not supported yet")
+      @sys.exit(1)
     }
   }
   let fs = OsFs::new()

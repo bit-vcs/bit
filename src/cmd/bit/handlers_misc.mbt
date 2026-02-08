@@ -61,7 +61,6 @@ async fn handle_diff(args : Array[String]) -> Unit raise Error {
   let rfs : &@git.RepoFileSystem = fs
   let git_dir = resolve_git_dir(rfs, root)
   let repo_git_dir = resolve_submodule_common_git_dir(rfs, git_dir)
-  let mut delegate_to_real_git = false
   let mut submodule_mode = false
   let mut range_spec : String? = None
   let mut cached = false
@@ -72,11 +71,7 @@ async fn handle_diff(args : Array[String]) -> Unit raise Error {
   let paths : Array[String] = []
   for arg in args {
     if arg == "--submodule" || arg.has_prefix("--submodule=") {
-      delegate_to_real_git = true
       submodule_mode = true
-    }
-    if arg.contains("^!") || arg.contains("..") {
-      delegate_to_real_git = true
     }
     match arg {
       "--cached" | "--staged" => cached = true
@@ -100,29 +95,6 @@ async fn handle_diff(args : Array[String]) -> Unit raise Error {
       _ => ()
     }
   }
-  if submodule_mode {
-    match range_spec {
-      Some(spec) => {
-        let handled = try_handle_submodule_range_diff(
-          fs, root, git_dir, repo_git_dir, spec,
-        )
-        if handled {
-          return
-        }
-      }
-      None => ()
-    }
-  }
-  if delegate_to_real_git {
-    match real_git_path() {
-      Some(real_git) => {
-        let real_args = real_git_args_from_cli()
-        let code = @process.run(real_git, real_args, inherit_env=true)
-        @sys.exit(code)
-      }
-      None => ()
-    }
-  }
   // Handle subdir-clone diff with upstream ref
   match (ref_target, get_subdir_info(fs, git_dir)) {
     (Some(refspec), Some((_, subdir_path, _))) => {
@@ -135,10 +107,32 @@ async fn handle_diff(args : Array[String]) -> Unit raise Error {
     }
     _ => ()
   }
-  let all_files = if cached {
-    @gitlib.diff_index(fs, root)
-  } else {
-    @gitlib.diff_worktree(fs, root)
+  let all_files = match range_spec {
+    Some(spec) => {
+      if submodule_mode {
+        let handled = try_handle_submodule_range_diff(
+          fs, root, git_dir, repo_git_dir, spec,
+        )
+        if handled {
+          return
+        }
+      }
+      let db = @gitlib.ObjectDb::load(rfs, repo_git_dir)
+      match resolve_submodule_diff_range(db, rfs, repo_git_dir, spec) {
+        Some((old_id, new_id)) =>
+          @gitlib.diff_trees(rfs, repo_git_dir, Some(old_id), new_id)
+        None =>
+          raise @git.GitError::InvalidObject(
+            "unsupported diff range: " + spec,
+          )
+      }
+    }
+    None =>
+      if cached {
+        @gitlib.diff_index(fs, root)
+      } else {
+        @gitlib.diff_worktree(fs, root)
+      }
   }
   // Filter by paths if specified
   let files = if paths.length() > 0 {
@@ -821,32 +815,7 @@ async fn handle_mv(args : Array[String]) -> Unit raise Error {
 
 ///|
 async fn handle_config(args : Array[String]) -> Unit raise Error {
-  let mut delegate_scope = false
-  for arg in args {
-    if arg == "--global" || arg == "--system" {
-      delegate_scope = true
-      break
-    }
-  }
-  if delegate_scope {
-    match real_git_path() {
-      Some(real_git) => {
-        let real_args = real_git_args_from_cli()
-        let code = @process.run(real_git, real_args, inherit_env=true)
-        @sys.exit(code)
-      }
-      None => ()
-    }
-  }
   let fs = OsFs::new()
-  let rfs : &@git.RepoFileSystem = fs
-  let git_dir = find_git_dir(fs)
-  let git_dir = if rfs.is_file(git_dir) {
-    @gitlib.resolve_gitdir(rfs, git_dir)
-  } else {
-    git_dir
-  }
-  let config_path = git_dir + "/config"
   // Parse arguments
   let mut get_mode = false
   let mut get_bool = false
@@ -857,11 +826,15 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
   let mut remove_section_mode = false
   let mut fixed_value_mode = false
   let mut local_mode = false
+  let mut global_mode = false
+  let mut system_mode = false
   let mut key : String? = None
   let mut value : String? = None
   for arg in args {
     match arg {
       "--local" => local_mode = true
+      "--global" => global_mode = true
+      "--system" => system_mode = true
       "--get" => get_mode = true
       "--bool" => get_bool = true
       "--list" | "-l" => list_mode = true
@@ -879,8 +852,36 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
         }
     }
   }
-  if local_mode {
-    ()
+  if global_mode && system_mode {
+    raise @git.GitError::InvalidObject(
+      "only one config scope can be specified",
+    )
+  }
+  if local_mode && (global_mode || system_mode) {
+    raise @git.GitError::InvalidObject(
+      "--local cannot be used with --global or --system",
+    )
+  }
+  let config_path = if global_mode {
+    match @sys.get_env_var("GIT_CONFIG_GLOBAL") {
+      Some(path) => path
+      None =>
+        match @sys.get_env_var("HOME") {
+          Some(home) => home + "/.gitconfig"
+          None => ".gitconfig"
+        }
+    }
+  } else if system_mode {
+    @sys.get_env_var("GIT_CONFIG_SYSTEM").unwrap_or("/etc/gitconfig")
+  } else {
+    let rfs : &@git.RepoFileSystem = fs
+    let git_dir = find_git_dir(fs)
+    let git_dir = if rfs.is_file(git_dir) {
+      @gitlib.resolve_gitdir(rfs, git_dir)
+    } else {
+      git_dir
+    }
+    git_dir + "/config"
   }
   // Handle --list
   if list_mode {
@@ -3395,21 +3396,11 @@ async fn handle_submodule_update(
   let rfs : &@git.RepoFileSystem = fs
   let gitfile = root + "/.git"
   if has_init_flag && rfs.is_file(gitfile) {
-    let gitfile_content = decode_bytes(
+    let _gitfile_content = decode_bytes(
       rfs.read_file(gitfile) catch {
         _ => Bytes::default()
       },
     )
-    if gitfile_content.contains("worktrees/") {
-      match real_git_path() {
-        Some(real_git) => {
-          let real_args = real_git_args_from_cli()
-          let code = @process.run(real_git, real_args, inherit_env=true)
-          @sys.exit(code)
-        }
-        None => ()
-      }
-    }
   }
   let mut init = false
   let mut recursive = false

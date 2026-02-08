@@ -41,11 +41,6 @@ fn shell_parse_service_command(raw : String) -> (String, String)? {
 }
 
 ///|
-fn shell_real_git_path() -> String? {
-  real_git_path()
-}
-
-///|
 fn shell_is_safe_interactive_name(name : String) -> Bool {
   if name.length() == 0 {
     return false
@@ -115,23 +110,10 @@ async fn shell_run_service_command(command_line : String) -> Unit raise Error {
             err if @async.is_cancellation_error(err) => raise err
             err => exit_with_error("receive-pack", err)
           }
-        _ =>
-          match shell_real_git_path() {
-            Some(real_git) => {
-              let code = @process.run(
-                real_git,
-                ["upload-archive", path],
-                inherit_env=true,
-              )
-              if code != 0 {
-                @sys.exit(code)
-              }
-            }
-            None => {
-              eprint_line("fatal: 'git-upload-archive' is not supported")
-              @sys.exit(1)
-            }
-          }
+        _ => {
+          eprint_line("fatal: 'git-upload-archive' is not supported")
+          @sys.exit(1)
+        }
       }
     None => {
       eprint_line("fatal: unrecognized command")

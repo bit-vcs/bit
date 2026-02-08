@@ -110,16 +110,15 @@ test "helpers: resolve_git_dir keeps explicit GIT_DIR even if .bit exists" {
 }
 
 ///|
-test "helpers: real_git_path respects strict no real git flag" {
+async test "helpers: run_git_command handles --version without external git" {
   let prev_shim = @sys.get_env_var("SHIM_REAL_GIT")
   let prev_git_shim = @sys.get_env_var("GIT_SHIM_REAL_GIT")
   let prev_strict = @sys.get_env_var("BIT_STRICT_NO_REAL_GIT")
-  @sys.set_env_var("SHIM_REAL_GIT", "/tmp/real-git")
+  @sys.set_env_var("SHIM_REAL_GIT", "/tmp/bit-does-not-need-real-git")
   @sys.unset_env_var("GIT_SHIM_REAL_GIT")
   @sys.unset_env_var("BIT_STRICT_NO_REAL_GIT")
-  assert_eq(real_git_path(), Some("/tmp/real-git"))
-  @sys.set_env_var("BIT_STRICT_NO_REAL_GIT", "1")
-  assert_eq(real_git_path(), None)
+  let code = run_git_command(["--version"])
+  assert_eq(code, 0)
   match prev_shim {
     Some(v) => @sys.set_env_var("SHIM_REAL_GIT", v)
     None => @sys.unset_env_var("SHIM_REAL_GIT")
@@ -135,28 +134,11 @@ test "helpers: real_git_path respects strict no real git flag" {
 }
 
 ///|
-test "helpers: real_git_trace_enabled parses bool-ish env values" {
-  let prev_trace = @sys.get_env_var("BIT_TRACE_REAL_GIT")
-  @sys.unset_env_var("BIT_TRACE_REAL_GIT")
-  assert_eq(real_git_trace_enabled(), false)
-  @sys.set_env_var("BIT_TRACE_REAL_GIT", "1")
-  assert_eq(real_git_trace_enabled(), true)
-  @sys.set_env_var("BIT_TRACE_REAL_GIT", "true")
-  assert_eq(real_git_trace_enabled(), true)
-  @sys.set_env_var("BIT_TRACE_REAL_GIT", "off")
-  assert_eq(real_git_trace_enabled(), false)
-  match prev_trace {
-    Some(v) => @sys.set_env_var("BIT_TRACE_REAL_GIT", v)
-    None => @sys.unset_env_var("BIT_TRACE_REAL_GIT")
-  }
-}
-
-///|
-async test "helpers: run_git_command returns error in strict mode" {
+async test "helpers: run_git_command handles --version in strict mode" {
   let prev_strict = @sys.get_env_var("BIT_STRICT_NO_REAL_GIT")
   @sys.set_env_var("BIT_STRICT_NO_REAL_GIT", "1")
   let code = run_git_command(["--version"])
-  assert_eq(code, 1)
+  assert_eq(code, 0)
   match prev_strict {
     Some(v) => @sys.set_env_var("BIT_STRICT_NO_REAL_GIT", v)
     None => @sys.unset_env_var("BIT_STRICT_NO_REAL_GIT")
