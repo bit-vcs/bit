@@ -61,17 +61,18 @@ allowlist で残っている 5 テスト:
 現状棚卸し（`src/cmd/bit`）:
 - `real_git_path()` 経由の委譲: 42 箇所（14 関数）
 - `@process.run("git", ...)` 直呼び: 10 箇所（5 関数）
+- 2026-02-08 更新: `@process.run("git", ...)` 直呼びは共通ヘルパ `run_git_command` に集約済み（呼び出しサイト 0）
 - ホットスポット: `handle_pack_objects`(11), `handle_index_pack`(5), `handle_upload_pack`(4), `handle_receive_pack`(4), `handle_multi_pack_index`+`midx_write`(5), `handle_clone`(3)
 
 ### Phase 0: ガードと可視化（先に失敗させる）
 
-- [ ] `BIT_STRICT_NO_REAL_GIT=1` 時は `real_git_path()` 委譲を即時エラーにする（段階的導入）
-- [ ] `@process.run("git", ...)` 直呼び箇所にトレース出力を入れて、テストで検出可能にする
-- [ ] `just` タスクに strict 実行系（real-git なし）を追加し、回帰チェック可能にする
+- [x] `BIT_STRICT_NO_REAL_GIT=1` 時は `real_git_path()` 委譲を即時エラーにする（段階的導入）
+- [x] `@process.run("git", ...)` 直呼び箇所にトレース出力を入れて、テストで検出可能にする
+- [x] `just` タスクに strict 実行系（real-git なし）を追加し、回帰チェック可能にする
 
 ### Phase 1: 常時委譲（pure 実装が死んでいる箇所）を先に撤去
 
-- [ ] `src/cmd/bit/handlers_remote.mbt`: `handle_pull` 末尾の無条件 real-git 委譲を撤去し、既存 pure merge/rebase 経路を有効化
+- [x] `src/cmd/bit/handlers_remote.mbt`: `handle_pull` 末尾の無条件 real-git 委譲を撤去し、既存 pure merge/rebase 経路を有効化
 - [ ] `src/cmd/bit/handlers_misc.mbt`: `handle_cat_file` の無条件委譲を撤去（batch/all/unordered まで pure 化）
 - [ ] `src/cmd/bit/handlers_maintenance.mbt`: `handle_repack` の先頭委譲を撤去（`@gitlib.repack_repo` ベースで不足機能を埋める）
 - [ ] `src/cmd/bit/handlers_remote.mbt`: `handle_receive_pack` の advertise/非advertise 両経路の委譲を段階的に撤去

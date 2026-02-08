@@ -130,7 +130,7 @@ async fn handle_hq_get(args : Array[String]) -> Unit raise Error {
     if update {
       // Update existing
       print_line("Updating \{contract_path_hq(local_path)}...")
-      let code = @process.run("git", ["-C", local_path, "pull", "--ff-only"])
+      let code = run_git_command(["-C", local_path, "pull", "--ff-only"])
       if code == 0 {
         print_line("Updated \{contract_path_hq(local_path)}")
       } else {
@@ -170,7 +170,7 @@ async fn handle_hq_get(args : Array[String]) -> Unit raise Error {
   }
   clone_args.push(r.clone_url(ssh~))
   clone_args.push(local_path)
-  let code = @process.run("git", clone_args)
+  let code = run_git_command(clone_args)
   if code != 0 {
     eprint_line("bit hq get: clone failed")
     return
@@ -178,13 +178,13 @@ async fn handle_hq_get(args : Array[String]) -> Unit raise Error {
   // Handle sparse checkout
   if r.needs_sparse() {
     let subdir = r.subdir.unwrap_or("")
-    let _ = @process.run("git", [
+    let _ = run_git_command([
       "-C", local_path, "sparse-checkout", "init", "--cone",
     ])
-    let _ = @process.run("git", [
+    let _ = run_git_command([
       "-C", local_path, "sparse-checkout", "set", subdir,
     ])
-    let _ = @process.run("git", ["-C", local_path, "checkout"])
+    let _ = run_git_command(["-C", local_path, "checkout"])
 
   }
   print_line("Cloned to \{contract_path_hq(local_path)}")

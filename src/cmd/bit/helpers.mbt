@@ -44,6 +44,76 @@ async fn eprint_line(s : String) -> Unit {
 }
 
 ///|
+fn env_flag_enabled(name : String) -> Bool {
+  match @sys.get_env_var(name) {
+    Some(raw) => {
+      let value = trim_string(raw).to_lower()
+      match value {
+        "" | "0" | "false" | "no" | "off" => false
+        "1" | "true" | "yes" | "on" => true
+        _ => {
+          let parsed = @strconv.parse_int(value) catch {
+            _ => return false
+          }
+          parsed != 0
+        }
+      }
+    }
+    None => false
+  }
+}
+
+///|
+fn real_git_strict_enabled() -> Bool {
+  env_flag_enabled("BIT_STRICT_NO_REAL_GIT")
+}
+
+///|
+fn real_git_trace_enabled() -> Bool {
+  env_flag_enabled("BIT_TRACE_REAL_GIT")
+}
+
+///|
+async fn trace_real_git_exec(bin : String, args : Array[String]) -> Unit {
+  if not(real_git_trace_enabled()) {
+    return
+  }
+  let parts : Array[String] = [bin]
+  for arg in args {
+    parts.push(arg)
+  }
+  @stdio.stderr.write(str_to_bytes("trace: real-git exec: " + parts.join(" ") + "\n"))
+}
+
+///|
+async fn run_git_command(
+  args : Array[String],
+  cwd? : String? = None,
+  inherit_env? : Bool = true,
+) -> Int {
+  trace_real_git_exec("git", args)
+  if real_git_strict_enabled() {
+    eprint_line("fatal: real git execution is disabled (BIT_STRICT_NO_REAL_GIT=1)")
+    return 1
+  }
+  match cwd {
+    Some(dir) => @process.run("git", args, inherit_env=inherit_env, cwd=dir)
+    None => @process.run("git", args, inherit_env=inherit_env)
+  }
+}
+
+///|
+fn real_git_path() -> String? {
+  if real_git_strict_enabled() {
+    return None
+  }
+  match @sys.get_env_var("SHIM_REAL_GIT") {
+    Some(path) => Some(path)
+    None => @sys.get_env_var("GIT_SHIM_REAL_GIT")
+  }
+}
+
+///|
 fn decode_bytes(data : Bytes) -> String {
   @encoding.decoder(@encoding.Encoding::UTF8).decode_lossy(data[:])
 }

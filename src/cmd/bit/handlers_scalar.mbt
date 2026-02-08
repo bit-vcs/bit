@@ -334,12 +334,12 @@ fn scalar_rewrite_repo_config(fs : OsFs, repo : String) -> Unit {
 
 ///|
 async fn scalar_run_git(args : Array[String]) -> Int {
-  @process.run("git", args, inherit_env=true)
+  run_git_command(args)
 }
 
 ///|
 async fn scalar_run_git_in(repo : String, args : Array[String]) -> Int {
-  @process.run("git", args, inherit_env=true, cwd=repo)
+  run_git_command(args, cwd=Some(repo))
 }
 
 ///|

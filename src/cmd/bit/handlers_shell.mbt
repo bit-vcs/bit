@@ -42,10 +42,7 @@ fn shell_parse_service_command(raw : String) -> (String, String)? {
 
 ///|
 fn shell_real_git_path() -> String? {
-  match @sys.get_env_var("SHIM_REAL_GIT") {
-    Some(path) => Some(path)
-    None => @sys.get_env_var("GIT_SHIM_REAL_GIT")
-  }
+  real_git_path()
 }
 
 ///|

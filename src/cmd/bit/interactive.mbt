@@ -9,14 +9,10 @@ fn has_interactive_add_flag(args : Array[String]) -> Bool {
 }
 
 ///|
-fn resolve_real_git_binary() -> String {
-  match @sys.get_env_var("SHIM_REAL_GIT") {
-    Some(path) => path
-    None =>
-      match @sys.get_env_var("GIT_SHIM_REAL_GIT") {
-        Some(path) => path
-        None => "git"
-      }
+fn resolve_real_git_binary() -> String? {
+  match real_git_path() {
+    Some(path) => Some(path)
+    None => if real_git_strict_enabled() { None } else { Some("git") }
   }
 }
 
@@ -26,7 +22,16 @@ async fn default_add_interactive_runner(args : Array[String]) -> Int {
   for arg in args {
     real_args.push(arg)
   }
-  @process.run(resolve_real_git_binary(), real_args, inherit_env=true)
+  match resolve_real_git_binary() {
+    Some(bin) => {
+      trace_real_git_exec(bin, real_args)
+      @process.run(bin, real_args, inherit_env=true)
+    }
+    None => {
+      eprint_line("fatal: interactive add requires real git")
+      1
+    }
+  }
 }
 
 ///|

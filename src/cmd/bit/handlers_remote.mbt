@@ -3067,14 +3067,6 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
     }
     None => ()
   }
-  match real_git_path() {
-    Some(real_git) => {
-      let real_args = real_git_args_from_cli()
-      let code = @process.run(real_git, real_args, inherit_env=true)
-      @sys.exit(code)
-    }
-    None => ()
-  }
   if rebase {
     let id = @gitlib.rebase_onto(fs, fs, root, tid)
     print_line("Updated to \{id.to_hex()}")

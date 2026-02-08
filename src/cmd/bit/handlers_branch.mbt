@@ -1480,7 +1480,7 @@ async fn handle_subdir_rebase(
   print_line("  Base commit: \{base_hex}")
   // Step 1: Fetch from origin
   print_line("  Fetching from origin...")
-  let _ = @process.run("git", ["-C", root, "fetch", "origin"])
+  let _ = run_git_command(["-C", root, "fetch", "origin"])
   // Step 2: Resolve upstream ref
   let upstream_path = git_dir + "/refs/remotes/" + target_ref
   let upstream_bytes = fs.read_file(upstream_path) catch {
@@ -1519,7 +1519,7 @@ async fn handle_subdir_rebase(
   // Step 5: Update base commit
   update_subdir_base(fs, git_dir, upstream_hex)
   // Step 6: Reset index
-  let _ = @process.run("git", ["-C", root, "reset", "HEAD"])
+  let _ = run_git_command(["-C", root, "reset", "HEAD"])
   print_line("done.")
   print_line("")
   print_line("Successfully rebased onto \{target_ref}")

@@ -222,14 +222,6 @@ fn write_keep_file(
 }
 
 ///|
-fn real_git_path() -> String? {
-  match @sys.get_env_var("SHIM_REAL_GIT") {
-    Some(path) => Some(path)
-    None => @sys.get_env_var("GIT_SHIM_REAL_GIT")
-  }
-}
-
-///|
 fn check_sha1_collisions_with_repo(
   fs : &@git.RepoFileSystem,
   git_dir : String,

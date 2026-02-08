@@ -233,7 +233,7 @@ async fn subdir_clone(
   // Step 7: Write subdir-clone metadata to .git/info/attributes
   write_subdir_attributes(fs, git_dir, remote_url, subdir_path, commit_id)
   // Step 8: Reset index
-  let _ = @process.run("git", ["-C", target, "reset", "HEAD"])
+  let _ = run_git_command(["-C", target, "reset", "HEAD"])
   print_line("done.")
   print_line("")
   print_line("Cloned '\{subdir_path}' to '\{relative_target}/'")
