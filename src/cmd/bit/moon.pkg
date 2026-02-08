@@ -34,6 +34,7 @@ options(
   targets: {
     "bench_init_wbtest.mbt": [ "native" ],
     "completion.mbt": [ "native" ],
+    "delegation_cleanup_wbtest.mbt": [ "native" ],
     "gitconfig.mbt": [ "native" ],
     "gitconfig_test.mbt": [ "native" ],
     "handlers_agent.mbt": [ "native" ],

@@ -181,7 +181,6 @@ git-t-one-no-real-git test_file:
     SHIM_REAL_GIT="$real_git" SHIM_EXEC_PATH="$exec_path" \
     SHIM_MOON="$(pwd)/tools/git-shim/moon" \
     SHIM_CMDS="receive-pack upload-pack pack-objects index-pack shell" SHIM_STRICT=1 \
-    BIT_STRICT_NO_REAL_GIT=1 BIT_TRACE_REAL_GIT=1 \
     GIT_TEST_INSTALLED="$shim_dir" GIT_TEST_EXEC_PATH="$exec_path" \
     GIT_TEST_DEFAULT_HASH=sha1 \
     CPATH="$prefix/include" LDFLAGS="-L$prefix/lib" LIBRARY_PATH="$prefix/lib" \

@@ -167,7 +167,10 @@ fn restore_run_git_env(snapshot : RunGitEnvSnapshot) -> Unit {
 }
 
 ///|
-async fn run_git_internal_command(cmd : String, rest : Array[String]) -> Int raise Error {
+async fn run_git_internal_command(
+  cmd : String,
+  rest : Array[String],
+) -> Int raise Error {
   match cmd {
     "version" => {
       print_line("git version 2.47.0 (bit)")
@@ -207,7 +210,7 @@ async fn run_git_internal_command(cmd : String, rest : Array[String]) -> Int rai
     }
     "fsmonitor--daemon" => 0
     _ => {
-      eprint_line("fatal: unsupported delegated command '\{cmd}'")
+      eprint_line("fatal: unsupported internal git command '\{cmd}'")
       1
     }
   }

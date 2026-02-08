@@ -11,7 +11,7 @@ priv struct IndexPackConfig {
   strict : Bool
   fsck_objects : Bool
   ignore_missing_email : Bool
-  delegate_to_real_git : Bool
+  has_unsupported_options : Bool
 }
 
 ///|
@@ -44,7 +44,7 @@ fn parse_index_pack_args(args : Array[String]) -> IndexPackParse {
   let mut strict = false
   let mut fsck_objects = false
   let mut ignore_missing_email = false
-  let mut delegate_to_real_git = false
+  let mut has_unsupported_options = false
   let mut i = 0
   let mut in_opts = true
   let mut extra_args = 0
@@ -61,31 +61,31 @@ fn parse_index_pack_args(args : Array[String]) -> IndexPackParse {
         "--verify" => verify = true
         "--verify-stat-only" => verify_stat_only = true
         "--fix-thin" => fix_thin = true
-        "--rev-index" => delegate_to_real_git = true
-        "--no-rev-index" => delegate_to_real_git = true
+        "--rev-index" => has_unsupported_options = true
+        "--no-rev-index" => has_unsupported_options = true
         "--keep" => keep_msg = Some("")
         "--strict" => {
           strict = true
-          delegate_to_real_git = true
+          has_unsupported_options = true
         }
         "--fsck-objects" => {
           fsck_objects = true
-          delegate_to_real_git = true
+          has_unsupported_options = true
         }
         "--index-version" => {
-          delegate_to_real_git = true
+          has_unsupported_options = true
           if i + 1 < args.length() {
             i += 1
           }
         }
         "--max-input-size" => {
-          delegate_to_real_git = true
+          has_unsupported_options = true
           if i + 1 < args.length() {
             i += 1
           }
         }
-        "-v" => delegate_to_real_git = true
-        "--verbose" => delegate_to_real_git = true
+        "-v" => has_unsupported_options = true
+        "--verbose" => has_unsupported_options = true
         "--object-format" => {
           if i + 1 >= args.length() {
             return IndexPackParse::Unsupported
@@ -113,24 +113,24 @@ fn parse_index_pack_args(args : Array[String]) -> IndexPackParse {
             }
           } else if arg.has_prefix("--strict=") {
             strict = true
-            delegate_to_real_git = true
+            has_unsupported_options = true
             if arg.contains("missingEmail=ignore") {
               ignore_missing_email = true
             }
           } else if arg.has_prefix("--fsck-objects=") {
             fsck_objects = true
-            delegate_to_real_git = true
+            has_unsupported_options = true
             if arg.contains("missingEmail=ignore") {
               ignore_missing_email = true
             }
           } else if arg.has_prefix("--verify-stat-only") {
             return IndexPackParse::Unsupported
           } else if arg.has_prefix("--index-version=") {
-            delegate_to_real_git = true
+            has_unsupported_options = true
           } else if arg.has_prefix("--max-input-size=") {
-            delegate_to_real_git = true
+            has_unsupported_options = true
           } else if arg.has_prefix("--threads") {
-            delegate_to_real_git = true
+            has_unsupported_options = true
           } else if arg.has_prefix("--object-format") ||
             arg.has_prefix("--threads") {
             return IndexPackParse::Unsupported
@@ -148,7 +148,7 @@ fn parse_index_pack_args(args : Array[String]) -> IndexPackParse {
     }
     i += 1
   }
-  if !delegate_to_real_git {
+  if !has_unsupported_options {
     if extra_args > 0 {
       return IndexPackParse::Error("fatal: too many arguments")
     }
@@ -181,7 +181,7 @@ fn parse_index_pack_args(args : Array[String]) -> IndexPackParse {
     strict,
     fsck_objects,
     ignore_missing_email,
-    delegate_to_real_git,
+    has_unsupported_options,
   })
 }
 
@@ -625,9 +625,7 @@ fn read_sha1_at(data : Bytes, offset : Int) -> @git.ObjectId {
 async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
   for arg in args {
     if arg == "-h" || arg == "--help" || arg == "--help-all" {
-      @stdio.stdout.write(
-        "usage: git index-pack [<options>] <pack> [<idx>]\n",
-      )
+      @stdio.stdout.write("usage: git index-pack [<options>] <pack> [<idx>]\n")
       @sys.exit(129)
     }
   }
@@ -641,7 +639,7 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
       @sys.exit(1)
     }
     IndexPackParse::Ok(cfg) => {
-      if cfg.delegate_to_real_git {
+      if cfg.has_unsupported_options {
         @stdio.stderr.write("bit: unsupported index-pack options\n")
         @sys.exit(1)
       }

@@ -64,6 +64,7 @@ allowlist で残っている 5 テスト:
 - 2026-02-08 更新: `handlers_maintenance` / `handlers_plumbing` / `index_pack` / `pack_objects` / `upload-pack` / `receive-pack` の real-git 委譲を撤去
 - 2026-02-08 更新: `handle_cat_file` / `interactive add -p` の real-git 委譲を撤去
 - 2026-02-08 更新: `run_git_command` を bit 内部ディスパッチに置換し、`hq` / `scalar` / `subdir` / `branch` の実行経路から外部 git 実行を除去
+- 2026-02-08 更新: `pack-objects` / `index-pack` の `delegate_to_real_git` 命名を `has_unsupported_options` に統一し、`src/cmd/bit` から `real_git` 文字列を除去
 
 ### Phase 0: ガードと可視化（先に失敗させる）
 

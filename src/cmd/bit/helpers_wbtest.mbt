@@ -110,37 +110,13 @@ test "helpers: resolve_git_dir keeps explicit GIT_DIR even if .bit exists" {
 }
 
 ///|
-async test "helpers: run_git_command handles --version without external git" {
-  let prev_shim = @sys.get_env_var("SHIM_REAL_GIT")
-  let prev_git_shim = @sys.get_env_var("GIT_SHIM_REAL_GIT")
-  let prev_strict = @sys.get_env_var("BIT_STRICT_NO_REAL_GIT")
-  @sys.set_env_var("SHIM_REAL_GIT", "/tmp/bit-does-not-need-real-git")
-  @sys.unset_env_var("GIT_SHIM_REAL_GIT")
-  @sys.unset_env_var("BIT_STRICT_NO_REAL_GIT")
+async test "helpers: run_git_command handles --version via internal dispatch" {
   let code = run_git_command(["--version"])
   assert_eq(code, 0)
-  match prev_shim {
-    Some(v) => @sys.set_env_var("SHIM_REAL_GIT", v)
-    None => @sys.unset_env_var("SHIM_REAL_GIT")
-  }
-  match prev_git_shim {
-    Some(v) => @sys.set_env_var("GIT_SHIM_REAL_GIT", v)
-    None => @sys.unset_env_var("GIT_SHIM_REAL_GIT")
-  }
-  match prev_strict {
-    Some(v) => @sys.set_env_var("BIT_STRICT_NO_REAL_GIT", v)
-    None => @sys.unset_env_var("BIT_STRICT_NO_REAL_GIT")
-  }
 }
 
 ///|
-async test "helpers: run_git_command handles --version in strict mode" {
-  let prev_strict = @sys.get_env_var("BIT_STRICT_NO_REAL_GIT")
-  @sys.set_env_var("BIT_STRICT_NO_REAL_GIT", "1")
-  let code = run_git_command(["--version"])
-  assert_eq(code, 0)
-  match prev_strict {
-    Some(v) => @sys.set_env_var("BIT_STRICT_NO_REAL_GIT", v)
-    None => @sys.unset_env_var("BIT_STRICT_NO_REAL_GIT")
-  }
+async test "helpers: run_git_command returns error for unknown command" {
+  let code = run_git_command(["unknown-bit-dispatch"])
+  assert_eq(code, 1)
 }

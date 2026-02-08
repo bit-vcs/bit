@@ -23,7 +23,7 @@ priv struct PackObjectsConfig {
   name_hash_version : Int?
   write_bitmap : Bool
   include_tag : Bool
-  delegate_to_real_git : Bool
+  has_unsupported_options : Bool
   missing_mode : MissingMode
 }
 
@@ -65,7 +65,7 @@ fn parse_pack_objects_args(args : Array[String]) -> PackObjectsParse {
   let mut name_hash_version : Int? = None
   let mut write_bitmap = false
   let mut include_tag = false
-  let mut delegate_to_real_git = false
+  let mut has_unsupported_options = false
   let mut missing_mode = MissingMode::Error
   let mut i = 0
   let mut in_opts = true
@@ -91,28 +91,28 @@ fn parse_pack_objects_args(args : Array[String]) -> PackObjectsParse {
         "--no-path-walk" => ()
         "--sparse" => sparse_mode = Some(true)
         "--no-sparse" => sparse_mode = Some(false)
-        "--non-empty" => delegate_to_real_git = true
-        "--reflog" => delegate_to_real_git = true
-        "--indexed-objects" => delegate_to_real_git = true
-        "--keep-true-parents" => delegate_to_real_git = true
-        "--thin" => delegate_to_real_git = true
-        "--cruft" => delegate_to_real_git = true
+        "--non-empty" => has_unsupported_options = true
+        "--reflog" => has_unsupported_options = true
+        "--indexed-objects" => has_unsupported_options = true
+        "--keep-true-parents" => has_unsupported_options = true
+        "--thin" => has_unsupported_options = true
+        "--cruft" => has_unsupported_options = true
         "--cruft-expiration" => {
-          delegate_to_real_git = true
+          has_unsupported_options = true
           if i + 1 >= args.length() {
             return PackObjectsParse::Unsupported
           }
           i += 1
         }
         "--max-cruft-size" => {
-          delegate_to_real_git = true
+          has_unsupported_options = true
           if i + 1 >= args.length() {
             return PackObjectsParse::Unsupported
           }
           i += 1
         }
         "--max-pack-size" => {
-          delegate_to_real_git = true
+          has_unsupported_options = true
           if i + 1 >= args.length() {
             return PackObjectsParse::Unsupported
           }
@@ -124,11 +124,11 @@ fn parse_pack_objects_args(args : Array[String]) -> PackObjectsParse {
           stdin_packs = true
           stdin_packs_follow = true
         }
-        "--unpack-unreachable" => delegate_to_real_git = true
-        "--keep-unreachable" => delegate_to_real_git = true
-        "--pack-loose-unreachable" => delegate_to_real_git = true
+        "--unpack-unreachable" => has_unsupported_options = true
+        "--keep-unreachable" => has_unsupported_options = true
+        "--pack-loose-unreachable" => has_unsupported_options = true
         "--keep-pack" => {
-          delegate_to_real_git = true
+          has_unsupported_options = true
           if i + 1 >= args.length() {
             return PackObjectsParse::Unsupported
           }
@@ -199,7 +199,7 @@ fn parse_pack_objects_args(args : Array[String]) -> PackObjectsParse {
           if i + 1 >= args.length() {
             return PackObjectsParse::Unsupported
           }
-          delegate_to_real_git = true
+          has_unsupported_options = true
           i += 1
         }
         _ =>
@@ -210,22 +210,22 @@ fn parse_pack_objects_args(args : Array[String]) -> PackObjectsParse {
             }
             window = parsed
           } else if arg.has_prefix("--index-version=") {
-            delegate_to_real_git = true
+            has_unsupported_options = true
           } else if arg == "--index-version" {
-            delegate_to_real_git = true
+            has_unsupported_options = true
             if i + 1 < args.length() {
               i += 1
             }
           } else if arg.has_prefix("--filter=") {
             let spec = String::unsafe_substring(arg, start=9, end=arg.length())
             filter = parse_pack_filter_spec(spec)
-            delegate_to_real_git = true
+            has_unsupported_options = true
           } else if arg == "--filter" {
             if i + 1 >= args.length() {
               return PackObjectsParse::Unsupported
             }
             filter = parse_pack_filter_spec(args[i + 1])
-            delegate_to_real_git = true
+            has_unsupported_options = true
             i += 1
           } else if arg.has_prefix("--object-format=") {
             object_format = normalize_object_format((try! arg[16:]).to_string())
@@ -245,7 +245,7 @@ fn parse_pack_objects_args(args : Array[String]) -> PackObjectsParse {
             }
             name_hash_version = Some(normalized)
           } else if arg.has_prefix("--index-version=") {
-            delegate_to_real_git = true
+            has_unsupported_options = true
           } else if arg.has_prefix("--missing=") {
             let value = (try! arg[10:]).to_string()
             match value {
@@ -262,11 +262,11 @@ fn parse_pack_objects_args(args : Array[String]) -> PackObjectsParse {
           } else if arg.has_prefix("--cruft-expiration=") ||
             arg.has_prefix("--max-cruft-size=") ||
             arg.has_prefix("--max-pack-size=") {
-            delegate_to_real_git = true
+            has_unsupported_options = true
           } else if arg.has_prefix("--unpack-unreachable=") {
-            delegate_to_real_git = true
+            has_unsupported_options = true
           } else if arg.has_prefix("--keep-pack=") {
-            delegate_to_real_git = true
+            has_unsupported_options = true
           } else if arg.has_prefix("--stdin-packs") ||
             arg.has_prefix("--write-bitmap-index") ||
             arg.has_prefix("--threads") ||
@@ -276,7 +276,7 @@ fn parse_pack_objects_args(args : Array[String]) -> PackObjectsParse {
             arg.has_prefix("--reuse") ||
             arg.has_prefix("--delta-islands") {
             if arg.has_prefix("--no-reuse") {
-              delegate_to_real_git = true
+              has_unsupported_options = true
             } else {
               return PackObjectsParse::Unsupported
             }
@@ -347,7 +347,7 @@ fn parse_pack_objects_args(args : Array[String]) -> PackObjectsParse {
     name_hash_version,
     write_bitmap,
     include_tag,
-    delegate_to_real_git,
+    has_unsupported_options,
     missing_mode,
   })
 }
@@ -1591,9 +1591,7 @@ async fn try_reuse_single_stdin_pack(
 async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
   for arg in args {
     if arg == "-h" || arg == "--help" || arg == "--help-all" {
-      @stdio.stdout.write(
-        "usage: git pack-objects [<options>] <base-name>\n",
-      )
+      @stdio.stdout.write("usage: git pack-objects [<options>] <base-name>\n")
       @sys.exit(129)
     }
   }
@@ -1621,7 +1619,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
         @stdio.stderr.write("bit: SHA256 repositories are not supported\n")
         @sys.exit(1)
       }
-      if cfg.delegate_to_real_git {
+      if cfg.has_unsupported_options {
         @stdio.stderr.write("bit: unsupported pack-objects options\n")
         @sys.exit(1)
       }
@@ -1629,13 +1627,13 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
       ignore(trace2_event)
       ignore(is_pack_reuse_config_enabled(git_dir))
       // Keep these flags visible for future compatibility tuning.
-      let needs_real_git_delta = cfg.window == 0 || cfg.depth != 50
-      let needs_real_git_stdin_object_mode = cfg.stdout &&
+      let non_default_delta_params = cfg.window == 0 || cfg.depth != 50
+      let stdin_object_mode_without_revs = cfg.stdout &&
         !cfg.revs &&
         !cfg.all &&
         !cfg.stdin_packs
-      ignore(needs_real_git_delta)
-      ignore(needs_real_git_stdin_object_mode)
+      ignore(non_default_delta_params)
+      ignore(stdin_object_mode_without_revs)
       let pack_dir = git_dir + "/objects/pack"
       if cfg.name_hash_version is Some(version) &&
         cfg.write_bitmap &&
