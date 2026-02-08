@@ -181,9 +181,7 @@ async fn handle_hq_get(args : Array[String]) -> Unit raise Error {
     let _ = run_git_command([
       "-C", local_path, "sparse-checkout", "init", "--cone",
     ])
-    let _ = run_git_command([
-      "-C", local_path, "sparse-checkout", "set", subdir,
-    ])
+    let _ = run_git_command(["-C", local_path, "sparse-checkout", "set", subdir])
     let _ = run_git_command(["-C", local_path, "checkout"])
 
   }

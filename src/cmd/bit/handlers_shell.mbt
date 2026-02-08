@@ -5,8 +5,10 @@ let shell_max_command_length = 4096
 fn shell_unquote_arg(raw : String) -> String {
   let text = trim_string(raw)
   if text.length() >= 2 &&
-    ((text.has_prefix("'") && text.has_suffix("'")) ||
-      (text.has_prefix("\"") && text.has_suffix("\""))) {
+    (
+      (text.has_prefix("'") && text.has_suffix("'")) ||
+      (text.has_prefix("\"") && text.has_suffix("\""))
+    ) {
     String::unsafe_substring(text, start=1, end=text.length() - 1)
   } else {
     text
@@ -17,9 +19,7 @@ fn shell_unquote_arg(raw : String) -> String {
 fn shell_parse_service_command(raw : String) -> (String, String)? {
   let line = trim_string(raw)
   let services : Array[String] = [
-    "git-upload-pack",
-    "git-receive-pack",
-    "git-upload-archive",
+    "git-upload-pack", "git-receive-pack", "git-upload-archive",
   ]
   for service in services {
     if line == service {
@@ -132,7 +132,9 @@ async fn shell_run_interactive(fs : OsFs) -> Unit {
   if command_line.length() == 0 {
     @sys.exit(0)
   }
-  let (command_name, command_args) = shell_parse_interactive_command(command_line)
+  let (command_name, command_args) = shell_parse_interactive_command(
+    command_line,
+  )
   if not(shell_is_safe_interactive_name(command_name)) {
     eprint_line("fatal: unrecognized command")
     @sys.exit(1)

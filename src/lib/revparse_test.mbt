@@ -139,6 +139,21 @@ test "rev-parse: HEAD~1 equals HEAD^" {
 }
 
 ///|
+test "rev-parse: tag^{commit} peels annotated tag" {
+  let fs = setup_rev_repo()
+  fs.write_string("/repo/a.txt", "hello\n")
+  add_paths(fs, fs, "/repo", ["a.txt"])
+  let id = commit(
+    fs, fs, "/repo", "msg\n", "Test <test@example.com>", 1700000000L,
+  )
+  create_annotated_tag(
+    fs, fs, "/repo/.git", "v1", id, "annotated", "Test <test@example.com>", 1700000001L,
+  )
+  let parsed = rev_parse(fs, "/repo/.git", "v1^{commit}")
+  assert_eq(parsed.unwrap().to_hex(), id.to_hex())
+}
+
+///|
 async test "status porcelain + diff" {
   let fs = setup_rev_repo()
   fs.write_string("/repo/a.txt", "hello\n")

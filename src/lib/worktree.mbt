@@ -397,6 +397,7 @@ pub fn commit(
   author_timestamp : Int64,
   committer? : String = author,
   committer_timestamp? : Int64 = author_timestamp,
+  allow_empty? : Bool = false,
 ) -> @git.ObjectId raise @git.GitError {
   let git_dir = join_path(root, ".git")
   let actual_git_dir = if rfs.is_file(git_dir) {
@@ -404,12 +405,44 @@ pub fn commit(
   } else {
     git_dir
   }
-  let entries = read_index_entries(rfs, actual_git_dir)
-  if entries.length() == 0 {
-    raise @git.GitError::InvalidObject("Empty index")
-  }
-  let tree_id = write_tree_from_index(fs, actual_git_dir, entries)
   let parent = resolve_head_commit(rfs, actual_git_dir)
+  let entries = read_index_entries(rfs, actual_git_dir)
+  let tree_id = if entries.length() == 0 {
+    if not(allow_empty) {
+      raise @git.GitError::InvalidObject("Empty index")
+    }
+    match parent {
+      Some(parent_id) => {
+        let db = ObjectDb::load(rfs, actual_git_dir)
+        let parent_tree = match db.get(rfs, parent_id) {
+          Some(obj) if obj.obj_type == @git.ObjectType::Commit =>
+            (@git.parse_commit(obj.data).tree |> Some) catch {
+              _ => None
+            }
+          _ => None
+        }
+        match parent_tree {
+          Some(tree) => tree
+          None => {
+            let (empty_tree_id, empty_tree_compressed) = @git.create_tree([])
+            write_object_bytes(
+              fs, actual_git_dir, empty_tree_id, empty_tree_compressed,
+            )
+            empty_tree_id
+          }
+        }
+      }
+      None => {
+        let (empty_tree_id, empty_tree_compressed) = @git.create_tree([])
+        write_object_bytes(
+          fs, actual_git_dir, empty_tree_id, empty_tree_compressed,
+        )
+        empty_tree_id
+      }
+    }
+  } else {
+    write_tree_from_index(fs, actual_git_dir, entries)
+  }
   let parents = match parent {
     Some(p) => [p]
     None => []
@@ -898,6 +931,52 @@ fn to_octal_string(value : Int) -> String {
 }
 
 ///|
+fn trim_worktree_text(s : String) -> String {
+  let mut start = 0
+  let mut end = s.length()
+  while start < end {
+    let c = s[start]
+    if c == ' ' || c == '\n' || c == '\r' || c == '\t' {
+      start += 1
+    } else {
+      break
+    }
+  }
+  while end > start {
+    let c = s[end - 1]
+    if c == ' ' || c == '\n' || c == '\r' || c == '\t' {
+      end -= 1
+    } else {
+      break
+    }
+  }
+  String::unsafe_substring(s, start~, end~)
+}
+
+///|
+fn resolve_worktree_common_git_dir(
+  fs : &@git.RepoFileSystem,
+  git_dir : String,
+) -> String {
+  let commondir_path = join_path(git_dir, "commondir")
+  if not(fs.is_file(commondir_path)) {
+    return git_dir
+  }
+  let raw = @utf8.decode_lossy(
+    (fs.read_file(commondir_path) catch { _ => Bytes::default() })[:],
+  )
+  let rel = trim_worktree_text(raw)
+  if rel.length() == 0 {
+    return git_dir
+  }
+  if rel.has_prefix("/") {
+    normalize_path(rel)
+  } else {
+    normalize_path(join_path(git_dir, rel))
+  }
+}
+
+///|
 fn read_head_tree_entries(
   fs : &@git.RepoFileSystem,
   git_dir : String,
@@ -907,7 +986,8 @@ fn read_head_tree_entries(
   match head {
     None => return result
     Some(commit_id) => {
-      let db = ObjectDb::load_lazy(fs, git_dir)
+      let common_git_dir = resolve_worktree_common_git_dir(fs, git_dir)
+      let db = ObjectDb::load_lazy(fs, common_git_dir)
       let commit_obj = db.get(fs, commit_id)
       match commit_obj {
         None => return result

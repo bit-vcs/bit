@@ -160,3 +160,25 @@ test "worktree admin: prune locked worktree not pruned" {
   assert_eq(pruned.length(), 0)
   assert_true(fs.is_dir("/repo/.git/worktrees/locked-missing"))
 }
+
+///|
+test "worktree admin: bare repo excludes pseudo main worktree" {
+  let fs = @git.TestFs::new()
+  fs.mkdir_p("/bare/objects")
+  fs.mkdir_p("/bare/refs/heads")
+  fs.write_string("/bare/HEAD", "ref: refs/heads/main\n")
+  fs.write_string(
+    "/bare/refs/heads/main", "1111111111111111111111111111111111111111\n",
+  )
+  fs.mkdir_p("/bare/worktrees/wt")
+  fs.write_string("/bare/worktrees/wt/gitdir", "/bare/wt/.git\n")
+  fs.write_string("/bare/worktrees/wt/HEAD", "ref: refs/heads/wt\n")
+  fs.write_string("/bare/worktrees/wt/commondir", "..\n")
+  fs.write_string(
+    "/bare/refs/heads/wt", "2222222222222222222222222222222222222222\n",
+  )
+  let worktrees = list_worktrees(fs, "/bare")
+  assert_eq(worktrees.length(), 1)
+  assert_eq(worktrees[0].path, "/bare/wt")
+  assert_eq(worktrees[0].branch, Some("wt"))
+}

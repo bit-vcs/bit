@@ -10,7 +10,6 @@ test "interactive: normalize add patch args strips patch flags" {
   let no_path = normalize_add_interactive_args(["-p"])
   assert_eq(no_path.length(), 1)
   assert_eq(no_path[0], "-A")
-
   let with_path = normalize_add_interactive_args(["--patch", "README.md"])
   assert_eq(with_path.length(), 1)
   assert_eq(with_path[0], "README.md")

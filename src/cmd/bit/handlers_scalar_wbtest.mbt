@@ -59,13 +59,8 @@ test "scalar: register + unregister maintenance repo entries" {
 ///|
 test "scalar: clone option parser handles scalar-only flags" {
   let parsed = scalar_parse_clone_options([
-    "--full-clone",
-    "--no-src",
-    "--no-tags",
-    "--no-maintenance",
-    "--single-branch",
-    "https://example.com/repo.git",
-    "dst",
+    "--full-clone", "--no-src", "--no-tags", "--no-maintenance", "--single-branch",
+    "https://example.com/repo.git", "dst",
   ])
   assert_true(parsed.full_clone)
   assert_false(parsed.src)
@@ -81,11 +76,7 @@ test "scalar: clone option parser handles scalar-only flags" {
 ///|
 test "scalar: clone option parser keeps --branch value out of positional args" {
   let parsed = scalar_parse_clone_options([
-    "--branch",
-    "main",
-    "--single-branch",
-    "https://example.com/repo.git",
-    "dst",
+    "--branch", "main", "--single-branch", "https://example.com/repo.git", "dst",
   ])
   assert_eq(parsed.clone_opts.length(), 3)
   assert_eq(parsed.clone_opts[0], "--branch")

@@ -24,9 +24,14 @@ pub fn list_worktrees(
 ) -> Array[WorktreeInfo] raise @git.GitError {
   let result : Array[WorktreeInfo] = []
   let git_dir = resolve_git_dir(fs, root)
-  // Add main worktree
-  let main_info = get_main_worktree_info(fs, root, git_dir)
-  result.push(main_info)
+  let root_is_bare = normalize_path(git_dir) == normalize_path(root) &&
+    fs.is_file(join_path(root, "HEAD")) &&
+    fs.is_dir(join_path(root, "objects"))
+  // Add main worktree for non-bare repositories.
+  if not(root_is_bare) {
+    let main_info = get_main_worktree_info(fs, root, git_dir)
+    result.push(main_info)
+  }
   // Scan .git/worktrees/ for linked worktrees
   let worktrees_dir = join_path(git_dir, "worktrees")
   if not(fs.is_dir(worktrees_dir)) {
@@ -526,6 +531,10 @@ fn resolve_git_dir(
   fs : &@git.RepoFileSystem,
   root : String,
 ) -> String raise @git.GitError {
+  if fs.is_file(join_path(root, "HEAD")) &&
+    fs.is_dir(join_path(root, "objects")) {
+    return root
+  }
   let git_path = join_path(root, ".git")
   if fs.is_dir(git_path) {
     return git_path

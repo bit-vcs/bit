@@ -55,6 +55,14 @@ fn is_gitlink_mode_for_diff(mode : Int) -> Bool {
 }
 
 ///|
+fn looks_like_cached_diff_revision(token : String) -> Bool {
+  token == "HEAD" ||
+  token == "@" ||
+  token.has_prefix("HEAD^") ||
+  token.has_prefix("HEAD~")
+}
+
+///|
 async fn handle_diff(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let fs = OsFs::new()
@@ -85,6 +93,10 @@ async fn handle_diff(args : Array[String]) -> Unit raise Error {
           if range_spec is None {
             range_spec = Some(arg)
           }
+        } else if cached &&
+          ref_target is None &&
+          looks_like_cached_diff_revision(arg) {
+          ref_target = Some(arg)
         } else if arg.contains("/") && ref_target is None {
           // Check if it's a ref (contains / like origin/main)
           ref_target = Some(arg)
@@ -122,9 +134,7 @@ async fn handle_diff(args : Array[String]) -> Unit raise Error {
         Some((old_id, new_id)) =>
           @gitlib.diff_trees(rfs, repo_git_dir, Some(old_id), new_id)
         None =>
-          raise @git.GitError::InvalidObject(
-            "unsupported diff range: " + spec,
-          )
+          raise @git.GitError::InvalidObject("unsupported diff range: " + spec)
       }
     }
     None =>
@@ -769,8 +779,17 @@ async fn handle_tag(args : Array[String]) -> Unit raise Error {
     let msg = message.unwrap_or("")
     let author = get_author_string()
     let timestamp = get_commit_timestamp()
+    let timezone = get_commit_timezone()
     @gitlib.create_annotated_tag(
-      fs, fs, git_dir, name, id, msg, author, timestamp,
+      fs,
+      fs,
+      git_dir,
+      name,
+      id,
+      msg,
+      author,
+      timestamp,
+      timezone~,
     )
   } else {
     @gitlib.create_lightweight_tag(fs, git_dir, name, id)
@@ -863,9 +882,7 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
     }
   }
   if global_mode && system_mode {
-    raise @git.GitError::InvalidObject(
-      "only one config scope can be specified",
-    )
+    raise @git.GitError::InvalidObject("only one config scope can be specified")
   }
   if local_mode && (global_mode || system_mode) {
     raise @git.GitError::InvalidObject(
@@ -885,12 +902,8 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
     @sys.get_env_var("GIT_CONFIG_SYSTEM").unwrap_or("/etc/gitconfig")
   } else {
     let rfs : &@git.RepoFileSystem = fs
-    let git_dir = find_git_dir(fs)
-    let git_dir = if rfs.is_file(git_dir) {
-      @gitlib.resolve_gitdir(rfs, git_dir)
-    } else {
-      git_dir
-    }
+    let root = get_work_root()
+    let git_dir = resolve_git_dir(rfs, root)
     git_dir + "/config"
   }
   // Handle --list
@@ -1517,22 +1530,67 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
 }
 
 ///|
+fn peel_cat_file_object_to_type(
+  db : @gitlib.ObjectDb,
+  fs : &@git.RepoFileSystem,
+  object_id : @git.ObjectId,
+  expected_type : @git.ObjectType,
+) -> Bytes raise @git.GitError {
+  let mut current_id = object_id
+  for _ in 0..<8 {
+    let current_obj = db.get(fs, current_id)
+    guard current_obj is Some(current) else {
+      raise @git.GitError::InvalidObject(
+        "Object not found: " + current_id.to_hex(),
+      )
+    }
+    if current.obj_type == expected_type {
+      return current.data
+    }
+    guard current.obj_type == @git.ObjectType::Tag else {
+      raise @git.GitError::InvalidObject(
+        "object is of type \{current.obj_type.to_string()}, not \{expected_type.to_string()}",
+      )
+    }
+    let tag_target = parse_tag_object(decode_bytes(current.data)) catch {
+      _ => None
+    }
+    guard tag_target is Some(target_id) else {
+      raise @git.GitError::InvalidObject("malformed tag object")
+    }
+    current_id = target_id
+  }
+  raise @git.GitError::InvalidObject("tag dereference depth exceeded")
+}
+
+///|
 async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
-  let git_dir = root + "/.git"
   let fs = OsFs::new()
+  let git_dir = resolve_git_dir(fs, root)
   let mut show_type = false
   let mut show_size = false
   let mut pretty_print = false
-  let mut obj_spec : String? = None
+  let positionals : Array[String] = []
   for arg in args {
     match arg {
       "-t" => show_type = true
       "-s" => show_size = true
       "-p" => pretty_print = true
       _ if arg.has_prefix("-") => warn_unimplemented_arg("cat-file", arg)
-      _ => obj_spec = Some(arg)
+      _ => positionals.push(arg)
     }
+  }
+  let mut expected_type : @git.ObjectType? = None
+  let mut obj_spec : String? = None
+  if not(show_type || show_size || pretty_print) && positionals.length() >= 2 {
+    expected_type = Some(parse_object_type(positionals[0])) catch { _ => None }
+    if expected_type is Some(_) {
+      obj_spec = Some(positionals[1])
+    }
+  }
+  if obj_spec is None && positionals.length() > 0 {
+    obj_spec = Some(positionals[positionals.length() - 1])
   }
   guard obj_spec is Some(spec) else {
     raise @git.GitError::InvalidObject("object name required")
@@ -1545,6 +1603,11 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
   let obj = db.get(fs, oid)
   guard obj is Some(o) else {
     raise @git.GitError::InvalidObject("Object not found: \{spec}")
+  }
+  if expected_type is Some(expected) {
+    let data = peel_cat_file_object_to_type(db, fs, oid, expected)
+    @stdio.stdout.write(data)
+    return ()
   }
   if show_type {
     print_line(o.obj_type.to_string())
@@ -2315,6 +2378,7 @@ async fn handle_show_ref(args : Array[String]) -> Unit raise Error {
     return
   }
   let refs = @gitlib.show_ref(fs, git_dir)
+  let mut matched_count = 0
   for item in refs {
     let (refname, id) = item
     if heads_only && not(refname.has_prefix("refs/heads/")) {
@@ -2335,11 +2399,17 @@ async fn handle_show_ref(args : Array[String]) -> Unit raise Error {
         continue
       }
     }
-    if hash_only {
-      print_line(id.to_hex())
-    } else {
-      print_line("\{id.to_hex()} \{refname}")
+    matched_count += 1
+    if not(quiet) {
+      if hash_only {
+        print_line(id.to_hex())
+      } else {
+        print_line("\{id.to_hex()} \{refname}")
+      }
     }
+  }
+  if matched_count == 0 {
+    @sys.exit(1)
   }
 }
 
@@ -3474,6 +3544,7 @@ async fn handle_submodule_update(
         _ => Bytes::default()
       },
     )
+
   }
   let mut init = false
   let mut recursive = false
@@ -3574,7 +3645,7 @@ async fn fetch_submodule_objects(
   let rfs : &@git.RepoFileSystem = fs
   match @gitlib.resolve_local_repo_path(rfs, root, url) {
     Some(src_path) => {
-      fetch_local_repo(fs, src_path, modules_dir, "origin", url, [])
+      fetch_local_repo(fs, src_path, modules_dir, modules_dir, "origin", url, [])
       return ()
     }
     None => ()

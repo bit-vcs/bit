@@ -177,6 +177,21 @@ test "push-default: colon refspec is treated as matching" {
 }
 
 ///|
+test "push matching-refspec: fails when no branch candidates exist" {
+  let parsed = parse_push_refspecs_with_presence([":"])
+  let _ = ensure_matching_refspec_has_candidates(parsed, 0) catch {
+    _ => return ()
+  }
+  fail("expected matching-refspec failure without candidates")
+}
+
+///|
+test "push matching-refspec: allows at least one candidate" {
+  let parsed = parse_push_refspecs_with_presence([":"])
+  ensure_matching_refspec_has_candidates(parsed, 1)
+}
+
+///|
 test "push-parse: two positional args treat first as remote" {
   let (remote, refspec) = resolve_push_positionals(["", "main"], fn(_name) {
     false
@@ -208,40 +223,20 @@ test "push-parse: single positional known remote" {
 
 ///|
 test "push-parse: single positional unknown is refspec" {
-  let (remote, refspec) = resolve_push_positionals(["main"], fn(_name) {
-    false
-  })
+  let (remote, refspec) = resolve_push_positionals(["main"], fn(_name) { false })
   assert_eq(remote, None)
   assert_eq(refspec, Some("main"))
 }
 
 ///|
 test "push-refspec: detect ambiguous short source token" {
-  assert_true(
-    is_ambiguous_push_source_refspec(
-      "foo",
-      true,
-      true,
-    ),
-  )
+  assert_true(is_ambiguous_push_source_refspec("foo", true, true))
 }
 
 ///|
 test "push-refspec: ignore head and rev-expression tokens" {
-  assert_false(
-    is_ambiguous_push_source_refspec(
-      "HEAD",
-      true,
-      true,
-    ),
-  )
-  assert_false(
-    is_ambiguous_push_source_refspec(
-      "main~2",
-      true,
-      true,
-    ),
-  )
+  assert_false(is_ambiguous_push_source_refspec("HEAD", true, true))
+  assert_false(is_ambiguous_push_source_refspec("main~2", true, true))
 }
 
 ///|
@@ -252,9 +247,7 @@ test "push/fetch options: strip long option prefix for error messages" {
 
 ///|
 test "url rewrite: insteadOf is applied for fetch/push" {
-  let rules : Array[(String, String, Bool)] = [
-    ("/tmp/trash/", "trash/", false),
-  ]
+  let rules : Array[(String, String, Bool)] = [("/tmp/trash/", "trash/", false)]
   assert_eq(
     rewrite_url_by_rules("trash/testrepo", rules, false),
     "/tmp/trash/testrepo",
@@ -267,9 +260,7 @@ test "url rewrite: insteadOf is applied for fetch/push" {
 
 ///|
 test "url rewrite: pushInsteadOf is push-only" {
-  let rules : Array[(String, String, Bool)] = [
-    ("/tmp/trash/", "trash/", true),
-  ]
+  let rules : Array[(String, String, Bool)] = [("/tmp/trash/", "trash/", true)]
   assert_eq(
     rewrite_url_by_rules("trash/testrepo", rules, false),
     "trash/testrepo",
@@ -312,12 +303,11 @@ test "push plan: object id to incomplete destination is rejected" {
 ///|
 test "push porcelain: line format matches git style" {
   let line = format_push_porcelain_line(
-    "*",
-    "refs/heads/main",
-    "refs/remotes/origin/main",
-    "[new reference]",
+    "*", "refs/heads/main", "refs/remotes/origin/main", "[new reference]",
   )
-  assert_eq(line, "*\trefs/heads/main:refs/remotes/origin/main\t[new reference]")
+  assert_eq(
+    line, "*\trefs/heads/main:refs/remotes/origin/main\t[new reference]",
+  )
 }
 
 ///|
@@ -344,11 +334,170 @@ test "push porcelain: classify non-fast-forward update marker" {
     "fedcba9876543210fedcba9876543210fedcba98",
   )
   let (flag, status) = classify_push_porcelain_success(
-    old_id,
-    new_id,
-    false,
-    false,
+    old_id, new_id, false, false,
   )
   assert_eq(flag, " ")
   assert_eq(status, "[updated]")
+}
+
+///|
+test "push reject: non-fast-forward takes precedence over deny-current-branch" {
+  let status = select_push_rejection_status(true, false, true, false)
+  assert_eq(status, Some("[rejected] (non-fast-forward)"))
+}
+
+///|
+test "push hide-ref: prefix pattern matches nested refs" {
+  assert_true(is_hidden_ref("refs/hidden/one", ["refs/hidden"]))
+  assert_false(is_hidden_ref("refs/heads/main", ["refs/hidden"]))
+}
+
+///|
+test "push prune: destination wildcard maps back to source wildcard" {
+  let src = prune_source_ref_for_destination(
+    "refs/heads/*", "refs/tmp/*", "refs/tmp/topic",
+  )
+  assert_eq(src, Some("refs/heads/topic"))
+}
+
+///|
+test "fetch refspec: short source expands to branch and tag namespaces" {
+  let candidates = fetch_source_candidates("main")
+  assert_eq(candidates.length(), 3)
+  assert_eq(candidates[0], "main")
+  assert_eq(candidates[1], "refs/heads/main")
+  assert_eq(candidates[2], "refs/tags/main")
+}
+
+///|
+test "push refspec parse: keeps explicit destination presence" {
+  let specs = parse_push_refspecs_with_presence([
+    "main", "topic:refs/heads/topic", "+dev",
+  ])
+  assert_eq(specs.length(), 3)
+  assert_false(specs[0].has_explicit_destination)
+  assert_true(specs[1].has_explicit_destination)
+  assert_false(specs[2].has_explicit_destination)
+}
+
+///|
+test "push refmap: colon-less source uses remote.push refmap first" {
+  let dst = infer_colonless_push_destination_token(
+    "main",
+    "refs/heads/main",
+    PushSourceKind::Branch,
+    "main",
+    PushDefaultMode::Simple,
+    Some("refs/heads/main"),
+    ["+refs/heads/*:refs/remotes/src/*"],
+  )
+  assert_eq(dst, "refs/remotes/src/main")
+}
+
+///|
+test "push refmap: without remote.push, upstream mapping is used" {
+  let dst = infer_colonless_push_destination_token(
+    "main",
+    "refs/heads/main",
+    PushSourceKind::Branch,
+    "main",
+    PushDefaultMode::Upstream,
+    Some("refs/heads/trunk"),
+    [],
+  )
+  assert_eq(dst, "refs/heads/trunk")
+}
+
+///|
+test "push deny-current: updateInstead returns checked-out worktree path" {
+  let decision = enforce_receive_deny_current_branch(
+    Some("updateinstead"),
+    Some("/repo/wt"),
+    "refs/heads/main",
+  )
+  match decision {
+    DenyCurrentBranchDecision::UpdateInstead(path) =>
+      assert_eq(path, "/repo/wt")
+    _ => fail("expected updateInstead decision")
+  }
+}
+
+///|
+test "push deny-current: refuse rejects checked-out branch" {
+  let _ = enforce_receive_deny_current_branch(
+    Some("refuse"),
+    Some("/repo/wt"),
+    "refs/heads/main",
+  ) catch {
+    _ => return ()
+  }
+  fail("expected checked-out branch rejection")
+}
+
+///|
+test "push deny-current: no checked-out worktree allows update" {
+  let decision = enforce_receive_deny_current_branch(
+    Some("refuse"),
+    None,
+    "refs/heads/main",
+  )
+  match decision {
+    DenyCurrentBranchDecision::Allow => ()
+    _ => fail("expected allow decision in bare repository")
+  }
+}
+
+///|
+test "push transfer: tag that points to blob copies tagged blob object" {
+  let fs = @git.TestFs::new()
+  ignore(try? @gitlib.init_repo(fs, "/src", bare=true))
+  ignore(try? @gitlib.init_repo(fs, "/dst", bare=true))
+  let blob_id = @gitlib.write_loose_object(
+    fs,
+    "/src",
+    @git.ObjectType::Blob,
+    str_to_bytes("unreferenced\n"),
+  )
+  let tag_data = str_to_bytes(
+    "object " +
+    blob_id.to_hex() +
+    "\n" +
+    "type blob\n" +
+    "tag tag-of-blob\n" +
+    "tagger Test User <test@example.com> 0 +0000\n" +
+    "\n" +
+    "foo\n",
+  )
+  let tag_id = @gitlib.write_loose_object(
+    fs,
+    "/src",
+    @git.ObjectType::Tag,
+    tag_data,
+  )
+  let src_db = @gitlib.ObjectDb::load(fs, "/src")
+  let transferred_object_ids : Map[String, Bool] = {}
+  copy_wanted_object_graph(
+    fs, fs, src_db, "/dst", tag_id, transferred_object_ids,
+  ) catch {
+    _ => fail("copy_wanted_object_graph failed")
+  }
+  let dst_db = @gitlib.ObjectDb::load(fs, "/dst")
+  let copied_tag = dst_db.get(fs, tag_id) catch { _ => None }
+  let copied_blob = dst_db.get(fs, blob_id) catch { _ => None }
+  assert_true(copied_tag is Some(_))
+  assert_true(copied_blob is Some(_))
+}
+
+///|
+test "push delete: prune_empty_parent_dirs removes empty nested ref dirs" {
+  let fs = @git.TestFs::new()
+  fs.write_string(
+    "/repo/.git/refs/heads/branch/conflict", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
+  )
+  @gitlib.remove_ref_path(fs, fs, "/repo/.git/refs/heads/branch/conflict")
+  prune_empty_parent_dirs(
+    fs, fs, "/repo/.git/refs/heads/branch/conflict", "/repo/.git/refs/heads",
+  )
+  assert_true(not(fs.is_dir("/repo/.git/refs/heads/branch")))
+  assert_true(fs.is_dir("/repo/.git/refs/heads"))
 }

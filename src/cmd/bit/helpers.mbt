@@ -598,7 +598,85 @@ fn get_author_string() -> String {
 ///|
 fn get_commit_timestamp() -> Int64 {
   match @sys.get_env_var("GIT_COMMITTER_DATE") {
-    Some(s) => @strconv.parse_int64(s) catch { _ => get_current_timestamp() }
+    Some(s) =>
+      match parse_git_env_timestamp(s) {
+        Some(ts) => ts
+        None => get_current_timestamp()
+      }
     None => get_current_timestamp()
   }
+}
+
+///|
+fn parse_git_env_timestamp(raw : String) -> Int64? {
+  let mut token : String? = None
+  for part_view in raw.split(" ") {
+    let part = part_view.to_string()
+    if part.length() > 0 {
+      token = Some(part)
+      break
+    }
+  }
+  match token {
+    Some(part) =>
+      if part.has_prefix("@") {
+        let numeric = String::unsafe_substring(part, start=1, end=part.length())
+        let parsed = @strconv.parse_int64(numeric) catch { _ => return None }
+        Some(parsed)
+      } else {
+        let parsed = @strconv.parse_int64(part) catch { _ => return None }
+        Some(parsed)
+      }
+    None => None
+  }
+}
+
+///|
+fn get_commit_timezone() -> String {
+  match @sys.get_env_var("GIT_COMMITTER_DATE") {
+    Some(raw) =>
+      match parse_git_env_timezone(raw) {
+        Some(tz) => tz
+        None => "+0000"
+      }
+    None => "+0000"
+  }
+}
+
+///|
+fn parse_git_env_timezone(raw : String) -> String? {
+  let fields : Array[String] = []
+  for part_view in raw.split(" ") {
+    let part = part_view.to_string()
+    if part.length() > 0 {
+      fields.push(part)
+    }
+  }
+  if fields.length() < 2 {
+    return None
+  }
+  let tz = fields[fields.length() - 1]
+  if is_valid_timezone_token(tz) {
+    Some(tz)
+  } else {
+    None
+  }
+}
+
+///|
+fn is_valid_timezone_token(token : String) -> Bool {
+  if token.length() != 5 {
+    return false
+  }
+  let chars = token.to_array()
+  if not(chars[0] == '+' || chars[0] == '-') {
+    return false
+  }
+  for i = 1; i < chars.length(); i = i + 1 {
+    let c = chars[i]
+    if c < '0' || c > '9' {
+      return false
+    }
+  }
+  true
 }

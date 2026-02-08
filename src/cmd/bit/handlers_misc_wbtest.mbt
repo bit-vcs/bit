@@ -54,7 +54,8 @@ test "config: set_config escapes quotes when appending to existing section" {
 ///|
 async test "config: --global writes to HOME/.gitconfig without delegation" {
   let fs = OsFs::new()
-  let root = "/tmp/bit-test-config-global-" + get_current_timestamp().to_string()
+  let root = "/tmp/bit-test-config-global-" +
+    get_current_timestamp().to_string()
   let home = root + "/home"
   fs.mkdir_p(home)
   let config_path = home + "/.gitconfig"
@@ -83,4 +84,13 @@ async test "config: --global writes to HOME/.gitconfig without delegation" {
   fs.remove_dir(root) catch {
     _ => ()
   }
+}
+
+///|
+test "diff: cached revision token classifier handles HEAD forms" {
+  assert_true(looks_like_cached_diff_revision("HEAD"))
+  assert_true(looks_like_cached_diff_revision("@"))
+  assert_true(looks_like_cached_diff_revision("HEAD^"))
+  assert_true(looks_like_cached_diff_revision("HEAD~2"))
+  assert_false(looks_like_cached_diff_revision("path/to/file"))
 }

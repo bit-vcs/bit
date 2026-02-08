@@ -1,0 +1,22 @@
+diff --git a/t/t5528-push-default.sh b/t/t5528-push-default.sh
+index 80b14edfbf..3d50f68362 100755
+--- a/t/t5528-push-default.sh
++++ b/t/t5528-push-default.sh
+@@ -147,7 +147,15 @@ test_expect_success 'push from/to new branch fails with upstream and simple ' '
+ # it expected to fail because the branch is new and cannot be pushed, but
+ # in fact it was failing because of an ambiguous remote
+ #
+-test_expect_failure 'push from/to new branch fails with matching ' '
++matching_new_branch_expect=test_expect_failure
++shim_cmds="${SHIM_CMDS:-${GIT_SHIM_CMDS:-}}"
++case " $shim_cmds " in
++*" push "*)
++	matching_new_branch_expect=test_expect_success
++	;;
++esac
++
++$matching_new_branch_expect 'push from/to new branch fails with matching ' '
+ 	git checkout -b new-branch-2 &&
+ 	test_config branch.new-branch-2.remote parent1 &&
+ 	test_push_failure matching
+ '

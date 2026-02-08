@@ -21,8 +21,12 @@ fn strip_remote_helper_path(url : String) -> String? {
       if start >= url.length() {
         None
       } else {
-        let path = String::unsafe_substring(url, start=start, end=url.length())
-        if path.length() == 0 { None } else { Some(path) }
+        let path = String::unsafe_substring(url, start~, end=url.length())
+        if path.length() == 0 {
+          None
+        } else {
+          Some(path)
+        }
       }
     }
     None => None
@@ -84,9 +88,6 @@ pub fn resolve_local_repo_path(
     }
     return None
   }
-  if fs.is_dir(raw) {
-    return raw |> normalize_local_path |> Some
-  }
   let candidate = normalize_local_path(root + "/" + raw)
   if fs.is_dir(candidate) {
     return Some(candidate)
@@ -112,6 +113,9 @@ pub fn resolve_local_repo_path(
     if fs.is_dir(alt) {
       return Some(alt)
     }
+  }
+  if fs.is_dir(raw) {
+    return raw |> normalize_local_path |> Some
   }
   None
 }

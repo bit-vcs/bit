@@ -20,3 +20,15 @@ test "pull: do not flag submodule removal" {
   )
   assert_eq(replaced, None)
 }
+
+///|
+test "pull: initial head target uses current branch ref" {
+  let target = resolve_initial_pull_head_target(Some("main"))
+  assert_eq(target, "refs/heads/main")
+}
+
+///|
+test "pull: initial head target uses detached HEAD" {
+  let target = resolve_initial_pull_head_target(None)
+  assert_eq(target, "HEAD")
+}

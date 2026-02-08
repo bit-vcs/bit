@@ -27,6 +27,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Checkout llm dependency
+        run: |
+          git clone --depth 1 https://github.com/mizchi/llm ../llm
+
       - name: Install MoonBit CLI (Unix)
         if: runner.os != 'Windows'
         run: |

@@ -208,7 +208,9 @@ test "integration: pktline ref update format" {
 test "integration: pktline with capabilities" {
   let old_id = ObjectId::zero()
   let new_id = ObjectId::from_hex("ce013625030ba8dba906f756967f9e9ca394464a")
-  let cmd = @protocol.build_ref_update(old_id, new_id, "refs/heads/main", "report-status")
+  let cmd = @protocol.build_ref_update(
+    old_id, new_id, "refs/heads/main", "report-status",
+  )
 
   // Should contain null byte before capabilities
   assert_true(cmd.find("\u0000") is Some(_))
@@ -222,7 +224,9 @@ test "integration: receive-pack body format" {
   let packfile = Bytes::from_array([
     b'P', b'A', b'C', b'K', b'\x00', b'\x00', b'\x00', b'\x02',
   ])
-  let req = @protocol.PushRequest::new(old_id, new_id, "refs/heads/main", packfile)
+  let req = @protocol.PushRequest::new(
+    old_id, new_id, "refs/heads/main", packfile,
+  )
   let body = @protocol.build_receive_pack_body(req)
 
   // Body should start with pkt-line (4 hex chars)

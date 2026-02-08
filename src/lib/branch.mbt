@@ -16,8 +16,13 @@ pub struct BranchInfo {
 ///|
 fn resolve_worktree_git_dir(fs : &@git.RepoFileSystem, root : String) -> String {
   let git_path = join_path(root, ".git")
-  if fs.is_file(git_path) {
+  if fs.is_dir(git_path) {
+    git_path
+  } else if fs.is_file(git_path) {
     resolve_gitdir(fs, git_path)
+  } else if fs.is_file(join_path(root, "HEAD")) &&
+    fs.is_dir(join_path(root, "objects")) {
+    root
   } else {
     git_path
   }
@@ -190,6 +195,41 @@ pub fn create_branch_at(
 }
 
 ///|
+fn is_directory_empty(rfs : &@git.RepoFileSystem, path : String) -> Bool {
+  let entries = rfs.readdir(path) catch { _ => return false }
+  for entry in entries {
+    if entry != "." && entry != ".." {
+      return false
+    }
+  }
+  true
+}
+
+///|
+fn prune_empty_ref_parent_dirs(
+  fs : &@git.FileSystem,
+  rfs : &@git.RepoFileSystem,
+  ref_path : String,
+  stop_dir : String,
+) -> Unit {
+  let mut current = parent_dir(ref_path)
+  while current.length() > 0 &&
+        current != stop_dir &&
+        current.has_prefix(stop_dir + "/") {
+    if not(rfs.is_dir(current)) {
+      break
+    }
+    if not(is_directory_empty(rfs, current)) {
+      break
+    }
+    fs.remove_dir(current) catch {
+      _ => break
+    }
+    current = parent_dir(current)
+  }
+}
+
+///|
 /// Delete a local branch. Fails if it's the current branch.
 pub fn delete_branch(
   fs : &@git.FileSystem,
@@ -238,6 +278,12 @@ pub fn delete_branch(
   // Delete loose ref if it exists
   if rfs.is_file(ref_path) {
     fs.remove_file(ref_path)
+    prune_empty_ref_parent_dirs(
+      fs,
+      rfs,
+      ref_path,
+      join_path(git_dir, "refs/heads"),
+    )
   }
   // Remove from packed-refs if present
   let packed_path = join_path(git_dir, "packed-refs")
@@ -391,6 +437,25 @@ pub fn resolve_ref(
 }
 
 ///|
+fn resolve_ref_commondir(
+  fs : &@git.RepoFileSystem,
+  git_dir : String,
+) -> String? {
+  let commondir_path = join_path(git_dir, "commondir")
+  if not(fs.is_file(commondir_path)) {
+    return None
+  }
+  let rel = read_ref_line(fs, commondir_path) catch { _ => "" }
+  if rel.length() == 0 {
+    return None
+  }
+  if rel.has_prefix("/") {
+    return Some(normalize_path(rel))
+  }
+  Some(normalize_path(join_path(git_dir, rel)))
+}
+
+///|
 fn resolve_ref_inner(
   fs : &@git.RepoFileSystem,
   git_dir : String,
@@ -408,6 +473,16 @@ fn resolve_ref_inner(
       return resolve_ref_inner(fs, git_dir, target, depth + 1)
     }
     return line |> @git.ObjectId::from_hex |> Some
+  }
+  match resolve_ref_commondir(fs, git_dir) {
+    Some(common_git_dir) =>
+      if common_git_dir != git_dir {
+        match resolve_ref_inner(fs, common_git_dir, refname, depth + 1) {
+          Some(id) => return Some(id)
+          None => ()
+        }
+      }
+    None => ()
   }
   let packed = join_path(git_dir, "packed-refs")
   if fs.is_file(packed) {
@@ -672,9 +747,10 @@ pub fn create_annotated_tag(
   message : String,
   tagger : String,
   timestamp : Int64,
+  timezone? : String = "+0000",
 ) -> Unit raise @git.GitError {
   // Create tag object
-  let tag_content = "object \{target.to_hex()}\ntype commit\ntag \{name}\ntagger \{tagger} \{timestamp} +0000\n\n\{message}\n"
+  let tag_content = "object \{target.to_hex()}\ntype commit\ntag \{name}\ntagger \{tagger} \{timestamp} \{timezone}\n\n\{message}\n"
   let tag_bytes = @utf8.encode(tag_content)
   let (tag_id, compressed) = @git.create_object(@git.ObjectType::Tag, tag_bytes)
   write_object_bytes(fs, git_dir, tag_id, compressed)

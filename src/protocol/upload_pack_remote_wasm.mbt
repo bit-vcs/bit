@@ -13,7 +13,9 @@ fn[T] wasm_http_not_available() -> T raise @git.GitError {
 
 ///|
 async fn[T] wasm_http_not_available_async() -> T raise @git.GitError {
-  @async.sleep(0) catch { _ => () }
+  @async.sleep(0) catch {
+    _ => ()
+  }
   wasm_http_not_available()
 }
 

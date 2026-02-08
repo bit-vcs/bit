@@ -50,6 +50,8 @@ type BlameOptions
 
 type CherryPickResult
 
+type DenyCurrentBranchDecision
+
 type GlobalOptions
 
 type MboxPatch
@@ -67,7 +69,27 @@ type OsObjectStore
 
 type OsRefStore
 
+type PushDefaultMode
+
+type PushParsedRefspec
+
+type PushPorcelainLine
+
+type PushRefPlan
+
+type PushResolvedUpdate
+
+type PushSourceKind
+
+type PushTargetPlan
+
 type RebaseTodoEntry
+
+type RunGitCommandInvocation
+
+type RunGitEnvSnapshot
+
+type ScalarCloneOptions
 
 type SubdirChangeInfo
 

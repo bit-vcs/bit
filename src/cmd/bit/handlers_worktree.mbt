@@ -23,6 +23,20 @@ fn get_absolute_work_root() -> String {
 }
 
 ///|
+fn infer_default_worktree_branch_name(path : String) -> String {
+  let trimmed = if path.has_suffix("/") && path.length() > 1 {
+    String::unsafe_substring(path, start=0, end=path.length() - 1)
+  } else {
+    path
+  }
+  match trimmed.rev_find("/") {
+    Some(idx) =>
+      String::unsafe_substring(trimmed, start=idx + 1, end=trimmed.length())
+    None => trimmed
+  }
+}
+
+///|
 async fn handle_worktree(args : Array[String]) -> Unit raise Error {
   if args.length() == 0 {
     show_worktree_help()
@@ -252,6 +266,9 @@ async fn handle_worktree_add(args : Array[String]) -> Unit raise Error {
   guard path is Some(wt_path) else {
     eprint_line("usage: git worktree add [<options>] <path> [<commit-ish>]")
     @sys.exit(1)
+  }
+  if new_branch is None && not(detach) && commit_ish is None {
+    new_branch = Some(infer_default_worktree_branch_name(wt_path))
   }
   @gitlib.create_worktree(
     fs,

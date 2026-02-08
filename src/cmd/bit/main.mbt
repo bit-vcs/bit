@@ -1287,8 +1287,21 @@ async fn dispatch_command(
 
 ///|
 async fn exit_with_error(cmd : String, err : Error) -> Unit {
-  eprint_line("\{cmd} failed: \{err}")
+  let msg = format_error_message(err)
+  eprint_line("\{cmd} failed: \{msg}")
   @sys.exit(1)
+}
+
+///|
+fn format_error_message(err : Error) -> String {
+  match err {
+    @git.GitError::ProtocolError(msg) => msg
+    @git.GitError::InvalidObject(msg) => msg
+    @git.GitError::PackfileError(msg) => msg
+    @git.GitError::HashMismatch(_, _) => "hash mismatch"
+    @git.GitError::IoError(msg) => msg
+    _ => err.to_string()
+  }
 }
 
 ///|

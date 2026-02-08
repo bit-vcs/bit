@@ -864,12 +864,9 @@ async fn handle_multi_pack_index(args : Array[String]) -> Unit raise Error {
       }
       _ if arg.has_prefix("--preferred-pack=") =>
         preferred_pack = Some(arg[17:].to_string())
-      "--stdin-packs" | "--bitmap" | "--incremental" => {
+      "--stdin-packs" | "--bitmap" | "--incremental" =>
         unsupported_opt = Some(arg)
-      }
-      _ if arg.has_prefix("--refs-snapshot") => {
-        unsupported_opt = Some(arg)
-      }
+      _ if arg.has_prefix("--refs-snapshot") => unsupported_opt = Some(arg)
       "write" | "verify" | "expire" | "repack" => subcommand = Some(arg)
       _ if arg.has_prefix("-") => {
         warn_unimplemented_arg("multi-pack-index", arg)

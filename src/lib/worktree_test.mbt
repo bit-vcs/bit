@@ -54,3 +54,31 @@ async test "worktree: status text" {
   assert_true(text2.contains("Changes to be committed"))
   assert_true(text2.contains("staged: a.txt"))
 }
+
+///|
+async test "worktree: empty commit requires allow_empty" {
+  let fs = setup_repo()
+  let _ = commit(
+    fs, fs, "/repo", "msg\n", "Test <test@example.com>", 1700000000L,
+  ) catch {
+    _ => return ()
+  }
+  fail("expected empty-index commit to fail without allow_empty")
+}
+
+///|
+async test "worktree: allow_empty creates initial commit" {
+  let fs = setup_repo()
+  let allow_empty = true
+  let commit_id = commit(
+    fs,
+    fs,
+    "/repo",
+    "empty\n",
+    "Test <test@example.com>",
+    1700000000L,
+    allow_empty~,
+  )
+  let ref_text = fs.read_string("/repo/.git/refs/heads/main")
+  assert_true(ref_text.contains(commit_id.to_hex()))
+}

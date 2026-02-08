@@ -515,14 +515,7 @@ fn scalar_parse_clone_options(args : Array[String]) -> ScalarCloneOptions {
     }
     i += 1
   }
-  {
-    full_clone,
-    src,
-    tags,
-    maintenance,
-    clone_opts,
-    positional,
-  }
+  { full_clone, src, tags, maintenance, clone_opts, positional }
 }
 
 ///|
