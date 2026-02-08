@@ -58,7 +58,9 @@ pub fn init_repo_with_options(
   fs.mkdir_p(join_path(git_dir, "refs/heads"))
   fs.mkdir_p(join_path(git_dir, "refs/tags"))
   fs.mkdir_p(join_path(git_dir, "info"))
-  fs.mkdir_p(join_path(git_dir, "hooks"))
+  if opts.template_dir is None {
+    fs.mkdir_p(join_path(git_dir, "hooks"))
+  }
   // If separate-git-dir, create .git file pointing to actual git dir
   if opts.separate_git_dir is Some(_) && not(bare) {
     let gitfile_path = join_path(root, ".git")
