@@ -182,3 +182,59 @@ test "push-default: colon refspec reports branch hint" {
   }
   fail("expected colon refspec error")
 }
+
+///|
+test "push-parse: two positional args treat first as remote" {
+  let (remote, refspec) = resolve_push_positionals(["", "main"], fn(_name) {
+    false
+  })
+  assert_eq(remote, Some(""))
+  assert_eq(refspec, Some("main"))
+}
+
+///|
+test "push-parse: single positional known remote" {
+  let (remote, refspec) = resolve_push_positionals(["origin"], fn(name) {
+    name == "origin"
+  })
+  assert_eq(remote, Some("origin"))
+  assert_eq(refspec, None)
+}
+
+///|
+test "push-parse: single positional unknown is refspec" {
+  let (remote, refspec) = resolve_push_positionals(["main"], fn(_name) {
+    false
+  })
+  assert_eq(remote, None)
+  assert_eq(refspec, Some("main"))
+}
+
+///|
+test "push-refspec: detect ambiguous short source token" {
+  assert_true(
+    is_ambiguous_push_source_refspec(
+      "foo",
+      true,
+      true,
+    ),
+  )
+}
+
+///|
+test "push-refspec: ignore head and rev-expression tokens" {
+  assert_false(
+    is_ambiguous_push_source_refspec(
+      "HEAD",
+      true,
+      true,
+    ),
+  )
+  assert_false(
+    is_ambiguous_push_source_refspec(
+      "main~2",
+      true,
+      true,
+    ),
+  )
+}

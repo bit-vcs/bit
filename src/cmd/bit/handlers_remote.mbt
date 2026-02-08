@@ -3300,6 +3300,53 @@ fn resolve_push_target_plan(
 }
 
 ///|
+fn resolve_push_positionals(
+  positionals : Array[String],
+  is_known_remote : (String) -> Bool,
+) -> (String?, String?) {
+  if positionals.length() == 0 {
+    (None, None)
+  } else if positionals.length() == 1 {
+    let first = positionals[0]
+    if is_known_remote(first) {
+      (Some(first), None)
+    } else {
+      (None, Some(first))
+    }
+  } else {
+    (Some(positionals[0]), Some(positionals[positionals.length() - 1]))
+  }
+}
+
+///|
+fn strip_push_force_prefix(source_spec : String) -> String {
+  if source_spec.has_prefix("+") {
+    String::unsafe_substring(source_spec, start=1, end=source_spec.length())
+  } else {
+    source_spec
+  }
+}
+
+///|
+fn is_ambiguous_push_source_refspec(
+  source_spec : String,
+  has_head_ref : Bool,
+  has_tag_ref : Bool,
+) -> Bool {
+  if source_spec.length() == 0 ||
+    source_spec == "HEAD" ||
+    source_spec == "@" ||
+    source_spec.has_prefix("refs/") ||
+    source_spec.contains("^") ||
+    source_spec.contains("~") ||
+    source_spec.contains(":") {
+    false
+  } else {
+    has_head_ref && has_tag_ref
+  }
+}
+
+///|
 async fn handle_push(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let fs = OsFs::new()
@@ -3310,34 +3357,23 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
     None => None
   }
   // Parse arguments
-  let mut explicit_remote : String? = None
-  let mut explicit_refspec : String? = None
   let mut force = false
   let mut set_upstream = false
   let mut push_all = false
+  let positional_args : Array[String] = []
   for arg in args {
     match arg {
       "-f" | "--force" => force = true
       "-u" | "--set-upstream" => set_upstream = true
       "--all" => push_all = true
       _ if arg.has_prefix("-") => warn_unimplemented_arg("push", arg)
-      _ =>
-        if explicit_remote is None && explicit_refspec is None {
-          // First non-option is either remote or refspec
-          // Check if it's a known remote
-          let url = @gitlib.get_remote_url(fs, git_dir, arg)
-          if url is Some(_) {
-            explicit_remote = Some(arg)
-          } else {
-            explicit_refspec = Some(arg)
-          }
-        } else if explicit_remote is Some(_) && explicit_refspec is None {
-          explicit_refspec = Some(arg)
-        } else {
-          explicit_refspec = Some(arg)
-        }
+      _ => positional_args.push(arg)
     }
   }
+  let (explicit_remote, explicit_refspec) = resolve_push_positionals(
+    positional_args,
+    fn(name) { @gitlib.get_remote_url(fs, git_dir, name) is Some(_) },
+  )
   let head_ref = @gitlib.read_head_ref(fs, git_dir)
   let current_branch = match head_ref {
     @gitlib.HeadRef::Branch(branch) => branch
@@ -3397,7 +3433,25 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
       push_default, remote_pushdefault, auto_setup_remote,
     )
   }
+  if explicit_refspec is Some(spec) {
+    let (raw_src, _) = @gitlib.parse_refspec_pair(spec)
+    let src_spec = strip_push_force_prefix(raw_src)
+    let has_head_ref = @gitlib.resolve_ref(fs, git_dir, "refs/heads/" + src_spec) is Some(_)
+    let has_tag_ref = @gitlib.resolve_ref(fs, git_dir, "refs/tags/" + src_spec) is Some(_)
+    if is_ambiguous_push_source_refspec(
+      src_spec,
+      has_head_ref,
+      has_tag_ref,
+    ) {
+      raise @git.GitError::InvalidObject(
+        "src refspec '\{src_spec}' matches more than one",
+      )
+    }
+  }
   let remote_name = plan.remote_name
+  if remote_name.length() == 0 {
+    raise @git.GitError::InvalidObject("fatal: bad repository ''")
+  }
   let source_ref = plan.source_ref
   let refname = plan.dest_ref
   // Get remote URL - prefer subdir-clone remote

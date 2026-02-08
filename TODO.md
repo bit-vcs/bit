@@ -11,6 +11,34 @@
 | Pure化 coverage | ~85% |
 | CI | 5 shards all green |
 
+## 中期目標: bit standalone（real-git fallback なし）
+
+`bit` 単体で主要 Git シナリオ（clone/fetch/pull/push/pack/protocol）が動作し、git-shim の fallback に依存しない状態を目標にする。
+
+### Definition of Done
+
+- [ ] `just git-t-full` の重点セットが `failed 0 / broken 0`
+- [ ] `tools/git-shim/bin/git` を standalone 検証モードで実行したとき、非interceptコマンドの real-git 実行を禁止できる
+- [ ] README に standalone 保証範囲と未対応コマンドを明記する
+
+### 直近 Blocker（2026-02-08 実測）
+
+- [ ] **t5516-fetch-push.sh**（`git-t-full`: failed 122/123, `git-t-one`: 123/123）
+  - [ ] push/fetch のオプション互換（`--no-ipv4/--no-ipv6` など）
+  - [ ] URL 解決互換（`insteadOf`, `pushInsteadOf`, `pushurl`）
+  - [ ] refspec 解決互換（colon-less, ambiguity, onelevel, `HEAD`/`@`）
+  - [ ] push 後処理互換（hooks, reflog, local ref update）
+  - [ ] `receive.denyCurrentBranch=updateInstead` と worktree 系互換
+  - [ ] protocol v2 / negotiation / hideRefs 周辺互換
+  - [ ] 各論点ごとに wbtest を追加してから `just git-t-full t5516-fetch-push.sh` で検証
+- [x] **t5529-push-errors.sh**（`git-t-full`: 8/8 pass）
+  - [x] 空 remote 指定時のエラーメッセージ互換
+  - [x] 曖昧 ref の事前検出（ネットワーク前に fail）互換
+  - [x] `just git-t-full t5529-push-errors.sh` で 8/8 を確認
+- [ ] **t5528-push-default.sh**
+  - [ ] known-breakage vanished を解消（patch/todo の更新）して終了コードを安定化
+  - [ ] `just git-t-full t5528-push-default.sh` を green 化
+
 ## Tier 1: Git Compatibility (Critical)
 
 allowlist で残っている 5 テスト:
@@ -36,9 +64,9 @@ allowlist で残っている 5 テスト:
 
 ### 優先修正（次に着手）
 
-- [x] t5528-push-default.sh
-- [x] t0411-clone-from-partial.sh
-- [x] t1006-cat-file.sh
+- [ ] t5516-fetch-push.sh（standalone blocker）
+- [x] t5529-push-errors.sh（standalone blocker）
+- [ ] t5528-push-default.sh（known-breakage 整理）
 
 ### その他 backlog
 
@@ -109,7 +137,7 @@ allowlist で残っている 5 テスト:
 - [x] `src/cmd/bit` 内の `match real_git_path()` を 42 -> 0
 - [x] `src/cmd/bit` 内の `@process.run("git", ...)` を 10 -> 0
 - [x] `just check` が通る
-- [ ] 重点テスト（`t0411`, `t1006`, `t5316`, `t5317`, `t5319`, `t5334`, `t5572`）が strict 実行で通る
+- [ ] 重点テスト（`t5516`, `t5529`, `t5528`, `t5510`, `t5616`）が `just git-t-full` で通る
 
 ## Tier 2: Agent Features (High)
 
