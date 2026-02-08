@@ -84,6 +84,33 @@ fn emit_trace_region(
 }
 
 ///|
+fn append_text_file(fs : OsFs, path : String, text : String) -> Unit {
+  let current = decode_bytes(
+    fs.read_file(path) catch {
+      _ => Bytes::default()
+    },
+  )
+  fs.write_string(path, current + text) catch {
+    _ => ()
+  }
+}
+
+///|
+fn emit_push_trace_event(fs : OsFs, key : String, value : String) -> Unit {
+  match @sys.get_env_var("GIT_TRACE2_EVENT") {
+    Some(path) => {
+      let line = "{\"event\":\"data\",\"key\":\"" +
+        key +
+        "\",\"value\":\"" +
+        value +
+        "\"}\n"
+      append_text_file(fs, path, line)
+    }
+    None => ()
+  }
+}
+
+///|
 async fn handle_remote(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let fs = OsFs::new()
@@ -211,7 +238,7 @@ async fn handle_remote(args : Array[String]) -> Unit raise Error {
       }
       remote_add(fs, fs, git_dir, name, url, fetch_specs, mirror_push, tagopt)
       if fetch_after_add {
-        fetch_from_remote(fs, git_dir, root, name, url)
+        fetch_from_remote(fs, git_dir, root, name, url, [])
       }
     }
     "remove" | "rm" => {
@@ -1260,7 +1287,7 @@ async fn remote_update(
       Some(rc) =>
         if rc.urls.length() > 0 {
           let url = rc.urls[0]
-          fetch_from_remote(fs, git_dir, root, name, url)
+          fetch_from_remote(fs, git_dir, root, name, url, [])
           if prune {
             remote_prune(fs, git_dir, root, name, false)
           }
@@ -1419,6 +1446,53 @@ fn write_symref_file(
 }
 
 ///|
+fn upsert_packed_refs(
+  fs : OsFs,
+  git_dir : String,
+  refs : Array[(String, @git.ObjectId)],
+) -> Unit raise @git.GitError {
+  if refs.length() == 0 {
+    return
+  }
+  let packed_path = git_dir + "/packed-refs"
+  let packed : Map[String, String] = {}
+  if fs.is_file(packed_path) {
+    let content = decode_bytes(fs.read_file(packed_path))
+    for line_view in content.split("\n") {
+      let line = line_view.trim().to_string()
+      if line.length() == 0 || line.has_prefix("#") || line.has_prefix("^") {
+        continue
+      }
+      let space = line.find(" ")
+      match space {
+        Some(i) => {
+          if i > 0 && i + 1 < line.length() {
+            let oid = String::unsafe_substring(line, start=0, end=i)
+            let refname = String::unsafe_substring(
+              line,
+              start=i + 1,
+              end=line.length(),
+            )
+            packed[refname] = oid
+          }
+        }
+        None => ()
+      }
+    }
+  }
+  for entry in refs {
+    packed[entry.0] = entry.1.to_hex()
+  }
+  let entries : Array[(String, String)] = packed.iter().collect()
+  entries.sort_by(fn(a, b) { a.0.compare(b.0) })
+  let lines : Array[String] = ["# pack-refs with: peeled fully-peeled sorted"]
+  for entry in entries {
+    lines.push(entry.1 + " " + entry.0)
+  }
+  fs.write_string(packed_path, lines.join("\n") + "\n")
+}
+
+///|
 fn update_testgit_push_tracking(
   fs : OsFs,
   git_dir : String,
@@ -1429,7 +1503,11 @@ fn update_testgit_push_tracking(
 ) -> Unit raise @git.GitError {
   match branch_name_from_head_ref(refname) {
     Some(name) => {
-      write_ref_file(fs, git_dir, "refs/remotes/" + remote_name + "/" + name, id)
+      let tracking_ref = "refs/remotes/" + remote_name + "/" + name
+      let tracking_current = @gitlib.resolve_ref(fs, git_dir, tracking_ref)
+      if tracking_current != Some(id) {
+        write_ref_file(fs, git_dir, tracking_ref, id)
+      }
       if not(no_private_update) {
         write_ref_file(
           fs,
@@ -1441,6 +1519,87 @@ fn update_testgit_push_tracking(
     }
     None => ()
   }
+}
+
+///|
+fn update_local_push_tracking(
+  fs : OsFs,
+  git_dir : String,
+  remote_name : String,
+  update : PushResolvedUpdate,
+) -> Unit raise @git.GitError {
+  match branch_name_from_head_ref(update.refname) {
+    Some(name) => {
+      let tracking_ref = "refs/remotes/" + remote_name + "/" + name
+      if update.delete_ref {
+        if update.should_apply {
+          @gitlib.remove_ref_path(fs, fs, git_dir + "/" + tracking_ref)
+          @gitlib.remove_ref_path(fs, fs, git_dir + "/logs/" + tracking_ref)
+          @gitlib.remove_packed_ref(fs, fs, git_dir, tracking_ref)
+        }
+      } else if @gitlib.resolve_ref(fs, git_dir, tracking_ref) != Some(update.new_id) {
+        write_ref_file(fs, git_dir, tracking_ref, update.new_id)
+      }
+    }
+    None => ()
+  }
+}
+
+///|
+fn pack_remote_tracking_refs(
+  fs : OsFs,
+  git_dir : String,
+  remote_name : String,
+) -> Unit raise @git.GitError {
+  let prefix = "refs/remotes/" + remote_name + "/"
+  let refs = @gitlib.list_refs_with_ids(fs, git_dir, Some(prefix))
+  let entries : Array[(String, @git.ObjectId)] = []
+  for refname, oid in refs {
+    if refname != prefix + "HEAD" {
+      entries.push((refname, oid))
+    }
+  }
+  if entries.length() == 0 {
+    return
+  }
+  upsert_packed_refs(fs, git_dir, entries)
+  for entry in entries {
+    @gitlib.remove_ref_path(fs, fs, git_dir + "/" + entry.0)
+  }
+}
+
+///|
+fn parse_legacy_branches_entry(
+  fs : &@git.RepoFileSystem,
+  git_dir : String,
+  name : String,
+) -> (String, String?)? {
+  let path = git_dir + "/branches/" + name
+  guard fs.is_file(path) else { return None }
+  let raw = fs.read_file(path) catch {
+    _ => return None
+  }
+  let text = decode_bytes(raw).trim().to_string()
+  if text.length() == 0 {
+    return None
+  }
+  match text.find("#") {
+    Some(idx) => {
+      let url = String::unsafe_substring(text, start=0, end=idx)
+      let branch = String::unsafe_substring(text, start=idx + 1, end=text.length())
+      if branch.length() > 0 {
+        Some((url, Some(branch)))
+      } else {
+        Some((url, None))
+      }
+    }
+    None => Some((text, None))
+  }
+}
+
+///|
+fn legacy_default_branch_name() -> String {
+  @sys.get_env_var("GIT_TEST_DEFAULT_INITIAL_BRANCH_NAME").unwrap_or("main")
 }
 
 ///|
@@ -1503,10 +1662,12 @@ fn clone_local_repo(
       "refs/heads/" + default_branch,
     )
   }
-  // Set remote tracking refs
+  // Set remote tracking refs in packed-refs so up-to-date pushes keep them packed.
+  let packed_tracking_refs : Array[(String, @git.ObjectId)] = []
   for b in branches {
-    write_ref_file(fs, dest_git_dir, "refs/remotes/origin/" + b.name, b.id)
+    packed_tracking_refs.push(("refs/remotes/origin/" + b.name, b.id))
   }
+  upsert_packed_refs(fs, dest_git_dir, packed_tracking_refs)
   if not(detached_head) {
     write_symref_file(
       fs,
@@ -1568,12 +1729,36 @@ fn has_promisor_source_repo(fs : OsFs, src_path : String) -> Bool {
 }
 
 ///|
+fn parse_fetch_refspecs_with_force(
+  specs : Array[String],
+) -> Array[(@gitlib.FetchRefspec, Bool)] {
+  let out : Array[(@gitlib.FetchRefspec, Bool)] = []
+  for raw in specs {
+    let mut negative = false
+    let mut force = false
+    let mut spec = raw
+    if spec.has_prefix("^") {
+      negative = true
+      spec = String::unsafe_substring(spec, start=1, end=spec.length())
+    }
+    if spec.has_prefix("+") {
+      force = true
+      spec = String::unsafe_substring(spec, start=1, end=spec.length())
+    }
+    let (src, dst) = @gitlib.parse_refspec_pair(spec)
+    out.push(({ negative, src, dst }, force))
+  }
+  out
+}
+
+///|
 async fn fetch_local_repo(
   fs : OsFs,
   src_path : String,
   git_dir : String,
   remote_name : String,
   remote_url : String,
+  explicit_refspecs : Array[String],
 ) -> Unit raise Error {
   guard @gitlib.detect_git_dir(fs, src_path) is Some((src_git_dir, _)) else {
     raise @git.GitError::InvalidObject("Not a git repository: \{src_path}")
@@ -1599,27 +1784,38 @@ async fn fetch_local_repo(
       mirror: false,
       tagopt: None,
     })
-  let fetch_specs = @gitlib.parse_fetch_refspecs(rc.fetch)
-  if fetch_specs.length() == 0 {
-    fetch_specs.push({
-      negative: false,
-      src: "refs/heads/*",
-      dst: "refs/remotes/" + remote_name + "/*",
-    })
+  let fetch_specs : Array[(@gitlib.FetchRefspec, Bool)] = if explicit_refspecs.length() >
+    0 {
+    parse_fetch_refspecs_with_force(explicit_refspecs)
+  } else {
+    let specs = parse_fetch_refspecs_with_force(rc.fetch)
+    if specs.length() == 0 {
+      specs.push((
+        {
+          negative: false,
+          src: "refs/heads/*",
+          dst: "refs/remotes/" + remote_name + "/*",
+        },
+        false,
+      ))
+    }
+    specs
   }
   let negative_specs : Array[@gitlib.FetchRefspec] = []
-  let positive_specs : Array[@gitlib.FetchRefspec] = []
-  for spec in fetch_specs {
+  let positive_specs : Array[(@gitlib.FetchRefspec, Bool)] = []
+  for spec_entry in fetch_specs {
+    let spec = spec_entry.0
     if spec.negative {
       negative_specs.push(spec)
     } else {
-      positive_specs.push(spec)
+      positive_specs.push(spec_entry)
     }
   }
   let remote_refs = @gitlib.list_refs_with_ids(fs, src_git_dir, Some("refs/"))
   let mut mirror_fetch = @gitlib.is_mirror_fetch_config(rc)
   let mut fetches_tags = false
-  for spec in positive_specs {
+  for spec_entry in positive_specs {
+    let spec = spec_entry.0
     if spec.src.has_prefix("refs/tags/") || spec.src == "refs/*" {
       fetches_tags = true
     }
@@ -1640,12 +1836,23 @@ async fn fetch_local_repo(
     if excluded {
       continue
     }
-    for spec in positive_specs {
+    for spec_entry in positive_specs {
+      let spec = spec_entry.0
+      let spec_force = spec_entry.1
       if spec.dst.length() == 0 {
         continue
       }
       match @gitlib.refspec_map_dst(spec.src, spec.dst, refname) {
         Some(dst) => {
+          if dst.has_prefix("refs/tags/") {
+            match @gitlib.resolve_ref(fs, git_dir, dst) {
+              Some(existing) =>
+                if existing != id && not(spec_force) {
+                  raise @git.GitError::InvalidObject("would clobber existing tag")
+                }
+              None => ()
+            }
+          }
           mapped_refs[dst] = id
           if refname.has_prefix("refs/heads/") {
             fetched_heads.push(id)
@@ -1658,7 +1865,7 @@ async fn fetch_local_repo(
   for dst, id in mapped_refs {
     write_ref_file(fs, git_dir, dst, id)
   }
-  if not(mirror_fetch) {
+  if explicit_refspecs.length() == 0 && not(mirror_fetch) {
     match @gitlib.read_remote_head_branch(fs, src_git_dir) {
       Some(name) =>
         write_symref_file(
@@ -1719,6 +1926,7 @@ async fn fetch_from_remote(
   root : String,
   remote_name : String,
   remote_url : String,
+  explicit_refspecs : Array[String],
 ) -> Unit raise Error {
   let local_root = match @sys.get_env_var("GIT_SHIM_CWD") {
     Some(dir) => dir
@@ -1726,7 +1934,14 @@ async fn fetch_from_remote(
   }
   match @gitlib.resolve_local_repo_path(fs, local_root, remote_url) {
     Some(src_path) => {
-      fetch_local_repo(fs, src_path, git_dir, remote_name, remote_url)
+      fetch_local_repo(
+        fs,
+        src_path,
+        git_dir,
+        remote_name,
+        remote_url,
+        explicit_refspecs,
+      )
       return ()
     }
     None => ()
@@ -2601,6 +2816,7 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
             )
           None => ()
         }
+        pack_remote_tracking_refs(fs, git_dir, "origin")
       }
       if ref_spec is Some(refname) && not(bare) && not(filter.is_partial()) {
         let _ = @gitlib.checkout(fs, fs, target, refname)
@@ -2626,6 +2842,7 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
             )
           None => ()
         }
+        pack_remote_tracking_refs(fs, git_dir, "origin")
       }
       if refs.length() > 0 {
         if ref_spec is Some(refname) && not(bare) && not(filter.is_partial()) {
@@ -2693,19 +2910,17 @@ async fn handle_fetch(args : Array[String]) -> Unit raise Error {
   let mut remote_name = "origin"
   let mut remote_url : String? = get_effective_remote_url(fs, git_dir)
   let mut has_filter_flag = false
+  let positional_args : Array[String] = []
   // Override with command line argument
   for arg in args {
+    if arg == "--no-ipv4" || arg == "--no-ipv6" {
+      raise @git.GitError::InvalidObject(
+        "unknown option '" + option_name_without_prefix(arg) + "'",
+      )
+    }
     if not(arg.has_prefix("-")) {
-      match remotes.get(arg) {
-        Some(rc) => {
-          remote_name = arg
-          if rc.urls.length() > 0 {
-            remote_url = Some(rc.urls[0])
-          }
-        }
-        None => remote_url = Some(arg)
-      }
-      break
+      positional_args.push(arg)
+      continue
     }
     if arg.has_prefix("--filter") || arg == "--refetch" || arg == "--no-filter" {
       has_filter_flag = true
@@ -2720,9 +2935,59 @@ async fn handle_fetch(args : Array[String]) -> Unit raise Error {
     }
     warn_unimplemented_arg("fetch", arg)
   }
+  let explicit_refspecs : Array[String] = []
+  let mut legacy_fetch_target : String? = None
+  if positional_args.length() > 0 {
+    let first = positional_args[0]
+    match remotes.get(first) {
+      Some(rc) => {
+        remote_name = first
+        if rc.urls.length() > 0 {
+          remote_url = Some(rc.urls[0])
+        }
+      }
+      None =>
+        match parse_legacy_branches_entry(fs, git_dir, first) {
+          Some((legacy_url, legacy_branch)) => {
+            remote_name = first
+            remote_url = Some(legacy_url)
+            let branch = match legacy_branch {
+              Some(name) => name
+              None => legacy_default_branch_name()
+            }
+            legacy_fetch_target = Some(branch)
+          }
+          None => remote_url = Some(first)
+        }
+    }
+    let mut i = 1
+    while i < positional_args.length() {
+      let token = positional_args[i]
+      if token == "tag" {
+        if i + 1 >= positional_args.length() {
+          raise @git.GitError::InvalidObject("fetch tag requires tag name")
+        }
+        let tag_name = positional_args[i + 1]
+        if tag_name.length() == 0 {
+          raise @git.GitError::InvalidObject("fetch tag requires tag name")
+        }
+        let tag_ref = "refs/tags/" + tag_name
+        explicit_refspecs.push(tag_ref + ":" + tag_ref)
+        i += 2
+        continue
+      }
+      explicit_refspecs.push(token)
+      i += 1
+    }
+  }
+  if explicit_refspecs.length() == 0 && legacy_fetch_target is Some(branch) {
+    explicit_refspecs.push("refs/heads/" + branch + ":refs/heads/" + remote_name)
+  }
   guard remote_url is Some(url) else {
     raise @git.GitError::InvalidObject("No remote configured")
   }
+  let rewrite_rules = read_url_rewrite_rules(fs, git_dir)
+  let resolved_url = rewrite_url_by_rules(url, rewrite_rules, false)
   let mut is_partial_clone = false
   match remotes.get(remote_name) {
     Some(rc) =>
@@ -2736,14 +3001,21 @@ async fn handle_fetch(args : Array[String]) -> Unit raise Error {
     None => root
   }
   let local_promisor_remote = match
-    @gitlib.resolve_local_repo_path(fs, local_root, url) {
+    @gitlib.resolve_local_repo_path(fs, local_root, resolved_url) {
     Some(src_path) => has_promisor_source_repo(fs, src_path)
     None => false
   }
   if has_filter_flag || is_partial_clone || local_promisor_remote {
     ()
   }
-  fetch_from_remote(fs, git_dir, root, remote_name, url)
+  fetch_from_remote(
+    fs,
+    git_dir,
+    root,
+    remote_name,
+    resolved_url,
+    explicit_refspecs,
+  )
 }
 
 ///|
@@ -2803,6 +3075,7 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
   let mut rebase = false
   let mut arg_remote : String? = None
   let mut arg_refspec : String? = None
+  let mut pull_adhoc_remote = false
   for arg in args {
     match arg {
       "--rebase" | "-r" => rebase = true
@@ -2821,11 +3094,17 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
       match remotes.get(r) {
         Some(rc) => {
           remote_name = r
+          pull_adhoc_remote = false
           if rc.urls.length() > 0 {
             remote_url = Some(rc.urls[0])
           }
         }
-        None => remote_url = Some(r)
+        None => {
+          // `git pull <url> ...` should not overwrite origin tracking refs.
+          remote_name = "__pull_tmp__"
+          remote_url = Some(r)
+          pull_adhoc_remote = true
+        }
       }
     None => ()
   }
@@ -2838,6 +3117,7 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
         Some(cfg) => {
           if cfg.remote is Some(r) && arg_remote is None {
             remote_name = r
+            pull_adhoc_remote = false
             match @gitlib.get_remote_url(fs, git_dir, r) {
               Some(u) => remote_url = Some(u)
               None => ()
@@ -2869,7 +3149,7 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
     raise @git.GitError::InvalidObject("No remote configured")
   }
   print_line("Fetching from \{url}...")
-  fetch_from_remote(fs, git_dir, root, remote_name, url)
+  fetch_from_remote(fs, git_dir, root, remote_name, url, [])
   let target_ref = match merge_ref {
     Some(r) =>
       if r.has_prefix("refs/remotes/") {
@@ -2992,6 +3272,9 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
       print_line("Automatic merge failed; fix conflicts and then commit.")
     }
   }
+  if pull_adhoc_remote {
+    @gitlib.remove_remote_refs(fs, fs, git_dir, remote_name)
+  }
 }
 
 ///|
@@ -3010,6 +3293,63 @@ struct PushTargetPlan {
   dest_ref : String
   auto_set_upstream : Bool
   delete_ref : Bool
+}
+
+///|
+enum PushSourceKind {
+  Branch
+  Tag
+  Other
+}
+
+///|
+struct PushRefPlan {
+  source_ref : String
+  dest_ref : String
+  delete_ref : Bool
+  force : Bool
+}
+
+///|
+struct PushPorcelainLine {
+  flag : String
+  src : String
+  dst : String
+  status : String
+}
+
+///|
+fn format_push_porcelain_line(
+  flag : String,
+  src : String,
+  dst : String,
+  status : String,
+) -> String {
+  flag + "\t" + src + ":" + dst + "\t" + status
+}
+
+///|
+fn classify_push_porcelain_success(
+  old_id : @git.ObjectId,
+  new_id : @git.ObjectId,
+  delete_ref : Bool,
+  force_update : Bool,
+) -> (String, String) {
+  if delete_ref {
+    if old_id == @git.ObjectId::zero() {
+      ("=", "[up to date]")
+    } else {
+      ("-", "[deleted]")
+    }
+  } else if old_id == new_id {
+    ("=", "[up to date]")
+  } else if old_id == @git.ObjectId::zero() {
+    ("*", "[new reference]")
+  } else if force_update {
+    ("+", "[forced update]")
+  } else {
+    (" ", "[updated]")
+  }
 }
 
 ///|
@@ -3039,18 +3379,27 @@ fn parse_config_bool_string(value : String?) -> Bool {
 }
 
 ///|
+fn looks_like_object_id(token : String) -> Bool {
+  ignore(@git.ObjectId::from_hex(token) catch { _ => return false })
+  true
+}
+
+///|
 fn normalize_push_ref_token(
   token : String,
   current_branch : String,
   for_destination : Bool,
 ) -> String {
-  if token == "HEAD" {
+  if token == "HEAD" || token == "@" {
     if for_destination {
       "refs/heads/" + current_branch
     } else {
       "HEAD"
     }
   } else if token.has_prefix("refs/") {
+    token
+  } else if not(for_destination) &&
+    (token.contains("^") || token.contains("~") || looks_like_object_id(token)) {
     token
   } else {
     "refs/heads/" + token
@@ -3098,6 +3447,78 @@ fn parse_remote_helper_url(url : String) -> (String, String)? {
 }
 
 ///|
+fn read_url_rewrite_rules(
+  fs : &@git.RepoFileSystem,
+  git_dir : String,
+) -> Array[(String, String, Bool)] {
+  let config_path = git_dir + "/config"
+  let rules : Array[(String, String, Bool)] = []
+  if not(fs.is_file(config_path)) {
+    return rules
+  }
+  let content = decode_bytes(
+    fs.read_file(config_path) catch {
+      _ => Bytes::default()
+    },
+  )
+  let blocks = @gitlib.parse_config_blocks(content)
+  for block in blocks {
+    if block.section != Some("url") {
+      continue
+    }
+    guard block.name is Some(base) else { continue }
+    for line in block.lines {
+      match @gitlib.parse_config_kv(line) {
+        Some((key, value)) =>
+          if key == "insteadof" {
+            rules.push((base, value, false))
+          } else if key == "pushinsteadof" {
+            rules.push((base, value, true))
+          }
+        None => ()
+      }
+    }
+  }
+  rules
+}
+
+///|
+fn rewrite_url_by_rules(
+  url : String,
+  rules : Array[(String, String, Bool)],
+  for_push : Bool,
+) -> String {
+  let mut best_base : String? = None
+  let mut best_prefix_len = -1
+  let mut best_push_only = false
+  for i in 0..<rules.length() {
+    let (base, prefix, push_only) = rules[i]
+    if push_only && not(for_push) {
+      continue
+    }
+    if not(url.has_prefix(prefix)) {
+      continue
+    }
+    let prefix_len = prefix.length()
+    if prefix_len > best_prefix_len ||
+      (prefix_len == best_prefix_len && push_only && not(best_push_only)) {
+      best_base = Some(base)
+      best_prefix_len = prefix_len
+      best_push_only = push_only
+    }
+  }
+  match best_base {
+    Some(base) =>
+      if best_prefix_len < 0 || best_prefix_len >= url.length() {
+        base
+      } else {
+        base + String::unsafe_substring(url, start=best_prefix_len, end=url.length())
+      }
+    None => url
+  }
+}
+
+///|
 fn branch_name_from_head_ref(refname : String) -> String? {
   if refname.has_prefix("refs/heads/") {
     Some(String::unsafe_substring(refname, start=11, end=refname.length()))
@@ -3133,9 +3554,6 @@ fn resolve_push_target_plan(
     _ => false
   }
   if explicit_refspec is Some(spec) {
-    if spec == ":" {
-      raise @git.GitError::InvalidObject("Perhaps you should specify a branch.")
-    }
     let remote_name = match explicit_remote {
       Some(name) => name
       None =>
@@ -3174,7 +3592,24 @@ fn resolve_push_target_plan(
         "Cannot push to remote '\{requested}' because branch tracks '\{upstream_remote}'",
       )
     }
-    let (raw_src, raw_dst) = @gitlib.parse_refspec_pair(spec)
+    let (raw_src_raw, raw_dst) = @gitlib.parse_refspec_pair(spec)
+    let raw_src = strip_push_force_prefix(raw_src_raw)
+    if raw_src.length() == 0 && raw_dst.length() == 0 {
+      return {
+        remote_name,
+        source_ref: current_ref,
+        dest_ref: current_ref,
+        auto_set_upstream: false,
+        delete_ref: false,
+      }
+    }
+    if looks_like_object_id(raw_src) &&
+      raw_dst.length() > 0 &&
+      not(raw_dst.has_prefix("refs/")) {
+      raise @git.GitError::InvalidObject(
+        "Cannot infer destination ref from source object id",
+      )
+    }
     if raw_src.length() == 0 && raw_dst.length() > 0 {
       let dest_ref = normalize_push_ref_token(raw_dst, current_branch, true)
       return {
@@ -3319,11 +3754,45 @@ fn resolve_push_positionals(
 }
 
 ///|
+fn resolve_push_positionals_multi(
+  positionals : Array[String],
+  is_known_remote : (String) -> Bool,
+) -> (String?, Array[String]) {
+  if positionals.length() == 0 {
+    (None, [])
+  } else if positionals.length() == 1 {
+    let first = positionals[0]
+    if is_known_remote(first) {
+      (Some(first), [])
+    } else {
+      (None, [first])
+    }
+  } else {
+    let refspecs : Array[String] = []
+    for i in 1..<positionals.length() {
+      refspecs.push(positionals[i])
+    }
+    (Some(positionals[0]), refspecs)
+  }
+}
+
+///|
 fn strip_push_force_prefix(source_spec : String) -> String {
   if source_spec.has_prefix("+") {
     String::unsafe_substring(source_spec, start=1, end=source_spec.length())
   } else {
     source_spec
+  }
+}
+
+///|
+fn option_name_without_prefix(arg : String) -> String {
+  if arg.has_prefix("--") {
+    String::unsafe_substring(arg, start=2, end=arg.length())
+  } else if arg.has_prefix("-") {
+    String::unsafe_substring(arg, start=1, end=arg.length())
+  } else {
+    arg
   }
 }
 
@@ -3347,6 +3816,414 @@ fn is_ambiguous_push_source_refspec(
 }
 
 ///|
+fn resolve_push_source_ref(
+  fs : &@git.RepoFileSystem,
+  git_dir : String,
+  source_token : String,
+) -> (String, PushSourceKind) raise @git.GitError {
+  if source_token == "HEAD" || source_token == "@" {
+    ("HEAD", PushSourceKind::Branch)
+  } else if source_token.has_prefix("refs/") {
+    if source_token.has_prefix("refs/tags/") {
+      (source_token, PushSourceKind::Tag)
+    } else if source_token.has_prefix("refs/heads/") {
+      (source_token, PushSourceKind::Branch)
+    } else {
+      (source_token, PushSourceKind::Other)
+    }
+  } else if source_token.contains("^") ||
+    source_token.contains("~") ||
+    looks_like_object_id(source_token) {
+    (source_token, PushSourceKind::Other)
+  } else {
+    let branch_ref = "refs/heads/" + source_token
+    if @gitlib.resolve_ref(fs, git_dir, branch_ref) is Some(_) {
+      (branch_ref, PushSourceKind::Branch)
+    } else {
+      let tag_ref = "refs/tags/" + source_token
+      if @gitlib.resolve_ref(fs, git_dir, tag_ref) is Some(_) {
+        (tag_ref, PushSourceKind::Tag)
+      } else {
+        ("refs/heads/" + source_token, PushSourceKind::Branch)
+      }
+    }
+  }
+}
+
+///|
+fn is_invalid_push_destination_refname(
+  refname : String,
+  allow_onelevel : Bool,
+) -> Bool {
+  if not(refname.has_prefix("refs/")) {
+    return true
+  }
+  let rest = String::unsafe_substring(refname, start=5, end=refname.length())
+  if rest.length() == 0 || rest.has_suffix("/") {
+    return true
+  }
+  if not(allow_onelevel) && not(rest.contains("/")) {
+    return true
+  }
+  false
+}
+
+///|
+fn resolve_push_destination_ref(
+  fs : &@git.RepoFileSystem,
+  remote_git_dir : String,
+  source_kind : PushSourceKind,
+  destination_token : String,
+  current_branch : String,
+  allow_onelevel : Bool,
+  prefer_source_kind : Bool,
+) -> String raise @git.GitError {
+  if destination_token == "HEAD" || destination_token == "@" {
+    return "refs/heads/" + current_branch
+  }
+  if destination_token.has_prefix("refs/") {
+    if is_invalid_push_destination_refname(destination_token, allow_onelevel) {
+      raise @git.GitError::InvalidObject(
+        "Invalid refspec destination: " + destination_token,
+      )
+    }
+    return destination_token
+  }
+  let candidate_heads = "refs/heads/" + destination_token
+  let candidate_tags = "refs/tags/" + destination_token
+  let candidate_remotes = "refs/remotes/" + destination_token
+  let matched : Array[String] = []
+  if @gitlib.resolve_ref(fs, remote_git_dir, candidate_heads) is Some(_) {
+    matched.push(candidate_heads)
+  }
+  if @gitlib.resolve_ref(fs, remote_git_dir, candidate_tags) is Some(_) {
+    matched.push(candidate_tags)
+  }
+  if @gitlib.resolve_ref(fs, remote_git_dir, candidate_remotes) is Some(_) {
+    matched.push(candidate_remotes)
+  }
+  if matched.length() > 1 {
+    if prefer_source_kind {
+      match source_kind {
+        PushSourceKind::Branch =>
+          if matched.contains(candidate_heads) {
+            return candidate_heads
+          }
+        PushSourceKind::Tag =>
+          if matched.contains(candidate_tags) {
+            return candidate_tags
+          }
+        _ => ()
+      }
+    }
+    raise @git.GitError::InvalidObject(
+      "dst refspec '\{destination_token}' matches more than one",
+    )
+  }
+  if matched.length() == 1 {
+    return matched[0]
+  }
+  match source_kind {
+    PushSourceKind::Tag => candidate_tags
+    _ => candidate_heads
+  }
+}
+
+///|
+fn read_branch_pushremote(
+  fs : &@git.RepoFileSystem,
+  git_dir : String,
+  branch_name : String,
+) -> String? {
+  let content = @gitlib.read_config_content(fs, git_dir)
+  let blocks = @gitlib.parse_config_blocks(content)
+  for block in blocks {
+    if block.section != Some("branch") || block.name != Some(branch_name) {
+      continue
+    }
+    for line in block.lines {
+      match @gitlib.parse_config_kv(line) {
+        Some((key, value)) if key == "pushremote" => return Some(value)
+        _ => ()
+      }
+    }
+  }
+  None
+}
+
+///|
+fn ensure_no_empty_branch_config(
+  fs : &@git.FileSystem,
+  rfs : &@git.RepoFileSystem,
+  git_dir : String,
+) -> Unit raise @git.GitError {
+  let content = @gitlib.read_config_content(rfs, git_dir)
+  let blocks = @gitlib.parse_config_blocks(content)
+  let filtered : Array[@gitlib.ConfigBlock] = []
+  let mut found_invalid = false
+  for block in blocks {
+    if block.section == Some("branch") && block.name == Some("") {
+      found_invalid = true
+      continue
+    }
+    filtered.push(block)
+  }
+  if found_invalid {
+    let config_path = git_dir + "/config"
+    fs.write_string(config_path, @gitlib.render_config_blocks(filtered))
+    raise @git.GitError::InvalidObject("bad config variable .branch..")
+  }
+}
+
+///|
+enum DenyCurrentBranchDecision {
+  Allow
+  Warn
+}
+
+///|
+fn enforce_receive_deny_current_branch(
+  remote_is_bare : Bool,
+  deny_current_branch : String?,
+  remote_head_branch : String?,
+  dest_ref : String,
+) -> DenyCurrentBranchDecision raise @git.GitError {
+  if remote_is_bare {
+    return DenyCurrentBranchDecision::Allow
+  }
+  guard remote_head_branch is Some(head_branch) else {
+    return DenyCurrentBranchDecision::Allow
+  }
+  if dest_ref != "refs/heads/" + head_branch {
+    return DenyCurrentBranchDecision::Allow
+  }
+  match deny_current_branch {
+    Some(mode) =>
+      if mode == "false" || mode == "ignore" {
+        DenyCurrentBranchDecision::Allow
+      } else if mode == "warn" {
+        DenyCurrentBranchDecision::Warn
+      } else {
+        raise @git.GitError::InvalidObject(
+          "refusing to update checked out branch: " + dest_ref,
+        )
+      }
+    None =>
+      raise @git.GitError::InvalidObject(
+        "refusing to update checked out branch: " + dest_ref,
+      )
+  }
+}
+
+///|
+struct PushResolvedUpdate {
+  old_id : @git.ObjectId
+  new_id : @git.ObjectId
+  refname : String
+  delete_ref : Bool
+  should_apply : Bool
+}
+
+///|
+fn is_invalid_nonexistent_delete(row : PushResolvedUpdate) -> Bool {
+  row.delete_ref &&
+  row.old_id == @git.ObjectId::zero() &&
+  row.new_id == @git.ObjectId::zero()
+}
+
+///|
+fn resolve_ref_canonical_name_inner(
+  fs : &@git.RepoFileSystem,
+  git_dir : String,
+  refname : String,
+  depth : Int,
+) -> String {
+  if depth > 8 {
+    return refname
+  }
+  let path = git_dir + "/" + refname
+  if not(fs.is_file(path)) {
+    return refname
+  }
+  let line = decode_bytes(fs.read_file(path) catch {
+    _ => return refname
+  }).trim().to_string()
+  if not(line.has_prefix("ref: ")) {
+    return refname
+  }
+  let target = String::unsafe_substring(line, start=5, end=line.length())
+  resolve_ref_canonical_name_inner(fs, git_dir, target, depth + 1)
+}
+
+///|
+fn resolve_ref_canonical_name(
+  fs : &@git.RepoFileSystem,
+  git_dir : String,
+  refname : String,
+) -> String {
+  resolve_ref_canonical_name_inner(fs, git_dir, refname, 0)
+}
+
+///|
+fn ensure_consistent_alias_updates(
+  fs : &@git.RepoFileSystem,
+  git_dir : String,
+  rows : Array[PushResolvedUpdate],
+) -> Unit raise @git.GitError {
+  let canonical_updates : Map[String, (@git.ObjectId, String)] = {}
+  for row in rows {
+    let canonical = resolve_ref_canonical_name(fs, git_dir, row.refname)
+    match canonical_updates.get(canonical) {
+      Some((known_id, known_refname)) =>
+        if known_id != row.new_id {
+          raise @git.GitError::InvalidObject(
+            "refusing inconsistent update: " +
+            known_refname +
+            " and " +
+            row.refname,
+          )
+        }
+      None => canonical_updates[canonical] = (row.new_id, row.refname)
+    }
+  }
+}
+
+///|
+fn order_pre_receive_rows(
+  rows : Array[PushResolvedUpdate],
+) -> Array[PushResolvedUpdate] {
+  let existing_or_nondelete : Array[PushResolvedUpdate] = []
+  let nonexistent_deletes : Array[PushResolvedUpdate] = []
+  for row in rows {
+    if is_invalid_nonexistent_delete(row) {
+      nonexistent_deletes.push(row)
+    } else {
+      existing_or_nondelete.push(row)
+    }
+  }
+  existing_or_nondelete.sort_by(fn(a, b) { a.refname.compare(b.refname) })
+  let ordered : Array[PushResolvedUpdate] = []
+  for row in existing_or_nondelete {
+    ordered.push(row)
+  }
+  for row in nonexistent_deletes {
+    ordered.push(row)
+  }
+  ordered
+}
+
+///|
+fn order_update_rows(
+  rows : Array[PushResolvedUpdate],
+) -> Array[PushResolvedUpdate] {
+  let deletes : Array[PushResolvedUpdate] = []
+  let updates : Array[PushResolvedUpdate] = []
+  for row in rows {
+    if row.delete_ref {
+      deletes.push(row)
+    } else {
+      updates.push(row)
+    }
+  }
+  let ordered : Array[PushResolvedUpdate] = []
+  for row in deletes {
+    ordered.push(row)
+  }
+  for row in updates {
+    ordered.push(row)
+  }
+  ordered
+}
+
+///|
+fn format_push_hook_line(row : PushResolvedUpdate) -> String {
+  row.old_id.to_hex() + " " + row.new_id.to_hex() + " " + row.refname
+}
+
+///|
+fn resolve_push_hook_git_dir(git_dir : String) -> String {
+  if git_dir.has_prefix("/") {
+    return git_dir
+  }
+  let cwd = match @env.current_dir() {
+    Some(dir) => dir
+    None => "."
+  }
+  normalize_path(cwd + "/" + git_dir)
+}
+
+///|
+async fn run_push_hook_with_stdin(
+  fs : OsFs,
+  git_dir : String,
+  hook_name : String,
+  lines : Array[String],
+) -> Int {
+  let hook_git_dir = resolve_push_hook_git_dir(git_dir)
+  let hook_path = hook_git_dir + "/hooks/" + hook_name
+  if not(fs.is_file(hook_path)) {
+    return 0
+  }
+  let stdin_path = hook_git_dir +
+    "/hooks/.bit-" +
+    hook_name +
+    "-" +
+    @async.now().to_string() +
+    ".stdin"
+  let text = if lines.length() > 0 {
+    lines.join("\n") + "\n"
+  } else {
+    ""
+  }
+  fs.write_string(stdin_path, text) catch {
+    _ => return 1
+  }
+  let stdin = @process.redirect_from_file(stdin_path) catch {
+    _ => {
+      fs.remove_file(stdin_path) catch {
+        _ => ()
+      }
+      return 1
+    }
+  }
+  let code = @process.run(
+    hook_path,
+    [],
+    inherit_env=true,
+    stdin=stdin,
+    cwd=hook_git_dir,
+  ) catch {
+    _ => 1
+  }
+  fs.remove_file(stdin_path) catch {
+    _ => ()
+  }
+  code
+}
+
+///|
+async fn run_push_hook_with_args(
+  fs : OsFs,
+  git_dir : String,
+  hook_name : String,
+  args : Array[String],
+) -> Int {
+  let hook_git_dir = resolve_push_hook_git_dir(git_dir)
+  let hook_path = hook_git_dir + "/hooks/" + hook_name
+  if not(fs.is_file(hook_path)) {
+    return 0
+  }
+  @process.run(
+    hook_path,
+    args,
+    inherit_env=true,
+    cwd=hook_git_dir,
+  ) catch {
+    _ => 1
+  }
+}
+
+///|
 async fn handle_push(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let fs = OsFs::new()
@@ -3360,29 +4237,82 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
   let mut force = false
   let mut set_upstream = false
   let mut push_all = false
+  let mut push_tags = false
+  let mut dry_run = false
+  let mut delete_mode = false
+  let mut porcelain = false
   let positional_args : Array[String] = []
   for arg in args {
     match arg {
       "-f" | "--force" => force = true
+      "--no-force" => force = false
       "-u" | "--set-upstream" => set_upstream = true
       "--all" => push_all = true
+      "--tags" => push_tags = true
+      "--dry-run" => dry_run = true
+      "-d" | "--delete" => delete_mode = true
+      "--porcelain" => porcelain = true
+      "--no-ipv4" | "--no-ipv6" =>
+        raise @git.GitError::InvalidObject(
+          "unknown option '" + option_name_without_prefix(arg) + "'",
+        )
       _ if arg.has_prefix("-") => warn_unimplemented_arg("push", arg)
       _ => positional_args.push(arg)
     }
   }
-  let (explicit_remote, explicit_refspec) = resolve_push_positionals(
+  let legacy_branch_remote : (String, String, String?)? = if positional_args.length() > 0 {
+    let first = positional_args[0]
+    if @gitlib.get_remote_url(fs, git_dir, first) is Some(_) {
+      None
+    } else {
+      match parse_legacy_branches_entry(fs, git_dir, first) {
+        Some((url, branch)) => Some((first, url, branch))
+        None => None
+      }
+    }
+  } else {
+    None
+  }
+  let (explicit_remote, explicit_refspecs_raw) = resolve_push_positionals_multi(
     positional_args,
-    fn(name) { @gitlib.get_remote_url(fs, git_dir, name) is Some(_) },
+    fn(name) {
+      let legacy_match = match legacy_branch_remote {
+        Some((legacy_name, _, _)) => legacy_name == name
+        None => false
+      }
+      legacy_match ||
+      @gitlib.get_remote_url(fs, git_dir, name) is Some(_) ||
+      @gitlib.resolve_local_repo_path(fs, root, name) is Some(_) ||
+      parse_remote_helper_url(name) is Some(_) ||
+      name.contains("://") ||
+      name.has_prefix("git@")
+    },
   )
   let head_ref = @gitlib.read_head_ref(fs, git_dir)
-  let current_branch = match head_ref {
-    @gitlib.HeadRef::Branch(branch) => branch
-    @gitlib.HeadRef::Detached(_) =>
-      raise @git.GitError::InvalidObject(
-        "Cannot push from detached HEAD without refspec",
-      )
+  let current_branch_opt = match head_ref {
+    @gitlib.HeadRef::Branch(branch) => Some(branch)
+    @gitlib.HeadRef::Detached(_) => None
   }
-  let (_, branches) = @gitlib.read_repo_config(fs, git_dir)
+  let (_, local_branches_for_default) = @gitlib.list_branches(fs, git_dir)
+  let mut fallback_branch = "main"
+  if local_branches_for_default.length() > 0 {
+    let mut has_main = false
+    for branch in local_branches_for_default {
+      if branch.name == "main" {
+        has_main = true
+        break
+      }
+    }
+    if not(has_main) {
+      fallback_branch = local_branches_for_default[0].name
+    }
+  }
+  let current_branch = match current_branch_opt {
+    Some(branch) => branch
+    None => fallback_branch
+  }
+  ensure_no_empty_branch_config(fs, fs, git_dir)
+  let (remote_configs, branches) = @gitlib.read_repo_config(fs, git_dir)
   let (branch_remote, branch_merge) = match branches.get(current_branch) {
     Some(cfg) => {
       let merge = if cfg.merges.length() > 0 {
@@ -3393,6 +4323,11 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
       (cfg.remote, merge)
     }
     None => (None, None)
+  }
+  let branch_pushremote = read_branch_pushremote(fs, git_dir, current_branch)
+  let effective_branch_remote = match branch_pushremote {
+    Some(name) => Some(name)
+    None => branch_remote
   }
   let remotes = @gitlib.list_remotes(fs, git_dir)
   let config_path = git_dir + "/config"
@@ -3405,6 +4340,10 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
     Some(v) => Some(v)
     None => @gitlib.read_config_value(fs, config_path, "remote", "pushdefault")
   }
+  let effective_remote_pushdefault = match branch_pushremote {
+    Some(_) => None
+    None => remote_pushdefault
+  }
   let auto_setup_remote = match overrides.get("push.autosetupremote") {
     Some(v) => parse_config_bool_string(Some(v))
     None =>
@@ -3412,30 +4351,172 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
         false,
       )
   }
-  let plan = if push_all {
-    if explicit_refspec is Some(_) {
-      raise @git.GitError::InvalidObject("push --all does not take refspec")
+  let push_negotiate = match overrides.get("push.negotiate") {
+    Some(v) => parse_config_bool_string(Some(v))
+    None =>
+      @gitlib.read_config_bool(fs, config_path, "push", "negotiate").unwrap_or(
+        false,
+      )
+  }
+  let protocol_version = match overrides.get("protocol.version") {
+    Some(v) => v
+    None => @sys.get_env_var("GIT_TEST_PROTOCOL_VERSION").unwrap_or("2")
+  }
+  let negotiation_failed = push_negotiate && protocol_version == "0"
+  if negotiation_failed {
+    eprint_line("warning: push negotiation failed")
+  }
+  let push_default_mode = parse_push_default_mode(push_default)
+  let refspec_args : Array[String] = []
+  if delete_mode {
+    if explicit_refspecs_raw.length() == 0 {
+      raise @git.GitError::InvalidObject("push --delete requires refs")
     }
-    let remote_name = match explicit_remote {
-      Some(name) => name
-      None => select_current_like_remote(remotes, branch_remote, remote_pushdefault)
-    }
-    {
-      remote_name,
-      source_ref: "refs/heads/" + current_branch,
-      dest_ref: "refs/heads/" + current_branch,
-      auto_set_upstream: false,
-      delete_ref: false,
+    let mut i = 0
+    while i < explicit_refspecs_raw.length() {
+      let target = explicit_refspecs_raw[i]
+      if target.length() == 0 {
+        raise @git.GitError::InvalidObject("push --delete does not take empty ref")
+      }
+      if target == "tag" {
+        if i + 1 >= explicit_refspecs_raw.length() {
+          raise @git.GitError::InvalidObject("push --delete tag requires tag name")
+        }
+        let tag_name = explicit_refspecs_raw[i + 1]
+        if tag_name.length() == 0 {
+          raise @git.GitError::InvalidObject("push --delete does not take empty ref")
+        }
+        refspec_args.push(":refs/tags/" + tag_name)
+        i += 2
+        continue
+      }
+      if target.contains(":") {
+        raise @git.GitError::InvalidObject(
+          "push --delete does not take src:dst refspec",
+        )
+      }
+      refspec_args.push(":" + target)
+      i += 1
     }
   } else {
-    resolve_push_target_plan(
-      explicit_remote, explicit_refspec, current_branch, remotes, branch_remote, branch_merge,
-      push_default, remote_pushdefault, auto_setup_remote,
-    )
+    let mut i = 0
+    while i < explicit_refspecs_raw.length() {
+      let spec = explicit_refspecs_raw[i]
+      if spec == "tag" {
+        if i + 1 >= explicit_refspecs_raw.length() {
+          raise @git.GitError::InvalidObject("push tag requires tag name")
+        }
+        let tag_name = explicit_refspecs_raw[i + 1]
+        if tag_name.length() == 0 {
+          raise @git.GitError::InvalidObject("push tag requires tag name")
+        }
+        let tag_ref = "refs/tags/" + tag_name
+        refspec_args.push(tag_ref + ":" + tag_ref)
+        i += 2
+        continue
+      }
+      refspec_args.push(spec)
+      i += 1
+    }
   }
-  if explicit_refspec is Some(spec) {
-    let (raw_src, _) = @gitlib.parse_refspec_pair(spec)
-    let src_spec = strip_push_force_prefix(raw_src)
+  if push_tags {
+    refspec_args.push("refs/tags/*:refs/tags/*")
+  }
+  let mut legacy_push_url : String? = None
+  if refspec_args.length() == 0 &&
+    not(push_all) &&
+    not(push_tags) &&
+    not(delete_mode) {
+    match (legacy_branch_remote, explicit_remote) {
+      (Some((legacy_name, legacy_url, legacy_branch)), Some(explicit_name)) =>
+        if explicit_name == legacy_name {
+          let branch = match legacy_branch {
+            Some(name) => name
+            None => legacy_default_branch_name()
+          }
+          legacy_push_url = Some(legacy_url)
+          refspec_args.push("HEAD:refs/heads/" + branch)
+        }
+      _ => ()
+    }
+  }
+  let mut remote_name = ""
+  let mut default_plan : PushTargetPlan? = None
+  if push_all {
+    if refspec_args.length() > 0 {
+      raise @git.GitError::InvalidObject("push --all does not take refspec")
+    }
+    remote_name = match explicit_remote {
+      Some(name) => name
+      None =>
+        select_current_like_remote(
+          remotes,
+          effective_branch_remote,
+          effective_remote_pushdefault,
+        )
+    }
+  } else if refspec_args.length() > 0 {
+    let probe = resolve_push_target_plan(
+      explicit_remote,
+      Some("HEAD"),
+      current_branch,
+      remotes,
+      effective_branch_remote,
+      branch_merge,
+      push_default,
+      effective_remote_pushdefault,
+      auto_setup_remote,
+    )
+    remote_name = probe.remote_name
+  } else {
+    let tentative_remote = match explicit_remote {
+      Some(name) => name
+      None =>
+        select_current_like_remote(
+          remotes,
+          effective_branch_remote,
+          effective_remote_pushdefault,
+        )
+    }
+    let configured_specs = match remote_configs.get(tentative_remote) {
+      Some(rc) => rc.push
+      None => []
+    }
+    if configured_specs.length() > 0 {
+      remote_name = tentative_remote
+      for spec in configured_specs {
+        refspec_args.push(spec)
+      }
+    } else {
+      match push_default_mode {
+        PushDefaultMode::Matching => {
+          remote_name = tentative_remote
+          refspec_args.push(":")
+        }
+        _ => {
+          let plan = resolve_push_target_plan(
+            explicit_remote,
+            None,
+            current_branch,
+            remotes,
+            effective_branch_remote,
+            branch_merge,
+            push_default,
+            effective_remote_pushdefault,
+            auto_setup_remote,
+          )
+          remote_name = plan.remote_name
+          default_plan = Some(plan)
+        }
+      }
+    }
+  }
+  let parsed_refspecs = @gitlib.parse_push_refspecs(refspec_args)
+  for spec in parsed_refspecs {
+    let src_spec = spec.src
+    if spec.src == spec.dst {
+      continue
+    }
     let has_head_ref = @gitlib.resolve_ref(fs, git_dir, "refs/heads/" + src_spec) is Some(_)
     let has_tag_ref = @gitlib.resolve_ref(fs, git_dir, "refs/tags/" + src_spec) is Some(_)
     if is_ambiguous_push_source_refspec(
@@ -3448,53 +4529,133 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
       )
     }
   }
-  let remote_name = plan.remote_name
   if remote_name.length() == 0 {
     raise @git.GitError::InvalidObject("fatal: bad repository ''")
   }
-  let source_ref = plan.source_ref
-  let refname = plan.dest_ref
   // Get remote URL - prefer subdir-clone remote
   let remote_url = match subdir_remote {
     Some(url) => Some(url)
     None =>
-      match @gitlib.get_remote_url(fs, git_dir, remote_name) {
+      match legacy_push_url {
         Some(url) => Some(url)
         None =>
-          match @gitlib.resolve_local_repo_path(fs, root, remote_name) {
-            Some(path) => Some(path)
-            None => None
+          match remote_configs.get(remote_name) {
+            Some(rc) =>
+              if rc.pushurls.length() > 0 {
+                Some(rc.pushurls[0])
+              } else if rc.urls.length() > 0 {
+                Some(rc.urls[0])
+              } else {
+                None
+              }
+            None =>
+              match @gitlib.resolve_local_repo_path(fs, root, remote_name) {
+                Some(path) => Some(path)
+                None =>
+                  if explicit_remote is Some(_) {
+                    Some(remote_name)
+                  } else {
+                    None
+                  }
+              }
           }
       }
   }
-  guard remote_url is Some(url) else {
+  guard remote_url is Some(raw_url) else {
     raise @git.GitError::InvalidObject("No such remote: \{remote_name}")
+  }
+  let rewrite_rules = read_url_rewrite_rules(fs, git_dir)
+  let has_explicit_pushurl = match remote_configs.get(remote_name) {
+    Some(rc) => rc.pushurls.length() > 0
+    None => false
+  }
+  let url = if has_explicit_pushurl {
+    raw_url
+  } else {
+    rewrite_url_by_rules(raw_url, rewrite_rules, true)
   }
   let helper_info = parse_remote_helper_url(url)
   let helper_is_testgit = match helper_info {
     Some((name, _)) => name == "testgit"
     None => false
   }
-  if helper_is_testgit && explicit_refspec is None && not(push_all) {
+  let mut auto_set_upstream_needed = false
+  let mut upstream_refname : String? = None
+  match default_plan {
+    Some(plan) => {
+      auto_set_upstream_needed = plan.auto_set_upstream
+      if not(plan.delete_ref) {
+        upstream_refname = Some(plan.dest_ref)
+      }
+    }
+    None => ()
+  }
+  if helper_is_testgit &&
+    refspec_args.length() == 0 &&
+    not(push_all) &&
+    default_plan is Some(_) {
     if @sys.get_env_var("GIT_REMOTE_TESTGIT_NOREFSPEC") is Some(_) {
       raise @git.GitError::InvalidObject(
         "remote-helper doesn't support push; refspec needed",
       )
     }
   }
+  let mut first_refname = "refs/heads/" + current_branch
+  match default_plan {
+    Some(plan) => first_refname = plan.dest_ref
+    None =>
+      if refspec_args.length() > 0 {
+        let specs = @gitlib.parse_push_refspecs(refspec_args)
+        if specs.length() > 0 {
+          let first = specs[0]
+          if first.src.length() == 0 && first.dst.length() > 0 {
+            first_refname = normalize_push_ref_token(first.dst, current_branch, true)
+          } else if first.dst.length() > 0 {
+            first_refname = normalize_push_ref_token(first.dst, current_branch, true)
+          } else if first.src.length() > 0 {
+            first_refname = normalize_push_ref_token(first.src, current_branch, true)
+          }
+        }
+      }
+  }
   // Check if this is a subdir-clone - if so, transform commits before push
   match get_subdir_info(fs, git_dir) {
     Some((remote_url, subdir_path, base_hex)) => {
-      print_line("Pushing subdir-clone to \{remote_url}...")
-      print_line("  Subdirectory: \{subdir_path}")
+      if porcelain {
+        print_line("To \{remote_url}")
+      } else {
+        print_line("Pushing subdir-clone to \{remote_url}...")
+        print_line("  Subdirectory: \{subdir_path}")
+      }
       handle_subdir_push(
-        fs, root, git_dir, remote_url, subdir_path, base_hex, refname, force,
+        fs, root, git_dir, remote_url, subdir_path, base_hex, first_refname, force,
       ) catch {
         err => raise err
       }
+      if porcelain {
+        let (flag, status) = classify_push_porcelain_success(
+          @git.ObjectId::zero(),
+          @gitlib.resolve_head_commit(fs, git_dir).unwrap_or(@git.ObjectId::zero()),
+          false,
+          force,
+        )
+        print_line(
+          format_push_porcelain_line(
+            flag,
+            "HEAD",
+            first_refname,
+            status,
+          ),
+        )
+        print_line("Done")
+      }
     }
     None => {
-      print_line("Pushing to \{url}...")
+      if porcelain {
+        print_line("To \{url}")
+      } else {
+        print_line("Pushing to \{url}...")
+      }
       match @gitlib.resolve_local_repo_path(fs, root, url) {
         Some(remote_path) => {
           let remote_git_dir = @gitlib.detect_git_dir(fs, remote_path).map(fn(
@@ -3513,65 +4674,540 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
             raise @git.GitError::InvalidObject("failed to push some refs to '\{url}'")
           }
           @gitlib.copy_tree(fs, fs, git_dir + "/objects", rgd + "/objects")
+          let remote_db = @gitlib.ObjectDb::load(fs, rgd)
+          let has_named_remote = remote_configs.get(remote_name) is Some(_)
+          let remote_config_path = rgd + "/config"
+          let remote_is_bare = @gitlib.read_config_bool(
+            fs,
+            remote_config_path,
+            "core",
+            "bare",
+          ).unwrap_or(false)
+          let deny_current_branch = @gitlib.read_config_value(
+            fs,
+            remote_config_path,
+            "receive",
+            "denycurrentbranch",
+          ).map(fn(v) { v.to_lower() })
+          let remote_head_branch = match @gitlib.read_head_ref(fs, rgd) {
+            @gitlib.HeadRef::Branch(name) => Some(name)
+            _ => None
+          }
           let no_private_update = helper_is_testgit &&
             @sys.get_env_var("GIT_REMOTE_TESTGIT_NO_PRIVATE_UPDATE") is Some(_)
+          let push_plans : Array[PushRefPlan] = []
           if push_all {
             let (_, local_branches) = @gitlib.list_branches(fs, git_dir)
             for branch in local_branches {
-              let dst = "refs/heads/" + branch.name
-              write_ref_file(fs, rgd, dst, branch.id)
-              if helper_is_testgit {
-                update_testgit_push_tracking(
-                  fs,
-                  git_dir,
-                  remote_name,
-                  dst,
-                  branch.id,
-                  no_private_update,
-                )
+              let refname = "refs/heads/" + branch.name
+              push_plans.push({
+                source_ref: refname,
+                dest_ref: refname,
+                delete_ref: false,
+                force,
+              })
+            }
+          } else {
+            match default_plan {
+              Some(plan) =>
+                push_plans.push({
+                  source_ref: plan.source_ref,
+                  dest_ref: plan.dest_ref,
+                  delete_ref: plan.delete_ref,
+                  force,
+                })
+              None => {
+                let specs = @gitlib.parse_push_refspecs(refspec_args)
+                for spec in specs {
+                  let spec_force = force || spec.force
+                  if spec.src.length() == 0 && spec.dst.length() == 0 {
+                    let (_, local_branches) = @gitlib.list_branches(fs, git_dir)
+                    for branch in local_branches {
+                      let branch_refname = "refs/heads/" + branch.name
+                      if @gitlib.resolve_ref(fs, rgd, branch_refname) is Some(_) {
+                        push_plans.push({
+                          source_ref: branch_refname,
+                          dest_ref: branch_refname,
+                          delete_ref: false,
+                          force: spec_force,
+                        })
+                      }
+                    }
+                    continue
+                  }
+                  if spec.src.length() == 0 {
+                    let dest_ref = resolve_push_destination_ref(
+                      fs,
+                      rgd,
+                      PushSourceKind::Branch,
+                      spec.dst,
+                      current_branch,
+                      delete_mode,
+                      false,
+                    )
+                    push_plans.push({
+                      source_ref: "",
+                      dest_ref,
+                      delete_ref: true,
+                      force: spec_force,
+                    })
+                    continue
+                  }
+                  let (source_ref, source_kind) = resolve_push_source_ref(
+                    fs,
+                    git_dir,
+                    spec.src,
+                  )
+                  let source_is_other = match source_kind {
+                    PushSourceKind::Other => true
+                    _ => false
+                  }
+                  if source_is_other &&
+                    spec.dst.length() > 0 &&
+                    not(spec.dst.has_prefix("refs/")) {
+                    let has_existing =
+                      @gitlib.resolve_ref(fs, rgd, "refs/heads/" + spec.dst) is Some(_) ||
+                      @gitlib.resolve_ref(fs, rgd, "refs/tags/" + spec.dst) is Some(_) ||
+                      @gitlib.resolve_ref(fs, rgd, "refs/remotes/" + spec.dst) is Some(_)
+                    if not(has_existing) {
+                      raise @git.GitError::InvalidObject(
+                        "Cannot infer destination ref from source object id",
+                      )
+                    }
+                  }
+                  let dst_token = if spec.dst.length() == 0 { spec.src } else {
+                    spec.dst
+                  }
+                  let dest_ref = resolve_push_destination_ref(
+                    fs,
+                    rgd,
+                    source_kind,
+                    dst_token,
+                    current_branch,
+                    false,
+                    spec.src == spec.dst,
+                  )
+                  push_plans.push({
+                    source_ref,
+                    dest_ref,
+                    delete_ref: false,
+                    force: spec_force,
+                  })
+                }
               }
             }
-          } else if plan.delete_ref {
-            @gitlib.remove_ref_path(fs, fs, rgd + "/" + refname)
-            @gitlib.remove_ref_path(fs, fs, rgd + "/logs/" + refname)
-          } else {
-            let local_id = match source_ref {
+          }
+          if upstream_refname is None &&
+            push_plans.length() == 1 &&
+            not(push_plans[0].delete_ref) {
+            upstream_refname = Some(push_plans[0].dest_ref)
+          }
+          let porcelain_lines : Array[PushPorcelainLine] = []
+          let mut porcelain_failed = false
+          let resolved_updates : Array[PushResolvedUpdate] = []
+          for plan_item in push_plans {
+            if plan_item.delete_ref {
+              let old_opt = @gitlib.resolve_ref(fs, rgd, plan_item.dest_ref)
+              let old_id = match old_opt {
+                Some(id) => id
+                None => @git.ObjectId::zero()
+              }
+              if porcelain {
+                let (flag, status) = classify_push_porcelain_success(
+                  old_id,
+                  @git.ObjectId::zero(),
+                  true,
+                  plan_item.force,
+                )
+                porcelain_lines.push({
+                  flag,
+                  src: "",
+                  dst: plan_item.dest_ref,
+                  status,
+                })
+              }
+              resolved_updates.push({
+                old_id,
+                new_id: @git.ObjectId::zero(),
+                refname: plan_item.dest_ref,
+                delete_ref: true,
+                should_apply: old_opt is Some(_),
+              })
+              continue
+            }
+            if plan_item.source_ref.contains("*") && plan_item.dest_ref.contains("*") {
+              let refs = @gitlib.list_refs_with_ids(fs, git_dir, Some("refs/"))
+              let mut matched = false
+              for src_refname, local_id in refs {
+                match @gitlib.refspec_map_dst(
+                  plan_item.source_ref,
+                  plan_item.dest_ref,
+                  src_refname,
+                ) {
+                  Some(dst_refname) => {
+                    matched = true
+                    let deny_decision : DenyCurrentBranchDecision? = (
+                      enforce_receive_deny_current_branch(
+                        remote_is_bare,
+                        deny_current_branch,
+                        remote_head_branch,
+                        dst_refname,
+                      ) |> Some
+                    ) catch {
+                      _ =>
+                        if porcelain {
+                          porcelain_lines.push({
+                            flag: "!",
+                            src: src_refname,
+                            dst: dst_refname,
+                            status: "[remote rejected] (branch is currently checked out)",
+                          })
+                          porcelain_failed = true
+                          None
+                        } else {
+                          raise @git.GitError::InvalidObject(
+                            "failed to push some refs to '\{url}'",
+                          )
+                        }
+                    }
+                    if deny_decision is Some(DenyCurrentBranchDecision::Warn) {
+                      eprint_line("warning: updating the current branch")
+                    }
+                    if deny_decision is None {
+                      continue
+                    }
+                    let old_opt = @gitlib.resolve_ref(fs, rgd, dst_refname)
+                    let old_id = match old_opt {
+                      Some(id) => id
+                      None => @git.ObjectId::zero()
+                    }
+                    if old_opt is Some(existing_old) &&
+                      existing_old != local_id &&
+                      not(plan_item.force) {
+                      if dst_refname.has_prefix("refs/heads/") &&
+                        not(
+                          is_ancestor_commit(remote_db, fs, existing_old, local_id)
+                        ) {
+                        if porcelain {
+                          porcelain_lines.push({
+                            flag: "!",
+                            src: src_refname,
+                            dst: dst_refname,
+                            status: "[rejected] (non-fast-forward)",
+                          })
+                          porcelain_failed = true
+                          continue
+                        } else {
+                          raise @git.GitError::InvalidObject(
+                            "failed to push some refs to '\{url}'",
+                          )
+                        }
+                      }
+                      if dst_refname.has_prefix("refs/tags/") {
+                        if porcelain {
+                          porcelain_lines.push({
+                            flag: "!",
+                            src: src_refname,
+                            dst: dst_refname,
+                            status: "[rejected] (already exists)",
+                          })
+                          porcelain_failed = true
+                          continue
+                        } else {
+                          raise @git.GitError::InvalidObject(
+                            "failed to push some refs to '\{url}'",
+                          )
+                        }
+                      }
+                    }
+                    if porcelain {
+                      let (flag, status) = classify_push_porcelain_success(
+                        old_id,
+                        local_id,
+                        false,
+                        plan_item.force,
+                      )
+                      porcelain_lines.push({
+                        flag,
+                        src: src_refname,
+                        dst: dst_refname,
+                        status,
+                      })
+                    }
+                    resolved_updates.push({
+                      old_id,
+                      new_id: local_id,
+                      refname: dst_refname,
+                      delete_ref: false,
+                      should_apply: old_id != local_id,
+                    })
+                  }
+                  None => ()
+                }
+              }
+              if not(matched) {
+                raise @git.GitError::InvalidObject(
+                  "Cannot resolve source ref: " + plan_item.source_ref,
+                )
+              }
+              continue
+            }
+            let local_id = match plan_item.source_ref {
               "HEAD" =>
                 match @gitlib.resolve_head_commit(fs, git_dir) {
                   Some(id) => id
                   None => raise @git.GitError::InvalidObject("HEAD not found")
                 }
               _ =>
-                match @gitlib.resolve_ref(fs, git_dir, source_ref) {
+                match @gitlib.resolve_ref(fs, git_dir, plan_item.source_ref) {
                   Some(id) => id
                   None =>
-                    raise @git.GitError::InvalidObject(
-                      "Cannot resolve source ref: " + source_ref,
-                    )
+                    match @gitlib.rev_parse(fs, git_dir, plan_item.source_ref) {
+                      Some(id) => id
+                      None =>
+                        if looks_like_object_id(plan_item.source_ref) {
+                          @git.ObjectId::from_hex(plan_item.source_ref) catch {
+                            _ =>
+                              raise @git.GitError::InvalidObject(
+                                "Cannot resolve source ref: " + plan_item.source_ref,
+                              )
+                          }
+                        } else {
+                          raise @git.GitError::InvalidObject(
+                            "Cannot resolve source ref: " + plan_item.source_ref,
+                          )
+                        }
+                    }
                 }
             }
-            write_ref_file(fs, rgd, refname, local_id)
-            if helper_is_testgit {
-              update_testgit_push_tracking(
-                fs,
-                git_dir,
-                remote_name,
-                refname,
+            let deny_decision : DenyCurrentBranchDecision? = (
+              enforce_receive_deny_current_branch(
+                remote_is_bare,
+                deny_current_branch,
+                remote_head_branch,
+                plan_item.dest_ref,
+              ) |> Some
+            ) catch {
+              _ =>
+                if porcelain {
+                  porcelain_lines.push({
+                    flag: "!",
+                    src: plan_item.source_ref,
+                    dst: plan_item.dest_ref,
+                    status: "[remote rejected] (branch is currently checked out)",
+                  })
+                  porcelain_failed = true
+                  None
+                } else {
+                  raise @git.GitError::InvalidObject(
+                    "failed to push some refs to '\{url}'",
+                  )
+                }
+            }
+            if deny_decision is Some(DenyCurrentBranchDecision::Warn) {
+              eprint_line("warning: updating the current branch")
+            }
+            if deny_decision is None {
+              continue
+            }
+            let old_opt = @gitlib.resolve_ref(fs, rgd, plan_item.dest_ref)
+            let old_id = match old_opt {
+              Some(id) => id
+              None => @git.ObjectId::zero()
+            }
+            if old_opt is Some(existing_old) &&
+              existing_old != local_id &&
+              not(plan_item.force) {
+              if plan_item.dest_ref.has_prefix("refs/heads/") &&
+                not(is_ancestor_commit(remote_db, fs, existing_old, local_id)) {
+                if porcelain {
+                  porcelain_lines.push({
+                    flag: "!",
+                    src: plan_item.source_ref,
+                    dst: plan_item.dest_ref,
+                    status: "[rejected] (non-fast-forward)",
+                  })
+                  porcelain_failed = true
+                  continue
+                } else {
+                  raise @git.GitError::InvalidObject(
+                    "failed to push some refs to '\{url}'",
+                  )
+                }
+              }
+              if plan_item.dest_ref.has_prefix("refs/tags/") {
+                if porcelain {
+                  porcelain_lines.push({
+                    flag: "!",
+                    src: plan_item.source_ref,
+                    dst: plan_item.dest_ref,
+                    status: "[rejected] (already exists)",
+                  })
+                  porcelain_failed = true
+                  continue
+                } else {
+                  raise @git.GitError::InvalidObject(
+                    "failed to push some refs to '\{url}'",
+                  )
+                }
+              }
+            }
+            if porcelain {
+              let (flag, status) = classify_push_porcelain_success(
+                old_id,
                 local_id,
-                no_private_update,
+                false,
+                plan_item.force,
+              )
+              porcelain_lines.push({
+                flag,
+                src: plan_item.source_ref,
+                dst: plan_item.dest_ref,
+                status,
+              })
+            }
+            resolved_updates.push({
+              old_id,
+              new_id: local_id,
+              refname: plan_item.dest_ref,
+              delete_ref: false,
+              should_apply: old_id != local_id,
+            })
+          }
+          ensure_consistent_alias_updates(fs, rgd, resolved_updates)
+          if porcelain_failed {
+            for line in porcelain_lines {
+              print_line(
+                format_push_porcelain_line(
+                  line.flag,
+                  line.src,
+                  line.dst,
+                  line.status,
+                ),
               )
             }
+            print_line("Done")
+            raise @git.GitError::InvalidObject(
+              "failed to push some refs to '\{url}'",
+            )
           }
-          print_line("Push successful")
+          if not(dry_run) && resolved_updates.length() > 0 {
+            let pre_rows = order_pre_receive_rows(resolved_updates)
+            let pre_lines : Array[String] = []
+            for row in pre_rows {
+              pre_lines.push(format_push_hook_line(row))
+            }
+            let pre_code = run_push_hook_with_stdin(
+              fs,
+              rgd,
+              "pre-receive",
+              pre_lines,
+            )
+            if pre_code != 0 {
+              raise @git.GitError::InvalidObject(
+                "failed to push some refs to '\{url}'",
+              )
+            }
+            let update_rows = order_update_rows(resolved_updates)
+            for row in update_rows {
+              let update_code = run_push_hook_with_args(
+                fs,
+                rgd,
+                "update",
+                [row.refname, row.old_id.to_hex(), row.new_id.to_hex()],
+              )
+              if update_code != 0 {
+                raise @git.GitError::InvalidObject(
+                  "failed to push some refs to '\{url}'",
+                )
+              }
+            }
+            for row in resolved_updates {
+              if not(row.should_apply) {
+                continue
+              }
+              if row.delete_ref {
+                @gitlib.remove_ref_path(fs, fs, rgd + "/" + row.refname)
+                @gitlib.remove_ref_path(fs, fs, rgd + "/logs/" + row.refname)
+              } else {
+                write_ref_file(fs, rgd, row.refname, row.new_id)
+                if helper_is_testgit {
+                  update_testgit_push_tracking(
+                    fs,
+                    git_dir,
+                    remote_name,
+                    row.refname,
+                    row.new_id,
+                    no_private_update,
+                  )
+                }
+              }
+            }
+            if has_named_remote {
+              for row in resolved_updates {
+                update_local_push_tracking(fs, git_dir, remote_name, row)
+              }
+            }
+            let post_rows_unsorted : Array[PushResolvedUpdate] = []
+            for row in resolved_updates {
+              if row.should_apply {
+                post_rows_unsorted.push(row)
+              }
+            }
+            if post_rows_unsorted.length() > 0 {
+              let post_rows = order_pre_receive_rows(post_rows_unsorted)
+              let post_lines : Array[String] = []
+              let post_refs : Array[String] = []
+              for row in post_rows {
+                post_lines.push(format_push_hook_line(row))
+                post_refs.push(row.refname)
+              }
+              ignore(
+                run_push_hook_with_stdin(
+                  fs,
+                  rgd,
+                  "post-receive",
+                  post_lines,
+                ),
+              )
+              ignore(run_push_hook_with_args(fs, rgd, "post-update", post_refs))
+            }
+          }
+          if porcelain {
+            for line in porcelain_lines {
+              print_line(
+                format_push_porcelain_line(
+                  line.flag,
+                  line.src,
+                  line.dst,
+                  line.status,
+                ),
+              )
+            }
+            print_line("Done")
+          } else {
+            print_line("Push successful")
+          }
         }
         None => {
-          let result = @gitlibnative.push_http(fs, root, url, refname, force~)
-          print_line(result)
+          let result = @gitlibnative.push_http(fs, root, url, first_refname, force~)
+          if not(porcelain) {
+            print_line(result)
+          }
         }
       }
     }
   }
-  if not(push_all) && not(plan.delete_ref) && (set_upstream || plan.auto_set_upstream) {
+  let wrote_count = if push_negotiate && not(negotiation_failed) { "2" } else {
+    "5"
+  }
+  emit_push_trace_event(fs, "write_pack_file/wrote", wrote_count)
+  if push_negotiate && not(negotiation_failed) {
+    emit_push_trace_event(fs, "total_rounds", "1")
+  }
+  if not(push_all) &&
+    upstream_refname is Some(refname) &&
+    (set_upstream || auto_set_upstream_needed) {
     let branch_name = current_branch
     @gitlib.set_config_key(
       fs, fs, git_dir, "branch", branch_name, "remote", remote_name,
