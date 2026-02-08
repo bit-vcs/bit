@@ -61,6 +61,25 @@ test "rev-parse: HEAD^ parent reference" {
 }
 
 ///|
+test "rev-parse: @ and @^ aliases HEAD" {
+  let fs = setup_rev_repo()
+  fs.write_string("/repo/a.txt", "first\n")
+  add_paths(fs, fs, "/repo", ["a.txt"])
+  let first = commit(
+    fs, fs, "/repo", "first\n", "Test <test@example.com>", 1700000000L,
+  )
+  fs.write_string("/repo/a.txt", "second\n")
+  add_paths(fs, fs, "/repo", ["a.txt"])
+  let second = commit(
+    fs, fs, "/repo", "second\n", "Test <test@example.com>", 1700000001L,
+  )
+  let at = rev_parse(fs, "/repo/.git", "@")
+  let at_parent = rev_parse(fs, "/repo/.git", "@^")
+  assert_eq(at.unwrap().to_hex(), second.to_hex())
+  assert_eq(at_parent.unwrap().to_hex(), first.to_hex())
+}
+
+///|
 test "rev-parse: HEAD^^ and HEAD~2 are equivalent" {
   let fs = setup_rev_repo()
   // Three commits

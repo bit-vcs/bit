@@ -212,11 +212,16 @@ fn resolve_base_ref(
   git_dir : String,
   spec : String,
 ) -> @git.ObjectId? raise @git.GitError {
-  if spec == "HEAD" || spec == "" {
+  if spec == "HEAD" || spec == "" || spec == "@" {
     return resolve_head_commit(fs, git_dir)
   }
   if spec.has_prefix("refs/") {
     return resolve_ref(fs, git_dir, spec)
+  }
+  if spec.has_prefix("heads/") ||
+    spec.has_prefix("tags/") ||
+    spec.has_prefix("remotes/") {
+    return resolve_ref(fs, git_dir, "refs/" + spec)
   }
   if spec.length() == 40 && is_hex_string(spec) {
     match @git.ObjectId::from_hex(spec) {
