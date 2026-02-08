@@ -54,7 +54,7 @@ allowlist で残っている 5 テスト:
 - [x] t9211-scalar-clone.sh
 - [x] t9350-fast-export.sh
 - [x] t9850-shell.sh
-- [ ] t9902-completion.sh
+- [x] t9902-completion.sh
 
 ## Tier 2: Agent Features (High)
 
@@ -81,6 +81,18 @@ allowlist で残っている 5 テスト:
 - [ ] bit mount / bit jj / .bitignore / BIT~ 環境変数
 
 ## 完了した項目
+
+### ✅ t9902 completion known-breakage 解消 (2026-02-08)
+
+- `tools/git-patches/t9902-completion-known-breakage.patch` 追加:
+  - `contrib/completion/git-completion.bash`:
+    - `~` を含むパス補完時に `--others` 検索用パスを正規化しつつ、表示プレフィックスは `~/...` を維持
+    - `__git_complete_remote_or_refspec` で `git push <remote> -d/--delete` の後置オプションも解釈
+  - `t/t9902-completion.sh`:
+    - 3件の `test_expect_failure` を `test_expect_success` に更新
+    - `tilde expansion` テストは `~/tmp/subdir/` を使うようにしてハーネス生成ファイル混入を回避
+- 検証:
+  - `just git-t-one t9902-completion.sh` => `failed 0 / broken 0`
 
 ### ✅ t9850 git-shell 互換実装 (2026-02-08)
 
@@ -385,21 +397,6 @@ GitHub/GitLab に依存しない、Git ネイティブな Pull Request システ
 - [ ] **Step 5: 同期 (sync.mbt)**
   - push, fetch
   - conflict resolution
-
-### ファイル構成
-
-```
-src/x/collab/
-├── moon.pkg.json
-├── types.mbt          # 型定義
-├── format.mbt         # シリアライズ/デシリアライズ
-├── pr.mbt             # PrSystem, create/list/show/close
-├── comment.mbt        # コメント操作
-├── review.mbt         # レビュー操作
-├── merge.mbt          # PR マージ
-├── sync.mbt           # fetch/push 同期
-└── pr_test.mbt        # テスト
-```
 
 ### 検証方法
 

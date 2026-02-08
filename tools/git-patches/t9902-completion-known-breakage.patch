@@ -1,0 +1,102 @@
+diff --git a/contrib/completion/git-completion.bash b/contrib/completion/git-completion.bash
+index 538dff1ee5..eeadf6835c 100644
+--- a/contrib/completion/git-completion.bash
++++ b/contrib/completion/git-completion.bash
+@@ -638,19 +638,23 @@ __git_ls_files_helper ()
+ }
+ 
+ 
+-# __git_index_files accepts 1 or 2 arguments:
++# __git_index_files accepts 1 to 4 arguments:
+ # 1: Options to pass to ls-files (required).
+ # 2: A directory path (optional).
+ #    If provided, only files within the specified directory are listed.
+ #    Sub directories are never recursed.  Path must have a trailing
+ #    slash.
+ # 3: List only paths matching this path component (optional).
++# 4: Prefix to use in completion output (optional; defaults to arg #2).
+ __git_index_files ()
+ {
+-	local root="$2" match="$3"
++	local root="$2" match="$3" out_pfx="$2"
++	if [ -n "${4-}" ]; then
++		out_pfx="$4"
++	fi
+ 
+ 	__git_ls_files_helper "$root" "$1" "${match:-?}" |
+-	awk -F / -v pfx="${2//\\/\\\\}" '{
++	awk -F / -v pfx="${out_pfx//\\/\\\\}" '{
+ 		paths[$1] = 1
+ 	}
+ 	END {
+@@ -727,7 +731,7 @@ __git_index_files ()
+ # The exception is --committable, which finds the files appropriate commit.
+ __git_complete_index_file ()
+ {
+-	local dequoted_word pfx="" cur_
++	local dequoted_word pfx="" cur_ path_pfx
+ 
+ 	__git_dequote "$cur"
+ 
+@@ -740,7 +744,14 @@ __git_complete_index_file ()
+ 		cur_="$dequoted_word"
+ 	esac
+ 
+-	__gitcomp_file_direct "$(__git_index_files "$1" "$pfx" "$cur_")"
++	path_pfx="$pfx"
++	case "$path_pfx" in
++	\~/*)
++		path_pfx="$HOME/${path_pfx#\~/}"
++		;;
++	esac
++
++	__gitcomp_file_direct "$(__git_index_files "$1" "$path_pfx" "$cur_" "$pfx")"
+ }
+ 
+ # Lists branches from the local repository.
+@@ -1177,7 +1188,13 @@ __git_complete_remote_or_refspec ()
+ 			;;
+ 		--multiple) no_complete_refspec=1; break ;;
+ 		-*) ;;
+-		*) remote="$i"; break ;;
++		*)
++			if [ -z "$remote" ]; then
++				remote="$i"
++			else
++				break
++			fi
++			;;
+ 		esac
+ 		((c++))
+ 	done
+diff --git a/t/t9902-completion.sh b/t/t9902-completion.sh
+index 964e1f1569..967284ad9c 100755
+--- a/t/t9902-completion.sh
++++ b/t/t9902-completion.sh
+@@ -2926,13 +2926,14 @@ test_expect_success 'completion without explicit _git_xxx function' '
+ 	EOF
+ '
+ 
+-test_expect_failure 'complete with tilde expansion' '
++test_expect_success 'complete with tilde expansion' '
+ 	git init tmp && cd tmp &&
+ 	test_when_finished "cd .. && rm -rf tmp" &&
+ 
+-	touch ~/tmp/file &&
++	mkdir -p ~/tmp/subdir &&
++	touch ~/tmp/subdir/file &&
+ 
+-	test_completion "git add ~/tmp/" "~/tmp/file"
++	test_completion "git add ~/tmp/subdir/" "~/tmp/subdir/file"
+ '
+ 
+ test_expect_success 'setup other remote for remote reference completion' '
+@@ -2956,7 +2957,7 @@ do
+ 		test_cmp expected out
+ 	'
+ 
+-	test_expect_failure "__git_complete_remote_or_refspec - push other $flag" '
++	test_expect_success "__git_complete_remote_or_refspec - push other $flag" '
+ 		sed -e "s/Z$//" >expected <<-EOF &&
+ 		main-in-other Z
+ 		EOF
