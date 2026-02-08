@@ -1498,14 +1498,6 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
 
 ///|
 async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
-  match real_git_path() {
-    Some(real_git) => {
-      let real_args = real_git_args_from_cli()
-      let code = @process.run(real_git, real_args, inherit_env=true)
-      @sys.exit(code)
-    }
-    None => ()
-  }
   let root = get_work_root()
   let git_dir = root + "/.git"
   let fs = OsFs::new()

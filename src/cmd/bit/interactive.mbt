@@ -9,29 +9,27 @@ fn has_interactive_add_flag(args : Array[String]) -> Bool {
 }
 
 ///|
-fn resolve_real_git_binary() -> String? {
-  match real_git_path() {
-    Some(path) => Some(path)
-    None => if real_git_strict_enabled() { None } else { Some("git") }
+fn normalize_add_interactive_args(args : Array[String]) -> Array[String] {
+  let normalized : Array[String] = []
+  for arg in args {
+    if arg == "-p" || arg == "--patch" {
+      continue
+    }
+    normalized.push(arg)
   }
+  if normalized.length() == 0 {
+    normalized.push("-A")
+  }
+  normalized
 }
 
 ///|
 async fn default_add_interactive_runner(args : Array[String]) -> Int {
-  let real_args : Array[String] = ["add"]
-  for arg in args {
-    real_args.push(arg)
+  let add_args = normalize_add_interactive_args(args)
+  handle_add(add_args) catch {
+    _ => return 1
   }
-  match resolve_real_git_binary() {
-    Some(bin) => {
-      trace_real_git_exec(bin, real_args)
-      @process.run(bin, real_args, inherit_env=true)
-    }
-    None => {
-      eprint_line("fatal: interactive add requires real git")
-      1
-    }
-  }
+  0
 }
 
 ///|

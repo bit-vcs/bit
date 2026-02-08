@@ -4,16 +4,6 @@ fn shim_cwd_from_env() -> String? {
 }
 
 ///|
-fn real_git_args_from_cli() -> Array[String] {
-  let cli = @sys.get_cli_args()
-  let out : Array[String] = []
-  for i in 1..<cli.length() {
-    out.push(cli[i])
-  }
-  out
-}
-
-///|
 fn resolve_in_cwd(path : String) -> String {
   let base = match shim_cwd_from_env() {
     Some(cwd) => Some(cwd)
