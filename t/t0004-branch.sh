@@ -2,7 +2,7 @@
 #
 # Test git branch operations: branch, checkout, switch
 
-source "$(dirname "$0")/test-lib.sh"
+source "$(dirname "$0")/test-lib-e2e.sh"
 
 test_expect_success 'git branch lists branches' '
     git_cmd init &&

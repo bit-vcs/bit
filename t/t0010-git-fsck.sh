@@ -2,7 +2,7 @@
 #
 # Verify repositories modified by bit are still valid for git
 
-source "$(dirname "$0")/test-lib.sh"
+source "$(dirname "$0")/test-lib-e2e.sh"
 
 test_expect_success 'git fsck passes after merge and reset' '
     git_cmd init &&

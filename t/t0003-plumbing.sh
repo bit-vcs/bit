@@ -2,7 +2,7 @@
 #
 # Test git plumbing commands: cat-file, ls-files, hash-object, etc.
 
-source "$(dirname "$0")/test-lib.sh"
+source "$(dirname "$0")/test-lib-e2e.sh"
 
 test_expect_success 'git hash-object computes sha1' '
     git_cmd init &&

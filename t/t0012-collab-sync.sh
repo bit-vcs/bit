@@ -2,7 +2,7 @@
 #
 # e2e: collab sync between two clones over Smart HTTP
 
-source "$(dirname "$0")/test-lib.sh"
+source "$(dirname "$0")/test-lib-e2e.sh"
 
 TEST_COUNT=1
 PASS_COUNT=0

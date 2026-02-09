@@ -2,7 +2,7 @@
 #
 # Test git init command
 
-source "$(dirname "$0")/test-lib.sh"
+source "$(dirname "$0")/test-lib-e2e.sh"
 
 test_expect_success 'git init creates .git directory' '
     git_cmd init &&

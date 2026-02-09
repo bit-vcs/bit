@@ -2,7 +2,7 @@
 #
 # Regression tests for clone modes and submodule update
 
-source "$(dirname "$0")/test-lib.sh"
+source "$(dirname "$0")/test-lib-e2e.sh"
 
 test_expect_success 'clone preserves symlink and exec modes' '
     mkdir src &&

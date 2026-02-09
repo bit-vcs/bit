@@ -2,7 +2,7 @@
 #
 # Test --no-git-fallback behavior
 
-source "$(dirname "$0")/test-lib.sh"
+source "$(dirname "$0")/test-lib-e2e.sh"
 
 test_expect_failure 'unsupported command fails with --no-git-fallback' '
     git_cmd init &&

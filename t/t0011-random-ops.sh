@@ -2,7 +2,7 @@
 #
 # Randomized operation log applied to git and bit, compare trees and fsck
 
-source "$(dirname "$0")/test-lib.sh"
+source "$(dirname "$0")/test-lib-e2e.sh"
 
 LCG_STATE=0
 RAND_VALUE=0

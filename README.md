@@ -104,8 +104,8 @@ Full upstream run (`just git-t`) summary on macOS (2026-02-07):
 
 - `just check`: pass
 - `just test`: pass (`js/lib 215 pass`, `native 724 pass`)
-- `just e2e`: pass
-- `just test-subdir`: pass
+- `just e2e` (`t/run-tests.sh t00`): pass
+- `just test-subdir` (`t/run-tests.sh t900`): pass
 - `just git-t-allowlist`: pass (`success 24,274 / failed 0 / broken 177`)
 
 ## Environment Variables

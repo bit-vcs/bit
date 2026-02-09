@@ -64,13 +64,13 @@ uninstall:
     @rm -f ~/.local/bin/bit
     @echo "Removed ~/.local/bin/bit"
 
-# Run e2e tests (bit integration tests)
+# Run t00xx integration tests (legacy e2e set)
 e2e:
     bash e2e/run-tests.sh
 
 # Run subdir-clone/push integration tests (t/ directory)
 test-subdir:
-    @bash t/run-tests.sh
+    @bash t/run-tests.sh t900
 
 # Pre-release check
 release-check: fmt info check test e2e

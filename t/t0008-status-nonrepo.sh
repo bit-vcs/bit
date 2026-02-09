@@ -2,7 +2,7 @@
 #
 # Regression tests for status outside repo
 
-source "$(dirname "$0")/test-lib.sh"
+source "$(dirname "$0")/test-lib-e2e.sh"
 
 test_expect_success 'status in non-repo shows friendly error' '
     mkdir outside &&

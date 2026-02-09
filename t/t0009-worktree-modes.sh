@@ -2,7 +2,7 @@
 #
 # Regression tests for worktree mode/symlink changes
 
-source "$(dirname "$0")/test-lib.sh"
+source "$(dirname "$0")/test-lib-e2e.sh"
 
 test_expect_success 'status/diff detect exec bit and symlink changes' '
     git_cmd init >/dev/null &&

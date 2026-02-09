@@ -2,7 +2,7 @@
 #
 # Test pack-related commands: receive-pack, upload-pack, etc.
 
-source "$(dirname "$0")/test-lib.sh"
+source "$(dirname "$0")/test-lib-e2e.sh"
 
 test_expect_success 'receive-pack -h shows usage and exits 129' '
     output=$(git_cmd receive-pack -h 2>&1 || true) &&

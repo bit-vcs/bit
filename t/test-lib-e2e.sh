@@ -1,6 +1,6 @@
 #!/bin/bash
-# Simple test framework for moongit e2e tests
-# Usage: source test-lib.sh
+# Simple test framework for bit t00xx integration tests (legacy e2e)
+# Usage: source test-lib-e2e.sh
 
 set -e
 

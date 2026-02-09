@@ -8,11 +8,17 @@ This directory contains shell-based integration tests for bit, following the Git
 # Run all tests
 ./t/run-tests.sh
 
+# Run legacy e2e subset (t00xx)
+./t/run-tests.sh t00
+
+# Run subdir-focused subset (t900x)
+./t/run-tests.sh t900
+
 # Run a single test
 ./t/t9000-subdir-clone.sh
 
 # Run with verbose output
-BIT_TEST_VERBOSE=1 ./t/t9000-subdir-clone.sh
+./t/run-tests.sh -v t9000
 
 # Keep trash directories for debugging
 BIT_TEST_KEEP_TRASH=1 ./t/t9000-subdir-clone.sh
@@ -22,6 +28,7 @@ BIT_TEST_KEEP_TRASH=1 ./t/t9000-subdir-clone.sh
 
 Tests are numbered in the format `tNNNN-description.sh`:
 
+- `t00xx` - Legacy e2e/integration scenarios (migrated from `e2e/`)
 - `t0xxx` - Basic functionality
 - `t1xxx` - Object handling
 - `t2xxx` - Index operations
@@ -31,7 +38,12 @@ Tests are numbered in the format `tNNNN-description.sh`:
 
 ## Writing Tests
 
-Tests use `test-lib.sh` which provides:
+Tests use two helper libs:
+
+- `test-lib.sh` for git-style shell integration tests (`t1xxx`, `t3xxx`, `t9xxx`, etc.)
+- `test-lib-e2e.sh` for the migrated `t000x` scenarios (`git_cmd`, isolated temp dir per case)
+
+Common helpers include:
 
 - `test_expect_success 'description' 'commands'` - Run a test
 - `test_expect_failure 'description' 'commands'` - Expect failure
