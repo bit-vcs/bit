@@ -197,6 +197,47 @@ pub fn Collab::close_issue(
 }
 
 ///|
+/// Reopen a closed Issue
+pub fn Collab::reopen_issue(
+  self : Collab,
+  objects : &@lib.ObjectStore,
+  refs : &@lib.RefStore,
+  clock : &@lib.Clock,
+  issue_id : String,
+) -> Unit raise @git.GitError {
+  let issue = self.get_issue(objects, issue_id)
+  guard issue is Some(existing) else {
+    raise @git.GitError::InvalidObject("Issue not found: \{issue_id}")
+  }
+  if existing.state != IssueState::Closed {
+    raise @git.GitError::InvalidObject("Issue is not closed: \{issue_id}")
+  }
+  let updated = Issue::new(
+    existing.id,
+    existing.title,
+    existing.body,
+    existing.author,
+    existing.created_at,
+    clock.now(),
+    IssueState::Open,
+    labels=existing.labels,
+    assignees=existing.assignees,
+    linked_prs=existing.linked_prs,
+  )
+  ignore(
+    self.store.put_record(
+      objects,
+      refs,
+      clock,
+      issue_meta_key(issue_id),
+      "issue",
+      updated.serialize(),
+      existing.author,
+    ),
+  )
+}
+
+///|
 /// Add a comment to an Issue
 pub fn Collab::add_issue_comment(
   self : Collab,

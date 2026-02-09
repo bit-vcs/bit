@@ -288,6 +288,51 @@ pub fn Collab::close_pr(
 }
 
 ///|
+/// Reopen a closed Pull Request
+pub fn Collab::reopen_pr(
+  self : Collab,
+  objects : &@lib.ObjectStore,
+  refs : &@lib.RefStore,
+  clock : &@lib.Clock,
+  pr_id : String,
+) -> Unit raise @git.GitError {
+  let pr = self.get_pr(objects, pr_id)
+  guard pr is Some(existing) else {
+    raise @git.GitError::InvalidObject("PR not found: \{pr_id}")
+  }
+  if existing.state != PrState::Closed {
+    raise @git.GitError::InvalidObject("PR is not closed: \{pr_id}")
+  }
+  let updated = PullRequest::new(
+    existing.id,
+    existing.title,
+    existing.body,
+    existing.source_branch,
+    existing.source_commit,
+    existing.target_branch,
+    existing.target_commit,
+    existing.author,
+    existing.created_at,
+    clock.now(),
+    PrState::Open,
+    existing.labels,
+    source_repo=existing.source_repo,
+    source_ref=existing.source_ref,
+  )
+  ignore(
+    self.store.put_record(
+      objects,
+      refs,
+      clock,
+      pr_meta_key(pr_id),
+      "pr",
+      updated.serialize(),
+      existing.author,
+    ),
+  )
+}
+
+///|
 fn generate_entity_id(
   kind : String,
   author : String,

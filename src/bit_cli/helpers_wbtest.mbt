@@ -210,3 +210,21 @@ test "main: parse_global_options resolves -C relative path without GIT_SHIM_PWD"
     None => @sys.unset_env_var("GIT_SHIM_PWD")
   }
 }
+
+///|
+async test "main: show_command_help supports pr alias" {
+  let ok = show_command_help("pr")
+  assert_true(ok)
+}
+
+///|
+async test "main: show_command_help supports issue alias" {
+  let ok = show_command_help("issue")
+  assert_true(ok)
+}
+
+///|
+async test "main: show_command_help supports hub command" {
+  let ok = show_command_help("hub")
+  assert_true(ok)
+}

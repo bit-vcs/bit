@@ -49,7 +49,9 @@ async fn show_help() -> Unit {
     #|   worktree    Manage multiple working trees
     #|
     #|experimental
-    #|   collab       Manage pull requests and issues
+    #|   hub          Manage pull requests and issues
+    #|   pr           Shortcut for 'hub pr' (gh-like)
+    #|   issue        Shortcut for 'hub issue' (gh-like)
     #|   agent        P2P agent for automated PR collaboration
     #|   subdir-clone  Clone subdirectory as independent repository
     #|   hq            ghq-compatible repository management (~/bhq)
@@ -105,8 +107,16 @@ async fn show_command_help(cmd : String) -> Bool {
       show_worktree_help()
       true
     }
-    "collab" => {
+    "hub" | "collab" => {
       print_collab_usage()
+      true
+    }
+    "pr" => {
+      print_collab_pr_usage()
+      true
+    }
+    "issue" => {
+      print_collab_issue_usage()
       true
     }
     "agent" => {
@@ -940,7 +950,9 @@ async fn dispatch_known_command(
     "mv" => handle_mv(rest)
     "config" => handle_config(rest)
     "subdir-clone" => handle_subdir_clone(rest)
-    "collab" => handle_collab(rest)
+    "hub" | "collab" => handle_collab(rest)
+    "pr" => handle_collab_pr(rest)
+    "issue" => handle_collab_issue(rest)
     "agent" => handle_agent(rest)
     "hq" => handle_hq(rest)
     "sparse-checkout" => handle_sparse_checkout(rest)

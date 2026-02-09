@@ -31,6 +31,23 @@ test "collab parser: parse_review_verdict handles known and unknown values" {
 }
 
 ///|
+test "collab parser: parse_review_verdict_flag handles gh-style flags" {
+  assert_eq(
+    parse_review_verdict_flag("--approve"),
+    Some(@collab.ReviewVerdict::Approved),
+  )
+  assert_eq(
+    parse_review_verdict_flag("--comment"),
+    Some(@collab.ReviewVerdict::Comment),
+  )
+  assert_eq(
+    parse_review_verdict_flag("--request-changes"),
+    Some(@collab.ReviewVerdict::RequestChanges),
+  )
+  assert_eq(parse_review_verdict_flag("--unknown"), None)
+}
+
+///|
 test "collab parser: parse_merge_strategy handles known and unknown values" {
   match parse_merge_strategy("merge") {
     Some(@collab.PrMergeStrategy::Merge) => ()
@@ -48,6 +65,145 @@ test "collab parser: parse_merge_strategy handles known and unknown values" {
     None => ()
     _ => fail("unexpected strategy")
   }
+}
+
+///|
+test "collab parser: parse_merge_strategy_flag handles gh-style flags" {
+  match parse_merge_strategy_flag("--merge") {
+    Some(@collab.PrMergeStrategy::Merge) => ()
+    _ => fail("expected merge strategy")
+  }
+  match parse_merge_strategy_flag("--squash") {
+    Some(@collab.PrMergeStrategy::Squash) => ()
+    _ => fail("expected squash strategy")
+  }
+  match parse_merge_strategy_flag("--ff") {
+    Some(@collab.PrMergeStrategy::FastForward) => ()
+    _ => fail("expected ff strategy")
+  }
+  match parse_merge_strategy_flag("--unknown") {
+    None => ()
+    _ => fail("unexpected strategy")
+  }
+}
+
+///|
+test "collab parser: normalize pr subcommand handles gh aliases" {
+  assert_eq(normalize_collab_pr_subcommand("view"), "get")
+  assert_eq(normalize_collab_pr_subcommand("edit"), "update")
+  assert_eq(normalize_collab_pr_subcommand("list"), "list")
+}
+
+///|
+test "collab parser: normalize issue subcommand handles gh aliases" {
+  assert_eq(normalize_collab_issue_subcommand("view"), "get")
+  assert_eq(normalize_collab_issue_subcommand("edit"), "update")
+  assert_eq(normalize_collab_issue_subcommand("list"), "list")
+}
+
+///|
+test "collab parser: resolve comment subcommand defaults to add" {
+  assert_eq(resolve_collab_comment_subcommand("add"), "add")
+  assert_eq(resolve_collab_comment_subcommand("list"), "list")
+  assert_eq(resolve_collab_comment_subcommand("123"), "add")
+}
+
+///|
+test "collab parser: resolve review subcommand defaults to submit" {
+  assert_eq(resolve_collab_review_subcommand("submit"), "submit")
+  assert_eq(resolve_collab_review_subcommand("list"), "list")
+  assert_eq(resolve_collab_review_subcommand("123"), "submit")
+}
+
+///|
+test "collab parser: parse_pr_state_flag handles gh-style flags" {
+  assert_eq(parse_pr_state_flag("--open"), Some(@collab.PrState::Open))
+  assert_eq(parse_pr_state_flag("--closed"), Some(@collab.PrState::Closed))
+  assert_eq(parse_pr_state_flag("--merged"), Some(@collab.PrState::Merged))
+  assert_eq(parse_pr_state_flag("--all"), None)
+}
+
+///|
+test "collab parser: parse_issue_state_flag handles gh-style flags" {
+  assert_eq(parse_issue_state_flag("--open"), Some(@collab.IssueState::Open))
+  assert_eq(
+    parse_issue_state_flag("--closed"),
+    Some(@collab.IssueState::Closed),
+  )
+  assert_eq(parse_issue_state_flag("--all"), None)
+}
+
+///|
+test "collab parser: parse_head_branch_name handles symbolic and detached head" {
+  assert_eq(parse_head_branch_name("ref: refs/heads/main\n"), Some("main"))
+  assert_eq(
+    parse_head_branch_name("ref: refs/heads/feature/topic\n"),
+    Some("feature/topic"),
+  )
+  assert_eq(
+    parse_head_branch_name("9fceb02f5f7a6f5a5be74e5f7d2d9d31b2f9f0f5\n"),
+    None,
+  )
+}
+
+///|
+test "collab parser: parse_collab_pr_list_options handles gh-style flags and limit" {
+  let opts = parse_collab_pr_list_options(["--closed", "--limit", "5"])
+  assert_eq(opts.limit, Some(5))
+  match opts.state {
+    Some(@collab.PrState::Closed) => ()
+    _ => fail("expected closed state")
+  }
+  let opts2 = parse_collab_pr_list_options(["-L", "3", "--open"])
+  assert_eq(opts2.limit, Some(3))
+  match opts2.state {
+    Some(@collab.PrState::Open) => ()
+    _ => fail("expected open state")
+  }
+}
+
+///|
+test "collab parser: parse_collab_issue_list_options handles gh-style flags and limit" {
+  let opts = parse_collab_issue_list_options(["--closed", "--limit", "7"])
+  assert_eq(opts.limit, Some(7))
+  match opts.state {
+    Some(@collab.IssueState::Closed) => ()
+    _ => fail("expected closed state")
+  }
+  let opts2 = parse_collab_issue_list_options(["-L", "2", "--open"])
+  assert_eq(opts2.limit, Some(2))
+  match opts2.state {
+    Some(@collab.IssueState::Open) => ()
+    _ => fail("expected open state")
+  }
+}
+
+///|
+test "collab parser: parse_collab_pr_list_options rejects invalid limit" {
+  ignore(
+    parse_collab_pr_list_options(["--limit", "0"]) catch {
+      @git.GitError::InvalidObject(message) => {
+        assert_true(message.contains("Limit must be positive"))
+        return ()
+      }
+      err => fail("unexpected error: \{err.to_string()}")
+    },
+  )
+  fail("expected invalid object error")
+}
+
+///|
+test "collab parser: parse_collab_issue_list_options rejects missing limit value" {
+  ignore(
+    parse_collab_issue_list_options(["-L"]) catch {
+      @git.GitError::InvalidObject(message) => {
+        assert_true(message.contains("--limit requires a value"))
+        return ()
+      }
+      err => fail("unexpected error: \{err.to_string()}")
+    },
+  )
+  fail("expected invalid object error")
 }
 
 ///|
@@ -91,7 +247,7 @@ test "collab dump parser: unknown option fails" {
   ignore(
     parse_collab_dump_options(["--unknown"]) catch {
       @git.GitError::InvalidObject(message) => {
-        assert_true(message.contains("Unknown collab dump option"))
+        assert_true(message.contains("Unknown hub dump option"))
         return ()
       }
       err => fail("unexpected error: \{err.to_string()}")

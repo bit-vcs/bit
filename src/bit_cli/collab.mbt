@@ -120,73 +120,91 @@ fn init_collab_store(
 
 ///|
 fn print_collab_usage() -> Unit {
-  println("Usage: bit collab <subcommand> [<args>]")
+  println("Usage: bit hub <subcommand> [<args>]")
   println("")
   println("Subcommands:")
-  println("  init          Initialize collab metadata")
+  println("  init          Initialize collaboration metadata")
   println("  pr            Manage pull requests")
   println("  issue         Manage issues")
   println("  note          Manage notes")
-  println("  sync          Sync collab refs with remotes")
-  println("  dump          Dump raw collab records from notes")
+  println("  sync          Sync collaboration refs with remotes")
+  println("  dump          Dump raw collaboration records from notes")
   println("  help          Show this help")
   println("")
-  println("Run 'bit collab <subcommand> -h' for details.")
+  println("Run 'bit hub <subcommand> -h' for details.")
 }
 
 ///|
 fn print_collab_pr_usage() -> Unit {
-  println("Usage: bit collab pr <subcommand> [<args>]")
+  println("Usage: bit hub pr <subcommand> [<args>]")
   println("")
   println("Subcommands:")
-  println("  list [--state <open|closed|merged>]")
+  println(
+    "  list [--state <open|closed|merged> | --open | --closed | --merged] [--limit <n>]",
+  )
+  println("  status")
   println(
     "  import [--repo <owner/repo>] [--state <open|closed|merged|all>] [--limit <n>]",
   )
   println("  get <id>")
+  println("  view <id>                             (alias: get)")
   println(
-    "  create --title <title> [--body <body>] --source <branch> --target <branch> [--source-repo <owner/repo>] [--source-ref <ref>]",
+    "  create --title <title> [--body <body>] (--source|--head) <branch> (--target|--base) <branch> [--source-repo <owner/repo>] [--source-ref <ref>]",
   )
   println(
     "  update <id> [--title <title>] [--body <body>] [--label <label>...]",
   )
+  println("  edit <id> ...                         (alias: update)")
   println("  close <id>")
-  println("  merge <id> [--strategy <merge|squash|ff>]")
+  println("  reopen <id>")
+  println("  merge <id> [--strategy <merge|squash|ff>] [--merge|--squash|--ff]")
   println(
     "  comment add <pr-id> --body <body> [--reply-to <id>] [--file <path>] [--line <n>] [--commit <hex>]",
+  )
+  println(
+    "  comment <pr-id> --body <body> ...    (gh-style alias: comment add)",
   )
   println("  comment list <pr-id>")
   println(
     "  review submit <pr-id> --verdict <approved|comment|request-changes> --commit <hex> [--body <body>]",
+  )
+  println(
+    "  review <pr-id> (--approve|--comment|--request-changes|--verdict <v>) --commit <hex> [--body <body>]",
   )
   println("  review list <pr-id>")
 }
 
 ///|
 fn print_collab_issue_usage() -> Unit {
-  println("Usage: bit collab issue <subcommand> [<args>]")
+  println("Usage: bit hub issue <subcommand> [<args>]")
   println("")
   println("Subcommands:")
-  println("  list [--state <open|closed>]")
+  println("  list [--state <open|closed> | --open | --closed] [--limit <n>]")
   println(
     "  import [--repo <owner/repo>] [--state <open|closed|all>] [--limit <n>]",
   )
   println("  get <id>")
+  println("  view <id>                             (alias: get)")
   println(
     "  create --title <title> [--body <body>] [--label <label>...] [--assignee <user>...]",
   )
   println(
     "  update <id> [--title <title>] [--body <body>] [--label <label>...] [--assignee <user>...]",
   )
+  println("  edit <id> ...                         (alias: update)")
   println("  close <id>")
+  println("  reopen <id>")
   println("  comment add <issue-id> --body <body> [--reply-to <id>]")
+  println(
+    "  comment <issue-id> --body <body> ...  (gh-style alias: comment add)",
+  )
   println("  comment list <issue-id>")
   println("  link <issue-id> <pr-id>")
 }
 
 ///|
 fn print_collab_note_usage() -> Unit {
-  println("Usage: bit collab note <subcommand> [<args>]")
+  println("Usage: bit hub note <subcommand> [<args>]")
   println("")
   println("Subcommands:")
   println("  add <commit> [--body <body>] [--ns <name>]")
@@ -197,7 +215,7 @@ fn print_collab_note_usage() -> Unit {
 
 ///|
 fn print_collab_sync_usage() -> Unit {
-  println("Usage: bit collab sync <subcommand> [<args>]")
+  println("Usage: bit hub sync <subcommand> [<args>]")
   println("")
   println("Subcommands:")
   println("  push [<remote-url>]")
@@ -206,7 +224,7 @@ fn print_collab_sync_usage() -> Unit {
 
 ///|
 fn print_collab_dump_usage() -> Unit {
-  println("Usage: bit collab dump [<prefix>] [<options>]")
+  println("Usage: bit hub dump [<prefix>] [<options>]")
   println("")
   println("Options:")
   println("  --prefix <prefix>       Filter by key prefix (default: collab/)")
@@ -232,7 +250,7 @@ async fn handle_collab(args : Array[String]) -> Unit raise Error {
     "sync" => handle_collab_sync(rest)
     "dump" => handle_collab_dump(rest)
     _ => {
-      eprint_line("bit collab: unknown subcommand '\{subcmd}'")
+      eprint_line("bit hub: unknown subcommand '\{subcmd}'")
       print_collab_usage()
       @sys.exit(1)
     }
@@ -243,14 +261,14 @@ async fn handle_collab(args : Array[String]) -> Unit raise Error {
 async fn handle_collab_init(args : Array[String]) -> Unit raise Error {
   for arg in args {
     if arg.has_prefix("-") {
-      warn_unimplemented_arg("collab init", arg)
+      warn_unimplemented_arg("hub init", arg)
     }
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
   let (objects, refs, _clock) = make_collab_stores(git_dir)
   let _ = init_collab_store(objects, refs)
-  print_line("Initialized collab metadata")
+  print_line("Initialized collaboration metadata")
 }
 
 ///|
@@ -259,21 +277,23 @@ async fn handle_collab_pr(args : Array[String]) -> Unit raise Error {
     print_collab_pr_usage()
     return ()
   }
-  let subcmd = args[0]
+  let subcmd = normalize_collab_pr_subcommand(args[0])
   let rest = collect_args(args, 1)
   match subcmd {
     "list" => handle_collab_pr_list(rest)
+    "status" => handle_collab_pr_status(rest)
     "get" => handle_collab_pr_get(rest)
     "import" => handle_collab_pr_import(rest)
     "create" => handle_collab_pr_create(rest)
     "update" => handle_collab_pr_update(rest)
     "close" => handle_collab_pr_close(rest)
+    "reopen" => handle_collab_pr_reopen(rest)
     "merge" => handle_collab_pr_merge(rest)
     "comment" => handle_collab_pr_comment(rest)
     "review" => handle_collab_pr_review(rest)
     "help" | "-h" | "--help" => print_collab_pr_usage()
     _ => {
-      eprint_line("bit collab pr: unknown subcommand '\{subcmd}'")
+      eprint_line("bit hub pr: unknown subcommand '\{subcmd}'")
       print_collab_pr_usage()
       @sys.exit(1)
     }
@@ -281,11 +301,36 @@ async fn handle_collab_pr(args : Array[String]) -> Unit raise Error {
 }
 
 ///|
-async fn handle_collab_pr_list(args : Array[String]) -> Unit raise Error {
+struct CollabPrListOptions {
+  state : @collab.PrState?
+  limit : Int?
+}
+
+///|
+fn parse_positive_list_limit(value : String) -> Int raise @git.GitError {
+  let parsed = @strconv.parse_int(value) catch {
+    _ => raise @git.GitError::InvalidObject("Invalid limit: \{value}")
+  }
+  if parsed <= 0 {
+    raise @git.GitError::InvalidObject("Limit must be positive")
+  }
+  parsed
+}
+
+///|
+fn parse_collab_pr_list_options(
+  args : Array[String],
+) -> CollabPrListOptions raise @git.GitError {
   let mut state : @collab.PrState? = None
+  let mut limit : Int? = None
   let mut i = 0
   while i < args.length() {
     let arg = args[i]
+    if parse_pr_state_flag(arg) is Some(flag_state) {
+      state = Some(flag_state)
+      i += 1
+      continue
+    }
     match arg {
       "--state" if i + 1 < args.length() => {
         let value = args[i + 1]
@@ -299,7 +344,7 @@ async fn handle_collab_pr_list(args : Array[String]) -> Unit raise Error {
       }
       "--state" =>
         raise @git.GitError::InvalidObject(
-          "collab pr list: --state requires a value",
+          "hub pr list: --state requires a value",
         )
       _ if arg.has_prefix("--state=") => {
         let value = String::unsafe_substring(arg, start=8, end=arg.length())
@@ -311,22 +356,102 @@ async fn handle_collab_pr_list(args : Array[String]) -> Unit raise Error {
         i += 1
         continue
       }
-      _ if arg.has_prefix("-") => warn_unimplemented_arg("collab pr list", arg)
-      _ => warn_unimplemented_arg("collab pr list", arg)
+      "--limit" | "-L" if i + 1 < args.length() => {
+        limit = Some(parse_positive_list_limit(args[i + 1]))
+        i += 2
+        continue
+      }
+      "--limit" | "-L" =>
+        raise @git.GitError::InvalidObject(
+          "hub pr list: --limit requires a value",
+        )
+      _ if arg.has_prefix("--limit=") => {
+        let value = String::unsafe_substring(arg, start=8, end=arg.length())
+        limit = Some(parse_positive_list_limit(value))
+        i += 1
+        continue
+      }
+      _ if arg.has_prefix("-") => ()
+      _ => ()
     }
     i += 1
+  }
+  { state, limit }
+}
+
+///|
+async fn handle_collab_pr_list(args : Array[String]) -> Unit raise Error {
+  let options = parse_collab_pr_list_options(args)
+  let root = get_work_root()
+  let git_dir = root + "/.git"
+  let (objects, refs, _clock) = make_collab_stores(git_dir)
+  let collab = load_collab_store(objects, refs)
+  let prs = collab.list_prs(objects, state=options.state)
+  let raw_limit = options.limit.unwrap_or(prs.length())
+  let limit = if raw_limit < prs.length() { raw_limit } else { prs.length() }
+  if limit == 0 {
+    print_line("No pull requests")
+    return ()
+  }
+  let mut i = 0
+  while i < limit {
+    prs[i] |> format_pr_summary |> print_line
+    i += 1
+  }
+}
+
+///|
+async fn handle_collab_pr_status(args : Array[String]) -> Unit raise Error {
+  for arg in args {
+    match arg {
+      "help" | "-h" | "--help" => {
+        print_collab_pr_usage()
+        return ()
+      }
+      _ if arg.has_prefix("-") => warn_unimplemented_arg("hub pr status", arg)
+      _ => warn_unimplemented_arg("hub pr status", arg)
+    }
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
   let (objects, refs, _clock) = make_collab_stores(git_dir)
   let collab = load_collab_store(objects, refs)
-  let prs = collab.list_prs(objects, state~)
-  if prs.length() == 0 {
-    print_line("No pull requests")
+  let open_prs = collab.list_prs(objects, state=Some(@collab.PrState::Open))
+  if open_prs.length() == 0 {
+    print_line("No open pull requests")
     return ()
   }
-  for pr in prs {
-    pr |> format_pr_summary |> print_line
+  let branch_ids : Array[String] = []
+  match detect_current_branch_name(git_dir) {
+    Some(branch) => {
+      print_line("Current branch: \{branch}")
+      let mut branch_count = 0
+      for pr in open_prs {
+        if pr_matches_branch(pr, branch) {
+          branch_ids.push(pr.id())
+          branch_count += 1
+          pr |> format_pr_summary |> print_line
+        }
+      }
+      if branch_count == 0 {
+        print_line("No open pull request for current branch")
+      }
+    }
+    None => print_line("Current branch: (detached HEAD)")
+  }
+  let author = get_author_string()
+  let mut mine_count = 0
+  for pr in open_prs {
+    if pr.author() == author && not(branch_ids.contains(pr.id())) {
+      if mine_count == 0 {
+        print_line("Open pull requests authored by \{author}:")
+      }
+      mine_count += 1
+      pr |> format_pr_summary |> print_line
+    }
+  }
+  if mine_count == 0 {
+    print_line("No open pull requests authored by \{author}")
   }
 }
 
@@ -350,7 +475,7 @@ async fn handle_collab_pr_import(args : Array[String]) -> Unit raise Error {
       }
       "--repo" =>
         raise @git.GitError::InvalidObject(
-          "collab pr import: --repo requires a value",
+          "hub pr import: --repo requires a value",
         )
       _ if arg.has_prefix("--repo=") => {
         repo = Some(String::unsafe_substring(arg, start=7, end=arg.length()))
@@ -364,7 +489,7 @@ async fn handle_collab_pr_import(args : Array[String]) -> Unit raise Error {
       }
       "--state" =>
         raise @git.GitError::InvalidObject(
-          "collab pr import: --state requires a value",
+          "hub pr import: --state requires a value",
         )
       _ if arg.has_prefix("--state=") => {
         state = String::unsafe_substring(arg, start=8, end=arg.length())
@@ -381,7 +506,7 @@ async fn handle_collab_pr_import(args : Array[String]) -> Unit raise Error {
       }
       "--limit" =>
         raise @git.GitError::InvalidObject(
-          "collab pr import: --limit requires a value",
+          "hub pr import: --limit requires a value",
         )
       _ if arg.has_prefix("--limit=") => {
         let value = String::unsafe_substring(arg, start=8, end=arg.length())
@@ -391,9 +516,8 @@ async fn handle_collab_pr_import(args : Array[String]) -> Unit raise Error {
         i += 1
         continue
       }
-      _ if arg.has_prefix("-") =>
-        warn_unimplemented_arg("collab pr import", arg)
-      _ => warn_unimplemented_arg("collab pr import", arg)
+      _ if arg.has_prefix("-") => warn_unimplemented_arg("hub pr import", arg)
+      _ => warn_unimplemented_arg("hub pr import", arg)
     }
     i += 1
   }
@@ -437,13 +561,13 @@ async fn handle_collab_pr_get(args : Array[String]) -> Unit raise Error {
   let mut pr_id : String? = None
   for arg in args {
     if arg.has_prefix("-") {
-      warn_unimplemented_arg("collab pr get", arg)
+      warn_unimplemented_arg("hub pr get", arg)
       continue
     }
     if pr_id is None {
       pr_id = Some(arg)
     } else {
-      warn_unimplemented_arg("collab pr get", arg)
+      warn_unimplemented_arg("hub pr get", arg)
     }
   }
   guard pr_id is Some(id) else {
@@ -504,17 +628,17 @@ async fn handle_collab_pr_create(args : Array[String]) -> Unit raise Error {
         i += 2
         continue
       }
-      "-m" | "--message" | "--body" if i + 1 < args.length() => {
+      "-m" | "-b" | "--message" | "--body" if i + 1 < args.length() => {
         body = Some(args[i + 1])
         i += 2
         continue
       }
-      "--source" if i + 1 < args.length() => {
+      "--source" | "--head" if i + 1 < args.length() => {
         source_branch = Some(args[i + 1])
         i += 2
         continue
       }
-      "--target" if i + 1 < args.length() => {
+      "--target" | "--base" if i + 1 < args.length() => {
         target_branch = Some(args[i + 1])
         i += 2
         continue
@@ -551,9 +675,23 @@ async fn handle_collab_pr_create(args : Array[String]) -> Unit raise Error {
         i += 1
         continue
       }
+      _ if arg.has_prefix("--head=") => {
+        source_branch = Some(
+          String::unsafe_substring(arg, start=7, end=arg.length()),
+        )
+        i += 1
+        continue
+      }
       _ if arg.has_prefix("--target=") => {
         target_branch = Some(
           String::unsafe_substring(arg, start=9, end=arg.length()),
+        )
+        i += 1
+        continue
+      }
+      _ if arg.has_prefix("--base=") => {
+        target_branch = Some(
+          String::unsafe_substring(arg, start=7, end=arg.length()),
         )
         i += 1
         continue
@@ -573,7 +711,7 @@ async fn handle_collab_pr_create(args : Array[String]) -> Unit raise Error {
         continue
       }
       _ if arg.has_prefix("-") => {
-        warn_unimplemented_arg("collab pr create", arg)
+        warn_unimplemented_arg("hub pr create", arg)
         i += 1
         continue
       }
@@ -652,12 +790,12 @@ async fn handle_collab_pr_update(args : Array[String]) -> Unit raise Error {
         i += 2
         continue
       }
-      "-m" | "--message" | "--body" if i + 1 < args.length() => {
+      "-m" | "-b" | "--message" | "--body" if i + 1 < args.length() => {
         body = Some(args[i + 1])
         i += 2
         continue
       }
-      "--label" if i + 1 < args.length() => {
+      "--label" | "-l" if i + 1 < args.length() => {
         labels.push(args[i + 1])
         i += 2
         continue
@@ -683,7 +821,7 @@ async fn handle_collab_pr_update(args : Array[String]) -> Unit raise Error {
         continue
       }
       _ if arg.has_prefix("-") => {
-        warn_unimplemented_arg("collab pr update", arg)
+        warn_unimplemented_arg("hub pr update", arg)
         i += 1
         continue
       }
@@ -691,7 +829,7 @@ async fn handle_collab_pr_update(args : Array[String]) -> Unit raise Error {
         if pr_id is None {
           pr_id = Some(arg)
         } else {
-          warn_unimplemented_arg("collab pr update", arg)
+          warn_unimplemented_arg("hub pr update", arg)
         }
         i += 1
         continue
@@ -727,13 +865,13 @@ async fn handle_collab_pr_close(args : Array[String]) -> Unit raise Error {
   let mut pr_id : String? = None
   for arg in args {
     if arg.has_prefix("-") {
-      warn_unimplemented_arg("collab pr close", arg)
+      warn_unimplemented_arg("hub pr close", arg)
       continue
     }
     if pr_id is None {
       pr_id = Some(arg)
     } else {
-      warn_unimplemented_arg("collab pr close", arg)
+      warn_unimplemented_arg("hub pr close", arg)
     }
   }
   guard pr_id is Some(id) else {
@@ -748,6 +886,35 @@ async fn handle_collab_pr_close(args : Array[String]) -> Unit raise Error {
 }
 
 ///|
+async fn handle_collab_pr_reopen(args : Array[String]) -> Unit raise Error {
+  if args.length() == 0 {
+    print_collab_pr_usage()
+    return ()
+  }
+  let mut pr_id : String? = None
+  for arg in args {
+    if arg.has_prefix("-") {
+      warn_unimplemented_arg("hub pr reopen", arg)
+      continue
+    }
+    if pr_id is None {
+      pr_id = Some(arg)
+    } else {
+      warn_unimplemented_arg("hub pr reopen", arg)
+    }
+  }
+  guard pr_id is Some(id) else {
+    raise @git.GitError::InvalidObject("PR id is required")
+  }
+  let root = get_work_root()
+  let git_dir = root + "/.git"
+  let (objects, refs, clock) = make_collab_stores(git_dir)
+  let collab = init_collab_store(objects, refs)
+  collab.reopen_pr(objects, refs, clock, id)
+  print_line("Reopened PR #\{id}")
+}
+
+///|
 async fn handle_collab_pr_merge(args : Array[String]) -> Unit raise Error {
   if args.length() == 0 {
     print_collab_pr_usage()
@@ -758,7 +925,16 @@ async fn handle_collab_pr_merge(args : Array[String]) -> Unit raise Error {
   let mut i = 0
   while i < args.length() {
     let arg = args[i]
+    if parse_merge_strategy_flag(arg) is Some(flag_strategy) {
+      strategy = Some(flag_strategy)
+      i += 1
+      continue
+    }
     match arg {
+      "--rebase" =>
+        raise @git.GitError::InvalidObject(
+          "Merge strategy 'rebase' is not supported",
+        )
       "--strategy" if i + 1 < args.length() => {
         let value = args[i + 1]
         match parse_merge_strategy(value) {
@@ -784,7 +960,7 @@ async fn handle_collab_pr_merge(args : Array[String]) -> Unit raise Error {
         continue
       }
       _ if arg.has_prefix("-") => {
-        warn_unimplemented_arg("collab pr merge", arg)
+        warn_unimplemented_arg("hub pr merge", arg)
         i += 1
         continue
       }
@@ -792,7 +968,7 @@ async fn handle_collab_pr_merge(args : Array[String]) -> Unit raise Error {
         if pr_id is None {
           pr_id = Some(arg)
         } else {
-          warn_unimplemented_arg("collab pr merge", arg)
+          warn_unimplemented_arg("hub pr merge", arg)
         }
         i += 1
         continue
@@ -832,14 +1008,15 @@ async fn handle_collab_pr_comment(args : Array[String]) -> Unit raise Error {
     print_collab_pr_usage()
     return ()
   }
-  let subcmd = args[0]
-  let rest = collect_args(args, 1)
+  let first = args[0]
+  let subcmd = resolve_collab_comment_subcommand(first)
+  let rest = if subcmd == first { collect_args(args, 1) } else { args }
   match subcmd {
     "add" => handle_collab_pr_comment_add(rest)
     "list" => handle_collab_pr_comment_list(rest)
     "help" | "-h" | "--help" => print_collab_pr_usage()
     _ => {
-      eprint_line("bit collab pr comment: unknown subcommand '\{subcmd}'")
+      eprint_line("bit hub pr comment: unknown subcommand '\{subcmd}'")
       print_collab_pr_usage()
       @sys.exit(1)
     }
@@ -858,7 +1035,7 @@ async fn handle_collab_pr_comment_add(args : Array[String]) -> Unit raise Error 
   while i < args.length() {
     let arg = args[i]
     match arg {
-      "-m" | "--message" | "--body" if i + 1 < args.length() => {
+      "-m" | "-b" | "--message" | "--body" if i + 1 < args.length() => {
         body = Some(args[i + 1])
         i += 2
         continue
@@ -920,7 +1097,7 @@ async fn handle_collab_pr_comment_add(args : Array[String]) -> Unit raise Error 
         continue
       }
       _ if arg.has_prefix("-") => {
-        warn_unimplemented_arg("collab pr comment add", arg)
+        warn_unimplemented_arg("hub pr comment add", arg)
         i += 1
         continue
       }
@@ -928,7 +1105,7 @@ async fn handle_collab_pr_comment_add(args : Array[String]) -> Unit raise Error 
         if pr_id is None {
           pr_id = Some(arg)
         } else {
-          warn_unimplemented_arg("collab pr comment add", arg)
+          warn_unimplemented_arg("hub pr comment add", arg)
         }
         i += 1
         continue
@@ -971,13 +1148,13 @@ async fn handle_collab_pr_comment_list(
   let mut pr_id : String? = None
   for arg in args {
     if arg.has_prefix("-") {
-      warn_unimplemented_arg("collab pr comment list", arg)
+      warn_unimplemented_arg("hub pr comment list", arg)
       continue
     }
     if pr_id is None {
       pr_id = Some(arg)
     } else {
-      warn_unimplemented_arg("collab pr comment list", arg)
+      warn_unimplemented_arg("hub pr comment list", arg)
     }
   }
   guard pr_id is Some(id) else {
@@ -1003,14 +1180,15 @@ async fn handle_collab_pr_review(args : Array[String]) -> Unit raise Error {
     print_collab_pr_usage()
     return ()
   }
-  let subcmd = args[0]
-  let rest = collect_args(args, 1)
+  let first = args[0]
+  let subcmd = resolve_collab_review_subcommand(first)
+  let rest = if subcmd == first { collect_args(args, 1) } else { args }
   match subcmd {
     "submit" => handle_collab_pr_review_submit(rest)
     "list" => handle_collab_pr_review_list(rest)
     "help" | "-h" | "--help" => print_collab_pr_usage()
     _ => {
-      eprint_line("bit collab pr review: unknown subcommand '\{subcmd}'")
+      eprint_line("bit hub pr review: unknown subcommand '\{subcmd}'")
       print_collab_pr_usage()
       @sys.exit(1)
     }
@@ -1028,6 +1206,11 @@ async fn handle_collab_pr_review_submit(
   let mut i = 0
   while i < args.length() {
     let arg = args[i]
+    if parse_review_verdict_flag(arg) is Some(flag_verdict) {
+      verdict = Some(flag_verdict)
+      i += 1
+      continue
+    }
     match arg {
       "--verdict" if i + 1 < args.length() => {
         let value = args[i + 1]
@@ -1046,7 +1229,7 @@ async fn handle_collab_pr_review_submit(
         i += 2
         continue
       }
-      "-m" | "--message" | "--body" if i + 1 < args.length() => {
+      "-m" | "-b" | "--message" | "--body" if i + 1 < args.length() => {
         body = Some(args[i + 1])
         i += 2
         continue
@@ -1080,7 +1263,7 @@ async fn handle_collab_pr_review_submit(
         continue
       }
       _ if arg.has_prefix("-") => {
-        warn_unimplemented_arg("collab pr review submit", arg)
+        warn_unimplemented_arg("hub pr review submit", arg)
         i += 1
         continue
       }
@@ -1088,7 +1271,7 @@ async fn handle_collab_pr_review_submit(
         if pr_id is None {
           pr_id = Some(arg)
         } else {
-          warn_unimplemented_arg("collab pr review submit", arg)
+          warn_unimplemented_arg("hub pr review submit", arg)
         }
         i += 1
         continue
@@ -1131,13 +1314,13 @@ async fn handle_collab_pr_review_list(args : Array[String]) -> Unit raise Error 
   let mut pr_id : String? = None
   for arg in args {
     if arg.has_prefix("-") {
-      warn_unimplemented_arg("collab pr review list", arg)
+      warn_unimplemented_arg("hub pr review list", arg)
       continue
     }
     if pr_id is None {
       pr_id = Some(arg)
     } else {
-      warn_unimplemented_arg("collab pr review list", arg)
+      warn_unimplemented_arg("hub pr review list", arg)
     }
   }
   guard pr_id is Some(id) else {
@@ -1163,7 +1346,7 @@ async fn handle_collab_issue(args : Array[String]) -> Unit raise Error {
     print_collab_issue_usage()
     return ()
   }
-  let subcmd = args[0]
+  let subcmd = normalize_collab_issue_subcommand(args[0])
   let rest = collect_args(args, 1)
   match subcmd {
     "list" => handle_collab_issue_list(rest)
@@ -1172,11 +1355,12 @@ async fn handle_collab_issue(args : Array[String]) -> Unit raise Error {
     "create" => handle_collab_issue_create(rest)
     "update" => handle_collab_issue_update(rest)
     "close" => handle_collab_issue_close(rest)
+    "reopen" => handle_collab_issue_reopen(rest)
     "comment" => handle_collab_issue_comment(rest)
     "link" => handle_collab_issue_link(rest)
     "help" | "-h" | "--help" => print_collab_issue_usage()
     _ => {
-      eprint_line("bit collab issue: unknown subcommand '\{subcmd}'")
+      eprint_line("bit hub issue: unknown subcommand '\{subcmd}'")
       print_collab_issue_usage()
       @sys.exit(1)
     }
@@ -1184,11 +1368,25 @@ async fn handle_collab_issue(args : Array[String]) -> Unit raise Error {
 }
 
 ///|
-async fn handle_collab_issue_list(args : Array[String]) -> Unit raise Error {
+struct CollabIssueListOptions {
+  state : @collab.IssueState?
+  limit : Int?
+}
+
+///|
+fn parse_collab_issue_list_options(
+  args : Array[String],
+) -> CollabIssueListOptions raise @git.GitError {
   let mut state : @collab.IssueState? = None
+  let mut limit : Int? = None
   let mut i = 0
   while i < args.length() {
     let arg = args[i]
+    if parse_issue_state_flag(arg) is Some(flag_state) {
+      state = Some(flag_state)
+      i += 1
+      continue
+    }
     match arg {
       "--state" if i + 1 < args.length() => {
         let value = args[i + 1]
@@ -1202,7 +1400,7 @@ async fn handle_collab_issue_list(args : Array[String]) -> Unit raise Error {
       }
       "--state" =>
         raise @git.GitError::InvalidObject(
-          "collab issue list: --state requires a value",
+          "hub issue list: --state requires a value",
         )
       _ if arg.has_prefix("--state=") => {
         let value = String::unsafe_substring(arg, start=8, end=arg.length())
@@ -1214,23 +1412,51 @@ async fn handle_collab_issue_list(args : Array[String]) -> Unit raise Error {
         i += 1
         continue
       }
-      _ if arg.has_prefix("-") =>
-        warn_unimplemented_arg("collab issue list", arg)
-      _ => warn_unimplemented_arg("collab issue list", arg)
+      "--limit" | "-L" if i + 1 < args.length() => {
+        limit = Some(parse_positive_list_limit(args[i + 1]))
+        i += 2
+        continue
+      }
+      "--limit" | "-L" =>
+        raise @git.GitError::InvalidObject(
+          "hub issue list: --limit requires a value",
+        )
+      _ if arg.has_prefix("--limit=") => {
+        let value = String::unsafe_substring(arg, start=8, end=arg.length())
+        limit = Some(parse_positive_list_limit(value))
+        i += 1
+        continue
+      }
+      _ if arg.has_prefix("-") => ()
+      _ => ()
     }
     i += 1
   }
+  { state, limit }
+}
+
+///|
+async fn handle_collab_issue_list(args : Array[String]) -> Unit raise Error {
+  let options = parse_collab_issue_list_options(args)
   let root = get_work_root()
   let git_dir = root + "/.git"
   let (objects, refs, _clock) = make_collab_stores(git_dir)
   let collab = load_collab_store(objects, refs)
-  let issues = collab.list_issues(objects, state~)
-  if issues.length() == 0 {
+  let issues = collab.list_issues(objects, state=options.state)
+  let raw_limit = options.limit.unwrap_or(issues.length())
+  let limit = if raw_limit < issues.length() {
+    raw_limit
+  } else {
+    issues.length()
+  }
+  if limit == 0 {
     print_line("No issues")
     return ()
   }
-  for issue in issues {
-    issue |> format_issue_summary |> print_line
+  let mut i = 0
+  while i < limit {
+    issues[i] |> format_issue_summary |> print_line
+    i += 1
   }
 }
 
@@ -1254,7 +1480,7 @@ async fn handle_collab_issue_import(args : Array[String]) -> Unit raise Error {
       }
       "--repo" =>
         raise @git.GitError::InvalidObject(
-          "collab issue import: --repo requires a value",
+          "hub issue import: --repo requires a value",
         )
       _ if arg.has_prefix("--repo=") => {
         repo = Some(String::unsafe_substring(arg, start=7, end=arg.length()))
@@ -1268,7 +1494,7 @@ async fn handle_collab_issue_import(args : Array[String]) -> Unit raise Error {
       }
       "--state" =>
         raise @git.GitError::InvalidObject(
-          "collab issue import: --state requires a value",
+          "hub issue import: --state requires a value",
         )
       _ if arg.has_prefix("--state=") => {
         state = String::unsafe_substring(arg, start=8, end=arg.length())
@@ -1285,7 +1511,7 @@ async fn handle_collab_issue_import(args : Array[String]) -> Unit raise Error {
       }
       "--limit" =>
         raise @git.GitError::InvalidObject(
-          "collab issue import: --limit requires a value",
+          "hub issue import: --limit requires a value",
         )
       _ if arg.has_prefix("--limit=") => {
         let value = String::unsafe_substring(arg, start=8, end=arg.length())
@@ -1296,8 +1522,8 @@ async fn handle_collab_issue_import(args : Array[String]) -> Unit raise Error {
         continue
       }
       _ if arg.has_prefix("-") =>
-        warn_unimplemented_arg("collab issue import", arg)
-      _ => warn_unimplemented_arg("collab issue import", arg)
+        warn_unimplemented_arg("hub issue import", arg)
+      _ => warn_unimplemented_arg("hub issue import", arg)
     }
     i += 1
   }
@@ -1336,13 +1562,13 @@ async fn handle_collab_issue_get(args : Array[String]) -> Unit raise Error {
   let mut issue_id : String? = None
   for arg in args {
     if arg.has_prefix("-") {
-      warn_unimplemented_arg("collab issue get", arg)
+      warn_unimplemented_arg("hub issue get", arg)
       continue
     }
     if issue_id is None {
       issue_id = Some(arg)
     } else {
-      warn_unimplemented_arg("collab issue get", arg)
+      warn_unimplemented_arg("hub issue get", arg)
     }
   }
   guard issue_id is Some(id) else {
@@ -1374,17 +1600,17 @@ async fn handle_collab_issue_create(args : Array[String]) -> Unit raise Error {
         i += 2
         continue
       }
-      "-m" | "--message" | "--body" if i + 1 < args.length() => {
+      "-m" | "-b" | "--message" | "--body" if i + 1 < args.length() => {
         body = Some(args[i + 1])
         i += 2
         continue
       }
-      "--label" if i + 1 < args.length() => {
+      "--label" | "-l" if i + 1 < args.length() => {
         labels.push(args[i + 1])
         i += 2
         continue
       }
-      "--assignee" if i + 1 < args.length() => {
+      "--assignee" | "-a" if i + 1 < args.length() => {
         assignees.push(args[i + 1])
         i += 2
         continue
@@ -1417,12 +1643,12 @@ async fn handle_collab_issue_create(args : Array[String]) -> Unit raise Error {
         continue
       }
       _ if arg.has_prefix("-") => {
-        warn_unimplemented_arg("collab issue create", arg)
+        warn_unimplemented_arg("hub issue create", arg)
         i += 1
         continue
       }
       _ => {
-        warn_unimplemented_arg("collab issue create", arg)
+        warn_unimplemented_arg("hub issue create", arg)
         i += 1
         continue
       }
@@ -1469,17 +1695,17 @@ async fn handle_collab_issue_update(args : Array[String]) -> Unit raise Error {
         i += 2
         continue
       }
-      "-m" | "--message" | "--body" if i + 1 < args.length() => {
+      "-m" | "-b" | "--message" | "--body" if i + 1 < args.length() => {
         body = Some(args[i + 1])
         i += 2
         continue
       }
-      "--label" if i + 1 < args.length() => {
+      "--label" | "-l" if i + 1 < args.length() => {
         labels.push(args[i + 1])
         i += 2
         continue
       }
-      "--assignee" if i + 1 < args.length() => {
+      "--assignee" | "-a" if i + 1 < args.length() => {
         assignees.push(args[i + 1])
         i += 2
         continue
@@ -1512,7 +1738,7 @@ async fn handle_collab_issue_update(args : Array[String]) -> Unit raise Error {
         continue
       }
       _ if arg.has_prefix("-") => {
-        warn_unimplemented_arg("collab issue update", arg)
+        warn_unimplemented_arg("hub issue update", arg)
         i += 1
         continue
       }
@@ -1520,7 +1746,7 @@ async fn handle_collab_issue_update(args : Array[String]) -> Unit raise Error {
         if issue_id is None {
           issue_id = Some(arg)
         } else {
-          warn_unimplemented_arg("collab issue update", arg)
+          warn_unimplemented_arg("hub issue update", arg)
         }
         i += 1
         continue
@@ -1562,13 +1788,13 @@ async fn handle_collab_issue_close(args : Array[String]) -> Unit raise Error {
   let mut issue_id : String? = None
   for arg in args {
     if arg.has_prefix("-") {
-      warn_unimplemented_arg("collab issue close", arg)
+      warn_unimplemented_arg("hub issue close", arg)
       continue
     }
     if issue_id is None {
       issue_id = Some(arg)
     } else {
-      warn_unimplemented_arg("collab issue close", arg)
+      warn_unimplemented_arg("hub issue close", arg)
     }
   }
   guard issue_id is Some(id) else {
@@ -1583,19 +1809,49 @@ async fn handle_collab_issue_close(args : Array[String]) -> Unit raise Error {
 }
 
 ///|
+async fn handle_collab_issue_reopen(args : Array[String]) -> Unit raise Error {
+  if args.length() == 0 {
+    print_collab_issue_usage()
+    return ()
+  }
+  let mut issue_id : String? = None
+  for arg in args {
+    if arg.has_prefix("-") {
+      warn_unimplemented_arg("hub issue reopen", arg)
+      continue
+    }
+    if issue_id is None {
+      issue_id = Some(arg)
+    } else {
+      warn_unimplemented_arg("hub issue reopen", arg)
+    }
+  }
+  guard issue_id is Some(id) else {
+    raise @git.GitError::InvalidObject("Issue id is required")
+  }
+  let root = get_work_root()
+  let git_dir = root + "/.git"
+  let (objects, refs, clock) = make_collab_stores(git_dir)
+  let collab = init_collab_store(objects, refs)
+  collab.reopen_issue(objects, refs, clock, id)
+  print_line("Reopened issue #\{id}")
+}
+
+///|
 async fn handle_collab_issue_comment(args : Array[String]) -> Unit raise Error {
   if args.length() == 0 {
     print_collab_issue_usage()
     return ()
   }
-  let subcmd = args[0]
-  let rest = collect_args(args, 1)
+  let first = args[0]
+  let subcmd = resolve_collab_comment_subcommand(first)
+  let rest = if subcmd == first { collect_args(args, 1) } else { args }
   match subcmd {
     "add" => handle_collab_issue_comment_add(rest)
     "list" => handle_collab_issue_comment_list(rest)
     "help" | "-h" | "--help" => print_collab_issue_usage()
     _ => {
-      eprint_line("bit collab issue comment: unknown subcommand '\{subcmd}'")
+      eprint_line("bit hub issue comment: unknown subcommand '\{subcmd}'")
       print_collab_issue_usage()
       @sys.exit(1)
     }
@@ -1613,7 +1869,7 @@ async fn handle_collab_issue_comment_add(
   while i < args.length() {
     let arg = args[i]
     match arg {
-      "-m" | "--message" | "--body" if i + 1 < args.length() => {
+      "-m" | "-b" | "--message" | "--body" if i + 1 < args.length() => {
         body = Some(args[i + 1])
         i += 2
         continue
@@ -1641,7 +1897,7 @@ async fn handle_collab_issue_comment_add(
         continue
       }
       _ if arg.has_prefix("-") => {
-        warn_unimplemented_arg("collab issue comment add", arg)
+        warn_unimplemented_arg("hub issue comment add", arg)
         i += 1
         continue
       }
@@ -1649,7 +1905,7 @@ async fn handle_collab_issue_comment_add(
         if issue_id is None {
           issue_id = Some(arg)
         } else {
-          warn_unimplemented_arg("collab issue comment add", arg)
+          warn_unimplemented_arg("hub issue comment add", arg)
         }
         i += 1
         continue
@@ -1689,13 +1945,13 @@ async fn handle_collab_issue_comment_list(
   let mut issue_id : String? = None
   for arg in args {
     if arg.has_prefix("-") {
-      warn_unimplemented_arg("collab issue comment list", arg)
+      warn_unimplemented_arg("hub issue comment list", arg)
       continue
     }
     if issue_id is None {
       issue_id = Some(arg)
     } else {
-      warn_unimplemented_arg("collab issue comment list", arg)
+      warn_unimplemented_arg("hub issue comment list", arg)
     }
   }
   guard issue_id is Some(id) else {
@@ -1746,7 +2002,7 @@ async fn handle_collab_note(args : Array[String]) -> Unit raise Error {
     "remove" => handle_collab_note_remove(rest)
     "help" | "-h" | "--help" => print_collab_note_usage()
     _ => {
-      eprint_line("bit collab note: unknown subcommand '\{subcmd}'")
+      eprint_line("bit hub note: unknown subcommand '\{subcmd}'")
       print_collab_note_usage()
       @sys.exit(1)
     }
@@ -1792,7 +2048,7 @@ async fn handle_collab_note_add(args : Array[String]) -> Unit raise Error {
         continue
       }
       _ if arg.has_prefix("-") => {
-        warn_unimplemented_arg("collab note add", arg)
+        warn_unimplemented_arg("hub note add", arg)
         i += 1
         continue
       }
@@ -1800,7 +2056,7 @@ async fn handle_collab_note_add(args : Array[String]) -> Unit raise Error {
         if commit_hex is None {
           commit_hex = Some(arg)
         } else {
-          warn_unimplemented_arg("collab note add", arg)
+          warn_unimplemented_arg("hub note add", arg)
         }
         i += 1
         continue
@@ -1861,7 +2117,7 @@ async fn handle_collab_note_get(args : Array[String]) -> Unit raise Error {
         continue
       }
       _ if arg.has_prefix("-") => {
-        warn_unimplemented_arg("collab note get", arg)
+        warn_unimplemented_arg("hub note get", arg)
         i += 1
         continue
       }
@@ -1869,7 +2125,7 @@ async fn handle_collab_note_get(args : Array[String]) -> Unit raise Error {
         if commit_hex is None {
           commit_hex = Some(arg)
         } else {
-          warn_unimplemented_arg("collab note get", arg)
+          warn_unimplemented_arg("hub note get", arg)
         }
         i += 1
         continue
@@ -1913,12 +2169,12 @@ async fn handle_collab_note_list(args : Array[String]) -> Unit raise Error {
         continue
       }
       _ if arg.has_prefix("-") => {
-        warn_unimplemented_arg("collab note list", arg)
+        warn_unimplemented_arg("hub note list", arg)
         i += 1
         continue
       }
       _ => {
-        warn_unimplemented_arg("collab note list", arg)
+        warn_unimplemented_arg("hub note list", arg)
         i += 1
         continue
       }
@@ -1961,7 +2217,7 @@ async fn handle_collab_note_remove(args : Array[String]) -> Unit raise Error {
         continue
       }
       _ if arg.has_prefix("-") => {
-        warn_unimplemented_arg("collab note remove", arg)
+        warn_unimplemented_arg("hub note remove", arg)
         i += 1
         continue
       }
@@ -1969,7 +2225,7 @@ async fn handle_collab_note_remove(args : Array[String]) -> Unit raise Error {
         if commit_hex is None {
           commit_hex = Some(arg)
         } else {
-          warn_unimplemented_arg("collab note remove", arg)
+          warn_unimplemented_arg("hub note remove", arg)
         }
         i += 1
         continue
@@ -2006,7 +2262,7 @@ async fn handle_collab_sync(args : Array[String]) -> Unit raise Error {
     "fetch" => handle_collab_sync_fetch(rest)
     "help" | "-h" | "--help" => print_collab_sync_usage()
     _ => {
-      eprint_line("bit collab sync: unknown subcommand '\{subcmd}'")
+      eprint_line("bit hub sync: unknown subcommand '\{subcmd}'")
       print_collab_sync_usage()
       @sys.exit(1)
     }
@@ -2024,7 +2280,7 @@ async fn handle_collab_sync_push(args : Array[String]) -> Unit raise Error {
       remote_url = Some(arg)
       break
     }
-    warn_unimplemented_arg("collab sync push", arg)
+    warn_unimplemented_arg("hub sync push", arg)
   }
   guard remote_url is Some(url) else {
     raise @git.GitError::InvalidObject("No remote configured")
@@ -2051,7 +2307,7 @@ async fn handle_collab_sync_fetch(args : Array[String]) -> Unit raise Error {
       remote_url = Some(arg)
       break
     }
-    warn_unimplemented_arg("collab sync fetch", arg)
+    warn_unimplemented_arg("hub sync fetch", arg)
   }
   guard remote_url is Some(url) else {
     raise @git.GitError::InvalidObject("No remote configured")
@@ -2093,7 +2349,7 @@ fn parse_collab_dump_options(
       }
       "--prefix" =>
         raise @git.GitError::InvalidObject(
-          "collab dump: --prefix requires a value",
+          "hub dump: --prefix requires a value",
         )
       _ if arg.has_prefix("--prefix=") => {
         prefix = String::unsafe_substring(arg, start=9, end=arg.length())
@@ -2115,11 +2371,11 @@ fn parse_collab_dump_options(
         continue
       }
       _ if arg.has_prefix("-") =>
-        raise @git.GitError::InvalidObject("Unknown collab dump option: \{arg}")
+        raise @git.GitError::InvalidObject("Unknown hub dump option: \{arg}")
       _ => {
         if used_positional_prefix {
           raise @git.GitError::InvalidObject(
-            "collab dump: unexpected positional argument: \{arg}",
+            "hub dump: unexpected positional argument: \{arg}",
           )
         }
         prefix = arg
@@ -2163,7 +2419,7 @@ async fn handle_collab_dump(args : Array[String]) -> Unit raise Error {
     include_deleted=options.include_deleted,
   )
   if records.length() == 0 {
-    print_line("No collab records for prefix: \{options.prefix}")
+    print_line("No collaboration records for prefix: \{options.prefix}")
     return ()
   }
   records.sort_by(fn(a, b) {
@@ -2478,6 +2734,109 @@ fn parse_gh_issues(text : String) -> Array[@collab.Issue] raise @git.GitError {
     }
   }
   out
+}
+
+///|
+fn parse_head_branch_name(head_content : String) -> String? {
+  let text = trim_string(head_content)
+  if text.has_prefix("ref: refs/heads/") {
+    Some(String::unsafe_substring(text, start=16, end=text.length()))
+  } else {
+    None
+  }
+}
+
+///|
+fn detect_current_branch_name(git_dir : String) -> String? {
+  let fs = OsFs::new()
+  let head_bytes = fs.read_file(git_dir + "/HEAD") catch { _ => return None }
+  parse_head_branch_name(decode_bytes(head_bytes))
+}
+
+///|
+fn pr_matches_branch(pr : @collab.PullRequest, branch : String) -> Bool {
+  let source_branch = pr.source_branch()
+  let branch_ref = "refs/heads/" + branch
+  if source_branch == branch || source_branch == branch_ref {
+    return true
+  }
+  match pr.source_ref() {
+    Some(source_ref) => source_ref == branch || source_ref == branch_ref
+    None => false
+  }
+}
+
+///|
+fn parse_pr_state_flag(value : String) -> @collab.PrState? {
+  match value {
+    "--open" => Some(@collab.PrState::Open)
+    "--closed" => Some(@collab.PrState::Closed)
+    "--merged" => Some(@collab.PrState::Merged)
+    _ => None
+  }
+}
+
+///|
+fn parse_issue_state_flag(value : String) -> @collab.IssueState? {
+  match value {
+    "--open" => Some(@collab.IssueState::Open)
+    "--closed" => Some(@collab.IssueState::Closed)
+    _ => None
+  }
+}
+
+///|
+fn normalize_collab_pr_subcommand(subcmd : String) -> String {
+  match subcmd {
+    "view" => "get"
+    "edit" => "update"
+    _ => subcmd
+  }
+}
+
+///|
+fn normalize_collab_issue_subcommand(subcmd : String) -> String {
+  match subcmd {
+    "view" => "get"
+    "edit" => "update"
+    _ => subcmd
+  }
+}
+
+///|
+fn resolve_collab_comment_subcommand(subcmd : String) -> String {
+  match subcmd {
+    "add" | "list" | "help" | "-h" | "--help" => subcmd
+    _ => "add"
+  }
+}
+
+///|
+fn resolve_collab_review_subcommand(subcmd : String) -> String {
+  match subcmd {
+    "submit" | "list" | "help" | "-h" | "--help" => subcmd
+    _ => "submit"
+  }
+}
+
+///|
+fn parse_review_verdict_flag(value : String) -> @collab.ReviewVerdict? {
+  match value {
+    "--approve" | "--approved" => Some(@collab.ReviewVerdict::Approved)
+    "--comment" => Some(@collab.ReviewVerdict::Comment)
+    "--request-changes" => Some(@collab.ReviewVerdict::RequestChanges)
+    _ => None
+  }
+}
+
+///|
+fn parse_merge_strategy_flag(value : String) -> @collab.PrMergeStrategy? {
+  match value {
+    "--merge" => Some(@collab.PrMergeStrategy::Merge)
+    "--squash" => Some(@collab.PrMergeStrategy::Squash)
+    "--ff" | "--fast-forward" => Some(@collab.PrMergeStrategy::FastForward)
+    _ => None
+  }
 }
 
 ///|

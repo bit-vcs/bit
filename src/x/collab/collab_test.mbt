@@ -244,6 +244,42 @@ test "pr: close PR" {
 }
 
 ///|
+test "pr: reopen PR" {
+  let (_fs, objects, refs, clock) = setup_repo_with_branch()
+  let prs = Collab::init(objects, refs)
+  let pr = prs.create_pr(
+    objects, refs, clock, "Test PR", "Body", "refs/heads/feature", "refs/heads/main",
+    "alice@example.com",
+  )
+  let pr_id = pr.id()
+  prs.close_pr(objects, refs, clock, pr_id)
+  prs.reopen_pr(objects, refs, clock, pr_id)
+  let reopened = prs.get_pr(objects, pr_id)
+  guard reopened is Some(pr2) else { panic() }
+  assert_eq(pr2.state(), PrState::Open)
+}
+
+///|
+test "pr: reopen open PR fails" {
+  let (_fs, objects, refs, clock) = setup_repo_with_branch()
+  let prs = Collab::init(objects, refs)
+  let pr = prs.create_pr(
+    objects, refs, clock, "Test PR", "Body", "refs/heads/feature", "refs/heads/main",
+    "alice@example.com",
+  )
+  ignore(
+    prs.reopen_pr(objects, refs, clock, pr.id()) catch {
+      @git.GitError::InvalidObject(message) => {
+        assert_true(message.contains("not closed"))
+        return ()
+      }
+      err => fail("unexpected error: \{err.to_string()}")
+    },
+  )
+  fail("expected invalid object error")
+}
+
+///|
 test "pr: update PR" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
   let collab = Collab::init(objects, refs)
@@ -597,6 +633,40 @@ test "issue: close issue" {
   let closed = prs.get_issue(objects, issue_id)
   guard closed is Some(issue) else { panic() }
   assert_eq(issue.state(), IssueState::Closed)
+}
+
+///|
+test "issue: reopen issue" {
+  let (_fs, objects, refs, clock) = setup_repo_with_branch()
+  let prs = Collab::init(objects, refs)
+  let issue = prs.create_issue(
+    objects, refs, clock, "Test Issue", "Body", "alice@example.com",
+  )
+  let issue_id = issue.id()
+  prs.close_issue(objects, refs, clock, issue_id)
+  prs.reopen_issue(objects, refs, clock, issue_id)
+  let reopened = prs.get_issue(objects, issue_id)
+  guard reopened is Some(issue2) else { panic() }
+  assert_eq(issue2.state(), IssueState::Open)
+}
+
+///|
+test "issue: reopen open issue fails" {
+  let (_fs, objects, refs, clock) = setup_repo_with_branch()
+  let prs = Collab::init(objects, refs)
+  let issue = prs.create_issue(
+    objects, refs, clock, "Test Issue", "Body", "alice@example.com",
+  )
+  ignore(
+    prs.reopen_issue(objects, refs, clock, issue.id()) catch {
+      @git.GitError::InvalidObject(message) => {
+        assert_true(message.contains("not closed"))
+        return ()
+      }
+      err => fail("unexpected error: \{err.to_string()}")
+    },
+  )
+  fail("expected invalid object error")
 }
 
 ///|
