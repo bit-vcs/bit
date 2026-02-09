@@ -1,19 +1,7 @@
-///| Minimal filesystem abstraction for git materialization
+///| Re-export shared filesystem contracts from @types package.
 
 ///|
-pub(open) trait FileSystem {
-  mkdir_p(Self, String) -> Unit raise GitError
-  write_file(Self, String, Bytes) -> Unit raise GitError
-  write_string(Self, String, String) -> Unit raise GitError
-  remove_file(Self, String) -> Unit raise GitError
-  remove_dir(Self, String) -> Unit raise GitError
-}
+pub using @types {trait FileSystem}
 
 ///|
-/// Read-only filesystem abstraction for loading git objects
-pub(open) trait RepoFileSystem {
-  read_file(Self, String) -> Bytes raise GitError
-  readdir(Self, String) -> Array[String] raise GitError
-  is_dir(Self, String) -> Bool
-  is_file(Self, String) -> Bool
-}
+pub using @types {trait RepoFileSystem}

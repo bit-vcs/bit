@@ -2,162 +2,57 @@
 package "mizchi/bit"
 
 import {
-  "mizchi/bit/hash",
+  "mizchi/bit/object",
+  "mizchi/bit/repo",
+  "mizchi/bit/types",
 }
 
 // Values
-pub fn checkout_commit(ObjectStore, ObjectId) -> Map[String, Bytes] raise GitError
+pub fn checkout_commit(@repo.ObjectStore, @object.ObjectId) -> Map[String, Bytes] raise @object.GitError
 
-pub fn checkout_commit_to_fs(ObjectStore, ObjectId, &FileSystem, String) -> Unit raise GitError
+pub fn checkout_commit_to_fs(@repo.ObjectStore, @object.ObjectId, &@types.FileSystem, String) -> Unit raise @object.GitError
 
-pub fn create_blob(Bytes) -> (ObjectId, Bytes)
+pub fn create_blob(Bytes) -> (@object.ObjectId, Bytes)
 
-pub fn create_blob_string(String) -> (ObjectId, Bytes)
+pub fn create_blob_string(String) -> (@object.ObjectId, Bytes)
 
-pub fn create_commit(Commit) -> (ObjectId, Bytes)
+pub fn create_commit(@object.Commit) -> (@object.ObjectId, Bytes)
 
-pub fn create_object(ObjectType, Bytes) -> (ObjectId, Bytes)
+pub fn create_object(@object.ObjectType, Bytes) -> (@object.ObjectId, Bytes)
 
-pub fn create_tree(Array[TreeEntry]) -> (ObjectId, Bytes)
+pub fn create_tree(Array[@object.TreeEntry]) -> (@object.ObjectId, Bytes)
 
-pub fn hash_blob(Bytes) -> ObjectId
+pub fn hash_blob(Bytes) -> @object.ObjectId
 
-pub fn hash_blob_string(String) -> ObjectId
+pub fn hash_blob_string(String) -> @object.ObjectId
 
-pub fn hash_object_content(ObjectType, Bytes) -> ObjectId
+pub fn hash_object_content(@object.ObjectType, Bytes) -> @object.ObjectId
 
 pub fn join_path(String, String) -> String
 
-pub fn materialize_clone_to_fs(ObjectStore, ObjectId, String, String, &FileSystem, String) -> Unit raise GitError
+pub fn materialize_clone_to_fs(@repo.ObjectStore, @object.ObjectId, String, String, &@types.FileSystem, String) -> Unit raise @object.GitError
 
-pub fn parse_commit(Bytes) -> CommitInfo raise GitError
+pub fn parse_commit(Bytes) -> @repo.CommitInfo raise @object.GitError
 
-pub fn parse_tree(Bytes) -> Array[TreeEntry] raise GitError
+pub fn parse_tree(Bytes) -> Array[@object.TreeEntry] raise @object.GitError
 
-pub fn serialize_commit_content(Commit) -> Bytes
+pub fn serialize_commit_content(@object.Commit) -> Bytes
 
-pub fn serialize_tree(Array[TreeEntry]) -> Bytes
+pub fn serialize_tree(Array[@object.TreeEntry]) -> Bytes
 
-pub fn sha1(Bytes) -> ObjectId
+pub fn sha1(Bytes) -> @object.ObjectId
 
-pub fn sha1_array(Array[Byte]) -> ObjectId
+pub fn sha1_array(Array[Byte]) -> @object.ObjectId
 
-pub fn sha1_array_prefix(Array[Byte], Int) -> ObjectId
+pub fn sha1_array_prefix(Array[Byte], Int) -> @object.ObjectId
 
-pub fn sha1_prefix(Bytes, Int) -> ObjectId
+pub fn sha1_prefix(Bytes, Int) -> @object.ObjectId
 
-pub fn write_git_metadata(ObjectStore, ObjectId, String, String, &FileSystem, String) -> Unit raise GitError
+pub fn write_git_metadata(@repo.ObjectStore, @object.ObjectId, String, String, &@types.FileSystem, String) -> Unit raise @object.GitError
 
 // Errors
-pub(all) suberror GitError {
-  InvalidObject(String)
-  HashMismatch(String, String)
-  PackfileError(String)
-  ProtocolError(String)
-  IoError(String)
-}
-pub impl Eq for GitError
-pub impl Show for GitError
 
 // Types and methods
-pub struct Commit {
-  tree : ObjectId
-  parents : Array[ObjectId]
-  author : String
-  author_time : Int64
-  author_tz : String
-  committer : String
-  commit_time : Int64
-  committer_tz : String
-  message : String
-}
-pub fn Commit::new(ObjectId, Array[ObjectId], String, Int64, String, String, Int64, String, String) -> Self
-
-pub struct CommitInfo {
-  tree : ObjectId
-  parents : Array[ObjectId]
-}
-
-pub struct HttpResponse {
-  code : Int
-  headers : Map[String, String]
-}
-pub fn HttpResponse::new(Int) -> Self
-pub fn HttpResponse::with_headers(Int, Map[String, String]) -> Self
-
-pub struct MockHttpClient {
-  responses : Map[String, (Int, Bytes)]
-}
-pub fn MockHttpClient::add_response(Self, String, Int, Bytes) -> Unit
-pub fn MockHttpClient::new() -> Self
-pub impl HttpClient for MockHttpClient
-
-pub struct ObjectId {
-  bytes : FixedArray[Byte]
-}
-pub fn ObjectId::from_bytes(Bytes) -> Self raise GitError
-pub fn ObjectId::from_bytes_at(Bytes, Int) -> Self
-pub fn ObjectId::from_hex(String) -> Self raise GitError
-pub fn ObjectId::new(FixedArray[Byte]) -> Self
-pub fn ObjectId::to_bytes(Self) -> Bytes
-pub fn ObjectId::to_hex(Self) -> String
-pub fn ObjectId::zero() -> Self
-pub impl Eq for ObjectId
-pub impl Hash for ObjectId
-pub impl Show for ObjectId
-
-pub struct ObjectStore {
-  objects : Map[String, PackObject]
-}
-pub fn ObjectStore::add_objects(Self, Array[PackObject]) -> Unit
-pub fn ObjectStore::contains(Self, ObjectId) -> Bool
-pub fn ObjectStore::from_pack(Array[PackObject]) -> Self
-pub fn ObjectStore::get(Self, ObjectId) -> PackObject?
-pub fn ObjectStore::new() -> Self
-
-pub(all) enum ObjectType {
-  Blob
-  Tree
-  Commit
-  Tag
-}
-pub fn ObjectType::to_packfile_type(Self) -> Int
-pub fn ObjectType::to_string(Self) -> String
-pub impl Eq for ObjectType
-pub impl Show for ObjectType
-
-pub(all) enum PackCompression {
-  Default
-  Stored
-}
-
-pub(all) enum PackDeltaMode {
-  NoDelta
-  RefDelta
-  OfsDelta
-}
-
-pub struct PackObject {
-  obj_type : ObjectType
-  data : Bytes
-  id : ObjectId
-  offset : Int
-  crc32 : UInt
-}
-pub fn PackObject::new(ObjectType, Bytes) -> Self
-pub fn PackObject::with_metadata(ObjectType, Bytes, ObjectId, Int, UInt) -> Self
-
-pub struct Sha1State {
-  inner : @hash.Sha1State
-}
-pub fn Sha1State::finish(Self) -> ObjectId
-pub fn Sha1State::new() -> Self
-pub fn Sha1State::reset(Self) -> Unit
-pub fn Sha1State::update(Self, Bytes) -> Unit
-pub fn Sha1State::update_byte(Self, Byte) -> Unit
-pub fn Sha1State::update_slice(Self, Bytes, Int, Int) -> Unit
-pub fn Sha1State::update_string(Self, String) -> Unit
-
 pub struct TestFs {
   files : Map[String, Bytes]
   dirs : Map[String, Bool]
@@ -167,43 +62,48 @@ pub fn TestFs::is_dir(Self, String) -> Bool
 pub fn TestFs::is_file(Self, String) -> Bool
 pub fn TestFs::mkdir_p(Self, String) -> Unit
 pub fn TestFs::new() -> Self
-pub fn TestFs::read_file(Self, String) -> Bytes raise GitError
-pub fn TestFs::read_string(Self, String) -> String raise GitError
-pub fn TestFs::readdir(Self, String) -> Array[String] raise GitError
-pub fn TestFs::remove_dir(Self, String) -> Unit raise GitError
-pub fn TestFs::remove_file(Self, String) -> Unit raise GitError
+pub fn TestFs::read_file(Self, String) -> Bytes raise @object.GitError
+pub fn TestFs::read_string(Self, String) -> String raise @object.GitError
+pub fn TestFs::readdir(Self, String) -> Array[String] raise @object.GitError
+pub fn TestFs::remove_dir(Self, String) -> Unit raise @object.GitError
+pub fn TestFs::remove_file(Self, String) -> Unit raise @object.GitError
 pub fn TestFs::write_file(Self, String, Bytes) -> Unit
 pub fn TestFs::write_string(Self, String, String) -> Unit
-pub impl FileSystem for TestFs
-pub impl RepoFileSystem for TestFs
-
-pub struct TreeEntry {
-  mode : String
-  name : String
-  id : ObjectId
-}
-pub fn TreeEntry::new(String, String, ObjectId) -> Self
+pub impl @types.FileSystem for TestFs
+pub impl @types.RepoFileSystem for TestFs
 
 // Type aliases
+pub using @object {type Commit}
+
+pub using @repo {type CommitInfo}
+
+pub using @object {type GitError}
+
+pub using @types {type HttpResponse}
+
+pub using @types {type MockHttpClient}
+
+pub using @object {type ObjectId}
+
+pub using @repo {type ObjectStore}
+
+pub using @object {type ObjectType}
+
+pub using @object {type PackCompression}
+
+pub using @object {type PackDeltaMode}
+
+pub using @object {type PackObject}
+
+pub using @object {type Sha1State}
+
+pub using @object {type TreeEntry}
+
+pub using @types {trait FileSystem}
+
+pub using @types {trait HttpClient}
+
+pub using @types {trait RepoFileSystem}
 
 // Traits
-pub(open) trait FileSystem {
-  mkdir_p(Self, String) -> Unit raise GitError
-  write_file(Self, String, Bytes) -> Unit raise GitError
-  write_string(Self, String, String) -> Unit raise GitError
-  remove_file(Self, String) -> Unit raise GitError
-  remove_dir(Self, String) -> Unit raise GitError
-}
-
-pub(open) trait HttpClient {
-  get(Self, String, Map[String, String]) -> (HttpResponse, Bytes) raise GitError
-  post(Self, String, Bytes, Map[String, String]) -> (HttpResponse, Bytes) raise GitError
-}
-
-pub(open) trait RepoFileSystem {
-  read_file(Self, String) -> Bytes raise GitError
-  readdir(Self, String) -> Array[String] raise GitError
-  is_dir(Self, String) -> Bool
-  is_file(Self, String) -> Bool
-}
 

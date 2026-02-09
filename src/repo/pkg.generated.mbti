@@ -1,0 +1,50 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/bit/repo"
+
+import {
+  "mizchi/bit/object",
+  "mizchi/bit/types",
+}
+
+// Values
+pub fn checkout_commit(ObjectStore, @object.ObjectId) -> Map[String, Bytes] raise @object.GitError
+
+pub fn checkout_commit_to_fs(ObjectStore, @object.ObjectId, &@types.FileSystem, String) -> Unit raise @object.GitError
+
+pub fn is_gitlink_mode(String) -> Bool
+
+pub fn is_tree_mode(String) -> Bool
+
+pub fn join_path(String, String) -> String
+
+pub fn materialize_clone_to_fs(ObjectStore, @object.ObjectId, String, String, &@types.FileSystem, String) -> Unit raise @object.GitError
+
+pub fn parent_dir(String) -> String
+
+pub fn parse_commit(Bytes) -> CommitInfo raise @object.GitError
+
+pub fn parse_tree(Bytes) -> Array[@object.TreeEntry] raise @object.GitError
+
+pub fn write_git_metadata(ObjectStore, @object.ObjectId, String, String, &@types.FileSystem, String) -> Unit raise @object.GitError
+
+// Errors
+
+// Types and methods
+pub struct CommitInfo {
+  tree : @object.ObjectId
+  parents : Array[@object.ObjectId]
+}
+
+pub struct ObjectStore {
+  objects : Map[String, @object.PackObject]
+}
+pub fn ObjectStore::add_objects(Self, Array[@object.PackObject]) -> Unit
+pub fn ObjectStore::contains(Self, @object.ObjectId) -> Bool
+pub fn ObjectStore::from_pack(Array[@object.PackObject]) -> Self
+pub fn ObjectStore::get(Self, @object.ObjectId) -> @object.PackObject?
+pub fn ObjectStore::new() -> Self
+
+// Type aliases
+
+// Traits
+

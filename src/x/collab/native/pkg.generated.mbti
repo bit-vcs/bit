@@ -2,14 +2,15 @@
 package "mizchi/bit/x/collab/native"
 
 import {
-  "mizchi/bit",
+  "mizchi/bit/object",
+  "mizchi/bit/types",
   "mizchi/bit/x/collab",
 }
 
 // Values
-pub async fn collab_fetch(@collab.Collab, &@bit.FileSystem, &@bit.RepoFileSystem, String, String) -> @collab.PrSyncResult raise @bit.GitError
+pub async fn collab_fetch(@collab.Collab, &@types.FileSystem, &@types.RepoFileSystem, String, String) -> @collab.PrSyncResult raise @object.GitError
 
-pub async fn collab_push(@collab.Collab, &@bit.RepoFileSystem, String, String) -> @collab.PrSyncResult raise @bit.GitError
+pub async fn collab_push(@collab.Collab, &@types.RepoFileSystem, String, String) -> @collab.PrSyncResult raise @object.GitError
 
 // Errors
 

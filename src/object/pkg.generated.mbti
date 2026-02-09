@@ -1,0 +1,129 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/bit/object"
+
+import {
+  "mizchi/bit/hash",
+}
+
+// Values
+pub fn create_blob(Bytes) -> (ObjectId, Bytes)
+
+pub fn create_blob_string(String) -> (ObjectId, Bytes)
+
+pub fn create_commit(Commit) -> (ObjectId, Bytes)
+
+pub fn create_object(ObjectType, Bytes) -> (ObjectId, Bytes)
+
+pub fn create_tree(Array[TreeEntry]) -> (ObjectId, Bytes)
+
+pub fn hash_blob(Bytes) -> ObjectId
+
+pub fn hash_blob_string(String) -> ObjectId
+
+pub fn hash_object_content(ObjectType, Bytes) -> ObjectId
+
+pub fn serialize_commit_content(Commit) -> Bytes
+
+pub fn serialize_tree(Array[TreeEntry]) -> Bytes
+
+pub fn sha1(Bytes) -> ObjectId
+
+pub fn sha1_array(Array[Byte]) -> ObjectId
+
+pub fn sha1_array_prefix(Array[Byte], Int) -> ObjectId
+
+pub fn sha1_prefix(Bytes, Int) -> ObjectId
+
+// Errors
+pub(all) suberror GitError {
+  InvalidObject(String)
+  HashMismatch(String, String)
+  PackfileError(String)
+  ProtocolError(String)
+  IoError(String)
+}
+pub impl Eq for GitError
+pub impl Show for GitError
+
+// Types and methods
+pub struct Commit {
+  tree : ObjectId
+  parents : Array[ObjectId]
+  author : String
+  author_time : Int64
+  author_tz : String
+  committer : String
+  commit_time : Int64
+  committer_tz : String
+  message : String
+}
+pub fn Commit::new(ObjectId, Array[ObjectId], String, Int64, String, String, Int64, String, String) -> Self
+
+pub struct ObjectId {
+  bytes : FixedArray[Byte]
+}
+pub fn ObjectId::from_bytes(Bytes) -> Self raise GitError
+pub fn ObjectId::from_bytes_at(Bytes, Int) -> Self
+pub fn ObjectId::from_hex(String) -> Self raise GitError
+pub fn ObjectId::new(FixedArray[Byte]) -> Self
+pub fn ObjectId::to_bytes(Self) -> Bytes
+pub fn ObjectId::to_hex(Self) -> String
+pub fn ObjectId::zero() -> Self
+pub impl Eq for ObjectId
+pub impl Hash for ObjectId
+pub impl Show for ObjectId
+
+pub(all) enum ObjectType {
+  Blob
+  Tree
+  Commit
+  Tag
+}
+pub fn ObjectType::to_packfile_type(Self) -> Int
+pub fn ObjectType::to_string(Self) -> String
+pub impl Eq for ObjectType
+pub impl Show for ObjectType
+
+pub(all) enum PackCompression {
+  Default
+  Stored
+}
+
+pub(all) enum PackDeltaMode {
+  NoDelta
+  RefDelta
+  OfsDelta
+}
+
+pub struct PackObject {
+  obj_type : ObjectType
+  data : Bytes
+  id : ObjectId
+  offset : Int
+  crc32 : UInt
+}
+pub fn PackObject::new(ObjectType, Bytes) -> Self
+pub fn PackObject::with_metadata(ObjectType, Bytes, ObjectId, Int, UInt) -> Self
+
+pub struct Sha1State {
+  inner : @hash.Sha1State
+}
+pub fn Sha1State::finish(Self) -> ObjectId
+pub fn Sha1State::new() -> Self
+pub fn Sha1State::reset(Self) -> Unit
+pub fn Sha1State::update(Self, Bytes) -> Unit
+pub fn Sha1State::update_byte(Self, Byte) -> Unit
+pub fn Sha1State::update_slice(Self, Bytes, Int, Int) -> Unit
+pub fn Sha1State::update_string(Self, String) -> Unit
+
+pub struct TreeEntry {
+  mode : String
+  name : String
+  id : ObjectId
+}
+pub fn TreeEntry::new(String, String, ObjectId) -> Self
+
+// Type aliases
+
+// Traits
+

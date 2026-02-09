@@ -2,17 +2,17 @@
 package "mizchi/bit/x/agent/native"
 
 import {
-  "mizchi/bit",
+  "mizchi/bit/object",
   "mizchi/bit/x/agent",
   "mizchi/bit/x/collab",
 }
 
 // Values
-pub async fn poll_once(@agent.AgentConfig, String) -> Unit raise @bit.GitError
+pub async fn poll_once(@agent.AgentConfig, String) -> Unit raise @object.GitError
 
 pub async fn run_task(@agent.AgentTask, @agent.AgentConfig, String) -> @agent.TaskResult
 
-pub async fn serve(@agent.AgentConfig, String) -> Unit raise @bit.GitError
+pub async fn serve(@agent.AgentConfig, String) -> Unit raise @object.GitError
 
 pub async fn validate_pr(@collab.PullRequest, @agent.AgentConfig, String) -> @agent.ReviewResult
 

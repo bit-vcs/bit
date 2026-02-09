@@ -3,12 +3,12 @@
 ///|
 pub fn materialize_clone_to_fs(
   store : ObjectStore,
-  commit_id : ObjectId,
+  commit_id : @object.ObjectId,
   refname : String,
   remote_url : String,
-  fs : &FileSystem,
+  fs : &@types.FileSystem,
   root : String,
-) -> Unit raise GitError {
+) -> Unit raise @object.GitError {
   checkout_commit_to_fs(store, commit_id, fs, root)
   write_git_metadata(store, commit_id, refname, remote_url, fs, root)
 }
@@ -16,12 +16,12 @@ pub fn materialize_clone_to_fs(
 ///|
 pub fn write_git_metadata(
   store : ObjectStore,
-  commit_id : ObjectId,
+  commit_id : @object.ObjectId,
   refname : String,
   remote_url : String,
-  fs : &FileSystem,
+  fs : &@types.FileSystem,
   root : String,
-) -> Unit raise GitError {
+) -> Unit raise @object.GitError {
   let git_dir = join_path(root, ".git")
   fs.mkdir_p(git_dir)
   fs.mkdir_p(join_path(git_dir, "objects"))
@@ -39,11 +39,11 @@ pub fn write_git_metadata(
 
 ///|
 fn write_head_and_refs(
-  fs : &FileSystem,
+  fs : &@types.FileSystem,
   git_dir : String,
   refname : String,
-  commit_id : ObjectId,
-) -> Unit raise GitError {
+  commit_id : @object.ObjectId,
+) -> Unit raise @object.GitError {
   let head_path = join_path(git_dir, "HEAD")
   if refname == "HEAD" {
     write_text(fs, head_path, commit_id.to_hex() + "\n")
@@ -58,10 +58,10 @@ fn write_head_and_refs(
 
 ///|
 fn write_config(
-  fs : &FileSystem,
+  fs : &@types.FileSystem,
   git_dir : String,
   remote_url : String,
-) -> Unit raise GitError {
+) -> Unit raise @object.GitError {
   let config_path = join_path(git_dir, "config")
   let base =
     #|[core]
@@ -83,13 +83,19 @@ fn write_config(
 }
 
 ///|
-fn write_packed_refs(fs : &FileSystem, git_dir : String) -> Unit raise GitError {
+fn write_packed_refs(
+  fs : &@types.FileSystem,
+  git_dir : String,
+) -> Unit raise @object.GitError {
   let path = join_path(git_dir, "packed-refs")
   write_text(fs, path, "# pack-refs with: peeled fully-peeled\n")
 }
 
 ///|
-fn write_alternates(fs : &FileSystem, git_dir : String) -> Unit raise GitError {
+fn write_alternates(
+  fs : &@types.FileSystem,
+  git_dir : String,
+) -> Unit raise @object.GitError {
   let path = join_path(git_dir, "objects/info/alternates")
   write_text(fs, path, "")
 }
@@ -97,10 +103,10 @@ fn write_alternates(fs : &FileSystem, git_dir : String) -> Unit raise GitError {
 ///|
 fn write_index_v2(
   store : ObjectStore,
-  fs : &FileSystem,
+  fs : &@types.FileSystem,
   git_dir : String,
-  commit_id : ObjectId,
-) -> Unit raise GitError {
+  commit_id : @object.ObjectId,
+) -> Unit raise @object.GitError {
   let entries = collect_commit_entries(store, commit_id)
   entries.sort_by((a, b) => String::compare(a.path, b.path))
   let out : Array[Byte] = []
@@ -153,7 +159,7 @@ fn write_index_v2(
     }
   }
   let content = Bytes::from_array(FixedArray::makei(out.length(), i => out[i]))
-  let checksum = sha1(content)
+  let checksum = @object.sha1(content)
   for b in checksum.bytes {
     out.push(b)
   }
@@ -167,7 +173,7 @@ fn write_index_v2(
 ///|
 priv struct IndexEntryInfo {
   path : String
-  id : ObjectId
+  id : @object.ObjectId
   size : Int
   mode : Int
 }
@@ -175,14 +181,14 @@ priv struct IndexEntryInfo {
 ///|
 fn collect_commit_entries(
   store : ObjectStore,
-  commit_id : ObjectId,
-) -> Array[IndexEntryInfo] raise GitError {
+  commit_id : @object.ObjectId,
+) -> Array[IndexEntryInfo] raise @object.GitError {
   let commit_obj = store.get(commit_id)
   match commit_obj {
-    None => raise GitError::InvalidObject("Missing commit object")
+    None => raise @object.GitError::InvalidObject("Missing commit object")
     Some(obj) => {
-      if obj.obj_type != ObjectType::Commit {
-        raise GitError::InvalidObject("Object is not a commit")
+      if obj.obj_type != @object.ObjectType::Commit {
+        raise @object.GitError::InvalidObject("Object is not a commit")
       }
       let info = parse_commit(obj.data)
       let out : Array[IndexEntryInfo] = []
@@ -195,16 +201,16 @@ fn collect_commit_entries(
 ///|
 fn collect_tree_entries(
   store : ObjectStore,
-  tree_id : ObjectId,
+  tree_id : @object.ObjectId,
   prefix : String,
   out : Array[IndexEntryInfo],
-) -> Unit raise GitError {
+) -> Unit raise @object.GitError {
   let tree_obj = store.get(tree_id)
   match tree_obj {
-    None => raise GitError::InvalidObject("Missing tree object")
+    None => raise @object.GitError::InvalidObject("Missing tree object")
     Some(obj) => {
-      if obj.obj_type != ObjectType::Tree {
-        raise GitError::InvalidObject("Object is not a tree")
+      if obj.obj_type != @object.ObjectType::Tree {
+        raise @object.GitError::InvalidObject("Object is not a tree")
       }
       let entries = parse_tree(obj.data)
       for entry in entries {
@@ -221,10 +227,10 @@ fn collect_tree_entries(
         } else {
           let blob = store.get(entry.id)
           match blob {
-            None => raise GitError::InvalidObject("Missing blob object")
+            None => raise @object.GitError::InvalidObject("Missing blob object")
             Some(b) => {
-              if b.obj_type != ObjectType::Blob {
-                raise GitError::InvalidObject("Object is not a blob")
+              if b.obj_type != @object.ObjectType::Blob {
+                raise @object.GitError::InvalidObject("Object is not a blob")
               }
               let mode = parse_octal(entry.mode)
               out.push({ path, id: entry.id, size: b.data.length(), mode })
@@ -264,10 +270,10 @@ fn push_u16_be(out : Array[Byte], v : Int) -> Unit {
 
 ///|
 fn write_text(
-  fs : &FileSystem,
+  fs : &@types.FileSystem,
   path : String,
   content : String,
-) -> Unit raise GitError {
+) -> Unit raise @object.GitError {
   fs.write_string(path, content)
 }
 

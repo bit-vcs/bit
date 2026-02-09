@@ -2,8 +2,9 @@
 package "mizchi/bit/bit_cli"
 
 import {
-  "mizchi/bit",
   "mizchi/bit/lib",
+  "mizchi/bit/object",
+  "mizchi/bit/types",
 }
 
 // Values
@@ -17,7 +18,7 @@ pub fn get_effective_remote_url(OsFs, String) -> String?
 
 pub fn get_subdir_info(OsFs, String) -> (String, String, String)?
 
-pub fn get_subdir_tree_from_commit(@lib.ObjectDb, OsFs, @bit.ObjectId, String) -> @bit.ObjectId? raise @bit.GitError
+pub fn get_subdir_tree_from_commit(@lib.ObjectDb, OsFs, @object.ObjectId, String) -> @object.ObjectId? raise @object.GitError
 
 pub fn is_subdir_clone(OsFs, String) -> Bool
 
@@ -31,7 +32,7 @@ pub fn read_subdir_attributes(OsFs, String) -> (String, String, String)?
 
 pub fn resolve_alias(Map[String, String], String, Array[String]) -> AliasResolution
 
-pub fn resolve_ref_for_subdir(OsFs, String, String) -> @bit.ObjectId? raise
+pub fn resolve_ref_for_subdir(OsFs, String, String) -> @object.ObjectId? raise
 
 pub fn split_alias_command(String) -> Array[String]
 
@@ -65,8 +66,8 @@ pub struct OsFs {
   dummy : Int
 }
 pub fn OsFs::new() -> Self
-pub impl @bit.FileSystem for OsFs
-pub impl @bit.RepoFileSystem for OsFs
+pub impl @types.FileSystem for OsFs
+pub impl @types.RepoFileSystem for OsFs
 
 type OsObjectStore
 

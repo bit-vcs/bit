@@ -2,19 +2,20 @@
 package "mizchi/bit/diff"
 
 import {
-  "mizchi/bit",
+  "mizchi/bit/object",
+  "mizchi/bit/types",
 }
 
 // Values
-pub fn diff_index(&@bit.RepoFileSystem, String) -> Array[DiffFile] raise @bit.GitError
+pub fn diff_index(&@types.RepoFileSystem, String) -> Array[DiffFile] raise @object.GitError
 
 pub fn diff_stat(Array[DiffFile]) -> Array[String]
 
 pub fn diff_text(Array[DiffFile]) -> Array[String]
 
-pub fn diff_trees(&@bit.RepoFileSystem, String, @bit.ObjectId?, @bit.ObjectId) -> Array[DiffFile] raise @bit.GitError
+pub fn diff_trees(&@types.RepoFileSystem, String, @object.ObjectId?, @object.ObjectId) -> Array[DiffFile] raise @object.GitError
 
-pub async fn diff_worktree(&@bit.RepoFileSystem, String) -> Array[DiffFile] raise @bit.GitError
+pub async fn diff_worktree(&@types.RepoFileSystem, String) -> Array[DiffFile] raise @object.GitError
 
 // Errors
 

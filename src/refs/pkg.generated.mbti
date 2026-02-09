@@ -2,27 +2,28 @@
 package "mizchi/bit/refs"
 
 import {
-  "mizchi/bit",
+  "mizchi/bit/object",
+  "mizchi/bit/types",
 }
 
 // Values
-pub fn collect_loose_ref_ids(&@bit.RepoFileSystem, String, String, Map[String, @bit.ObjectId], String?) -> Unit
+pub fn collect_loose_ref_ids(&@types.RepoFileSystem, String, String, Map[String, @object.ObjectId], String?) -> Unit
 
-pub fn collect_packed_ref_ids(&@bit.RepoFileSystem, String, Map[String, @bit.ObjectId], String?) -> Unit
+pub fn collect_packed_ref_ids(&@types.RepoFileSystem, String, Map[String, @object.ObjectId], String?) -> Unit
 
-pub fn list_refs_with_ids(&@bit.RepoFileSystem, String, String?) -> Map[String, @bit.ObjectId]
+pub fn list_refs_with_ids(&@types.RepoFileSystem, String, String?) -> Map[String, @object.ObjectId]
 
-pub fn list_remote_tracking_refs(&@bit.RepoFileSystem, String, String) -> Map[String, @bit.ObjectId]
+pub fn list_remote_tracking_refs(&@types.RepoFileSystem, String, String) -> Map[String, @object.ObjectId]
 
-pub fn remove_packed_ref(&@bit.FileSystem, &@bit.RepoFileSystem, String, String) -> Unit raise @bit.GitError
+pub fn remove_packed_ref(&@types.FileSystem, &@types.RepoFileSystem, String, String) -> Unit raise @object.GitError
 
-pub fn remove_packed_refs_with_prefix(&@bit.FileSystem, &@bit.RepoFileSystem, String, String, String) -> Unit raise @bit.GitError
+pub fn remove_packed_refs_with_prefix(&@types.FileSystem, &@types.RepoFileSystem, String, String, String) -> Unit raise @object.GitError
 
-pub fn remove_remote_refs(&@bit.FileSystem, &@bit.RepoFileSystem, String, String) -> Unit
+pub fn remove_remote_refs(&@types.FileSystem, &@types.RepoFileSystem, String, String) -> Unit
 
-pub fn rename_packed_refs_prefix(&@bit.FileSystem, &@bit.RepoFileSystem, String, String, String, String, String) -> Unit raise @bit.GitError
+pub fn rename_packed_refs_prefix(&@types.FileSystem, &@types.RepoFileSystem, String, String, String, String, String) -> Unit raise @object.GitError
 
-pub fn rewrite_packed_refs(&@bit.FileSystem, &@bit.RepoFileSystem, String, (String) -> String?) -> Unit raise @bit.GitError
+pub fn rewrite_packed_refs(&@types.FileSystem, &@types.RepoFileSystem, String, (String) -> String?) -> Unit raise @object.GitError
 
 // Errors
 

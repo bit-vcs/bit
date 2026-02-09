@@ -1,0 +1,66 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/bit/types"
+
+import {
+  "mizchi/bit/object",
+}
+
+// Values
+
+// Errors
+
+// Types and methods
+pub struct HttpResponse {
+  code : Int
+  headers : Map[String, String]
+}
+pub fn HttpResponse::new(Int) -> Self
+pub fn HttpResponse::with_headers(Int, Map[String, String]) -> Self
+
+pub struct MockHttpClient {
+  responses : Map[String, (Int, Bytes)]
+}
+pub fn MockHttpClient::add_response(Self, String, Int, Bytes) -> Unit
+pub fn MockHttpClient::new() -> Self
+pub impl HttpClient for MockHttpClient
+
+// Type aliases
+pub using @object {type Commit}
+
+pub using @object {type GitError}
+
+pub using @object {type ObjectId}
+
+pub using @object {type ObjectType}
+
+pub using @object {type PackCompression}
+
+pub using @object {type PackDeltaMode}
+
+pub using @object {type PackObject}
+
+pub using @object {type Sha1State}
+
+pub using @object {type TreeEntry}
+
+// Traits
+pub(open) trait FileSystem {
+  mkdir_p(Self, String) -> Unit raise @object.GitError
+  write_file(Self, String, Bytes) -> Unit raise @object.GitError
+  write_string(Self, String, String) -> Unit raise @object.GitError
+  remove_file(Self, String) -> Unit raise @object.GitError
+  remove_dir(Self, String) -> Unit raise @object.GitError
+}
+
+pub(open) trait HttpClient {
+  get(Self, String, Map[String, String]) -> (HttpResponse, Bytes) raise @object.GitError
+  post(Self, String, Bytes, Map[String, String]) -> (HttpResponse, Bytes) raise @object.GitError
+}
+
+pub(open) trait RepoFileSystem {
+  read_file(Self, String) -> Bytes raise @object.GitError
+  readdir(Self, String) -> Array[String] raise @object.GitError
+  is_dir(Self, String) -> Bool
+  is_file(Self, String) -> Bool
+}
+

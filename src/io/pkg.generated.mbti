@@ -2,7 +2,7 @@
 package "mizchi/bit/io"
 
 import {
-  "mizchi/bit",
+  "mizchi/bit/types",
 }
 
 // Values
@@ -16,9 +16,9 @@ pub fn set_env_provider(EnvProvider) -> Unit
 
 pub fn set_worktree_probe(WorktreeProbeProvider) -> Unit
 
-pub async fn worktree_entry(&@bit.RepoFileSystem, String) -> WorktreeEntry? noraise
+pub async fn worktree_entry(&@types.RepoFileSystem, String) -> WorktreeEntry? noraise
 
-pub async fn worktree_entry_meta(&@bit.RepoFileSystem, String) -> WorktreeEntryMeta? noraise
+pub async fn worktree_entry_meta(&@types.RepoFileSystem, String) -> WorktreeEntryMeta? noraise
 
 // Errors
 
@@ -60,10 +60,10 @@ pub fn WorktreeKindMeta::regular() -> Self
 pub fn WorktreeKindMeta::symlink() -> Self
 
 pub struct WorktreeProbeProvider {
-  entry_meta : async (&@bit.RepoFileSystem, String) -> WorktreeEntryMeta? noraise
+  entry_meta : async (&@types.RepoFileSystem, String) -> WorktreeEntryMeta? noraise
   symlink_target : (String) -> String?
 }
-pub fn WorktreeProbeProvider::new(async (&@bit.RepoFileSystem, String) -> WorktreeEntryMeta? noraise, (String) -> String?) -> Self
+pub fn WorktreeProbeProvider::new(async (&@types.RepoFileSystem, String) -> WorktreeEntryMeta? noraise, (String) -> String?) -> Self
 pub fn WorktreeProbeProvider::none() -> Self
 
 // Type aliases

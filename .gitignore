@@ -17,7 +17,7 @@ express/
 express-git/
 express-moongit/
 git-repo/
-repo/
+/repo/
 repo-git/
 repo-moongit/
 third_party/

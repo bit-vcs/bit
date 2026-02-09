@@ -1,8 +1,8 @@
-///| Minimal object store + checkout helpers
+///| Pure repository object store and tree/commit parsing
 
 ///|
 pub struct ObjectStore {
-  objects : Map[String, PackObject]
+  objects : Map[String, @object.PackObject]
 }
 
 ///|
@@ -11,7 +11,9 @@ pub fn ObjectStore::new() -> ObjectStore {
 }
 
 ///|
-pub fn ObjectStore::from_pack(objects : Array[PackObject]) -> ObjectStore {
+pub fn ObjectStore::from_pack(
+  objects : Array[@object.PackObject],
+) -> ObjectStore {
   let store = ObjectStore::new()
   store.add_objects(objects)
   store
@@ -20,26 +22,29 @@ pub fn ObjectStore::from_pack(objects : Array[PackObject]) -> ObjectStore {
 ///|
 pub fn ObjectStore::add_objects(
   self : ObjectStore,
-  objects : Array[PackObject],
+  objects : Array[@object.PackObject],
 ) -> Unit {
   for obj in objects {
     // Use cached id if available (offset >= 0 means it was parsed from pack)
     let id = if obj.offset >= 0 {
       obj.id
     } else {
-      hash_object_content(obj.obj_type, obj.data)
+      @object.hash_object_content(obj.obj_type, obj.data)
     }
     self.objects[id.to_hex()] = obj
   }
 }
 
 ///|
-pub fn ObjectStore::get(self : ObjectStore, id : ObjectId) -> PackObject? {
+pub fn ObjectStore::get(
+  self : ObjectStore,
+  id : @object.ObjectId,
+) -> @object.PackObject? {
   self.objects.get(id.to_hex())
 }
 
 ///|
-pub fn ObjectStore::contains(self : ObjectStore, id : ObjectId) -> Bool {
+pub fn ObjectStore::contains(self : ObjectStore, id : @object.ObjectId) -> Bool {
   match self.objects.get(id.to_hex()) {
     Some(_) => true
     None => false
@@ -48,15 +53,15 @@ pub fn ObjectStore::contains(self : ObjectStore, id : ObjectId) -> Bool {
 
 ///|
 pub struct CommitInfo {
-  tree : ObjectId
-  parents : Array[ObjectId]
+  tree : @object.ObjectId
+  parents : Array[@object.ObjectId]
 }
 
 ///|
-pub fn parse_commit(content : Bytes) -> CommitInfo raise GitError {
+pub fn parse_commit(content : Bytes) -> CommitInfo raise @object.GitError {
   let text = @utf8.decode_lossy(content[:])
-  let mut tree_id : ObjectId? = None
-  let parents : Array[ObjectId] = []
+  let mut tree_id : @object.ObjectId? = None
+  let parents : Array[@object.ObjectId] = []
   for line_view in text.split("\n") {
     let line = line_view.to_string()
     if line.length() == 0 {
@@ -64,21 +69,23 @@ pub fn parse_commit(content : Bytes) -> CommitInfo raise GitError {
     }
     if line.has_prefix("tree ") {
       let hex = String::unsafe_substring(line, start=5, end=line.length())
-      tree_id = hex |> ObjectId::from_hex |> Some
+      tree_id = hex |> @object.ObjectId::from_hex |> Some
     } else if line.has_prefix("parent ") {
       let hex = String::unsafe_substring(line, start=7, end=line.length())
-      parents.push(ObjectId::from_hex(hex))
+      parents.push(@object.ObjectId::from_hex(hex))
     }
   }
   match tree_id {
     Some(tree) => { tree, parents }
-    None => raise GitError::InvalidObject("Missing tree in commit")
+    None => raise @object.GitError::InvalidObject("Missing tree in commit")
   }
 }
 
 ///|
-pub fn parse_tree(content : Bytes) -> Array[TreeEntry] raise GitError {
-  let entries : Array[TreeEntry] = []
+pub fn parse_tree(
+  content : Bytes,
+) -> Array[@object.TreeEntry] raise @object.GitError {
+  let entries : Array[@object.TreeEntry] = []
   let mut i = 0
   while i < content.length() {
     // Parse mode (ASCII only, so byte-by-byte is fine)
@@ -88,7 +95,7 @@ pub fn parse_tree(content : Bytes) -> Array[TreeEntry] raise GitError {
       i += 1
     }
     if i >= content.length() {
-      raise GitError::InvalidObject("Truncated tree entry mode")
+      raise @object.GitError::InvalidObject("Truncated tree entry mode")
     }
     i += 1 // skip space
     // Parse name - collect bytes and decode as UTF-8
@@ -97,7 +104,7 @@ pub fn parse_tree(content : Bytes) -> Array[TreeEntry] raise GitError {
       i += 1
     }
     if i >= content.length() {
-      raise GitError::InvalidObject("Truncated tree entry name")
+      raise @object.GitError::InvalidObject("Truncated tree entry name")
     }
     let name_len = i - name_start
     let name_bytes = FixedArray::makei(name_len, fn(j) {
@@ -106,15 +113,15 @@ pub fn parse_tree(content : Bytes) -> Array[TreeEntry] raise GitError {
     let name = @utf8.decode_lossy(Bytes::from_array(name_bytes)[:])
     i += 1 // skip NUL
     if i + 20 > content.length() {
-      raise GitError::InvalidObject("Truncated tree entry id")
+      raise @object.GitError::InvalidObject("Truncated tree entry id")
     }
     let bytes : FixedArray[Byte] = FixedArray::make(20, b'\x00')
     for j in 0..<20 {
       bytes[j] = content[i + j]
     }
     i += 20
-    let id = ObjectId::new(bytes)
-    entries.push(TreeEntry::new(mode_buf.to_string(), name, id))
+    let id = @object.ObjectId::new(bytes)
+    entries.push(@object.TreeEntry::new(mode_buf.to_string(), name, id))
   }
   entries
 }
@@ -122,14 +129,14 @@ pub fn parse_tree(content : Bytes) -> Array[TreeEntry] raise GitError {
 ///|
 pub fn checkout_commit(
   store : ObjectStore,
-  commit_id : ObjectId,
-) -> Map[String, Bytes] raise GitError {
+  commit_id : @object.ObjectId,
+) -> Map[String, Bytes] raise @object.GitError {
   let commit_obj = store.get(commit_id)
   match commit_obj {
-    None => raise GitError::InvalidObject("Missing commit object")
+    None => raise @object.GitError::InvalidObject("Missing commit object")
     Some(obj) => {
-      if obj.obj_type != ObjectType::Commit {
-        raise GitError::InvalidObject("Object is not a commit")
+      if obj.obj_type != @object.ObjectType::Commit {
+        raise @object.GitError::InvalidObject("Object is not a commit")
       }
       let info = parse_commit(obj.data)
       let files : Map[String, Bytes] = {}
@@ -140,19 +147,18 @@ pub fn checkout_commit(
 }
 
 ///|
-/// Materialize commit files into a filesystem under `root`.
 pub fn checkout_commit_to_fs(
   store : ObjectStore,
-  commit_id : ObjectId,
-  fs : &FileSystem,
+  commit_id : @object.ObjectId,
+  fs : &@types.FileSystem,
   root : String,
-) -> Unit raise GitError {
+) -> Unit raise @object.GitError {
   let commit_obj = store.get(commit_id)
   match commit_obj {
-    None => raise GitError::InvalidObject("Missing commit object")
+    None => raise @object.GitError::InvalidObject("Missing commit object")
     Some(obj) => {
-      if obj.obj_type != ObjectType::Commit {
-        raise GitError::InvalidObject("Object is not a commit")
+      if obj.obj_type != @object.ObjectType::Commit {
+        raise @object.GitError::InvalidObject("Object is not a commit")
       }
       let info = parse_commit(obj.data)
       walk_tree_to_fs(store, info.tree, "", fs, root)
@@ -163,16 +169,16 @@ pub fn checkout_commit_to_fs(
 ///|
 fn walk_tree(
   store : ObjectStore,
-  tree_id : ObjectId,
+  tree_id : @object.ObjectId,
   prefix : String,
   files : Map[String, Bytes],
-) -> Unit raise GitError {
+) -> Unit raise @object.GitError {
   let tree_obj = store.get(tree_id)
   match tree_obj {
-    None => raise GitError::InvalidObject("Missing tree object")
+    None => raise @object.GitError::InvalidObject("Missing tree object")
     Some(obj) => {
-      if obj.obj_type != ObjectType::Tree {
-        raise GitError::InvalidObject("Object is not a tree")
+      if obj.obj_type != @object.ObjectType::Tree {
+        raise @object.GitError::InvalidObject("Object is not a tree")
       }
       let entries = parse_tree(obj.data)
       for entry in entries {
@@ -188,10 +194,10 @@ fn walk_tree(
         } else {
           let blob_obj = store.get(entry.id)
           match blob_obj {
-            None => raise GitError::InvalidObject("Missing blob object")
+            None => raise @object.GitError::InvalidObject("Missing blob object")
             Some(b) => {
-              if b.obj_type != ObjectType::Blob {
-                raise GitError::InvalidObject("Object is not a blob")
+              if b.obj_type != @object.ObjectType::Blob {
+                raise @object.GitError::InvalidObject("Object is not a blob")
               }
               files[path] = b.data
             }
@@ -205,17 +211,17 @@ fn walk_tree(
 ///|
 fn walk_tree_to_fs(
   store : ObjectStore,
-  tree_id : ObjectId,
+  tree_id : @object.ObjectId,
   prefix : String,
-  fs : &FileSystem,
+  fs : &@types.FileSystem,
   root : String,
-) -> Unit raise GitError {
+) -> Unit raise @object.GitError {
   let tree_obj = store.get(tree_id)
   match tree_obj {
-    None => raise GitError::InvalidObject("Missing tree object")
+    None => raise @object.GitError::InvalidObject("Missing tree object")
     Some(obj) => {
-      if obj.obj_type != ObjectType::Tree {
-        raise GitError::InvalidObject("Object is not a tree")
+      if obj.obj_type != @object.ObjectType::Tree {
+        raise @object.GitError::InvalidObject("Object is not a tree")
       }
       let entries = parse_tree(obj.data)
       for entry in entries {
@@ -232,10 +238,10 @@ fn walk_tree_to_fs(
         } else {
           let blob_obj = store.get(entry.id)
           match blob_obj {
-            None => raise GitError::InvalidObject("Missing blob object")
+            None => raise @object.GitError::InvalidObject("Missing blob object")
             Some(b) => {
-              if b.obj_type != ObjectType::Blob {
-                raise GitError::InvalidObject("Object is not a blob")
+              if b.obj_type != @object.ObjectType::Blob {
+                raise @object.GitError::InvalidObject("Object is not a blob")
               }
               let full_path = join_path(root, path)
               let dir = parent_dir(full_path)
@@ -250,12 +256,12 @@ fn walk_tree_to_fs(
 }
 
 ///|
-fn is_tree_mode(mode : String) -> Bool {
+pub fn is_tree_mode(mode : String) -> Bool {
   mode == "40000" || mode == "040000"
 }
 
 ///|
-fn is_gitlink_mode(mode : String) -> Bool {
+pub fn is_gitlink_mode(mode : String) -> Bool {
   mode == "160000" || mode == "0160000"
 }
 
@@ -275,7 +281,7 @@ pub fn join_path(root : String, path : String) -> String {
 }
 
 ///|
-fn parent_dir(path : String) -> String {
+pub fn parent_dir(path : String) -> String {
   match path.rev_find("/") {
     None => "/"
     Some(0) => "/"

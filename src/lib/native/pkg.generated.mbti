@@ -2,26 +2,27 @@
 package "mizchi/bit/lib/native"
 
 import {
-  "mizchi/bit",
   "mizchi/bit/lib",
+  "mizchi/bit/object",
+  "mizchi/bit/types",
 }
 
 // Values
-pub async fn apply_worktree_modes_from_commit(&@bit.FileSystem, &@bit.RepoFileSystem, String, String, @bit.ObjectId) -> Unit raise @bit.GitError
+pub async fn apply_worktree_modes_from_commit(&@types.FileSystem, &@types.RepoFileSystem, String, String, @object.ObjectId) -> Unit raise @object.GitError
 
-pub async fn clone_http(&@bit.FileSystem, &@bit.RepoFileSystem, String, String, Bool) -> @bit.ObjectId? raise @bit.GitError
+pub async fn clone_http(&@types.FileSystem, &@types.RepoFileSystem, String, String, Bool) -> @object.ObjectId? raise @object.GitError
 
-pub fn native_promisor_db(&@bit.RepoFileSystem, String, lazy_load? : Bool) -> @lib.PromisorDb raise @bit.GitError
+pub fn native_promisor_db(&@types.RepoFileSystem, String, lazy_load? : Bool) -> @lib.PromisorDb raise @object.GitError
 
-pub async fn pull_http(&@bit.FileSystem, &@bit.RepoFileSystem, String, String, Bool, rebase? : Bool) -> @bit.ObjectId? raise @bit.GitError
+pub async fn pull_http(&@types.FileSystem, &@types.RepoFileSystem, String, String, Bool, rebase? : Bool) -> @object.ObjectId? raise @object.GitError
 
-pub async fn push_http(&@bit.RepoFileSystem, String, String, String, force? : Bool) -> String raise @bit.GitError
+pub async fn push_http(&@types.RepoFileSystem, String, String, String, force? : Bool) -> String raise @object.GitError
 
-pub async fn push_http_from_commit(&@bit.RepoFileSystem, String, String, @bit.ObjectId, String) -> String raise @bit.GitError
+pub async fn push_http_from_commit(&@types.RepoFileSystem, String, String, @object.ObjectId, String) -> String raise @object.GitError
 
-pub async fn push_http_tree_only(&@bit.RepoFileSystem, String, String, @bit.ObjectId, @bit.ObjectId, String) -> String raise @bit.GitError
+pub async fn push_http_tree_only(&@types.RepoFileSystem, String, String, @object.ObjectId, @object.ObjectId, String) -> String raise @object.GitError
 
-pub async fn resolve_remote_ref_id(String, String) -> (@bit.ObjectId, String?)? raise @bit.GitError
+pub async fn resolve_remote_ref_id(String, String) -> (@object.ObjectId, String?)? raise @object.GitError
 
 // Errors
 

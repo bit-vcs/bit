@@ -2,8 +2,8 @@
 package "mizchi/bit/x/kv"
 
 import {
-  "mizchi/bit",
   "mizchi/bit/lib",
+  "mizchi/bit/object",
 }
 
 // Values
@@ -12,22 +12,22 @@ import {
 
 // Types and methods
 pub(all) struct GitObject {
-  id : @bit.ObjectId
-  obj_type : @bit.ObjectType
+  id : @object.ObjectId
+  obj_type : @object.ObjectType
   data : Bytes
 }
 
 pub(all) enum GossipMessage {
   Announce(GossipState)
-  WantObjects(Array[@bit.ObjectId])
+  WantObjects(Array[@object.ObjectId])
   HaveObjects(Array[GitObject])
-  SyncRequest(NodeId, @bit.ObjectId)
-  SyncResponse(Array[GitObject], @bit.ObjectId)
+  SyncRequest(NodeId, @object.ObjectId)
+  SyncResponse(Array[GitObject], @object.ObjectId)
 }
 
 pub(all) struct GossipState {
   node_id : NodeId
-  head : @bit.ObjectId
+  head : @object.ObjectId
   clock : VectorClock
   timestamp : Int64
 }
@@ -37,14 +37,14 @@ pub struct Kv {
   tree : &@lib.WorkingTree
   store : &@lib.ObjectStore
   mut clock : VectorClock
-  mut head : @bit.ObjectId
+  mut head : @object.ObjectId
   peers : Map[String, PeerInfo]
   pending_objects : Map[String, GitObject]
 }
 pub fn Kv::add_peer(Self, PeerInfo) -> Unit
-pub fn Kv::apply_pending_objects(Self) -> Int raise @bit.GitError
+pub fn Kv::apply_pending_objects(Self) -> Int raise @object.GitError
 pub fn Kv::clock(Self) -> VectorClock
-pub fn Kv::commit(Self, String, Int64) -> @bit.ObjectId raise @bit.GitError
+pub fn Kv::commit(Self, String, Int64) -> @object.ObjectId raise @object.GitError
 pub fn Kv::delete(Self, String) -> Unit
 pub fn Kv::get(Self, String) -> Bytes?
 pub fn Kv::get_gossip_state(Self, Int64) -> GossipState
@@ -52,12 +52,12 @@ pub fn Kv::get_peers(Self) -> Array[PeerInfo]
 pub fn Kv::handle_gossip(Self, GossipMessage, Int64) -> GossipMessage?
 pub fn Kv::has(Self, String) -> Bool
 pub fn Kv::has_pending_objects(Self) -> Bool
-pub fn Kv::head(Self) -> @bit.ObjectId
+pub fn Kv::head(Self) -> @object.ObjectId
 pub fn Kv::is_dirty(Self) -> Bool
 pub fn Kv::list(Self, String) -> Array[String]
 pub fn Kv::list_recursive(Self, String) -> Array[String]
-pub fn Kv::merge(Self, @bit.ObjectId, VectorClock, MergeStrategy, Int64) -> MergeResult raise @bit.GitError
-pub fn Kv::new(NodeId, &@lib.WorkingTree, &@lib.ObjectStore, @bit.ObjectId) -> Self
+pub fn Kv::merge(Self, @object.ObjectId, VectorClock, MergeStrategy, Int64) -> MergeResult raise @object.GitError
+pub fn Kv::new(NodeId, &@lib.WorkingTree, &@lib.ObjectStore, @object.ObjectId) -> Self
 pub fn Kv::node_id(Self) -> NodeId
 pub fn Kv::pending_object_count(Self) -> Int
 pub fn Kv::remove_peer(Self, NodeId) -> Bool
@@ -77,8 +77,8 @@ pub fn KvConfig::default(NodeId) -> Self
 
 pub(all) enum MergeResult {
   NoOp
-  FastForward(@bit.ObjectId)
-  Merged(@bit.ObjectId, Array[String])
+  FastForward(@object.ObjectId)
+  Merged(@object.ObjectId, Array[String])
   Conflict(Array[String])
 }
 
@@ -99,7 +99,7 @@ pub impl Show for NodeId
 pub(all) struct PeerInfo {
   node_id : NodeId
   last_seen : Int64
-  head : @bit.ObjectId
+  head : @object.ObjectId
   endpoint : String
 }
 
@@ -134,7 +134,7 @@ pub(all) struct SyncResult {
   objects_sent : Int
   objects_received : Int
   conflicts : Array[String]
-  new_head : @bit.ObjectId
+  new_head : @object.ObjectId
 }
 
 pub(all) struct VectorClock {

@@ -2,7 +2,8 @@
 package "mizchi/bit/osfs"
 
 import {
-  "mizchi/bit",
+  "mizchi/bit/object",
+  "mizchi/bit/types",
 }
 
 // Values
@@ -14,8 +15,8 @@ pub struct OsFs {
   // private fields
 }
 pub fn OsFs::new() -> Self
-pub impl @bit.FileSystem for OsFs
-pub impl @bit.RepoFileSystem for OsFs
+pub impl @types.FileSystem for OsFs
+pub impl @types.RepoFileSystem for OsFs
 
 // Type aliases
 

@@ -2,15 +2,16 @@
 package "mizchi/bit/ignore"
 
 import {
-  "mizchi/bit",
+  "mizchi/bit/object",
+  "mizchi/bit/types",
 }
 
 // Values
-pub fn is_ignored_path(&@bit.RepoFileSystem, String, String, Bool) -> Bool raise @bit.GitError
+pub fn is_ignored_path(&@types.RepoFileSystem, String, String, Bool) -> Bool raise @object.GitError
 
-pub fn list_working_files(&@bit.RepoFileSystem, String) -> Array[String] raise @bit.GitError
+pub fn list_working_files(&@types.RepoFileSystem, String) -> Array[String] raise @object.GitError
 
-pub async fn list_working_files_async(&@bit.RepoFileSystem, String) -> Array[String] raise @bit.GitError
+pub async fn list_working_files_async(&@types.RepoFileSystem, String) -> Array[String] raise @object.GitError
 
 pub fn match_glob(String, String) -> Bool
 

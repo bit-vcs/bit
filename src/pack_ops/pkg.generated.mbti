@@ -2,18 +2,19 @@
 package "mizchi/bit/pack_ops"
 
 import {
-  "mizchi/bit",
   "mizchi/bit/lib",
+  "mizchi/bit/object",
+  "mizchi/bit/types",
 }
 
 // Values
-pub fn collect_commit_tree_only(@lib.ObjectDb, &@bit.RepoFileSystem, @bit.ObjectId) -> Array[@bit.PackObject] raise @bit.GitError
+pub fn collect_commit_tree_only(@lib.ObjectDb, &@types.RepoFileSystem, @object.ObjectId) -> Array[@object.PackObject] raise @object.GitError
 
-pub fn collect_diff_objects(@lib.ObjectDb, &@bit.RepoFileSystem, @bit.ObjectId, @bit.ObjectId) -> Array[@bit.PackObject] raise @bit.GitError
+pub fn collect_diff_objects(@lib.ObjectDb, &@types.RepoFileSystem, @object.ObjectId, @object.ObjectId) -> Array[@object.PackObject] raise @object.GitError
 
-pub fn collect_reachable_objects(@lib.ObjectDb, &@bit.RepoFileSystem, @bit.ObjectId) -> Array[@bit.PackObject] raise @bit.GitError
+pub fn collect_reachable_objects(@lib.ObjectDb, &@types.RepoFileSystem, @object.ObjectId) -> Array[@object.PackObject] raise @object.GitError
 
-pub fn collect_reachable_objects_from_commits(@lib.ObjectDb, &@bit.RepoFileSystem, Array[@bit.ObjectId]) -> Array[@bit.PackObject] raise @bit.GitError
+pub fn collect_reachable_objects_from_commits(@lib.ObjectDb, &@types.RepoFileSystem, Array[@object.ObjectId]) -> Array[@object.PackObject] raise @object.GitError
 
 // Errors
 
