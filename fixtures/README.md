@@ -3,7 +3,7 @@
 ## Regenerate idx fixtures
 
 ```sh
-./src/fixtures/regen_idx.sh
+./fixtures/regen_idx.sh
 ```
 
 ## hello.pack
@@ -18,10 +18,10 @@ printf "hello\n" > hello.txt
 git add hello.txt
 git commit -m "init" -q
 OBJ_LIST=$(git rev-list --objects --all)
-printf "%s\n" "$OBJ_LIST" | git pack-objects --stdout > /path/to/src/git/fixtures/hello.pack
+printf "%s\n" "$OBJ_LIST" | git pack-objects --stdout > /path/to/fixtures/hello.pack
 # Verify
 cd /path/to/repo
-git index-pack src/git/fixtures/hello.pack
+git index-pack fixtures/hello.pack
 ```
 
 ## oracle.pack
@@ -40,10 +40,10 @@ git add hello.txt world.txt
 GIT_AUTHOR_DATE="1700000000 +0000" GIT_COMMITTER_DATE="1700000000 +0000" git commit -q -m "initial"
 git rev-list --objects --all | cut -d' ' -f1 | \
   git -c core.compression=0 pack-objects --stdout --window=0 --depth=0 --no-reuse-delta --no-reuse-object \
-  > /path/to/src/git/fixtures/oracle.pack
+  > /path/to/fixtures/oracle.pack
 # Verify
 cd /path/to/repo
-git index-pack src/git/fixtures/oracle.pack
+git index-pack fixtures/oracle.pack
 ```
 
 ## oracle_deflate.pack
@@ -62,11 +62,11 @@ git add hello.txt world.txt
 GIT_AUTHOR_DATE="1700000000 +0000" GIT_COMMITTER_DATE="1700000000 +0000" git commit -q -m "initial"
 git rev-list --objects --all | cut -d' ' -f1 | \
   git -c core.compression=1 pack-objects --stdout --window=0 --depth=0 --no-reuse-delta --no-reuse-object \
-  > /path/to/src/git/fixtures/oracle_deflate.pack
+  > /path/to/fixtures/oracle_deflate.pack
 # Verify
 cd /path/to/repo
-git index-pack src/git/fixtures/oracle_deflate.pack
-git verify-pack -v src/git/fixtures/oracle_deflate.pack
+git index-pack fixtures/oracle_deflate.pack
+git verify-pack -v fixtures/oracle_deflate.pack
 ```
 
 ## oracle_delta.pack
@@ -89,11 +89,11 @@ git add big.txt big2.txt
 GIT_AUTHOR_DATE="1700000000 +0000" GIT_COMMITTER_DATE="1700000000 +0000" git commit -q -m "initial"
 git rev-list --objects --all | cut -d' ' -f1 | \
   git -c core.compression=1 pack-objects --stdout --window=10 --depth=10 --no-reuse-object \
-  > /path/to/src/git/fixtures/oracle_delta.pack
+  > /path/to/fixtures/oracle_delta.pack
 # Verify
 cd /path/to/repo
-git index-pack src/git/fixtures/oracle_delta.pack
-git verify-pack -v src/git/fixtures/oracle_delta.pack
+git index-pack fixtures/oracle_delta.pack
+git verify-pack -v fixtures/oracle_delta.pack
 ```
 
 ## oracle_thin.pack
@@ -121,11 +121,11 @@ GIT_AUTHOR_DATE="1700000001 +0000" GIT_COMMITTER_DATE="1700000001 +0000" git com
 commit2=$(git rev-parse HEAD)
 printf "%s\n^%s\n" "$commit2" "$commit1" | \
   git -c core.compression=1 pack-objects --thin --stdout --window=10 --depth=10 --no-reuse-object --revs \
-  > /path/to/src/git/fixtures/oracle_thin.pack
+  > /path/to/fixtures/oracle_thin.pack
 
 # Verify in a repo that has commit1
-git index-pack src/git/fixtures/oracle_thin.pack # expected: unresolved delta
-cat src/git/fixtures/oracle_thin.pack | git index-pack --fix-thin --stdin
+git index-pack fixtures/oracle_thin.pack # expected: unresolved delta
+cat fixtures/oracle_thin.pack | git index-pack --fix-thin --stdin
 ```
 
 ## oracle_thin_base.pack
@@ -144,7 +144,7 @@ git add big.txt
 GIT_AUTHOR_DATE="1700000000 +0000" GIT_COMMITTER_DATE="1700000000 +0000" git commit -q -m "c1"
 git rev-list --objects --all | cut -d' ' -f1 | \
   git -c core.compression=1 pack-objects --stdout --window=0 --depth=0 --no-reuse-delta --no-reuse-object --no-delta-base-offset \
-  > /path/to/src/git/fixtures/oracle_thin_base.pack
+  > /path/to/fixtures/oracle_thin_base.pack
 ```
 
 ## oracle_after_delta.pack
@@ -174,7 +174,7 @@ printf "%s\n" "$(git rev-parse HEAD)" | \
 # Reorder to put delta before base (REF_DELTA is safe to reorder)
 cd /path/to/repo
 git index-pack /tmp/tmp_refdelta.pack
-node -e 'const fs=require("fs"); const crypto=require("crypto"); const {execSync}=require("child_process"); const packPath="/tmp/tmp_refdelta.pack"; const buf=fs.readFileSync(packPath); const trailerOffset=buf.length-20; const out=execSync("git verify-pack -v "+packPath,{encoding:"utf8"}); const lines=out.trim().split("\\n").filter(l=>/^[0-9a-f]{40} /.test(l)); const entries=lines.map(l=>{const parts=l.trim().split(/\\s+/); return {offset: parseInt(parts[4],10), isDelta: parts.length>=7};}).sort((a,b)=>a.offset-b.offset); const offsets=entries.map(e=>e.offset).concat([trailerOffset]); const slices=entries.map((e,i)=>({isDelta:e.isDelta, buf: buf.slice(e.offset, offsets[i+1])})); const reordered=slices.filter(s=>s.isDelta).concat(slices.filter(s=>!s.isDelta)); const header=buf.slice(0,12); const body=Buffer.concat(reordered.map(s=>s.buf)); const content=Buffer.concat([header, body]); const trailer=crypto.createHash("sha1").update(content).digest(); fs.writeFileSync("/path/to/src/git/fixtures/oracle_after_delta.pack", Buffer.concat([content,trailer]));'
+node -e 'const fs=require("fs"); const crypto=require("crypto"); const {execSync}=require("child_process"); const packPath="/tmp/tmp_refdelta.pack"; const buf=fs.readFileSync(packPath); const trailerOffset=buf.length-20; const out=execSync("git verify-pack -v "+packPath,{encoding:"utf8"}); const lines=out.trim().split("\\n").filter(l=>/^[0-9a-f]{40} /.test(l)); const entries=lines.map(l=>{const parts=l.trim().split(/\\s+/); return {offset: parseInt(parts[4],10), isDelta: parts.length>=7};}).sort((a,b)=>a.offset-b.offset); const offsets=entries.map(e=>e.offset).concat([trailerOffset]); const slices=entries.map((e,i)=>({isDelta:e.isDelta, buf: buf.slice(e.offset, offsets[i+1])})); const reordered=slices.filter(s=>s.isDelta).concat(slices.filter(s=>!s.isDelta)); const header=buf.slice(0,12); const body=Buffer.concat(reordered.map(s=>s.buf)); const content=Buffer.concat([header, body]); const trailer=crypto.createHash("sha1").update(content).digest(); fs.writeFileSync("/path/to/fixtures/oracle_after_delta.pack", Buffer.concat([content,trailer]));'
 ```
 
 ## upload-pack v2 fixtures (advertise/ls-refs/fetch)

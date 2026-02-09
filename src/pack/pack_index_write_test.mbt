@@ -26,38 +26,38 @@ fn assert_pack_idx_matches(pack_path : String, idx_path : String) -> Unit raise 
 
 ///|
 test "pack index fixture: hello.pack" {
-  assert_pack_idx_matches("src/fixtures/hello.pack", "src/fixtures/hello.idx")
+  assert_pack_idx_matches("fixtures/hello.pack", "fixtures/hello.idx")
 }
 
 ///|
 test "pack index fixture: oracle.pack" {
-  assert_pack_idx_matches("src/fixtures/oracle.pack", "src/fixtures/oracle.idx")
+  assert_pack_idx_matches("fixtures/oracle.pack", "fixtures/oracle.idx")
 }
 
 ///|
 test "pack index fixture: oracle_deflate.pack" {
   assert_pack_idx_matches(
-    "src/fixtures/oracle_deflate.pack", "src/fixtures/oracle_deflate.idx",
+    "fixtures/oracle_deflate.pack", "fixtures/oracle_deflate.idx",
   )
 }
 
 ///|
 test "pack index fixture: oracle_delta.pack" {
   assert_pack_idx_matches(
-    "src/fixtures/oracle_delta.pack", "src/fixtures/oracle_delta.idx",
+    "fixtures/oracle_delta.pack", "fixtures/oracle_delta.idx",
   )
 }
 
 ///|
 test "pack index fixture: oracle_after_delta.pack" {
   assert_pack_idx_matches(
-    "src/fixtures/oracle_after_delta.pack", "src/fixtures/oracle_after_delta.idx",
+    "fixtures/oracle_after_delta.pack", "fixtures/oracle_after_delta.idx",
   )
 }
 
 ///|
 test "pack index fixture: oracle_thin_base.pack" {
   assert_pack_idx_matches(
-    "src/fixtures/oracle_thin_base.pack", "src/fixtures/oracle_thin_base.idx",
+    "fixtures/oracle_thin_base.pack", "fixtures/oracle_thin_base.idx",
   )
 }

@@ -1,12 +1,8 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "mizchi/bit/hash"
 
-import {
-  "mizchi/bit",
-}
-
 // Values
-pub fn hex_char_to_int(Char) -> Int raise @bit.GitError
+pub fn hex_char_to_int(Char) -> Int raise
 
 pub fn int_to_hex4(Int) -> String
 
@@ -16,11 +12,33 @@ pub fn is_hex_string(String) -> Bool
 
 pub fn lower_hex_string(String) -> String
 
+pub fn sha1_array_prefix_raw(Array[Byte], Int) -> FixedArray[Byte]
+
+pub fn sha1_array_raw(Array[Byte]) -> FixedArray[Byte]
+
+pub fn sha1_prefix_raw(Bytes, Int) -> FixedArray[Byte]
+
+pub fn sha1_raw(Bytes) -> FixedArray[Byte]
+
 pub fn short_hex(String, Int) -> String
 
 // Errors
 
 // Types and methods
+pub struct Sha1State {
+  h : FixedArray[Int]
+  block : FixedArray[Byte]
+  w : FixedArray[Int]
+  mut block_len : Int
+  mut total_len : Int64
+}
+pub fn Sha1State::finish_raw(Self) -> FixedArray[Byte]
+pub fn Sha1State::new() -> Self
+pub fn Sha1State::reset(Self) -> Unit
+pub fn Sha1State::update(Self, Bytes) -> Unit
+pub fn Sha1State::update_byte(Self, Byte) -> Unit
+pub fn Sha1State::update_slice(Self, Bytes, Int, Int) -> Unit
+pub fn Sha1State::update_string(Self, String) -> Unit
 
 // Type aliases
 

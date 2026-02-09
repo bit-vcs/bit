@@ -309,7 +309,10 @@ fn receive_parse_pkt_len(data : Bytes, start : Int) -> Int raise @git.GitError {
   let mut v = 0
   for i in 0..<4 {
     let c = data[start + i].to_int().unsafe_to_char()
-    v = v * 16 + @githash.hex_char_to_int(c)
+    let digit = @githash.hex_char_to_int(c) catch {
+      _ => raise @git.GitError::ProtocolError("Invalid pkt-line length")
+    }
+    v = v * 16 + digit
   }
   v
 }

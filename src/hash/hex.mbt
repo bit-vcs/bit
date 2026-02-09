@@ -41,7 +41,7 @@ pub fn lower_hex_string(s : String) -> String {
 }
 
 ///|
-pub fn hex_char_to_int(c : Char) -> Int raise @git.GitError {
+pub fn hex_char_to_int(c : Char) -> Int raise {
   if c >= '0' && c <= '9' {
     return c.to_int() - '0'.to_int()
   }
@@ -51,7 +51,7 @@ pub fn hex_char_to_int(c : Char) -> Int raise @git.GitError {
   if c >= 'A' && c <= 'F' {
     return 10 + (c.to_int() - 'A'.to_int())
   }
-  raise @git.GitError::ProtocolError("Invalid hex char")
+  fail("Invalid hex char")
 }
 
 ///|

@@ -1,6 +1,10 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "mizchi/bit"
 
+import {
+  "mizchi/bit/hash",
+}
+
 // Values
 pub fn checkout_commit(ObjectStore, ObjectId) -> Map[String, Bytes] raise GitError
 
@@ -144,11 +148,7 @@ pub fn PackObject::new(ObjectType, Bytes) -> Self
 pub fn PackObject::with_metadata(ObjectType, Bytes, ObjectId, Int, UInt) -> Self
 
 pub struct Sha1State {
-  h : FixedArray[Int]
-  block : FixedArray[Byte]
-  w : FixedArray[Int]
-  mut block_len : Int
-  mut total_len : Int64
+  inner : @hash.Sha1State
 }
 pub fn Sha1State::finish(Self) -> ObjectId
 pub fn Sha1State::new() -> Self

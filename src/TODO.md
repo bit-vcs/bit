@@ -28,5 +28,5 @@
 ### Fixture format
 
 - Store small fixtures as hex strings in tests (see integration tests).
-- For large fixtures, keep `.pack` files under `src/git/fixtures/` (git LFS if needed).
+- For large fixtures, keep `.pack` files under `fixtures/` (git LFS if needed).
 - Always keep the exact git commands used to generate each fixture.
