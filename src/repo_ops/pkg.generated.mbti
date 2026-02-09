@@ -1,0 +1,41 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/bit/repo_ops"
+
+import {
+  "mizchi/bit",
+  "mizchi/bit/lib",
+}
+
+// Values
+pub fn append_reflog(&@bit.FileSystem, &@bit.RepoFileSystem, String, String, @bit.ObjectId, @bit.ObjectId, String, String, Int64, String, String) -> Unit raise @bit.GitError
+
+pub fn apply_template(&@bit.FileSystem, &@bit.RepoFileSystem, String, String) -> Unit raise @bit.GitError
+
+pub fn create_reflog(&@bit.FileSystem, &@bit.RepoFileSystem, String, String) -> Unit raise @bit.GitError
+
+pub fn delete_reflog(&@bit.FileSystem, &@bit.RepoFileSystem, String, String) -> Unit raise @bit.GitError
+
+pub fn init_repo(&@bit.FileSystem, String, default_branch? : String, bare? : Bool) -> Unit raise @bit.GitError
+
+pub fn init_repo_with_options(&@bit.FileSystem, String, @lib.InitOptions) -> Unit raise @bit.GitError
+
+pub fn read_reflog(&@bit.RepoFileSystem, String, String) -> Array[@lib.ReflogEntry] raise @bit.GitError
+
+pub fn reflog_exists(&@bit.RepoFileSystem, String, String) -> Bool
+
+pub fn rev_parse(&@bit.RepoFileSystem, String, String) -> @bit.ObjectId? raise @bit.GitError
+
+pub fn should_log_ref(&@bit.RepoFileSystem, String, String, Bool) -> (Bool, Bool) raise @bit.GitError
+
+pub fn show_ref(&@bit.RepoFileSystem, String) -> Array[(String, @bit.ObjectId)] raise @bit.GitError
+
+pub fn show_ref_text(&@bit.RepoFileSystem, String) -> Array[String] raise @bit.GitError
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits
+

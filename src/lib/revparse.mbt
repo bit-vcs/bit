@@ -180,46 +180,17 @@ fn substring_revparse(s : String, start : Int, end : Int) -> String {
 }
 
 ///|
-fn is_hex_char(c : Char) -> Bool {
-  (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
-}
-
-///|
-fn is_hex_string(s : String) -> Bool {
-  if s.length() == 0 {
-    return false
-  }
-  for c in s {
-    if not(is_hex_char(c)) {
-      return false
-    }
-  }
-  true
-}
-
-///|
-fn lower_hex_string(s : String) -> String {
-  let out = StringBuilder::new()
-  for c in s {
-    if c >= 'A' && c <= 'F' {
-      out.write_char((c.to_int() + 32).unsafe_to_char())
-    } else {
-      out.write_char(c)
-    }
-  }
-  out.to_string()
-}
-
-///|
 fn resolve_abbrev_ref_id(
   fs : &@git.RepoFileSystem,
   git_dir : String,
   spec : String,
 ) -> @git.ObjectId? raise @git.GitError {
-  if spec.length() < 4 || spec.length() >= 40 || not(is_hex_string(spec)) {
+  if spec.length() < 4 ||
+    spec.length() >= 40 ||
+    not(@githash.is_hex_string(spec)) {
     return None
   }
-  let needle = lower_hex_string(spec)
+  let needle = @githash.lower_hex_string(spec)
   let refs = show_ref(fs, git_dir)
   let db = ObjectDb::load(fs, git_dir)
   let queue : Array[@git.ObjectId] = []
@@ -281,7 +252,7 @@ fn resolve_base_ref(
     spec.has_prefix("remotes/") {
     return resolve_ref(fs, git_dir, "refs/" + spec)
   }
-  if spec.length() == 40 && is_hex_string(spec) {
+  if spec.length() == 40 && @githash.is_hex_string(spec) {
     match @git.ObjectId::from_hex(spec) {
       id => return Some(id)
     }

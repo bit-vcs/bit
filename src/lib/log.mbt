@@ -83,7 +83,7 @@ pub fn log_head_oneline(
   let entries = log_head(fs, git_dir, max_count~, since~, until~)
   let lines : Array[String] = []
   for e in entries {
-    let short = log_shorten_hex(e.id.to_hex(), 7)
+    let short = @githash.short_hex(e.id.to_hex(), 7)
     lines.push("\{short} \{e.message}")
   }
   lines
@@ -160,10 +160,3 @@ fn parse_int64(s : String) -> Int64 {
 }
 
 ///|
-fn log_shorten_hex(hex : String, n : Int) -> String {
-  if hex.length() <= n {
-    hex
-  } else {
-    String::unsafe_substring(hex, start=0, end=n)
-  }
-}

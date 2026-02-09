@@ -4,6 +4,7 @@ import {
   "mizchi/bit/protocol" as @protocol,
   "mizchi/bit/native" as @gitnative,
   "mizchi/bit/lib" as @gitlib,
+  "mizchi/bit/ignore" as @ignore,
   "mizchi/bit/io" as @gitio,
   "mizchi/bit/io/native" as @gitionative,
   "moonbitlang/async" as @async,
@@ -28,7 +29,7 @@ import "wbtest" {
 options(
   targets: {
     "bench_worktree_entry_wbtest.mbt": [ "native" ],
-    "gitignore_async_test.mbt": [ "native" ],
+    "ignore_async_test.mbt": [ "native" ],
     "promisor.mbt": [ "native" ],
     "remote_ref.mbt": [ "native" ],
     "sync_http.mbt": [ "native" ],

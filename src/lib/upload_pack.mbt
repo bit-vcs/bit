@@ -429,7 +429,7 @@ fn build_upload_pack_response(
       }
       let data_len = end - offset
       let pkt_len = data_len + 5 // 4 (header) + 1 (band byte)
-      let len_hex = upload_int_to_hex4(pkt_len)
+      let len_hex = @githash.int_to_hex4(pkt_len)
       for c in len_hex {
         out.push(c.to_int().to_byte())
       }
@@ -533,19 +533,6 @@ fn upload_pack_map_invalid_object(msg : String) -> String {
 }
 
 ///|
-fn upload_int_to_hex4(n : Int) -> String {
-  let digits = "0123456789abcdef"
-  let mut result = ""
-  let mut v = n
-  for _ in 0..<4 {
-    let d = v % 16
-    result = String::make(1, digits[d].to_int().unsafe_to_char()) + result
-    v = v / 16
-  }
-  result
-}
-
-///|
 fn upload_default_caps(agent : String) -> String {
   let caps : Array[String] = [
     "multi_ack",
@@ -572,23 +559,9 @@ fn upload_parse_pkt_len(data : Bytes, start : Int) -> Int raise @git.GitError {
   let mut v = 0
   for i in 0..<4 {
     let c = data[start + i].to_int().unsafe_to_char()
-    v = v * 16 + upload_hex_char_to_int(c)
+    v = v * 16 + @githash.hex_char_to_int(c)
   }
   v
-}
-
-///|
-fn upload_hex_char_to_int(c : Char) -> Int raise @git.GitError {
-  if c >= '0' && c <= '9' {
-    return c.to_int() - '0'.to_int()
-  }
-  if c >= 'a' && c <= 'f' {
-    return 10 + (c.to_int() - 'a'.to_int())
-  }
-  if c >= 'A' && c <= 'F' {
-    return 10 + (c.to_int() - 'A'.to_int())
-  }
-  raise @git.GitError::ProtocolError("Invalid hex char")
 }
 
 ///|
@@ -903,7 +876,7 @@ fn build_upload_pack_response_v2(
     }
     let data_len = end - offset
     let pkt_len = data_len + 5 // 4 (header) + 1 (band byte)
-    let len_hex = upload_int_to_hex4(pkt_len)
+    let len_hex = @githash.int_to_hex4(pkt_len)
     for c in len_hex {
       out.push(c.to_int().to_byte())
     }

@@ -1,2 +1,15 @@
 import {
+  "mizchi/bit" as @git,
+  "mizchi/bit/io" as @gitio,
+  "moonbitlang/core/encoding/utf8" as @utf8,
 }
+
+import "test" {
+  "moonbitlang/core/bench" as @bench,
+  "moonbitlang/x/fs" as @fs,
+  "mizchi/bit/osfs" as @osfs,
+}
+
+options(
+  targets: { "bench_working_files_test.mbt": [ "native" ] },
+)

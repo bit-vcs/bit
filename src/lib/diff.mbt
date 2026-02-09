@@ -31,7 +31,7 @@ pub async fn diff_worktree(
   t0 = profile_lap(profile, "diff_worktree read_index_entries", t0)
   let db = ObjectDb::load_lazy(fs, git_dir)
   t0 = profile_lap(profile, "diff_worktree load_db", t0)
-  let cached_files = working_files_cache(root)
+  let cached_files = @ignore.working_files_cache(root)
   let cache_map : Map[String, Bool] = {}
   let mut cache_ready = false
   match cached_files {
@@ -50,7 +50,7 @@ pub async fn diff_worktree(
       continue
     }
     if cache_ready && not(cache_map.contains(path)) {
-      let ignored = is_ignored_path(fs, root, path, false)
+      let ignored = @ignore.is_ignored_path(fs, root, path, false)
       if not(ignored) {
         let old = diff_read_blob(db, fs, entry.id)
         // Skip if blob not found (e.g., submodule)

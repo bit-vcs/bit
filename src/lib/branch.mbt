@@ -89,7 +89,7 @@ pub fn list_branches_text(
   let lines : Array[String] = []
   match head {
     Detached(id) => {
-      let short = shorten_hex(id.to_hex(), 7)
+      let short = @githash.short_hex(id.to_hex(), 7)
       lines.push("* (HEAD detached at \{short})")
     }
     Branch(_) => ()
@@ -624,15 +624,6 @@ fn trim_line(line : String) -> String {
     s = String::unsafe_substring(s, start=0, end=s.length() - 1)
   }
   s
-}
-
-///|
-fn shorten_hex(hex : String, n : Int) -> String {
-  if hex.length() <= n {
-    hex
-  } else {
-    String::unsafe_substring(hex, start=0, end=n)
-  }
 }
 
 ///|

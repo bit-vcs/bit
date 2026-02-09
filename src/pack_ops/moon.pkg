@@ -1,0 +1,8 @@
+import {
+  "mizchi/bit" as @git,
+  "mizchi/bit/lib" as @gitlib,
+}
+
+import "test" {
+  "moonbitlang/async" as @async,
+}

@@ -1,0 +1,25 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/bit/pack_ops"
+
+import {
+  "mizchi/bit",
+  "mizchi/bit/lib",
+}
+
+// Values
+pub fn collect_commit_tree_only(@lib.ObjectDb, &@bit.RepoFileSystem, @bit.ObjectId) -> Array[@bit.PackObject] raise @bit.GitError
+
+pub fn collect_diff_objects(@lib.ObjectDb, &@bit.RepoFileSystem, @bit.ObjectId, @bit.ObjectId) -> Array[@bit.PackObject] raise @bit.GitError
+
+pub fn collect_reachable_objects(@lib.ObjectDb, &@bit.RepoFileSystem, @bit.ObjectId) -> Array[@bit.PackObject] raise @bit.GitError
+
+pub fn collect_reachable_objects_from_commits(@lib.ObjectDb, &@bit.RepoFileSystem, Array[@bit.ObjectId]) -> Array[@bit.PackObject] raise @bit.GitError
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits
+

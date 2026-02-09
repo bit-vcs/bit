@@ -4,7 +4,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-BIT_BIN="$PROJECT_DIR/_build/native/release/build/cmd/bit/bit.exe"
+BIT_BIN="${BIT_BIN:-$PROJECT_DIR/_build/native/release/build/bit_cli/bit_cli.exe}"
 BENCH_DIR="${BENCH_DIR:-/tmp/git_benchmark}"
 REPO_URL="${REPO_URL:-https://github.com/expressjs/express.git}"
 

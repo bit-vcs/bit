@@ -1,0 +1,8 @@
+import {
+  "mizchi/bit" as @git,
+  "mizchi/bit/ignore" as @ignore,
+  "mizchi/bit/io" as @gitio,
+  "mizchi/bit/lib" as @gitlib,
+  "moonbitlang/core/bench" as @bench,
+  "moonbitlang/core/encoding/utf8" as @utf8,
+}

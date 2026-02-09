@@ -1,0 +1,28 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/bit/hash"
+
+import {
+  "mizchi/bit",
+}
+
+// Values
+pub fn hex_char_to_int(Char) -> Int raise @bit.GitError
+
+pub fn int_to_hex4(Int) -> String
+
+pub fn is_hex_char(Char) -> Bool
+
+pub fn is_hex_string(String) -> Bool
+
+pub fn lower_hex_string(String) -> String
+
+pub fn short_hex(String, Int) -> String
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits
+

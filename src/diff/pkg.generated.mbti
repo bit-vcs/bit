@@ -1,0 +1,40 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/bit/diff"
+
+import {
+  "mizchi/bit",
+}
+
+// Values
+pub fn diff_index(&@bit.RepoFileSystem, String) -> Array[DiffFile] raise @bit.GitError
+
+pub fn diff_stat(Array[DiffFile]) -> Array[String]
+
+pub fn diff_text(Array[DiffFile]) -> Array[String]
+
+pub fn diff_trees(&@bit.RepoFileSystem, String, @bit.ObjectId?, @bit.ObjectId) -> Array[DiffFile] raise @bit.GitError
+
+pub async fn diff_worktree(&@bit.RepoFileSystem, String) -> Array[DiffFile] raise @bit.GitError
+
+// Errors
+
+// Types and methods
+pub struct DiffFile {
+  path : String
+  kind : DiffKind
+  old_content : Bytes?
+  new_content : Bytes?
+  old_mode : Int?
+  new_mode : Int?
+}
+
+pub enum DiffKind {
+  Added
+  Modified
+  Deleted
+}
+
+// Type aliases
+
+// Traits
+

@@ -1,6 +1,9 @@
 import {
   "mizchi/bit" as @git,
   "mizchi/bit/io" as @gitio,
+  "mizchi/bit/refs" as @gitrefs,
+  "mizchi/bit/remote" as @gitremote,
+  "mizchi/bit/hash" as @githash,
   "mizchi/bit/pack" as @pack,
   "mizchi/bit/protocol" as @protocol,
   "mizchi/bit/ignore" as @ignore,
@@ -25,7 +28,6 @@ import "wbtest" {
 options(
   targets: {
     "bench_index_diff_test.mbt": [ "native" ],
-    "bench_list_working_files_test.mbt": [ "native" ],
     "bench_status_test.mbt": [ "native" ],
   },
 )

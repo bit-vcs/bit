@@ -15,11 +15,9 @@ jobs:
         include:
           - os: ubuntu-latest
             target: linux-x64
-            binary: bit.exe
             asset: bit-linux-x64
           - os: macos-latest
             target: darwin-arm64
-            binary: bit.exe
             asset: bit-darwin-arm64
 
     runs-on: ${{ matrix.os }}
@@ -52,14 +50,24 @@ jobs:
       - name: Prepare artifact (Unix)
         if: runner.os != 'Windows'
         run: |
-          cp _build/native/release/build/cmd/bit/${{ matrix.binary }} ${{ matrix.asset }}
+          bin_path="_build/native/release/build/bit_cli/bit_cli.exe"
+          if [ ! -f "$bin_path" ]; then
+            echo "bit binary not found at $bin_path"
+            exit 1
+          fi
+          cp "$bin_path" ${{ matrix.asset }}
           chmod +x ${{ matrix.asset }}
 
       - name: Prepare artifact (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          Copy-Item "_build/native/release/build/cmd/bit/${{ matrix.binary }}" "${{ matrix.asset }}"
+          $binPath = "_build/native/release/build/bit_cli/bit_cli.exe"
+          if (-not (Test-Path $binPath)) {
+            Write-Error "bit binary not found at $binPath"
+            exit 1
+          }
+          Copy-Item $binPath "${{ matrix.asset }}"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

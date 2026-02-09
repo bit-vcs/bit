@@ -1,0 +1,35 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/bit/remote"
+
+import {
+  "mizchi/bit",
+}
+
+// Values
+pub fn check_shorthand_ambiguity(String, (String) -> Bool) -> String?
+
+pub fn detect_git_dir(&@bit.RepoFileSystem, String) -> (String, Bool)?
+
+pub fn is_bare_git_dir(String) -> Bool
+
+pub fn parse_github_shorthand(String) -> GitHubShorthand?
+
+pub fn resolve_gitdir(&@bit.RepoFileSystem, String) -> String
+
+pub fn resolve_local_repo_path(&@bit.RepoFileSystem, String, String) -> String?
+
+// Errors
+
+// Types and methods
+pub(all) enum GitHubShorthand {
+  Repo(String, String?)
+  Subdir(String, String, String?)
+  File(String, String)
+}
+pub impl Eq for GitHubShorthand
+pub impl Show for GitHubShorthand
+
+// Type aliases
+
+// Traits
+

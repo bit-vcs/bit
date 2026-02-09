@@ -65,7 +65,12 @@ jobs:
       - name: Build bit
         run: |
           moon build --target native
-          cp _build/native/release/build/cmd/bit/bit.exe tools/git-shim/moon
+          bin_path="_build/native/release/build/bit_cli/bit_cli.exe"
+          if [ ! -f "$bin_path" ]; then
+            echo "bit binary not found at $bin_path"
+            exit 1
+          fi
+          cp "$bin_path" tools/git-shim/moon
           chmod +x tools/git-shim/moon
 
       - name: Run git compatibility tests

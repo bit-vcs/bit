@@ -309,23 +309,9 @@ fn receive_parse_pkt_len(data : Bytes, start : Int) -> Int raise @git.GitError {
   let mut v = 0
   for i in 0..<4 {
     let c = data[start + i].to_int().unsafe_to_char()
-    v = v * 16 + receive_hex_char_to_int(c)
+    v = v * 16 + @githash.hex_char_to_int(c)
   }
   v
-}
-
-///|
-fn receive_hex_char_to_int(c : Char) -> Int raise @git.GitError {
-  if c >= '0' && c <= '9' {
-    return c.to_int() - '0'.to_int()
-  }
-  if c >= 'a' && c <= 'f' {
-    return 10 + (c.to_int() - 'a'.to_int())
-  }
-  if c >= 'A' && c <= 'F' {
-    return 10 + (c.to_int() - 'A'.to_int())
-  }
-  raise @git.GitError::ProtocolError("Invalid hex char")
 }
 
 ///|

@@ -39,13 +39,23 @@ clean:
 build:
     moon build --target native
     @mkdir -p tools/git-shim
-    @cp _build/native/release/build/cmd/bit/bit.exe tools/git-shim/moon
+    @bin_path="_build/native/release/build/bit_cli/bit_cli.exe"; \
+    if [ ! -x "$bin_path" ]; then \
+      echo "bit binary not found at $bin_path"; \
+      exit 1; \
+    fi; \
+    cp "$bin_path" tools/git-shim/moon
     @chmod +x tools/git-shim/moon
 
 # Install bit to ~/.local/bin
 install: build
     @mkdir -p ~/.local/bin
-    @cp _build/native/release/build/cmd/bit/bit.exe ~/.local/bin/bit
+    @bin_path="_build/native/release/build/bit_cli/bit_cli.exe"; \
+    if [ ! -x "$bin_path" ]; then \
+      echo "bit binary not found at $bin_path"; \
+      exit 1; \
+    fi; \
+    cp "$bin_path" ~/.local/bin/bit
     @chmod +x ~/.local/bin/bit
     @echo "Installed bit to ~/.local/bin/bit"
 
@@ -257,7 +267,7 @@ bench-lib:
     moon bench --target native -p mizchi/bit/lib
 
 bench-init:
-    moon bench --target native -p mizchi/bit/cmd/bit -f bench_init_wbtest.mbt
+    moon bench --target native -p mizchi/bit/bit_cli -f bench_init_wbtest.mbt
 
 bench-status:
     moon bench --target native -p mizchi/bit/lib -f bench_status_test.mbt

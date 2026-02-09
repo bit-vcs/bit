@@ -22,7 +22,7 @@ pub async fn status_text(
   match head {
     Branch(name) => sb.write_string("On branch " + name + "\n")
     Detached(id) => {
-      let short = shorten_hex(id.to_hex(), 7)
+      let short = @githash.short_hex(id.to_hex(), 7)
       sb.write_string("HEAD detached at " + short + "\n")
     }
   }

@@ -1,10 +1,22 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "mizchi/bit/ignore"
 
+import {
+  "mizchi/bit",
+}
+
 // Values
+pub fn is_ignored_path(&@bit.RepoFileSystem, String, String, Bool) -> Bool raise @bit.GitError
+
+pub fn list_working_files(&@bit.RepoFileSystem, String) -> Array[String] raise @bit.GitError
+
+pub async fn list_working_files_async(&@bit.RepoFileSystem, String) -> Array[String] raise @bit.GitError
+
 pub fn match_glob(String, String) -> Bool
 
 pub fn parse(String, String) -> Array[Rule]
+
+pub fn working_files_cache(String) -> Array[String]?
 
 // Errors
 

@@ -130,8 +130,6 @@ pub fn is_bare_git_dir(String) -> Bool
 
 pub fn is_branch_checked_out(&@bit.RepoFileSystem, String, String) -> String? raise @bit.GitError
 
-pub fn is_ignored_path(&@bit.RepoFileSystem, String, String, Bool) -> Bool raise @bit.GitError
-
 pub fn is_mirror_fetch_config(RemoteConfig) -> Bool
 
 pub fn is_partial_clone(&@bit.RepoFileSystem, String) -> Bool
@@ -165,10 +163,6 @@ pub fn list_remotes(&@bit.RepoFileSystem, String) -> Array[String]
 pub fn list_remotes_verbose(&@bit.RepoFileSystem, String) -> Array[(String, String)]
 
 pub fn list_tags(&@bit.RepoFileSystem, String) -> Array[String]
-
-pub fn list_working_files(&@bit.RepoFileSystem, String) -> Array[String] raise @bit.GitError
-
-pub async fn list_working_files_async(&@bit.RepoFileSystem, String) -> Array[String] raise @bit.GitError
 
 pub fn list_worktrees(&@bit.RepoFileSystem, String) -> Array[WorktreeInfo] raise @bit.GitError
 
@@ -387,8 +381,6 @@ pub fn update_subdir_base(&@bit.FileSystem, &@bit.RepoFileSystem, String, String
 pub fn upload_pack(&@bit.RepoFileSystem, String, UploadPackRequest) -> Bytes raise @bit.GitError
 
 pub fn upload_pack_v2(&@bit.RepoFileSystem, String, UploadPackRequestV2, UploadPackConfig) -> Bytes raise @bit.GitError
-
-pub fn working_files_cache(String) -> Array[String]?
 
 pub fn write_index_entries(&@bit.FileSystem, String, Array[IndexEntry]) -> Unit raise @bit.GitError
 

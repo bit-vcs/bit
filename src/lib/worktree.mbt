@@ -35,7 +35,7 @@ pub async fn status(
   let untracked : Array[String] = []
   let unstaged_modified : Array[String] = []
   let unstaged_deleted : Array[String] = []
-  let files = list_working_files_async(fs, root)
+  let files = @ignore.list_working_files_async(fs, root)
   t0 = profile_lap(profile, "status list_working_files", t0)
   let visited : Map[String, Bool] = {}
   for path in files {
@@ -462,7 +462,7 @@ fn expand_paths(
   paths : Array[String],
 ) -> Array[String] raise @git.GitError {
   let result : Array[String] = []
-  let all = list_working_files(fs, root)
+  let all = @ignore.list_working_files(fs, root)
   for p in paths {
     let path = normalize_rel_path(p)
     // Handle "." specially - add all files
@@ -494,7 +494,7 @@ async fn expand_paths_async(
   paths : Array[String],
 ) -> Array[String] raise @git.GitError {
   let result : Array[String] = []
-  let all = list_working_files_async(fs, root)
+  let all = @ignore.list_working_files_async(fs, root)
   for p in paths {
     let path = normalize_rel_path(p)
     // Handle "." specially - add all files
