@@ -282,6 +282,68 @@ fn extract_subtask_plans(text : String) -> Array[SubtaskPlan] {
 }
 
 ///|
+fn normalize_planned_file_path(
+  file_path : String,
+  work_dir : String,
+) -> String? {
+  let raw = file_path.trim().to_string()
+  if raw.is_empty() {
+    return None
+  }
+  let wd = work_dir.trim().to_string()
+  let wd_prefix = if wd.has_suffix("/") { wd } else { wd + "/" }
+  let relative = if raw == wd {
+    ""
+  } else if raw.has_prefix(wd_prefix) {
+    String::unsafe_substring(raw, start=wd_prefix.length(), end=raw.length())
+  } else if raw.has_prefix("/") {
+    return None
+  } else if raw.has_prefix("./") {
+    String::unsafe_substring(raw, start=2, end=raw.length())
+  } else {
+    raw
+  }
+  if relative.is_empty() {
+    return None
+  }
+  if relative == "." ||
+    relative == ".." ||
+    relative.has_prefix("../") ||
+    relative.contains("/../") {
+    return None
+  }
+  Some(relative)
+}
+
+///|
+fn normalize_subtask_plans(
+  plans : Array[SubtaskPlan],
+  work_dir : String,
+  log : (String) -> Unit,
+) -> Array[SubtaskPlan] {
+  let normalized : Array[SubtaskPlan] = []
+  for plan in plans {
+    let files : Array[String] = []
+    let seen : Map[String, Bool] = {}
+    for file in plan.files {
+      match normalize_planned_file_path(file, work_dir) {
+        Some(relative) =>
+          if seen.get(relative) is None {
+            files.push(relative)
+            seen[relative] = true
+          }
+        None =>
+          if not(file.trim().to_string().is_empty()) {
+            log("[planner] Ignore invalid file scope: " + file)
+          }
+      }
+    }
+    normalized.push({ task: plan.task, files })
+  }
+  normalized
+}
+
+///|
 fn validate_file_overlap(plans : Array[SubtaskPlan]) -> Array[String] {
   let seen : Map[String, Int] = {}
   let conflicts : Array[String] = []
@@ -310,9 +372,9 @@ fn plan_subtasks(
   log : (String) -> Unit,
 ) -> Array[String] {
   let file_listing = exec(
-    "find " +
+    "cd " +
     shell_escape(config.work_dir) +
-    " -maxdepth 3 -not -path '*/.*' -type f | head -200",
+    " && find . -maxdepth 3 -not -path './.*' -type f | sed 's#^./##' | head -200",
   )
   let system_prompt =
     #|You are a task planner for a coding project.
@@ -321,7 +383,7 @@ fn plan_subtasks(
     #|
     #|Respond with ONLY a JSON array of objects. Each object has:
     #|- "task": description of the subtask
-    #|- "files": array of file paths this subtask will modify (write-scope)
+    #|- "files": array of repository-relative file paths this subtask will modify (write-scope)
     #|
     #|Example:
     #|[
@@ -329,6 +391,7 @@ fn plan_subtasks(
     #|  {"task": "Add tests for string module", "files": ["src/string_test.mbt"]}
     #|]
     #|
+    #|CRITICAL: Use repository-relative paths only (e.g. src/a.mbt, not /abs/path/src/a.mbt).
     #|CRITICAL: No two subtasks may list the same file. If tasks share dependencies, combine them into one subtask.
   let provider = create_provider(
     config.provider_name,
@@ -351,8 +414,9 @@ fn plan_subtasks(
   if plans.is_empty() {
     return [config.task]
   }
+  let normalized_plans = normalize_subtask_plans(plans, config.work_dir, log)
   // Validate file overlap
-  let conflicts = validate_file_overlap(plans)
+  let conflicts = validate_file_overlap(normalized_plans)
   if not(conflicts.is_empty()) {
     if config.verbose {
       log(
@@ -364,7 +428,7 @@ fn plan_subtasks(
   }
   // Build task descriptions with file scope hints
   let tasks : Array[String] = []
-  for plan in plans {
+  for plan in normalized_plans {
     if plan.files.is_empty() {
       tasks.push(plan.task)
     } else {
@@ -376,16 +440,45 @@ fn plan_subtasks(
 
 ///|
 /// Find the bit binary path for spawning sub-agents
-fn find_bit_binary() -> String {
-  let env = @ffi.get_env("BIT_PATH")
+fn is_likely_bit_binary(path : String) -> Bool {
+  let p = path.trim().to_string()
+  if p.is_empty() {
+    return false
+  }
+  p == "bit" ||
+  p.has_suffix("/bit") ||
+  p.has_suffix("/bit_cli.exe") ||
+  p.contains("/bit_cli.")
+}
+
+///|
+fn select_bit_binary(
+  bit_path_env : String,
+  argv0 : String,
+  which_bit : String,
+) -> String {
+  let env = bit_path_env.trim().to_string()
   if not(env.is_empty()) {
     return env
   }
-  let which = strip_trailing_whitespace(exec("which bit 2>/dev/null"))
+  let a0 = argv0.trim().to_string()
+  if is_likely_bit_binary(a0) {
+    return a0
+  }
+  let which = which_bit.trim().to_string()
   if not(which.is_empty()) {
     return which
   }
   "bit"
+}
+
+///|
+fn find_bit_binary() -> String {
+  let bit_path_env = @ffi.get_env("BIT_PATH")
+  let argv = @sys.get_cli_args()
+  let argv0 = if argv.length() > 0 { argv[0] } else { "" }
+  let which = strip_trailing_whitespace(exec("which bit 2>/dev/null"))
+  select_bit_binary(bit_path_env, argv0, which)
 }
 
 ///|
@@ -570,6 +663,9 @@ pub fn run_orchestrator(
       config.model,
       config.verbose,
     )
+    if config.verbose {
+      log("[orchestrator] agent binary: " + r.bit_binary)
+    }
     let tr : &AgentRunner = r
     tr
   }

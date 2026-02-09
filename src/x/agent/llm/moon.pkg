@@ -6,6 +6,7 @@ import {
   "mizchi/llm/claude_code" as @claude_code,
   "moonbitlang/core/json" as @json,
   "moonbitlang/core/strconv" as @strconv,
+  "moonbitlang/x/sys" as @sys,
 }
 
 options(
