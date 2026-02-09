@@ -28,6 +28,16 @@ pub fn pr_meta_key(pr_id : String) -> String {
 }
 
 ///|
+pub fn pr_proposal_prefix() -> String {
+  "collab/proposal/pr/"
+}
+
+///|
+pub fn pr_proposal_meta_key(pr_id : String) -> String {
+  pr_proposal_prefix() + pr_id + "/meta"
+}
+
+///|
 pub fn pr_comment_prefix(pr_id : String) -> String {
   "collab/pr/" + pr_id + "/comment/"
 }
@@ -73,6 +83,32 @@ pub struct CollabRecord {
   deleted : Bool
   signature : String?
   payload : String
+}
+
+///|
+pub(all) enum RecordTriggerClass {
+  Full
+  NotifyOnly
+} derive(Eq, Show)
+
+///|
+pub fn classify_record_trigger(record : CollabRecord) -> RecordTriggerClass {
+  if record.kind == "pr-proposal" || record.key.has_prefix("collab/proposal/") {
+    RecordTriggerClass::NotifyOnly
+  } else {
+    RecordTriggerClass::Full
+  }
+}
+
+///|
+pub fn record_notify_topic(record : CollabRecord) -> String? {
+  if classify_record_trigger(record) == RecordTriggerClass::Full {
+    return None
+  }
+  match record.kind {
+    "pr-proposal" => Some("hub.pr.proposal")
+    _ => Some("hub.notify")
+  }
 }
 
 ///|

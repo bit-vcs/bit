@@ -8,6 +8,8 @@ import {
 }
 
 // Values
+pub fn classify_record_trigger(CollabRecord) -> RecordTriggerClass
+
 pub fn collab_notes_ns_name() -> String
 
 pub fn collab_notes_ref_name() -> String
@@ -48,9 +50,15 @@ pub fn pr_comment_prefix(String) -> String
 
 pub fn pr_meta_key(String) -> String
 
+pub fn pr_proposal_meta_key(String) -> String
+
+pub fn pr_proposal_prefix() -> String
+
 pub fn pr_review_key(String, String) -> String
 
 pub fn pr_review_prefix(String) -> String
+
+pub fn record_notify_topic(CollabRecord) -> String?
 
 pub fn short_ref_name(String) -> String
 
@@ -83,6 +91,7 @@ pub fn Collab::get_issue(Self, &@lib.ObjectStore, String) -> Issue?
 pub fn Collab::get_note(Self, &@lib.ObjectStore, &@lib.RefStore, @object.ObjectId, ns? : String) -> Note? raise @object.GitError
 pub fn Collab::get_pr(Self, &@lib.ObjectStore, String) -> PullRequest?
 pub fn Collab::import_issues(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, Array[Issue]) -> ImportStats raise @object.GitError
+pub fn Collab::import_pr_proposals(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, Array[PullRequest]) -> ImportStats raise @object.GitError
 pub fn Collab::import_prs(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, Array[PullRequest]) -> ImportStats raise @object.GitError
 pub fn Collab::init(&@lib.ObjectStore, &@lib.RefStore, node_id? : String, signing_key? : String?, require_signed? : Bool) -> Self raise @object.GitError
 pub fn Collab::is_approved(Self, &@lib.ObjectStore, String) -> Bool
@@ -91,12 +100,16 @@ pub fn Collab::list_comments(Self, &@lib.ObjectStore, String) -> Array[PrComment
 pub fn Collab::list_issue_comments(Self, &@lib.ObjectStore, String) -> Array[IssueComment]
 pub fn Collab::list_issues(Self, &@lib.ObjectStore, state? : IssueState?) -> Array[Issue]
 pub fn Collab::list_notes(Self, &@lib.ObjectStore, &@lib.RefStore, ns? : String) -> Array[Note] raise @object.GitError
+pub fn Collab::list_pr_proposals(Self, &@lib.ObjectStore) -> Array[PullRequest]
 pub fn Collab::list_prs(Self, &@lib.ObjectStore, state? : PrState?) -> Array[PullRequest]
 pub fn Collab::list_reviews(Self, &@lib.ObjectStore, String) -> Array[PrReview]
 pub fn Collab::load(&@lib.ObjectStore, &@lib.RefStore, node_id? : String, signing_key? : String?, require_signed? : Bool) -> Self raise @object.GitError
 pub fn Collab::merge_pr(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, strategy? : PrMergeStrategy) -> PrMergeResult raise @object.GitError
+pub fn Collab::propose_pr(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, String, String, String, source_repo? : String?, source_ref? : String?) -> PullRequest raise @object.GitError
 pub fn Collab::reload_store(Self, &@lib.ObjectStore, &@lib.RefStore) -> Unit raise @object.GitError
 pub fn Collab::remove_note(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, @object.ObjectId, ns? : String) -> Unit raise @object.GitError
+pub fn Collab::reopen_issue(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String) -> Unit raise @object.GitError
+pub fn Collab::reopen_pr(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String) -> Unit raise @object.GitError
 pub fn Collab::submit_review(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, ReviewVerdict, String, @object.ObjectId) -> PrReview raise @object.GitError
 pub fn Collab::update_issue(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, title? : String?, body? : String?, labels? : Array[String]?, assignees? : Array[String]?) -> Issue raise @object.GitError
 pub fn Collab::update_pr(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, title? : String?, body? : String?, labels? : Array[String]?) -> PullRequest raise @object.GitError
@@ -321,6 +334,13 @@ pub fn PullRequest::target_branch(Self) -> String
 pub fn PullRequest::target_commit(Self) -> @object.ObjectId
 pub fn PullRequest::title(Self) -> String
 pub fn PullRequest::updated_at(Self) -> Int64
+
+pub(all) enum RecordTriggerClass {
+  Full
+  NotifyOnly
+}
+pub impl Eq for RecordTriggerClass
+pub impl Show for RecordTriggerClass
 
 pub(all) enum ReviewVerdict {
   Approved

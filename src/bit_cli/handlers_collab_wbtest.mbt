@@ -91,6 +91,7 @@ test "collab parser: parse_merge_strategy_flag handles gh-style flags" {
 test "collab parser: normalize pr subcommand handles gh aliases" {
   assert_eq(normalize_collab_pr_subcommand("view"), "get")
   assert_eq(normalize_collab_pr_subcommand("edit"), "update")
+  assert_eq(normalize_collab_pr_subcommand("proposal"), "proposals")
   assert_eq(normalize_collab_pr_subcommand("list"), "list")
 }
 
@@ -378,4 +379,69 @@ test "collab parser: parse_gh_issues rejects non-array JSON" {
     },
   )
   fail("expected invalid object error")
+}
+
+///|
+test "collab notify: select_notify_records filters notify-only records" {
+  let canonical = @collab.CollabRecord::new(
+    "collab/pr/1/meta", "pr", "canonical", "node-a", 1L,
+  )
+  let proposal = @collab.CollabRecord::new(
+    "collab/proposal/pr/p1/meta", "pr-proposal", "proposal", "node-b", 2L,
+  )
+  let selected = select_notify_records([canonical, proposal])
+  assert_eq(selected.length(), 1)
+  assert_true(selected.contains("collab/proposal/pr/p1/meta"))
+}
+
+///|
+test "collab notify: collect_changed_notify_records detects new and updated" {
+  let before : Map[String, @collab.CollabRecord] = {}
+  before["collab/proposal/pr/p1/meta"] = @collab.CollabRecord::new(
+    "collab/proposal/pr/p1/meta", "pr-proposal", "old", "node-a", 1L,
+  )
+  let after : Map[String, @collab.CollabRecord] = {}
+  after["collab/proposal/pr/p1/meta"] = @collab.CollabRecord::new(
+    "collab/proposal/pr/p1/meta", "pr-proposal", "new", "node-a", 2L,
+  )
+  after["collab/proposal/pr/p2/meta"] = @collab.CollabRecord::new(
+    "collab/proposal/pr/p2/meta", "pr-proposal", "created", "node-b", 3L,
+  )
+  let changed = collect_changed_notify_records(before, after)
+  assert_eq(changed.length(), 2)
+  assert_eq(changed[0].key, "collab/proposal/pr/p1/meta")
+  assert_eq(changed[1].key, "collab/proposal/pr/p2/meta")
+}
+
+///|
+test "collab notify: format_hub_notify_message handles hub.pr.proposal" {
+  let proposal = @collab.PullRequest::new(
+    "p-1",
+    "External Proposal",
+    "Body",
+    "refs/heads/feature",
+    @git.ObjectId::zero(),
+    "refs/heads/main",
+    @git.ObjectId::zero(),
+    "peer-user",
+    10L,
+    10L,
+    @collab.PrState::Open,
+    [],
+  )
+  let record = @collab.CollabRecord::new(
+    @collab.pr_proposal_meta_key("p-1"),
+    "pr-proposal",
+    proposal.serialize(),
+    "peer-node",
+    10L,
+  )
+  let message = format_hub_notify_message("hub.pr.proposal", record)
+  assert_true(message.contains("hub.pr.proposal"))
+  assert_true(message.contains("#p-1"))
+  assert_true(message.contains("External Proposal"))
+  assert_eq(
+    format_hub_notify_message("hub.other", record),
+    "[hub.notify] hub.other key=collab/proposal/pr/p-1/meta",
+  )
 }

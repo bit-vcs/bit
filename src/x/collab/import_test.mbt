@@ -67,6 +67,149 @@ test "import pr: updates existing" {
 }
 
 ///|
+test "import pr proposal: stores notify-only proposal records" {
+  let (_fs, objects, refs, clock) = setup_repo_with_branch()
+  let collab = Collab::init(objects, refs)
+  let source_id = refs.resolve("refs/heads/feature")
+  guard source_id is Some(sid) else { panic() }
+  let target_id = refs.resolve("refs/heads/main")
+  guard target_id is Some(tid) else { panic() }
+  let proposal = PullRequest::new(
+    "p1",
+    "External Proposal",
+    "Notify only",
+    "refs/heads/feature",
+    sid,
+    "refs/heads/main",
+    tid,
+    "peer-user",
+    1700000200L,
+    1700000300L,
+    PrState::Open,
+    [],
+  )
+  let stats = collab.import_pr_proposals(objects, refs, clock, [proposal])
+  assert_eq(stats.created(), 1)
+  assert_eq(stats.updated(), 0)
+  assert_eq(collab.list_prs(objects).length(), 0)
+  let proposals = collab.list_pr_proposals(objects)
+  assert_eq(proposals.length(), 1)
+  assert_eq(proposals[0].id(), "p1")
+  let key = pr_proposal_meta_key("p1")
+  let record = collab.store.get_record(objects, key)
+  guard record is Some(r) else { panic() }
+  assert_eq(classify_record_trigger(r), RecordTriggerClass::NotifyOnly)
+  assert_eq(record_notify_topic(r), Some("hub.pr.proposal"))
+}
+
+///|
+test "import pr proposal: strict reader hides unsigned imported records" {
+  let (_fs, objects, refs, clock) = setup_repo_with_branch()
+  let writer = Collab::init(objects, refs)
+  let reader = Collab::init(
+    objects,
+    refs,
+    signing_key=Some("k1"),
+    require_signed=true,
+  )
+  let source_id = refs.resolve("refs/heads/feature")
+  guard source_id is Some(sid) else { panic() }
+  let target_id = refs.resolve("refs/heads/main")
+  guard target_id is Some(tid) else { panic() }
+  let proposal = PullRequest::new(
+    "p-unsigned",
+    "External Proposal",
+    "Notify only",
+    "refs/heads/feature",
+    sid,
+    "refs/heads/main",
+    tid,
+    "peer-user",
+    1701000200L,
+    1701000300L,
+    PrState::Open,
+    [],
+  )
+  let stats = writer.import_pr_proposals(objects, refs, clock, [proposal])
+  assert_eq(stats.created(), 1)
+  reader.reload_store(objects, refs)
+  assert_eq(reader.list_pr_proposals(objects).length(), 0)
+}
+
+///|
+test "import pr proposal: wrong key hides signed imported records" {
+  let (_fs, objects, refs, clock) = setup_repo_with_branch()
+  let writer = Collab::init(
+    objects,
+    refs,
+    signing_key=Some("writer-key"),
+    require_signed=true,
+  )
+  let reader = Collab::init(
+    objects,
+    refs,
+    signing_key=Some("reader-key"),
+    require_signed=true,
+  )
+  let source_id = refs.resolve("refs/heads/feature")
+  guard source_id is Some(sid) else { panic() }
+  let target_id = refs.resolve("refs/heads/main")
+  guard target_id is Some(tid) else { panic() }
+  let proposal = PullRequest::new(
+    "p-signed",
+    "Signed Proposal",
+    "Notify only",
+    "refs/heads/feature",
+    sid,
+    "refs/heads/main",
+    tid,
+    "peer-user",
+    1702000200L,
+    1702000300L,
+    PrState::Open,
+    [],
+  )
+  let stats = writer.import_pr_proposals(objects, refs, clock, [proposal])
+  assert_eq(stats.created(), 1)
+  reader.reload_store(objects, refs)
+  assert_eq(reader.list_pr_proposals(objects).length(), 0)
+}
+
+///|
+test "import pr proposal: require_signed without key rejects writes" {
+  let (_fs, objects, refs, clock) = setup_repo_with_branch()
+  let strict = Collab::init(objects, refs, require_signed=true)
+  let source_id = refs.resolve("refs/heads/feature")
+  guard source_id is Some(sid) else { panic() }
+  let target_id = refs.resolve("refs/heads/main")
+  guard target_id is Some(tid) else { panic() }
+  let proposal = PullRequest::new(
+    "p-reject",
+    "Signed Proposal",
+    "Notify only",
+    "refs/heads/feature",
+    sid,
+    "refs/heads/main",
+    tid,
+    "peer-user",
+    1703000200L,
+    1703000300L,
+    PrState::Open,
+    [],
+  )
+  ignore(
+    strict.import_pr_proposals(objects, refs, clock, [proposal]) catch {
+      @git.GitError::InvalidObject(message) => {
+        assert_true(message.contains("signing key"))
+        return ()
+      }
+      err => fail("unexpected error: \{err.to_string()}")
+    },
+  )
+  fail("expected invalid object error")
+}
+
+///|
 test "import issue: creates" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
   let collab = Collab::init(objects, refs)

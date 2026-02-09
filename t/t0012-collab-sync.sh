@@ -60,14 +60,26 @@ run_case() {
             --body "sync test pr" \
             --source refs/heads/feature/collab \
             --target refs/heads/main >/dev/null
+        git_cmd hub pr propose \
+            --title "Proposal from node-a" \
+            --body "sync test proposal" \
+            --source refs/heads/feature/collab \
+            --target refs/heads/main >/dev/null
         git_cmd collab sync push "http://localhost:$port" >/dev/null
     )
 
     (
         cd node-b
         git_cmd collab init >/dev/null
+        cat > .git/hooks/hub-notify <<EOF
+#!/bin/sh
+echo "\$1 \$2 \$3" >> "$TRASH_DIR/hub-notify.log"
+EOF
+        chmod +x .git/hooks/hub-notify
         git_cmd collab sync fetch "http://localhost:$port" >/dev/null
         git_cmd collab pr list | grep -q "Add feature from node-a"
+        git_cmd hub pr proposals | grep -q "Proposal from node-a"
+        grep -q "hub.pr.proposal pr-proposal collab/proposal/pr/" "$TRASH_DIR/hub-notify.log"
         git_cmd collab issue create \
             --title "Track rollout from node-b" \
             --body "sync test issue" >/dev/null

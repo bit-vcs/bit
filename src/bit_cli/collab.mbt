@@ -149,6 +149,12 @@ fn print_collab_pr_usage() -> Unit {
   println("  get <id>")
   println("  view <id>                             (alias: get)")
   println(
+    "  propose --title <title> [--body <body>] (--source|--head) <branch> (--target|--base) <branch> [--source-repo <owner/repo>] [--source-ref <ref>]",
+  )
+  println("  proposals [--state <open|closed|merged>] [--limit <n>]")
+  println("  proposal ...                          (alias: proposals)")
+  println("  import-proposal <id>")
+  println(
     "  create --title <title> [--body <body>] (--source|--head) <branch> (--target|--base) <branch> [--source-repo <owner/repo>] [--source-ref <ref>]",
   )
   println(
@@ -281,9 +287,12 @@ async fn handle_collab_pr(args : Array[String]) -> Unit raise Error {
   let rest = collect_args(args, 1)
   match subcmd {
     "list" => handle_collab_pr_list(rest)
+    "proposals" => handle_collab_pr_proposals(rest)
     "status" => handle_collab_pr_status(rest)
     "get" => handle_collab_pr_get(rest)
     "import" => handle_collab_pr_import(rest)
+    "import-proposal" => handle_collab_pr_import_proposal(rest)
+    "propose" => handle_collab_pr_propose(rest)
     "create" => handle_collab_pr_create(rest)
     "update" => handle_collab_pr_update(rest)
     "close" => handle_collab_pr_close(rest)
@@ -391,6 +400,34 @@ async fn handle_collab_pr_list(args : Array[String]) -> Unit raise Error {
   let limit = if raw_limit < prs.length() { raw_limit } else { prs.length() }
   if limit == 0 {
     print_line("No pull requests")
+    return ()
+  }
+  let mut i = 0
+  while i < limit {
+    prs[i] |> format_pr_summary |> print_line
+    i += 1
+  }
+}
+
+///|
+async fn handle_collab_pr_proposals(args : Array[String]) -> Unit raise Error {
+  let options = parse_collab_pr_list_options(args)
+  let root = get_work_root()
+  let git_dir = root + "/.git"
+  let (objects, refs, _clock) = make_collab_stores(git_dir)
+  let collab = load_collab_store(objects, refs)
+  let candidates = collab.list_pr_proposals(objects)
+  let prs : Array[@collab.PullRequest] = []
+  for pr in candidates {
+    match options.state {
+      None => prs.push(pr)
+      Some(s) => if pr.state() == s { prs.push(pr) }
+    }
+  }
+  let raw_limit = options.limit.unwrap_or(prs.length())
+  let limit = if raw_limit < prs.length() { raw_limit } else { prs.length() }
+  if limit == 0 {
+    print_line("No pull request proposals")
     return ()
   }
   let mut i = 0
@@ -548,6 +585,55 @@ async fn handle_collab_pr_import(args : Array[String]) -> Unit raise Error {
 }
 
 ///|
+async fn handle_collab_pr_import_proposal(
+  args : Array[String],
+) -> Unit raise Error {
+  if args.length() == 0 {
+    print_collab_pr_usage()
+    return ()
+  }
+  let first = args[0]
+  if first == "-h" || first == "--help" || first == "help" {
+    print_collab_pr_usage()
+    return ()
+  }
+  let mut proposal_id : String? = None
+  for arg in args {
+    if arg.has_prefix("-") {
+      warn_unimplemented_arg("hub pr import-proposal", arg)
+      continue
+    }
+    if proposal_id is None {
+      proposal_id = Some(arg)
+    } else {
+      warn_unimplemented_arg("hub pr import-proposal", arg)
+    }
+  }
+  guard proposal_id is Some(id) else {
+    raise @git.GitError::InvalidObject("Proposal id is required")
+  }
+  let root = get_work_root()
+  let git_dir = root + "/.git"
+  let (objects, refs, clock) = make_collab_stores(git_dir)
+  let collab = init_collab_store(objects, refs)
+  let proposals = collab.list_pr_proposals(objects)
+  let mut selected : @collab.PullRequest? = None
+  for proposal in proposals {
+    if proposal.id() == id {
+      selected = Some(proposal)
+      break
+    }
+  }
+  guard selected is Some(pr) else {
+    raise @git.GitError::InvalidObject("PR proposal not found: \{id}")
+  }
+  let stats = collab.import_prs(objects, refs, clock, [pr])
+  print_line(
+    "Imported proposal as PR: created \{stats.created()}, updated \{stats.updated()}",
+  )
+}
+
+///|
 async fn handle_collab_pr_get(args : Array[String]) -> Unit raise Error {
   if args.length() == 0 {
     print_collab_pr_usage()
@@ -611,7 +697,20 @@ fn infer_source_repo_name(fs : OsFs, git_dir : String) -> String? {
 }
 
 ///|
-async fn handle_collab_pr_create(args : Array[String]) -> Unit raise Error {
+struct CollabPrCreateOptions {
+  title : String
+  body : String
+  source_branch : String
+  target_branch : String
+  source_repo : String?
+  source_ref : String?
+}
+
+///|
+async fn parse_collab_pr_create_options(
+  args : Array[String],
+  warn_context : String,
+) -> CollabPrCreateOptions raise Error {
   let mut title : String? = None
   let mut body : String? = None
   let mut source_branch : String? = None
@@ -711,7 +810,7 @@ async fn handle_collab_pr_create(args : Array[String]) -> Unit raise Error {
         continue
       }
       _ if arg.has_prefix("-") => {
-        warn_unimplemented_arg("hub pr create", arg)
+        warn_unimplemented_arg(warn_context, arg)
         i += 1
         continue
       }
@@ -737,38 +836,86 @@ async fn handle_collab_pr_create(args : Array[String]) -> Unit raise Error {
   guard target_branch is Some(tgt) else {
     raise @git.GitError::InvalidObject("Missing --target")
   }
-  let pr_body = body.unwrap_or("")
+  {
+    title: t,
+    body: body.unwrap_or(""),
+    source_branch: src,
+    target_branch: tgt,
+    source_repo,
+    source_ref,
+  }
+}
+
+///|
+async fn handle_collab_pr_create(args : Array[String]) -> Unit raise Error {
+  let options = parse_collab_pr_create_options(args, "hub pr create")
   let root = get_work_root()
   let git_dir = root + "/.git"
   let (objects, refs, clock) = make_collab_stores(git_dir)
   let fs = OsFs::new()
-  let source_repo_value = match source_repo {
+  let source_repo_value = match options.source_repo {
     Some(repo) => if repo.length() == 0 { None } else { Some(repo) }
     None => infer_source_repo_name(fs, git_dir)
   }
-  let source_ref_value = match source_ref {
+  let source_ref_value = match options.source_ref {
     Some(ref_name) =>
       if ref_name.length() == 0 {
-        Some(normalize_branch_ref(src))
+        Some(normalize_branch_ref(options.source_branch))
       } else {
         Some(normalize_branch_ref(ref_name))
       }
-    None => Some(normalize_branch_ref(src))
+    None => Some(normalize_branch_ref(options.source_branch))
   }
   let collab = init_collab_store(objects, refs)
   let pr = collab.create_pr(
     objects,
     refs,
     clock,
-    t,
-    pr_body,
-    src,
-    tgt,
+    options.title,
+    options.body,
+    options.source_branch,
+    options.target_branch,
     get_author_string(),
     source_repo=source_repo_value,
     source_ref=source_ref_value,
   )
   print_line(pr.serialize())
+}
+
+///|
+async fn handle_collab_pr_propose(args : Array[String]) -> Unit raise Error {
+  let options = parse_collab_pr_create_options(args, "hub pr propose")
+  let root = get_work_root()
+  let git_dir = root + "/.git"
+  let (objects, refs, clock) = make_collab_stores(git_dir)
+  let fs = OsFs::new()
+  let source_repo_value = match options.source_repo {
+    Some(repo) => if repo.length() == 0 { None } else { Some(repo) }
+    None => infer_source_repo_name(fs, git_dir)
+  }
+  let source_ref_value = match options.source_ref {
+    Some(ref_name) =>
+      if ref_name.length() == 0 {
+        Some(normalize_branch_ref(options.source_branch))
+      } else {
+        Some(normalize_branch_ref(ref_name))
+      }
+    None => Some(normalize_branch_ref(options.source_branch))
+  }
+  let collab = init_collab_store(objects, refs)
+  let proposal = collab.propose_pr(
+    objects,
+    refs,
+    clock,
+    options.title,
+    options.body,
+    options.source_branch,
+    options.target_branch,
+    get_author_string(),
+    source_repo=source_repo_value,
+    source_ref=source_ref_value,
+  )
+  print_line(proposal.serialize())
 }
 
 ///|
@@ -2297,6 +2444,127 @@ async fn handle_collab_sync_push(args : Array[String]) -> Unit raise Error {
 }
 
 ///|
+fn load_collab_record_store(
+  objects : &@gitlib.ObjectStore,
+  refs : &@gitlib.RefStore,
+) -> @collab.CollabStore raise @git.GitError {
+  @collab.CollabStore::load(
+    objects,
+    refs,
+    signing_key=get_collab_signing_key(),
+    require_signed=get_collab_require_signed(),
+  )
+}
+
+///|
+fn select_notify_records(
+  records : Array[@collab.CollabRecord],
+) -> Map[String, @collab.CollabRecord] {
+  let selected : Map[String, @collab.CollabRecord] = {}
+  for record in records {
+    if @collab.record_notify_topic(record) is Some(_) {
+      selected[record.key] = record
+    }
+  }
+  selected
+}
+
+///|
+fn collect_notify_records_from_store(
+  store : @collab.CollabStore,
+  objects : &@gitlib.ObjectStore,
+) -> Map[String, @collab.CollabRecord] {
+  let records = store.list_records(objects, "collab/")
+  select_notify_records(records)
+}
+
+///|
+fn collect_changed_notify_records(
+  before : Map[String, @collab.CollabRecord],
+  after : Map[String, @collab.CollabRecord],
+) -> Array[@collab.CollabRecord] {
+  let changed : Array[@collab.CollabRecord] = []
+  for key, record in after {
+    match before.get(key) {
+      Some(prev) =>
+        if prev.serialize() != record.serialize() {
+          changed.push(record)
+        }
+      None => changed.push(record)
+    }
+  }
+  changed.sort_by(fn(a, b) {
+    if a.key < b.key {
+      -1
+    } else if a.key > b.key {
+      1
+    } else {
+      0
+    }
+  })
+  changed
+}
+
+///|
+fn format_hub_notify_message(
+  topic : String,
+  record : @collab.CollabRecord,
+) -> String {
+  match topic {
+    "hub.pr.proposal" => {
+      let proposal = @collab.parse_pull_request(record.payload) catch {
+        _ => return "[hub.notify] hub.pr.proposal key=\{record.key}"
+      }
+      "[hub.notify] hub.pr.proposal #\{proposal.id()} [\{proposal.state().to_string()}] \{proposal.title()}"
+    }
+    _ => "[hub.notify] \{topic} key=\{record.key}"
+  }
+}
+
+///|
+async fn run_hub_notify_hook(
+  fs : OsFs,
+  git_dir : String,
+  topic : String,
+  record : @collab.CollabRecord,
+) -> Int {
+  let hook_path = git_dir + "/hooks/hub-notify"
+  if not(fs.is_file(hook_path)) {
+    return -1
+  }
+  @process.run(
+    hook_path,
+    [topic, record.kind, record.key, record.node],
+    inherit_env=true,
+    cwd=os_parent_path(git_dir),
+  ) catch {
+    _ => 1
+  }
+}
+
+///|
+async fn dispatch_collab_notify_events(
+  fs : OsFs,
+  git_dir : String,
+  changed : Array[@collab.CollabRecord],
+) -> Unit {
+  for record in changed {
+    match @collab.record_notify_topic(record) {
+      Some(topic) => {
+        let code = run_hub_notify_hook(fs, git_dir, topic, record)
+        if code > 0 {
+          eprint_line("bit hub notify: hook failed (\{code}) for \{topic}")
+        }
+        if code != 0 {
+          eprint_line(format_hub_notify_message(topic, record))
+        }
+      }
+      None => ()
+    }
+  }
+}
+
+///|
 async fn handle_collab_sync_fetch(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let git_dir = root + "/.git"
@@ -2313,9 +2581,17 @@ async fn handle_collab_sync_fetch(args : Array[String]) -> Unit raise Error {
     raise @git.GitError::InvalidObject("No remote configured")
   }
   let (objects, refs, _clock) = make_collab_stores(git_dir)
+  let before_store = load_collab_record_store(objects, refs)
+  let before_notify = collect_notify_records_from_store(before_store, objects)
   let collab = load_collab_store(objects, refs)
   let result = @collab_native.collab_fetch(collab, fs, fs, git_dir, url)
   if result.success() {
+    let after_store = load_collab_record_store(objects, refs)
+    let after_notify = collect_notify_records_from_store(after_store, objects)
+    let changed_notify = collect_changed_notify_records(
+      before_notify, after_notify,
+    )
+    dispatch_collab_notify_events(fs, git_dir, changed_notify)
     print_line(result.message())
   } else {
     eprint_line(result.message())
@@ -2790,6 +3066,7 @@ fn normalize_collab_pr_subcommand(subcmd : String) -> String {
   match subcmd {
     "view" => "get"
     "edit" => "update"
+    "proposal" => "proposals"
     _ => subcmd
   }
 }

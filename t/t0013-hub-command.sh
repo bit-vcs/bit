@@ -50,4 +50,23 @@ test_expect_success 'pr/issue shortcuts continue to work with hub surface' '
     git_cmd pr list | grep -q "No pull requests"
 '
 
+test_expect_success 'hub pr proposal: propose/list/import keeps canonical PRs separated' '
+    git_cmd init &&
+    echo "base" > README.md &&
+    git_cmd add README.md &&
+    git_cmd commit -m "base" &&
+    git_cmd checkout -b feature/proposal &&
+    echo "proposal" > proposal.txt &&
+    git_cmd add proposal.txt &&
+    git_cmd commit -m "proposal" &&
+    git_cmd hub init >/dev/null &&
+    proposal_out=$(git_cmd hub pr propose --title "Proposal PR" --body "Body" --head refs/heads/feature/proposal --base refs/heads/main) &&
+    proposal_id=$(printf "%s\n" "$proposal_out" | head -n1 | cut -d" " -f2) &&
+    test -n "$proposal_id" &&
+    git_cmd hub pr proposals | grep -q "Proposal PR" &&
+    git_cmd hub pr list --open | grep -q "No pull requests" &&
+    git_cmd hub pr import-proposal "$proposal_id" >/dev/null &&
+    git_cmd hub pr list --open | grep -q "Proposal PR"
+'
+
 test_done

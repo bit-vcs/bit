@@ -61,6 +61,46 @@ pub fn Collab::import_prs(
 }
 
 ///|
+pub fn Collab::import_pr_proposals(
+  self : Collab,
+  objects : &@lib.ObjectStore,
+  refs : &@lib.RefStore,
+  clock : &@lib.Clock,
+  prs : Array[PullRequest],
+) -> ImportStats raise @git.GitError {
+  if prs.length() == 0 {
+    return ImportStats::new(0, 0)
+  }
+  let mut created = 0
+  let mut updated = 0
+  for pr in prs {
+    let key = pr_proposal_meta_key(pr.id())
+    let existing = self.store.get_record(objects, key)
+    match existing {
+      Some(r) =>
+        if r.timestamp >= pr.updated_at {
+          continue
+        } else {
+          updated += 1
+        }
+      None => created += 1
+    }
+    ignore(
+      self.store.put_record(
+        objects,
+        refs,
+        clock,
+        key,
+        "pr-proposal",
+        pr.serialize(),
+        pr.author(),
+      ),
+    )
+  }
+  ImportStats::new(created, updated)
+}
+
+///|
 pub fn Collab::import_issues(
   self : Collab,
   objects : &@lib.ObjectStore,

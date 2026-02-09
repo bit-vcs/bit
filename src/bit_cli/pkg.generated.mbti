@@ -54,6 +54,12 @@ type CherryPickResult
 
 type CollabDumpOptions
 
+type CollabIssueListOptions
+
+type CollabPrCreateOptions
+
+type CollabPrListOptions
+
 type DenyCurrentBranchDecision
 
 type GlobalOptions

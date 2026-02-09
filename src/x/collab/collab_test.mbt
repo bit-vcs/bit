@@ -229,6 +229,52 @@ test "pr: list PRs" {
 }
 
 ///|
+test "pr proposal: propose and list without mutating canonical PR list" {
+  let (_fs, objects, refs, clock) = setup_repo_with_branch()
+  let collab = Collab::init(objects, refs)
+  let proposed = collab.propose_pr(
+    objects, refs, clock, "Proposal PR", "From external peer", "refs/heads/feature",
+    "refs/heads/main", "carol@example.com",
+  )
+  let proposals = collab.list_pr_proposals(objects)
+  assert_eq(proposals.length(), 1)
+  assert_eq(proposals[0].id(), proposed.id())
+  assert_eq(proposals[0].title(), "Proposal PR")
+  let canonical = collab.list_prs(objects)
+  assert_eq(canonical.length(), 0)
+}
+
+///|
+test "pr proposal: classify as notify-only trigger" {
+  let (_fs, objects, refs, clock) = setup_repo_with_branch()
+  let collab = Collab::init(objects, refs)
+  let proposed = collab.propose_pr(
+    objects, refs, clock, "Notify proposal", "Only notify should fire", "refs/heads/feature",
+    "refs/heads/main", "dave@example.com",
+  )
+  let proposal_key = pr_proposal_meta_key(proposed.id())
+  let proposal_record = collab.store.get_record(objects, proposal_key)
+  guard proposal_record is Some(record) else { panic() }
+  assert_eq(classify_record_trigger(record), RecordTriggerClass::NotifyOnly)
+  assert_eq(record_notify_topic(record), Some("hub.pr.proposal"))
+}
+
+///|
+test "pr: classify canonical records as full triggers" {
+  let (_fs, objects, refs, clock) = setup_repo_with_branch()
+  let collab = Collab::init(objects, refs)
+  let pr = collab.create_pr(
+    objects, refs, clock, "Canonical PR", "Should keep full triggers", "refs/heads/feature",
+    "refs/heads/main", "erin@example.com",
+  )
+  let key = pr_meta_key(pr.id())
+  let record = collab.store.get_record(objects, key)
+  guard record is Some(r) else { panic() }
+  assert_eq(classify_record_trigger(r), RecordTriggerClass::Full)
+  assert_eq(record_notify_topic(r), None)
+}
+
+///|
 test "pr: close PR" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
   let prs = Collab::init(objects, refs)
@@ -1009,6 +1055,7 @@ test "signature: require_signed hides unsigned records" {
     objects, refs, clock, "Unsigned", "Body", "refs/heads/feature", "refs/heads/main",
     "alice@example.com",
   )
+  strict_collab.reload_store(objects, refs)
   let strict_view = strict_collab.get_pr(objects, unsigned_pr.id())
   assert_true(strict_view is None)
   let signed_pr = strict_collab.create_pr(
@@ -1038,6 +1085,7 @@ test "signature: wrong key hides signed records" {
     objects, refs, clock, "Signed", "Body", "refs/heads/feature", "refs/heads/main",
     "alice@example.com",
   )
+  reader.reload_store(objects, refs)
   let seen = reader.get_pr(objects, pr.id())
   assert_true(seen is None)
 }
@@ -1049,6 +1097,75 @@ test "signature: require_signed without key rejects writes" {
   ignore(
     strict.create_pr(
       objects, refs, clock, "Signed", "Body", "refs/heads/feature", "refs/heads/main",
+      "alice@example.com",
+    ) catch {
+      @git.GitError::InvalidObject(message) => {
+        assert_true(message.contains("signing key"))
+        return ()
+      }
+      err => fail("unexpected error: \{err.to_string()}")
+    },
+  )
+  fail("expected invalid object error")
+}
+
+///|
+test "signature: require_signed hides unsigned proposal records" {
+  let (_fs, objects, refs, clock) = setup_repo_with_branch()
+  let unsigned_collab = Collab::init(objects, refs)
+  let strict_collab = Collab::init(
+    objects,
+    refs,
+    signing_key=Some("k1"),
+    require_signed=true,
+  )
+  let _ = unsigned_collab.propose_pr(
+    objects, refs, clock, "Unsigned proposal", "Body", "refs/heads/feature", "refs/heads/main",
+    "alice@example.com",
+  )
+  strict_collab.reload_store(objects, refs)
+  let strict_view = strict_collab.list_pr_proposals(objects)
+  assert_eq(strict_view.length(), 0)
+  let signed = strict_collab.propose_pr(
+    objects, refs, clock, "Signed proposal", "Body", "refs/heads/feature", "refs/heads/main",
+    "alice@example.com",
+  )
+  let strict_signed = strict_collab.list_pr_proposals(objects)
+  assert_eq(strict_signed.length(), 1)
+  assert_eq(strict_signed[0].id(), signed.id())
+}
+
+///|
+test "signature: wrong key hides signed proposal records" {
+  let (_fs, objects, refs, clock) = setup_repo_with_branch()
+  let writer = Collab::init(
+    objects,
+    refs,
+    signing_key=Some("writer-key"),
+    require_signed=true,
+  )
+  let reader = Collab::init(
+    objects,
+    refs,
+    signing_key=Some("reader-key"),
+    require_signed=true,
+  )
+  let _ = writer.propose_pr(
+    objects, refs, clock, "Signed proposal", "Body", "refs/heads/feature", "refs/heads/main",
+    "alice@example.com",
+  )
+  reader.reload_store(objects, refs)
+  let seen = reader.list_pr_proposals(objects)
+  assert_eq(seen.length(), 0)
+}
+
+///|
+test "signature: require_signed without key rejects proposal writes" {
+  let (_fs, objects, refs, clock) = setup_repo_with_branch()
+  let strict = Collab::init(objects, refs, require_signed=true)
+  ignore(
+    strict.propose_pr(
+      objects, refs, clock, "Signed proposal", "Body", "refs/heads/feature", "refs/heads/main",
       "alice@example.com",
     ) catch {
       @git.GitError::InvalidObject(message) => {
