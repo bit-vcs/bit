@@ -121,45 +121,27 @@ async fn show_command_help(cmd : String) -> Bool {
       true
     }
     "init" => {
-      show_simple_command_help(
-        "git init [<options>] [<directory>]",
-        summary="Create an empty Git repository or reinitialize an existing one.",
-      )
+      show_init_command_help()
       true
     }
     "status" => {
-      show_simple_command_help(
-        "git status [<options>] [--] [<pathspec>...]",
-        summary="Show the working tree status.",
-      )
+      show_status_command_help()
       true
     }
     "add" => {
-      show_simple_command_help(
-        "git add [<options>] [--] <pathspec>...",
-        summary="Add file contents to the index.",
-      )
+      show_add_command_help()
       true
     }
     "commit" => {
-      show_simple_command_help(
-        "git commit [<options>]",
-        summary="Record changes to the repository.",
-      )
+      show_commit_command_help()
       true
     }
     "log" => {
-      show_simple_command_help(
-        "git log [<options>] [<revision-range>] [--] [<pathspec>...]",
-        summary="Show commit logs.",
-      )
+      show_log_command_help()
       true
     }
     "show" => {
-      show_simple_command_help(
-        "git show [<options>] [<object>...]",
-        summary="Show various types of objects.",
-      )
+      show_show_command_help()
       true
     }
     "tree" => {
@@ -858,430 +840,156 @@ async fn dispatch_command(
   cmd : String,
   rest : Array[String],
 ) -> Unit raise Error {
-  let cmd_handles_help = match cmd {
-    "receive-pack"
-    | "git-receive-pack"
-    | "upload-pack"
-    | "git-upload-pack"
-    | "pack-objects"
-    | "index-pack"
-    | "scalar" => true
-    _ => false
-  }
-  if not(cmd_handles_help) {
+  let normalized_cmd = normalize_dispatch_command(cmd)
+  if not(command_handles_builtin_help(normalized_cmd)) {
     for arg in rest {
       if arg == "-h" || arg == "--help" {
-        if (cmd |> show_command_help |> not) {
-          eprint_line("warning: help for '\{cmd}' is not implemented")
+        if (normalized_cmd |> show_command_help |> not) {
+          eprint_line(
+            "warning: help for '\{normalized_cmd}' is not implemented",
+          )
         }
         return ()
       }
     }
   }
+  dispatch_known_command(normalized_cmd, rest) catch {
+    err if @async.is_cancellation_error(err) => raise err
+    err => exit_with_error(command_error_name(normalized_cmd), err)
+  }
+}
+
+///|
+fn normalize_dispatch_command(cmd : String) -> String {
+  for
+    entry in [
+      ("git-receive-pack", "receive-pack"),
+      ("git-upload-pack", "upload-pack"),
+      ("show-branch", "show-branches"),
+      ("--version", "version"),
+    ] {
+    if cmd == entry.0 {
+      return entry.1
+    }
+  }
+  cmd
+}
+
+///|
+fn command_handles_builtin_help(cmd : String) -> Bool {
+  for
+    name in [
+      "receive-pack", "upload-pack", "pack-objects", "index-pack", "scalar",
+    ] {
+    if cmd == name {
+      return true
+    }
+  }
+  false
+}
+
+///|
+fn command_error_name(cmd : String) -> String {
+  if cmd == "subdir-clone" {
+    "subdir"
+  } else {
+    cmd
+  }
+}
+
+///|
+async fn dispatch_known_command(
+  cmd : String,
+  rest : Array[String],
+) -> Unit raise Error {
   match cmd {
     "help" => handle_help(rest)
     // Pack operations
-    "receive-pack" | "git-receive-pack" =>
-      handle_receive_pack(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("receive-pack", err)
-      }
-    "upload-pack" | "git-upload-pack" =>
-      handle_upload_pack(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("upload-pack", err)
-      }
-    "pack-objects" =>
-      handle_pack_objects(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("pack-objects", err)
-      }
-    "index-pack" =>
-      handle_index_pack(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("index-pack", err)
-      }
+    "receive-pack" => handle_receive_pack(rest)
+    "upload-pack" => handle_upload_pack(rest)
+    "pack-objects" => handle_pack_objects(rest)
+    "index-pack" => handle_index_pack(rest)
     // Remote operations
-    "remote" =>
-      handle_remote(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("remote", err)
-      }
-    "clone" =>
-      handle_clone(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("clone", err)
-      }
-    "fetch" =>
-      handle_fetch(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("fetch", err)
-      }
-    "pull" =>
-      handle_pull(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("pull", err)
-      }
-    "push" =>
-      handle_push(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("push", err)
-      }
+    "remote" => handle_remote(rest)
+    "clone" => handle_clone(rest)
+    "fetch" => handle_fetch(rest)
+    "pull" => handle_pull(rest)
+    "push" => handle_push(rest)
     // Core operations
-    "init" =>
-      handle_init(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("init", err)
-      }
-    "status" =>
-      handle_status(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("status", err)
-      }
-    "add" =>
-      handle_add(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("add", err)
-      }
-    "commit" =>
-      handle_commit(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("commit", err)
-      }
-    "log" =>
-      handle_log(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("log", err)
-      }
-    "show" =>
-      handle_show(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("show", err)
-      }
-    "tree" =>
-      handle_tree(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("tree", err)
-      }
-    "cat" =>
-      handle_cat(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("cat", err)
-      }
+    "init" => handle_init(rest)
+    "status" => handle_status(rest)
+    "add" => handle_add(rest)
+    "commit" => handle_commit(rest)
+    "log" => handle_log(rest)
+    "show" => handle_show(rest)
+    "tree" => handle_tree(rest)
+    "cat" => handle_cat(rest)
     // Branch operations
-    "branch" =>
-      handle_branch(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("branch", err)
-      }
-    "checkout" =>
-      handle_checkout(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("checkout", err)
-      }
-    "switch" =>
-      handle_switch(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("switch", err)
-      }
-    "reset" =>
-      handle_reset(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("reset", err)
-      }
-    "rebase" =>
-      handle_rebase(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("rebase", err)
-      }
-    "stash" =>
-      handle_stash(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("stash", err)
-      }
-    "cherry-pick" =>
-      handle_cherry_pick(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("cherry-pick", err)
-      }
-    "show-branches" | "show-branch" =>
-      handle_show_branches(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("show-branches", err)
-      }
+    "branch" => handle_branch(rest)
+    "checkout" => handle_checkout(rest)
+    "switch" => handle_switch(rest)
+    "reset" => handle_reset(rest)
+    "rebase" => handle_rebase(rest)
+    "stash" => handle_stash(rest)
+    "cherry-pick" => handle_cherry_pick(rest)
+    "show-branches" => handle_show_branches(rest)
     // Misc operations
-    "diff" =>
-      handle_diff(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("diff", err)
-      }
-    "merge" =>
-      handle_merge(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("merge", err)
-      }
-    "tag" =>
-      handle_tag(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("tag", err)
-      }
-    "rm" =>
-      handle_rm(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("rm", err)
-      }
-    "mv" =>
-      handle_mv(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("mv", err)
-      }
-    "config" =>
-      handle_config(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("config", err)
-      }
-    "subdir-clone" =>
-      handle_subdir_clone(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("subdir", err)
-      }
-    "collab" =>
-      handle_collab(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("collab", err)
-      }
-    "agent" =>
-      handle_agent(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("agent", err)
-      }
-    "hq" =>
-      handle_hq(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("hq", err)
-      }
-    "sparse-checkout" =>
-      handle_sparse_checkout(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("sparse-checkout", err)
-      }
-    "rev-parse" =>
-      handle_rev_parse(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("rev-parse", err)
-      }
-    "cat-file" =>
-      handle_cat_file(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("cat-file", err)
-      }
-    "ls-files" =>
-      handle_ls_files(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("ls-files", err)
-      }
-    "hash-object" =>
-      handle_hash_object(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("hash-object", err)
-      }
-    "ls-tree" =>
-      handle_ls_tree(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("ls-tree", err)
-      }
-    "write-tree" =>
-      handle_write_tree(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("write-tree", err)
-      }
-    "show-ref" =>
-      handle_show_ref(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("show-ref", err)
-      }
-    "update-ref" =>
-      handle_update_ref(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("update-ref", err)
-      }
-    "symbolic-ref" =>
-      handle_symbolic_ref(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("symbolic-ref", err)
-      }
-    "reflog" =>
-      handle_reflog(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("reflog", err)
-      }
-    "worktree" =>
-      handle_worktree(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("worktree", err)
-      }
-    "gc" =>
-      handle_gc(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("gc", err)
-      }
-    "clean" =>
-      handle_clean(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("clean", err)
-      }
-    "grep" =>
-      handle_grep(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("grep", err)
-      }
-    "submodule" =>
-      handle_submodule(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("submodule", err)
-      }
-    "revert" =>
-      handle_revert(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("revert", err)
-      }
-    "notes" =>
-      handle_notes(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("notes", err)
-      }
-    "bisect" =>
-      handle_bisect(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("bisect", err)
-      }
-    "describe" =>
-      handle_describe(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("describe", err)
-      }
-    "blame" =>
-      handle_blame(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("blame", err)
-      }
-    "format-patch" =>
-      handle_format_patch(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("format-patch", err)
-      }
-    "shortlog" =>
-      handle_shortlog(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("shortlog", err)
-      }
-    "am" =>
-      handle_am(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("am", err)
-      }
-    "apply" =>
-      handle_apply(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("apply", err)
-      }
-    "fsck" =>
-      handle_fsck(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("fsck", err)
-      }
-    "prune" =>
-      handle_prune(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("prune", err)
-      }
-    "pack-refs" =>
-      handle_pack_refs(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("pack-refs", err)
-      }
-    "repack" =>
-      handle_repack(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("repack", err)
-      }
-    "maintenance" =>
-      handle_maintenance(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("maintenance", err)
-      }
-    "rev-list" =>
-      handle_rev_list(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("rev-list", err)
-      }
-    "verify-pack" =>
-      handle_verify_pack(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("verify-pack", err)
-      }
-    "unpack-objects" =>
-      handle_unpack_objects(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("unpack-objects", err)
-      }
-    "bundle" =>
-      handle_bundle(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("bundle", err)
-      }
-    "read-tree" =>
-      handle_read_tree(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("read-tree", err)
-      }
-    "update-index" =>
-      handle_update_index(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("update-index", err)
-      }
-    "mktree" =>
-      handle_mktree(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("mktree", err)
-      }
-    "request-pull" =>
-      handle_request_pull(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("request-pull", err)
-      }
-    "send-pack" =>
-      handle_send_pack(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("send-pack", err)
-      }
-    "range-diff" =>
-      handle_range_diff(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("range-diff", err)
-      }
-    "multi-pack-index" =>
-      handle_multi_pack_index(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("multi-pack-index", err)
-      }
-    "cherry" =>
-      handle_cherry(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("cherry", err)
-      }
+    "diff" => handle_diff(rest)
+    "merge" => handle_merge(rest)
+    "tag" => handle_tag(rest)
+    "rm" => handle_rm(rest)
+    "mv" => handle_mv(rest)
+    "config" => handle_config(rest)
+    "subdir-clone" => handle_subdir_clone(rest)
+    "collab" => handle_collab(rest)
+    "agent" => handle_agent(rest)
+    "hq" => handle_hq(rest)
+    "sparse-checkout" => handle_sparse_checkout(rest)
+    "rev-parse" => handle_rev_parse(rest)
+    "cat-file" => handle_cat_file(rest)
+    "ls-files" => handle_ls_files(rest)
+    "hash-object" => handle_hash_object(rest)
+    "ls-tree" => handle_ls_tree(rest)
+    "write-tree" => handle_write_tree(rest)
+    "show-ref" => handle_show_ref(rest)
+    "update-ref" => handle_update_ref(rest)
+    "symbolic-ref" => handle_symbolic_ref(rest)
+    "reflog" => handle_reflog(rest)
+    "worktree" => handle_worktree(rest)
+    "gc" => handle_gc(rest)
+    "clean" => handle_clean(rest)
+    "grep" => handle_grep(rest)
+    "submodule" => handle_submodule(rest)
+    "revert" => handle_revert(rest)
+    "notes" => handle_notes(rest)
+    "bisect" => handle_bisect(rest)
+    "describe" => handle_describe(rest)
+    "blame" => handle_blame(rest)
+    "format-patch" => handle_format_patch(rest)
+    "shortlog" => handle_shortlog(rest)
+    "am" => handle_am(rest)
+    "apply" => handle_apply(rest)
+    "fsck" => handle_fsck(rest)
+    "prune" => handle_prune(rest)
+    "pack-refs" => handle_pack_refs(rest)
+    "repack" => handle_repack(rest)
+    "maintenance" => handle_maintenance(rest)
+    "rev-list" => handle_rev_list(rest)
+    "verify-pack" => handle_verify_pack(rest)
+    "unpack-objects" => handle_unpack_objects(rest)
+    "bundle" => handle_bundle(rest)
+    "read-tree" => handle_read_tree(rest)
+    "update-index" => handle_update_index(rest)
+    "mktree" => handle_mktree(rest)
+    "request-pull" => handle_request_pull(rest)
+    "send-pack" => handle_send_pack(rest)
+    "range-diff" => handle_range_diff(rest)
+    "multi-pack-index" => handle_multi_pack_index(rest)
+    "cherry" => handle_cherry(rest)
     "completion" => handle_completion(rest)
-    "scalar" =>
-      handle_scalar(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("scalar", err)
-      }
-    "shell" =>
-      handle_shell(rest) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        err => exit_with_error("shell", err)
-      }
-    "version" | "--version" => print_line("git version 2.47.0 (bit)")
+    "scalar" => handle_scalar(rest)
+    "shell" => handle_shell(rest)
+    "version" => print_line("git version 2.47.0 (bit)")
     // Error for unknown commands
     _ => {
       eprint_line("bit: '\{cmd}' is not a bit command")
