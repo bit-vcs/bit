@@ -7,6 +7,9 @@ pub(all) struct LlmAgentConfig {
   provider_name : String
   model : String
   max_steps : Int
+  max_runtime_sec : Int // hard stop by wall clock seconds; <=0 disables
+  max_tool_calls : Int // hard stop by tool call count; <=0 disables
+  stop_file : String // optional stop file path; exists => cancel
   auto_commit : Bool
   auto_pr : Bool
   pr_title : String
@@ -159,6 +162,47 @@ fn is_exec_error(output : String) -> Bool {
 }
 
 ///|
+fn now_unix_seconds(exec_cmd : (String) -> String) -> Int {
+  let out = strip_trailing_whitespace(exec_cmd("date +%s"))
+  @strconv.parse_int(out) catch { _ => 0 }
+}
+
+///|
+fn is_stop_file_triggered(stop_file : String, exec_cmd : (String) -> String) -> Bool {
+  let path = stop_file.trim().to_string()
+  if path.is_empty() {
+    return false
+  }
+  let cmd = "test -f " + shell_escape(path) + " && echo 1 || echo 0"
+  strip_trailing_whitespace(exec_cmd(cmd)) == "1"
+}
+
+///|
+fn evaluate_agent_stop_reason(
+  cancel_requested : Bool,
+  start_sec : Int,
+  now_sec : Int,
+  max_runtime_sec : Int,
+  tool_calls : Int,
+  max_tool_calls : Int,
+  stop_file_triggered : Bool,
+) -> String? {
+  if cancel_requested {
+    return Some("cancel:requested")
+  }
+  if stop_file_triggered {
+    return Some("cancel:stop_file")
+  }
+  if max_runtime_sec > 0 && start_sec > 0 && now_sec - start_sec >= max_runtime_sec {
+    return Some("budget:max_runtime_sec")
+  }
+  if max_tool_calls > 0 && tool_calls >= max_tool_calls {
+    return Some("budget:max_tool_calls")
+  }
+  None
+}
+
+///|
 fn run_auto_commit_steps(
   work_dir : String,
   branch : String,
@@ -245,13 +289,42 @@ pub fn run_llm_agent(
     log("[cancelled]")
     return
   }
+  let start_sec = now_unix_seconds(exec)
+  let stop_file = if config.stop_file.trim().to_string().is_empty() {
+    @ffi.get_env("BIT_AGENT_STOP_FILE")
+  } else {
+    config.stop_file
+  }
   let text_buf = StringBuilder::new()
   let mut tools_in_step = 0
-  @llmlib.run_agent(
+  let total_tool_calls : Ref[Int] = Ref::new(0)
+  let cancel_reason : Ref[String?] = Ref::new(None)
+  let final_reason : Ref[String] = Ref::new("")
+  let was_cancelled : Ref[Bool] = Ref::new(false)
+  let should_stop = fn() {
+    let reason = evaluate_agent_stop_reason(
+      should_cancel(),
+      start_sec,
+      now_unix_seconds(exec),
+      config.max_runtime_sec,
+      total_tool_calls.val,
+      config.max_tool_calls,
+      is_stop_file_triggered(stop_file, exec),
+    )
+    match reason {
+      Some(r) => {
+        cancel_reason.val = Some(r)
+        true
+      }
+      None => false
+    }
+  }
+  @llmlib.run_agent_cancellable(
     provider,
     registry,
     messages,
     @llmlib.StopCondition::MaxSteps(config.max_steps),
+    should_stop,
     fn(event) {
       match event {
         Stream(stream_event) =>
@@ -269,6 +342,7 @@ pub fn run_llm_agent(
             log("\n[tool] " + name + " " + input.stringify())
           }
         ToolResult(name~, result~, is_error~) => {
+          total_tool_calls.val += 1
           tools_in_step += 1
           if has_coord {
             guard coord is Some(c) else { () }
@@ -327,24 +401,48 @@ pub fn run_llm_agent(
           }
         }
         Done(reason~) => {
+          let effective_reason = if reason == "cancelled" {
+            match cancel_reason.val {
+              Some(r) => r
+              None => "cancelled"
+            }
+          } else {
+            reason
+          }
+          final_reason.val = effective_reason
+          was_cancelled.val = reason == "cancelled"
           if has_coord {
             guard coord is Some(c) else { () }
-            c.write_status(config.coord_dir, config.agent_id, Done)
+            c.write_status(
+              config.coord_dir,
+              config.agent_id,
+              if was_cancelled.val { Cancelled } else { Done },
+            )
             c.append_event(
               config.coord_dir,
               config.agent_id,
-              Finished(summary=reason),
+              Finished(summary=effective_reason),
             )
           }
           let text = text_buf.to_string()
           if not(text.is_empty()) {
             on_output(text)
           }
-          log("\n[done] " + reason)
+          if was_cancelled.val {
+            log("\n[cancelled] " + effective_reason)
+          } else {
+            log("\n[done] " + effective_reason)
+          }
         }
       }
     },
   )
+  if was_cancelled.val {
+    if verbose && not(final_reason.val.is_empty()) {
+      log("[agent] stop reason: " + final_reason.val)
+    }
+    return
+  }
   // Auto-commit
   if config.auto_commit {
     let branch = config.branch_name

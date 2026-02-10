@@ -32,6 +32,9 @@ pub(all) struct OrchestratorConfig {
   provider_name : String
   model : String
   max_workers : Int
+  max_runtime_sec : Int
+  max_tool_calls : Int
+  stop_file : String
   target_branch : String
   auto_pr : Bool
   verbose : Bool
@@ -549,6 +552,10 @@ fn create_cloudflare_payload(
   payload["target_branch"] = config.target_branch.to_json()
   payload["provider"] = config.provider_name.to_json()
   payload["model"] = config.model.to_json()
+  payload["max_steps"] = (20).to_json()
+  payload["max_runtime_sec"] = config.max_runtime_sec.to_json()
+  payload["max_tool_calls"] = config.max_tool_calls.to_json()
+  payload["stop_file"] = config.stop_file.to_json()
   payload["work_dir"] = config.work_dir.to_json()
   payload["source"] = "bit-orchestrator".to_json()
   Json::object(payload)
@@ -982,6 +989,9 @@ pub fn run_orchestrator(
       provider_name: config.provider_name,
       model: config.model,
       max_steps: 20,
+      max_runtime_sec: config.max_runtime_sec,
+      max_tool_calls: config.max_tool_calls,
+      stop_file: config.stop_file,
       auto_commit: true,
       auto_pr: config.auto_pr,
       pr_title: "",
@@ -1069,6 +1079,9 @@ pub fn run_orchestrator(
       provider_name: config.provider_name,
       model: config.model,
       max_steps: 20,
+      max_runtime_sec: config.max_runtime_sec,
+      max_tool_calls: config.max_tool_calls,
+      stop_file: config.stop_file,
       auto_commit: false,
       auto_pr: false,
       pr_title: "",

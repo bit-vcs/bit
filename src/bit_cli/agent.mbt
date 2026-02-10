@@ -301,6 +301,9 @@ fn print_agent_llm_usage() -> Unit {
   println("  --provider <name>      openrouter|anthropic|openai|claude_code")
   println("  --model <name>         Model name (default: provider default)")
   println("  --max-steps <n>        Max agent steps (default: 20)")
+  println("  --max-runtime-sec <n>  Max runtime seconds before forced stop (default: 900)")
+  println("  --max-tool-calls <n>   Max tool calls before forced stop (default: 60)")
+  println("  --stop-file <path>     Stop when this file appears (or BIT_AGENT_STOP_FILE)")
   println("  --max-workers <n>      Max parallel workers (default: 3)")
   println("  --branch <name>        Git branch (default: agent/<timestamp>)")
   println("  --target-branch <name> PR target branch (default: main)")
@@ -326,6 +329,9 @@ fn handle_agent_llm(args : Array[String]) -> Unit {
   let mut provider = "openrouter"
   let mut model = ""
   let mut max_steps = 20
+  let mut max_runtime_sec = 900
+  let mut max_tool_calls = 60
+  let mut stop_file = ""
   let mut max_workers = 3
   let mut branch = ""
   let mut target_branch = "main"
@@ -392,6 +398,24 @@ fn handle_agent_llm(args : Array[String]) -> Unit {
           max_steps = parse_llm_int(args[i], 20)
         }
       }
+      "--max-runtime-sec" => {
+        i += 1
+        if i < args.length() {
+          max_runtime_sec = parse_llm_int(args[i], 900)
+        }
+      }
+      "--max-tool-calls" => {
+        i += 1
+        if i < args.length() {
+          max_tool_calls = parse_llm_int(args[i], 60)
+        }
+      }
+      "--stop-file" => {
+        i += 1
+        if i < args.length() {
+          stop_file = args[i]
+        }
+      }
       "--max-workers" => {
         i += 1
         if i < args.length() {
@@ -454,6 +478,9 @@ fn handle_agent_llm(args : Array[String]) -> Unit {
       provider_name: provider,
       model,
       max_workers,
+      max_runtime_sec,
+      max_tool_calls,
+      stop_file,
       target_branch,
       auto_pr,
       verbose,
@@ -477,6 +504,9 @@ fn handle_agent_llm(args : Array[String]) -> Unit {
       provider_name: provider,
       model,
       max_steps,
+      max_runtime_sec,
+      max_tool_calls,
+      stop_file,
       auto_commit,
       auto_pr,
       pr_title,

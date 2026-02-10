@@ -151,6 +151,18 @@ fn build_tool_defs() -> Json {
     "type": "integer".to_json(),
     "description": "Max agent steps (default: 20)".to_json(),
   })
+  ra_props["max_runtime_sec"] = Json::object({
+    "type": "integer".to_json(),
+    "description": "Max runtime seconds before forced stop (default: 900)".to_json(),
+  })
+  ra_props["max_tool_calls"] = Json::object({
+    "type": "integer".to_json(),
+    "description": "Max tool calls before forced stop (default: 60)".to_json(),
+  })
+  ra_props["stop_file"] = Json::object({
+    "type": "string".to_json(),
+    "description": "Stop when this file appears (or BIT_AGENT_STOP_FILE if empty)".to_json(),
+  })
   ra_props["no_commit"] = Json::object({
     "type": "boolean".to_json(),
     "description": "Skip auto-commit (default: false)".to_json(),
@@ -188,6 +200,18 @@ fn build_tool_defs() -> Json {
   o_props["max_workers"] = Json::object({
     "type": "integer".to_json(),
     "description": "Max parallel workers (default: 3)".to_json(),
+  })
+  o_props["max_runtime_sec"] = Json::object({
+    "type": "integer".to_json(),
+    "description": "Max runtime seconds per worker before forced stop (default: 900)".to_json(),
+  })
+  o_props["max_tool_calls"] = Json::object({
+    "type": "integer".to_json(),
+    "description": "Max tool calls per worker before forced stop (default: 60)".to_json(),
+  })
+  o_props["stop_file"] = Json::object({
+    "type": "string".to_json(),
+    "description": "Stop when this file appears (or BIT_AGENT_STOP_FILE if empty)".to_json(),
   })
   o_props["exec_mode"] = Json::object({
     "type": "string".to_json(),
@@ -262,6 +286,9 @@ fn handle_run_agent(id : Json, args : Json) -> String {
   let provider = json_get_str(args, "provider")
   let model = json_get_str(args, "model")
   let max_steps = json_get_int(args, "max_steps", 20)
+  let max_runtime_sec = json_get_int(args, "max_runtime_sec", 900)
+  let max_tool_calls = json_get_int(args, "max_tool_calls", 60)
+  let stop_file = json_get_str(args, "stop_file")
   let no_commit = json_get_bool(args, "no_commit", false)
   let stream = json_get_bool(args, "stream", true)
   let ts = @agent_llm.strip_trailing_whitespace(
@@ -279,6 +306,9 @@ fn handle_run_agent(id : Json, args : Json) -> String {
     },
     model,
     max_steps,
+    max_runtime_sec,
+    max_tool_calls,
+    stop_file,
     auto_commit: not(no_commit),
     auto_pr: false,
     pr_title: "",
@@ -309,6 +339,9 @@ fn handle_run_orchestrator(id : Json, args : Json) -> String {
   let provider = json_get_str(args, "provider")
   let model = json_get_str(args, "model")
   let max_workers = json_get_int(args, "max_workers", 3)
+  let max_runtime_sec = json_get_int(args, "max_runtime_sec", 900)
+  let max_tool_calls = json_get_int(args, "max_tool_calls", 60)
+  let stop_file = json_get_str(args, "stop_file")
   let exec_mode = @agent_llm.parse_orchestrator_exec_mode(
     json_get_str(args, "exec_mode"),
   )
@@ -325,6 +358,9 @@ fn handle_run_orchestrator(id : Json, args : Json) -> String {
     },
     model,
     max_workers,
+    max_runtime_sec,
+    max_tool_calls,
+    stop_file,
     target_branch: "main",
     auto_pr: false,
     verbose: true,

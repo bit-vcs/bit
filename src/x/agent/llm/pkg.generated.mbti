@@ -1,6 +1,10 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "mizchi/bit/x/agent/llm"
 
+import {
+  "mizchi/llm/tools",
+}
+
 // Values
 pub fn coord_append_event(String, String, CoordEvent) -> Unit
 
@@ -26,7 +30,7 @@ pub fn coord_write_step(String, String, Int) -> Unit
 
 pub fn create_provider(String, String, String) -> @mizchi/llm.BoxedProvider
 
-pub fn create_tool_registry(&ToolEnvironment) -> @mizchi/llm.ToolRegistry
+pub fn create_tool_registry(&ToolEnvironment) -> @tools.ToolRegistry
 
 pub fn file_coordination_backend(String) -> &CoordinationBackend
 
@@ -86,6 +90,9 @@ pub(all) struct LlmAgentConfig {
   provider_name : String
   model : String
   max_steps : Int
+  max_runtime_sec : Int
+  max_tool_calls : Int
+  stop_file : String
   auto_commit : Bool
   auto_pr : Bool
   pr_title : String
@@ -103,6 +110,9 @@ pub(all) struct OrchestratorConfig {
   provider_name : String
   model : String
   max_workers : Int
+  max_runtime_sec : Int
+  max_tool_calls : Int
+  stop_file : String
   target_branch : String
   auto_pr : Bool
   verbose : Bool
