@@ -700,7 +700,7 @@ fn poll_cloudflare_jobs(
   for job in jobs {
     statuses[job.job_id] = "queued"
   }
-  let max_iterations = 30
+  let max_iterations = 600
   let mut iteration = 0
   let mut stale_iterations = 0
   while iteration < max_iterations {
@@ -739,7 +739,7 @@ fn poll_cloudflare_jobs(
       stale_iterations = 0
     } else {
       stale_iterations += 1
-      if stale_iterations >= 5 {
+      if stale_iterations >= 30 {
         log(
           "[orchestrator] WARN no remote status change; stop polling early (jobs may still be running)",
         )

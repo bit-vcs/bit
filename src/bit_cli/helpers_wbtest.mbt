@@ -228,3 +228,8 @@ async test "main: show_command_help supports hub command" {
   let ok = show_command_help("hub")
   assert_true(ok)
 }
+
+///|
+test "main: command_handles_builtin_help allows agent subcommand-specific help" {
+  assert_true(command_handles_builtin_help("agent"))
+}
