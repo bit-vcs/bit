@@ -71,3 +71,54 @@ test "select_bit_binary falls back to which bit for non-bit argv0" {
   let got = select_bit_binary("", "moon", "/usr/local/bin/bit")
   assert_eq(got, "/usr/local/bin/bit")
 }
+
+///|
+test "parse_orchestrator_exec_mode parses known aliases" {
+  assert_true(parse_orchestrator_exec_mode("process") == ProcessMode)
+  assert_true(parse_orchestrator_exec_mode("local") == ProcessMode)
+  assert_true(parse_orchestrator_exec_mode("in-process") == InProcessMode)
+  assert_true(parse_orchestrator_exec_mode("self") == InProcessMode)
+  assert_true(parse_orchestrator_exec_mode("cloudflare") == CloudflareMode)
+  assert_true(parse_orchestrator_exec_mode("remote") == CloudflareMode)
+}
+
+///|
+test "parse_orchestrator_exec_mode falls back to process for unknown values" {
+  assert_true(parse_orchestrator_exec_mode("") == ProcessMode)
+  assert_true(parse_orchestrator_exec_mode("weird") == ProcessMode)
+}
+
+///|
+test "normalize_orchestrator_submit_url accepts endpoint and base url" {
+  assert_eq(
+    normalize_orchestrator_submit_url(
+      "https://cluster.example.com/api/v1/jobs/submit",
+    ),
+    Some("https://cluster.example.com/api/v1/jobs/submit"),
+  )
+  assert_eq(
+    normalize_orchestrator_submit_url("https://cluster.example.com"),
+    Some("https://cluster.example.com/api/v1/jobs/submit"),
+  )
+  assert_eq(
+    normalize_orchestrator_submit_url("https://cluster.example.com/"),
+    Some("https://cluster.example.com/api/v1/jobs/submit"),
+  )
+}
+
+///|
+test "normalize_orchestrator_submit_url rejects empty value" {
+  assert_eq(normalize_orchestrator_submit_url(""), None)
+  assert_eq(normalize_orchestrator_submit_url("   "), None)
+}
+
+///|
+test "cloudflare_job_status_url rewrites submit endpoint to job endpoint" {
+  assert_eq(
+    cloudflare_job_status_url(
+      "https://cluster.example.com/api/v1/jobs/submit",
+      "job-123",
+    ),
+    "https://cluster.example.com/api/v1/jobs/job-123",
+  )
+}

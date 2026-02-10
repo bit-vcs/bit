@@ -189,6 +189,18 @@ fn build_tool_defs() -> Json {
     "type": "integer".to_json(),
     "description": "Max parallel workers (default: 3)".to_json(),
   })
+  o_props["exec_mode"] = Json::object({
+    "type": "string".to_json(),
+    "description": "Execution mode: process|in-process|cloudflare".to_json(),
+  })
+  o_props["orchestrator_url"] = Json::object({
+    "type": "string".to_json(),
+    "description": "Cloudflare orchestrator URL (base or /api/v1/jobs/submit)".to_json(),
+  })
+  o_props["orchestrator_token"] = Json::object({
+    "type": "string".to_json(),
+    "description": "Optional bearer token for cloudflare mode".to_json(),
+  })
   o_props["stream"] = Json::object({
     "type": "boolean".to_json(),
     "description": "Stream progress via notifications/message (default: true)".to_json(),
@@ -297,6 +309,11 @@ fn handle_run_orchestrator(id : Json, args : Json) -> String {
   let provider = json_get_str(args, "provider")
   let model = json_get_str(args, "model")
   let max_workers = json_get_int(args, "max_workers", 3)
+  let exec_mode = @agent_llm.parse_orchestrator_exec_mode(
+    json_get_str(args, "exec_mode"),
+  )
+  let orchestrator_url = json_get_str(args, "orchestrator_url")
+  let orchestrator_token = json_get_str(args, "orchestrator_token")
   let stream = json_get_bool(args, "stream", true)
   let config : @agent_llm.OrchestratorConfig = {
     work_dir,
@@ -311,7 +328,9 @@ fn handle_run_orchestrator(id : Json, args : Json) -> String {
     target_branch: "main",
     auto_pr: false,
     verbose: true,
-    in_process: false,
+    exec_mode,
+    orchestrator_url,
+    orchestrator_token,
   }
   let buf = StringBuilder::new()
   log("[mcp] Orchestrating: task=" + task)

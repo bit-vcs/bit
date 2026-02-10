@@ -289,6 +289,14 @@ fn print_agent_llm_usage() -> Unit {
   println("Options:")
   println("  --task <text>          Task description (required)")
   println("  --orchestrate          Run as orchestrator (parallel subtasks)")
+  println(
+    "  --exec-mode <mode>     process|in-process|cloudflare (default: process)",
+  )
+  println("  --in-process           Alias of --exec-mode in-process")
+  println(
+    "  --orchestrator-url <url> Cloudflare orchestrator URL (cloudflare mode)",
+  )
+  println("  --orchestrator-token <token> Bearer token for cloudflare mode")
   println("  --work-dir <path>      Working directory (default: cwd)")
   println("  --provider <name>      openrouter|anthropic|openai|claude_code")
   println("  --model <name>         Model name (default: provider default)")
@@ -326,12 +334,34 @@ fn handle_agent_llm(args : Array[String]) -> Unit {
   let mut pr_title = ""
   let mut verbose = true
   let mut orchestrate = false
+  let mut exec_mode = @agent_llm.ProcessMode
+  let mut orchestrator_url = ""
+  let mut orchestrator_token = ""
   let mut coord_dir = ""
   let mut agent_id_flag = ""
   let mut i = 0
   while i < args.length() {
     match args[i] {
       "--orchestrate" => orchestrate = true
+      "--in-process" => exec_mode = @agent_llm.InProcessMode
+      "--exec-mode" => {
+        i += 1
+        if i < args.length() {
+          exec_mode = @agent_llm.parse_orchestrator_exec_mode(args[i])
+        }
+      }
+      "--orchestrator-url" => {
+        i += 1
+        if i < args.length() {
+          orchestrator_url = args[i]
+        }
+      }
+      "--orchestrator-token" => {
+        i += 1
+        if i < args.length() {
+          orchestrator_token = args[i]
+        }
+      }
       "--task" => {
         i += 1
         if i < args.length() {
@@ -427,7 +457,9 @@ fn handle_agent_llm(args : Array[String]) -> Unit {
       target_branch,
       auto_pr,
       verbose,
-      in_process: false,
+      exec_mode,
+      orchestrator_url,
+      orchestrator_token,
     }
     @agent_llm.run_orchestrator(config, on_output=output)
   } else {

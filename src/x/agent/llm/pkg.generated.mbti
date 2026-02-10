@@ -34,6 +34,8 @@ pub fn kv_coordination_backend(String, () -> &KvStore) -> &CoordinationBackend
 
 pub fn native_tool_env(String) -> &ToolEnvironment
 
+pub fn parse_orchestrator_exec_mode(String) -> OrchestratorExecMode
+
 pub fn run_llm_agent(LlmAgentConfig, on_output~ : (String) -> Unit, should_cancel? : () -> Bool) -> Unit
 
 pub fn run_orchestrator(OrchestratorConfig, on_output~ : (String) -> Unit) -> Unit
@@ -104,8 +106,17 @@ pub(all) struct OrchestratorConfig {
   target_branch : String
   auto_pr : Bool
   verbose : Bool
-  in_process : Bool
+  exec_mode : OrchestratorExecMode
+  orchestrator_url : String
+  orchestrator_token : String
 }
+
+pub(all) enum OrchestratorExecMode {
+  ProcessMode
+  InProcessMode
+  CloudflareMode
+}
+pub impl Eq for OrchestratorExecMode
 
 // Type aliases
 

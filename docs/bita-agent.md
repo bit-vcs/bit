@@ -77,6 +77,8 @@ cancel_agent(handle) -> Unit
 実装:
 - `ProcessAgentRunner`: nohup でバックグラウンドプロセス spawn (並列)
 - `InProcessAgentRunner`: run_llm_agent を直接呼び出し (逐次)
+- `Cloudflare submit mode`: `POST /api/v1/jobs/submit` に subtask を投入
+  - submit 後は `GET /api/v1/jobs/:job_id` を polling して `done|failed|cancelled` を監視
 
 ## System Prompt
 
@@ -145,13 +147,20 @@ read-only ツール: `read_file`, `list_directory`, `list_files_recursive`, `sea
 
 1. Plan subtasks (LLM planner)
 2. Validate file overlap
-3. Create worktrees + coordination directory
-4. Spawn agents via AgentRunner (process or in-process)
-5. Monitor progress (stall detection, error pattern detection)
-6. Commit changes per worktree
-7. Merge branches
-8. Cleanup
-9. Optional: create PR
+3. `exec_mode=cloudflare` の場合: Cloudflare orchestrator に subtask を submit して終了
+4. それ以外: worktrees + coordination directory を作成
+5. Spawn agents via AgentRunner (process or in-process)
+6. Monitor progress (stall detection, error pattern detection)
+7. Commit changes per worktree
+8. Merge branches
+9. Cleanup
+10. Optional: create PR
+
+`bit agent llm --orchestrate` の主なモード:
+
+- `--exec-mode process` (default): 既存の並列プロセス実行
+- `--exec-mode in-process`: bit プロセス内で逐次実行 (self-agent モード)
+- `--exec-mode cloudflare --orchestrator-url <url>`: Cloudflare worker orchestrator へ投入
 
 ### Monitor Decisions
 

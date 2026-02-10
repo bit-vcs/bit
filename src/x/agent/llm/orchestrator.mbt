@@ -13,6 +13,19 @@ priv struct SubtaskPlan {
 }
 
 ///|
+priv struct SubmittedRemoteJob {
+  job_id : String
+  agent_id : String
+}
+
+///|
+pub(all) enum OrchestratorExecMode {
+  ProcessMode
+  InProcessMode
+  CloudflareMode
+} derive(Eq)
+
+///|
 pub(all) struct OrchestratorConfig {
   work_dir : String
   task : String
@@ -22,7 +35,46 @@ pub(all) struct OrchestratorConfig {
   target_branch : String
   auto_pr : Bool
   verbose : Bool
-  in_process : Bool // true = run agents in-process (sequential), false = spawn processes
+  exec_mode : OrchestratorExecMode // process|in-process|cloudflare
+  orchestrator_url : String // cloudflare mode: base URL or /api/v1/jobs/submit endpoint
+  orchestrator_token : String // cloudflare mode: optional bearer token
+}
+
+///|
+pub fn parse_orchestrator_exec_mode(raw : String) -> OrchestratorExecMode {
+  let normalized = raw.trim().to_string_view().to_lower().to_string()
+  match normalized {
+    "in-process" | "inprocess" | "self" | "self-agent" => InProcessMode
+    "cloudflare" | "remote" | "remote-cloudflare" => CloudflareMode
+    "process" | "local" => ProcessMode
+    _ => ProcessMode
+  }
+}
+
+///|
+fn normalize_orchestrator_submit_url(base_url : String) -> String? {
+  let trimmed = base_url.trim().to_string()
+  if trimmed.is_empty() {
+    return None
+  }
+  if trimmed.has_suffix("/api/v1/jobs/submit") {
+    return Some(trimmed)
+  }
+  if trimmed.has_suffix("/") {
+    return Some(trimmed + "api/v1/jobs/submit")
+  }
+  Some(trimmed + "/api/v1/jobs/submit")
+}
+
+///|
+fn cloudflare_job_status_url(submit_url : String, job_id : String) -> String {
+  let suffix = "/submit"
+  if submit_url.has_suffix(suffix) {
+    let end = submit_url.length() - suffix.length()
+    String::unsafe_substring(submit_url, start=0, end=end) + "/" + job_id
+  } else {
+    submit_url + "/" + job_id
+  }
 }
 
 ///|
@@ -482,6 +534,329 @@ fn find_bit_binary() -> String {
 }
 
 ///|
+fn create_cloudflare_payload(
+  config : OrchestratorConfig,
+  session_id : String,
+  agent_id : String,
+  branch : String,
+  task : String,
+) -> Json {
+  let payload : Map[String, Json] = {}
+  payload["objective_id"] = (session_id + "/" + agent_id).to_json()
+  payload["task"] = task.to_json()
+  payload["agent_id"] = agent_id.to_json()
+  payload["branch"] = branch.to_json()
+  payload["target_branch"] = config.target_branch.to_json()
+  payload["provider"] = config.provider_name.to_json()
+  payload["model"] = config.model.to_json()
+  payload["work_dir"] = config.work_dir.to_json()
+  payload["source"] = "bit-orchestrator".to_json()
+  Json::object(payload)
+}
+
+///|
+fn submit_cloudflare_job(
+  submit_url : String,
+  token : String,
+  payload : Json,
+  log : (String) -> Unit,
+) -> String? {
+  let auth_token = token.trim().to_string()
+  let auth_header = if auth_token.is_empty() {
+    ""
+  } else {
+    " -H " + shell_escape("authorization: Bearer " + auth_token)
+  }
+  let cmd = "curl -sS -X POST" +
+    " -H " +
+    shell_escape("content-type: application/json") +
+    auth_header +
+    " --data " +
+    shell_escape(payload.stringify()) +
+    " " +
+    shell_escape(submit_url)
+  let output = exec(cmd)
+  if is_exec_error(output) {
+    log("[orchestrator] ERROR cloudflare submit failed: " + output)
+    return None
+  }
+  let parsed = @json.parse(output) catch {
+    _ => {
+      log("[orchestrator] ERROR cloudflare submit invalid response: " + output)
+      return None
+    }
+  }
+  match parsed {
+    Object(m) => {
+      let ok = match m.get("ok") {
+        Some(True) => true
+        _ => false
+      }
+      if not(ok) {
+        let err = match m.get("error") {
+          Some(String(s)) => s
+          _ => output
+        }
+        log("[orchestrator] ERROR cloudflare submit rejected: " + err)
+        return None
+      }
+      match m.get("job_id") {
+        Some(String(job_id)) => Some(job_id)
+        _ => {
+          log("[orchestrator] ERROR cloudflare submit missing job_id")
+          None
+        }
+      }
+    }
+    _ => {
+      log("[orchestrator] ERROR cloudflare submit invalid json object")
+      None
+    }
+  }
+}
+
+///|
+fn is_terminal_cloudflare_status(status : String) -> Bool {
+  status == "done" || status == "failed" || status == "cancelled"
+}
+
+///|
+fn fetch_cloudflare_job_status(
+  submit_url : String,
+  token : String,
+  job_id : String,
+  log : (String) -> Unit,
+) -> String? {
+  let status_url = cloudflare_job_status_url(submit_url, job_id)
+  let auth_token = token.trim().to_string()
+  let auth_header = if auth_token.is_empty() {
+    ""
+  } else {
+    " -H " + shell_escape("authorization: Bearer " + auth_token)
+  }
+  let cmd = "curl -sS" +
+    auth_header +
+    " " +
+    shell_escape(status_url)
+  let output = exec(cmd)
+  if is_exec_error(output) {
+    log("[orchestrator] ERROR cloudflare status request failed for " + job_id + ": " + output)
+    return None
+  }
+  let parsed = @json.parse(output) catch {
+    _ => {
+      log("[orchestrator] ERROR cloudflare status invalid response for " + job_id + ": " + output)
+      return None
+    }
+  }
+  match parsed {
+    Object(root) => {
+      let ok = match root.get("ok") {
+        Some(True) => true
+        _ => false
+      }
+      if not(ok) {
+        let err = match root.get("error") {
+          Some(String(s)) => s
+          _ => "unknown error"
+        }
+        log("[orchestrator] cloudflare status rejected for " + job_id + ": " + err)
+        return None
+      }
+      match root.get("job") {
+        Some(Object(job)) =>
+          match job.get("status") {
+            Some(String(status)) => Some(status)
+            _ => {
+              log("[orchestrator] ERROR cloudflare status missing `job.status` for " + job_id)
+              None
+            }
+          }
+        _ => {
+          log("[orchestrator] ERROR cloudflare status missing `job` for " + job_id)
+          None
+        }
+      }
+    }
+    _ => {
+      log("[orchestrator] ERROR cloudflare status expected object for " + job_id)
+      None
+    }
+  }
+}
+
+///|
+fn poll_cloudflare_jobs(
+  submit_url : String,
+  token : String,
+  jobs : Array[SubmittedRemoteJob],
+  log : (String) -> Unit,
+  verbose : Bool,
+) -> Unit {
+  if jobs.is_empty() {
+    return
+  }
+  let statuses : Map[String, String] = {}
+  for job in jobs {
+    statuses[job.job_id] = "queued"
+  }
+  let max_iterations = 30
+  let mut iteration = 0
+  let mut stale_iterations = 0
+  while iteration < max_iterations {
+    let mut pending = 0
+    let mut any_change = false
+    for job in jobs {
+      match fetch_cloudflare_job_status(submit_url, token, job.job_id, log) {
+        Some(status) => {
+          let previous = statuses.get(job.job_id).unwrap_or("")
+          if previous != status {
+            any_change = true
+            statuses[job.job_id] = status
+            if verbose {
+              log(
+                "[orchestrator] remote status " +
+                job.agent_id +
+                " job_id=" +
+                job.job_id +
+                " -> " +
+                status,
+              )
+            }
+          }
+        }
+        None => ()
+      }
+      let current = statuses.get(job.job_id).unwrap_or("queued")
+      if not(is_terminal_cloudflare_status(current)) {
+        pending += 1
+      }
+    }
+    if pending == 0 {
+      break
+    }
+    if any_change {
+      stale_iterations = 0
+    } else {
+      stale_iterations += 1
+      if stale_iterations >= 5 {
+        log(
+          "[orchestrator] WARN no remote status change; stop polling early (jobs may still be running)",
+        )
+        break
+      }
+    }
+    iteration += 1
+    ignore(exec("sleep 2"))
+  }
+  if iteration >= max_iterations {
+    log("[orchestrator] WARN cloudflare polling timeout reached")
+  }
+  let mut done_count = 0
+  let mut failed_count = 0
+  let mut cancelled_count = 0
+  let mut queued_count = 0
+  let mut running_count = 0
+  for job in jobs {
+    match statuses.get(job.job_id).unwrap_or("queued") {
+      "done" => done_count += 1
+      "failed" => failed_count += 1
+      "cancelled" => cancelled_count += 1
+      "running" => running_count += 1
+      _ => queued_count += 1
+    }
+  }
+  log(
+    "[orchestrator] remote summary done=" +
+    done_count.to_string() +
+    " failed=" +
+    failed_count.to_string() +
+    " cancelled=" +
+    cancelled_count.to_string() +
+    " running=" +
+    running_count.to_string() +
+    " queued=" +
+    queued_count.to_string(),
+  )
+}
+
+///|
+fn run_cloudflare_orchestration(
+  config : OrchestratorConfig,
+  subtasks : Array[String],
+  log : (String) -> Unit,
+) -> Unit {
+  let submit_url = match
+    normalize_orchestrator_submit_url(config.orchestrator_url) {
+    Some(url) => url
+    None => {
+      log(
+        "[orchestrator] ERROR cloudflare mode requires --orchestrator-url (base URL or /api/v1/jobs/submit)",
+      )
+      return
+    }
+  }
+  let ts = strip_trailing_whitespace(exec("date +%s"))
+  let session_id = "bit-orch-" + ts
+  log(
+    "[orchestrator] Submitting " +
+    subtasks.length().to_string() +
+    " subtasks to cloudflare orchestrator: " +
+    submit_url,
+  )
+  let mut accepted = 0
+  let jobs : Array[SubmittedRemoteJob] = []
+  for i, task in subtasks {
+    let agent_id = "agent-" + i.to_string()
+    let branch = "agent/" + ts + "-" + i.to_string()
+    let payload = create_cloudflare_payload(
+      config, session_id, agent_id, branch, task,
+    )
+    match
+      submit_cloudflare_job(submit_url, config.orchestrator_token, payload, log) {
+      Some(job_id) => {
+        accepted += 1
+        jobs.push({ job_id, agent_id })
+        log(
+          "[orchestrator] queued " +
+          agent_id +
+          " -> job_id=" +
+          job_id +
+          " branch=" +
+          branch,
+        )
+      }
+      None =>
+        log(
+          "[orchestrator] failed to queue " + agent_id + " (task: " + task + ")",
+        )
+    }
+  }
+  log(
+    "[orchestrator] cloudflare queue accepted " +
+    accepted.to_string() +
+    "/" +
+    subtasks.length().to_string() +
+    " jobs",
+  )
+  if accepted == subtasks.length() {
+    log("[orchestrator] Remote orchestration submit completed.")
+  } else {
+    log("[orchestrator] Remote orchestration submit completed with errors.")
+  }
+  if not(jobs.is_empty()) {
+    log("[orchestrator] Polling cloudflare job statuses...")
+    poll_cloudflare_jobs(
+      submit_url,
+      config.orchestrator_token,
+      jobs,
+      log,
+      config.verbose,
+    )
+  }
+}
+
+///|
 /// Monitor decision
 priv enum MonitorDecision {
   Continue
@@ -590,6 +965,10 @@ pub fn run_orchestrator(
       log("  " + (i + 1).to_string() + ". " + task)
     }
   }
+  if config.exec_mode == CloudflareMode {
+    run_cloudflare_orchestration(config, subtasks, log)
+    return
+  }
   // If only 1 subtask, run directly (no need for parallel overhead)
   if subtasks.length() == 1 {
     if verbose {
@@ -649,7 +1028,8 @@ pub fn run_orchestrator(
     }
   }
   // Step 3: Select runner and spawn agents
-  let runner : &AgentRunner = if config.in_process {
+  let in_process = config.exec_mode == InProcessMode
+  let runner : &AgentRunner = if in_process {
     let r = InProcessAgentRunner::new(
       config.provider_name,
       config.model,
@@ -669,7 +1049,7 @@ pub fn run_orchestrator(
     let tr : &AgentRunner = r
     tr
   }
-  let mode = if config.in_process { "in-process" } else { "process" }
+  let mode = if in_process { "in-process" } else { "process" }
   if verbose {
     log(
       "\n[orchestrator] Spawning " +
@@ -700,7 +1080,7 @@ pub fn run_orchestrator(
       provider: None,
     }
     let handle = runner.spawn_agent(agent_config, log_file)
-    if not(config.in_process) {
+    if not(in_process) {
       let pid = @strconv.parse_int(handle) catch { _ => 0 }
       coord_write_pid(session_dir, w.agent_id, pid)
     }
