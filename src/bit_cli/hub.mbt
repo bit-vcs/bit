@@ -245,6 +245,225 @@ fn print_hub_dump_usage() -> Unit {
 }
 
 ///|
+struct HubMergePolicy {
+  required_approvals : Int
+  allow_request_changes : Bool
+  require_signed_records : Bool
+}
+
+///|
+fn default_hub_merge_policy() -> HubMergePolicy {
+  {
+    required_approvals: 0,
+    allow_request_changes: true,
+    require_signed_records: false,
+  }
+}
+
+///|
+fn default_hub_merge_policy_toml() -> String {
+  let template =
+    #|# Hub merge policy
+    #|# required_approvals: minimum number of latest approved reviews
+    #|# allow_request_changes: allow merge while latest review requests changes
+    #|# require_signed_records: require PR metadata and reviews to be signed
+    #|[merge]
+    #|required_approvals = 0
+    #|allow_request_changes = true
+    #|require_signed_records = false
+  template
+}
+
+///|
+fn parse_merge_policy_bool(
+  value : String,
+  key : String,
+) -> Bool raise @git.GitError {
+  let normalized = value.to_lower()
+  match normalized {
+    "true" | "1" | "yes" => true
+    "false" | "0" | "no" => false
+    _ =>
+      raise @git.GitError::InvalidObject(
+        "hub merge policy: '\{key}' must be true or false: \{value}",
+      )
+  }
+}
+
+///|
+fn parse_hub_merge_policy_toml(
+  content : String,
+) -> HubMergePolicy raise @git.GitError {
+  let mut required_approvals = 0
+  let mut allow_request_changes = true
+  let mut require_signed_records = false
+  let mut in_merge_section = false
+  for line_view in content.split("\n") {
+    let raw_line = line_view.to_string()
+    let line = trim_string(raw_line)
+    if line.length() == 0 || line.has_prefix("#") || line.has_prefix(";") {
+      continue
+    }
+    if line.has_prefix("[") && line.has_suffix("]") {
+      let section_name = trim_string(
+        String::unsafe_substring(line, start=1, end=line.length() - 1),
+      )
+      in_merge_section = section_name == "merge"
+      continue
+    }
+    if not(in_merge_section) {
+      continue
+    }
+    let eq_idx = line.find("=")
+    guard eq_idx is Some(i) else {
+      raise @git.GitError::InvalidObject(
+        "hub merge policy: expected key=value in [merge]: \{line}",
+      )
+    }
+    let key = trim_string(String::unsafe_substring(line, start=0, end=i))
+    let value_part = trim_string(
+      String::unsafe_substring(line, start=i + 1, end=line.length()),
+    )
+    let value = match value_part.find("#") {
+      Some(comment_start) =>
+        trim_string(
+          String::unsafe_substring(value_part, start=0, end=comment_start),
+        )
+      None => value_part
+    }
+    match key {
+      "required_approvals" => {
+        let parsed = @strconv.parse_int(value) catch {
+          _ =>
+            raise @git.GitError::InvalidObject(
+              "hub merge policy: required_approvals must be int: \{value}",
+            )
+        }
+        if parsed < 0 {
+          raise @git.GitError::InvalidObject(
+            "hub merge policy: required_approvals must be >= 0",
+          )
+        }
+        required_approvals = parsed
+      }
+      "allow_request_changes" =>
+        allow_request_changes = parse_merge_policy_bool(value, key)
+      "require_signed_records" =>
+        require_signed_records = parse_merge_policy_bool(value, key)
+      _ =>
+        raise @git.GitError::InvalidObject(
+          "hub merge policy: unknown key in [merge]: \{key}",
+        )
+    }
+  }
+  { required_approvals, allow_request_changes, require_signed_records }
+}
+
+///|
+fn hub_merge_policy_path(git_dir : String) -> String {
+  git_dir + "/hub/policy.toml"
+}
+
+///|
+fn ensure_hub_merge_policy_file(
+  fs : OsFs,
+  git_dir : String,
+) -> Unit raise @git.GitError {
+  let policy_path = hub_merge_policy_path(git_dir)
+  if fs.is_file(policy_path) {
+    return ()
+  }
+  fs.mkdir_p(git_dir + "/hub")
+  fs.write_string(policy_path, default_hub_merge_policy_toml())
+}
+
+///|
+fn load_hub_merge_policy(
+  fs : OsFs,
+  git_dir : String,
+) -> HubMergePolicy raise @git.GitError {
+  let policy_path = hub_merge_policy_path(git_dir)
+  if not(fs.is_file(policy_path)) {
+    return default_hub_merge_policy()
+  }
+  let content = decode_bytes(fs.read_file(policy_path))
+  parse_hub_merge_policy_toml(content)
+}
+
+///|
+fn summarize_latest_review_state(reviews : Array[@hub.PrReview]) -> (Int, Bool) {
+  let latest_verdicts : Map[String, @hub.ReviewVerdict] = {}
+  for review in reviews {
+    latest_verdicts[review.author] = review.verdict
+  }
+  let mut approvals = 0
+  let mut has_request_changes = false
+  for item in latest_verdicts.to_array() {
+    let (_, verdict) = item
+    match verdict {
+      @hub.ReviewVerdict::Approved => approvals += 1
+      @hub.ReviewVerdict::RequestChanges => has_request_changes = true
+      @hub.ReviewVerdict::Comment => ()
+    }
+  }
+  (approvals, has_request_changes)
+}
+
+///|
+fn check_hub_pr_merge_policy(
+  hub : @hub.Hub,
+  objects : &@gitlib.ObjectStore,
+  refs : &@gitlib.RefStore,
+  pr_id : String,
+  policy : HubMergePolicy,
+) -> Unit raise @git.GitError {
+  let pr = hub.get_pr(objects, pr_id)
+  guard pr is Some(existing_pr) else { return () }
+  if existing_pr.state() != @hub.PrState::Open {
+    return ()
+  }
+  let reviews = hub.list_reviews(objects, pr_id)
+  let (approved_count, has_request_changes) = summarize_latest_review_state(
+    reviews,
+  )
+  if not(policy.allow_request_changes) && has_request_changes {
+    raise @git.GitError::InvalidObject(
+      "Merge blocked by policy: request-changes review is present",
+    )
+  }
+  if approved_count < policy.required_approvals {
+    raise @git.GitError::InvalidObject(
+      "Merge blocked by policy: required approvals=\{policy.required_approvals}, current approvals=\{approved_count}",
+    )
+  }
+  if policy.require_signed_records {
+    let signing_key = get_hub_signing_key()
+    if signing_key is None {
+      raise @git.GitError::InvalidObject(
+        "Merge blocked by policy: require_signed_records=true requires BIT_COLLAB_SIGN_KEY",
+      )
+    }
+    let strict_hub = @hub.Hub::load(
+      objects,
+      refs,
+      signing_key~,
+      require_signed=true,
+    )
+    if strict_hub.get_pr(objects, pr_id) is None {
+      raise @git.GitError::InvalidObject(
+        "Merge blocked by policy: PR metadata is unsigned or has invalid signature",
+      )
+    }
+    let strict_reviews = strict_hub.list_reviews(objects, pr_id)
+    if strict_reviews.length() != reviews.length() {
+      raise @git.GitError::InvalidObject(
+        "Merge blocked by policy: unsigned or invalid PR reviews are present",
+      )
+    }
+  }
+}
+
+///|
 async fn handle_hub(args : Array[String]) -> Unit raise Error {
   if args.length() == 0 {
     print_hub_usage()
@@ -277,8 +496,10 @@ async fn handle_hub_init(args : Array[String]) -> Unit raise Error {
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
+  let fs = OsFs::new()
   let (objects, refs, _clock) = make_hub_stores(git_dir)
   let _ = init_hub_store(objects, refs)
+  ensure_hub_merge_policy_file(fs, git_dir)
   print_line("Initialized hub metadata")
 }
 
@@ -1132,8 +1353,11 @@ async fn handle_hub_pr_merge(args : Array[String]) -> Unit raise Error {
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
+  let fs = OsFs::new()
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let hub = init_hub_store(objects, refs)
+  let merge_policy = load_hub_merge_policy(fs, git_dir)
+  check_hub_pr_merge_policy(hub, objects, refs, id, merge_policy)
   let result = match strategy {
     Some(s) =>
       hub.merge_pr(objects, refs, clock, id, get_author_string(), strategy=s)

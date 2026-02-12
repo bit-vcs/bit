@@ -8,6 +8,15 @@ test_expect_success 'hub help shows usage' '
     git_cmd hub | grep -q "Usage: bit hub <subcommand>"
 '
 
+test_expect_success 'hub init creates default merge policy file' '
+    git_cmd init &&
+    git_cmd hub init >/dev/null &&
+    test_file_exists .git/hub/policy.toml &&
+    grep -q "required_approvals = 0" .git/hub/policy.toml &&
+    grep -q "allow_request_changes = true" .git/hub/policy.toml &&
+    grep -q "require_signed_records = false" .git/hub/policy.toml
+'
+
 test_expect_success 'hub issue lifecycle: create close reopen' '
     git_cmd init &&
     git_cmd hub init >/dev/null &&
@@ -67,6 +76,90 @@ test_expect_success 'hub pr proposal: propose/list/import keeps canonical PRs se
     git_cmd hub pr list --open | grep -q "No pull requests" &&
     git_cmd hub pr import-proposal "$proposal_id" >/dev/null &&
     git_cmd hub pr list --open | grep -q "Proposal PR"
+'
+
+test_expect_success 'hub pr merge policy: required approvals blocks and then allows merge after approval' '
+    git_cmd init &&
+    echo "base" > README.md &&
+    git_cmd add README.md &&
+    git_cmd commit -m "base" &&
+    git_cmd checkout -b feature/policy-approve &&
+    echo "feature" > policy.txt &&
+    git_cmd add policy.txt &&
+    git_cmd commit -m "feature" &&
+    git_cmd hub init >/dev/null &&
+    cat > .git/hub/policy.toml <<-\EOF &&
+[merge]
+required_approvals = 1
+allow_request_changes = true
+require_signed_records = false
+EOF
+    pr_out=$(git_cmd hub pr create --title "Policy PR" --body "Body" --head refs/heads/feature/policy-approve --base refs/heads/main) &&
+    pr_id=$(printf "%s\n" "$pr_out" | head -n1 | cut -d" " -f2) &&
+    test -n "$pr_id" &&
+    if git_cmd hub pr merge "$pr_id" >merge.out 2>merge.err; then
+        false
+    else
+        grep -q "required approvals=1" merge.err
+    fi &&
+    source_commit=$(git_cmd rev-parse refs/heads/feature/policy-approve) &&
+    git_cmd hub pr review "$pr_id" --approve --commit "$source_commit" >/dev/null &&
+    git_cmd hub pr merge "$pr_id" >/dev/null &&
+    git_cmd hub pr list --merged | grep -q "Policy PR"
+'
+
+test_expect_success 'hub pr merge policy: request-changes can block merge' '
+    git_cmd init &&
+    echo "base" > README.md &&
+    git_cmd add README.md &&
+    git_cmd commit -m "base" &&
+    git_cmd checkout -b feature/policy-rc &&
+    echo "feature" > blocked.txt &&
+    git_cmd add blocked.txt &&
+    git_cmd commit -m "feature" &&
+    git_cmd hub init >/dev/null &&
+    cat > .git/hub/policy.toml <<-\EOF &&
+[merge]
+required_approvals = 0
+allow_request_changes = false
+require_signed_records = false
+EOF
+    pr_out=$(git_cmd hub pr create --title "Blocked PR" --body "Body" --head refs/heads/feature/policy-rc --base refs/heads/main) &&
+    pr_id=$(printf "%s\n" "$pr_out" | head -n1 | cut -d" " -f2) &&
+    test -n "$pr_id" &&
+    source_commit=$(git_cmd rev-parse refs/heads/feature/policy-rc) &&
+    git_cmd hub pr review "$pr_id" --request-changes --commit "$source_commit" >/dev/null &&
+    if git_cmd hub pr merge "$pr_id" >merge.out 2>merge.err; then
+        false
+    else
+        grep -q "request-changes review is present" merge.err
+    fi
+'
+
+test_expect_success 'hub pr merge policy: require_signed_records fails without signing key' '
+    git_cmd init &&
+    echo "base" > README.md &&
+    git_cmd add README.md &&
+    git_cmd commit -m "base" &&
+    git_cmd checkout -b feature/policy-signed &&
+    echo "feature" > unsigned.txt &&
+    git_cmd add unsigned.txt &&
+    git_cmd commit -m "feature" &&
+    git_cmd hub init >/dev/null &&
+    cat > .git/hub/policy.toml <<-\EOF &&
+[merge]
+required_approvals = 0
+allow_request_changes = true
+require_signed_records = true
+EOF
+    pr_out=$(git_cmd hub pr create --title "Signed PR" --body "Body" --head refs/heads/feature/policy-signed --base refs/heads/main) &&
+    pr_id=$(printf "%s\n" "$pr_out" | head -n1 | cut -d" " -f2) &&
+    test -n "$pr_id" &&
+    if git_cmd hub pr merge "$pr_id" >merge.out 2>merge.err; then
+        false
+    else
+        grep -q "BIT_COLLAB_SIGN_KEY" merge.err
+    fi
 '
 
 test_done
