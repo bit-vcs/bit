@@ -262,6 +262,70 @@ test "hub dump summary: includes key and kind" {
 }
 
 ///|
+test "hub search parser: defaults" {
+  let opts = parse_hub_search_options([])
+  assert_true(opts.query is None)
+  assert_true(hub_search_has_type(opts.types, HubSearchType::Pr))
+  assert_true(hub_search_has_type(opts.types, HubSearchType::Issue))
+  assert_true(hub_search_has_type(opts.types, HubSearchType::PrComment))
+  assert_true(hub_search_has_type(opts.types, HubSearchType::PrReview))
+  assert_true(hub_search_has_type(opts.types, HubSearchType::IssueComment))
+  assert_true(opts.state is None)
+  assert_true(opts.author is None)
+  assert_eq(opts.labels.length(), 0)
+  assert_true(opts.limit is None)
+}
+
+///|
+test "hub search parser: parse query and filters" {
+  let opts = parse_hub_search_options([
+    "--type", "pr,issue", "--state", "open", "--author", "alice", "--label", "bug",
+    "--limit", "3", "hello", "world",
+  ])
+  guard opts.query is Some(q) else { fail("expected query") }
+  assert_eq(q, "hello world")
+  assert_eq(opts.types.length(), 2)
+  assert_true(hub_search_has_type(opts.types, HubSearchType::Pr))
+  assert_true(hub_search_has_type(opts.types, HubSearchType::Issue))
+  guard opts.state is Some(state) else { fail("expected state") }
+  assert_eq(state, "open")
+  guard opts.author is Some(author) else { fail("expected author") }
+  assert_eq(author, "alice")
+  assert_eq(opts.labels.length(), 1)
+  assert_eq(opts.labels[0], "bug")
+  guard opts.limit is Some(limit) else { fail("expected limit") }
+  assert_eq(limit, 3)
+}
+
+///|
+test "hub search parser: reject unknown type" {
+  ignore(
+    parse_hub_search_options(["--type", "unknown"]) catch {
+      @git.GitError::InvalidObject(message) => {
+        assert_true(message.contains("Unknown hub search type"))
+        return ()
+      }
+      err => fail("unexpected error: \{err.to_string()}")
+    },
+  )
+  fail("expected invalid object error")
+}
+
+///|
+test "hub search parser: reject unknown state" {
+  ignore(
+    parse_hub_search_options(["--state", "draft"]) catch {
+      @git.GitError::InvalidObject(message) => {
+        assert_true(message.contains("Unknown hub search state"))
+        return ()
+      }
+      err => fail("unexpected error: \{err.to_string()}")
+    },
+  )
+  fail("expected invalid object error")
+}
+
+///|
 async test "hub pr list: --state requires a value" {
   handle_hub_pr_list(["--state"]) catch {
     @git.GitError::InvalidObject(message) => {

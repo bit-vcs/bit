@@ -162,4 +162,52 @@ EOF
     fi
 '
 
+test_expect_success 'hub search: query and type filter' '
+    git_cmd init &&
+    echo "base" > README.md &&
+    git_cmd add README.md &&
+    git_cmd commit -m "base" &&
+    git_cmd checkout -b feature/search &&
+    echo "feature" > search.txt &&
+    git_cmd add search.txt &&
+    git_cmd commit -m "feature" &&
+    git_cmd hub init >/dev/null &&
+    issue_out=$(git_cmd hub issue create --title "Search Issue" --body "issue keyword-issue") &&
+    issue_id=$(printf "%s\n" "$issue_out" | head -n1 | cut -d" " -f2) &&
+    test -n "$issue_id" &&
+    pr_out=$(git_cmd hub pr create --title "Search PR" --body "pr keyword-pr" --head refs/heads/feature/search --base refs/heads/main) &&
+    pr_id=$(printf "%s\n" "$pr_out" | head -n1 | cut -d" " -f2) &&
+    test -n "$pr_id" &&
+    all_out=$(git_cmd hub search "Search") &&
+    printf "%s\n" "$all_out" | grep -q "pr #$pr_id" &&
+    printf "%s\n" "$all_out" | grep -q "issue #$issue_id" &&
+    issue_only=$(git_cmd hub search --type issue "Search") &&
+    printf "%s\n" "$issue_only" | grep -q "issue #$issue_id" &&
+    ! printf "%s\n" "$issue_only" | grep -q "pr #$pr_id"
+'
+
+test_expect_success 'hub search: comment/review and limit filter' '
+    git_cmd init &&
+    echo "base" > README.md &&
+    git_cmd add README.md &&
+    git_cmd commit -m "base" &&
+    git_cmd checkout -b feature/search-detail &&
+    echo "feature" > detail.txt &&
+    git_cmd add detail.txt &&
+    git_cmd commit -m "feature" &&
+    git_cmd hub init >/dev/null &&
+    pr_out=$(git_cmd hub pr create --title "Detail PR" --body "detail body" --head refs/heads/feature/search-detail --base refs/heads/main) &&
+    pr_id=$(printf "%s\n" "$pr_out" | head -n1 | cut -d" " -f2) &&
+    test -n "$pr_id" &&
+    git_cmd hub pr comment "$pr_id" --body "token-comment" >/dev/null &&
+    source_commit=$(git_cmd rev-parse refs/heads/feature/search-detail) &&
+    git_cmd hub pr review "$pr_id" --approve --commit "$source_commit" --body "token-review" >/dev/null &&
+    comment_out=$(git_cmd hub search --type comment "token-comment") &&
+    printf "%s\n" "$comment_out" | grep -q "pr-comment #$pr_id/" &&
+    review_out=$(git_cmd hub search --type review "token-review") &&
+    printf "%s\n" "$review_out" | grep -q "pr-review #$pr_id/" &&
+    limited_out=$(git_cmd hub search --type pr "Detail" --limit 1) &&
+    test "$(printf "%s\n" "$limited_out" | wc -l | tr -d " ")" -eq 1
+'
+
 test_done
