@@ -150,5 +150,20 @@ test_path_is_missing() {
     ! test -e "$1"
 }
 
+# Expect a command to fail (non-zero exit)
+test_must_fail() {
+    "$@" && return 1 || return 0
+}
+
+# Grep for pattern in file (like test_grep in git test suite)
+test_grep() {
+    grep -q "$1" "$2"
+}
+
+# Assert file is empty (zero bytes)
+test_must_be_empty() {
+    test ! -s "$1"
+}
+
 # Cleanup on exit
 trap cleanup_test_dir EXIT

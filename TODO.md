@@ -1,23 +1,82 @@
-# moongit TODO (updated 2026-02-08)
+# moongit TODO (updated 2026-02-12)
 
 ## 現在のステータス
 
 | Metric | Value |
 |--------|-------|
-| MoonBit tests | js/lib 215 pass, native 724 pass |
+| MoonBit tests | js/lib 215 pass, native 811 pass |
 | Git compatibility | 95.5% (744/779) |
-| Allowlist pass | 97.6% (24274/24858, failed 0 / broken 177) |
+| Allowlist pass | 97.6% (24279/24858, failed 0 / broken 177) |
 | Full git/t run | 96.3% (31832/33046, failed 0 / broken 397) |
 | Pure化 coverage | ~85% |
 | CI | 5 shards all green |
 
-## 直近の通し実行結果（2026-02-08）
+## 直近の通し実行結果（2026-02-12）
 
 - [x] `just check` は成功
-- [x] `just test` は成功（`js/lib 215 pass`, `native 724 pass`）
+- [x] `just test` は成功（`js/lib 215 pass`, `native 811 pass`）
 - [x] `just e2e` は成功
 - [x] `just test-subdir` は成功（14/14 suites）
-- [x] `just git-t-allowlist` は成功（`success 24274 / failed 0 / broken 177`）
+- [x] `just git-t-allowlist` は成功（`success 24279 / failed 0 / broken 177`）
+
+## 性能改善（2026-02-12）
+
+| ベンチマーク | Before | After | 改善率 |
+|---|---|---|---|
+| checkout 100 files | 84.68 ms | 37.25 ms | -56% |
+| create_packfile 100 | 13.75 ms | 6.62 ms | -52% |
+| create_packfile_with_delta 100 | 21.03 ms | 10.03 ms | -52% |
+| commit 100 files | 9.97 ms | 9.86 ms | -1% |
+
+主な最適化:
+- checkout: blob 二重読み込み排除 + ObjectDb lazy load + SHA1 検証スキップ
+- packfile: delta 遅延圧縮（delta 採用時に通常圧縮をスキップ）
+- ObjectDb: loose object 高速パス（seen set 割り当て削減）
+
+## Standalone 状況（2026-02-12）
+
+### アプリケーション本体: real git fallback 0 箇所
+
+`bit` コマンド自体は外部 git バイナリへの fallback が完全に撤去済み。
+`SHIM_REAL_GIT`, `real_git_path()`, `@process.run("git", ...)` いずれも 0。
+
+残っている `@process.run` は全て正当な用途:
+- `git-upload-pack` / `ssh` (プロトコル実装)
+- エディタ起動 (`GIT_EDITOR`)
+- hooks 実行 (`pre-push`, `hub-notify` 等)
+- `git-shell-commands/` スクリプト
+- workspace タスク実行 (`sh -lc`)
+- `has_unsupported_options` → 未対応オプションは即エラー終了（fallback ではない）
+
+### git-shim (テストハーネス): real git 依存あり
+
+git/t テストスイートはテストセットアップ自体が `git` コマンドを前提としており、
+shim を完全に外して動かすことは不可能。以下が real git に pass-through される:
+
+- `--help`, `--version`, `--exec-path` → real git
+- `multi-pack-index write` → 常に real git
+- `cat-file` → 常に real git
+- サブコマンドなし呼び出し → real git
+- `SHIM_CMDS` に含まれないコマンド → real git
+
+### 次のステップ: bit 単体の E2E テストで git 互換を保証する
+
+git/t テストスイートは引き続き git 互換の主要な検証手段だが、テストセットアップ自体が
+real git に依存するため、**bit だけで実行されている部分**と**real git が走っている部分**の
+境界が不明確になる。`t/` 以下の E2E テストは `--no-git-fallback` で bit 単体実行し、
+git/t ではカバーしきれない standalone 動作を補完的に検証する。
+
+目的:
+- git/t を置き換えるのではなく、**git/t で real git に依存してしまう箇所**を bit 単体で検証
+- 基本的に **git 互換であることを確認し続ける**のが目標
+- bit 固有の拡張機能（`--bit` フラグ等）のテストもここに置く
+
+- [x] **`bit init` テスト拡充** (30 テスト) — standalone の起点。git/t の `t0001-init.sh` 相当を移植
+  - [x] デフォルト init / bare init / GIT_DIR / reinit / template / initial-branch / separate-git-dir / ディレクトリ作成 / quiet
+- [x] `bit add/commit/status` テスト拡充 — `t0018-commit-workflow.sh` で 25 テスト追加
+- [x] `bit clone/fetch/push` テスト拡充 — `t0019-clone-local.sh` + `t0020-push-fetch-pull.sh` で 30 テスト追加（`clone -b` / empty clone は skip）
+- [ ] `--help` 移植 — 手間の問題（全サブコマンドの usage テキスト）。優先度低
+- [ ] `multi-pack-index write` / `cat-file` の shim pass-through を bit 実装に置換
 
 ## 中期目標: bit standalone（real-git fallback なし）
 
@@ -25,8 +84,9 @@
 
 ### Definition of Done
 
-- [ ] `just git-t-full` の重点セットが `failed 0 / broken 0`
-- [ ] `tools/git-shim/bin/git` を standalone 検証モードで実行したとき、非interceptコマンドの real-git 実行を禁止できる
+- [x] `bit` アプリケーション本体に real git fallback が 0 箇所
+- [x] `t/` 以下に init の standalone E2E テストを整備 (30 テスト)
+- [x] `t/` 以下に clone/commit/push/pull の standalone E2E テストを拡充
 - [ ] README に standalone 保証範囲と未対応コマンドを明記する
 
 ### 直近 Blocker（2026-02-08 実測）

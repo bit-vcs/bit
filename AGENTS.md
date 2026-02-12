@@ -65,3 +65,15 @@ moon doc 'String::*rev*'  # Glob pattern search
 ```bash
 just release-check  # fmt + info + check + test
 ```
+
+## Full Test (git-compat)
+
+`just git-t-allowlist` はローカルで 26 分以上かかる。full test は PR ブランチを作って CI で確認すること。
+
+```bash
+# ローカルでは軽量チェックのみ
+just release-check
+
+# full test は CI で
+git push origin HEAD  # PR ブランチを push して CI 結果を確認
+```

@@ -178,7 +178,7 @@ Allowlist run (`just git-t-allowlist-shim-strict`) on macOS:
 
 | | Count |
 |---|---|
-| success | 24,274 |
+| success | 24,279 |
 | failed | 0 |
 | broken (prereq skip) | 177 |
 | total | 24,858 |
@@ -205,13 +205,24 @@ Full upstream run (`just git-t`) summary on macOS (2026-02-07):
 | broken (known breakage / prereq skip) | 397 |
 | total | 33,046 |
 
-### Local test snapshot (2026-02-08)
+### Local test snapshot (2026-02-12)
 
 - `just check`: pass
-- `just test`: pass (`js/lib 215 pass`, `native 724 pass`)
+- `just test`: pass (`js/lib 215 pass`, `native 811 pass`)
 - `just e2e` (`t/run-tests.sh t00`): pass
 - `just test-subdir` (`t/run-tests.sh t900`): pass
-- `just git-t-allowlist`: pass (`success 24,274 / failed 0 / broken 177`)
+- `just git-t-allowlist`: pass (`success 24,279 / failed 0 / broken 177`)
+
+### Performance (2026-02-12)
+
+| Operation | Time |
+|---|---|
+| checkout 100 files | 37.25 ms |
+| commit 100 files | 9.86 ms |
+| create_packfile 100 | 6.62 ms |
+| create_packfile_with_delta 100 | 10.03 ms |
+| add_paths 100 files | 7.42 ms |
+| status clean (small) | 2.38 ms |
 
 ### Distributed/Agent testing
 
