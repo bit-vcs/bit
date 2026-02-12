@@ -149,7 +149,7 @@ allowlist で残っている 5 テスト:
 
 ## Tier 2: Agent Features (High)
 
-- [x] **MCP server dispatch**: run_agent/orchestrate ツール呼び出しの実装完了 (`src/x/agent/mcp/server.mbt`)
+- [x] **MCP server dispatch**: run_agent/orchestrate ツール呼び出しの実装完了 (`src/x/mcp/server.mbt`)
 - [x] **MCP streaming**: 長時間実行エージェントの出力をクライアントにストリーミング
 - [ ] **Process agent signal handling**: タイムアウト/キャンセル時のクリーンアップ改善
 - [ ] **Agent output capture**: ProcessAgentRunner の per-agent stdout 取得
@@ -376,16 +376,16 @@ allowlist で残っている 5 テスト:
 
 ### ✅ MCP server dispatch テスト整備 + JSON-RPC パースエラーハンドリング (2026-02-07)
 
-- `src/x/agent/mcp/server.mbt` を `process_message` + `dispatch_request` に分離
+- `src/x/mcp/server.mbt` を `process_message` + `dispatch_request` に分離
 - 不正 JSON で `-32700 Parse error` を返すよう修正
-- `src/x/agent/mcp/server_wbtest.mbt` 追加（tools/list, initialize, tools/call, parse error）
+- `src/x/mcp/server_wbtest.mbt` 追加（tools/list, initialize, tools/call, parse error）
 
 ### ✅ MCP streaming 対応 (2026-02-07)
 
-- `src/x/agent/mcp/server.mbt`: `run_agent` / `run_orchestrator` の `on_output` で `notifications/message` を送信
-- `src/x/agent/mcp/server.mbt`: `tool_output_notification` と `jsonrpc_notification` を追加
-- `src/x/agent/mcp/server.mbt`: `tools/call.arguments.stream` (default: true) を追加し、通知の有効/無効を切り替え可能に
-- `src/x/agent/mcp/server_wbtest.mbt`: stream 通知 JSON の whitebox テストを追加
+- `src/x/mcp/server.mbt`: `run_agent` / `run_orchestrator` の `on_output` で `notifications/message` を送信
+- `src/x/mcp/server.mbt`: `tool_output_notification` と `jsonrpc_notification` を追加
+- `src/x/mcp/server.mbt`: `tools/call.arguments.stream` (default: true) を追加し、通知の有効/無効を切り替え可能に
+- `src/x/mcp/server_wbtest.mbt`: stream 通知 JSON の whitebox テストを追加
 
 ### ✅ t5316/t5317 pack-objects 互換修正 + shim 実行安定化 (2026-02-07)
 

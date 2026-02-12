@@ -2,7 +2,7 @@
 
 ///|
 test "build_tool_defs includes run_agent and run_orchestrator" {
-  let defs = build_tool_defs().stringify()
+  let defs = mcp_tool_defs().stringify()
   assert_true(defs.contains("\"run_agent\""))
   assert_true(defs.contains("\"run_orchestrator\""))
   assert_true(defs.contains("\"stream\""))
@@ -10,7 +10,7 @@ test "build_tool_defs includes run_agent and run_orchestrator" {
 
 ///|
 test "process_message returns parse error for invalid json" {
-  let resp = process_message("{invalid json")
+  let resp = mcp_process_message("{invalid json")
   match resp {
     Some(s) => {
       assert_true(s.contains("\"error\""))
@@ -23,14 +23,14 @@ test "process_message returns parse error for invalid json" {
 ///|
 test "process_message ignores initialized notification" {
   let req = "{\"jsonrpc\":\"2.0\",\"method\":\"initialized\"}"
-  let resp = process_message(req)
+  let resp = mcp_process_message(req)
   assert_true(resp is None)
 }
 
 ///|
 test "process_message initialize returns capability response" {
   let req = "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{}}"
-  let resp = process_message(req)
+  let resp = mcp_process_message(req)
   match resp {
     Some(s) => {
       assert_true(s.contains("\"jsonrpc\":\"2.0\""))
@@ -43,7 +43,7 @@ test "process_message initialize returns capability response" {
 ///|
 test "process_message unknown tool returns method-not-found" {
   let req = "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"unknown\",\"arguments\":{}}}"
-  let resp = process_message(req)
+  let resp = mcp_process_message(req)
   match resp {
     Some(s) => {
       assert_true(s.contains("\"error\""))
@@ -56,7 +56,7 @@ test "process_message unknown tool returns method-not-found" {
 ///|
 test "process_message run_agent validates required task" {
   let req = "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"run_agent\",\"arguments\":{}}}"
-  let resp = process_message(req)
+  let resp = mcp_process_message(req)
   match resp {
     Some(s) => {
       assert_true(s.contains("\"isError\":true"))
@@ -64,6 +64,17 @@ test "process_message run_agent validates required task" {
     }
     None => assert_true(false)
   }
+}
+
+///|
+test "mcp_dispatch_request exposes tools/list handler" {
+  let resp = mcp_dispatch_request(
+    "tools/list",
+    Json::number(9.0),
+    Json::object({}),
+  )
+  assert_true(resp.contains("\"run_agent\""))
+  assert_true(resp.contains("\"run_orchestrator\""))
 }
 
 ///|

@@ -1,0 +1,20 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/bit/x/mcp"
+
+// Values
+pub fn mcp_dispatch_request(String, Json, Json) -> String
+
+pub fn mcp_process_message(String) -> String?
+
+pub fn mcp_tool_defs() -> Json
+
+pub fn run_mcp_server() -> Unit
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits
+

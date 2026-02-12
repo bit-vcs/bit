@@ -244,6 +244,11 @@ fn build_tool_defs() -> Json {
 }
 
 ///|
+pub fn mcp_tool_defs() -> Json {
+  build_tool_defs()
+}
+
+///|
 fn handle_tools_list(id : Json) -> String {
   jsonrpc_response(id, build_tool_defs())
 }
@@ -413,6 +418,11 @@ fn dispatch_request(meth : String, id : Json, params : Json) -> String {
 }
 
 ///|
+pub fn mcp_dispatch_request(meth : String, id : Json, params : Json) -> String {
+  dispatch_request(meth, id, params)
+}
+
+///|
 fn process_message(msg : String) -> String? {
   let json = @json.parse(msg) catch {
     _ => {
@@ -434,6 +444,11 @@ fn process_message(msg : String) -> String? {
 }
 
 ///|
+pub fn mcp_process_message(msg : String) -> String? {
+  process_message(msg)
+}
+
+///|
 pub fn run_mcp_server() -> Unit {
   log("[mcp] bit-agent MCP server started")
   while true {
@@ -441,7 +456,7 @@ pub fn run_mcp_server() -> Unit {
     if msg.is_empty() {
       break
     }
-    match process_message(msg) {
+    match mcp_process_message(msg) {
       Some(response) => write_message(response)
       None => ()
     }
