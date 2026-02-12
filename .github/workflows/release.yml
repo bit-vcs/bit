@@ -50,7 +50,7 @@ jobs:
       - name: Prepare artifact (Unix)
         if: runner.os != 'Windows'
         run: |
-          bin_path="_build/native/release/build/bit_cli/bit_cli.exe"
+          bin_path="_build/native/release/build/cmd/bit/bit.exe"
           if [ ! -f "$bin_path" ]; then
             echo "bit binary not found at $bin_path"
             exit 1
@@ -62,7 +62,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $binPath = "_build/native/release/build/bit_cli/bit_cli.exe"
+          $binPath = "_build/native/release/build/cmd/bit/bit.exe"
           if (-not (Test-Path $binPath)) {
             Write-Error "bit binary not found at $binPath"
             exit 1

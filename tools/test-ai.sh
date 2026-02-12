@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-BIT_BIN="${BIT_BIN:-$ROOT_DIR/_build/native/release/build/bit_cli/bit_cli.exe}"
+BIT_BIN="${BIT_BIN:-$ROOT_DIR/_build/native/release/build/cmd/bit/bit.exe}"
 DEBUG_ROOT="${DEBUG_ROOT:-$ROOT_DIR/tmp}"
 DEBUG_REPO="${DEBUG_REPO:-}"
 TEST_AI_SKIP_DEMO="${TEST_AI_SKIP_DEMO:-0}"
@@ -157,6 +157,6 @@ Notes:
   - Set TEST_AI_AGENT_LOOP=1 to run in agent-loop mode.
   - Set TEST_AI_AGENT_MAX_STEPS=<n> for --agent-max-steps.
   - Set DEBUG_REPO=/path/to/empty-dir to use a fixed location.
-  - Set BIT_BIN=/path/to/bit_cli.exe to use a custom binary.
+  - Set BIT_BIN=/path/to/bit.exe to use a custom binary.
   - Set TEST_AI_SKIP_DEMO=1 to only prepare conflict state.
 EOF

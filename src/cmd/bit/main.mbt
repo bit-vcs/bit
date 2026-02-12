@@ -53,7 +53,6 @@ async fn show_help() -> Unit {
     #|   hub          Manage pull requests and issues
     #|   pr           Shortcut for 'hub pr' (gh-like)
     #|   issue        Shortcut for 'hub issue' (gh-like)
-    #|   agent        P2P agent for automated PR hub workflow
     #|   mcp          Run bit MCP server (stdio)
     #|   workspace    Manage hierarchical bit workspace projects
     #|   ws           Shortcut for 'workspace'
@@ -122,10 +121,6 @@ async fn show_command_help(cmd : String) -> Bool {
     }
     "issue" => {
       print_hub_issue_usage()
-      true
-    }
-    "agent" => {
-      print_agent_usage()
       true
     }
     "mcp" => {
@@ -926,7 +921,7 @@ fn normalize_dispatch_command(cmd : String) -> String {
 fn command_handles_builtin_help(cmd : String) -> Bool {
   for
     name in [
-      "receive-pack", "upload-pack", "pack-objects", "index-pack", "scalar", "agent",
+      "receive-pack", "upload-pack", "pack-objects", "index-pack", "scalar",
     ] {
     if cmd == name {
       return true
@@ -992,7 +987,6 @@ async fn dispatch_known_command(
     "hub" => handle_hub(rest)
     "pr" => handle_hub_pr(rest)
     "issue" => handle_hub_issue(rest)
-    "agent" => handle_agent(rest)
     "mcp" => handle_mcp(rest)
     "workspace" => handle_workspace(rest)
     "repo" => handle_repo(rest)

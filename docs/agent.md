@@ -185,7 +185,7 @@ src/x/agent/native/       -- native: I/O adapters
   runner.mbt              -- FsWorkingTree adapter, run_task, validate_pr
   server.mbt              -- poll_once, serve (polling daemon)
 
-src/bit_cli/
+src/cmd/bit/
   handlers_agent.mbt      -- CLI: bit agent run/serve/status
 ```
 
@@ -196,7 +196,7 @@ pure 層 (`src/x/agent/`) はファイルシステムやネットワークに依
 ```
 src/x/agent/         → @git, @lib, @hub (pure)
 src/x/agent/native/  → @agent, @hub_native, @bitfs, @osfs, @gitnative, @protocol, @pack (native)
-src/bit_cli/          → @agent, @agent_native (native, handlers_agent.mbt only)
+src/cmd/bit/          → @agent, @agent_native (native, handlers_agent.mbt only)
 ```
 
 ## 既存コンポーネントの再利用

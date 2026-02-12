@@ -1,5 +1,5 @@
 ///|
-/// workspace command entry points for bit_cli
+/// workspace command entry points for bit command package
 
 ///|
 async fn print_workspace_usage() -> Unit {

@@ -1,5 +1,5 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "mizchi/bit/bit_cli"
+package "mizchi/bit/cmd/bit"
 
 import {
   "mizchi/bit/lib",

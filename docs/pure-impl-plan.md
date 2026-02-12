@@ -67,7 +67,7 @@ bitfs 計画に従い、実行環境依存の実装は adapter に閉じ込め�
 - `bit/adapters/clock_native`
 - `bit/adapters/random_native`
 
-CLI (`bit_cli`) がこれらを組み立てて core に注入する。
+CLI (`cmd/bit`) がこれらを組み立てて core に注入する。
 
 ---
 
@@ -82,7 +82,7 @@ x/hub (pure) / x/kv (pure)
   ↑
 adapters/bitfs_native (native-only)
   ↑
-bit_cli (native-only)
+cmd/bit (native-only)
 ```
 
 `bit/x/fs` は可能な限り pure / target-agnostic を維持。

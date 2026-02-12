@@ -21,16 +21,16 @@ fi
 BIT_BUILD_DIR="${TEST_DIRECTORY%/t}"
 
 # Find bit binary
-if test -x "$BIT_BUILD_DIR/target/release/build/bit_cli/bit_cli"; then
-	BIT="$BIT_BUILD_DIR/target/release/build/bit_cli/bit_cli"
-elif test -x "$BIT_BUILD_DIR/target/release/build/bit_cli/bit_cli.exe"; then
-	BIT="$BIT_BUILD_DIR/target/release/build/bit_cli/bit_cli.exe"
-elif test -x "$BIT_BUILD_DIR/target/native/release/build/bit_cli/bit_cli.exe"; then
-	BIT="$BIT_BUILD_DIR/target/native/release/build/bit_cli/bit_cli.exe"
-elif test -x "$BIT_BUILD_DIR/_build/native/release/build/bit_cli/bit_cli"; then
-	BIT="$BIT_BUILD_DIR/_build/native/release/build/bit_cli/bit_cli"
-elif test -x "$BIT_BUILD_DIR/_build/native/release/build/bit_cli/bit_cli.exe"; then
-	BIT="$BIT_BUILD_DIR/_build/native/release/build/bit_cli/bit_cli.exe"
+if test -x "$BIT_BUILD_DIR/target/release/build/cmd/bit/bit"; then
+	BIT="$BIT_BUILD_DIR/target/release/build/cmd/bit/bit"
+elif test -x "$BIT_BUILD_DIR/target/release/build/cmd/bit/bit.exe"; then
+	BIT="$BIT_BUILD_DIR/target/release/build/cmd/bit/bit.exe"
+elif test -x "$BIT_BUILD_DIR/target/native/release/build/cmd/bit/bit.exe"; then
+	BIT="$BIT_BUILD_DIR/target/native/release/build/cmd/bit/bit.exe"
+elif test -x "$BIT_BUILD_DIR/_build/native/release/build/cmd/bit/bit"; then
+	BIT="$BIT_BUILD_DIR/_build/native/release/build/cmd/bit/bit"
+elif test -x "$BIT_BUILD_DIR/_build/native/release/build/cmd/bit/bit.exe"; then
+	BIT="$BIT_BUILD_DIR/_build/native/release/build/cmd/bit/bit.exe"
 elif test -x "$BIT_BUILD_DIR/target/release/build/main/main"; then
 	BIT="$BIT_BUILD_DIR/target/release/build/main/main"
 elif test -x "$BIT_BUILD_DIR/_build/native/release/build/main/main"; then

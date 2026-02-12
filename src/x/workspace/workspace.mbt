@@ -190,7 +190,17 @@ priv struct WorkspaceNode {
   mut remote : String?
   mut branch : String?
   mut depends_on : Array[String]
-  tasks : Map[String, String]
+  tasks : Map[String, WorkspaceTask]
+}
+
+///|
+priv struct WorkspaceTask {
+  mut cmd : String
+  mut srcs : Array[String]
+  mut outs : Array[String]
+  env : Map[String, String]
+  mut cwd : String
+  mut trigger_mode : String
 }
 
 ///|
@@ -223,6 +233,11 @@ fn workspace_new_node() -> WorkspaceNode {
 }
 
 ///|
+fn workspace_new_task(cmd? : String = "") -> WorkspaceTask {
+  { cmd, srcs: [], outs: [], env: {}, cwd: "", trigger_mode: "auto" }
+}
+
+///|
 fn workspace_default_manifest() -> WorkspaceManifest {
   { version: 1, nodes: [workspace_new_node()] }
 }
@@ -233,25 +248,33 @@ fn workspace_flow_template_manifest() -> WorkspaceManifest {
   root.id = "root"
   root.path = "."
   root.depends_on = []
-  root.tasks["test"] = "echo root >> \"$BIT_WORKSPACE_FLOW_LOG_DIR/root.log\""
+  root.tasks["test"] = workspace_new_task(
+    cmd="echo root >> \"$BIT_WORKSPACE_FLOW_LOG_DIR/root.log\"",
+  )
 
   let dep = workspace_new_node()
   dep.id = "dep"
   dep.path = "dep"
   dep.depends_on = ["root"]
-  dep.tasks["test"] = "echo dep >> \"$BIT_WORKSPACE_FLOW_LOG_DIR/dep.log\""
+  dep.tasks["test"] = workspace_new_task(
+    cmd="echo dep >> \"$BIT_WORKSPACE_FLOW_LOG_DIR/dep.log\"",
+  )
 
   let leaf = workspace_new_node()
   leaf.id = "leaf"
   leaf.path = "leaf"
   leaf.depends_on = ["dep"]
-  leaf.tasks["test"] = "echo leaf >> \"$BIT_WORKSPACE_FLOW_LOG_DIR/leaf.log\""
+  leaf.tasks["test"] = workspace_new_task(
+    cmd="echo leaf >> \"$BIT_WORKSPACE_FLOW_LOG_DIR/leaf.log\"",
+  )
 
   let extra = workspace_new_node()
   extra.id = "extra"
   extra.path = "extra"
   extra.depends_on = []
-  extra.tasks["test"] = "echo extra >> \"$BIT_WORKSPACE_FLOW_LOG_DIR/extra.log\""
+  extra.tasks["test"] = workspace_new_task(
+    cmd="echo extra >> \"$BIT_WORKSPACE_FLOW_LOG_DIR/extra.log\"",
+  )
 
   { version: 1, nodes: [root, dep, leaf, extra] }
 }
@@ -279,6 +302,11 @@ fn workspace_manifest_for_template(
 ///|
 fn workspace_subcommand_names() -> Array[String] {
   ["init", "status", "commit", "push", "run", "flow", "export", "doctor"]
+}
+
+///|
+fn workspace_default_star_file() -> String {
+  "bitflow.star"
 }
 
 ///|
@@ -581,13 +609,66 @@ fn parse_workspace_manifest(text : String) -> WorkspaceManifest {
               "depends_on" => next.depends_on = parse_toml_string_array(value)
               _ =>
                 if key.has_prefix("task.") {
-                  let task_name = String::unsafe_substring(
+                  let task_key = String::unsafe_substring(
                     key,
                     start=5,
                     end=key.length(),
                   )
-                  if parse_toml_string(value) is Some(cmd) {
-                    next.tasks[task_name] = cmd
+                  let task_name = match task_key.find(".") {
+                    Some(idx) =>
+                      String::unsafe_substring(task_key, start=0, end=idx)
+                    None => task_key
+                  }
+                  if task_name.length() == 0 {
+                    ()
+                  } else {
+                    let task = next.tasks
+                      .get(task_name)
+                      .unwrap_or(workspace_new_task())
+                    let task_field = match task_key.find(".") {
+                      Some(idx) =>
+                        Some(
+                          String::unsafe_substring(
+                            task_key,
+                            start=idx + 1,
+                            end=task_key.length(),
+                          ),
+                        )
+                      None => None
+                    }
+                    match task_field {
+                      None =>
+                        if parse_toml_string(value) is Some(cmd) {
+                          task.cmd = cmd
+                        }
+                      Some("cmd") =>
+                        if parse_toml_string(value) is Some(cmd) {
+                          task.cmd = cmd
+                        }
+                      Some("srcs") => task.srcs = parse_toml_string_array(value)
+                      Some("outs") => task.outs = parse_toml_string_array(value)
+                      Some("cwd") =>
+                        if parse_toml_string(value) is Some(cwd) {
+                          task.cwd = cwd
+                        }
+                      Some("trigger_mode") =>
+                        if parse_toml_string(value) is Some(trigger_mode) {
+                          task.trigger_mode = trigger_mode
+                        }
+                      Some(field) if field.has_prefix("env.") => {
+                        let env_key = String::unsafe_substring(
+                          field,
+                          start=4,
+                          end=field.length(),
+                        )
+                        if env_key.length() > 0 &&
+                          parse_toml_string(value) is Some(env_value) {
+                          task.env[env_key] = env_value
+                        }
+                      }
+                      _ => ()
+                    }
+                    next.tasks[task_name] = task
                   }
                 }
             }
@@ -665,12 +746,61 @@ fn format_workspace_manifest(manifest : WorkspaceManifest) -> String {
       }
       None => ()
     }
-    for task_name, task_cmd in node.tasks {
+    let task_names : Array[String] = []
+    for task_name, _ in node.tasks {
+      task_names.push(task_name)
+    }
+    task_names.sort()
+    for task_name in task_names {
+      guard node.tasks.get(task_name) is Some(task) else { continue }
       buf.write_string("task.")
       buf.write_string(task_name)
       buf.write_string(" = ")
-      buf.write_string(toml_quote(task_cmd))
+      buf.write_string(toml_quote(task.cmd))
       buf.write_string("\n")
+      if task.srcs.length() > 0 {
+        buf.write_string("task.")
+        buf.write_string(task_name)
+        buf.write_string(".srcs = ")
+        buf.write_string(format_toml_string_array(task.srcs))
+        buf.write_string("\n")
+      }
+      if task.outs.length() > 0 {
+        buf.write_string("task.")
+        buf.write_string(task_name)
+        buf.write_string(".outs = ")
+        buf.write_string(format_toml_string_array(task.outs))
+        buf.write_string("\n")
+      }
+      if task.cwd.length() > 0 {
+        buf.write_string("task.")
+        buf.write_string(task_name)
+        buf.write_string(".cwd = ")
+        buf.write_string(toml_quote(task.cwd))
+        buf.write_string("\n")
+      }
+      if task.trigger_mode != "auto" {
+        buf.write_string("task.")
+        buf.write_string(task_name)
+        buf.write_string(".trigger_mode = ")
+        buf.write_string(toml_quote(task.trigger_mode))
+        buf.write_string("\n")
+      }
+      let env_keys : Array[String] = []
+      for env_key, _ in task.env {
+        env_keys.push(env_key)
+      }
+      env_keys.sort()
+      for env_key in env_keys {
+        let env_value = task.env.get(env_key).unwrap_or("")
+        buf.write_string("task.")
+        buf.write_string(task_name)
+        buf.write_string(".env.")
+        buf.write_string(env_key)
+        buf.write_string(" = ")
+        buf.write_string(toml_quote(env_value))
+        buf.write_string("\n")
+      }
     }
   }
   buf.to_string()
@@ -1120,6 +1250,37 @@ fn workspace_flow_nodes(
 }
 
 ///|
+fn workspace_task_for(
+  node : WorkspaceNode,
+  task_name : String,
+) -> WorkspaceTask? {
+  match node.tasks.get(task_name) {
+    Some(task) if task.cmd.length() > 0 => Some(task)
+    _ => None
+  }
+}
+
+///|
+fn workspace_flow_task(
+  node : WorkspaceNode,
+  depends_on : Array[String],
+  task_spec : WorkspaceTask,
+) -> @bitflow.FlowTask {
+  @bitflow.new_task(
+    node.id,
+    node.id,
+    task_spec.cmd,
+    depends_on,
+    required=node.required,
+    srcs=task_spec.srcs,
+    outs=task_spec.outs,
+    env=task_spec.env,
+    cwd=task_spec.cwd,
+    trigger_mode=task_spec.trigger_mode,
+  )
+}
+
+///|
 fn workspace_flow_ir(
   manifest : WorkspaceManifest,
   selected : Map[String, Bool],
@@ -1138,16 +1299,11 @@ fn workspace_flow_ir(
       }
     }
     nodes.push(@bitflow.new_node(node.id, depends_on, required=node.required))
-    let cmd = node.tasks.get(task).unwrap_or("")
-    tasks.push(
-      @bitflow.new_task(
-        node.id,
-        node.id,
-        cmd,
-        depends_on,
-        required=node.required,
-      ),
-    )
+    match workspace_task_for(node, task) {
+      Some(task_spec) =>
+        tasks.push(workspace_flow_task(node, depends_on, task_spec))
+      None => ()
+    }
   }
   @bitflow.new_ir("workspace-flow-" + task, nodes, tasks, max_parallel=1)
 }
@@ -1180,7 +1336,13 @@ async fn workspace_is_node_dirty(fs : @osfs.OsFs, node_root : String) -> Bool {
   if workspace_node_git_dir(fs, node_root) is None {
     return false
   }
-  let lines = @gitlib.status_porcelain(fs, node_root) catch { _ => [] }
+  let lines : Result[Array[String], Error] = try? @gitlib.status_porcelain(
+    fs, node_root,
+  )
+  let lines = match lines {
+    Ok(entries) => entries
+    Err(_) => []
+  }
   lines.length() > 0
 }
 
@@ -1227,17 +1389,29 @@ fn workspace_flow_cache_key(task : String, node_id : String) -> String {
 
 ///|
 fn workspace_flow_fingerprint(
-  task : String,
-  task_cmd : String,
   node : WorkspaceNode,
+  task_spec : WorkspaceTask,
   signatures : Map[String, String],
 ) -> String {
-  @bitflow.flow_fingerprint(
-    task,
-    task_cmd,
+  @bitflow.flow_task_fingerprint(
+    workspace_flow_task(node, node.depends_on, task_spec),
     @bitflow.new_node(node.id, node.depends_on, required=node.required),
     signatures,
   )
+}
+
+///|
+fn workspace_task_run_cwd(
+  node_root : String,
+  task_spec : WorkspaceTask,
+) -> String {
+  if task_spec.cwd.length() == 0 {
+    node_root
+  } else if task_spec.cwd.has_prefix("/") {
+    task_spec.cwd
+  } else {
+    normalize_path(node_root + "/" + task_spec.cwd)
+  }
 }
 
 ///|
@@ -1276,7 +1450,9 @@ pub fn print_workspace_usage() -> Unit {
     #|  push [--resume ID]  Push nodes in dependency order
     #|  run <task>          Run configured task in nodes
     #|  flow <task> [--pr <id>]
+    #|  flow --config/-c [path.star] [--target <task-id>] [--pr <id>] [--var key=value]
     #|                      Run topological workflow with success cache
+    #|                      (default star file: bitflow.star)
     #|                      and optionally report result to hub PR
     #|  export --format git-interop
     #|                      Export workspace interoperability metadata
@@ -1332,14 +1508,28 @@ fn workspace_record_step(
   status : String,
   message : String,
 ) -> Unit {
-  steps.push({
-    node_id: node.id,
-    path: node.path,
+  workspace_record_step_raw(
+    steps,
+    node.id,
+    node.path,
     command,
     status,
-    required: node.required,
+    node.required,
     message,
-  })
+  )
+}
+
+///|
+fn workspace_record_step_raw(
+  steps : Array[WorkspaceTxnStep],
+  node_id : String,
+  path : String,
+  command : String,
+  status : String,
+  required : Bool,
+  message : String,
+) -> Unit {
+  steps.push({ node_id, path, command, status, required, message })
 }
 
 ///|
@@ -1349,6 +1539,176 @@ fn workspace_txn_id(prefix : String) -> String {
   get_current_timestamp().to_string() +
   "-" +
   @async.now().to_string()
+}
+
+///|
+fn workspace_slug(raw : String) -> String {
+  raw
+  .replace_all(old="/", new="-")
+  .replace_all(old=":", new="-")
+  .replace_all(old=" ", new="-")
+}
+
+///|
+fn workspace_bitflow_fs_adapter(fs : @osfs.OsFs) -> @bitflow.FsAdapter {
+  @bitflow.FsAdapter::new(
+    fn(path : String) {
+      if not(fs.is_file(path)) {
+        return None
+      }
+      let content : Result[Bytes, Error] = try? fs.read_file(path)
+      match content {
+        Ok(bytes) => Some(decode_bytes(bytes))
+        Err(_) => None
+      }
+    },
+    fn(_path : String, _text : String) { false },
+    fn(path : String) { fs.is_file(path) },
+    fn() { [] },
+  )
+}
+
+///|
+fn workspace_star_workflow_adapter(fs : @osfs.OsFs) -> @bitflow.WorkflowAdapter {
+  @bitflow.WorkflowAdapter::new(
+    workspace_bitflow_fs_adapter(fs),
+    @bitflow.CommandAdapter::none(),
+  )
+}
+
+///|
+fn workspace_star_task_run_cwd(
+  workspace_root : String,
+  node_map : Map[String, WorkspaceNode],
+  task : @bitflow.FlowTask,
+) -> String {
+  if task.cwd.length() > 0 {
+    if task.cwd.has_prefix("/") {
+      task.cwd
+    } else {
+      normalize_path(workspace_root + "/" + task.cwd)
+    }
+  } else {
+    match node_map.get(task.node) {
+      Some(node) => workspace_node_abs_path(workspace_root, node.path)
+      None => workspace_root
+    }
+  }
+}
+
+///|
+fn workspace_scope_flow_ir_by_nodes(
+  flow_ir : @bitflow.FlowIr,
+  selected_nodes : Map[String, Bool],
+) -> @bitflow.FlowIr {
+  let scoped_nodes : Array[@bitflow.FlowNode] = []
+  for node in flow_ir.nodes {
+    if selected_nodes.get(node.id) is Some(_) {
+      scoped_nodes.push(node)
+    }
+  }
+  let selected_task_ids : Map[String, Bool] = {}
+  for task in flow_ir.tasks {
+    if selected_nodes.get(task.node) is Some(_) {
+      selected_task_ids[task.id] = true
+    }
+  }
+  let scoped_tasks : Array[@bitflow.FlowTask] = []
+  for task in flow_ir.tasks {
+    if selected_task_ids.get(task.id) is None {
+      continue
+    }
+    let needs : Array[String] = []
+    for dep in task.needs {
+      if selected_task_ids.get(dep) is Some(_) {
+        needs.push(dep)
+      }
+    }
+    scoped_tasks.push(
+      @bitflow.new_task(
+        task.id,
+        task.node,
+        task.cmd,
+        needs,
+        required=task.required,
+        srcs=task.srcs,
+        outs=task.outs,
+        env=task.env,
+        cwd=task.cwd,
+        trigger_mode=task.trigger_mode,
+      ),
+    )
+  }
+  let entry_targets : Array[String] = []
+  if flow_ir.entry_targets.length() > 0 {
+    for target in flow_ir.entry_targets {
+      if selected_task_ids.get(target) is Some(_) {
+        entry_targets.push(target)
+      }
+    }
+  }
+  @bitflow.new_ir(
+    flow_ir.name,
+    scoped_nodes,
+    scoped_tasks,
+    entry_targets~,
+    max_parallel=flow_ir.max_parallel,
+  )
+}
+
+///|
+fn workspace_parse_star_flow_ir(
+  fs : @osfs.OsFs,
+  workspace_root : String,
+  star_path : String,
+  target : String?,
+  external_inputs : Map[String, String],
+) -> @bitflow.FlowIr raise @git.GitError {
+  let absolute_star_path = if star_path.has_prefix("/") {
+    normalize_path(star_path)
+  } else {
+    normalize_path(workspace_root + "/" + star_path)
+  }
+  if not(fs.is_file(absolute_star_path)) {
+    raise @git.GitError::InvalidObject(
+      "workspace flow: star file not found: " + absolute_star_path,
+    )
+  }
+  let parsed = @bitflow.parse_from_fs_with_inputs(
+    absolute_star_path,
+    workspace_star_workflow_adapter(fs),
+    external_inputs,
+  )
+  if parsed.errors.length() > 0 {
+    raise @git.GitError::InvalidObject(
+      "workspace flow: star parse failed: " + parsed.errors[0],
+    )
+  }
+  let flow_ir = parsed.ir
+  match target {
+    Some(task_id) if task_id.length() > 0 && task_id != "all" => {
+      let mut found = false
+      for task in flow_ir.tasks {
+        if task.id == task_id {
+          found = true
+          break
+        }
+      }
+      if not(found) {
+        raise @git.GitError::InvalidObject(
+          "workspace flow: star target task not found: " + task_id,
+        )
+      }
+      @bitflow.new_ir(
+        flow_ir.name,
+        flow_ir.nodes,
+        flow_ir.tasks,
+        entry_targets=[task_id],
+        max_parallel=flow_ir.max_parallel,
+      )
+    }
+    _ => flow_ir
+  }
 }
 
 ///|
@@ -1684,16 +2044,24 @@ async fn handle_workspace_run(args : Array[String]) -> Unit raise Error {
       continue
     }
     let node_root = workspace_node_abs_path(workspace_root, node.path)
-    match node.tasks.get(task) {
-      Some(task_cmd) => {
-        println("workspace run[\{node.id}]: \{task_cmd}")
-        let code = @process.run(
+    match workspace_task_for(node, task) {
+      Some(task_spec) => {
+        println("workspace run[\{node.id}]: \{task_spec.cmd}")
+        let code : Result[Int, Error] = try? @process.run(
           "sh",
-          ["-lc", task_cmd],
+          ["-lc", task_spec.cmd],
+          extra_env=task_spec.env,
           inherit_env=true,
-          cwd=node_root,
-        ) catch {
-          _ => 1
+          cwd=workspace_task_run_cwd(node_root, task_spec),
+        )
+        let code = match code {
+          Ok(exit_code) => exit_code
+          Err(err) =>
+            if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+              raise err
+            } else {
+              1
+            }
         }
         if code == 0 {
           workspace_record_step(steps, node, "run", "success", task)
@@ -1743,6 +2111,9 @@ async fn handle_workspace_flow(
   let mut no_cache = false
   let mut reset_cache = false
   let mut task_name : String? = None
+  let mut star_path : String? = None
+  let mut star_target : String? = None
+  let star_var_cli_args : Array[String] = []
   let mut report_pr_id : String? = None
   let mut i = 0
   while i < args.length() {
@@ -1760,6 +2131,58 @@ async fn handle_workspace_flow(
         raise @git.GitError::InvalidObject(
           "workspace flow: --pr requires a value",
         )
+      "--config" => {
+        if i + 1 < args.length() {
+          let value = args[i + 1]
+          if not(value.has_prefix("-")) {
+            star_path = Some(value)
+            i += 2
+            continue
+          }
+        }
+        star_path = Some(workspace_default_star_file())
+        i += 1
+        continue
+      }
+      "--star" =>
+        raise @git.GitError::InvalidObject(
+          "workspace flow: --star is removed; use --config or -c",
+        )
+      "-c" => {
+        if i + 1 < args.length() {
+          let value = args[i + 1]
+          if not(value.has_prefix("-")) {
+            star_path = Some(value)
+            i += 2
+            continue
+          }
+        }
+        star_path = Some(workspace_default_star_file())
+        i += 1
+        continue
+      }
+      "--target" if i + 1 < args.length() => {
+        star_target = Some(args[i + 1])
+        i += 2
+        continue
+      }
+      "--target" =>
+        raise @git.GitError::InvalidObject(
+          "workspace flow: --target requires a value",
+        )
+      "--var" => {
+        star_var_cli_args.push("--var")
+        if i + 1 < args.length() {
+          let value = args[i + 1]
+          if not(value.has_prefix("-")) {
+            star_var_cli_args.push(value)
+            i += 2
+            continue
+          }
+        }
+        i += 1
+        continue
+      }
       "-h" | "--help" => {
         print_workspace_usage()
         return
@@ -1772,13 +2195,46 @@ async fn handle_workspace_flow(
         report_pr_id = Some(
           String::unsafe_substring(arg, start=9, end=arg.length()),
         )
+      _ if arg.has_prefix("--config=") => {
+        let value = String::unsafe_substring(arg, start=9, end=arg.length())
+        star_path = Some(
+          if value.length() == 0 {
+            workspace_default_star_file()
+          } else {
+            value
+          },
+        )
+      }
+      _ if arg.has_prefix("--star=") =>
+        raise @git.GitError::InvalidObject(
+          "workspace flow: --star is removed; use --config or -c",
+        )
+      _ if arg.has_prefix("--target=") =>
+        star_target = Some(
+          String::unsafe_substring(arg, start=9, end=arg.length()),
+        )
+      _ if arg.has_prefix("-c=") => {
+        let value = String::unsafe_substring(arg, start=3, end=arg.length())
+        star_path = Some(
+          if value.length() == 0 {
+            workspace_default_star_file()
+          } else {
+            value
+          },
+        )
+      }
+      _ if arg.has_prefix("--var=") => star_var_cli_args.push(arg)
       _ if arg.has_prefix("-") => warn_unimplemented_arg("workspace flow", arg)
-      _ => if task_name is None { task_name = Some(arg) }
+      _ =>
+        if task_name is None {
+          if arg.has_suffix(".star") {
+            star_path = Some(arg)
+          } else {
+            task_name = Some(arg)
+          }
+        }
     }
     i += 1
-  }
-  guard task_name is Some(task) else {
-    raise @git.GitError::InvalidObject("workspace flow requires <task>")
   }
   let fs = @osfs.OsFs::new()
   let workspace_root = require_workspace_root(None)
@@ -1789,6 +2245,313 @@ async fn handle_workspace_flow(
   let changed = collect_changed_node_ids(
     fs, workspace_root, manifest, lock_signatures, fingerprint_mode,
   )
+  if star_path is None {
+    let default_star_file = workspace_default_star_file()
+    if star_target is Some(_) {
+      star_path = Some(default_star_file)
+    } else if task_name is None {
+      let default_star_path = normalize_path(
+        workspace_root + "/" + default_star_file,
+      )
+      if fs.is_file(default_star_path) {
+        star_path = Some(default_star_file)
+      }
+    }
+  }
+  if star_path is Some(star_file) {
+    let external_inputs = @bitflow.parse_external_inputs(
+      star_var_cli_args,
+      @sys.get_env_vars(),
+    )
+    if external_inputs.errors.length() > 0 {
+      raise @git.GitError::InvalidObject(
+        "workspace flow: invalid external input: " + external_inputs.errors[0],
+      )
+    }
+    if star_target is None && task_name is Some(positional_target) {
+      star_target = Some(positional_target)
+    }
+    let flow_ir_base = workspace_parse_star_flow_ir(
+      fs,
+      workspace_root,
+      star_file,
+      star_target,
+      external_inputs.values,
+    )
+    let star_selected_nodes = if affected_only {
+      @bitflow.expand_affected_nodes(flow_ir_base.nodes, changed)
+    } else {
+      let all_ids : Map[String, Bool] = {}
+      for node in flow_ir_base.nodes {
+        all_ids[node.id] = true
+      }
+      all_ids
+    }
+    let flow_ir = workspace_scope_flow_ir_by_nodes(
+      flow_ir_base, star_selected_nodes,
+    )
+    let flow_issues = @bitflow.ir_issues(flow_ir)
+    if flow_issues.length() > 0 {
+      raise @git.GitError::InvalidObject(
+        "workspace flow star invalid: " + flow_issues[0],
+      )
+    }
+    let ordered_ids = @bitflow.topological_nodes(flow_ir.nodes).map(node => {
+      node.id
+    })
+    let node_map = workspace_node_map(manifest)
+    let node_signatures : Map[String, String] = {}
+    let root_signature = workspace_directory_hash_with_mode(
+      fs, workspace_root, fingerprint_mode,
+    )
+    for node in manifest.nodes {
+      let node_root = workspace_node_abs_path(workspace_root, node.path)
+      match
+        workspace_node_directory_signature_with_mode(
+          fs, node_root, fingerprint_mode,
+        ) {
+        Some(signature) => node_signatures[node.id] = signature
+        None => node_signatures[node.id] = "missing"
+      }
+    }
+    for flow_node in flow_ir.nodes {
+      if node_signatures.get(flow_node.id) is Some(_) {
+        continue
+      }
+      let guessed_root = workspace_node_abs_path(workspace_root, flow_node.id)
+      match
+        workspace_node_directory_signature_with_mode(
+          fs, guessed_root, fingerprint_mode,
+        ) {
+        Some(signature) => node_signatures[flow_node.id] = signature
+        None => node_signatures[flow_node.id] = root_signature
+      }
+    }
+    let flow_cache = if no_cache {
+      {}
+    } else {
+      read_workspace_flow_cache(fs, workspace_root)
+    }
+    if reset_cache {
+      flow_cache.clear()
+    }
+    let cache_plan = @bitflow.plan_task_cache(
+      flow_ir, node_signatures, flow_cache,
+    )
+    if cache_plan.issues.length() > 0 {
+      raise @git.GitError::InvalidObject(
+        "workspace flow cache plan invalid: " + cache_plan.issues[0],
+      )
+    }
+    let decision_by_task : Map[String, @bitflow.FlowTaskCacheDecision] = {}
+    for decision in cache_plan.decisions {
+      decision_by_task[decision.id] = decision
+    }
+    let task_map : Map[String, @bitflow.FlowTask] = {}
+    for task_spec in flow_ir.tasks {
+      task_map[task_spec.id] = task_spec
+    }
+    let task_graph_nodes : Array[@bitflow.FlowNode] = []
+    for task_spec in flow_ir.tasks {
+      task_graph_nodes.push(
+        @bitflow.new_node(
+          task_spec.id,
+          task_spec.needs,
+          required=task_spec.required,
+        ),
+      )
+    }
+    let ordered_task_ids = @bitflow.topological_nodes(task_graph_nodes).map(node => {
+      node.id
+    })
+    let task_ran : Map[String, Bool] = {}
+    let flow_label = match star_target {
+      Some(target) => "star/" + target
+      None => "star"
+    }
+    let txn_id = workspace_txn_id("flow-" + workspace_slug(flow_label))
+    let steps : Array[WorkspaceTxnStep] = []
+    let task_success : Map[String, Bool] = {}
+    let mut required_failed = false
+    for task_id in ordered_task_ids {
+      guard task_map.get(task_id) is Some(task_spec) else { continue }
+      let blocked_deps : Array[String] = []
+      for dep in task_spec.needs {
+        if not(task_success.get(dep).unwrap_or(false)) {
+          blocked_deps.push(dep)
+        }
+      }
+      let path = match node_map.get(task_spec.node) {
+        Some(node) => node.path
+        None =>
+          if task_spec.cwd.length() > 0 {
+            task_spec.cwd
+          } else {
+            task_spec.node
+          }
+      }
+      if blocked_deps.length() > 0 {
+        workspace_record_step_raw(
+          steps,
+          task_spec.node,
+          path,
+          "flow",
+          "blocked",
+          task_spec.required,
+          "blocked by dependency: " + blocked_deps.join(", "),
+        )
+        task_success[task_spec.id] = false
+        if task_spec.required {
+          required_failed = true
+        }
+        continue
+      }
+      let decision = decision_by_task.get(task_spec.id)
+      let cache_key = match decision {
+        Some(value) => value.cache_key
+        None => @bitflow.flow_cache_key(task_spec.id, task_spec.node)
+      }
+      let fingerprint = match decision {
+        Some(value) => value.fingerprint
+        None => ""
+      }
+      let mut dep_ran = false
+      for dep in task_spec.needs {
+        if task_ran.get(dep).unwrap_or(false) {
+          dep_ran = true
+          break
+        }
+      }
+      if not(no_cache) && not(dep_ran) {
+        match decision {
+          Some(value) if value.hit => {
+            workspace_record_step_raw(
+              steps,
+              task_spec.node,
+              path,
+              "flow",
+              "cached",
+              task_spec.required,
+              task_spec.id,
+            )
+            task_success[task_spec.id] = true
+            task_ran[task_spec.id] = false
+            continue
+          }
+          _ => ()
+        }
+      }
+      println("workspace flow[\{task_spec.id}]: \{task_spec.cmd}")
+      let run_code : Result[Int, Error] = try? @process.run(
+        "sh",
+        ["-lc", task_spec.cmd],
+        extra_env=task_spec.env,
+        inherit_env=true,
+        cwd=workspace_star_task_run_cwd(workspace_root, node_map, task_spec),
+      )
+      let code = match run_code {
+        Ok(exit_code) => exit_code
+        Err(err) =>
+          if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+            raise err
+          } else {
+            1
+          }
+      }
+      task_ran[task_spec.id] = true
+      if code == 0 {
+        workspace_record_step_raw(
+          steps,
+          task_spec.node,
+          path,
+          "flow",
+          "success",
+          task_spec.required,
+          task_spec.id,
+        )
+        task_success[task_spec.id] = true
+        if not(no_cache) && fingerprint.length() > 0 {
+          flow_cache[cache_key] = fingerprint
+        }
+      } else {
+        workspace_record_step_raw(
+          steps,
+          task_spec.node,
+          path,
+          "flow",
+          "failed",
+          task_spec.required,
+          "task '\{task_spec.id}' failed with exit \{code}",
+        )
+        task_success[task_spec.id] = false
+        if not(no_cache) {
+          flow_cache.remove(cache_key)
+        }
+        if task_spec.required {
+          required_failed = true
+        }
+      }
+    }
+    let _ = ensure_workspace_meta_dir(fs, workspace_root)
+    if not(no_cache) {
+      write_workspace_flow_cache(fs, workspace_root, flow_cache)
+    }
+    let state = if required_failed { "partial_failed" } else { "completed" }
+    write_workspace_txn(
+      fs,
+      workspace_root,
+      txn_id,
+      "flow:" + flow_label,
+      state,
+      steps,
+    )
+    println("workspace flow txn: " + txn_id + " (" + state + ")")
+    if report_pr_id is Some(pr_id) {
+      let workspace_fingerprint = workspace_flow_workspace_fingerprint(
+        flow_label, ordered_ids, star_selected_nodes, node_signatures,
+      )
+      let status = if required_failed { "failed" } else { "success" }
+      let report_args : Array[String] = [
+        "pr", "workflow", "submit", pr_id, "--task", flow_label, "--status", status,
+        "--fingerprint", workspace_fingerprint, "--txn", txn_id,
+      ]
+      let (report_code, report_err) = run_repo_builtin_in_dir(
+        workspace_root, "hub", report_args,
+      )
+      if report_code == 0 {
+        println(
+          "workspace flow report: pr " +
+          pr_id +
+          " task=" +
+          flow_label +
+          " status=" +
+          status,
+        )
+      } else {
+        raise @git.GitError::InvalidObject(
+          if report_err.length() == 0 {
+            "workspace flow report failed for PR " + pr_id
+          } else {
+            "workspace flow report failed: " + report_err
+          },
+        )
+      }
+    }
+    if required_failed {
+      raise @git.GitError::InvalidObject(
+        "workspace flow failed on required nodes (txn: " + txn_id + ")",
+      )
+    }
+    return
+  }
+  if star_var_cli_args.length() > 0 {
+    raise @git.GitError::InvalidObject(
+      "workspace flow: --var is only supported with star workflow mode",
+    )
+  }
+  guard task_name is Some(task) else {
+    raise @git.GitError::InvalidObject("workspace flow requires <task>")
+  }
   let selected = if affected_only {
     expand_affected_node_ids(manifest, changed)
   } else {
@@ -1835,6 +2598,22 @@ async fn handle_workspace_flow(
   if reset_cache {
     flow_cache.clear()
   }
+  let cache_plan = @bitflow.plan_task_cache(
+    flow_ir, node_signatures, flow_cache,
+  )
+  if cache_plan.issues.length() > 0 {
+    raise @git.GitError::InvalidObject(
+      "workspace flow cache plan invalid: " + cache_plan.issues[0],
+    )
+  }
+  let cache_hit_by_node : Map[String, Bool] = {}
+  let cache_key_by_node : Map[String, String] = {}
+  let cache_fingerprint_by_node : Map[String, String] = {}
+  for decision in cache_plan.decisions {
+    cache_hit_by_node[decision.id] = decision.hit
+    cache_key_by_node[decision.id] = decision.cache_key
+    cache_fingerprint_by_node[decision.id] = decision.fingerprint
+  }
   let txn_id = workspace_txn_id("flow-" + task)
   let steps : Array[WorkspaceTxnStep] = []
   let node_success : Map[String, Bool] = {}
@@ -1878,12 +2657,16 @@ async fn handle_workspace_flow(
       }
       continue
     }
-    match node.tasks.get(task) {
-      Some(task_cmd) => {
-        let cache_key = workspace_flow_cache_key(task, node.id)
-        let fingerprint = workspace_flow_fingerprint(
-          task, task_cmd, node, node_signatures,
-        )
+    match workspace_task_for(node, task) {
+      Some(task_spec) => {
+        let cache_key = cache_key_by_node
+          .get(node.id)
+          .unwrap_or(workspace_flow_cache_key(task, node.id))
+        let fingerprint = cache_fingerprint_by_node
+          .get(node.id)
+          .unwrap_or(
+            workspace_flow_fingerprint(node, task_spec, node_signatures),
+          )
         let mut dep_ran = false
         for dep in node.depends_on {
           if selected.get(dep) is None {
@@ -1894,25 +2677,30 @@ async fn handle_workspace_flow(
             break
           }
         }
-        if not(no_cache) && not(dep_ran) {
-          match flow_cache.get(cache_key) {
-            Some(prev) if prev == fingerprint => {
-              workspace_record_step(steps, node, "flow", "cached", task)
-              node_success[node.id] = true
-              node_ran[node.id] = false
-              continue
-            }
-            _ => ()
-          }
+        if not(no_cache) &&
+          not(dep_ran) &&
+          cache_hit_by_node.get(node.id).unwrap_or(false) {
+          workspace_record_step(steps, node, "flow", "cached", task)
+          node_success[node.id] = true
+          node_ran[node.id] = false
+          continue
         }
-        println("workspace flow[\{node.id}]: \{task_cmd}")
-        let code = @process.run(
+        println("workspace flow[\{node.id}]: \{task_spec.cmd}")
+        let code : Result[Int, Error] = try? @process.run(
           "sh",
-          ["-lc", task_cmd],
+          ["-lc", task_spec.cmd],
+          extra_env=task_spec.env,
           inherit_env=true,
-          cwd=node_root,
-        ) catch {
-          _ => 1
+          cwd=workspace_task_run_cwd(node_root, task_spec),
+        )
+        let code = match code {
+          Ok(exit_code) => exit_code
+          Err(err) =>
+            if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
+              raise err
+            } else {
+              1
+            }
         }
         if code == 0 {
           workspace_record_step(steps, node, "flow", "success", task)

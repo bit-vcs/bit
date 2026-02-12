@@ -11,9 +11,6 @@ import {
   "mizchi/bit/io/native" @gitionative,
   "mizchi/bit/x/hub" @hub,
   "mizchi/bit/x/hub/native" @hub_native,
-  "mizchi/bit/x/agent" @agent,
-  "mizchi/bit/x/agent/native" @agent_native,
-  "mizchi/bit/x/agent/llm" @agent_llm,
   "mizchi/bit/x/rebase-ai" @rebase_ai,
   "mizchi/llm/ffi" @llm_ffi,
   "mizchi/bit/x/fs" @bitfs,
@@ -42,7 +39,6 @@ options(
   is_main: true,
   targets: {
     "add.mbt": [ "native" ],
-    "agent.mbt": [ "native" ],
     "am.mbt": [ "native" ],
     "apply.mbt": [ "native" ],
     "bench_init_wbtest.mbt": [ "native" ],

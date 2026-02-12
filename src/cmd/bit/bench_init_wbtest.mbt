@@ -2,7 +2,7 @@
 
 ///|
 /// Run with:
-/// - moon bench -p mizchi/bit/bit_cli --target native
+/// - moon bench -p mizchi/bit/cmd/bit --target native
 
 ///|
 let bench_config_path : String = "/tmp/bit_bench_gitconfig"

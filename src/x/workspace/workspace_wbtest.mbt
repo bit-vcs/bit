@@ -35,17 +35,17 @@ test "workspace: flow ir keeps selected dependency edges" {
   root.id = "root"
   root.path = "."
   root.depends_on = []
-  root.tasks["test"] = "echo root"
+  root.tasks["test"] = workspace_new_task(cmd="echo root")
   let dep = workspace_new_node()
   dep.id = "dep"
   dep.path = "dep"
   dep.depends_on = ["root"]
-  dep.tasks["test"] = "echo dep"
+  dep.tasks["test"] = workspace_new_task(cmd="echo dep")
   let extra = workspace_new_node()
   extra.id = "extra"
   extra.path = "extra"
   extra.depends_on = []
-  extra.tasks["test"] = "echo extra"
+  extra.tasks["test"] = workspace_new_task(cmd="echo extra")
   let manifest : WorkspaceManifest = { version: 1, nodes: [root, dep, extra] }
   let selected : Map[String, Bool] = { "root": true, "dep": true }
   let ir = workspace_flow_ir(manifest, selected, "test")
@@ -94,12 +94,51 @@ test "workspace: parse manifest with dependencies and tasks" {
   assert_eq(root.path, ".")
   assert_eq(root.required, true)
   assert_eq(root.depends_on.length(), 0)
-  assert_eq(root.tasks.get("test").unwrap_or(""), "just test")
+  match root.tasks.get("test") {
+    Some(task) => assert_eq(task.cmd, "just test")
+    None => fail("root test task missing")
+  }
   assert_eq(foo.id, "foo")
   assert_eq(foo.required, false)
   assert_eq(foo.depends_on.length(), 1)
   assert_eq(foo.depends_on[0], "root")
-  assert_eq(foo.tasks.get("check").unwrap_or(""), "just check")
+  match foo.tasks.get("check") {
+    Some(task) => assert_eq(task.cmd, "just check")
+    None => fail("foo check task missing")
+  }
+}
+
+///|
+test "workspace: parse manifest supports extended task fields" {
+  let manifest_text =
+    #|version = 1
+    #|
+    #|[[nodes]]
+    #|id = "root"
+    #|path = "."
+    #|required = true
+    #|depends_on = []
+    #|task.test = "just test"
+    #|task.test.srcs = ["src/**"]
+    #|task.test.outs = ["dist/**"]
+    #|task.test.cwd = "pkg"
+    #|task.test.trigger_mode = "manual"
+    #|task.test.env.MODE = "ci"
+  let parsed = parse_workspace_manifest(manifest_text)
+  assert_eq(parsed.nodes.length(), 1)
+  match parsed.nodes[0].tasks.get("test") {
+    Some(task) => {
+      assert_eq(task.cmd, "just test")
+      assert_eq(task.srcs.length(), 1)
+      assert_eq(task.srcs[0], "src/**")
+      assert_eq(task.outs.length(), 1)
+      assert_eq(task.outs[0], "dist/**")
+      assert_eq(task.cwd, "pkg")
+      assert_eq(task.trigger_mode, "manual")
+      assert_eq(task.env.get("MODE").unwrap_or(""), "ci")
+    }
+    None => fail("extended task config not parsed")
+  }
 }
 
 ///|
@@ -109,7 +148,7 @@ test "workspace: format and parse roundtrip keeps node shape" {
   node.path = "packages/pkg"
   node.required = false
   node.depends_on = ["root"]
-  node.tasks["lint"] = "just lint"
+  node.tasks["lint"] = workspace_new_task(cmd="just lint")
   let manifest : WorkspaceManifest = {
     version: 1,
     nodes: [workspace_new_node(), node],
@@ -122,7 +161,38 @@ test "workspace: format and parse roundtrip keeps node shape" {
   assert_eq(reparsed.nodes[1].required, false)
   assert_eq(reparsed.nodes[1].depends_on.length(), 1)
   assert_eq(reparsed.nodes[1].depends_on[0], "root")
-  assert_eq(reparsed.nodes[1].tasks.get("lint").unwrap_or(""), "just lint")
+  match reparsed.nodes[1].tasks.get("lint") {
+    Some(task) => assert_eq(task.cmd, "just lint")
+    None => fail("lint task missing after roundtrip")
+  }
+}
+
+///|
+test "workspace: flow ir preserves extended task metadata" {
+  let root = workspace_new_node()
+  root.id = "root"
+  root.path = "."
+  root.depends_on = []
+  let task = workspace_new_task(cmd="just test")
+  task.srcs = ["src/**"]
+  task.outs = ["dist/**"]
+  task.env["MODE"] = "ci"
+  task.cwd = "pkg"
+  task.trigger_mode = "manual"
+  root.tasks["test"] = task
+  let manifest : WorkspaceManifest = { version: 1, nodes: [root] }
+  let selected : Map[String, Bool] = { "root": true }
+  let ir = workspace_flow_ir(manifest, selected, "test")
+  assert_eq(ir.tasks.length(), 1)
+  let ir_task = ir.tasks[0]
+  assert_eq(ir_task.cmd, "just test")
+  assert_eq(ir_task.srcs.length(), 1)
+  assert_eq(ir_task.srcs[0], "src/**")
+  assert_eq(ir_task.outs.length(), 1)
+  assert_eq(ir_task.outs[0], "dist/**")
+  assert_eq(ir_task.env.get("MODE").unwrap_or(""), "ci")
+  assert_eq(ir_task.cwd, "pkg")
+  assert_eq(ir_task.trigger_mode, "manual")
 }
 
 ///|
@@ -137,8 +207,10 @@ test "workspace: flow template manifest scaffolds expected node graph" {
   assert_eq(manifest.nodes[3].id, "extra")
   assert_eq(manifest.nodes[1].depends_on[0], "root")
   assert_eq(manifest.nodes[2].depends_on[0], "dep")
-  let root_task = manifest.nodes[0].tasks.get("test").unwrap_or("")
-  assert_true(root_task.contains("BIT_WORKSPACE_FLOW_LOG_DIR"))
+  match manifest.nodes[0].tasks.get("test") {
+    Some(task) => assert_true(task.cmd.contains("BIT_WORKSPACE_FLOW_LOG_DIR"))
+    None => fail("flow template root test task missing")
+  }
 }
 
 ///|
@@ -243,15 +315,58 @@ test "workspace: flow cache key keeps task and node scope" {
 }
 
 ///|
+test "workspace: bitflow cache plan reflects task metadata changes" {
+  let node = workspace_new_node()
+  node.id = "pkg"
+  node.path = "pkg"
+  node.depends_on = []
+  let task = workspace_new_task(cmd="just test")
+  task.srcs = ["src/**"]
+  task.outs = ["dist/**"]
+  task.cwd = "pkg"
+  task.trigger_mode = "auto"
+  node.tasks["test"] = task
+  let manifest : WorkspaceManifest = { version: 1, nodes: [node] }
+  let selected : Map[String, Bool] = { "pkg": true }
+  let signatures : Map[String, String] = { "pkg": "pkg-1" }
+  let ir1 = workspace_flow_ir(manifest, selected, "test")
+  let cache : Map[String, String] = {}
+  let plan1 = @bitflow.plan_task_cache(ir1, signatures, cache)
+  assert_eq(plan1.issues.length(), 0)
+  assert_eq(plan1.decisions.length(), 1)
+  assert_eq(plan1.decisions[0].hit, false)
+  cache[plan1.decisions[0].cache_key] = plan1.decisions[0].fingerprint
+  let plan2 = @bitflow.plan_task_cache(ir1, signatures, cache)
+  assert_eq(plan2.decisions.length(), 1)
+  assert_eq(plan2.decisions[0].hit, true)
+  match manifest.nodes[0].tasks.get("test") {
+    Some(updated_task) => {
+      updated_task.trigger_mode = "manual"
+      manifest.nodes[0].tasks["test"] = updated_task
+    }
+    None => fail("task missing for metadata update")
+  }
+  let ir2 = workspace_flow_ir(manifest, selected, "test")
+  let plan3 = @bitflow.plan_task_cache(ir2, signatures, cache)
+  assert_eq(plan3.decisions.length(), 1)
+  assert_eq(plan3.decisions[0].hit, false)
+}
+
+///|
 test "workspace: flow fingerprint changes when dependency signature changes" {
   let node = workspace_new_node()
   node.id = "pkg"
   node.path = "pkg"
   node.depends_on = ["root"]
+  let task = workspace_new_task(cmd="just test")
+  task.srcs = ["src/**"]
+  task.outs = ["dist/**"]
+  task.env["MODE"] = "test"
+  task.cwd = "pkg"
   let signatures : Map[String, String] = { "pkg": "pkg-1", "root": "root-1" }
-  let fp1 = workspace_flow_fingerprint("test", "just test", node, signatures)
+  let fp1 = workspace_flow_fingerprint(node, task, signatures)
   signatures["root"] = "root-2"
-  let fp2 = workspace_flow_fingerprint("test", "just test", node, signatures)
+  let fp2 = workspace_flow_fingerprint(node, task, signatures)
   assert_eq(fp1 == fp2, false)
 }
 
@@ -332,22 +447,30 @@ async test "workspace: node signature changes by fingerprint mode" {
   let fs = @osfs.OsFs::new()
   let root = "/tmp/bit-test-workspace-signature-mode-" +
     get_current_timestamp().to_string()
-  ignore(@process.run("rm", ["-rf", root], inherit_env=true)) catch {
-    _ => ()
-  }
+  let cleanup_before : Result[Int, Error] = try? @process.run(
+    "rm",
+    ["-rf", root],
+    inherit_env=true,
+  )
+  ignore(cleanup_before)
   fs.mkdir_p(root)
-  let init_code = @process.run(
+  let init_code_result : Result[Int, Error] = try? @process.run(
     "git",
     ["init", "-b", "main"],
     inherit_env=true,
     cwd=root,
-  ) catch {
-    _ => -1
+  )
+  let init_code = match init_code_result {
+    Ok(code) => code
+    Err(_) => -1
   }
   if init_code != 0 {
-    ignore(@process.run("rm", ["-rf", root], inherit_env=true)) catch {
-      _ => ()
-    }
+    let cleanup_failed : Result[Int, Error] = try? @process.run(
+      "rm",
+      ["-rf", root],
+      inherit_env=true,
+    )
+    ignore(cleanup_failed)
     return
   }
   fs.write_string(root + "/file.txt", "payload\n")
@@ -365,9 +488,12 @@ async test "workspace: node signature changes by fingerprint mode" {
     (Some(fast_sig), Some(git_sig)) => assert_eq(fast_sig == git_sig, false)
     _ => fail("workspace signature should exist for initialized repository")
   }
-  ignore(@process.run("rm", ["-rf", root], inherit_env=true)) catch {
-    _ => ()
-  }
+  let cleanup_after : Result[Int, Error] = try? @process.run(
+    "rm",
+    ["-rf", root],
+    inherit_env=true,
+  )
+  ignore(cleanup_after)
 }
 
 ///|
@@ -395,6 +521,68 @@ test "workspace: manifest issues include governance and security violations" {
   assert_true(issues_contain(issues, "duplicate node id"))
   assert_true(issues_contain(issues, "escapes workspace root"))
   assert_true(issues_contain(issues, "depends on unknown node"))
+}
+
+///|
+test "workspace: default star workflow file is bitflow.star" {
+  assert_eq(workspace_default_star_file(), "bitflow.star")
+}
+
+///|
+test "workspace: parse star flow ir supports load and external inputs" {
+  let fs = @osfs.OsFs::new()
+  let root = "/tmp/bit-test-workspace-star-ir-" +
+    get_current_timestamp().to_string()
+  fs.mkdir_p(root + "/defs")
+  let root_star =
+    #|var(name="flow_mark", type="string", required=True)
+    #|workflow(name="ci")
+    #|node(id="root", depends_on=[])
+    #|task(id="root:test", node="root", cmd=["echo", flow_mark], needs=[])
+    #|load(path="defs/dep.star")
+    #|entrypoint(targets=["dep:test"])
+  let dep_star =
+    #|node(id="dep", depends_on=["root"])
+    #|task(id="dep:test", node="dep", cmd=["echo", flow_mark], needs=["root:test"])
+  fs.write_string(root + "/bitflow.star", root_star)
+  fs.write_string(root + "/defs/dep.star", dep_star)
+  let ir = workspace_parse_star_flow_ir(
+    fs,
+    root,
+    "bitflow.star",
+    Some("dep:test"),
+    { "flow_mark": "from-input" },
+  ) catch {
+    err => fail("unexpected parse error: \{err.to_string()}")
+  }
+  assert_eq(ir.nodes.length(), 2)
+  assert_eq(ir.tasks.length(), 2)
+  assert_eq(ir.entry_targets.length(), 1)
+  assert_eq(ir.entry_targets[0], "dep:test")
+  let task_map : Map[String, @bitflow.FlowTask] = {}
+  for task in ir.tasks {
+    task_map[task.id] = task
+  }
+  match task_map.get("root:test") {
+    Some(task) => assert_eq(task.cmd, "echo from-input")
+    None => fail("root:test missing")
+  }
+  match task_map.get("dep:test") {
+    Some(task) => assert_eq(task.cmd, "echo from-input")
+    None => fail("dep:test missing")
+  }
+  fs.remove_file(root + "/bitflow.star") catch {
+    _ => ()
+  }
+  fs.remove_file(root + "/defs/dep.star") catch {
+    _ => ()
+  }
+  fs.remove_dir(root + "/defs") catch {
+    _ => ()
+  }
+  fs.remove_dir(root) catch {
+    _ => ()
+  }
 }
 
 ///|
