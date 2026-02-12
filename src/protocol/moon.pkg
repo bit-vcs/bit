@@ -7,12 +7,14 @@ import {
 import {
   "mizchi/bit" @git,
   "mizchi/bit/pack" @pack,
+  "moonbitlang/core/bench" @bench,
 } for "test"
 
 warnings = "-29"
 
 options(
   targets: {
+    "bench_test.mbt": [ "native" ],
     "remote_test.mbt": [ "native" ],
     "upload_pack_remote_wasm.mbt": [ "wasm-gc", "wasm" ],
   },

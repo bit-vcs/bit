@@ -25,7 +25,11 @@ pub async fn clone_http(
   match default_ref {
     None => return None
     Some((refname, commit_id)) => {
-      let pack = @gitionative.fetch_pack_http(remote_url, [commit_id], prefer_v2)
+      let pack = @gitionative.fetch_pack_http(
+        remote_url,
+        [commit_id],
+        prefer_v2,
+      )
       let objects = @pack.parse_packfile(pack)
       @pack.write_packfile_with_index(fs, git_dir, pack, objects)
       // 4. Update refs

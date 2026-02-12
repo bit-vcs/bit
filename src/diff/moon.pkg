@@ -8,3 +8,7 @@ import {
 }
 
 warnings = "-29"
+
+options(
+  targets: { "bench_test.mbt": [ "native" ] },
+)

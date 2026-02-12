@@ -279,6 +279,18 @@ bench-init:
 bench-status:
     moon bench --target native -p mizchi/bit/lib -f bench_status_test.mbt
 
+bench-pack:
+    moon bench --target native -p mizchi/bit/pack -f bench_test.mbt
+
+bench-protocol:
+    moon bench --target native -p mizchi/bit/protocol -f bench_test.mbt
+
+bench-diff:
+    moon bench --target native -p mizchi/bit/diff -f bench_test.mbt
+
+bench-ops:
+    moon bench --target native -p mizchi/bit/lib -f bench_ops_test.mbt
+
 # Save benchmark results with a name
 bench-save name:
     moon bench --target native 2>&1 | bash tools/bench-save.sh {{name}}

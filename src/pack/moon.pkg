@@ -10,6 +10,7 @@ import {
   "moonbitlang/async/process" @process,
   "moonbitlang/x/fs",
   "mizchi/tempfile",
+  "moonbitlang/core/bench" @bench,
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/strconv" @strconv,
 } for "test"
@@ -22,6 +23,7 @@ warnings = "-29"
 
 options(
   targets: {
+    "bench_test.mbt": [ "native" ],
     "git_oracle_pack_test.mbt": [ "native" ],
     "pack_index_write_test.mbt": [ "native" ],
   },

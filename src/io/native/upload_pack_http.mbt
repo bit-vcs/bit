@@ -7,9 +7,7 @@ pub async fn upload_pack_info_refs_http(
   remote : String,
   prefer_v2 : Bool,
 ) -> Bytes raise @git.GitError {
-  upload_pack_info_refs_with_http(
-    remote, prefer_v2, native_http_get,
-  )
+  upload_pack_info_refs_with_http(remote, prefer_v2, native_http_get)
 }
 
 ///|
@@ -18,9 +16,7 @@ pub async fn upload_pack_request_http(
   body : Bytes,
   prefer_v2 : Bool,
 ) -> Bytes raise @git.GitError {
-  upload_pack_request_with_http(
-    remote, body, prefer_v2, native_http_post,
-  )
+  upload_pack_request_with_http(remote, body, prefer_v2, native_http_post)
 }
 
 ///|
