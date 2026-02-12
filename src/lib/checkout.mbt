@@ -131,7 +131,13 @@ pub fn checkout(
   if update_worktree || update_index {
     let db = ObjectDb::load(rfs, actual_git_dir)
     let files = collect_tree_files_from_commit(db, rfs, commit_id)
-    if update_worktree {
+    if update_worktree && update_index {
+      // Combined path: read each blob only once
+      let entries = write_worktree_and_build_index(
+        db, fs, rfs, root, actual_git_dir, files, remove_missing=true,
+      )
+      write_index_entries(fs, actual_git_dir, entries)
+    } else if update_worktree {
       write_worktree_from_files(
         db,
         fs,
@@ -141,8 +147,7 @@ pub fn checkout(
         files,
         remove_missing=true,
       )
-    }
-    if update_index {
+    } else {
       let entries = tree_files_to_index(db, rfs, files)
       write_index_entries(fs, actual_git_dir, entries)
     }

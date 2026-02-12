@@ -223,8 +223,67 @@ pub fn ObjectDb::get(
   fs : &@git.RepoFileSystem,
   id : @git.ObjectId,
 ) -> @git.PackObject? raise @git.GitError {
+  let hex = id.to_hex()
+  // Fast path: try loose object first without allocating seen set
+  if not(self.prefer_packed) {
+    match get_loose_by_hex(self, fs, hex) {
+      Some(obj) => return Some(obj)
+      None => ()
+    }
+  }
   let seen : Map[String, Bool] = {}
-  get_by_hex(self, fs, id.to_hex(), seen)
+  seen[hex] = true
+  // prefer_packed: try packs first, then loose (already tried above if !prefer_packed)
+  if self.prefer_packed {
+    match get_from_packs(self, fs, hex, seen) {
+      Some(obj) => return Some(obj)
+      None => ()
+    }
+    return get_loose_by_hex(self, fs, hex)
+  }
+  // !prefer_packed: loose already tried, now try packs
+  get_from_packs(self, fs, hex, seen)
+}
+
+///|
+/// Fast loose-object lookup without seen set allocation.
+fn get_loose_by_hex(
+  db : ObjectDb,
+  fs : &@git.RepoFileSystem,
+  hex : String,
+) -> @git.PackObject? raise @git.GitError {
+  let loose_path = match db.loose_paths.get(hex) {
+    Some(path) => Some(path)
+    None =>
+      if hex.length() == 40 {
+        let prefix = String::unsafe_substring(hex, start=0, end=2)
+        let suffix = String::unsafe_substring(hex, start=2, end=40)
+        let path = db.objects_dir + "/" + prefix + "/" + suffix
+        if fs.is_file(path) {
+          db.loose_paths[hex] = path
+          Some(path)
+        } else {
+          None
+        }
+      } else {
+        None
+      }
+  }
+  match loose_path {
+    Some(path) => {
+      let compressed = fs.read_file(path)
+      let raw = @zlib.zlib_decompress(compressed) catch {
+        e => raise @git.GitError::InvalidObject("Zlib error: \{e}")
+      }
+      let obj = parse_loose_object(raw)
+      let computed = @git.hash_object_content(obj.obj_type, obj.data).to_hex()
+      if computed != hex {
+        raise @git.GitError::HashMismatch(computed, hex)
+      }
+      Some(obj)
+    }
+    None => None
+  }
 }
 
 ///|

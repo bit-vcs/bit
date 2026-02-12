@@ -360,74 +360,103 @@ fn pack_object_with_delta(
 ) -> (Int, Bool) {
   let obj_type = obj.obj_type.to_packfile_type()
   let data = obj.data
+  // NoDelta or no base: compress normally
+  let try_delta = match delta_mode {
+    @git.PackDeltaMode::NoDelta => false
+    _ =>
+      match base {
+        Some((base_offset, base_obj)) =>
+          base_offset < obj_offset && base_obj.obj_type == obj.obj_type
+        None => false
+      }
+  }
+  if not(try_delta) {
+    let compressed = compress_pack_data(data, compression)
+    let normal_len = type_and_size_len(data.length()) + compressed.length()
+    encode_type_and_size(obj_type, data.length(), result)
+    for b in compressed {
+      result.push(b)
+    }
+    return (normal_len, false)
+  }
+  // Delta path: compute delta first, only compress normal if delta loses
+  let (base_offset, base_obj) = base.unwrap()
+  let delta = build_delta(base_obj.data, data)
+  let compressed_delta = compress_pack_data(delta, compression)
+  // Estimate delta overhead
+  let delta_overhead = match delta_mode {
+    @git.PackDeltaMode::OfsDelta => {
+      let back_offset = obj_offset - base_offset
+      type_and_size_len(delta.length()) + ofs_delta_len(back_offset)
+    }
+    @git.PackDeltaMode::RefDelta =>
+      type_and_size_len(delta.length()) + 20
+    @git.PackDeltaMode::NoDelta => 0 // unreachable
+  }
+  let delta_total = delta_overhead + compressed_delta.length()
+  // Quick upper bound: if delta is already smaller than raw data header + raw,
+  // we can skip normal compression entirely
+  let normal_upper = type_and_size_len(data.length()) + data.length()
+  if delta_total < normal_upper {
+    // Delta wins without needing normal compression
+    match delta_mode {
+      @git.PackDeltaMode::OfsDelta => {
+        let back_offset = obj_offset - base_offset
+        encode_type_and_size(6, delta.length(), result)
+        encode_ofs_delta_offset(back_offset, result)
+        for b in compressed_delta {
+          result.push(b)
+        }
+        return (delta_total, true)
+      }
+      @git.PackDeltaMode::RefDelta => {
+        let base_id = @git.hash_object_content(base_obj.obj_type, base_obj.data)
+        encode_type_and_size(7, delta.length(), result)
+        for b in base_id.bytes {
+          result.push(b)
+        }
+        for b in compressed_delta {
+          result.push(b)
+        }
+        return (delta_total, true)
+      }
+      @git.PackDeltaMode::NoDelta => () // unreachable
+    }
+  }
+  // Delta might not win — need to compare against normal compression
   let compressed = compress_pack_data(data, compression)
   let normal_len = type_and_size_len(data.length()) + compressed.length()
-  match delta_mode {
-    @git.PackDeltaMode::NoDelta => {
-      encode_type_and_size(obj_type, data.length(), result)
-      for b in compressed {
-        result.push(b)
-      }
-      return (normal_len, false)
-    }
-    _ => ()
-  }
-  match base {
-    None => {
-      encode_type_and_size(obj_type, data.length(), result)
-      for b in compressed {
-        result.push(b)
-      }
-      (normal_len, false)
-    }
-    Some((base_offset, base_obj)) => {
-      if base_offset < obj_offset && base_obj.obj_type == obj.obj_type {
-        let delta = build_delta(base_obj.data, data)
-        let compressed_delta = compress_pack_data(delta, compression)
-        match delta_mode {
-          @git.PackDeltaMode::OfsDelta => {
-            let back_offset = obj_offset - base_offset
-            let delta_len = type_and_size_len(delta.length()) +
-              ofs_delta_len(back_offset) +
-              compressed_delta.length()
-            if delta_len < normal_len {
-              encode_type_and_size(6, delta.length(), result)
-              encode_ofs_delta_offset(back_offset, result)
-              for b in compressed_delta {
-                result.push(b)
-              }
-              return (delta_len, true)
-            }
-          }
-          @git.PackDeltaMode::RefDelta => {
-            let base_id = @git.hash_object_content(
-              base_obj.obj_type,
-              base_obj.data,
-            )
-            let delta_len = type_and_size_len(delta.length()) +
-              base_id.bytes.length() +
-              compressed_delta.length()
-            if delta_len < normal_len {
-              encode_type_and_size(7, delta.length(), result)
-              for b in base_id.bytes {
-                result.push(b)
-              }
-              for b in compressed_delta {
-                result.push(b)
-              }
-              return (delta_len, true)
-            }
-          }
-          @git.PackDeltaMode::NoDelta => ()
+  if delta_total < normal_len {
+    match delta_mode {
+      @git.PackDeltaMode::OfsDelta => {
+        let back_offset = obj_offset - base_offset
+        encode_type_and_size(6, delta.length(), result)
+        encode_ofs_delta_offset(back_offset, result)
+        for b in compressed_delta {
+          result.push(b)
         }
+        return (delta_total, true)
       }
-      encode_type_and_size(obj_type, data.length(), result)
-      for b in compressed {
-        result.push(b)
+      @git.PackDeltaMode::RefDelta => {
+        let base_id = @git.hash_object_content(base_obj.obj_type, base_obj.data)
+        encode_type_and_size(7, delta.length(), result)
+        for b in base_id.bytes {
+          result.push(b)
+        }
+        for b in compressed_delta {
+          result.push(b)
+        }
+        return (delta_total, true)
       }
-      (normal_len, false)
+      @git.PackDeltaMode::NoDelta => () // unreachable
     }
   }
+  // Normal wins
+  encode_type_and_size(obj_type, data.length(), result)
+  for b in compressed {
+    result.push(b)
+  }
+  (normal_len, false)
 }
 
 ///|
