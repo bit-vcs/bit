@@ -20,6 +20,7 @@ pub struct PrMergePolicy {
   required_approvals : Int
   allow_request_changes : Bool
   require_signed_records : Bool
+  required_workflows : Array[String]
 }
 
 ///|
@@ -27,8 +28,14 @@ pub fn PrMergePolicy::new(
   required_approvals : Int,
   allow_request_changes : Bool,
   require_signed_records : Bool,
+  required_workflows? : Array[String] = [],
 ) -> PrMergePolicy {
-  { required_approvals, allow_request_changes, require_signed_records }
+  {
+    required_approvals,
+    allow_request_changes,
+    require_signed_records,
+    required_workflows,
+  }
 }
 
 ///|
@@ -49,6 +56,11 @@ pub fn PrMergePolicy::allow_request_changes(self : PrMergePolicy) -> Bool {
 ///|
 pub fn PrMergePolicy::require_signed_records(self : PrMergePolicy) -> Bool {
   self.require_signed_records
+}
+
+///|
+pub fn PrMergePolicy::required_workflows(self : PrMergePolicy) -> Array[String] {
+  self.required_workflows
 }
 
 ///|
@@ -91,6 +103,42 @@ fn summarize_latest_review_state(reviews : Array[PrReview]) -> (Int, Bool) {
 }
 
 ///|
+fn find_pr_workflow_result(
+  workflows : Array[PrWorkflowResult],
+  task : String,
+) -> PrWorkflowResult? {
+  let mut found : PrWorkflowResult? = None
+  for workflow in workflows {
+    if workflow.task() == task {
+      found = Some(workflow)
+      break
+    }
+  }
+  found
+}
+
+///|
+fn ensure_required_workflows_success(
+  workflows : Array[PrWorkflowResult],
+  required_workflows : Array[String],
+) -> Unit raise @git.GitError {
+  for task in required_workflows {
+    match find_pr_workflow_result(workflows, task) {
+      Some(workflow) =>
+        if workflow.status() != PrWorkflowStatus::Success {
+          raise @git.GitError::InvalidObject(
+            "Merge blocked by policy: required workflow '\{task}' status=\{workflow.status().to_string()}",
+          )
+        }
+      None =>
+        raise @git.GitError::InvalidObject(
+          "Merge blocked by policy: required workflow '\{task}' has no result",
+        )
+    }
+  }
+}
+
+///|
 pub fn Hub::check_merge_policy(
   self : Hub,
   objects : &@lib.ObjectStore,
@@ -118,6 +166,7 @@ pub fn Hub::check_merge_policy(
       "Merge blocked by policy: required approvals=\{policy.required_approvals}, current approvals=\{approved_count}",
     )
   }
+  let mut workflows = self.list_pr_workflows(objects, pr_id)
   if policy.require_signed_records {
     guard signing_key is Some(sign_key) else {
       raise @git.GitError::InvalidObject(
@@ -141,6 +190,10 @@ pub fn Hub::check_merge_policy(
         "Merge blocked by policy: unsigned or invalid PR reviews are present",
       )
     }
+    workflows = strict_hub.list_pr_workflows(objects, pr_id)
+  }
+  if policy.required_workflows.length() > 0 {
+    ensure_required_workflows_success(workflows, policy.required_workflows)
   }
 }
 

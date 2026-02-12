@@ -454,10 +454,14 @@ test "hub merge policy parser: parse merge section values" {
     #|required_approvals = 2
     #|allow_request_changes = false
     #|require_signed_records = true
+    #|required_workflows = ["test", "lint"]
   let policy = parse_hub_merge_policy_toml(policy_text)
   assert_eq(policy.required_approvals(), 2)
   assert_false(policy.allow_request_changes())
   assert_true(policy.require_signed_records())
+  assert_eq(policy.required_workflows().length(), 2)
+  assert_eq(policy.required_workflows()[0], "test")
+  assert_eq(policy.required_workflows()[1], "lint")
 }
 
 ///|
@@ -475,6 +479,49 @@ test "hub merge policy parser: reject negative required approvals" {
     },
   )
   fail("expected invalid object error")
+}
+
+///|
+test "hub merge policy parser: reject non-array required_workflows" {
+  let policy_text =
+    #|[merge]
+    #|required_workflows = "test"
+  ignore(
+    parse_hub_merge_policy_toml(policy_text) catch {
+      @git.GitError::InvalidObject(message) => {
+        assert_true(message.contains("required_workflows"))
+        return ()
+      }
+      err => fail("unexpected error: \{err.to_string()}")
+    },
+  )
+  fail("expected invalid object error")
+}
+
+///|
+test "hub sync parser: parse remote and auth/signing overrides" {
+  let options = parse_hub_sync_runtime_options(
+    [
+      "--auth-token", "token-1", "--signing-key", "k1", "--require-signed", "relay+http://127.0.0.1:8787",
+    ],
+    default_remote_url=Some("https://origin.example/repo.git"),
+  )
+  assert_eq(options.remote_url, Some("relay+http://127.0.0.1:8787"))
+  assert_eq(options.auth_token, Some("token-1"))
+  assert_eq(options.signing_key, Some("k1"))
+  assert_eq(options.require_signed, Some(true))
+}
+
+///|
+test "hub sync parser: defaults to configured remote and allows unsigned override" {
+  let options = parse_hub_sync_runtime_options(
+    ["--allow-unsigned"],
+    default_remote_url=Some("https://origin.example/repo.git"),
+  )
+  assert_eq(options.remote_url, Some("https://origin.example/repo.git"))
+  assert_eq(options.require_signed, Some(false))
+  assert_eq(options.auth_token, None)
+  assert_eq(options.signing_key, None)
 }
 
 ///|

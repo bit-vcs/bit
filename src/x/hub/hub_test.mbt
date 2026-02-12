@@ -568,6 +568,100 @@ test "pr merge policy: require signed records rejects unsigned PR with key" {
 }
 
 ///|
+test "pr workflow: record and list latest workflow result" {
+  let (_fs, objects, refs, clock) = setup_repo_with_branch()
+  let hub = Hub::init(objects, refs)
+  let pr = hub.create_pr(
+    objects, refs, clock, "Workflow PR", "Body", "refs/heads/feature", "refs/heads/main",
+    "alice@example.com",
+  )
+  let _ = hub.record_pr_workflow(
+    objects,
+    refs,
+    clock,
+    pr.id(),
+    "test",
+    PrWorkflowStatus::Failed,
+    "fp-1",
+    "ci@example.com",
+    txn_id=Some("txn-failed"),
+    summary="failed",
+  )
+  let _ = hub.record_pr_workflow(
+    objects,
+    refs,
+    clock,
+    pr.id(),
+    "test",
+    PrWorkflowStatus::Success,
+    "fp-2",
+    "ci@example.com",
+    txn_id=Some("txn-success"),
+    summary="passed",
+  )
+  let workflows = hub.list_pr_workflows(objects, pr.id())
+  assert_eq(workflows.length(), 1)
+  assert_eq(workflows[0].task(), "test")
+  assert_eq(workflows[0].status(), PrWorkflowStatus::Success)
+  assert_eq(workflows[0].workspace_fingerprint(), "fp-2")
+}
+
+///|
+test "pr merge policy: required workflows block until latest status is success" {
+  let (_fs, objects, refs, clock) = setup_repo_with_branch()
+  let hub = Hub::init(objects, refs)
+  let pr = hub.create_pr(
+    objects, refs, clock, "Workflow Gate PR", "Body", "refs/heads/feature", "refs/heads/main",
+    "alice@example.com",
+  )
+  let policy = PrMergePolicy::new(0, true, false, required_workflows=["test"])
+  ignore(
+    hub.check_merge_policy(objects, refs, pr.id(), policy) catch {
+      @git.GitError::InvalidObject(message) => {
+        assert_true(message.contains("required workflow 'test'"))
+        return ()
+      }
+      err => fail("unexpected error: \{err.to_string()}")
+    },
+  )
+  fail("expected invalid object error")
+}
+
+///|
+test "pr merge policy: required workflows accepts latest success status" {
+  let (_fs, objects, refs, clock) = setup_repo_with_branch()
+  let hub = Hub::init(objects, refs)
+  let pr = hub.create_pr(
+    objects, refs, clock, "Workflow Gate PR", "Body", "refs/heads/feature", "refs/heads/main",
+    "alice@example.com",
+  )
+  let _ = hub.record_pr_workflow(
+    objects,
+    refs,
+    clock,
+    pr.id(),
+    "test",
+    PrWorkflowStatus::Failed,
+    "fp-failed",
+    "ci@example.com",
+    txn_id=Some("txn-failed"),
+  )
+  let _ = hub.record_pr_workflow(
+    objects,
+    refs,
+    clock,
+    pr.id(),
+    "test",
+    PrWorkflowStatus::Success,
+    "fp-success",
+    "ci@example.com",
+    txn_id=Some("txn-success"),
+  )
+  let policy = PrMergePolicy::new(0, true, false, required_workflows=["test"])
+  hub.check_merge_policy(objects, refs, pr.id(), policy)
+}
+
+///|
 test "pr: merge fast-forward" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
   let prs = Hub::init(objects, refs)

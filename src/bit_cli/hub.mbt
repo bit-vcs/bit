@@ -179,6 +179,10 @@ fn print_hub_pr_usage() -> Unit {
     "  review <pr-id> (--approve|--comment|--request-changes|--verdict <v>) --commit <hex> [--body <body>]",
   )
   println("  review list <pr-id>")
+  println(
+    "  workflow submit <pr-id> --task <task> --status <pending|running|success|failed> [--fingerprint <value>] [--txn <id>] [--author <name>] [--summary <text>]",
+  )
+  println("  workflow list <pr-id>")
 }
 
 ///|
@@ -225,8 +229,12 @@ fn print_hub_sync_usage() -> Unit {
   println("Usage: bit hub sync <subcommand> [<args>]")
   println("")
   println("Subcommands:")
-  println("  push [<remote-url>]")
-  println("  fetch [<remote-url>]")
+  println(
+    "  push [<remote-url>] [--auth-token <token>] [--signing-key <key>] [--require-signed|--allow-unsigned]",
+  )
+  println(
+    "  fetch [<remote-url>] [--auth-token <token>] [--signing-key <key>] [--require-signed|--allow-unsigned]",
+  )
   println("")
   println("Remote URL:")
   println("  - Smart HTTP remote: https://host/repo.git")
@@ -272,10 +280,12 @@ fn default_hub_merge_policy_toml() -> String {
     #|# required_approvals: minimum number of latest approved reviews
     #|# allow_request_changes: allow merge while latest review requests changes
     #|# require_signed_records: require PR metadata and reviews to be signed
+    #|# required_workflows: workflow task names that must be latest-success
     #|[merge]
     #|required_approvals = 0
     #|allow_request_changes = true
     #|require_signed_records = false
+    #|required_workflows = []
   template
 }
 
@@ -296,12 +306,45 @@ fn parse_merge_policy_bool(
 }
 
 ///|
+fn parse_merge_policy_string_array(
+  value : String,
+  key : String,
+) -> Array[String] raise @git.GitError {
+  let parsed = @json.parse(value) catch {
+    _ =>
+      raise @git.GitError::InvalidObject(
+        "hub merge policy: '\{key}' must be JSON string array: \{value}",
+      )
+  }
+  match parsed {
+    Json::Array(items) => {
+      let out : Array[String] = []
+      for item in items {
+        match item {
+          Json::String(text) => out.push(text)
+          _ =>
+            raise @git.GitError::InvalidObject(
+              "hub merge policy: '\{key}' must contain only strings",
+            )
+        }
+      }
+      out
+    }
+    _ =>
+      raise @git.GitError::InvalidObject(
+        "hub merge policy: '\{key}' must be string array",
+      )
+  }
+}
+
+///|
 fn parse_hub_merge_policy_toml(
   content : String,
 ) -> @hub.PrMergePolicy raise @git.GitError {
   let mut required_approvals = 0
   let mut allow_request_changes = true
   let mut require_signed_records = false
+  let mut required_workflows : Array[String] = []
   let mut in_merge_section = false
   for line_view in content.split("\n") {
     let raw_line = line_view.to_string()
@@ -355,6 +398,8 @@ fn parse_hub_merge_policy_toml(
         allow_request_changes = parse_merge_policy_bool(value, key)
       "require_signed_records" =>
         require_signed_records = parse_merge_policy_bool(value, key)
+      "required_workflows" =>
+        required_workflows = parse_merge_policy_string_array(value, key)
       _ =>
         raise @git.GitError::InvalidObject(
           "hub merge policy: unknown key in [merge]: \{key}",
@@ -362,7 +407,10 @@ fn parse_hub_merge_policy_toml(
     }
   }
   @hub.PrMergePolicy::new(
-    required_approvals, allow_request_changes, require_signed_records,
+    required_approvals,
+    allow_request_changes,
+    require_signed_records,
+    required_workflows~,
   )
 }
 
@@ -994,6 +1042,7 @@ async fn handle_hub_pr(args : Array[String]) -> Unit raise Error {
     "merge" => handle_hub_pr_merge(rest)
     "comment" => handle_hub_pr_comment(rest)
     "review" => handle_hub_pr_review(rest)
+    "workflow" => handle_hub_pr_workflow(rest)
     "help" | "-h" | "--help" => print_hub_pr_usage()
     _ => {
       eprint_line("bit hub pr: unknown subcommand '\{subcmd}'")
@@ -2187,6 +2236,205 @@ async fn handle_hub_pr_review_list(args : Array[String]) -> Unit raise Error {
 }
 
 ///|
+async fn handle_hub_pr_workflow(args : Array[String]) -> Unit raise Error {
+  if args.length() == 0 {
+    print_hub_pr_usage()
+    return ()
+  }
+  let subcmd = args[0]
+  let rest = collect_args(args, 1)
+  match subcmd {
+    "submit" => handle_hub_pr_workflow_submit(rest)
+    "list" => handle_hub_pr_workflow_list(rest)
+    "help" | "-h" | "--help" => print_hub_pr_usage()
+    _ => {
+      eprint_line("bit hub pr workflow: unknown subcommand '\{subcmd}'")
+      print_hub_pr_usage()
+      @sys.exit(1)
+    }
+  }
+}
+
+///|
+async fn handle_hub_pr_workflow_submit(
+  args : Array[String],
+) -> Unit raise Error {
+  let mut pr_id : String? = None
+  let mut task : String? = None
+  let mut status : @hub.PrWorkflowStatus? = None
+  let mut workspace_fingerprint = ""
+  let mut txn_id : String? = None
+  let mut author : String? = None
+  let mut summary = ""
+  let mut i = 0
+  while i < args.length() {
+    let arg = args[i]
+    match arg {
+      "--task" if i + 1 < args.length() => {
+        task = Some(args[i + 1])
+        i += 2
+        continue
+      }
+      "--status" if i + 1 < args.length() => {
+        let raw = args[i + 1]
+        match @hub.parse_pr_workflow_status(raw) {
+          Some(value) => status = Some(value)
+          None =>
+            raise @git.GitError::InvalidObject(
+              "Unknown workflow status: \{raw}",
+            )
+        }
+        i += 2
+        continue
+      }
+      "--fingerprint" if i + 1 < args.length() => {
+        workspace_fingerprint = args[i + 1]
+        i += 2
+        continue
+      }
+      "--txn" if i + 1 < args.length() => {
+        txn_id = Some(args[i + 1])
+        i += 2
+        continue
+      }
+      "--author" if i + 1 < args.length() => {
+        author = Some(args[i + 1])
+        i += 2
+        continue
+      }
+      "-m" | "--summary" | "--body" if i + 1 < args.length() => {
+        summary = args[i + 1]
+        i += 2
+        continue
+      }
+      _ if arg.has_prefix("--task=") => {
+        task = Some(String::unsafe_substring(arg, start=7, end=arg.length()))
+        i += 1
+        continue
+      }
+      _ if arg.has_prefix("--status=") => {
+        let raw = String::unsafe_substring(arg, start=9, end=arg.length())
+        match @hub.parse_pr_workflow_status(raw) {
+          Some(value) => status = Some(value)
+          None =>
+            raise @git.GitError::InvalidObject(
+              "Unknown workflow status: \{raw}",
+            )
+        }
+        i += 1
+        continue
+      }
+      _ if arg.has_prefix("--fingerprint=") => {
+        workspace_fingerprint = String::unsafe_substring(
+          arg,
+          start=14,
+          end=arg.length(),
+        )
+        i += 1
+        continue
+      }
+      _ if arg.has_prefix("--txn=") => {
+        txn_id = Some(String::unsafe_substring(arg, start=6, end=arg.length()))
+        i += 1
+        continue
+      }
+      _ if arg.has_prefix("--author=") => {
+        author = Some(String::unsafe_substring(arg, start=9, end=arg.length()))
+        i += 1
+        continue
+      }
+      _ if arg.has_prefix("--summary=") => {
+        summary = String::unsafe_substring(arg, start=10, end=arg.length())
+        i += 1
+        continue
+      }
+      _ if arg.has_prefix("--body=") => {
+        summary = String::unsafe_substring(arg, start=7, end=arg.length())
+        i += 1
+        continue
+      }
+      _ if arg.has_prefix("-") => {
+        warn_unimplemented_arg("hub pr workflow submit", arg)
+        i += 1
+        continue
+      }
+      _ => {
+        if pr_id is None {
+          pr_id = Some(arg)
+        } else {
+          warn_unimplemented_arg("hub pr workflow submit", arg)
+        }
+        i += 1
+        continue
+      }
+    }
+  }
+  guard pr_id is Some(id) else {
+    raise @git.GitError::InvalidObject("PR id is required")
+  }
+  guard task is Some(task_name) else {
+    raise @git.GitError::InvalidObject("Missing --task")
+  }
+  guard status is Some(workflow_status) else {
+    raise @git.GitError::InvalidObject("Missing --status")
+  }
+  let root = get_work_root()
+  let git_dir = root + "/.git"
+  let (objects, refs, clock) = make_hub_stores(git_dir)
+  let hub = init_hub_store(objects, refs)
+  let workflow = hub.record_pr_workflow(
+    objects,
+    refs,
+    clock,
+    id,
+    task_name,
+    workflow_status,
+    workspace_fingerprint,
+    author.unwrap_or(get_author_string()),
+    txn_id~,
+    summary~,
+  )
+  let txn_text = workflow.txn_id().unwrap_or("")
+  print_line(
+    "pr workflow \{id} task=\{workflow.task()} status=\{workflow.status().to_string()} fingerprint=\{workflow.workspace_fingerprint()} txn=\{txn_text}",
+  )
+}
+
+///|
+async fn handle_hub_pr_workflow_list(args : Array[String]) -> Unit raise Error {
+  let mut pr_id : String? = None
+  for arg in args {
+    if arg.has_prefix("-") {
+      warn_unimplemented_arg("hub pr workflow list", arg)
+      continue
+    }
+    if pr_id is None {
+      pr_id = Some(arg)
+    } else {
+      warn_unimplemented_arg("hub pr workflow list", arg)
+    }
+  }
+  guard pr_id is Some(id) else {
+    raise @git.GitError::InvalidObject("PR id is required")
+  }
+  let root = get_work_root()
+  let git_dir = root + "/.git"
+  let (objects, refs, _clock) = make_hub_stores(git_dir)
+  let hub = load_hub_store(objects, refs)
+  let workflows = hub.list_pr_workflows(objects, id)
+  if workflows.length() == 0 {
+    print_line("No workflows")
+    return ()
+  }
+  for workflow in workflows {
+    let txn_text = workflow.txn_id().unwrap_or("")
+    print_line(
+      "pr=\{id} task=\{workflow.task()} status=\{workflow.status().to_string()} fingerprint=\{workflow.workspace_fingerprint()} txn=\{txn_text} updated=\{workflow.updated_at().to_string()} author=\{workflow.author()}",
+    )
+  }
+}
+
+///|
 async fn handle_hub_issue(args : Array[String]) -> Unit raise Error {
   if args.length() == 0 {
     print_hub_issue_usage()
@@ -3114,24 +3362,110 @@ async fn handle_hub_sync(args : Array[String]) -> Unit raise Error {
 }
 
 ///|
+struct HubSyncRuntimeOptions {
+  remote_url : String?
+  auth_token : String?
+  signing_key : String?
+  require_signed : Bool?
+}
+
+///|
+fn parse_hub_sync_runtime_options(
+  args : Array[String],
+  default_remote_url? : String? = None,
+) -> HubSyncRuntimeOptions raise @git.GitError {
+  let mut remote_url = default_remote_url
+  let mut auth_token : String? = None
+  let mut signing_key : String? = None
+  let mut require_signed : Bool? = None
+  let mut i = 0
+  while i < args.length() {
+    let arg = args[i]
+    match arg {
+      "--auth-token" if i + 1 < args.length() => {
+        auth_token = Some(args[i + 1])
+        i += 2
+        continue
+      }
+      "--auth-token" =>
+        raise @git.GitError::InvalidObject(
+          "hub sync: --auth-token requires a value",
+        )
+      "--signing-key" | "--sign-key" if i + 1 < args.length() => {
+        signing_key = Some(args[i + 1])
+        i += 2
+        continue
+      }
+      "--signing-key" | "--sign-key" =>
+        raise @git.GitError::InvalidObject(
+          "hub sync: --signing-key requires a value",
+        )
+      "--require-signed" => {
+        require_signed = Some(true)
+        i += 1
+        continue
+      }
+      "--allow-unsigned" => {
+        require_signed = Some(false)
+        i += 1
+        continue
+      }
+      _ if arg.has_prefix("--auth-token=") => {
+        auth_token = Some(
+          String::unsafe_substring(arg, start=13, end=arg.length()),
+        )
+        i += 1
+        continue
+      }
+      _ if arg.has_prefix("--signing-key=") => {
+        signing_key = Some(
+          String::unsafe_substring(arg, start=14, end=arg.length()),
+        )
+        i += 1
+        continue
+      }
+      _ if arg.has_prefix("--sign-key=") => {
+        signing_key = Some(
+          String::unsafe_substring(arg, start=11, end=arg.length()),
+        )
+        i += 1
+        continue
+      }
+      _ if arg.has_prefix("-") =>
+        raise @git.GitError::InvalidObject("Unknown hub sync option: \{arg}")
+      _ => {
+        remote_url = Some(arg)
+        i += 1
+        continue
+      }
+    }
+  }
+  { remote_url, auth_token, signing_key, require_signed }
+}
+
+///|
 async fn handle_hub_sync_push(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let git_dir = root + "/.git"
   let fs = OsFs::new()
-  let mut remote_url : String? = get_effective_remote_url(fs, git_dir)
-  for arg in args {
-    if not(arg.has_prefix("-")) {
-      remote_url = Some(arg)
-      break
-    }
-    warn_unimplemented_arg("hub sync push", arg)
-  }
-  guard remote_url is Some(url) else {
+  let options = parse_hub_sync_runtime_options(
+    args,
+    default_remote_url=get_effective_remote_url(fs, git_dir),
+  )
+  guard options.remote_url is Some(url) else {
     raise @git.GitError::InvalidObject("No remote configured")
   }
   let (objects, refs, _clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
-  let result = @hub_native.hub_push(hub, fs, git_dir, url)
+  let result = @hub_native.hub_push(
+    hub,
+    fs,
+    git_dir,
+    url,
+    signing_key=options.signing_key,
+    require_signed=options.require_signed,
+    auth_token=options.auth_token,
+  )
   if result.success() {
     print_line(result.message())
   } else {
@@ -3263,22 +3597,27 @@ async fn handle_hub_sync_fetch(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let git_dir = root + "/.git"
   let fs = OsFs::new()
-  let mut remote_url : String? = get_effective_remote_url(fs, git_dir)
-  for arg in args {
-    if not(arg.has_prefix("-")) {
-      remote_url = Some(arg)
-      break
-    }
-    warn_unimplemented_arg("hub sync fetch", arg)
-  }
-  guard remote_url is Some(url) else {
+  let options = parse_hub_sync_runtime_options(
+    args,
+    default_remote_url=get_effective_remote_url(fs, git_dir),
+  )
+  guard options.remote_url is Some(url) else {
     raise @git.GitError::InvalidObject("No remote configured")
   }
   let (objects, refs, _clock) = make_hub_stores(git_dir)
   let before_store = load_hub_record_store(objects, refs)
   let before_notify = collect_notify_records_from_store(before_store, objects)
   let hub = load_hub_store(objects, refs)
-  let result = @hub_native.hub_fetch(hub, fs, fs, git_dir, url)
+  let result = @hub_native.hub_fetch(
+    hub,
+    fs,
+    fs,
+    git_dir,
+    url,
+    signing_key=options.signing_key,
+    require_signed=options.require_signed,
+    auth_token=options.auth_token,
+  )
   if result.success() {
     let after_store = load_hub_record_store(objects, refs)
     let after_notify = collect_notify_records_from_store(after_store, objects)

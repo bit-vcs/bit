@@ -64,6 +64,12 @@ type HubPrCreateOptions
 
 type HubPrListOptions
 
+type HubSearchOptions
+
+type HubSearchType
+
+type HubSyncRuntimeOptions
+
 type MboxPatch
 
 type OsClock

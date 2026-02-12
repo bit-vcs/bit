@@ -1241,6 +1241,28 @@ fn workspace_flow_fingerprint(
 }
 
 ///|
+fn workspace_flow_workspace_fingerprint(
+  task : String,
+  ordered_ids : Array[String],
+  selected : Map[String, Bool],
+  signatures : Map[String, String],
+) -> String {
+  let out = StringBuilder::new()
+  out.write_string("task=")
+  out.write_string(task)
+  for node_id in ordered_ids {
+    if selected.get(node_id) is None {
+      continue
+    }
+    out.write_string("\n")
+    out.write_string(node_id)
+    out.write_string("=")
+    out.write_string(signatures.get(node_id).unwrap_or("missing"))
+  }
+  out.to_string()
+}
+
+///|
 pub fn print_workspace_usage() -> Unit {
   let usage =
     #|Usage: bit workspace <command> [options]
@@ -1253,7 +1275,9 @@ pub fn print_workspace_usage() -> Unit {
     #|  commit -m <msg>     Commit changed nodes as one workspace transaction
     #|  push [--resume ID]  Push nodes in dependency order
     #|  run <task>          Run configured task in nodes
-    #|  flow <task>         Run topological workflow with success cache
+    #|  flow <task> [--pr <id>]
+    #|                      Run topological workflow with success cache
+    #|                      and optionally report result to hub PR
     #|  export --format git-interop
     #|                      Export workspace interoperability metadata
     #|  doctor              Validate workspace consistency
@@ -1708,23 +1732,50 @@ async fn handle_workspace_run(args : Array[String]) -> Unit raise Error {
 }
 
 ///|
-async fn handle_workspace_flow(args : Array[String]) -> Unit raise Error {
+async fn handle_workspace_flow(
+  args : Array[String],
+  run_repo_builtin_in_dir : async (String, String, Array[String]) -> (
+    Int,
+    String,
+  ),
+) -> Unit raise Error {
   let mut affected_only = false
   let mut no_cache = false
   let mut reset_cache = false
   let mut task_name : String? = None
-  for arg in args {
+  let mut report_pr_id : String? = None
+  let mut i = 0
+  while i < args.length() {
+    let arg = args[i]
     match arg {
       "--affected" => affected_only = true
       "--no-cache" => no_cache = true
       "--reset-cache" | "--clear-cache" => reset_cache = true
+      "--pr" | "--hub-pr" if i + 1 < args.length() => {
+        report_pr_id = Some(args[i + 1])
+        i += 2
+        continue
+      }
+      "--pr" | "--hub-pr" =>
+        raise @git.GitError::InvalidObject(
+          "workspace flow: --pr requires a value",
+        )
       "-h" | "--help" => {
         print_workspace_usage()
         return
       }
+      _ if arg.has_prefix("--pr=") =>
+        report_pr_id = Some(
+          String::unsafe_substring(arg, start=5, end=arg.length()),
+        )
+      _ if arg.has_prefix("--hub-pr=") =>
+        report_pr_id = Some(
+          String::unsafe_substring(arg, start=9, end=arg.length()),
+        )
       _ if arg.has_prefix("-") => warn_unimplemented_arg("workspace flow", arg)
       _ => if task_name is None { task_name = Some(arg) }
     }
+    i += 1
   }
   guard task_name is Some(task) else {
     raise @git.GitError::InvalidObject("workspace flow requires <task>")
@@ -1908,6 +1959,37 @@ async fn handle_workspace_flow(args : Array[String]) -> Unit raise Error {
   let state = if required_failed { "partial_failed" } else { "completed" }
   write_workspace_txn(fs, workspace_root, txn_id, "flow:" + task, state, steps)
   println("workspace flow txn: " + txn_id + " (" + state + ")")
+  if report_pr_id is Some(pr_id) {
+    let workspace_fingerprint = workspace_flow_workspace_fingerprint(
+      task, ordered_ids, selected, node_signatures,
+    )
+    let status = if required_failed { "failed" } else { "success" }
+    let report_args : Array[String] = [
+      "pr", "workflow", "submit", pr_id, "--task", task, "--status", status, "--fingerprint",
+      workspace_fingerprint, "--txn", txn_id,
+    ]
+    let (report_code, report_err) = run_repo_builtin_in_dir(
+      workspace_root, "hub", report_args,
+    )
+    if report_code == 0 {
+      println(
+        "workspace flow report: pr " +
+        pr_id +
+        " task=" +
+        task +
+        " status=" +
+        status,
+      )
+    } else {
+      raise @git.GitError::InvalidObject(
+        if report_err.length() == 0 {
+          "workspace flow report failed for PR " + pr_id
+        } else {
+          "workspace flow report failed: " + report_err
+        },
+      )
+    }
+  }
   if required_failed {
     raise @git.GitError::InvalidObject(
       "workspace flow failed on required nodes (txn: " + txn_id + ")",
@@ -2029,7 +2111,7 @@ pub async fn handle_workspace(
     "commit" => handle_workspace_commit(rest, run_repo_builtin_in_dir)
     "push" => handle_workspace_push(rest, run_repo_builtin_in_dir)
     "run" => handle_workspace_run(rest)
-    "flow" => handle_workspace_flow(rest)
+    "flow" => handle_workspace_flow(rest, run_repo_builtin_in_dir)
     "export" => handle_workspace_export(rest)
     "doctor" => handle_workspace_doctor(rest)
     _ => {

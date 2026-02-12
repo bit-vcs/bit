@@ -42,6 +42,10 @@ pub fn parse_pr_comment(String) -> PrComment raise PrError
 
 pub fn parse_pr_review(String) -> PrReview raise PrError
 
+pub fn parse_pr_workflow_result(String) -> PrWorkflowResult raise PrError
+
+pub fn parse_pr_workflow_status(String) -> PrWorkflowStatus?
+
 pub fn parse_pull_request(String) -> PullRequest raise PrError
 
 pub fn pr_comment_key(String, String) -> String
@@ -57,6 +61,10 @@ pub fn pr_proposal_prefix() -> String
 pub fn pr_review_key(String, String) -> String
 
 pub fn pr_review_prefix(String) -> String
+
+pub fn pr_workflow_key(String, String) -> String
+
+pub fn pr_workflow_prefix(String) -> String
 
 pub fn record_notify_topic(HubRecord) -> String?
 
@@ -83,6 +91,7 @@ pub fn Hub::add_issue_comment(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clo
 pub fn Hub::add_note(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, @object.ObjectId, String, String, Int64, ns? : String) -> Note raise @object.GitError
 pub fn Hub::add_note_plain(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, @object.ObjectId, String, ns? : String) -> Unit raise @object.GitError
 pub fn Hub::can_merge(Self, &@lib.ObjectStore, &@lib.RefStore, String) -> Bool raise @object.GitError
+pub fn Hub::check_merge_policy(Self, &@lib.ObjectStore, &@lib.RefStore, String, PrMergePolicy, signing_key? : String?) -> Unit raise @object.GitError
 pub fn Hub::close_issue(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String) -> Unit raise @object.GitError
 pub fn Hub::close_pr(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String) -> Unit raise @object.GitError
 pub fn Hub::create_issue(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, String, labels? : Array[String], assignees? : Array[String]) -> Issue raise @object.GitError
@@ -101,11 +110,13 @@ pub fn Hub::list_issue_comments(Self, &@lib.ObjectStore, String) -> Array[IssueC
 pub fn Hub::list_issues(Self, &@lib.ObjectStore, state? : IssueState?) -> Array[Issue]
 pub fn Hub::list_notes(Self, &@lib.ObjectStore, &@lib.RefStore, ns? : String) -> Array[Note] raise @object.GitError
 pub fn Hub::list_pr_proposals(Self, &@lib.ObjectStore) -> Array[PullRequest]
+pub fn Hub::list_pr_workflows(Self, &@lib.ObjectStore, String) -> Array[PrWorkflowResult]
 pub fn Hub::list_prs(Self, &@lib.ObjectStore, state? : PrState?) -> Array[PullRequest]
 pub fn Hub::list_reviews(Self, &@lib.ObjectStore, String) -> Array[PrReview]
 pub fn Hub::load(&@lib.ObjectStore, &@lib.RefStore, node_id? : String, signing_key? : String?, require_signed? : Bool) -> Self raise @object.GitError
 pub fn Hub::merge_pr(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, strategy? : PrMergeStrategy) -> PrMergeResult raise @object.GitError
 pub fn Hub::propose_pr(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, String, String, String, source_repo? : String?, source_ref? : String?) -> PullRequest raise @object.GitError
+pub fn Hub::record_pr_workflow(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, PrWorkflowStatus, String, String, txn_id? : String?, summary? : String) -> PrWorkflowResult raise @object.GitError
 pub fn Hub::reload_store(Self, &@lib.ObjectStore, &@lib.RefStore) -> Unit raise @object.GitError
 pub fn Hub::remove_note(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, @object.ObjectId, ns? : String) -> Unit raise @object.GitError
 pub fn Hub::reopen_issue(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String) -> Unit raise @object.GitError
@@ -241,6 +252,19 @@ pub fn PrComment::pr_id(Self) -> String
 pub fn PrComment::reply_to(Self) -> String?
 pub fn PrComment::serialize(Self) -> String
 
+pub struct PrMergePolicy {
+  required_approvals : Int
+  allow_request_changes : Bool
+  require_signed_records : Bool
+  required_workflows : Array[String]
+}
+pub fn PrMergePolicy::allow_request_changes(Self) -> Bool
+pub fn PrMergePolicy::default() -> Self
+pub fn PrMergePolicy::new(Int, Bool, Bool, required_workflows? : Array[String]) -> Self
+pub fn PrMergePolicy::require_signed_records(Self) -> Bool
+pub fn PrMergePolicy::required_approvals(Self) -> Int
+pub fn PrMergePolicy::required_workflows(Self) -> Array[String]
+
 pub struct PrMergeResult {
   success : Bool
   commit_id : @object.ObjectId?
@@ -297,6 +321,37 @@ pub fn PrSyncResult::message(Self) -> String
 pub fn PrSyncResult::new(Bool, String, @object.ObjectId?, @object.ObjectId?) -> Self
 pub fn PrSyncResult::remote_commit(Self) -> @object.ObjectId?
 pub fn PrSyncResult::success(Self) -> Bool
+
+pub struct PrWorkflowResult {
+  pr_id : String
+  task : String
+  status : PrWorkflowStatus
+  workspace_fingerprint : String
+  txn_id : String?
+  author : String
+  updated_at : Int64
+  summary : String
+}
+pub fn PrWorkflowResult::author(Self) -> String
+pub fn PrWorkflowResult::new(String, String, PrWorkflowStatus, String, String, Int64, txn_id? : String?, summary? : String) -> Self
+pub fn PrWorkflowResult::pr_id(Self) -> String
+pub fn PrWorkflowResult::serialize(Self) -> String
+pub fn PrWorkflowResult::status(Self) -> PrWorkflowStatus
+pub fn PrWorkflowResult::summary(Self) -> String
+pub fn PrWorkflowResult::task(Self) -> String
+pub fn PrWorkflowResult::txn_id(Self) -> String?
+pub fn PrWorkflowResult::updated_at(Self) -> Int64
+pub fn PrWorkflowResult::workspace_fingerprint(Self) -> String
+
+pub(all) enum PrWorkflowStatus {
+  Pending
+  Running
+  Success
+  Failed
+}
+pub fn PrWorkflowStatus::to_string(Self) -> String
+pub impl Eq for PrWorkflowStatus
+pub impl Show for PrWorkflowStatus
 
 pub struct PullRequest {
   id : String

@@ -805,10 +805,22 @@ pub async fn hub_push(
   rfs : &@git.RepoFileSystem,
   git_dir : String,
   remote_url : String,
+  signing_key? : String? = None,
+  require_signed? : Bool? = None,
+  auth_token? : String? = None,
 ) -> @hub.PrSyncResult raise @git.GitError {
-  let signing_key = relay_signing_key()
-  let require_signed = relay_require_signed()
-  let auth_token = relay_auth_token()
+  let effective_signing_key = match signing_key {
+    Some(value) => Some(value)
+    None => relay_signing_key()
+  }
+  let effective_require_signed = match require_signed {
+    Some(value) => value
+    None => relay_require_signed()
+  }
+  let effective_auth_token = match auth_token {
+    Some(value) => Some(value)
+    None => relay_auth_token()
+  }
   match parse_relay_base_url(remote_url) {
     Some(base_url) =>
       relay_push_with_http(
@@ -816,9 +828,9 @@ pub async fn hub_push(
         git_dir,
         base_url,
         @gitnative.native_http_post,
-        signing_key~,
-        require_signed=require_signed,
-        auth_token~,
+        signing_key=effective_signing_key,
+        require_signed=effective_require_signed,
+        auth_token=effective_auth_token,
       )
     None =>
       hub_push_git_http(rfs, git_dir, remote_url) catch {
@@ -828,9 +840,9 @@ pub async fn hub_push(
             git_dir,
             trim_trailing_slash(remote_url),
             @gitnative.native_http_post,
-            signing_key~,
-            require_signed=require_signed,
-            auth_token~,
+            signing_key=effective_signing_key,
+            require_signed=effective_require_signed,
+            auth_token=effective_auth_token,
           )
         other => raise other
       }
@@ -845,10 +857,22 @@ pub async fn hub_fetch(
   rfs : &@git.RepoFileSystem,
   git_dir : String,
   remote_url : String,
+  signing_key? : String? = None,
+  require_signed? : Bool? = None,
+  auth_token? : String? = None,
 ) -> @hub.PrSyncResult raise @git.GitError {
-  let signing_key = relay_signing_key()
-  let require_signed = relay_require_signed()
-  let auth_token = relay_auth_token()
+  let effective_signing_key = match signing_key {
+    Some(value) => Some(value)
+    None => relay_signing_key()
+  }
+  let effective_require_signed = match require_signed {
+    Some(value) => value
+    None => relay_require_signed()
+  }
+  let effective_auth_token = match auth_token {
+    Some(value) => Some(value)
+    None => relay_auth_token()
+  }
   match parse_relay_base_url(remote_url) {
     Some(base_url) =>
       relay_fetch_with_http(
@@ -858,9 +882,9 @@ pub async fn hub_fetch(
         git_dir,
         base_url,
         @gitnative.native_http_get,
-        signing_key~,
-        require_signed=require_signed,
-        auth_token~,
+        signing_key=effective_signing_key,
+        require_signed=effective_require_signed,
+        auth_token=effective_auth_token,
       )
     None =>
       hub_fetch_git_http(hub, fs, rfs, git_dir, remote_url) catch {
@@ -872,9 +896,9 @@ pub async fn hub_fetch(
             git_dir,
             trim_trailing_slash(remote_url),
             @gitnative.native_http_get,
-            signing_key~,
-            require_signed=require_signed,
-            auth_token~,
+            signing_key=effective_signing_key,
+            require_signed=effective_require_signed,
+            auth_token=effective_auth_token,
           )
         other => raise other
       }

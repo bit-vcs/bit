@@ -162,6 +162,47 @@ EOF
     fi
 '
 
+test_expect_success 'hub pr merge policy: required_workflows blocks until workflow success is recorded' '
+    git_cmd init &&
+    echo "base" > README.md &&
+    git_cmd add README.md &&
+    git_cmd commit -m "base" &&
+    git_cmd checkout -b feature/policy-workflow &&
+    echo "feature" > workflow.txt &&
+    git_cmd add workflow.txt &&
+    git_cmd commit -m "feature" &&
+    git_cmd checkout main &&
+    git_cmd hub init >/dev/null &&
+    cat > .git/hub/policy.toml <<-\EOF &&
+[merge]
+required_approvals = 0
+allow_request_changes = true
+require_signed_records = false
+required_workflows = ["test"]
+EOF
+    pr_out=$(git_cmd hub pr create --title "Workflow PR" --body "Body" --head refs/heads/feature/policy-workflow --base refs/heads/main) &&
+    pr_id=$(printf "%s\n" "$pr_out" | head -n1 | cut -d" " -f2) &&
+    test -n "$pr_id" &&
+    if git_cmd hub pr merge "$pr_id" >merge.out 2>merge.err; then
+        false
+    else
+        grep -q "required workflow" merge.err
+    fi &&
+    git_cmd hub pr workflow submit "$pr_id" --task test --status failed --fingerprint fp-failed --txn txn-failed >/dev/null &&
+    if git_cmd hub pr merge "$pr_id" >merge2.out 2>merge2.err; then
+        false
+    else
+        grep -q "status=failed" merge2.err
+    fi &&
+    git_cmd hub pr workflow submit "$pr_id" --task test --status success --fingerprint fp-success --txn txn-success >/dev/null &&
+    workflow_list=$(git_cmd hub pr workflow list "$pr_id") &&
+    printf "%s\n" "$workflow_list" | grep -q "task=test" &&
+    printf "%s\n" "$workflow_list" | grep -q "status=success" &&
+    printf "%s\n" "$workflow_list" | grep -q "fingerprint=fp-success" &&
+    git_cmd hub pr merge "$pr_id" >/dev/null &&
+    git_cmd hub pr list --merged | grep -q "Workflow PR"
+'
+
 test_expect_success 'hub search: query and type filter' '
     git_cmd init &&
     echo "base" > README.md &&

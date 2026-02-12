@@ -136,7 +136,7 @@ test_expect_success 'workspace flow uses add-all style fingerprint for staged an
 	echo "dep-worktree-2" > ws/dep/dep.txt &&
 	(cd ws &&
 	 BIT_WORKSPACE_FLOW_LOG_DIR="$PWD/../flow-logs" $BIT workspace flow test >../ws-flow-fourth.out 2>&1) &&
-	test_line_count = flow-logs/root.log 4 &&
+	test_line_count = flow-logs/root.log 3 &&
 	test_line_count = flow-logs/dep.log 4 &&
 	test_line_count = flow-logs/leaf.log 4 &&
 	test_line_count = flow-logs/extra.log 3
