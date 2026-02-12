@@ -463,10 +463,17 @@ fn build_provider(
     Some(provider) => provider
     None => {
       ensure_openrouter_api_key()
-      let provider = @agent_llm.create_provider(
-        default_provider,
-        effective_model(options),
-        openrouter_system_prompt(agent_loop_mode),
+      let api_key = trim_text(@llm_ffi.get_env("OPENROUTER_API_KEY"))
+      let model = effective_model(options)
+      let system_prompt = openrouter_system_prompt(agent_loop_mode)
+      let provider = @llmlib.BoxedProvider::new(
+        @openai.OpenAIProvider::new(
+          api_key,
+          endpoint=OpenRouter,
+          model~,
+          system_prompt~,
+          max_tokens=8192,
+        ),
       )
       provider_ref.val = Some(provider)
       provider

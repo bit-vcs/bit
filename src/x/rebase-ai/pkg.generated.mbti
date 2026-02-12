@@ -40,7 +40,7 @@ pub struct AiRebaseOptions {
   provider : @llm.BoxedProvider?
 }
 pub fn AiRebaseOptions::default() -> Self
-pub fn AiRebaseOptions::new(model? : String, max_auto_rounds? : Int, agent_max_steps? : Int, use_agent_loop? : Bool, verbose? : Bool, provider? : @llm.BoxedProvider?) -> Self
+pub fn AiRebaseOptions::new(model? : String, max_auto_rounds? : Int, agent_max_steps? : Int, use_agent_loop? : Bool, verbose? : Bool, provider~ : @llm.BoxedProvider?) -> Self
 
 // Type aliases
 

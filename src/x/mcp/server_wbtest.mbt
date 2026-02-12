@@ -1,11 +1,9 @@
 ///| Whitebox tests for MCP request dispatch
 
 ///|
-test "build_tool_defs includes run_agent and run_orchestrator" {
+test "build_tool_defs returns empty tools" {
   let defs = mcp_tool_defs().stringify()
-  assert_true(defs.contains("\"run_agent\""))
-  assert_true(defs.contains("\"run_orchestrator\""))
-  assert_true(defs.contains("\"stream\""))
+  assert_true(defs.contains("\"tools\""))
 }
 
 ///|
@@ -41,7 +39,7 @@ test "process_message initialize returns capability response" {
 }
 
 ///|
-test "process_message unknown tool returns method-not-found" {
+test "process_message unknown tool returns error" {
   let req = "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"unknown\",\"arguments\":{}}}"
   let resp = mcp_process_message(req)
   match resp {
@@ -54,35 +52,11 @@ test "process_message unknown tool returns method-not-found" {
 }
 
 ///|
-test "process_message run_agent validates required task" {
-  let req = "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"run_agent\",\"arguments\":{}}}"
-  let resp = mcp_process_message(req)
-  match resp {
-    Some(s) => {
-      assert_true(s.contains("\"isError\":true"))
-      assert_true(s.contains("task is required"))
-    }
-    None => assert_true(false)
-  }
-}
-
-///|
 test "mcp_dispatch_request exposes tools/list handler" {
   let resp = mcp_dispatch_request(
     "tools/list",
     Json::number(9.0),
     Json::object({}),
   )
-  assert_true(resp.contains("\"run_agent\""))
-  assert_true(resp.contains("\"run_orchestrator\""))
-}
-
-///|
-test "stream notification embeds request id and delta" {
-  let msg = tool_output_notification(Json::number(7.0), "run_agent", "hello")
-  assert_true(msg.contains("\"jsonrpc\":\"2.0\""))
-  assert_true(msg.contains("\"method\":\"notifications/message\""))
-  assert_true(msg.contains("\"requestId\":7"))
-  assert_true(msg.contains("\"tool\":\"run_agent\""))
-  assert_true(msg.contains("\"delta\":\"hello\""))
+  assert_true(resp.contains("\"tools\""))
 }

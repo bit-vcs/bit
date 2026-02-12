@@ -76,7 +76,7 @@ pub fn create_lightweight_tag(&@types.FileSystem, String, String, @object.Object
 
 pub fn create_reflog(&@types.FileSystem, &@types.RepoFileSystem, String, String) -> Unit raise @object.GitError
 
-pub fn create_worktree(&@types.FileSystem, &@types.RepoFileSystem, String, String, String?, detach? : Bool, new_branch? : String?) -> Unit raise @object.GitError
+pub fn create_worktree(&@types.FileSystem, &@types.RepoFileSystem, String, String, String?, detach? : Bool, new_branch~ : String?) -> Unit raise @object.GitError
 
 pub fn delete_branch(&@types.FileSystem, &@types.RepoFileSystem, String, String, force? : Bool) -> Unit raise @object.GitError
 
@@ -174,7 +174,7 @@ pub fn load_object_store_from_fs(&@types.RepoFileSystem, String) -> @repo.Object
 
 pub fn load_rebase_state(&@types.RepoFileSystem, String) -> RebaseState? raise @object.GitError
 
-pub fn lock_worktree(&@types.FileSystem, &@types.RepoFileSystem, String, String, reason? : String?) -> Unit raise @object.GitError
+pub fn lock_worktree(&@types.FileSystem, &@types.RepoFileSystem, String, String, reason~ : String?) -> Unit raise @object.GitError
 
 pub fn log_head(&@types.RepoFileSystem, String, max_count? : Int, since? : Int64, until? : Int64) -> Array[LogEntry] raise @object.GitError
 
@@ -598,7 +598,7 @@ pub async fn PromisorDb::get_or_fetch(Self, &@types.RepoFileSystem, &@types.File
 pub fn PromisorDb::get_promisor_remote(Self) -> String?
 pub fn PromisorDb::has_local(Self, &@types.RepoFileSystem, @object.ObjectId) -> Bool raise @object.GitError
 pub fn PromisorDb::has_promisor(Self) -> Bool
-pub fn PromisorDb::new(&@types.RepoFileSystem, String, lazy_load? : Bool, fetch_fn? : (async (String, Array[@object.ObjectId]) -> Result[Array[@object.PackObject], @object.GitError] noraise)?) -> Self raise @object.GitError
+pub fn PromisorDb::new(&@types.RepoFileSystem, String, lazy_load? : Bool, fetch_fn~ : (async (String, Array[@object.ObjectId]) -> Result[Array[@object.PackObject], @object.GitError] noraise)?) -> Self raise @object.GitError
 
 pub struct PruneResult {
   pruned : Array[@object.ObjectId]
