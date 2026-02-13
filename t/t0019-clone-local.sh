@@ -31,6 +31,29 @@ make_source_repo_with_subdir() {
     )
 }
 
+setup_fake_ssh_command() {
+    mkdir -p mock-bin &&
+    cat > mock-bin/ssh <<'EOF' &&
+#!/bin/sh
+log_file="${BIT_TEST_SSH_LOG:-}"
+if [ -n "$log_file" ]; then
+    printf '%s\n' "$*" >> "$log_file"
+fi
+host="$1"
+shift
+if [ "${1:-}" = "env" ]; then
+    shift
+    export "$1"
+    shift
+fi
+cmd="$1"
+shift
+exec "$cmd" "$@"
+EOF
+    chmod +x mock-bin/ssh &&
+    export PATH="$(pwd)/mock-bin:$PATH"
+}
+
 # =============================================================================
 # Basic clone (4)
 # =============================================================================
@@ -120,6 +143,35 @@ test_expect_success 'clone file:// local repo works' '
     test_dir_exists dest/.git &&
     test_file_exists dest/file1.txt &&
     test_file_exists dest/file2.txt
+'
+
+test_expect_success 'clone ./local repo works' '
+    make_source_repo &&
+    git_cmd clone ./source dest &&
+    test_dir_exists dest/.git &&
+    test_file_exists dest/file1.txt &&
+    test_file_exists dest/file2.txt
+'
+
+test_expect_success 'clone absolute local path works' '
+    make_source_repo &&
+    git_cmd clone "$(pwd)/source" dest &&
+    test_dir_exists dest/.git &&
+    test_file_exists dest/file1.txt &&
+    test_file_exists dest/file2.txt
+'
+
+test_expect_success 'clone git@host:path via ssh transport works' '
+    command -v git-upload-pack >/dev/null &&
+    make_source_repo &&
+    git_cmd clone --bare source source.git &&
+    setup_fake_ssh_command &&
+    export BIT_TEST_SSH_LOG="$(pwd)/ssh.log" &&
+    git_cmd clone "git@localhost:$(pwd)/source.git" dest &&
+    test_dir_exists dest/.git &&
+    test_file_exists dest/file1.txt &&
+    test_file_exists dest/file2.txt &&
+    test_grep "git-upload-pack" "$BIT_TEST_SSH_LOG"
 '
 
 test_expect_success 'subdir-clone local path works' '

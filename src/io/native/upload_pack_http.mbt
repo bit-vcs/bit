@@ -3,11 +3,38 @@
 ///| This file is only compiled for native target
 
 ///|
+fn remote_uses_http_transport(remote : String) -> Bool {
+  let spec = @protocol.parse_remote(remote)
+  spec.kind == @protocol.RemoteKind::Http
+}
+
+///|
+fn ensure_process_transport_options(
+  depth : Int,
+  filter : @protocol.FilterSpec,
+) -> Unit raise @git.GitError {
+  if depth > 0 {
+    raise @git.GitError::ProtocolError(
+      "shallow clone is not supported over process transport yet",
+    )
+  }
+  if filter.is_partial() {
+    raise @git.GitError::ProtocolError(
+      "partial clone filter is not supported over process transport yet",
+    )
+  }
+}
+
+///|
 pub async fn upload_pack_info_refs_http(
   remote : String,
   prefer_v2 : Bool,
 ) -> Bytes raise @git.GitError {
-  upload_pack_info_refs_with_http(remote, prefer_v2, native_http_get)
+  if remote_uses_http_transport(remote) {
+    upload_pack_info_refs_with_http(remote, prefer_v2, native_http_get)
+  } else {
+    upload_pack_info_refs_process(remote, prefer_v2)
+  }
 }
 
 ///|
@@ -16,7 +43,11 @@ pub async fn upload_pack_request_http(
   body : Bytes,
   prefer_v2 : Bool,
 ) -> Bytes raise @git.GitError {
-  upload_pack_request_with_http(remote, body, prefer_v2, native_http_post)
+  if remote_uses_http_transport(remote) {
+    upload_pack_request_with_http(remote, body, prefer_v2, native_http_post)
+  } else {
+    upload_pack_request_process(remote, body, prefer_v2)
+  }
 }
 
 ///|
@@ -29,9 +60,13 @@ pub async fn discover_upload_refs_http(
   @protocol.ProtocolVersion,
   Map[String, String],
 ) raise @git.GitError {
-  discover_upload_refs_with_http(
-    remote, prefer_v2, native_http_get, native_http_post,
-  )
+  if remote_uses_http_transport(remote) {
+    discover_upload_refs_with_http(
+      remote, prefer_v2, native_http_get, native_http_post,
+    )
+  } else {
+    discover_upload_refs_process(remote, prefer_v2)
+  }
 }
 
 ///|
@@ -42,9 +77,14 @@ pub async fn fetch_pack_http(
   depth? : Int = 0,
   filter? : @protocol.FilterSpec = @protocol.FilterSpec::NoFilter,
 ) -> Bytes raise @git.GitError {
-  fetch_pack_with_http(
-    remote, wants, prefer_v2, depth, filter, native_http_get, native_http_post,
-  )
+  if remote_uses_http_transport(remote) {
+    fetch_pack_with_http(
+      remote, wants, prefer_v2, depth, filter, native_http_get, native_http_post,
+    )
+  } else {
+    ensure_process_transport_options(depth, filter)
+    fetch_pack_process(remote, wants, prefer_v2)
+  }
 }
 
 ///|
@@ -55,9 +95,14 @@ pub async fn fetch_objects_http(
   depth? : Int = 0,
   filter? : @protocol.FilterSpec = @protocol.FilterSpec::NoFilter,
 ) -> Array[@git.PackObject] raise @git.GitError {
-  fetch_objects_with_http(
-    remote, wants, prefer_v2, depth, filter, native_http_get, native_http_post,
-  )
+  if remote_uses_http_transport(remote) {
+    fetch_objects_with_http(
+      remote, wants, prefer_v2, depth, filter, native_http_get, native_http_post,
+    )
+  } else {
+    ensure_process_transport_options(depth, filter)
+    fetch_objects_process(remote, wants, prefer_v2)
+  }
 }
 
 ///|
@@ -67,9 +112,14 @@ pub async fn clone_http(
   depth? : Int = 0,
   filter? : @protocol.FilterSpec = @protocol.FilterSpec::NoFilter,
 ) -> (Array[(@git.ObjectId, String)], Array[@git.PackObject]) raise @git.GitError {
-  clone_with_http(
-    remote, prefer_v2, depth, filter, native_http_get, native_http_post,
-  )
+  if remote_uses_http_transport(remote) {
+    clone_with_http(
+      remote, prefer_v2, depth, filter, native_http_get, native_http_post,
+    )
+  } else {
+    ensure_process_transport_options(depth, filter)
+    clone_process(remote, prefer_v2)
+  }
 }
 
 ///|
@@ -84,7 +134,12 @@ pub async fn clone_http_to_fs(
   depth? : Int = 0,
   filter? : @protocol.FilterSpec = @protocol.FilterSpec::NoFilter,
 ) -> Array[(@git.ObjectId, String)] raise @git.GitError {
-  clone_to_fs_with_http(
-    remote, prefer_v2, depth, filter, fs, root, native_http_get, native_http_post,
-  )
+  if remote_uses_http_transport(remote) {
+    clone_to_fs_with_http(
+      remote, prefer_v2, depth, filter, fs, root, native_http_get, native_http_post,
+    )
+  } else {
+    ensure_process_transport_options(depth, filter)
+    clone_process_to_fs(remote, prefer_v2, fs, root)
+  }
 }

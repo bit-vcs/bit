@@ -220,6 +220,32 @@ test_expect_success 'init creates a new deep directory' '
     test_dir_exists a/b/c/.git
 '
 
+test_expect_success 'init with absolute directory argument' '
+    absdir="$(pwd)/absrepo" &&
+    git_cmd init "$absdir" &&
+    test_dir_exists absrepo/.git &&
+    test_file_exists absrepo/.git/HEAD
+'
+
+test_expect_success 'init with "." initializes current directory' '
+    mkdir here &&
+    (cd here &&
+        git_cmd init . &&
+        test_dir_exists .git &&
+        test_file_exists .git/config
+    )
+'
+
+test_expect_success 'init --separate-git-dir absolute path works' '
+    mkdir split &&
+    real_git_dir="$(pwd)/real-abs.git" &&
+    (cd split && git_cmd init --separate-git-dir="$real_git_dir") &&
+    test_file_exists split/.git &&
+    test_dir_exists real-abs.git/objects &&
+    test_grep "gitdir:" split/.git &&
+    test_grep "real-abs.git" split/.git
+'
+
 test_expect_success 'init recreates a directory' '
     mkdir existingdir &&
     git_cmd init existingdir &&

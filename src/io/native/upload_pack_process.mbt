@@ -93,15 +93,15 @@ async fn run_process_with_files(
   stdin_data : Bytes?,
 ) -> (Int, Bytes, Bytes) raise @git.GitError {
   let nonce = @async.now()
-  let base = "/tmp/moonbit-git-upload-pack-\{nonce}"
+  let base = ".moonbit-git-upload-pack-\{nonce}"
   let stdout_path = "\{base}.out"
   let stderr_path = "\{base}.err"
   let stdin_path = "\{base}.in"
   let cleanup_paths = [stdout_path, stderr_path, stdin_path]
-  let stdout = @process.redirect_to_file(stdout_path, truncate=true) catch {
+  let stdout = @process.redirect_to_file(stdout_path, truncate=true, create=420) catch {
     e => raise @git.GitError::IoError("failed to open stdout file: \{e}")
   }
-  let stderr = @process.redirect_to_file(stderr_path, truncate=true) catch {
+  let stderr = @process.redirect_to_file(stderr_path, truncate=true, create=420) catch {
     e => raise @git.GitError::IoError("failed to open stderr file: \{e}")
   }
   let stdin = match stdin_data {

@@ -3,8 +3,7 @@
 # Test push, fetch, and pull operations using local bare repos
 # All tests use git_cmd (--no-git-fallback), no real git required.
 #
-# Note: bit requires file:// URLs for local transport (plain paths fail).
-# Pattern: create source -> clone --bare -> clone bare -> set file:// remote
+# Most push/pull tests pin origin to file:// URLs for stable local transport.
 
 source "$(dirname "$0")/test-lib-e2e.sh"
 
@@ -31,6 +30,29 @@ clone_work2() {
     (cd work2 &&
         git_cmd remote set-url origin "file://$(cd .. && pwd)/origin.git"
     )
+}
+
+setup_fake_ssh_command() {
+    mkdir -p mock-bin &&
+    cat > mock-bin/ssh <<'EOF' &&
+#!/bin/sh
+log_file="${BIT_TEST_SSH_LOG:-}"
+if [ -n "$log_file" ]; then
+    printf '%s\n' "$*" >> "$log_file"
+fi
+host="$1"
+shift
+if [ "${1:-}" = "env" ]; then
+    shift
+    export "$1"
+    shift
+fi
+cmd="$1"
+shift
+exec "$cmd" "$@"
+EOF
+    chmod +x mock-bin/ssh &&
+    export PATH="$(pwd)/mock-bin:$PATH"
 }
 
 # =============================================================================
@@ -222,6 +244,29 @@ test_expect_success 'fetch with no changes is no-op' '
         ref_after=$(git_cmd rev-parse origin/main) &&
         test "$ref_before" = "$ref_after"
     )
+'
+
+test_expect_success 'fetch git@host:path remote updates remote-tracking refs' '
+    command -v git-upload-pack >/dev/null &&
+    make_origin_and_work &&
+    setup_fake_ssh_command &&
+    export BIT_TEST_SSH_LOG="$(pwd)/ssh.log" &&
+    origin_abs="$(pwd)/origin.git" &&
+    git_cmd clone "git@localhost:$origin_abs" work2 &&
+    before_ref=$(git_cmd -C work2 show-ref | awk '"'"'$2=="refs/remotes/origin/main" { print $1 }'"'"') &&
+    (cd work &&
+        echo "ssh-fetch" > ssh-fetch.txt &&
+        git_cmd add ssh-fetch.txt &&
+        git_cmd commit -m "ssh fetch commit" &&
+        git_cmd push origin main
+    ) &&
+    (cd work2 &&
+        git_cmd fetch origin &&
+        after_ref=$(git_cmd show-ref | awk '"'"'$2=="refs/remotes/origin/main" { print $1 }'"'"') &&
+        test "$before_ref" != "$after_ref" &&
+        git_cmd cat-file -p origin/main | grep -q "ssh fetch commit"
+    ) &&
+    test_grep "git-upload-pack" "$BIT_TEST_SSH_LOG"
 '
 
 # =============================================================================
