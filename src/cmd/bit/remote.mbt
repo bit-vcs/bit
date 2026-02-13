@@ -1745,6 +1745,37 @@ fn write_clone_alternates(
 }
 
 ///|
+fn read_global_branch_autosetuprebase(
+  fs : &@git.RepoFileSystem,
+) -> String? raise Error {
+  let config_path = match @sys.get_env_var("GIT_CONFIG_GLOBAL") {
+    Some(path) => path
+    None =>
+      match @sys.get_env_var("HOME") {
+        Some(home) => home + "/.gitconfig"
+        None => return None
+      }
+  }
+  if not(fs.is_file(config_path)) {
+    return None
+  }
+  let content = decode_bytes(fs.read_file(config_path))
+  let blocks = @gitlib.parse_config_blocks(content)
+  for block in blocks {
+    if block.section == Some("branch") && block.name is None {
+      for line in block.lines {
+        match @gitlib.parse_config_kv(line) {
+          Some((key, value)) if key == "autosetuprebase" =>
+            return Some(trim_string(value).to_lower())
+          _ => ()
+        }
+      }
+    }
+  }
+  None
+}
+
+///|
 fn clone_local_repo(
   fs : OsFs,
   src_path : String,
@@ -1799,6 +1830,13 @@ fn clone_local_repo(
     reference_alternates,
   )
   write_clone_alternates(fs, dest_git_dir, alternates)
+  let src_shallow_path = src_git_dir + "/shallow"
+  if fs.is_file(src_shallow_path) {
+    fs.write_string(
+      dest_git_dir + "/shallow",
+      decode_bytes(fs.read_file(src_shallow_path)),
+    )
+  }
   match head_id {
     Some(id) =>
       if detached_head {
@@ -1808,6 +1846,19 @@ fn clone_local_repo(
         write_ref_file(fs, dest_git_dir, "refs/heads/" + default_branch, id)
       }
     None => ()
+  }
+  if mirror {
+    let refs = @gitlib.list_refs_with_ids(fs, src_git_dir, None)
+    for refname, id in refs {
+      if refname.has_prefix("refs/") {
+        write_ref_file(fs, dest_git_dir, refname, id)
+      }
+    }
+  } else {
+    let tags = @gitlib.list_refs_with_ids(fs, src_git_dir, Some("refs/tags/"))
+    for refname, id in tags {
+      write_ref_file(fs, dest_git_dir, refname, id)
+    }
   }
   // Configure origin
   let fetch_specs = if mirror {
@@ -1838,6 +1889,21 @@ fn clone_local_repo(
       "merge",
       "refs/heads/" + default_branch,
     )
+    match read_global_branch_autosetuprebase(fs) {
+      Some(mode) =>
+        if mode == "always" || mode == "true" || mode == "remote" {
+          @gitlib.set_config_key(
+            fs,
+            fs,
+            dest_git_dir,
+            "branch",
+            default_branch,
+            "rebase",
+            "true",
+          )
+        }
+      None => ()
+    }
   }
   // Set remote tracking refs in packed-refs so up-to-date pushes keep them packed.
   let packed_tracking_refs : Array[(String, @git.ObjectId)] = []

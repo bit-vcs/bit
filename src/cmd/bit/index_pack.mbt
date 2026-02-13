@@ -84,8 +84,8 @@ fn parse_index_pack_args(args : Array[String]) -> IndexPackParse {
             i += 1
           }
         }
-        "-v" => has_unsupported_options = true
-        "--verbose" => has_unsupported_options = true
+        "-v" => ()
+        "--verbose" => ()
         "--object-format" => {
           if i + 1 >= args.length() {
             return IndexPackParse::Unsupported

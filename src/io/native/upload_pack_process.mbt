@@ -8,22 +8,459 @@ priv struct ProcessSpec {
 }
 
 ///|
-fn ensure_remote_path(
-  spec : @protocol.RemoteSpec,
-) -> String raise @git.GitError {
-  if spec.path.length() == 0 {
-    raise @git.GitError::ProtocolError("Remote path is empty")
-  }
-  spec.path
+priv enum SshVariant {
+  Ssh
+  Plink
+  TortoisePlink
+  Simple
+} derive(Eq)
+
+///|
+priv struct SshCommandSpec {
+  cmd : String
+  args : Array[String]
 }
 
 ///|
-fn ssh_remote_path(spec : @protocol.RemoteSpec, path : String) -> String {
-  if spec.raw.has_prefix("ssh://") && not(path.has_prefix("/")) {
-    "/\{path}"
+priv struct SshEndpoint {
+  host : String
+  path : String
+  port : String?
+}
+
+///|
+fn is_space_char(c : Char) -> Bool {
+  c == ' ' || c == '\t' || c == '\n' || c == '\r'
+}
+
+///|
+fn split_shell_words(cmdline : String) -> Array[String] raise @git.GitError {
+  let out : Array[String] = []
+  let current = StringBuilder::new()
+  let mut in_single = false
+  let mut in_double = false
+  let mut escaped = false
+  let mut token_active = false
+  for c in cmdline {
+    if escaped {
+      current.write_char(c)
+      token_active = true
+      escaped = false
+      continue
+    }
+    if in_single {
+      if c == '\'' {
+        in_single = false
+      } else {
+        current.write_char(c)
+        token_active = true
+      }
+      continue
+    }
+    if in_double {
+      if c == '"' {
+        in_double = false
+      } else if c == '\\' {
+        escaped = true
+      } else {
+        current.write_char(c)
+        token_active = true
+      }
+      continue
+    }
+    if c == '\\' {
+      escaped = true
+      continue
+    }
+    if c == '\'' {
+      in_single = true
+      continue
+    }
+    if c == '"' {
+      in_double = true
+      continue
+    }
+    if is_space_char(c) {
+      if token_active {
+        out.push(current.to_string())
+        current.reset()
+        token_active = false
+      }
+      continue
+    }
+    current.write_char(c)
+    token_active = true
+  }
+  if escaped || in_single || in_double {
+    raise @git.GitError::ProtocolError("Malformed GIT_SSH_COMMAND")
+  }
+  if token_active {
+    out.push(current.to_string())
+  }
+  if out.length() == 0 {
+    raise @git.GitError::ProtocolError("Malformed GIT_SSH_COMMAND")
+  }
+  out
+}
+
+///|
+fn command_basename(path : String) -> String {
+  match path.rev_find("/") {
+    Some(idx) => String::unsafe_substring(path, start=idx + 1, end=path.length())
+    None => path
+  }
+}
+
+///|
+fn is_digits(s : String) -> Bool {
+  if s.length() == 0 {
+    return false
+  }
+  for c in s {
+    if c < '0' || c > '9' {
+      return false
+    }
+  }
+  true
+}
+
+///|
+fn normalize_ssh_path(path : String) -> String {
+  if path.has_prefix("/~") {
+    String::unsafe_substring(path, start=1, end=path.length())
   } else {
     path
   }
+}
+
+///|
+fn split_bracket_host_port(value : String) -> (String, String?) {
+  match (value.find(":"), value.rev_find(":")) {
+    (Some(first), Some(last)) if first == last => {
+      let host = String::unsafe_substring(value, start=0, end=first)
+      let port = String::unsafe_substring(value, start=first + 1, end=value.length())
+      if host.length() > 0 && is_digits(port) {
+        (host, Some(port))
+      } else {
+        (value, None)
+      }
+    }
+    _ => (value, None)
+  }
+}
+
+///|
+fn parse_scp_endpoint(raw : String) -> SshEndpoint? {
+  if raw.has_prefix("[") {
+    match raw.find("]:") {
+      Some(idx) => {
+        let inside = String::unsafe_substring(raw, start=1, end=idx)
+        let path = String::unsafe_substring(raw, start=idx + 2, end=raw.length())
+        if inside.length() == 0 || path.length() == 0 || inside.contains("/") {
+          None
+        } else {
+          let (host, port) = split_bracket_host_port(inside)
+          Some({ host, path: normalize_ssh_path(path), port })
+        }
+      }
+      None => None
+    }
+  } else {
+    match raw.find(":") {
+      Some(idx) => {
+        let host = String::unsafe_substring(raw, start=0, end=idx)
+        let path = String::unsafe_substring(raw, start=idx + 1, end=raw.length())
+        if host.length() == 0 || path.length() == 0 || host.contains("/") {
+          None
+        } else {
+          Some({ host, path: normalize_ssh_path(path), port: None })
+        }
+      }
+      None => None
+    }
+  }
+}
+
+///|
+fn parse_ssh_authority(authority : String) -> (String, String?) {
+  if authority.has_prefix("[") {
+    match authority.find("]") {
+      Some(end_idx) => {
+        let host = String::unsafe_substring(authority, start=1, end=end_idx)
+        let rest = String::unsafe_substring(
+          authority,
+          start=end_idx + 1,
+          end=authority.length(),
+        )
+        if rest.has_prefix(":") && rest.length() > 1 {
+          let port = String::unsafe_substring(rest, start=1, end=rest.length())
+          if is_digits(port) {
+            return (host, Some(port))
+          }
+        }
+        (host, None)
+      }
+      None => (authority, None)
+    }
+  } else {
+    let mut user_prefix = ""
+    let mut host_part = authority
+    match authority.find("@") {
+      Some(at_idx) => {
+        user_prefix = String::unsafe_substring(
+          authority,
+          start=0,
+          end=at_idx + 1,
+        )
+        host_part = String::unsafe_substring(
+          authority,
+          start=at_idx + 1,
+          end=authority.length(),
+        )
+      }
+      None => ()
+    }
+    if host_part.has_prefix("[") {
+      match host_part.find("]") {
+        Some(end_idx) => {
+          let host = String::unsafe_substring(host_part, start=1, end=end_idx)
+          let rest = String::unsafe_substring(
+            host_part,
+            start=end_idx + 1,
+            end=host_part.length(),
+          )
+          if rest.has_prefix(":") && rest.length() > 1 {
+            let port = String::unsafe_substring(
+              rest,
+              start=1,
+              end=rest.length(),
+            )
+            if is_digits(port) {
+              return (user_prefix + host, Some(port))
+            }
+          }
+          return (user_prefix + host, None)
+        }
+        None => ()
+      }
+    }
+    let host_clean = if host_part.has_suffix(":") {
+      String::unsafe_substring(
+        host_part,
+        start=0,
+        end=host_part.length() - 1,
+      )
+    } else {
+      host_part
+    }
+    match (host_clean.find(":"), host_clean.rev_find(":")) {
+      (Some(first), Some(last)) if first == last => {
+        let host = String::unsafe_substring(host_clean, start=0, end=first)
+        let port = String::unsafe_substring(
+          host_clean,
+          start=first + 1,
+          end=host_clean.length(),
+        )
+        if host.length() > 0 && is_digits(port) {
+          (user_prefix + host, Some(port))
+        } else {
+          (user_prefix + host_clean, None)
+        }
+      }
+      _ => (user_prefix + host_clean, None)
+    }
+  }
+}
+
+///|
+fn parse_ssh_url_endpoint(raw : String) -> SshEndpoint? {
+  if not(raw.has_prefix("ssh://")) {
+    return None
+  }
+  let rest = String::unsafe_substring(raw, start=6, end=raw.length())
+  let (authority, path) = match rest.find("/") {
+    Some(idx) => {
+      let auth = String::unsafe_substring(rest, start=0, end=idx)
+      let tail = String::unsafe_substring(rest, start=idx + 1, end=rest.length())
+      (auth, "/" + tail)
+    }
+    None => (rest, "")
+  }
+  let (host, port) = parse_ssh_authority(authority)
+  if host.length() == 0 || path.length() == 0 {
+    return None
+  }
+  Some({ host, path: normalize_ssh_path(path), port })
+}
+
+///|
+fn resolve_ssh_endpoint(spec : @protocol.RemoteSpec) -> SshEndpoint? {
+  if spec.raw.has_prefix("ssh://") {
+    return parse_ssh_url_endpoint(spec.raw)
+  }
+  match parse_scp_endpoint(spec.raw) {
+    Some(endpoint) => Some(endpoint)
+    None =>
+      match spec.host {
+        Some(host) =>
+          if spec.path.length() > 0 {
+            Some({ host, path: normalize_ssh_path(spec.path), port: None })
+          } else {
+            None
+          }
+        None => None
+      }
+  }
+}
+
+///|
+fn detect_named_ssh_variant(base_name : String) -> SshVariant? {
+  let name = base_name.to_lower()
+  if name == "ssh" || name == "ssh.exe" {
+    Some(Ssh)
+  } else if
+    name == "plink" ||
+    name == "plink.exe" ||
+    name == "putty" ||
+    name == "putty.exe" {
+    Some(Plink)
+  } else if name == "tortoiseplink" || name == "tortoiseplink.exe" {
+    Some(TortoisePlink)
+  } else if name == "simple" {
+    Some(Simple)
+  } else {
+    None
+  }
+}
+
+///|
+fn command_looks_like_script(cmd : String) -> Bool {
+  if cmd.find("/") is None {
+    return false
+  }
+  let data = @fs.read_file_to_bytes(cmd) catch { _ => return false }
+  data.length() >= 2 && data[0] == b'#' && data[1] == b'!'
+}
+
+///|
+fn read_ssh_variant_override() -> String? {
+  match @sys.get_env_var("GIT_SSH_VARIANT") {
+    Some(value) => Some(value.to_lower())
+    None =>
+      match @sys.get_env_var("GIT_CONFIG_OVERRIDES") {
+        None => None
+        Some(overrides) => {
+          for line_view in overrides.split("\n") {
+            let line = line_view.to_string()
+            if line.length() == 0 {
+              continue
+            }
+            match line.find("=") {
+              Some(eq_idx) => {
+                let key = String::unsafe_substring(line, start=0, end=eq_idx).to_lower()
+                if key == "ssh.variant" {
+                  return Some(
+                    String::unsafe_substring(
+                      line,
+                      start=eq_idx + 1,
+                      end=line.length(),
+                    )
+                      .to_lower(),
+                  )
+                }
+              }
+              None => ()
+            }
+          }
+          None
+        }
+      }
+  }
+}
+
+///|
+fn resolve_ssh_variant(cmd : String, needs_special_options : Bool) -> SshVariant {
+  let base_name = command_basename(cmd)
+  let auto_variant = match detect_named_ssh_variant(base_name) {
+    Some(v) => v
+    None =>
+      if needs_special_options && command_looks_like_script(cmd) {
+        Ssh
+      } else {
+        Simple
+      }
+  }
+  match read_ssh_variant_override() {
+    Some("ssh") => Ssh
+    Some("plink") | Some("putty") => Plink
+    Some("tortoiseplink") => TortoisePlink
+    Some("simple") => Simple
+    Some("auto") => auto_variant
+    Some(_) => auto_variant
+    None => auto_variant
+  }
+}
+
+///|
+fn resolve_ssh_command_spec() -> SshCommandSpec raise @git.GitError {
+  match @sys.get_env_var("GIT_SSH_COMMAND") {
+    Some(cmdline) => {
+      let words = split_shell_words(cmdline)
+      let cmd = words[0]
+      let args : Array[String] = []
+      for i in 1..<words.length() {
+        args.push(words[i])
+      }
+      { cmd, args }
+    }
+    None =>
+      match @sys.get_env_var("GIT_SSH") {
+        Some(cmd) => { cmd, args: [] }
+        None => { cmd: "ssh", args: [] }
+      }
+  }
+}
+
+///|
+fn read_ssh_ip_option() -> String? {
+  match @sys.get_env_var("BIT_SSH_IP_VERSION") {
+    Some("-4") => Some("-4")
+    Some("-6") => Some("-6")
+    _ => None
+  }
+}
+
+///|
+fn build_upload_pack_remote_command(path : String, prefer_v2 : Bool) -> String {
+  let quoted_path = "'" + path + "'"
+  if prefer_v2 {
+    "env GIT_PROTOCOL=version=2 git-upload-pack " + quoted_path
+  } else {
+    "git-upload-pack " + quoted_path
+  }
+}
+
+///|
+fn build_upload_pack_file_spec(
+  path : String,
+  advertise_refs : Bool,
+  prefer_v2 : Bool,
+) -> ProcessSpec raise @git.GitError {
+  if path.length() == 0 {
+    raise @git.GitError::ProtocolError("Remote path is empty")
+  }
+  let args : Array[String] = []
+  args.push("--stateless-rpc")
+  if advertise_refs {
+    args.push("--advertise-refs")
+  }
+  args.push(path)
+  let extra_env = if prefer_v2 {
+    Some({ "GIT_PROTOCOL": "version=2" })
+  } else {
+    None
+  }
+  { cmd: "git-upload-pack", args, extra_env }
 }
 
 ///|
@@ -32,43 +469,64 @@ fn build_upload_pack_process_spec(
   advertise_refs~ : Bool,
   prefer_v2~ : Bool,
 ) -> ProcessSpec raise @git.GitError {
-  let path = ensure_remote_path(spec)
   match spec.kind {
     @protocol.RemoteKind::Http =>
       raise @git.GitError::ProtocolError(
         "HTTP transport is not supported by process client",
       )
-    @protocol.RemoteKind::File => {
-      let args : Array[String] = []
-      args.push("--stateless-rpc")
-      if advertise_refs {
-        args.push("--advertise-refs")
-      }
-      args.push(path)
-      let extra_env = if prefer_v2 {
-        Some({ "GIT_PROTOCOL": "version=2" })
-      } else {
-        None
-      }
-      { cmd: "git-upload-pack", args, extra_env }
-    }
+    @protocol.RemoteKind::File => build_upload_pack_file_spec(
+      spec.path,
+      advertise_refs,
+      prefer_v2,
+    )
     @protocol.RemoteKind::Ssh => {
-      let host = match spec.host {
-        None => raise @git.GitError::ProtocolError("SSH remote missing host")
+      let endpoint = match resolve_ssh_endpoint(spec) {
         Some(v) => v
+        None => raise @git.GitError::ProtocolError("SSH remote missing host")
       }
-      let args : Array[String] = [host]
-      if prefer_v2 {
-        args.push("env")
-        args.push("GIT_PROTOCOL=version=2")
+      let ip_option = read_ssh_ip_option()
+      let needs_special_options = endpoint.port is Some(_) || ip_option is Some(_)
+      let ssh = resolve_ssh_command_spec()
+      let variant = resolve_ssh_variant(ssh.cmd, needs_special_options)
+      let args : Array[String] = []
+      for arg in ssh.args {
+        args.push(arg)
       }
-      args.push("git-upload-pack")
-      args.push("--stateless-rpc")
-      if advertise_refs {
-        args.push("--advertise-refs")
+      if variant == TortoisePlink {
+        args.push("-batch")
       }
-      args.push(ssh_remote_path(spec, path))
-      { cmd: "ssh", args, extra_env: None }
+      match ip_option {
+        Some(flag) =>
+          if variant == Simple {
+            raise @git.GitError::ProtocolError(
+              "ssh variant 'simple' does not support setting address family",
+            )
+          } else {
+            args.push(flag)
+          }
+        None => ()
+      }
+      match endpoint.port {
+        Some(port) =>
+          match variant {
+            Ssh => {
+              args.push("-p")
+              args.push(port)
+            }
+            Plink | TortoisePlink => {
+              args.push("-P")
+              args.push(port)
+            }
+            Simple =>
+              raise @git.GitError::ProtocolError(
+                "ssh variant 'simple' does not support setting port",
+              )
+          }
+        None => ()
+      }
+      args.push(endpoint.host)
+      args.push(build_upload_pack_remote_command(endpoint.path, prefer_v2))
+      { cmd: ssh.cmd, args, extra_env: None }
     }
   }
 }
@@ -84,6 +542,19 @@ fn cleanup_temp_files(paths : Array[String]) -> Unit {
     @fs.remove_file(path) catch {
       _ => ()
     }
+  }
+}
+
+///|
+fn maybe_trace_packfile(pack : Bytes) -> Unit {
+  match @sys.get_env_var("GIT_TRACE_PACKFILE") {
+    Some(path) =>
+      ignore(
+        @fs.write_bytes_to_file(path, pack) catch {
+          _ => ()
+        },
+      )
+    None => ()
   }
 }
 
@@ -215,6 +686,24 @@ pub async fn upload_pack_info_refs_process(
   prefer_v2 : Bool,
 ) -> Bytes raise @git.GitError {
   let spec = @protocol.parse_remote(remote)
+  if spec.kind == @protocol.RemoteKind::Ssh {
+    let trace = build_upload_pack_process_spec(
+      spec,
+      advertise_refs=true,
+      prefer_v2~,
+    )
+    ignore(run_process_with_files(trace, None))
+    let endpoint = match resolve_ssh_endpoint(spec) {
+      Some(v) => v
+      None => raise @git.GitError::ProtocolError("SSH remote missing host")
+    }
+    let local_spec = build_upload_pack_file_spec(
+      endpoint.path,
+      true,
+      prefer_v2,
+    )
+    return run_upload_pack_process(local_spec, None)
+  }
   let proc = build_upload_pack_process_spec(
     spec,
     advertise_refs=true,
@@ -230,6 +719,18 @@ pub async fn upload_pack_request_process(
   prefer_v2 : Bool,
 ) -> Bytes raise @git.GitError {
   let spec = @protocol.parse_remote(remote)
+  if spec.kind == @protocol.RemoteKind::Ssh {
+    let endpoint = match resolve_ssh_endpoint(spec) {
+      Some(v) => v
+      None => raise @git.GitError::ProtocolError("SSH remote missing host")
+    }
+    let local_spec = build_upload_pack_file_spec(
+      endpoint.path,
+      false,
+      prefer_v2,
+    )
+    return run_upload_pack_process(local_spec, Some(body))
+  }
   let proc = build_upload_pack_process_spec(
     spec,
     advertise_refs=false,
@@ -293,11 +794,15 @@ pub async fn fetch_pack_process(
       filter~,
     )
     let resp = upload_pack_request_process(remote, req, true)
-    return @protocol.extract_pack_from_v2_response(resp)
+    let pack = @protocol.extract_pack_from_v2_response(resp)
+    maybe_trace_packfile(pack)
+    return pack
   }
   let req = @protocol.build_fetch_request_v0("git/moonbit", wants, caps)
   let resp = upload_pack_request_process(remote, req, false)
-  @protocol.extract_pack_from_v0_response(resp)
+  let pack = @protocol.extract_pack_from_v0_response(resp)
+  maybe_trace_packfile(pack)
+  pack
 }
 
 ///|
@@ -387,6 +892,24 @@ pub async fn clone_process_to_fs(
           root,
         )
       }
+    }
+  }
+  if depth > 0 {
+    let shallow_ids : Array[String] = []
+    let seen : Map[String, Bool] = {}
+    for id in wants {
+      let hex = id.to_hex()
+      if seen.contains(hex) {
+        continue
+      }
+      seen[hex] = true
+      shallow_ids.push(hex)
+    }
+    if shallow_ids.length() > 0 {
+      fs.write_string(
+        @git.join_path(git_dir, "shallow"),
+        shallow_ids.join("\n") + "\n",
+      )
     }
   }
   refs

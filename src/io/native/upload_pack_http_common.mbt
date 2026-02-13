@@ -230,6 +230,7 @@ pub async fn clone_to_fs_with_http(
     let pack = fetch_pack_with_http(
       remote, wants, prefer_v2, depth, filter, http_get, http_post,
     )
+    let pack_id = read_pack_trailer_id_http(pack)
     let objects = @pack.parse_packfile(pack)
     // Write pack and index to disk immediately
     match default_ref {
@@ -240,6 +241,7 @@ pub async fn clone_to_fs_with_http(
         // Write promisor file if partial clone
         if filter.is_partial() {
           write_promisor_file(fs, git_dir, remote)
+          write_pack_promisor_marker_http(fs, git_dir, pack_id, refs, default_ref)
         }
       }
       None => ()
@@ -249,28 +251,24 @@ pub async fn clone_to_fs_with_http(
   }
   // Phase 2: Checkout (pack bytes no longer needed)
   // Skip checkout for partial clone with blob:none (no blobs to checkout)
-  match filter {
-    @protocol.FilterSpec::BlobNone =>
-      // For partial clone, only write refs and config, don't checkout files
-      match default_ref {
-        Some((refname, commit_id)) => {
-          let git_dir = @git.join_path(root, ".git")
-          write_partial_clone_refs(fs, git_dir, refname, commit_id, remote)
-        }
-        None => ()
+  if filter.is_partial() {
+    // For partial clone, write refs/config and let caller perform lazy checkout.
+    match default_ref {
+      Some((refname, commit_id)) => {
+        let git_dir = @git.join_path(root, ".git")
+        write_partial_clone_refs(fs, git_dir, refname, commit_id, remote, filter)
       }
-    _ => {
-      let store = @git.ObjectStore::from_pack(objects)
-      match default_ref {
-        None => ()
-        Some((refname, commit_id)) => {
-          if no_checkout {
-            @git.write_git_metadata(store, commit_id, refname, remote, fs, root)
-          } else {
-            @git.materialize_clone_to_fs(
-              store, commit_id, refname, remote, fs, root,
-            )
-          }
+      None => ()
+    }
+  } else {
+    let store = @git.ObjectStore::from_pack(objects)
+    match default_ref {
+      None => ()
+      Some((refname, commit_id)) => {
+        if no_checkout {
+          @git.write_git_metadata(store, commit_id, refname, remote, fs, root)
+        } else {
+          @git.materialize_clone_to_fs(store, commit_id, refname, remote, fs, root)
         }
       }
     }
@@ -293,6 +291,59 @@ fn write_promisor_file(
 }
 
 ///|
+fn read_pack_trailer_id_http(pack : Bytes) -> @git.ObjectId raise @git.GitError {
+  if pack.length() < 20 {
+    raise @git.GitError::PackfileError("Packfile too short")
+  }
+  let trailer_start = pack.length() - 20
+  let bytes = FixedArray::makei(20, i => pack[trailer_start + i])
+  @git.ObjectId::new(bytes)
+}
+
+///|
+fn write_pack_promisor_marker_http(
+  fs : &@git.FileSystem,
+  git_dir : String,
+  pack_id : @git.ObjectId,
+  refs : Array[(@git.ObjectId, String)],
+  default_ref : (String, @git.ObjectId)?,
+) -> Unit raise @git.GitError {
+  let pack_dir = @git.join_path(git_dir, "objects/pack")
+  fs.mkdir_p(pack_dir)
+  let marker_lines : Array[String] = []
+  let seen : Map[String, Bool] = {}
+  for item in refs {
+    let (id, name) = item
+    if name.length() == 0 {
+      continue
+    }
+    let line = id.to_hex() + " " + name
+    if seen.contains(line) {
+      continue
+    }
+    seen[line] = true
+    marker_lines.push(line)
+  }
+  match default_ref {
+    Some((_, head_id)) => {
+      let head_line = head_id.to_hex() + " HEAD"
+      if not(seen.contains(head_line)) {
+        seen[head_line] = true
+        marker_lines.push(head_line)
+      }
+    }
+    None => ()
+  }
+  if marker_lines.length() == 0 {
+    return ()
+  }
+  let marker_content = marker_lines.join("\n") + "\n"
+  let base = "pack-\{pack_id.to_hex()}"
+  let marker_path = @git.join_path(pack_dir, base + ".promisor")
+  fs.write_string(marker_path, marker_content)
+}
+
+///|
 /// Write refs for partial clone (without checkout)
 fn write_partial_clone_refs(
   fs : &@git.FileSystem,
@@ -300,6 +351,7 @@ fn write_partial_clone_refs(
   refname : String,
   commit_id : @git.ObjectId,
   remote : String,
+  filter : @protocol.FilterSpec,
 ) -> Unit raise @git.GitError {
   // Write HEAD
   let head_path = @git.join_path(git_dir, "HEAD")
@@ -324,6 +376,6 @@ fn write_partial_clone_refs(
   fs.write_string(ref_path, commit_id.to_hex() + "\n")
   // Write config with remote
   let config_path = @git.join_path(git_dir, "config")
-  let config = "[core]\n\trepositoryformatversion = 1\n\tfilemode = true\n\tbare = false\n\tlogallaliases = false\n[extensions]\n\tpartialclone = origin\n[remote \"origin\"]\n\turl = \{remote}\n\tfetch = +refs/heads/*:refs/remotes/origin/*\n\tpromisor = true\n\tpartialclonefilter = blob:none\n"
+  let config = "[core]\n\trepositoryformatversion = 1\n\tfilemode = true\n\tbare = false\n\tlogallaliases = false\n[extensions]\n\tpartialclone = origin\n[remote \"origin\"]\n\turl = \{remote}\n\tfetch = +refs/heads/*:refs/remotes/origin/*\n\tpromisor = true\n\tpartialclonefilter = \{filter.to_string()}\n"
   fs.write_string(config_path, config)
 }

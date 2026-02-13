@@ -41,6 +41,28 @@ pub fn parse_remote(remote : String) -> RemoteSpec {
       base_url: None,
     }
   }
+  if remote.has_prefix("[") {
+    match remote.find("]:") {
+      Some(idx) => {
+        let host = String::unsafe_substring(remote, start=1, end=idx)
+        let path = String::unsafe_substring(
+          remote,
+          start=idx + 2,
+          end=remote.length(),
+        )
+        if host.length() > 0 && path.length() > 0 && not(host.contains("/")) {
+          return {
+            kind: RemoteKind::Ssh,
+            raw: remote,
+            host: Some(host),
+            path,
+            base_url: None,
+          }
+        }
+      }
+      None => ()
+    }
+  }
   // scp-style: [user@]host:path
   let colon = remote.find(":")
   if colon is Some(idx) && not(remote.has_prefix("/")) {
@@ -50,12 +72,16 @@ pub fn parse_remote(remote : String) -> RemoteSpec {
       start=idx + 1,
       end=remote.length(),
     )
-    return {
-      kind: RemoteKind::Ssh,
-      raw: remote,
-      host: Some(host),
-      path,
-      base_url: None,
+    if host.length() > 0 &&
+      path.length() > 0 &&
+      not(host.contains("/")) {
+      return {
+        kind: RemoteKind::Ssh,
+        raw: remote,
+        host: Some(host),
+        path,
+        base_url: None,
+      }
     }
   }
   // default: local path
@@ -92,8 +118,17 @@ fn parse_ssh_url(remote : String) -> RemoteSpec {
         base_url: None,
       }
     Some(idx) => {
-      let host = String::unsafe_substring(rest, start=0, end=idx)
-      let path = String::unsafe_substring(
+      let authority = String::unsafe_substring(rest, start=0, end=idx)
+      let host = if authority.has_suffix(":") {
+        String::unsafe_substring(
+          authority,
+          start=0,
+          end=authority.length() - 1,
+        )
+      } else {
+        authority
+      }
+      let path = "/" + String::unsafe_substring(
         rest,
         start=idx + 1,
         end=rest.length(),
