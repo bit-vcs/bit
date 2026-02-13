@@ -113,9 +113,9 @@ git/t ではカバーしきれない standalone 動作を補完的に検証す�
   - [x] 空 remote 指定時のエラーメッセージ互換
   - [x] 曖昧 ref の事前検出（ネットワーク前に fail）互換
   - [x] `just git-t-full t5529-push-errors.sh` で 8/8 を確認
-- [ ] **t5528-push-default.sh**
-  - [ ] known-breakage vanished を解消（patch/todo の更新）して終了コードを安定化
-  - [ ] `just git-t-full t5528-push-default.sh` を green 化
+- [x] **t5528-push-default.sh**（`git-t-full`: success 32/32）
+  - [x] known-breakage vanished を解消（patch/todo の更新）して終了コードを安定化
+  - [x] `just git-t-full t5528-push-default.sh` を green 化
 
 ## Tier 1: Git Compatibility (Critical)
 
@@ -147,7 +147,7 @@ allowlist で残っている 5 テスト:
 - [x] t5616-partial-clone.sh（one-remote は 47/47）
 - [x] t5516-fetch-push.sh（full pass 123/123）
 - [x] t5529-push-errors.sh（standalone blocker）
-- [ ] t5528-push-default.sh（known-breakage 整理）
+- [x] t5528-push-default.sh（known-breakage 整理）
 
 ### その他 backlog
 
@@ -218,7 +218,7 @@ allowlist で残っている 5 テスト:
 - [x] `src/cmd/bit` 内の `match real_git_path()` を 42 -> 0
 - [x] `src/cmd/bit` 内の `@process.run("git", ...)` を 10 -> 0
 - [x] `just check` が通る
-- [ ] 重点テスト（残: `t5528`。`t5510` / `t5601` / `t5616` は通過）が `just git-t-full` で通る
+- [x] 重点テスト（`t5528` / `t5510` / `t5601` / `t5616`）が `just git-t-full` で通る
 
 ## Tier 2: Agent Features (High)
 

@@ -35,16 +35,31 @@ fn collect_global_config_overrides_for_delegate() -> Array[String] {
 }
 
 ///|
-async fn delegate_to_real_git(subcmd : String, args : Array[String]) -> Unit raise Error {
-  let real_git = resolve_real_git_for_fetch()
-  let delegated_args : Array[String] = []
+fn collect_global_path_overrides_for_delegate() -> Array[String] {
+  let overrides : Array[String] = []
   match @sys.get_env_var("GIT_SHIM_CWD") {
     Some(dir) if dir.length() > 0 => {
-      delegated_args.push("-C")
-      delegated_args.push(dir)
+      overrides.push("-C")
+      overrides.push(dir)
     }
     _ => ()
   }
+  match @sys.get_env_var("GIT_DIR") {
+    Some(dir) if dir.length() > 0 => overrides.push("--git-dir=" + dir)
+    _ => ()
+  }
+  match @sys.get_env_var("GIT_WORK_TREE") {
+    Some(dir) if dir.length() > 0 => overrides.push("--work-tree=" + dir)
+    _ => ()
+  }
+  overrides
+}
+
+///|
+async fn delegate_to_real_git(subcmd : String, args : Array[String]) -> Unit raise Error {
+  let real_git = resolve_real_git_for_fetch()
+  let delegated_args : Array[String] = []
+  delegated_args.append(collect_global_path_overrides_for_delegate())
   delegated_args.append(collect_global_config_overrides_for_delegate())
   delegated_args.push(subcmd)
   delegated_args.append(args)
