@@ -87,6 +87,11 @@ async fn subdir_clone(
   )
   let fs = OsFs::new()
   let target_existed = fs.is_dir(target)
+  let local_root = match @sys.get_env_var("GIT_SHIM_CWD") {
+    Some(dir) => dir
+    None => root
+  }
+  let local_repo_path = @gitlib.resolve_local_repo_path(fs, local_root, remote_url)
   // Step 1: Create target directory
   fs.mkdir_p(target) catch {
     _ => raise @git.GitError::IoError("Failed to create directory: " + target)
@@ -94,25 +99,56 @@ async fn subdir_clone(
   // Step 2: Clone with blob:none filter to a temp location
   print_line("  Fetching repository metadata...")
   let temp_clone = target + "/.git-temp"
-  let refs = @gitionative.clone_http_to_fs(
-    remote_url,
-    true,
-    fs,
-    temp_clone,
-    filter=@protocol.FilterSpec::BlobNone,
-  )
-  if refs.length() == 0 {
-    raise @git.GitError::InvalidObject("Clone failed: no refs found")
+  let from_local_repo = match local_repo_path {
+    Some(src_path) => {
+      let remote_display = if remote_url.has_prefix("file://") {
+        remote_url
+      } else if remote_url.has_prefix("/") {
+        remote_url
+      } else {
+        normalize_path(local_root + "/" + remote_url)
+      }
+      clone_local_repo(
+        fs,
+        src_path,
+        temp_clone,
+        remote_display,
+        false,
+        @protocol.FilterSpec::BlobNone,
+      )
+      true
+    }
+    None => {
+      let refs = @gitionative.clone_http_to_fs(
+        remote_url,
+        true,
+        fs,
+        temp_clone,
+        filter=@protocol.FilterSpec::BlobNone,
+      )
+      if refs.length() == 0 {
+        raise @git.GitError::InvalidObject("Clone failed: no refs found")
+      }
+      false
+    }
   }
   // Step 3: Read HEAD commit from temp
   let temp_git_dir = temp_clone + "/.git"
   let commit_id = match ref_spec {
     Some(refname) => {
-      let resolved = resolve_remote_ref_id(remote_url, refname)
-      guard resolved is Some((id, _)) else {
-        raise @git.GitError::InvalidObject("Unknown ref: " + refname)
+      if from_local_repo {
+        let resolved = @gitrepo.rev_parse(fs, temp_git_dir, refname)
+        guard resolved is Some(id) else {
+          raise @git.GitError::InvalidObject("Unknown ref: " + refname)
+        }
+        id
+      } else {
+        let resolved = resolve_remote_ref_id(remote_url, refname)
+        guard resolved is Some((id, _)) else {
+          raise @git.GitError::InvalidObject("Unknown ref: " + refname)
+        }
+        id
       }
-      id
     }
     None => {
       let head_ref = fs.read_file(temp_git_dir + "/HEAD") catch {
@@ -146,7 +182,7 @@ async fn subdir_clone(
   }
   // Load object database and get tree
   let mut db = @gitlib.ObjectDb::load_lazy(fs, temp_git_dir)
-  if db.get(fs, commit_id) is None {
+  if not(from_local_repo) && db.get(fs, commit_id) is None {
     let pack = @gitionative.fetch_pack_http(remote_url, [commit_id], true)
     let objects = @pack.parse_packfile(pack)
     @pack.write_packfile_with_index(fs, temp_git_dir, pack, objects)
@@ -180,6 +216,9 @@ async fn subdir_clone(
       }
     }
     if missing.length() > 0 {
+      if from_local_repo {
+        raise @git.GitError::InvalidObject("missing local objects for subdir clone")
+      }
       let pack = @gitionative.fetch_pack_http(remote_url, missing, true)
       let objects = @pack.parse_packfile(pack)
       @pack.write_packfile_with_index(fs, temp_git_dir, pack, objects)

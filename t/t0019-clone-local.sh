@@ -19,6 +19,18 @@ make_source_repo() {
     )
 }
 
+make_source_repo_with_subdir() {
+    git_cmd init source &&
+    (cd source &&
+        mkdir -p vibe/std vibe/encoding docs &&
+        echo "std1" > vibe/std/a.vibe &&
+        echo "enc1" > vibe/encoding/b.vibe &&
+        echo "doc1" > docs/readme.md &&
+        git_cmd add -A &&
+        git_cmd commit -m "init subdir repo"
+    )
+}
+
 # =============================================================================
 # Basic clone (4)
 # =============================================================================
@@ -100,6 +112,32 @@ test_expect_success 'clone local bare repo as source' '
     git_cmd clone bare.git dest &&
     test_file_exists dest/file1.txt &&
     test_file_exists dest/file2.txt
+'
+
+test_expect_success 'clone file:// local repo works' '
+    make_source_repo &&
+    git_cmd clone "file://$(pwd)/source" dest &&
+    test_dir_exists dest/.git &&
+    test_file_exists dest/file1.txt &&
+    test_file_exists dest/file2.txt
+'
+
+test_expect_success 'subdir-clone local path works' '
+    make_source_repo_with_subdir &&
+    git_cmd subdir-clone source vibe out &&
+    test_dir_exists out/.git &&
+    test_file_exists out/std/a.vibe &&
+    test_file_exists out/encoding/b.vibe &&
+    test_path_is_missing out/docs/readme.md
+'
+
+test_expect_success 'subdir-clone file:// local repo works' '
+    make_source_repo_with_subdir &&
+    git_cmd subdir-clone "file://$(pwd)/source" vibe out &&
+    test_dir_exists out/.git &&
+    test_file_exists out/std/a.vibe &&
+    test_file_exists out/encoding/b.vibe &&
+    test_path_is_missing out/docs/readme.md
 '
 
 # =============================================================================
