@@ -87,6 +87,9 @@ git/t ではカバーしきれない standalone 動作を補完的に検証す�
   - ローカル相対/絶対 path clone と `git@host:path` clone/fetch 回帰を追加
 - [ ] `--help` 移植 — 手間の問題（全サブコマンドの usage テキスト）。優先度低
 - [ ] `multi-pack-index write` / `cat-file` の shim pass-through を bit 実装に置換
+  - [x] `just git-t-full t8010-cat-file-filters.sh` を bit `cat-file` 経路で 9/9 pass
+  - [x] `t5319-multi-pack-index.sh` を `SHIM_CMDS="multi-pack-index cat-file"` で 96/96 pass
+  - [ ] git-shim 既定の pass-through 分岐を撤去し、allowlist/full の再計測を完了
 
 ## 中期目標: bit standalone（real-git fallback なし）
 

@@ -150,7 +150,14 @@ pub fn ObjectDb::load(
   fs : &@git.RepoFileSystem,
   git_dir : String,
 ) -> ObjectDb raise @git.GitError {
-  let objects_dir = join_path(git_dir, "objects")
+  ObjectDb::load_from_objects_dir(fs, join_path(git_dir, "objects"))
+}
+
+///|
+pub fn ObjectDb::load_from_objects_dir(
+  fs : &@git.RepoFileSystem,
+  objects_dir : String,
+) -> ObjectDb raise @git.GitError {
   let loose_paths = if fs.is_dir(objects_dir) {
     collect_loose_paths(fs, objects_dir)
   } else {
@@ -187,7 +194,14 @@ pub fn ObjectDb::load_lazy(
   fs : &@git.RepoFileSystem,
   git_dir : String,
 ) -> ObjectDb raise @git.GitError {
-  let objects_dir = join_path(git_dir, "objects")
+  ObjectDb::load_lazy_from_objects_dir(fs, join_path(git_dir, "objects"))
+}
+
+///|
+pub fn ObjectDb::load_lazy_from_objects_dir(
+  fs : &@git.RepoFileSystem,
+  objects_dir : String,
+) -> ObjectDb raise @git.GitError {
   let lazy_packs = if fs.is_dir(objects_dir) {
     let pack_dir = join_path(objects_dir, "pack")
     if fs.is_dir(pack_dir) {
@@ -471,8 +485,15 @@ pub fn load_all_objects_from_fs(
   fs : &@git.RepoFileSystem,
   git_dir : String,
 ) -> Array[@git.PackObject] raise @git.GitError {
+  load_all_objects_from_object_dir(fs, join_path(git_dir, "objects"))
+}
+
+///|
+pub fn load_all_objects_from_object_dir(
+  fs : &@git.RepoFileSystem,
+  objects_dir : String,
+) -> Array[@git.PackObject] raise @git.GitError {
   let result : Array[@git.PackObject] = []
-  let objects_dir = join_path(git_dir, "objects")
   if fs.is_dir(objects_dir) {
     let loose = load_loose_objects(fs, objects_dir)
     for obj in loose {

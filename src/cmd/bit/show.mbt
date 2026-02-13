@@ -106,6 +106,11 @@ async fn handle_show(args : Array[String]) -> Unit raise Error {
       "Object not found: \{commit_id.to_hex()}",
     )
   }
+  // `git show <blob-ish>` should print blob contents directly.
+  if o.obj_type == @git.ObjectType::Blob {
+    @stdio.stdout.write(o.data)
+    return ()
+  }
   if o.obj_type != @git.ObjectType::Commit {
     raise @git.GitError::InvalidObject("Not a commit: \{commit_id.to_hex()}")
   }
