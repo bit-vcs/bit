@@ -1,13 +1,13 @@
 {
   "name": "mizchi/bit",
-  "version": "0.18.1",
+  "version": "0.18.3",
   "deps": {
-    "moonbitlang/async": "0.16.2",
+    "moonbitlang/async": "0.16.6",
     "mizchi/zlib": "0.3.0",
     "moonbitlang/x": "0.4.40",
     "mizchi/tempfile": "0.1.0",
-    "mizchi/llm": "0.1.4",
-    "mizchi/bitflow": "0.2.0"
+    "mizchi/llm": "0.2.2",
+    "mizchi/bitflow": "0.3.1"
   },
   "readme": "README.mbt.md",
   "repository": "https://github.com/mizchi/bit-vcs",
