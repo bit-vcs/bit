@@ -12,8 +12,14 @@ fn resolve_real_git_for_fetch() -> String {
 
 ///|
 fn is_real_git_delegate_enabled() -> Bool {
-  (@sys.get_env_var("SHIM_REAL_GIT") is Some(_)) ||
-  (@sys.get_env_var("GIT_SHIM_REAL_GIT") is Some(_))
+  match @sys.get_env_var("SHIM_REAL_GIT") {
+    Some(path) if path.length() > 0 => true
+    _ =>
+      match @sys.get_env_var("GIT_SHIM_REAL_GIT") {
+        Some(path) => path.length() > 0
+        None => false
+      }
+  }
 }
 
 ///|
@@ -44,13 +50,15 @@ fn collect_global_path_overrides_for_delegate() -> Array[String] {
     }
     _ => ()
   }
-  match @sys.get_env_var("GIT_DIR") {
-    Some(dir) if dir.length() > 0 => overrides.push("--git-dir=" + dir)
-    _ => ()
+  let explicit_git_dir = match @sys.get_env_var("GIT_SHIM_EXPLICIT_GIT_DIR") {
+    Some(value) => value == "1"
+    None => false
   }
-  match @sys.get_env_var("GIT_WORK_TREE") {
-    Some(dir) if dir.length() > 0 => overrides.push("--work-tree=" + dir)
-    _ => ()
+  if explicit_git_dir {
+    match @sys.get_env_var("GIT_DIR") {
+      Some(dir) if dir.length() > 0 => overrides.push("--git-dir=" + dir)
+      _ => ()
+    }
   }
   overrides
 }

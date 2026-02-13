@@ -1,35 +1,6 @@
 ///| Branch handlers: branch, checkout, switch, reset, rebase, stash, cherry-pick
 
 ///|
-fn resolve_real_git_for_branch() -> String {
-  match @sys.get_env_var("SHIM_REAL_GIT") {
-    Some(path) if path.length() > 0 => path
-    _ =>
-      match @sys.get_env_var("GIT_SHIM_REAL_GIT") {
-        Some(path) if path.length() > 0 => path
-        _ => "git"
-      }
-  }
-}
-
-///|
-async fn delegate_branch_to_real_git(args : Array[String]) -> Unit raise Error {
-  let real_git = resolve_real_git_for_branch()
-  let delegated_args = ["branch"]
-  delegated_args.append(args)
-  let code = @process.run(
-    real_git,
-    delegated_args,
-    inherit_env=true,
-    cwd=get_work_root(),
-  ) catch {
-    err if @async.is_cancellation_error(err) => raise err
-    _ => 1
-  }
-  @sys.exit(code)
-}
-
-///|
 fn is_reftable_repo_for_branch(fs : &@git.RepoFileSystem, git_dir : String) -> Bool {
   if fs.is_dir(git_dir + "/reftable") {
     return true

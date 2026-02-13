@@ -689,8 +689,11 @@ async fn run_main_for_args(args : Array[String]) -> Unit {
     @sys.exit(1)
   }
   match opts.git_dir {
-    Some(dir) => @sys.set_env_var("GIT_DIR", dir)
-    None => ()
+    Some(dir) => {
+      @sys.set_env_var("GIT_DIR", dir)
+      @sys.set_env_var("GIT_SHIM_EXPLICIT_GIT_DIR", "1")
+    }
+    None => @sys.unset_env_var("GIT_SHIM_EXPLICIT_GIT_DIR")
   }
   // Store config overrides in environment variable for handlers to access
   if opts.config_overrides.length() > 0 {
