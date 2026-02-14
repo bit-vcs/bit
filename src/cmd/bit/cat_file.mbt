@@ -132,21 +132,21 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
     )
   }
   if cmd_modes.length() > 0 {
-    if batch_mode || batch_buffer || batch_no_buffer || follow_symlinks {
+    let allows_batch_mode = cmd_modes.length() == 1 &&
+      (cmd_modes[0] == "--textconv" || cmd_modes[0] == "--filters")
+    if (batch_mode || batch_buffer || batch_no_buffer || follow_symlinks) &&
+      !allows_batch_mode {
       cat_file_usage_fatal(
         "option '\{cmd_modes[0]}' is incompatible with batch options",
       )
     }
-    if explicit_path is Some(_) {
-      cat_file_usage_fatal(
-        "option '\{cmd_modes[0]}' is incompatible with --path",
-      )
-    }
-    if positionals.length() == 0 {
-      cat_file_usage_fatal("object name required")
-    }
-    if positionals.length() > 1 {
-      cat_file_usage_fatal("too many arguments")
+    if !batch_mode {
+      if positionals.length() == 0 {
+        cat_file_usage_fatal("object name required")
+      }
+      if positionals.length() > 1 {
+        cat_file_usage_fatal("too many arguments")
+      }
     }
   }
   if explicit_path is Some(_) && batch_mode {
@@ -183,6 +183,9 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
       batch_output_separator,
     )
     let dbs = cat_file_load_object_dbs(fs, git_dir)
+    let format_uses_deltabase = cat_file_batch_format_uses_deltabase(
+      batch_format,
+    )
     if batch_all_objects_mode {
       let object_dirs = cat_file_collect_object_dirs(fs, git_dir)
       for object_dir in object_dirs {
@@ -213,6 +216,7 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
                 None,
                 None,
                 None,
+                None,
               ) +
               batch_output_separator,
             ),
@@ -231,6 +235,17 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
           continue
         }
         if batch_check_mode {
+          let delta_base_hex = if format_uses_deltabase {
+            cat_file_resolve_delta_base_hex(
+              dbs,
+              fs,
+              git_dir,
+              id,
+              id.to_hex().length(),
+            )
+          } else {
+            None
+          }
           @stdio.stdout.write(
             cat_file_string_to_bytes(
               cat_file_format_batch_check_line(
@@ -241,6 +256,7 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
                 None,
                 None,
                 None,
+                delta_base_hex,
               ) +
               batch_output_separator,
             ),
@@ -275,6 +291,17 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
               None,
               None,
               None,
+              if format_uses_deltabase {
+                cat_file_resolve_delta_base_hex(
+                  dbs,
+                  fs,
+                  git_dir,
+                  id,
+                  id.to_hex().length(),
+                )
+              } else {
+                None
+              },
             ) +
             batch_output_separator,
           ),
@@ -556,6 +583,17 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
           id.to_hex(),
         )
         let target_oid_len = display_object_name.length()
+        let delta_base_hex = if format_uses_deltabase {
+          cat_file_resolve_delta_base_hex(
+            dbs,
+            fs,
+            git_dir,
+            id,
+            target_oid_len,
+          )
+        } else {
+          None
+        }
         let display_data = cat_file_convert_object_data_for_display(
           fs, git_dir, o, target_oid_len,
         )
@@ -569,6 +607,7 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
               object_mode,
               Some(display_object_name),
               Some(display_data.length()),
+              delta_base_hex,
             ) +
             batch_output_separator,
           )
@@ -596,6 +635,7 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
             object_mode,
             Some(display_object_name),
             Some(display_data.length()),
+            delta_base_hex,
           ) +
           batch_output_separator,
         )
@@ -996,6 +1036,7 @@ fn cat_file_format_batch_check_line(
   object_mode : String?,
   object_name_override : String?,
   object_size_override : Int?,
+  delta_base_hex : String?,
 ) -> String {
   let mut out = match format {
     Some(fmt) if fmt.length() > 0 => fmt
@@ -1012,7 +1053,7 @@ fn cat_file_format_batch_check_line(
   }
   out = out.replace_all(old="%(objectname)", new=id_hex)
   out = out.replace_all(old="%(objecttype)", new=obj.obj_type.to_string())
-  out = out.replace_all(old="%(deltabase)", new=zero_oid)
+  out = out.replace_all(old="%(deltabase)", new=delta_base_hex.unwrap_or(zero_oid))
   out = out.replace_all(old="%(rest)", new=rest)
   out = out.replace_all(old="%(objectmode)", new=object_mode.unwrap_or(""))
   out
@@ -1027,6 +1068,14 @@ fn cat_file_batch_format_uses_rest(format : String?) -> Bool {
 }
 
 ///|
+fn cat_file_batch_format_uses_deltabase(format : String?) -> Bool {
+  match format {
+    Some(fmt) => fmt.contains("%(deltabase)")
+    None => false
+  }
+}
+
+///|
 fn cat_file_batch_check_format_needs_object(format : String?) -> Bool {
   let effective = match format {
     Some(fmt) if fmt.length() > 0 => fmt
@@ -1034,7 +1083,32 @@ fn cat_file_batch_check_format_needs_object(format : String?) -> Bool {
   }
   effective.contains("%(objecttype)") ||
   effective.contains("%(objectsize)") ||
-  effective.contains("%(objectsize:disk)")
+  effective.contains("%(objectsize:disk)") ||
+  effective.contains("%(deltabase)")
+}
+
+///|
+fn cat_file_resolve_delta_base_hex(
+  dbs : Array[@gitlib.ObjectDb],
+  fs : OsFs,
+  git_dir : String,
+  id : @git.ObjectId,
+  target_oid_len : Int,
+) -> String? {
+  for db in dbs {
+    let base = db.find_delta_base(fs, id) catch { _ => None }
+    if base is Some(base_id) {
+      return Some(
+        cat_file_map_oid_hex_to_length(
+          fs,
+          git_dir,
+          base_id.to_hex(),
+          target_oid_len,
+        ),
+      )
+    }
+  }
+  None
 }
 
 ///|
@@ -1899,7 +1973,7 @@ async fn cat_file_run_textconv(
 ) -> Bytes raise Error {
   let temp_path = git_dir + "/bit-cat-file-textconv.tmp"
   fs.write_file(temp_path, input)
-  let shell_cmd = cat_file_normalize_textconv_command(command) + " \"$1\""
+  let shell_cmd = cat_file_build_textconv_shell_command(command)
   let (code, stdout) = @process.collect_stdout(
     "sh",
     ["-c", shell_cmd, "cat-file-textconv", temp_path],
@@ -1926,17 +2000,20 @@ async fn cat_file_run_textconv(
 }
 
 ///|
-fn cat_file_normalize_textconv_command(command : String) -> String {
+fn cat_file_build_textconv_shell_command(command : String) -> String {
   let trimmed = trim_string(command)
+  if trimmed.contains("%f") {
+    return trimmed.replace_all(old="%f", new="\"$1\"")
+  }
   if trimmed.has_suffix("<") {
     let body = String::unsafe_substring(
       trimmed,
       start=0,
       end=trimmed.length() - 1,
     )
-    trim_string(body)
+    trim_string(body) + " < \"$1\""
   } else {
-    trimmed
+    trimmed + " \"$1\""
   }
 }
 

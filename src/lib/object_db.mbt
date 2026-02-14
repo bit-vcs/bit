@@ -268,6 +268,23 @@ pub fn ObjectDb::get(
 }
 
 ///|
+/// Return delta base object id if the selected packed object is DELTA.
+/// Returns None for loose objects or non-delta packed objects.
+pub fn ObjectDb::find_delta_base(
+  self : ObjectDb,
+  fs : &@git.RepoFileSystem,
+  id : @git.ObjectId,
+) -> @git.ObjectId? raise @git.GitError {
+  let hex = id.to_hex()
+  if not(self.prefer_packed) {
+    if get_loose_by_hex(self, fs, hex) is Some(_) {
+      return None
+    }
+  }
+  find_delta_base_from_packs(self, fs, hex)
+}
+
+///|
 /// Fast loose-object lookup without seen set allocation.
 fn get_loose_by_hex(
   db : ObjectDb,
@@ -395,6 +412,69 @@ fn get_from_packs(
   match last_error {
     Some(e) => raise e
     None => None
+  }
+}
+
+///|
+fn find_delta_base_from_packs(
+  db : ObjectDb,
+  fs : &@git.RepoFileSystem,
+  hex : String,
+) -> @git.ObjectId? {
+  for pack in db.packs {
+    match PackIndex::find_offset_hex(pack, hex) {
+      Some(offset) =>
+        try {
+          let data = get_pack_bytes(db, fs, pack.pack_path)
+          return read_pack_delta_base_at(data, pack, offset)
+        } catch {
+          _ => ()
+        }
+      None => ()
+    }
+  }
+  for lazy_pack in db.lazy_packs {
+    try {
+      match lazy_pack.find_offset_hex(fs, hex) {
+        Some(offset) => {
+          let pack = lazy_pack.get(fs)
+          let data = get_pack_bytes(db, fs, pack.pack_path)
+          return read_pack_delta_base_at(data, pack, offset)
+        }
+        None => ()
+      }
+    } catch {
+      _ => ()
+    }
+  }
+  None
+}
+
+///|
+fn read_pack_delta_base_at(
+  data : Bytes,
+  pack : PackIndex,
+  offset : Int64,
+) -> @git.ObjectId? raise @git.GitError {
+  let offset_i = offset_to_int(offset)
+  let (type_id, _, next_offset) = @pack.decode_type_and_size_at(data, offset_i)
+  match type_id {
+    6 => {
+      let (back_offset, _) = @pack.read_ofs_delta_offset(data, next_offset)
+      let base_offset = offset_i - back_offset
+      if base_offset < 0 {
+        return None
+      }
+      match PackIndex::find_id_by_offset(pack, base_offset.to_int64()) {
+        Some(base_hex) => Some(@git.ObjectId::from_hex(base_hex))
+        None => None
+      }
+    }
+    7 => {
+      let (base_hex, _) = @pack.read_ref_delta_id(data, next_offset)
+      Some(@git.ObjectId::from_hex(base_hex))
+    }
+    _ => None
   }
 }
 
