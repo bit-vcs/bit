@@ -5,6 +5,14 @@ struct CatFilePathAttrs {
 }
 
 ///|
+enum CatFileObjectFilter {
+  Disabled
+  BlobNone
+  BlobLimit(Int64)
+  ObjectType(@git.ObjectType)
+}
+
+///|
 async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let fs = OsFs::new()
@@ -26,6 +34,7 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
   let mut nul_terminated = false
   let mut nul_terminated_upper = false
   let mut batch_format : String? = None
+  let mut object_filter_spec : String? = None
   let mut explicit_path : String? = None
   let positionals : Array[String] = []
   let mut i = 0
@@ -54,6 +63,13 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
       "--follow-symlinks" => follow_symlinks = true
       "-z" => nul_terminated = true
       "-Z" => nul_terminated_upper = true
+      "--filter" if i + 1 < args.length() => {
+        object_filter_spec = Some(args[i + 1])
+        i += 2
+        continue
+      }
+      "--filter" => cat_file_usage_fatal("--filter requires a value")
+      "--no-filter" => object_filter_spec = None
       "--path" if i + 1 < args.length() => {
         explicit_path = Some(args[i + 1])
         i += 2
@@ -63,6 +79,10 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
       _ if arg.has_prefix("--path=") =>
         explicit_path = Some(
           String::unsafe_substring(arg, start=7, end=arg.length()),
+        )
+      _ if arg.has_prefix("--filter=") =>
+        object_filter_spec = Some(
+          String::unsafe_substring(arg, start=9, end=arg.length()),
         )
       _ if arg.has_prefix("--batch=") => {
         batch_mode = true
@@ -89,6 +109,8 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
     }
     i += 1
   }
+  let object_filter = cat_file_parse_object_filter_or_exit(object_filter_spec)
+  let object_filter_enabled = !cat_file_object_filter_is_disabled(object_filter)
   let transform_mode = filters_mode || textconv_mode
   let cmd_modes : Array[String] = []
   if exists_check {
@@ -205,7 +227,7 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
         bytes_from_array([]),
       )
       for id in objects {
-        if batch_check_mode && !batch_check_needs_object {
+        if batch_check_mode && !batch_check_needs_object && !object_filter_enabled {
           @stdio.stdout.write(
             cat_file_string_to_bytes(
               cat_file_format_batch_check_line(
@@ -232,6 +254,9 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
               ),
             )
           }
+          continue
+        }
+        if cat_file_object_is_excluded_by_filter(object_filter, o) {
           continue
         }
         if batch_check_mode {
@@ -572,6 +597,18 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
             pending_chunks.push(missing)
           } else {
             @stdio.stdout.write(missing)
+          }
+          line_index += 1
+          continue
+        }
+        if cat_file_object_is_excluded_by_filter(object_filter, o) {
+          let excluded = cat_file_string_to_bytes(
+            spec + " excluded" + batch_output_separator,
+          )
+          if buffer_enabled {
+            pending_chunks.push(excluded)
+          } else {
+            @stdio.stdout.write(excluded)
           }
           line_index += 1
           continue
@@ -1120,6 +1157,115 @@ fn cat_file_batch_check_format_needs_object(format : String?) -> Bool {
   effective.contains("%(objectsize)") ||
   effective.contains("%(objectsize:disk)") ||
   effective.contains("%(deltabase)")
+}
+
+///|
+async fn cat_file_parse_object_filter_or_exit(
+  spec : String?,
+) -> CatFileObjectFilter raise Error {
+  match spec {
+    Some(value) => cat_file_parse_object_filter_spec_or_exit(value)
+    None => CatFileObjectFilter::Disabled
+  }
+}
+
+///|
+async fn cat_file_parse_object_filter_spec_or_exit(
+  spec : String,
+) -> CatFileObjectFilter raise Error {
+  if spec == "blob:none" {
+    return CatFileObjectFilter::BlobNone
+  }
+  if spec.has_prefix("blob:limit=") {
+    let limit_str = String::unsafe_substring(spec, start=11, end=spec.length())
+    let limit = parse_size_value(limit_str)
+    guard limit is Some(max_size) else {
+      return cat_file_filter_die_fatal("fatal: invalid filter-spec '\{spec}'")
+    }
+    return CatFileObjectFilter::BlobLimit(max_size)
+  }
+  if spec.has_prefix("object:type=") {
+    let object_type_name = String::unsafe_substring(
+      spec,
+      start=12,
+      end=spec.length(),
+    )
+    let object_type : @git.ObjectType? = match object_type_name {
+      "blob" => Some(@git.ObjectType::Blob)
+      "commit" => Some(@git.ObjectType::Commit)
+      "tag" => Some(@git.ObjectType::Tag)
+      "tree" => Some(@git.ObjectType::Tree)
+      _ => None
+    }
+    guard object_type is Some(filter_type) else {
+      return cat_file_filter_die_fatal("fatal: invalid filter-spec '\{spec}'")
+    }
+    return CatFileObjectFilter::ObjectType(filter_type)
+  }
+  if spec == "sparse:path" || spec.has_prefix("sparse:path=") {
+    return cat_file_filter_die_fatal(
+      "fatal: sparse:path filters support has been dropped",
+    )
+  }
+  if spec.has_prefix("tree:") || spec.has_prefix("sparse:oid=") {
+    let kind = cat_file_parse_object_filter_kind(spec)
+    return cat_file_filter_die_usage(
+      "usage: objects filter not supported: '\{kind}'",
+    )
+  }
+  cat_file_filter_die_fatal("fatal: invalid filter-spec '\{spec}'")
+}
+
+///|
+fn cat_file_parse_object_filter_kind(spec : String) -> String {
+  if spec.has_prefix("tree:") {
+    return "tree"
+  }
+  match spec.find("=") {
+    Some(idx) => String::unsafe_substring(spec, start=0, end=idx)
+    None => spec
+  }
+}
+
+///|
+async fn cat_file_filter_die_fatal(
+  message : String,
+) -> CatFileObjectFilter raise Error {
+  eprint_line(message)
+  @sys.exit(128)
+  CatFileObjectFilter::Disabled
+}
+
+///|
+async fn cat_file_filter_die_usage(
+  message : String,
+) -> CatFileObjectFilter raise Error {
+  eprint_line(message)
+  @sys.exit(129)
+  CatFileObjectFilter::Disabled
+}
+
+///|
+fn cat_file_object_filter_is_disabled(filter : CatFileObjectFilter) -> Bool {
+  match filter {
+    Disabled => true
+    _ => false
+  }
+}
+
+///|
+fn cat_file_object_is_excluded_by_filter(
+  filter : CatFileObjectFilter,
+  obj : @git.PackObject,
+) -> Bool {
+  match filter {
+    Disabled => false
+    BlobNone => obj.obj_type == @git.ObjectType::Blob
+    BlobLimit(limit) =>
+      obj.obj_type == @git.ObjectType::Blob &&
+      obj.data.length().to_int64() >= limit
+    ObjectType(filter_type) => obj.obj_type != filter_type
+  }
 }
 
 ///|
