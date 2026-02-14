@@ -147,6 +147,8 @@ options(
     "sparse_checkout.mbt": [ "native" ],
     "stash.mbt": [ "native" ],
     "status.mbt": [ "native" ],
+    "storage_runtime.mbt": [ "native" ],
+    "storage_runtime_wbtest.mbt": [ "native" ],
     "subdir_clone.mbt": [ "native" ],
     "subdir_ops.mbt": [ "native" ],
     "subdir_shorthand_test.mbt": [ "native" ],

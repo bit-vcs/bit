@@ -164,11 +164,45 @@ bit push origin feature
 
 ## Compatibility
 
+- Standalone default path: `bit --no-git-fallback` runs core workflows without real-git delegation.
 - Hash algorithm: SHA-1 only.
 - SHA-256 repositories and `--object-format=sha256` are not supported.
 - Git config: reads global aliases from `~/.gitconfig` (or `GIT_CONFIG_GLOBAL`) only.
 - Shell aliases (prefixed with `!`) are not supported.
 - Intentionally unsupported (for now): `http-push-webdav` and `send-email` paths.
+
+### Standalone Scope (Current)
+
+The following workflows are covered in standalone mode (`--no-git-fallback`) and CI smoke tests:
+
+- `init`, `clone`, `fetch`, `pull`, `push`
+- `add`, `commit`, `checkout`, `branch`, `log`, `tag`
+- plumbing subset used by core flows (`hash-object`, `write-tree`, `update-ref`)
+
+Advanced paths are intentionally rejected with explicit "standalone mode" errors (for example: sha256 compat object format, reftable-only update-ref path, advanced pack/midx flags).
+
+### Storage Abstraction For Agents
+
+`bit` core operations can be run against any storage backend that implements:
+
+- `@git.FileSystem` (write side)
+- `@git.RepoFileSystem` (read side)
+
+Entry point:
+
+- `/Users/mz/ghq/github.com/mizchi/bit/src/cmd/bit/storage_runtime.mbt`
+- `run_storage_command(fs, rfs, root, cmd, args)`
+
+One in-memory implementation is `@git.TestFs`, which can be used as agent storage:
+
+```moonbit
+let fs = @git.TestFs::new()
+let root = "/agent-repo"
+run_storage_command(fs, fs, root, "init", ["-q"])
+fs.write_string(root + "/note.txt", "hello")
+run_storage_command(fs, fs, root, "add", ["note.txt"])
+run_storage_command(fs, fs, root, "commit", ["-m", "agent snapshot"])
+```
 
 ### Git Test Suite (git/t)
 

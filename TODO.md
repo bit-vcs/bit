@@ -379,7 +379,7 @@ git/t ではカバーしきれない standalone 動作を補完的に検証す�
 - [x] `bit` アプリケーション本体に real git fallback が 0 箇所
 - [x] `t/` 以下に init の standalone E2E テストを整備 (30 テスト)
 - [x] `t/` 以下に clone/commit/push/pull の standalone E2E テストを拡充
-- [ ] README に standalone 保証範囲と未対応コマンドを明記する
+- [x] README に standalone 保証範囲と未対応コマンドを明記する（2026-02-15）
 
 ### 直近 Blocker（2026-02-14 実測）
 
