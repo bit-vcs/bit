@@ -90,7 +90,7 @@
 
 - [x] P0（短期）着手: `rm`, `reset`, `switch`, `add` の先頭委譲を撤去
 - [ ] P1（中期）: `checkout`, `log`（`config`, `update-ref`, `branch` は完了）
-- [ ] P2（中〜高）: `bundle`, `merge`
+- [x] P2（中〜高）: `bundle`, `merge`
 - [ ] P3（高）: `fetch`, `pull`, `push`, `hash-object`（compat object format の条件付き委譲）
 
 P0 から順に「先頭の `if is_real_git_delegate_enabled() { delegate_to_real_git(...) }` を撤去」
@@ -157,6 +157,16 @@ P0 から順に「先頭の `if is_real_git_delegate_enabled() { delegate_to_rea
   - delegate gate の wbtest を追加（`src/cmd/bit/merge_wbtest.mbt`）
   - [x] `GIT_TEST_OPTS='--run=1-20' just git-t-full t7600-merge.sh` が green
     （`success 20 / failed 0 / broken 0`）
+- [x] P2 progress: `bundle` の先頭委譲を「real git が実行可能な時のみ」に変更（2026-02-14）
+  - `SHIM_REAL_GIT=/no/such` でも pure bundle が実行できる fallback smoke を追加
+    （`t/t0005-fallback.sh`）
+  - delegate gate の wbtest を追加（`src/cmd/bit/bundle_wbtest.mbt`）
+  - [x] `moon test --target native --package mizchi/bit/cmd/bit --file bundle_wbtest.mbt` が green
+  - [x] `just git-t-full t5607-clone-bundle.sh` 全量 green（`success 16 / failed 0 / broken 0`）
+  - [x] 互換修正:
+    - ローカル bundle path（`foo/bar.bundle`）を GitHub shorthand に誤解釈しないよう修正
+    - ローカル `*.bundle` clone は delegate 可能時に real git 委譲（fsckObjects / advice 互換を確保）
+    - `hash-object --literally` を no-op 受理（warning 抑止）
 
 ### 絞り込み再計測の結果（2026-02-13 夜）
 

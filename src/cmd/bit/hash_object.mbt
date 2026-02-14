@@ -10,6 +10,7 @@ async fn handle_hash_object(args : Array[String]) -> Unit raise Error {
     match arg {
       "-w" => write_object = true
       "--stdin" => stdin_mode = true
+      "--literally" => ()
       "-t" => () // next arg is type, handled below
       _ if arg.has_prefix("-t") =>
         obj_type = String::unsafe_substring(arg, start=2, end=arg.length())

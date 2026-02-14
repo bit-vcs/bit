@@ -109,4 +109,19 @@ test_expect_success 'merge works even if SHIM_REAL_GIT is invalid' '
     )
 '
 
+test_expect_success 'bundle works even if SHIM_REAL_GIT is invalid' '
+    git_cmd init repo &&
+    (
+        cd repo &&
+        git_cmd config user.name "bit-test" &&
+        git_cmd config user.email "bit-test@example.com" &&
+        echo hello >a.txt &&
+        git_cmd add a.txt &&
+        git_cmd commit -m "first commit" &&
+        SHIM_REAL_GIT=/no/such git_cmd bundle create ../smoke.bundle HEAD &&
+        SHIM_REAL_GIT=/no/such git_cmd bundle list-heads ../smoke.bundle >actual &&
+        grep -Eq "^[0-9a-f]{40} HEAD$" actual
+    )
+'
+
 test_done

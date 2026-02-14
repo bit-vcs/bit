@@ -219,8 +219,16 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
   let local_src_path = @gitlib.resolve_local_repo_path(
     fs, command_root, remote_url,
   )
+  let local_src_file_path = resolve_local_clone_source_file(
+    fs, command_root, remote_url,
+  )
+  if clone_should_delegate_to_real_git_for_bundle(
+      fs, local_src_file_path,
+    ) {
+    delegate_to_real_git("clone", args)
+  }
   // Check for ambiguity with local directories only when path is not local.
-  if local_src_path is None {
+  if local_src_path is None && local_src_file_path is None {
     match check_shorthand_ambiguity(remote_url, p => fs.is_dir(p)) {
       Some(conflict_path) =>
         raise @git.GitError::InvalidObject(
@@ -230,28 +238,31 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
     }
   }
   // Check for shorthand (user/repo, user/repo:path, or browser URL)
-  match parse_github_shorthand(remote_url) {
-    Some(Repo(github_url, refname)) => {
-      // user/repo → normal clone from GitHub
-      print_line("Shorthand: \{github_url}")
-      url = Some(github_url)
-      ref_spec = refname
-    }
-    Some(Subdir(github_url, subdir, refname)) => {
-      // user/repo:path or /tree/ URL → subdir clone
-      print_line("Subdir clone: \{github_url} → \{subdir}")
-      return subdir_clone(github_url, subdir, dest, refname)
-    }
-    Some(File(raw_url, filename)) => {
-      // /blob/ URL → single file fetch
-      let target_file = match dest {
-        Some(d) => d
-        None => filename
+  // only when remote is not an existing local path.
+  if local_src_path is None && local_src_file_path is None {
+    match parse_github_shorthand(remote_url) {
+      Some(Repo(github_url, refname)) => {
+        // user/repo → normal clone from GitHub
+        print_line("Shorthand: \{github_url}")
+        url = Some(github_url)
+        ref_spec = refname
       }
-      print_line("Fetching file: \{raw_url}")
-      return fetch_raw_file(raw_url, target_file)
+      Some(Subdir(github_url, subdir, refname)) => {
+        // user/repo:path or /tree/ URL → subdir clone
+        print_line("Subdir clone: \{github_url} → \{subdir}")
+        return subdir_clone(github_url, subdir, dest, refname)
+      }
+      Some(File(raw_url, filename)) => {
+        // /blob/ URL → single file fetch
+        let target_file = match dest {
+          Some(d) => d
+          None => filename
+        }
+        print_line("Fetching file: \{raw_url}")
+        return fetch_raw_file(raw_url, target_file)
+      }
+      None => ()
     }
-    None => ()
   }
   // Re-extract remote_url after potential shorthand expansion
   guard url is Some(remote_url) else {
@@ -629,6 +640,63 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
     _ => []
   }
   emit_clone_bundle_trace_events(fs, bundle_uris)
+}
+
+///|
+fn resolve_local_clone_source_file(
+  fs : &@git.RepoFileSystem,
+  command_root : String,
+  remote_url : String,
+) -> String? {
+  let raw = if remote_url.has_prefix("file://") {
+    String::unsafe_substring(remote_url, start=7, end=remote_url.length())
+  } else {
+    remote_url
+  }
+  if raw.has_prefix("http://") ||
+    raw.has_prefix("https://") ||
+    raw.has_prefix("git@") {
+    return None
+  }
+  if raw.has_prefix("/") {
+    if fs.is_file(raw) {
+      return Some(raw)
+    }
+    return None
+  }
+  let candidate = normalize_path(command_root + "/" + raw)
+  if fs.is_file(candidate) {
+    return Some(candidate)
+  }
+  if fs.is_file(raw) {
+    return Some(normalize_path(raw))
+  }
+  None
+}
+
+///|
+fn clone_can_delegate_to_real_git(fs : &@git.RepoFileSystem) -> Bool {
+  guard is_real_git_delegate_enabled() else { return false }
+  let real_git = resolve_real_git_for_fetch()
+  if real_git.length() == 0 {
+    return false
+  }
+  if real_git.has_prefix("/") {
+    return fs.is_file(real_git)
+  }
+  true
+}
+
+///|
+fn clone_should_delegate_to_real_git_for_bundle(
+  fs : &@git.RepoFileSystem,
+  local_src_file_path : String?,
+) -> Bool {
+  guard clone_can_delegate_to_real_git(fs) else { return false }
+  match local_src_file_path {
+    Some(path) => path.has_suffix(".bundle")
+    None => false
+  }
 }
 
 ///|

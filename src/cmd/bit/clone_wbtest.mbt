@@ -1,4 +1,12 @@
 ///|
+fn restore_env_var_for_clone_wbtest(name : String, prev : String?) -> Unit {
+  match prev {
+    Some(value) => @sys.set_env_var(name, value)
+    None => @sys.unset_env_var(name)
+  }
+}
+
+///|
 test "clone caps contain token: direct token word" {
   let caps = ["multi_ack thin-pack filter side-band-64k"]
   assert_true(clone_caps_contain_token(caps, "filter"))
@@ -26,6 +34,72 @@ test "clone caps contain token: fetch embedded token list" {
 test "clone caps contain token: missing token" {
   let caps = ["multi_ack thin-pack", "fetch=shallow deepen-since"]
   assert_false(clone_caps_contain_token(caps, "filter"))
+}
+
+///|
+test "clone local source file resolver: existing relative bundle path" {
+  let fs = @git.TestFs::new()
+  fs.write_string("/work/repo/repo.bundle", "bundle")
+  let resolved = resolve_local_clone_source_file(fs, "/work/repo", "repo.bundle")
+  assert_eq(resolved, Some("/work/repo/repo.bundle"))
+}
+
+///|
+test "clone local source file resolver: file URL path" {
+  let fs = @git.TestFs::new()
+  fs.write_string("/tmp/repo.bundle", "bundle")
+  let resolved = resolve_local_clone_source_file(
+    fs, "/work/repo", "file:///tmp/repo.bundle",
+  )
+  assert_eq(resolved, Some("/tmp/repo.bundle"))
+}
+
+///|
+test "clone local source file resolver: remote URL is ignored" {
+  let fs = @git.TestFs::new()
+  let resolved = resolve_local_clone_source_file(
+    fs, "/work/repo", "https://example.com/repo.bundle",
+  )
+  assert_eq(resolved, None)
+}
+
+///|
+test "clone bundle delegate gate: unavailable real git path stays in pure path" {
+  let prev_primary = @sys.get_env_var("SHIM_REAL_GIT")
+  let prev_secondary = @sys.get_env_var("GIT_SHIM_REAL_GIT")
+  let fs = @git.TestFs::new()
+  @sys.set_env_var("SHIM_REAL_GIT", "/tmp/mock-git")
+  @sys.unset_env_var("GIT_SHIM_REAL_GIT")
+  assert_false(clone_can_delegate_to_real_git(fs))
+  assert_false(
+    clone_should_delegate_to_real_git_for_bundle(
+      fs, Some("/work/repo/repo.bundle"),
+    ),
+  )
+  restore_env_var_for_clone_wbtest("SHIM_REAL_GIT", prev_primary)
+  restore_env_var_for_clone_wbtest("GIT_SHIM_REAL_GIT", prev_secondary)
+}
+
+///|
+test "clone bundle delegate gate: available real git path is delegated" {
+  let prev_primary = @sys.get_env_var("SHIM_REAL_GIT")
+  let prev_secondary = @sys.get_env_var("GIT_SHIM_REAL_GIT")
+  let fs = @git.TestFs::new()
+  @sys.set_env_var("SHIM_REAL_GIT", "git")
+  @sys.unset_env_var("GIT_SHIM_REAL_GIT")
+  assert_true(clone_can_delegate_to_real_git(fs))
+  assert_true(
+    clone_should_delegate_to_real_git_for_bundle(
+      fs, Some("/work/repo/repo.bundle"),
+    ),
+  )
+  assert_false(
+    clone_should_delegate_to_real_git_for_bundle(
+      fs, Some("/work/repo/not-bundle.git"),
+    ),
+  )
+  restore_env_var_for_clone_wbtest("SHIM_REAL_GIT", prev_primary)
+  restore_env_var_for_clone_wbtest("GIT_SHIM_REAL_GIT", prev_secondary)
 }
 
 ///|
