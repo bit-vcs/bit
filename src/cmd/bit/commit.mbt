@@ -10,6 +10,9 @@ async fn show_commit_command_help() -> Unit {
 
 ///|
 async fn handle_commit(args : Array[String]) -> Unit raise Error {
+  if commit_should_delegate_to_real_git(args) {
+    delegate_to_real_git("commit", args)
+  }
   let root = get_work_root()
   let fs = OsFs::new()
   let commit_message_encoding = resolve_commit_message_encoding()
@@ -198,6 +201,56 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
       None => print_line("[" + short_id + "] " + first_line)
     }
   }
+}
+
+///|
+fn commit_should_delegate_to_real_git(args : Array[String]) -> Bool {
+  guard is_real_git_delegate_enabled() else { return false }
+  let mut expect_value = false
+  for arg in args {
+    if expect_value {
+      expect_value = false
+      continue
+    }
+    if arg == "--" {
+      // `git commit -- <pathspec>` requires full pathspec semantics.
+      return true
+    }
+    if arg == "-m" ||
+      arg == "--message" ||
+      arg == "-F" ||
+      arg == "--file" ||
+      arg == "-C" ||
+      arg == "--reuse-message" ||
+      arg == "-c" ||
+      arg == "--reedit-message" ||
+      arg == "--author" ||
+      arg == "--date" {
+      expect_value = true
+      continue
+    }
+    if arg.has_prefix("--message=") ||
+      arg.has_prefix("--author=") ||
+      arg.has_prefix("--date=") ||
+      arg.has_prefix("--file=") ||
+      arg.has_prefix("--reuse-message=") ||
+      arg.has_prefix("--reedit-message=") {
+      continue
+    }
+    if arg.has_prefix("-m") ||
+      arg.has_prefix("-F") ||
+      arg.has_prefix("-C") ||
+      arg.has_prefix("-c") ||
+      arg.has_prefix("-am") ||
+      arg.has_prefix("-ma") {
+      continue
+    }
+    if arg.has_prefix("-") {
+      continue
+    }
+    return true
+  }
+  false
 }
 
 ///|

@@ -1,8 +1,9 @@
 ///|
 async fn handle_tag(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
-  let git_dir = root + "/.git"
   let fs = OsFs::new()
+  let rfs : &@git.RepoFileSystem = fs
+  let git_dir = resolve_git_dir(rfs, root)
   let mut list_mode = true
   let mut delete_mode = false
   let mut annotated = false

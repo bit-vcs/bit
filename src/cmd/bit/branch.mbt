@@ -26,7 +26,8 @@ async fn handle_branch(args : Array[String]) -> Unit raise Error {
   let mut track_upstream = false
   let mut start_point : String? = None
   let mut i = 0
-  if is_real_git_delegate_enabled() && branch_should_delegate_to_real_git(args) {
+  if branch_can_delegate_to_real_git(fs) &&
+    branch_should_delegate_to_real_git(args) {
     delegate_to_real_git("branch", args)
   }
   while i < args.length() {
@@ -177,7 +178,9 @@ async fn handle_branch(args : Array[String]) -> Unit raise Error {
             match new_branch {
               Some(name) => {
                 if name == "HEAD" {
-                  @stdio.stderr.write("fatal: 'HEAD' is not a valid branch name")
+                  @stdio.stderr.write(
+                    "fatal: 'HEAD' is not a valid branch name",
+                  )
                   @sys.exit(1)
                 }
                 let refname = "refs/heads/" + name
@@ -264,10 +267,14 @@ async fn handle_branch(args : Array[String]) -> Unit raise Error {
 
 ///|
 fn branch_should_delegate_to_real_git(args : Array[String]) -> Bool {
+  if args.length() == 0 {
+    // Plain `git branch` listing requires full compatibility for column/sort/rebase status.
+    return true
+  }
   let positional : Array[String] = []
   for arg in args {
     match arg {
-      "-a" | "--all" | "-r" | "--remotes" | "-v" | "--verbose" => ()
+      "-a" | "--all" | "-r" | "--remotes" => ()
       _ if arg.has_prefix("-") => return true
       _ => positional.push(arg)
     }
@@ -278,15 +285,15 @@ fn branch_should_delegate_to_real_git(args : Array[String]) -> Bool {
   if positional.length() > 2 {
     return true
   }
-  let name = positional[0]
-  if name == "HEAD" || branch_has_glob_magic(name) {
+  if positional.length() == 2 {
+    // Branch creation from start-point has many tracking/autosetup edge-cases.
     return true
   }
-  if positional.length() == 2 {
-    let start = positional[1]
-    if start.has_suffix("...") {
-      return true
-    }
+  let name = positional[0]
+  if name == "HEAD" ||
+    branch_has_glob_magic(name) ||
+    branch_has_invalid_ref_syntax(name) {
+    return true
   }
   false
 }
@@ -296,6 +303,32 @@ fn branch_has_glob_magic(name : String) -> Bool {
   name.find("*") is Some(_) ||
   name.find("?") is Some(_) ||
   name.find("[") is Some(_)
+}
+
+///|
+fn branch_has_invalid_ref_syntax(name : String) -> Bool {
+  name.find("..") is Some(_) ||
+  name.find("@{") is Some(_) ||
+  name.find("\\") is Some(_) ||
+  name.find(":") is Some(_) ||
+  name.find("//") is Some(_) ||
+  name.has_prefix("/") ||
+  name.has_suffix("/") ||
+  name.has_suffix(".") ||
+  name.has_suffix(".lock")
+}
+
+///|
+fn branch_can_delegate_to_real_git(fs : &@git.RepoFileSystem) -> Bool {
+  guard is_real_git_delegate_enabled() else { return false }
+  let real_git = resolve_real_git_for_fetch()
+  if real_git.length() == 0 {
+    return false
+  }
+  if real_git.has_prefix("/") {
+    return fs.is_file(real_git)
+  }
+  true
 }
 
 ///|

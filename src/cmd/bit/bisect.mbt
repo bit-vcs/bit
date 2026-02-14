@@ -1,5 +1,8 @@
 ///|
 async fn handle_bisect(args : Array[String]) -> Unit raise Error {
+  if is_real_git_delegate_enabled() {
+    delegate_to_real_git("bisect", args)
+  }
   let root = get_work_root()
   let fs = OsFs::new()
   let wfs : &@git.FileSystem = fs

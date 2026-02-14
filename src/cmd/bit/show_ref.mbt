@@ -28,9 +28,10 @@ async fn handle_show_ref(args : Array[String]) -> Unit raise Error {
       @sys.exit(1)
     }
     let refname = patterns[0]
-    match @gitlib.resolve_ref(fs, git_dir, refname) {
-      Some(_) => @sys.exit(0)
-      None => @sys.exit(2)
+    if show_ref_exists_without_resolution(fs, git_dir, refname) {
+      @sys.exit(0)
+    } else {
+      @sys.exit(2)
     }
   }
   if verify {
@@ -90,6 +91,47 @@ async fn handle_show_ref(args : Array[String]) -> Unit raise Error {
   if matched_count == 0 {
     @sys.exit(1)
   }
+}
+
+///|
+fn show_ref_exists_without_resolution(
+  fs : &@git.RepoFileSystem,
+  git_dir : String,
+  refname : String,
+) -> Bool {
+  let loose_path = git_dir + "/" + refname
+  if fs.is_file(loose_path) {
+    return true
+  }
+  let packed_refs_path = git_dir + "/packed-refs"
+  if not(fs.is_file(packed_refs_path)) {
+    return false
+  }
+  let content = decode_bytes(
+    fs.read_file(packed_refs_path) catch {
+      _ => return false
+    },
+  )
+  for line_view in content.split("\n") {
+    let line = trim_string(line_view.to_string())
+    if line.length() == 0 || line.has_prefix("#") || line.has_prefix("^") {
+      continue
+    }
+    match line.find(" ") {
+      Some(idx) => {
+        let packed_ref = String::unsafe_substring(
+          line,
+          start=idx + 1,
+          end=line.length(),
+        )
+        if packed_ref == refname {
+          return true
+        }
+      }
+      None => ()
+    }
+  }
+  false
 }
 
 ///|

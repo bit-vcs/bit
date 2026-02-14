@@ -102,7 +102,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
       "--abbrev-ref" => ()
       _ if arg.has_prefix("--abbrev-ref=") => ()
       _ if arg.has_prefix("-") => warn_unimplemented_arg("rev-parse", arg)
-      _ => {
+      _ =>
         if abbrev_ref {
           let name = resolve_abbrev_ref_name(fs, git_dir, arg)
           match name {
@@ -125,7 +125,8 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
           match id {
             Some(oid) =>
               match short_length {
-                Some(length) => print_line(shorten_oid_hex(oid.to_hex(), length))
+                Some(length) =>
+                  print_line(shorten_oid_hex(oid.to_hex(), length))
                 None => print_line(oid.to_hex())
               }
             None =>
@@ -134,7 +135,6 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
               }
           }
         }
-      }
     }
   }
   ignore(show_ref_format)

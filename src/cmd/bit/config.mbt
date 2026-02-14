@@ -15,8 +15,11 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
   let mut local_mode = false
   let mut global_mode = false
   let mut system_mode = false
+  let mut worktree_mode = false
   let mut config_path_override : String? = None
   let mut expect_config_path = false
+  let mut default_value : String? = None
+  let mut expect_default_value = false
   let mut key : String? = None
   let mut value : String? = None
   for arg in normalized_args {
@@ -25,14 +28,25 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
       expect_config_path = false
       continue
     }
+    if expect_default_value {
+      default_value = Some(arg)
+      expect_default_value = false
+      continue
+    }
     match arg {
       "--local" => local_mode = true
       "--global" => global_mode = true
       "--system" => system_mode = true
+      "--worktree" => worktree_mode = true
       "-f" | "--file" => expect_config_path = true
       _ if arg.has_prefix("--file=") =>
         config_path_override = Some(
           String::unsafe_substring(arg, start=7, end=arg.length()),
+        )
+      "--default" => expect_default_value = true
+      _ if arg.has_prefix("--default=") =>
+        default_value = Some(
+          String::unsafe_substring(arg, start=10, end=arg.length()),
         )
       "--get" => get_mode = true
       "--get-all" => {
@@ -46,7 +60,13 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
       "--add" => add_mode = true
       "--remove-section" => remove_section_mode = true
       "--fixed-value" => fixed_value_mode = true
-      _ if arg.has_prefix("-") => warn_unimplemented_arg("config", arg)
+      _ if arg.has_prefix("-") =>
+        if key is Some(_) && value is None {
+          // `git config <key> -value` treats `-value` as a value.
+          value = Some(arg)
+        } else {
+          warn_unimplemented_arg("config", arg)
+        }
       _ =>
         if key is None {
           key = Some(arg)
@@ -58,12 +78,20 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
   if expect_config_path {
     raise @git.GitError::InvalidObject("option '-f' requires a value")
   }
+  if expect_default_value {
+    raise @git.GitError::InvalidObject("option '--default' requires a value")
+  }
   if global_mode && system_mode {
     raise @git.GitError::InvalidObject("only one config scope can be specified")
   }
   if local_mode && (global_mode || system_mode) {
     raise @git.GitError::InvalidObject(
       "--local cannot be used with --global or --system",
+    )
+  }
+  if worktree_mode && (global_mode || system_mode) {
+    raise @git.GitError::InvalidObject(
+      "--worktree cannot be used with --global or --system",
     )
   }
   let config_path = match config_path_override {
@@ -84,7 +112,11 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
         let rfs : &@git.RepoFileSystem = fs
         let root = get_work_root()
         let git_dir = resolve_git_dir(rfs, root)
-        git_dir + "/config"
+        if worktree_mode {
+          git_dir + "/config.worktree"
+        } else {
+          git_dir + "/config"
+        }
       }
   }
   // Handle --list
@@ -140,8 +172,12 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
           print_line(val)
         }
       None =>
-        // Key not found - exit silently with code 1 (git behavior)
-        @sys.exit(1)
+        match default_value {
+          Some(def) => print_line(def)
+          None =>
+            // Key not found - exit silently with code 1 (git behavior)
+            @sys.exit(1)
+        }
     }
   } else {
     // Write config
@@ -155,21 +191,38 @@ fn normalize_config_args(args : Array[String]) -> Array[String] {
   if args.length() == 0 {
     return args
   }
-  // Support modern "git config set ..." by mapping it to the legacy form
-  // that this handler already implements.
-  if args[0] != "set" {
-    return args
-  }
   let normalized : Array[String] = []
-  for i in 1..<args.length() {
-    let arg = args[i]
-    if arg == "--append" {
-      normalized.push("--add")
-    } else {
-      normalized.push(arg)
+  match args[0] {
+    // Support modern "git config set ..." by mapping it to the legacy form.
+    "set" => {
+      for i in 1..<args.length() {
+        let arg = args[i]
+        if arg == "--append" {
+          normalized.push("--add")
+        } else {
+          normalized.push(arg)
+        }
+      }
+      normalized
     }
+    // Support modern "git config unset <key>".
+    "unset" => {
+      normalized.push("--unset")
+      for i in 1..<args.length() {
+        normalized.push(args[i])
+      }
+      normalized
+    }
+    // Support modern "git config get <key>".
+    "get" => {
+      normalized.push("--get")
+      for i in 1..<args.length() {
+        normalized.push(args[i])
+      }
+      normalized
+    }
+    _ => args
   }
-  normalized
 }
 
 ///|
@@ -295,6 +348,7 @@ fn get_config_value(
   let subsection_l = subsection.map(sub => sub.to_lower())
   let name_l = name.to_lower()
   let mut in_section = false
+  let mut found : String? = None
   for line_view in content.split("\n") {
     let line = trim_string(line_view.to_string())
     if line.has_prefix("[") && line.has_suffix("]") {
@@ -329,7 +383,7 @@ fn get_config_value(
             " \t",
           )
           if key_part.to_lower() == name_l {
-            return Some(
+            found = Some(
               parse_config_value(
                 String::unsafe_substring(line, start=i + 1, end=line.length()),
               ),
@@ -340,7 +394,7 @@ fn get_config_value(
       }
     }
   }
-  None
+  found
 }
 
 ///|
@@ -627,6 +681,78 @@ fn unset_config(
   let result : Array[String] = []
   for line in lines {
     let trimmed = trim_string(line)
+    if trimmed.has_prefix("[") {
+      let close_idx = trimmed.find("]")
+      match close_idx {
+        Some(close_i) => {
+          let header_content = trim_chars(
+            String::unsafe_substring(trimmed, start=1, end=close_i),
+            " \t",
+          )
+          let header_content_l = header_content.to_lower()
+          let after_header = trim_chars(
+            String::unsafe_substring(
+              trimmed,
+              start=close_i + 1,
+              end=trimmed.length(),
+            ),
+            " \t",
+          )
+          let section_matches = match subsection {
+            Some(_) => {
+              let sub_l = subsection_l.unwrap_or("")
+              let expected = section_l + " \"" + sub_l + "\""
+              header_content_l == expected ||
+              header_content_l == section_l + " " + sub_l
+            }
+            None => header_content_l == section_l
+          }
+          if after_header.length() > 0 && section_matches {
+            in_section = true
+            let inline_eq_idx = after_header.find("=")
+            let (inline_key, inline_value) = match inline_eq_idx {
+              Some(idx) =>
+                (
+                  trim_chars(
+                    String::unsafe_substring(after_header, start=0, end=idx),
+                    " \t",
+                  ),
+                  Some(
+                    trim_chars(
+                      String::unsafe_substring(
+                        after_header,
+                        start=idx + 1,
+                        end=after_header.length(),
+                      ),
+                      " \t",
+                    ),
+                  ),
+                )
+              None => (after_header, (None : String?))
+            }
+            if inline_key.to_lower() == name_l {
+              if fixed_value is Some(fv) {
+                if inline_value is Some(iv) && iv == fv {
+                  if unset_all {
+                    continue
+                  }
+                  if not(removed) {
+                    removed = true
+                    continue
+                  }
+                }
+              } else if unset_all {
+                continue
+              } else if not(removed) {
+                removed = true
+                continue
+              }
+            }
+          }
+        }
+        None => ()
+      }
+    }
     if trimmed.has_prefix("[") && trimmed.has_suffix("]") {
       let sec_content = String::unsafe_substring(
         trimmed,
@@ -673,7 +799,18 @@ fn unset_config(
             }
           }
         }
-        None => ()
+        None => {
+          let key_only = trim_chars(trimmed, " \t")
+          if key_only.to_lower() == name_l && fixed_value is None {
+            if unset_all {
+              continue
+            }
+            if not(removed) {
+              removed = true
+              continue
+            }
+          }
+        }
       }
     }
     result.push(line)

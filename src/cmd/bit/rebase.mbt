@@ -1,5 +1,8 @@
 ///|
 async fn handle_rebase(args : Array[String]) -> Unit raise Error {
+  if is_real_git_delegate_enabled() && rebase_should_delegate_to_real_git(args) {
+    delegate_to_real_git("rebase", args)
+  }
   let root = get_work_root()
   let git_dir = root + "/.git"
   let fs = OsFs::new()
@@ -113,6 +116,20 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
     let result = @gitlib.rebase_start(fs, fs, root, id)
     print_rebase_result(result)
   }
+}
+
+///|
+fn rebase_should_delegate_to_real_git(args : Array[String]) -> Bool {
+  for arg in args {
+    if arg == "-i" ||
+      arg == "--interactive" ||
+      arg == "--continue" ||
+      arg == "--abort" ||
+      arg == "--skip" {
+      return true
+    }
+  }
+  false
 }
 
 ///|
