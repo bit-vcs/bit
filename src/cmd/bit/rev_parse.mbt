@@ -38,6 +38,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
   let mut quiet = false
   let mut show_ref_format = false
   let mut show_object_format = false
+  let mut short_length : Int? = None
   for arg in args {
     match arg {
       "--revs-only" => revs_only = true
@@ -45,6 +46,15 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
       "--quiet" => quiet = true
       "--show-ref-format" => show_ref_format = true
       "--show-object-format" => show_object_format = true
+      "--short" => short_length = Some(7)
+      _ if arg.has_prefix("--short=") =>
+        match
+          parse_rev_parse_short_length(
+            String::unsafe_substring(arg, start=8, end=arg.length()),
+          ) {
+          Some(value) => short_length = Some(value)
+          None => short_length = Some(7)
+        }
       _ if arg.has_prefix("--show-object-format=") => show_object_format = true
       _ => ()
     }
@@ -84,6 +94,8 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
       "--revs-only" => ()
       "--verify" => ()
       "--quiet" => ()
+      "--short" => ()
+      _ if arg.has_prefix("--short=") => ()
       _ if arg.has_prefix("-") => warn_unimplemented_arg("rev-parse", arg)
       _ => {
         let id = if arg == "FETCH_HEAD" {
@@ -92,7 +104,11 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
           @gitrepo.rev_parse(fs, git_dir, arg)
         }
         match id {
-          Some(oid) => print_line(oid.to_hex())
+          Some(oid) =>
+            match short_length {
+              Some(length) => print_line(shorten_oid_hex(oid.to_hex(), length))
+              None => print_line(oid.to_hex())
+            }
           None =>
             if not(revs_only) {
               raise @git.GitError::InvalidObject("unknown revision: " + arg)
@@ -103,6 +119,33 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
   }
   ignore(show_ref_format)
   ignore(show_object_format)
+}
+
+///|
+fn parse_rev_parse_short_length(value : String) -> Int? {
+  if value.length() == 0 {
+    return None
+  }
+  let mut result = 0
+  for c in value {
+    if c < '0' || c > '9' {
+      return None
+    }
+    result = result * 10 + (c.to_int() - '0'.to_int())
+  }
+  Some(result)
+}
+
+///|
+fn shorten_oid_hex(hex : String, requested : Int) -> String {
+  let mut length = requested
+  if length < 4 {
+    length = 4
+  }
+  if length > hex.length() {
+    length = hex.length()
+  }
+  String::unsafe_substring(hex, start=0, end=length)
 }
 
 ///|

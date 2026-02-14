@@ -101,7 +101,7 @@ pub fn write_index_entries(
   entries : Array[IndexEntry],
 ) -> Unit raise @git.GitError {
   let sorted = entries.copy()
-  sorted.sort_by((a, b) => String::compare(a.path, b.path))
+  sorted.sort_by((a, b) => index_path_compare_git_order(a.path, b.path))
   let out : Array[Byte] = []
   // Header: "DIRC" + version(2) + count
   out.push(b'D')
@@ -234,4 +234,29 @@ fn index_push_u32_be(out : Array[Byte], v : Int) -> Unit {
 fn index_push_u16_be(out : Array[Byte], v : Int) -> Unit {
   out.push(((v >> 8) & 0xff).to_byte())
   out.push((v & 0xff).to_byte())
+}
+
+///|
+fn index_path_compare_git_order(a : String, b : String) -> Int {
+  let a_chars = a.to_array()
+  let b_chars = b.to_array()
+  let mut i = 0
+  while i < a_chars.length() && i < b_chars.length() {
+    let av = a_chars[i].to_int()
+    let bv = b_chars[i].to_int()
+    if av < bv {
+      return -1
+    }
+    if av > bv {
+      return 1
+    }
+    i += 1
+  }
+  if a_chars.length() < b_chars.length() {
+    -1
+  } else if a_chars.length() > b_chars.length() {
+    1
+  } else {
+    0
+  }
 }

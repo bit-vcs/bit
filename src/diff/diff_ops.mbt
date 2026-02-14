@@ -259,7 +259,7 @@ pub fn diff_index(
 }
 
 ///|
-/// Format diff as simple unified-like text.
+/// Format diff as unified text.
 pub fn diff_text(files : Array[DiffFile]) -> Array[String] {
   let lines : Array[String] = []
   for f in files {
@@ -267,32 +267,117 @@ pub fn diff_text(files : Array[DiffFile]) -> Array[String] {
     diff_emit_modes(lines, f)
     match f.kind {
       DiffKind::Added => {
+        diff_emit_index_line(lines, None, f.new_content, None)
         lines.push("--- /dev/null")
         lines.push("+++ b/\{f.path}")
-        match f.new_content {
-          Some(data) => diff_emit_lines(lines, data, "+")
-          None => ()
-        }
+        diff_emit_unified_hunk(lines, None, f.new_content)
       }
       DiffKind::Deleted => {
+        diff_emit_index_line(lines, f.old_content, None, None)
         lines.push("--- a/\{f.path}")
         lines.push("+++ /dev/null")
-        match f.old_content {
-          Some(data) => diff_emit_lines(lines, data, "-")
-          None => ()
-        }
+        diff_emit_unified_hunk(lines, f.old_content, None)
       }
-      DiffKind::Modified =>
-        match (f.old_content, f.new_content) {
-          (Some(old), Some(new)) => {
-            lines.push("--- a/\{f.path}")
-            lines.push("+++ b/\{f.path}")
-            diff_emit_lines(lines, old, "-")
-            diff_emit_lines(lines, new, "+")
-          }
-          _ => ()
+      DiffKind::Modified => {
+        let mode = match (f.old_mode, f.new_mode) {
+          (Some(old), Some(new)) if old == new => Some(new)
+          _ => None
         }
+        diff_emit_index_line(lines, f.old_content, f.new_content, mode)
+        lines.push("--- a/\{f.path}")
+        lines.push("+++ b/\{f.path}")
+        diff_emit_unified_hunk(lines, f.old_content, f.new_content)
+      }
     }
+  }
+  lines
+}
+
+///|
+fn diff_blob_short_id(data : Bytes) -> String {
+  let hex = @git.hash_blob(data).to_hex()
+  String::unsafe_substring(hex, start=0, end=7)
+}
+
+///|
+fn diff_emit_index_line(
+  out : Array[String],
+  old_content : Bytes?,
+  new_content : Bytes?,
+  mode : Int?,
+) -> Unit {
+  let old_short = match old_content {
+    Some(data) => diff_blob_short_id(data)
+    None => "0000000"
+  }
+  let new_short = match new_content {
+    Some(data) => diff_blob_short_id(data)
+    None => "0000000"
+  }
+  if old_short == "0000000" && new_short == "0000000" {
+    return
+  }
+  let mut line = "index \{old_short}..\{new_short}"
+  match mode {
+    Some(file_mode) => line += " " + mode_to_string(file_mode)
+    None => ()
+  }
+  out.push(line)
+}
+
+///|
+fn diff_emit_unified_hunk(
+  out : Array[String],
+  old_content : Bytes?,
+  new_content : Bytes?,
+) -> Unit {
+  guard old_content is Some(_) || new_content is Some(_) else { return }
+  let old_lines = match old_content {
+    Some(data) => diff_split_lines_no_trailing_empty(data)
+    None => []
+  }
+  let new_lines = match new_content {
+    Some(data) => diff_split_lines_no_trailing_empty(data)
+    None => []
+  }
+  if old_lines.length() == 0 && new_lines.length() == 0 {
+    return
+  }
+  let old_start = if old_lines.length() == 0 { 0 } else { 1 }
+  let new_start = if new_lines.length() == 0 { 0 } else { 1 }
+  let old_range = diff_format_range(old_start, old_lines.length())
+  let new_range = diff_format_range(new_start, new_lines.length())
+  out.push("@@ -\{old_range} +\{new_range} @@")
+  for line in old_lines {
+    out.push("-" + line)
+  }
+  for line in new_lines {
+    out.push("+" + line)
+  }
+}
+
+///|
+fn diff_format_range(start : Int, count : Int) -> String {
+  if count == 0 {
+    "\{start},0"
+  } else if count == 1 {
+    start.to_string()
+  } else {
+    "\{start},\{count}"
+  }
+}
+
+///|
+fn diff_split_lines_no_trailing_empty(data : Bytes) -> Array[String] {
+  let text = @utf8.decode_lossy(data[:])
+  let lines : Array[String] = []
+  for line_view in text.split("\n") {
+    lines.push(line_view.to_string())
+  }
+  if text.has_suffix("\n") &&
+    lines.length() > 0 &&
+    lines[lines.length() - 1].length() == 0 {
+    ignore(lines.pop())
   }
   lines
 }
@@ -318,15 +403,6 @@ fn diff_emit_modes(out : Array[String], f : DiffFile) -> Unit {
         }
         _ => ()
       }
-  }
-}
-
-///|
-fn diff_emit_lines(out : Array[String], data : Bytes, prefix : String) -> Unit {
-  let text = @utf8.decode_lossy(data[:])
-  for line_view in text.split("\n") {
-    let line = line_view.to_string()
-    out.push(prefix + line)
   }
 }
 

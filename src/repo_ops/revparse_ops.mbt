@@ -244,6 +244,9 @@ fn resolve_base_ref(
   if spec == "HEAD" || spec == "" || spec == "@" {
     return @gitlib.resolve_head_commit(fs, git_dir)
   }
+  if @gitlib.resolve_ref(fs, git_dir, spec) is Some(id) {
+    return Some(id)
+  }
   if spec.has_prefix("refs/") {
     return @gitlib.resolve_ref(fs, git_dir, spec)
   }

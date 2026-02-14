@@ -69,9 +69,9 @@ P0 から順に「先頭の `if is_real_git_delegate_enabled() { delegate_to_rea
   - 付随修正: `worktree add -f` 受理、worktree 上の `bisect` gitdir 解決、checkout の commondir object 参照
 - [ ] P0 blocker: `t3600-rm.sh`（`--run=1-20` で 5 fail）
   - `--cached` 整合性チェック、`ls-files` との整合、`rm` 出力メッセージ互換
-- [ ] P0 blocker: `t7102-reset.sh`（`--run=1-20` で 20 fail）
+- [x] P0 blocker: `t7102-reset.sh`（`GIT_TEST_OPTS='--run=1-20'`: success 20/20, 2026-02-14）
   - オプション検証、`--soft/--hard` の状態遷移、エラーメッセージと出力文言互換
-- [ ] P0 blocker: `t3700-add.sh`（`--run=1-20` で 7 fail）
+- [x] P0 blocker: `t3700-add.sh`（`GIT_TEST_OPTS='--run=1-20'`: success 20/20, 2026-02-14）
   - no-pathspec ヒント文言、`--` 経由 pathspec、`core.filemode=0`、ignore エラー互換
 - [x] P0 smoke: `SHIM_REAL_GIT=/no/such` でも `add/rm/reset/switch` が実行可能（委譲しないことを確認）
 
@@ -182,7 +182,7 @@ git/t ではカバーしきれない standalone 動作を補完的に検証す�
 - [x] `t/` 以下に clone/commit/push/pull の standalone E2E テストを拡充
 - [ ] README に standalone 保証範囲と未対応コマンドを明記する
 
-### 直近 Blocker（2026-02-13 実測）
+### 直近 Blocker（2026-02-14 実測）
 
 - [x] **t5516-fetch-push.sh**（`git-t-full`: success 123/123）
 - [x] **t5510-fetch.sh**（`git-t-full`: success 215/215）
@@ -192,6 +192,14 @@ git/t ではカバーしきれない standalone 動作を補完的に検証す�
 - [x] **t5601-clone.sh**（`git-t-full`: success 114/115, skip 1）
 - [ ] **t5601-clone.sh（pass-through 撤去後の再計測）**
   - [ ] `clone with GIT_DEFAULT_HASH`（test 104）で fail（`success 113 / failed 1 / skip 1`）
+- [x] **t2060-switch.sh**（`git-t-full`: success 16/16）
+  - [x] `--detach` / `--orphan` / `--guess` / `--track=inherit` / `--ignore-other-worktrees` 互換を実装
+- [ ] **t3600-rm.sh**（`GIT_TEST_OPTS='--run=1-20'`: failed 5）
+  - [ ] `--cached` 整合性チェック、`ls-files` との整合、出力メッセージ互換
+- [x] **t7102-reset.sh**（`GIT_TEST_OPTS='--run=1-20'`: success 20/20）
+  - [x] `--soft/--hard` 状態遷移、オプション検証、出力/エラーメッセージ互換
+- [x] **t3700-add.sh**（`GIT_TEST_OPTS='--run=1-20'`: success 20/20）
+  - [x] no-pathspec ヒント、`--` pathspec、`core.filemode=0`、ignore エラー互換
 - [x] **t5616-partial-clone.sh**（`git-t-one-remote`: success 47/47）
   - [x] promisor/filter/refetch/lazy-fetch/protocol v2 互換（one-remote）
 - [x] **t5529-push-errors.sh**（`git-t-full`: 8/8 pass）

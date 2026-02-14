@@ -12,6 +12,7 @@ async fn show_commit_command_help() -> Unit {
 async fn handle_commit(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let fs = OsFs::new()
+  let commit_message_encoding = resolve_commit_message_encoding()
   let mut message : String? = None
   let mut all_modified = false
   let mut amend = false
@@ -45,6 +46,23 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
         i += 2
         continue
       }
+      "-F" if i + 1 < args.length() => {
+        message = Some(
+          read_commit_message_from_file(
+            fs,
+            root,
+            args[i + 1],
+            commit_message_encoding,
+          ),
+        )
+        i += 2
+        continue
+      }
+      "-C" if i + 1 < args.length() => {
+        message = read_commit_message_from_revision(fs, root, args[i + 1])
+        i += 2
+        continue
+      }
       _ if arg.has_prefix("-m") => {
         message = Some((try! arg[2:]).to_string())
         i += 1
@@ -68,6 +86,20 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
       }
       _ if arg.has_prefix("--date=") => {
         date_override = Some((try! arg[7:]).to_string())
+        i += 1
+        continue
+      }
+      _ if arg.has_prefix("-F") => {
+        let file = (try! arg[2:]).to_string()
+        message = Some(
+          read_commit_message_from_file(fs, root, file, commit_message_encoding),
+        )
+        i += 1
+        continue
+      }
+      _ if arg.has_prefix("-C") => {
+        let spec = (try! arg[2:]).to_string()
+        message = read_commit_message_from_revision(fs, root, spec)
         i += 1
         continue
       }
@@ -166,6 +198,87 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
       None => print_line("[" + short_id + "] " + first_line)
     }
   }
+}
+
+///|
+async fn read_commit_message_from_file(
+  fs : &@git.RepoFileSystem,
+  root : String,
+  file : String,
+  encoding : String,
+) -> String raise Error {
+  if file == "-" {
+    return decode_commit_message_bytes(read_all_stdin(), encoding)
+  }
+  let path = if file.has_prefix("/") { file } else { root + "/" + file }
+  decode_commit_message_bytes(fs.read_file(path), encoding)
+}
+
+///|
+fn read_commit_message_from_revision(
+  fs : &@git.RepoFileSystem,
+  root : String,
+  spec : String,
+) -> String? raise Error {
+  let git_dir = resolve_git_dir(fs, root)
+  let commit_id = @gitrepo.rev_parse(fs, git_dir, spec)
+  match commit_id {
+    Some(id) => {
+      let db = @gitlib.ObjectDb::load_lazy(fs, git_dir)
+      match db.get(fs, id) {
+        Some(obj) => Some(extract_commit_message(obj.data))
+        None => None
+      }
+    }
+    None => None
+  }
+}
+
+///|
+fn resolve_commit_message_encoding() -> String {
+  let overrides = @gitlib.parse_config_overrides()
+  match overrides.get("i18n.commitencoding") {
+    Some(value) => {
+      let trimmed = trim_string(value)
+      if trimmed.length() > 0 {
+        trimmed
+      } else {
+        "UTF-8"
+      }
+    }
+    None => "UTF-8"
+  }
+}
+
+///|
+fn decode_commit_message_bytes(data : Bytes, encoding : String) -> String {
+  if is_iso_8859_1_encoding(encoding) {
+    let out = StringBuilder::new()
+    for b in data {
+      out.write_char(b.to_int().unsafe_to_char())
+    }
+    out.to_string()
+  } else {
+    decode_bytes(data)
+  }
+}
+
+///|
+fn is_iso_8859_1_encoding(encoding : String) -> Bool {
+  let normalized = normalize_commit_encoding_name(encoding)
+  normalized == "iso88591" || normalized == "latin1" || normalized == "latin"
+}
+
+///|
+fn normalize_commit_encoding_name(value : String) -> String {
+  let out = StringBuilder::new()
+  for c in trim_string(value).to_lower() {
+    if c == '-' || c == '_' || c == ' ' {
+      continue
+    }
+    out.write_char(c)
+  }
+  out.to_string()
 }
 
 ///|

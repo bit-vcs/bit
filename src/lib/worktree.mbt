@@ -320,6 +320,7 @@ pub async fn add_paths_async(
     git_dir
   }
   let autocrlf = read_autocrlf_setting(rfs, actual_git_dir)
+  let core_filemode = read_core_filemode_setting(rfs, actual_git_dir)
   let entries = read_index_entries(rfs, actual_git_dir)
   let map : Map[String, IndexEntry] = {}
   for e in entries {
@@ -344,14 +345,12 @@ pub async fn add_paths_async(
             let size = content.length()
             let mtime_sec = info.mtime_sec.unwrap_or(0)
             let mtime_nsec = info.mtime_nsec.unwrap_or(0)
-            map[path] = {
-              path,
-              id,
-              mode: info.mode,
-              size,
-              mtime_sec,
-              mtime_nsec,
+            let mode = if core_filemode {
+              info.mode
+            } else {
+              default_file_mode()
             }
+            map[path] = { path, id, mode, size, mtime_sec, mtime_nsec }
           }
           @gitio.WorktreeKind::Symlink(target~) => {
             let bytes = @utf8.encode(target)
@@ -642,6 +641,86 @@ fn parse_autocrlf_value(value : String) -> AutoCrlf {
     "input" => AutoCrlf::Input
     _ => AutoCrlf::Off
   }
+}
+
+///|
+fn read_core_filemode_setting(
+  fs : &@git.RepoFileSystem,
+  git_dir : String,
+) -> Bool {
+  let local_path = join_path(git_dir, "config")
+  if not(fs.is_file(local_path)) {
+    return true
+  }
+  match read_core_filemode_from_config(fs, local_path) {
+    Some(v) => v
+    None => true
+  }
+}
+
+///|
+fn read_core_filemode_from_config(
+  fs : &@git.RepoFileSystem,
+  path : String,
+) -> Bool? {
+  let bytes = fs.read_file(path) catch { _ => return None }
+  let content = @utf8.decode_lossy(bytes[:])
+  let mut section = ""
+  let mut value : Bool? = None
+  for line_view in content.split("\n") {
+    let line = line_view.trim().to_string()
+    if line.length() == 0 {
+      continue
+    }
+    if line.has_prefix("#") || line.has_prefix(";") {
+      continue
+    }
+    if line.has_prefix("[") && line.has_suffix("]") {
+      let inner = String::unsafe_substring(line, start=1, end=line.length() - 1)
+      let inner_trim = inner.trim().to_string()
+      let section_name = match inner_trim.find(" ") {
+        Some(i) => String::unsafe_substring(inner_trim, start=0, end=i)
+        None => inner_trim
+      }
+      section = section_name.to_lower()
+      continue
+    }
+    if section != "core" {
+      continue
+    }
+    match line.find("=") {
+      Some(idx) => {
+        let key = String::unsafe_substring(line, start=0, end=idx)
+          .trim()
+          .to_string()
+          .to_lower()
+        if key != "filemode" {
+          continue
+        }
+        let raw_value = String::unsafe_substring(
+            line,
+            start=idx + 1,
+            end=line.length(),
+          )
+          .trim()
+          .to_string()
+          .to_lower()
+        if raw_value == "true" ||
+          raw_value == "yes" ||
+          raw_value == "on" ||
+          raw_value == "1" {
+          value = Some(true)
+        } else if raw_value == "false" ||
+          raw_value == "no" ||
+          raw_value == "off" ||
+          raw_value == "0" {
+          value = Some(false)
+        }
+      }
+      None => ()
+    }
+  }
+  value
 }
 
 ///|
