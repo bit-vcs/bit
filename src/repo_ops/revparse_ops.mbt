@@ -553,6 +553,7 @@ fn resolve_path_in_commit(
   }
 }
 
+///|
 /// List all refs (loose + packed).
 pub fn show_ref(
   fs : &@types.RepoFileSystem,

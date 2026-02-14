@@ -86,7 +86,7 @@ fn format_show_date(timestamp : Int64, timezone : String) -> String {
   let days = local_seconds / 86400
   let time_of_day = local_seconds % 86400
   let hours = time_of_day / 3600
-  let minutes = (time_of_day % 3600) / 60
+  let minutes = time_of_day % 3600 / 60
   let seconds = time_of_day % 60
   let (year, month, day) = days_to_date(days)
   let weekday = (days + 4) % 7 // Jan 1, 1970 was Thursday.
@@ -168,7 +168,9 @@ async fn handle_show(args : Array[String]) -> Unit raise Error {
       grep_patterns.push(args[i + 1])
       i += 1
     } else if arg.has_prefix("--grep=") {
-      grep_patterns.push(String::unsafe_substring(arg, start=7, end=arg.length()))
+      grep_patterns.push(
+        String::unsafe_substring(arg, start=7, end=arg.length()),
+      )
     } else if arg == "-i" || arg == "--regexp-ignore-case" {
       grep_ignore_case = true
     } else if arg == "-F" || arg == "--fixed-strings" {
@@ -188,9 +190,7 @@ async fn handle_show(args : Array[String]) -> Unit raise Error {
     i += 1
   }
   let grep_pattern_type = resolve_grep_pattern_type(
-    fs,
-    git_dir,
-    grep_pattern_type_override,
+    fs, git_dir, grep_pattern_type_override,
   )
   if oneline && quiet {
     let targets : Array[String] = if revs.length() > 0 {
@@ -215,13 +215,13 @@ async fn handle_show(args : Array[String]) -> Unit raise Error {
       }
       let info = parse_show_commit(o.data)
       if not(
-        grep_patterns_match_message(
-          info.message,
-          grep_patterns,
-          grep_pattern_type,
-          grep_ignore_case,
-        ),
-      ) {
+          grep_patterns_match_message(
+            info.message,
+            grep_patterns,
+            grep_pattern_type,
+            grep_ignore_case,
+          ),
+        ) {
         continue
       }
       let short = String::unsafe_substring(commit_id.to_hex(), start=0, end=7)
@@ -285,19 +285,21 @@ async fn handle_show(args : Array[String]) -> Unit raise Error {
   // Parse full commit details
   let show_info = parse_show_commit(o.data)
   if not(
-    grep_patterns_match_message(
-      show_info.message,
-      grep_patterns,
-      grep_pattern_type,
-      grep_ignore_case,
-    ),
-  ) {
+      grep_patterns_match_message(
+        show_info.message,
+        grep_patterns,
+        grep_pattern_type,
+        grep_ignore_case,
+      ),
+    ) {
     return ()
   }
   // Print commit info
   print_line("commit \{commit_id.to_hex()}")
   print_line("Author: \{show_info.author}")
-  print_line("Date:   \{format_show_date(show_info.timestamp, show_info.timezone)}")
+  print_line(
+    "Date:   \{format_show_date(show_info.timestamp, show_info.timezone)}",
+  )
   print_line("")
   // Print message with indentation
   for line_view in show_info.message.split("\n") {

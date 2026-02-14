@@ -54,12 +54,11 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
         i += 2
         continue
       }
-      "-m" => {
-        raise @git.GitError::InvalidObject("option '-m' requires a value")
-      }
-      "--message" => {
-        raise @git.GitError::InvalidObject("option '--message' requires a value")
-      }
+      "-m" => raise @git.GitError::InvalidObject("option '-m' requires a value")
+      "--message" =>
+        raise @git.GitError::InvalidObject(
+          "option '--message' requires a value",
+        )
       _ if arg.has_prefix("-m") => {
         message = Some((try! arg[2:]).to_string())
         i += 1

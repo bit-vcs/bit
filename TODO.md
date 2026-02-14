@@ -189,6 +189,8 @@ P0 から順に「先頭の `if is_real_git_delegate_enabled() { delegate_to_rea
       - `tag -d` 複数削除対応（negotiation-tip setup 回帰を解消）
       - `add` pathspec 解決失敗時の real git fallback
       - reftable repo の `init/commit/update-ref/tag` を real git 委譲（setup 互換を確保）
+      - non-sha1 repo の `add/commit` を real git 委譲（`t5601` test 104 回帰を解消）
+      - promisor repo の `checkout` を real git 委譲（`t5601` test 108 回帰を解消）
     - [x] 回帰確認:
       `just git-t-full t5607-clone-bundle.sh`（16/16）、
       `just git-t-full t5750-bundle-uri-parse.sh`（13/13）、
@@ -196,6 +198,9 @@ P0 から順に「先頭の `if is_real_git_delegate_enabled() { delegate_to_rea
       `moon test -p mizchi/bit/cmd/bit -f hash_object_wbtest.mbt`（3/3）、
       `moon check --target native`、
       `t/t0005-fallback.sh`（15/15）
+    - [x] `bit hq get` の失敗経路を非0終了に修正
+      （invalid repo / clone失敗 / sparse-checkout失敗）
+    - [x] 回帰E2Eを追加: `t/t0021-hq-get.sh`（2/2）
 
 ### 絞り込み再計測の結果（2026-02-13 夜）
 
@@ -223,9 +228,9 @@ P0 から順に「先頭の `if is_real_git_delegate_enabled() { delegate_to_rea
 - fetch/clone 回帰（full command set）
   - [x] `t5510-fetch.sh`: `success 215 / failed 0`
   - [x] `t5516-fetch-push.sh`: `success 123 / failed 0`
-  - [ ] `t5601-clone.sh`: `success 65 / failed 50 / skip 0`（pass-through 撤去後）
+  - [x] `t5601-clone.sh`: `success 114 / failed 0 / skip 1`（pass-through 撤去後, 2026-02-14）
     - [x] test 104 `clone with GIT_DEFAULT_HASH` は pass（`--run=104`: success 1 / failed 0）
-    - [ ] 残: SSH clone クラスタ（`40-97`）
+    - [x] SSH clone クラスタ（`40-97`）は解消（`GIT_TEST_OPTS='--run=1-97'`: success 96 / failed 0）
 
 ## 性能改善（2026-02-12）
 
@@ -313,13 +318,13 @@ git/t ではカバーしきれない standalone 動作を補完的に検証す�
   - [x] `--prune` / `--prune-tags` / `--refmap` / `--atomic` 互換
   - [x] bundle / negotiation-tip / D/F conflict / auto-gc 互換
 - [x] **t5601-clone.sh（2026-02-13 基準値）**（`git-t-full`: success 114/115, skip 1）
-- [ ] **t5601-clone.sh（pass-through 撤去後の再計測）**
-  - [ ] 現在値: `success 65 / failed 50 / skip 0`（2026-02-14）
+- [x] **t5601-clone.sh（pass-through 撤去後の再計測）**
+  - [x] 現在値: `success 114 / failed 0 / skip 1`（2026-02-14）
   - [x] `clone with GIT_DEFAULT_HASH`（test 104）は pass（`GIT_TEST_OPTS='--run=104'`: success 1/1）
-  - [ ] SSH clone クラスタ（`40-97`）は未解消（`just git-t-full t5601-clone.sh`）
-- [ ] **bit ghq get 回帰の切り分け**
-  - [ ] `bit ghq get` の落ち方を再現し、最小 E2E を `t/` に追加（Red）
-  - [ ] `t5601` 修正と同時に `ghq get` ガードを維持して Green 化
+  - [x] SSH clone クラスタ（`40-97`）は解消（`GIT_TEST_OPTS='--run=1-97'`: success 96 / failed 0）
+- [x] **bit ghq get 回帰の切り分け**
+  - [x] `bit ghq get` の落ち方を再現し、最小 E2E を `t/` に追加（`t/t0021-hq-get.sh`）
+  - [x] `t5601` 修正と同時に `ghq get` ガードを維持して Green 化
 - [x] **t2060-switch.sh**（`git-t-full`: success 16/16）
   - [x] `--detach` / `--orphan` / `--guess` / `--track=inherit` / `--ignore-other-worktrees` 互換を実装
 - [x] **t3600-rm.sh**（`GIT_TEST_OPTS='--run=1-20'`: success 20/20, 2026-02-14）

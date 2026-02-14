@@ -15,7 +15,7 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
   let rfs : &@git.RepoFileSystem = fs
   let git_dir = resolve_git_dir(rfs, root)
   if commit_should_delegate_to_real_git(args) ||
-    (real_git_delegate_is_available(rfs) && is_reftable_repo(rfs, git_dir)) {
+    commit_repo_requires_real_git_delegate(rfs, git_dir) {
     delegate_to_real_git("commit", args)
     return ()
   }
@@ -197,16 +197,8 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
     )
   } else if merge_heads.length() > 0 {
     commit_with_merge_heads(
-      fs,
-      fs,
-      root,
-      msg,
-      author,
-      author_timestamp,
-      committer,
-      committer_timestamp,
-      merge_heads,
-      allow_empty,
+      fs, fs, root, msg, author, author_timestamp, committer, committer_timestamp,
+      merge_heads, allow_empty,
     )
   } else {
     @gitlib.commit(
@@ -237,6 +229,15 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
       None => print_line("[" + short_id + "] " + first_line)
     }
   }
+}
+
+///|
+fn commit_repo_requires_real_git_delegate(
+  fs : &@git.RepoFileSystem,
+  git_dir : String,
+) -> Bool {
+  guard real_git_delegate_is_available(fs) else { return false }
+  is_reftable_repo(fs, git_dir) || repo_object_format(fs, git_dir) != "sha1"
 }
 
 ///|
@@ -349,10 +350,7 @@ fn commit_with_merge_heads(
           None => {
             let (empty_tree_id, empty_tree_compressed) = @git.create_tree([])
             @gitlib.write_object_bytes(
-              fs,
-              git_dir,
-              empty_tree_id,
-              empty_tree_compressed,
+              fs, git_dir, empty_tree_id, empty_tree_compressed,
             )
             empty_tree_id
           }
@@ -361,10 +359,7 @@ fn commit_with_merge_heads(
       None => {
         let (empty_tree_id, empty_tree_compressed) = @git.create_tree([])
         @gitlib.write_object_bytes(
-          fs,
-          git_dir,
-          empty_tree_id,
-          empty_tree_compressed,
+          fs, git_dir, empty_tree_id, empty_tree_compressed,
         )
         empty_tree_id
       }
@@ -390,15 +385,8 @@ fn commit_with_merge_heads(
     parents.push(merge_head)
   }
   let commit = @git.Commit::new(
-    tree_id,
-    parents,
-    author,
-    author_timestamp,
-    "+0000",
-    committer,
-    committer_timestamp,
-    "+0000",
-    message,
+    tree_id, parents, author, author_timestamp, "+0000", committer, committer_timestamp,
+    "+0000", message,
   )
   let (commit_id, compressed) = @git.create_commit(commit)
   @gitlib.write_object_bytes(fs, git_dir, commit_id, compressed)

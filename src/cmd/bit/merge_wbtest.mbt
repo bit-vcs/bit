@@ -29,7 +29,9 @@ test "merge delegate gate: available real git path is delegated" {
   @sys.unset_env_var("GIT_SHIM_REAL_GIT")
   assert_true(merge_can_delegate_to_real_git(fs))
   assert_true(merge_should_delegate_to_real_git(fs, ["feature"]))
-  assert_true(merge_should_delegate_to_real_git(fs, ["--message", "msg", "feature"]))
+  assert_true(
+    merge_should_delegate_to_real_git(fs, ["--message", "msg", "feature"]),
+  )
   assert_true(merge_should_delegate_to_real_git(fs, ["feature-a", "feature-b"]))
   restore_env_var_for_merge_wbtest("SHIM_REAL_GIT", prev_primary)
   restore_env_var_for_merge_wbtest("GIT_SHIM_REAL_GIT", prev_secondary)

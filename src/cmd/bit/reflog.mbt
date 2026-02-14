@@ -130,13 +130,10 @@ async fn show_reflog(
       }
       let message = "commit: " + entry.message
       if not(
-        grep_patterns_match_message(
-          message,
-          grep_patterns,
-          grep_pattern_type,
-          grep_ignore_case,
-        ),
-      ) {
+          grep_patterns_match_message(
+            message, grep_patterns, grep_pattern_type, grep_ignore_case,
+          ),
+        ) {
         continue
       }
       let sha = if no_abbrev_commit {
@@ -160,13 +157,13 @@ async fn show_reflog(
     let idx = len - 1 - i
     let entry = entries[idx]
     if not(
-      grep_patterns_match_message(
-        entry.message,
-        grep_patterns,
-        grep_pattern_type,
-        grep_ignore_case,
-      ),
-    ) {
+        grep_patterns_match_message(
+          entry.message,
+          grep_patterns,
+          grep_pattern_type,
+          grep_ignore_case,
+        ),
+      ) {
       continue
     }
     let sha = if no_abbrev_commit {
@@ -201,13 +198,16 @@ fn parse_reflog_show_args(args : Array[String]) -> ReflogShowArgs {
         max_count = parse_reflog_max_count_value(
           String::unsafe_substring(arg, start=12, end=arg.length()),
         )
-      _ if reflog_parse_short_max_count(arg) is Some(limit) => max_count = Some(limit)
+      _ if reflog_parse_short_max_count(arg) is Some(limit) =>
+        max_count = Some(limit)
       "--grep" if i + 1 < args.length() => {
         grep_patterns.push(args[i + 1])
         i += 1
       }
       _ if arg.has_prefix("--grep=") =>
-        grep_patterns.push(String::unsafe_substring(arg, start=7, end=arg.length()))
+        grep_patterns.push(
+          String::unsafe_substring(arg, start=7, end=arg.length()),
+        )
       "-i" | "--regexp-ignore-case" => grep_ignore_case = true
       "-F" | "--fixed-strings" =>
         grep_pattern_type_override = Some(GrepPatternType::Fixed)

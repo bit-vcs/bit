@@ -28,12 +28,13 @@ fn resolve_grep_pattern_type(
       match get_config_override("grep.patterntype") {
         Some(value) => parse_grep_pattern_type_name(value)
         None =>
-          match @gitlib.read_config_value(
-            rfs,
-            git_dir + "/config",
-            "grep",
-            "patterntype",
-          ) {
+          match
+            @gitlib.read_config_value(
+              rfs,
+              git_dir + "/config",
+              "grep",
+              "patterntype",
+            ) {
             Some(value) => parse_grep_pattern_type_name(value)
             None => GrepPatternType::Basic
           }
@@ -66,21 +67,13 @@ fn grep_message_matches_pattern(
   pattern_type : GrepPatternType,
   ignore_case : Bool,
 ) -> Bool {
-  let source = if ignore_case {
-    message.to_lower()
-  } else {
-    message
-  }
-  let needle = if ignore_case {
-    pattern.to_lower()
-  } else {
-    pattern
-  }
+  let source = if ignore_case { message.to_lower() } else { message }
+  let needle = if ignore_case { pattern.to_lower() } else { pattern }
   match pattern_type {
     GrepPatternType::Fixed => source.contains(needle)
-    GrepPatternType::Basic |
-    GrepPatternType::Extended |
-    GrepPatternType::Perl => grep_regex_like_contains(source, needle)
+    GrepPatternType::Basic
+    | GrepPatternType::Extended
+    | GrepPatternType::Perl => grep_regex_like_contains(source, needle)
   }
 }
 
@@ -147,7 +140,8 @@ fn grep_regex_like_match_at(
 fn extract_commit_message_from_raw(data : Bytes) -> String {
   let text = decode_bytes(data)
   match text.find("\n\n") {
-    Some(idx) => String::unsafe_substring(text, start=idx + 2, end=text.length())
+    Some(idx) =>
+      String::unsafe_substring(text, start=idx + 2, end=text.length())
     None => ""
   }
 }

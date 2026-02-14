@@ -16,6 +16,13 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
   }
   let root = get_work_root()
   let fs = OsFs::new()
+  let rfs : &@git.RepoFileSystem = fs
+  let git_dir = resolve_git_dir(rfs, root)
+  if real_git_delegate_is_available(rfs) &&
+    repo_object_format(rfs, git_dir) != "sha1" {
+    delegate_to_real_git("add", args)
+    return
+  }
   let mut add_all = false
   let mut force = false
   let mut refresh = false
@@ -95,7 +102,6 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
     @sys.exit(1)
   }
   if stage_paths.length() == 0 {
-    let rfs : &@git.RepoFileSystem = fs
     if real_git_delegate_is_available(rfs) {
       delegate_to_real_git("add", args)
       return

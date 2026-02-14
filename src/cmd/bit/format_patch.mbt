@@ -44,7 +44,9 @@ async fn handle_format_patch(args : Array[String]) -> Unit raise Error {
         i += 2
       }
       _ if arg.has_prefix("--grep=") => {
-        grep_patterns.push(String::unsafe_substring(arg, start=7, end=arg.length()))
+        grep_patterns.push(
+          String::unsafe_substring(arg, start=7, end=arg.length()),
+        )
         i += 1
       }
       "-i" | "--regexp-ignore-case" => {
@@ -87,18 +89,11 @@ async fn handle_format_patch(args : Array[String]) -> Unit raise Error {
     @sys.exit(128)
   }
   let grep_pattern_type = resolve_grep_pattern_type(
-    rfs,
-    git_dir,
-    grep_pattern_type_override,
+    rfs, git_dir, grep_pattern_type_override,
   )
   let db = @gitlib.ObjectDb::load(rfs, git_dir)
   let commits = filter_format_patch_commits_by_grep(
-    db,
-    rfs,
-    commits,
-    grep_patterns,
-    grep_pattern_type,
-    grep_ignore_case,
+    db, rfs, commits, grep_patterns, grep_pattern_type, grep_ignore_case,
   )
   if commits.length() == 0 {
     return
@@ -261,19 +256,14 @@ fn filter_format_patch_commits_by_grep(
   let filtered : Array[@git.ObjectId] = []
   for commit_id in commits {
     let obj = db.get(rfs, commit_id)
-    guard obj is Some(o) else {
-      continue
-    }
+    guard obj is Some(o) else { continue }
     if o.obj_type != @git.ObjectType::Commit {
       continue
     }
     let commit_message = extract_commit_message_from_raw(o.data)
     if grep_patterns_match_message(
-      commit_message,
-      grep_patterns,
-      grep_pattern_type,
-      grep_ignore_case,
-    ) {
+        commit_message, grep_patterns, grep_pattern_type, grep_ignore_case,
+      ) {
       filtered.push(commit_id)
     }
   }

@@ -111,13 +111,13 @@ async fn handle_hq_get(args : Array[String]) -> Unit raise Error {
   }
   guard url is Some(repo_url) else {
     print_hq_get_usage()
-    return
+    @sys.exit(1)
   }
   // Parse repository URL
   let repo = @hq.parse_repo_url(repo_url)
   guard repo is Some(r) else {
     eprint_line("bit hq get: invalid repository '\{repo_url}'")
-    return
+    @sys.exit(1)
   }
   // Load configuration
   let config = @hq.load_config(get_env_hq, get_git_config_hq)
@@ -138,6 +138,7 @@ async fn handle_hq_get(args : Array[String]) -> Unit raise Error {
         print_line("Updated \{contract_path_hq(local_path)}")
       } else {
         eprint_line("bit hq get: failed to update")
+        @sys.exit(1)
       }
     } else {
       print_line(
@@ -180,20 +181,35 @@ async fn handle_hq_get(args : Array[String]) -> Unit raise Error {
   let code = run_git_command(clone_args, cwd=None)
   if code != 0 {
     eprint_line("bit hq get: clone failed")
-    return
+    @sys.exit(1)
   }
   // Handle sparse checkout
   if r.needs_sparse() {
     let subdir = r.subdir.unwrap_or("")
-    let _ = run_git_command(
+    let sparse_init_code = run_git_command(
       ["-C", local_path, "sparse-checkout", "init", "--cone"],
       cwd=None,
     )
-    let _ = run_git_command(
+    if sparse_init_code != 0 {
+      eprint_line("bit hq get: sparse-checkout init failed")
+      @sys.exit(1)
+    }
+    let sparse_set_code = run_git_command(
       ["-C", local_path, "sparse-checkout", "set", subdir],
       cwd=None,
     )
-    let _ = run_git_command(["-C", local_path, "checkout"], cwd=None)
+    if sparse_set_code != 0 {
+      eprint_line("bit hq get: sparse-checkout set failed")
+      @sys.exit(1)
+    }
+    let checkout_code = run_git_command(
+      ["-C", local_path, "checkout"],
+      cwd=None,
+    )
+    if checkout_code != 0 {
+      eprint_line("bit hq get: checkout failed")
+      @sys.exit(1)
+    }
   }
   print_line("Cloned to \{contract_path_hq(local_path)}")
 }

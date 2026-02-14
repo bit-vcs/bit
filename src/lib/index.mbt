@@ -152,7 +152,9 @@ pub fn read_skip_worktree_paths(
     let stage = (flags >> 12) & 0x3
     let has_extended = (flags & 0x4000) != 0
     let ext_flags = if has_extended {
-      index_read_u16_be(data, offset + 62) catch { _ => return out }
+      index_read_u16_be(data, offset + 62) catch {
+        _ => return out
+      }
     } else {
       0
     }

@@ -12,7 +12,9 @@ test "branch delegate gate: non-reftable simple create stays pure path" {
   let prev_secondary = @sys.get_env_var("GIT_SHIM_REAL_GIT")
   let fs = @git.TestFs::new()
   fs.mkdir_p("/repo/.git")
-  fs.write_string("/repo/.git/config", "[core]\n\trepositoryformatversion = 0\n")
+  fs.write_string(
+    "/repo/.git/config", "[core]\n\trepositoryformatversion = 0\n",
+  )
   @sys.set_env_var("SHIM_REAL_GIT", "git")
   @sys.unset_env_var("GIT_SHIM_REAL_GIT")
   assert_false(
@@ -29,8 +31,7 @@ test "branch delegate gate: reftable repo delegates simple create" {
   let fs = @git.TestFs::new()
   fs.mkdir_p("/repo/.git")
   fs.write_string(
-    "/repo/.git/config",
-    "[core]\n\trepositoryformatversion = 1\n[extensions]\n\trefStorage = reftable\n",
+    "/repo/.git/config", "[core]\n\trepositoryformatversion = 1\n[extensions]\n\trefStorage = reftable\n",
   )
   @sys.set_env_var("SHIM_REAL_GIT", "git")
   @sys.unset_env_var("GIT_SHIM_REAL_GIT")

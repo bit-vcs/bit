@@ -76,6 +76,8 @@ fn index_test_mark_single_entry_skip_worktree(
     k += 1
   }
 
-  let patched = Bytes::from_array(FixedArray::makei(arr.length(), fn(i) { arr[i] }))
+  let patched = Bytes::from_array(
+    FixedArray::makei(arr.length(), fn(i) { arr[i] }),
+  )
   fs.write_file(index_path, patched)
 }

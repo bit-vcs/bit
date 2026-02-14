@@ -230,9 +230,7 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
   let local_src_file_path = resolve_local_clone_source_file(
     fs, command_root, remote_url,
   )
-  if clone_should_delegate_to_real_git_for_bundle(
-      fs, local_src_file_path,
-    ) {
+  if clone_should_delegate_to_real_git_for_bundle(fs, local_src_file_path) {
     delegate_to_real_git("clone", args)
     return ()
   }
