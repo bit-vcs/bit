@@ -7,6 +7,7 @@ async fn handle_show_ref(args : Array[String]) -> Unit raise Error {
   let mut tags_only = false
   let mut hash_only = false
   let mut verify = false
+  let mut exists = false
   let mut quiet = false
   let patterns : Array[String] = []
   for arg in args {
@@ -15,10 +16,21 @@ async fn handle_show_ref(args : Array[String]) -> Unit raise Error {
       "--tags" => tags_only = true
       "-s" | "--hash" => hash_only = true
       "--verify" => verify = true
+      "--exists" => exists = true
       "-q" | "--quiet" => quiet = true
       "--" => ()
       _ if arg.has_prefix("-") => warn_unimplemented_arg("show-ref", arg)
       _ => patterns.push(arg)
+    }
+  }
+  if exists {
+    if patterns.length() != 1 {
+      @sys.exit(1)
+    }
+    let refname = patterns[0]
+    match @gitlib.resolve_ref(fs, git_dir, refname) {
+      Some(_) => @sys.exit(0)
+      None => @sys.exit(2)
     }
   }
   if verify {

@@ -71,16 +71,25 @@
 - [x] `config` の先頭 real-git 委譲を撤去（`src/cmd/bit/config.mbt`）
 - [x] `SHIM_REAL_GIT=/no/such` でも `config` が動く fallback smoke を追加（`t/t0005-fallback.sh`）
 - [x] `GIT_TEST_OPTS='--run=1-20' just git-t-full t1300-config.sh` が green（`success 20 / failed 0 / broken 0`）
+- [x] `branch` の先頭 real-git 委譲を撤去（複雑オプションのみ条件付き委譲）
+  - `SHIM_REAL_GIT=/no/such` fallback smoke: `t/t0005-fallback.sh` を継続 green（6/6）
+  - `GIT_TEST_OPTS='--run=1-30' just git-t-full t3200-branch.sh` が green
+- [x] `rev-parse` の互換修正（`src/cmd/bit/rev_parse.mbt`）
+  - `--abbrev-ref`（`HEAD` / local branch）を実装
+  - reflog 記法 `name@{N}` の解決を実装（`aaa@{0}`, `bbb@{1}` 回帰を解消）
+- [x] `reflog show` の互換修正（`src/cmd/bit/reflog.mbt`）
+  - `--no-abbrev-commit` の引数解釈と表示を実装（`t3200` #11 回帰を解消）
 
 ## 次に git 依存をなくす候補（2026-02-14）
 
 `moon ide find-references delegate_to_real_git` 基準で、`src/cmd/bit` には
-まだ 15 コマンド分の `SHIM_REAL_GIT` 条件付き委譲が残っている。
+まだ 9 コマンド分の `SHIM_REAL_GIT` 条件付き委譲が残っている
+（呼び出し 9 + 定義 1 = 参照 10）。
 
 優先度（低リスク順）:
 
 - [x] P0（短期）着手: `rm`, `reset`, `switch`, `add` の先頭委譲を撤去
-- [ ] P1（中期）: `branch`, `checkout`, `update-ref`, `log`（`config` は完了）
+- [ ] P1（中期）: `checkout`, `log`（`config`, `update-ref`, `branch` は完了）
 - [ ] P2（中〜高）: `bundle`, `merge`
 - [ ] P3（高）: `fetch`, `pull`, `push`, `hash-object`（compat object format の条件付き委譲）
 
@@ -97,6 +106,16 @@ P0 から順に「先頭の `if is_real_git_delegate_enabled() { delegate_to_rea
 - [x] P0 blocker: `t3700-add.sh`（`GIT_TEST_OPTS='--run=1-20'`: success 20/20, 2026-02-14）
   - no-pathspec ヒント文言、`--` 経由 pathspec、`core.filemode=0`、ignore エラー互換
 - [x] P0 smoke: `SHIM_REAL_GIT=/no/such` でも `add/rm/reset/switch` が実行可能（委譲しないことを確認）
+- [x] P1 progress: `update-ref` の先頭委譲を撤去（2026-02-14）
+  - `SHIM_REAL_GIT=/no/such` fallback smoke を追加（`t/t0005-fallback.sh`）
+  - `GIT_TEST_OPTS='--run=1-30' just git-t-full t1400-update-ref.sh` が green
+  - 互換修正: `HEAD` 経由更新/削除、HEAD reflog 追記、`core.logAllRefUpdates=true`（bare）、
+    packed-refs からの削除、self-referential symbolic-ref のループ検出
+- [x] P1 progress: `branch` の先頭委譲を撤去（2026-02-14）
+  - `GIT_TEST_OPTS='--run=1-30' just git-t-full t3200-branch.sh` が green
+  - 互換修正: `branch -h`（broken repo 129）、`--create-reflog` + reflog 出力、
+    `rev-parse --abbrev-ref`, `name@{N}` を実装して `t3200` 初段回帰を解消
+  - [ ] `just git-t-full t3200-branch.sh` 全量は未完（現状 `failed 27 / 167`）
 
 ### 絞り込み再計測の結果（2026-02-13 夜）
 

@@ -39,6 +39,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
   let mut show_ref_format = false
   let mut show_object_format = false
   let mut short_length : Int? = None
+  let mut abbrev_ref = false
   for arg in args {
     match arg {
       "--revs-only" => revs_only = true
@@ -47,6 +48,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
       "--show-ref-format" => show_ref_format = true
       "--show-object-format" => show_object_format = true
       "--short" => short_length = Some(7)
+      "--abbrev-ref" => abbrev_ref = true
       _ if arg.has_prefix("--short=") =>
         match
           parse_rev_parse_short_length(
@@ -55,6 +57,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
           Some(value) => short_length = Some(value)
           None => short_length = Some(7)
         }
+      _ if arg.has_prefix("--abbrev-ref=") => abbrev_ref = true
       _ if arg.has_prefix("--show-object-format=") => show_object_format = true
       _ => ()
     }
@@ -96,25 +99,40 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
       "--quiet" => ()
       "--short" => ()
       _ if arg.has_prefix("--short=") => ()
+      "--abbrev-ref" => ()
+      _ if arg.has_prefix("--abbrev-ref=") => ()
       _ if arg.has_prefix("-") => warn_unimplemented_arg("rev-parse", arg)
       _ => {
-        let id = if arg == "FETCH_HEAD" {
-          resolve_fetch_head_oid(fs, git_dir)
-        } else if arg.has_prefix(":") && arg.length() > 1 {
-          resolve_index_path_oid(fs, git_dir, arg)
+        if abbrev_ref {
+          let name = resolve_abbrev_ref_name(fs, git_dir, arg)
+          match name {
+            Some(value) => print_line(value)
+            None =>
+              if not(revs_only) {
+                raise @git.GitError::InvalidObject("unknown revision: " + arg)
+              }
+          }
         } else {
-          @gitrepo.rev_parse(fs, git_dir, arg)
-        }
-        match id {
-          Some(oid) =>
-            match short_length {
-              Some(length) => print_line(shorten_oid_hex(oid.to_hex(), length))
-              None => print_line(oid.to_hex())
-            }
-          None =>
-            if not(revs_only) {
-              raise @git.GitError::InvalidObject("unknown revision: " + arg)
-            }
+          let id = if arg == "FETCH_HEAD" {
+            resolve_fetch_head_oid(fs, git_dir)
+          } else if arg.has_prefix(":") && arg.length() > 1 {
+            resolve_index_path_oid(fs, git_dir, arg)
+          } else if arg.find("@{") is Some(_) {
+            resolve_reflog_selector(fs, git_dir, arg)
+          } else {
+            @gitrepo.rev_parse(fs, git_dir, arg)
+          }
+          match id {
+            Some(oid) =>
+              match short_length {
+                Some(length) => print_line(shorten_oid_hex(oid.to_hex(), length))
+                None => print_line(oid.to_hex())
+              }
+            None =>
+              if not(revs_only) {
+                raise @git.GitError::InvalidObject("unknown revision: " + arg)
+              }
+          }
         }
       }
     }
@@ -189,6 +207,81 @@ fn parse_rev_parse_short_length(value : String) -> Int? {
     result = result * 10 + (c.to_int() - '0'.to_int())
   }
   Some(result)
+}
+
+///|
+fn parse_reflog_selector(spec : String) -> (String, Int)? {
+  guard spec.has_suffix("}") else { return None }
+  match spec.find("@{") {
+    Some(idx) => {
+      let number_start = idx + 2
+      guard number_start < spec.length() - 1 else { return None }
+      let number_text = String::unsafe_substring(
+        spec,
+        start=number_start,
+        end=spec.length() - 1,
+      )
+      let mut number = 0
+      for c in number_text {
+        if c < '0' || c > '9' {
+          return None
+        }
+        number = number * 10 + (c.to_int() - '0'.to_int())
+      }
+      let raw_ref = String::unsafe_substring(spec, start=0, end=idx)
+      let refname = if raw_ref.length() == 0 || raw_ref == "HEAD" {
+        "HEAD"
+      } else if raw_ref.has_prefix("refs/") {
+        raw_ref
+      } else {
+        "refs/heads/" + raw_ref
+      }
+      Some((refname, number))
+    }
+    None => None
+  }
+}
+
+///|
+fn resolve_reflog_selector(
+  fs : &@git.RepoFileSystem,
+  git_dir : String,
+  spec : String,
+) -> @git.ObjectId? raise Error {
+  match parse_reflog_selector(spec) {
+    Some(parsed) => {
+      let refname = parsed.0
+      let index = parsed.1
+      let entries = @gitrepo.read_reflog(fs, git_dir, refname)
+      let len = entries.length()
+      if index >= len {
+        return None
+      }
+      Some(entries[len - 1 - index].new_id)
+    }
+    None => None
+  }
+}
+
+///|
+fn resolve_abbrev_ref_name(
+  fs : &@git.RepoFileSystem,
+  git_dir : String,
+  spec : String,
+) -> String? raise Error {
+  if spec == "HEAD" {
+    return match @gitlib.read_head_ref(fs, git_dir) {
+      @gitlib.HeadRef::Branch(name) => Some(name)
+      @gitlib.HeadRef::Detached(_) => Some("HEAD")
+    }
+  }
+  if spec.has_prefix("refs/heads/") {
+    return Some(String::unsafe_substring(spec, start=11, end=spec.length()))
+  }
+  if @gitlib.resolve_ref(fs, git_dir, "refs/heads/" + spec) is Some(_) {
+    return Some(spec)
+  }
+  None
 }
 
 ///|

@@ -113,6 +113,8 @@ type RebaseTodoEntry
 
 type RemoteTrackingHeadState
 
+type RmOptions
+
 type RunGitCommandInvocation
 
 type RunGitEnvSnapshot

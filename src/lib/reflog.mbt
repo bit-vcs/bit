@@ -253,17 +253,13 @@ pub fn should_log_ref(
   match log_all_ref_updates {
     Some("always") => (true, true)
     Some("true") | Some("1") =>
-      // Log refs/heads/* and refs/remotes/* only, not arbitrary refs
-      if is_bare {
-        (false, false) // bare repos don't log by default even with true
-      } else {
-        (
-          refname.has_prefix("refs/heads/") ||
-          refname.has_prefix("refs/remotes/") ||
-          refname == "HEAD",
-          false,
-        )
-      }
+      // Log branch/remote refs only, not arbitrary refs.
+      (
+        refname.has_prefix("refs/heads/") ||
+        refname.has_prefix("refs/remotes/") ||
+        (not(is_bare) && refname == "HEAD"),
+        false,
+      )
     _ => (false, false)
   }
 }

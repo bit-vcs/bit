@@ -1,11 +1,8 @@
 ///|
 async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
-  if is_real_git_delegate_enabled() {
-    delegate_to_real_git("update-ref", args)
-  }
   let root = get_work_root()
-  let git_dir = root + "/.git"
   let fs = OsFs::new()
+  let git_dir = resolve_git_dir(fs, root)
   let mut delete_mode = false
   let mut create_reflog = false
   let mut no_deref = false
@@ -28,11 +25,9 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
     }
     i += 1
   }
-  ignore(no_deref)
-  // Check if bare repo
-  let is_bare = fs.is_file(git_dir + "/config") &&
-    not(fs.is_dir(root + "/.git"))
-  let actual_git_dir = if is_bare { root } else { git_dir }
+  let is_bare = is_bare_repo_dir(root)
+  let actual_git_dir = git_dir
+  let head_target = resolve_symbolic_ref_target(fs, actual_git_dir, "HEAD")
   // Get current timestamp for reflog
   let timestamp = get_current_timestamp()
   let timezone = "+0000"
@@ -41,7 +36,17 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
     if positional.length() < 1 {
       raise @git.GitError::InvalidObject("usage: git update-ref -d <refname>")
     }
-    let refname = positional[0]
+    let input_refname = positional[0]
+    let refname = resolve_update_target_ref(
+      fs, actual_git_dir, input_refname, no_deref,
+    )
+    if not(no_deref) &&
+      has_symbolic_ref_cycle(fs, actual_git_dir, input_refname) {
+      @stdio.stderr.write(
+        "error: cannot lock ref '\{input_refname}': unable to resolve reference '\{input_refname}'",
+      )
+      @sys.exit(1)
+    }
     let old_value : String? = if positional.length() >= 2 {
       Some(positional[1])
     } else {
@@ -75,14 +80,18 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
     if fs.is_file(ref_path) {
       fs.remove_file(ref_path)
     }
+    delete_packed_ref_entry(fs, actual_git_dir, refname)
     // Write reflog entry for deletion
     let rfs : &@git.RepoFileSystem = fs
     let wfs : &@git.FileSystem = fs
     let (should_log, _) = @gitrepo.should_log_ref(
       rfs, actual_git_dir, refname, is_bare,
     )
+    let should_head_log = should_update_head_reflog(
+      input_refname, refname, no_deref, head_target,
+    )
+    let msg = message.unwrap_or("update-ref: delete")
     if should_log || @gitrepo.reflog_exists(rfs, actual_git_dir, refname) {
-      let msg = message.unwrap_or("update-ref: delete")
       @gitrepo.append_reflog(
         wfs,
         rfs,
@@ -97,6 +106,24 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
         msg,
       )
     }
+    if should_head_log {
+      @gitrepo.append_reflog(
+        wfs,
+        rfs,
+        actual_git_dir,
+        "HEAD",
+        old_id,
+        @git.ObjectId::zero(),
+        author,
+        email,
+        timestamp,
+        timezone,
+        msg,
+      )
+    }
+    if refname != "HEAD" {
+      @gitrepo.delete_reflog(wfs, rfs, actual_git_dir, refname)
+    }
     return ()
   }
   if positional.length() < 2 {
@@ -104,7 +131,16 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
       "usage: git update-ref <refname> <newvalue> [<oldvalue>]",
     )
   }
-  let refname = positional[0]
+  let input_refname = positional[0]
+  let refname = resolve_update_target_ref(
+    fs, actual_git_dir, input_refname, no_deref,
+  )
+  if not(no_deref) && has_symbolic_ref_cycle(fs, actual_git_dir, input_refname) {
+    @stdio.stderr.write(
+      "error: cannot lock ref '\{input_refname}': unable to resolve reference '\{input_refname}'",
+    )
+    @sys.exit(1)
+  }
   let new_value = positional[1]
   let old_value : String? = if positional.length() >= 3 {
     Some(positional[2])
@@ -165,17 +201,181 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
     // Create reflog if requested
     @gitrepo.create_reflog(wfs, rfs, actual_git_dir, refname)
   }
+  let should_head_log = should_update_head_reflog(
+    input_refname, refname, no_deref, head_target,
+  )
   if should_log ||
     always ||
     create_reflog ||
+    should_head_log ||
     @gitrepo.reflog_exists(rfs, actual_git_dir, refname) {
     let old_id = current_id.unwrap_or(@git.ObjectId::zero())
     let msg = message.unwrap_or("update-ref: updating")
-    @gitrepo.append_reflog(
-      wfs, rfs, actual_git_dir, refname, old_id, new_id, author, email, timestamp,
-      timezone, msg,
-    )
+    if should_log ||
+      always ||
+      create_reflog ||
+      @gitrepo.reflog_exists(rfs, actual_git_dir, refname) {
+      @gitrepo.append_reflog(
+        wfs, rfs, actual_git_dir, refname, old_id, new_id, author, email, timestamp,
+        timezone, msg,
+      )
+    }
+    if should_head_log {
+      @gitrepo.append_reflog(
+        wfs, rfs, actual_git_dir, "HEAD", old_id, new_id, author, email, timestamp,
+        timezone, msg,
+      )
+    }
   }
+}
+
+///|
+fn resolve_update_target_ref(
+  fs : &@git.RepoFileSystem,
+  git_dir : String,
+  refname : String,
+  no_deref : Bool,
+) -> String {
+  if no_deref {
+    return refname
+  }
+  resolve_symbolic_ref_target(fs, git_dir, refname).unwrap_or(refname)
+}
+
+///|
+fn resolve_symbolic_ref_target(
+  fs : &@git.RepoFileSystem,
+  git_dir : String,
+  refname : String,
+) -> String? {
+  let mut current = refname
+  let mut depth = 0
+  while depth < 8 {
+    let ref_path = git_dir + "/" + current
+    if not(fs.is_file(ref_path)) {
+      return if current == refname { None } else { Some(current) }
+    }
+    let content = decode_bytes(fs.read_file(ref_path)) catch {
+      _ => return if current == refname { None } else { Some(current) }
+    }
+    let line = trim_chars(content, " \t\r\n")
+    if not(line.has_prefix("ref: ")) {
+      return if current == refname { None } else { Some(current) }
+    }
+    current = String::unsafe_substring(line, start=5, end=line.length())
+    depth += 1
+  }
+  if current == refname {
+    None
+  } else {
+    Some(current)
+  }
+}
+
+///|
+fn should_update_head_reflog(
+  input_refname : String,
+  refname : String,
+  no_deref : Bool,
+  head_target : String?,
+) -> Bool {
+  if no_deref {
+    return false
+  }
+  if refname == "HEAD" {
+    return false
+  }
+  if input_refname == "HEAD" {
+    return true
+  }
+  match head_target {
+    Some(head_ref) => head_ref == refname
+    None => false
+  }
+}
+
+///|
+fn delete_packed_ref_entry(
+  fs : OsFs,
+  git_dir : String,
+  refname : String,
+) -> Unit raise Error {
+  let packed_refs_path = git_dir + "/packed-refs"
+  if not(fs.is_file(packed_refs_path)) {
+    return ()
+  }
+  let content = decode_bytes(fs.read_file(packed_refs_path)) catch {
+    _ => return ()
+  }
+  let lines : Array[String] = []
+  let mut removed = false
+  let mut skip_peeled = false
+  for line_view in content.split("\n") {
+    let line = line_view.to_string()
+    if skip_peeled && line.has_prefix("^") {
+      skip_peeled = false
+      removed = true
+      continue
+    }
+    skip_peeled = false
+    if line.length() > 0 &&
+      not(line.has_prefix("#")) &&
+      not(line.has_prefix("^")) {
+      let space_idx = line.find(" ")
+      match space_idx {
+        Some(i) => {
+          let packed_ref = String::unsafe_substring(
+            line,
+            start=i + 1,
+            end=line.length(),
+          )
+          if packed_ref == refname {
+            removed = true
+            skip_peeled = true
+            continue
+          }
+        }
+        None => ()
+      }
+    }
+    lines.push(line)
+  }
+  if removed {
+    fs.write_string(packed_refs_path, lines.join("\n"))
+  }
+}
+
+///|
+fn has_symbolic_ref_cycle(
+  fs : &@git.RepoFileSystem,
+  git_dir : String,
+  refname : String,
+) -> Bool {
+  let visited : Array[String] = []
+  let mut current = refname
+  let mut depth = 0
+  while depth < 16 {
+    for prev in visited {
+      if prev == current {
+        return true
+      }
+    }
+    visited.push(current)
+    let ref_path = git_dir + "/" + current
+    if not(fs.is_file(ref_path)) {
+      return false
+    }
+    let content = decode_bytes(fs.read_file(ref_path)) catch {
+      _ => return false
+    }
+    let line = trim_chars(content, " \t\r\n")
+    if not(line.has_prefix("ref: ")) {
+      return false
+    }
+    current = String::unsafe_substring(line, start=5, end=line.length())
+    depth += 1
+  }
+  true
 }
 
 ///|
@@ -184,6 +384,19 @@ fn read_ref_value(
   git_dir : String,
   refname : String,
 ) -> @git.ObjectId? {
+  read_ref_value_inner(fs, git_dir, refname, 0)
+}
+
+///|
+fn read_ref_value_inner(
+  fs : &@git.RepoFileSystem,
+  git_dir : String,
+  refname : String,
+  depth : Int,
+) -> @git.ObjectId? {
+  if depth > 8 {
+    return None
+  }
   let ref_path = git_dir + "/" + refname
   if fs.is_file(ref_path) {
     let content = decode_bytes(fs.read_file(ref_path)) catch {
@@ -193,7 +406,7 @@ fn read_ref_value(
     if hex.has_prefix("ref: ") {
       // Symbolic ref - resolve it
       let target = String::unsafe_substring(hex, start=5, end=hex.length())
-      return read_ref_value(fs, git_dir, target)
+      return read_ref_value_inner(fs, git_dir, target, depth + 1)
     }
     (hex |> @git.ObjectId::from_hex |> Some) catch {
       _ => None

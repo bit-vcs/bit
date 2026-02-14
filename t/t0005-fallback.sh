@@ -26,4 +26,30 @@ test_expect_success 'config works even if SHIM_REAL_GIT is invalid' '
     )
 '
 
+test_expect_success 'update-ref works even if SHIM_REAL_GIT is invalid' '
+    git_cmd init repo &&
+    (
+        cd repo &&
+        echo hello >a.txt &&
+        git_cmd add a.txt &&
+        git_cmd commit -m "first commit" &&
+        head_oid="$(git_cmd rev-parse HEAD)" &&
+        SHIM_REAL_GIT=/no/such git_cmd update-ref refs/heads/smoke "$head_oid" &&
+        test "$(git_cmd rev-parse refs/heads/smoke)" = "$head_oid"
+    )
+'
+
+test_expect_success 'branch works even if SHIM_REAL_GIT is invalid' '
+    git_cmd init repo &&
+    (
+        cd repo &&
+        echo hello >a.txt &&
+        git_cmd add a.txt &&
+        git_cmd commit -m "first commit" &&
+        head_oid="$(git_cmd rev-parse HEAD)" &&
+        SHIM_REAL_GIT=/no/such git_cmd branch smoke "$head_oid" &&
+        test "$(git_cmd rev-parse refs/heads/smoke)" = "$head_oid"
+    )
+'
+
 test_done
