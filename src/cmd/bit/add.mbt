@@ -43,14 +43,7 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
     }
   }
   if dry_run {
-    handle_add_dry_run(
-      fs,
-      root,
-      paths,
-      force~,
-      ignore_missing~,
-      interactive~,
-    )
+    handle_add_dry_run(fs, root, paths, force~, ignore_missing~, interactive~)
     return
   }
   if paths.iter().any(p => p.length() == 0) {
@@ -150,7 +143,9 @@ async fn handle_add_dry_run(
       }
     }
     if ignored.length() > 0 {
-      eprint_line("The following paths are ignored by one of your .gitignore files:")
+      eprint_line(
+        "The following paths are ignored by one of your .gitignore files:",
+      )
       for path in ignored {
         eprint_line(path)
       }
@@ -348,7 +343,11 @@ fn add_parse_refresh_pathspec(raw : String) -> (String, Bool) {
 }
 
 ///|
-fn add_refresh_pathspec_matches(spec : String, icase : Bool, path : String) -> Bool {
+fn add_refresh_pathspec_matches(
+  spec : String,
+  icase : Bool,
+  path : String,
+) -> Bool {
   if spec == "." {
     return true
   }

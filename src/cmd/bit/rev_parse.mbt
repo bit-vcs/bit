@@ -153,10 +153,7 @@ fn parse_index_pathspec(spec : String) -> (Int, String?) {
   let rest = String::unsafe_substring(spec, start=1, end=spec.length())
   let mut stage = 0
   let mut path = rest
-  if rest.length() >= 3 &&
-    rest[0] >= '0' &&
-    rest[0] <= '3' &&
-    rest[1] == ':' {
+  if rest.length() >= 3 && rest[0] >= '0' && rest[0] <= '3' && rest[1] == ':' {
     stage = rest[0].to_int() - '0'.to_int()
     path = String::unsafe_substring(rest, start=2, end=rest.length())
   }

@@ -236,7 +236,9 @@ fn update_skip_worktree_state(
   }
   out.sort_by((a, b) => String::compare(a, b))
   if out.length() == 0 {
-    fs.remove_file(state_path) catch { _ => () }
+    fs.remove_file(state_path) catch {
+      _ => ()
+    }
   } else {
     fs.write_string(state_path, out.join("\n") + "\n")
   }

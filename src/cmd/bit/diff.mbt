@@ -119,20 +119,18 @@ async fn handle_diff(args : Array[String]) -> Unit raise Error {
         _ if arg.has_prefix("-") => warn_unimplemented_arg("diff", arg)
         _ => ()
       }
-    } else {
-      if arg.contains("^!") || arg.contains("..") {
-        if range_spec is None {
-          range_spec = Some(arg)
-        }
-      } else if cached &&
-        ref_target is None &&
-        looks_like_cached_diff_revision(arg) {
-        ref_target = Some(arg)
-      } else if arg.contains("/") && ref_target is None {
-        ref_target = Some(arg)
-      } else {
-        paths.push(arg)
+    } else if arg.contains("^!") || arg.contains("..") {
+      if range_spec is None {
+        range_spec = Some(arg)
       }
+    } else if cached &&
+      ref_target is None &&
+      looks_like_cached_diff_revision(arg) {
+      ref_target = Some(arg)
+    } else if arg.contains("/") && ref_target is None {
+      ref_target = Some(arg)
+    } else {
+      paths.push(arg)
     }
   }
   // Handle subdir-clone diff with upstream ref
@@ -394,10 +392,7 @@ async fn collect_diff_index_stale_entries(
       if not(is_stale) && entry.mode != 0o120000 {
         let size_result : Result[Bytes, Error] = try? fs.read_file(abs)
         match size_result {
-          Ok(content) =>
-            if content.length() != entry.size {
-              is_stale = true
-            }
+          Ok(content) => if content.length() != entry.size { is_stale = true }
           Err(_) => ()
         }
       }
@@ -501,7 +496,9 @@ fn diff_cached_against_ref(
   ignore(root)
   let target = @gitrepo.rev_parse(rfs, git_dir, spec)
   guard target is Some(target_id) else {
-    raise @git.GitError::InvalidObject("unknown revision or path not in the working tree: " + spec)
+    raise @git.GitError::InvalidObject(
+      "unknown revision or path not in the working tree: " + spec,
+    )
   }
   let db = @gitlib.ObjectDb::load(rfs, git_dir)
   let old_tree = resolve_diff_tree_id(db, rfs, target_id)

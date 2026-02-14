@@ -48,6 +48,26 @@
 - [x] `init --shared=world` で `reftable/tables.list` と `reftable/*.ref` の権限を補正
 - [x] `GIT_TEST_OPTS='--run=24' just git-t-full t0610-reftable-basics.sh` が green
 - [x] `--ref-format=reftable` 初期化時の `.ref` 初期テーブルを bit 単体で生成
+- [x] `hq get` 後に `.git/index` が未ソートになり `git rebase` が落ちる不具合を再現・修正
+  - 再現ログ: `BUG: unpack-trees.c:792: pos ... doesn't point to the first entry of ... in index`
+  - 修正: `src/repo/materialize.mbt` の index ソートを `String::lexical_compare` に変更
+  - 再現テスト追加: `src/repo/materialize_wbtest.mbt`（`write_index_v2 writes Git lexical path order`）
+- [x] SSH transport の `upload-pack` 実行コマンドを stateless-rpc 形式に修正
+  - `git-upload-pack --stateless-rpc [--advertise-refs] <path>` を明示
+  - 影響テスト更新: `src/io/native/upload_pack_process_wbtest.mbt`
+- [x] E2E の fake ssh を単一コマンド文字列実行に対応
+  - `t/t0019-clone-local.sh`, `t/t0020-push-fetch-pull.sh`
+- [x] `upload_pack_process_wbtest` を `native` 限定に設定（`js` check の unbound 回避）
+- [x] `just release-check` を再実行し green を確認
+- [x] 似た境界ケースの再現テストを追加（意図的に壊れやすい入力）
+  - `src/repo/materialize_wbtest.mbt`:
+    `write_index_v2 keeps lexical order for prefix-like paths`
+    （`a-y`, `a.b`, `a.y`, `a/z`, `a0`）
+  - `src/io/native/upload_pack_process_wbtest.mbt`:
+    `upload-pack process: info-refs over ssh escapes single quote in remote path`
+    （`git@github.com:mizchi/o'hara.git`）
+  - 対応実装: `src/io/native/upload_pack_process.mbt` で `'` を含む path の
+    shell single-quote escape を追加
 
 ## 次に git 依存をなくす候補（2026-02-14）
 

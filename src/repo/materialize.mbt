@@ -108,7 +108,8 @@ fn write_index_v2(
   commit_id : @object.ObjectId,
 ) -> Unit raise @object.GitError {
   let entries = collect_commit_entries(store, commit_id)
-  entries.sort_by((a, b) => String::compare(a.path, b.path))
+  // Git index entries must be in lexical path order.
+  entries.sort_by((a, b) => String::lexical_compare(a.path, b.path))
   let out : Array[Byte] = []
   // Header: "DIRC" + version(2) + count
   out.push(b'D')

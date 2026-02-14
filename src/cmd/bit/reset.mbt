@@ -38,14 +38,12 @@ async fn handle_reset(args : Array[String]) -> Unit raise Error {
         _ if arg.has_prefix("-") => reset_die_unknown_option(arg)
         _ => if rev is None { rev = Some(arg) } else { paths.push(arg) }
       }
+    } else if parse_as_paths {
+      paths.push(arg)
+    } else if rev is None {
+      rev = Some(arg)
     } else {
-      if parse_as_paths {
-        paths.push(arg)
-      } else if rev is None {
-        rev = Some(arg)
-      } else {
-        paths.push(arg)
-      }
+      paths.push(arg)
     }
   }
   if parse_options && rev is Some(token) && paths.length() == 0 {
@@ -262,7 +260,8 @@ fn reset_collect_tree_files_from_target(
     Some(obj) =>
       match obj.obj_type {
         @git.ObjectType::Tree => @gitlib.collect_tree_files(db, fs, target)
-        @git.ObjectType::Commit => @gitlib.collect_tree_files_from_commit(db, fs, target)
+        @git.ObjectType::Commit =>
+          @gitlib.collect_tree_files_from_commit(db, fs, target)
         _ => raise @git.GitError::InvalidObject("Invalid reset target object")
       }
     None => raise @git.GitError::InvalidObject("Missing reset target object")
@@ -399,7 +398,11 @@ fn reset_read_skip_worktree_paths(
   let out : Map[String, Bool] = {}
   let sidecar_path = git_dir + "/bit-skip-worktree"
   if fs.is_file(sidecar_path) {
-    let text = decode_bytes(fs.read_file(sidecar_path) catch { _ => Bytes::default() })
+    let text = decode_bytes(
+      fs.read_file(sidecar_path) catch {
+        _ => Bytes::default()
+      },
+    )
     for line_view in text.split("\n") {
       let line = trim_string(line_view.to_string())
       if line.length() > 0 {
@@ -543,7 +546,10 @@ fn reset_write_orig_head(
 }
 
 ///|
-async fn reset_print_hard_reset_message(short_id : String, subject : Bytes) -> Unit {
+async fn reset_print_hard_reset_message(
+  short_id : String,
+  subject : Bytes,
+) -> Unit {
   let prefix = if subject.length() > 0 {
     "HEAD is now at \{short_id} "
   } else {
@@ -575,8 +581,7 @@ fn reset_commit_subject_bytes(
       )
       let output_encoding = reset_log_output_encoding()
       let source_encoding = reset_detect_commit_subject_encoding(
-        subject,
-        commit_encoding,
+        subject, commit_encoding,
       )
       reset_convert_encoding(subject, source_encoding, output_encoding)
     }
@@ -599,7 +604,11 @@ fn reset_extract_commit_subject_and_encoding(data : Bytes) -> (Bytes, String?) {
     }
     let line = decode_bytes(reset_slice_bytes(data, line_start, line_end))
     if line.length() == 0 {
-      let subject_start = if offset < data.length() { offset + 1 } else { offset }
+      let subject_start = if offset < data.length() {
+        offset + 1
+      } else {
+        offset
+      }
       let mut subject_end = subject_start
       while subject_end < data.length() && data[subject_end] != b'\n' {
         subject_end += 1
@@ -611,13 +620,7 @@ fn reset_extract_commit_subject_and_encoding(data : Bytes) -> (Bytes, String?) {
     }
     if line.has_prefix("encoding ") {
       encoding = Some(
-        trim_string(
-          String::unsafe_substring(
-            line,
-            start=9,
-            end=line.length(),
-          ),
-        ),
+        trim_string(String::unsafe_substring(line, start=9, end=line.length())),
       )
     }
     if offset < data.length() {

@@ -49,7 +49,10 @@ if [ "${1:-}" = "env" ]; then
 fi
 cmd="$1"
 shift
-exec "$cmd" "$@"
+if [ "$#" -gt 0 ]; then
+    exec "$cmd" "$@"
+fi
+exec sh -c "$cmd"
 EOF
     chmod +x mock-bin/ssh &&
     export PATH="$(pwd)/mock-bin:$PATH"

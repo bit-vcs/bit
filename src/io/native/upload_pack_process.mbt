@@ -447,10 +447,29 @@ fn read_ssh_ip_option() -> String? {
 ///|
 fn build_upload_pack_remote_command(
   path : String,
-  _advertise_refs : Bool,
+  advertise_refs : Bool,
 ) -> String {
-  let quoted_path = "'" + path + "'"
-  "git-upload-pack " + quoted_path
+  let quoted_path = quote_shell_arg_single(path)
+  if advertise_refs {
+    "git-upload-pack --stateless-rpc --advertise-refs " + quoted_path
+  } else {
+    "git-upload-pack --stateless-rpc " + quoted_path
+  }
+}
+
+///|
+fn quote_shell_arg_single(value : String) -> String {
+  let b = StringBuilder::new()
+  b.write_char('\'')
+  for c in value {
+    if c == '\'' {
+      b.write_string("'\\''")
+    } else {
+      b.write_char(c)
+    }
+  }
+  b.write_char('\'')
+  b.to_string()
 }
 
 ///|

@@ -4,4 +4,8 @@ import {
   "moonbitlang/core/encoding/utf8" @utf8,
 }
 
+import {
+  "mizchi/bit/io" @io,
+} for "wbtest"
+
 warnings = "-29"
