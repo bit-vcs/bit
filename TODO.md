@@ -82,21 +82,88 @@
 - [x] `reflog show` の互換修正（`src/cmd/bit/reflog.mbt`）
   - `--no-abbrev-commit` の引数解釈と表示を実装（`t3200` #11 回帰を解消）
 
-## 次に git 依存をなくす候補（2026-02-14）
+## 次に git 依存をなくす候補（2026-02-14 再優先度）
 
-`moon ide find-references delegate_to_real_git` 基準で、`src/cmd/bit` には
-まだ 9 コマンド分の `SHIM_REAL_GIT` 条件付き委譲が残っている
-（呼び出し 9 + 定義 1 = 参照 10）。
+`moon ide find-references delegate_to_real_git` は 0 件（本体削除済み）。
+さらに `index-pack` / `pack-objects` の real-git 実行 fallback
+（`delegate_*_to_real_git`）も撤去し、unsupported は standalone 明示エラー化した。
 
-優先度（低リスク順）:
+現時点の残件は「real git fallback 実行」ではなく、
+`*_should_delegate_to_real_git` という判定名や no-op 分岐の整理が中心。
 
-- [x] P0（短期）着手: `rm`, `reset`, `switch`, `add` の先頭委譲を撤去
-- [x] P1（中期）: `checkout`, `log`（`config`, `update-ref`, `branch` は完了）
-- [x] P2（中〜高）: `bundle`, `merge`
-- [x] P3（高）: `fetch`, `pull`, `push`, `hash-object`（compat object format の条件付き委譲）
+目的（このフェーズ）:
+- `bit` を standalone で使うため、`SHIM_REAL_GIT` が存在しても
+  **基本機能では委譲しない** 状態を先に作る
+- エージェント用ストレージ（in-memory 運用）に不要な advanced 機能は後回し
 
-P0 から順に「先頭の `if is_real_git_delegate_enabled() { delegate_to_real_git(...) }` を撤去」
-して、`just git-t-full` のスポット run で回帰を潰す。
+優先度（基本機能優先）:
+
+- [x] P0（最優先・必須）: 日常ワークフローの委譲ゼロ化
+  - 対象: `init`, `clone`, `fetch`, `pull`, `push`, `add`, `commit`,
+    `checkout`, `branch`, `log`, `tag`
+  - 方針: 「real git へ委譲」ではなく「pure 実装で実行」か
+    「未対応を明示エラー」で統一
+  - 検証: `t/t0005-fallback.sh` を上記コマンドの代表オプションまで拡張
+  - [x] 2026-02-14 進捗: `fetch/pull/push/tag` の先頭委譲を撤去
+    - `SHIM_REAL_GIT=false` でも pure 実行される smoke を追加
+      （`t/t0005-fallback.sh`）
+    - `bash t/t0005-fallback.sh` は `1..19` で green
+  - [x] 2026-02-14 進捗: `init` の先頭委譲を撤去
+    - `SHIM_REAL_GIT=false git init` の smoke を追加（`t/t0005-fallback.sh`）
+  - [x] 2026-02-14 進捗: `clone` の standard clone 先頭委譲を撤去
+    - `SHIM_REAL_GIT=false git clone` の smoke を追加（`t/t0005-fallback.sh`）
+    - `bash t/t0005-fallback.sh` は `1..21` で green
+  - [x] 2026-02-14 進捗: `branch/log/checkout` の先頭委譲を no-op 化
+    - `SHIM_REAL_GIT=false` での `branch` 一覧 / `log --oneline` /
+      `checkout -b` smoke を追加（`t/t0005-fallback.sh`）
+    - `bash t/t0005-fallback.sh` は `1..24` で green
+  - [x] 2026-02-14 進捗: `add/commit` の委譲を撤去し、advanced は明示エラー化
+    - `add` の pathspec ミスマッチ時 real-git fallback を撤去
+    - `commit` の署名/pathspec 系は standalone 明示エラー
+    - `bash t/t0005-fallback.sh` は `1..26` で green
+  - [x] 2026-02-14 進捗: `clone/hash-object` の残委譲を明示エラー化
+    - `clone --ref-format=reftable` / local bundle clone は standalone 明示エラー
+    - `hash-object -w` + `compatObjectFormat=sha256` は standalone 明示エラー
+    - `bash t/t0005-fallback.sh` は `1..29` で green
+
+- [x] P1（準必須）: ストレージ境界の委譲整理
+  - 対象: `update-ref`, `write-tree` の reftable / 非 sha1 分岐
+  - 方針: fallback をやめ、capability 判定 + 明示エラーか pure 実装へ
+  - [x] 2026-02-14 進捗: `add` / `commit` / `hash-object` / `clone` / `init`
+    の委譲分岐を standalone 方針へ寄せた（pure 実行 or 明示エラー）
+  - [x] 2026-02-14 進捗: `update-ref` / `write-tree` の委譲を明示エラー化
+    - `update-ref` on reftable は standalone 明示エラー
+    - `write-tree` on non-sha1 repo は standalone 明示エラー
+    - `bash t/t0005-fallback.sh` は `1..31` で green
+
+- [x] P2（任意・後回し）: 高度ワークフローの fallback 撤去
+  - 対象: `rebase`（interactive/continue/abort/skip）, `submodule`, `bisect`,
+    `bundle`
+  - 方針: fallback 実行は行わず、pure 実装か standalone 明示エラーへ寄せる
+
+- [x] P3（任意・後回し）: pack/midx 高度最適化の fallback 撤去
+  - 対象: `cat-file`（incremental midx chain / objectsize:disk）,
+    `multi-pack-index`（bitmap/rev/incremental chain）
+  - 参照テスト: `t5326`, `t5327`, `t5334`
+
+- [x] P4（任意・後回し）: plumbing の fallback 撤去
+  - 対象: `index-pack`, `pack-objects`
+  - 方針: real git 実行ではなく standalone 明示エラーに統一
+  - 検証: `t/t0005-fallback.sh` に plumbing unsupported の smoke を追加
+
+- [x] P5（整理タスク）: delegate 判定名/no-op 分岐のリネーム・削除
+  - 対象: `branch`, `checkout`, `log`, `clone`, `commit`, `hash-object`,
+    `merge`, `bundle` などの `*_should_delegate_to_real_git*`
+  - 方針: `*_requires_standalone_error*` 等へ改名し、誤解を生む命名を解消
+  - [x] 2026-02-14 進捗: 判定関数名を `standalone_error` / `advanced_compat` 系へ統一
+    - 例: `commit_*`, `hash-object_*`, `write-tree_*`, `add_*` は
+      `*_requires_standalone_error*` に改名
+    - 例: `branch/checkout/log/clone/merge/bundle` は
+      `*_requires_advanced_compat*` / `*_compat_path_available*` に改名
+  - [x] 2026-02-14 進捗: `branch/checkout/log/merge/bundle/clone/bisect/submodule`
+    の no-op 分岐を削除し、不要な delegate gate wbtest を整理
+
+### 実施済みログ（旧プラン）
 
 - [x] P0 blocker: `t2060-switch.sh`（16/16 pass, 2026-02-14）
   - `switch` の主要オプション互換を実装し、`--ignore-other-worktrees` の回帰まで解消

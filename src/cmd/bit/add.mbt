@@ -19,9 +19,11 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
   let rfs : &@git.RepoFileSystem = fs
   let git_dir = resolve_git_dir(rfs, root)
   if real_git_delegate_is_available(rfs) &&
-    add_repo_requires_real_git_delegate(rfs, git_dir) {
-    delegate_to_real_git("add", args)
-    return
+    add_repo_requires_standalone_error(rfs, git_dir) {
+    eprint_line(
+      "fatal: add with this repository object format is not supported in standalone mode",
+    )
+    @sys.exit(1)
   }
   let mut add_all = false
   let mut force = false
@@ -102,10 +104,6 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
     @sys.exit(1)
   }
   if stage_paths.length() == 0 {
-    if real_git_delegate_is_available(rfs) {
-      delegate_to_real_git("add", args)
-      return
-    }
     let first = add_first_non_empty_pathspec(paths)
     if first is Some(spec) {
       eprint_line("fatal: pathspec '\{spec}' did not match any files")
@@ -115,7 +113,7 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
 }
 
 ///|
-fn add_repo_requires_real_git_delegate(
+fn add_repo_requires_standalone_error(
   fs : &@git.RepoFileSystem,
   git_dir : String,
 ) -> Bool {

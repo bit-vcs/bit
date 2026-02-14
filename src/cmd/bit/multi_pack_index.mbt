@@ -102,12 +102,16 @@ async fn handle_multi_pack_index(args : Array[String]) -> Unit raise Error {
         no_bitmap ||
         has_incremental_chain
       ) {
-      delegate_to_real_git("multi-pack-index", args)
-      return ()
+      eprint_line(
+        "error: multi-pack-index write with bitmap/incremental chain is not supported in standalone mode",
+      )
+      @sys.exit(1)
     }
     if subcommand == Some("verify") && has_incremental_chain {
-      delegate_to_real_git("multi-pack-index", args)
-      return ()
+      eprint_line(
+        "error: multi-pack-index verify with incremental chain is not supported in standalone mode",
+      )
+      @sys.exit(1)
     }
   } else if subcommand == Some("write") &&
     (incremental || refs_snapshot is Some(_)) {

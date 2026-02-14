@@ -37,12 +37,15 @@ async fn handle_hash_object(args : Array[String]) -> Unit raise Error {
     let compat_object_format = read_hash_object_compat_object_format(
       fs, git_dir,
     )
-    if hash_object_should_delegate_to_real_git(
+    if hash_object_requires_standalone_error(
         write_object,
         compat_object_format,
         real_git_delegate_is_available(rfs),
       ) {
-      delegate_to_real_git("hash-object", args)
+      eprint_line(
+        "fatal: hash-object -w with compatObjectFormat=sha256 is not supported in standalone mode",
+      )
+      @sys.exit(1)
     }
   }
   if stdin_mode {
@@ -93,7 +96,7 @@ fn read_hash_object_compat_object_format(
 }
 
 ///|
-fn hash_object_should_delegate_to_real_git(
+fn hash_object_requires_standalone_error(
   write_object : Bool,
   compat_object_format : String?,
   real_git_delegate_available : Bool,

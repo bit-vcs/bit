@@ -1,7 +1,10 @@
 ///|
 async fn handle_rebase(args : Array[String]) -> Unit raise Error {
-  if is_real_git_delegate_enabled() && rebase_should_delegate_to_real_git(args) {
-    delegate_to_real_git("rebase", args)
+  if is_real_git_delegate_enabled() && rebase_args_require_standalone_error(args) {
+    eprint_line(
+      "fatal: interactive/step rebase mode is not supported in standalone mode",
+    )
+    @sys.exit(1)
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
@@ -119,7 +122,7 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
 }
 
 ///|
-fn rebase_should_delegate_to_real_git(args : Array[String]) -> Bool {
+fn rebase_args_require_standalone_error(args : Array[String]) -> Bool {
   for arg in args {
     if arg == "-i" ||
       arg == "--interactive" ||

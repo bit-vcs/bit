@@ -4,9 +4,11 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
   let rfs : &@git.RepoFileSystem = fs
   let git_dir = resolve_git_dir(rfs, root)
-  if real_git_delegate_is_available(rfs) && is_reftable_repo(rfs, git_dir) {
-    delegate_to_real_git("update-ref", args)
-    return ()
+  if is_reftable_repo(rfs, git_dir) {
+    eprint_line(
+      "fatal: update-ref on reftable repository is not supported in standalone mode",
+    )
+    @sys.exit(1)
   }
   let mut delete_mode = false
   let mut create_reflog = false

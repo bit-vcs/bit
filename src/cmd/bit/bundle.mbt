@@ -1,35 +1,4 @@
-///|
-fn bundle_can_delegate_to_real_git(fs : &@git.RepoFileSystem) -> Bool {
-  guard is_real_git_delegate_enabled() else { return false }
-  let real_git = resolve_real_git_for_fetch()
-  if real_git.length() == 0 {
-    return false
-  }
-  if real_git.has_prefix("/") {
-    return fs.is_file(real_git)
-  }
-  true
-}
-
-///|
-fn bundle_should_delegate_to_real_git(
-  fs : &@git.RepoFileSystem,
-  args : Array[String],
-) -> Bool {
-  ignore(args)
-  if bundle_can_delegate_to_real_git(fs) {
-    return true
-  }
-  false
-}
-
-///|
 async fn handle_bundle(args : Array[String]) -> Unit raise Error {
-  let fs = OsFs::new()
-  let rfs : &@git.RepoFileSystem = fs
-  if bundle_should_delegate_to_real_git(rfs, args) {
-    delegate_to_real_git("bundle", args)
-  }
   if args.length() == 0 {
     print_line("usage: git bundle <command> [<args>]")
     print_line("")

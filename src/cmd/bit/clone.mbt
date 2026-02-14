@@ -216,13 +216,11 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
     @sys.exit(1)
   }
   let fs = OsFs::new()
-  if clone_should_delegate_to_real_git_for_standard_clone(fs, remote_url) {
-    delegate_to_real_git("clone", args)
-    return ()
-  }
-  if clone_should_delegate_to_real_git_for_ref_format(fs, ref_format) {
-    delegate_to_real_git("clone", args)
-    return ()
+  if clone_ref_format_requires_advanced_compat(fs, ref_format) {
+    eprint_line(
+      "fatal: clone with --ref-format=reftable is not supported in standalone mode",
+    )
+    @sys.exit(1)
   }
   let local_src_path = @gitlib.resolve_local_repo_path(
     fs, command_root, remote_url,
@@ -230,9 +228,11 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
   let local_src_file_path = resolve_local_clone_source_file(
     fs, command_root, remote_url,
   )
-  if clone_should_delegate_to_real_git_for_bundle(fs, local_src_file_path) {
-    delegate_to_real_git("clone", args)
-    return ()
+  if clone_bundle_requires_advanced_compat(fs, local_src_file_path) {
+    eprint_line(
+      "fatal: clone from local bundle is not supported in standalone mode",
+    )
+    @sys.exit(1)
   }
   // Check for ambiguity with local directories only when path is not local.
   if local_src_path is None && local_src_file_path is None {
@@ -680,7 +680,7 @@ fn resolve_local_clone_source_file(
 }
 
 ///|
-fn clone_can_delegate_to_real_git(fs : &@git.RepoFileSystem) -> Bool {
+fn clone_compat_path_available(fs : &@git.RepoFileSystem) -> Bool {
   guard is_real_git_delegate_enabled() else { return false }
   let real_git = resolve_real_git_for_fetch()
   if real_git.length() == 0 {
@@ -693,11 +693,11 @@ fn clone_can_delegate_to_real_git(fs : &@git.RepoFileSystem) -> Bool {
 }
 
 ///|
-fn clone_should_delegate_to_real_git_for_bundle(
+fn clone_bundle_requires_advanced_compat(
   fs : &@git.RepoFileSystem,
   local_src_file_path : String?,
 ) -> Bool {
-  guard clone_can_delegate_to_real_git(fs) else { return false }
+  guard clone_compat_path_available(fs) else { return false }
   match local_src_file_path {
     Some(path) => path.has_suffix(".bundle")
     None => false
@@ -705,26 +705,14 @@ fn clone_should_delegate_to_real_git_for_bundle(
 }
 
 ///|
-fn clone_should_delegate_to_real_git_for_ref_format(
+fn clone_ref_format_requires_advanced_compat(
   fs : &@git.RepoFileSystem,
   ref_format : String,
 ) -> Bool {
   if ref_format != "reftable" {
     return false
   }
-  clone_can_delegate_to_real_git(fs)
-}
-
-///|
-fn clone_should_delegate_to_real_git_for_standard_clone(
-  fs : &@git.RepoFileSystem,
-  remote_url : String,
-) -> Bool {
-  guard clone_can_delegate_to_real_git(fs) else { return false }
-  match parse_github_shorthand(remote_url) {
-    Some(_) => false
-    None => true
-  }
+  clone_compat_path_available(fs)
 }
 
 ///|

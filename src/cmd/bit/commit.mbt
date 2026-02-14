@@ -14,10 +14,17 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
   let rfs : &@git.RepoFileSystem = fs
   let git_dir = resolve_git_dir(rfs, root)
-  if commit_should_delegate_to_real_git(args) ||
-    commit_repo_requires_real_git_delegate(rfs, git_dir) {
-    delegate_to_real_git("commit", args)
-    return ()
+  if commit_repo_requires_standalone_error(rfs, git_dir) {
+    eprint_line(
+      "fatal: commit with this repository object format is not supported in standalone mode",
+    )
+    @sys.exit(1)
+  }
+  if commit_args_require_standalone_error(args) {
+    eprint_line(
+      "fatal: this commit mode is not supported in standalone mode",
+    )
+    @sys.exit(1)
   }
   let commit_message_encoding = resolve_commit_message_encoding()
   let mut message : String? = None
@@ -232,7 +239,7 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
 }
 
 ///|
-fn commit_repo_requires_real_git_delegate(
+fn commit_repo_requires_standalone_error(
   fs : &@git.RepoFileSystem,
   git_dir : String,
 ) -> Bool {
@@ -414,7 +421,7 @@ fn cleanup_merge_state_files(
 }
 
 ///|
-fn commit_should_delegate_to_real_git(args : Array[String]) -> Bool {
+fn commit_args_require_standalone_error(args : Array[String]) -> Bool {
   guard is_real_git_delegate_enabled() else { return false }
   let mut expect_value = false
   for arg in args {

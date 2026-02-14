@@ -1,33 +1,8 @@
-///|
-fn checkout_should_delegate_to_real_git(args : Array[String]) -> Bool {
-  guard is_real_git_delegate_enabled() else { return false }
-  let mut positional_count = 0
-  for arg in args {
-    match arg {
-      "-" => positional_count += 1
-      "--" => return true
-      "-b" | "-B" | "-f" | "--force" => return true
-      _ if arg.has_prefix("-") => return true
-      _ => positional_count += 1
-    }
-  }
-  positional_count != 1
-}
-
-///|
 async fn handle_checkout(args : Array[String]) -> Unit raise Error {
-  if checkout_should_delegate_to_real_git(args) {
-    delegate_to_real_git("checkout", args)
-    return ()
-  }
   let root = get_work_root()
   let fs = OsFs::new()
   let rfs : &@git.RepoFileSystem = fs
   let git_dir = resolve_git_dir(rfs, root)
-  if checkout_repo_requires_real_git_delegate(rfs, git_dir) {
-    delegate_to_real_git("checkout", args)
-    return ()
-  }
   // Parse arguments
   let mut saw_separator = false
   let mut create_branch = false
@@ -256,24 +231,6 @@ fn append_checkout_trace_line(fs : OsFs, path : String, line : String) -> Unit {
   let existing = decode_bytes(fs.read_file(path) catch { _ => b"" })
   fs.write_string(path, existing + line) catch {
     _ => ()
-  }
-}
-
-///|
-fn checkout_repo_requires_real_git_delegate(
-  fs : &@git.RepoFileSystem,
-  git_dir : String,
-) -> Bool {
-  guard real_git_delegate_is_available(fs) else { return false }
-  match
-    @gitlib.read_config_value(
-      fs,
-      git_dir + "/config",
-      "remote \"origin\"",
-      "promisor",
-    ) {
-    Some(value) => value.to_lower() == "true"
-    None => false
   }
 }
 

@@ -18,12 +18,12 @@ test "add: sha256 repository requires real-git delegation when available" {
   fs.write_string(
     "/repo/.git/config", "[extensions]\n\tobjectformat = sha256\n",
   )
-  assert_true(add_repo_requires_real_git_delegate(fs, "/repo/.git"))
+  assert_true(add_repo_requires_standalone_error(fs, "/repo/.git"))
 
   fs.write_string(
     "/repo/.git/config", "[core]\n\trepositoryformatversion = 0\n",
   )
-  assert_false(add_repo_requires_real_git_delegate(fs, "/repo/.git"))
+  assert_false(add_repo_requires_standalone_error(fs, "/repo/.git"))
 
   restore_env_var_for_add_wbtest("SHIM_REAL_GIT", prev_shim_real_git)
   restore_env_var_for_add_wbtest("GIT_SHIM_REAL_GIT", prev_legacy_real_git)
@@ -41,12 +41,12 @@ test "add: compatobjectformat=sha256 requires real-git delegation when available
   fs.write_string(
     "/repo/.git/config", "[extensions]\n\tcompatobjectformat = sha256\n",
   )
-  assert_true(add_repo_requires_real_git_delegate(fs, "/repo/.git"))
+  assert_true(add_repo_requires_standalone_error(fs, "/repo/.git"))
 
   fs.write_string(
     "/repo/.git/config", "[extensions]\n\tcompatobjectformat = sha1\n",
   )
-  assert_false(add_repo_requires_real_git_delegate(fs, "/repo/.git"))
+  assert_false(add_repo_requires_standalone_error(fs, "/repo/.git"))
 
   restore_env_var_for_add_wbtest("SHIM_REAL_GIT", prev_shim_real_git)
   restore_env_var_for_add_wbtest("GIT_SHIM_REAL_GIT", prev_legacy_real_git)

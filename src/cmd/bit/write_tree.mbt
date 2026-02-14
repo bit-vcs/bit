@@ -4,8 +4,11 @@ async fn handle_write_tree(args : Array[String]) -> Unit raise Error {
   let git_dir = root + "/.git"
   let fs = OsFs::new()
   let rfs : &@git.RepoFileSystem = fs
-  if write_tree_repo_requires_real_git_delegate(rfs, git_dir) {
-    delegate_to_real_git("write-tree", args)
+  if write_tree_repo_requires_standalone_error(rfs, git_dir) {
+    eprint_line(
+      "fatal: write-tree with this repository object format is not supported in standalone mode",
+    )
+    @sys.exit(1)
   }
   // Parse --prefix option
   let mut prefix : String? = None
@@ -22,11 +25,10 @@ async fn handle_write_tree(args : Array[String]) -> Unit raise Error {
 }
 
 ///|
-fn write_tree_repo_requires_real_git_delegate(
+fn write_tree_repo_requires_standalone_error(
   fs : &@git.RepoFileSystem,
   git_dir : String,
 ) -> Bool {
-  guard real_git_delegate_is_available(fs) else { return false }
   repo_object_format(fs, git_dir) != "sha1" ||
   (match repo_compat_object_format(fs, git_dir) {
     Some(format) => format != "sha1"

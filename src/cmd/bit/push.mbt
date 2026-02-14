@@ -1,10 +1,6 @@
 ///|
 async fn handle_push(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
-  let rfs : &@git.RepoFileSystem = fs
-  if real_git_delegate_is_available(rfs) {
-    delegate_to_real_git("push", args)
-  }
   let root = get_work_root()
   let git_dir = resolve_git_dir(fs, root)
   // Check if this is a subdir-clone

@@ -18,12 +18,12 @@ test "write-tree: compatobjectformat=sha256 requires real-git delegation when av
   fs.write_string(
     "/repo/.git/config", "[extensions]\n\tcompatobjectformat = sha256\n",
   )
-  assert_true(write_tree_repo_requires_real_git_delegate(fs, "/repo/.git"))
+  assert_true(write_tree_repo_requires_standalone_error(fs, "/repo/.git"))
 
   fs.write_string(
     "/repo/.git/config", "[extensions]\n\tcompatobjectformat = sha1\n",
   )
-  assert_false(write_tree_repo_requires_real_git_delegate(fs, "/repo/.git"))
+  assert_false(write_tree_repo_requires_standalone_error(fs, "/repo/.git"))
 
   restore_env_var_for_write_tree_wbtest("SHIM_REAL_GIT", prev_shim_real_git)
   restore_env_var_for_write_tree_wbtest(

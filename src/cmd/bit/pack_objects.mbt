@@ -1627,37 +1627,6 @@ async fn try_reuse_single_stdin_pack(
 }
 
 ///|
-fn resolve_real_git_for_pack_objects() -> String {
-  match @sys.get_env_var("SHIM_REAL_GIT") {
-    Some(path) if path.length() > 0 => path
-    _ =>
-      match @sys.get_env_var("GIT_SHIM_REAL_GIT") {
-        Some(path) if path.length() > 0 => path
-        _ => "git"
-      }
-  }
-}
-
-///|
-async fn delegate_pack_objects_to_real_git(
-  args : Array[String],
-) -> Unit raise Error {
-  let real_git = resolve_real_git_for_pack_objects()
-  let delegated_args = ["pack-objects"]
-  delegated_args.append(args)
-  let code = @process.run(
-    real_git,
-    delegated_args,
-    inherit_env=true,
-    cwd=get_work_root(),
-  ) catch {
-    err if @async.is_cancellation_error(err) => raise err
-    _ => 1
-  }
-  @sys.exit(code)
-}
-
-///|
 async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
   for arg in args {
     if arg == "-h" || arg == "--help" || arg == "--help-all" {
@@ -1666,9 +1635,12 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
     }
   }
   match parse_pack_objects_args(args) {
-    PackObjectsParse::Unsupported =>
-      // Keep git/t compatibility for advanced options we do not implement.
-      delegate_pack_objects_to_real_git(args)
+    PackObjectsParse::Unsupported => {
+      @stdio.stderr.write(
+        "bit pack-objects: unsupported options in standalone mode\n",
+      )
+      @sys.exit(1)
+    }
     PackObjectsParse::Error(msg) => {
       @stdio.stderr.write(msg + "\n")
       @sys.exit(1)
@@ -1689,12 +1661,16 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
         @sys.exit(1)
       }
       if cfg.has_unsupported_options {
-        // Keep git/t compatibility for advanced options we do not implement.
-        delegate_pack_objects_to_real_git(args)
+        @stdio.stderr.write(
+          "bit pack-objects: unsupported options in standalone mode\n",
+        )
+        @sys.exit(1)
       }
       if !cfg.stdout && !cfg.stdin_packs && !cfg.revs && !cfg.all {
-        // File-output stdin-object mode requires strict pack/index compatibility.
-        delegate_pack_objects_to_real_git(args)
+        @stdio.stderr.write(
+          "bit pack-objects: file-output stdin-object mode is not supported in standalone mode\n",
+        )
+        @sys.exit(1)
       }
       let trace2_event = @sys.get_env_var("GIT_TRACE2_EVENT")
       ignore(trace2_event)

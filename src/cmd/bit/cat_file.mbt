@@ -25,8 +25,10 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
   let git_dir = resolve_git_dir(fs, root)
   if real_git_delegate_is_available(fs) &&
     cat_file_has_incremental_midx_chain(fs, git_dir) {
-    delegate_to_real_git("cat-file", args)
-    return ()
+    eprint_line(
+      "fatal: cat-file with incremental multi-pack-index chain is not supported in standalone mode",
+    )
+    @sys.exit(1)
   }
   let mut show_type = false
   let mut show_size = false
@@ -126,8 +128,10 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
   if batch_all_objects_mode &&
     batch_format_uses_objectsize_disk &&
     real_git_delegate_is_available(fs) {
-    delegate_to_real_git("cat-file", args)
-    return ()
+    eprint_line(
+      "fatal: cat-file --batch-all-objects with %(objectsize:disk) is not supported in standalone mode",
+    )
+    @sys.exit(1)
   }
   let object_filter = cat_file_parse_object_filter_or_exit(object_filter_spec)
   let object_filter_enabled = !cat_file_object_filter_is_disabled(object_filter)

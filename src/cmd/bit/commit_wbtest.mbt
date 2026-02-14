@@ -12,13 +12,13 @@ test "commit: signing options trigger real-git delegation when enabled" {
   let prev_legacy_real_git = @sys.get_env_var("GIT_SHIM_REAL_GIT")
   @sys.set_env_var("SHIM_REAL_GIT", "/usr/bin/git")
   @sys.unset_env_var("GIT_SHIM_REAL_GIT")
-  assert_true(commit_should_delegate_to_real_git(["-S", "-m", "msg"]))
+  assert_true(commit_args_require_standalone_error(["-S", "-m", "msg"]))
   assert_true(
-    commit_should_delegate_to_real_git(["-S/path/to/key", "-m", "msg"]),
+    commit_args_require_standalone_error(["-S/path/to/key", "-m", "msg"]),
   )
-  assert_true(commit_should_delegate_to_real_git(["--gpg-sign", "-m", "msg"]))
+  assert_true(commit_args_require_standalone_error(["--gpg-sign", "-m", "msg"]))
   assert_true(
-    commit_should_delegate_to_real_git(["--gpg-sign=KEY", "-m", "msg"]),
+    commit_args_require_standalone_error(["--gpg-sign=KEY", "-m", "msg"]),
   )
   restore_env_var_for_commit_wbtest("SHIM_REAL_GIT", prev_shim_real_git)
   restore_env_var_for_commit_wbtest("GIT_SHIM_REAL_GIT", prev_legacy_real_git)
@@ -36,12 +36,12 @@ test "commit: sha256 repository requires real-git delegation when available" {
   fs.write_string(
     "/repo/.git/config", "[extensions]\n\tobjectformat = sha256\n",
   )
-  assert_true(commit_repo_requires_real_git_delegate(fs, "/repo/.git"))
+  assert_true(commit_repo_requires_standalone_error(fs, "/repo/.git"))
 
   fs.write_string(
     "/repo/.git/config", "[core]\n\trepositoryformatversion = 0\n",
   )
-  assert_false(commit_repo_requires_real_git_delegate(fs, "/repo/.git"))
+  assert_false(commit_repo_requires_standalone_error(fs, "/repo/.git"))
 
   restore_env_var_for_commit_wbtest("SHIM_REAL_GIT", prev_shim_real_git)
   restore_env_var_for_commit_wbtest("GIT_SHIM_REAL_GIT", prev_legacy_real_git)
@@ -59,12 +59,12 @@ test "commit: compatobjectformat=sha256 requires real-git delegation when availa
   fs.write_string(
     "/repo/.git/config", "[extensions]\n\tcompatobjectformat = sha256\n",
   )
-  assert_true(commit_repo_requires_real_git_delegate(fs, "/repo/.git"))
+  assert_true(commit_repo_requires_standalone_error(fs, "/repo/.git"))
 
   fs.write_string(
     "/repo/.git/config", "[extensions]\n\tcompatobjectformat = sha1\n",
   )
-  assert_false(commit_repo_requires_real_git_delegate(fs, "/repo/.git"))
+  assert_false(commit_repo_requires_standalone_error(fs, "/repo/.git"))
 
   restore_env_var_for_commit_wbtest("SHIM_REAL_GIT", prev_shim_real_git)
   restore_env_var_for_commit_wbtest("GIT_SHIM_REAL_GIT", prev_legacy_real_git)

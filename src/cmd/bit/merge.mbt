@@ -1,35 +1,6 @@
-///|
-fn merge_can_delegate_to_real_git(fs : &@git.RepoFileSystem) -> Bool {
-  guard is_real_git_delegate_enabled() else { return false }
-  let real_git = resolve_real_git_for_fetch()
-  if real_git.length() == 0 {
-    return false
-  }
-  if real_git.has_prefix("/") {
-    return fs.is_file(real_git)
-  }
-  true
-}
-
-///|
-fn merge_should_delegate_to_real_git(
-  fs : &@git.RepoFileSystem,
-  args : Array[String],
-) -> Bool {
-  ignore(args)
-  if merge_can_delegate_to_real_git(fs) {
-    return true
-  }
-  false
-}
-
-///|
 async fn handle_merge(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
   let rfs : &@git.RepoFileSystem = fs
-  if merge_should_delegate_to_real_git(rfs, args) {
-    delegate_to_real_git("merge", args)
-  }
   let root = get_work_root()
   let git_dir = root + "/.git"
   let wfs : &@git.FileSystem = fs

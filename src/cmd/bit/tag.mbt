@@ -3,10 +3,6 @@ async fn handle_tag(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let fs = OsFs::new()
   let rfs : &@git.RepoFileSystem = fs
-  if real_git_delegate_is_available(rfs) {
-    delegate_to_real_git("tag", args)
-    return ()
-  }
   let git_dir = resolve_git_dir(rfs, root)
   let mut list_mode = true
   let mut delete_mode = false
