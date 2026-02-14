@@ -12,6 +12,7 @@ async fn handle_update_index(args : Array[String]) -> Unit raise Error {
   let mut stdin = false
   let mut nul_term = false
   let mut verbose = false
+  let mut skip_worktree_mode : Bool? = None
   let cacheinfo : Array[(String, String, String)] = []
   let paths : Array[String] = []
   let mut i = 0
@@ -26,6 +27,8 @@ async fn handle_update_index(args : Array[String]) -> Unit raise Error {
       "--really-refresh" => refresh = true
       "-q" => quiet = true
       "--ignore-missing" => ignore_missing = true
+      "--skip-worktree" => skip_worktree_mode = Some(true)
+      "--no-skip-worktree" => skip_worktree_mode = Some(false)
       "--stdin" => stdin = true
       "-z" => nul_term = true
       "-v" | "--verbose" => verbose = true
@@ -155,6 +158,21 @@ async fn handle_update_index(args : Array[String]) -> Unit raise Error {
     }
     @gitlib.write_index_entries(fs, git_dir, refreshed)
   }
+  match skip_worktree_mode {
+    Some(enabled) => {
+      let normalized : Array[String] = []
+      for p in paths {
+        let clean = normalize_update_index_path(p)
+        if clean.length() > 0 {
+          normalized.push(clean)
+        }
+      }
+      if normalized.length() > 0 {
+        update_skip_worktree_state(fs, git_dir, normalized, enabled)
+      }
+    }
+    None => ()
+  }
 }
 
 ///|
@@ -181,6 +199,46 @@ fn normalize_update_index_path(path : String) -> String {
     String::unsafe_substring(path, start=2, end=path.length())
   } else {
     path
+  }
+}
+
+///|
+fn update_skip_worktree_state(
+  fs : OsFs,
+  git_dir : String,
+  paths : Array[String],
+  enabled : Bool,
+) -> Unit raise Error {
+  let state_path = git_dir + "/bit-skip-worktree"
+  let state : Map[String, Bool] = {}
+  if fs.is_file(state_path) {
+    let text = decode_bytes(fs.read_file(state_path))
+    for line_view in text.split("\n") {
+      let line = trim_string(line_view.to_string())
+      if line.length() > 0 {
+        state[line] = true
+      }
+    }
+  }
+  for p in paths {
+    if enabled {
+      state[p] = true
+    } else {
+      state.remove(p)
+    }
+  }
+  let out : Array[String] = []
+  for item in state.to_array() {
+    let (path, marked) = item
+    if marked {
+      out.push(path)
+    }
+  }
+  out.sort_by((a, b) => String::compare(a, b))
+  if out.length() == 0 {
+    fs.remove_file(state_path) catch { _ => () }
+  } else {
+    fs.write_string(state_path, out.join("\n") + "\n")
   }
 }
 

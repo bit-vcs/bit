@@ -100,6 +100,8 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
       _ => {
         let id = if arg == "FETCH_HEAD" {
           resolve_fetch_head_oid(fs, git_dir)
+        } else if arg.has_prefix(":") && arg.length() > 1 {
+          resolve_index_path_oid(fs, git_dir, arg)
         } else {
           @gitrepo.rev_parse(fs, git_dir, arg)
         }
@@ -119,6 +121,62 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
   }
   ignore(show_ref_format)
   ignore(show_object_format)
+}
+
+///|
+fn resolve_index_path_oid(
+  fs : &@git.RepoFileSystem,
+  git_dir : String,
+  spec : String,
+) -> @git.ObjectId? raise Error {
+  let (stage, path_opt) = parse_index_pathspec(spec)
+  guard path_opt is Some(path) else { return None }
+  // Current index reader keeps one entry per path; stage lookup is supported for :0:path only.
+  if stage != 0 {
+    return None
+  }
+  let normalized = normalize_index_pathspec_path(path)
+  let entries = @gitlib.read_index_entries(fs, git_dir)
+  for entry in entries {
+    if normalize_index_pathspec_path(entry.path) == normalized {
+      return Some(entry.id)
+    }
+  }
+  None
+}
+
+///|
+fn parse_index_pathspec(spec : String) -> (Int, String?) {
+  if not(spec.has_prefix(":")) || spec.length() <= 1 {
+    return (0, None)
+  }
+  let rest = String::unsafe_substring(spec, start=1, end=spec.length())
+  let mut stage = 0
+  let mut path = rest
+  if rest.length() >= 3 &&
+    rest[0] >= '0' &&
+    rest[0] <= '3' &&
+    rest[1] == ':' {
+    stage = rest[0].to_int() - '0'.to_int()
+    path = String::unsafe_substring(rest, start=2, end=rest.length())
+  }
+  if path.length() == 0 {
+    (stage, None)
+  } else {
+    (stage, Some(path))
+  }
+}
+
+///|
+fn normalize_index_pathspec_path(path : String) -> String {
+  let mut out = path
+  while out.has_prefix("./") {
+    out = String::unsafe_substring(out, start=2, end=out.length())
+  }
+  while out.length() > 1 && out.has_suffix("/") {
+    out = String::unsafe_substring(out, start=0, end=out.length() - 1)
+  }
+  out
 }
 
 ///|

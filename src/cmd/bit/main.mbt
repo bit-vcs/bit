@@ -193,6 +193,13 @@ async fn show_command_help(cmd : String, silent? : Bool = false) -> Bool {
       )
       true
     }
+    "diff-index" => {
+      show_simple_command_help(
+        "git diff-index [<options>] <tree-ish> [--] [<pathspec>...]",
+        summary="Compare tree object with working tree and index.",
+      )
+      true
+    }
     "branch" => {
       show_simple_command_help(
         "git branch [<options>] [<branchname>]",
@@ -703,6 +710,10 @@ async fn run_main_for_args(args : Array[String]) -> Unit {
     }
     None => @sys.unset_env_var("GIT_SHIM_EXPLICIT_GIT_DIR")
   }
+  match opts.work_tree {
+    Some(dir) => @sys.set_env_var("GIT_WORK_TREE", dir)
+    None => ()
+  }
   // Store config overrides in environment variable for handlers to access
   if opts.config_overrides.length() > 0 {
     let encoded : Array[String] = []
@@ -763,6 +774,7 @@ struct GlobalOptions {
   rest : Array[String]
   cwd : String?
   git_dir : String?
+  work_tree : String?
   unsupported_global : Bool
   bare : Bool
   config_overrides : Array[(String, String)]
@@ -797,6 +809,7 @@ fn parse_global_options(args : Array[String]) -> GlobalOptions {
   let mut in_opts = true
   let mut cwd : String? = None
   let mut git_dir : String? = None
+  let mut work_tree : String? = None
   let mut unsupported_global = false
   let mut bare = false
   let mut subcmd : String? = None
@@ -828,6 +841,17 @@ fn parse_global_options(args : Array[String]) -> GlobalOptions {
     if in_opts && arg.has_prefix("--git-dir=") {
       let raw = String::unsafe_substring(arg, start=10, end=arg.length())
       git_dir = Some(resolve_global_path(raw, cwd))
+      i += 1
+      continue
+    }
+    if in_opts && arg == "--work-tree" && i + 1 < args.length() {
+      work_tree = Some(resolve_global_path(args[i + 1], cwd))
+      i += 2
+      continue
+    }
+    if in_opts && arg.has_prefix("--work-tree=") {
+      let raw = String::unsafe_substring(arg, start=12, end=arg.length())
+      work_tree = Some(resolve_global_path(raw, cwd))
       i += 1
       continue
     }
@@ -868,16 +892,23 @@ fn parse_global_options(args : Array[String]) -> GlobalOptions {
     rest = collect_args(args, i + 1)
     break
   }
-  { subcmd, rest, cwd, git_dir, unsupported_global, bare, config_overrides }
+  {
+    subcmd,
+    rest,
+    cwd,
+    git_dir,
+    work_tree,
+    unsupported_global,
+    bare,
+    config_overrides,
+  }
 }
 
 ///|
 fn is_unsupported_global_flag(arg : String) -> Bool {
-  arg == "--work-tree" ||
   arg == "--namespace" ||
   arg == "--super-prefix" ||
   arg == "--git-path" ||
-  arg.has_prefix("--work-tree=") ||
   arg.has_prefix("--namespace=") ||
   arg.has_prefix("--super-prefix=") ||
   arg.has_prefix("--git-path=")
@@ -989,6 +1020,8 @@ async fn dispatch_known_command(
     "show-branches" => handle_show_branches(rest)
     // Misc operations
     "diff" => handle_diff(rest)
+    "diff-files" => handle_diff_files(rest)
+    "diff-index" => handle_diff_index(rest)
     "merge" => handle_merge(rest)
     "tag" => handle_tag(rest)
     "rm" => handle_rm(rest)

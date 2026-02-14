@@ -18,6 +18,10 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
   let mut add_all = false
   let mut force = false
+  let mut refresh = false
+  let mut dry_run = false
+  let mut ignore_missing = false
+  let mut interactive = false
   let mut end_of_options = false
   let paths : Array[String] = []
   for raw_arg in args {
@@ -29,10 +33,32 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
     match arg {
       "-A" | "--all" if not(end_of_options) => add_all = true
       "-f" | "--force" if not(end_of_options) => force = true
+      "--refresh" if not(end_of_options) => refresh = true
+      "-n" | "--dry-run" if not(end_of_options) => dry_run = true
+      "--ignore-missing" if not(end_of_options) => ignore_missing = true
+      "--interactive" if not(end_of_options) => interactive = true
       _ if end_of_options || not(arg.has_prefix("-")) => paths.push(arg)
       _ if arg.has_prefix("-") => warn_unimplemented_arg("add", arg)
       _ => ()
     }
+  }
+  if dry_run {
+    handle_add_dry_run(
+      fs,
+      root,
+      paths,
+      force~,
+      ignore_missing~,
+      interactive~,
+    )
+    return
+  }
+  if paths.iter().any(p => p.length() == 0) {
+    @sys.exit(1)
+  }
+  if refresh {
+    add_refresh_index_entries(fs, root, paths)
+    return
   }
   if add_all {
     // Stage all: untracked, modified, and deleted
@@ -75,6 +101,264 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
     eprint_line("hint: Use -f if you really want to add them.")
     @sys.exit(1)
   }
+  if stage_paths.length() == 0 {
+    let first = add_first_non_empty_pathspec(paths)
+    if first is Some(spec) {
+      eprint_line("fatal: pathspec '\{spec}' did not match any files")
+      @sys.exit(1)
+    }
+  }
+}
+
+///|
+async fn handle_add_dry_run(
+  fs : OsFs,
+  root : String,
+  paths : Array[String],
+  force? : Bool = false,
+  ignore_missing? : Bool = false,
+  interactive? : Bool = false,
+) -> Unit raise Error {
+  if interactive {
+    @sys.exit(1)
+  }
+  if paths.iter().any(p => p.length() == 0) {
+    @sys.exit(1)
+  }
+  let stage_paths = expand_add_stage_paths(fs, root, paths, force)
+  let unmatched = add_collect_unmatched_pathspecs(fs, root, paths, force)
+  if unmatched.length() > 0 && not(ignore_missing) {
+    eprint_line("fatal: pathspec '\{unmatched[0]}' did not match any files")
+    @sys.exit(1)
+  }
+  let printed : Map[String, Bool] = {}
+  for path in stage_paths {
+    if printed.contains(path) {
+      continue
+    }
+    printed[path] = true
+    print_line("add '\{path}'")
+  }
+  if unmatched.length() == 0 {
+    return
+  }
+  if ignore_missing {
+    let ignored : Array[String] = []
+    for spec in unmatched {
+      if @ignore.is_ignored_path(fs, root, spec, false) {
+        ignored.push(spec)
+      }
+    }
+    if ignored.length() > 0 {
+      eprint_line("The following paths are ignored by one of your .gitignore files:")
+      for path in ignored {
+        eprint_line(path)
+      }
+      eprint_line("hint: Use -f if you really want to add them.")
+      eprint_line(
+        "hint: Disable this message with \"git config set advice.addIgnoredFile false\"",
+      )
+    }
+    @sys.exit(1)
+  }
+  @sys.exit(1)
+}
+
+///|
+async fn add_collect_unmatched_pathspecs(
+  fs : &@git.RepoFileSystem,
+  root : String,
+  paths : Array[String],
+  force : Bool,
+) -> Array[String] raise Error {
+  let out : Array[String] = []
+  let git_dir = resolve_git_dir(fs, root)
+  let tracked_entries = @gitlib.read_index_entries(fs, git_dir)
+  let tracked : Map[String, Bool] = {}
+  let tracked_folded : Map[String, String] = {}
+  for entry in tracked_entries {
+    let normalized = normalize_add_path(entry.path)
+    tracked[normalized] = true
+    let folded = normalized.to_lower()
+    if not(tracked_folded.contains(folded)) {
+      tracked_folded[folded] = normalized
+    }
+  }
+  let visible_paths = if force {
+    []
+  } else {
+    @ignore.list_working_files_async(fs, root)
+  }
+  let visible_map : Map[String, Bool] = {}
+  let visible_folded : Map[String, String] = {}
+  for p in visible_paths {
+    visible_map[p] = true
+    let folded = p.to_lower()
+    if not(visible_folded.contains(folded)) {
+      visible_folded[folded] = p
+    }
+  }
+  for raw_path in paths {
+    let path = add_normalize_input_path(root, raw_path)
+    if path.length() == 0 || path == "." {
+      continue
+    }
+    let abs = root + "/" + path
+    let matched = if visible_map.get(path) is Some(_) {
+      true
+    } else if visible_folded.get(path.to_lower()) is Some(_) {
+      true
+    } else if tracked.contains(path) {
+      true
+    } else if tracked_folded.get(path.to_lower()) is Some(_) {
+      true
+    } else if fs.is_dir(abs) {
+      let prefix = path + "/"
+      visible_paths.iter().any(p => p.has_prefix(prefix))
+    } else {
+      false
+    }
+    if not(matched) {
+      out.push(path)
+    }
+  }
+  out
+}
+
+///|
+fn add_first_non_empty_pathspec(paths : Array[String]) -> String? {
+  for raw in paths {
+    let normalized = normalize_add_path(raw)
+    if normalized.length() > 0 && normalized != "." {
+      return Some(normalized)
+    }
+  }
+  None
+}
+
+///|
+async fn add_refresh_index_entries(
+  fs : OsFs,
+  root : String,
+  raw_specs : Array[String],
+) -> Unit raise Error {
+  let git_dir = resolve_git_dir(fs, root)
+  let entries = @gitlib.read_index_entries(fs, git_dir)
+  if entries.length() == 0 {
+    return
+  }
+  let tracked_paths : Array[String] = []
+  for entry in entries {
+    tracked_paths.push(entry.path)
+  }
+  let selected : Map[String, Bool] = {}
+  if raw_specs.length() == 0 {
+    for path in tracked_paths {
+      selected[path] = true
+    }
+  } else {
+    for raw in raw_specs {
+      let (pattern, icase) = add_parse_refresh_pathspec(raw)
+      if pattern.length() == 0 {
+        continue
+      }
+      let mut matched = false
+      for path in tracked_paths {
+        if add_refresh_pathspec_matches(pattern, icase, path) {
+          matched = true
+          selected[path] = true
+        }
+      }
+      if not(matched) {
+        eprint_line("fatal: pathspec '\{raw}' did not match any files")
+        @sys.exit(1)
+      }
+    }
+  }
+  let refreshed : Array[@gitlib.IndexEntry] = []
+  for entry in entries {
+    if not(selected.contains(entry.path)) {
+      refreshed.push(entry)
+      continue
+    }
+    let abs = root + "/" + entry.path
+    if not(fs.is_file(abs)) {
+      refreshed.push(entry)
+      continue
+    }
+    let mut size = entry.size
+    let size_result : Result[Bytes, Error] = try? fs.read_file(abs)
+    match size_result {
+      Ok(content) => size = content.length()
+      Err(_) => ()
+    }
+    let mut mtime_sec = entry.mtime_sec
+    let mut mtime_nsec = entry.mtime_nsec
+    let mtime_result : Result[(Int64, Int), Error] = try? @asyncfs.mtime(
+      abs,
+      follow_symlink=false,
+    )
+    match mtime_result {
+      Ok((sec, nsec)) => {
+        mtime_sec = sec.to_int()
+        mtime_nsec = nsec
+      }
+      Err(_) => ()
+    }
+    refreshed.push(
+      @gitlib.IndexEntry::new(
+        entry.path,
+        entry.id,
+        entry.mode,
+        size,
+        mtime_sec~,
+        mtime_nsec~,
+      ),
+    )
+  }
+  @gitlib.write_index_entries(fs, git_dir, refreshed)
+}
+
+///|
+fn add_parse_refresh_pathspec(raw : String) -> (String, Bool) {
+  let normalized = normalize_add_path(raw)
+  if normalized.has_prefix(":(") {
+    match normalized.find(")") {
+      Some(idx) => {
+        let magic = String::unsafe_substring(normalized, start=2, end=idx)
+        let rest = String::unsafe_substring(
+          normalized,
+          start=idx + 1,
+          end=normalized.length(),
+        )
+        let mut icase = false
+        for token_view in magic.split(",") {
+          let token = trim_string(token_view.to_string())
+          if token == "icase" {
+            icase = true
+          }
+        }
+        (normalize_add_path(rest), icase)
+      }
+      None => (normalized, false)
+    }
+  } else {
+    (normalized, false)
+  }
+}
+
+///|
+fn add_refresh_pathspec_matches(spec : String, icase : Bool, path : String) -> Bool {
+  if spec == "." {
+    return true
+  }
+  if icase {
+    let folded_spec = spec.to_lower()
+    let folded_path = path.to_lower()
+    return folded_path == folded_spec ||
+      folded_path.has_prefix(folded_spec + "/")
+  }
+  path == spec || path.has_prefix(spec + "/")
 }
 
 ///|
@@ -86,7 +370,48 @@ fn normalize_add_path(path : String) -> String {
   while out.length() > 1 && out.has_suffix("/") {
     out = String::unsafe_substring(out, start=0, end=out.length() - 1)
   }
-  out
+  let sb = StringBuilder::new()
+  let mut i = 0
+  while i < out.length() {
+    let c = out[i].unsafe_to_char()
+    if c == '\\' && i + 1 < out.length() {
+      let next = out[i + 1].unsafe_to_char()
+      if next == '[' || next == ']' || next == '\\' {
+        sb.write_char(next)
+        i += 2
+        continue
+      }
+    }
+    sb.write_char(c)
+    i += 1
+  }
+  sb.to_string()
+}
+
+///|
+fn add_normalize_input_path(root : String, raw_path : String) -> String {
+  let normalized = normalize_add_path(raw_path)
+  if normalized.length() == 0 {
+    return normalized
+  }
+  let root_prefix = if root.has_suffix("/") { root } else { root + "/" }
+  if normalized.has_prefix(root_prefix) {
+    return String::unsafe_substring(
+      normalized,
+      start=root_prefix.length(),
+      end=normalized.length(),
+    )
+  }
+  let normalized_folded = normalized.to_lower()
+  let root_folded = root_prefix.to_lower()
+  if normalized_folded.has_prefix(root_folded) {
+    return String::unsafe_substring(
+      normalized,
+      start=root_prefix.length(),
+      end=normalized.length(),
+    )
+  }
+  normalized
 }
 
 ///|
@@ -135,12 +460,29 @@ async fn expand_add_stage_paths(
   } else {
     @ignore.list_working_files_async(fs, root)
   }
+  let git_dir = resolve_git_dir(fs, root)
+  let tracked_entries = @gitlib.read_index_entries(fs, git_dir)
+  let tracked_map : Map[String, Bool] = {}
+  let tracked_folded : Map[String, String] = {}
+  for entry in tracked_entries {
+    let normalized = normalize_add_path(entry.path)
+    tracked_map[normalized] = true
+    let folded = normalized.to_lower()
+    if not(tracked_folded.contains(folded)) {
+      tracked_folded[folded] = normalized
+    }
+  }
   let visible_map : Map[String, Bool] = {}
+  let visible_folded : Map[String, String] = {}
   for p in visible_paths {
     visible_map[p] = true
+    let folded = p.to_lower()
+    if not(visible_folded.contains(folded)) {
+      visible_folded[folded] = p
+    }
   }
   for raw_path in paths {
-    let path = normalize_add_path(raw_path)
+    let path = add_normalize_input_path(root, raw_path)
     if path.length() == 0 {
       continue
     }
@@ -168,8 +510,20 @@ async fn expand_add_stage_paths(
       out.push(path)
       continue
     }
-    if not(fs.is_file(abs)) && not(fs.is_dir(abs)) {
+    match visible_folded.get(path.to_lower()) {
+      Some(actual) => {
+        out.push(actual)
+        continue
+      }
+      None => ()
+    }
+    if tracked_map.contains(path) {
       out.push(path)
+      continue
+    }
+    match tracked_folded.get(path.to_lower()) {
+      Some(actual) => out.push(actual)
+      None => ()
     }
   }
   out
@@ -229,12 +583,21 @@ fn add_has_explicit_ignored_path(
   root : String,
   paths : Array[String],
 ) -> Bool raise Error {
+  let git_dir = resolve_git_dir(fs, root)
+  let tracked_entries = @gitlib.read_index_entries(fs, git_dir)
+  let tracked : Map[String, Bool] = {}
+  for entry in tracked_entries {
+    tracked[normalize_add_path(entry.path)] = true
+  }
   for raw_path in paths {
-    let rel = normalize_add_path(raw_path)
+    let rel = add_normalize_input_path(root, raw_path)
     if rel.length() == 0 {
       continue
     }
     if rel == "." {
+      continue
+    }
+    if tracked.contains(rel) {
       continue
     }
     let abs = root + "/" + rel

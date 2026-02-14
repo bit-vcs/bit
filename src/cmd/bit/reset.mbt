@@ -4,20 +4,34 @@ async fn handle_reset(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
   let rfs : &@git.RepoFileSystem = fs
   let git_dir = resolve_git_dir(rfs, root)
+  let skip_before_reset = reset_read_skip_worktree_paths(rfs, git_dir)
   let mut mode : @gitlib.ResetMode = @gitlib.ResetMode::Mixed
   let mut rev : String? = None
   let paths : Array[String] = []
   let mut parse_options = true
+  let mut parse_as_paths = false
+  let mut refresh = true
+  let mut quiet = false
+  let mut intent_to_add = false
   for arg in args {
-    if parse_options && arg == "--" {
-      parse_options = false
-      continue
-    }
     if parse_options {
+      if arg == "--end-of-options" {
+        parse_options = false
+        continue
+      }
+      if arg == "--" {
+        parse_options = false
+        parse_as_paths = true
+        continue
+      }
       match arg {
         "--soft" => mode = @gitlib.ResetMode::Soft
         "--mixed" => mode = @gitlib.ResetMode::Mixed
         "--hard" => mode = @gitlib.ResetMode::Hard
+        "--refresh" => refresh = true
+        "--no-refresh" => refresh = false
+        "--quiet" | "-q" => quiet = true
+        "-N" => intent_to_add = true
         "--no-soft" | "--no-mixed" | "--no-hard" | "--no-merge" | "--no-keep" =>
           reset_die_unknown_option(arg)
         _ if arg.has_prefix("--no-") => reset_die_unknown_option(arg)
@@ -25,10 +39,33 @@ async fn handle_reset(args : Array[String]) -> Unit raise Error {
         _ => if rev is None { rev = Some(arg) } else { paths.push(arg) }
       }
     } else {
-      paths.push(arg)
+      if parse_as_paths {
+        paths.push(arg)
+      } else if rev is None {
+        rev = Some(arg)
+      } else {
+        paths.push(arg)
+      }
+    }
+  }
+  if parse_options && rev is Some(token) && paths.length() == 0 {
+    let mixed_mode = match mode {
+      @gitlib.ResetMode::Mixed => true
+      _ => false
+    }
+    if mixed_mode &&
+      @gitrepo.rev_parse(rfs, git_dir, token) is None &&
+      reset_token_looks_like_path(rfs, root, token) {
+      paths.push(token)
+      rev = None
     }
   }
   let spec = rev.unwrap_or("HEAD")
+  let before_entries = if intent_to_add {
+    @gitlib.read_index_entries(rfs, git_dir)
+  } else {
+    []
+  }
   if paths.length() > 0 {
     let mixed_mode = match mode {
       @gitlib.ResetMode::Mixed => true
@@ -39,6 +76,17 @@ async fn handle_reset(args : Array[String]) -> Unit raise Error {
       @sys.exit(1)
     }
     reset_mixed_paths(fs, rfs, root, git_dir, spec, paths)
+    if refresh {
+      ignore(
+        reset_refresh_index_entries(
+          fs,
+          rfs,
+          root,
+          git_dir,
+          skip_override=Some(skip_before_reset),
+        ),
+      )
+    }
     return
   }
   let soft_mode = match mode {
@@ -52,6 +100,30 @@ async fn handle_reset(args : Array[String]) -> Unit raise Error {
   let orig_head = @gitlib.resolve_ref(rfs, git_dir, "HEAD")
   let commit_id = @gitlib.reset(fs, rfs, root, spec, mode)
   reset_write_orig_head(fs, git_dir, orig_head)
+  let mixed_mode = match mode {
+    @gitlib.ResetMode::Mixed => true
+    _ => false
+  }
+  if mixed_mode {
+    if intent_to_add {
+      reset_apply_intent_to_add(fs, rfs, root, git_dir, before_entries)
+    }
+    if refresh {
+      let changed = reset_refresh_index_entries(
+        fs,
+        rfs,
+        root,
+        git_dir,
+        skip_override=Some(skip_before_reset),
+      )
+      if not(quiet) && changed.length() > 0 {
+        print_line("Unstaged changes after reset:")
+        for path in changed {
+          print_line("M\t" + path)
+        }
+      }
+    }
+  }
   let hard_mode = match mode {
     @gitlib.ResetMode::Hard => true
     _ => false
@@ -91,7 +163,7 @@ fn reset_mixed_paths(
   }
   let object_git_dir = reset_resolve_common_git_dir(rfs, git_dir)
   let db = @gitlib.ObjectDb::load_lazy(rfs, object_git_dir)
-  let tree_files = @gitlib.collect_tree_files_from_commit(db, rfs, target)
+  let tree_files = reset_collect_tree_files_from_target(db, rfs, target)
   let normalized_paths : Array[String] = []
   for raw in paths {
     let p = reset_normalize_path(raw)
@@ -161,6 +233,228 @@ fn reset_normalize_path(path : String) -> String {
   } else {
     path
   }
+}
+
+///|
+fn reset_token_looks_like_path(
+  fs : &@git.RepoFileSystem,
+  root : String,
+  token : String,
+) -> Bool {
+  let path = reset_normalize_path(token)
+  if path == "." {
+    return true
+  }
+  if path.length() == 0 {
+    return false
+  }
+  let abs = root + "/" + path
+  fs.is_file(abs) || fs.is_dir(abs)
+}
+
+///|
+fn reset_collect_tree_files_from_target(
+  db : @gitlib.ObjectDb,
+  fs : &@git.RepoFileSystem,
+  target : @git.ObjectId,
+) -> Map[String, @gitlib.TreeFileEntry] raise Error {
+  match db.get(fs, target) {
+    Some(obj) =>
+      match obj.obj_type {
+        @git.ObjectType::Tree => @gitlib.collect_tree_files(db, fs, target)
+        @git.ObjectType::Commit => @gitlib.collect_tree_files_from_commit(db, fs, target)
+        _ => raise @git.GitError::InvalidObject("Invalid reset target object")
+      }
+    None => raise @git.GitError::InvalidObject("Missing reset target object")
+  }
+}
+
+///|
+fn reset_apply_intent_to_add(
+  fs : &@git.FileSystem,
+  rfs : &@git.RepoFileSystem,
+  root : String,
+  git_dir : String,
+  before_entries : Array[@gitlib.IndexEntry],
+) -> Unit raise Error {
+  let after_entries = @gitlib.read_index_entries(rfs, git_dir)
+  let after_map : Map[String, Bool] = {}
+  for entry in after_entries {
+    after_map[entry.path] = true
+  }
+  let merged : Array[@gitlib.IndexEntry] = []
+  merged.append(after_entries)
+  let zero = reset_zero_oid()
+  for entry in before_entries {
+    if after_map.contains(entry.path) {
+      continue
+    }
+    let abs = root + "/" + entry.path
+    if not(rfs.is_file(abs)) {
+      continue
+    }
+    merged.push(
+      @gitlib.IndexEntry::new(
+        entry.path,
+        zero,
+        entry.mode,
+        0,
+        mtime_sec=0,
+        mtime_nsec=0,
+      ),
+    )
+  }
+  @gitlib.write_index_entries(fs, git_dir, merged)
+}
+
+///|
+fn reset_zero_oid() -> @git.ObjectId {
+  @git.ObjectId::new(FixedArray::make(20, b'\x00'))
+}
+
+///|
+async fn reset_refresh_index_entries(
+  fs : &@git.FileSystem,
+  rfs : &@git.RepoFileSystem,
+  root : String,
+  git_dir : String,
+  skip_override? : Map[String, Bool]? = None,
+) -> Array[String] raise Error {
+  let entries = @gitlib.read_index_entries(rfs, git_dir)
+  let skip = reset_read_skip_worktree_paths(rfs, git_dir)
+  match skip_override {
+    Some(extra) =>
+      for item in extra.to_array() {
+        let (path, enabled) = item
+        if enabled {
+          skip[path] = true
+        }
+      }
+    None => ()
+  }
+  let updated : Array[@gitlib.IndexEntry] = []
+  let changed_map : Map[String, Bool] = {}
+  for entry in entries {
+    let abs = root + "/" + entry.path
+    let mut out_entry = entry
+    let mut changed = false
+    if not(rfs.is_file(abs)) {
+      changed = true
+    } else {
+      let content = rfs.read_file(abs) catch {
+        _ => {
+          changed = true
+          Bytes::default()
+        }
+      }
+      if not(changed) {
+        let id = @git.hash_blob(content)
+        if id == entry.id {
+          let mut mtime_sec = entry.mtime_sec
+          let mut mtime_nsec = entry.mtime_nsec
+          let mtime_result : Result[(Int64, Int), Error] = try? @asyncfs.mtime(
+            abs,
+            follow_symlink=false,
+          )
+          match mtime_result {
+            Ok((sec, nsec)) => {
+              mtime_sec = sec.to_int()
+              mtime_nsec = nsec
+            }
+            Err(_) => ()
+          }
+          out_entry = @gitlib.IndexEntry::new(
+            entry.path,
+            entry.id,
+            entry.mode,
+            content.length(),
+            mtime_sec~,
+            mtime_nsec~,
+          )
+        } else {
+          changed = true
+        }
+      }
+    }
+    if changed && not(skip.contains(entry.path)) {
+      changed_map[entry.path] = true
+    }
+    updated.push(out_entry)
+  }
+  @gitlib.write_index_entries(fs, git_dir, updated)
+  let changed : Array[String] = []
+  for item in changed_map.to_array() {
+    let (path, _) = item
+    changed.push(path)
+  }
+  changed.sort_by((a, b) => String::compare(a, b))
+  changed
+}
+
+///|
+fn reset_read_skip_worktree_paths(
+  fs : &@git.RepoFileSystem,
+  git_dir : String,
+) -> Map[String, Bool] {
+  let out : Map[String, Bool] = {}
+  let sidecar_path = git_dir + "/bit-skip-worktree"
+  if fs.is_file(sidecar_path) {
+    let text = decode_bytes(fs.read_file(sidecar_path) catch { _ => Bytes::default() })
+    for line_view in text.split("\n") {
+      let line = trim_string(line_view.to_string())
+      if line.length() > 0 {
+        out[line] = true
+      }
+    }
+  }
+  let index_path = git_dir + "/index"
+  if not(fs.is_file(index_path)) {
+    return out
+  }
+  let data = fs.read_file(index_path) catch { _ => return out }
+  if data.length() < 12 + 20 {
+    return out
+  }
+  if not(
+      data[0] == b'D' && data[1] == b'I' && data[2] == b'R' && data[3] == b'C',
+    ) {
+    return out
+  }
+  let count = reset_read_u32_be(data, 8)
+  let mut offset = 12
+  for _ in 0..<count {
+    if offset + 62 > data.length() {
+      return out
+    }
+    let flags = reset_read_u16_be(data, offset + 60)
+    let stage = (flags >> 12) & 0x3
+    let has_extended = (flags & 0x4000) != 0
+    let ext_flags = if has_extended {
+      reset_read_u16_be(data, offset + 62)
+    } else {
+      0
+    }
+    let fixed_size = if has_extended { 64 } else { 62 }
+    let path_start = offset + fixed_size
+    let mut i = path_start
+    while i < data.length() && data[i] != b'\x00' {
+      i += 1
+    }
+    if i >= data.length() {
+      return out
+    }
+    if stage == 0 && has_extended && (ext_flags & 0x4000) != 0 {
+      let path_bytes : Array[Byte] = []
+      for j in path_start..<i {
+        path_bytes.push(data[j])
+      }
+      out[decode_bytes(bytes_from_array(path_bytes))] = true
+    }
+    let path_len = i - path_start
+    let entry_size = (fixed_size + path_len + 1 + 7) / 8 * 8
+    offset += entry_size
+  }
+  out
 }
 
 ///|

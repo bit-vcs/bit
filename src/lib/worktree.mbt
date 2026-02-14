@@ -348,7 +348,10 @@ pub async fn add_paths_async(
             let mode = if core_filemode {
               info.mode
             } else {
-              default_file_mode()
+              match map.get(path) {
+                Some(existing) => existing.mode
+                None => default_file_mode()
+              }
             }
             map[path] = { path, id, mode, size, mtime_sec, mtime_nsec }
           }
@@ -869,6 +872,9 @@ pub fn write_tree_from_index(
       let prefix_with_slash = if p.has_suffix("/") { p } else { p + "/" }
       let result : Array[IndexEntry] = []
       for e in entries {
+        if worktree_is_zero_object_id(e.id) {
+          continue
+        }
         if e.path.has_prefix(prefix_with_slash) {
           // Strip the prefix from the path
           let new_path = e.path[prefix_with_slash.length():].to_string() catch {
@@ -886,7 +892,16 @@ pub fn write_tree_from_index(
       }
       result
     }
-    None => entries.map(e => e)
+    None => {
+      let result : Array[IndexEntry] = []
+      for e in entries {
+        if worktree_is_zero_object_id(e.id) {
+          continue
+        }
+        result.push(e)
+      }
+      result
+    }
   }
   write_tree_from_entries(fs, git_dir, rel_entries)
 }
@@ -900,6 +915,9 @@ fn write_tree_from_entries(
   let file_entries : Array[@git.TreeEntry] = []
   let dir_map : Map[String, Array[IndexEntry]] = {}
   for e in entries {
+    if worktree_is_zero_object_id(e.id) {
+      continue
+    }
     match split_first(e.path) {
       (name, None) => {
         let mode = mode_to_string(e.mode)
@@ -944,6 +962,16 @@ fn write_tree_from_entries(
   let (tree_id, compressed) = @git.create_tree(file_entries)
   write_object_bytes(fs, git_dir, tree_id, compressed)
   tree_id
+}
+
+///|
+fn worktree_is_zero_object_id(id : @git.ObjectId) -> Bool {
+  for b in id.bytes {
+    if b != b'\x00' {
+      return false
+    }
+  }
+  true
 }
 
 ///|

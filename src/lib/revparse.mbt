@@ -25,6 +25,14 @@ pub fn rev_parse(
     }
     None => ()
   }
+  match parse_peel_tree_spec(spec) {
+    Some(base_spec) => {
+      let base = rev_parse(fs, git_dir, base_spec)
+      guard base is Some(base_id) else { return None }
+      return peel_object_to_tree(fs, git_dir, base_id)
+    }
+    None => ()
+  }
   // Parse suffix (^, ^^, ~n, ^n)
   let (base_spec, ancestor_count) = parse_rev_suffix(spec)
   // Resolve base reference
@@ -49,6 +57,15 @@ fn parse_peel_commit_spec(spec : String) -> String? {
 }
 
 ///|
+fn parse_peel_tree_spec(spec : String) -> String? {
+  let suffix = "^{tree}"
+  if spec.has_suffix(suffix) && spec.length() > suffix.length() {
+    return Some(substring_revparse(spec, 0, spec.length() - suffix.length()))
+  }
+  None
+}
+
+///|
 fn peel_object_to_commit(
   fs : &@git.RepoFileSystem,
   git_dir : String,
@@ -61,6 +78,31 @@ fn peel_object_to_commit(
     guard obj is Some(o) else { return None }
     match o.obj_type {
       @git.ObjectType::Commit => return Some(current)
+      @git.ObjectType::Tag =>
+        match parse_tag_object_target(o.data) {
+          Some(next) => current = next
+          None => return None
+        }
+      _ => return None
+    }
+  }
+  None
+}
+
+///|
+fn peel_object_to_tree(
+  fs : &@git.RepoFileSystem,
+  git_dir : String,
+  id : @git.ObjectId,
+) -> @git.ObjectId? raise @git.GitError {
+  let db = ObjectDb::load(fs, git_dir)
+  let mut current = id
+  for _ in 0..<8 {
+    let obj = db.get(fs, current)
+    guard obj is Some(o) else { return None }
+    match o.obj_type {
+      @git.ObjectType::Tree => return Some(current)
+      @git.ObjectType::Commit => return Some(@git.parse_commit(o.data).tree)
       @git.ObjectType::Tag =>
         match parse_tag_object_target(o.data) {
           Some(next) => current = next

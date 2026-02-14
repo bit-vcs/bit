@@ -46,7 +46,7 @@ pub fn read_index_entries(
   }
   let count = index_read_u32_be(data, 8)
   let mut offset = 12
-  let entries : Array[IndexEntry] = []
+  let selected : Map[String, (Int, IndexEntry)] = {}
   for _ in 0..<count {
     let entry_start = offset
     if offset + 62 > data.length() {
@@ -74,6 +74,7 @@ pub fn read_index_entries(
     // flags (u16)
     let flags = index_read_u16_be(data, offset)
     offset += 2
+    let stage = (flags >> 12) & 0x3
     // Check extended flag (bit 14) - if set, skip 2 more bytes
     let has_extended = (flags & 0x4000) != 0
     if has_extended {
@@ -89,8 +90,23 @@ pub fn read_index_entries(
     let entry_size = (entry_size_without_padding + 7) / 8 * 8
     offset = entry_start + entry_size
     ignore(next)
-    entries.push({ path: path_str, id, mode, size, mtime_sec, mtime_nsec })
+    let entry = { path: path_str, id, mode, size, mtime_sec, mtime_nsec }
+    let prio = index_stage_priority(stage)
+    match selected.get(path_str) {
+      Some((prev_prio, _)) =>
+        if prio > prev_prio {
+          selected[path_str] = (prio, entry)
+        }
+      None => selected[path_str] = (prio, entry)
+    }
   }
+  let entries : Array[IndexEntry] = []
+  for item in selected.to_array() {
+    let (_, value) = item
+    let (_, entry) = value
+    entries.push(entry)
+  }
+  entries.sort_by((a, b) => index_path_compare_git_order(a.path, b.path))
   entries
 }
 
@@ -115,8 +131,8 @@ pub fn write_index_entries(
     // Index entry format (40 bytes stat data):
     // ctime_seconds, ctime_nanoseconds, mtime_seconds, mtime_nanoseconds,
     // dev, ino, mode, uid, gid, file_size
-    index_push_u32_be(out, 0) // ctime_seconds
-    index_push_u32_be(out, 0) // ctime_nanoseconds
+    index_push_u32_be(out, e.mtime_sec) // ctime_seconds
+    index_push_u32_be(out, e.mtime_nsec) // ctime_nanoseconds
     index_push_u32_be(out, e.mtime_sec) // mtime_seconds
     index_push_u32_be(out, e.mtime_nsec) // mtime_nanoseconds
     index_push_u32_be(out, 0) // dev
@@ -258,5 +274,18 @@ fn index_path_compare_git_order(a : String, b : String) -> Int {
     1
   } else {
     0
+  }
+}
+
+///|
+fn index_stage_priority(stage : Int) -> Int {
+  if stage == 0 {
+    4
+  } else if stage == 2 {
+    3
+  } else if stage == 1 {
+    2
+  } else {
+    1
   }
 }

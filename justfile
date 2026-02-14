@@ -250,7 +250,7 @@ git-t-full test_file: build
     echo "$real_git" > tools/git-shim/real-git-path; \
     SHIM_REAL_GIT="$real_git" SHIM_EXEC_PATH="$exec_path" \
     SHIM_MOON="$(pwd)/tools/git-shim/moon" \
-    SHIM_CMDS="init status add commit log show branch checkout switch reset rebase stash cherry-pick diff merge tag rm mv config sparse-checkout rev-parse cat-file ls-files hash-object ls-tree write-tree show-ref update-ref symbolic-ref reflog worktree gc clean grep submodule revert notes bisect describe blame format-patch shortlog remote clone fetch pull push receive-pack upload-pack pack-objects index-pack shell" SHIM_STRICT=1 \
+    SHIM_CMDS="init status add commit log show branch checkout switch reset rebase stash cherry-pick diff diff-files diff-index merge tag rm mv config sparse-checkout rev-parse cat-file ls-files hash-object ls-tree write-tree show-ref update-ref symbolic-ref reflog worktree gc clean grep submodule revert notes bisect describe blame format-patch shortlog remote clone fetch pull push receive-pack upload-pack pack-objects index-pack shell" SHIM_STRICT=1 \
     GIT_TEST_INSTALLED="$shim_dir" GIT_TEST_EXEC_PATH="$exec_path" \
     GIT_TEST_DEFAULT_HASH=sha1 \
     CPATH="$prefix/include" LDFLAGS="-L$prefix/lib" LIBRARY_PATH="$prefix/lib" \

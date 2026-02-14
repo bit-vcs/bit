@@ -117,10 +117,8 @@ pub async fn diff_worktree(
               content_changed = id != entry.id
               if content_changed {
                 let old = diff_read_blob(db, fs, entry.id)
-                if old is Some(_) {
-                  old_content = old
-                  new_content = Some(normalized)
-                }
+                old_content = old
+                new_content = Some(normalized)
               }
             }
           }
@@ -148,10 +146,8 @@ pub async fn diff_worktree(
                   content_changed = id != entry.id
                   if content_changed {
                     let old = diff_read_blob(db, fs, entry.id)
-                    if old is Some(_) {
-                      old_content = old
-                      new_content = Some(bytes)
-                    }
+                    old_content = old
+                    new_content = Some(bytes)
                   }
                 }
                 None => ()
@@ -160,6 +156,16 @@ pub async fn diff_worktree(
           }
         }
         if content_changed && old_content is None {
+          if diff_is_zero_oid(entry.id) && new_content is Some(nc) {
+            out.push({
+              path,
+              kind: DiffKind::Added,
+              old_content: None,
+              new_content: Some(nc),
+              old_mode: None,
+              new_mode: Some(info.mode),
+            })
+          }
           continue
         }
         if content_changed || mode_changed {
@@ -297,6 +303,16 @@ pub fn diff_text(files : Array[DiffFile]) -> Array[String] {
 fn diff_blob_short_id(data : Bytes) -> String {
   let hex = @git.hash_blob(data).to_hex()
   String::unsafe_substring(hex, start=0, end=7)
+}
+
+///|
+fn diff_is_zero_oid(id : @git.ObjectId) -> Bool {
+  for b in id.bytes {
+    if b != b'\x00' {
+      return false
+    }
+  }
+  true
 }
 
 ///|
