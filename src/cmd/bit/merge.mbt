@@ -1,13 +1,38 @@
 ///|
+fn merge_can_delegate_to_real_git(fs : &@git.RepoFileSystem) -> Bool {
+  guard is_real_git_delegate_enabled() else { return false }
+  let real_git = resolve_real_git_for_fetch()
+  if real_git.length() == 0 {
+    return false
+  }
+  if real_git.has_prefix("/") {
+    return fs.is_file(real_git)
+  }
+  true
+}
+
+///|
+fn merge_should_delegate_to_real_git(
+  fs : &@git.RepoFileSystem,
+  args : Array[String],
+) -> Bool {
+  ignore(args)
+  if merge_can_delegate_to_real_git(fs) {
+    return true
+  }
+  false
+}
+
+///|
 async fn handle_merge(args : Array[String]) -> Unit raise Error {
-  if is_real_git_delegate_enabled() {
+  let fs = OsFs::new()
+  let rfs : &@git.RepoFileSystem = fs
+  if merge_should_delegate_to_real_git(rfs, args) {
     delegate_to_real_git("merge", args)
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
-  let fs = OsFs::new()
   let wfs : &@git.FileSystem = fs
-  let rfs : &@git.RepoFileSystem = fs
   let mut target_ref : String? = None
   let mut message : String? = None
   let mut no_ff = false
@@ -24,8 +49,24 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
         i += 2
         continue
       }
+      "--message" if i + 1 < args.length() => {
+        message = Some(args[i + 1])
+        i += 2
+        continue
+      }
+      "-m" => {
+        raise @git.GitError::InvalidObject("option '-m' requires a value")
+      }
+      "--message" => {
+        raise @git.GitError::InvalidObject("option '--message' requires a value")
+      }
       _ if arg.has_prefix("-m") => {
         message = Some((try! arg[2:]).to_string())
+        i += 1
+        continue
+      }
+      _ if arg.has_prefix("--message=") => {
+        message = Some((try! arg[10:]).to_string())
         i += 1
         continue
       }
@@ -54,7 +95,14 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
         i += 1
         continue
       }
-      _ if not(arg.has_prefix("-")) => target_ref = Some(arg)
+      _ if not(arg.has_prefix("-")) =>
+        match target_ref {
+          Some(_) =>
+            raise @git.GitError::InvalidObject(
+              "multiple merge heads are not supported",
+            )
+          None => target_ref = Some(arg)
+        }
       _ if arg.has_prefix("-") => warn_unimplemented_arg("merge", arg)
       _ => ()
     }

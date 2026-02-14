@@ -2,6 +2,7 @@
 priv struct ReflogShowArgs {
   refname : String
   no_abbrev_commit : Bool
+  max_count : Int?
   grep_patterns : Array[String]
   grep_pattern_type_override : GrepPatternType?
   grep_ignore_case : Bool
@@ -22,6 +23,7 @@ async fn handle_reflog(args : Array[String]) -> Unit raise Error {
       git_dir,
       "HEAD",
       false,
+      None,
       empty_grep_patterns,
       GrepPatternType::Basic,
       false,
@@ -46,6 +48,7 @@ async fn handle_reflog(args : Array[String]) -> Unit raise Error {
         git_dir,
         parsed.refname,
         parsed.no_abbrev_commit,
+        parsed.max_count,
         parsed.grep_patterns,
         grep_pattern_type,
         parsed.grep_ignore_case,
@@ -90,6 +93,7 @@ async fn handle_reflog(args : Array[String]) -> Unit raise Error {
         git_dir,
         parsed.refname,
         parsed.no_abbrev_commit,
+        parsed.max_count,
         parsed.grep_patterns,
         grep_pattern_type,
         parsed.grep_ignore_case,
@@ -104,6 +108,7 @@ async fn show_reflog(
   git_dir : String,
   refname : String,
   no_abbrev_commit : Bool,
+  max_count : Int?,
   grep_patterns : Array[String],
   grep_pattern_type : GrepPatternType,
   grep_ignore_case : Bool,
@@ -112,10 +117,17 @@ async fn show_reflog(
   if entries.length() == 0 && refname == "HEAD" {
     // Some pure commit paths may not materialize logs/HEAD.
     // Fall back to HEAD history so `reflog --grep` semantics remain usable.
-    let max_count = 64
-    let commits = @gitlib.log_head(fs, git_dir, max_count~)
+    let fallback_max_count = match max_count {
+      Some(limit) => limit
+      None => 64
+    }
+    let commits = @gitlib.log_head(fs, git_dir, max_count=fallback_max_count)
     let mut fallback_index = 0
+    let mut printed = 0
     for entry in commits {
+      if reflog_limit_reached(max_count, printed) {
+        break
+      }
       let message = "commit: " + entry.message
       if not(
         grep_patterns_match_message(
@@ -134,12 +146,17 @@ async fn show_reflog(
       }
       print_line("\{sha} HEAD@{\{fallback_index}}: \{message}")
       fallback_index += 1
+      printed += 1
     }
     return
   }
   // Show in reverse order (newest first)
   let len = entries.length()
+  let mut printed = 0
   for i in 0..<len {
+    if reflog_limit_reached(max_count, printed) {
+      break
+    }
     let idx = len - 1 - i
     let entry = entries[idx]
     if not(
@@ -158,6 +175,7 @@ async fn show_reflog(
       String::unsafe_substring(entry.new_id.to_hex(), start=0, end=7)
     }
     print_line("\{sha} \{refname}@{\{i}}: \{entry.message}")
+    printed += 1
   }
 }
 
@@ -165,6 +183,7 @@ async fn show_reflog(
 fn parse_reflog_show_args(args : Array[String]) -> ReflogShowArgs {
   let mut refname = "HEAD"
   let mut no_abbrev_commit = false
+  let mut max_count : Int? = None
   let mut has_refname = false
   let grep_patterns : Array[String] = []
   let mut grep_pattern_type_override : GrepPatternType? = None
@@ -174,6 +193,15 @@ fn parse_reflog_show_args(args : Array[String]) -> ReflogShowArgs {
     let arg = args[i]
     match arg {
       "--no-abbrev-commit" => no_abbrev_commit = true
+      "-n" | "--max-count" if i + 1 < args.length() => {
+        max_count = parse_reflog_max_count_value(args[i + 1])
+        i += 1
+      }
+      _ if arg.has_prefix("--max-count=") =>
+        max_count = parse_reflog_max_count_value(
+          String::unsafe_substring(arg, start=12, end=arg.length()),
+        )
+      _ if reflog_parse_short_max_count(arg) is Some(limit) => max_count = Some(limit)
       "--grep" if i + 1 < args.length() => {
         grep_patterns.push(args[i + 1])
         i += 1
@@ -201,9 +229,41 @@ fn parse_reflog_show_args(args : Array[String]) -> ReflogShowArgs {
   {
     refname,
     no_abbrev_commit,
+    max_count,
     grep_patterns,
     grep_pattern_type_override,
     grep_ignore_case,
+  }
+}
+
+///|
+fn parse_reflog_max_count_value(value : String) -> Int? {
+  if value.length() == 0 {
+    return None
+  }
+  for c in value {
+    if c < '0' || c > '9' {
+      return None
+    }
+  }
+  Some(@strconv.parse_int(value) catch { _ => return None })
+}
+
+///|
+fn reflog_parse_short_max_count(arg : String) -> Int? {
+  if arg.length() <= 1 || not(arg.has_prefix("-")) {
+    return None
+  }
+  parse_reflog_max_count_value(
+    String::unsafe_substring(arg, start=1, end=arg.length()),
+  )
+}
+
+///|
+fn reflog_limit_reached(max_count : Int?, printed : Int) -> Bool {
+  match max_count {
+    Some(limit) => printed >= limit
+    None => false
   }
 }
 

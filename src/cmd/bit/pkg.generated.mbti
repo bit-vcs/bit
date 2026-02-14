@@ -64,6 +64,8 @@ type FetchHeadEntry
 
 type GlobalOptions
 
+type GrepPatternType
+
 type HubDumpOptions
 
 type HubIssueListOptions

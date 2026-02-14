@@ -40,6 +40,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
   let mut show_object_format = false
   let mut short_length : Int? = None
   let mut abbrev_ref = false
+  let mut symbolic_full_name = false
   for arg in args {
     match arg {
       "--revs-only" => revs_only = true
@@ -49,6 +50,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
       "--show-object-format" => show_object_format = true
       "--short" => short_length = Some(7)
       "--abbrev-ref" => abbrev_ref = true
+      "--symbolic-full-name" => symbolic_full_name = true
       _ if arg.has_prefix("--short=") =>
         match
           parse_rev_parse_short_length(
@@ -101,10 +103,20 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
       _ if arg.has_prefix("--short=") => ()
       "--abbrev-ref" => ()
       _ if arg.has_prefix("--abbrev-ref=") => ()
+      "--symbolic-full-name" => ()
       _ if arg.has_prefix("-") => warn_unimplemented_arg("rev-parse", arg)
       _ =>
         if abbrev_ref {
           let name = resolve_abbrev_ref_name(fs, git_dir, arg)
+          match name {
+            Some(value) => print_line(value)
+            None =>
+              if not(revs_only) {
+                raise @git.GitError::InvalidObject("unknown revision: " + arg)
+              }
+          }
+        } else if symbolic_full_name {
+          let name = resolve_symbolic_full_name(fs, git_dir, arg)
           match name {
             Some(value) => print_line(value)
             None =>
@@ -282,6 +294,40 @@ fn resolve_abbrev_ref_name(
   }
   if @gitlib.resolve_ref(fs, git_dir, "refs/heads/" + spec) is Some(_) {
     return Some(spec)
+  }
+  None
+}
+
+///|
+fn resolve_symbolic_full_name(
+  fs : &@git.RepoFileSystem,
+  git_dir : String,
+  spec : String,
+) -> String? raise Error {
+  if spec == "HEAD" {
+    return match @gitlib.read_head_ref(fs, git_dir) {
+      @gitlib.HeadRef::Branch(name) => Some("refs/heads/" + name)
+      @gitlib.HeadRef::Detached(_) => Some("HEAD")
+    }
+  }
+  if spec.has_prefix("refs/") {
+    return if @gitlib.resolve_ref(fs, git_dir, spec) is Some(_) {
+      Some(spec)
+    } else {
+      None
+    }
+  }
+  let head_ref = "refs/heads/" + spec
+  if @gitlib.resolve_ref(fs, git_dir, head_ref) is Some(_) {
+    return Some(head_ref)
+  }
+  let tag_ref = "refs/tags/" + spec
+  if @gitlib.resolve_ref(fs, git_dir, tag_ref) is Some(_) {
+    return Some(tag_ref)
+  }
+  let remote_ref = "refs/remotes/" + spec
+  if @gitlib.resolve_ref(fs, git_dir, remote_ref) is Some(_) {
+    return Some(remote_ref)
   }
   None
 }

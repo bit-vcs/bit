@@ -1,6 +1,22 @@
 ///|
+fn checkout_should_delegate_to_real_git(args : Array[String]) -> Bool {
+  guard is_real_git_delegate_enabled() else { return false }
+  let mut positional_count = 0
+  for arg in args {
+    match arg {
+      "-" => ()
+      "--" => return true
+      "-b" | "-B" | "-f" | "--force" => return true
+      _ if arg.has_prefix("-") => return true
+      _ => positional_count += 1
+    }
+  }
+  positional_count != 1
+}
+
+///|
 async fn handle_checkout(args : Array[String]) -> Unit raise Error {
-  if is_real_git_delegate_enabled() {
+  if checkout_should_delegate_to_real_git(args) {
     delegate_to_real_git("checkout", args)
   }
   let root = get_work_root()

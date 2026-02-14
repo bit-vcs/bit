@@ -107,6 +107,48 @@ test "rev-parse: HEAD^^ and HEAD~2 are equivalent" {
 }
 
 ///|
+test "rev-parse: HEAD^2 resolves second parent" {
+  let fs = setup_rev_repo()
+  fs.write_string("/repo/base.txt", "base\n")
+  add_paths(fs, fs, "/repo", ["base.txt"])
+  let c0 = commit(
+    fs, fs, "/repo", "base\n", "Test <test@example.com>", 1700000000L,
+  )
+  fs.write_string("/repo/main.txt", "main\n")
+  add_paths(fs, fs, "/repo", ["main.txt"])
+  let c1 = commit(
+    fs, fs, "/repo", "main\n", "Test <test@example.com>", 1700000001L,
+  )
+  ignore(reset(fs, fs, "/repo", c0.to_hex(), ResetMode::Hard))
+  fs.write_string("/repo/side.txt", "side\n")
+  add_paths(fs, fs, "/repo", ["side.txt"])
+  let c2 = commit(
+    fs, fs, "/repo", "side\n", "Test <test@example.com>", 1700000002L,
+  )
+  ignore(reset(fs, fs, "/repo", c1.to_hex(), ResetMode::Hard))
+  let entries = read_index_entries(fs, "/repo/.git")
+  let tree_id = write_tree_from_index(fs, "/repo/.git", entries)
+  let merge_commit = @git.Commit::new(
+    tree_id,
+    [c1, c2],
+    "Test <test@example.com>",
+    1700000003L,
+    "+0000",
+    "Test <test@example.com>",
+    1700000003L,
+    "+0000",
+    "merge\n",
+  )
+  let (merge_id, merge_data) = @git.create_commit(merge_commit)
+  write_object_bytes(fs, "/repo/.git", merge_id, merge_data)
+  update_head_ref(fs, fs, "/repo/.git", merge_id)
+  let first_parent = rev_parse(fs, "/repo/.git", "HEAD^")
+  let second_parent = rev_parse(fs, "/repo/.git", "HEAD^2")
+  assert_eq(first_parent.unwrap().to_hex(), c1.to_hex())
+  assert_eq(second_parent.unwrap().to_hex(), c2.to_hex())
+}
+
+///|
 test "rev-parse: 40-char hex without suffix" {
   let fs = setup_rev_repo()
   fs.write_string("/repo/a.txt", "hello\n")

@@ -1299,6 +1299,13 @@ fn expand_rm_paths(
   let result : Array[String] = []
   for p in paths {
     let norm_path = normalize_rel_path(p)
+    if norm_path == "." || norm_path == "" {
+      for item in index_map.to_array() {
+        let (entry_path, _) = item
+        result.push(entry_path)
+      }
+      continue
+    }
     let abs = join_path(root, norm_path)
     if rfs.is_dir(abs) {
       // Add all index entries under this directory

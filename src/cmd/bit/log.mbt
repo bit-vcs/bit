@@ -133,13 +133,12 @@ fn log_should_delegate_to_real_git(args : Array[String]) -> Bool {
 
 ///|
 fn log_args_require_real_git(args : Array[String]) -> Bool {
-  let mut oneline = false
   let mut has_count = false
   let mut i = 0
   while i < args.length() {
     let arg = args[i]
     match arg {
-      "--oneline" => oneline = true
+      "--oneline" => ()
       "-n" | "--max-count" | "--since" | "--until" =>
         if i + 1 < args.length() {
           if arg == "-n" || arg == "--max-count" {
@@ -160,7 +159,7 @@ fn log_args_require_real_git(args : Array[String]) -> Bool {
     }
     i += 1
   }
-  not(oneline && has_count)
+  not(has_count)
 }
 
 ///|

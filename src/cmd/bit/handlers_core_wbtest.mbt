@@ -82,6 +82,9 @@ async test "core: init --template= does not precreate hooks directory" {
   handle_init(["-q", "--template=", path])
   assert_true(fs.is_dir(path + "/.git"))
   assert_false(fs.is_dir(path + "/.git/hooks"))
+  assert_false(fs.is_dir(path + "/.git/info"))
+  assert_false(fs.is_file(path + "/.git/info/exclude"))
+  assert_false(fs.is_file(path + "/.git/description"))
   fs.mkdir_p(path + "/.git/hooks")
   assert_true(fs.is_dir(path + "/.git/hooks"))
   match prev_git_dir {

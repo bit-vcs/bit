@@ -28,6 +28,7 @@ pub async fn diff_worktree(
   let git_dir = @git.join_path(root, ".git")
   let autocrlf = read_autocrlf_setting(fs, git_dir)
   let index_entries = @gitlib.read_index_entries(fs, git_dir)
+  let skip_worktree_paths = @gitlib.read_skip_worktree_paths(fs, git_dir)
   t0 = profile_lap(profile, "diff_worktree read_index_entries", t0)
   let db = @gitlib.ObjectDb::load_lazy(fs, git_dir)
   t0 = profile_lap(profile, "diff_worktree load_db", t0)
@@ -47,6 +48,9 @@ pub async fn diff_worktree(
   for entry in index_entries {
     let path = entry.path
     if is_gitlink_mode_int(entry.mode) {
+      continue
+    }
+    if skip_worktree_paths.contains(path) {
       continue
     }
     if cache_ready && not(cache_map.contains(path)) {

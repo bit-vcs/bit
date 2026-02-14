@@ -12,6 +12,7 @@ async fn show_show_command_help() -> Unit {
 priv struct ShowCommitInfo {
   author : String
   timestamp : Int64
+  timezone : String
   message : String
 }
 
@@ -20,6 +21,7 @@ fn parse_show_commit(data : Bytes) -> ShowCommitInfo {
   let text = decode_bytes(data)
   let mut author = ""
   let mut timestamp = 0L
+  let mut timezone = "+0000"
   let mut in_message = false
   let message_lines : Array[String] = []
   for line_view in text.split("\n") {
@@ -38,6 +40,11 @@ fn parse_show_commit(data : Bytes) -> ShowCommitInfo {
       let mut last_space = rest.rev_find(" ")
       if last_space is Some(tz_idx) {
         let before_tz = String::unsafe_substring(rest, start=0, end=tz_idx)
+        timezone = String::unsafe_substring(
+          rest,
+          start=tz_idx + 1,
+          end=rest.length(),
+        )
         last_space = before_tz.rev_find(" ")
         if last_space is Some(time_idx) {
           author = String::unsafe_substring(before_tz, start=0, end=time_idx)
@@ -61,7 +68,7 @@ fn parse_show_commit(data : Bytes) -> ShowCommitInfo {
     }
   }
   let message = message_lines.join("\n")
-  { author, timestamp, message }
+  { author, timestamp, timezone, message }
 }
 
 ///|
@@ -69,6 +76,48 @@ fn show_first_message_line(message : String) -> String {
   match message.find("\n") {
     Some(idx) => String::unsafe_substring(message, start=0, end=idx)
     None => message
+  }
+}
+
+///|
+fn format_show_date(timestamp : Int64, timezone : String) -> String {
+  let tz_offset = parse_timezone_offset_seconds(timezone)
+  let local_seconds = timestamp.to_int() + tz_offset
+  let days = local_seconds / 86400
+  let time_of_day = local_seconds % 86400
+  let hours = time_of_day / 3600
+  let minutes = (time_of_day % 3600) / 60
+  let seconds = time_of_day % 60
+  let (year, month, day) = days_to_date(days)
+  let weekday = (days + 4) % 7 // Jan 1, 1970 was Thursday.
+  let weekday_names = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+  let month_names = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov",
+    "Dec",
+  ]
+  let wd = weekday_names[weekday]
+  let mn = month_names[month - 1]
+  "\{wd} \{mn} \{day} \{pad_left_zero(hours.to_string(), 2)}:\{pad_left_zero(minutes.to_string(), 2)}:\{pad_left_zero(seconds.to_string(), 2)} \{year} \{timezone}"
+}
+
+///|
+fn parse_timezone_offset_seconds(timezone : String) -> Int {
+  if timezone.length() != 5 {
+    return 0
+  }
+  let sign = timezone.unsafe_get(0)
+  if sign != '+' && sign != '-' {
+    return 0
+  }
+  let hh = String::unsafe_substring(timezone, start=1, end=3)
+  let mm = String::unsafe_substring(timezone, start=3, end=5)
+  let hours = @strconv.parse_int(hh) catch { _ => return 0 }
+  let minutes = @strconv.parse_int(mm) catch { _ => return 0 }
+  let total = hours * 3600 + minutes * 60
+  if sign == '-' {
+    -total
+  } else {
+    total
   }
 }
 
@@ -102,6 +151,14 @@ async fn handle_show(args : Array[String]) -> Unit raise Error {
     } else if arg.has_prefix("--pretty=format:") {
       pretty_format = Some(
         String::unsafe_substring(arg, start=16, end=arg.length()),
+      )
+    } else if arg.has_prefix("--pretty=tformat:") {
+      pretty_format = Some(
+        String::unsafe_substring(arg, start=17, end=arg.length()),
+      )
+    } else if arg.has_prefix("--pretty=") {
+      pretty_format = Some(
+        String::unsafe_substring(arg, start=9, end=arg.length()),
       )
     } else if arg.has_prefix("--format=") {
       pretty_format = Some(
@@ -217,6 +274,11 @@ async fn handle_show(args : Array[String]) -> Unit raise Error {
         print_line(commit_id.to_hex())
         return ()
       }
+      "%s" => {
+        let info = parse_show_commit(o.data)
+        print_line(show_first_message_line(info.message))
+        return ()
+      }
       _ => warn_unimplemented_arg("show", "--pretty=format:\{fmt}")
     }
   }
@@ -235,7 +297,7 @@ async fn handle_show(args : Array[String]) -> Unit raise Error {
   // Print commit info
   print_line("commit \{commit_id.to_hex()}")
   print_line("Author: \{show_info.author}")
-  print_line("Date:   \{show_info.timestamp}")
+  print_line("Date:   \{format_show_date(show_info.timestamp, show_info.timezone)}")
   print_line("")
   // Print message with indentation
   for line_view in show_info.message.split("\n") {

@@ -21,6 +21,7 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
   let mut amend = false
   let mut allow_empty = false
   let mut no_verify = false
+  let mut no_edit = false
   let mut quiet = false
   let mut author_override : String? = None
   let mut date_override : String? = None
@@ -110,12 +111,19 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
       "--amend" => amend = true
       "--allow-empty" => allow_empty = true
       "--no-verify" => no_verify = true
+      "--no-edit" => no_edit = true
       "-q" | "--quiet" => quiet = true
       _ if arg.has_prefix("-") => warn_unimplemented_arg("commit", arg)
       _ => ()
     }
     i += 1
   }
+  let git_dir = resolve_git_dir(fs, root)
+  let merge_heads = read_merge_head_ids(fs, git_dir)
+  let should_cleanup_merge_state = merge_heads.length() > 0 ||
+    fs.is_file(git_dir + "/MERGE_MSG") ||
+    fs.is_file(git_dir + "/MERGE_MODE") ||
+    fs.is_file(git_dir + "/SQUASH_MSG")
   // If -a flag, stage all modified files
   if all_modified {
     let status = @gitlib.status(fs, root)
@@ -132,12 +140,16 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
   }
   // Open editor when message is not specified.
   if message is None {
-    let initial_message = if amend {
-      get_head_commit_message(fs, root)
+    if no_edit {
+      message = resolve_no_edit_commit_message(fs, root, git_dir, amend)
     } else {
-      None
+      let initial_message = if amend {
+        get_head_commit_message(fs, root)
+      } else {
+        None
+      }
+      message = read_commit_message_from_editor(fs, root, initial_message~)
     }
-    message = read_commit_message_from_editor(fs, root, initial_message~)
   }
   guard message is Some(msg) else {
     raise @git.GitError::InvalidObject(
@@ -157,7 +169,6 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
   // Committer is always the current user
   let committer = get_committer_string()
   let committer_timestamp = default_timestamp
-  let git_dir = resolve_git_dir(fs, root)
   if not(no_verify) {
     let hook_status = run_pre_commit_hook(fs, root, git_dir)
     if hook_status != 0 {
@@ -175,6 +186,19 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
       committer~,
       committer_timestamp~,
     )
+  } else if merge_heads.length() > 0 {
+    commit_with_merge_heads(
+      fs,
+      fs,
+      root,
+      msg,
+      author,
+      author_timestamp,
+      committer,
+      committer_timestamp,
+      merge_heads,
+      allow_empty,
+    )
   } else {
     @gitlib.commit(
       fs,
@@ -188,6 +212,9 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
       allow_empty~,
     )
   }
+  if should_cleanup_merge_state {
+    cleanup_merge_state_files(fs, git_dir)
+  }
   let short_id = (try! commit_id.to_hex()[:7]).to_string()
   let first_line = match msg.find("\n") {
     Some(idx) => (try! msg[:idx]).to_string()
@@ -199,6 +226,187 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
       Some((_, path, _)) =>
         print_line("[" + short_id + " (subdir: " + path + ")] " + first_line)
       None => print_line("[" + short_id + "] " + first_line)
+    }
+  }
+}
+
+///|
+fn resolve_no_edit_commit_message(
+  fs : &@git.RepoFileSystem,
+  root : String,
+  git_dir : String,
+  amend : Bool,
+) -> String? raise Error {
+  let merge_head_path = git_dir + "/MERGE_HEAD"
+  let squash_msg_path = git_dir + "/SQUASH_MSG"
+  let merge_msg_path = git_dir + "/MERGE_MSG"
+  if fs.is_file(merge_head_path) {
+    if fs.is_file(merge_msg_path) {
+      return Some(decode_bytes(fs.read_file(merge_msg_path)))
+    }
+    if amend {
+      return get_head_commit_message(fs, root)
+    }
+    return None
+  }
+  if fs.is_file(squash_msg_path) {
+    let squash_msg = decode_bytes(fs.read_file(squash_msg_path))
+    if fs.is_file(merge_msg_path) {
+      let merge_msg = decode_bytes(fs.read_file(merge_msg_path))
+      return Some(join_commit_messages(squash_msg, merge_msg))
+    }
+    return Some(squash_msg)
+  }
+  if fs.is_file(merge_msg_path) {
+    return Some(decode_bytes(fs.read_file(merge_msg_path)))
+  }
+  if amend {
+    return get_head_commit_message(fs, root)
+  }
+  None
+}
+
+///|
+fn join_commit_messages(primary : String, secondary : String) -> String {
+  if primary.length() == 0 {
+    return secondary
+  }
+  if secondary.length() == 0 {
+    return primary
+  }
+  if primary.has_suffix("\n") || secondary.has_prefix("\n") {
+    primary + secondary
+  } else {
+    primary + "\n" + secondary
+  }
+}
+
+///|
+fn read_merge_head_ids(
+  fs : &@git.RepoFileSystem,
+  git_dir : String,
+) -> Array[@git.ObjectId] raise Error {
+  let path = git_dir + "/MERGE_HEAD"
+  if not(fs.is_file(path)) {
+    return []
+  }
+  let ids : Array[@git.ObjectId] = []
+  let content = decode_bytes(fs.read_file(path))
+  for line_view in content.split("\n") {
+    let line = trim_string(line_view.to_string())
+    if line.length() == 0 {
+      continue
+    }
+    let id = @git.ObjectId::from_hex(line) catch {
+      _ => raise @git.GitError::InvalidObject("invalid MERGE_HEAD: \{line}")
+    }
+    ids.push(id)
+  }
+  ids
+}
+
+///|
+fn commit_with_merge_heads(
+  fs : &@git.FileSystem,
+  rfs : &@git.RepoFileSystem,
+  root : String,
+  message : String,
+  author : String,
+  author_timestamp : Int64,
+  committer : String,
+  committer_timestamp : Int64,
+  merge_heads : Array[@git.ObjectId],
+  allow_empty : Bool,
+) -> @git.ObjectId raise Error {
+  let git_dir = resolve_git_dir(rfs, root)
+  let head_parent = @gitlib.resolve_head_commit(rfs, git_dir)
+  let entries = @gitlib.read_index_entries(rfs, git_dir)
+  let tree_id = if entries.length() == 0 {
+    if not(allow_empty) {
+      raise @git.GitError::InvalidObject("Empty index")
+    }
+    match head_parent {
+      Some(parent_id) => {
+        let db = @gitlib.ObjectDb::load_lazy(rfs, git_dir)
+        let parent_tree = match db.get(rfs, parent_id) {
+          Some(obj) if obj.obj_type == @git.ObjectType::Commit =>
+            (@git.parse_commit(obj.data).tree |> Some) catch {
+              _ => None
+            }
+          _ => None
+        }
+        match parent_tree {
+          Some(tree) => tree
+          None => {
+            let (empty_tree_id, empty_tree_compressed) = @git.create_tree([])
+            @gitlib.write_object_bytes(
+              fs,
+              git_dir,
+              empty_tree_id,
+              empty_tree_compressed,
+            )
+            empty_tree_id
+          }
+        }
+      }
+      None => {
+        let (empty_tree_id, empty_tree_compressed) = @git.create_tree([])
+        @gitlib.write_object_bytes(
+          fs,
+          git_dir,
+          empty_tree_id,
+          empty_tree_compressed,
+        )
+        empty_tree_id
+      }
+    }
+  } else {
+    @gitlib.write_tree_from_index(fs, git_dir, entries)
+  }
+  let parents : Array[@git.ObjectId] = []
+  let seen : Map[String, Bool] = {}
+  match head_parent {
+    Some(parent_id) => {
+      parents.push(parent_id)
+      seen[parent_id.to_hex()] = true
+    }
+    None => ()
+  }
+  for merge_head in merge_heads {
+    let hex = merge_head.to_hex()
+    if seen.contains(hex) {
+      continue
+    }
+    seen[hex] = true
+    parents.push(merge_head)
+  }
+  let commit = @git.Commit::new(
+    tree_id,
+    parents,
+    author,
+    author_timestamp,
+    "+0000",
+    committer,
+    committer_timestamp,
+    "+0000",
+    message,
+  )
+  let (commit_id, compressed) = @git.create_commit(commit)
+  @gitlib.write_object_bytes(fs, git_dir, commit_id, compressed)
+  @gitlib.update_head_ref(fs, rfs, git_dir, commit_id)
+  commit_id
+}
+
+///|
+fn cleanup_merge_state_files(
+  fs : &@git.FileSystem,
+  git_dir : String,
+) -> Unit raise Error {
+  let files = ["MERGE_HEAD", "MERGE_MSG", "MERGE_MODE", "SQUASH_MSG"]
+  for file in files {
+    fs.remove_file(git_dir + "/" + file) catch {
+      err if @async.is_cancellation_error(err) => raise err
+      _ => ()
     }
   }
 }

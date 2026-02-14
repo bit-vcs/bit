@@ -254,6 +254,8 @@ pub fn read_remote_head_branch(&@types.RepoFileSystem, String) -> String?
 
 pub fn read_repo_config(&@types.RepoFileSystem, String) -> (Map[String, RemoteConfig], Map[String, BranchConfig])
 
+pub fn read_skip_worktree_paths(&@types.RepoFileSystem, String) -> Map[String, Bool]
+
 pub fn read_sparse_patterns(&@types.RepoFileSystem, String) -> Array[String] raise @object.GitError
 
 pub fn read_subdir_attributes(&@types.RepoFileSystem, String) -> (String, String, String)?

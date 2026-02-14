@@ -116,9 +116,24 @@ P0 から順に「先頭の `if is_real_git_delegate_enabled() { delegate_to_rea
   - 互換修正: `branch -h`（broken repo 129）、`--create-reflog` + reflog 出力、
     `rev-parse --abbrev-ref`, `name@{N}` を実装して `t3200` 初段回帰を解消
   - [x] `just git-t-full t3200-branch.sh` 全量 green（`success 167 / failed 0 / broken 0`）
+- [x] P1 progress: `checkout` の無条件先頭委譲を条件付き化（2026-02-14）
+  - 単一ターゲット checkout のみ pure 実行し、それ以外（`-b/-B/-f/--force/--`、複数 positional）は real git 委譲
+  - fallback smoke 追加: `SHIM_REAL_GIT=/no/such` でも `git checkout smoke` が実行可能
+    （`t/t0005-fallback.sh`）
+  - delegate gate の wbtest を追加（`src/cmd/bit/checkout_wbtest.mbt`）
+  - [x] `diff` の sparse-checkout 互換を修正（`skip-worktree` を index 拡張フラグ/sidecar から解決）
+    - 追加: `read_skip_worktree_paths`（`src/lib/index.mbt`）
+    - `diff_worktree` で `skip-worktree` パスを除外（`src/lib/diff.mbt`, `src/diff/diff_ops.mbt`）
+    - 追加テスト: `src/lib/index_wbtest.mbt`
+  - [x] `GIT_TEST_OPTS='--run=1-30' just git-t-full t2018-checkout-branch.sh` が green（`success 25 / failed 0 / broken 0`）
+- [x] P1 progress: `rev-parse --symbolic-full-name` を実装（2026-02-14）
+  - `t2018-checkout-branch.sh` で `HEAD` の symbolic ref 解決が必要なケースを解消
 - [x] P1 progress: `log` の無条件先頭委譲を条件付き化（2026-02-14）
   - `--oneline` + 件数指定のみ pure 実行し、それ以外は real git 委譲（互換優先）
   - fallback smoke 追加: `SHIM_REAL_GIT=/no/such` でも `git log --oneline -1` が実行可能
+    （`t/t0005-fallback.sh`）
+  - delegate gate を緩和し、件数指定（`git log -1`, `--max-count=2`）も pure 実行
+  - fallback smoke 追加: `SHIM_REAL_GIT=/no/such` でも `git log -1` が実行可能
     （`t/t0005-fallback.sh`）
   - [x] `t4202-log.sh` の fail 6件クラスタ（test 8, 23-27）を解消
     - `rev-parse :/<message>` と `HEAD^{/<message>}` を実装
@@ -136,6 +151,12 @@ P0 から順に「先頭の `if is_real_git_delegate_enabled() { delegate_to_rea
     - `GIT_TEST_OPTS='--run=140-145' just git-t-full t4202-log.sh` が green
     - `GIT_TEST_OPTS='--run=1,47,111,112,115,118,121' just git-t-full t4202-log.sh` が green
     - `just git-t-full t4202-log.sh` 全量 green（`success 128 / failed 0 / broken 0`、環境依存 skip 21）
+- [x] P2 progress: `merge` の先頭委譲を「real git が実行可能な時のみ」に変更（2026-02-14）
+  - `SHIM_REAL_GIT=/no/such` でも pure merge が実行できる fallback smoke を追加
+    （`t/t0005-fallback.sh`）
+  - delegate gate の wbtest を追加（`src/cmd/bit/merge_wbtest.mbt`）
+  - [x] `GIT_TEST_OPTS='--run=1-20' just git-t-full t7600-merge.sh` が green
+    （`success 20 / failed 0 / broken 0`）
 
 ### 絞り込み再計測の結果（2026-02-13 夜）
 

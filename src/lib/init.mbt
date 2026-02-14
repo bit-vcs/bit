@@ -55,6 +55,7 @@ pub fn init_repo_with_options(
     Some(sep_dir) => sep_dir
     None => if bare { root } else { join_path(root, ".git") }
   }
+  let use_default_template_files = opts.template_dir is None
   let head_path = join_path(git_dir, "HEAD")
   // Create git directory structure
   fs.mkdir_p(git_dir)
@@ -63,9 +64,9 @@ pub fn init_repo_with_options(
   fs.mkdir_p(join_path(git_dir, "objects/pack"))
   fs.mkdir_p(join_path(git_dir, "refs/heads"))
   fs.mkdir_p(join_path(git_dir, "refs/tags"))
-  fs.mkdir_p(join_path(git_dir, "info"))
-  if opts.template_dir is None {
+  if use_default_template_files {
     fs.mkdir_p(join_path(git_dir, "hooks"))
+    fs.mkdir_p(join_path(git_dir, "info"))
   }
   // If separate-git-dir, create .git file pointing to actual git dir
   if opts.separate_git_dir is Some(_) && not(bare) {
@@ -101,13 +102,15 @@ pub fn init_repo_with_options(
     config += "[extensions]\n" + extension_lines.join("\n") + "\n"
   }
   fs.write_string(join_path(git_dir, "config"), config)
-  // Create description file
-  fs.write_string(
-    join_path(git_dir, "description"),
-    "Unnamed repository; edit this file 'description' to name the repository.\n",
-  )
-  // Create info/exclude
-  fs.write_string(join_path(git_dir, "info/exclude"), "")
+  if use_default_template_files {
+    // Create description file
+    fs.write_string(
+      join_path(git_dir, "description"),
+      "Unnamed repository; edit this file 'description' to name the repository.\n",
+    )
+    // Create info/exclude
+    fs.write_string(join_path(git_dir, "info/exclude"), "")
+  }
 }
 
 ///|

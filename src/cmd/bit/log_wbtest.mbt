@@ -3,6 +3,8 @@ test "log delegate gate: oneline + count stays in pure path" {
   assert_false(log_args_require_real_git(["--oneline", "-1"]))
   assert_false(log_args_require_real_git(["-n", "2", "--oneline"]))
   assert_false(log_args_require_real_git(["--oneline", "--max-count=2"]))
+  assert_false(log_args_require_real_git(["-1"]))
+  assert_false(log_args_require_real_git(["--max-count=2"]))
 }
 
 ///|

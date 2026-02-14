@@ -1,4 +1,4 @@
-///| Git index (v2) reader/writer
+///| Git index (v2/v3) reader/writer
 
 ///|
 pub struct IndexEntry {
@@ -41,7 +41,7 @@ pub fn read_index_entries(
     raise @git.GitError::InvalidObject("Invalid index header")
   }
   let version = index_read_u32_be(data, 4)
-  if version != 2 {
+  if version != 2 && version != 3 {
     raise @git.GitError::InvalidObject("Unsupported index version: \{version}")
   }
   let count = index_read_u32_be(data, 8)
@@ -108,6 +108,75 @@ pub fn read_index_entries(
   }
   entries.sort_by((a, b) => index_path_compare_git_order(a.path, b.path))
   entries
+}
+
+///|
+/// Read skip-worktree paths from both bit sidecar and index extended flags.
+pub fn read_skip_worktree_paths(
+  fs : &@git.RepoFileSystem,
+  git_dir : String,
+) -> Map[String, Bool] {
+  let out : Map[String, Bool] = {}
+  let sidecar_path = join_path(git_dir, "bit-skip-worktree")
+  if fs.is_file(sidecar_path) {
+    let text = @utf8.decode_lossy(
+      (fs.read_file(sidecar_path) catch { _ => Bytes::default() })[:],
+    )
+    for line_view in text.split("\n") {
+      let line = line_view.to_string()
+      if line.length() > 0 {
+        out[line] = true
+      }
+    }
+  }
+  let index_path = join_path(git_dir, "index")
+  if not(fs.is_file(index_path)) {
+    return out
+  }
+  let data = fs.read_file(index_path) catch { _ => return out }
+  if data.length() < 12 + 20 {
+    return out
+  }
+  if not(
+      data[0] == b'D' && data[1] == b'I' && data[2] == b'R' && data[3] == b'C',
+    ) {
+    return out
+  }
+  let count = index_read_u32_be(data, 8) catch { _ => return out }
+  let mut offset = 12
+  for _ in 0..<count {
+    if offset + 62 > data.length() {
+      return out
+    }
+    let flags = index_read_u16_be(data, offset + 60) catch { _ => return out }
+    let stage = (flags >> 12) & 0x3
+    let has_extended = (flags & 0x4000) != 0
+    let ext_flags = if has_extended {
+      index_read_u16_be(data, offset + 62) catch { _ => return out }
+    } else {
+      0
+    }
+    let fixed_size = if has_extended { 64 } else { 62 }
+    let path_start = offset + fixed_size
+    let mut i = path_start
+    while i < data.length() && data[i] != b'\x00' {
+      i += 1
+    }
+    if i >= data.length() {
+      return out
+    }
+    if stage == 0 && has_extended && (ext_flags & 0x4000) != 0 {
+      let path_bytes : Array[Byte] = []
+      for j in path_start..<i {
+        path_bytes.push(data[j])
+      }
+      out[index_bytes_to_string(path_bytes)] = true
+    }
+    let path_len = i - path_start
+    let entry_size = (fixed_size + path_len + 1 + 7) / 8 * 8
+    offset += entry_size
+  }
+  out
 }
 
 ///|

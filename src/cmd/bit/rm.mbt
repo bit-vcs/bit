@@ -106,10 +106,15 @@ fn parse_rm_options(args : Array[String]) -> RmOptions {
 
 ///|
 fn rm_normalize_rel_path(path : String) -> String {
-  if path.has_prefix("./") {
+  let normalized = if path.has_prefix("./") {
     String::unsafe_substring(path, start=2, end=path.length())
   } else {
     path
+  }
+  if normalized == "." {
+    ""
+  } else {
+    normalized
   }
 }
 
@@ -120,6 +125,9 @@ fn rm_pathspec_matches_any(
   recursive : Bool,
 ) -> Bool {
   let path = rm_normalize_rel_path(raw_path)
+  if path.length() == 0 {
+    return entries.length() > 0
+  }
   for entry in entries {
     if entry.path == path {
       return true
@@ -141,6 +149,15 @@ fn rm_collect_target_paths(
   let seen : Map[String, Bool] = {}
   for raw_path in raw_paths {
     let path = rm_normalize_rel_path(raw_path)
+    if path.length() == 0 {
+      for entry in entries {
+        if not(seen.contains(entry.path)) {
+          seen[entry.path] = true
+          out.push(entry.path)
+        }
+      }
+      continue
+    }
     for entry in entries {
       if entry.path == path || (recursive && entry.path.has_prefix(path + "/")) {
         if not(seen.contains(entry.path)) {
