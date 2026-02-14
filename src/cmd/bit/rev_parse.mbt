@@ -41,7 +41,11 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
   let mut short_length : Int? = None
   let mut abbrev_ref = false
   let mut symbolic_full_name = false
-  for arg in args {
+  let mut output_object_format : String? = None
+  let output_object_format_arg_indices : Map[Int, Bool] = {}
+  let mut arg_index = 0
+  while arg_index < args.length() {
+    let arg = args[arg_index]
     match arg {
       "--revs-only" => revs_only = true
       "--verify" => verify = true
@@ -51,6 +55,19 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
       "--short" => short_length = Some(7)
       "--abbrev-ref" => abbrev_ref = true
       "--symbolic-full-name" => symbolic_full_name = true
+      "--output-object-format" => {
+        output_object_format_arg_indices[arg_index] = true
+        if arg_index + 1 >= args.length() {
+          eprint_line(
+            "fatal: option '--output-object-format' requires a value",
+          )
+          @sys.exit(128)
+        }
+        output_object_format = Some(args[arg_index + 1])
+        output_object_format_arg_indices[arg_index + 1] = true
+        arg_index += 2
+        continue
+      }
       _ if arg.has_prefix("--short=") =>
         match
           parse_rev_parse_short_length(
@@ -61,12 +78,36 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
         }
       _ if arg.has_prefix("--abbrev-ref=") => abbrev_ref = true
       _ if arg.has_prefix("--show-object-format=") => show_object_format = true
+      _ if arg.has_prefix("--output-object-format=") => {
+        output_object_format_arg_indices[arg_index] = true
+        output_object_format = Some(
+          String::unsafe_substring(arg, start=23, end=arg.length()),
+        )
+      }
       _ => ()
+    }
+    arg_index += 1
+  }
+  if output_object_format is Some(raw_output_format) {
+    let requested_format = @gitlib.config_strip_quotes(raw_output_format).to_lower()
+    if !rev_parse_output_object_format_supported(
+      fs,
+      git_dir,
+      requested_format,
+    ) {
+      eprint_line("fatal: unsupported object format: \{requested_format}")
+      @sys.exit(128)
     }
   }
   ignore(verify)
   ignore(quiet)
-  for arg in args {
+  let mut process_index = 0
+  while process_index < args.length() {
+    if output_object_format_arg_indices.contains(process_index) {
+      process_index += 1
+      continue
+    }
+    let arg = args[process_index]
     match arg {
       "--git-dir" => print_line(git_dir)
       "--absolute-git-dir" => print_line(abs_git_dir)
@@ -104,6 +145,8 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
       "--abbrev-ref" => ()
       _ if arg.has_prefix("--abbrev-ref=") => ()
       "--symbolic-full-name" => ()
+      "--output-object-format" => ()
+      _ if arg.has_prefix("--output-object-format=") => ()
       _ if arg.has_prefix("-") => warn_unimplemented_arg("rev-parse", arg)
       _ =>
         if abbrev_ref {
@@ -137,12 +180,18 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
             @gitrepo.rev_parse(fs, git_dir, arg)
           }
           match id {
-            Some(oid) =>
+            Some(oid) => {
+              let output_oid_hex = rev_parse_resolve_output_oid_hex(
+                fs,
+                git_dir,
+                oid,
+                output_object_format,
+              )
               match short_length {
-                Some(length) =>
-                  print_line(shorten_oid_hex(oid.to_hex(), length))
-                None => print_line(oid.to_hex())
+                Some(length) => print_line(shorten_oid_hex(output_oid_hex, length))
+                None => print_line(output_oid_hex)
               }
+            }
             None =>
               if not(revs_only) {
                 raise @git.GitError::InvalidObject("unknown revision: " + arg)
@@ -150,9 +199,53 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
           }
         }
     }
+    process_index += 1
   }
   ignore(show_ref_format)
   ignore(show_object_format)
+}
+
+///|
+fn rev_parse_resolve_output_oid_hex(
+  fs : &@git.RepoFileSystem,
+  git_dir : String,
+  oid : @git.ObjectId,
+  output_object_format : String?,
+) -> String {
+  let oid_hex = oid.to_hex()
+  guard output_object_format is Some(raw_requested_format) else { return oid_hex }
+  let requested_format = @gitlib.config_strip_quotes(raw_requested_format).to_lower()
+  let storage_format = repo_object_format(fs, git_dir)
+  if requested_format == storage_format {
+    return oid_hex
+  }
+  match repo_compat_object_format(fs, git_dir) {
+    Some(compat_format) if compat_format == requested_format =>
+      match rev_parse_lookup_loose_object_idx(fs, git_dir, oid_hex) {
+        Some(mapped) => mapped
+        None => oid_hex
+      }
+    _ => oid_hex
+  }
+}
+
+///|
+fn rev_parse_output_object_format_supported(
+  fs : &@git.RepoFileSystem,
+  git_dir : String,
+  requested_format : String,
+) -> Bool {
+  if requested_format.length() == 0 {
+    return false
+  }
+  let storage_format = repo_object_format(fs, git_dir)
+  if requested_format == storage_format {
+    return true
+  }
+  match repo_compat_object_format(fs, git_dir) {
+    Some(compat_format) => compat_format == requested_format
+    None => false
+  }
 }
 
 ///|
@@ -446,10 +539,9 @@ fn rev_parse_parse_tag_target_with_compat(
   if direct_id is Some(id) && (db.get(fs, id) catch { _ => None }) is Some(_) {
     return direct_id
   }
-  let osfs = OsFs::new()
   let root = get_work_root()
-  let git_dir = resolve_git_dir(osfs, root)
-  match rev_parse_lookup_loose_object_idx(osfs, git_dir, raw_name) {
+  let git_dir = resolve_git_dir(fs, root)
+  match rev_parse_lookup_loose_object_idx(fs, git_dir, raw_name) {
     Some(mapped_name) => {
       let mapped_id : @git.ObjectId? = Some(
         @git.ObjectId::from_hex(mapped_name),
@@ -481,7 +573,7 @@ fn rev_parse_extract_tag_target_name(tag_text : String) -> String? {
 
 ///|
 fn rev_parse_lookup_loose_object_idx(
-  fs : OsFs,
+  fs : &@git.RepoFileSystem,
   git_dir : String,
   spec : String,
 ) -> String? {

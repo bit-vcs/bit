@@ -613,6 +613,30 @@ fn repo_object_format(fs : &@git.RepoFileSystem, git_dir : String) -> String {
 }
 
 ///|
+fn repo_compat_object_format(
+  fs : &@git.RepoFileSystem,
+  git_dir : String,
+) -> String? {
+  match
+    @gitlib.read_config_value(
+      fs,
+      git_dir + "/config",
+      "extensions",
+      "compatobjectformat",
+    ) {
+    Some(value) => {
+      let normalized = @gitlib.config_strip_quotes(value).to_lower()
+      if normalized == "sha1" || normalized == "sha256" {
+        Some(normalized)
+      } else {
+        None
+      }
+    }
+    None => None
+  }
+}
+
+///|
 fn get_author_string() -> String {
   match @sys.get_env_var("GIT_AUTHOR_NAME") {
     Some(name) => {

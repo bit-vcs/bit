@@ -237,7 +237,12 @@ fn commit_repo_requires_real_git_delegate(
   git_dir : String,
 ) -> Bool {
   guard real_git_delegate_is_available(fs) else { return false }
-  is_reftable_repo(fs, git_dir) || repo_object_format(fs, git_dir) != "sha1"
+  is_reftable_repo(fs, git_dir) ||
+  repo_object_format(fs, git_dir) != "sha1" ||
+  (match repo_compat_object_format(fs, git_dir) {
+    Some(format) => format != "sha1"
+    None => false
+  })
 }
 
 ///|

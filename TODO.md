@@ -214,13 +214,13 @@ P0 から順に「先頭の `if is_real_git_delegate_enabled() { delegate_to_rea
   - [x] `t1006` 修正反映:
     - `write-tree` が read-only loose object 上書きで `Permission denied` になる経路を修正
     - `extensions.compatObjectFormat=sha256` + `hash-object -w` を real git 委譲にして tag compat OID 変換を安定化
-  - [ ] `t1006-cat-file.sh`（`GIT_TEST_OPTS='--run=54-420'`, setup あり）: `failed 91 among remaining 418`（known breakage 2件は別）
+  - [ ] `t1006-cat-file.sh`（`GIT_TEST_OPTS='--run=54-420'`, setup あり）: `failed 25 among remaining 418`（known breakage 2件は別, 2026-02-15）
     - [x] 通過確認: test `228-305`（tag->blob peel、batch 引数バリデーションを含む）
-    - [ ] 残クラスタA（batch 入出力整形）: test `306, 308-315`
-    - [ ] 残クラスタB（follow-symlinks）: test `367-373`
-    - [ ] 残クラスタC（--batch-all-objects / replace / submodule）: test `375-385`
-    - [ ] 残クラスタD（batch-command / buffering）: test `390, 395, 396`
-    - [ ] 残クラスタE（--filter 系）: test `398-420`
+    - [x] 残クラスタA（batch 入出力整形）: test `306, 308-315`
+      - `GIT_TEST_OPTS='--run=54,306,308-315 -x' just git-t-full t1006-cat-file.sh`: `success 10 / failed 0 / broken 0`
+      - 実施内容: `rev-parse --output-object-format` 対応、`compatobjectformat=sha256` での `commit/write-tree` real-git 委譲
+    - [ ] 残クラスタB（delta/symlink/corrupt loose）: test `332-334, 352, 354-373`
+    - [ ] 残クラスタC（--batch-all-objects objectsize:disk）: test `381`
 - multi-pack-index（`SHIM_CMDS="multi-pack-index cat-file" SHIM_STRICT=1`）
   - [x] `t5319-multi-pack-index.sh`: `success 95 / failed 0`（`EXPENSIVE` skip あり）
   - [ ] `t5326-multi-pack-bitmaps.sh`: `success 304 / failed 53`
