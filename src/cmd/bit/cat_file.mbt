@@ -249,7 +249,15 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
           )
           continue
         }
-        let obj = cat_file_find_object_in_dbs_lenient(dbs, fs, id)
+        let (obj, has_invalid_object_type) = cat_file_find_object_in_dbs_lenient(
+          dbs,
+          fs,
+          id,
+        )
+        if has_invalid_object_type {
+          eprint_line("fatal: invalid object type")
+          @sys.exit(128)
+        }
         guard obj is Some(o) else {
           if batch_check_mode {
             @stdio.stdout.write(
@@ -603,7 +611,15 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
           continue
         }
         let lookup_id = cat_file_resolve_replace_object_id(fs, git_dir, id)
-        let obj = cat_file_find_object_in_dbs_lenient(dbs, fs, lookup_id)
+        let (obj, has_invalid_object_type) = cat_file_find_object_in_dbs_lenient(
+          dbs,
+          fs,
+          lookup_id,
+        )
+        if has_invalid_object_type {
+          eprint_line("fatal: invalid object type")
+          @sys.exit(128)
+        }
         guard obj is Some(o) else {
           if output_info_mode && object_mode is Some(mode) && mode == "160000" {
             let submodule = cat_file_string_to_bytes(
@@ -760,9 +776,15 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
   let mut expected_type : @git.ObjectType? = None
   let mut obj_spec : String? = None
   if not(show_type || show_size || pretty_print) && positionals.length() >= 2 {
-    expected_type = Some(parse_object_type(positionals[0])) catch { _ => None }
-    if expected_type is Some(_) {
-      obj_spec = Some(positionals[1])
+    match cat_file_parse_object_type_name(positionals[0]) {
+      Some(obj_type) => {
+        expected_type = Some(obj_type)
+        obj_spec = Some(positionals[1])
+      }
+      None => {
+      eprint_line("fatal: invalid object type \"\{positionals[0]}\"")
+      @sys.exit(128)
+      }
     }
   }
   if obj_spec is None && positionals.length() > 0 {
@@ -866,7 +888,7 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
   if exists_check {
     match resolved_obj_id {
       Some(oid) =>
-        if cat_file_find_object_in_dbs(dbs, fs, oid) is Some(_) {
+        if cat_file_object_exists_for_exists_check(dbs, fs, oid) {
           return ()
         }
       None => ()
@@ -900,6 +922,11 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
             } else {
               eprint_line("fatal: invalid object type")
             }
+            @sys.exit(128)
+          }
+          if cat_file_is_zlib_dictionary_error(msg) {
+            eprint_line("error: inflate: needs dictionary")
+            eprint_line("error: unable to unpack \{oid.to_hex()} header")
             @sys.exit(128)
           }
           raise err
@@ -1008,6 +1035,7 @@ fn cat_file_load_object_dbs(
     let alt_db = @gitlib.ObjectDb::load_from_objects_dir(fs, object_dir) catch {
       _ => continue
     }
+    alt_db.set_skip_verify(true)
     out.push(alt_db)
   }
   out
@@ -1033,14 +1061,68 @@ fn cat_file_find_object_in_dbs_lenient(
   dbs : Array[@gitlib.ObjectDb],
   fs : OsFs,
   id : @git.ObjectId,
-) -> @git.PackObject? {
+) -> (@git.PackObject?, Bool) {
   for db in dbs {
-    let obj = db.get(fs, id) catch { _ => None }
+    let obj = db.get(fs, id) catch {
+      err =>
+        match err {
+          @git.GitError::InvalidObject(msg) =>
+            if cat_file_extract_unknown_object_type(msg) is Some(_) {
+              return (None, true)
+            } else {
+              None
+            }
+          _ => None
+        }
+    }
     if obj is Some(o) {
-      return Some(o)
+      return (Some(o), false)
     }
   }
-  None
+  (None, false)
+}
+
+///|
+fn cat_file_object_exists_for_exists_check(
+  dbs : Array[@gitlib.ObjectDb],
+  fs : OsFs,
+  id : @git.ObjectId,
+) -> Bool {
+  for db in dbs {
+    let obj = db.get(fs, id) catch {
+      err =>
+        match err {
+          @git.GitError::InvalidObject(msg) =>
+            if msg.has_prefix("Unknown object type: ") {
+              return true
+            } else {
+              None
+            }
+          _ => None
+        }
+    }
+    if obj is Some(_) {
+      return true
+    }
+  }
+  false
+}
+
+///|
+fn cat_file_extract_unknown_object_type(msg : String) -> String? {
+  let prefix = "Unknown object type: "
+  if !msg.has_prefix(prefix) {
+    return None
+  }
+  Some(String::unsafe_substring(msg, start=prefix.length(), end=msg.length()))
+}
+
+///|
+fn cat_file_is_zlib_dictionary_error(msg : String) -> Bool {
+  if !msg.has_prefix("Zlib error: ") {
+    return false
+  }
+  msg.contains("Preset dictionary") || msg.contains("needs dictionary")
 }
 
 ///|
@@ -1194,6 +1276,17 @@ fn cat_file_batch_format_uses_objectsize_disk(format : String?) -> Bool {
   match format {
     Some(fmt) => fmt.contains("%(objectsize:disk)")
     None => false
+  }
+}
+
+///|
+fn cat_file_parse_object_type_name(name : String) -> @git.ObjectType? {
+  match name {
+    "blob" => Some(@git.ObjectType::Blob)
+    "commit" => Some(@git.ObjectType::Commit)
+    "tag" => Some(@git.ObjectType::Tag)
+    "tree" => Some(@git.ObjectType::Tree)
+    _ => None
   }
 }
 
@@ -1486,6 +1579,27 @@ fn cat_file_rev_parse_with_compat(
   git_dir : String,
   spec : String,
 ) -> @git.ObjectId? raise Error {
+  let direct = cat_file_rev_parse_direct_or_loose(fs, git_dir, spec)
+  if direct is Some(_) {
+    return direct
+  }
+  let reflog_zero = cat_file_rev_parse_reflog_zero_with_compat(
+    fs,
+    git_dir,
+    spec,
+  )
+  if reflog_zero is Some(_) {
+    return reflog_zero
+  }
+  cat_file_rev_parse_commit_message_search_with_compat(fs, git_dir, spec)
+}
+
+///|
+fn cat_file_rev_parse_direct_or_loose(
+  fs : OsFs,
+  git_dir : String,
+  spec : String,
+) -> @git.ObjectId? raise Error {
   let direct = @gitrepo.rev_parse(fs, git_dir, spec)
   if direct is Some(_) {
     return direct
@@ -1493,6 +1607,117 @@ fn cat_file_rev_parse_with_compat(
   match cat_file_lookup_loose_object_idx(fs, git_dir, spec) {
     Some(mapped) => @gitrepo.rev_parse(fs, git_dir, mapped)
     None => None
+  }
+}
+
+///|
+fn cat_file_rev_parse_reflog_zero_with_compat(
+  fs : OsFs,
+  git_dir : String,
+  spec : String,
+) -> @git.ObjectId? raise Error {
+  let suffix = "@{0}"
+  if !spec.has_suffix(suffix) || spec.length() <= suffix.length() {
+    return None
+  }
+  let base_spec = String::unsafe_substring(
+    spec,
+    start=0,
+    end=spec.length() - suffix.length(),
+  )
+  cat_file_rev_parse_direct_or_loose(fs, git_dir, base_spec)
+}
+
+///|
+fn cat_file_rev_parse_commit_message_search_with_compat(
+  fs : OsFs,
+  git_dir : String,
+  spec : String,
+) -> @git.ObjectId? raise Error {
+  match cat_file_split_commit_message_search_spec(spec) {
+    Some((base_spec, needle)) => {
+      let base = cat_file_rev_parse_direct_or_loose(fs, git_dir, base_spec)
+      guard base is Some(base_id) else { return None }
+      let db = @gitlib.ObjectDb::load(fs, git_dir) catch { _ => return None }
+      cat_file_find_reachable_commit_by_message(db, fs, base_id, needle)
+    }
+    None => None
+  }
+}
+
+///|
+fn cat_file_split_commit_message_search_spec(
+  spec : String,
+) -> (String, String)? {
+  let marker = "^{/"
+  match spec.find(marker) {
+    Some(idx) if idx > 0 && spec.has_suffix("}") &&
+      idx + marker.length() < spec.length() - 1 =>
+      Some(
+        (
+          String::unsafe_substring(spec, start=0, end=idx),
+          String::unsafe_substring(
+            spec,
+            start=idx + marker.length(),
+            end=spec.length() - 1,
+          ),
+        ),
+      )
+    _ => None
+  }
+}
+
+///|
+fn cat_file_find_reachable_commit_by_message(
+  db : @gitlib.ObjectDb,
+  fs : OsFs,
+  start : @git.ObjectId,
+  needle : String,
+) -> @git.ObjectId? {
+  let queue : Array[@git.ObjectId] = [start]
+  let seen : Map[String, Bool] = {}
+  while queue.length() > 0 {
+    let current = queue.unsafe_pop()
+    let hex = current.to_hex()
+    if seen.contains(hex) {
+      continue
+    }
+    seen[hex] = true
+    let obj = db.get(fs, current) catch { _ => continue }
+    match obj {
+      Some(o) if o.obj_type == @git.ObjectType::Commit => {
+        if cat_file_commit_message_contains(o.data, needle) {
+          return Some(current)
+        }
+        let info = @git.parse_commit(o.data) catch { _ => continue }
+        for parent in info.parents {
+          if not(seen.contains(parent.to_hex())) {
+            queue.push(parent)
+          }
+        }
+      }
+      _ => ()
+    }
+  }
+  None
+}
+
+///|
+fn cat_file_commit_message_contains(data : Bytes, needle : String) -> Bool {
+  if needle.length() == 0 {
+    return true
+  }
+  let text = decode_bytes(data)
+  match text.find("\n\n") {
+    Some(idx) if idx + 2 <= text.length() => {
+      let message = String::unsafe_substring(
+        text,
+        start=idx + 2,
+        end=text.length(),
+      )
+      message.find(needle) is Some(_)
+    }
+    _ => false
   }
 }
 
@@ -1810,7 +2035,7 @@ fn cat_file_hex_to_byte_array(hex : String) -> Array[Byte]? {
 
 ///|
 fn cat_file_path_from_spec(spec : String) -> String? {
-  match spec.find(":") {
+  match cat_file_find_path_separator_index(spec) {
     Some(idx) if idx + 1 < spec.length() =>
       Some(String::unsafe_substring(spec, start=idx + 1, end=spec.length()))
     _ => None
@@ -1819,7 +2044,7 @@ fn cat_file_path_from_spec(spec : String) -> String? {
 
 ///|
 fn cat_file_split_object_path_spec(spec : String) -> (String, String)? {
-  match spec.find(":") {
+  match cat_file_find_path_separator_index(spec) {
     Some(idx) if idx > 0 =>
       Some(
         (
@@ -1829,6 +2054,27 @@ fn cat_file_split_object_path_spec(spec : String) -> (String, String)? {
       )
     _ => None
   }
+}
+
+///|
+fn cat_file_find_path_separator_index(spec : String) -> Int? {
+  let chars = spec.to_array()
+  let mut brace_depth = 0
+  let mut i = 0
+  while i < chars.length() {
+    let c = chars[i]
+    if c == '{' {
+      brace_depth += 1
+    } else if c == '}' {
+      if brace_depth > 0 {
+        brace_depth -= 1
+      }
+    } else if c == ':' && brace_depth == 0 && i > 0 {
+      return Some(i)
+    }
+    i += 1
+  }
+  None
 }
 
 ///|

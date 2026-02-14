@@ -1,7 +1,6 @@
 ///|
 async fn handle_hash_object(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
-  let git_dir = root + "/.git"
   let fs = OsFs::new()
   let mut write_object = false
   let mut stdin_mode = false
@@ -26,6 +25,11 @@ async fn handle_hash_object(args : Array[String]) -> Unit raise Error {
       obj_type = args[i + 1]
     }
     i += 1
+  }
+  let git_dir = if write_object {
+    resolve_git_dir(fs, root)
+  } else {
+    root + "/.git"
   }
   if is_real_git_delegate_enabled() {
     let compat_object_format = read_hash_object_compat_object_format(
