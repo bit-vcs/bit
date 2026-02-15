@@ -9,6 +9,27 @@ async fn show_status_command_help() -> Unit {
 }
 
 ///|
+fn status_storage_runtime_parsed_args(
+  args : Array[String],
+) -> @runtime.StorageStatusArgs? {
+  let parsed = storage_runtime_parse_command("status", args) catch {
+    _ => return None
+  }
+  match parsed {
+    @runtime.StorageCommand::Status(status_args) => Some(status_args)
+    _ => None
+  }
+}
+
+///|
+fn status_should_use_storage_runtime(args : Array[String]) -> Bool {
+  match status_storage_runtime_parsed_args(args) {
+    Some(parsed) => parsed.porcelain || parsed.short
+    None => false
+  }
+}
+
+///|
 async fn handle_status(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
   let mut root = get_work_root()
@@ -33,6 +54,20 @@ async fn handle_status(args : Array[String]) -> Unit raise Error {
     raise @git.GitError::InvalidObject(
       "Not a git repository (or any of the parent directories): .git/.bit",
     )
+  }
+  if status_should_use_storage_runtime(args) {
+    match status_storage_runtime_parsed_args(args) {
+      Some(parsed) => {
+        @runtime.run_storage_command(
+          fs,
+          fs,
+          root,
+          @runtime.StorageCommand::Status(parsed),
+        )
+        return
+      }
+      None => ()
+    }
   }
   let mut porcelain = false
   let mut short = false

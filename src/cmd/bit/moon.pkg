@@ -148,6 +148,7 @@ options(
     "sparse_checkout.mbt": [ "native" ],
     "stash.mbt": [ "native" ],
     "status.mbt": [ "native" ],
+    "status_wbtest.mbt": [ "native" ],
     "storage_runtime.mbt": [ "native", "wasm-gc", "wasm" ],
     "storage_runtime_wbtest.mbt": [ "native" ],
     "subdir_clone.mbt": [ "native" ],

@@ -23,6 +23,24 @@ fn is_short_count_flag(arg : String) -> Bool {
 }
 
 ///|
+fn log_storage_runtime_delegate_args(
+  args : Array[String],
+) -> @runtime.StorageLogArgs? {
+  let parsed = storage_runtime_parse_command("log", args) catch {
+    _ => return None
+  }
+  match parsed {
+    @runtime.StorageCommand::Log(log_args) if log_args.oneline => Some(log_args)
+    _ => None
+  }
+}
+
+///|
+fn log_should_use_storage_runtime(args : Array[String]) -> Bool {
+  log_storage_runtime_delegate_args(args) is Some(_)
+}
+
+///|
 fn format_log_oneline(
   fmt : String,
   id : @git.ObjectId,
@@ -131,6 +149,20 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
   let rfs : &@git.RepoFileSystem = fs
   let git_dir = resolve_git_dir(fs, root)
+  if log_should_use_storage_runtime(args) {
+    match log_storage_runtime_delegate_args(args) {
+      Some(log_args) => {
+        @runtime.run_storage_command(
+          fs,
+          rfs,
+          root,
+          @runtime.StorageCommand::Log(log_args),
+        )
+        return
+      }
+      None => ()
+    }
+  }
   let mut oneline = false
   let mut graph = false
   let mut all_refs = false
