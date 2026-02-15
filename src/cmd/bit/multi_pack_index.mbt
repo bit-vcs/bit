@@ -93,15 +93,9 @@ async fn handle_multi_pack_index(args : Array[String]) -> Unit raise Error {
     "/multi-pack-index.d/multi-pack-index-chain"
   let has_incremental_chain = fs.is_file(incremental_chain_path)
   if subcommand == Some("write") &&
-    (
-      incremental ||
-      refs_snapshot is Some(_) ||
-      bitmap ||
-      no_bitmap ||
-      has_incremental_chain
-    ) {
+    (incremental || refs_snapshot is Some(_) || has_incremental_chain) {
     eprint_line(
-      "error: multi-pack-index write with bitmap/incremental chain is not supported in standalone mode",
+      "error: multi-pack-index write with incremental chain is not supported in standalone mode",
     )
     @sys.exit(1)
   }
@@ -128,7 +122,7 @@ async fn handle_multi_pack_index(args : Array[String]) -> Unit raise Error {
   match subcommand {
     Some("write") =>
       midx_write(
-        fs, effective_pack_dir, progress, preferred_pack, stdin_packs, bitmap,
+        fs, effective_pack_dir, progress, preferred_pack, stdin_packs, bitmap, no_bitmap,
       )
     Some("verify") => midx_verify(fs, effective_pack_dir, progress)
     Some("expire") => midx_expire(fs, effective_pack_dir, progress)
@@ -155,6 +149,7 @@ async fn midx_write(
   preferred_pack : String?,
   stdin_packs : Bool,
   bitmap : Bool,
+  no_bitmap : Bool,
 ) -> Unit raise Error {
   let all_pack_files = midx_find_pack_files(fs, pack_dir)
   let pack_files = if stdin_packs {
@@ -166,6 +161,7 @@ async fn midx_write(
   } else {
     all_pack_files
   }
+  midx_sort_strings_lex_in_place(pack_files)
   let midx_path = pack_dir + "/multi-pack-index"
   let has_existing_midx = fs.is_file(midx_path)
   let existing_midx_packs : Array[String] = []
@@ -312,7 +308,14 @@ async fn midx_write(
     return
   }
   // Build MIDX file
-  let midx_bytes = midx_build(pack_files, unique_entries, bitmap, oid_version)
+  let midx_bytes = midx_build(
+    pack_files,
+    unique_entries,
+    bitmap,
+    oid_version,
+    preferred_pack_idx,
+  )
+  let mut write_midx_file = true
   if has_existing_midx {
     match midx_try_read_file(fs, midx_path) {
       Some(existing) => {
@@ -320,23 +323,22 @@ async fn midx_write(
           eprint_line("error: checksum.mismatch in existing multi-pack-index")
         }
         if midx_bytes_equal(existing, midx_bytes) {
-          midx_cleanup_rev_files(fs, pack_dir)
-          if progress {
-            eprint_line(
-              "Wrote multi-pack-index with " +
-              unique_entries.length().to_string() +
-              " objects from " +
-              pack_files.length().to_string() +
-              " packs",
-            )
-          }
-          return
+          write_midx_file = false
         }
       }
       None => ()
     }
   }
-  fs.write_file(midx_path, midx_bytes)
+  if write_midx_file {
+    fs.write_file(midx_path, midx_bytes)
+  }
+  if bitmap {
+    midx_write_bitmap(
+      fs, pack_dir, pack_files, unique_entries, midx_bytes, preferred_pack_idx,
+    )
+  } else if no_bitmap {
+    midx_cleanup_bitmap_files(fs, pack_dir)
+  }
   midx_cleanup_rev_files(fs, pack_dir)
   if progress {
     eprint_line(
@@ -778,7 +780,7 @@ async fn midx_expire(
   }
   // Rewrite MIDX without expired packs
   if expired > 0 {
-    midx_write(fs, pack_dir, false, None, false, false)
+    midx_write(fs, pack_dir, false, None, false, false, false)
   }
 }
 
@@ -917,7 +919,7 @@ async fn midx_repack(
     )
   }
   @pack.write_packfile_with_index(fs, git_dir, pack_data, objects_for_index)
-  midx_write(fs, pack_dir, false, None, false, false)
+  midx_write(fs, pack_dir, false, None, false, false, false)
   if progress {
     eprint_line(
       "Repacked " +
@@ -954,6 +956,20 @@ priv struct MidxRepackPack {
   referenced_objects : Int
   total_objects : Int
   pack_size : Int
+}
+
+///|
+priv struct MidxRidxEntry {
+  midx_pos : Int
+  pack_idx : Int
+  offset_hi : Int
+  offset : Int
+}
+
+///|
+priv struct MidxBitmapTip {
+  id : @git.ObjectId
+  midx_pos : Int
 }
 
 ///|
@@ -1194,7 +1210,6 @@ fn midx_select_pack_files_from_stdin(
   filtered
 }
 
-///|
 fn midx_has_valid_checksum(data : Bytes) -> Bool {
   if data.length() < 20 {
     return false
@@ -1220,6 +1235,329 @@ fn midx_cleanup_rev_files(fs : OsFs, pack_dir : String) -> Unit {
       }
     }
   }
+}
+
+///|
+fn midx_cleanup_bitmap_files(fs : OsFs, pack_dir : String) -> Unit {
+  let entries = fs.readdir(pack_dir) catch { _ => return }
+  for entry in entries {
+    if entry.has_prefix("multi-pack-index-") && entry.has_suffix(".bitmap") {
+      fs.remove_file(pack_dir + "/" + entry) catch {
+        _ => ()
+      }
+    }
+  }
+}
+
+///|
+async fn midx_fail_bitmap_write(
+  fs : OsFs,
+  pack_dir : String,
+  message : String,
+) -> Unit raise Error {
+  fs.remove_file(pack_dir + "/multi-pack-index") catch { _ => () }
+  midx_cleanup_bitmap_files(fs, pack_dir)
+  eprint_line(message)
+  @sys.exit(1)
+}
+
+///|
+async fn midx_write_bitmap(
+  fs : OsFs,
+  pack_dir : String,
+  pack_files : Array[String],
+  entries : Array[MidxEntry],
+  midx_bytes : Bytes,
+  preferred_pack_idx : Int?,
+) -> Unit raise Error {
+  let checksum_hex = midx_checksum_hex(midx_bytes)
+  if checksum_hex.length() == 0 {
+    eprint_line("error: invalid multi-pack-index checksum")
+    @sys.exit(1)
+    return
+  }
+  let checksum_offset = midx_bytes.length() - 20
+  let checksum = FixedArray::makei(20, i => midx_bytes[checksum_offset + i])
+  let object_count = entries.length()
+  let midx_pos_by_oid : Map[String, Int] = {}
+  for midx_pos, entry in entries {
+    midx_pos_by_oid[entry.id.to_hex()] = midx_pos
+  }
+  let object_type_by_midx_pos : Array[Int] = Array::make(object_count, -1)
+  for pack_idx, pack_name in pack_files {
+    let pack_data = fs.read_file(pack_dir + "/" + pack_name) catch {
+      err if @async.is_cancellation_error(err) => raise err
+      _ => {
+        eprint_line("could not load pack")
+        @sys.exit(1)
+        return
+      }
+    }
+    let pack_objects = @pack.parse_packfile(pack_data) catch {
+      _ => {
+        eprint_line("could not load pack")
+        @sys.exit(1)
+        return
+      }
+    }
+    for obj in pack_objects {
+      match midx_pos_by_oid.get(obj.id.to_hex()) {
+        Some(midx_pos) => {
+          if entries[midx_pos].pack_idx == pack_idx {
+            object_type_by_midx_pos[midx_pos] = midx_object_type_code(obj.obj_type)
+          }
+        }
+        None => ()
+      }
+    }
+  }
+  for obj_type in object_type_by_midx_pos {
+    if obj_type < 0 {
+      midx_fail_bitmap_write(fs, pack_dir, "error: pack doesn't have full closure")
+      return
+    }
+  }
+  let pack_pos_to_midx = midx_build_ridx_positions(entries, preferred_pack_idx)
+  if pack_pos_to_midx.length() != object_count {
+    midx_fail_bitmap_write(fs, pack_dir, "error: pack doesn't have full closure")
+    return
+  }
+  let pack_pos_by_midx_pos : Array[Int] = Array::make(object_count, -1)
+  for pack_pos, midx_pos in pack_pos_to_midx {
+    pack_pos_by_midx_pos[midx_pos] = pack_pos
+  }
+  let objects_dir = parent_dir(pack_dir)
+  let git_dir = parent_dir(objects_dir)
+  let db = @gitlib.ObjectDb::load(fs, git_dir)
+  let bitmap_tips = midx_collect_bitmap_tips(fs, git_dir, midx_pos_by_oid)
+  if bitmap_tips.length() == 0 {
+    for midx_pos, obj_type in object_type_by_midx_pos {
+      if obj_type == 1 {
+        bitmap_tips.push({ id: entries[midx_pos].id, midx_pos })
+        break
+      }
+    }
+  }
+  if bitmap_tips.length() == 0 {
+    eprint_line("warning: bitmap without any objects")
+    return
+  }
+  bitmap_tips.sort_by(fn(a, b) { a.midx_pos - b.midx_pos })
+  let commit_positions : Array[Int] = []
+  let tree_positions : Array[Int] = []
+  let blob_positions : Array[Int] = []
+  let tag_positions : Array[Int] = []
+  for pack_pos, midx_pos in pack_pos_to_midx {
+    match object_type_by_midx_pos[midx_pos] {
+      1 => commit_positions.push(pack_pos)
+      2 => tree_positions.push(pack_pos)
+      3 => blob_positions.push(pack_pos)
+      4 => tag_positions.push(pack_pos)
+      _ => ()
+    }
+  }
+  let reachable_positions_by_tip : Array[Array[Int]] = []
+  for tip in bitmap_tips {
+    let reachable = @gitlib.collect_reachable_objects(db, fs, tip.id) catch {
+      _ => {
+        midx_fail_bitmap_write(
+          fs,
+          pack_dir,
+          "error: pack doesn't have full closure",
+        )
+        return
+      }
+    }
+    let positions : Array[Int] = []
+    for obj in reachable {
+      match midx_pos_by_oid.get(obj.id.to_hex()) {
+        Some(midx_pos) => {
+          let pack_pos = pack_pos_by_midx_pos[midx_pos]
+          if pack_pos < 0 {
+            midx_fail_bitmap_write(
+              fs,
+              pack_dir,
+              "error: pack doesn't have full closure",
+            )
+            return
+          }
+          positions.push(pack_pos)
+        }
+        None => {
+          midx_fail_bitmap_write(
+            fs,
+            pack_dir,
+            "error: pack doesn't have full closure",
+          )
+          return
+        }
+      }
+    }
+    reachable_positions_by_tip.push(positions)
+  }
+  let out : Array[Byte] = []
+  out.push(b'B')
+  out.push(b'I')
+  out.push(b'T')
+  out.push(b'M')
+  midx_push_u16(out, 1)
+  midx_push_u16(out, 1)
+  midx_push_u32(out, bitmap_tips.length())
+  for b in checksum {
+    out.push(b)
+  }
+  let commits_bitmap = midx_build_ewah_bitmap(object_count, commit_positions)
+  for b in commits_bitmap {
+    out.push(b)
+  }
+  let trees_bitmap = midx_build_ewah_bitmap(object_count, tree_positions)
+  for b in trees_bitmap {
+    out.push(b)
+  }
+  let blobs_bitmap = midx_build_ewah_bitmap(object_count, blob_positions)
+  for b in blobs_bitmap {
+    out.push(b)
+  }
+  let tags_bitmap = midx_build_ewah_bitmap(object_count, tag_positions)
+  for b in tags_bitmap {
+    out.push(b)
+  }
+  for i in 0..<bitmap_tips.length() {
+    midx_push_u32(out, bitmap_tips[i].midx_pos)
+    out.push(b'\x00')
+    out.push(b'\x01')
+    let reachable_bitmap = midx_build_ewah_bitmap(
+      object_count,
+      reachable_positions_by_tip[i],
+    )
+    for b in reachable_bitmap {
+      out.push(b)
+    }
+  }
+  let body = Bytes::from_array(FixedArray::makei(out.length(), i => out[i]))
+  let trailer = @git.sha1(body)
+  for b in trailer.bytes {
+    out.push(b)
+  }
+  let bitmap_path = pack_dir + "/multi-pack-index-" + checksum_hex + ".bitmap"
+  midx_cleanup_bitmap_files(fs, pack_dir)
+  fs.write_file(
+    bitmap_path,
+    Bytes::from_array(FixedArray::makei(out.length(), i => out[i])),
+  )
+}
+
+///|
+fn midx_checksum_hex(data : Bytes) -> String {
+  if data.length() < 20 {
+    return ""
+  }
+  let checksum_offset = data.length() - 20
+  let oid = @git.ObjectId::new(
+    FixedArray::makei(20, i => data[checksum_offset + i]),
+  )
+  oid.to_hex()
+}
+
+///|
+fn midx_build_ewah_bitmap(bit_size : Int, positions : Array[Int]) -> Array[Byte] {
+  let word_count = if bit_size <= 0 {
+    0
+  } else {
+    (bit_size + 63) / 64
+  }
+  let word_hi : Array[Int] = Array::make(word_count, 0)
+  let word_lo : Array[Int] = Array::make(word_count, 0)
+  for pos in positions {
+    if pos < 0 || pos >= bit_size {
+      continue
+    }
+    let word_idx = pos / 64
+    let bit = pos % 64
+    if bit < 32 {
+      word_lo[word_idx] = word_lo[word_idx] | (1 << bit)
+    } else {
+      word_hi[word_idx] = word_hi[word_idx] | (1 << (bit - 32))
+    }
+  }
+  let out : Array[Byte] = []
+  midx_push_u32(out, bit_size)
+  midx_push_u32(out, word_count + 1)
+  // RLW layout (64-bit):
+  // bit 0 = run bit, bits [1..32] = running length, bits [33..63] = literal words.
+  // For literal-only bitmaps, run bit/length are zero and literal_words = word_count.
+  let rlw_hi = word_count << 1
+  let rlw_lo = 0
+  midx_push_u64_parts(out, rlw_hi, rlw_lo)
+  for i in 0..<word_count {
+    midx_push_u64_parts(out, word_hi[i], word_lo[i])
+  }
+  midx_push_u32(out, 0)
+  out
+}
+
+///|
+fn midx_object_type_code(obj_type : @git.ObjectType) -> Int {
+  match obj_type {
+    @git.ObjectType::Commit => 1
+    @git.ObjectType::Tree => 2
+    @git.ObjectType::Blob => 3
+    @git.ObjectType::Tag => 4
+  }
+}
+
+///|
+fn midx_collect_bitmap_tips(
+  fs : OsFs,
+  git_dir : String,
+  midx_pos_by_oid : Map[String, Int],
+) -> Array[MidxBitmapTip] {
+  let tips : Array[MidxBitmapTip] = []
+  let seen : Map[String, Bool] = {}
+  let refs = @gitlib.list_refs_with_ids(fs, git_dir, Some("refs/"))
+  let refnames : Array[String] = []
+  for refname, _ in refs {
+    if refname.has_prefix("refs/heads/") || refname.has_prefix("refs/tags/") {
+      refnames.push(refname)
+    }
+  }
+  midx_sort_strings_lex_in_place(refnames)
+  for refname in refnames {
+    let rev = refname + "^{commit}"
+    let parsed = @gitrepo.rev_parse(fs, git_dir, rev) catch { _ => None }
+    match parsed {
+      Some(id) => {
+        let hex = id.to_hex()
+        if not(seen.contains(hex)) {
+          match midx_pos_by_oid.get(hex) {
+            Some(midx_pos) => {
+              tips.push({ id, midx_pos })
+              seen[hex] = true
+            }
+            None => ()
+          }
+        }
+      }
+      None => ()
+    }
+  }
+  let head = @gitrepo.rev_parse(fs, git_dir, "HEAD") catch { _ => None }
+  match head {
+    Some(id) => {
+      let hex = id.to_hex()
+      if not(seen.contains(hex)) {
+        match midx_pos_by_oid.get(hex) {
+          Some(midx_pos) => {
+            tips.push({ id, midx_pos })
+            seen[hex] = true
+          }
+          None => ()
+        }
+      }
+    }
+    None => ()
+  }
+  tips
 }
 
 ///|
@@ -1358,13 +1696,23 @@ fn midx_build(
   entries : Array[MidxEntry],
   bitmap : Bool,
   oid_version : Int,
+  preferred_pack_idx : Int?,
 ) -> Bytes {
   let out : Array[Byte] = []
   let (ooff_chunk, loff_chunk) = midx_build_ooff_loff(entries)
   let has_loff = loff_chunk.length() > 0
+  let ridx_chunk = if bitmap {
+    Some(midx_build_ridx(entries, preferred_pack_idx))
+  } else {
+    None
+  }
   let mut num_chunks = 4
   if has_loff {
     num_chunks += 1
+  }
+  match ridx_chunk {
+    Some(_) => num_chunks += 1
+    None => ()
   }
   if bitmap {
     num_chunks += 1
@@ -1384,7 +1732,7 @@ fn midx_build(
   let oidf_chunk = midx_build_oidf(entries)
   let oidl_chunk = midx_build_oidl(entries)
   let btmp_chunk = if bitmap {
-    Some(midx_build_btmp(pack_files.length(), entries))
+    Some(midx_build_btmp(pack_files.length(), entries, preferred_pack_idx))
   } else {
     None
   }
@@ -1430,6 +1778,17 @@ fn midx_build(
     midx_push_u64(out, offset)
     offset += loff_chunk.length()
   }
+  match ridx_chunk {
+    Some(chunk) => {
+      out.push(b'R')
+      out.push(b'I')
+      out.push(b'D')
+      out.push(b'X')
+      midx_push_u64(out, offset)
+      offset += chunk.length()
+    }
+    None => ()
+  }
   match btmp_chunk {
     Some(chunk) => {
       out.push(b'B')
@@ -1469,6 +1828,13 @@ fn midx_build(
     for b in loff_chunk {
       out.push(b)
     }
+  }
+  match ridx_chunk {
+    Some(chunk) =>
+      for b in chunk {
+        out.push(b)
+      }
+    None => ()
   }
   match btmp_chunk {
     Some(chunk) =>
@@ -1559,22 +1925,112 @@ fn midx_build_ooff_loff(
 }
 
 ///|
-fn midx_build_btmp(pack_count : Int, entries : Array[MidxEntry]) -> Array[Byte] {
+fn midx_build_btmp(
+  pack_count : Int,
+  entries : Array[MidxEntry],
+  preferred_pack_idx : Int?,
+) -> Array[Byte] {
   let counts : Array[Int] = Array::make(pack_count, 0)
   for entry in entries {
     if entry.pack_idx >= 0 && entry.pack_idx < pack_count {
       counts[entry.pack_idx] = counts[entry.pack_idx] + 1
     }
   }
-  let out : Array[Byte] = []
+  let bitmap_pos_by_pack : Array[Int] = Array::make(pack_count, 0)
+  let pack_order : Array[Int] = []
+  for i in 0..<pack_count {
+    pack_order.push(i)
+  }
+  pack_order.sort_by(fn(a, b) {
+    midx_pack_rank(a, preferred_pack_idx) - midx_pack_rank(b, preferred_pack_idx)
+  })
   let mut bitmap_pos = 0
+  for pack_idx in pack_order {
+    bitmap_pos_by_pack[pack_idx] = bitmap_pos
+    bitmap_pos += counts[pack_idx]
+  }
+  let out : Array[Byte] = []
   for i in 0..<pack_count {
     let bitmap_nr = counts[i]
-    midx_push_u32(out, bitmap_pos)
+    midx_push_u32(out, bitmap_pos_by_pack[i])
     midx_push_u32(out, bitmap_nr)
-    bitmap_pos += bitmap_nr
   }
   out
+}
+
+///|
+fn midx_build_ridx(
+  entries : Array[MidxEntry],
+  preferred_pack_idx : Int?,
+) -> Array[Byte] {
+  let positions = midx_build_ridx_positions(entries, preferred_pack_idx)
+  let out : Array[Byte] = []
+  for pos in positions {
+    midx_push_u32(out, pos)
+  }
+  out
+}
+
+///|
+fn midx_build_ridx_positions(
+  entries : Array[MidxEntry],
+  preferred_pack_idx : Int?,
+) -> Array[Int] {
+  let ridx_entries : Array[MidxRidxEntry] = []
+  for midx_pos, entry in entries {
+    ridx_entries.push({
+      midx_pos,
+      pack_idx: entry.pack_idx,
+      offset_hi: entry.offset_hi,
+      offset: entry.offset,
+    })
+  }
+  ridx_entries.sort_by(fn(a, b) {
+    let a_rank = midx_pack_rank(a.pack_idx, preferred_pack_idx)
+    let b_rank = midx_pack_rank(b.pack_idx, preferred_pack_idx)
+    if a_rank != b_rank {
+      return a_rank - b_rank
+    }
+    if a.offset_hi != b.offset_hi {
+      return if midx_u32_lt(a.offset_hi, b.offset_hi) { -1 } else { 1 }
+    }
+    if a.offset != b.offset {
+      return if midx_u32_lt(a.offset, b.offset) { -1 } else { 1 }
+    }
+    a.midx_pos - b.midx_pos
+  })
+  let out : Array[Int] = []
+  for entry in ridx_entries {
+    out.push(entry.midx_pos)
+  }
+  out
+}
+
+///|
+fn midx_pack_rank(pack_idx : Int, preferred_pack_idx : Int?) -> Int {
+  match preferred_pack_idx {
+    Some(pref_idx) =>
+      if pack_idx == pref_idx {
+        0
+      } else if pack_idx < pref_idx {
+        pack_idx + 1
+      } else {
+        pack_idx
+      }
+    None => pack_idx
+  }
+}
+
+///|
+fn midx_push_u16(out : Array[Byte], value : Int) -> Unit {
+  out.push(((value >> 8) & 0xff).to_byte())
+  out.push((value & 0xff).to_byte())
+}
+
+///|
+fn midx_push_u64_parts(out : Array[Byte], hi : Int, lo : Int) -> Unit {
+  midx_push_u32(out, hi)
+  midx_push_u32(out, lo)
 }
 
 ///|

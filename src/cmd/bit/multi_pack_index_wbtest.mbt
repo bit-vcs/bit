@@ -78,8 +78,13 @@ test "midx build writes BTMP chunk only when --bitmap is requested" {
       offset: 3,
     },
   ]
-  let with_bitmap = midx_build(pack_files, entries, true, 1)
+  let with_bitmap = midx_build(pack_files, entries, true, 1, None)
   let chunk_count = with_bitmap[6].to_int()
+  let ridx_offset = midx_find_chunk(with_bitmap, chunk_count, "RIDX")
+  assert_true(ridx_offset > 0)
+  assert_eq(midx_read_u32(with_bitmap, ridx_offset), 0)
+  assert_eq(midx_read_u32(with_bitmap, ridx_offset + 4), 1)
+  assert_eq(midx_read_u32(with_bitmap, ridx_offset + 8), 2)
   let btmp_offset = midx_find_chunk(with_bitmap, chunk_count, "BTMP")
   assert_true(btmp_offset > 0)
   let btmp_end = midx_find_chunk_end(with_bitmap, chunk_count, "BTMP")
@@ -90,9 +95,33 @@ test "midx build writes BTMP chunk only when --bitmap is requested" {
   assert_eq(midx_read_u32(with_bitmap, btmp_offset + 12), 0)
   assert_eq(midx_read_u32(with_bitmap, btmp_offset + 16), 2)
   assert_eq(midx_read_u32(with_bitmap, btmp_offset + 20), 1)
-  let without_bitmap = midx_build(pack_files, entries, false, 1)
+  let without_bitmap = midx_build(pack_files, entries, false, 1, None)
   let without_chunk_count = without_bitmap[6].to_int()
+  assert_eq(midx_find_chunk(without_bitmap, without_chunk_count, "RIDX"), 0)
   assert_eq(midx_find_chunk(without_bitmap, without_chunk_count, "BTMP"), 0)
+}
+
+///|
+test "midx ewah bitmap uses literal RLW encoding compatible with git" {
+  let ewah = midx_build_ewah_bitmap(130, [0, 40, 65, 129])
+  let ewah_bytes = Bytes::from_array(FixedArray::makei(ewah.length(), i => ewah[i]))
+  assert_eq(ewah.length(), 44)
+  assert_eq(midx_read_u32(ewah_bytes, 0), 130)
+  assert_eq(midx_read_u32(ewah_bytes, 4), 4)
+  // RLW: run_bit=0, running_len=0, literal_words=3
+  assert_eq(midx_read_u32(ewah_bytes, 8), 6)
+  assert_eq(midx_read_u32(ewah_bytes, 12), 0)
+  // literal word #0 (bits 0 and 40 set)
+  assert_eq(midx_read_u32(ewah_bytes, 16), 256)
+  assert_eq(midx_read_u32(ewah_bytes, 20), 1)
+  // literal word #1 (bit 65 set)
+  assert_eq(midx_read_u32(ewah_bytes, 24), 0)
+  assert_eq(midx_read_u32(ewah_bytes, 28), 2)
+  // literal word #2 (bit 129 set)
+  assert_eq(midx_read_u32(ewah_bytes, 32), 0)
+  assert_eq(midx_read_u32(ewah_bytes, 36), 2)
+  // RLW position
+  assert_eq(midx_read_u32(ewah_bytes, 40), 0)
 }
 
 ///|
@@ -121,7 +150,7 @@ test "midx build writes LOFF chunk for large offsets" {
       offset: -1,
     },
   ]
-  let data = midx_build(pack_files, entries, false, 1)
+  let data = midx_build(pack_files, entries, false, 1, None)
   let chunk_count = data[6].to_int()
   let ooff_offset = midx_find_chunk(data, chunk_count, "OOFF")
   let loff_offset = midx_find_chunk(data, chunk_count, "LOFF")
@@ -152,8 +181,8 @@ test "midx build writes oid version byte from argument" {
       offset: 1,
     },
   ]
-  let sha1 = midx_build(pack_files, entries, false, 1)
-  let sha256 = midx_build(pack_files, entries, false, 2)
+  let sha1 = midx_build(pack_files, entries, false, 1, None)
+  let sha256 = midx_build(pack_files, entries, false, 2, None)
   assert_eq(sha1[5].to_int(), 1)
   assert_eq(sha256[5].to_int(), 2)
 }
@@ -186,7 +215,7 @@ test "midx read pack usage returns referenced object counts per pack" {
       offset: 3,
     },
   ]
-  let data = midx_build(pack_files, entries, false, 1)
+  let data = midx_build(pack_files, entries, false, 1, None)
   let usage = midx_read_pack_usage_from_data(data)
   guard usage is Some((names, counts)) else { fail("expected pack usage") }
   assert_eq(names.length(), 2)
