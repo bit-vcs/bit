@@ -24,6 +24,10 @@
 - [ ] `t5540-http-push-webdav.sh`
 - [ ] `t9001-send-email.sh`
 - [ ] `--help` 移植（全サブコマンドの usage テキスト）
+  - [x] `show_command_help` を spec 駆動へ整理（追加時の重複実装を削減）
+  - [x] help 経路の回帰テストを追加（completion 一覧 / dispatch 固有 / alias）
+  - [x] 詳細ヘルプをオプトイン外部読込に対応（`BIT_HELP_FULL=1`, `BIT_HELP_TEXT_DIR`）
+  - [ ] 外部 help テキスト実体の整備（必要コマンド分）
 
 ## P3: プラットフォーム/将来タスク
 
