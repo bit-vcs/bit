@@ -500,6 +500,165 @@ test "storage runtime: status porcelain branch line" {
 }
 
 ///|
+test "storage runtime: status porcelain branch mode includes branch and changes" {
+  let fs = @git.TestFs::new()
+  let root = "/repo-storage-runtime-status-branch-change"
+  let prev_quiet = setup_storage_runtime_quiet_for_wbtest()
+  let (
+    prev_author_name,
+    prev_author_email,
+    prev_committer_name,
+    prev_committer_email,
+  ) = setup_identity_for_storage_runtime_wbtest()
+  run_storage_command(fs, fs, root, storage_runtime_wbtest_init_command()) catch {
+    err => fail("init failed: \{err}")
+  }
+  fs.write_string(root + "/a.txt", "base\n")
+  run_storage_command(
+    fs,
+    fs,
+    root,
+    storage_runtime_wbtest_add_command(["a.txt"]),
+  ) catch {
+    err => fail("add failed: \{err}")
+  }
+  run_storage_command(
+    fs,
+    fs,
+    root,
+    storage_runtime_wbtest_commit_command("base"),
+  ) catch {
+    err => fail("commit failed: \{err}")
+  }
+  fs.write_string(root + "/a.txt", "changed\n")
+  let lines = storage_status_porcelain_lines(fs, root, true) catch {
+    err => {
+      fail("status lines failed: \{err}")
+      []
+    }
+  }
+  assert_true(lines.length() >= 2)
+  assert_eq(lines[0], "## main")
+  assert_true(storage_runtime_wbtest_has_line(lines, " M a.txt"))
+  restore_identity_for_storage_runtime_wbtest(
+    prev_author_name, prev_author_email, prev_committer_name, prev_committer_email,
+  )
+  restore_env_var_for_storage_runtime_wbtest(
+    "BIT_STORAGE_RUNTIME_QUIET", prev_quiet,
+  )
+}
+
+///|
+test "storage runtime: status porcelain detached head branch line" {
+  let fs = @git.TestFs::new()
+  let root = "/repo-storage-runtime-status-detached"
+  let prev_quiet = setup_storage_runtime_quiet_for_wbtest()
+  let (
+    prev_author_name,
+    prev_author_email,
+    prev_committer_name,
+    prev_committer_email,
+  ) = setup_identity_for_storage_runtime_wbtest()
+  run_storage_command(fs, fs, root, storage_runtime_wbtest_init_command()) catch {
+    err => fail("init failed: \{err}")
+  }
+  fs.write_string(root + "/a.txt", "base\n")
+  run_storage_command(
+    fs,
+    fs,
+    root,
+    storage_runtime_wbtest_add_command(["a.txt"]),
+  ) catch {
+    err => fail("add failed: \{err}")
+  }
+  run_storage_command(
+    fs,
+    fs,
+    root,
+    storage_runtime_wbtest_commit_command("base"),
+  ) catch {
+    err => fail("commit failed: \{err}")
+  }
+  let head_full = storage_runtime_wbtest_trim(
+    storage_runtime_wbtest_decode_bytes(
+      fs.read_file(root + "/.git/refs/heads/main"),
+    ),
+  )
+  fs.write_string(root + "/.git/HEAD", head_full + "\n")
+  let short = (try! head_full[:7]).to_string()
+  let lines = storage_status_porcelain_lines(fs, root, true) catch {
+    err => {
+      fail("status lines failed: \{err}")
+      []
+    }
+  }
+  assert_eq(lines.length(), 1)
+  assert_eq(lines[0], "## HEAD (detached at " + short + ")")
+  restore_identity_for_storage_runtime_wbtest(
+    prev_author_name, prev_author_email, prev_committer_name, prev_committer_email,
+  )
+  restore_env_var_for_storage_runtime_wbtest(
+    "BIT_STORAGE_RUNTIME_QUIET", prev_quiet,
+  )
+}
+
+///|
+test "storage runtime: status porcelain reports MM for staged and unstaged change" {
+  let fs = @git.TestFs::new()
+  let root = "/repo-storage-runtime-status-mm"
+  let prev_quiet = setup_storage_runtime_quiet_for_wbtest()
+  let (
+    prev_author_name,
+    prev_author_email,
+    prev_committer_name,
+    prev_committer_email,
+  ) = setup_identity_for_storage_runtime_wbtest()
+  run_storage_command(fs, fs, root, storage_runtime_wbtest_init_command()) catch {
+    err => fail("init failed: \{err}")
+  }
+  fs.write_string(root + "/a.txt", "base\n")
+  run_storage_command(
+    fs,
+    fs,
+    root,
+    storage_runtime_wbtest_add_command(["a.txt"]),
+  ) catch {
+    err => fail("add failed: \{err}")
+  }
+  run_storage_command(
+    fs,
+    fs,
+    root,
+    storage_runtime_wbtest_commit_command("base"),
+  ) catch {
+    err => fail("commit failed: \{err}")
+  }
+  fs.write_string(root + "/a.txt", "stage-1\n")
+  run_storage_command(
+    fs,
+    fs,
+    root,
+    storage_runtime_wbtest_add_command(["a.txt"]),
+  ) catch {
+    err => fail("stage modified failed: \{err}")
+  }
+  fs.write_string(root + "/a.txt", "stage-2\n")
+  let lines = storage_status_porcelain_lines(fs, root, false) catch {
+    err => {
+      fail("status lines failed: \{err}")
+      []
+    }
+  }
+  assert_true(storage_runtime_wbtest_has_line(lines, "MM a.txt"))
+  restore_identity_for_storage_runtime_wbtest(
+    prev_author_name, prev_author_email, prev_committer_name, prev_committer_email,
+  )
+  restore_env_var_for_storage_runtime_wbtest(
+    "BIT_STORAGE_RUNTIME_QUIET", prev_quiet,
+  )
+}
+
+///|
 test "storage runtime: status porcelain lines report staged add modify delete" {
   let fs = @git.TestFs::new()
   let root = "/repo-storage-runtime-status-staged"
