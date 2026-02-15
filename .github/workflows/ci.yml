@@ -15,18 +15,18 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: true
+      - name: Install just
+        uses: extractions/setup-just@v2
       - name: Install MoonBit CLI
         run: |
           curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
           echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
       - name: Moon update
         run: moon update
-      - name: Moon check
-        run: moon check --deny-warn --target js
-      - name: Moon test
-        run: moon test --target js
-      - name: Moon test (native)
-        run: moon test --target native
+      - name: just check
+        run: just check
+      - name: just test
+        run: just test
 
   distributed-test:
     runs-on: ubuntu-latest

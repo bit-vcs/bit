@@ -1,0 +1,18 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/bit/runtime"
+
+import {
+  "mizchi/bit/types",
+}
+
+// Values
+pub fn run_storage_command(&@types.FileSystem, &@types.RepoFileSystem, String, String, Array[String]) -> Unit raise
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits
+

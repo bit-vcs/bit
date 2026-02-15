@@ -12,10 +12,15 @@ check:
     moon check --deny-warn --target js
     moon check --deny-warn --target wasm
     moon check --deny-warn --target native
+    @if rg -n "OsFs::new|@process\\.run" src/runtime >/dev/null; then \
+      echo "runtime layer must not use OsFs::new or @process.run"; \
+      exit 1; \
+    fi
 
 # Run tests (js target: main packages only, native: all)
 test:
     moon test --target js -p mizchi/bit -p mizchi/bit/lib
+    moon test --target wasm -p mizchi/bit/runtime -f storage_runtime_wbtest.mbt
     moon test --target native
 
 # Update snapshot tests (both js and native)

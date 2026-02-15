@@ -336,6 +336,21 @@ fn build_repo_scoped_rw_registry(
 }
 
 ///|
+fn stage_paths_with_storage_runtime(
+  fs : &@git.FileSystem,
+  rfs : &@git.RepoFileSystem,
+  root : String,
+  paths : Array[String],
+) -> Unit raise @git.GitError {
+  @runtime.run_storage_command(fs, rfs, root, "add", paths) catch {
+    err =>
+      raise @git.GitError::InvalidObject(
+        "rebase-ai: storage runtime add failed: \{err}",
+      )
+  }
+}
+
+///|
 fn resolve_conflict_file_with_agent_loop(
   fs : &@git.FileSystem,
   rfs : &@git.RepoFileSystem,
@@ -375,7 +390,7 @@ fn resolve_conflict_file_with_agent_loop(
   } else {
     [rel_path]
   }
-  @gitlib.add_paths(fs, rfs, root, stage_paths)
+  stage_paths_with_storage_runtime(fs, rfs, root, stage_paths)
   true
 }
 
@@ -403,7 +418,7 @@ fn resolve_conflict_file_with_provider(
     return false
   }
   fs.write_string(abs_path, resolved)
-  @gitlib.add_paths(fs, rfs, root, [rel_path])
+  stage_paths_with_storage_runtime(fs, rfs, root, [rel_path])
   true
 }
 

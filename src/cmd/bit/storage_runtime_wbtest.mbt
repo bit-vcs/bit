@@ -1,8 +1,37 @@
 ///|
-fn restore_env_var_for_storage_runtime_wbtest(
-  name : String,
-  prev : String?,
-) -> Unit {
+fn cmd_storage_decode_bytes(data : Bytes) -> String {
+  @utf8.decode_lossy(data[:])
+}
+
+///|
+fn cmd_storage_trim(s : String) -> String {
+  let mut start = 0
+  let mut end = s.length()
+  while start < end {
+    let c = s.unsafe_get(start)
+    if c == ' ' || c == '\t' || c == '\n' || c == '\r' {
+      start += 1
+    } else {
+      break
+    }
+  }
+  while end > start {
+    let c = s.unsafe_get(end - 1)
+    if c == ' ' || c == '\t' || c == '\n' || c == '\r' {
+      end -= 1
+    } else {
+      break
+    }
+  }
+  if start == 0 && end == s.length() {
+    s
+  } else {
+    String::unsafe_substring(s, start~, end~)
+  }
+}
+
+///|
+fn cmd_storage_restore_env(name : String, prev : String?) -> Unit {
   match prev {
     Some(value) => @sys.set_env_var(name, value)
     None => @sys.unset_env_var(name)
@@ -10,14 +39,9 @@ fn restore_env_var_for_storage_runtime_wbtest(
 }
 
 ///|
-fn setup_storage_runtime_quiet_for_wbtest() -> String? {
-  let prev = @sys.get_env_var("BIT_STORAGE_RUNTIME_QUIET")
-  @sys.set_env_var("BIT_STORAGE_RUNTIME_QUIET", "1")
-  prev
-}
-
-///|
-fn setup_identity_for_storage_runtime_wbtest() -> (
+fn cmd_storage_setup_test_env() -> (
+  String?,
+  String?,
   String?,
   String?,
   String?,
@@ -27,196 +51,106 @@ fn setup_identity_for_storage_runtime_wbtest() -> (
   let prev_author_email = @sys.get_env_var("GIT_AUTHOR_EMAIL")
   let prev_committer_name = @sys.get_env_var("GIT_COMMITTER_NAME")
   let prev_committer_email = @sys.get_env_var("GIT_COMMITTER_EMAIL")
-  @sys.set_env_var("GIT_AUTHOR_NAME", "Storage Test")
-  @sys.set_env_var("GIT_AUTHOR_EMAIL", "storage@example.com")
-  @sys.set_env_var("GIT_COMMITTER_NAME", "Storage Test")
-  @sys.set_env_var("GIT_COMMITTER_EMAIL", "storage@example.com")
+  let prev_committer_date = @sys.get_env_var("GIT_COMMITTER_DATE")
+  let prev_quiet = @sys.get_env_var("BIT_STORAGE_RUNTIME_QUIET")
+  @sys.set_env_var("GIT_AUTHOR_NAME", "Storage Delegate Test")
+  @sys.set_env_var("GIT_AUTHOR_EMAIL", "storage-delegate@example.com")
+  @sys.set_env_var("GIT_COMMITTER_NAME", "Storage Delegate Test")
+  @sys.set_env_var("GIT_COMMITTER_EMAIL", "storage-delegate@example.com")
+  @sys.set_env_var("GIT_COMMITTER_DATE", "1700000000")
+  @sys.set_env_var("BIT_STORAGE_RUNTIME_QUIET", "1")
   (
-    prev_author_name, prev_author_email, prev_committer_name, prev_committer_email,
+    prev_author_name,
+    prev_author_email,
+    prev_committer_name,
+    prev_committer_email,
+    prev_committer_date,
+    prev_quiet,
   )
 }
 
 ///|
-fn restore_identity_for_storage_runtime_wbtest(
+fn cmd_storage_restore_test_env(
   prev_author_name : String?,
   prev_author_email : String?,
   prev_committer_name : String?,
   prev_committer_email : String?,
+  prev_committer_date : String?,
+  prev_quiet : String?,
 ) -> Unit {
-  restore_env_var_for_storage_runtime_wbtest(
-    "GIT_AUTHOR_NAME", prev_author_name,
-  )
-  restore_env_var_for_storage_runtime_wbtest(
-    "GIT_AUTHOR_EMAIL", prev_author_email,
-  )
-  restore_env_var_for_storage_runtime_wbtest(
-    "GIT_COMMITTER_NAME", prev_committer_name,
-  )
-  restore_env_var_for_storage_runtime_wbtest(
-    "GIT_COMMITTER_EMAIL", prev_committer_email,
-  )
+  cmd_storage_restore_env("GIT_AUTHOR_NAME", prev_author_name)
+  cmd_storage_restore_env("GIT_AUTHOR_EMAIL", prev_author_email)
+  cmd_storage_restore_env("GIT_COMMITTER_NAME", prev_committer_name)
+  cmd_storage_restore_env("GIT_COMMITTER_EMAIL", prev_committer_email)
+  cmd_storage_restore_env("GIT_COMMITTER_DATE", prev_committer_date)
+  cmd_storage_restore_env("BIT_STORAGE_RUNTIME_QUIET", prev_quiet)
 }
 
 ///|
-async test "storage runtime: init/add/commit/status/log on TestFs" {
+async test "storage runtime cmd wrapper: delegates successful flow" {
   let fs = @git.TestFs::new()
-  let root = "/repo-storage-runtime-basic"
-  let prev_quiet = setup_storage_runtime_quiet_for_wbtest()
+  let root_cmd = "/repo-storage-runtime-cmd-wrapper"
+  let root_runtime = "/repo-storage-runtime-runtime-direct"
   let (
     prev_author_name,
     prev_author_email,
     prev_committer_name,
     prev_committer_email,
-  ) = setup_identity_for_storage_runtime_wbtest()
-  run_storage_command(fs, fs, root, "init", ["-q"]) catch {
-    err => fail("init failed: \{err}")
-  }
-  fs.write_string(root + "/a.txt", "hello\n")
-  run_storage_command(fs, fs, root, "add", ["a.txt"]) catch {
-    err => fail("add failed: \{err}")
-  }
-  run_storage_command(fs, fs, root, "commit", ["-q", "-m", "first commit"]) catch {
-    err => fail("commit failed: \{err}")
-  }
-  let git_dir = resolve_git_dir(fs, root)
-  assert_true(fs.is_file(git_dir + "/refs/heads/main"))
-  let status = @gitlib.status(fs, root)
-  assert_eq(status.untracked.length(), 0)
-  assert_eq(status.unstaged_modified.length(), 0)
-  assert_eq(status.unstaged_deleted.length(), 0)
-  run_storage_command(fs, fs, root, "status", ["--porcelain"]) catch {
-    err => fail("status failed: \{err}")
-  }
-  run_storage_command(fs, fs, root, "log", ["--oneline", "-1"]) catch {
-    err => fail("log failed: \{err}")
-  }
-  restore_identity_for_storage_runtime_wbtest(
-    prev_author_name, prev_author_email, prev_committer_name, prev_committer_email,
-  )
-  restore_env_var_for_storage_runtime_wbtest(
-    "BIT_STORAGE_RUNTIME_QUIET", prev_quiet,
-  )
-}
+    prev_committer_date,
+    prev_quiet,
+  ) = cmd_storage_setup_test_env()
 
-///|
-async test "storage runtime: hash-object -w and write-tree work on TestFs" {
-  let fs = @git.TestFs::new()
-  let root = "/repo-storage-runtime-objects"
-  let prev_quiet = setup_storage_runtime_quiet_for_wbtest()
-  run_storage_command(fs, fs, root, "init", ["-q"]) catch {
-    err => fail("init failed: \{err}")
+  run_storage_command(fs, fs, root_cmd, "init", ["-q"]) catch {
+    err => fail("cmd init failed: \{err}")
   }
-  fs.write_string(root + "/blob.txt", "blob-data\n")
-  run_storage_command(fs, fs, root, "add", ["blob.txt"]) catch {
-    err => fail("add failed: \{err}")
+  fs.write_string(root_cmd + "/a.txt", "hello\n")
+  run_storage_command(fs, fs, root_cmd, "add", ["a.txt"]) catch {
+    err => fail("cmd add failed: \{err}")
   }
-  run_storage_command(fs, fs, root, "hash-object", ["-w", "blob.txt"]) catch {
-    err => fail("hash-object failed: \{err}")
+  run_storage_command(fs, fs, root_cmd, "commit", ["-q", "-m", "base"]) catch {
+    err => fail("cmd commit failed: \{err}")
   }
-  let blob_id = @git.hash_object_content(
-    @git.ObjectType::Blob,
-    fs.read_file(root + "/blob.txt"),
-  )
-  let blob_hex = blob_id.to_hex()
-  let dir = (try! blob_hex[:2]).to_string()
-  let rest = (try! blob_hex[2:]).to_string()
-  let object_path = root + "/.git/objects/" + dir + "/" + rest
-  assert_true(fs.is_file(object_path))
-  run_storage_command(fs, fs, root, "write-tree", []) catch {
-    err => fail("write-tree failed: \{err}")
-  }
-  restore_env_var_for_storage_runtime_wbtest(
-    "BIT_STORAGE_RUNTIME_QUIET", prev_quiet,
-  )
-}
 
-///|
-async test "storage runtime: update-ref create and delete on TestFs" {
-  let fs = @git.TestFs::new()
-  let root = "/repo-storage-runtime-update-ref"
-  let prev_quiet = setup_storage_runtime_quiet_for_wbtest()
-  let (
+  @runtime.run_storage_command(fs, fs, root_runtime, "init", ["-q"]) catch {
+    err => fail("runtime init failed: \{err}")
+  }
+  fs.write_string(root_runtime + "/a.txt", "hello\n")
+  @runtime.run_storage_command(fs, fs, root_runtime, "add", ["a.txt"]) catch {
+    err => fail("runtime add failed: \{err}")
+  }
+  @runtime.run_storage_command(fs, fs, root_runtime, "commit", ["-q", "-m", "base"]) catch {
+    err => fail("runtime commit failed: \{err}")
+  }
+
+  let cmd_head = cmd_storage_trim(
+    cmd_storage_decode_bytes(fs.read_file(root_cmd + "/.git/refs/heads/main")),
+  )
+  let runtime_head = cmd_storage_trim(
+    cmd_storage_decode_bytes(fs.read_file(root_runtime + "/.git/refs/heads/main")),
+  )
+  assert_eq(cmd_head, runtime_head)
+
+  cmd_storage_restore_test_env(
     prev_author_name,
     prev_author_email,
     prev_committer_name,
     prev_committer_email,
-  ) = setup_identity_for_storage_runtime_wbtest()
-  run_storage_command(fs, fs, root, "init", ["-q"]) catch {
-    err => fail("init failed: \{err}")
-  }
-  fs.write_string(root + "/a.txt", "hello\n")
-  run_storage_command(fs, fs, root, "add", ["a.txt"]) catch {
-    err => fail("add failed: \{err}")
-  }
-  run_storage_command(fs, fs, root, "commit", ["-q", "-m", "base"]) catch {
-    err => fail("commit failed: \{err}")
-  }
-  let git_dir = resolve_git_dir(fs, root)
-  let head_id = match @gitrepo.rev_parse(fs, git_dir, "HEAD") {
-    Some(id) => id
-    None => {
-      fail("HEAD not found")
-      @git.ObjectId::zero()
-    }
-  }
-  run_storage_command(fs, fs, root, "update-ref", [
-    "refs/heads/storage",
-    head_id.to_hex(),
-  ]) catch {
-    err => fail("update-ref create failed: \{err}")
-  }
-  let created = trim_string(
-    decode_bytes(fs.read_file(git_dir + "/refs/heads/storage")),
-  )
-  assert_eq(created, head_id.to_hex())
-  run_storage_command(fs, fs, root, "update-ref", [
-    "-d",
-    "refs/heads/storage",
-    head_id.to_hex(),
-  ]) catch {
-    err => fail("update-ref delete failed: \{err}")
-  }
-  assert_false(fs.is_file(git_dir + "/refs/heads/storage"))
-  restore_identity_for_storage_runtime_wbtest(
-    prev_author_name, prev_author_email, prev_committer_name, prev_committer_email,
-  )
-  restore_env_var_for_storage_runtime_wbtest(
-    "BIT_STORAGE_RUNTIME_QUIET", prev_quiet,
+    prev_committer_date,
+    prev_quiet,
   )
 }
 
 ///|
-async test "storage runtime: unsupported command is rejected" {
+async test "storage runtime cmd wrapper: delegates error path" {
   let fs = @git.TestFs::new()
-  let prev_quiet = setup_storage_runtime_quiet_for_wbtest()
-  let mut failed = false
-  run_storage_command(fs, fs, "/repo-storage-runtime-unsupported", "clone", []) catch {
-    _ => failed = true
+  let mut cmd_error = ""
+  let mut runtime_error = ""
+  run_storage_command(fs, fs, "/repo-cmd-error", "clone", []) catch {
+    err => cmd_error = "\{err}"
   }
-  assert_true(failed)
-  restore_env_var_for_storage_runtime_wbtest(
-    "BIT_STORAGE_RUNTIME_QUIET", prev_quiet,
-  )
-}
-
-///|
-async test "storage runtime: commit without message is rejected" {
-  let fs = @git.TestFs::new()
-  let root = "/repo-storage-runtime-no-message"
-  let prev_quiet = setup_storage_runtime_quiet_for_wbtest()
-  run_storage_command(fs, fs, root, "init", ["-q"]) catch {
-    err => fail("init failed: \{err}")
+  @runtime.run_storage_command(fs, fs, "/repo-runtime-error", "clone", []) catch {
+    err => runtime_error = "\{err}"
   }
-  fs.write_string(root + "/a.txt", "hello\n")
-  run_storage_command(fs, fs, root, "add", ["a.txt"]) catch {
-    err => fail("add failed: \{err}")
-  }
-  let mut failed = false
-  run_storage_command(fs, fs, root, "commit", []) catch {
-    _ => failed = true
-  }
-  assert_true(failed)
-  restore_env_var_for_storage_runtime_wbtest(
-    "BIT_STORAGE_RUNTIME_QUIET", prev_quiet,
-  )
+  assert_true(cmd_error.length() > 0)
+  assert_eq(cmd_error, runtime_error)
 }
