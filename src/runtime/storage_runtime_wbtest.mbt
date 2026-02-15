@@ -113,22 +113,32 @@ test "storage runtime: init/add/commit/status/log on TestFs" {
     prev_committer_name,
     prev_committer_email,
   ) = setup_identity_for_storage_runtime_wbtest()
-  run_storage_command(fs, fs, root, "init", ["-q"]) catch {
+  run_storage_command(fs, fs, root, StorageCommand::Init(["-q"])) catch {
     err => fail("init failed: \{err}")
   }
   fs.write_string(root + "/a.txt", "hello\n")
-  run_storage_command(fs, fs, root, "add", ["a.txt"]) catch {
+  run_storage_command(fs, fs, root, StorageCommand::Add(["a.txt"])) catch {
     err => fail("add failed: \{err}")
   }
-  run_storage_command(fs, fs, root, "commit", ["-q", "-m", "first commit"]) catch {
+  run_storage_command(
+    fs,
+    fs,
+    root,
+    StorageCommand::Commit(["-q", "-m", "first commit"]),
+  ) catch {
     err => fail("commit failed: \{err}")
   }
   let git_dir = root + "/.git"
   assert_true(fs.is_file(git_dir + "/refs/heads/main"))
-  run_storage_command(fs, fs, root, "status", ["--porcelain"]) catch {
+  run_storage_command(
+    fs,
+    fs,
+    root,
+    StorageCommand::Status(["--porcelain"]),
+  ) catch {
     err => fail("status failed: \{err}")
   }
-  run_storage_command(fs, fs, root, "log", ["--oneline", "-1"]) catch {
+  run_storage_command(fs, fs, root, StorageCommand::Log(["--oneline", "-1"])) catch {
     err => fail("log failed: \{err}")
   }
   restore_identity_for_storage_runtime_wbtest(
@@ -144,14 +154,19 @@ test "storage runtime: hash-object -w and write-tree work on TestFs" {
   let fs = @git.TestFs::new()
   let root = "/repo-storage-runtime-objects"
   let prev_quiet = setup_storage_runtime_quiet_for_wbtest()
-  run_storage_command(fs, fs, root, "init", ["-q"]) catch {
+  run_storage_command(fs, fs, root, StorageCommand::Init(["-q"])) catch {
     err => fail("init failed: \{err}")
   }
   fs.write_string(root + "/blob.txt", "blob-data\n")
-  run_storage_command(fs, fs, root, "add", ["blob.txt"]) catch {
+  run_storage_command(fs, fs, root, StorageCommand::Add(["blob.txt"])) catch {
     err => fail("add failed: \{err}")
   }
-  run_storage_command(fs, fs, root, "hash-object", ["-w", "blob.txt"]) catch {
+  run_storage_command(
+    fs,
+    fs,
+    root,
+    StorageCommand::HashObject(["-w", "blob.txt"]),
+  ) catch {
     err => fail("hash-object failed: \{err}")
   }
   let blob_id = @git.hash_object_content(
@@ -163,7 +178,7 @@ test "storage runtime: hash-object -w and write-tree work on TestFs" {
   let rest = (try! blob_hex[2:]).to_string()
   let object_path = root + "/.git/objects/" + dir + "/" + rest
   assert_true(fs.is_file(object_path))
-  run_storage_command(fs, fs, root, "write-tree", []) catch {
+  run_storage_command(fs, fs, root, StorageCommand::WriteTree([])) catch {
     err => fail("write-tree failed: \{err}")
   }
   restore_env_var_for_storage_runtime_wbtest(
@@ -182,14 +197,19 @@ test "storage runtime: update-ref create and delete on TestFs" {
     prev_committer_name,
     prev_committer_email,
   ) = setup_identity_for_storage_runtime_wbtest()
-  run_storage_command(fs, fs, root, "init", ["-q"]) catch {
+  run_storage_command(fs, fs, root, StorageCommand::Init(["-q"])) catch {
     err => fail("init failed: \{err}")
   }
   fs.write_string(root + "/a.txt", "hello\n")
-  run_storage_command(fs, fs, root, "add", ["a.txt"]) catch {
+  run_storage_command(fs, fs, root, StorageCommand::Add(["a.txt"])) catch {
     err => fail("add failed: \{err}")
   }
-  run_storage_command(fs, fs, root, "commit", ["-q", "-m", "base"]) catch {
+  run_storage_command(
+    fs,
+    fs,
+    root,
+    StorageCommand::Commit(["-q", "-m", "base"]),
+  ) catch {
     err => fail("commit failed: \{err}")
   }
   let git_dir = root + "/.git"
@@ -200,10 +220,12 @@ test "storage runtime: update-ref create and delete on TestFs" {
       @git.ObjectId::zero()
     }
   }
-  run_storage_command(fs, fs, root, "update-ref", [
-    "refs/heads/storage",
-    head_id.to_hex(),
-  ]) catch {
+  run_storage_command(
+    fs,
+    fs,
+    root,
+    StorageCommand::UpdateRef(["refs/heads/storage", head_id.to_hex()]),
+  ) catch {
     err => fail("update-ref create failed: \{err}")
   }
   let created = storage_runtime_wbtest_trim(
@@ -212,11 +234,12 @@ test "storage runtime: update-ref create and delete on TestFs" {
     ),
   )
   assert_eq(created, head_id.to_hex())
-  run_storage_command(fs, fs, root, "update-ref", [
-    "-d",
-    "refs/heads/storage",
-    head_id.to_hex(),
-  ]) catch {
+  run_storage_command(
+    fs,
+    fs,
+    root,
+    StorageCommand::UpdateRef(["-d", "refs/heads/storage", head_id.to_hex()]),
+  ) catch {
     err => fail("update-ref delete failed: \{err}")
   }
   assert_false(fs.is_file(git_dir + "/refs/heads/storage"))
@@ -233,7 +256,13 @@ test "storage runtime: unsupported command is rejected" {
   let fs = @git.TestFs::new()
   let prev_quiet = setup_storage_runtime_quiet_for_wbtest()
   let mut failed = false
-  run_storage_command(fs, fs, "/repo-storage-runtime-unsupported", "clone", []) catch {
+  run_storage_command_by_name(
+    fs,
+    fs,
+    "/repo-storage-runtime-unsupported",
+    "clone",
+    [],
+  ) catch {
     _ => failed = true
   }
   assert_true(failed)
@@ -247,15 +276,15 @@ test "storage runtime: commit without message is rejected" {
   let fs = @git.TestFs::new()
   let root = "/repo-storage-runtime-no-message"
   let prev_quiet = setup_storage_runtime_quiet_for_wbtest()
-  run_storage_command(fs, fs, root, "init", ["-q"]) catch {
+  run_storage_command(fs, fs, root, StorageCommand::Init(["-q"])) catch {
     err => fail("init failed: \{err}")
   }
   fs.write_string(root + "/a.txt", "hello\n")
-  run_storage_command(fs, fs, root, "add", ["a.txt"]) catch {
+  run_storage_command(fs, fs, root, StorageCommand::Add(["a.txt"])) catch {
     err => fail("add failed: \{err}")
   }
   let mut failed = false
-  run_storage_command(fs, fs, root, "commit", []) catch {
+  run_storage_command(fs, fs, root, StorageCommand::Commit([])) catch {
     _ => failed = true
   }
   assert_true(failed)
@@ -275,14 +304,19 @@ test "storage runtime: status porcelain lines report unstaged and untracked" {
     prev_committer_name,
     prev_committer_email,
   ) = setup_identity_for_storage_runtime_wbtest()
-  run_storage_command(fs, fs, root, "init", ["-q"]) catch {
+  run_storage_command(fs, fs, root, StorageCommand::Init(["-q"])) catch {
     err => fail("init failed: \{err}")
   }
   fs.write_string(root + "/a.txt", "base\n")
-  run_storage_command(fs, fs, root, "add", ["a.txt"]) catch {
+  run_storage_command(fs, fs, root, StorageCommand::Add(["a.txt"])) catch {
     err => fail("add failed: \{err}")
   }
-  run_storage_command(fs, fs, root, "commit", ["-q", "-m", "base"]) catch {
+  run_storage_command(
+    fs,
+    fs,
+    root,
+    StorageCommand::Commit(["-q", "-m", "base"]),
+  ) catch {
     err => fail("commit failed: \{err}")
   }
   fs.write_string(root + "/a.txt", "changed\n")
@@ -314,14 +348,19 @@ test "storage runtime: status porcelain branch line" {
     prev_committer_name,
     prev_committer_email,
   ) = setup_identity_for_storage_runtime_wbtest()
-  run_storage_command(fs, fs, root, "init", ["-q"]) catch {
+  run_storage_command(fs, fs, root, StorageCommand::Init(["-q"])) catch {
     err => fail("init failed: \{err}")
   }
   fs.write_string(root + "/a.txt", "base\n")
-  run_storage_command(fs, fs, root, "add", ["a.txt"]) catch {
+  run_storage_command(fs, fs, root, StorageCommand::Add(["a.txt"])) catch {
     err => fail("add failed: \{err}")
   }
-  run_storage_command(fs, fs, root, "commit", ["-q", "-m", "base"]) catch {
+  run_storage_command(
+    fs,
+    fs,
+    root,
+    StorageCommand::Commit(["-q", "-m", "base"]),
+  ) catch {
     err => fail("commit failed: \{err}")
   }
   let lines = storage_status_porcelain_lines(fs, root, true) catch {
@@ -351,30 +390,35 @@ test "storage runtime: status porcelain lines report staged add modify delete" {
     prev_committer_name,
     prev_committer_email,
   ) = setup_identity_for_storage_runtime_wbtest()
-  run_storage_command(fs, fs, root, "init", ["-q"]) catch {
+  run_storage_command(fs, fs, root, StorageCommand::Init(["-q"])) catch {
     err => fail("init failed: \{err}")
   }
   fs.write_string(root + "/a.txt", "base\n")
   fs.write_string(root + "/c.txt", "remove\n")
-  run_storage_command(fs, fs, root, "add", ["a.txt", "c.txt"]) catch {
+  run_storage_command(fs, fs, root, StorageCommand::Add(["a.txt", "c.txt"])) catch {
     err => fail("add failed: \{err}")
   }
-  run_storage_command(fs, fs, root, "commit", ["-q", "-m", "base"]) catch {
+  run_storage_command(
+    fs,
+    fs,
+    root,
+    StorageCommand::Commit(["-q", "-m", "base"]),
+  ) catch {
     err => fail("commit failed: \{err}")
   }
 
   fs.write_string(root + "/a.txt", "changed\n")
-  run_storage_command(fs, fs, root, "add", ["a.txt"]) catch {
+  run_storage_command(fs, fs, root, StorageCommand::Add(["a.txt"])) catch {
     err => fail("stage modified failed: \{err}")
   }
   fs.write_string(root + "/b.txt", "new\n")
-  run_storage_command(fs, fs, root, "add", ["b.txt"]) catch {
+  run_storage_command(fs, fs, root, StorageCommand::Add(["b.txt"])) catch {
     err => fail("stage added failed: \{err}")
   }
   fs.remove_file(root + "/c.txt") catch {
     err => fail("remove file failed: \{err}")
   }
-  run_storage_command(fs, fs, root, "add", ["c.txt"]) catch {
+  run_storage_command(fs, fs, root, StorageCommand::Add(["c.txt"])) catch {
     err => fail("stage deleted failed: \{err}")
   }
 

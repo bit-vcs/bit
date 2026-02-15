@@ -342,7 +342,12 @@ fn stage_paths_with_storage_runtime(
   root : String,
   paths : Array[String],
 ) -> Unit raise @git.GitError {
-  @runtime.run_storage_command(fs, rfs, root, "add", paths) catch {
+  @runtime.run_storage_command(
+    fs,
+    rfs,
+    root,
+    @runtime.StorageCommand::Add(paths),
+  ) catch {
     err =>
       raise @git.GitError::InvalidObject(
         "rebase-ai: storage runtime add failed: \{err}",

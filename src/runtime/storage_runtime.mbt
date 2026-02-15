@@ -1,23 +1,64 @@
 ///|
+pub(all) enum StorageCommand {
+  Init(Array[String])
+  Add(Array[String])
+  Commit(Array[String])
+  Status(Array[String])
+  Log(Array[String])
+  HashObject(Array[String])
+  WriteTree(Array[String])
+  UpdateRef(Array[String])
+}
+
+///|
+pub fn parse_storage_command(
+  cmd : String,
+  args : Array[String],
+) -> StorageCommand raise Error {
+  match cmd {
+    "init" => StorageCommand::Init(args)
+    "add" => StorageCommand::Add(args)
+    "commit" => StorageCommand::Commit(args)
+    "status" => StorageCommand::Status(args)
+    "log" => StorageCommand::Log(args)
+    "hash-object" => StorageCommand::HashObject(args)
+    "write-tree" => StorageCommand::WriteTree(args)
+    "update-ref" => StorageCommand::UpdateRef(args)
+    _ =>
+      raise @git.GitError::InvalidObject("unsupported storage command: " + cmd)
+  }
+}
+
+///|
 pub fn run_storage_command(
+  fs : &@git.FileSystem,
+  rfs : &@git.RepoFileSystem,
+  root : String,
+  command : StorageCommand,
+) -> Unit raise Error {
+  match command {
+    StorageCommand::Init(args) => storage_handle_init(fs, rfs, root, args)
+    StorageCommand::Add(args) => storage_handle_add(fs, rfs, root, args)
+    StorageCommand::Commit(args) => storage_handle_commit(fs, rfs, root, args)
+    StorageCommand::Status(args) => storage_handle_status(rfs, root, args)
+    StorageCommand::Log(args) => storage_handle_log(rfs, root, args)
+    StorageCommand::HashObject(args) =>
+      storage_handle_hash_object(fs, rfs, root, args)
+    StorageCommand::WriteTree(args) => storage_handle_write_tree(fs, rfs, root, args)
+    StorageCommand::UpdateRef(args) => storage_handle_update_ref(fs, rfs, root, args)
+  }
+}
+
+///|
+pub fn run_storage_command_by_name(
   fs : &@git.FileSystem,
   rfs : &@git.RepoFileSystem,
   root : String,
   cmd : String,
   args : Array[String],
 ) -> Unit raise Error {
-  match cmd {
-    "init" => storage_handle_init(fs, rfs, root, args)
-    "add" => storage_handle_add(fs, rfs, root, args)
-    "commit" => storage_handle_commit(fs, rfs, root, args)
-    "status" => storage_handle_status(rfs, root, args)
-    "log" => storage_handle_log(rfs, root, args)
-    "hash-object" => storage_handle_hash_object(fs, rfs, root, args)
-    "write-tree" => storage_handle_write_tree(fs, rfs, root, args)
-    "update-ref" => storage_handle_update_ref(fs, rfs, root, args)
-    _ =>
-      raise @git.GitError::InvalidObject("unsupported storage command: " + cmd)
-  }
+  let command = parse_storage_command(cmd, args)
+  run_storage_command(fs, rfs, root, command)
 }
 
 ///|

@@ -6,11 +6,25 @@ import {
 }
 
 // Values
-pub fn run_storage_command(&@types.FileSystem, &@types.RepoFileSystem, String, String, Array[String]) -> Unit raise
+pub fn parse_storage_command(String, Array[String]) -> StorageCommand raise
+
+pub fn run_storage_command(&@types.FileSystem, &@types.RepoFileSystem, String, StorageCommand) -> Unit raise
+
+pub fn run_storage_command_by_name(&@types.FileSystem, &@types.RepoFileSystem, String, String, Array[String]) -> Unit raise
 
 // Errors
 
 // Types and methods
+pub(all) enum StorageCommand {
+  Init(Array[String])
+  Add(Array[String])
+  Commit(Array[String])
+  Status(Array[String])
+  Log(Array[String])
+  HashObject(Array[String])
+  WriteTree(Array[String])
+  UpdateRef(Array[String])
+}
 
 // Type aliases
 

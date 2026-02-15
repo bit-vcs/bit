@@ -100,25 +100,45 @@ async test "storage runtime cmd wrapper: delegates successful flow" {
     prev_quiet,
   ) = cmd_storage_setup_test_env()
 
-  run_storage_command(fs, fs, root_cmd, "init", ["-q"]) catch {
+  run_storage_command(fs, fs, root_cmd, @runtime.StorageCommand::Init(["-q"])) catch {
     err => fail("cmd init failed: \{err}")
   }
   fs.write_string(root_cmd + "/a.txt", "hello\n")
-  run_storage_command(fs, fs, root_cmd, "add", ["a.txt"]) catch {
+  run_storage_command(fs, fs, root_cmd, @runtime.StorageCommand::Add(["a.txt"])) catch {
     err => fail("cmd add failed: \{err}")
   }
-  run_storage_command(fs, fs, root_cmd, "commit", ["-q", "-m", "base"]) catch {
+  run_storage_command(
+    fs,
+    fs,
+    root_cmd,
+    @runtime.StorageCommand::Commit(["-q", "-m", "base"]),
+  ) catch {
     err => fail("cmd commit failed: \{err}")
   }
 
-  @runtime.run_storage_command(fs, fs, root_runtime, "init", ["-q"]) catch {
+  @runtime.run_storage_command(
+    fs,
+    fs,
+    root_runtime,
+    @runtime.StorageCommand::Init(["-q"]),
+  ) catch {
     err => fail("runtime init failed: \{err}")
   }
   fs.write_string(root_runtime + "/a.txt", "hello\n")
-  @runtime.run_storage_command(fs, fs, root_runtime, "add", ["a.txt"]) catch {
+  @runtime.run_storage_command(
+    fs,
+    fs,
+    root_runtime,
+    @runtime.StorageCommand::Add(["a.txt"]),
+  ) catch {
     err => fail("runtime add failed: \{err}")
   }
-  @runtime.run_storage_command(fs, fs, root_runtime, "commit", ["-q", "-m", "base"]) catch {
+  @runtime.run_storage_command(
+    fs,
+    fs,
+    root_runtime,
+    @runtime.StorageCommand::Commit(["-q", "-m", "base"]),
+  ) catch {
     err => fail("runtime commit failed: \{err}")
   }
 
@@ -145,10 +165,16 @@ async test "storage runtime cmd wrapper: delegates error path" {
   let fs = @git.TestFs::new()
   let mut cmd_error = ""
   let mut runtime_error = ""
-  run_storage_command(fs, fs, "/repo-cmd-error", "clone", []) catch {
+  run_storage_command_by_name(fs, fs, "/repo-cmd-error", "clone", []) catch {
     err => cmd_error = "\{err}"
   }
-  @runtime.run_storage_command(fs, fs, "/repo-runtime-error", "clone", []) catch {
+  @runtime.run_storage_command_by_name(
+    fs,
+    fs,
+    "/repo-runtime-error",
+    "clone",
+    [],
+  ) catch {
     err => runtime_error = "\{err}"
   }
   assert_true(cmd_error.length() > 0)

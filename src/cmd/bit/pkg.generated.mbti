@@ -4,6 +4,7 @@ package "mizchi/bit/cmd/bit"
 import {
   "mizchi/bit/lib",
   "mizchi/bit/object",
+  "mizchi/bit/runtime",
   "mizchi/bit/types",
 }
 
@@ -34,7 +35,9 @@ pub fn resolve_alias(Map[String, String], String, Array[String]) -> AliasResolut
 
 pub fn resolve_ref_for_subdir(OsFs, String, String) -> @object.ObjectId? raise
 
-pub async fn run_storage_command(&@types.FileSystem, &@types.RepoFileSystem, String, String, Array[String]) -> Unit
+pub async fn run_storage_command(&@types.FileSystem, &@types.RepoFileSystem, String, @runtime.StorageCommand) -> Unit
+
+pub async fn run_storage_command_by_name(&@types.FileSystem, &@types.RepoFileSystem, String, String, Array[String]) -> Unit
 
 pub fn split_alias_command(String) -> Array[String]
 
