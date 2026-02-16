@@ -21,6 +21,12 @@
 
 ## P2: Git互換の残タスク（方針未対応）
 
+- [ ] Git 互換を一度に全件化するため、`hash-object` で確立した方針を順次展開する
+  - [ ] まずコマンド別に「storage runtime で実装不十分になりやすい領域」を洗い出す（filter / autocrlf / gitattributes / pathspec など）
+  - [ ] 各コマンドで `--random` でも壊れにくいフォールバックを設計し、`real git` と `storage runtime` の振る舞い差を最小化する
+  - [ ] 方針適用ごとに既存テストを回して短時間で固定し、失敗は allowlist/full で再確認する
+  - [ ] フォールバックルールを横断的に共通化して、将来コマンド追加時の抜け漏れを抑制する
+
 - [ ] `t5540-http-push-webdav.sh`
 - [ ] `t9001-send-email.sh`
 - [ ] `--help` 移植（全サブコマンドの usage テキスト）

@@ -44,6 +44,7 @@ pub(all) struct StorageHashObjectArgs {
 ///|
 pub(all) struct StorageWriteTreeArgs {
   prefix : String?
+  missing_ok : Bool
 }
 
 ///|
@@ -979,6 +980,14 @@ fn storage_handle_hash_object(
   root : String,
   args : StorageHashObjectArgs,
 ) -> Unit raise Error {
+  let cwd = match @sys.get_env_var("GIT_SHIM_PWD") {
+    Some(path) => path
+    None =>
+      match @env.current_dir() {
+        Some(path) => path
+        None => root
+      }
+  }
   let git_dir = if args.write_object {
     storage_resolve_git_dir(rfs, root)
   } else {
@@ -1003,7 +1012,11 @@ fn storage_handle_hash_object(
     return
   }
   for path in args.paths {
-    let abs = if path.has_prefix("/") { path } else { root + "/" + path }
+    let abs = if path.has_prefix("/") {
+      storage_normalize_path(path)
+    } else {
+      storage_normalize_path(cwd + "/" + path)
+    }
     let content = rfs.read_file(abs)
     let id = @git.hash_object_content(args.obj_type, content)
     if args.write_object {
@@ -1043,9 +1056,11 @@ fn storage_handle_write_tree(
   let entries = @gitlib.read_index_entries(rfs, git_dir)
   let tree_id = @gitlib.write_tree_from_index(
     fs,
+    rfs,
     git_dir,
     entries,
     prefix=args.prefix,
+    missing_ok=args.missing_ok,
   )
   storage_print_line(tree_id.to_hex())
 }

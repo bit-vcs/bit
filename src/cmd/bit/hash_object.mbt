@@ -2,13 +2,91 @@
 fn hash_object_storage_runtime_delegate_args(
   args : Array[String],
 ) -> @runtime.StorageHashObjectArgs? {
+  if hash_object_need_real_git(args) {
+    return None
+  }
   let parsed = storage_runtime_parse_command("hash-object", args) catch {
     _ => return None
   }
   match parsed {
-    @runtime.StorageCommand::HashObject(hash_args) => Some(hash_args)
+    @runtime.StorageCommand::HashObject(hash_args) =>
+      if hash_args.stdin_mode || hash_args.obj_type != @git.ObjectType::Blob {
+        None
+      } else {
+        Some(hash_args)
+      }
     _ => None
   }
+}
+
+///|
+fn hash_object_need_real_git(_args : Array[String]) -> Bool {
+  let root = get_work_root()
+  if hash_object_need_real_git_for_filtering(root) {
+    return true
+  }
+  false
+}
+
+///|
+fn hash_object_need_real_git_for_filtering(root : String) -> Bool {
+  hash_object_need_real_git_for_autocrlf(root) ||
+  hash_object_need_real_git_for_gitattributes(root)
+}
+
+///|
+fn hash_object_need_real_git_for_autocrlf(root : String) -> Bool {
+  let fs = OsFs::new()
+  let git_dir = resolve_git_dir(fs, root)
+  match @gitlib.read_config_value(fs, git_dir + "/config", "core", "autocrlf") {
+    Some(value) =>
+      match @gitlib.config_strip_quotes(value).to_lower() {
+        "true" => true
+        "input" => true
+        "false" => false
+        _ => true
+      }
+    None => false
+  }
+}
+
+///|
+fn hash_object_need_real_git_for_gitattributes(root : String) -> Bool {
+  let fs = OsFs::new()
+  let attr_path = root + "/.gitattributes"
+  if not(fs.is_file(attr_path)) {
+    return false
+  }
+  let content = decode_bytes(
+    fs.read_file(attr_path) catch {
+      _ => Bytes::default()
+    },
+  )
+  for line_view in content.split("\n") {
+    let line = trim_string(line_view.to_string())
+    if line.length() == 0 || line.has_prefix("#") {
+      continue
+    }
+    for token_view in line.split(" ") {
+      let token = trim_string(token_view.to_string())
+      if token.length() == 0 {
+        continue
+      }
+      if token == "crlf" ||
+        token == "-crlf" ||
+        token == "text" ||
+        token == "-text" ||
+        token == "eol" ||
+        token == "filter" ||
+        token.has_prefix("eol=") ||
+        token.has_prefix("text=") ||
+        token.has_prefix("filter=") ||
+        token.has_prefix("working-tree-encoding=") {
+        return true
+      }
+    }
+  }
+  false
 }
 
 ///|
@@ -17,12 +95,42 @@ fn hash_object_should_use_storage_runtime(args : Array[String]) -> Bool {
 }
 
 ///|
+fn hash_object_real_git_binary() -> String {
+  match @sys.get_env_var("SHIM_REAL_GIT") {
+    Some(path) if path.length() > 0 => path
+    _ =>
+      match @sys.get_env_var("GIT_SHIM_REAL_GIT") {
+        Some(path) if path.length() > 0 => path
+        _ => "git"
+      }
+  }
+}
+
+///|
+async fn hash_object_run_real_git(args : Array[String]) -> Unit raise Error {
+  let real_args : Array[String] = ["hash-object"]
+  for arg in args {
+    real_args.push(arg)
+  }
+  let real_git = hash_object_real_git_binary()
+  let code = @process.run(real_git, real_args, inherit_env=true) catch {
+    err => {
+      eprint_line(err.to_string())
+      1
+    }
+  }
+  if code != 0 {
+    @sys.exit(code)
+  }
+}
+
+///|
 async fn handle_hash_object(args : Array[String]) -> Unit raise Error {
-  let root = get_work_root()
-  let fs = OsFs::new()
   if hash_object_should_use_storage_runtime(args) {
     match hash_object_storage_runtime_delegate_args(args) {
       Some(hash_args) => {
+        let root = get_work_root()
+        let fs = OsFs::new()
         @runtime.run_storage_command(
           fs,
           fs,
@@ -34,113 +142,5 @@ async fn handle_hash_object(args : Array[String]) -> Unit raise Error {
       None => ()
     }
   }
-  let mut write_object = false
-  let mut stdin_mode = false
-  let mut obj_type = "blob"
-  let paths : Array[String] = []
-  for arg in args {
-    match arg {
-      "-w" => write_object = true
-      "--stdin" => stdin_mode = true
-      "--literally" => ()
-      "-t" => () // next arg is type, handled below
-      _ if arg.has_prefix("-t") =>
-        obj_type = String::unsafe_substring(arg, start=2, end=arg.length())
-      _ if not(arg.has_prefix("-")) => paths.push(arg)
-      _ if arg.has_prefix("-") => warn_unimplemented_arg("hash-object", arg)
-      _ => ()
-    }
-  }
-  // Handle -t <type> pattern
-  let mut i = 0
-  while i < args.length() {
-    if args[i] == "-t" && i + 1 < args.length() {
-      obj_type = args[i + 1]
-    }
-    i += 1
-  }
-  let git_dir = if write_object {
-    resolve_git_dir(fs, root)
-  } else {
-    root + "/.git"
-  }
-  let compat_object_format = read_hash_object_compat_object_format(fs, git_dir)
-  if hash_object_requires_standalone_error(write_object, compat_object_format) {
-    eprint_line(
-      "fatal: hash-object -w with compatObjectFormat=sha256 is not supported in standalone mode",
-    )
-    @sys.exit(1)
-  }
-  if stdin_mode {
-    let content = read_all_stdin()
-    let id = @git.hash_object_content(parse_object_type(obj_type), content)
-    if write_object {
-      let _ = @gitlib.write_loose_object(
-        fs,
-        git_dir,
-        parse_object_type(obj_type),
-        content,
-      )
-    }
-    print_line(id.to_hex())
-    return ()
-  }
-  for path in paths {
-    let abs = if path.has_prefix("/") { path } else { root + "/" + path }
-    let content = fs.read_file(abs)
-    let id = @git.hash_object_content(parse_object_type(obj_type), content)
-    if write_object {
-      let _ = @gitlib.write_loose_object(
-        fs,
-        git_dir,
-        parse_object_type(obj_type),
-        content,
-      )
-    }
-    print_line(id.to_hex())
-  }
+  ignore(hash_object_run_real_git(args))
 }
-
-///|
-fn read_hash_object_compat_object_format(
-  fs : OsFs,
-  git_dir : String,
-) -> String? {
-  let overrides = @gitlib.parse_config_overrides()
-  match overrides.get("extensions.compatobjectformat") {
-    Some(value) => Some(value)
-    None => {
-      let config_path = git_dir + "/config"
-      @gitlib.read_config_value(
-        fs, config_path, "extensions", "compatobjectformat",
-      )
-    }
-  }
-}
-
-///|
-fn hash_object_requires_standalone_error(
-  write_object : Bool,
-  compat_object_format : String?,
-) -> Bool {
-  if not(write_object) {
-    return false
-  }
-  match compat_object_format {
-    Some(format) => @gitlib.config_strip_quotes(format).to_lower() == "sha256"
-    None => false
-  }
-}
-
-///|
-fn parse_object_type(s : String) -> @git.ObjectType raise Error {
-  match s {
-    "blob" => @git.ObjectType::Blob
-    "tree" => @git.ObjectType::Tree
-    "commit" => @git.ObjectType::Commit
-    "tag" => @git.ObjectType::Tag
-    _ => raise @git.GitError::InvalidObject("invalid object type \"" + s + "\"")
-  }
-}
-
-///|
