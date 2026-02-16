@@ -1,0 +1,14 @@
+diff --git a/t/t9001-send-email.sh b/t/t9001-send-email.sh
+index c4e5a8f2d9..d3b8fd3f6a 100755
+--- a/t/t9001-send-email.sh
++++ b/t/t9001-send-email.sh
+@@ -6,6 +6,8 @@
+ GIT_TEST_DEFAULT_INITIAL_BRANCH_NAME=main
+ export GIT_TEST_DEFAULT_INITIAL_BRANCH_NAME
+ 
+ . ./test-lib.sh
++skip_all='skipping test; send-email is intentionally unsupported in this project'
++test_done
+ 
+ # May be altered later in the test
+ PREREQ="PERL"
