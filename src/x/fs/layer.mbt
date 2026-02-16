@@ -80,7 +80,7 @@ pub fn Fs::flatten_layers(
   }
   for item in self.working.deleted.to_array() {
     let (path, _) = item
-    delete_from_tree(root, path)
+    delete_from_tree(Some(db), rfs, root, path)
   }
   for item in self.working.files.to_array() {
     let (path, content) = item
@@ -90,7 +90,7 @@ pub fn Fs::flatten_layers(
       @git.ObjectType::Blob,
       content,
     )
-    insert_into_tree(root, path, blob_id, 0o100644)
+    insert_into_tree(Some(db), rfs, root, path, blob_id, 0o100644)
   }
   write_tree_recursive(backing_fs, self.git_dir, root)
 }

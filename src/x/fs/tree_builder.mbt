@@ -5,16 +5,45 @@ priv struct TreeNode {
   blob_id : @git.ObjectId?
   mode : Int
   children : Map[String, TreeNode]
+  base_tree_id : @git.ObjectId?
+  mut loaded : Bool
+  mut dirty : Bool
 }
 
 ///|
 fn TreeNode::new_file(id : @git.ObjectId, mode : Int) -> TreeNode {
-  { blob_id: Some(id), mode, children: {} }
+  {
+    blob_id: Some(id),
+    mode,
+    children: {},
+    base_tree_id: None,
+    loaded: true,
+    dirty: false,
+  }
 }
 
 ///|
 fn TreeNode::new_dir() -> TreeNode {
-  { blob_id: None, mode: 0o040000, children: {} }
+  {
+    blob_id: None,
+    mode: 0o040000,
+    children: {},
+    base_tree_id: None,
+    loaded: true,
+    dirty: false,
+  }
+}
+
+///|
+fn TreeNode::new_base_dir(id : @git.ObjectId) -> TreeNode {
+  {
+    blob_id: None,
+    mode: 0o040000,
+    children: {},
+    base_tree_id: Some(id),
+    loaded: false,
+    dirty: false,
+  }
 }
 
 ///|
@@ -25,10 +54,17 @@ pub fn build_tree_from_working(
   base_tree : @git.ObjectId,
   working : WorkingLayer,
 ) -> @git.ObjectId raise @git.GitError {
-  let root = load_tree_structure(rfs, git_dir, base_tree)
+  let (root, db) = if base_tree == @git.ObjectId::zero() {
+    (TreeNode::new_dir(), None)
+  } else {
+    (
+      TreeNode::new_base_dir(base_tree),
+      Some(@lib.ObjectDb::load_lazy(rfs, git_dir)),
+    )
+  }
   for item in working.deleted.to_array() {
     let (path, _) = item
-    delete_from_tree(root, path)
+    delete_from_tree(db, rfs, root, path)
   }
   for item in working.files.to_array() {
     let (path, content) = item
@@ -38,9 +74,52 @@ pub fn build_tree_from_working(
       @git.ObjectType::Blob,
       content,
     )
-    insert_into_tree(root, path, blob_id, 0o100644)
+    insert_into_tree(db, rfs, root, path, blob_id, 0o100644)
   }
   write_tree_recursive(backing_fs, git_dir, root)
+}
+
+///|
+fn ensure_dir_loaded(
+  db_opt : @lib.ObjectDb?,
+  rfs : &@git.RepoFileSystem,
+  node : TreeNode,
+) -> Unit raise @git.GitError {
+  guard node.blob_id is None else { return }
+  if node.loaded {
+    return
+  }
+  let tree_id = match node.base_tree_id {
+    Some(id) => id
+    None => {
+      node.loaded = true
+      return
+    }
+  }
+  let db = match db_opt {
+    Some(v) => v
+    None =>
+      raise @git.GitError::InvalidObject(
+        "Tree load requested without object database: \{tree_id}",
+      )
+  }
+  let obj = db.get(rfs, tree_id)
+  guard obj is Some(o) else {
+    raise @git.GitError::InvalidObject("Tree not found: \{tree_id}")
+  }
+  if o.obj_type != @git.ObjectType::Tree {
+    raise @git.GitError::InvalidObject("Not a tree: \{tree_id}")
+  }
+  let entries = @git.parse_tree(o.data)
+  for entry in entries {
+    if is_tree_mode(entry.mode) {
+      node.children[entry.name] = TreeNode::new_base_dir(entry.id)
+    } else {
+      let mode = parse_octal(entry.mode)
+      node.children[entry.name] = TreeNode::new_file(entry.id, mode)
+    }
+  }
+  node.loaded = true
 }
 
 ///|
@@ -86,27 +165,49 @@ fn load_tree_recursive(
 }
 
 ///|
-fn delete_from_tree(root : TreeNode, path : String) -> Unit {
+fn delete_from_tree(
+  db_opt : @lib.ObjectDb?,
+  rfs : &@git.RepoFileSystem,
+  root : TreeNode,
+  path : String,
+) -> Unit raise @git.GitError {
   let parts = split_path(path)
   guard parts.length() > 0 else { return }
-  let _ = delete_recursive(root, parts, 0)
+  let _ = delete_recursive(db_opt, rfs, root, parts, 0)
 }
 
 ///|
-fn delete_recursive(node : TreeNode, parts : Array[String], idx : Int) -> Bool {
+fn delete_recursive(
+  db_opt : @lib.ObjectDb?,
+  rfs : &@git.RepoFileSystem,
+  node : TreeNode,
+  parts : Array[String],
+  idx : Int,
+) -> Bool raise @git.GitError {
   if idx >= parts.length() {
     return false
   }
+  ensure_dir_loaded(db_opt, rfs, node)
   let name = parts[idx]
   if idx == parts.length() - 1 {
-    node.children.remove(name)
-    return true
+    if node.children.contains(name) {
+      node.children.remove(name)
+      node.dirty = true
+      return true
+    }
+    return false
   }
   match node.children.get(name) {
     Some(child) => {
-      let deleted = delete_recursive(child, parts, idx + 1)
-      if deleted && child.children.length() == 0 && child.blob_id is None {
-        node.children.remove(name)
+      if child.blob_id is Some(_) {
+        return false
+      }
+      let deleted = delete_recursive(db_opt, rfs, child, parts, idx + 1)
+      if deleted {
+        if child.children.length() == 0 {
+          node.children.remove(name)
+        }
+        node.dirty = true
       }
       deleted
     }
@@ -116,26 +217,45 @@ fn delete_recursive(node : TreeNode, parts : Array[String], idx : Int) -> Bool {
 
 ///|
 fn insert_into_tree(
+  db_opt : @lib.ObjectDb?,
+  rfs : &@git.RepoFileSystem,
   root : TreeNode,
   path : String,
   blob_id : @git.ObjectId,
   mode : Int,
-) -> Unit {
+) -> Unit raise @git.GitError {
   let parts = split_path(path)
   guard parts.length() > 0 else { return }
+  ensure_dir_loaded(db_opt, rfs, root)
+  root.dirty = true
   let mut current = root
   for i = 0; i < parts.length() - 1; i = i + 1 {
+    ensure_dir_loaded(db_opt, rfs, current)
     let name = parts[i]
     if current.children.get(name) is Some(child) {
-      current = child
+      if child.blob_id is Some(_) {
+        let dir = TreeNode::new_dir()
+        dir.dirty = true
+        current.children[name] = dir
+        current.dirty = true
+        current = dir
+      } else {
+        ensure_dir_loaded(db_opt, rfs, child)
+        child.dirty = true
+        current = child
+      }
     } else {
       let child = TreeNode::new_dir()
+      child.dirty = true
       current.children[name] = child
+      current.dirty = true
       current = child
     }
   }
+  ensure_dir_loaded(db_opt, rfs, current)
   let file_name = parts[parts.length() - 1]
   current.children[file_name] = TreeNode::new_file(blob_id, mode)
+  current.dirty = true
 }
 
 ///|
@@ -144,6 +264,11 @@ fn write_tree_recursive(
   git_dir : String,
   node : TreeNode,
 ) -> @git.ObjectId raise @git.GitError {
+  if not(node.dirty) {
+    if node.base_tree_id is Some(base_tree_id) {
+      return base_tree_id
+    }
+  }
   let entries : Array[@git.TreeEntry] = []
   for item in node.children.to_array() {
     let (name, child) = item
@@ -162,7 +287,9 @@ fn write_tree_recursive(
     compare_strings(a_key, b_key)
   })
   let (tree_id, compressed) = @git.create_tree(entries)
-  @lib.write_object_bytes(fs, git_dir, tree_id, compressed)
+  if node.base_tree_id != Some(tree_id) {
+    @lib.write_object_bytes(fs, git_dir, tree_id, compressed)
+  }
   tree_id
 }
 

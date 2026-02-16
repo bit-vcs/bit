@@ -1,5 +1,109 @@
 ///|
 /// Fs whitebox tests
+priv struct CountingFs {
+  fs : @git.TestFs
+  read_counts : Map[String, Int]
+  write_counts : Map[String, Int]
+}
+
+///|
+fn CountingFs::new(fs : @git.TestFs) -> CountingFs {
+  { fs, read_counts: {}, write_counts: {} }
+}
+
+///|
+fn CountingFs::clear_counts(self : CountingFs) -> Unit {
+  self.read_counts.clear()
+  self.write_counts.clear()
+}
+
+///|
+fn CountingFs::read_count(self : CountingFs, path : String) -> Int {
+  match self.read_counts.get(path) {
+    Some(n) => n
+    None => 0
+  }
+}
+
+///|
+fn CountingFs::write_count(self : CountingFs, path : String) -> Int {
+  match self.write_counts.get(path) {
+    Some(n) => n
+    None => 0
+  }
+}
+
+///|
+fn loose_object_path(git_dir : String, id : @git.ObjectId) -> String {
+  let hex = id.to_hex()
+  git_dir +
+  "/objects/" +
+  String::unsafe_substring(hex, start=0, end=2) +
+  "/" +
+  String::unsafe_substring(hex, start=2, end=hex.length())
+}
+
+///|
+impl @git.RepoFileSystem for CountingFs with read_file(self, path) {
+  let count = match self.read_counts.get(path) {
+    Some(n) => n
+    None => 0
+  }
+  self.read_counts[path] = count + 1
+  self.fs.read_file(path)
+}
+
+///|
+impl @git.RepoFileSystem for CountingFs with readdir(self, path) {
+  self.fs.readdir(path)
+}
+
+///|
+impl @git.RepoFileSystem for CountingFs with is_dir(self, path) {
+  self.fs.is_dir(path)
+}
+
+///|
+impl @git.RepoFileSystem for CountingFs with is_file(self, path) {
+  self.fs.is_file(path)
+}
+
+///|
+impl @git.FileSystem for CountingFs with mkdir_p(self, path) {
+  self.fs.mkdir_p(path)
+}
+
+///|
+impl @git.FileSystem for CountingFs with write_file(self, path, data) {
+  let count = match self.write_counts.get(path) {
+    Some(n) => n
+    None => 0
+  }
+  self.write_counts[path] = count + 1
+  self.fs.write_file(path, data)
+}
+
+///|
+impl @git.FileSystem for CountingFs with write_string(self, path, s) {
+  let count = match self.write_counts.get(path) {
+    Some(n) => n
+    None => 0
+  }
+  self.write_counts[path] = count + 1
+  self.fs.write_string(path, s)
+}
+
+///|
+impl @git.FileSystem for CountingFs with remove_file(self, path) {
+  self.fs.remove_file(path)
+}
+
+///|
+impl @git.FileSystem for CountingFs with remove_dir(self, path) {
+  self.fs.remove_dir(path)
+}
+
+///|
 test "path: normalize_path removes leading and trailing slashes" {
   assert_eq(normalize_path("/foo/bar/"), "foo/bar")
   assert_eq(normalize_path("./foo"), "foo")
@@ -122,4 +226,37 @@ test "read_ops: sibling path cache is warmed on first lookup" {
   let _ = bitfs.read_file(fs, "a.txt")
   assert_true(bitfs.cache.get_path("a.txt") is Some(Some(_)))
   assert_true(bitfs.cache.get_path("b.txt") is Some(Some(_)))
+}
+
+///|
+test "snapshot: untouched subtree objects are not loaded or rewritten" {
+  let cfs = CountingFs::new(@git.TestFs::new())
+  @lib.init_repo(cfs, "/repo")
+
+  let seed = Fs::empty("/repo/.git")
+  seed.write_file("hot/a.txt", b"v1")
+  seed.write_file("cold/x.txt", b"x1")
+  seed.write_file("cold/y.txt", b"y1")
+  let base = seed.snapshot(cfs, cfs, "seed", "Bench <bench@example.com>", 1000L)
+
+  let db = @lib.ObjectDb::load_lazy(cfs, "/repo/.git")
+  let base_tree_obj = db.get(cfs, base.tree_id)
+  assert_true(base_tree_obj is Some(_))
+  let root_entries = @git.parse_tree(base_tree_obj.unwrap().data)
+  let mut cold_tree_id = @git.ObjectId::zero()
+  for entry in root_entries {
+    if entry.name == "cold" {
+      cold_tree_id = entry.id
+    }
+  }
+  assert_true(cold_tree_id != @git.ObjectId::zero())
+  let cold_tree_path = loose_object_path("/repo/.git", cold_tree_id)
+
+  let bitfs = Fs::from_commit(cfs, "/repo/.git", base.commit_id)
+  cfs.clear_counts()
+  bitfs.write_file("hot/a.txt", b"v2")
+  let _ = bitfs.snapshot(cfs, cfs, "edit", "Bench <bench@example.com>", 1001L)
+
+  assert_eq(cfs.read_count(cold_tree_path), 0)
+  assert_eq(cfs.write_count(cold_tree_path), 0)
 }

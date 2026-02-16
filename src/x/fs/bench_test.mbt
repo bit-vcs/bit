@@ -118,6 +118,11 @@ let bench_repo_100 : (@git.TestFs, @git.ObjectId) = try! setup_repo_with_files(
 )
 
 ///|
+let bench_repo_500 : (@git.TestFs, @git.ObjectId) = try! setup_repo_with_files(
+  500,
+)
+
+///|
 test "bench bitfs read 100 files (cold)" (b : @bench.T) {
   let (fs, commit) = bench_repo_100
   b.bench(fn() {
@@ -167,6 +172,17 @@ test "bench bitfs snapshot 500 files" (b : @bench.T) {
       bitfs.write_file("file\{i}.txt", content)
     }
     b.keep(try! bitfs.snapshot(fs, fs, "test", "Author <a@b.com>", 1700000000L))
+  })
+}
+
+///|
+test "bench bitfs snapshot incremental 1/500 files" (b : @bench.T) {
+  let (fs, commit) = bench_repo_500
+  let content = Bytes::make(100, b'b')
+  b.bench(fn() {
+    let bitfs = try! Fs::from_commit(fs, "/repo/.git", commit)
+    bitfs.write_file("file250.txt", content)
+    b.keep(try! bitfs.snapshot(fs, fs, "test", "Author <a@b.com>", 1700000001L))
   })
 }
 
