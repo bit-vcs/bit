@@ -2,11 +2,14 @@ import {
   "mizchi/bit" @git,
   "mizchi/bit/lib" @lib,
   "moonbitlang/core/buffer" @buffer,
+  "moonbitlang/core/encoding/utf8" @utf8,
 }
 
 import {
   "moonbitlang/core/bench" @bench,
   "mizchi/bit/x/fs" @fs,
+  "mizchi/bit/osfs" @osfs,
+  "moonbitlang/x/fs" @nfs,
 } for "test"
 
 warnings = "-29"

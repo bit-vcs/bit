@@ -164,13 +164,11 @@ pub fn SerializedSnapshot::to_bytes(self : SerializedSnapshot) -> Bytes {
 }
 
 ///|
-/// Write ASCII string as length-prefixed bytes (1 byte per char, compatible with read_string)
+/// Write UTF-8 string as length-prefixed bytes.
 fn buf_write_ascii_string(buf : @buffer.Buffer, s : String) -> Unit {
-  let chars = s.to_array()
-  buf.write_int_le(chars.length())
-  for c in chars {
-    buf.write_byte(c.to_int().to_byte())
-  }
+  let bytes = @utf8.encode(s)
+  buf.write_int_le(bytes.length())
+  buf.write_bytes(bytes)
 }
 
 ///|
@@ -237,11 +235,8 @@ fn read_i64_le(data : Bytes, pos : Int) -> Int64 {
 ///|
 fn read_string(data : Bytes, pos : Int) -> (String, Int) {
   let len = read_u32_le(data, pos)
-  let chars : Array[Char] = []
-  for i in 0..<len {
-    chars.push(data[pos + 4 + i].to_int().unsafe_to_char())
-  }
-  (String::from_array(chars), pos + 4 + len)
+  let view = data[pos + 4:pos + 4 + len]
+  (@utf8.decode_lossy(view), pos + 4 + len)
 }
 
 ///|
