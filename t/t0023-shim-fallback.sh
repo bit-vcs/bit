@@ -1,0 +1,54 @@
+#!/bin/sh
+#
+# Test git-shim fallback logic for unsupported commands.
+
+. "$(dirname "$0")/test-lib.sh"
+
+test_description="git-shim fallback to alternate real git for unsupported subcommands"
+
+shim="$BIT_BUILD_DIR/tools/git-shim/bin/git"
+
+setup_stubs() {
+cat >primary-git <<'EOF'
+#!/bin/sh
+if [ "$1" = "help" ] && [ "$2" = "send-email" ]; then
+  echo "git: 'send-email' is not a git command." >&2
+  exit 1
+fi
+echo "primary:$*" >> "$SHIM_TEST_TRACE"
+exit 0
+EOF
+chmod +x primary-git
+
+cat >fallback-git <<'EOF'
+#!/bin/sh
+echo "fallback:$*" >> "$SHIM_TEST_TRACE"
+exit 0
+EOF
+chmod +x fallback-git
+}
+
+test_expect_success 'fallback is used when primary git does not support subcommand' '
+  test_path_is_file "$shim" &&
+  setup_stubs &&
+  : >trace &&
+  SHIM_TEST_TRACE="$PWD/trace" \
+  SHIM_REAL_GIT="$PWD/primary-git" \
+  SHIM_REAL_GIT_FALLBACK="$PWD/fallback-git" \
+  "$shim" send-email --from=ci@example.com &&
+  grep -q "^fallback:send-email --from=ci@example.com$" trace &&
+  ! grep -q "^primary:send-email " trace
+'
+
+test_expect_success 'no fallback when primary git supports subcommand' '
+  setup_stubs &&
+  : >trace &&
+  SHIM_TEST_TRACE="$PWD/trace" \
+  SHIM_REAL_GIT="$PWD/primary-git" \
+  SHIM_REAL_GIT_FALLBACK="$PWD/fallback-git" \
+  "$shim" status &&
+  grep -q "^primary:status$" trace &&
+  ! grep -q "^fallback:" trace
+'
+
+test_done

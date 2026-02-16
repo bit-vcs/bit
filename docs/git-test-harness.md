@@ -27,17 +27,26 @@ Run allowlist with shim in **strict** mode (fails selected subcommands):
 just git-t-allowlist-shim-strict
 ```
 
+Run allowlist with **random routing** (per command invocation, probabilistic bit vs real git):
+
+```
+SHIM_RANDOM_RATIO=50 just git-t-allowlist-shim-random
+```
+
 ## Environment Variables (git-shim)
 
 The upstream test harness unsets `GIT_*` variables, so prefer `SHIM_*` when
 running via `make test`:
 
 - `SHIM_REAL_GIT` (or `GIT_SHIM_REAL_GIT`): absolute path to system git (required)
+- `SHIM_REAL_GIT_FALLBACK` (or `GIT_SHIM_REAL_GIT_FALLBACK`): optional absolute path to an alternate git binary used when `SHIM_REAL_GIT` does not provide `git help <subcommand>`
 - `SHIM_EXEC_PATH` (or `GIT_SHIM_EXEC_PATH`): exec-path for dashed commands (optional)
 - `SHIM_CMDS` (or `GIT_SHIM_CMDS`): space-separated subcommands to intercept (e.g. `pack-objects index-pack`)
 - `SHIM_STRICT=1` (or `GIT_SHIM_STRICT=1`): fail intercepted subcommands
 - `SHIM_MOON` (or `GIT_SHIM_MOON`): command to execute instead of system git for intercepted subcommands
 - `SHIM_LOG` (or `GIT_SHIM_LOG`): optional log file for shim decisions
+- `SHIM_RANDOM_MODE=1` (or `GIT_SHIM_RANDOM_MODE=1`): enable random routing for intercepted subcommands (disabled in strict mode)
+- `SHIM_RANDOM_RATIO` (or `GIT_SHIM_RANDOM_RATIO`): integer `0..100`; probability (%) of routing intercepted commands to `SHIM_MOON` (`0` = always real git, `100` = always bit)
 - `tools/git-shim/real-git-path` should contain an absolute path to a real `git`
   binary (not the shim), or the shim will refuse to run to avoid recursion.
 

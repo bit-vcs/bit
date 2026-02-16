@@ -135,13 +135,18 @@ git-t-allowlist-shim: build
     real_git="$(pwd)/third_party/git/git"; \
     if [ -x "$real_git" ]; then \
       exec_path="$(pwd)/third_party/git"; \
+      fallback_real_git="$(/usr/bin/which git)"; \
+      if [ "$fallback_real_git" = "$real_git" ]; then \
+        fallback_real_git=""; \
+      fi; \
     else \
       real_git=$(/usr/bin/which git); \
       exec_path=$($real_git --exec-path); \
+      fallback_real_git=""; \
     fi; \
     shim_dir="$(pwd)/tools/git-shim/bin"; \
     echo "$real_git" > tools/git-shim/real-git-path; \
-    SHIM_REAL_GIT="$real_git" SHIM_EXEC_PATH="$exec_path" \
+    SHIM_REAL_GIT="$real_git" SHIM_REAL_GIT_FALLBACK="$fallback_real_git" SHIM_EXEC_PATH="$exec_path" \
     SHIM_MOON="$(pwd)/tools/git-shim/moon" SHIM_CMDS="receive-pack" \
     GIT_TEST_INSTALLED="$shim_dir" GIT_TEST_EXEC_PATH="$exec_path" \
     GIT_TEST_DEFAULT_HASH=sha1 \
@@ -155,15 +160,49 @@ git-t-allowlist-shim-strict: build
     real_git="$(pwd)/third_party/git/git"; \
     if [ -x "$real_git" ]; then \
       exec_path="$(pwd)/third_party/git"; \
+      fallback_real_git="$(/usr/bin/which git)"; \
+      if [ "$fallback_real_git" = "$real_git" ]; then \
+        fallback_real_git=""; \
+      fi; \
     else \
       real_git=$(/usr/bin/which git); \
       exec_path=$($real_git --exec-path); \
+      fallback_real_git=""; \
     fi; \
     shim_dir="$(pwd)/tools/git-shim/bin"; \
     echo "$real_git" > tools/git-shim/real-git-path; \
-    SHIM_REAL_GIT="$real_git" SHIM_EXEC_PATH="$exec_path" \
+    SHIM_REAL_GIT="$real_git" SHIM_REAL_GIT_FALLBACK="$fallback_real_git" SHIM_EXEC_PATH="$exec_path" \
     SHIM_MOON="$(pwd)/tools/git-shim/moon" \
     SHIM_CMDS="receive-pack upload-pack pack-objects index-pack shell" SHIM_STRICT=1 \
+    GIT_TEST_INSTALLED="$shim_dir" GIT_TEST_EXEC_PATH="$exec_path" \
+    GIT_TEST_DEFAULT_HASH=sha1 \
+    CPATH="$prefix/include" LDFLAGS="-L$prefix/lib" LIBRARY_PATH="$prefix/lib" \
+    tools/run-git-test.sh T="$(rg -v '^[[:space:]]*#' tools/git-test-allowlist.txt | rg -v '^[[:space:]]*$' | tr '\n' ' ')"
+
+# Run allowlist with random bit/real-git routing for intercepted subcommands.
+# Usage: SHIM_RANDOM_RATIO=30 just git-t-allowlist-shim-random
+git-t-allowlist-shim-random: build
+    @tools/apply-git-test-patches.sh
+    @prefix=$(brew --prefix gettext); \
+    real_git="$(pwd)/third_party/git/git"; \
+    if [ -x "$real_git" ]; then \
+      exec_path="$(pwd)/third_party/git"; \
+      fallback_real_git="$(/usr/bin/which git)"; \
+      if [ "$fallback_real_git" = "$real_git" ]; then \
+        fallback_real_git=""; \
+      fi; \
+    else \
+      real_git=$(/usr/bin/which git); \
+      exec_path=$($real_git --exec-path); \
+      fallback_real_git=""; \
+    fi; \
+    shim_dir="$(pwd)/tools/git-shim/bin"; \
+    shim_cmds="init status add commit log show branch checkout switch reset rebase stash cherry-pick diff diff-files diff-index merge tag rm mv config sparse-checkout rev-parse cat-file ls-files hash-object ls-tree write-tree show-ref update-ref symbolic-ref reflog worktree gc clean grep submodule revert notes bisect describe blame format-patch shortlog remote clone fetch pull push receive-pack upload-pack pack-objects index-pack shell"; \
+    ratio="${SHIM_RANDOM_RATIO:-50}"; \
+    echo "$real_git" > tools/git-shim/real-git-path; \
+    SHIM_REAL_GIT="$real_git" SHIM_REAL_GIT_FALLBACK="$fallback_real_git" SHIM_EXEC_PATH="$exec_path" \
+    SHIM_MOON="$(pwd)/tools/git-shim/moon" SHIM_CMDS="$shim_cmds" \
+    SHIM_RANDOM_MODE=1 SHIM_RANDOM_RATIO="$ratio" \
     GIT_TEST_INSTALLED="$shim_dir" GIT_TEST_EXEC_PATH="$exec_path" \
     GIT_TEST_DEFAULT_HASH=sha1 \
     CPATH="$prefix/include" LDFLAGS="-L$prefix/lib" LIBRARY_PATH="$prefix/lib" \
@@ -180,13 +219,18 @@ git-t-one test_file: build
     real_git="$(pwd)/third_party/git/git"; \
     if [ -x "$real_git" ]; then \
       exec_path="$(pwd)/third_party/git"; \
+      fallback_real_git="$(/usr/bin/which git)"; \
+      if [ "$fallback_real_git" = "$real_git" ]; then \
+        fallback_real_git=""; \
+      fi; \
     else \
       real_git=$(/usr/bin/which git); \
       exec_path=$($real_git --exec-path); \
+      fallback_real_git=""; \
     fi; \
     shim_dir="$(pwd)/tools/git-shim/bin"; \
     echo "$real_git" > tools/git-shim/real-git-path; \
-    SHIM_REAL_GIT="$real_git" SHIM_EXEC_PATH="$exec_path" \
+    SHIM_REAL_GIT="$real_git" SHIM_REAL_GIT_FALLBACK="$fallback_real_git" SHIM_EXEC_PATH="$exec_path" \
     SHIM_MOON="$(pwd)/tools/git-shim/moon" \
     SHIM_CMDS="receive-pack upload-pack pack-objects index-pack shell" SHIM_STRICT=1 \
     GIT_TEST_INSTALLED="$shim_dir" GIT_TEST_EXEC_PATH="$exec_path" \
@@ -201,13 +245,18 @@ git-t-one-no-real-git test_file: build
     real_git="$(pwd)/third_party/git/git"; \
     if [ -x "$real_git" ]; then \
       exec_path="$(pwd)/third_party/git"; \
+      fallback_real_git="$(/usr/bin/which git)"; \
+      if [ "$fallback_real_git" = "$real_git" ]; then \
+        fallback_real_git=""; \
+      fi; \
     else \
       real_git=$(/usr/bin/which git); \
       exec_path=$($real_git --exec-path); \
+      fallback_real_git=""; \
     fi; \
     shim_dir="$(pwd)/tools/git-shim/bin"; \
     echo "$real_git" > tools/git-shim/real-git-path; \
-    SHIM_REAL_GIT="$real_git" SHIM_EXEC_PATH="$exec_path" \
+    SHIM_REAL_GIT="$real_git" SHIM_REAL_GIT_FALLBACK="$fallback_real_git" SHIM_EXEC_PATH="$exec_path" \
     SHIM_MOON="$(pwd)/tools/git-shim/moon" \
     SHIM_CMDS="receive-pack upload-pack pack-objects index-pack shell" SHIM_STRICT=1 \
     GIT_TEST_INSTALLED="$shim_dir" GIT_TEST_EXEC_PATH="$exec_path" \
@@ -222,15 +271,49 @@ git-t-one-remote test_file: build
     real_git="$(pwd)/third_party/git/git"; \
     if [ -x "$real_git" ]; then \
       exec_path="$(pwd)/third_party/git"; \
+      fallback_real_git="$(/usr/bin/which git)"; \
+      if [ "$fallback_real_git" = "$real_git" ]; then \
+        fallback_real_git=""; \
+      fi; \
     else \
       real_git=$(/usr/bin/which git); \
       exec_path=$($real_git --exec-path); \
+      fallback_real_git=""; \
     fi; \
     shim_dir="$(pwd)/tools/git-shim/bin"; \
     echo "$real_git" > tools/git-shim/real-git-path; \
-    SHIM_REAL_GIT="$real_git" SHIM_EXEC_PATH="$exec_path" \
+    SHIM_REAL_GIT="$real_git" SHIM_REAL_GIT_FALLBACK="$fallback_real_git" SHIM_EXEC_PATH="$exec_path" \
     SHIM_MOON="$(pwd)/tools/git-shim/moon" \
     SHIM_CMDS="receive-pack upload-pack pack-objects index-pack remote shell" SHIM_STRICT=1 \
+    GIT_TEST_INSTALLED="$shim_dir" GIT_TEST_EXEC_PATH="$exec_path" \
+    GIT_TEST_DEFAULT_HASH=sha1 \
+    CPATH="$prefix/include" LDFLAGS="-L$prefix/lib" LIBRARY_PATH="$prefix/lib" \
+    tools/run-git-test.sh T="{{test_file}}"
+
+# Run a single test file with random bit/real-git routing for intercepted subcommands.
+# Usage: SHIM_RANDOM_RATIO=70 just git-t-one-random t3200-branch.sh
+git-t-one-random test_file: build
+    @tools/apply-git-test-patches.sh
+    @prefix=$(brew --prefix gettext); \
+    real_git="$(pwd)/third_party/git/git"; \
+    if [ -x "$real_git" ]; then \
+      exec_path="$(pwd)/third_party/git"; \
+      fallback_real_git="$(/usr/bin/which git)"; \
+      if [ "$fallback_real_git" = "$real_git" ]; then \
+        fallback_real_git=""; \
+      fi; \
+    else \
+      real_git=$(/usr/bin/which git); \
+      exec_path=$($real_git --exec-path); \
+      fallback_real_git=""; \
+    fi; \
+    shim_dir="$(pwd)/tools/git-shim/bin"; \
+    shim_cmds="init status add commit log show branch checkout switch reset rebase stash cherry-pick diff diff-files diff-index merge tag rm mv config sparse-checkout rev-parse cat-file ls-files hash-object ls-tree write-tree show-ref update-ref symbolic-ref reflog worktree gc clean grep submodule revert notes bisect describe blame format-patch shortlog remote clone fetch pull push receive-pack upload-pack pack-objects index-pack shell"; \
+    ratio="${SHIM_RANDOM_RATIO:-50}"; \
+    echo "$real_git" > tools/git-shim/real-git-path; \
+    SHIM_REAL_GIT="$real_git" SHIM_REAL_GIT_FALLBACK="$fallback_real_git" SHIM_EXEC_PATH="$exec_path" \
+    SHIM_MOON="$(pwd)/tools/git-shim/moon" SHIM_CMDS="$shim_cmds" \
+    SHIM_RANDOM_MODE=1 SHIM_RANDOM_RATIO="$ratio" \
     GIT_TEST_INSTALLED="$shim_dir" GIT_TEST_EXEC_PATH="$exec_path" \
     GIT_TEST_DEFAULT_HASH=sha1 \
     CPATH="$prefix/include" LDFLAGS="-L$prefix/lib" LIBRARY_PATH="$prefix/lib" \
@@ -251,13 +334,18 @@ git-t-full test_file: build
     real_git="$(pwd)/third_party/git/git"; \
     if [ -x "$real_git" ]; then \
       exec_path="$(pwd)/third_party/git"; \
+      fallback_real_git="$(/usr/bin/which git)"; \
+      if [ "$fallback_real_git" = "$real_git" ]; then \
+        fallback_real_git=""; \
+      fi; \
     else \
       real_git=$(/usr/bin/which git); \
       exec_path=$($real_git --exec-path); \
+      fallback_real_git=""; \
     fi; \
     shim_dir="$(pwd)/tools/git-shim/bin"; \
     echo "$real_git" > tools/git-shim/real-git-path; \
-    SHIM_REAL_GIT="$real_git" SHIM_EXEC_PATH="$exec_path" \
+    SHIM_REAL_GIT="$real_git" SHIM_REAL_GIT_FALLBACK="$fallback_real_git" SHIM_EXEC_PATH="$exec_path" \
     SHIM_MOON="$(pwd)/tools/git-shim/moon" \
     SHIM_CMDS="init status add commit log show branch checkout switch reset rebase stash cherry-pick diff diff-files diff-index merge tag rm mv config sparse-checkout rev-parse cat-file ls-files hash-object ls-tree write-tree show-ref update-ref symbolic-ref reflog worktree gc clean grep submodule revert notes bisect describe blame format-patch shortlog remote clone fetch pull push receive-pack upload-pack pack-objects index-pack shell" SHIM_STRICT=1 \
     GIT_TEST_INSTALLED="$shim_dir" GIT_TEST_EXEC_PATH="$exec_path" \

@@ -45,6 +45,54 @@ capture_stderr="${GIT_SHIM_CAPTURE:-${SHIM_CAPTURE:-}}"
 strict_mode="${GIT_SHIM_STRICT:-${SHIM_STRICT:-}}"
 force_pack_intercept="${GIT_SHIM_FORCE_PACK_INTERCEPT:-${SHIM_FORCE_PACK_INTERCEPT:-}}"
 force_transport_intercept="${GIT_SHIM_FORCE_TRANSPORT_INTERCEPT:-${SHIM_FORCE_TRANSPORT_INTERCEPT:-}}"
+random_mode="${GIT_SHIM_RANDOM_MODE:-${SHIM_RANDOM_MODE:-}}"
+random_ratio_raw="${GIT_SHIM_RANDOM_RATIO:-${SHIM_RANDOM_RATIO:-}}"
+fallback_real_git="${GIT_SHIM_REAL_GIT_FALLBACK:-${SHIM_REAL_GIT_FALLBACK:-}}"
+
+has_command_support() {
+  git_bin="$1"
+  subcmd="$2"
+  "$git_bin" help "$subcmd" >/dev/null 2>&1
+}
+
+resolve_real_git() {
+  subcmd="${1:-}"
+  if [ -z "$subcmd" ] || [ -z "$fallback_real_git" ]; then
+    printf '%s\n' "$real_git"
+    return 0
+  fi
+  if has_command_support "$real_git" "$subcmd"; then
+    printf '%s\n' "$real_git"
+    return 0
+  fi
+  if has_command_support "$fallback_real_git" "$subcmd"; then
+    log "fallback $subcmd $*"
+    printf '%s\n' "$fallback_real_git"
+    return 0
+  fi
+  printf '%s\n' "$real_git"
+}
+
+exec_real_git() {
+  git_bin="$1"
+  shift
+  if [ "$capture_stderr" = "1" ]; then
+    "$git_bin" "$@" 2>>"$script_dir/../shim-stderr.log"
+  else
+    "$git_bin" "$@"
+  fi
+}
+
+is_uint() {
+  case "${1:-}" in
+    ''|*[!0-9]*)
+      return 1
+      ;;
+    *)
+      return 0
+      ;;
+  esac
+}
 
 # Fast-path global --exec-path (query only; preserve override when subcommand exists)
 if [ "${1:-}" = "--exec-path" ] && [ "$#" -gt 1 ]; then
@@ -154,11 +202,12 @@ fi
 
 if [ -z "$subcmd" ]; then
   log "pass <none> $*"
+  real_bin="$(resolve_real_git)"
   set +e
   if [ "$capture_stderr" = "1" ]; then
-    "$real_git" "$@" 2>>"$script_dir/../shim-stderr.log"
+    exec_real_git "$real_bin" "$@"
   else
-    "$real_git" "$@"
+    exec_real_git "$real_bin" "$@"
   fi
   status=$?
   set -e
@@ -180,8 +229,9 @@ if [ "$subcmd" = "version" ]; then
     fi
   done
   if [ "$has_build_opts" -eq 1 ]; then
+    real_bin="$(resolve_real_git "$subcmd")"
     set +e
-    output=$("$real_git" "$@" 2>&1)
+    output=$("$real_bin" "$@" 2>&1)
     status=$?
     set -e
     if [ "$status" -eq 0 ]; then
@@ -222,6 +272,40 @@ if [ "$intercept" -eq 1 ]; then
       fi
       ;;
   esac
+fi
+
+if [ "$intercept" -eq 1 ] && [ "$strict_mode" != "1" ] && [ "$random_mode" = "1" ]; then
+  ratio="${random_ratio_raw:-50}"
+  if ! is_uint "$ratio" || [ "$ratio" -gt 100 ]; then
+    echo "git-shim: SHIM_RANDOM_RATIO must be an integer in 0..100" >&2
+    exit 2
+  fi
+
+  choose_intercept=0
+  roll=0
+  if [ "$ratio" -ge 100 ]; then
+    choose_intercept=1
+    roll=0
+  elif [ "$ratio" -le 0 ]; then
+    choose_intercept=0
+    roll=99
+  else
+    roll="$(od -An -N2 -tu2 /dev/urandom 2>/dev/null | tr -d '[:space:]' || true)"
+    if ! is_uint "$roll"; then
+      roll="$(date +%s 2>/dev/null || echo 0)"
+    fi
+    roll=$((roll % 100))
+    if [ "$roll" -lt "$ratio" ]; then
+      choose_intercept=1
+    fi
+  fi
+
+  if [ "$choose_intercept" -eq 1 ]; then
+    log "random bit $subcmd ratio=$ratio roll=$roll"
+  else
+    log "random real-git $subcmd ratio=$ratio roll=$roll"
+    intercept=0
+  fi
 fi
 
 if [ "$intercept" -eq 1 ]; then
@@ -293,8 +377,9 @@ if [ "$subcmd" = "index-pack" ]; then
 fi
 
 log "pass $subcmd $*"
+real_bin="$(resolve_real_git "$subcmd")"
 if [ "$capture_stderr" = "1" ]; then
-  exec "$real_git" "$@" 2>>"$script_dir/../shim-stderr.log"
+  exec_real_git "$real_bin" "$@"
 else
-  exec "$real_git" "$@"
+  exec_real_git "$real_bin" "$@"
 fi
