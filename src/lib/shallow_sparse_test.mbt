@@ -230,6 +230,22 @@ test "sparse: multiple sparse patterns" {
 }
 
 ///|
+test "sparse: leading slash pattern is normalized" {
+  let patterns = ["/src/"]
+  assert_true(matches_sparse_pattern("src/main.mbt", patterns))
+  assert_true(matches_sparse_pattern("src/utils/helper.mbt", patterns))
+  assert_false(matches_sparse_pattern("tests/test.mbt", patterns))
+}
+
+///|
+test "sparse: leading slash negation is normalized" {
+  let patterns = ["/src/", "!/src/vendor/"]
+  assert_true(matches_sparse_pattern("src/core/main.mbt", patterns))
+  assert_false(matches_sparse_pattern("src/vendor/lib.mbt", patterns))
+  assert_false(matches_sparse_pattern("docs/readme.md", patterns))
+}
+
+///|
 test "shallow_sparse: combined scenario" {
   // Shallow clone + sparse checkout: minimal local objects
   let fs = @git.TestFs::new()

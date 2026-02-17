@@ -182,6 +182,34 @@ pub fn read_skip_worktree_paths(
 }
 
 ///|
+pub fn write_skip_worktree_paths(
+  fs : &@git.FileSystem,
+  git_dir : String,
+  paths : Array[String],
+) -> Unit raise @git.GitError {
+  let state_path = join_path(git_dir, "bit-skip-worktree")
+  let by_path : Map[String, Bool] = {}
+  for path in paths {
+    if path.length() > 0 {
+      by_path[path] = true
+    }
+  }
+  let sorted : Array[String] = []
+  for item in by_path.to_array() {
+    let (path, _) = item
+    sorted.push(path)
+  }
+  sorted.sort_by((a, b) => String::compare(a, b))
+  if sorted.length() == 0 {
+    fs.remove_file(state_path) catch {
+      _ => ()
+    }
+    return
+  }
+  fs.write_string(state_path, sorted.join("\n") + "\n")
+}
+
+///|
 pub fn write_index_entries(
   fs : &@git.FileSystem,
   git_dir : String,
@@ -258,6 +286,74 @@ fn index_read_u16_be(data : Bytes, start : Int) -> Int raise @git.GitError {
     raise @git.GitError::InvalidObject("Unexpected end of index data")
   }
   (data[start].to_int() << 8) | data[start + 1].to_int()
+}
+
+///|
+pub fn write_index_entries_with_skip_worktree(
+  fs : &@git.FileSystem,
+  git_dir : String,
+  entries : Array[IndexEntry],
+  skip_worktree_paths : Map[String, Bool],
+) -> Unit raise @git.GitError {
+  let sorted = entries.copy()
+  sorted.sort_by((a, b) => index_path_compare_git_order(a.path, b.path))
+  let out : Array[Byte] = []
+  // Header: "DIRC" + version(2) + count
+  out.push(b'D')
+  out.push(b'I')
+  out.push(b'R')
+  out.push(b'C')
+  index_push_u32_be(out, 2)
+  index_push_u32_be(out, sorted.length())
+  for e in sorted {
+    let entry_start = out.length()
+    // Index entry format (40 bytes stat data):
+    // ctime_seconds, ctime_nanoseconds, mtime_seconds, mtime_nanoseconds,
+    // dev, ino, mode, uid, gid, file_size
+    index_push_u32_be(out, e.mtime_sec) // ctime_seconds
+    index_push_u32_be(out, e.mtime_nsec) // ctime_nanoseconds
+    index_push_u32_be(out, e.mtime_sec) // mtime_seconds
+    index_push_u32_be(out, e.mtime_nsec) // mtime_nanoseconds
+    index_push_u32_be(out, 0) // dev
+    index_push_u32_be(out, 0) // ino
+    index_push_u32_be(out, e.mode) // mode
+    index_push_u32_be(out, 0) // uid
+    index_push_u32_be(out, 0) // gid
+    index_push_u32_be(out, e.size) // file_size
+    // object id
+    for b in e.id.bytes {
+      out.push(b)
+    }
+    let name_len = if e.path.length() < 0x0fff {
+      e.path.length()
+    } else {
+      0x0fff
+    }
+    let is_skip = skip_worktree_paths.contains(e.path)
+    let mut flags = name_len
+    if is_skip {
+      flags = flags | 0x4000
+    }
+    index_push_u16_be(out, flags)
+    if is_skip {
+      index_push_u16_be(out, 0x4000)
+    }
+    for c in e.path {
+      out.push(c.to_int().to_byte())
+    }
+    out.push(b'\x00')
+    while (out.length() - entry_start) % 8 != 0 {
+      out.push(b'\x00')
+    }
+  }
+  let content = index_bytes_from_array(out)
+  let checksum = @git.sha1(content)
+  for b in checksum.bytes {
+    out.push(b)
+  }
+  let index_bytes = index_bytes_from_array(out)
+  let index_path = join_path(git_dir, "index")
+  fs.write_file(index_path, index_bytes)
 }
 
 ///|

@@ -18,7 +18,9 @@ pub fn delete_reflog(&@types.FileSystem, &@types.RepoFileSystem, String, String)
 
 pub fn init_repo(&@types.FileSystem, String, default_branch? : String, bare? : Bool) -> Unit raise @object.GitError
 
-pub fn init_repo_with_options(&@types.FileSystem, String, @lib.InitOptions) -> Unit raise @object.GitError
+pub fn init_repo_with_options(&@types.FileSystem, &@types.RepoFileSystem, String, @lib.InitOptions) -> Unit raise @object.GitError
+
+pub fn init_repo_with_options_with_repo_fs(&@types.FileSystem, &@types.RepoFileSystem, String, @lib.InitOptions) -> Unit raise @object.GitError
 
 pub fn read_reflog(&@types.RepoFileSystem, String, String) -> Array[@lib.ReflogEntry] raise @object.GitError
 

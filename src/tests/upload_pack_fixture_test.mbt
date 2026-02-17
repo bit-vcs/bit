@@ -30,6 +30,22 @@ fn hex_to_bytes(hex : String) -> Bytes {
 }
 
 ///|
+fn append_bytes(buf : Array[Byte], text : String) -> Unit {
+  for c in text {
+    buf.push(c.to_int().to_byte())
+  }
+}
+
+///|
+fn bytes_to_string(buf : Array[Byte]) -> String {
+  let sb = StringBuilder::new()
+  for b in buf {
+    sb.write_char(b.to_int().unsafe_to_char())
+  }
+  sb.to_string()
+}
+
+///|
 let adv_v2_hex : String = "3030306576657273696f6e20320a303031636167656e743d6769742f322e35302e312d44617277696e0a303031336c732d726566733d756e626f726e0a3030323066657463683d7368616c6c6f7720776169742d666f722d646f6e650a303031327365727665722d6f7074696f6e0a303031376f626a6563742d666f726d61743d736861310a30303030"
 
 ///|
@@ -122,4 +138,39 @@ test "upload-pack v2: materialize clone to fs" {
   let config = fs.read_string("/repo/.git/config")
   assert_true(config.contains("https://example.com/repo.git"))
   assert_true(fs.exists("/repo/.git/index"))
+}
+
+test "upload-pack v0: advertised symref is used as HEAD target" {
+  let refs_line : Array[Byte] = []
+  append_bytes(refs_line, fixture_commit)
+  append_bytes(refs_line, " HEAD")
+  refs_line.push(b'\x00')
+  append_bytes(refs_line, "symref=HEAD:refs/heads/main agent=git/2.53.0\n")
+  let branch_line : Array[Byte] = []
+  append_bytes(branch_line, fixture_commit)
+  append_bytes(branch_line, " refs/heads/main\n")
+  let adv =
+    @protocol.pktline_encode(bytes_to_string(refs_line)) +
+    @protocol.pktline_encode(bytes_to_string(branch_line)) +
+    @protocol.pktline_flush()
+  let refs = @protocol.parse_refs(adv)
+  assert_true(refs.length() == 2)
+
+  let symrefs : Map[String, String] = {
+    "HEAD": "refs/heads/main"
+  }
+  match symrefs.get("HEAD") {
+    Some(target) => assert_true(target == "refs/heads/main")
+    None => assert_true(false)
+  }
+  match @protocol.select_default_ref(refs, symrefs) {
+    Some((name, commit_id)) => {
+      assert_true(name == "refs/heads/main")
+      assert_true(commit_id.to_hex() == fixture_commit)
+    }
+    None => assert_true(false)
+  }
+  let wants = @protocol.select_default_wants(refs, symrefs)
+  assert_true(wants.length() == 1)
+  assert_true(wants[0].to_hex() == fixture_commit)
 }

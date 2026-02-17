@@ -3,6 +3,7 @@
 ///
 /// Supported formats:
 /// - user/repo
+/// - user/repo/path/to/subdir (slash separator for subdir)
 /// - user/repo:path/to/subdir (colon separator for subdir)
 /// - github.com/user/repo
 /// - github.com/user/repo:path/to/subdir
@@ -111,11 +112,12 @@ fn parse_https_url(input : String) -> RepoPath? {
 fn parse_shorthand(input : String) -> RepoPath? {
   // user/repo
   // user/repo:path/to/subdir (colon separator for subdir)
+  // user/repo/path/to/subdir (slash separator for subdir)
   // github.com/user/repo
   // gitlab.com/user/repo:path
 
   // Check for subdir separator ':'
-  let (repo_part, subdir) = match find_char(input, ':') {
+  let (repo_part, explicit_subdir) = match find_char(input, ':') {
     Some(idx) => {
       let rp = slice_to(input, idx)
       let sd = slice_from(input, idx + 1)
@@ -123,7 +125,10 @@ fn parse_shorthand(input : String) -> RepoPath? {
     }
     None => (input, None)
   }
-  let parts = repo_part.split("/").collect()
+  let parts = repo_part
+    .split("/")
+    .filter(s => s.length() > 0)
+    .collect()
   if parts.length() < 2 {
     return None
   }
@@ -137,18 +142,38 @@ fn parse_shorthand(input : String) -> RepoPath? {
     let host = first
     let user = parts[1].to_string()
     let repo = parts[2].to_string()
+    let subdir = match explicit_subdir {
+      Some(sd) => Some(sd)
+      None => {
+        if parts.length() > 3 {
+          Some(join_parts(parts, 3, parts.length()))
+        } else {
+          None
+        }
+      }
+    }
     // Normalize github.com
     let normalized_host : String? = if host == "github.com" {
       None
     } else {
       Some(host)
     }
-    Some(RepoPath::new(user, repo, host=normalized_host, subdir~))
+    Some(RepoPath::new(user, repo, host=normalized_host, subdir=subdir))
   } else {
     // user/repo format (github.com implicit)
     let user = parts[0].to_string()
     let repo = parts[1].to_string()
-    Some(RepoPath::new(user, repo, subdir~))
+    let subdir = match explicit_subdir {
+      Some(sd) => Some(sd)
+      None => {
+        if parts.length() > 2 {
+          Some(join_parts(parts, 2, parts.length()))
+        } else {
+          None
+        }
+      }
+    }
+    Some(RepoPath::new(user, repo, subdir=subdir))
   }
 }
 

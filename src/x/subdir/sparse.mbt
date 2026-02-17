@@ -252,33 +252,40 @@ pub fn matches_module_sparse(path : String, patterns : Array[String]) -> Bool {
 ///|
 /// パターンマッチ（シンプルな glob 対応）
 fn sparse_path_matches(path : String, pattern : String) -> Bool {
+  let normalized_pattern = if pattern.has_prefix("/") &&
+    pattern != "/*" &&
+    pattern != "!/*/" {
+    String::unsafe_substring(pattern, start=1, end=pattern.length())
+  } else {
+    pattern
+  }
   // "/*" - ルート直下のファイル
-  if pattern == "/*" {
+  if normalized_pattern == "/*" {
     return not(path.contains("/"))
   }
   // "!/*/" - ルート直下のディレクトリを除外
-  if pattern == "!/*/" {
+  if normalized_pattern == "!/*/" {
     return path.contains("/")
   }
   // "**" - 任意のパス（先にチェック）
-  if pattern.contains("**") {
-    return match_double_star(path, pattern)
+  if normalized_pattern.contains("**") {
+    return match_double_star(path, normalized_pattern)
   }
   // "dir/" - ディレクトリとその中身
-  if pattern.has_suffix("/") {
+  if normalized_pattern.has_suffix("/") {
     let dir = String::unsafe_substring(
-      pattern,
+      normalized_pattern,
       start=0,
-      end=pattern.length() - 1,
+      end=normalized_pattern.length() - 1,
     )
     return path == dir || path.has_prefix(dir + "/")
   }
   // "dir/*" - ディレクトリ直下のファイル
-  if pattern.has_suffix("/*") {
+  if normalized_pattern.has_suffix("/*") {
     let dir = String::unsafe_substring(
-      pattern,
+      normalized_pattern,
       start=0,
-      end=pattern.length() - 2,
+      end=normalized_pattern.length() - 2,
     )
     if path.has_prefix(dir + "/") {
       let rest = String::unsafe_substring(
@@ -291,25 +298,25 @@ fn sparse_path_matches(path : String, pattern : String) -> Bool {
     return false
   }
   // "*.ext" - 拡張子マッチ
-  if pattern.has_prefix("*") {
+  if normalized_pattern.has_prefix("*") {
     let suffix = String::unsafe_substring(
-      pattern,
+      normalized_pattern,
       start=1,
-      end=pattern.length(),
+      end=normalized_pattern.length(),
     )
     return path.has_suffix(suffix)
   }
   // "prefix*" - プレフィックスマッチ
-  if pattern.has_suffix("*") {
+  if normalized_pattern.has_suffix("*") {
     let prefix = String::unsafe_substring(
-      pattern,
+      normalized_pattern,
       start=0,
-      end=pattern.length() - 1,
+      end=normalized_pattern.length() - 1,
     )
     return path.has_prefix(prefix)
   }
   // 完全一致またはプレフィックス
-  path == pattern || path.has_prefix(pattern + "/")
+  path == normalized_pattern || path.has_prefix(normalized_pattern + "/")
 }
 
 ///|

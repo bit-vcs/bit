@@ -1302,15 +1302,27 @@ fn resolve_ref_canonical_name_inner(
   if depth > 8 {
     return refname
   }
-  let path = git_dir + "/" + refname
-  if not(fs.is_file(path)) {
-    return refname
+  let normalized = if refname == "HEAD" {
+    "HEAD"
+  } else {
+    let normalized = @gitlib.normalize_repo_path(refname) catch {
+      _ => return refname
+    }
+    if normalized.has_prefix("refs/") {
+      normalized
+    } else {
+      return refname
+    }
   }
-  let line = decode_bytes(fs.read_file(path) catch { _ => return refname })
+  let path = git_dir + "/" + normalized
+  if not(fs.is_file(path)) {
+    return normalized
+  }
+  let line = decode_bytes(fs.read_file(path) catch { _ => return normalized })
     .trim()
     .to_string()
   if not(line.has_prefix("ref: ")) {
-    return refname
+    return normalized
   }
   let target = String::unsafe_substring(line, start=5, end=line.length())
   resolve_ref_canonical_name_inner(fs, git_dir, target, depth + 1)

@@ -1,0 +1,14 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/bit/bootstrap"
+
+// Values
+pub fn init_stdin_guard() -> Unit
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits
+

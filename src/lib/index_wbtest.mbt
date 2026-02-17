@@ -40,6 +40,20 @@ test "index: read_skip_worktree_paths reads extended skip-worktree flag" {
 }
 
 ///|
+test "index: write_skip_worktree_paths marks extended flag entries" {
+  let fs = @git.TestFs::new()
+  init_repo(fs, "/repo")
+  fs.write_string("/repo/a.txt", "hello\n")
+  add_paths(fs, fs, "/repo", ["a.txt"])
+  let entries = read_index_entries(fs, "/repo/.git")
+  let skip_set : Map[String, Bool] = { "a.txt": true }
+  write_skip_worktree_paths(fs, "/repo/.git", ["a.txt"])
+  write_index_entries_with_skip_worktree(fs, "/repo/.git", entries, skip_set)
+  let skip = read_skip_worktree_paths(fs, "/repo/.git")
+  assert_true(skip.contains("a.txt"))
+}
+
+///|
 fn index_test_mark_single_entry_skip_worktree(
   fs : @git.TestFs,
   index_path : String,

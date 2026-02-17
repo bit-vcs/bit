@@ -231,7 +231,8 @@ fn parse_update_index_info_line(line : String) -> (Int, @git.ObjectId, String)? 
         start=tab_idx + 1,
         end=line.length(),
       )
-      let normalized_path = normalize_update_index_path(path)
+      let normalized_path =
+        normalize_update_index_path(path) catch { _ => return None }
       let fields = split_update_index_fields(info)
       if fields.length() == 0 {
         return None
@@ -304,7 +305,8 @@ fn parse_update_index_cacheinfo(
   match parse_octal_mode(mode_str) {
     None => None
     Some(mode) => {
-      let normalized_path = normalize_update_index_path(path)
+      let normalized_path =
+        normalize_update_index_path(path) catch { _ => return None }
       if mode == 0 {
         None
       } else {
@@ -411,7 +413,7 @@ fn apply_update_index_entries(
 ///|
 fn dedupe_index_entries_by_path(
   entries : Array[@gitlib.IndexEntry],
-) -> Array[@gitlib.IndexEntry] {
+) -> Array[@gitlib.IndexEntry] raise @git.GitError {
   let by_path : Map[String, @gitlib.IndexEntry] = {}
   for entry in entries {
     by_path[normalize_update_index_path(entry.path)] = entry
@@ -427,12 +429,11 @@ fn dedupe_index_entries_by_path(
 }
 
 ///|
-fn normalize_update_index_path(path : String) -> String {
-  if path.length() >= 2 && path.has_prefix("./") {
-    String::unsafe_substring(path, start=2, end=path.length())
-  } else {
-    path
+fn normalize_update_index_path(path : String) -> String raise @git.GitError {
+  if path.has_prefix("/") {
+    raise @git.GitError::InvalidObject("path must be relative")
   }
+  @gitlib.normalize_repo_path(path)
 }
 
 ///|

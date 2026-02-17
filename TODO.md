@@ -29,6 +29,9 @@
 
 - [ ] `t5540-http-push-webdav.sh`
 - [ ] `t9001-send-email.sh`
+- [ ] `t1300-config.sh` の再確認が必要なケース（`git --config-env` 系）
+  - [x] `2026-02-17`: `git --config-env` を引数なしで受けた際の shim 落ちを再現
+  - [x] `2026-02-17`: `tools/git-shim/bin/git` の `resolve_real_git` の `shift` 例外を修正
 - [ ] `full allowlist (just git-t-allowlist-shim-strict)` を再開して完走させる
   - [ ] `2026-02-17`: 実行途中で 1時間56分でタイムアウト
   - [x] `2026-02-17`: `t1300-config.sh` の `git --config-env with missing value` を再現（`tools/git-shim/bin/git` の `resolve_real_git` 引数未設定時 `shift` バグ）

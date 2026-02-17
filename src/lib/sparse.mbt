@@ -228,35 +228,42 @@ pub fn matches_sparse_pattern(path : String, patterns : Array[String]) -> Bool {
 ///|
 /// Simple glob-like pattern matching for sparse checkout.
 fn sparse_path_matches(path : String, pattern : String) -> Bool {
+  let normalized_pattern = if pattern.has_prefix("/") &&
+    pattern != "/*" &&
+    pattern != "!/*/" {
+    String::unsafe_substring(pattern, start=1, end=pattern.length())
+  } else {
+    pattern
+  }
   // Handle common patterns:
   // "/*" - match all files in root
   // "!/*/  " - exclude all directories in root
   // "dir/" - match directory and contents
   // "dir/*" - match files in directory
   // "*.txt" - match files ending in .txt
-  if pattern == "/*" {
+  if normalized_pattern == "/*" {
     // Match files in root (no slash in path)
     return not(path.contains("/"))
   }
-  if pattern == "!/*/" {
+  if normalized_pattern == "!/*/" {
     // This is handled by negation in matches_sparse_pattern
     return path.contains("/")
   }
-  if pattern.has_suffix("/") {
+  if normalized_pattern.has_suffix("/") {
     // Directory pattern - match if path starts with this directory
     let dir = String::unsafe_substring(
-      pattern,
+      normalized_pattern,
       start=0,
-      end=pattern.length() - 1,
+      end=normalized_pattern.length() - 1,
     )
     return path == dir || path.has_prefix(dir + "/")
   }
-  if pattern.has_suffix("/*") {
+  if normalized_pattern.has_suffix("/*") {
     // Match files directly in directory
     let dir = String::unsafe_substring(
-      pattern,
+      normalized_pattern,
       start=0,
-      end=pattern.length() - 2,
+      end=normalized_pattern.length() - 2,
     )
     if path.has_prefix(dir + "/") {
       let rest = String::unsafe_substring(
@@ -268,27 +275,27 @@ fn sparse_path_matches(path : String, pattern : String) -> Bool {
     }
     return false
   }
-  if pattern.has_prefix("*") {
-    // Wildcard at start
-    let suffix = String::unsafe_substring(
-      pattern,
-      start=1,
-      end=pattern.length(),
-    )
-    return path.has_suffix(suffix)
-  }
-  if pattern.has_suffix("*") {
-    // Wildcard at end
-    let prefix = String::unsafe_substring(
-      pattern,
+    if normalized_pattern.has_prefix("*") {
+      // Wildcard at start
+      let suffix = String::unsafe_substring(
+        normalized_pattern,
+        start=1,
+        end=normalized_pattern.length(),
+      )
+      return path.has_suffix(suffix)
+    }
+    if normalized_pattern.has_suffix("*") {
+      // Wildcard at end
+      let prefix = String::unsafe_substring(
+      normalized_pattern,
       start=0,
-      end=pattern.length() - 1,
+      end=normalized_pattern.length() - 1,
     )
-    return path.has_prefix(prefix)
-  }
-  if pattern.contains("**") {
+      return path.has_prefix(prefix)
+    }
+  if normalized_pattern.contains("**") {
     // Double star matches any path
-    let parts = pattern.split("**")
+    let parts = normalized_pattern.split("**")
     let parts_arr : Array[String] = []
     for p in parts {
       parts_arr.push(p.to_string())
@@ -301,7 +308,7 @@ fn sparse_path_matches(path : String, pattern : String) -> Bool {
     }
   }
   // Exact match or path prefix
-  path == pattern || path.has_prefix(pattern + "/")
+  path == normalized_pattern || path.has_prefix(normalized_pattern + "/")
 }
 
 ///|
@@ -321,17 +328,20 @@ fn sparse_update_worktree(
       let all_files = collect_tree_files_from_commit(db, rfs, commit_id)
       // Filter files based on sparse patterns
       let sparse_files : Map[String, TreeFileEntry] = {}
+      let skip_paths : Array[String] = []
       for item in all_files.to_array() {
         let (path, entry) = item
         if matches_sparse_pattern(path, patterns) {
           sparse_files[path] = entry
+        } else {
+          skip_paths.push(path)
         }
       }
       // Remove files not in sparse set
-      let index_entries = read_index_entries(rfs, git_dir)
-      for entry in index_entries {
-        if not(matches_sparse_pattern(entry.path, patterns)) {
-          let file_path = join_path(root, entry.path)
+      for item in all_files.to_array() {
+        let (path, _) = item
+        if not(matches_sparse_pattern(path, patterns)) {
+          let file_path = join_path(root, path)
           if rfs.is_file(file_path) {
             fs.remove_file(file_path)
           }
@@ -339,9 +349,14 @@ fn sparse_update_worktree(
       }
       // Write sparse files
       write_worktree_from_files(db, fs, rfs, root, git_dir, sparse_files)
-      // Update index with skip-worktree flag info (simplified - just write all)
-      let entries = tree_files_to_index(db, rfs, all_files)
-      write_index_entries(fs, git_dir, entries)
+      write_skip_worktree_paths(fs, git_dir, skip_paths)
+      // Update index with sparse skip-worktree entries.
+      let skip_set : Map[String, Bool] = {}
+      for path in skip_paths {
+        skip_set[path] = true
+      }
+      let all_entries = tree_files_to_index(db, rfs, all_files)
+      write_index_entries_with_skip_worktree(fs, git_dir, all_entries, skip_set)
     }
   }
 }

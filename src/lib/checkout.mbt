@@ -18,11 +18,13 @@ pub fn restore_paths(
   let index_entries = read_index_entries(rfs, actual_git_dir)
   let index_map : Map[String, IndexEntry] = {}
   for e in index_entries {
-    index_map[e.path] = e
+    let safe_path = normalize_checkout_path(e.path)
+    index_map[safe_path] = e
   }
   let db = ObjectDb::load(rfs, object_git_dir)
   for path in paths {
-    match index_map.get(path) {
+    let safe_path = normalize_checkout_path(path)
+    match index_map.get(safe_path) {
       None =>
         raise @git.GitError::InvalidObject(
           "error: pathspec '\{path}' did not match any file(s) known to git",
@@ -35,17 +37,24 @@ pub fn restore_paths(
               "Object not found: \{entry.id.to_hex()}",
             )
           Some(o) => {
-            let abs_path = join_path(root, path)
+            let abs_path = join_path(root, safe_path)
             let dir = parent_dir(abs_path)
             if dir.length() > 0 && dir != root {
               fs.mkdir_p(dir)
             }
-            fs.write_file(abs_path, o.data)
+    fs.write_file(abs_path, o.data)
           }
         }
       }
     }
   }
+}
+
+fn normalize_checkout_path(path : String) -> String raise @git.GitError {
+  if path.has_prefix("/") {
+    raise @git.GitError::InvalidObject("path must not be absolute")
+  }
+  normalize_repo_path(path)
 }
 
 ///|

@@ -1563,7 +1563,19 @@ fn write_ref_file(
   refname : String,
   id : @git.ObjectId,
 ) -> Unit raise @git.GitError {
-  let path = git_dir + "/" + refname
+  let normalized = if refname == "HEAD" {
+    "HEAD"
+  } else {
+    let normalized = @gitlib.normalize_repo_path(refname) catch {
+      _ => raise @git.GitError::InvalidObject("invalid refname: " + refname)
+    }
+    if normalized.has_prefix("refs/") {
+      normalized
+    } else {
+      raise @git.GitError::InvalidObject("invalid refname: " + refname)
+    }
+  }
+  let path = git_dir + "/" + normalized
   let dir = parent_dir(path)
   if dir.length() > 0 {
     ensure_dir(dir)
@@ -1578,12 +1590,36 @@ fn write_symref_file(
   refname : String,
   target : String,
 ) -> Unit raise @git.GitError {
-  let path = git_dir + "/" + refname
+  let normalized_refname = if refname == "HEAD" {
+    "HEAD"
+  } else {
+    let normalized = @gitlib.normalize_repo_path(refname) catch {
+      _ => raise @git.GitError::InvalidObject("invalid refname: " + refname)
+    }
+    if normalized.has_prefix("refs/") {
+      normalized
+    } else {
+      raise @git.GitError::InvalidObject("invalid refname: " + refname)
+    }
+  }
+  let normalized_target = if target == "HEAD" {
+    "HEAD"
+  } else {
+    let normalized = @gitlib.normalize_repo_path(target) catch {
+      _ => raise @git.GitError::InvalidObject("invalid ref target: " + target)
+    }
+    if normalized == "HEAD" || normalized.has_prefix("refs/") {
+      normalized
+    } else {
+      raise @git.GitError::InvalidObject("invalid ref target: " + target)
+    }
+  }
+  let path = git_dir + "/" + normalized_refname
   let dir = parent_dir(path)
   if dir.length() > 0 {
     ensure_dir(dir)
   }
-  fs.write_string(path, "ref: " + target + "\n")
+  fs.write_string(path, "ref: " + normalized_target + "\n")
 }
 
 ///|
@@ -2911,32 +2947,9 @@ async fn fetch_from_remote(
       } else {
         "refs/remotes/" + remote_name + "/HEAD"
       }
-      let remote_path = git_dir + "/" + remote_ref
       let mut prev_id : @git.ObjectId? = None
-      if fs.is_file(remote_path) {
-        let content = decode_bytes(
-          fs.read_file(remote_path) catch {
-            err => {
-              if @async.is_being_cancelled() ||
-                @async.is_cancellation_error(err) {
-                raise err
-              }
-              Bytes::default()
-            }
-          },
-        )
-        let hex = trim_string(content)
-        if hex.length() > 0 {
-          prev_id = (hex |> @git.ObjectId::from_hex |> Some) catch {
-            err => {
-              if @async.is_being_cancelled() ||
-                @async.is_cancellation_error(err) {
-                raise err
-              }
-              None
-            }
-          }
-        }
+      prev_id = @gitlib.resolve_ref(fs, git_dir, remote_ref) catch {
+        _ => None
       }
       if prev_id is Some(pid) && pid == commit_id {
         return ()
@@ -2977,14 +2990,7 @@ async fn fetch_from_remote(
           )
         }
       }
-      let dir = match remote_path.rev_find("/") {
-        None => ""
-        Some(i) => String::unsafe_substring(remote_path, start=0, end=i)
-      }
-      if dir.length() > 0 {
-        fs.mkdir_p(dir)
-      }
-      fs.write_string(remote_path, commit_id.to_hex() + "\n")
+      write_ref_file(fs, git_dir, remote_ref, commit_id)
       print_line("From \{remote_url}")
       match prev_id {
         None => print_line(" * [new branch] \{refname} -> \{remote_ref}")

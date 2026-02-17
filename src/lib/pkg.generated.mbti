@@ -126,6 +126,8 @@ pub fn init_repo(&@types.FileSystem, String, default_branch? : String, bare? : B
 
 pub fn init_repo_with_options(&@types.FileSystem, String, InitOptions) -> Unit raise @object.GitError
 
+pub fn init_repo_with_options_with_repo_fs(&@types.FileSystem, &@types.RepoFileSystem, String, InitOptions) -> Unit raise @object.GitError
+
 pub fn is_ancestor_of(&@types.RepoFileSystem, String, @object.ObjectId, @object.ObjectId) -> Bool
 
 pub fn is_bare_git_dir(String) -> Bool

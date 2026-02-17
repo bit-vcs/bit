@@ -780,7 +780,8 @@ pub async fn discover_upload_refs_process(
   }
   let refs = @protocol.parse_refs(adv)
   let caps = @protocol.parse_v0_advertised_caps(adv)
-  (refs, caps, @protocol.ProtocolVersion::V0, {})
+  let symrefs = parse_symrefs_from_capabilities(caps)
+  (refs, caps, @protocol.ProtocolVersion::V0, symrefs)
 }
 
 ///|
