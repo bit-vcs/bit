@@ -38,13 +38,13 @@ fi
 
 result_dir="${1:-compat-random-results}"
 if [ ! -d "$result_dir" ]; then
-  emit_no_result_summary "$result_dir" >&2
+  emit_no_result_summary "$result_dir"
   exit 1
 fi
 
 mapfile -t record_files < <(find "$result_dir" -type f -name '*.record.tsv' | sort)
 if [ "${#record_files[@]}" -eq 0 ]; then
-  emit_no_result_summary "$result_dir" >&2
+  emit_no_result_summary "$result_dir"
   exit 1
 fi
 
@@ -95,7 +95,7 @@ for file in "${record_files[@]}"; do
 done
 
 if [ "$total" -eq 0 ]; then
-  emit_no_result_summary "$result_dir" >&2
+  emit_no_result_summary "$result_dir"
   echo "no result rows parsed in $result_dir" >&2
   exit 1
 fi
