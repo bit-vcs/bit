@@ -96,22 +96,48 @@ bit pr list --open
 bit issue list --open
 ```
 
-### bit rebase-ai
+### bit ai
 
 AI-assisted rebase conflict resolution (OpenRouter, default model `moonshotai/kimi-k2`).
+Subcommands:
+  - `rebase` (alias: `rebase-ai`)
+  - `merge`
+  - `commit`
+  - `cherry-pick`
+  - `revert`
 
 ```bash
 export OPENROUTER_API_KEY=...
 
 # Start / continue / abort / skip
-bit rebase-ai main
-bit rebase-ai --continue
-bit rebase-ai --abort
-bit rebase-ai --skip
+bit ai rebase main
+bit ai rebase --continue
+bit ai rebase --abort
+bit ai rebase --skip
+bit ai merge --continue
+bit ai merge --abort
 
 # Options
-bit rebase-ai --model moonshotai/kimi-k2 --max-ai-rounds 16 main
-bit rebase-ai --agent-loop --agent-max-steps 24 main
+bit ai rebase --model moonshotai/kimi-k2 --max-ai-rounds 16 main
+bit ai rebase --agent-loop --agent-max-steps 24 main
+bit ai merge --agent-loop --agent-max-steps 24 branch
+bit ai commit --split
+bit ai commit
+bit ai cherry-pick abc1234
+bit ai revert abc1234
+
+# Alias (legacy)
+bit rebase-ai main
+```
+
+### bit ai commit
+
+Experimental AI-assisted commit message helper entrypoint (currently delegates to `bit commit` for compatibility).
+`bit ai commit` は `rebase` と同じ AI 設定引数を受け付けます（`--model`, `--max-ai-rounds`, `--agent-loop`, `--agent-max-steps`）。
+
+```bash
+bit ai commit -m "message..."
+bit ai commit
 ```
 
 ### bit mcp

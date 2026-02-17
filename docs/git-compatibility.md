@@ -11,7 +11,7 @@ Current standalone integration coverage (`t/t0001-*.sh` to `t/t0022-*.sh`) inclu
 - repository lifecycle and core porcelain: `init`, `status`, `add`, `commit`, `branch`, `checkout`/`switch`, `reset`, `log`, `tag`
 - transport-style workflows in standalone mode: `clone`, `fetch`, `pull`, `push`, `bundle`
 - plumbing used by normal flows: `hash-object`, `cat-file`, `ls-files`, `ls-tree`, `write-tree`, `update-ref`, `fsck`
-- feature flows: `hub`, `rebase-ai`, `mcp`, `hq`
+- feature flows: `hub`, `ai` (`rebase`, `merge`, `cherry-pick`, `revert`, `commit`; `rebase-ai` is alias), `mcp`, `hq`
 - randomized parity smoke coverage: `t0011-random-ops.sh` (seeds 1, 2, 3; 25 operations each; compares git vs bit repo shape and status)
 
 Representative files:
