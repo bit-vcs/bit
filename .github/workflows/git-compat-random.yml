@@ -37,7 +37,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: true
           fetch-depth: 0
 
       - name: Install dependencies
@@ -114,6 +113,8 @@ jobs:
 
       - name: Create issue on failures
         if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           pnpm --dir tools/ci-notify run notify -- \
             --summary compat-random-summary.md \
