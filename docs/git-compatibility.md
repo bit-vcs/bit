@@ -49,6 +49,13 @@ Representative files:
     - matching branch refs
     - matching `rev-parse <branch>^{tree}`
     - both repos clean (`status --porcelain` empty)
+- `t/t0014-random-rebase.sh` was added and executed with seeds `501` and `502` with `50` operations each.
+  - Covered operations set: `init`, `commit-new`, `commit-mod`, `commit-rm`, `branch`, `switch`, `rebase`, `status`, `tag`.
+  - Verification checks:
+    - `git fsck --strict` (both repos)
+    - matching branch refs
+    - matching `rev-parse <branch>^{tree}`
+    - both repos clean (`status --porcelain` empty)
 
 ## Explicitly Unsupported In Standalone Mode
 
