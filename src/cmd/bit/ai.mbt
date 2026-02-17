@@ -21,9 +21,7 @@ fn read_file_text(
   if not(fs.is_file(path)) {
     return None
   }
-  let content = fs.read_file(path) catch {
-    _ => return None
-  }
+  let content = fs.read_file(path) catch { _ => return None }
   Some(@utf8.decode_lossy(content[:]))
 }
 
