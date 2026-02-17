@@ -34,7 +34,7 @@ async fn show_help() -> Unit {
     #|   checkout    Switch branches or restore working tree files
     #|   merge       Join two or more development histories together
     #|   rebase      Reapply commits on top of another base tip
-    #|   ai           AI helpers (rebase, commit)
+    #|   ai           AI helpers (rebase, merge, commit, cherry-pick, revert)
     #|   rebase-ai    AI-assisted rebase conflict resolution (OpenRouter kimi-k2, alias for ai rebase)
     #|   reset       Reset current HEAD to the specified state
     #|   stash       Stash the changes in a dirty working directory
@@ -141,7 +141,7 @@ fn show_command_help_specs() -> Array[(String, String, String)] {
       "rebase", "git rebase [<options>] <upstream> [<branch>]", "Reapply commits on top of another base tip.",
     ),
     (
-      "ai", "bit ai <command> [<args>]", "AI helpers (rebase, commit).",
+      "ai", "bit ai <command> [<args>]", "AI helpers (rebase, merge, commit, cherry-pick, revert).",
     ),
     (
       "merge", "git merge [<options>] <commit>...", "Join two or more development histories together.",
@@ -318,9 +318,7 @@ fn show_command_help_specs() -> Array[(String, String, String)] {
       "completion", "bit completion <bash|zsh>", "Generate shell completion scripts.\n\nInstall:\n  bash: eval \"$(bit completion bash)\"\n  zsh:  eval \"$(bit completion zsh)\"",
     ),
     (
-      "x/hooks",
-      "bit/x/hooks <subcommand> [<args>]",
-      "Manage hooks used by bit commands. Experimental: avoid overusing hooks as automation.",
+      "x/hooks", "bit/x/hooks <subcommand> [<args>]", "Manage hooks used by bit commands. Experimental: avoid overusing hooks as automation.",
     ),
     (
       "shell", "bit shell [--login] [<path>]", "Start an interactive bit shell with command forwarding.",
@@ -509,7 +507,7 @@ async fn show_command_help(cmd : String, silent? : Bool = false) -> Bool {
       if not(silent) {
         show_simple_command_help(
           "bit ai <command> [<args>]",
-          summary="AI helpers.\n\nSubcommands:\n  rebase   AI-assisted rebase conflict resolution\n  commit   AI-assisted commit message workflow",
+          summary="AI helpers.\n\nSubcommands:\n  rebase   AI-assisted rebase conflict resolution\n  merge    AI-assisted merge conflict resolution\n  cherry-pick AI-assisted cherry-pick conflict resolution\n  revert   AI-assisted revert conflict resolution\n  commit   AI-assisted commit message workflow",
         )
       }
       true

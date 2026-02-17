@@ -120,33 +120,29 @@ fn openrouter_system_prompt(agent_loop_mode : Bool) -> String {
 
 ///|
 fn commit_system_prompt(_agent_loop_mode : Bool) -> String {
-  #|You are an expert commit message writer.
-  #|Write commit messages that follow Conventional Commits.
-  #|Return only the commit message text, never explanations or JSON wrappers.
+  (
+    #|You are an expert commit message writer.
+    #|Write commit messages that follow Conventional Commits.
+    #|Return only the commit message text, never explanations or JSON wrappers.
+  )
 }
 
 ///|
 fn build_commit_message_prompt(diff_units : String, context : String) -> String {
-  let mut buf = StringBuilder::new()
+  let buf = StringBuilder::new()
   buf.write_string(
-    "Write one commit message that follows Conventional Commits.\n"
-  )
-  buf.write_string("Allowed types: feat, fix, chore, docs, style, refactor, perf, test, build, ci, revert, deps.\n")
-  buf.write_string(
-    "Treat each file block as a logical unit and summarize all units in one message.\n"
+    "Write one commit message that follows Conventional Commits.\n",
   )
   buf.write_string(
-    "Output format must be:\n"
+    "Allowed types: feat, fix, chore, docs, style, refactor, perf, test, build, ci, revert, deps.\n",
   )
   buf.write_string(
-    "<type>(<scope>): <summary>\n\n"
+    "Treat each file block as a logical unit and summarize all units in one message.\n",
   )
-  buf.write_string(
-    "- <scope>: <change summary>\n"
-  )
-  buf.write_string(
-    "- ...\n\n"
-  )
+  buf.write_string("Output format must be:\n")
+  buf.write_string("<type>(<scope>): <summary>\n\n")
+  buf.write_string("- <scope>: <change summary>\n")
+  buf.write_string("- ...\n\n")
   if context.length() > 0 {
     buf.write_string("Project/User instructions:\n")
     buf.write_string(context)
@@ -168,6 +164,24 @@ fn build_resolve_prompt(path : String, conflicted_content : String) -> String {
   buf.write_string("----- BEGIN CONFLICTED FILE -----\n")
   buf.write_string(conflicted_content)
   buf.write_string("\n----- END CONFLICTED FILE -----\n")
+  buf.to_string()
+}
+
+///|
+fn build_resolve_prompt_with_context(
+  path : String,
+  conflicted_content : String,
+  context : String,
+) -> String {
+  let trimmed_context = trim_text(context)
+  if trimmed_context.length() == 0 {
+    return build_resolve_prompt(path, conflicted_content)
+  }
+  let buf = StringBuilder::new()
+  buf.write_string("Project/User constraints:\n")
+  buf.write_string(trimmed_context)
+  buf.write_string("\n\n")
+  buf.write_string(build_resolve_prompt(path, conflicted_content))
   buf.to_string()
 }
 
@@ -425,7 +439,9 @@ fn build_repo_scoped_read_tools(
       if not(rfs.is_dir(abs_path)) {
         return "error: invalid path"
       }
-      let mut entries = rfs.readdir(abs_path) catch { _ => return "error: readdir failed" }
+      let entries = rfs.readdir(abs_path) catch {
+        _ => return "error: readdir failed"
+      }
       entries.sort_by((a, b) => String::lexical_compare(a, b))
       let out : Array[String] = []
       for entry in entries {
@@ -481,6 +497,7 @@ fn resolve_conflict_file_with_agent_loop(
   rel_path : String,
   provider : @llmlib.BoxedProvider,
   options : AiRebaseOptions,
+  context : String,
 ) -> Bool raise @bit.GitError {
   let abs_path = root + "/" + rel_path
   let bytes = rfs.read_file(abs_path) catch { _ => return false }
@@ -489,9 +506,14 @@ fn resolve_conflict_file_with_agent_loop(
     return false
   }
   let (registry, touched_paths) = build_repo_scoped_rw_registry(fs, rfs, root)
-  let messages : Array[@llmlib.Message] = [
-    @llmlib.Message::user(build_agent_loop_prompt(rel_path)),
-  ]
+  let user_prompt = if context.length() == 0 {
+    build_agent_loop_prompt(rel_path)
+  } else {
+    build_agent_loop_prompt(rel_path) +
+    "\n\n" +
+    build_resolve_prompt_with_context(rel_path, conflicted, context)
+  }
+  let messages : Array[@llmlib.Message] = [@llmlib.Message::user(user_prompt)]
   @llmlib.run_agent_cancellable(
     provider,
     registry,
@@ -524,6 +546,7 @@ fn resolve_conflict_file_with_provider(
   root : String,
   rel_path : String,
   provider : @llmlib.BoxedProvider,
+  context : String,
 ) -> Bool raise @bit.GitError {
   let abs_path = root + "/" + rel_path
   let bytes = rfs.read_file(abs_path) catch { _ => return false }
@@ -531,7 +554,7 @@ fn resolve_conflict_file_with_provider(
   if not(has_conflict_markers(conflicted)) {
     return false
   }
-  let prompt = build_resolve_prompt(rel_path, conflicted)
+  let prompt = build_resolve_prompt_with_context(rel_path, conflicted, context)
   let raw = collect_text_with_provider(provider, prompt)
   let resolved = normalize_model_output(raw)
   if trim_text(resolved).length() == 0 {
@@ -596,8 +619,11 @@ fn build_provider(
   options : AiRebaseOptions,
   provider_ref : Ref[@llmlib.BoxedProvider?],
 ) -> @llmlib.BoxedProvider raise @bit.GitError {
-  let agent_loop_mode = use_agent_loop_mode(options)
-  build_provider_with_system_prompt(options, provider_ref, openrouter_system_prompt(agent_loop_mode))
+  build_provider_with_system_prompt(
+    options,
+    provider_ref,
+    openrouter_system_prompt(use_agent_loop_mode(options)),
+  )
 }
 
 ///|
@@ -606,7 +632,6 @@ fn build_provider_with_system_prompt(
   provider_ref : Ref[@llmlib.BoxedProvider?],
   system_prompt : String,
 ) -> @llmlib.BoxedProvider raise @bit.GitError {
-  let agent_loop_mode = use_agent_loop_mode(options)
   match provider_ref.val {
     Some(provider) => provider
     None => {
@@ -656,7 +681,7 @@ pub fn ai_generate_commit_message(
   )
   if use_agent_loop_mode(options) {
     let registry = build_repo_scoped_read_tools(fs, root)
-    let mut out = StringBuilder::new()
+    let out = StringBuilder::new()
     @llmlib.run_agent_cancellable(
       provider,
       registry,
@@ -700,6 +725,7 @@ fn resolve_conflict_paths(
   paths : Array[String],
   options : AiRebaseOptions,
   provider_ref : Ref[@llmlib.BoxedProvider?],
+  context : String,
 ) -> AiConflictResolution raise @bit.GitError {
   if paths.length() == 0 {
     return { resolved: [], failed: [] }
@@ -711,12 +737,14 @@ fn resolve_conflict_paths(
   for path in paths {
     let ok = if agent_loop_mode {
       resolve_conflict_file_with_agent_loop(
-        fs, rfs, root, path, provider, options,
+        fs, rfs, root, path, provider, options, context,
       ) catch {
         _ => false
       }
     } else {
-      resolve_conflict_file_with_provider(fs, rfs, root, path, provider) catch {
+      resolve_conflict_file_with_provider(
+        fs, rfs, root, path, provider, context,
+      ) catch {
         _ => false
       }
     }
@@ -727,6 +755,19 @@ fn resolve_conflict_paths(
     }
   }
   { resolved, failed }
+}
+
+///|
+pub fn ai_resolve_conflict_paths(
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  root : String,
+  paths : Array[String],
+  options : AiRebaseOptions,
+  context : String,
+) -> AiConflictResolution raise @bit.GitError {
+  let provider_ref : Ref[@llmlib.BoxedProvider?] = { val: options.provider }
+  resolve_conflict_paths(fs, rfs, root, paths, options, provider_ref, context)
 }
 
 ///|
@@ -767,7 +808,7 @@ fn continue_until_non_conflict(
       return current
     }
     let resolved = resolve_conflict_paths(
-      fs, rfs, root, conflict_paths, options, provider_ref,
+      fs, rfs, root, conflict_paths, options, provider_ref, "",
     )
     if resolved.failed.length() > 0 {
       raise_unresolved_conflicts(resolved.failed)
@@ -804,7 +845,7 @@ pub fn ai_rebase_continue(
   let marker_paths = find_conflict_marker_paths(rfs, root)
   if marker_paths.length() > 0 {
     let resolved = resolve_conflict_paths(
-      fs, rfs, root, marker_paths, options, provider_ref,
+      fs, rfs, root, marker_paths, options, provider_ref, "",
     )
     if resolved.failed.length() > 0 {
       raise_unresolved_conflicts(resolved.failed)

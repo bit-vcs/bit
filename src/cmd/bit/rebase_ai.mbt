@@ -88,7 +88,9 @@ fn parse_rebase_ai_args(
         continue
       }
       "--onto" =>
-        raise @bitcore.GitError::InvalidObject("rebase-ai: --onto requires a value")
+        raise @bitcore.GitError::InvalidObject(
+          "rebase-ai: --onto requires a value",
+        )
       "--model" if i + 1 < args.length() => {
         model = args[i + 1]
         i += 2

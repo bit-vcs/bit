@@ -129,6 +129,48 @@ fn generate_bash_completion() -> String {
     #|                __bit_refs
     #|            fi
     #|            ;;
+    #|        ai)
+    #|            if (( cword == subcmd_idx + 1 )); then
+    #|                COMPREPLY=( $(compgen -W "rebase merge commit cherry-pick revert" -- "$cur") )
+    #|            else
+    #|                case "${words[subcmd_idx+1]}" in
+    #|                    rebase)
+    #|                        if [[ "$cur" == -* ]]; then
+    #|                            COMPREPLY=( $(compgen -W "--onto --abort --continue --skip --quit --interactive -i --keep-empty --no-keep-empty --rebase-merges --no-rebase-merges --stat --no-stat --model --max-ai-rounds --agent-loop --agent-max-steps" -- "$cur") )
+    #|                        else
+    #|                            COMPREPLY=()
+    #|                        fi
+    #|                        ;;
+    #|                    merge)
+    #|                        if [[ "$cur" == -* ]]; then
+    #|                            COMPREPLY=( $(compgen -W "--no-commit --squash --no-ff --ff-only --ff --edit --no-edit --stat --no-stat --log --no-log --strategy -s --strategy-option -X --abort --continue --quit --allow-unrelated-histories -m --model --max-ai-rounds --agent-loop --agent-max-steps" -- "$cur") )
+    #|                        else
+    #|                            COMPREPLY=()
+    #|                        fi
+    #|                        ;;
+    #|                    commit)
+    #|                        COMPREPLY=( $(compgen -W "--model --max-ai-rounds --agent-loop --agent-max-steps --split -m --message -a --all --amend --no-edit -e --edit --allow-empty --allow-empty-message --author --date -s --signoff --dry-run -v --verbose" -- "$cur") )
+    #|                        ;;
+    #|                    cherry-pick)
+    #|                        if [[ "$cur" == -* ]]; then
+    #|                            COMPREPLY=( $(compgen -W "--edit -e --no-commit -n --mainline -m --abort --continue --quit --skip --model --max-ai-rounds --agent-loop --agent-max-steps" -- "$cur") )
+    #|                        else
+    #|                            COMPREPLY=()
+    #|                        fi
+    #|                        ;;
+    #|                    revert)
+    #|                        if [[ "$cur" == -* ]]; then
+    #|                            COMPREPLY=( $(compgen -W "--edit -e --no-commit -n --mainline -m --abort --continue --skip --model --max-ai-rounds --agent-loop --agent-max-steps" -- "$cur") )
+    #|                        else
+    #|                            COMPREPLY=()
+    #|                        fi
+    #|                        ;;
+    #|                    *)
+    #|                        COMPREPLY=()
+    #|                        ;;
+    #|                esac
+    #|            fi
+    #|            ;;
     #|        cherry-pick)
     #|            if [[ "$cur" == -* ]]; then
     #|                COMPREPLY=( $(compgen -W "--edit -e --no-commit -n --mainline -m --abort --continue --quit --skip" -- "$cur") )
@@ -425,6 +467,115 @@ fn generate_zsh_completion() -> String {
     #|                '--stat[show diffstat]' \
     #|                '--no-stat[hide diffstat]' \
     #|                '*:ref:__bit_ref_names'
+    #|            ;;
+    #|        ai)
+    #|            if (( cword == subcmd_idx + 1 )); then
+    #|                _arguments \
+    #|                    '1:subcommand:(rebase commit merge cherry-pick revert)'
+    #|            else
+    #|                case ${words[subcmd_idx+1]} in
+    #|                    rebase)
+    #|                        _arguments \
+    #|                            '--onto[rebase onto]:ref:__bit_ref_names' \
+    #|                            '--abort[abort rebase]' \
+    #|                            '--continue[continue rebase]' \
+    #|                            '--skip[skip current patch]' \
+    #|                            '--quit[quit rebase]' \
+    #|                            '(-i --interactive)'{-i,--interactive}'[interactive rebase]' \
+    #|                            '--keep-empty[keep empty commits]' \
+    #|                            '--rebase-merges[rebase merge commits]' \
+    #|                            '--stat[show diffstat]' \
+    #|                            '--no-stat[hide diffstat]' \
+    #|                            '--model[provider model]:model' \
+    #|                            '--max-ai-rounds[maximum AI resolution loops]:rounds' \
+    #|                            '--agent-loop[use agent loop mode]' \
+    #|                            '--agent-max-steps[agent steps per round]:steps' \
+    #|                            '*:ref:__bit_ref_names'
+    #|                        ;;
+    #|                    commit)
+    #|                        _arguments \
+    #|                            '--model[provider model]:model' \
+    #|                            '--max-ai-rounds[maximum AI resolution loops]:rounds' \
+    #|                            '--agent-loop[use agent loop mode]' \
+    #|                            '--agent-max-steps[agent steps per round]:steps' \
+    #|                            '--split[split mixed changes into logical units]' \
+    #|                            '-m[commit message]:message' \
+    #|                            '--message[commit message]:message' \
+    #|                            '-a[all]' \
+    #|                            '--all[all]' \
+    #|                            '--amend[amend]' \
+    #|                            '--no-edit[reuse message]' \
+    #|                            '-e[edit]' \
+    #|                            '--edit[edit]' \
+    #|                            '--allow-empty[allow empty]' \
+    #|                            '--allow-empty-message[allow empty message]' \
+    #|                            '--author[author]:author' \
+    #|                            '--date[date]:date' \
+    #|                            '-s[signoff]' \
+    #|                            '--signoff[signoff]' \
+    #|                            '--dry-run[dry run]' \
+    #|                            '-v[verbose]' \
+    #|                            '--verbose[verbose]'
+    #|                        ;;
+    #|                    merge)
+    #|                        _arguments \
+    #|                            '--no-commit[do not commit]' \
+    #|                            '--squash[squash commits]' \
+    #|                            '--no-ff[no fast-forward merge]' \
+    #|                            '--ff-only[fast-forward only]' \
+    #|                            '--ff[fast-forward if possible]' \
+    #|                            '--edit[edit merge message]' \
+    #|                            '--no-edit[accept auto merge message]' \
+    #|                            '--stat[show diffstat]' \
+    #|                            '--no-stat[hide diffstat]' \
+    #|                            '--log[add log to merge message]' \
+    #|                            '--no-log[omit log]' \
+    #|                            '--strategy[merge strategy]:strategy' \
+    #|                            '--strategy-option[strategy option]:strategy_option' \
+    #|                            '-s[merge strategy]:strategy' \
+    #|                            '-X[strategy option]:strategy_option' \
+    #|                            '--abort[abort merge]' \
+    #|                            '--continue[continue merge]' \
+    #|                            '--quit[quit merge]' \
+    #|                            '--allow-unrelated-histories[allow unrelated histories]' \
+    #|                            '--model[provider model]:model' \
+    #|                            '--max-ai-rounds[maximum AI resolution loops]:rounds' \
+    #|                            '--agent-loop[use agent loop mode]' \
+    #|                            '--agent-max-steps[agent steps per round]:steps' \
+    #|                            '*:ref:__bit_ref_names'
+    #|                        ;;
+    #|                    cherry-pick)
+    #|                        _arguments \
+    #|                            '--edit[edit message]' \
+    #|                            '--mainline[mainline parent]:number' \
+    #|                            '-m[mainline parent]:number' \
+    #|                            '--abort[abort cherry-pick]' \
+    #|                            '--continue[continue cherry-pick]' \
+    #|                            '--skip[skip current patch]' \
+    #|                            '--quit[quit cherry-pick]' \
+    #|                            '--no-commit[do not commit]' \
+    #|                            '--model[provider model]:model' \
+    #|                            '--max-ai-rounds[maximum AI resolution loops]:rounds' \
+    #|                            '--agent-loop[use agent loop mode]' \
+    #|                            '--agent-max-steps[agent steps per round]:steps' \
+    #|                            '*:ref:__bit_ref_names'
+    #|                        ;;
+    #|                    revert)
+    #|                        _arguments \
+    #|                            '--edit[edit message]' \
+    #|                            '--abort[abort revert]' \
+    #|                            '--continue[continue revert]' \
+    #|                            '--skip[skip current patch]' \
+    #|                            '--model[provider model]:model' \
+    #|                            '--max-ai-rounds[maximum AI resolution loops]:rounds' \
+    #|                            '--agent-loop[use agent loop mode]' \
+    #|                            '--agent-max-steps[agent steps per round]:steps' \
+    #|                            '*:ref:__bit_ref_names'
+    #|                        ;;
+    #|                    *)
+    #|                        ;;
+    #|                esac
+    #|            fi
     #|            ;;
     #|        cherry-pick)
     #|            _arguments \
@@ -801,13 +952,12 @@ fn completion_summary(cmd : String) -> String {
 ///|
 fn all_subcommands() -> Array[(String, String)] {
   let names = [
-    "add", "am", "apply", "bisect", "blame", "branch", "bundle", "cat", "cat-file",
+    "add", "ai", "am", "apply", "bisect", "blame", "branch", "bundle", "cat", "cat-file",
     "checkout", "cherry", "cherry-pick", "clean", "clone", "hub", "commit", "completion",
-    "x/hooks",
-    "config", "describe", "diff", "diff-files", "fetch", "format-patch", "fsck",
-    "gc", "grep", "hash-object", "help", "hq", "index-pack", "init", "log", "ls-files",
-    "ls-tree", "maintenance", "mcp", "merge", "mktree", "multi-pack-index", "mv",
-    "notes", "pack-objects", "pack-refs", "prune", "pull", "push", "range-diff",
+    "x/hooks", "config", "describe", "diff", "diff-files", "fetch", "format-patch",
+    "fsck", "gc", "grep", "hash-object", "help", "hq", "index-pack", "init", "log",
+    "ls-files", "ls-tree", "maintenance", "mcp", "merge", "mktree", "multi-pack-index",
+    "mv", "notes", "pack-objects", "pack-refs", "prune", "pull", "push", "range-diff",
     "read-tree", "repo", "rebase", "receive-pack", "reflog", "remote", "repack",
     "request-pull", "reset", "rev-list", "rev-parse", "revert", "rm", "send-pack",
     "shortlog", "show", "show-branch", "show-ref", "sparse-checkout", "stash", "status",
