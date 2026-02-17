@@ -100,6 +100,7 @@ jobs:
 
       - name: Aggregate
         run: |
+          set -o pipefail
           bash tools/aggregate-git-compat-random.sh compat-random-results | tee compat-random-summary.md
 
       - name: Setup Node.js

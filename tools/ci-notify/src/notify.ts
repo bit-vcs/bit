@@ -32,7 +32,11 @@ if (args.help) {
 }
 
 const config = buildConfig(args);
-let summary = parseSummarySafe(config.summary);
+let summary = parseSummarySafe(config.summary, {
+  runId: config.runId,
+  runUrl: config.runUrl,
+  repo: config.repo,
+});
 
 if (summary.failures <= 0) {
   console.log("[ci-notify] no failures in summary, skip.");
@@ -193,17 +197,53 @@ function parseSummary(path: string): Summary {
   };
 }
 
-function parseSummarySafe(path: string): Summary {
+function parseSummarySafe(path: string, context: {
+  runId: string;
+  runUrl: string;
+  repo: string;
+}): Summary {
   try {
     return parseSummary(path);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return {
-      raw: `summary parse failed: ${msg}`,
+      raw: formatSummaryParseFailure(path, msg, context),
       failures: 1,
       runCount: 0,
     };
   }
+}
+
+function formatSummaryParseFailure(
+  path: string,
+  reason: string,
+  context: {
+    runId: string;
+    runUrl: string;
+    repo: string;
+  }
+) {
+  return [
+    "# git-compat random aggregate",
+    `result_dir: failed to read summary`,
+    "files: 0",
+    "runs: 0",
+    "success: 0",
+    "failure: 1",
+    "success_rate: 0.00%",
+    "duration_sum_sec: 0",
+    "duration_avg_sec: 0",
+    "duration_min_sec: 0",
+    "duration_max_sec: 0",
+    "",
+    "## failures",
+    "- summary parse failed",
+    `- repository: ${context.repo}`,
+    `- run_id: ${context.runId}`,
+    `- run_url: ${context.runUrl}`,
+    `- summary_path: ${path}`,
+    `- reason: ${reason}`,
+  ].join("\n");
 }
 
 function generateBody(args: {
