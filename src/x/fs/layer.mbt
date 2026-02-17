@@ -3,18 +3,18 @@
 ///|
 pub fn Fs::add_layer(
   self : Fs,
-  backing_fs : &@git.RepoFileSystem,
-  tree_id : @git.ObjectId,
+  backing_fs : &@bit.RepoFileSystem,
+  tree_id : @bit.ObjectId,
   name : String,
-  commit_id? : @git.ObjectId? = None,
-) -> Unit raise @git.GitError {
+  commit_id? : @bit.ObjectId? = None,
+) -> Unit raise @bit.GitError {
   let db = self.get_db(backing_fs)
   let obj = db.get(backing_fs, tree_id)
   guard obj is Some(o) else {
-    raise @git.GitError::InvalidObject("Tree not found: \{tree_id}")
+    raise @bit.GitError::InvalidObject("Tree not found: \{tree_id}")
   }
-  if o.obj_type != @git.ObjectType::Tree {
-    raise @git.GitError::InvalidObject("Not a tree: \{tree_id}")
+  if o.obj_type != @bit.ObjectType::Tree {
+    raise @bit.GitError::InvalidObject("Not a tree: \{tree_id}")
   }
   self.layers.insert(0, { tree_id, commit_id, name })
   self.cache.clear()
@@ -23,19 +23,19 @@ pub fn Fs::add_layer(
 ///|
 pub fn Fs::add_layer_from_commit(
   self : Fs,
-  backing_fs : &@git.RepoFileSystem,
-  commit_id : @git.ObjectId,
+  backing_fs : &@bit.RepoFileSystem,
+  commit_id : @bit.ObjectId,
   name : String,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let db = self.get_db(backing_fs)
   let obj = db.get(backing_fs, commit_id)
   guard obj is Some(o) else {
-    raise @git.GitError::InvalidObject("Commit not found: \{commit_id}")
+    raise @bit.GitError::InvalidObject("Commit not found: \{commit_id}")
   }
-  if o.obj_type != @git.ObjectType::Commit {
-    raise @git.GitError::InvalidObject("Not a commit: \{commit_id}")
+  if o.obj_type != @bit.ObjectType::Commit {
+    raise @bit.GitError::InvalidObject("Not a commit: \{commit_id}")
   }
-  let info = @git.parse_commit(o.data)
+  let info = @bit.parse_commit(o.data)
   self.add_layer(backing_fs, info.tree, name, commit_id=Some(commit_id))
 }
 
@@ -61,15 +61,15 @@ pub fn Fs::list_layers(self : Fs) -> Array[Layer] {
 ///|
 pub fn Fs::flatten_layers(
   self : Fs,
-  backing_fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
-) -> @git.ObjectId raise @git.GitError {
+  backing_fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+) -> @bit.ObjectId raise @bit.GitError {
   if self.layers.length() == 0 && not(self.working.is_dirty()) {
     return self.base_tree
   }
   let root = TreeNode::new_dir()
   let db = self.get_db(rfs)
-  if self.base_tree != @git.ObjectId::zero() {
+  if self.base_tree != @bit.ObjectId::zero() {
     load_tree_recursive(db, rfs, self.base_tree, root)
   }
   let mut i = self.layers.length() - 1
@@ -87,7 +87,7 @@ pub fn Fs::flatten_layers(
     let blob_id = @lib.write_loose_object(
       backing_fs,
       self.git_dir,
-      @git.ObjectType::Blob,
+      @bit.ObjectType::Blob,
       content,
     )
     insert_into_tree(Some(db), rfs, root, path, blob_id, 0o100644)
@@ -98,18 +98,18 @@ pub fn Fs::flatten_layers(
 ///|
 fn merge_tree_into(
   db : @lib.ObjectDb,
-  rfs : &@git.RepoFileSystem,
-  tree_id : @git.ObjectId,
+  rfs : &@bit.RepoFileSystem,
+  tree_id : @bit.ObjectId,
   target : TreeNode,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let obj = db.get(rfs, tree_id)
   guard obj is Some(o) else {
-    raise @git.GitError::InvalidObject("Tree not found: \{tree_id}")
+    raise @bit.GitError::InvalidObject("Tree not found: \{tree_id}")
   }
-  if o.obj_type != @git.ObjectType::Tree {
-    raise @git.GitError::InvalidObject("Not a tree: \{tree_id}")
+  if o.obj_type != @bit.ObjectType::Tree {
+    raise @bit.GitError::InvalidObject("Not a tree: \{tree_id}")
   }
-  let entries = @git.parse_tree(o.data)
+  let entries = @bit.parse_tree(o.data)
   for entry in entries {
     if is_tree_mode(entry.mode) {
       // Check if target has existing directory to merge into

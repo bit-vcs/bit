@@ -109,7 +109,7 @@ fn cmd_storage_commit_command(message : String) -> @runtime.StorageCommand {
 
 ///|
 async test "storage runtime cmd wrapper: delegates successful flow" {
-  let fs = @git.TestFs::new()
+  let fs = @bitcore.TestFs::new()
   let root_cmd = "/repo-storage-runtime-cmd-wrapper"
   let root_runtime = "/repo-storage-runtime-runtime-direct"
   let (
@@ -171,7 +171,7 @@ async test "storage runtime cmd wrapper: delegates successful flow" {
 
 ///|
 async test "storage runtime cmd wrapper: delegates error path" {
-  let fs = @git.TestFs::new()
+  let fs = @bitcore.TestFs::new()
   let mut cmd_error = ""
   run_storage_command_by_name(fs, fs, "/repo-cmd-error", "clone", []) catch {
     err => cmd_error = "\{err}"
@@ -325,7 +325,7 @@ test "storage runtime parser: hash-object normal and invalid type" {
       @runtime.StorageCommand::HashObject({
         write_object: false,
         stdin_mode: false,
-        obj_type: @git.ObjectType::Blob,
+        obj_type: @bitcore.ObjectType::Blob,
         paths: [],
       })
     }
@@ -334,7 +334,7 @@ test "storage runtime parser: hash-object normal and invalid type" {
     @runtime.StorageCommand::HashObject(args) => {
       assert_true(args.write_object)
       assert_false(args.stdin_mode)
-      assert_eq(args.obj_type, @git.ObjectType::Tree)
+      assert_eq(args.obj_type, @bitcore.ObjectType::Tree)
       assert_eq(args.paths, ["x.txt"])
     }
     _ => fail("expected hash-object command")

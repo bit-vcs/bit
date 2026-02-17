@@ -124,7 +124,7 @@ async fn remove_dir_recursive(path : String) -> Unit {
 }
 
 ///|
-async fn git_stdout_trim(args : Array[String], cwd : String?) -> (Int, String) {
+async fn bit_stdout_trim(args : Array[String], cwd : String?) -> (Int, String) {
   let (code, out, _) = run_git(args, None, cwd)
   (code, String::trim(bytes_to_string_lossy(out)).to_string())
 }
@@ -178,7 +178,7 @@ async test "git oracle: index-pack accepts blob packfile" {
     remove_dir_recursive(temp_dir)
     return ()
   }
-  let expected = @git.hash_blob(content).to_hex()
+  let expected = @bit.hash_blob(content).to_hex()
   let verify_out = bytes_to_string_lossy(vout)
   let oid = match find_blob_hash_in_verify_output(verify_out) {
     Some(id) => id
@@ -241,9 +241,9 @@ async test "git oracle: parse pack-objects output" {
   }
   let parsed_ids : Array[String] = []
   for obj in objects {
-    parsed_ids.push(@git.hash_object_content(obj.obj_type, obj.data).to_hex())
+    parsed_ids.push(@bit.hash_object_content(obj.obj_type, obj.data).to_hex())
   }
-  let (head_code, commit_hex) = git_stdout_trim(
+  let (head_code, commit_hex) = bit_stdout_trim(
     ["rev-parse", "HEAD"],
     Some(repo_dir),
   )
@@ -251,7 +251,7 @@ async test "git oracle: parse pack-objects output" {
     remove_dir_recursive(repo_dir)
     return ()
   }
-  let (tree_code, tree_hex) = git_stdout_trim(
+  let (tree_code, tree_hex) = bit_stdout_trim(
     ["rev-parse", "HEAD^{tree}"],
     Some(repo_dir),
   )
@@ -259,7 +259,7 @@ async test "git oracle: parse pack-objects output" {
     remove_dir_recursive(repo_dir)
     return ()
   }
-  let (blob_code, blob_hex) = git_stdout_trim(
+  let (blob_code, blob_hex) = bit_stdout_trim(
     ["hash-object", "hello.txt"],
     Some(repo_dir),
   )
@@ -373,7 +373,7 @@ async test "git oracle: parse delta packfile from git" {
   let mut found_base = false
   let mut found_modified = false
   for obj in objects {
-    if obj.obj_type == @git.ObjectType::Blob {
+    if obj.obj_type == @bit.ObjectType::Blob {
       let text = @utf8.decode_lossy(obj.data[:])
       if text.contains("some content") {
         found_base = true
@@ -397,11 +397,11 @@ async test "git oracle: verify MoonBit packfile with git verify-pack" {
   let temp_dir = create_temp_dir("moonbit-pack-verify")
   let base = @utf8.encode("Hello, World! This is a test content.\n")
   let target = @utf8.encode("Hello, World! This is a test modified.\n")
-  let obj1 = @git.PackObject::new(@git.ObjectType::Blob, base)
-  let obj2 = @git.PackObject::new(@git.ObjectType::Blob, target)
+  let obj1 = @bit.PackObject::new(@bit.ObjectType::Blob, base)
+  let obj2 = @bit.PackObject::new(@bit.ObjectType::Blob, target)
   let pack = create_packfile_with_delta(
     [obj1, obj2],
-    @git.PackDeltaMode::OfsDelta,
+    @bit.PackDeltaMode::OfsDelta,
   )
   let pack_path = "\{temp_dir}/test.pack"
   let idx_path = "\{temp_dir}/test.idx"
@@ -432,11 +432,11 @@ async test "git oracle: verify REF_DELTA packfile" {
   let temp_dir = create_temp_dir("moonbit-ref-delta-verify")
   let base = @utf8.encode("Base content line 1\nBase content line 2\n")
   let target = @utf8.encode("Base content line 1\nModified line 2\n")
-  let obj1 = @git.PackObject::new(@git.ObjectType::Blob, base)
-  let obj2 = @git.PackObject::new(@git.ObjectType::Blob, target)
+  let obj1 = @bit.PackObject::new(@bit.ObjectType::Blob, base)
+  let obj2 = @bit.PackObject::new(@bit.ObjectType::Blob, target)
   let pack = create_packfile_with_delta(
     [obj1, obj2],
-    @git.PackDeltaMode::RefDelta,
+    @bit.PackDeltaMode::RefDelta,
   )
   let pack_path = "\{temp_dir}/ref.pack"
   let idx_path = "\{temp_dir}/ref.idx"
@@ -465,8 +465,8 @@ async test "git oracle: verify packfile with commit+tree+blob" {
   // Create a packfile with all three object types using create_commit_packfile
   let temp_dir = create_temp_dir("moonbit-commit-tree-blob-pack")
   let blob_content = @utf8.encode("hello world\n")
-  let commit = @git.Commit::new(
-    @git.ObjectId::zero(), // Will be replaced by create_commit_packfile
+  let commit = @bit.Commit::new(
+    @bit.ObjectId::zero(), // Will be replaced by create_commit_packfile
     [],
     "Test <test@example.com>",
     1700000000L,
@@ -509,7 +509,7 @@ async test "git oracle: verify packfile with commit+tree+blob" {
 }
 
 // Note: upload-pack oracle tests are in src/lib/upload_pack_test.mbt
-// because they need access to @gitlib package which is not accessible
+// because they need access to @bitlib package which is not accessible
 // from the main package's blackbox tests.
 
 // =============================================================================
@@ -522,8 +522,8 @@ async test "git oracle: pack index verified by git" {
   // Create a simple packfile with multiple objects
   let blob1 = @utf8.encode("hello\n")
   let blob2 = @utf8.encode("world\n")
-  let obj1 = @git.PackObject::new(@git.ObjectType::Blob, blob1)
-  let obj2 = @git.PackObject::new(@git.ObjectType::Blob, blob2)
+  let obj1 = @bit.PackObject::new(@bit.ObjectType::Blob, blob1)
+  let obj2 = @bit.PackObject::new(@bit.ObjectType::Blob, blob2)
   let pack = create_packfile([obj1, obj2])
   // Build pack index using MoonBit
   let idx = build_pack_index_from_objects(pack, [obj1, obj2])
@@ -551,8 +551,8 @@ async test "git oracle: pack index verified by git" {
   let (vcode, vout, _) = run_git(["verify-pack", "-v", pack_path], None, None)
   if vcode == 0 {
     let out_str = bytes_to_string_lossy(vout)
-    let hello_hash = @git.hash_blob(blob1).to_hex()
-    let world_hash = @git.hash_blob(blob2).to_hex()
+    let hello_hash = @bit.hash_blob(blob1).to_hex()
+    let world_hash = @bit.hash_blob(blob2).to_hex()
     // These should be in the output, but don't fail test if not
     if not(out_str.contains(hello_hash)) || not(out_str.contains(world_hash)) {
       println("Warning: blob hashes not found in verify-pack output")
@@ -604,7 +604,7 @@ async test "git oracle: parse tree matches git cat-file" {
     return ()
   }
   // Get tree object from git
-  let (tree_code, tree_hex) = git_stdout_trim(
+  let (tree_code, tree_hex) = bit_stdout_trim(
     ["rev-parse", "HEAD^{tree}"],
     Some(repo_dir),
   )
@@ -626,7 +626,7 @@ async test "git oracle: parse tree matches git cat-file" {
     return ()
   }
   // Parse with MoonBit
-  let entries = @git.parse_tree(cat_out) catch {
+  let entries = @bit.parse_tree(cat_out) catch {
     _ => {
       remove_dir_recursive(repo_dir)
       return ()
@@ -683,7 +683,7 @@ async test "git oracle: parse tree with subdirectory" {
   )
   assert_true(commit_code == 0)
   // Get tree
-  let (tree_code, tree_hex) = git_stdout_trim(
+  let (tree_code, tree_hex) = bit_stdout_trim(
     ["rev-parse", "HEAD^{tree}"],
     Some(repo_dir),
   )
@@ -700,7 +700,7 @@ async test "git oracle: parse tree with subdirectory" {
     remove_dir_recursive(repo_dir)
     return ()
   }
-  let entries = @git.parse_tree(cat_out) catch {
+  let entries = @bit.parse_tree(cat_out) catch {
     _ => {
       remove_dir_recursive(repo_dir)
       return ()
@@ -765,7 +765,7 @@ async test "git oracle: parse commit matches git format" {
     return ()
   }
   // Get commit object
-  let (head_code, head_hex) = git_stdout_trim(
+  let (head_code, head_hex) = bit_stdout_trim(
     ["rev-parse", "HEAD"],
     Some(repo_dir),
   )
@@ -783,7 +783,7 @@ async test "git oracle: parse commit matches git format" {
     return ()
   }
   // Parse with MoonBit
-  let commit = @git.parse_commit(cat_out) catch {
+  let commit = @bit.parse_commit(cat_out) catch {
     _ => {
       remove_dir_recursive(repo_dir)
       return ()
@@ -793,18 +793,18 @@ async test "git oracle: parse commit matches git format" {
   assert_true(commit.tree.to_hex().length() == 40)
   assert_true(commit.parents.length() == 0)
   // Verify tree hash matches git
-  let (git_tree_code, git_tree_hex) = git_stdout_trim(
+  let (bit_tree_code, bit_tree_hex) = bit_stdout_trim(
     ["rev-parse", "HEAD^{tree}"],
     Some(repo_dir),
   )
-  if git_tree_code != 0 {
+  if bit_tree_code != 0 {
     remove_dir_recursive(repo_dir)
     return ()
   }
   // Compare tree hashes
   let parsed_tree = commit.tree.to_hex()
-  if parsed_tree != git_tree_hex {
-    println("Tree mismatch: parsed=\{parsed_tree} git=\{git_tree_hex}")
+  if parsed_tree != bit_tree_hex {
+    println("Tree mismatch: parsed=\{parsed_tree} git=\{bit_tree_hex}")
     // Skip this test if mismatch (might be flaky)
     remove_dir_recursive(repo_dir)
     return ()
@@ -843,7 +843,7 @@ async test "git oracle: parse commit with parent" {
     remove_dir_recursive(repo_dir)
     return ()
   }
-  let (first_code, first_hex) = git_stdout_trim(
+  let (first_code, first_hex) = bit_stdout_trim(
     ["rev-parse", "HEAD"],
     Some(repo_dir),
   )
@@ -876,7 +876,7 @@ async test "git oracle: parse commit with parent" {
     return ()
   }
   // Get second commit
-  let (head_code, head_hex) = git_stdout_trim(
+  let (head_code, head_hex) = bit_stdout_trim(
     ["rev-parse", "HEAD"],
     Some(repo_dir),
   )
@@ -893,7 +893,7 @@ async test "git oracle: parse commit with parent" {
     remove_dir_recursive(repo_dir)
     return ()
   }
-  let commit = @git.parse_commit(cat_out) catch {
+  let commit = @bit.parse_commit(cat_out) catch {
     _ => {
       remove_dir_recursive(repo_dir)
       return ()
@@ -979,7 +979,7 @@ async test "git oracle: parse merge commit with two parents" {
     remove_dir_recursive(repo_dir)
     return ()
   }
-  let (feature_code, feature_hex) = git_stdout_trim(
+  let (feature_code, feature_hex) = bit_stdout_trim(
     ["rev-parse", "HEAD"],
     Some(repo_dir),
   )
@@ -1028,7 +1028,7 @@ async test "git oracle: parse merge commit with two parents" {
     remove_dir_recursive(repo_dir)
     return ()
   }
-  let (main_code, main_hex) = git_stdout_trim(
+  let (main_code, main_hex) = bit_stdout_trim(
     ["rev-parse", "HEAD"],
     Some(repo_dir),
   )
@@ -1050,7 +1050,7 @@ async test "git oracle: parse merge commit with two parents" {
     return ()
   }
   // Get merge commit
-  let (head_code, head_hex) = git_stdout_trim(
+  let (head_code, head_hex) = bit_stdout_trim(
     ["rev-parse", "HEAD"],
     Some(repo_dir),
   )
@@ -1067,7 +1067,7 @@ async test "git oracle: parse merge commit with two parents" {
     remove_dir_recursive(repo_dir)
     return ()
   }
-  let commit = @git.parse_commit(cat_out) catch {
+  let commit = @bit.parse_commit(cat_out) catch {
     _ => {
       remove_dir_recursive(repo_dir)
       return ()
@@ -1148,7 +1148,7 @@ async test "git oracle: executable file mode 100755" {
     return ()
   }
   // Get tree hash
-  let (tree_code, tree_hex) = git_stdout_trim(
+  let (tree_code, tree_hex) = bit_stdout_trim(
     ["rev-parse", "HEAD^{tree}"],
     Some(repo_dir),
   )
@@ -1165,7 +1165,7 @@ async test "git oracle: executable file mode 100755" {
     remove_dir_recursive(repo_dir)
     return ()
   }
-  let entries = @git.parse_tree(cat_out) catch {
+  let entries = @bit.parse_tree(cat_out) catch {
     _ => {
       remove_dir_recursive(repo_dir)
       return ()
@@ -1207,7 +1207,7 @@ async test "git oracle: symlink mode 120000" {
   )
   assert_true(commit_code == 0)
   // Get tree
-  let (tree_code, tree_hex) = git_stdout_trim(
+  let (tree_code, tree_hex) = bit_stdout_trim(
     ["rev-parse", "HEAD^{tree}"],
     Some(repo_dir),
   )
@@ -1224,7 +1224,7 @@ async test "git oracle: symlink mode 120000" {
     remove_dir_recursive(repo_dir)
     return ()
   }
-  let entries = @git.parse_tree(cat_out) catch {
+  let entries = @bit.parse_tree(cat_out) catch {
     _ => {
       remove_dir_recursive(repo_dir)
       return ()
@@ -1302,7 +1302,7 @@ async test "git oracle: MoonBit blob hash matches git hash-object" {
   let content_bytes = @utf8.encode(content)
 
   // Hash with MoonBit
-  let moonbit_hash = @git.hash_blob(content_bytes).to_hex()
+  let moonbit_hash = @bit.hash_blob(content_bytes).to_hex()
 
   // Hash with git
   let temp_dir = create_temp_dir("moonbit-blob-hash")
@@ -1313,15 +1313,15 @@ async test "git oracle: MoonBit blob hash matches git hash-object" {
       return ()
     }
   }
-  let (code, git_out, _) = run_git(["hash-object", file_path], None, None)
+  let (code, bit_out, _) = run_git(["hash-object", file_path], None, None)
   if code != 0 {
     remove_dir_recursive(temp_dir)
     return ()
   }
-  let git_hash = bytes_to_string_lossy(git_out).trim().to_string()
+  let bit_hash = bytes_to_string_lossy(bit_out).trim().to_string()
 
   // Verify they match
-  assert_true(moonbit_hash == git_hash)
+  assert_true(moonbit_hash == bit_hash)
   remove_dir_recursive(temp_dir)
 }
 
@@ -1352,31 +1352,31 @@ async test "git oracle: MoonBit tree format matches git write-tree" {
     return ()
   }
   // Get git's tree hash
-  let (wt_code, git_tree_hex, _) = run_git(["write-tree"], None, Some(repo_dir))
+  let (wt_code, bit_tree_hex, _) = run_git(["write-tree"], None, Some(repo_dir))
   if wt_code != 0 {
     remove_dir_recursive(repo_dir)
     return ()
   }
-  let git_tree_hash = bytes_to_string_lossy(git_tree_hex).trim().to_string()
-  if git_tree_hash.length() != 40 {
+  let bit_tree_hash = bytes_to_string_lossy(bit_tree_hex).trim().to_string()
+  if bit_tree_hash.length() != 40 {
     // git write-tree failed to produce valid hash
     remove_dir_recursive(repo_dir)
     return ()
   }
 
   // Create same tree with MoonBit
-  let alpha_hash = @git.hash_blob(@utf8.encode("alpha\n"))
-  let beta_hash = @git.hash_blob(@utf8.encode("beta\n"))
+  let alpha_hash = @bit.hash_blob(@utf8.encode("alpha\n"))
+  let beta_hash = @bit.hash_blob(@utf8.encode("beta\n"))
   let entries = [
-    @git.TreeEntry::new("100644", "alpha.txt", alpha_hash),
-    @git.TreeEntry::new("100644", "beta.txt", beta_hash),
+    @bit.TreeEntry::new("100644", "alpha.txt", alpha_hash),
+    @bit.TreeEntry::new("100644", "beta.txt", beta_hash),
   ]
-  let (moonbit_tree_id, _) = @git.create_tree(entries)
+  let (moonbit_tree_id, _) = @bit.create_tree(entries)
 
   // Verify hashes match
-  if moonbit_tree_id.to_hex() != git_tree_hash {
+  if moonbit_tree_id.to_hex() != bit_tree_hash {
     println(
-      "Tree hash mismatch: moonbit=\{moonbit_tree_id.to_hex()} git=\{git_tree_hash}",
+      "Tree hash mismatch: moonbit=\{moonbit_tree_id.to_hex()} git=\{bit_tree_hash}",
     )
     remove_dir_recursive(repo_dir)
     return ()
@@ -1404,8 +1404,8 @@ async test "git oracle: MoonBit packfile unpack with git unpack-objects" {
   // Create packfile with MoonBit
   let blob1 = @utf8.encode("first file content\n")
   let blob2 = @utf8.encode("second file content\n")
-  let obj1 = @git.PackObject::new(@git.ObjectType::Blob, blob1)
-  let obj2 = @git.PackObject::new(@git.ObjectType::Blob, blob2)
+  let obj1 = @bit.PackObject::new(@bit.ObjectType::Blob, blob1)
+  let obj2 = @bit.PackObject::new(@bit.ObjectType::Blob, blob2)
   let pack = create_packfile([obj1, obj2])
 
   // Save packfile
@@ -1429,8 +1429,8 @@ async test "git oracle: MoonBit packfile unpack with git unpack-objects" {
   }
 
   // Verify objects exist in repo
-  let hash1 = @git.hash_blob(blob1).to_hex()
-  let hash2 = @git.hash_blob(blob2).to_hex()
+  let hash1 = @bit.hash_blob(blob1).to_hex()
+  let hash2 = @bit.hash_blob(blob2).to_hex()
   let (cat1_code, cat1_out, _) = run_git(
     ["cat-file", "blob", hash1],
     None,
@@ -1489,7 +1489,7 @@ async test "git oracle: MoonBit commit format matches git commit-tree" {
     remove_dir_recursive(repo_dir)
     return ()
   }
-  let tree_id = @git.ObjectId::from_hex(tree_hex)
+  let tree_id = @bit.ObjectId::from_hex(tree_hex)
 
   // Create commit with git commit-tree
   let author = "Test Author <test@example.com>"
@@ -1507,11 +1507,11 @@ async test "git oracle: MoonBit commit format matches git commit-tree" {
     remove_dir_recursive(repo_dir)
     return ()
   }
-  let git_commit_hex = bytes_to_string_lossy(ct_out).trim().to_string()
+  let bit_commit_hex = bytes_to_string_lossy(ct_out).trim().to_string()
 
   // Get the raw commit from git
   let (cat_code, cat_out, _) = run_git(
-    ["cat-file", "commit", git_commit_hex],
+    ["cat-file", "commit", bit_commit_hex],
     None,
     Some(repo_dir),
   )
@@ -1521,11 +1521,11 @@ async test "git oracle: MoonBit commit format matches git commit-tree" {
   }
 
   // Parse the commit to extract author timestamp
-  let git_commit_text = bytes_to_string_lossy(cat_out)
+  let bit_commit_text = bytes_to_string_lossy(cat_out)
   // Parse author line to get actual timestamp git used
-  let mut git_author_time = 0L
-  let mut git_author_tz = "+0000"
-  for line in git_commit_text.split("\n") {
+  let mut bit_author_time = 0L
+  let mut bit_author_tz = "+0000"
+  for line in bit_commit_text.split("\n") {
     let line_str = line.to_string()
     if line_str.has_prefix("author ") {
       // Format: "author Name <email> timestamp tz"
@@ -1538,8 +1538,8 @@ async test "git oracle: MoonBit commit format matches git commit-tree" {
       if parts_arr.length() >= 2 {
         let tz_idx = parts_arr.length() - 1
         let ts_idx = parts_arr.length() - 2
-        git_author_tz = parts_arr[tz_idx]
-        git_author_time = @strconv.parse_int64(parts_arr[ts_idx]) catch {
+        bit_author_tz = parts_arr[tz_idx]
+        bit_author_time = @strconv.parse_int64(parts_arr[ts_idx]) catch {
           _ => 0L
         }
       }
@@ -1548,24 +1548,24 @@ async test "git oracle: MoonBit commit format matches git commit-tree" {
   }
 
   // Create same commit with MoonBit using git's actual timestamp
-  let commit = @git.Commit::new(
+  let commit = @bit.Commit::new(
     tree_id,
     [],
     author,
-    git_author_time,
-    git_author_tz,
+    bit_author_time,
+    bit_author_tz,
     author,
-    git_author_time,
-    git_author_tz,
+    bit_author_time,
+    bit_author_tz,
     message,
   )
-  let (_, _) = @git.create_commit(commit)
+  let (_, _) = @bit.create_commit(commit)
 
   // Note: The hashes may not match exactly due to timestamp differences
   // from when git runs, so we verify the format instead
   // by checking both can be parsed identically
   let (cat2_code, cat2_out, _) = run_git(
-    ["cat-file", "commit", git_commit_hex],
+    ["cat-file", "commit", bit_commit_hex],
     None,
     Some(repo_dir),
   )
@@ -1575,7 +1575,7 @@ async test "git oracle: MoonBit commit format matches git commit-tree" {
   }
 
   // Parse both commits
-  let git_parsed = @git.parse_commit(cat2_out) catch {
+  let bit_parsed = @bit.parse_commit(cat2_out) catch {
     _ => {
       remove_dir_recursive(repo_dir)
       return ()
@@ -1583,8 +1583,8 @@ async test "git oracle: MoonBit commit format matches git commit-tree" {
   }
 
   // Verify tree hashes match
-  assert_true(git_parsed.tree.to_hex() == tree_hex)
-  assert_true(git_parsed.parents.length() == 0)
+  assert_true(bit_parsed.tree.to_hex() == tree_hex)
+  assert_true(bit_parsed.parents.length() == 0)
   remove_dir_recursive(repo_dir)
 }
 
@@ -1620,7 +1620,7 @@ async test "git oracle: diff-tree compatibility" {
     remove_dir_recursive(repo_dir)
     return ()
   }
-  let (tree1_code, tree1_hex) = git_stdout_trim(
+  let (tree1_code, tree1_hex) = bit_stdout_trim(
     ["rev-parse", "HEAD^{tree}"],
     Some(repo_dir),
   )
@@ -1653,7 +1653,7 @@ async test "git oracle: diff-tree compatibility" {
     remove_dir_recursive(repo_dir)
     return ()
   }
-  let (tree2_code, tree2_hex) = git_stdout_trim(
+  let (tree2_code, tree2_hex) = bit_stdout_trim(
     ["rev-parse", "HEAD^{tree}"],
     Some(repo_dir),
   )
@@ -1680,8 +1680,8 @@ async test "git oracle: diff-tree compatibility" {
   assert_true(diff_text.contains("M")) // M for modified
 
   // Verify we can reconstruct the blob hashes
-  let old_blob = @git.hash_blob(@utf8.encode("original\n")).to_hex()
-  let new_blob = @git.hash_blob(@utf8.encode("modified\n")).to_hex()
+  let old_blob = @bit.hash_blob(@utf8.encode("original\n")).to_hex()
+  let new_blob = @bit.hash_blob(@utf8.encode("modified\n")).to_hex()
   assert_true(diff_text.contains(old_blob))
   assert_true(diff_text.contains(new_blob))
   remove_dir_recursive(repo_dir)
@@ -1723,8 +1723,8 @@ async test "git oracle: ls-files index format" {
   let ls_text = bytes_to_string_lossy(ls_out)
 
   // Verify expected blob hashes
-  let one_hash = @git.hash_blob(@utf8.encode("one\n")).to_hex()
-  let two_hash = @git.hash_blob(@utf8.encode("two\n")).to_hex()
+  let one_hash = @bit.hash_blob(@utf8.encode("one\n")).to_hex()
+  let two_hash = @bit.hash_blob(@utf8.encode("two\n")).to_hex()
   assert_true(ls_text.contains(one_hash))
   assert_true(ls_text.contains(two_hash))
   assert_true(ls_text.contains("one.txt"))

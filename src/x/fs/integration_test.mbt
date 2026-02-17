@@ -8,7 +8,7 @@ fn get_helix_git_dir() -> String {
 
 ///|
 /// Get HEAD commit from helix repository
-fn get_helix_head() -> @git.ObjectId raise @git.GitError {
+fn get_helix_head() -> @bit.ObjectId raise @bit.GitError {
   let osfs = @osfs.OsFs::new()
   let git_dir = get_helix_git_dir()
   let head_path = git_dir + "/HEAD"
@@ -23,9 +23,9 @@ fn get_helix_head() -> @git.ObjectId raise @git.GitError {
     let ref_path = git_dir + "/" + ref_name
     let ref_content = osfs.read_file(ref_path)
     let ref_str = @utf8.decode_lossy(ref_content[:]).trim().to_string()
-    @git.ObjectId::from_hex(ref_str)
+    @bit.ObjectId::from_hex(ref_str)
   } else {
-    @git.ObjectId::from_hex(head_str)
+    @bit.ObjectId::from_hex(head_str)
   }
 }
 
@@ -193,7 +193,7 @@ struct FileChange {
 /// Collect all changes from the working layer
 fn collect_changes(
   bitfs : Fs,
-  osfs : &@git.RepoFileSystem,
+  osfs : &@bit.RepoFileSystem,
 ) -> Array[FileChange] {
   let changes : Array[FileChange] = []
 
@@ -219,7 +219,7 @@ fn collect_changes(
 /// Check if file exists in base tree (without creating new Fs)
 fn file_exists_in_base(
   bitfs : Fs,
-  osfs : &@git.RepoFileSystem,
+  osfs : &@bit.RepoFileSystem,
   path : String,
 ) -> Bool {
   bitfs.exists_in_base(osfs, path)

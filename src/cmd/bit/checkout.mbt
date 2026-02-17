@@ -2,7 +2,7 @@
 async fn handle_checkout(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let fs = OsFs::new()
-  let rfs : &@git.RepoFileSystem = fs
+  let rfs : &@bitcore.RepoFileSystem = fs
   let git_dir = resolve_git_dir(rfs, root)
   // Parse arguments
   let mut saw_separator = false
@@ -26,7 +26,7 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
     i += 1
   }
   if targets.length() == 0 {
-    raise @git.GitError::InvalidObject("No target specified for checkout")
+    raise @bitcore.GitError::InvalidObject("No target specified for checkout")
   }
   // git checkout -b <branch> [start-point]
   if create_branch {
@@ -34,39 +34,39 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
     let branch_name = targets[0]
     let start_point = if targets.length() > 1 { Some(targets[1]) } else { None }
     // Check if branch already exists
-    let branch_exists = @gitlib.resolve_ref(
+    let branch_exists = @bitlib.resolve_ref(
         fs,
         git_dir,
         "refs/heads/" + branch_name,
       )
       is Some(_)
     if branch_exists && not(force_create) {
-      raise @git.GitError::InvalidObject(
+      raise @bitcore.GitError::InvalidObject(
         "branch '\{branch_name}' already exists",
       )
     }
     // For start point, first checkout to that commit, then create branch
     match start_point {
       Some(ref_name) => {
-        let commit_id = @gitrepo.rev_parse(fs, git_dir, ref_name)
+        let commit_id = @bitrepo.rev_parse(fs, git_dir, ref_name)
         guard commit_id is Some(_) else {
-          raise @git.GitError::InvalidObject("unknown revision: \{ref_name}")
+          raise @bitcore.GitError::InvalidObject("unknown revision: \{ref_name}")
         }
         // Checkout the start point first (detached)
         let _ = checkout_with_promisor_retry(fs, root, ref_name, detach=true)
         // Then create and switch to new branch
-        @gitlib.switch_branch(fs, fs, root, branch_name, create=true)
+        @bitlib.switch_branch(fs, fs, root, branch_name, create=true)
       }
       None =>
         // Use switch_branch which handles both atomically
-        @gitlib.switch_branch(fs, fs, root, branch_name, create=true)
+        @bitlib.switch_branch(fs, fs, root, branch_name, create=true)
     }
     save_previous_checkout_location(fs, git_dir, previous_location)
     return ()
   }
   // If -- was used, treat all targets as file paths
   if saw_separator {
-    @gitlib.restore_paths(fs, fs, root, targets)
+    @bitlib.restore_paths(fs, fs, root, targets)
     return ()
   }
   // Single target: determine if it's a branch or file
@@ -74,7 +74,7 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
     let target = resolve_checkout_target(rfs, git_dir, targets[0])
     let previous_location = current_checkout_location(rfs, git_dir)
     let is_file = fs.is_file(root + "/" + target)
-    let is_branch = @gitlib.resolve_ref(fs, git_dir, "refs/heads/" + target)
+    let is_branch = @bitlib.resolve_ref(fs, git_dir, "refs/heads/" + target)
       is Some(_)
     let mut switched_head = false
     if is_file && is_branch {
@@ -83,7 +83,7 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
       switched_head = true
     } else if is_file {
       // Restore single file
-      @gitlib.restore_paths(fs, fs, root, [target])
+      @bitlib.restore_paths(fs, fs, root, [target])
     } else {
       // Try as branch/commit
       let _ = checkout_with_promisor_retry(fs, root, target)
@@ -94,7 +94,7 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
     }
   } else {
     // Multiple targets: treat as file paths
-    @gitlib.restore_paths(fs, fs, root, targets)
+    @bitlib.restore_paths(fs, fs, root, targets)
   }
 }
 
@@ -104,13 +104,13 @@ async fn checkout_with_promisor_retry(
   root : String,
   spec : String,
   detach? : Bool = false,
-) -> @git.ObjectId raise Error {
+) -> @bitcore.ObjectId raise Error {
   let git_dir = resolve_git_dir(fs, root)
   let mut checkout_spec = spec
   let mut checkout_detach = detach
-  let mut resolved_target : @git.ObjectId? = None
+  let mut resolved_target : @bitcore.ObjectId? = None
   if spec.contains("^") || spec.contains("~") {
-    match @gitrepo.rev_parse(fs, git_dir, spec) {
+    match @bitrepo.rev_parse(fs, git_dir, spec) {
       Some(id) => {
         resolved_target = Some(id)
         checkout_spec = id.to_hex()
@@ -119,11 +119,11 @@ async fn checkout_with_promisor_retry(
       None => ()
     }
   }
-  let mut promisor_db : @gitlib.PromisorDb? = None
+  let mut promisor_db : @bitlib.PromisorDb? = None
   let mut wrote_trace_round = false
   match resolved_target {
     Some(target_id) => {
-      let pdb = @gitlibnative.native_promisor_db(fs, git_dir)
+      let pdb = @bitlibnative.native_promisor_db(fs, git_dir)
       if pdb.has_promisor() {
         let missing_ids = collect_missing_checkout_blob_ids(
           fs, git_dir, target_id,
@@ -142,7 +142,7 @@ async fn checkout_with_promisor_retry(
   }
   let mut attempts = 0
   while attempts < 16 {
-    let result : Result[@git.ObjectId, Error] = try? @gitlib.checkout(
+    let result : Result[@bitcore.ObjectId, Error] = try? @bitlib.checkout(
       fs,
       fs,
       root,
@@ -157,7 +157,7 @@ async fn checkout_with_promisor_retry(
             let pdb = match promisor_db {
               Some(db) => db
               None => {
-                let db = @gitlibnative.native_promisor_db(fs, git_dir)
+                let db = @bitlibnative.native_promisor_db(fs, git_dir)
                 if not(db.has_promisor()) {
                   raise err
                 }
@@ -179,21 +179,21 @@ async fn checkout_with_promisor_retry(
         }
     }
   }
-  raise @git.GitError::InvalidObject("checkout lazy-fetch retry limit exceeded")
+  raise @bitcore.GitError::InvalidObject("checkout lazy-fetch retry limit exceeded")
 }
 
 ///|
 fn collect_missing_checkout_blob_ids(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
-  commit_id : @git.ObjectId,
-) -> Array[@git.ObjectId] raise Error {
-  let db = @gitlib.ObjectDb::load_lazy(fs, git_dir)
+  commit_id : @bitcore.ObjectId,
+) -> Array[@bitcore.ObjectId] raise Error {
+  let db = @bitlib.ObjectDb::load_lazy(fs, git_dir)
   db.set_skip_verify(true)
-  let files = @gitlib.collect_tree_files_from_commit(db, fs, commit_id) catch {
+  let files = @bitlib.collect_tree_files_from_commit(db, fs, commit_id) catch {
     _ => return []
   }
-  let missing : Array[@git.ObjectId] = []
+  let missing : Array[@bitcore.ObjectId] = []
   let seen : Map[String, Bool] = {}
   for item in files.to_array() {
     let (_, entry) = item
@@ -237,7 +237,7 @@ fn append_checkout_trace_line(fs : OsFs, path : String, line : String) -> Unit {
 
 ///|
 fn resolve_checkout_target(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
   target : String,
 ) -> String raise Error {
@@ -247,7 +247,7 @@ fn resolve_checkout_target(
   match load_previous_checkout_location(fs, git_dir) {
     Some(prev) => prev
     None =>
-      raise @git.GitError::InvalidObject(
+      raise @bitcore.GitError::InvalidObject(
         "No previous checkout target available",
       )
   }
@@ -255,7 +255,7 @@ fn resolve_checkout_target(
 
 ///|
 fn current_checkout_location(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
 ) -> String? raise Error {
   let head_path = git_dir + "/HEAD"
@@ -282,7 +282,7 @@ fn checkout_prev_location_path(git_dir : String) -> String {
 
 ///|
 fn load_previous_checkout_location(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
 ) -> String? raise Error {
   let path = checkout_prev_location_path(git_dir)
@@ -299,7 +299,7 @@ fn load_previous_checkout_location(
 
 ///|
 fn save_previous_checkout_location(
-  fs : &@git.FileSystem,
+  fs : &@bitcore.FileSystem,
   git_dir : String,
   location : String?,
 ) -> Unit raise Error {
@@ -311,12 +311,12 @@ fn save_previous_checkout_location(
 }
 
 ///|
-fn parse_checkout_missing_object_id(err : Error) -> @git.ObjectId? {
+fn parse_checkout_missing_object_id(err : Error) -> @bitcore.ObjectId? {
   let prefixes = [
     "Missing blob object: ", "Missing tree object: ", "Object not found: ",
   ]
   match err {
-    @git.GitError::InvalidObject(msg) => {
+    @bitcore.GitError::InvalidObject(msg) => {
       for prefix in prefixes {
         if msg.has_prefix(prefix) {
           let hex = String::unsafe_substring(
@@ -324,7 +324,7 @@ fn parse_checkout_missing_object_id(err : Error) -> @git.ObjectId? {
             start=prefix.length(),
             end=msg.length(),
           )
-          return Some(@git.ObjectId::from_hex(trim_string(hex))) catch {
+          return Some(@bitcore.ObjectId::from_hex(trim_string(hex))) catch {
             _ => None
           }
         }

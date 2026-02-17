@@ -71,7 +71,7 @@ fn commit_storage_runtime_delegate_args(
 async fn handle_commit(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let fs = OsFs::new()
-  let rfs : &@git.RepoFileSystem = fs
+  let rfs : &@bitcore.RepoFileSystem = fs
   let git_dir = resolve_git_dir(rfs, root)
   if commit_repo_requires_standalone_error(rfs, git_dir) {
     eprint_line(
@@ -213,7 +213,7 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
     fs.is_file(git_dir + "/SQUASH_MSG")
   // If -a flag, stage all modified files
   if all_modified {
-    let status = @gitlib.status(fs, root)
+    let status = @bitlib.status(fs, root)
     let paths_to_add : Array[String] = []
     for p in status.unstaged_modified {
       paths_to_add.push(p)
@@ -222,7 +222,7 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
       paths_to_add.push(p)
     }
     if paths_to_add.length() > 0 {
-      @gitlib.add_paths_async(fs, fs, root, paths_to_add)
+      @bitlib.add_paths_async(fs, fs, root, paths_to_add)
     }
   }
   // Open editor when message is not specified.
@@ -239,7 +239,7 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
     }
   }
   guard message is Some(msg) else {
-    raise @git.GitError::InvalidObject(
+    raise @bitcore.GitError::InvalidObject(
       "Aborting commit due to empty commit message.",
     )
   }
@@ -259,11 +259,11 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
   if not(no_verify) {
     let hook_status = run_pre_commit_hook(fs, root, git_dir)
     if hook_status != 0 {
-      raise @git.GitError::InvalidObject("pre-commit hook failed")
+      raise @bitcore.GitError::InvalidObject("pre-commit hook failed")
     }
   }
   let commit_id = if amend {
-    @gitlib.commit_amend(
+    @bitlib.commit_amend(
       fs,
       fs,
       root,
@@ -279,7 +279,7 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
       merge_heads, allow_empty,
     )
   } else {
-    @gitlib.commit(
+    @bitlib.commit(
       fs,
       fs,
       root,
@@ -311,7 +311,7 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
 
 ///|
 fn commit_repo_requires_standalone_error(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
 ) -> Bool {
   is_reftable_repo(fs, git_dir) ||
@@ -324,7 +324,7 @@ fn commit_repo_requires_standalone_error(
 
 ///|
 fn resolve_no_edit_commit_message(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   root : String,
   git_dir : String,
   amend : Bool,
@@ -375,22 +375,22 @@ fn join_commit_messages(primary : String, secondary : String) -> String {
 
 ///|
 fn read_merge_head_ids(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
-) -> Array[@git.ObjectId] raise Error {
+) -> Array[@bitcore.ObjectId] raise Error {
   let path = git_dir + "/MERGE_HEAD"
   if not(fs.is_file(path)) {
     return []
   }
-  let ids : Array[@git.ObjectId] = []
+  let ids : Array[@bitcore.ObjectId] = []
   let content = decode_bytes(fs.read_file(path))
   for line_view in content.split("\n") {
     let line = trim_string(line_view.to_string())
     if line.length() == 0 {
       continue
     }
-    let id = @git.ObjectId::from_hex(line) catch {
-      _ => raise @git.GitError::InvalidObject("invalid MERGE_HEAD: \{line}")
+    let id = @bitcore.ObjectId::from_hex(line) catch {
+      _ => raise @bitcore.GitError::InvalidObject("invalid MERGE_HEAD: \{line}")
     }
     ids.push(id)
   }
@@ -399,30 +399,30 @@ fn read_merge_head_ids(
 
 ///|
 fn commit_with_merge_heads(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   root : String,
   message : String,
   author : String,
   author_timestamp : Int64,
   committer : String,
   committer_timestamp : Int64,
-  merge_heads : Array[@git.ObjectId],
+  merge_heads : Array[@bitcore.ObjectId],
   allow_empty : Bool,
-) -> @git.ObjectId raise Error {
+) -> @bitcore.ObjectId raise Error {
   let git_dir = resolve_git_dir(rfs, root)
-  let head_parent = @gitlib.resolve_head_commit(rfs, git_dir)
-  let entries = @gitlib.read_index_entries(rfs, git_dir)
+  let head_parent = @bitlib.resolve_head_commit(rfs, git_dir)
+  let entries = @bitlib.read_index_entries(rfs, git_dir)
   let tree_id = if entries.length() == 0 {
     if not(allow_empty) {
-      raise @git.GitError::InvalidObject("Empty index")
+      raise @bitcore.GitError::InvalidObject("Empty index")
     }
     match head_parent {
       Some(parent_id) => {
-        let db = @gitlib.ObjectDb::load_lazy(rfs, git_dir)
+        let db = @bitlib.ObjectDb::load_lazy(rfs, git_dir)
         let parent_tree = match db.get(rfs, parent_id) {
-          Some(obj) if obj.obj_type == @git.ObjectType::Commit =>
-            (@git.parse_commit(obj.data).tree |> Some) catch {
+          Some(obj) if obj.obj_type == @bitcore.ObjectType::Commit =>
+            (@bitcore.parse_commit(obj.data).tree |> Some) catch {
               _ => None
             }
           _ => None
@@ -430,8 +430,8 @@ fn commit_with_merge_heads(
         match parent_tree {
           Some(tree) => tree
           None => {
-            let (empty_tree_id, empty_tree_compressed) = @git.create_tree([])
-            @gitlib.write_object_bytes(
+            let (empty_tree_id, empty_tree_compressed) = @bitcore.create_tree([])
+            @bitlib.write_object_bytes(
               fs, git_dir, empty_tree_id, empty_tree_compressed,
             )
             empty_tree_id
@@ -439,17 +439,17 @@ fn commit_with_merge_heads(
         }
       }
       None => {
-        let (empty_tree_id, empty_tree_compressed) = @git.create_tree([])
-        @gitlib.write_object_bytes(
+        let (empty_tree_id, empty_tree_compressed) = @bitcore.create_tree([])
+        @bitlib.write_object_bytes(
           fs, git_dir, empty_tree_id, empty_tree_compressed,
         )
         empty_tree_id
       }
     }
   } else {
-    @gitlib.write_tree_from_index(fs, rfs, git_dir, entries)
+    @bitlib.write_tree_from_index(fs, rfs, git_dir, entries)
   }
-  let parents : Array[@git.ObjectId] = []
+  let parents : Array[@bitcore.ObjectId] = []
   let seen : Map[String, Bool] = {}
   match head_parent {
     Some(parent_id) => {
@@ -466,19 +466,19 @@ fn commit_with_merge_heads(
     seen[hex] = true
     parents.push(merge_head)
   }
-  let commit = @git.Commit::new(
+  let commit = @bitcore.Commit::new(
     tree_id, parents, author, author_timestamp, "+0000", committer, committer_timestamp,
     "+0000", message,
   )
-  let (commit_id, compressed) = @git.create_commit(commit)
-  @gitlib.write_object_bytes(fs, git_dir, commit_id, compressed)
-  @gitlib.update_head_ref(fs, rfs, git_dir, commit_id)
+  let (commit_id, compressed) = @bitcore.create_commit(commit)
+  @bitlib.write_object_bytes(fs, git_dir, commit_id, compressed)
+  @bitlib.update_head_ref(fs, rfs, git_dir, commit_id)
   commit_id
 }
 
 ///|
 fn cleanup_merge_state_files(
-  fs : &@git.FileSystem,
+  fs : &@bitcore.FileSystem,
   git_dir : String,
 ) -> Unit raise Error {
   let files = ["MERGE_HEAD", "MERGE_MSG", "MERGE_MODE", "SQUASH_MSG"]
@@ -549,7 +549,7 @@ fn commit_args_require_standalone_error(args : Array[String]) -> Bool {
 
 ///|
 async fn read_commit_message_from_file(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   root : String,
   file : String,
   encoding : String,
@@ -563,15 +563,15 @@ async fn read_commit_message_from_file(
 
 ///|
 fn read_commit_message_from_revision(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   root : String,
   spec : String,
 ) -> String? raise Error {
   let git_dir = resolve_git_dir(fs, root)
-  let commit_id = @gitrepo.rev_parse(fs, git_dir, spec)
+  let commit_id = @bitrepo.rev_parse(fs, git_dir, spec)
   match commit_id {
     Some(id) => {
-      let db = @gitlib.ObjectDb::load_lazy(fs, git_dir)
+      let db = @bitlib.ObjectDb::load_lazy(fs, git_dir)
       match db.get(fs, id) {
         Some(obj) => Some(extract_commit_message(obj.data))
         None => None
@@ -583,7 +583,7 @@ fn read_commit_message_from_revision(
 
 ///|
 fn resolve_commit_message_encoding() -> String {
-  let overrides = @gitlib.parse_config_overrides()
+  let overrides = @bitlib.parse_config_overrides()
   match overrides.get("i18n.commitencoding") {
     Some(value) => {
       let trimmed = trim_string(value)

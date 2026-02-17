@@ -12,7 +12,7 @@ pub fn Hub::create_issue(
   author : String,
   labels? : Array[String] = [],
   assignees? : Array[String] = [],
-) -> Issue raise @git.GitError {
+) -> Issue raise @bit.GitError {
   let timestamp = clock.now()
   let issue_id = generate_entity_id(
     "issue",
@@ -97,10 +97,10 @@ pub fn Hub::update_issue(
   body? : String? = None,
   labels? : Array[String]? = None,
   assignees? : Array[String]? = None,
-) -> Issue raise @git.GitError {
+) -> Issue raise @bit.GitError {
   let issue = self.get_issue(objects, issue_id)
   guard issue is Some(existing) else {
-    raise @git.GitError::InvalidObject("Issue not found: \{issue_id}")
+    raise @bit.GitError::InvalidObject("Issue not found: \{issue_id}")
   }
   let new_title = match title {
     Some(t) => t
@@ -152,13 +152,13 @@ pub fn Hub::close_issue(
   refs : &@lib.RefStore,
   clock : &@lib.Clock,
   issue_id : String,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let issue = self.get_issue(objects, issue_id)
   guard issue is Some(existing) else {
-    raise @git.GitError::InvalidObject("Issue not found: \{issue_id}")
+    raise @bit.GitError::InvalidObject("Issue not found: \{issue_id}")
   }
   if existing.state != IssueState::Open {
-    raise @git.GitError::InvalidObject("Issue is not open: \{issue_id}")
+    raise @bit.GitError::InvalidObject("Issue is not open: \{issue_id}")
   }
   let updated = Issue::new(
     existing.id,
@@ -193,13 +193,13 @@ pub fn Hub::reopen_issue(
   refs : &@lib.RefStore,
   clock : &@lib.Clock,
   issue_id : String,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let issue = self.get_issue(objects, issue_id)
   guard issue is Some(existing) else {
-    raise @git.GitError::InvalidObject("Issue not found: \{issue_id}")
+    raise @bit.GitError::InvalidObject("Issue not found: \{issue_id}")
   }
   if existing.state != IssueState::Closed {
-    raise @git.GitError::InvalidObject("Issue is not closed: \{issue_id}")
+    raise @bit.GitError::InvalidObject("Issue is not closed: \{issue_id}")
   }
   let updated = Issue::new(
     existing.id,
@@ -237,10 +237,10 @@ pub fn Hub::add_issue_comment(
   author : String,
   body : String,
   reply_to? : String? = None,
-) -> IssueComment raise @git.GitError {
+) -> IssueComment raise @bit.GitError {
   let issue = self.get_issue(objects, issue_id)
   guard issue is Some(_) else {
-    raise @git.GitError::InvalidObject("Issue not found: \{issue_id}")
+    raise @bit.GitError::InvalidObject("Issue not found: \{issue_id}")
   }
   let timestamp = clock.now()
   let comment = IssueComment::new(
@@ -252,7 +252,7 @@ pub fn Hub::add_issue_comment(
     reply_to~,
   )
   let comment_data = comment.serialize()
-  let (blob_id, _compressed) = @git.create_blob_string(comment_data)
+  let (blob_id, _compressed) = @bit.create_blob_string(comment_data)
   let comment_id = short_hex(blob_id.to_hex(), 8)
   let final_comment = IssueComment::new(
     comment_id,
@@ -313,10 +313,10 @@ pub fn Hub::link_pr_to_issue(
   clock : &@lib.Clock,
   issue_id : String,
   pr_id : String,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let issue = self.get_issue(objects, issue_id)
   guard issue is Some(existing) else {
-    raise @git.GitError::InvalidObject("Issue not found: \{issue_id}")
+    raise @bit.GitError::InvalidObject("Issue not found: \{issue_id}")
   }
   let linked = existing.linked_prs
   if not(linked.contains(pr_id)) {

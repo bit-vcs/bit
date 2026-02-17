@@ -199,7 +199,7 @@ test "import pr proposal: require_signed without key rejects writes" {
   )
   ignore(
     strict.import_pr_proposals(objects, refs, clock, [proposal]) catch {
-      @git.GitError::InvalidObject(message) => {
+      @bit.GitError::InvalidObject(message) => {
         assert_true(message.contains("signing key"))
         return ()
       }

@@ -1,7 +1,7 @@
 ///|
 pub async fn run_storage_command(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   root : String,
   command : @runtime.StorageCommand,
 ) -> Unit raise Error {
@@ -13,7 +13,7 @@ fn storage_runtime_fail_unsupported_option(
   cmd : String,
   arg : String,
 ) -> Unit raise Error {
-  raise @git.GitError::InvalidObject(
+  raise @bitcore.GitError::InvalidObject(
     cmd + ": option is not supported in storage runtime: " + arg,
   )
 }
@@ -23,7 +23,7 @@ fn storage_runtime_fail_unsupported_mode(
   cmd : String,
   detail : String,
 ) -> Unit raise Error {
-  raise @git.GitError::InvalidObject(
+  raise @bitcore.GitError::InvalidObject(
     cmd + ": mode is not supported in storage runtime: " + detail,
   )
 }
@@ -43,13 +43,13 @@ fn storage_runtime_is_short_count_flag(arg : String) -> Bool {
 }
 
 ///|
-fn storage_runtime_parse_object_type(s : String) -> @git.ObjectType raise Error {
+fn storage_runtime_parse_object_type(s : String) -> @bitcore.ObjectType raise Error {
   match s {
-    "blob" => @git.ObjectType::Blob
-    "tree" => @git.ObjectType::Tree
-    "commit" => @git.ObjectType::Commit
-    "tag" => @git.ObjectType::Tag
-    _ => raise @git.GitError::InvalidObject("invalid object type \"" + s + "\"")
+    "blob" => @bitcore.ObjectType::Blob
+    "tree" => @bitcore.ObjectType::Tree
+    "commit" => @bitcore.ObjectType::Commit
+    "tag" => @bitcore.ObjectType::Tag
+    _ => raise @bitcore.GitError::InvalidObject("invalid object type \"" + s + "\"")
   }
 }
 
@@ -146,7 +146,7 @@ fn storage_runtime_parse_add_args(
     }
   }
   if not(add_all) && paths.length() == 0 {
-    raise @git.GitError::InvalidObject("add requires pathspec")
+    raise @bitcore.GitError::InvalidObject("add requires pathspec")
   }
   { add_all, paths }
 }
@@ -207,7 +207,7 @@ fn storage_runtime_parse_commit_args(
     i += 1
   }
   guard message is Some(msg) else {
-    raise @git.GitError::InvalidObject(
+    raise @bitcore.GitError::InvalidObject(
       "storage runtime commit requires -m/--message",
     )
   }
@@ -349,7 +349,7 @@ fn storage_runtime_parse_update_ref_args(
   }
   if delete_mode {
     guard positional.length() >= 1 else {
-      raise @git.GitError::InvalidObject(
+      raise @bitcore.GitError::InvalidObject(
         "usage: update-ref -d <refname> [<oldvalue>]",
       )
     }
@@ -366,7 +366,7 @@ fn storage_runtime_parse_update_ref_args(
     }
   }
   guard positional.length() >= 2 else {
-    raise @git.GitError::InvalidObject(
+    raise @bitcore.GitError::InvalidObject(
       "usage: update-ref <refname> <newvalue> [<oldvalue>]",
     )
   }
@@ -410,14 +410,14 @@ fn storage_runtime_parse_command(
         storage_runtime_parse_update_ref_args(args),
       )
     _ =>
-      raise @git.GitError::InvalidObject("unsupported storage command: " + cmd)
+      raise @bitcore.GitError::InvalidObject("unsupported storage command: " + cmd)
   }
 }
 
 ///|
 pub async fn run_storage_command_by_name(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   root : String,
   cmd : String,
   args : Array[String],

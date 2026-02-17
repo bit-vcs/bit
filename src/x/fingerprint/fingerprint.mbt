@@ -8,7 +8,7 @@ pub(all) enum FingerprintMode {
 pub fn parse_fingerprint_mode(raw : String) -> FingerprintMode? {
   match raw {
     "fast" => Some(FingerprintMode::Fast)
-    "git" | "git-compat" | "git_compat" => Some(FingerprintMode::GitCompat)
+    "git" | "git-compat" | "bit-compat" | "bit_compat" => Some(FingerprintMode::GitCompat)
     _ => None
   }
 }
@@ -36,7 +36,7 @@ fn fingerprint_ignore_entry(
 
 ///|
 fn collect_fast_hash_files(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   root : String,
   rel : String,
   ignore_entries : Array[String],
@@ -61,12 +61,12 @@ fn collect_fast_hash_files(
 
 ///|
 pub fn fast_directory_fingerprint(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   root : String,
   ignore_entries? : Array[String] = [".", "..", ".git", ".bit"],
 ) -> String {
   if not(fs.is_dir(root)) {
-    return @git.hash_blob_string("missing").to_hex()
+    return @bit.hash_blob_string("missing").to_hex()
   }
   let files : Array[String] = []
   collect_fast_hash_files(fs, root, "", ignore_entries, files)
@@ -74,13 +74,13 @@ pub fn fast_directory_fingerprint(
   for rel in files {
     let file_path = root + "/" + rel
     let content = fs.read_file(file_path) catch { _ => Bytes::from_array([]) }
-    let file_hash = @git.sha1(content).to_hex()
+    let file_hash = @bit.sha1(content).to_hex()
     buf.write_string(rel)
     buf.write_string("\t")
     buf.write_string(file_hash)
     buf.write_string("\n")
   }
-  @git.hash_blob_string(buf.to_string()).to_hex()
+  @bit.hash_blob_string(buf.to_string()).to_hex()
 }
 
 ///|
@@ -132,10 +132,10 @@ fn trim_string(s : String) -> String {
 }
 
 ///|
-fn resolve_git_dir(fs : &@git.RepoFileSystem, root : String) -> String {
-  let git_path = root + "/.git"
-  if fs.is_file(git_path) {
-    let bytes = fs.read_file(git_path) catch { _ => return git_path }
+fn resolve_git_dir(fs : &@bit.RepoFileSystem, root : String) -> String {
+  let bit_path = root + "/.git"
+  if fs.is_file(bit_path) {
+    let bytes = fs.read_file(bit_path) catch { _ => return bit_path }
     let text = decode_bytes(bytes)
     for line_view in text.split("\n") {
       let line = trim_string(line_view.to_string())
@@ -146,16 +146,16 @@ fn resolve_git_dir(fs : &@git.RepoFileSystem, root : String) -> String {
         String::unsafe_substring(line, start=7, end=line.length()),
       )
       if raw.length() == 0 {
-        return git_path
+        return bit_path
       }
       if raw.has_prefix("/") {
         return raw
       }
       return root + "/" + raw
     }
-    git_path
+    bit_path
   } else {
-    git_path
+    bit_path
   }
 }
 
@@ -228,23 +228,23 @@ fn mode_to_string(mode : Int) -> String {
 }
 
 ///|
-fn tree_id_from_entries(entries : Array[@gitlib.IndexEntry]) -> @git.ObjectId {
+fn tree_id_from_entries(entries : Array[@bitlib.IndexEntry]) -> @bit.ObjectId {
   if entries.length() == 0 {
-    return @git.create_tree([]).0
+    return @bit.create_tree([]).0
   }
-  let file_entries : Array[@git.TreeEntry] = []
-  let dir_map : Map[String, Array[@gitlib.IndexEntry]] = {}
+  let file_entries : Array[@bit.TreeEntry] = []
+  let dir_map : Map[String, Array[@bitlib.IndexEntry]] = {}
   for e in entries {
     match split_first(e.path) {
       (name, None) => {
         let mode = mode_to_string(e.mode)
-        file_entries.push(@git.TreeEntry::new(mode, name, e.id))
+        file_entries.push(@bit.TreeEntry::new(mode, name, e.id))
       }
       (name, Some(rest)) =>
         match dir_map.get(name) {
           Some(list) =>
             list.push(
-              @gitlib.IndexEntry::new(
+              @bitlib.IndexEntry::new(
                 rest,
                 e.id,
                 e.mode,
@@ -255,7 +255,7 @@ fn tree_id_from_entries(entries : Array[@gitlib.IndexEntry]) -> @git.ObjectId {
             )
           None =>
             dir_map[name] = [
-              @gitlib.IndexEntry::new(
+              @bitlib.IndexEntry::new(
                 rest,
                 e.id,
                 e.mode,
@@ -270,32 +270,32 @@ fn tree_id_from_entries(entries : Array[@gitlib.IndexEntry]) -> @git.ObjectId {
   for item in dir_map.to_array() {
     let (dir_name, list) = item
     let sub_id = tree_id_from_entries(list)
-    file_entries.push(@git.TreeEntry::new("40000", dir_name, sub_id))
+    file_entries.push(@bit.TreeEntry::new("40000", dir_name, sub_id))
   }
   file_entries.sort_by(fn(a, b) {
     let a_key = if a.mode == "40000" { a.name + "/" } else { a.name }
     let b_key = if b.mode == "40000" { b.name + "/" } else { b.name }
     compare_strings_lexicographic(a_key, b_key)
   })
-  @git.create_tree(file_entries).0
+  @bit.create_tree(file_entries).0
 }
 
 ///|
 fn index_entries_after_add_all(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   root : String,
   ignore_entries : Array[String],
-) -> Array[@gitlib.IndexEntry] {
+) -> Array[@bitlib.IndexEntry] {
   let git_dir = resolve_git_dir(fs, root)
-  let existing = @gitlib.read_index_entries(fs, git_dir) catch { _ => [] }
-  let staged : Map[String, @gitlib.IndexEntry] = {}
+  let existing = @bitlib.read_index_entries(fs, git_dir) catch { _ => [] }
+  let staged : Map[String, @bitlib.IndexEntry] = {}
   for e in existing {
     if fingerprint_path_ignored(e.path, ignore_entries) {
       continue
     }
     staged[e.path] = e
   }
-  let working_files = @gitignore.list_working_files(fs, root) catch { _ => [] }
+  let working_files = @bitignore.list_working_files(fs, root) catch { _ => [] }
   let present : Map[String, Bool] = {}
   for rel in working_files {
     if fingerprint_path_ignored(rel, ignore_entries) {
@@ -304,9 +304,9 @@ fn index_entries_after_add_all(
     let abs = root + "/" + rel
     if fs.is_file(abs) {
       let content = fs.read_file(abs) catch { _ => Bytes::from_array([]) }
-      let id = @git.hash_blob(content)
+      let id = @bit.hash_blob(content)
       let mode = staged.get(rel).map(e => e.mode).unwrap_or(33188)
-      staged[rel] = @gitlib.IndexEntry::new(rel, id, mode, content.length())
+      staged[rel] = @bitlib.IndexEntry::new(rel, id, mode, content.length())
       present[rel] = true
     }
   }
@@ -319,7 +319,7 @@ fn index_entries_after_add_all(
   for path in removed_paths {
     staged.remove(path)
   }
-  let out : Array[@gitlib.IndexEntry] = []
+  let out : Array[@bitlib.IndexEntry] = []
   for _, entry in staged {
     out.push(entry)
   }
@@ -327,13 +327,13 @@ fn index_entries_after_add_all(
 }
 
 ///|
-pub fn git_compat_directory_fingerprint(
-  fs : &@git.RepoFileSystem,
+pub fn bit_compat_directory_fingerprint(
+  fs : &@bit.RepoFileSystem,
   root : String,
   ignore_entries? : Array[String] = [".", "..", ".git", ".bit"],
 ) -> String {
   if not(fs.is_dir(root)) {
-    return @git.hash_blob_string("missing").to_hex()
+    return @bit.hash_blob_string("missing").to_hex()
   }
   let entries = index_entries_after_add_all(fs, root, ignore_entries)
   tree_id_from_entries(entries).to_hex()
@@ -341,7 +341,7 @@ pub fn git_compat_directory_fingerprint(
 
 ///|
 pub fn directory_fingerprint(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   root : String,
   mode : FingerprintMode,
   ignore_entries? : Array[String] = [".", "..", ".git", ".bit"],
@@ -350,6 +350,6 @@ pub fn directory_fingerprint(
     FingerprintMode::Fast =>
       fast_directory_fingerprint(fs, root, ignore_entries~)
     FingerprintMode::GitCompat =>
-      git_compat_directory_fingerprint(fs, root, ignore_entries~)
+      bit_compat_directory_fingerprint(fs, root, ignore_entries~)
   }
 }

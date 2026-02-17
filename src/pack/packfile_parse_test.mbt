@@ -8,7 +8,7 @@ test "packfile parse: blob roundtrip" {
   let objects = parse_packfile(packfile)
   assert_true(objects.length() == 1)
   let obj = objects[0]
-  assert_true(obj.obj_type == @git.ObjectType::Blob)
+  assert_true(obj.obj_type == @bit.ObjectType::Blob)
   assert_true(obj.data.length() == content.length())
   for i = 0; i < content.length(); i = i + 1 {
     assert_true(obj.data[i] == content[i])
@@ -18,8 +18,8 @@ test "packfile parse: blob roundtrip" {
 ///|
 test "packfile parse: commit packfile order" {
   let blob_content = Bytes::from_array([b'h', b'e', b'l', b'l', b'o', b'\n'])
-  let commit = @git.Commit::new(
-    @git.ObjectId::zero(),
+  let commit = @bit.Commit::new(
+    @bit.ObjectId::zero(),
     [],
     "Test <test@example.com>",
     1700000000L,
@@ -32,9 +32,9 @@ test "packfile parse: commit packfile order" {
   let (_, packfile) = create_commit_packfile(blob_content, "hello.txt", commit)
   let objects = parse_packfile(packfile)
   assert_true(objects.length() == 3)
-  assert_true(objects[0].obj_type == @git.ObjectType::Blob)
-  assert_true(objects[1].obj_type == @git.ObjectType::Tree)
-  assert_true(objects[2].obj_type == @git.ObjectType::Commit)
+  assert_true(objects[0].obj_type == @bit.ObjectType::Blob)
+  assert_true(objects[1].obj_type == @bit.ObjectType::Tree)
+  assert_true(objects[2].obj_type == @bit.ObjectType::Commit)
 }
 
 ///|
@@ -52,7 +52,7 @@ test "packfile parse: trailer mismatch" {
   )
   let result = try? parse_packfile(tampered)
   match result {
-    Err(@git.GitError::HashMismatch(_, _)) => ()
+    Err(@bit.GitError::HashMismatch(_, _)) => ()
     _ => assert_true(false)
   }
 }

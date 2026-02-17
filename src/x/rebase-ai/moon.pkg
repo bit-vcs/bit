@@ -1,7 +1,7 @@
 import {
   "moonbitlang/async" @async,
-  "mizchi/bit" @git,
-  "mizchi/bit/lib" @gitlib,
+  "mizchi/bit" @bit,
+  "mizchi/bit/lib" @bitlib,
   "mizchi/bit/runtime" @runtime,
   "mizchi/bit/osfs" @osfs,
   "mizchi/llm" @llmlib,

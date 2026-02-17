@@ -2,7 +2,7 @@
 
 ///|
 test "smart http: info/refs auth" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   ignore(try? init_repo(fs, "/repo"))
   let bad = receive_pack_info_refs_response(fs, "/repo", None, "token")
   assert_true(bad.status == 401)

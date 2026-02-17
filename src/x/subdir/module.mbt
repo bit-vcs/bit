@@ -11,8 +11,8 @@ let gitlink_mode : Int = 57344
 ///|
 /// サブディレクトリをモジュールとして初期化
 pub fn init_module(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   repo_root : String,
   subdir_path : String,
@@ -92,8 +92,8 @@ pub fn init_module(
 ///|
 /// Filter driver スクリプトを作成
 fn setup_filter_script(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   subdir_path : String,
 ) -> Unit raise SubdirError {
@@ -129,8 +129,8 @@ fn setup_filter_script(
 ///|
 /// .git/config に filter 設定を追加
 fn setup_filter_config(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   filter_name : String,
   clean_script : String,
@@ -157,8 +157,8 @@ fn setup_filter_config(
 ///|
 /// .gitattributes に filter パターンを追加
 fn setup_gitattributes_filter(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   repo_root : String,
   subdir_path : String,
 ) -> Unit raise SubdirError {
@@ -186,8 +186,8 @@ fn setup_gitattributes_filter(
 ///|
 /// pre-commit hook を設定
 fn setup_precommit_hook(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   subdir_path : String,
 ) -> Unit raise SubdirError {
@@ -234,8 +234,8 @@ fn setup_precommit_hook(
 ///|
 /// pre-commit hook から subdir チェックを削除
 fn remove_precommit_hook(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   subdir_path : String,
 ) -> Unit raise SubdirError {
@@ -299,8 +299,8 @@ fn remove_hook_section(content : String, marker : String) -> String {
 ///|
 /// Filter driver を設定して git add をブロック
 fn _setup_filter_driver(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   repo_root : String,
   subdir_path : String,
@@ -319,8 +319,8 @@ fn _setup_filter_driver(
 ///|
 /// .git/config に filter 設定を追加
 fn add_filter_to_config(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   filter_name : String,
   subdir_path : String,
@@ -360,8 +360,8 @@ fn add_filter_to_config(
 ///|
 /// .gitattributes に filter パターンを追加
 fn add_filter_to_gitattributes(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   repo_root : String,
   filter_name : String,
   subdir_path : String,
@@ -393,8 +393,8 @@ fn add_filter_to_gitattributes(
 ///|
 /// Filter driver を削除
 fn cleanup_filter_driver(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   repo_root : String,
   subdir_path : String,
@@ -432,8 +432,8 @@ fn cleanup_filter_driver(
 ///|
 /// .git/config から filter セクションを削除
 fn remove_filter_from_config(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   filter_name : String,
 ) -> Unit raise SubdirError {
@@ -524,8 +524,8 @@ fn trim_trailing_newlines(s : String) -> String {
 ///|
 /// .gitattributes から filter パターンを削除
 fn remove_filter_from_gitattributes(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   repo_root : String,
   filter_name : String,
   subdir_path : String,
@@ -572,9 +572,9 @@ fn remove_filter_from_gitattributes(
 ///|
 /// HEAD コミットを解決
 fn resolve_head_commit_for_module(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
-) -> @git.ObjectId? {
+) -> @bit.ObjectId? {
   let head_path = git_dir + "/HEAD"
   let content = rfs.read_file(head_path) catch { _ => return None }
   let head_str = content |> bytes_to_string_mod |> trim_newlines_mod
@@ -584,11 +584,11 @@ fn resolve_head_commit_for_module(
       _ => return None
     }
     let hex = ref_content |> bytes_to_string_mod |> trim_newlines_mod
-    (hex |> @git.ObjectId::from_hex |> Some) catch {
+    (hex |> @bit.ObjectId::from_hex |> Some) catch {
       _ => None
     }
   } else {
-    (head_str |> @git.ObjectId::from_hex |> Some) catch {
+    (head_str |> @bit.ObjectId::from_hex |> Some) catch {
       _ => None
     }
   }
@@ -597,8 +597,8 @@ fn resolve_head_commit_for_module(
 ///|
 /// .gitmodules にサブモジュールエントリを追加
 fn _add_to_gitmodules(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   repo_root : String,
   subdir_path : String,
 ) -> Unit raise SubdirError {
@@ -634,8 +634,8 @@ fn _add_to_gitmodules(
 ///|
 /// .gitmodules からサブモジュールエントリを削除
 fn _remove_from_gitmodules(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   repo_root : String,
   subdir_path : String,
 ) -> Unit raise SubdirError {
@@ -703,11 +703,11 @@ fn remove_gitmodules_section(content : String, subdir_path : String) -> String {
 ///|
 /// index に gitlink エントリを追加
 fn _add_gitlink_to_index(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   subdir_path : String,
-  commit_id : @git.ObjectId,
+  commit_id : @bit.ObjectId,
 ) -> Unit raise SubdirError {
   // 現在の index を読み込む
   let entries = @lib.read_index_entries(rfs, git_dir) catch { _ => [] }
@@ -733,8 +733,8 @@ fn _add_gitlink_to_index(
 ///|
 /// index から gitlink エントリを削除し、サブディレクトリのファイルを復元
 fn _remove_gitlink_from_index(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   subdir_path : String,
 ) -> Unit raise SubdirError {
@@ -783,7 +783,7 @@ fn skip_chars_mod(s : String, n : Int) -> String {
 ///|
 /// モジュールが初期化済みかチェック
 pub fn is_module_initialized(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   subdir_path : String,
 ) -> Bool {
@@ -796,8 +796,8 @@ pub fn is_module_initialized(
 ///|
 /// モジュールを削除
 pub fn deinit_module(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   repo_root : String,
   subdir_path : String,
@@ -821,8 +821,8 @@ pub fn deinit_module(
 ///|
 /// モジュールの状態を親リポジトリと同期
 pub fn sync_module(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   subdir_path : String,
 ) -> Unit raise SubdirError {
@@ -843,7 +843,7 @@ pub fn sync_module(
 ///|
 /// 初期化済みモジュール一覧を取得
 pub fn list_modules(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> Array[String] {
   let modules_dir = git_dir + "/modules"
@@ -946,7 +946,7 @@ fn build_module_config(worktree_path : String, subdir_path : String) -> String {
 
 ///|
 /// 親リポジトリの HEAD を読み取り
-fn read_parent_head(rfs : &@git.RepoFileSystem, git_dir : String) -> String? {
+fn read_parent_head(rfs : &@bit.RepoFileSystem, git_dir : String) -> String? {
   let head_path = git_dir + "/HEAD"
   let content = rfs.read_file(head_path) catch { _ => return None }
   content |> bytes_to_string_mod |> Some
@@ -955,8 +955,8 @@ fn read_parent_head(rfs : &@git.RepoFileSystem, git_dir : String) -> String? {
 ///|
 /// モジュールディレクトリを再帰的に削除
 fn remove_module_dir(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   path : String,
 ) -> Unit {
   let entries = rfs.readdir(path) catch { _ => return () }

@@ -9,12 +9,12 @@ pub(all) enum ResetMode {
 
 ///|
 pub fn reset(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   spec : String,
   mode : ResetMode,
-) -> @git.ObjectId raise @git.GitError {
+) -> @bit.ObjectId raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   let actual_git_dir = if rfs.is_file(git_dir) {
     resolve_gitdir(rfs, git_dir)
@@ -23,7 +23,7 @@ pub fn reset(
   }
   let object_git_dir = reset_resolve_common_git_dir(rfs, actual_git_dir)
   let target = match rev_parse(rfs, actual_git_dir, spec) {
-    None => raise @git.GitError::InvalidObject("Invalid ref: \{spec}")
+    None => raise @bit.GitError::InvalidObject("Invalid ref: \{spec}")
     Some(id) => id
   }
   update_head_ref(fs, rfs, actual_git_dir, target)
@@ -57,7 +57,7 @@ pub fn reset(
 
 ///|
 fn reset_resolve_common_git_dir(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> String {
   let commondir_path = join_path(git_dir, "commondir")

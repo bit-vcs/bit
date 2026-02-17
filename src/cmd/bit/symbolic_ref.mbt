@@ -16,7 +16,7 @@ async fn handle_symbolic_ref(args : Array[String]) -> Unit raise Error {
     }
   }
   if positional.length() == 0 {
-    raise @git.GitError::InvalidObject("usage: git symbolic-ref <name> [<ref>]")
+    raise @bitcore.GitError::InvalidObject("usage: git symbolic-ref <name> [<ref>]")
   }
   let name = symbolic_ref_normalize_refname(positional[0])
   let ref_path = if name == "HEAD" {
@@ -33,7 +33,7 @@ async fn handle_symbolic_ref(args : Array[String]) -> Unit raise Error {
   if positional.length() == 1 {
     // Read mode
     if not(fs.is_file(ref_path)) {
-      raise @git.GitError::InvalidObject("ref \{name} not found")
+      raise @bitcore.GitError::InvalidObject("ref \{name} not found")
     }
     let content = decode_bytes(fs.read_file(ref_path))
     let trimmed = content.trim_end(chars="\n\r ").to_string()
@@ -51,7 +51,7 @@ async fn handle_symbolic_ref(args : Array[String]) -> Unit raise Error {
         print_line(target)
       }
     } else {
-      raise @git.GitError::InvalidObject("ref \{name} is not a symbolic ref")
+      raise @bitcore.GitError::InvalidObject("ref \{name} is not a symbolic ref")
     }
   } else {
     // Write mode
@@ -61,14 +61,14 @@ async fn handle_symbolic_ref(args : Array[String]) -> Unit raise Error {
 }
 
 ///|
-fn symbolic_ref_normalize_refname(name : String) -> String raise @git.GitError {
-  let normalized = @gitlib.normalize_repo_path(name) catch {
-    _ => raise @git.GitError::InvalidObject("invalid refname: " + name)
+fn symbolic_ref_normalize_refname(name : String) -> String raise @bitcore.GitError {
+  let normalized = @bitlib.normalize_repo_path(name) catch {
+    _ => raise @bitcore.GitError::InvalidObject("invalid refname: " + name)
   }
   if normalized == "HEAD" || normalized.has_prefix("refs/") {
     normalized
   } else {
-    raise @git.GitError::InvalidObject("invalid refname: " + name)
+    raise @bitcore.GitError::InvalidObject("invalid refname: " + name)
   }
 }
 

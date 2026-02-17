@@ -86,7 +86,7 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
   }
   // If --all, add all refs
   if all {
-    let all_refs = @gitrepo.show_ref(fs, git_dir)
+    let all_refs = @bitrepo.show_ref(fs, git_dir)
     for item in all_refs {
       let (name, _) = item
       refs.push(name)
@@ -97,9 +97,9 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
     refs.push("HEAD")
   }
   // Resolve starting commits
-  let start_ids : Array[@git.ObjectId] = []
+  let start_ids : Array[@bitcore.ObjectId] = []
   for spec in refs {
-    match @gitrepo.rev_parse(fs, git_dir, spec) {
+    match @bitrepo.rev_parse(fs, git_dir, spec) {
       Some(id) => start_ids.push(id)
       None => ()
     }
@@ -107,20 +107,20 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
   // Resolve exclude commits
   let exclude_ids : Map[String, Bool] = {}
   for spec in excludes {
-    match @gitrepo.rev_parse(fs, git_dir, spec) {
+    match @bitrepo.rev_parse(fs, git_dir, spec) {
       Some(id) =>
         // Walk the exclude commit and all its ancestors
         walk_commits_to_map(fs, git_dir, id, exclude_ids)
       None => ()
     }
   }
-  let db = @gitlib.ObjectDb::load(fs, git_dir)
+  let db = @bitlib.ObjectDb::load(fs, git_dir)
   let visited : Map[String, Bool] = {}
-  let result : Array[@git.ObjectId] = []
-  let object_ids : Array[@git.ObjectId] = []
+  let result : Array[@bitcore.ObjectId] = []
+  let object_ids : Array[@bitcore.ObjectId] = []
   let limit = max_count.unwrap_or(2147483647)
   // BFS/DFS traversal
-  let queue : Array[@git.ObjectId] = []
+  let queue : Array[@bitcore.ObjectId] = []
   for id in start_ids {
     queue.push(id)
   }
@@ -137,8 +137,8 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
     }
     // Get commit and add parents
     match db.get(fs, id) {
-      Some(obj) if obj.obj_type == @git.ObjectType::Commit => {
-        let info = @git.parse_commit(obj.data)
+      Some(obj) if obj.obj_type == @bitcore.ObjectType::Commit => {
+        let info = @bitcore.parse_commit(obj.data)
         if objects {
           // Also collect tree objects
           collect_tree_objects(db, fs, info.tree, object_ids, visited)
@@ -200,11 +200,11 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
 fn walk_commits_to_map(
   fs : OsFs,
   git_dir : String,
-  start : @git.ObjectId,
+  start : @bitcore.ObjectId,
   out : Map[String, Bool],
 ) -> Unit {
-  let db = @gitlib.ObjectDb::load(fs, git_dir) catch { _ => return () }
-  let queue : Array[@git.ObjectId] = [start]
+  let db = @bitlib.ObjectDb::load(fs, git_dir) catch { _ => return () }
+  let queue : Array[@bitcore.ObjectId] = [start]
   while queue.length() > 0 {
     let id = queue.unsafe_pop()
     let hex = id.to_hex()
@@ -214,8 +214,8 @@ fn walk_commits_to_map(
     out[hex] = true
     let obj = db.get(fs, id) catch { _ => continue }
     match obj {
-      Some(o) if o.obj_type == @git.ObjectType::Commit => {
-        let info = @git.parse_commit(o.data) catch { _ => continue }
+      Some(o) if o.obj_type == @bitcore.ObjectType::Commit => {
+        let info = @bitcore.parse_commit(o.data) catch { _ => continue }
         for parent in info.parents {
           if not(out.contains(parent.to_hex())) {
             queue.push(parent)
@@ -229,10 +229,10 @@ fn walk_commits_to_map(
 
 ///|
 fn collect_tree_objects(
-  db : @gitlib.ObjectDb,
+  db : @bitlib.ObjectDb,
   fs : OsFs,
-  tree_id : @git.ObjectId,
-  out : Array[@git.ObjectId],
+  tree_id : @bitcore.ObjectId,
+  out : Array[@bitcore.ObjectId],
   visited : Map[String, Bool],
 ) -> Unit {
   let hex = tree_id.to_hex()
@@ -243,8 +243,8 @@ fn collect_tree_objects(
   out.push(tree_id)
   let obj = db.get(fs, tree_id) catch { _ => return () }
   match obj {
-    Some(o) if o.obj_type == @git.ObjectType::Tree => {
-      let entries = @git.parse_tree(o.data) catch { _ => return () }
+    Some(o) if o.obj_type == @bitcore.ObjectType::Tree => {
+      let entries = @bitcore.parse_tree(o.data) catch { _ => return () }
       for entry in entries {
         let entry_hex = entry.id.to_hex()
         if not(visited.contains(entry_hex)) {

@@ -2,14 +2,14 @@
 
 ///|
 priv struct PackIndexEntry {
-  id : @git.ObjectId
+  id : @bit.ObjectId
   offset : Int
   crc : UInt
 }
 
 ///|
 /// Build a pack index (v2) from packfile bytes.
-pub fn build_pack_index(pack : Bytes) -> Bytes raise @git.GitError {
+pub fn build_pack_index(pack : Bytes) -> Bytes raise @bit.GitError {
   let objects = parse_packfile(pack)
   build_pack_index_from_objects(pack, objects)
 }
@@ -20,8 +20,8 @@ pub fn build_pack_index(pack : Bytes) -> Bytes raise @git.GitError {
 /// Falls back to re-parsing the pack if metadata is missing.
 pub fn build_pack_index_from_objects(
   pack : Bytes,
-  objects : Array[@git.PackObject],
-) -> Bytes raise @git.GitError {
+  objects : Array[@bit.PackObject],
+) -> Bytes raise @bit.GitError {
   // Check if any objects are missing metadata (offset < 0 means not from parsed pack)
   let mut needs_parse = false
   for obj in objects {
@@ -75,14 +75,14 @@ pub fn build_pack_index_from_objects(
   // Offsets table (no large offsets due to Int range)
   for entry in entries {
     if entry.offset < 0 {
-      raise @git.GitError::PackfileError("Negative pack offset")
+      raise @bit.GitError::PackfileError("Negative pack offset")
     }
     push_u32_be_from_int(out, entry.offset)
   }
 
   // Packfile checksum (trailer)
   if pack.length() < 20 {
-    raise @git.GitError::PackfileError("Packfile too short")
+    raise @bit.GitError::PackfileError("Packfile too short")
   }
   let trailer_offset = pack.length() - 20
   let pack_checksum = read_trailer_id(pack, trailer_offset)
@@ -92,7 +92,7 @@ pub fn build_pack_index_from_objects(
 
   // Index checksum
   let before_checksum = bytes_from_array(out)
-  let index_checksum = @git.sha1(before_checksum)
+  let index_checksum = @bit.sha1(before_checksum)
   for b in index_checksum.bytes {
     out.push(b)
   }
@@ -102,10 +102,10 @@ pub fn build_pack_index_from_objects(
 ///|
 /// Write a pack index to the filesystem.
 pub fn write_pack_index(
-  fs : &@git.FileSystem,
+  fs : &@bit.FileSystem,
   idx_path : String,
   pack : Bytes,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let idx = build_pack_index(pack)
   fs.write_file(idx_path, idx)
 }
@@ -113,11 +113,11 @@ pub fn write_pack_index(
 ///|
 /// Write a pack index using pre-parsed objects.
 pub fn write_pack_index_from_objects(
-  fs : &@git.FileSystem,
+  fs : &@bit.FileSystem,
   idx_path : String,
   pack : Bytes,
-  objects : Array[@git.PackObject],
-) -> Unit raise @git.GitError {
+  objects : Array[@bit.PackObject],
+) -> Unit raise @bit.GitError {
   let idx = build_pack_index_from_objects(pack, objects)
   fs.write_file(idx_path, idx)
 }
@@ -125,12 +125,12 @@ pub fn write_pack_index_from_objects(
 ///|
 /// Write a pack index using pre-parsed objects with specific version.
 pub fn write_pack_index_from_objects_versioned(
-  fs : &@git.FileSystem,
+  fs : &@bit.FileSystem,
   idx_path : String,
   pack : Bytes,
-  objects : Array[@git.PackObject],
+  objects : Array[@bit.PackObject],
   version : Int,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let idx = if version == 1 {
     build_pack_index_v1_from_objects(pack, objects)
   } else {
@@ -144,8 +144,8 @@ pub fn write_pack_index_from_objects_versioned(
 /// Falls back to re-parsing the pack if metadata is missing.
 fn build_pack_index_v1_from_objects(
   pack : Bytes,
-  objects : Array[@git.PackObject],
-) -> Bytes raise @git.GitError {
+  objects : Array[@bit.PackObject],
+) -> Bytes raise @bit.GitError {
   // Check if any objects are missing metadata
   let mut needs_parse = false
   for obj in objects {
@@ -185,7 +185,7 @@ fn build_pack_index_v1_from_objects(
   // v1 entries: each entry is offset(4) + sha1(20) = 24 bytes
   for entry in entries {
     if entry.offset < 0 {
-      raise @git.GitError::PackfileError("Negative pack offset")
+      raise @bit.GitError::PackfileError("Negative pack offset")
     }
     push_u32_be_from_int(out, entry.offset)
     for b in entry.id.bytes {
@@ -195,7 +195,7 @@ fn build_pack_index_v1_from_objects(
 
   // Packfile checksum (trailer)
   if pack.length() < 20 {
-    raise @git.GitError::PackfileError("Packfile too short")
+    raise @bit.GitError::PackfileError("Packfile too short")
   }
   let trailer_offset = pack.length() - 20
   let pack_checksum = read_trailer_id(pack, trailer_offset)
@@ -208,24 +208,24 @@ fn build_pack_index_v1_from_objects(
 ///|
 fn _scan_pack_entry_offsets(
   data : Bytes,
-) -> (Array[Int], Array[Int]) raise @git.GitError {
+) -> (Array[Int], Array[Int]) raise @bit.GitError {
   if data.length() < 32 {
-    raise @git.GitError::PackfileError("Packfile too short")
+    raise @bit.GitError::PackfileError("Packfile too short")
   }
   if not(
       data[0] == b'P' && data[1] == b'A' && data[2] == b'C' && data[3] == b'K',
     ) {
-    raise @git.GitError::PackfileError("Invalid packfile magic")
+    raise @bit.GitError::PackfileError("Invalid packfile magic")
   }
   let version = read_u32_be(data, 4)
   if version != 2 {
-    raise @git.GitError::PackfileError(
+    raise @bit.GitError::PackfileError(
       "Unsupported packfile version: \{version}",
     )
   }
   let count = read_u32_be(data, 8)
   if count < 0 {
-    raise @git.GitError::PackfileError("Packfile object count out of range")
+    raise @bit.GitError::PackfileError("Packfile object count out of range")
   }
   let mut offset = 12
   let starts : Array[Int] = []
@@ -237,10 +237,10 @@ fn _scan_pack_entry_offsets(
     let after = match type_id {
       1 | 2 | 3 | 4 => {
         let (content, after) = @zlib.zlib_decompress_at(data, offset) catch {
-          e => raise @git.GitError::PackfileError("Zlib error: \{e}")
+          e => raise @bit.GitError::PackfileError("Zlib error: \{e}")
         }
         if content.length() != size {
-          raise @git.GitError::PackfileError(
+          raise @bit.GitError::PackfileError(
             "Object size mismatch: expected=\{size}, got=\{content.length()}",
           )
         }
@@ -249,10 +249,10 @@ fn _scan_pack_entry_offsets(
       6 => {
         let (_, after_ref) = read_ofs_delta_offset(data, offset)
         let (delta, after) = @zlib.zlib_decompress_at(data, after_ref) catch {
-          e => raise @git.GitError::PackfileError("Zlib error: \{e}")
+          e => raise @bit.GitError::PackfileError("Zlib error: \{e}")
         }
         if delta.length() != size {
-          raise @git.GitError::PackfileError(
+          raise @bit.GitError::PackfileError(
             "Delta size mismatch: expected=\{size}, got=\{delta.length()}",
           )
         }
@@ -261,17 +261,17 @@ fn _scan_pack_entry_offsets(
       7 => {
         let (_, after_ref) = read_ref_delta_id(data, offset)
         let (delta, after) = @zlib.zlib_decompress_at(data, after_ref) catch {
-          e => raise @git.GitError::PackfileError("Zlib error: \{e}")
+          e => raise @bit.GitError::PackfileError("Zlib error: \{e}")
         }
         if delta.length() != size {
-          raise @git.GitError::PackfileError(
+          raise @bit.GitError::PackfileError(
             "Delta size mismatch: expected=\{size}, got=\{delta.length()}",
           )
         }
         after
       }
       _ =>
-        raise @git.GitError::PackfileError(
+        raise @bit.GitError::PackfileError(
           "Unknown packfile object type: \{type_id}",
         )
     }
@@ -281,21 +281,21 @@ fn _scan_pack_entry_offsets(
   }
   let trailer_offset = data.length() - 20
   if offset != trailer_offset {
-    raise @git.GitError::PackfileError("Packfile length mismatch")
+    raise @bit.GitError::PackfileError("Packfile length mismatch")
   }
   let pack_bytes = Bytes::from_array(
     FixedArray::makei(trailer_offset, i => data[i]),
   )
-  let computed = @git.sha1(pack_bytes)
+  let computed = @bit.sha1(pack_bytes)
   let trailer = read_trailer_id(data, trailer_offset)
   if computed != trailer {
-    raise @git.GitError::HashMismatch(computed.to_hex(), trailer.to_hex())
+    raise @bit.GitError::HashMismatch(computed.to_hex(), trailer.to_hex())
   }
   (starts, ends)
 }
 
 ///|
-fn compare_object_id(a : @git.ObjectId, b : @git.ObjectId) -> Int {
+fn compare_object_id(a : @bit.ObjectId, b : @bit.ObjectId) -> Int {
   for i in 0..<20 {
     let av = a.bytes[i].to_int()
     let bv = b.bytes[i].to_int()
@@ -311,9 +311,9 @@ pub fn crc32_range(
   data : Bytes,
   start : Int,
   end : Int,
-) -> UInt raise @git.GitError {
+) -> UInt raise @bit.GitError {
   if start < 0 || end < start || end > data.length() {
-    raise @git.GitError::PackfileError("Invalid CRC range")
+    raise @bit.GitError::PackfileError("Invalid CRC range")
   }
   let slice = Bytes::from_array(
     FixedArray::makei(end - start, i => data[start + i]),
@@ -350,21 +350,21 @@ fn push_u32_be_from_uint(out : Array[Byte], value : UInt) -> Unit {
 ///|
 /// Write a packfile and its index under .git/objects/pack.
 pub fn write_packfile_with_index(
-  fs : &@git.FileSystem,
+  fs : &@bit.FileSystem,
   git_dir : String,
   pack : Bytes,
-  objects : Array[@git.PackObject],
-) -> Unit raise @git.GitError {
+  objects : Array[@bit.PackObject],
+) -> Unit raise @bit.GitError {
   if pack.length() < 20 {
-    raise @git.GitError::PackfileError("Packfile too short")
+    raise @bit.GitError::PackfileError("Packfile too short")
   }
-  let pack_dir = @git.join_path(git_dir, "objects/pack")
+  let pack_dir = @bit.join_path(git_dir, "objects/pack")
   fs.mkdir_p(pack_dir)
   let trailer_offset = pack.length() - 20
   let pack_id = read_trailer_id(pack, trailer_offset)
   let base = "pack-\{pack_id.to_hex()}"
-  let pack_path = @git.join_path(pack_dir, base + ".pack")
-  let idx_path = @git.join_path(pack_dir, base + ".idx")
+  let pack_path = @bit.join_path(pack_dir, base + ".pack")
+  let idx_path = @bit.join_path(pack_dir, base + ".idx")
   fs.write_file(pack_path, pack)
   write_pack_index_from_objects(fs, idx_path, pack, objects)
 }

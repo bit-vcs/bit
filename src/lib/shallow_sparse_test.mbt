@@ -3,7 +3,7 @@
 ///|
 test "shallow: collect_commit_tree_only works with shallow depth=1" {
   // Simulate shallow clone: only the tip commit exists, no parents
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -25,9 +25,9 @@ test "shallow: collect_commit_tree_only works with shallow depth=1" {
   let mut has_blob = false
   for obj in objects {
     match obj.obj_type {
-      @git.ObjectType::Commit => has_commit = true
-      @git.ObjectType::Tree => has_tree = true
-      @git.ObjectType::Blob => has_blob = true
+      @bit.ObjectType::Commit => has_commit = true
+      @bit.ObjectType::Tree => has_tree = true
+      @bit.ObjectType::Blob => has_blob = true
       _ => ()
     }
   }
@@ -38,7 +38,7 @@ test "shallow: collect_commit_tree_only works with shallow depth=1" {
 
 ///|
 test "shallow: diff collection with missing parent" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -64,7 +64,7 @@ test "shallow: diff collection with missing parent" {
 
 ///|
 test "shallow: single commit push (no parent history)" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -82,8 +82,8 @@ test "shallow: single commit push (no parent history)" {
   assert_true(objects.length() > 0)
   // Verify commit has no parents
   for obj in objects {
-    if obj.obj_type == @git.ObjectType::Commit {
-      let info = @git.parse_commit(obj.data) catch { _ => continue }
+    if obj.obj_type == @bit.ObjectType::Commit {
+      let info = @bit.parse_commit(obj.data) catch { _ => continue }
       assert_eq(info.parents.length(), 0)
     }
   }
@@ -92,7 +92,7 @@ test "shallow: single commit push (no parent history)" {
 ///|
 test "sparse: diff collection with partial tree" {
   // Simulate sparse checkout: some trees/blobs might be missing
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -117,7 +117,7 @@ test "sparse: diff collection with partial tree" {
   let mut included_found = false
   let mut excluded_found = false
   for obj in diff {
-    if obj.obj_type == @git.ObjectType::Blob {
+    if obj.obj_type == @bit.ObjectType::Blob {
       let content = @utf8.decode_lossy(obj.data[:])
       if content == "included modified" {
         included_found = true
@@ -133,7 +133,7 @@ test "sparse: diff collection with partial tree" {
 
 ///|
 test "sparse: collect objects respects cone pattern" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -162,7 +162,7 @@ test "sparse: collect objects respects cone pattern" {
   let mut utils_found = false
   let mut root_found = false
   for obj in diff {
-    if obj.obj_type == @git.ObjectType::Blob {
+    if obj.obj_type == @bit.ObjectType::Blob {
       let content = @utf8.decode_lossy(obj.data[:])
       if content == "core modified" {
         core_modified_found = true
@@ -183,7 +183,7 @@ test "sparse: collect objects respects cone pattern" {
 ///|
 test "sparse: multiple sparse patterns" {
   // Test with multiple include patterns
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -211,7 +211,7 @@ test "sparse: multiple sparse patterns" {
   let mut tests_found = false
   let mut docs_found = false
   for obj in diff {
-    if obj.obj_type == @git.ObjectType::Blob {
+    if obj.obj_type == @bit.ObjectType::Blob {
       let content = @utf8.decode_lossy(obj.data[:])
       if content == "src modified" {
         src_found = true
@@ -248,7 +248,7 @@ test "sparse: leading slash negation is normalized" {
 ///|
 test "shallow_sparse: combined scenario" {
   // Shallow clone + sparse checkout: minimal local objects
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -287,7 +287,7 @@ test "shallow_sparse: combined scenario" {
 test "blob_none: filter simulates no blob fetch" {
   // blob:none filter means no blobs are initially fetched
   // But we should still be able to work with commits and trees
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -310,7 +310,7 @@ test "blob_none: filter simulates no blob fetch" {
 test "treeless: filter simulates tree:0" {
   // tree:0 filter means no trees are initially fetched
   // We test that collect functions handle this gracefully
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -331,7 +331,7 @@ test "treeless: filter simulates tree:0" {
 ///|
 test "subdir_shallow: clone subdirectory with depth=1" {
   // Simulates: bit clone --depth=1 @user/repo/src
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -373,10 +373,10 @@ test "subdir_shallow: clone subdirectory with depth=1" {
 ///|
 fn collect_object_ids_only(
   db : ObjectDb,
-  fs : &@git.RepoFileSystem,
-  commit_id : @git.ObjectId,
+  fs : &@bit.RepoFileSystem,
+  commit_id : @bit.ObjectId,
   seen : Map[String, Bool],
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let hex = commit_id.to_hex()
   if seen.contains(hex) {
     return
@@ -386,8 +386,8 @@ fn collect_object_ids_only(
   match obj {
     None => ()
     Some(o) =>
-      if o.obj_type == @git.ObjectType::Commit {
-        let info = @git.parse_commit(o.data)
+      if o.obj_type == @bit.ObjectType::Commit {
+        let info = @bit.parse_commit(o.data)
         collect_tree_ids_local(db, fs, info.tree, seen)
         for p in info.parents {
           collect_object_ids_only(db, fs, p, seen)
@@ -399,10 +399,10 @@ fn collect_object_ids_only(
 ///|
 fn collect_tree_ids_local(
   db : ObjectDb,
-  fs : &@git.RepoFileSystem,
-  tree_id : @git.ObjectId,
+  fs : &@bit.RepoFileSystem,
+  tree_id : @bit.ObjectId,
   seen : Map[String, Bool],
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let hex = tree_id.to_hex()
   if seen.contains(hex) {
     return
@@ -412,8 +412,8 @@ fn collect_tree_ids_local(
   match obj {
     None => ()
     Some(o) =>
-      if o.obj_type == @git.ObjectType::Tree {
-        let entries = @git.parse_tree(o.data)
+      if o.obj_type == @bit.ObjectType::Tree {
+        let entries = @bit.parse_tree(o.data)
         for entry in entries {
           seen[entry.id.to_hex()] = true
           if entry.mode == "40000" || entry.mode == "040000" {

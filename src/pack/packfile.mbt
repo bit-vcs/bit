@@ -10,11 +10,11 @@ fn pack_array_to_bytes(arr : Array[Byte]) -> Bytes {
 /// Compress pack data. Use stored when compression expands data.
 fn compress_pack_data(
   data : Bytes,
-  compression : @git.PackCompression,
+  compression : @bit.PackCompression,
 ) -> Bytes {
   match compression {
-    @git.PackCompression::Stored => @zlib.zlib_compress_stored(data)
-    @git.PackCompression::Default => {
+    @bit.PackCompression::Stored => @zlib.zlib_compress_stored(data)
+    @bit.PackCompression::Default => {
       let compressed = @zlib.zlib_compress(data)
       if compressed.length() > data.length() {
         @zlib.zlib_compress_stored(data)
@@ -351,18 +351,18 @@ fn build_delta(base : Bytes, target : Bytes) -> Bytes {
 
 ///|
 fn pack_object_with_delta(
-  obj : @git.PackObject,
-  base : (Int, @git.PackObject)?,
+  obj : @bit.PackObject,
+  base : (Int, @bit.PackObject)?,
   obj_offset : Int,
   result : Array[Byte],
-  delta_mode : @git.PackDeltaMode,
-  compression : @git.PackCompression,
+  delta_mode : @bit.PackDeltaMode,
+  compression : @bit.PackCompression,
 ) -> (Int, Bool) {
   let obj_type = obj.obj_type.to_packfile_type()
   let data = obj.data
   // NoDelta or no base: compress normally
   let try_delta = match delta_mode {
-    @git.PackDeltaMode::NoDelta => false
+    @bit.PackDeltaMode::NoDelta => false
     _ =>
       match base {
         Some((base_offset, base_obj)) =>
@@ -385,12 +385,12 @@ fn pack_object_with_delta(
   let compressed_delta = compress_pack_data(delta, compression)
   // Estimate delta overhead
   let delta_overhead = match delta_mode {
-    @git.PackDeltaMode::OfsDelta => {
+    @bit.PackDeltaMode::OfsDelta => {
       let back_offset = obj_offset - base_offset
       type_and_size_len(delta.length()) + ofs_delta_len(back_offset)
     }
-    @git.PackDeltaMode::RefDelta => type_and_size_len(delta.length()) + 20
-    @git.PackDeltaMode::NoDelta => 0 // unreachable
+    @bit.PackDeltaMode::RefDelta => type_and_size_len(delta.length()) + 20
+    @bit.PackDeltaMode::NoDelta => 0 // unreachable
   }
   let delta_total = delta_overhead + compressed_delta.length()
   // Quick upper bound: if delta is already smaller than raw data header + raw,
@@ -399,7 +399,7 @@ fn pack_object_with_delta(
   if delta_total < normal_upper {
     // Delta wins without needing normal compression
     match delta_mode {
-      @git.PackDeltaMode::OfsDelta => {
+      @bit.PackDeltaMode::OfsDelta => {
         let back_offset = obj_offset - base_offset
         encode_type_and_size(6, delta.length(), result)
         encode_ofs_delta_offset(back_offset, result)
@@ -408,8 +408,8 @@ fn pack_object_with_delta(
         }
         return (delta_total, true)
       }
-      @git.PackDeltaMode::RefDelta => {
-        let base_id = @git.hash_object_content(base_obj.obj_type, base_obj.data)
+      @bit.PackDeltaMode::RefDelta => {
+        let base_id = @bit.hash_object_content(base_obj.obj_type, base_obj.data)
         encode_type_and_size(7, delta.length(), result)
         for b in base_id.bytes {
           result.push(b)
@@ -419,7 +419,7 @@ fn pack_object_with_delta(
         }
         return (delta_total, true)
       }
-      @git.PackDeltaMode::NoDelta => () // unreachable
+      @bit.PackDeltaMode::NoDelta => () // unreachable
     }
   }
   // Delta might not win — need to compare against normal compression
@@ -427,7 +427,7 @@ fn pack_object_with_delta(
   let normal_len = type_and_size_len(data.length()) + compressed.length()
   if delta_total < normal_len {
     match delta_mode {
-      @git.PackDeltaMode::OfsDelta => {
+      @bit.PackDeltaMode::OfsDelta => {
         let back_offset = obj_offset - base_offset
         encode_type_and_size(6, delta.length(), result)
         encode_ofs_delta_offset(back_offset, result)
@@ -436,8 +436,8 @@ fn pack_object_with_delta(
         }
         return (delta_total, true)
       }
-      @git.PackDeltaMode::RefDelta => {
-        let base_id = @git.hash_object_content(base_obj.obj_type, base_obj.data)
+      @bit.PackDeltaMode::RefDelta => {
+        let base_id = @bit.hash_object_content(base_obj.obj_type, base_obj.data)
         encode_type_and_size(7, delta.length(), result)
         for b in base_id.bytes {
           result.push(b)
@@ -447,7 +447,7 @@ fn pack_object_with_delta(
         }
         return (delta_total, true)
       }
-      @git.PackDeltaMode::NoDelta => () // unreachable
+      @bit.PackDeltaMode::NoDelta => () // unreachable
     }
   }
   // Normal wins
@@ -466,15 +466,15 @@ fn pack_object_with_delta(
 ///   [object count]   4 bytes (big-endian)
 ///   [...objects...]  variable
 ///   [SHA-1 trailer]  20 bytes
-pub fn create_packfile(objects : Array[@git.PackObject]) -> Bytes {
-  create_packfile_with_delta(objects, @git.PackDeltaMode::OfsDelta)
+pub fn create_packfile(objects : Array[@bit.PackObject]) -> Bytes {
+  create_packfile_with_delta(objects, @bit.PackDeltaMode::OfsDelta)
 }
 
 ///|
 /// Create a packfile from a list of objects with a chosen delta mode
 pub fn create_packfile_with_delta(
-  objects : Array[@git.PackObject],
-  delta_mode : @git.PackDeltaMode,
+  objects : Array[@bit.PackObject],
+  delta_mode : @bit.PackDeltaMode,
 ) -> Bytes {
   let (pack, _) = create_packfile_with_delta_stats(objects, delta_mode)
   pack
@@ -483,22 +483,22 @@ pub fn create_packfile_with_delta(
 ///|
 /// Create a packfile with delta statistics (delta object count)
 pub fn create_packfile_with_delta_stats(
-  objects : Array[@git.PackObject],
-  delta_mode : @git.PackDeltaMode,
+  objects : Array[@bit.PackObject],
+  delta_mode : @bit.PackDeltaMode,
 ) -> (Bytes, Int) {
   create_packfile_with_delta_stats_compression(
     objects,
     delta_mode,
-    @git.PackCompression::Default,
+    @bit.PackCompression::Default,
   )
 }
 
 ///|
 /// Create a packfile with delta statistics and compression mode
 pub fn create_packfile_with_delta_stats_compression(
-  objects : Array[@git.PackObject],
-  delta_mode : @git.PackDeltaMode,
-  compression : @git.PackCompression,
+  objects : Array[@bit.PackObject],
+  delta_mode : @bit.PackDeltaMode,
+  compression : @bit.PackCompression,
 ) -> (Bytes, Int) {
   let result : Array[Byte] = []
 
@@ -523,7 +523,7 @@ pub fn create_packfile_with_delta_stats_compression(
 
   // Pack each object (delta against the last object of the same type)
   let mut offset = 12
-  let last_by_type : Map[Int, (Int, @git.PackObject)] = {}
+  let last_by_type : Map[Int, (Int, @bit.PackObject)] = {}
   let mut delta_count = 0
   for obj in objects {
     let obj_offset = offset
@@ -540,7 +540,7 @@ pub fn create_packfile_with_delta_stats_compression(
   }
 
   // Compute SHA-1 of everything so far
-  let trailer = @git.sha1_array_prefix(result, result.length())
+  let trailer = @bit.sha1_array_prefix(result, result.length())
 
   // Append trailer
   for b in trailer.bytes {
@@ -552,9 +552,9 @@ pub fn create_packfile_with_delta_stats_compression(
 ///|
 /// Create a packfile with delta stats, optional delta reuse, and depth limit
 pub fn create_packfile_with_delta_stats_compression_reuse(
-  objects : Array[@git.PackObject],
-  delta_mode : @git.PackDeltaMode,
-  compression : @git.PackCompression,
+  objects : Array[@bit.PackObject],
+  delta_mode : @bit.PackDeltaMode,
+  compression : @bit.PackCompression,
   reuse_only : Bool,
   max_depth : Int,
 ) -> (Bytes, Int) {
@@ -581,12 +581,12 @@ pub fn create_packfile_with_delta_stats_compression_reuse(
 
   // Pack each object with optional delta reuse / depth limit
   let mut offset = 12
-  let last_by_type : Map[Int, (Int, @git.PackObject, Int)] = {}
+  let last_by_type : Map[Int, (Int, @bit.PackObject, Int)] = {}
   let mut delta_count = 0
   for obj in objects {
     let obj_offset = offset
     let key = obj.obj_type.to_packfile_type()
-    let mut base : (Int, @git.PackObject)? = None
+    let mut base : (Int, @bit.PackObject)? = None
     let mut base_depth = 0
     match last_by_type.get(key) {
       Some((base_offset, base_obj, depth)) => {
@@ -601,7 +601,7 @@ pub fn create_packfile_with_delta_stats_compression_reuse(
         max_depth > 0 &&
         base_depth < max_depth &&
         (match delta_mode {
-          @git.PackDeltaMode::NoDelta => false
+          @bit.PackDeltaMode::NoDelta => false
           _ => true
         }) &&
         (!reuse_only || (obj.offset >= 0 && base_obj.offset >= 0))
@@ -609,7 +609,7 @@ pub fn create_packfile_with_delta_stats_compression_reuse(
     let mode = if allow_delta {
       delta_mode
     } else {
-      @git.PackDeltaMode::NoDelta
+      @bit.PackDeltaMode::NoDelta
     }
     let (written, used_delta) = pack_object_with_delta(
       obj, base, obj_offset, result, mode, compression,
@@ -623,7 +623,7 @@ pub fn create_packfile_with_delta_stats_compression_reuse(
   }
 
   // Compute SHA-1 of everything so far
-  let trailer = @git.sha1_array_prefix(result, result.length())
+  let trailer = @bit.sha1_array_prefix(result, result.length())
 
   // Append trailer
   for b in trailer.bytes {
@@ -664,7 +664,7 @@ pub fn encode_type_and_size(
 ///|
 /// Create a packfile containing a single blob
 pub fn create_blob_packfile(content : Bytes) -> Bytes {
-  let obj = @git.PackObject::new(@git.ObjectType::Blob, content)
+  let obj = @bit.PackObject::new(@bit.ObjectType::Blob, content)
   create_packfile([obj])
 }
 
@@ -673,17 +673,17 @@ pub fn create_blob_packfile(content : Bytes) -> Bytes {
 pub fn create_commit_packfile(
   blob_content : Bytes,
   filename : String,
-  commit : @git.Commit,
-) -> (@git.ObjectId, Bytes) {
+  commit : @bit.Commit,
+) -> (@bit.ObjectId, Bytes) {
   // Create blob
-  let (blob_id, _) = @git.create_blob(blob_content)
+  let (blob_id, _) = @bit.create_blob(blob_content)
 
   // Create tree with single entry
-  let entry = @git.TreeEntry::new("100644", filename, blob_id)
-  let (tree_id, _) = @git.create_tree([entry])
+  let entry = @bit.TreeEntry::new("100644", filename, blob_id)
+  let (tree_id, _) = @bit.create_tree([entry])
 
   // Update commit with correct tree
-  let final_commit = @git.Commit::new(
+  let final_commit = @bit.Commit::new(
     tree_id,
     commit.parents,
     commit.author,
@@ -694,14 +694,14 @@ pub fn create_commit_packfile(
     commit.committer_tz,
     commit.message,
   )
-  let (commit_id, _) = @git.create_commit(final_commit)
+  let (commit_id, _) = @bit.create_commit(final_commit)
 
   // Build pack objects (raw content, not git object format)
   let pack_objects = [
-    @git.PackObject::new(@git.ObjectType::Blob, blob_content),
-    @git.PackObject::new(@git.ObjectType::Tree, build_tree_content([entry])),
-    @git.PackObject::new(
-      @git.ObjectType::Commit,
+    @bit.PackObject::new(@bit.ObjectType::Blob, blob_content),
+    @bit.PackObject::new(@bit.ObjectType::Tree, build_tree_content([entry])),
+    @bit.PackObject::new(
+      @bit.ObjectType::Commit,
       build_commit_content(final_commit),
     ),
   ]
@@ -711,7 +711,7 @@ pub fn create_commit_packfile(
 
 ///|
 /// Build raw tree content (without "tree {size}\0" header)
-fn build_tree_content(entries : Array[@git.TreeEntry]) -> Bytes {
+fn build_tree_content(entries : Array[@bit.TreeEntry]) -> Bytes {
   let content : Array[Byte] = []
   for entry in entries {
     for c in entry.mode {
@@ -731,7 +731,7 @@ fn build_tree_content(entries : Array[@git.TreeEntry]) -> Bytes {
 
 ///|
 /// Build raw commit content (without "commit {size}\0" header)
-fn build_commit_content(commit : @git.Commit) -> Bytes {
+fn build_commit_content(commit : @bit.Commit) -> Bytes {
   let content = StringBuilder::new()
   content.write_string("tree ")
   content.write_string(commit.tree.to_hex())

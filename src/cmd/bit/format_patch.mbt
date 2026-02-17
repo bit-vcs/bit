@@ -3,8 +3,8 @@ async fn handle_format_patch(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let git_dir = root + "/.git"
   let fs = OsFs::new()
-  let wfs : &@git.FileSystem = fs
-  let rfs : &@git.RepoFileSystem = fs
+  let wfs : &@bitcore.FileSystem = fs
+  let rfs : &@bitcore.RepoFileSystem = fs
   // Parse options
   let mut output_dir = "."
   let mut start_number = 1
@@ -91,7 +91,7 @@ async fn handle_format_patch(args : Array[String]) -> Unit raise Error {
   let grep_pattern_type = resolve_grep_pattern_type(
     rfs, git_dir, grep_pattern_type_override,
   )
-  let db = @gitlib.ObjectDb::load(rfs, git_dir)
+  let db = @bitlib.ObjectDb::load(rfs, git_dir)
   let commits = filter_format_patch_commits_by_grep(
     db, rfs, commits, grep_patterns, grep_pattern_type, grep_ignore_case,
   )
@@ -136,13 +136,13 @@ async fn handle_format_patch(args : Array[String]) -> Unit raise Error {
 
 ///|
 fn parse_format_patch_revisions(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   git_dir : String,
   revisions : Array[String],
-) -> (@git.ObjectId?, Array[@git.ObjectId]) raise Error {
+) -> (@bitcore.ObjectId?, Array[@bitcore.ObjectId]) raise Error {
   if revisions.length() == 0 {
     // Default: HEAD~1..HEAD (last commit)
-    let head = @gitrepo.rev_parse(rfs, git_dir, "HEAD")
+    let head = @bitrepo.rev_parse(rfs, git_dir, "HEAD")
     guard head is Some(h) else { return (None, []) }
     return (None, [h])
   }
@@ -156,8 +156,8 @@ fn parse_format_patch_revisions(
         start=idx + 2,
         end=rev.length(),
       )
-      let base_id = @gitrepo.rev_parse(rfs, git_dir, base_ref)
-      let end_id = @gitrepo.rev_parse(
+      let base_id = @bitrepo.rev_parse(rfs, git_dir, base_ref)
+      let end_id = @bitrepo.rev_parse(
         rfs,
         git_dir,
         if end_ref.length() == 0 {
@@ -183,7 +183,7 @@ fn parse_format_patch_revisions(
         (None, commits)
       } else {
         // Single commit
-        let id = @gitrepo.rev_parse(rfs, git_dir, rev)
+        let id = @bitrepo.rev_parse(rfs, git_dir, rev)
         guard id is Some(cid) else { return (None, []) }
         (None, [cid])
       }
@@ -192,20 +192,20 @@ fn parse_format_patch_revisions(
 
 ///|
 fn collect_commits_in_range(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   git_dir : String,
-  base : @git.ObjectId,
-  end : @git.ObjectId,
-) -> Array[@git.ObjectId] raise Error {
-  let db = @gitlib.ObjectDb::load(rfs, git_dir)
-  let result : Array[@git.ObjectId] = []
+  base : @bitcore.ObjectId,
+  end : @bitcore.ObjectId,
+) -> Array[@bitcore.ObjectId] raise Error {
+  let db = @bitlib.ObjectDb::load(rfs, git_dir)
+  let result : Array[@bitcore.ObjectId] = []
   let mut current = end
   let base_hex = base.to_hex()
   while current.to_hex() != base_hex {
     result.push(current)
     let obj = db.get(rfs, current)
     guard obj is Some(o) else { break }
-    let info = @git.parse_commit(o.data)
+    let info = @bitcore.parse_commit(o.data)
     if info.parents.length() == 0 {
       break
     }
@@ -218,20 +218,20 @@ fn collect_commits_in_range(
 
 ///|
 fn collect_last_n_commits(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   git_dir : String,
   n : Int,
-) -> Array[@git.ObjectId] raise Error {
-  let db = @gitlib.ObjectDb::load(rfs, git_dir)
-  let head = @gitrepo.rev_parse(rfs, git_dir, "HEAD")
+) -> Array[@bitcore.ObjectId] raise Error {
+  let db = @bitlib.ObjectDb::load(rfs, git_dir)
+  let head = @bitrepo.rev_parse(rfs, git_dir, "HEAD")
   guard head is Some(h) else { return [] }
-  let result : Array[@git.ObjectId] = []
+  let result : Array[@bitcore.ObjectId] = []
   let mut current = h
   for _ in 0..<n {
     result.push(current)
     let obj = db.get(rfs, current)
     guard obj is Some(o) else { break }
-    let info = @git.parse_commit(o.data)
+    let info = @bitcore.parse_commit(o.data)
     if info.parents.length() == 0 {
       break
     }
@@ -243,21 +243,21 @@ fn collect_last_n_commits(
 
 ///|
 fn filter_format_patch_commits_by_grep(
-  db : @gitlib.ObjectDb,
-  rfs : &@git.RepoFileSystem,
-  commits : Array[@git.ObjectId],
+  db : @bitlib.ObjectDb,
+  rfs : &@bitcore.RepoFileSystem,
+  commits : Array[@bitcore.ObjectId],
   grep_patterns : Array[String],
   grep_pattern_type : GrepPatternType,
   grep_ignore_case : Bool,
-) -> Array[@git.ObjectId] raise Error {
+) -> Array[@bitcore.ObjectId] raise Error {
   if grep_patterns.length() == 0 {
     return commits
   }
-  let filtered : Array[@git.ObjectId] = []
+  let filtered : Array[@bitcore.ObjectId] = []
   for commit_id in commits {
     let obj = db.get(rfs, commit_id)
     guard obj is Some(o) else { continue }
-    if o.obj_type != @git.ObjectType::Commit {
+    if o.obj_type != @bitcore.ObjectType::Commit {
       continue
     }
     let commit_message = extract_commit_message_from_raw(o.data)
@@ -285,20 +285,20 @@ fn generate_cover_letter(num_patches : Int) -> String {
 
 ///|
 fn generate_patch(
-  db : @gitlib.ObjectDb,
-  rfs : &@git.RepoFileSystem,
-  commit_id : @git.ObjectId,
-  _base : @git.ObjectId?,
+  db : @bitlib.ObjectDb,
+  rfs : &@bitcore.RepoFileSystem,
+  commit_id : @bitcore.ObjectId,
+  _base : @bitcore.ObjectId?,
   patch_num : Int,
   total : Int,
   numbered : Bool,
 ) -> String raise Error {
   let obj = db.get(rfs, commit_id)
   guard obj is Some(o) else {
-    raise @git.GitError::InvalidObject("commit not found")
+    raise @bitcore.GitError::InvalidObject("commit not found")
   }
   let commit_text = decode_bytes(o.data)
-  let info = @git.parse_commit(o.data)
+  let info = @bitcore.parse_commit(o.data)
   // Extract commit details
   let author_line = extract_author_line(commit_text)
   let message = extract_commit_message(o.data)
@@ -348,9 +348,9 @@ fn generate_patch(
 
 ///|
 fn format_patch_filename(
-  db : @gitlib.ObjectDb,
-  rfs : &@git.RepoFileSystem,
-  commit_id : @git.ObjectId,
+  db : @bitlib.ObjectDb,
+  rfs : &@bitcore.RepoFileSystem,
+  commit_id : @bitcore.ObjectId,
   patch_num : Int,
   _total : Int,
   _numbered : Bool,
@@ -430,21 +430,21 @@ fn format_email_date(ts : Int64, tz : String) -> String {
 
 ///|
 fn generate_commit_diff(
-  db : @gitlib.ObjectDb,
-  rfs : &@git.RepoFileSystem,
-  commit_id : @git.ObjectId,
-  parent_id : @git.ObjectId?,
+  db : @bitlib.ObjectDb,
+  rfs : &@bitcore.RepoFileSystem,
+  commit_id : @bitcore.ObjectId,
+  parent_id : @bitcore.ObjectId?,
 ) -> String raise Error {
   let obj = db.get(rfs, commit_id)
   guard obj is Some(o) else { return "" }
-  let info = @git.parse_commit(o.data)
+  let info = @bitcore.parse_commit(o.data)
   let tree = info.tree
   let parent_tree = match parent_id {
     Some(pid) => {
       let pobj = db.get(rfs, pid)
       match pobj {
         Some(po) => {
-          let pinfo = @git.parse_commit(po.data)
+          let pinfo = @bitcore.parse_commit(po.data)
           Some(pinfo.tree)
         }
         None => None
@@ -458,15 +458,15 @@ fn generate_commit_diff(
 
 ///|
 fn diff_trees(
-  db : @gitlib.ObjectDb,
-  rfs : &@git.RepoFileSystem,
-  old_tree : @git.ObjectId?,
-  new_tree : @git.ObjectId,
+  db : @bitlib.ObjectDb,
+  rfs : &@bitcore.RepoFileSystem,
+  old_tree : @bitcore.ObjectId?,
+  new_tree : @bitcore.ObjectId,
   prefix : String,
 ) -> String raise Error {
   let sb = StringBuilder::new()
   let new_entries = get_tree_entries(db, rfs, new_tree)
-  let old_entries : Map[String, @git.TreeEntry] = {}
+  let old_entries : Map[String, @bitcore.TreeEntry] = {}
   match old_tree {
     Some(ot) => {
       let entries = get_tree_entries(db, rfs, ot)
@@ -530,21 +530,21 @@ fn diff_trees(
 
 ///|
 fn get_tree_entries(
-  db : @gitlib.ObjectDb,
-  rfs : &@git.RepoFileSystem,
-  tree_id : @git.ObjectId,
-) -> Array[@git.TreeEntry] raise Error {
+  db : @bitlib.ObjectDb,
+  rfs : &@bitcore.RepoFileSystem,
+  tree_id : @bitcore.ObjectId,
+) -> Array[@bitcore.TreeEntry] raise Error {
   let obj = db.get(rfs, tree_id)
   guard obj is Some(o) else { return [] }
-  @git.parse_tree(o.data)
+  @bitcore.parse_tree(o.data)
 }
 
 ///|
 fn diff_blobs(
-  db : @gitlib.ObjectDb,
-  rfs : &@git.RepoFileSystem,
-  old_id : @git.ObjectId?,
-  new_id : @git.ObjectId,
+  db : @bitlib.ObjectDb,
+  rfs : &@bitcore.RepoFileSystem,
+  old_id : @bitcore.ObjectId?,
+  new_id : @bitcore.ObjectId,
   path : String,
 ) -> String raise Error {
   let sb = StringBuilder::new()

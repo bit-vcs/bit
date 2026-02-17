@@ -34,7 +34,7 @@ async fn handle_cherry(args : Array[String]) -> Unit raise Error {
         let branch = trim_string(head_content[16:].to_string())
         // Check for remote tracking
         let remote_ref = "origin/" + branch
-        if @gitrepo.rev_parse(fs, git_dir, remote_ref) is Some(_) {
+        if @bitrepo.rev_parse(fs, git_dir, remote_ref) is Some(_) {
           remote_ref
         } else {
           "origin/HEAD"
@@ -47,7 +47,7 @@ async fn handle_cherry(args : Array[String]) -> Unit raise Error {
   // Default head to HEAD
   let effective_head = head.unwrap_or("HEAD")
   // Resolve revisions
-  let upstream_id = match @gitrepo.rev_parse(fs, git_dir, effective_upstream) {
+  let upstream_id = match @bitrepo.rev_parse(fs, git_dir, effective_upstream) {
     Some(id) => id
     None => {
       eprint_line("fatal: bad revision '" + effective_upstream + "'")
@@ -55,7 +55,7 @@ async fn handle_cherry(args : Array[String]) -> Unit raise Error {
       return
     }
   }
-  let head_id = match @gitrepo.rev_parse(fs, git_dir, effective_head) {
+  let head_id = match @bitrepo.rev_parse(fs, git_dir, effective_head) {
     Some(id) => id
     None => {
       eprint_line("fatal: bad revision '" + effective_head + "'")
@@ -63,16 +63,16 @@ async fn handle_cherry(args : Array[String]) -> Unit raise Error {
       return
     }
   }
-  let limit_id : @git.ObjectId? = match limit {
-    Some(l) => @gitrepo.rev_parse(fs, git_dir, l)
+  let limit_id : @bitcore.ObjectId? = match limit {
+    Some(l) => @bitrepo.rev_parse(fs, git_dir, l)
     None => None
   }
   // Collect commits from upstream (to find merge base)
-  let db = @gitlib.ObjectDb::load(fs, git_dir)
+  let db = @bitlib.ObjectDb::load(fs, git_dir)
   let upstream_commits = cherry_collect_commits(db, fs, upstream_id, limit_id)
   let head_commits = cherry_collect_commits(db, fs, head_id, limit_id)
   // Compute patch-ids for upstream commits
-  let upstream_patch_ids : Map[String, @git.ObjectId] = {}
+  let upstream_patch_ids : Map[String, @bitcore.ObjectId] = {}
   for commit_id in upstream_commits {
     let patch_id = cherry_compute_patch_id(db, fs, commit_id)
     upstream_patch_ids[patch_id] = commit_id
@@ -104,17 +104,17 @@ async fn handle_cherry(args : Array[String]) -> Unit raise Error {
 
 ///|
 fn cherry_collect_commits(
-  db : @gitlib.ObjectDb,
+  db : @bitlib.ObjectDb,
   fs : OsFs,
-  start : @git.ObjectId,
-  limit : @git.ObjectId?,
-) -> Array[@git.ObjectId] {
-  let result : Array[@git.ObjectId] = []
+  start : @bitcore.ObjectId,
+  limit : @bitcore.ObjectId?,
+) -> Array[@bitcore.ObjectId] {
+  let result : Array[@bitcore.ObjectId] = []
   let limit_hex = match limit {
     Some(l) => l.to_hex()
     None => ""
   }
-  let mut current : @git.ObjectId? = Some(start)
+  let mut current : @bitcore.ObjectId? = Some(start)
   let mut count = 0
   let max_commits = 1000 // Safety limit
   while current is Some(id) && count < max_commits {
@@ -125,8 +125,8 @@ fn cherry_collect_commits(
     count += 1
     let obj = db.get(fs, id) catch { _ => break }
     match obj {
-      Some(o) if o.obj_type == @git.ObjectType::Commit => {
-        let info = @git.parse_commit(o.data) catch { _ => break }
+      Some(o) if o.obj_type == @bitcore.ObjectType::Commit => {
+        let info = @bitcore.parse_commit(o.data) catch { _ => break }
         current = if info.parents.length() > 0 {
           Some(info.parents[0])
         } else {
@@ -141,15 +141,15 @@ fn cherry_collect_commits(
 
 ///|
 fn cherry_compute_patch_id(
-  db : @gitlib.ObjectDb,
+  db : @bitlib.ObjectDb,
   fs : OsFs,
-  commit_id : @git.ObjectId,
+  commit_id : @bitcore.ObjectId,
 ) -> String {
   // Get commit and its parent
   let obj = db.get(fs, commit_id) catch { _ => return commit_id.to_hex() }
   match obj {
-    Some(o) if o.obj_type == @git.ObjectType::Commit => {
-      let info = @git.parse_commit(o.data) catch {
+    Some(o) if o.obj_type == @bitcore.ObjectType::Commit => {
+      let info = @bitcore.parse_commit(o.data) catch {
         _ => return commit_id.to_hex()
       }
       // Get tree entries of this commit
@@ -161,8 +161,8 @@ fn cherry_compute_patch_id(
           _ => return commit_id.to_hex()
         }
         match parent_obj {
-          Some(po) if po.obj_type == @git.ObjectType::Commit => {
-            let parent_info = @git.parse_commit(po.data) catch {
+          Some(po) if po.obj_type == @bitcore.ObjectType::Commit => {
+            let parent_info = @bitcore.parse_commit(po.data) catch {
               _ => return commit_id.to_hex()
             }
             cherry_get_tree_entries(db, fs, parent_info.tree)
@@ -188,7 +188,7 @@ fn cherry_compute_patch_id(
           patch_content[i].to_int().to_byte()
         }),
       )
-      @git.sha1(patch_bytes).to_hex()
+      @bitcore.sha1(patch_bytes).to_hex()
     }
     _ => commit_id.to_hex()
   }
@@ -196,15 +196,15 @@ fn cherry_compute_patch_id(
 
 ///|
 fn cherry_get_tree_entries(
-  db : @gitlib.ObjectDb,
+  db : @bitlib.ObjectDb,
   fs : OsFs,
-  tree_id : @git.ObjectId,
+  tree_id : @bitcore.ObjectId,
 ) -> Array[(String, String)] {
   let result : Array[(String, String)] = []
   let obj = db.get(fs, tree_id) catch { _ => return result }
   match obj {
-    Some(o) if o.obj_type == @git.ObjectType::Tree => {
-      let entries = @git.parse_tree(o.data) catch { _ => return result }
+    Some(o) if o.obj_type == @bitcore.ObjectType::Tree => {
+      let entries = @bitcore.parse_tree(o.data) catch { _ => return result }
       for entry in entries {
         // For files, add path -> blob id
         // For directories, recursively get entries

@@ -28,7 +28,7 @@ pub fn Hub::import_prs(
   refs : &@lib.RefStore,
   clock : &@lib.Clock,
   prs : Array[PullRequest],
-) -> ImportStats raise @git.GitError {
+) -> ImportStats raise @bit.GitError {
   if prs.length() == 0 {
     return ImportStats::new(0, 0)
   }
@@ -67,7 +67,7 @@ pub fn Hub::import_pr_proposals(
   refs : &@lib.RefStore,
   clock : &@lib.Clock,
   prs : Array[PullRequest],
-) -> ImportStats raise @git.GitError {
+) -> ImportStats raise @bit.GitError {
   if prs.length() == 0 {
     return ImportStats::new(0, 0)
   }
@@ -107,7 +107,7 @@ pub fn Hub::import_issues(
   refs : &@lib.RefStore,
   clock : &@lib.Clock,
   issues : Array[Issue],
-) -> ImportStats raise @git.GitError {
+) -> ImportStats raise @bit.GitError {
   if issues.length() == 0 {
     return ImportStats::new(0, 0)
   }

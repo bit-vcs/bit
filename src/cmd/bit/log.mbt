@@ -43,7 +43,7 @@ fn log_should_use_storage_runtime(args : Array[String]) -> Bool {
 ///|
 fn format_log_oneline(
   fmt : String,
-  id : @git.ObjectId,
+  id : @bitcore.ObjectId,
   subject : String,
 ) -> String {
   let short = (try! id.to_hex()[:7]).to_string()
@@ -59,7 +59,7 @@ fn format_log_oneline(
 
 ///|
 fn resolve_log_reflog_refname(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   git_dir : String,
   rev : String,
 ) -> String? {
@@ -70,21 +70,21 @@ fn resolve_log_reflog_refname(
     return Some(rev)
   }
   let heads_ref = "refs/heads/" + rev
-  if (@gitlib.resolve_ref(rfs, git_dir, heads_ref) catch { _ => None })
+  if (@bitlib.resolve_ref(rfs, git_dir, heads_ref) catch { _ => None })
     is Some(_) {
     return Some(heads_ref)
   }
   let tags_ref = "refs/tags/" + rev
-  if (@gitlib.resolve_ref(rfs, git_dir, tags_ref) catch { _ => None })
+  if (@bitlib.resolve_ref(rfs, git_dir, tags_ref) catch { _ => None })
     is Some(_) {
     return Some(tags_ref)
   }
   let remotes_ref = "refs/remotes/" + rev
-  if (@gitlib.resolve_ref(rfs, git_dir, remotes_ref) catch { _ => None })
+  if (@bitlib.resolve_ref(rfs, git_dir, remotes_ref) catch { _ => None })
     is Some(_) {
     return Some(remotes_ref)
   }
-  if (@gitlib.resolve_ref(rfs, git_dir, rev) catch { _ => None }) is Some(_) {
+  if (@bitlib.resolve_ref(rfs, git_dir, rev) catch { _ => None }) is Some(_) {
     return Some(rev)
   }
   None
@@ -115,11 +115,11 @@ fn format_reflog_entry(fmt : String?, gd : String, message : String) -> String {
 }
 
 ///|
-fn get_head_commit_message(fs : &@git.RepoFileSystem, root : String) -> String? {
+fn get_head_commit_message(fs : &@bitcore.RepoFileSystem, root : String) -> String? {
   let git_dir = resolve_git_dir(fs, root)
-  let head = @gitlib.resolve_head_commit(fs, git_dir) catch { _ => return None }
+  let head = @bitlib.resolve_head_commit(fs, git_dir) catch { _ => return None }
   guard head is Some(commit_id) else { return None }
-  let db = @gitlib.ObjectDb::load(fs, git_dir) catch { _ => return None }
+  let db = @bitlib.ObjectDb::load(fs, git_dir) catch { _ => return None }
   let obj = db.get(fs, commit_id) catch { _ => return None }
   guard obj is Some(o) else { return None }
   // Extract message from raw commit data (after blank line)
@@ -147,7 +147,7 @@ fn get_head_commit_message(fs : &@git.RepoFileSystem, root : String) -> String? 
 async fn handle_log(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let fs = OsFs::new()
-  let rfs : &@git.RepoFileSystem = fs
+  let rfs : &@bitcore.RepoFileSystem = fs
   let git_dir = resolve_git_dir(fs, root)
   if log_should_use_storage_runtime(args) {
     match log_storage_runtime_delegate_args(args) {
@@ -260,14 +260,14 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
       }
       let refname = resolve_log_reflog_refname(rfs, git_dir, target)
       guard refname is Some(actual_refname) else {
-        raise @git.GitError::InvalidObject("Unknown revision: " + target)
+        raise @bitcore.GitError::InvalidObject("Unknown revision: " + target)
       }
       let display_ref = if target.has_prefix("refs/") {
         shorten_reflog_refname(actual_refname)
       } else {
         target
       }
-      let entries = @gitrepo.read_reflog(rfs, git_dir, actual_refname)
+      let entries = @bitrepo.read_reflog(rfs, git_dir, actual_refname)
       let mut idx = 0
       let mut entry_i = entries.length()
       while entry_i > 0 && emitted < max_count {
@@ -282,24 +282,24 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
     return
   }
   if format is Some(fmt) {
-    let db = @gitlib.ObjectDb::load(rfs, git_dir)
-    let targets : Array[(String, @git.ObjectId)] = []
+    let db = @bitlib.ObjectDb::load(rfs, git_dir)
+    let targets : Array[(String, @bitcore.ObjectId)] = []
     if all_refs || no_walk {
-      let refs = @gitlib.list_refs_with_ids(rfs, git_dir, None)
+      let refs = @bitlib.list_refs_with_ids(rfs, git_dir, None)
       for name, id in refs {
         targets.push((name, id))
       }
       targets.sort_by((a, b) => a.0.compare(b.0))
     }
     for rev in revs {
-      let resolved = @gitrepo.rev_parse(rfs, git_dir, rev)
+      let resolved = @bitrepo.rev_parse(rfs, git_dir, rev)
       guard resolved is Some(id) else {
-        raise @git.GitError::InvalidObject("Unknown revision: " + rev)
+        raise @bitcore.GitError::InvalidObject("Unknown revision: " + rev)
       }
       targets.push((rev, id))
     }
     if targets.length() == 0 {
-      let head = @gitrepo.rev_parse(rfs, git_dir, "HEAD")
+      let head = @bitrepo.rev_parse(rfs, git_dir, "HEAD")
       guard head is Some(id) else { return }
       targets.push(("HEAD", id))
     }
@@ -335,7 +335,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
   if graph {
     log_with_graph(rfs, git_dir, max_count, oneline, all_refs, decorate)
   } else if oneline {
-    let lines = @gitlib.log_head_oneline(
+    let lines = @bitlib.log_head_oneline(
       fs,
       git_dir,
       max_count~,
@@ -346,7 +346,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
       print_line(line)
     }
   } else {
-    let entries = @gitlib.log_head(
+    let entries = @bitlib.log_head(
       fs,
       git_dir,
       max_count~,
@@ -360,21 +360,21 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
       print_line("    " + entry.message)
       print_line("")
       if show_stat || show_patch {
-        let diff_files = @gitdiff.diff_trees(
+        let diff_files = @bitdiff.diff_trees(
           rfs,
           git_dir,
           entry.parent_tree,
           entry.tree,
         )
         if show_stat {
-          let stat_lines = @gitdiff.diff_stat(diff_files)
+          let stat_lines = @bitdiff.diff_stat(diff_files)
           for line in stat_lines {
             print_line(line)
           }
           print_line("")
         }
         if show_patch {
-          let patch_lines = @gitdiff.diff_text(diff_files)
+          let patch_lines = @bitdiff.diff_text(diff_files)
           for line in patch_lines {
             print_line(line)
           }
@@ -387,16 +387,16 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
 
 ///|
 async fn log_with_graph(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   git_dir : String,
   max_count : Int,
   oneline : Bool,
   all_refs : Bool,
   decorate : Bool,
 ) -> Unit raise Error {
-  let db = @gitlib.ObjectDb::load(rfs, git_dir)
+  let db = @bitlib.ObjectDb::load(rfs, git_dir)
   // Collect starting points
-  let starts : Array[@git.ObjectId] = []
+  let starts : Array[@bitcore.ObjectId] = []
   let ref_names : Map[String, Array[String]] = {} // commit hex -> ref names
   if all_refs {
     // Add all branches
@@ -410,7 +410,7 @@ async fn log_with_graph(
         let ref_path = heads_dir + "/" + branch
         if rfs.is_file(ref_path) {
           let hex = rfs.read_file(ref_path) |> decode_bytes |> trim_string
-          let id = @git.ObjectId::from_hex(hex)
+          let id = @bitcore.ObjectId::from_hex(hex)
           starts.push(id)
           match ref_names.get(hex) {
             Some(arr) => arr.push(branch)
@@ -420,7 +420,7 @@ async fn log_with_graph(
       }
     }
   } else {
-    let head = @gitrepo.rev_parse(rfs, git_dir, "HEAD")
+    let head = @bitrepo.rev_parse(rfs, git_dir, "HEAD")
     match head {
       Some(h) => {
         starts.push(h)
@@ -448,10 +448,10 @@ async fn log_with_graph(
     }
   }
   // BFS to collect commits with graph structure
-  let commits : Array[(@git.ObjectId, Array[@git.ObjectId], Int)] = [] // (id, parents, column)
+  let commits : Array[(@bitcore.ObjectId, Array[@bitcore.ObjectId], Int)] = [] // (id, parents, column)
   let visited : Map[String, Bool] = {}
-  let active_columns : Array[@git.ObjectId?] = [] // Track which columns are active
-  let queue : Array[(@git.ObjectId, Int)] = [] // (commit, column)
+  let active_columns : Array[@bitcore.ObjectId?] = [] // Track which columns are active
+  let queue : Array[(@bitcore.ObjectId, Int)] = [] // (commit, column)
   // Initialize queue
   for i, start in starts {
     queue.push((start, i))
@@ -466,7 +466,7 @@ async fn log_with_graph(
     queue.sort_by((a, b) => a.1.compare(b.1))
     let (current, col) = queue[0]
     // Remove first element
-    let new_queue : Array[(@git.ObjectId, Int)] = []
+    let new_queue : Array[(@bitcore.ObjectId, Int)] = []
     for i in 1..<queue.length() {
       new_queue.push(queue[i])
     }
@@ -485,7 +485,7 @@ async fn log_with_graph(
     let obj = db.get(rfs, current)
     match obj {
       Some(o) => {
-        let info = @git.parse_commit(o.data)
+        let info = @bitcore.parse_commit(o.data)
         commits.push((current, info.parents, col))
         // Add parents to queue
         for i, parent in info.parents {
@@ -548,7 +548,7 @@ async fn log_with_graph(
 }
 
 ///|
-fn find_free_column(columns : Array[@git.ObjectId?], start : Int) -> Int {
+fn find_free_column(columns : Array[@bitcore.ObjectId?], start : Int) -> Int {
   for i in (start + 1)..<columns.length() {
     if columns[i] is None {
       return i
@@ -559,7 +559,7 @@ fn find_free_column(columns : Array[@git.ObjectId?], start : Int) -> Int {
 
 ///|
 fn get_max_column(
-  commits : Array[(@git.ObjectId, Array[@git.ObjectId], Int)],
+  commits : Array[(@bitcore.ObjectId, Array[@bitcore.ObjectId], Int)],
 ) -> Int {
   let mut max = 0
   for entry in commits {
@@ -587,9 +587,9 @@ fn build_graph_line(col : Int, max_col : Int, is_merge : Bool) -> String {
 
 ///|
 fn get_commit_subject(
-  db : @gitlib.ObjectDb,
-  rfs : &@git.RepoFileSystem,
-  commit_id : @git.ObjectId,
+  db : @bitlib.ObjectDb,
+  rfs : &@bitcore.RepoFileSystem,
+  commit_id : @bitcore.ObjectId,
 ) -> String raise Error {
   let obj = db.get(rfs, commit_id)
   guard obj is Some(o) else { return "" }

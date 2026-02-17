@@ -3,7 +3,7 @@
 ///|
 /// Check if sparse checkout is enabled.
 pub fn is_sparse_checkout_enabled(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> Bool {
   let config_path = join_path(git_dir, "config")
@@ -37,9 +37,9 @@ pub fn is_sparse_checkout_enabled(
 ///|
 /// Read sparse checkout patterns from .git/info/sparse-checkout.
 pub fn read_sparse_patterns(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
-) -> Array[String] raise @git.GitError {
+) -> Array[String] raise @bit.GitError {
   let sparse_path = join_path(git_dir, "info/sparse-checkout")
   if not(rfs.is_file(sparse_path)) {
     return []
@@ -59,10 +59,10 @@ pub fn read_sparse_patterns(
 ///|
 /// Write sparse checkout patterns to .git/info/sparse-checkout.
 pub fn write_sparse_patterns(
-  fs : &@git.FileSystem,
+  fs : &@bit.FileSystem,
   git_dir : String,
   patterns : Array[String],
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let info_dir = join_path(git_dir, "info")
   fs.mkdir_p(info_dir)
   let sparse_path = join_path(git_dir, "info/sparse-checkout")
@@ -81,11 +81,11 @@ pub fn write_sparse_patterns(
 ///|
 /// Initialize sparse checkout.
 pub fn sparse_checkout_init(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   cone? : Bool = false,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   // Enable sparse checkout in config
   let config_path = join_path(git_dir, "config")
@@ -127,11 +127,11 @@ pub fn sparse_checkout_init(
 ///|
 /// Set sparse checkout patterns (replaces existing patterns).
 pub fn sparse_checkout_set(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   patterns : Array[String],
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   // Ensure sparse checkout is initialized
   if not(is_sparse_checkout_enabled(rfs, git_dir)) {
@@ -145,11 +145,11 @@ pub fn sparse_checkout_set(
 ///|
 /// Add patterns to sparse checkout.
 pub fn sparse_checkout_add(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   new_patterns : Array[String],
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   // Ensure sparse checkout is initialized
   if not(is_sparse_checkout_enabled(rfs, git_dir)) {
@@ -169,10 +169,10 @@ pub fn sparse_checkout_add(
 ///|
 /// Disable sparse checkout.
 pub fn sparse_checkout_disable(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   // Update config to disable
   let config_path = join_path(git_dir, "config")
@@ -314,10 +314,10 @@ fn sparse_path_matches(path : String, pattern : String) -> Bool {
 ///|
 /// Update worktree based on sparse checkout patterns.
 fn sparse_update_worktree(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   let patterns = read_sparse_patterns(rfs, git_dir)
   let head = resolve_head_commit(rfs, git_dir)

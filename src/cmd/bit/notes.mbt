@@ -3,8 +3,8 @@ async fn handle_notes(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let git_dir = root + "/.git"
   let fs = OsFs::new()
-  let wfs : &@git.FileSystem = fs
-  let rfs : &@git.RepoFileSystem = fs
+  let wfs : &@bitcore.FileSystem = fs
+  let rfs : &@bitcore.RepoFileSystem = fs
   let mut ref_name : String? = None
   let rest : Array[String] = []
   let mut i = 0
@@ -324,7 +324,7 @@ async fn handle_notes(args : Array[String]) -> Unit raise Error {
 
 ///|
 async fn notes_list(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   git_dir : String,
   notes_ref_path : String,
 ) -> Unit raise Error {
@@ -333,15 +333,15 @@ async fn notes_list(
   }
   let ref_content = decode_bytes(rfs.read_file(notes_ref_path))
   let commit_hex = trim_string(ref_content)
-  let commit_id = @git.ObjectId::from_hex(commit_hex)
-  let db = @gitlib.ObjectDb::load(rfs, git_dir)
+  let commit_id = @bitcore.ObjectId::from_hex(commit_hex)
+  let db = @bitlib.ObjectDb::load(rfs, git_dir)
   let obj = db.get(rfs, commit_id)
   guard obj is Some(o) else { return }
-  let commit_info = @git.parse_commit(o.data)
+  let commit_info = @bitcore.parse_commit(o.data)
   // Read tree
   let tree_obj = db.get(rfs, commit_info.tree)
   guard tree_obj is Some(to) else { return }
-  let entries = @git.parse_tree(to.data)
+  let entries = @bitcore.parse_tree(to.data)
   for entry in entries {
     print_line("\{entry.id.to_hex()} \{entry.name}")
   }
@@ -349,15 +349,15 @@ async fn notes_list(
 
 ///|
 async fn notes_show(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   git_dir : String,
   notes_ref_path : String,
   commit_ref : String,
 ) -> Unit raise Error {
   // Resolve target commit
-  let target_id = @gitrepo.rev_parse(rfs, git_dir, commit_ref)
+  let target_id = @bitrepo.rev_parse(rfs, git_dir, commit_ref)
   guard target_id is Some(tid) else {
-    raise @git.GitError::InvalidObject("unknown revision: \{commit_ref}")
+    raise @bitcore.GitError::InvalidObject("unknown revision: \{commit_ref}")
   }
   let target_hex = tid.to_hex()
   // Check if notes ref exists
@@ -367,21 +367,21 @@ async fn notes_show(
   }
   let ref_content = decode_bytes(rfs.read_file(notes_ref_path))
   let commit_hex = trim_string(ref_content)
-  let commit_id = @git.ObjectId::from_hex(commit_hex)
-  let db = @gitlib.ObjectDb::load(rfs, git_dir)
+  let commit_id = @bitcore.ObjectId::from_hex(commit_hex)
+  let db = @bitlib.ObjectDb::load(rfs, git_dir)
   let obj = db.get(rfs, commit_id)
   guard obj is Some(o) else {
     @stdio.stderr.write("error: notes ref corrupt")
     @sys.exit(1)
   }
-  let commit_info = @git.parse_commit(o.data)
+  let commit_info = @bitcore.parse_commit(o.data)
   // Read tree
   let tree_obj = db.get(rfs, commit_info.tree)
   guard tree_obj is Some(to) else {
     @stdio.stderr.write("error: notes tree corrupt")
     @sys.exit(1)
   }
-  let entries = @git.parse_tree(to.data)
+  let entries = @bitcore.parse_tree(to.data)
   // Find entry matching target commit
   for entry in entries {
     if entry.name == target_hex {
@@ -400,8 +400,8 @@ async fn notes_show(
 
 ///|
 async fn notes_add(
-  wfs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  wfs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   git_dir : String,
   notes_ref_path : String,
   commit_ref : String,
@@ -409,38 +409,38 @@ async fn notes_add(
   force : Bool,
 ) -> Unit raise Error {
   // Resolve target commit
-  let target_id = @gitrepo.rev_parse(rfs, git_dir, commit_ref)
+  let target_id = @bitrepo.rev_parse(rfs, git_dir, commit_ref)
   guard target_id is Some(tid) else {
-    raise @git.GitError::InvalidObject("unknown revision: \{commit_ref}")
+    raise @bitcore.GitError::InvalidObject("unknown revision: \{commit_ref}")
   }
   let target_hex = tid.to_hex()
   // Create blob for note content
   let note_content = Bytes::from_array(
     message.to_array().map(c => c.to_int().to_byte()),
   )
-  let note_id = @gitlib.write_loose_object(
+  let note_id = @bitlib.write_loose_object(
     wfs,
     git_dir,
-    @git.ObjectType::Blob,
+    @bitcore.ObjectType::Blob,
     note_content,
   )
   // Get existing tree entries if notes ref exists
-  let entries : Array[@git.TreeEntry] = []
-  let mut parent_commit : @git.ObjectId? = None
+  let entries : Array[@bitcore.TreeEntry] = []
+  let mut parent_commit : @bitcore.ObjectId? = None
   if rfs.is_file(notes_ref_path) {
     let ref_content = decode_bytes(rfs.read_file(notes_ref_path))
     let commit_hex = trim_string(ref_content)
-    let commit_id = @git.ObjectId::from_hex(commit_hex)
+    let commit_id = @bitcore.ObjectId::from_hex(commit_hex)
     parent_commit = Some(commit_id)
-    let db = @gitlib.ObjectDb::load(rfs, git_dir)
+    let db = @bitlib.ObjectDb::load(rfs, git_dir)
     let obj = db.get(rfs, commit_id)
     match obj {
       Some(o) => {
-        let commit_info = @git.parse_commit(o.data)
+        let commit_info = @bitcore.parse_commit(o.data)
         let tree_obj = db.get(rfs, commit_info.tree)
         match tree_obj {
           Some(to) => {
-            let existing = @git.parse_tree(to.data)
+            let existing = @bitcore.parse_tree(to.data)
             for e in existing {
               if e.name == target_hex {
                 if not(force) {
@@ -463,12 +463,12 @@ async fn notes_add(
     }
   }
   // Add new note entry
-  entries.push(@git.TreeEntry::new("100644", target_hex, note_id))
+  entries.push(@bitcore.TreeEntry::new("100644", target_hex, note_id))
   // Sort entries by name (git requires sorted trees)
   entries.sort_by((a, b) => a.name.compare(b.name))
   // Create tree
-  let (tree_id, tree_data) = @git.create_tree(entries)
-  @gitlib.write_object_bytes(wfs, git_dir, tree_id, tree_data)
+  let (tree_id, tree_data) = @bitcore.create_tree(entries)
+  @bitlib.write_object_bytes(wfs, git_dir, tree_id, tree_data)
   // Create commit
   let author = get_author_string()
   let timestamp = @sys.get_env_var("GIT_COMMITTER_DATE")
@@ -478,11 +478,11 @@ async fn notes_add(
     Some(p) => [p]
     None => []
   }
-  let commit = @git.Commit::new(
+  let commit = @bitcore.Commit::new(
     tree_id, parents, author, timestamp, "+0000", author, timestamp, "+0000", "Notes added by 'git notes add'\n",
   )
-  let (commit_id, commit_data) = @git.create_commit(commit)
-  @gitlib.write_object_bytes(wfs, git_dir, commit_id, commit_data)
+  let (commit_id, commit_data) = @bitcore.create_commit(commit)
+  @bitlib.write_object_bytes(wfs, git_dir, commit_id, commit_data)
   // Ensure refs/notes directory exists
   wfs.mkdir_p(git_dir + "/refs/notes")
   // Update notes ref
@@ -491,41 +491,41 @@ async fn notes_add(
 
 ///|
 async fn notes_append(
-  wfs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  wfs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   git_dir : String,
   notes_ref_path : String,
   commit_ref : String,
   message : String,
 ) -> Unit raise Error {
   // Resolve target commit
-  let target_id = @gitrepo.rev_parse(rfs, git_dir, commit_ref)
+  let target_id = @bitrepo.rev_parse(rfs, git_dir, commit_ref)
   guard target_id is Some(tid) else {
-    raise @git.GitError::InvalidObject("unknown revision: \{commit_ref}")
+    raise @bitcore.GitError::InvalidObject("unknown revision: \{commit_ref}")
   }
   let target_hex = tid.to_hex()
   // Get existing tree entries and note content if present
-  let entries : Array[@git.TreeEntry] = []
-  let mut parent_commit : @git.ObjectId? = None
+  let entries : Array[@bitcore.TreeEntry] = []
+  let mut parent_commit : @bitcore.ObjectId? = None
   let mut existing_text : String? = None
   if rfs.is_file(notes_ref_path) {
     let ref_content = decode_bytes(rfs.read_file(notes_ref_path))
     let commit_hex = trim_string(ref_content)
-    let commit_id = @git.ObjectId::from_hex(commit_hex)
+    let commit_id = @bitcore.ObjectId::from_hex(commit_hex)
     parent_commit = Some(commit_id)
-    let db = @gitlib.ObjectDb::load(rfs, git_dir)
+    let db = @bitlib.ObjectDb::load(rfs, git_dir)
     let obj = db.get(rfs, commit_id)
     guard obj is Some(o) else {
       @stdio.stderr.write("error: notes ref corrupt")
       @sys.exit(1)
     }
-    let commit_info = @git.parse_commit(o.data)
+    let commit_info = @bitcore.parse_commit(o.data)
     let tree_obj = db.get(rfs, commit_info.tree)
     guard tree_obj is Some(to) else {
       @stdio.stderr.write("error: notes tree corrupt")
       @sys.exit(1)
     }
-    let existing = @git.parse_tree(to.data)
+    let existing = @bitcore.parse_tree(to.data)
     for e in existing {
       if e.name == target_hex {
         let note_obj = db.get(rfs, e.id)
@@ -550,19 +550,19 @@ async fn notes_append(
   let note_content = Bytes::from_array(
     new_text.to_array().map(c => c.to_int().to_byte()),
   )
-  let note_id = @gitlib.write_loose_object(
+  let note_id = @bitlib.write_loose_object(
     wfs,
     git_dir,
-    @git.ObjectType::Blob,
+    @bitcore.ObjectType::Blob,
     note_content,
   )
   // Add new note entry
-  entries.push(@git.TreeEntry::new("100644", target_hex, note_id))
+  entries.push(@bitcore.TreeEntry::new("100644", target_hex, note_id))
   // Sort entries by name (git requires sorted trees)
   entries.sort_by((a, b) => a.name.compare(b.name))
   // Create tree
-  let (tree_id, tree_data) = @git.create_tree(entries)
-  @gitlib.write_object_bytes(wfs, git_dir, tree_id, tree_data)
+  let (tree_id, tree_data) = @bitcore.create_tree(entries)
+  @bitlib.write_object_bytes(wfs, git_dir, tree_id, tree_data)
   // Create commit
   let author = get_author_string()
   let timestamp = get_current_timestamp()
@@ -570,11 +570,11 @@ async fn notes_append(
     Some(p) => [p]
     None => []
   }
-  let commit = @git.Commit::new(
+  let commit = @bitcore.Commit::new(
     tree_id, parents, author, timestamp, "+0000", author, timestamp, "+0000", "Notes appended by 'git notes append'\n",
   )
-  let (commit_id, commit_data) = @git.create_commit(commit)
-  @gitlib.write_object_bytes(wfs, git_dir, commit_id, commit_data)
+  let (commit_id, commit_data) = @bitcore.create_commit(commit)
+  @bitlib.write_object_bytes(wfs, git_dir, commit_id, commit_data)
   // Ensure refs/notes directory exists
   wfs.mkdir_p(git_dir + "/refs/notes")
   // Update notes ref
@@ -583,8 +583,8 @@ async fn notes_append(
 
 ///|
 async fn notes_copy(
-  wfs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  wfs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   git_dir : String,
   notes_ref_path : String,
   from_ref : String,
@@ -592,13 +592,13 @@ async fn notes_copy(
   force : Bool,
 ) -> Unit raise Error {
   // Resolve commits
-  let from_id = @gitrepo.rev_parse(rfs, git_dir, from_ref)
+  let from_id = @bitrepo.rev_parse(rfs, git_dir, from_ref)
   guard from_id is Some(fid) else {
-    raise @git.GitError::InvalidObject("unknown revision: \{from_ref}")
+    raise @bitcore.GitError::InvalidObject("unknown revision: \{from_ref}")
   }
-  let to_id = @gitrepo.rev_parse(rfs, git_dir, to_ref)
+  let to_id = @bitrepo.rev_parse(rfs, git_dir, to_ref)
   guard to_id is Some(tid) else {
-    raise @git.GitError::InvalidObject("unknown revision: \{to_ref}")
+    raise @bitcore.GitError::InvalidObject("unknown revision: \{to_ref}")
   }
   let from_hex = fid.to_hex()
   let to_hex = tid.to_hex()
@@ -613,22 +613,22 @@ async fn notes_copy(
   }
   let ref_content = decode_bytes(rfs.read_file(notes_ref_path))
   let commit_hex = trim_string(ref_content)
-  let commit_id = @git.ObjectId::from_hex(commit_hex)
-  let db = @gitlib.ObjectDb::load(rfs, git_dir)
+  let commit_id = @bitcore.ObjectId::from_hex(commit_hex)
+  let db = @bitlib.ObjectDb::load(rfs, git_dir)
   let obj = db.get(rfs, commit_id)
   guard obj is Some(o) else {
     @stdio.stderr.write("error: notes ref corrupt")
     @sys.exit(1)
   }
-  let commit_info = @git.parse_commit(o.data)
+  let commit_info = @bitcore.parse_commit(o.data)
   let tree_obj = db.get(rfs, commit_info.tree)
   guard tree_obj is Some(to) else {
     @stdio.stderr.write("error: notes tree corrupt")
     @sys.exit(1)
   }
-  let existing = @git.parse_tree(to.data)
-  let entries : Array[@git.TreeEntry] = []
-  let mut source_entry : @git.TreeEntry? = None
+  let existing = @bitcore.parse_tree(to.data)
+  let entries : Array[@bitcore.TreeEntry] = []
+  let mut source_entry : @bitcore.TreeEntry? = None
   let mut dest_exists = false
   for e in existing {
     if e.name == from_hex {
@@ -653,13 +653,13 @@ async fn notes_copy(
     @stdio.stderr.write("error: note already exists for \{to_hex}")
     @sys.exit(1)
   }
-  entries.push(@git.TreeEntry::new("100644", to_hex, src.id))
+  entries.push(@bitcore.TreeEntry::new("100644", to_hex, src.id))
   entries.sort_by((a, b) => a.name.compare(b.name))
-  let (tree_id, tree_data) = @git.create_tree(entries)
-  @gitlib.write_object_bytes(wfs, git_dir, tree_id, tree_data)
+  let (tree_id, tree_data) = @bitcore.create_tree(entries)
+  @bitlib.write_object_bytes(wfs, git_dir, tree_id, tree_data)
   let author = get_author_string()
   let timestamp = get_current_timestamp()
-  let commit = @git.Commit::new(
+  let commit = @bitcore.Commit::new(
     tree_id,
     [commit_id],
     author,
@@ -670,24 +670,24 @@ async fn notes_copy(
     "+0000",
     "Notes copied by 'git notes copy'\n",
   )
-  let (new_commit_id, commit_data) = @git.create_commit(commit)
-  @gitlib.write_object_bytes(wfs, git_dir, new_commit_id, commit_data)
+  let (new_commit_id, commit_data) = @bitcore.create_commit(commit)
+  @bitlib.write_object_bytes(wfs, git_dir, new_commit_id, commit_data)
   wfs.mkdir_p(git_dir + "/refs/notes")
   wfs.write_string(notes_ref_path, new_commit_id.to_hex() + "\n")
 }
 
 ///|
 async fn notes_remove(
-  wfs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  wfs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   git_dir : String,
   notes_ref_path : String,
   commit_ref : String,
 ) -> Unit raise Error {
   // Resolve target commit
-  let target_id = @gitrepo.rev_parse(rfs, git_dir, commit_ref)
+  let target_id = @bitrepo.rev_parse(rfs, git_dir, commit_ref)
   guard target_id is Some(tid) else {
-    raise @git.GitError::InvalidObject("unknown revision: \{commit_ref}")
+    raise @bitcore.GitError::InvalidObject("unknown revision: \{commit_ref}")
   }
   let target_hex = tid.to_hex()
   // Check if notes ref exists
@@ -697,23 +697,23 @@ async fn notes_remove(
   }
   let ref_content = decode_bytes(rfs.read_file(notes_ref_path))
   let commit_hex = trim_string(ref_content)
-  let commit_id = @git.ObjectId::from_hex(commit_hex)
-  let db = @gitlib.ObjectDb::load(rfs, git_dir)
+  let commit_id = @bitcore.ObjectId::from_hex(commit_hex)
+  let db = @bitlib.ObjectDb::load(rfs, git_dir)
   let obj = db.get(rfs, commit_id)
   guard obj is Some(o) else {
     @stdio.stderr.write("error: notes ref corrupt")
     @sys.exit(1)
   }
-  let commit_info = @git.parse_commit(o.data)
+  let commit_info = @bitcore.parse_commit(o.data)
   let tree_obj = db.get(rfs, commit_info.tree)
   guard tree_obj is Some(to) else {
     @stdio.stderr.write("error: notes tree corrupt")
     @sys.exit(1)
   }
-  let existing = @git.parse_tree(to.data)
+  let existing = @bitcore.parse_tree(to.data)
   // Filter out target entry
   let mut found = false
-  let entries : Array[@git.TreeEntry] = []
+  let entries : Array[@bitcore.TreeEntry] = []
   for e in existing {
     if e.name == target_hex {
       found = true
@@ -726,12 +726,12 @@ async fn notes_remove(
     @sys.exit(1)
   }
   // Create new tree
-  let (tree_id, tree_data) = @git.create_tree(entries)
-  @gitlib.write_object_bytes(wfs, git_dir, tree_id, tree_data)
+  let (tree_id, tree_data) = @bitcore.create_tree(entries)
+  @bitlib.write_object_bytes(wfs, git_dir, tree_id, tree_data)
   // Create commit
   let author = get_author_string()
   let timestamp = get_current_timestamp()
-  let commit = @git.Commit::new(
+  let commit = @bitcore.Commit::new(
     tree_id,
     [commit_id],
     author,
@@ -742,8 +742,8 @@ async fn notes_remove(
     "+0000",
     "Notes removed by 'git notes remove'\n",
   )
-  let (new_commit_id, commit_data) = @git.create_commit(commit)
-  @gitlib.write_object_bytes(wfs, git_dir, new_commit_id, commit_data)
+  let (new_commit_id, commit_data) = @bitcore.create_commit(commit)
+  @bitlib.write_object_bytes(wfs, git_dir, new_commit_id, commit_data)
   // Update notes ref
   wfs.write_string(notes_ref_path, new_commit_id.to_hex() + "\n")
   print_line("Removing note for \{target_hex}")
@@ -751,8 +751,8 @@ async fn notes_remove(
 
 ///|
 async fn notes_prune(
-  wfs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  wfs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   git_dir : String,
   notes_ref_path : String,
 ) -> Unit raise Error {
@@ -762,19 +762,19 @@ async fn notes_prune(
   }
   let ref_content = decode_bytes(rfs.read_file(notes_ref_path))
   let commit_hex = trim_string(ref_content)
-  let commit_id = @git.ObjectId::from_hex(commit_hex)
-  let db = @gitlib.ObjectDb::load(rfs, git_dir)
+  let commit_id = @bitcore.ObjectId::from_hex(commit_hex)
+  let db = @bitlib.ObjectDb::load(rfs, git_dir)
   let obj = db.get(rfs, commit_id)
   guard obj is Some(o) else { return }
-  let commit_info = @git.parse_commit(o.data)
+  let commit_info = @bitcore.parse_commit(o.data)
   let tree_obj = db.get(rfs, commit_info.tree)
   guard tree_obj is Some(to) else { return }
-  let existing = @git.parse_tree(to.data)
+  let existing = @bitcore.parse_tree(to.data)
   // Filter entries where the referenced commit still exists
-  let entries : Array[@git.TreeEntry] = []
+  let entries : Array[@bitcore.TreeEntry] = []
   let mut pruned = 0
   for e in existing {
-    let ref_id = @git.ObjectId::from_hex(e.name)
+    let ref_id = @bitcore.ObjectId::from_hex(e.name)
     let ref_obj = db.get(rfs, ref_id) catch {
       err if @async.is_cancellation_error(err) => raise err
       _ => None
@@ -788,12 +788,12 @@ async fn notes_prune(
     return
   }
   // Create new tree
-  let (tree_id, tree_data) = @git.create_tree(entries)
-  @gitlib.write_object_bytes(wfs, git_dir, tree_id, tree_data)
+  let (tree_id, tree_data) = @bitcore.create_tree(entries)
+  @bitlib.write_object_bytes(wfs, git_dir, tree_id, tree_data)
   // Create commit
   let author = get_author_string()
   let timestamp = get_current_timestamp()
-  let commit = @git.Commit::new(
+  let commit = @bitcore.Commit::new(
     tree_id,
     [commit_id],
     author,
@@ -804,8 +804,8 @@ async fn notes_prune(
     "+0000",
     "Notes pruned by 'git notes prune'\n",
   )
-  let (new_commit_id, commit_data) = @git.create_commit(commit)
-  @gitlib.write_object_bytes(wfs, git_dir, new_commit_id, commit_data)
+  let (new_commit_id, commit_data) = @bitcore.create_commit(commit)
+  @bitlib.write_object_bytes(wfs, git_dir, new_commit_id, commit_data)
   // Update notes ref
   wfs.write_string(notes_ref_path, new_commit_id.to_hex() + "\n")
   print_line("Pruned \{pruned} notes")
@@ -813,39 +813,39 @@ async fn notes_prune(
 
 ///|
 async fn load_notes_tree(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   git_dir : String,
   notes_ref_path : String,
-) -> (@git.ObjectId, Array[@git.TreeEntry])? raise Error {
+) -> (@bitcore.ObjectId, Array[@bitcore.TreeEntry])? raise Error {
   if not(rfs.is_file(notes_ref_path)) {
     return None
   }
   let ref_content = decode_bytes(rfs.read_file(notes_ref_path))
   let commit_hex = trim_string(ref_content)
-  let commit_id = @git.ObjectId::from_hex(commit_hex)
-  let db = @gitlib.ObjectDb::load(rfs, git_dir)
+  let commit_id = @bitcore.ObjectId::from_hex(commit_hex)
+  let db = @bitlib.ObjectDb::load(rfs, git_dir)
   let obj = db.get(rfs, commit_id)
   guard obj is Some(o) else {
     @stdio.stderr.write("error: notes ref corrupt")
     @sys.exit(1)
     return None
   }
-  let commit_info = @git.parse_commit(o.data)
+  let commit_info = @bitcore.parse_commit(o.data)
   let tree_obj = db.get(rfs, commit_info.tree)
   guard tree_obj is Some(to) else {
     @stdio.stderr.write("error: notes tree corrupt")
     @sys.exit(1)
     return None
   }
-  let entries = @git.parse_tree(to.data)
+  let entries = @bitcore.parse_tree(to.data)
   Some((commit_id, entries))
 }
 
 ///|
 async fn note_text(
-  db : @gitlib.ObjectDb,
-  rfs : &@git.RepoFileSystem,
-  entry : @git.TreeEntry,
+  db : @bitlib.ObjectDb,
+  rfs : &@bitcore.RepoFileSystem,
+  entry : @bitcore.TreeEntry,
 ) -> String raise Error {
   let obj = db.get(rfs, entry.id)
   guard obj is Some(o) else {
@@ -939,8 +939,8 @@ fn split_whitespace_tokens(line : String) -> Array[String] {
 
 ///|
 async fn notes_merge(
-  wfs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  wfs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   git_dir : String,
   notes_ref_path : String,
   other_ref_path : String,
@@ -959,8 +959,8 @@ async fn notes_merge(
       return
     }
     Some((current_commit_id, current_entries)) => {
-      let db = @gitlib.ObjectDb::load(rfs, git_dir)
-      let entries : Map[String, @git.TreeEntry] = Map::new()
+      let db = @bitlib.ObjectDb::load(rfs, git_dir)
+      let entries : Map[String, @bitcore.TreeEntry] = Map::new()
       for e in current_entries {
         entries.set(e.name, e)
       }
@@ -982,15 +982,15 @@ async fn notes_merge(
               let merged_content = Bytes::from_array(
                 merged.to_array().map(c => c.to_int().to_byte()),
               )
-              let merged_id = @gitlib.write_loose_object(
+              let merged_id = @bitlib.write_loose_object(
                 wfs,
                 git_dir,
-                @git.ObjectType::Blob,
+                @bitcore.ObjectType::Blob,
                 merged_content,
               )
               entries.set(
                 e.name,
-                @git.TreeEntry::new("100644", e.name, merged_id),
+                @bitcore.TreeEntry::new("100644", e.name, merged_id),
               )
             } else if strategy == Some("cat_sort_uniq") {
               let ours = note_text(db, rfs, existing)
@@ -999,15 +999,15 @@ async fn notes_merge(
               let merged_content = Bytes::from_array(
                 merged.to_array().map(c => c.to_int().to_byte()),
               )
-              let merged_id = @gitlib.write_loose_object(
+              let merged_id = @bitlib.write_loose_object(
                 wfs,
                 git_dir,
-                @git.ObjectType::Blob,
+                @bitcore.ObjectType::Blob,
                 merged_content,
               )
               entries.set(
                 e.name,
-                @git.TreeEntry::new("100644", e.name, merged_id),
+                @bitcore.TreeEntry::new("100644", e.name, merged_id),
               )
             } else {
               conflicts += 1
@@ -1018,11 +1018,11 @@ async fn notes_merge(
         @stdio.stderr.write("error: notes merge conflict")
         @sys.exit(1)
       }
-      let merged_entries : Array[@git.TreeEntry] = []
+      let merged_entries : Array[@bitcore.TreeEntry] = []
       entries.each((_k, v) => merged_entries.push(v))
       merged_entries.sort_by((a, b) => a.name.compare(b.name))
-      let (tree_id, tree_data) = @git.create_tree(merged_entries)
-      @gitlib.write_object_bytes(wfs, git_dir, tree_id, tree_data)
+      let (tree_id, tree_data) = @bitcore.create_tree(merged_entries)
+      @bitlib.write_object_bytes(wfs, git_dir, tree_id, tree_data)
       let author = get_author_string()
       let timestamp = get_current_timestamp()
       let current_hex = current_commit_id.to_hex()
@@ -1032,12 +1032,12 @@ async fn notes_merge(
       } else {
         [current_commit_id, other_commit_id]
       }
-      let commit = @git.Commit::new(
+      let commit = @bitcore.Commit::new(
         tree_id, parents, author, timestamp, "+0000", author, timestamp, "+0000",
         "Notes merged by 'git notes merge'\n",
       )
-      let (new_commit_id, commit_data) = @git.create_commit(commit)
-      @gitlib.write_object_bytes(wfs, git_dir, new_commit_id, commit_data)
+      let (new_commit_id, commit_data) = @bitcore.create_commit(commit)
+      @bitlib.write_object_bytes(wfs, git_dir, new_commit_id, commit_data)
       wfs.mkdir_p(git_dir + "/refs/notes")
       wfs.write_string(notes_ref_path, new_commit_id.to_hex() + "\n")
     }
@@ -1046,21 +1046,21 @@ async fn notes_merge(
 
 ///|
 async fn notes_rewrite(
-  wfs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  wfs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   git_dir : String,
   notes_ref_path : String,
   from_ref : String,
   to_ref : String,
   force : Bool,
 ) -> Unit raise Error {
-  let from_id = @gitrepo.rev_parse(rfs, git_dir, from_ref)
+  let from_id = @bitrepo.rev_parse(rfs, git_dir, from_ref)
   guard from_id is Some(fid) else {
-    raise @git.GitError::InvalidObject("unknown revision: \{from_ref}")
+    raise @bitcore.GitError::InvalidObject("unknown revision: \{from_ref}")
   }
-  let to_id = @gitrepo.rev_parse(rfs, git_dir, to_ref)
+  let to_id = @bitrepo.rev_parse(rfs, git_dir, to_ref)
   guard to_id is Some(tid) else {
-    raise @git.GitError::InvalidObject("unknown revision: \{to_ref}")
+    raise @bitcore.GitError::InvalidObject("unknown revision: \{to_ref}")
   }
   let from_hex = fid.to_hex()
   let to_hex = tid.to_hex()
@@ -1069,8 +1069,8 @@ async fn notes_rewrite(
   }
   let current = load_notes_tree(rfs, git_dir, notes_ref_path)
   guard current is Some((current_commit_id, current_entries)) else { return }
-  let entries : Map[String, @git.TreeEntry] = Map::new()
-  let mut source : @git.TreeEntry? = None
+  let entries : Map[String, @bitcore.TreeEntry] = Map::new()
+  let mut source : @bitcore.TreeEntry? = None
   let mut dest_exists = false
   for e in current_entries {
     if e.name == from_hex {
@@ -1088,15 +1088,15 @@ async fn notes_rewrite(
     @sys.exit(1)
   }
   entries.remove(from_hex)
-  entries.set(to_hex, @git.TreeEntry::new("100644", to_hex, src.id))
-  let rewritten_entries : Array[@git.TreeEntry] = []
+  entries.set(to_hex, @bitcore.TreeEntry::new("100644", to_hex, src.id))
+  let rewritten_entries : Array[@bitcore.TreeEntry] = []
   entries.each((_k, v) => rewritten_entries.push(v))
   rewritten_entries.sort_by((a, b) => a.name.compare(b.name))
-  let (tree_id, tree_data) = @git.create_tree(rewritten_entries)
-  @gitlib.write_object_bytes(wfs, git_dir, tree_id, tree_data)
+  let (tree_id, tree_data) = @bitcore.create_tree(rewritten_entries)
+  @bitlib.write_object_bytes(wfs, git_dir, tree_id, tree_data)
   let author = get_author_string()
   let timestamp = get_current_timestamp()
-  let commit = @git.Commit::new(
+  let commit = @bitcore.Commit::new(
     tree_id,
     [current_commit_id],
     author,
@@ -1107,8 +1107,8 @@ async fn notes_rewrite(
     "+0000",
     "Notes rewritten by 'git notes rewrite'\n",
   )
-  let (new_commit_id, commit_data) = @git.create_commit(commit)
-  @gitlib.write_object_bytes(wfs, git_dir, new_commit_id, commit_data)
+  let (new_commit_id, commit_data) = @bitcore.create_commit(commit)
+  @bitlib.write_object_bytes(wfs, git_dir, new_commit_id, commit_data)
   wfs.mkdir_p(git_dir + "/refs/notes")
   wfs.write_string(notes_ref_path, new_commit_id.to_hex() + "\n")
 }

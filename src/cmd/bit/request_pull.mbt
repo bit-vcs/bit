@@ -25,7 +25,7 @@ async fn handle_request_pull(args : Array[String]) -> Unit raise Error {
   let url = positional[1]
   let end = if positional.length() > 2 { positional[2] } else { "HEAD" }
   // Resolve start and end commits
-  let start_id = match @gitrepo.rev_parse(fs, git_dir, start) {
+  let start_id = match @bitrepo.rev_parse(fs, git_dir, start) {
     Some(id) => id
     None => {
       eprint_line("fatal: Not a valid revision: " + start)
@@ -33,7 +33,7 @@ async fn handle_request_pull(args : Array[String]) -> Unit raise Error {
       return
     }
   }
-  let end_id = match @gitrepo.rev_parse(fs, git_dir, end) {
+  let end_id = match @bitrepo.rev_parse(fs, git_dir, end) {
     Some(id) => id
     None => {
       eprint_line("fatal: Not a valid revision: " + end)
@@ -42,10 +42,10 @@ async fn handle_request_pull(args : Array[String]) -> Unit raise Error {
     }
   }
   // Verify end is a commit
-  let db = @gitlib.ObjectDb::load(fs, git_dir)
+  let db = @bitlib.ObjectDb::load(fs, git_dir)
   let end_obj = db.get(fs, end_id)
   match end_obj {
-    Some(obj) if obj.obj_type == @git.ObjectType::Commit => ()
+    Some(obj) if obj.obj_type == @bitcore.ObjectType::Commit => ()
     _ => {
       eprint_line("fatal: Not a commit: " + end)
       @sys.exit(128)
@@ -54,7 +54,7 @@ async fn handle_request_pull(args : Array[String]) -> Unit raise Error {
   }
   // Count commits
   let mut commit_count = 0
-  let mut current : @git.ObjectId? = Some(end_id)
+  let mut current : @bitcore.ObjectId? = Some(end_id)
   let start_hex = start_id.to_hex()
   while current is Some(id) {
     if id.to_hex() == start_hex {
@@ -62,8 +62,8 @@ async fn handle_request_pull(args : Array[String]) -> Unit raise Error {
     }
     commit_count += 1
     match db.get(fs, id) {
-      Some(obj) if obj.obj_type == @git.ObjectType::Commit => {
-        let info = @git.parse_commit(obj.data)
+      Some(obj) if obj.obj_type == @bitcore.ObjectType::Commit => {
+        let info = @bitcore.parse_commit(obj.data)
         current = if info.parents.length() > 0 {
           Some(info.parents[0])
         } else {
@@ -85,7 +85,7 @@ async fn handle_request_pull(args : Array[String]) -> Unit raise Error {
   print_line("")
   // Get start commit message
   match db.get(fs, start_id) {
-    Some(obj) if obj.obj_type == @git.ObjectType::Commit => {
+    Some(obj) if obj.obj_type == @bitcore.ObjectType::Commit => {
       let first_line = plumb_get_first_line_of_commit(obj.data)
       print_line(
         "  " + first_line + " (" + start_id.to_hex()[:10].to_string() + ")",
@@ -102,7 +102,7 @@ async fn handle_request_pull(args : Array[String]) -> Unit raise Error {
   print_line("")
   // Get end commit message
   match db.get(fs, end_id) {
-    Some(obj) if obj.obj_type == @git.ObjectType::Commit => {
+    Some(obj) if obj.obj_type == @bitcore.ObjectType::Commit => {
       let first_line = plumb_get_first_line_of_commit(obj.data)
       print_line(
         "  " + first_line + " (" + end_id.to_hex()[:10].to_string() + ")",

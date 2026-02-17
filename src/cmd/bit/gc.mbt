@@ -16,13 +16,13 @@ async fn handle_gc(args : Array[String]) -> Unit raise Error {
   }
   ignore(aggressive) // Not yet implemented, treat as regular gc
   if prune_only {
-    let result = @gitlib.prune_repo(fs, fs, root)
+    let result = @bitlib.prune_repo(fs, fs, root)
     if not(quiet) && result.pruned.length() > 0 {
       print_line("Pruned \{result.pruned.length()} unreachable objects")
     }
     return
   }
-  let result = @gitlib.gc_repo(fs, fs, root)
+  let result = @bitlib.gc_repo(fs, fs, root)
   if not(quiet) {
     match result.pack {
       Some(pack) =>

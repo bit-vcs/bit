@@ -3,7 +3,7 @@ priv struct PackObjectsConfig {
   revs : Bool
   stdout : Bool
   all : Bool
-  delta_mode : @git.PackDeltaMode
+  delta_mode : @bitcore.PackDeltaMode
   window : Int
   depth : Int
   base_name : String?
@@ -45,7 +45,7 @@ fn parse_pack_objects_args(args : Array[String]) -> PackObjectsParse {
   let mut revs = false
   let mut stdout = false
   let mut all = false
-  let mut delta_mode = @git.PackDeltaMode::RefDelta
+  let mut delta_mode = @bitcore.PackDeltaMode::RefDelta
   let mut window = 10
   let mut depth = 50
   let mut base_name : String? = None
@@ -82,7 +82,7 @@ fn parse_pack_objects_args(args : Array[String]) -> PackObjectsParse {
         "--revs" => revs = true
         "--stdout" => stdout = true
         "--all" => all = true
-        "--delta-base-offset" => delta_mode = @git.PackDeltaMode::OfsDelta
+        "--delta-base-offset" => delta_mode = @bitcore.PackDeltaMode::OfsDelta
         "--local" => local_only = true
         "--honor-pack-keep" => honor_pack_keep = true
         "--incremental" => incremental = true
@@ -304,7 +304,7 @@ fn parse_pack_objects_args(args : Array[String]) -> PackObjectsParse {
     depth = 0
   }
   if depth == 0 {
-    delta_mode = @git.PackDeltaMode::NoDelta
+    delta_mode = @bitcore.PackDeltaMode::NoDelta
   }
   let has_filter = match filter {
     @protocol.FilterSpec::NoFilter => false
@@ -373,16 +373,16 @@ fn parse_pack_filter_spec(spec : String) -> @protocol.FilterSpec {
 ///|
 /// Apply filter specification to objects
 fn apply_pack_filter_spec(
-  objects : Array[@git.PackObject],
+  objects : Array[@bitcore.PackObject],
   filter : @protocol.FilterSpec,
-) -> Array[@git.PackObject] {
+) -> Array[@bitcore.PackObject] {
   match filter {
     NoFilter => objects
     BlobNone => {
       // Exclude all blobs
-      let result : Array[@git.PackObject] = []
+      let result : Array[@bitcore.PackObject] = []
       for obj in objects {
-        if obj.obj_type != @git.ObjectType::Blob {
+        if obj.obj_type != @bitcore.ObjectType::Blob {
           result.push(obj)
         }
       }
@@ -390,9 +390,9 @@ fn apply_pack_filter_spec(
     }
     BlobLimit(max_size) => {
       // Exclude blobs larger than max_size
-      let result : Array[@git.PackObject] = []
+      let result : Array[@bitcore.PackObject] = []
       for obj in objects {
-        if obj.obj_type != @git.ObjectType::Blob ||
+        if obj.obj_type != @bitcore.ObjectType::Blob ||
           obj.data.length().to_int64() <= max_size {
           result.push(obj)
         }
@@ -461,7 +461,7 @@ fn hex_byte_to_int(b : Byte) -> Int? {
 }
 
 ///|
-fn parse_object_id_bytes(line : BytesView) -> @git.ObjectId? {
+fn parse_object_id_bytes(line : BytesView) -> @bitcore.ObjectId? {
   let trimmed = trim_line_bytes(line)
   if trimmed.length() == 0 {
     return None
@@ -489,7 +489,7 @@ fn parse_object_id_bytes(line : BytesView) -> @git.ObjectId? {
       _ => return None
     }
   }
-  bytes |> @git.ObjectId::new |> Some
+  bytes |> @bitcore.ObjectId::new |> Some
 }
 
 ///|
@@ -529,7 +529,7 @@ fn invalid_object_line_message(line : String) -> String {
 }
 
 ///|
-fn parse_tag_target_id(data : Bytes) -> @git.ObjectId? {
+fn parse_tag_target_id(data : Bytes) -> @bitcore.ObjectId? {
   let lines = split_lines_bytes(data)
   for line in lines {
     let trimmed = trim_line_bytes(line)
@@ -539,7 +539,7 @@ fn parse_tag_target_id(data : Bytes) -> @git.ObjectId? {
     let text = line_to_string(trimmed)
     if text.has_prefix("object ") {
       let hex = (try! text[7:]).to_string()
-      let id = @git.ObjectId::from_hex(hex) catch { _ => return None }
+      let id = @bitcore.ObjectId::from_hex(hex) catch { _ => return None }
       return Some(id)
     }
   }
@@ -548,14 +548,14 @@ fn parse_tag_target_id(data : Bytes) -> @git.ObjectId? {
 
 ///|
 fn resolve_tag_chain(
-  db : @gitlib.ObjectDb,
+  db : @bitlib.ObjectDb,
   fs : OsFs,
-  start : @git.ObjectId,
-) -> (Array[@git.PackObject], @git.ObjectId?) {
-  let chain : Array[@git.PackObject] = []
+  start : @bitcore.ObjectId,
+) -> (Array[@bitcore.PackObject], @bitcore.ObjectId?) {
+  let chain : Array[@bitcore.PackObject] = []
   let seen : Map[String, Bool] = {}
   let mut current = start
-  let mut resolved : @git.ObjectId? = None
+  let mut resolved : @bitcore.ObjectId? = None
   while true {
     let key = current.to_hex()
     if seen.contains(key) {
@@ -569,7 +569,7 @@ fn resolve_tag_chain(
       value => value
     }
     match obj {
-      Some(o) if o.obj_type == @git.ObjectType::Tag => {
+      Some(o) if o.obj_type == @bitcore.ObjectType::Tag => {
         chain.push(o)
         match parse_tag_target_id(o.data) {
           Some(next) => {
@@ -599,16 +599,16 @@ fn resolve_tag_chain(
 fn collect_include_tag_objects(
   fs : OsFs,
   git_dir : String,
-  db : @gitlib.ObjectDb,
-  objects : Array[@git.PackObject],
-) -> Array[@git.PackObject] {
+  db : @bitlib.ObjectDb,
+  objects : Array[@bitcore.PackObject],
+) -> Array[@bitcore.PackObject] {
   let included : Map[String, Bool] = {}
   for obj in objects {
     included[object_hex(obj)] = true
   }
-  let refs = @gitrepo.show_ref(fs, git_dir) catch { _ => [] }
+  let refs = @bitrepo.show_ref(fs, git_dir) catch { _ => [] }
   let added : Map[String, Bool] = {}
-  let out : Array[@git.PackObject] = []
+  let out : Array[@bitcore.PackObject] = []
   for pair in refs {
     let (_name, id) = pair
     let (chain, target) = resolve_tag_chain(db, fs, id)
@@ -685,7 +685,7 @@ fn parse_pack_index_ids(data : Bytes) -> Array[String]? {
       bytes[i] = data[offset + i]
     }
     offset += 20
-    ids.push(@git.ObjectId::new(bytes).to_hex())
+    ids.push(@bitcore.ObjectId::new(bytes).to_hex())
   }
   Some(ids)
 }
@@ -834,9 +834,9 @@ fn read_alternate_object_dirs(fs : OsFs, git_dir : String) -> Array[String] {
 fn load_object_lookup_dbs(
   fs : OsFs,
   git_dir : String,
-  primary : @gitlib.ObjectDb,
-) -> Array[@gitlib.ObjectDb] {
-  let out : Array[@gitlib.ObjectDb] = [primary]
+  primary : @bitlib.ObjectDb,
+) -> Array[@bitlib.ObjectDb] {
+  let out : Array[@bitlib.ObjectDb] = [primary]
   let seen : Map[String, Bool] = {}
   seen[normalize_path(primary.objects_dir)] = true
   let alt_dirs = read_alternate_object_dirs(fs, git_dir)
@@ -845,7 +845,7 @@ fn load_object_lookup_dbs(
     if seen.contains(normalized) {
       continue
     }
-    let alt_db = @gitlib.ObjectDb::load_from_objects_dir(fs, alt_dir) catch {
+    let alt_db = @bitlib.ObjectDb::load_from_objects_dir(fs, alt_dir) catch {
       _ => continue
     }
     seen[normalized] = true
@@ -856,10 +856,10 @@ fn load_object_lookup_dbs(
 
 ///|
 fn find_object_in_lookup_dbs(
-  dbs : Array[@gitlib.ObjectDb],
+  dbs : Array[@bitlib.ObjectDb],
   fs : OsFs,
-  id : @git.ObjectId,
-) -> @git.PackObject? {
+  id : @bitcore.ObjectId,
+) -> @bitcore.PackObject? {
   for db in dbs {
     let obj = db.get(fs, id) catch { _ => None }
     if obj is Some(found) {
@@ -901,7 +901,7 @@ fn resolve_pack_path(
 }
 
 ///|
-fn read_pack_objects(fs : OsFs, pack_path : String) -> Array[@git.PackObject] {
+fn read_pack_objects(fs : OsFs, pack_path : String) -> Array[@bitcore.PackObject] {
   let data = fs.read_file(pack_path) catch { _ => return [] }
   @pack.parse_packfile(data) catch {
     _ => []
@@ -909,14 +909,14 @@ fn read_pack_objects(fs : OsFs, pack_path : String) -> Array[@git.PackObject] {
 }
 
 ///|
-fn object_hex(obj : @git.PackObject) -> String {
-  @git.hash_object_content(obj.obj_type, obj.data).to_hex()
+fn object_hex(obj : @bitcore.PackObject) -> String {
+  @bitcore.hash_object_content(obj.obj_type, obj.data).to_hex()
 }
 
 ///|
-fn dedup_objects(objects : Array[@git.PackObject]) -> Array[@git.PackObject] {
+fn dedup_objects(objects : Array[@bitcore.PackObject]) -> Array[@bitcore.PackObject] {
   let seen : Map[String, Bool] = {}
-  let out : Array[@git.PackObject] = []
+  let out : Array[@bitcore.PackObject] = []
   for obj in objects {
     let hex = object_hex(obj)
     if not(seen.contains(hex)) {
@@ -928,7 +928,7 @@ fn dedup_objects(objects : Array[@git.PackObject]) -> Array[@git.PackObject] {
 }
 
 ///|
-fn sort_stdin_object_mode_objects(objects : Array[@git.PackObject]) -> Unit {
+fn sort_stdin_object_mode_objects(objects : Array[@bitcore.PackObject]) -> Unit {
   objects.sort_by(fn(a, b) {
     let a_type = a.obj_type.to_packfile_type()
     let b_type = b.obj_type.to_packfile_type()
@@ -940,8 +940,8 @@ fn sort_stdin_object_mode_objects(objects : Array[@git.PackObject]) -> Unit {
     if a_size != b_size {
       return b_size - a_size
     }
-    let a_hex = @git.hash_object_content(a.obj_type, a.data).to_hex()
-    let b_hex = @git.hash_object_content(b.obj_type, b.data).to_hex()
+    let a_hex = @bitcore.hash_object_content(a.obj_type, a.data).to_hex()
+    let b_hex = @bitcore.hash_object_content(b.obj_type, b.data).to_hex()
     if a_hex < b_hex {
       -1
     } else if a_hex > b_hex {
@@ -954,13 +954,13 @@ fn sort_stdin_object_mode_objects(objects : Array[@git.PackObject]) -> Unit {
 
 ///|
 fn filter_objects(
-  objects : Array[@git.PackObject],
+  objects : Array[@bitcore.PackObject],
   exclude : Map[String, Bool],
-) -> Array[@git.PackObject] {
+) -> Array[@bitcore.PackObject] {
   if exclude.length() == 0 {
     return objects
   }
-  let out : Array[@git.PackObject] = []
+  let out : Array[@bitcore.PackObject] = []
   for obj in objects {
     let hex = object_hex(obj)
     if not(exclude.contains(hex)) {
@@ -971,9 +971,9 @@ fn filter_objects(
 }
 
 ///|
-async fn report_collect_error(err : @git.GitError) -> Unit {
+async fn report_collect_error(err : @bitcore.GitError) -> Unit {
   match err {
-    @git.GitError::InvalidObject(msg) =>
+    @bitcore.GitError::InvalidObject(msg) =>
       if msg.contains("Missing tree object") {
         @stdio.stderr.write("fatal: bad tree object\n")
       } else if msg.contains("Missing commit object") {
@@ -983,15 +983,15 @@ async fn report_collect_error(err : @git.GitError) -> Unit {
       } else {
         @stdio.stderr.write("fatal: " + msg + "\n")
       }
-    @git.GitError::HashMismatch(expected, actual) =>
+    @bitcore.GitError::HashMismatch(expected, actual) =>
       @stdio.stderr.write(
         "fatal: hash mismatch (expected " + expected + ", got " + actual + ")\n",
       )
-    @git.GitError::PackfileError(msg) =>
+    @bitcore.GitError::PackfileError(msg) =>
       @stdio.stderr.write("fatal: " + msg + "\n")
-    @git.GitError::ProtocolError(msg) =>
+    @bitcore.GitError::ProtocolError(msg) =>
       @stdio.stderr.write("fatal: " + msg + "\n")
-    @git.GitError::IoError(msg) => @stdio.stderr.write("fatal: " + msg + "\n")
+    @bitcore.GitError::IoError(msg) => @stdio.stderr.write("fatal: " + msg + "\n")
   }
   @sys.exit(1)
 }
@@ -1001,7 +1001,7 @@ fn count_pack_reused_objects(
   fs : OsFs,
   git_dir : String,
   pack_dir : String,
-  objects : Array[@git.PackObject],
+  objects : Array[@bitcore.PackObject],
 ) -> Int {
   let packed_ids = collect_pack_ids_from_dir(fs, pack_dir)
   let alt_dirs = read_alternate_object_dirs(fs, git_dir)
@@ -1065,14 +1065,14 @@ fn is_promisor_pack(fs : OsFs, pack_path : String) -> Bool {
 ///|
 fn collect_loose_objects(
   fs : OsFs,
-  db : @gitlib.ObjectDb,
+  db : @bitlib.ObjectDb,
   objects_dir : String,
-) -> Array[@git.PackObject] {
-  let out : Array[@git.PackObject] = []
+) -> Array[@bitcore.PackObject] {
+  let out : Array[@bitcore.PackObject] = []
   let ids = collect_loose_object_ids(fs, objects_dir)
   for item in ids {
     let (hex, _v) = item
-    let id = @git.ObjectId::from_hex(hex) catch { _ => continue }
+    let id = @bitcore.ObjectId::from_hex(hex) catch { _ => continue }
     try db.get(fs, id) catch {
       _ => ()
     } noraise {
@@ -1088,12 +1088,12 @@ fn collect_loose_objects(
 
 ///|
 fn append_commit_ids_from_objects(
-  objects : Array[@git.PackObject],
-  out : Array[@git.ObjectId],
+  objects : Array[@bitcore.PackObject],
+  out : Array[@bitcore.ObjectId],
 ) -> Unit {
   for obj in objects {
-    if obj.obj_type == @git.ObjectType::Commit {
-      out.push(@git.hash_object_content(obj.obj_type, obj.data))
+    if obj.obj_type == @bitcore.ObjectType::Commit {
+      out.push(@bitcore.hash_object_content(obj.obj_type, obj.data))
     }
   }
 }
@@ -1102,12 +1102,12 @@ fn append_commit_ids_from_objects(
 
 ///|
 fn collect_objects_from_ref_allow_missing(
-  db : @gitlib.ObjectDb,
+  db : @bitlib.ObjectDb,
   fs : OsFs,
-  id : @git.ObjectId,
+  id : @bitcore.ObjectId,
   blocked : Map[String, Bool],
   seen : Map[String, Bool],
-  out : Array[@git.PackObject],
+  out : Array[@bitcore.PackObject],
 ) -> Unit {
   let hex = id.to_hex()
   if blocked.contains(hex) {
@@ -1124,13 +1124,13 @@ fn collect_objects_from_ref_allow_missing(
   match obj {
     Some(o) =>
       match o.obj_type {
-        @git.ObjectType::Commit =>
+        @bitcore.ObjectType::Commit =>
           collect_commit_objects_allow_missing(db, fs, id, blocked, seen, out)
-        @git.ObjectType::Tree =>
+        @bitcore.ObjectType::Tree =>
           collect_tree_objects_allow_missing(db, fs, id, blocked, seen, out)
-        @git.ObjectType::Blob =>
+        @bitcore.ObjectType::Blob =>
           collect_blob_object_allow_missing(db, fs, id, blocked, seen, out)
-        @git.ObjectType::Tag => {
+        @bitcore.ObjectType::Tag => {
           seen[hex] = true
           out.push(o)
           match parse_tag_target_id(o.data) {
@@ -1148,13 +1148,13 @@ fn collect_objects_from_ref_allow_missing(
 
 ///|
 fn collect_reachable_objects_from_commits_allow_missing(
-  db : @gitlib.ObjectDb,
+  db : @bitlib.ObjectDb,
   fs : OsFs,
-  commits : Array[@git.ObjectId],
+  commits : Array[@bitcore.ObjectId],
   blocked : Map[String, Bool],
-) -> Array[@git.PackObject] {
+) -> Array[@bitcore.PackObject] {
   let seen : Map[String, Bool] = {}
-  let out : Array[@git.PackObject] = []
+  let out : Array[@bitcore.PackObject] = []
   for commit_id in commits {
     collect_commit_objects_allow_missing(db, fs, commit_id, blocked, seen, out)
   }
@@ -1163,12 +1163,12 @@ fn collect_reachable_objects_from_commits_allow_missing(
 
 ///|
 fn collect_commit_objects_allow_missing(
-  db : @gitlib.ObjectDb,
+  db : @bitlib.ObjectDb,
   fs : OsFs,
-  commit_id : @git.ObjectId,
+  commit_id : @bitcore.ObjectId,
   blocked : Map[String, Bool],
   seen : Map[String, Bool],
-  out : Array[@git.PackObject],
+  out : Array[@bitcore.PackObject],
 ) -> Unit {
   let hex = commit_id.to_hex()
   if blocked.contains(hex) {
@@ -1184,9 +1184,9 @@ fn collect_commit_objects_allow_missing(
     value => value
   }
   match obj {
-    Some(o) if o.obj_type == @git.ObjectType::Commit => {
+    Some(o) if o.obj_type == @bitcore.ObjectType::Commit => {
       out.push(o)
-      let info = @git.parse_commit(o.data) catch { _ => return () }
+      let info = @bitcore.parse_commit(o.data) catch { _ => return () }
       collect_tree_objects_allow_missing(db, fs, info.tree, blocked, seen, out)
       for parent in info.parents {
         collect_commit_objects_allow_missing(db, fs, parent, blocked, seen, out)
@@ -1198,12 +1198,12 @@ fn collect_commit_objects_allow_missing(
 
 ///|
 fn collect_tree_objects_allow_missing(
-  db : @gitlib.ObjectDb,
+  db : @bitlib.ObjectDb,
   fs : OsFs,
-  tree_id : @git.ObjectId,
+  tree_id : @bitcore.ObjectId,
   blocked : Map[String, Bool],
   seen : Map[String, Bool],
-  out : Array[@git.PackObject],
+  out : Array[@bitcore.PackObject],
 ) -> Unit {
   let hex = tree_id.to_hex()
   if blocked.contains(hex) {
@@ -1219,9 +1219,9 @@ fn collect_tree_objects_allow_missing(
     value => value
   }
   match obj {
-    Some(o) if o.obj_type == @git.ObjectType::Tree => {
+    Some(o) if o.obj_type == @bitcore.ObjectType::Tree => {
       out.push(o)
-      let entries = @git.parse_tree(o.data) catch { _ => return () }
+      let entries = @bitcore.parse_tree(o.data) catch { _ => return () }
       for entry in entries {
         if entry.mode.has_prefix("40") {
           collect_tree_objects_allow_missing(
@@ -1250,12 +1250,12 @@ fn collect_tree_objects_allow_missing(
 
 ///|
 fn collect_blob_object_allow_missing(
-  db : @gitlib.ObjectDb,
+  db : @bitlib.ObjectDb,
   fs : OsFs,
-  blob_id : @git.ObjectId,
+  blob_id : @bitcore.ObjectId,
   blocked : Map[String, Bool],
   seen : Map[String, Bool],
-  out : Array[@git.PackObject],
+  out : Array[@bitcore.PackObject],
 ) -> Unit {
   let hex = blob_id.to_hex()
   if blocked.contains(hex) {
@@ -1270,7 +1270,7 @@ fn collect_blob_object_allow_missing(
   } noraise {
     value =>
       match value {
-        Some(o) if o.obj_type == @git.ObjectType::Blob => out.push(o)
+        Some(o) if o.obj_type == @bitcore.ObjectType::Blob => out.push(o)
         _ => ()
       }
   }
@@ -1278,12 +1278,12 @@ fn collect_blob_object_allow_missing(
 
 ///|
 fn collect_excluded_commit_ids(
-  db : @gitlib.ObjectDb,
+  db : @bitlib.ObjectDb,
   fs : OsFs,
-  exclude_commits : Array[@git.ObjectId],
+  exclude_commits : Array[@bitcore.ObjectId],
 ) -> Map[String, Bool] {
   let excluded : Map[String, Bool] = {}
-  let queue : Array[@git.ObjectId] = []
+  let queue : Array[@bitcore.ObjectId] = []
   for id in exclude_commits {
     queue.push(id)
   }
@@ -1300,8 +1300,8 @@ fn collect_excluded_commit_ids(
       value => value
     }
     match obj {
-      Some(o) if o.obj_type == @git.ObjectType::Commit => {
-        let info = @git.parse_commit(o.data) catch { _ => continue }
+      Some(o) if o.obj_type == @bitcore.ObjectType::Commit => {
+        let info = @bitcore.parse_commit(o.data) catch { _ => continue }
         for parent in info.parents {
           queue.push(parent)
         }
@@ -1314,18 +1314,18 @@ fn collect_excluded_commit_ids(
 
 ///|
 fn read_commit_tree(
-  db : @gitlib.ObjectDb,
+  db : @bitlib.ObjectDb,
   fs : OsFs,
-  commit_id : @git.ObjectId,
-) -> @git.ObjectId? {
+  commit_id : @bitcore.ObjectId,
+) -> @bitcore.ObjectId? {
   let obj = try db.get(fs, commit_id) catch {
     _ => None
   } noraise {
     value => value
   }
   match obj {
-    Some(o) if o.obj_type == @git.ObjectType::Commit => {
-      let info = @git.parse_commit(o.data) catch { _ => return None }
+    Some(o) if o.obj_type == @bitcore.ObjectType::Commit => {
+      let info = @bitcore.parse_commit(o.data) catch { _ => return None }
       Some(info.tree)
     }
     _ => None
@@ -1334,11 +1334,11 @@ fn read_commit_tree(
 
 ///|
 fn find_excluded_parent_tree(
-  db : @gitlib.ObjectDb,
+  db : @bitlib.ObjectDb,
   fs : OsFs,
-  parents : Array[@git.ObjectId],
+  parents : Array[@bitcore.ObjectId],
   excluded : Map[String, Bool],
-) -> @git.ObjectId? {
+) -> @bitcore.ObjectId? {
   for parent in parents {
     if excluded.contains(parent.to_hex()) {
       match read_commit_tree(db, fs, parent) {
@@ -1352,13 +1352,13 @@ fn find_excluded_parent_tree(
 
 ///|
 fn collect_sparse_tree_objects(
-  db : @gitlib.ObjectDb,
+  db : @bitlib.ObjectDb,
   fs : OsFs,
-  tree_id : @git.ObjectId,
-  base_tree_id : @git.ObjectId?,
+  tree_id : @bitcore.ObjectId,
+  base_tree_id : @bitcore.ObjectId?,
   blocked : Map[String, Bool],
   seen : Map[String, Bool],
-  out : Array[@git.PackObject],
+  out : Array[@bitcore.PackObject],
 ) -> Unit {
   let hex = tree_id.to_hex()
   if seen.contains(hex) {
@@ -1370,9 +1370,9 @@ fn collect_sparse_tree_objects(
     value => value
   }
   match obj {
-    Some(o) if o.obj_type == @git.ObjectType::Tree => {
-      let entries = @git.parse_tree(o.data) catch { _ => return () }
-      let base_entries : Map[String, @git.TreeEntry] = {}
+    Some(o) if o.obj_type == @bitcore.ObjectType::Tree => {
+      let entries = @bitcore.parse_tree(o.data) catch { _ => return () }
+      let base_entries : Map[String, @bitcore.TreeEntry] = {}
       match base_tree_id {
         Some(base_id) => {
           let base_obj = try db.get(fs, base_id) catch {
@@ -1381,8 +1381,8 @@ fn collect_sparse_tree_objects(
             value => value
           }
           match base_obj {
-            Some(bo) if bo.obj_type == @git.ObjectType::Tree => {
-              let base_list = @git.parse_tree(bo.data) catch { _ => [] }
+            Some(bo) if bo.obj_type == @bitcore.ObjectType::Tree => {
+              let base_list = @bitcore.parse_tree(bo.data) catch { _ => [] }
               for entry in base_list {
                 base_entries[entry.name] = entry
               }
@@ -1436,13 +1436,13 @@ fn collect_sparse_tree_objects(
 
 ///|
 fn collect_sparse_commit_objects(
-  db : @gitlib.ObjectDb,
+  db : @bitlib.ObjectDb,
   fs : OsFs,
-  commit_id : @git.ObjectId,
+  commit_id : @bitcore.ObjectId,
   excluded : Map[String, Bool],
   blocked : Map[String, Bool],
   seen : Map[String, Bool],
-  out : Array[@git.PackObject],
+  out : Array[@bitcore.PackObject],
 ) -> Unit {
   let hex = commit_id.to_hex()
   if excluded.contains(hex) {
@@ -1458,9 +1458,9 @@ fn collect_sparse_commit_objects(
     value => value
   }
   match obj {
-    Some(o) if o.obj_type == @git.ObjectType::Commit => {
+    Some(o) if o.obj_type == @bitcore.ObjectType::Commit => {
       out.push(o)
-      let info = @git.parse_commit(o.data) catch { _ => return () }
+      let info = @bitcore.parse_commit(o.data) catch { _ => return () }
       let base_tree = find_excluded_parent_tree(db, fs, info.parents, excluded)
       collect_sparse_tree_objects(
         db,
@@ -1483,15 +1483,15 @@ fn collect_sparse_commit_objects(
 
 ///|
 fn collect_sparse_objects_from_commits(
-  db : @gitlib.ObjectDb,
+  db : @bitlib.ObjectDb,
   fs : OsFs,
-  include_commits : Array[@git.ObjectId],
-  exclude_commits : Array[@git.ObjectId],
-) -> Array[@git.PackObject] {
+  include_commits : Array[@bitcore.ObjectId],
+  exclude_commits : Array[@bitcore.ObjectId],
+) -> Array[@bitcore.PackObject] {
   let excluded = collect_excluded_commit_ids(db, fs, exclude_commits)
   let blocked : Map[String, Bool] = {}
   let seen : Map[String, Bool] = {}
-  let out : Array[@git.PackObject] = []
+  let out : Array[@bitcore.PackObject] = []
   for commit_id in include_commits {
     collect_sparse_commit_objects(
       db, fs, commit_id, excluded, blocked, seen, out,
@@ -1504,11 +1504,11 @@ fn collect_sparse_objects_from_commits(
 async fn collect_objects_from_stdin_packs(
   fs : OsFs,
   git_dir : String,
-  db : @gitlib.ObjectDb,
+  db : @bitlib.ObjectDb,
   cfg : PackObjectsConfig,
   include_names : Array[String],
   exclude_names : Array[String],
-) -> Array[@git.PackObject] {
+) -> Array[@bitcore.PackObject] {
   let pack_dir = git_dir + "/objects/pack"
   let alt_dirs = read_alternate_object_dirs(fs, git_dir)
   let include_paths : Array[String] = []
@@ -1540,8 +1540,8 @@ async fn collect_objects_from_stdin_packs(
       }
     }
   }
-  let include_objects : Array[@git.PackObject] = []
-  let seed_commits : Array[@git.ObjectId] = []
+  let include_objects : Array[@bitcore.PackObject] = []
+  let seed_commits : Array[@bitcore.ObjectId] = []
   for path in include_paths {
     let objs = read_pack_objects(fs, path)
     for obj in objs {
@@ -1571,7 +1571,7 @@ async fn collect_objects_from_stdin_packs(
       }
     }
   }
-  let mut objects : Array[@git.PackObject] = include_objects
+  let mut objects : Array[@bitcore.PackObject] = include_objects
   if cfg.unpacked {
     let objects_dir = git_dir + "/objects"
     let loose = collect_loose_objects(fs, db, objects_dir)
@@ -1715,15 +1715,15 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
       let pack_size_limit = get_pack_size_limit(git_dir)
       let pack_compression_level = get_pack_compression_level(git_dir)
       let pack_compression = match pack_compression_level {
-        Some(level) if level == 0 => @git.PackCompression::Stored
-        _ => @git.PackCompression::Default
+        Some(level) if level == 0 => @bitcore.PackCompression::Stored
+        _ => @bitcore.PackCompression::Default
       }
-      let db = @gitlib.ObjectDb::load(fs, git_dir)
+      let db = @bitlib.ObjectDb::load(fs, git_dir)
       if cfg.window == 0 {
         db.set_prefer_packed(true)
       }
       let lookup_dbs = load_object_lookup_dbs(fs, git_dir, db)
-      let mut objects : Array[@git.PackObject] = []
+      let mut objects : Array[@bitcore.PackObject] = []
       if cfg.stdin_packs {
         let input = read_all_stdin()
         let (include_names, exclude_names) = parse_stdin_pack_lines(input)
@@ -1736,13 +1736,13 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
           fs, git_dir, db, cfg, include_names, exclude_names,
         )
       } else if cfg.all {
-        let refs = @gitrepo.show_ref(fs, git_dir) catch {
+        let refs = @bitrepo.show_ref(fs, git_dir) catch {
           err if @async.is_cancellation_error(err) => raise err
           _ => []
         }
         let blocked : Map[String, Bool] = {}
         let seen : Map[String, Bool] = {}
-        let out : Array[@git.PackObject] = []
+        let out : Array[@bitcore.PackObject] = []
         for pair in refs {
           let (_name, id) = pair
           collect_objects_from_ref_allow_missing(db, fs, id, blocked, seen, out)
@@ -1751,9 +1751,9 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
       } else if cfg.revs {
         let input = read_all_stdin()
         let lines = split_lines_bytes(input)
-        let include_commits : Array[@git.ObjectId] = []
-        let exclude_commits : Array[@git.ObjectId] = []
-        let explicit_tags : Array[@git.PackObject] = []
+        let include_commits : Array[@bitcore.ObjectId] = []
+        let exclude_commits : Array[@bitcore.ObjectId] = []
+        let explicit_tags : Array[@bitcore.PackObject] = []
         let mut negate_mode = false
         for line in lines {
           let trimmed = trim_line_bytes(line)
@@ -1781,7 +1781,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
                 let left = (try! spec[:pos]).to_string()
                 let right = (try! spec[pos + 2:]).to_string()
                 if right.length() > 0 {
-                  match @gitrepo.rev_parse(fs, git_dir, right) {
+                  match @bitrepo.rev_parse(fs, git_dir, right) {
                     None => {
                       @stdio.stderr.write(
                         "fatal: bad revision '" + right + "'\n",
@@ -1801,7 +1801,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
                   }
                 }
                 if left.length() > 0 {
-                  match @gitrepo.rev_parse(fs, git_dir, left) {
+                  match @bitrepo.rev_parse(fs, git_dir, left) {
                     None => {
                       @stdio.stderr.write(
                         "fatal: bad revision '" + left + "'\n",
@@ -1823,7 +1823,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
             }
           }
           if !handled {
-            match @gitrepo.rev_parse(fs, git_dir, spec) {
+            match @bitrepo.rev_parse(fs, git_dir, spec) {
               None => {
                 @stdio.stderr.write("fatal: bad revision '" + spec + "'\n")
                 @sys.exit(1)
@@ -1880,7 +1880,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
               db, fs, include_commits, blocked,
             )
           } else {
-            @gitlib.collect_reachable_objects_from_commits(
+            @bitlib.collect_reachable_objects_from_commits(
               db, fs, include_commits,
             ) catch {
               err if @async.is_cancellation_error(err) => raise err
@@ -1899,12 +1899,12 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
             )
             let exclude_set : Map[String, Bool] = {}
             for obj in exclude_objects {
-              let id = @git.hash_object_content(obj.obj_type, obj.data)
+              let id = @bitcore.hash_object_content(obj.obj_type, obj.data)
               exclude_set[id.to_hex()] = true
             }
-            let filtered : Array[@git.PackObject] = []
+            let filtered : Array[@bitcore.PackObject] = []
             for obj in include_objects {
-              let id = @git.hash_object_content(obj.obj_type, obj.data)
+              let id = @bitcore.hash_object_content(obj.obj_type, obj.data)
               if !exclude_set.contains(id.to_hex()) {
                 filtered.push(obj)
               }
@@ -2088,9 +2088,9 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
 ///|
 /// Split objects into groups based on pack size limit
 fn split_objects_by_size_limit(
-  objects : Array[@git.PackObject],
+  objects : Array[@bitcore.PackObject],
   limit : Int64?,
-) -> Array[Array[@git.PackObject]] {
+) -> Array[Array[@bitcore.PackObject]] {
   match limit {
     None => [objects]
     Some(max_size) => {
@@ -2104,8 +2104,8 @@ fn split_objects_by_size_limit(
       } else {
         max_size
       }
-      let groups : Array[Array[@git.PackObject]] = []
-      let mut current_group : Array[@git.PackObject] = []
+      let groups : Array[Array[@bitcore.PackObject]] = []
+      let mut current_group : Array[@bitcore.PackObject] = []
       let mut current_size = 0L
       // Pack header is 12 bytes, trailer is 20 bytes
       let pack_overhead = 32L

@@ -45,11 +45,11 @@ test "partial_clone: mount and list files" {
     )
     let ref_path = git_dir + "/" + ref_name
     let ref_content = osfs.read_file(ref_path)
-    @git.ObjectId::from_hex(
+    @bit.ObjectId::from_hex(
       @utf8.decode_lossy(ref_content[:]).trim().to_string(),
     )
   } else {
-    @git.ObjectId::from_hex(head_str)
+    @bit.ObjectId::from_hex(head_str)
   }
   println("Commit: \{commit_id}")
 
@@ -101,11 +101,11 @@ async test "partial_clone: on-demand fetch" {
     )
     let ref_path = git_dir + "/" + ref_name
     let ref_content = osfs.read_file(ref_path)
-    @git.ObjectId::from_hex(
+    @bit.ObjectId::from_hex(
       @utf8.decode_lossy(ref_content[:]).trim().to_string(),
     )
   } else {
-    @git.ObjectId::from_hex(head_str)
+    @bit.ObjectId::from_hex(head_str)
   }
   let bitfs = Fs::from_commit(osfs, git_dir, commit_id)
 
@@ -165,11 +165,11 @@ test "partial_clone: glob pattern matching" {
     )
     let ref_path = git_dir + "/" + ref_name
     let ref_content = osfs.read_file(ref_path)
-    @git.ObjectId::from_hex(
+    @bit.ObjectId::from_hex(
       @utf8.decode_lossy(ref_content[:]).trim().to_string(),
     )
   } else {
-    @git.ObjectId::from_hex(head_str)
+    @bit.ObjectId::from_hex(head_str)
   }
   let bitfs = Fs::from_commit(osfs, git_dir, commit_id)
   println("\n=== Glob Pattern Test ===")
@@ -228,11 +228,11 @@ async test "partial_clone: prefetch with glob" {
     )
     let ref_path = git_dir + "/" + ref_name
     let ref_content = osfs.read_file(ref_path)
-    @git.ObjectId::from_hex(
+    @bit.ObjectId::from_hex(
       @utf8.decode_lossy(ref_content[:]).trim().to_string(),
     )
   } else {
-    @git.ObjectId::from_hex(head_str)
+    @bit.ObjectId::from_hex(head_str)
   }
   let bitfs = Fs::from_commit(osfs, git_dir, commit_id)
   println("\n=== Prefetch Glob Test ===")
@@ -270,11 +270,11 @@ async test "partial_clone: prefetch BFS" {
     )
     let ref_path = git_dir + "/" + ref_name
     let ref_content = osfs.read_file(ref_path)
-    @git.ObjectId::from_hex(
+    @bit.ObjectId::from_hex(
       @utf8.decode_lossy(ref_content[:]).trim().to_string(),
     )
   } else {
-    @git.ObjectId::from_hex(head_str)
+    @bit.ObjectId::from_hex(head_str)
   }
   let bitfs = Fs::from_commit(osfs, git_dir, commit_id)
   println("\n=== Prefetch BFS Test ===")
@@ -318,11 +318,11 @@ async test "partial_clone: prefetch multiple files" {
     )
     let ref_path = git_dir + "/" + ref_name
     let ref_content = osfs.read_file(ref_path)
-    @git.ObjectId::from_hex(
+    @bit.ObjectId::from_hex(
       @utf8.decode_lossy(ref_content[:]).trim().to_string(),
     )
   } else {
-    @git.ObjectId::from_hex(head_str)
+    @bit.ObjectId::from_hex(head_str)
   }
   let bitfs = Fs::from_commit(osfs, git_dir, commit_id)
   println("\n=== Prefetch Test ===")

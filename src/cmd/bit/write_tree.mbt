@@ -21,7 +21,7 @@ async fn handle_write_tree(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let git_dir = root + "/.git"
   let fs = OsFs::new()
-  let rfs : &@git.RepoFileSystem = fs
+  let rfs : &@bitcore.RepoFileSystem = fs
   if write_tree_repo_requires_standalone_error(rfs, git_dir) {
     eprint_line(
       "fatal: write-tree with this repository object format is not supported in standalone mode",
@@ -54,8 +54,8 @@ async fn handle_write_tree(args : Array[String]) -> Unit raise Error {
       warn_unimplemented_arg("write-tree", arg)
     }
   }
-  let entries = @gitlib.read_index_entries(fs, git_dir)
-  let tree_id = @gitlib.write_tree_from_index(
+  let entries = @bitlib.read_index_entries(fs, git_dir)
+  let tree_id = @bitlib.write_tree_from_index(
     fs,
     rfs,
     git_dir,
@@ -68,7 +68,7 @@ async fn handle_write_tree(args : Array[String]) -> Unit raise Error {
 
 ///|
 fn write_tree_repo_requires_standalone_error(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
 ) -> Bool {
   repo_object_format(fs, git_dir) != "sha1" ||

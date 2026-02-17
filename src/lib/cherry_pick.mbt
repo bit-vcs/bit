@@ -9,39 +9,39 @@ pub enum CherryPickStatus {
 ///|
 pub struct CherryPickResult {
   status : CherryPickStatus
-  commit_id : @git.ObjectId?
+  commit_id : @bit.ObjectId?
   conflicts : Array[String]
 }
 
 ///|
 /// Cherry-pick a single commit onto current HEAD.
 pub fn cherry_pick(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
-  commit_id : @git.ObjectId,
+  commit_id : @bit.ObjectId,
   author : String,
   timestamp : Int64,
-) -> CherryPickResult raise @git.GitError {
+) -> CherryPickResult raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   // Get current HEAD
   let head = resolve_head_commit(rfs, git_dir)
   guard head is Some(head_id) else {
-    raise @git.GitError::InvalidObject("HEAD not found")
+    raise @bit.GitError::InvalidObject("HEAD not found")
   }
   let db = ObjectDb::load(rfs, git_dir)
   // Read the commit to cherry-pick
   let commit_obj = db.get(rfs, commit_id)
   guard commit_obj is Some(obj) else {
-    raise @git.GitError::InvalidObject("Commit not found")
+    raise @bit.GitError::InvalidObject("Commit not found")
   }
-  if obj.obj_type != @git.ObjectType::Commit {
-    raise @git.GitError::InvalidObject("Not a commit")
+  if obj.obj_type != @bit.ObjectType::Commit {
+    raise @bit.GitError::InvalidObject("Not a commit")
   }
-  let commit_info = @git.parse_commit(obj.data)
+  let commit_info = @bit.parse_commit(obj.data)
   // Get the parent of the cherry-picked commit
   if commit_info.parents.length() == 0 {
-    raise @git.GitError::InvalidObject(
+    raise @bit.GitError::InvalidObject(
       "Cannot cherry-pick initial commit without parent",
     )
   }
@@ -155,7 +155,7 @@ pub fn cherry_pick(
     None => "Cherry-picked from \{commit_id.to_hex()}"
   }
   // Create new commit
-  let new_commit = @git.Commit::new(
+  let new_commit = @bit.Commit::new(
     result_tree,
     [head_id],
     author,
@@ -166,7 +166,7 @@ pub fn cherry_pick(
     "+0000",
     message,
   )
-  let (new_id, new_data) = @git.create_commit(new_commit)
+  let (new_id, new_data) = @bit.create_commit(new_commit)
   write_object_bytes(fs, git_dir, new_id, new_data)
   // Update HEAD
   update_head_ref(fs, rfs, git_dir, new_id)

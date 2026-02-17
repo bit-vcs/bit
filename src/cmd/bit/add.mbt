@@ -39,7 +39,7 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
   }
   let root = get_work_root()
   let fs = OsFs::new()
-  let rfs : &@git.RepoFileSystem = fs
+  let rfs : &@bitcore.RepoFileSystem = fs
   let git_dir = resolve_git_dir(rfs, root)
   if add_repo_requires_standalone_error(rfs, git_dir) {
     eprint_line(
@@ -100,7 +100,7 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
   }
   if add_all {
     // Stage all: untracked, modified, and deleted
-    let status = @gitlib.status(fs, root)
+    let status = @bitlib.status(fs, root)
     let all_paths : Array[String] = []
     for p in status.untracked {
       all_paths.push(p)
@@ -112,7 +112,7 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
       all_paths.push(p)
     }
     if all_paths.length() > 0 {
-      @gitlib.add_paths_async(fs, fs, root, all_paths)
+      @bitlib.add_paths_async(fs, fs, root, all_paths)
       stage_submodule_gitlinks(fs, root, all_paths)
     }
     return
@@ -129,7 +129,7 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
   }
   let stage_paths = expand_add_stage_paths(fs, root, paths, force)
   if stage_paths.length() > 0 {
-    @gitlib.add_paths_async(fs, fs, root, stage_paths)
+    @bitlib.add_paths_async(fs, fs, root, stage_paths)
     stage_submodule_gitlinks(fs, root, stage_paths)
   }
   if not(force) && add_has_explicit_ignored_path(fs, root, paths) {
@@ -150,7 +150,7 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
 
 ///|
 fn add_repo_requires_standalone_error(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
 ) -> Bool {
   repo_object_format(fs, git_dir) != "sha1" ||
@@ -218,14 +218,14 @@ async fn handle_add_dry_run(
 
 ///|
 async fn add_collect_unmatched_pathspecs(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   root : String,
   paths : Array[String],
   force : Bool,
 ) -> Array[String] raise Error {
   let out : Array[String] = []
   let git_dir = resolve_git_dir(fs, root)
-  let tracked_entries = @gitlib.read_index_entries(fs, git_dir)
+  let tracked_entries = @bitlib.read_index_entries(fs, git_dir)
   let tracked : Map[String, Bool] = {}
   let tracked_folded : Map[String, String] = {}
   for entry in tracked_entries {
@@ -295,7 +295,7 @@ async fn add_refresh_index_entries(
   raw_specs : Array[String],
 ) -> Unit raise Error {
   let git_dir = resolve_git_dir(fs, root)
-  let entries = @gitlib.read_index_entries(fs, git_dir)
+  let entries = @bitlib.read_index_entries(fs, git_dir)
   if entries.length() == 0 {
     return
   }
@@ -327,7 +327,7 @@ async fn add_refresh_index_entries(
       }
     }
   }
-  let refreshed : Array[@gitlib.IndexEntry] = []
+  let refreshed : Array[@bitlib.IndexEntry] = []
   for entry in entries {
     if not(selected.contains(entry.path)) {
       refreshed.push(entry)
@@ -358,7 +358,7 @@ async fn add_refresh_index_entries(
       Err(_) => ()
     }
     refreshed.push(
-      @gitlib.IndexEntry::new(
+      @bitlib.IndexEntry::new(
         entry.path,
         entry.id,
         entry.mode,
@@ -368,7 +368,7 @@ async fn add_refresh_index_entries(
       ),
     )
   }
-  @gitlib.write_index_entries(fs, git_dir, refreshed)
+  @bitlib.write_index_entries(fs, git_dir, refreshed)
 }
 
 ///|
@@ -472,14 +472,14 @@ fn add_normalize_input_path(root : String, raw_path : String) -> String {
 
 ///|
 fn add_should_show_empty_pathspec_hint(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   root : String,
 ) -> Bool {
   let git_dir = resolve_git_dir(fs, root)
   match get_config_override("advice.addEmptyPathspec") {
     Some(value) => add_parse_bool(value).unwrap_or(true)
     None =>
-      @gitlib.read_config_bool(
+      @bitlib.read_config_bool(
         fs,
         git_dir + "/config",
         "advice",
@@ -505,7 +505,7 @@ fn add_parse_bool(value : String) -> Bool? {
 
 ///|
 async fn expand_add_stage_paths(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   root : String,
   paths : Array[String],
   force : Bool,
@@ -517,7 +517,7 @@ async fn expand_add_stage_paths(
     @ignore.list_working_files_async(fs, root)
   }
   let git_dir = resolve_git_dir(fs, root)
-  let tracked_entries = @gitlib.read_index_entries(fs, git_dir)
+  let tracked_entries = @bitlib.read_index_entries(fs, git_dir)
   let tracked_map : Map[String, Bool] = {}
   let tracked_folded : Map[String, String] = {}
   for entry in tracked_entries {
@@ -587,7 +587,7 @@ async fn expand_add_stage_paths(
 
 ///|
 fn expand_force_add_path(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   root : String,
   path : String,
   out : Array[String],
@@ -606,7 +606,7 @@ fn expand_force_add_path(
 
 ///|
 fn collect_all_addable_paths(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   root : String,
   rel : String,
   out : Array[String],
@@ -635,12 +635,12 @@ fn collect_all_addable_paths(
 
 ///|
 fn add_has_explicit_ignored_path(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   root : String,
   paths : Array[String],
 ) -> Bool raise Error {
   let git_dir = resolve_git_dir(fs, root)
-  let tracked_entries = @gitlib.read_index_entries(fs, git_dir)
+  let tracked_entries = @bitlib.read_index_entries(fs, git_dir)
   let tracked : Map[String, Bool] = {}
   for entry in tracked_entries {
     tracked[normalize_add_path(entry.path)] = true
@@ -670,7 +670,7 @@ fn add_has_explicit_ignored_path(
 
 ///|
 fn add_has_ignored_under(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   root : String,
   rel : String,
 ) -> Bool raise Error {
@@ -705,7 +705,7 @@ fn stage_submodule_gitlinks(
   root : String,
   paths : Array[String],
 ) -> Unit raise Error {
-  let rfs : &@git.RepoFileSystem = fs
+  let rfs : &@bitcore.RepoFileSystem = fs
   let git_dir = resolve_git_dir(fs, root)
   for raw_path in paths {
     let rel_path = normalize_add_path(raw_path)
@@ -715,13 +715,13 @@ fn stage_submodule_gitlinks(
     let sub_path = root + "/" + rel_path
     let sub_git = sub_path + "/.git"
     let sub_git_dir = if rfs.is_file(sub_git) {
-      @gitlib.resolve_gitdir(rfs, sub_git)
+      @bitlib.resolve_gitdir(rfs, sub_git)
     } else if rfs.is_dir(sub_git) {
       sub_git
     } else {
       continue
     }
-    match @gitlib.resolve_head_commit(rfs, sub_git_dir) {
+    match @bitlib.resolve_head_commit(rfs, sub_git_dir) {
       Some(id) => update_submodule_index_entry(fs, git_dir, rel_path, id)
       None => ()
     }

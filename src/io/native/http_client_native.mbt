@@ -17,7 +17,7 @@ pub fn NativeHttpClient::new() -> NativeHttpClient {
 async fn apply_auth_header(
   url : String,
   headers : Map[String, String],
-) -> Map[String, String] raise @git.GitError {
+) -> Map[String, String] raise @bit.GitError {
   if headers.contains("Authorization") {
     return headers
   }
@@ -37,7 +37,7 @@ async fn apply_auth_header(
 }
 
 ///|
-async fn resolve_auth_header(url : String) -> String? raise @git.GitError {
+async fn resolve_auth_header(url : String) -> String? raise @bit.GitError {
   match parse_http_url(url) {
     None => None
     Some((protocol, host, path, username, password)) =>
@@ -48,7 +48,7 @@ async fn resolve_auth_header(url : String) -> String? raise @git.GitError {
         }
         None => {
           let cred_path = normalize_credential_path(path)
-          match git_credential_fill(protocol, host, cred_path, username) {
+          match bit_credential_fill(protocol, host, cred_path, username) {
             None => None
             Some((user, pass)) => Some(build_basic_auth(user, pass))
           }
@@ -141,18 +141,18 @@ fn normalize_credential_path(path : String) -> String {
 }
 
 ///|
-async fn git_credential_fill(
+async fn bit_credential_fill(
   protocol : String,
   host : String,
   path : String,
   username : String?,
-) -> (String, String)? raise @git.GitError {
+) -> (String, String)? raise @bit.GitError {
   let input = build_credential_input(protocol, host, path, username)
   let (stdin, writer) = @process.write_to_process() catch {
-    err => raise @git.GitError::IoError("git credential pipe failed: \{err}")
+    err => raise @bit.GitError::IoError("git credential pipe failed: \{err}")
   }
   writer.write(input) catch {
-    err => raise @git.GitError::IoError("git credential write failed: \{err}")
+    err => raise @bit.GitError::IoError("git credential write failed: \{err}")
   }
   writer.close()
   let (code, stdout, stderr) = @process.collect_output(
@@ -162,7 +162,7 @@ async fn git_credential_fill(
     stdin~,
     extra_env={ "GIT_TERMINAL_PROMPT": "0" },
   ) catch {
-    err => raise @git.GitError::IoError("git credential fill failed: \{err}")
+    err => raise @bit.GitError::IoError("git credential fill failed: \{err}")
   }
   if code != 0 {
     ignore(stderr)
@@ -170,7 +170,7 @@ async fn git_credential_fill(
   }
   let text = stdout.text() catch {
     err if @async.is_cancellation_error(err) =>
-      raise @git.GitError::IoError(err.to_string())
+      raise @bit.GitError::IoError(err.to_string())
     _ => ""
   }
   let mut user : String? = None
@@ -224,16 +224,16 @@ fn build_credential_input(
 pub async fn native_http_get(
   url : String,
   headers : Map[String, String],
-) -> (@git.HttpResponse, Bytes) raise @git.GitError {
+) -> (@bit.HttpResponse, Bytes) raise @bit.GitError {
   let auth_headers = apply_auth_header(url, headers)
   let (response, client) = @http.get_stream(url, headers=auth_headers) catch {
-    e => raise @git.GitError::IoError("HTTP GET failed: \{e}")
+    e => raise @bit.GitError::IoError("HTTP GET failed: \{e}")
   }
   let chunks : Array[Byte] = []
   while true {
     let chunk = client.read_some() catch {
       err if @async.is_cancellation_error(err) =>
-        raise @git.GitError::IoError(err.to_string())
+        raise @bit.GitError::IoError(err.to_string())
       _ => break
     }
     match chunk {
@@ -248,7 +248,7 @@ pub async fn native_http_get(
   let data = Bytes::from_array(
     FixedArray::makei(chunks.length(), i => chunks[i]),
   )
-  (@git.HttpResponse::new(response.code), data)
+  (@bit.HttpResponse::new(response.code), data)
 }
 
 ///|
@@ -256,22 +256,22 @@ pub async fn native_http_post(
   url : String,
   body : Bytes,
   headers : Map[String, String],
-) -> (@git.HttpResponse, Bytes) raise @git.GitError {
+) -> (@bit.HttpResponse, Bytes) raise @bit.GitError {
   let auth_headers = apply_auth_header(url, headers)
   let client = @http.post_stream(url, headers=auth_headers) catch {
-    e => raise @git.GitError::IoError("HTTP POST failed: \{e}")
+    e => raise @bit.GitError::IoError("HTTP POST failed: \{e}")
   }
   client.write(body) catch {
-    e => raise @git.GitError::IoError("HTTP POST write failed: \{e}")
+    e => raise @bit.GitError::IoError("HTTP POST write failed: \{e}")
   }
   let response = client.end_request() catch {
-    e => raise @git.GitError::IoError("HTTP POST end_request failed: \{e}")
+    e => raise @bit.GitError::IoError("HTTP POST end_request failed: \{e}")
   }
   let chunks : Array[Byte] = []
   while true {
     let chunk = client.read_some() catch {
       err if @async.is_cancellation_error(err) =>
-        raise @git.GitError::IoError(err.to_string())
+        raise @bit.GitError::IoError(err.to_string())
       _ => break
     }
     match chunk {
@@ -286,5 +286,5 @@ pub async fn native_http_post(
   let data = Bytes::from_array(
     FixedArray::makei(chunks.length(), i => chunks[i]),
   )
-  (@git.HttpResponse::new(response.code), data)
+  (@bit.HttpResponse::new(response.code), data)
 }

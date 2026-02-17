@@ -1,7 +1,7 @@
 ///|
-fn rm_wbtest_entry(path : String) -> @gitlib.IndexEntry {
-  let zero = @git.ObjectId::new(FixedArray::make(20, b'\x00'))
-  @gitlib.IndexEntry::new(path, zero, 0o100644, 0)
+fn rm_wbtest_entry(path : String) -> @bitlib.IndexEntry {
+  let zero = @bitcore.ObjectId::new(FixedArray::make(20, b'\x00'))
+  @bitlib.IndexEntry::new(path, zero, 0o100644, 0)
 }
 
 ///|

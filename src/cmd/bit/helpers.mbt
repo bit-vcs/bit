@@ -1,8 +1,8 @@
 ///| Helper functions and utilities for git-shim
 
 ///|
-fn io_error(err : @fs.IOError) -> @git.GitError {
-  @git.GitError::IoError(err.to_string())
+fn io_error(err : @fs.IOError) -> @bitcore.GitError {
+  @bitcore.GitError::IoError(err.to_string())
 }
 
 ///|
@@ -55,7 +55,7 @@ struct RunGitCommandInvocation {
 struct RunGitEnvSnapshot {
   shim_cwd : String?
   git_dir : String?
-  git_work_tree : String?
+  bit_work_tree : String?
 }
 
 ///|
@@ -137,7 +137,7 @@ fn enter_run_git_env(cwd : String?, git_dir : String?) -> RunGitEnvSnapshot {
   let snapshot = {
     shim_cwd: @sys.get_env_var("GIT_SHIM_CWD"),
     git_dir: @sys.get_env_var("GIT_DIR"),
-    git_work_tree: @sys.get_env_var("GIT_WORK_TREE"),
+    bit_work_tree: @sys.get_env_var("GIT_WORK_TREE"),
   }
   let fs = OsFs::new()
   match git_dir {
@@ -163,7 +163,7 @@ fn enter_run_git_env(cwd : String?, git_dir : String?) -> RunGitEnvSnapshot {
 fn restore_run_git_env(snapshot : RunGitEnvSnapshot) -> Unit {
   restore_env_var("GIT_SHIM_CWD", snapshot.shim_cwd)
   restore_env_var("GIT_DIR", snapshot.git_dir)
-  restore_env_var("GIT_WORK_TREE", snapshot.git_work_tree)
+  restore_env_var("GIT_WORK_TREE", snapshot.bit_work_tree)
 }
 
 ///|
@@ -305,7 +305,7 @@ fn parent_dir(path : String) -> String {
 }
 
 ///|
-fn ensure_dir(path : String) -> Unit raise @git.GitError {
+fn ensure_dir(path : String) -> Unit raise @bitcore.GitError {
   if path.length() == 0 || path == "/" || path == "." {
     return ()
   }
@@ -314,7 +314,7 @@ fn ensure_dir(path : String) -> Unit raise @git.GitError {
     if is_dir {
       return ()
     }
-    raise @git.GitError::IoError("path exists and is not dir: " + path)
+    raise @bitcore.GitError::IoError("path exists and is not dir: " + path)
   }
   let parent = parent_dir(path)
   if parent.length() > 0 && parent != path {
@@ -399,20 +399,20 @@ fn join_repo_marker(root : String, marker : String) -> String {
 }
 
 ///|
-fn detect_repo_marker_path(fs : &@git.RepoFileSystem, root : String) -> String? {
+fn detect_repo_marker_path(fs : &@bitcore.RepoFileSystem, root : String) -> String? {
   let bit_path = join_repo_marker(root, ".bit")
   if fs.is_dir(bit_path) || fs.is_file(bit_path) {
     return Some(bit_path)
   }
-  let git_path = join_repo_marker(root, ".git")
-  if fs.is_dir(git_path) || fs.is_file(git_path) {
-    return Some(git_path)
+  let bit_path = join_repo_marker(root, ".git")
+  if fs.is_dir(bit_path) || fs.is_file(bit_path) {
+    return Some(bit_path)
   }
   None
 }
 
 ///|
-fn default_repo_marker_path(fs : &@git.RepoFileSystem, root : String) -> String {
+fn default_repo_marker_path(fs : &@bitcore.RepoFileSystem, root : String) -> String {
   match detect_repo_marker_path(fs, root) {
     Some(path) => path
     None => join_repo_marker(root, ".git")
@@ -465,12 +465,12 @@ fn find_repo_root(start : String) -> String? {
     if is_bit_dir || is_bit_file {
       return Some(current)
     }
-    let git_path = join_repo_marker(current, ".git")
-    let is_git_dir = @fs.is_dir(git_path) catch { _ => false }
+    let bit_path = join_repo_marker(current, ".git")
+    let is_git_dir = @fs.is_dir(bit_path) catch { _ => false }
     let is_git_file = if is_git_dir {
       false
     } else {
-      @fs.is_file(git_path) catch {
+      @fs.is_file(bit_path) catch {
         _ => false
       }
     }
@@ -543,7 +543,7 @@ fn normalize_repo_root(path : String) -> String {
 }
 
 ///|
-fn resolve_git_dir(fs : &@git.RepoFileSystem, root : String) -> String {
+fn resolve_git_dir(fs : &@bitcore.RepoFileSystem, root : String) -> String {
   let default_git_dir = default_repo_marker_path(fs, root)
   match @sys.get_env_var("GIT_DIR") {
     Some(dir) => {
@@ -559,7 +559,7 @@ fn resolve_git_dir(fs : &@git.RepoFileSystem, root : String) -> String {
         }
       }
       if fs.is_file(resolved) {
-        @gitlib.resolve_gitdir(fs, resolved)
+        @bitlib.resolve_gitdir(fs, resolved)
       } else if fs.is_dir(resolved) {
         resolved
       } else if is_bare_repo_dir(root) {
@@ -570,7 +570,7 @@ fn resolve_git_dir(fs : &@git.RepoFileSystem, root : String) -> String {
     }
     None =>
       if fs.is_file(default_git_dir) {
-        @gitlib.resolve_gitdir(fs, default_git_dir)
+        @bitlib.resolve_gitdir(fs, default_git_dir)
       } else if fs.is_dir(default_git_dir) {
         default_git_dir
       } else if is_bare_repo_dir(root) {
@@ -582,12 +582,12 @@ fn resolve_git_dir(fs : &@git.RepoFileSystem, root : String) -> String {
 }
 
 ///|
-fn is_reftable_repo(fs : &@git.RepoFileSystem, git_dir : String) -> Bool {
+fn is_reftable_repo(fs : &@bitcore.RepoFileSystem, git_dir : String) -> Bool {
   if fs.is_dir(git_dir + "/reftable") {
     return true
   }
   match
-    @gitlib.read_config_value(
+    @bitlib.read_config_value(
       fs,
       git_dir + "/config",
       "extensions",
@@ -599,9 +599,9 @@ fn is_reftable_repo(fs : &@git.RepoFileSystem, git_dir : String) -> Bool {
 }
 
 ///|
-fn repo_object_format(fs : &@git.RepoFileSystem, git_dir : String) -> String {
+fn repo_object_format(fs : &@bitcore.RepoFileSystem, git_dir : String) -> String {
   match
-    @gitlib.read_config_value(
+    @bitlib.read_config_value(
       fs,
       git_dir + "/config",
       "extensions",
@@ -614,18 +614,18 @@ fn repo_object_format(fs : &@git.RepoFileSystem, git_dir : String) -> String {
 
 ///|
 fn repo_compat_object_format(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
 ) -> String? {
   match
-    @gitlib.read_config_value(
+    @bitlib.read_config_value(
       fs,
       git_dir + "/config",
       "extensions",
       "compatobjectformat",
     ) {
     Some(value) => {
-      let normalized = @gitlib.config_strip_quotes(value).to_lower()
+      let normalized = @bitlib.config_strip_quotes(value).to_lower()
       if normalized == "sha1" || normalized == "sha256" {
         Some(normalized)
       } else {

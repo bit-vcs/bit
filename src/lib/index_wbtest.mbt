@@ -1,6 +1,6 @@
 ///|
 test "index: read_index_entries accepts version 3 headers" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   init_repo(fs, "/repo")
   fs.write_string("/repo/a.txt", "hello\n")
   add_paths(fs, fs, "/repo", ["a.txt"])
@@ -25,7 +25,7 @@ test "index: read_index_entries accepts version 3 headers" {
 
 ///|
 test "index: read_skip_worktree_paths reads extended skip-worktree flag" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   init_repo(fs, "/repo")
   fs.write_string("/repo/a.txt", "hello\n")
   add_paths(fs, fs, "/repo", ["a.txt"])
@@ -41,7 +41,7 @@ test "index: read_skip_worktree_paths reads extended skip-worktree flag" {
 
 ///|
 test "index: write_skip_worktree_paths marks extended flag entries" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   init_repo(fs, "/repo")
   fs.write_string("/repo/a.txt", "hello\n")
   add_paths(fs, fs, "/repo", ["a.txt"])
@@ -55,7 +55,7 @@ test "index: write_skip_worktree_paths marks extended flag entries" {
 
 ///|
 fn index_test_mark_single_entry_skip_worktree(
-  fs : @git.TestFs,
+  fs : @bit.TestFs,
   index_path : String,
 ) -> Unit {
   let data = fs.read_file(index_path) catch { _ => Bytes::default() }

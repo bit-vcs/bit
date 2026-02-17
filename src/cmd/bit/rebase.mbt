@@ -9,8 +9,8 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let git_dir = root + "/.git"
   let fs = OsFs::new()
-  let wfs : &@git.FileSystem = fs
-  let rfs : &@git.RepoFileSystem = fs
+  let wfs : &@bitcore.FileSystem = fs
+  let rfs : &@bitcore.RepoFileSystem = fs
   // Parse arguments
   let mut do_continue = false
   let mut do_abort = false
@@ -67,7 +67,7 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
     if rfs.is_dir(rebase_merge_dir) {
       interactive_rebase_continue(wfs, rfs, root, git_dir)
     } else {
-      let result = @gitlib.rebase_continue(fs, fs, root)
+      let result = @bitlib.rebase_continue(fs, fs, root)
       print_rebase_result(result)
     }
     return ()
@@ -78,7 +78,7 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
     if rfs.is_dir(rebase_merge_dir) {
       interactive_rebase_abort(wfs, rfs, root, git_dir)
     } else {
-      @gitlib.rebase_abort(fs, fs, root)
+      @bitlib.rebase_abort(fs, fs, root)
     }
     print_line("Rebase aborted")
     return ()
@@ -89,24 +89,24 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
     if rfs.is_dir(rebase_merge_dir) {
       interactive_rebase_skip(wfs, rfs, root, git_dir)
     } else {
-      let result = @gitlib.rebase_skip(fs, fs, root)
+      let result = @bitlib.rebase_skip(fs, fs, root)
       print_rebase_result(result)
     }
     return ()
   }
   // Start new rebase
   guard upstream is Some(ref_name) else {
-    raise @git.GitError::InvalidObject("usage: git rebase [-i] <upstream>")
+    raise @bitcore.GitError::InvalidObject("usage: git rebase [-i] <upstream>")
   }
-  let upstream_id = @gitrepo.rev_parse(fs, git_dir, ref_name)
+  let upstream_id = @bitrepo.rev_parse(fs, git_dir, ref_name)
   guard upstream_id is Some(id) else {
-    raise @git.GitError::InvalidObject("unknown revision: \{ref_name}")
+    raise @bitcore.GitError::InvalidObject("unknown revision: \{ref_name}")
   }
   if interactive {
     // Interactive rebase
     let onto_id = match onto {
       Some(o) => {
-        let oid = @gitrepo.rev_parse(rfs, git_dir, o)
+        let oid = @bitrepo.rev_parse(rfs, git_dir, o)
         match oid {
           Some(x) => x
           None => id
@@ -116,7 +116,7 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
     }
     interactive_rebase_start(wfs, rfs, root, git_dir, id, onto_id)
   } else {
-    let result = @gitlib.rebase_start(fs, fs, root, id)
+    let result = @bitlib.rebase_start(fs, fs, root, id)
     print_rebase_result(result)
   }
 }
@@ -137,18 +137,18 @@ fn rebase_args_require_standalone_error(args : Array[String]) -> Bool {
 
 ///|
 async fn interactive_rebase_start(
-  wfs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  wfs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   root : String,
   git_dir : String,
-  upstream : @git.ObjectId,
-  onto : @git.ObjectId,
+  upstream : @bitcore.ObjectId,
+  onto : @bitcore.ObjectId,
 ) -> Unit raise Error {
-  let db = @gitlib.ObjectDb::load(rfs, git_dir)
+  let db = @bitlib.ObjectDb::load(rfs, git_dir)
   // Get HEAD
-  let head = @gitrepo.rev_parse(rfs, git_dir, "HEAD")
+  let head = @bitrepo.rev_parse(rfs, git_dir, "HEAD")
   guard head is Some(h) else {
-    raise @git.GitError::InvalidObject("Cannot resolve HEAD")
+    raise @bitcore.GitError::InvalidObject("Cannot resolve HEAD")
   }
   // Collect commits to rebase
   let commits = collect_rebase_commits(db, rfs, h, upstream)
@@ -170,7 +170,7 @@ async fn interactive_rebase_start(
   // Also save done file (empty initially)
   wfs.write_string(rebase_dir + "/done", "")
   // Checkout onto
-  ignore(@gitlib.checkout(wfs, rfs, root, onto.to_hex(), detach=true))
+  ignore(@bitlib.checkout(wfs, rfs, root, onto.to_hex(), detach=true))
   let edited = edit_rebase_todo(todo_path)
   if edited {
     interactive_rebase_continue(wfs, rfs, root, git_dir)
@@ -195,19 +195,19 @@ async fn interactive_rebase_start(
 
 ///|
 fn collect_rebase_commits(
-  db : @gitlib.ObjectDb,
-  rfs : &@git.RepoFileSystem,
-  head : @git.ObjectId,
-  upstream : @git.ObjectId,
-) -> Array[@git.ObjectId] raise Error {
-  let result : Array[@git.ObjectId] = []
+  db : @bitlib.ObjectDb,
+  rfs : &@bitcore.RepoFileSystem,
+  head : @bitcore.ObjectId,
+  upstream : @bitcore.ObjectId,
+) -> Array[@bitcore.ObjectId] raise Error {
+  let result : Array[@bitcore.ObjectId] = []
   let upstream_hex = upstream.to_hex()
   let mut current = head
   while current.to_hex() != upstream_hex {
     result.push(current)
     let obj = db.get(rfs, current)
     guard obj is Some(o) else { break }
-    let info = @git.parse_commit(o.data)
+    let info = @bitcore.parse_commit(o.data)
     if info.parents.length() == 0 {
       break
     }
@@ -220,9 +220,9 @@ fn collect_rebase_commits(
 
 ///|
 fn generate_rebase_todo(
-  db : @gitlib.ObjectDb,
-  rfs : &@git.RepoFileSystem,
-  commits : Array[@git.ObjectId],
+  db : @bitlib.ObjectDb,
+  rfs : &@bitcore.RepoFileSystem,
+  commits : Array[@bitcore.ObjectId],
 ) -> String raise Error {
   let sb = StringBuilder::new()
   for commit in commits {
@@ -257,7 +257,7 @@ fn generate_rebase_todo(
 }
 
 ///|
-fn get_current_branch(rfs : &@git.RepoFileSystem, git_dir : String) -> String {
+fn get_current_branch(rfs : &@bitcore.RepoFileSystem, git_dir : String) -> String {
   let head_path = git_dir + "/HEAD"
   if rfs.is_file(head_path) {
     let content = trim_string(
@@ -272,8 +272,8 @@ fn get_current_branch(rfs : &@git.RepoFileSystem, git_dir : String) -> String {
 
 ///|
 async fn interactive_rebase_continue(
-  wfs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  wfs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   root : String,
   git_dir : String,
 ) -> Unit raise Error {
@@ -295,7 +295,7 @@ async fn interactive_rebase_continue(
   }
   // Process first entry
   let entry = entries[0]
-  let db = @gitlib.ObjectDb::load(rfs, git_dir)
+  let db = @bitlib.ObjectDb::load(rfs, git_dir)
   let author = get_author_string()
   let timestamp = get_commit_timestamp()
   match entry.command {
@@ -507,8 +507,8 @@ fn get_rest_after_parts(s : String, num_parts : Int) -> String {
 
 ///|
 fn move_todo_to_done(
-  wfs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  wfs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   rebase_dir : String,
   entry : RebaseTodoEntry,
 ) -> Unit {
@@ -567,35 +567,35 @@ struct CherryPickResult {
 
 ///|
 async fn cherry_pick_commit(
-  wfs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  wfs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   root : String,
   git_dir : String,
-  db : @gitlib.ObjectDb,
+  db : @bitlib.ObjectDb,
   commit_ref : String,
 ) -> CherryPickResult raise Error {
   // Resolve commit
-  let commit_id = @gitrepo.rev_parse(rfs, git_dir, commit_ref)
+  let commit_id = @bitrepo.rev_parse(rfs, git_dir, commit_ref)
   guard commit_id is Some(cid) else {
-    raise @git.GitError::InvalidObject("Cannot resolve: \{commit_ref}")
+    raise @bitcore.GitError::InvalidObject("Cannot resolve: \{commit_ref}")
   }
   let obj = db.get(rfs, cid)
   guard obj is Some(o) else {
-    raise @git.GitError::InvalidObject("Cannot read commit: \{commit_ref}")
+    raise @bitcore.GitError::InvalidObject("Cannot read commit: \{commit_ref}")
   }
-  let info = @git.parse_commit(o.data)
+  let info = @bitcore.parse_commit(o.data)
   let message = extract_commit_message(o.data)
   let author_line = extract_author_line_from_bytes(o.data)
   let timestamp = get_commit_timestamp()
   // Simple cherry-pick: apply changes from commit
   // For now, create a new commit with the same tree
   // (This is simplified - real cherry-pick should apply diff)
-  let head = @gitrepo.rev_parse(rfs, git_dir, "HEAD")
+  let head = @bitrepo.rev_parse(rfs, git_dir, "HEAD")
   guard head is Some(h) else {
-    raise @git.GitError::InvalidObject("Cannot resolve HEAD")
+    raise @bitcore.GitError::InvalidObject("Cannot resolve HEAD")
   }
   // Create commit
-  let commit = @git.Commit::new(
+  let commit = @bitcore.Commit::new(
     info.tree,
     [h],
     author_line,
@@ -606,12 +606,12 @@ async fn cherry_pick_commit(
     "+0000",
     message,
   )
-  let (new_commit_id, commit_data) = @git.create_commit(commit)
-  @gitlib.write_object_bytes(wfs, git_dir, new_commit_id, commit_data)
+  let (new_commit_id, commit_data) = @bitcore.create_commit(commit)
+  @bitlib.write_object_bytes(wfs, git_dir, new_commit_id, commit_data)
   // Update HEAD
   wfs.write_string(git_dir + "/HEAD", new_commit_id.to_hex() + "\n")
   // Checkout the tree
-  ignore(@gitlib.checkout(wfs, rfs, root, new_commit_id.to_hex(), detach=true))
+  ignore(@bitlib.checkout(wfs, rfs, root, new_commit_id.to_hex(), detach=true))
   let short = String::unsafe_substring(new_commit_id.to_hex(), start=0, end=7)
   print_line("[\{short}] \{get_first_line(message)}")
   { has_conflict: false }
@@ -619,35 +619,35 @@ async fn cherry_pick_commit(
 
 ///|
 async fn squash_commit(
-  wfs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  wfs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   root : String,
   git_dir : String,
-  db : @gitlib.ObjectDb,
+  db : @bitlib.ObjectDb,
   commit_ref : String,
   author : String,
   timestamp : Int64,
   fixup : Bool,
 ) -> Unit raise Error {
   // Get commit to squash
-  let commit_id = @gitrepo.rev_parse(rfs, git_dir, commit_ref)
+  let commit_id = @bitrepo.rev_parse(rfs, git_dir, commit_ref)
   guard commit_id is Some(cid) else { return }
   let obj = db.get(rfs, cid)
   guard obj is Some(o) else { return }
-  let info = @git.parse_commit(o.data)
+  let info = @bitcore.parse_commit(o.data)
   let squash_msg = extract_commit_message(o.data)
   // Get current HEAD
-  let head = @gitrepo.rev_parse(rfs, git_dir, "HEAD")
+  let head = @bitrepo.rev_parse(rfs, git_dir, "HEAD")
   guard head is Some(h) else { return }
   let head_obj = db.get(rfs, h)
   guard head_obj is Some(ho) else { return }
-  let head_info = @git.parse_commit(ho.data)
+  let head_info = @bitcore.parse_commit(ho.data)
   let head_msg = extract_commit_message(ho.data)
   // New message: combine or just use head's
   let new_msg = if fixup { head_msg } else { head_msg + "\n\n" + squash_msg }
   // Create new commit with squashed changes
   // Use squashed commit's tree (simplified)
-  let commit = @git.Commit::new(
+  let commit = @bitcore.Commit::new(
     info.tree,
     head_info.parents,
     author,
@@ -658,11 +658,11 @@ async fn squash_commit(
     "+0000",
     new_msg,
   )
-  let (new_commit_id, commit_data) = @git.create_commit(commit)
-  @gitlib.write_object_bytes(wfs, git_dir, new_commit_id, commit_data)
+  let (new_commit_id, commit_data) = @bitcore.create_commit(commit)
+  @bitlib.write_object_bytes(wfs, git_dir, new_commit_id, commit_data)
   // Update HEAD
   wfs.write_string(git_dir + "/HEAD", new_commit_id.to_hex() + "\n")
-  ignore(@gitlib.checkout(wfs, rfs, root, new_commit_id.to_hex(), detach=true))
+  ignore(@bitlib.checkout(wfs, rfs, root, new_commit_id.to_hex(), detach=true))
   let short = String::unsafe_substring(new_commit_id.to_hex(), start=0, end=7)
   if fixup {
     print_line("[\{short}] fixup")
@@ -673,8 +673,8 @@ async fn squash_commit(
 
 ///|
 fn interactive_rebase_abort(
-  wfs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  wfs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   root : String,
   git_dir : String,
 ) -> Unit raise Error {
@@ -684,7 +684,7 @@ fn interactive_rebase_abort(
   // Restore original HEAD
   if rfs.is_file(orig_head_path) {
     let orig_hex = rfs.read_file(orig_head_path) |> decode_bytes |> trim_string
-    ignore(@gitlib.checkout(wfs, rfs, root, orig_hex, detach=true))
+    ignore(@bitlib.checkout(wfs, rfs, root, orig_hex, detach=true))
     // Restore branch if was on one
     if rfs.is_file(head_name_path) {
       let branch = rfs.read_file(head_name_path) |> decode_bytes |> trim_string
@@ -700,8 +700,8 @@ fn interactive_rebase_abort(
 
 ///|
 async fn interactive_rebase_skip(
-  wfs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  wfs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   root : String,
   git_dir : String,
 ) -> Unit raise Error {
@@ -724,15 +724,15 @@ async fn interactive_rebase_skip(
 
 ///|
 async fn interactive_rebase_finish(
-  wfs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  wfs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   _root : String,
   git_dir : String,
 ) -> Unit raise Error {
   let rebase_dir = git_dir + "/rebase-merge"
   let head_name_path = rebase_dir + "/head-name"
   // Get current HEAD
-  let head = @gitrepo.rev_parse(rfs, git_dir, "HEAD")
+  let head = @bitrepo.rev_parse(rfs, git_dir, "HEAD")
   guard head is Some(h) else { return }
   // Restore branch pointer
   if rfs.is_file(head_name_path) {
@@ -749,8 +749,8 @@ async fn interactive_rebase_finish(
 
 ///|
 fn cleanup_rebase_dir(
-  wfs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  wfs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   rebase_dir : String,
 ) -> Unit {
   let files = rfs.readdir(rebase_dir) catch { _ => return }
@@ -765,9 +765,9 @@ fn cleanup_rebase_dir(
 }
 
 ///|
-async fn print_rebase_result(result : @gitlib.RebaseResult) -> Unit {
+async fn print_rebase_result(result : @bitlib.RebaseResult) -> Unit {
   match result.status {
-    @gitlib.RebaseStatus::Complete =>
+    @bitlib.RebaseStatus::Complete =>
       match result.commit_id {
         Some(id) => {
           let short = String::unsafe_substring(id.to_hex(), start=0, end=7)
@@ -775,9 +775,9 @@ async fn print_rebase_result(result : @gitlib.RebaseResult) -> Unit {
         }
         None => print_line("Successfully rebased.")
       }
-    @gitlib.RebaseStatus::NothingToRebase =>
+    @bitlib.RebaseStatus::NothingToRebase =>
       print_line("Current branch is up to date.")
-    @gitlib.RebaseStatus::Conflict => {
+    @bitlib.RebaseStatus::Conflict => {
       print_line("CONFLICT: Merge conflict in:")
       for path in result.conflicts {
         print_line("  \{path}")
@@ -833,7 +833,7 @@ async fn handle_subdir_rebase(
   print_line("  Upstream: \{upstream_hex}")
   // Step 3: Find commits affecting subdirectory
   print_line("  Finding changes to \{subdir_path}...")
-  let db = @gitlib.ObjectDb::load_lazy(fs, git_dir)
+  let db = @bitlib.ObjectDb::load_lazy(fs, git_dir)
   let commits = find_subdir_affecting_commits(
     db, fs, base_hex, upstream_hex, subdir_path,
   ) catch {
@@ -863,33 +863,33 @@ async fn handle_subdir_rebase(
 
 ///|
 struct SubdirChangeInfo {
-  id : @git.ObjectId
-  subdir_tree : @git.ObjectId
+  id : @bitcore.ObjectId
+  subdir_tree : @bitcore.ObjectId
   message : String
   author : String
 }
 
 ///|
 fn find_subdir_affecting_commits(
-  db : @gitlib.ObjectDb,
+  db : @bitlib.ObjectDb,
   fs : OsFs,
   base_hex : String,
   target_hex : String,
   subdir_path : String,
-) -> Array[SubdirChangeInfo] raise @git.GitError {
+) -> Array[SubdirChangeInfo] raise @bitcore.GitError {
   let result : Array[SubdirChangeInfo] = []
-  let base_id = @git.ObjectId::from_hex(base_hex) catch {
-    _ => raise @git.GitError::InvalidObject("Invalid base: " + base_hex)
+  let base_id = @bitcore.ObjectId::from_hex(base_hex) catch {
+    _ => raise @bitcore.GitError::InvalidObject("Invalid base: " + base_hex)
   }
-  let target_id = @git.ObjectId::from_hex(target_hex) catch {
-    _ => raise @git.GitError::InvalidObject("Invalid target: " + target_hex)
+  let target_id = @bitcore.ObjectId::from_hex(target_hex) catch {
+    _ => raise @bitcore.GitError::InvalidObject("Invalid target: " + target_hex)
   }
   // Get base subdir tree
   let base_subdir = get_commit_subdir_tree(db, fs, base_id, subdir_path) catch {
     err => raise err
   }
   // Walk from target to base, collect commits
-  let commits_to_check : Array[@git.ObjectId] = []
+  let commits_to_check : Array[@bitcore.ObjectId] = []
   let visited : Map[String, Bool] = {}
   let mut current = target_id
   while true {
@@ -901,7 +901,7 @@ fn find_subdir_affecting_commits(
     commits_to_check.push(current)
     let obj = db.get(fs, current)
     guard obj is Some(o) else { break }
-    let info = @git.parse_commit(o.data) catch { err => raise err }
+    let info = @bitcore.parse_commit(o.data) catch { err => raise err }
     if info.parents.length() == 0 {
       break
     }
@@ -946,14 +946,14 @@ fn find_subdir_affecting_commits(
 
 ///|
 fn get_commit_subdir_tree(
-  db : @gitlib.ObjectDb,
+  db : @bitlib.ObjectDb,
   fs : OsFs,
-  commit_id : @git.ObjectId,
+  commit_id : @bitcore.ObjectId,
   subdir_path : String,
-) -> @git.ObjectId? raise @git.GitError {
+) -> @bitcore.ObjectId? raise @bitcore.GitError {
   let obj = db.get(fs, commit_id)
   guard obj is Some(o) else { return None }
-  let info = @git.parse_commit(o.data) catch { err => raise err }
+  let info = @bitcore.parse_commit(o.data) catch { err => raise err }
   find_tree_subtree(db, fs, info.tree, subdir_path) catch {
     err => raise err
   }
@@ -961,11 +961,11 @@ fn get_commit_subdir_tree(
 
 ///|
 fn find_tree_subtree(
-  db : @gitlib.ObjectDb,
+  db : @bitlib.ObjectDb,
   fs : OsFs,
-  tree_id : @git.ObjectId,
+  tree_id : @bitcore.ObjectId,
   path : String,
-) -> @git.ObjectId? raise @git.GitError {
+) -> @bitcore.ObjectId? raise @bitcore.GitError {
   let parts : Array[String] = []
   for p in path.split("/") {
     let s = p.to_string()
@@ -977,7 +977,7 @@ fn find_tree_subtree(
   for part in parts {
     let obj = db.get(fs, current)
     guard obj is Some(o) else { return None }
-    let entries = @git.parse_tree(o.data) catch { err => raise err }
+    let entries = @bitcore.parse_tree(o.data) catch { err => raise err }
     let mut found = false
     for entry in entries {
       if entry.name == part {
@@ -1020,11 +1020,11 @@ fn parse_commit_author_message(content : Bytes) -> (String, String) {
 ///|
 fn apply_subdir_change(
   fs : OsFs,
-  db : @gitlib.ObjectDb,
+  db : @bitlib.ObjectDb,
   worktree : String,
   git_dir : String,
   info : SubdirChangeInfo,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bitcore.GitError {
   // Clear worktree (keep .git)
   let entries = fs.readdir(worktree) catch { _ => [] }
   for entry in entries {
@@ -1049,7 +1049,7 @@ fn apply_subdir_change(
   let message = info.message + "\n\n(rebased from " + info.id.to_hex() + ")\n"
   // Get current HEAD
   let head_bytes = fs.read_file(git_dir + "/HEAD") catch {
-    _ => raise @git.GitError::IoError("Failed to read HEAD")
+    _ => raise @bitcore.GitError::IoError("Failed to read HEAD")
   }
   let head_text = subdir_bytes_to_string(head_bytes)
     .trim(chars=" \n\t")
@@ -1061,20 +1061,20 @@ fn apply_subdir_change(
       end=head_text.length(),
     )
     let ref_bytes = fs.read_file(git_dir + "/" + ref_name) catch {
-      _ => raise @git.GitError::IoError("Failed to read ref")
+      _ => raise @bitcore.GitError::IoError("Failed to read ref")
     }
     let ref_hex = subdir_bytes_to_string(ref_bytes)
       .trim(chars=" \n\t")
       .to_string()
-    @git.ObjectId::from_hex(ref_hex) catch {
-      _ => raise @git.GitError::InvalidObject("Invalid ref")
+    @bitcore.ObjectId::from_hex(ref_hex) catch {
+      _ => raise @bitcore.GitError::InvalidObject("Invalid ref")
     }
   } else {
-    @git.ObjectId::from_hex(head_text) catch {
-      _ => raise @git.GitError::InvalidObject("Invalid HEAD")
+    @bitcore.ObjectId::from_hex(head_text) catch {
+      _ => raise @bitcore.GitError::InvalidObject("Invalid HEAD")
     }
   }
-  let commit = @git.Commit::new(
+  let commit = @bitcore.Commit::new(
     info.subdir_tree,
     [parent_id],
     info.author,
@@ -1085,9 +1085,9 @@ fn apply_subdir_change(
     "+0000",
     message,
   )
-  let (new_id, commit_bytes) = @git.create_commit(commit)
-  @gitlib.write_object_bytes(fs, git_dir, new_id, commit_bytes) catch {
-    _ => raise @git.GitError::IoError("Failed to write commit")
+  let (new_id, commit_bytes) = @bitcore.create_commit(commit)
+  @bitlib.write_object_bytes(fs, git_dir, new_id, commit_bytes) catch {
+    _ => raise @bitcore.GitError::IoError("Failed to write commit")
   }
   // Update HEAD
   let ref_path = git_dir + "/refs/heads/main"
@@ -1116,14 +1116,14 @@ fn subdir_clear_dir(fs : OsFs, path : String) -> Unit {
 
 ///|
 fn subdir_write_tree(
-  db : @gitlib.ObjectDb,
+  db : @bitlib.ObjectDb,
   fs : OsFs,
-  tree_id : @git.ObjectId,
+  tree_id : @bitcore.ObjectId,
   dir : String,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bitcore.GitError {
   let obj = db.get(fs, tree_id)
   guard obj is Some(o) else { return }
-  let entries = @git.parse_tree(o.data) catch { err => raise err }
+  let entries = @bitcore.parse_tree(o.data) catch { err => raise err }
   for entry in entries {
     let path = dir + "/" + entry.name
     if entry.mode == "40000" || entry.mode == "040000" {

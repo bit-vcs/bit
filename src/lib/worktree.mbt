@@ -13,9 +13,9 @@ pub struct Status {
 ///|
 /// Get status similar to `git status --porcelain` buckets.
 pub async fn status(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   root : String,
-) -> Status raise @git.GitError {
+) -> Status raise @bit.GitError {
   let profile = profile_enabled()
   let mut t0 = profile_start(profile)
   let git_dir = join_path(root, ".git")
@@ -51,11 +51,11 @@ pub async fn status(
           continue
         }
         let abs = join_path(root, path)
-        match @gitio.worktree_entry_meta(fs, abs) {
+        match @bitio.worktree_entry_meta(fs, abs) {
           None => ()
           Some(info) =>
             match info.kind {
-              @gitio.WorktreeKindMeta::Regular => {
+              @bitio.WorktreeKindMeta::Regular => {
                 let mut stat_matches = false
                 let mut size_mismatch = false
                 match info.size {
@@ -84,20 +84,20 @@ pub async fn status(
                 } else if not(stat_matches) {
                   let content = fs.read_file(abs)
                   let normalized = normalize_worktree_content(content, autocrlf)
-                  let id = @git.hash_blob(normalized)
+                  let id = @bit.hash_blob(normalized)
                   if id != entry.id {
                     unstaged_modified.push(path)
                   }
                 } else if racy_git {
                   let content = fs.read_file(abs)
                   let normalized = normalize_worktree_content(content, autocrlf)
-                  let id = @git.hash_blob(normalized)
+                  let id = @bit.hash_blob(normalized)
                   if id != entry.id {
                     unstaged_modified.push(path)
                   }
                 }
               }
-              @gitio.WorktreeKindMeta::Symlink => {
+              @bitio.WorktreeKindMeta::Symlink => {
                 let mode_changed = info.mode != entry.mode
                 let mut stat_matches = false
                 match info.mtime_sec {
@@ -115,9 +115,9 @@ pub async fn status(
                 if mode_changed {
                   unstaged_modified.push(path)
                 } else if not(stat_matches) {
-                  match @gitio.read_symlink_target_path(abs) {
+                  match @bitio.read_symlink_target_path(abs) {
                     Some(target) => {
-                      let id = target |> @utf8.encode |> @git.hash_blob
+                      let id = target |> @utf8.encode |> @bit.hash_blob
                       if id != entry.id {
                         unstaged_modified.push(path)
                       }
@@ -125,9 +125,9 @@ pub async fn status(
                     None => ()
                   }
                 } else if racy_git {
-                  match @gitio.read_symlink_target_path(abs) {
+                  match @bitio.read_symlink_target_path(abs) {
                     Some(target) => {
-                      let id = target |> @utf8.encode |> @git.hash_blob
+                      let id = target |> @utf8.encode |> @bit.hash_blob
                       if id != entry.id {
                         unstaged_modified.push(path)
                       }
@@ -151,7 +151,7 @@ pub async fn status(
           continue
         }
       }
-      if @gitio.worktree_entry_meta(fs, abs) is None {
+      if @bitio.worktree_entry_meta(fs, abs) is None {
         unstaged_deleted.push(path)
       }
     }
@@ -193,9 +193,9 @@ pub async fn status(
 ///|
 /// Format status in porcelain-like lines.
 pub async fn status_porcelain(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   root : String,
-) -> Array[String] raise @git.GitError {
+) -> Array[String] raise @bit.GitError {
   let s = status(fs, root)
   status_porcelain_from(s)
 }
@@ -264,11 +264,11 @@ pub fn status_porcelain_from(s : Status) -> Array[String] {
 ///|
 /// Add files to index (like `git add`).
 pub fn add_paths(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   paths : Array[String],
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   let actual_git_dir = if rfs.is_file(git_dir) {
     resolve_gitdir(rfs, git_dir)
@@ -290,7 +290,7 @@ pub fn add_paths(
       let id = write_loose_object(
         fs,
         actual_git_dir,
-        @git.ObjectType::Blob,
+        @bit.ObjectType::Blob,
         normalized,
       )
       let size = content.length()
@@ -317,11 +317,11 @@ pub fn add_paths(
 ///|
 /// Add files to index with worktree mode detection (native).
 pub async fn add_paths_async(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   paths : Array[String],
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   let actual_git_dir = if rfs.is_file(git_dir) {
     resolve_gitdir(rfs, git_dir)
@@ -338,17 +338,17 @@ pub async fn add_paths_async(
   let all_paths = expand_paths_async(rfs, root, paths)
   for path in all_paths {
     let abs = join_path(root, path)
-    match @gitio.worktree_entry(rfs, abs) {
+    match @bitio.worktree_entry(rfs, abs) {
       None => map.remove(path)
       Some(info) =>
         match info.kind {
-          @gitio.WorktreeKind::Regular => {
+          @bitio.WorktreeKind::Regular => {
             let content = rfs.read_file(abs)
             let normalized = normalize_worktree_content(content, autocrlf)
             let id = write_loose_object(
               fs,
               actual_git_dir,
-              @git.ObjectType::Blob,
+              @bit.ObjectType::Blob,
               normalized,
             )
             let size = content.length()
@@ -364,12 +364,12 @@ pub async fn add_paths_async(
             }
             map[path] = { path, id, mode, size, mtime_sec, mtime_nsec }
           }
-          @gitio.WorktreeKind::Symlink(target~) => {
+          @bitio.WorktreeKind::Symlink(target~) => {
             let bytes = @utf8.encode(target)
             let id = write_loose_object(
               fs,
               actual_git_dir,
-              @git.ObjectType::Blob,
+              @bit.ObjectType::Blob,
               bytes,
             )
             let size = bytes.length()
@@ -396,10 +396,10 @@ pub async fn add_paths_async(
 }
 
 ///|
-/// @git.Commit current index and update HEAD.
+/// @bit.Commit current index and update HEAD.
 pub fn commit(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   message : String,
   author : String,
@@ -407,7 +407,7 @@ pub fn commit(
   committer? : String = author,
   committer_timestamp? : Int64 = author_timestamp,
   allow_empty? : Bool = false,
-) -> @git.ObjectId raise @git.GitError {
+) -> @bit.ObjectId raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   let actual_git_dir = if rfs.is_file(git_dir) {
     resolve_gitdir(rfs, git_dir)
@@ -418,14 +418,14 @@ pub fn commit(
   let entries = read_index_entries(rfs, actual_git_dir)
   let tree_id = if entries.length() == 0 {
     if not(allow_empty) {
-      raise @git.GitError::InvalidObject("Empty index")
+      raise @bit.GitError::InvalidObject("Empty index")
     }
     match parent {
       Some(parent_id) => {
         let db = ObjectDb::load_lazy(rfs, actual_git_dir)
         let parent_tree = match db.get(rfs, parent_id) {
-          Some(obj) if obj.obj_type == @git.ObjectType::Commit =>
-            (@git.parse_commit(obj.data).tree |> Some) catch {
+          Some(obj) if obj.obj_type == @bit.ObjectType::Commit =>
+            (@bit.parse_commit(obj.data).tree |> Some) catch {
               _ => None
             }
           _ => None
@@ -433,7 +433,7 @@ pub fn commit(
         match parent_tree {
           Some(tree) => tree
           None => {
-            let (empty_tree_id, empty_tree_compressed) = @git.create_tree([])
+            let (empty_tree_id, empty_tree_compressed) = @bit.create_tree([])
             write_object_bytes(
               fs, actual_git_dir, empty_tree_id, empty_tree_compressed,
             )
@@ -442,7 +442,7 @@ pub fn commit(
         }
       }
       None => {
-        let (empty_tree_id, empty_tree_compressed) = @git.create_tree([])
+        let (empty_tree_id, empty_tree_compressed) = @bit.create_tree([])
         write_object_bytes(
           fs, actual_git_dir, empty_tree_id, empty_tree_compressed,
         )
@@ -456,11 +456,11 @@ pub fn commit(
     Some(p) => [p]
     None => []
   }
-  let commit = @git.Commit::new(
+  let commit = @bit.Commit::new(
     tree_id, parents, author, author_timestamp, "+0000", committer, committer_timestamp,
     "+0000", message,
   )
-  let (commit_id, compressed) = @git.create_commit(commit)
+  let (commit_id, compressed) = @bit.create_commit(commit)
   write_object_bytes(fs, actual_git_dir, commit_id, compressed)
   update_head_ref(fs, rfs, actual_git_dir, commit_id)
   commit_id
@@ -468,10 +468,10 @@ pub fn commit(
 
 ///|
 fn expand_paths(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   root : String,
   paths : Array[String],
-) -> Array[String] raise @git.GitError {
+) -> Array[String] raise @bit.GitError {
   let result : Array[String] = []
   let all = @ignore.list_working_files(fs, root)
   for p in paths {
@@ -500,10 +500,10 @@ fn expand_paths(
 
 ///|
 async fn expand_paths_async(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   root : String,
   paths : Array[String],
-) -> Array[String] raise @git.GitError {
+) -> Array[String] raise @bit.GitError {
   let result : Array[String] = []
   let all = @ignore.list_working_files_async(fs, root)
   for p in paths {
@@ -531,7 +531,7 @@ async fn expand_paths_async(
 }
 
 ///|
-fn normalize_rel_path(path : String) -> String raise @git.GitError {
+fn normalize_rel_path(path : String) -> String raise @bit.GitError {
   if path == "." {
     return "."
   }
@@ -544,7 +544,7 @@ fn normalize_rel_path(path : String) -> String raise @git.GitError {
     return "."
   }
   normalize_repo_path(normalized) catch {
-    _ => raise @git.GitError::InvalidObject("invalid path: " + path)
+    _ => raise @bit.GitError::InvalidObject("invalid path: " + path)
   }
 }
 
@@ -562,15 +562,15 @@ priv enum AutoCrlf {
 
 ///|
 fn read_autocrlf_setting(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> AutoCrlf {
   let mut value : AutoCrlf? = None
-  match @gitio.env_get("HOME") {
+  match @bitio.env_get("HOME") {
     None => ()
     Some(home) => {
       let candidates : Array[String] = []
-      if @gitio.env_get("XDG_CONFIG_HOME") is Some(base) {
+      if @bitio.env_get("XDG_CONFIG_HOME") is Some(base) {
         candidates.push(base + "/git/config")
       }
       candidates.push(home + "/.gitconfig")
@@ -597,7 +597,7 @@ fn read_autocrlf_setting(
 
 ///|
 fn read_autocrlf_from_config(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   path : String,
 ) -> AutoCrlf? {
   let bytes = fs.read_file(path) catch { _ => return None }
@@ -666,7 +666,7 @@ fn parse_autocrlf_value(value : String) -> AutoCrlf {
 
 ///|
 fn read_core_filemode_setting(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> Bool {
   let local_path = join_path(git_dir, "config")
@@ -681,7 +681,7 @@ fn read_core_filemode_setting(
 
 ///|
 fn read_core_filemode_from_config(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   path : String,
 ) -> Bool? {
   let bytes = fs.read_file(path) catch { _ => return None }
@@ -746,7 +746,7 @@ fn read_core_filemode_from_config(
 
 ///|
 fn racy_git_enabled() -> Bool {
-  match @gitio.env_get("BIT_RACY_GIT") {
+  match @bitio.env_get("BIT_RACY_GIT") {
     Some(v) => v != "" && v != "0"
     None => false
   }
@@ -801,23 +801,23 @@ fn normalize_crlf_to_lf(content : Bytes) -> Bytes {
 
 ///|
 pub fn write_loose_object(
-  fs : &@git.FileSystem,
+  fs : &@bit.FileSystem,
   git_dir : String,
-  obj_type : @git.ObjectType,
+  obj_type : @bit.ObjectType,
   content : Bytes,
-) -> @git.ObjectId raise @git.GitError {
-  let (id, compressed) = @git.create_object(obj_type, content)
+) -> @bit.ObjectId raise @bit.GitError {
+  let (id, compressed) = @bit.create_object(obj_type, content)
   write_object_bytes(fs, git_dir, id, compressed)
   id
 }
 
 ///|
 pub fn write_object_bytes(
-  fs : &@git.FileSystem,
+  fs : &@bit.FileSystem,
   git_dir : String,
-  id : @git.ObjectId,
+  id : @bit.ObjectId,
   compressed : Bytes,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let hex = id.to_hex()
   let path = join_path(
     git_dir,
@@ -833,9 +833,9 @@ pub fn write_object_bytes(
   fs.mkdir_p(dir)
   fs.write_file(path, compressed) catch {
     // Loose objects may already exist as read-only files.
-    @git.GitError::IoError(msg) if msg.contains("Permission denied") => {
+    @bit.GitError::IoError(msg) if msg.contains("Permission denied") => {
       fs.remove_file(path) catch {
-        _ => raise @git.GitError::IoError(msg)
+        _ => raise @bit.GitError::IoError(msg)
       }
       fs.write_file(path, compressed)
     }
@@ -845,9 +845,9 @@ pub fn write_object_bytes(
 
 ///|
 pub fn resolve_head_commit(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
-) -> @git.ObjectId? raise @git.GitError {
+) -> @bit.ObjectId? raise @bit.GitError {
   match read_head_ref(fs, git_dir) {
     Branch(name) => resolve_ref(fs, git_dir, "refs/heads/" + name)
     Detached(id) => Some(id)
@@ -856,11 +856,11 @@ pub fn resolve_head_commit(
 
 ///|
 pub fn update_head_ref(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
-  commit_id : @git.ObjectId,
-) -> Unit raise @git.GitError {
+  commit_id : @bit.ObjectId,
+) -> Unit raise @bit.GitError {
   let head_path = join_path(git_dir, "HEAD")
   let head = read_head_ref(rfs, git_dir) catch {
     _ => HeadRef::Detached(commit_id)
@@ -878,13 +878,13 @@ pub fn update_head_ref(
 
 ///|
 pub fn write_tree_from_index(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   entries : Array[IndexEntry],
   prefix? : String? = None,
   missing_ok? : Bool = false,
-) -> @git.ObjectId raise @git.GitError {
+) -> @bit.ObjectId raise @bit.GitError {
   // If prefix is specified, filter entries and strip prefix from paths
   let rel_entries = match prefix {
     Some(p) => {
@@ -933,13 +933,13 @@ pub fn write_tree_from_index(
 
 ///|
 fn write_tree_from_entries(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   entries : Array[IndexEntry],
   object_db : ObjectDb?,
-) -> @git.ObjectId raise @git.GitError {
-  let file_entries : Array[@git.TreeEntry] = []
+) -> @bit.ObjectId raise @bit.GitError {
+  let file_entries : Array[@bit.TreeEntry] = []
   let dir_map : Map[String, Array[IndexEntry]] = {}
   for e in entries {
     if worktree_is_zero_object_id(e.id) {
@@ -949,7 +949,7 @@ fn write_tree_from_entries(
       Some(db) =>
         match db.get(rfs, e.id) {
           None =>
-            raise @git.GitError::InvalidObject(
+            raise @bit.GitError::InvalidObject(
               "Object not found: " + e.id.to_hex(),
             )
           Some(_) => ()
@@ -959,7 +959,7 @@ fn write_tree_from_entries(
     match split_first(e.path) {
       (name, None) => {
         let mode = mode_to_string(e.mode)
-        file_entries.push(@git.TreeEntry::new(mode, name, e.id))
+        file_entries.push(@bit.TreeEntry::new(mode, name, e.id))
       }
       (name, Some(rest)) =>
         match dir_map.get(name) {
@@ -989,7 +989,7 @@ fn write_tree_from_entries(
   for item in dir_map.to_array() {
     let (dir_name, list) = item
     let sub_id = write_tree_from_entries(fs, rfs, git_dir, list, object_db)
-    file_entries.push(@git.TreeEntry::new("40000", dir_name, sub_id))
+    file_entries.push(@bit.TreeEntry::new("40000", dir_name, sub_id))
   }
   // Git sorts tree entries by name, with directories having "/" appended for comparison
   file_entries.sort_by(fn(a, b) {
@@ -997,13 +997,13 @@ fn write_tree_from_entries(
     let b_key = if b.mode == "40000" { b.name + "/" } else { b.name }
     compare_strings_lexicographic(a_key, b_key)
   })
-  let (tree_id, compressed) = @git.create_tree(file_entries)
+  let (tree_id, compressed) = @bit.create_tree(file_entries)
   write_object_bytes(fs, git_dir, tree_id, compressed)
   tree_id
 }
 
 ///|
-fn worktree_is_zero_object_id(id : @git.ObjectId) -> Bool {
+fn worktree_is_zero_object_id(id : @bit.ObjectId) -> Bool {
   for b in id.bytes {
     if b != b'\x00' {
       return false
@@ -1107,7 +1107,7 @@ fn trim_worktree_text(s : String) -> String {
 
 ///|
 fn resolve_worktree_common_git_dir(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> String {
   let commondir_path = join_path(git_dir, "commondir")
@@ -1130,13 +1130,13 @@ fn resolve_worktree_common_git_dir(
 
 ///|
 fn collect_staged_changes_from_head(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
   index_map : Map[String, IndexEntry],
   skip_worktree_paths : Map[String, Bool],
   staged_modified : Array[String],
   staged_deleted : Array[String],
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let head = resolve_head_commit(fs, git_dir)
   match head {
     None => return
@@ -1147,10 +1147,10 @@ fn collect_staged_changes_from_head(
       match commit_obj {
         None => return
         Some(obj) => {
-          if obj.obj_type != @git.ObjectType::Commit {
-            raise @git.GitError::InvalidObject("Object is not a commit")
+          if obj.obj_type != @bit.ObjectType::Commit {
+            raise @bit.GitError::InvalidObject("Object is not a commit")
           }
-          let info = @git.parse_commit(obj.data)
+          let info = @bit.parse_commit(obj.data)
           collect_staged_changes_db(
             db,
             fs,
@@ -1170,22 +1170,22 @@ fn collect_staged_changes_from_head(
 ///|
 fn collect_staged_changes_db(
   db : ObjectDb,
-  fs : &@git.RepoFileSystem,
-  tree_id : @git.ObjectId,
+  fs : &@bit.RepoFileSystem,
+  tree_id : @bit.ObjectId,
   prefix : String,
   index_map : Map[String, IndexEntry],
   skip_worktree_paths : Map[String, Bool],
   staged_modified : Array[String],
   staged_deleted : Array[String],
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let tree_obj = db.get(fs, tree_id)
   match tree_obj {
-    None => raise @git.GitError::InvalidObject("Missing tree object")
+    None => raise @bit.GitError::InvalidObject("Missing tree object")
     Some(obj) => {
-      if obj.obj_type != @git.ObjectType::Tree {
-        raise @git.GitError::InvalidObject("Object is not a tree")
+      if obj.obj_type != @bit.ObjectType::Tree {
+        raise @bit.GitError::InvalidObject("Object is not a tree")
       }
-      let entries = @git.parse_tree(obj.data)
+      let entries = @bit.parse_tree(obj.data)
       for entry in entries {
         let path = if prefix.length() == 0 {
           entry.name
@@ -1238,15 +1238,15 @@ fn worktree_parse_octal(s : String) -> Int {
 ///|
 /// Commit with amend (replace the last commit).
 pub fn commit_amend(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   message : String,
   author : String,
   author_timestamp : Int64,
   committer? : String = author,
   committer_timestamp? : Int64 = author_timestamp,
-) -> @git.ObjectId raise @git.GitError {
+) -> @bit.ObjectId raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   let actual_git_dir = if rfs.is_file(git_dir) {
     resolve_gitdir(rfs, git_dir)
@@ -1255,7 +1255,7 @@ pub fn commit_amend(
   }
   let entries = read_index_entries(rfs, actual_git_dir)
   if entries.length() == 0 {
-    raise @git.GitError::InvalidObject("Empty index")
+    raise @bit.GitError::InvalidObject("Empty index")
   }
   let tree_id = write_tree_from_index(fs, rfs, actual_git_dir, entries)
   // Get the parent of the current HEAD (grandparent of new commit)
@@ -1267,7 +1267,7 @@ pub fn commit_amend(
       let obj = db.get(rfs, head_id)
       match obj {
         Some(o) => {
-          let info = @git.parse_commit(o.data)
+          let info = @bit.parse_commit(o.data)
           info.parents
         }
         None => []
@@ -1275,11 +1275,11 @@ pub fn commit_amend(
     }
     None => []
   }
-  let commit = @git.Commit::new(
+  let commit = @bit.Commit::new(
     tree_id, parents, author, author_timestamp, "+0000", committer, committer_timestamp,
     "+0000", message,
   )
-  let (commit_id, compressed) = @git.create_commit(commit)
+  let (commit_id, compressed) = @bit.create_commit(commit)
   write_object_bytes(fs, actual_git_dir, commit_id, compressed)
   update_head_ref(fs, rfs, actual_git_dir, commit_id)
   commit_id
@@ -1288,14 +1288,14 @@ pub fn commit_amend(
 ///|
 /// Remove files from index (and optionally working tree).
 pub fn rm_paths(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   paths : Array[String],
   cached? : Bool = false,
   force? : Bool = false,
   recursive? : Bool = false,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   let actual_git_dir = if rfs.is_file(git_dir) {
     resolve_gitdir(rfs, git_dir)
@@ -1336,11 +1336,11 @@ pub fn rm_paths(
 
 ///|
 fn expand_rm_paths(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   paths : Array[String],
   index_map : Map[String, IndexEntry],
-) -> Array[String] raise @git.GitError {
+) -> Array[String] raise @bit.GitError {
   let result : Array[String] = []
   for p in paths {
     let norm_path = normalize_rel_path(p)
@@ -1375,13 +1375,13 @@ fn expand_rm_paths(
 ///|
 /// Move/rename a file in the index and working tree.
 pub fn mv_path(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   source : String,
   dest : String,
   force? : Bool = false,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   let actual_git_dir = if rfs.is_file(git_dir) {
     resolve_gitdir(rfs, git_dir)
@@ -1394,11 +1394,11 @@ pub fn mv_path(
   let dst_abs = join_path(root, dst_norm)
   // Check source exists
   if not(rfs.is_file(src_abs)) {
-    raise @git.GitError::InvalidObject("source '\{source}' does not exist")
+    raise @bit.GitError::InvalidObject("source '\{source}' does not exist")
   }
   // Check dest doesn't exist (unless force)
   if rfs.is_file(dst_abs) && not(force) {
-    raise @git.GitError::InvalidObject("destination '\{dest}' already exists")
+    raise @bit.GitError::InvalidObject("destination '\{dest}' already exists")
   }
   // Read index
   let entries = read_index_entries(rfs, actual_git_dir)
@@ -1408,7 +1408,7 @@ pub fn mv_path(
   }
   // Find source entry
   guard map.get(src_norm) is Some(src_entry) else {
-    raise @git.GitError::InvalidObject("'\{source}' not in index")
+    raise @bit.GitError::InvalidObject("'\{source}' not in index")
   }
   // Remove source, add dest
   map.remove(src_norm)

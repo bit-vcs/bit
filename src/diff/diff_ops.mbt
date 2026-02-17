@@ -20,17 +20,17 @@ pub struct DiffFile {
 ///|
 /// Diff working tree against index (default `git diff`).
 pub async fn diff_worktree(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   root : String,
-) -> Array[DiffFile] raise @git.GitError {
+) -> Array[DiffFile] raise @bit.GitError {
   let profile = profile_enabled()
   let mut t0 = profile_start(profile)
-  let git_dir = @git.join_path(root, ".git")
+  let git_dir = @bit.join_path(root, ".git")
   let autocrlf = read_autocrlf_setting(fs, git_dir)
-  let index_entries = @gitlib.read_index_entries(fs, git_dir)
-  let skip_worktree_paths = @gitlib.read_skip_worktree_paths(fs, git_dir)
+  let index_entries = @bitlib.read_index_entries(fs, git_dir)
+  let skip_worktree_paths = @bitlib.read_skip_worktree_paths(fs, git_dir)
   t0 = profile_lap(profile, "diff_worktree read_index_entries", t0)
-  let db = @gitlib.ObjectDb::load_lazy(fs, git_dir)
+  let db = @bitlib.ObjectDb::load_lazy(fs, git_dir)
   t0 = profile_lap(profile, "diff_worktree load_db", t0)
   let cached_files = @ignore.working_files_cache(root)
   let cache_map : Map[String, Bool] = {}
@@ -71,8 +71,8 @@ pub async fn diff_worktree(
         continue
       }
     }
-    let abs = @git.join_path(root, path)
-    match @gitio.worktree_entry_meta(fs, abs) {
+    let abs = @bit.join_path(root, path)
+    match @bitio.worktree_entry_meta(fs, abs) {
       None => {
         let old = diff_read_blob(db, fs, entry.id)
         // Skip if blob not found (e.g., submodule)
@@ -93,7 +93,7 @@ pub async fn diff_worktree(
         let mut old_content : Bytes? = None
         let mut new_content : Bytes? = None
         match info.kind {
-          @gitio.WorktreeKindMeta::Regular => {
+          @bitio.WorktreeKindMeta::Regular => {
             let mut stat_matches = false
             match info.size {
               Some(sz) =>
@@ -117,7 +117,7 @@ pub async fn diff_worktree(
             } else {
               let content = fs.read_file(abs)
               let normalized = normalize_worktree_content(content, autocrlf)
-              let id = @git.hash_blob(normalized)
+              let id = @bit.hash_blob(normalized)
               content_changed = id != entry.id
               if content_changed {
                 let old = diff_read_blob(db, fs, entry.id)
@@ -126,7 +126,7 @@ pub async fn diff_worktree(
               }
             }
           }
-          @gitio.WorktreeKindMeta::Symlink => {
+          @bitio.WorktreeKindMeta::Symlink => {
             let mut stat_matches = false
             match info.mtime_sec {
               Some(ms) =>
@@ -143,10 +143,10 @@ pub async fn diff_worktree(
             if not(mode_changed) && stat_matches {
               content_changed = false
             } else {
-              match @gitio.read_symlink_target_path(abs) {
+              match @bitio.read_symlink_target_path(abs) {
                 Some(target) => {
                   let bytes = @utf8.encode(target)
-                  let id = @git.hash_blob(bytes)
+                  let id = @bit.hash_blob(bytes)
                   content_changed = id != entry.id
                   if content_changed {
                     let old = diff_read_blob(db, fs, entry.id)
@@ -194,17 +194,17 @@ pub async fn diff_worktree(
 ///|
 /// Diff index against HEAD (`git diff --cached`).
 pub fn diff_index(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   root : String,
-) -> Array[DiffFile] raise @git.GitError {
-  let git_dir = @git.join_path(root, ".git")
-  let index_entries = @gitlib.read_index_entries(fs, git_dir)
-  let index_map : Map[String, @gitlib.IndexEntry] = {}
+) -> Array[DiffFile] raise @bit.GitError {
+  let git_dir = @bit.join_path(root, ".git")
+  let index_entries = @bitlib.read_index_entries(fs, git_dir)
+  let index_map : Map[String, @bitlib.IndexEntry] = {}
   for e in index_entries {
     index_map[e.path] = e
   }
   let head_entries = diff_read_head_entries(fs, git_dir)
-  let db = @gitlib.ObjectDb::load_lazy(fs, git_dir)
+  let db = @bitlib.ObjectDb::load_lazy(fs, git_dir)
   let out : Array[DiffFile] = []
   for item in index_map.to_array() {
     let (path, entry) = item
@@ -305,12 +305,12 @@ pub fn diff_text(files : Array[DiffFile]) -> Array[String] {
 
 ///|
 fn diff_blob_short_id(data : Bytes) -> String {
-  let hex = @git.hash_blob(data).to_hex()
+  let hex = @bit.hash_blob(data).to_hex()
   String::unsafe_substring(hex, start=0, end=7)
 }
 
 ///|
-fn diff_is_zero_oid(id : @git.ObjectId) -> Bool {
+fn diff_is_zero_oid(id : @bit.ObjectId) -> Bool {
   for b in id.bytes {
     if b != b'\x00' {
       return false
@@ -491,15 +491,15 @@ fn count_lines(data : Bytes) -> Int {
 
 ///|
 fn diff_read_blob(
-  db : @gitlib.ObjectDb,
-  fs : &@git.RepoFileSystem,
-  id : @git.ObjectId,
-) -> Bytes? raise @git.GitError {
+  db : @bitlib.ObjectDb,
+  fs : &@bit.RepoFileSystem,
+  id : @bit.ObjectId,
+) -> Bytes? raise @bit.GitError {
   let obj = db.get(fs, id)
   match obj {
     None => None // Object might be in a submodule or unavailable
     Some(o) =>
-      if o.obj_type != @git.ObjectType::Blob {
+      if o.obj_type != @bit.ObjectType::Blob {
         None // Submodule entries point to commits, not blobs
       } else {
         Some(o.data)
@@ -509,29 +509,29 @@ fn diff_read_blob(
 
 ///|
 priv struct DiffHeadEntry {
-  id : @git.ObjectId
+  id : @bit.ObjectId
   mode : Int
 }
 
 ///|
 fn diff_read_head_entries(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
-) -> Map[String, DiffHeadEntry] raise @git.GitError {
+) -> Map[String, DiffHeadEntry] raise @bit.GitError {
   let result : Map[String, DiffHeadEntry] = {}
-  let head = @gitlib.resolve_head_commit(fs, git_dir)
+  let head = @bitlib.resolve_head_commit(fs, git_dir)
   match head {
     None => return result
     Some(commit_id) => {
-      let db = @gitlib.ObjectDb::load(fs, git_dir)
+      let db = @bitlib.ObjectDb::load(fs, git_dir)
       let commit_obj = db.get(fs, commit_id)
       match commit_obj {
         None => return result
         Some(obj) => {
-          if obj.obj_type != @git.ObjectType::Commit {
-            raise @git.GitError::InvalidObject("Object is not a commit")
+          if obj.obj_type != @bit.ObjectType::Commit {
+            raise @bit.GitError::InvalidObject("Object is not a commit")
           }
-          let info = @git.parse_commit(obj.data)
+          let info = @bit.parse_commit(obj.data)
           diff_collect_tree(db, fs, info.tree, "", result)
         }
       }
@@ -542,20 +542,20 @@ fn diff_read_head_entries(
 
 ///|
 fn diff_collect_tree(
-  db : @gitlib.ObjectDb,
-  fs : &@git.RepoFileSystem,
-  tree_id : @git.ObjectId,
+  db : @bitlib.ObjectDb,
+  fs : &@bit.RepoFileSystem,
+  tree_id : @bit.ObjectId,
   prefix : String,
   out : Map[String, DiffHeadEntry],
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let tree_obj = db.get(fs, tree_id)
   match tree_obj {
-    None => raise @git.GitError::InvalidObject("Missing tree object")
+    None => raise @bit.GitError::InvalidObject("Missing tree object")
     Some(obj) => {
-      if obj.obj_type != @git.ObjectType::Tree {
-        raise @git.GitError::InvalidObject("Object is not a tree")
+      if obj.obj_type != @bit.ObjectType::Tree {
+        raise @bit.GitError::InvalidObject("Object is not a tree")
       }
-      let entries = @git.parse_tree(obj.data)
+      let entries = @bit.parse_tree(obj.data)
       for entry in entries {
         let path = if prefix.length() == 0 {
           entry.name
@@ -580,12 +580,12 @@ fn diff_is_tree_mode(mode : String) -> Bool {
 ///|
 /// Diff two trees by their ObjectIds. Returns DiffFile array.
 pub fn diff_trees(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
-  old_tree : @git.ObjectId?,
-  new_tree : @git.ObjectId,
-) -> Array[DiffFile] raise @git.GitError {
-  let db = @gitlib.ObjectDb::load(fs, git_dir)
+  old_tree : @bit.ObjectId?,
+  new_tree : @bit.ObjectId,
+) -> Array[DiffFile] raise @bit.GitError {
+  let db = @bitlib.ObjectDb::load(fs, git_dir)
   let out : Array[DiffFile] = []
   let old_entries : Map[String, DiffHeadEntry] = {}
   let new_entries : Map[String, DiffHeadEntry] = {}
@@ -705,15 +705,15 @@ priv enum AutoCrlf {
 
 ///|
 fn read_autocrlf_setting(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> AutoCrlf {
   let mut value : AutoCrlf? = None
-  match @gitio.env_get("HOME") {
+  match @bitio.env_get("HOME") {
     None => ()
     Some(home) => {
       let candidates : Array[String] = []
-      if @gitio.env_get("XDG_CONFIG_HOME") is Some(base) {
+      if @bitio.env_get("XDG_CONFIG_HOME") is Some(base) {
         candidates.push(base + "/git/config")
       }
       candidates.push(home + "/.gitconfig")
@@ -725,7 +725,7 @@ fn read_autocrlf_setting(
       }
     }
   }
-  let local_path = @git.join_path(git_dir, "config")
+  let local_path = @bit.join_path(git_dir, "config")
   if fs.is_file(local_path) {
     match read_autocrlf_from_config(fs, local_path) {
       Some(v) => value = Some(v)
@@ -740,7 +740,7 @@ fn read_autocrlf_setting(
 
 ///|
 fn read_autocrlf_from_config(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   path : String,
 ) -> AutoCrlf? {
   let bytes = fs.read_file(path) catch { _ => return None }
@@ -856,7 +856,7 @@ fn normalize_crlf_to_lf(content : Bytes) -> Bytes {
 
 ///|
 fn profile_enabled() -> Bool {
-  match @gitio.env_get("BIT_PROFILE") {
+  match @bitio.env_get("BIT_PROFILE") {
     Some(v) => v != "" && v != "0"
     None => false
   }

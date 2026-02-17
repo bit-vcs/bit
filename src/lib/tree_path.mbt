@@ -30,7 +30,7 @@ fn normalize_repo_path_internal(path : String) -> String {
 }
 
 ///|
-pub fn normalize_repo_path(path : String) -> String raise @git.GitError {
+pub fn normalize_repo_path(path : String) -> String raise @bit.GitError {
   let normalized = normalize_repo_path_internal(path)
   let stripped = if normalized.has_prefix("/") && normalized.length() > 1 {
     (try! normalized[1:]).to_string()
@@ -38,10 +38,10 @@ pub fn normalize_repo_path(path : String) -> String raise @git.GitError {
     normalized
   }
   if stripped == "." || stripped == "/" || stripped.length() == 0 {
-    raise @git.GitError::InvalidObject("path required")
+    raise @bit.GitError::InvalidObject("path required")
   }
   if stripped == ".." || stripped.has_prefix("../") {
-    raise @git.GitError::InvalidObject(
+    raise @bit.GitError::InvalidObject(
       "path must not traverse outside repository",
     )
   }
@@ -56,10 +56,10 @@ fn split_path_parts(path : String) -> Array[String] {
 ///|
 pub fn find_tree_entry(
   db : ObjectDb,
-  fs : &@git.RepoFileSystem,
-  tree_id : @git.ObjectId,
+  fs : &@bit.RepoFileSystem,
+  tree_id : @bit.ObjectId,
   path : String,
-) -> @git.TreeEntry? raise @git.GitError {
+) -> @bit.TreeEntry? raise @bit.GitError {
   let parts = split_path_parts(path)
   if parts.length() == 0 {
     return None
@@ -69,8 +69,8 @@ pub fn find_tree_entry(
     let name = parts[i]
     let obj = db.get(fs, current)
     guard obj is Some(o) else { return None }
-    let entries = @git.parse_tree(o.data)
-    let mut found : @git.TreeEntry? = None
+    let entries = @bit.parse_tree(o.data)
+    let mut found : @bit.TreeEntry? = None
     for entry in entries {
       if entry.name == name {
         found = Some(entry)

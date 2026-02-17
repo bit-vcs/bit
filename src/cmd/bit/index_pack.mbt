@@ -195,7 +195,7 @@ fn pack_write_reverse_index_enabled(git_dir : String) -> Bool {
       }
     None => ()
   }
-  match git_config_get(git_dir, "pack", "writeReverseIndex") {
+  match bit_config_get(git_dir, "pack", "writeReverseIndex") {
     Some(value) =>
       match parse_bool_value(value) {
         Some(flag) => return flag
@@ -211,7 +211,7 @@ fn write_keep_file(
   fs : OsFs,
   path : String,
   msg : String?,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bitcore.GitError {
   match msg {
     None => ()
     Some(text) => {
@@ -223,22 +223,22 @@ fn write_keep_file(
 
 ///|
 fn check_sha1_collisions_with_repo(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
-  objects : Array[@git.PackObject],
-) -> Unit raise @git.GitError {
-  let db = @gitlib.ObjectDb::load(fs, git_dir)
+  objects : Array[@bitcore.PackObject],
+) -> Unit raise @bitcore.GitError {
+  let db = @bitlib.ObjectDb::load(fs, git_dir)
   for obj in objects {
     let existing = db.get(fs, obj.id) catch {
-      @git.GitError::HashMismatch(_, _) =>
-        raise @git.GitError::PackfileError("SHA1 COLLISION FOUND")
+      @bitcore.GitError::HashMismatch(_, _) =>
+        raise @bitcore.GitError::PackfileError("SHA1 COLLISION FOUND")
       err => raise err
     }
     match existing {
       Some(base) =>
         if base.obj_type != obj.obj_type ||
           not(Bytes::equal(base.data, obj.data)) {
-          raise @git.GitError::PackfileError("SHA1 COLLISION FOUND")
+          raise @bitcore.GitError::PackfileError("SHA1 COLLISION FOUND")
         }
       None => ()
     }
@@ -266,7 +266,7 @@ fn commit_has_missing_email(content : Bytes) -> Bool {
 }
 
 ///|
-fn parse_tag_object_id(data : Bytes) -> @git.ObjectId? raise @git.GitError {
+fn parse_tag_object_id(data : Bytes) -> @bitcore.ObjectId? raise @bitcore.GitError {
   let text = @utf8.decode_lossy(data[:])
   let mut object_hex : String? = None
   for line_view in text.split("\n") {
@@ -282,30 +282,30 @@ fn parse_tag_object_id(data : Bytes) -> @git.ObjectId? raise @git.GitError {
   }
   match object_hex {
     None => None
-    Some(hex) => hex |> @git.ObjectId::from_hex |> Some
+    Some(hex) => hex |> @bitcore.ObjectId::from_hex |> Some
   }
 }
 
 ///|
 fn ensure_object_exists(
-  fs : &@git.RepoFileSystem,
-  db : @gitlib.ObjectDb?,
+  fs : &@bitcore.RepoFileSystem,
+  db : @bitlib.ObjectDb?,
   pack_ids : Map[String, Bool],
   repo_cache : Map[String, Bool],
-  id : @git.ObjectId,
-) -> Unit raise @git.GitError {
+  id : @bitcore.ObjectId,
+) -> Unit raise @bitcore.GitError {
   let hex = id.to_hex()
   if pack_ids.contains(hex) {
     return
   }
   match db {
-    None => raise @git.GitError::PackfileError("missing object " + hex)
+    None => raise @bitcore.GitError::PackfileError("missing object " + hex)
     Some(objdb) => {
       if repo_cache.contains(hex) {
         if repo_cache[hex] {
           return
         }
-        raise @git.GitError::PackfileError("missing object " + hex)
+        raise @bitcore.GitError::PackfileError("missing object " + hex)
       }
       let exists = match objdb.get(fs, id) {
         Some(_) => true
@@ -313,7 +313,7 @@ fn ensure_object_exists(
       }
       repo_cache[hex] = exists
       if !exists {
-        raise @git.GitError::PackfileError("missing object " + hex)
+        raise @bitcore.GitError::PackfileError("missing object " + hex)
       }
     }
   }
@@ -321,13 +321,13 @@ fn ensure_object_exists(
 
 ///|
 fn check_pack_strict_and_fsck(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String?,
-  objects : Array[@git.PackObject],
+  objects : Array[@bitcore.PackObject],
   strict : Bool,
   fsck_objects : Bool,
   ignore_missing_email : Bool,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bitcore.GitError {
   if !strict && !fsck_objects {
     return
   }
@@ -338,7 +338,7 @@ fn check_pack_strict_and_fsck(
   let db = match git_dir {
     Some(dir) =>
       if fs.is_dir(dir) {
-        Some(@gitlib.ObjectDb::load(fs, dir))
+        Some(@bitlib.ObjectDb::load(fs, dir))
       } else {
         None
       }
@@ -348,29 +348,29 @@ fn check_pack_strict_and_fsck(
   for obj in objects {
     if (strict || fsck_objects) &&
       !ignore_missing_email &&
-      obj.obj_type == @git.ObjectType::Commit {
+      obj.obj_type == @bitcore.ObjectType::Commit {
       if commit_has_missing_email(obj.data) {
-        raise @git.GitError::InvalidObject("missingEmail")
+        raise @bitcore.GitError::InvalidObject("missingEmail")
       }
     }
     if strict {
       match obj.obj_type {
-        @git.ObjectType::Commit => {
-          let info = @git.parse_commit(obj.data)
+        @bitcore.ObjectType::Commit => {
+          let info = @bitcore.parse_commit(obj.data)
           ensure_object_exists(fs, db, pack_ids, repo_cache, info.tree)
           for parent in info.parents {
             ensure_object_exists(fs, db, pack_ids, repo_cache, parent)
           }
         }
-        @git.ObjectType::Tree => {
-          let entries = @git.parse_tree(obj.data)
+        @bitcore.ObjectType::Tree => {
+          let entries = @bitcore.parse_tree(obj.data)
           for entry in entries {
             ensure_object_exists(fs, db, pack_ids, repo_cache, entry.id)
           }
         }
-        @git.ObjectType::Tag =>
+        @bitcore.ObjectType::Tag =>
           match parse_tag_object_id(obj.data) {
-            None => raise @git.GitError::InvalidObject("invalid tag object")
+            None => raise @bitcore.GitError::InvalidObject("invalid tag object")
             Some(target) =>
               ensure_object_exists(fs, db, pack_ids, repo_cache, target)
           }
@@ -408,7 +408,7 @@ fn verify_pack_index(idx : Bytes, pack : Bytes) -> String? {
   }
   let idx_data_len = idx.length() - 20
   let idx_data = Bytes::from_array(FixedArray::makei(idx_data_len, i => idx[i]))
-  let computed_idx_checksum = @git.sha1(idx_data)
+  let computed_idx_checksum = @bitcore.sha1(idx_data)
   let stored_idx_checksum = read_sha1_at(idx, idx_data_len)
   if computed_idx_checksum != stored_idx_checksum {
     return Some("incorrect index checksum")
@@ -451,7 +451,7 @@ fn verify_pack_index(idx : Bytes, pack : Bytes) -> String? {
   let pack_data = Bytes::from_array(
     FixedArray::makei(pack_data_len, i => pack[i]),
   )
-  let computed_pack_checksum = @git.sha1(pack_data)
+  let computed_pack_checksum = @bitcore.sha1(pack_data)
   if computed_pack_checksum != stored_pack_checksum {
     return Some("pack checksum mismatch")
   }
@@ -557,7 +557,7 @@ fn verify_pack_index_v1(idx : Bytes, pack : Bytes) -> String? {
   let pack_data = Bytes::from_array(
     FixedArray::makei(pack_data_len, i => pack[i]),
   )
-  let computed_pack_checksum = @git.sha1(pack_data)
+  let computed_pack_checksum = @bitcore.sha1(pack_data)
   if computed_pack_checksum != stored_pack_checksum {
     return Some("pack checksum mismatch")
   }
@@ -613,12 +613,12 @@ fn read_u64_be(data : Bytes, offset : Int) -> Int64 {
 }
 
 ///|
-fn read_sha1_at(data : Bytes, offset : Int) -> @git.ObjectId {
+fn read_sha1_at(data : Bytes, offset : Int) -> @bitcore.ObjectId {
   let bytes : FixedArray[Byte] = FixedArray::make(20, b'\x00')
   for i in 0..<20 {
     bytes[i] = data[offset + i]
   }
-  @git.ObjectId::new(bytes)
+  @bitcore.ObjectId::new(bytes)
 }
 
 ///|
@@ -747,7 +747,7 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
           @sys.exit(1)
         }
         let bases = if cfg.fix_thin {
-          @gitlib.load_all_objects_from_fs(fs, git_dir) catch {
+          @bitlib.load_all_objects_from_fs(fs, git_dir) catch {
             err if @async.is_cancellation_error(err) => raise err
             _ => []
           }
@@ -812,13 +812,13 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
           }
       }
       let objects = @pack.parse_packfile(pack)
-      let git_dir_opt = if fs.is_dir(git_dir) { Some(git_dir) } else { None }
-      if git_dir_opt is Some(dir) {
+      let bit_dir_opt = if fs.is_dir(git_dir) { Some(git_dir) } else { None }
+      if bit_dir_opt is Some(dir) {
         check_sha1_collisions_with_repo(fs, dir, objects)
       }
       check_pack_strict_and_fsck(
         fs,
-        git_dir_opt,
+        bit_dir_opt,
         objects,
         cfg.strict,
         cfg.fsck_objects,

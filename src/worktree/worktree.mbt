@@ -2,57 +2,57 @@
 
 ///|
 pub async fn status(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   root : String,
-) -> @gitlib.Status raise @git.GitError {
-  @gitlib.status(fs, root)
+) -> @bitlib.Status raise @bit.GitError {
+  @bitlib.status(fs, root)
 }
 
 ///|
 pub async fn status_porcelain(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   root : String,
-) -> Array[String] raise @git.GitError {
-  @gitlib.status_porcelain(fs, root)
+) -> Array[String] raise @bit.GitError {
+  @bitlib.status_porcelain(fs, root)
 }
 
 ///|
-pub fn status_porcelain_from(s : @gitlib.Status) -> Array[String] {
-  @gitlib.status_porcelain_from(s)
+pub fn status_porcelain_from(s : @bitlib.Status) -> Array[String] {
+  @bitlib.status_porcelain_from(s)
 }
 
 ///|
 pub async fn status_text(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   root : String,
-) -> String raise @git.GitError {
-  @gitlib.status_text(fs, root)
+) -> String raise @bit.GitError {
+  @bitlib.status_text(fs, root)
 }
 
 ///|
 pub fn add_paths(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   paths : Array[String],
-) -> Unit raise @git.GitError {
-  @gitlib.add_paths(fs, rfs, root, paths)
+) -> Unit raise @bit.GitError {
+  @bitlib.add_paths(fs, rfs, root, paths)
 }
 
 ///|
 pub async fn add_paths_async(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   paths : Array[String],
-) -> Unit raise @git.GitError {
-  @gitlib.add_paths_async(fs, rfs, root, paths)
+) -> Unit raise @bit.GitError {
+  @bitlib.add_paths_async(fs, rfs, root, paths)
 }
 
 ///|
 pub fn commit(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   message : String,
   author : String,
@@ -60,8 +60,8 @@ pub fn commit(
   committer? : String = author,
   committer_timestamp? : Int64 = author_timestamp,
   allow_empty? : Bool = false,
-) -> @git.ObjectId raise @git.GitError {
-  @gitlib.commit(
+) -> @bit.ObjectId raise @bit.GitError {
+  @bitlib.commit(
     fs,
     rfs,
     root,
@@ -76,16 +76,16 @@ pub fn commit(
 
 ///|
 pub fn commit_amend(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   message : String,
   author : String,
   author_timestamp : Int64,
   committer? : String = author,
   committer_timestamp? : Int64 = author_timestamp,
-) -> @git.ObjectId raise @git.GitError {
-  @gitlib.commit_amend(
+) -> @bit.ObjectId raise @bit.GitError {
+  @bitlib.commit_amend(
     fs,
     rfs,
     root,
@@ -99,74 +99,74 @@ pub fn commit_amend(
 
 ///|
 pub fn rm_paths(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   paths : Array[String],
   cached? : Bool = false,
   force? : Bool = false,
   recursive? : Bool = false,
-) -> Unit raise @git.GitError {
-  @gitlib.rm_paths(fs, rfs, root, paths, cached~, force~, recursive~)
+) -> Unit raise @bit.GitError {
+  @bitlib.rm_paths(fs, rfs, root, paths, cached~, force~, recursive~)
 }
 
 ///|
 pub fn mv_path(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   source : String,
   dest : String,
   force? : Bool = false,
-) -> Unit raise @git.GitError {
-  @gitlib.mv_path(fs, rfs, root, source, dest, force~)
+) -> Unit raise @bit.GitError {
+  @bitlib.mv_path(fs, rfs, root, source, dest, force~)
 }
 
 ///|
 pub fn write_loose_object(
-  fs : &@git.FileSystem,
+  fs : &@bit.FileSystem,
   git_dir : String,
-  obj_type : @git.ObjectType,
+  obj_type : @bit.ObjectType,
   content : Bytes,
-) -> @git.ObjectId raise @git.GitError {
-  @gitlib.write_loose_object(fs, git_dir, obj_type, content)
+) -> @bit.ObjectId raise @bit.GitError {
+  @bitlib.write_loose_object(fs, git_dir, obj_type, content)
 }
 
 ///|
 pub fn write_object_bytes(
-  fs : &@git.FileSystem,
+  fs : &@bit.FileSystem,
   git_dir : String,
-  id : @git.ObjectId,
+  id : @bit.ObjectId,
   compressed : Bytes,
-) -> Unit raise @git.GitError {
-  @gitlib.write_object_bytes(fs, git_dir, id, compressed)
+) -> Unit raise @bit.GitError {
+  @bitlib.write_object_bytes(fs, git_dir, id, compressed)
 }
 
 ///|
 pub fn resolve_head_commit(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
-) -> @git.ObjectId? raise @git.GitError {
-  @gitlib.resolve_head_commit(fs, git_dir)
+) -> @bit.ObjectId? raise @bit.GitError {
+  @bitlib.resolve_head_commit(fs, git_dir)
 }
 
 ///|
 pub fn update_head_ref(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
-  commit_id : @git.ObjectId,
-) -> Unit raise @git.GitError {
-  @gitlib.update_head_ref(fs, rfs, git_dir, commit_id)
+  commit_id : @bit.ObjectId,
+) -> Unit raise @bit.GitError {
+  @bitlib.update_head_ref(fs, rfs, git_dir, commit_id)
 }
 
 ///|
 pub fn write_tree_from_index(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
-  entries : Array[@gitlib.IndexEntry],
+  entries : Array[@bitlib.IndexEntry],
   prefix? : String? = None,
-) -> @git.ObjectId raise @git.GitError {
-  @gitlib.write_tree_from_index(fs, rfs, git_dir, entries, prefix~)
+) -> @bit.ObjectId raise @bit.GitError {
+  @bitlib.write_tree_from_index(fs, rfs, git_dir, entries, prefix~)
 }

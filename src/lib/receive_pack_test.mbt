@@ -2,8 +2,8 @@
 
 ///|
 fn build_receive_request(
-  old_id : @git.ObjectId,
-  new_id : @git.ObjectId,
+  old_id : @bit.ObjectId,
+  new_id : @bit.ObjectId,
   refname : String,
   pack : Bytes,
 ) -> Bytes {
@@ -23,7 +23,7 @@ fn build_receive_request(
 
 ///|
 test "receive-pack: push to empty repo" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   ignore(try? init_repo(fs, "/src"))
   ignore(try? init_repo(fs, "/dst"))
   fs.write_string("/src/a.txt", "hello\n")
@@ -35,7 +35,7 @@ test "receive-pack: push to empty repo" {
   let objects = collect_reachable_objects(db, fs, commit_id)
   let pack = @pack.create_packfile(objects)
   let req = build_receive_request(
-    @git.ObjectId::zero(),
+    @bit.ObjectId::zero(),
     commit_id,
     "refs/heads/main",
     pack,
@@ -53,7 +53,7 @@ test "receive-pack: push to empty repo" {
 
 ///|
 test "receive-pack: advertise empty repo" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   ignore(try? init_repo(fs, "/repo"))
   let adv = build_receive_pack_advertisement(fs, "/repo")
   let decoded = @protocol.pktline_decode(adv) catch { _ => [] }
@@ -66,7 +66,7 @@ test "receive-pack: advertise empty repo" {
 
 ///|
 test "receive-pack: reject non-fast-forward" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   ignore(try? init_repo(fs, "/src"))
   ignore(try? init_repo(fs, "/dst"))
   fs.write_string("/src/a.txt", "one\n")
@@ -96,11 +96,11 @@ test "receive-pack: reject non-fast-forward" {
 
 ///|
 test "receive-pack: reject invalid refname" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   ignore(try? init_repo(fs, "/dst"))
   let req = build_receive_request(
-    @git.ObjectId::zero(),
-    @git.ObjectId::zero(),
+    @bit.ObjectId::zero(),
+    @bit.ObjectId::zero(),
     "../refs/heads/main",
     @protocol.pktline_flush(),
   )
@@ -112,12 +112,12 @@ test "receive-pack: reject invalid refname" {
 
 ///|
 test "receive-pack: reject path traversal from /tmp repo" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   let tmp_repo = "/tmp/bit-receive-pack-poc"
   ignore(try? init_repo(fs, tmp_repo))
   let bad_req = build_receive_request(
-    @git.ObjectId::zero(),
-    @git.ObjectId::zero(),
+    @bit.ObjectId::zero(),
+    @bit.ObjectId::zero(),
     "../" + "tmp/bit-receive-pack-poc/.git/HEAD",
     @protocol.pktline_flush(),
   )

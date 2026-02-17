@@ -12,7 +12,7 @@ test "commit: signing options require standalone error" {
 
 ///|
 test "commit: sha256 repository requires standalone error" {
-  let fs = @git.TestFs::new()
+  let fs = @bitcore.TestFs::new()
   fs.mkdir_p("/repo/.git")
   fs.write_string(
     "/repo/.git/config", "[extensions]\n\tobjectformat = sha256\n",
@@ -27,7 +27,7 @@ test "commit: sha256 repository requires standalone error" {
 
 ///|
 test "commit: compatobjectformat=sha256 requires standalone error" {
-  let fs = @git.TestFs::new()
+  let fs = @bitcore.TestFs::new()
   fs.mkdir_p("/repo/.git")
   fs.write_string(
     "/repo/.git/config", "[extensions]\n\tcompatobjectformat = sha256\n",
@@ -42,7 +42,7 @@ test "commit: compatobjectformat=sha256 requires standalone error" {
 
 ///|
 test "commit: no-edit prefers SQUASH_MSG and appends MERGE_MSG comments" {
-  let fs = @git.TestFs::new()
+  let fs = @bitcore.TestFs::new()
   fs.mkdir_p("/repo/.git")
   fs.write_string("/repo/.git/SQUASH_MSG", "squash body\n")
   fs.write_string("/repo/.git/MERGE_MSG", "\n# Conflicts:\n#\tfile\n")
@@ -52,7 +52,7 @@ test "commit: no-edit prefers SQUASH_MSG and appends MERGE_MSG comments" {
 
 ///|
 test "commit: no-edit prefers MERGE_MSG when MERGE_HEAD exists" {
-  let fs = @git.TestFs::new()
+  let fs = @bitcore.TestFs::new()
   fs.mkdir_p("/repo/.git")
   fs.write_string(
     "/repo/.git/MERGE_HEAD", "1111111111111111111111111111111111111111\n",
@@ -65,7 +65,7 @@ test "commit: no-edit prefers MERGE_MSG when MERGE_HEAD exists" {
 
 ///|
 test "commit: read MERGE_HEAD supports multiple parents" {
-  let fs = @git.TestFs::new()
+  let fs = @bitcore.TestFs::new()
   fs.mkdir_p("/repo/.git")
   fs.write_string(
     "/repo/.git/MERGE_HEAD", "1111111111111111111111111111111111111111\n2222222222222222222222222222222222222222\n",

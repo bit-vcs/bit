@@ -8,7 +8,7 @@ async fn handle_receive_pack(args : Array[String]) -> Unit {
     }
   }
   guard parse_pack_args(args) is Some((advertise, repo_path)) else {
-    raise @git.GitError::ProtocolError("missing repository path")
+    raise @bitcore.GitError::ProtocolError("missing repository path")
   }
   let root = if repo_path.has_suffix(".git") && !repo_path.has_suffix("/.git") {
     // Bare repository with .git suffix
@@ -27,11 +27,11 @@ async fn handle_receive_pack(args : Array[String]) -> Unit {
     @sys.exit(1)
   }
   if advertise {
-    let out = @gitlib.build_receive_pack_advertisement(fs, root)
+    let out = @bitlib.build_receive_pack_advertisement(fs, root)
     @stdio.stdout.write(out)
   } else {
     let input = read_all_stdin()
-    let out = @gitlib.receive_pack(fs, fs, root, input)
+    let out = @bitlib.receive_pack(fs, fs, root, input)
     @stdio.stdout.write(out)
   }
 }

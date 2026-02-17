@@ -3,7 +3,7 @@
 ///|
 /// Test adapter: TestFs -> ObjectStore
 struct TestObjectStore {
-  fs : @git.TestFs
+  fs : @bit.TestFs
   git_dir : String
 }
 
@@ -15,7 +15,7 @@ impl @lib.ObjectStore for TestObjectStore with get(self, id) {
 
 ///|
 impl @lib.ObjectStore for TestObjectStore with put(self, obj_type, content) {
-  let (id, compressed) = @git.create_object(obj_type, content)
+  let (id, compressed) = @bit.create_object(obj_type, content)
   let hex = id.to_hex()
   let dir = self.git_dir +
     "/objects/" +
@@ -36,7 +36,7 @@ impl @lib.ObjectStore for TestObjectStore with has(self, id) {
 ///|
 /// Test adapter: TestFs -> RefStore
 struct TestRefStore {
-  fs : @git.TestFs
+  fs : @bit.TestFs
   git_dir : String
 }
 
@@ -88,12 +88,12 @@ impl @lib.Clock for TestClock with now(self) {
 
 ///|
 fn setup_repo_with_branch() -> (
-  @git.TestFs,
+  @bit.TestFs,
   &@lib.ObjectStore,
   &@lib.RefStore,
   &@lib.Clock,
 ) {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   fs.mkdir_p("/repo/.git/refs/heads")
   fs.mkdir_p("/repo/.git/objects")
   let objects : TestObjectStore = { fs, git_dir: "/repo/.git" }
@@ -101,12 +101,12 @@ fn setup_repo_with_branch() -> (
   let clock : TestClock = { time: 1706745600L }
   // Create initial commit on main
   let blob_content = "Hello, world!\n"
-  let (blob_id, blob_compressed) = @git.create_blob_string(blob_content)
+  let (blob_id, blob_compressed) = @bit.create_blob_string(blob_content)
   write_test_object(fs, "/repo/.git", blob_id, blob_compressed)
-  let tree_entries = [@git.TreeEntry::new("100644", "README.md", blob_id)]
-  let (tree_id, tree_compressed) = @git.create_tree(tree_entries)
+  let tree_entries = [@bit.TreeEntry::new("100644", "README.md", blob_id)]
+  let (tree_id, tree_compressed) = @bit.create_tree(tree_entries)
   write_test_object(fs, "/repo/.git", tree_id, tree_compressed)
-  let commit = @git.Commit::new(
+  let commit = @bit.Commit::new(
     tree_id,
     [],
     "Alice <alice@example.com>",
@@ -117,24 +117,24 @@ fn setup_repo_with_branch() -> (
     "+0000",
     "Initial commit\n",
   )
-  let (commit_id, commit_compressed) = @git.create_commit(commit)
+  let (commit_id, commit_compressed) = @bit.create_commit(commit)
   write_test_object(fs, "/repo/.git", commit_id, commit_compressed)
   fs.write_string("/repo/.git/refs/heads/main", commit_id.to_hex() + "\n")
   fs.write_string("/repo/.git/HEAD", "ref: refs/heads/main\n")
   // Create feature branch with different content
   let feature_blob = "Hello, feature!\n"
-  let (feature_blob_id, feature_blob_compressed) = @git.create_blob_string(
+  let (feature_blob_id, feature_blob_compressed) = @bit.create_blob_string(
     feature_blob,
   )
   write_test_object(fs, "/repo/.git", feature_blob_id, feature_blob_compressed)
   let feature_tree_entries = [
-    @git.TreeEntry::new("100644", "README.md", feature_blob_id),
+    @bit.TreeEntry::new("100644", "README.md", feature_blob_id),
   ]
-  let (feature_tree_id, feature_tree_compressed) = @git.create_tree(
+  let (feature_tree_id, feature_tree_compressed) = @bit.create_tree(
     feature_tree_entries,
   )
   write_test_object(fs, "/repo/.git", feature_tree_id, feature_tree_compressed)
-  let feature_commit = @git.Commit::new(
+  let feature_commit = @bit.Commit::new(
     feature_tree_id,
     [commit_id],
     "Bob <bob@example.com>",
@@ -145,7 +145,7 @@ fn setup_repo_with_branch() -> (
     "+0000",
     "Add feature\n",
   )
-  let (feature_commit_id, feature_commit_compressed) = @git.create_commit(
+  let (feature_commit_id, feature_commit_compressed) = @bit.create_commit(
     feature_commit,
   )
   write_test_object(
@@ -160,9 +160,9 @@ fn setup_repo_with_branch() -> (
 
 ///|
 fn write_test_object(
-  fs : @git.TestFs,
+  fs : @bit.TestFs,
   git_dir : String,
-  id : @git.ObjectId,
+  id : @bit.ObjectId,
   compressed : Bytes,
 ) -> Unit {
   let hex = id.to_hex()
@@ -403,7 +403,7 @@ test "pr: reopen open PR fails" {
   )
   ignore(
     prs.reopen_pr(objects, refs, clock, pr.id()) catch {
-      @git.GitError::InvalidObject(message) => {
+      @bit.GitError::InvalidObject(message) => {
         assert_true(message.contains("not closed"))
         return ()
       }
@@ -564,7 +564,7 @@ test "pr merge policy: required approvals blocks until approved" {
   let policy = PrMergePolicy::new(1, true, false)
   ignore(
     hub.check_merge_policy(objects, refs, pr.id(), policy) catch {
-      @git.GitError::InvalidObject(message) => {
+      @bit.GitError::InvalidObject(message) => {
         assert_true(message.contains("required approvals=1"))
         return ()
       }
@@ -597,7 +597,7 @@ test "pr merge policy: request changes blocks when disabled" {
   let policy = PrMergePolicy::new(0, false, false)
   ignore(
     hub.check_merge_policy(objects, refs, pr.id(), policy) catch {
-      @git.GitError::InvalidObject(message) => {
+      @bit.GitError::InvalidObject(message) => {
         assert_true(message.contains("request-changes review is present"))
         return ()
       }
@@ -618,7 +618,7 @@ test "pr merge policy: require signed records fails without signing key" {
   let policy = PrMergePolicy::new(0, true, true)
   ignore(
     hub.check_merge_policy(objects, refs, pr.id(), policy) catch {
-      @git.GitError::InvalidObject(message) => {
+      @bit.GitError::InvalidObject(message) => {
         assert_true(message.contains("signing key"))
         return ()
       }
@@ -645,7 +645,7 @@ test "pr merge policy: require signed records rejects unsigned PR with key" {
       policy,
       signing_key=Some("k1"),
     ) catch {
-      @git.GitError::InvalidObject(message) => {
+      @bit.GitError::InvalidObject(message) => {
         assert_true(message.contains("PR metadata is unsigned"))
         return ()
       }
@@ -705,7 +705,7 @@ test "pr merge policy: required workflows block until latest status is success" 
   let policy = PrMergePolicy::new(0, true, false, required_workflows=["test"])
   ignore(
     hub.check_merge_policy(objects, refs, pr.id(), policy) catch {
-      @git.GitError::InvalidObject(message) => {
+      @bit.GitError::InvalidObject(message) => {
         assert_true(message.contains("required workflow 'test'"))
         return ()
       }
@@ -831,9 +831,9 @@ test "format: serialize and parse PullRequest" {
     "Test PR",
     "Description\nwith multiple lines",
     "refs/heads/feature",
-    @git.ObjectId::zero(),
+    @bit.ObjectId::zero(),
     "refs/heads/main",
-    @git.ObjectId::zero(),
+    @bit.ObjectId::zero(),
     "alice@example.com",
     1706745600L,
     1706832000L,
@@ -855,9 +855,9 @@ test "format: serialize and parse PullRequest with source metadata" {
     "Fork PR",
     "Body",
     "feature",
-    @git.ObjectId::zero(),
+    @bit.ObjectId::zero(),
     "main",
-    @git.ObjectId::zero(),
+    @bit.ObjectId::zero(),
     "alice@example.com",
     1706745600L,
     1706832000L,
@@ -903,7 +903,7 @@ test "format: serialize and parse PrReview" {
     ReviewVerdict::Approved,
     "LGTM!",
     1706918400L,
-    @git.ObjectId::zero(),
+    @bit.ObjectId::zero(),
   )
   let serialized = review.serialize()
   let parsed = parse_pr_review(serialized)
@@ -1054,7 +1054,7 @@ test "issue: reopen open issue fails" {
   )
   ignore(
     prs.reopen_issue(objects, refs, clock, issue.id()) catch {
-      @git.GitError::InvalidObject(message) => {
+      @bit.GitError::InvalidObject(message) => {
         assert_true(message.contains("not closed"))
         return ()
       }
@@ -1238,9 +1238,9 @@ test "work item: kind is derived from patch capability" {
 
   let patch = WorkItemPatch::new(
     "refs/heads/feature",
-    @git.ObjectId::zero(),
+    @bit.ObjectId::zero(),
     "refs/heads/main",
-    @git.ObjectId::zero(),
+    @bit.ObjectId::zero(),
   )
   let pr_like = WorkItem::new(
     "w-pr",
@@ -1280,16 +1280,16 @@ test "format: serialize and parse WorkItem issue" {
 
 ///|
 test "format: serialize and parse WorkItem pull request" {
-  let merge_id = @git.ObjectId::from_hex(
+  let merge_id = @bit.ObjectId::from_hex(
     "abcdef0123456789abcdef0123456789abcdef01",
   ) catch {
     _ => panic()
   }
   let patch = WorkItemPatch::new(
     "refs/heads/feature",
-    @git.ObjectId::zero(),
+    @bit.ObjectId::zero(),
     "refs/heads/main",
-    @git.ObjectId::zero(),
+    @bit.ObjectId::zero(),
     closes_issues=["issue-1"],
     merge_commit=Some(merge_id),
     source_repo=Some("contrib/bit"),
@@ -1475,7 +1475,7 @@ test "hub_record version=0 backward compat" {
 
 ///|
 test "pr merge_commit round-trip" {
-  let merge_id = @git.ObjectId::from_hex(
+  let merge_id = @bit.ObjectId::from_hex(
     "abcdef0123456789abcdef0123456789abcdef01",
   ) catch {
     _ => panic()
@@ -1485,9 +1485,9 @@ test "pr merge_commit round-trip" {
     "Test PR",
     "Body",
     "refs/heads/feature",
-    @git.ObjectId::zero(),
+    @bit.ObjectId::zero(),
     "refs/heads/main",
-    @git.ObjectId::zero(),
+    @bit.ObjectId::zero(),
     "alice@example.com",
     1706745600L,
     1706832000L,
@@ -1509,9 +1509,9 @@ test "pr merge_commit none round-trip" {
     "No merge commit",
     "Body",
     "refs/heads/feature",
-    @git.ObjectId::zero(),
+    @bit.ObjectId::zero(),
     "refs/heads/main",
-    @git.ObjectId::zero(),
+    @bit.ObjectId::zero(),
     "bob@example.com",
     1706745600L,
     1706832000L,
@@ -1617,7 +1617,7 @@ test "signature: require_signed without key rejects writes" {
       objects, refs, clock, "Signed", "Body", "refs/heads/feature", "refs/heads/main",
       "alice@example.com",
     ) catch {
-      @git.GitError::InvalidObject(message) => {
+      @bit.GitError::InvalidObject(message) => {
         assert_true(message.contains("signing key"))
         return ()
       }
@@ -1686,7 +1686,7 @@ test "signature: require_signed without key rejects proposal writes" {
       objects, refs, clock, "Signed proposal", "Body", "refs/heads/feature", "refs/heads/main",
       "alice@example.com",
     ) catch {
-      @git.GitError::InvalidObject(message) => {
+      @bit.GitError::InvalidObject(message) => {
         assert_true(message.contains("signing key"))
         return ()
       }
@@ -1699,7 +1699,7 @@ test "signature: require_signed without key rejects proposal writes" {
 ///|
 test "format: serialize and parse Note" {
   let note = Note::new(
-    @git.ObjectId::zero(),
+    @bit.ObjectId::zero(),
     "This is a helpful note.",
     "alice@example.com",
     1706745600L,

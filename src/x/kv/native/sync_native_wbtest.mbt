@@ -3,8 +3,8 @@
 ///|
 priv struct TestWorkingTree {
   fs : @fs.Fs
-  backing_fs : &@git.RepoFileSystem
-  write_fs : &@git.FileSystem
+  backing_fs : &@bit.RepoFileSystem
+  write_fs : &@bit.FileSystem
 }
 
 ///|
@@ -76,8 +76,8 @@ impl @lib.WorkingTree for TestWorkingTree with checkout(self, commit_id) {
 
 ///|
 priv struct TestObjectStore {
-  backing_fs : &@git.RepoFileSystem
-  write_fs : &@git.FileSystem
+  backing_fs : &@bit.RepoFileSystem
+  write_fs : &@bit.FileSystem
   git_dir : String
 }
 
@@ -103,7 +103,7 @@ impl @lib.ObjectStore for TestObjectStore with has(self, id) {
 
 ///|
 fn make_test_kv_simple(node_id : String) -> @kv.Kv {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -114,7 +114,7 @@ fn make_test_kv_simple(node_id : String) -> @kv.Kv {
     write_fs: fs,
     git_dir: "/repo/.git",
   }
-  @kv.Kv::new(@kv.NodeId::new(node_id), tree, store, @git.ObjectId::zero())
+  @kv.Kv::new(@kv.NodeId::new(node_id), tree, store, @bit.ObjectId::zero())
 }
 
 ///|
@@ -122,7 +122,7 @@ fn peer(node_id : String, endpoint : String) -> @kv.PeerInfo {
   {
     node_id: @kv.NodeId::new(node_id),
     last_seen: 0L,
-    head: @git.ObjectId::zero(),
+    head: @bit.ObjectId::zero(),
     endpoint,
   }
 }
@@ -131,7 +131,7 @@ fn peer(node_id : String, endpoint : String) -> @kv.PeerInfo {
 test "kv native: encode/decode announce message roundtrip" {
   let state : @kv.GossipState = {
     node_id: @kv.NodeId::new("node-a"),
-    head: @git.ObjectId::zero(),
+    head: @bit.ObjectId::zero(),
     clock: @kv.VectorClock::new().increment(@kv.NodeId::new("node-a")),
     timestamp: 1234L,
   }

@@ -17,7 +17,7 @@ struct TestNode {
 fn TestNetwork::new(node_count : Int) -> TestNetwork {
   let nodes : Array[TestNode] = []
   for i = 0; i < node_count; i = i + 1 {
-    let fs = @git.TestFs::new()
+    let fs = @bit.TestFs::new()
     @lib.init_repo(fs, "/repo") catch {
       _ => ()
     }
@@ -29,7 +29,7 @@ fn TestNetwork::new(node_count : Int) -> TestNetwork {
       write_fs: fs,
       git_dir: "/repo/.git",
     }
-    let kv = Kv::new(node_id, tree, store, @git.ObjectId::zero())
+    let kv = Kv::new(node_id, tree, store, @bit.ObjectId::zero())
     nodes.push({ db: kv })
   }
   { nodes, message_queue: [], tick: 0L }
@@ -145,7 +145,7 @@ test "sync: three nodes chain sync" {
   let node2 = net.node(2)
   assert_true(
     node2.db.pending_object_count() > 0 ||
-    node2.db.head() != @git.ObjectId::zero(),
+    node2.db.head() != @bit.ObjectId::zero(),
   )
 }
 
@@ -172,7 +172,7 @@ test "sync: concurrent writes from multiple nodes" {
     // Either has pending objects or has a non-zero HEAD
     assert_true(
       node.db.pending_object_count() >= 0 ||
-      node.db.head() != @git.ObjectId::zero(),
+      node.db.head() != @bit.ObjectId::zero(),
     )
   }
 }
@@ -228,7 +228,7 @@ test "sync: random operations simulation" {
     let node = net.node(idx)
     // Each node should have done something
     assert_true(
-      node.db.head() != @git.ObjectId::zero() ||
+      node.db.head() != @bit.ObjectId::zero() ||
       node.db.pending_object_count() > 0,
     )
   }
@@ -288,7 +288,7 @@ test "sync: gossip peer selection" {
     let peer : PeerInfo = {
       node_id: NodeId::new("node-" + i.to_string()),
       last_seen: (i * 100).to_int64(),
-      head: @git.ObjectId::zero(),
+      head: @bit.ObjectId::zero(),
       endpoint: "ws://node-" + i.to_string(),
     }
     node0.db.add_peer(peer)

@@ -70,12 +70,12 @@ pub fn pktline_delim() -> Bytes {
 ///|
 /// Decode pkt-lines from bytes
 /// Returns array of (data, is_flush)
-pub fn pktline_decode(data : Bytes) -> Array[(Bytes, Bool)] raise @git.GitError {
+pub fn pktline_decode(data : Bytes) -> Array[(Bytes, Bool)] raise @bit.GitError {
   let result : Array[(Bytes, Bool)] = []
   let mut offset = 0
   while offset < data.length() {
     if offset + 4 > data.length() {
-      raise @git.GitError::ProtocolError("Incomplete pkt-line header")
+      raise @bit.GitError::ProtocolError("Incomplete pkt-line header")
     }
 
     // Read 4-byte hex length
@@ -97,7 +97,7 @@ pub fn pktline_decode(data : Bytes) -> Array[(Bytes, Bool)] raise @git.GitError 
     }
     let payload_len = len - 4
     if offset + payload_len > data.length() {
-      raise @git.GitError::ProtocolError("Incomplete pkt-line payload")
+      raise @bit.GitError::ProtocolError("Incomplete pkt-line payload")
     }
     let payload : Array[Byte] = []
     for i in 0..<payload_len {
@@ -137,8 +137,8 @@ fn pkt_hex_char_to_int(c : Char) -> Int {
 /// Build a ref update command for git-receive-pack
 /// Format: {old_sha} {new_sha} {refname}\0{capabilities}\n
 pub fn build_ref_update(
-  old_id : @git.ObjectId,
-  new_id : @git.ObjectId,
+  old_id : @bit.ObjectId,
+  new_id : @bit.ObjectId,
   refname : String,
   capabilities : String,
 ) -> String {
@@ -148,8 +148,8 @@ pub fn build_ref_update(
 ///|
 /// Build a ref update command (without capabilities)
 pub fn build_ref_update_simple(
-  old_id : @git.ObjectId,
-  new_id : @git.ObjectId,
+  old_id : @bit.ObjectId,
+  new_id : @bit.ObjectId,
   refname : String,
 ) -> String {
   "\{old_id.to_hex()} \{new_id.to_hex()} \{refname}\n"
@@ -161,9 +161,9 @@ pub fn build_ref_update_simple(
 ///         {sha} {refname}\n (for subsequent lines)
 pub fn parse_refs(
   data : Bytes,
-) -> Array[(@git.ObjectId, String)] raise @git.GitError {
+) -> Array[(@bit.ObjectId, String)] raise @bit.GitError {
   let lines = pktline_decode(data)
-  let result : Array[(@git.ObjectId, String)] = []
+  let result : Array[(@bit.ObjectId, String)] = []
   for item in lines {
     let (line_bytes, is_flush) = item
     if is_flush || line_bytes.length() == 0 {
@@ -204,7 +204,7 @@ pub fn parse_refs(
       }
       refname.write_char(chars[i])
     }
-    let id = @git.ObjectId::from_hex(sha_str.to_string())
+    let id = @bit.ObjectId::from_hex(sha_str.to_string())
     result.push((id, refname.to_string()))
   }
   result

@@ -2,8 +2,8 @@
 
 ///|
 pub struct RefUpdate {
-  old_id : @git.ObjectId
-  new_id : @git.ObjectId
+  old_id : @bit.ObjectId
+  new_id : @bit.ObjectId
   refname : String
 }
 
@@ -23,17 +23,17 @@ pub struct ReceivePackResult {
 ///|
 /// Build receive-pack advertisement (info/refs payload).
 pub fn build_receive_pack_advertisement(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   root : String,
   agent? : String = "git/moonbit",
-) -> Bytes raise @git.GitError {
+) -> Bytes raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   let refs = show_ref(fs, git_dir)
   refs.sort_by((a, b) => String::compare(a.0, b.0))
   let caps = receive_default_caps(agent)
   let out : Array[Byte] = []
   if refs.length() == 0 {
-    let zero = @git.ObjectId::zero().to_hex()
+    let zero = @bit.ObjectId::zero().to_hex()
     let line = "\{zero} capabilities^{}\u0000\{caps}\n"
     receive_push_bytes(out, @protocol.pktline_encode(line))
     receive_push_bytes(out, @protocol.pktline_flush())
@@ -52,12 +52,12 @@ pub fn build_receive_pack_advertisement(
 }
 
 ///|
-fn normalize_receive_refname(refname : String) -> String raise @git.GitError {
+fn normalize_receive_refname(refname : String) -> String raise @bit.GitError {
   let normalized = normalize_repo_path(refname) catch {
-    _ => raise @git.GitError::ProtocolError("Invalid receive-pack ref: " + refname)
+    _ => raise @bit.GitError::ProtocolError("Invalid receive-pack ref: " + refname)
   }
   if not(normalized.has_prefix("refs/")) {
-    raise @git.GitError::ProtocolError("Invalid receive-pack ref: " + refname)
+    raise @bit.GitError::ProtocolError("Invalid receive-pack ref: " + refname)
   }
   normalized
 }
@@ -65,7 +65,7 @@ fn normalize_receive_refname(refname : String) -> String raise @git.GitError {
 ///|
 pub fn parse_receive_pack_request(
   data : Bytes,
-) -> ReceivePackRequest raise @git.GitError {
+) -> ReceivePackRequest raise @bit.GitError {
   let updates : Array[RefUpdate] = []
   let capabilities : Array[String] = []
   let mut i = 0
@@ -77,7 +77,7 @@ pub fn parse_receive_pack_request(
       break
     }
     if len < 4 || i + len > data.length() {
-      raise @git.GitError::ProtocolError("Invalid pkt-line length")
+      raise @bit.GitError::ProtocolError("Invalid pkt-line length")
     }
     let line = receive_bytes_to_string_range(data, i + 4, i + len)
     let mut line = receive_trim_line(line)
@@ -103,10 +103,10 @@ pub fn parse_receive_pack_request(
     }
     let parts = receive_split_by_space(line)
     if parts.length() < 3 {
-      raise @git.GitError::ProtocolError("Invalid receive-pack command")
+      raise @bit.GitError::ProtocolError("Invalid receive-pack command")
     }
-    let old_id = @git.ObjectId::from_hex(parts[0])
-    let new_id = @git.ObjectId::from_hex(parts[1])
+    let old_id = @bit.ObjectId::from_hex(parts[0])
+    let new_id = @bit.ObjectId::from_hex(parts[1])
     let refname = normalize_receive_refname(parts[2])
     updates.push({ old_id, new_id, refname })
     i += len
@@ -117,11 +117,11 @@ pub fn parse_receive_pack_request(
 
 ///|
 pub fn apply_receive_pack(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   req : ReceivePackRequest,
-) -> ReceivePackResult raise @git.GitError {
+) -> ReceivePackResult raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   if req.pack.length() > 0 {
     let objects = @pack.parse_packfile(req.pack)
@@ -139,7 +139,7 @@ pub fn apply_receive_pack(
     }
     let current = resolve_ref(rfs, git_dir, refname)
     let current_id = match current {
-      None => @git.ObjectId::zero()
+      None => @bit.ObjectId::zero()
       Some(id) => id
     }
     if current_id != upd.old_id {
@@ -147,8 +147,8 @@ pub fn apply_receive_pack(
       continue
     }
     if refname.has_prefix("refs/heads/") {
-      if current_id != @git.ObjectId::zero() &&
-        upd.new_id != @git.ObjectId::zero() {
+      if current_id != @bit.ObjectId::zero() &&
+        upd.new_id != @bit.ObjectId::zero() {
         let ff = receive_is_ancestor_commit(db, rfs, current_id, upd.new_id) catch {
           _ => false
         }
@@ -158,7 +158,7 @@ pub fn apply_receive_pack(
         }
       }
     }
-    if upd.new_id == @git.ObjectId::zero() {
+    if upd.new_id == @bit.ObjectId::zero() {
       if not(receive_delete_ref(fs, rfs, git_dir, refname)) {
         rejected.push((refname, "ref not found"))
         continue
@@ -176,11 +176,11 @@ pub fn apply_receive_pack(
 
 ///|
 pub fn receive_pack(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   data : Bytes,
-) -> Bytes raise @git.GitError {
+) -> Bytes raise @bit.GitError {
   let req = parse_receive_pack_request(data)
   let result = apply_receive_pack(fs, rfs, root, req)
   receive_build_status_response(result)
@@ -204,18 +204,18 @@ fn receive_build_status_response(result : ReceivePackResult) -> Bytes {
 ///|
 fn receive_is_ancestor_commit(
   db : ObjectDb,
-  fs : &@git.RepoFileSystem,
-  ancestor : @git.ObjectId,
-  commit_id : @git.ObjectId,
-) -> Bool raise @git.GitError {
+  fs : &@bit.RepoFileSystem,
+  ancestor : @bit.ObjectId,
+  commit_id : @bit.ObjectId,
+) -> Bool raise @bit.GitError {
   if ancestor == commit_id {
     return true
   }
-  let stack : Array[@git.ObjectId] = [commit_id]
+  let stack : Array[@bit.ObjectId] = [commit_id]
   let seen : Map[String, Bool] = {}
   while stack.length() > 0 {
     let id = match stack.pop() {
-      None => raise @git.GitError::InvalidObject("Empty stack")
+      None => raise @bit.GitError::InvalidObject("Empty stack")
       Some(v) => v
     }
     let hex = id.to_hex()
@@ -237,17 +237,17 @@ fn receive_is_ancestor_commit(
 ///|
 fn receive_commit_parents(
   db : ObjectDb,
-  fs : &@git.RepoFileSystem,
-  commit_id : @git.ObjectId,
-) -> Array[@git.ObjectId] raise @git.GitError {
+  fs : &@bit.RepoFileSystem,
+  commit_id : @bit.ObjectId,
+) -> Array[@bit.ObjectId] raise @bit.GitError {
   let obj = db.get(fs, commit_id)
   match obj {
-    None => raise @git.GitError::InvalidObject("Missing commit object")
+    None => raise @bit.GitError::InvalidObject("Missing commit object")
     Some(o) => {
-      if o.obj_type != @git.ObjectType::Commit {
-        raise @git.GitError::InvalidObject("Object is not a commit")
+      if o.obj_type != @bit.ObjectType::Commit {
+        raise @bit.GitError::InvalidObject("Object is not a commit")
       }
-      let info = @git.parse_commit(o.data)
+      let info = @bit.parse_commit(o.data)
       info.parents
     }
   }
@@ -255,11 +255,11 @@ fn receive_commit_parents(
 
 ///|
 fn receive_delete_ref(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   refname : String,
-) -> Bool raise @git.GitError {
+) -> Bool raise @bit.GitError {
   let normalized = normalize_receive_refname(refname) catch {
     _ => return false
   }
@@ -322,15 +322,15 @@ fn receive_delete_ref(
 }
 
 ///|
-fn receive_parse_pkt_len(data : Bytes, start : Int) -> Int raise @git.GitError {
+fn receive_parse_pkt_len(data : Bytes, start : Int) -> Int raise @bit.GitError {
   if start + 4 > data.length() {
-    raise @git.GitError::ProtocolError("Invalid pkt-line length")
+    raise @bit.GitError::ProtocolError("Invalid pkt-line length")
   }
   let mut v = 0
   for i in 0..<4 {
     let c = data[start + i].to_int().unsafe_to_char()
-    let digit = @githash.hex_char_to_int(c) catch {
-      _ => raise @git.GitError::ProtocolError("Invalid pkt-line length")
+    let digit = @bithash.hex_char_to_int(c) catch {
+      _ => raise @bit.GitError::ProtocolError("Invalid pkt-line length")
     }
     v = v * 16 + digit
   }

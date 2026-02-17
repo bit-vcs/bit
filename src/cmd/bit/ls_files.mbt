@@ -39,11 +39,11 @@ async fn handle_ls_files(args : Array[String]) -> Unit raise Error {
   let terminator = if use_nul { "\u0000" } else { "\n" }
   let cwd_prefix = compute_cwd_prefix(root)
   let filters = normalize_ls_tree_filters(raw_filters, cwd_prefix)
-  let entries = @gitlib.read_index_entries(fs, git_dir)
+  let entries = @bitlib.read_index_entries(fs, git_dir)
   if error_unmatch {
     for filter in filters {
       if not(ls_files_filter_has_match(filter, entries)) {
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "pathspec '\{filter}' did not match any files",
         )
       }
@@ -215,8 +215,8 @@ async fn handle_ls_files(args : Array[String]) -> Unit raise Error {
     for submod in submodules {
       let sub_git_dir = root + "/" + submod.path + "/.git"
       if fs.is_dir(sub_git_dir) || fs.is_file(sub_git_dir) {
-        let actual_git_dir = @gitlib.resolve_gitdir(fs, sub_git_dir)
-        let sub_entries = @gitlib.read_index_entries(fs, actual_git_dir)
+        let actual_git_dir = @bitlib.resolve_gitdir(fs, sub_git_dir)
+        let sub_entries = @bitlib.read_index_entries(fs, actual_git_dir)
         for se in sub_entries {
           let mode = format_mode(se.mode)
           let full_path = submod.path + "/" + se.path
@@ -242,8 +242,8 @@ async fn handle_ls_files(args : Array[String]) -> Unit raise Error {
     for submod in submodules {
       let sub_git_dir = root + "/" + submod.path + "/.git"
       if fs.is_dir(sub_git_dir) || fs.is_file(sub_git_dir) {
-        let actual_git_dir = @gitlib.resolve_gitdir(fs, sub_git_dir)
-        let sub_entries = @gitlib.read_index_entries(fs, actual_git_dir)
+        let actual_git_dir = @bitlib.resolve_gitdir(fs, sub_git_dir)
+        let sub_entries = @bitlib.read_index_entries(fs, actual_git_dir)
         for se in sub_entries {
           let full_path = submod.path + "/" + se.path
           if not(ls_files_matches_filters(full_path, filters)) {
@@ -266,7 +266,7 @@ struct SubmoduleInfo {
 ///|
 /// Parse .gitmodules file to extract submodule info
 fn parse_gitmodules(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   root : String,
 ) -> Array[SubmoduleInfo] {
   let gitmodules_path = root + "/.gitmodules"
@@ -356,7 +356,7 @@ fn normalize_ls_tree_filters(
   for filter in filters {
     let (raw, is_exclude) = parse_pathspec_magic(filter)
     if is_exclude {
-      raise @git.GitError::InvalidObject(
+      raise @bitcore.GitError::InvalidObject(
         "pathspec magic not supported by this command: 'exclude' (mnemonic: '!')",
       )
     }
@@ -518,7 +518,7 @@ fn ls_files_compare_paths(left : String, right : String) -> Int {
 ///|
 fn ls_files_filter_has_match(
   filter : String,
-  entries : Array[@gitlib.IndexEntry],
+  entries : Array[@bitlib.IndexEntry],
 ) -> Bool {
   for entry in entries {
     if ls_files_pathspec_matches(entry.path, filter) {
@@ -605,10 +605,10 @@ fn ls_files_simple_wildcard_match(path : String, pattern : String) -> Bool {
 ///|
 /// Collect untracked directories at the top level
 fn collect_untracked_dirs(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   root : String,
   tracked_dirs : Map[String, Bool],
-) -> Array[String] raise @git.GitError {
+) -> Array[String] raise @bitcore.GitError {
   let result : Array[String] = []
   collect_untracked_dirs_recursive(fs, root, "", tracked_dirs, result)
   result.sort_by(fn(a, b) { ls_files_compare_paths(a, b) })
@@ -617,18 +617,18 @@ fn collect_untracked_dirs(
 
 ///|
 fn collect_untracked_dirs_recursive(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   root : String,
   prefix : String,
   tracked_dirs : Map[String, Bool],
   out : Array[String],
-) -> Unit raise @git.GitError {
-  let dir = if prefix == "" { root } else { root + "/" + prefix }
-  if prefix != "" {
-    let git_marker = dir + "/.git"
+) -> Unit raise @bitcore.GitError {
+    let dir = if prefix == "" { root } else { root + "/" + prefix }
+    if prefix != "" {
+    let dot_git_marker = dir + "/.git"
     let bit_marker = dir + "/.bit"
-    if fs.is_file(git_marker) ||
-      fs.is_dir(git_marker) ||
+    if fs.is_file(dot_git_marker) ||
+      fs.is_dir(dot_git_marker) ||
       fs.is_file(bit_marker) ||
       fs.is_dir(bit_marker) {
       return ()

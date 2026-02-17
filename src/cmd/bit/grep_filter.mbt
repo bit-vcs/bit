@@ -18,7 +18,7 @@ fn parse_grep_pattern_type_name(value : String) -> GrepPatternType {
 
 ///|
 fn resolve_grep_pattern_type(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   git_dir : String,
   cli_override : GrepPatternType?,
 ) -> GrepPatternType {
@@ -29,7 +29,7 @@ fn resolve_grep_pattern_type(
         Some(value) => parse_grep_pattern_type_name(value)
         None =>
           match
-            @gitlib.read_config_value(
+            @bitlib.read_config_value(
               rfs,
               git_dir + "/config",
               "grep",

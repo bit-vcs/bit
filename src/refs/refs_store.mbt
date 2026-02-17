@@ -34,10 +34,10 @@ fn trim_string_refs(s : String) -> String {
 
 ///|
 pub fn collect_loose_ref_ids(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   dir : String,
   prefix : String,
-  out : Map[String, @git.ObjectId],
+  out : Map[String, @bit.ObjectId],
   filter_prefix : String?,
 ) -> Unit {
   if not(fs.is_dir(dir)) {
@@ -65,7 +65,7 @@ pub fn collect_loose_ref_ids(
       if hex.length() == 0 {
         continue
       }
-      let id = @git.ObjectId::from_hex(hex) catch { _ => continue }
+      let id = @bit.ObjectId::from_hex(hex) catch { _ => continue }
       out[name] = id
     }
   }
@@ -73,9 +73,9 @@ pub fn collect_loose_ref_ids(
 
 ///|
 pub fn collect_packed_ref_ids(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
-  out : Map[String, @git.ObjectId],
+  out : Map[String, @bit.ObjectId],
   filter_prefix : String?,
 ) -> Unit {
   let packed_path = git_dir + "/packed-refs"
@@ -111,7 +111,7 @@ pub fn collect_packed_ref_ids(
         if out.contains(refname) {
           continue
         }
-        let id = @git.ObjectId::from_hex(id_hex) catch { _ => continue }
+        let id = @bit.ObjectId::from_hex(id_hex) catch { _ => continue }
         out[refname] = id
       }
     }
@@ -120,11 +120,11 @@ pub fn collect_packed_ref_ids(
 
 ///|
 pub fn list_refs_with_ids(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
   filter_prefix : String?,
-) -> Map[String, @git.ObjectId] {
-  let out : Map[String, @git.ObjectId] = {}
+) -> Map[String, @bit.ObjectId] {
+  let out : Map[String, @bit.ObjectId] = {}
   let refs_dir = git_dir + "/refs"
   collect_loose_ref_ids(fs, refs_dir, "refs", out, filter_prefix)
   collect_packed_ref_ids(fs, git_dir, out, filter_prefix)
@@ -133,11 +133,11 @@ pub fn list_refs_with_ids(
 
 ///|
 pub fn rewrite_packed_refs(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   transform : (String) -> String?,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let packed_path = git_dir + "/packed-refs"
   if not(rfs.is_file(packed_path)) {
     return ()
@@ -201,11 +201,11 @@ pub fn rewrite_packed_refs(
 
 ///|
 pub fn remove_packed_ref(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   refname : String,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   rewrite_packed_refs(fs, rfs, git_dir, fn(name) {
     if name == refname {
       None
@@ -217,12 +217,12 @@ pub fn remove_packed_ref(
 
 ///|
 pub fn remove_packed_refs_with_prefix(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   prefix : String,
   exact : String,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   rewrite_packed_refs(fs, rfs, git_dir, fn(name) {
     if name == exact || name.has_prefix(prefix) {
       None
@@ -234,14 +234,14 @@ pub fn remove_packed_refs_with_prefix(
 
 ///|
 pub fn rename_packed_refs_prefix(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   old_prefix : String,
   new_prefix : String,
   old_exact : String,
   new_exact : String,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   rewrite_packed_refs(fs, rfs, git_dir, fn(name) {
     if name == old_exact {
       Some(new_exact)
@@ -260,13 +260,13 @@ pub fn rename_packed_refs_prefix(
 
 ///|
 pub fn list_remote_tracking_refs(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
   remote_name : String,
-) -> Map[String, @git.ObjectId] {
+) -> Map[String, @bit.ObjectId] {
   let prefix = "refs/remotes/" + remote_name + "/"
   let refs = list_refs_with_ids(fs, git_dir, Some(prefix))
-  let out : Map[String, @git.ObjectId] = {}
+  let out : Map[String, @bit.ObjectId] = {}
   for refname, id in refs {
     if not(refname.has_prefix(prefix)) {
       continue
@@ -286,8 +286,8 @@ pub fn list_remote_tracking_refs(
 
 ///|
 pub fn remove_remote_refs(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   name : String,
 ) -> Unit {
@@ -303,8 +303,8 @@ pub fn remove_remote_refs(
 
 ///|
 fn remove_tree_internal(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   path : String,
 ) -> Unit {
   if rfs.is_dir(path) {

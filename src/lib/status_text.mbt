@@ -3,26 +3,26 @@
 ///|
 /// Format status output similar to `git status`.
 pub async fn status_text(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   root : String,
-) -> String raise @git.GitError {
+) -> String raise @bit.GitError {
   let bit_marker = join_path(root, ".bit")
-  let git_marker = if fs.is_dir(bit_marker) || fs.is_file(bit_marker) {
+  let bit_marker = if fs.is_dir(bit_marker) || fs.is_file(bit_marker) {
     bit_marker
   } else {
     join_path(root, ".git")
   }
-  let git_dir = if fs.is_file(git_marker) {
-    resolve_gitdir(fs, git_marker)
+  let git_dir = if fs.is_file(bit_marker) {
+    resolve_gitdir(fs, bit_marker)
   } else {
-    git_marker
+    bit_marker
   }
   let sb = StringBuilder::new()
   let head = read_head_ref(fs, git_dir)
   match head {
     Branch(name) => sb.write_string("On branch " + name + "\n")
     Detached(id) => {
-      let short = @githash.short_hex(id.to_hex(), 7)
+      let short = @bithash.short_hex(id.to_hex(), 7)
       sb.write_string("HEAD detached at " + short + "\n")
     }
   }

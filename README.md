@@ -147,18 +147,18 @@ bit hq root
 
 `bit` core operations can run against any storage backend that implements:
 
-- `@git.FileSystem` (write side)
-- `@git.RepoFileSystem` (read side)
+- `@bit.FileSystem` (write side)
+- `@bit.RepoFileSystem` (read side)
 
 Entry point:
 
 - `/Users/mz/ghq/github.com/mizchi/bit/src/cmd/bit/storage_runtime.mbt`
 - `run_storage_command(fs, rfs, root, cmd, args)`
 
-One in-memory implementation is `@git.TestFs`, which can be used as agent storage:
+One in-memory implementation is `@bit.TestFs`, which can be used as agent storage:
 
 ```moonbit
-let fs = @git.TestFs::new()
+let fs = @bit.TestFs::new()
 let root = "/agent-repo"
 run_storage_command(fs, fs, root, "init", ["-q"])
 fs.write_string(root + "/note.txt", "hello")

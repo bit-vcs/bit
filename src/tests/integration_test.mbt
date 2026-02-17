@@ -53,7 +53,7 @@ test "integration: packfile structure is valid" {
   for i = 0; i < content_len; i = i + 1 {
     content_bytes.push(packfile[i])
   }
-  let expected_trailer = @git.sha1_array(content_bytes)
+  let expected_trailer = @bit.sha1_array(content_bytes)
   for i = 0; i < 20; i = i + 1 {
     assert_true(packfile[content_len + i] == expected_trailer.bytes[i])
   }
@@ -70,7 +70,7 @@ test "integration: blob hash matches git hash-object" {
   ]
   for pair in test_cases {
     let (content, expected_hash) = pair
-    let id = @git.hash_blob_string(content)
+    let id = @bit.hash_blob_string(content)
     assert_true(id.to_hex() == expected_hash)
   }
 }
@@ -78,11 +78,11 @@ test "integration: blob hash matches git hash-object" {
 ///|
 test "integration: tree format is correct" {
   // Tree entry format: {mode} {name}\0{20-byte sha}
-  let blob_id = @git.ObjectId::from_hex(
+  let blob_id = @bit.ObjectId::from_hex(
     "ce013625030ba8dba906f756967f9e9ca394464a",
   )
-  let entry = @git.TreeEntry::new("100644", "hello.txt", blob_id)
-  let (tree_id, compressed) = @git.create_tree([entry])
+  let entry = @bit.TreeEntry::new("100644", "hello.txt", blob_id)
+  let (tree_id, compressed) = @bit.create_tree([entry])
 
   // Decompress and verify format
   let decompressed = @zlib.zlib_decompress(compressed)
@@ -100,10 +100,10 @@ test "integration: tree format is correct" {
 
 ///|
 test "integration: commit format is correct" {
-  let tree_id = @git.ObjectId::from_hex(
+  let tree_id = @bit.ObjectId::from_hex(
     "aaa96ced2d9a1c8e72c56b253a0e2fe78393feb7",
   )
-  let commit = @git.Commit::new(
+  let commit = @bit.Commit::new(
     tree_id,
     [],
     "Test <test@example.com>",
@@ -114,7 +114,7 @@ test "integration: commit format is correct" {
     "+0000",
     "Test commit\n",
   )
-  let (_, compressed) = @git.create_commit(commit)
+  let (_, compressed) = @bit.create_commit(commit)
 
   // Decompress and verify format
   let decompressed = @zlib.zlib_decompress(compressed)
@@ -155,8 +155,8 @@ test "integration: packfile object encoding" {
 test "integration: multi-object packfile" {
   // Create a packfile with blob, tree, and commit
   let blob_content = Bytes::from_array([b'h', b'e', b'l', b'l', b'o', b'\n'])
-  let commit = @git.Commit::new(
-    @git.ObjectId::zero(),
+  let commit = @bit.Commit::new(
+    @bit.ObjectId::zero(),
     [],
     "Test <test@example.com>",
     1700000000L,
@@ -185,7 +185,7 @@ test "integration: multi-object packfile" {
   for i = 0; i < content_len; i = i + 1 {
     content_bytes.push(packfile[i])
   }
-  let expected_trailer = @git.sha1_array(content_bytes)
+  let expected_trailer = @bit.sha1_array(content_bytes)
   for i = 0; i < 20; i = i + 1 {
     assert_true(packfile[content_len + i] == expected_trailer.bytes[i])
   }
@@ -197,8 +197,8 @@ test "integration: multi-object packfile" {
 
 ///|
 test "integration: pktline ref update format" {
-  let old_id = @git.ObjectId::zero()
-  let new_id = @git.ObjectId::from_hex(
+  let old_id = @bit.ObjectId::zero()
+  let new_id = @bit.ObjectId::from_hex(
     "ce013625030ba8dba906f756967f9e9ca394464a",
   )
   let cmd = @protocol.build_ref_update_simple(old_id, new_id, "refs/heads/main")
@@ -212,8 +212,8 @@ test "integration: pktline ref update format" {
 
 ///|
 test "integration: pktline with capabilities" {
-  let old_id = @git.ObjectId::zero()
-  let new_id = @git.ObjectId::from_hex(
+  let old_id = @bit.ObjectId::zero()
+  let new_id = @bit.ObjectId::from_hex(
     "ce013625030ba8dba906f756967f9e9ca394464a",
   )
   let cmd = @protocol.build_ref_update(
@@ -227,8 +227,8 @@ test "integration: pktline with capabilities" {
 
 ///|
 test "integration: receive-pack body format" {
-  let old_id = @git.ObjectId::zero()
-  let new_id = @git.ObjectId::from_hex(
+  let old_id = @bit.ObjectId::zero()
+  let new_id = @bit.ObjectId::from_hex(
     "ce013625030ba8dba906f756967f9e9ca394464a",
   )
   let packfile = Bytes::from_array([
@@ -272,7 +272,7 @@ test "integration: parse failed push response" {
   let result = @protocol.parse_receive_pack_response(response)
   match result {
     Ok(_) => assert_true(false)
-    Err(@git.GitError::ProtocolError(msg)) =>
+    Err(@bit.GitError::ProtocolError(msg)) =>
       assert_true(msg.find("unpack error") is Some(_))
     Err(_) => assert_true(false)
   }

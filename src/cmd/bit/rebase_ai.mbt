@@ -13,15 +13,15 @@ struct RebaseAiArgs {
 }
 
 ///|
-fn parse_rebase_ai_rounds(raw : String) -> Int raise @git.GitError {
+fn parse_rebase_ai_rounds(raw : String) -> Int raise @bitcore.GitError {
   let parsed = @strconv.parse_int(raw) catch {
     _ =>
-      raise @git.GitError::InvalidObject(
+      raise @bitcore.GitError::InvalidObject(
         "rebase-ai: --max-ai-rounds expects a positive integer",
       )
   }
   if parsed <= 0 {
-    raise @git.GitError::InvalidObject(
+    raise @bitcore.GitError::InvalidObject(
       "rebase-ai: --max-ai-rounds must be greater than 0",
     )
   }
@@ -29,15 +29,15 @@ fn parse_rebase_ai_rounds(raw : String) -> Int raise @git.GitError {
 }
 
 ///|
-fn parse_rebase_ai_agent_steps(raw : String) -> Int raise @git.GitError {
+fn parse_rebase_ai_agent_steps(raw : String) -> Int raise @bitcore.GitError {
   let parsed = @strconv.parse_int(raw) catch {
     _ =>
-      raise @git.GitError::InvalidObject(
+      raise @bitcore.GitError::InvalidObject(
         "rebase-ai: --agent-max-steps expects a positive integer",
       )
   }
   if parsed <= 0 {
-    raise @git.GitError::InvalidObject(
+    raise @bitcore.GitError::InvalidObject(
       "rebase-ai: --agent-max-steps must be greater than 0",
     )
   }
@@ -47,7 +47,7 @@ fn parse_rebase_ai_agent_steps(raw : String) -> Int raise @git.GitError {
 ///|
 fn parse_rebase_ai_args(
   args : Array[String],
-) -> RebaseAiArgs raise @git.GitError {
+) -> RebaseAiArgs raise @bitcore.GitError {
   let mut do_continue = false
   let mut do_abort = false
   let mut do_skip = false
@@ -88,14 +88,14 @@ fn parse_rebase_ai_args(
         continue
       }
       "--onto" =>
-        raise @git.GitError::InvalidObject("rebase-ai: --onto requires a value")
+        raise @bitcore.GitError::InvalidObject("rebase-ai: --onto requires a value")
       "--model" if i + 1 < args.length() => {
         model = args[i + 1]
         i += 2
         continue
       }
       "--model" =>
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "rebase-ai: --model requires a value",
         )
       "--max-ai-rounds" if i + 1 < args.length() => {
@@ -104,7 +104,7 @@ fn parse_rebase_ai_args(
         continue
       }
       "--max-ai-rounds" =>
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "rebase-ai: --max-ai-rounds requires a value",
         )
       "--agent-loop" => {
@@ -118,7 +118,7 @@ fn parse_rebase_ai_args(
         continue
       }
       "--agent-max-steps" =>
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "rebase-ai: --agent-max-steps requires a value",
         )
       _ if arg.has_prefix("--model=") => {
@@ -184,8 +184,8 @@ async fn handle_rebase_ai(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let git_dir = root + "/.git"
   let fs = OsFs::new()
-  let wfs : &@git.FileSystem = fs
-  let rfs : &@git.RepoFileSystem = fs
+  let wfs : &@bitcore.FileSystem = fs
+  let rfs : &@bitcore.RepoFileSystem = fs
   let parsed = parse_rebase_ai_args(args)
   if is_subdir_clone(fs, git_dir) {
     handle_subdir_rebase(fs, root, git_dir, parsed.upstream)
@@ -210,20 +210,20 @@ async fn handle_rebase_ai(args : Array[String]) -> Unit raise Error {
     @rebase_ai.ai_rebase_skip(wfs, rfs, root, options~)
   } else {
     guard parsed.upstream is Some(ref_name) else {
-      raise @git.GitError::InvalidObject(
+      raise @bitcore.GitError::InvalidObject(
         "usage: git rebase-ai [<options>] <upstream>",
       )
     }
-    let upstream_id = @gitrepo.rev_parse(fs, git_dir, ref_name)
+    let upstream_id = @bitrepo.rev_parse(fs, git_dir, ref_name)
     guard upstream_id is Some(id) else {
-      raise @git.GitError::InvalidObject("unknown revision: \{ref_name}")
+      raise @bitcore.GitError::InvalidObject("unknown revision: \{ref_name}")
     }
     let _ = parsed.onto
     @rebase_ai.ai_rebase_start(wfs, rfs, root, id, options~)
   }
   print_rebase_result(result)
   match result.status {
-    @gitlib.RebaseStatus::Conflict => {
+    @bitlib.RebaseStatus::Conflict => {
       print_line("")
       print_line(
         "rebase-ai: auto resolution stopped. resolve manually, then run \"git rebase-ai --continue\".",

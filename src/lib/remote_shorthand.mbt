@@ -8,18 +8,18 @@ pub(all) enum GitHubShorthand {
 } derive(Eq, Show)
 
 ///|
-fn from_remote_shorthand(value : @gitremote.GitHubShorthand) -> GitHubShorthand {
+fn from_remote_shorthand(value : @bitremote.GitHubShorthand) -> GitHubShorthand {
   match value {
-    @gitremote.GitHubShorthand::Repo(url, ref_spec) => Repo(url, ref_spec)
-    @gitremote.GitHubShorthand::Subdir(url, path, ref_spec) =>
+    @bitremote.GitHubShorthand::Repo(url, ref_spec) => Repo(url, ref_spec)
+    @bitremote.GitHubShorthand::Subdir(url, path, ref_spec) =>
       Subdir(url, path, ref_spec)
-    @gitremote.GitHubShorthand::File(url, name) => File(url, name)
+    @bitremote.GitHubShorthand::File(url, name) => File(url, name)
   }
 }
 
 ///|
 pub fn parse_github_shorthand(url : String) -> GitHubShorthand? {
-  match @gitremote.parse_github_shorthand(url) {
+  match @bitremote.parse_github_shorthand(url) {
     Some(value) => Some(from_remote_shorthand(value))
     None => None
   }
@@ -30,5 +30,5 @@ pub fn check_shorthand_ambiguity(
   url : String,
   dir_exists : (String) -> Bool,
 ) -> String? {
-  @gitremote.check_shorthand_ambiguity(url, dir_exists)
+  @bitremote.check_shorthand_ambiguity(url, dir_exists)
 }

@@ -10,7 +10,7 @@
 /// 3. 前のコミットとツリーIDが異なる場合、そのコミットを含める
 pub fn SubdirRepo::log(
   self : SubdirRepo,
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   max_count? : Int = 100,
 ) -> Array[SubdirCommit] raise SubdirError {
   let start_commit = match self.current_commit {
@@ -134,9 +134,9 @@ fn extract_timestamp_from_author(author : String) -> Int64 {
 ///|
 /// サブディレクトリに影響するコミット履歴をフィルタリング
 fn filter_subdir_history(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
-  start_commit : @git.ObjectId,
+  start_commit : @bit.ObjectId,
   subdir_path : String,
   max_count : Int,
 ) -> Array[SubdirCommit] raise SubdirError {
@@ -145,8 +145,8 @@ fn filter_subdir_history(
   }
   let result : Array[SubdirCommit] = []
   let visited : Map[String, Bool] = {}
-  let queue : Array[@git.ObjectId] = [start_commit]
-  let mut prev_tree : @git.ObjectId? = None
+  let queue : Array[@bit.ObjectId] = [start_commit]
+  let mut prev_tree : @bit.ObjectId? = None
   while queue.length() > 0 && result.length() < max_count {
     let commit_id = queue.remove(0)
     let commit_hex = commit_id.to_hex()
@@ -161,7 +161,7 @@ fn filter_subdir_history(
       Some(o) => o
       None => continue
     }
-    let commit_info = @git.parse_commit(obj.data) catch { _ => continue }
+    let commit_info = @bit.parse_commit(obj.data) catch { _ => continue }
     // サブディレクトリのツリーIDを取得
     let subdir_tree = get_subdir_tree_from_tree(
       db,
@@ -212,10 +212,10 @@ fn filter_subdir_history(
 /// ルートツリーからサブディレクトリのツリーIDを取得（エラーを返さない版）
 fn get_subdir_tree_from_tree(
   db : @lib.ObjectDb,
-  rfs : &@git.RepoFileSystem,
-  root_tree : @git.ObjectId,
+  rfs : &@bit.RepoFileSystem,
+  root_tree : @bit.ObjectId,
   subdir_path : String,
-) -> @git.ObjectId? {
+) -> @bit.ObjectId? {
   let path_parts = split_subdir_path(subdir_path)
   if path_parts.length() == 0 {
     return Some(root_tree)
@@ -227,8 +227,8 @@ fn get_subdir_tree_from_tree(
       Some(o) => o
       None => return None
     }
-    let entries = @git.parse_tree(tobj.data) catch { _ => return None }
-    let mut found_id : @git.ObjectId? = None
+    let entries = @bit.parse_tree(tobj.data) catch { _ => return None }
+    let mut found_id : @bit.ObjectId? = None
     for entry in entries {
       if entry.name == part && (entry.mode == "040000" || entry.mode == "40000") {
         found_id = Some(entry.id)
@@ -280,11 +280,11 @@ pub fn SubdirRepo::diff(self : SubdirRepo) -> Array[DiffEntry] {
   // 追加・変更されたファイル
   for path in working {
     // 追加されたファイルとして扱う（変更と追加の区別は簡略化）
-    result.push(Added(path, @git.ObjectId::zero()))
+    result.push(Added(path, @bit.ObjectId::zero()))
   }
   // 削除されたファイル
   for path in deleted {
-    result.push(Deleted(path, @git.ObjectId::zero()))
+    result.push(Deleted(path, @bit.ObjectId::zero()))
   }
   result
 }

@@ -40,7 +40,7 @@ async fn handle_show_ref(args : Array[String]) -> Unit raise Error {
     }
     let mut has_missing = false
     for refname in patterns {
-      match @gitlib.resolve_ref(fs, git_dir, refname) {
+      match @bitlib.resolve_ref(fs, git_dir, refname) {
         Some(id) =>
           if not(quiet) {
             if hash_only {
@@ -57,7 +57,7 @@ async fn handle_show_ref(args : Array[String]) -> Unit raise Error {
     }
     return
   }
-  let refs = @gitrepo.show_ref(fs, git_dir)
+  let refs = @bitrepo.show_ref(fs, git_dir)
   let mut matched_count = 0
   for item in refs {
     let (refname, id) = item
@@ -95,14 +95,14 @@ async fn handle_show_ref(args : Array[String]) -> Unit raise Error {
 
 ///|
 fn show_ref_exists_without_resolution(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
   refname : String,
 ) -> Bool {
   let normalized = if refname == "HEAD" {
     "HEAD"
   } else {
-    let normalized = @gitlib.normalize_repo_path(refname) catch { _ => return false }
+    let normalized = @bitlib.normalize_repo_path(refname) catch { _ => return false }
     if not(normalized.has_prefix("refs/")) {
       return false
     }

@@ -17,16 +17,16 @@ pub fn ObjectCache::set_blob(
 ///|
 pub fn ObjectCache::get_tree(
   self : ObjectCache,
-  tree_id : @git.ObjectId,
-) -> Array[@git.TreeEntry]? {
+  tree_id : @bit.ObjectId,
+) -> Array[@bit.TreeEntry]? {
   self.trees.get(tree_id) // Direct ObjectId lookup, no hex conversion
 }
 
 ///|
 pub fn ObjectCache::set_tree(
   self : ObjectCache,
-  tree_id : @git.ObjectId,
-  entries : Array[@git.TreeEntry],
+  tree_id : @bit.ObjectId,
+  entries : Array[@bit.TreeEntry],
 ) -> Unit {
   self.trees[tree_id] = entries // Direct ObjectId key
 }
@@ -35,7 +35,7 @@ pub fn ObjectCache::set_tree(
 pub fn ObjectCache::get_path(
   self : ObjectCache,
   path : String,
-) -> @git.ObjectId?? {
+) -> @bit.ObjectId?? {
   self.path_cache.get(path)
 }
 
@@ -43,7 +43,7 @@ pub fn ObjectCache::get_path(
 pub fn ObjectCache::set_path(
   self : ObjectCache,
   path : String,
-  id : @git.ObjectId?,
+  id : @bit.ObjectId?,
 ) -> Unit {
   self.path_cache[path] = id
 }

@@ -1,15 +1,15 @@
 ///|
 pub(open) trait ObjectStore {
-  get(Self, @git.ObjectId) -> @git.PackObject? raise @git.GitError
-  put(Self, @git.ObjectType, Bytes) -> @git.ObjectId raise @git.GitError
-  has(Self, @git.ObjectId) -> Bool raise @git.GitError
+  get(Self, @bit.ObjectId) -> @bit.PackObject? raise @bit.GitError
+  put(Self, @bit.ObjectType, Bytes) -> @bit.ObjectId raise @bit.GitError
+  has(Self, @bit.ObjectId) -> Bool raise @bit.GitError
 }
 
 ///|
 pub(open) trait RefStore {
-  resolve(Self, String) -> @git.ObjectId? raise @git.GitError
-  update(Self, String, @git.ObjectId?) -> Unit raise @git.GitError
-  list(Self, String) -> Array[String] raise @git.GitError
+  resolve(Self, String) -> @bit.ObjectId? raise @bit.GitError
+  update(Self, String, @bit.ObjectId?) -> Unit raise @bit.GitError
+  list(Self, String) -> Array[String] raise @bit.GitError
 }
 
 ///|
@@ -25,27 +25,27 @@ pub(open) trait Random {
 ///|
 pub struct PushUpdate {
   refname : String
-  old_id : @git.ObjectId?
-  new_id : @git.ObjectId?
+  old_id : @bit.ObjectId?
+  new_id : @bit.ObjectId?
 }
 
 ///|
 pub(open) trait Transport {
-  fetch(Self, String, Array[@git.ObjectId]) -> Bytes raise @git.GitError
-  push(Self, String, Array[PushUpdate]) -> Result[Unit, String] raise @git.GitError
+  fetch(Self, String, Array[@bit.ObjectId]) -> Bytes raise @bit.GitError
+  push(Self, String, Array[PushUpdate]) -> Result[Unit, String] raise @bit.GitError
 }
 
 ///|
 pub(open) trait WorkingTree {
-  read_file(Self, String) -> Bytes raise @git.GitError
+  read_file(Self, String) -> Bytes raise @bit.GitError
   write_file(Self, String, Bytes) -> Unit
   remove_file(Self, String) -> Unit
   is_file(Self, String) -> Bool
   is_dir(Self, String) -> Bool
-  readdir(Self, String) -> Array[String] raise @git.GitError
+  readdir(Self, String) -> Array[String] raise @bit.GitError
   is_dirty(Self) -> Bool
   rollback(Self) -> Unit
   get_working_files(Self) -> Array[String]
-  snapshot(Self, String, String, Int64) -> @git.ObjectId raise @git.GitError
-  checkout(Self, @git.ObjectId) -> Unit raise @git.GitError
+  snapshot(Self, String, String, Int64) -> @bit.ObjectId raise @bit.GitError
+  checkout(Self, @bit.ObjectId) -> Unit raise @bit.GitError
 }

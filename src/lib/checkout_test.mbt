@@ -1,8 +1,8 @@
 ///| Tests for checkout
 
 ///|
-fn setup_repo_checkout() -> @git.TestFs {
-  let fs = @git.TestFs::new()
+fn setup_repo_checkout() -> @bit.TestFs {
+  let fs = @bit.TestFs::new()
   ignore(try? init_repo(fs, "/repo"))
   fs
 }

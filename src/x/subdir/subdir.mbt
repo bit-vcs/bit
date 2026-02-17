@@ -98,10 +98,10 @@ fn split_path(path : String) -> Array[String] {
 /// コミットからサブディレクトリのツリーIDを抽出
 pub fn extract_subdir_tree(
   db : @lib.ObjectDb,
-  rfs : &@git.RepoFileSystem,
-  commit_id : @git.ObjectId,
+  rfs : &@bit.RepoFileSystem,
+  commit_id : @bit.ObjectId,
   subdir_path : String,
-) -> @git.ObjectId raise SubdirError {
+) -> @bit.ObjectId raise SubdirError {
   // コミットを取得
   let commit_obj = db.get(rfs, commit_id) catch {
     _ => raise CommitNotFound(commit_id)
@@ -110,7 +110,7 @@ pub fn extract_subdir_tree(
     Some(o) => o
     None => raise CommitNotFound(commit_id)
   }
-  let commit = @git.parse_commit(obj.data) catch {
+  let commit = @bit.parse_commit(obj.data) catch {
     _ => raise CommitNotFound(commit_id)
   }
   // ルートツリーから開始
@@ -129,7 +129,7 @@ pub fn extract_subdir_tree(
       Some(o) => o
       None => raise TreeNotFound(current_tree)
     }
-    let entries = @git.parse_tree(tobj.data) catch {
+    let entries = @bit.parse_tree(tobj.data) catch {
       _ => raise TreeNotFound(current_tree)
     }
     let mut found = false
@@ -156,9 +156,9 @@ pub fn extract_subdir_tree(
 ///|
 /// コミットからサブディレクトリリポジトリを作成
 pub fn SubdirRepo::from_commit(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
-  commit_id : @git.ObjectId,
+  commit_id : @bit.ObjectId,
   subdir_path : String,
   config? : SubdirConfig = SubdirConfig::default(),
 ) -> SubdirRepo raise SubdirError {
@@ -189,7 +189,7 @@ pub fn SubdirRepo::from_commit(
 ///|
 /// HEAD からサブディレクトリリポジトリを作成
 pub fn SubdirRepo::from_head(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   subdir_path : String,
   config? : SubdirConfig = SubdirConfig::default(),
@@ -199,17 +199,17 @@ pub fn SubdirRepo::from_head(
     _ => raise IoError("failed to read HEAD")
   }
   let head_str = head_content |> bytes_to_string |> trim_newlines
-  let head_id : @git.ObjectId = if head_str.has_prefix("ref: ") {
+  let head_id : @bit.ObjectId = if head_str.has_prefix("ref: ") {
     // シンボリックリファレンス
     let ref_path = skip_chars(head_str, 5)
     let ref_content = rfs.read_file(git_dir + "/" + ref_path) catch {
       _ => raise IoError("failed to read ref: " + ref_path)
     }
-    (ref_content |> bytes_to_string |> trim_newlines |> @git.ObjectId::from_hex) catch {
+    (ref_content |> bytes_to_string |> trim_newlines |> @bit.ObjectId::from_hex) catch {
       _ => raise IoError("invalid commit id in ref")
     }
   } else {
-    @git.ObjectId::from_hex(head_str) catch {
+    @bit.ObjectId::from_hex(head_str) catch {
       _ => raise IoError("invalid commit id in HEAD")
     }
   }
@@ -221,7 +221,7 @@ pub fn SubdirRepo::from_head(
 ///|
 /// ブランチからサブディレクトリリポジトリを作成
 pub fn SubdirRepo::from_branch(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   branch : String,
   subdir_path : String,
@@ -232,7 +232,7 @@ pub fn SubdirRepo::from_branch(
   let ref_content = rfs.read_file(ref_path) catch {
     _ => raise IoError("branch not found: " + branch)
   }
-  let commit_id = @git.ObjectId::from_hex(
+  let commit_id = @bit.ObjectId::from_hex(
     trim_newlines(bytes_to_string(ref_content)),
   ) catch {
     _ => raise IoError("invalid commit id in branch ref")
@@ -250,13 +250,13 @@ pub fn SubdirRepo::path(self : SubdirRepo) -> String {
 
 ///|
 /// 現在のベースコミットを取得
-pub fn SubdirRepo::base_commit(self : SubdirRepo) -> @git.ObjectId? {
+pub fn SubdirRepo::base_commit(self : SubdirRepo) -> @bit.ObjectId? {
   self.current_commit
 }
 
 ///|
 /// サブディレクトリのツリーIDを取得
-pub fn SubdirRepo::tree_id(self : SubdirRepo) -> @git.ObjectId? {
+pub fn SubdirRepo::tree_id(self : SubdirRepo) -> @bit.ObjectId? {
   self.subdir_tree
 }
 
@@ -278,7 +278,7 @@ pub fn SubdirRepo::fs(self : SubdirRepo) -> @fs.Fs {
 /// workdir: ワーキングディレクトリのルートパス
 pub fn SubdirRepo::load_workdir(
   self : SubdirRepo,
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   workdir : String,
 ) -> Unit {
   // サブディレクトリのパスを取得

@@ -56,7 +56,7 @@ async fn handle_maintenance(args : Array[String]) -> Unit raise Error {
     Some("incremental-repack") => handle_repack(["-d", "-q"])
     Some("pack-refs") => handle_pack_refs(["--all"])
     Some(t) =>
-      raise @git.GitError::InvalidObject("Unknown maintenance task: \{t}")
+      raise @bitcore.GitError::InvalidObject("Unknown maintenance task: \{t}")
   }
 }
 
@@ -76,7 +76,7 @@ async fn run_maintenance_tasks(
   handle_pack_refs(["--all"])
   if auto {
     // Run GC only if needed
-    let result = @gitlib.gc_repo(fs, fs, root)
+    let result = @bitlib.gc_repo(fs, fs, root)
     if not(quiet) && result.pack is Some(_) {
       print_line("  gc (auto)")
     }
@@ -150,7 +150,7 @@ fn get_config_value_simple(
 
 ///|
 async fn stage_all_changes(fs : OsFs, root : String) -> Unit raise Error {
-  let status = @gitlib.status(fs, root) catch {
+  let status = @bitlib.status(fs, root) catch {
     err => {
       if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
         raise err
@@ -169,7 +169,7 @@ async fn stage_all_changes(fs : OsFs, root : String) -> Unit raise Error {
     all_paths.push(p)
   }
   if all_paths.length() > 0 {
-    let _ = @gitlib.add_paths_async(fs, fs, root, all_paths) catch {
+    let _ = @bitlib.add_paths_async(fs, fs, root, all_paths) catch {
       err => {
         if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
           raise err

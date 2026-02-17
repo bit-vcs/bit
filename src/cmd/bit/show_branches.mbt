@@ -35,10 +35,10 @@ async fn handle_show_branches(args : Array[String]) -> Unit raise Error {
     }
     i += 1
   }
-  let db = @gitlib.ObjectDb::load(fs, git_dir)
+  let db = @bitlib.ObjectDb::load(fs, git_dir)
   // Get branches to show
-  let (head_ref, all_branches) = @gitlib.list_branches(fs, git_dir)
-  let branches_to_show : Array[@gitlib.BranchInfo] = if specific_branches.length() >
+  let (head_ref, all_branches) = @bitlib.list_branches(fs, git_dir)
+  let branches_to_show : Array[@bitlib.BranchInfo] = if specific_branches.length() >
     0 {
     all_branches.filter(b => specific_branches.contains(b.name))
   } else {
@@ -115,9 +115,9 @@ async fn handle_show_branches(args : Array[String]) -> Unit raise Error {
 
 ///|
 fn show_branch_get_subject(
-  db : @gitlib.ObjectDb,
-  fs : &@git.RepoFileSystem,
-  commit_id : @git.ObjectId,
+  db : @bitlib.ObjectDb,
+  fs : &@bitcore.RepoFileSystem,
+  commit_id : @bitcore.ObjectId,
 ) -> String {
   let obj = db.get(fs, commit_id) catch { _ => return "???" }
   match obj {
@@ -131,13 +131,13 @@ fn show_branch_get_subject(
 
 ///|
 fn show_branch_collect_commits(
-  db : @gitlib.ObjectDb,
-  fs : &@git.RepoFileSystem,
-  start : @git.ObjectId,
+  db : @bitlib.ObjectDb,
+  fs : &@bitcore.RepoFileSystem,
+  start : @bitcore.ObjectId,
   max_count : Int,
   skip : Map[String, Bool],
-) -> Array[(@git.ObjectId, String)] {
-  let result : Array[(@git.ObjectId, String)] = []
+) -> Array[(@bitcore.ObjectId, String)] {
+  let result : Array[(@bitcore.ObjectId, String)] = []
   let mut current = start
   let mut count = 0
   while count < max_count {
@@ -149,7 +149,7 @@ fn show_branch_collect_commits(
     match obj {
       None => break
       Some(o) => {
-        let info = @git.parse_commit(o.data) catch { _ => break }
+        let info = @bitcore.parse_commit(o.data) catch { _ => break }
         let msg = extract_commit_message(o.data)
         let subject = get_first_line(msg)
         result.push((current, subject))
@@ -166,10 +166,10 @@ fn show_branch_collect_commits(
 
 ///|
 fn show_branch_is_reachable(
-  db : @gitlib.ObjectDb,
-  fs : &@git.RepoFileSystem,
-  target : @git.ObjectId,
-  from : @git.ObjectId,
+  db : @bitlib.ObjectDb,
+  fs : &@bitcore.RepoFileSystem,
+  target : @bitcore.ObjectId,
+  from : @bitcore.ObjectId,
   max_depth : Int,
 ) -> Bool {
   let target_hex = target.to_hex()
@@ -183,7 +183,7 @@ fn show_branch_is_reachable(
     match obj {
       None => return false
       Some(o) => {
-        let info = @git.parse_commit(o.data) catch { _ => return false }
+        let info = @bitcore.parse_commit(o.data) catch { _ => return false }
         if info.parents.length() == 0 {
           return false
         }

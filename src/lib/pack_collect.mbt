@@ -5,22 +5,22 @@
 /// Used for subdir-push where parent history already exists on remote.
 pub fn collect_commit_tree_only(
   db : ObjectDb,
-  fs : &@git.RepoFileSystem,
-  commit_id : @git.ObjectId,
-) -> Array[@git.PackObject] raise @git.GitError {
+  fs : &@bit.RepoFileSystem,
+  commit_id : @bit.ObjectId,
+) -> Array[@bit.PackObject] raise @bit.GitError {
   let seen : Map[String, Bool] = {}
-  let out : Array[@git.PackObject] = []
+  let out : Array[@bit.PackObject] = []
   let hex = commit_id.to_hex()
   seen[hex] = true
   let obj = db.get(fs, commit_id)
   match obj {
-    None => raise @git.GitError::InvalidObject("Missing commit object")
+    None => raise @bit.GitError::InvalidObject("Missing commit object")
     Some(o) => {
-      if o.obj_type != @git.ObjectType::Commit {
-        raise @git.GitError::InvalidObject("Object is not a commit")
+      if o.obj_type != @bit.ObjectType::Commit {
+        raise @bit.GitError::InvalidObject("Object is not a commit")
       }
       out.push(o)
-      let info = @git.parse_commit(o.data)
+      let info = @bit.parse_commit(o.data)
       collect_tree_objects(db, fs, info.tree, seen, out)
       // Do NOT walk parent commits - they already exist on remote
     }
@@ -34,15 +34,15 @@ pub fn collect_commit_tree_only(
 /// Used for subdir-push where base objects already exist on remote.
 pub fn collect_diff_objects(
   db : ObjectDb,
-  fs : &@git.RepoFileSystem,
-  base_commit : @git.ObjectId,
-  new_commit : @git.ObjectId,
-) -> Array[@git.PackObject] raise @git.GitError {
+  fs : &@bit.RepoFileSystem,
+  base_commit : @bit.ObjectId,
+  new_commit : @bit.ObjectId,
+) -> Array[@bit.PackObject] raise @bit.GitError {
   // First, collect all object IDs reachable from base (without fetching data)
   let base_ids : Map[String, Bool] = {}
   collect_object_ids_only(db, fs, base_commit, base_ids)
   // Now collect new commit's objects, skipping those in base_ids
-  let out : Array[@git.PackObject] = []
+  let out : Array[@bit.PackObject] = []
   collect_new_commit_objects(db, fs, new_commit, base_ids, out)
   out
 }
@@ -51,10 +51,10 @@ pub fn collect_diff_objects(
 /// Collect object IDs reachable from a commit (without loading full data).
 fn collect_object_ids_only(
   db : ObjectDb,
-  fs : &@git.RepoFileSystem,
-  commit_id : @git.ObjectId,
+  fs : &@bit.RepoFileSystem,
+  commit_id : @bit.ObjectId,
   seen : Map[String, Bool],
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let hex = commit_id.to_hex()
   if seen.contains(hex) {
     return
@@ -64,8 +64,8 @@ fn collect_object_ids_only(
   match obj {
     None => () // Object might not exist locally - that's ok
     Some(o) =>
-      if o.obj_type == @git.ObjectType::Commit {
-        let info = @git.parse_commit(o.data)
+      if o.obj_type == @bit.ObjectType::Commit {
+        let info = @bit.parse_commit(o.data)
         collect_tree_ids_only(db, fs, info.tree, seen)
         for p in info.parents {
           collect_object_ids_only(db, fs, p, seen)
@@ -77,10 +77,10 @@ fn collect_object_ids_only(
 ///|
 fn collect_tree_ids_only(
   db : ObjectDb,
-  fs : &@git.RepoFileSystem,
-  tree_id : @git.ObjectId,
+  fs : &@bit.RepoFileSystem,
+  tree_id : @bit.ObjectId,
   seen : Map[String, Bool],
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let hex = tree_id.to_hex()
   if seen.contains(hex) {
     return
@@ -90,8 +90,8 @@ fn collect_tree_ids_only(
   match obj {
     None => () // Object might not exist locally
     Some(o) =>
-      if o.obj_type == @git.ObjectType::Tree {
-        let entries = @git.parse_tree(o.data)
+      if o.obj_type == @bit.ObjectType::Tree {
+        let entries = @bit.parse_tree(o.data)
         for entry in entries {
           let entry_hex = entry.id.to_hex()
           seen[entry_hex] = true
@@ -107,24 +107,24 @@ fn collect_tree_ids_only(
 /// Collect objects from a commit, but only those NOT in the base_ids set.
 fn collect_new_commit_objects(
   db : ObjectDb,
-  fs : &@git.RepoFileSystem,
-  commit_id : @git.ObjectId,
+  fs : &@bit.RepoFileSystem,
+  commit_id : @bit.ObjectId,
   base_ids : Map[String, Bool],
-  out : Array[@git.PackObject],
-) -> Unit raise @git.GitError {
+  out : Array[@bit.PackObject],
+) -> Unit raise @bit.GitError {
   let hex = commit_id.to_hex()
   if base_ids.contains(hex) {
     return
   }
   let obj = db.get(fs, commit_id)
   match obj {
-    None => raise @git.GitError::InvalidObject("Missing commit object")
+    None => raise @bit.GitError::InvalidObject("Missing commit object")
     Some(o) => {
-      if o.obj_type != @git.ObjectType::Commit {
-        raise @git.GitError::InvalidObject("Object is not a commit")
+      if o.obj_type != @bit.ObjectType::Commit {
+        raise @bit.GitError::InvalidObject("Object is not a commit")
       }
       out.push(o)
-      let info = @git.parse_commit(o.data)
+      let info = @bit.parse_commit(o.data)
       collect_new_tree_objects(db, fs, info.tree, base_ids, out)
       // Do NOT walk parent commits - they're in base_ids
     }
@@ -134,24 +134,24 @@ fn collect_new_commit_objects(
 ///|
 fn collect_new_tree_objects(
   db : ObjectDb,
-  fs : &@git.RepoFileSystem,
-  tree_id : @git.ObjectId,
+  fs : &@bit.RepoFileSystem,
+  tree_id : @bit.ObjectId,
   base_ids : Map[String, Bool],
-  out : Array[@git.PackObject],
-) -> Unit raise @git.GitError {
+  out : Array[@bit.PackObject],
+) -> Unit raise @bit.GitError {
   let hex = tree_id.to_hex()
   if base_ids.contains(hex) {
     return // Skip trees that exist in base
   }
   let obj = db.get(fs, tree_id)
   match obj {
-    None => raise @git.GitError::InvalidObject("Missing tree object: \{hex}")
+    None => raise @bit.GitError::InvalidObject("Missing tree object: \{hex}")
     Some(o) => {
-      if o.obj_type != @git.ObjectType::Tree {
-        raise @git.GitError::InvalidObject("Object is not a tree")
+      if o.obj_type != @bit.ObjectType::Tree {
+        raise @bit.GitError::InvalidObject("Object is not a tree")
       }
       out.push(o)
-      let entries = @git.parse_tree(o.data)
+      let entries = @bit.parse_tree(o.data)
       for entry in entries {
         let entry_hex = entry.id.to_hex()
         if base_ids.contains(entry_hex) {
@@ -170,21 +170,21 @@ fn collect_new_tree_objects(
 ///|
 fn collect_new_blob_object(
   db : ObjectDb,
-  fs : &@git.RepoFileSystem,
-  blob_id : @git.ObjectId,
+  fs : &@bit.RepoFileSystem,
+  blob_id : @bit.ObjectId,
   base_ids : Map[String, Bool],
-  out : Array[@git.PackObject],
-) -> Unit raise @git.GitError {
+  out : Array[@bit.PackObject],
+) -> Unit raise @bit.GitError {
   let hex = blob_id.to_hex()
   if base_ids.contains(hex) {
     return // Skip blobs that exist in base
   }
   let obj = db.get(fs, blob_id)
   match obj {
-    None => raise @git.GitError::InvalidObject("Missing blob object: \{hex}")
+    None => raise @bit.GitError::InvalidObject("Missing blob object: \{hex}")
     Some(o) => {
-      if o.obj_type != @git.ObjectType::Blob {
-        raise @git.GitError::InvalidObject("Object is not a blob")
+      if o.obj_type != @bit.ObjectType::Blob {
+        raise @bit.GitError::InvalidObject("Object is not a blob")
       }
       out.push(o)
     }
@@ -194,11 +194,11 @@ fn collect_new_blob_object(
 ///|
 pub fn collect_reachable_objects(
   db : ObjectDb,
-  fs : &@git.RepoFileSystem,
-  commit_id : @git.ObjectId,
-) -> Array[@git.PackObject] raise @git.GitError {
+  fs : &@bit.RepoFileSystem,
+  commit_id : @bit.ObjectId,
+) -> Array[@bit.PackObject] raise @bit.GitError {
   let seen : Map[String, Bool] = {}
-  let out : Array[@git.PackObject] = []
+  let out : Array[@bit.PackObject] = []
   collect_commit_objects(db, fs, commit_id, seen, out)
   out
 }
@@ -207,11 +207,11 @@ pub fn collect_reachable_objects(
 /// Collect reachable objects from multiple commits (deduplicated).
 pub fn collect_reachable_objects_from_commits(
   db : ObjectDb,
-  fs : &@git.RepoFileSystem,
-  commits : Array[@git.ObjectId],
-) -> Array[@git.PackObject] raise @git.GitError {
+  fs : &@bit.RepoFileSystem,
+  commits : Array[@bit.ObjectId],
+) -> Array[@bit.PackObject] raise @bit.GitError {
   let seen : Map[String, Bool] = {}
-  let out : Array[@git.PackObject] = []
+  let out : Array[@bit.PackObject] = []
   for commit_id in commits {
     collect_commit_objects(db, fs, commit_id, seen, out)
   }
@@ -221,11 +221,11 @@ pub fn collect_reachable_objects_from_commits(
 ///|
 fn collect_commit_objects(
   db : ObjectDb,
-  fs : &@git.RepoFileSystem,
-  commit_id : @git.ObjectId,
+  fs : &@bit.RepoFileSystem,
+  commit_id : @bit.ObjectId,
   seen : Map[String, Bool],
-  out : Array[@git.PackObject],
-) -> Unit raise @git.GitError {
+  out : Array[@bit.PackObject],
+) -> Unit raise @bit.GitError {
   let hex = commit_id.to_hex()
   if seen.contains(hex) {
     return
@@ -233,13 +233,13 @@ fn collect_commit_objects(
   seen[hex] = true
   let obj = db.get(fs, commit_id)
   match obj {
-    None => raise @git.GitError::InvalidObject("Missing commit object")
+    None => raise @bit.GitError::InvalidObject("Missing commit object")
     Some(o) => {
-      if o.obj_type != @git.ObjectType::Commit {
-        raise @git.GitError::InvalidObject("Object is not a commit")
+      if o.obj_type != @bit.ObjectType::Commit {
+        raise @bit.GitError::InvalidObject("Object is not a commit")
       }
       out.push(o)
-      let info = @git.parse_commit(o.data)
+      let info = @bit.parse_commit(o.data)
       collect_tree_objects(db, fs, info.tree, seen, out)
       for p in info.parents {
         collect_commit_objects(db, fs, p, seen, out)
@@ -251,11 +251,11 @@ fn collect_commit_objects(
 ///|
 fn collect_tree_objects(
   db : ObjectDb,
-  fs : &@git.RepoFileSystem,
-  tree_id : @git.ObjectId,
+  fs : &@bit.RepoFileSystem,
+  tree_id : @bit.ObjectId,
   seen : Map[String, Bool],
-  out : Array[@git.PackObject],
-) -> Unit raise @git.GitError {
+  out : Array[@bit.PackObject],
+) -> Unit raise @bit.GitError {
   let hex = tree_id.to_hex()
   if seen.contains(hex) {
     return
@@ -263,13 +263,13 @@ fn collect_tree_objects(
   seen[hex] = true
   let obj = db.get(fs, tree_id)
   match obj {
-    None => raise @git.GitError::InvalidObject("Missing tree object")
+    None => raise @bit.GitError::InvalidObject("Missing tree object")
     Some(o) => {
-      if o.obj_type != @git.ObjectType::Tree {
-        raise @git.GitError::InvalidObject("Object is not a tree")
+      if o.obj_type != @bit.ObjectType::Tree {
+        raise @bit.GitError::InvalidObject("Object is not a tree")
       }
       out.push(o)
-      let entries = @git.parse_tree(o.data)
+      let entries = @bit.parse_tree(o.data)
       for entry in entries {
         if collect_is_tree_mode(entry.mode) {
           collect_tree_objects(db, fs, entry.id, seen, out)
@@ -284,11 +284,11 @@ fn collect_tree_objects(
 ///|
 fn collect_blob_object(
   db : ObjectDb,
-  fs : &@git.RepoFileSystem,
-  blob_id : @git.ObjectId,
+  fs : &@bit.RepoFileSystem,
+  blob_id : @bit.ObjectId,
   seen : Map[String, Bool],
-  out : Array[@git.PackObject],
-) -> Unit raise @git.GitError {
+  out : Array[@bit.PackObject],
+) -> Unit raise @bit.GitError {
   let hex = blob_id.to_hex()
   if seen.contains(hex) {
     return
@@ -296,10 +296,10 @@ fn collect_blob_object(
   seen[hex] = true
   let obj = db.get(fs, blob_id)
   match obj {
-    None => raise @git.GitError::InvalidObject("Missing blob object: \{hex}")
+    None => raise @bit.GitError::InvalidObject("Missing blob object: \{hex}")
     Some(o) => {
-      if o.obj_type != @git.ObjectType::Blob {
-        raise @git.GitError::InvalidObject("Object is not a blob")
+      if o.obj_type != @bit.ObjectType::Blob {
+        raise @bit.GitError::InvalidObject("Object is not a blob")
       }
       out.push(o)
     }

@@ -18,7 +18,7 @@ fn update_ref_should_use_storage_runtime_args(args : Array[String]) -> Bool {
 
 ///|
 fn update_ref_storage_runtime_delegate_args(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
   is_bare : Bool,
   args : Array[String],
@@ -31,7 +31,7 @@ fn update_ref_storage_runtime_delegate_args(
   if parsed.delete_mode {
     return None
   }
-  let normalized_refname = @gitlib.normalize_repo_path(parsed.refname) catch {
+  let normalized_refname = @bitlib.normalize_repo_path(parsed.refname) catch {
     _ => return None
   }
   if not(parsed.refname.has_prefix("refs/")) {
@@ -43,7 +43,7 @@ fn update_ref_storage_runtime_delegate_args(
   if resolve_symbolic_ref_target(fs, git_dir, normalized_refname) is Some(_) {
     return None
   }
-  let (should_log, always) = @gitrepo.should_log_ref(
+  let (should_log, always) = @bitrepo.should_log_ref(
     fs,
     git_dir,
     normalized_refname,
@@ -51,7 +51,7 @@ fn update_ref_storage_runtime_delegate_args(
   ) catch {
     _ => return None
   }
-  if should_log || always || @gitrepo.reflog_exists(fs, git_dir, normalized_refname) {
+  if should_log || always || @bitrepo.reflog_exists(fs, git_dir, normalized_refname) {
     return None
   }
   Some(parsed)
@@ -61,7 +61,7 @@ fn update_ref_storage_runtime_delegate_args(
 async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let fs = OsFs::new()
-  let rfs : &@git.RepoFileSystem = fs
+  let rfs : &@bitcore.RepoFileSystem = fs
   let git_dir = resolve_git_dir(rfs, root)
   if is_reftable_repo(rfs, git_dir) {
     eprint_line(
@@ -155,7 +155,7 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
           )
           cmd_args.push(tokens[1])
           cmd_args.push(tokens[2])
-          cmd_args.push(@git.ObjectId::zero().to_hex())
+          cmd_args.push(@bitcore.ObjectId::zero().to_hex())
           handle_update_ref(cmd_args)
         }
         "update" => {
@@ -206,12 +206,12 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
           let ok = match tokens.length() {
             2 => current_id is Some(_)
             _ => {
-              let expected_id = @git.ObjectId::from_hex(tokens[2]) catch {
-                _ => @git.ObjectId::zero()
+              let expected_id = @bitcore.ObjectId::from_hex(tokens[2]) catch {
+                _ => @bitcore.ObjectId::zero()
               }
               match current_id {
                 Some(cur_id) => cur_id.to_hex() == expected_id.to_hex()
-                None => expected_id.to_hex() == @git.ObjectId::zero().to_hex()
+                None => expected_id.to_hex() == @bitcore.ObjectId::zero().to_hex()
               }
             }
           }
@@ -230,7 +230,7 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
   }
   if delete_mode {
   if positional.length() < 1 {
-      raise @git.GitError::InvalidObject("usage: git update-ref -d <refname>")
+      raise @bitcore.GitError::InvalidObject("usage: git update-ref -d <refname>")
     }
     let input_refname = normalize_update_ref_name(positional[0])
     let refname = resolve_update_target_ref(
@@ -270,7 +270,7 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
     }
     // Get old value for reflog before deleting
     let old_id = read_ref_value(fs, actual_git_dir, refname).unwrap_or(
-      @git.ObjectId::zero(),
+      @bitcore.ObjectId::zero(),
     )
     // Delete the ref
     if fs.is_file(ref_path) {
@@ -278,23 +278,23 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
     }
     delete_packed_ref_entry(fs, actual_git_dir, refname)
     // Write reflog entry for deletion
-    let rfs : &@git.RepoFileSystem = fs
-    let wfs : &@git.FileSystem = fs
-    let (should_log, _) = @gitrepo.should_log_ref(
+    let rfs : &@bitcore.RepoFileSystem = fs
+    let wfs : &@bitcore.FileSystem = fs
+    let (should_log, _) = @bitrepo.should_log_ref(
       rfs, actual_git_dir, refname, is_bare,
     )
     let should_head_log = should_update_head_reflog(
       input_refname, refname, no_deref, head_target,
     )
     let msg = message.unwrap_or("update-ref: delete")
-    if should_log || @gitrepo.reflog_exists(rfs, actual_git_dir, refname) {
-      @gitrepo.append_reflog(
+    if should_log || @bitrepo.reflog_exists(rfs, actual_git_dir, refname) {
+      @bitrepo.append_reflog(
         wfs,
         rfs,
         actual_git_dir,
         refname,
         old_id,
-        @git.ObjectId::zero(),
+        @bitcore.ObjectId::zero(),
         author,
         email,
         timestamp,
@@ -303,13 +303,13 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
       )
     }
     if should_head_log {
-      @gitrepo.append_reflog(
+      @bitrepo.append_reflog(
         wfs,
         rfs,
         actual_git_dir,
         "HEAD",
         old_id,
-        @git.ObjectId::zero(),
+        @bitcore.ObjectId::zero(),
         author,
         email,
         timestamp,
@@ -318,12 +318,12 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
       )
     }
     if refname != "HEAD" {
-      @gitrepo.delete_reflog(wfs, rfs, actual_git_dir, refname)
+      @bitrepo.delete_reflog(wfs, rfs, actual_git_dir, refname)
     }
     return ()
   }
   if positional.length() < 2 {
-    raise @git.GitError::InvalidObject(
+    raise @bitcore.GitError::InvalidObject(
       "usage: git update-ref <refname> <newvalue> [<oldvalue>]",
     )
   }
@@ -343,12 +343,12 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
   } else {
     None
   }
-  let new_id = @git.ObjectId::from_hex(new_value) catch {
+  let new_id = @bitcore.ObjectId::from_hex(new_value) catch {
     _ =>
-      match @gitrepo.rev_parse(fs, actual_git_dir, new_value) {
+      match @bitrepo.rev_parse(fs, actual_git_dir, new_value) {
         Some(id) => id
         None =>
-          raise @git.GitError::InvalidObject("unknown revision: " + new_value)
+          raise @bitcore.GitError::InvalidObject("unknown revision: " + new_value)
       }
   }
   // Get current value
@@ -356,7 +356,7 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
   // Check oldvalue if specified
   match old_value {
     Some(ov) => {
-      let expected_id = @git.ObjectId::from_hex(ov)
+      let expected_id = @bitcore.ObjectId::from_hex(ov)
       match current_id {
         Some(cur_id) =>
           if cur_id.to_hex() != expected_id.to_hex() {
@@ -366,7 +366,7 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
             @sys.exit(1)
           }
         None =>
-          if expected_id.to_hex() != @git.ObjectId::zero().to_hex() {
+          if expected_id.to_hex() != @bitcore.ObjectId::zero().to_hex() {
             @stdio.stderr.write(
               "error: cannot lock ref '\{refname}': unable to resolve reference '\{refname}'",
             )
@@ -388,14 +388,14 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
   // Write the ref
   fs.write_string(ref_path, new_id.to_hex() + "\n")
   // Handle reflog
-  let rfs : &@git.RepoFileSystem = fs
-  let wfs : &@git.FileSystem = fs
-  let (should_log, always) = @gitrepo.should_log_ref(
+  let rfs : &@bitcore.RepoFileSystem = fs
+  let wfs : &@bitcore.FileSystem = fs
+  let (should_log, always) = @bitrepo.should_log_ref(
     rfs, actual_git_dir, refname, is_bare,
   )
   if create_reflog {
     // Create reflog if requested
-    @gitrepo.create_reflog(wfs, rfs, actual_git_dir, refname)
+    @bitrepo.create_reflog(wfs, rfs, actual_git_dir, refname)
   }
   let should_head_log = should_update_head_reflog(
     input_refname, refname, no_deref, head_target,
@@ -404,20 +404,20 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
     always ||
     create_reflog ||
     should_head_log ||
-    @gitrepo.reflog_exists(rfs, actual_git_dir, refname) {
-    let old_id = current_id.unwrap_or(@git.ObjectId::zero())
+    @bitrepo.reflog_exists(rfs, actual_git_dir, refname) {
+    let old_id = current_id.unwrap_or(@bitcore.ObjectId::zero())
     let msg = message.unwrap_or("update-ref: updating")
     if should_log ||
       always ||
       create_reflog ||
-      @gitrepo.reflog_exists(rfs, actual_git_dir, refname) {
-      @gitrepo.append_reflog(
+      @bitrepo.reflog_exists(rfs, actual_git_dir, refname) {
+      @bitrepo.append_reflog(
         wfs, rfs, actual_git_dir, refname, old_id, new_id, author, email, timestamp,
         timezone, msg,
       )
     }
     if should_head_log {
-      @gitrepo.append_reflog(
+      @bitrepo.append_reflog(
         wfs, rfs, actual_git_dir, "HEAD", old_id, new_id, author, email, timestamp,
         timezone, msg,
       )
@@ -426,20 +426,20 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
 }
 
 ///|
-fn normalize_update_ref_name(refname : String) -> String raise @git.GitError {
-  let normalized = @gitlib.normalize_repo_path(refname) catch {
-    _ => raise @git.GitError::InvalidObject("invalid refname: " + refname)
+fn normalize_update_ref_name(refname : String) -> String raise @bitcore.GitError {
+  let normalized = @bitlib.normalize_repo_path(refname) catch {
+    _ => raise @bitcore.GitError::InvalidObject("invalid refname: " + refname)
   }
   if normalized == "HEAD" || normalized.has_prefix("refs/") {
     normalized
   } else {
-    raise @git.GitError::InvalidObject("invalid refname: " + refname)
+    raise @bitcore.GitError::InvalidObject("invalid refname: " + refname)
   }
 }
 
 ///|
 fn resolve_update_target_ref(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
   refname : String,
   no_deref : Bool,
@@ -452,7 +452,7 @@ fn resolve_update_target_ref(
 
 ///|
 fn resolve_symbolic_ref_target(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
   refname : String,
 ) -> String? {
@@ -555,7 +555,7 @@ fn delete_packed_ref_entry(
 
 ///|
 fn has_symbolic_ref_cycle(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
   refname : String,
 ) -> Bool {
@@ -588,20 +588,20 @@ fn has_symbolic_ref_cycle(
 
 ///|
 fn read_ref_value(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
   refname : String,
-) -> @git.ObjectId? {
+) -> @bitcore.ObjectId? {
   read_ref_value_inner(fs, git_dir, refname, 0)
 }
 
 ///|
 fn read_ref_value_inner(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
   refname : String,
   depth : Int,
-) -> @git.ObjectId? {
+) -> @bitcore.ObjectId? {
   if depth > 8 {
     return None
   }
@@ -616,12 +616,12 @@ fn read_ref_value_inner(
       let target = String::unsafe_substring(hex, start=5, end=hex.length())
       return read_ref_value_inner(fs, git_dir, target, depth + 1)
     }
-    (hex |> @git.ObjectId::from_hex |> Some) catch {
+    (hex |> @bitcore.ObjectId::from_hex |> Some) catch {
       _ => None
     }
   } else {
     // Check packed-refs
-    @gitlib.resolve_ref(fs, git_dir, refname) catch {
+    @bitlib.resolve_ref(fs, git_dir, refname) catch {
       _ => None
     }
   }
@@ -629,7 +629,7 @@ fn read_ref_value_inner(
 
 ///|
 fn get_author_info(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
 ) -> (String, String) {
   // Try to get from config or environment

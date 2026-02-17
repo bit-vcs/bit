@@ -20,7 +20,7 @@ async fn handle_repack(args : Array[String]) -> Unit raise Error {
   ignore(all)
   ignore(delete_redundant)
   // Use gitlib's repack_repo
-  let result = @gitlib.repack_repo(fs, fs, root)
+  let result = @bitlib.repack_repo(fs, fs, root)
   match result {
     Some(info) =>
       if not(quiet) {

@@ -3,7 +3,7 @@ async fn handle_shortlog(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let git_dir = root + "/.git"
   let fs = OsFs::new()
-  let rfs : &@git.RepoFileSystem = fs
+  let rfs : &@bitcore.RepoFileSystem = fs
   // Parse options
   let mut numbered = false
   let mut summary = false
@@ -26,12 +26,12 @@ async fn handle_shortlog(args : Array[String]) -> Unit raise Error {
     }
   }
   // Collect commits and group by author
-  let db = @gitlib.ObjectDb::load(rfs, git_dir)
-  let head = @gitrepo.rev_parse(rfs, git_dir, "HEAD")
+  let db = @bitlib.ObjectDb::load(rfs, git_dir)
+  let head = @bitrepo.rev_parse(rfs, git_dir, "HEAD")
   guard head is Some(h) else { return }
   let author_commits : Map[String, Array[String]] = {}
   let visited : Map[String, Bool] = {}
-  let queue : Array[@git.ObjectId] = [h]
+  let queue : Array[@bitcore.ObjectId] = [h]
   let mut count = 0
   while queue.length() > 0 {
     if max_count > 0 && count >= max_count {
@@ -69,7 +69,7 @@ async fn handle_shortlog(args : Array[String]) -> Unit raise Error {
         } else {
           author_commits[author_key] = [subject]
         }
-        let info = @git.parse_commit(o.data)
+        let info = @bitcore.parse_commit(o.data)
         for p in info.parents {
           queue.push(p)
         }

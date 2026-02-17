@@ -258,7 +258,7 @@ test "hub parser: parse_hub_work_item_list_options handles filters and limit" {
 test "hub parser: parse_hub_pr_list_options rejects invalid limit" {
   ignore(
     parse_hub_pr_list_options(["--limit", "0"]) catch {
-      @git.GitError::InvalidObject(message) => {
+      @bitcore.GitError::InvalidObject(message) => {
         assert_true(message.contains("Limit must be positive"))
         return ()
       }
@@ -272,7 +272,7 @@ test "hub parser: parse_hub_pr_list_options rejects invalid limit" {
 test "hub parser: parse_hub_issue_list_options rejects missing limit value" {
   ignore(
     parse_hub_issue_list_options(["-L"]) catch {
-      @git.GitError::InvalidObject(message) => {
+      @bitcore.GitError::InvalidObject(message) => {
         assert_true(message.contains("--limit requires a value"))
         return ()
       }
@@ -286,7 +286,7 @@ test "hub parser: parse_hub_issue_list_options rejects missing limit value" {
 test "hub parser: parse_hub_work_item_list_options rejects unknown kind" {
   ignore(
     parse_hub_work_item_list_options(["--kind", "review"]) catch {
-      @git.GitError::InvalidObject(message) => {
+      @bitcore.GitError::InvalidObject(message) => {
         assert_true(message.contains("Unknown work item kind"))
         return ()
       }
@@ -314,7 +314,7 @@ async test "hub parser: parse_hub_pr_create_options accepts positional source/ta
 async test "hub parser: parse_hub_pr_create_options rejects missing title value" {
   ignore(
     parse_hub_pr_create_options(["--title"], "hub pr create") catch {
-      @git.GitError::InvalidObject(message) => {
+      @bitcore.GitError::InvalidObject(message) => {
         assert_true(message.contains("--title requires a value"))
         return ()
       }
@@ -327,7 +327,7 @@ async test "hub parser: parse_hub_pr_create_options rejects missing title value"
 ///|
 async test "hub pr update: --label requires a value" {
   handle_hub_pr_update(["123", "--label"]) catch {
-    @git.GitError::InvalidObject(message) => {
+    @bitcore.GitError::InvalidObject(message) => {
       assert_true(message.contains("--label requires a value"))
       return ()
     }
@@ -339,7 +339,7 @@ async test "hub pr update: --label requires a value" {
 ///|
 async test "hub pr review submit: --verdict requires a value" {
   handle_hub_pr_review_submit(["123", "--verdict"]) catch {
-    @git.GitError::InvalidObject(message) => {
+    @bitcore.GitError::InvalidObject(message) => {
       assert_true(message.contains("--verdict requires a value"))
       return ()
     }
@@ -351,7 +351,7 @@ async test "hub pr review submit: --verdict requires a value" {
 ///|
 async test "hub pr review submit: --commit requires a value" {
   handle_hub_pr_review_submit(["123", "--approve", "--commit"]) catch {
-    @git.GitError::InvalidObject(message) => {
+    @bitcore.GitError::InvalidObject(message) => {
       assert_true(message.contains("--commit requires a value"))
       return ()
     }
@@ -386,7 +386,7 @@ test "hub dump parser: options and positional prefix" {
 test "hub dump parser: --prefix requires value" {
   ignore(
     parse_hub_dump_options(["--prefix"]) catch {
-      @git.GitError::InvalidObject(message) => {
+      @bitcore.GitError::InvalidObject(message) => {
         assert_true(message.contains("--prefix requires a value"))
         return ()
       }
@@ -400,7 +400,7 @@ test "hub dump parser: --prefix requires value" {
 test "hub dump parser: unknown option fails" {
   ignore(
     parse_hub_dump_options(["--unknown"]) catch {
-      @git.GitError::InvalidObject(message) => {
+      @bitcore.GitError::InvalidObject(message) => {
         assert_true(message.contains("Unknown hub dump option"))
         return ()
       }
@@ -460,7 +460,7 @@ test "hub search parser: parse query and filters" {
 test "hub search parser: reject unknown type" {
   ignore(
     parse_hub_search_options(["--type", "unknown"]) catch {
-      @git.GitError::InvalidObject(message) => {
+      @bitcore.GitError::InvalidObject(message) => {
         assert_true(message.contains("Unknown hub search type"))
         return ()
       }
@@ -474,7 +474,7 @@ test "hub search parser: reject unknown type" {
 test "hub search parser: reject unknown state" {
   ignore(
     parse_hub_search_options(["--state", "draft"]) catch {
-      @git.GitError::InvalidObject(message) => {
+      @bitcore.GitError::InvalidObject(message) => {
         assert_true(message.contains("Unknown hub search state"))
         return ()
       }
@@ -487,7 +487,7 @@ test "hub search parser: reject unknown state" {
 ///|
 async test "hub pr list: --state requires a value" {
   handle_hub_pr_list(["--state"]) catch {
-    @git.GitError::InvalidObject(message) => {
+    @bitcore.GitError::InvalidObject(message) => {
       assert_true(message.contains("--state requires a value"))
       return ()
     }
@@ -499,7 +499,7 @@ async test "hub pr list: --state requires a value" {
 ///|
 async test "hub issue list: --state requires a value" {
   handle_hub_issue_list(["--state"]) catch {
-    @git.GitError::InvalidObject(message) => {
+    @bitcore.GitError::InvalidObject(message) => {
       assert_true(message.contains("--state requires a value"))
       return ()
     }
@@ -511,7 +511,7 @@ async test "hub issue list: --state requires a value" {
 ///|
 async test "hub pr import: --limit requires a value" {
   handle_hub_pr_import(["--limit"]) catch {
-    @git.GitError::InvalidObject(message) => {
+    @bitcore.GitError::InvalidObject(message) => {
       assert_true(message.contains("--limit requires a value"))
       return ()
     }
@@ -523,7 +523,7 @@ async test "hub pr import: --limit requires a value" {
 ///|
 async test "hub issue import: --limit requires a value" {
   handle_hub_issue_import(["--limit"]) catch {
-    @git.GitError::InvalidObject(message) => {
+    @bitcore.GitError::InvalidObject(message) => {
       assert_true(message.contains("--limit requires a value"))
       return ()
     }
@@ -559,7 +559,7 @@ test "hub import provider parser: gh and json-file aliases" {
 ///|
 async test "hub pr import: --provider requires a value" {
   handle_hub_pr_import(["--provider"]) catch {
-    @git.GitError::InvalidObject(message) => {
+    @bitcore.GitError::InvalidObject(message) => {
       assert_true(message.contains("--provider requires a value"))
       return ()
     }
@@ -571,7 +571,7 @@ async test "hub pr import: --provider requires a value" {
 ///|
 async test "hub pr import: unknown provider fails" {
   handle_hub_pr_import(["--provider", "unknown"]) catch {
-    @git.GitError::InvalidObject(message) => {
+    @bitcore.GitError::InvalidObject(message) => {
       assert_true(message.contains("Unknown GitHub import provider"))
       return ()
     }
@@ -583,7 +583,7 @@ async test "hub pr import: unknown provider fails" {
 ///|
 async test "hub pr import: json-file provider requires --input" {
   handle_hub_pr_import(["--provider", "json-file"]) catch {
-    @git.GitError::InvalidObject(message) => {
+    @bitcore.GitError::InvalidObject(message) => {
       assert_true(message.contains("--input requires a file path"))
       return ()
     }
@@ -595,7 +595,7 @@ async test "hub pr import: json-file provider requires --input" {
 ///|
 async test "hub issue import: --input requires a value" {
   handle_hub_issue_import(["--provider", "json-file", "--input"]) catch {
-    @git.GitError::InvalidObject(message) => {
+    @bitcore.GitError::InvalidObject(message) => {
       assert_true(message.contains("--input requires a value"))
       return ()
     }
@@ -616,7 +616,7 @@ test "hub parser: parse_gh_prs rejects missing branch names" {
     #|}]
   ignore(
     parse_gh_prs(payload) catch {
-      @git.GitError::InvalidObject(message) => {
+      @bitcore.GitError::InvalidObject(message) => {
         assert_true(message.contains("Missing branch name"))
         return ()
       }
@@ -660,7 +660,7 @@ test "hub parser: parse_gh_prs captures source repo/ref" {
 test "hub parser: parse_gh_issues rejects non-array JSON" {
   ignore(
     parse_gh_issues("{}") catch {
-      @git.GitError::InvalidObject(message) => {
+      @bitcore.GitError::InvalidObject(message) => {
         assert_true(message.contains("Expected JSON array"))
         return ()
       }
@@ -702,7 +702,7 @@ test "hub merge policy parser: reject negative required approvals" {
     #|required_approvals = -1
   ignore(
     parse_hub_merge_policy_toml(policy_text) catch {
-      @git.GitError::InvalidObject(message) => {
+      @bitcore.GitError::InvalidObject(message) => {
         assert_true(message.contains("required_approvals"))
         return ()
       }
@@ -719,7 +719,7 @@ test "hub merge policy parser: reject non-array required_workflows" {
     #|required_workflows = "test"
   ignore(
     parse_hub_merge_policy_toml(policy_text) catch {
-      @git.GitError::InvalidObject(message) => {
+      @bitcore.GitError::InvalidObject(message) => {
         assert_true(message.contains("required_workflows"))
         return ()
       }
@@ -772,7 +772,7 @@ test "hub sync parser: parses conflict policy option" {
 test "hub sync parser: invalid conflict policy value fails" {
   ignore(
     parse_hub_sync_runtime_options(["--conflict-policy", "unknown"]) catch {
-      @git.GitError::InvalidObject(message) => {
+      @bitcore.GitError::InvalidObject(message) => {
         assert_true(message.contains("Unknown hub conflict policy"))
         return ()
       }
@@ -795,7 +795,7 @@ test "hub sync parser: --sign-key alias parses inline value" {
 test "hub sync parser: rejects unknown option" {
   ignore(
     parse_hub_sync_runtime_options(["--unknown"]) catch {
-      @git.GitError::InvalidObject(message) => {
+      @bitcore.GitError::InvalidObject(message) => {
         assert_true(message.contains("Unknown hub sync option"))
         return ()
       }
@@ -844,9 +844,9 @@ test "hub notify: format_hub_notify_message handles hub.pr.proposal" {
     "External Proposal",
     "Body",
     "refs/heads/feature",
-    @git.ObjectId::zero(),
+    @bitcore.ObjectId::zero(),
     "refs/heads/main",
-    @git.ObjectId::zero(),
+    @bitcore.ObjectId::zero(),
     "peer-user",
     10L,
     10L,

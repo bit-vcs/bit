@@ -3,7 +3,7 @@ async fn handle_describe(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let git_dir = root + "/.git"
   let fs = OsFs::new()
-  let rfs : &@git.RepoFileSystem = fs
+  let rfs : &@bitcore.RepoFileSystem = fs
   // Parse options
   let mut use_tags = false // --tags: use lightweight tags too
   let mut always = false // --always: show abbreviated commit if no tag
@@ -28,9 +28,9 @@ async fn handle_describe(args : Array[String]) -> Unit raise Error {
     }
   }
   // Resolve target commit
-  let target_id = @gitrepo.rev_parse(rfs, git_dir, commit_ref)
+  let target_id = @bitrepo.rev_parse(rfs, git_dir, commit_ref)
   guard target_id is Some(tid) else {
-    raise @git.GitError::InvalidObject("unknown revision: \{commit_ref}")
+    raise @bitcore.GitError::InvalidObject("unknown revision: \{commit_ref}")
   }
   // Get all tags
   let tags = get_all_tags(rfs, git_dir, use_tags)
@@ -74,27 +74,27 @@ async fn handle_describe(args : Array[String]) -> Unit raise Error {
 
 ///|
 fn get_all_tags(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   git_dir : String,
   include_lightweight : Bool,
-) -> Map[String, @git.ObjectId] raise Error {
-  let tags : Map[String, @git.ObjectId] = {}
+) -> Map[String, @bitcore.ObjectId] raise Error {
+  let tags : Map[String, @bitcore.ObjectId] = {}
   let tags_dir = git_dir + "/refs/tags"
   if not(rfs.is_dir(tags_dir)) {
     return tags
   }
   let entries = rfs.readdir(tags_dir) catch { _ => return tags }
-  let db = @gitlib.ObjectDb::load(rfs, git_dir)
+  let db = @bitlib.ObjectDb::load(rfs, git_dir)
   for entry in entries {
     let tag_path = tags_dir + "/" + entry
     if rfs.is_file(tag_path) {
       let ref_hex = rfs.read_file(tag_path) |> decode_bytes |> trim_string
-      let ref_id = @git.ObjectId::from_hex(ref_hex)
+      let ref_id = @bitcore.ObjectId::from_hex(ref_hex)
       // Check if it's an annotated tag (tag object) or lightweight (commit)
       let obj = db.get(rfs, ref_id)
       match obj {
         Some(o) =>
-          if o.obj_type == @git.ObjectType::Tag {
+          if o.obj_type == @bitcore.ObjectType::Tag {
             // Annotated tag - dereference to commit
             let tag_data = decode_bytes(o.data)
             let commit_id = parse_tag_object(tag_data)
@@ -102,7 +102,7 @@ fn get_all_tags(
               Some(cid) => tags[entry] = cid
               None => ()
             }
-          } else if o.obj_type == @git.ObjectType::Commit && include_lightweight {
+          } else if o.obj_type == @bitcore.ObjectType::Commit && include_lightweight {
             // Lightweight tag
             tags[entry] = ref_id
           }
@@ -114,7 +114,7 @@ fn get_all_tags(
 }
 
 ///|
-fn parse_tag_object(data : String) -> @git.ObjectId? raise Error {
+fn parse_tag_object(data : String) -> @bitcore.ObjectId? raise Error {
   // Tag object format:
   // object <sha>
   // type commit
@@ -124,7 +124,7 @@ fn parse_tag_object(data : String) -> @git.ObjectId? raise Error {
     let line = line_view.to_string()
     if line.has_prefix("object ") {
       let hex = String::unsafe_substring(line, start=7, end=line.length())
-      return hex |> trim_string |> @git.ObjectId::from_hex |> Some
+      return hex |> trim_string |> @bitcore.ObjectId::from_hex |> Some
     }
   }
   None
@@ -132,20 +132,20 @@ fn parse_tag_object(data : String) -> @git.ObjectId? raise Error {
 
 ///|
 fn find_closest_tag(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   git_dir : String,
-  target : @git.ObjectId,
-  tags : Map[String, @git.ObjectId],
-) -> (String, Int, @git.ObjectId)? raise Error {
+  target : @bitcore.ObjectId,
+  tags : Map[String, @bitcore.ObjectId],
+) -> (String, Int, @bitcore.ObjectId)? raise Error {
   // BFS from target to find closest tag
   // Queue entries: (commit_id, distance)
-  let db = @gitlib.ObjectDb::load(rfs, git_dir)
+  let db = @bitlib.ObjectDb::load(rfs, git_dir)
   let visited : Map[String, Bool] = {}
-  let queue : Array[(@git.ObjectId, Int)] = [(target, 0)]
+  let queue : Array[(@bitcore.ObjectId, Int)] = [(target, 0)]
   while queue.length() > 0 {
     // Dequeue from front (FIFO for BFS)
     let (current, distance) = queue[0]
-    let new_queue : Array[(@git.ObjectId, Int)] = []
+    let new_queue : Array[(@bitcore.ObjectId, Int)] = []
     for i in 1..<queue.length() {
       new_queue.push(queue[i])
     }
@@ -171,7 +171,7 @@ fn find_closest_tag(
     let obj = db.get(rfs, current)
     match obj {
       Some(o) => {
-        let info = @git.parse_commit(o.data)
+        let info = @bitcore.parse_commit(o.data)
         for p in info.parents {
           if not(visited.get(p.to_hex()).unwrap_or(false)) {
             queue.push((p, distance + 1))

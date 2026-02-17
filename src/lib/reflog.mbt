@@ -2,8 +2,8 @@
 
 ///|
 pub struct ReflogEntry {
-  old_id : @git.ObjectId
-  new_id : @git.ObjectId
+  old_id : @bit.ObjectId
+  new_id : @bit.ObjectId
   author : String
   email : String
   timestamp : Int64
@@ -14,7 +14,7 @@ pub struct ReflogEntry {
 ///|
 /// Check if a reflog exists for the given ref.
 pub fn reflog_exists(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
   refname : String,
 ) -> Bool {
@@ -35,10 +35,10 @@ pub fn get_reflog_path(git_dir : String, refname : String) -> String {
 ///|
 /// Read reflog entries for a given ref.
 pub fn read_reflog(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
   refname : String,
-) -> Array[ReflogEntry] raise @git.GitError {
+) -> Array[ReflogEntry] raise @bit.GitError {
   let reflog_path = get_reflog_path(git_dir, refname)
   if not(fs.is_file(reflog_path)) {
     return []
@@ -74,8 +74,8 @@ fn parse_reflog_line(line : String) -> ReflogEntry? {
   if parts.length() < 5 {
     return None
   }
-  let old_id = @git.ObjectId::from_hex(parts[0]) catch { _ => return None }
-  let new_id = @git.ObjectId::from_hex(parts[1]) catch { _ => return None }
+  let old_id = @bit.ObjectId::from_hex(parts[0]) catch { _ => return None }
+  let new_id = @bit.ObjectId::from_hex(parts[1]) catch { _ => return None }
   // Author name can have spaces, email is in angle brackets
   // Find the email (surrounded by < >)
   let mut author = ""
@@ -116,18 +116,18 @@ fn parse_reflog_line(line : String) -> ReflogEntry? {
 ///|
 /// Append a reflog entry.
 pub fn append_reflog(
-  wfs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  wfs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   refname : String,
-  old_id : @git.ObjectId,
-  new_id : @git.ObjectId,
+  old_id : @bit.ObjectId,
+  new_id : @bit.ObjectId,
   author : String,
   email : String,
   timestamp : Int64,
   timezone : String,
   message : String,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let reflog_path = get_reflog_path(git_dir, refname)
   // Ensure parent directory exists
   let parent_dir = match reflog_path.rev_find("/") {
@@ -151,11 +151,11 @@ pub fn append_reflog(
 ///|
 /// Create an empty reflog file for a ref.
 pub fn create_reflog(
-  wfs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  wfs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   refname : String,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let reflog_path = get_reflog_path(git_dir, refname)
   let parent_dir = match reflog_path.rev_find("/") {
     None => ""
@@ -172,11 +172,11 @@ pub fn create_reflog(
 ///|
 /// Delete a reflog file.
 pub fn delete_reflog(
-  wfs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  wfs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   refname : String,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let reflog_path = get_reflog_path(git_dir, refname)
   if rfs.is_file(reflog_path) {
     wfs.remove_file(reflog_path)
@@ -212,11 +212,11 @@ fn trim_whitespace(s : String) -> String {
 /// - should_log: true if this ref should have reflogs
 /// - always_log: true if core.logAllRefUpdates=always
 pub fn should_log_ref(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
   refname : String,
   is_bare : Bool,
-) -> (Bool, Bool) raise @git.GitError {
+) -> (Bool, Bool) raise @bit.GitError {
   // Read core.logAllRefUpdates from config
   let config_path = git_dir + "/config"
   let mut log_all_ref_updates : String? = None

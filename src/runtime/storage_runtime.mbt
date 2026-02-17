@@ -37,7 +37,7 @@ pub(all) struct StorageLogArgs {
 pub(all) struct StorageHashObjectArgs {
   write_object : Bool
   stdin_mode : Bool
-  obj_type : @git.ObjectType
+  obj_type : @bit.ObjectType
   paths : Array[String]
 }
 
@@ -69,8 +69,8 @@ pub(all) enum StorageCommand {
 
 ///|
 pub fn run_storage_command(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   command : StorageCommand,
 ) -> Unit raise Error {
@@ -153,13 +153,13 @@ fn storage_normalize_path(path : String) -> String {
 }
 
 ///|
-fn storage_is_bare_repo_dir(rfs : &@git.RepoFileSystem, path : String) -> Bool {
+fn storage_is_bare_repo_dir(rfs : &@bit.RepoFileSystem, path : String) -> Bool {
   rfs.is_file(path + "/HEAD") && rfs.is_dir(path + "/objects")
 }
 
 ///|
 fn storage_default_repo_marker_path(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
 ) -> String {
   if storage_is_bare_repo_dir(rfs, root) {
@@ -170,7 +170,7 @@ fn storage_default_repo_marker_path(
 }
 
 ///|
-fn storage_resolve_git_dir(rfs : &@git.RepoFileSystem, root : String) -> String {
+fn storage_resolve_git_dir(rfs : &@bit.RepoFileSystem, root : String) -> String {
   let default_git_dir = storage_default_repo_marker_path(rfs, root)
   match @sys.get_env_var("GIT_DIR") {
     Some(dir) => {
@@ -180,7 +180,7 @@ fn storage_resolve_git_dir(rfs : &@git.RepoFileSystem, root : String) -> String 
         storage_normalize_path(root + "/" + dir)
       }
       if rfs.is_file(resolved) {
-        @gitlib.resolve_gitdir(rfs, resolved)
+        @bitlib.resolve_gitdir(rfs, resolved)
       } else if rfs.is_dir(resolved) {
         resolved
       } else if storage_is_bare_repo_dir(rfs, root) {
@@ -191,7 +191,7 @@ fn storage_resolve_git_dir(rfs : &@git.RepoFileSystem, root : String) -> String 
     }
     None =>
       if rfs.is_file(default_git_dir) {
-        @gitlib.resolve_gitdir(rfs, default_git_dir)
+        @bitlib.resolve_gitdir(rfs, default_git_dir)
       } else if rfs.is_dir(default_git_dir) {
         default_git_dir
       } else if storage_is_bare_repo_dir(rfs, root) {
@@ -204,11 +204,11 @@ fn storage_resolve_git_dir(rfs : &@git.RepoFileSystem, root : String) -> String 
 
 ///|
 fn storage_repo_object_format(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> String {
   match
-    @gitlib.read_config_value(
+    @bitlib.read_config_value(
       rfs,
       git_dir + "/config",
       "extensions",
@@ -221,18 +221,18 @@ fn storage_repo_object_format(
 
 ///|
 fn storage_repo_compat_object_format(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> String? {
   match
-    @gitlib.read_config_value(
+    @bitlib.read_config_value(
       rfs,
       git_dir + "/config",
       "extensions",
       "compatobjectformat",
     ) {
     Some(value) => {
-      let normalized = @gitlib.config_strip_quotes(value).to_lower()
+      let normalized = @bitlib.config_strip_quotes(value).to_lower()
       if normalized == "sha1" || normalized == "sha256" {
         Some(normalized)
       } else {
@@ -319,28 +319,28 @@ fn storage_hash_object_requires_standalone_error(
     return false
   }
   match compat_object_format {
-    Some(format) => @gitlib.config_strip_quotes(format).to_lower() == "sha256"
+    Some(format) => @bitlib.config_strip_quotes(format).to_lower() == "sha256"
     None => false
   }
 }
 
 ///|
 fn storage_read_all_stdin() -> Bytes raise Error {
-  raise @git.GitError::InvalidObject(
+  raise @bit.GitError::InvalidObject(
     "hash-object: stdin is not supported in storage runtime",
   )
 }
 
 ///|
 fn storage_is_reftable_repo(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> Bool {
   if rfs.is_dir(git_dir + "/reftable") {
     return true
   }
   match
-    @gitlib.read_config_value(
+    @bitlib.read_config_value(
       rfs,
       git_dir + "/config",
       "extensions",
@@ -365,20 +365,20 @@ fn storage_parent_dir(path : String) -> String {
 
 ///|
 fn storage_read_ref_value(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   refname : String,
-) -> @git.ObjectId? {
+) -> @bit.ObjectId? {
   storage_read_ref_value_inner(rfs, git_dir, refname, 0)
 }
 
 ///|
 fn storage_read_ref_value_inner(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   refname : String,
   depth : Int,
-) -> @git.ObjectId? {
+) -> @bit.ObjectId? {
   if depth > 8 {
     return None
   }
@@ -392,11 +392,11 @@ fn storage_read_ref_value_inner(
       let target = String::unsafe_substring(hex, start=5, end=hex.length())
       return storage_read_ref_value_inner(rfs, git_dir, target, depth + 1)
     }
-    (@git.ObjectId::from_hex(hex) |> Some) catch {
+    (@bit.ObjectId::from_hex(hex) |> Some) catch {
       _ => None
     }
   } else {
-    @gitlib.resolve_ref(rfs, git_dir, refname) catch {
+    @bitlib.resolve_ref(rfs, git_dir, refname) catch {
       _ => None
     }
   }
@@ -407,7 +407,7 @@ fn storage_fail_unsupported_mode(
   cmd : String,
   detail : String,
 ) -> Unit raise Error {
-  raise @git.GitError::InvalidObject(
+  raise @bit.GitError::InvalidObject(
     cmd + ": mode is not supported in storage runtime: " + detail,
   )
 }
@@ -434,7 +434,7 @@ fn storage_print_line(text : String) -> Unit {
 ///|
 fn storage_require_sha1_repo(
   cmd : String,
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> Unit raise Error {
   if storage_repo_object_format(rfs, git_dir) != "sha1" {
@@ -451,8 +451,8 @@ fn storage_require_sha1_repo(
 
 ///|
 fn storage_handle_init(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   args : StorageInitArgs,
 ) -> Unit raise Error {
@@ -469,7 +469,7 @@ fn storage_handle_init(
   } else {
     args.default_branch
   }
-  let opts : @gitlib.InitOptions = {
+  let opts : @bitlib.InitOptions = {
     default_branch,
     bare: false,
     separate_git_dir: None,
@@ -477,7 +477,7 @@ fn storage_handle_init(
     ref_format,
     object_format,
   }
-  @gitrepo.init_repo_with_options_with_repo_fs(fs, rfs, root, opts)
+  @bitrepo.init_repo_with_options_with_repo_fs(fs, rfs, root, opts)
   if not(args.quiet) {
     let git_dir = storage_resolve_git_dir(rfs, root)
     storage_print_line("Initialized empty Git repository in " + git_dir + "/")
@@ -486,8 +486,8 @@ fn storage_handle_init(
 
 ///|
 fn storage_handle_add(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   args : StorageAddArgs,
 ) -> Unit raise Error {
@@ -496,19 +496,19 @@ fn storage_handle_add(
   if args.add_all {
     let add_all_paths = storage_collect_add_all_paths(rfs, root)
     if add_all_paths.length() > 0 {
-      @gitlib.add_paths(fs, rfs, root, add_all_paths)
+      @bitlib.add_paths(fs, rfs, root, add_all_paths)
     }
     return
   }
   if args.paths.length() == 0 {
-    raise @git.GitError::InvalidObject("add requires pathspec")
+    raise @bit.GitError::InvalidObject("add requires pathspec")
   }
-  @gitlib.add_paths(fs, rfs, root, args.paths)
+  @bitlib.add_paths(fs, rfs, root, args.paths)
 }
 
 ///|
 fn storage_collect_add_all_paths(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
 ) -> Array[String] raise Error {
   let snapshot = storage_collect_status_snapshot(rfs, root)
@@ -527,7 +527,7 @@ fn storage_collect_add_all_paths(
 
 ///|
 fn storage_collect_commit_all_modified_paths(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
 ) -> Array[String] raise Error {
   let snapshot = storage_collect_status_snapshot(rfs, root)
@@ -543,15 +543,15 @@ fn storage_collect_commit_all_modified_paths(
 
 ///|
 fn storage_handle_commit(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   args : StorageCommitArgs,
 ) -> Unit raise Error {
   let git_dir = storage_resolve_git_dir(rfs, root)
   storage_require_sha1_repo("commit", rfs, git_dir)
   guard args.message.length() > 0 else {
-    raise @git.GitError::InvalidObject(
+    raise @bit.GitError::InvalidObject(
       "storage runtime commit requires -m/--message",
     )
   }
@@ -560,13 +560,13 @@ fn storage_handle_commit(
       rfs, root,
     )
     if all_modified_paths.length() > 0 {
-      @gitlib.add_paths(fs, rfs, root, all_modified_paths)
+      @bitlib.add_paths(fs, rfs, root, all_modified_paths)
     }
   }
   let timestamp = storage_get_commit_timestamp()
   let committer = storage_get_committer_string()
   let committer_timestamp = timestamp
-  let commit_id = @gitlib.commit(
+  let commit_id = @bitlib.commit(
     fs,
     rfs,
     root,
@@ -616,7 +616,7 @@ fn storage_is_tree_mode(mode : String) -> Bool {
 
 ///|
 fn storage_resolve_common_git_dir(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> String {
   let commondir_path = git_dir + "/commondir"
@@ -641,22 +641,22 @@ fn storage_resolve_common_git_dir(
 
 ///|
 fn storage_collect_staged_changes_db(
-  db : @gitlib.ObjectDb,
-  rfs : &@git.RepoFileSystem,
-  tree_id : @git.ObjectId,
+  db : @bitlib.ObjectDb,
+  rfs : &@bit.RepoFileSystem,
+  tree_id : @bit.ObjectId,
   prefix : String,
-  index_map : Map[String, @gitlib.IndexEntry],
+  index_map : Map[String, @bitlib.IndexEntry],
   staged_modified : Array[String],
   staged_deleted : Array[String],
 ) -> Unit raise Error {
   let tree_obj = db.get(rfs, tree_id)
   match tree_obj {
-    None => raise @git.GitError::InvalidObject("Missing tree object")
+    None => raise @bit.GitError::InvalidObject("Missing tree object")
     Some(obj) => {
-      if obj.obj_type != @git.ObjectType::Tree {
-        raise @git.GitError::InvalidObject("Object is not a tree")
+      if obj.obj_type != @bit.ObjectType::Tree {
+        raise @bit.GitError::InvalidObject("Object is not a tree")
       }
-      let entries = @git.parse_tree(obj.data)
+      let entries = @bit.parse_tree(obj.data)
       for entry in entries {
         let path = if prefix.length() == 0 {
           entry.name
@@ -692,24 +692,24 @@ fn storage_collect_staged_changes_db(
 
 ///|
 fn storage_collect_staged_changes_from_head(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
-  index_map : Map[String, @gitlib.IndexEntry],
+  index_map : Map[String, @bitlib.IndexEntry],
   staged_modified : Array[String],
   staged_deleted : Array[String],
 ) -> Unit raise Error {
-  match @gitlib.resolve_head_commit(rfs, git_dir) {
+  match @bitlib.resolve_head_commit(rfs, git_dir) {
     None => ()
     Some(commit_id) => {
       let common_git_dir = storage_resolve_common_git_dir(rfs, git_dir)
-      let db = @gitlib.ObjectDb::load_lazy(rfs, common_git_dir)
+      let db = @bitlib.ObjectDb::load_lazy(rfs, common_git_dir)
       match db.get(rfs, commit_id) {
         None => ()
         Some(obj) => {
-          if obj.obj_type != @git.ObjectType::Commit {
-            raise @git.GitError::InvalidObject("Object is not a commit")
+          if obj.obj_type != @bit.ObjectType::Commit {
+            raise @bit.GitError::InvalidObject("Object is not a commit")
           }
-          let info = @git.parse_commit(obj.data)
+          let info = @bit.parse_commit(obj.data)
           storage_collect_staged_changes_db(
             db,
             rfs,
@@ -727,12 +727,12 @@ fn storage_collect_staged_changes_from_head(
 
 ///|
 fn storage_collect_status_snapshot(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
 ) -> StorageStatusSnapshot raise Error {
   let git_dir = storage_resolve_git_dir(rfs, root)
-  let entries = @gitlib.read_index_entries(rfs, git_dir)
-  let index_map : Map[String, @gitlib.IndexEntry] = {}
+  let entries = @bitlib.read_index_entries(rfs, git_dir)
+  let index_map : Map[String, @bitlib.IndexEntry] = {}
   for entry in entries {
     index_map[entry.path] = entry
   }
@@ -747,7 +747,7 @@ fn storage_collect_status_snapshot(
       Some(index_entry) => {
         let abs_path = root + "/" + rel_path
         let content = rfs.read_file(abs_path) catch { _ => continue }
-        let worktree_id = @git.hash_blob(content)
+        let worktree_id = @bit.hash_blob(content)
         if worktree_id != index_entry.id {
           unstaged_modified.push(rel_path)
         }
@@ -765,7 +765,7 @@ fn storage_collect_status_snapshot(
       unstaged_deleted.push(entry.path)
     }
   }
-  let staged_index_map : Map[String, @gitlib.IndexEntry] = {}
+  let staged_index_map : Map[String, @bitlib.IndexEntry] = {}
   for entry in entries {
     staged_index_map[entry.path] = entry
   }
@@ -798,12 +798,12 @@ fn storage_collect_status_snapshot(
 
 ///|
 fn storage_status_porcelain_branch_line(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> String raise Error {
-  match @gitlib.read_head_ref(rfs, git_dir) {
-    @gitlib.HeadRef::Branch(name) => "## " + name
-    @gitlib.HeadRef::Detached(id) => {
+  match @bitlib.read_head_ref(rfs, git_dir) {
+    @bitlib.HeadRef::Branch(name) => "## " + name
+    @bitlib.HeadRef::Detached(id) => {
       let short_id = (try! id.to_hex()[:7]).to_string()
       "## HEAD (detached at " + short_id + ")"
     }
@@ -812,7 +812,7 @@ fn storage_status_porcelain_branch_line(
 
 ///|
 fn storage_status_porcelain_lines(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   show_branch : Bool,
 ) -> Array[String] raise Error {
@@ -878,14 +878,14 @@ fn storage_status_porcelain_lines(
 
 ///|
 fn storage_status_text_lines(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
 ) -> Array[String] raise Error {
   let git_dir = storage_resolve_git_dir(rfs, root)
   let out : Array[String] = []
-  match @gitlib.read_head_ref(rfs, git_dir) {
-    @gitlib.HeadRef::Branch(name) => out.push("On branch " + name)
-    @gitlib.HeadRef::Detached(id) => {
+  match @bitlib.read_head_ref(rfs, git_dir) {
+    @bitlib.HeadRef::Branch(name) => out.push("On branch " + name)
+    @bitlib.HeadRef::Detached(id) => {
       let short_id = (try! id.to_hex()[:7]).to_string()
       out.push("HEAD detached at " + short_id)
     }
@@ -935,7 +935,7 @@ fn storage_status_text_lines(
 
 ///|
 fn storage_handle_status(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   args : StorageStatusArgs,
 ) -> Unit raise Error {
@@ -951,19 +951,19 @@ fn storage_handle_status(
 
 ///|
 fn storage_handle_log(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   args : StorageLogArgs,
 ) -> Unit raise Error {
   let git_dir = storage_resolve_git_dir(rfs, root)
   if args.oneline {
-    let lines = @gitlib.log_head_oneline(rfs, git_dir, max_count=args.max_count)
+    let lines = @bitlib.log_head_oneline(rfs, git_dir, max_count=args.max_count)
     for line in lines {
       storage_print_line(line)
     }
     return
   }
-  let entries = @gitlib.log_head(rfs, git_dir, max_count=args.max_count)
+  let entries = @bitlib.log_head(rfs, git_dir, max_count=args.max_count)
   for entry in entries {
     storage_print_line("commit " + entry.id.to_hex())
     storage_print_line("Author: " + entry.author)
@@ -975,8 +975,8 @@ fn storage_handle_log(
 
 ///|
 fn storage_handle_hash_object(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   args : StorageHashObjectArgs,
 ) -> Unit raise Error {
@@ -1004,9 +1004,9 @@ fn storage_handle_hash_object(
   }
   if args.stdin_mode {
     let content = storage_read_all_stdin()
-    let id = @git.hash_object_content(args.obj_type, content)
+    let id = @bit.hash_object_content(args.obj_type, content)
     if args.write_object {
-      ignore(@gitlib.write_loose_object(fs, git_dir, args.obj_type, content))
+      ignore(@bitlib.write_loose_object(fs, git_dir, args.obj_type, content))
     }
     storage_print_line(id.to_hex())
     return
@@ -1018,9 +1018,9 @@ fn storage_handle_hash_object(
       storage_normalize_path(cwd + "/" + path)
     }
     let content = rfs.read_file(abs)
-    let id = @git.hash_object_content(args.obj_type, content)
+    let id = @bit.hash_object_content(args.obj_type, content)
     if args.write_object {
-      ignore(@gitlib.write_loose_object(fs, git_dir, args.obj_type, content))
+      ignore(@bitlib.write_loose_object(fs, git_dir, args.obj_type, content))
     }
     storage_print_line(id.to_hex())
   }
@@ -1028,14 +1028,14 @@ fn storage_handle_hash_object(
 
 ///|
 fn storage_read_compat_object_format(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> String? {
-  let overrides = @gitlib.parse_config_overrides()
+  let overrides = @bitlib.parse_config_overrides()
   match overrides.get("extensions.compatobjectformat") {
     Some(value) => Some(value)
     None =>
-      @gitlib.read_config_value(
+      @bitlib.read_config_value(
         rfs,
         git_dir + "/config",
         "extensions",
@@ -1046,15 +1046,15 @@ fn storage_read_compat_object_format(
 
 ///|
 fn storage_handle_write_tree(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   args : StorageWriteTreeArgs,
 ) -> Unit raise Error {
   let git_dir = storage_resolve_git_dir(rfs, root)
   storage_require_sha1_repo("write-tree", rfs, git_dir)
-  let entries = @gitlib.read_index_entries(rfs, git_dir)
-  let tree_id = @gitlib.write_tree_from_index(
+  let entries = @bitlib.read_index_entries(rfs, git_dir)
+  let tree_id = @bitlib.write_tree_from_index(
     fs,
     rfs,
     git_dir,
@@ -1067,8 +1067,8 @@ fn storage_handle_write_tree(
 
 ///|
 fn storage_handle_update_ref(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   args : StorageUpdateRefArgs,
 ) -> Unit raise Error {
@@ -1085,7 +1085,7 @@ fn storage_handle_update_ref(
     return
   }
   guard args.new_value is Some(raw_new_value) else {
-    raise @git.GitError::InvalidObject(
+    raise @bit.GitError::InvalidObject(
       "usage: update-ref <refname> <newvalue> [<oldvalue>]",
     )
   }
@@ -1102,25 +1102,25 @@ fn storage_handle_update_ref(
 
 ///|
 fn storage_verify_old_ref_value(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   refname : String,
   old_value : String?,
 ) -> Unit raise Error {
   match old_value {
     Some(expected_hex) => {
-      let expected = @git.ObjectId::from_hex(expected_hex)
+      let expected = @bit.ObjectId::from_hex(expected_hex)
       let current = storage_read_ref_value(rfs, git_dir, refname)
       match current {
         Some(cur_id) =>
           if cur_id.to_hex() != expected.to_hex() {
-            raise @git.GitError::InvalidObject(
+            raise @bit.GitError::InvalidObject(
               "update-ref oldvalue mismatch for " + refname,
             )
           }
         None =>
-          if expected.to_hex() != @git.ObjectId::zero().to_hex() {
-            raise @git.GitError::InvalidObject(
+          if expected.to_hex() != @bit.ObjectId::zero().to_hex() {
+            raise @bit.GitError::InvalidObject(
               "update-ref expected existing ref: " + refname,
             )
           }
@@ -1132,15 +1132,15 @@ fn storage_verify_old_ref_value(
 
 ///|
 fn storage_resolve_object_id(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   spec : String,
-) -> @git.ObjectId raise Error {
-  @git.ObjectId::from_hex(spec) catch {
+) -> @bit.ObjectId raise Error {
+  @bit.ObjectId::from_hex(spec) catch {
     _ =>
-      match @gitrepo.rev_parse(rfs, git_dir, spec) {
+      match @bitrepo.rev_parse(rfs, git_dir, spec) {
         Some(id) => id
-        None => raise @git.GitError::InvalidObject("unknown revision: " + spec)
+        None => raise @bit.GitError::InvalidObject("unknown revision: " + spec)
       }
   }
 }

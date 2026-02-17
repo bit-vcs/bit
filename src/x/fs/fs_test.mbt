@@ -3,7 +3,7 @@
 test "bitfs: empty filesystem" {
   let bitfs = Fs::empty("/repo/.git")
   assert_eq(bitfs.is_dirty(), false)
-  assert_eq(bitfs.base_tree(), @git.ObjectId::zero())
+  assert_eq(bitfs.base_tree(), @bit.ObjectId::zero())
   assert_eq(bitfs.base_commit(), None)
 }
 
@@ -53,7 +53,7 @@ test "bitfs: config defaults" {
 
 ///|
 test "bitfs: full workflow with backing fs" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo")
   fs.write_string("/repo/file.txt", "initial\n")
   @lib.add_paths(fs, fs, "/repo", ["file.txt"])
@@ -78,7 +78,7 @@ test "bitfs: full workflow with backing fs" {
 
 ///|
 test "bitfs: readdir from base tree" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo")
   fs.write_string("/repo/a/b.txt", "content\n")
   fs.write_string("/repo/a/c.txt", "content\n")
@@ -98,7 +98,7 @@ test "bitfs: readdir from base tree" {
 
 ///|
 test "bitfs: is_dir and is_file" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo")
   fs.write_string("/repo/dir/file.txt", "content\n")
   @lib.add_paths(fs, fs, "/repo", ["dir/file.txt"])
@@ -116,7 +116,7 @@ test "bitfs: is_dir and is_file" {
 
 ///|
 test "bitfs: layers" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo")
   fs.write_string("/repo/base.txt", "base\n")
   @lib.add_paths(fs, fs, "/repo", ["base.txt"])

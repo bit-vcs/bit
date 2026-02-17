@@ -178,11 +178,11 @@ src/x/agent/llm/
   tools.mbt          -> @ffi, @llmlib    # shell + LLM
   runner.mbt         -> @ffi, @llmlib    # shell + LLM
   coord.mbt          -> @strconv         # pure coordination
-  coord_kv.mbt       -> @kv, @git, @lib  # via BitKvAdapter only
+  coord_kv.mbt       -> @kv, @bit, @lib  # via BitKvAdapter only
   orchestrator.mbt   -> @llmlib, @strconv
 ```
 
-`@kv`/`@git`/`@lib` への依存は `BitKvAdapter` に隔離済み。
+`@kv`/`@bit`/`@lib` への依存は `BitKvAdapter` に隔離済み。
 `coord_kv.mbt` から `BitKvAdapter` を分離すれば、パッケージ全体が独立可能。
 
 ## Test Coverage

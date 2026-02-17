@@ -4,16 +4,16 @@
 pub struct PrSyncResult {
   success : Bool
   message : String
-  local_commit : @git.ObjectId?
-  remote_commit : @git.ObjectId?
+  local_commit : @bit.ObjectId?
+  remote_commit : @bit.ObjectId?
 }
 
 ///|
 pub fn PrSyncResult::new(
   success : Bool,
   message : String,
-  local_commit : @git.ObjectId?,
-  remote_commit : @git.ObjectId?,
+  local_commit : @bit.ObjectId?,
+  remote_commit : @bit.ObjectId?,
 ) -> PrSyncResult {
   { success, message, local_commit, remote_commit }
 }
@@ -29,22 +29,22 @@ pub fn PrSyncResult::message(self : PrSyncResult) -> String {
 }
 
 ///|
-pub fn PrSyncResult::local_commit(self : PrSyncResult) -> @git.ObjectId? {
+pub fn PrSyncResult::local_commit(self : PrSyncResult) -> @bit.ObjectId? {
   self.local_commit
 }
 
 ///|
-pub fn PrSyncResult::remote_commit(self : PrSyncResult) -> @git.ObjectId? {
+pub fn PrSyncResult::remote_commit(self : PrSyncResult) -> @bit.ObjectId? {
   self.remote_commit
 }
 
 ///|
 pub fn write_object_bytes(
-  fs : &@git.FileSystem,
+  fs : &@bit.FileSystem,
   git_dir : String,
-  id : @git.ObjectId,
+  id : @bit.ObjectId,
   compressed : Bytes,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let hex = id.to_hex()
   let dir = join_path(
     git_dir,
@@ -67,28 +67,28 @@ fn join_path(a : String, b : String) -> String {
 ///|
 fn get_commit_tree(
   objects : &@lib.ObjectStore,
-  commit_id : @git.ObjectId,
-) -> @git.ObjectId? raise @git.GitError {
+  commit_id : @bit.ObjectId,
+) -> @bit.ObjectId? raise @bit.GitError {
   let obj = objects.get(commit_id)
   guard obj is Some(commit_obj) else { return None }
-  if commit_obj.obj_type != @git.ObjectType::Commit {
+  if commit_obj.obj_type != @bit.ObjectType::Commit {
     return None
   }
-  let info = @git.parse_commit(commit_obj.data)
+  let info = @bit.parse_commit(commit_obj.data)
   Some(info.tree)
 }
 
 ///|
 pub fn merge_notes_commits(
   prs : Hub,
-  fs : &@git.FileSystem,
+  fs : &@bit.FileSystem,
   git_dir : String,
   objects : &@lib.ObjectStore,
   refs : &@lib.RefStore,
-  local_id : @git.ObjectId,
-  remote_id : @git.ObjectId,
+  local_id : @bit.ObjectId,
+  remote_id : @bit.ObjectId,
   conflict_policy? : RecordMergePolicy = RecordMergePolicy::Lww,
-) -> PrSyncResult raise @git.GitError {
+) -> PrSyncResult raise @bit.GitError {
   // Fast-forward if possible
   if is_commit_ancestor_store(objects, local_id, remote_id) {
     refs.update(hub_notes_ref_name(), Some(remote_id))
@@ -116,11 +116,11 @@ pub fn merge_notes_commits(
   }
   let local_tree = get_commit_tree(objects, local_id)
   guard local_tree is Some(ltree) else {
-    raise @git.GitError::InvalidObject("Cannot read local notes tree")
+    raise @bit.GitError::InvalidObject("Cannot read local notes tree")
   }
   let remote_tree = get_commit_tree(objects, remote_id)
   guard remote_tree is Some(rtree) else {
-    raise @git.GitError::InvalidObject("Cannot read remote notes tree")
+    raise @bit.GitError::InvalidObject("Cannot read remote notes tree")
   }
   let merged_tree_id = merge_notes_trees_store(
     objects,
@@ -130,7 +130,7 @@ pub fn merge_notes_commits(
     rtree,
     conflict_policy~,
   )
-  let commit = @git.Commit::new(
+  let commit = @bit.Commit::new(
     merged_tree_id,
     [local_id, remote_id],
     "Hub <hub@local>",
@@ -141,7 +141,7 @@ pub fn merge_notes_commits(
     "+0000",
     "Merge hub notes\n",
   )
-  let (commit_id, commit_compressed) = @git.create_commit(commit)
+  let (commit_id, commit_compressed) = @bit.create_commit(commit)
   write_object_bytes(fs, git_dir, commit_id, commit_compressed)
   refs.update(hub_notes_ref_name(), Some(commit_id))
   prs.store = HubStore::load(
@@ -162,18 +162,18 @@ pub fn merge_notes_commits(
 ///|
 fn is_commit_ancestor_store(
   objects : &@lib.ObjectStore,
-  ancestor : @git.ObjectId,
-  commit : @git.ObjectId,
-) -> Bool raise @git.GitError {
+  ancestor : @bit.ObjectId,
+  commit : @bit.ObjectId,
+) -> Bool raise @bit.GitError {
   if ancestor == commit {
     return true
   }
   let obj = objects.get(commit)
   guard obj is Some(commit_obj) else { return false }
-  if commit_obj.obj_type != @git.ObjectType::Commit {
+  if commit_obj.obj_type != @bit.ObjectType::Commit {
     return false
   }
-  let info = @git.parse_commit(commit_obj.data)
+  let info = @bit.parse_commit(commit_obj.data)
   for parent in info.parents {
     if is_commit_ancestor_store(objects, ancestor, parent) {
       return true
@@ -185,19 +185,19 @@ fn is_commit_ancestor_store(
 ///|
 fn merge_notes_trees_store(
   objects : &@lib.ObjectStore,
-  fs : &@git.FileSystem,
+  fs : &@bit.FileSystem,
   git_dir : String,
-  local_tree : @git.ObjectId,
-  remote_tree : @git.ObjectId,
+  local_tree : @bit.ObjectId,
+  remote_tree : @bit.ObjectId,
   conflict_policy? : RecordMergePolicy = RecordMergePolicy::Lww,
-) -> @git.ObjectId raise @git.GitError {
+) -> @bit.ObjectId raise @bit.GitError {
   let local_entries = read_tree_entries_store(objects, local_tree)
   let remote_entries = read_tree_entries_store(objects, remote_tree)
-  let local_map : Map[String, @git.ObjectId] = {}
+  let local_map : Map[String, @bit.ObjectId] = {}
   for entry in local_entries {
     local_map[entry.name] = entry.id
   }
-  let remote_map : Map[String, @git.ObjectId] = {}
+  let remote_map : Map[String, @bit.ObjectId] = {}
   for entry in remote_entries {
     remote_map[entry.name] = entry.id
   }
@@ -210,13 +210,13 @@ fn merge_notes_trees_store(
     let (key, _) = item
     keys[key] = true
   }
-  let merged_entries : Array[@git.TreeEntry] = []
+  let merged_entries : Array[@bit.TreeEntry] = []
   for item in keys.to_array() {
     let (key, _) = item
     match (local_map.get(key), remote_map.get(key)) {
       (Some(lid), Some(rid)) =>
         if lid == rid {
-          merged_entries.push(@git.TreeEntry::new("100644", key, lid))
+          merged_entries.push(@bit.TreeEntry::new("100644", key, lid))
         } else {
           let ours = objects.get(lid)
           let theirs = objects.get(rid)
@@ -228,22 +228,22 @@ fn merge_notes_trees_store(
                 conflict_policy,
               )
               let merged_text = @utf8.decode_lossy(merged_bytes[:])
-              let (blob_id, compressed) = @git.create_blob_string(merged_text)
+              let (blob_id, compressed) = @bit.create_blob_string(merged_text)
               write_object_bytes(fs, git_dir, blob_id, compressed)
-              merged_entries.push(@git.TreeEntry::new("100644", key, blob_id))
+              merged_entries.push(@bit.TreeEntry::new("100644", key, blob_id))
             }
-            _ => merged_entries.push(@git.TreeEntry::new("100644", key, lid))
+            _ => merged_entries.push(@bit.TreeEntry::new("100644", key, lid))
           }
         }
       (Some(lid), None) =>
-        merged_entries.push(@git.TreeEntry::new("100644", key, lid))
+        merged_entries.push(@bit.TreeEntry::new("100644", key, lid))
       (None, Some(rid)) =>
-        merged_entries.push(@git.TreeEntry::new("100644", key, rid))
+        merged_entries.push(@bit.TreeEntry::new("100644", key, rid))
       _ => ()
     }
   }
   merged_entries.sort_by((a, b) => String::compare(a.name, b.name))
-  let (new_tree_id, tree_compressed) = @git.create_tree(merged_entries)
+  let (new_tree_id, tree_compressed) = @bit.create_tree(merged_entries)
   write_object_bytes(fs, git_dir, new_tree_id, tree_compressed)
   new_tree_id
 }
@@ -251,19 +251,19 @@ fn merge_notes_trees_store(
 ///|
 fn read_tree_entries_store(
   objects : &@lib.ObjectStore,
-  tree_id : @git.ObjectId,
-) -> Array[@git.TreeEntry] {
+  tree_id : @bit.ObjectId,
+) -> Array[@bit.TreeEntry] {
   let obj = objects.get(tree_id) catch { _ => None }
   match obj {
-    Some(tree_obj) => @git.parse_tree(tree_obj.data) catch { _ => [] }
+    Some(tree_obj) => @bit.parse_tree(tree_obj.data) catch { _ => [] }
     None => []
   }
 }
 
 ///|
 pub fn find_remote_notes_ref(
-  refs : Array[(@git.ObjectId, String)],
-) -> (@git.ObjectId, String) {
+  refs : Array[(@bit.ObjectId, String)],
+) -> (@bit.ObjectId, String) {
   let ref_name = hub_notes_ref_name()
   for item in refs {
     let (id, name) = item
@@ -271,13 +271,13 @@ pub fn find_remote_notes_ref(
       return (id, name)
     }
   }
-  (@git.ObjectId::zero(), ref_name)
+  (@bit.ObjectId::zero(), ref_name)
 }
 
 ///|
 pub fn find_upload_notes_ref(
-  refs : Array[(@git.ObjectId, String)],
-) -> (@git.ObjectId, String)? {
+  refs : Array[(@bit.ObjectId, String)],
+) -> (@bit.ObjectId, String)? {
   let ref_name = hub_notes_ref_name()
   for item in refs {
     let (id, name) = item

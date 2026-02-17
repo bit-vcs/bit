@@ -107,7 +107,7 @@ fn resolve_commit_message_search_all_refs(
       starts.push(id)
     }
   }
-  match @gitlib.resolve_head_commit(fs, git_dir) {
+  match @bitlib.resolve_head_commit(fs, git_dir) {
     Some(id) => {
       let hex = id.to_hex()
       if not(seen_start.contains(hex)) {
@@ -130,7 +130,7 @@ fn find_reachable_commit_by_message_from_many(
   starts : Array[@object.ObjectId],
   needle : String,
 ) -> @object.ObjectId? raise @object.GitError {
-  let db = @gitlib.ObjectDb::load(fs, git_dir)
+  let db = @bitlib.ObjectDb::load(fs, git_dir)
   let queue : Array[@object.ObjectId] = []
   for start in starts {
     queue.push(start)
@@ -242,7 +242,7 @@ fn peel_object_to_commit(
   git_dir : String,
   id : @object.ObjectId,
 ) -> @object.ObjectId? raise @object.GitError {
-  let db = @gitlib.ObjectDb::load(fs, git_dir)
+  let db = @bitlib.ObjectDb::load(fs, git_dir)
   let mut current = id
   for _ in 0..<8 {
     let obj = db.get(fs, current)
@@ -266,7 +266,7 @@ fn peel_object_to_tree(
   git_dir : String,
   id : @object.ObjectId,
 ) -> @object.ObjectId? raise @object.GitError {
-  let db = @gitlib.ObjectDb::load(fs, git_dir)
+  let db = @bitlib.ObjectDb::load(fs, git_dir)
   let mut current = id
   for _ in 0..<8 {
     let obj = db.get(fs, current)
@@ -343,7 +343,7 @@ fn apply_rev_suffix(
   start : @object.ObjectId,
   suffix : String,
 ) -> @object.ObjectId? raise @object.GitError {
-  let db = @gitlib.ObjectDb::load(fs, git_dir)
+  let db = @bitlib.ObjectDb::load(fs, git_dir)
   let chars = suffix.to_array()
   let mut current = start
   let mut i = 0
@@ -397,7 +397,7 @@ fn apply_rev_suffix(
 
 ///|
 fn commit_nth_parent(
-  db : @gitlib.ObjectDb,
+  db : @bitlib.ObjectDb,
   fs : &@types.RepoFileSystem,
   commit_id : @object.ObjectId,
   nth_parent : Int,
@@ -435,19 +435,19 @@ fn resolve_abbrev_ref_id(
 ) -> @object.ObjectId? raise @object.GitError {
   if spec.length() < 4 ||
     spec.length() >= 40 ||
-    not(@githash.is_hex_string(spec)) {
+    not(@bithash.is_hex_string(spec)) {
     return None
   }
-  let needle = @githash.lower_hex_string(spec)
+  let needle = @bithash.lower_hex_string(spec)
   let refs = show_ref(fs, git_dir)
-  let db = @gitlib.ObjectDb::load(fs, git_dir)
+  let db = @bitlib.ObjectDb::load(fs, git_dir)
   let queue : Array[@object.ObjectId] = []
   let seen : Map[String, Bool] = {}
   for item in refs {
     let (_, id) = item
     queue.push(id)
   }
-  match @gitlib.resolve_head_commit(fs, git_dir) {
+  match @bitlib.resolve_head_commit(fs, git_dir) {
     Some(id) => queue.push(id)
     None => ()
   }
@@ -490,20 +490,20 @@ fn resolve_base_ref(
   spec : String,
 ) -> @object.ObjectId? raise @object.GitError {
   if spec == "HEAD" || spec == "" || spec == "@" {
-    return @gitlib.resolve_head_commit(fs, git_dir)
+    return @bitlib.resolve_head_commit(fs, git_dir)
   }
-  if @gitlib.resolve_ref(fs, git_dir, spec) is Some(id) {
+  if @bitlib.resolve_ref(fs, git_dir, spec) is Some(id) {
     return Some(id)
   }
   if spec.has_prefix("refs/") {
-    return @gitlib.resolve_ref(fs, git_dir, spec)
+    return @bitlib.resolve_ref(fs, git_dir, spec)
   }
   if spec.has_prefix("heads/") ||
     spec.has_prefix("tags/") ||
     spec.has_prefix("remotes/") {
-    return @gitlib.resolve_ref(fs, git_dir, "refs/" + spec)
+    return @bitlib.resolve_ref(fs, git_dir, "refs/" + spec)
   }
-  if spec.length() == 40 && @githash.is_hex_string(spec) {
+  if spec.length() == 40 && @bithash.is_hex_string(spec) {
     match @object.ObjectId::from_hex(spec) {
       id => return Some(id)
     }
@@ -511,13 +511,13 @@ fn resolve_base_ref(
   if resolve_abbrev_ref_id(fs, git_dir, spec) is Some(id) {
     return Some(id)
   }
-  if @gitlib.resolve_ref(fs, git_dir, "refs/heads/" + spec) is Some(id) {
+  if @bitlib.resolve_ref(fs, git_dir, "refs/heads/" + spec) is Some(id) {
     return Some(id)
   }
-  if @gitlib.resolve_ref(fs, git_dir, "refs/remotes/" + spec) is Some(id) {
+  if @bitlib.resolve_ref(fs, git_dir, "refs/remotes/" + spec) is Some(id) {
     return Some(id)
   }
-  if @gitlib.resolve_ref(fs, git_dir, "refs/tags/" + spec) is Some(id) {
+  if @bitlib.resolve_ref(fs, git_dir, "refs/tags/" + spec) is Some(id) {
     return Some(id)
   }
   None
@@ -534,7 +534,7 @@ fn resolve_path_in_commit(
   if path.length() == 0 {
     return None
   }
-  let db = @gitlib.ObjectDb::load(fs, git_dir)
+  let db = @bitlib.ObjectDb::load(fs, git_dir)
   let obj = db.get(fs, base_id)
   match obj {
     None => return None
@@ -544,7 +544,7 @@ fn resolve_path_in_commit(
         @object.ObjectType::Tree => base_id
         _ => return None
       }
-      let entry = @gitlib.find_tree_entry(db, fs, tree_id, path)
+      let entry = @bitlib.find_tree_entry(db, fs, tree_id, path)
       match entry {
         Some(e) => Some(e.id)
         None => None
@@ -610,7 +610,7 @@ fn ref_collect_loose(
       let line = ref_read_line(fs, path)
       if line.has_prefix("ref: ") {
         let target = String::unsafe_substring(line, start=5, end=line.length())
-        let resolved = @gitlib.resolve_ref(fs, git_dir, target) catch {
+        let resolved = @bitlib.resolve_ref(fs, git_dir, target) catch {
           _ => None
         }
         match resolved {

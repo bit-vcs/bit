@@ -11,15 +11,15 @@ pub fn Hub::submit_review(
   author : String,
   verdict : ReviewVerdict,
   body : String,
-  commit_id : @git.ObjectId,
-) -> PrReview raise @git.GitError {
+  commit_id : @bit.ObjectId,
+) -> PrReview raise @bit.GitError {
   // Verify PR exists and is open
   let pr = self.get_pr(objects, pr_id)
   guard pr is Some(existing) else {
-    raise @git.GitError::InvalidObject("PR not found: \{pr_id}")
+    raise @bit.GitError::InvalidObject("PR not found: \{pr_id}")
   }
   if existing.state != PrState::Open {
-    raise @git.GitError::InvalidObject("PR is not open: \{pr_id}")
+    raise @bit.GitError::InvalidObject("PR is not open: \{pr_id}")
   }
   let timestamp = clock.now()
   // Generate review ID from content hash
@@ -27,7 +27,7 @@ pub fn Hub::submit_review(
     "", pr_id, author, verdict, body, timestamp, commit_id,
   )
   let review_data = review.serialize()
-  let (blob_id, _compressed) = @git.create_blob_string(review_data)
+  let (blob_id, _compressed) = @bit.create_blob_string(review_data)
   let review_id = short_hex(blob_id.to_hex(), 8)
   // Create final review with ID
   let final_review = PrReview::new(

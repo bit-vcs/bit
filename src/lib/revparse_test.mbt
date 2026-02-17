@@ -1,8 +1,8 @@
 ///| Tests for rev-parse/show-ref/log/diff/status porcelain
 
 ///|
-fn setup_rev_repo() -> @git.TestFs {
-  let fs = @git.TestFs::new()
+fn setup_rev_repo() -> @bit.TestFs {
+  let fs = @bit.TestFs::new()
   fs.mkdir_p("/repo/.git/refs/heads")
   fs.write_string("/repo/.git/HEAD", "ref: refs/heads/main\n")
   fs
@@ -128,7 +128,7 @@ test "rev-parse: HEAD^2 resolves second parent" {
   ignore(reset(fs, fs, "/repo", c1.to_hex(), ResetMode::Hard))
   let entries = read_index_entries(fs, "/repo/.git")
   let tree_id = write_tree_from_index(fs, fs, "/repo/.git", entries)
-  let merge_commit = @git.Commit::new(
+  let merge_commit = @bit.Commit::new(
     tree_id,
     [c1, c2],
     "Test <test@example.com>",
@@ -139,7 +139,7 @@ test "rev-parse: HEAD^2 resolves second parent" {
     "+0000",
     "merge\n",
   )
-  let (merge_id, merge_data) = @git.create_commit(merge_commit)
+  let (merge_id, merge_data) = @bit.create_commit(merge_commit)
   write_object_bytes(fs, "/repo/.git", merge_id, merge_data)
   update_head_ref(fs, fs, "/repo/.git", merge_id)
   let first_parent = rev_parse(fs, "/repo/.git", "HEAD^")

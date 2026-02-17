@@ -15,27 +15,27 @@ let bench_1mb : Bytes = Bytes::make(1024 * 1024, b'x')
 
 ///|
 test "bench sha1 1KB" (b : @bench.T) {
-  b.bench(fn() { b.keep(@git.sha1(bench_1kb)) })
+  b.bench(fn() { b.keep(@bit.sha1(bench_1kb)) })
 }
 
 ///|
 test "bench sha1 64KB" (b : @bench.T) {
-  b.bench(fn() { b.keep(@git.sha1(bench_64kb)) })
+  b.bench(fn() { b.keep(@bit.sha1(bench_64kb)) })
 }
 
 ///|
 test "bench sha1 1MB" (b : @bench.T) {
-  b.bench(fn() { b.keep(@git.sha1(bench_1mb)) })
+  b.bench(fn() { b.keep(@bit.sha1(bench_1mb)) })
 }
 
 ///|
 test "bench hash_blob 1KB" (b : @bench.T) {
-  b.bench(fn() { b.keep(@git.hash_blob(bench_1kb)) })
+  b.bench(fn() { b.keep(@bit.hash_blob(bench_1kb)) })
 }
 
 ///|
 test "bench hash_blob 64KB" (b : @bench.T) {
-  b.bench(fn() { b.keep(@git.hash_blob(bench_64kb)) })
+  b.bench(fn() { b.keep(@bit.hash_blob(bench_64kb)) })
 }
 
 ///|
@@ -55,19 +55,19 @@ test "bench zlib decompress 64KB" (b : @bench.T) {
 
 ///|
 test "bench create_object blob 1KB" (b : @bench.T) {
-  b.bench(fn() { b.keep(@git.create_object(@git.ObjectType::Blob, bench_1kb)) })
+  b.bench(fn() { b.keep(@bit.create_object(@bit.ObjectType::Blob, bench_1kb)) })
 }
 
 ///|
 test "bench ObjectId to_hex" (b : @bench.T) {
-  let id = @git.ObjectId::zero()
+  let id = @bit.ObjectId::zero()
   b.bench(fn() { b.keep(id.to_hex()) })
 }
 
 ///|
 test "bench ObjectId from_hex" (b : @bench.T) {
   let hex = "0000000000000000000000000000000000000000"
-  b.bench(fn() { b.keep(try! @git.ObjectId::from_hex(hex)) })
+  b.bench(fn() { b.keep(try! @bit.ObjectId::from_hex(hex)) })
 }
 
 ///|
@@ -97,8 +97,8 @@ test "bench bitfs write 1000 files" (b : @bench.T) {
 ///|
 fn setup_repo_with_files(
   count : Int,
-) -> (@git.TestFs, @git.ObjectId) raise @git.GitError {
-  let fs = @git.TestFs::new()
+) -> (@bit.TestFs, @bit.ObjectId) raise @bit.GitError {
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo")
   let paths : Array[String] = []
   for i in 0..<count {
@@ -113,12 +113,12 @@ fn setup_repo_with_files(
 }
 
 ///|
-let bench_repo_100 : (@git.TestFs, @git.ObjectId) = try! setup_repo_with_files(
+let bench_repo_100 : (@bit.TestFs, @bit.ObjectId) = try! setup_repo_with_files(
   100,
 )
 
 ///|
-let bench_repo_500 : (@git.TestFs, @git.ObjectId) = try! setup_repo_with_files(
+let bench_repo_500 : (@bit.TestFs, @bit.ObjectId) = try! setup_repo_with_files(
   500,
 )
 
@@ -151,7 +151,7 @@ test "bench bitfs read 100 files (cached)" (b : @bench.T) {
 test "bench bitfs snapshot 100 files" (b : @bench.T) {
   let content = Bytes::make(100, b'a')
   b.bench(fn() {
-    let fs = @git.TestFs::new()
+    let fs = @bit.TestFs::new()
     try! @lib.init_repo(fs, "/repo")
     let bitfs = Fs::empty("/repo/.git")
     for i in 0..<100 {
@@ -165,7 +165,7 @@ test "bench bitfs snapshot 100 files" (b : @bench.T) {
 test "bench bitfs snapshot 500 files" (b : @bench.T) {
   let content = Bytes::make(100, b'a')
   b.bench(fn() {
-    let fs = @git.TestFs::new()
+    let fs = @bit.TestFs::new()
     try! @lib.init_repo(fs, "/repo")
     let bitfs = Fs::empty("/repo/.git")
     for i in 0..<500 {

@@ -1,11 +1,11 @@
 import {
-  "mizchi/bit" @git,
+  "mizchi/bit" @bit,
   "mizchi/bit/pack" @pack,
   "moonbitlang/async" @async,
 }
 
 import {
-  "mizchi/bit" @git,
+  "mizchi/bit" @bit,
   "mizchi/bit/pack" @pack,
   "moonbitlang/core/bench" @bench,
 } for "test"

@@ -2,16 +2,16 @@
 
 ///|
 pub struct TreeFileEntry {
-  id : @git.ObjectId
+  id : @bit.ObjectId
   mode : Int
 }
 
 ///|
 fn worktree_is_case_insensitive(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
-) -> Bool raise @git.GitError {
+) -> Bool raise @bit.GitError {
   let lower_path = join_path(git_dir, "bit-case-probe-9fcb2c2d")
   let upper_path = join_path(git_dir, "BIT-CASE-PROBE-9FCB2C2D")
   if rfs.is_file(lower_path) ||
@@ -30,11 +30,11 @@ fn worktree_is_case_insensitive(
 
 ///|
 fn detect_case_insensitive_collision_skips(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   paths : Array[String],
-) -> Map[String, Bool] raise @git.GitError {
+) -> Map[String, Bool] raise @bit.GitError {
   let skip : Map[String, Bool] = {}
   if not(worktree_is_case_insensitive(fs, rfs, git_dir)) {
     return skip
@@ -68,9 +68,9 @@ fn detect_case_insensitive_collision_skips(
 ///|
 pub fn collect_tree_files(
   db : ObjectDb,
-  fs : &@git.RepoFileSystem,
-  tree_id : @git.ObjectId,
-) -> Map[String, TreeFileEntry] raise @git.GitError {
+  fs : &@bit.RepoFileSystem,
+  tree_id : @bit.ObjectId,
+) -> Map[String, TreeFileEntry] raise @bit.GitError {
   let out : Map[String, TreeFileEntry] = {}
   collect_tree_files_inner(db, fs, tree_id, "", out)
   out
@@ -79,17 +79,17 @@ pub fn collect_tree_files(
 ///|
 pub fn collect_tree_files_from_commit(
   db : ObjectDb,
-  fs : &@git.RepoFileSystem,
-  commit_id : @git.ObjectId,
-) -> Map[String, TreeFileEntry] raise @git.GitError {
+  fs : &@bit.RepoFileSystem,
+  commit_id : @bit.ObjectId,
+) -> Map[String, TreeFileEntry] raise @bit.GitError {
   let commit_obj = db.get(fs, commit_id)
   match commit_obj {
-    None => raise @git.GitError::InvalidObject("Missing commit object")
+    None => raise @bit.GitError::InvalidObject("Missing commit object")
     Some(obj) => {
-      if obj.obj_type != @git.ObjectType::Commit {
-        raise @git.GitError::InvalidObject("Object is not a commit")
+      if obj.obj_type != @bit.ObjectType::Commit {
+        raise @bit.GitError::InvalidObject("Object is not a commit")
       }
-      let info = @git.parse_commit(obj.data)
+      let info = @bit.parse_commit(obj.data)
       collect_tree_files(db, fs, info.tree)
     }
   }
@@ -98,9 +98,9 @@ pub fn collect_tree_files_from_commit(
 ///|
 pub fn tree_files_to_index(
   db : ObjectDb,
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   files : Map[String, TreeFileEntry],
-) -> Array[IndexEntry] raise @git.GitError {
+) -> Array[IndexEntry] raise @bit.GitError {
   let entries : Array[IndexEntry] = []
   for item in files.to_array() {
     let (path, info) = item
@@ -118,12 +118,12 @@ pub fn tree_files_to_index(
     let obj = db.get(fs, info.id)
     match obj {
       None =>
-        raise @git.GitError::InvalidObject(
+        raise @bit.GitError::InvalidObject(
           "Missing blob object: " + info.id.to_hex(),
         )
       Some(o) => {
-        if o.obj_type != @git.ObjectType::Blob {
-          raise @git.GitError::InvalidObject("Object is not a blob")
+        if o.obj_type != @bit.ObjectType::Blob {
+          raise @bit.GitError::InvalidObject("Object is not a blob")
         }
         entries.push({
           path,
@@ -143,13 +143,13 @@ pub fn tree_files_to_index(
 ///|
 pub fn write_worktree_from_files(
   db : ObjectDb,
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   git_dir : String,
   files : Map[String, TreeFileEntry],
   remove_missing? : Bool = false,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   if remove_missing {
     let entries = read_index_entries(rfs, git_dir)
     for entry in entries {
@@ -188,9 +188,9 @@ pub fn write_worktree_from_files(
     }
     let full_path = join_path(root, path)
     if rfs.is_dir(full_path) {
-      let git_marker = join_path(full_path, ".git")
-      if rfs.is_file(git_marker) || rfs.is_dir(git_marker) {
-        raise @git.GitError::InvalidObject(
+      let bit_marker = join_path(full_path, ".git")
+      if rfs.is_file(bit_marker) || rfs.is_dir(bit_marker) {
+        raise @bit.GitError::InvalidObject(
           "Refusing to overwrite submodule: \{path}",
         )
       }
@@ -198,12 +198,12 @@ pub fn write_worktree_from_files(
     let obj = db.get(rfs, info.id)
     match obj {
       None =>
-        raise @git.GitError::InvalidObject(
+        raise @bit.GitError::InvalidObject(
           "Missing blob object: " + info.id.to_hex(),
         )
       Some(o) => {
-        if o.obj_type != @git.ObjectType::Blob {
-          raise @git.GitError::InvalidObject("Object is not a blob")
+        if o.obj_type != @bit.ObjectType::Blob {
+          raise @bit.GitError::InvalidObject("Object is not a blob")
         }
         let full_path = join_path(root, path)
         let dir = parent_dir(full_path)
@@ -218,13 +218,13 @@ pub fn write_worktree_from_files(
 /// Combined worktree write + index build — reads each blob only once.
 pub fn write_worktree_and_build_index(
   db : ObjectDb,
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   git_dir : String,
   files : Map[String, TreeFileEntry],
   remove_missing? : Bool = false,
-) -> Array[IndexEntry] raise @git.GitError {
+) -> Array[IndexEntry] raise @bit.GitError {
   if remove_missing {
     let entries = read_index_entries(rfs, git_dir)
     for entry in entries {
@@ -272,9 +272,9 @@ pub fn write_worktree_and_build_index(
     if not(skip_write) {
       let full_path = join_path(root, path)
       if rfs.is_dir(full_path) {
-        let git_marker = join_path(full_path, ".git")
-        if rfs.is_file(git_marker) || rfs.is_dir(git_marker) {
-          raise @git.GitError::InvalidObject(
+        let bit_marker = join_path(full_path, ".git")
+        if rfs.is_file(bit_marker) || rfs.is_dir(bit_marker) {
+          raise @bit.GitError::InvalidObject(
             "Refusing to overwrite submodule: \{path}",
           )
         }
@@ -283,12 +283,12 @@ pub fn write_worktree_and_build_index(
     let obj = db.get(rfs, info.id)
     match obj {
       None =>
-        raise @git.GitError::InvalidObject(
+        raise @bit.GitError::InvalidObject(
           "Missing blob object: " + info.id.to_hex(),
         )
       Some(o) => {
-        if o.obj_type != @git.ObjectType::Blob {
-          raise @git.GitError::InvalidObject("Object is not a blob")
+        if o.obj_type != @bit.ObjectType::Blob {
+          raise @bit.GitError::InvalidObject("Object is not a blob")
         }
         if not(skip_write) {
           let full_path = join_path(root, path)
@@ -314,22 +314,22 @@ pub fn write_worktree_and_build_index(
 ///|
 fn collect_tree_files_inner(
   db : ObjectDb,
-  fs : &@git.RepoFileSystem,
-  tree_id : @git.ObjectId,
+  fs : &@bit.RepoFileSystem,
+  tree_id : @bit.ObjectId,
   prefix : String,
   out : Map[String, TreeFileEntry],
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let tree_obj = db.get(fs, tree_id)
   match tree_obj {
     None =>
-      raise @git.GitError::InvalidObject(
+      raise @bit.GitError::InvalidObject(
         "Missing tree object: " + tree_id.to_hex(),
       )
     Some(obj) => {
-      if obj.obj_type != @git.ObjectType::Tree {
-        raise @git.GitError::InvalidObject("Object is not a tree")
+      if obj.obj_type != @bit.ObjectType::Tree {
+        raise @bit.GitError::InvalidObject("Object is not a tree")
       }
-      let entries = @git.parse_tree(obj.data)
+      let entries = @bit.parse_tree(obj.data)
       for entry in entries {
         let path = if prefix.length() == 0 {
           entry.name

@@ -2,26 +2,26 @@
 
 ///|
 pub async fn apply_worktree_modes_from_commit(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   git_dir : String,
-  commit_id : @git.ObjectId,
-) -> Unit raise @git.GitError {
-  let db = @gitlib.ObjectDb::load(rfs, git_dir)
-  let files = @gitlib.collect_tree_files_from_commit(db, rfs, commit_id)
+  commit_id : @bit.ObjectId,
+) -> Unit raise @bit.GitError {
+  let db = @bitlib.ObjectDb::load(rfs, git_dir)
+  let files = @bitlib.collect_tree_files_from_commit(db, rfs, commit_id)
   apply_worktree_modes_from_files(db, rfs, fs, root, git_dir, files)
 }
 
 ///|
 async fn apply_worktree_modes_from_files(
-  db : @gitlib.ObjectDb,
-  rfs : &@git.RepoFileSystem,
-  fs : &@git.FileSystem,
+  db : @bitlib.ObjectDb,
+  rfs : &@bit.RepoFileSystem,
+  fs : &@bit.FileSystem,
   root : String,
   git_dir : String,
-  files : Map[String, @gitlib.TreeFileEntry],
-) -> Unit raise @git.GitError {
+  files : Map[String, @bitlib.TreeFileEntry],
+) -> Unit raise @bit.GitError {
   let items = files.to_array()
   items.sort_by((left, right) => {
     let (left_path, _) = left
@@ -63,16 +63,16 @@ async fn apply_worktree_modes_from_files(
 
 ///|
 fn read_symlink_target(
-  db : @gitlib.ObjectDb,
-  rfs : &@git.RepoFileSystem,
-  id : @git.ObjectId,
-) -> String raise @git.GitError {
+  db : @bitlib.ObjectDb,
+  rfs : &@bit.RepoFileSystem,
+  id : @bit.ObjectId,
+) -> String raise @bit.GitError {
   let obj = db.get(rfs, id)
   match obj {
-    None => raise @git.GitError::InvalidObject("Missing blob object")
+    None => raise @bit.GitError::InvalidObject("Missing blob object")
     Some(o) => {
-      if o.obj_type != @git.ObjectType::Blob {
-        raise @git.GitError::InvalidObject("Object is not a blob")
+      if o.obj_type != @bit.ObjectType::Blob {
+        raise @bit.GitError::InvalidObject("Object is not a blob")
       }
       @utf8.decode_lossy(o.data[:])
     }
@@ -81,10 +81,10 @@ fn read_symlink_target(
 
 ///|
 fn worktree_is_case_insensitive(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
-) -> Bool raise @git.GitError {
+) -> Bool raise @bit.GitError {
   let lower_path = if git_dir.has_suffix("/") {
     git_dir + "bit-case-probe-9fcb2c2d"
   } else {
@@ -111,11 +111,11 @@ fn worktree_is_case_insensitive(
 
 ///|
 fn detect_case_insensitive_collision_skips(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   paths : Array[String],
-) -> Map[String, Bool] raise @git.GitError {
+) -> Map[String, Bool] raise @bit.GitError {
   let skip : Map[String, Bool] = {}
   if not(worktree_is_case_insensitive(fs, rfs, git_dir)) {
     return skip
@@ -150,22 +150,22 @@ fn detect_case_insensitive_collision_skips(
 async fn apply_symlink(
   path : String,
   target : String,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   remove_path_if_exists(path)
   @afs.symlink(target~, path) catch {
-    err => raise @git.GitError::IoError(err.to_string())
+    err => raise @bit.GitError::IoError(err.to_string())
   }
 }
 
 ///|
-async fn apply_file_mode(path : String, mode : Int) -> Unit raise @git.GitError {
+async fn apply_file_mode(path : String, mode : Int) -> Unit raise @bit.GitError {
   @afs.chmod(path, mode) catch {
-    err => raise @git.GitError::IoError(err.to_string())
+    err => raise @bit.GitError::IoError(err.to_string())
   }
 }
 
 ///|
-async fn remove_path_if_exists(path : String) -> Unit raise @git.GitError {
+async fn remove_path_if_exists(path : String) -> Unit raise @bit.GitError {
   let exists = @afs.exists(path) catch {
     err if @async.is_cancellation_error(err) => abort("cancelled")
     _ => false
@@ -182,16 +182,16 @@ async fn remove_path_if_exists(path : String) -> Unit raise @git.GitError {
       match kind {
         @afs.FileKind::Directory =>
           @afs.rmdir(path, recursive=true) catch {
-            err => raise @git.GitError::IoError(err.to_string())
+            err => raise @bit.GitError::IoError(err.to_string())
           }
         _ =>
           @afs.remove(path) catch {
-            err => raise @git.GitError::IoError(err.to_string())
+            err => raise @bit.GitError::IoError(err.to_string())
           }
       }
     Err(_) =>
       @afs.remove(path) catch {
-        err => raise @git.GitError::IoError(err.to_string())
+        err => raise @bit.GitError::IoError(err.to_string())
       }
   }
 }

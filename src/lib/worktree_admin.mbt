@@ -6,7 +6,7 @@ pub(all) struct WorktreeInfo {
   /// Absolute path to the worktree directory
   path : String
   /// Current HEAD commit id
-  head_id : @git.ObjectId?
+  head_id : @bit.ObjectId?
   /// Branch name if HEAD points to a branch, None if detached
   branch : String?
   /// True if the worktree is locked
@@ -19,9 +19,9 @@ pub(all) struct WorktreeInfo {
 /// List all worktrees in a repository.
 /// Returns the main worktree first, followed by linked worktrees.
 pub fn list_worktrees(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   root : String,
-) -> Array[WorktreeInfo] raise @git.GitError {
+) -> Array[WorktreeInfo] raise @bit.GitError {
   let result : Array[WorktreeInfo] = []
   let git_dir = resolve_git_dir(fs, root)
   let main_root = resolve_main_worktree_root(root, git_dir)
@@ -68,10 +68,10 @@ fn resolve_main_worktree_root(root : String, git_dir : String) -> String {
 /// Check if a branch is checked out in any worktree.
 /// Returns the worktree path if the branch is in use, None otherwise.
 pub fn is_branch_checked_out(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   root : String,
   branch : String,
-) -> String? raise @git.GitError {
+) -> String? raise @bit.GitError {
   let worktrees = list_worktrees(fs, root)
   for wt in worktrees {
     match wt.branch {
@@ -85,15 +85,15 @@ pub fn is_branch_checked_out(
 ///|
 /// Create a new linked worktree.
 pub fn create_worktree(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   worktree_path : String,
   commit_ish : String?,
   detach? : Bool = false,
   force? : Bool = false,
   new_branch~ : String?,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let git_dir = resolve_git_dir(rfs, root)
   // Resolve the absolute worktree path
   let abs_wt_path = if worktree_path.has_prefix("/") {
@@ -103,7 +103,7 @@ pub fn create_worktree(
   }
   // Check worktree path doesn't already exist as a file
   if rfs.is_file(abs_wt_path) {
-    raise @git.GitError::InvalidObject(
+    raise @bit.GitError::InvalidObject(
       "'\{worktree_path}' already exists as a file",
     )
   }
@@ -113,7 +113,7 @@ pub fn create_worktree(
   let worktrees_dir = join_path(git_dir, "worktrees")
   let admin_dir = join_path(worktrees_dir, wt_name)
   if rfs.is_dir(admin_dir) {
-    raise @git.GitError::InvalidObject(
+    raise @bit.GitError::InvalidObject(
       "'\{wt_name}' is already a worktree; use a different path",
     )
   }
@@ -127,7 +127,7 @@ pub fn create_worktree(
       if not(force) {
         match is_branch_checked_out(rfs, root, b) {
           Some(path) =>
-            raise @git.GitError::InvalidObject(
+            raise @bit.GitError::InvalidObject(
               "'\{b}' is already checked out at '\{path}'",
             )
           None => ()
@@ -149,7 +149,7 @@ pub fn create_worktree(
       match commit_id {
         Some(id) => fs.write_string(head_path, id.to_hex() + "\n")
         None =>
-          raise @git.GitError::InvalidObject(
+          raise @bit.GitError::InvalidObject(
             "No commit to create worktree from",
           )
       }
@@ -172,12 +172,12 @@ pub fn create_worktree(
 ///|
 /// Remove a linked worktree.
 pub fn remove_worktree(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   worktree_path : String,
   force? : Bool = false,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let git_dir = resolve_git_dir(rfs, root)
   // Resolve the absolute worktree path
   let abs_wt_path = if worktree_path.has_prefix("/") {
@@ -188,14 +188,14 @@ pub fn remove_worktree(
   // Find the admin directory for this worktree
   let admin_dir = find_worktree_admin_dir(rfs, git_dir, abs_wt_path)
   guard admin_dir is Some(admin) else {
-    raise @git.GitError::InvalidObject(
+    raise @bit.GitError::InvalidObject(
       "'\{worktree_path}' is not a valid worktree",
     )
   }
   // Check if locked
   let locked_path = join_path(admin, "locked")
   if rfs.is_file(locked_path) && not(force) {
-    raise @git.GitError::InvalidObject(
+    raise @bit.GitError::InvalidObject(
       "'\{worktree_path}' is locked; use --force to remove anyway",
     )
   }
@@ -211,11 +211,11 @@ pub fn remove_worktree(
 /// Prune worktrees with invalid gitdir references.
 /// Returns list of pruned admin directory names.
 pub fn prune_worktrees(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   dry_run? : Bool = false,
-) -> Array[String] raise @git.GitError {
+) -> Array[String] raise @bit.GitError {
   let git_dir = resolve_git_dir(rfs, root)
   let worktrees_dir = join_path(git_dir, "worktrees")
   let pruned : Array[String] = []
@@ -264,12 +264,12 @@ pub fn prune_worktrees(
 ///|
 /// Lock a worktree to prevent it from being pruned.
 pub fn lock_worktree(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   worktree_path : String,
   reason~ : String?,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let git_dir = resolve_git_dir(rfs, root)
   // Resolve absolute path
   let abs_wt_path = if worktree_path.has_prefix("/") {
@@ -280,14 +280,14 @@ pub fn lock_worktree(
   // Find admin directory
   let admin_dir = find_worktree_admin_dir(rfs, git_dir, abs_wt_path)
   guard admin_dir is Some(admin) else {
-    raise @git.GitError::InvalidObject(
+    raise @bit.GitError::InvalidObject(
       "'\{worktree_path}' is not a valid worktree",
     )
   }
   // Check if already locked
   let locked_path = join_path(admin, "locked")
   if rfs.is_file(locked_path) {
-    raise @git.GitError::InvalidObject("'\{worktree_path}' is already locked")
+    raise @bit.GitError::InvalidObject("'\{worktree_path}' is already locked")
   }
   // Write lock file
   let content = reason.unwrap_or("")
@@ -297,11 +297,11 @@ pub fn lock_worktree(
 ///|
 /// Unlock a worktree.
 pub fn unlock_worktree(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   worktree_path : String,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let git_dir = resolve_git_dir(rfs, root)
   // Resolve absolute path
   let abs_wt_path = if worktree_path.has_prefix("/") {
@@ -312,14 +312,14 @@ pub fn unlock_worktree(
   // Find admin directory
   let admin_dir = find_worktree_admin_dir(rfs, git_dir, abs_wt_path)
   guard admin_dir is Some(admin) else {
-    raise @git.GitError::InvalidObject(
+    raise @bit.GitError::InvalidObject(
       "'\{worktree_path}' is not a valid worktree",
     )
   }
   // Check if locked
   let locked_path = join_path(admin, "locked")
   if not(rfs.is_file(locked_path)) {
-    raise @git.GitError::InvalidObject("'\{worktree_path}' is not locked")
+    raise @bit.GitError::InvalidObject("'\{worktree_path}' is not locked")
   }
   // Remove lock file
   fs.remove_file(locked_path)
@@ -328,10 +328,10 @@ pub fn unlock_worktree(
 ///|
 /// Get lock reason for a worktree.
 pub fn get_worktree_lock_reason(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   worktree_path : String,
-) -> String? raise @git.GitError {
+) -> String? raise @bit.GitError {
   let git_dir = resolve_git_dir(rfs, root)
   let abs_wt_path = if worktree_path.has_prefix("/") {
     worktree_path
@@ -355,13 +355,13 @@ pub fn get_worktree_lock_reason(
 ///|
 /// Move a worktree to a new location.
 pub fn move_worktree(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   source_path : String,
   dest_path : String,
   force? : Bool = false,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let git_dir = resolve_git_dir(rfs, root)
   // Resolve absolute paths
   let abs_src = if source_path.has_prefix("/") {
@@ -377,20 +377,20 @@ pub fn move_worktree(
   // Find admin directory
   let admin_dir = find_worktree_admin_dir(rfs, git_dir, abs_src)
   guard admin_dir is Some(admin) else {
-    raise @git.GitError::InvalidObject(
+    raise @bit.GitError::InvalidObject(
       "'\{source_path}' is not a valid worktree",
     )
   }
   // Check if locked (unless force)
   let locked_path = join_path(admin, "locked")
   if rfs.is_file(locked_path) && not(force) {
-    raise @git.GitError::InvalidObject(
+    raise @bit.GitError::InvalidObject(
       "'\{source_path}' is locked; use --force to move anyway",
     )
   }
   // Check destination doesn't exist
   if rfs.is_dir(abs_dst) || rfs.is_file(abs_dst) {
-    raise @git.GitError::InvalidObject("'\{dest_path}' already exists")
+    raise @bit.GitError::InvalidObject("'\{dest_path}' already exists")
   }
   // Update gitdir file to point to new location
   let gitdir_path = join_path(admin, "gitdir")
@@ -405,11 +405,11 @@ pub fn move_worktree(
 
 ///|
 fn copy_dir_recursive_wt(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   src : String,
   dst : String,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   fs.mkdir_p(dst)
   let entries = rfs.readdir(src)
   for entry in entries {
@@ -430,11 +430,11 @@ fn copy_dir_recursive_wt(
 ///|
 /// Repair worktree administrative files.
 pub fn repair_worktree(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   worktree_paths? : Array[String] = [],
-) -> Array[String] raise @git.GitError {
+) -> Array[String] raise @bit.GitError {
   let git_dir = resolve_git_dir(rfs, root)
   let repaired : Array[String] = []
   let worktrees_dir = join_path(git_dir, "worktrees")
@@ -508,10 +508,10 @@ pub fn repair_worktree(
 ///|
 /// Check if a worktree is prunable and return the reason.
 pub fn get_worktree_prunable_reason(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   worktree_path : String,
-) -> String? raise @git.GitError {
+) -> String? raise @bit.GitError {
   let git_dir = resolve_git_dir(rfs, root)
   let abs_wt_path = if worktree_path.has_prefix("/") {
     worktree_path
@@ -541,20 +541,20 @@ pub fn get_worktree_prunable_reason(
 ///|
 /// Resolve the actual git directory, handling .git files (for worktrees).
 fn resolve_git_dir(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   root : String,
-) -> String raise @git.GitError {
+) -> String raise @bit.GitError {
   if fs.is_file(join_path(root, "HEAD")) &&
     fs.is_dir(join_path(root, "objects")) {
     return root
   }
-  let git_path = join_path(root, ".git")
-  if fs.is_dir(git_path) {
-    return git_path
+  let bit_path = join_path(root, ".git")
+  if fs.is_dir(bit_path) {
+    return bit_path
   }
-  if fs.is_file(git_path) {
+  if fs.is_file(bit_path) {
     // .git is a file pointing to the real git directory
-    let content = read_trimmed_file(fs, git_path)
+    let content = read_trimmed_file(fs, bit_path)
     if content.has_prefix("gitdir: ") {
       let target = String::unsafe_substring(
         content,
@@ -570,15 +570,15 @@ fn resolve_git_dir(
       }
     }
   }
-  raise @git.GitError::InvalidObject("Not a git repository: \{root}")
+  raise @bit.GitError::InvalidObject("Not a git repository: \{root}")
 }
 
 ///|
 /// Resolve commondir to get the main git directory.
 fn resolve_commondir(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
-) -> String raise @git.GitError {
+) -> String raise @bit.GitError {
   let commondir_path = join_path(git_dir, "commondir")
   if fs.is_file(commondir_path) {
     let rel = read_trimmed_file(fs, commondir_path)
@@ -593,10 +593,10 @@ fn resolve_commondir(
 
 ///|
 fn get_main_worktree_info(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   root : String,
   git_dir : String,
-) -> WorktreeInfo raise @git.GitError {
+) -> WorktreeInfo raise @bit.GitError {
   let head_ref = read_head_ref(fs, git_dir)
   let (head_id, branch) = match head_ref {
     Branch(name) => (resolve_ref(fs, git_dir, "refs/heads/" + name), Some(name))
@@ -607,9 +607,9 @@ fn get_main_worktree_info(
 
 ///|
 fn get_linked_worktree_info(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   admin_dir : String,
-) -> WorktreeInfo? raise @git.GitError {
+) -> WorktreeInfo? raise @bit.GitError {
   // Read gitdir to find worktree path
   let gitdir_path = join_path(admin_dir, "gitdir")
   if not(fs.is_file(gitdir_path)) {
@@ -641,7 +641,7 @@ fn get_linked_worktree_info(
     (id, Some(branch_name))
   } else {
     // Detached HEAD
-    let id = @git.ObjectId::from_hex(head_content)
+    let id = @bit.ObjectId::from_hex(head_content)
     (Some(id), None)
   }
   // Check if locked
@@ -651,9 +651,9 @@ fn get_linked_worktree_info(
 
 ///|
 fn resolve_commondir_from_admin(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   admin_dir : String,
-) -> String raise @git.GitError {
+) -> String raise @bit.GitError {
   let commondir_path = join_path(admin_dir, "commondir")
   if fs.is_file(commondir_path) {
     let rel = read_trimmed_file(fs, commondir_path)
@@ -669,14 +669,14 @@ fn resolve_commondir_from_admin(
 
 ///|
 fn resolve_worktree_target(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   git_dir : String,
   commit_ish : String?,
   detach : Bool,
   new_branch : String?,
-) -> (String?, @git.ObjectId?) raise @git.GitError {
+) -> (String?, @bit.ObjectId?) raise @bit.GitError {
   // If new branch requested, create it
   match new_branch {
     Some(branch_name) => {
@@ -685,7 +685,7 @@ fn resolve_worktree_target(
         None => resolve_head_commit(rfs, git_dir)
       }
       guard target is Some(id) else {
-        raise @git.GitError::InvalidObject(
+        raise @bit.GitError::InvalidObject(
           "Cannot resolve commit for new branch",
         )
       }
@@ -728,13 +728,13 @@ fn resolve_worktree_target(
 
 ///|
 fn checkout_to_worktree(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   worktree_path : String,
   admin_dir : String,
-  commit_id : @git.ObjectId,
-) -> Unit raise @git.GitError {
+  commit_id : @bit.ObjectId,
+) -> Unit raise @bit.GitError {
   let db = ObjectDb::load(rfs, git_dir)
   let files = collect_tree_files_from_commit(db, rfs, commit_id)
   // Write files to worktree
@@ -763,10 +763,10 @@ fn checkout_to_worktree(
 
 ///|
 fn find_worktree_admin_dir(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
   worktree_path : String,
-) -> String? raise @git.GitError {
+) -> String? raise @bit.GitError {
   let worktrees_dir = join_path(git_dir, "worktrees")
   if not(fs.is_dir(worktrees_dir)) {
     return None
@@ -796,10 +796,10 @@ fn find_worktree_admin_dir(
 
 ///|
 fn remove_dir_recursive(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   path : String,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   if not(rfs.is_dir(path)) {
     if rfs.is_file(path) {
       fs.remove_file(path)
@@ -823,9 +823,9 @@ fn remove_dir_recursive(
 
 ///|
 fn read_trimmed_file(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   path : String,
-) -> String raise @git.GitError {
+) -> String raise @bit.GitError {
   let content = @utf8.decode_lossy(fs.read_file(path)[:])
   worktree_trim_whitespace(content)
 }
@@ -900,10 +900,10 @@ fn normalize_path(path : String) -> String {
 ///|
 /// Write index entries to a specific path (for worktree index).
 fn write_index_entries_to_path(
-  fs : &@git.FileSystem,
+  fs : &@bit.FileSystem,
   path : String,
   entries : Array[IndexEntry],
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let sorted = entries.copy()
   sorted.sort_by((a, b) => String::compare(a.path, b.path))
   // Serialize index
@@ -972,7 +972,7 @@ fn write_index_entries_to_path(
   }
   // Compute checksum
   let data = Bytes::from_array(FixedArray::makei(buf.length(), i => buf[i]))
-  let checksum = @git.sha1(data)
+  let checksum = @bit.sha1(data)
   for b in checksum.bytes {
     buf.push(b)
   }

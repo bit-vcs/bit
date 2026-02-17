@@ -37,10 +37,10 @@ async fn handle_grep(args : Array[String]) -> Unit raise Error {
     }
   }
   guard pattern is Some(pat) else {
-    raise @git.GitError::InvalidObject("fatal: no pattern given")
+    raise @bitcore.GitError::InvalidObject("fatal: no pattern given")
   }
   // Get files from index
-  let index_entries = @gitlib.read_index_entries(fs, git_dir)
+  let index_entries = @bitlib.read_index_entries(fs, git_dir)
   let files_to_search : Array[String] = []
   if paths.length() == 0 {
     for e in index_entries {

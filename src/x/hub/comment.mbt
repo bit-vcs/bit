@@ -13,12 +13,12 @@ pub fn Hub::add_comment(
   reply_to? : String? = None,
   file_path? : String? = None,
   line_number? : Int? = None,
-  commit_id? : @git.ObjectId? = None,
-) -> PrComment raise @git.GitError {
+  commit_id? : @bit.ObjectId? = None,
+) -> PrComment raise @bit.GitError {
   // Verify PR exists
   let pr = self.get_pr(objects, pr_id)
   guard pr is Some(_) else {
-    raise @git.GitError::InvalidObject("PR not found: \{pr_id}")
+    raise @bit.GitError::InvalidObject("PR not found: \{pr_id}")
   }
   let timestamp = clock.now()
   // Generate comment ID from content hash
@@ -34,7 +34,7 @@ pub fn Hub::add_comment(
     commit_id~,
   )
   let comment_data = comment.serialize()
-  let (blob_id, _compressed) = @git.create_blob_string(comment_data)
+  let (blob_id, _compressed) = @bit.create_blob_string(comment_data)
   let comment_id = short_hex(blob_id.to_hex(), 8)
   // Create final comment with ID
   let final_comment = PrComment::new(

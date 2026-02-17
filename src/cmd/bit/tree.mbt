@@ -46,7 +46,7 @@ fn temp_root_dir() -> String {
 }
 
 ///|
-fn make_temp_dir(fs : OsFs, prefix : String) -> String raise @git.GitError {
+fn make_temp_dir(fs : OsFs, prefix : String) -> String raise @bitcore.GitError {
   let base = temp_root_dir() + "/" + prefix + "-" + "\{get_current_timestamp()}"
   let mut candidate = base
   let mut i = 0
@@ -55,7 +55,7 @@ fn make_temp_dir(fs : OsFs, prefix : String) -> String raise @git.GitError {
     candidate = base + "-" + "\{i}"
   }
   fs.mkdir_p(candidate) catch {
-    _ => raise @git.GitError::IoError("Failed to create temp dir: " + candidate)
+    _ => raise @bitcore.GitError::IoError("Failed to create temp dir: " + candidate)
   }
   candidate
 }
@@ -87,7 +87,7 @@ async fn handle_tree(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
   match check_shorthand_ambiguity(spec, p => fs.is_dir(p)) {
     Some(conflict_path) =>
-      raise @git.GitError::InvalidObject(
+      raise @bitcore.GitError::InvalidObject(
         "Ambiguous: '\{conflict_path}' exists locally. Use full URL or ./\{spec} for local path.",
       )
     None => ()
@@ -97,14 +97,14 @@ async fn handle_tree(args : Array[String]) -> Unit raise Error {
     Some(Repo(url, refname)) => (url, None, refname)
     Some(Subdir(url, subpath, refname)) => (url, Some(subpath), refname)
     Some(File(_url, _)) =>
-      raise @git.GitError::InvalidObject(
+      raise @bitcore.GitError::InvalidObject(
         "tree does not accept file URLs; use 'bit cat' instead",
       )
     None =>
       if spec.has_prefix("https://") || spec.has_prefix("http://") {
         (spec, None, None)
       } else if spec.has_prefix("git@") {
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "SSH URLs are not supported; use https://",
         )
       } else {
@@ -138,7 +138,7 @@ async fn handle_tree(args : Array[String]) -> Unit raise Error {
   let normalized_filters = normalize_ls_tree_filters(path_filters, "")
   let temp_dir = make_temp_dir(fs, "bit-tree")
   try {
-    let _ = @gitionative.clone_http_to_fs(
+    let _ = @bitnative.clone_http_to_fs(
       remote_url,
       true,
       fs,
@@ -151,24 +151,24 @@ async fn handle_tree(args : Array[String]) -> Unit raise Error {
       Some(refname) => {
         let resolved = resolve_remote_ref_id(remote_url, refname)
         guard resolved is Some((id, _)) else {
-          raise @git.GitError::InvalidObject("Unknown ref: " + refname)
+          raise @bitcore.GitError::InvalidObject("Unknown ref: " + refname)
         }
         id
       }
       None => {
-        let head_id = @gitrepo.rev_parse(fs, git_dir, "HEAD")
+        let head_id = @bitrepo.rev_parse(fs, git_dir, "HEAD")
         guard head_id is Some(id) else {
-          raise @git.GitError::InvalidObject("HEAD not found")
+          raise @bitcore.GitError::InvalidObject("HEAD not found")
         }
         id
       }
     }
-    let mut db = @gitlib.ObjectDb::load_lazy(fs, git_dir)
+    let mut db = @bitlib.ObjectDb::load_lazy(fs, git_dir)
     if db.get(fs, commit_id) is None {
-      let pack = @gitionative.fetch_pack_http(remote_url, [commit_id], true)
+      let pack = @bitnative.fetch_pack_http(remote_url, [commit_id], true)
       let objects = @pack.parse_packfile(pack)
       @pack.write_packfile_with_index(fs, git_dir, pack, objects)
-      db = @gitlib.ObjectDb::load_lazy(fs, git_dir)
+      db = @bitlib.ObjectDb::load_lazy(fs, git_dir)
     }
     let tree_id = resolve_to_tree(db, fs, commit_id)
     print_tree_entries(

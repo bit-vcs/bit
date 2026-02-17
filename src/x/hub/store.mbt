@@ -390,7 +390,7 @@ fn is_valid_record(record : HubRecord) -> Bool {
 
 ///|
 fn compute_record_signature(record : HubRecord, signing_key : String) -> String {
-  let state = @git.Sha1State::new()
+  let state = @bit.Sha1State::new()
   state.update_string(serialize_hub_record_unsigned(record))
   state.update_string("\n--signing-key--\n")
   state.update_string(signing_key)
@@ -451,8 +451,8 @@ pub struct HubStore {
   node_id : String
   signing_key : String?
   require_signed : Bool
-  entries : Map[String, @git.ObjectId] // entry_name -> blob_id
-  mut head : @git.ObjectId? // current notes commit
+  entries : Map[String, @bit.ObjectId] // entry_name -> blob_id
+  mut head : @bit.ObjectId? // current notes commit
 }
 
 ///|
@@ -462,20 +462,20 @@ pub fn HubStore::load(
   node_id? : String = "local",
   signing_key? : String? = None,
   require_signed? : Bool = false,
-) -> HubStore raise @git.GitError {
+) -> HubStore raise @bit.GitError {
   let node = node_id
   let key = signing_key
   let require_signed_val = require_signed
   let commit = refs.resolve(hub_notes_ref)
-  let entries : Map[String, @git.ObjectId] = {}
+  let entries : Map[String, @bit.ObjectId] = {}
   let head = match commit {
     Some(cid) => {
       let obj = objects.get(cid)
       guard obj is Some(commit_obj) else { None }
-      let info = @git.parse_commit(commit_obj.data)
+      let info = @bit.parse_commit(commit_obj.data)
       let tree_obj = objects.get(info.tree)
       guard tree_obj is Some(tobj) else { None }
-      let tree_entries = @git.parse_tree(tobj.data)
+      let tree_entries = @bit.parse_tree(tobj.data)
       for entry in tree_entries {
         entries[entry.name] = entry.id
       }
@@ -522,9 +522,9 @@ fn verify_record_by_policy(store : HubStore, record : HubRecord) -> Bool {
 ///|
 fn ensure_signature_ready_for_write(
   store : HubStore,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   if store.require_signed && store.signing_key is None {
-    raise @git.GitError::InvalidObject(
+    raise @bit.GitError::InvalidObject(
       "Hub signing is required but signing key is not configured",
     )
   }
@@ -571,7 +571,7 @@ pub fn HubStore::put_record(
   kind : String,
   payload : String,
   node : String,
-) -> HubRecord raise @git.GitError {
+) -> HubRecord raise @bit.GitError {
   ensure_signature_ready_for_write(self)
   let timestamp = clock.now()
   let existing = self.get_record(objects, key)
@@ -596,11 +596,11 @@ pub fn HubStore::put_record(
   let target_id = key_to_target_id(key)
   // Store the key blob
   let key_bytes = @utf8.encode(key)
-  ignore(objects.put(@git.ObjectType::Blob, key_bytes))
+  ignore(objects.put(@bit.ObjectType::Blob, key_bytes))
   // Store the record blob
   let record_text = record.serialize()
   let record_bytes = @utf8.encode(record_text)
-  let record_blob_id = objects.put(@git.ObjectType::Blob, record_bytes)
+  let record_blob_id = objects.put(@bit.ObjectType::Blob, record_bytes)
   self.entries[target_id.to_hex()] = record_blob_id
   let _ = commit_notes(self, objects, refs, "Update " + kind, timestamp)
   record
@@ -615,7 +615,7 @@ pub fn HubStore::delete_record(
   key : String,
   kind : String,
   node : String,
-) -> HubRecord raise @git.GitError {
+) -> HubRecord raise @bit.GitError {
   ensure_signature_ready_for_write(self)
   let timestamp = clock.now()
   let existing = self.get_record(objects, key)
@@ -640,11 +640,11 @@ pub fn HubStore::delete_record(
   let target_id = key_to_target_id(key)
   // Store the key blob
   let key_bytes = @utf8.encode(key)
-  ignore(objects.put(@git.ObjectType::Blob, key_bytes))
+  ignore(objects.put(@bit.ObjectType::Blob, key_bytes))
   // Store the record blob
   let record_text = record.serialize()
   let record_bytes = @utf8.encode(record_text)
-  let record_blob_id = objects.put(@git.ObjectType::Blob, record_bytes)
+  let record_blob_id = objects.put(@bit.ObjectType::Blob, record_bytes)
   self.entries[target_id.to_hex()] = record_blob_id
   let _ = commit_notes(self, objects, refs, "Delete " + kind, timestamp)
   record
@@ -695,8 +695,8 @@ fn increment_clock(
 }
 
 ///|
-fn key_to_target_id(key : String) -> @git.ObjectId {
-  let (id, _compressed) = @git.create_blob_string(key)
+fn key_to_target_id(key : String) -> @bit.ObjectId {
+  let (id, _compressed) = @bit.create_blob_string(key)
   id
 }
 
@@ -707,22 +707,22 @@ fn commit_notes(
   refs : &@lib.RefStore,
   message : String,
   timestamp : Int64,
-) -> @git.ObjectId raise @git.GitError {
+) -> @bit.ObjectId raise @bit.GitError {
   // Build tree from entries
-  let tree_entries : Array[@git.TreeEntry] = []
+  let tree_entries : Array[@bit.TreeEntry] = []
   for item in store.entries.to_array() {
     let (name, blob_id) = item
-    tree_entries.push(@git.TreeEntry::new("100644", name, blob_id))
+    tree_entries.push(@bit.TreeEntry::new("100644", name, blob_id))
   }
   tree_entries.sort_by((a, b) => String::compare(a.name, b.name))
-  let tree_bytes = @git.serialize_tree(tree_entries)
-  let tree_id = objects.put(@git.ObjectType::Tree, tree_bytes)
+  let tree_bytes = @bit.serialize_tree(tree_entries)
+  let tree_id = objects.put(@bit.ObjectType::Tree, tree_bytes)
   // Create commit
   let parents = match store.head {
     Some(p) => [p]
     None => []
   }
-  let commit = @git.Commit::new(
+  let commit = @bit.Commit::new(
     tree_id,
     parents,
     "Hub <hub@local>",
@@ -733,8 +733,8 @@ fn commit_notes(
     "+0000",
     message + "\n",
   )
-  let commit_bytes = @git.serialize_commit_content(commit)
-  let commit_id = objects.put(@git.ObjectType::Commit, commit_bytes)
+  let commit_bytes = @bit.serialize_commit_content(commit)
+  let commit_id = objects.put(@bit.ObjectType::Commit, commit_bytes)
   store.head = Some(commit_id)
   refs.update(hub_notes_ref, Some(commit_id))
   commit_id

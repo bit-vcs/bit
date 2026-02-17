@@ -16,7 +16,7 @@ src/x/agent/llm/          mizchi/llm (外部)
   ← git 層への依存: ZERO
 
 src/x/agent/               mizchi/bit (本体)
-  types.mbt                  @git.ObjectId (型のみ)
+  types.mbt                  @bit.ObjectId (型のみ)
   workflow.mbt               &@lib.ObjectStore (trait)
   policy.mbt                 &@lib.RefStore (trait)
                              &@lib.Clock (trait)
@@ -25,8 +25,8 @@ src/x/agent/               mizchi/bit (本体)
   ← git 層への依存: trait 参照のみ、実装非依存
 
 src/x/agent/native/        mizchi/bit (本体)
-  runner.mbt                 @git.*, @lib.ObjectDb
-  server.mbt                 @pack, @protocol, @gitnative
+  runner.mbt                 @bit.*, @lib.ObjectDb
+  server.mbt                 @pack, @protocol, @bitnative
   ← git 層への依存: TIGHT (native adapter)
 ```
 
@@ -56,7 +56,7 @@ fn(input) {
 
 `src/x/agent/` の `workflow.mbt` と `policy.mbt` は trait 経由で git 層を使う。依存は:
 
-- `@git.ObjectId` — 型のみ
+- `@bit.ObjectId` — 型のみ
 - `&@lib.ObjectStore` / `&@lib.RefStore` / `&@lib.WorkingTree` / `&@lib.Clock` — trait 参照
 - `@hub.Hub` — hub API
 

@@ -30,7 +30,7 @@ test "clone caps contain token: missing token" {
 
 ///|
 test "clone local source file resolver: existing relative bundle path" {
-  let fs = @git.TestFs::new()
+  let fs = @bitcore.TestFs::new()
   fs.write_string("/work/repo/repo.bundle", "bundle")
   let resolved = resolve_local_clone_source_file(
     fs, "/work/repo", "repo.bundle",
@@ -40,7 +40,7 @@ test "clone local source file resolver: existing relative bundle path" {
 
 ///|
 test "clone local source file resolver: file URL path" {
-  let fs = @git.TestFs::new()
+  let fs = @bitcore.TestFs::new()
   fs.write_string("/tmp/repo.bundle", "bundle")
   let resolved = resolve_local_clone_source_file(
     fs, "/work/repo", "file:///tmp/repo.bundle",
@@ -50,7 +50,7 @@ test "clone local source file resolver: file URL path" {
 
 ///|
 test "clone local source file resolver: remote URL is ignored" {
-  let fs = @git.TestFs::new()
+  let fs = @bitcore.TestFs::new()
   let resolved = resolve_local_clone_source_file(
     fs, "/work/repo", "https://example.com/repo.bundle",
   )

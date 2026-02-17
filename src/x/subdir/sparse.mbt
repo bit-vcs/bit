@@ -7,7 +7,7 @@
 ///|
 /// モジュールの sparse checkout が有効かチェック
 pub fn is_module_sparse_enabled(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   subdir_path : String,
 ) -> Bool {
@@ -43,7 +43,7 @@ pub fn is_module_sparse_enabled(
 ///|
 /// モジュールの sparse checkout パターンを読み取り
 pub fn read_module_sparse_patterns(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   subdir_path : String,
 ) -> Array[String] {
@@ -69,7 +69,7 @@ pub fn read_module_sparse_patterns(
 ///|
 /// モジュールの sparse checkout パターンを書き込み
 pub fn write_module_sparse_patterns(
-  fs : &@git.FileSystem,
+  fs : &@bit.FileSystem,
   git_dir : String,
   subdir_path : String,
   patterns : Array[String],
@@ -91,8 +91,8 @@ pub fn write_module_sparse_patterns(
 ///|
 /// モジュールの sparse checkout を初期化
 pub fn init_module_sparse(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   subdir_path : String,
   cone? : Bool = false,
@@ -150,8 +150,8 @@ pub fn init_module_sparse(
 ///|
 /// モジュールの sparse checkout パターンを設定（既存を置換）
 pub fn set_module_sparse_patterns(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   subdir_path : String,
   patterns : Array[String],
@@ -170,8 +170,8 @@ pub fn set_module_sparse_patterns(
 ///|
 /// モジュールの sparse checkout にパターンを追加
 pub fn add_module_sparse_patterns(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   subdir_path : String,
   new_patterns : Array[String],
@@ -196,8 +196,8 @@ pub fn add_module_sparse_patterns(
 ///|
 /// モジュールの sparse checkout を無効化
 pub fn disable_module_sparse(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   subdir_path : String,
 ) -> Unit raise SubdirError {

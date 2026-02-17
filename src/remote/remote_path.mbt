@@ -140,7 +140,7 @@ fn trim_string_internal(s : String) -> String {
 
 ///|
 pub fn resolve_local_repo_path(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   root : String,
   url : String,
 ) -> String? {
@@ -174,12 +174,12 @@ pub fn resolve_local_repo_path(
     return Some(parent_candidate)
   }
   {
-    let base = match @gitio.env_current_dir() {
+    let base = match @bitio.env_current_dir() {
       Some(dir) => dir
       None =>
-        match @gitio.env_get("PWD") {
+        match @bitio.env_get("PWD") {
           Some(dir) => dir
-          None => @gitio.env_get("GIT_SHIM_PWD").unwrap_or(".")
+          None => @bitio.env_get("GIT_SHIM_PWD").unwrap_or(".")
         }
     }
     let alt = normalize_local_path(base + "/" + raw)
@@ -195,13 +195,13 @@ pub fn resolve_local_repo_path(
 
 ///|
 /// Resolve .git file to actual git directory (for submodules)
-pub fn resolve_gitdir(fs : &@git.RepoFileSystem, git_path : String) -> String {
-  if fs.is_dir(git_path) {
-    return git_path
+pub fn resolve_gitdir(fs : &@bit.RepoFileSystem, bit_path : String) -> String {
+  if fs.is_dir(bit_path) {
+    return bit_path
   }
   // It's a file with "gitdir: <path>" content
-  let content = decode_bytes_lossy(fs.read_file(git_path)) catch {
-    _ => return git_path
+  let content = decode_bytes_lossy(fs.read_file(bit_path)) catch {
+    _ => return bit_path
   }
   let trimmed = trim_string_internal(content)
   if trimmed.has_prefix("gitdir: ") {
@@ -212,20 +212,20 @@ pub fn resolve_gitdir(fs : &@git.RepoFileSystem, git_path : String) -> String {
     )
     // If relative path, resolve relative to parent of .git file
     if not(target.has_prefix("/")) {
-      let parent = match git_path.rev_find("/") {
-        Some(i) => String::unsafe_substring(git_path, start=0, end=i)
+      let parent = match bit_path.rev_find("/") {
+        Some(i) => String::unsafe_substring(bit_path, start=0, end=i)
         None => "."
       }
       return parent + "/" + target
     }
     return target
   }
-  git_path
+  bit_path
 }
 
 ///|
 pub fn detect_git_dir(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   path : String,
 ) -> (String, Bool)? {
   let bare_head = fs.is_file(path + "/HEAD")
@@ -233,9 +233,9 @@ pub fn detect_git_dir(
   if bare_head && bare_objs {
     return Some((path, true))
   }
-  let git_path = path + "/.git"
-  if fs.is_dir(git_path) || fs.is_file(git_path) {
-    let resolved = resolve_gitdir(fs, git_path)
+  let bit_path = path + "/.git"
+  if fs.is_dir(bit_path) || fs.is_file(bit_path) {
+    let resolved = resolve_gitdir(fs, bit_path)
     return Some((resolved, false))
   }
   None

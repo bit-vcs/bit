@@ -12,27 +12,27 @@ pub fn Hub::propose_pr(
   author : String,
   source_repo? : String? = None,
   source_ref? : String? = None,
-) -> PullRequest raise @git.GitError {
+) -> PullRequest raise @bit.GitError {
   let timestamp = clock.now()
   let source_commit = refs.resolve(source_branch) catch {
     _ =>
-      raise @git.GitError::InvalidObject(
+      raise @bit.GitError::InvalidObject(
         "Cannot resolve source branch: \{source_branch}",
       )
   }
   guard source_commit is Some(src_id) else {
-    raise @git.GitError::InvalidObject(
+    raise @bit.GitError::InvalidObject(
       "Source branch not found: \{source_branch}",
     )
   }
   let target_commit = refs.resolve(target_branch) catch {
     _ =>
-      raise @git.GitError::InvalidObject(
+      raise @bit.GitError::InvalidObject(
         "Cannot resolve target branch: \{target_branch}",
       )
   }
   guard target_commit is Some(tgt_id) else {
-    raise @git.GitError::InvalidObject(
+    raise @bit.GitError::InvalidObject(
       "Target branch not found: \{target_branch}",
     )
   }

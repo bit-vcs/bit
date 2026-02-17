@@ -3,9 +3,9 @@ async fn handle_submodule(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let git_dir = root + "/.git"
   let fs = OsFs::new()
-  let rfs : &@git.RepoFileSystem = fs
+  let rfs : &@bitcore.RepoFileSystem = fs
   let git_dir = if rfs.is_file(git_dir) {
-    @gitlib.resolve_gitdir(rfs, git_dir)
+    @bitlib.resolve_gitdir(rfs, git_dir)
   } else {
     git_dir
   }
@@ -30,7 +30,7 @@ async fn handle_submodule(args : Array[String]) -> Unit raise Error {
 
 ///|
 fn resolve_submodule_common_git_dir(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
 ) -> String {
   let commondir_path = git_dir + "/commondir"
@@ -59,22 +59,22 @@ fn resolve_submodule_fetch_url(
   git_dir : String,
   url : String,
 ) -> String {
-  let rfs : &@git.RepoFileSystem = fs
-  match @gitlib.resolve_local_repo_path(rfs, root, url) {
+  let rfs : &@bitcore.RepoFileSystem = fs
+  match @bitlib.resolve_local_repo_path(rfs, root, url) {
     Some(local_path) => return local_path
     None => ()
   }
   let config_git_dir = resolve_submodule_common_git_dir(rfs, git_dir)
-  let (remotes, _) = @gitlib.read_repo_config(fs, config_git_dir)
+  let (remotes, _) = @bitlib.read_repo_config(fs, config_git_dir)
   let origin_url = match remotes.get("origin") {
     Some(rc) if rc.urls.length() > 0 => Some(rc.urls[0])
     _ => None
   }
   match origin_url {
     Some(base_url) =>
-      match @gitlib.resolve_local_repo_path(rfs, root, base_url) {
+      match @bitlib.resolve_local_repo_path(rfs, root, base_url) {
         Some(base_path) =>
-          match @gitlib.resolve_local_repo_path(rfs, base_path, url) {
+          match @bitlib.resolve_local_repo_path(rfs, base_path, url) {
             Some(resolved) => resolved
             None => url
           }
@@ -101,7 +101,7 @@ async fn handle_submodule_add(
       "--branch" | "-b" => {
         i += 1
         if i >= args.length() {
-          raise @git.GitError::InvalidObject(
+          raise @bitcore.GitError::InvalidObject(
             "submodule add requires a branch name",
           )
         }
@@ -118,7 +118,7 @@ async fn handle_submodule_add(
     i += 1
   }
   if url.length() == 0 {
-    raise @git.GitError::InvalidObject("submodule add requires a repository")
+    raise @bitcore.GitError::InvalidObject("submodule add requires a repository")
   }
   if path.length() == 0 {
     path = derive_submodule_path(url)
@@ -135,7 +135,7 @@ async fn handle_submodule_add(
   let target_id = resolve_submodule_head_id(fs, root, fetch_url)
   let modules_dir = git_dir + "/modules/" + name
   if not(fs.is_dir(modules_dir)) {
-    @gitrepo.init_repo(fs, modules_dir, bare=true)
+    @bitrepo.init_repo(fs, modules_dir, bare=true)
   }
   let modules_config = modules_dir + "/config"
   set_config(fs, modules_config, "remote.origin.url", fetch_url, false)
@@ -155,7 +155,7 @@ async fn handle_submodule_add(
   let checkout_branch = match branch {
     Some(name) => Some(name)
     None =>
-      match @gitlib.read_remote_head_branch(fs, modules_dir) {
+      match @bitlib.read_remote_head_branch(fs, modules_dir) {
         Some(name) => Some(name)
         None => Some("main")
       }
@@ -190,7 +190,7 @@ async fn handle_submodule_add(
     }
     None => ()
   }
-  @gitlibnative.apply_worktree_modes_from_commit(
+  @bitlibnative.apply_worktree_modes_from_commit(
     fs, fs, sub_path, modules_dir, target_id,
   ) catch {
     err => {
@@ -202,7 +202,7 @@ async fn handle_submodule_add(
       )
     }
   }
-  @gitlib.add_paths_async(fs, fs, root, [".gitmodules"])
+  @bitlib.add_paths_async(fs, fs, root, [".gitmodules"])
   update_submodule_index_entry(fs, git_dir, path, target_id)
 }
 
@@ -231,7 +231,7 @@ fn write_gitmodules_entry(
   branch : String?,
 ) -> Unit raise Error {
   let gitmodules_path = root + "/.gitmodules"
-  let rfs : &@git.RepoFileSystem = fs
+  let rfs : &@bitcore.RepoFileSystem = fs
   let mut content = if rfs.is_file(gitmodules_path) {
     decode_bytes(rfs.read_file(gitmodules_path))
   } else {
@@ -256,30 +256,30 @@ async fn resolve_submodule_head_id(
   fs : OsFs,
   root : String,
   url : String,
-) -> @git.ObjectId raise Error {
-  let rfs : &@git.RepoFileSystem = fs
-  match @gitlib.resolve_local_repo_path(rfs, root, url) {
+) -> @bitcore.ObjectId raise Error {
+  let rfs : &@bitcore.RepoFileSystem = fs
+  match @bitlib.resolve_local_repo_path(rfs, root, url) {
     Some(src_path) =>
-      match @gitlib.detect_git_dir(rfs, src_path) {
+      match @bitlib.detect_git_dir(rfs, src_path) {
         Some((src_git_dir, _)) => {
-          let head = @gitlib.resolve_head_commit(rfs, src_git_dir)
+          let head = @bitlib.resolve_head_commit(rfs, src_git_dir)
           match head {
             Some(id) => id
             None =>
-              raise @git.GitError::InvalidObject(
+              raise @bitcore.GitError::InvalidObject(
                 "Invalid HEAD in submodule: " + url,
               )
           }
         }
         None =>
-          raise @git.GitError::InvalidObject("Not a git repository: " + url)
+          raise @bitcore.GitError::InvalidObject("Not a git repository: " + url)
       }
     None => {
       let resolved = resolve_remote_ref_id(url, "HEAD")
       match resolved {
         Some((id, _)) => id
         None =>
-          raise @git.GitError::InvalidObject(
+          raise @bitcore.GitError::InvalidObject(
             "Failed to resolve submodule HEAD: " + url,
           )
       }
@@ -292,20 +292,20 @@ fn update_submodule_index_entry(
   fs : OsFs,
   git_dir : String,
   path : String,
-  id : @git.ObjectId,
+  id : @bitcore.ObjectId,
 ) -> Unit raise Error {
-  let rfs : &@git.RepoFileSystem = fs
-  let entries = @gitlib.read_index_entries(rfs, git_dir) catch { _ => [] }
-  let out : Array[@gitlib.IndexEntry] = []
+  let rfs : &@bitcore.RepoFileSystem = fs
+  let entries = @bitlib.read_index_entries(rfs, git_dir) catch { _ => [] }
+  let out : Array[@bitlib.IndexEntry] = []
   for e in entries {
     if e.path != path {
       out.push(e)
     }
   }
   out.push(
-    @gitlib.IndexEntry::new(path, id, 57344, 0, mtime_sec=0, mtime_nsec=0),
+    @bitlib.IndexEntry::new(path, id, 57344, 0, mtime_sec=0, mtime_nsec=0),
   )
-  @gitlib.write_index_entries(fs, git_dir, out)
+  @bitlib.write_index_entries(fs, git_dir, out)
 }
 
 ///|
@@ -324,7 +324,7 @@ async fn handle_submodule_status(
       _ => ()
     }
   }
-  let rfs : &@git.RepoFileSystem = fs
+  let rfs : &@bitcore.RepoFileSystem = fs
   let submodules = parse_gitmodules(rfs, root)
   for sub in submodules {
     if paths.length() > 0 && not(paths.contains(sub.path)) {
@@ -338,8 +338,8 @@ async fn handle_submodule_status(
       continue
     }
     // Get HEAD of submodule
-    let sub_git_dir = @gitlib.resolve_gitdir(rfs, sub_git)
-    let head_id = @gitlib.resolve_head_commit(rfs, sub_git_dir) catch {
+    let sub_git_dir = @bitlib.resolve_gitdir(rfs, sub_git)
+    let head_id = @bitlib.resolve_head_commit(rfs, sub_git_dir) catch {
       err => {
         if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
           raise err
@@ -373,11 +373,11 @@ async fn handle_submodule_status(
 
 ///|
 fn get_submodule_index_id(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
   path : String,
-) -> @git.ObjectId? {
-  let entries = @gitlib.read_index_entries(fs, git_dir) catch {
+) -> @bitcore.ObjectId? {
+  let entries = @bitlib.read_index_entries(fs, git_dir) catch {
     _ => return None
   }
   for e in entries {
@@ -401,8 +401,8 @@ async fn handle_submodule_init(
       paths.push(arg)
     }
   }
-  let rfs : &@git.RepoFileSystem = fs
-  let wfs : &@git.FileSystem = fs
+  let rfs : &@bitcore.RepoFileSystem = fs
+  let wfs : &@bitcore.FileSystem = fs
   let submodules = parse_gitmodules(rfs, root)
   for sub in submodules {
     if paths.length() > 0 && not(paths.contains(sub.path)) {
@@ -441,7 +441,7 @@ async fn handle_submodule_update(
       break
     }
   }
-  let rfs : &@git.RepoFileSystem = fs
+  let rfs : &@bitcore.RepoFileSystem = fs
   let gitfile = root + "/.git"
   if has_init_flag && rfs.is_file(gitfile) {
     let _gitfile_content = decode_bytes(
@@ -466,8 +466,8 @@ async fn handle_submodule_update(
       _ => ()
     }
   }
-  let rfs : &@git.RepoFileSystem = fs
-  let wfs : &@git.FileSystem = fs
+  let rfs : &@bitcore.RepoFileSystem = fs
+  let wfs : &@bitcore.FileSystem = fs
   // Init first if requested
   if init {
     handle_submodule_init(fs, root, git_dir, paths)
@@ -488,7 +488,7 @@ async fn handle_submodule_update(
     // Clone if needed
     if not(sub_git_is_dir) && not(has_modules) {
       print_line("Cloning into '\{sub.path}'...")
-      @gitrepo.init_repo(wfs, modules_dir, bare=true)
+      @bitrepo.init_repo(wfs, modules_dir, bare=true)
       let config_path = modules_dir + "/config"
       set_config(fs, config_path, "remote.origin.url", sub.url, false)
       set_config(
@@ -516,13 +516,13 @@ async fn handle_submodule_update(
       ensure_submodule_gitdir_config(fs, modules_dir, sub_path)
     }
     // Checkout target commit
-    let sub_git_dir = @gitlib.resolve_gitdir(rfs, sub_git)
+    let sub_git_dir = @bitlib.resolve_gitdir(rfs, sub_git)
     print_line(
       "Submodule path '\{sub.path}': checked out '\{target_id.to_hex()}'",
     )
     // Use checkout command
     run_checkout_in_submodule(wfs, rfs, sub_path, sub_git_dir, target_id)
-    @gitlibnative.apply_worktree_modes_from_commit(
+    @bitlibnative.apply_worktree_modes_from_commit(
       fs, fs, sub_path, sub_git_dir, target_id,
     ) catch {
       err => {
@@ -552,17 +552,17 @@ async fn fetch_submodule_objects(
   root : String,
   modules_dir : String,
   url : String,
-  target_id : @git.ObjectId,
+  target_id : @bitcore.ObjectId,
 ) -> Unit raise Error {
-  let rfs : &@git.RepoFileSystem = fs
-  match @gitlib.resolve_local_repo_path(rfs, root, url) {
+  let rfs : &@bitcore.RepoFileSystem = fs
+  match @bitlib.resolve_local_repo_path(rfs, root, url) {
     Some(src_path) => {
       fetch_local_repo(fs, src_path, modules_dir, modules_dir, "origin", url, [])
       return ()
     }
     None => ()
   }
-  let pack = @gitionative.fetch_pack_http(url, [target_id], true)
+  let pack = @bitnative.fetch_pack_http(url, [target_id], true)
   let objects = @pack.parse_packfile(pack)
   @pack.write_packfile_with_index(fs, modules_dir, pack, objects)
 }
@@ -581,21 +581,21 @@ fn ensure_submodule_gitdir_config(
 
 ///|
 fn run_checkout_in_submodule(
-  wfs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  wfs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   work_tree : String,
   git_dir : String,
-  commit_id : @git.ObjectId,
+  commit_id : @bitcore.ObjectId,
 ) -> Unit {
-  let db = @gitlib.ObjectDb::load(rfs, git_dir) catch { _ => return }
+  let db = @bitlib.ObjectDb::load(rfs, git_dir) catch { _ => return }
   let head_path = git_dir + "/HEAD"
   wfs.write_string(head_path, commit_id.to_hex() + "\n") catch {
     _ => ()
   }
-  let files = @gitlib.collect_tree_files_from_commit(db, rfs, commit_id) catch {
+  let files = @bitlib.collect_tree_files_from_commit(db, rfs, commit_id) catch {
     _ => return
   }
-  @gitlib.write_worktree_from_files(
+  @bitlib.write_worktree_from_files(
     db,
     wfs,
     rfs,
@@ -606,10 +606,10 @@ fn run_checkout_in_submodule(
   ) catch {
     _ => return
   }
-  let entries = @gitlib.tree_files_to_index(db, rfs, files) catch {
+  let entries = @bitlib.tree_files_to_index(db, rfs, files) catch {
     _ => return
   }
-  @gitlib.write_index_entries(wfs, git_dir, entries) catch {
+  @bitlib.write_index_entries(wfs, git_dir, entries) catch {
     _ => return
   }
 }
@@ -669,8 +669,8 @@ async fn handle_submodule_deinit(
       _ => ()
     }
   }
-  let rfs : &@git.RepoFileSystem = fs
-  let wfs : &@git.FileSystem = fs
+  let rfs : &@bitcore.RepoFileSystem = fs
+  let wfs : &@bitcore.FileSystem = fs
   let submodules = parse_gitmodules(rfs, root)
   for sub in submodules {
     if not(all) && paths.length() > 0 && not(paths.contains(sub.path)) {
@@ -679,9 +679,9 @@ async fn handle_submodule_deinit(
     let sub_path = root + "/" + sub.path
     // Check for local modifications
     if not(force) && rfs.is_dir(sub_path) {
-      let sub_git_dir = @gitlib.resolve_gitdir(rfs, sub_path + "/.git")
+      let sub_git_dir = @bitlib.resolve_gitdir(rfs, sub_path + "/.git")
       if rfs.is_dir(sub_git_dir) {
-        let status = @gitlib.status(rfs, sub_path) catch {
+        let status = @bitlib.status(rfs, sub_path) catch {
           err => {
             if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
               raise err
@@ -776,8 +776,8 @@ async fn handle_submodule_sync(
       _ => ()
     }
   }
-  let rfs : &@git.RepoFileSystem = fs
-  let wfs : &@git.FileSystem = fs
+  let rfs : &@bitcore.RepoFileSystem = fs
+  let wfs : &@bitcore.FileSystem = fs
   let submodules = parse_gitmodules(rfs, root)
   for sub in submodules {
     if paths.length() > 0 && not(paths.contains(sub.path)) {
@@ -795,7 +795,7 @@ async fn handle_submodule_sync(
     }
     // Update submodule's origin URL
     let sub_path = root + "/" + sub.path
-    let sub_git_dir = @gitlib.resolve_gitdir(rfs, sub_path + "/.git")
+    let sub_git_dir = @bitlib.resolve_gitdir(rfs, sub_path + "/.git")
     let sub_config = sub_git_dir + "/config"
     if rfs.is_file(sub_config) {
       let content = decode_bytes(rfs.read_file(sub_config))

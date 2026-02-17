@@ -66,17 +66,17 @@ fn make_refs_advertisement(count : Int) -> Bytes {
 let bench_refs_50 : Bytes = make_refs_advertisement(50)
 
 ///|
-fn make_want_ids() -> Array[@git.ObjectId] {
-  let ids : Array[@git.ObjectId] = []
+fn make_want_ids() -> Array[@bit.ObjectId] {
+  let ids : Array[@bit.ObjectId] = []
   for i in 0..<5 {
     let hex = "00000000000000000000000000000000000000" + (10 + i).to_string()
-    ids.push(try! @git.ObjectId::from_hex(hex))
+    ids.push(try! @bit.ObjectId::from_hex(hex))
   }
   ids
 }
 
 ///|
-let bench_want_ids : Array[@git.ObjectId] = make_want_ids()
+let bench_want_ids : Array[@bit.ObjectId] = make_want_ids()
 
 ///|
 let bench_caps : Array[String] = [
@@ -86,8 +86,8 @@ let bench_caps : Array[String] = [
 
 ///|
 fn make_push_request() -> @protocol.PushRequest {
-  let old_id = @git.ObjectId::zero()
-  let new_id = try! @git.ObjectId::from_hex(
+  let old_id = @bit.ObjectId::zero()
+  let new_id = try! @bit.ObjectId::from_hex(
     "ce013625030ba8dba906f756967f9e9ca394464a",
   )
   let packfile = Bytes::from_array([

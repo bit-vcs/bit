@@ -90,7 +90,7 @@ pub fn parse_legacy_pull_request(text : String) -> PullRequest raise PrError {
   let mut state = PrState::Open
   let labels : Array[String] = []
   let closes_issues : Array[String] = []
-  let mut merge_commit : @git.ObjectId? = None
+  let mut merge_commit : @bit.ObjectId? = None
   let body_lines : Array[String] = []
   let mut in_body = false
   for line_view in text.split("\n") {
@@ -130,7 +130,7 @@ pub fn parse_legacy_pull_request(text : String) -> PullRequest raise PrError {
           "closes" => closes_issues.push(value)
           "merge-commit" =>
             merge_commit = Some(
-              @git.ObjectId::from_hex(value) catch {
+              @bit.ObjectId::from_hex(value) catch {
                 _ => raise PrError::InvalidFormat("Invalid merge-commit hex")
               },
             )
@@ -142,10 +142,10 @@ pub fn parse_legacy_pull_request(text : String) -> PullRequest raise PrError {
   if id.length() == 0 {
     raise PrError::InvalidFormat("Missing pr id")
   }
-  let source_commit = @git.ObjectId::from_hex(source_commit_hex) catch {
+  let source_commit = @bit.ObjectId::from_hex(source_commit_hex) catch {
     _ => raise PrError::InvalidFormat("Invalid source-commit hex")
   }
-  let target_commit = @git.ObjectId::from_hex(target_commit_hex) catch {
+  let target_commit = @bit.ObjectId::from_hex(target_commit_hex) catch {
     _ => raise PrError::InvalidFormat("Invalid target-commit hex")
   }
   PullRequest::new(
@@ -275,7 +275,7 @@ pub fn parse_work_item(text : String) -> WorkItem raise PrError {
   let mut target_branch : String? = None
   let mut target_commit_hex : String? = None
   let closes_issues : Array[String] = []
-  let mut merge_commit : @git.ObjectId? = None
+  let mut merge_commit : @bit.ObjectId? = None
   let body_lines : Array[String] = []
   let mut in_body = false
   for line_view in text.split("\n") {
@@ -317,7 +317,7 @@ pub fn parse_work_item(text : String) -> WorkItem raise PrError {
           "closes" => closes_issues.push(value)
           "merge-commit" =>
             merge_commit = Some(
-              @git.ObjectId::from_hex(value) catch {
+              @bit.ObjectId::from_hex(value) catch {
                 _ => raise PrError::InvalidFormat("Invalid merge-commit hex")
               },
             )
@@ -333,10 +333,10 @@ pub fn parse_work_item(text : String) -> WorkItem raise PrError {
     (source_branch, source_commit_hex, target_branch, target_commit_hex) {
     (None, None, None, None) => None
     (Some(src_branch), Some(src_hex), Some(tgt_branch), Some(tgt_hex)) => {
-      let source_commit = @git.ObjectId::from_hex(src_hex) catch {
+      let source_commit = @bit.ObjectId::from_hex(src_hex) catch {
         _ => raise PrError::InvalidFormat("Invalid source-commit hex")
       }
-      let target_commit = @git.ObjectId::from_hex(tgt_hex) catch {
+      let target_commit = @bit.ObjectId::from_hex(tgt_hex) catch {
         _ => raise PrError::InvalidFormat("Invalid target-commit hex")
       }
       Some(
@@ -432,7 +432,7 @@ pub fn parse_pr_comment(text : String) -> PrComment raise PrError {
   let mut reply_to : String? = None
   let mut file_path : String? = None
   let mut line_number : Int? = None
-  let mut commit_id : @git.ObjectId? = None
+  let mut commit_id : @bit.ObjectId? = None
   let body_lines : Array[String] = []
   let mut in_body = false
   for line_view in text.split("\n") {
@@ -465,7 +465,7 @@ pub fn parse_pr_comment(text : String) -> PrComment raise PrError {
           "line" => line_number = value |> parse_int |> Some
           "commit" =>
             commit_id = Some(
-              @git.ObjectId::from_hex(value) catch {
+              @bit.ObjectId::from_hex(value) catch {
                 _ => raise PrError::InvalidFormat("Invalid commit hex")
               },
             )
@@ -563,7 +563,7 @@ pub fn parse_pr_review(text : String) -> PrReview raise PrError {
   if id.length() == 0 {
     raise PrError::InvalidFormat("Missing review id")
   }
-  let commit_id = @git.ObjectId::from_hex(commit_hex) catch {
+  let commit_id = @bit.ObjectId::from_hex(commit_hex) catch {
     _ => raise PrError::InvalidFormat("Invalid commit hex")
   }
   PrReview::new(
@@ -860,7 +860,7 @@ pub fn Note::serialize_plain(self : Note) -> String {
 ///|
 /// Parse Note from Git-style text format (with metadata)
 pub fn parse_note(text : String) -> Note {
-  let mut commit_id = @git.ObjectId::zero()
+  let mut commit_id = @bit.ObjectId::zero()
   let mut author = ""
   let mut created_at : Int64 = 0
   let mut ns = "commits"
@@ -888,8 +888,8 @@ pub fn parse_note(text : String) -> Note {
         )
         match key {
           "commit" =>
-            commit_id = @git.ObjectId::from_hex(value) catch {
-              _ => @git.ObjectId::zero()
+            commit_id = @bit.ObjectId::from_hex(value) catch {
+              _ => @bit.ObjectId::zero()
             }
           "author" => author = value
           "created" => created_at = parse_int64(value)
@@ -904,6 +904,6 @@ pub fn parse_note(text : String) -> Note {
 
 ///|
 /// Parse Note from plain text (Git compatible, creates minimal Note)
-pub fn parse_note_plain(commit_id : @git.ObjectId, text : String) -> Note {
+pub fn parse_note_plain(commit_id : @bit.ObjectId, text : String) -> Note {
   Note::new(commit_id, text, "", 0L, ns="commits")
 }

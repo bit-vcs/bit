@@ -4,19 +4,19 @@ async fn handle_rm(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
   let opts = parse_rm_options(args)
   if opts.paths.length() == 0 {
-    raise @git.GitError::InvalidObject("No pathspec given")
+    raise @bitcore.GitError::InvalidObject("No pathspec given")
   }
   let git_dir = root + "/.git"
   let actual_git_dir = if fs.is_file(git_dir) {
-    @gitlib.resolve_gitdir(fs, git_dir)
+    @bitlib.resolve_gitdir(fs, git_dir)
   } else {
     git_dir
   }
-  let entries = @gitlib.read_index_entries(fs, actual_git_dir)
+  let entries = @bitlib.read_index_entries(fs, actual_git_dir)
   for path in opts.paths {
     if not(opts.ignore_unmatch) &&
       not(rm_pathspec_matches_any(path, entries, opts.recursive)) {
-      raise @git.GitError::InvalidObject(
+      raise @bitcore.GitError::InvalidObject(
         "pathspec '\{path}' did not match any files",
       )
     }
@@ -27,7 +27,7 @@ async fn handle_rm(args : Array[String]) -> Unit raise Error {
     opts.recursive,
   )
   if opts.cached && not(opts.force) {
-    let st = @gitlib.status(fs, root)
+    let st = @bitlib.status(fs, root)
     let staged_but_not_head : Map[String, Bool] = {}
     for path in st.staged_added {
       staged_but_not_head[path] = true
@@ -41,13 +41,13 @@ async fn handle_rm(args : Array[String]) -> Unit raise Error {
     }
     for path in removed_paths {
       if staged_but_not_head.contains(path) && unstaged_modified.contains(path) {
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "the following file has staged content different from both the file and the HEAD:\n    \{path}",
         )
       }
     }
   }
-  @gitlib.rm_paths(
+  @bitlib.rm_paths(
     fs,
     fs,
     root,
@@ -121,7 +121,7 @@ fn rm_normalize_rel_path(path : String) -> String {
 ///|
 fn rm_pathspec_matches_any(
   raw_path : String,
-  entries : Array[@gitlib.IndexEntry],
+  entries : Array[@bitlib.IndexEntry],
   recursive : Bool,
 ) -> Bool {
   let path = rm_normalize_rel_path(raw_path)
@@ -142,7 +142,7 @@ fn rm_pathspec_matches_any(
 ///|
 fn rm_collect_target_paths(
   raw_paths : Array[String],
-  entries : Array[@gitlib.IndexEntry],
+  entries : Array[@bitlib.IndexEntry],
   recursive : Bool,
 ) -> Array[String] {
   let out : Array[String] = []

@@ -198,19 +198,19 @@ async fn handle_show(args : Array[String]) -> Unit raise Error {
     } else {
       ["HEAD"]
     }
-    let db = @gitlib.ObjectDb::load(fs, git_dir)
+    let db = @bitlib.ObjectDb::load(fs, git_dir)
     for target in targets {
-      let id = @gitrepo.rev_parse(fs, git_dir, target)
+      let id = @bitrepo.rev_parse(fs, git_dir, target)
       guard id is Some(commit_id) else {
-        raise @git.GitError::InvalidObject("unknown revision: \{target}")
+        raise @bitcore.GitError::InvalidObject("unknown revision: \{target}")
       }
       let obj = db.get(fs, commit_id)
       guard obj is Some(o) else {
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "Object not found: \{commit_id.to_hex()}",
         )
       }
-      if o.obj_type != @git.ObjectType::Commit {
+      if o.obj_type != @bitcore.ObjectType::Commit {
         continue
       }
       let info = parse_show_commit(o.data)
@@ -230,28 +230,28 @@ async fn handle_show(args : Array[String]) -> Unit raise Error {
     return ()
   }
   // Resolve revision
-  let id = @gitrepo.rev_parse(fs, git_dir, rev)
+  let id = @bitrepo.rev_parse(fs, git_dir, rev)
   guard id is Some(commit_id) else {
-    raise @git.GitError::InvalidObject("unknown revision: \{rev}")
+    raise @bitcore.GitError::InvalidObject("unknown revision: \{rev}")
   }
   // Load object
-  let db = @gitlib.ObjectDb::load(fs, git_dir)
+  let db = @bitlib.ObjectDb::load(fs, git_dir)
   let obj = db.get(fs, commit_id)
   guard obj is Some(o) else {
-    raise @git.GitError::InvalidObject(
+    raise @bitcore.GitError::InvalidObject(
       "Object not found: \{commit_id.to_hex()}",
     )
   }
   // `git show <blob-ish>` should print blob contents directly.
-  if o.obj_type == @git.ObjectType::Blob {
+  if o.obj_type == @bitcore.ObjectType::Blob {
     @stdio.stdout.write(o.data)
     return ()
   }
-  if o.obj_type != @git.ObjectType::Commit {
-    raise @git.GitError::InvalidObject("Not a commit: \{commit_id.to_hex()}")
+  if o.obj_type != @bitcore.ObjectType::Commit {
+    raise @bitcore.GitError::InvalidObject("Not a commit: \{commit_id.to_hex()}")
   }
   // Parse commit for tree/parents
-  let commit_info = @git.parse_commit(o.data)
+  let commit_info = @bitcore.parse_commit(o.data)
   // If --pretty=raw, output raw commit object content
   if pretty_raw {
     print_line("commit \{commit_id.to_hex()}")
@@ -309,8 +309,8 @@ async fn handle_show(args : Array[String]) -> Unit raise Error {
   // Show diff against parent (simplified)
   if not(quiet) && commit_info.parents.length() > 0 {
     let parent_id = commit_info.parents[0]
-    let parent_files = @gitlib.collect_tree_files_from_commit(db, fs, parent_id)
-    let current_files = @gitlib.collect_tree_files_from_commit(
+    let parent_files = @bitlib.collect_tree_files_from_commit(db, fs, parent_id)
+    let current_files = @bitlib.collect_tree_files_from_commit(
       db, fs, commit_id,
     )
     // Show changed files

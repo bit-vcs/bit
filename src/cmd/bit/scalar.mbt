@@ -90,14 +90,14 @@ fn scalar_list_maintenance_repos(fs : OsFs) -> Array[String] {
   if content.length() == 0 {
     return []
   }
-  let blocks = @gitlib.parse_config_blocks(content)
+  let blocks = @bitlib.parse_config_blocks(content)
   let repos : Array[String] = []
   for block in blocks {
     if block.section == Some("maintenance") {
       for line in block.lines {
-        match @gitlib.parse_config_kv(line) {
+        match @bitlib.parse_config_kv(line) {
           Some((key, value)) if key.to_lower() == "repo" =>
-            repos.push(@gitlib.config_strip_quotes(value))
+            repos.push(@bitlib.config_strip_quotes(value))
           _ => ()
         }
       }
@@ -111,8 +111,8 @@ fn scalar_render_global_config_with_repos(
   content : String,
   repos : Array[String],
 ) -> String {
-  let blocks = @gitlib.parse_config_blocks(content)
-  let new_blocks : Array[@gitlib.ConfigBlock] = []
+  let blocks = @bitlib.parse_config_blocks(content)
+  let new_blocks : Array[@bitlib.ConfigBlock] = []
   let mut found = false
   for block in blocks {
     if block.section == Some("maintenance") {
@@ -120,7 +120,7 @@ fn scalar_render_global_config_with_repos(
       let updated = block
       let kept : Array[String] = []
       for line in block.lines {
-        match @gitlib.parse_config_kv(line) {
+        match @bitlib.parse_config_kv(line) {
           Some((key, _)) if key.to_lower() == "repo" => ()
           _ => kept.push(line)
         }
@@ -150,7 +150,7 @@ fn scalar_render_global_config_with_repos(
       lines,
     })
   }
-  @gitlib.render_config_blocks(new_blocks)
+  @bitlib.render_config_blocks(new_blocks)
 }
 
 ///|
@@ -233,15 +233,15 @@ fn scalar_require_worktree_repo(
 ) -> String raise Error {
   let repo = scalar_resolve_register_repo_path(fs, enlistment)
   if repo == ".git" || repo.has_suffix("/.git") {
-    raise @git.GitError::InvalidObject("Scalar enlistments require a worktree")
+    raise @bitcore.GitError::InvalidObject("Scalar enlistments require a worktree")
   }
   if is_bare_repo_dir(repo) {
-    raise @git.GitError::InvalidObject("Scalar enlistments require a worktree")
+    raise @bitcore.GitError::InvalidObject("Scalar enlistments require a worktree")
   }
   if fs.is_dir(repo + "/.git") || fs.is_file(repo + "/.git") {
     return repo
   }
-  raise @git.GitError::InvalidObject("not a git repository")
+  raise @bitcore.GitError::InvalidObject("not a git repository")
 }
 
 ///|
@@ -255,8 +255,8 @@ fn scalar_rewrite_repo_config(fs : OsFs, repo : String) -> Unit {
   } else {
     ""
   }
-  let blocks = @gitlib.parse_config_blocks(content)
-  let new_blocks : Array[@gitlib.ConfigBlock] = []
+  let blocks = @bitlib.parse_config_blocks(content)
+  let new_blocks : Array[@bitlib.ConfigBlock] = []
   let mut has_gui = false
   let mut has_log = false
   let mut has_core = false
@@ -268,7 +268,7 @@ fn scalar_rewrite_repo_config(fs : OsFs, repo : String) -> Unit {
           let updated = block
           let lines : Array[String] = []
           for line in block.lines {
-            match @gitlib.parse_config_kv(line) {
+            match @bitlib.parse_config_kv(line) {
               Some((key, _)) => {
                 let key_l = key.to_lower()
                 if section == "gui" && key_l == "gcwarning" {
@@ -327,7 +327,7 @@ fn scalar_rewrite_repo_config(fs : OsFs, repo : String) -> Unit {
       lines: ["\tfsmonitor = true"],
     })
   }
-  fs.write_string(config_path, @gitlib.render_config_blocks(new_blocks)) catch {
+  fs.write_string(config_path, @bitlib.render_config_blocks(new_blocks)) catch {
     _ => ()
   }
 }

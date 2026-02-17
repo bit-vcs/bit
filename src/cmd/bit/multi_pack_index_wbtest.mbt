@@ -1,6 +1,6 @@
 ///|
-fn make_test_oid(byte : Byte) -> @git.ObjectId {
-  @git.ObjectId::new(FixedArray::make(20, byte))
+fn make_test_oid(byte : Byte) -> @bitcore.ObjectId {
+  @bitcore.ObjectId::new(FixedArray::make(20, byte))
 }
 
 ///|

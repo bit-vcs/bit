@@ -1,8 +1,8 @@
 ///| Tests for worktree status/add/commit
 
 ///|
-fn setup_repo() -> @git.TestFs {
-  let fs = @git.TestFs::new()
+fn setup_repo() -> @bit.TestFs {
+  let fs = @bit.TestFs::new()
   ignore(try? init_repo(fs, "/repo"))
   fs
 }

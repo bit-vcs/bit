@@ -157,11 +157,11 @@ test "load_config: BHQ_ROOT environment variable" {
     }
   }
 
-  fn git_config_get(_key : String) -> String? {
+  fn bit_config_get(_key : String) -> String? {
     None
   }
 
-  let config = load_config(env_get, git_config_get)
+  let config = load_config(env_get, bit_config_get)
   inspect(config.root, content="/custom/path")
 }
 
@@ -171,11 +171,11 @@ test "load_config: default bhq root" {
     None
   }
 
-  fn git_config_get(_key : String) -> String? {
+  fn bit_config_get(_key : String) -> String? {
     None
   }
 
-  let config = load_config(env_get, git_config_get)
+  let config = load_config(env_get, bit_config_get)
   // Default is ~/bhq, but ~ is expanded to /home/user in tests
   inspect(config.root, content="/home/user/bhq")
 }

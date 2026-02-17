@@ -1,10 +1,10 @@
 import {
-  "mizchi/bit" @git,
+  "mizchi/bit" @bit,
   "mizchi/zlib",
 }
 
 import {
-  "mizchi/bit" @git,
+  "mizchi/bit" @bit,
   "mizchi/bit/protocol" @protocol,
   "moonbitlang/async" @async,
   "moonbitlang/async/process" @process,
@@ -24,7 +24,7 @@ warnings = "-29"
 options(
   targets: {
     "bench_test.mbt": [ "native" ],
-    "git_oracle_pack_test.mbt": [ "native" ],
+    "bit_oracle_pack_test.mbt": [ "native" ],
     "pack_index_write_test.mbt": [ "native" ],
   },
 )

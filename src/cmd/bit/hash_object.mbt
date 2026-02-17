@@ -10,7 +10,7 @@ fn hash_object_storage_runtime_delegate_args(
   }
   match parsed {
     @runtime.StorageCommand::HashObject(hash_args) =>
-      if hash_args.stdin_mode || hash_args.obj_type != @git.ObjectType::Blob {
+      if hash_args.stdin_mode || hash_args.obj_type != @bitcore.ObjectType::Blob {
         None
       } else {
         Some(hash_args)
@@ -38,9 +38,9 @@ fn hash_object_need_real_git_for_filtering(root : String) -> Bool {
 fn hash_object_need_real_git_for_autocrlf(root : String) -> Bool {
   let fs = OsFs::new()
   let git_dir = resolve_git_dir(fs, root)
-  match @gitlib.read_config_value(fs, git_dir + "/config", "core", "autocrlf") {
+  match @bitlib.read_config_value(fs, git_dir + "/config", "core", "autocrlf") {
     Some(value) =>
-      match @gitlib.config_strip_quotes(value).to_lower() {
+      match @bitlib.config_strip_quotes(value).to_lower() {
         "true" => true
         "input" => true
         "false" => false

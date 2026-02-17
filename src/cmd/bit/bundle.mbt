@@ -62,7 +62,7 @@ async fn handle_bundle_create(args : Array[String]) -> Unit raise Error {
   }
   // Collect refs to include
   if all {
-    let all_refs = @gitrepo.show_ref(fs, git_dir)
+    let all_refs = @bitrepo.show_ref(fs, git_dir)
     for item in all_refs {
       let (name, _) = item
       refs.push(name)
@@ -81,22 +81,22 @@ async fn handle_bundle_create(args : Array[String]) -> Unit raise Error {
   }
   // Add prerequisites (excluded refs)
   for spec in excludes {
-    match @gitrepo.rev_parse(fs, git_dir, spec) {
+    match @bitrepo.rev_parse(fs, git_dir, spec) {
       Some(id) => add_prereq(id.to_hex())
       None => ()
     }
   }
   // Collect objects for pack
-  let start_ids : Array[@git.ObjectId] = []
+  let start_ids : Array[@bitcore.ObjectId] = []
   for spec in refs {
-    match @gitrepo.rev_parse(fs, git_dir, spec) {
+    match @bitrepo.rev_parse(fs, git_dir, spec) {
       Some(id) => start_ids.push(id)
       None => ()
     }
   }
   let exclude_ids : Map[String, Bool] = {}
   for spec in excludes {
-    match @gitrepo.rev_parse(fs, git_dir, spec) {
+    match @bitrepo.rev_parse(fs, git_dir, spec) {
       Some(id) => walk_commits_to_map(fs, git_dir, id, exclude_ids)
       None => ()
     }
@@ -108,7 +108,7 @@ async fn handle_bundle_create(args : Array[String]) -> Unit raise Error {
   }
   // Add refs
   for spec in refs {
-    match @gitrepo.rev_parse(fs, git_dir, spec) {
+    match @bitrepo.rev_parse(fs, git_dir, spec) {
       Some(id) => {
         let refname = if spec == "HEAD" { "HEAD" } else { spec }
         lines.push(id.to_hex() + " " + refname)
@@ -142,13 +142,13 @@ async fn handle_bundle_create(args : Array[String]) -> Unit raise Error {
 fn collect_bundle_objects(
   fs : OsFs,
   git_dir : String,
-  start_ids : Array[@git.ObjectId],
+  start_ids : Array[@bitcore.ObjectId],
   exclude_ids : Map[String, Bool],
-) -> Array[@git.PackObject] raise Error {
-  let db = @gitlib.ObjectDb::load(fs, git_dir)
+) -> Array[@bitcore.PackObject] raise Error {
+  let db = @bitlib.ObjectDb::load(fs, git_dir)
   let visited : Map[String, Bool] = {}
-  let objects : Array[@git.PackObject] = []
-  let queue : Array[@git.ObjectId] = []
+  let objects : Array[@bitcore.PackObject] = []
+  let queue : Array[@bitcore.ObjectId] = []
   for id in start_ids {
     queue.push(id)
   }
@@ -163,8 +163,8 @@ fn collect_bundle_objects(
       Some(obj) => {
         objects.push(obj)
         match obj.obj_type {
-          @git.ObjectType::Commit => {
-            let info = @git.parse_commit(obj.data)
+          @bitcore.ObjectType::Commit => {
+            let info = @bitcore.parse_commit(obj.data)
             // Add tree
             if not(visited.contains(info.tree.to_hex())) {
               queue.push(info.tree)
@@ -177,15 +177,15 @@ fn collect_bundle_objects(
               }
             }
           }
-          @git.ObjectType::Tree => {
-            let entries = @git.parse_tree(obj.data)
+          @bitcore.ObjectType::Tree => {
+            let entries = @bitcore.parse_tree(obj.data)
             for entry in entries {
               if not(visited.contains(entry.id.to_hex())) {
                 queue.push(entry.id)
               }
             }
           }
-          @git.ObjectType::Tag => {
+          @bitcore.ObjectType::Tag => {
             // Parse tag target
             let text = decode_bytes(obj.data)
             for line_view in text.split("\n") {
@@ -196,7 +196,7 @@ fn collect_bundle_objects(
                   start=7,
                   end=line.length(),
                 )
-                let target = @git.ObjectId::from_hex(target_hex)
+                let target = @bitcore.ObjectId::from_hex(target_hex)
                 if not(visited.contains(target_hex)) {
                   queue.push(target)
                 }
@@ -235,7 +235,7 @@ async fn handle_bundle_verify(args : Array[String]) -> Unit raise Error {
   // Check prerequisites
   let mut ok = true
   for prereq in prereqs {
-    match @gitrepo.rev_parse(fs, git_dir, prereq) {
+    match @bitrepo.rev_parse(fs, git_dir, prereq) {
       Some(_) => ()
       None => {
         if not(quiet) {
@@ -301,7 +301,7 @@ async fn handle_bundle_unbundle(args : Array[String]) -> Unit raise Error {
   // Unpack objects
   let objects = @pack.parse_packfile(pack_data)
   for obj in objects {
-    let _ = @gitlib.write_loose_object(fs, git_dir, obj.obj_type, obj.data)
+    let _ = @bitlib.write_loose_object(fs, git_dir, obj.obj_type, obj.data)
   }
   // Print refs
   for item in refs {
@@ -332,7 +332,7 @@ fn parse_bundle_file(
     i += 1
   }
   if header_end == 0 {
-    raise @git.GitError::PackfileError("Invalid bundle: no header found")
+    raise @bitcore.GitError::PackfileError("Invalid bundle: no header found")
   }
   let header_bytes = FixedArray::makei(header_end, j => data[j])
   let header = header_bytes |> Bytes::from_array |> decode_bytes

@@ -51,16 +51,16 @@ pub fn Remote::receive_pack_url(self : Remote) -> String {
 ///|
 /// Git push request data
 pub struct PushRequest {
-  old_id : @git.ObjectId
-  new_id : @git.ObjectId
+  old_id : @bit.ObjectId
+  new_id : @bit.ObjectId
   refname : String
   packfile : Bytes
 }
 
 ///|
 pub fn PushRequest::new(
-  old_id : @git.ObjectId,
-  new_id : @git.ObjectId,
+  old_id : @bit.ObjectId,
+  new_id : @bit.ObjectId,
   refname : String,
   packfile : Bytes,
 ) -> PushRequest {
@@ -95,7 +95,7 @@ pub fn build_receive_pack_body(req : PushRequest) -> Bytes {
 /// Parse receive-pack response
 pub fn parse_receive_pack_response(
   data : Bytes,
-) -> Result[String, @git.GitError] {
+) -> Result[String, @bit.GitError] {
   let decoded = pktline_decode(data) catch { e => return Err(e) }
   let mut unpack_ok = false
   let mut ref_ok = false
@@ -138,7 +138,7 @@ pub fn parse_receive_pack_response(
   }
   if sideband {
     if error_msg.length() > 0 {
-      return error_msg |> @git.GitError::ProtocolError |> Err
+      return error_msg |> @bit.GitError::ProtocolError |> Err
     }
     let band1 = remote_array_to_bytes(band1_bytes)
     let band_decoded = pktline_decode(band1) catch { e => return Err(e) }
@@ -165,9 +165,9 @@ pub fn parse_receive_pack_response(
   if unpack_ok && ref_ok {
     Ok("Push successful")
   } else if error_msg.length() > 0 {
-    error_msg |> @git.GitError::ProtocolError |> Err
+    error_msg |> @bit.GitError::ProtocolError |> Err
   } else {
-    "Unknown response" |> @git.GitError::ProtocolError |> Err
+    "Unknown response" |> @bit.GitError::ProtocolError |> Err
   }
 }
 
@@ -255,8 +255,8 @@ fn remote_bytes_to_string(data : Bytes) -> String {
 /// Discover refs using provided HTTP client functions
 pub async fn discover_refs_with_http(
   remote : Remote,
-  http_get : async (String, Map[String, String]) -> (@git.HttpResponse, Bytes) raise @git.GitError,
-) -> (Array[(@git.ObjectId, String)], Array[String]) raise @git.GitError {
+  http_get : async (String, Map[String, String]) -> (@bit.HttpResponse, Bytes) raise @bit.GitError,
+) -> (Array[(@bit.ObjectId, String)], Array[String]) raise @bit.GitError {
   let url = remote.info_refs_url()
   let headers : Map[String, String] = {
     "User-Agent": "git/moonbit",
@@ -264,7 +264,7 @@ pub async fn discover_refs_with_http(
   }
   let (response, data) = http_get(url, headers)
   if response.code != 200 {
-    raise @git.GitError::ProtocolError(
+    raise @bit.GitError::ProtocolError(
       "Failed to discover refs: HTTP \{response.code}",
     )
   }
@@ -278,16 +278,16 @@ pub async fn discover_refs_with_http(
 pub async fn push_with_http(
   remote : Remote,
   req : PushRequest,
-  http_get : async (String, Map[String, String]) -> (@git.HttpResponse, Bytes) raise @git.GitError,
+  http_get : async (String, Map[String, String]) -> (@bit.HttpResponse, Bytes) raise @bit.GitError,
   http_post : async (String, Bytes, Map[String, String]) -> (
-    @git.HttpResponse,
+    @bit.HttpResponse,
     Bytes,
-  ) raise @git.GitError,
-) -> String raise @git.GitError {
+  ) raise @bit.GitError,
+) -> String raise @bit.GitError {
   let (_, caps) = discover_refs_with_http(remote, http_get)
   let has_report_status = caps.contains("report-status")
   if not(has_report_status) {
-    raise @git.GitError::ProtocolError("Server does not support report-status")
+    raise @bit.GitError::ProtocolError("Server does not support report-status")
   }
   let url = remote.receive_pack_url()
   let body = build_receive_pack_body(req)
@@ -298,7 +298,7 @@ pub async fn push_with_http(
   }
   let (response, response_data) = http_post(url, body, headers)
   if response.code != 200 {
-    raise @git.GitError::ProtocolError("Failed to push: HTTP \{response.code}")
+    raise @bit.GitError::ProtocolError("Failed to push: HTTP \{response.code}")
   }
   match parse_receive_pack_response(response_data) {
     Ok(msg) => msg

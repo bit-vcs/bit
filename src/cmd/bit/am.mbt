@@ -66,7 +66,7 @@ async fn handle_am(args : Array[String]) -> Unit raise Error {
   // Handle --skip
   if skip {
     if not(fs.is_dir(am_dir)) {
-      raise @git.GitError::InvalidObject("No am in progress")
+      raise @bitcore.GitError::InvalidObject("No am in progress")
     }
     let next_file = am_dir + "/next"
     if fs.is_file(next_file) {
@@ -82,7 +82,7 @@ async fn handle_am(args : Array[String]) -> Unit raise Error {
   // Handle --continue or apply new patches
   if continue_am {
     if not(fs.is_dir(am_dir)) {
-      raise @git.GitError::InvalidObject("No am in progress")
+      raise @bitcore.GitError::InvalidObject("No am in progress")
     }
     apply_remaining_patches(
       fs, root, git_dir, am_dir, three_way, signoff, quiet,
@@ -98,9 +98,9 @@ async fn handle_am(args : Array[String]) -> Unit raise Error {
       let patches = parse_mbox(input, keep_cr && not(no_keep_cr))
       if patches.length() == 0 {
         remove_dir_recursive(fs, am_dir)
-        raise @git.GitError::InvalidObject("No patches found in input")
+        raise @bitcore.GitError::InvalidObject("No patches found in input")
       }
-      let head = @gitlib.resolve_ref(fs, git_dir, "HEAD")
+      let head = @bitlib.resolve_ref(fs, git_dir, "HEAD")
       if head is Some(id) {
         fs.write_string(am_dir + "/orig-head", id.to_hex())
       }
@@ -131,9 +131,9 @@ async fn handle_am(args : Array[String]) -> Unit raise Error {
     }
     if all_patches.length() == 0 {
       remove_dir_recursive(fs, am_dir)
-      raise @git.GitError::InvalidObject("No patches found")
+      raise @bitcore.GitError::InvalidObject("No patches found")
     }
-    let head = @gitlib.resolve_ref(fs, git_dir, "HEAD")
+    let head = @bitlib.resolve_ref(fs, git_dir, "HEAD")
     if head is Some(id) {
       fs.write_string(am_dir + "/orig-head", id.to_hex())
     }
@@ -352,7 +352,7 @@ async fn apply_remaining_patches(
     }
     let commit_author = get_author_string()
     let commit_timestamp = get_commit_timestamp()
-    let _ = @gitlib.commit(
+    let _ = @bitlib.commit(
       fs, fs, root, commit_msg, commit_author, commit_timestamp,
     )
     next += 1

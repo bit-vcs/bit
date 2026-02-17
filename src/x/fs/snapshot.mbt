@@ -3,14 +3,14 @@
 ///|
 pub fn Fs::snapshot(
   self : Fs,
-  backing_fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  backing_fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   message : String,
   author : String,
   timestamp : Int64,
-) -> Snapshot raise @git.GitError {
+) -> Snapshot raise @bit.GitError {
   if not(self.working.is_dirty()) {
-    raise @git.GitError::InvalidObject("No changes to commit")
+    raise @bit.GitError::InvalidObject("No changes to commit")
   }
   let tree_id = build_tree_from_working(
     backing_fs,
@@ -23,10 +23,10 @@ pub fn Fs::snapshot(
     Some(id) => [id]
     None => []
   }
-  let commit = @git.Commit::new(
+  let commit = @bit.Commit::new(
     tree_id, parents, author, timestamp, "+0000", author, timestamp, "+0000", message,
   )
-  let (commit_id, compressed) = @git.create_commit(commit)
+  let (commit_id, compressed) = @bit.create_commit(commit)
   @lib.write_object_bytes(backing_fs, self.git_dir, commit_id, compressed)
   self.base_tree = tree_id
   self.base_commit = Some(commit_id)
@@ -39,18 +39,18 @@ pub fn Fs::snapshot(
 ///|
 pub fn Fs::checkout_snapshot(
   self : Fs,
-  backing_fs : &@git.RepoFileSystem,
-  commit_id : @git.ObjectId,
-) -> Unit raise @git.GitError {
+  backing_fs : &@bit.RepoFileSystem,
+  commit_id : @bit.ObjectId,
+) -> Unit raise @bit.GitError {
   let db = self.get_db(backing_fs)
   let obj = db.get(backing_fs, commit_id)
   guard obj is Some(o) else {
-    raise @git.GitError::InvalidObject("Commit not found: \{commit_id}")
+    raise @bit.GitError::InvalidObject("Commit not found: \{commit_id}")
   }
-  if o.obj_type != @git.ObjectType::Commit {
-    raise @git.GitError::InvalidObject("Not a commit: \{commit_id}")
+  if o.obj_type != @bit.ObjectType::Commit {
+    raise @bit.GitError::InvalidObject("Not a commit: \{commit_id}")
   }
-  let info = @git.parse_commit(o.data)
+  let info = @bit.parse_commit(o.data)
   self.base_tree = info.tree
   self.base_commit = Some(commit_id)
   self.working.clear()
@@ -66,9 +66,9 @@ pub fn Fs::rollback(self : Fs) -> Unit {
 ///|
 pub fn Fs::list_snapshots(
   self : Fs,
-  backing_fs : &@git.RepoFileSystem,
+  backing_fs : &@bit.RepoFileSystem,
   max_count? : Int = 100,
-) -> Array[Snapshot] raise @git.GitError {
+) -> Array[Snapshot] raise @bit.GitError {
   let result : Array[Snapshot] = []
   let mut current = self.base_commit
   let db = self.get_db(backing_fs)
@@ -81,10 +81,10 @@ pub fn Fs::list_snapshots(
         match obj {
           None => break
           Some(o) => {
-            if o.obj_type != @git.ObjectType::Commit {
+            if o.obj_type != @bit.ObjectType::Commit {
               break
             }
-            let info = @git.parse_commit(o.data)
+            let info = @bit.parse_commit(o.data)
             let (author, timestamp, message) = parse_commit_details(o.data)
             result.push(
               Snapshot::new(commit_id, info.tree, message, author, timestamp),

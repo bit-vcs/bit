@@ -111,20 +111,20 @@ fn join_repo_marker(root : String, marker : String) -> String {
 }
 
 ///|
-fn detect_repo_marker_path(fs : &@git.RepoFileSystem, root : String) -> String? {
+fn detect_repo_marker_path(fs : &@bit.RepoFileSystem, root : String) -> String? {
   let bit_marker = join_repo_marker(root, ".bit")
   if fs.is_dir(bit_marker) || fs.is_file(bit_marker) {
     return Some(bit_marker)
   }
-  let git_marker = join_repo_marker(root, ".git")
-  if fs.is_dir(git_marker) || fs.is_file(git_marker) {
-    return Some(git_marker)
+  let bit_marker = join_repo_marker(root, ".git")
+  if fs.is_dir(bit_marker) || fs.is_file(bit_marker) {
+    return Some(bit_marker)
   }
   None
 }
 
 ///|
-fn default_repo_marker_path(fs : &@git.RepoFileSystem, root : String) -> String {
+fn default_repo_marker_path(fs : &@bit.RepoFileSystem, root : String) -> String {
   match detect_repo_marker_path(fs, root) {
     Some(path) => path
     None => join_repo_marker(root, ".git")
@@ -139,7 +139,7 @@ fn is_bare_repo_dir(path : String) -> Bool {
 }
 
 ///|
-fn resolve_git_dir(fs : &@git.RepoFileSystem, root : String) -> String {
+fn resolve_git_dir(fs : &@bit.RepoFileSystem, root : String) -> String {
   let default_git_dir = default_repo_marker_path(fs, root)
   match @sys.get_env_var("GIT_DIR") {
     Some(dir) => {
@@ -155,7 +155,7 @@ fn resolve_git_dir(fs : &@git.RepoFileSystem, root : String) -> String {
         }
       }
       if fs.is_file(resolved) {
-        @gitlib.resolve_gitdir(fs, resolved)
+        @bitlib.resolve_gitdir(fs, resolved)
       } else if fs.is_dir(resolved) {
         resolved
       } else if is_bare_repo_dir(root) {
@@ -166,7 +166,7 @@ fn resolve_git_dir(fs : &@git.RepoFileSystem, root : String) -> String {
     }
     None =>
       if fs.is_file(default_git_dir) {
-        @gitlib.resolve_gitdir(fs, default_git_dir)
+        @bitlib.resolve_gitdir(fs, default_git_dir)
       } else if fs.is_dir(default_git_dir) {
         default_git_dir
       } else if is_bare_repo_dir(root) {
@@ -282,7 +282,7 @@ fn workspace_flow_template_manifest() -> WorkspaceManifest {
 ///|
 fn workspace_manifest_for_template(
   template : String?,
-) -> WorkspaceManifest raise @git.GitError {
+) -> WorkspaceManifest raise @bit.GitError {
   match template {
     None => workspace_default_manifest()
     Some(raw) => {
@@ -291,7 +291,7 @@ fn workspace_manifest_for_template(
         "" | "default" | "basic" | "minimal" => workspace_default_manifest()
         "flow" => workspace_flow_template_manifest()
         _ =>
-          raise @git.GitError::InvalidObject(
+          raise @bit.GitError::InvalidObject(
             "unknown workspace template: '" + raw + "'",
           )
       }
@@ -347,15 +347,15 @@ fn workspace_bit_marker(root : String) -> String {
 
 ///|
 fn workspace_resolve_gitdir_from_bit_file(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   bit_file : String,
 ) -> String? {
-  Some(@gitlib.resolve_gitdir(fs, bit_file))
+  Some(@bitlib.resolve_gitdir(fs, bit_file))
 }
 
 ///|
 fn workspace_manifest_path_at(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   root : String,
 ) -> String? {
   let bit_marker = workspace_bit_marker(root)
@@ -376,15 +376,15 @@ fn workspace_manifest_path_at(
       None => ()
     }
   }
-  let git_marker = join_repo_marker(root, ".git")
-  if fs.is_dir(git_marker) {
-    let path = git_marker + "/workspace.toml"
+  let bit_marker = join_repo_marker(root, ".git")
+  if fs.is_dir(bit_marker) {
+    let path = bit_marker + "/workspace.toml"
     if fs.is_file(path) {
       return Some(path)
     }
   }
-  if fs.is_file(git_marker) {
-    match workspace_resolve_gitdir_from_bit_file(fs, git_marker) {
+  if fs.is_file(bit_marker) {
+    match workspace_resolve_gitdir_from_bit_file(fs, bit_marker) {
       Some(git_dir) => {
         let path = git_dir + "/workspace.toml"
         if fs.is_file(path) {
@@ -399,7 +399,7 @@ fn workspace_manifest_path_at(
 
 ///|
 fn workspace_meta_dir_for_root(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   root : String,
 ) -> String {
   let bit_marker = workspace_bit_marker(root)
@@ -412,12 +412,12 @@ fn workspace_meta_dir_for_root(
       None => ()
     }
   }
-  let git_marker = join_repo_marker(root, ".git")
-  if fs.is_dir(git_marker) {
-    return git_marker
+  let bit_marker = join_repo_marker(root, ".git")
+  if fs.is_dir(bit_marker) {
+    return bit_marker
   }
-  if fs.is_file(git_marker) {
-    match workspace_resolve_gitdir_from_bit_file(fs, git_marker) {
+  if fs.is_file(bit_marker) {
+    match workspace_resolve_gitdir_from_bit_file(fs, bit_marker) {
       Some(git_dir) => return git_dir
       None => ()
     }
@@ -427,33 +427,33 @@ fn workspace_meta_dir_for_root(
 
 ///|
 fn workspace_manifest_write_path(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   root : String,
 ) -> String {
   workspace_meta_dir_for_root(fs, root) + "/workspace.toml"
 }
 
 ///|
-fn workspace_lock_path(fs : &@git.RepoFileSystem, root : String) -> String {
+fn workspace_lock_path(fs : &@bit.RepoFileSystem, root : String) -> String {
   workspace_meta_dir_for_root(fs, root) + "/workspace.lock.json"
 }
 
 ///|
 fn workspace_flow_cache_path(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   root : String,
 ) -> String {
   workspace_meta_dir_for_root(fs, root) + "/workspace.flow-cache.json"
 }
 
 ///|
-fn workspace_txn_dir(fs : &@git.RepoFileSystem, root : String) -> String {
+fn workspace_txn_dir(fs : &@bit.RepoFileSystem, root : String) -> String {
   workspace_meta_dir_for_root(fs, root) + "/txns"
 }
 
 ///|
 fn workspace_txn_path(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   root : String,
   txn_id : String,
 ) -> String {
@@ -484,12 +484,12 @@ fn find_workspace_root_from(start : String) -> String? {
 }
 
 ///|
-fn require_workspace_root(cwd : String?) -> String raise @git.GitError {
+fn require_workspace_root(cwd : String?) -> String raise @bit.GitError {
   let start = resolve_workspace_probe_dir(cwd)
   match find_workspace_root_from(start) {
     Some(root) => root
     None =>
-      raise @git.GitError::InvalidObject(
+      raise @bit.GitError::InvalidObject(
         "Not inside a workspace (missing .bit/workspace.toml)",
       )
   }
@@ -810,11 +810,11 @@ fn format_workspace_manifest(manifest : WorkspaceManifest) -> String {
 fn load_workspace_manifest(
   fs : @osfs.OsFs,
   workspace_root : String,
-) -> WorkspaceManifest raise @git.GitError {
+) -> WorkspaceManifest raise @bit.GitError {
   let manifest_path = match workspace_manifest_path_at(fs, workspace_root) {
     Some(path) => path
     None =>
-      raise @git.GitError::InvalidObject(
+      raise @bit.GitError::InvalidObject(
         "workspace manifest not found under " + workspace_root,
       )
   }
@@ -899,12 +899,12 @@ fn require_workspace_manifest_valid(
   workspace_root : String,
   manifest : WorkspaceManifest,
   command : String,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let issues = workspace_manifest_issues(fs, workspace_root, manifest, false)
   if issues.length() == 0 {
     return
   }
-  raise @git.GitError::InvalidObject(
+  raise @bit.GitError::InvalidObject(
     "workspace \{command} manifest invalid: " + issues[0],
   )
 }
@@ -919,7 +919,7 @@ fn workspace_node_git_dir(fs : @osfs.OsFs, node_root : String) -> String? {
     return None
   }
   let git_dir = resolve_git_dir(fs, node_root)
-  let head_ok = try @gitlib.read_head_ref(fs, git_dir) catch {
+  let head_ok = try @bitlib.read_head_ref(fs, git_dir) catch {
     _ => None
   } noraise {
     _ => Some(true)
@@ -935,11 +935,11 @@ fn workspace_node_head_hex(fs : @osfs.OsFs, node_root : String) -> String? {
   guard workspace_node_git_dir(fs, node_root) is Some(git_dir) else {
     return None
   }
-  let head = @gitlib.read_head_ref(fs, git_dir) catch { _ => return None }
+  let head = @bitlib.read_head_ref(fs, git_dir) catch { _ => return None }
   match head {
-    @gitlib.HeadRef::Detached(id) => Some(id.to_hex())
-    @gitlib.HeadRef::Branch(name) =>
-      try @gitlib.resolve_ref(fs, git_dir, "refs/heads/" + name) catch {
+    @bitlib.HeadRef::Detached(id) => Some(id.to_hex())
+    @bitlib.HeadRef::Branch(name) =>
+      try @bitlib.resolve_ref(fs, git_dir, "refs/heads/" + name) catch {
         _ => None
       } noraise {
         maybe_id =>
@@ -998,7 +998,7 @@ fn workspace_node_directory_signature_with_mode(
   let mode_name = @fingerprint.fingerprint_mode_name(mode)
   let dir_hash = workspace_directory_hash_with_mode(fs, node_root, mode)
   Some(
-    @git.hash_blob_string(
+    @bit.hash_blob_string(
       "mode=" + mode_name + "\nhead=" + head + "\ndir=" + dir_hash,
     ).to_hex(),
   )
@@ -1336,7 +1336,7 @@ async fn workspace_is_node_dirty(fs : @osfs.OsFs, node_root : String) -> Bool {
   if workspace_node_git_dir(fs, node_root) is None {
     return false
   }
-  let lines : Result[Array[String], Error] = try? @gitlib.status_porcelain(
+  let lines : Result[Array[String], Error] = try? @bitlib.status_porcelain(
     fs, node_root,
   )
   let lines = match lines {
@@ -1663,14 +1663,14 @@ fn workspace_parse_star_flow_ir(
   star_path : String,
   target : String?,
   external_inputs : Map[String, String],
-) -> @bitflow.FlowIr raise @git.GitError {
+) -> @bitflow.FlowIr raise @bit.GitError {
   let absolute_star_path = if star_path.has_prefix("/") {
     normalize_path(star_path)
   } else {
     normalize_path(workspace_root + "/" + star_path)
   }
   if not(fs.is_file(absolute_star_path)) {
-    raise @git.GitError::InvalidObject(
+    raise @bit.GitError::InvalidObject(
       "workspace flow: star file not found: " + absolute_star_path,
     )
   }
@@ -1680,7 +1680,7 @@ fn workspace_parse_star_flow_ir(
     external_inputs,
   )
   if parsed.errors.length() > 0 {
-    raise @git.GitError::InvalidObject(
+    raise @bit.GitError::InvalidObject(
       "workspace flow: star parse failed: " + parsed.errors[0],
     )
   }
@@ -1695,7 +1695,7 @@ fn workspace_parse_star_flow_ir(
         }
       }
       if not(found) {
-        raise @git.GitError::InvalidObject(
+        raise @bit.GitError::InvalidObject(
           "workspace flow: star target task not found: " + task_id,
         )
       }
@@ -1840,7 +1840,7 @@ async fn handle_workspace_commit(
     i += 1
   }
   guard message is Some(raw_message) else {
-    raise @git.GitError::InvalidObject("workspace commit requires -m <message>")
+    raise @bit.GitError::InvalidObject("workspace commit requires -m <message>")
   }
   let fs = @osfs.OsFs::new()
   let workspace_root = require_workspace_root(None)
@@ -1898,7 +1898,7 @@ async fn handle_workspace_commit(
   write_workspace_lock_snapshot(fs, workspace_root, manifest)
   println("workspace commit txn: " + txn_id + " (" + state + ")")
   if required_failed {
-    raise @git.GitError::InvalidObject(
+    raise @bit.GitError::InvalidObject(
       "workspace commit failed on required nodes (txn: " + txn_id + ")",
     )
   }
@@ -1993,7 +1993,7 @@ async fn handle_workspace_push(
   write_workspace_lock_snapshot(fs, workspace_root, manifest)
   println("workspace push txn: " + txn_id + " (" + state + ")")
   if required_failed {
-    raise @git.GitError::InvalidObject(
+    raise @bit.GitError::InvalidObject(
       "workspace push failed on required nodes (txn: " + txn_id + ")",
     )
   }
@@ -2015,7 +2015,7 @@ async fn handle_workspace_run(args : Array[String]) -> Unit raise Error {
     }
   }
   guard task_name is Some(task) else {
-    raise @git.GitError::InvalidObject("workspace run requires <task>")
+    raise @bit.GitError::InvalidObject("workspace run requires <task>")
   }
   let fs = @osfs.OsFs::new()
   let workspace_root = require_workspace_root(None)
@@ -2093,7 +2093,7 @@ async fn handle_workspace_run(args : Array[String]) -> Unit raise Error {
   write_workspace_txn(fs, workspace_root, txn_id, "run", state, steps)
   println("workspace run txn: " + txn_id + " (" + state + ")")
   if required_failed {
-    raise @git.GitError::InvalidObject(
+    raise @bit.GitError::InvalidObject(
       "workspace run failed on required nodes (txn: " + txn_id + ")",
     )
   }
@@ -2128,7 +2128,7 @@ async fn handle_workspace_flow(
         continue
       }
       "--pr" | "--hub-pr" =>
-        raise @git.GitError::InvalidObject(
+        raise @bit.GitError::InvalidObject(
           "workspace flow: --pr requires a value",
         )
       "--config" => {
@@ -2145,7 +2145,7 @@ async fn handle_workspace_flow(
         continue
       }
       "--star" =>
-        raise @git.GitError::InvalidObject(
+        raise @bit.GitError::InvalidObject(
           "workspace flow: --star is removed; use --config or -c",
         )
       "-c" => {
@@ -2167,7 +2167,7 @@ async fn handle_workspace_flow(
         continue
       }
       "--target" =>
-        raise @git.GitError::InvalidObject(
+        raise @bit.GitError::InvalidObject(
           "workspace flow: --target requires a value",
         )
       "--var" => {
@@ -2206,7 +2206,7 @@ async fn handle_workspace_flow(
         )
       }
       _ if arg.has_prefix("--star=") =>
-        raise @git.GitError::InvalidObject(
+        raise @bit.GitError::InvalidObject(
           "workspace flow: --star is removed; use --config or -c",
         )
       _ if arg.has_prefix("--target=") =>
@@ -2264,7 +2264,7 @@ async fn handle_workspace_flow(
       @sys.get_env_vars(),
     )
     if external_inputs.errors.length() > 0 {
-      raise @git.GitError::InvalidObject(
+      raise @bit.GitError::InvalidObject(
         "workspace flow: invalid external input: " + external_inputs.errors[0],
       )
     }
@@ -2292,7 +2292,7 @@ async fn handle_workspace_flow(
     )
     let flow_issues = @bitflow.ir_issues(flow_ir)
     if flow_issues.length() > 0 {
-      raise @git.GitError::InvalidObject(
+      raise @bit.GitError::InvalidObject(
         "workspace flow star invalid: " + flow_issues[0],
       )
     }
@@ -2339,7 +2339,7 @@ async fn handle_workspace_flow(
       flow_ir, node_signatures, flow_cache,
     )
     if cache_plan.issues.length() > 0 {
-      raise @git.GitError::InvalidObject(
+      raise @bit.GitError::InvalidObject(
         "workspace flow cache plan invalid: " + cache_plan.issues[0],
       )
     }
@@ -2528,7 +2528,7 @@ async fn handle_workspace_flow(
           status,
         )
       } else {
-        raise @git.GitError::InvalidObject(
+        raise @bit.GitError::InvalidObject(
           if report_err.length() == 0 {
             "workspace flow report failed for PR " + pr_id
           } else {
@@ -2538,19 +2538,19 @@ async fn handle_workspace_flow(
       }
     }
     if required_failed {
-      raise @git.GitError::InvalidObject(
+      raise @bit.GitError::InvalidObject(
         "workspace flow failed on required nodes (txn: " + txn_id + ")",
       )
     }
     return
   }
   if star_var_cli_args.length() > 0 {
-    raise @git.GitError::InvalidObject(
+    raise @bit.GitError::InvalidObject(
       "workspace flow: --var is only supported with star workflow mode",
     )
   }
   guard task_name is Some(task) else {
-    raise @git.GitError::InvalidObject("workspace flow requires <task>")
+    raise @bit.GitError::InvalidObject("workspace flow requires <task>")
   }
   let selected = if affected_only {
     expand_affected_node_ids(manifest, changed)
@@ -2564,7 +2564,7 @@ async fn handle_workspace_flow(
   let flow_ir = workspace_flow_ir(manifest, selected, task)
   let flow_issues = @bitflow.ir_issues(flow_ir)
   if flow_issues.length() > 0 {
-    raise @git.GitError::InvalidObject(
+    raise @bit.GitError::InvalidObject(
       "workspace flow invalid: " + flow_issues[0],
     )
   }
@@ -2602,7 +2602,7 @@ async fn handle_workspace_flow(
     flow_ir, node_signatures, flow_cache,
   )
   if cache_plan.issues.length() > 0 {
-    raise @git.GitError::InvalidObject(
+    raise @bit.GitError::InvalidObject(
       "workspace flow cache plan invalid: " + cache_plan.issues[0],
     )
   }
@@ -2769,7 +2769,7 @@ async fn handle_workspace_flow(
         status,
       )
     } else {
-      raise @git.GitError::InvalidObject(
+      raise @bit.GitError::InvalidObject(
         if report_err.length() == 0 {
           "workspace flow report failed for PR " + pr_id
         } else {
@@ -2779,7 +2779,7 @@ async fn handle_workspace_flow(
     }
   }
   if required_failed {
-    raise @git.GitError::InvalidObject(
+    raise @bit.GitError::InvalidObject(
       "workspace flow failed on required nodes (txn: " + txn_id + ")",
     )
   }
@@ -2810,7 +2810,7 @@ async fn handle_workspace_export(args : Array[String]) -> Unit raise Error {
     i += 1
   }
   guard format is Some(fmt) && fmt == "git-interop" else {
-    raise @git.GitError::InvalidObject(
+    raise @bit.GitError::InvalidObject(
       "workspace export requires --format git-interop",
     )
   }
@@ -2875,7 +2875,7 @@ async fn handle_workspace_doctor(args : Array[String]) -> Unit raise Error {
   for issue in issues {
     eprint_line("workspace doctor: " + issue)
   }
-  raise @git.GitError::InvalidObject("workspace doctor found issues")
+  raise @bit.GitError::InvalidObject("workspace doctor found issues")
 }
 
 ///|

@@ -17,7 +17,7 @@ async fn handle_unpack_objects(args : Array[String]) -> Unit raise Error {
   // Read packfile from stdin
   let data = read_all_stdin()
   if data.length() < 32 {
-    raise @git.GitError::PackfileError("Packfile too short")
+    raise @bitcore.GitError::PackfileError("Packfile too short")
   }
   // Parse the packfile
   let objects = @pack.parse_packfile(data)
@@ -31,7 +31,7 @@ async fn handle_unpack_objects(args : Array[String]) -> Unit raise Error {
   }
   // Write objects to the repository
   for obj in objects {
-    let _ = @gitlib.write_loose_object(fs, git_dir, obj.obj_type, obj.data)
+    let _ = @bitlib.write_loose_object(fs, git_dir, obj.obj_type, obj.data)
   }
 }
 

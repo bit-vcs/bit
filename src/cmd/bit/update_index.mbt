@@ -69,7 +69,7 @@ async fn handle_update_index(args : Array[String]) -> Unit raise Error {
     }
     i += 1
   }
-  let direct_updates : Array[@gitlib.IndexEntry] = []
+  let direct_updates : Array[@bitlib.IndexEntry] = []
   let direct_remove_paths : Array[String] = []
   // Read from stdin if requested
   if stdin {
@@ -88,13 +88,13 @@ async fn handle_update_index(args : Array[String]) -> Unit raise Error {
               direct_remove_paths.push(normalized_path)
             } else {
               direct_updates.push(
-                @gitlib.IndexEntry::new(normalized_path, id, mode, 0),
+                @bitlib.IndexEntry::new(normalized_path, id, mode, 0),
               )
             }
           }
           None => {
             eprint_line("error: bad index-info line: " + part)
-            raise @git.GitError::InvalidObject("bad index-info line")
+            raise @bitcore.GitError::InvalidObject("bad index-info line")
           }
         }
       } else {
@@ -118,7 +118,7 @@ async fn handle_update_index(args : Array[String]) -> Unit raise Error {
           direct_remove_paths.push(normalized_path)
         } else {
           direct_updates.push(
-            @gitlib.IndexEntry::new(normalized_path, id, mode, 0),
+            @bitlib.IndexEntry::new(normalized_path, id, mode, 0),
           )
         }
       }
@@ -126,7 +126,7 @@ async fn handle_update_index(args : Array[String]) -> Unit raise Error {
         eprint_line(
           "error: bad cacheinfo: " + mode_str + " " + sha + " " + path,
         )
-        raise @git.GitError::InvalidObject("bad cacheinfo")
+        raise @bitcore.GitError::InvalidObject("bad cacheinfo")
       }
     }
   }
@@ -157,51 +157,51 @@ async fn handle_update_index(args : Array[String]) -> Unit raise Error {
       // Use gitlib functions
       if add_paths.length() > 0 {
         // Ensure replacing existing entries is idempotent for the same path.
-        let existing_entries = @gitlib.read_index_entries(fs, git_dir)
+        let existing_entries = @bitlib.read_index_entries(fs, git_dir)
         let add_set : Map[String, Bool] = {}
         for p in add_paths {
           add_set[normalize_update_index_path(p)] = true
         }
-        let filtered_entries : Array[@gitlib.IndexEntry] = []
+        let filtered_entries : Array[@bitlib.IndexEntry] = []
         for e in existing_entries {
           if not(add_set.contains(normalize_update_index_path(e.path))) {
             filtered_entries.push(e)
           }
         }
-        @gitlib.write_index_entries(fs, git_dir, filtered_entries)
-        @gitlib.add_paths_async(fs, fs, root, add_paths)
+        @bitlib.write_index_entries(fs, git_dir, filtered_entries)
+        @bitlib.add_paths_async(fs, fs, root, add_paths)
         let normalized_entries = dedupe_index_entries_by_path(
-          @gitlib.read_index_entries(fs, git_dir),
+          @bitlib.read_index_entries(fs, git_dir),
         )
-        @gitlib.write_index_entries(fs, git_dir, normalized_entries)
+        @bitlib.write_index_entries(fs, git_dir, normalized_entries)
       }
       // For removals, filter out from index
       if remove_paths.length() > 0 {
-        let entries = @gitlib.read_index_entries(fs, git_dir)
+        let entries = @bitlib.read_index_entries(fs, git_dir)
         let remove_set : Map[String, Bool] = {}
         for p in remove_paths {
           remove_set[normalize_update_index_path(p)] = true
         }
-        let filtered : Array[@gitlib.IndexEntry] = []
+        let filtered : Array[@bitlib.IndexEntry] = []
         for e in entries {
           if not(remove_set.contains(normalize_update_index_path(e.path))) {
             filtered.push(e)
           }
         }
-        @gitlib.write_index_entries(fs, git_dir, filtered)
+        @bitlib.write_index_entries(fs, git_dir, filtered)
       }
     }
   }
   // Handle --refresh
   if refresh && paths.length() == 0 {
     // Refresh all entries - recompute hashes
-    let entries = @gitlib.read_index_entries(fs, git_dir)
-    let refreshed : Array[@gitlib.IndexEntry] = []
+    let entries = @bitlib.read_index_entries(fs, git_dir)
+    let refreshed : Array[@bitlib.IndexEntry] = []
     for e in entries {
       // Keep existing entries (could recompute hash if needed)
       refreshed.push(e)
     }
-    @gitlib.write_index_entries(fs, git_dir, refreshed)
+    @bitlib.write_index_entries(fs, git_dir, refreshed)
   }
   match skip_worktree_mode {
     Some(enabled) => {
@@ -221,7 +221,7 @@ async fn handle_update_index(args : Array[String]) -> Unit raise Error {
 }
 
 ///|
-fn parse_update_index_info_line(line : String) -> (Int, @git.ObjectId, String)? {
+fn parse_update_index_info_line(line : String) -> (Int, @bitcore.ObjectId, String)? {
   match line.find("\t") {
     None => None
     Some(tab_idx) => {
@@ -244,7 +244,7 @@ fn parse_update_index_info_line(line : String) -> (Int, @git.ObjectId, String)? 
             if fields.length() < 2 {
               return None
             }
-            Some((0, @git.ObjectId::zero(), normalized_path))
+            Some((0, @bitcore.ObjectId::zero(), normalized_path))
           } else {
             match fields.length() {
               2 => {
@@ -301,7 +301,7 @@ fn parse_update_index_cacheinfo(
   mode_str : String,
   sha : String,
   path : String,
-) -> (Int, @git.ObjectId, String)? {
+) -> (Int, @bitcore.ObjectId, String)? {
   match parse_octal_mode(mode_str) {
     None => None
     Some(mode) => {
@@ -310,8 +310,8 @@ fn parse_update_index_cacheinfo(
       if mode == 0 {
         None
       } else {
-        let id = @git.ObjectId::from_hex(sha) catch { _ => return None }
-        if id == @git.ObjectId::zero() {
+        let id = @bitcore.ObjectId::from_hex(sha) catch { _ => return None }
+        if id == @bitcore.ObjectId::zero() {
           None
         } else {
           Some((mode, id, normalized_path))
@@ -332,9 +332,9 @@ fn parse_update_index_stage(value : String) -> Int? {
 }
 
 ///|
-fn parse_update_index_object_id(hex : String) -> @git.ObjectId? {
-  let id = @git.ObjectId::from_hex(hex) catch { _ => return None }
-  if id == @git.ObjectId::zero() {
+fn parse_update_index_object_id(hex : String) -> @bitcore.ObjectId? {
+  let id = @bitcore.ObjectId::from_hex(hex) catch { _ => return None }
+  if id == @bitcore.ObjectId::zero() {
     None
   } else {
     Some(id)
@@ -377,11 +377,11 @@ fn split_update_index_fields(s : String) -> Array[String] {
 fn apply_update_index_entries(
   fs : OsFs,
   git_dir : String,
-  updates : Array[@gitlib.IndexEntry],
+  updates : Array[@bitlib.IndexEntry],
   removals : Array[String],
 ) -> Unit raise Error {
-  let existing = @gitlib.read_index_entries(fs, git_dir)
-  let update_map : Map[String, @gitlib.IndexEntry] = {}
+  let existing = @bitlib.read_index_entries(fs, git_dir)
+  let update_map : Map[String, @bitlib.IndexEntry] = {}
   for entry in updates {
     update_map[normalize_update_index_path(entry.path)] = entry
   }
@@ -389,7 +389,7 @@ fn apply_update_index_entries(
   for p in removals {
     removal_set[normalize_update_index_path(p)] = true
   }
-  let out : Array[@gitlib.IndexEntry] = []
+  let out : Array[@bitlib.IndexEntry] = []
   for entry in existing {
     let path = normalize_update_index_path(entry.path)
     if removal_set.contains(path) {
@@ -407,20 +407,20 @@ fn apply_update_index_entries(
     let (_, entry) = item
     out.push(entry)
   }
-  @gitlib.write_index_entries(fs, git_dir, dedupe_index_entries_by_path(out))
+  @bitlib.write_index_entries(fs, git_dir, dedupe_index_entries_by_path(out))
 }
 
 ///|
 fn dedupe_index_entries_by_path(
-  entries : Array[@gitlib.IndexEntry],
-) -> Array[@gitlib.IndexEntry] raise @git.GitError {
-  let by_path : Map[String, @gitlib.IndexEntry] = {}
+  entries : Array[@bitlib.IndexEntry],
+) -> Array[@bitlib.IndexEntry] raise @bitcore.GitError {
+  let by_path : Map[String, @bitlib.IndexEntry] = {}
   for entry in entries {
     by_path[normalize_update_index_path(entry.path)] = entry
   }
-  let sorted : Array[(String, @gitlib.IndexEntry)] = by_path.to_array()
+  let sorted : Array[(String, @bitlib.IndexEntry)] = by_path.to_array()
   sorted.sort_by((a, b) => String::compare(a.0, b.0))
-  let out : Array[@gitlib.IndexEntry] = []
+  let out : Array[@bitlib.IndexEntry] = []
   for item in sorted {
     let (_, entry) = item
     out.push(entry)
@@ -429,11 +429,11 @@ fn dedupe_index_entries_by_path(
 }
 
 ///|
-fn normalize_update_index_path(path : String) -> String raise @git.GitError {
+fn normalize_update_index_path(path : String) -> String raise @bitcore.GitError {
   if path.has_prefix("/") {
-    raise @git.GitError::InvalidObject("path must be relative")
+    raise @bitcore.GitError::InvalidObject("path must be relative")
   }
-  @gitlib.normalize_repo_path(path)
+  @bitlib.normalize_repo_path(path)
 }
 
 ///|

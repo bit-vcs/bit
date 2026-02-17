@@ -11,9 +11,9 @@ let bench_diff_root : String = "/bench_diff"
 fn setup_diff_repo(
   file_count : Int,
   changed_pct : Int,
-) -> (@git.TestFs, @git.ObjectId, @git.ObjectId) raise @git.GitError {
-  let fs = @git.TestFs::new()
-  ignore(try? @gitlib.init_repo(fs, bench_diff_root))
+) -> (@bit.TestFs, @bit.ObjectId, @bit.ObjectId) raise @bit.GitError {
+  let fs = @bit.TestFs::new()
+  ignore(try? @bitlib.init_repo(fs, bench_diff_root))
   let git_dir = bench_diff_root + "/.git"
   for i in 0..<file_count {
     fs.write_string(
@@ -21,13 +21,13 @@ fn setup_diff_repo(
       "original content line 1\nline 2\nline 3\nline 4\nline 5\n",
     )
   }
-  @gitlib.add_paths(fs, fs, bench_diff_root, ["."])
-  let commit1 = @gitlib.commit(
+  @bitlib.add_paths(fs, fs, bench_diff_root, ["."])
+  let commit1 = @bitlib.commit(
     fs, fs, bench_diff_root, "first commit\n", "Bench <bench@example.com>", 1700000000L,
   )
-  let db1 = @gitlib.ObjectDb::load(fs, git_dir)
+  let db1 = @bitlib.ObjectDb::load(fs, git_dir)
   let obj1 = db1.get(fs, commit1).unwrap()
-  let tree1 = @git.parse_commit(obj1.data).tree
+  let tree1 = @bit.parse_commit(obj1.data).tree
   let changed_count = file_count * changed_pct / 100
   for i in 0..<changed_count {
     fs.write_string(
@@ -36,13 +36,13 @@ fn setup_diff_repo(
     )
   }
   if changed_count > 0 {
-    @gitlib.add_paths(fs, fs, bench_diff_root, ["."])
-    let commit2 = @gitlib.commit(
+    @bitlib.add_paths(fs, fs, bench_diff_root, ["."])
+    let commit2 = @bitlib.commit(
       fs, fs, bench_diff_root, "second commit\n", "Bench <bench@example.com>", 1700000001L,
     )
-    let db2 = @gitlib.ObjectDb::load(fs, git_dir)
+    let db2 = @bitlib.ObjectDb::load(fs, git_dir)
     let obj2 = db2.get(fs, commit2).unwrap()
-    let tree2 = @git.parse_commit(obj2.data).tree
+    let tree2 = @bit.parse_commit(obj2.data).tree
     (fs, tree1, tree2)
   } else {
     (fs, tree1, tree1)
@@ -50,12 +50,12 @@ fn setup_diff_repo(
 }
 
 ///|
-let bench_diff_identical : (@git.TestFs, @git.ObjectId, @git.ObjectId) = try! setup_diff_repo(
+let bench_diff_identical : (@bit.TestFs, @bit.ObjectId, @bit.ObjectId) = try! setup_diff_repo(
   100, 0,
 )
 
 ///|
-let bench_diff_10pct : (@git.TestFs, @git.ObjectId, @git.ObjectId) = try! setup_diff_repo(
+let bench_diff_10pct : (@bit.TestFs, @bit.ObjectId, @bit.ObjectId) = try! setup_diff_repo(
   100, 10,
 )
 

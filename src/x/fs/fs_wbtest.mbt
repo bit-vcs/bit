@@ -1,13 +1,13 @@
 ///|
 /// Fs whitebox tests
 priv struct CountingFs {
-  fs : @git.TestFs
+  fs : @bit.TestFs
   read_counts : Map[String, Int]
   write_counts : Map[String, Int]
 }
 
 ///|
-fn CountingFs::new(fs : @git.TestFs) -> CountingFs {
+fn CountingFs::new(fs : @bit.TestFs) -> CountingFs {
   { fs, read_counts: {}, write_counts: {} }
 }
 
@@ -34,7 +34,7 @@ fn CountingFs::write_count(self : CountingFs, path : String) -> Int {
 }
 
 ///|
-fn loose_object_path(git_dir : String, id : @git.ObjectId) -> String {
+fn loose_object_path(git_dir : String, id : @bit.ObjectId) -> String {
   let hex = id.to_hex()
   git_dir +
   "/objects/" +
@@ -44,7 +44,7 @@ fn loose_object_path(git_dir : String, id : @git.ObjectId) -> String {
 }
 
 ///|
-impl @git.RepoFileSystem for CountingFs with read_file(self, path) {
+impl @bit.RepoFileSystem for CountingFs with read_file(self, path) {
   let count = match self.read_counts.get(path) {
     Some(n) => n
     None => 0
@@ -54,27 +54,27 @@ impl @git.RepoFileSystem for CountingFs with read_file(self, path) {
 }
 
 ///|
-impl @git.RepoFileSystem for CountingFs with readdir(self, path) {
+impl @bit.RepoFileSystem for CountingFs with readdir(self, path) {
   self.fs.readdir(path)
 }
 
 ///|
-impl @git.RepoFileSystem for CountingFs with is_dir(self, path) {
+impl @bit.RepoFileSystem for CountingFs with is_dir(self, path) {
   self.fs.is_dir(path)
 }
 
 ///|
-impl @git.RepoFileSystem for CountingFs with is_file(self, path) {
+impl @bit.RepoFileSystem for CountingFs with is_file(self, path) {
   self.fs.is_file(path)
 }
 
 ///|
-impl @git.FileSystem for CountingFs with mkdir_p(self, path) {
+impl @bit.FileSystem for CountingFs with mkdir_p(self, path) {
   self.fs.mkdir_p(path)
 }
 
 ///|
-impl @git.FileSystem for CountingFs with write_file(self, path, data) {
+impl @bit.FileSystem for CountingFs with write_file(self, path, data) {
   let count = match self.write_counts.get(path) {
     Some(n) => n
     None => 0
@@ -84,7 +84,7 @@ impl @git.FileSystem for CountingFs with write_file(self, path, data) {
 }
 
 ///|
-impl @git.FileSystem for CountingFs with write_string(self, path, s) {
+impl @bit.FileSystem for CountingFs with write_string(self, path, s) {
   let count = match self.write_counts.get(path) {
     Some(n) => n
     None => 0
@@ -94,12 +94,12 @@ impl @git.FileSystem for CountingFs with write_string(self, path, s) {
 }
 
 ///|
-impl @git.FileSystem for CountingFs with remove_file(self, path) {
+impl @bit.FileSystem for CountingFs with remove_file(self, path) {
   self.fs.remove_file(path)
 }
 
 ///|
-impl @git.FileSystem for CountingFs with remove_dir(self, path) {
+impl @bit.FileSystem for CountingFs with remove_dir(self, path) {
   self.fs.remove_dir(path)
 }
 
@@ -169,7 +169,7 @@ test "cache: blob eviction when over limit" {
 ///|
 test "cache: path cache invalidation" {
   let cache = ObjectCache::new(1000)
-  let id = @git.ObjectId::zero()
+  let id = @bit.ObjectId::zero()
   cache.set_path("a/b/c", Some(id))
   cache.set_path("a/b/d", Some(id))
   cache.set_path("a/x", Some(id))
@@ -183,8 +183,8 @@ test "cache: path cache invalidation" {
 ///|
 test "cache: tree cache" {
   let cache = ObjectCache::new(1000)
-  let id = @git.ObjectId::zero()
-  let entries = [@git.TreeEntry::new("100644", "file.txt", id)]
+  let id = @bit.ObjectId::zero()
+  let entries = [@bit.TreeEntry::new("100644", "file.txt", id)]
   cache.set_tree(id, entries)
   assert_true(cache.get_tree(id) is Some(_))
 }
@@ -215,7 +215,7 @@ test "ensure_parent_dirs creates parent directories" {
 
 ///|
 test "read_ops: sibling path cache is warmed on first lookup" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo")
   let bitfs = Fs::empty("/repo/.git")
   bitfs.write_file("a.txt", b"a")
@@ -230,7 +230,7 @@ test "read_ops: sibling path cache is warmed on first lookup" {
 
 ///|
 test "snapshot: untouched subtree objects are not loaded or rewritten" {
-  let cfs = CountingFs::new(@git.TestFs::new())
+  let cfs = CountingFs::new(@bit.TestFs::new())
   @lib.init_repo(cfs, "/repo")
 
   let seed = Fs::empty("/repo/.git")
@@ -242,14 +242,14 @@ test "snapshot: untouched subtree objects are not loaded or rewritten" {
   let db = @lib.ObjectDb::load_lazy(cfs, "/repo/.git")
   let base_tree_obj = db.get(cfs, base.tree_id)
   assert_true(base_tree_obj is Some(_))
-  let root_entries = @git.parse_tree(base_tree_obj.unwrap().data)
-  let mut cold_tree_id = @git.ObjectId::zero()
+  let root_entries = @bit.parse_tree(base_tree_obj.unwrap().data)
+  let mut cold_tree_id = @bit.ObjectId::zero()
   for entry in root_entries {
     if entry.name == "cold" {
       cold_tree_id = entry.id
     }
   }
-  assert_true(cold_tree_id != @git.ObjectId::zero())
+  assert_true(cold_tree_id != @bit.ObjectId::zero())
   let cold_tree_path = loose_object_path("/repo/.git", cold_tree_id)
 
   let bitfs = Fs::from_commit(cfs, "/repo/.git", base.commit_id)

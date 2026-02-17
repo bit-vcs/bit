@@ -3,11 +3,11 @@
 ///|
 /// Check if a relative path is ignored by .gitignore files under root.
 pub fn is_ignored_path(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   root : String,
   rel_path : String,
   is_dir : Bool,
-) -> Bool raise @git.GitError {
+) -> Bool raise @bit.GitError {
   // Always ignore .jj directory (Jujutsu VCS)
   if rel_path == ".jj" || rel_path.has_prefix(".jj/") {
     return true
@@ -16,7 +16,7 @@ pub fn is_ignored_path(
   let segments = split_path_segments(rel_path)
   let mut base = ""
   // root .gitignore
-  let root_ignore = @git.join_path(root, ".gitignore")
+  let root_ignore = @bit.join_path(root, ".gitignore")
   if fs.is_file(root_ignore) {
     let content = @utf8.decode_lossy(fs.read_file(root_ignore)[:])
     matcher.add_rules(base, content)
@@ -24,9 +24,9 @@ pub fn is_ignored_path(
   for i in 0..<segments.length() {
     let seg = segments[i]
     base = if base == "" { seg } else { base + "/" + seg }
-    let dir_path = @git.join_path(root, base)
+    let dir_path = @bit.join_path(root, base)
     if fs.is_dir(dir_path) {
-      let ignore_path = @git.join_path(dir_path, ".gitignore")
+      let ignore_path = @bit.join_path(dir_path, ".gitignore")
       if fs.is_file(ignore_path) {
         let content = @utf8.decode_lossy(fs.read_file(ignore_path)[:])
         matcher.add_rules(base, content)
@@ -39,9 +39,9 @@ pub fn is_ignored_path(
 ///|
 /// List files under root, excluding ignored paths and .git.
 pub fn list_working_files(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   root : String,
-) -> Array[String] raise @git.GitError {
+) -> Array[String] raise @bit.GitError {
   let matcher = Matcher::new()
   let out : Array[String] = []
   walk_dir(fs, root, "", matcher, out)
@@ -50,18 +50,18 @@ pub fn list_working_files(
 
 ///|
 fn walk_dir(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   root : String,
   rel : String,
   matcher : Matcher,
   out : Array[String],
-) -> Unit raise @git.GitError {
-  let dir = if rel == "" { root } else { @git.join_path(root, rel) }
+) -> Unit raise @bit.GitError {
+  let dir = if rel == "" { root } else { @bit.join_path(root, rel) }
   // Skip submodules (directories containing .git/.bit file or directory)
   if rel != "" {
-    let git_marker = @git.join_path(dir, ".git")
-    let bit_marker = @git.join_path(dir, ".bit")
-    if fs.is_file(git_marker) || fs.is_file(bit_marker) {
+    let dot_git_marker = @bit.join_path(dir, ".git")
+    let bit_marker = @bit.join_path(dir, ".bit")
+    if fs.is_file(dot_git_marker) || fs.is_file(bit_marker) {
       return ()
     }
   }
@@ -84,7 +84,7 @@ fn walk_dir(
   }
   let prev_len = matcher.len()
   if has_gitignore {
-    let ignore_path = @git.join_path(dir, ".gitignore")
+    let ignore_path = @bit.join_path(dir, ".gitignore")
     let content = @utf8.decode_lossy(fs.read_file(ignore_path)[:])
     matcher.add_rules(rel, content)
   }
@@ -97,7 +97,7 @@ fn walk_dir(
       continue
     }
     let child_rel = if rel == "" { name } else { rel + "/" + name }
-    let child_path = @git.join_path(root, child_rel)
+    let child_path = @bit.join_path(root, child_rel)
     let is_dir = fs.is_dir(child_path)
     if matcher.is_ignored(child_rel, is_dir) {
       if is_dir && matcher.has_negation() {

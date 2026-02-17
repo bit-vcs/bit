@@ -3,11 +3,11 @@
 ///|
 /// Restore files from index to working tree (like `git checkout -- <paths>` or `git restore <paths>`).
 pub fn restore_paths(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   paths : Array[String],
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   let actual_git_dir = if rfs.is_file(git_dir) {
     resolve_gitdir(rfs, git_dir)
@@ -26,14 +26,14 @@ pub fn restore_paths(
     let safe_path = normalize_checkout_path(path)
     match index_map.get(safe_path) {
       None =>
-        raise @git.GitError::InvalidObject(
+        raise @bit.GitError::InvalidObject(
           "error: pathspec '\{path}' did not match any file(s) known to git",
         )
       Some(entry) => {
         let obj = db.get(rfs, entry.id)
         match obj {
           None =>
-            raise @git.GitError::InvalidObject(
+            raise @bit.GitError::InvalidObject(
               "Object not found: \{entry.id.to_hex()}",
             )
           Some(o) => {
@@ -50,23 +50,23 @@ pub fn restore_paths(
   }
 }
 
-fn normalize_checkout_path(path : String) -> String raise @git.GitError {
+fn normalize_checkout_path(path : String) -> String raise @bit.GitError {
   if path.has_prefix("/") {
-    raise @git.GitError::InvalidObject("path must not be absolute")
+    raise @bit.GitError::InvalidObject("path must not be absolute")
   }
   normalize_repo_path(path)
 }
 
 ///|
 pub fn checkout(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   spec : String,
   detach? : Bool = false,
   update_worktree? : Bool = true,
   update_index? : Bool = true,
-) -> @git.ObjectId raise @git.GitError {
+) -> @bit.ObjectId raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   let actual_git_dir = if rfs.is_file(git_dir) {
     resolve_gitdir(rfs, git_dir)
@@ -75,7 +75,7 @@ pub fn checkout(
   }
   let object_git_dir = resolve_checkout_common_git_dir(rfs, actual_git_dir)
   let head_path = join_path(actual_git_dir, "HEAD")
-  let mut target : @git.ObjectId? = None
+  let mut target : @bit.ObjectId? = None
   let mut refname : String? = None
   if not(detach) {
     let name = if spec.has_prefix("refs/") {
@@ -124,7 +124,7 @@ pub fn checkout(
     None => {
       let resolved = rev_parse(rfs, actual_git_dir, spec)
       match resolved {
-        None => raise @git.GitError::InvalidObject("Invalid ref: \{spec}")
+        None => raise @bit.GitError::InvalidObject("Invalid ref: \{spec}")
         Some(id) => {
           let peeled_commit = rev_parse(rfs, actual_git_dir, spec + "^{commit}")
           target = Some(peeled_commit.unwrap_or(id))
@@ -134,7 +134,7 @@ pub fn checkout(
     Some(_) => ()
   }
   let commit_id = match target {
-    None => raise @git.GitError::InvalidObject("Invalid ref: \{spec}")
+    None => raise @bit.GitError::InvalidObject("Invalid ref: \{spec}")
     Some(id) => id
   }
   if refname is Some(name) {
@@ -178,7 +178,7 @@ pub fn checkout(
 
 ///|
 fn resolve_checkout_common_git_dir(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> String {
   let commondir_path = join_path(git_dir, "commondir")

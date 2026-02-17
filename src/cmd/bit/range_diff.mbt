@@ -54,10 +54,10 @@ async fn handle_range_diff(args : Array[String]) -> Unit raise Error {
     return
   }
   // Resolve revisions
-  let r1_start = @gitrepo.rev_parse(fs, git_dir, range1_start)
-  let r1_end = @gitrepo.rev_parse(fs, git_dir, range1_end)
-  let r2_start = @gitrepo.rev_parse(fs, git_dir, range2_start)
-  let r2_end = @gitrepo.rev_parse(fs, git_dir, range2_end)
+  let r1_start = @bitrepo.rev_parse(fs, git_dir, range1_start)
+  let r1_end = @bitrepo.rev_parse(fs, git_dir, range1_end)
+  let r2_start = @bitrepo.rev_parse(fs, git_dir, range2_start)
+  let r2_end = @bitrepo.rev_parse(fs, git_dir, range2_end)
   guard r1_start is Some(r1s) &&
     r1_end is Some(r1e) &&
     r2_start is Some(r2s) &&
@@ -70,7 +70,7 @@ async fn handle_range_diff(args : Array[String]) -> Unit raise Error {
   let commits1 = plumb_collect_range_commits(fs, git_dir, r1s, r1e)
   let commits2 = plumb_collect_range_commits(fs, git_dir, r2s, r2e)
   // Output range-diff
-  let db = @gitlib.ObjectDb::load(fs, git_dir)
+  let db = @bitlib.ObjectDb::load(fs, git_dir)
   let mut idx1 = 1
   let mut idx2 = 1
   // Simple matching by commit message
@@ -147,13 +147,13 @@ fn plumb_parse_range(range : String) -> (String, String) {
 fn plumb_collect_range_commits(
   fs : OsFs,
   git_dir : String,
-  start : @git.ObjectId,
-  end : @git.ObjectId,
-) -> Array[@git.ObjectId] {
-  let db = @gitlib.ObjectDb::load(fs, git_dir) catch { _ => return [] }
-  let result : Array[@git.ObjectId] = []
+  start : @bitcore.ObjectId,
+  end : @bitcore.ObjectId,
+) -> Array[@bitcore.ObjectId] {
+  let db = @bitlib.ObjectDb::load(fs, git_dir) catch { _ => return [] }
+  let result : Array[@bitcore.ObjectId] = []
   let start_hex = start.to_hex()
-  let mut current : @git.ObjectId? = Some(end)
+  let mut current : @bitcore.ObjectId? = Some(end)
   while current is Some(id) {
     if id.to_hex() == start_hex {
       break
@@ -161,8 +161,8 @@ fn plumb_collect_range_commits(
     result.push(id)
     let obj = db.get(fs, id) catch { _ => break }
     match obj {
-      Some(o) if o.obj_type == @git.ObjectType::Commit => {
-        let info = @git.parse_commit(o.data) catch { _ => break }
+      Some(o) if o.obj_type == @bitcore.ObjectType::Commit => {
+        let info = @bitcore.parse_commit(o.data) catch { _ => break }
         current = if info.parents.length() > 0 {
           Some(info.parents[0])
         } else {
@@ -178,13 +178,13 @@ fn plumb_collect_range_commits(
 
 ///|
 fn plumb_get_commit_subject(
-  db : @gitlib.ObjectDb,
+  db : @bitlib.ObjectDb,
   fs : OsFs,
-  id : @git.ObjectId,
+  id : @bitcore.ObjectId,
 ) -> String {
   let obj = db.get(fs, id) catch { _ => return "" }
   match obj {
-    Some(o) if o.obj_type == @git.ObjectType::Commit =>
+    Some(o) if o.obj_type == @bitcore.ObjectType::Commit =>
       plumb_get_first_line_of_commit(o.data)
     _ => ""
   }

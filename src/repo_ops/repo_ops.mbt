@@ -7,7 +7,7 @@ pub fn init_repo(
   default_branch? : String = "main",
   bare? : Bool = false,
 ) -> Unit raise @object.GitError {
-  @gitlib.init_repo(fs, root, default_branch~, bare~)
+  @bitlib.init_repo(fs, root, default_branch~, bare~)
 }
 
 ///|
@@ -15,9 +15,9 @@ pub fn init_repo_with_options(
   fs : &@types.FileSystem,
   _rfs : &@types.RepoFileSystem,
   root : String,
-  opts : @gitlib.InitOptions,
+  opts : @bitlib.InitOptions,
 ) -> Unit raise @object.GitError {
-  @gitlib.init_repo_with_options(fs, root, opts)
+  @bitlib.init_repo_with_options(fs, root, opts)
 }
 
 ///|
@@ -25,9 +25,9 @@ pub fn init_repo_with_options_with_repo_fs(
   fs : &@types.FileSystem,
   rfs : &@types.RepoFileSystem,
   root : String,
-  opts : @gitlib.InitOptions,
+  opts : @bitlib.InitOptions,
 ) -> Unit raise @object.GitError {
-  @gitlib.init_repo_with_options_with_repo_fs(fs, rfs, root, opts)
+  @bitlib.init_repo_with_options_with_repo_fs(fs, rfs, root, opts)
 }
 
 ///|
@@ -37,7 +37,7 @@ pub fn apply_template(
   git_dir : String,
   template_dir : String,
 ) -> Unit raise @object.GitError {
-  @gitlib.apply_template(wfs, rfs, git_dir, template_dir)
+  @bitlib.apply_template(wfs, rfs, git_dir, template_dir)
 }
 
 ///|
@@ -46,7 +46,7 @@ pub fn reflog_exists(
   git_dir : String,
   refname : String,
 ) -> Bool {
-  @gitlib.reflog_exists(fs, git_dir, refname)
+  @bitlib.reflog_exists(fs, git_dir, refname)
 }
 
 ///|
@@ -54,8 +54,8 @@ pub fn read_reflog(
   fs : &@types.RepoFileSystem,
   git_dir : String,
   refname : String,
-) -> Array[@gitlib.ReflogEntry] raise @object.GitError {
-  @gitlib.read_reflog(fs, git_dir, refname)
+) -> Array[@bitlib.ReflogEntry] raise @object.GitError {
+  @bitlib.read_reflog(fs, git_dir, refname)
 }
 
 ///|
@@ -72,7 +72,7 @@ pub fn append_reflog(
   timezone : String,
   message : String,
 ) -> Unit raise @object.GitError {
-  @gitlib.append_reflog(
+  @bitlib.append_reflog(
     wfs, rfs, git_dir, refname, old_id, new_id, author, email, timestamp, timezone,
     message,
   )
@@ -85,7 +85,7 @@ pub fn create_reflog(
   git_dir : String,
   refname : String,
 ) -> Unit raise @object.GitError {
-  @gitlib.create_reflog(wfs, rfs, git_dir, refname)
+  @bitlib.create_reflog(wfs, rfs, git_dir, refname)
 }
 
 ///|
@@ -95,7 +95,7 @@ pub fn delete_reflog(
   git_dir : String,
   refname : String,
 ) -> Unit raise @object.GitError {
-  @gitlib.delete_reflog(wfs, rfs, git_dir, refname)
+  @bitlib.delete_reflog(wfs, rfs, git_dir, refname)
 }
 
 ///|
@@ -105,5 +105,5 @@ pub fn should_log_ref(
   refname : String,
   is_bare : Bool,
 ) -> (Bool, Bool) raise @object.GitError {
-  @gitlib.should_log_ref(fs, git_dir, refname, is_bare)
+  @bitlib.should_log_ref(fs, git_dir, refname, is_bare)
 }

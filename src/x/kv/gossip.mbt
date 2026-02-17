@@ -173,7 +173,7 @@ fn Kv::handle_announce(
   }
   self.add_peer(peer)
   // If their head is different, request sync
-  if state.head != self.head && state.head != @git.ObjectId::zero() {
+  if state.head != self.head && state.head != @bit.ObjectId::zero() {
     // Compare vector clocks
     let cmp = self.clock.compare(state.clock)
     if cmp < 0 {
@@ -193,7 +193,7 @@ fn Kv::handle_announce(
 ///|
 fn Kv::handle_want_objects(
   self : Kv,
-  ids : Array[@git.ObjectId],
+  ids : Array[@bit.ObjectId],
 ) -> GossipMessage? {
   let objects : Array[GitObject] = []
   let store : &@lib.ObjectStore = self.store
@@ -220,7 +220,7 @@ fn Kv::handle_have_objects(self : Kv, objects : Array[GitObject]) -> Unit {
 fn Kv::handle_sync_request(
   self : Kv,
   _from : NodeId,
-  their_head : @git.ObjectId,
+  their_head : @bit.ObjectId,
 ) -> GossipMessage? {
   // Find objects they don't have
   let missing = self.find_missing_objects(their_head)
@@ -235,7 +235,7 @@ fn Kv::handle_sync_request(
 fn Kv::handle_sync_response(
   self : Kv,
   objects : Array[GitObject],
-  _new_head : @git.ObjectId,
+  _new_head : @bit.ObjectId,
 ) -> Unit {
   // Store received objects for later processing
   for obj in objects {
@@ -249,10 +249,10 @@ fn Kv::handle_sync_response(
 /// This does a simple walk from our HEAD to their HEAD
 fn Kv::find_missing_objects(
   self : Kv,
-  their_head : @git.ObjectId,
+  their_head : @bit.ObjectId,
 ) -> Array[GitObject] {
   let result : Array[GitObject] = []
-  if self.head == their_head || self.head == @git.ObjectId::zero() {
+  if self.head == their_head || self.head == @bit.ObjectId::zero() {
     return result
   }
   let store : &@lib.ObjectStore = self.store
@@ -261,13 +261,13 @@ fn Kv::find_missing_objects(
   collect_reachable_objects(store, self.head, our_objects)
   // Collect objects reachable from their HEAD
   let their_objects : Map[String, Bool] = {}
-  if their_head != @git.ObjectId::zero() {
+  if their_head != @bit.ObjectId::zero() {
     collect_reachable_objects(store, their_head, their_objects)
   }
   // Find objects we have that they don't
   for entry in our_objects {
     if not(their_objects.contains(entry.0)) {
-      let id = @git.ObjectId::from_hex(entry.0) catch { _ => continue }
+      let id = @bit.ObjectId::from_hex(entry.0) catch { _ => continue }
       let obj = store.get(id) catch { _ => continue }
       guard obj is Some(o) else { continue }
       result.push({ id, obj_type: o.obj_type, data: o.data })
@@ -279,10 +279,10 @@ fn Kv::find_missing_objects(
 ///|
 fn collect_reachable_objects(
   store : &@lib.ObjectStore,
-  start : @git.ObjectId,
+  start : @bit.ObjectId,
   result : Map[String, Bool],
 ) -> Unit {
-  if start == @git.ObjectId::zero() {
+  if start == @bit.ObjectId::zero() {
     return
   }
   let hex = start.to_hex()
@@ -294,14 +294,14 @@ fn collect_reachable_objects(
   guard obj is Some(o) else { return }
   match o.obj_type {
     Commit => {
-      let commit = @git.parse_commit(o.data) catch { _ => return }
+      let commit = @bit.parse_commit(o.data) catch { _ => return }
       collect_reachable_objects(store, commit.tree, result)
       for parent in commit.parents {
         collect_reachable_objects(store, parent, result)
       }
     }
     Tree => {
-      let entries = @git.parse_tree(o.data) catch { _ => return }
+      let entries = @bit.parse_tree(o.data) catch { _ => return }
       for entry in entries {
         collect_reachable_objects(store, entry.id, result)
       }
@@ -313,7 +313,7 @@ fn collect_reachable_objects(
 ///|
 /// Apply pending objects from sync
 /// Returns number of objects applied
-pub fn Kv::apply_pending_objects(self : Kv) -> Int raise @git.GitError {
+pub fn Kv::apply_pending_objects(self : Kv) -> Int raise @bit.GitError {
   let mut count = 0
   let store : &@lib.ObjectStore = self.store
   for entry in self.pending_objects {

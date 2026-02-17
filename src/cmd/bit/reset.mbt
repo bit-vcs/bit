@@ -2,10 +2,10 @@
 async fn handle_reset(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let fs = OsFs::new()
-  let rfs : &@git.RepoFileSystem = fs
+  let rfs : &@bitcore.RepoFileSystem = fs
   let git_dir = resolve_git_dir(rfs, root)
   let skip_before_reset = reset_read_skip_worktree_paths(rfs, git_dir)
-  let mut mode : @gitlib.ResetMode = @gitlib.ResetMode::Mixed
+  let mut mode : @bitlib.ResetMode = @bitlib.ResetMode::Mixed
   let mut rev : String? = None
   let paths : Array[String] = []
   let mut parse_options = true
@@ -25,9 +25,9 @@ async fn handle_reset(args : Array[String]) -> Unit raise Error {
         continue
       }
       match arg {
-        "--soft" => mode = @gitlib.ResetMode::Soft
-        "--mixed" => mode = @gitlib.ResetMode::Mixed
-        "--hard" => mode = @gitlib.ResetMode::Hard
+        "--soft" => mode = @bitlib.ResetMode::Soft
+        "--mixed" => mode = @bitlib.ResetMode::Mixed
+        "--hard" => mode = @bitlib.ResetMode::Hard
         "--refresh" => refresh = true
         "--no-refresh" => refresh = false
         "--quiet" | "-q" => quiet = true
@@ -48,11 +48,11 @@ async fn handle_reset(args : Array[String]) -> Unit raise Error {
   }
   if parse_options && rev is Some(token) && paths.length() == 0 {
     let mixed_mode = match mode {
-      @gitlib.ResetMode::Mixed => true
+      @bitlib.ResetMode::Mixed => true
       _ => false
     }
     if mixed_mode &&
-      @gitrepo.rev_parse(rfs, git_dir, token) is None &&
+      @bitrepo.rev_parse(rfs, git_dir, token) is None &&
       reset_token_looks_like_path(rfs, root, token) {
       paths.push(token)
       rev = None
@@ -60,13 +60,13 @@ async fn handle_reset(args : Array[String]) -> Unit raise Error {
   }
   let spec = rev.unwrap_or("HEAD")
   let before_entries = if intent_to_add {
-    @gitlib.read_index_entries(rfs, git_dir)
+    @bitlib.read_index_entries(rfs, git_dir)
   } else {
     []
   }
   if paths.length() > 0 {
     let mixed_mode = match mode {
-      @gitlib.ResetMode::Mixed => true
+      @bitlib.ResetMode::Mixed => true
       _ => false
     }
     if not(mixed_mode) {
@@ -88,18 +88,18 @@ async fn handle_reset(args : Array[String]) -> Unit raise Error {
     return
   }
   let soft_mode = match mode {
-    @gitlib.ResetMode::Soft => true
+    @bitlib.ResetMode::Soft => true
     _ => false
   }
   if soft_mode && reset_soft_blocked(rfs, git_dir) {
     eprint_line("fatal: Cannot do a soft reset in the middle of a merge.")
     @sys.exit(1)
   }
-  let orig_head = @gitlib.resolve_ref(rfs, git_dir, "HEAD")
-  let commit_id = @gitlib.reset(fs, rfs, root, spec, mode)
+  let orig_head = @bitlib.resolve_ref(rfs, git_dir, "HEAD")
+  let commit_id = @bitlib.reset(fs, rfs, root, spec, mode)
   reset_write_orig_head(fs, git_dir, orig_head)
   let mixed_mode = match mode {
-    @gitlib.ResetMode::Mixed => true
+    @bitlib.ResetMode::Mixed => true
     _ => false
   }
   if mixed_mode {
@@ -123,7 +123,7 @@ async fn handle_reset(args : Array[String]) -> Unit raise Error {
     }
   }
   let hard_mode = match mode {
-    @gitlib.ResetMode::Hard => true
+    @bitlib.ResetMode::Hard => true
     _ => false
   }
   if hard_mode {
@@ -148,19 +148,19 @@ async fn reset_die_unknown_option(arg : String) -> Unit raise Error {
 
 ///|
 fn reset_mixed_paths(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   root : String,
   git_dir : String,
   spec : String,
   paths : Array[String],
 ) -> Unit raise Error {
-  let target = match @gitrepo.rev_parse(rfs, git_dir, spec) {
+  let target = match @bitrepo.rev_parse(rfs, git_dir, spec) {
     Some(id) => id
-    None => raise @git.GitError::InvalidObject("Invalid ref: \{spec}")
+    None => raise @bitcore.GitError::InvalidObject("Invalid ref: \{spec}")
   }
   let object_git_dir = reset_resolve_common_git_dir(rfs, git_dir)
-  let db = @gitlib.ObjectDb::load_lazy(rfs, object_git_dir)
+  let db = @bitlib.ObjectDb::load_lazy(rfs, object_git_dir)
   let tree_files = reset_collect_tree_files_from_target(db, rfs, target)
   let normalized_paths : Array[String] = []
   for raw in paths {
@@ -169,8 +169,8 @@ fn reset_mixed_paths(
       normalized_paths.push(p)
     }
   }
-  let current_entries = @gitlib.read_index_entries(rfs, git_dir)
-  let out_map : Map[String, @gitlib.IndexEntry] = {}
+  let current_entries = @bitlib.read_index_entries(rfs, git_dir)
+  let out_map : Map[String, @bitlib.IndexEntry] = {}
   for entry in current_entries {
     if not(reset_pathspec_matches_any(normalized_paths, entry.path)) {
       out_map[entry.path] = entry
@@ -187,19 +187,19 @@ fn reset_mixed_paths(
       match db.get(rfs, info.id) {
         Some(obj) => obj.data.length()
         None =>
-          raise @git.GitError::InvalidObject(
+          raise @bitcore.GitError::InvalidObject(
             "Missing blob object: " + info.id.to_hex(),
           )
       }
     }
-    out_map[path] = @gitlib.IndexEntry::new(path, info.id, info.mode, size)
+    out_map[path] = @bitlib.IndexEntry::new(path, info.id, info.mode, size)
   }
-  let out : Array[@gitlib.IndexEntry] = []
+  let out : Array[@bitlib.IndexEntry] = []
   for item in out_map.to_array() {
     let (_, entry) = item
     out.push(entry)
   }
-  @gitlib.write_index_entries(fs, git_dir, out)
+  @bitlib.write_index_entries(fs, git_dir, out)
   ignore(root)
 }
 
@@ -235,7 +235,7 @@ fn reset_normalize_path(path : String) -> String {
 
 ///|
 fn reset_token_looks_like_path(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   root : String,
   token : String,
 ) -> Bool {
@@ -252,36 +252,36 @@ fn reset_token_looks_like_path(
 
 ///|
 fn reset_collect_tree_files_from_target(
-  db : @gitlib.ObjectDb,
-  fs : &@git.RepoFileSystem,
-  target : @git.ObjectId,
-) -> Map[String, @gitlib.TreeFileEntry] raise Error {
+  db : @bitlib.ObjectDb,
+  fs : &@bitcore.RepoFileSystem,
+  target : @bitcore.ObjectId,
+) -> Map[String, @bitlib.TreeFileEntry] raise Error {
   match db.get(fs, target) {
     Some(obj) =>
       match obj.obj_type {
-        @git.ObjectType::Tree => @gitlib.collect_tree_files(db, fs, target)
-        @git.ObjectType::Commit =>
-          @gitlib.collect_tree_files_from_commit(db, fs, target)
-        _ => raise @git.GitError::InvalidObject("Invalid reset target object")
+        @bitcore.ObjectType::Tree => @bitlib.collect_tree_files(db, fs, target)
+        @bitcore.ObjectType::Commit =>
+          @bitlib.collect_tree_files_from_commit(db, fs, target)
+        _ => raise @bitcore.GitError::InvalidObject("Invalid reset target object")
       }
-    None => raise @git.GitError::InvalidObject("Missing reset target object")
+    None => raise @bitcore.GitError::InvalidObject("Missing reset target object")
   }
 }
 
 ///|
 fn reset_apply_intent_to_add(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   root : String,
   git_dir : String,
-  before_entries : Array[@gitlib.IndexEntry],
+  before_entries : Array[@bitlib.IndexEntry],
 ) -> Unit raise Error {
-  let after_entries = @gitlib.read_index_entries(rfs, git_dir)
+  let after_entries = @bitlib.read_index_entries(rfs, git_dir)
   let after_map : Map[String, Bool] = {}
   for entry in after_entries {
     after_map[entry.path] = true
   }
-  let merged : Array[@gitlib.IndexEntry] = []
+  let merged : Array[@bitlib.IndexEntry] = []
   merged.append(after_entries)
   let zero = reset_zero_oid()
   for entry in before_entries {
@@ -293,7 +293,7 @@ fn reset_apply_intent_to_add(
       continue
     }
     merged.push(
-      @gitlib.IndexEntry::new(
+      @bitlib.IndexEntry::new(
         entry.path,
         zero,
         entry.mode,
@@ -303,23 +303,23 @@ fn reset_apply_intent_to_add(
       ),
     )
   }
-  @gitlib.write_index_entries(fs, git_dir, merged)
+  @bitlib.write_index_entries(fs, git_dir, merged)
 }
 
 ///|
-fn reset_zero_oid() -> @git.ObjectId {
-  @git.ObjectId::new(FixedArray::make(20, b'\x00'))
+fn reset_zero_oid() -> @bitcore.ObjectId {
+  @bitcore.ObjectId::new(FixedArray::make(20, b'\x00'))
 }
 
 ///|
 async fn reset_refresh_index_entries(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   root : String,
   git_dir : String,
   skip_override? : Map[String, Bool]? = None,
 ) -> Array[String] raise Error {
-  let entries = @gitlib.read_index_entries(rfs, git_dir)
+  let entries = @bitlib.read_index_entries(rfs, git_dir)
   let skip = reset_read_skip_worktree_paths(rfs, git_dir)
   match skip_override {
     Some(extra) =>
@@ -331,7 +331,7 @@ async fn reset_refresh_index_entries(
       }
     None => ()
   }
-  let updated : Array[@gitlib.IndexEntry] = []
+  let updated : Array[@bitlib.IndexEntry] = []
   let changed_map : Map[String, Bool] = {}
   for entry in entries {
     let abs = root + "/" + entry.path
@@ -347,7 +347,7 @@ async fn reset_refresh_index_entries(
         }
       }
       if not(changed) {
-        let id = @git.hash_blob(content)
+        let id = @bitcore.hash_blob(content)
         if id == entry.id {
           let mut mtime_sec = entry.mtime_sec
           let mut mtime_nsec = entry.mtime_nsec
@@ -362,7 +362,7 @@ async fn reset_refresh_index_entries(
             }
             Err(_) => ()
           }
-          out_entry = @gitlib.IndexEntry::new(
+          out_entry = @bitlib.IndexEntry::new(
             entry.path,
             entry.id,
             entry.mode,
@@ -380,7 +380,7 @@ async fn reset_refresh_index_entries(
     }
     updated.push(out_entry)
   }
-  @gitlib.write_index_entries(fs, git_dir, updated)
+  @bitlib.write_index_entries(fs, git_dir, updated)
   let changed : Array[String] = []
   for item in changed_map.to_array() {
     let (path, _) = item
@@ -392,7 +392,7 @@ async fn reset_refresh_index_entries(
 
 ///|
 fn reset_read_skip_worktree_paths(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
 ) -> Map[String, Bool] {
   let out : Map[String, Bool] = {}
@@ -461,7 +461,7 @@ fn reset_read_skip_worktree_paths(
 }
 
 ///|
-fn reset_soft_blocked(fs : &@git.RepoFileSystem, git_dir : String) -> Bool {
+fn reset_soft_blocked(fs : &@bitcore.RepoFileSystem, git_dir : String) -> Bool {
   if fs.is_file(git_dir + "/MERGE_HEAD") {
     return true
   }
@@ -470,7 +470,7 @@ fn reset_soft_blocked(fs : &@git.RepoFileSystem, git_dir : String) -> Bool {
 
 ///|
 fn reset_index_has_unmerged_entries(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
 ) -> Bool {
   let path = git_dir + "/index"
@@ -535,9 +535,9 @@ fn reset_read_u16_be(data : Bytes, start : Int) -> Int {
 
 ///|
 fn reset_write_orig_head(
-  fs : &@git.FileSystem,
+  fs : &@bitcore.FileSystem,
   git_dir : String,
-  head : @git.ObjectId?,
+  head : @bitcore.ObjectId?,
 ) -> Unit raise Error {
   match head {
     Some(id) => fs.write_string(git_dir + "/ORIG_HEAD", id.to_hex() + "\n")
@@ -568,12 +568,12 @@ async fn reset_print_hard_reset_message(
 
 ///|
 fn reset_commit_subject_bytes(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
-  commit_id : @git.ObjectId,
+  commit_id : @bitcore.ObjectId,
 ) -> Bytes raise Error {
   let object_git_dir = reset_resolve_common_git_dir(fs, git_dir)
-  let db = @gitlib.ObjectDb::load_lazy(fs, object_git_dir)
+  let db = @bitlib.ObjectDb::load_lazy(fs, object_git_dir)
   match db.get(fs, commit_id) {
     Some(obj) => {
       let (subject, commit_encoding) = reset_extract_commit_subject_and_encoding(
@@ -634,7 +634,7 @@ fn reset_extract_commit_subject_and_encoding(data : Bytes) -> (Bytes, String?) {
 
 ///|
 fn reset_log_output_encoding() -> String {
-  let overrides = @gitlib.parse_config_overrides()
+  let overrides = @bitlib.parse_config_overrides()
   match overrides.get("i18n.logoutputencoding") {
     Some(value) => {
       let trimmed = trim_string(value)
@@ -783,7 +783,7 @@ fn reset_slice_bytes(data : Bytes, start : Int, end : Int) -> Bytes {
 
 ///|
 fn reset_resolve_common_git_dir(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
 ) -> String {
   let commondir_path = git_dir + "/commondir"

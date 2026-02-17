@@ -45,13 +45,13 @@ async fn handle_status(args : Array[String]) -> Unit raise Error {
         has_git_file = if has_git_dir { false } else { fs.is_file(git_dir) }
       }
       None =>
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "Not a git repository (or any of the parent directories): .git/.bit",
         )
     }
   }
   if not(has_git_dir) && not(has_git_file) {
-    raise @git.GitError::InvalidObject(
+    raise @bitcore.GitError::InvalidObject(
       "Not a git repository (or any of the parent directories): .git/.bit",
     )
   }
@@ -98,22 +98,22 @@ async fn handle_status(args : Array[String]) -> Unit raise Error {
   }
   if porcelain || short {
     if show_branch {
-      let head = @gitlib.read_head_ref(fs, git_dir) catch {
+      let head = @bitlib.read_head_ref(fs, git_dir) catch {
         err if @async.is_cancellation_error(err) => raise err
         _ => return ()
       }
       match head {
-        @gitlib.HeadRef::Branch(name) => print_line("## \{name}")
-        @gitlib.HeadRef::Detached(id) =>
+        @bitlib.HeadRef::Branch(name) => print_line("## \{name}")
+        @bitlib.HeadRef::Detached(id) =>
           print_line("## HEAD (detached at \{id.to_hex()[:7].to_string()})")
       }
     }
-    let lines = @gitlib.status_porcelain(fs, root)
+    let lines = @bitlib.status_porcelain(fs, root)
     for line in lines {
       print_line(line)
     }
   } else {
-    let text = @gitlib.status_text(fs, root)
+    let text = @bitlib.status_text(fs, root)
     print_str(text)
   }
 }

@@ -50,18 +50,18 @@ fn collect_global_path_overrides_for_delegate() -> Array[String] {
 ///|
 async fn handle_fetch(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
-  let rfs : &@git.RepoFileSystem = fs
+  let rfs : &@bitcore.RepoFileSystem = fs
   // Keep override parsers exercised without delegating to real git.
   ignore(collect_global_path_overrides_for_delegate())
   ignore(collect_global_config_overrides_for_delegate())
   let root = get_work_root()
   let git_dir = resolve_git_dir(rfs, root)
-  let (remotes, branches) = @gitlib.read_repo_config(fs, git_dir)
+  let (remotes, branches) = @bitlib.read_repo_config(fs, git_dir)
   // Read remote URL - prefer subdir-clone remote, then config
   let mut remote_name = "origin"
   let mut remote_url : String? = get_effective_remote_url(fs, git_dir)
-  match @gitlib.read_head_ref(fs, git_dir) {
-    @gitlib.HeadRef::Branch(branch_name) =>
+  match @bitlib.read_head_ref(fs, git_dir) {
+    @bitlib.HeadRef::Branch(branch_name) =>
       match branches.get(branch_name) {
         Some(branch_config) =>
           match branch_config.remote {
@@ -79,7 +79,7 @@ async fn handle_fetch(args : Array[String]) -> Unit raise Error {
           }
         None => ()
       }
-    @gitlib.HeadRef::Detached(_) => ()
+    @bitlib.HeadRef::Detached(_) => ()
   }
   let mut explicit_filter_flag = false
   let mut explicit_no_filter = false
@@ -118,7 +118,7 @@ async fn handle_fetch(args : Array[String]) -> Unit raise Error {
       continue
     }
     if arg == "--no-ipv4" || arg == "--no-ipv6" {
-      raise @git.GitError::InvalidObject(
+      raise @bitcore.GitError::InvalidObject(
         "unknown option '" + option_name_without_prefix(arg) + "'",
       )
     }
@@ -178,11 +178,11 @@ async fn handle_fetch(args : Array[String]) -> Unit raise Error {
       let token = positional_args[i]
       if token == "tag" {
         if i + 1 >= positional_args.length() {
-          raise @git.GitError::InvalidObject("fetch tag requires tag name")
+          raise @bitcore.GitError::InvalidObject("fetch tag requires tag name")
         }
         let tag_name = positional_args[i + 1]
         if tag_name.length() == 0 {
-          raise @git.GitError::InvalidObject("fetch tag requires tag name")
+          raise @bitcore.GitError::InvalidObject("fetch tag requires tag name")
         }
         let tag_ref = "refs/tags/" + tag_name
         explicit_refspecs.push(tag_ref + ":" + tag_ref)
@@ -199,7 +199,7 @@ async fn handle_fetch(args : Array[String]) -> Unit raise Error {
     )
   }
   guard remote_url is Some(url) else {
-    raise @git.GitError::InvalidObject("No remote configured")
+    raise @bitcore.GitError::InvalidObject("No remote configured")
   }
   let rewrite_rules = read_url_rewrite_rules(fs, git_dir)
   let resolved_url = rewrite_url_by_rules(url, rewrite_rules, false)
@@ -226,7 +226,7 @@ async fn handle_fetch(args : Array[String]) -> Unit raise Error {
     None => root
   }
   let local_promisor_remote = match
-    @gitlib.resolve_local_repo_path(fs, local_root, resolved_url) {
+    @bitlib.resolve_local_repo_path(fs, local_root, resolved_url) {
     Some(src_path) => has_promisor_source_repo(fs, src_path)
     None => false
   }
@@ -290,11 +290,11 @@ fn resolve_initial_pull_head_target(branch_name : String?) -> String {
 
 ///|
 fn collect_commit_tree_modes(
-  db : @gitlib.ObjectDb,
-  fs : &@git.RepoFileSystem,
-  commit_id : @git.ObjectId,
-) -> Map[String, Int] raise @git.GitError {
-  let files = @gitlib.collect_tree_files_from_commit(db, fs, commit_id)
+  db : @bitlib.ObjectDb,
+  fs : &@bitcore.RepoFileSystem,
+  commit_id : @bitcore.ObjectId,
+) -> Map[String, Int] raise @bitcore.GitError {
+  let files = @bitlib.collect_tree_files_from_commit(db, fs, commit_id)
   let modes : Map[String, Int] = {}
   for path, entry in files {
     modes[path] = entry.mode

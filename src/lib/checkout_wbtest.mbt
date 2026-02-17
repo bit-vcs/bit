@@ -1,6 +1,6 @@
 ///|
 test "checkout: restore_paths rejects traversal pathspecs" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   init_repo(fs, "/repo")
   fs.write_string("/repo/a.txt", "hello\n")
   add_paths(fs, fs, "/repo", ["a.txt"])
@@ -11,9 +11,9 @@ test "checkout: restore_paths rejects traversal pathspecs" {
 
 ///|
 test "checkout: restore_paths rejects index paths outside repository" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   init_repo(fs, "/repo")
-  let (blob_id, blob) = @git.create_blob_string("outside.txt")
+  let (blob_id, blob) = @bit.create_blob_string("outside.txt")
   let entries : Array[IndexEntry] = [
     IndexEntry::new("../outside.txt", blob_id, 33188, blob.length())
   ]
@@ -23,7 +23,7 @@ test "checkout: restore_paths rejects index paths outside repository" {
 }
 
 fn restore_paths_is_rejected(
-  fs : @git.TestFs,
+  fs : @bit.TestFs,
   root : String,
   paths : Array[String],
 ) -> Bool {

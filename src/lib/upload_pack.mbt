@@ -2,11 +2,11 @@
 
 ///|
 pub struct UploadPackRequest {
-  wants : Array[@git.ObjectId]
-  haves : Array[@git.ObjectId]
+  wants : Array[@bit.ObjectId]
+  haves : Array[@bit.ObjectId]
   capabilities : Array[String]
   done : Bool
-  shallow : Array[@git.ObjectId]
+  shallow : Array[@bit.ObjectId]
   deepen : Int?
 }
 
@@ -15,9 +15,9 @@ pub struct UploadPackRequest {
 pub struct UploadPackRequestV2 {
   command : String // "fetch", "ls-refs", etc.
   capabilities : Array[String]
-  wants : Array[@git.ObjectId]
+  wants : Array[@bit.ObjectId]
   want_refs : Array[String]
-  haves : Array[@git.ObjectId]
+  haves : Array[@bit.ObjectId]
   done : Bool
   // v2-specific capabilities
   filter : String? // e.g., "blob:none"
@@ -75,12 +75,12 @@ fn upload_parse_pkt_len_safe(data : Bytes, start : Int) -> Int {
 /// Parse protocol v2 upload-pack request
 pub fn parse_upload_pack_request_v2(
   data : Bytes,
-) -> UploadPackRequestV2 raise @git.GitError {
+) -> UploadPackRequestV2 raise @bit.GitError {
   let mut command = ""
   let capabilities : Array[String] = []
-  let wants : Array[@git.ObjectId] = []
+  let wants : Array[@bit.ObjectId] = []
   let want_refs : Array[String] = []
-  let haves : Array[@git.ObjectId] = []
+  let haves : Array[@bit.ObjectId] = []
   let mut done = false
   let mut filter : String? = None
   let mut packfile_uris : String? = None
@@ -103,7 +103,7 @@ pub fn parse_upload_pack_request_v2(
     if len == 1 {
       if in_args {
         let cmd = if command.length() > 0 { command } else { "unknown" }
-        raise @git.GitError::ProtocolError(
+        raise @bit.GitError::ProtocolError(
           "expected flush after " + cmd + " arguments",
         )
       }
@@ -112,10 +112,10 @@ pub fn parse_upload_pack_request_v2(
       continue
     }
     if len < 4 || i + len > data.length() {
-      raise @git.GitError::ProtocolError("Invalid pkt-line length in v2")
+      raise @bit.GitError::ProtocolError("Invalid pkt-line length in v2")
     }
     if saw_flush_after_args {
-      raise @git.GitError::ProtocolError("Unexpected data after flush")
+      raise @bit.GitError::ProtocolError("Unexpected data after flush")
     }
     let line = upload_bytes_to_string_range(data, i + 4, i + len)
     let line = upload_trim_line(line)
@@ -141,14 +141,14 @@ pub fn parse_upload_pack_request_v2(
       let hex = upload_trim_line(hex)
       if hex.length() >= 40 {
         let hex40 = String::unsafe_substring(hex, start=0, end=40)
-        wants.push(@git.ObjectId::from_hex(hex40))
+        wants.push(@bit.ObjectId::from_hex(hex40))
       }
     } else if line.has_prefix("have ") {
       let hex = String::unsafe_substring(line, start=5, end=line.length())
       let hex = upload_trim_line(hex)
       if hex.length() >= 40 {
         let hex40 = String::unsafe_substring(hex, start=0, end=40)
-        haves.push(@git.ObjectId::from_hex(hex40))
+        haves.push(@bit.ObjectId::from_hex(hex40))
       }
     } else if line == "done" {
       done = true
@@ -175,17 +175,17 @@ pub fn parse_upload_pack_request_v2(
 ///|
 /// Build upload-pack advertisement (info/refs payload).
 pub fn build_upload_pack_advertisement(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   root : String,
   agent? : String = "git/moonbit",
-) -> Bytes raise @git.GitError {
+) -> Bytes raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   let refs = show_ref(fs, git_dir)
   refs.sort_by((a, b) => String::compare(a.0, b.0))
   let caps = upload_default_caps(agent)
   let out : Array[Byte] = []
   if refs.length() == 0 {
-    let zero = @git.ObjectId::zero().to_hex()
+    let zero = @bit.ObjectId::zero().to_hex()
     let line = "\{zero} capabilities^{}\u0000\{caps}\n"
     upload_push_bytes(out, @protocol.pktline_encode(line))
     upload_push_bytes(out, @protocol.pktline_flush())
@@ -206,10 +206,10 @@ pub fn build_upload_pack_advertisement(
 ///|
 pub fn parse_upload_pack_request(
   data : Bytes,
-) -> UploadPackRequest raise @git.GitError {
-  let wants : Array[@git.ObjectId] = []
-  let haves : Array[@git.ObjectId] = []
-  let shallow : Array[@git.ObjectId] = []
+) -> UploadPackRequest raise @bit.GitError {
+  let wants : Array[@bit.ObjectId] = []
+  let haves : Array[@bit.ObjectId] = []
+  let shallow : Array[@bit.ObjectId] = []
   let capabilities : Array[String] = []
   let mut done = false
   let mut deepen : Int? = None
@@ -223,7 +223,7 @@ pub fn parse_upload_pack_request(
       continue
     }
     if len < 4 || i + len > data.length() {
-      raise @git.GitError::ProtocolError("Invalid pkt-line length")
+      raise @bit.GitError::ProtocolError("Invalid pkt-line length")
     }
     let line = upload_bytes_to_string_range(data, i + 4, i + len)
     let mut line = upload_trim_line(line)
@@ -281,21 +281,21 @@ pub fn parse_upload_pack_request(
       }
       if hex.length() >= 40 {
         let hex40 = String::unsafe_substring(hex, start=0, end=40)
-        wants.push(@git.ObjectId::from_hex(hex40))
+        wants.push(@bit.ObjectId::from_hex(hex40))
       }
     } else if line.has_prefix("have ") {
       let hex = String::unsafe_substring(line, start=5, end=line.length())
       let hex = upload_trim_line(hex)
       if hex.length() >= 40 {
         let hex40 = String::unsafe_substring(hex, start=0, end=40)
-        haves.push(@git.ObjectId::from_hex(hex40))
+        haves.push(@bit.ObjectId::from_hex(hex40))
       }
     } else if line.has_prefix("shallow ") {
       let hex = String::unsafe_substring(line, start=8, end=line.length())
       let hex = upload_trim_line(hex)
       if hex.length() >= 40 {
         let hex40 = String::unsafe_substring(hex, start=0, end=40)
-        shallow.push(@git.ObjectId::from_hex(hex40))
+        shallow.push(@bit.ObjectId::from_hex(hex40))
       }
     } else if line.has_prefix("deepen ") {
       let depth_str = String::unsafe_substring(line, start=7, end=line.length())
@@ -314,10 +314,10 @@ pub fn parse_upload_pack_request(
 
 ///|
 pub fn upload_pack(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   root : String,
   req : UploadPackRequest,
-) -> Bytes raise @git.GitError {
+) -> Bytes raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   let db = ObjectDb::load(fs, git_dir)
 
@@ -325,10 +325,10 @@ pub fn upload_pack(
   for want in req.wants {
     let obj = db.get(fs, want)
     match obj {
-      None => raise @git.GitError::ProtocolError("not our ref " + want.to_hex())
+      None => raise @bit.GitError::ProtocolError("not our ref " + want.to_hex())
       Some(o) =>
-        if o.obj_type != @git.ObjectType::Commit {
-          raise @git.GitError::ProtocolError("not our ref " + want.to_hex())
+        if o.obj_type != @bit.ObjectType::Commit {
+          raise @bit.GitError::ProtocolError("not our ref " + want.to_hex())
         }
     }
   }
@@ -353,7 +353,7 @@ pub fn upload_pack(
     req.deepen is None
   let objects = collect_reachable_objects_from_commits(db, fs, req.wants) catch {
     err =>
-      raise @git.GitError::ProtocolError(
+      raise @bit.GitError::ProtocolError(
         upload_pack_error_message(err, include_pack_objects_died),
       )
   }
@@ -363,12 +363,12 @@ pub fn upload_pack(
     let have_set : Map[String, Bool] = {}
     let have_objects = collect_reachable_objects_from_commits(db, fs, req.haves)
     for obj in have_objects {
-      let id = @git.hash_object_content(obj.obj_type, obj.data)
+      let id = @bit.hash_object_content(obj.obj_type, obj.data)
       have_set[id.to_hex()] = true
     }
-    let filtered : Array[@git.PackObject] = []
+    let filtered : Array[@bit.PackObject] = []
     for obj in objects {
-      let id = @git.hash_object_content(obj.obj_type, obj.data)
+      let id = @bit.hash_object_content(obj.obj_type, obj.data)
       if not(have_set.contains(id.to_hex())) {
         filtered.push(obj)
       }
@@ -379,7 +379,7 @@ pub fn upload_pack(
 }
 
 ///|
-fn build_upload_pack_ack_response(ack_ids : Array[@git.ObjectId]) -> Bytes {
+fn build_upload_pack_ack_response(ack_ids : Array[@bit.ObjectId]) -> Bytes {
   let out : Array[Byte] = []
   if ack_ids.length() > 0 {
     for id in ack_ids {
@@ -397,9 +397,9 @@ fn build_upload_pack_ack_response(ack_ids : Array[@git.ObjectId]) -> Bytes {
 
 ///|
 fn build_upload_pack_response(
-  objects : Array[@git.PackObject],
+  objects : Array[@bit.PackObject],
   use_side_band : Bool,
-  ack_ids : Array[@git.ObjectId],
+  ack_ids : Array[@bit.ObjectId],
 ) -> Bytes {
   let out : Array[Byte] = []
   if ack_ids.length() > 0 {
@@ -415,7 +415,7 @@ fn build_upload_pack_response(
   // Create packfile
   let pack = @pack.create_packfile_with_delta(
     objects,
-    @git.PackDeltaMode::NoDelta,
+    @bit.PackDeltaMode::NoDelta,
   )
   if use_side_band {
     // Send packfile via side-band-64k (band 1)
@@ -429,7 +429,7 @@ fn build_upload_pack_response(
       }
       let data_len = end - offset
       let pkt_len = data_len + 5 // 4 (header) + 1 (band byte)
-      let len_hex = @githash.int_to_hex4(pkt_len)
+      let len_hex = @bithash.int_to_hex4(pkt_len)
       for c in len_hex {
         out.push(c.to_int().to_byte())
       }
@@ -453,12 +453,12 @@ fn build_upload_pack_response(
 ///|
 fn collect_have_acks_v0(
   db : ObjectDb,
-  fs : &@git.RepoFileSystem,
-  haves : Array[@git.ObjectId],
-) -> Array[@git.ObjectId] {
-  let out : Array[@git.ObjectId] = []
+  fs : &@bit.RepoFileSystem,
+  haves : Array[@bit.ObjectId],
+) -> Array[@bit.ObjectId] {
+  let out : Array[@bit.ObjectId] = []
   for id in haves {
-    let res : Result[@git.PackObject?, Error] = try? db.get(fs, id)
+    let res : Result[@bit.PackObject?, Error] = try? db.get(fs, id)
     match res {
       Ok(Some(_)) => out.push(id)
       _ => ()
@@ -470,17 +470,17 @@ fn collect_have_acks_v0(
 ///|
 fn collect_have_acks_v2(
   db : ObjectDb,
-  fs : &@git.RepoFileSystem,
-  haves : Array[@git.ObjectId],
-) -> Array[@git.ObjectId] {
-  let out : Array[@git.ObjectId] = []
+  fs : &@bit.RepoFileSystem,
+  haves : Array[@bit.ObjectId],
+) -> Array[@bit.ObjectId] {
+  let out : Array[@bit.ObjectId] = []
   let seen : Map[String, Bool] = {}
   for id in haves {
     let hex = id.to_hex()
     if seen.contains(hex) {
       continue
     }
-    let res : Result[@git.PackObject?, Error] = try? db.get(fs, id)
+    let res : Result[@bit.PackObject?, Error] = try? db.get(fs, id)
     match res {
       Ok(Some(_)) => {
         out.push(id)
@@ -494,7 +494,7 @@ fn collect_have_acks_v2(
 
 ///|
 fn upload_pack_error_message(
-  err : @git.GitError,
+  err : @bit.GitError,
   include_pack_objects_died : Bool,
 ) -> String {
   let base = match err {
@@ -552,15 +552,15 @@ fn upload_default_caps(agent : String) -> String {
 }
 
 ///|
-fn upload_parse_pkt_len(data : Bytes, start : Int) -> Int raise @git.GitError {
+fn upload_parse_pkt_len(data : Bytes, start : Int) -> Int raise @bit.GitError {
   if start + 4 > data.length() {
-    raise @git.GitError::ProtocolError("Invalid pkt-line length")
+    raise @bit.GitError::ProtocolError("Invalid pkt-line length")
   }
   let mut v = 0
   for i in 0..<4 {
     let c = data[start + i].to_int().unsafe_to_char()
-    let digit = @githash.hex_char_to_int(c) catch {
-      _ => raise @git.GitError::ProtocolError("Invalid pkt-line length")
+    let digit = @bithash.hex_char_to_int(c) catch {
+      _ => raise @bit.GitError::ProtocolError("Invalid pkt-line length")
     }
     v = v * 16 + digit
   }
@@ -644,45 +644,45 @@ pub fn UploadPackConfig::default() -> UploadPackConfig {
 ///|
 /// Handle protocol v2 upload-pack request
 pub fn upload_pack_v2(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   root : String,
   req : UploadPackRequestV2,
   config : UploadPackConfig,
-) -> Bytes raise @git.GitError {
+) -> Bytes raise @bit.GitError {
   // Validate request against config
   if req.filter is Some(_) && not(config.allow_filter) {
-    raise @git.GitError::ProtocolError(
+    raise @bit.GitError::ProtocolError(
       "unexpected line: 'filter " + req.filter.unwrap() + "'",
     )
   }
   if req.packfile_uris is Some(_) && config.blob_packfile_uri is None {
-    raise @git.GitError::ProtocolError(
+    raise @bit.GitError::ProtocolError(
       "unexpected line: 'packfile-uris " + req.packfile_uris.unwrap() + "'",
     )
   }
 
   // Process the fetch command
   if req.command != "fetch" {
-    raise @git.GitError::ProtocolError(
+    raise @bit.GitError::ProtocolError(
       "unsupported command: '" + req.command + "'",
     )
   }
   let git_dir = join_path(root, ".git")
   let db = ObjectDb::load(fs, git_dir)
   let refs = show_ref(fs, git_dir)
-  let ref_map : Map[String, @git.ObjectId] = {}
+  let ref_map : Map[String, @bit.ObjectId] = {}
   for item in refs {
     let (name, id) = item
     ref_map[name] = id
   }
-  let all_wants : Array[@git.ObjectId] = []
+  let all_wants : Array[@bit.ObjectId] = []
   for id in req.wants {
     all_wants.push(id)
   }
-  let wanted_refs : Array[(String, @git.ObjectId)] = []
+  let wanted_refs : Array[(String, @bit.ObjectId)] = []
   if req.want_refs.length() > 0 {
     if not(config.allow_ref_in_want) {
-      raise @git.GitError::ProtocolError("unknown command 'want-ref'")
+      raise @bit.GitError::ProtocolError("unknown command 'want-ref'")
     }
     for name in req.want_refs {
       match ref_map.get(name) {
@@ -690,12 +690,12 @@ pub fn upload_pack_v2(
           wanted_refs.push((name, id))
           all_wants.push(id)
         }
-        None => raise @git.GitError::ProtocolError("unknown ref " + name)
+        None => raise @bit.GitError::ProtocolError("unknown ref " + name)
       }
     }
   }
   let seen_wants : Map[String, Bool] = {}
-  let wants : Array[@git.ObjectId] = []
+  let wants : Array[@bit.ObjectId] = []
   for id in all_wants {
     let hex = id.to_hex()
     if not(seen_wants.contains(hex)) {
@@ -711,7 +711,7 @@ pub fn upload_pack_v2(
   // Collect objects reachable from wants
   let objects = collect_reachable_objects_from_commits(db, fs, wants) catch {
     err =>
-      raise @git.GitError::ProtocolError(upload_pack_error_message(err, true))
+      raise @bit.GitError::ProtocolError(upload_pack_error_message(err, true))
   }
 
   // Apply partial clone filter (blob:none, blob:limit, tree:depth)
@@ -726,12 +726,12 @@ pub fn upload_pack_v2(
     let have_set : Map[String, Bool] = {}
     let have_objects = collect_reachable_objects_from_commits(db, fs, req.haves)
     for obj in have_objects {
-      let id = @git.hash_object_content(obj.obj_type, obj.data)
+      let id = @bit.hash_object_content(obj.obj_type, obj.data)
       have_set[id.to_hex()] = true
     }
-    let filtered : Array[@git.PackObject] = []
+    let filtered : Array[@bit.PackObject] = []
     for obj in objects {
-      let id = @git.hash_object_content(obj.obj_type, obj.data)
+      let id = @bit.hash_object_content(obj.obj_type, obj.data)
       if not(have_set.contains(id.to_hex())) {
         filtered.push(obj)
       }
@@ -766,16 +766,16 @@ fn parse_filter_spec(spec : String) -> @protocol.FilterSpec {
 ///|
 /// Apply filter specification to objects
 fn apply_filter_spec(
-  objects : Array[@git.PackObject],
+  objects : Array[@bit.PackObject],
   filter : @protocol.FilterSpec,
-) -> Array[@git.PackObject] {
+) -> Array[@bit.PackObject] {
   match filter {
     NoFilter => objects
     BlobNone => {
       // Exclude all blobs
-      let result : Array[@git.PackObject] = []
+      let result : Array[@bit.PackObject] = []
       for obj in objects {
-        if obj.obj_type != @git.ObjectType::Blob {
+        if obj.obj_type != @bit.ObjectType::Blob {
           result.push(obj)
         }
       }
@@ -783,9 +783,9 @@ fn apply_filter_spec(
     }
     BlobLimit(max_size) => {
       // Exclude blobs larger than max_size
-      let result : Array[@git.PackObject] = []
+      let result : Array[@bit.PackObject] = []
       for obj in objects {
-        if obj.obj_type != @git.ObjectType::Blob ||
+        if obj.obj_type != @bit.ObjectType::Blob ||
           obj.data.length().to_int64() <= max_size {
           result.push(obj)
         }
@@ -801,8 +801,8 @@ fn apply_filter_spec(
 
 ///|
 fn build_upload_pack_response_v2_ack(
-  ack_ids : Array[@git.ObjectId],
-  wanted_refs : Array[(String, @git.ObjectId)],
+  ack_ids : Array[@bit.ObjectId],
+  wanted_refs : Array[(String, @bit.ObjectId)],
 ) -> Bytes {
   let out : Array[Byte] = []
   if ack_ids.length() > 0 {
@@ -832,9 +832,9 @@ fn build_upload_pack_response_v2_ack(
 
 ///|
 fn build_upload_pack_response_v2(
-  objects : Array[@git.PackObject],
-  ack_ids : Array[@git.ObjectId],
-  wanted_refs : Array[(String, @git.ObjectId)],
+  objects : Array[@bit.PackObject],
+  ack_ids : Array[@bit.ObjectId],
+  wanted_refs : Array[(String, @bit.ObjectId)],
 ) -> Bytes {
   let out : Array[Byte] = []
   if ack_ids.length() > 0 {
@@ -865,7 +865,7 @@ fn build_upload_pack_response_v2(
   // Create packfile
   let pack = @pack.create_packfile_with_delta(
     objects,
-    @git.PackDeltaMode::NoDelta,
+    @bit.PackDeltaMode::NoDelta,
   )
 
   // Send packfile via side-band-64k (band 1)
@@ -879,7 +879,7 @@ fn build_upload_pack_response_v2(
     }
     let data_len = end - offset
     let pkt_len = data_len + 5 // 4 (header) + 1 (band byte)
-    let len_hex = @githash.int_to_hex4(pkt_len)
+    let len_hex = @bithash.int_to_hex4(pkt_len)
     for c in len_hex {
       out.push(c.to_int().to_byte())
     }

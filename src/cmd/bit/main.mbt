@@ -518,7 +518,7 @@ async fn run_main_for_args(args : Array[String]) -> Unit {
     show_help()
     return ()
   }
-  @gitionative.init_native_io()
+  @bitnative.init_native_io()
   // Handle --version and --help early (can appear anywhere before command)
   for i in 1..<args.length() {
     match args[i] {
@@ -940,11 +940,11 @@ async fn exit_with_error(cmd : String, err : Error) -> Unit {
 ///|
 fn format_error_message(err : Error) -> String {
   match err {
-    @git.GitError::ProtocolError(msg) => msg
-    @git.GitError::InvalidObject(msg) => msg
-    @git.GitError::PackfileError(msg) => msg
-    @git.GitError::HashMismatch(_, _) => "hash mismatch"
-    @git.GitError::IoError(msg) => msg
+    @bitcore.GitError::ProtocolError(msg) => msg
+    @bitcore.GitError::InvalidObject(msg) => msg
+    @bitcore.GitError::PackfileError(msg) => msg
+    @bitcore.GitError::HashMismatch(_, _) => "hash mismatch"
+    @bitcore.GitError::IoError(msg) => msg
     _ => err.to_string()
   }
 }

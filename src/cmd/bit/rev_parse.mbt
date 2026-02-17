@@ -23,7 +23,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
   }
   let root = get_work_root()
   let fs = OsFs::new()
-  let rfs : &@git.RepoFileSystem = fs
+  let rfs : &@bitcore.RepoFileSystem = fs
   let git_dir = resolve_git_dir(rfs, root)
   let cwd_abs = @sys.get_env_var("PWD").unwrap_or(root)
   let abs_git_dir = if git_dir.has_prefix("/") {
@@ -87,7 +87,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
     arg_index += 1
   }
   if output_object_format is Some(raw_output_format) {
-    let requested_format = @gitlib.config_strip_quotes(raw_output_format).to_lower()
+    let requested_format = @bitlib.config_strip_quotes(raw_output_format).to_lower()
     if !rev_parse_output_object_format_supported(fs, git_dir, requested_format) {
       eprint_line("fatal: unsupported object format: \{requested_format}")
       @sys.exit(128)
@@ -165,7 +165,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
             Some(value) => print_line(value)
             None =>
               if not(revs_only) {
-                raise @git.GitError::InvalidObject("unknown revision: " + arg)
+                raise @bitcore.GitError::InvalidObject("unknown revision: " + arg)
               }
           }
         } else if symbolic_full_name {
@@ -174,7 +174,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
             Some(value) => print_line(value)
             None =>
               if not(revs_only) {
-                raise @git.GitError::InvalidObject("unknown revision: " + arg)
+                raise @bitcore.GitError::InvalidObject("unknown revision: " + arg)
               }
           }
         } else {
@@ -187,7 +187,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
           } else if arg.find("@{") is Some(_) {
             resolve_reflog_selector(fs, git_dir, arg)
           } else {
-            @gitrepo.rev_parse(fs, git_dir, arg)
+            @bitrepo.rev_parse(fs, git_dir, arg)
           }
           match id {
             Some(oid) => {
@@ -202,7 +202,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
             }
             None =>
               if not(revs_only) {
-                raise @git.GitError::InvalidObject("unknown revision: " + arg)
+                raise @bitcore.GitError::InvalidObject("unknown revision: " + arg)
               }
           }
         }
@@ -265,16 +265,16 @@ fn rev_parse_resolve_git_path(
 
 ///|
 fn rev_parse_resolve_output_oid_hex(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
-  oid : @git.ObjectId,
+  oid : @bitcore.ObjectId,
   output_object_format : String?,
 ) -> String {
   let oid_hex = oid.to_hex()
   guard output_object_format is Some(raw_requested_format) else {
     return oid_hex
   }
-  let requested_format = @gitlib.config_strip_quotes(raw_requested_format).to_lower()
+  let requested_format = @bitlib.config_strip_quotes(raw_requested_format).to_lower()
   let storage_format = repo_object_format(fs, git_dir)
   if requested_format == storage_format {
     return oid_hex
@@ -291,7 +291,7 @@ fn rev_parse_resolve_output_oid_hex(
 
 ///|
 fn rev_parse_output_object_format_supported(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
   requested_format : String,
 ) -> Bool {
@@ -310,10 +310,10 @@ fn rev_parse_output_object_format_supported(
 
 ///|
 fn resolve_index_path_oid(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
   spec : String,
-) -> @git.ObjectId? raise Error {
+) -> @bitcore.ObjectId? raise Error {
   let (stage, path_opt) = parse_index_pathspec(spec)
   guard path_opt is Some(path) else { return None }
   // Current index reader keeps one entry per path; stage lookup is supported for :0:path only.
@@ -321,7 +321,7 @@ fn resolve_index_path_oid(
     return None
   }
   let normalized = normalize_index_pathspec_path(path)
-  let entries = @gitlib.read_index_entries(fs, git_dir)
+  let entries = @bitlib.read_index_entries(fs, git_dir)
   for entry in entries {
     if normalize_index_pathspec_path(entry.path) == normalized {
       return Some(entry.id)
@@ -411,15 +411,15 @@ fn parse_reflog_selector(spec : String) -> (String, Int)? {
 
 ///|
 fn resolve_reflog_selector(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
   spec : String,
-) -> @git.ObjectId? raise Error {
+) -> @bitcore.ObjectId? raise Error {
   match parse_reflog_selector(spec) {
     Some(parsed) => {
       let refname = parsed.0
       let index = parsed.1
-      let entries = @gitrepo.read_reflog(fs, git_dir, refname)
+      let entries = @bitrepo.read_reflog(fs, git_dir, refname)
       let len = entries.length()
       if index >= len {
         return None
@@ -432,20 +432,20 @@ fn resolve_reflog_selector(
 
 ///|
 fn resolve_abbrev_ref_name(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
   spec : String,
 ) -> String? raise Error {
   if spec == "HEAD" {
-    return match @gitlib.read_head_ref(fs, git_dir) {
-      @gitlib.HeadRef::Branch(name) => Some(name)
-      @gitlib.HeadRef::Detached(_) => Some("HEAD")
+    return match @bitlib.read_head_ref(fs, git_dir) {
+      @bitlib.HeadRef::Branch(name) => Some(name)
+      @bitlib.HeadRef::Detached(_) => Some("HEAD")
     }
   }
   if spec.has_prefix("refs/heads/") {
     return Some(String::unsafe_substring(spec, start=11, end=spec.length()))
   }
-  if @gitlib.resolve_ref(fs, git_dir, "refs/heads/" + spec) is Some(_) {
+  if @bitlib.resolve_ref(fs, git_dir, "refs/heads/" + spec) is Some(_) {
     return Some(spec)
   }
   None
@@ -453,33 +453,33 @@ fn resolve_abbrev_ref_name(
 
 ///|
 fn resolve_symbolic_full_name(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
   spec : String,
 ) -> String? raise Error {
   if spec == "HEAD" {
-    return match @gitlib.read_head_ref(fs, git_dir) {
-      @gitlib.HeadRef::Branch(name) => Some("refs/heads/" + name)
-      @gitlib.HeadRef::Detached(_) => Some("HEAD")
+    return match @bitlib.read_head_ref(fs, git_dir) {
+      @bitlib.HeadRef::Branch(name) => Some("refs/heads/" + name)
+      @bitlib.HeadRef::Detached(_) => Some("HEAD")
     }
   }
   if spec.has_prefix("refs/") {
-    return if @gitlib.resolve_ref(fs, git_dir, spec) is Some(_) {
+    return if @bitlib.resolve_ref(fs, git_dir, spec) is Some(_) {
       Some(spec)
     } else {
       None
     }
   }
   let head_ref = "refs/heads/" + spec
-  if @gitlib.resolve_ref(fs, git_dir, head_ref) is Some(_) {
+  if @bitlib.resolve_ref(fs, git_dir, head_ref) is Some(_) {
     return Some(head_ref)
   }
   let tag_ref = "refs/tags/" + spec
-  if @gitlib.resolve_ref(fs, git_dir, tag_ref) is Some(_) {
+  if @bitlib.resolve_ref(fs, git_dir, tag_ref) is Some(_) {
     return Some(tag_ref)
   }
   let remote_ref = "refs/remotes/" + spec
-  if @gitlib.resolve_ref(fs, git_dir, remote_ref) is Some(_) {
+  if @bitlib.resolve_ref(fs, git_dir, remote_ref) is Some(_) {
     return Some(remote_ref)
   }
   None
@@ -499,9 +499,9 @@ fn shorten_oid_hex(hex : String, requested : Int) -> String {
 
 ///|
 fn resolve_fetch_head_oid(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
-) -> @git.ObjectId? {
+) -> @bitcore.ObjectId? {
   let fetch_head_path = git_dir + "/FETCH_HEAD"
   guard fs.is_file(fetch_head_path) else { return None }
   let content = decode_bytes(
@@ -509,7 +509,7 @@ fn resolve_fetch_head_oid(
       _ => return None
     },
   )
-  let mut result : @git.ObjectId? = None
+  let mut result : @bitcore.ObjectId? = None
   for line_view in content.split("\n") {
     let line = line_view.to_string().trim().to_string()
     if line.length() == 0 {
@@ -527,7 +527,7 @@ fn resolve_fetch_head_oid(
     if oid_hex.length() == 0 {
       continue
     }
-    let oid = @git.ObjectId::from_hex(oid_hex) catch { _ => continue }
+    let oid = @bitcore.ObjectId::from_hex(oid_hex) catch { _ => continue }
     result = Some(oid)
     break
   }
@@ -554,46 +554,46 @@ fn shell_single_quote(value : String) -> String {
 
 ///|
 fn peel_cat_file_object_to_type(
-  db : @gitlib.ObjectDb,
-  fs : &@git.RepoFileSystem,
-  object_id : @git.ObjectId,
-  expected_type : @git.ObjectType,
-) -> Bytes raise @git.GitError {
+  db : @bitlib.ObjectDb,
+  fs : &@bitcore.RepoFileSystem,
+  object_id : @bitcore.ObjectId,
+  expected_type : @bitcore.ObjectType,
+) -> Bytes raise @bitcore.GitError {
   let mut current_id = object_id
   for _ in 0..<8 {
     let current_obj = db.get(fs, current_id)
     guard current_obj is Some(current) else {
-      raise @git.GitError::InvalidObject(
+      raise @bitcore.GitError::InvalidObject(
         "Object not found: " + current_id.to_hex(),
       )
     }
     if current.obj_type == expected_type {
       return current.data
     }
-    guard current.obj_type == @git.ObjectType::Tag else {
-      raise @git.GitError::InvalidObject(
+    guard current.obj_type == @bitcore.ObjectType::Tag else {
+      raise @bitcore.GitError::InvalidObject(
         "object is of type \{current.obj_type.to_string()}, not \{expected_type.to_string()}",
       )
     }
     let tag_text = decode_bytes(current.data)
     let tag_target = rev_parse_parse_tag_target_with_compat(db, fs, tag_text)
     guard tag_target is Some(target_id) else {
-      raise @git.GitError::InvalidObject("malformed tag object")
+      raise @bitcore.GitError::InvalidObject("malformed tag object")
     }
     current_id = target_id
   }
-  raise @git.GitError::InvalidObject("tag dereference depth exceeded")
+  raise @bitcore.GitError::InvalidObject("tag dereference depth exceeded")
 }
 
 ///|
 fn rev_parse_parse_tag_target_with_compat(
-  db : @gitlib.ObjectDb,
-  fs : &@git.RepoFileSystem,
+  db : @bitlib.ObjectDb,
+  fs : &@bitcore.RepoFileSystem,
   tag_text : String,
-) -> @git.ObjectId? {
+) -> @bitcore.ObjectId? {
   let target_name = rev_parse_extract_tag_target_name(tag_text)
   guard target_name is Some(raw_name) else { return None }
-  let direct_id : @git.ObjectId? = Some(@git.ObjectId::from_hex(raw_name)) catch {
+  let direct_id : @bitcore.ObjectId? = Some(@bitcore.ObjectId::from_hex(raw_name)) catch {
     _ => None
   }
   if direct_id is Some(id) && (db.get(fs, id) catch { _ => None }) is Some(_) {
@@ -603,8 +603,8 @@ fn rev_parse_parse_tag_target_with_compat(
   let git_dir = resolve_git_dir(fs, root)
   match rev_parse_lookup_loose_object_idx(fs, git_dir, raw_name) {
     Some(mapped_name) => {
-      let mapped_id : @git.ObjectId? = Some(
-        @git.ObjectId::from_hex(mapped_name),
+      let mapped_id : @bitcore.ObjectId? = Some(
+        @bitcore.ObjectId::from_hex(mapped_name),
       ) catch {
         _ => None
       }
@@ -633,7 +633,7 @@ fn rev_parse_extract_tag_target_name(tag_text : String) -> String? {
 
 ///|
 fn rev_parse_lookup_loose_object_idx(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
   spec : String,
 ) -> String? {

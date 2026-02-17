@@ -4,35 +4,35 @@
 /// Parse a packfile into objects.
 pub fn parse_packfile(
   data : Bytes,
-) -> Array[@git.PackObject] raise @git.GitError {
+) -> Array[@bit.PackObject] raise @bit.GitError {
   parse_packfile_with_bases(data, [])
 }
 
 ///|
 /// Compute the maximum delta chain length in a packfile
-pub fn max_delta_chain_length(data : Bytes) -> Int raise @git.GitError {
+pub fn max_delta_chain_length(data : Bytes) -> Int raise @bit.GitError {
   if data.length() < 32 {
-    raise @git.GitError::PackfileError("Packfile too short")
+    raise @bit.GitError::PackfileError("Packfile too short")
   }
   if not(
       data[0] == b'P' && data[1] == b'A' && data[2] == b'C' && data[3] == b'K',
     ) {
-    raise @git.GitError::PackfileError("Invalid packfile magic")
+    raise @bit.GitError::PackfileError("Invalid packfile magic")
   }
   let version = read_u32_be(data, 4)
   if version != 2 {
-    raise @git.GitError::PackfileError(
+    raise @bit.GitError::PackfileError(
       "Unsupported packfile version: \{version}",
     )
   }
   let count = read_u32_be(data, 8)
   let mut offset = 12
-  let objects : Array[@git.PackObject] = []
+  let objects : Array[@bit.PackObject] = []
   let resolved : Array[Bool] = []
   let depths : Array[Int] = []
   let pending : Array[PendingDelta] = []
   let by_offset : Map[Int, Int] = {}
-  let by_id : Map[String, @git.PackObject] = {}
+  let by_id : Map[String, @bit.PackObject] = {}
   let by_id_depth : Map[String, Int] = {}
   let mut max_depth = 0
   for _ in 0..<count {
@@ -43,10 +43,10 @@ pub fn max_delta_chain_length(data : Bytes) -> Int raise @git.GitError {
       1 | 2 | 3 | 4 => {
         let obj_type = packfile_type_to_object_type(type_id)
         let (content, after) = @zlib.zlib_decompress_at(data, offset) catch {
-          e => raise @git.GitError::PackfileError("Zlib error: \{e}")
+          e => raise @bit.GitError::PackfileError("Zlib error: \{e}")
         }
         if content.length() != size {
-          raise @git.GitError::PackfileError(
+          raise @bit.GitError::PackfileError(
             "Object size mismatch: expected=\{size}, got=\{content.length()}",
           )
         }
@@ -56,21 +56,21 @@ pub fn max_delta_chain_length(data : Bytes) -> Int raise @git.GitError {
         let (back_offset, after_ref) = read_ofs_delta_offset(data, offset)
         let base_offset = obj_offset - back_offset
         if base_offset < 0 {
-          raise @git.GitError::PackfileError("Invalid OFS_DELTA base offset")
+          raise @bit.GitError::PackfileError("Invalid OFS_DELTA base offset")
         }
         let (delta, after) = @zlib.zlib_decompress_at(data, after_ref) catch {
-          e => raise @git.GitError::PackfileError("Zlib error: \{e}")
+          e => raise @bit.GitError::PackfileError("Zlib error: \{e}")
         }
         if delta.length() != size {
-          raise @git.GitError::PackfileError(
+          raise @bit.GitError::PackfileError(
             "Delta size mismatch: expected=\{size}, got=\{delta.length()}",
           )
         }
         let crc = crc32_range(data, obj_offset, after)
-        let placeholder = @git.PackObject::with_metadata(
-          @git.ObjectType::Blob,
+        let placeholder = @bit.PackObject::with_metadata(
+          @bit.ObjectType::Blob,
           Bytes::from_array([]),
-          @git.ObjectId::zero(),
+          @bit.ObjectId::zero(),
           obj_offset,
           crc,
         )
@@ -86,8 +86,8 @@ pub fn max_delta_chain_length(data : Bytes) -> Int raise @git.GitError {
               resolved[base_index] {
               let base = objects[base_index]
               let content = apply_delta(base.data, delta)
-              let obj_id = @git.hash_object_content(base.obj_type, content)
-              let obj = @git.PackObject::with_metadata(
+              let obj_id = @bit.hash_object_content(base.obj_type, content)
+              let obj = @bit.PackObject::with_metadata(
                 base.obj_type,
                 content,
                 obj_id,
@@ -111,27 +111,27 @@ pub fn max_delta_chain_length(data : Bytes) -> Int raise @git.GitError {
               })
             }
           None =>
-            raise @git.GitError::PackfileError(
+            raise @bit.GitError::PackfileError(
               "Missing base object for OFS_DELTA",
             )
         }
-        (@git.ObjectType::Blob, Bytes::from_array([]), after)
+        (@bit.ObjectType::Blob, Bytes::from_array([]), after)
       }
       7 => {
         let (base_id, after_ref) = read_ref_delta_id(data, offset)
         let (delta, after) = @zlib.zlib_decompress_at(data, after_ref) catch {
-          e => raise @git.GitError::PackfileError("Zlib error: \{e}")
+          e => raise @bit.GitError::PackfileError("Zlib error: \{e}")
         }
         if delta.length() != size {
-          raise @git.GitError::PackfileError(
+          raise @bit.GitError::PackfileError(
             "Delta size mismatch: expected=\{size}, got=\{delta.length()}",
           )
         }
         let crc = crc32_range(data, obj_offset, after)
-        let placeholder = @git.PackObject::with_metadata(
-          @git.ObjectType::Blob,
+        let placeholder = @bit.PackObject::with_metadata(
+          @bit.ObjectType::Blob,
           Bytes::from_array([]),
-          @git.ObjectId::zero(),
+          @bit.ObjectId::zero(),
           obj_offset,
           crc,
         )
@@ -143,8 +143,8 @@ pub fn max_delta_chain_length(data : Bytes) -> Int raise @git.GitError {
         match by_id.get(base_id) {
           Some(base) => {
             let content = apply_delta(base.data, delta)
-            let obj_id = @git.hash_object_content(base.obj_type, content)
-            let obj = @git.PackObject::with_metadata(
+            let obj_id = @bit.hash_object_content(base.obj_type, content)
+            let obj = @bit.PackObject::with_metadata(
               base.obj_type,
               content,
               obj_id,
@@ -165,18 +165,18 @@ pub fn max_delta_chain_length(data : Bytes) -> Int raise @git.GitError {
           None =>
             pending.push({ index: idx, base: DeltaBaseRef::Ref(base_id), delta })
         }
-        (@git.ObjectType::Blob, Bytes::from_array([]), after)
+        (@bit.ObjectType::Blob, Bytes::from_array([]), after)
       }
       _ =>
-        raise @git.GitError::PackfileError(
+        raise @bit.GitError::PackfileError(
           "Unknown packfile object type: \{type_id}",
         )
     }
     offset = after
     if type_id == 1 || type_id == 2 || type_id == 3 || type_id == 4 {
       let crc = crc32_range(data, obj_offset, after)
-      let obj_id = @git.hash_object_content(obj_type, content)
-      let obj = @git.PackObject::with_metadata(
+      let obj_id = @bit.hash_object_content(obj_type, content)
+      let obj = @bit.PackObject::with_metadata(
         obj_type, content, obj_id, obj_offset, crc,
       )
       objects.push(obj)
@@ -200,9 +200,9 @@ pub fn max_delta_chain_length(data : Bytes) -> Int raise @git.GitError {
             resolved[base_index] {
             let base = objects[base_index]
             let content = apply_delta(base.data, p.delta)
-            let obj_id = @git.hash_object_content(base.obj_type, content)
+            let obj_id = @bit.hash_object_content(base.obj_type, content)
             let old = objects[p.index]
-            let obj = @git.PackObject::with_metadata(
+            let obj = @bit.PackObject::with_metadata(
               base.obj_type,
               content,
               obj_id,
@@ -226,9 +226,9 @@ pub fn max_delta_chain_length(data : Bytes) -> Int raise @git.GitError {
           match by_id.get(base_id) {
             Some(base) => {
               let content = apply_delta(base.data, p.delta)
-              let obj_id = @git.hash_object_content(base.obj_type, content)
+              let obj_id = @bit.hash_object_content(base.obj_type, content)
               let old = objects[p.index]
-              let obj = @git.PackObject::with_metadata(
+              let obj = @bit.PackObject::with_metadata(
                 base.obj_type,
                 content,
                 obj_id,
@@ -254,16 +254,16 @@ pub fn max_delta_chain_length(data : Bytes) -> Int raise @git.GitError {
     pending_list = next_pending
   }
   if pending_list.length() > 0 {
-    raise @git.GitError::PackfileError("Unresolved delta objects")
+    raise @bit.GitError::PackfileError("Unresolved delta objects")
   }
   let trailer_offset = data.length() - 20
   if offset != trailer_offset {
-    raise @git.GitError::PackfileError("Packfile length mismatch")
+    raise @bit.GitError::PackfileError("Packfile length mismatch")
   }
-  let computed = @git.sha1_prefix(data, trailer_offset)
+  let computed = @bit.sha1_prefix(data, trailer_offset)
   let trailer = read_trailer_id(data, trailer_offset)
   if computed != trailer {
-    raise @git.GitError::HashMismatch(computed.to_hex(), trailer.to_hex())
+    raise @bit.GitError::HashMismatch(computed.to_hex(), trailer.to_hex())
   }
   max_depth
 }
@@ -272,13 +272,13 @@ pub fn max_delta_chain_length(data : Bytes) -> Int raise @git.GitError {
 /// Parse a packfile with preloaded base objects (for thin packs).
 pub fn parse_packfile_with_bases(
   data : Bytes,
-  bases : Array[@git.PackObject],
-) -> Array[@git.PackObject] raise @git.GitError {
+  bases : Array[@bit.PackObject],
+) -> Array[@bit.PackObject] raise @bit.GitError {
   let by_offset : Map[Int, Int] = {}
-  let by_id : Map[String, @git.PackObject] = {}
+  let by_id : Map[String, @bit.PackObject] = {}
   for obj in bases {
-    let id = @git.hash_object_content(obj.obj_type, obj.data)
-    let base_obj = @git.PackObject::with_metadata(
+    let id = @bit.hash_object_content(obj.obj_type, obj.data)
+    let base_obj = @bit.PackObject::with_metadata(
       obj.obj_type,
       obj.data,
       id,
@@ -294,8 +294,8 @@ pub fn parse_packfile_with_bases(
 /// Parse a packfile and emit resolved objects (order not guaranteed).
 pub fn parse_packfile_stream(
   data : Bytes,
-  emit : (@git.PackObject) -> Unit,
-) -> Unit raise @git.GitError {
+  emit : (@bit.PackObject) -> Unit,
+) -> Unit raise @bit.GitError {
   parse_packfile_stream_with_bases(data, [], emit)
 }
 
@@ -303,14 +303,14 @@ pub fn parse_packfile_stream(
 /// Parse a packfile with base objects and emit resolved objects.
 pub fn parse_packfile_stream_with_bases(
   data : Bytes,
-  bases : Array[@git.PackObject],
-  emit : (@git.PackObject) -> Unit,
-) -> Unit raise @git.GitError {
-  let by_offset : Map[Int, @git.PackObject] = {}
-  let by_id : Map[String, @git.PackObject] = {}
+  bases : Array[@bit.PackObject],
+  emit : (@bit.PackObject) -> Unit,
+) -> Unit raise @bit.GitError {
+  let by_offset : Map[Int, @bit.PackObject] = {}
+  let by_id : Map[String, @bit.PackObject] = {}
   for obj in bases {
-    let id = @git.hash_object_content(obj.obj_type, obj.data)
-    let base_obj = @git.PackObject::with_metadata(
+    let id = @bit.hash_object_content(obj.obj_type, obj.data)
+    let base_obj = @bit.PackObject::with_metadata(
       obj.obj_type,
       obj.data,
       id,
@@ -324,15 +324,15 @@ pub fn parse_packfile_stream_with_bases(
 
 ///|
 fn insert_pack_object_by_id(
-  by_id : Map[String, @git.PackObject],
-  obj : @git.PackObject,
-) -> Unit raise @git.GitError {
+  by_id : Map[String, @bit.PackObject],
+  obj : @bit.PackObject,
+) -> Unit raise @bit.GitError {
   let key = obj.id.to_hex()
   match by_id.get(key) {
     Some(existing) =>
       if existing.obj_type != obj.obj_type ||
         not(Bytes::equal(existing.data, obj.data)) {
-        raise @git.GitError::PackfileError("SHA1 COLLISION FOUND")
+        raise @bit.GitError::PackfileError("SHA1 COLLISION FOUND")
       }
     None => ()
   }
@@ -363,27 +363,27 @@ priv struct PendingDeltaStream {
 fn parse_packfile_internal(
   data : Bytes,
   by_offset : Map[Int, Int],
-  by_id : Map[String, @git.PackObject],
-) -> Array[@git.PackObject] raise @git.GitError {
+  by_id : Map[String, @bit.PackObject],
+) -> Array[@bit.PackObject] raise @bit.GitError {
   if data.length() < 32 {
-    raise @git.GitError::PackfileError("Packfile too short")
+    raise @bit.GitError::PackfileError("Packfile too short")
   }
 
   // Magic: "PACK"
   if not(
       data[0] == b'P' && data[1] == b'A' && data[2] == b'C' && data[3] == b'K',
     ) {
-    raise @git.GitError::PackfileError("Invalid packfile magic")
+    raise @bit.GitError::PackfileError("Invalid packfile magic")
   }
   let version = read_u32_be(data, 4)
   if version != 2 {
-    raise @git.GitError::PackfileError(
+    raise @bit.GitError::PackfileError(
       "Unsupported packfile version: \{version}",
     )
   }
   let count = read_u32_be(data, 8)
   let mut offset = 12
-  let objects : Array[@git.PackObject] = []
+  let objects : Array[@bit.PackObject] = []
   let resolved : Array[Bool] = []
   let obj_offsets : Array[Int] = [] // Track offsets for CRC calculation
   let obj_ends : Array[Int] = [] // Track end positions for CRC calculation
@@ -396,10 +396,10 @@ fn parse_packfile_internal(
       1 | 2 | 3 | 4 => {
         let obj_type = packfile_type_to_object_type(type_id)
         let (content, after) = @zlib.zlib_decompress_at(data, offset) catch {
-          e => raise @git.GitError::PackfileError("Zlib error: \{e}")
+          e => raise @bit.GitError::PackfileError("Zlib error: \{e}")
         }
         if content.length() != size {
-          raise @git.GitError::PackfileError(
+          raise @bit.GitError::PackfileError(
             "Object size mismatch: expected=\{size}, got=\{content.length()}",
           )
         }
@@ -409,22 +409,22 @@ fn parse_packfile_internal(
         let (back_offset, after_ref) = read_ofs_delta_offset(data, offset)
         let base_offset = obj_offset - back_offset
         if base_offset < 0 {
-          raise @git.GitError::PackfileError("Invalid OFS_DELTA base offset")
+          raise @bit.GitError::PackfileError("Invalid OFS_DELTA base offset")
         }
         let (delta, after) = @zlib.zlib_decompress_at(data, after_ref) catch {
-          e => raise @git.GitError::PackfileError("Zlib error: \{e}")
+          e => raise @bit.GitError::PackfileError("Zlib error: \{e}")
         }
         if delta.length() != size {
-          raise @git.GitError::PackfileError(
+          raise @bit.GitError::PackfileError(
             "Delta size mismatch: expected=\{size}, got=\{delta.length()}",
           )
         }
         // Compute CRC32 for this delta object
         let crc = crc32_range(data, obj_offset, after)
-        let placeholder = @git.PackObject::with_metadata(
-          @git.ObjectType::Blob,
+        let placeholder = @bit.PackObject::with_metadata(
+          @bit.ObjectType::Blob,
           Bytes::from_array([]),
-          @git.ObjectId::zero(),
+          @bit.ObjectId::zero(),
           obj_offset,
           crc,
         )
@@ -439,8 +439,8 @@ fn parse_packfile_internal(
             if resolved[base_index] {
               let base = objects[base_index]
               let content = apply_delta(base.data, delta)
-              let obj_id = @git.hash_object_content(base.obj_type, content)
-              let obj = @git.PackObject::with_metadata(
+              let obj_id = @bit.hash_object_content(base.obj_type, content)
+              let obj = @bit.PackObject::with_metadata(
                 base.obj_type,
                 content,
                 obj_id,
@@ -458,28 +458,28 @@ fn parse_packfile_internal(
               })
             }
           None =>
-            raise @git.GitError::PackfileError(
+            raise @bit.GitError::PackfileError(
               "Missing base object for OFS_DELTA",
             )
         }
-        (@git.ObjectType::Blob, Bytes::from_array([]), after)
+        (@bit.ObjectType::Blob, Bytes::from_array([]), after)
       }
       7 => {
         let (base_id, after_ref) = read_ref_delta_id(data, offset)
         let (delta, after) = @zlib.zlib_decompress_at(data, after_ref) catch {
-          e => raise @git.GitError::PackfileError("Zlib error: \{e}")
+          e => raise @bit.GitError::PackfileError("Zlib error: \{e}")
         }
         if delta.length() != size {
-          raise @git.GitError::PackfileError(
+          raise @bit.GitError::PackfileError(
             "Delta size mismatch: expected=\{size}, got=\{delta.length()}",
           )
         }
         // Compute CRC32 for this delta object
         let crc = crc32_range(data, obj_offset, after)
-        let placeholder = @git.PackObject::with_metadata(
-          @git.ObjectType::Blob,
+        let placeholder = @bit.PackObject::with_metadata(
+          @bit.ObjectType::Blob,
           Bytes::from_array([]),
-          @git.ObjectId::zero(),
+          @bit.ObjectId::zero(),
           obj_offset,
           crc,
         )
@@ -492,8 +492,8 @@ fn parse_packfile_internal(
         match by_id.get(base_id) {
           Some(base) => {
             let content = apply_delta(base.data, delta)
-            let obj_id = @git.hash_object_content(base.obj_type, content)
-            let obj = @git.PackObject::with_metadata(
+            let obj_id = @bit.hash_object_content(base.obj_type, content)
+            let obj = @bit.PackObject::with_metadata(
               base.obj_type,
               content,
               obj_id,
@@ -507,10 +507,10 @@ fn parse_packfile_internal(
           None =>
             pending.push({ index: idx, base: DeltaBaseRef::Ref(base_id), delta })
         }
-        (@git.ObjectType::Blob, Bytes::from_array([]), after)
+        (@bit.ObjectType::Blob, Bytes::from_array([]), after)
       }
       _ =>
-        raise @git.GitError::PackfileError(
+        raise @bit.GitError::PackfileError(
           "Unknown packfile object type: \{type_id}",
         )
     }
@@ -518,8 +518,8 @@ fn parse_packfile_internal(
     if type_id == 1 || type_id == 2 || type_id == 3 || type_id == 4 {
       // Compute CRC32 and hash for non-delta objects
       let crc = crc32_range(data, obj_offset, after)
-      let obj_id = @git.hash_object_content(obj_type, content)
-      let obj = @git.PackObject::with_metadata(
+      let obj_id = @bit.hash_object_content(obj_type, content)
+      let obj = @bit.PackObject::with_metadata(
         obj_type, content, obj_id, obj_offset, crc,
       )
       objects.push(obj)
@@ -543,10 +543,10 @@ fn parse_packfile_internal(
             resolved[base_index] {
             let base = objects[base_index]
             let content = apply_delta(base.data, p.delta)
-            let obj_id = @git.hash_object_content(base.obj_type, content)
+            let obj_id = @bit.hash_object_content(base.obj_type, content)
             // Preserve offset and crc from placeholder
             let old = objects[p.index]
-            let obj = @git.PackObject::with_metadata(
+            let obj = @bit.PackObject::with_metadata(
               base.obj_type,
               content,
               obj_id,
@@ -564,10 +564,10 @@ fn parse_packfile_internal(
           match by_id.get(base_id) {
             Some(base) => {
               let content = apply_delta(base.data, p.delta)
-              let obj_id = @git.hash_object_content(base.obj_type, content)
+              let obj_id = @bit.hash_object_content(base.obj_type, content)
               // Preserve offset and crc from placeholder
               let old = objects[p.index]
-              let obj = @git.PackObject::with_metadata(
+              let obj = @bit.PackObject::with_metadata(
                 base.obj_type,
                 content,
                 obj_id,
@@ -586,16 +586,16 @@ fn parse_packfile_internal(
     pending_list = next_pending
   }
   if pending_list.length() > 0 {
-    raise @git.GitError::PackfileError("Unresolved delta objects")
+    raise @bit.GitError::PackfileError("Unresolved delta objects")
   }
   let trailer_offset = data.length() - 20
   if offset != trailer_offset {
-    raise @git.GitError::PackfileError("Packfile length mismatch")
+    raise @bit.GitError::PackfileError("Packfile length mismatch")
   }
-  let computed = @git.sha1_prefix(data, trailer_offset)
+  let computed = @bit.sha1_prefix(data, trailer_offset)
   let trailer = read_trailer_id(data, trailer_offset)
   if computed != trailer {
-    raise @git.GitError::HashMismatch(computed.to_hex(), trailer.to_hex())
+    raise @bit.GitError::HashMismatch(computed.to_hex(), trailer.to_hex())
   }
   objects
 }
@@ -603,21 +603,21 @@ fn parse_packfile_internal(
 ///|
 fn parse_packfile_stream_internal(
   data : Bytes,
-  by_offset : Map[Int, @git.PackObject],
-  by_id : Map[String, @git.PackObject],
-  emit : (@git.PackObject) -> Unit,
-) -> Unit raise @git.GitError {
+  by_offset : Map[Int, @bit.PackObject],
+  by_id : Map[String, @bit.PackObject],
+  emit : (@bit.PackObject) -> Unit,
+) -> Unit raise @bit.GitError {
   if data.length() < 32 {
-    raise @git.GitError::PackfileError("Packfile too short")
+    raise @bit.GitError::PackfileError("Packfile too short")
   }
   if not(
       data[0] == b'P' && data[1] == b'A' && data[2] == b'C' && data[3] == b'K',
     ) {
-    raise @git.GitError::PackfileError("Invalid packfile magic")
+    raise @bit.GitError::PackfileError("Invalid packfile magic")
   }
   let version = read_u32_be(data, 4)
   if version != 2 {
-    raise @git.GitError::PackfileError(
+    raise @bit.GitError::PackfileError(
       "Unsupported packfile version: \{version}",
     )
   }
@@ -632,14 +632,14 @@ fn parse_packfile_stream_internal(
       1 | 2 | 3 | 4 => {
         let obj_type = packfile_type_to_object_type(type_id)
         let (content, after) = @zlib.zlib_decompress_at(data, offset) catch {
-          e => raise @git.GitError::PackfileError("Zlib error: \{e}")
+          e => raise @bit.GitError::PackfileError("Zlib error: \{e}")
         }
         if content.length() != size {
-          raise @git.GitError::PackfileError(
+          raise @bit.GitError::PackfileError(
             "Object size mismatch: expected=\{size}, got=\{content.length()}",
           )
         }
-        let obj = @git.PackObject::new(obj_type, content)
+        let obj = @bit.PackObject::new(obj_type, content)
         by_offset[obj_offset] = obj
         insert_pack_object_by_id(by_id, obj)
         emit(obj)
@@ -649,20 +649,20 @@ fn parse_packfile_stream_internal(
         let (back_offset, after_ref) = read_ofs_delta_offset(data, offset)
         let base_offset = obj_offset - back_offset
         if base_offset < 0 {
-          raise @git.GitError::PackfileError("Invalid OFS_DELTA base offset")
+          raise @bit.GitError::PackfileError("Invalid OFS_DELTA base offset")
         }
         let (delta, after) = @zlib.zlib_decompress_at(data, after_ref) catch {
-          e => raise @git.GitError::PackfileError("Zlib error: \{e}")
+          e => raise @bit.GitError::PackfileError("Zlib error: \{e}")
         }
         if delta.length() != size {
-          raise @git.GitError::PackfileError(
+          raise @bit.GitError::PackfileError(
             "Delta size mismatch: expected=\{size}, got=\{delta.length()}",
           )
         }
         match by_offset.get(base_offset) {
           Some(base) => {
             let content = apply_delta(base.data, delta)
-            let obj = @git.PackObject::new(base.obj_type, content)
+            let obj = @bit.PackObject::new(base.obj_type, content)
             by_offset[obj_offset] = obj
             insert_pack_object_by_id(by_id, obj)
             emit(obj)
@@ -679,17 +679,17 @@ fn parse_packfile_stream_internal(
       7 => {
         let (base_id, after_ref) = read_ref_delta_id(data, offset)
         let (delta, after) = @zlib.zlib_decompress_at(data, after_ref) catch {
-          e => raise @git.GitError::PackfileError("Zlib error: \{e}")
+          e => raise @bit.GitError::PackfileError("Zlib error: \{e}")
         }
         if delta.length() != size {
-          raise @git.GitError::PackfileError(
+          raise @bit.GitError::PackfileError(
             "Delta size mismatch: expected=\{size}, got=\{delta.length()}",
           )
         }
         match by_id.get(base_id) {
           Some(base) => {
             let content = apply_delta(base.data, delta)
-            let obj = @git.PackObject::new(base.obj_type, content)
+            let obj = @bit.PackObject::new(base.obj_type, content)
             by_offset[obj_offset] = obj
             insert_pack_object_by_id(by_id, obj)
             emit(obj)
@@ -704,7 +704,7 @@ fn parse_packfile_stream_internal(
         offset = after
       }
       _ =>
-        raise @git.GitError::PackfileError(
+        raise @bit.GitError::PackfileError(
           "Unknown packfile object type: \{type_id}",
         )
     }
@@ -719,7 +719,7 @@ fn parse_packfile_stream_internal(
           match by_offset.get(base_offset) {
             Some(base) => {
               let content = apply_delta(base.data, p.delta)
-              let obj = @git.PackObject::new(base.obj_type, content)
+              let obj = @bit.PackObject::new(base.obj_type, content)
               by_offset[p.offset] = obj
               insert_pack_object_by_id(by_id, obj)
               emit(obj)
@@ -731,7 +731,7 @@ fn parse_packfile_stream_internal(
           match by_id.get(base_id) {
             Some(base) => {
               let content = apply_delta(base.data, p.delta)
-              let obj = @git.PackObject::new(base.obj_type, content)
+              let obj = @bit.PackObject::new(base.obj_type, content)
               by_offset[p.offset] = obj
               insert_pack_object_by_id(by_id, obj)
               emit(obj)
@@ -747,16 +747,16 @@ fn parse_packfile_stream_internal(
     pending_list = next_pending
   }
   if pending_list.length() > 0 {
-    raise @git.GitError::PackfileError("Unresolved delta objects")
+    raise @bit.GitError::PackfileError("Unresolved delta objects")
   }
   let trailer_offset = data.length() - 20
   if offset != trailer_offset {
-    raise @git.GitError::PackfileError("Packfile length mismatch")
+    raise @bit.GitError::PackfileError("Packfile length mismatch")
   }
-  let computed = @git.sha1_prefix(data, trailer_offset)
+  let computed = @bit.sha1_prefix(data, trailer_offset)
   let trailer = read_trailer_id(data, trailer_offset)
   if computed != trailer {
-    raise @git.GitError::HashMismatch(computed.to_hex(), trailer.to_hex())
+    raise @bit.GitError::HashMismatch(computed.to_hex(), trailer.to_hex())
   }
 }
 
@@ -765,9 +765,9 @@ fn parse_packfile_stream_internal(
 pub fn decode_type_and_size_at(
   data : Bytes,
   start : Int,
-) -> (Int, Int, Int) raise @git.GitError {
+) -> (Int, Int, Int) raise @bit.GitError {
   if start < 0 || start >= data.length() {
-    raise @git.GitError::PackfileError("Unexpected end of packfile header")
+    raise @bit.GitError::PackfileError("Unexpected end of packfile header")
   }
   let first = data[start].to_int()
   let mut size = first & 0x0f
@@ -777,7 +777,7 @@ pub fn decode_type_and_size_at(
   let mut has_more = (first & 0x80) != 0
   while has_more {
     if offset >= data.length() {
-      raise @git.GitError::PackfileError("Unexpected end of packfile size")
+      raise @bit.GitError::PackfileError("Unexpected end of packfile size")
     }
     let b = data[offset].to_int()
     offset += 1
@@ -792,14 +792,14 @@ pub fn decode_type_and_size_at(
 /// Convert packfile type id to ObjectType.
 pub fn packfile_type_to_object_type(
   type_id : Int,
-) -> @git.ObjectType raise @git.GitError {
+) -> @bit.ObjectType raise @bit.GitError {
   match type_id {
-    1 => @git.ObjectType::Commit
-    2 => @git.ObjectType::Tree
-    3 => @git.ObjectType::Blob
-    4 => @git.ObjectType::Tag
+    1 => @bit.ObjectType::Commit
+    2 => @bit.ObjectType::Tree
+    3 => @bit.ObjectType::Blob
+    4 => @bit.ObjectType::Tag
     _ =>
-      raise @git.GitError::PackfileError(
+      raise @bit.GitError::PackfileError(
         "Unknown packfile object type: \{type_id}",
       )
   }
@@ -809,9 +809,9 @@ pub fn packfile_type_to_object_type(
 pub fn read_ofs_delta_offset(
   data : Bytes,
   start : Int,
-) -> (Int, Int) raise @git.GitError {
+) -> (Int, Int) raise @bit.GitError {
   if start >= data.length() {
-    raise @git.GitError::PackfileError("Unexpected end of packfile delta")
+    raise @bit.GitError::PackfileError("Unexpected end of packfile delta")
   }
   let mut offset = start
   let mut c = data[offset].to_int()
@@ -819,7 +819,7 @@ pub fn read_ofs_delta_offset(
   let mut val = c & 0x7f
   while (c & 0x80) != 0 {
     if offset >= data.length() {
-      raise @git.GitError::PackfileError("Unexpected end of packfile delta")
+      raise @bit.GitError::PackfileError("Unexpected end of packfile delta")
     }
     c = data[offset].to_int()
     offset += 1
@@ -833,25 +833,25 @@ pub fn read_ofs_delta_offset(
 pub fn read_ref_delta_id(
   data : Bytes,
   start : Int,
-) -> (String, Int) raise @git.GitError {
+) -> (String, Int) raise @bit.GitError {
   if start + 20 > data.length() {
-    raise @git.GitError::PackfileError("Unexpected end of packfile delta")
+    raise @bit.GitError::PackfileError("Unexpected end of packfile delta")
   }
   let bytes : FixedArray[Byte] = FixedArray::make(20, b'\x00')
   for i in 0..<20 {
     bytes[i] = data[start + i]
   }
-  let id = @git.ObjectId::new(bytes)
+  let id = @bit.ObjectId::new(bytes)
   (id.to_hex(), start + 20)
 }
 
 ///|
-pub fn apply_delta(base : Bytes, delta : Bytes) -> Bytes raise @git.GitError {
+pub fn apply_delta(base : Bytes, delta : Bytes) -> Bytes raise @bit.GitError {
   let mut offset = 0
   let (base_size, off1) = read_delta_size(delta, offset)
   offset = off1
   if base_size != base.length() {
-    raise @git.GitError::PackfileError("Delta base size mismatch")
+    raise @bit.GitError::PackfileError("Delta base size mismatch")
   }
   let (result_size, off2) = read_delta_size(delta, offset)
   offset = off2
@@ -894,7 +894,7 @@ pub fn apply_delta(base : Bytes, delta : Bytes) -> Bytes raise @git.GitError {
         cp_size = 0x10000
       }
       if cp_off < 0 || cp_off + cp_size > base.length() {
-        raise @git.GitError::PackfileError("Delta copy out of range")
+        raise @bit.GitError::PackfileError("Delta copy out of range")
       }
       for i in 0..<cp_size {
         out.push(base[cp_off + i])
@@ -902,10 +902,10 @@ pub fn apply_delta(base : Bytes, delta : Bytes) -> Bytes raise @git.GitError {
     } else {
       let literal_len = opcode & 0x7f
       if literal_len == 0 {
-        raise @git.GitError::PackfileError("Invalid delta opcode")
+        raise @bit.GitError::PackfileError("Invalid delta opcode")
       }
       if offset + literal_len > delta.length() {
-        raise @git.GitError::PackfileError("Delta literal out of range")
+        raise @bit.GitError::PackfileError("Delta literal out of range")
       }
       for i in 0..<literal_len {
         out.push(delta[offset + i])
@@ -914,19 +914,19 @@ pub fn apply_delta(base : Bytes, delta : Bytes) -> Bytes raise @git.GitError {
     }
   }
   if out.length() != result_size {
-    raise @git.GitError::PackfileError("Delta result size mismatch")
+    raise @bit.GitError::PackfileError("Delta result size mismatch")
   }
   Bytes::from_array(FixedArray::makei(out.length(), i => out[i]))
 }
 
 ///|
-fn read_delta_size(data : Bytes, start : Int) -> (Int, Int) raise @git.GitError {
+fn read_delta_size(data : Bytes, start : Int) -> (Int, Int) raise @bit.GitError {
   let mut offset = start
   let mut size = 0
   let mut shift = 0
   while true {
     if offset >= data.length() {
-      raise @git.GitError::PackfileError("Unexpected end of delta data")
+      raise @bit.GitError::PackfileError("Unexpected end of delta data")
     }
     let b = data[offset].to_int()
     offset += 1
@@ -940,9 +940,9 @@ fn read_delta_size(data : Bytes, start : Int) -> (Int, Int) raise @git.GitError 
 }
 
 ///|
-fn read_u32_be(data : Bytes, start : Int) -> Int raise @git.GitError {
+fn read_u32_be(data : Bytes, start : Int) -> Int raise @bit.GitError {
   if start < 0 || start + 4 > data.length() {
-    raise @git.GitError::PackfileError("Unexpected end of packfile header")
+    raise @bit.GitError::PackfileError("Unexpected end of packfile header")
   }
   (data[start].to_int() << 24) |
   (data[start + 1].to_int() << 16) |
@@ -951,10 +951,10 @@ fn read_u32_be(data : Bytes, start : Int) -> Int raise @git.GitError {
 }
 
 ///|
-fn read_trailer_id(data : Bytes, start : Int) -> @git.ObjectId {
+fn read_trailer_id(data : Bytes, start : Int) -> @bit.ObjectId {
   let bytes : FixedArray[Byte] = FixedArray::make(20, b'\x00')
   for i in 0..<20 {
     bytes[i] = data[start + i]
   }
-  @git.ObjectId::new(bytes)
+  @bit.ObjectId::new(bytes)
 }

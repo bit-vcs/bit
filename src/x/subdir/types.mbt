@@ -11,9 +11,9 @@ pub struct SubdirRepo {
   /// サブディレクトリパス（正規化済み、例: "src/lib"）
   subdir_path : String
   /// 現在のベースコミット
-  current_commit : @git.ObjectId?
+  current_commit : @bit.ObjectId?
   /// サブディレクトリのツリーID
-  subdir_tree : @git.ObjectId?
+  subdir_tree : @bit.ObjectId?
   /// 仮想ファイルシステム（サブディレクトリがルートとして見える）
   bitfs : @fs.Fs
   /// 設定
@@ -24,9 +24,9 @@ pub struct SubdirRepo {
 /// サブディレクトリに影響するコミット情報
 pub struct SubdirCommit {
   /// 元のコミットID
-  id : @git.ObjectId
+  id : @bit.ObjectId
   /// このコミットでのサブディレクトリのツリーID
-  subdir_tree : @git.ObjectId
+  subdir_tree : @bit.ObjectId
   /// コミットメッセージ
   message : String
   /// 作者
@@ -34,7 +34,7 @@ pub struct SubdirCommit {
   /// タイムスタンプ
   timestamp : Int64
   /// サブディレクトリ履歴での前のコミット（サブディレクトリを変更した直前のコミット）
-  prev_commit : @git.ObjectId?
+  prev_commit : @bit.ObjectId?
 }
 
 ///|
@@ -55,9 +55,9 @@ pub fn SubdirConfig::default() -> SubdirConfig {
 ///|
 /// 差分エントリ
 pub enum DiffEntry {
-  Added(String, @git.ObjectId)
-  Modified(String, @git.ObjectId, @git.ObjectId)
-  Deleted(String, @git.ObjectId)
+  Added(String, @bit.ObjectId)
+  Modified(String, @bit.ObjectId, @bit.ObjectId)
+  Deleted(String, @bit.ObjectId)
 }
 
 ///|
@@ -83,8 +83,8 @@ pub fn DiffEntry::to_string(self : DiffEntry) -> String {
 pub suberror SubdirError {
   SubdirNotFound(String)
   InvalidPath(String)
-  CommitNotFound(@git.ObjectId)
-  TreeNotFound(@git.ObjectId)
+  CommitNotFound(@bit.ObjectId)
+  TreeNotFound(@bit.ObjectId)
   IoError(String)
 }
 

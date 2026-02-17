@@ -41,7 +41,7 @@ async fn verify_single_pack(
   }
   let pack_file = base_path + ".pack"
   if not(fs.is_file(pack_file)) {
-    raise @git.GitError::InvalidObject("pack file not found: " + pack_file)
+    raise @bitcore.GitError::InvalidObject("pack file not found: " + pack_file)
   }
   let data = fs.read_file(pack_file)
   // Parse and verify the packfile
@@ -54,22 +54,22 @@ async fn verify_single_pack(
   let mut total_size = 0
   for obj in objects {
     match obj.obj_type {
-      @git.ObjectType::Commit => _commits += 1
-      @git.ObjectType::Tree => _trees += 1
-      @git.ObjectType::Blob => _blobs += 1
-      @git.ObjectType::Tag => _tags += 1
+      @bitcore.ObjectType::Commit => _commits += 1
+      @bitcore.ObjectType::Tree => _trees += 1
+      @bitcore.ObjectType::Blob => _blobs += 1
+      @bitcore.ObjectType::Tag => _tags += 1
     }
     total_size += obj.data.length()
   }
   if verbose && not(stat_only) {
     // Print each object
     for obj in objects {
-      let id = @git.hash_object_content(obj.obj_type, obj.data)
+      let id = @bitcore.hash_object_content(obj.obj_type, obj.data)
       let type_str = match obj.obj_type {
-        @git.ObjectType::Commit => "commit"
-        @git.ObjectType::Tree => "tree"
-        @git.ObjectType::Blob => "blob"
-        @git.ObjectType::Tag => "tag"
+        @bitcore.ObjectType::Commit => "commit"
+        @bitcore.ObjectType::Tree => "tree"
+        @bitcore.ObjectType::Blob => "blob"
+        @bitcore.ObjectType::Tag => "tag"
       }
       print_line("\{id.to_hex()} \{type_str} \{obj.data.length()}")
     }
@@ -92,7 +92,7 @@ fn get_pack_checksum(data : Bytes) -> String {
   }
   let start = data.length() - 20
   let bytes : FixedArray[Byte] = FixedArray::makei(20, i => data[start + i])
-  @git.ObjectId::new(bytes).to_hex()
+  @bitcore.ObjectId::new(bytes).to_hex()
 }
 
 ///|

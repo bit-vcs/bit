@@ -8,12 +8,12 @@ fn is_tree_mode(mode : String) -> Bool {
 ///|
 pub fn Fs::read_file(
   self : Fs,
-  backing_fs : &@git.RepoFileSystem,
+  backing_fs : &@bit.RepoFileSystem,
   path : String,
-) -> Bytes raise @git.GitError {
+) -> Bytes raise @bit.GitError {
   let norm = normalize_path(path)
   if self.working.deleted.contains(norm) {
-    raise @git.GitError::IoError("File not found: \{path}")
+    raise @bit.GitError::IoError("File not found: \{path}")
   }
   if self.working.files.get(norm) is Some(data) {
     return data
@@ -23,15 +23,15 @@ pub fn Fs::read_file(
   }
   let obj_id = self.resolve_path(backing_fs, norm)
   guard obj_id is Some(id) else {
-    raise @git.GitError::IoError("File not found: \{path}")
+    raise @bit.GitError::IoError("File not found: \{path}")
   }
   let db = self.get_db(backing_fs)
   let obj = db.get(backing_fs, id)
   guard obj is Some(o) else {
-    raise @git.GitError::IoError("Blob not found: \{id}")
+    raise @bit.GitError::IoError("Blob not found: \{id}")
   }
-  if o.obj_type != @git.ObjectType::Blob {
-    raise @git.GitError::InvalidObject("Not a file: \{path}")
+  if o.obj_type != @bit.ObjectType::Blob {
+    raise @bit.GitError::InvalidObject("Not a file: \{path}")
   }
   self.cache.set_blob(norm, o.data)
   o.data
@@ -40,9 +40,9 @@ pub fn Fs::read_file(
 ///|
 pub fn Fs::readdir(
   self : Fs,
-  backing_fs : &@git.RepoFileSystem,
+  backing_fs : &@bit.RepoFileSystem,
   path : String,
-) -> Array[String] raise @git.GitError {
+) -> Array[String] raise @bit.GitError {
   let norm = normalize_path(path)
   let entries : Map[String, Bool] = {}
   for item in self.working.files.to_array() {
@@ -100,7 +100,7 @@ pub fn Fs::readdir(
 ///|
 fn Fs::readdir_from_layers(
   self : Fs,
-  backing_fs : &@git.RepoFileSystem,
+  backing_fs : &@bit.RepoFileSystem,
   norm : String,
   entries : Map[String, Bool],
 ) -> Unit {
@@ -114,12 +114,12 @@ fn Fs::readdir_from_layers(
 ///|
 fn Fs::readdir_from_tree(
   self : Fs,
-  backing_fs : &@git.RepoFileSystem,
+  backing_fs : &@bit.RepoFileSystem,
   path : String,
-  tree_id : @git.ObjectId,
+  tree_id : @bit.ObjectId,
   entries : Map[String, Bool],
-) -> Unit raise @git.GitError {
-  if tree_id == @git.ObjectId::zero() {
+) -> Unit raise @bit.GitError {
+  if tree_id == @bit.ObjectId::zero() {
     return
   }
   let tree_entries = self.get_tree_entries(backing_fs, tree_id)
@@ -157,7 +157,7 @@ fn Fs::readdir_from_tree(
 ///|
 pub fn Fs::is_dir(
   self : Fs,
-  backing_fs : &@git.RepoFileSystem,
+  backing_fs : &@bit.RepoFileSystem,
   path : String,
 ) -> Bool {
   let norm = normalize_path(path)
@@ -182,7 +182,7 @@ pub fn Fs::is_dir(
 ///|
 fn Fs::is_dir_in_tree(
   self : Fs,
-  backing_fs : &@git.RepoFileSystem,
+  backing_fs : &@bit.RepoFileSystem,
   path : String,
 ) -> Bool {
   for layer in self.layers {
@@ -196,11 +196,11 @@ fn Fs::is_dir_in_tree(
 ///|
 fn Fs::check_dir_in_tree(
   self : Fs,
-  backing_fs : &@git.RepoFileSystem,
-  tree_id : @git.ObjectId,
+  backing_fs : &@bit.RepoFileSystem,
+  tree_id : @bit.ObjectId,
   path : String,
 ) -> Bool {
-  if tree_id == @git.ObjectId::zero() {
+  if tree_id == @bit.ObjectId::zero() {
     return false
   }
   let parts = split_path(path)
@@ -235,7 +235,7 @@ fn Fs::check_dir_in_tree(
 ///|
 pub fn Fs::is_file(
   self : Fs,
-  backing_fs : &@git.RepoFileSystem,
+  backing_fs : &@bit.RepoFileSystem,
   path : String,
 ) -> Bool {
   let norm = normalize_path(path)
@@ -252,7 +252,7 @@ pub fn Fs::is_file(
 /// Check if file exists in base tree (ignoring working layer)
 pub fn Fs::exists_in_base(
   self : Fs,
-  backing_fs : &@git.RepoFileSystem,
+  backing_fs : &@bit.RepoFileSystem,
   path : String,
 ) -> Bool {
   let norm = normalize_path(path)
@@ -268,9 +268,9 @@ pub fn Fs::exists_in_base(
 ///|
 fn Fs::resolve_path(
   self : Fs,
-  backing_fs : &@git.RepoFileSystem,
+  backing_fs : &@bit.RepoFileSystem,
   path : String,
-) -> @git.ObjectId? {
+) -> @bit.ObjectId? {
   if self.cache.get_path(path) is Some(cached) {
     return cached
   }
@@ -288,11 +288,11 @@ fn Fs::resolve_path(
 ///|
 fn Fs::find_in_tree(
   self : Fs,
-  backing_fs : &@git.RepoFileSystem,
-  tree_id : @git.ObjectId,
+  backing_fs : &@bit.RepoFileSystem,
+  tree_id : @bit.ObjectId,
   path : String,
-) -> @git.ObjectId? {
-  if tree_id == @git.ObjectId::zero() {
+) -> @bit.ObjectId? {
+  if tree_id == @bit.ObjectId::zero() {
     return None
   }
   let parts = split_path(path)
@@ -352,21 +352,21 @@ fn Fs::find_in_tree(
 ///|
 fn Fs::get_tree_entries(
   self : Fs,
-  backing_fs : &@git.RepoFileSystem,
-  tree_id : @git.ObjectId,
-) -> Array[@git.TreeEntry] raise @git.GitError {
+  backing_fs : &@bit.RepoFileSystem,
+  tree_id : @bit.ObjectId,
+) -> Array[@bit.TreeEntry] raise @bit.GitError {
   if self.cache.get_tree(tree_id) is Some(entries) {
     return entries
   }
   let db = self.get_db(backing_fs)
   let obj = db.get(backing_fs, tree_id)
   guard obj is Some(o) else {
-    raise @git.GitError::InvalidObject("Tree not found: \{tree_id}")
+    raise @bit.GitError::InvalidObject("Tree not found: \{tree_id}")
   }
-  if o.obj_type != @git.ObjectType::Tree {
-    raise @git.GitError::InvalidObject("Not a tree: \{tree_id}")
+  if o.obj_type != @bit.ObjectType::Tree {
+    raise @bit.GitError::InvalidObject("Not a tree: \{tree_id}")
   }
-  let entries = @git.parse_tree(o.data)
+  let entries = @bit.parse_tree(o.data)
   self.cache.set_tree(tree_id, entries)
   entries
 }
@@ -380,14 +380,14 @@ fn Fs::get_tree_entries(
 /// This is the primary method for partial clone repositories.
 pub async fn Fs::read_file_async(
   self : Fs,
-  read_fs : &@git.RepoFileSystem,
-  write_fs : &@git.FileSystem,
+  read_fs : &@bit.RepoFileSystem,
+  write_fs : &@bit.FileSystem,
   path : String,
-) -> Bytes raise @git.GitError {
+) -> Bytes raise @bit.GitError {
   let norm = normalize_path(path)
   // Check working layer first
   if self.working.deleted.contains(norm) {
-    raise @git.GitError::IoError("File not found: \{path}")
+    raise @bit.GitError::IoError("File not found: \{path}")
   }
   if self.working.files.get(norm) is Some(data) {
     return data
@@ -399,15 +399,15 @@ pub async fn Fs::read_file_async(
   // Resolve path to object ID
   let obj_id = self.resolve_path(read_fs, norm)
   guard obj_id is Some(id) else {
-    raise @git.GitError::IoError("File not found: \{path}")
+    raise @bit.GitError::IoError("File not found: \{path}")
   }
   // Try to get object, using promisor if available
   let obj = self.get_object_async(read_fs, write_fs, id)
   guard obj is Some(o) else {
-    raise @git.GitError::IoError("Blob not found: \{id}")
+    raise @bit.GitError::IoError("Blob not found: \{id}")
   }
-  if o.obj_type != @git.ObjectType::Blob {
-    raise @git.GitError::InvalidObject("Not a file: \{path}")
+  if o.obj_type != @bit.ObjectType::Blob {
+    raise @bit.GitError::InvalidObject("Not a file: \{path}")
   }
   self.cache.set_blob(norm, o.data)
   o.data
@@ -417,10 +417,10 @@ pub async fn Fs::read_file_async(
 /// Get an object, fetching from promisor remote if not available locally (async).
 async fn Fs::get_object_async(
   self : Fs,
-  read_fs : &@git.RepoFileSystem,
-  write_fs : &@git.FileSystem,
-  id : @git.ObjectId,
-) -> @git.PackObject? raise @git.GitError {
+  read_fs : &@bit.RepoFileSystem,
+  write_fs : &@bit.FileSystem,
+  id : @bit.ObjectId,
+) -> @bit.PackObject? raise @bit.GitError {
   // First try local via PromisorDb
   let promisor_db = self.get_promisor_db(read_fs)
   match promisor_db {
@@ -449,17 +449,17 @@ async fn Fs::get_object_async(
 /// Useful for batch fetching before accessing many files.
 pub async fn Fs::prefetch(
   self : Fs,
-  read_fs : &@git.RepoFileSystem,
-  write_fs : &@git.FileSystem,
+  read_fs : &@bit.RepoFileSystem,
+  write_fs : &@bit.FileSystem,
   paths : Array[String],
-) -> Int raise @git.GitError {
+) -> Int raise @bit.GitError {
   let promisor_db = self.get_promisor_db(read_fs)
   guard promisor_db is Some(pdb) else { return 0 }
   if not(pdb.has_promisor()) {
     return 0
   }
   // Collect object IDs that need fetching
-  let ids : Array[@git.ObjectId] = []
+  let ids : Array[@bit.ObjectId] = []
   for path in paths {
     let norm = normalize_path(path)
     // Skip working layer files
@@ -494,9 +494,9 @@ pub async fn Fs::prefetch(
 /// Check if a file requires fetching from remote
 pub fn Fs::needs_fetch(
   self : Fs,
-  read_fs : &@git.RepoFileSystem,
+  read_fs : &@bit.RepoFileSystem,
   path : String,
-) -> Bool raise @git.GitError {
+) -> Bool raise @bit.GitError {
   let norm = normalize_path(path)
   // Check working layer
   if self.working.files.contains(norm) || self.working.deleted.contains(norm) {
@@ -594,10 +594,10 @@ fn glob_match_impl(pattern : String, pi : Int, path : String, si : Int) -> Bool 
 /// Example patterns: "*.rs", "src/**/*.mbt", "README.*"
 pub async fn Fs::prefetch_glob(
   self : Fs,
-  read_fs : &@git.RepoFileSystem,
-  write_fs : &@git.FileSystem,
+  read_fs : &@bit.RepoFileSystem,
+  write_fs : &@bit.FileSystem,
   pattern : String,
-) -> Int raise @git.GitError {
+) -> Int raise @bit.GitError {
   // Collect all files matching the pattern
   let matching : Array[String] = []
   self.collect_matching_files(read_fs, "", pattern, matching)
@@ -612,11 +612,11 @@ pub async fn Fs::prefetch_glob(
 /// Recursively collect files matching a glob pattern
 fn Fs::collect_matching_files(
   self : Fs,
-  read_fs : &@git.RepoFileSystem,
+  read_fs : &@bit.RepoFileSystem,
   dir : String,
   pattern : String,
   result : Array[String],
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let entries = self.readdir(read_fs, dir)
   for entry in entries {
     let full_path = if dir == "" { entry } else { dir + "/" + entry }
@@ -636,9 +636,9 @@ fn Fs::collect_matching_files(
 /// Useful for progressive preloading.
 pub fn Fs::collect_files_bfs(
   self : Fs,
-  read_fs : &@git.RepoFileSystem,
+  read_fs : &@bit.RepoFileSystem,
   limit : Int,
-) -> Array[String] raise @git.GitError {
+) -> Array[String] raise @bit.GitError {
   let result : Array[String] = []
   let queue : Array[String] = [""]
   let mut head = 0
@@ -667,10 +667,10 @@ pub fn Fs::collect_files_bfs(
 /// Prioritizes shallow files (root level first, then subdirs).
 pub async fn Fs::prefetch_bfs(
   self : Fs,
-  read_fs : &@git.RepoFileSystem,
-  write_fs : &@git.FileSystem,
+  read_fs : &@bit.RepoFileSystem,
+  write_fs : &@bit.FileSystem,
   limit : Int,
-) -> Int raise @git.GitError {
+) -> Int raise @bit.GitError {
   let files = self.collect_files_bfs(read_fs, limit)
   self.prefetch(read_fs, write_fs, files)
 }
@@ -680,9 +680,9 @@ pub async fn Fs::prefetch_bfs(
 /// Useful for showing progress or prioritizing fetches.
 pub fn Fs::get_pending_fetches(
   self : Fs,
-  read_fs : &@git.RepoFileSystem,
+  read_fs : &@bit.RepoFileSystem,
   limit : Int,
-) -> Array[String] raise @git.GitError {
+) -> Array[String] raise @bit.GitError {
   let files = self.collect_files_bfs(read_fs, limit)
   let pending : Array[String] = []
   for file in files {

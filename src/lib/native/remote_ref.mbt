@@ -1,6 +1,6 @@
 ///|
-fn parse_object_id_hex(text : String) -> @git.ObjectId? {
-  let parsed : Result[@git.ObjectId, Error] = try? @git.ObjectId::from_hex(text)
+fn parse_object_id_hex(text : String) -> @bit.ObjectId? {
+  let parsed : Result[@bit.ObjectId, Error] = try? @bit.ObjectId::from_hex(text)
   match parsed {
     Ok(id) => Some(id)
     Err(_) => None
@@ -43,16 +43,16 @@ fn lower_hex_string(s : String) -> String {
 pub async fn resolve_remote_ref_id(
   remote_url : String,
   ref_spec : String,
-) -> (@git.ObjectId, String?)? raise @git.GitError {
+) -> (@bit.ObjectId, String?)? raise @bit.GitError {
   if parse_object_id_hex(ref_spec) is Some(id) {
     return Some((id, None))
   }
-  let (refs, _caps, _version, symrefs) = @gitionative.discover_upload_refs_http(
+  let (refs, _caps, _version, symrefs) = @bitnative.discover_upload_refs_http(
     remote_url, true,
   )
   if is_hex_string(ref_spec) && ref_spec.length() >= 4 {
     let needle = lower_hex_string(ref_spec)
-    let matches : Array[@git.ObjectId] = []
+    let matches : Array[@bit.ObjectId] = []
     for item in refs {
       let (id, _name) = item
       if id.to_hex().has_prefix(needle) {
@@ -63,7 +63,7 @@ pub async fn resolve_remote_ref_id(
       return Some((matches[0], None))
     }
     if matches.length() > 1 {
-      raise @git.GitError::InvalidObject("short hash is ambiguous: " + ref_spec)
+      raise @bit.GitError::InvalidObject("short hash is ambiguous: " + ref_spec)
     }
   }
   if ref_spec == "HEAD" {

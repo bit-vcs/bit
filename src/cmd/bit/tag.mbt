@@ -2,7 +2,7 @@
 async fn handle_tag(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let fs = OsFs::new()
-  let rfs : &@git.RepoFileSystem = fs
+  let rfs : &@bitcore.RepoFileSystem = fs
   let git_dir = resolve_git_dir(rfs, root)
   let mut list_mode = true
   let mut delete_mode = false
@@ -67,16 +67,16 @@ async fn handle_tag(args : Array[String]) -> Unit raise Error {
   }
   if delete_mode {
     guard delete_tags.length() > 0 else {
-      raise @git.GitError::InvalidObject("tag name required for delete")
+      raise @bitcore.GitError::InvalidObject("tag name required for delete")
     }
     for name in delete_tags {
-      @gitlib.delete_tag(fs, git_dir, name)
+      @bitlib.delete_tag(fs, git_dir, name)
       print_line("Deleted tag '\{name}'")
     }
     return ()
   }
   if list_mode {
-    let tags = @gitlib.list_tags(fs, git_dir)
+    let tags = @bitlib.list_tags(fs, git_dir)
     tags.sort()
     for tag in tags {
       print_line(tag)
@@ -84,17 +84,17 @@ async fn handle_tag(args : Array[String]) -> Unit raise Error {
     return ()
   }
   guard tag_name is Some(name) else {
-    raise @git.GitError::InvalidObject("tag name required")
+    raise @bitcore.GitError::InvalidObject("tag name required")
   }
   // Resolve target (default to HEAD)
   let target_ref = target.unwrap_or("HEAD")
-  let commit_id = @gitrepo.rev_parse(fs, git_dir, target_ref)
+  let commit_id = @bitrepo.rev_parse(fs, git_dir, target_ref)
   guard commit_id is Some(id) else {
-    raise @git.GitError::InvalidObject("unknown revision: \{target_ref}")
+    raise @bitcore.GitError::InvalidObject("unknown revision: \{target_ref}")
   }
   if force {
-    if @gitlib.resolve_ref(fs, git_dir, "refs/tags/" + name) is Some(_) {
-      @gitlib.delete_tag(fs, git_dir, name)
+    if @bitlib.resolve_ref(fs, git_dir, "refs/tags/" + name) is Some(_) {
+      @bitlib.delete_tag(fs, git_dir, name)
     }
   }
   if annotated {
@@ -102,7 +102,7 @@ async fn handle_tag(args : Array[String]) -> Unit raise Error {
     let author = get_author_string()
     let timestamp = get_commit_timestamp()
     let timezone = get_commit_timezone()
-    @gitlib.create_annotated_tag(
+    @bitlib.create_annotated_tag(
       fs,
       fs,
       git_dir,
@@ -114,7 +114,7 @@ async fn handle_tag(args : Array[String]) -> Unit raise Error {
       timezone~,
     )
   } else {
-    @gitlib.create_lightweight_tag(fs, git_dir, name, id)
+    @bitlib.create_lightweight_tag(fs, git_dir, name, id)
   }
 }
 

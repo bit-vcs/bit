@@ -47,7 +47,7 @@ async fn handle_fsck(args : Array[String]) -> Unit raise Error {
     print_line("Checking connectivity...")
   }
   // Use show_ref to get all refs
-  let refs = @gitrepo.show_ref(fs, git_dir)
+  let refs = @bitrepo.show_ref(fs, git_dir)
   if verbose {
     print_line("Found \{refs.length()} refs")
   }

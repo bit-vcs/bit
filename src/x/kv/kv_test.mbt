@@ -2,8 +2,8 @@
 // Test adapter: WorkingTree wrapping @fs.Fs
 priv struct TestWorkingTree {
   fs : @fs.Fs
-  backing_fs : &@git.RepoFileSystem
-  write_fs : &@git.FileSystem
+  backing_fs : &@bit.RepoFileSystem
+  write_fs : &@bit.FileSystem
 }
 
 ///|
@@ -76,16 +76,16 @@ impl @lib.WorkingTree for TestWorkingTree with checkout(self, commit_id) {
 ///|
 // Test adapter: ObjectStore that reloads ObjectDb each time
 priv struct TestObjectStore {
-  backing_fs : &@git.RepoFileSystem
-  write_fs : &@git.FileSystem
+  backing_fs : &@bit.RepoFileSystem
+  write_fs : &@bit.FileSystem
   git_dir : String
 }
 
 ///|
 // Test adapter: ObjectStore with filesystem-backed get() call counter
 priv struct CountingTestObjectStore {
-  backing_fs : &@git.RepoFileSystem
-  write_fs : &@git.FileSystem
+  backing_fs : &@bit.RepoFileSystem
+  write_fs : &@bit.FileSystem
   git_dir : String
   counter_path : String
 }
@@ -145,19 +145,19 @@ impl @lib.ObjectStore for CountingTestObjectStore with has(self, id) {
 fn make_test_kv(
   node_id : String,
   git_dir : String,
-) -> (Kv, @git.TestFs) raise @git.GitError {
-  let fs = @git.TestFs::new()
+) -> (Kv, @bit.TestFs) raise @bit.GitError {
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo")
   let bitfs = @fs.Fs::empty(git_dir)
   let tree : TestWorkingTree = { fs: bitfs, backing_fs: fs, write_fs: fs }
   let store : TestObjectStore = { backing_fs: fs, write_fs: fs, git_dir }
-  let kv = Kv::new(NodeId::new(node_id), tree, store, @git.ObjectId::zero())
+  let kv = Kv::new(NodeId::new(node_id), tree, store, @bit.ObjectId::zero())
   (kv, fs)
 }
 
 ///|
 fn make_test_kv_simple(node_id : String) -> Kv {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   let bitfs = @fs.Fs::empty("/repo/.git")
   let tree : TestWorkingTree = { fs: bitfs, backing_fs: fs, write_fs: fs }
   let store : TestObjectStore = {
@@ -165,15 +165,15 @@ fn make_test_kv_simple(node_id : String) -> Kv {
     write_fs: fs,
     git_dir: "/repo/.git",
   }
-  Kv::new(NodeId::new(node_id), tree, store, @git.ObjectId::zero())
+  Kv::new(NodeId::new(node_id), tree, store, @bit.ObjectId::zero())
 }
 
 ///|
 fn make_counting_test_kv(
   node_id : String,
   git_dir : String,
-) -> (Kv, @git.TestFs, String) raise @git.GitError {
-  let fs = @git.TestFs::new()
+) -> (Kv, @bit.TestFs, String) raise @bit.GitError {
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo")
   let bitfs = @fs.Fs::empty(git_dir)
   let tree : TestWorkingTree = { fs: bitfs, backing_fs: fs, write_fs: fs }
@@ -184,18 +184,18 @@ fn make_counting_test_kv(
     git_dir,
     counter_path,
   }
-  let kv = Kv::new(NodeId::new(node_id), tree, store, @git.ObjectId::zero())
+  let kv = Kv::new(NodeId::new(node_id), tree, store, @bit.ObjectId::zero())
   (kv, fs, counter_path)
 }
 
 ///|
-fn read_counter(fs : @git.TestFs, counter_path : String) -> Int {
+fn read_counter(fs : @bit.TestFs, counter_path : String) -> Int {
   let bytes = fs.read_file(counter_path) catch { _ => b"" }
   bytes.length()
 }
 
 ///|
-fn reset_counter(fs : @git.TestFs, counter_path : String) -> Unit {
+fn reset_counter(fs : @bit.TestFs, counter_path : String) -> Unit {
   fs.write_file(counter_path, b"")
 }
 
@@ -283,7 +283,7 @@ test "Kv: gossip state" {
   let db = make_test_kv_simple("node1")
   let state = db.get_gossip_state(1000L)
   assert_eq(state.node_id.id, "node1")
-  assert_eq(state.head, @git.ObjectId::zero())
+  assert_eq(state.head, @bit.ObjectId::zero())
   assert_eq(state.timestamp, 1000L)
 }
 
@@ -294,13 +294,13 @@ test "Kv: peer management" {
   let peer1 : PeerInfo = {
     node_id: NodeId::new("peer1"),
     last_seen: 1000L,
-    head: @git.ObjectId::zero(),
+    head: @bit.ObjectId::zero(),
     endpoint: "wss://peer1.example.com",
   }
   let peer2 : PeerInfo = {
     node_id: NodeId::new("peer2"),
     last_seen: 2000L,
-    head: @git.ObjectId::zero(),
+    head: @bit.ObjectId::zero(),
     endpoint: "wss://peer2.example.com",
   }
   db.add_peer(peer1)
@@ -322,7 +322,7 @@ test "Kv: select gossip peers" {
     let peer : PeerInfo = {
       node_id: NodeId::new("peer" + i.to_string()),
       last_seen: i.to_int64() * 1000L,
-      head: @git.ObjectId::zero(),
+      head: @bit.ObjectId::zero(),
       endpoint: "wss://peer" + i.to_string() + ".example.com",
     }
     db.add_peer(peer)
@@ -364,7 +364,7 @@ test "Kv: sync cursor roundtrip" {
   let peer : PeerInfo = {
     node_id: NodeId::new("peer1"),
     last_seen: 1000L,
-    head: @git.ObjectId::zero(),
+    head: @bit.ObjectId::zero(),
     endpoint: "wss://peer1.example.com",
   }
   db.add_peer(peer)
@@ -379,13 +379,13 @@ test "Kv: failed peer is throttled until retry window" {
   let peer1 : PeerInfo = {
     node_id: NodeId::new("peer1"),
     last_seen: 1000L,
-    head: @git.ObjectId::zero(),
+    head: @bit.ObjectId::zero(),
     endpoint: "wss://peer1.example.com",
   }
   let peer2 : PeerInfo = {
     node_id: NodeId::new("peer2"),
     last_seen: 1000L,
-    head: @git.ObjectId::zero(),
+    head: @bit.ObjectId::zero(),
     endpoint: "wss://peer2.example.com",
   }
   db.add_peer(peer1)
@@ -403,7 +403,7 @@ test "Kv: sync_round success increments peer cursor" {
   let peer : PeerInfo = {
     node_id: NodeId::new("peer1"),
     last_seen: 1000L,
-    head: @git.ObjectId::zero(),
+    head: @bit.ObjectId::zero(),
     endpoint: "wss://peer1.example.com",
   }
   db.add_peer(peer)
@@ -428,7 +428,7 @@ test "Kv: sync_round success increments peer cursor" {
 ///|
 test "Kv: sync_round processes response and follow-up message" {
   let db = make_test_kv_simple("node1")
-  let remote_head = @git.ObjectId::from_hex(
+  let remote_head = @bit.ObjectId::from_hex(
     "1111111111111111111111111111111111111111",
   ) catch {
     _ => fail("invalid remote head")
@@ -468,7 +468,7 @@ test "Kv: sync_round failure applies retry backoff" {
   let peer : PeerInfo = {
     node_id: NodeId::new("peer1"),
     last_seen: 1000L,
-    head: @git.ObjectId::zero(),
+    head: @bit.ObjectId::zero(),
     endpoint: "wss://peer1.example.com",
   }
   db.add_peer(peer)
@@ -494,7 +494,7 @@ test "Kv: commit and rollback" {
   // Commit
   let commit_id = db.commit("Initial commit", 1000L)
   assert_false(db.is_dirty())
-  assert_true(commit_id != @git.ObjectId::zero())
+  assert_true(commit_id != @bit.ObjectId::zero())
   // Make more changes
   db.set("key3", b"value3")
   assert_true(db.is_dirty())

@@ -4,11 +4,11 @@
 /// Create Fs from a commit.
 /// Uses config.lazy_load to determine loading strategy (default: lazy).
 pub fn Fs::from_commit(
-  backing_fs : &@git.RepoFileSystem,
+  backing_fs : &@bit.RepoFileSystem,
   git_dir : String,
-  commit_id : @git.ObjectId,
+  commit_id : @bit.ObjectId,
   config? : FsConfig = FsConfig::default(),
-) -> Fs raise @git.GitError {
+) -> Fs raise @bit.GitError {
   let db = if config.lazy_load {
     @lib.ObjectDb::load_lazy(backing_fs, git_dir)
   } else {
@@ -16,12 +16,12 @@ pub fn Fs::from_commit(
   }
   let obj = db.get(backing_fs, commit_id)
   guard obj is Some(commit_obj) else {
-    raise @git.GitError::InvalidObject("Commit not found: \{commit_id}")
+    raise @bit.GitError::InvalidObject("Commit not found: \{commit_id}")
   }
-  if commit_obj.obj_type != @git.ObjectType::Commit {
-    raise @git.GitError::InvalidObject("Object is not a commit")
+  if commit_obj.obj_type != @bit.ObjectType::Commit {
+    raise @bit.GitError::InvalidObject("Object is not a commit")
   }
-  let info = @git.parse_commit(commit_obj.data)
+  let info = @bit.parse_commit(commit_obj.data)
   {
     git_dir,
     base_tree: info.tree,
@@ -41,7 +41,7 @@ pub fn Fs::from_commit(
 /// Uses config.lazy_load to determine loading strategy (default: lazy).
 pub fn Fs::from_tree(
   git_dir : String,
-  tree_id : @git.ObjectId,
+  tree_id : @bit.ObjectId,
   config? : FsConfig = FsConfig::default(),
 ) -> Fs {
   {
@@ -62,16 +62,16 @@ pub fn Fs::from_tree(
 /// Create Fs from a branch name.
 /// Uses config.lazy_load to determine loading strategy (default: lazy).
 pub fn Fs::from_branch(
-  backing_fs : &@git.RepoFileSystem,
+  backing_fs : &@bit.RepoFileSystem,
   git_dir : String,
   branch : String,
   config? : FsConfig = FsConfig::default(),
-) -> Fs raise @git.GitError {
+) -> Fs raise @bit.GitError {
   let commit_id = @lib.resolve_ref(backing_fs, git_dir, "refs/heads/" + branch)
   match commit_id {
     Some(id) => Fs::from_commit(backing_fs, git_dir, id, config~)
     None =>
-      raise @git.GitError::InvalidObject(
+      raise @bit.GitError::InvalidObject(
         "Branch not found: refs/heads/" + branch,
       )
   }
@@ -86,7 +86,7 @@ pub fn Fs::empty(
 ) -> Fs {
   {
     git_dir,
-    base_tree: @git.ObjectId::zero(),
+    base_tree: @bit.ObjectId::zero(),
     base_commit: None,
     working: WorkingLayer::new(),
     layers: [],
@@ -103,8 +103,8 @@ pub fn Fs::empty(
 /// Respects lazy_mode: uses lazy loading when true, eager loading when false.
 pub fn Fs::get_db(
   self : Fs,
-  backing_fs : &@git.RepoFileSystem,
-) -> @lib.ObjectDb raise @git.GitError {
+  backing_fs : &@bit.RepoFileSystem,
+) -> @lib.ObjectDb raise @bit.GitError {
   match self.cached_db {
     Some(db) => db
     None => {
@@ -124,8 +124,8 @@ pub fn Fs::get_db(
 /// Returns None if promisor support is disabled in config.
 pub fn Fs::get_promisor_db(
   self : Fs,
-  backing_fs : &@git.RepoFileSystem,
-) -> @lib.PromisorDb? raise @git.GitError {
+  backing_fs : &@bit.RepoFileSystem,
+) -> @lib.PromisorDb? raise @bit.GitError {
   if not(self.config.enable_promisor) {
     return None
   }
@@ -146,7 +146,7 @@ pub fn Fs::get_promisor_db(
 
 ///|
 /// Check if this Fs is backed by a partial clone with promisor remote
-pub fn Fs::has_promisor(self : Fs, backing_fs : &@git.RepoFileSystem) -> Bool {
+pub fn Fs::has_promisor(self : Fs, backing_fs : &@bit.RepoFileSystem) -> Bool {
   if not(self.config.enable_promisor) {
     return false
   }
@@ -157,7 +157,7 @@ pub fn Fs::has_promisor(self : Fs, backing_fs : &@git.RepoFileSystem) -> Bool {
 /// Get the promisor remote URL if available
 pub fn Fs::get_promisor_remote(
   self : Fs,
-  backing_fs : &@git.RepoFileSystem,
+  backing_fs : &@bit.RepoFileSystem,
 ) -> String? {
   if not(self.config.enable_promisor) {
     return None
@@ -176,12 +176,12 @@ pub fn Fs::git_dir(self : Fs) -> String {
 }
 
 ///|
-pub fn Fs::base_tree(self : Fs) -> @git.ObjectId {
+pub fn Fs::base_tree(self : Fs) -> @bit.ObjectId {
   self.base_tree
 }
 
 ///|
-pub fn Fs::base_commit(self : Fs) -> @git.ObjectId? {
+pub fn Fs::base_commit(self : Fs) -> @bit.ObjectId? {
   self.base_commit
 }
 

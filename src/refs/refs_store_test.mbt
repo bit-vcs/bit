@@ -1,10 +1,10 @@
 ///|
 test "refs/store: list refs merges loose and packed" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   fs.mkdir_p("/repo/.git/refs/heads")
-  let id = @git.hash_blob(@utf8.encode("hello"))
+  let id = @bit.hash_blob(@utf8.encode("hello"))
   fs.write_string("/repo/.git/refs/heads/main", id.to_hex() + "\n")
-  let id2 = @git.hash_blob(@utf8.encode("world"))
+  let id2 = @bit.hash_blob(@utf8.encode("world"))
   fs.write_string(
     "/repo/.git/packed-refs",
     "# pack-refs with: peeled fully-peeled\n\{id2.to_hex()} refs/tags/v1\n",
@@ -16,7 +16,7 @@ test "refs/store: list refs merges loose and packed" {
 
 ///|
 test "refs/store: remove remote refs drops refs and logs trees" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   fs.mkdir_p("/repo/.git/refs/remotes/origin")
   fs.write_string("/repo/.git/refs/remotes/origin/main", "dummy")
   fs.mkdir_p("/repo/.git/logs/refs/remotes/origin")

@@ -9,7 +9,7 @@ pub(all) enum ProtocolVersion {
 ///|
 pub fn detect_protocol_version(
   data : Bytes,
-) -> ProtocolVersion raise @git.GitError {
+) -> ProtocolVersion raise @bit.GitError {
   let lines = pktline_decode(data)
   for item in lines {
     let (line_bytes, is_flush) = item
@@ -30,7 +30,7 @@ pub fn detect_protocol_version(
 ///|
 pub fn parse_v2_advertised_caps(
   data : Bytes,
-) -> Array[String] raise @git.GitError {
+) -> Array[String] raise @bit.GitError {
   let result : Array[String] = []
   let lines = pktline_decode(data)
   for item in lines {
@@ -50,7 +50,7 @@ pub fn parse_v2_advertised_caps(
 ///|
 pub fn parse_v0_advertised_caps(
   data : Bytes,
-) -> Array[String] raise @git.GitError {
+) -> Array[String] raise @bit.GitError {
   let result : Array[String] = []
   let decoded = pktline_decode(data)
   for item in decoded {
@@ -95,13 +95,13 @@ pub fn build_ls_refs_request(agent : String, prefixes : Array[String]) -> Bytes 
 
 ///|
 pub struct LsRefsResult {
-  refs : Array[(@git.ObjectId, String)]
+  refs : Array[(@bit.ObjectId, String)]
   symrefs : Map[String, String]
 }
 
 ///|
-pub fn parse_ls_refs_response(data : Bytes) -> LsRefsResult raise @git.GitError {
-  let refs : Array[(@git.ObjectId, String)] = []
+pub fn parse_ls_refs_response(data : Bytes) -> LsRefsResult raise @bit.GitError {
+  let refs : Array[(@bit.ObjectId, String)] = []
   let symrefs : Map[String, String] = {}
   let lines = pktline_decode(data)
   for item in lines {
@@ -114,7 +114,7 @@ pub fn parse_ls_refs_response(data : Bytes) -> LsRefsResult raise @git.GitError 
     if parts.length() < 2 {
       continue
     }
-    let id = @git.ObjectId::from_hex(parts[0])
+    let id = @bit.ObjectId::from_hex(parts[0])
     let name = parts[1]
     refs.push((id, name))
     for i in 2..<parts.length() {
@@ -130,10 +130,10 @@ pub fn parse_ls_refs_response(data : Bytes) -> LsRefsResult raise @git.GitError 
 
 ///|
 pub fn select_default_wants(
-  refs : Array[(@git.ObjectId, String)],
+  refs : Array[(@bit.ObjectId, String)],
   symrefs : Map[String, String],
-) -> Array[@git.ObjectId] {
-  let wants : Array[@git.ObjectId] = []
+) -> Array[@bit.ObjectId] {
+  let wants : Array[@bit.ObjectId] = []
   match symrefs.get("HEAD") {
     Some(target) =>
       for item in refs {
@@ -161,9 +161,9 @@ pub fn select_default_wants(
 
 ///|
 pub fn select_default_ref(
-  refs : Array[(@git.ObjectId, String)],
+  refs : Array[(@bit.ObjectId, String)],
   symrefs : Map[String, String],
-) -> (String, @git.ObjectId)? {
+) -> (String, @bit.ObjectId)? {
   match symrefs.get("HEAD") {
     Some(target) =>
       for item in refs {
@@ -220,7 +220,7 @@ pub fn FilterSpec::is_partial(self : FilterSpec) -> Bool {
 /// - filter: partial clone filter specification
 pub fn build_fetch_request_v2(
   agent : String,
-  wants : Array[@git.ObjectId],
+  wants : Array[@bit.ObjectId],
   depth : Int,
   filter? : FilterSpec = FilterSpec::NoFilter,
 ) -> Bytes {
@@ -250,7 +250,7 @@ pub fn build_fetch_request_v2(
 ///|
 pub fn build_fetch_request_v0(
   agent : String,
-  wants : Array[@git.ObjectId],
+  wants : Array[@bit.ObjectId],
   advertised : Array[String],
 ) -> Bytes {
   if wants.length() == 0 {
@@ -270,7 +270,7 @@ pub fn build_fetch_request_v0(
 }
 
 ///|
-pub fn extract_pack_from_v2_response(data : Bytes) -> Bytes raise @git.GitError {
+pub fn extract_pack_from_v2_response(data : Bytes) -> Bytes raise @bit.GitError {
   let lines = pktline_decode(data)
   let mut in_pack = false
   let chunks : Array[Byte] = []
@@ -300,14 +300,14 @@ pub fn extract_pack_from_v2_response(data : Bytes) -> Bytes raise @git.GitError 
       }
     } else if channel == 3 {
       let msg = bytes_to_string_from(line_bytes, 1)
-      raise @git.GitError::ProtocolError("upload-pack error: \{msg}")
+      raise @bit.GitError::ProtocolError("upload-pack error: \{msg}")
     }
   }
   Bytes::from_array(FixedArray::makei(chunks.length(), i => chunks[i]))
 }
 
 ///|
-pub fn extract_pack_from_v0_response(data : Bytes) -> Bytes raise @git.GitError {
+pub fn extract_pack_from_v0_response(data : Bytes) -> Bytes raise @bit.GitError {
   let lines = pktline_decode(data)
   let chunks : Array[Byte] = []
   for item in lines {
@@ -322,7 +322,7 @@ pub fn extract_pack_from_v0_response(data : Bytes) -> Bytes raise @git.GitError 
       }
     } else if channel == 3 {
       let msg = bytes_to_string_from(line_bytes, 1)
-      raise @git.GitError::ProtocolError("upload-pack error: \{msg}")
+      raise @bit.GitError::ProtocolError("upload-pack error: \{msg}")
     }
   }
   Bytes::from_array(FixedArray::makei(chunks.length(), i => chunks[i]))

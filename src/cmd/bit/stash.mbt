@@ -39,7 +39,7 @@ async fn handle_stash(args : Array[String]) -> Unit raise Error {
       }
       let author = get_author_string()
       let timestamp = get_commit_timestamp()
-      let result = @gitlib.stash_push(fs, fs, root, message, author, timestamp)
+      let result = @bitlib.stash_push(fs, fs, root, message, author, timestamp)
       match result {
         Some(id) => {
           let short = String::unsafe_substring(id.to_hex(), start=0, end=7)
@@ -49,7 +49,7 @@ async fn handle_stash(args : Array[String]) -> Unit raise Error {
       }
     }
     "list" => {
-      let entries = @gitlib.stash_list(fs, git_dir)
+      let entries = @bitlib.stash_list(fs, git_dir)
       for i, entry in entries {
         let short = String::unsafe_substring(entry.id.to_hex(), start=0, end=7)
         print_line("stash@{" + i.to_string() + "}: \{entry.message} [\{short}]")
@@ -57,17 +57,17 @@ async fn handle_stash(args : Array[String]) -> Unit raise Error {
     }
     "pop" => {
       let index = parse_stash_index(rest)
-      @gitlib.stash_apply(fs, fs, root, index, true)
+      @bitlib.stash_apply(fs, fs, root, index, true)
       print_line("Dropped stash@{" + index.to_string() + "}")
     }
     "apply" => {
       let index = parse_stash_index(rest)
-      @gitlib.stash_apply(fs, fs, root, index, false)
+      @bitlib.stash_apply(fs, fs, root, index, false)
       print_line("Applied stash@{" + index.to_string() + "}")
     }
     "drop" => {
       let index = parse_stash_index(rest)
-      @gitlib.stash_drop(fs, fs, root, index)
+      @bitlib.stash_drop(fs, fs, root, index)
       print_line("Dropped stash@{" + index.to_string() + "}")
     }
     "clear" => {
@@ -83,7 +83,7 @@ async fn handle_stash(args : Array[String]) -> Unit raise Error {
       print_line("Cleared all stash entries")
     }
     _ =>
-      raise @git.GitError::InvalidObject("Unknown stash subcommand: \{subcmd}")
+      raise @bitcore.GitError::InvalidObject("Unknown stash subcommand: \{subcmd}")
   }
 }
 

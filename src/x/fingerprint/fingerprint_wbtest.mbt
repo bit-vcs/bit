@@ -21,7 +21,7 @@ async fn cleanup_tmp_dir(path : String) -> Unit {
 }
 
 ///|
-async fn git_write_tree_after_add_all(root : String) -> String? {
+async fn bit_write_tree_after_add_all(root : String) -> String? {
   let add_code = @process.run("git", ["add", "-A"], inherit_env=true, cwd=root) catch {
     err => {
       if @async.is_being_cancelled() {
@@ -61,7 +61,7 @@ async fn git_write_tree_after_add_all(root : String) -> String? {
 }
 
 ///|
-async fn git_cached_name_status(root : String) -> String? {
+async fn bit_cached_name_status(root : String) -> String? {
   let (code, out, _) = @process.collect_output(
     "git",
     ["diff", "--cached", "--name-status"],
@@ -90,7 +90,7 @@ async fn git_cached_name_status(root : String) -> String? {
 }
 
 ///|
-async fn git_reset_clean(root : String) -> Bool {
+async fn bit_reset_clean(root : String) -> Bool {
   let reset_code = @process.run(
     "git",
     ["reset", "--hard"],
@@ -125,11 +125,11 @@ async fn git_reset_clean(root : String) -> Bool {
 
 ///|
 async fn assert_git_add_all_equivalent(fs : @osfs.OsFs, root : String) -> Unit {
-  let cached_before = git_cached_name_status(root).unwrap_or("")
+  let cached_before = bit_cached_name_status(root).unwrap_or("")
   let ours = directory_fingerprint(fs, root, FingerprintMode::GitCompat)
-  let cached_after = git_cached_name_status(root).unwrap_or("")
+  let cached_after = bit_cached_name_status(root).unwrap_or("")
   assert_eq(cached_before, cached_after)
-  guard git_write_tree_after_add_all(root) is Some(expected) else {
+  guard bit_write_tree_after_add_all(root) is Some(expected) else {
     assert_eq(1, 0)
     return
   }
@@ -145,7 +145,11 @@ async test "fingerprint: parse mode aliases" {
     Some(FingerprintMode::GitCompat),
   )
   assert_eq(
-    parse_fingerprint_mode("git_compat"),
+    parse_fingerprint_mode("bit_compat"),
+    Some(FingerprintMode::GitCompat),
+  )
+  assert_eq(
+    parse_fingerprint_mode("bit_compat"),
     Some(FingerprintMode::GitCompat),
   )
   assert_eq(parse_fingerprint_mode("unknown"), None)
@@ -209,7 +213,7 @@ async test "fingerprint: git compat mode matches git write-tree for simple files
   fs.write_string(root + "/README.md", "hello\n")
   fs.write_string(root + "/pkg/mod.txt", "mod\n")
   let ours = directory_fingerprint(fs, root, FingerprintMode::GitCompat)
-  guard git_write_tree_after_add_all(root) is Some(expected) else {
+  guard bit_write_tree_after_add_all(root) is Some(expected) else {
     cleanup_tmp_dir(root)
     assert_eq(1, 0)
     return
@@ -319,11 +323,11 @@ async test "fingerprint: git compat matches git add -A write-tree with staged an
   // unstaged delete
   fs.remove_file(root + "/dir/a.txt")
 
-  let before_cached = git_cached_name_status(root).unwrap_or("")
+  let before_cached = bit_cached_name_status(root).unwrap_or("")
   let ours = directory_fingerprint(fs, root, FingerprintMode::GitCompat)
-  let after_cached = git_cached_name_status(root).unwrap_or("")
+  let after_cached = bit_cached_name_status(root).unwrap_or("")
   assert_eq(before_cached, after_cached)
-  guard git_write_tree_after_add_all(root) is Some(expected) else {
+  guard bit_write_tree_after_add_all(root) is Some(expected) else {
     cleanup_tmp_dir(root)
     assert_eq(1, 0)
     return
@@ -456,23 +460,23 @@ async test "fingerprint: git compat add-all matrix matches git write-tree" {
   assert_eq(commit_base, 0)
 
   // case: untracked file
-  assert_true(git_reset_clean(root))
+  assert_true(bit_reset_clean(root))
   fs.write_string(root + "/untracked.txt", "u\n")
   assert_git_add_all_equivalent(fs, root)
 
   // case: untracked nested directory file
-  assert_true(git_reset_clean(root))
+  assert_true(bit_reset_clean(root))
   fs.mkdir_p(root + "/newdir/sub")
   fs.write_string(root + "/newdir/sub/file.txt", "n\n")
   assert_git_add_all_equivalent(fs, root)
 
   // case: tracked unstaged modification
-  assert_true(git_reset_clean(root))
+  assert_true(bit_reset_clean(root))
   fs.write_string(root + "/tracked.txt", "mod\n")
   assert_git_add_all_equivalent(fs, root)
 
   // case: staged + unstaged on same tracked file
-  assert_true(git_reset_clean(root))
+  assert_true(bit_reset_clean(root))
   fs.write_string(root + "/tracked.txt", "stage-1\n")
   ignore(
     @process.run("git", ["add", "tracked.txt"], inherit_env=true, cwd=root),
@@ -488,7 +492,7 @@ async test "fingerprint: git compat add-all matrix matches git write-tree" {
   assert_git_add_all_equivalent(fs, root)
 
   // case: staged rename
-  assert_true(git_reset_clean(root))
+  assert_true(bit_reset_clean(root))
   ignore(
     @process.run(
       "git",
@@ -507,7 +511,7 @@ async test "fingerprint: git compat add-all matrix matches git write-tree" {
   assert_git_add_all_equivalent(fs, root)
 
   // case: staged delete + untracked file
-  assert_true(git_reset_clean(root))
+  assert_true(bit_reset_clean(root))
   ignore(
     @process.run("git", ["rm", "-f", "dir/a.txt"], inherit_env=true, cwd=root),
   ) catch {

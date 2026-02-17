@@ -12,9 +12,9 @@ pub(all) enum MergeResult {
   /// No changes needed
   NoOp
   /// Fast-forward to their HEAD
-  FastForward(@git.ObjectId)
+  FastForward(@bit.ObjectId)
   /// Merged with new commit
-  Merged(@git.ObjectId, Array[String]) // new_head, conflict_paths
+  Merged(@bit.ObjectId, Array[String]) // new_head, conflict_paths
   /// Conflict that couldn't be auto-resolved
   Conflict(Array[String])
 }
@@ -23,24 +23,24 @@ pub(all) enum MergeResult {
 /// Perform a three-way merge
 pub fn Kv::merge(
   self : Kv,
-  their_head : @git.ObjectId,
+  their_head : @bit.ObjectId,
   their_clock : VectorClock,
   strategy : MergeStrategy,
   timestamp : Int64,
-) -> MergeResult raise @git.GitError {
+) -> MergeResult raise @bit.GitError {
   // Same head, no merge needed
   if self.head == their_head {
     return NoOp
   }
   // We have no commits, fast-forward to theirs
-  if self.head == @git.ObjectId::zero() {
+  if self.head == @bit.ObjectId::zero() {
     self.head = their_head
     self.clock = self.clock.merge(their_clock)
     self.tree.checkout(their_head)
     return FastForward(their_head)
   }
   // They have no commits
-  if their_head == @git.ObjectId::zero() {
+  if their_head == @bit.ObjectId::zero() {
     return NoOp
   }
   // Find common ancestor
@@ -59,7 +59,7 @@ pub fn Kv::merge(
   }
   // Need to do a real merge
   let conflicts = self.do_merge(
-    base.unwrap_or(@git.ObjectId::zero()),
+    base.unwrap_or(@bit.ObjectId::zero()),
     their_head,
     strategy,
   )
@@ -84,38 +84,38 @@ pub fn Kv::merge(
 ///|
 fn Kv::do_merge(
   self : Kv,
-  base : @git.ObjectId,
-  their_head : @git.ObjectId,
+  base : @bit.ObjectId,
+  their_head : @bit.ObjectId,
   strategy : MergeStrategy,
 ) -> Array[String] {
   let conflicts : Array[String] = []
   let store : &@lib.ObjectStore = self.store
   // Get trees
-  let base_tree = if base == @git.ObjectId::zero() {
-    @git.ObjectId::zero()
+  let base_tree = if base == @bit.ObjectId::zero() {
+    @bit.ObjectId::zero()
   } else {
     let obj = store.get(base) catch { _ => return conflicts }
     match obj {
       Some(o) => {
-        let commit = @git.parse_commit(o.data) catch { _ => return conflicts }
+        let commit = @bit.parse_commit(o.data) catch { _ => return conflicts }
         commit.tree
       }
-      None => @git.ObjectId::zero()
+      None => @bit.ObjectId::zero()
     }
   }
   let their_tree = {
     let obj = store.get(their_head) catch { _ => return conflicts }
     match obj {
       Some(o) => {
-        let commit = @git.parse_commit(o.data) catch { _ => return conflicts }
+        let commit = @bit.parse_commit(o.data) catch { _ => return conflicts }
         commit.tree
       }
       None => return conflicts
     }
   }
   // Collect files from each tree
-  let base_files : Map[String, @git.ObjectId] = {}
-  let their_files : Map[String, @git.ObjectId] = {}
+  let base_files : Map[String, @bit.ObjectId] = {}
+  let their_files : Map[String, @bit.ObjectId] = {}
   collect_tree_files_flat(store, base_tree, "", base_files)
   collect_tree_files_flat(store, their_tree, "", their_files)
   // Get our current files
@@ -147,12 +147,12 @@ fn Kv::do_merge(
     if in_theirs && in_ours {
       // Both have the file
       let our_content = self.tree.read_file(path) catch { _ => continue }
-      let our_hash = @git.hash_blob(our_content)
-      let their_hash = their_id.unwrap_or(@git.ObjectId::zero())
+      let our_hash = @bit.hash_blob(our_content)
+      let their_hash = their_id.unwrap_or(@bit.ObjectId::zero())
       if our_hash != their_hash {
         // Different content
         if in_base {
-          let base_hash = base_id.unwrap_or(@git.ObjectId::zero())
+          let base_hash = base_id.unwrap_or(@bit.ObjectId::zero())
           if base_hash == our_hash {
             // We didn't change, take theirs
             let their_content = get_blob_content(store, their_hash)
@@ -180,7 +180,7 @@ fn Kv::do_merge(
       // They added, we don't have
       if not(in_base) {
         // New file from them
-        let their_hash = their_id.unwrap_or(@git.ObjectId::zero())
+        let their_hash = their_id.unwrap_or(@bit.ObjectId::zero())
         let content = get_blob_content(store, their_hash)
         match content {
           Some(c) => self.tree.write_file(path, c)
@@ -208,7 +208,7 @@ fn resolve_conflict(
   store : &@lib.ObjectStore,
   path : String,
   our_content : Bytes,
-  their_hash : @git.ObjectId,
+  their_hash : @bit.ObjectId,
   strategy : MergeStrategy,
 ) -> Unit {
   match strategy {
@@ -239,8 +239,8 @@ fn resolve_conflict(
 }
 
 ///|
-fn get_blob_content(store : &@lib.ObjectStore, id : @git.ObjectId) -> Bytes? {
-  if id == @git.ObjectId::zero() {
+fn get_blob_content(store : &@lib.ObjectStore, id : @bit.ObjectId) -> Bytes? {
+  if id == @bit.ObjectId::zero() {
     return None
   }
   let obj = store.get(id) catch { _ => return None }
@@ -279,9 +279,9 @@ fn create_conflict_markers(ours : Bytes, theirs : Bytes) -> Bytes {
 ///|
 fn Kv::create_merge_commit(
   self : Kv,
-  their_head : @git.ObjectId,
+  their_head : @bit.ObjectId,
   timestamp : Int64,
-) -> @git.ObjectId raise @git.GitError {
+) -> @bit.ObjectId raise @bit.GitError {
   let hex = their_head.to_hex()
   let short_hex = String::unsafe_substring(hex, start=0, end=8)
   let message = "Merge " + short_hex + "\n"
@@ -295,7 +295,7 @@ fn Kv::create_merge_commit(
     self.head = snap_id
     return snap_id
   }
-  let snap_info = @git.parse_commit(obj.data)
+  let snap_info = @bit.parse_commit(obj.data)
   // Create proper merge commit with two parents
   let author = self.node_id.id + " <" + self.node_id.id + ">"
   let sb = StringBuilder::new()
@@ -323,7 +323,7 @@ fn Kv::create_merge_commit(
   let buf = @buffer.new()
   buf.write_string(sb.to_string())
   let commit_bytes = buf.to_bytes()
-  let merge_id = store.put(@git.ObjectType::Commit, commit_bytes)
+  let merge_id = store.put(@bit.ObjectType::Commit, commit_bytes)
   self.head = merge_id
   merge_id
 }
@@ -332,10 +332,10 @@ fn Kv::create_merge_commit(
 /// Find the merge base (common ancestor) of two commits
 fn find_merge_base(
   store : &@lib.ObjectStore,
-  commit1 : @git.ObjectId,
-  commit2 : @git.ObjectId,
-) -> @git.ObjectId? {
-  if commit1 == @git.ObjectId::zero() || commit2 == @git.ObjectId::zero() {
+  commit1 : @bit.ObjectId,
+  commit2 : @bit.ObjectId,
+) -> @bit.ObjectId? {
+  if commit1 == @bit.ObjectId::zero() || commit2 == @bit.ObjectId::zero() {
     return None
   }
   // Collect ancestors of commit1
@@ -348,11 +348,11 @@ fn find_merge_base(
 ///|
 fn collect_ancestors(
   store : &@lib.ObjectStore,
-  commit_id : @git.ObjectId,
+  commit_id : @bit.ObjectId,
   depth : Int,
   result : Map[String, Int],
 ) -> Unit {
-  if commit_id == @git.ObjectId::zero() {
+  if commit_id == @bit.ObjectId::zero() {
     return
   }
   let hex = commit_id.to_hex()
@@ -362,7 +362,7 @@ fn collect_ancestors(
   result[hex] = depth
   let obj = store.get(commit_id) catch { _ => return }
   guard obj is Some(o) else { return }
-  let commit = @git.parse_commit(o.data) catch { _ => return }
+  let commit = @bit.parse_commit(o.data) catch { _ => return }
   for parent in commit.parents {
     collect_ancestors(store, parent, depth + 1, result)
   }
@@ -371,11 +371,11 @@ fn collect_ancestors(
 ///|
 fn find_common_ancestor(
   store : &@lib.ObjectStore,
-  commit_id : @git.ObjectId,
+  commit_id : @bit.ObjectId,
   _depth : Int,
   ancestors1 : Map[String, Int],
-) -> @git.ObjectId? {
-  if commit_id == @git.ObjectId::zero() {
+) -> @bit.ObjectId? {
+  if commit_id == @bit.ObjectId::zero() {
     return None
   }
   let hex = commit_id.to_hex()
@@ -384,7 +384,7 @@ fn find_common_ancestor(
   }
   let obj = store.get(commit_id) catch { _ => return None }
   guard obj is Some(o) else { return None }
-  let commit = @git.parse_commit(o.data) catch { _ => return None }
+  let commit = @bit.parse_commit(o.data) catch { _ => return None }
   for parent in commit.parents {
     let found = find_common_ancestor(store, parent, _depth + 1, ancestors1)
     if found is Some(_) {
@@ -397,16 +397,16 @@ fn find_common_ancestor(
 ///|
 fn collect_tree_files_flat(
   store : &@lib.ObjectStore,
-  tree_id : @git.ObjectId,
+  tree_id : @bit.ObjectId,
   prefix : String,
-  result : Map[String, @git.ObjectId],
+  result : Map[String, @bit.ObjectId],
 ) -> Unit {
-  if tree_id == @git.ObjectId::zero() {
+  if tree_id == @bit.ObjectId::zero() {
     return
   }
   let obj = store.get(tree_id) catch { _ => return }
   guard obj is Some(o) else { return }
-  let entries = @git.parse_tree(o.data) catch { _ => return }
+  let entries = @bit.parse_tree(o.data) catch { _ => return }
   for entry in entries {
     let path = if prefix.length() == 0 {
       entry.name

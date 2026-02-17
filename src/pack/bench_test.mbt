@@ -5,29 +5,29 @@
 /// - moon bench -p mizchi/bit/pack --target native -f bench_test.mbt
 
 ///|
-fn make_blob_objects(count : Int) -> Array[@git.PackObject] {
-  let objects : Array[@git.PackObject] = []
+fn make_blob_objects(count : Int) -> Array[@bit.PackObject] {
+  let objects : Array[@bit.PackObject] = []
   for i in 0..<count {
     let data = Bytes::from_array(
       "blob content \{i} with some padding to make it realistic\n"
       .to_array()
       .map(fn(c) { c.to_int().to_byte() }),
     )
-    objects.push(@git.PackObject::new(@git.ObjectType::Blob, data))
+    objects.push(@bit.PackObject::new(@bit.ObjectType::Blob, data))
   }
   objects
 }
 
 ///|
-fn make_similar_blob_objects(count : Int) -> Array[@git.PackObject] {
+fn make_similar_blob_objects(count : Int) -> Array[@bit.PackObject] {
   let base = "This is a shared base content that will be used for delta compression. It contains enough text to make delta encoding worthwhile. Line number: "
-  let objects : Array[@git.PackObject] = []
+  let objects : Array[@bit.PackObject] = []
   for i in 0..<count {
     let text = base + i.to_string() + "\nSome trailing content.\n"
     let data = Bytes::from_array(
       text.to_array().map(fn(c) { c.to_int().to_byte() }),
     )
-    objects.push(@git.PackObject::new(@git.ObjectType::Blob, data))
+    objects.push(@bit.PackObject::new(@bit.ObjectType::Blob, data))
   }
   objects
 }
@@ -39,13 +39,13 @@ let bench_pack_small : Bytes = @pack.create_packfile(make_blob_objects(3))
 let bench_pack_100 : Bytes = @pack.create_packfile(make_blob_objects(100))
 
 ///|
-let bench_objects_10 : Array[@git.PackObject] = make_blob_objects(10)
+let bench_objects_10 : Array[@bit.PackObject] = make_blob_objects(10)
 
 ///|
-let bench_objects_100 : Array[@git.PackObject] = make_blob_objects(100)
+let bench_objects_100 : Array[@bit.PackObject] = make_blob_objects(100)
 
 ///|
-let bench_similar_100 : Array[@git.PackObject] = make_similar_blob_objects(100)
+let bench_similar_100 : Array[@bit.PackObject] = make_similar_blob_objects(100)
 
 ///|
 test "bench parse_packfile small" (b : @bench.T) {
@@ -84,7 +84,7 @@ test "bench create_packfile_with_delta 100" (b : @bench.T) {
   b.bench(fn() {
     let pack = @pack.create_packfile_with_delta(
       bench_similar_100,
-      @git.PackDeltaMode::OfsDelta,
+      @bit.PackDeltaMode::OfsDelta,
     )
     b.keep(pack.length())
   })

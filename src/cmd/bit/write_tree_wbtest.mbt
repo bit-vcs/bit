@@ -1,6 +1,6 @@
 ///|
 test "write-tree: compatobjectformat=sha256 requires standalone error" {
-  let fs = @git.TestFs::new()
+  let fs = @bitcore.TestFs::new()
   fs.mkdir_p("/repo/.git")
   fs.write_string(
     "/repo/.git/config", "[extensions]\n\tcompatobjectformat = sha256\n",

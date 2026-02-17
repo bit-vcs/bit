@@ -3,7 +3,7 @@ async fn handle_blame(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let git_dir = root + "/.git"
   let fs = OsFs::new()
-  let rfs : &@git.RepoFileSystem = fs
+  let rfs : &@bitcore.RepoFileSystem = fs
   // Parse options
   let mut long_sha = false
   let mut porcelain = false
@@ -136,7 +136,7 @@ fn BlameOptions::new(
 
 ///|
 struct BlameLine {
-  commit_id : @git.ObjectId
+  commit_id : @bitcore.ObjectId
   author : String
   author_time : Int64
   author_tz : String
@@ -147,7 +147,7 @@ struct BlameLine {
 
 ///|
 fn BlameLine::new(
-  commit_id : @git.ObjectId,
+  commit_id : @bitcore.ObjectId,
   author : String,
   author_time : Int64,
   author_tz : String,
@@ -177,23 +177,23 @@ fn parse_line_range(range : String) -> (Int, Int) {
 
 ///|
 fn compute_blame_with_opts(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   git_dir : String,
   root : String,
   commit_ref : String,
   file_path : String,
   opts : BlameOptions,
 ) -> Array[BlameLine] raise Error {
-  let db = @gitlib.ObjectDb::load(rfs, git_dir)
+  let db = @bitlib.ObjectDb::load(rfs, git_dir)
   // Get target commit
-  let target_id = @gitrepo.rev_parse(rfs, git_dir, commit_ref)
+  let target_id = @bitrepo.rev_parse(rfs, git_dir, commit_ref)
   guard target_id is Some(tid) else {
-    raise @git.GitError::InvalidObject("unknown revision: \{commit_ref}")
+    raise @bitcore.GitError::InvalidObject("unknown revision: \{commit_ref}")
   }
   // Get file content at target commit
   let file_content = get_file_at_commit(db, rfs, tid, file_path)
   guard file_content is Some(content) else {
-    raise @git.GitError::InvalidObject("file not found: \{file_path}")
+    raise @bitcore.GitError::InvalidObject("file not found: \{file_path}")
   }
   let lines = split_lines(content)
   if lines.length() == 0 {
@@ -202,7 +202,7 @@ fn compute_blame_with_opts(
   // Build commit history for this file
   let history = build_file_history(db, rfs, tid, file_path)
   // For -M/-C: also collect other files in commits
-  let other_files : Map[String, Array[(String, @git.ObjectId)]] = {}
+  let other_files : Map[String, Array[(String, @bitcore.ObjectId)]] = {}
   if opts.detect_moves || opts.detect_copies {
     collect_other_files(db, rfs, history, file_path, other_files)
   }
@@ -231,16 +231,16 @@ fn compute_blame_with_opts(
 
 ///|
 fn collect_other_files(
-  db : @gitlib.ObjectDb,
-  rfs : &@git.RepoFileSystem,
-  history : Array[@git.ObjectId],
+  db : @bitlib.ObjectDb,
+  rfs : &@bitcore.RepoFileSystem,
+  history : Array[@bitcore.ObjectId],
   exclude_path : String,
-  result : Map[String, Array[(String, @git.ObjectId)]],
+  result : Map[String, Array[(String, @bitcore.ObjectId)]],
 ) -> Unit {
   for commit_id in history {
     let obj = db.get(rfs, commit_id) catch { _ => continue }
     guard obj is Some(o) else { continue }
-    let info = @git.parse_commit(o.data) catch { _ => continue }
+    let info = @bitcore.parse_commit(o.data) catch { _ => continue }
     let files = collect_files_in_tree(db, rfs, info.tree, "") catch {
       _ => continue
     }
@@ -259,15 +259,15 @@ fn collect_other_files(
 
 ///|
 fn collect_files_in_tree(
-  db : @gitlib.ObjectDb,
-  rfs : &@git.RepoFileSystem,
-  tree_id : @git.ObjectId,
+  db : @bitlib.ObjectDb,
+  rfs : &@bitcore.RepoFileSystem,
+  tree_id : @bitcore.ObjectId,
   prefix : String,
-) -> Array[(String, @git.ObjectId)] raise Error {
-  let result : Array[(String, @git.ObjectId)] = []
+) -> Array[(String, @bitcore.ObjectId)] raise Error {
+  let result : Array[(String, @bitcore.ObjectId)] = []
   let tree_obj = db.get(rfs, tree_id)
   guard tree_obj is Some(to) else { return result }
-  let entries = @git.parse_tree(to.data)
+  let entries = @bitcore.parse_tree(to.data)
   for entry in entries {
     let path = if prefix.length() > 0 {
       prefix + "/" + entry.name
@@ -290,14 +290,14 @@ fn collect_files_in_tree(
 
 ///|
 fn get_file_at_commit(
-  db : @gitlib.ObjectDb,
-  rfs : &@git.RepoFileSystem,
-  commit_id : @git.ObjectId,
+  db : @bitlib.ObjectDb,
+  rfs : &@bitcore.RepoFileSystem,
+  commit_id : @bitcore.ObjectId,
   file_path : String,
 ) -> String? raise Error {
   let obj = db.get(rfs, commit_id)
   guard obj is Some(o) else { return None }
-  let info = @git.parse_commit(o.data)
+  let info = @bitcore.parse_commit(o.data)
   // Walk tree to find file
   let blob_id = find_blob_in_tree(db, rfs, info.tree, file_path)
   guard blob_id is Some(bid) else { return None }
@@ -308,14 +308,14 @@ fn get_file_at_commit(
 
 ///|
 fn find_blob_in_tree(
-  db : @gitlib.ObjectDb,
-  rfs : &@git.RepoFileSystem,
-  tree_id : @git.ObjectId,
+  db : @bitlib.ObjectDb,
+  rfs : &@bitcore.RepoFileSystem,
+  tree_id : @bitcore.ObjectId,
   path : String,
-) -> @git.ObjectId? raise Error {
+) -> @bitcore.ObjectId? raise Error {
   let tree_obj = db.get(rfs, tree_id)
   guard tree_obj is Some(to) else { return None }
-  let entries = @git.parse_tree(to.data)
+  let entries = @bitcore.parse_tree(to.data)
   // Split path into components
   let parts = split_path(path)
   if parts.length() == 0 {
@@ -381,15 +381,15 @@ fn split_lines(content : String) -> Array[String] {
 
 ///|
 fn build_file_history(
-  db : @gitlib.ObjectDb,
-  rfs : &@git.RepoFileSystem,
-  start : @git.ObjectId,
+  db : @bitlib.ObjectDb,
+  rfs : &@bitcore.RepoFileSystem,
+  start : @bitcore.ObjectId,
   file_path : String,
-) -> Array[@git.ObjectId] raise Error {
+) -> Array[@bitcore.ObjectId] raise Error {
   // Walk commit history, collecting commits that touch the file
-  let result : Array[@git.ObjectId] = []
+  let result : Array[@bitcore.ObjectId] = []
   let visited : Map[String, Bool] = {}
-  let queue : Array[@git.ObjectId] = [start]
+  let queue : Array[@bitcore.ObjectId] = [start]
   while queue.length() > 0 {
     let current = queue.pop()
     guard current is Some(cid) else { break }
@@ -407,7 +407,7 @@ fn build_file_history(
     let obj = db.get(rfs, cid)
     match obj {
       Some(o) => {
-        let info = @git.parse_commit(o.data)
+        let info = @bitcore.parse_commit(o.data)
         for p in info.parents {
           queue.push(p)
         }
@@ -420,15 +420,15 @@ fn build_file_history(
 
 ///|
 fn find_line_origin_with_opts(
-  db : @gitlib.ObjectDb,
-  rfs : &@git.RepoFileSystem,
-  history : Array[@git.ObjectId],
+  db : @bitlib.ObjectDb,
+  rfs : &@bitcore.RepoFileSystem,
+  history : Array[@bitcore.ObjectId],
   file_path : String,
   line : String,
   _line_idx : Int,
   opts : BlameOptions,
-  other_files : Map[String, Array[(String, @git.ObjectId)]],
-) -> (@git.ObjectId, String, Int64, String, Bool) raise Error {
+  other_files : Map[String, Array[(String, @bitcore.ObjectId)]],
+) -> (@bitcore.ObjectId, String, Int64, String, Bool) raise Error {
   // Find oldest commit in history that contains this line
   let mut best_commit = history[0]
   let mut is_boundary = false
@@ -543,9 +543,9 @@ fn normalize_whitespace(s : String) -> String {
 
 ///|
 fn get_blob_content(
-  db : @gitlib.ObjectDb,
-  rfs : &@git.RepoFileSystem,
-  blob_id : @git.ObjectId,
+  db : @bitlib.ObjectDb,
+  rfs : &@bitcore.RepoFileSystem,
+  blob_id : @bitcore.ObjectId,
 ) -> String? raise Error {
   let blob = db.get(rfs, blob_id)
   guard blob is Some(b) else { return None }

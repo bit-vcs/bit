@@ -66,7 +66,7 @@ fn looks_like_cached_diff_revision(token : String) -> Bool {
 async fn handle_diff(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let fs = OsFs::new()
-  let rfs : &@git.RepoFileSystem = fs
+  let rfs : &@bitcore.RepoFileSystem = fs
   let git_dir = resolve_git_dir(rfs, root)
   let repo_git_dir = resolve_submodule_common_git_dir(rfs, git_dir)
   let mut submodule_mode = false
@@ -144,9 +144,9 @@ async fn handle_diff(args : Array[String]) -> Unit raise Error {
       if exit_code {
         // `handle_subdir_diff` writes output directly; use diff result as conservative signal.
         let files = if cached {
-          @gitdiff.diff_index(fs, root)
+          @bitdiff.diff_index(fs, root)
         } else {
-          @gitdiff.diff_worktree(fs, root)
+          @bitdiff.diff_worktree(fs, root)
         }
         if files.length() > 0 {
           @sys.exit(1)
@@ -166,32 +166,32 @@ async fn handle_diff(args : Array[String]) -> Unit raise Error {
           return
         }
       }
-      let db = @gitlib.ObjectDb::load(rfs, repo_git_dir)
+      let db = @bitlib.ObjectDb::load(rfs, repo_git_dir)
       match resolve_submodule_diff_range(db, rfs, repo_git_dir, spec) {
         Some((old_id, new_id)) => {
           let old_tree = resolve_diff_tree_id(db, rfs, old_id)
           let new_tree = resolve_diff_tree_id(db, rfs, new_id)
           match (old_tree, new_tree) {
             (Some(ot), Some(nt)) =>
-              @gitdiff.diff_trees(rfs, repo_git_dir, Some(ot), nt)
+              @bitdiff.diff_trees(rfs, repo_git_dir, Some(ot), nt)
             _ =>
-              raise @git.GitError::InvalidObject(
+              raise @bitcore.GitError::InvalidObject(
                 "unsupported diff range: " + spec,
               )
           }
         }
         None =>
-          raise @git.GitError::InvalidObject("unsupported diff range: " + spec)
+          raise @bitcore.GitError::InvalidObject("unsupported diff range: " + spec)
       }
     }
     None =>
       if cached {
         match ref_target {
           Some(spec) => diff_cached_against_ref(fs, rfs, root, git_dir, spec)
-          None => @gitdiff.diff_index(fs, root)
+          None => @bitdiff.diff_index(fs, root)
         }
       } else {
-        @gitdiff.diff_worktree(fs, root)
+        @bitdiff.diff_worktree(fs, root)
       }
   }
   // Filter by paths if specified
@@ -214,19 +214,19 @@ async fn handle_diff(args : Array[String]) -> Unit raise Error {
     } else if name_status {
       for f in files {
         let status = match f.kind {
-          @gitdiff.DiffKind::Added => "A"
-          @gitdiff.DiffKind::Modified => "M"
-          @gitdiff.DiffKind::Deleted => "D"
+          @bitdiff.DiffKind::Added => "A"
+          @bitdiff.DiffKind::Modified => "M"
+          @bitdiff.DiffKind::Deleted => "D"
         }
         print_line("\{status}\t\{f.path}")
       }
     } else if stat_mode {
-      let lines = @gitdiff.diff_stat(files)
+      let lines = @bitdiff.diff_stat(files)
       for line in lines {
         print_line(line)
       }
     } else {
-      let lines = @gitdiff.diff_text(files)
+      let lines = @bitdiff.diff_text(files)
       for line in lines {
         print_line(line)
       }
@@ -330,11 +330,11 @@ async fn handle_diff_index(args : Array[String]) -> Unit raise Error {
   }
   let root = get_work_root()
   let fs = OsFs::new()
-  let rfs : &@git.RepoFileSystem = fs
+  let rfs : &@bitcore.RepoFileSystem = fs
   let git_dir = resolve_git_dir(rfs, root)
   let target = treeish.unwrap_or("HEAD")
   let staged_all = diff_cached_against_ref(fs, rfs, root, git_dir, target)
-  let staged : Array[@gitdiff.DiffFile] = []
+  let staged : Array[@bitdiff.DiffFile] = []
   let staged_paths : Map[String, Bool] = {}
   for file in staged_all {
     if diff_path_matches_filters(file.path, filters) {
@@ -347,7 +347,7 @@ async fn handle_diff_index(args : Array[String]) -> Unit raise Error {
   } else {
     collect_diff_index_stale_entries(fs, root, filters)
   }
-  let stale : Array[@gitlib.IndexEntry] = []
+  let stale : Array[@bitlib.IndexEntry] = []
   for entry in stale_all {
     if not(staged_paths.contains(entry.path)) {
       stale.push(entry)
@@ -381,10 +381,10 @@ async fn collect_diff_index_stale_entries(
   fs : OsFs,
   root : String,
   filters : Array[String],
-) -> Array[@gitlib.IndexEntry] raise Error {
+) -> Array[@bitlib.IndexEntry] raise Error {
   let git_dir = resolve_git_dir(fs, root)
-  let entries = @gitlib.read_index_entries(fs, git_dir)
-  let stale : Array[@gitlib.IndexEntry] = []
+  let entries = @bitlib.read_index_entries(fs, git_dir)
+  let stale : Array[@bitlib.IndexEntry] = []
   for entry in entries {
     if not(diff_path_matches_filters(entry.path, filters)) {
       continue
@@ -427,11 +427,11 @@ fn diff_path_matches_filters(path : String, filters : Array[String]) -> Bool {
 }
 
 ///|
-fn format_diff_index_line_from_diff_file(file : @gitdiff.DiffFile) -> String {
+fn format_diff_index_line_from_diff_file(file : @bitdiff.DiffFile) -> String {
   let status = match file.kind {
-    @gitdiff.DiffKind::Added => "A"
-    @gitdiff.DiffKind::Modified => "M"
-    @gitdiff.DiffKind::Deleted => "D"
+    @bitdiff.DiffKind::Added => "A"
+    @bitdiff.DiffKind::Modified => "M"
+    @bitdiff.DiffKind::Deleted => "D"
   }
   let old_mode = diff_index_mode_string(file.old_mode)
   let new_mode = diff_index_mode_string(file.new_mode)
@@ -441,7 +441,7 @@ fn format_diff_index_line_from_diff_file(file : @gitdiff.DiffFile) -> String {
 }
 
 ///|
-fn format_diff_index_line_from_entry(entry : @gitlib.IndexEntry) -> String {
+fn format_diff_index_line_from_entry(entry : @bitlib.IndexEntry) -> String {
   let mode = diff_index_mode_string(Some(entry.mode))
   let old_oid = entry.id.to_hex()
   let new_oid = diff_index_zero_oid_hex()
@@ -451,7 +451,7 @@ fn format_diff_index_line_from_entry(entry : @gitlib.IndexEntry) -> String {
 ///|
 fn diff_index_content_oid_string(content : Bytes?) -> String {
   match content {
-    Some(bytes) => @git.sha1(bytes).to_hex()
+    Some(bytes) => @bitcore.sha1(bytes).to_hex()
     None => diff_index_zero_oid_hex()
   }
 }
@@ -502,47 +502,47 @@ fn diff_index_to_octal(value : Int) -> String {
 ///|
 fn diff_cached_against_ref(
   fs : OsFs,
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   root : String,
   git_dir : String,
   spec : String,
-) -> Array[@gitdiff.DiffFile] raise Error {
+) -> Array[@bitdiff.DiffFile] raise Error {
   ignore(root)
-  let target = @gitrepo.rev_parse(rfs, git_dir, spec)
+  let target = @bitrepo.rev_parse(rfs, git_dir, spec)
   guard target is Some(target_id) else {
-    raise @git.GitError::InvalidObject(
+    raise @bitcore.GitError::InvalidObject(
       "unknown revision or path not in the working tree: " + spec,
     )
   }
-  let db = @gitlib.ObjectDb::load(rfs, git_dir)
+  let db = @bitlib.ObjectDb::load(rfs, git_dir)
   let old_tree = resolve_diff_tree_id(db, rfs, target_id)
   guard old_tree is Some(old_tree_id) else {
-    raise @git.GitError::InvalidObject("object is not a tree-ish: " + spec)
+    raise @bitcore.GitError::InvalidObject("object is not a tree-ish: " + spec)
   }
-  let index_entries = @gitlib.read_index_entries(rfs, git_dir)
-  let index_tree = @gitlib.write_tree_from_index(
+  let index_entries = @bitlib.read_index_entries(rfs, git_dir)
+  let index_tree = @bitlib.write_tree_from_index(
     fs, rfs, git_dir, index_entries,
   )
-  @gitdiff.diff_trees(rfs, git_dir, Some(old_tree_id), index_tree)
+  @bitdiff.diff_trees(rfs, git_dir, Some(old_tree_id), index_tree)
 }
 
 ///|
 fn resolve_diff_tree_id(
-  db : @gitlib.ObjectDb,
-  rfs : &@git.RepoFileSystem,
-  id : @git.ObjectId,
-) -> @git.ObjectId? {
+  db : @bitlib.ObjectDb,
+  rfs : &@bitcore.RepoFileSystem,
+  id : @bitcore.ObjectId,
+) -> @bitcore.ObjectId? {
   let mut current = id
   for _ in 0..<8 {
     let obj = db.get(rfs, current) catch { _ => return None }
     guard obj is Some(o) else { return None }
     match o.obj_type {
-      @git.ObjectType::Tree => return Some(current)
-      @git.ObjectType::Commit => {
-        let commit = @git.parse_commit(o.data) catch { _ => return None }
+      @bitcore.ObjectType::Tree => return Some(current)
+      @bitcore.ObjectType::Commit => {
+        let commit = @bitcore.parse_commit(o.data) catch { _ => return None }
         return Some(commit.tree)
       }
-      @git.ObjectType::Tag => {
+      @bitcore.ObjectType::Tag => {
         let parsed = parse_tag_object(decode_bytes(o.data)) catch { _ => None }
         guard parsed is Some(target) else { return None }
         current = target
@@ -561,15 +561,15 @@ async fn try_handle_submodule_range_diff(
   repo_git_dir : String,
   spec : String,
 ) -> Bool raise Error {
-  let rfs : &@git.RepoFileSystem = fs
-  let db = @gitlib.ObjectDb::load(rfs, repo_git_dir)
+  let rfs : &@bitcore.RepoFileSystem = fs
+  let db = @bitlib.ObjectDb::load(rfs, repo_git_dir)
   guard resolve_submodule_diff_range(db, rfs, repo_git_dir, spec)
     is Some((old_commit, new_commit)) else {
     return false
   }
-  let old_entries = @gitlib.collect_tree_files_from_commit(db, rfs, old_commit)
-  let new_entries = @gitlib.collect_tree_files_from_commit(db, rfs, new_commit)
-  let changes : Array[(String, @git.ObjectId, @git.ObjectId)] = []
+  let old_entries = @bitlib.collect_tree_files_from_commit(db, rfs, old_commit)
+  let new_entries = @bitlib.collect_tree_files_from_commit(db, rfs, new_commit)
+  let changes : Array[(String, @bitcore.ObjectId, @bitcore.ObjectId)] = []
   for item in new_entries.to_array() {
     let (path, new_entry) = item
     if not(is_gitlink_mode_for_diff(new_entry.mode)) {
@@ -609,24 +609,24 @@ async fn try_handle_submodule_range_diff(
 
 ///|
 fn resolve_submodule_diff_range(
-  db : @gitlib.ObjectDb,
-  rfs : &@git.RepoFileSystem,
+  db : @bitlib.ObjectDb,
+  rfs : &@bitcore.RepoFileSystem,
   git_dir : String,
   spec : String,
-) -> (@git.ObjectId, @git.ObjectId)? raise Error {
+) -> (@bitcore.ObjectId, @bitcore.ObjectId)? raise Error {
   if spec.has_suffix("^!") && spec.length() > 2 {
     let target_ref = String::unsafe_substring(
       spec,
       start=0,
       end=spec.length() - 2,
     )
-    let end_id = @gitrepo.rev_parse(rfs, git_dir, target_ref)
+    let end_id = @bitrepo.rev_parse(rfs, git_dir, target_ref)
     guard end_id is Some(new_id) else { return None }
     guard db.get(rfs, new_id) is Some(obj) else { return None }
-    if obj.obj_type != @git.ObjectType::Commit {
+    if obj.obj_type != @bitcore.ObjectType::Commit {
       return None
     }
-    let info = @git.parse_commit(obj.data)
+    let info = @bitcore.parse_commit(obj.data)
     if info.parents.length() == 0 {
       return None
     }
@@ -643,8 +643,8 @@ fn resolve_submodule_diff_range(
       if start_ref.length() == 0 {
         return None
       }
-      let start_id = @gitrepo.rev_parse(rfs, git_dir, start_ref)
-      let end_id = @gitrepo.rev_parse(
+      let start_id = @bitrepo.rev_parse(rfs, git_dir, start_ref)
+      let end_id = @bitrepo.rev_parse(
         rfs,
         git_dir,
         if end_ref.length() == 0 {
@@ -683,10 +683,10 @@ fn collect_submodule_diff_subjects(
   repo_git_dir : String,
   path : String,
   submodule_name : String,
-  old_id : @git.ObjectId,
-  new_id : @git.ObjectId,
+  old_id : @bitcore.ObjectId,
+  new_id : @bitcore.ObjectId,
 ) -> Array[String] raise Error {
-  let rfs : &@git.RepoFileSystem = fs
+  let rfs : &@bitcore.RepoFileSystem = fs
   let candidates = resolve_submodule_git_dir_candidates(
     rfs, root, git_dir, repo_git_dir, path, submodule_name,
   )
@@ -697,12 +697,12 @@ fn collect_submodule_diff_subjects(
     if commits.length() == 0 {
       continue
     }
-    let db = @gitlib.ObjectDb::load(rfs, sub_git_dir) catch { _ => continue }
+    let db = @bitlib.ObjectDb::load(rfs, sub_git_dir) catch { _ => continue }
     let subjects : Array[String] = []
     for commit_id in commits {
       match db.get(rfs, commit_id) {
         Some(obj) =>
-          if obj.obj_type == @git.ObjectType::Commit {
+          if obj.obj_type == @bitcore.ObjectType::Commit {
             let message = extract_commit_message(obj.data)
             let subject = get_first_line(message)
             if subject.length() > 0 {
@@ -721,7 +721,7 @@ fn collect_submodule_diff_subjects(
 
 ///|
 fn resolve_submodule_git_dir_candidates(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   root : String,
   git_dir : String,
   repo_git_dir : String,
@@ -731,7 +731,7 @@ fn resolve_submodule_git_dir_candidates(
   let candidates : Array[String] = []
   let worktree_git = root + "/" + path + "/.git"
   if rfs.is_file(worktree_git) {
-    let resolved = @gitlib.resolve_gitdir(rfs, worktree_git)
+    let resolved = @bitlib.resolve_gitdir(rfs, worktree_git)
     candidates.push(resolved)
   } else if rfs.is_dir(worktree_git) {
     candidates.push(worktree_git)

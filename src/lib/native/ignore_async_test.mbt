@@ -2,7 +2,7 @@
 
 ///|
 async test "ignore async: symlink dir is not traversed" {
-  @gitionative.init_worktree_probe()
+  @bitnative.init_worktree_probe()
   let fs = @osfs.OsFs::new()
   let mk = @process.collect_output(
     "mktemp",

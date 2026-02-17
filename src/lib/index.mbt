@@ -3,7 +3,7 @@
 ///|
 pub struct IndexEntry {
   path : String
-  id : @git.ObjectId
+  id : @bit.ObjectId
   mode : Int
   size : Int
   mtime_sec : Int
@@ -13,7 +13,7 @@ pub struct IndexEntry {
 ///|
 pub fn IndexEntry::new(
   path : String,
-  id : @git.ObjectId,
+  id : @bit.ObjectId,
   mode : Int,
   size : Int,
   mtime_sec? : Int = 0,
@@ -24,25 +24,25 @@ pub fn IndexEntry::new(
 
 ///|
 pub fn read_index_entries(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
-) -> Array[IndexEntry] raise @git.GitError {
+) -> Array[IndexEntry] raise @bit.GitError {
   let path = join_path(git_dir, "index")
   if not(fs.is_file(path)) {
     return []
   }
   let data = fs.read_file(path)
   if data.length() < 12 + 20 {
-    raise @git.GitError::InvalidObject("Index file too short")
+    raise @bit.GitError::InvalidObject("Index file too short")
   }
   if not(
       data[0] == b'D' && data[1] == b'I' && data[2] == b'R' && data[3] == b'C',
     ) {
-    raise @git.GitError::InvalidObject("Invalid index header")
+    raise @bit.GitError::InvalidObject("Invalid index header")
   }
   let version = index_read_u32_be(data, 4)
   if version != 2 && version != 3 {
-    raise @git.GitError::InvalidObject("Unsupported index version: \{version}")
+    raise @bit.GitError::InvalidObject("Unsupported index version: \{version}")
   }
   let count = index_read_u32_be(data, 8)
   let mut offset = 12
@@ -50,7 +50,7 @@ pub fn read_index_entries(
   for _ in 0..<count {
     let entry_start = offset
     if offset + 62 > data.length() {
-      raise @git.GitError::InvalidObject("Index entry truncated")
+      raise @bit.GitError::InvalidObject("Index entry truncated")
     }
     // Index entry format (40 bytes stat data):
     // ctime_seconds, ctime_nanoseconds, mtime_seconds, mtime_nanoseconds,
@@ -113,7 +113,7 @@ pub fn read_index_entries(
 ///|
 /// Read skip-worktree paths from both bit sidecar and index extended flags.
 pub fn read_skip_worktree_paths(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> Map[String, Bool] {
   let out : Map[String, Bool] = {}
@@ -183,10 +183,10 @@ pub fn read_skip_worktree_paths(
 
 ///|
 pub fn write_skip_worktree_paths(
-  fs : &@git.FileSystem,
+  fs : &@bit.FileSystem,
   git_dir : String,
   paths : Array[String],
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let state_path = join_path(git_dir, "bit-skip-worktree")
   let by_path : Map[String, Bool] = {}
   for path in paths {
@@ -211,10 +211,10 @@ pub fn write_skip_worktree_paths(
 
 ///|
 pub fn write_index_entries(
-  fs : &@git.FileSystem,
+  fs : &@bit.FileSystem,
   git_dir : String,
   entries : Array[IndexEntry],
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let sorted = entries.copy()
   sorted.sort_by((a, b) => index_path_compare_git_order(a.path, b.path))
   let out : Array[Byte] = []
@@ -260,7 +260,7 @@ pub fn write_index_entries(
     }
   }
   let content = index_bytes_from_array(out)
-  let checksum = @git.sha1(content)
+  let checksum = @bit.sha1(content)
   for b in checksum.bytes {
     out.push(b)
   }
@@ -270,9 +270,9 @@ pub fn write_index_entries(
 }
 
 ///|
-fn index_read_u32_be(data : Bytes, start : Int) -> Int raise @git.GitError {
+fn index_read_u32_be(data : Bytes, start : Int) -> Int raise @bit.GitError {
   if start < 0 || start + 4 > data.length() {
-    raise @git.GitError::InvalidObject("Unexpected end of index data")
+    raise @bit.GitError::InvalidObject("Unexpected end of index data")
   }
   (data[start].to_int() << 24) |
   (data[start + 1].to_int() << 16) |
@@ -281,20 +281,20 @@ fn index_read_u32_be(data : Bytes, start : Int) -> Int raise @git.GitError {
 }
 
 ///|
-fn index_read_u16_be(data : Bytes, start : Int) -> Int raise @git.GitError {
+fn index_read_u16_be(data : Bytes, start : Int) -> Int raise @bit.GitError {
   if start < 0 || start + 2 > data.length() {
-    raise @git.GitError::InvalidObject("Unexpected end of index data")
+    raise @bit.GitError::InvalidObject("Unexpected end of index data")
   }
   (data[start].to_int() << 8) | data[start + 1].to_int()
 }
 
 ///|
 pub fn write_index_entries_with_skip_worktree(
-  fs : &@git.FileSystem,
+  fs : &@bit.FileSystem,
   git_dir : String,
   entries : Array[IndexEntry],
   skip_worktree_paths : Map[String, Bool],
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let sorted = entries.copy()
   sorted.sort_by((a, b) => index_path_compare_git_order(a.path, b.path))
   let out : Array[Byte] = []
@@ -347,7 +347,7 @@ pub fn write_index_entries_with_skip_worktree(
     }
   }
   let content = index_bytes_from_array(out)
-  let checksum = @git.sha1(content)
+  let checksum = @bit.sha1(content)
   for b in checksum.bytes {
     out.push(b)
   }
@@ -360,28 +360,28 @@ pub fn write_index_entries_with_skip_worktree(
 fn index_read_object_id(
   data : Bytes,
   start : Int,
-) -> @git.ObjectId raise @git.GitError {
+) -> @bit.ObjectId raise @bit.GitError {
   if start + 20 > data.length() {
-    raise @git.GitError::InvalidObject("Unexpected end of index data")
+    raise @bit.GitError::InvalidObject("Unexpected end of index data")
   }
   let bytes : FixedArray[Byte] = FixedArray::make(20, b'\x00')
   for i in 0..<20 {
     bytes[i] = data[start + i]
   }
-  @git.ObjectId::new(bytes)
+  @bit.ObjectId::new(bytes)
 }
 
 ///|
 fn index_read_cstring(
   data : Bytes,
   start : Int,
-) -> (String, Int) raise @git.GitError {
+) -> (String, Int) raise @bit.GitError {
   let mut i = start
   while i < data.length() && data[i] != b'\x00' {
     i += 1
   }
   if i >= data.length() {
-    raise @git.GitError::InvalidObject("Missing NUL in index entry")
+    raise @bit.GitError::InvalidObject("Missing NUL in index entry")
   }
   let bytes : Array[Byte] = []
   for j in start..<i {

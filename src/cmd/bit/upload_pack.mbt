@@ -23,9 +23,9 @@ async fn handle_upload_pack(args : Array[String]) -> Unit raise Error {
   let mut protocol_version = 1
   try {
     // Parse config overrides from environment variable
-    let cmdline_config = @gitlib.parse_config_overrides()
+    let cmdline_config = @bitlib.parse_config_overrides()
     guard parse_pack_args(args) is Some((advertise_flag, repo_path)) else {
-      raise @git.GitError::ProtocolError("missing repository path")
+      raise @bitcore.GitError::ProtocolError("missing repository path")
     }
     advertise = advertise_flag
     let root = if repo_path.has_suffix(".git") && !repo_path.has_suffix("/.git") {
@@ -64,12 +64,12 @@ async fn handle_upload_pack(args : Array[String]) -> Unit raise Error {
       }
     }
     let allow_filter = match
-      git_config_get(config_git_dir, "uploadpack", "allowfilter") {
+      bit_config_get(config_git_dir, "uploadpack", "allowfilter") {
       Some(value) => parse_bool_value(value).unwrap_or(false)
       None => false
     }
     let allow_any_want = match
-      git_config_get(config_git_dir, "uploadpack", "allowanysha1inwant") {
+      bit_config_get(config_git_dir, "uploadpack", "allowanysha1inwant") {
       Some(value) => parse_bool_value(value).unwrap_or(false)
       None => false
     }
@@ -78,24 +78,24 @@ async fn handle_upload_pack(args : Array[String]) -> Unit raise Error {
       @sys.exit(1)
     }
     if advertise {
-      let out = @gitlib.build_upload_pack_advertisement(fs, root)
+      let out = @bitlib.build_upload_pack_advertisement(fs, root)
       @stdio.stdout.write(out)
     } else {
       let input = read_all_stdin()
       // Check protocol version from GIT_PROTOCOL environment variable
-      protocol_version = @gitlib.get_protocol_version()
+      protocol_version = @bitlib.get_protocol_version()
       if protocol_version == 2 {
         // Protocol v2: parse and handle v2 request
-        let req = @gitlib.parse_upload_pack_request_v2(input)
-        let config = @gitlib.build_upload_pack_config_with_overrides(
+        let req = @bitlib.parse_upload_pack_request_v2(input)
+        let config = @bitlib.build_upload_pack_config_with_overrides(
           fs, root, cmdline_config,
         )
-        let out = @gitlib.upload_pack_v2(fs, root, req, config)
+        let out = @bitlib.upload_pack_v2(fs, root, req, config)
         @stdio.stdout.write(out)
       } else {
         // Protocol v1: use existing handler
-        let req = @gitlib.parse_upload_pack_request(input)
-        let out = @gitlib.upload_pack(fs, root, req)
+        let req = @bitlib.parse_upload_pack_request(input)
+        let out = @bitlib.upload_pack(fs, root, req)
         @stdio.stdout.write(out)
       }
     }
@@ -156,11 +156,11 @@ async fn upload_pack_fail(
 ///|
 fn upload_pack_error_text(err : Error) -> String {
   match err {
-    @git.GitError::ProtocolError(msg) => msg
-    @git.GitError::InvalidObject(msg) => msg
-    @git.GitError::PackfileError(msg) => msg
-    @git.GitError::HashMismatch(_, _) => "hash mismatch"
-    @git.GitError::IoError(msg) => msg
+    @bitcore.GitError::ProtocolError(msg) => msg
+    @bitcore.GitError::InvalidObject(msg) => msg
+    @bitcore.GitError::PackfileError(msg) => msg
+    @bitcore.GitError::HashMismatch(_, _) => "hash mismatch"
+    @bitcore.GitError::IoError(msg) => msg
     _ => err.to_string()
   }
 }

@@ -13,7 +13,7 @@ fn test_concat_bytes(chunks : Array[Bytes]) -> Bytes {
 
 ///|
 test "build_upload_pack_advertisement: empty repo" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   ignore(try? init_repo(fs, "/repo"))
   let adv = build_upload_pack_advertisement(fs, "/repo")
   // Should have capabilities^{} line for empty repo
@@ -24,7 +24,7 @@ test "build_upload_pack_advertisement: empty repo" {
 
 ///|
 test "build_upload_pack_advertisement: with refs" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   ignore(try? init_repo(fs, "/repo"))
   // Create a commit to get a real ref
   fs.write_string("/repo/a.txt", "hello\n")
@@ -228,5 +228,5 @@ test "parse_upload_pack_request_v2: extra delimiter" {
   }
 }
 
-// Note: Oracle tests for upload-pack are in src/git_oracle_pack_test.mbt
+// Note: Oracle tests for upload-pack are in src/bit_oracle_pack_test.mbt
 // (main package) which has access to native-only features (@process, @fs).

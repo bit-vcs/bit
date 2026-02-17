@@ -33,11 +33,11 @@ test "perf: partial clone access pattern verification" {
     )
     let ref_path = git_dir + "/" + ref_name
     let ref_content = osfs.read_file(ref_path)
-    @git.ObjectId::from_hex(
+    @bit.ObjectId::from_hex(
       @utf8.decode_lossy(ref_content[:]).trim().to_string(),
     )
   } else {
-    @git.ObjectId::from_hex(head_str)
+    @bit.ObjectId::from_hex(head_str)
   }
 
   // Phase 1: Mount (instant - only HEAD parsing)
@@ -139,11 +139,11 @@ test "perf: verify lazy vs eager difference" {
     )
     let ref_path = git_dir + "/" + ref_name
     let ref_content = osfs.read_file(ref_path)
-    @git.ObjectId::from_hex(
+    @bit.ObjectId::from_hex(
       @utf8.decode_lossy(ref_content[:]).trim().to_string(),
     )
   } else {
-    @git.ObjectId::from_hex(head_str)
+    @bit.ObjectId::from_hex(head_str)
   }
 
   // Lazy mode (default, fast)

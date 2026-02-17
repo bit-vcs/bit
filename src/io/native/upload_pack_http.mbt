@@ -21,7 +21,7 @@ fn ensure_process_transport_options(
 pub async fn upload_pack_info_refs_http(
   remote : String,
   prefer_v2 : Bool,
-) -> Bytes raise @git.GitError {
+) -> Bytes raise @bit.GitError {
   if remote_uses_http_transport(remote) {
     upload_pack_info_refs_with_http(remote, prefer_v2, native_http_get)
   } else {
@@ -34,7 +34,7 @@ pub async fn upload_pack_request_http(
   remote : String,
   body : Bytes,
   prefer_v2 : Bool,
-) -> Bytes raise @git.GitError {
+) -> Bytes raise @bit.GitError {
   if remote_uses_http_transport(remote) {
     upload_pack_request_with_http(remote, body, prefer_v2, native_http_post)
   } else {
@@ -47,11 +47,11 @@ pub async fn discover_upload_refs_http(
   remote : String,
   prefer_v2 : Bool,
 ) -> (
-  Array[(@git.ObjectId, String)],
+  Array[(@bit.ObjectId, String)],
   Array[String],
   @protocol.ProtocolVersion,
   Map[String, String],
-) raise @git.GitError {
+) raise @bit.GitError {
   if remote_uses_http_transport(remote) {
     discover_upload_refs_with_http(
       remote, prefer_v2, native_http_get, native_http_post,
@@ -64,11 +64,11 @@ pub async fn discover_upload_refs_http(
 ///|
 pub async fn fetch_pack_http(
   remote : String,
-  wants : Array[@git.ObjectId],
+  wants : Array[@bit.ObjectId],
   prefer_v2 : Bool,
   depth? : Int = 0,
   filter? : @protocol.FilterSpec = @protocol.FilterSpec::NoFilter,
-) -> Bytes raise @git.GitError {
+) -> Bytes raise @bit.GitError {
   if remote_uses_http_transport(remote) {
     fetch_pack_with_http(
       remote, wants, prefer_v2, depth, filter, native_http_get, native_http_post,
@@ -82,11 +82,11 @@ pub async fn fetch_pack_http(
 ///|
 pub async fn fetch_objects_http(
   remote : String,
-  wants : Array[@git.ObjectId],
+  wants : Array[@bit.ObjectId],
   prefer_v2 : Bool,
   depth? : Int = 0,
   filter? : @protocol.FilterSpec = @protocol.FilterSpec::NoFilter,
-) -> Array[@git.PackObject] raise @git.GitError {
+) -> Array[@bit.PackObject] raise @bit.GitError {
   if remote_uses_http_transport(remote) {
     fetch_objects_with_http(
       remote, wants, prefer_v2, depth, filter, native_http_get, native_http_post,
@@ -103,7 +103,7 @@ pub async fn clone_http(
   prefer_v2 : Bool,
   depth? : Int = 0,
   filter? : @protocol.FilterSpec = @protocol.FilterSpec::NoFilter,
-) -> (Array[(@git.ObjectId, String)], Array[@git.PackObject]) raise @git.GitError {
+) -> (Array[(@bit.ObjectId, String)], Array[@bit.PackObject]) raise @bit.GitError {
   if remote_uses_http_transport(remote) {
     clone_with_http(
       remote, prefer_v2, depth, filter, native_http_get, native_http_post,
@@ -121,12 +121,12 @@ pub async fn clone_http(
 pub async fn clone_http_to_fs(
   remote : String,
   prefer_v2 : Bool,
-  fs : &@git.FileSystem,
+  fs : &@bit.FileSystem,
   root : String,
   depth? : Int = 0,
   filter? : @protocol.FilterSpec = @protocol.FilterSpec::NoFilter,
   no_checkout? : Bool = false,
-) -> Array[(@git.ObjectId, String)] raise @git.GitError {
+) -> Array[(@bit.ObjectId, String)] raise @bit.GitError {
   if remote_uses_http_transport(remote) {
     clone_to_fs_with_http(
       remote,

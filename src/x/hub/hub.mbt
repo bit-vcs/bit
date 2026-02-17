@@ -14,7 +14,7 @@ pub fn Hub::load(
   node_id? : String = "local",
   signing_key? : String? = None,
   require_signed? : Bool = false,
-) -> Hub raise @git.GitError {
+) -> Hub raise @bit.GitError {
   let store = HubStore::load(
     objects,
     refs,
@@ -31,7 +31,7 @@ pub fn Hub::reload_store(
   self : Hub,
   objects : &@lib.ObjectStore,
   refs : &@lib.RefStore,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   self.store = HubStore::load(
     objects,
     refs,
@@ -49,7 +49,7 @@ pub fn Hub::init(
   node_id? : String = "local",
   signing_key? : String? = None,
   require_signed? : Bool = false,
-) -> Hub raise @git.GitError {
+) -> Hub raise @bit.GitError {
   Hub::load(objects, refs, node_id~, signing_key~, require_signed~)
 }
 
@@ -67,28 +67,28 @@ pub fn Hub::create_pr(
   author : String,
   source_repo? : String? = None,
   source_ref? : String? = None,
-) -> PullRequest raise @git.GitError {
+) -> PullRequest raise @bit.GitError {
   let timestamp = clock.now()
   // Resolve source and target commits
   let source_commit = refs.resolve(source_branch) catch {
     _ =>
-      raise @git.GitError::InvalidObject(
+      raise @bit.GitError::InvalidObject(
         "Cannot resolve source branch: \{source_branch}",
       )
   }
   guard source_commit is Some(src_id) else {
-    raise @git.GitError::InvalidObject(
+    raise @bit.GitError::InvalidObject(
       "Source branch not found: \{source_branch}",
     )
   }
   let target_commit = refs.resolve(target_branch) catch {
     _ =>
-      raise @git.GitError::InvalidObject(
+      raise @bit.GitError::InvalidObject(
         "Cannot resolve target branch: \{target_branch}",
       )
   }
   guard target_commit is Some(tgt_id) else {
-    raise @git.GitError::InvalidObject(
+    raise @bit.GitError::InvalidObject(
       "Target branch not found: \{target_branch}",
     )
   }
@@ -181,10 +181,10 @@ pub fn Hub::update_pr(
   title? : String? = None,
   body? : String? = None,
   labels? : Array[String]? = None,
-) -> PullRequest raise @git.GitError {
+) -> PullRequest raise @bit.GitError {
   let pr = self.get_pr(objects, pr_id)
   guard pr is Some(existing) else {
-    raise @git.GitError::InvalidObject("PR not found: \{pr_id}")
+    raise @bit.GitError::InvalidObject("PR not found: \{pr_id}")
   }
   let new_title = match title {
     Some(t) => t
@@ -236,13 +236,13 @@ pub fn Hub::close_pr(
   refs : &@lib.RefStore,
   clock : &@lib.Clock,
   pr_id : String,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let pr = self.get_pr(objects, pr_id)
   guard pr is Some(existing) else {
-    raise @git.GitError::InvalidObject("PR not found: \{pr_id}")
+    raise @bit.GitError::InvalidObject("PR not found: \{pr_id}")
   }
   if existing.state != PrState::Open {
-    raise @git.GitError::InvalidObject("PR is not open: \{pr_id}")
+    raise @bit.GitError::InvalidObject("PR is not open: \{pr_id}")
   }
   // Create updated PR with Closed state
   let updated = PullRequest::new(
@@ -282,13 +282,13 @@ pub fn Hub::reopen_pr(
   refs : &@lib.RefStore,
   clock : &@lib.Clock,
   pr_id : String,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let pr = self.get_pr(objects, pr_id)
   guard pr is Some(existing) else {
-    raise @git.GitError::InvalidObject("PR not found: \{pr_id}")
+    raise @bit.GitError::InvalidObject("PR not found: \{pr_id}")
   }
   if existing.state != PrState::Closed {
-    raise @git.GitError::InvalidObject("PR is not closed: \{pr_id}")
+    raise @bit.GitError::InvalidObject("PR is not closed: \{pr_id}")
   }
   let updated = PullRequest::new(
     existing.id,
@@ -327,7 +327,7 @@ fn generate_entity_id(
   seed : String,
 ) -> String {
   let base = kind + "\n" + author + "\n" + timestamp.to_string() + "\n" + seed
-  let (id, _compressed) = @git.create_blob_string(base)
+  let (id, _compressed) = @bit.create_blob_string(base)
   short_hex_id(id.to_hex(), 8)
 }
 

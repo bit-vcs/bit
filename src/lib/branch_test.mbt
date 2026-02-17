@@ -1,8 +1,8 @@
 ///| Tests for git branch listing
 
 ///|
-fn setup_branch_fs() -> @git.TestFs {
-  let fs = @git.TestFs::new()
+fn setup_branch_fs() -> @bit.TestFs {
+  let fs = @bit.TestFs::new()
   fs.mkdir_p("/repo/.git")
   fs.mkdir_p("/repo/.git/refs/heads")
   fs
@@ -86,7 +86,7 @@ test "branch: resolve_ref follows linked worktree commondir" {
 
 ///|
 test "branch: create_branch_at writes refs in bare repository root" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   fs.mkdir_p("/bare/refs/heads")
   fs.mkdir_p("/bare/objects")
   fs.write_string("/bare/HEAD", "ref: refs/heads/main\n")
@@ -95,7 +95,7 @@ test "branch: create_branch_at writes refs in bare repository root" {
     fs,
     "/bare",
     "wt",
-    @git.ObjectId::from_hex("dddddddddddddddddddddddddddddddddddddddd"),
+    @bit.ObjectId::from_hex("dddddddddddddddddddddddddddddddddddddddd"),
   )
   let content = fs.read_string("/bare/refs/heads/wt")
   assert_true(content.has_prefix("dddddddddd"))

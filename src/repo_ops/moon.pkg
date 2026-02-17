@@ -1,8 +1,8 @@
 import {
   "mizchi/bit/repo" @repo,
   "mizchi/bit/types" @types,
-  "mizchi/bit/lib" @gitlib,
-  "mizchi/bit/hash" @githash,
+  "mizchi/bit/lib" @bitlib,
+  "mizchi/bit/hash" @bithash,
   "mizchi/bit/object" @object,
   "moonbitlang/core/encoding/utf8" @utf8,
 }

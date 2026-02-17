@@ -9,12 +9,12 @@ pub struct HttpResponse {
 
 ///|
 pub fn receive_pack_info_refs_response(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   root : String,
   auth_header : String?,
   token : String,
   agent? : String = "git/moonbit",
-) -> HttpResponse raise @git.GitError {
+) -> HttpResponse raise @bit.GitError {
   if not(check_bearer_token(auth_header, token)) {
     return {
       status: 401,
@@ -37,13 +37,13 @@ pub fn receive_pack_info_refs_response(
 
 ///|
 pub fn receive_pack_response(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   auth_header : String?,
   token : String,
   body : Bytes,
-) -> HttpResponse raise @git.GitError {
+) -> HttpResponse raise @bit.GitError {
   if not(check_bearer_token(auth_header, token)) {
     return {
       status: 401,

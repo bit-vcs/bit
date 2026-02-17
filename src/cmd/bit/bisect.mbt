@@ -2,8 +2,8 @@
 async fn handle_bisect(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let fs = OsFs::new()
-  let wfs : &@git.FileSystem = fs
-  let rfs : &@git.RepoFileSystem = fs
+  let wfs : &@bitcore.FileSystem = fs
+  let rfs : &@bitcore.RepoFileSystem = fs
   let git_dir = resolve_git_dir(rfs, root)
   let subcmd = args.get(0).unwrap_or("help")
   match subcmd {
@@ -40,8 +40,8 @@ async fn handle_bisect(args : Array[String]) -> Unit raise Error {
 
 ///|
 async fn bisect_start(
-  wfs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  wfs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   _root : String,
   git_dir : String,
   args : Array[String],
@@ -101,8 +101,8 @@ async fn bisect_start(
 
 ///|
 async fn bisect_mark(
-  wfs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  wfs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   git_dir : String,
   args : Array[String],
   mark_type : String,
@@ -118,13 +118,13 @@ async fn bisect_mark(
   }
   // Get commit to mark (default HEAD)
   let commit_ref = args.get(1).unwrap_or("HEAD")
-  let commit_id = @gitrepo.rev_parse(rfs, git_dir, commit_ref)
+  let commit_id = @bitrepo.rev_parse(rfs, git_dir, commit_ref)
   guard commit_id is Some(cid) else {
-    raise @git.GitError::InvalidObject("unknown revision: \{commit_ref}")
+    raise @bitcore.GitError::InvalidObject("unknown revision: \{commit_ref}")
   }
   let commit_hex = cid.to_hex()
   // Get commit message for log
-  let db = @gitlib.ObjectDb::load(rfs, git_dir)
+  let db = @bitlib.ObjectDb::load(rfs, git_dir)
   let obj = db.get(rfs, cid)
   let commit_msg = match obj {
     Some(o) => {
@@ -156,8 +156,8 @@ async fn bisect_mark(
 
 ///|
 async fn bisect_skip(
-  wfs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  wfs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   git_dir : String,
   args : Array[String],
 ) -> Unit raise Error {
@@ -171,9 +171,9 @@ async fn bisect_skip(
   }
   // Get commit to skip (default HEAD)
   let commit_ref = args.get(1).unwrap_or("HEAD")
-  let commit_id = @gitrepo.rev_parse(rfs, git_dir, commit_ref)
+  let commit_id = @bitrepo.rev_parse(rfs, git_dir, commit_ref)
   guard commit_id is Some(cid) else {
-    raise @git.GitError::InvalidObject("unknown revision: \{commit_ref}")
+    raise @bitcore.GitError::InvalidObject("unknown revision: \{commit_ref}")
   }
   let commit_hex = cid.to_hex()
   // Write skip ref
@@ -191,8 +191,8 @@ async fn bisect_skip(
 
 ///|
 async fn bisect_next(
-  wfs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  wfs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   git_dir : String,
 ) -> Unit raise Error {
   let bisect_refs_dir = git_dir + "/refs/bisect"
@@ -204,10 +204,10 @@ async fn bisect_next(
     return
   }
   let bad_hex = rfs.read_file(bad_path) |> decode_bytes |> trim_string
-  let bad_id = @git.ObjectId::from_hex(bad_hex)
+  let bad_id = @bitcore.ObjectId::from_hex(bad_hex)
   // Read good commits
-  let good_commits : Array[@git.ObjectId] = []
-  let bisect_entries = (rfs : &@git.RepoFileSystem).readdir(bisect_refs_dir) catch {
+  let good_commits : Array[@bitcore.ObjectId] = []
+  let bisect_entries = (rfs : &@bitcore.RepoFileSystem).readdir(bisect_refs_dir) catch {
     err if @async.is_cancellation_error(err) => raise err
     _ => []
   }
@@ -216,7 +216,7 @@ async fn bisect_next(
       let good_hex = trim_string(
         decode_bytes(rfs.read_file(bisect_refs_dir + "/" + entry)),
       )
-      good_commits.push(@git.ObjectId::from_hex(good_hex))
+      good_commits.push(@bitcore.ObjectId::from_hex(good_hex))
     }
   }
   if good_commits.length() == 0 {
@@ -224,17 +224,17 @@ async fn bisect_next(
     return
   }
   // Read skip commits
-  let skip_commits : Array[@git.ObjectId] = []
+  let skip_commits : Array[@bitcore.ObjectId] = []
   for entry in bisect_entries {
     if entry.has_prefix("skip-") {
       let skip_hex = trim_string(
         decode_bytes(rfs.read_file(bisect_refs_dir + "/" + entry)),
       )
-      skip_commits.push(@git.ObjectId::from_hex(skip_hex))
+      skip_commits.push(@bitcore.ObjectId::from_hex(skip_hex))
     }
   }
   // Get all commits between good and bad using rev-list logic
-  let db = @gitlib.ObjectDb::load(rfs, git_dir)
+  let db = @bitlib.ObjectDb::load(rfs, git_dir)
   let candidates = bisect_get_candidates(
     db, rfs, bad_id, good_commits, skip_commits,
   )
@@ -266,7 +266,7 @@ async fn bisect_next(
   wfs.write_string(bisect_expected_path, mid_hex + "\n")
   // Checkout the commit (detached HEAD)
   let root = git_dir + "/.."
-  ignore(@gitlib.checkout(wfs, rfs, root, mid_hex, detach=true))
+  ignore(@bitlib.checkout(wfs, rfs, root, mid_hex, detach=true))
   print_line(
     "Bisecting: \{remaining} revisions left to test after this (roughly \{steps} steps)",
   )
@@ -290,12 +290,12 @@ fn bisect_steps(n : Int) -> Int {
 
 ///|
 fn bisect_get_candidates(
-  db : @gitlib.ObjectDb,
-  rfs : &@git.RepoFileSystem,
-  bad : @git.ObjectId,
-  goods : Array[@git.ObjectId],
-  skips : Array[@git.ObjectId],
-) -> Array[@git.ObjectId] raise Error {
+  db : @bitlib.ObjectDb,
+  rfs : &@bitcore.RepoFileSystem,
+  bad : @bitcore.ObjectId,
+  goods : Array[@bitcore.ObjectId],
+  skips : Array[@bitcore.ObjectId],
+) -> Array[@bitcore.ObjectId] raise Error {
   // Get all ancestors of bad that are not ancestors of any good
   let good_set : Map[String, Bool] = {}
   // Mark all good commits and their ancestors
@@ -303,9 +303,9 @@ fn bisect_get_candidates(
     mark_ancestors(db, rfs, g, good_set)
   }
   // Collect candidates: ancestors of bad that are not in good_set
-  let candidates : Array[@git.ObjectId] = []
+  let candidates : Array[@bitcore.ObjectId] = []
   let visited : Map[String, Bool] = {}
-  let queue : Array[@git.ObjectId] = [bad]
+  let queue : Array[@bitcore.ObjectId] = [bad]
   while queue.length() > 0 {
     let current = queue.pop()
     guard current is Some(cid) else { break }
@@ -333,7 +333,7 @@ fn bisect_get_candidates(
     let obj = db.get(rfs, cid)
     match obj {
       Some(o) => {
-        let info = @git.parse_commit(o.data)
+        let info = @bitcore.parse_commit(o.data)
         for p in info.parents {
           queue.push(p)
         }
@@ -346,12 +346,12 @@ fn bisect_get_candidates(
 
 ///|
 fn mark_ancestors(
-  db : @gitlib.ObjectDb,
-  rfs : &@git.RepoFileSystem,
-  start : @git.ObjectId,
+  db : @bitlib.ObjectDb,
+  rfs : &@bitcore.RepoFileSystem,
+  start : @bitcore.ObjectId,
   set : Map[String, Bool],
 ) -> Unit {
-  let queue : Array[@git.ObjectId] = [start]
+  let queue : Array[@bitcore.ObjectId] = [start]
   while queue.length() > 0 {
     let current = queue.pop()
     guard current is Some(cid) else { break }
@@ -363,7 +363,7 @@ fn mark_ancestors(
     let obj = db.get(rfs, cid) catch { _ => None }
     match obj {
       Some(o) => {
-        let info = @git.parse_commit(o.data) catch { _ => continue }
+        let info = @bitcore.parse_commit(o.data) catch { _ => continue }
         for p in info.parents {
           queue.push(p)
         }
@@ -375,8 +375,8 @@ fn mark_ancestors(
 
 ///|
 async fn bisect_reset(
-  wfs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  wfs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   root : String,
   git_dir : String,
   args : Array[String],
@@ -401,13 +401,13 @@ async fn bisect_reset(
     // Try to checkout branch
     if rfs.is_file(git_dir + "/refs/heads/" + checkout_ref) {
       // Checkout the branch (not detached)
-      ignore(@gitlib.checkout(wfs, rfs, root, checkout_ref, detach=false))
+      ignore(@bitlib.checkout(wfs, rfs, root, checkout_ref, detach=false))
     } else {
       // Try to checkout as a commit (detached)
-      let target = @gitrepo.rev_parse(rfs, git_dir, checkout_ref)
+      let target = @bitrepo.rev_parse(rfs, git_dir, checkout_ref)
       match target {
         Some(_) =>
-          ignore(@gitlib.checkout(wfs, rfs, root, checkout_ref, detach=true))
+          ignore(@bitlib.checkout(wfs, rfs, root, checkout_ref, detach=true))
         None => ()
       }
     }
@@ -438,7 +438,7 @@ async fn bisect_reset(
     _ => ()
   }
   // Clean up refs/bisect
-  let entries = (rfs : &@git.RepoFileSystem).readdir(bisect_refs_dir) catch {
+  let entries = (rfs : &@bitcore.RepoFileSystem).readdir(bisect_refs_dir) catch {
     err if @async.is_cancellation_error(err) => raise err
     _ => []
   }
@@ -457,7 +457,7 @@ async fn bisect_reset(
 
 ///|
 async fn bisect_log(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   git_dir : String,
 ) -> Unit raise Error {
   let bisect_log_path = git_dir + "/BISECT_LOG"

@@ -4,8 +4,8 @@
 /// Cached ObjectStore that loads ObjectDb once (for benchmarks)
 priv struct CachedTestObjectStore {
   db : @lib.ObjectDb
-  backing_fs : &@git.RepoFileSystem
-  write_fs : &@git.FileSystem
+  backing_fs : &@bit.RepoFileSystem
+  write_fs : &@bit.FileSystem
   git_dir : String
 }
 
@@ -17,7 +17,7 @@ priv enum KvBenchBackend {
 
 ///|
 priv enum KvBenchFixture {
-  MemFixture(Kv, @git.TestFs)
+  MemFixture(Kv, @bit.TestFs)
   FsFixture(Kv, @osfs.OsFs)
 }
 
@@ -61,7 +61,7 @@ fn bench_seed_files(
   db : Kv,
   file_count : Int,
   file_size : Int,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   // Create files with different content to avoid dedup.
   for i = 0; i < file_count; i = i + 1 {
     let path = "dir" +
@@ -77,20 +77,20 @@ fn bench_seed_files(
 
 ///|
 fn bench_resolve_head(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
-) -> @git.ObjectId {
+) -> @bit.ObjectId {
   let resolved = @lib.resolve_ref(fs, git_dir, "HEAD") catch { _ => None }
-  resolved.unwrap_or(@git.ObjectId::zero())
+  resolved.unwrap_or(@bit.ObjectId::zero())
 }
 
 ///|
 fn create_cached_bench_db(
-  backing_fs : &@git.RepoFileSystem,
-  write_fs : &@git.FileSystem,
+  backing_fs : &@bit.RepoFileSystem,
+  write_fs : &@bit.FileSystem,
   git_dir : String,
-  head : @git.ObjectId,
-) -> Kv raise @git.GitError {
+  head : @bit.ObjectId,
+) -> Kv raise @bit.GitError {
   let bitfs = @fs.Fs::empty(git_dir)
   let tree : TestWorkingTree = { fs: bitfs, backing_fs, write_fs }
   let obj_db = @lib.ObjectDb::load(backing_fs, git_dir)
@@ -124,8 +124,8 @@ impl @lib.ObjectStore for CachedTestObjectStore with has(self, id) {
 fn create_bench_db(
   file_count : Int,
   file_size : Int,
-) -> (Kv, @git.TestFs) raise @git.GitError {
-  let fs = @git.TestFs::new()
+) -> (Kv, @bit.TestFs) raise @bit.GitError {
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo")
   let git_dir = "/repo/.git"
   let bitfs = @fs.Fs::empty(git_dir)
@@ -135,7 +135,7 @@ fn create_bench_db(
     NodeId::new("bench-node"),
     tree,
     store,
-    @git.ObjectId::zero(),
+    @bit.ObjectId::zero(),
   )
   bench_seed_files(db, file_count, file_size)
   let cached_kv = create_cached_bench_db(fs, fs, git_dir, db.head())
@@ -148,13 +148,13 @@ fn native_bench_repo_root(file_count : Int, file_size : Int) -> String {
 }
 
 ///|
-fn read_marker_head(marker : String) -> @git.ObjectId? {
+fn read_marker_head(marker : String) -> @bit.ObjectId? {
   let raw = @nfs.read_file_to_string(marker) catch { _ => return None }
   let line = raw.trim().to_string()
   if line.length() == 0 {
     return None
   }
-  let parsed = @git.ObjectId::from_hex(line) catch { _ => return None }
+  let parsed = @bit.ObjectId::from_hex(line) catch { _ => return None }
   Some(parsed)
 }
 
@@ -163,7 +163,7 @@ fn ensure_native_bench_repo(
   root : String,
   file_count : Int,
   file_size : Int,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let marker = bench_join_path(root, ".bench_ready")
   if @nfs.path_exists(marker) {
     return
@@ -180,7 +180,7 @@ fn ensure_native_bench_repo(
     NodeId::new("bench-node"),
     tree,
     store,
-    @git.ObjectId::zero(),
+    @bit.ObjectId::zero(),
   )
   bench_seed_files(db, file_count, file_size)
   @nfs.write_string_to_file(marker, db.head().to_hex()) catch {
@@ -192,7 +192,7 @@ fn ensure_native_bench_repo(
 fn create_bench_db_native(
   file_count : Int,
   file_size : Int,
-) -> (Kv, @osfs.OsFs) raise @git.GitError {
+) -> (Kv, @osfs.OsFs) raise @bit.GitError {
   let root = native_bench_repo_root(file_count, file_size)
   ensure_native_bench_repo(root, file_count, file_size)
   let fs = @osfs.OsFs::new()
@@ -211,7 +211,7 @@ fn create_bench_fixture(
   backend : KvBenchBackend,
   file_count : Int,
   file_size : Int,
-) -> KvBenchFixture raise @git.GitError {
+) -> KvBenchFixture raise @bit.GitError {
   match backend {
     InMemory => {
       let (db, fs) = create_bench_db(file_count, file_size)

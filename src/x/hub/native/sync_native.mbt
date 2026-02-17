@@ -4,8 +4,8 @@
 /// Native adapter: ObjectDb + RepoFileSystem -> ObjectStore
 priv struct NativeObjectStore {
   db : @lib.ObjectDb
-  rfs : &@git.RepoFileSystem
-  fs : &@git.FileSystem
+  rfs : &@bit.RepoFileSystem
+  fs : &@bit.FileSystem
   git_dir : String
 }
 
@@ -16,7 +16,7 @@ impl @lib.ObjectStore for NativeObjectStore with get(self, id) {
 
 ///|
 impl @lib.ObjectStore for NativeObjectStore with put(self, obj_type, content) {
-  let (id, compressed) = @git.create_object(obj_type, content)
+  let (id, compressed) = @bit.create_object(obj_type, content)
   @hub.write_object_bytes(self.fs, self.git_dir, id, compressed)
   id
 }
@@ -31,7 +31,7 @@ impl @lib.ObjectStore for NativeObjectStore with has(self, id) {
 /// Native read-only adapter for relay push.
 priv struct NativeReadObjectStore {
   db : @lib.ObjectDb
-  rfs : &@git.RepoFileSystem
+  rfs : &@bit.RepoFileSystem
 }
 
 ///|
@@ -45,7 +45,7 @@ impl @lib.ObjectStore for NativeReadObjectStore with put(
   _obj_type,
   _content,
 ) {
-  raise @git.GitError::InvalidObject("NativeReadObjectStore is read-only")
+  raise @bit.GitError::InvalidObject("NativeReadObjectStore is read-only")
 }
 
 ///|
@@ -57,8 +57,8 @@ impl @lib.ObjectStore for NativeReadObjectStore with has(self, id) {
 ///|
 /// Native adapter: FileSystem + git_dir -> RefStore
 priv struct NativeRefStore {
-  fs : &@git.FileSystem
-  rfs : &@git.RepoFileSystem
+  fs : &@bit.FileSystem
+  rfs : &@bit.RepoFileSystem
   git_dir : String
 }
 
@@ -89,7 +89,7 @@ impl @lib.RefStore for NativeRefStore with list(self, _prefix) {
 ///|
 /// Native read-only ref adapter for relay push.
 priv struct NativeReadRefStore {
-  rfs : &@git.RepoFileSystem
+  rfs : &@bit.RepoFileSystem
   git_dir : String
 }
 
@@ -229,12 +229,12 @@ fn parse_relay_base_url(remote_url : String) -> String? {
 }
 
 ///|
-fn should_fallback_to_relay(err : @git.GitError, remote_url : String) -> Bool {
+fn should_fallback_to_relay(err : @bit.GitError, remote_url : String) -> Bool {
   if not(is_http_url(remote_url)) {
     return false
   }
   match err {
-    @git.GitError::ProtocolError(msg) => msg.contains("HTTP 404")
+    @bit.GitError::ProtocolError(msg) => msg.contains("HTTP 404")
     _ => false
   }
 }
@@ -282,15 +282,15 @@ fn parse_relay_publish_accepted(text : String) -> Bool {
 ///|
 fn parse_relay_poll_body(
   text : String,
-) -> (Int, Array[@hub.HubRecord]) raise @git.GitError {
+) -> (Int, Array[@hub.HubRecord]) raise @bit.GitError {
   let parsed = @json.parse(text) catch {
     err =>
-      raise @git.GitError::InvalidObject(
+      raise @bit.GitError::InvalidObject(
         "invalid relay poll response: \{err.to_string()}",
       )
   }
   guard parsed is Json::Object(root) else {
-    raise @git.GitError::InvalidObject(
+    raise @bit.GitError::InvalidObject(
       "invalid relay poll response: expected object",
     )
   }
@@ -319,7 +319,7 @@ fn parse_relay_poll_body(
 
 ///|
 fn hub_record_entry_name(key : String) -> String {
-  let (target_id, _) = @git.create_blob_string(key)
+  let (target_id, _) = @bit.create_blob_string(key)
   target_id.to_hex()
 }
 
@@ -372,7 +372,7 @@ fn relay_compute_record_signature(
   record : @hub.HubRecord,
   signing_key : String,
 ) -> String {
-  let state = @git.Sha1State::new()
+  let state = @bit.Sha1State::new()
   state.update_string(relay_serialize_record_unsigned(record))
   state.update_string("\n--signing-key--\n")
   state.update_string(signing_key)
@@ -403,20 +403,20 @@ fn commit_relay_notes(
   refs : &@lib.RefStore,
   message : String,
   timestamp : Int64,
-) -> @git.ObjectId raise @git.GitError {
-  let tree_entries : Array[@git.TreeEntry] = []
+) -> @bit.ObjectId raise @bit.GitError {
+  let tree_entries : Array[@bit.TreeEntry] = []
   for item in store.entries.to_array() {
     let (name, blob_id) = item
-    tree_entries.push(@git.TreeEntry::new("100644", name, blob_id))
+    tree_entries.push(@bit.TreeEntry::new("100644", name, blob_id))
   }
   tree_entries.sort_by((a, b) => String::compare(a.name, b.name))
-  let tree_bytes = @git.serialize_tree(tree_entries)
-  let tree_id = objects.put(@git.ObjectType::Tree, tree_bytes)
+  let tree_bytes = @bit.serialize_tree(tree_entries)
+  let tree_id = objects.put(@bit.ObjectType::Tree, tree_bytes)
   let parents = match store.head {
     Some(p) => [p]
     None => []
   }
-  let commit = @git.Commit::new(
+  let commit = @bit.Commit::new(
     tree_id,
     parents,
     "Hub <hub@local>",
@@ -427,8 +427,8 @@ fn commit_relay_notes(
     "+0000",
     message + "\n",
   )
-  let commit_bytes = @git.serialize_commit_content(commit)
-  let commit_id = objects.put(@git.ObjectType::Commit, commit_bytes)
+  let commit_bytes = @bit.serialize_commit_content(commit)
+  let commit_id = objects.put(@bit.ObjectType::Commit, commit_bytes)
   refs.update(@hub.hub_notes_ref_name(), Some(commit_id))
   commit_id
 }
@@ -439,7 +439,7 @@ fn apply_relay_record(
   objects : &@lib.ObjectStore,
   record : @hub.HubRecord,
   conflict_policy : @hub.RecordMergePolicy,
-) -> Bool raise @git.GitError {
+) -> Bool raise @bit.GitError {
   if not(
       relay_record_matches_signing_policy(
         record,
@@ -454,7 +454,7 @@ fn apply_relay_record(
   let current_blob_id = store.entries.get(entry_name)
   match current_blob_id {
     None => {
-      let next_blob_id = objects.put(@git.ObjectType::Blob, incoming_bytes)
+      let next_blob_id = objects.put(@bit.ObjectType::Blob, incoming_bytes)
       store.entries[entry_name] = next_blob_id
       true
     }
@@ -462,7 +462,7 @@ fn apply_relay_record(
       let existing_obj = objects.get(existing_blob_id)
       match existing_obj {
         None => {
-          let next_blob_id = objects.put(@git.ObjectType::Blob, incoming_bytes)
+          let next_blob_id = objects.put(@bit.ObjectType::Blob, incoming_bytes)
           store.entries[entry_name] = next_blob_id
           true
         }
@@ -475,7 +475,7 @@ fn apply_relay_record(
           if merged == existing_blob.data {
             false
           } else {
-            let next_blob_id = objects.put(@git.ObjectType::Blob, merged)
+            let next_blob_id = objects.put(@bit.ObjectType::Blob, merged)
             store.entries[entry_name] = next_blob_id
             true
           }
@@ -494,7 +494,7 @@ fn apply_relay_records(
   commit_timestamp : Int64,
   message : String,
   conflict_policy : @hub.RecordMergePolicy,
-) -> Bool raise @git.GitError {
+) -> Bool raise @bit.GitError {
   let mut changed = false
   for record in records {
     if apply_relay_record(store, objects, record, conflict_policy) {
@@ -510,7 +510,7 @@ fn apply_relay_records(
 
 ///|
 fn relay_cursor_key(remote_url : String) -> String {
-  let (id, _) = @git.create_blob_string(remote_url)
+  let (id, _) = @bit.create_blob_string(remote_url)
   id.to_hex()
 }
 
@@ -521,7 +521,7 @@ fn relay_cursor_path(git_dir : String, remote_url : String) -> String {
 
 ///|
 fn read_relay_cursor(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   remote_url : String,
 ) -> Int {
@@ -542,11 +542,11 @@ fn read_relay_cursor(
 
 ///|
 fn write_relay_cursor(
-  fs : &@git.FileSystem,
+  fs : &@bit.FileSystem,
   git_dir : String,
   remote_url : String,
   cursor : Int,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let path = relay_cursor_path(git_dir, remote_url)
   let dir = parent_path(path)
   fs.mkdir_p(dir)
@@ -565,17 +565,17 @@ fn relay_poll_url(base_url : String, after : Int, limit : Int) -> String {
 
 ///|
 async fn relay_push_with_http(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   remote_url : String,
   http_post : async (String, Bytes, Map[String, String]) -> (
-    @git.HttpResponse,
+    @bit.HttpResponse,
     Bytes,
-  ) raise @git.GitError,
+  ) raise @bit.GitError,
   signing_key~ : String?,
   require_signed? : Bool = false,
   auth_token~ : String?,
-) -> @hub.PrSyncResult raise @git.GitError {
+) -> @hub.PrSyncResult raise @bit.GitError {
   let ref_name = @hub.hub_notes_ref_name()
   let local_commit = @lib.resolve_ref(rfs, git_dir, ref_name)
   guard local_commit is Some(local_id) else {
@@ -610,7 +610,7 @@ async fn relay_push_with_http(
     payload_obj["kind"] = Json::string("hub.record")
     payload_obj["record"] = Json::string(record.serialize())
     let payload_text = Json::object(payload_obj).stringify()
-    let (record_blob_id, _) = @git.create_blob_string(record.serialize())
+    let (record_blob_id, _) = @bit.create_blob_string(record.serialize())
     let event_id = record_blob_id.to_hex()
     let url = relay_publish_url(base_url, event_id)
     let (response, response_body) = http_post(
@@ -642,16 +642,16 @@ async fn relay_push_with_http(
 ///|
 async fn relay_fetch_with_http(
   hub : @hub.Hub,
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   remote_url : String,
-  http_get : async (String, Map[String, String]) -> (@git.HttpResponse, Bytes) raise @git.GitError,
+  http_get : async (String, Map[String, String]) -> (@bit.HttpResponse, Bytes) raise @bit.GitError,
   signing_key~ : String?,
   require_signed? : Bool = false,
   auth_token~ : String?,
   conflict_policy? : @hub.RecordMergePolicy = @hub.default_record_merge_policy(),
-) -> @hub.PrSyncResult raise @git.GitError {
+) -> @hub.PrSyncResult raise @bit.GitError {
   let base_url = trim_trailing_slash(remote_url)
   let before = @lib.resolve_ref(rfs, git_dir, @hub.hub_notes_ref_name())
   let cursor = read_relay_cursor(rfs, git_dir, base_url)
@@ -718,10 +718,10 @@ async fn relay_fetch_with_http(
 ///|
 /// Push hub notes ref to remote (git smart-http transport)
 async fn hub_push_git_http(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   remote_url : String,
-) -> @hub.PrSyncResult raise @git.GitError {
+) -> @hub.PrSyncResult raise @bit.GitError {
   let ref_name = @hub.hub_notes_ref_name()
   let local_commit = @lib.resolve_ref(rfs, git_dir, ref_name)
   guard local_commit is Some(local_id) else {
@@ -736,10 +736,10 @@ async fn hub_push_git_http(
   let objects = @lib.collect_reachable_objects(db, rfs, local_id)
   let pack = @pack.create_packfile(objects)
   let remote = @protocol.Remote::new(remote_url)
-  let refs = @gitionative.discover_receive_refs_http(remote)
+  let refs = @bitnative.discover_receive_refs_http(remote)
   let (old_id, push_ref) = @hub.find_remote_notes_ref(refs)
   let req = @protocol.PushRequest::new(old_id, local_id, push_ref, pack)
-  let result = @gitionative.push(remote, req)
+  let result = @bitnative.push(remote, req)
   if result.has_prefix("unpack ok") ||
     result.has_prefix("ok ") ||
     result.has_prefix("Push successful") {
@@ -763,14 +763,14 @@ async fn hub_push_git_http(
 /// Fetch hub notes ref from remote and merge (git smart-http transport)
 async fn hub_fetch_git_http(
   hub : @hub.Hub,
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   remote_url : String,
   conflict_policy? : @hub.RecordMergePolicy = @hub.default_record_merge_policy(),
-) -> @hub.PrSyncResult raise @git.GitError {
+) -> @hub.PrSyncResult raise @bit.GitError {
   let ref_name = @hub.hub_notes_ref_name()
-  let (refs, _, _, _) = @gitionative.discover_upload_refs_http(remote_url, true)
+  let (refs, _, _, _) = @bitnative.discover_upload_refs_http(remote_url, true)
   let remote_id = @hub.find_upload_notes_ref(refs)
   guard remote_id is Some((rid, remote_ref)) else {
     return @hub.PrSyncResult::new(
@@ -780,7 +780,7 @@ async fn hub_fetch_git_http(
       None,
     )
   }
-  let pack = @gitionative.fetch_pack_http(remote_url, [rid], true)
+  let pack = @bitnative.fetch_pack_http(remote_url, [rid], true)
   let objects = @pack.parse_packfile(pack)
   @pack.write_packfile_with_index(fs, git_dir, pack, objects)
   let remote_short = @hub.short_ref_name(remote_ref)
@@ -830,14 +830,14 @@ async fn hub_fetch_git_http(
 /// Push hub notes ref to remote
 pub async fn hub_push(
   _hub : @hub.Hub,
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   remote_url : String,
   signing_key~ : String?,
   require_signed~ : Bool?,
   auth_token~ : String?,
   conflict_policy~ : @hub.RecordMergePolicy?,
-) -> @hub.PrSyncResult raise @git.GitError {
+) -> @hub.PrSyncResult raise @bit.GitError {
   let effective_signing_key = match signing_key {
     Some(value) => Some(value)
     None => relay_signing_key()
@@ -860,7 +860,7 @@ pub async fn hub_push(
         rfs,
         git_dir,
         base_url,
-        @gitionative.native_http_post,
+        @bitnative.native_http_post,
         signing_key=effective_signing_key,
         require_signed=effective_require_signed,
         auth_token=effective_auth_token,
@@ -876,7 +876,7 @@ pub async fn hub_push(
               rfs,
               git_dir,
               trim_trailing_slash(remote_url),
-              @gitionative.native_http_post,
+              @bitnative.native_http_post,
               signing_key=effective_signing_key,
               require_signed=effective_require_signed,
               auth_token=effective_auth_token,
@@ -893,15 +893,15 @@ pub async fn hub_push(
 /// Fetch hub notes ref from remote and merge
 pub async fn hub_fetch(
   hub : @hub.Hub,
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   remote_url : String,
   signing_key~ : String?,
   require_signed~ : Bool?,
   auth_token~ : String?,
   conflict_policy~ : @hub.RecordMergePolicy?,
-) -> @hub.PrSyncResult raise @git.GitError {
+) -> @hub.PrSyncResult raise @bit.GitError {
   let effective_signing_key = match signing_key {
     Some(value) => Some(value)
     None => relay_signing_key()
@@ -926,7 +926,7 @@ pub async fn hub_fetch(
         rfs,
         git_dir,
         base_url,
-        @gitionative.native_http_get,
+        @bitnative.native_http_get,
         signing_key=effective_signing_key,
         require_signed=effective_require_signed,
         auth_token=effective_auth_token,
@@ -952,7 +952,7 @@ pub async fn hub_fetch(
               rfs,
               git_dir,
               trim_trailing_slash(remote_url),
-              @gitionative.native_http_get,
+              @bitnative.native_http_get,
               signing_key=effective_signing_key,
               require_signed=effective_require_signed,
               auth_token=effective_auth_token,

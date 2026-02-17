@@ -1,11 +1,11 @@
 ///|
 /// Write subdir-clone metadata to .git/info/attributes
 pub fn write_subdir_attributes(
-  fs : &@git.FileSystem,
+  fs : &@bit.FileSystem,
   git_dir : String,
   remote_url : String,
   subdir_path : String,
-  base_commit : @git.ObjectId,
+  base_commit : @bit.ObjectId,
 ) -> Unit {
   let info_dir = git_dir + "/info"
   fs.mkdir_p(info_dir) catch {
@@ -31,7 +31,7 @@ pub fn write_subdir_attributes(
 ///|
 /// Read subdir-clone metadata from .git/info/attributes
 pub fn read_subdir_attributes(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> (String, String, String)? {
   let attr_path = git_dir + "/info/attributes"
@@ -60,8 +60,8 @@ pub fn read_subdir_attributes(
 ///|
 /// Update subdir-base in .git/info/attributes
 pub fn update_subdir_base(
-  wfs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  wfs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   new_base : String,
 ) -> Unit {
@@ -72,7 +72,7 @@ pub fn update_subdir_base(
         git_dir,
         remote,
         path,
-        @git.ObjectId::from_hex(new_base) catch {
+        @bit.ObjectId::from_hex(new_base) catch {
           _ => return
         },
       )
@@ -82,14 +82,14 @@ pub fn update_subdir_base(
 
 ///|
 /// Check if current directory is a subdir-clone
-pub fn is_subdir_clone(fs : &@git.RepoFileSystem, git_dir : String) -> Bool {
+pub fn is_subdir_clone(fs : &@bit.RepoFileSystem, git_dir : String) -> Bool {
   read_subdir_attributes(fs, git_dir) is Some(_)
 }
 
 ///|
 /// Get effective remote URL - prefers subdir remote over config
 pub fn get_effective_remote_url(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> String? {
   // First check subdir-clone attributes
@@ -102,7 +102,7 @@ pub fn get_effective_remote_url(
 ///|
 /// Get subdir info for display (remote, path, base)
 pub fn get_subdir_info(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> (String, String, String)? {
   read_subdir_attributes(fs, git_dir)
@@ -112,13 +112,13 @@ pub fn get_subdir_info(
 /// Get the subdir tree from a commit (for subdir-clone operations)
 pub fn get_subdir_tree_from_commit(
   db : ObjectDb,
-  fs : &@git.RepoFileSystem,
-  commit_id : @git.ObjectId,
+  fs : &@bit.RepoFileSystem,
+  commit_id : @bit.ObjectId,
   subdir_path : String,
-) -> @git.ObjectId? raise @git.GitError {
+) -> @bit.ObjectId? raise @bit.GitError {
   let obj = db.get(fs, commit_id)
   guard obj is Some(o) else { return None }
-  let info = @git.parse_commit(o.data) catch { err => raise err }
+  let info = @bit.parse_commit(o.data) catch { err => raise err }
   find_subtree(db, fs, info.tree, subdir_path) catch {
     err => raise err
   }
@@ -127,10 +127,10 @@ pub fn get_subdir_tree_from_commit(
 ///|
 /// Resolve a ref to commit ID, handling both local and remote refs
 pub fn resolve_ref_for_subdir(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
   refspec : String,
-) -> @git.ObjectId? raise @git.GitError {
+) -> @bit.ObjectId? raise @bit.GitError {
   // Try direct rev_parse first
   match rev_parse(fs, git_dir, refspec) {
     Some(id) => Some(id)
@@ -139,7 +139,7 @@ pub fn resolve_ref_for_subdir(
       let remote_path = git_dir + "/refs/remotes/" + refspec
       let bytes = fs.read_file(remote_path) catch { _ => return None }
       let hex = bytes_to_string(bytes).trim(chars=" \n\t").to_string()
-      let id = @git.ObjectId::from_hex(hex) catch { _ => return None }
+      let id = @bit.ObjectId::from_hex(hex) catch { _ => return None }
       Some(id)
     }
   }
@@ -148,10 +148,10 @@ pub fn resolve_ref_for_subdir(
 ///|
 fn find_subtree(
   db : ObjectDb,
-  rfs : &@git.RepoFileSystem,
-  tree_id : @git.ObjectId,
+  rfs : &@bit.RepoFileSystem,
+  tree_id : @bit.ObjectId,
   path : String,
-) -> @git.ObjectId? raise @git.GitError {
+) -> @bit.ObjectId? raise @bit.GitError {
   let parts : Array[String] = []
   for p in path.split("/") {
     let s = p.to_string()
@@ -163,7 +163,7 @@ fn find_subtree(
   for part in parts {
     let obj = db.get(rfs, current)
     guard obj is Some(tree_obj) else { return None }
-    let entries = @git.parse_tree(tree_obj.data) catch { err => raise err }
+    let entries = @bit.parse_tree(tree_obj.data) catch { err => raise err }
     let mut found = false
     for entry in entries {
       if entry.name == part {
@@ -185,13 +185,13 @@ fn find_subtree(
 ///|
 pub fn collect_tree_blobs(
   db : ObjectDb,
-  rfs : &@git.RepoFileSystem,
-  tree_id : @git.ObjectId,
-) -> Array[@git.ObjectId] raise @git.GitError {
-  let blobs : Array[@git.ObjectId] = []
+  rfs : &@bit.RepoFileSystem,
+  tree_id : @bit.ObjectId,
+) -> Array[@bit.ObjectId] raise @bit.GitError {
+  let blobs : Array[@bit.ObjectId] = []
   let obj = db.get(rfs, tree_id)
   guard obj is Some(tree_obj) else { return blobs }
-  let entries = @git.parse_tree(tree_obj.data) catch { err => raise err }
+  let entries = @bit.parse_tree(tree_obj.data) catch { err => raise err }
   for entry in entries {
     if entry.mode == "40000" || entry.mode == "040000" {
       let sub_blobs = collect_tree_blobs(db, rfs, entry.id) catch {
@@ -210,14 +210,14 @@ pub fn collect_tree_blobs(
 ///|
 pub fn write_tree_to_worktree(
   db : ObjectDb,
-  rfs : &@git.RepoFileSystem,
-  wfs : &@git.FileSystem,
-  tree_id : @git.ObjectId,
+  rfs : &@bit.RepoFileSystem,
+  wfs : &@bit.FileSystem,
+  tree_id : @bit.ObjectId,
   dir : String,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let obj = db.get(rfs, tree_id)
   guard obj is Some(tree_obj) else { return }
-  let entries = @git.parse_tree(tree_obj.data) catch { err => raise err }
+  let entries = @bit.parse_tree(tree_obj.data) catch { err => raise err }
   for entry in entries {
     let path = dir + "/" + entry.name
     if entry.mode == "40000" || entry.mode == "040000" {
@@ -239,8 +239,8 @@ pub fn write_tree_to_worktree(
 
 ///|
 pub fn move_directory(
-  rfs : &@git.RepoFileSystem,
-  wfs : &@git.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  wfs : &@bit.FileSystem,
   src : String,
   dst : String,
 ) -> Unit {
@@ -264,8 +264,8 @@ pub fn move_directory(
 
 ///|
 pub fn subdir_remove_dir(
-  rfs : &@git.RepoFileSystem,
-  wfs : &@git.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  wfs : &@bit.FileSystem,
   path : String,
 ) -> Unit {
   let entries = rfs.readdir(path) catch { _ => return }
@@ -336,7 +336,7 @@ fn trim_string(s : String) -> String {
 
 ///|
 fn read_remote_url_from_config(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> String? {
   let config_path = git_dir + "/config"

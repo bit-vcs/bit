@@ -1,8 +1,8 @@
 ///| Tests for reset
 
 ///|
-fn setup_repo_reset() -> @git.TestFs {
-  let fs = @git.TestFs::new()
+fn setup_repo_reset() -> @bit.TestFs {
+  let fs = @bit.TestFs::new()
   ignore(try? init_repo(fs, "/repo"))
   fs
 }

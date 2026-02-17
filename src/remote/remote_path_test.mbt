@@ -1,6 +1,6 @@
 ///|
 test "remote/path: resolve helper URL with relative local path" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   fs.mkdir_p("/work/server/.git/objects")
   let resolved = resolve_local_repo_path(
     fs, "/work/client", "testgit::../server",
@@ -10,7 +10,7 @@ test "remote/path: resolve helper URL with relative local path" {
 
 ///|
 test "remote/path: detect bare git dir" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   fs.mkdir_p("/bare/objects")
   fs.write_string("/bare/HEAD", "ref: refs/heads/main\n")
   let detected = detect_git_dir(fs, "/bare")

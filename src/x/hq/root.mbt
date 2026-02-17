@@ -8,7 +8,7 @@ pub fn hq_root(config : HqConfig) -> String {
 /// Get all configured roots (for ghq compatibility)
 pub fn hq_roots(
   env_get : (String) -> String?,
-  git_config_get_all : (String) -> Array[String],
+  bit_config_get_all : (String) -> Array[String],
 ) -> Array[String] {
   let roots : Array[String] = []
   // Check BHQ_ROOT first
@@ -17,7 +17,7 @@ pub fn hq_roots(
     _ => ()
   }
   // Add ghq.root values
-  let ghq_roots = git_config_get_all("ghq.root")
+  let ghq_roots = bit_config_get_all("ghq.root")
   for root in ghq_roots {
     let expanded = expand_home(root)
     if not(roots.contains(expanded)) {

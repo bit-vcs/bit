@@ -32,22 +32,22 @@ fn json_get_int64(
 }
 
 ///|
-fn object_type_to_string(obj_type : @git.ObjectType) -> String {
+fn object_type_to_string(obj_type : @bit.ObjectType) -> String {
   match obj_type {
-    @git.ObjectType::Commit => "commit"
-    @git.ObjectType::Tree => "tree"
-    @git.ObjectType::Blob => "blob"
-    @git.ObjectType::Tag => "tag"
+    @bit.ObjectType::Commit => "commit"
+    @bit.ObjectType::Tree => "tree"
+    @bit.ObjectType::Blob => "blob"
+    @bit.ObjectType::Tag => "tag"
   }
 }
 
 ///|
-fn parse_object_type(value : String) -> @git.ObjectType? {
+fn parse_object_type(value : String) -> @bit.ObjectType? {
   match value {
-    "commit" => Some(@git.ObjectType::Commit)
-    "tree" => Some(@git.ObjectType::Tree)
-    "blob" => Some(@git.ObjectType::Blob)
-    "tag" => Some(@git.ObjectType::Tag)
+    "commit" => Some(@bit.ObjectType::Commit)
+    "tree" => Some(@bit.ObjectType::Tree)
+    "blob" => Some(@bit.ObjectType::Blob)
+    "tag" => Some(@bit.ObjectType::Tag)
     _ => None
   }
 }
@@ -84,7 +84,7 @@ fn parse_vector_clock(value : Json) -> Result[@kv.VectorClock, String] {
 }
 
 ///|
-fn object_ids_to_json(ids : Array[@git.ObjectId]) -> Json {
+fn object_ids_to_json(ids : Array[@bit.ObjectId]) -> Json {
   Json::array(ids.map(fn(id) { Json::string(id.to_hex()) }))
 }
 
@@ -92,11 +92,11 @@ fn object_ids_to_json(ids : Array[@git.ObjectId]) -> Json {
 fn parse_object_id(
   value : Json,
   field : String,
-) -> Result[@git.ObjectId, String] {
+) -> Result[@bit.ObjectId, String] {
   guard value is Json::String(hex) else {
     return Err("\{field} must be string")
   }
-  let id = @git.ObjectId::from_hex(hex) catch {
+  let id = @bit.ObjectId::from_hex(hex) catch {
     _ => return Err("invalid object id for \{field}: \{hex}")
   }
   Ok(id)
@@ -106,11 +106,11 @@ fn parse_object_id(
 fn parse_object_id_array(
   value : Json,
   field : String,
-) -> Result[Array[@git.ObjectId], String] {
+) -> Result[Array[@bit.ObjectId], String] {
   guard value is Json::Array(items) else {
     return Err("\{field} must be array")
   }
-  let result : Array[@git.ObjectId] = []
+  let result : Array[@bit.ObjectId] = []
   for item in items {
     let parsed = parse_object_id(item, field)
     match parsed {
@@ -122,7 +122,7 @@ fn parse_object_id_array(
 }
 
 ///|
-fn git_object_to_json(obj : @kv.GitObject) -> Json {
+fn bit_object_to_json(obj : @kv.GitObject) -> Json {
   let json_obj : Map[String, Json] = {}
   json_obj["id"] = Json::string(obj.id.to_hex())
   json_obj["obj_type"] = Json::string(object_type_to_string(obj.obj_type))
@@ -212,7 +212,7 @@ fn gossip_message_to_json(msg : @kv.GossipMessage) -> Json {
     }
     @kv.GossipMessage::HaveObjects(objects) => {
       obj["type"] = Json::string("have_objects")
-      obj["objects"] = Json::array(objects.map(fn(o) { git_object_to_json(o) }))
+      obj["objects"] = Json::array(objects.map(fn(o) { bit_object_to_json(o) }))
     }
     @kv.GossipMessage::SyncRequest(from, their_head) => {
       obj["type"] = Json::string("sync_request")
@@ -221,7 +221,7 @@ fn gossip_message_to_json(msg : @kv.GossipMessage) -> Json {
     }
     @kv.GossipMessage::SyncResponse(objects, new_head) => {
       obj["type"] = Json::string("sync_response")
-      obj["objects"] = Json::array(objects.map(fn(o) { git_object_to_json(o) }))
+      obj["objects"] = Json::array(objects.map(fn(o) { bit_object_to_json(o) }))
       obj["new_head"] = Json::string(new_head.to_hex())
     }
   }

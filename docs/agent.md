@@ -194,8 +194,8 @@ pure 層 (`src/x/agent/`) はファイルシステムやネットワークに依
 ### 依存グラフ
 
 ```
-src/x/agent/         → @git, @lib, @hub (pure)
-src/x/agent/native/  → @agent, @hub_native, @bitfs, @osfs, @gitnative, @protocol, @pack (native)
+src/x/agent/         → @bit, @lib, @hub (pure)
+src/x/agent/native/  → @agent, @hub_native, @bitfs, @osfs, @bitnative, @protocol, @pack (native)
 src/cmd/bit/          → @agent, @agent_native (native, handlers_agent.mbt only)
 ```
 

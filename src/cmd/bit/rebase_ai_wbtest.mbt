@@ -20,7 +20,7 @@ test "rebase-ai parser: model and round options" {
 test "rebase-ai parser: invalid max-ai-rounds rejects non-positive value" {
   ignore(
     parse_rebase_ai_args(["--max-ai-rounds", "0"]) catch {
-      @git.GitError::InvalidObject(message) => {
+      @bitcore.GitError::InvalidObject(message) => {
         assert_true(message.contains("greater than 0"))
         return ()
       }
@@ -44,7 +44,7 @@ test "rebase-ai parser: agent-loop options" {
 test "rebase-ai parser: invalid --agent-max-steps rejects non-positive value" {
   ignore(
     parse_rebase_ai_args(["--agent-max-steps", "0"]) catch {
-      @git.GitError::InvalidObject(message) => {
+      @bitcore.GitError::InvalidObject(message) => {
         assert_true(message.contains("greater than 0"))
         return ()
       }

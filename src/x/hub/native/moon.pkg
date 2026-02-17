@@ -1,8 +1,8 @@
 import {
-  "mizchi/bit" @git,
+  "mizchi/bit" @bit,
   "mizchi/bit/pack" @pack,
   "mizchi/bit/protocol" @protocol,
-  "mizchi/bit/io/native" @gitionative,
+  "mizchi/bit/io/native" @bitnative,
   "mizchi/bit/lib" @lib,
   "mizchi/bit/x/hub" @hub,
   "moonbitlang/async" @async,

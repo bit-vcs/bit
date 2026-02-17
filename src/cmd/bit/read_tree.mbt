@@ -37,7 +37,7 @@ async fn handle_read_tree(args : Array[String]) -> Unit raise Error {
   // Handle --empty: clear index
   if empty {
     if not(dry_run) {
-      @gitlib.write_index_entries(fs, git_dir, [])
+      @bitlib.write_index_entries(fs, git_dir, [])
     }
     return
   }
@@ -47,7 +47,7 @@ async fn handle_read_tree(args : Array[String]) -> Unit raise Error {
     return
   }
   // Resolve tree-ish to tree object
-  let tree_id = match @gitrepo.rev_parse(fs, git_dir, tree_refs[0]) {
+  let tree_id = match @bitrepo.rev_parse(fs, git_dir, tree_refs[0]) {
     Some(id) => plumb_resolve_to_tree(fs, git_dir, id)
     None => {
       eprint_line("fatal: not a valid object name: " + tree_refs[0])
@@ -56,18 +56,18 @@ async fn handle_read_tree(args : Array[String]) -> Unit raise Error {
     }
   }
   // Collect tree files
-  let db = @gitlib.ObjectDb::load(fs, git_dir)
-  let files = @gitlib.collect_tree_files(db, fs, tree_id)
+  let db = @bitlib.ObjectDb::load(fs, git_dir)
+  let files = @bitlib.collect_tree_files(db, fs, tree_id)
   // Get entries from tree
-  let entries = @gitlib.tree_files_to_index(db, fs, files)
+  let entries = @bitlib.tree_files_to_index(db, fs, files)
   // Write to index
   if not(dry_run) {
-    @gitlib.write_index_entries(fs, git_dir, entries)
+    @bitlib.write_index_entries(fs, git_dir, entries)
   }
   // Handle -u: update working tree
   if update && not(dry_run) {
     let root = get_work_root()
-    @gitlib.write_worktree_from_files(
+    @bitlib.write_worktree_from_files(
       db,
       fs,
       fs,
@@ -83,33 +83,33 @@ async fn handle_read_tree(args : Array[String]) -> Unit raise Error {
 fn plumb_resolve_to_tree(
   fs : OsFs,
   git_dir : String,
-  id : @git.ObjectId,
-) -> @git.ObjectId raise Error {
-  let db = @gitlib.ObjectDb::load(fs, git_dir)
+  id : @bitcore.ObjectId,
+) -> @bitcore.ObjectId raise Error {
+  let db = @bitlib.ObjectDb::load(fs, git_dir)
   match db.get(fs, id) {
     Some(obj) =>
       match obj.obj_type {
-        @git.ObjectType::Tree => id
-        @git.ObjectType::Commit => {
-          let info = @git.parse_commit(obj.data)
+        @bitcore.ObjectType::Tree => id
+        @bitcore.ObjectType::Commit => {
+          let info = @bitcore.parse_commit(obj.data)
           info.tree
         }
-        @git.ObjectType::Tag => {
+        @bitcore.ObjectType::Tag => {
           // Parse tag and follow to target
           let text = decode_bytes(obj.data)
           for line_view in text.split("\n") {
             let line = line_view.to_string()
             if line.has_prefix("object ") {
               let target_hex = line[7:].to_string()
-              let target = @git.ObjectId::from_hex(target_hex)
+              let target = @bitcore.ObjectId::from_hex(target_hex)
               return plumb_resolve_to_tree(fs, git_dir, target)
             }
           }
-          raise @git.GitError::InvalidObject("Invalid tag object")
+          raise @bitcore.GitError::InvalidObject("Invalid tag object")
         }
-        _ => raise @git.GitError::InvalidObject("Cannot resolve to tree")
+        _ => raise @bitcore.GitError::InvalidObject("Cannot resolve to tree")
       }
-    None => raise @git.GitError::InvalidObject("Object not found")
+    None => raise @bitcore.GitError::InvalidObject("Object not found")
   }
 }
 

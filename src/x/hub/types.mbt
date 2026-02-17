@@ -128,16 +128,16 @@ pub struct PullRequest {
   source_branch : String // refs/heads/feature-x
   source_repo : String? // owner/repo of source branch
   source_ref : String? // refs/heads/feature-x in source repo
-  source_commit : @git.ObjectId
+  source_commit : @bit.ObjectId
   target_branch : String // refs/heads/main
-  target_commit : @git.ObjectId
+  target_commit : @bit.ObjectId
   author : String
   created_at : Int64
   updated_at : Int64
   state : PrState
   labels : Array[String]
   closes_issues : Array[String] // Issues this PR closes
-  merge_commit : @git.ObjectId?
+  merge_commit : @bit.ObjectId?
 }
 
 ///|
@@ -146,16 +146,16 @@ pub fn PullRequest::new(
   title : String,
   body : String,
   source_branch : String,
-  source_commit : @git.ObjectId,
+  source_commit : @bit.ObjectId,
   target_branch : String,
-  target_commit : @git.ObjectId,
+  target_commit : @bit.ObjectId,
   author : String,
   created_at : Int64,
   updated_at : Int64,
   state : PrState,
   labels : Array[String],
   closes_issues? : Array[String] = [],
-  merge_commit? : @git.ObjectId? = None,
+  merge_commit? : @bit.ObjectId? = None,
   source_repo? : String? = None,
   source_ref? : String? = None,
 ) -> PullRequest {
@@ -210,7 +210,7 @@ pub fn PullRequest::source_ref(self : PullRequest) -> String? {
 }
 
 ///|
-pub fn PullRequest::source_commit(self : PullRequest) -> @git.ObjectId {
+pub fn PullRequest::source_commit(self : PullRequest) -> @bit.ObjectId {
   self.source_commit
 }
 
@@ -220,7 +220,7 @@ pub fn PullRequest::target_branch(self : PullRequest) -> String {
 }
 
 ///|
-pub fn PullRequest::target_commit(self : PullRequest) -> @git.ObjectId {
+pub fn PullRequest::target_commit(self : PullRequest) -> @bit.ObjectId {
   self.target_commit
 }
 
@@ -255,7 +255,7 @@ pub fn PullRequest::closes_issues(self : PullRequest) -> Array[String] {
 }
 
 ///|
-pub fn PullRequest::merge_commit(self : PullRequest) -> @git.ObjectId? {
+pub fn PullRequest::merge_commit(self : PullRequest) -> @bit.ObjectId? {
   self.merge_commit
 }
 
@@ -265,21 +265,21 @@ pub struct WorkItemPatch {
   source_branch : String
   source_repo : String?
   source_ref : String?
-  source_commit : @git.ObjectId
+  source_commit : @bit.ObjectId
   target_branch : String
-  target_commit : @git.ObjectId
+  target_commit : @bit.ObjectId
   closes_issues : Array[String]
-  merge_commit : @git.ObjectId?
+  merge_commit : @bit.ObjectId?
 }
 
 ///|
 pub fn WorkItemPatch::new(
   source_branch : String,
-  source_commit : @git.ObjectId,
+  source_commit : @bit.ObjectId,
   target_branch : String,
-  target_commit : @git.ObjectId,
+  target_commit : @bit.ObjectId,
   closes_issues? : Array[String] = [],
-  merge_commit? : @git.ObjectId? = None,
+  merge_commit? : @bit.ObjectId? = None,
   source_repo? : String? = None,
   source_ref? : String? = None,
 ) -> WorkItemPatch {
@@ -311,7 +311,7 @@ pub fn WorkItemPatch::source_ref(self : WorkItemPatch) -> String? {
 }
 
 ///|
-pub fn WorkItemPatch::source_commit(self : WorkItemPatch) -> @git.ObjectId {
+pub fn WorkItemPatch::source_commit(self : WorkItemPatch) -> @bit.ObjectId {
   self.source_commit
 }
 
@@ -321,7 +321,7 @@ pub fn WorkItemPatch::target_branch(self : WorkItemPatch) -> String {
 }
 
 ///|
-pub fn WorkItemPatch::target_commit(self : WorkItemPatch) -> @git.ObjectId {
+pub fn WorkItemPatch::target_commit(self : WorkItemPatch) -> @bit.ObjectId {
   self.target_commit
 }
 
@@ -331,7 +331,7 @@ pub fn WorkItemPatch::closes_issues(self : WorkItemPatch) -> Array[String] {
 }
 
 ///|
-pub fn WorkItemPatch::merge_commit(self : WorkItemPatch) -> @git.ObjectId? {
+pub fn WorkItemPatch::merge_commit(self : WorkItemPatch) -> @bit.ObjectId? {
   self.merge_commit
 }
 
@@ -533,7 +533,7 @@ pub struct PrComment {
   reply_to : String? // threading
   file_path : String? // file-level comment
   line_number : Int? // line-level comment
-  commit_id : @git.ObjectId?
+  commit_id : @bit.ObjectId?
 }
 
 ///|
@@ -546,7 +546,7 @@ pub fn PrComment::new(
   reply_to? : String? = None,
   file_path? : String? = None,
   line_number? : Int? = None,
-  commit_id? : @git.ObjectId? = None,
+  commit_id? : @bit.ObjectId? = None,
 ) -> PrComment {
   {
     id,
@@ -602,7 +602,7 @@ pub fn PrComment::line_number(self : PrComment) -> Int? {
 }
 
 ///|
-pub fn PrComment::commit_id(self : PrComment) -> @git.ObjectId? {
+pub fn PrComment::commit_id(self : PrComment) -> @bit.ObjectId? {
   self.commit_id
 }
 
@@ -637,7 +637,7 @@ pub struct PrReview {
   verdict : ReviewVerdict
   body : String
   created_at : Int64
-  commit_id : @git.ObjectId
+  commit_id : @bit.ObjectId
 }
 
 ///|
@@ -648,7 +648,7 @@ pub fn PrReview::new(
   verdict : ReviewVerdict,
   body : String,
   created_at : Int64,
-  commit_id : @git.ObjectId,
+  commit_id : @bit.ObjectId,
 ) -> PrReview {
   { id, pr_id, author, verdict, body, created_at, commit_id }
 }
@@ -684,7 +684,7 @@ pub fn PrReview::created_at(self : PrReview) -> Int64 {
 }
 
 ///|
-pub fn PrReview::commit_id(self : PrReview) -> @git.ObjectId {
+pub fn PrReview::commit_id(self : PrReview) -> @bit.ObjectId {
   self.commit_id
 }
 
@@ -861,7 +861,7 @@ pub fn IssueComment::reply_to(self : IssueComment) -> String? {
 ///|
 /// Note attached to a commit (Git notes compatible)
 pub struct Note {
-  commit_id : @git.ObjectId // The commit this note is attached to
+  commit_id : @bit.ObjectId // The commit this note is attached to
   body : String
   author : String
   created_at : Int64
@@ -870,7 +870,7 @@ pub struct Note {
 
 ///|
 pub fn Note::new(
-  commit_id : @git.ObjectId,
+  commit_id : @bit.ObjectId,
   body : String,
   author : String,
   created_at : Int64,
@@ -880,7 +880,7 @@ pub fn Note::new(
 }
 
 ///|
-pub fn Note::commit_id(self : Note) -> @git.ObjectId {
+pub fn Note::commit_id(self : Note) -> @bit.ObjectId {
   self.commit_id
 }
 

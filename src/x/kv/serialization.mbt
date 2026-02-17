@@ -37,18 +37,18 @@ pub(all) enum SnapshotMode {
 
 ///|
 /// Serialize ObjectId to bytes - now uses direct byte access
-fn object_id_to_bytes(id : @git.ObjectId) -> Bytes {
+fn object_id_to_bytes(id : @bit.ObjectId) -> Bytes {
   id.to_bytes()
 }
 
 ///|
 /// Deserialize bytes to ObjectId - now uses direct byte access
-fn _bytes_to_object_id(bytes : Bytes, offset : Int) -> @git.ObjectId {
-  @git.ObjectId::from_bytes_at(bytes, offset)
+fn _bytes_to_object_id(bytes : Bytes, offset : Int) -> @bit.ObjectId {
+  @bit.ObjectId::from_bytes_at(bytes, offset)
 }
 
 ///|
-fn object_type_to_int(t : @git.ObjectType) -> Int {
+fn object_type_to_int(t : @bit.ObjectType) -> Int {
   match t {
     Commit => 1
     Tree => 2
@@ -58,12 +58,12 @@ fn object_type_to_int(t : @git.ObjectType) -> Int {
 }
 
 ///|
-fn _int_to_object_type(n : Int) -> @git.ObjectType {
+fn _int_to_object_type(n : Int) -> @bit.ObjectType {
   match n {
-    1 => @git.ObjectType::Commit
-    2 => @git.ObjectType::Tree
-    4 => @git.ObjectType::Tag
-    _ => @git.ObjectType::Blob
+    1 => @bit.ObjectType::Commit
+    2 => @bit.ObjectType::Tree
+    4 => @bit.ObjectType::Tag
+    _ => @bit.ObjectType::Blob
   }
 }
 
@@ -106,7 +106,7 @@ fn Kv::serialize_snapshot_uncached(
   }
   // Collect reachable objects
   let objects : Array[SerializedObject] = []
-  if self.head != @git.ObjectId::zero() {
+  if self.head != @bit.ObjectId::zero() {
     let store : &@lib.ObjectStore = self.store
     match mode {
       FullHistory =>
@@ -186,12 +186,12 @@ pub fn Kv::serialize_snapshot_bytes(
 ///|
 fn collect_objects_for_serialization(
   store : &@lib.ObjectStore,
-  id : @git.ObjectId,
+  id : @bit.ObjectId,
   objects : Array[SerializedObject],
-  visited : Set[@git.ObjectId],
+  visited : Set[@bit.ObjectId],
   include_parents : Bool,
 ) -> Unit {
-  if id == @git.ObjectId::zero() {
+  if id == @bit.ObjectId::zero() {
     return
   }
   if visited.contains(id) {
@@ -209,7 +209,7 @@ fn collect_objects_for_serialization(
   // Recurse into children
   match o.obj_type {
     Commit => {
-      let commit = @git.parse_commit(o.data) catch { _ => return }
+      let commit = @bit.parse_commit(o.data) catch { _ => return }
       collect_objects_for_serialization(
         store,
         commit.tree,
@@ -226,7 +226,7 @@ fn collect_objects_for_serialization(
       }
     }
     Tree => {
-      let entries = @git.parse_tree(o.data) catch { _ => return }
+      let entries = @bit.parse_tree(o.data) catch { _ => return }
       for entry in entries {
         collect_objects_for_serialization(
           store,
@@ -244,14 +244,14 @@ fn collect_objects_for_serialization(
 ///|
 fn collect_tree_and_blob_objects_from_head(
   store : &@lib.ObjectStore,
-  head : @git.ObjectId,
+  head : @bit.ObjectId,
   objects : Array[SerializedObject],
 ) -> Unit {
   let head_obj = store.get(head) catch { _ => return }
   guard head_obj is Some(obj) else { return }
   match obj.obj_type {
     Commit => {
-      let commit = @git.parse_commit(obj.data) catch { _ => return }
+      let commit = @bit.parse_commit(obj.data) catch { _ => return }
       collect_tree_and_blob_objects(store, commit.tree, objects, Set::new())
     }
     Tree => collect_tree_and_blob_objects(store, head, objects, Set::new())
@@ -268,11 +268,11 @@ fn collect_tree_and_blob_objects_from_head(
 ///|
 fn collect_tree_and_blob_objects(
   store : &@lib.ObjectStore,
-  id : @git.ObjectId,
+  id : @bit.ObjectId,
   objects : Array[SerializedObject],
-  visited : Set[@git.ObjectId],
+  visited : Set[@bit.ObjectId],
 ) -> Unit {
-  if id == @git.ObjectId::zero() {
+  if id == @bit.ObjectId::zero() {
     return
   }
   if visited.contains(id) {
@@ -288,7 +288,7 @@ fn collect_tree_and_blob_objects(
         obj_type: object_type_to_int(Tree),
         data: o.data,
       })
-      let entries = @git.parse_tree(o.data) catch { _ => return }
+      let entries = @bit.parse_tree(o.data) catch { _ => return }
       for entry in entries {
         collect_tree_and_blob_objects(store, entry.id, objects, visited)
       }

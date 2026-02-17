@@ -34,7 +34,7 @@ async fn handle_clean(args : Array[String]) -> Unit raise Error {
     @sys.exit(1)
   }
   // Get untracked files from status
-  let status = @gitlib.status(fs, root)
+  let status = @bitlib.status(fs, root)
   let mut files_to_clean : Array[String] = []
   if remove_only_ignored {
     // -X: only ignored files (not implemented - need gitignore parsing)
@@ -91,13 +91,13 @@ async fn handle_clean(args : Array[String]) -> Unit raise Error {
     for dir in dirs_to_check {
       let abs_dir = root + "/" + dir
       if fs.is_dir(abs_dir) {
-        let rfs : &@git.RepoFileSystem = fs
+        let rfs : &@bitcore.RepoFileSystem = fs
         let entries = rfs.readdir(abs_dir) catch {
           err if @async.is_cancellation_error(err) => raise err
           _ => continue
         }
         if entries.length() == 0 {
-          let wfs : &@git.FileSystem = fs
+          let wfs : &@bitcore.FileSystem = fs
           wfs.remove_dir(abs_dir) catch {
             err if @async.is_cancellation_error(err) => raise err
             _ => ()
@@ -114,8 +114,8 @@ async fn handle_clean(args : Array[String]) -> Unit raise Error {
 
 ///|
 fn remove_dir_recursive(fs : OsFs, path : String) -> Unit {
-  let rfs : &@git.RepoFileSystem = fs
-  let wfs : &@git.FileSystem = fs
+  let rfs : &@bitcore.RepoFileSystem = fs
+  let wfs : &@bitcore.FileSystem = fs
   let entries = rfs.readdir(path) catch { _ => return }
   for entry in entries {
     let full = path + "/" + entry

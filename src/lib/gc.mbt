@@ -2,7 +2,7 @@
 
 ///|
 pub struct RepackResult {
-  pack_id : @git.ObjectId
+  pack_id : @bit.ObjectId
   object_count : Int
   pack_bytes : Int
 }
@@ -10,21 +10,21 @@ pub struct RepackResult {
 ///|
 pub struct GcResult {
   pack : RepackResult?
-  dangling : Array[@git.ObjectId]
+  dangling : Array[@bit.ObjectId]
 }
 
 ///|
 pub struct PruneResult {
-  pruned : Array[@git.ObjectId]
+  pruned : Array[@bit.ObjectId]
 }
 
 ///|
 /// Repack reachable objects from refs under the repository root.
 pub fn repack_repo(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
-) -> RepackResult? raise @git.GitError {
+) -> RepackResult? raise @bit.GitError {
   let git_dir = root + "/.git"
   repack_git_dir(fs, rfs, git_dir)
 }
@@ -32,10 +32,10 @@ pub fn repack_repo(
 ///|
 /// Run a lightweight gc: repack reachable objects and report unreachable ids.
 pub fn gc_repo(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
-) -> GcResult raise @git.GitError {
+) -> GcResult raise @bit.GitError {
   let git_dir = root + "/.git"
   gc_git_dir(fs, rfs, git_dir)
 }
@@ -43,20 +43,20 @@ pub fn gc_repo(
 ///|
 /// Prune unreachable loose objects (skip if there are no refs).
 pub fn prune_repo(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
-) -> PruneResult raise @git.GitError {
+) -> PruneResult raise @bit.GitError {
   let git_dir = root + "/.git"
   prune_git_dir(fs, rfs, git_dir)
 }
 
 ///|
 fn repack_git_dir(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
-) -> RepackResult? raise @git.GitError {
+) -> RepackResult? raise @bit.GitError {
   let ref_ids = collect_ref_ids(rfs, git_dir)
   if ref_ids.length() == 0 {
     return None
@@ -72,10 +72,10 @@ fn repack_git_dir(
 
 ///|
 fn gc_git_dir(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
-) -> GcResult raise @git.GitError {
+) -> GcResult raise @bit.GitError {
   let ref_ids = collect_ref_ids(rfs, git_dir)
   let db = ObjectDb::load(rfs, git_dir)
   let roots = resolve_commit_roots(db, rfs, ref_ids)
@@ -87,7 +87,7 @@ fn gc_git_dir(
   }
   let reachable_hex : Map[String, Bool] = {}
   for obj in reachable {
-    let id = @git.hash_object_content(obj.obj_type, obj.data)
+    let id = @bit.hash_object_content(obj.obj_type, obj.data)
     reachable_hex[id.to_hex()] = true
   }
   let store = load_object_store_from_fs(rfs, git_dir)
@@ -99,9 +99,9 @@ fn gc_git_dir(
     }
   }
   unreachable_hex.sort()
-  let dangling : Array[@git.ObjectId] = []
+  let dangling : Array[@bit.ObjectId] = []
   for hex in unreachable_hex {
-    dangling.push(@git.ObjectId::from_hex(hex))
+    dangling.push(@bit.ObjectId::from_hex(hex))
   }
   let pack = repack_from_objects(fs, git_dir, reachable)
   if prune_enabled {
@@ -120,10 +120,10 @@ fn gc_git_dir(
 
 ///|
 fn prune_git_dir(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
-) -> PruneResult raise @git.GitError {
+) -> PruneResult raise @bit.GitError {
   let ref_ids = collect_ref_ids(rfs, git_dir)
   let db = ObjectDb::load(rfs, git_dir)
   let roots = resolve_commit_roots(db, rfs, ref_ids)
@@ -133,14 +133,14 @@ fn prune_git_dir(
   let reachable = collect_reachable_objects_from_commits(db, rfs, roots)
   let reachable_hex : Map[String, Bool] = {}
   for obj in reachable {
-    let id = @git.hash_object_content(obj.obj_type, obj.data)
+    let id = @bit.hash_object_content(obj.obj_type, obj.data)
     reachable_hex[id.to_hex()] = true
   }
   let loose_hex = list_loose_object_hex(rfs, git_dir)
-  let pruned : Array[@git.ObjectId] = []
+  let pruned : Array[@bit.ObjectId] = []
   for hex in loose_hex {
     if not(reachable_hex.contains(hex)) {
-      pruned.push(@git.ObjectId::from_hex(hex))
+      pruned.push(@bit.ObjectId::from_hex(hex))
     }
   }
   prune_loose_objects(fs, rfs, git_dir, reachable_hex, false)
@@ -149,20 +149,20 @@ fn prune_git_dir(
 
 ///|
 fn repack_from_objects(
-  fs : &@git.FileSystem,
+  fs : &@bit.FileSystem,
   git_dir : String,
-  objects : Array[@git.PackObject],
-) -> RepackResult? raise @git.GitError {
+  objects : Array[@bit.PackObject],
+) -> RepackResult? raise @bit.GitError {
   if objects.length() == 0 {
     return None
   }
   let pack = @pack.create_packfile(objects)
   // Force index rebuild from the newly created pack to avoid stale offsets/CRC
   // carried from source packs.
-  let objects_for_index : Array[@git.PackObject] = []
+  let objects_for_index : Array[@bit.PackObject] = []
   for obj in objects {
     objects_for_index.push(
-      @git.PackObject::with_metadata(obj.obj_type, obj.data, obj.id, -1, 0U),
+      @bit.PackObject::with_metadata(obj.obj_type, obj.data, obj.id, -1, 0U),
     )
   }
   @pack.write_packfile_with_index(fs, git_dir, pack, objects_for_index)
@@ -171,21 +171,21 @@ fn repack_from_objects(
 }
 
 ///|
-fn pack_trailer_id(pack : Bytes) -> @git.ObjectId raise @git.GitError {
+fn pack_trailer_id(pack : Bytes) -> @bit.ObjectId raise @bit.GitError {
   if pack.length() < 20 {
-    raise @git.GitError::PackfileError("Packfile too short")
+    raise @bit.GitError::PackfileError("Packfile too short")
   }
   let start = pack.length() - 20
   let bytes = FixedArray::makei(20, i => pack[start + i])
-  @git.ObjectId::new(bytes)
+  @bit.ObjectId::new(bytes)
 }
 
 ///|
 fn collect_ref_ids(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
-) -> Array[@git.ObjectId] raise @git.GitError {
-  let refs : Map[String, @git.ObjectId] = {}
+) -> Array[@bit.ObjectId] raise @bit.GitError {
+  let refs : Map[String, @bit.ObjectId] = {}
   let heads_dir = join_path(git_dir, "refs/heads")
   if fs.is_dir(heads_dir) {
     collect_loose_refs(fs, heads_dir, "refs/heads", refs)
@@ -207,7 +207,7 @@ fn collect_ref_ids(
     Detached(id) => refs["HEAD"] = id
     Branch(_) => ()
   }
-  let out : Array[@git.ObjectId] = []
+  let out : Array[@bit.ObjectId] = []
   for item in refs.to_array() {
     let (_, id) = item
     out.push(id)
@@ -217,11 +217,11 @@ fn collect_ref_ids(
 
 ///|
 fn collect_loose_refs(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   dir : String,
   prefix : String,
-  out : Map[String, @git.ObjectId],
-) -> Unit raise @git.GitError {
+  out : Map[String, @bit.ObjectId],
+) -> Unit raise @bit.GitError {
   let entries = fs.readdir(dir)
   for name in entries {
     let path = join_path(dir, name)
@@ -230,17 +230,17 @@ fn collect_loose_refs(
       collect_loose_refs(fs, path, refname, out)
     } else if fs.is_file(path) {
       let line = read_ref_line_gc(fs, path)
-      out[refname] = @git.ObjectId::from_hex(line)
+      out[refname] = @bit.ObjectId::from_hex(line)
     }
   }
 }
 
 ///|
 fn collect_packed_refs(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   packed_path : String,
-  out : Map[String, @git.ObjectId],
-) -> Unit raise @git.GitError {
+  out : Map[String, @bit.ObjectId],
+) -> Unit raise @bit.GitError {
   let prefixes : Array[String] = ["refs/heads/", "refs/tags/", "refs/remotes/"]
   let text = @utf8.decode_lossy(fs.read_file(packed_path)[:])
   for line_view in text.split("\n") {
@@ -271,7 +271,7 @@ fn collect_packed_refs(
           }
         }
         if matched && not(out.contains(refname)) {
-          out[refname] = @git.ObjectId::from_hex(id_hex)
+          out[refname] = @bit.ObjectId::from_hex(id_hex)
         }
       }
     }
@@ -280,9 +280,9 @@ fn collect_packed_refs(
 
 ///|
 fn read_ref_line_gc(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   path : String,
-) -> String raise @git.GitError {
+) -> String raise @bit.GitError {
   let text = @utf8.decode_lossy(fs.read_file(path)[:])
   for line_view in text.split("\n") {
     let line = trim_line_gc(line_view.to_string())
@@ -290,7 +290,7 @@ fn read_ref_line_gc(
       return line
     }
   }
-  raise @git.GitError::InvalidObject("Empty ref: \{path}")
+  raise @bit.GitError::InvalidObject("Empty ref: \{path}")
 }
 
 ///|
@@ -305,11 +305,11 @@ fn trim_line_gc(line : String) -> String {
 ///|
 fn resolve_commit_roots(
   db : ObjectDb,
-  fs : &@git.RepoFileSystem,
-  ref_ids : Array[@git.ObjectId],
-) -> Array[@git.ObjectId] raise @git.GitError {
+  fs : &@bit.RepoFileSystem,
+  ref_ids : Array[@bit.ObjectId],
+) -> Array[@bit.ObjectId] raise @bit.GitError {
   let seen : Map[String, Bool] = {}
-  let roots : Array[@git.ObjectId] = []
+  let roots : Array[@bit.ObjectId] = []
   for id in ref_ids {
     let local_seen : Map[String, Bool] = {}
     match resolve_commit_from_ref(db, fs, id, local_seen) {
@@ -329,10 +329,10 @@ fn resolve_commit_roots(
 ///|
 fn resolve_commit_from_ref(
   db : ObjectDb,
-  fs : &@git.RepoFileSystem,
-  id : @git.ObjectId,
+  fs : &@bit.RepoFileSystem,
+  id : @bit.ObjectId,
   seen : Map[String, Bool],
-) -> @git.ObjectId? raise @git.GitError {
+) -> @bit.ObjectId? raise @bit.GitError {
   let hex = id.to_hex()
   if seen.contains(hex) {
     return None
@@ -342,8 +342,8 @@ fn resolve_commit_from_ref(
     None => None
     Some(obj) =>
       match obj.obj_type {
-        @git.ObjectType::Commit => Some(id)
-        @git.ObjectType::Tag =>
+        @bit.ObjectType::Commit => Some(id)
+        @bit.ObjectType::Tag =>
           match parse_tag_target(obj.data) {
             None => None
             Some((target, tag_type)) =>
@@ -363,7 +363,7 @@ fn resolve_commit_from_ref(
 ///|
 fn parse_tag_target(
   data : Bytes,
-) -> (@git.ObjectId, String)? raise @git.GitError {
+) -> (@bit.ObjectId, String)? raise @bit.GitError {
   let text = @utf8.decode_lossy(data[:])
   let mut object_hex : String? = None
   let mut object_type : String? = None
@@ -385,19 +385,19 @@ fn parse_tag_target(
     Some(hex) =>
       match object_type {
         None => None
-        Some(typ) => Some((@git.ObjectId::from_hex(hex), typ))
+        Some(typ) => Some((@bit.ObjectId::from_hex(hex), typ))
       }
   }
 }
 
 ///|
 fn prune_loose_objects(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   keep : Map[String, Bool],
   remove_reachable : Bool,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let objects_dir = join_path(git_dir, "objects")
   if not(rfs.is_dir(objects_dir)) {
     return
@@ -434,9 +434,9 @@ fn prune_loose_objects(
 
 ///|
 fn list_loose_object_hex(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
-) -> Array[String] raise @git.GitError {
+) -> Array[String] raise @bit.GitError {
   let out : Array[String] = []
   let objects_dir = join_path(git_dir, "objects")
   if not(fs.is_dir(objects_dir)) {
@@ -471,11 +471,11 @@ fn list_loose_object_hex(
 
 ///|
 fn prune_packfiles(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
-  keep_pack_id : @git.ObjectId,
-) -> Unit raise @git.GitError {
+  keep_pack_id : @bit.ObjectId,
+) -> Unit raise @bit.GitError {
   let pack_dir = join_path(git_dir, "objects/pack")
   if not(rfs.is_dir(pack_dir)) {
     return

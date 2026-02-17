@@ -1,7 +1,7 @@
 ///|
 async fn handle_pull(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
-  let rfs : &@git.RepoFileSystem = fs
+  let rfs : &@bitcore.RepoFileSystem = fs
   let root = get_work_root()
   let git_dir = root + "/.git"
   if rfs.is_file(git_dir) {
@@ -13,11 +13,11 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
     ignore(gitfile)
   }
   let git_dir = if rfs.is_file(git_dir) {
-    @gitlib.resolve_gitdir(rfs, git_dir)
+    @bitlib.resolve_gitdir(rfs, git_dir)
   } else {
     git_dir
   }
-  let (remotes, branches) = @gitlib.read_repo_config(fs, git_dir)
+  let (remotes, branches) = @bitlib.read_repo_config(fs, git_dir)
   // Read remote URL - prefer subdir-clone remote, then config
   let mut remote_name = "origin"
   let mut remote_url : String? = get_effective_remote_url(fs, git_dir)
@@ -58,16 +58,16 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
     None => ()
   }
   // Resolve upstream from branch config when available
-  let head_ref = @gitlib.read_head_ref(fs, git_dir)
+  let head_ref = @bitlib.read_head_ref(fs, git_dir)
   let mut merge_ref : String? = None
   match head_ref {
-    @gitlib.HeadRef::Branch(branch) => {
+    @bitlib.HeadRef::Branch(branch) => {
       match branches.get(branch) {
         Some(cfg) => {
           if cfg.remote is Some(r) && arg_remote is None {
             remote_name = r
             pull_adhoc_remote = false
-            match @gitlib.get_remote_url(fs, git_dir, r) {
+            match @bitlib.get_remote_url(fs, git_dir, r) {
               Some(u) => remote_url = Some(u)
               None => ()
             }
@@ -95,7 +95,7 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
     None => ()
   }
   guard remote_url is Some(url) else {
-    raise @git.GitError::InvalidObject("No remote configured")
+    raise @bitcore.GitError::InvalidObject("No remote configured")
   }
   print_line("Fetching from \{url}...")
   fetch_from_remote(fs, git_dir, root, remote_name, url, [])
@@ -133,15 +133,15 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
     }
     None => "HEAD"
   }
-  let mut target_id = @gitlib.resolve_ref(fs, git_dir, target_ref)
+  let mut target_id = @bitlib.resolve_ref(fs, git_dir, target_ref)
   if target_id is None {
-    match @gitlib.resolve_local_repo_path(fs, root, url) {
+    match @bitlib.resolve_local_repo_path(fs, root, url) {
       Some(src_path) =>
-        match @gitlib.detect_git_dir(fs, src_path) {
+        match @bitlib.detect_git_dir(fs, src_path) {
           Some((src_git_dir, _)) =>
-            match @gitlib.resolve_ref(fs, src_git_dir, upstream_ref) {
+            match @bitlib.resolve_ref(fs, src_git_dir, upstream_ref) {
               Some(id) => {
-                @gitlib.copy_tree(
+                @bitlib.copy_tree(
                   fs,
                   fs,
                   src_git_dir + "/objects",
@@ -157,7 +157,7 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
       None =>
         match resolve_remote_ref_id(url, upstream_ref) {
           Some((id, _)) => {
-            let pack = @gitionative.fetch_pack_http(url, [id], true)
+            let pack = @bitnative.fetch_pack_http(url, [id], true)
             let objects = @pack.parse_packfile(pack)
             @pack.write_packfile_with_index(fs, git_dir, pack, objects)
             write_ref_file(fs, git_dir, target_ref, id)
@@ -168,18 +168,18 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
     }
   }
   guard target_id is Some(tid) else {
-    raise @git.GitError::InvalidObject("Unknown ref: " + target_ref)
+    raise @bitcore.GitError::InvalidObject("Unknown ref: " + target_ref)
   }
-  let db = @gitlib.ObjectDb::load(fs, git_dir)
+  let db = @bitlib.ObjectDb::load(fs, git_dir)
   let target_modes = collect_commit_tree_modes(db, fs, tid)
-  let current_head = @gitlib.resolve_ref(fs, git_dir, "HEAD")
+  let current_head = @bitlib.resolve_ref(fs, git_dir, "HEAD")
   match current_head {
     Some(head_id) => {
       let head_modes = collect_commit_tree_modes(db, fs, head_id)
       match
         find_submodule_replaced_with_non_submodule(head_modes, target_modes) {
         Some(path) =>
-          raise @git.GitError::InvalidObject(
+          raise @bitcore.GitError::InvalidObject(
             "Refusing to replace submodule '\{path}' with non-submodule entry",
           )
         None => ()
@@ -188,46 +188,46 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
     None => ()
   }
   if current_head is None {
-    let head_target = match @gitlib.read_head_ref(fs, git_dir) {
-      @gitlib.HeadRef::Branch(branch) =>
+    let head_target = match @bitlib.read_head_ref(fs, git_dir) {
+      @bitlib.HeadRef::Branch(branch) =>
         resolve_initial_pull_head_target(Some(branch))
-      @gitlib.HeadRef::Detached(_) => resolve_initial_pull_head_target(None)
+      @bitlib.HeadRef::Detached(_) => resolve_initial_pull_head_target(None)
     }
     if head_target == "HEAD" {
       fs.write_string(git_dir + "/HEAD", tid.to_hex() + "\n")
     } else {
       write_ref_file(fs, git_dir, head_target, tid)
     }
-    if not(@gitlib.is_bare_git_dir(git_dir)) {
+    if not(@bitlib.is_bare_git_dir(git_dir)) {
       if head_target.has_prefix("refs/heads/") {
         let branch = String::unsafe_substring(
           head_target,
           start="refs/heads/".length(),
           end=head_target.length(),
         )
-        ignore(@gitlib.checkout(fs, fs, root, branch))
+        ignore(@bitlib.checkout(fs, fs, root, branch))
       } else {
-        ignore(@gitlib.checkout(fs, fs, root, tid.to_hex()))
+        ignore(@bitlib.checkout(fs, fs, root, tid.to_hex()))
       }
     }
     print_line("Fast-forward")
     if pull_adhoc_remote {
-      @gitlib.remove_remote_refs(fs, fs, git_dir, remote_name)
+      @bitlib.remove_remote_refs(fs, fs, git_dir, remote_name)
     }
     return
   }
   if rebase {
-    let id = @gitlib.rebase_onto(fs, fs, root, tid)
+    let id = @bitlib.rebase_onto(fs, fs, root, tid)
     print_line("Updated to \{id.to_hex()}")
     return
   }
   let author = get_author_string()
   let timestamp = get_commit_timestamp()
   let msg = "Merge " + target_ref
-  let result = @gitlib.merge(fs, fs, root, tid, msg, author, timestamp)
+  let result = @bitlib.merge(fs, fs, root, tid, msg, author, timestamp)
   match result.status {
-    @gitlib.MergeStatus::AlreadyUpToDate => print_line("Already up to date.")
-    @gitlib.MergeStatus::FastForward =>
+    @bitlib.MergeStatus::AlreadyUpToDate => print_line("Already up to date.")
+    @bitlib.MergeStatus::FastForward =>
       match result.commit_id {
         Some(id) => {
           let short = String::unsafe_substring(id.to_hex(), start=0, end=7)
@@ -235,7 +235,7 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
         }
         None => print_line("Fast-forward")
       }
-    @gitlib.MergeStatus::Merged =>
+    @bitlib.MergeStatus::Merged =>
       match result.commit_id {
         Some(id) => {
           let short = String::unsafe_substring(id.to_hex(), start=0, end=7)
@@ -243,7 +243,7 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
         }
         None => print_line("Merged")
       }
-    @gitlib.MergeStatus::Conflicted => {
+    @bitlib.MergeStatus::Conflicted => {
       print_line("CONFLICT (content): Merge conflict in the following files:")
       for path in result.conflicts {
         print_line("  \{path}")
@@ -252,7 +252,7 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
     }
   }
   if pull_adhoc_remote {
-    @gitlib.remove_remote_refs(fs, fs, git_dir, remote_name)
+    @bitlib.remove_remote_refs(fs, fs, git_dir, remote_name)
   }
 }
 
@@ -317,20 +317,20 @@ fn format_push_porcelain_line(
 
 ///|
 fn classify_push_porcelain_success(
-  old_id : @git.ObjectId,
-  new_id : @git.ObjectId,
+  old_id : @bitcore.ObjectId,
+  new_id : @bitcore.ObjectId,
   delete_ref : Bool,
   force_update : Bool,
 ) -> (String, String) {
   if delete_ref {
-    if old_id == @git.ObjectId::zero() {
+    if old_id == @bitcore.ObjectId::zero() {
       ("=", "[up to date]")
     } else {
       ("-", "[deleted]")
     }
   } else if old_id == new_id {
     ("=", "[up to date]")
-  } else if old_id == @git.ObjectId::zero() {
+  } else if old_id == @bitcore.ObjectId::zero() {
     ("*", "[new reference]")
   } else if force_update {
     ("+", "[forced update]")
@@ -398,7 +398,7 @@ fn is_hidden_ref(refname : String, patterns : Array[String]) -> Bool {
 
 ///|
 fn read_config_values(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
   section : String,
   key : String,
@@ -415,13 +415,13 @@ fn read_config_values(
   )
   let section_lower = section.to_lower()
   let key_lower = key.to_lower()
-  let blocks = @gitlib.parse_config_blocks(content)
+  let blocks = @bitlib.parse_config_blocks(content)
   for block in blocks {
     if block.section != Some(section_lower) {
       continue
     }
     for line in block.lines {
-      match @gitlib.parse_config_kv(line) {
+      match @bitlib.parse_config_kv(line) {
         Some((parsed_key, parsed_value)) =>
           if parsed_key == key_lower {
             values.push(parsed_value)
@@ -435,7 +435,7 @@ fn read_config_values(
 
 ///|
 fn read_hide_refs(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
   sections : Array[String],
 ) -> Array[String] {
@@ -455,7 +455,7 @@ fn prune_source_ref_for_destination(
   dst_pattern : String,
   dst_ref : String,
 ) -> String? {
-  @gitlib.refspec_map_dst(dst_pattern, src_pattern, dst_ref)
+  @bitlib.refspec_map_dst(dst_pattern, src_pattern, dst_ref)
 }
 
 ///|
@@ -490,13 +490,13 @@ fn resolve_remote_push_refmap_destination(
       source_candidates.push(current_ref)
     }
   }
-  let parsed_specs = @gitlib.parse_push_refspecs(remote_push_specs)
+  let parsed_specs = @bitlib.parse_push_refspecs(remote_push_specs)
   for spec in parsed_specs {
     if spec.src.length() == 0 || spec.dst.length() == 0 {
       continue
     }
     for source_candidate in source_candidates {
-      match @gitlib.refspec_map_dst(spec.src, spec.dst, source_candidate) {
+      match @bitlib.refspec_map_dst(spec.src, spec.dst, source_candidate) {
         Some(mapped) => return Some(mapped)
         None => ()
       }
@@ -556,7 +556,7 @@ fn parse_config_bool_string(value : String?) -> Bool {
 
 ///|
 fn looks_like_object_id(token : String) -> Bool {
-  ignore(@git.ObjectId::from_hex(token) catch { _ => return false })
+  ignore(@bitcore.ObjectId::from_hex(token) catch { _ => return false })
   true
 }
 
@@ -603,7 +603,7 @@ fn select_current_like_remote(
   remotes : Array[String],
   branch_remote : String?,
   remote_pushdefault : String?,
-) -> String raise @git.GitError {
+) -> String raise @bitcore.GitError {
   match remote_pushdefault {
     Some(name) => name
     None =>
@@ -615,7 +615,7 @@ fn select_current_like_remote(
           } else if remotes.contains("origin") {
             "origin"
           } else {
-            raise @git.GitError::InvalidObject("No such remote: origin")
+            raise @bitcore.GitError::InvalidObject("No such remote: origin")
           }
       }
   }
@@ -641,7 +641,7 @@ fn parse_remote_helper_url(url : String) -> (String, String)? {
 
 ///|
 fn read_url_rewrite_rules(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
 ) -> Array[(String, String, Bool)] {
   let config_path = git_dir + "/config"
@@ -654,14 +654,14 @@ fn read_url_rewrite_rules(
       _ => Bytes::default()
     },
   )
-  let blocks = @gitlib.parse_config_blocks(content)
+  let blocks = @bitlib.parse_config_blocks(content)
   for block in blocks {
     if block.section != Some("url") {
       continue
     }
     guard block.name is Some(base) else { continue }
     for line in block.lines {
-      match @gitlib.parse_config_kv(line) {
+      match @bitlib.parse_config_kv(line) {
         Some((key, value)) =>
           if key == "insteadof" {
             rules.push((base, value, false))
@@ -732,7 +732,7 @@ fn resolve_push_target_plan(
   push_default : String?,
   remote_pushdefault : String?,
   auto_setup_remote : Bool,
-) -> PushTargetPlan raise @git.GitError {
+) -> PushTargetPlan raise @bitcore.GitError {
   let mode = parse_push_default_mode(push_default)
   let mode_is_upstream = match mode {
     PushDefaultMode::Upstream => true
@@ -756,7 +756,7 @@ fn resolve_push_target_plan(
             match branch_remote {
               Some(name) => name
               None =>
-                raise @git.GitError::InvalidObject(
+                raise @bitcore.GitError::InvalidObject(
                   "No upstream configured for current branch",
                 )
             }
@@ -764,12 +764,12 @@ fn resolve_push_target_plan(
             match branch_remote {
               Some(name) => name
               None =>
-                raise @git.GitError::InvalidObject(
+                raise @bitcore.GitError::InvalidObject(
                   "No upstream configured for current branch",
                 )
             }
           PushDefaultMode::Nothing =>
-            raise @git.GitError::InvalidObject(
+            raise @bitcore.GitError::InvalidObject(
               "push.default is set to nothing; specify a refspec",
             )
           _ =>
@@ -782,11 +782,11 @@ fn resolve_push_target_plan(
       explicit_remote is Some(requested) &&
       branch_remote is Some(upstream_remote) &&
       requested != upstream_remote {
-      raise @git.GitError::InvalidObject(
+      raise @bitcore.GitError::InvalidObject(
         "Cannot push to remote '\{requested}' because branch tracks '\{upstream_remote}'",
       )
     }
-    let (raw_src_raw, raw_dst) = @gitlib.parse_refspec_pair(spec)
+    let (raw_src_raw, raw_dst) = @bitlib.parse_refspec_pair(spec)
     let raw_src = strip_push_force_prefix(raw_src_raw)
     if raw_src.length() == 0 && raw_dst.length() == 0 {
       return {
@@ -800,7 +800,7 @@ fn resolve_push_target_plan(
     if looks_like_object_id(raw_src) &&
       raw_dst.length() > 0 &&
       not(raw_dst.has_prefix("refs/")) {
-      raise @git.GitError::InvalidObject(
+      raise @bitcore.GitError::InvalidObject(
         "Cannot infer destination ref from source object id",
       )
     }
@@ -815,7 +815,7 @@ fn resolve_push_target_plan(
       }
     }
     guard raw_src.length() > 0 else {
-      raise @git.GitError::InvalidObject("Perhaps you should specify a branch.")
+      raise @bitcore.GitError::InvalidObject("Perhaps you should specify a branch.")
     }
     let source_ref = normalize_push_ref_token(raw_src, current_branch, false)
     let dest_ref = if raw_dst.length() == 0 {
@@ -832,12 +832,12 @@ fn resolve_push_target_plan(
     }
   }
   if mode_is_nothing {
-    raise @git.GitError::InvalidObject(
+    raise @bitcore.GitError::InvalidObject(
       "push.default is set to nothing; specify a refspec",
     )
   }
   if mode_is_upstream && explicit_remote is None && triangular {
-    raise @git.GitError::InvalidObject(
+    raise @bitcore.GitError::InvalidObject(
       "Cannot use upstream push.default in triangular workflow",
     )
   }
@@ -849,7 +849,7 @@ fn resolve_push_target_plan(
           match branch_remote {
             Some(name) => name
             None =>
-              raise @git.GitError::InvalidObject(
+              raise @bitcore.GitError::InvalidObject(
                 "No upstream configured for current branch",
               )
           }
@@ -857,7 +857,7 @@ fn resolve_push_target_plan(
           match branch_remote {
             Some(name) => name
             None =>
-              raise @git.GitError::InvalidObject(
+              raise @bitcore.GitError::InvalidObject(
                 "No upstream configured for current branch",
               )
           }
@@ -869,7 +869,7 @@ fn resolve_push_target_plan(
     explicit_remote is Some(requested) &&
     branch_remote is Some(upstream_remote) &&
     requested != upstream_remote {
-    raise @git.GitError::InvalidObject(
+    raise @bitcore.GitError::InvalidObject(
       "Cannot push to remote '\{requested}' because branch tracks '\{upstream_remote}'",
     )
   }
@@ -883,7 +883,7 @@ fn resolve_push_target_plan(
           if auto_setup_remote && branch_remote is Some(_) {
             auto_set_upstream_needed = true
           } else {
-            raise @git.GitError::InvalidObject(
+            raise @bitcore.GitError::InvalidObject(
               "No upstream configured for current branch",
             )
           }
@@ -895,7 +895,7 @@ fn resolve_push_target_plan(
         match branch_merge {
           Some(merge_ref) =>
             if merge_ref != current_ref {
-              raise @git.GitError::InvalidObject(
+              raise @bitcore.GitError::InvalidObject(
                 "Simple push requires upstream branch name to match current branch",
               )
             } else {
@@ -905,7 +905,7 @@ fn resolve_push_target_plan(
             if auto_setup_remote && branch_remote is Some(_) {
               auto_set_upstream_needed = true
             } else {
-              raise @git.GitError::InvalidObject(
+              raise @bitcore.GitError::InvalidObject(
                 "No upstream configured for current branch",
               )
             }
@@ -913,7 +913,7 @@ fn resolve_push_target_plan(
       }
     PushDefaultMode::Matching =>
       if branch_merge is None {
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "Perhaps you should specify a branch.",
         )
       }
@@ -983,7 +983,7 @@ fn parse_push_refspecs_with_presence(
       value = String::unsafe_substring(value, start=1, end=value.length())
     }
     let has_explicit_destination = value.find(":") is Some(_)
-    let (src, dst) = @gitlib.parse_refspec_pair(value)
+    let (src, dst) = @bitlib.parse_refspec_pair(value)
     out.push({ force, src, dst, has_explicit_destination })
   }
   out
@@ -993,13 +993,13 @@ fn parse_push_refspecs_with_presence(
 fn ensure_matching_refspec_has_candidates(
   parsed_specs : Array[PushParsedRefspec],
   plan_count : Int,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bitcore.GitError {
   if plan_count > 0 {
     return ()
   }
   for spec in parsed_specs {
     if spec.src.length() == 0 && spec.dst.length() == 0 {
-      raise @git.GitError::InvalidObject("Perhaps you should specify a branch.")
+      raise @bitcore.GitError::InvalidObject("Perhaps you should specify a branch.")
     }
   }
 }
@@ -1045,10 +1045,10 @@ fn is_ambiguous_push_source_refspec(
 
 ///|
 fn resolve_push_source_ref(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
   source_token : String,
-) -> (String, PushSourceKind) raise @git.GitError {
+) -> (String, PushSourceKind) raise @bitcore.GitError {
   if source_token == "HEAD" || source_token == "@" {
     ("HEAD", PushSourceKind::Branch)
   } else if source_token.has_prefix("refs/") {
@@ -1065,11 +1065,11 @@ fn resolve_push_source_ref(
     (source_token, PushSourceKind::Other)
   } else {
     let branch_ref = "refs/heads/" + source_token
-    if @gitlib.resolve_ref(fs, git_dir, branch_ref) is Some(_) {
+    if @bitlib.resolve_ref(fs, git_dir, branch_ref) is Some(_) {
       (branch_ref, PushSourceKind::Branch)
     } else {
       let tag_ref = "refs/tags/" + source_token
-      if @gitlib.resolve_ref(fs, git_dir, tag_ref) is Some(_) {
+      if @bitlib.resolve_ref(fs, git_dir, tag_ref) is Some(_) {
         (tag_ref, PushSourceKind::Tag)
       } else {
         ("refs/heads/" + source_token, PushSourceKind::Branch)
@@ -1080,32 +1080,32 @@ fn resolve_push_source_ref(
 
 ///|
 fn resolve_push_source_id(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
   source_ref : String,
-) -> @git.ObjectId raise @git.GitError {
+) -> @bitcore.ObjectId raise @bitcore.GitError {
   match source_ref {
     "HEAD" =>
-      match @gitlib.resolve_head_commit(fs, git_dir) {
+      match @bitlib.resolve_head_commit(fs, git_dir) {
         Some(id) => id
-        None => raise @git.GitError::InvalidObject("HEAD not found")
+        None => raise @bitcore.GitError::InvalidObject("HEAD not found")
       }
     _ =>
-      match @gitlib.resolve_ref(fs, git_dir, source_ref) {
+      match @bitlib.resolve_ref(fs, git_dir, source_ref) {
         Some(id) => id
         None =>
-          match @gitrepo.rev_parse(fs, git_dir, source_ref) {
+          match @bitrepo.rev_parse(fs, git_dir, source_ref) {
             Some(id) => id
             None =>
               if looks_like_object_id(source_ref) {
-                @git.ObjectId::from_hex(source_ref) catch {
+                @bitcore.ObjectId::from_hex(source_ref) catch {
                   _ =>
-                    raise @git.GitError::InvalidObject(
+                    raise @bitcore.GitError::InvalidObject(
                       "Cannot resolve source ref: " + source_ref,
                     )
                 }
               } else {
-                raise @git.GitError::InvalidObject(
+                raise @bitcore.GitError::InvalidObject(
                   "Cannot resolve source ref: " + source_ref,
                 )
               }
@@ -1134,20 +1134,20 @@ fn is_invalid_push_destination_refname(
 
 ///|
 fn resolve_push_destination_ref(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   remote_git_dir : String,
   source_kind : PushSourceKind,
   destination_token : String,
   current_branch : String,
   allow_onelevel : Bool,
   prefer_source_kind : Bool,
-) -> String raise @git.GitError {
+) -> String raise @bitcore.GitError {
   if destination_token == "HEAD" || destination_token == "@" {
     return "refs/heads/" + current_branch
   }
   if destination_token.has_prefix("refs/") {
     if is_invalid_push_destination_refname(destination_token, allow_onelevel) {
-      raise @git.GitError::InvalidObject(
+      raise @bitcore.GitError::InvalidObject(
         "Invalid refspec destination: " + destination_token,
       )
     }
@@ -1157,13 +1157,13 @@ fn resolve_push_destination_ref(
   let candidate_tags = "refs/tags/" + destination_token
   let candidate_remotes = "refs/remotes/" + destination_token
   let matched : Array[String] = []
-  if @gitlib.resolve_ref(fs, remote_git_dir, candidate_heads) is Some(_) {
+  if @bitlib.resolve_ref(fs, remote_git_dir, candidate_heads) is Some(_) {
     matched.push(candidate_heads)
   }
-  if @gitlib.resolve_ref(fs, remote_git_dir, candidate_tags) is Some(_) {
+  if @bitlib.resolve_ref(fs, remote_git_dir, candidate_tags) is Some(_) {
     matched.push(candidate_tags)
   }
-  if @gitlib.resolve_ref(fs, remote_git_dir, candidate_remotes) is Some(_) {
+  if @bitlib.resolve_ref(fs, remote_git_dir, candidate_remotes) is Some(_) {
     matched.push(candidate_remotes)
   }
   if matched.length() > 1 {
@@ -1180,7 +1180,7 @@ fn resolve_push_destination_ref(
         _ => ()
       }
     }
-    raise @git.GitError::InvalidObject(
+    raise @bitcore.GitError::InvalidObject(
       "dst refspec '\{destination_token}' matches more than one",
     )
   }
@@ -1195,18 +1195,18 @@ fn resolve_push_destination_ref(
 
 ///|
 fn read_branch_pushremote(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
   branch_name : String,
 ) -> String? {
-  let content = @gitlib.read_config_content(fs, git_dir)
-  let blocks = @gitlib.parse_config_blocks(content)
+  let content = @bitlib.read_config_content(fs, git_dir)
+  let blocks = @bitlib.parse_config_blocks(content)
   for block in blocks {
     if block.section != Some("branch") || block.name != Some(branch_name) {
       continue
     }
     for line in block.lines {
-      match @gitlib.parse_config_kv(line) {
+      match @bitlib.parse_config_kv(line) {
         Some((key, value)) if key == "pushremote" => return Some(value)
         _ => ()
       }
@@ -1217,13 +1217,13 @@ fn read_branch_pushremote(
 
 ///|
 fn ensure_no_empty_branch_config(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   git_dir : String,
-) -> Unit raise @git.GitError {
-  let content = @gitlib.read_config_content(rfs, git_dir)
-  let blocks = @gitlib.parse_config_blocks(content)
-  let filtered : Array[@gitlib.ConfigBlock] = []
+) -> Unit raise @bitcore.GitError {
+  let content = @bitlib.read_config_content(rfs, git_dir)
+  let blocks = @bitlib.parse_config_blocks(content)
+  let filtered : Array[@bitlib.ConfigBlock] = []
   let mut found_invalid = false
   for block in blocks {
     if block.section == Some("branch") && block.name == Some("") {
@@ -1234,8 +1234,8 @@ fn ensure_no_empty_branch_config(
   }
   if found_invalid {
     let config_path = git_dir + "/config"
-    fs.write_string(config_path, @gitlib.render_config_blocks(filtered))
-    raise @git.GitError::InvalidObject("bad config variable .branch..")
+    fs.write_string(config_path, @bitlib.render_config_blocks(filtered))
+    raise @bitcore.GitError::InvalidObject("bad config variable .branch..")
   }
 }
 
@@ -1251,7 +1251,7 @@ fn enforce_receive_deny_current_branch(
   deny_current_branch : String?,
   checked_out_worktree : String?,
   dest_ref : String,
-) -> DenyCurrentBranchDecision raise @git.GitError {
+) -> DenyCurrentBranchDecision raise @bitcore.GitError {
   guard checked_out_worktree is Some(worktree_path) else {
     return DenyCurrentBranchDecision::Allow
   }
@@ -1264,12 +1264,12 @@ fn enforce_receive_deny_current_branch(
       } else if mode == "updateinstead" {
         DenyCurrentBranchDecision::UpdateInstead(worktree_path)
       } else {
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "refusing to update checked out branch: " + dest_ref,
         )
       }
     None =>
-      raise @git.GitError::InvalidObject(
+      raise @bitcore.GitError::InvalidObject(
         "refusing to update checked out branch: " + dest_ref,
       )
   }
@@ -1277,8 +1277,8 @@ fn enforce_receive_deny_current_branch(
 
 ///|
 struct PushResolvedUpdate {
-  old_id : @git.ObjectId
-  new_id : @git.ObjectId
+  old_id : @bitcore.ObjectId
+  new_id : @bitcore.ObjectId
   refname : String
   delete_ref : Bool
   should_apply : Bool
@@ -1288,13 +1288,13 @@ struct PushResolvedUpdate {
 ///|
 fn is_invalid_nonexistent_delete(row : PushResolvedUpdate) -> Bool {
   row.delete_ref &&
-  row.old_id == @git.ObjectId::zero() &&
-  row.new_id == @git.ObjectId::zero()
+  row.old_id == @bitcore.ObjectId::zero() &&
+  row.new_id == @bitcore.ObjectId::zero()
 }
 
 ///|
 fn resolve_ref_canonical_name_inner(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
   refname : String,
   depth : Int,
@@ -1305,7 +1305,7 @@ fn resolve_ref_canonical_name_inner(
   let normalized = if refname == "HEAD" {
     "HEAD"
   } else {
-    let normalized = @gitlib.normalize_repo_path(refname) catch {
+    let normalized = @bitlib.normalize_repo_path(refname) catch {
       _ => return refname
     }
     if normalized.has_prefix("refs/") {
@@ -1330,7 +1330,7 @@ fn resolve_ref_canonical_name_inner(
 
 ///|
 fn resolve_ref_canonical_name(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
   refname : String,
 ) -> String {
@@ -1339,17 +1339,17 @@ fn resolve_ref_canonical_name(
 
 ///|
 fn ensure_consistent_alias_updates(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
   rows : Array[PushResolvedUpdate],
-) -> Unit raise @git.GitError {
-  let canonical_updates : Map[String, (@git.ObjectId, String)] = {}
+) -> Unit raise @bitcore.GitError {
+  let canonical_updates : Map[String, (@bitcore.ObjectId, String)] = {}
   for row in rows {
     let canonical = resolve_ref_canonical_name(fs, git_dir, row.refname)
     match canonical_updates.get(canonical) {
       Some((known_id, known_refname)) =>
         if known_id != row.new_id {
-          raise @git.GitError::InvalidObject(
+          raise @bitcore.GitError::InvalidObject(
             "refusing inconsistent update: " +
             known_refname +
             " and " +
@@ -1488,7 +1488,7 @@ async fn run_push_hook_with_args(
 }
 
 ///|
-fn is_worktree_status_clean(status : @gitlib.Status) -> Bool {
+fn is_worktree_status_clean(status : @bitlib.Status) -> Bool {
   status.staged_added.length() == 0 &&
   status.staged_modified.length() == 0 &&
   status.staged_deleted.length() == 0 &&
@@ -1502,19 +1502,19 @@ async fn apply_update_instead_worktree(
   fs : OsFs,
   repo_git_dir : String,
   worktree_path : String,
-  new_id : @git.ObjectId,
-) -> Unit raise @git.GitError {
-  let status = @gitlib.status(fs, worktree_path)
+  new_id : @bitcore.ObjectId,
+) -> Unit raise @bitcore.GitError {
+  let status = @bitlib.status(fs, worktree_path)
   if not(is_worktree_status_clean(status)) {
-    raise @git.GitError::InvalidObject("working tree has pending changes")
+    raise @bitcore.GitError::InvalidObject("working tree has pending changes")
   }
-  let worktree_git_dir = match @gitlib.detect_git_dir(fs, worktree_path) {
+  let worktree_git_dir = match @bitlib.detect_git_dir(fs, worktree_path) {
     Some((dir, _)) => dir
     None => repo_git_dir
   }
-  let db = @gitlib.ObjectDb::load(fs, repo_git_dir)
-  let files = @gitlib.collect_tree_files_from_commit(db, fs, new_id)
-  @gitlib.write_worktree_from_files(
+  let db = @bitlib.ObjectDb::load(fs, repo_git_dir)
+  let files = @bitlib.collect_tree_files_from_commit(db, fs, new_id)
+  @bitlib.write_worktree_from_files(
     db,
     fs,
     fs,
@@ -1523,8 +1523,8 @@ async fn apply_update_instead_worktree(
     files,
     remove_missing=true,
   )
-  let entries = @gitlib.tree_files_to_index(db, fs, files)
-  @gitlib.write_index_entries(fs, worktree_git_dir, entries)
+  let entries = @bitlib.tree_files_to_index(db, fs, files)
+  @bitlib.write_index_entries(fs, worktree_git_dir, entries)
 }
 
 ///|
@@ -1532,14 +1532,14 @@ async fn run_push_to_checkout_hook(
   fs : OsFs,
   git_dir : String,
   worktree_path : String,
-  new_id : @git.ObjectId,
+  new_id : @bitcore.ObjectId,
 ) -> Int {
   let hook_git_dir = resolve_push_hook_git_dir(git_dir)
   let hook_path = hook_git_dir + "/hooks/push-to-checkout"
   if not(fs.is_file(hook_path)) {
     return -1
   }
-  let worktree_git_dir = match @gitlib.detect_git_dir(fs, worktree_path) {
+  let worktree_git_dir = match @bitlib.detect_git_dir(fs, worktree_path) {
     Some((dir, _)) => resolve_push_hook_git_dir(dir)
     None => hook_git_dir
   }

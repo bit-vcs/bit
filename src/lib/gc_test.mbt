@@ -2,17 +2,17 @@
 
 ///|
 fn build_simple_repo(
-  fs : @git.TestFs,
+  fs : @bit.TestFs,
   root : String,
-) -> (@git.ObjectId, @git.ObjectId, @git.ObjectId) raise @git.GitError {
+) -> (@bit.ObjectId, @bit.ObjectId, @bit.ObjectId) raise @bit.GitError {
   init_repo(fs, root)
   let git_dir = root + "/.git"
-  let (blob_id, blob_bytes) = @git.create_blob_string("hello\n")
+  let (blob_id, blob_bytes) = @bit.create_blob_string("hello\n")
   write_object_bytes(fs, git_dir, blob_id, blob_bytes)
-  let entry = @git.TreeEntry::new("100644", "hello.txt", blob_id)
-  let (tree_id, tree_bytes) = @git.create_tree([entry])
+  let entry = @bit.TreeEntry::new("100644", "hello.txt", blob_id)
+  let (tree_id, tree_bytes) = @bit.create_tree([entry])
   write_object_bytes(fs, git_dir, tree_id, tree_bytes)
-  let commit = @git.Commit::new(
+  let commit = @bit.Commit::new(
     tree_id,
     [],
     "Test <test@example.com>",
@@ -23,7 +23,7 @@ fn build_simple_repo(
     "+0000",
     "test commit\n",
   )
-  let (commit_id, commit_bytes) = @git.create_commit(commit)
+  let (commit_id, commit_bytes) = @bit.create_commit(commit)
   write_object_bytes(fs, git_dir, commit_id, commit_bytes)
   update_head_ref(fs, fs, git_dir, commit_id)
   (commit_id, tree_id, blob_id)
@@ -31,11 +31,11 @@ fn build_simple_repo(
 
 ///|
 test "repack_repo writes pack with reachable objects" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   let root = "/repo"
   let git_dir = root + "/.git"
   let _ = build_simple_repo(fs, root)
-  let (orphan_id, orphan_bytes) = @git.create_blob_string("orphan\n")
+  let (orphan_id, orphan_bytes) = @bit.create_blob_string("orphan\n")
   write_object_bytes(fs, git_dir, orphan_id, orphan_bytes)
   let result = repack_repo(fs, fs, root)
   match result {
@@ -56,11 +56,11 @@ test "repack_repo writes pack with reachable objects" {
 
 ///|
 test "gc_repo reports unreachable objects" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   let root = "/repo"
   let git_dir = root + "/.git"
   let _ = build_simple_repo(fs, root)
-  let (orphan_id, orphan_bytes) = @git.create_blob_string("orphan\n")
+  let (orphan_id, orphan_bytes) = @bit.create_blob_string("orphan\n")
   write_object_bytes(fs, git_dir, orphan_id, orphan_bytes)
   let result = gc_repo(fs, fs, root)
   assert_true(result.dangling.length() == 1)
@@ -80,11 +80,11 @@ test "gc_repo reports unreachable objects" {
 
 ///|
 test "gc_repo keeps tag and remote refs" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   let root = "/repo"
   let git_dir = root + "/.git"
   let (_, tree_id, _) = build_simple_repo(fs, root)
-  let tag_commit = @git.Commit::new(
+  let tag_commit = @bit.Commit::new(
     tree_id,
     [],
     "Tagger <tag@example.com>",
@@ -95,7 +95,7 @@ test "gc_repo keeps tag and remote refs" {
     "+0000",
     "tagged commit\n",
   )
-  let (tag_commit_id, tag_commit_bytes) = @git.create_commit(tag_commit)
+  let (tag_commit_id, tag_commit_bytes) = @bit.create_commit(tag_commit)
   write_object_bytes(fs, git_dir, tag_commit_id, tag_commit_bytes)
   fs.mkdir_p(git_dir + "/refs/tags")
   fs.write_string(git_dir + "/refs/tags/v1", tag_commit_id.to_hex() + "\n")
@@ -112,12 +112,12 @@ test "gc_repo keeps tag and remote refs" {
 
 ///|
 test "gc_repo skips prune when no refs" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   let root = "/repo"
   let git_dir = root + "/.git"
   let _ = build_simple_repo(fs, root)
   fs.remove_file(git_dir + "/refs/heads/main")
-  let (orphan_id, orphan_bytes) = @git.create_blob_string("orphan\n")
+  let (orphan_id, orphan_bytes) = @bit.create_blob_string("orphan\n")
   write_object_bytes(fs, git_dir, orphan_id, orphan_bytes)
   let result = gc_repo(fs, fs, root)
   match result.pack {
@@ -135,19 +135,19 @@ test "gc_repo skips prune when no refs" {
 
 ///|
 test "gc_repo preserves all reachable objects after multiple commits" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   let root = "/repo"
   let git_dir = root + "/.git"
   // Create initial repo with first commit
   let (commit1_id, tree1_id, blob1_id) = build_simple_repo(fs, root)
   // Create second commit with different content
-  let (blob2_id, blob2_bytes) = @git.create_blob_string("world\n")
+  let (blob2_id, blob2_bytes) = @bit.create_blob_string("world\n")
   write_object_bytes(fs, git_dir, blob2_id, blob2_bytes)
-  let entry2 = @git.TreeEntry::new("100644", "world.txt", blob2_id)
-  let entry1 = @git.TreeEntry::new("100644", "hello.txt", blob1_id)
-  let (tree2_id, tree2_bytes) = @git.create_tree([entry1, entry2])
+  let entry2 = @bit.TreeEntry::new("100644", "world.txt", blob2_id)
+  let entry1 = @bit.TreeEntry::new("100644", "hello.txt", blob1_id)
+  let (tree2_id, tree2_bytes) = @bit.create_tree([entry1, entry2])
   write_object_bytes(fs, git_dir, tree2_id, tree2_bytes)
-  let commit2 = @git.Commit::new(
+  let commit2 = @bit.Commit::new(
     tree2_id,
     [commit1_id],
     "Test <test@example.com>",
@@ -158,7 +158,7 @@ test "gc_repo preserves all reachable objects after multiple commits" {
     "+0000",
     "second commit\n",
   )
-  let (commit2_id, commit2_bytes) = @git.create_commit(commit2)
+  let (commit2_id, commit2_bytes) = @bit.create_commit(commit2)
   write_object_bytes(fs, git_dir, commit2_id, commit2_bytes)
   update_head_ref(fs, fs, git_dir, commit2_id)
   // Run gc
@@ -179,7 +179,7 @@ test "gc_repo preserves all reachable objects after multiple commits" {
   let objects = @pack.parse_packfile(pack)
   let ids : Array[String] = []
   for obj in objects {
-    let id = @git.hash_object_content(obj.obj_type, obj.data)
+    let id = @bit.hash_object_content(obj.obj_type, obj.data)
     ids.push(id.to_hex())
   }
   assert_true(ids.contains(commit1_id.to_hex()))
@@ -192,18 +192,18 @@ test "gc_repo preserves all reachable objects after multiple commits" {
 
 ///|
 test "gc_repo preserves objects reachable from multiple branches" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   let root = "/repo"
   let git_dir = root + "/.git"
   // Create initial commit on main
   let (commit1_id, _, _) = build_simple_repo(fs, root)
   // Create a branch with different content
-  let (blob2_id, blob2_bytes) = @git.create_blob_string("feature\n")
+  let (blob2_id, blob2_bytes) = @bit.create_blob_string("feature\n")
   write_object_bytes(fs, git_dir, blob2_id, blob2_bytes)
-  let entry2 = @git.TreeEntry::new("100644", "feature.txt", blob2_id)
-  let (tree2_id, tree2_bytes) = @git.create_tree([entry2])
+  let entry2 = @bit.TreeEntry::new("100644", "feature.txt", blob2_id)
+  let (tree2_id, tree2_bytes) = @bit.create_tree([entry2])
   write_object_bytes(fs, git_dir, tree2_id, tree2_bytes)
-  let commit2 = @git.Commit::new(
+  let commit2 = @bit.Commit::new(
     tree2_id,
     [commit1_id],
     "Test <test@example.com>",
@@ -214,7 +214,7 @@ test "gc_repo preserves objects reachable from multiple branches" {
     "+0000",
     "feature commit\n",
   )
-  let (commit2_id, commit2_bytes) = @git.create_commit(commit2)
+  let (commit2_id, commit2_bytes) = @bit.create_commit(commit2)
   write_object_bytes(fs, git_dir, commit2_id, commit2_bytes)
   // Create feature branch pointing to commit2
   fs.write_string(git_dir + "/refs/heads/feature", commit2_id.to_hex() + "\n")
@@ -230,7 +230,7 @@ test "gc_repo preserves objects reachable from multiple branches" {
 
 ///|
 test "gc_repo creates new packfile" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   let root = "/repo"
   let git_dir = root + "/.git"
   let _ = build_simple_repo(fs, root)
@@ -256,7 +256,7 @@ test "gc_repo creates new packfile" {
 
 ///|
 test "gc_repo handles annotated tags" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   let root = "/repo"
   let git_dir = root + "/.git"
   let (commit_id, _, _) = build_simple_repo(fs, root)
@@ -265,8 +265,8 @@ test "gc_repo handles annotated tags" {
     commit_id.to_hex() +
     "\ntype commit\ntag v1.0\ntagger Test <test@example.com> 0 +0000\n\nrelease\n"
   let tag_bytes = @utf8.encode(tag_content)
-  let (tag_id, tag_compressed) = @git.create_object(
-    @git.ObjectType::Tag,
+  let (tag_id, tag_compressed) = @bit.create_object(
+    @bit.ObjectType::Tag,
     tag_bytes,
   )
   write_object_bytes(fs, git_dir, tag_id, tag_compressed)
@@ -288,7 +288,7 @@ test "gc_repo handles annotated tags" {
 
 ///|
 test "prune_repo does not remove reachable objects" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   let root = "/repo"
   let git_dir = root + "/.git"
   let (commit_id, tree_id, blob_id) = build_simple_repo(fs, root)
@@ -297,7 +297,7 @@ test "prune_repo does not remove reachable objects" {
   // No objects should be pruned
   assert_true(result.pruned.length() == 0)
   // Verify objects still exist
-  fn obj_path(id : @git.ObjectId) -> String {
+  fn obj_path(id : @bit.ObjectId) -> String {
     let hex = id.to_hex()
     git_dir +
     "/objects/" +

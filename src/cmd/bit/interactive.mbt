@@ -42,7 +42,7 @@ async fn run_add_interactive(
     None => default_add_interactive_runner(args)
   }
   if code != 0 {
-    raise @git.GitError::InvalidObject(
+    raise @bitcore.GitError::InvalidObject(
       "git add --patch failed with exit code \{code}",
     )
   }
@@ -104,7 +104,7 @@ async fn default_rebase_todo_editor(todo_path : String) -> Bool raise Error {
   guard resolve_sequence_editor() is Some(editor_cmd) else { return false }
   let code = run_editor_on_path(editor_cmd, todo_path)
   if code != 0 {
-    raise @git.GitError::InvalidObject(
+    raise @bitcore.GitError::InvalidObject(
       "rebase todo editor failed with exit code \{code}",
     )
   }
@@ -171,7 +171,7 @@ async fn default_commit_message_editor(path : String) -> Bool raise Error {
   guard resolve_commit_editor() is Some(editor_cmd) else { return false }
   let code = run_editor_on_path(editor_cmd, path)
   if code != 0 {
-    raise @git.GitError::InvalidObject(
+    raise @bitcore.GitError::InvalidObject(
       "commit message editor failed with exit code \{code}",
     )
   }

@@ -83,15 +83,15 @@ fn ensure_bench_repo(root : String, file_count : Int, dir_count : Int) -> Unit {
 
 ///|
 fn bench_list_walk_plain(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   root : String,
   rel : String,
   out : Array[String],
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let dir = if rel == "" { root } else { join_path(root, rel) }
   if rel != "" {
-    let git_marker = join_path(dir, ".git")
-    if fs.is_file(git_marker) || fs.is_dir(git_marker) {
+    let bit_marker = join_path(dir, ".git")
+    if fs.is_file(bit_marker) || fs.is_dir(bit_marker) {
       return ()
     }
   }

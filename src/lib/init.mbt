@@ -27,11 +27,11 @@ pub fn InitOptions::new() -> InitOptions {
 /// If `bare` is true, creates a bare repository (no working tree).
 /// If the repository already exists, this is a reinit and preserves existing HEAD.
 pub fn init_repo(
-  fs : &@git.FileSystem,
+  fs : &@bit.FileSystem,
   root : String,
   default_branch? : String = "main",
   bare? : Bool = false,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   init_repo_with_options(fs, root, {
     default_branch,
     bare,
@@ -46,10 +46,10 @@ pub fn init_repo(
 /// Initialize a repository with full options. If `separate_git_dir` is set, this
 /// version does not inspect the existing `.git` target and only updates `.git` atomically.
 pub fn init_repo_with_options(
-  fs : &@git.FileSystem,
+  fs : &@bit.FileSystem,
   root : String,
   opts : InitOptions,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let bare = opts.bare
   // Determine git directory location
   let git_dir = match opts.separate_git_dir {
@@ -124,11 +124,11 @@ pub fn init_repo_with_options(
 /// Initialize a repository with full options and full `.git` resolution via RepoFileSystem.
 /// This is used when reinitializing with --separate-git-dir to migrate existing data.
 pub fn init_repo_with_options_with_repo_fs(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   opts : InitOptions,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let bare = opts.bare
   // Determine git directory location
   let git_dir = match opts.separate_git_dir {
@@ -219,21 +219,21 @@ pub fn init_repo_with_options_with_repo_fs(
 /// Copy template directory contents to git directory.
 /// This should be called after init_repo_with_options if template_dir is specified.
 pub fn apply_template(
-  wfs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  wfs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   template_dir : String,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   copy_dir_recursive(wfs, rfs, template_dir, git_dir)
 }
 
 ///|
 fn copy_dir_recursive(
-  wfs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  wfs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   src : String,
   dst : String,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   if not(rfs.is_dir(src)) {
     return
   }

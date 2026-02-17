@@ -214,7 +214,7 @@ pub fn pr_workflow_prefix(pr_id : String) -> String {
 
 ///|
 fn workflow_task_key_suffix(task : String) -> String {
-  let (id, _compressed) = @git.create_blob_string("hub-pr-workflow:" + task)
+  let (id, _compressed) = @bit.create_blob_string("hub-pr-workflow:" + task)
   let hex = id.to_hex()
   String::unsafe_substring(hex, start=0, end=12)
 }
@@ -237,12 +237,12 @@ pub fn Hub::record_pr_workflow(
   author : String,
   txn_id? : String? = None,
   summary? : String = "",
-) -> PrWorkflowResult raise @git.GitError {
+) -> PrWorkflowResult raise @bit.GitError {
   if task.length() == 0 {
-    raise @git.GitError::InvalidObject("PR workflow task is required")
+    raise @bit.GitError::InvalidObject("PR workflow task is required")
   }
   if self.get_pr(objects, pr_id) is None {
-    raise @git.GitError::InvalidObject("PR not found: \{pr_id}")
+    raise @bit.GitError::InvalidObject("PR not found: \{pr_id}")
   }
   let draft = PrWorkflowResult::new(
     pr_id,

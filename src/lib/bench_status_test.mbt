@@ -11,8 +11,8 @@ let bench_root : String = "/bench_status"
 fn setup_status_repo(
   file_count : Int,
   dirty_count : Int,
-) -> @git.TestFs raise @git.GitError {
-  let fs = @git.TestFs::new()
+) -> @bit.TestFs raise @bit.GitError {
+  let fs = @bit.TestFs::new()
   ignore(try? init_repo(fs, bench_root))
   for i in 0..<file_count {
     fs.write_string(bench_root + "/file_\{i}.txt", "content\n")
@@ -30,13 +30,13 @@ fn setup_status_repo(
 }
 
 ///|
-let bench_status_clean_small : @git.TestFs = try! setup_status_repo(200, 0)
+let bench_status_clean_small : @bit.TestFs = try! setup_status_repo(200, 0)
 
 ///|
-let bench_status_dirty_small : @git.TestFs = try! setup_status_repo(200, 20)
+let bench_status_dirty_small : @bit.TestFs = try! setup_status_repo(200, 20)
 
 ///|
-let bench_status_clean_large : @git.TestFs = try! setup_status_repo(1000, 0)
+let bench_status_clean_large : @bit.TestFs = try! setup_status_repo(1000, 0)
 
 ///|
 test "bench status clean small" (b : @bench.T) {
@@ -76,7 +76,7 @@ test "bench status clean large" (b : @bench.T) {
 
 ///|
 async test "racy_git: unchanged file is not reported" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   ignore(try? init_repo(fs, "/repo"))
   fs.write_string("/repo/a.txt", "hello\n")
   add_paths(fs, fs, "/repo", ["a.txt"])

@@ -9,12 +9,12 @@ enum CatFileObjectFilter {
   Disabled
   BlobNone
   BlobLimit(Int64)
-  ObjectType(@git.ObjectType)
+  ObjectType(@bitcore.ObjectType)
 }
 
 ///|
 struct CatFileBatchAllObjectDiskRecord {
-  id : @git.ObjectId
+  id : @bitcore.ObjectId
   disk_size : Int
 }
 
@@ -248,7 +248,7 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
         []
       }
       let objects = if format_uses_objectsize_disk {
-        let ids : Array[@git.ObjectId] = []
+        let ids : Array[@bitcore.ObjectId] = []
         for record in disk_records {
           ids.push(record.id)
         }
@@ -259,8 +259,8 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
       let batch_check_needs_object = cat_file_batch_check_format_needs_object(
         batch_format,
       )
-      let batch_check_placeholder_obj = @git.PackObject::new(
-        @git.ObjectType::Blob,
+      let batch_check_placeholder_obj = @bitcore.PackObject::new(
+        @bitcore.ObjectType::Blob,
         bytes_from_array([]),
       )
       let sort_batch_check_output = batch_check_mode && !batch_unordered
@@ -515,7 +515,7 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
           @sys.exit(1)
         }
         let mut object_mode : String? = None
-        let mut resolved_oid : @git.ObjectId? = None
+        let mut resolved_oid : @bitcore.ObjectId? = None
         match cat_file_split_object_path_spec(spec) {
           Some((rev_part, path_part)) =>
             if dbs.length() > 0 {
@@ -525,11 +525,11 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
                   let base_obj = dbs[0].get(fs, base_id) catch { _ => None }
                   if base_obj is Some(obj) {
                     match obj.obj_type {
-                      @git.ObjectType::Commit => {
-                        resolved_oid = Some(@git.parse_commit(obj.data).tree)
+                      @bitcore.ObjectType::Commit => {
+                        resolved_oid = Some(@bitcore.parse_commit(obj.data).tree)
                         object_mode = Some("040000")
                       }
-                      @git.ObjectType::Tree => {
+                      @bitcore.ObjectType::Tree => {
                         resolved_oid = Some(base_id)
                         object_mode = Some("040000")
                       }
@@ -643,7 +643,7 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
         if resolved_oid is None &&
           spec.length() == 40 &&
           cat_file_is_hex_string(spec) {
-          let parsed_id = @git.ObjectId::from_hex(spec)
+          let parsed_id = @bitcore.ObjectId::from_hex(spec)
           resolved_oid = Some(parsed_id)
         }
         if resolved_oid is None {
@@ -813,7 +813,7 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
     }
     return ()
   }
-  let mut expected_type : @git.ObjectType? = None
+  let mut expected_type : @bitcore.ObjectType? = None
   let mut obj_spec : String? = None
   if not(show_type || show_size || pretty_print) && positionals.length() >= 2 {
     match cat_file_parse_object_type_name(positionals[0]) {
@@ -831,13 +831,13 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
     obj_spec = Some(positionals[positionals.length() - 1])
   }
   guard obj_spec is Some(spec) else {
-    raise @git.GitError::InvalidObject("object name required")
+    raise @bitcore.GitError::InvalidObject("object name required")
   }
   let mut effective_path = match explicit_path {
     Some(path) => Some(path)
     None => cat_file_path_from_spec(spec)
   }
-  let mut resolved_obj_id : @git.ObjectId? = None
+  let mut resolved_obj_id : @bitcore.ObjectId? = None
   let mut resolved_mode : String? = None
   match cat_file_split_object_path_spec(spec) {
     Some((rev_part, path_part)) => {
@@ -846,7 +846,7 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
         eprint_line("fatal: invalid object name '\{rev_part}'.")
         @sys.exit(128)
       }
-      let db_for_path = @gitlib.ObjectDb::load(fs, git_dir)
+      let db_for_path = @bitlib.ObjectDb::load(fs, git_dir)
       if path_part.length() == 0 {
         let base_obj = db_for_path.get(fs, base) catch { _ => None }
         guard base_obj is Some(obj) else {
@@ -856,11 +856,11 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
           @sys.exit(128)
         }
         match obj.obj_type {
-          @git.ObjectType::Commit => {
-            resolved_obj_id = Some(@git.parse_commit(obj.data).tree)
+          @bitcore.ObjectType::Commit => {
+            resolved_obj_id = Some(@bitcore.parse_commit(obj.data).tree)
             resolved_mode = Some("040000")
           }
-          @git.ObjectType::Tree => {
+          @bitcore.ObjectType::Tree => {
             resolved_obj_id = Some(base)
             resolved_mode = Some("040000")
           }
@@ -942,7 +942,7 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
   let obj = cat_file_find_object_in_dbs(dbs, fs, oid) catch {
     err =>
       match err {
-        @git.GitError::InvalidObject(msg) => {
+        @bitcore.GitError::InvalidObject(msg) => {
           let prefix = "Unknown object type: "
           if msg.has_prefix(prefix) {
             let obj_type = String::unsafe_substring(
@@ -998,7 +998,7 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
     } else {
       peel_cat_file_object_to_type(db, fs, oid, expected) catch {
         _ =>
-          raise @git.GitError::InvalidObject(
+          raise @bitcore.GitError::InvalidObject(
             "object is of type \{o.obj_type.to_string()}, not \{expected.to_string()}",
           )
       }
@@ -1016,9 +1016,9 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
   }
   if pretty_print {
     match o.obj_type {
-      @git.ObjectType::Blob => @stdio.stdout.write(display_data)
-      @git.ObjectType::Tree => {
-        let entries = @git.parse_tree(o.data)
+      @bitcore.ObjectType::Blob => @stdio.stdout.write(display_data)
+      @bitcore.ObjectType::Tree => {
+        let entries = @bitcore.parse_tree(o.data)
         for entry in entries {
           let mode_str = if entry.mode == "40000" {
             "040000"
@@ -1037,8 +1037,8 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
           )
         }
       }
-      @git.ObjectType::Commit => @stdio.stdout.write(display_data)
-      @git.ObjectType::Tag => @stdio.stdout.write(display_data)
+      @bitcore.ObjectType::Commit => @stdio.stdout.write(display_data)
+      @bitcore.ObjectType::Tag => @stdio.stdout.write(display_data)
     }
     return ()
   }
@@ -1068,11 +1068,11 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
 fn cat_file_load_object_dbs(
   fs : OsFs,
   git_dir : String,
-) -> Array[@gitlib.ObjectDb] {
-  let out : Array[@gitlib.ObjectDb] = []
+) -> Array[@bitlib.ObjectDb] {
+  let out : Array[@bitlib.ObjectDb] = []
   let object_dirs = cat_file_collect_object_dirs(fs, git_dir)
   for object_dir in object_dirs {
-    let alt_db = @gitlib.ObjectDb::load_from_objects_dir(fs, object_dir) catch {
+    let alt_db = @bitlib.ObjectDb::load_from_objects_dir(fs, object_dir) catch {
       _ => continue
     }
     alt_db.set_skip_verify(true)
@@ -1083,10 +1083,10 @@ fn cat_file_load_object_dbs(
 
 ///|
 fn cat_file_find_object_in_dbs(
-  dbs : Array[@gitlib.ObjectDb],
+  dbs : Array[@bitlib.ObjectDb],
   fs : OsFs,
-  id : @git.ObjectId,
-) -> @git.PackObject? raise Error {
+  id : @bitcore.ObjectId,
+) -> @bitcore.PackObject? raise Error {
   for db in dbs {
     let obj = db.get(fs, id)
     if obj is Some(o) {
@@ -1098,15 +1098,15 @@ fn cat_file_find_object_in_dbs(
 
 ///|
 fn cat_file_find_object_in_dbs_lenient(
-  dbs : Array[@gitlib.ObjectDb],
+  dbs : Array[@bitlib.ObjectDb],
   fs : OsFs,
-  id : @git.ObjectId,
-) -> (@git.PackObject?, Bool) {
+  id : @bitcore.ObjectId,
+) -> (@bitcore.PackObject?, Bool) {
   for db in dbs {
     let obj = db.get(fs, id) catch {
       err =>
         match err {
-          @git.GitError::InvalidObject(msg) =>
+          @bitcore.GitError::InvalidObject(msg) =>
             if cat_file_extract_unknown_object_type(msg) is Some(_) {
               return (None, true)
             } else {
@@ -1124,15 +1124,15 @@ fn cat_file_find_object_in_dbs_lenient(
 
 ///|
 fn cat_file_object_exists_for_exists_check(
-  dbs : Array[@gitlib.ObjectDb],
+  dbs : Array[@bitlib.ObjectDb],
   fs : OsFs,
-  id : @git.ObjectId,
+  id : @bitcore.ObjectId,
 ) -> Bool {
   for db in dbs {
     let obj = db.get(fs, id) catch {
       err =>
         match err {
-          @git.GitError::InvalidObject(msg) =>
+          @bitcore.GitError::InvalidObject(msg) =>
             if msg.has_prefix("Unknown object type: ") {
               return true
             } else {
@@ -1170,10 +1170,10 @@ fn cat_file_collect_batch_all_objects(
   fs : OsFs,
   object_dirs : Array[String],
   unordered : Bool,
-) -> Array[@git.ObjectId] {
+) -> Array[@bitcore.ObjectId] {
   let seen_ids : Map[String, Bool] = {}
   for scan_object_dir in object_dirs {
-    let db = @gitlib.ObjectDb::load_from_objects_dir(fs, scan_object_dir) catch {
+    let db = @bitlib.ObjectDb::load_from_objects_dir(fs, scan_object_dir) catch {
       _ => continue
     }
     for item in db.loose_paths.to_array() {
@@ -1200,9 +1200,9 @@ fn cat_file_collect_batch_all_objects(
   if not(unordered) {
     ids.sort()
   }
-  let out : Array[@git.ObjectId] = []
+  let out : Array[@bitcore.ObjectId] = []
   for hex in ids {
-    let id = @git.ObjectId::from_hex(hex) catch { _ => continue }
+    let id = @bitcore.ObjectId::from_hex(hex) catch { _ => continue }
     out.push(id)
   }
   out
@@ -1216,12 +1216,12 @@ fn cat_file_collect_batch_all_object_disk_records(
 ) -> Array[CatFileBatchAllObjectDiskRecord] {
   let out : Array[CatFileBatchAllObjectDiskRecord] = []
   for scan_object_dir in object_dirs {
-    let db = @gitlib.ObjectDb::load_from_objects_dir(fs, scan_object_dir) catch {
+    let db = @bitlib.ObjectDb::load_from_objects_dir(fs, scan_object_dir) catch {
       _ => continue
     }
     for item in db.loose_paths.to_array() {
       let (hex, path) = item
-      let id = @git.ObjectId::from_hex(hex) catch { _ => continue }
+      let id = @bitcore.ObjectId::from_hex(hex) catch { _ => continue }
       let size = fs.read_file(path).length() catch { _ => continue }
       out.push(CatFileBatchAllObjectDiskRecord::{ id, disk_size: size })
     }
@@ -1247,7 +1247,7 @@ fn cat_file_collect_batch_all_object_disk_records(
 ///|
 fn cat_file_append_pack_disk_records(
   fs : OsFs,
-  pack : @gitlib.PackIndex,
+  pack : @bitlib.PackIndex,
   out : Array[CatFileBatchAllObjectDiskRecord],
 ) -> Unit {
   let pack_data = fs.read_file(pack.pack_path) catch { _ => return }
@@ -1263,7 +1263,7 @@ fn cat_file_append_pack_disk_records(
       pack_end,
     )
     guard size is Some(entry_size) else { continue }
-    let id = @git.ObjectId::from_hex(pack.ids[i]) catch { _ => continue }
+    let id = @bitcore.ObjectId::from_hex(pack.ids[i]) catch { _ => continue }
     out.push(CatFileBatchAllObjectDiskRecord::{ id, disk_size: entry_size })
   }
 }
@@ -1357,8 +1357,8 @@ fn cat_file_read_alternate_object_dirs(
 ///|
 fn cat_file_format_batch_check_line(
   format : String?,
-  id : @git.ObjectId,
-  obj : @git.PackObject,
+  id : @bitcore.ObjectId,
+  obj : @bitcore.PackObject,
   rest : String,
   object_mode : String?,
   object_name_override : String?,
@@ -1415,12 +1415,12 @@ fn cat_file_batch_format_uses_objectsize_disk(format : String?) -> Bool {
 }
 
 ///|
-fn cat_file_parse_object_type_name(name : String) -> @git.ObjectType? {
+fn cat_file_parse_object_type_name(name : String) -> @bitcore.ObjectType? {
   match name {
-    "blob" => Some(@git.ObjectType::Blob)
-    "commit" => Some(@git.ObjectType::Commit)
-    "tag" => Some(@git.ObjectType::Tag)
-    "tree" => Some(@git.ObjectType::Tree)
+    "blob" => Some(@bitcore.ObjectType::Blob)
+    "commit" => Some(@bitcore.ObjectType::Commit)
+    "tag" => Some(@bitcore.ObjectType::Tag)
+    "tree" => Some(@bitcore.ObjectType::Tree)
     _ => None
   }
 }
@@ -1468,11 +1468,11 @@ async fn cat_file_parse_object_filter_spec_or_exit(
       start=12,
       end=spec.length(),
     )
-    let object_type : @git.ObjectType? = match object_type_name {
-      "blob" => Some(@git.ObjectType::Blob)
-      "commit" => Some(@git.ObjectType::Commit)
-      "tag" => Some(@git.ObjectType::Tag)
-      "tree" => Some(@git.ObjectType::Tree)
+    let object_type : @bitcore.ObjectType? = match object_type_name {
+      "blob" => Some(@bitcore.ObjectType::Blob)
+      "commit" => Some(@bitcore.ObjectType::Commit)
+      "tag" => Some(@bitcore.ObjectType::Tag)
+      "tree" => Some(@bitcore.ObjectType::Tree)
       _ => None
     }
     guard object_type is Some(filter_type) else {
@@ -1534,13 +1534,13 @@ fn cat_file_object_filter_is_disabled(filter : CatFileObjectFilter) -> Bool {
 ///|
 fn cat_file_object_is_excluded_by_filter(
   filter : CatFileObjectFilter,
-  obj : @git.PackObject,
+  obj : @bitcore.PackObject,
 ) -> Bool {
   match filter {
     Disabled => false
-    BlobNone => obj.obj_type == @git.ObjectType::Blob
+    BlobNone => obj.obj_type == @bitcore.ObjectType::Blob
     BlobLimit(limit) =>
-      obj.obj_type == @git.ObjectType::Blob &&
+      obj.obj_type == @bitcore.ObjectType::Blob &&
       obj.data.length().to_int64() >= limit
     ObjectType(filter_type) => obj.obj_type != filter_type
   }
@@ -1550,8 +1550,8 @@ fn cat_file_object_is_excluded_by_filter(
 fn cat_file_resolve_replace_object_id(
   fs : OsFs,
   git_dir : String,
-  id : @git.ObjectId,
-) -> @git.ObjectId {
+  id : @bitcore.ObjectId,
+) -> @bitcore.ObjectId {
   let mut current = id
   let seen : Map[String, Bool] = {}
   while true {
@@ -1560,7 +1560,7 @@ fn cat_file_resolve_replace_object_id(
       break
     }
     seen[hex] = true
-    let replace_ref = @gitlib.resolve_ref(fs, git_dir, "refs/replace/" + hex) catch {
+    let replace_ref = @bitlib.resolve_ref(fs, git_dir, "refs/replace/" + hex) catch {
       _ => None
     }
     match replace_ref {
@@ -1573,10 +1573,10 @@ fn cat_file_resolve_replace_object_id(
 
 ///|
 fn cat_file_resolve_delta_base_hex(
-  dbs : Array[@gitlib.ObjectDb],
+  dbs : Array[@bitlib.ObjectDb],
   fs : OsFs,
   git_dir : String,
-  id : @git.ObjectId,
+  id : @bitcore.ObjectId,
   target_oid_len : Int,
 ) -> String? {
   for db in dbs {
@@ -1597,9 +1597,9 @@ fn cat_file_resolve_delta_base_hex(
 
 ///|
 fn cat_file_resolve_object_disk_size(
-  dbs : Array[@gitlib.ObjectDb],
+  dbs : Array[@bitlib.ObjectDb],
   fs : OsFs,
-  id : @git.ObjectId,
+  id : @bitcore.ObjectId,
 ) -> Int? {
   for db in dbs {
     let disk_size = db.find_object_disk_size(fs, id) catch { _ => None }
@@ -1634,7 +1634,7 @@ fn cat_file_zero_oid(length : Int) -> String {
 
 ///|
 fn cat_file_has_incremental_midx_chain(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
 ) -> Bool {
   let chain_path = git_dir +
@@ -1719,7 +1719,7 @@ fn cat_file_rev_parse_with_compat(
   fs : OsFs,
   git_dir : String,
   spec : String,
-) -> @git.ObjectId? raise Error {
+) -> @bitcore.ObjectId? raise Error {
   let direct = cat_file_rev_parse_direct_or_loose(fs, git_dir, spec)
   if direct is Some(_) {
     return direct
@@ -1738,13 +1738,13 @@ fn cat_file_rev_parse_direct_or_loose(
   fs : OsFs,
   git_dir : String,
   spec : String,
-) -> @git.ObjectId? raise Error {
-  let direct = @gitrepo.rev_parse(fs, git_dir, spec)
+) -> @bitcore.ObjectId? raise Error {
+  let direct = @bitrepo.rev_parse(fs, git_dir, spec)
   if direct is Some(_) {
     return direct
   }
   match cat_file_lookup_loose_object_idx(fs, git_dir, spec) {
-    Some(mapped) => @gitrepo.rev_parse(fs, git_dir, mapped)
+    Some(mapped) => @bitrepo.rev_parse(fs, git_dir, mapped)
     None => None
   }
 }
@@ -1754,7 +1754,7 @@ fn cat_file_rev_parse_reflog_zero_with_compat(
   fs : OsFs,
   git_dir : String,
   spec : String,
-) -> @git.ObjectId? raise Error {
+) -> @bitcore.ObjectId? raise Error {
   let suffix = "@{0}"
   if !spec.has_suffix(suffix) || spec.length() <= suffix.length() {
     return None
@@ -1772,12 +1772,12 @@ fn cat_file_rev_parse_commit_message_search_with_compat(
   fs : OsFs,
   git_dir : String,
   spec : String,
-) -> @git.ObjectId? raise Error {
+) -> @bitcore.ObjectId? raise Error {
   match cat_file_split_commit_message_search_spec(spec) {
     Some((base_spec, needle)) => {
       let base = cat_file_rev_parse_direct_or_loose(fs, git_dir, base_spec)
       guard base is Some(base_id) else { return None }
-      let db = @gitlib.ObjectDb::load(fs, git_dir) catch { _ => return None }
+      let db = @bitlib.ObjectDb::load(fs, git_dir) catch { _ => return None }
       cat_file_find_reachable_commit_by_message(db, fs, base_id, needle)
     }
     None => None
@@ -1809,12 +1809,12 @@ fn cat_file_split_commit_message_search_spec(
 
 ///|
 fn cat_file_find_reachable_commit_by_message(
-  db : @gitlib.ObjectDb,
+  db : @bitlib.ObjectDb,
   fs : OsFs,
-  start : @git.ObjectId,
+  start : @bitcore.ObjectId,
   needle : String,
-) -> @git.ObjectId? {
-  let queue : Array[@git.ObjectId] = [start]
+) -> @bitcore.ObjectId? {
+  let queue : Array[@bitcore.ObjectId] = [start]
   let seen : Map[String, Bool] = {}
   while queue.length() > 0 {
     let current = queue.unsafe_pop()
@@ -1825,11 +1825,11 @@ fn cat_file_find_reachable_commit_by_message(
     seen[hex] = true
     let obj = db.get(fs, current) catch { _ => continue }
     match obj {
-      Some(o) if o.obj_type == @git.ObjectType::Commit => {
+      Some(o) if o.obj_type == @bitcore.ObjectType::Commit => {
         if cat_file_commit_message_contains(o.data, needle) {
           return Some(current)
         }
-        let info = @git.parse_commit(o.data) catch { _ => continue }
+        let info = @bitcore.parse_commit(o.data) catch { _ => continue }
         for parent in info.parents {
           if not(seen.contains(parent.to_hex())) {
             queue.push(parent)
@@ -1937,29 +1937,29 @@ fn cat_file_batch_oid_token(spec : String) -> String? {
 fn cat_file_convert_object_data_for_display(
   fs : OsFs,
   git_dir : String,
-  obj : @git.PackObject,
+  obj : @bitcore.PackObject,
   target_oid_len : Int,
 ) -> Bytes {
   if target_oid_len != 64 {
     return obj.data
   }
   match obj.obj_type {
-    @git.ObjectType::Blob => obj.data
-    @git.ObjectType::Tree =>
+    @bitcore.ObjectType::Blob => obj.data
+    @bitcore.ObjectType::Tree =>
       cat_file_convert_tree_data_for_display(
         fs,
         git_dir,
         obj.data,
         target_oid_len,
       )
-    @git.ObjectType::Commit =>
+    @bitcore.ObjectType::Commit =>
       cat_file_rewrite_text_object_ids_for_display(
         fs,
         git_dir,
         obj.data,
         target_oid_len,
       )
-    @git.ObjectType::Tag =>
+    @bitcore.ObjectType::Tag =>
       cat_file_rewrite_text_object_ids_for_display(
         fs,
         git_dir,
@@ -1976,7 +1976,7 @@ fn cat_file_convert_tree_data_for_display(
   data : Bytes,
   target_oid_len : Int,
 ) -> Bytes {
-  let entries = @git.parse_tree(data) catch { _ => return data }
+  let entries = @bitcore.parse_tree(data) catch { _ => return data }
   let out : Array[Byte] = []
   for entry in entries {
     for c in entry.mode.to_array() {
@@ -2240,8 +2240,8 @@ fn cat_file_find_index_entry(
   fs : OsFs,
   git_dir : String,
   path : String,
-) -> @gitlib.IndexEntry? {
-  let entries = @gitlib.read_index_entries(fs, git_dir) catch { _ => [] }
+) -> @bitlib.IndexEntry? {
+  let entries = @bitlib.read_index_entries(fs, git_dir) catch { _ => [] }
   for entry in entries {
     if entry.path == path {
       return Some(entry)
@@ -2252,28 +2252,28 @@ fn cat_file_find_index_entry(
 
 ///|
 fn cat_file_find_tree_entry_from_base(
-  db : @gitlib.ObjectDb,
+  db : @bitlib.ObjectDb,
   fs : OsFs,
-  base_id : @git.ObjectId,
+  base_id : @bitcore.ObjectId,
   path : String,
-) -> @git.TreeEntry? raise Error {
+) -> @bitcore.TreeEntry? raise Error {
   if path.length() == 0 {
     return None
   }
   let base_obj = db.get(fs, base_id)
   guard base_obj is Some(obj) else { return None }
   let tree_id = match obj.obj_type {
-    @git.ObjectType::Commit => @git.parse_commit(obj.data).tree
-    @git.ObjectType::Tree => base_id
+    @bitcore.ObjectType::Commit => @bitcore.parse_commit(obj.data).tree
+    @bitcore.ObjectType::Tree => base_id
     _ => return None
   }
-  @gitlib.find_tree_entry(db, fs, tree_id, path)
+  @bitlib.find_tree_entry(db, fs, tree_id, path)
 }
 
 ///|
 struct CatFileFollowResolution {
   kind : String
-  id : @git.ObjectId?
+  id : @bitcore.ObjectId?
   mode : String?
   symlink_target : String?
 }
@@ -2313,17 +2313,17 @@ fn cat_file_copy_path_parts(
 
 ///|
 fn cat_file_find_tree_entry_by_name(
-  db : @gitlib.ObjectDb,
+  db : @bitlib.ObjectDb,
   fs : OsFs,
-  tree_id : @git.ObjectId,
+  tree_id : @bitcore.ObjectId,
   name : String,
-) -> @git.TreeEntry? raise Error {
+) -> @bitcore.TreeEntry? raise Error {
   let tree_obj = db.get(fs, tree_id)
   guard tree_obj is Some(tree) else { return None }
-  if tree.obj_type != @git.ObjectType::Tree {
+  if tree.obj_type != @bitcore.ObjectType::Tree {
     return None
   }
-  let entries = @git.parse_tree(tree.data)
+  let entries = @bitcore.parse_tree(tree.data)
   for entry in entries {
     if entry.name == name {
       return Some(entry)
@@ -2334,14 +2334,14 @@ fn cat_file_find_tree_entry_by_name(
 
 ///|
 fn cat_file_read_symlink_target_from_entry(
-  db : @gitlib.ObjectDb,
+  db : @bitlib.ObjectDb,
   fs : OsFs,
-  entry : @git.TreeEntry,
+  entry : @bitcore.TreeEntry,
 ) -> String? raise Error {
   let obj = db.get(fs, entry.id)
   guard obj is Some(o) else { return None }
   match o.obj_type {
-    @git.ObjectType::Blob => Some(decode_bytes(o.data))
+    @bitcore.ObjectType::Blob => Some(decode_bytes(o.data))
     _ => None
   }
 }
@@ -2413,9 +2413,9 @@ fn cat_file_render_outside_path(
 
 ///|
 fn cat_file_resolve_tree_entry_follow_symlinks(
-  db : @gitlib.ObjectDb,
+  db : @bitlib.ObjectDb,
   fs : OsFs,
-  base_id : @git.ObjectId,
+  base_id : @bitcore.ObjectId,
   path : String,
 ) -> CatFileFollowResolution raise Error {
   let missing = CatFileFollowResolution::{
@@ -2427,8 +2427,8 @@ fn cat_file_resolve_tree_entry_follow_symlinks(
   let base_obj = db.get(fs, base_id)
   guard base_obj is Some(base) else { return missing }
   let root_tree_id = match base.obj_type {
-    @git.ObjectType::Commit => @git.parse_commit(base.data).tree
-    @git.ObjectType::Tree => base_id
+    @bitcore.ObjectType::Commit => @bitcore.parse_commit(base.data).tree
+    @bitcore.ObjectType::Tree => base_id
     _ => return missing
   }
   let initial_parts = cat_file_split_repo_path_parts(path)
@@ -2451,7 +2451,7 @@ fn cat_file_resolve_tree_entry_follow_symlinks(
       }
     }
     let mut current_tree = root_tree_id
-    let tree_stack : Array[@git.ObjectId] = [root_tree_id]
+    let tree_stack : Array[@bitcore.ObjectId] = [root_tree_id]
     let mut idx = 0
     let mut restarted = false
     while idx < parts.length() {
@@ -2612,7 +2612,7 @@ async fn cat_file_apply_path_transforms(
       Some(driver) => {
         let config_path = git_dir + "/config"
         let section = "diff \"" + driver + "\""
-        match @gitlib.read_config_value(fs, config_path, section, "textconv") {
+        match @bitlib.read_config_value(fs, config_path, section, "textconv") {
           Some(cmd) if trim_string(cmd).length() > 0 =>
             out = cat_file_run_textconv(fs, root, git_dir, cmd, out)
           _ => ()
@@ -2645,17 +2645,17 @@ async fn cat_file_run_textconv(
       fs.remove_file(temp_path) catch {
         _ => ()
       }
-      raise @git.GitError::IoError("textconv failed: \{err}")
+      raise @bitcore.GitError::IoError("textconv failed: \{err}")
     }
   }
   fs.remove_file(temp_path) catch {
     _ => ()
   }
   if code != 0 {
-    raise @git.GitError::IoError("textconv failed with status \{code}")
+    raise @bitcore.GitError::IoError("textconv failed with status \{code}")
   }
   let text = stdout.text() catch {
-    err => raise @git.GitError::IoError(err.to_string())
+    err => raise @bitcore.GitError::IoError(err.to_string())
   }
   cat_file_string_to_bytes(text)
 }

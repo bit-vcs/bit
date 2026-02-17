@@ -9,36 +9,36 @@ async fn handle_subdir_diff(
   name_only : Bool,
   name_status : Bool,
 ) -> Unit raise Error {
-  let rfs : &@git.RepoFileSystem = fs
+  let rfs : &@bitcore.RepoFileSystem = fs
   print_line("# Comparing with \{refspec} (subdir: \{subdir_path})")
   print_line("")
   // Resolve upstream ref
   let upstream_id = resolve_ref_for_subdir(fs, git_dir, refspec)
   guard upstream_id is Some(uid) else {
-    raise @git.GitError::InvalidObject("Cannot resolve ref: \{refspec}")
+    raise @bitcore.GitError::InvalidObject("Cannot resolve ref: \{refspec}")
   }
   // Get local HEAD
-  let head_id = @gitrepo.rev_parse(rfs, git_dir, "HEAD")
+  let head_id = @bitrepo.rev_parse(rfs, git_dir, "HEAD")
   guard head_id is Some(hid) else {
-    raise @git.GitError::InvalidObject("Cannot resolve HEAD")
+    raise @bitcore.GitError::InvalidObject("Cannot resolve HEAD")
   }
   // Load object database
-  let db = @gitlib.ObjectDb::load_lazy(fs, git_dir)
+  let db = @bitlib.ObjectDb::load_lazy(fs, git_dir)
   // Get upstream subdir tree
   let upstream_tree = get_subdir_tree_from_commit(db, fs, uid, subdir_path) catch {
     err => raise err
   }
   guard upstream_tree is Some(utree) else {
-    raise @git.GitError::InvalidObject(
+    raise @bitcore.GitError::InvalidObject(
       "Subdirectory not found in upstream: \{subdir_path}",
     )
   }
   // Get local tree (root is the subdir)
   let local_obj = db.get(rfs, hid)
   guard local_obj is Some(lo) else {
-    raise @git.GitError::InvalidObject("Cannot read local HEAD")
+    raise @bitcore.GitError::InvalidObject("Cannot read local HEAD")
   }
-  let local_info = @git.parse_commit(lo.data) catch { err => raise err }
+  let local_info = @bitcore.parse_commit(lo.data) catch { err => raise err }
   let local_tree = local_info.tree
   // Compare trees
   let diffs = compare_trees(db, rfs, utree, local_tree, "")
@@ -99,10 +99,10 @@ struct SubdirDiffEntry {
 
 ///|
 fn compare_trees(
-  db : @gitlib.ObjectDb,
-  rfs : &@git.RepoFileSystem,
-  tree_a : @git.ObjectId,
-  tree_b : @git.ObjectId,
+  db : @bitlib.ObjectDb,
+  rfs : &@bitcore.RepoFileSystem,
+  tree_a : @bitcore.ObjectId,
+  tree_b : @bitcore.ObjectId,
   prefix : String,
 ) -> Array[SubdirDiffEntry] raise Error {
   let result : Array[SubdirDiffEntry] = []
@@ -110,8 +110,8 @@ fn compare_trees(
   let entries_a = get_tree_entries(db, rfs, tree_a)
   let entries_b = get_tree_entries(db, rfs, tree_b)
   // Build maps
-  let map_a : Map[String, @git.TreeEntry] = {}
-  let map_b : Map[String, @git.TreeEntry] = {}
+  let map_a : Map[String, @bitcore.TreeEntry] = {}
+  let map_b : Map[String, @bitcore.TreeEntry] = {}
   for e in entries_a {
     map_a[e.name] = e
   }
@@ -167,9 +167,9 @@ fn compare_trees(
 
 ///|
 fn compare_trees_deleted(
-  db : @gitlib.ObjectDb,
-  rfs : &@git.RepoFileSystem,
-  tree_id : @git.ObjectId,
+  db : @bitlib.ObjectDb,
+  rfs : &@bitcore.RepoFileSystem,
+  tree_id : @bitcore.ObjectId,
   prefix : String,
 ) -> Array[SubdirDiffEntry] raise Error {
   let result : Array[SubdirDiffEntry] = []
@@ -190,9 +190,9 @@ fn compare_trees_deleted(
 
 ///|
 fn compare_trees_added(
-  db : @gitlib.ObjectDb,
-  rfs : &@git.RepoFileSystem,
-  tree_id : @git.ObjectId,
+  db : @bitlib.ObjectDb,
+  rfs : &@bitcore.RepoFileSystem,
+  tree_id : @bitcore.ObjectId,
   prefix : String,
 ) -> Array[SubdirDiffEntry] raise Error {
   let result : Array[SubdirDiffEntry] = []
@@ -227,30 +227,30 @@ async fn handle_subdir_merge(
     err => raise err
   }
   guard upstream_id is Some(uid) else {
-    raise @git.GitError::InvalidObject("unknown revision: \{refspec}")
+    raise @bitcore.GitError::InvalidObject("unknown revision: \{refspec}")
   }
   // Load object database
-  let db = @gitlib.ObjectDb::load_lazy(fs, git_dir)
+  let db = @bitlib.ObjectDb::load_lazy(fs, git_dir)
   // Get upstream subdir tree
   let upstream_tree = get_subdir_tree_from_commit(db, fs, uid, subdir_path) catch {
     err => raise err
   }
   guard upstream_tree is Some(utree) else {
-    raise @git.GitError::InvalidObject(
+    raise @bitcore.GitError::InvalidObject(
       "Subdirectory not found in upstream: \{subdir_path}",
     )
   }
   // Get local HEAD tree
-  let rfs : &@git.RepoFileSystem = fs
-  let head_id = @gitrepo.rev_parse(rfs, git_dir, "HEAD")
+  let rfs : &@bitcore.RepoFileSystem = fs
+  let head_id = @bitrepo.rev_parse(rfs, git_dir, "HEAD")
   guard head_id is Some(hid) else {
-    raise @git.GitError::InvalidObject("Cannot resolve HEAD")
+    raise @bitcore.GitError::InvalidObject("Cannot resolve HEAD")
   }
   let local_obj = db.get(rfs, hid)
   guard local_obj is Some(lo) else {
-    raise @git.GitError::InvalidObject("Cannot read local HEAD")
+    raise @bitcore.GitError::InvalidObject("Cannot read local HEAD")
   }
-  let local_info = @git.parse_commit(lo.data) catch { err => raise err }
+  let local_info = @bitcore.parse_commit(lo.data) catch { err => raise err }
   let local_tree = local_info.tree
   // Check if already up to date
   if local_tree.to_hex() == utree.to_hex() {
@@ -267,7 +267,7 @@ async fn handle_subdir_merge(
   let timestamp = get_commit_timestamp()
   let msg = message.unwrap_or("Merge \{refspec} (subdir: \{subdir_path})")
   // Stage all changes
-  let status = @gitlib.status(fs, root)
+  let status = @bitlib.status(fs, root)
   let paths_to_add : Array[String] = []
   for p in status.untracked {
     paths_to_add.push(p)
@@ -279,25 +279,25 @@ async fn handle_subdir_merge(
     paths_to_add.push(p)
   }
   if paths_to_add.length() > 0 {
-    @gitlib.add_paths_async(fs, fs, root, paths_to_add)
+    @bitlib.add_paths_async(fs, fs, root, paths_to_add)
   }
   // Commit
-  let commit_id = @gitlib.commit(fs, fs, root, msg, author, timestamp)
+  let commit_id = @bitlib.commit(fs, fs, root, msg, author, timestamp)
   let short = String::unsafe_substring(commit_id.to_hex(), start=0, end=7)
   print_line("[\{short}] \{msg}")
 }
 
 ///|
 fn write_subdir_tree_to_worktree(
-  db : @gitlib.ObjectDb,
+  db : @bitlib.ObjectDb,
   fs : OsFs,
-  tree_id : @git.ObjectId,
+  tree_id : @bitcore.ObjectId,
   dir : String,
 ) -> Unit raise Error {
-  let rfs : &@git.RepoFileSystem = fs
+  let rfs : &@bitcore.RepoFileSystem = fs
   let obj = db.get(rfs, tree_id)
   guard obj is Some(tree_obj) else { return }
-  let entries = @git.parse_tree(tree_obj.data) catch { _ => return }
+  let entries = @bitcore.parse_tree(tree_obj.data) catch { _ => return }
   for entry in entries {
     let path = dir + "/" + entry.name
     if entry.mode == "40000" || entry.mode == "040000" {

@@ -4,16 +4,16 @@ struct OsObjectStore {
 }
 
 ///|
-impl @gitlib.ObjectStore for OsObjectStore with get(self, id) {
+impl @bitlib.ObjectStore for OsObjectStore with get(self, id) {
   let fs = OsFs::new()
-  let db = @gitlib.ObjectDb::load_lazy(fs, self.git_dir)
+  let db = @bitlib.ObjectDb::load_lazy(fs, self.git_dir)
   db.get(fs, id)
 }
 
 ///|
-impl @gitlib.ObjectStore for OsObjectStore with put(self, obj_type, content) {
+impl @bitlib.ObjectStore for OsObjectStore with put(self, obj_type, content) {
   let fs = OsFs::new()
-  let (id, compressed) = @git.create_object(obj_type, content)
+  let (id, compressed) = @bitcore.create_object(obj_type, content)
   let hex = id.to_hex()
   let dir = self.git_dir +
     "/objects/" +
@@ -25,9 +25,9 @@ impl @gitlib.ObjectStore for OsObjectStore with put(self, obj_type, content) {
 }
 
 ///|
-impl @gitlib.ObjectStore for OsObjectStore with has(self, id) {
+impl @bitlib.ObjectStore for OsObjectStore with has(self, id) {
   let fs = OsFs::new()
-  let db = @gitlib.ObjectDb::load_lazy(fs, self.git_dir)
+  let db = @bitlib.ObjectDb::load_lazy(fs, self.git_dir)
   let obj = db.get(fs, id)
   obj is Some(_)
 }
@@ -38,13 +38,13 @@ struct OsRefStore {
 }
 
 ///|
-impl @gitlib.RefStore for OsRefStore with resolve(self, ref_name) {
+impl @bitlib.RefStore for OsRefStore with resolve(self, ref_name) {
   let fs = OsFs::new()
-  @gitlib.resolve_ref(fs, self.git_dir, ref_name)
+  @bitlib.resolve_ref(fs, self.git_dir, ref_name)
 }
 
 ///|
-impl @gitlib.RefStore for OsRefStore with update(self, ref_name, id) {
+impl @bitlib.RefStore for OsRefStore with update(self, ref_name, id) {
   let fs = OsFs::new()
   match id {
     Some(commit_id) => {
@@ -58,7 +58,7 @@ impl @gitlib.RefStore for OsRefStore with update(self, ref_name, id) {
 }
 
 ///|
-impl @gitlib.RefStore for OsRefStore with list(self, _prefix) {
+impl @bitlib.RefStore for OsRefStore with list(self, _prefix) {
   ignore(self)
   []
 }
@@ -78,14 +78,14 @@ struct OsClock {
 }
 
 ///|
-impl @gitlib.Clock for OsClock with now(self) {
+impl @bitlib.Clock for OsClock with now(self) {
   self.time
 }
 
 ///|
 fn make_hub_stores(
   git_dir : String,
-) -> (&@gitlib.ObjectStore, &@gitlib.RefStore, &@gitlib.Clock) {
+) -> (&@bitlib.ObjectStore, &@bitlib.RefStore, &@bitlib.Clock) {
   let objects : OsObjectStore = { git_dir, }
   let refs : OsRefStore = { git_dir, }
   let clock : OsClock = { time: get_commit_timestamp() }
@@ -94,9 +94,9 @@ fn make_hub_stores(
 
 ///|
 fn load_hub_store(
-  objects : &@gitlib.ObjectStore,
-  refs : &@gitlib.RefStore,
-) -> @hub.Hub raise @git.GitError {
+  objects : &@bitlib.ObjectStore,
+  refs : &@bitlib.RefStore,
+) -> @hub.Hub raise @bitcore.GitError {
   @hub.Hub::load(
     objects,
     refs,
@@ -107,9 +107,9 @@ fn load_hub_store(
 
 ///|
 fn init_hub_store(
-  objects : &@gitlib.ObjectStore,
-  refs : &@gitlib.RefStore,
-) -> @hub.Hub raise @git.GitError {
+  objects : &@bitlib.ObjectStore,
+  refs : &@bitlib.RefStore,
+) -> @hub.Hub raise @bitcore.GitError {
   @hub.Hub::init(
     objects,
     refs,
@@ -306,13 +306,13 @@ fn default_hub_merge_policy_toml() -> String {
 fn parse_merge_policy_bool(
   value : String,
   key : String,
-) -> Bool raise @git.GitError {
+) -> Bool raise @bitcore.GitError {
   let normalized = value.to_lower()
   match normalized {
     "true" | "1" | "yes" => true
     "false" | "0" | "no" => false
     _ =>
-      raise @git.GitError::InvalidObject(
+      raise @bitcore.GitError::InvalidObject(
         "hub merge policy: '\{key}' must be true or false: \{value}",
       )
   }
@@ -322,10 +322,10 @@ fn parse_merge_policy_bool(
 fn parse_merge_policy_string_array(
   value : String,
   key : String,
-) -> Array[String] raise @git.GitError {
+) -> Array[String] raise @bitcore.GitError {
   let parsed = @json.parse(value) catch {
     _ =>
-      raise @git.GitError::InvalidObject(
+      raise @bitcore.GitError::InvalidObject(
         "hub merge policy: '\{key}' must be JSON string array: \{value}",
       )
   }
@@ -336,7 +336,7 @@ fn parse_merge_policy_string_array(
         match item {
           Json::String(text) => out.push(text)
           _ =>
-            raise @git.GitError::InvalidObject(
+            raise @bitcore.GitError::InvalidObject(
               "hub merge policy: '\{key}' must contain only strings",
             )
         }
@@ -344,7 +344,7 @@ fn parse_merge_policy_string_array(
       out
     }
     _ =>
-      raise @git.GitError::InvalidObject(
+      raise @bitcore.GitError::InvalidObject(
         "hub merge policy: '\{key}' must be string array",
       )
   }
@@ -353,7 +353,7 @@ fn parse_merge_policy_string_array(
 ///|
 fn parse_hub_merge_policy_toml(
   content : String,
-) -> @hub.PrMergePolicy raise @git.GitError {
+) -> @hub.PrMergePolicy raise @bitcore.GitError {
   let mut required_approvals = 0
   let mut allow_request_changes = true
   let mut require_signed_records = false
@@ -377,7 +377,7 @@ fn parse_hub_merge_policy_toml(
     }
     let eq_idx = line.find("=")
     guard eq_idx is Some(i) else {
-      raise @git.GitError::InvalidObject(
+      raise @bitcore.GitError::InvalidObject(
         "hub merge policy: expected key=value in [merge]: \{line}",
       )
     }
@@ -396,12 +396,12 @@ fn parse_hub_merge_policy_toml(
       "required_approvals" => {
         let parsed = @strconv.parse_int(value) catch {
           _ =>
-            raise @git.GitError::InvalidObject(
+            raise @bitcore.GitError::InvalidObject(
               "hub merge policy: required_approvals must be int: \{value}",
             )
         }
         if parsed < 0 {
-          raise @git.GitError::InvalidObject(
+          raise @bitcore.GitError::InvalidObject(
             "hub merge policy: required_approvals must be >= 0",
           )
         }
@@ -414,7 +414,7 @@ fn parse_hub_merge_policy_toml(
       "required_workflows" =>
         required_workflows = parse_merge_policy_string_array(value, key)
       _ =>
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "hub merge policy: unknown key in [merge]: \{key}",
         )
     }
@@ -436,7 +436,7 @@ fn hub_merge_policy_path(git_dir : String) -> String {
 fn ensure_hub_merge_policy_file(
   fs : OsFs,
   git_dir : String,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bitcore.GitError {
   let policy_path = hub_merge_policy_path(git_dir)
   if fs.is_file(policy_path) {
     return ()
@@ -449,7 +449,7 @@ fn ensure_hub_merge_policy_file(
 fn load_hub_merge_policy(
   fs : OsFs,
   git_dir : String,
-) -> @hub.PrMergePolicy raise @git.GitError {
+) -> @hub.PrMergePolicy raise @bitcore.GitError {
   let policy_path = hub_merge_policy_path(git_dir)
   if not(fs.is_file(policy_path)) {
     return default_hub_merge_policy()
@@ -592,7 +592,7 @@ fn parse_hub_search_state(value : String) -> String? {
 ///|
 fn parse_hub_search_options(
   args : Array[String],
-) -> HubSearchOptions raise @git.GitError {
+) -> HubSearchOptions raise @bitcore.GitError {
   let query_parts : Array[String] = []
   let mut types = all_hub_search_types()
   let mut type_filter_set = false
@@ -608,7 +608,7 @@ fn parse_hub_search_options(
         let value = args[i + 1]
         let parsed = parse_hub_search_types(value)
         guard parsed is Some(parsed_types) else {
-          raise @git.GitError::InvalidObject(
+          raise @bitcore.GitError::InvalidObject(
             "Unknown hub search type: \{value}",
           )
         }
@@ -623,14 +623,14 @@ fn parse_hub_search_options(
         continue
       }
       "--type" =>
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "hub search: --type requires a value",
         )
       _ if arg.has_prefix("--type=") => {
         let value = String::unsafe_substring(arg, start=7, end=arg.length())
         let parsed = parse_hub_search_types(value)
         guard parsed is Some(parsed_types) else {
-          raise @git.GitError::InvalidObject(
+          raise @bitcore.GitError::InvalidObject(
             "Unknown hub search type: \{value}",
           )
         }
@@ -648,7 +648,7 @@ fn parse_hub_search_options(
         let value = args[i + 1]
         let parsed = parse_hub_search_state(value)
         guard parsed is Some(s) else {
-          raise @git.GitError::InvalidObject(
+          raise @bitcore.GitError::InvalidObject(
             "Unknown hub search state: \{value}",
           )
         }
@@ -657,14 +657,14 @@ fn parse_hub_search_options(
         continue
       }
       "--state" =>
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "hub search: --state requires a value",
         )
       _ if arg.has_prefix("--state=") => {
         let value = String::unsafe_substring(arg, start=8, end=arg.length())
         let parsed = parse_hub_search_state(value)
         guard parsed is Some(s) else {
-          raise @git.GitError::InvalidObject(
+          raise @bitcore.GitError::InvalidObject(
             "Unknown hub search state: \{value}",
           )
         }
@@ -687,7 +687,7 @@ fn parse_hub_search_options(
         continue
       }
       "--author" =>
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "hub search: --author requires a value",
         )
       _ if arg.has_prefix("--author=") => {
@@ -701,7 +701,7 @@ fn parse_hub_search_options(
         continue
       }
       "--label" =>
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "hub search: --label requires a value",
         )
       _ if arg.has_prefix("--label=") => {
@@ -715,7 +715,7 @@ fn parse_hub_search_options(
         continue
       }
       "--limit" =>
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "hub search: --limit requires a value",
         )
       _ if arg.has_prefix("--limit=") => {
@@ -729,7 +729,7 @@ fn parse_hub_search_options(
         continue
       }
       _ if arg.has_prefix("-") =>
-        raise @git.GitError::InvalidObject("Unknown hub search option: \{arg}")
+        raise @bitcore.GitError::InvalidObject("Unknown hub search option: \{arg}")
       _ => {
         query_parts.push(arg)
         i += 1
@@ -1073,12 +1073,12 @@ struct HubPrListOptions {
 }
 
 ///|
-fn parse_positive_list_limit(value : String) -> Int raise @git.GitError {
+fn parse_positive_list_limit(value : String) -> Int raise @bitcore.GitError {
   let parsed = @strconv.parse_int(value) catch {
-    _ => raise @git.GitError::InvalidObject("Invalid limit: \{value}")
+    _ => raise @bitcore.GitError::InvalidObject("Invalid limit: \{value}")
   }
   if parsed <= 0 {
-    raise @git.GitError::InvalidObject("Limit must be positive")
+    raise @bitcore.GitError::InvalidObject("Limit must be positive")
   }
   parsed
 }
@@ -1086,7 +1086,7 @@ fn parse_positive_list_limit(value : String) -> Int raise @git.GitError {
 ///|
 fn parse_hub_pr_list_options(
   args : Array[String],
-) -> HubPrListOptions raise @git.GitError {
+) -> HubPrListOptions raise @bitcore.GitError {
   let common = parse_hub_list_options(args, "hub pr list", "PR", true, false)
   let state = match common.state {
     None => None
@@ -1220,7 +1220,7 @@ async fn handle_hub_pr_import(args : Array[String]) -> Unit raise Error {
         continue
       }
       "--repo" =>
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "hub pr import: --repo requires a value",
         )
       _ if arg.has_prefix("--repo=") => {
@@ -1234,7 +1234,7 @@ async fn handle_hub_pr_import(args : Array[String]) -> Unit raise Error {
         continue
       }
       "--state" =>
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "hub pr import: --state requires a value",
         )
       _ if arg.has_prefix("--state=") => {
@@ -1245,13 +1245,13 @@ async fn handle_hub_pr_import(args : Array[String]) -> Unit raise Error {
       "--limit" if i + 1 < args.length() => {
         limit = @strconv.parse_int(args[i + 1]) catch {
           _ =>
-            raise @git.GitError::InvalidObject("Invalid limit: \{args[i + 1]}")
+            raise @bitcore.GitError::InvalidObject("Invalid limit: \{args[i + 1]}")
         }
         i += 2
         continue
       }
       "--limit" =>
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "hub pr import: --limit requires a value",
         )
       "--provider" if i + 1 < args.length() => {
@@ -1260,7 +1260,7 @@ async fn handle_hub_pr_import(args : Array[String]) -> Unit raise Error {
         continue
       }
       "--provider" =>
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "hub pr import: --provider requires a value",
         )
       "--input" if i + 1 < args.length() => {
@@ -1269,13 +1269,13 @@ async fn handle_hub_pr_import(args : Array[String]) -> Unit raise Error {
         continue
       }
       "--input" =>
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "hub pr import: --input requires a value",
         )
       _ if arg.has_prefix("--limit=") => {
         let value = String::unsafe_substring(arg, start=8, end=arg.length())
         limit = @strconv.parse_int(value) catch {
-          _ => raise @git.GitError::InvalidObject("Invalid limit: \{value}")
+          _ => raise @bitcore.GitError::InvalidObject("Invalid limit: \{value}")
         }
         i += 1
         continue
@@ -1301,10 +1301,10 @@ async fn handle_hub_pr_import(args : Array[String]) -> Unit raise Error {
   let state_value = state.to_lower()
   match state_value {
     "open" | "closed" | "merged" | "all" => ()
-    _ => raise @git.GitError::InvalidObject("Unknown PR state: \{state}")
+    _ => raise @bitcore.GitError::InvalidObject("Unknown PR state: \{state}")
   }
   if limit <= 0 {
-    raise @git.GitError::InvalidObject("Limit must be positive")
+    raise @bitcore.GitError::InvalidObject("Limit must be positive")
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
@@ -1356,7 +1356,7 @@ async fn handle_hub_pr_import_proposal(
     }
   }
   guard proposal_id is Some(id) else {
-    raise @git.GitError::InvalidObject("Proposal id is required")
+    raise @bitcore.GitError::InvalidObject("Proposal id is required")
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
@@ -1371,7 +1371,7 @@ async fn handle_hub_pr_import_proposal(
     }
   }
   guard selected is Some(pr) else {
-    raise @git.GitError::InvalidObject("PR proposal not found: \{id}")
+    raise @bitcore.GitError::InvalidObject("PR proposal not found: \{id}")
   }
   let stats = hub.import_prs(objects, refs, clock, [pr])
   print_line(
@@ -1403,7 +1403,7 @@ async fn handle_hub_pr_get(args : Array[String]) -> Unit raise Error {
     }
   }
   guard pr_id is Some(id) else {
-    raise @git.GitError::InvalidObject("PR id is required")
+    raise @bitcore.GitError::InvalidObject("PR id is required")
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
@@ -1411,7 +1411,7 @@ async fn handle_hub_pr_get(args : Array[String]) -> Unit raise Error {
   let hub = load_hub_store(objects, refs)
   let pr = hub.get_pr(objects, id)
   guard pr is Some(val) else {
-    raise @git.GitError::InvalidObject("PR not found: \{id}")
+    raise @bitcore.GitError::InvalidObject("PR not found: \{id}")
   }
   print_line(val.serialize())
 }
@@ -1474,7 +1474,7 @@ async fn parse_hub_pr_create_options(
         continue
       }
       "-t" | "--title" =>
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "\{warn_context}: --title requires a value",
         )
       "-m" | "-b" | "--message" | "--body" if i + 1 < args.length() => {
@@ -1483,7 +1483,7 @@ async fn parse_hub_pr_create_options(
         continue
       }
       "-m" | "-b" | "--message" | "--body" =>
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "\{warn_context}: --body requires a value",
         )
       "--source" | "--head" if i + 1 < args.length() => {
@@ -1492,7 +1492,7 @@ async fn parse_hub_pr_create_options(
         continue
       }
       "--source" | "--head" =>
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "\{warn_context}: --source requires a value",
         )
       "--target" | "--base" if i + 1 < args.length() => {
@@ -1501,7 +1501,7 @@ async fn parse_hub_pr_create_options(
         continue
       }
       "--target" | "--base" =>
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "\{warn_context}: --target requires a value",
         )
       "--source-repo" if i + 1 < args.length() => {
@@ -1510,7 +1510,7 @@ async fn parse_hub_pr_create_options(
         continue
       }
       "--source-repo" =>
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "\{warn_context}: --source-repo requires a value",
         )
       "--source-ref" if i + 1 < args.length() => {
@@ -1519,7 +1519,7 @@ async fn parse_hub_pr_create_options(
         continue
       }
       "--source-ref" =>
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "\{warn_context}: --source-ref requires a value",
         )
       _ if arg.has_prefix("--title=") => {
@@ -1598,13 +1598,13 @@ async fn parse_hub_pr_create_options(
     target_branch = Some(positionals[1])
   }
   guard title is Some(t) else {
-    raise @git.GitError::InvalidObject("Missing --title")
+    raise @bitcore.GitError::InvalidObject("Missing --title")
   }
   guard source_branch is Some(src) else {
-    raise @git.GitError::InvalidObject("Missing --source")
+    raise @bitcore.GitError::InvalidObject("Missing --source")
   }
   guard target_branch is Some(tgt) else {
-    raise @git.GitError::InvalidObject("Missing --target")
+    raise @bitcore.GitError::InvalidObject("Missing --target")
   }
   {
     title: t,
@@ -1708,7 +1708,7 @@ async fn handle_hub_pr_update(args : Array[String]) -> Unit raise Error {
         continue
       }
       "-t" | "--title" =>
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "hub pr update: --title requires a value",
         )
       "-m" | "-b" | "--message" | "--body" if i + 1 < args.length() => {
@@ -1717,7 +1717,7 @@ async fn handle_hub_pr_update(args : Array[String]) -> Unit raise Error {
         continue
       }
       "-m" | "-b" | "--message" | "--body" =>
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "hub pr update: --body requires a value",
         )
       "--label" | "-l" if i + 1 < args.length() => {
@@ -1726,7 +1726,7 @@ async fn handle_hub_pr_update(args : Array[String]) -> Unit raise Error {
         continue
       }
       "--label" | "-l" =>
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "hub pr update: --label requires a value",
         )
       _ if arg.has_prefix("--title=") => {
@@ -1766,7 +1766,7 @@ async fn handle_hub_pr_update(args : Array[String]) -> Unit raise Error {
     }
   }
   guard pr_id is Some(id) else {
-    raise @git.GitError::InvalidObject("PR id is required")
+    raise @bitcore.GitError::InvalidObject("PR id is required")
   }
   let label_option = if labels.length() > 0 { Some(labels) } else { None }
   let root = get_work_root()
@@ -1804,7 +1804,7 @@ async fn handle_hub_pr_close(args : Array[String]) -> Unit raise Error {
     }
   }
   guard pr_id is Some(id) else {
-    raise @git.GitError::InvalidObject("PR id is required")
+    raise @bitcore.GitError::InvalidObject("PR id is required")
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
@@ -1833,7 +1833,7 @@ async fn handle_hub_pr_reopen(args : Array[String]) -> Unit raise Error {
     }
   }
   guard pr_id is Some(id) else {
-    raise @git.GitError::InvalidObject("PR id is required")
+    raise @bitcore.GitError::InvalidObject("PR id is required")
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
@@ -1861,7 +1861,7 @@ async fn handle_hub_pr_merge(args : Array[String]) -> Unit raise Error {
     }
     match arg {
       "--rebase" =>
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "Merge strategy 'rebase' is not supported",
         )
       "--strategy" if i + 1 < args.length() => {
@@ -1869,7 +1869,7 @@ async fn handle_hub_pr_merge(args : Array[String]) -> Unit raise Error {
         match parse_merge_strategy(value) {
           Some(s) => strategy = Some(s)
           None =>
-            raise @git.GitError::InvalidObject(
+            raise @bitcore.GitError::InvalidObject(
               "Unknown merge strategy: \{value}",
             )
         }
@@ -1881,7 +1881,7 @@ async fn handle_hub_pr_merge(args : Array[String]) -> Unit raise Error {
         match parse_merge_strategy(value) {
           Some(s) => strategy = Some(s)
           None =>
-            raise @git.GitError::InvalidObject(
+            raise @bitcore.GitError::InvalidObject(
               "Unknown merge strategy: \{value}",
             )
         }
@@ -1905,7 +1905,7 @@ async fn handle_hub_pr_merge(args : Array[String]) -> Unit raise Error {
     }
   }
   guard pr_id is Some(id) else {
-    raise @git.GitError::InvalidObject("PR id is required")
+    raise @bitcore.GitError::InvalidObject("PR id is required")
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
@@ -1968,7 +1968,7 @@ async fn handle_hub_pr_comment_add(args : Array[String]) -> Unit raise Error {
   let mut reply_to : String? = None
   let mut file_path : String? = None
   let mut line_number : Int? = None
-  let mut commit_id : @git.ObjectId? = None
+  let mut commit_id : @bitcore.ObjectId? = None
   let mut i = 0
   while i < args.length() {
     let arg = args[i]
@@ -1994,7 +1994,7 @@ async fn handle_hub_pr_comment_add(args : Array[String]) -> Unit raise Error {
         continue
       }
       "--commit" if i + 1 < args.length() => {
-        commit_id = args[i + 1] |> @git.ObjectId::from_hex |> Some
+        commit_id = args[i + 1] |> @bitcore.ObjectId::from_hex |> Some
         i += 2
         continue
       }
@@ -2030,7 +2030,7 @@ async fn handle_hub_pr_comment_add(args : Array[String]) -> Unit raise Error {
       }
       _ if arg.has_prefix("--commit=") => {
         let value = String::unsafe_substring(arg, start=9, end=arg.length())
-        commit_id = value |> @git.ObjectId::from_hex |> Some
+        commit_id = value |> @bitcore.ObjectId::from_hex |> Some
         i += 1
         continue
       }
@@ -2051,10 +2051,10 @@ async fn handle_hub_pr_comment_add(args : Array[String]) -> Unit raise Error {
     }
   }
   guard pr_id is Some(id) else {
-    raise @git.GitError::InvalidObject("PR id is required")
+    raise @bitcore.GitError::InvalidObject("PR id is required")
   }
   guard body is Some(msg) else {
-    raise @git.GitError::InvalidObject("Missing --body")
+    raise @bitcore.GitError::InvalidObject("Missing --body")
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
@@ -2094,7 +2094,7 @@ async fn handle_hub_pr_comment_list(args : Array[String]) -> Unit raise Error {
     }
   }
   guard pr_id is Some(id) else {
-    raise @git.GitError::InvalidObject("PR id is required")
+    raise @bitcore.GitError::InvalidObject("PR id is required")
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
@@ -2136,7 +2136,7 @@ async fn handle_hub_pr_review_submit(args : Array[String]) -> Unit raise Error {
   let mut pr_id : String? = None
   let mut verdict : @hub.ReviewVerdict? = None
   let mut body : String? = None
-  let mut commit_id : @git.ObjectId? = None
+  let mut commit_id : @bitcore.ObjectId? = None
   let mut i = 0
   while i < args.length() {
     let arg = args[i]
@@ -2151,7 +2151,7 @@ async fn handle_hub_pr_review_submit(args : Array[String]) -> Unit raise Error {
         match parse_review_verdict(value) {
           Some(v) => verdict = Some(v)
           None =>
-            raise @git.GitError::InvalidObject(
+            raise @bitcore.GitError::InvalidObject(
               "Unknown review verdict: \{value}",
             )
         }
@@ -2159,16 +2159,16 @@ async fn handle_hub_pr_review_submit(args : Array[String]) -> Unit raise Error {
         continue
       }
       "--verdict" =>
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "hub pr review submit: --verdict requires a value",
         )
       "--commit" if i + 1 < args.length() => {
-        commit_id = args[i + 1] |> @git.ObjectId::from_hex |> Some
+        commit_id = args[i + 1] |> @bitcore.ObjectId::from_hex |> Some
         i += 2
         continue
       }
       "--commit" =>
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "hub pr review submit: --commit requires a value",
         )
       "-m" | "-b" | "--message" | "--body" if i + 1 < args.length() => {
@@ -2177,7 +2177,7 @@ async fn handle_hub_pr_review_submit(args : Array[String]) -> Unit raise Error {
         continue
       }
       "-m" | "-b" | "--message" | "--body" =>
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "hub pr review submit: --body requires a value",
         )
       _ if arg.has_prefix("--verdict=") => {
@@ -2185,7 +2185,7 @@ async fn handle_hub_pr_review_submit(args : Array[String]) -> Unit raise Error {
         match parse_review_verdict(value) {
           Some(v) => verdict = Some(v)
           None =>
-            raise @git.GitError::InvalidObject(
+            raise @bitcore.GitError::InvalidObject(
               "Unknown review verdict: \{value}",
             )
         }
@@ -2194,7 +2194,7 @@ async fn handle_hub_pr_review_submit(args : Array[String]) -> Unit raise Error {
       }
       _ if arg.has_prefix("--commit=") => {
         let value = String::unsafe_substring(arg, start=9, end=arg.length())
-        commit_id = value |> @git.ObjectId::from_hex |> Some
+        commit_id = value |> @bitcore.ObjectId::from_hex |> Some
         i += 1
         continue
       }
@@ -2225,13 +2225,13 @@ async fn handle_hub_pr_review_submit(args : Array[String]) -> Unit raise Error {
     }
   }
   guard pr_id is Some(id) else {
-    raise @git.GitError::InvalidObject("PR id is required")
+    raise @bitcore.GitError::InvalidObject("PR id is required")
   }
   guard verdict is Some(v) else {
-    raise @git.GitError::InvalidObject("Missing --verdict")
+    raise @bitcore.GitError::InvalidObject("Missing --verdict")
   }
   guard commit_id is Some(cid) else {
-    raise @git.GitError::InvalidObject("Missing --commit")
+    raise @bitcore.GitError::InvalidObject("Missing --commit")
   }
   let review_body = body.unwrap_or("")
   let root = get_work_root()
@@ -2270,7 +2270,7 @@ async fn handle_hub_pr_review_list(args : Array[String]) -> Unit raise Error {
     }
   }
   guard pr_id is Some(id) else {
-    raise @git.GitError::InvalidObject("PR id is required")
+    raise @bitcore.GitError::InvalidObject("PR id is required")
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
@@ -2331,7 +2331,7 @@ async fn handle_hub_pr_workflow_submit(
         match @hub.parse_pr_workflow_status(raw) {
           Some(value) => status = Some(value)
           None =>
-            raise @git.GitError::InvalidObject(
+            raise @bitcore.GitError::InvalidObject(
               "Unknown workflow status: \{raw}",
             )
         }
@@ -2368,7 +2368,7 @@ async fn handle_hub_pr_workflow_submit(
         match @hub.parse_pr_workflow_status(raw) {
           Some(value) => status = Some(value)
           None =>
-            raise @git.GitError::InvalidObject(
+            raise @bitcore.GitError::InvalidObject(
               "Unknown workflow status: \{raw}",
             )
         }
@@ -2421,13 +2421,13 @@ async fn handle_hub_pr_workflow_submit(
     }
   }
   guard pr_id is Some(id) else {
-    raise @git.GitError::InvalidObject("PR id is required")
+    raise @bitcore.GitError::InvalidObject("PR id is required")
   }
   guard task is Some(task_name) else {
-    raise @git.GitError::InvalidObject("Missing --task")
+    raise @bitcore.GitError::InvalidObject("Missing --task")
   }
   guard status is Some(workflow_status) else {
-    raise @git.GitError::InvalidObject("Missing --status")
+    raise @bitcore.GitError::InvalidObject("Missing --status")
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
@@ -2466,7 +2466,7 @@ async fn handle_hub_pr_workflow_list(args : Array[String]) -> Unit raise Error {
     }
   }
   guard pr_id is Some(id) else {
-    raise @git.GitError::InvalidObject("PR id is required")
+    raise @bitcore.GitError::InvalidObject("PR id is required")
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
@@ -2550,15 +2550,15 @@ fn parse_work_item_state_for_list(
   value : String,
   unknown_state_label : String,
   allow_merged : Bool,
-) -> @hub.WorkItemState raise @git.GitError {
+) -> @hub.WorkItemState raise @bitcore.GitError {
   let state = parse_work_item_state(value)
   guard state is Some(parsed) else {
-    raise @git.GitError::InvalidObject(
+    raise @bitcore.GitError::InvalidObject(
       "Unknown \{unknown_state_label} state: \{value}",
     )
   }
   if not(allow_merged) && parsed == @hub.WorkItemState::Merged {
-    raise @git.GitError::InvalidObject(
+    raise @bitcore.GitError::InvalidObject(
       "Unknown \{unknown_state_label} state: \{value}",
     )
   }
@@ -2572,7 +2572,7 @@ fn parse_hub_list_options(
   unknown_state_label : String,
   allow_merged : Bool,
   allow_kind : Bool,
-) -> HubWorkItemListOptions raise @git.GitError {
+) -> HubWorkItemListOptions raise @bitcore.GitError {
   let mut state : @hub.WorkItemState? = None
   let mut kind : @hub.WorkItemKind? = None
   let mut limit : Int? = None
@@ -2616,7 +2616,7 @@ fn parse_hub_list_options(
         continue
       }
       "--state" =>
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "\{context}: --state requires a value",
         )
       _ if arg.has_prefix("--state=") => {
@@ -2634,13 +2634,13 @@ fn parse_hub_list_options(
         if parse_work_item_kind(value) is Some(k) {
           kind = Some(k)
         } else {
-          raise @git.GitError::InvalidObject("Unknown work item kind: \{value}")
+          raise @bitcore.GitError::InvalidObject("Unknown work item kind: \{value}")
         }
         i += 2
         continue
       }
       "--kind" if allow_kind =>
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "\{context}: --kind requires a value",
         )
       _ if allow_kind && arg.has_prefix("--kind=") => {
@@ -2648,7 +2648,7 @@ fn parse_hub_list_options(
         if parse_work_item_kind(value) is Some(k) {
           kind = Some(k)
         } else {
-          raise @git.GitError::InvalidObject("Unknown work item kind: \{value}")
+          raise @bitcore.GitError::InvalidObject("Unknown work item kind: \{value}")
         }
         i += 1
         continue
@@ -2659,7 +2659,7 @@ fn parse_hub_list_options(
         continue
       }
       "--limit" | "-L" =>
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "\{context}: --limit requires a value",
         )
       _ if arg.has_prefix("--limit=") => {
@@ -2679,7 +2679,7 @@ fn parse_hub_list_options(
 ///|
 fn parse_hub_issue_list_options(
   args : Array[String],
-) -> HubIssueListOptions raise @git.GitError {
+) -> HubIssueListOptions raise @bitcore.GitError {
   let common = parse_hub_list_options(
     args, "hub issue list", "issue", false, false,
   )
@@ -2693,7 +2693,7 @@ fn parse_hub_issue_list_options(
 ///|
 fn parse_hub_work_item_list_options(
   args : Array[String],
-) -> HubWorkItemListOptions raise @git.GitError {
+) -> HubWorkItemListOptions raise @bitcore.GitError {
   parse_hub_list_options(args, "hub work-item list", "work item", true, true)
 }
 
@@ -2772,7 +2772,7 @@ async fn handle_hub_issue_import(args : Array[String]) -> Unit raise Error {
         continue
       }
       "--repo" =>
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "hub issue import: --repo requires a value",
         )
       _ if arg.has_prefix("--repo=") => {
@@ -2786,7 +2786,7 @@ async fn handle_hub_issue_import(args : Array[String]) -> Unit raise Error {
         continue
       }
       "--state" =>
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "hub issue import: --state requires a value",
         )
       _ if arg.has_prefix("--state=") => {
@@ -2797,13 +2797,13 @@ async fn handle_hub_issue_import(args : Array[String]) -> Unit raise Error {
       "--limit" if i + 1 < args.length() => {
         limit = @strconv.parse_int(args[i + 1]) catch {
           _ =>
-            raise @git.GitError::InvalidObject("Invalid limit: \{args[i + 1]}")
+            raise @bitcore.GitError::InvalidObject("Invalid limit: \{args[i + 1]}")
         }
         i += 2
         continue
       }
       "--limit" =>
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "hub issue import: --limit requires a value",
         )
       "--provider" if i + 1 < args.length() => {
@@ -2812,7 +2812,7 @@ async fn handle_hub_issue_import(args : Array[String]) -> Unit raise Error {
         continue
       }
       "--provider" =>
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "hub issue import: --provider requires a value",
         )
       "--input" if i + 1 < args.length() => {
@@ -2821,13 +2821,13 @@ async fn handle_hub_issue_import(args : Array[String]) -> Unit raise Error {
         continue
       }
       "--input" =>
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "hub issue import: --input requires a value",
         )
       _ if arg.has_prefix("--limit=") => {
         let value = String::unsafe_substring(arg, start=8, end=arg.length())
         limit = @strconv.parse_int(value) catch {
-          _ => raise @git.GitError::InvalidObject("Invalid limit: \{value}")
+          _ => raise @bitcore.GitError::InvalidObject("Invalid limit: \{value}")
         }
         i += 1
         continue
@@ -2854,10 +2854,10 @@ async fn handle_hub_issue_import(args : Array[String]) -> Unit raise Error {
   let state_value = state.to_lower()
   match state_value {
     "open" | "closed" | "all" => ()
-    _ => raise @git.GitError::InvalidObject("Unknown issue state: \{state}")
+    _ => raise @bitcore.GitError::InvalidObject("Unknown issue state: \{state}")
   }
   if limit <= 0 {
-    raise @git.GitError::InvalidObject("Limit must be positive")
+    raise @bitcore.GitError::InvalidObject("Limit must be positive")
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
@@ -2902,7 +2902,7 @@ async fn handle_hub_issue_get(args : Array[String]) -> Unit raise Error {
     }
   }
   guard issue_id is Some(id) else {
-    raise @git.GitError::InvalidObject("Issue id is required")
+    raise @bitcore.GitError::InvalidObject("Issue id is required")
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
@@ -2910,7 +2910,7 @@ async fn handle_hub_issue_get(args : Array[String]) -> Unit raise Error {
   let hub = load_hub_store(objects, refs)
   let issue = hub.get_issue(objects, id)
   guard issue is Some(val) else {
-    raise @git.GitError::InvalidObject("Issue not found: \{id}")
+    raise @bitcore.GitError::InvalidObject("Issue not found: \{id}")
   }
   print_line(val.serialize())
 }
@@ -2939,7 +2939,7 @@ async fn handle_hub_work_item_get(args : Array[String]) -> Unit raise Error {
     }
   }
   guard work_item_id is Some(id) else {
-    raise @git.GitError::InvalidObject("Work item id is required")
+    raise @bitcore.GitError::InvalidObject("Work item id is required")
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
@@ -2947,7 +2947,7 @@ async fn handle_hub_work_item_get(args : Array[String]) -> Unit raise Error {
   let hub = load_hub_store(objects, refs)
   let work_item = hub.get_work_item(objects, id)
   guard work_item is Some(val) else {
-    raise @git.GitError::InvalidObject("Work item not found: \{id}")
+    raise @bitcore.GitError::InvalidObject("Work item not found: \{id}")
   }
   print_line(format_work_item_detail(val))
 }
@@ -3022,7 +3022,7 @@ async fn handle_hub_issue_create(args : Array[String]) -> Unit raise Error {
     }
   }
   guard title is Some(t) else {
-    raise @git.GitError::InvalidObject("Missing --title")
+    raise @bitcore.GitError::InvalidObject("Missing --title")
   }
   let issue_body = body.unwrap_or("")
   let root = get_work_root()
@@ -3121,7 +3121,7 @@ async fn handle_hub_issue_update(args : Array[String]) -> Unit raise Error {
     }
   }
   guard issue_id is Some(id) else {
-    raise @git.GitError::InvalidObject("Issue id is required")
+    raise @bitcore.GitError::InvalidObject("Issue id is required")
   }
   let label_option = if labels.length() > 0 { Some(labels) } else { None }
   let assignee_option = if assignees.length() > 0 {
@@ -3165,7 +3165,7 @@ async fn handle_hub_issue_close(args : Array[String]) -> Unit raise Error {
     }
   }
   guard issue_id is Some(id) else {
-    raise @git.GitError::InvalidObject("Issue id is required")
+    raise @bitcore.GitError::InvalidObject("Issue id is required")
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
@@ -3194,7 +3194,7 @@ async fn handle_hub_issue_reopen(args : Array[String]) -> Unit raise Error {
     }
   }
   guard issue_id is Some(id) else {
-    raise @git.GitError::InvalidObject("Issue id is required")
+    raise @bitcore.GitError::InvalidObject("Issue id is required")
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
@@ -3278,10 +3278,10 @@ async fn handle_hub_issue_comment_add(args : Array[String]) -> Unit raise Error 
     }
   }
   guard issue_id is Some(id) else {
-    raise @git.GitError::InvalidObject("Issue id is required")
+    raise @bitcore.GitError::InvalidObject("Issue id is required")
   }
   guard body is Some(msg) else {
-    raise @git.GitError::InvalidObject("Missing --body")
+    raise @bitcore.GitError::InvalidObject("Missing --body")
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
@@ -3320,7 +3320,7 @@ async fn handle_hub_issue_comment_list(
     }
   }
   guard issue_id is Some(id) else {
-    raise @git.GitError::InvalidObject("Issue id is required")
+    raise @bitcore.GitError::InvalidObject("Issue id is required")
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
@@ -3429,7 +3429,7 @@ async fn handle_hub_note_add(args : Array[String]) -> Unit raise Error {
     }
   }
   guard commit_hex is Some(hex) else {
-    raise @git.GitError::InvalidObject("Commit id is required")
+    raise @bitcore.GitError::InvalidObject("Commit id is required")
   }
   let note_body = match body {
     Some(b) => b
@@ -3437,7 +3437,7 @@ async fn handle_hub_note_add(args : Array[String]) -> Unit raise Error {
       let input = read_all_stdin()
       let text = decode_bytes(input)
       if text.length() == 0 {
-        raise @git.GitError::InvalidObject("Missing --body")
+        raise @bitcore.GitError::InvalidObject("Missing --body")
       }
       text
     }
@@ -3450,7 +3450,7 @@ async fn handle_hub_note_add(args : Array[String]) -> Unit raise Error {
     objects,
     refs,
     clock,
-    @git.ObjectId::from_hex(hex),
+    @bitcore.ObjectId::from_hex(hex),
     note_body,
     get_author_string(),
     get_commit_timestamp(),
@@ -3498,7 +3498,7 @@ async fn handle_hub_note_get(args : Array[String]) -> Unit raise Error {
     }
   }
   guard commit_hex is Some(hex) else {
-    raise @git.GitError::InvalidObject("Commit id is required")
+    raise @bitcore.GitError::InvalidObject("Commit id is required")
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
@@ -3507,11 +3507,11 @@ async fn handle_hub_note_get(args : Array[String]) -> Unit raise Error {
   let note = hub.get_note(
     objects,
     refs,
-    @git.ObjectId::from_hex(hex),
+    @bitcore.ObjectId::from_hex(hex),
     ns=note_ns(ns),
   )
   guard note is Some(val) else {
-    raise @git.GitError::InvalidObject("Note not found for \{hex}")
+    raise @bitcore.GitError::InvalidObject("Note not found for \{hex}")
   }
   print_line(val.serialize())
 }
@@ -3598,7 +3598,7 @@ async fn handle_hub_note_remove(args : Array[String]) -> Unit raise Error {
     }
   }
   guard commit_hex is Some(hex) else {
-    raise @git.GitError::InvalidObject("Commit id is required")
+    raise @bitcore.GitError::InvalidObject("Commit id is required")
   }
   let root = get_work_root()
   let git_dir = root + "/.git"
@@ -3608,7 +3608,7 @@ async fn handle_hub_note_remove(args : Array[String]) -> Unit raise Error {
     objects,
     refs,
     clock,
-    @git.ObjectId::from_hex(hex),
+    @bitcore.ObjectId::from_hex(hex),
     ns=note_ns(ns),
   )
   print_line("Removed note for \{hex}")
@@ -3646,11 +3646,11 @@ struct HubSyncRuntimeOptions {
 ///|
 fn parse_hub_conflict_policy(
   value : String,
-) -> @hub.RecordMergePolicy raise @git.GitError {
+) -> @hub.RecordMergePolicy raise @bitcore.GitError {
   match @hub.parse_record_merge_policy(value) {
     Some(policy) => policy
     None =>
-      raise @git.GitError::InvalidObject(
+      raise @bitcore.GitError::InvalidObject(
         "Unknown hub conflict policy: \{value}",
       )
   }
@@ -3660,7 +3660,7 @@ fn parse_hub_conflict_policy(
 fn parse_hub_sync_runtime_options(
   args : Array[String],
   default_remote_url? : String? = None,
-) -> HubSyncRuntimeOptions raise @git.GitError {
+) -> HubSyncRuntimeOptions raise @bitcore.GitError {
   let mut remote_url = default_remote_url
   let mut auth_token : String? = None
   let mut signing_key : String? = None
@@ -3676,7 +3676,7 @@ fn parse_hub_sync_runtime_options(
         continue
       }
       "--auth-token" =>
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "hub sync: --auth-token requires a value",
         )
       "--signing-key" | "--sign-key" if i + 1 < args.length() => {
@@ -3685,7 +3685,7 @@ fn parse_hub_sync_runtime_options(
         continue
       }
       "--signing-key" | "--sign-key" =>
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "hub sync: --signing-key requires a value",
         )
       "--require-signed" => {
@@ -3704,7 +3704,7 @@ fn parse_hub_sync_runtime_options(
         continue
       }
       "--conflict-policy" =>
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "hub sync: --conflict-policy requires a value",
         )
       _ if arg.has_prefix("--auth-token=") => {
@@ -3735,7 +3735,7 @@ fn parse_hub_sync_runtime_options(
         continue
       }
       _ if arg.has_prefix("-") =>
-        raise @git.GitError::InvalidObject("Unknown hub sync option: \{arg}")
+        raise @bitcore.GitError::InvalidObject("Unknown hub sync option: \{arg}")
       _ => {
         remote_url = Some(arg)
         i += 1
@@ -3756,7 +3756,7 @@ async fn handle_hub_sync_push(args : Array[String]) -> Unit raise Error {
     default_remote_url=get_effective_remote_url(fs, git_dir),
   )
   guard options.remote_url is Some(url) else {
-    raise @git.GitError::InvalidObject("No remote configured")
+    raise @bitcore.GitError::InvalidObject("No remote configured")
   }
   let (objects, refs, _clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
@@ -3780,9 +3780,9 @@ async fn handle_hub_sync_push(args : Array[String]) -> Unit raise Error {
 
 ///|
 fn load_hub_record_store(
-  objects : &@gitlib.ObjectStore,
-  refs : &@gitlib.RefStore,
-) -> @hub.HubStore raise @git.GitError {
+  objects : &@bitlib.ObjectStore,
+  refs : &@bitlib.RefStore,
+) -> @hub.HubStore raise @bitcore.GitError {
   @hub.HubStore::load(
     objects,
     refs,
@@ -3807,7 +3807,7 @@ fn select_notify_records(
 ///|
 fn collect_notify_records_from_store(
   store : @hub.HubStore,
-  objects : &@gitlib.ObjectStore,
+  objects : &@bitlib.ObjectStore,
 ) -> Map[String, @hub.HubRecord] {
   let records = store.list_records(objects, "hub/")
   select_notify_records(records)
@@ -3906,7 +3906,7 @@ async fn handle_hub_sync_fetch(args : Array[String]) -> Unit raise Error {
     default_remote_url=get_effective_remote_url(fs, git_dir),
   )
   guard options.remote_url is Some(url) else {
-    raise @git.GitError::InvalidObject("No remote configured")
+    raise @bitcore.GitError::InvalidObject("No remote configured")
   }
   let (objects, refs, _clock) = make_hub_stores(git_dir)
   let before_store = load_hub_record_store(objects, refs)
@@ -3947,7 +3947,7 @@ struct HubDumpOptions {
 ///|
 fn parse_hub_dump_options(
   args : Array[String],
-) -> HubDumpOptions raise @git.GitError {
+) -> HubDumpOptions raise @bitcore.GitError {
   let mut prefix = "hub/"
   let mut raw = false
   let mut include_deleted = false
@@ -3962,7 +3962,7 @@ fn parse_hub_dump_options(
         continue
       }
       "--prefix" =>
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "hub dump: --prefix requires a value",
         )
       _ if arg.has_prefix("--prefix=") => {
@@ -3985,10 +3985,10 @@ fn parse_hub_dump_options(
         continue
       }
       _ if arg.has_prefix("-") =>
-        raise @git.GitError::InvalidObject("Unknown hub dump option: \{arg}")
+        raise @bitcore.GitError::InvalidObject("Unknown hub dump option: \{arg}")
       _ => {
         if used_positional_prefix {
-          raise @git.GitError::InvalidObject(
+          raise @bitcore.GitError::InvalidObject(
             "hub dump: unexpected positional argument: \{arg}",
           )
         }
@@ -4074,11 +4074,11 @@ fn parse_github_import_provider(value : String) -> GitHubImportProvider? {
 ///|
 fn parse_github_import_provider_option(
   value : String,
-) -> GitHubImportProvider raise @git.GitError {
+) -> GitHubImportProvider raise @bitcore.GitError {
   match parse_github_import_provider(value) {
     Some(provider) => provider
     None =>
-      raise @git.GitError::InvalidObject(
+      raise @bitcore.GitError::InvalidObject(
         "Unknown GitHub import provider: \{value}",
       )
   }
@@ -4089,15 +4089,15 @@ fn read_import_json_from_file(
   fs : OsFs,
   context : String,
   input_path : String?,
-) -> (String, String) raise @git.GitError {
+) -> (String, String) raise @bitcore.GitError {
   guard input_path is Some(path) else {
-    raise @git.GitError::InvalidObject(
+    raise @bitcore.GitError::InvalidObject(
       "\{context}: --input requires a file path when --provider=json-file",
     )
   }
   let bytes = fs.read_file(path) catch {
     err =>
-      raise @git.GitError::IoError(
+      raise @bitcore.GitError::IoError(
         "\{context}: failed to read --input file '\{path}': \{err}",
       )
   }
@@ -4109,26 +4109,26 @@ fn resolve_github_repo(
   fs : OsFs,
   git_dir : String,
   repo : String?,
-) -> String raise @git.GitError {
+) -> String raise @bitcore.GitError {
   match repo {
     Some(name) => name
     None => {
       let remote_url = get_effective_remote_url(fs, git_dir)
       guard remote_url is Some(url) else {
-        raise @git.GitError::InvalidObject("No remote configured; use --repo")
+        raise @bitcore.GitError::InvalidObject("No remote configured; use --repo")
       }
       match @hq.parse_repo_url(url) {
         Some(parsed) => {
           let host = parsed.host_name()
           if host != "github.com" {
-            raise @git.GitError::InvalidObject(
+            raise @bitcore.GitError::InvalidObject(
               "Only github.com is supported for gh import",
             )
           }
           parsed.full_name()
         }
         None =>
-          raise @git.GitError::InvalidObject("Cannot parse remote URL: \{url}")
+          raise @bitcore.GitError::InvalidObject("Cannot parse remote URL: \{url}")
       }
     }
   }
@@ -4139,7 +4139,7 @@ async fn gh_pr_list(
   repo : String,
   state : String,
   limit : Int,
-) -> (String, String) raise @git.GitError {
+) -> (String, String) raise @bitcore.GitError {
   let fields = "number,title,body,headRefName,headRefOid,headRepository,baseRefName,baseRefOid,author,createdAt,updatedAt,state,labels"
   let jq = "[.[] | {id:(.number|tostring), title:.title, body:(.body // \"\"), source_branch:.headRefName, source_ref:(if (.headRefName // \"\") == \"\" then \"\" else (\"refs/heads/\" + .headRefName) end), source_repo:((.headRepository // {}) | .nameWithOwner // \"\"), source_commit:.headRefOid, target_branch:.baseRefName, target_commit:.baseRefOid, author:(.author.login // \"unknown\"), created_at:(.createdAt|fromdateiso8601), updated_at:(.updatedAt|fromdateiso8601), state:(.state|ascii_downcase), labels:(.labels|map(.name))}]"
   let args = [
@@ -4164,7 +4164,7 @@ async fn gh_issue_list(
   repo : String,
   state : String,
   limit : Int,
-) -> (String, String) raise @git.GitError {
+) -> (String, String) raise @bitcore.GitError {
   let fields = "number,title,body,author,createdAt,updatedAt,state,labels,assignees"
   let jq = "[.[] | {id:(.number|tostring), title:.title, body:(.body // \"\"), author:(.author.login // \"unknown\"), created_at:(.createdAt|fromdateiso8601), updated_at:(.updatedAt|fromdateiso8601), state:(.state|ascii_downcase), labels:(.labels|map(.name)), assignees:(.assignees|map(.login))}]"
   let args = [
@@ -4187,42 +4187,42 @@ async fn gh_issue_list(
 ///|
 async fn gh_collect_output(
   args : Array[String],
-) -> (String, String) raise @git.GitError {
+) -> (String, String) raise @bitcore.GitError {
   let (code, stdout, stderr) = @process.collect_output(
     "gh",
     args,
     inherit_env=true,
   ) catch {
-    err => raise @git.GitError::IoError("gh failed: \{err}")
+    err => raise @bitcore.GitError::IoError("gh failed: \{err}")
   }
   let out = stdout.text() catch {
     err if @async.is_cancellation_error(err) =>
-      raise @git.GitError::IoError(err.to_string())
+      raise @bitcore.GitError::IoError(err.to_string())
     _ => ""
   }
   let err_text = stderr.text() catch {
     err if @async.is_cancellation_error(err) =>
-      raise @git.GitError::IoError(err.to_string())
+      raise @bitcore.GitError::IoError(err.to_string())
     _ => ""
   }
   if code != 0 {
     let message = trim_string(err_text)
-    raise @git.GitError::InvalidObject("gh failed (\{code}): \{message}")
+    raise @bitcore.GitError::InvalidObject("gh failed (\{code}): \{message}")
   }
   (out, err_text)
 }
 
 ///|
-fn parse_json_array(text : String) -> Array[Json] raise @git.GitError {
+fn parse_json_array(text : String) -> Array[Json] raise @bitcore.GitError {
   let parsed = @json.parse(text) catch {
     err =>
-      raise @git.GitError::InvalidObject(
+      raise @bitcore.GitError::InvalidObject(
         "Invalid JSON from gh: \{err.to_string()}",
       )
   }
   match parsed {
     Json::Array(items) => items
-    _ => raise @git.GitError::InvalidObject("Expected JSON array from gh")
+    _ => raise @bitcore.GitError::InvalidObject("Expected JSON array from gh")
   }
 }
 
@@ -4278,7 +4278,7 @@ fn json_get_string_array(
 }
 
 ///|
-fn parse_gh_prs(text : String) -> Array[@hub.PullRequest] raise @git.GitError {
+fn parse_gh_prs(text : String) -> Array[@hub.PullRequest] raise @bitcore.GitError {
   let items = parse_json_array(text)
   let out : Array[@hub.PullRequest] = []
   for item in items {
@@ -4297,17 +4297,17 @@ fn parse_gh_prs(text : String) -> Array[@hub.PullRequest] raise @git.GitError {
         let source_hex = json_get_string(obj, "source_commit", "")
         let target_hex = json_get_string(obj, "target_commit", "")
         if source_branch.length() == 0 || target_branch.length() == 0 {
-          raise @git.GitError::InvalidObject("Missing branch name for PR \{id}")
+          raise @bitcore.GitError::InvalidObject("Missing branch name for PR \{id}")
         }
-        let source_commit = @git.ObjectId::from_hex(source_hex) catch {
+        let source_commit = @bitcore.ObjectId::from_hex(source_hex) catch {
           _ =>
-            raise @git.GitError::InvalidObject(
+            raise @bitcore.GitError::InvalidObject(
               "Invalid source commit for PR \{id}",
             )
         }
-        let target_commit = @git.ObjectId::from_hex(target_hex) catch {
+        let target_commit = @bitcore.ObjectId::from_hex(target_hex) catch {
           _ =>
-            raise @git.GitError::InvalidObject(
+            raise @bitcore.GitError::InvalidObject(
               "Invalid target commit for PR \{id}",
             )
         }
@@ -4355,7 +4355,7 @@ fn parse_gh_prs(text : String) -> Array[@hub.PullRequest] raise @git.GitError {
 }
 
 ///|
-fn parse_gh_issues(text : String) -> Array[@hub.Issue] raise @git.GitError {
+fn parse_gh_issues(text : String) -> Array[@hub.Issue] raise @bitcore.GitError {
   let items = parse_json_array(text)
   let out : Array[@hub.Issue] = []
   for item in items {

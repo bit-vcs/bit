@@ -10,12 +10,12 @@
 /// サブディレクトリの変更を元リポジトリにコミット
 pub fn SubdirRepo::commit(
   self : SubdirRepo,
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   message : String,
   author? : String = "author <author@example.com>",
   timestamp? : Int64 = 0L,
-) -> @git.ObjectId raise SubdirError {
+) -> @bit.ObjectId raise SubdirError {
   // 変更がなければエラー
   if not(self.is_dirty()) {
     raise IoError("nothing to commit")
@@ -46,7 +46,7 @@ pub fn SubdirRepo::commit(
     Some(o) => o
     None => raise CommitNotFound(parent_commit)
   }
-  let parent_info = @git.parse_commit(parent_data.data) catch {
+  let parent_info = @bit.parse_commit(parent_data.data) catch {
     _ => raise CommitNotFound(parent_commit)
   }
   // ルートツリーを取得してサブディレクトリを置換
@@ -89,14 +89,14 @@ pub fn SubdirRepo::commit(
 ///|
 /// ルートツリーのサブディレクトリ部分を置換して新しいツリーを作成
 fn replace_subdir_tree(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   db : @lib.ObjectDb,
   git_dir : String,
-  root_tree : @git.ObjectId,
+  root_tree : @bit.ObjectId,
   subdir_path : String,
-  new_subdir_tree : @git.ObjectId,
-) -> @git.ObjectId raise SubdirError {
+  new_subdir_tree : @bit.ObjectId,
+) -> @bit.ObjectId raise SubdirError {
   let path_parts = split_subdir_path(subdir_path)
   if path_parts.length() == 0 {
     // サブディレクトリがルートの場合、そのまま返す
@@ -111,15 +111,15 @@ fn replace_subdir_tree(
 ///|
 /// ツリーを再帰的に置換
 fn replace_tree_recursive(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   db : @lib.ObjectDb,
   git_dir : String,
-  current_tree : @git.ObjectId,
+  current_tree : @bit.ObjectId,
   path_parts : Array[String],
   depth : Int,
-  new_leaf_tree : @git.ObjectId,
-) -> @git.ObjectId raise SubdirError {
+  new_leaf_tree : @bit.ObjectId,
+) -> @bit.ObjectId raise SubdirError {
   // 現在のツリーを読み込む
   let tree_obj = db.get(rfs, current_tree) catch {
     _ => raise TreeNotFound(current_tree)
@@ -128,11 +128,11 @@ fn replace_tree_recursive(
     Some(o) => o
     None => raise TreeNotFound(current_tree)
   }
-  let entries = @git.parse_tree(tree_data.data) catch {
+  let entries = @bit.parse_tree(tree_data.data) catch {
     _ => raise TreeNotFound(current_tree)
   }
   // 新しいエントリリストを構築
-  let new_entries : Array[@git.TreeEntry] = []
+  let new_entries : Array[@bit.TreeEntry] = []
   let target_name = path_parts[depth]
   let is_last = depth == path_parts.length() - 1
   for entry in entries {
@@ -141,7 +141,7 @@ fn replace_tree_recursive(
       if is_last {
         // 最後のパス要素なら、新しいツリーで置換
         new_entries.push(
-          @git.TreeEntry::new(entry.mode, entry.name, new_leaf_tree),
+          @bit.TreeEntry::new(entry.mode, entry.name, new_leaf_tree),
         )
       } else {
         // まだパスが続く場合は再帰
@@ -158,7 +158,7 @@ fn replace_tree_recursive(
           e => raise e
         }
         new_entries.push(
-          @git.TreeEntry::new(entry.mode, entry.name, new_child_tree),
+          @bit.TreeEntry::new(entry.mode, entry.name, new_child_tree),
         )
       }
     } else {
@@ -176,7 +176,7 @@ fn replace_tree_recursive(
 
 ///|
 /// ツリーエントリからツリーオブジェクトの内容を構築
-fn build_tree_content(entries : Array[@git.TreeEntry]) -> Bytes {
+fn build_tree_content(entries : Array[@bit.TreeEntry]) -> Bytes {
   // エントリをソート（Git のツリーは名前でソートされている必要がある）
   let sorted = entries.copy()
   sorted.sort_by(fn(a, b) {
@@ -238,11 +238,11 @@ fn string_to_bytes_local(s : String) -> Bytes {
 ///|
 /// オブジェクトを書き込む
 fn write_object(
-  fs : &@git.FileSystem,
+  fs : &@bit.FileSystem,
   git_dir : String,
   obj_type : String,
   content : Bytes,
-) -> @git.ObjectId raise SubdirError {
+) -> @bit.ObjectId raise SubdirError {
   // ヘッダー: "type size\0"
   let header = obj_type + " " + content.length().to_string()
   let header_bytes = string_to_bytes_local(header)
@@ -250,7 +250,7 @@ fn write_object(
   // フルデータ
   let full_data = concat_bytes([header_bytes, null_byte, content])
   // SHA-1 ハッシュを計算
-  let hash = @git.sha1(full_data)
+  let hash = @bit.sha1(full_data)
   let hex = hash.to_hex()
   // オブジェクトパス: first 2 chars / rest
   let dir_name = hex_substring(hex, 0, 2)
@@ -283,14 +283,14 @@ fn hex_substring(s : String, start : Int, end : Int) -> String {
 ///|
 /// コミットオブジェクトを作成
 fn create_commit_object(
-  fs : &@git.FileSystem,
+  fs : &@bit.FileSystem,
   git_dir : String,
-  tree_id : @git.ObjectId,
-  parent_id : @git.ObjectId,
+  tree_id : @bit.ObjectId,
+  parent_id : @bit.ObjectId,
   message : String,
   author : String,
   timestamp : Int64,
-) -> @git.ObjectId raise SubdirError {
+) -> @bit.ObjectId raise SubdirError {
   // コミット内容を構築
   let content = StringBuilder::new()
   content.write_string("tree ")
@@ -319,10 +319,10 @@ fn create_commit_object(
 ///|
 /// HEAD（またはブランチ参照）を新しいコミットに更新
 fn update_head_ref(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
-  commit_id : @git.ObjectId,
+  commit_id : @bit.ObjectId,
 ) -> Unit raise SubdirError {
   let head_path = git_dir + "/HEAD"
   let head_bytes = rfs.read_file(head_path) catch {
@@ -412,14 +412,14 @@ fn get_parent_dir(path : String) -> String {
 ///|
 /// Create a commit in the repository (public API for subdir-push)
 pub fn create_commit_in_repo(
-  fs : &@git.FileSystem,
+  fs : &@bit.FileSystem,
   git_dir : String,
-  tree_id : @git.ObjectId,
-  parent_id : @git.ObjectId,
+  tree_id : @bit.ObjectId,
+  parent_id : @bit.ObjectId,
   message : String,
   author : String,
   timestamp : Int64,
-) -> @git.ObjectId raise SubdirError {
+) -> @bit.ObjectId raise SubdirError {
   create_commit_object(
     fs, git_dir, tree_id, parent_id, message, author, timestamp,
   )
@@ -428,10 +428,10 @@ pub fn create_commit_in_repo(
 ///|
 /// インデックスを新しいコミットに合わせて更新
 fn update_index_from_commit(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
-  commit_id : @git.ObjectId,
+  commit_id : @bit.ObjectId,
 ) -> Unit raise SubdirError {
   let db = @lib.ObjectDb::load(rfs, git_dir) catch {
     _ => raise IoError("failed to load object db")

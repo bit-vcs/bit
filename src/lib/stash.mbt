@@ -2,16 +2,16 @@
 
 ///|
 pub struct StashEntry {
-  id : @git.ObjectId
+  id : @bit.ObjectId
   message : String
 }
 
 ///|
 /// List all stash entries.
 pub fn stash_list(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
-) -> Array[StashEntry] raise @git.GitError {
+) -> Array[StashEntry] raise @bit.GitError {
   let stash_ref_path = git_dir + "/refs/stash"
   if not(fs.is_file(stash_ref_path)) {
     return []
@@ -22,7 +22,7 @@ pub fn stash_list(
     // Just return the current stash
     let content = @utf8.decode_lossy(fs.read_file(stash_ref_path)[:])
     let hex = content.trim_end(chars="\n\r ").to_string()
-    let id = @git.ObjectId::from_hex(hex)
+    let id = @bit.ObjectId::from_hex(hex)
     return [{ id, message: "WIP on HEAD" }]
   }
   let log_content = @utf8.decode_lossy(fs.read_file(reflog_path)[:])
@@ -46,7 +46,7 @@ pub fn stash_list(
         let parts = prefix.split(" ").map(v => v.to_string()).collect()
         if parts.length() >= 2 {
           let new_sha = parts[1]
-          let id = @git.ObjectId::from_hex(new_sha) catch { _ => continue }
+          let id = @bit.ObjectId::from_hex(new_sha) catch { _ => continue }
           entries.push({ id, message })
         }
       }
@@ -60,13 +60,13 @@ pub fn stash_list(
 ///|
 /// Push current changes to stash.
 pub async fn stash_push(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   message : String,
   author : String,
   timestamp : Int64,
-) -> @git.ObjectId? raise @git.GitError {
+) -> @bit.ObjectId? raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   // Check if there are changes
   let st = status(rfs, root)
@@ -80,7 +80,7 @@ pub async fn stash_push(
   // Get current HEAD
   let head = resolve_head_commit(rfs, git_dir)
   guard head is Some(head_id) else {
-    raise @git.GitError::InvalidObject("HEAD not found")
+    raise @bit.GitError::InvalidObject("HEAD not found")
   }
   // Create tree from current index
   let index_entries = read_index_entries(rfs, git_dir)
@@ -91,7 +91,7 @@ pub async fn stash_push(
   )
   let worktree_tree = write_tree_from_index(fs, rfs, git_dir, worktree_entries)
   // Create index commit (index state)
-  let index_commit = @git.Commit::new(
+  let index_commit = @bit.Commit::new(
     index_tree,
     [head_id],
     author,
@@ -102,11 +102,11 @@ pub async fn stash_push(
     "+0000",
     "index on HEAD",
   )
-  let (index_commit_id, index_commit_data) = @git.create_commit(index_commit)
+  let (index_commit_id, index_commit_data) = @bit.create_commit(index_commit)
   write_object_bytes(fs, git_dir, index_commit_id, index_commit_data)
   // Create stash commit (worktree state) with 2 parents: HEAD and index commit
   let stash_msg = if message.length() > 0 { message } else { "WIP on HEAD" }
-  let stash_commit = @git.Commit::new(
+  let stash_commit = @bit.Commit::new(
     worktree_tree,
     [head_id, index_commit_id],
     author,
@@ -117,7 +117,7 @@ pub async fn stash_push(
     "+0000",
     stash_msg,
   )
-  let (stash_id, stash_data) = @git.create_commit(stash_commit)
+  let (stash_id, stash_data) = @bit.create_commit(stash_commit)
   write_object_bytes(fs, git_dir, stash_id, stash_data)
   // Update refs/stash
   let stash_ref_path = git_dir + "/refs/stash"
@@ -125,15 +125,15 @@ pub async fn stash_push(
   let old_id = if rfs.is_file(stash_ref_path) {
     let content = @utf8.decode_lossy(rfs.read_file(stash_ref_path)[:])
     let hex = content.trim_end(chars="\n\r ").to_string()
-    let parsed : Result[@git.ObjectId, Error] = try? @git.ObjectId::from_hex(
+    let parsed : Result[@bit.ObjectId, Error] = try? @bit.ObjectId::from_hex(
       hex,
     )
     match parsed {
       Ok(id) => id
-      Err(_) => @git.ObjectId::zero()
+      Err(_) => @bit.ObjectId::zero()
     }
   } else {
-    @git.ObjectId::zero()
+    @bit.ObjectId::zero()
   }
   fs.write_string(stash_ref_path, stash_id.to_hex() + "\n")
   // Append to reflog
@@ -159,19 +159,19 @@ pub async fn stash_push(
 
 ///|
 fn build_worktree_index(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   root : String,
   index_entries : Array[IndexEntry],
-) -> Array[IndexEntry] raise @git.GitError {
+) -> Array[IndexEntry] raise @bit.GitError {
   let result : Array[IndexEntry] = []
   for e in index_entries {
     let abs = join_path(root, e.path)
     if rfs.is_file(abs) {
       let content = rfs.read_file(abs)
       // Write blob to object store
-      let id = write_loose_object(fs, git_dir, @git.ObjectType::Blob, content)
+      let id = write_loose_object(fs, git_dir, @bit.ObjectType::Blob, content)
       result.push({
         path: e.path,
         id,
@@ -189,28 +189,28 @@ fn build_worktree_index(
 ///|
 /// Apply stash entry (optionally dropping it).
 pub fn stash_apply(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   index : Int,
   drop : Bool,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   let entries = stash_list(rfs, git_dir)
   if index >= entries.length() {
-    raise @git.GitError::InvalidObject("No stash entry at index \{index}")
+    raise @bit.GitError::InvalidObject("No stash entry at index \{index}")
   }
   let entry = entries[index]
   // Get stash commit
   let db = ObjectDb::load(rfs, git_dir)
   let obj = db.get(rfs, entry.id)
   guard obj is Some(stash_obj) else {
-    raise @git.GitError::InvalidObject("Stash object not found")
+    raise @bit.GitError::InvalidObject("Stash object not found")
   }
-  if stash_obj.obj_type != @git.ObjectType::Commit {
-    raise @git.GitError::InvalidObject("Invalid stash entry")
+  if stash_obj.obj_type != @bit.ObjectType::Commit {
+    raise @bit.GitError::InvalidObject("Invalid stash entry")
   }
-  let commit_info = @git.parse_commit(stash_obj.data)
+  let commit_info = @bit.parse_commit(stash_obj.data)
   // Apply worktree state from stash
   let stash_files = collect_tree_files(db, rfs, commit_info.tree)
   write_worktree_from_files(
@@ -227,8 +227,8 @@ pub fn stash_apply(
     let index_commit_id = commit_info.parents[1]
     let index_obj = db.get(rfs, index_commit_id)
     match index_obj {
-      Some(idx_obj) if idx_obj.obj_type == @git.ObjectType::Commit => {
-        let idx_info = @git.parse_commit(idx_obj.data)
+      Some(idx_obj) if idx_obj.obj_type == @bit.ObjectType::Commit => {
+        let idx_info = @bit.parse_commit(idx_obj.data)
         let idx_files = collect_tree_files(db, rfs, idx_info.tree)
         let idx_entries = tree_files_to_index(db, rfs, idx_files)
         write_index_entries(fs, git_dir, idx_entries)
@@ -244,25 +244,25 @@ pub fn stash_apply(
 ///|
 /// Drop stash entry at index.
 pub fn stash_drop(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   index : Int,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   stash_drop_at(fs, rfs, git_dir, index)
 }
 
 ///|
 fn stash_drop_at(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   index : Int,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let entries = stash_list(rfs, git_dir)
   if index >= entries.length() {
-    raise @git.GitError::InvalidObject("No stash entry at index \{index}")
+    raise @bit.GitError::InvalidObject("No stash entry at index \{index}")
   }
   // Rebuild reflog without the entry
   let reflog_path = git_dir + "/logs/refs/stash"

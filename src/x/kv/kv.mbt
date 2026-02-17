@@ -6,7 +6,7 @@ pub fn Kv::new(
   node_id : NodeId,
   tree : &@lib.WorkingTree,
   store : &@lib.ObjectStore,
-  head : @git.ObjectId,
+  head : @bit.ObjectId,
 ) -> Kv {
   {
     node_id,
@@ -23,7 +23,7 @@ pub fn Kv::new(
 
 ///|
 /// Get the current HEAD
-pub fn Kv::head(self : Kv) -> @git.ObjectId {
+pub fn Kv::head(self : Kv) -> @bit.ObjectId {
   self.head
 }
 
@@ -124,7 +124,7 @@ pub fn Kv::commit(
   self : Kv,
   message : String,
   timestamp : Int64,
-) -> @git.ObjectId raise @git.GitError {
+) -> @bit.ObjectId raise @bit.GitError {
   // Increment our clock
   self.clock = self.clock.increment(self.node_id)
   // Create snapshot

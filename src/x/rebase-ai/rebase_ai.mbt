@@ -284,8 +284,8 @@ fn build_agent_loop_prompt(rel_path : String) -> String {
 
 ///|
 fn build_repo_scoped_rw_registry(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
 ) -> (@llmlib.ToolRegistry, Ref[Array[String]]) {
   let registry = @llmlib.ToolRegistry::new()
@@ -337,11 +337,11 @@ fn build_repo_scoped_rw_registry(
 
 ///|
 fn stage_paths_with_storage_runtime(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   paths : Array[String],
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   @runtime.run_storage_command(
     fs,
     rfs,
@@ -349,7 +349,7 @@ fn stage_paths_with_storage_runtime(
     @runtime.StorageCommand::Add({ add_all: false, paths }),
   ) catch {
     err =>
-      raise @git.GitError::InvalidObject(
+      raise @bit.GitError::InvalidObject(
         "rebase-ai: storage runtime add failed: \{err}",
       )
   }
@@ -357,13 +357,13 @@ fn stage_paths_with_storage_runtime(
 
 ///|
 fn resolve_conflict_file_with_agent_loop(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   rel_path : String,
   provider : @llmlib.BoxedProvider,
   options : AiRebaseOptions,
-) -> Bool raise @git.GitError {
+) -> Bool raise @bit.GitError {
   let abs_path = root + "/" + rel_path
   let bytes = rfs.read_file(abs_path) catch { _ => return false }
   let conflicted = decode_bytes(bytes)
@@ -401,12 +401,12 @@ fn resolve_conflict_file_with_agent_loop(
 
 ///|
 fn resolve_conflict_file_with_provider(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   rel_path : String,
   provider : @llmlib.BoxedProvider,
-) -> Bool raise @git.GitError {
+) -> Bool raise @bit.GitError {
   let abs_path = root + "/" + rel_path
   let bytes = rfs.read_file(abs_path) catch { _ => return false }
   let conflicted = decode_bytes(bytes)
@@ -429,7 +429,7 @@ fn resolve_conflict_file_with_provider(
 
 ///|
 fn collect_conflict_marker_paths_recursive(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   rel : String,
   out : Array[String],
@@ -457,7 +457,7 @@ fn collect_conflict_marker_paths_recursive(
 
 ///|
 pub fn find_conflict_marker_paths(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
 ) -> Array[String] {
   let out : Array[String] = []
@@ -466,10 +466,10 @@ pub fn find_conflict_marker_paths(
 }
 
 ///|
-fn ensure_openrouter_api_key() -> Unit raise @git.GitError {
+fn ensure_openrouter_api_key() -> Unit raise @bit.GitError {
   let api_key = trim_text(@llm_ffi.get_env("OPENROUTER_API_KEY"))
   if api_key.length() == 0 {
-    raise @git.GitError::InvalidObject("rebase-ai requires OPENROUTER_API_KEY")
+    raise @bit.GitError::InvalidObject("rebase-ai requires OPENROUTER_API_KEY")
   }
 }
 
@@ -477,7 +477,7 @@ fn ensure_openrouter_api_key() -> Unit raise @git.GitError {
 fn build_provider(
   options : AiRebaseOptions,
   provider_ref : Ref[@llmlib.BoxedProvider?],
-) -> @llmlib.BoxedProvider raise @git.GitError {
+) -> @llmlib.BoxedProvider raise @bit.GitError {
   let agent_loop_mode = use_agent_loop_mode(options)
   match provider_ref.val {
     Some(provider) => provider
@@ -504,24 +504,24 @@ fn build_provider(
 ///|
 fn raise_unresolved_conflicts(
   conflicts : Array[String],
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   if conflicts.length() == 0 {
-    raise @git.GitError::InvalidObject("rebase-ai: unresolved conflicts remain")
+    raise @bit.GitError::InvalidObject("rebase-ai: unresolved conflicts remain")
   }
-  raise @git.GitError::InvalidObject(
+  raise @bit.GitError::InvalidObject(
     "rebase-ai failed to resolve conflicts: " + conflicts.join(", "),
   )
 }
 
 ///|
 fn resolve_conflict_paths(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   paths : Array[String],
   options : AiRebaseOptions,
   provider_ref : Ref[@llmlib.BoxedProvider?],
-) -> AiConflictResolution raise @git.GitError {
+) -> AiConflictResolution raise @bit.GitError {
   if paths.length() == 0 {
     return { resolved: [], failed: [] }
   }
@@ -561,19 +561,19 @@ fn normalized_round_limit(options : AiRebaseOptions) -> Int {
 
 ///|
 fn continue_until_non_conflict(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
-  initial : @gitlib.RebaseResult,
+  initial : @bitlib.RebaseResult,
   options : AiRebaseOptions,
   provider_ref : Ref[@llmlib.BoxedProvider?],
-) -> @gitlib.RebaseResult raise @git.GitError {
+) -> @bitlib.RebaseResult raise @bit.GitError {
   let mut current = initial
   let mut rounds = 0
   let round_limit = normalized_round_limit(options)
   while rounds <= round_limit {
     match current.status {
-      @gitlib.RebaseStatus::Conflict => ()
+      @bitlib.RebaseStatus::Conflict => ()
       _ => return current
     }
     if rounds >= round_limit {
@@ -593,7 +593,7 @@ fn continue_until_non_conflict(
     if resolved.failed.length() > 0 {
       raise_unresolved_conflicts(resolved.failed)
     }
-    current = @gitlib.rebase_continue(fs, rfs, root)
+    current = @bitlib.rebase_continue(fs, rfs, root)
     rounds += 1
   }
   current
@@ -601,14 +601,14 @@ fn continue_until_non_conflict(
 
 ///|
 pub fn ai_rebase_start(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
-  upstream : @git.ObjectId,
+  upstream : @bit.ObjectId,
   options? : AiRebaseOptions = AiRebaseOptions::default(),
-) -> @gitlib.RebaseResult raise @git.GitError {
+) -> @bitlib.RebaseResult raise @bit.GitError {
   let provider_ref : Ref[@llmlib.BoxedProvider?] = { val: options.provider }
-  let start_result = @gitlib.rebase_start(fs, rfs, root, upstream)
+  let start_result = @bitlib.rebase_start(fs, rfs, root, upstream)
   continue_until_non_conflict(
     fs, rfs, root, start_result, options, provider_ref,
   )
@@ -616,11 +616,11 @@ pub fn ai_rebase_start(
 
 ///|
 pub fn ai_rebase_continue(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   options? : AiRebaseOptions = AiRebaseOptions::default(),
-) -> @gitlib.RebaseResult raise @git.GitError {
+) -> @bitlib.RebaseResult raise @bit.GitError {
   let provider_ref : Ref[@llmlib.BoxedProvider?] = { val: options.provider }
   let marker_paths = find_conflict_marker_paths(rfs, root)
   if marker_paths.length() > 0 {
@@ -631,7 +631,7 @@ pub fn ai_rebase_continue(
       raise_unresolved_conflicts(resolved.failed)
     }
   }
-  let continue_result = @gitlib.rebase_continue(fs, rfs, root)
+  let continue_result = @bitlib.rebase_continue(fs, rfs, root)
   continue_until_non_conflict(
     fs, rfs, root, continue_result, options, provider_ref,
   )
@@ -639,21 +639,21 @@ pub fn ai_rebase_continue(
 
 ///|
 pub fn ai_rebase_skip(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   options? : AiRebaseOptions = AiRebaseOptions::default(),
-) -> @gitlib.RebaseResult raise @git.GitError {
+) -> @bitlib.RebaseResult raise @bit.GitError {
   let provider_ref : Ref[@llmlib.BoxedProvider?] = { val: options.provider }
-  let skip_result = @gitlib.rebase_skip(fs, rfs, root)
+  let skip_result = @bitlib.rebase_skip(fs, rfs, root)
   continue_until_non_conflict(fs, rfs, root, skip_result, options, provider_ref)
 }
 
 ///|
 pub fn ai_rebase_abort(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
-) -> Unit raise @git.GitError {
-  @gitlib.rebase_abort(fs, rfs, root)
+) -> Unit raise @bit.GitError {
+  @bitlib.rebase_abort(fs, rfs, root)
 }

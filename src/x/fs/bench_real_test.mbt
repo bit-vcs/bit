@@ -31,9 +31,9 @@ fn get_bench_git_dir() -> String {
 ///|
 /// Get HEAD commit ID from the real repository
 fn get_head_commit(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
-) -> @git.ObjectId raise @git.GitError {
+) -> @bit.ObjectId raise @bit.GitError {
   let head_path = git_dir + "/HEAD"
   let head_content = fs.read_file(head_path)
   let head_str = @utf8.decode_lossy(head_content[:]).trim().to_string()
@@ -46,9 +46,9 @@ fn get_head_commit(
     let ref_path = git_dir + "/" + ref_name
     let ref_content = fs.read_file(ref_path)
     let ref_str = @utf8.decode_lossy(ref_content[:]).trim().to_string()
-    @git.ObjectId::from_hex(ref_str)
+    @bit.ObjectId::from_hex(ref_str)
   } else {
-    @git.ObjectId::from_hex(head_str)
+    @bit.ObjectId::from_hex(head_str)
   }
 }
 
@@ -115,7 +115,7 @@ let bench_real_osfs : @osfs.OsFs = @osfs.OsFs::new()
 let bench_real_git_dir : String = get_bench_git_dir()
 
 ///|
-fn with_real_commit(f : (@git.ObjectId) -> Unit) -> Unit {
+fn with_real_commit(f : (@bit.ObjectId) -> Unit) -> Unit {
   if not(bench_git_dir_exists()) {
     println("Skipping: bench git dir not found")
     return

@@ -3,37 +3,37 @@
 ///|
 pub enum HeadRef {
   Branch(String)
-  Detached(@git.ObjectId)
+  Detached(@bit.ObjectId)
 }
 
 ///|
 pub struct BranchInfo {
   name : String
-  id : @git.ObjectId
+  id : @bit.ObjectId
   current : Bool
 }
 
 ///|
-fn resolve_worktree_git_dir(fs : &@git.RepoFileSystem, root : String) -> String {
-  let git_path = join_path(root, ".git")
-  if fs.is_dir(git_path) {
-    git_path
-  } else if fs.is_file(git_path) {
-    resolve_gitdir(fs, git_path)
+fn resolve_worktree_git_dir(fs : &@bit.RepoFileSystem, root : String) -> String {
+  let bit_path = join_path(root, ".git")
+  if fs.is_dir(bit_path) {
+    bit_path
+  } else if fs.is_file(bit_path) {
+    resolve_gitdir(fs, bit_path)
   } else if fs.is_file(join_path(root, "HEAD")) &&
     fs.is_dir(join_path(root, "objects")) {
     root
   } else {
-    git_path
+    bit_path
   }
 }
 
 ///|
 /// Read HEAD and return its reference.
 pub fn read_head_ref(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
-) -> HeadRef raise @git.GitError {
+) -> HeadRef raise @bit.GitError {
   let head_path = join_path(git_dir, "HEAD")
   let line = read_ref_line(fs, head_path)
   if line.has_prefix("ref: ") {
@@ -45,7 +45,7 @@ pub fn read_head_ref(
     }
     HeadRef::Branch(name)
   } else {
-    let id = @git.ObjectId::from_hex(line)
+    let id = @bit.ObjectId::from_hex(line)
     HeadRef::Detached(id)
   }
 }
@@ -53,11 +53,11 @@ pub fn read_head_ref(
 ///|
 /// List local branches with current flag.
 pub fn list_branches(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
-) -> (HeadRef, Array[BranchInfo]) raise @git.GitError {
+) -> (HeadRef, Array[BranchInfo]) raise @bit.GitError {
   let head = read_head_ref(fs, git_dir)
-  let map : Map[String, @git.ObjectId] = {}
+  let map : Map[String, @bit.ObjectId] = {}
   let heads_dir = join_path(git_dir, "refs/heads")
   if fs.is_dir(heads_dir) {
     collect_loose_heads(fs, heads_dir, "", map)
@@ -82,14 +82,14 @@ pub fn list_branches(
 ///|
 /// Format like `git branch` output.
 pub fn list_branches_text(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
-) -> Array[String] raise @git.GitError {
+) -> Array[String] raise @bit.GitError {
   let (head, branches) = list_branches(fs, git_dir)
   let lines : Array[String] = []
   match head {
     Detached(id) => {
-      let short = @githash.short_hex(id.to_hex(), 7)
+      let short = @bithash.short_hex(id.to_hex(), 7)
       lines.push("* (HEAD detached at \{short})")
     }
     Branch(_) => ()
@@ -104,9 +104,9 @@ pub fn list_branches_text(
 ///|
 /// List branches with commit hash (verbose mode).
 pub fn list_branches_verbose(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
-) -> Array[String] raise @git.GitError {
+) -> Array[String] raise @bit.GitError {
   let lines : Array[String] = []
   let (head, branches) = list_branches(fs, git_dir)
   for b in branches {
@@ -123,7 +123,7 @@ pub fn list_branches_verbose(
 ///|
 /// List remote tracking branches.
 pub fn list_remote_branches(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> Array[String] {
   let lines : Array[String] = []
@@ -139,7 +139,7 @@ pub fn list_remote_branches(
 
 ///|
 fn collect_remote_refs(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   base_dir : String,
   prefix : String,
   out : Array[String],
@@ -159,11 +159,11 @@ fn collect_remote_refs(
 ///|
 /// Create a local branch pointing at current HEAD.
 pub fn create_branch(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   name : String,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let git_dir = resolve_worktree_git_dir(rfs, root)
   let refname = branch_ref_name(name)
   let ref_path = join_path(git_dir, refname)
@@ -179,12 +179,12 @@ pub fn create_branch(
 ///|
 /// Create a local branch pointing at a specific commit.
 pub fn create_branch_at(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   name : String,
-  commit_id : @git.ObjectId,
-) -> Unit raise @git.GitError {
+  commit_id : @bit.ObjectId,
+) -> Unit raise @bit.GitError {
   let git_dir = resolve_worktree_git_dir(rfs, root)
   let refname = branch_ref_name(name)
   let ref_path = join_path(git_dir, refname)
@@ -195,7 +195,7 @@ pub fn create_branch_at(
 }
 
 ///|
-fn is_directory_empty(rfs : &@git.RepoFileSystem, path : String) -> Bool {
+fn is_directory_empty(rfs : &@bit.RepoFileSystem, path : String) -> Bool {
   let entries = rfs.readdir(path) catch { _ => return false }
   for entry in entries {
     if entry != "." && entry != ".." {
@@ -207,8 +207,8 @@ fn is_directory_empty(rfs : &@git.RepoFileSystem, path : String) -> Bool {
 
 ///|
 fn prune_empty_ref_parent_dirs(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   ref_path : String,
   stop_dir : String,
 ) -> Unit {
@@ -232,18 +232,18 @@ fn prune_empty_ref_parent_dirs(
 ///|
 /// Delete a local branch. Fails if it's the current branch.
 pub fn delete_branch(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   name : String,
   force? : Bool = false,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let git_dir = resolve_worktree_git_dir(rfs, root)
   let head = read_head_ref(rfs, git_dir)
   match head {
     Branch(current) =>
       if current == name {
-        raise @git.GitError::InvalidObject(
+        raise @bit.GitError::InvalidObject(
           "Cannot delete branch '\{name}' checked out at '\{root}'",
         )
       }
@@ -256,19 +256,19 @@ pub fn delete_branch(
     resolve_packed_ref(rfs, join_path(git_dir, "packed-refs"), refname)
     is Some(_)
   if not(exists) {
-    raise @git.GitError::InvalidObject("branch '\{name}' not found")
+    raise @bit.GitError::InvalidObject("branch '\{name}' not found")
   }
   // Check if branch is fully merged (unless force)
   if not(force) {
     let head_commit = resolve_head_commit(rfs, git_dir)
     let branch_id = match resolve_ref(rfs, git_dir, refname) {
       Some(id) => id
-      None => raise @git.GitError::InvalidObject("branch '\{name}' not found")
+      None => raise @bit.GitError::InvalidObject("branch '\{name}' not found")
     }
     match head_commit {
       Some(head_id) =>
         if not(is_ancestor_of(rfs, git_dir, branch_id, head_id)) {
-          raise @git.GitError::InvalidObject(
+          raise @bit.GitError::InvalidObject(
             "The branch '\{name}' is not fully merged.\nIf you are sure you want to delete it, run 'git branch -D \{name}'.",
           )
         }
@@ -295,13 +295,13 @@ pub fn delete_branch(
 ///|
 /// Rename a local branch.
 pub fn rename_branch(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   old_name : String,
   new_name : String,
   force? : Bool = false,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let git_dir = resolve_worktree_git_dir(rfs, root)
   let old_ref = branch_ref_name(old_name)
   let new_ref = branch_ref_name(new_name)
@@ -309,14 +309,14 @@ pub fn rename_branch(
   let new_path = join_path(git_dir, new_ref)
   let old_id = match resolve_ref(rfs, git_dir, old_ref) {
     Some(id) => id
-    None => raise @git.GitError::InvalidObject("branch '\{old_name}' not found")
+    None => raise @bit.GitError::InvalidObject("branch '\{old_name}' not found")
   }
   let packed_path = join_path(git_dir, "packed-refs")
   let new_exists = rfs.is_file(new_path) ||
     resolve_packed_ref(rfs, packed_path, new_ref) is Some(_)
   if new_exists {
     if not(force) {
-      raise @git.GitError::InvalidObject("branch '\{new_name}' already exists")
+      raise @bit.GitError::InvalidObject("branch '\{new_name}' already exists")
     }
     if rfs.is_file(new_path) {
       fs.remove_file(new_path)
@@ -356,11 +356,11 @@ pub fn rename_branch(
 
 ///|
 fn remove_from_packed_refs(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   packed_path : String,
   refname : String,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let text = @utf8.decode_lossy(rfs.read_file(packed_path)[:])
   let lines : Array[String] = []
   let mut found = false
@@ -400,13 +400,13 @@ fn remove_from_packed_refs(
 ///|
 /// Switch HEAD to a branch, optionally creating it and checking out files.
 pub fn switch_branch(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : String,
   name : String,
   create? : Bool = false,
   checkout_files? : Bool = true,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let git_dir = resolve_worktree_git_dir(rfs, root)
   let refname = branch_ref_name(name)
   let ref_path = join_path(git_dir, refname)
@@ -414,7 +414,7 @@ pub fn switch_branch(
     create_branch(fs, rfs, root, name)
   } else if not(rfs.is_file(ref_path)) {
     match resolve_ref(rfs, git_dir, refname) {
-      None => raise @git.GitError::InvalidObject("Invalid ref: \{name}")
+      None => raise @bit.GitError::InvalidObject("Invalid ref: \{name}")
       Some(_) => ()
     }
   }
@@ -429,10 +429,10 @@ pub fn switch_branch(
 ///|
 /// Resolve a ref to an object id.
 pub fn resolve_ref(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
   refname : String,
-) -> @git.ObjectId? raise @git.GitError {
+) -> @bit.ObjectId? raise @bit.GitError {
   let normalized = normalize_repo_path(refname) catch {
     _ => return None
   }
@@ -441,7 +441,7 @@ pub fn resolve_ref(
 
 ///|
 fn resolve_ref_commondir(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> String? {
   let commondir_path = join_path(git_dir, "commondir")
@@ -460,11 +460,11 @@ fn resolve_ref_commondir(
 
 ///|
 fn resolve_ref_inner(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
   refname : String,
   depth : Int,
-) -> @git.ObjectId? raise @git.GitError {
+) -> @bit.ObjectId? raise @bit.GitError {
   let refname = normalize_repo_path(refname) catch {
     _ => return None
   }
@@ -499,11 +499,11 @@ fn resolve_ref_inner(
 
 ///|
 fn collect_loose_heads(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   dir : String,
   prefix : String,
-  out : Map[String, @git.ObjectId],
-) -> Unit raise @git.GitError {
+  out : Map[String, @bit.ObjectId],
+) -> Unit raise @bit.GitError {
   let entries = fs.readdir(dir)
   for name in entries {
     let path = join_path(dir, name)
@@ -522,10 +522,10 @@ fn collect_loose_heads(
 
 ///|
 fn collect_packed_heads(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   packed_path : String,
-  out : Map[String, @git.ObjectId],
-) -> Unit raise @git.GitError {
+  out : Map[String, @bit.ObjectId],
+) -> Unit raise @bit.GitError {
   let text = @utf8.decode_lossy(fs.read_file(packed_path)[:])
   for line_view in text.split("\n") {
     let line = trim_line(line_view.to_string())
@@ -568,9 +568,9 @@ fn collect_packed_heads(
 }
 
 ///|
-fn branch_ref_name(name : String) -> String raise @git.GitError {
+fn branch_ref_name(name : String) -> String raise @bit.GitError {
   let normalized = normalize_repo_path(name) catch {
-    _ => raise @git.GitError::InvalidObject("invalid branch name: " + name)
+    _ => raise @bit.GitError::InvalidObject("invalid branch name: " + name)
   }
   if normalized.has_prefix("refs/heads/") {
     normalized
@@ -580,9 +580,9 @@ fn branch_ref_name(name : String) -> String raise @git.GitError {
 }
 
 ///|
-fn normalize_tag_ref(name : String) -> String raise @git.GitError {
+fn normalize_tag_ref(name : String) -> String raise @bit.GitError {
   let normalized = normalize_repo_path(name) catch {
-    _ => raise @git.GitError::InvalidObject("invalid tag name: " + name)
+    _ => raise @bit.GitError::InvalidObject("invalid tag name: " + name)
   }
   if normalized.has_prefix("refs/tags/") {
     normalized
@@ -593,10 +593,10 @@ fn normalize_tag_ref(name : String) -> String raise @git.GitError {
 
 ///|
 fn resolve_packed_ref(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   packed_path : String,
   refname : String,
-) -> @git.ObjectId? raise @git.GitError {
+) -> @bit.ObjectId? raise @bit.GitError {
   let text = @utf8.decode_lossy(fs.read_file(packed_path)[:])
   for line_view in text.split("\n") {
     let line = trim_line(line_view.to_string())
@@ -629,20 +629,20 @@ fn resolve_packed_ref(
 }
 
 ///|
-fn parse_ref_object_id(hex : String) -> @git.ObjectId? raise @git.GitError {
+fn parse_ref_object_id(hex : String) -> @bit.ObjectId? raise @bit.GitError {
   // lib/object currently represents only SHA-1 ObjectId values.
   // Treat SHA-256 refs as unresolved so callers can degrade gracefully.
   if hex.length() == 64 {
     return None
   }
-  Some(@git.ObjectId::from_hex(hex))
+  Some(@bit.ObjectId::from_hex(hex))
 }
 
 ///|
 fn read_ref_line(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   path : String,
-) -> String raise @git.GitError {
+) -> String raise @bit.GitError {
   let text = @utf8.decode_lossy(fs.read_file(path)[:])
   for line_view in text.split("\n") {
     let line = trim_line(line_view.to_string())
@@ -650,7 +650,7 @@ fn read_ref_line(
       return line
     }
   }
-  raise @git.GitError::InvalidObject("Empty ref: \{path}")
+  raise @bit.GitError::InvalidObject("Empty ref: \{path}")
 }
 
 ///|
@@ -664,7 +664,7 @@ fn trim_line(line : String) -> String {
 
 ///|
 /// List all tags.
-pub fn list_tags(fs : &@git.RepoFileSystem, git_dir : String) -> Array[String] {
+pub fn list_tags(fs : &@bit.RepoFileSystem, git_dir : String) -> Array[String] {
   let tags : Array[String] = []
   let refs_dir = join_path(git_dir, "refs/tags")
   if fs.is_dir(refs_dir) {
@@ -681,7 +681,7 @@ pub fn list_tags(fs : &@git.RepoFileSystem, git_dir : String) -> Array[String] {
 
 ///|
 fn collect_tag_names(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   dir : String,
   prefix : String,
   out : Array[String],
@@ -702,7 +702,7 @@ fn collect_tag_names(
 
 ///|
 fn collect_packed_tags(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   packed_path : String,
   out : Array[String],
 ) -> Unit {
@@ -741,10 +741,10 @@ fn collect_packed_tags(
 ///|
 /// Delete a tag.
 pub fn delete_tag(
-  fs : &@git.FileSystem,
+  fs : &@bit.FileSystem,
   git_dir : String,
   name : String,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let refname = normalize_tag_ref(name)
   let ref_path = join_path(git_dir, refname)
   fs.remove_file(ref_path)
@@ -753,11 +753,11 @@ pub fn delete_tag(
 ///|
 /// Create a lightweight tag.
 pub fn create_lightweight_tag(
-  fs : &@git.FileSystem,
+  fs : &@bit.FileSystem,
   git_dir : String,
   name : String,
-  target : @git.ObjectId,
-) -> Unit raise @git.GitError {
+  target : @bit.ObjectId,
+) -> Unit raise @bit.GitError {
   let tags_dir = join_path(git_dir, "refs/tags")
   fs.mkdir_p(tags_dir)
   let refname = normalize_tag_ref(name)
@@ -768,31 +768,31 @@ pub fn create_lightweight_tag(
 ///|
 /// Create an annotated tag.
 pub fn create_annotated_tag(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   name : String,
-  target : @git.ObjectId,
+  target : @bit.ObjectId,
   message : String,
   tagger : String,
   timestamp : Int64,
   timezone? : String = "+0000",
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let db = ObjectDb::load(rfs, git_dir)
   let target_obj = db.get(rfs, target)
   guard target_obj is Some(obj) else {
-    raise @git.GitError::InvalidObject("unknown object: \{target.to_hex()}")
+    raise @bit.GitError::InvalidObject("unknown object: \{target.to_hex()}")
   }
   let target_type = match obj.obj_type {
-    @git.ObjectType::Blob => "blob"
-    @git.ObjectType::Tree => "tree"
-    @git.ObjectType::Commit => "commit"
-    @git.ObjectType::Tag => "tag"
+    @bit.ObjectType::Blob => "blob"
+    @bit.ObjectType::Tree => "tree"
+    @bit.ObjectType::Commit => "commit"
+    @bit.ObjectType::Tag => "tag"
   }
   // Create tag object
   let tag_content = "object \{target.to_hex()}\ntype \{target_type}\ntag \{name}\ntagger \{tagger} \{timestamp} \{timezone}\n\n\{message}\n"
   let tag_bytes = @utf8.encode(tag_content)
-  let (tag_id, compressed) = @git.create_object(@git.ObjectType::Tag, tag_bytes)
+  let (tag_id, compressed) = @bit.create_object(@bit.ObjectType::Tag, tag_bytes)
   write_object_bytes(fs, git_dir, tag_id, compressed)
   // Create ref pointing to tag object
   let tags_dir = join_path(git_dir, "refs/tags")
@@ -805,10 +805,10 @@ pub fn create_annotated_tag(
 ///|
 /// Check if `ancestor` is an ancestor of `descendant` via BFS.
 pub fn is_ancestor_of(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
-  ancestor : @git.ObjectId,
-  descendant : @git.ObjectId,
+  ancestor : @bit.ObjectId,
+  descendant : @bit.ObjectId,
 ) -> Bool {
   if ancestor == descendant {
     return true
@@ -816,7 +816,7 @@ pub fn is_ancestor_of(
   let db = ObjectDb::load(fs, git_dir) catch { _ => return false }
   let ancestor_hex = ancestor.to_hex()
   let visited : Map[String, Bool] = {}
-  let queue : Array[@git.ObjectId] = [descendant]
+  let queue : Array[@bit.ObjectId] = [descendant]
   while queue.length() > 0 {
     let current = queue.pop()
     guard current is Some(cid) else { break }
@@ -831,7 +831,7 @@ pub fn is_ancestor_of(
     let obj = db.get(fs, cid) catch { _ => continue }
     match obj {
       Some(o) => {
-        let info = @git.parse_commit(o.data) catch { _ => continue }
+        let info = @bit.parse_commit(o.data) catch { _ => continue }
         for p in info.parents {
           queue.push(p)
         }

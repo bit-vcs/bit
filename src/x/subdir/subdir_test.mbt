@@ -3,7 +3,7 @@
 
 ///|
 test "subdir: extract_subdir_tree finds nested directory" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -26,12 +26,12 @@ test "subdir: extract_subdir_tree finds nested directory" {
     _ => return ()
   }
   // ツリーが見つかったことを確認
-  assert_true(tree_id != @git.ObjectId::zero())
+  assert_true(tree_id != @bit.ObjectId::zero())
 }
 
 ///|
 test "subdir: SubdirRepo::from_commit creates repo" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -57,7 +57,7 @@ test "subdir: SubdirRepo::from_commit creates repo" {
 
 ///|
 test "subdir: read file through Fs" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -82,7 +82,7 @@ test "subdir: read file through Fs" {
 
 ///|
 test "subdir: write file to working layer" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -113,7 +113,7 @@ test "subdir: write file to working layer" {
 
 ///|
 test "subdir: error on non-existent subdir" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -142,7 +142,7 @@ test "subdir: error on non-existent subdir" {
 
 ///|
 test "subdir: log returns commits that changed subdir" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -181,7 +181,7 @@ test "subdir: log returns commits that changed subdir" {
 
 ///|
 test "subdir: diff shows working changes" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -208,7 +208,7 @@ test "subdir: diff shows working changes" {
 
 ///|
 test "subdir: commit changes to parent repo" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -252,7 +252,7 @@ test "subdir: commit changes to parent repo" {
 
 ///|
 test "subdir: normalize path" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -287,7 +287,7 @@ test "subdir: normalize path" {
 
 ///|
 test "subdir: init creates config and marker files" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -309,7 +309,7 @@ test "subdir: init creates config and marker files" {
 
 ///|
 test "subdir: is_subdir_initialized returns correct status" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -327,7 +327,7 @@ test "subdir: is_subdir_initialized returns correct status" {
 
 ///|
 test "subdir: deinit removes config and marker files" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -369,7 +369,7 @@ test "subdir: generate_shell_rc contains git wrapper" {
 
 ///|
 test "subdir: init creates wrapper script with correct content" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -395,7 +395,7 @@ test "subdir: init creates wrapper script with correct content" {
 
 ///|
 test "subdir: config file contains correct settings" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -417,7 +417,7 @@ test "subdir: config file contains correct settings" {
 
 ///|
 test "subdir: marker file contains path info" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -437,7 +437,7 @@ test "subdir: marker file contains path info" {
 
 ///|
 test "subdir: get_subdir_info returns info for initialized subdir" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -464,7 +464,7 @@ test "subdir: get_subdir_info returns info for initialized subdir" {
 
 ///|
 test "subdir: full workflow init -> check -> deinit" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -498,7 +498,7 @@ test "subdir: full workflow init -> check -> deinit" {
 
 ///|
 test "subdir: nested path initialization" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -583,7 +583,7 @@ test "subdir: env vars have correct values" {
 
 ///|
 test "subdir: init with SubdirRepo integration" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -621,7 +621,7 @@ fn bytes_to_string_test(bytes : Bytes) -> String {
 
 ///|
 test "module: init creates git module structure" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -645,7 +645,7 @@ test "module: init creates git module structure" {
 
 ///|
 test "module: .git file contains correct gitdir path" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -662,7 +662,7 @@ test "module: .git file contains correct gitdir path" {
 
 ///|
 test "module: config contains worktree path" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -683,7 +683,7 @@ test "module: config contains worktree path" {
 
 ///|
 test "module: alternates points to parent objects" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -703,7 +703,7 @@ test "module: alternates points to parent objects" {
 
 ///|
 test "module: is_module_initialized returns correct status" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -720,7 +720,7 @@ test "module: is_module_initialized returns correct status" {
 
 ///|
 test "module: deinit removes module structure" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -739,7 +739,7 @@ test "module: deinit removes module structure" {
 
 ///|
 test "module: list_modules returns initialized modules" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -764,7 +764,7 @@ test "module: list_modules returns initialized modules" {
 
 ///|
 test "module: nested path creates correct structure" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -784,7 +784,7 @@ test "module: nested path creates correct structure" {
 
 ///|
 test "subdir: commit creates new commit in parent repo" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -832,7 +832,7 @@ test "subdir: commit creates new commit in parent repo" {
 
 ///|
 test "subdir: checkout retrieves files from specific commit" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -867,7 +867,7 @@ test "subdir: checkout retrieves files from specific commit" {
 
 ///|
 test "subdir: commit preserves files outside subdirectory" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -913,7 +913,7 @@ test "subdir: commit preserves files outside subdirectory" {
 
 ///|
 test "error: SubdirRepo from non-existent subdir" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -937,7 +937,7 @@ test "error: SubdirRepo from non-existent subdir" {
 
 ///|
 test "error: commit without changes" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -966,7 +966,7 @@ test "error: commit without changes" {
 
 ///|
 test "error: module init creates directories" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -984,7 +984,7 @@ test "error: module init creates directories" {
 
 ///|
 test "edge: empty subdirectory" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -1006,7 +1006,7 @@ test "edge: empty subdirectory" {
 
 ///|
 test "edge: very deep nesting (5 levels)" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -1029,7 +1029,7 @@ test "edge: very deep nesting (5 levels)" {
 
 ///|
 test "edge: module with very deep nesting" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -1052,7 +1052,7 @@ test "edge: module with very deep nesting" {
 
 ///|
 test "edge: path normalization variants" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -1075,7 +1075,7 @@ test "edge: path normalization variants" {
 
 ///|
 test "edge: single file in subdirectory" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -1100,7 +1100,7 @@ test "edge: single file in subdirectory" {
 
 ///|
 test "workflow: init -> commit -> checkout -> deinit" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -1155,7 +1155,7 @@ test "workflow: init -> commit -> checkout -> deinit" {
 
 ///|
 test "workflow: multiple commits in sequence" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -1204,7 +1204,7 @@ test "workflow: multiple commits in sequence" {
 
 ///|
 test "parallel: multiple modules independent operations" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -1257,7 +1257,7 @@ test "parallel: multiple modules independent operations" {
 
 ///|
 test "parallel: commit to one module preserves others" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -1308,7 +1308,7 @@ test "parallel: commit to one module preserves others" {
 
 ///|
 test "sync: sync_module updates HEAD" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -1338,7 +1338,7 @@ test "sync: sync_module updates HEAD" {
 
 ///|
 test "misc: log filters commits correctly" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -1375,7 +1375,7 @@ test "misc: log filters commits correctly" {
 
 ///|
 test "misc: diff shows only subdirectory changes" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -1398,7 +1398,7 @@ test "misc: diff shows only subdirectory changes" {
 
 ///|
 test "misc: multiple files in subdirectory" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -1423,7 +1423,7 @@ test "misc: multiple files in subdirectory" {
 
 ///|
 test "misc: subdirectory with nested directories" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -1449,7 +1449,7 @@ test "misc: subdirectory with nested directories" {
 
 ///|
 test "misc: commit with delete file" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -1499,7 +1499,7 @@ fn string_to_bytes_test(s : String) -> Bytes {
 
 ///|
 test "sparse: init_module_sparse enables sparse checkout" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -1524,7 +1524,7 @@ test "sparse: init_module_sparse enables sparse checkout" {
 
 ///|
 test "sparse: init_module_sparse with cone mode" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -1552,7 +1552,7 @@ test "sparse: init_module_sparse with cone mode" {
 
 ///|
 test "sparse: write and read patterns" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -1584,7 +1584,7 @@ test "sparse: write and read patterns" {
 
 ///|
 test "sparse: set_module_sparse_patterns replaces existing" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -1615,7 +1615,7 @@ test "sparse: set_module_sparse_patterns replaces existing" {
 
 ///|
 test "sparse: add_module_sparse_patterns appends without duplicates" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -1648,7 +1648,7 @@ test "sparse: add_module_sparse_patterns appends without duplicates" {
 
 ///|
 test "sparse: disable_module_sparse disables sparse checkout" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -1722,7 +1722,7 @@ test "sparse: matches_module_sparse with empty patterns includes all" {
 
 ///|
 test "sparse: init without module fails" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -1741,7 +1741,7 @@ test "sparse: init without module fails" {
 
 ///|
 test "sparse: read patterns from non-existent module returns empty" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -1752,7 +1752,7 @@ test "sparse: read patterns from non-existent module returns empty" {
 
 ///|
 test "sparse: is_module_sparse_enabled returns false for non-existent" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -1765,7 +1765,7 @@ test "sparse: is_module_sparse_enabled returns false for non-existent" {
 
 ///|
 test "module: init creates .gitmodules entry" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -1791,7 +1791,7 @@ test "module: init creates .gitmodules entry" {
 
 ///|
 test "module: init adds gitlink to index" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -1821,7 +1821,7 @@ test "module: init adds gitlink to index" {
 
 ///|
 test "module: init removes subdir files from index" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -1850,7 +1850,7 @@ test "module: init removes subdir files from index" {
 
 ///|
 test "module: deinit removes .gitmodules entry" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -1874,7 +1874,7 @@ test "module: deinit removes .gitmodules entry" {
 
 ///|
 test "module: deinit removes gitlink from index" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -1904,7 +1904,7 @@ test "module: deinit removes gitlink from index" {
 
 ///|
 test "module: multiple modules in gitmodules" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -1933,7 +1933,7 @@ test "module: multiple modules in gitmodules" {
 
 ///|
 test "module: deinit one of multiple modules" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   @lib.init_repo(fs, "/repo") catch {
     _ => ()
   }

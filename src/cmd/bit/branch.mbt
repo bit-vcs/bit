@@ -4,9 +4,9 @@ async fn handle_branch(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let git_dir = root + "/.git"
   let fs = OsFs::new()
-  let rfs : &@git.RepoFileSystem = fs
+  let rfs : &@bitcore.RepoFileSystem = fs
   let git_dir = if rfs.is_file(git_dir) {
-    @gitlib.resolve_gitdir(rfs, git_dir)
+    @bitlib.resolve_gitdir(rfs, git_dir)
   } else {
     git_dir
   }
@@ -118,10 +118,10 @@ async fn handle_branch(args : Array[String]) -> Unit raise Error {
       None => merge_ref = normalize_local_branch_ref(upstream)
         }
       }
-      @gitlib.set_config_key(
+      @bitlib.set_config_key(
         fs, fs, git_dir, "branch", branch_name, "remote", remote_name,
       )
-      @gitlib.set_config_key(
+      @bitlib.set_config_key(
         fs, fs, git_dir, "branch", branch_name, "merge", merge_ref,
       )
       return
@@ -130,7 +130,7 @@ async fn handle_branch(args : Array[String]) -> Unit raise Error {
   }
   match delete_branch {
     Some(name) => {
-      @gitlib.delete_branch(fs, fs, root, name, force=force_delete)
+      @bitlib.delete_branch(fs, fs, root, name, force=force_delete)
       print_line("Deleted branch \{name}")
     }
     None =>
@@ -141,7 +141,7 @@ async fn handle_branch(args : Array[String]) -> Unit raise Error {
               if from_name == to_name {
                 ()
               } else {
-                @gitlib.rename_branch(
+                @bitlib.rename_branch(
                   fs,
                   fs,
                   root,
@@ -158,7 +158,7 @@ async fn handle_branch(args : Array[String]) -> Unit raise Error {
               Some(to_name) => {
                 let current = get_current_branch(fs, git_dir)
                 if current != to_name {
-                  @gitlib.rename_branch(
+                  @bitlib.rename_branch(
                     fs,
                     fs,
                     root,
@@ -181,7 +181,7 @@ async fn handle_branch(args : Array[String]) -> Unit raise Error {
                 }
     let refname = normalize_local_branch_ref(name)
                 if not(force_create) &&
-                  @gitlib.resolve_ref(fs, git_dir, refname) is Some(_) {
+                  @bitlib.resolve_ref(fs, git_dir, refname) is Some(_) {
                   @stdio.stderr.write(
                     "fatal: a branch named '\{name}' already exists",
                   )
@@ -189,15 +189,15 @@ async fn handle_branch(args : Array[String]) -> Unit raise Error {
                 }
                 match start_point {
                   Some(sp) => {
-                    let commit_id = @gitrepo.rev_parse(fs, git_dir, sp)
+                    let commit_id = @bitrepo.rev_parse(fs, git_dir, sp)
                     guard commit_id is Some(id) else {
-                      raise @git.GitError::InvalidObject(
+                      raise @bitcore.GitError::InvalidObject(
                         "unknown revision: \{sp}",
                       )
                     }
-                    @gitlib.create_branch_at(fs, fs, root, name, id)
+                    @bitlib.create_branch_at(fs, fs, root, name, id)
                   }
-                  None => @gitlib.create_branch(fs, fs, root, name)
+                  None => @bitlib.create_branch(fs, fs, root, name)
                 }
                 if track_upstream {
                   let upstream = match start_point {
@@ -226,10 +226,10 @@ async fn handle_branch(args : Array[String]) -> Unit raise Error {
                       None => merge_ref = normalize_local_branch_ref(upstream)
                     }
                   }
-                  @gitlib.set_config_key(
+                  @bitlib.set_config_key(
                     fs, fs, git_dir, "branch", name, "remote", remote_name,
                   )
-                  @gitlib.set_config_key(
+                  @bitlib.set_config_key(
                     fs, fs, git_dir, "branch", name, "merge", merge_ref,
                   )
                 }
@@ -239,9 +239,9 @@ async fn handle_branch(args : Array[String]) -> Unit raise Error {
                   // List local branches
                   if not(show_remotes) {
                     let lines = if verbose {
-                      @gitlib.list_branches_verbose(fs, git_dir)
+                      @bitlib.list_branches_verbose(fs, git_dir)
                     } else {
-                      @gitlib.list_branches_text(fs, git_dir)
+                      @bitlib.list_branches_text(fs, git_dir)
                     }
                     for line in lines {
                       print_line(line)
@@ -249,7 +249,7 @@ async fn handle_branch(args : Array[String]) -> Unit raise Error {
                   }
                   // List remote branches
                   if show_all || show_remotes {
-                    let remotes = @gitlib.list_remote_branches(fs, git_dir)
+                    let remotes = @bitlib.list_remote_branches(fs, git_dir)
                     for line in remotes {
                       print_line(line)
                     }
@@ -261,9 +261,9 @@ async fn handle_branch(args : Array[String]) -> Unit raise Error {
   }
 }
 
-fn normalize_local_branch_ref(name : String) -> String raise @git.GitError {
-  let normalized = @gitlib.normalize_repo_path(name) catch {
-    _ => raise @git.GitError::InvalidObject("invalid branch name: " + name)
+fn normalize_local_branch_ref(name : String) -> String raise @bitcore.GitError {
+  let normalized = @bitlib.normalize_repo_path(name) catch {
+    _ => raise @bitcore.GitError::InvalidObject("invalid branch name: " + name)
   }
   if normalized.has_prefix("refs/heads/") {
     normalized

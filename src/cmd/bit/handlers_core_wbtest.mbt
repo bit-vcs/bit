@@ -39,7 +39,7 @@ async test "core: init --bit creates .bit repository metadata directory" {
   assert_true(fs.is_file(path + "/.bit/HEAD"))
   let resolved = resolve_git_dir(fs, path)
   assert_eq(resolved, path + "/.bit")
-  let status = @gitlib.status(fs, path)
+  let status = @bitlib.status(fs, path)
   assert_eq(status.untracked.length(), 0)
   @sys.set_env_var("GIT_SHIM_CWD", path)
   @sys.set_env_var("GIT_SHIM_PWD", path)

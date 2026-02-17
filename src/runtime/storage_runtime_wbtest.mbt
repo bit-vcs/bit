@@ -152,7 +152,7 @@ fn storage_runtime_wbtest_hash_object_command(
   paths : Array[String],
   write_object? : Bool = false,
   stdin_mode? : Bool = false,
-  obj_type? : @git.ObjectType = @git.ObjectType::Blob,
+  obj_type? : @bit.ObjectType = @bit.ObjectType::Blob,
 ) -> StorageCommand {
   StorageCommand::HashObject({ write_object, stdin_mode, obj_type, paths })
 }
@@ -176,7 +176,7 @@ fn storage_runtime_wbtest_update_ref_command(
 
 ///|
 test "storage runtime: init/add/commit/status/log on TestFs" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   let root = "/repo-storage-runtime-basic"
   let prev_quiet = setup_storage_runtime_quiet_for_wbtest()
   let (
@@ -233,7 +233,7 @@ test "storage runtime: init/add/commit/status/log on TestFs" {
 
 ///|
 test "storage runtime: hash-object -w and write-tree work on TestFs" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   let root = "/repo-storage-runtime-objects"
   let prev_quiet = setup_storage_runtime_quiet_for_wbtest()
   run_storage_command(fs, fs, root, storage_runtime_wbtest_init_command()) catch {
@@ -256,8 +256,8 @@ test "storage runtime: hash-object -w and write-tree work on TestFs" {
   ) catch {
     err => fail("hash-object failed: \{err}")
   }
-  let blob_id = @git.hash_object_content(
-    @git.ObjectType::Blob,
+  let blob_id = @bit.hash_object_content(
+    @bit.ObjectType::Blob,
     fs.read_file(root + "/blob.txt"),
   )
   let blob_hex = blob_id.to_hex()
@@ -275,7 +275,7 @@ test "storage runtime: hash-object -w and write-tree work on TestFs" {
 
 ///|
 test "storage runtime: update-ref create and delete on TestFs" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   let root = "/repo-storage-runtime-update-ref"
   let prev_quiet = setup_storage_runtime_quiet_for_wbtest()
   let (
@@ -305,11 +305,11 @@ test "storage runtime: update-ref create and delete on TestFs" {
     err => fail("commit failed: \{err}")
   }
   let git_dir = root + "/.git"
-  let head_id = match @gitrepo.rev_parse(fs, git_dir, "HEAD") {
+  let head_id = match @bitrepo.rev_parse(fs, git_dir, "HEAD") {
     Some(id) => id
     None => {
       fail("HEAD not found")
-      @git.ObjectId::zero()
+      @bit.ObjectId::zero()
     }
   }
   run_storage_command(
@@ -355,7 +355,7 @@ test "storage runtime: update-ref create and delete on TestFs" {
 
 ///|
 test "storage runtime: add without pathspec is rejected" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   let root = "/repo-storage-runtime-add-no-pathspec"
   let prev_quiet = setup_storage_runtime_quiet_for_wbtest()
   run_storage_command(fs, fs, root, storage_runtime_wbtest_init_command()) catch {
@@ -373,7 +373,7 @@ test "storage runtime: add without pathspec is rejected" {
 
 ///|
 test "storage runtime: commit without message is rejected" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   let root = "/repo-storage-runtime-no-message"
   let prev_quiet = setup_storage_runtime_quiet_for_wbtest()
   run_storage_command(fs, fs, root, storage_runtime_wbtest_init_command()) catch {
@@ -405,7 +405,7 @@ test "storage runtime: commit without message is rejected" {
 
 ///|
 test "storage runtime: status porcelain lines report unstaged and untracked" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   let root = "/repo-storage-runtime-status-lines"
   let prev_quiet = setup_storage_runtime_quiet_for_wbtest()
   let (
@@ -454,7 +454,7 @@ test "storage runtime: status porcelain lines report unstaged and untracked" {
 
 ///|
 test "storage runtime: status porcelain branch line" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   let root = "/repo-storage-runtime-status-branch"
   let prev_quiet = setup_storage_runtime_quiet_for_wbtest()
   let (
@@ -501,7 +501,7 @@ test "storage runtime: status porcelain branch line" {
 
 ///|
 test "storage runtime: status porcelain branch mode includes branch and changes" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   let root = "/repo-storage-runtime-status-branch-change"
   let prev_quiet = setup_storage_runtime_quiet_for_wbtest()
   let (
@@ -550,7 +550,7 @@ test "storage runtime: status porcelain branch mode includes branch and changes"
 
 ///|
 test "storage runtime: status porcelain detached head branch line" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   let root = "/repo-storage-runtime-status-detached"
   let prev_quiet = setup_storage_runtime_quiet_for_wbtest()
   let (
@@ -604,7 +604,7 @@ test "storage runtime: status porcelain detached head branch line" {
 
 ///|
 test "storage runtime: status porcelain reports MM for staged and unstaged change" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   let root = "/repo-storage-runtime-status-mm"
   let prev_quiet = setup_storage_runtime_quiet_for_wbtest()
   let (
@@ -660,7 +660,7 @@ test "storage runtime: status porcelain reports MM for staged and unstaged chang
 
 ///|
 test "storage runtime: status porcelain lines report staged add modify delete" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   let root = "/repo-storage-runtime-status-staged"
   let prev_quiet = setup_storage_runtime_quiet_for_wbtest()
   let (
@@ -741,7 +741,7 @@ test "storage runtime: status porcelain lines report staged add modify delete" {
 
 ///|
 test "storage runtime: add -A stages untracked modified deleted" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   let root = "/repo-storage-runtime-add-all"
   let prev_quiet = setup_storage_runtime_quiet_for_wbtest()
   let (
@@ -803,7 +803,7 @@ test "storage runtime: add -A stages untracked modified deleted" {
 
 ///|
 test "storage runtime: commit -a stages tracked only" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   let root = "/repo-storage-runtime-commit-all-modified"
   let prev_quiet = setup_storage_runtime_quiet_for_wbtest()
   let (
@@ -850,7 +850,7 @@ test "storage runtime: commit -a stages tracked only" {
   }
   assert_true(storage_runtime_wbtest_has_line(lines, "?? untracked.txt"))
   assert_false(storage_runtime_wbtest_has_line(lines, " M tracked.txt"))
-  let log_lines = @gitlib.log_head_oneline(fs, root + "/.git", max_count=1)
+  let log_lines = @bitlib.log_head_oneline(fs, root + "/.git", max_count=1)
   assert_true(log_lines[0].contains("auto stage"))
   restore_identity_for_storage_runtime_wbtest(
     prev_author_name, prev_author_email, prev_committer_name, prev_committer_email,

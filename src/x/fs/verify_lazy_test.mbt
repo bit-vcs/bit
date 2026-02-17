@@ -22,9 +22,9 @@ test "verify: lazy loading on helix repo" {
     let ref_path = git_dir + "/" + ref_name
     let ref_content = osfs.read_file(ref_path)
     let ref_str = @utf8.decode_lossy(ref_content[:]).trim().to_string()
-    @git.ObjectId::from_hex(ref_str)
+    @bit.ObjectId::from_hex(ref_str)
   } else {
-    @git.ObjectId::from_hex(head_str)
+    @bit.ObjectId::from_hex(head_str)
   }
   println("HEAD: \{commit_id}")
 
@@ -104,14 +104,14 @@ test "verify: lazy loading on this repo" {
     if osfs.is_file(ref_path) {
       let ref_content = osfs.read_file(ref_path)
       let ref_str = @utf8.decode_lossy(ref_content[:]).trim().to_string()
-      @git.ObjectId::from_hex(ref_str)
+      @bit.ObjectId::from_hex(ref_str)
     } else {
       // Packed ref - skip for now
       println("Skipping: packed ref")
       return
     }
   } else {
-    @git.ObjectId::from_hex(head_str)
+    @bit.ObjectId::from_hex(head_str)
   }
   println("HEAD: \{commit_id}")
   let bitfs = Fs::from_commit(osfs, git_dir, commit_id)

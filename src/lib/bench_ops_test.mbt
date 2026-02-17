@@ -8,8 +8,8 @@
 let bench_ops_root : String = "/bench_ops"
 
 ///|
-fn setup_add_repo(file_count : Int) -> @git.TestFs {
-  let fs = @git.TestFs::new()
+fn setup_add_repo(file_count : Int) -> @bit.TestFs {
+  let fs = @bit.TestFs::new()
   ignore(try? init_repo(fs, bench_ops_root))
   for i in 0..<file_count {
     fs.write_string(bench_ops_root + "/file_\{i}.txt", "content \{i}\n")
@@ -18,8 +18,8 @@ fn setup_add_repo(file_count : Int) -> @git.TestFs {
 }
 
 ///|
-fn setup_commit_repo(file_count : Int) -> @git.TestFs raise @git.GitError {
-  let fs = @git.TestFs::new()
+fn setup_commit_repo(file_count : Int) -> @bit.TestFs raise @bit.GitError {
+  let fs = @bit.TestFs::new()
   ignore(try? init_repo(fs, bench_ops_root))
   for i in 0..<file_count {
     fs.write_string(bench_ops_root + "/file_\{i}.txt", "content \{i}\n")
@@ -29,8 +29,8 @@ fn setup_commit_repo(file_count : Int) -> @git.TestFs raise @git.GitError {
 }
 
 ///|
-fn setup_checkout_repo(file_count : Int) -> @git.TestFs raise @git.GitError {
-  let fs = @git.TestFs::new()
+fn setup_checkout_repo(file_count : Int) -> @bit.TestFs raise @bit.GitError {
+  let fs = @bit.TestFs::new()
   ignore(try? init_repo(fs, bench_ops_root))
   for i in 0..<file_count {
     fs.write_string(bench_ops_root + "/file_\{i}.txt", "content \{i}\n")

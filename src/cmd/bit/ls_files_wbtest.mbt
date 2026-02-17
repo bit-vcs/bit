@@ -60,10 +60,10 @@ test "ls-files: has matching file under directory" {
 }
 
 ///|
-fn ls_files_entry(path : String) -> @gitlib.IndexEntry {
-  @gitlib.IndexEntry::new(
+fn ls_files_entry(path : String) -> @bitlib.IndexEntry {
+  @bitlib.IndexEntry::new(
     path,
-    @git.ObjectId::new(FixedArray::make(20, b'\x00')),
+    @bitcore.ObjectId::new(FixedArray::make(20, b'\x00')),
     0,
     0,
   )

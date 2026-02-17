@@ -32,8 +32,8 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
     }
     i += 1
   }
-  let rfs : &@git.RepoFileSystem = fs
-  let wfs : &@git.FileSystem = fs
+  let rfs : &@bitcore.RepoFileSystem = fs
+  let wfs : &@bitcore.FileSystem = fs
   let revert_head_path = git_dir + "/REVERT_HEAD"
   let merge_msg_path = git_dir + "/MERGE_MSG"
   let orig_head_path = git_dir + "/ORIG_HEAD"
@@ -50,7 +50,7 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
         " \t\r\n",
       )
       // Reset to ORIG_HEAD
-      ignore(@gitlib.reset(wfs, rfs, root, orig_hex, @gitlib.ResetMode::Hard))
+      ignore(@bitlib.reset(wfs, rfs, root, orig_hex, @bitlib.ResetMode::Hard))
       wfs.remove_file(orig_head_path) catch {
         err if @async.is_cancellation_error(err) => raise err
         _ => ()
@@ -84,7 +84,7 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
       _ => ()
     }
     // Reset index to HEAD
-    ignore(@gitlib.reset(wfs, rfs, root, "HEAD", @gitlib.ResetMode::Mixed))
+    ignore(@bitlib.reset(wfs, rfs, root, "HEAD", @bitlib.ResetMode::Mixed))
     print_line("Revert skipped.")
     return
   }
@@ -103,7 +103,7 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
     // Create the commit
     let author = get_author_string()
     let timestamp = get_commit_timestamp()
-    let new_commit_id = @gitlib.commit(wfs, rfs, root, msg, author, timestamp)
+    let new_commit_id = @bitlib.commit(wfs, rfs, root, msg, author, timestamp)
     let short_id = (try! new_commit_id.to_hex()[:7]).to_string()
     let first_line = match msg.find("\n") {
       Some(idx) => String::unsafe_substring(msg, start=0, end=idx)
@@ -127,7 +127,7 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
   }
   // Normal revert
   if commits.length() == 0 {
-    raise @git.GitError::InvalidObject("usage: git revert <commit>...")
+    raise @bitcore.GitError::InvalidObject("usage: git revert <commit>...")
   }
   // Check if revert already in progress
   if rfs.is_file(revert_head_path) {
@@ -137,39 +137,39 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
     @sys.exit(1)
   }
   // Save ORIG_HEAD
-  let current_head = @gitlib.resolve_head_commit(rfs, git_dir)
+  let current_head = @bitlib.resolve_head_commit(rfs, git_dir)
   if current_head is Some(hid) {
     wfs.write_string(orig_head_path, hid.to_hex() + "\n")
   }
-  let db = @gitlib.ObjectDb::load(rfs, git_dir)
+  let db = @bitlib.ObjectDb::load(rfs, git_dir)
   for commit_ref in commits {
     // Resolve commit
-    let commit_id = @gitrepo.rev_parse(rfs, git_dir, commit_ref)
+    let commit_id = @bitrepo.rev_parse(rfs, git_dir, commit_ref)
     guard commit_id is Some(cid) else {
-      raise @git.GitError::InvalidObject("unknown revision: \{commit_ref}")
+      raise @bitcore.GitError::InvalidObject("unknown revision: \{commit_ref}")
     }
     // Load commit
     let obj = db.get(rfs, cid)
     guard obj is Some(o) else {
-      raise @git.GitError::InvalidObject("commit not found: \{cid.to_hex()}")
+      raise @bitcore.GitError::InvalidObject("commit not found: \{cid.to_hex()}")
     }
-    let commit_info = @git.parse_commit(o.data)
+    let commit_info = @bitcore.parse_commit(o.data)
     // Get parent (for merge commits, use mainline)
-    let parent_id : @git.ObjectId? = if commit_info.parents.length() == 0 {
+    let parent_id : @bitcore.ObjectId? = if commit_info.parents.length() == 0 {
       None
     } else if commit_info.parents.length() > 1 {
       // Merge commit
       match mainline {
         Some(m) =>
           if m < 1 || m > commit_info.parents.length() {
-            raise @git.GitError::InvalidObject(
+            raise @bitcore.GitError::InvalidObject(
               "mainline must be 1..\{commit_info.parents.length()}",
             )
           } else {
             Some(commit_info.parents[m - 1])
           }
         None =>
-          raise @git.GitError::InvalidObject(
+          raise @bitcore.GitError::InvalidObject(
             "commit is a merge, -m option required",
           )
       }
@@ -177,9 +177,9 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
       Some(commit_info.parents[0])
     }
     // Get trees for commit and parent
-    let commit_files = @gitlib.collect_tree_files_from_commit(db, rfs, cid)
-    let parent_files : Map[String, @gitlib.TreeFileEntry] = match parent_id {
-      Some(pid) => @gitlib.collect_tree_files_from_commit(db, rfs, pid)
+    let commit_files = @bitlib.collect_tree_files_from_commit(db, rfs, cid)
+    let parent_files : Map[String, @bitlib.TreeFileEntry] = match parent_id {
+      Some(pid) => @bitlib.collect_tree_files_from_commit(db, rfs, pid)
       None => {}
     }
     // Apply reverse changes
@@ -215,7 +215,7 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
         }
         wfs.write_file(abs_path, bo.data)
         // Add to index
-        @gitlib.add_paths_async(wfs, rfs, root, [path])
+        @bitlib.add_paths_async(wfs, rfs, root, [path])
       }
     }
     // Files that were modified in commit -> restore parent version
@@ -231,7 +231,7 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
               err if @async.is_cancellation_error(err) => raise err
               _ => b""
             }
-            let current_id = @git.hash_blob(current_content)
+            let current_id = @bitcore.hash_blob(current_content)
             if current_id.to_hex() != commit_entry.id.to_hex() {
               // Current file differs from commit, potential conflict
               @stdio.stderr.write("warning: \{path} has local modifications")
@@ -242,7 +242,7 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
             let blob_obj = db.get(rfs, parent_entry.id)
             guard blob_obj is Some(bo) else { continue }
             wfs.write_file(abs_path, bo.data)
-            @gitlib.add_paths_async(wfs, rfs, root, [path])
+            @bitlib.add_paths_async(wfs, rfs, root, [path])
           }
         None => ()
       }
@@ -270,7 +270,7 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
     if not(no_commit) {
       let author = get_author_string()
       let timestamp = get_commit_timestamp()
-      let new_commit_id = @gitlib.commit(
+      let new_commit_id = @bitlib.commit(
         wfs,
         rfs,
         root,
@@ -310,28 +310,28 @@ fn extract_commit_message(data : Bytes) -> String {
 
 ///|
 fn remove_from_index(
-  wfs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  wfs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   git_dir : String,
   path : String,
 ) -> Unit {
-  let entries = @gitlib.read_index_entries(rfs, git_dir) catch { _ => return }
-  let new_entries : Array[@gitlib.IndexEntry] = []
+  let entries = @bitlib.read_index_entries(rfs, git_dir) catch { _ => return }
+  let new_entries : Array[@bitlib.IndexEntry] = []
   for e in entries {
     if e.path != path {
       new_entries.push(e)
     }
   }
-  @gitlib.write_index_entries(wfs, git_dir, new_entries) catch {
+  @bitlib.write_index_entries(wfs, git_dir, new_entries) catch {
     _ => ()
   }
 }
 
 ///|
-fn normalize_notes_ref(ref_name : String?) -> String raise @git.GitError {
+fn normalize_notes_ref(ref_name : String?) -> String raise @bitcore.GitError {
   let name = ref_name.unwrap_or("commits")
-  let normalized = @gitlib.normalize_repo_path(name) catch {
-    _ => raise @git.GitError::InvalidObject("invalid notes ref: " + name)
+  let normalized = @bitlib.normalize_repo_path(name) catch {
+    _ => raise @bitcore.GitError::InvalidObject("invalid notes ref: " + name)
   }
   if normalized.has_prefix("refs/") {
     normalized

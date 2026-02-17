@@ -312,11 +312,11 @@ test "push porcelain: line format matches git style" {
 
 ///|
 test "push porcelain: classify new reference" {
-  let new_id = @git.ObjectId::from_hex(
+  let new_id = @bitcore.ObjectId::from_hex(
     "0123456789abcdef0123456789abcdef01234567",
   )
   let (flag, status) = classify_push_porcelain_success(
-    @git.ObjectId::zero(),
+    @bitcore.ObjectId::zero(),
     new_id,
     false,
     false,
@@ -327,10 +327,10 @@ test "push porcelain: classify new reference" {
 
 ///|
 test "push porcelain: classify non-fast-forward update marker" {
-  let old_id = @git.ObjectId::from_hex(
+  let old_id = @bitcore.ObjectId::from_hex(
     "0123456789abcdef0123456789abcdef01234567",
   )
-  let new_id = @git.ObjectId::from_hex(
+  let new_id = @bitcore.ObjectId::from_hex(
     "fedcba9876543210fedcba9876543210fedcba98",
   )
   let (flag, status) = classify_push_porcelain_success(
@@ -449,13 +449,13 @@ test "push deny-current: no checked-out worktree allows update" {
 
 ///|
 test "push transfer: tag that points to blob copies tagged blob object" {
-  let fs = @git.TestFs::new()
-  ignore(try? @gitrepo.init_repo(fs, "/src", bare=true))
-  ignore(try? @gitrepo.init_repo(fs, "/dst", bare=true))
-  let blob_id = @gitlib.write_loose_object(
+  let fs = @bitcore.TestFs::new()
+  ignore(try? @bitrepo.init_repo(fs, "/src", bare=true))
+  ignore(try? @bitrepo.init_repo(fs, "/dst", bare=true))
+  let blob_id = @bitlib.write_loose_object(
     fs,
     "/src",
-    @git.ObjectType::Blob,
+    @bitcore.ObjectType::Blob,
     str_to_bytes("unreferenced\n"),
   )
   let tag_data = str_to_bytes(
@@ -468,20 +468,20 @@ test "push transfer: tag that points to blob copies tagged blob object" {
     "\n" +
     "foo\n",
   )
-  let tag_id = @gitlib.write_loose_object(
+  let tag_id = @bitlib.write_loose_object(
     fs,
     "/src",
-    @git.ObjectType::Tag,
+    @bitcore.ObjectType::Tag,
     tag_data,
   )
-  let src_db = @gitlib.ObjectDb::load(fs, "/src")
+  let src_db = @bitlib.ObjectDb::load(fs, "/src")
   let transferred_object_ids : Map[String, Bool] = {}
   copy_wanted_object_graph(
     fs, fs, src_db, "/dst", tag_id, transferred_object_ids,
   ) catch {
     _ => fail("copy_wanted_object_graph failed")
   }
-  let dst_db = @gitlib.ObjectDb::load(fs, "/dst")
+  let dst_db = @bitlib.ObjectDb::load(fs, "/dst")
   let copied_tag = dst_db.get(fs, tag_id) catch { _ => None }
   let copied_blob = dst_db.get(fs, blob_id) catch { _ => None }
   assert_true(copied_tag is Some(_))
@@ -490,11 +490,11 @@ test "push transfer: tag that points to blob copies tagged blob object" {
 
 ///|
 test "push delete: prune_empty_parent_dirs removes empty nested ref dirs" {
-  let fs = @git.TestFs::new()
+  let fs = @bitcore.TestFs::new()
   fs.write_string(
     "/repo/.git/refs/heads/branch/conflict", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
   )
-  @gitlib.remove_ref_path(fs, fs, "/repo/.git/refs/heads/branch/conflict")
+  @bitlib.remove_ref_path(fs, fs, "/repo/.git/refs/heads/branch/conflict")
   prune_empty_parent_dirs(
     fs, fs, "/repo/.git/refs/heads/branch/conflict", "/repo/.git/refs/heads",
   )

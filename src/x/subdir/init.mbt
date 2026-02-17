@@ -9,7 +9,7 @@
 ///|
 /// サブディレクトリを初期化
 pub fn init_subdir(
-  fs : &@git.FileSystem,
+  fs : &@bit.FileSystem,
   git_dir : String,
   repo_root : String,
   subdir_path : String,
@@ -53,7 +53,7 @@ pub fn init_subdir(
 ///|
 /// サブディレクトリが初期化済みかチェック
 pub fn is_subdir_initialized(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   subdir_path : String,
 ) -> Bool {
@@ -66,7 +66,7 @@ pub fn is_subdir_initialized(
 ///|
 /// 初期化済みサブディレクトリの情報を取得
 pub fn get_subdir_info(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   _repo_root : String,
   subdir_path : String,
@@ -84,8 +84,8 @@ pub fn get_subdir_info(
 ///|
 /// 初期化を解除
 pub fn deinit_subdir(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   repo_root : String,
   subdir_path : String,
@@ -232,7 +232,7 @@ fn build_verbose_marker(subdir_path : String, git_dir : String) -> String {
 ///|
 /// git ラッパースクリプトを作成
 fn create_wrapper_script(
-  fs : &@git.FileSystem,
+  fs : &@bit.FileSystem,
   subdir_abs : String,
   subdir_path : String,
 ) -> Unit raise SubdirError {

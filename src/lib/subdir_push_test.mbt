@@ -2,7 +2,7 @@
 
 ///|
 test "subdir_push: transform single commit tree structure" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -23,7 +23,7 @@ test "subdir_push: transform single commit tree structure" {
   let db = ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
   let upstream_obj = db.get(fs, upstream_commit) catch { _ => return () }
   guard upstream_obj is Some(obj) else { return () }
-  let upstream_info = @git.parse_commit(obj.data) catch { _ => return () }
+  let upstream_info = @bit.parse_commit(obj.data) catch { _ => return () }
   // Simulate subdir-clone: extract fs subtree and create new repo
   init_repo(fs, "/subdir") catch {
     _ => ()
@@ -41,19 +41,19 @@ test "subdir_push: transform single commit tree structure" {
   let subdir_db = ObjectDb::load(fs, "/subdir/.git") catch { _ => return () }
   let subdir_obj = subdir_db.get(fs, subdir_commit) catch { _ => return () }
   guard subdir_obj is Some(so) else { return () }
-  let subdir_info = @git.parse_commit(so.data) catch { _ => return () }
+  let subdir_info = @bit.parse_commit(so.data) catch { _ => return () }
   // The subdir_info.tree is the new fs tree
   let new_fs_tree = subdir_info.tree
   // Verify the new fs tree has the modified content
   let fs_tree_obj = subdir_db.get(fs, new_fs_tree) catch { _ => return () }
   guard fs_tree_obj is Some(fto) else { return () }
-  let fs_entries = @git.parse_tree(fto.data) catch { _ => return () }
+  let fs_entries = @bit.parse_tree(fto.data) catch { _ => return () }
   // Should have fs.mbt and new.mbt
   assert_eq(fs_entries.length(), 2)
   // Verify upstream tree still has all content
   let root_tree_obj = db.get(fs, upstream_info.tree) catch { _ => return () }
   guard root_tree_obj is Some(rto) else { return () }
-  let root_entries = @git.parse_tree(rto.data) catch { _ => return () }
+  let root_entries = @bit.parse_tree(rto.data) catch { _ => return () }
   // Should have: README.md, docs, src
   let mut has_readme = false
   let mut has_docs = false
@@ -73,7 +73,7 @@ test "subdir_push: transform single commit tree structure" {
 
 ///|
 test "subdir_push: collect diff correctly excludes base objects" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -101,7 +101,7 @@ test "subdir_push: collect diff correctly excludes base objects" {
   let mut b_original_found = false
   let mut other_found = false
   for obj in diff {
-    if obj.obj_type == @git.ObjectType::Blob {
+    if obj.obj_type == @bit.ObjectType::Blob {
       let content = @utf8.decode_lossy(obj.data[:])
       if content == "a modified" {
         a_modified_found = true
@@ -122,7 +122,7 @@ test "subdir_push: collect diff correctly excludes base objects" {
 
 ///|
 test "subdir_push: multiple commits transform correctly" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -146,7 +146,7 @@ test "subdir_push: multiple commits transform correctly" {
   let diff = collect_diff_objects(db, fs, commit1, tip) catch { _ => return () }
   let mut commit_count = 0
   for obj in diff {
-    if obj.obj_type == @git.ObjectType::Commit {
+    if obj.obj_type == @bit.ObjectType::Commit {
       commit_count += 1
     }
   }
@@ -156,7 +156,7 @@ test "subdir_push: multiple commits transform correctly" {
 
 ///|
 test "subdir_push: handles binary files" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -186,7 +186,7 @@ test "subdir_push: handles binary files" {
   // Should include the modified binary blob
   let mut binary_blob_found = false
   for obj in diff {
-    if obj.obj_type == @git.ObjectType::Blob {
+    if obj.obj_type == @bit.ObjectType::Blob {
       if obj.data.length() == 4 && obj.data[0] == b'\x00' {
         binary_blob_found = true
       }
@@ -197,7 +197,7 @@ test "subdir_push: handles binary files" {
 
 ///|
 test "subdir_push: empty tree handling" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -226,7 +226,7 @@ test "subdir_push: empty tree handling" {
 
 ///|
 test "subdir_push: deeply nested changes" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -256,8 +256,8 @@ test "subdir_push: deeply nested changes" {
   let mut shallow_found = false
   for obj in diff {
     match obj.obj_type {
-      @git.ObjectType::Tree => tree_count += 1
-      @git.ObjectType::Blob => {
+      @bit.ObjectType::Tree => tree_count += 1
+      @bit.ObjectType::Blob => {
         let content = @utf8.decode_lossy(obj.data[:])
         if content == "deep modified" {
           deep_modified_found = true
@@ -277,7 +277,7 @@ test "subdir_push: deeply nested changes" {
 
 ///|
 test "subdir_push: large number of unchanged files" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -307,7 +307,7 @@ test "subdir_push: large number of unchanged files" {
   // Should only include: commit, root tree, modified blob
   let mut blob_count = 0
   for obj in diff {
-    if obj.obj_type == @git.ObjectType::Blob {
+    if obj.obj_type == @bit.ObjectType::Blob {
       blob_count += 1
     }
   }
@@ -318,7 +318,7 @@ test "subdir_push: large number of unchanged files" {
 ///|
 test "subdir_push: file mode changes" {
   // This tests that we correctly handle mode changes even when content is same
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -340,7 +340,7 @@ test "subdir_push: file mode changes" {
   // Should include the modified blob
   let mut modified_found = false
   for obj in diff {
-    if obj.obj_type == @git.ObjectType::Blob {
+    if obj.obj_type == @bit.ObjectType::Blob {
       let content = @utf8.decode_lossy(obj.data[:])
       if content.contains("goodbye") {
         modified_found = true

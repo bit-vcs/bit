@@ -29,6 +29,6 @@ test "fuzz: parse_tree" {
   for _ in 0..<128 {
     let len = rng.next_int() % 512
     let data = build_bytes(rng, len)
-    ignore(try? @git.parse_tree(data))
+    ignore(try? @bit.parse_tree(data))
   }
 }

@@ -114,7 +114,7 @@ pub fn VectorClock::compare(self : VectorClock, other : VectorClock) -> Int {
 /// State of a node in the gossip network
 pub(all) struct GossipState {
   node_id : NodeId
-  head : @git.ObjectId // Current HEAD commit
+  head : @bit.ObjectId // Current HEAD commit
   clock : VectorClock
   timestamp : Int64 // Wall clock (for tie-breaking)
 }
@@ -125,20 +125,20 @@ pub(all) enum GossipMessage {
   /// Periodic state announcement
   Announce(GossipState)
   /// Request objects by hash
-  WantObjects(Array[@git.ObjectId])
+  WantObjects(Array[@bit.ObjectId])
   /// Send objects
   HaveObjects(Array[GitObject])
   /// Request sync with specific node
-  SyncRequest(NodeId, @git.ObjectId) // from, their_head
+  SyncRequest(NodeId, @bit.ObjectId) // from, their_head
   /// Sync response with missing objects
-  SyncResponse(Array[GitObject], @git.ObjectId) // objects, new_head
+  SyncResponse(Array[GitObject], @bit.ObjectId) // objects, new_head
 }
 
 ///|
 /// Serialized git object for transfer
 pub(all) struct GitObject {
-  id : @git.ObjectId
-  obj_type : @git.ObjectType
+  id : @bit.ObjectId
+  obj_type : @bit.ObjectType
   data : Bytes
 }
 
@@ -147,7 +147,7 @@ pub(all) struct GitObject {
 pub(all) struct PeerInfo {
   node_id : NodeId
   last_seen : Int64
-  head : @git.ObjectId
+  head : @bit.ObjectId
   endpoint : String // e.g., "wss://worker.example.com/node/abc"
 }
 
@@ -191,7 +191,7 @@ pub struct Kv {
   tree : &@lib.WorkingTree
   store : &@lib.ObjectStore
   mut clock : VectorClock
-  mut head : @git.ObjectId
+  mut head : @bit.ObjectId
   sync_engine : SyncEngine
   pending_objects : Map[String, GitObject] // object_id hex -> object
   snapshot_cache : Map[Int, SerializedSnapshot] // mode -> snapshot
@@ -229,7 +229,7 @@ pub(all) struct SyncResult {
   objects_sent : Int
   objects_received : Int
   conflicts : Array[String] // paths with conflicts
-  new_head : @git.ObjectId
+  new_head : @bit.ObjectId
 }
 
 ///|

@@ -1,8 +1,8 @@
 ///| Tests for fs_tree helpers
 
 ///|
-fn setup_fs_tree() -> @git.TestFs {
-  @git.TestFs::new()
+fn setup_fs_tree() -> @bit.TestFs {
+  @bit.TestFs::new()
 }
 
 ///|

@@ -49,7 +49,7 @@ async fn handle_subdir_clone(args : Array[String]) -> Unit raise Error {
     return
   }
   guard subdir is Some(subdir_path) else {
-    raise @git.GitError::InvalidObject("subdirectory path required")
+    raise @bitcore.GitError::InvalidObject("subdirectory path required")
   }
   subdir_clone(remote_url, subdir_path, dest, None)
 }
@@ -91,12 +91,12 @@ async fn subdir_clone(
     Some(dir) => dir
     None => root
   }
-  let local_repo_path = @gitlib.resolve_local_repo_path(
+  let local_repo_path = @bitlib.resolve_local_repo_path(
     fs, local_root, remote_url,
   )
   // Step 1: Create target directory
   fs.mkdir_p(target) catch {
-    _ => raise @git.GitError::IoError("Failed to create directory: " + target)
+    _ => raise @bitcore.GitError::IoError("Failed to create directory: " + target)
   }
   // Step 2: Clone with blob:none filter to a temp location
   print_line("  Fetching repository metadata...")
@@ -121,7 +121,7 @@ async fn subdir_clone(
       true
     }
     None => {
-      let refs = @gitionative.clone_http_to_fs(
+      let refs = @bitnative.clone_http_to_fs(
         remote_url,
         true,
         fs,
@@ -129,7 +129,7 @@ async fn subdir_clone(
         filter=@protocol.FilterSpec::BlobNone,
       )
       if refs.length() == 0 {
-        raise @git.GitError::InvalidObject("Clone failed: no refs found")
+        raise @bitcore.GitError::InvalidObject("Clone failed: no refs found")
       }
       false
     }
@@ -139,21 +139,21 @@ async fn subdir_clone(
   let commit_id = match ref_spec {
     Some(refname) =>
       if from_local_repo {
-        let resolved = @gitrepo.rev_parse(fs, temp_git_dir, refname)
+        let resolved = @bitrepo.rev_parse(fs, temp_git_dir, refname)
         guard resolved is Some(id) else {
-          raise @git.GitError::InvalidObject("Unknown ref: " + refname)
+          raise @bitcore.GitError::InvalidObject("Unknown ref: " + refname)
         }
         id
       } else {
         let resolved = resolve_remote_ref_id(remote_url, refname)
         guard resolved is Some((id, _)) else {
-          raise @git.GitError::InvalidObject("Unknown ref: " + refname)
+          raise @bitcore.GitError::InvalidObject("Unknown ref: " + refname)
         }
         id
       }
     None => {
       let head_ref = fs.read_file(temp_git_dir + "/HEAD") catch {
-        _ => raise @git.GitError::IoError("Failed to read HEAD")
+        _ => raise @bitcore.GitError::IoError("Failed to read HEAD")
       }
       let head_text = @utf8.decode_lossy(head_ref[:])
         .trim(chars=" \n\r\t")
@@ -166,50 +166,50 @@ async fn subdir_clone(
         )
         let ref_path = temp_git_dir + "/" + ref_name
         let ref_content = fs.read_file(ref_path) catch {
-          _ => raise @git.GitError::IoError("Failed to read ref: " + ref_name)
+          _ => raise @bitcore.GitError::IoError("Failed to read ref: " + ref_name)
         }
         let ref_text = @utf8.decode_lossy(ref_content[:])
           .trim(chars=" \n\r\t")
           .to_string()
-        @git.ObjectId::from_hex(ref_text) catch {
-          _ => raise @git.GitError::InvalidObject("Invalid commit ID in ref")
+        @bitcore.ObjectId::from_hex(ref_text) catch {
+          _ => raise @bitcore.GitError::InvalidObject("Invalid commit ID in ref")
         }
       } else {
-        @git.ObjectId::from_hex(head_text) catch {
-          _ => raise @git.GitError::InvalidObject("Invalid HEAD")
+        @bitcore.ObjectId::from_hex(head_text) catch {
+          _ => raise @bitcore.GitError::InvalidObject("Invalid HEAD")
         }
       }
     }
   }
   // Load object database and get tree
-  let mut db = @gitlib.ObjectDb::load_lazy(fs, temp_git_dir)
+  let mut db = @bitlib.ObjectDb::load_lazy(fs, temp_git_dir)
   if not(from_local_repo) && db.get(fs, commit_id) is None {
-    let pack = @gitionative.fetch_pack_http(remote_url, [commit_id], true)
+    let pack = @bitnative.fetch_pack_http(remote_url, [commit_id], true)
     let objects = @pack.parse_packfile(pack)
     @pack.write_packfile_with_index(fs, temp_git_dir, pack, objects)
-    db = @gitlib.ObjectDb::load_lazy(fs, temp_git_dir)
+    db = @bitlib.ObjectDb::load_lazy(fs, temp_git_dir)
   }
   let commit_obj = db.get(fs, commit_id)
   guard commit_obj is Some(_) else {
-    raise @git.GitError::InvalidObject("Commit not found")
+    raise @bitcore.GitError::InvalidObject("Commit not found")
   }
   // Navigate to subdirectory tree
   print_line("  Finding subdirectory '\{subdir_path}'...")
-  let subdir_tree_id = @gitlib.get_subdir_tree_from_commit(
+  let subdir_tree_id = @bitlib.get_subdir_tree_from_commit(
     db, fs, commit_id, subdir_path,
   )
   guard subdir_tree_id is Some(tree_id) else {
-    @gitlib.subdir_remove_dir(fs, fs, temp_clone)
+    @bitlib.subdir_remove_dir(fs, fs, temp_clone)
     if not(target_existed) {
-      @gitlib.subdir_remove_dir(fs, fs, target)
+      @bitlib.subdir_remove_dir(fs, fs, target)
     }
-    raise @git.GitError::InvalidObject("Subdirectory not found: " + subdir_path)
+    raise @bitcore.GitError::InvalidObject("Subdirectory not found: " + subdir_path)
   }
   // Fetch blobs for the subdirectory
   print_line("  Fetching files...")
-  let needed_blobs = @gitlib.collect_tree_blobs(db, fs, tree_id)
+  let needed_blobs = @bitlib.collect_tree_blobs(db, fs, tree_id)
   if needed_blobs.length() > 0 {
-    let missing : Array[@git.ObjectId] = []
+    let missing : Array[@bitcore.ObjectId] = []
     for blob_id in needed_blobs {
       let exists = db.get(fs, blob_id)
       if exists is None {
@@ -218,36 +218,36 @@ async fn subdir_clone(
     }
     if missing.length() > 0 {
       if from_local_repo {
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "missing local objects for subdir clone",
         )
       }
-      let pack = @gitionative.fetch_pack_http(remote_url, missing, true)
+      let pack = @bitnative.fetch_pack_http(remote_url, missing, true)
       let objects = @pack.parse_packfile(pack)
       @pack.write_packfile_with_index(fs, temp_git_dir, pack, objects)
     }
   }
   // Reload object database
-  let db2 = @gitlib.ObjectDb::load_lazy(fs, temp_git_dir)
+  let db2 = @bitlib.ObjectDb::load_lazy(fs, temp_git_dir)
   // Step 4: Write files directly to target
   print_line("  Writing files...")
-  @gitlib.write_tree_to_worktree(db2, fs, fs, tree_id, target)
+  @bitlib.write_tree_to_worktree(db2, fs, fs, tree_id, target)
   // Step 5: Move .git to target
   print_line("  Setting up git repository...")
-  @gitlib.move_directory(fs, fs, temp_git_dir, git_dir)
-  @gitlib.subdir_remove_dir(fs, fs, temp_clone)
+  @bitlib.move_directory(fs, fs, temp_git_dir, git_dir)
+  @bitlib.subdir_remove_dir(fs, fs, temp_clone)
   // Step 6: Create orphan commit with subdirectory as root
   print_line("  Creating initial commit...")
   let timestamp = get_current_timestamp()
-  let author = "subdir-clone <subdir-clone@bit>"
+  let author = "subdir-clone <subdir-clone@bitcore>"
   let message = "Initial commit (cloned from " + subdir_path + ")\n"
-  let parents : Array[@git.ObjectId] = []
-  let commit = @git.Commit::new(
+  let parents : Array[@bitcore.ObjectId] = []
+  let commit = @bitcore.Commit::new(
     tree_id, parents, author, timestamp, "+0000", author, timestamp, "+0000", message,
   )
-  let (new_commit_id, commit_bytes) = @git.create_commit(commit)
-  @gitlib.write_object_bytes(fs, git_dir, new_commit_id, commit_bytes) catch {
-    _ => raise @git.GitError::IoError("Failed to write commit object")
+  let (new_commit_id, commit_bytes) = @bitcore.create_commit(commit)
+  @bitlib.write_object_bytes(fs, git_dir, new_commit_id, commit_bytes) catch {
+    _ => raise @bitcore.GitError::IoError("Failed to write commit object")
   }
   // Update HEAD
   let head_path = git_dir + "/HEAD"
@@ -297,9 +297,9 @@ fn write_subdir_attributes(
   git_dir : String,
   remote_url : String,
   subdir_path : String,
-  base_commit : @git.ObjectId,
+  base_commit : @bitcore.ObjectId,
 ) -> Unit {
-  @gitlib.write_subdir_attributes(
+  @bitlib.write_subdir_attributes(
     fs, git_dir, remote_url, subdir_path, base_commit,
   )
 }
@@ -310,7 +310,7 @@ pub fn read_subdir_attributes(
   fs : OsFs,
   git_dir : String,
 ) -> (String, String, String)? {
-  @gitlib.read_subdir_attributes(fs, git_dir)
+  @bitlib.read_subdir_attributes(fs, git_dir)
 }
 
 ///|
@@ -320,19 +320,19 @@ pub fn update_subdir_base(
   git_dir : String,
   new_base : String,
 ) -> Unit {
-  @gitlib.update_subdir_base(fs, fs, git_dir, new_base)
+  @bitlib.update_subdir_base(fs, fs, git_dir, new_base)
 }
 
 ///|
 /// Check if current directory is a subdir-clone
 pub fn is_subdir_clone(fs : OsFs, git_dir : String) -> Bool {
-  @gitlib.is_subdir_clone(fs, git_dir)
+  @bitlib.is_subdir_clone(fs, git_dir)
 }
 
 ///|
 /// Get effective remote URL - prefers subdir remote over config
 pub fn get_effective_remote_url(fs : OsFs, git_dir : String) -> String? {
-  @gitlib.get_effective_remote_url(fs, git_dir)
+  @bitlib.get_effective_remote_url(fs, git_dir)
 }
 
 ///|
@@ -341,18 +341,18 @@ pub fn get_subdir_info(
   fs : OsFs,
   git_dir : String,
 ) -> (String, String, String)? {
-  @gitlib.get_subdir_info(fs, git_dir)
+  @bitlib.get_subdir_info(fs, git_dir)
 }
 
 ///|
 /// Get the subdir tree from a commit (for subdir-clone operations)
 pub fn get_subdir_tree_from_commit(
-  db : @gitlib.ObjectDb,
+  db : @bitlib.ObjectDb,
   fs : OsFs,
-  commit_id : @git.ObjectId,
+  commit_id : @bitcore.ObjectId,
   subdir_path : String,
-) -> @git.ObjectId? raise @git.GitError {
-  @gitlib.get_subdir_tree_from_commit(db, fs, commit_id, subdir_path)
+) -> @bitcore.ObjectId? raise @bitcore.GitError {
+  @bitlib.get_subdir_tree_from_commit(db, fs, commit_id, subdir_path)
 }
 
 ///|
@@ -361,8 +361,8 @@ pub fn resolve_ref_for_subdir(
   fs : OsFs,
   git_dir : String,
   refspec : String,
-) -> @git.ObjectId? raise Error {
-  @gitlib.resolve_ref_for_subdir(fs, git_dir, refspec)
+) -> @bitcore.ObjectId? raise Error {
+  @bitlib.resolve_ref_for_subdir(fs, git_dir, refspec)
 }
 
 ///|

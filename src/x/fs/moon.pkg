@@ -1,5 +1,5 @@
 import {
-  "mizchi/bit" @git,
+  "mizchi/bit" @bit,
   "mizchi/bit/lib" @lib,
   "moonbitlang/core/encoding/utf8" @utf8,
 }

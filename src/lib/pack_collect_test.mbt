@@ -2,7 +2,7 @@
 
 ///|
 test "collect_diff_objects: collects only new objects" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -32,8 +32,8 @@ test "collect_diff_objects: collects only new objects" {
   // Verify the new commit is included
   let mut has_new_commit = false
   for obj in diff_objects {
-    if obj.obj_type == @git.ObjectType::Commit {
-      let info = @git.parse_commit(obj.data) catch { _ => continue }
+    if obj.obj_type == @bit.ObjectType::Commit {
+      let info = @bit.parse_commit(obj.data) catch { _ => continue }
       if info.parents.length() > 0 && info.parents[0] == commit1 {
         has_new_commit = true
       }
@@ -44,7 +44,7 @@ test "collect_diff_objects: collects only new objects" {
 
 ///|
 test "collect_diff_objects: empty diff when no changes" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -65,7 +65,7 @@ test "collect_diff_objects: empty diff when no changes" {
 
 ///|
 test "collect_diff_objects: preserves unchanged nested trees" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -91,7 +91,7 @@ test "collect_diff_objects: preserves unchanged nested trees" {
   // Should NOT include the nested unchanged trees/blobs
   let mut deep_blob_count = 0
   for obj in diff_objects {
-    if obj.obj_type == @git.ObjectType::Blob {
+    if obj.obj_type == @bit.ObjectType::Blob {
       // Check if it's the deep.mbt blob
       let content = @utf8.decode_lossy(obj.data[:])
       if content.contains("deep content") {
@@ -104,7 +104,7 @@ test "collect_diff_objects: preserves unchanged nested trees" {
 
 ///|
 test "collect_commit_tree_only: includes all tree objects" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -126,9 +126,9 @@ test "collect_commit_tree_only: includes all tree objects" {
   let mut blob_count = 0
   for obj in objects {
     match obj.obj_type {
-      @git.ObjectType::Commit => commit_count += 1
-      @git.ObjectType::Tree => tree_count += 1
-      @git.ObjectType::Blob => blob_count += 1
+      @bit.ObjectType::Commit => commit_count += 1
+      @bit.ObjectType::Tree => tree_count += 1
+      @bit.ObjectType::Blob => blob_count += 1
       _ => ()
     }
   }
@@ -139,7 +139,7 @@ test "collect_commit_tree_only: includes all tree objects" {
 
 ///|
 test "collect_commit_tree_only: does not walk parent commits" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -156,7 +156,7 @@ test "collect_commit_tree_only: does not walk parent commits" {
   // Should only have 1 commit (commit2), not 2
   let mut commit_count = 0
   for obj in objects {
-    if obj.obj_type == @git.ObjectType::Commit {
+    if obj.obj_type == @bit.ObjectType::Commit {
       commit_count += 1
     }
   }
@@ -165,7 +165,7 @@ test "collect_commit_tree_only: does not walk parent commits" {
 
 ///|
 test "collect_reachable_objects: walks parent commits" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -184,7 +184,7 @@ test "collect_reachable_objects: walks parent commits" {
   // Should have 2 commits
   let mut commit_count = 0
   for obj in objects {
-    if obj.obj_type == @git.ObjectType::Commit {
+    if obj.obj_type == @bit.ObjectType::Commit {
       commit_count += 1
     }
   }
@@ -193,7 +193,7 @@ test "collect_reachable_objects: walks parent commits" {
 
 ///|
 test "collect_diff_objects: handles subdirectory changes" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -225,7 +225,7 @@ test "collect_diff_objects: handles subdirectory changes" {
   let mut kv_content_found = false
   let mut readme_found = false
   for obj in diff_objects {
-    if obj.obj_type == @git.ObjectType::Blob {
+    if obj.obj_type == @bit.ObjectType::Blob {
       let content = @utf8.decode_lossy(obj.data[:])
       if content.contains("kv content") {
         kv_content_found = true
@@ -241,7 +241,7 @@ test "collect_diff_objects: handles subdirectory changes" {
 
 ///|
 test "collect_diff_objects: handles file deletion" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -266,7 +266,7 @@ test "collect_diff_objects: handles file deletion" {
   let mut keep_found = false
   let mut delete_found = false
   for obj in diff_objects {
-    if obj.obj_type == @git.ObjectType::Blob {
+    if obj.obj_type == @bit.ObjectType::Blob {
       let content = @utf8.decode_lossy(obj.data[:])
       if content.contains("keep") {
         keep_found = true
@@ -282,7 +282,7 @@ test "collect_diff_objects: handles file deletion" {
 
 ///|
 test "collect_diff_objects: handles new directory" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -307,7 +307,7 @@ test "collect_diff_objects: handles new directory" {
   // Should include the new dir tree and its blob
   let mut new_dir_file_found = false
   for obj in diff_objects {
-    if obj.obj_type == @git.ObjectType::Blob {
+    if obj.obj_type == @bit.ObjectType::Blob {
       let content = @utf8.decode_lossy(obj.data[:])
       if content.contains("new dir file") {
         new_dir_file_found = true
@@ -319,7 +319,7 @@ test "collect_diff_objects: handles new directory" {
 
 ///|
 test "collect_reachable_objects_from_commits: deduplicates" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   init_repo(fs, "/repo") catch {
     _ => ()
   }
@@ -341,7 +341,7 @@ test "collect_reachable_objects_from_commits: deduplicates" {
   // Shared blob should only appear once
   let mut shared_count = 0
   for obj in objects {
-    if obj.obj_type == @git.ObjectType::Blob {
+    if obj.obj_type == @bit.ObjectType::Blob {
       let content = @utf8.decode_lossy(obj.data[:])
       if content.contains("shared") {
         shared_count += 1

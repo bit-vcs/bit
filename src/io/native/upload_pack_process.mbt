@@ -34,7 +34,7 @@ fn is_space_char(c : Char) -> Bool {
 }
 
 ///|
-fn split_shell_words(cmdline : String) -> Array[String] raise @git.GitError {
+fn split_shell_words(cmdline : String) -> Array[String] raise @bit.GitError {
   let out : Array[String] = []
   let current = StringBuilder::new()
   let mut in_single = false
@@ -92,13 +92,13 @@ fn split_shell_words(cmdline : String) -> Array[String] raise @git.GitError {
     token_active = true
   }
   if escaped || in_single || in_double {
-    raise @git.GitError::ProtocolError("Malformed GIT_SSH_COMMAND")
+    raise @bit.GitError::ProtocolError("Malformed GIT_SSH_COMMAND")
   }
   if token_active {
     out.push(current.to_string())
   }
   if out.length() == 0 {
-    raise @git.GitError::ProtocolError("Malformed GIT_SSH_COMMAND")
+    raise @bit.GitError::ProtocolError("Malformed GIT_SSH_COMMAND")
   }
   out
 }
@@ -416,7 +416,7 @@ fn resolve_ssh_variant(
 }
 
 ///|
-fn resolve_ssh_command_spec() -> SshCommandSpec raise @git.GitError {
+fn resolve_ssh_command_spec() -> SshCommandSpec raise @bit.GitError {
   match @sys.get_env_var("GIT_SSH_COMMAND") {
     Some(cmdline) => {
       let words = split_shell_words(cmdline)
@@ -477,9 +477,9 @@ fn build_upload_pack_file_spec(
   path : String,
   advertise_refs : Bool,
   prefer_v2 : Bool,
-) -> ProcessSpec raise @git.GitError {
+) -> ProcessSpec raise @bit.GitError {
   if path.length() == 0 {
-    raise @git.GitError::ProtocolError("Remote path is empty")
+    raise @bit.GitError::ProtocolError("Remote path is empty")
   }
   let args : Array[String] = []
   args.push("--stateless-rpc")
@@ -500,10 +500,10 @@ fn build_upload_pack_process_spec(
   spec : @protocol.RemoteSpec,
   advertise_refs~ : Bool,
   prefer_v2~ : Bool,
-) -> ProcessSpec raise @git.GitError {
+) -> ProcessSpec raise @bit.GitError {
   match spec.kind {
     @protocol.RemoteKind::Http =>
-      raise @git.GitError::ProtocolError(
+      raise @bit.GitError::ProtocolError(
         "HTTP transport is not supported by process client",
       )
     @protocol.RemoteKind::File =>
@@ -511,7 +511,7 @@ fn build_upload_pack_process_spec(
     @protocol.RemoteKind::Ssh => {
       let endpoint = match resolve_ssh_endpoint(spec) {
         Some(v) => v
-        None => raise @git.GitError::ProtocolError("SSH remote missing host")
+        None => raise @bit.GitError::ProtocolError("SSH remote missing host")
       }
       let ip_option = read_ssh_ip_option()
       let needs_special_options = endpoint.port is Some(_) ||
@@ -528,7 +528,7 @@ fn build_upload_pack_process_spec(
       match ip_option {
         Some(flag) =>
           if variant == Simple {
-            raise @git.GitError::ProtocolError(
+            raise @bit.GitError::ProtocolError(
               "ssh variant 'simple' does not support setting address family",
             )
           } else {
@@ -548,7 +548,7 @@ fn build_upload_pack_process_spec(
               args.push(port)
             }
             Simple =>
-              raise @git.GitError::ProtocolError(
+              raise @bit.GitError::ProtocolError(
                 "ssh variant 'simple' does not support setting port",
               )
           }
@@ -600,7 +600,7 @@ fn maybe_trace_packfile(pack : Bytes) -> Unit {
 async fn run_process_with_files(
   spec : ProcessSpec,
   stdin_data : Bytes?,
-) -> (Int, Bytes, Bytes) raise @git.GitError {
+) -> (Int, Bytes, Bytes) raise @bit.GitError {
   let nonce = @async.now()
   let base = ".moonbit-git-upload-pack-\{nonce}"
   let stdout_path = "\{base}.out"
@@ -608,20 +608,20 @@ async fn run_process_with_files(
   let stdin_path = "\{base}.in"
   let cleanup_paths = [stdout_path, stderr_path, stdin_path]
   let stdout = @process.redirect_to_file(stdout_path, truncate=true, create=420) catch {
-    e => raise @git.GitError::IoError("failed to open stdout file: \{e}")
+    e => raise @bit.GitError::IoError("failed to open stdout file: \{e}")
   }
   let stderr = @process.redirect_to_file(stderr_path, truncate=true, create=420) catch {
-    e => raise @git.GitError::IoError("failed to open stderr file: \{e}")
+    e => raise @bit.GitError::IoError("failed to open stderr file: \{e}")
   }
   let stdin_bytes = match stdin_data {
     Some(data) => data
     None => Bytes::default()
   }
   @fs.write_bytes_to_file(stdin_path, stdin_bytes) catch {
-    e => raise @git.GitError::IoError("failed to write stdin temp file: \{e}")
+    e => raise @bit.GitError::IoError("failed to write stdin temp file: \{e}")
   }
   let stdin = @process.redirect_from_file(stdin_path) catch {
-    e => raise @git.GitError::IoError("process stdin failed: \{e}")
+    e => raise @bit.GitError::IoError("process stdin failed: \{e}")
   }
   let run_cwd = resolve_process_cwd()
   let code = match (spec.extra_env, run_cwd) {
@@ -636,7 +636,7 @@ async fn run_process_with_files(
       ) catch {
         e => {
           cleanup_temp_files(cleanup_paths)
-          raise @git.GitError::IoError("process failed: \{e}")
+          raise @bit.GitError::IoError("process failed: \{e}")
         }
       }
     (Some(env), None) =>
@@ -651,7 +651,7 @@ async fn run_process_with_files(
       ) catch {
         e => {
           cleanup_temp_files(cleanup_paths)
-          raise @git.GitError::IoError("process failed: \{e}")
+          raise @bit.GitError::IoError("process failed: \{e}")
         }
       }
     (None, Some(cwd)) =>
@@ -666,7 +666,7 @@ async fn run_process_with_files(
       ) catch {
         e => {
           cleanup_temp_files(cleanup_paths)
-          raise @git.GitError::IoError("process failed: \{e}")
+          raise @bit.GitError::IoError("process failed: \{e}")
         }
       }
     (Some(env), Some(cwd)) =>
@@ -682,20 +682,20 @@ async fn run_process_with_files(
       ) catch {
         e => {
           cleanup_temp_files(cleanup_paths)
-          raise @git.GitError::IoError("process failed: \{e}")
+          raise @bit.GitError::IoError("process failed: \{e}")
         }
       }
   }
   let out = @fs.read_file_to_bytes(stdout_path) catch {
     e => {
       cleanup_temp_files(cleanup_paths)
-      raise @git.GitError::IoError("failed to read stdout: \{e}")
+      raise @bit.GitError::IoError("failed to read stdout: \{e}")
     }
   }
   let err = @fs.read_file_to_bytes(stderr_path) catch {
     e => {
       cleanup_temp_files(cleanup_paths)
-      raise @git.GitError::IoError("failed to read stderr: \{e}")
+      raise @bit.GitError::IoError("failed to read stderr: \{e}")
     }
   }
   cleanup_temp_files(cleanup_paths)
@@ -706,14 +706,14 @@ async fn run_process_with_files(
 async fn run_upload_pack_process(
   spec : ProcessSpec,
   stdin_data : Bytes?,
-) -> Bytes raise @git.GitError {
+) -> Bytes raise @bit.GitError {
   let (code, stdout, stderr) = run_process_with_files(spec, stdin_data)
   if code != 0 {
     let args_joined = spec.args.join(" ")
     let cmdline = "\{spec.cmd} \{args_joined}"
     let err = bytes_to_string_lossy(stderr)
     let detail = if err.length() > 0 { ": \{err}" } else { "" }
-    raise @git.GitError::IoError(
+    raise @bit.GitError::IoError(
       "git-upload-pack failed (exit=\{code}): \{cmdline}\{detail}",
     )
   }
@@ -724,7 +724,7 @@ async fn run_upload_pack_process(
 fn build_upload_pack_info_refs_process_spec(
   remote : String,
   prefer_v2 : Bool,
-) -> ProcessSpec raise @git.GitError {
+) -> ProcessSpec raise @bit.GitError {
   let remote_spec = @protocol.parse_remote(remote)
   build_upload_pack_process_spec(remote_spec, advertise_refs=true, prefer_v2~)
 }
@@ -733,7 +733,7 @@ fn build_upload_pack_info_refs_process_spec(
 fn build_upload_pack_request_process_spec(
   remote : String,
   prefer_v2 : Bool,
-) -> ProcessSpec raise @git.GitError {
+) -> ProcessSpec raise @bit.GitError {
   let remote_spec = @protocol.parse_remote(remote)
   build_upload_pack_process_spec(remote_spec, advertise_refs=false, prefer_v2~)
 }
@@ -742,7 +742,7 @@ fn build_upload_pack_request_process_spec(
 pub async fn upload_pack_info_refs_process(
   remote : String,
   prefer_v2 : Bool,
-) -> Bytes raise @git.GitError {
+) -> Bytes raise @bit.GitError {
   let proc = build_upload_pack_info_refs_process_spec(remote, prefer_v2)
   run_upload_pack_process(proc, None)
 }
@@ -752,7 +752,7 @@ pub async fn upload_pack_request_process(
   remote : String,
   body : Bytes,
   prefer_v2 : Bool,
-) -> Bytes raise @git.GitError {
+) -> Bytes raise @bit.GitError {
   let proc = build_upload_pack_request_process_spec(remote, prefer_v2)
   run_upload_pack_process(proc, Some(body))
 }
@@ -762,11 +762,11 @@ pub async fn discover_upload_refs_process(
   remote : String,
   prefer_v2 : Bool,
 ) -> (
-  Array[(@git.ObjectId, String)],
+  Array[(@bit.ObjectId, String)],
   Array[String],
   @protocol.ProtocolVersion,
   Map[String, String],
-) raise @git.GitError {
+) raise @bit.GitError {
   let adv = upload_pack_info_refs_process(remote, prefer_v2)
   let version = @protocol.detect_protocol_version(adv)
   if version == @protocol.ProtocolVersion::V2 {
@@ -787,16 +787,16 @@ pub async fn discover_upload_refs_process(
 ///|
 pub async fn fetch_pack_process(
   remote : String,
-  wants : Array[@git.ObjectId],
+  wants : Array[@bit.ObjectId],
   prefer_v2 : Bool,
   depth? : Int = 0,
   filter? : @protocol.FilterSpec = @protocol.FilterSpec::NoFilter,
-) -> Bytes raise @git.GitError {
+) -> Bytes raise @bit.GitError {
   let (refs, caps, version, _symrefs) = discover_upload_refs_process(
     remote, prefer_v2,
   )
   let wants = if wants.length() == 0 {
-    let ids : Array[@git.ObjectId] = []
+    let ids : Array[@bit.ObjectId] = []
     for item in refs {
       let (id, _) = item
       ids.push(id)
@@ -827,11 +827,11 @@ pub async fn fetch_pack_process(
 ///|
 pub async fn fetch_objects_process(
   remote : String,
-  wants : Array[@git.ObjectId],
+  wants : Array[@bit.ObjectId],
   prefer_v2 : Bool,
   depth? : Int = 0,
   filter? : @protocol.FilterSpec = @protocol.FilterSpec::NoFilter,
-) -> Array[@git.PackObject] raise @git.GitError {
+) -> Array[@bit.PackObject] raise @bit.GitError {
   let pack = fetch_pack_process(remote, wants, prefer_v2, depth~, filter~)
   @pack.parse_packfile(pack)
 }
@@ -842,7 +842,7 @@ pub async fn clone_process(
   prefer_v2 : Bool,
   depth? : Int = 0,
   filter? : @protocol.FilterSpec = @protocol.FilterSpec::NoFilter,
-) -> (Array[(@git.ObjectId, String)], Array[@git.PackObject]) raise @git.GitError {
+) -> (Array[(@bit.ObjectId, String)], Array[@bit.PackObject]) raise @bit.GitError {
   let (refs, _caps, _version, symrefs) = discover_upload_refs_process(
     remote, prefer_v2,
   )
@@ -857,12 +857,12 @@ pub async fn clone_process(
 pub async fn clone_process_to_fs(
   remote : String,
   prefer_v2 : Bool,
-  fs : &@git.FileSystem,
+  fs : &@bit.FileSystem,
   root : String,
   depth? : Int = 0,
   filter? : @protocol.FilterSpec = @protocol.FilterSpec::NoFilter,
   no_checkout? : Bool = false,
-) -> Array[(@git.ObjectId, String)] raise @git.GitError {
+) -> Array[(@bit.ObjectId, String)] raise @bit.GitError {
   let (refs, _caps, _version, symrefs) = discover_upload_refs_process(
     remote, prefer_v2,
   )
@@ -877,16 +877,16 @@ pub async fn clone_process_to_fs(
   }
   let pack = fetch_pack_process(remote, wants, prefer_v2, depth~, filter~)
   let objects = @pack.parse_packfile(pack)
-  let git_dir = @git.join_path(root, ".git")
+  let git_dir = @bit.join_path(root, ".git")
   let pack_id = read_pack_trailer_id(pack)
-  fs.mkdir_p(@git.join_path(git_dir, "objects/pack"))
+  fs.mkdir_p(@bit.join_path(git_dir, "objects/pack"))
   @pack.write_packfile_with_index(fs, git_dir, pack, objects)
   let effective_no_checkout = no_checkout || filter.is_partial()
   if filter.is_partial() {
     write_promisor_remote_file(fs, git_dir, remote)
     write_pack_promisor_marker(fs, git_dir, pack_id, refs, default_ref)
   }
-  let store = @git.ObjectStore::from_pack(objects)
+  let store = @bit.ObjectStore::from_pack(objects)
   match default_ref {
     None => ()
     Some((refname, commit_id)) =>
@@ -895,9 +895,9 @@ pub async fn clone_process_to_fs(
           fs, root, refname, commit_id, remote, filter,
         )
       } else if effective_no_checkout {
-        @git.write_git_metadata(store, commit_id, refname, remote, fs, root)
+        @bit.write_git_metadata(store, commit_id, refname, remote, fs, root)
       } else {
-        @git.materialize_clone_to_fs(
+        @bit.materialize_clone_to_fs(
           store, commit_id, refname, remote, fs, root,
         )
       }
@@ -915,7 +915,7 @@ pub async fn clone_process_to_fs(
     }
     if shallow_ids.length() > 0 {
       fs.write_string(
-        @git.join_path(git_dir, "shallow"),
+        @bit.join_path(git_dir, "shallow"),
         shallow_ids.join("\n") + "\n",
       )
     }
@@ -924,35 +924,35 @@ pub async fn clone_process_to_fs(
 }
 
 ///|
-fn read_pack_trailer_id(pack : Bytes) -> @git.ObjectId raise @git.GitError {
+fn read_pack_trailer_id(pack : Bytes) -> @bit.ObjectId raise @bit.GitError {
   if pack.length() < 20 {
-    raise @git.GitError::PackfileError("Packfile too short")
+    raise @bit.GitError::PackfileError("Packfile too short")
   }
   let trailer_start = pack.length() - 20
   let bytes = FixedArray::makei(20, i => pack[trailer_start + i])
-  @git.ObjectId::new(bytes)
+  @bit.ObjectId::new(bytes)
 }
 
 ///|
 fn write_promisor_remote_file(
-  fs : &@git.FileSystem,
+  fs : &@bit.FileSystem,
   git_dir : String,
   remote : String,
-) -> Unit raise @git.GitError {
-  let info_dir = @git.join_path(git_dir, "objects/info")
+) -> Unit raise @bit.GitError {
+  let info_dir = @bit.join_path(git_dir, "objects/info")
   fs.mkdir_p(info_dir)
-  fs.write_string(@git.join_path(info_dir, "promisor"), remote + "\n")
+  fs.write_string(@bit.join_path(info_dir, "promisor"), remote + "\n")
 }
 
 ///|
 fn write_pack_promisor_marker(
-  fs : &@git.FileSystem,
+  fs : &@bit.FileSystem,
   git_dir : String,
-  pack_id : @git.ObjectId,
-  refs : Array[(@git.ObjectId, String)],
-  default_ref : (String, @git.ObjectId)?,
-) -> Unit raise @git.GitError {
-  let pack_dir = @git.join_path(git_dir, "objects/pack")
+  pack_id : @bit.ObjectId,
+  refs : Array[(@bit.ObjectId, String)],
+  default_ref : (String, @bit.ObjectId)?,
+) -> Unit raise @bit.GitError {
+  let pack_dir = @bit.join_path(git_dir, "objects/pack")
   let marker_lines : Array[String] = []
   let seen : Map[String, Bool] = {}
   for item in refs {
@@ -979,26 +979,26 @@ fn write_pack_promisor_marker(
   }
   let marker_content = marker_lines.join("\n") + "\n"
   let base = "pack-\{pack_id.to_hex()}"
-  let marker_path = @git.join_path(pack_dir, base + ".promisor")
+  let marker_path = @bit.join_path(pack_dir, base + ".promisor")
   fs.write_string(marker_path, marker_content)
 }
 
 ///|
 fn write_partial_clone_metadata(
-  fs : &@git.FileSystem,
+  fs : &@bit.FileSystem,
   root : String,
   refname : String,
-  commit_id : @git.ObjectId,
+  commit_id : @bit.ObjectId,
   remote : String,
   filter : @protocol.FilterSpec,
-) -> Unit raise @git.GitError {
-  let git_dir = @git.join_path(root, ".git")
-  fs.mkdir_p(@git.join_path(git_dir, "objects/info"))
-  fs.mkdir_p(@git.join_path(git_dir, "objects/pack"))
-  fs.mkdir_p(@git.join_path(git_dir, "refs/heads"))
-  fs.mkdir_p(@git.join_path(git_dir, "refs/tags"))
-  fs.write_string(@git.join_path(git_dir, "HEAD"), "ref: \{refname}\n")
-  let ref_path = @git.join_path(git_dir, refname)
+) -> Unit raise @bit.GitError {
+  let git_dir = @bit.join_path(root, ".git")
+  fs.mkdir_p(@bit.join_path(git_dir, "objects/info"))
+  fs.mkdir_p(@bit.join_path(git_dir, "objects/pack"))
+  fs.mkdir_p(@bit.join_path(git_dir, "refs/heads"))
+  fs.mkdir_p(@bit.join_path(git_dir, "refs/tags"))
+  fs.write_string(@bit.join_path(git_dir, "HEAD"), "ref: \{refname}\n")
+  let ref_path = @bit.join_path(git_dir, refname)
   let ref_dir = match ref_path.rev_find("/") {
     Some(idx) => String::unsafe_substring(ref_path, start=0, end=idx)
     None => git_dir
@@ -1006,7 +1006,7 @@ fn write_partial_clone_metadata(
   fs.mkdir_p(ref_dir)
   fs.write_string(ref_path, commit_id.to_hex() + "\n")
   let filter_value = filter.to_string()
-  let config_path = @git.join_path(git_dir, "config")
+  let config_path = @bit.join_path(git_dir, "config")
   let config =
     #|[core]
     #|	repositoryformatversion = 1
@@ -1022,6 +1022,6 @@ fn write_partial_clone_metadata(
     $|	partialclonefilter = \{filter_value}
     #|
   fs.write_string(config_path, config)
-  let packed_refs_path = @git.join_path(git_dir, "packed-refs")
+  let packed_refs_path = @bit.join_path(git_dir, "packed-refs")
   fs.write_string(packed_refs_path, "# pack-refs with: peeled fully-peeled\n")
 }

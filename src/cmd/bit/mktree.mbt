@@ -18,7 +18,7 @@ async fn handle_mktree(args : Array[String]) -> Unit raise Error {
   let sep = if nul_term { "\u0000" } else { "\n" }
   if batch {
     // Batch mode: empty line separates trees
-    let current_entries : Array[@git.TreeEntry] = []
+    let current_entries : Array[@bitcore.TreeEntry] = []
     for line_view in input.split(sep) {
       let line = trim_string(line_view.to_string())
       if line.length() == 0 {
@@ -39,7 +39,7 @@ async fn handle_mktree(args : Array[String]) -> Unit raise Error {
     }
   } else {
     // Single tree mode
-    let entries : Array[@git.TreeEntry] = []
+    let entries : Array[@bitcore.TreeEntry] = []
     for line_view in input.split(sep) {
       let line = trim_string(line_view.to_string())
       if line.length() == 0 {
@@ -55,7 +55,7 @@ async fn handle_mktree(args : Array[String]) -> Unit raise Error {
 ///|
 fn parse_and_add_tree_entry(
   line : String,
-  entries : Array[@git.TreeEntry],
+  entries : Array[@bitcore.TreeEntry],
 ) -> Unit {
   // Format: <mode> SP <type> SP <object> TAB <file>
   // Or: <mode> SP <object> TAB <file> (simplified)
@@ -79,8 +79,8 @@ fn parse_and_add_tree_entry(
         let mode = parts[0]
         // Object ID is either parts[1] or parts[2] depending on format
         let object_hex = if parts.length() >= 3 { parts[2] } else { parts[1] }
-        let id = @git.ObjectId::from_hex(object_hex) catch { _ => return () }
-        entries.push(@git.TreeEntry::new(mode, name, id))
+        let id = @bitcore.ObjectId::from_hex(object_hex) catch { _ => return () }
+        entries.push(@bitcore.TreeEntry::new(mode, name, id))
       }
     }
   }
@@ -90,8 +90,8 @@ fn parse_and_add_tree_entry(
 fn write_mktree_entries(
   fs : OsFs,
   git_dir : String,
-  entries : Array[@git.TreeEntry],
-) -> @git.ObjectId raise Error {
+  entries : Array[@bitcore.TreeEntry],
+) -> @bitcore.ObjectId raise Error {
   // Sort entries by Git's tree sorting rules
   let sorted = entries.copy()
   sorted.sort_by(fn(a, b) {
@@ -99,8 +99,8 @@ fn write_mktree_entries(
     let b_key = if b.mode == "40000" { b.name + "/" } else { b.name }
     String::compare(a_key, b_key)
   })
-  let (tree_id, compressed) = @git.create_tree(sorted)
-  @gitlib.write_object_bytes(fs, git_dir, tree_id, compressed)
+  let (tree_id, compressed) = @bitcore.create_tree(sorted)
+  @bitlib.write_object_bytes(fs, git_dir, tree_id, compressed)
   tree_id
 }
 

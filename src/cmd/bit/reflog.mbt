@@ -13,8 +13,8 @@ async fn handle_reflog(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let git_dir = root + "/.git"
   let fs = OsFs::new()
-  let rfs : &@git.RepoFileSystem = fs
-  let wfs : &@git.FileSystem = fs
+  let rfs : &@bitcore.RepoFileSystem = fs
+  let wfs : &@bitcore.FileSystem = fs
   let empty_grep_patterns : Array[String] = []
   if args.length() == 0 {
     // Default to show HEAD
@@ -61,7 +61,7 @@ async fn handle_reflog(args : Array[String]) -> Unit raise Error {
         @sys.exit(1)
       }
       let refname = normalize_reflog_refname(rest[0])
-      if @gitrepo.reflog_exists(rfs, git_dir, refname) {
+      if @bitrepo.reflog_exists(rfs, git_dir, refname) {
         @sys.exit(0)
       } else {
         @sys.exit(1)
@@ -73,7 +73,7 @@ async fn handle_reflog(args : Array[String]) -> Unit raise Error {
         @sys.exit(1)
       }
       let refname = normalize_reflog_refname(rest[0])
-      @gitrepo.delete_reflog(wfs, rfs, git_dir, refname)
+      @bitrepo.delete_reflog(wfs, rfs, git_dir, refname)
     }
     "expire" =>
       // For now, just a no-op (would need to implement expiry logic)
@@ -106,7 +106,7 @@ async fn handle_reflog(args : Array[String]) -> Unit raise Error {
 
 ///|
 async fn show_reflog(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
   refname : String,
   no_abbrev_commit : Bool,
@@ -115,7 +115,7 @@ async fn show_reflog(
   grep_pattern_type : GrepPatternType,
   grep_ignore_case : Bool,
 ) -> Unit raise Error {
-  let entries = @gitrepo.read_reflog(fs, git_dir, refname)
+  let entries = @bitrepo.read_reflog(fs, git_dir, refname)
   if entries.length() == 0 && refname == "HEAD" {
     // Some pure commit paths may not materialize logs/HEAD.
     // Fall back to HEAD history so `reflog --grep` semantics remain usable.
@@ -123,7 +123,7 @@ async fn show_reflog(
       Some(limit) => limit
       None => 64
     }
-    let commits = @gitlib.log_head(fs, git_dir, max_count=fallback_max_count)
+    let commits = @bitlib.log_head(fs, git_dir, max_count=fallback_max_count)
     let mut fallback_index = 0
     let mut printed = 0
     for entry in commits {
@@ -238,12 +238,12 @@ fn parse_reflog_show_args(args : Array[String]) -> ReflogShowArgs {
   }
 }
 
-fn normalize_reflog_refname(refname : String) -> String raise @git.GitError {
+fn normalize_reflog_refname(refname : String) -> String raise @bitcore.GitError {
   if refname == "HEAD" {
     return refname
   }
-  @gitlib.normalize_repo_path(refname) catch {
-    _ => raise @git.GitError::InvalidObject("invalid refname: " + refname)
+  @bitlib.normalize_repo_path(refname) catch {
+    _ => raise @bitcore.GitError::InvalidObject("invalid refname: " + refname)
   }
 }
 

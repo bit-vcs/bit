@@ -3,19 +3,19 @@
 ///| Uses HTTP client functions passed as arguments
 
 // Type aliases for HTTP client functions (for documentation)
-// HttpGetFn = async (String, Map[String, String]) -> (@git.HttpResponse, Bytes) raise @git.GitError
-// HttpPostFn = async (String, Bytes, Map[String, String]) -> (@git.HttpResponse, Bytes) raise @git.GitError
+// HttpGetFn = async (String, Map[String, String]) -> (@bit.HttpResponse, Bytes) raise @bit.GitError
+// HttpPostFn = async (String, Bytes, Map[String, String]) -> (@bit.HttpResponse, Bytes) raise @bit.GitError
 
 ///|
 /// Fetch info/refs using provided HTTP client
 pub async fn upload_pack_info_refs_with_http(
   remote : String,
   prefer_v2 : Bool,
-  http_get : async (String, Map[String, String]) -> (@git.HttpResponse, Bytes) raise @git.GitError,
-) -> Bytes raise @git.GitError {
+  http_get : async (String, Map[String, String]) -> (@bit.HttpResponse, Bytes) raise @bit.GitError,
+) -> Bytes raise @bit.GitError {
   let spec = @protocol.parse_remote(remote)
   if spec.kind != @protocol.RemoteKind::Http {
-    raise @git.GitError::ProtocolError("HTTP transport required")
+    raise @bit.GitError::ProtocolError("HTTP transport required")
   }
   let base = spec.base_url.unwrap_or(remote)
   let url = "\{base}/info/refs?service=git-upload-pack"
@@ -28,7 +28,7 @@ pub async fn upload_pack_info_refs_with_http(
   }
   let (response, data) = http_get(url, headers)
   if response.code != 200 {
-    raise @git.GitError::ProtocolError(
+    raise @bit.GitError::ProtocolError(
       "Failed to fetch info/refs: HTTP \{response.code}",
     )
   }
@@ -42,13 +42,13 @@ pub async fn upload_pack_request_with_http(
   body : Bytes,
   prefer_v2 : Bool,
   http_post : async (String, Bytes, Map[String, String]) -> (
-    @git.HttpResponse,
+    @bit.HttpResponse,
     Bytes,
-  ) raise @git.GitError,
-) -> Bytes raise @git.GitError {
+  ) raise @bit.GitError,
+) -> Bytes raise @bit.GitError {
   let spec = @protocol.parse_remote(remote)
   if spec.kind != @protocol.RemoteKind::Http {
-    raise @git.GitError::ProtocolError("HTTP transport required")
+    raise @bit.GitError::ProtocolError("HTTP transport required")
   }
   let base = spec.base_url.unwrap_or(remote)
   let url = "\{base}/git-upload-pack"
@@ -62,7 +62,7 @@ pub async fn upload_pack_request_with_http(
   }
   let (response, data) = http_post(url, body, headers)
   if response.code != 200 {
-    raise @git.GitError::ProtocolError(
+    raise @bit.GitError::ProtocolError(
       "Failed to upload-pack: HTTP \{response.code}",
     )
   }
@@ -74,17 +74,17 @@ pub async fn upload_pack_request_with_http(
 pub async fn discover_upload_refs_with_http(
   remote : String,
   prefer_v2 : Bool,
-  http_get : async (String, Map[String, String]) -> (@git.HttpResponse, Bytes) raise @git.GitError,
+  http_get : async (String, Map[String, String]) -> (@bit.HttpResponse, Bytes) raise @bit.GitError,
   http_post : async (String, Bytes, Map[String, String]) -> (
-    @git.HttpResponse,
+    @bit.HttpResponse,
     Bytes,
-  ) raise @git.GitError,
+  ) raise @bit.GitError,
 ) -> (
-  Array[(@git.ObjectId, String)],
+  Array[(@bit.ObjectId, String)],
   Array[String],
   @protocol.ProtocolVersion,
   Map[String, String],
-) raise @git.GitError {
+) raise @bit.GitError {
   let adv = upload_pack_info_refs_with_http(remote, prefer_v2, http_get)
   let version = @protocol.detect_protocol_version(adv)
   if version == @protocol.ProtocolVersion::V2 {
@@ -133,21 +133,21 @@ fn parse_symrefs_from_capabilities(caps : Array[String]) -> Map[String, String] 
 /// - filter: partial clone filter (v2 only)
 pub async fn fetch_pack_with_http(
   remote : String,
-  wants : Array[@git.ObjectId],
+  wants : Array[@bit.ObjectId],
   prefer_v2 : Bool,
   depth : Int,
   filter : @protocol.FilterSpec,
-  http_get : async (String, Map[String, String]) -> (@git.HttpResponse, Bytes) raise @git.GitError,
+  http_get : async (String, Map[String, String]) -> (@bit.HttpResponse, Bytes) raise @bit.GitError,
   http_post : async (String, Bytes, Map[String, String]) -> (
-    @git.HttpResponse,
+    @bit.HttpResponse,
     Bytes,
-  ) raise @git.GitError,
-) -> Bytes raise @git.GitError {
+  ) raise @bit.GitError,
+) -> Bytes raise @bit.GitError {
   let (refs, caps, version, _symrefs) = discover_upload_refs_with_http(
     remote, prefer_v2, http_get, http_post,
   )
   let wants = if wants.length() == 0 {
-    let ids : Array[@git.ObjectId] = []
+    let ids : Array[@bit.ObjectId] = []
     for item in refs {
       let (id, _) = item
       ids.push(id)
@@ -178,16 +178,16 @@ pub async fn fetch_pack_with_http(
 /// - filter: partial clone filter
 pub async fn fetch_objects_with_http(
   remote : String,
-  wants : Array[@git.ObjectId],
+  wants : Array[@bit.ObjectId],
   prefer_v2 : Bool,
   depth : Int,
   filter : @protocol.FilterSpec,
-  http_get : async (String, Map[String, String]) -> (@git.HttpResponse, Bytes) raise @git.GitError,
+  http_get : async (String, Map[String, String]) -> (@bit.HttpResponse, Bytes) raise @bit.GitError,
   http_post : async (String, Bytes, Map[String, String]) -> (
-    @git.HttpResponse,
+    @bit.HttpResponse,
     Bytes,
-  ) raise @git.GitError,
-) -> Array[@git.PackObject] raise @git.GitError {
+  ) raise @bit.GitError,
+) -> Array[@bit.PackObject] raise @bit.GitError {
   let pack = fetch_pack_with_http(
     remote, wants, prefer_v2, depth, filter, http_get, http_post,
   )
@@ -203,12 +203,12 @@ pub async fn clone_with_http(
   prefer_v2 : Bool,
   depth : Int,
   filter : @protocol.FilterSpec,
-  http_get : async (String, Map[String, String]) -> (@git.HttpResponse, Bytes) raise @git.GitError,
+  http_get : async (String, Map[String, String]) -> (@bit.HttpResponse, Bytes) raise @bit.GitError,
   http_post : async (String, Bytes, Map[String, String]) -> (
-    @git.HttpResponse,
+    @bit.HttpResponse,
     Bytes,
-  ) raise @git.GitError,
-) -> (Array[(@git.ObjectId, String)], Array[@git.PackObject]) raise @git.GitError {
+  ) raise @bit.GitError,
+) -> (Array[(@bit.ObjectId, String)], Array[@bit.PackObject]) raise @bit.GitError {
   let (refs, _caps, _version, symrefs) = discover_upload_refs_with_http(
     remote, prefer_v2, http_get, http_post,
   )
@@ -229,15 +229,15 @@ pub async fn clone_to_fs_with_http(
   prefer_v2 : Bool,
   depth : Int,
   filter : @protocol.FilterSpec,
-  fs : &@git.FileSystem,
+  fs : &@bit.FileSystem,
   root : String,
-  http_get : async (String, Map[String, String]) -> (@git.HttpResponse, Bytes) raise @git.GitError,
+  http_get : async (String, Map[String, String]) -> (@bit.HttpResponse, Bytes) raise @bit.GitError,
   http_post : async (String, Bytes, Map[String, String]) -> (
-    @git.HttpResponse,
+    @bit.HttpResponse,
     Bytes,
-  ) raise @git.GitError,
+  ) raise @bit.GitError,
   no_checkout? : Bool = false,
-) -> Array[(@git.ObjectId, String)] raise @git.GitError {
+) -> Array[(@bit.ObjectId, String)] raise @bit.GitError {
   let (refs, _caps, _version, symrefs) = discover_upload_refs_with_http(
     remote, prefer_v2, http_get, http_post,
   )
@@ -261,8 +261,8 @@ pub async fn clone_to_fs_with_http(
     // Write pack and index to disk immediately
     match default_ref {
       Some(_) => {
-        let git_dir = @git.join_path(root, ".git")
-        fs.mkdir_p(@git.join_path(git_dir, "objects/pack"))
+        let git_dir = @bit.join_path(root, ".git")
+        fs.mkdir_p(@bit.join_path(git_dir, "objects/pack"))
         @pack.write_packfile_with_index(fs, git_dir, pack, objects)
         // Write promisor file if partial clone
         if filter.is_partial() {
@@ -283,7 +283,7 @@ pub async fn clone_to_fs_with_http(
     // For partial clone, write refs/config and let caller perform lazy checkout.
     match default_ref {
       Some((refname, commit_id)) => {
-        let git_dir = @git.join_path(root, ".git")
+        let git_dir = @bit.join_path(root, ".git")
         write_partial_clone_refs(
           fs, git_dir, refname, commit_id, remote, filter,
         )
@@ -291,14 +291,14 @@ pub async fn clone_to_fs_with_http(
       None => ()
     }
   } else {
-    let store = @git.ObjectStore::from_pack(objects)
+    let store = @bit.ObjectStore::from_pack(objects)
     match default_ref {
       None => ()
       Some((refname, commit_id)) =>
         if no_checkout {
-          @git.write_git_metadata(store, commit_id, refname, remote, fs, root)
+          @bit.write_git_metadata(store, commit_id, refname, remote, fs, root)
         } else {
-          @git.materialize_clone_to_fs(
+          @bit.materialize_clone_to_fs(
             store, commit_id, refname, remote, fs, root,
           )
         }
@@ -310,36 +310,36 @@ pub async fn clone_to_fs_with_http(
 ///|
 /// Write promisor file to mark this as a partial clone repository
 fn write_promisor_file(
-  fs : &@git.FileSystem,
+  fs : &@bit.FileSystem,
   git_dir : String,
   remote : String,
-) -> Unit raise @git.GitError {
-  let promisor_dir = @git.join_path(git_dir, "objects/info")
+) -> Unit raise @bit.GitError {
+  let promisor_dir = @bit.join_path(git_dir, "objects/info")
   fs.mkdir_p(promisor_dir)
-  let promisor_path = @git.join_path(promisor_dir, "promisor")
+  let promisor_path = @bit.join_path(promisor_dir, "promisor")
   // Format: remote URL that can fulfill missing objects
   fs.write_string(promisor_path, remote + "\n")
 }
 
 ///|
-fn read_pack_trailer_id_http(pack : Bytes) -> @git.ObjectId raise @git.GitError {
+fn read_pack_trailer_id_http(pack : Bytes) -> @bit.ObjectId raise @bit.GitError {
   if pack.length() < 20 {
-    raise @git.GitError::PackfileError("Packfile too short")
+    raise @bit.GitError::PackfileError("Packfile too short")
   }
   let trailer_start = pack.length() - 20
   let bytes = FixedArray::makei(20, i => pack[trailer_start + i])
-  @git.ObjectId::new(bytes)
+  @bit.ObjectId::new(bytes)
 }
 
 ///|
 fn write_pack_promisor_marker_http(
-  fs : &@git.FileSystem,
+  fs : &@bit.FileSystem,
   git_dir : String,
-  pack_id : @git.ObjectId,
-  refs : Array[(@git.ObjectId, String)],
-  default_ref : (String, @git.ObjectId)?,
-) -> Unit raise @git.GitError {
-  let pack_dir = @git.join_path(git_dir, "objects/pack")
+  pack_id : @bit.ObjectId,
+  refs : Array[(@bit.ObjectId, String)],
+  default_ref : (String, @bit.ObjectId)?,
+) -> Unit raise @bit.GitError {
+  let pack_dir = @bit.join_path(git_dir, "objects/pack")
   fs.mkdir_p(pack_dir)
   let marker_lines : Array[String] = []
   let seen : Map[String, Bool] = {}
@@ -370,25 +370,25 @@ fn write_pack_promisor_marker_http(
   }
   let marker_content = marker_lines.join("\n") + "\n"
   let base = "pack-\{pack_id.to_hex()}"
-  let marker_path = @git.join_path(pack_dir, base + ".promisor")
+  let marker_path = @bit.join_path(pack_dir, base + ".promisor")
   fs.write_string(marker_path, marker_content)
 }
 
 ///|
 /// Write refs for partial clone (without checkout)
 fn write_partial_clone_refs(
-  fs : &@git.FileSystem,
+  fs : &@bit.FileSystem,
   git_dir : String,
   refname : String,
-  commit_id : @git.ObjectId,
+  commit_id : @bit.ObjectId,
   remote : String,
   filter : @protocol.FilterSpec,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   // Write HEAD
-  let head_path = @git.join_path(git_dir, "HEAD")
+  let head_path = @bit.join_path(git_dir, "HEAD")
   fs.write_string(head_path, "ref: \{refname}\n")
   // Write the ref - compute parent directory
-  let ref_path = @git.join_path(git_dir, refname)
+  let ref_path = @bit.join_path(git_dir, refname)
   // Get parent directory by finding last /
   let ref_dir = {
     let mut last_slash = -1
@@ -406,7 +406,7 @@ fn write_partial_clone_refs(
   fs.mkdir_p(ref_dir)
   fs.write_string(ref_path, commit_id.to_hex() + "\n")
   // Write config with remote
-  let config_path = @git.join_path(git_dir, "config")
+  let config_path = @bit.join_path(git_dir, "config")
   let config = "[core]\n\trepositoryformatversion = 1\n\tfilemode = true\n\tbare = false\n\tlogallaliases = false\n[extensions]\n\tpartialclone = origin\n[remote \"origin\"]\n\turl = \{remote}\n\tfetch = +refs/heads/*:refs/remotes/origin/*\n\tpromisor = true\n\tpartialclonefilter = \{filter.to_string()}\n"
   fs.write_string(config_path, config)
 }

@@ -57,7 +57,7 @@ async fn handle_send_pack(args : Array[String]) -> Unit raise Error {
   }
   // If --all or --mirror, add all refs
   if all || mirror {
-    let refs = @gitrepo.show_ref(fs, git_dir)
+    let refs = @bitrepo.show_ref(fs, git_dir)
     for item in refs {
       let (name, _) = item
       if mirror || name.has_prefix("refs/heads/") {
@@ -74,7 +74,7 @@ async fn handle_send_pack(args : Array[String]) -> Unit raise Error {
     }
   }
   // Parse refspecs and collect refs to push
-  let refs_to_push : Array[(String, @git.ObjectId, String)] = []
+  let refs_to_push : Array[(String, @bitcore.ObjectId, String)] = []
   for spec in refspecs {
     let (src, dst) = match spec.find(":") {
       Some(idx) => (spec[:idx].to_string(), spec[idx + 1:].to_string())
@@ -83,7 +83,7 @@ async fn handle_send_pack(args : Array[String]) -> Unit raise Error {
     // Handle force push
     let actual_src = if src.has_prefix("+") { src[1:].to_string() } else { src }
     // Resolve source ref
-    match @gitrepo.rev_parse(fs, git_dir, actual_src) {
+    match @bitrepo.rev_parse(fs, git_dir, actual_src) {
       Some(id) => refs_to_push.push((actual_src, id, dst))
       None =>
         if actual_src.length() > 0 {

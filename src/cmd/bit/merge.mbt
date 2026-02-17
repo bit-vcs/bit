@@ -1,10 +1,10 @@
 ///|
 async fn handle_merge(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
-  let rfs : &@git.RepoFileSystem = fs
+  let rfs : &@bitcore.RepoFileSystem = fs
   let root = get_work_root()
   let git_dir = root + "/.git"
-  let wfs : &@git.FileSystem = fs
+  let wfs : &@bitcore.FileSystem = fs
   let mut target_ref : String? = None
   let mut message : String? = None
   let mut no_ff = false
@@ -26,9 +26,9 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
         i += 2
         continue
       }
-      "-m" => raise @git.GitError::InvalidObject("option '-m' requires a value")
+      "-m" => raise @bitcore.GitError::InvalidObject("option '-m' requires a value")
       "--message" =>
-        raise @git.GitError::InvalidObject(
+        raise @bitcore.GitError::InvalidObject(
           "option '--message' requires a value",
         )
       _ if arg.has_prefix("-m") => {
@@ -69,7 +69,7 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
       _ if not(arg.has_prefix("-")) =>
         match target_ref {
           Some(_) =>
-            raise @git.GitError::InvalidObject(
+            raise @bitcore.GitError::InvalidObject(
               "multiple merge heads are not supported",
             )
           None => target_ref = Some(arg)
@@ -87,7 +87,7 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
       let orig_hex = rfs.read_file(orig_head_path)
         |> decode_bytes
         |> trim_string
-      ignore(@gitlib.reset(wfs, rfs, root, orig_hex, @gitlib.ResetMode::Hard))
+      ignore(@bitlib.reset(wfs, rfs, root, orig_hex, @bitlib.ResetMode::Hard))
       wfs.remove_file(orig_head_path) catch {
         err if @async.is_cancellation_error(err) => raise err
         _ => ()
@@ -127,7 +127,7 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
     }
     let author = get_author_string()
     let timestamp = get_commit_timestamp()
-    let commit_id = @gitlib.commit(wfs, rfs, root, msg, author, timestamp)
+    let commit_id = @bitlib.commit(wfs, rfs, root, msg, author, timestamp)
     let short = String::unsafe_substring(commit_id.to_hex(), start=0, end=7)
     // Clean up merge state
     wfs.remove_file(merge_head_path) catch {
@@ -146,7 +146,7 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
     return
   }
   guard target_ref is Some(refspec) else {
-    raise @git.GitError::InvalidObject("No commit to merge specified")
+    raise @bitcore.GitError::InvalidObject("No commit to merge specified")
   }
   // Check if subdir-clone and handle specially
   match get_subdir_info(fs, git_dir) {
@@ -159,9 +159,9 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
     None => ()
   }
   // Resolve target
-  let target_id = @gitrepo.rev_parse(fs, git_dir, refspec)
+  let target_id = @bitrepo.rev_parse(fs, git_dir, refspec)
   guard target_id is Some(tid) else {
-    raise @git.GitError::InvalidObject("unknown revision: \{refspec}")
+    raise @bitcore.GitError::InvalidObject("unknown revision: \{refspec}")
   }
   let author = get_author_string()
   let timestamp = get_commit_timestamp()
@@ -169,17 +169,17 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
   // Handle --squash
   if squash {
     // Squash merge: apply changes but don't commit
-    let result = @gitlib.merge(fs, fs, root, tid, msg, author, timestamp)
+    let result = @bitlib.merge(fs, fs, root, tid, msg, author, timestamp)
     match result.status {
-      @gitlib.MergeStatus::AlreadyUpToDate => print_line("Already up to date.")
-      @gitlib.MergeStatus::FastForward | @gitlib.MergeStatus::Merged => {
+      @bitlib.MergeStatus::AlreadyUpToDate => print_line("Already up to date.")
+      @bitlib.MergeStatus::FastForward | @bitlib.MergeStatus::Merged => {
         // Reset HEAD but keep working tree changes
-        let head = @gitrepo.rev_parse(rfs, git_dir, "HEAD")
+        let head = @bitrepo.rev_parse(rfs, git_dir, "HEAD")
         match head {
           Some(h) =>
             // Reset index to HEAD but keep working tree
             ignore(
-              @gitlib.reset(wfs, rfs, root, h.to_hex(), @gitlib.ResetMode::Soft),
+              @bitlib.reset(wfs, rfs, root, h.to_hex(), @bitlib.ResetMode::Soft),
             )
           None => ()
         }
@@ -190,7 +190,7 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
           "Squashed commit of the following:\n\n" + msg + "\n",
         )
       }
-      @gitlib.MergeStatus::Conflicted => {
+      @bitlib.MergeStatus::Conflicted => {
         print_line("CONFLICT: Merge conflict")
         for path in result.conflicts {
           print_line("  \{path}")
@@ -200,7 +200,7 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
     return
   }
   // Check if fast-forward is possible
-  let head = @gitrepo.rev_parse(rfs, git_dir, "HEAD")
+  let head = @bitrepo.rev_parse(rfs, git_dir, "HEAD")
   let is_ff = match head {
     Some(h) => is_ancestor(rfs, git_dir, h, tid)
     None => false
@@ -213,21 +213,21 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
   // Handle --no-ff: force merge commit even if fast-forward possible
   if no_ff && is_ff {
     // Create merge commit even though ff is possible
-    let db = @gitlib.ObjectDb::load(rfs, git_dir)
-    let head_id = @gitrepo.rev_parse(rfs, git_dir, "HEAD")
+    let db = @bitlib.ObjectDb::load(rfs, git_dir)
+    let head_id = @bitrepo.rev_parse(rfs, git_dir, "HEAD")
     guard head_id is Some(hid) else {
-      raise @git.GitError::InvalidObject("Cannot resolve HEAD")
+      raise @bitcore.GitError::InvalidObject("Cannot resolve HEAD")
     }
     // Use target's tree
     let target_obj = db.get(rfs, tid)
     guard target_obj is Some(to) else {
-      raise @git.GitError::InvalidObject("Cannot read target commit")
+      raise @bitcore.GitError::InvalidObject("Cannot read target commit")
     }
-    let target_info = @git.parse_commit(to.data)
+    let target_info = @bitcore.parse_commit(to.data)
     // Write tree (use target's tree)
     let tree_id = target_info.tree
     // Create merge commit with two parents
-    let commit = @git.Commit::new(
+    let commit = @bitcore.Commit::new(
       tree_id,
       [hid, tid],
       author,
@@ -238,8 +238,8 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
       "+0000",
       msg + "\n",
     )
-    let (commit_id, commit_data) = @git.create_commit(commit)
-    @gitlib.write_object_bytes(wfs, git_dir, commit_id, commit_data)
+    let (commit_id, commit_data) = @bitcore.create_commit(commit)
+    @bitlib.write_object_bytes(wfs, git_dir, commit_id, commit_data)
     // Update HEAD
     let head_path = git_dir + "/HEAD"
     let head_content = rfs.read_file(head_path) |> decode_bytes |> trim_string
@@ -256,16 +256,16 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
       wfs.write_string(head_path, commit_id.to_hex() + "\n")
     }
     // Checkout the new tree
-    ignore(@gitlib.checkout(wfs, rfs, root, commit_id.to_hex(), detach=false))
+    ignore(@bitlib.checkout(wfs, rfs, root, commit_id.to_hex(), detach=false))
     let short = String::unsafe_substring(commit_id.to_hex(), start=0, end=7)
     print_line("Merge made by the 'ort' strategy (--no-ff). [\{short}]")
     return
   }
   // Regular merge
-  let result = @gitlib.merge(fs, fs, root, tid, msg, author, timestamp)
+  let result = @bitlib.merge(fs, fs, root, tid, msg, author, timestamp)
   match result.status {
-    @gitlib.MergeStatus::AlreadyUpToDate => print_line("Already up to date.")
-    @gitlib.MergeStatus::FastForward =>
+    @bitlib.MergeStatus::AlreadyUpToDate => print_line("Already up to date.")
+    @bitlib.MergeStatus::FastForward =>
       match result.commit_id {
         Some(id) => {
           let short = String::unsafe_substring(id.to_hex(), start=0, end=7)
@@ -273,7 +273,7 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
         }
         None => print_line("Fast-forward")
       }
-    @gitlib.MergeStatus::Merged =>
+    @bitlib.MergeStatus::Merged =>
       match result.commit_id {
         Some(id) => {
           let short = String::unsafe_substring(id.to_hex(), start=0, end=7)
@@ -281,7 +281,7 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
         }
         None => print_line("Merged")
       }
-    @gitlib.MergeStatus::Conflicted => {
+    @bitlib.MergeStatus::Conflicted => {
       print_line("CONFLICT (content): Merge conflict in the following files:")
       for path in result.conflicts {
         print_line("  \{path}")
@@ -293,16 +293,16 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
 
 ///|
 fn is_ancestor(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   git_dir : String,
-  ancestor : @git.ObjectId,
-  descendant : @git.ObjectId,
+  ancestor : @bitcore.ObjectId,
+  descendant : @bitcore.ObjectId,
 ) -> Bool {
   // Check if ancestor is an ancestor of descendant
-  let db = @gitlib.ObjectDb::load(rfs, git_dir) catch { _ => return false }
+  let db = @bitlib.ObjectDb::load(rfs, git_dir) catch { _ => return false }
   let ancestor_hex = ancestor.to_hex()
   let visited : Map[String, Bool] = {}
-  let queue : Array[@git.ObjectId] = [descendant]
+  let queue : Array[@bitcore.ObjectId] = [descendant]
   while queue.length() > 0 {
     let current = queue.pop()
     guard current is Some(cid) else { break }
@@ -317,7 +317,7 @@ fn is_ancestor(
     let obj = db.get(rfs, cid) catch { _ => continue }
     match obj {
       Some(o) => {
-        let info = @git.parse_commit(o.data) catch { _ => continue }
+        let info = @bitcore.parse_commit(o.data) catch { _ => continue }
         for p in info.parents {
           queue.push(p)
         }

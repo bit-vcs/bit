@@ -16,26 +16,26 @@ fn resolve_in_cwd(path : String) -> String {
 }
 
 ///|
-fn pack_hash_id(pack : Bytes) -> @git.ObjectId raise @git.GitError {
+fn pack_hash_id(pack : Bytes) -> @bitcore.ObjectId raise @bitcore.GitError {
   if pack.length() < 20 {
-    raise @git.GitError::PackfileError("Packfile too short")
+    raise @bitcore.GitError::PackfileError("Packfile too short")
   }
   let start = pack.length() - 20
   let bytes : FixedArray[Byte] = FixedArray::make(20, b'\x00')
   for i in 0..<20 {
     bytes[i] = pack[start + i]
   }
-  @git.ObjectId::new(bytes)
+  @bitcore.ObjectId::new(bytes)
 }
 
 ///|
-fn pack_hash_hex(pack : Bytes) -> String raise @git.GitError {
+fn pack_hash_hex(pack : Bytes) -> String raise @bitcore.GitError {
   pack_hash_id(pack).to_hex()
 }
 
 ///|
 /// Parse git config file and get value for section.key
-fn git_config_get(git_dir : String, section : String, key : String) -> String? {
+fn bit_config_get(git_dir : String, section : String, key : String) -> String? {
   let config_path = git_dir + "/config"
   let content = @fs.read_file_to_string(config_path) catch { _ => return None }
   parse_git_config_value(content, section, key)
@@ -157,7 +157,7 @@ fn is_pack_reuse_config_enabled(git_dir : String) -> Bool {
       }
     None => ()
   }
-  match git_config_get(git_dir, "pack", "allowPackReuse") {
+  match bit_config_get(git_dir, "pack", "allowPackReuse") {
     Some(value) =>
       match parse_pack_allow_reuse(value) {
         Some(flag) => return flag
@@ -173,7 +173,7 @@ fn is_pack_reuse_config_enabled(git_dir : String) -> Bool {
       }
     None => ()
   }
-  match git_config_get(git_dir, "feature", "experimental") {
+  match bit_config_get(git_dir, "feature", "experimental") {
     Some(value) =>
       match parse_bool_value(value) {
         Some(flag) => return flag
@@ -187,7 +187,7 @@ fn is_pack_reuse_config_enabled(git_dir : String) -> Bool {
 ///|
 /// Get pack.packSizeLimit from git config
 fn get_pack_size_limit(git_dir : String) -> Int64? {
-  match git_config_get(git_dir, "pack", "packSizeLimit") {
+  match bit_config_get(git_dir, "pack", "packSizeLimit") {
     None => None
     Some(value) => parse_size_value(value)
   }
@@ -195,7 +195,7 @@ fn get_pack_size_limit(git_dir : String) -> Int64? {
 
 ///|
 fn get_pack_use_sparse(git_dir : String) -> Bool {
-  match git_config_get(git_dir, "pack", "useSparse") {
+  match bit_config_get(git_dir, "pack", "useSparse") {
     Some(value) => parse_bool_value(value).unwrap_or(false)
     // Match upstream git default: pack.useSparse is true unless disabled.
     None => true
@@ -223,10 +223,10 @@ fn get_pack_compression_level(git_dir : String) -> Int? {
   if get_config_override("core.compression") is Some(value) {
     return parse_compression_level(value)
   }
-  if git_config_get(git_dir, "pack", "compression") is Some(value) {
+  if bit_config_get(git_dir, "pack", "compression") is Some(value) {
     return parse_compression_level(value)
   }
-  if git_config_get(git_dir, "core", "compression") is Some(value) {
+  if bit_config_get(git_dir, "core", "compression") is Some(value) {
     return parse_compression_level(value)
   }
   None
@@ -236,7 +236,7 @@ fn get_pack_compression_level(git_dir : String) -> Int? {
 /// Check if repository uses SHA256 (returns true if SHA256, false if SHA1)
 fn is_sha256_repo(git_dir : String) -> Bool {
   // Check extensions.objectFormat in config
-  match git_config_get(git_dir, "extensions", "objectFormat") {
+  match bit_config_get(git_dir, "extensions", "objectFormat") {
     Some(format) => format.to_lower() == "sha256"
     None => false
   }

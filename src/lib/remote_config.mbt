@@ -343,7 +343,7 @@ pub fn split_config_key(
 ///|
 pub fn parse_config_override_pairs() -> Array[(String, String)] {
   let out : Array[(String, String)] = []
-  let overrides = @gitio.env_get("GIT_CONFIG_OVERRIDES")
+  let overrides = @bitio.env_get("GIT_CONFIG_OVERRIDES")
   guard overrides is Some(env_value) else { return out }
   for line in split_by_newline(env_value) {
     if line.length() == 0 {
@@ -475,7 +475,7 @@ pub fn apply_config_overrides(
 
 ///|
 pub fn read_repo_config(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> (Map[String, RemoteConfig], Map[String, BranchConfig]) {
   let config_path = git_dir + "/config"
@@ -497,7 +497,7 @@ pub fn read_repo_config(
 
 ///|
 pub fn list_remotes(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> Array[String] {
   let (remotes, _) = read_repo_config(fs, git_dir)
@@ -511,7 +511,7 @@ pub fn list_remotes(
 
 ///|
 pub fn list_remotes_verbose(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> Array[(String, String)] {
   let (remotes, _) = read_repo_config(fs, git_dir)
@@ -547,7 +547,7 @@ pub fn list_remotes_verbose(
 
 ///|
 pub fn get_remote_url(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
   name : String,
 ) -> String? {
@@ -761,22 +761,22 @@ pub fn is_mirror_fetch_config(rc : RemoteConfig) -> Bool {
 
 ///|
 pub fn remote_set_branches(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   name : String,
   branches : Array[String],
   add : Bool,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let config_path = git_dir + "/config"
   if not(rfs.is_file(config_path)) {
-    raise @git.GitError::InvalidObject("No such remote '\{name}'")
+    raise @bit.GitError::InvalidObject("No such remote '\{name}'")
   }
   let content = decode_bytes_lossy(rfs.read_file(config_path))
   let (remotes, _) = parse_remote_config(content)
   let rc = match remotes.get(name) {
     Some(cfg) => cfg
-    None => raise @git.GitError::InvalidObject("No such remote '\{name}'")
+    None => raise @bit.GitError::InvalidObject("No such remote '\{name}'")
   }
   let mirror_fetch = is_mirror_fetch_config(rc)
   let updated_specs : Array[String] = []
@@ -833,21 +833,21 @@ pub fn remote_set_branches(
     }
   }
   if not(found) {
-    raise @git.GitError::InvalidObject("No such remote '\{name}'")
+    raise @bit.GitError::InvalidObject("No such remote '\{name}'")
   }
   fs.write_string(config_path, render_config_blocks(new_blocks))
 }
 
 ///|
 pub fn set_config_key(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   section : String,
   name : String,
   key : String,
   value : String,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let config_path = git_dir + "/config"
   let target_section = "[\{section} \"\{name}\"]"
   let content = if rfs.is_file(config_path) {

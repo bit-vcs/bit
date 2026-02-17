@@ -105,7 +105,7 @@ async fn handle_worktree_list(args : Array[String]) -> Unit raise Error {
     eprint_line("fatal: --verbose and --porcelain are mutually exclusive")
     @sys.exit(1)
   }
-  let worktrees = @gitlib.list_worktrees(fs, root)
+  let worktrees = @bitlib.list_worktrees(fs, root)
   if porcelain {
     for wt in worktrees {
       let sep = if nul_terminated { "\u{00}" } else { "\n" }
@@ -121,7 +121,7 @@ async fn handle_worktree_list(args : Array[String]) -> Unit raise Error {
       }
       if wt.locked {
         // Get lock reason if available
-        let reason = @gitlib.get_worktree_lock_reason(fs, root, wt.path)
+        let reason = @bitlib.get_worktree_lock_reason(fs, root, wt.path)
         match reason {
           Some(r) =>
             if r.length() > 0 {
@@ -136,7 +136,7 @@ async fn handle_worktree_list(args : Array[String]) -> Unit raise Error {
       }
       // Check if prunable
       if not(wt.is_main) {
-        let prunable = @gitlib.get_worktree_prunable_reason(fs, root, wt.path)
+        let prunable = @bitlib.get_worktree_prunable_reason(fs, root, wt.path)
         match prunable {
           Some(r) => print_str("prunable \{r}\{sep}")
           None => ()
@@ -159,7 +159,7 @@ async fn handle_worktree_list(args : Array[String]) -> Unit raise Error {
       print_line("\{wt.path}  \{commit_str} \{branch_str}\{locked_str}")
       // Print lock reason on next line if locked
       if wt.locked {
-        let reason = @gitlib.get_worktree_lock_reason(fs, root, wt.path)
+        let reason = @bitlib.get_worktree_lock_reason(fs, root, wt.path)
         match reason {
           Some(r) => if r.length() > 0 { print_line("\tlocked: \{r}") }
           None => ()
@@ -167,7 +167,7 @@ async fn handle_worktree_list(args : Array[String]) -> Unit raise Error {
       }
       // Print prunable reason if applicable
       if not(wt.is_main) {
-        let prunable = @gitlib.get_worktree_prunable_reason(fs, root, wt.path)
+        let prunable = @bitlib.get_worktree_prunable_reason(fs, root, wt.path)
         match prunable {
           Some(r) => print_line("\tprunable: \{r}")
           None => ()
@@ -190,7 +190,7 @@ async fn handle_worktree_list(args : Array[String]) -> Unit raise Error {
         suffix = suffix + " locked"
       }
       if not(wt.is_main) {
-        let prunable = @gitlib.get_worktree_prunable_reason(fs, root, wt.path)
+        let prunable = @bitlib.get_worktree_prunable_reason(fs, root, wt.path)
         if prunable is Some(_) {
           suffix = suffix + " prunable"
         }
@@ -272,7 +272,7 @@ async fn handle_worktree_add(args : Array[String]) -> Unit raise Error {
   if new_branch is None && not(detach) && commit_ish is None {
     new_branch = Some(infer_default_worktree_branch_name(wt_path))
   }
-  @gitlib.create_worktree(
+  @bitlib.create_worktree(
     fs,
     fs,
     root,
@@ -311,7 +311,7 @@ async fn handle_worktree_remove(args : Array[String]) -> Unit raise Error {
     eprint_line("usage: git worktree remove [--force] <worktree>")
     @sys.exit(1)
   }
-  @gitlib.remove_worktree(fs, fs, root, wt_path, force~)
+  @bitlib.remove_worktree(fs, fs, root, wt_path, force~)
   print_line("Removed worktree '\{wt_path}'")
 }
 
@@ -329,7 +329,7 @@ async fn handle_worktree_prune(args : Array[String]) -> Unit raise Error {
       _ => ()
     }
   }
-  let pruned = @gitlib.prune_worktrees(fs, fs, root, dry_run~)
+  let pruned = @bitlib.prune_worktrees(fs, fs, root, dry_run~)
   if pruned.length() == 0 {
     if verbose {
       print_line("Nothing to prune")
@@ -372,7 +372,7 @@ async fn handle_worktree_lock(args : Array[String]) -> Unit raise Error {
     eprint_line("usage: git worktree lock [--reason <string>] <worktree>")
     @sys.exit(1)
   }
-  @gitlib.lock_worktree(fs, fs, root, wt_path, reason~)
+  @bitlib.lock_worktree(fs, fs, root, wt_path, reason~)
 }
 
 ///|
@@ -391,7 +391,7 @@ async fn handle_worktree_unlock(args : Array[String]) -> Unit raise Error {
     eprint_line("usage: git worktree unlock <worktree>")
     @sys.exit(1)
   }
-  @gitlib.unlock_worktree(fs, fs, root, wt_path)
+  @bitlib.unlock_worktree(fs, fs, root, wt_path)
 }
 
 ///|
@@ -414,7 +414,7 @@ async fn handle_worktree_move(args : Array[String]) -> Unit raise Error {
   }
   let source = positional[0]
   let dest = positional[1]
-  @gitlib.move_worktree(fs, fs, root, source, dest, force~)
+  @bitlib.move_worktree(fs, fs, root, source, dest, force~)
   print_line("Moving '\{source}' to '\{dest}'")
 }
 
@@ -430,7 +430,7 @@ async fn handle_worktree_repair(args : Array[String]) -> Unit raise Error {
       warn_unimplemented_arg("worktree", arg)
     }
   }
-  let repaired = @gitlib.repair_worktree(fs, fs, root, worktree_paths=paths)
+  let repaired = @bitlib.repair_worktree(fs, fs, root, worktree_paths=paths)
   if repaired.length() == 0 {
     // No output if nothing to repair (like git)
     ()

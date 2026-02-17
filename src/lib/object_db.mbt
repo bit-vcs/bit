@@ -27,8 +27,8 @@ pub fn LazyPackIndex::new(
 ///|
 pub fn LazyPackIndex::get(
   self : LazyPackIndex,
-  fs : &@git.RepoFileSystem,
-) -> PackIndex raise @git.GitError {
+  fs : &@bit.RepoFileSystem,
+) -> PackIndex raise @bit.GitError {
   match self.loaded {
     Some(idx) => idx
     None => {
@@ -43,9 +43,9 @@ pub fn LazyPackIndex::get(
 ///|
 pub fn LazyPackIndex::find_offset(
   self : LazyPackIndex,
-  fs : &@git.RepoFileSystem,
-  id : @git.ObjectId,
-) -> Int64? raise @git.GitError {
+  fs : &@bit.RepoFileSystem,
+  id : @bit.ObjectId,
+) -> Int64? raise @bit.GitError {
   let idx = self.get(fs)
   idx.find_offset(id)
 }
@@ -53,15 +53,15 @@ pub fn LazyPackIndex::find_offset(
 ///|
 pub fn LazyPackIndex::find_offset_hex(
   self : LazyPackIndex,
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   hex : String,
-) -> Int64? raise @git.GitError {
+) -> Int64? raise @bit.GitError {
   let idx = self.get(fs)
   idx.find_offset_hex(hex)
 }
 
 ///|
-pub fn PackIndex::find_offset(self : PackIndex, id : @git.ObjectId) -> Int64? {
+pub fn PackIndex::find_offset(self : PackIndex, id : @bit.ObjectId) -> Int64? {
   let target = id.to_hex()
   PackIndex::find_offset_hex(self, target)
 }
@@ -114,7 +114,7 @@ pub struct ObjectDb {
 
 ///|
 fn pack_cache_limit_from_env() -> Int {
-  match @gitio.env_get("BIT_PACK_CACHE_LIMIT") {
+  match @bitio.env_get("BIT_PACK_CACHE_LIMIT") {
     Some(v) =>
       try @strconv.parse_int(v) catch {
         _ => 2
@@ -147,17 +147,17 @@ fn evict_pack_cache(db : ObjectDb) -> Unit {
 ///|
 /// Load ObjectDb with full loose object scan (slower but complete)
 pub fn ObjectDb::load(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
-) -> ObjectDb raise @git.GitError {
+) -> ObjectDb raise @bit.GitError {
   ObjectDb::load_from_objects_dir(fs, join_path(git_dir, "objects"))
 }
 
 ///|
 pub fn ObjectDb::load_from_objects_dir(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   objects_dir : String,
-) -> ObjectDb raise @git.GitError {
+) -> ObjectDb raise @bit.GitError {
   let loose_paths = if fs.is_dir(objects_dir) {
     collect_loose_paths(fs, objects_dir)
   } else {
@@ -191,17 +191,17 @@ pub fn ObjectDb::load_from_objects_dir(
 ///|
 /// Load ObjectDb lazily - don't scan loose objects or load pack indexes upfront
 pub fn ObjectDb::load_lazy(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
-) -> ObjectDb raise @git.GitError {
+) -> ObjectDb raise @bit.GitError {
   ObjectDb::load_lazy_from_objects_dir(fs, join_path(git_dir, "objects"))
 }
 
 ///|
 pub fn ObjectDb::load_lazy_from_objects_dir(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   objects_dir : String,
-) -> ObjectDb raise @git.GitError {
+) -> ObjectDb raise @bit.GitError {
   let lazy_packs = if fs.is_dir(objects_dir) {
     let pack_dir = join_path(objects_dir, "pack")
     if fs.is_dir(pack_dir) {
@@ -242,9 +242,9 @@ pub fn ObjectDb::set_skip_verify(self : ObjectDb, value : Bool) -> Unit {
 ///|
 pub fn ObjectDb::get(
   self : ObjectDb,
-  fs : &@git.RepoFileSystem,
-  id : @git.ObjectId,
-) -> @git.PackObject? raise @git.GitError {
+  fs : &@bit.RepoFileSystem,
+  id : @bit.ObjectId,
+) -> @bit.PackObject? raise @bit.GitError {
   let hex = id.to_hex()
   // Fast path: try loose object first without allocating seen set
   if not(self.prefer_packed) {
@@ -272,9 +272,9 @@ pub fn ObjectDb::get(
 /// Returns None for loose objects or non-delta packed objects.
 pub fn ObjectDb::find_delta_base(
   self : ObjectDb,
-  fs : &@git.RepoFileSystem,
-  id : @git.ObjectId,
-) -> @git.ObjectId? raise @git.GitError {
+  fs : &@bit.RepoFileSystem,
+  id : @bit.ObjectId,
+) -> @bit.ObjectId? raise @bit.GitError {
   let hex = id.to_hex()
   if not(self.prefer_packed) {
     if get_loose_by_hex(self, fs, hex) is Some(_) {
@@ -290,9 +290,9 @@ pub fn ObjectDb::find_delta_base(
 /// - packed object: packed entry byte length
 pub fn ObjectDb::find_object_disk_size(
   self : ObjectDb,
-  fs : &@git.RepoFileSystem,
-  id : @git.ObjectId,
-) -> Int? raise @git.GitError {
+  fs : &@bit.RepoFileSystem,
+  id : @bit.ObjectId,
+) -> Int? raise @bit.GitError {
   let hex = id.to_hex()
   match find_loose_path_by_hex(self, fs, hex) {
     Some(path) => Some(fs.read_file(path).length())
@@ -303,7 +303,7 @@ pub fn ObjectDb::find_object_disk_size(
 ///|
 fn find_loose_path_by_hex(
   db : ObjectDb,
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   hex : String,
 ) -> String? {
   match db.loose_paths.get(hex) {
@@ -328,9 +328,9 @@ fn find_loose_path_by_hex(
 ///|
 fn find_pack_object_disk_size_by_hex(
   db : ObjectDb,
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   hex : String,
-) -> Int? raise @git.GitError {
+) -> Int? raise @bit.GitError {
   for pack in db.packs {
     let offset = PackIndex::find_offset_hex(pack, hex)
     if offset is Some(found) {
@@ -350,10 +350,10 @@ fn find_pack_object_disk_size_by_hex(
 ///|
 fn pack_object_disk_size_at(
   db : ObjectDb,
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   pack : PackIndex,
   offset : Int64,
-) -> Int? raise @git.GitError {
+) -> Int? raise @bit.GitError {
   let data = get_pack_bytes(db, fs, pack.pack_path)
   if data.length() <= 20 {
     return None
@@ -388,9 +388,9 @@ fn pack_object_disk_size_at(
 /// Fast loose-object lookup without seen set allocation.
 fn get_loose_by_hex(
   db : ObjectDb,
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   hex : String,
-) -> @git.PackObject? raise @git.GitError {
+) -> @bit.PackObject? raise @bit.GitError {
   let loose_path = match db.loose_paths.get(hex) {
     Some(path) => Some(path)
     None =>
@@ -412,13 +412,13 @@ fn get_loose_by_hex(
     Some(path) => {
       let compressed = fs.read_file(path)
       let raw = @zlib.zlib_decompress(compressed) catch {
-        e => raise @git.GitError::InvalidObject("Zlib error: \{e}")
+        e => raise @bit.GitError::InvalidObject("Zlib error: \{e}")
       }
       let obj = parse_loose_object(raw)
       if not(db.skip_verify) {
-        let computed = @git.hash_object_content(obj.obj_type, obj.data).to_hex()
+        let computed = @bit.hash_object_content(obj.obj_type, obj.data).to_hex()
         if computed != hex {
-          raise @git.GitError::HashMismatch(computed, hex)
+          raise @bit.GitError::HashMismatch(computed, hex)
         }
       }
       Some(obj)
@@ -430,9 +430,9 @@ fn get_loose_by_hex(
 ///|
 fn get_pack_bytes(
   db : ObjectDb,
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   pack_path : String,
-) -> Bytes raise @git.GitError {
+) -> Bytes raise @bit.GitError {
   if db.pack_cache_limit == 0 {
     return fs.read_file(pack_path)
   }
@@ -454,11 +454,11 @@ fn get_pack_bytes(
 ///|
 fn get_from_packs(
   db : ObjectDb,
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   hex : String,
   seen : Map[String, Bool],
-) -> @git.PackObject? raise @git.GitError {
-  let mut last_error : @git.GitError? = None
+) -> @bit.PackObject? raise @bit.GitError {
+  let mut last_error : @bit.GitError? = None
   // Try pack files (eagerly loaded)
   for pack in db.packs {
     match PackIndex::find_offset_hex(pack, hex) {
@@ -474,7 +474,7 @@ fn get_from_packs(
                 db.saw_corrupt_pack = true
                 return Some(obj)
               }
-              raise @git.GitError::HashMismatch(computed, hex)
+              raise @bit.GitError::HashMismatch(computed, hex)
             }
           }
           return Some(obj)
@@ -499,7 +499,7 @@ fn get_from_packs(
                 db.saw_corrupt_pack = true
                 return Some(obj)
               }
-              raise @git.GitError::HashMismatch(computed, hex)
+              raise @bit.GitError::HashMismatch(computed, hex)
             }
           }
           return Some(obj)
@@ -518,9 +518,9 @@ fn get_from_packs(
 ///|
 fn find_delta_base_from_packs(
   db : ObjectDb,
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   hex : String,
-) -> @git.ObjectId? {
+) -> @bit.ObjectId? {
   for pack in db.packs {
     match PackIndex::find_offset_hex(pack, hex) {
       Some(offset) =>
@@ -555,7 +555,7 @@ fn read_pack_delta_base_at(
   data : Bytes,
   pack : PackIndex,
   offset : Int64,
-) -> @git.ObjectId? raise @git.GitError {
+) -> @bit.ObjectId? raise @bit.GitError {
   let offset_i = offset_to_int(offset)
   let (type_id, _, next_offset) = @pack.decode_type_and_size_at(data, offset_i)
   match type_id {
@@ -566,13 +566,13 @@ fn read_pack_delta_base_at(
         return None
       }
       match PackIndex::find_id_by_offset(pack, base_offset.to_int64()) {
-        Some(base_hex) => Some(@git.ObjectId::from_hex(base_hex))
+        Some(base_hex) => Some(@bit.ObjectId::from_hex(base_hex))
         None => None
       }
     }
     7 => {
       let (base_hex, _) = @pack.read_ref_delta_id(data, next_offset)
-      Some(@git.ObjectId::from_hex(base_hex))
+      Some(@bit.ObjectId::from_hex(base_hex))
     }
     _ => None
   }
@@ -581,12 +581,12 @@ fn read_pack_delta_base_at(
 ///|
 fn get_by_hex(
   db : ObjectDb,
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   hex : String,
   seen : Map[String, Bool],
-) -> @git.PackObject? raise @git.GitError {
+) -> @bit.PackObject? raise @bit.GitError {
   if seen.contains(hex) {
-    raise @git.GitError::InvalidObject("Delta cycle detected: \{hex}")
+    raise @bit.GitError::InvalidObject("Delta cycle detected: \{hex}")
   }
   seen[hex] = true
   if db.prefer_packed {
@@ -618,13 +618,13 @@ fn get_by_hex(
     Some(path) => {
       let compressed = fs.read_file(path)
       let raw = @zlib.zlib_decompress(compressed) catch {
-        e => raise @git.GitError::InvalidObject("Zlib error: \{e}")
+        e => raise @bit.GitError::InvalidObject("Zlib error: \{e}")
       }
       let obj = parse_loose_object(raw)
       if not(db.skip_verify) {
-        let computed = @git.hash_object_content(obj.obj_type, obj.data).to_hex()
+        let computed = @bit.hash_object_content(obj.obj_type, obj.data).to_hex()
         if computed != hex {
-          raise @git.GitError::HashMismatch(computed, hex)
+          raise @bit.GitError::HashMismatch(computed, hex)
         }
       }
       return Some(obj)
@@ -639,10 +639,10 @@ fn get_by_hex(
 
 ///|
 pub fn load_object_store_from_fs(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
-) -> @git.ObjectStore raise @git.GitError {
-  let store = @git.ObjectStore::new()
+) -> @bit.ObjectStore raise @bit.GitError {
+  let store = @bit.ObjectStore::new()
   let objects_dir = join_path(git_dir, "objects")
   if fs.is_dir(objects_dir) {
     let loose = load_loose_objects(fs, objects_dir)
@@ -662,18 +662,18 @@ pub fn load_object_store_from_fs(
 
 ///|
 pub fn load_all_objects_from_fs(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
-) -> Array[@git.PackObject] raise @git.GitError {
+) -> Array[@bit.PackObject] raise @bit.GitError {
   load_all_objects_from_object_dir(fs, join_path(git_dir, "objects"))
 }
 
 ///|
 pub fn load_all_objects_from_object_dir(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   objects_dir : String,
-) -> Array[@git.PackObject] raise @git.GitError {
-  let result : Array[@git.PackObject] = []
+) -> Array[@bit.PackObject] raise @bit.GitError {
+  let result : Array[@bit.PackObject] = []
   if fs.is_dir(objects_dir) {
     let loose = load_loose_objects(fs, objects_dir)
     for obj in loose {
@@ -693,9 +693,9 @@ pub fn load_all_objects_from_object_dir(
 ///|
 /// Collect paths to loose objects without loading content (lazy loading)
 fn collect_loose_paths(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   objects_dir : String,
-) -> Map[String, String] raise @git.GitError {
+) -> Map[String, String] raise @bit.GitError {
   let result : Map[String, String] = {}
   let entries = fs.readdir(objects_dir)
   for entry in entries {
@@ -724,16 +724,16 @@ fn collect_loose_paths(
 
 ///|
 fn load_loose_objects(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   objects_dir : String,
-) -> Array[@git.PackObject] raise @git.GitError {
-  let result : Array[@git.PackObject] = []
+) -> Array[@bit.PackObject] raise @bit.GitError {
+  let result : Array[@bit.PackObject] = []
   let paths = collect_loose_paths(fs, objects_dir)
   for item in paths.to_array() {
     let (_, path) = item
     let compressed = fs.read_file(path)
     let raw = @zlib.zlib_decompress(compressed) catch {
-      e => raise @git.GitError::InvalidObject("Zlib error: \{e}")
+      e => raise @bit.GitError::InvalidObject("Zlib error: \{e}")
     }
     let obj = parse_loose_object(raw)
     result.push(obj)
@@ -743,9 +743,9 @@ fn load_loose_objects(
 
 ///|
 fn load_pack_indexes(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   pack_dir : String,
-) -> Array[PackIndex] raise @git.GitError {
+) -> Array[PackIndex] raise @bit.GitError {
   let result : Array[PackIndex] = []
   let entries = fs.readdir(pack_dir)
   for entry in entries {
@@ -771,9 +771,9 @@ fn load_pack_indexes(
 ///|
 /// Collect pack index paths without loading them (for lazy loading)
 fn collect_lazy_pack_indexes(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   pack_dir : String,
-) -> Array[LazyPackIndex] raise @git.GitError {
+) -> Array[LazyPackIndex] raise @bit.GitError {
   let result : Array[LazyPackIndex] = []
   let entries = fs.readdir(pack_dir)
   for entry in entries {
@@ -796,10 +796,10 @@ fn collect_lazy_pack_indexes(
 
 ///|
 fn load_pack_objects(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   pack_dir : String,
-) -> Array[@git.PackObject] raise @git.GitError {
-  let result : Array[@git.PackObject] = []
+) -> Array[@bit.PackObject] raise @bit.GitError {
+  let result : Array[@bit.PackObject] = []
   let entries = fs.readdir(pack_dir)
   for entry in entries {
     if not(entry.has_suffix(".pack")) {
@@ -825,9 +825,9 @@ fn load_pack_objects(
 fn parse_pack_index_v1(
   data : Bytes,
   pack_path : String,
-) -> PackIndex raise @git.GitError {
+) -> PackIndex raise @bit.GitError {
   if data.length() < 256 * 4 {
-    raise @git.GitError::InvalidObject("Index file too short")
+    raise @bit.GitError::InvalidObject("Index file too short")
   }
   let mut offset = 0
   let fanout : Array[Int64] = []
@@ -837,13 +837,13 @@ fn parse_pack_index_v1(
   }
   let count64 = fanout[255]
   if count64 > 2147483647L {
-    raise @git.GitError::InvalidObject("Too many objects in index")
+    raise @bit.GitError::InvalidObject("Too many objects in index")
   }
   let count = count64.to_int()
   let entries_start = offset
   let expected_len = entries_start + count * 24 + 20
   if data.length() < expected_len {
-    raise @git.GitError::InvalidObject("Index file truncated (v1)")
+    raise @bit.GitError::InvalidObject("Index file truncated (v1)")
   }
   let ids : Array[String] = []
   let offsets : Array[Int64] = []
@@ -855,7 +855,7 @@ fn parse_pack_index_v1(
     for j in 0..<20 {
       bytes[j] = data[base + 4 + j]
     }
-    ids.push(@git.ObjectId::new(bytes).to_hex())
+    ids.push(@bit.ObjectId::new(bytes).to_hex())
   }
   { pack_path, ids, offsets, version: 1 }
 }
@@ -864,9 +864,9 @@ fn parse_pack_index_v1(
 fn parse_pack_index(
   data : Bytes,
   pack_path : String,
-) -> PackIndex raise @git.GitError {
+) -> PackIndex raise @bit.GitError {
   if data.length() < 8 {
-    raise @git.GitError::InvalidObject("Index file too short")
+    raise @bit.GitError::InvalidObject("Index file too short")
   }
   let magic = read_u32_be_at64(data, 0)
   if magic != 0xff744f63L {
@@ -874,7 +874,7 @@ fn parse_pack_index(
   }
   let version = read_u32_be_at64(data, 4)
   if version != 2L {
-    raise @git.GitError::InvalidObject(
+    raise @bit.GitError::InvalidObject(
       "Unsupported pack index version: \{version}",
     )
   }
@@ -886,25 +886,25 @@ fn parse_pack_index(
   }
   let count64 = fanout[255]
   if count64 > 2147483647L {
-    raise @git.GitError::InvalidObject("Too many objects in index")
+    raise @bit.GitError::InvalidObject("Too many objects in index")
   }
   let count = count64.to_int()
   let ids : Array[String] = []
   for _ in 0..<count {
     if offset + 20 > data.length() {
-      raise @git.GitError::InvalidObject("Index file truncated (ids)")
+      raise @bit.GitError::InvalidObject("Index file truncated (ids)")
     }
     let bytes : FixedArray[Byte] = FixedArray::make(20, b'\x00')
     for i in 0..<20 {
       bytes[i] = data[offset + i]
     }
     offset += 20
-    ids.push(@git.ObjectId::new(bytes).to_hex())
+    ids.push(@bit.ObjectId::new(bytes).to_hex())
   }
   // Skip CRC32 table
   offset += count * 4
   if offset + count * 4 > data.length() {
-    raise @git.GitError::InvalidObject("Index file truncated (offsets)")
+    raise @bit.GitError::InvalidObject("Index file truncated (offsets)")
   }
   let offsets : Array[Int64] = []
   let large_indices : Array[Int] = []
@@ -922,7 +922,7 @@ fn parse_pack_index(
     let mut large_idx = 0
     while large_idx < large_indices.length() {
       if offset + 8 > data.length() {
-        raise @git.GitError::InvalidObject(
+        raise @bit.GitError::InvalidObject(
           "Index file truncated (large offsets)",
         )
       }
@@ -942,9 +942,9 @@ fn read_pack_object_at(
   pack : PackIndex,
   offset : Int64,
   db : ObjectDb,
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   seen : Map[String, Bool],
-) -> @git.PackObject raise @git.GitError {
+) -> @bit.PackObject raise @bit.GitError {
   let offset_i = offset_to_int(offset)
   let (type_id, size, next_offset) = @pack.decode_type_and_size_at(
     data, offset_i,
@@ -953,15 +953,15 @@ fn read_pack_object_at(
     1 | 2 | 3 | 4 => {
       let obj_type = @pack.packfile_type_to_object_type(type_id)
       let (content, _after) = @zlib.zlib_decompress_at(data, next_offset) catch {
-        e => raise @git.GitError::PackfileError("Zlib error: \{e}")
+        e => raise @bit.GitError::PackfileError("Zlib error: \{e}")
       }
       if content.length() != size {
-        raise @git.GitError::PackfileError(
+        raise @bit.GitError::PackfileError(
           "Object size mismatch: expected=\{size}, got=\{content.length()}",
         )
       }
-      let id = @git.hash_object_content(obj_type, content)
-      @git.PackObject::with_metadata(obj_type, content, id, offset_i, 0U)
+      let id = @bit.hash_object_content(obj_type, content)
+      @bit.PackObject::with_metadata(obj_type, content, id, offset_i, 0U)
     }
     6 => {
       let (back_offset, after_ref) = @pack.read_ofs_delta_offset(
@@ -969,13 +969,13 @@ fn read_pack_object_at(
       )
       let base_offset = offset_i - back_offset
       if base_offset < 0 {
-        raise @git.GitError::PackfileError("Invalid OFS_DELTA base offset")
+        raise @bit.GitError::PackfileError("Invalid OFS_DELTA base offset")
       }
       let (delta, _after) = @zlib.zlib_decompress_at(data, after_ref) catch {
-        e => raise @git.GitError::PackfileError("Zlib error: \{e}")
+        e => raise @bit.GitError::PackfileError("Zlib error: \{e}")
       }
       if delta.length() != size {
-        raise @git.GitError::PackfileError(
+        raise @bit.GitError::PackfileError(
           "Delta size mismatch: expected=\{size}, got=\{delta.length()}",
         )
       }
@@ -998,16 +998,16 @@ fn read_pack_object_at(
           }
       }
       let content = @pack.apply_delta(base.data, delta)
-      let id = @git.hash_object_content(base.obj_type, content)
-      @git.PackObject::with_metadata(base.obj_type, content, id, offset_i, 0U)
+      let id = @bit.hash_object_content(base.obj_type, content)
+      @bit.PackObject::with_metadata(base.obj_type, content, id, offset_i, 0U)
     }
     7 => {
       let (base_hex, after_ref) = @pack.read_ref_delta_id(data, next_offset)
       let (delta, _after) = @zlib.zlib_decompress_at(data, after_ref) catch {
-        e => raise @git.GitError::PackfileError("Zlib error: \{e}")
+        e => raise @bit.GitError::PackfileError("Zlib error: \{e}")
       }
       if delta.length() != size {
-        raise @git.GitError::PackfileError(
+        raise @bit.GitError::PackfileError(
           "Delta size mismatch: expected=\{size}, got=\{delta.length()}",
         )
       }
@@ -1018,7 +1018,7 @@ fn read_pack_object_at(
               match get_by_hex(db, fs, base_hex, seen) {
                 Some(obj) => obj
                 None =>
-                  raise @git.GitError::PackfileError(
+                  raise @bit.GitError::PackfileError(
                     "Missing base object for REF_DELTA",
                   )
               }
@@ -1027,27 +1027,27 @@ fn read_pack_object_at(
           match get_by_hex(db, fs, base_hex, seen) {
             Some(obj) => obj
             None =>
-              raise @git.GitError::PackfileError(
+              raise @bit.GitError::PackfileError(
                 "Missing base object for REF_DELTA",
               )
           }
       }
       let content = @pack.apply_delta(base.data, delta)
-      let id = @git.hash_object_content(base.obj_type, content)
-      @git.PackObject::with_metadata(base.obj_type, content, id, offset_i, 0U)
+      let id = @bit.hash_object_content(base.obj_type, content)
+      @bit.PackObject::with_metadata(base.obj_type, content, id, offset_i, 0U)
     }
     _ =>
-      raise @git.GitError::PackfileError(
+      raise @bit.GitError::PackfileError(
         "Unknown packfile object type: \{type_id}",
       )
   }
 }
 
 ///|
-fn parse_loose_object(data : Bytes) -> @git.PackObject raise @git.GitError {
+fn parse_loose_object(data : Bytes) -> @bit.PackObject raise @bit.GitError {
   let len = data.length()
   if len == 0 {
-    raise @git.GitError::InvalidObject("Empty loose object")
+    raise @bit.GitError::InvalidObject("Empty loose object")
   }
   let type_buf = StringBuilder::new()
   let mut i = 0
@@ -1056,25 +1056,25 @@ fn parse_loose_object(data : Bytes) -> @git.PackObject raise @git.GitError {
     i += 1
   }
   if i >= len || data[i] != b' ' {
-    raise @git.GitError::InvalidObject("Invalid loose object header")
+    raise @bit.GitError::InvalidObject("Invalid loose object header")
   }
   i += 1
   let mut size = 0
   while i < len && data[i] != b'\x00' {
     let b = data[i]
     if b < b'0' || b > b'9' {
-      raise @git.GitError::InvalidObject("Invalid loose object size")
+      raise @bit.GitError::InvalidObject("Invalid loose object size")
     }
     size = size * 10 + (b.to_int() - b'0'.to_int())
     i += 1
   }
   if i >= len || data[i] != b'\x00' {
-    raise @git.GitError::InvalidObject("Invalid loose object header")
+    raise @bit.GitError::InvalidObject("Invalid loose object header")
   }
   i += 1
   let content_len = len - i
   if content_len != size {
-    raise @git.GitError::InvalidObject(
+    raise @bit.GitError::InvalidObject(
       "Loose object size mismatch: expected=\{size}, got=\{content_len}",
     )
   }
@@ -1082,28 +1082,28 @@ fn parse_loose_object(data : Bytes) -> @git.PackObject raise @git.GitError {
     FixedArray::makei(content_len, j => data[i + j]),
   )
   let obj_type = object_type_from_string(type_buf.to_string())
-  @git.PackObject::new(obj_type, content)
+  @bit.PackObject::new(obj_type, content)
 }
 
 ///|
-fn object_type_from_string(s : String) -> @git.ObjectType raise @git.GitError {
+fn object_type_from_string(s : String) -> @bit.ObjectType raise @bit.GitError {
   if s == "blob" {
-    @git.ObjectType::Blob
+    @bit.ObjectType::Blob
   } else if s == "tree" {
-    @git.ObjectType::Tree
+    @bit.ObjectType::Tree
   } else if s == "commit" {
-    @git.ObjectType::Commit
+    @bit.ObjectType::Commit
   } else if s == "tag" {
-    @git.ObjectType::Tag
+    @bit.ObjectType::Tag
   } else {
-    raise @git.GitError::InvalidObject("Unknown object type: \{s}")
+    raise @bit.GitError::InvalidObject("Unknown object type: \{s}")
   }
 }
 
 ///|
-fn read_u32_be_at64(data : Bytes, start : Int) -> Int64 raise @git.GitError {
+fn read_u32_be_at64(data : Bytes, start : Int) -> Int64 raise @bit.GitError {
   if start + 4 > data.length() {
-    raise @git.GitError::InvalidObject("Unexpected end of index data")
+    raise @bit.GitError::InvalidObject("Unexpected end of index data")
   }
   let b0 = data[start].to_int64()
   let b1 = data[start + 1].to_int64()
@@ -1113,9 +1113,9 @@ fn read_u32_be_at64(data : Bytes, start : Int) -> Int64 raise @git.GitError {
 }
 
 ///|
-fn read_u64_be_at64(data : Bytes, start : Int) -> Int64 raise @git.GitError {
+fn read_u64_be_at64(data : Bytes, start : Int) -> Int64 raise @bit.GitError {
   if start + 8 > data.length() {
-    raise @git.GitError::InvalidObject("Unexpected end of index data")
+    raise @bit.GitError::InvalidObject("Unexpected end of index data")
   }
   let hi = read_u32_be_at64(data, start)
   let lo = read_u32_be_at64(data, start + 4)
@@ -1123,9 +1123,9 @@ fn read_u64_be_at64(data : Bytes, start : Int) -> Int64 raise @git.GitError {
 }
 
 ///|
-fn offset_to_int(offset : Int64) -> Int raise @git.GitError {
+fn offset_to_int(offset : Int64) -> Int raise @bit.GitError {
   if offset < 0L || offset > 2147483647L {
-    raise @git.GitError::InvalidObject("Pack offset exceeds Int range")
+    raise @bit.GitError::InvalidObject("Pack offset exceeds Int range")
   }
   offset.to_int()
 }

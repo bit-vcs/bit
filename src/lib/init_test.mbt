@@ -2,7 +2,7 @@
 
 ///|
 test "init: default options use files ref format" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   let opts = InitOptions::new()
   init_repo_with_options(fs, "/repo", opts)
   let config = fs.read_string("/repo/.git/config")
@@ -12,7 +12,7 @@ test "init: default options use files ref format" {
 
 ///|
 test "init: reftable ref format writes extensions and metadata directory" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   init_repo_with_options(fs, "/repo", {
     default_branch: "main",
     bare: false,
@@ -30,7 +30,7 @@ test "init: reftable ref format writes extensions and metadata directory" {
 
 ///|
 test "init: sha256 object format writes objectFormat extension" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   init_repo_with_options(fs, "/repo", {
     default_branch: "main",
     bare: false,
@@ -45,7 +45,7 @@ test "init: sha256 object format writes objectFormat extension" {
 }
 
 test "init: reinit to move existing .git directory to separate gitdir" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   init_repo_with_options(fs, "/repo", {
     default_branch: "main",
     bare: false,
@@ -75,7 +75,7 @@ test "init: reinit to move existing .git directory to separate gitdir" {
 }
 
 test "init: reinit to move existing separate gitdir path from .git file" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   init_repo_with_options_with_repo_fs(
     fs,
     fs,

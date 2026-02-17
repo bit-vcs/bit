@@ -2,10 +2,10 @@
 
 ///|
 pub fn rev_parse(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
   spec : String,
-) -> @git.ObjectId? raise @git.GitError {
+) -> @bit.ObjectId? raise @bit.GitError {
   if spec.has_prefix(":/") && spec.length() > 2 {
     let needle = substring_revparse(spec, 2, spec.length())
     return resolve_commit_message_search_all_refs(fs, git_dir, needle)
@@ -74,11 +74,11 @@ fn parse_commit_message_search_spec(spec : String) -> (String, String)? {
 
 ///|
 fn resolve_commit_message_search(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
   base_spec : String,
   needle : String,
-) -> @git.ObjectId? raise @git.GitError {
+) -> @bit.ObjectId? raise @bit.GitError {
   if needle.length() == 0 {
     return None
   }
@@ -89,14 +89,14 @@ fn resolve_commit_message_search(
 
 ///|
 fn resolve_commit_message_search_all_refs(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
   needle : String,
-) -> @git.ObjectId? raise @git.GitError {
+) -> @bit.ObjectId? raise @bit.GitError {
   if needle.length() == 0 {
     return None
   }
-  let starts : Array[@git.ObjectId] = []
+  let starts : Array[@bit.ObjectId] = []
   let seen_start : Map[String, Bool] = {}
   let refs = show_ref(fs, git_dir)
   for item in refs {
@@ -125,18 +125,18 @@ fn resolve_commit_message_search_all_refs(
 
 ///|
 fn find_reachable_commit_by_message_from_many(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
-  starts : Array[@git.ObjectId],
+  starts : Array[@bit.ObjectId],
   needle : String,
-) -> @git.ObjectId? raise @git.GitError {
+) -> @bit.ObjectId? raise @bit.GitError {
   let db = ObjectDb::load(fs, git_dir)
-  let queue : Array[@git.ObjectId] = []
+  let queue : Array[@bit.ObjectId] = []
   for start in starts {
     queue.push(start)
   }
   let seen : Map[String, Bool] = {}
-  let mut best_id : @git.ObjectId? = None
+  let mut best_id : @bit.ObjectId? = None
   let mut best_time = -1L
   while queue.length() > 0 {
     let current = queue.unsafe_pop()
@@ -147,7 +147,7 @@ fn find_reachable_commit_by_message_from_many(
     seen[hex] = true
     match db.get(fs, current) {
       Some(obj) =>
-        if obj.obj_type == @git.ObjectType::Commit {
+        if obj.obj_type == @bit.ObjectType::Commit {
           if commit_message_contains(obj.data, needle) {
             let ts = parse_commit_committer_timestamp(obj.data)
             if best_id is None || ts > best_time {
@@ -155,7 +155,7 @@ fn find_reachable_commit_by_message_from_many(
               best_time = ts
             }
           }
-          let info = @git.parse_commit(obj.data)
+          let info = @bit.parse_commit(obj.data)
           for parent in info.parents {
             if not(seen.contains(parent.to_hex())) {
               queue.push(parent)
@@ -238,18 +238,18 @@ fn parse_peel_tree_spec(spec : String) -> String? {
 
 ///|
 fn peel_object_to_commit(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
-  id : @git.ObjectId,
-) -> @git.ObjectId? raise @git.GitError {
+  id : @bit.ObjectId,
+) -> @bit.ObjectId? raise @bit.GitError {
   let db = ObjectDb::load(fs, git_dir)
   let mut current = id
   for _ in 0..<8 {
     let obj = db.get(fs, current)
     guard obj is Some(o) else { return None }
     match o.obj_type {
-      @git.ObjectType::Commit => return Some(current)
-      @git.ObjectType::Tag =>
+      @bit.ObjectType::Commit => return Some(current)
+      @bit.ObjectType::Tag =>
         match parse_tag_object_target(o.data) {
           Some(next) => current = next
           None => return None
@@ -262,19 +262,19 @@ fn peel_object_to_commit(
 
 ///|
 fn peel_object_to_tree(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
-  id : @git.ObjectId,
-) -> @git.ObjectId? raise @git.GitError {
+  id : @bit.ObjectId,
+) -> @bit.ObjectId? raise @bit.GitError {
   let db = ObjectDb::load(fs, git_dir)
   let mut current = id
   for _ in 0..<8 {
     let obj = db.get(fs, current)
     guard obj is Some(o) else { return None }
     match o.obj_type {
-      @git.ObjectType::Tree => return Some(current)
-      @git.ObjectType::Commit => return Some(@git.parse_commit(o.data).tree)
-      @git.ObjectType::Tag =>
+      @bit.ObjectType::Tree => return Some(current)
+      @bit.ObjectType::Commit => return Some(@bit.parse_commit(o.data).tree)
+      @bit.ObjectType::Tag =>
         match parse_tag_object_target(o.data) {
           Some(next) => current = next
           None => return None
@@ -286,7 +286,7 @@ fn peel_object_to_tree(
 }
 
 ///|
-fn parse_tag_object_target(data : Bytes) -> @git.ObjectId? {
+fn parse_tag_object_target(data : Bytes) -> @bit.ObjectId? {
   let text = @utf8.decode_lossy(data[:])
   for line_view in text.split("\n") {
     let line = line_view.to_string()
@@ -295,7 +295,7 @@ fn parse_tag_object_target(data : Bytes) -> @git.ObjectId? {
     }
     if line.has_prefix("object ") {
       let hex = substring_revparse(line, 7, line.length())
-      let id = @git.ObjectId::from_hex(hex) catch { _ => return None }
+      let id = @bit.ObjectId::from_hex(hex) catch { _ => return None }
       return Some(id)
     }
   }
@@ -338,11 +338,11 @@ fn parse_rev_suffix(spec : String) -> (String, String?) {
 ///|
 /// Apply revision suffix operators.
 fn apply_rev_suffix(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
-  start : @git.ObjectId,
+  start : @bit.ObjectId,
   suffix : String,
-) -> @git.ObjectId? raise @git.GitError {
+) -> @bit.ObjectId? raise @bit.GitError {
   let db = ObjectDb::load(fs, git_dir)
   let chars = suffix.to_array()
   let mut current = start
@@ -398,19 +398,19 @@ fn apply_rev_suffix(
 ///|
 fn commit_nth_parent(
   db : ObjectDb,
-  fs : &@git.RepoFileSystem,
-  commit_id : @git.ObjectId,
+  fs : &@bit.RepoFileSystem,
+  commit_id : @bit.ObjectId,
   nth_parent : Int,
-) -> @git.ObjectId? raise @git.GitError {
+) -> @bit.ObjectId? raise @bit.GitError {
   if nth_parent <= 0 {
     return Some(commit_id)
   }
   let obj = db.get(fs, commit_id)
   guard obj is Some(o) else { return None }
-  if o.obj_type != @git.ObjectType::Commit {
+  if o.obj_type != @bit.ObjectType::Commit {
     return None
   }
-  let info = @git.parse_commit(o.data)
+  let info = @bit.parse_commit(o.data)
   if nth_parent > info.parents.length() {
     return None
   }
@@ -429,19 +429,19 @@ fn substring_revparse(s : String, start : Int, end : Int) -> String {
 
 ///|
 fn resolve_abbrev_ref_id(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
   spec : String,
-) -> @git.ObjectId? raise @git.GitError {
+) -> @bit.ObjectId? raise @bit.GitError {
   if spec.length() < 4 ||
     spec.length() >= 40 ||
-    not(@githash.is_hex_string(spec)) {
+    not(@bithash.is_hex_string(spec)) {
     return None
   }
-  let needle = @githash.lower_hex_string(spec)
+  let needle = @bithash.lower_hex_string(spec)
   let refs = show_ref(fs, git_dir)
   let db = ObjectDb::load(fs, git_dir)
-  let queue : Array[@git.ObjectId] = []
+  let queue : Array[@bit.ObjectId] = []
   let seen : Map[String, Bool] = {}
   for item in refs {
     let (_, id) = item
@@ -451,7 +451,7 @@ fn resolve_abbrev_ref_id(
     Some(id) => queue.push(id)
     None => ()
   }
-  let mut matched : @git.ObjectId? = None
+  let mut matched : @bit.ObjectId? = None
   while queue.length() > 0 {
     let id = match queue.pop() {
       Some(oid) => oid
@@ -470,8 +470,8 @@ fn resolve_abbrev_ref_id(
     }
     match db.get(fs, id) {
       Some(obj) =>
-        if obj.obj_type == @git.ObjectType::Commit {
-          let info = @git.parse_commit(obj.data)
+        if obj.obj_type == @bit.ObjectType::Commit {
+          let info = @bit.parse_commit(obj.data)
           for parent in info.parents {
             queue.push(parent)
           }
@@ -485,10 +485,10 @@ fn resolve_abbrev_ref_id(
 ///|
 /// Resolve base reference (without suffix)
 fn resolve_base_ref(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
   spec : String,
-) -> @git.ObjectId? raise @git.GitError {
+) -> @bit.ObjectId? raise @bit.GitError {
   if spec == "HEAD" || spec == "" || spec == "@" {
     return resolve_head_commit(fs, git_dir)
   }
@@ -503,8 +503,8 @@ fn resolve_base_ref(
     spec.has_prefix("remotes/") {
     return resolve_ref(fs, git_dir, "refs/" + spec)
   }
-  if spec.length() == 40 && @githash.is_hex_string(spec) {
-    match @git.ObjectId::from_hex(spec) {
+  if spec.length() == 40 && @bithash.is_hex_string(spec) {
+    match @bit.ObjectId::from_hex(spec) {
       id => return Some(id)
     }
   }
@@ -526,11 +526,11 @@ fn resolve_base_ref(
 ///|
 /// Resolve path within a commit/tree
 fn resolve_path_in_commit(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
-  base_id : @git.ObjectId,
+  base_id : @bit.ObjectId,
   path : String,
-) -> @git.ObjectId? raise @git.GitError {
+) -> @bit.ObjectId? raise @bit.GitError {
   if path.length() == 0 {
     return None
   }
@@ -540,8 +540,8 @@ fn resolve_path_in_commit(
     None => return None
     Some(o) => {
       let tree_id = match o.obj_type {
-        @git.ObjectType::Commit => @git.parse_commit(o.data).tree
-        @git.ObjectType::Tree => base_id
+        @bit.ObjectType::Commit => @bit.parse_commit(o.data).tree
+        @bit.ObjectType::Tree => base_id
         _ => return None
       }
       let entry = find_tree_entry(db, fs, tree_id, path)
@@ -556,10 +556,10 @@ fn resolve_path_in_commit(
 ///|
 /// List all refs (loose + packed).
 pub fn show_ref(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
-) -> Array[(String, @git.ObjectId)] raise @git.GitError {
-  let out : Map[String, @git.ObjectId] = {}
+) -> Array[(String, @bit.ObjectId)] raise @bit.GitError {
+  let out : Map[String, @bit.ObjectId] = {}
   let refs_dir = join_path(git_dir, "refs")
   if fs.is_dir(refs_dir) {
     ref_collect_loose(fs, git_dir, refs_dir, "refs", out)
@@ -568,7 +568,7 @@ pub fn show_ref(
   if fs.is_file(packed) {
     ref_collect_packed(fs, packed, out)
   }
-  let result : Array[(String, @git.ObjectId)] = []
+  let result : Array[(String, @bit.ObjectId)] = []
   for item in out.to_array() {
     let (name, id) = item
     result.push((name, id))
@@ -580,9 +580,9 @@ pub fn show_ref(
 ///|
 /// Format like `git show-ref` output.
 pub fn show_ref_text(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
-) -> Array[String] raise @git.GitError {
+) -> Array[String] raise @bit.GitError {
   let refs = show_ref(fs, git_dir)
   let lines : Array[String] = []
   for item in refs {
@@ -594,12 +594,12 @@ pub fn show_ref_text(
 
 ///|
 fn ref_collect_loose(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
   dir : String,
   prefix : String,
-  out : Map[String, @git.ObjectId],
-) -> Unit raise @git.GitError {
+  out : Map[String, @bit.ObjectId],
+) -> Unit raise @bit.GitError {
   let entries = fs.readdir(dir)
   for name in entries {
     let path = join_path(dir, name)
@@ -616,7 +616,7 @@ fn ref_collect_loose(
           None => ()
         }
       } else {
-        out[rel] = @git.ObjectId::from_hex(line)
+        out[rel] = @bit.ObjectId::from_hex(line)
       }
     }
   }
@@ -624,10 +624,10 @@ fn ref_collect_loose(
 
 ///|
 fn ref_collect_packed(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   packed_path : String,
-  out : Map[String, @git.ObjectId],
-) -> Unit raise @git.GitError {
+  out : Map[String, @bit.ObjectId],
+) -> Unit raise @bit.GitError {
   let text = @utf8.decode_lossy(fs.read_file(packed_path)[:])
   for line_view in text.split("\n") {
     let line = ref_trim_line(line_view.to_string())
@@ -651,7 +651,7 @@ fn ref_collect_packed(
           end=line.length(),
         )
         if not(out.contains(name)) {
-          out[name] = @git.ObjectId::from_hex(id_hex)
+          out[name] = @bit.ObjectId::from_hex(id_hex)
         }
       }
     }
@@ -660,9 +660,9 @@ fn ref_collect_packed(
 
 ///|
 fn ref_read_line(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   path : String,
-) -> String raise @git.GitError {
+) -> String raise @bit.GitError {
   let text = @utf8.decode_lossy(fs.read_file(path)[:])
   for line_view in text.split("\n") {
     let line = ref_trim_line(line_view.to_string())
@@ -670,7 +670,7 @@ fn ref_read_line(
       return line
     }
   }
-  raise @git.GitError::InvalidObject("Empty ref: \{path}")
+  raise @bit.GitError::InvalidObject("Empty ref: \{path}")
 }
 
 ///|

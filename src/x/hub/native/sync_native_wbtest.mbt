@@ -14,15 +14,15 @@ impl @lib.Clock for FixedClock with now(self) {
 async fn relay_test_http_get_ok(
   _url : String,
   _headers : Map[String, String],
-) -> (@git.HttpResponse, Bytes) raise @git.GitError {
+) -> (@bit.HttpResponse, Bytes) raise @bit.GitError {
   let no_ops : Array[async () -> Unit] = []
   ignore(
     @async.all(no_ops) catch {
-      err => raise @git.GitError::IoError(err.to_string())
+      err => raise @bit.GitError::IoError(err.to_string())
     },
   )
   let body = "{\"ok\":true,\"room\":\"main\",\"next_cursor\":1,\"envelopes\":[{\"room\":\"main\",\"id\":\"msg-1\",\"sender\":\"node-a\",\"topic\":\"notify\",\"payload\":{\"kind\":\"hub.record\",\"record\":\"version 1\\nkey hub/pr/1/meta\\nkind hub.pr\\nclock node-a=1\\ntimestamp 1\\nnode node-a\\ndeleted 0\\n\\npayload\"},\"signature\":null}]}"
-  (@git.HttpResponse::new(200), @utf8.encode(body))
+  (@bit.HttpResponse::new(200), @utf8.encode(body))
 }
 
 ///|
@@ -30,15 +30,15 @@ async fn relay_test_http_post_ok(
   _url : String,
   _body : Bytes,
   _headers : Map[String, String],
-) -> (@git.HttpResponse, Bytes) raise @git.GitError {
+) -> (@bit.HttpResponse, Bytes) raise @bit.GitError {
   let no_ops : Array[async () -> Unit] = []
   ignore(
     @async.all(no_ops) catch {
-      err => raise @git.GitError::IoError(err.to_string())
+      err => raise @bit.GitError::IoError(err.to_string())
     },
   )
   (
-    @git.HttpResponse::new(200),
+    @bit.HttpResponse::new(200),
     @utf8.encode("{\"ok\":true,\"accepted\":true,\"cursor\":1}"),
   )
 }
@@ -64,25 +64,25 @@ test "relay: parse_relay_base_url handles explicit prefixes" {
 test "relay: should_fallback_to_relay only for http 404 smart-http errors" {
   assert_true(
     should_fallback_to_relay(
-      @git.GitError::ProtocolError("Failed to fetch info/refs: HTTP 404"),
+      @bit.GitError::ProtocolError("Failed to fetch info/refs: HTTP 404"),
       "http://127.0.0.1:8787",
     ),
   )
   assert_true(
     should_fallback_to_relay(
-      @git.GitError::ProtocolError("Failed to discover refs: HTTP 404"),
+      @bit.GitError::ProtocolError("Failed to discover refs: HTTP 404"),
       "https://relay.example.com",
     ),
   )
   assert_false(
     should_fallback_to_relay(
-      @git.GitError::ProtocolError("Failed to fetch info/refs: HTTP 500"),
+      @bit.GitError::ProtocolError("Failed to fetch info/refs: HTTP 500"),
       "http://127.0.0.1:8787",
     ),
   )
   assert_false(
     should_fallback_to_relay(
-      @git.GitError::IoError("connection refused"),
+      @bit.GitError::IoError("connection refused"),
       "http://127.0.0.1:8787",
     ),
   )
@@ -100,7 +100,7 @@ test "relay: parse_relay_poll_body extracts hub records and cursor" {
 
 ///|
 test "relay: apply_relay_records stores imported record into notes" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   let git_dir = "/repo/.git"
   fs.mkdir_p(git_dir)
   let db = @lib.ObjectDb::load_lazy(fs, git_dir)
@@ -136,7 +136,7 @@ test "relay: apply_relay_records stores imported record into notes" {
 
 ///|
 async test "relay: relay_fetch_with_http imports records and stores cursor" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   let git_dir = "/repo/.git"
   fs.mkdir_p(git_dir)
   let db = @lib.ObjectDb::load_lazy(fs, git_dir)
@@ -165,7 +165,7 @@ async test "relay: relay_fetch_with_http imports records and stores cursor" {
 
 ///|
 async test "relay: relay_push_with_http sends local hub records" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   let git_dir = "/repo/.git"
   fs.mkdir_p(git_dir)
   let db = @lib.ObjectDb::load_lazy(fs, git_dir)
@@ -197,7 +197,7 @@ async test "relay: relay_push_with_http sends local hub records" {
 
 ///|
 async test "relay: relay push forwards auth token header" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   let git_dir = "/repo/.git"
   fs.mkdir_p(git_dir)
   let db = @lib.ObjectDb::load_lazy(fs, git_dir)
@@ -218,11 +218,11 @@ async test "relay: relay push forwards auth token header" {
     _url : String,
     _body : Bytes,
     headers : Map[String, String],
-  ) -> (@git.HttpResponse, Bytes) raise @git.GitError {
+  ) -> (@bit.HttpResponse, Bytes) raise @bit.GitError {
     let no_ops : Array[async () -> Unit] = []
     ignore(
       @async.all(no_ops) catch {
-        err => raise @git.GitError::IoError(err.to_string())
+        err => raise @bit.GitError::IoError(err.to_string())
       },
     )
     match headers.get("Authorization") {
@@ -230,7 +230,7 @@ async test "relay: relay push forwards auth token header" {
       None => ()
     }
     (
-      @git.HttpResponse::new(200),
+      @bit.HttpResponse::new(200),
       @utf8.encode("{\"ok\":true,\"accepted\":true,\"cursor\":1}"),
     )
   }
@@ -249,7 +249,7 @@ async test "relay: relay push forwards auth token header" {
 
 ///|
 async test "relay: relay fetch forwards auth token header" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   let git_dir = "/repo/.git"
   fs.mkdir_p(git_dir)
   let db = @lib.ObjectDb::load_lazy(fs, git_dir)
@@ -262,11 +262,11 @@ async test "relay: relay fetch forwards auth token header" {
   let get = async fn(
     _url : String,
     headers : Map[String, String],
-  ) -> (@git.HttpResponse, Bytes) raise @git.GitError {
+  ) -> (@bit.HttpResponse, Bytes) raise @bit.GitError {
     let no_ops : Array[async () -> Unit] = []
     ignore(
       @async.all(no_ops) catch {
-        err => raise @git.GitError::IoError(err.to_string())
+        err => raise @bit.GitError::IoError(err.to_string())
       },
     )
     match headers.get("Authorization") {
@@ -274,7 +274,7 @@ async test "relay: relay fetch forwards auth token header" {
       None => ()
     }
     let body = "{\"ok\":true,\"room\":\"main\",\"next_cursor\":1,\"envelopes\":[]}"
-    (@git.HttpResponse::new(200), @utf8.encode(body))
+    (@bit.HttpResponse::new(200), @utf8.encode(body))
   }
   let result = relay_fetch_with_http(
     hub,
@@ -293,7 +293,7 @@ async test "relay: relay fetch forwards auth token header" {
 
 ///|
 async test "relay: strict signed policy rejects unsigned records during fetch" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   let git_dir = "/repo/.git"
   fs.mkdir_p(git_dir)
   let db = @lib.ObjectDb::load_lazy(fs, git_dir)

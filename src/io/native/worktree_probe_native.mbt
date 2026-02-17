@@ -1,10 +1,10 @@
 ///|
 pub fn init_worktree_probe() -> Unit {
-  let provider = @gitio.WorktreeProbeProvider::new(
+  let provider = @bitio.WorktreeProbeProvider::new(
     async fn(
-      fs : &@git.RepoFileSystem,
+      fs : &@bit.RepoFileSystem,
       abs_path : String,
-    ) -> @gitio.WorktreeEntryMeta? noraise {
+    ) -> @bitio.WorktreeEntryMeta? noraise {
       match native_read_symlink_target_path(abs_path) {
         Some(_) => {
           let mut mtime_sec : Int? = None
@@ -21,8 +21,8 @@ pub fn init_worktree_probe() -> Unit {
             Err(_) => ()
           }
           Some(
-            @gitio.WorktreeEntryMeta::new(
-              @gitio.WorktreeKindMeta::symlink(),
+            @bitio.WorktreeEntryMeta::new(
+              @bitio.WorktreeKindMeta::symlink(),
               0o120000,
               None,
               mtime_sec,
@@ -40,17 +40,17 @@ pub fn init_worktree_probe() -> Unit {
     },
     fn(path : String) { native_read_symlink_target_path(path) },
   )
-  @gitio.set_worktree_probe(provider)
+  @bitio.set_worktree_probe(provider)
 }
 
 ///|
 async fn native_regular_meta(
   abs_path : String,
   use_os : Bool,
-) -> @gitio.WorktreeEntryMeta noraise {
+) -> @bitio.WorktreeEntryMeta noraise {
   if not(use_os) {
-    return @gitio.WorktreeEntryMeta::new(
-      @gitio.WorktreeKindMeta::regular(),
+    return @bitio.WorktreeEntryMeta::new(
+      @bitio.WorktreeKindMeta::regular(),
       0o100644,
       None,
       None,
@@ -88,8 +88,8 @@ async fn native_regular_meta(
     }
     Err(_) => ()
   }
-  @gitio.WorktreeEntryMeta::new(
-    @gitio.WorktreeKindMeta::regular(),
+  @bitio.WorktreeEntryMeta::new(
+    @bitio.WorktreeKindMeta::regular(),
     mode,
     size,
     mtime_sec,

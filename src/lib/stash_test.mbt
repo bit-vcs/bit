@@ -1,8 +1,8 @@
 ///| Tests for stash
 
 ///|
-fn setup_stash_repo() -> @git.TestFs {
-  let fs = @git.TestFs::new()
+fn setup_stash_repo() -> @bit.TestFs {
+  let fs = @bit.TestFs::new()
   ignore(try? init_repo(fs, "/repo"))
   fs
 }

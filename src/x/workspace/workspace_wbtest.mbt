@@ -217,7 +217,7 @@ test "workspace: flow template manifest scaffolds expected node graph" {
 test "workspace: manifest template rejects unknown name" {
   ignore(
     workspace_manifest_for_template(Some("nope-template")) catch {
-      @git.GitError::InvalidObject(message) => {
+      @bit.GitError::InvalidObject(message) => {
         assert_true(message.contains("unknown workspace template"))
         return ()
       }
@@ -487,7 +487,7 @@ async test "workspace: node signature changes by fingerprint mode" {
     @fingerprint.FingerprintMode::GitCompat,
   )
   match (fast, git) {
-    (Some(fast_sig), Some(git_sig)) => assert_eq(fast_sig == git_sig, false)
+    (Some(fast_sig), Some(bit_sig)) => assert_eq(fast_sig == bit_sig, false)
     _ => fail("workspace signature should exist for initialized repository")
   }
   let cleanup_after : Result[Int, Error] = try? @process.run(

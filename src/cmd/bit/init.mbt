@@ -123,7 +123,7 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
     i += 1
   }
   // Check GIT_DIR and GIT_WORK_TREE environment variables
-  let git_dir_env = @sys.get_env_var("GIT_DIR")
+  let bit_dir_env = @sys.get_env_var("GIT_DIR")
   let work_tree_env = @sys.get_env_var("GIT_WORK_TREE")
   // Check GIT_TEMPLATE_DIR environment variable
   if template_dir is None {
@@ -131,7 +131,7 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
   }
   // Determine the target path and git directory
   let (path, effective_git_dir) : (String, String?) = match
-    (target_dir, git_dir_env) {
+    (target_dir, bit_dir_env) {
     (Some(dir), _) => {
       let p = if dir.has_prefix("/") { dir } else { root + "/" + dir }
       (p, None)
@@ -150,7 +150,7 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
     (None, None) => (root, None)
   }
   // Determine if bare: only bare if explicitly requested or GIT_DIR without GIT_WORK_TREE
-  if git_dir_env is Some(_) && work_tree_env is None && target_dir is None {
+  if bit_dir_env is Some(_) && work_tree_env is None && target_dir is None {
     bare = true
   }
   // If GIT_WORK_TREE is set with --bare, that's an error
@@ -223,7 +223,7 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
     object_format = Some(existing_object_format)
   }
   // Build init options
-  let opts : @gitlib.InitOptions = {
+  let opts : @bitlib.InitOptions = {
     default_branch: branch,
     bare,
     separate_git_dir: resolved_sep_git_dir,
@@ -232,7 +232,7 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
     object_format: object_format.unwrap_or("sha1"),
   }
   // Initialize repository
-  @gitrepo.init_repo_with_options_with_repo_fs(fs, fs, path, opts)
+  @bitrepo.init_repo_with_options_with_repo_fs(fs, fs, path, opts)
   match reinit_tables_list_content {
     Some(content) =>
       fs.write_string(actual_git_dir + "/reftable/tables.list", content)
@@ -242,7 +242,7 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
   match template_dir {
     Some(tpl) =>
       if fs.is_dir(tpl) {
-        @gitrepo.apply_template(fs, fs, actual_git_dir, tpl)
+        @bitrepo.apply_template(fs, fs, actual_git_dir, tpl)
       }
     None => ()
   }

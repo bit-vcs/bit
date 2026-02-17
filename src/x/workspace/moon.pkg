@@ -1,7 +1,7 @@
 import {
-  "mizchi/bit" @git,
+  "mizchi/bit" @bit,
   "mizchi/bit/x/fingerprint" @fingerprint,
-  "mizchi/bit/lib" @gitlib,
+  "mizchi/bit/lib" @bitlib,
   "mizchi/bitflow/workflow" @bitflow,
   "mizchi/bit/osfs" @osfs,
   "moonbitlang/async" @async,

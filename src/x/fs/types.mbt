@@ -43,8 +43,8 @@ pub fn FsConfig::local_only() -> FsConfig {
 ///|
 pub struct Fs {
   git_dir : String
-  mut base_tree : @git.ObjectId
-  mut base_commit : @git.ObjectId?
+  mut base_tree : @bit.ObjectId
+  mut base_commit : @bit.ObjectId?
   working : WorkingLayer
   layers : Array[Layer]
   cache : ObjectCache
@@ -82,16 +82,16 @@ pub fn WorkingLayer::is_dirty(self : WorkingLayer) -> Bool {
 
 ///|
 pub(all) struct Layer {
-  tree_id : @git.ObjectId
-  commit_id : @git.ObjectId?
+  tree_id : @bit.ObjectId
+  commit_id : @bit.ObjectId?
   name : String
 }
 
 ///|
 pub(all) struct ObjectCache {
   blob_cache : LruCache[Bytes] // Two-generation LRU for blobs
-  trees : Map[@git.ObjectId, Array[@git.TreeEntry]] // ObjectId as key (no hex conversion)
-  path_cache : Map[String, @git.ObjectId?]
+  trees : Map[@bit.ObjectId, Array[@bit.TreeEntry]] // ObjectId as key (no hex conversion)
+  path_cache : Map[String, @bit.ObjectId?]
 }
 
 ///|
@@ -105,8 +105,8 @@ pub fn ObjectCache::new(max_bytes : Int) -> ObjectCache {
 
 ///|
 pub(all) struct Snapshot {
-  commit_id : @git.ObjectId
-  tree_id : @git.ObjectId
+  commit_id : @bit.ObjectId
+  tree_id : @bit.ObjectId
   message : String
   author : String
   timestamp : Int64
@@ -114,8 +114,8 @@ pub(all) struct Snapshot {
 
 ///|
 pub fn Snapshot::new(
-  commit_id : @git.ObjectId,
-  tree_id : @git.ObjectId,
+  commit_id : @bit.ObjectId,
+  tree_id : @bit.ObjectId,
   message : String,
   author : String,
   timestamp : Int64,

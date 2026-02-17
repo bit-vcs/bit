@@ -1,7 +1,7 @@
 ///| File-system tree helpers
 
 ///|
-fn ensure_dir(fs : &@git.FileSystem, path : String) -> Unit raise @git.GitError {
+fn ensure_dir(fs : &@bit.FileSystem, path : String) -> Unit raise @bit.GitError {
   if path.length() == 0 || path == "/" || path == "." {
     return ()
   }
@@ -10,11 +10,11 @@ fn ensure_dir(fs : &@git.FileSystem, path : String) -> Unit raise @git.GitError 
 
 ///|
 pub fn copy_tree(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   src : String,
   dest : String,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let is_dir = rfs.is_dir(src)
   if is_dir {
     ensure_dir(fs, dest)
@@ -45,8 +45,8 @@ pub fn copy_tree(
 
 ///|
 pub fn remove_tree(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   path : String,
 ) -> Unit {
   if rfs.is_dir(path) {
@@ -71,22 +71,22 @@ pub fn remove_tree(
 
 ///|
 pub fn move_tree(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   src : String,
   dest : String,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   copy_tree(fs, rfs, src, dest)
   remove_tree(fs, rfs, src)
 }
 
 ///|
 pub fn move_tree_safe(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   src : String,
   dest : String,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   if not(rfs.is_dir(src)) {
     return ()
   }
@@ -104,8 +104,8 @@ pub fn move_tree_safe(
 
 ///|
 pub fn remove_ref_path(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   path : String,
 ) -> Unit {
   if rfs.is_dir(path) {

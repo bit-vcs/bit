@@ -293,7 +293,7 @@ async fn midx_write(
   })
   // Remove duplicates (keep first occurrence = preferred pack)
   let unique_entries : Array[MidxEntry] = []
-  let mut last_id : @git.ObjectId? = None
+  let mut last_id : @bitcore.ObjectId? = None
   for entry in all_entries {
     match last_id {
       Some(lid) if lid == entry.id => continue
@@ -347,7 +347,7 @@ async fn midx_write(
 fn midx_repo_oid_version(pack_dir : String) -> Int {
   let objects_dir = parent_dir(pack_dir)
   let git_dir = parent_dir(objects_dir)
-  match git_config_get(git_dir, "extensions", "objectformat") {
+  match bit_config_get(git_dir, "extensions", "objectformat") {
     Some(fmt) => {
       let f = fmt.trim().to_lower()
       if f == "sha256" {
@@ -561,8 +561,8 @@ async fn midx_verify(
   let content = Bytes::from_array(
     FixedArray::makei(checksum_offset, i => data[i]),
   )
-  let computed = @git.sha1(content)
-  let stored = @git.ObjectId::new(
+  let computed = @bitcore.sha1(content)
+  let stored = @bitcore.ObjectId::new(
     FixedArray::makei(20, i => data[checksum_offset + i]),
   )
   if computed != stored {
@@ -592,10 +592,10 @@ async fn midx_verify(
     }
     pack_entries.push(entries)
   }
-  let object_ids : Array[@git.ObjectId] = []
-  let mut prev_oid : @git.ObjectId? = None
+  let object_ids : Array[@bitcore.ObjectId] = []
+  let mut prev_oid : @bitcore.ObjectId? = None
   for i in 0..<object_count {
-    let oid = @git.ObjectId::new(
+    let oid = @bitcore.ObjectId::new(
       FixedArray::makei(20, j => data[oidl_chunk.start + i * 20 + j]),
     )
     match prev_oid {
@@ -871,7 +871,7 @@ async fn midx_repack(
   }
   let objects_dir = parent_dir(pack_dir)
   let git_dir = parent_dir(objects_dir)
-  let db = @gitlib.ObjectDb::load(fs, git_dir) catch {
+  let db = @bitlib.ObjectDb::load(fs, git_dir) catch {
     err if @async.is_cancellation_error(err) => raise err
     _ => {
       if progress {
@@ -881,7 +881,7 @@ async fn midx_repack(
     }
   }
   let seen : Map[String, Bool] = {}
-  let repack_objects : Array[@git.PackObject] = []
+  let repack_objects : Array[@bitcore.PackObject] = []
   for pack_name in selected_packs {
     let idx_path = pack_dir + "/" + midx_pack_stem(pack_name) + ".idx"
     let entries = midx_read_pack_index(fs, idx_path, 0, 0)
@@ -904,10 +904,10 @@ async fn midx_repack(
     return
   }
   let pack_data = @pack.create_packfile(repack_objects)
-  let objects_for_index : Array[@git.PackObject] = []
+  let objects_for_index : Array[@bitcore.PackObject] = []
   for obj in repack_objects {
     objects_for_index.push(
-      @git.PackObject::with_metadata(obj.obj_type, obj.data, obj.id, -1, 0U),
+      @bitcore.PackObject::with_metadata(obj.obj_type, obj.data, obj.id, -1, 0U),
     )
   }
   @pack.write_packfile_with_index(fs, git_dir, pack_data, objects_for_index)
@@ -926,7 +926,7 @@ async fn midx_repack(
 ///|
 /// MIDX entry for building
 priv struct MidxEntry {
-  id : @git.ObjectId
+  id : @bitcore.ObjectId
   pack_idx : Int
   pack_mtime : Int
   offset_hi : Int
@@ -960,13 +960,13 @@ priv struct MidxRidxEntry {
 
 ///|
 priv struct MidxBitmapTip {
-  id : @git.ObjectId
+  id : @bitcore.ObjectId
   midx_pos : Int
 }
 
 ///|
 priv struct MidxBitmapCandidate {
-  id : @git.ObjectId
+  id : @bitcore.ObjectId
   midx_pos : Int
   preferred : Bool
 }
@@ -1216,7 +1216,7 @@ fn midx_has_valid_checksum(data : Bytes) -> Bool {
   }
   let body_len = data.length() - 20
   let body = Bytes::from_array(FixedArray::makei(body_len, i => data[i]))
-  let checksum = @git.sha1(body)
+  let checksum = @bitcore.sha1(body)
   for i in 0..<20 {
     if checksum.bytes[i] != data[body_len + i] {
       return false
@@ -1336,7 +1336,7 @@ async fn midx_write_bitmap(
   }
   let objects_dir = parent_dir(pack_dir)
   let git_dir = parent_dir(objects_dir)
-  let db = @gitlib.ObjectDb::load(fs, git_dir)
+  let db = @bitlib.ObjectDb::load(fs, git_dir)
   let bitmap_tips = midx_collect_bitmap_tips(
     fs, git_dir, midx_pos_by_oid, refs_snapshot,
   )
@@ -1368,7 +1368,7 @@ async fn midx_write_bitmap(
   }
   let reachable_positions_by_tip : Array[Array[Int]] = []
   for tip in bitmap_tips {
-    let reachable = @gitlib.collect_reachable_objects(db, fs, tip.id) catch {
+    let reachable = @bitlib.collect_reachable_objects(db, fs, tip.id) catch {
       _ => {
         midx_fail_bitmap_write(
           fs, pack_dir, "error: pack doesn't have full closure",
@@ -1467,7 +1467,7 @@ async fn midx_write_bitmap(
     midx_emit_lookup_table_trace(fs)
   }
   let body = Bytes::from_array(FixedArray::makei(out.length(), i => out[i]))
-  let trailer = @git.sha1(body)
+  let trailer = @bitcore.sha1(body)
   for b in trailer.bytes {
     out.push(b)
   }
@@ -1575,7 +1575,7 @@ fn midx_parse_bitmap_hash_cache(
 
 ///|
 fn midx_should_write_bitmap_lookup_table(git_dir : String) -> Bool {
-  let overrides = @gitlib.parse_config_overrides()
+  let overrides = @bitlib.parse_config_overrides()
   match overrides.get("pack.writebitmaplookuptable") {
     Some(value) =>
       match midx_parse_config_bool(value) {
@@ -1583,7 +1583,7 @@ fn midx_should_write_bitmap_lookup_table(git_dir : String) -> Bool {
         None => false
       }
     None =>
-      match git_config_get(git_dir, "pack", "writeBitmapLookupTable") {
+      match bit_config_get(git_dir, "pack", "writeBitmapLookupTable") {
         Some(value) =>
           match midx_parse_config_bool(value) {
             Some(v) => v
@@ -1644,7 +1644,7 @@ fn midx_checksum_hex(data : Bytes) -> String {
     return ""
   }
   let checksum_offset = data.length() - 20
-  let oid = @git.ObjectId::new(
+  let oid = @bitcore.ObjectId::new(
     FixedArray::makei(20, i => data[checksum_offset + i]),
   )
   oid.to_hex()
@@ -1687,12 +1687,12 @@ fn midx_build_ewah_bitmap(
 }
 
 ///|
-fn midx_object_type_code(obj_type : @git.ObjectType) -> Int {
+fn midx_object_type_code(obj_type : @bitcore.ObjectType) -> Int {
   match obj_type {
-    @git.ObjectType::Commit => 1
-    @git.ObjectType::Tree => 2
-    @git.ObjectType::Blob => 3
-    @git.ObjectType::Tag => 4
+    @bitcore.ObjectType::Commit => 1
+    @bitcore.ObjectType::Tree => 2
+    @bitcore.ObjectType::Blob => 3
+    @bitcore.ObjectType::Tag => 4
   }
 }
 
@@ -1711,7 +1711,7 @@ fn midx_collect_bitmap_tips(
       for pair in specs {
         let spec = pair.0
         let preferred = pair.1
-        let parsed = @gitrepo.rev_parse(fs, git_dir, spec) catch { _ => None }
+        let parsed = @bitrepo.rev_parse(fs, git_dir, spec) catch { _ => None }
         match parsed {
           Some(id) =>
             midx_add_bitmap_candidate(
@@ -1723,7 +1723,7 @@ fn midx_collect_bitmap_tips(
     }
     None => {
       let preferred_prefixes = midx_config_prefer_bitmap_tip_prefixes(git_dir)
-      let refs = @gitlib.list_refs_with_ids(fs, git_dir, Some("refs/"))
+      let refs = @bitlib.list_refs_with_ids(fs, git_dir, Some("refs/"))
       let refnames : Array[String] = []
       for refname, _ in refs {
         if refname.has_prefix("refs/heads/") || refname.has_prefix("refs/tags/") {
@@ -1733,7 +1733,7 @@ fn midx_collect_bitmap_tips(
       midx_sort_strings_lex_in_place(refnames)
       for refname in refnames {
         let rev = refname + "^{commit}"
-        let parsed = @gitrepo.rev_parse(fs, git_dir, rev) catch { _ => None }
+        let parsed = @bitrepo.rev_parse(fs, git_dir, rev) catch { _ => None }
         match parsed {
           Some(id) =>
             midx_add_bitmap_candidate(
@@ -1746,7 +1746,7 @@ fn midx_collect_bitmap_tips(
           None => ()
         }
       }
-      let head = @gitrepo.rev_parse(fs, git_dir, "HEAD") catch { _ => None }
+      let head = @bitrepo.rev_parse(fs, git_dir, "HEAD") catch { _ => None }
       match head {
         Some(id) =>
           midx_add_bitmap_candidate(
@@ -1783,7 +1783,7 @@ fn midx_add_bitmap_candidate(
   out : Array[MidxBitmapCandidate],
   seen_idx_by_hex : Map[String, Int],
   midx_pos_by_oid : Map[String, Int],
-  id : @git.ObjectId,
+  id : @bitcore.ObjectId,
   preferred : Bool,
 ) -> Unit {
   let hex = id.to_hex()
@@ -1812,11 +1812,11 @@ fn midx_add_bitmap_candidate(
 
 ///|
 fn midx_config_prefer_bitmap_tip_prefixes(git_dir : String) -> Array[String] {
-  let overrides = @gitlib.parse_config_overrides()
+  let overrides = @bitlib.parse_config_overrides()
   match overrides.get("pack.preferbitmaptips") {
     Some(value) => midx_split_bitmap_tip_prefixes(value)
     None =>
-      match git_config_get(git_dir, "pack", "preferBitmapTips") {
+      match bit_config_get(git_dir, "pack", "preferBitmapTips") {
         Some(value) => midx_split_bitmap_tip_prefixes(value)
         None => []
       }
@@ -1950,7 +1950,7 @@ fn midx_read_pack_index(
       if id_offset + oid_len > data.length() {
         return []
       }
-      let id = @git.ObjectId::new(
+      let id = @bitcore.ObjectId::new(
         FixedArray::makei(20, j => data[id_offset + j]),
       )
       let raw_offset = midx_read_u32(data, offsets_offset + i * 4)
@@ -1982,7 +1982,7 @@ fn midx_read_pack_index(
     let entry_offset = entries_offset + i * 24
     let offset = midx_read_u32(data, entry_offset)
     let id_offset = entry_offset + 4
-    let id = @git.ObjectId::new(FixedArray::makei(20, j => data[id_offset + j]))
+    let id = @bitcore.ObjectId::new(FixedArray::makei(20, j => data[id_offset + j]))
     entries.push({ id, pack_idx, pack_mtime, offset_hi: 0, offset })
   }
   entries
@@ -2175,7 +2175,7 @@ fn midx_build(
   }
   // Checksum
   let content = Bytes::from_array(FixedArray::makei(out.length(), i => out[i]))
-  let checksum = @git.sha1(content)
+  let checksum = @bitcore.sha1(content)
   for b in checksum.bytes {
     out.push(b)
   }
@@ -2439,7 +2439,7 @@ fn midx_sort_strings_lex_in_place(values : Array[String]) -> Unit {
 }
 
 ///|
-fn midx_compare_oid(a : @git.ObjectId, b : @git.ObjectId) -> Int {
+fn midx_compare_oid(a : @bitcore.ObjectId, b : @bitcore.ObjectId) -> Int {
   for i in 0..<20 {
     let av = a.bytes[i].to_int()
     let bv = b.bytes[i].to_int()

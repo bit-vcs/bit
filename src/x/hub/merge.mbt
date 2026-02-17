@@ -10,7 +10,7 @@ pub(all) enum PrMergeStrategy {
 ///|
 pub struct PrMergeResult {
   success : Bool
-  commit_id : @git.ObjectId?
+  commit_id : @bit.ObjectId?
   conflicts : Array[String]
   message : String
 }
@@ -69,7 +69,7 @@ pub fn PrMergeResult::success(self : PrMergeResult) -> Bool {
 }
 
 ///|
-pub fn PrMergeResult::commit_id(self : PrMergeResult) -> @git.ObjectId? {
+pub fn PrMergeResult::commit_id(self : PrMergeResult) -> @bit.ObjectId? {
   self.commit_id
 }
 
@@ -121,17 +121,17 @@ fn find_pr_workflow_result(
 fn ensure_required_workflows_success(
   workflows : Array[PrWorkflowResult],
   required_workflows : Array[String],
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   for task in required_workflows {
     match find_pr_workflow_result(workflows, task) {
       Some(workflow) =>
         if workflow.status() != PrWorkflowStatus::Success {
-          raise @git.GitError::InvalidObject(
+          raise @bit.GitError::InvalidObject(
             "Merge blocked by policy: required workflow '\{task}' status=\{workflow.status().to_string()}",
           )
         }
       None =>
-        raise @git.GitError::InvalidObject(
+        raise @bit.GitError::InvalidObject(
           "Merge blocked by policy: required workflow '\{task}' has no result",
         )
     }
@@ -146,7 +146,7 @@ pub fn Hub::check_merge_policy(
   pr_id : String,
   policy : PrMergePolicy,
   signing_key? : String? = None,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let pr = self.get_pr(objects, pr_id)
   guard pr is Some(existing_pr) else { return () }
   if existing_pr.state != PrState::Open {
@@ -157,19 +157,19 @@ pub fn Hub::check_merge_policy(
     reviews,
   )
   if not(policy.allow_request_changes) && has_request_changes {
-    raise @git.GitError::InvalidObject(
+    raise @bit.GitError::InvalidObject(
       "Merge blocked by policy: request-changes review is present",
     )
   }
   if approved_count < policy.required_approvals {
-    raise @git.GitError::InvalidObject(
+    raise @bit.GitError::InvalidObject(
       "Merge blocked by policy: required approvals=\{policy.required_approvals}, current approvals=\{approved_count}",
     )
   }
   let mut workflows = self.list_pr_workflows(objects, pr_id)
   if policy.require_signed_records {
     guard signing_key is Some(sign_key) else {
-      raise @git.GitError::InvalidObject(
+      raise @bit.GitError::InvalidObject(
         "Merge blocked by policy: require_signed_records=true requires signing key (BIT_COLLAB_SIGN_KEY for CLI)",
       )
     }
@@ -180,13 +180,13 @@ pub fn Hub::check_merge_policy(
       require_signed=true,
     )
     if strict_hub.get_pr(objects, pr_id) is None {
-      raise @git.GitError::InvalidObject(
+      raise @bit.GitError::InvalidObject(
         "Merge blocked by policy: PR metadata is unsigned or has invalid signature",
       )
     }
     let strict_reviews = strict_hub.list_reviews(objects, pr_id)
     if strict_reviews.length() != reviews.length() {
-      raise @git.GitError::InvalidObject(
+      raise @bit.GitError::InvalidObject(
         "Merge blocked by policy: unsigned or invalid PR reviews are present",
       )
     }
@@ -204,7 +204,7 @@ pub fn Hub::can_merge(
   objects : &@lib.ObjectStore,
   refs : &@lib.RefStore,
   pr_id : String,
-) -> Bool raise @git.GitError {
+) -> Bool raise @bit.GitError {
   let pr = self.get_pr(objects, pr_id)
   guard pr is Some(existing) else { return false }
   if existing.state != PrState::Open {
@@ -227,7 +227,7 @@ pub fn Hub::merge_pr(
   pr_id : String,
   merger : String,
   strategy? : PrMergeStrategy = PrMergeStrategy::Merge,
-) -> PrMergeResult raise @git.GitError {
+) -> PrMergeResult raise @bit.GitError {
   let timestamp = clock.now()
   // Get and validate PR
   let pr = self.get_pr(objects, pr_id)
@@ -288,7 +288,7 @@ pub fn Hub::merge_pr(
             message: "Cannot read source tree",
           }
         }
-        let commit = @git.Commit::new(
+        let commit = @bit.Commit::new(
           tree_id,
           [target_id, source_id],
           merger,
@@ -299,8 +299,8 @@ pub fn Hub::merge_pr(
           "+0000",
           merge_message,
         )
-        let commit_bytes = @git.serialize_commit_content(commit)
-        let commit_id = objects.put(@git.ObjectType::Commit, commit_bytes)
+        let commit_bytes = @bit.serialize_commit_content(commit)
+        let commit_id = objects.put(@bit.ObjectType::Commit, commit_bytes)
         update_branch_ref(refs, existing.target_branch, commit_id)
         mark_pr_merged(self, objects, refs, clock, pr_id, existing, commit_id)
         return {
@@ -321,7 +321,7 @@ pub fn Hub::merge_pr(
           }
         }
         let squash_message = "Squash PR #\{pr_id}: \{existing.title}\n\nSquashed-by: \{merger}\n"
-        let commit = @git.Commit::new(
+        let commit = @bit.Commit::new(
           tree_id,
           [target_id],
           merger,
@@ -332,8 +332,8 @@ pub fn Hub::merge_pr(
           "+0000",
           squash_message,
         )
-        let commit_bytes = @git.serialize_commit_content(commit)
-        let commit_id = objects.put(@git.ObjectType::Commit, commit_bytes)
+        let commit_bytes = @bit.serialize_commit_content(commit)
+        let commit_id = objects.put(@bit.ObjectType::Commit, commit_bytes)
         update_branch_ref(refs, existing.target_branch, commit_id)
         mark_pr_merged(self, objects, refs, clock, pr_id, existing, commit_id)
         return {
@@ -382,11 +382,11 @@ pub fn Hub::merge_pr(
     Squash => [target_id]
     _ => [target_id, source_id]
   }
-  let commit = @git.Commit::new(
+  let commit = @bit.Commit::new(
     tree_id, parents, merger, timestamp, "+0000", merger, timestamp, "+0000", merge_message,
   )
-  let commit_bytes = @git.serialize_commit_content(commit)
-  let commit_id = objects.put(@git.ObjectType::Commit, commit_bytes)
+  let commit_bytes = @bit.serialize_commit_content(commit)
+  let commit_id = objects.put(@bit.ObjectType::Commit, commit_bytes)
   // Update target branch
   update_branch_ref(refs, existing.target_branch, commit_id)
   // Mark PR as merged
@@ -402,27 +402,27 @@ pub fn Hub::merge_pr(
 ///|
 fn get_commit_tree_id(
   objects : &@lib.ObjectStore,
-  commit_id : @git.ObjectId,
-) -> @git.ObjectId? raise @git.GitError {
+  commit_id : @bit.ObjectId,
+) -> @bit.ObjectId? raise @bit.GitError {
   let obj = objects.get(commit_id)
   guard obj is Some(commit_obj) else { return None }
-  if commit_obj.obj_type != @git.ObjectType::Commit {
+  if commit_obj.obj_type != @bit.ObjectType::Commit {
     return None
   }
-  let info = @git.parse_commit(commit_obj.data)
+  let info = @bit.parse_commit(commit_obj.data)
   Some(info.tree)
 }
 
 ///|
 fn is_ancestor(
   objects : &@lib.ObjectStore,
-  ancestor : @git.ObjectId,
-  commit_id : @git.ObjectId,
-) -> Bool raise @git.GitError {
+  ancestor : @bit.ObjectId,
+  commit_id : @bit.ObjectId,
+) -> Bool raise @bit.GitError {
   if ancestor == commit_id {
     return true
   }
-  let stack : Array[@git.ObjectId] = [commit_id]
+  let stack : Array[@bit.ObjectId] = [commit_id]
   let seen : Map[String, Bool] = {}
   while stack.length() > 0 {
     let id = stack.pop()
@@ -437,10 +437,10 @@ fn is_ancestor(
     }
     let obj = objects.get(current)
     guard obj is Some(commit_obj) else { continue }
-    if commit_obj.obj_type != @git.ObjectType::Commit {
+    if commit_obj.obj_type != @bit.ObjectType::Commit {
       continue
     }
-    let info = @git.parse_commit(commit_obj.data)
+    let info = @bit.parse_commit(commit_obj.data)
     for parent in info.parents {
       stack.push(parent)
     }
@@ -451,11 +451,11 @@ fn is_ancestor(
 ///|
 fn find_merge_base(
   objects : &@lib.ObjectStore,
-  a : @git.ObjectId,
-  b : @git.ObjectId,
-) -> @git.ObjectId? raise @git.GitError {
+  a : @bit.ObjectId,
+  b : @bit.ObjectId,
+) -> @bit.ObjectId? raise @bit.GitError {
   let seen_a : Map[String, Bool] = {}
-  let stack_a : Array[@git.ObjectId] = [a]
+  let stack_a : Array[@bit.ObjectId] = [a]
   while stack_a.length() > 0 {
     let id = stack_a.pop()
     guard id is Some(current) else { break }
@@ -466,15 +466,15 @@ fn find_merge_base(
     seen_a[hex] = true
     let obj = objects.get(current)
     guard obj is Some(commit_obj) else { continue }
-    if commit_obj.obj_type != @git.ObjectType::Commit {
+    if commit_obj.obj_type != @bit.ObjectType::Commit {
       continue
     }
-    let info = @git.parse_commit(commit_obj.data)
+    let info = @bit.parse_commit(commit_obj.data)
     for parent in info.parents {
       stack_a.push(parent)
     }
   }
-  let stack_b : Array[@git.ObjectId] = [b]
+  let stack_b : Array[@bit.ObjectId] = [b]
   while stack_b.length() > 0 {
     let id = stack_b.pop()
     guard id is Some(current) else { break }
@@ -484,10 +484,10 @@ fn find_merge_base(
     }
     let obj = objects.get(current)
     guard obj is Some(commit_obj) else { continue }
-    if commit_obj.obj_type != @git.ObjectType::Commit {
+    if commit_obj.obj_type != @bit.ObjectType::Commit {
       continue
     }
-    let info = @git.parse_commit(commit_obj.data)
+    let info = @bit.parse_commit(commit_obj.data)
     for parent in info.parents {
       stack_b.push(parent)
     }
@@ -497,22 +497,22 @@ fn find_merge_base(
 
 ///|
 priv struct FileEntry {
-  id : @git.ObjectId
+  id : @bit.ObjectId
   mode : String
 }
 
 ///|
 fn collect_files_from_commit(
   objects : &@lib.ObjectStore,
-  commit_id : @git.ObjectId,
-) -> Map[String, FileEntry] raise @git.GitError {
+  commit_id : @bit.ObjectId,
+) -> Map[String, FileEntry] raise @bit.GitError {
   let result : Map[String, FileEntry] = {}
   let obj = objects.get(commit_id)
   guard obj is Some(commit_obj) else { return result }
-  if commit_obj.obj_type != @git.ObjectType::Commit {
+  if commit_obj.obj_type != @bit.ObjectType::Commit {
     return result
   }
-  let info = @git.parse_commit(commit_obj.data)
+  let info = @bit.parse_commit(commit_obj.data)
   collect_tree_files(objects, info.tree, "", result)
   result
 }
@@ -520,16 +520,16 @@ fn collect_files_from_commit(
 ///|
 fn collect_tree_files(
   objects : &@lib.ObjectStore,
-  tree_id : @git.ObjectId,
+  tree_id : @bit.ObjectId,
   prefix : String,
   out : Map[String, FileEntry],
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let obj = objects.get(tree_id)
   guard obj is Some(tree_obj) else { return () }
-  if tree_obj.obj_type != @git.ObjectType::Tree {
+  if tree_obj.obj_type != @bit.ObjectType::Tree {
     return ()
   }
-  let entries = @git.parse_tree(tree_obj.data)
+  let entries = @bit.parse_tree(tree_obj.data)
   for entry in entries {
     let path = if prefix.length() == 0 {
       entry.name
@@ -605,7 +605,7 @@ fn entry_eq(a : FileEntry?, b : FileEntry?) -> Bool {
 fn create_tree_from_files(
   objects : &@lib.ObjectStore,
   files : Map[String, FileEntry],
-) -> @git.ObjectId raise @git.GitError {
+) -> @bit.ObjectId raise @bit.GitError {
   let tree_map : Map[String, Array[(String, FileEntry)]] = {}
   for item in files.to_array() {
     let (path, entry) = item
@@ -627,7 +627,7 @@ fn create_tree_from_files(
       None => ()
     }
   }
-  let tree_ids : Map[String, @git.ObjectId] = {}
+  let tree_ids : Map[String, @bit.ObjectId] = {}
   let dirs = tree_map.keys().to_array()
   dirs.sort_by(fn(a, b) {
     let a_depth = count_slashes(a)
@@ -637,22 +637,22 @@ fn create_tree_from_files(
   for dir in dirs {
     let entries_arr = tree_map.get(dir)
     guard entries_arr is Some(file_entries) else { continue }
-    let tree_entries : Array[@git.TreeEntry] = []
+    let tree_entries : Array[@bit.TreeEntry] = []
     for item in file_entries {
       let (name, entry) = item
-      tree_entries.push(@git.TreeEntry::new(entry.mode, name, entry.id))
+      tree_entries.push(@bit.TreeEntry::new(entry.mode, name, entry.id))
     }
     for item in tree_ids.to_array() {
       let (subdir, id) = item
       let parent_dir = get_parent_dir(subdir)
       if parent_dir == dir {
         let name = get_base_name(subdir)
-        tree_entries.push(@git.TreeEntry::new("040000", name, id))
+        tree_entries.push(@bit.TreeEntry::new("040000", name, id))
       }
     }
     tree_entries.sort_by((a, b) => String::compare(a.name, b.name))
-    let tree_bytes = @git.serialize_tree(tree_entries)
-    let tree_id = objects.put(@git.ObjectType::Tree, tree_bytes)
+    let tree_bytes = @bit.serialize_tree(tree_entries)
+    let tree_id = objects.put(@bit.ObjectType::Tree, tree_bytes)
     tree_ids[dir] = tree_id
   }
   tree_ids.get("") |> Option::unwrap()
@@ -699,7 +699,7 @@ fn normalize_head_ref(ref_name : String) -> String {
 fn resolve_ref_with_head_fallback(
   refs : &@lib.RefStore,
   ref_name : String,
-) -> @git.ObjectId? raise @git.GitError {
+) -> @bit.ObjectId? raise @bit.GitError {
   let direct = refs.resolve(ref_name)
   match direct {
     Some(id) => Some(id)
@@ -732,7 +732,7 @@ fn resolve_pr_source_commit(
   objects : &@lib.ObjectStore,
   refs : &@lib.RefStore,
   pr : PullRequest,
-) -> Result[@git.ObjectId, String] raise @git.GitError {
+) -> Result[@bit.ObjectId, String] raise @bit.GitError {
   match pr.source_ref {
     Some(ref_name) => {
       let from_source_ref = resolve_ref_with_head_fallback(refs, ref_name)
@@ -759,8 +759,8 @@ fn resolve_pr_source_commit(
 fn update_branch_ref(
   refs : &@lib.RefStore,
   branch : String,
-  commit_id : @git.ObjectId,
-) -> Unit raise @git.GitError {
+  commit_id : @bit.ObjectId,
+) -> Unit raise @bit.GitError {
   let ref_name = if branch.has_prefix("refs/") {
     branch
   } else {
@@ -777,8 +777,8 @@ fn mark_pr_merged(
   clock : &@lib.Clock,
   pr_id : String,
   existing : PullRequest,
-  merge_commit_id : @git.ObjectId,
-) -> Unit raise @git.GitError {
+  merge_commit_id : @bit.ObjectId,
+) -> Unit raise @bit.GitError {
   let updated = PullRequest::new(
     existing.id,
     existing.title,

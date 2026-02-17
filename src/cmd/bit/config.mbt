@@ -76,21 +76,21 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
     }
   }
   if expect_config_path {
-    raise @git.GitError::InvalidObject("option '-f' requires a value")
+    raise @bitcore.GitError::InvalidObject("option '-f' requires a value")
   }
   if expect_default_value {
-    raise @git.GitError::InvalidObject("option '--default' requires a value")
+    raise @bitcore.GitError::InvalidObject("option '--default' requires a value")
   }
   if global_mode && system_mode {
-    raise @git.GitError::InvalidObject("only one config scope can be specified")
+    raise @bitcore.GitError::InvalidObject("only one config scope can be specified")
   }
   if local_mode && (global_mode || system_mode) {
-    raise @git.GitError::InvalidObject(
+    raise @bitcore.GitError::InvalidObject(
       "--local cannot be used with --global or --system",
     )
   }
   if worktree_mode && (global_mode || system_mode) {
-    raise @git.GitError::InvalidObject(
+    raise @bitcore.GitError::InvalidObject(
       "--worktree cannot be used with --global or --system",
     )
   }
@@ -109,7 +109,7 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
       } else if system_mode {
         @sys.get_env_var("GIT_CONFIG_SYSTEM").unwrap_or("/etc/gitconfig")
       } else {
-        let rfs : &@git.RepoFileSystem = fs
+        let rfs : &@bitcore.RepoFileSystem = fs
         let root = get_work_root()
         let git_dir = resolve_git_dir(rfs, root)
         if worktree_mode {
@@ -128,18 +128,18 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
   }
   if remove_section_mode {
     guard key is Some(section_key) else {
-      raise @git.GitError::InvalidObject("section name required")
+      raise @bitcore.GitError::InvalidObject("section name required")
     }
     remove_config_section_file(fs, config_path, section_key)
     return
   }
   guard key is Some(k) else {
-    raise @git.GitError::InvalidObject("key required")
+    raise @bitcore.GitError::InvalidObject("key required")
   }
   // Handle --unset / --unset-all
   if unset_mode || unset_all {
     if fixed_value_mode && value is None {
-      raise @git.GitError::InvalidObject("value required for --fixed-value")
+      raise @bitcore.GitError::InvalidObject("value required for --fixed-value")
     }
     let fixed = if fixed_value_mode { value } else { None }
     unset_config(fs, config_path, k, fixed, unset_all)
@@ -260,7 +260,7 @@ fn code_in_string(c : UInt16, s : String) -> Bool {
 
 ///|
 async fn list_config(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   config_path : String,
 ) -> Unit raise Error {
   if not(fs.is_file(config_path)) {
@@ -318,7 +318,7 @@ async fn list_config(
 
 ///|
 fn get_config_value(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   config_path : String,
   key : String,
 ) -> String? raise Error {
@@ -504,8 +504,8 @@ fn set_config(
   value : String,
   add_mode : Bool,
 ) -> Unit raise Error {
-  let rfs : &@git.RepoFileSystem = fs
-  let wfs : &@git.FileSystem = fs
+  let rfs : &@bitcore.RepoFileSystem = fs
+  let wfs : &@bitcore.FileSystem = fs
   let parts : Array[String] = []
   for p in key.split(".") {
     parts.push(p.to_string())
@@ -644,8 +644,8 @@ fn unset_config(
   fixed_value : String?,
   unset_all : Bool,
 ) -> Unit raise Error {
-  let rfs : &@git.RepoFileSystem = fs
-  let wfs : &@git.FileSystem = fs
+  let rfs : &@bitcore.RepoFileSystem = fs
+  let wfs : &@bitcore.FileSystem = fs
   if not(rfs.is_file(config_path)) {
     return
   }
@@ -824,8 +824,8 @@ fn remove_config_section_file(
   config_path : String,
   section_key : String,
 ) -> Unit raise Error {
-  let rfs : &@git.RepoFileSystem = fs
-  let wfs : &@git.FileSystem = fs
+  let rfs : &@bitcore.RepoFileSystem = fs
+  let wfs : &@bitcore.FileSystem = fs
   if not(rfs.is_file(config_path)) {
     return
   }

@@ -3,8 +3,8 @@
 ///|
 priv struct TestHubObjectStore {
   db : @lib.ObjectDb
-  rfs : &@git.RepoFileSystem
-  fs : &@git.FileSystem
+  rfs : &@bit.RepoFileSystem
+  fs : &@bit.FileSystem
   git_dir : String
 }
 
@@ -15,7 +15,7 @@ impl @lib.ObjectStore for TestHubObjectStore with get(self, id) {
 
 ///|
 impl @lib.ObjectStore for TestHubObjectStore with put(self, obj_type, content) {
-  let (id, compressed) = @git.create_object(obj_type, content)
+  let (id, compressed) = @bit.create_object(obj_type, content)
   write_object_bytes(self.fs, self.git_dir, id, compressed)
   id
 }
@@ -27,28 +27,28 @@ impl @lib.ObjectStore for TestHubObjectStore with has(self, id) {
 }
 
 ///|
-fn setup_sync_repo() -> (@git.TestFs, String) {
-  let fs = @git.TestFs::new()
+fn setup_sync_repo() -> (@bit.TestFs, String) {
+  let fs = @bit.TestFs::new()
   fs.mkdir_p("/repo/.git")
   (fs, "/repo/.git")
 }
 
 ///|
 fn make_test_object_store(
-  fs : @git.TestFs,
+  fs : @bit.TestFs,
   git_dir : String,
-) -> TestHubObjectStore raise @git.GitError {
+) -> TestHubObjectStore raise @bit.GitError {
   let db = @lib.ObjectDb::load_lazy(fs, git_dir)
   { db, rfs: fs, fs, git_dir }
 }
 
 ///|
 fn write_tree(
-  fs : @git.TestFs,
+  fs : @bit.TestFs,
   git_dir : String,
-  entries : Array[@git.TreeEntry],
-) -> @git.ObjectId {
-  let (id, compressed) = @git.create_tree(entries)
+  entries : Array[@bit.TreeEntry],
+) -> @bit.ObjectId {
+  let (id, compressed) = @bit.create_tree(entries)
   write_object_bytes(fs, git_dir, id, compressed) catch {
     _ => panic()
   }
@@ -56,7 +56,7 @@ fn write_tree(
 }
 
 ///|
-fn read_blob_string(objects : TestHubObjectStore, id : @git.ObjectId) -> String {
+fn read_blob_string(objects : TestHubObjectStore, id : @bit.ObjectId) -> String {
   let obj = objects.db.get(objects.rfs, id) catch { _ => None }
   guard obj is Some(blob) else { return "" }
   @utf8.decode_lossy(blob.data[:])
@@ -64,11 +64,11 @@ fn read_blob_string(objects : TestHubObjectStore, id : @git.ObjectId) -> String 
 
 ///|
 fn write_record_blob(
-  fs : @git.TestFs,
+  fs : @bit.TestFs,
   git_dir : String,
   record : HubRecord,
-) -> @git.ObjectId {
-  let (id, compressed) = @git.create_blob_string(record.serialize())
+) -> @bit.ObjectId {
+  let (id, compressed) = @bit.create_blob_string(record.serialize())
   write_object_bytes(fs, git_dir, id, compressed) catch {
     _ => panic()
   }
@@ -78,9 +78,9 @@ fn write_record_blob(
 ///|
 fn find_tree_entry(
   objects : TestHubObjectStore,
-  tree_id : @git.ObjectId,
+  tree_id : @bit.ObjectId,
   name : String,
-) -> @git.ObjectId? {
+) -> @bit.ObjectId? {
   let obj_store : &@lib.ObjectStore = objects
   let entries = read_tree_entries_store(obj_store, tree_id)
   for entry in entries {
@@ -97,11 +97,11 @@ test "sync: merge notes unions entries" {
   let objects = make_test_object_store(fs, git_dir)
   let key1 = "hub/pr/1/meta"
   let key2 = "hub/pr/2/meta"
-  let (key1_id, key1_compressed) = @git.create_blob_string(key1)
+  let (key1_id, key1_compressed) = @bit.create_blob_string(key1)
   write_object_bytes(fs, git_dir, key1_id, key1_compressed) catch {
     _ => panic()
   }
-  let (key2_id, key2_compressed) = @git.create_blob_string(key2)
+  let (key2_id, key2_compressed) = @bit.create_blob_string(key2)
   write_object_bytes(fs, git_dir, key2_id, key2_compressed) catch {
     _ => panic()
   }
@@ -110,10 +110,10 @@ test "sync: merge notes unions entries" {
   let blob1 = write_record_blob(fs, git_dir, record1)
   let blob2 = write_record_blob(fs, git_dir, record2)
   let local_notes = write_tree(fs, git_dir, [
-    @git.TreeEntry::new("100644", key1_id.to_hex(), blob1),
+    @bit.TreeEntry::new("100644", key1_id.to_hex(), blob1),
   ])
   let remote_notes = write_tree(fs, git_dir, [
-    @git.TreeEntry::new("100644", key2_id.to_hex(), blob2),
+    @bit.TreeEntry::new("100644", key2_id.to_hex(), blob2),
   ])
   let obj_store : &@lib.ObjectStore = objects
   let merged = merge_notes_trees_store(
@@ -128,7 +128,7 @@ test "sync: merge notes uses LWW by clock and timestamp" {
   let (fs, git_dir) = setup_sync_repo()
   let objects = make_test_object_store(fs, git_dir)
   let key = "hub/pr/1/meta"
-  let (key_id, key_compressed) = @git.create_blob_string(key)
+  let (key_id, key_compressed) = @bit.create_blob_string(key)
   write_object_bytes(fs, git_dir, key_id, key_compressed) catch {
     _ => panic()
   }
@@ -142,10 +142,10 @@ test "sync: merge notes uses LWW by clock and timestamp" {
   let local_blob = write_record_blob(fs, git_dir, local_record)
   let remote_blob = write_record_blob(fs, git_dir, remote_record)
   let local_notes = write_tree(fs, git_dir, [
-    @git.TreeEntry::new("100644", key_id.to_hex(), local_blob),
+    @bit.TreeEntry::new("100644", key_id.to_hex(), local_blob),
   ])
   let remote_notes = write_tree(fs, git_dir, [
-    @git.TreeEntry::new("100644", key_id.to_hex(), remote_blob),
+    @bit.TreeEntry::new("100644", key_id.to_hex(), remote_blob),
   ])
   let obj_store : &@lib.ObjectStore = objects
   let merged = merge_notes_trees_store(
@@ -163,7 +163,7 @@ test "sync: merge notes supports tombstone-wins policy" {
   let (fs, git_dir) = setup_sync_repo()
   let objects = make_test_object_store(fs, git_dir)
   let key = "hub/pr/1/meta"
-  let (key_id, key_compressed) = @git.create_blob_string(key)
+  let (key_id, key_compressed) = @bit.create_blob_string(key)
   write_object_bytes(fs, git_dir, key_id, key_compressed) catch {
     _ => panic()
   }
@@ -188,10 +188,10 @@ test "sync: merge notes supports tombstone-wins policy" {
   let local_blob = write_record_blob(fs, git_dir, local_record)
   let remote_blob = write_record_blob(fs, git_dir, remote_record)
   let local_notes = write_tree(fs, git_dir, [
-    @git.TreeEntry::new("100644", key_id.to_hex(), local_blob),
+    @bit.TreeEntry::new("100644", key_id.to_hex(), local_blob),
   ])
   let remote_notes = write_tree(fs, git_dir, [
-    @git.TreeEntry::new("100644", key_id.to_hex(), remote_blob),
+    @bit.TreeEntry::new("100644", key_id.to_hex(), remote_blob),
   ])
   let obj_store : &@lib.ObjectStore = objects
   let merged = merge_notes_trees_store(

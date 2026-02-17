@@ -22,7 +22,7 @@ async fn handle_ls_tree(args : Array[String]) -> Unit raise Error {
     }
   }
   guard positional.length() > 0 else {
-    raise @git.GitError::InvalidObject("tree-ish required")
+    raise @bitcore.GitError::InvalidObject("tree-ish required")
   }
   let spec = positional[0]
   // Path filters are remaining positional arguments
@@ -32,11 +32,11 @@ async fn handle_ls_tree(args : Array[String]) -> Unit raise Error {
   }
   let cwd_prefix = compute_cwd_prefix(root)
   let normalized_filters = normalize_ls_tree_filters(path_filters, cwd_prefix)
-  let tree_id = @gitrepo.rev_parse(fs, git_dir, spec)
+  let tree_id = @bitrepo.rev_parse(fs, git_dir, spec)
   guard tree_id is Some(tid) else {
-    raise @git.GitError::InvalidObject("Not a valid object name: \{spec}")
+    raise @bitcore.GitError::InvalidObject("Not a valid object name: \{spec}")
   }
-  let db = @gitlib.ObjectDb::load(fs, git_dir)
+  let db = @bitlib.ObjectDb::load(fs, git_dir)
   // Resolve to tree if it's a commit
   let actual_tree_id = resolve_to_tree(db, fs, tid)
   // Parse submodules if needed
@@ -53,29 +53,29 @@ async fn handle_ls_tree(args : Array[String]) -> Unit raise Error {
 
 ///|
 fn resolve_to_tree(
-  db : @gitlib.ObjectDb,
-  fs : &@git.RepoFileSystem,
-  id : @git.ObjectId,
-) -> @git.ObjectId raise @git.GitError {
+  db : @bitlib.ObjectDb,
+  fs : &@bitcore.RepoFileSystem,
+  id : @bitcore.ObjectId,
+) -> @bitcore.ObjectId raise @bitcore.GitError {
   let obj = db.get(fs, id)
   guard obj is Some(o) else {
-    raise @git.GitError::InvalidObject("Object not found")
+    raise @bitcore.GitError::InvalidObject("Object not found")
   }
   match o.obj_type {
-    @git.ObjectType::Tree => id
-    @git.ObjectType::Commit => {
-      let info = @git.parse_commit(o.data)
+    @bitcore.ObjectType::Tree => id
+    @bitcore.ObjectType::Commit => {
+      let info = @bitcore.parse_commit(o.data)
       info.tree
     }
-    _ => raise @git.GitError::InvalidObject("Not a tree or commit")
+    _ => raise @bitcore.GitError::InvalidObject("Not a tree or commit")
   }
 }
 
 ///|
 async fn print_tree_entries(
-  db : @gitlib.ObjectDb,
-  fs : &@git.RepoFileSystem,
-  tree_id : @git.ObjectId,
+  db : @bitlib.ObjectDb,
+  fs : &@bitcore.RepoFileSystem,
+  tree_id : @bitcore.ObjectId,
   prefix : String,
   recursive : Bool,
   show_trees : Bool,
@@ -89,9 +89,9 @@ async fn print_tree_entries(
 ) -> Unit raise Error {
   let obj = db.get(fs, tree_id)
   guard obj is Some(o) else {
-    raise @git.GitError::InvalidObject("Tree not found")
+    raise @bitcore.GitError::InvalidObject("Tree not found")
   }
-  let entries = @git.parse_tree(o.data)
+  let entries = @bitcore.parse_tree(o.data)
   for entry in entries {
     let path = if prefix.length() == 0 {
       entry.name
@@ -135,9 +135,9 @@ async fn print_tree_entries(
       if found_submod {
         // Resolve the submodule's git directory
         let sub_git_path = root + "/" + path + "/.git"
-        let sub_git_dir = @gitlib.resolve_gitdir(fs, sub_git_path)
+        let sub_git_dir = @bitlib.resolve_gitdir(fs, sub_git_path)
         // Load the submodule's object database
-        let sub_db = @gitlib.ObjectDb::load(fs, sub_git_dir)
+        let sub_db = @bitlib.ObjectDb::load(fs, sub_git_dir)
         // entry.id is the commit SHA in the submodule
         // Resolve it to a tree
         let sub_tree_id = resolve_to_tree(sub_db, fs, entry.id) catch {

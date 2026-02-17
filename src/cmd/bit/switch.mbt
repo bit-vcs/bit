@@ -2,7 +2,7 @@
 async fn handle_switch(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let fs = OsFs::new()
-  let rfs : &@git.RepoFileSystem = fs
+  let rfs : &@bitcore.RepoFileSystem = fs
   let git_dir = resolve_git_dir(rfs, root)
   if fs.is_file(git_dir + "/MERGE_HEAD") {
     eprint_line("fatal: cannot switch branch while merging")
@@ -75,7 +75,7 @@ async fn handle_switch(args : Array[String]) -> Unit raise Error {
   if orphan {
     if branch is None {
       if positional.length() == 0 {
-        raise @git.GitError::InvalidObject("No branch specified")
+        raise @bitcore.GitError::InvalidObject("No branch specified")
       }
       branch = Some(positional[0])
     }
@@ -87,12 +87,12 @@ async fn handle_switch(args : Array[String]) -> Unit raise Error {
       0
     }
     if extra_args > 0 {
-      raise @git.GitError::InvalidObject(
+      raise @bitcore.GitError::InvalidObject(
         "orphan mode does not accept start-point",
       )
     }
     guard branch is Some(name) else {
-      raise @git.GitError::InvalidObject("No branch specified")
+      raise @bitcore.GitError::InvalidObject("No branch specified")
     }
     let branch_name = normalize_switch_branch_ref(name)
     if not(ignore_other_worktrees) {
@@ -108,14 +108,14 @@ async fn handle_switch(args : Array[String]) -> Unit raise Error {
     }
     ignore(discard_changes)
     switch_write_head_ref(fs, git_dir, branch_name)
-    @gitlib.write_index_entries(fs, git_dir, [])
+    @bitlib.write_index_entries(fs, git_dir, [])
     println("Switched to a new branch '\{branch_name}'")
     return
   }
   if create {
     if branch is None {
       if positional.length() == 0 {
-        raise @git.GitError::InvalidObject("No branch specified")
+        raise @bitcore.GitError::InvalidObject("No branch specified")
       }
       branch = Some(positional[0])
     }
@@ -131,7 +131,7 @@ async fn handle_switch(args : Array[String]) -> Unit raise Error {
       None
     }
     guard branch is Some(name) else {
-      raise @git.GitError::InvalidObject("No branch specified")
+      raise @bitcore.GitError::InvalidObject("No branch specified")
     }
     let branch_name = normalize_switch_branch_ref(name)
     if not(ignore_other_worktrees) {
@@ -146,29 +146,29 @@ async fn handle_switch(args : Array[String]) -> Unit raise Error {
       }
     }
     let refname = branch_name
-    if @gitlib.resolve_ref(rfs, git_dir, refname) is Some(_) &&
+    if @bitlib.resolve_ref(rfs, git_dir, refname) is Some(_) &&
       not(force_create) {
-      raise @git.GitError::InvalidObject(
+      raise @bitcore.GitError::InvalidObject(
         "branch '\{branch_name}' already exists",
       )
     }
     let target_id = match start_point {
       Some(spec) =>
-        match @gitrepo.rev_parse(rfs, git_dir, spec) {
+        match @bitrepo.rev_parse(rfs, git_dir, spec) {
           Some(id) => Some(id)
           None =>
-            raise @git.GitError::InvalidObject("unknown revision: \{spec}")
+            raise @bitcore.GitError::InvalidObject("unknown revision: \{spec}")
         }
-      None => @gitlib.resolve_ref(rfs, git_dir, "HEAD")
+      None => @bitlib.resolve_ref(rfs, git_dir, "HEAD")
     }
     let previous_location = current_checkout_location(rfs, git_dir)
       match target_id {
       Some(id) => {
-        @gitlib.create_branch_at(fs, rfs, root, branch_name, id)
+        @bitlib.create_branch_at(fs, rfs, root, branch_name, id)
         switch_apply_tracking_config(
           fs, rfs, git_dir, branch_name, start_point, track_mode,
         )
-        @gitlib.switch_branch(fs, rfs, root, branch_name)
+        @bitlib.switch_branch(fs, rfs, root, branch_name)
       }
       None => {
         let ref_path = git_dir + "/" + refname
@@ -194,10 +194,10 @@ async fn handle_switch(args : Array[String]) -> Unit raise Error {
   let target = if positional.length() > 0 {
     resolve_checkout_target(rfs, git_dir, positional[0])
   } else {
-    raise @git.GitError::InvalidObject("No branch specified")
+    raise @bitcore.GitError::InvalidObject("No branch specified")
   }
     let target_ref = normalize_switch_branch_ref(target)
-  let local_branch_exists = @gitlib.resolve_ref(rfs, git_dir, target_ref)
+  let local_branch_exists = @bitlib.resolve_ref(rfs, git_dir, target_ref)
     is Some(_)
   if local_branch_exists {
     if not(ignore_other_worktrees) {
@@ -219,7 +219,7 @@ async fn handle_switch(args : Array[String]) -> Unit raise Error {
   }
   let guess = switch_effective_guess(rfs, git_dir, guess_mode)
   if guess &&
-    @gitlib.resolve_ref(rfs, git_dir, "refs/remotes/origin/" + target)
+    @bitlib.resolve_ref(rfs, git_dir, "refs/remotes/origin/" + target)
     is Some(_) {
     let previous_location = current_checkout_location(rfs, git_dir)
     ignore(checkout_with_promisor_retry(fs, root, target))
@@ -227,19 +227,19 @@ async fn handle_switch(args : Array[String]) -> Unit raise Error {
     println("Switched to branch '\{target}'")
     return
   }
-  if @gitrepo.rev_parse(rfs, git_dir, target) is Some(_) {
+  if @bitrepo.rev_parse(rfs, git_dir, target) is Some(_) {
     eprint_line("fatal: a branch is expected, got '\{target}'")
     if switch_should_suggest_detach(rfs, git_dir) {
       eprint_line("hint: try again with the --detach option")
     }
     @sys.exit(1)
   }
-  raise @git.GitError::InvalidObject("Invalid ref: \{target}")
+  raise @bitcore.GitError::InvalidObject("Invalid ref: \{target}")
 }
 
-fn normalize_switch_branch_ref(name : String) -> String raise @git.GitError {
-  let normalized = @gitlib.normalize_repo_path(name) catch {
-    _ => raise @git.GitError::InvalidObject("invalid branch name: " + name)
+fn normalize_switch_branch_ref(name : String) -> String raise @bitcore.GitError {
+  let normalized = @bitlib.normalize_repo_path(name) catch {
+    _ => raise @bitcore.GitError::InvalidObject("invalid branch name: " + name)
   }
   if normalized.has_prefix("refs/heads/") {
     normalized
@@ -250,7 +250,7 @@ fn normalize_switch_branch_ref(name : String) -> String raise @git.GitError {
 
 ///|
 fn switch_write_head_ref(
-  fs : &@git.FileSystem,
+  fs : &@bitcore.FileSystem,
   git_dir : String,
   branch : String,
 ) -> Unit raise Error {
@@ -259,11 +259,11 @@ fn switch_write_head_ref(
 
 ///|
 fn switch_branch_in_use_path(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   root : String,
   branch : String,
 ) -> String? raise Error {
-  match @gitlib.is_branch_checked_out(fs, root, branch) {
+  match @bitlib.is_branch_checked_out(fs, root, branch) {
     Some(path) =>
       if normalize_path(path) == normalize_path(root) {
         None
@@ -276,7 +276,7 @@ fn switch_branch_in_use_path(
 
 ///|
 fn switch_get_config_value(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
   key : String,
 ) -> String? raise Error {
@@ -306,7 +306,7 @@ fn switch_parse_bool(value : String) -> Bool? {
 
 ///|
 fn switch_effective_guess(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
   guess_mode : Bool?,
 ) -> Bool raise Error {
@@ -322,7 +322,7 @@ fn switch_effective_guess(
 
 ///|
 fn switch_should_suggest_detach(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
 ) -> Bool raise Error {
   match switch_get_config_value(fs, git_dir, "advice.suggestDetachingHead") {
@@ -333,7 +333,7 @@ fn switch_should_suggest_detach(
 
 ///|
 fn switch_start_branch_name(
-  fs : &@git.RepoFileSystem,
+  fs : &@bitcore.RepoFileSystem,
   git_dir : String,
   start_point : String?,
 ) -> String? raise Error {
@@ -341,24 +341,24 @@ fn switch_start_branch_name(
     Some(spec) =>
       if spec.has_prefix("refs/heads/") {
         Some(String::unsafe_substring(spec, start=11, end=spec.length()))
-      } else if @gitlib.resolve_ref(fs, git_dir, "refs/heads/" + spec)
+      } else if @bitlib.resolve_ref(fs, git_dir, "refs/heads/" + spec)
         is Some(_) {
         Some(spec)
       } else {
         None
       }
     None =>
-      match @gitlib.read_head_ref(fs, git_dir) {
-        @gitlib.HeadRef::Branch(name) => Some(name)
-        @gitlib.HeadRef::Detached(_) => None
+      match @bitlib.read_head_ref(fs, git_dir) {
+        @bitlib.HeadRef::Branch(name) => Some(name)
+        @bitlib.HeadRef::Detached(_) => None
       }
   }
 }
 
 ///|
 fn switch_apply_tracking_config(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
   git_dir : String,
   branch : String,
   start_point : String?,
@@ -377,10 +377,10 @@ fn switch_apply_tracking_config(
     Some("direct") =>
       match source_branch {
         Some(source) => {
-          @gitlib.set_config_key(
+          @bitlib.set_config_key(
             fs, rfs, git_dir, "branch", branch, "remote", ".",
           )
-          @gitlib.set_config_key(
+          @bitlib.set_config_key(
             fs,
             rfs,
             git_dir,
@@ -395,18 +395,18 @@ fn switch_apply_tracking_config(
     Some("inherit") =>
       match source_branch {
         Some(source) => {
-          let (_remotes, branches) = @gitlib.read_repo_config(rfs, git_dir)
+          let (_remotes, branches) = @bitlib.read_repo_config(rfs, git_dir)
           match branches.get(source) {
             Some(cfg) => {
               match cfg.remote {
                 Some(remote) =>
-                  @gitlib.set_config_key(
+                  @bitlib.set_config_key(
                     fs, rfs, git_dir, "branch", branch, "remote", remote,
                   )
                 None => ()
               }
               if cfg.merges.length() > 0 {
-                @gitlib.set_config_key(
+                @bitlib.set_config_key(
                   fs,
                   rfs,
                   git_dir,

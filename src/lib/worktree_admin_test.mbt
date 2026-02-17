@@ -1,8 +1,8 @@
 ///| Tests for worktree administration
 
 ///|
-fn setup_worktree_admin_fs() -> @git.TestFs {
-  let fs = @git.TestFs::new()
+fn setup_worktree_admin_fs() -> @bit.TestFs {
+  let fs = @bit.TestFs::new()
   fs.mkdir_p("/repo/.git")
   fs.mkdir_p("/repo/.git/refs/heads")
   fs.mkdir_p("/repo/.git/objects")
@@ -163,7 +163,7 @@ test "worktree admin: prune locked worktree not pruned" {
 
 ///|
 test "worktree admin: bare repo excludes pseudo main worktree" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   fs.mkdir_p("/bare/objects")
   fs.mkdir_p("/bare/refs/heads")
   fs.write_string("/bare/HEAD", "ref: refs/heads/main\n")

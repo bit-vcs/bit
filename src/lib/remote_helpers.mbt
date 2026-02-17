@@ -124,7 +124,7 @@ pub fn sort_branch_configs_by_name(items : Array[BranchConfig]) -> Unit {
 
 ///|
 pub fn collect_local_branches(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> Array[String] {
   let out : Array[String] = []
@@ -230,7 +230,7 @@ pub enum RemoteHeadState {
 
 ///|
 pub fn read_local_remote_head_state(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   head_path : String,
   remote_name : String,
 ) -> RemoteHeadState {
@@ -264,7 +264,7 @@ pub fn read_local_remote_head_state(
 
 ///|
 pub fn read_remote_head_branch(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   remote_git_dir : String,
 ) -> String? {
   let head_path = remote_git_dir + "/HEAD"
@@ -294,11 +294,11 @@ pub fn read_remote_head_branch(
 
 ///|
 pub fn update_follow_remote_head(
-  fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   name : String,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let config_path = git_dir + "/config"
   guard rfs.is_file(config_path) else { return () }
   let content = remote_decode_bytes_lossy(rfs.read_file(config_path))
@@ -334,7 +334,7 @@ pub fn update_follow_remote_head(
 
 ///|
 pub fn read_config_content(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> String {
   let config_path = git_dir + "/config"
@@ -351,7 +351,7 @@ pub fn read_config_content(
 
 ///|
 pub fn legacy_remote_exists(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   name : String,
 ) -> Bool {
@@ -425,7 +425,7 @@ fn split_by_newline(s : String) -> Array[String] {
 
 ///|
 pub fn read_config_value(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   config_path : String,
   section : String,
   name : String,
@@ -474,7 +474,7 @@ pub fn read_config_value(
 
 ///|
 pub fn read_config_bool(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   config_path : String,
   section : String,
   name : String,
@@ -498,7 +498,7 @@ pub fn read_config_bool(
 /// Parse config overrides from GIT_CONFIG_OVERRIDES environment variable
 pub fn parse_config_overrides() -> Map[String, String] {
   let config : Map[String, String] = {}
-  let overrides = @gitio.env_get("GIT_CONFIG_OVERRIDES")
+  let overrides = @bitio.env_get("GIT_CONFIG_OVERRIDES")
   guard overrides is Some(env_value) else { return config }
   // Parse key=value pairs separated by newlines
   for line in split_by_newline(env_value) {
@@ -526,8 +526,8 @@ pub fn parse_config_overrides() -> Map[String, String] {
 ///|
 pub fn get_protocol_version() -> Int {
   // Check GIT_PROTOCOL environment variable for version=2
-  let git_protocol = @gitio.env_get("GIT_PROTOCOL")
-  match git_protocol {
+  let bit_protocol = @bitio.env_get("GIT_PROTOCOL")
+  match bit_protocol {
     Some(val) => if val.contains("version=2") { 2 } else { 1 }
     None => 1
   }
@@ -535,7 +535,7 @@ pub fn get_protocol_version() -> Int {
 
 ///|
 pub fn build_upload_pack_config_with_overrides(
-  fs : &@git.RepoFileSystem,
+  fs : &@bit.RepoFileSystem,
   root : String,
   overrides : Map[String, String],
 ) -> UploadPackConfig {

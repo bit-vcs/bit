@@ -18,7 +18,7 @@ async fn handle_prune(args : Array[String]) -> Unit raise Error {
     return
   }
   // Use gitlib's prune_repo
-  let result = @gitlib.prune_repo(fs, fs, root)
+  let result = @bitlib.prune_repo(fs, fs, root)
   if verbose {
     print_line("Pruned \{result.pruned.length()} unreachable objects")
   }

@@ -2,16 +2,16 @@
 
 ///|
 priv struct TreeNode {
-  blob_id : @git.ObjectId?
+  blob_id : @bit.ObjectId?
   mode : Int
   children : Map[String, TreeNode]
-  base_tree_id : @git.ObjectId?
+  base_tree_id : @bit.ObjectId?
   mut loaded : Bool
   mut dirty : Bool
 }
 
 ///|
-fn TreeNode::new_file(id : @git.ObjectId, mode : Int) -> TreeNode {
+fn TreeNode::new_file(id : @bit.ObjectId, mode : Int) -> TreeNode {
   {
     blob_id: Some(id),
     mode,
@@ -35,7 +35,7 @@ fn TreeNode::new_dir() -> TreeNode {
 }
 
 ///|
-fn TreeNode::new_base_dir(id : @git.ObjectId) -> TreeNode {
+fn TreeNode::new_base_dir(id : @bit.ObjectId) -> TreeNode {
   {
     blob_id: None,
     mode: 0o040000,
@@ -48,13 +48,13 @@ fn TreeNode::new_base_dir(id : @git.ObjectId) -> TreeNode {
 
 ///|
 pub fn build_tree_from_working(
-  backing_fs : &@git.FileSystem,
-  rfs : &@git.RepoFileSystem,
+  backing_fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
-  base_tree : @git.ObjectId,
+  base_tree : @bit.ObjectId,
   working : WorkingLayer,
-) -> @git.ObjectId raise @git.GitError {
-  let (root, db) = if base_tree == @git.ObjectId::zero() {
+) -> @bit.ObjectId raise @bit.GitError {
+  let (root, db) = if base_tree == @bit.ObjectId::zero() {
     (TreeNode::new_dir(), None)
   } else {
     (
@@ -71,7 +71,7 @@ pub fn build_tree_from_working(
     let blob_id = @lib.write_loose_object(
       backing_fs,
       git_dir,
-      @git.ObjectType::Blob,
+      @bit.ObjectType::Blob,
       content,
     )
     insert_into_tree(db, rfs, root, path, blob_id, 0o100644)
@@ -82,9 +82,9 @@ pub fn build_tree_from_working(
 ///|
 fn ensure_dir_loaded(
   db_opt : @lib.ObjectDb?,
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   node : TreeNode,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   guard node.blob_id is None else { return }
   if node.loaded {
     return
@@ -99,18 +99,18 @@ fn ensure_dir_loaded(
   let db = match db_opt {
     Some(v) => v
     None =>
-      raise @git.GitError::InvalidObject(
+      raise @bit.GitError::InvalidObject(
         "Tree load requested without object database: \{tree_id}",
       )
   }
   let obj = db.get(rfs, tree_id)
   guard obj is Some(o) else {
-    raise @git.GitError::InvalidObject("Tree not found: \{tree_id}")
+    raise @bit.GitError::InvalidObject("Tree not found: \{tree_id}")
   }
-  if o.obj_type != @git.ObjectType::Tree {
-    raise @git.GitError::InvalidObject("Not a tree: \{tree_id}")
+  if o.obj_type != @bit.ObjectType::Tree {
+    raise @bit.GitError::InvalidObject("Not a tree: \{tree_id}")
   }
-  let entries = @git.parse_tree(o.data)
+  let entries = @bit.parse_tree(o.data)
   for entry in entries {
     if is_tree_mode(entry.mode) {
       node.children[entry.name] = TreeNode::new_base_dir(entry.id)
@@ -124,12 +124,12 @@ fn ensure_dir_loaded(
 
 ///|
 fn load_tree_structure(
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
-  tree_id : @git.ObjectId,
-) -> TreeNode raise @git.GitError {
+  tree_id : @bit.ObjectId,
+) -> TreeNode raise @bit.GitError {
   let root = TreeNode::new_dir()
-  if tree_id == @git.ObjectId::zero() {
+  if tree_id == @bit.ObjectId::zero() {
     return root
   }
   let db = @lib.ObjectDb::load_lazy(rfs, git_dir)
@@ -140,18 +140,18 @@ fn load_tree_structure(
 ///|
 fn load_tree_recursive(
   db : @lib.ObjectDb,
-  rfs : &@git.RepoFileSystem,
-  tree_id : @git.ObjectId,
+  rfs : &@bit.RepoFileSystem,
+  tree_id : @bit.ObjectId,
   node : TreeNode,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let obj = db.get(rfs, tree_id)
   guard obj is Some(o) else {
-    raise @git.GitError::InvalidObject("Tree not found: \{tree_id}")
+    raise @bit.GitError::InvalidObject("Tree not found: \{tree_id}")
   }
-  if o.obj_type != @git.ObjectType::Tree {
-    raise @git.GitError::InvalidObject("Not a tree: \{tree_id}")
+  if o.obj_type != @bit.ObjectType::Tree {
+    raise @bit.GitError::InvalidObject("Not a tree: \{tree_id}")
   }
-  let entries = @git.parse_tree(o.data)
+  let entries = @bit.parse_tree(o.data)
   for entry in entries {
     if is_tree_mode(entry.mode) {
       let child = TreeNode::new_dir()
@@ -167,10 +167,10 @@ fn load_tree_recursive(
 ///|
 fn delete_from_tree(
   db_opt : @lib.ObjectDb?,
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : TreeNode,
   path : String,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let parts = split_path(path)
   guard parts.length() > 0 else { return }
   let _ = delete_recursive(db_opt, rfs, root, parts, 0)
@@ -179,11 +179,11 @@ fn delete_from_tree(
 ///|
 fn delete_recursive(
   db_opt : @lib.ObjectDb?,
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   node : TreeNode,
   parts : Array[String],
   idx : Int,
-) -> Bool raise @git.GitError {
+) -> Bool raise @bit.GitError {
   if idx >= parts.length() {
     return false
   }
@@ -218,12 +218,12 @@ fn delete_recursive(
 ///|
 fn insert_into_tree(
   db_opt : @lib.ObjectDb?,
-  rfs : &@git.RepoFileSystem,
+  rfs : &@bit.RepoFileSystem,
   root : TreeNode,
   path : String,
-  blob_id : @git.ObjectId,
+  blob_id : @bit.ObjectId,
   mode : Int,
-) -> Unit raise @git.GitError {
+) -> Unit raise @bit.GitError {
   let parts = split_path(path)
   guard parts.length() > 0 else { return }
   ensure_dir_loaded(db_opt, rfs, root)
@@ -260,16 +260,16 @@ fn insert_into_tree(
 
 ///|
 fn write_tree_recursive(
-  fs : &@git.FileSystem,
+  fs : &@bit.FileSystem,
   git_dir : String,
   node : TreeNode,
-) -> @git.ObjectId raise @git.GitError {
+) -> @bit.ObjectId raise @bit.GitError {
   if not(node.dirty) {
     if node.base_tree_id is Some(base_tree_id) {
       return base_tree_id
     }
   }
-  let entries : Array[@git.TreeEntry] = []
+  let entries : Array[@bit.TreeEntry] = []
   for item in node.children.to_array() {
     let (name, child) = item
     let (id, mode_str) = match child.blob_id {
@@ -279,14 +279,14 @@ fn write_tree_recursive(
         (subtree_id, "40000")
       }
     }
-    entries.push(@git.TreeEntry::new(mode_str, name, id))
+    entries.push(@bit.TreeEntry::new(mode_str, name, id))
   }
   entries.sort_by(fn(a, b) {
     let a_key = if a.mode == "40000" { a.name + "/" } else { a.name }
     let b_key = if b.mode == "40000" { b.name + "/" } else { b.name }
     compare_strings(a_key, b_key)
   })
-  let (tree_id, compressed) = @git.create_tree(entries)
+  let (tree_id, compressed) = @bit.create_tree(entries)
   if node.base_tree_id != Some(tree_id) {
     @lib.write_object_bytes(fs, git_dir, tree_id, compressed)
   }

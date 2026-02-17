@@ -1,5 +1,5 @@
 import {
-  "mizchi/bit" @git,
+  "mizchi/bit" @bit,
   "mizchi/bit/pack" @pack,
   "mizchi/bit/protocol" @protocol,
   "mizchi/bit/ignore" @ignore,

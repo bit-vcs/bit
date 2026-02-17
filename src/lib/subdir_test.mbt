@@ -2,7 +2,7 @@
 
 ///|
 test "subdir: get_subdir_tree_from_commit rejects missing or file path" {
-  let fs = @git.TestFs::new()
+  let fs = @bit.TestFs::new()
   init_repo(fs, "/repo") catch {
     _ => return ()
   }
