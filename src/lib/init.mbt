@@ -43,7 +43,8 @@ pub fn init_repo(
 }
 
 ///|
-/// Initialize a repository with full options including separate-git-dir and template.
+/// Initialize a repository with full options. If `separate_git_dir` is set, this
+/// version does not inspect the existing `.git` target and only updates `.git` atomically.
 pub fn init_repo_with_options(
   fs : &@git.FileSystem,
   root : String,
@@ -71,6 +72,12 @@ pub fn init_repo_with_options(
   // If separate-git-dir, create .git file pointing to actual git dir
   if opts.separate_git_dir is Some(_) && not(bare) {
     let gitfile_path = join_path(root, ".git")
+    fs.remove_dir(gitfile_path) catch {
+      _ => ()
+    }
+    fs.remove_file(gitfile_path) catch {
+      _ => ()
+    }
     fs.write_string(gitfile_path, "gitdir: " + git_dir + "\n")
   }
   // Always write HEAD (git init always updates HEAD with default branch)
@@ -81,11 +88,11 @@ pub fn init_repo_with_options(
   if opts.ref_format == "reftable" || opts.object_format != "sha1" {
     repository_format_version = "1"
   }
-  let mut config = "[core]\n\trepositoryformatversion = " +
+  let mut config = "[core]\\n\\trepositoryformatversion = " +
     repository_format_version +
-    "\n\tfilemode = true\n\tbare = " +
+    "\\n\\tfilemode = true\\n\\tbare = " +
     bare_str +
-    "\n"
+    "\\n"
   if opts.ref_format == "reftable" {
     fs.mkdir_p(join_path(git_dir, "reftable"))
     let tables_list_path = join_path(git_dir, "reftable/tables.list")
@@ -93,20 +100,116 @@ pub fn init_repo_with_options(
   }
   let extension_lines : Array[String] = []
   if opts.ref_format == "reftable" {
-    extension_lines.push("\trefStorage = reftable")
+    extension_lines.push("\\trefStorage = reftable")
   }
   if opts.object_format != "sha1" {
-    extension_lines.push("\tobjectFormat = " + opts.object_format)
+    extension_lines.push("\\tobjectFormat = " + opts.object_format)
   }
   if extension_lines.length() > 0 {
-    config += "[extensions]\n" + extension_lines.join("\n") + "\n"
+    config += "[extensions]\\n" + extension_lines.join("\\n") + "\\n"
   }
   fs.write_string(join_path(git_dir, "config"), config)
   if use_default_template_files {
     // Create description file
     fs.write_string(
       join_path(git_dir, "description"),
-      "Unnamed repository; edit this file 'description' to name the repository.\n",
+      "Unnamed repository; edit this file 'description' to name the repository.\\n",
+    )
+    // Create info/exclude
+    fs.write_string(join_path(git_dir, "info/exclude"), "")
+  }
+}
+
+///|
+/// Initialize a repository with full options and full `.git` resolution via RepoFileSystem.
+/// This is used when reinitializing with --separate-git-dir to migrate existing data.
+pub fn init_repo_with_options_with_repo_fs(
+  fs : &@git.FileSystem,
+  rfs : &@git.RepoFileSystem,
+  root : String,
+  opts : InitOptions,
+) -> Unit raise @git.GitError {
+  let bare = opts.bare
+  // Determine git directory location
+  let git_dir = match opts.separate_git_dir {
+    Some(sep_dir) => sep_dir
+    None => if bare { root } else { join_path(root, ".git") }
+  }
+  let use_default_template_files = opts.template_dir is None
+  let head_path = join_path(git_dir, "HEAD")
+  // Create git directory structure
+  fs.mkdir_p(git_dir)
+  fs.mkdir_p(join_path(git_dir, "objects"))
+  fs.mkdir_p(join_path(git_dir, "objects/info"))
+  fs.mkdir_p(join_path(git_dir, "objects/pack"))
+  fs.mkdir_p(join_path(git_dir, "refs/heads"))
+  fs.mkdir_p(join_path(git_dir, "refs/tags"))
+  if use_default_template_files {
+    fs.mkdir_p(join_path(git_dir, "hooks"))
+    fs.mkdir_p(join_path(git_dir, "info"))
+  }
+  // If separate-git-dir, create .git file pointing to actual git dir
+  if opts.separate_git_dir is Some(_) && not(bare) {
+    let gitfile_path = join_path(root, ".git")
+    let existing_git_dir = if rfs.is_dir(gitfile_path) {
+      Some(gitfile_path)
+    } else if rfs.is_file(gitfile_path) {
+      let existing = resolve_gitdir(rfs, gitfile_path)
+      if existing == gitfile_path {
+        None
+      } else {
+        Some(existing)
+      }
+    } else {
+      None
+    }
+    match existing_git_dir {
+      Some(old_git_dir) => {
+        if old_git_dir != git_dir && rfs.is_dir(old_git_dir) {
+          if rfs.is_dir(git_dir) || rfs.is_file(git_dir) {
+            remove_tree(fs, rfs, git_dir)
+          }
+          move_tree(fs, rfs, old_git_dir, git_dir)
+        }
+      }
+      None => ()
+    }
+    fs.write_string(gitfile_path, "gitdir: " + git_dir + "\n")
+  }
+  // Always write HEAD (git init always updates HEAD with default branch)
+  fs.write_string(head_path, "ref: refs/heads/" + opts.default_branch + "\n")
+  // Create/update config file with appropriate bare setting
+  let bare_str = if bare { "true" } else { "false" }
+  let mut repository_format_version = "0"
+  if opts.ref_format == "reftable" || opts.object_format != "sha1" {
+    repository_format_version = "1"
+  }
+  let mut config = "[core]\\n\\trepositoryformatversion = " +
+    repository_format_version +
+    "\\n\\tfilemode = true\\n\\tbare = " +
+    bare_str +
+    "\\n"
+  if opts.ref_format == "reftable" {
+    fs.mkdir_p(join_path(git_dir, "reftable"))
+    let tables_list_path = join_path(git_dir, "reftable/tables.list")
+    fs.write_string(tables_list_path, "")
+  }
+  let extension_lines : Array[String] = []
+  if opts.ref_format == "reftable" {
+    extension_lines.push("\\trefStorage = reftable")
+  }
+  if opts.object_format != "sha1" {
+    extension_lines.push("\\tobjectFormat = " + opts.object_format)
+  }
+  if extension_lines.length() > 0 {
+    config += "[extensions]\\n" + extension_lines.join("\\n") + "\\n"
+  }
+  fs.write_string(join_path(git_dir, "config"), config)
+  if use_default_template_files {
+    // Create description file
+    fs.write_string(
+      join_path(git_dir, "description"),
+      "Unnamed repository; edit this file 'description' to name the repository.\\n",
     )
     // Create info/exclude
     fs.write_string(join_path(git_dir, "info/exclude"), "")

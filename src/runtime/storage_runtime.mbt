@@ -477,7 +477,7 @@ fn storage_handle_init(
     ref_format,
     object_format,
   }
-  @gitrepo.init_repo_with_options(fs, root, opts)
+  @gitrepo.init_repo_with_options_with_repo_fs(fs, rfs, root, opts)
   if not(args.quiet) {
     let git_dir = storage_resolve_git_dir(rfs, root)
     storage_print_line("Initialized empty Git repository in " + git_dir + "/")

@@ -1883,38 +1883,53 @@ fn clone_local_repo(
     }
   }
   let dest_git_dir = if bare {
-    @gitlib.init_repo_with_options(fs, dest_path, {
-      default_branch,
-      bare: true,
-      separate_git_dir: None,
-      template_dir: None,
-      ref_format,
-      object_format: source_object_format,
-    })
+    @gitlib.init_repo_with_options_with_repo_fs(
+      fs,
+      fs,
+      dest_path,
+      {
+        default_branch,
+        bare: true,
+        separate_git_dir: None,
+        template_dir: None,
+        ref_format,
+        object_format: source_object_format,
+      },
+    )
     dest_path
   } else {
     match separate_git_dir {
       Some(path) => {
         fs.mkdir_p(dest_path)
-        @gitlib.init_repo_with_options(fs, dest_path, {
-          default_branch,
-          bare: false,
-          separate_git_dir: Some(path),
-          template_dir: None,
-          ref_format,
-          object_format: source_object_format,
-        })
+        @gitlib.init_repo_with_options_with_repo_fs(
+          fs,
+          fs,
+          dest_path,
+          {
+            default_branch,
+            bare: false,
+            separate_git_dir: Some(path),
+            template_dir: None,
+            ref_format,
+            object_format: source_object_format,
+          },
+        )
         path
       }
       None => {
-        @gitlib.init_repo_with_options(fs, dest_path, {
-          default_branch,
-          bare: false,
-          separate_git_dir: None,
-          template_dir: None,
-          ref_format,
-          object_format: source_object_format,
-        })
+        @gitlib.init_repo_with_options_with_repo_fs(
+          fs,
+          fs,
+          dest_path,
+          {
+            default_branch,
+            bare: false,
+            separate_git_dir: None,
+            template_dir: None,
+            ref_format,
+            object_format: source_object_format,
+          },
+        )
         dest_path + "/.git"
       }
     }

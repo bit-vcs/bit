@@ -232,7 +232,7 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
     object_format: object_format.unwrap_or("sha1"),
   }
   // Initialize repository
-  @gitrepo.init_repo_with_options(fs, path, opts)
+  @gitrepo.init_repo_with_options_with_repo_fs(fs, fs, path, opts)
   match reinit_tables_list_content {
     Some(content) =>
       fs.write_string(actual_git_dir + "/reftable/tables.list", content)
