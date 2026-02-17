@@ -119,6 +119,45 @@ fn openrouter_system_prompt(agent_loop_mode : Bool) -> String {
 }
 
 ///|
+fn commit_system_prompt(_agent_loop_mode : Bool) -> String {
+  #|You are an expert commit message writer.
+  #|Write commit messages that follow Conventional Commits.
+  #|Return only the commit message text, never explanations or JSON wrappers.
+}
+
+///|
+fn build_commit_message_prompt(diff_units : String, context : String) -> String {
+  let mut buf = StringBuilder::new()
+  buf.write_string(
+    "Write one commit message that follows Conventional Commits.\n"
+  )
+  buf.write_string("Allowed types: feat, fix, chore, docs, style, refactor, perf, test, build, ci, revert, deps.\n")
+  buf.write_string(
+    "Treat each file block as a logical unit and summarize all units in one message.\n"
+  )
+  buf.write_string(
+    "Output format must be:\n"
+  )
+  buf.write_string(
+    "<type>(<scope>): <summary>\n\n"
+  )
+  buf.write_string(
+    "- <scope>: <change summary>\n"
+  )
+  buf.write_string(
+    "- ...\n\n"
+  )
+  if context.length() > 0 {
+    buf.write_string("Project/User instructions:\n")
+    buf.write_string(context)
+    buf.write_string("\n\n")
+  }
+  buf.write_string("Diff units:\n")
+  buf.write_string(diff_units)
+  buf.to_string()
+}
+
+///|
 fn build_resolve_prompt(path : String, conflicted_content : String) -> String {
   let buf = StringBuilder::new()
   buf.write_string("Resolve this conflicted file:\n")
@@ -336,6 +375,85 @@ fn build_repo_scoped_rw_registry(
 }
 
 ///|
+fn build_repo_scoped_read_tools(
+  rfs : &@bit.RepoFileSystem,
+  root : String,
+) -> @llmlib.ToolRegistry {
+  let registry = @llmlib.ToolRegistry::new()
+  registry.register(
+    "read_file",
+    "Read file content from repository scope.",
+    @llmlib.SchemaBuilder::new()
+    .string("path", "Repository-relative file path", required=true)
+    .build(),
+    fn(input) {
+      let raw_path = json_get_str(input, "path")
+      guard resolve_repo_scoped_path(root, raw_path) is Some(path) else {
+        return "error: invalid path"
+      }
+      if not(rfs.is_file(root + "/" + path)) {
+        return "error: file not found"
+      }
+      let abs_path = root + "/" + path
+      let bytes = rfs.read_file(abs_path) catch {
+        _ => return "error: read failed"
+      }
+      decode_bytes(bytes)
+    },
+  )
+  registry.register(
+    "readdir",
+    "List repository-relative directory entries (non-recursive).",
+    @llmlib.SchemaBuilder::new()
+    .string("path", "Repository-relative directory path", required=false)
+    .build(),
+    fn(input) {
+      let raw_path = json_get_str(input, "path")
+      let rel_path = trim_text(raw_path)
+      let mut target_path = ""
+      if rel_path.length() > 0 {
+        guard resolve_repo_scoped_path(root, rel_path) is Some(path) else {
+          return "error: invalid path"
+        }
+        target_path = path
+      }
+      let abs_path = if target_path.length() == 0 {
+        root
+      } else {
+        root + "/" + target_path
+      }
+      if not(rfs.is_dir(abs_path)) {
+        return "error: invalid path"
+      }
+      let mut entries = rfs.readdir(abs_path) catch { _ => return "error: readdir failed" }
+      entries.sort_by((a, b) => String::lexical_compare(a, b))
+      let out : Array[String] = []
+      for entry in entries {
+        if entry == "." || entry == ".." || entry == ".git" {
+          continue
+        }
+        let rel_entry = if target_path.length() == 0 {
+          entry
+        } else {
+          target_path + "/" + entry
+        }
+        if rfs.is_dir(root + "/" + rel_entry) {
+          out.push(rel_entry + "/")
+        } else {
+          out.push(rel_entry)
+        }
+      }
+      if out.length() == 0 {
+        "(empty)"
+      } else {
+        out.join("\n")
+      }
+    },
+  )
+  registry
+}
+
+///|
 fn stage_paths_with_storage_runtime(
   fs : &@bit.FileSystem,
   rfs : &@bit.RepoFileSystem,
@@ -479,13 +597,22 @@ fn build_provider(
   provider_ref : Ref[@llmlib.BoxedProvider?],
 ) -> @llmlib.BoxedProvider raise @bit.GitError {
   let agent_loop_mode = use_agent_loop_mode(options)
+  build_provider_with_system_prompt(options, provider_ref, openrouter_system_prompt(agent_loop_mode))
+}
+
+///|
+fn build_provider_with_system_prompt(
+  options : AiRebaseOptions,
+  provider_ref : Ref[@llmlib.BoxedProvider?],
+  system_prompt : String,
+) -> @llmlib.BoxedProvider raise @bit.GitError {
+  let agent_loop_mode = use_agent_loop_mode(options)
   match provider_ref.val {
     Some(provider) => provider
     None => {
       ensure_openrouter_api_key()
       let api_key = trim_text(@llm_ffi.get_env("OPENROUTER_API_KEY"))
       let model = effective_model(options)
-      let system_prompt = openrouter_system_prompt(agent_loop_mode)
       let provider = @llmlib.BoxedProvider::new(
         @openai.OpenAIProvider::new(
           api_key,
@@ -495,9 +622,61 @@ fn build_provider(
           max_tokens=8192,
         ),
       )
-      provider_ref.val = Some(provider)
-      provider
+      match system_prompt {
+        _ => {
+          provider_ref.val = Some(provider)
+          provider
+        }
+      }
     }
+  }
+}
+
+///|
+pub fn ai_generate_commit_message(
+  fs : &@bit.RepoFileSystem,
+  root : String,
+  diff_units : String,
+  context : String,
+  options? : AiRebaseOptions = AiRebaseOptions::default(),
+) -> String raise @bit.GitError {
+  let trimmed_diff = trim_text(diff_units)
+  if trimmed_diff.length() == 0 {
+    raise @bit.GitError::InvalidObject("ai: no diff content provided")
+  }
+  let mut prompt = build_commit_message_prompt(trimmed_diff, trim_text(context))
+  if use_agent_loop_mode(options) {
+    prompt += "\n\nYou can call the provided read_file and readdir tools if context is insufficient."
+  }
+  let provider_ref : Ref[@llmlib.BoxedProvider?] = { val: options.provider }
+  let provider = build_provider_with_system_prompt(
+    options,
+    provider_ref,
+    commit_system_prompt(use_agent_loop_mode(options)),
+  )
+  if use_agent_loop_mode(options) {
+    let registry = build_repo_scoped_read_tools(fs, root)
+    let mut out = StringBuilder::new()
+    @llmlib.run_agent_cancellable(
+      provider,
+      registry,
+      [@llmlib.Message::user(prompt)],
+      @llmlib.StopCondition::MaxSteps(normalized_agent_step_limit(options)),
+      fn() { false },
+      fn(event) {
+        match event {
+          Stream(stream_event) =>
+            match stream_event {
+              TextDelta(delta) => out.write_string(delta)
+              _ => ()
+            }
+          _ => ()
+        }
+      },
+    )
+    normalize_model_output(out.to_string())
+  } else {
+    normalize_model_output(collect_text_with_provider(provider, prompt))
   }
 }
 

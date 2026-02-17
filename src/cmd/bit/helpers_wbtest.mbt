@@ -326,6 +326,40 @@ async test "main: show_command_help supports rebase-ai command" {
   assert_true(ok)
 }
 
+async test "main: show_command_help supports ai command" {
+  let ok = show_command_help("ai", silent=true)
+  assert_true(ok)
+}
+
+///|
+test "ai: parse_ai_commit_options strips ai flags and keeps commit args" {
+  let (
+    options,
+    commit_args,
+    generate_message,
+    all_modified,
+    user_instructions,
+  ) = parse_ai_commit_options([
+    "--model",
+    "gpt-4",
+    "--agent-loop",
+    "-m",
+    "msg",
+    "--max-ai-rounds=5",
+    "--agent-max-steps",
+    "10",
+    "--all",
+  ])
+  assert_eq(options.model, "gpt-4")
+  assert_true(options.use_agent_loop)
+  assert_eq(options.max_auto_rounds, 5)
+  assert_eq(options.agent_max_steps, 10)
+  assert_eq(commit_args, ["-m", "msg", "--all"])
+  assert_false(generate_message)
+  assert_true(all_modified)
+  assert_eq(user_instructions, [])
+}
+
 ///|
 async test "main: show_command_help supports all completion subcommands" {
   for entry in all_subcommands() {

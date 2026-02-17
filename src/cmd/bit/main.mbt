@@ -34,7 +34,8 @@ async fn show_help() -> Unit {
     #|   checkout    Switch branches or restore working tree files
     #|   merge       Join two or more development histories together
     #|   rebase      Reapply commits on top of another base tip
-    #|   rebase-ai   Rebase with AI conflict resolution (OpenRouter kimi-k2)
+    #|   ai           AI helpers (rebase, commit)
+    #|   rebase-ai    AI-assisted rebase conflict resolution (OpenRouter kimi-k2, alias for ai rebase)
     #|   reset       Reset current HEAD to the specified state
     #|   stash       Stash the changes in a dirty working directory
     #|   switch      Switch branches
@@ -138,6 +139,9 @@ fn show_command_help_specs() -> Array[(String, String, String)] {
     ),
     (
       "rebase", "git rebase [<options>] <upstream> [<branch>]", "Reapply commits on top of another base tip.",
+    ),
+    (
+      "ai", "bit ai <command> [<args>]", "AI helpers (rebase, commit).",
     ),
     (
       "merge", "git merge [<options>] <commit>...", "Join two or more development histories together.",
@@ -497,6 +501,15 @@ async fn show_command_help(cmd : String, silent? : Bool = false) -> Bool {
         show_simple_command_help(
           "git rebase-ai [<options>] <upstream>",
           summary="Rebase with AI conflict resolution (OpenRouter moonshotai/kimi-k2, supports --agent-loop).",
+        )
+      }
+      true
+    }
+    "ai" => {
+      if not(silent) {
+        show_simple_command_help(
+          "bit ai <command> [<args>]",
+          summary="AI helpers.\n\nSubcommands:\n  rebase   AI-assisted rebase conflict resolution\n  commit   AI-assisted commit message workflow",
         )
       }
       true
@@ -867,6 +880,7 @@ async fn dispatch_known_command(
     "switch" => handle_switch(rest)
     "reset" => handle_reset(rest)
     "rebase" => handle_rebase(rest)
+    "ai" => handle_ai(rest)
     "rebase-ai" => handle_rebase_ai(rest)
     "stash" => handle_stash(rest)
     "cherry-pick" => handle_cherry_pick(rest)
