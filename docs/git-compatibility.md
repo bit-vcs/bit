@@ -56,6 +56,14 @@ Representative files:
     - matching branch refs
     - matching `rev-parse <branch>^{tree}`
     - both repos clean (`status --porcelain` empty)
+- `t/t0015-random-midx.sh` was added and executed with seeds `701` and `702` with `60` operations each.
+  - Covered operations set: `init`, `commit-new`, `commit-mod`, `commit-rm`, `branch`, `switch`, `rebase`, `status`, `repack`, `multi-pack-index write` (including `--bitmap`), `multi-pack-index verify`, `multi-pack-index expire`.
+  - Verification checks:
+    - `git fsck --strict` (both repos)
+    - matching branch refs
+    - matching `rev-parse <branch>^{tree}`
+    - both repos clean (`status --porcelain` empty)
+    - if git-side multi-pack-index exists, bit-side multi-pack-index exists
 
 ## Explicitly Unsupported In Standalone Mode
 
