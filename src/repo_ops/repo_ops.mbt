@@ -13,10 +13,21 @@ pub fn init_repo(
 ///|
 pub fn init_repo_with_options(
   fs : &@types.FileSystem,
+  _rfs : &@types.RepoFileSystem,
   root : String,
   opts : @gitlib.InitOptions,
 ) -> Unit raise @object.GitError {
   @gitlib.init_repo_with_options(fs, root, opts)
+}
+
+///|
+pub fn init_repo_with_options_with_repo_fs(
+  fs : &@types.FileSystem,
+  rfs : &@types.RepoFileSystem,
+  root : String,
+  opts : @gitlib.InitOptions,
+) -> Unit raise @object.GitError {
+  @gitlib.init_repo_with_options_with_repo_fs(fs, rfs, root, opts)
 }
 
 ///|
