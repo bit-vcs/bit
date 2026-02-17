@@ -447,7 +447,7 @@ fn commit_with_merge_heads(
       }
     }
   } else {
-    @gitlib.write_tree_from_index(fs, git_dir, entries)
+    @gitlib.write_tree_from_index(fs, rfs, git_dir, entries)
   }
   let parents : Array[@git.ObjectId] = []
   let seen : Map[String, Bool] = {}

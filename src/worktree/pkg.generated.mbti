@@ -36,7 +36,7 @@ pub fn write_loose_object(&@types.FileSystem, String, @object.ObjectType, Bytes)
 
 pub fn write_object_bytes(&@types.FileSystem, String, @object.ObjectId, Bytes) -> Unit raise @object.GitError
 
-pub fn write_tree_from_index(&@types.FileSystem, String, Array[@lib.IndexEntry], prefix? : String?) -> @object.ObjectId raise @object.GitError
+pub fn write_tree_from_index(&@types.FileSystem, &@types.RepoFileSystem, String, Array[@lib.IndexEntry], prefix? : String?) -> @object.ObjectId raise @object.GitError
 
 // Errors
 

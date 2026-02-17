@@ -127,7 +127,7 @@ test "rev-parse: HEAD^2 resolves second parent" {
   )
   ignore(reset(fs, fs, "/repo", c1.to_hex(), ResetMode::Hard))
   let entries = read_index_entries(fs, "/repo/.git")
-  let tree_id = write_tree_from_index(fs, "/repo/.git", entries)
+  let tree_id = write_tree_from_index(fs, fs, "/repo/.git", entries)
   let merge_commit = @git.Commit::new(
     tree_id,
     [c1, c2],

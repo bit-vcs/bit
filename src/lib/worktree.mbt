@@ -441,7 +441,7 @@ pub fn commit(
       }
     }
   } else {
-    write_tree_from_index(fs, actual_git_dir, entries)
+    write_tree_from_index(fs, rfs, actual_git_dir, entries)
   }
   let parents = match parent {
     Some(p) => [p]
@@ -861,9 +861,11 @@ pub fn update_head_ref(
 ///|
 pub fn write_tree_from_index(
   fs : &@git.FileSystem,
+  rfs : &@git.RepoFileSystem,
   git_dir : String,
   entries : Array[IndexEntry],
   prefix? : String? = None,
+  missing_ok? : Bool = false,
 ) -> @git.ObjectId raise @git.GitError {
   // If prefix is specified, filter entries and strip prefix from paths
   let rel_entries = match prefix {
@@ -903,20 +905,38 @@ pub fn write_tree_from_index(
       result
     }
   }
-  write_tree_from_entries(fs, git_dir, rel_entries)
+  let object_db = if missing_ok {
+    None
+  } else {
+    Some(ObjectDb::load(rfs, git_dir))
+  }
+  write_tree_from_entries(fs, rfs, git_dir, rel_entries, object_db)
 }
 
 ///|
 fn write_tree_from_entries(
   fs : &@git.FileSystem,
+  rfs : &@git.RepoFileSystem,
   git_dir : String,
   entries : Array[IndexEntry],
+  object_db : ObjectDb?,
 ) -> @git.ObjectId raise @git.GitError {
   let file_entries : Array[@git.TreeEntry] = []
   let dir_map : Map[String, Array[IndexEntry]] = {}
   for e in entries {
     if worktree_is_zero_object_id(e.id) {
       continue
+    }
+    match object_db {
+      Some(db) =>
+        match db.get(rfs, e.id) {
+          None =>
+            raise @git.GitError::InvalidObject(
+              "Object not found: " + e.id.to_hex(),
+            )
+          Some(_) => ()
+        }
+      None => ()
     }
     match split_first(e.path) {
       (name, None) => {
@@ -950,7 +970,7 @@ fn write_tree_from_entries(
   }
   for item in dir_map.to_array() {
     let (dir_name, list) = item
-    let sub_id = write_tree_from_entries(fs, git_dir, list)
+    let sub_id = write_tree_from_entries(fs, rfs, git_dir, list, object_db)
     file_entries.push(@git.TreeEntry::new("40000", dir_name, sub_id))
   }
   // Git sorts tree entries by name, with directories having "/" appended for comparison
@@ -1212,7 +1232,7 @@ pub fn commit_amend(
   if entries.length() == 0 {
     raise @git.GitError::InvalidObject("Empty index")
   }
-  let tree_id = write_tree_from_index(fs, actual_git_dir, entries)
+  let tree_id = write_tree_from_index(fs, rfs, actual_git_dir, entries)
   // Get the parent of the current HEAD (grandparent of new commit)
   let current_head = resolve_head_commit(rfs, actual_git_dir)
   let parents = match current_head {

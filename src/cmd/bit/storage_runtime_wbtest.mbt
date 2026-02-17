@@ -347,12 +347,24 @@ test "storage runtime parser: write-tree normal and invalid option" {
   let parsed = storage_runtime_parse_command("write-tree", ["--prefix=sub/"]) catch {
     err => {
       fail("parse write-tree failed: \{err}")
-      @runtime.StorageCommand::WriteTree({ prefix: None })
+      @runtime.StorageCommand::WriteTree({ prefix: None, missing_ok: false })
     }
   }
   match parsed {
     @runtime.StorageCommand::WriteTree(args) =>
       assert_eq(args.prefix, Some("sub/"))
+    _ => fail("expected write-tree command")
+  }
+  let parsed_missing = storage_runtime_parse_command("write-tree", [
+    "--missing-ok",
+  ]) catch {
+    err => {
+      fail("parse write-tree failed: \{err}")
+      @runtime.StorageCommand::WriteTree({ prefix: None, missing_ok: false })
+    }
+  }
+  match parsed_missing {
+    @runtime.StorageCommand::WriteTree(args) => assert_true(args.missing_ok)
     _ => fail("expected write-tree command")
   }
   cmd_storage_parse_should_fail("write-tree", ["--unknown"])

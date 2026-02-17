@@ -1062,7 +1062,7 @@ pub fn rebase_continue(
   }
   // Build tree from current index
   let entries = read_index_entries(rfs, git_dir)
-  let new_tree = write_tree_from_entries(fs, git_dir, entries)
+  let new_tree = write_tree_from_entries(fs, rfs, git_dir, entries, None)
   // Create new commit with original author info
   let new_commit = @git.Commit::new(
     new_tree,

@@ -44,15 +44,25 @@ async fn handle_write_tree(args : Array[String]) -> Unit raise Error {
   }
   // Parse --prefix option
   let mut prefix : String? = None
+  let mut missing_ok = false
   for arg in args {
     if arg.has_prefix("--prefix=") {
       prefix = Some((try! arg[9:]).to_string())
+    } else if arg == "--missing-ok" {
+      missing_ok = true
     } else if arg.has_prefix("-") {
       warn_unimplemented_arg("write-tree", arg)
     }
   }
   let entries = @gitlib.read_index_entries(fs, git_dir)
-  let tree_id = @gitlib.write_tree_from_index(fs, git_dir, entries, prefix~)
+  let tree_id = @gitlib.write_tree_from_index(
+    fs,
+    rfs,
+    git_dir,
+    entries,
+    prefix~,
+    missing_ok~,
+  )
   print_line(tree_id.to_hex())
 }
 

@@ -270,6 +270,13 @@ test "main: parse_global_options resolves -C relative path without GIT_SHIM_PWD"
 }
 
 ///|
+test "main: parse_global_options keeps ls-files pathspec" {
+  let opts = parse_global_options(["bit", "ls-files", "a*"])
+  assert_eq(opts.subcmd, Some("ls-files"))
+  assert_eq(opts.rest, ["a*"])
+}
+
+///|
 async test "main: show_command_help supports pr alias" {
   let ok = show_command_help("pr", silent=true)
   assert_true(ok)

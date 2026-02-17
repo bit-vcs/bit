@@ -161,7 +161,7 @@ fn storage_runtime_wbtest_hash_object_command(
 fn storage_runtime_wbtest_write_tree_command(
   prefix? : String? = None,
 ) -> StorageCommand {
-  StorageCommand::WriteTree({ prefix, })
+  StorageCommand::WriteTree({ prefix, missing_ok: false })
 }
 
 ///|

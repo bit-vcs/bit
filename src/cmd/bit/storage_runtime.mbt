@@ -316,9 +316,14 @@ fn storage_runtime_parse_write_tree_args(
   args : Array[String],
 ) -> @runtime.StorageWriteTreeArgs raise Error {
   let mut prefix : String? = None
+  let mut missing_ok = false
   for arg in args {
     if arg.has_prefix("--prefix=") {
       prefix = Some((try! arg[9:]).to_string())
+      continue
+    }
+    if arg == "--missing-ok" {
+      missing_ok = true
       continue
     }
     if arg.has_prefix("-") {
@@ -326,7 +331,7 @@ fn storage_runtime_parse_write_tree_args(
     }
     storage_runtime_fail_unsupported_mode("write-tree", "path arguments")
   }
-  { prefix, }
+  { prefix, missing_ok }
 }
 
 ///|

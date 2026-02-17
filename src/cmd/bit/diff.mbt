@@ -241,6 +241,8 @@ async fn handle_diff(args : Array[String]) -> Unit raise Error {
 async fn handle_diff_files(args : Array[String]) -> Unit raise Error {
   let mut exit_code = false
   let mut quiet = false
+  let mut name_only = false
+  let mut name_status = false
   let mut parse_options = true
   let filters : Array[String] = []
   for arg in args {
@@ -255,6 +257,8 @@ async fn handle_diff_files(args : Array[String]) -> Unit raise Error {
           quiet = true
           exit_code = true
         }
+        "--name-only" => name_only = true
+        "--name-status" => name_status = true
         _ if not(arg.has_prefix("-")) => filters.push(arg)
         _ => ()
       }
@@ -270,8 +274,18 @@ async fn handle_diff_files(args : Array[String]) -> Unit raise Error {
       @sys.exit(1)
     }
     if not(quiet) {
-      for entry in stale_entries {
-        print_line(entry.path)
+      if name_only {
+        for entry in stale_entries {
+          print_line(entry.path)
+        }
+      } else if name_status {
+        for entry in stale_entries {
+          print_line("M\t" + entry.path)
+        }
+      } else {
+        for entry in stale_entries {
+          print_line(format_diff_index_line_from_entry(entry))
+        }
       }
     }
     return
@@ -506,7 +520,9 @@ fn diff_cached_against_ref(
     raise @git.GitError::InvalidObject("object is not a tree-ish: " + spec)
   }
   let index_entries = @gitlib.read_index_entries(rfs, git_dir)
-  let index_tree = @gitlib.write_tree_from_index(fs, git_dir, index_entries)
+  let index_tree = @gitlib.write_tree_from_index(
+    fs, rfs, git_dir, index_entries,
+  )
   @gitdiff.diff_trees(rfs, git_dir, Some(old_tree_id), index_tree)
 }
 

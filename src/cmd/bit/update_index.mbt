@@ -14,6 +14,7 @@ async fn handle_update_index(args : Array[String]) -> Unit raise Error {
   let mut verbose = false
   let mut skip_worktree_mode : Bool? = None
   let cacheinfo : Array[(String, String, String)] = []
+  let mut index_info = false
   let paths : Array[String] = []
   let mut i = 0
   while i < args.length() {
@@ -30,6 +31,7 @@ async fn handle_update_index(args : Array[String]) -> Unit raise Error {
       "--skip-worktree" => skip_worktree_mode = Some(true)
       "--no-skip-worktree" => skip_worktree_mode = Some(false)
       "--stdin" => stdin = true
+      "--index-info" => index_info = true
       "-z" => nul_term = true
       "-v" | "--verbose" => verbose = true
       "--cacheinfo" if i + 3 < args.length() => {
@@ -67,26 +69,69 @@ async fn handle_update_index(args : Array[String]) -> Unit raise Error {
     }
     i += 1
   }
+  let direct_updates : Array[@gitlib.IndexEntry] = []
+  let direct_remove_paths : Array[String] = []
   // Read from stdin if requested
   if stdin {
     let input = decode_bytes(read_all_stdin())
     let sep = if nul_term { "\u0000" } else { "\n" }
     for part_view in input.split(sep) {
       let part = trim_string(part_view.to_string())
-      if part.length() > 0 {
+      if part.length() == 0 {
+        continue
+      }
+      if index_info {
+        match parse_update_index_info_line(part) {
+          Some((mode, id, path)) => {
+            let normalized_path = normalize_update_index_path(path)
+            if mode == 0 {
+              direct_remove_paths.push(normalized_path)
+            } else {
+              direct_updates.push(
+                @gitlib.IndexEntry::new(normalized_path, id, mode, 0),
+              )
+            }
+          }
+          None => {
+            eprint_line("error: bad index-info line: " + part)
+            raise @git.GitError::InvalidObject("bad index-info line")
+          }
+        }
+      } else {
         paths.push(part)
       }
     }
   }
-  // For --cacheinfo, we need to write objects first
+  // Handle --cacheinfo (index entries provided directly from command arguments)
   for info in cacheinfo {
     let (mode_str, sha, path) = info
-    // Just add to paths for now - the object should already exist
-    ignore(mode_str)
-    ignore(sha)
-    if verbose {
-      print_line("add '" + path + "'")
+    match parse_update_index_cacheinfo(mode_str, sha, path) {
+      Some((mode, id, normalized_path)) => {
+        if verbose {
+          if mode == 0 {
+            print_line("remove '" + normalized_path + "'")
+          } else {
+            print_line("add '" + normalized_path + "'")
+          }
+        }
+        if mode == 0 {
+          direct_remove_paths.push(normalized_path)
+        } else {
+          direct_updates.push(
+            @gitlib.IndexEntry::new(normalized_path, id, mode, 0),
+          )
+        }
+      }
+      None => {
+        eprint_line(
+          "error: bad cacheinfo: " + mode_str + " " + sha + " " + path,
+        )
+        raise @git.GitError::InvalidObject("bad cacheinfo")
+      }
     }
+  }
+  if direct_updates.length() > 0 || direct_remove_paths.length() > 0 {
+    apply_update_index_entries(fs, git_dir, direct_updates, direct_remove_paths)
   }
   // Use the existing add functionality
   if paths.length() > 0 {
@@ -173,6 +218,194 @@ async fn handle_update_index(args : Array[String]) -> Unit raise Error {
     }
     None => ()
   }
+}
+
+///|
+fn parse_update_index_info_line(line : String) -> (Int, @git.ObjectId, String)? {
+  match line.find("\t") {
+    None => None
+    Some(tab_idx) => {
+      let info = String::unsafe_substring(line, start=0, end=tab_idx)
+      let path = String::unsafe_substring(
+        line,
+        start=tab_idx + 1,
+        end=line.length(),
+      )
+      let normalized_path = normalize_update_index_path(path)
+      let fields = split_update_index_fields(info)
+      if fields.length() == 0 {
+        return None
+      }
+      match parse_octal_mode(fields[0]) {
+        None => None
+        Some(mode) =>
+          if mode == 0 {
+            if fields.length() < 2 {
+              return None
+            }
+            Some((0, @git.ObjectId::zero(), normalized_path))
+          } else {
+            match fields.length() {
+              2 => {
+                let id = match parse_update_index_object_id(fields[1]) {
+                  None => return None
+                  Some(value) => value
+                }
+                Some((mode, id, normalized_path))
+              }
+              3 =>
+                if is_update_index_object_type(fields[1]) {
+                  let id = match parse_update_index_object_id(fields[2]) {
+                    None => return None
+                    Some(value) => value
+                  }
+                  Some((mode, id, normalized_path))
+                } else {
+                  match parse_update_index_stage(fields[2]) {
+                    None => None
+                    Some(_) => {
+                      let id = match parse_update_index_object_id(fields[1]) {
+                        None => return None
+                        Some(value) => value
+                      }
+                      Some((mode, id, normalized_path))
+                    }
+                  }
+                }
+              4 =>
+                if not(is_update_index_object_type(fields[1])) {
+                  None
+                } else {
+                  match parse_update_index_stage(fields[3]) {
+                    None => None
+                    Some(_) => {
+                      let id = match parse_update_index_object_id(fields[2]) {
+                        None => return None
+                        Some(value) => value
+                      }
+                      Some((mode, id, normalized_path))
+                    }
+                  }
+                }
+              _ => None
+            }
+          }
+      }
+    }
+  }
+}
+
+///|
+fn parse_update_index_cacheinfo(
+  mode_str : String,
+  sha : String,
+  path : String,
+) -> (Int, @git.ObjectId, String)? {
+  match parse_octal_mode(mode_str) {
+    None => None
+    Some(mode) => {
+      let normalized_path = normalize_update_index_path(path)
+      if mode == 0 {
+        None
+      } else {
+        let id = @git.ObjectId::from_hex(sha) catch { _ => return None }
+        if id == @git.ObjectId::zero() {
+          None
+        } else {
+          Some((mode, id, normalized_path))
+        }
+      }
+    }
+  }
+}
+
+///|
+fn parse_update_index_stage(value : String) -> Int? {
+  let parsed = @strconv.parse_int(value) catch { _ => return None }
+  if parsed >= 0 && parsed <= 3 {
+    Some(parsed)
+  } else {
+    None
+  }
+}
+
+///|
+fn parse_update_index_object_id(hex : String) -> @git.ObjectId? {
+  let id = @git.ObjectId::from_hex(hex) catch { _ => return None }
+  if id == @git.ObjectId::zero() {
+    None
+  } else {
+    Some(id)
+  }
+}
+
+///|
+fn is_update_index_object_type(value : String) -> Bool {
+  value == "blob" || value == "tree" || value == "commit" || value == "tag"
+}
+
+///|
+fn parse_octal_mode(s : String) -> Int? {
+  let mut mode = 0
+  if s.length() == 0 {
+    return None
+  }
+  for c in s {
+    if c < '0' || c > '7' {
+      return None
+    }
+    mode = mode * 8 + (c.to_int() - '0'.to_int())
+  }
+  Some(mode)
+}
+
+///|
+fn split_update_index_fields(s : String) -> Array[String] {
+  let out : Array[String] = []
+  for item in s.split(" ") {
+    let part = trim_string(item.to_string())
+    if part.length() > 0 {
+      out.push(part)
+    }
+  }
+  out
+}
+
+///|
+fn apply_update_index_entries(
+  fs : OsFs,
+  git_dir : String,
+  updates : Array[@gitlib.IndexEntry],
+  removals : Array[String],
+) -> Unit raise Error {
+  let existing = @gitlib.read_index_entries(fs, git_dir)
+  let update_map : Map[String, @gitlib.IndexEntry] = {}
+  for entry in updates {
+    update_map[normalize_update_index_path(entry.path)] = entry
+  }
+  let removal_set : Map[String, Bool] = {}
+  for p in removals {
+    removal_set[normalize_update_index_path(p)] = true
+  }
+  let out : Array[@gitlib.IndexEntry] = []
+  for entry in existing {
+    let path = normalize_update_index_path(entry.path)
+    if removal_set.contains(path) {
+      continue
+    }
+    match update_map.get(path) {
+      Some(next) => {
+        out.push(next)
+        update_map.remove(path)
+      }
+      None => out.push(entry)
+    }
+  }
+  for item in update_map.to_array() {
+    let (_, entry) = item
+    out.push(entry)
+  }
+  @gitlib.write_index_entries(fs, git_dir, dedupe_index_entries_by_path(out))
 }
 
 ///|

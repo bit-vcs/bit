@@ -77,6 +77,45 @@ test_expect_success 'git write-tree creates tree from index' '
     test ${#tree} -eq 40
 '
 
+test_expect_success 'git update-index --index-info accepts direct staged entries' '
+    git_cmd init &&
+    echo "hello" > test.txt &&
+    hash=$(git_cmd hash-object -w test.txt) &&
+    printf "100644 %s 0\\ttest.txt\\n" "$hash" | git_cmd update-index --index-info --stdin &&
+    tree=$(git_cmd write-tree) &&
+    test -n "$tree" &&
+    test ${#tree} -eq 40
+'
+
+test_expect_success 'git update-index --cacheinfo accepts mode sha path' '
+    git_cmd init &&
+    echo "hello" > test.txt &&
+    hash=$(git_cmd hash-object -w test.txt) &&
+    git_cmd update-index --cacheinfo 100644 "$hash" test.txt &&
+    tree=$(git_cmd write-tree) &&
+    test -n "$tree" &&
+    test ${#tree} -eq 40
+'
+
+test_expect_success 'git update-index --cacheinfo mode zero is rejected' '
+    git_cmd init &&
+    echo "hello" > test.txt &&
+    hash=$(git_cmd hash-object -w test.txt) &&
+    test_must_fail git_cmd update-index --cacheinfo 0 "$hash" test.txt
+'
+
+test_expect_success 'git write-tree fails on missing object unless --missing-ok' '
+    git_cmd init &&
+    echo "hello" > test.txt &&
+    hash=$(git_cmd hash-object -w test.txt) &&
+    printf "100644 %s 0\\ttest.txt\\n" "$hash" | git_cmd update-index --index-info --stdin &&
+    rm ".git/objects/${hash:0:2}/${hash:2}" &&
+    test_must_fail git_cmd write-tree &&
+    tree=$(git_cmd write-tree --missing-ok) &&
+    test -n "$tree" &&
+    test ${#tree} -eq 40
+'
+
 test_expect_success 'git ls-tree shows tree entries' '
     git_cmd init &&
     echo "hello" > test.txt &&

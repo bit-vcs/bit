@@ -398,7 +398,7 @@ pub fn write_sparse_patterns(&@types.FileSystem, String, Array[String]) -> Unit 
 
 pub fn write_subdir_attributes(&@types.FileSystem, String, String, String, @object.ObjectId) -> Unit
 
-pub fn write_tree_from_index(&@types.FileSystem, String, Array[IndexEntry], prefix? : String?) -> @object.ObjectId raise @object.GitError
+pub fn write_tree_from_index(&@types.FileSystem, &@types.RepoFileSystem, String, Array[IndexEntry], prefix? : String?, missing_ok? : Bool) -> @object.ObjectId raise @object.GitError
 
 pub fn write_tree_to_worktree(ObjectDb, &@types.RepoFileSystem, &@types.FileSystem, @object.ObjectId, String) -> Unit raise @object.GitError
 

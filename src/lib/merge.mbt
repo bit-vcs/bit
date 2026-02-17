@@ -102,7 +102,7 @@ pub fn merge(
   )
   let entries = tree_files_to_index(db, rfs, merged)
   write_index_entries(fs, git_dir, entries)
-  let tree_id = write_tree_from_index(fs, git_dir, entries)
+  let tree_id = write_tree_from_index(fs, rfs, git_dir, entries)
   let commit = @git.Commit::new(
     tree_id,
     [head, target],

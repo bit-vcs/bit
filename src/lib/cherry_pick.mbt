@@ -141,7 +141,7 @@ pub fn cherry_pick(
   // Write result tree
   let result_entries = tree_files_to_index(db, rfs, result_files)
   write_index_entries(fs, git_dir, result_entries)
-  let result_tree = write_tree_from_index(fs, git_dir, result_entries)
+  let result_tree = write_tree_from_index(fs, rfs, git_dir, result_entries)
   // Extract original commit message
   let commit_text = @utf8.decode_lossy(obj.data[:])
   let msg_start = commit_text.find("\n\n")

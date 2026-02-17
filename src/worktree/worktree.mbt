@@ -163,9 +163,10 @@ pub fn update_head_ref(
 ///|
 pub fn write_tree_from_index(
   fs : &@git.FileSystem,
+  rfs : &@git.RepoFileSystem,
   git_dir : String,
   entries : Array[@gitlib.IndexEntry],
   prefix? : String? = None,
 ) -> @git.ObjectId raise @git.GitError {
-  @gitlib.write_tree_from_index(fs, git_dir, entries, prefix~)
+  @gitlib.write_tree_from_index(fs, rfs, git_dir, entries, prefix~)
 }

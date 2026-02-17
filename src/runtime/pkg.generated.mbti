@@ -69,6 +69,7 @@ pub(all) struct StorageUpdateRefArgs {
 
 pub(all) struct StorageWriteTreeArgs {
   prefix : String?
+  missing_ok : Bool
 }
 
 // Type aliases

@@ -84,12 +84,12 @@ pub async fn stash_push(
   }
   // Create tree from current index
   let index_entries = read_index_entries(rfs, git_dir)
-  let index_tree = write_tree_from_index(fs, git_dir, index_entries)
+  let index_tree = write_tree_from_index(fs, rfs, git_dir, index_entries)
   // Create tree from worktree (also writes blobs to object store)
   let worktree_entries = build_worktree_index(
     fs, rfs, git_dir, root, index_entries,
   )
-  let worktree_tree = write_tree_from_index(fs, git_dir, worktree_entries)
+  let worktree_tree = write_tree_from_index(fs, rfs, git_dir, worktree_entries)
   // Create index commit (index state)
   let index_commit = @git.Commit::new(
     index_tree,
