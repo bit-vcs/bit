@@ -12,6 +12,7 @@ Current standalone integration coverage (`t/t0001-*.sh` to `t/t0021-*.sh`) inclu
 - transport-style workflows in standalone mode: `clone`, `fetch`, `pull`, `push`, `bundle`
 - plumbing used by normal flows: `hash-object`, `cat-file`, `ls-files`, `ls-tree`, `write-tree`, `update-ref`, `fsck`
 - feature flows: `hub`, `rebase-ai`, `mcp`, `hq`
+- randomized parity smoke coverage: `t0011-random-ops.sh` (seeds 1, 2, 3; 25 operations each; compares git vs bit repo shape and status)
 
 Representative files:
 
@@ -22,6 +23,18 @@ Representative files:
 - `t/t0019-clone-local.sh`
 - `t/t0020-push-fetch-pull.sh`
 - `t/t0021-hq-get.sh`
+
+## Randomized Compatibility Verification
+
+2026-02-17
+
+- `t/t0011-random-ops.sh` was executed and passed for seeds `1`, `2`, and `3` with `25` operations each.
+  - Covered operations set: `init`, `commit-new`, `commit-mod`, `commit-rm`, `branch`, `switch`, `merge`.
+  - Verification checks:
+    - `git fsck --strict` (both repos)
+    - matching branch refs
+    - matching `rev-parse <branch>^{tree}`
+    - both repos clean (`status --porcelain` empty)
 
 ## Explicitly Unsupported In Standalone Mode
 
