@@ -112,11 +112,11 @@ fn join_repo_marker(root : String, marker : String) -> String {
 
 ///|
 fn detect_repo_marker_path(fs : &@bit.RepoFileSystem, root : String) -> String? {
-  let bit_marker = join_repo_marker(root, ".bit")
-  if fs.is_dir(bit_marker) || fs.is_file(bit_marker) {
-    return Some(bit_marker)
+  let git_marker = join_repo_marker(root, ".git")
+  if fs.is_dir(git_marker) || fs.is_file(git_marker) {
+    return Some(git_marker)
   }
-  let bit_marker = join_repo_marker(root, ".git")
+  let bit_marker = join_repo_marker(root, ".bit")
   if fs.is_dir(bit_marker) || fs.is_file(bit_marker) {
     return Some(bit_marker)
   }
@@ -306,7 +306,30 @@ fn workspace_subcommand_names() -> Array[String] {
 
 ///|
 fn workspace_default_star_file() -> String {
+  ".bit/bitflow.star"
+}
+
+///|
+fn workspace_default_star_fallback_file() -> String {
   "bitflow.star"
+}
+
+///|
+fn workspace_default_star_candidates() -> Array[String] {
+  [workspace_default_star_file(), workspace_default_star_fallback_file()]
+}
+
+///|
+fn workspace_resolve_default_star_file(
+  fs : @osfs.OsFs,
+  workspace_root : String,
+) -> String? {
+  for path in workspace_default_star_candidates() {
+    if fs.is_file(normalize_path(workspace_root + "/" + path)) {
+      return Some(path)
+    }
+  }
+  None
 }
 
 ///|
@@ -996,12 +1019,54 @@ fn workspace_node_directory_signature_with_mode(
   guard workspace_node_git_dir(fs, node_root) is Some(_) else { return None }
   let head = workspace_node_head_hex(fs, node_root).unwrap_or("unknown")
   let mode_name = @fingerprint.fingerprint_mode_name(mode)
-  let dir_hash = workspace_directory_hash_with_mode(fs, node_root, mode)
+  let ignore_entries : Array[String] = [".", "..", ".git", ".bit"]
+  workspace_collect_nested_repo_paths(fs, node_root, "", ignore_entries)
+  let dir_hash = @fingerprint.directory_fingerprint(
+    fs,
+    node_root,
+    mode,
+    ignore_entries~,
+  )
   Some(
     @bit.hash_blob_string(
       "mode=" + mode_name + "\nhead=" + head + "\ndir=" + dir_hash,
     ).to_hex(),
   )
+}
+
+///|
+fn workspace_collect_nested_repo_paths(
+  fs : &@bit.RepoFileSystem,
+  node_root : String,
+  relative_root : String,
+  ignore_entries : Array[String],
+) -> Unit {
+  let target = if relative_root.length() == 0 {
+    node_root
+  } else {
+    node_root + "/" + relative_root
+  }
+  let entries = fs.readdir(target) catch { _ => [] }
+  for entry in entries {
+    if entry == "." || entry == ".." || entry == ".git" || entry == ".bit" {
+      continue
+    }
+    let relative_path = if relative_root.length() == 0 {
+      entry
+    } else {
+      relative_root + "/" + entry
+    }
+    let child_root = node_root + "/" + relative_path
+    if not(fs.is_dir(child_root)) {
+      continue
+    }
+    let marker = default_repo_marker_path(fs, child_root)
+    if fs.is_dir(marker) || fs.is_file(marker) || is_bare_repo_dir(child_root) {
+      ignore_entries.push(relative_path)
+      continue
+    }
+    workspace_collect_nested_repo_paths(fs, node_root, relative_path, ignore_entries)
+  }
 }
 
 ///|
@@ -1449,10 +1514,12 @@ pub fn print_workspace_usage() -> Unit {
     #|  commit -m <msg>     Commit changed nodes as one workspace transaction
     #|  push [--resume ID]  Push nodes in dependency order
     #|  run <task>          Run configured task in nodes
-    #|  flow <task> [--pr <id>]
-    #|  flow --config/-c [path.star] [--target <task-id>] [--pr <id>] [--var key=value]
+    #|  flow <task> [--affected] [--pr <id>]
+    #|                     [--no-cache] [--reset-cache]
+    #|  flow --config/-c [path.star] [--target <task-id>] [--affected]
+    #|                     [--pr <id>] [--var key=value]
     #|                      Run topological workflow with success cache
-    #|                      (default star file: bitflow.star)
+    #|                      (default star file: .bit/bitflow.star, fallback: bitflow.star)
     #|                      and optionally report result to hub PR
     #|  export --format git-interop
     #|                      Export workspace interoperability metadata
@@ -2115,6 +2182,7 @@ async fn handle_workspace_flow(
   let mut star_target : String? = None
   let star_var_cli_args : Array[String] = []
   let mut report_pr_id : String? = None
+  let mut star_path_from_default = false
   let mut i = 0
   while i < args.length() {
     let arg = args[i]
@@ -2141,6 +2209,7 @@ async fn handle_workspace_flow(
           }
         }
         star_path = Some(workspace_default_star_file())
+        star_path_from_default = true
         i += 1
         continue
       }
@@ -2158,6 +2227,7 @@ async fn handle_workspace_flow(
           }
         }
         star_path = Some(workspace_default_star_file())
+        star_path_from_default = true
         i += 1
         continue
       }
@@ -2197,13 +2267,12 @@ async fn handle_workspace_flow(
         )
       _ if arg.has_prefix("--config=") => {
         let value = String::unsafe_substring(arg, start=9, end=arg.length())
-        star_path = Some(
-          if value.length() == 0 {
-            workspace_default_star_file()
-          } else {
-            value
-          },
-        )
+        if value.length() == 0 {
+          star_path = Some(workspace_default_star_file())
+          star_path_from_default = true
+        } else {
+          star_path = Some(value)
+        }
       }
       _ if arg.has_prefix("--star=") =>
         raise @bit.GitError::InvalidObject(
@@ -2215,13 +2284,12 @@ async fn handle_workspace_flow(
         )
       _ if arg.has_prefix("-c=") => {
         let value = String::unsafe_substring(arg, start=3, end=arg.length())
-        star_path = Some(
-          if value.length() == 0 {
-            workspace_default_star_file()
-          } else {
-            value
-          },
-        )
+        if value.length() == 0 {
+          star_path = Some(workspace_default_star_file())
+          star_path_from_default = true
+        } else {
+          star_path = Some(value)
+        }
       }
       _ if arg.has_prefix("--var=") => star_var_cli_args.push(arg)
       _ if arg.has_prefix("-") => warn_unimplemented_arg("workspace flow", arg)
@@ -2245,17 +2313,25 @@ async fn handle_workspace_flow(
   let changed = collect_changed_node_ids(
     fs, workspace_root, manifest, lock_signatures, fingerprint_mode,
   )
-  if star_path is None {
-    let default_star_file = workspace_default_star_file()
-    if star_target is Some(_) {
-      star_path = Some(default_star_file)
-    } else if task_name is None {
-      let default_star_path = normalize_path(
-        workspace_root + "/" + default_star_file,
-      )
-      if fs.is_file(default_star_path) {
-        star_path = Some(default_star_file)
+  if star_path is Some(path) {
+    if star_path_from_default && path == workspace_default_star_file() {
+      star_path = match workspace_resolve_default_star_file(
+        fs,
+        workspace_root,
+      ) {
+        Some(resolved) => Some(resolved)
+        None => Some(path)
       }
+    }
+  }
+  if star_path is None {
+    if star_target is Some(_) {
+      star_path = workspace_resolve_default_star_file(fs, workspace_root)
+      if star_path is None {
+        star_path = Some(workspace_default_star_file())
+      }
+    } else if task_name is None {
+      star_path = workspace_resolve_default_star_file(fs, workspace_root)
     }
   }
   if star_path is Some(star_file) {

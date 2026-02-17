@@ -258,6 +258,180 @@ test "workspace: expand affected follows workspace dependency graph" {
 }
 
 ///|
+async test "workspace: collect_changed_node_ids tracks signature drift" {
+  let fs = @osfs.OsFs::new()
+  let root = "/tmp/bit-test-workspace-collect-changed-" +
+    get_current_timestamp().to_string()
+  fs.mkdir_p(root + "/root")
+  fs.mkdir_p(root + "/dep")
+  let root_init_code = try
+    @process.collect_output(
+      "git",
+      ["init", "-b", "main"],
+      inherit_env=true,
+      cwd=root + "/root",
+    )
+  catch {
+    _ => -1
+  } noraise {
+    (code, _, _) => code
+  }
+  let dep_init_code = try
+    @process.collect_output(
+      "git",
+      ["init", "-b", "main"],
+      inherit_env=true,
+      cwd=root + "/dep",
+    )
+  catch {
+    _ => -1
+  } noraise {
+    (code, _, _) => code
+  }
+  if root_init_code != 0 || dep_init_code != 0 {
+    fs.remove_dir(root + "/dep") catch {
+      _ => ()
+    }
+    fs.remove_dir(root + "/root") catch {
+      _ => ()
+    }
+    fs.remove_dir(root) catch {
+      _ => ()
+    }
+    return
+  }
+  fs.write_string(root + "/root/root.txt", "root-v1\n")
+  fs.write_string(root + "/dep/dep.txt", "dep-v1\n")
+  let root_node = workspace_new_node()
+  root_node.id = "root"
+  root_node.path = "root"
+  root_node.depends_on = []
+  let dep_node = workspace_new_node()
+  dep_node.id = "dep"
+  dep_node.path = "dep"
+  dep_node.depends_on = ["root"]
+  let manifest : WorkspaceManifest = {
+    version: 1,
+    nodes: [root_node, dep_node],
+  }
+  let lock_signatures : Map[String, String] = {}
+  for node in manifest.nodes {
+    let node_root = workspace_node_abs_path(root, node.path)
+    let signature = workspace_node_directory_signature_with_mode(
+      fs,
+      node_root,
+      @fingerprint.FingerprintMode::Fast,
+    ).unwrap_or("")
+    if signature.length() > 0 {
+      lock_signatures[node.id] = signature
+    }
+  }
+  let clean = collect_changed_node_ids(
+    fs,
+    root,
+    manifest,
+    lock_signatures,
+    @fingerprint.FingerprintMode::Fast,
+  )
+  assert_eq(clean.get("root") is None, true)
+  assert_eq(clean.get("dep") is None, true)
+  fs.write_string(root + "/dep/dep.txt", "dep-v2\n")
+  let changed = collect_changed_node_ids(
+    fs,
+    root,
+    manifest,
+    lock_signatures,
+    @fingerprint.FingerprintMode::Fast,
+  )
+  assert_eq(changed.get("root") is None, true)
+  assert_eq(changed.get("dep") is Some(_), true)
+  fs.remove_file(root + "/dep/dep.txt") catch {
+    _ => ()
+  }
+  fs.remove_file(root + "/root/root.txt") catch {
+    _ => ()
+  }
+  fs.remove_dir(root + "/dep") catch {
+    _ => ()
+  }
+  fs.remove_dir(root + "/root") catch {
+    _ => ()
+  }
+  fs.remove_dir(root) catch {
+    _ => ()
+  }
+}
+
+///|
+async test "workspace: collect_changed_node_ids marks missing node as changed" {
+  let fs = @osfs.OsFs::new()
+  let root = "/tmp/bit-test-workspace-collect-missing-" +
+    get_current_timestamp().to_string()
+  fs.mkdir_p(root + "/node-a")
+  let init_code = try
+    @process.collect_output(
+      "git",
+      ["init", "-b", "main"],
+      inherit_env=true,
+      cwd=root + "/node-a",
+    )
+  catch {
+    _ => -1
+  } noraise {
+    (code, _, _) => code
+  }
+  if init_code != 0 {
+    fs.remove_dir(root + "/node-a") catch {
+      _ => ()
+    }
+    fs.remove_dir(root) catch {
+      _ => ()
+    }
+    return
+  }
+  fs.write_string(root + "/node-a/file.txt", "payload\n")
+  let node_a = workspace_new_node()
+  node_a.id = "node-a"
+  node_a.path = "node-a"
+  node_a.depends_on = []
+  let manifest : WorkspaceManifest = { version: 1, nodes: [node_a] }
+  let node_root = workspace_node_abs_path(root, node_a.path)
+  let signature = workspace_node_directory_signature_with_mode(
+    fs,
+    node_root,
+    @fingerprint.FingerprintMode::Fast,
+  ).unwrap_or("")
+  let lock_signatures : Map[String, String] = { "node-a": signature }
+  let changed_before = collect_changed_node_ids(
+    fs,
+    root,
+    manifest,
+    lock_signatures,
+    @fingerprint.FingerprintMode::Fast,
+  )
+  assert_eq(changed_before.get("node-a") is None, true)
+  let cleanup_target = try
+    @process.run("rm", ["-rf", root + "/node-a"], inherit_env=true)
+  catch {
+    _ => 0
+  } noraise {
+    code => code
+  }
+  ignore(cleanup_target)
+  let changed_after = collect_changed_node_ids(
+    fs,
+    root,
+    manifest,
+    lock_signatures,
+    @fingerprint.FingerprintMode::Fast,
+  )
+  assert_eq(changed_after.get("node-a") is Some(_), true)
+  fs.remove_dir(root) catch {
+    _ => ()
+  }
+}
+
+///|
 test "workspace: implicit translation activates inside workspace root tree" {
   let fs = @osfs.OsFs::new()
   let root = "/tmp/bit-test-workspace-translate-" +
@@ -526,8 +700,32 @@ test "workspace: manifest issues include governance and security violations" {
 }
 
 ///|
-test "workspace: default star workflow file is bitflow.star" {
-  assert_eq(workspace_default_star_file(), "bitflow.star")
+test "workspace: default star workflow file is .bit/bitflow.star" {
+  assert_eq(workspace_default_star_file(), ".bit/bitflow.star")
+}
+
+///|
+test "workspace: resolve_default_star_file prefers .bit/bitflow.star" {
+  let fs = @osfs.OsFs::new()
+  let root = "/tmp/bit-test-workspace-default-star-" +
+    get_current_timestamp().to_string()
+  fs.mkdir_p(root + "/.bit")
+  fs.write_string(root + "/bitflow.star", "fallback\n")
+  fs.write_string(root + "/.bit/bitflow.star", "primary\n")
+  let resolved = workspace_resolve_default_star_file(fs, root)
+  assert_eq(resolved.unwrap_or(""), ".bit/bitflow.star")
+  fs.remove_file(root + "/.bit/bitflow.star") catch {
+    _ => ()
+  }
+  fs.remove_file(root + "/bitflow.star") catch {
+    _ => ()
+  }
+  fs.remove_dir(root + "/.bit") catch {
+    _ => ()
+  }
+  fs.remove_dir(root) catch {
+    _ => ()
+  }
 }
 
 ///|
