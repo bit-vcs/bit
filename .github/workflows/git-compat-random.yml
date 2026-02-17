@@ -39,6 +39,10 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Checkout git upstream submodule
+        run: |
+          git submodule update --init third_party/git
+
       - name: Install dependencies
         run: |
           sudo apt-get update
