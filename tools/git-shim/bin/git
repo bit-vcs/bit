@@ -57,7 +57,9 @@ has_command_support() {
 
 resolve_real_git() {
   subcmd="${1:-}"
-  shift
+  if [ "$#" -gt 0 ]; then
+    shift
+  fi
   support_cmd="$subcmd"
   if [ "$subcmd" = "help" ]; then
     seen_help=0

@@ -29,6 +29,9 @@
 
 - [ ] `t5540-http-push-webdav.sh`
 - [ ] `t9001-send-email.sh`
+- [ ] `full allowlist (just git-t-allowlist-shim-strict)` を再開して完走させる
+  - [ ] `2026-02-17`: 実行途中で 1時間56分でタイムアウト
+  - [x] `2026-02-17`: `t1300-config.sh` の `git --config-env with missing value` を再現（`tools/git-shim/bin/git` の `resolve_real_git` 引数未設定時 `shift` バグ）
 - [ ] `--help` 移植（全サブコマンドの usage テキスト）
   - [x] `show_command_help` を spec 駆動へ整理（追加時の重複実装を削減）
   - [x] help 経路の回帰テストを追加（completion 一覧 / dispatch 固有 / alias）
