@@ -133,7 +133,7 @@ pub fn cherry_pick(
   }
   if conflicts.length() > 0 {
     // Write the result to worktree but don't commit
-    write_worktree_from_files(db, fs, rfs, git_dir, root, result_files)
+    write_worktree_from_files(db, fs, rfs, root, git_dir, result_files)
     let result_entries = tree_files_to_index(db, rfs, result_files)
     write_index_entries(fs, git_dir, result_entries)
     return { status: CherryPickStatus::Conflict, commit_id: None, conflicts }
@@ -171,6 +171,6 @@ pub fn cherry_pick(
   // Update HEAD
   update_head_ref(fs, rfs, git_dir, new_id)
   // Update worktree
-  write_worktree_from_files(db, fs, rfs, git_dir, root, result_files)
+  write_worktree_from_files(db, fs, rfs, root, git_dir, result_files)
   { status: CherryPickStatus::Success, commit_id: Some(new_id), conflicts: [] }
 }

@@ -6,7 +6,7 @@ This document tracks detailed Git compatibility behavior for `bit`, including st
 
 Standalone coverage is validated with `git_cmd` in `t/test-lib-e2e.sh`, which runs `bit --no-git-fallback ...` (no real-git dependency in these tests).
 
-Current standalone integration coverage (`t/t0001-*.sh` to `t/t0021-*.sh`) includes:
+Current standalone integration coverage (`t/t0001-*.sh` to `t/t0022-*.sh`) includes:
 
 - repository lifecycle and core porcelain: `init`, `status`, `add`, `commit`, `branch`, `checkout`/`switch`, `reset`, `log`, `tag`
 - transport-style workflows in standalone mode: `clone`, `fetch`, `pull`, `push`, `bundle`
@@ -23,6 +23,7 @@ Representative files:
 - `t/t0019-clone-local.sh`
 - `t/t0020-push-fetch-pull.sh`
 - `t/t0021-hq-get.sh`
+- `t/t0022-random-branch-tag.sh`
 
 ## Randomized Compatibility Verification
 
@@ -78,6 +79,16 @@ Representative files:
     - matching branch refs
     - matching `rev-parse <branch>^{tree}`
     - matching `status --porcelain` output
+- `t/t0022-random-branch-tag.sh` was added and executed with seeds `1101`, `1102`, and `1103` with `50` operations each.
+  - Covered operations set: `init`, `commit-new`, `commit-mod`, `commit-rm`, `branch`, `switch`, `tag`, `tag -d`, `cherry-pick`, `status`, `pack-objects`, `index-pack`, `repack`, `gc`.
+  - Verification checks:
+    - `git fsck --strict` (both repos)
+    - matching branch refs
+    - matching `rev-parse <branch>^{tree}`
+    - both repos clean (`status --porcelain` empty)
+  - `t/t0022-random-branch-tag.sh` can also be run with custom seeds/params:
+    - `GIT_COMPAT_T0022_SEEDS="1104 1105" GIT_COMPAT_T0022_STEPS=50 GIT_COMPAT_T0022_MAX_BRANCHES=4 bash t/t0022-random-branch-tag.sh`
+  - Additional verification with this interface passed for seeds `1104` and `1105`.
 
 ## Explicitly Unsupported In Standalone Mode
 

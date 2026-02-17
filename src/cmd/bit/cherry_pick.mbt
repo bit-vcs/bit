@@ -3,6 +3,9 @@ async fn handle_cherry_pick(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let git_dir = root + "/.git"
   let fs = OsFs::new()
+  let wfs : &@git.FileSystem = fs
+  let rfs : &@git.RepoFileSystem = fs
+  let mut do_abort = false
   // Parse arguments
   let mut commit_spec : String? = None
   for arg in args {
@@ -10,7 +13,16 @@ async fn handle_cherry_pick(args : Array[String]) -> Unit raise Error {
       commit_spec = Some(arg)
       break
     }
-    warn_unimplemented_arg("cherry-pick", arg)
+    if arg == "--abort" {
+      do_abort = true
+    } else {
+      warn_unimplemented_arg("cherry-pick", arg)
+    }
+  }
+  // Handle --abort
+  if do_abort {
+    ignore(@gitlib.reset(wfs, rfs, root, "HEAD", @gitlib.ResetMode::Hard))
+    return
   }
   guard commit_spec is Some(spec) else {
     raise @git.GitError::InvalidObject("commit required")
@@ -49,6 +61,7 @@ async fn handle_cherry_pick(args : Array[String]) -> Unit raise Error {
       }
       print_line("")
       print_line("After fixing the conflicts, use \"git commit\" to continue.")
+      @sys.exit(1)
     }
   }
 }

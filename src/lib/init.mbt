@@ -88,11 +88,11 @@ pub fn init_repo_with_options(
   if opts.ref_format == "reftable" || opts.object_format != "sha1" {
     repository_format_version = "1"
   }
-  let mut config = "[core]\\n\\trepositoryformatversion = " +
+  let mut config = "[core]\n\trepositoryformatversion = " +
     repository_format_version +
-    "\\n\\tfilemode = true\\n\\tbare = " +
+    "\n\tfilemode = true\n\tbare = " +
     bare_str +
-    "\\n"
+    "\n"
   if opts.ref_format == "reftable" {
     fs.mkdir_p(join_path(git_dir, "reftable"))
     let tables_list_path = join_path(git_dir, "reftable/tables.list")
@@ -100,20 +100,20 @@ pub fn init_repo_with_options(
   }
   let extension_lines : Array[String] = []
   if opts.ref_format == "reftable" {
-    extension_lines.push("\\trefStorage = reftable")
+    extension_lines.push("\trefStorage = reftable")
   }
   if opts.object_format != "sha1" {
-    extension_lines.push("\\tobjectFormat = " + opts.object_format)
+    extension_lines.push("\tobjectFormat = " + opts.object_format)
   }
   if extension_lines.length() > 0 {
-    config += "[extensions]\\n" + extension_lines.join("\\n") + "\\n"
+    config += "[extensions]\n" + extension_lines.join("\n") + "\n"
   }
   fs.write_string(join_path(git_dir, "config"), config)
   if use_default_template_files {
     // Create description file
     fs.write_string(
       join_path(git_dir, "description"),
-      "Unnamed repository; edit this file 'description' to name the repository.\\n",
+      "Unnamed repository; edit this file 'description' to name the repository.\n",
     )
     // Create info/exclude
     fs.write_string(join_path(git_dir, "info/exclude"), "")
@@ -164,14 +164,13 @@ pub fn init_repo_with_options_with_repo_fs(
       None
     }
     match existing_git_dir {
-      Some(old_git_dir) => {
+      Some(old_git_dir) =>
         if old_git_dir != git_dir && rfs.is_dir(old_git_dir) {
           if rfs.is_dir(git_dir) || rfs.is_file(git_dir) {
             remove_tree(fs, rfs, git_dir)
           }
           move_tree(fs, rfs, old_git_dir, git_dir)
         }
-      }
       None => ()
     }
     fs.write_string(gitfile_path, "gitdir: " + git_dir + "\n")
@@ -184,11 +183,11 @@ pub fn init_repo_with_options_with_repo_fs(
   if opts.ref_format == "reftable" || opts.object_format != "sha1" {
     repository_format_version = "1"
   }
-  let mut config = "[core]\\n\\trepositoryformatversion = " +
+  let mut config = "[core]\n\trepositoryformatversion = " +
     repository_format_version +
-    "\\n\\tfilemode = true\\n\\tbare = " +
+    "\n\tfilemode = true\n\tbare = " +
     bare_str +
-    "\\n"
+    "\n"
   if opts.ref_format == "reftable" {
     fs.mkdir_p(join_path(git_dir, "reftable"))
     let tables_list_path = join_path(git_dir, "reftable/tables.list")
@@ -196,20 +195,20 @@ pub fn init_repo_with_options_with_repo_fs(
   }
   let extension_lines : Array[String] = []
   if opts.ref_format == "reftable" {
-    extension_lines.push("\\trefStorage = reftable")
+    extension_lines.push("\trefStorage = reftable")
   }
   if opts.object_format != "sha1" {
-    extension_lines.push("\\tobjectFormat = " + opts.object_format)
+    extension_lines.push("\tobjectFormat = " + opts.object_format)
   }
   if extension_lines.length() > 0 {
-    config += "[extensions]\\n" + extension_lines.join("\\n") + "\\n"
+    config += "[extensions]\n" + extension_lines.join("\n") + "\n"
   }
   fs.write_string(join_path(git_dir, "config"), config)
   if use_default_template_files {
     // Create description file
     fs.write_string(
       join_path(git_dir, "description"),
-      "Unnamed repository; edit this file 'description' to name the repository.\\n",
+      "Unnamed repository; edit this file 'description' to name the repository.\n",
     )
     // Create info/exclude
     fs.write_string(join_path(git_dir, "info/exclude"), "")
