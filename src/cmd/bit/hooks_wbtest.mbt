@@ -231,6 +231,42 @@ test "hooks: postinstall is considered sensitive and always prompt" {
   assert_true(is_always_prompt_hook("postinstall"))
 }
 
+async test "hooks: approving postinstall still requires approval on every run" {
+  let fs = OsFs::new()
+  let root =
+    "/tmp/bit-test-hooks-postinstall-approve-no-persist-" +
+      get_current_timestamp().to_string()
+  let git_dir = root + "/.git"
+  fs.mkdir_p(root)
+  fs.mkdir_p(git_dir)
+  let source = root + "/source-hook"
+  fs.write_string(source, "#!/bin/sh\necho hi\n")
+  handle_x_hooks_set(fs, root, ["postinstall", source])
+  handle_x_hooks_approve(fs, root, git_dir, ["postinstall"])
+  assert_true(fs.is_file(git_dir + "/hooks/postinstall"))
+  let rfs : &@bitcore.RepoFileSystem = fs
+  assert_false(hooks_is_current_checksum_approved(rfs, root, "postinstall"))
+  match hooks_read_approved_checksum(fs, root, "postinstall") {
+    Some(_) => ()
+    None => fail("expected approval checksum to be recorded for enabled sensitive hook")
+  }
+
+  handle_x_hooks_unapprove(fs, git_dir, ["postinstall"])
+  handle_x_hooks_remove(fs, root, ["postinstall"])
+  fs.remove_file(source) catch {
+    _ => ()
+  }
+  fs.remove_dir(git_dir) catch {
+    _ => ()
+  }
+  fs.remove_dir(root + "/.bit") catch {
+    _ => ()
+  }
+  fs.remove_dir(root) catch {
+    _ => ()
+  }
+}
+
 test "hooks: postinstall never becomes auto-approved by checksum" {
   let fs = OsFs::new()
   let root =
