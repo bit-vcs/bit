@@ -62,6 +62,7 @@ async fn show_help() -> Unit {
     #|
     #|setup
     #|   completion    Generate shell completion scripts (bash/zsh)
+    #|   x/hooks       Manage hooks used by bit commands
     #|
     #|low-level / plumbing
     #|   bundle          Create, verify, list-heads, and unbundle Git bundles
@@ -312,6 +313,7 @@ fn show_command_help_specs() -> Array[(String, String, String)] {
     (
       "completion", "bit completion <bash|zsh>", "Generate shell completion scripts.\n\nInstall:\n  bash: eval \"$(bit completion bash)\"\n  zsh:  eval \"$(bit completion zsh)\"",
     ),
+    ("x/hooks", "bit/x/hooks <subcommand> [<args>]", "Manage hooks used by bit commands."),
     (
       "shell", "bit shell [--login] [<path>]", "Start an interactive bit shell with command forwarding.",
     ),
@@ -477,6 +479,12 @@ async fn show_command_help(cmd : String, silent? : Bool = false) -> Bool {
     "show" => {
       if not(silent) {
         show_show_command_help()
+      }
+      true
+    }
+    "x/hooks" => {
+      if not(silent) {
+        print_x_hooks_usage()
       }
       true
     }
@@ -919,6 +927,7 @@ async fn dispatch_known_command(
     "multi-pack-index" => handle_multi_pack_index(rest)
     "cherry" => handle_cherry(rest)
     "completion" => handle_completion(rest)
+    "x/hooks" => handle_x_hooks(rest)
     "scalar" => handle_scalar(rest)
     "shell" => handle_shell(rest)
     "version" => print_line("git version 2.47.0 (bit)")
