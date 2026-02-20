@@ -253,6 +253,10 @@ fn print_hub_sync_usage() -> Unit {
   println("  - Smart HTTP remote: https://host/repo.git")
   println("  - Relay explicit: relay+http(s)://host")
   println("  - Relay fallback: http(s)://host (when info/refs returns 404)")
+  println("")
+  println("Relay signing env:")
+  println("  BIT_RELAY_SIGN_PRIVATE_KEY_FILE=<path>   Sign relay publish requests with Ed25519")
+  println("  BIT_RELAY_SIGN_PUBLIC_KEY=<base64url>    Optional override for x-relay-public-key")
 }
 
 ///|

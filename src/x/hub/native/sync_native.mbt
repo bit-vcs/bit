@@ -189,6 +189,360 @@ fn relay_conflict_policy() -> @hub.RecordMergePolicy {
 }
 
 ///|
+priv struct RelayHttpSigningConfig {
+  private_key_file : String
+  public_key : String
+}
+
+///|
+priv struct RelayPublishHttpSignature {
+  public_key : String
+  signature : String
+  timestamp_sec : Int64
+  nonce : String
+}
+
+///|
+fn relay_sign_private_key_file() -> String? {
+  match @sys.get_env_var("BIT_RELAY_SIGN_PRIVATE_KEY_FILE") {
+    Some(value) => {
+      let normalized = value.trim(chars=" \n\r\t").to_string()
+      if normalized.length() > 0 { Some(normalized) } else { None }
+    }
+    None => None
+  }
+}
+
+///|
+fn relay_sign_public_key() -> String? {
+  match @sys.get_env_var("BIT_RELAY_SIGN_PUBLIC_KEY") {
+    Some(value) => {
+      let normalized = value.trim(chars=" \n\r\t").to_string()
+      if normalized.length() > 0 { Some(normalized) } else { None }
+    }
+    None => None
+  }
+}
+
+///|
+fn relay_base64_to_base64url(base64 : String) -> String {
+  base64
+  .replace(old="+", new="-")
+  .replace(old="/", new="_")
+  .replace(old="=", new="")
+}
+
+///|
+fn relay_extract_ed25519_public_key_from_der(der : Bytes) -> String? {
+  if der.length() != 44 {
+    return None
+  }
+  let prefix : Array[Byte] = [
+    0x30,
+    0x2a,
+    0x30,
+    0x05,
+    0x06,
+    0x03,
+    0x2b,
+    0x65,
+    0x70,
+    0x03,
+    0x21,
+    0x00,
+  ]
+  for i = 0; i < prefix.length(); i = i + 1 {
+    if der[i] != prefix[i] {
+      return None
+    }
+  }
+  let raw_key = der[12:44]
+  let base64 = @base64.encode(raw_key, padding=false)
+  Some(relay_base64_to_base64url(base64))
+}
+
+///|
+fn relay_is_hex_char(c : Char) -> Bool {
+  (c >= '0' && c <= '9') ||
+  (c >= 'a' && c <= 'f') ||
+  (c >= 'A' && c <= 'F')
+}
+
+///|
+fn relay_extract_sha256_hex(output : String) -> String? {
+  for line_view in output.split("\n") {
+    let line = line_view.trim(chars=" \n\r\t").to_string()
+    if line.length() == 0 {
+      continue
+    }
+    let candidate_with_label = match line.find("=") {
+      Some(eq_idx) =>
+        String::unsafe_substring(line, start=eq_idx + 1, end=line.length())
+      None => line
+    }
+    let candidate_trimmed = candidate_with_label.trim(chars=" \n\r\t").to_string()
+    let token = match candidate_trimmed.find(" ") {
+      Some(space_idx) =>
+        String::unsafe_substring(candidate_trimmed, start=0, end=space_idx)
+      None => candidate_trimmed
+    }
+    if token.length() == 64 {
+      let mut ok = true
+      for c in token.to_array() {
+        if not(relay_is_hex_char(c)) {
+          ok = false
+          break
+        }
+      }
+      if ok {
+        return Some(token.to_lower())
+      }
+    }
+  }
+  None
+}
+
+///|
+async fn relay_prepare_process_stdin(
+  text : String,
+) -> &@process.ProcessInput raise @bit.GitError {
+  let (stdin, writer) = @process.write_to_process() catch {
+    err => raise @bit.GitError::IoError("relay sign: pipe failed: \{err}")
+  }
+  writer.write(text) catch {
+    err => raise @bit.GitError::IoError("relay sign: pipe write failed: \{err}")
+  }
+  writer.close()
+  stdin
+}
+
+///|
+async fn relay_sha256_hex(text : String) -> String raise @bit.GitError {
+  let stdin = relay_prepare_process_stdin(text)
+  let (code, stdout, stderr) = @process.collect_output(
+    "openssl",
+    ["dgst", "-sha256", "-hex", "-r"],
+    inherit_env=true,
+    stdin~,
+  ) catch {
+    err => raise @bit.GitError::IoError("relay sign: openssl dgst failed: \{err}")
+  }
+  if code != 0 {
+    let err_text = stderr.text() catch { _ => "" }
+    let normalized = err_text.trim(chars=" \n\r\t").to_string()
+    raise @bit.GitError::IoError("relay sign: openssl dgst error: \{normalized}")
+  }
+  let out_text = stdout.text() catch { _ => "" }
+  match relay_extract_sha256_hex(out_text) {
+    Some(hex) => hex
+    None =>
+      raise @bit.GitError::IoError(
+        "relay sign: openssl dgst returned unexpected output",
+      )
+  }
+}
+
+///|
+async fn relay_sign_ed25519(
+  private_key_file : String,
+  message : String,
+) -> String raise @bit.GitError {
+  let stdin = relay_prepare_process_stdin(message)
+  let (code, stdout, stderr) = @process.collect_output(
+    "sh",
+    [
+      "-c",
+      "openssl pkeyutl -sign -inkey \"$BIT_RELAY_SIGN_PRIVATE_KEY_FILE\" -in /dev/stdin | openssl base64 -A",
+    ],
+    inherit_env=true,
+    stdin~,
+    extra_env={ "BIT_RELAY_SIGN_PRIVATE_KEY_FILE": private_key_file },
+  ) catch {
+    err => raise @bit.GitError::IoError("relay sign: openssl pkeyutl failed: \{err}")
+  }
+  if code != 0 {
+    let err_text = stderr.text() catch { _ => "" }
+    let normalized = err_text.trim(chars=" \n\r\t").to_string()
+    raise @bit.GitError::IoError("relay sign: openssl pkeyutl error: \{normalized}")
+  }
+  let base64_sig = stdout.text() catch { _ => "" }
+  let normalized = base64_sig.trim(chars=" \n\r\t").to_string()
+  if normalized.length() == 0 {
+    raise @bit.GitError::IoError("relay sign: openssl produced empty signature")
+  }
+  relay_base64_to_base64url(normalized)
+}
+
+///|
+async fn relay_resolve_public_key(
+  private_key_file : String,
+) -> String raise @bit.GitError {
+  match relay_sign_public_key() {
+    Some(explicit) => explicit
+    None => {
+      let (code, stdout, stderr) = @process.collect_output(
+        "sh",
+        [
+          "-c",
+          "openssl pkey -in \"$BIT_RELAY_SIGN_PRIVATE_KEY_FILE\" -pubout -outform DER | openssl base64 -A",
+        ],
+        inherit_env=true,
+        extra_env={ "BIT_RELAY_SIGN_PRIVATE_KEY_FILE": private_key_file },
+      ) catch {
+        err => raise @bit.GitError::IoError("relay sign: openssl pkey failed: \{err}")
+      }
+      if code != 0 {
+        let err_text = stderr.text() catch { _ => "" }
+        let normalized = err_text.trim(chars=" \n\r\t").to_string()
+        raise @bit.GitError::IoError("relay sign: openssl pkey error: \{normalized}")
+      }
+      let der_base64 = stdout.text() catch { _ => "" }
+      let normalized = der_base64.trim(chars=" \n\r\t").to_string()
+      if normalized.length() == 0 {
+        raise @bit.GitError::IoError("relay sign: openssl returned empty public key")
+      }
+      let der = @base64.decode(normalized) catch {
+        _ =>
+          raise @bit.GitError::IoError("relay sign: invalid base64 from openssl public key")
+      }
+      match relay_extract_ed25519_public_key_from_der(der) {
+        Some(key) => key
+        None =>
+          raise @bit.GitError::IoError(
+            "relay sign: unsupported public key format (expected Ed25519)",
+          )
+      }
+    }
+  }
+}
+
+///|
+async fn relay_http_signing_config() -> RelayHttpSigningConfig? raise @bit.GitError {
+  match relay_sign_private_key_file() {
+    None => None
+    Some(private_key_file) => {
+      let public_key = relay_resolve_public_key(private_key_file)
+      Some({ private_key_file, public_key })
+    }
+  }
+}
+
+///|
+fn relay_canonicalize_json(value : Json) -> String {
+  match value {
+    Json::Null => "null"
+    Json::True => "true"
+    Json::False => "false"
+    Json::String(text) => Json::string(text).stringify()
+    Json::Number(number, ..) => Json::number(number).stringify()
+    Json::Array(items) => {
+      let parts : Array[String] = []
+      for item in items {
+        parts.push(relay_canonicalize_json(item))
+      }
+      "[" + parts.join(",") + "]"
+    }
+    Json::Object(obj) => {
+      let entries = obj.to_array()
+      entries.sort_by((a, b) => String::compare(a.0, b.0))
+      let parts : Array[String] = []
+      for entry in entries {
+        let (key, item) = entry
+        let quoted_key = Json::string(key).stringify()
+        parts.push(quoted_key + ":" + relay_canonicalize_json(item))
+      }
+      "{" + parts.join(",") + "}"
+    }
+  }
+}
+
+///|
+fn relay_build_publish_signing_message(
+  sender : String,
+  room : String,
+  id : String,
+  topic : String,
+  timestamp_sec : Int64,
+  nonce : String,
+  payload_sha256 : String,
+) -> String {
+  [
+    "v1",
+    "sender=" + sender,
+    "room=" + room,
+    "id=" + id,
+    "topic=" + topic,
+    "ts=" + timestamp_sec.to_string(),
+    "nonce=" + nonce,
+    "payload_sha256=" + payload_sha256,
+  ].join("\n")
+}
+
+///|
+async fn relay_sign_publish_payload(
+  config : RelayHttpSigningConfig?,
+  sender : String,
+  room : String,
+  topic : String,
+  id : String,
+  payload : Json,
+) -> RelayPublishHttpSignature? raise @bit.GitError {
+  match config {
+    None => None
+    Some(signing) => {
+      let now_ms = @env.now().to_int().to_int64()
+      let timestamp_sec = now_ms / 1000
+      let nonce = "\{now_ms}-\{id}"
+      let payload_sha256 = relay_sha256_hex(relay_canonicalize_json(payload))
+      let message = relay_build_publish_signing_message(
+        sender,
+        room,
+        id,
+        topic,
+        timestamp_sec,
+        nonce,
+        payload_sha256,
+      )
+      let signature = relay_sign_ed25519(signing.private_key_file, message)
+      Some({
+        public_key: signing.public_key,
+        signature,
+        timestamp_sec,
+        nonce,
+      })
+    }
+  }
+}
+
+///|
+fn relay_headers_with_publish_signature(
+  headers : Map[String, String],
+  signature : RelayPublishHttpSignature?,
+) -> Map[String, String] {
+  let out = headers
+  match signature {
+    Some(auth) => {
+      out["x-relay-public-key"] = auth.public_key
+      out["x-relay-signature"] = auth.signature
+      out["x-relay-timestamp"] = auth.timestamp_sec.to_string()
+      out["x-relay-nonce"] = auth.nonce
+    }
+    None => ()
+  }
+  out
+}
+
+///|
+fn relay_copy_headers(headers : Map[String, String]) -> Map[String, String] {
+  let out : Map[String, String] = {}
+  for entry in headers.to_array() {
+    let (key, value) = entry
+    out[key] = value
+  }
+  out
+}
+
+///|
 fn relay_headers_with_auth(
   headers : Map[String, String],
   auth_token : String?,
@@ -600,18 +954,32 @@ async fn relay_push_with_http(
     require_signed~,
   )
   let records = store.list_records(objects, "hub/", include_deleted=true)
-  let headers = relay_headers_with_auth(
+  let base_headers = relay_headers_with_auth(
     { "Content-Type": "application/json" },
     auth_token,
   )
+  let relay_signing = relay_http_signing_config()
   let mut accepted = 0
   for record in records {
     let payload_obj : Map[String, Json] = {}
     payload_obj["kind"] = Json::string("hub.record")
     payload_obj["record"] = Json::string(record.serialize())
-    let payload_text = Json::object(payload_obj).stringify()
+    let payload_json = Json::object(payload_obj)
+    let payload_text = payload_json.stringify()
     let (record_blob_id, _) = @bit.create_blob_string(record.serialize())
     let event_id = record_blob_id.to_hex()
+    let publish_signature = relay_sign_publish_payload(
+      relay_signing,
+      "bit",
+      "main",
+      "notify",
+      event_id,
+      payload_json,
+    )
+    let headers = relay_headers_with_publish_signature(
+      relay_copy_headers(base_headers),
+      publish_signature,
+    )
     let url = relay_publish_url(base_url, event_id)
     let (response, response_body) = http_post(
       url,

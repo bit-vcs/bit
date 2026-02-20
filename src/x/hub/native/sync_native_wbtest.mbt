@@ -248,6 +248,108 @@ async test "relay: relay push forwards auth token header" {
 }
 
 ///|
+async test "relay: relay push adds relay signature headers when key env is set" {
+  let fs = @bit.TestFs::new()
+  let git_dir = "/repo/.git"
+  fs.mkdir_p(git_dir)
+  let db = @lib.ObjectDb::load_lazy(fs, git_dir)
+  let native_objects : NativeObjectStore = { db, rfs: fs, fs, git_dir }
+  let native_refs : NativeRefStore = { fs, rfs: fs, git_dir }
+  let objects : &@lib.ObjectStore = native_objects
+  let refs : &@lib.RefStore = native_refs
+  let store = @hub.HubStore::load(objects, refs, node_id="node-local")
+  let clock : FixedClock = { now_ts: 1L }
+  let clock_ref : &@lib.Clock = clock
+  ignore(
+    store.put_record(
+      objects,
+      refs,
+      clock_ref,
+      "hub/pr/1/meta",
+      "hub.pr",
+      "payload",
+      "node-local",
+    ),
+  )
+
+  let key_path = "/tmp/bit-relay-sign-" + @env.now().to_int().to_string() + ".pem"
+  let keygen_code = @process.run(
+    "openssl",
+    ["genpkey", "-algorithm", "Ed25519", "-out", key_path],
+    inherit_env=true,
+  ) catch {
+    _ => -1
+  }
+  if keygen_code != 0 {
+    // Skip this test when openssl is unavailable in the runtime.
+    return
+  }
+
+  @sys.set_env_var("BIT_RELAY_SIGN_PRIVATE_KEY_FILE", key_path)
+  @sys.set_env_var("BIT_RELAY_SIGN_PUBLIC_KEY", "test-public-key")
+
+  let seen_public_keys : Array[String] = []
+  let seen_signatures : Array[String] = []
+  let seen_timestamps : Array[String] = []
+  let seen_nonces : Array[String] = []
+  let post = async fn(
+    _url : String,
+    _body : Bytes,
+    headers : Map[String, String],
+  ) -> (@bit.HttpResponse, Bytes) raise @bit.GitError {
+    let no_ops : Array[async () -> Unit] = []
+    ignore(
+      @async.all(no_ops) catch {
+        err => raise @bit.GitError::IoError(err.to_string())
+      },
+    )
+    match headers.get("x-relay-public-key") {
+      Some(value) => seen_public_keys.push(value)
+      None => ()
+    }
+    match headers.get("x-relay-signature") {
+      Some(value) => seen_signatures.push(value)
+      None => ()
+    }
+    match headers.get("x-relay-timestamp") {
+      Some(value) => seen_timestamps.push(value)
+      None => ()
+    }
+    match headers.get("x-relay-nonce") {
+      Some(value) => seen_nonces.push(value)
+      None => ()
+    }
+    (
+      @bit.HttpResponse::new(200),
+      @utf8.encode("{\"ok\":true,\"accepted\":true,\"cursor\":1}"),
+    )
+  }
+
+  let result = relay_push_with_http(
+    fs,
+    git_dir,
+    "http://relay.test",
+    post,
+    signing_key=None,
+    auth_token=None,
+  )
+
+  @sys.unset_env_var("BIT_RELAY_SIGN_PRIVATE_KEY_FILE")
+  @sys.unset_env_var("BIT_RELAY_SIGN_PUBLIC_KEY")
+  ignore(@process.run("rm", ["-f", key_path], inherit_env=true) catch { _ => -1 })
+
+  assert_true(result.success())
+  assert_eq(seen_public_keys.length(), 1)
+  assert_eq(seen_public_keys[0], "test-public-key")
+  assert_eq(seen_signatures.length(), 1)
+  assert_true(seen_signatures[0].length() > 0)
+  assert_eq(seen_timestamps.length(), 1)
+  assert_true(seen_timestamps[0].length() > 0)
+  assert_eq(seen_nonces.length(), 1)
+  assert_true(seen_nonces[0].length() > 0)
+}
+
+///|
 async test "relay: relay fetch forwards auth token header" {
   let fs = @bit.TestFs::new()
   let git_dir = "/repo/.git"
