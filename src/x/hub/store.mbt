@@ -109,7 +109,9 @@ pub(all) enum RecordTriggerClass {
 
 ///|
 pub fn classify_record_trigger(record : HubRecord) -> RecordTriggerClass {
-  if record.kind == "pr-proposal" || record.key.has_prefix("hub/proposal/") {
+  if record.kind == "pr-proposal" || record.key.has_prefix("hub/proposal/") ||
+    record.kind == "feature-broadcast" ||
+    record.key.has_prefix("hub/broadcast/") {
     RecordTriggerClass::NotifyOnly
   } else {
     RecordTriggerClass::Full
@@ -123,6 +125,7 @@ pub fn record_notify_topic(record : HubRecord) -> String? {
   }
   match record.kind {
     "pr-proposal" => Some("hub.pr.proposal")
+    "feature-broadcast" => Some("hub.feature.broadcast")
     _ => Some("hub.notify")
   }
 }
@@ -286,6 +289,16 @@ fn clock_to_string(clock : Map[String, Int64]) -> String {
     parts.push(key + "=" + value.to_string())
   }
   parts.join(",")
+}
+
+///|
+///|
+/// Compare two vector clocks. Returns 1 if a > b, -1 if b > a, 0 if concurrent.
+pub fn compare_vector_clocks(
+  a : Map[String, Int64],
+  b : Map[String, Int64],
+) -> Int {
+  compare_clock(a, b)
 }
 
 ///|

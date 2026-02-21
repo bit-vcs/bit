@@ -436,25 +436,38 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
   }
   let mut resolved_push_url = raw_url
   if push_remote_uses_relay_signaling(resolved_push_url) {
-    let preferred_sender = match
-      push_normalize_optional_value(relay_preferred_sender_opt) {
-      Some(value) => Some(value)
-      None => push_relay_preferred_sender()
+    // First: check if this is a direct session URL (relay+https://host/<session_id>)
+    match push_detect_relay_session(resolved_push_url) {
+      Some((base_url, session_id)) => {
+        let proxied = base_url + "/git/" + session_id
+        if not(quiet) && not(porcelain) {
+          print_line("Pushing via relay session: \{session_id}")
+        }
+        resolved_push_url = proxied
+      }
+      None => {
+        // Fallback: peer discovery via relay signaling
+        let preferred_sender = match
+          push_normalize_optional_value(relay_preferred_sender_opt) {
+          Some(value) => Some(value)
+          None => push_relay_preferred_sender()
+        }
+        let preferred_repo = match
+          push_normalize_optional_value(relay_preferred_repo_opt) {
+          Some(value) => Some(value)
+          None => push_relay_preferred_repo()
+        }
+        let (relay_sender, relay_push_url) = resolve_push_remote_via_relay(
+          resolved_push_url,
+          preferred_sender~,
+          preferred_repo~,
+        )
+        if not(quiet) && not(porcelain) {
+          print_line("Relay peer selected: \{relay_sender} -> \{relay_push_url}")
+        }
+        resolved_push_url = relay_push_url
+      }
     }
-    let preferred_repo = match
-      push_normalize_optional_value(relay_preferred_repo_opt) {
-      Some(value) => Some(value)
-      None => push_relay_preferred_repo()
-    }
-    let (relay_sender, relay_push_url) = resolve_push_remote_via_relay(
-      resolved_push_url,
-      preferred_sender~,
-      preferred_repo~,
-    )
-    if not(quiet) && not(porcelain) {
-      print_line("Relay peer selected: \{relay_sender} -> \{relay_push_url}")
-    }
-    resolved_push_url = relay_push_url
   }
   let rewrite_rules = read_url_rewrite_rules(fs, git_dir)
   let has_explicit_pushurl = match remote_configs.get(remote_name) {
@@ -1445,6 +1458,49 @@ fn push_remote_uses_relay_signaling(remote_url : String) -> Bool {
   remote_url.has_prefix("relay+http://") ||
   remote_url.has_prefix("relay+https://") ||
   remote_url.has_prefix("relay://")
+}
+
+///|
+fn push_is_session_id_char(c : Char) -> Bool {
+  (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')
+}
+
+///|
+/// Detect relay session URL: relay+https://host/<session_id>
+/// Returns (base_http_url, session_id) if the URL contains a valid session ID
+fn push_detect_relay_session(
+  remote_url : String,
+) -> (String, String)? {
+  let base_url = if remote_url.has_prefix("relay+http://") ||
+    remote_url.has_prefix("relay+https://") {
+    String::unsafe_substring(remote_url, start=6, end=remote_url.length())
+  } else if remote_url.has_prefix("relay://") {
+    "http://" +
+    String::unsafe_substring(remote_url, start=8, end=remote_url.length())
+  } else {
+    return None
+  }
+  let normalized = if base_url.has_suffix("/") {
+    String::unsafe_substring(base_url, start=0, end=base_url.length() - 1)
+  } else {
+    base_url
+  }
+  guard normalized.rev_find("/") is Some(slash_idx) else { return None }
+  let segment = String::unsafe_substring(
+    normalized,
+    start=slash_idx + 1,
+    end=normalized.length(),
+  )
+  if segment.length() < 6 || segment.length() > 16 {
+    return None
+  }
+  for c in segment {
+    if not(push_is_session_id_char(c)) {
+      return None
+    }
+  }
+  let base = String::unsafe_substring(normalized, start=0, end=slash_idx)
+  Some((base, segment))
 }
 
 ///|

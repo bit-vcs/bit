@@ -1,12 +1,14 @@
 ///|
 fn print_hub_serve_usage() -> Unit {
-  println("Usage: bit hub serve [<relay-url>] [--repo <name>]")
+  println("Usage: bit hub serve [<relay-url>] [--repo <name>] [--allow-push] [--broadcast]")
   println("")
   println("Serve the current repository via relay for remote cloning.")
   println("The relay URL should use relay+https:// or relay+http:// prefix.")
   println("")
   println("Options:")
   println("  --repo <name>    Repository name to advertise")
+  println("  --allow-push     Accept incoming push (receive-pack)")
+  println("  --broadcast      Broadcast feature notifications on push")
   println("  -h, --help       Show this help")
 }
 
@@ -14,18 +16,32 @@ fn print_hub_serve_usage() -> Unit {
 struct HubServeOptions {
   relay_url : String
   repo : String?
+  allow_push : Bool
+  broadcast : Bool
 }
 
 ///|
 fn parse_hub_serve_options(args : Array[String]) -> HubServeOptions? {
   let mut relay_url : String? = None
   let mut repo : String? = None
+  let mut allow_push = false
+  let mut broadcast = false
   let mut i = 0
   while i < args.length() {
     let arg = args[i]
     if arg == "-h" || arg == "--help" {
       print_hub_serve_usage()
       return None
+    }
+    if arg == "--allow-push" {
+      allow_push = true
+      i += 1
+      continue
+    }
+    if arg == "--broadcast" {
+      broadcast = true
+      i += 1
+      continue
     }
     if arg == "--repo" && i + 1 < args.length() {
       repo = Some(args[i + 1])
@@ -58,7 +74,7 @@ fn parse_hub_serve_options(args : Array[String]) -> HubServeOptions? {
         }
       }
   }
-  Some({ relay_url: url, repo })
+  Some({ relay_url: url, repo, allow_push, broadcast })
 }
 
 ///|
@@ -366,23 +382,108 @@ async fn serve_respond(
 }
 
 ///|
+///|
+fn serve_extract_query_param(path : String, param : String) -> String? {
+  let query_start = path.find("?")
+  guard query_start is Some(idx) else { return None }
+  let query = String::unsafe_substring(path, start=idx + 1, end=path.length())
+  let prefix = param + "="
+  for part_view in query.split("&") {
+    let part = part_view.to_string()
+    if part.has_prefix(prefix) {
+      return Some(
+        String::unsafe_substring(part, start=prefix.length(), end=part.length()),
+      )
+    }
+  }
+  None
+}
+
+///|
+/// Rewrite ref names for incoming push: refs/heads/X -> refs/relay/incoming/heads/X
+fn serve_rewrite_ref_incoming(refname : String) -> String {
+  if refname.has_prefix("refs/") {
+    let suffix = String::unsafe_substring(
+      refname,
+      start=5,
+      end=refname.length(),
+    )
+    "refs/relay/incoming/" + suffix
+  } else {
+    "refs/relay/incoming/" + refname
+  }
+}
+
+///|
 async fn serve_handle_git_request(
   repo_root : String,
   req : ServePollRequest,
+  allow_push~ : Bool = false,
 ) -> (Int, Map[String, String], Bytes) raise Error {
   let path = req.path
   if path.has_prefix("/info/refs") {
+    let service = serve_extract_query_param(path, "service")
+    match service {
+      Some("git-receive-pack") => {
+        if not(allow_push) {
+          let error_body = @encoding.encode(
+            @encoding.Encoding::UTF8,
+            "receive-pack not enabled",
+          )
+          return (403, {}, error_body)
+        }
+        let fs = OsFs::new()
+        let root = normalize_repo_root(repo_root)
+        let out = @bitlib.build_receive_pack_advertisement(fs, root)
+        let service_line = "# service=git-receive-pack\n"
+        let pkt_service = @protocol.pktline_encode(service_line)
+        let flush_bytes = @encoding.encode(@encoding.Encoding::UTF8, "0000")
+        let full_body = serve_concat_bytes([pkt_service, flush_bytes, out])
+        let headers : Map[String, String] = {
+          "Content-Type": "application/x-git-receive-pack-advertisement",
+        }
+        (200, headers, full_body)
+      }
+      _ => {
+        // Default: git-upload-pack
+        let fs = OsFs::new()
+        let root = normalize_repo_root(repo_root)
+        let out = @bitlib.build_upload_pack_advertisement(fs, root)
+        let service_line = "# service=git-upload-pack\n"
+        let pkt_service = @protocol.pktline_encode(service_line)
+        let flush_bytes = @encoding.encode(@encoding.Encoding::UTF8, "0000")
+        let full_body = serve_concat_bytes([pkt_service, flush_bytes, out])
+        let headers : Map[String, String] = {
+          "Content-Type": "application/x-git-upload-pack-advertisement",
+        }
+        (200, headers, full_body)
+      }
+    }
+  } else if path.has_prefix("/git-receive-pack") {
+    if not(allow_push) {
+      let error_body = @encoding.encode(
+        @encoding.Encoding::UTF8,
+        "receive-pack not enabled",
+      )
+      return (403, {}, error_body)
+    }
+    let input_bytes = match req.body_base64 {
+      Some(b64) => serve_base64_decode(b64)
+      None => Bytes::new(0)
+    }
     let fs = OsFs::new()
     let root = normalize_repo_root(repo_root)
-    let out = @bitlib.build_upload_pack_advertisement(fs, root)
-    let service_line = "# service=git-upload-pack\n"
-    let pkt_service = @protocol.pktline_encode(service_line)
-    let flush_bytes = @encoding.encode(@encoding.Encoding::UTF8, "0000")
-    let full_body = serve_concat_bytes([pkt_service, flush_bytes, out])
+    // Rewrite ref names in the raw protocol data to refs/relay/incoming/ namespace
+    let (rewritten_bytes, original_refnames) = serve_rewrite_receive_pack_refs(
+      input_bytes,
+    )
+    let out = @bitlib.receive_pack(fs, fs, root, rewritten_bytes)
+    // Rewrite status response: translate rewritten refs back to original names
+    let final_out = serve_rewrite_status_response(out, original_refnames)
     let headers : Map[String, String] = {
-      "Content-Type": "application/x-git-upload-pack-advertisement",
+      "Content-Type": "application/x-git-receive-pack-result",
     }
-    (200, headers, full_body)
+    (200, headers, final_out)
   } else if path.has_prefix("/git-upload-pack") {
     let input_bytes = match req.body_base64 {
       Some(b64) => serve_base64_decode(b64)
@@ -413,6 +514,210 @@ async fn serve_handle_git_request(
 }
 
 ///|
+/// Rewrite ref names in raw receive-pack protocol data.
+/// Returns (rewritten_bytes, mapping from rewritten -> original ref names)
+fn serve_rewrite_receive_pack_refs(
+  data : Bytes,
+) -> (Bytes, Map[String, String]) {
+  let rewrite_map : Map[String, String] = {}
+  // Parse pkt-lines up to the flush, rewrite ref names, then append remaining pack data
+  let out : Array[Byte] = []
+  let mut i = 0
+  let mut first = true
+  // Parse command lines
+  while i + 4 <= data.length() {
+    let len = serve_parse_pkt_len(data, i)
+    if len == 0 {
+      // flush packet
+      out.push(b'0')
+      out.push(b'0')
+      out.push(b'0')
+      out.push(b'0')
+      i += 4
+      break
+    }
+    if len < 4 || i + len > data.length() {
+      break
+    }
+    let line_start = i + 4
+    let line_end = i + len
+    let line = serve_bytes_to_string(data, line_start, line_end)
+    let trimmed = if line.has_suffix("\n") {
+      String::unsafe_substring(line, start=0, end=line.length() - 1)
+    } else {
+      line
+    }
+    // Split capabilities on first line
+    let (command_part, caps_part) = if first {
+      first = false
+      match trimmed.find("\u0000") {
+        Some(idx) => {
+          let cmd = String::unsafe_substring(trimmed, start=0, end=idx)
+          let caps = String::unsafe_substring(
+            trimmed,
+            start=idx,
+            end=trimmed.length(),
+          )
+          (cmd, caps)
+        }
+        None => (trimmed, "")
+      }
+    } else {
+      (trimmed, "")
+    }
+    // Parse: old_id new_id refname
+    let parts = serve_split_spaces(command_part)
+    let rewritten_line = if parts.length() >= 3 {
+      let original_ref = parts[2]
+      let rewritten_ref = serve_rewrite_ref_incoming(original_ref)
+      rewrite_map[rewritten_ref] = original_ref
+      parts[0] + " " + parts[1] + " " + rewritten_ref + caps_part + "\n"
+    } else {
+      line
+    }
+    // Encode as pkt-line
+    let pkt = @protocol.pktline_encode(rewritten_line)
+    for b in pkt {
+      out.push(b)
+    }
+    i += len
+  }
+  // Copy remaining pack data verbatim
+  while i < data.length() {
+    out.push(data[i])
+    i += 1
+  }
+  let result = Bytes::from_array(
+    FixedArray::makei(out.length(), fn(idx) { out[idx] }),
+  )
+  (result, rewrite_map)
+}
+
+///|
+/// Rewrite status response bytes: replace rewritten ref names with originals
+fn serve_rewrite_status_response(
+  data : Bytes,
+  rewrite_map : Map[String, String],
+) -> Bytes {
+  if rewrite_map.length() == 0 {
+    return data
+  }
+  let out : Array[Byte] = []
+  let mut i = 0
+  while i + 4 <= data.length() {
+    let len = serve_parse_pkt_len(data, i)
+    if len == 0 {
+      // flush packet
+      out.push(b'0')
+      out.push(b'0')
+      out.push(b'0')
+      out.push(b'0')
+      i += 4
+      continue
+    }
+    if len < 4 || i + len > data.length() {
+      break
+    }
+    let line = serve_bytes_to_string(data, i + 4, i + len)
+    // Check for "ok refname\n" or "ng refname msg\n"
+    let rewritten_line = if line.has_prefix("ok ") {
+      let refname = if line.has_suffix("\n") {
+        String::unsafe_substring(line, start=3, end=line.length() - 1)
+      } else {
+        String::unsafe_substring(line, start=3, end=line.length())
+      }
+      match rewrite_map.get(refname) {
+        Some(orig) => "ok \{orig}\n"
+        None => line
+      }
+    } else if line.has_prefix("ng ") {
+      let rest = String::unsafe_substring(line, start=3, end=line.length())
+      let trimmed_rest = if rest.has_suffix("\n") {
+        String::unsafe_substring(rest, start=0, end=rest.length() - 1)
+      } else {
+        rest
+      }
+      match trimmed_rest.find(" ") {
+        Some(sp) => {
+          let refname = String::unsafe_substring(
+            trimmed_rest,
+            start=0,
+            end=sp,
+          )
+          let msg = String::unsafe_substring(
+            trimmed_rest,
+            start=sp + 1,
+            end=trimmed_rest.length(),
+          )
+          match rewrite_map.get(refname) {
+            Some(orig) => "ng \{orig} \{msg}\n"
+            None => line
+          }
+        }
+        None => line
+      }
+    } else {
+      line
+    }
+    let pkt = @protocol.pktline_encode(rewritten_line)
+    for b in pkt {
+      out.push(b)
+    }
+    i += len
+  }
+  Bytes::from_array(FixedArray::makei(out.length(), fn(idx) { out[idx] }))
+}
+
+///|
+fn serve_parse_pkt_len(data : Bytes, start : Int) -> Int {
+  if start + 4 > data.length() {
+    return 0
+  }
+  let mut v = 0
+  for j in 0..<4 {
+    let c = data[start + j].to_int()
+    let digit = if c >= 0x30 && c <= 0x39 {
+      c - 0x30
+    } else if c >= 0x61 && c <= 0x66 {
+      c - 0x61 + 10
+    } else if c >= 0x41 && c <= 0x46 {
+      c - 0x41 + 10
+    } else {
+      return 0
+    }
+    v = v * 16 + digit
+  }
+  v
+}
+
+///|
+fn serve_bytes_to_string(data : Bytes, start : Int, end : Int) -> String {
+  let buf = StringBuilder::new()
+  let mut i = start
+  while i < end {
+    buf.write_char(data[i].to_int().unsafe_to_char())
+    i += 1
+  }
+  buf.to_string()
+}
+
+///|
+fn serve_split_spaces(s : String) -> Array[String] {
+  let out : Array[String] = []
+  let buf = StringBuilder::new()
+  for c in s {
+    if c == ' ' {
+      out.push(buf.to_string())
+      buf.reset()
+    } else {
+      buf.write_char(c)
+    }
+  }
+  out.push(buf.to_string())
+  out
+}
+
+///|
 async fn handle_hub_serve(args : Array[String]) -> Unit raise Error {
   guard parse_hub_serve_options(args) is Some(options) else { return }
   guard serve_parse_relay_base_url(options.relay_url) is Some(base_url) else {
@@ -426,7 +731,13 @@ async fn handle_hub_serve(args : Array[String]) -> Unit raise Error {
   let session_id = serve_register_session(base_url)
   print_line("Session registered: \{session_id}")
   print_line("Clone URL: \{options.relay_url}/\{session_id}")
-  print_line("Waiting for clone requests... (Ctrl-C to stop)")
+  if options.allow_push {
+    print_line("Push enabled: incoming pushes will be stored in refs/relay/incoming/")
+  }
+  if options.broadcast {
+    print_line("Broadcast enabled: feature notifications will be sent on push")
+  }
+  print_line("Waiting for requests... (Ctrl-C to stop)")
   while true {
     let requests = serve_poll(base_url, session_id, 30) catch {
       err => {
@@ -442,6 +753,7 @@ async fn handle_hub_serve(args : Array[String]) -> Unit raise Error {
       let (status, response_headers, body) = serve_handle_git_request(
         repo_root,
         req,
+        allow_push=options.allow_push,
       ) catch {
         err => {
           eprint_line("Error handling request \{req.request_id}: \{err}")
@@ -450,6 +762,16 @@ async fn handle_hub_serve(args : Array[String]) -> Unit raise Error {
             "internal server error",
           )
           (500, {}, error_body)
+        }
+      }
+      // Broadcast feature notification on successful receive-pack
+      if options.broadcast &&
+        req.path.has_prefix("/git-receive-pack") &&
+        status == 200 {
+        serve_broadcast_push_notification(
+          base_url, session_id, repo_root, req.path,
+        ) catch {
+          err => eprint_line("Broadcast error: \{err}")
         }
       }
       let body_b64 = serve_base64_encode(body)
@@ -469,5 +791,66 @@ async fn handle_hub_serve(args : Array[String]) -> Unit raise Error {
         }
       }
     }
+  }
+}
+
+///|
+/// Broadcast a push notification to the relay room
+async fn serve_broadcast_push_notification(
+  base_url : String,
+  session_id : String,
+  repo_root : String,
+  _path : String,
+) -> Unit raise Error {
+  // Collect incoming refs that were just updated
+  let fs = OsFs::new()
+  let root = normalize_repo_root(repo_root)
+  let git_dir = root + "/.git"
+  let incoming_dir = git_dir + "/refs/relay/incoming/heads"
+  if not(fs.is_dir(incoming_dir)) {
+    return
+  }
+  // Build broadcast payload with incoming refs
+  let refs = @bitrepo.show_ref(fs, git_dir)
+  let incoming_refs : Array[(String, String)] = []
+  for item in refs {
+    let (refname, id) = item
+    if refname.has_prefix("refs/relay/incoming/") {
+      incoming_refs.push((refname, id.to_hex()))
+    }
+  }
+  if incoming_refs.length() == 0 {
+    return
+  }
+  // Publish broadcast to relay
+  let payload_obj : Map[String, Json] = {}
+  payload_obj["type"] = Json::string("feature-broadcast")
+  payload_obj["session_id"] = Json::string(session_id)
+  let refs_arr : Array[Json] = []
+  for item in incoming_refs {
+    let (refname, hex) = item
+    let ref_obj : Map[String, Json] = {}
+    ref_obj["ref"] = Json::string(refname)
+    ref_obj["commit"] = Json::string(hex)
+    refs_arr.push(Json::object(ref_obj))
+  }
+  payload_obj["refs"] = Json::array(refs_arr)
+  let payload = Json::object(payload_obj)
+  let payload_text = payload.stringify()
+  let payload_bytes = @encoding.encode(@encoding.Encoding::UTF8, payload_text)
+  let room = "serve-\{session_id}"
+  let event_id = session_id + "-push-" +
+    @bitcore.sha1(payload_bytes).to_hex()
+  let url = "\{base_url}/api/v1/publish?room=\{room}&sender=\{session_id}&topic=notify&id=\{event_id}"
+  let headers : Map[String, String] = {
+    "Content-Type": "application/octet-stream",
+  }
+  let (response, _body) = @bitnative.native_http_post(url, payload_bytes, headers)
+  if response.code == 200 {
+    print_line("[\{session_id}] Broadcast: feature push notification sent")
+  } else {
+    eprint_line(
+      "[\{session_id}] Broadcast warning: HTTP \{response.code}",
+    )
   }
 }

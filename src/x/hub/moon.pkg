@@ -3,6 +3,7 @@ import {
   "mizchi/bit/lib" @lib,
   "moonbitlang/core/json" @json,
   "moonbitlang/core/encoding/utf8" @utf8,
+  "moonbitlang/core/strconv" @strconv,
 }
 
 import {
