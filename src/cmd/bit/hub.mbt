@@ -130,6 +130,7 @@ fn print_hub_usage() -> Unit {
   println("  note          Manage notes")
   println("  sync          Sync hub refs with remotes")
   println("  dump          Dump raw hub records from notes")
+  println("  serve         Serve repository via relay for remote cloning")
   println("  search        Search hub entities")
   println("  help          Show this help")
   println("")
@@ -1032,6 +1033,7 @@ async fn handle_hub(args : Array[String]) -> Unit raise Error {
     "sync" => handle_hub_sync(rest)
     "dump" => handle_hub_dump(rest)
     "search" => handle_hub_search(rest)
+    "serve" => handle_hub_serve(rest)
     _ => {
       eprint_line("bit hub: unknown subcommand '\{subcmd}'")
       print_hub_usage()

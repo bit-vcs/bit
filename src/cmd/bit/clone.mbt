@@ -232,24 +232,34 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
   }
   let mut remote_url = initial_remote_url
   if clone_remote_uses_relay_signaling(remote_url) {
-    let preferred_sender = match
-      clone_normalize_optional_value(relay_preferred_sender_opt) {
-      Some(value) => Some(value)
-      None => clone_relay_preferred_sender()
+    match clone_detect_relay_session(remote_url) {
+      Some((base_url, session_id)) => {
+        let proxied = base_url + "/git/" + session_id
+        print_line("Cloning via relay session: \{session_id}")
+        remote_url = proxied
+        url = Some(proxied)
+      }
+      None => {
+        let preferred_sender = match
+          clone_normalize_optional_value(relay_preferred_sender_opt) {
+          Some(value) => Some(value)
+          None => clone_relay_preferred_sender()
+        }
+        let preferred_repo = match
+          clone_normalize_optional_value(relay_preferred_repo_opt) {
+          Some(value) => Some(value)
+          None => clone_relay_preferred_repo()
+        }
+        let (relay_sender, relay_clone_url) = resolve_clone_remote_via_relay(
+          remote_url,
+          preferred_sender~,
+          preferred_repo~,
+        )
+        print_line("Relay peer selected: \{relay_sender} -> \{relay_clone_url}")
+        remote_url = relay_clone_url
+        url = Some(relay_clone_url)
+      }
     }
-    let preferred_repo = match
-      clone_normalize_optional_value(relay_preferred_repo_opt) {
-      Some(value) => Some(value)
-      None => clone_relay_preferred_repo()
-    }
-    let (relay_sender, relay_clone_url) = resolve_clone_remote_via_relay(
-      remote_url,
-      preferred_sender~,
-      preferred_repo~,
-    )
-    print_line("Relay peer selected: \{relay_sender} -> \{relay_clone_url}")
-    remote_url = relay_clone_url
-    url = Some(relay_clone_url)
   }
   let config_overrides = @bitlib.parse_config_overrides()
   let protocol_version = match config_overrides.get("protocol.version") {
@@ -744,6 +754,56 @@ fn clone_remote_uses_relay_signaling(remote_url : String) -> Bool {
   remote_url.has_prefix("relay+http://") ||
   remote_url.has_prefix("relay+https://") ||
   remote_url.has_prefix("relay://")
+}
+
+///|
+fn clone_is_session_id_char(c : Char) -> Bool {
+  (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')
+}
+
+///|
+fn clone_detect_relay_session(
+  remote_url : String,
+) -> (String, String)? {
+  // Parse relay URL to get base URL, then check if the last path segment
+  // is a 6-16 character alphanumeric session ID.
+  let base_url = if remote_url.has_prefix("relay+http://") ||
+    remote_url.has_prefix("relay+https://") {
+    String::unsafe_substring(remote_url, start=6, end=remote_url.length())
+  } else if remote_url.has_prefix("relay://") {
+    "http://" +
+    String::unsafe_substring(remote_url, start=8, end=remote_url.length())
+  } else {
+    return None
+  }
+  // Remove trailing slash
+  let normalized = if base_url.has_suffix("/") {
+    String::unsafe_substring(base_url, start=0, end=base_url.length() - 1)
+  } else {
+    base_url
+  }
+  // Extract last path segment
+  guard normalized.rev_find("/") is Some(slash_idx) else { return None }
+  let segment = String::unsafe_substring(
+    normalized,
+    start=slash_idx + 1,
+    end=normalized.length(),
+  )
+  // Validate: 6-16 alphanumeric characters
+  if segment.length() < 6 || segment.length() > 16 {
+    return None
+  }
+  for c in segment {
+    if not(clone_is_session_id_char(c)) {
+      return None
+    }
+  }
+  let base = String::unsafe_substring(
+    normalized,
+    start=0,
+    end=slash_idx,
+  )
+  Some((base, segment))
 }
 
 ///|
