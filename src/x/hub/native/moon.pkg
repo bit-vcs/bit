@@ -6,6 +6,10 @@ import {
   "mizchi/bit/lib" @lib,
   "mizchi/bit/x/hub" @hub,
   "moonbitlang/async" @async,
+  "moonbitlang/async/process" @process,
+  "moonbitlang/core/bench" @bench,
+  "moonbitlang/core/env" @env,
+  "moonbitlang/core/encoding/base64" @base64,
   "moonbitlang/core/encoding/utf8" @utf8,
   "moonbitlang/core/json" @json,
   "moonbitlang/x/sys" @sys,
@@ -17,6 +21,7 @@ warnings = "-29"
 options(
   targets: {
     "sync_native.mbt": [ "native" ],
+    "sync_native_bench_wbtest.mbt": [ "native" ],
     "sync_native_wbtest.mbt": [ "native" ],
   },
 )

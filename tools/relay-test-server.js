@@ -53,10 +53,15 @@ const server = http.createServer(async (req, res) => {
       writeJson(res, 400, { ok: false, error: `invalid json: ${String(err)}` });
       return;
     }
-    const payload =
-      bodyObj && typeof bodyObj.payload === 'object' && bodyObj.payload !== null
-        ? bodyObj.payload
-        : {};
+    const payload = (() => {
+      if (!bodyObj || typeof bodyObj !== 'object') {
+        return {};
+      }
+      if (typeof bodyObj.payload === 'object' && bodyObj.payload !== null) {
+        return bodyObj.payload;
+      }
+      return bodyObj;
+    })();
     const eventId = url.searchParams.get('id') || `msg-${autoId++}`;
     const room = url.searchParams.get('room') || 'main';
     const sender = url.searchParams.get('sender') || 'bit';

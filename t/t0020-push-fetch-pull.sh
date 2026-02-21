@@ -32,6 +32,23 @@ clone_work2() {
     )
 }
 
+make_named_origin_and_work() {
+    local name="$1"
+    local marker="$2"
+    git_cmd init "source_${name}" &&
+    (cd "source_${name}" &&
+        echo "$marker" > peer.txt &&
+        git_cmd add peer.txt &&
+        git_cmd commit -m "initial ${name}"
+    ) &&
+    git_cmd clone --bare "source_${name}" "origin-${name}.git" &&
+    rm -rf "source_${name}" &&
+    git_cmd clone "origin-${name}.git" "work-${name}" &&
+    (cd "work-${name}" &&
+        git_cmd remote set-url origin "file://$(cd .. && pwd)/origin-${name}.git"
+    )
+}
+
 setup_fake_ssh_command() {
     mkdir -p mock-bin &&
     cat > mock-bin/ssh <<'EOF' &&
@@ -56,6 +73,30 @@ exec sh -c "$cmd"
 EOF
     chmod +x mock-bin/ssh &&
     export PATH="$(pwd)/mock-bin:$PATH"
+}
+
+RELAY_PORT=""
+RELAY_PID=""
+
+start_relay_test_server() {
+    RELAY_PORT=$((12000 + RANDOM % 30000))
+    node "$PROJECT_ROOT/tools/relay-test-server.js" "$RELAY_PORT" > relay.log 2>&1 &
+    RELAY_PID=$!
+    sleep 1
+    kill -0 "$RELAY_PID"
+}
+
+stop_relay_test_server() {
+    if [ -n "$RELAY_PID" ]; then
+        kill "$RELAY_PID" 2>/dev/null || true
+        sleep 1
+        kill -9 "$RELAY_PID" 2>/dev/null || true
+        RELAY_PID=""
+    fi
+}
+
+relay_test_url() {
+    echo "relay+http://127.0.0.1:$RELAY_PORT"
 }
 
 # =============================================================================
@@ -364,7 +405,106 @@ test_expect_success 'pull updates working tree files' '
         git_cmd pull origin main &&
         content=$(cat file.txt) &&
         test "$content" = "new content"
-    )
+	    )
 '
+
+# =============================================================================
+# Group 4: relay clone/fetch/pull/push (2)
+# =============================================================================
+
+if ! command -v node >/dev/null 2>&1; then
+    test_skip "relay clone/push/fetch/pull roundtrip via clone-announce peer" "node not found"
+    test_skip "relay peer selection priority sender>repo>first works across clone/fetch/pull/push" "node not found"
+else
+test_expect_success "relay clone/push/fetch/pull roundtrip via clone-announce peer" '
+    make_origin_and_work &&
+    start_relay_test_server &&
+    trap "stop_relay_test_server" EXIT &&
+    relay_url=$(relay_test_url) &&
+    origin_clone_url="file://$(pwd)/origin.git" &&
+    (cd work &&
+        BIT_RELAY_SENDER=node-a git_cmd hub sync clone-announce \
+            "$relay_url" \
+            --url "$origin_clone_url" \
+            --repo relay-roundtrip
+    ) &&
+    git_cmd clone "$relay_url" relay-clone --relay-sender node-a --relay-repo relay-roundtrip &&
+    (cd relay-clone &&
+        echo "relay-change" > relay-change.txt &&
+        git_cmd add relay-change.txt &&
+        git_cmd commit -m "relay roundtrip commit" &&
+        git_cmd push "$relay_url" main --relay-sender node-a --relay-repo relay-roundtrip
+    ) &&
+    relay_head=$(git_cmd -C relay-clone rev-parse HEAD) &&
+    origin_head=$(git_cmd -C origin.git show-ref | awk '"'"'$2=="refs/heads/main" { print $1 }'"'"') &&
+    test "$relay_head" = "$origin_head" &&
+    (cd work &&
+        git_cmd fetch "$relay_url" --relay-sender node-a --relay-repo relay-roundtrip &&
+        fetched_head=$(git_cmd rev-parse refs/remotes/origin/main) &&
+        test "$fetched_head" = "$origin_head" &&
+        git_cmd pull "$relay_url" main --relay-sender node-a --relay-repo relay-roundtrip &&
+        test_file_exists relay-change.txt &&
+        git_cmd log --oneline | grep -q "relay roundtrip commit"
+    ) &&
+    stop_relay_test_server &&
+    trap - EXIT
+'
+
+test_expect_success "relay peer selection priority sender>repo>first works across clone/fetch/pull/push" '
+    make_named_origin_and_work a from-a &&
+    make_named_origin_and_work b from-b &&
+    start_relay_test_server &&
+    trap "stop_relay_test_server" EXIT &&
+    relay_url=$(relay_test_url) &&
+    root_dir=$(pwd) &&
+    origin_a_clone_url="file://$root_dir/origin-a.git" &&
+    origin_b_clone_url="file://$root_dir/origin-b.git" &&
+    (cd work-a &&
+        BIT_RELAY_SENDER=node-a git_cmd hub sync clone-announce \
+            "$relay_url" \
+            --url "$origin_a_clone_url" \
+            --repo repo-a
+    ) &&
+    (cd work-b &&
+        BIT_RELAY_SENDER=node-b git_cmd hub sync clone-announce \
+            "$relay_url" \
+            --url "$origin_b_clone_url" \
+            --repo repo-b
+    ) &&
+    git_cmd clone "$relay_url" client-sender --relay-sender node-a --relay-repo repo-b &&
+    test "$(cat client-sender/peer.txt)" = "from-a" &&
+    (cd client-sender &&
+        echo "sender-priority" > sender-priority.txt &&
+        git_cmd add sender-priority.txt &&
+        git_cmd commit -m "sender priority push" &&
+        git_cmd push "$relay_url" main --relay-sender node-a --relay-repo repo-b
+    ) &&
+    sender_head=$(git_cmd -C client-sender rev-parse HEAD) &&
+    origin_a_head=$(git_cmd -C origin-a.git rev-parse refs/heads/main) &&
+    origin_b_head=$(git_cmd -C origin-b.git rev-parse refs/heads/main) &&
+    test "$sender_head" = "$origin_a_head" &&
+    test "$sender_head" != "$origin_b_head" &&
+    git_cmd clone "$relay_url" client-repo --relay-sender node-z --relay-repo repo-b &&
+    test "$(cat client-repo/peer.txt)" = "from-b" &&
+    (cd work-b &&
+        echo "repo-fallback" > repo-fallback.txt &&
+        git_cmd add repo-fallback.txt &&
+        git_cmd commit -m "repo fallback update" &&
+        git_cmd push origin main
+    ) &&
+    expected_b_head=$(git_cmd -C origin-b.git rev-parse refs/heads/main) &&
+    (cd client-repo &&
+        git_cmd fetch "$relay_url" --relay-sender node-z --relay-repo repo-b &&
+        fetched_head=$(git_cmd rev-parse refs/remotes/origin/main) &&
+        test "$fetched_head" = "$expected_b_head" &&
+        git_cmd pull "$relay_url" main --relay-sender node-z --relay-repo repo-b &&
+        test_file_exists repo-fallback.txt
+    ) &&
+    git_cmd clone "$relay_url" client-first --relay-sender node-z --relay-repo repo-z &&
+    test "$(cat client-first/peer.txt)" = "from-a" &&
+    stop_relay_test_server &&
+    trap - EXIT
+'
+fi
 
 test_done

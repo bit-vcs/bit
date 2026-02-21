@@ -203,6 +203,47 @@ deleted 0
 - 認証・署名検証は未実装（`sig` は透過保存のみ）。
 - relay は unknown envelope/payload field をそのまま保持・返却する。
 
+## 10. Clone シグナリング（追加）
+
+`bit clone` のデータ転送は peer-to-peer で行い、relay は peer 発見だけを担う。
+
+- publish:
+  - `topic=notify`
+  - `payload.kind=bit.clone.announce.v1`
+  - `payload.clone_url=<smart-http endpoint>`
+  - `payload.repo=<optional repo label>`
+- poll:
+  - `GET /api/v1/poll` の `envelopes` から `payload.kind=bit.clone.announce.v1` を抽出
+  - 同一 `sender` の複数 announce は最後の 1 件を有効とする
+
+CLI:
+
+- `bit hub sync clone-announce [<remote-url>] --url <clone-url> [--repo <repo>]`
+- `bit hub sync clone-peers [<remote-url>] [--include-self]`
+- `bit clone relay+http(s)://<relay-host> [--relay-sender <sender>] [--relay-repo <repo>]` は `clone-peers` と同じ発見ロジックで peer を 1 件選んで clone する
+  - 既定は最初の peer
+  - `BIT_RELAY_CLONE_SENDER=<sender>` を設定するとその sender を優先
+  - `BIT_RELAY_CLONE_REPO=<repo>` または `--relay-repo` で repo 名一致 peer を優先（sender 指定があれば sender 優先）
+- `bit fetch relay+http(s)://<relay-host> [--relay-sender <sender>] [--relay-repo <repo>]` も同じ発見ロジックで peer を 1 件選んで fetch する
+  - `BIT_RELAY_FETCH_SENDER=<sender>` / `BIT_RELAY_FETCH_REPO=<repo>` で既定優先条件を指定できる
+- `bit pull relay+http(s)://<relay-host> [--relay-sender <sender>] [--relay-repo <repo>]` も同じ発見ロジックで peer を 1 件選んで pull する
+  - `BIT_RELAY_PULL_SENDER=<sender>` / `BIT_RELAY_PULL_REPO=<repo>` で既定優先条件を指定できる
+- `bit push relay+http(s)://<relay-host> [--relay-sender <sender>] [--relay-repo <repo>]` も同じ発見ロジックで peer を 1 件選んで push する
+  - `BIT_RELAY_PUSH_SENDER=<sender>` / `BIT_RELAY_PUSH_REPO=<repo>` で既定優先条件を指定できる
+
 ---
 
 この仕様は現行実装（`bit` と `bit-relay`）に合わせた draft であり、将来の topic 拡張や認証追加で更新される。
+
+## 11. ベンチマーク（k6）
+
+- シナリオ: `tools/relay-k6-scenario.js`
+- ローカル relay 起動付き実行:
+  - `bash tools/bench-relay-k6.sh`
+- 例（15秒、publish 120 req/s, poll 12 VU）:
+  - `K6_BENCH_DURATION=15s K6_PUBLISH_RATE=120 K6_POLL_VUS=12 bash tools/bench-relay-k6.sh`
+- 署名必須 relay（Cloudflare Worker など）で poll のみ測る場合:
+  - `RELAY_BASE_URL=https://bit-relay.mizchi.workers.dev K6_PUBLISH_RATE=0 K6_POLL_VUS=20 bash tools/bench-relay-k6.sh`
+- 署名必須 relay で publish も測る場合（ローカル signer 自動起動）:
+  - `RELAY_BASE_URL=https://bit-relay.mizchi.workers.dev RELAY_SIGN_PRIVATE_KEY_FILE=~/.config/bit/relay-ed25519.pem K6_PUBLISH_RATE=80 K6_POLL_VUS=8 bash tools/bench-relay-k6.sh`
+  - 必要に応じて `RELAY_SIGN_PUBLIC_KEY=<base64url>` で公開鍵を明示指定できる
