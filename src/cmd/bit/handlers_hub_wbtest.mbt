@@ -898,6 +898,18 @@ test "hub sync issue-url parser: missing --room-token value fails" {
 }
 
 ///|
+test "hub sync issue-url builder: adds slash before query at root remote" {
+  let url = build_hub_sync_issue_url({
+    remote_url: Some("relay+https://relay.example.com"),
+    room: Some("team-a"),
+    room_token: Some("token-1"),
+  })
+  assert_eq(
+    url, "relay+https://relay.example.com/?room=team-a&room_token=token-1",
+  )
+}
+
+///|
 test "hub notify: select_notify_records filters notify-only records" {
   let canonical = @hub.HubRecord::new(
     "hub/pr/1/meta", "pr", "canonical", "node-a", 1L,

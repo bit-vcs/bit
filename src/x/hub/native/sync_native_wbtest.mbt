@@ -393,8 +393,15 @@ async test "relay: relay push adds relay signature headers when key env is set" 
   assert_eq(seen_public_keys[0], "test-public-key")
   assert_eq(seen_signatures.length(), 1)
   assert_true(seen_signatures[0].length() > 0)
+  assert_false(seen_signatures[0].contains("+"))
+  assert_false(seen_signatures[0].contains("/"))
+  assert_false(seen_signatures[0].contains("="))
   assert_eq(seen_timestamps.length(), 1)
   assert_true(seen_timestamps[0].length() > 0)
+  let timestamp_sec = @strconv.parse_int64(seen_timestamps[0]) catch {
+    _ => fail("expected x-relay-timestamp to be int64")
+  }
+  assert_true(timestamp_sec >= 1_000_000_000L)
   assert_eq(seen_nonces.length(), 1)
   assert_true(seen_nonces[0].length() > 0)
 }

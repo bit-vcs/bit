@@ -255,6 +255,14 @@ fn relay_conflict_policy() -> @hub.RecordMergePolicy {
 }
 
 ///|
+extern "C" fn relay_native_time(ptr : Int) -> Int64 = "time"
+
+///|
+fn relay_unix_timestamp_sec() -> Int64 {
+  relay_native_time(0)
+}
+
+///|
 priv struct RelayHttpSigningConfig {
   private_key_file : String
   public_key : String
@@ -300,10 +308,19 @@ fn relay_sign_public_key() -> String? {
 
 ///|
 fn relay_base64_to_base64url(base64 : String) -> String {
-  base64
-  .replace(old="+", new="-")
-  .replace(old="/", new="_")
-  .replace(old="=", new="")
+  let out = StringBuilder::new()
+  for c in base64 {
+    if c == '+' {
+      out.write_char('-')
+    } else if c == '/' {
+      out.write_char('_')
+    } else if c == '=' {
+      ()
+    } else {
+      out.write_char(c)
+    }
+  }
+  out.to_string()
 }
 
 ///|
@@ -566,9 +583,9 @@ async fn relay_sign_publish_payload(
   match config {
     None => None
     Some(signing) => {
-      let now_ms = @env.now().to_int().to_int64()
-      let timestamp_sec = now_ms / 1000
-      let nonce = "\{now_ms}-\{id}"
+      let timestamp_sec = relay_unix_timestamp_sec()
+      let nonce_now = @env.now().to_int().to_int64()
+      let nonce = "\{timestamp_sec}-\{nonce_now}-\{id}"
       let payload_sha256 = relay_sha256_hex(relay_canonicalize_json(payload))
       let message = relay_build_publish_signing_message(
         sender, room, id, topic, timestamp_sec, nonce, payload_sha256,

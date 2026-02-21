@@ -261,7 +261,7 @@ fn print_hub_sync_usage() -> Unit {
   println("  - Relay explicit: relay+http(s)://host")
   println("  - Relay fallback: http(s)://host (when info/refs returns 404)")
   println(
-    "  - Shared signaling URL: relay+https://host?room=<room>&room_token=<token>",
+    "  - Shared signaling URL: relay+https://host/?room=<room>&room_token=<token>",
   )
   println("")
   println("Relay signing env:")
@@ -4130,7 +4130,7 @@ fn build_hub_sync_issue_url(
   } else {
     relay_base
   }
-  "\{relay_remote_url}?room=\{room}&room_token=\{room_token}"
+  "\{relay_remote_url}/?room=\{room}&room_token=\{room_token}"
 }
 
 ///|
