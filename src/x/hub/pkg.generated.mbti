@@ -12,6 +12,8 @@ pub fn canonical_work_item_record_kind() -> String
 
 pub fn classify_record_trigger(HubRecord) -> RecordTriggerClass
 
+pub fn compare_vector_clocks(Map[String, Int64], Map[String, Int64]) -> Int
+
 pub fn default_record_merge_policy() -> RecordMergePolicy
 
 pub fn find_remote_notes_ref(Array[(@object.ObjectId, String)]) -> (@object.ObjectId, String)
@@ -102,12 +104,14 @@ pub fn Hub::add_comment(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, St
 pub fn Hub::add_issue_comment(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, String, reply_to? : String?) -> IssueComment raise @object.GitError
 pub fn Hub::add_note(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, @object.ObjectId, String, String, Int64, ns? : String) -> Note raise @object.GitError
 pub fn Hub::add_note_plain(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, @object.ObjectId, String, ns? : String) -> Unit raise @object.GitError
+pub fn Hub::broadcast_feature(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, String, summary? : String, closes_issues? : Array[String], session_url? : String?) -> Unit raise @object.GitError
 pub fn Hub::can_merge(Self, &@lib.ObjectStore, &@lib.RefStore, String) -> Bool raise @object.GitError
 pub fn Hub::check_merge_policy(Self, &@lib.ObjectStore, &@lib.RefStore, String, PrMergePolicy, signing_key? : String?) -> Unit raise @object.GitError
 pub fn Hub::close_issue(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String) -> Unit raise @object.GitError
 pub fn Hub::close_pr(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String) -> Unit raise @object.GitError
 pub fn Hub::create_issue(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, String, labels? : Array[String], assignees? : Array[String]) -> Issue raise @object.GitError
 pub fn Hub::create_pr(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, String, String, String, source_repo? : String?, source_ref? : String?) -> PullRequest raise @object.GitError
+pub fn Hub::find_canonical_node(Self, &@lib.ObjectStore) -> String?
 pub fn Hub::get_issue(Self, &@lib.ObjectStore, String) -> Issue?
 pub fn Hub::get_note(Self, &@lib.ObjectStore, &@lib.RefStore, @object.ObjectId, ns? : String) -> Note? raise @object.GitError
 pub fn Hub::get_pr(Self, &@lib.ObjectStore, String) -> PullRequest?
@@ -119,8 +123,10 @@ pub fn Hub::init(&@lib.ObjectStore, &@lib.RefStore, node_id? : String, signing_k
 pub fn Hub::is_approved(Self, &@lib.ObjectStore, String) -> Bool
 pub fn Hub::link_pr_to_issue(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String) -> Unit raise @object.GitError
 pub fn Hub::list_comments(Self, &@lib.ObjectStore, String) -> Array[PrComment]
+pub fn Hub::list_feature_broadcasts(Self, &@lib.ObjectStore) -> Array[HubRecord]
 pub fn Hub::list_issue_comments(Self, &@lib.ObjectStore, String) -> Array[IssueComment]
 pub fn Hub::list_issues(Self, &@lib.ObjectStore, state? : IssueState?) -> Array[Issue]
+pub fn Hub::list_node_heartbeats(Self, &@lib.ObjectStore) -> Array[NodeHeartbeat]
 pub fn Hub::list_notes(Self, &@lib.ObjectStore, &@lib.RefStore, ns? : String) -> Array[Note] raise @object.GitError
 pub fn Hub::list_pr_proposals(Self, &@lib.ObjectStore) -> Array[PullRequest]
 pub fn Hub::list_pr_workflows(Self, &@lib.ObjectStore, String) -> Array[PrWorkflowResult]
@@ -129,7 +135,8 @@ pub fn Hub::list_reviews(Self, &@lib.ObjectStore, String) -> Array[PrReview]
 pub fn Hub::list_work_items(Self, &@lib.ObjectStore, state? : WorkItemState?, kind? : WorkItemKind?) -> Array[WorkItem]
 pub fn Hub::load(&@lib.ObjectStore, &@lib.RefStore, node_id? : String, signing_key? : String?, require_signed? : Bool) -> Self raise @object.GitError
 pub fn Hub::merge_pr(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, strategy? : PrMergeStrategy) -> PrMergeResult raise @object.GitError
-pub fn Hub::propose_pr(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, String, String, String, source_repo? : String?, source_ref? : String?) -> PullRequest raise @object.GitError
+pub fn Hub::propose_pr(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, String, String, String, source_repo? : String?, source_ref? : String?, closes_issues? : Array[String]) -> PullRequest raise @object.GitError
+pub fn Hub::publish_node_heartbeat(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, commit_count? : Int, main_tip? : String) -> Unit raise @object.GitError
 pub fn Hub::record_pr_workflow(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, PrWorkflowStatus, String, String, txn_id? : String?, summary? : String) -> PrWorkflowResult raise @object.GitError
 pub fn Hub::reload_store(Self, &@lib.ObjectStore, &@lib.RefStore) -> Unit raise @object.GitError
 pub fn Hub::remove_note(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, @object.ObjectId, ns? : String) -> Unit raise @object.GitError
@@ -228,6 +235,14 @@ pub fn IssueState::to_string(Self) -> String
 pub fn IssueState::to_work_item_state(Self) -> WorkItemState
 pub impl Eq for IssueState
 pub impl Show for IssueState
+
+pub struct NodeHeartbeat {
+  node_id : String
+  commit_count : Int
+  main_tip : String
+  timestamp : Int64
+  clock : Map[String, Int64]
+}
 
 pub struct Note {
   commit_id : @object.ObjectId

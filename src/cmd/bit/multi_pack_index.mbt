@@ -92,18 +92,6 @@ async fn handle_multi_pack_index(args : Array[String]) -> Unit raise Error {
   let incremental_chain_path = pack_dir +
     "/multi-pack-index.d/multi-pack-index-chain"
   let has_incremental_chain = fs.is_file(incremental_chain_path)
-  if subcommand == Some("write") && (incremental || has_incremental_chain) {
-    eprint_line(
-      "error: multi-pack-index write with incremental chain is not supported in standalone mode",
-    )
-    @sys.exit(1)
-  }
-  if subcommand == Some("verify") && has_incremental_chain {
-    eprint_line(
-      "error: multi-pack-index verify with incremental chain is not supported in standalone mode",
-    )
-    @sys.exit(1)
-  }
   match subcommand {
     Some("write") | Some("verify") =>
       if object_dir is None && not(fs.is_dir(git_dir)) {
@@ -120,11 +108,29 @@ async fn handle_multi_pack_index(args : Array[String]) -> Unit raise Error {
   }
   match subcommand {
     Some("write") =>
-      midx_write(
-        fs, effective_pack_dir, progress, preferred_pack, stdin_packs, bitmap, no_bitmap,
-        refs_snapshot,
-      )
-    Some("verify") => midx_verify(fs, effective_pack_dir, progress)
+      if incremental {
+        midx_write_incremental(
+          fs, effective_pack_dir, progress, preferred_pack, bitmap, refs_snapshot,
+        )
+      } else if has_incremental_chain {
+        // Chain collapse: rewrite monolithic MIDX from all packs
+        midx_write(
+          fs, effective_pack_dir, progress, preferred_pack, stdin_packs, bitmap,
+          no_bitmap, refs_snapshot,
+        )
+        midx_cleanup_incremental_dir(fs, effective_pack_dir)
+      } else {
+        midx_write(
+          fs, effective_pack_dir, progress, preferred_pack, stdin_packs, bitmap,
+          no_bitmap, refs_snapshot,
+        )
+      }
+    Some("verify") =>
+      if has_incremental_chain {
+        midx_verify_chain(fs, effective_pack_dir, progress)
+      } else {
+        midx_verify(fs, effective_pack_dir, progress)
+      }
     Some("expire") => midx_expire(fs, effective_pack_dir, progress)
     Some("repack") => midx_repack(fs, effective_pack_dir, batch_size, progress)
     _ => {
@@ -330,8 +336,8 @@ async fn midx_write(
     )
   } else if no_bitmap {
     midx_cleanup_bitmap_files(fs, pack_dir)
+    midx_cleanup_rev_files(fs, pack_dir)
   }
-  midx_cleanup_rev_files(fs, pack_dir)
   if progress {
     eprint_line(
       "Wrote multi-pack-index with " +
@@ -1477,6 +1483,12 @@ async fn midx_write_bitmap(
     bitmap_path,
     Bytes::from_array(FixedArray::makei(out.length(), i => out[i])),
   )
+  // Write .rev file if GIT_TEST_MIDX_WRITE_REV=1
+  if midx_should_write_rev() {
+    let rev_path = pack_dir + "/multi-pack-index-" + checksum_hex + ".rev"
+    midx_cleanup_rev_files(fs, pack_dir)
+    midx_write_rev_file(fs, rev_path, pack_pos_to_midx, checksum)
+  }
 }
 
 ///|
@@ -2532,6 +2544,581 @@ fn midx_bytes_to_string(data : Bytes, start : Int, end : Int) -> String {
     chars.push(Int::unsafe_to_char(data[i].to_int()))
   }
   String::from_array(chars)
+}
+
+///|
+fn midx_read_chain_hashes(fs : OsFs, pack_dir : String) -> Array[String] {
+  let chain_path = pack_dir + "/multi-pack-index.d/multi-pack-index-chain"
+  let data = fs.read_file(chain_path) catch { _ => return [] }
+  let text = midx_bytes_to_string(data, 0, data.length())
+  let out : Array[String] = []
+  for raw_line in text.split("\n") {
+    let line = raw_line.to_string().trim().to_string()
+    if line.length() > 0 {
+      out.push(line)
+    }
+  }
+  out
+}
+
+///|
+fn midx_read_packs_from_midx_data(data : Bytes) -> Array[String] {
+  let out : Array[String] = []
+  if data.length() < 12 {
+    return out
+  }
+  let num_packs = midx_read_u32(data, 8)
+  if num_packs <= 0 {
+    return out
+  }
+  let num_chunks = data[6].to_int()
+  let pnam_offset = midx_find_chunk(data, num_chunks, "PNAM")
+  let pnam_end = midx_find_chunk_end(data, num_chunks, "PNAM")
+  if pnam_offset <= 0 || pnam_end <= pnam_offset {
+    return out
+  }
+  let mut start = pnam_offset
+  for _ in 0..<num_packs {
+    if start >= pnam_end {
+      return out
+    }
+    let mut end = start
+    while end < pnam_end && data[end] != b'\x00' {
+      end += 1
+    }
+    if end >= pnam_end {
+      return out
+    }
+    let idx_name = midx_bytes_to_string(data, start, end)
+    out.push(midx_pack_name_from_pnam(idx_name))
+    start = end + 1
+  }
+  out
+}
+
+///|
+fn midx_read_oids_from_midx_data(data : Bytes) -> Map[String, Bool] {
+  let out : Map[String, Bool] = {}
+  if data.length() < 12 {
+    return out
+  }
+  let num_chunks = data[6].to_int()
+  let oidf_offset = midx_find_chunk(data, num_chunks, "OIDF")
+  let oidf_end = midx_find_chunk_end(data, num_chunks, "OIDF")
+  if oidf_offset <= 0 || oidf_end - oidf_offset != 256 * 4 {
+    return out
+  }
+  let object_count = midx_read_u32(data, oidf_offset + 255 * 4)
+  if object_count <= 0 {
+    return out
+  }
+  let oidl_offset = midx_find_chunk(data, num_chunks, "OIDL")
+  if oidl_offset <= 0 {
+    return out
+  }
+  for i in 0..<object_count {
+    let oid = @bitcore.ObjectId::new(
+      FixedArray::makei(20, j => data[oidl_offset + i * 20 + j]),
+    )
+    out[oid.to_hex()] = true
+  }
+  out
+}
+
+///|
+fn midx_write_chain_file(
+  fs : OsFs,
+  pack_dir : String,
+  hashes : Array[String],
+) -> Unit {
+  let chain_path = pack_dir + "/multi-pack-index.d/multi-pack-index-chain"
+  let mut content = ""
+  for hash in hashes {
+    content = content + hash + "\n"
+  }
+  fs.write_string(chain_path, content) catch {
+    _ => ()
+  }
+}
+
+///|
+fn midx_cleanup_incremental_dir(fs : OsFs, pack_dir : String) -> Unit {
+  let dir = pack_dir + "/multi-pack-index.d"
+  let entries = fs.readdir(dir) catch { _ => return }
+  for entry in entries {
+    fs.remove_file(dir + "/" + entry) catch {
+      _ => ()
+    }
+  }
+}
+
+///|
+fn midx_write_rev_file(
+  fs : OsFs,
+  rev_path : String,
+  ridx_positions : Array[Int],
+  midx_checksum_bytes : FixedArray[Byte],
+) -> Unit {
+  let out : Array[Byte] = []
+  // RIDX signature
+  out.push(b'R')
+  out.push(b'I')
+  out.push(b'D')
+  out.push(b'X')
+  // version = 1
+  midx_push_u32(out, 1)
+  // oid version = 1
+  midx_push_u32(out, 1)
+  // positions
+  for pos in ridx_positions {
+    midx_push_u32(out, pos)
+  }
+  // midx checksum (20 bytes)
+  for b in midx_checksum_bytes {
+    out.push(b)
+  }
+  // file checksum
+  let body = Bytes::from_array(FixedArray::makei(out.length(), i => out[i]))
+  let checksum = @bitcore.sha1(body)
+  for b in checksum.bytes {
+    out.push(b)
+  }
+  fs.write_file(
+    rev_path,
+    Bytes::from_array(FixedArray::makei(out.length(), i => out[i])),
+  ) catch {
+    _ => ()
+  }
+}
+
+///|
+fn midx_should_write_rev() -> Bool {
+  match @sys.get_env_var("GIT_TEST_MIDX_WRITE_REV") {
+    Some(value) => {
+      let v = value.trim().to_string()
+      v == "1" || v.to_lower() == "true"
+    }
+    None => false
+  }
+}
+
+///|
+fn midx_relink_monolithic_to_chain(fs : OsFs, pack_dir : String) -> String {
+  let midx_path = pack_dir + "/multi-pack-index"
+  let data = fs.read_file(midx_path) catch { _ => return "" }
+  if data.length() < 20 {
+    return ""
+  }
+  let hash = midx_checksum_hex(data)
+  if hash.length() == 0 {
+    return ""
+  }
+  let inc_dir = pack_dir + "/multi-pack-index.d"
+  ensure_dir(inc_dir) catch {
+    _ => ()
+  }
+  let dest = inc_dir + "/multi-pack-index-" + hash + ".midx"
+  fs.write_file(dest, data) catch {
+    _ => return ""
+  }
+  // Copy bitmap if exists
+  let bmp_src = pack_dir + "/multi-pack-index-" + hash + ".bitmap"
+  let bmp_data = fs.read_file(bmp_src) catch { _ => Bytes::new(0) }
+  if bmp_data.length() > 0 {
+    let bmp_dest = inc_dir + "/multi-pack-index-" + hash + ".bitmap"
+    fs.write_file(bmp_dest, bmp_data) catch {
+      _ => ()
+    }
+  }
+  // Copy rev if exists
+  let rev_src = pack_dir + "/multi-pack-index-" + hash + ".rev"
+  let rev_data = fs.read_file(rev_src) catch { _ => Bytes::new(0) }
+  if rev_data.length() > 0 {
+    let rev_dest = inc_dir + "/multi-pack-index-" + hash + ".rev"
+    fs.write_file(rev_dest, rev_data) catch {
+      _ => ()
+    }
+  }
+  // Remove monolithic files
+  fs.remove_file(midx_path) catch {
+    _ => ()
+  }
+  fs.remove_file(bmp_src) catch {
+    _ => ()
+  }
+  fs.remove_file(rev_src) catch {
+    _ => ()
+  }
+  hash
+}
+
+///|
+async fn midx_write_incremental(
+  fs : OsFs,
+  pack_dir : String,
+  progress : Bool,
+  preferred_pack : String?,
+  bitmap : Bool,
+  refs_snapshot : String?,
+) -> Unit raise Error {
+  let inc_dir = pack_dir + "/multi-pack-index.d"
+  // Get existing chain hashes
+  let chain_hashes = midx_read_chain_hashes(fs, pack_dir)
+  let hashes : Array[String] = []
+  if chain_hashes.length() > 0 {
+    for h in chain_hashes {
+      hashes.push(h)
+    }
+  } else {
+    // No chain; check for monolithic MIDX
+    let midx_path = pack_dir + "/multi-pack-index"
+    if fs.is_file(midx_path) {
+      // Only relink if all referenced packs still exist
+      let mono_data = fs.read_file(midx_path) catch { _ => Bytes::new(0) }
+      let mono_packs = midx_read_packs_from_midx_data(mono_data)
+      let mut mono_valid = mono_packs.length() > 0
+      for mp in mono_packs {
+        if not(fs.is_file(pack_dir + "/" + mp)) {
+          mono_valid = false
+          break
+        }
+      }
+      if mono_valid {
+        let relinked_hash = midx_relink_monolithic_to_chain(fs, pack_dir)
+        if relinked_hash.length() > 0 {
+          hashes.push(relinked_hash)
+        }
+      } else {
+        // Monolithic MIDX references missing packs; remove it
+        fs.remove_file(midx_path) catch {
+          _ => ()
+        }
+      }
+    }
+  }
+  // Build set of known packs from existing layers
+  let known_packs : Map[String, Bool] = {}
+  let existing_oids : Map[String, Bool] = {}
+  for hash in hashes {
+    let layer_path = inc_dir + "/multi-pack-index-" + hash + ".midx"
+    let layer_data = fs.read_file(layer_path) catch { _ => continue }
+    let packs = midx_read_packs_from_midx_data(layer_data)
+    for pack_name in packs {
+      known_packs[pack_name] = true
+    }
+    let oids = midx_read_oids_from_midx_data(layer_data)
+    for oid, _ in oids {
+      existing_oids[oid] = true
+    }
+  }
+  // Find new packs
+  let all_packs = midx_find_pack_files(fs, pack_dir)
+  let new_packs : Array[String] = []
+  for pack_name in all_packs {
+    if not(known_packs.contains(pack_name)) {
+      new_packs.push(pack_name)
+    }
+  }
+  midx_sort_strings_lex_in_place(new_packs)
+  if new_packs.length() == 0 {
+    // Nothing new — still update chain file if we relinked
+    if hashes.length() > 0 && chain_hashes.length() == 0 {
+      ensure_dir(inc_dir) catch {
+        _ => ()
+      }
+      midx_write_chain_file(fs, pack_dir, hashes)
+    }
+    if progress {
+      eprint_line("No new packs to add to multi-pack-index")
+    }
+    return
+  }
+  let oid_version = midx_repo_oid_version(pack_dir)
+  let normalized_preferred = match preferred_pack {
+    Some(name) => {
+      let mut value = name
+      if value.has_suffix(".idx") {
+        let end = value.length() - 4
+        value = String::unsafe_substring(value, start=0, end~) + ".pack"
+      }
+      match value.rev_find("/") {
+        Some(idx) =>
+          String::unsafe_substring(value, start=idx + 1, end=value.length())
+        None => value
+      }
+    }
+    None => ""
+  }
+  // Collect entries from new packs
+  let all_entries : Array[MidxEntry] = []
+  let mut preferred_pack_idx : Int? = None
+  for pack_idx, pack_name in new_packs {
+    let idx_path = pack_dir +
+      "/" +
+      String::unsafe_substring(pack_name, start=0, end=pack_name.length() - 5) +
+      ".idx"
+    let pack_path = pack_dir + "/" + pack_name
+    if not(fs.is_file(idx_path)) || not(fs.is_file(pack_path)) {
+      continue
+    }
+    if normalized_preferred.length() > 0 && pack_name == normalized_preferred {
+      preferred_pack_idx = Some(pack_idx)
+    }
+    let entries = midx_read_pack_index(fs, idx_path, pack_idx, 0)
+    for entry in entries {
+      all_entries.push(entry)
+    }
+  }
+  // Sort and deduplicate entries
+  all_entries.sort_by(fn(a, b) {
+    let cmp = midx_compare_oid(a.id, b.id)
+    if cmp != 0 {
+      return cmp
+    }
+    a.pack_idx - b.pack_idx
+  })
+  let unique_entries : Array[MidxEntry] = []
+  let mut last_id : @bitcore.ObjectId? = None
+  for entry in all_entries {
+    match last_id {
+      Some(lid) if lid == entry.id => continue
+      _ =>
+        // Also skip OIDs already in existing layers
+        if not(existing_oids.contains(entry.id.to_hex())) {
+          unique_entries.push(entry)
+          last_id = Some(entry.id)
+        } else {
+          last_id = Some(entry.id)
+        }
+    }
+  }
+  // Build MIDX for new layer
+  let midx_bytes = midx_build(
+    new_packs, unique_entries, bitmap, oid_version, preferred_pack_idx,
+  )
+  let new_hash = midx_checksum_hex(midx_bytes)
+  ensure_dir(inc_dir) catch {
+    _ => ()
+  }
+  let midx_dest = inc_dir + "/multi-pack-index-" + new_hash + ".midx"
+  fs.write_file(midx_dest, midx_bytes)
+  // Write bitmap if requested
+  if bitmap {
+    // For incremental bitmap, we need ALL packs and ALL entries across all layers
+    let all_bitmap_packs : Array[String] = []
+    let all_bitmap_entries : Array[MidxEntry] = []
+    // Collect from existing layers
+    for hash in hashes {
+      let layer_path = inc_dir + "/multi-pack-index-" + hash + ".midx"
+      let layer_data = fs.read_file(layer_path) catch { _ => continue }
+      let layer_packs = midx_read_packs_from_midx_data(layer_data)
+      for lp in layer_packs {
+        if not(midx_array_has_string(all_bitmap_packs, lp)) {
+          all_bitmap_packs.push(lp)
+        }
+      }
+    }
+    // Add new packs
+    for np in new_packs {
+      if not(midx_array_has_string(all_bitmap_packs, np)) {
+        all_bitmap_packs.push(np)
+      }
+    }
+    midx_sort_strings_lex_in_place(all_bitmap_packs)
+    // Re-collect all entries with correct pack indices based on all_bitmap_packs
+    for pack_idx, pack_name in all_bitmap_packs {
+      let idx_path = pack_dir +
+        "/" +
+        String::unsafe_substring(pack_name, start=0, end=pack_name.length() - 5) +
+        ".idx"
+      if not(fs.is_file(idx_path)) {
+        continue
+      }
+      let entries = midx_read_pack_index(fs, idx_path, pack_idx, 0)
+      for entry in entries {
+        all_bitmap_entries.push(entry)
+      }
+    }
+    // Sort and deduplicate
+    all_bitmap_entries.sort_by(fn(a, b) {
+      let cmp = midx_compare_oid(a.id, b.id)
+      if cmp != 0 {
+        return cmp
+      }
+      a.pack_idx - b.pack_idx
+    })
+    let merged_entries : Array[MidxEntry] = []
+    let mut merge_last : @bitcore.ObjectId? = None
+    for entry in all_bitmap_entries {
+      match merge_last {
+        Some(lid) if lid == entry.id => continue
+        _ => {
+          merged_entries.push(entry)
+          merge_last = Some(entry.id)
+        }
+      }
+    }
+    // Build a full MIDX for bitmap generation (not written to disk)
+    let full_midx_bytes = midx_build(
+      all_bitmap_packs, merged_entries, true, oid_version, preferred_pack_idx,
+    )
+    midx_write_bitmap(
+      fs, pack_dir, all_bitmap_packs, merged_entries, full_midx_bytes, preferred_pack_idx,
+      refs_snapshot,
+    )
+    // Move bitmap from pack_dir to inc_dir using new layer hash
+    let bmp_checksum_hex = midx_checksum_hex(full_midx_bytes)
+    let bmp_src = pack_dir + "/multi-pack-index-" + bmp_checksum_hex + ".bitmap"
+    let bmp_dest = inc_dir + "/multi-pack-index-" + new_hash + ".bitmap"
+    let bmp_data = fs.read_file(bmp_src) catch { _ => Bytes::new(0) }
+    if bmp_data.length() > 0 {
+      fs.write_file(bmp_dest, bmp_data) catch {
+        _ => ()
+      }
+      fs.remove_file(bmp_src) catch {
+        _ => ()
+      }
+    }
+    // Move .rev from pack_dir to inc_dir if it was written by midx_write_bitmap
+    if midx_should_write_rev() {
+      let rev_src = pack_dir + "/multi-pack-index-" + bmp_checksum_hex + ".rev"
+      let rev_dest = inc_dir + "/multi-pack-index-" + new_hash + ".rev"
+      let rev_data = fs.read_file(rev_src) catch { _ => Bytes::new(0) }
+      if rev_data.length() > 0 {
+        fs.write_file(rev_dest, rev_data) catch {
+          _ => ()
+        }
+        fs.remove_file(rev_src) catch {
+          _ => ()
+        }
+      }
+    }
+    // Clean up any monolithic midx that midx_write_bitmap may have deleted
+    // (midx_fail_bitmap_write deletes pack_dir/multi-pack-index)
+  } else if midx_should_write_rev() {
+    // Write .rev directly to inc_dir when no bitmap
+    let checksum_offset = midx_bytes.length() - 20
+    let checksum_bytes = FixedArray::makei(20, i => {
+      midx_bytes[checksum_offset + i]
+    })
+    let ridx_positions = midx_build_ridx_positions(
+      unique_entries, preferred_pack_idx,
+    )
+    let rev_path = inc_dir + "/multi-pack-index-" + new_hash + ".rev"
+    midx_write_rev_file(fs, rev_path, ridx_positions, checksum_bytes)
+  }
+  // Update chain file
+  hashes.push(new_hash)
+  midx_write_chain_file(fs, pack_dir, hashes)
+  // Remove monolithic midx if it still exists
+  let monolithic = pack_dir + "/multi-pack-index"
+  if fs.is_file(monolithic) {
+    fs.remove_file(monolithic) catch {
+      _ => ()
+    }
+  }
+  if progress {
+    eprint_line(
+      "Wrote incremental multi-pack-index with " +
+      unique_entries.length().to_string() +
+      " objects from " +
+      new_packs.length().to_string() +
+      " packs",
+    )
+  }
+}
+
+///|
+async fn midx_verify_chain(
+  fs : OsFs,
+  pack_dir : String,
+  progress : Bool,
+) -> Unit raise Error {
+  let hashes = midx_read_chain_hashes(fs, pack_dir)
+  if hashes.length() == 0 {
+    eprint_line("error: could not open multi-pack-index chain")
+    @sys.exit(1)
+    return
+  }
+  let inc_dir = pack_dir + "/multi-pack-index.d"
+  let mut has_error = false
+  for hash in hashes {
+    let layer_path = inc_dir + "/multi-pack-index-" + hash + ".midx"
+    if not(fs.is_file(layer_path)) {
+      eprint_line("error: could not open multi-pack-index layer: " + layer_path)
+      has_error = true
+      continue
+    }
+    let data = fs.read_file(layer_path) catch {
+      _ => {
+        eprint_line("error: could not read multi-pack-index layer: " + hash)
+        has_error = true
+        continue
+      }
+    }
+    // Validate basic structure
+    if data.length() < 32 {
+      eprint_line("error: multi-pack-index layer too short: " + hash)
+      has_error = true
+      continue
+    }
+    if not(
+        data[0] == b'M' && data[1] == b'I' && data[2] == b'D' && data[3] == b'X',
+      ) {
+      eprint_line(
+        "error: multi-pack-index signature is invalid in layer: " + hash,
+      )
+      has_error = true
+      continue
+    }
+    // Verify checksum
+    let checksum_offset = data.length() - 20
+    let content = Bytes::from_array(
+      FixedArray::makei(checksum_offset, i => data[i]),
+    )
+    let computed = @bitcore.sha1(content)
+    let stored = @bitcore.ObjectId::new(
+      FixedArray::makei(20, i => data[checksum_offset + i]),
+    )
+    if computed != stored {
+      eprint_line("error: incorrect checksum in layer: " + hash)
+      has_error = true
+      continue
+    }
+    // Verify OID ordering
+    let num_chunks = data[6].to_int()
+    let oidf_offset = midx_find_chunk(data, num_chunks, "OIDF")
+    let oidf_end = midx_find_chunk_end(data, num_chunks, "OIDF")
+    if oidf_offset > 0 && oidf_end - oidf_offset == 256 * 4 {
+      let object_count = midx_read_u32(data, oidf_offset + 255 * 4)
+      let oidl_offset = midx_find_chunk(data, num_chunks, "OIDL")
+      if oidl_offset > 0 && object_count > 0 {
+        let mut prev_oid : @bitcore.ObjectId? = None
+        for i in 0..<object_count {
+          let oid = @bitcore.ObjectId::new(
+            FixedArray::makei(20, j => data[oidl_offset + i * 20 + j]),
+          )
+          match prev_oid {
+            Some(prev) =>
+              if midx_compare_oid(prev, oid) >= 0 {
+                eprint_line("error: oid lookup out of order in layer: " + hash)
+                has_error = true
+              }
+            None => ()
+          }
+          prev_oid = Some(oid)
+        }
+      }
+    }
+    if progress {
+      eprint_line("Verified layer: " + hash)
+    }
+  }
+  if has_error {
+    @sys.exit(1)
+    return
+  }
+  print_line("multi-pack-index verified")
 }
 
 ///|

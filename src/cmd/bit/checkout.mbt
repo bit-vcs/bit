@@ -62,7 +62,12 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
       None =>
         // Same commit, just create branch ref and update HEAD
         @bitlib.switch_branch(
-          fs, fs, root, branch_name, create=true, checkout_files=false,
+          fs,
+          fs,
+          root,
+          branch_name,
+          create=true,
+          checkout_files=false,
         )
     }
     save_previous_checkout_location(fs, git_dir, previous_location)

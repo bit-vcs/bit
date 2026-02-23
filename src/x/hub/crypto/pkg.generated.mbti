@@ -1,0 +1,53 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/bit/x/hub/crypto"
+
+import {
+  "mizchi/bit/object",
+}
+
+// Values
+pub fn relay_base64_to_base64url(String) -> String
+
+pub fn relay_build_publish_signing_message(String, String, String, String, Int64, String, String) -> String
+
+pub fn relay_canonicalize_json(Json) -> String
+
+pub fn relay_extract_ed25519_public_key_from_der(Bytes) -> String?
+
+pub fn relay_extract_sha256_hex(String) -> String?
+
+pub fn relay_headers_with_publish_signature(Map[String, String], RelayPublishHttpSignature?) -> Map[String, String]
+
+pub async fn relay_http_signing_config() -> RelayHttpSigningConfig? raise @object.GitError
+
+pub fn relay_load_signing_key() -> String?
+
+pub fn relay_resolve_public_key(String) -> String raise @object.GitError
+
+pub fn relay_sha256_hex(String) -> String raise @object.GitError
+
+pub fn relay_sign_ed25519(String, String) -> String raise @object.GitError
+
+pub async fn relay_sign_publish_payload(RelayHttpSigningConfig?, String, String, String, String, Json) -> RelayPublishHttpSignature? raise @object.GitError
+
+pub fn relay_unix_timestamp_sec() -> Int64
+
+// Errors
+
+// Types and methods
+pub struct RelayHttpSigningConfig {
+  private_key_source : String
+  public_key : String
+}
+
+pub struct RelayPublishHttpSignature {
+  public_key : String
+  signature : String
+  timestamp_sec : Int64
+  nonce : String
+}
+
+// Type aliases
+
+// Traits
+

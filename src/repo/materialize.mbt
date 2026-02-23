@@ -34,7 +34,7 @@ pub fn write_git_metadata(
   write_config(fs, git_dir, remote_url)
   write_packed_refs(fs, git_dir)
   write_alternates(fs, git_dir)
-  write_index_v2(store, fs, git_dir, commit_id)
+  write_index_v2(store, fs, git_dir, commit_id, root)
 }
 
 ///|
@@ -106,6 +106,7 @@ fn write_index_v2(
   fs : &@types.FileSystem,
   git_dir : String,
   commit_id : @object.ObjectId,
+  root : String,
 ) -> Unit raise @object.GitError {
   let entries = collect_commit_entries(store, commit_id)
   // Git index entries must be in lexical path order.
@@ -119,13 +120,19 @@ fn write_index_v2(
   push_u32_be(out, 2)
   push_u32_be(out, entries.length())
   for e in entries {
+    // Stat the file to get actual mtime
+    let full_path = join_path(root, e.path)
+    let (mtime_sec, mtime_nsec) = match @io.lstat_entry_meta(full_path) {
+      Some(meta) => meta.mtime()
+      None => (0, 0)
+    }
     // Git index v2 entry format (62 bytes fixed + variable name):
     // ctime_sec (4) + ctime_nsec (4)
-    push_u32_be(out, 0)
-    push_u32_be(out, 0)
+    push_u32_be(out, mtime_sec)
+    push_u32_be(out, mtime_nsec)
     // mtime_sec (4) + mtime_nsec (4)
-    push_u32_be(out, 0)
-    push_u32_be(out, 0)
+    push_u32_be(out, mtime_sec)
+    push_u32_be(out, mtime_nsec)
     // dev (4) + ino (4)
     push_u32_be(out, 0)
     push_u32_be(out, 0)

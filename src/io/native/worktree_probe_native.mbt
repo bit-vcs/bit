@@ -1,5 +1,11 @@
 ///|
 pub fn init_worktree_probe() -> Unit {
+  let sync_meta : (&@bit.RepoFileSystem, String) -> @bitio.WorktreeEntryMeta? = fn(
+    _fs,
+    abs_path,
+  ) {
+    native_lstat_meta(abs_path)
+  }
   let provider = @bitio.WorktreeProbeProvider::new(
     fn(
       _fs : &@bit.RepoFileSystem,
@@ -8,6 +14,8 @@ pub fn init_worktree_probe() -> Unit {
       native_lstat_meta(abs_path)
     },
     fn(path : String) { native_read_symlink_target_path(path) },
+    entry_meta_sync=sync_meta,
+    lstat=native_lstat_meta,
   )
   @bitio.set_worktree_probe(provider)
 }

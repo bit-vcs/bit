@@ -123,13 +123,7 @@ pub fn Hub::broadcast_feature(
   let payload = sb.to_string()
   ignore(
     self.store.put_record(
-      objects,
-      refs,
-      clock,
-      key,
-      "feature-broadcast",
-      payload,
-      author,
+      objects, refs, clock, key, "feature-broadcast", payload, author,
     ),
   )
   ignore(timestamp)
@@ -174,13 +168,7 @@ pub fn Hub::publish_node_heartbeat(
   let payload = sb.to_string()
   ignore(
     self.store.put_record(
-      objects,
-      refs,
-      clock,
-      key,
-      "node-heartbeat",
-      payload,
-      node_id,
+      objects, refs, clock, key, "node-heartbeat", payload, node_id,
     ),
   )
 }
@@ -228,22 +216,19 @@ pub fn Hub::list_node_heartbeats(
             "commit_count" =>
               commit_count = @strconv.parse_int(v) catch { _ => 0 }
             "main_tip" => main_tip = v
-            "timestamp" =>
-              timestamp = @strconv.parse_int64(v) catch { _ => 0L }
+            "timestamp" => timestamp = @strconv.parse_int64(v) catch { _ => 0L }
             _ => ()
           }
         }
       }
     }
-    result.push(
-      {
-        node_id,
-        commit_count,
-        main_tip,
-        timestamp,
-        clock: record.clock,
-      },
-    )
+    result.push({
+      node_id,
+      commit_count,
+      main_tip,
+      timestamp,
+      clock: record.clock,
+    })
   }
   result
 }

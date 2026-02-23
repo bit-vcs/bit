@@ -50,8 +50,15 @@ pub fn WorktreeEntryMeta::new(
 }
 
 ///|
+pub fn WorktreeEntryMeta::mtime(self : WorktreeEntryMeta) -> (Int, Int) {
+  (self.mtime_sec.unwrap_or(0), self.mtime_nsec.unwrap_or(0))
+}
+
+///|
 pub struct WorktreeProbeProvider {
   entry_meta : async (&@types.RepoFileSystem, String) -> WorktreeEntryMeta? noraise
+  entry_meta_sync : (&@types.RepoFileSystem, String) -> WorktreeEntryMeta?
+  lstat : (String) -> WorktreeEntryMeta?
   symlink_target : (String) -> String?
 }
 
@@ -59,31 +66,49 @@ pub struct WorktreeProbeProvider {
 pub fn WorktreeProbeProvider::new(
   entry_meta : async (&@types.RepoFileSystem, String) -> WorktreeEntryMeta? noraise,
   symlink_target : (String) -> String?,
+  entry_meta_sync? : (&@types.RepoFileSystem, String) -> WorktreeEntryMeta?,
+  lstat? : (String) -> WorktreeEntryMeta?,
 ) -> WorktreeProbeProvider {
-  { entry_meta, symlink_target }
+  let sync_fn = match entry_meta_sync {
+    Some(f) => f
+    None => fn(_fs, _path) { None }
+  }
+  let lstat_fn = match lstat {
+    Some(f) => f
+    None => fn(_path) { None }
+  }
+  { entry_meta, entry_meta_sync: sync_fn, lstat: lstat_fn, symlink_target }
 }
 
 ///|
 pub fn WorktreeProbeProvider::none() -> WorktreeProbeProvider {
+  let fallback_meta : (&@types.RepoFileSystem, String) -> WorktreeEntryMeta? = fn(
+    fs,
+    path,
+  ) {
+    if fs.is_file(path) {
+      Some(
+        WorktreeEntryMeta::new(
+          WorktreeKindMeta::regular(),
+          0o100644,
+          None,
+          None,
+          None,
+        ),
+      )
+    } else {
+      None
+    }
+  }
   {
     entry_meta: fn(
       fs : &@types.RepoFileSystem,
       path : String,
     ) -> WorktreeEntryMeta? noraise {
-      if fs.is_file(path) {
-        Some(
-          WorktreeEntryMeta::new(
-            WorktreeKindMeta::regular(),
-            0o100644,
-            None,
-            None,
-            None,
-          ),
-        )
-      } else {
-        None
-      }
+      fallback_meta(fs, path)
     },
+    entry_meta_sync: fallback_meta,
+    lstat: fn(_path) { None },
     symlink_target: fn(_ : String) { None },
   }
 }
@@ -109,6 +134,21 @@ pub async fn worktree_entry_meta(
   abs_path : String,
 ) -> WorktreeEntryMeta? noraise {
   (worktree_probe_box.value.entry_meta)(fs, abs_path)
+}
+
+///|
+pub fn worktree_entry_meta_sync(
+  fs : &@types.RepoFileSystem,
+  abs_path : String,
+) -> WorktreeEntryMeta? {
+  (worktree_probe_box.value.entry_meta_sync)(fs, abs_path)
+}
+
+///|
+/// Stat a file without requiring RepoFileSystem. Uses the native lstat provider
+/// when available, otherwise returns None.
+pub fn lstat_entry_meta(abs_path : String) -> WorktreeEntryMeta? {
+  (worktree_probe_box.value.lstat)(abs_path)
 }
 
 ///|

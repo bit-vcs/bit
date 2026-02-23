@@ -4,7 +4,7 @@
 test "write_index_v2 writes Git lexical path order" {
   let (store, commit_id) = build_commit_for_index_order_wbtest()
   let fs = @io.TestFs::new()
-  write_index_v2(store, fs, "/repo/.git", commit_id) catch {
+  write_index_v2(store, fs, "/repo/.git", commit_id, "/repo") catch {
     err => fail("write_index_v2 failed: \{err}")
   }
   let index_bytes = fs.read_file("/repo/.git/index") catch {
@@ -20,7 +20,7 @@ test "write_index_v2 writes Git lexical path order" {
 test "write_index_v2 keeps lexical order for prefix-like paths" {
   let (store, commit_id) = build_commit_for_prefix_like_paths_wbtest()
   let fs = @io.TestFs::new()
-  write_index_v2(store, fs, "/repo/.git", commit_id) catch {
+  write_index_v2(store, fs, "/repo/.git", commit_id, "/repo") catch {
     err => fail("write_index_v2 failed: \{err}")
   }
   let index_bytes = fs.read_file("/repo/.git/index") catch {

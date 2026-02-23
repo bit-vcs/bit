@@ -11,6 +11,8 @@ pub fn env_current_dir() -> String?
 
 pub fn env_get(String) -> String?
 
+pub fn lstat_entry_meta(String) -> WorktreeEntryMeta?
+
 pub fn read_symlink_target_path(String) -> String?
 
 pub fn set_env_provider(EnvProvider) -> Unit
@@ -20,6 +22,8 @@ pub fn set_worktree_probe(WorktreeProbeProvider) -> Unit
 pub async fn worktree_entry(&@types.RepoFileSystem, String) -> WorktreeEntry? noraise
 
 pub async fn worktree_entry_meta(&@types.RepoFileSystem, String) -> WorktreeEntryMeta? noraise
+
+pub fn worktree_entry_meta_sync(&@types.RepoFileSystem, String) -> WorktreeEntryMeta?
 
 // Errors
 
@@ -65,6 +69,7 @@ pub struct WorktreeEntryMeta {
   mtime_sec : Int?
   mtime_nsec : Int?
 }
+pub fn WorktreeEntryMeta::mtime(Self) -> (Int, Int)
 pub fn WorktreeEntryMeta::new(WorktreeKindMeta, Int, Int?, Int?, Int?) -> Self
 
 pub enum WorktreeKind {
@@ -81,9 +86,11 @@ pub fn WorktreeKindMeta::symlink() -> Self
 
 pub struct WorktreeProbeProvider {
   entry_meta : async (&@types.RepoFileSystem, String) -> WorktreeEntryMeta? noraise
+  entry_meta_sync : (&@types.RepoFileSystem, String) -> WorktreeEntryMeta?
+  lstat : (String) -> WorktreeEntryMeta?
   symlink_target : (String) -> String?
 }
-pub fn WorktreeProbeProvider::new(async (&@types.RepoFileSystem, String) -> WorktreeEntryMeta? noraise, (String) -> String?) -> Self
+pub fn WorktreeProbeProvider::new(async (&@types.RepoFileSystem, String) -> WorktreeEntryMeta? noraise, (String) -> String?, entry_meta_sync? : (&@types.RepoFileSystem, String) -> WorktreeEntryMeta?, lstat? : (String) -> WorktreeEntryMeta?) -> Self
 pub fn WorktreeProbeProvider::none() -> Self
 
 // Type aliases

@@ -1,7 +1,7 @@
 ///|
 fn print_hub_serve_usage() -> Unit {
   println(
-    "Usage: bit hub serve [<relay-url>] [--repo <name>] [--allow-push] [--broadcast] [--auto-fetch] [--room <name>]",
+    "Usage: bit relay serve [<relay-url>] [--repo <name>] [--allow-push] [--broadcast] [--auto-fetch] [--room <name>]",
   )
   println("")
   println("Serve the current repository via relay for remote cloning.")

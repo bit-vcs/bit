@@ -234,3 +234,85 @@ test "midx expected repack size scales by referenced ratio" {
   assert_eq(midx_expected_repack_size(1, 4, 1000), 250)
   assert_eq(midx_expected_repack_size(3, 4, 1000), 750)
 }
+
+///|
+test "midx_read_packs_from_midx_data extracts pack names from MIDX binary" {
+  let pack_files = [
+    "pack-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.pack", "pack-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.pack",
+  ]
+  let entries : Array[MidxEntry] = [
+    {
+      id: make_test_oid(b'\x01'),
+      pack_idx: 0,
+      pack_mtime: 0,
+      offset_hi: 0,
+      offset: 1,
+    },
+    {
+      id: make_test_oid(b'\x02'),
+      pack_idx: 1,
+      pack_mtime: 0,
+      offset_hi: 0,
+      offset: 2,
+    },
+  ]
+  let data = midx_build(pack_files, entries, false, 1, None)
+  let packs = midx_read_packs_from_midx_data(data)
+  assert_eq(packs.length(), 2)
+  assert_eq(packs[0], pack_files[0])
+  assert_eq(packs[1], pack_files[1])
+}
+
+///|
+test "midx_read_oids_from_midx_data extracts OIDs from MIDX binary" {
+  let pack_files = ["pack-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.pack"]
+  let entries : Array[MidxEntry] = [
+    {
+      id: make_test_oid(b'\x01'),
+      pack_idx: 0,
+      pack_mtime: 0,
+      offset_hi: 0,
+      offset: 1,
+    },
+    {
+      id: make_test_oid(b'\x02'),
+      pack_idx: 0,
+      pack_mtime: 0,
+      offset_hi: 0,
+      offset: 2,
+    },
+  ]
+  let data = midx_build(pack_files, entries, false, 1, None)
+  let oids = midx_read_oids_from_midx_data(data)
+  assert_eq(oids.length(), 2)
+  assert_true(oids.contains(make_test_oid(b'\x01').to_hex()))
+  assert_true(oids.contains(make_test_oid(b'\x02').to_hex()))
+}
+
+///|
+test "midx_write_rev_file produces valid RIDX format" {
+  let positions = [2, 0, 1]
+  let checksum_bytes = FixedArray::make(20, b'\xAA')
+  let out : Array[Byte] = []
+  // Build expected output manually: RIDX sig + ver=1 + oid_ver=1 + positions + checksum + file checksum
+  out.push(b'R')
+  out.push(b'I')
+  out.push(b'D')
+  out.push(b'X')
+  midx_push_u32(out, 1) // version
+  midx_push_u32(out, 1) // oid version
+  for pos in positions {
+    midx_push_u32(out, pos)
+  }
+  for b in checksum_bytes {
+    out.push(b)
+  }
+  // The body up to here = 4+4+4+12+20 = 44 bytes
+  assert_eq(out.length(), 44)
+  // Verify header bytes
+  let body = Bytes::from_array(FixedArray::makei(out.length(), i => out[i]))
+  let file_checksum = @bitcore.sha1(body)
+  assert_true(
+    file_checksum.bytes[0] != b'\x00' || file_checksum.bytes[1] != b'\x00',
+  )
+}

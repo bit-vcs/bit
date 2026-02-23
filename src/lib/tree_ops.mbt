@@ -290,24 +290,29 @@ pub fn write_worktree_and_build_index(
         if o.obj_type != @bit.ObjectType::Blob {
           raise @bit.GitError::InvalidObject("Object is not a blob")
         }
+        let full_path = join_path(root, path)
         if not(skip_write) {
-          let full_path = join_path(root, path)
           let dir = parent_dir(full_path)
           fs.mkdir_p(dir)
           fs.write_file(full_path, o.data)
+        }
+        // Get actual mtime from the file we just wrote
+        let (mtime_sec, mtime_nsec) = match
+          @bitio.worktree_entry_meta_sync(rfs, full_path) {
+          Some(meta) => meta.mtime()
+          None => (0, 0)
         }
         index_entries.push({
           path,
           id: info.id,
           mode: info.mode,
           size: o.data.length(),
-          mtime_sec: 0,
-          mtime_nsec: 0,
+          mtime_sec,
+          mtime_nsec,
         })
       }
     }
   }
-  index_entries.sort_by((a, b) => String::compare(a.path, b.path))
   index_entries
 }
 

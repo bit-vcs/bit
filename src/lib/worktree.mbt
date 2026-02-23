@@ -333,11 +333,31 @@ pub async fn add_paths_async(
   let all_paths = expand_paths_async(rfs, root, paths)
   for path in all_paths {
     let abs = join_path(root, path)
-    match @bitio.worktree_entry(rfs, abs) {
+    let meta = @bitio.worktree_entry_meta(rfs, abs)
+    match meta {
       None => map.remove(path)
-      Some(info) =>
+      Some(info) => {
+        // Skip unchanged files: if stat matches index entry, no re-hash needed
+        match map.get(path) {
+          Some(existing) => {
+            let stat_matches = match
+              (info.size, info.mtime_sec, info.mtime_nsec) {
+              (Some(sz), Some(ms), Some(mn)) =>
+                sz == existing.size &&
+                (existing.mtime_sec != 0 || existing.mtime_nsec != 0) &&
+                ms == existing.mtime_sec &&
+                mn == existing.mtime_nsec &&
+                (not(core_filemode) || info.mode == existing.mode)
+              _ => false
+            }
+            if stat_matches {
+              continue
+            }
+          }
+          _ => ()
+        }
         match info.kind {
-          @bitio.WorktreeKind::Regular => {
+          @bitio.WorktreeKindMeta::Regular => {
             let content = rfs.read_file(abs)
             let normalized = normalize_worktree_content(content, autocrlf)
             let id = write_loose_object(
@@ -347,8 +367,7 @@ pub async fn add_paths_async(
               normalized,
             )
             let size = content.length()
-            let mtime_sec = info.mtime_sec.unwrap_or(0)
-            let mtime_nsec = info.mtime_nsec.unwrap_or(0)
+            let (mtime_sec, mtime_nsec) = info.mtime()
             let mode = if core_filemode {
               info.mode
             } else {
@@ -359,27 +378,31 @@ pub async fn add_paths_async(
             }
             map[path] = { path, id, mode, size, mtime_sec, mtime_nsec }
           }
-          @bitio.WorktreeKind::Symlink(target~) => {
-            let bytes = @utf8.encode(target)
-            let id = write_loose_object(
-              fs,
-              actual_git_dir,
-              @bit.ObjectType::Blob,
-              bytes,
-            )
-            let size = bytes.length()
-            let mtime_sec = info.mtime_sec.unwrap_or(0)
-            let mtime_nsec = info.mtime_nsec.unwrap_or(0)
-            map[path] = {
-              path,
-              id,
-              mode: info.mode,
-              size,
-              mtime_sec,
-              mtime_nsec,
+          @bitio.WorktreeKindMeta::Symlink =>
+            match @bitio.read_symlink_target_path(abs) {
+              Some(target) => {
+                let bytes = @utf8.encode(target)
+                let id = write_loose_object(
+                  fs,
+                  actual_git_dir,
+                  @bit.ObjectType::Blob,
+                  bytes,
+                )
+                let size = bytes.length()
+                let (mtime_sec, mtime_nsec) = info.mtime()
+                map[path] = {
+                  path,
+                  id,
+                  mode: info.mode,
+                  size,
+                  mtime_sec,
+                  mtime_nsec,
+                }
+              }
+              None => ()
             }
-          }
         }
+      }
     }
   }
   let out : Array[IndexEntry] = []

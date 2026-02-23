@@ -46,7 +46,11 @@ pub fn read_index_entries(
   }
   let count = index_read_u32_be(data, 8)
   let mut offset = 12
-  let selected : Map[String, (Int, IndexEntry)] = {}
+  // Fast path: parse directly into sorted array when no conflict stages.
+  // Index file entries are already sorted, so no re-sort needed.
+  let entries : Array[IndexEntry] = Array::new(capacity=count)
+  let stages : Array[Int] = Array::new(capacity=count)
+  let mut has_conflicts = false
   for _ in 0..<count {
     let entry_start = offset
     if offset + 62 > data.length() {
@@ -55,10 +59,7 @@ pub fn read_index_entries(
     // Index entry format (40 bytes stat data):
     // ctime_seconds, ctime_nanoseconds, mtime_seconds, mtime_nanoseconds,
     // dev, ino, mode, uid, gid, file_size
-    let _ctime_sec = index_read_u32_be(data, offset)
-    offset += 4
-    let _ctime_nsec = index_read_u32_be(data, offset)
-    offset += 4
+    offset += 8 // skip ctime_sec, ctime_nsec
     let mtime_sec = index_read_u32_be(data, offset)
     offset += 4
     let mtime_nsec = index_read_u32_be(data, offset)
@@ -80,34 +81,48 @@ pub fn read_index_entries(
     if has_extended {
       offset += 2
     }
-    let (path_str, next) = index_read_cstring(data, offset)
-    let path_len = path_str.length()
-    // Calculate next entry position: entry size must be a multiple of 8
-    // Fixed part: 62 bytes (or 64 with extended flags)
-    // Variable part: path_len + NUL + padding
+    // Read path directly from bytes (avoid intermediate Array[Byte] + StringBuilder)
     let fixed_size = if has_extended { 64 } else { 62 }
-    let entry_size_without_padding = fixed_size + path_len + 1
-    let entry_size = (entry_size_without_padding + 7) / 8 * 8
-    offset = entry_start + entry_size
-    ignore(next)
-    let entry = { path: path_str, id, mode, size, mtime_sec, mtime_nsec }
-    let prio = index_stage_priority(stage)
-    match selected.get(path_str) {
-      Some((prev_prio, _)) =>
-        if prio > prev_prio {
-          selected[path_str] = (prio, entry)
-        }
-      None => selected[path_str] = (prio, entry)
+    let path_start = entry_start + fixed_size
+    let mut path_end = path_start
+    while path_end < data.length() && data[path_end] != b'\x00' {
+      path_end += 1
     }
+    let path_str = @utf8.decode_lossy(data[path_start:path_end])
+    let path_len = path_end - path_start
+    let entry_size = (fixed_size + path_len + 1 + 7) / 8 * 8
+    offset = entry_start + entry_size
+    if stage != 0 {
+      has_conflicts = true
+    }
+    entries.push({ path: path_str, id, mode, size, mtime_sec, mtime_nsec })
+    stages.push(stage)
   }
-  let entries : Array[IndexEntry] = []
-  for item in selected.to_array() {
-    let (_, value) = item
-    let (_, entry) = value
-    entries.push(entry)
+  if has_conflicts {
+    // Slow path: deduplicate by stage priority
+    let selected : Map[String, (Int, IndexEntry)] = {}
+    for i in 0..<entries.length() {
+      let prio = index_stage_priority(stages[i])
+      let entry = entries[i]
+      match selected.get(entry.path) {
+        Some((prev_prio, _)) =>
+          if prio > prev_prio {
+            selected[entry.path] = (prio, entry)
+          }
+        None => selected[entry.path] = (prio, entry)
+      }
+    }
+    let deduped : Array[IndexEntry] = []
+    for item in selected.to_array() {
+      let (_, value) = item
+      let (_, entry) = value
+      deduped.push(entry)
+    }
+    deduped.sort_by((a, b) => index_path_compare_git_order(a.path, b.path))
+    deduped
+  } else {
+    entries
   }
-  entries.sort_by((a, b) => index_path_compare_git_order(a.path, b.path))
-  entries
 }
 
 ///|
@@ -168,11 +183,7 @@ pub fn read_skip_worktree_paths(
       return out
     }
     if stage == 0 && has_extended && (ext_flags & 0x4000) != 0 {
-      let path_bytes : Array[Byte] = []
-      for j in path_start..<i {
-        path_bytes.push(data[j])
-      }
-      out[index_bytes_to_string(path_bytes)] = true
+      out[@utf8.decode_lossy(data[path_start:i])] = true
     }
     let path_len = i - path_start
     let entry_size = (fixed_size + path_len + 1 + 7) / 8 * 8
@@ -210,6 +221,95 @@ pub fn write_skip_worktree_paths(
 }
 
 ///|
+fn index_entry_buf_size(path_len : Int, skip_worktree : Bool) -> Int {
+  let fixed_size = if skip_worktree { 64 } else { 62 }
+  (fixed_size + path_len + 1 + 7) / 8 * 8
+}
+
+///|
+fn write_index_entry_to_buf(
+  buf : FixedArray[Byte],
+  pos : Int,
+  e : IndexEntry,
+  skip_worktree : Bool,
+) -> Int {
+  let entry_start = pos
+  let mut pos = pos
+  fa_set_u32_be(buf, pos, e.mtime_sec) // ctime_sec
+  fa_set_u32_be(buf, pos + 4, e.mtime_nsec) // ctime_nsec
+  fa_set_u32_be(buf, pos + 8, e.mtime_sec) // mtime_sec
+  fa_set_u32_be(buf, pos + 12, e.mtime_nsec) // mtime_nsec
+  // dev, ino, uid, gid are zero (filled by make)
+  fa_set_u32_be(buf, pos + 24, e.mode) // mode
+  fa_set_u32_be(buf, pos + 36, e.size) // file_size
+  pos += 40
+  // object id (20 bytes)
+  for i in 0..<20 {
+    buf[pos + i] = e.id.bytes[i]
+  }
+  pos += 20
+  // flags
+  let name_len = if e.path.length() < 0x0fff { e.path.length() } else { 0x0fff }
+  let mut flags = name_len
+  if skip_worktree {
+    flags = flags | 0x4000
+  }
+  fa_set_u16_be(buf, pos, flags)
+  pos += 2
+  if skip_worktree {
+    fa_set_u16_be(buf, pos, 0x4000)
+    pos += 2
+  }
+  // path bytes
+  for c in e.path {
+    buf[pos] = c.to_int().to_byte()
+    pos += 1
+  }
+  // NUL + padding to 8-byte alignment (already zeroed)
+  entry_start + index_entry_buf_size(e.path.length(), skip_worktree)
+}
+
+///|
+fn write_index_buf(
+  sorted : Array[IndexEntry],
+  skip_worktree_paths : Map[String, Bool]?,
+) -> FixedArray[Byte] {
+  // Pre-calculate total buffer size
+  let mut total_size = 12 // header: "DIRC" + version + count
+  for e in sorted {
+    let is_skip = match skip_worktree_paths {
+      Some(m) => m.contains(e.path)
+      None => false
+    }
+    total_size += index_entry_buf_size(e.path.length(), is_skip)
+  }
+  total_size += 20 // SHA1 checksum
+  let buf : FixedArray[Byte] = FixedArray::make(total_size, b'\x00')
+  // Header
+  buf[0] = b'D'
+  buf[1] = b'I'
+  buf[2] = b'R'
+  buf[3] = b'C'
+  fa_set_u32_be(buf, 4, 2) // version
+  fa_set_u32_be(buf, 8, sorted.length()) // count
+  let mut pos = 12
+  for e in sorted {
+    let is_skip = match skip_worktree_paths {
+      Some(m) => m.contains(e.path)
+      None => false
+    }
+    pos = write_index_entry_to_buf(buf, pos, e, is_skip)
+  }
+  // SHA1 checksum over header + entries
+  let content_bytes = Bytes::from_array(buf[:pos])
+  let checksum = @bit.sha1(content_bytes)
+  for i in 0..<20 {
+    buf[pos + i] = checksum.bytes[i]
+  }
+  buf
+}
+
+///|
 pub fn write_index_entries(
   fs : &@bit.FileSystem,
   git_dir : String,
@@ -217,56 +317,9 @@ pub fn write_index_entries(
 ) -> Unit raise @bit.GitError {
   let sorted = entries.copy()
   sorted.sort_by((a, b) => index_path_compare_git_order(a.path, b.path))
-  let out : Array[Byte] = []
-  // Header: "DIRC" + version(2) + count
-  out.push(b'D')
-  out.push(b'I')
-  out.push(b'R')
-  out.push(b'C')
-  index_push_u32_be(out, 2)
-  index_push_u32_be(out, sorted.length())
-  for e in sorted {
-    let entry_start = out.length()
-    // Index entry format (40 bytes stat data):
-    // ctime_seconds, ctime_nanoseconds, mtime_seconds, mtime_nanoseconds,
-    // dev, ino, mode, uid, gid, file_size
-    index_push_u32_be(out, e.mtime_sec) // ctime_seconds
-    index_push_u32_be(out, e.mtime_nsec) // ctime_nanoseconds
-    index_push_u32_be(out, e.mtime_sec) // mtime_seconds
-    index_push_u32_be(out, e.mtime_nsec) // mtime_nanoseconds
-    index_push_u32_be(out, 0) // dev
-    index_push_u32_be(out, 0) // ino
-    index_push_u32_be(out, e.mode) // mode
-    index_push_u32_be(out, 0) // uid
-    index_push_u32_be(out, 0) // gid
-    index_push_u32_be(out, e.size) // file_size
-    // object id
-    for b in e.id.bytes {
-      out.push(b)
-    }
-    let name_len = if e.path.length() < 0x0fff {
-      e.path.length()
-    } else {
-      0x0fff
-    }
-    index_push_u16_be(out, name_len)
-    for c in e.path {
-      out.push(c.to_int().to_byte())
-    }
-    out.push(b'\x00')
-    // Pad to 8-byte alignment from entry start
-    while (out.length() - entry_start) % 8 != 0 {
-      out.push(b'\x00')
-    }
-  }
-  let content = index_bytes_from_array(out)
-  let checksum = @bit.sha1(content)
-  for b in checksum.bytes {
-    out.push(b)
-  }
-  let index_bytes = index_bytes_from_array(out)
+  let buf = write_index_buf(sorted, None)
   let index_path = join_path(git_dir, "index")
-  fs.write_file(index_path, index_bytes)
+  fs.write_file(index_path, Bytes::from_array(buf[:]))
 }
 
 ///|
@@ -297,63 +350,9 @@ pub fn write_index_entries_with_skip_worktree(
 ) -> Unit raise @bit.GitError {
   let sorted = entries.copy()
   sorted.sort_by((a, b) => index_path_compare_git_order(a.path, b.path))
-  let out : Array[Byte] = []
-  // Header: "DIRC" + version(2) + count
-  out.push(b'D')
-  out.push(b'I')
-  out.push(b'R')
-  out.push(b'C')
-  index_push_u32_be(out, 2)
-  index_push_u32_be(out, sorted.length())
-  for e in sorted {
-    let entry_start = out.length()
-    // Index entry format (40 bytes stat data):
-    // ctime_seconds, ctime_nanoseconds, mtime_seconds, mtime_nanoseconds,
-    // dev, ino, mode, uid, gid, file_size
-    index_push_u32_be(out, e.mtime_sec) // ctime_seconds
-    index_push_u32_be(out, e.mtime_nsec) // ctime_nanoseconds
-    index_push_u32_be(out, e.mtime_sec) // mtime_seconds
-    index_push_u32_be(out, e.mtime_nsec) // mtime_nanoseconds
-    index_push_u32_be(out, 0) // dev
-    index_push_u32_be(out, 0) // ino
-    index_push_u32_be(out, e.mode) // mode
-    index_push_u32_be(out, 0) // uid
-    index_push_u32_be(out, 0) // gid
-    index_push_u32_be(out, e.size) // file_size
-    // object id
-    for b in e.id.bytes {
-      out.push(b)
-    }
-    let name_len = if e.path.length() < 0x0fff {
-      e.path.length()
-    } else {
-      0x0fff
-    }
-    let is_skip = skip_worktree_paths.contains(e.path)
-    let mut flags = name_len
-    if is_skip {
-      flags = flags | 0x4000
-    }
-    index_push_u16_be(out, flags)
-    if is_skip {
-      index_push_u16_be(out, 0x4000)
-    }
-    for c in e.path {
-      out.push(c.to_int().to_byte())
-    }
-    out.push(b'\x00')
-    while (out.length() - entry_start) % 8 != 0 {
-      out.push(b'\x00')
-    }
-  }
-  let content = index_bytes_from_array(out)
-  let checksum = @bit.sha1(content)
-  for b in checksum.bytes {
-    out.push(b)
-  }
-  let index_bytes = index_bytes_from_array(out)
+  let buf = write_index_buf(sorted, Some(skip_worktree_paths))
   let index_path = join_path(git_dir, "index")
-  fs.write_file(index_path, index_bytes)
+  fs.write_file(index_path, Bytes::from_array(buf[:]))
 }
 
 ///|
@@ -372,72 +371,37 @@ fn index_read_object_id(
 }
 
 ///|
-fn index_read_cstring(
-  data : Bytes,
-  start : Int,
-) -> (String, Int) raise @bit.GitError {
-  let mut i = start
-  while i < data.length() && data[i] != b'\x00' {
-    i += 1
-  }
-  if i >= data.length() {
-    raise @bit.GitError::InvalidObject("Missing NUL in index entry")
-  }
-  let bytes : Array[Byte] = []
-  for j in start..<i {
-    bytes.push(data[j])
-  }
-  let s = index_bytes_to_string(bytes)
-  (s, i + 1)
+fn fa_set_u32_be(buf : FixedArray[Byte], offset : Int, v : Int) -> Unit {
+  buf[offset] = ((v >> 24) & 0xff).to_byte()
+  buf[offset + 1] = ((v >> 16) & 0xff).to_byte()
+  buf[offset + 2] = ((v >> 8) & 0xff).to_byte()
+  buf[offset + 3] = (v & 0xff).to_byte()
 }
 
 ///|
-fn index_bytes_to_string(bytes : Array[Byte]) -> String {
-  let sb = StringBuilder::new()
-  for b in bytes {
-    sb.write_char(b.to_int().unsafe_to_char())
-  }
-  sb.to_string()
-}
-
-///|
-fn index_bytes_from_array(arr : Array[Byte]) -> Bytes {
-  Bytes::from_array(FixedArray::makei(arr.length(), i => arr[i]))
-}
-
-///|
-fn index_push_u32_be(out : Array[Byte], v : Int) -> Unit {
-  out.push(((v >> 24) & 0xff).to_byte())
-  out.push(((v >> 16) & 0xff).to_byte())
-  out.push(((v >> 8) & 0xff).to_byte())
-  out.push((v & 0xff).to_byte())
-}
-
-///|
-fn index_push_u16_be(out : Array[Byte], v : Int) -> Unit {
-  out.push(((v >> 8) & 0xff).to_byte())
-  out.push((v & 0xff).to_byte())
+fn fa_set_u16_be(buf : FixedArray[Byte], offset : Int, v : Int) -> Unit {
+  buf[offset] = ((v >> 8) & 0xff).to_byte()
+  buf[offset + 1] = (v & 0xff).to_byte()
 }
 
 ///|
 fn index_path_compare_git_order(a : String, b : String) -> Int {
-  let a_chars = a.to_array()
-  let b_chars = b.to_array()
-  let mut i = 0
-  while i < a_chars.length() && i < b_chars.length() {
-    let av = a_chars[i].to_int()
-    let bv = b_chars[i].to_int()
+  let a_len = a.length()
+  let b_len = b.length()
+  let min_len = if a_len < b_len { a_len } else { b_len }
+  for i in 0..<min_len {
+    let av = a.unsafe_get(i)
+    let bv = b.unsafe_get(i)
     if av < bv {
       return -1
     }
     if av > bv {
       return 1
     }
-    i += 1
   }
-  if a_chars.length() < b_chars.length() {
+  if a_len < b_len {
     -1
-  } else if a_chars.length() > b_chars.length() {
+  } else if a_len > b_len {
     1
   } else {
     0

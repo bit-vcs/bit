@@ -1,20 +1,7 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "mizchi/bit/x/hub/native"
 
-import {
-  "mizchi/bit/object",
-  "mizchi/bit/types",
-  "mizchi/bit/x/hub",
-}
-
 // Values
-pub async fn hub_fetch(@hub.Hub, &@types.FileSystem, &@types.RepoFileSystem, String, String, signing_key~ : String?, require_signed~ : Bool?, auth_token~ : String?, conflict_policy~ : @hub.RecordMergePolicy?) -> @hub.PrSyncResult raise @object.GitError
-
-pub async fn hub_push(@hub.Hub, &@types.RepoFileSystem, String, String, signing_key~ : String?, require_signed~ : Bool?, auth_token~ : String?, conflict_policy~ : @hub.RecordMergePolicy?) -> @hub.PrSyncResult raise @object.GitError
-
-pub async fn relay_list_clone_peers(String, auth_token~ : String?, include_self? : Bool) -> Array[(String, String, String?)] raise @object.GitError
-
-pub async fn relay_publish_clone_announce(String, String, repo~ : String?, auth_token~ : String?) -> Bool raise @object.GitError
 
 // Errors
 
