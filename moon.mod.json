@@ -1,6 +1,6 @@
 {
   "name": "mizchi/bit",
-  "version": "0.24.0",
+  "version": "0.24.1",
   "deps": {
     "moonbitlang/async": "0.16.6",
     "mizchi/zlib": "0.3.0",
@@ -8,7 +8,7 @@
     "mizchi/tempfile": "0.1.0",
     "mizchi/llm": "0.2.2",
     "mizchi/bitflow": "0.3.1",
-    "mizchi/x": "0.1.3",
+    "mizchi/x": "0.1.4",
     "bobzhang/toml": "0.1.7"
   },
   "readme": "README.mbt.md",
