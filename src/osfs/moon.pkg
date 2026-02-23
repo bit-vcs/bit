@@ -6,5 +6,5 @@ import {
 warnings = "-29"
 
 options(
-  targets: { "osfs.mbt": [ "native" ] },
+  targets: { "osfs.mbt": [ "native", "js" ] },
 )

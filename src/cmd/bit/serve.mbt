@@ -254,14 +254,10 @@ struct ServeSession {
 async fn serve_register_session(base_url : String) -> ServeSession raise Error {
   let url = base_url + "/api/v1/serve/register"
   let headers : Map[String, String] = { "Content-Type": "application/json" }
-  let (response, body) = @bitnative.native_http_post(
-    url,
-    Bytes::new(0),
-    headers,
-  )
-  if response.code != 200 {
+  let (status_code, body) = serve_http_post(url, Bytes::new(0), headers)
+  if status_code != 200 {
     raise @bitcore.GitError::ProtocolError(
-      "Failed to register session: HTTP \{response.code}",
+      "Failed to register session: HTTP \{status_code}",
     )
   }
   let text = serve_decode_bytes(body)
@@ -359,9 +355,9 @@ async fn serve_poll(
     "\{base_url}/api/v1/serve/poll?session=\{session_id}&timeout=\{timeout}"
   }
   let headers : Map[String, String] = {}
-  let (response, body) = @bitnative.native_http_get(url, headers)
-  if response.code != 200 {
-    raise @bitcore.GitError::ProtocolError("Poll failed: HTTP \{response.code}")
+  let (status_code, body) = serve_http_get(url, headers)
+  if status_code != 200 {
+    raise @bitcore.GitError::ProtocolError("Poll failed: HTTP \{status_code}")
   }
   match serve_parse_poll_response(body) {
     Some(requests) => requests
@@ -410,12 +406,10 @@ async fn serve_respond(
   let payload_text = payload.stringify()
   let payload_bytes = @encoding.encode(@encoding.Encoding::UTF8, payload_text)
   let headers : Map[String, String] = { "Content-Type": "application/json" }
-  let (response, _body) = @bitnative.native_http_post(
-    url, payload_bytes, headers,
-  )
-  if response.code != 200 {
+  let (status_code, _body) = serve_http_post(url, payload_bytes, headers)
+  if status_code != 200 {
     eprint_line(
-      "Warning: respond failed for request \{request_id}: HTTP \{response.code}",
+      "Warning: respond failed for request \{request_id}: HTTP \{status_code}",
     )
   }
 }
@@ -921,13 +915,11 @@ async fn serve_broadcast_push_notification(
   let headers : Map[String, String] = {
     "Content-Type": "application/octet-stream",
   }
-  let (response, _body) = @bitnative.native_http_post(
-    url, payload_bytes, headers,
-  )
-  if response.code == 200 {
+  let (status_code, _body) = serve_http_post(url, payload_bytes, headers)
+  if status_code == 200 {
     print_line("[\{session_id}] Broadcast: feature push notification sent")
   } else {
-    eprint_line("[\{session_id}] Broadcast warning: HTTP \{response.code}")
+    eprint_line("[\{session_id}] Broadcast warning: HTTP \{status_code}")
   }
 }
 
@@ -1011,8 +1003,8 @@ async fn serve_auto_fetch_from_room(
 ) -> Int raise Error {
   let url = "\{base_url}/api/v1/poll?room=\{room}&after=\{cursor}&limit=50"
   let headers : Map[String, String] = {}
-  let (response, body) = @bitnative.native_http_get(url, headers)
-  if response.code != 200 {
+  let (status_code, body) = serve_http_get(url, headers)
+  if status_code != 200 {
     return cursor
   }
   guard serve_parse_room_poll_response(body) is Some((next_cursor, broadcasts)) else {
@@ -1048,7 +1040,7 @@ async fn serve_fetch_from_session(
   repo_root : String,
 ) -> Unit raise Error {
   let proxied_url = base_url + "/git/" + sender_session_id
-  let (remote_refs, _, _, _) = @bitnative.discover_upload_refs_http(
+  let (remote_refs, _, _, _) = serve_discover_upload_refs_http(
     proxied_url, true,
   )
   // Build wants from refs_info commit OIDs that exist on the remote
@@ -1075,7 +1067,7 @@ async fn serve_fetch_from_session(
   if wants.length() == 0 {
     return
   }
-  let pack = @bitnative.fetch_pack_http(proxied_url, wants, true)
+  let pack = serve_fetch_pack_http(proxied_url, wants, true)
   if pack.length() == 0 {
     return
   }
