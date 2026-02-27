@@ -735,10 +735,124 @@ fn build_upload_pack_request_process_spec(
 }
 
 ///|
+/// Run SSH git-upload-pack and read only the ref advertisement.
+///
+/// SSH git-upload-pack exits with code 128 when stdin is closed without
+/// sending wants.  File-based stdin (empty file) triggers this immediately,
+/// so we use pipe-based I/O: spawn → read stdout → close stdin → ignore
+/// non-zero exit as long as we got data.
+async fn run_ssh_upload_pack_info_refs(
+  spec : ProcessSpec,
+) -> Bytes raise @bit.GitError {
+  let (stdin_input, stdin_writer) = @process.write_to_process() catch {
+    err => raise @bit.GitError::IoError("SSH stdin pipe failed: \{err}")
+  }
+  let (stdout_reader, stdout_output) = @process.read_from_process() catch {
+    err => raise @bit.GitError::IoError("SSH stdout pipe failed: \{err}")
+  }
+  let nonce = @async.now()
+  let stderr_path = ".moonbit-ssh-info-refs-\{nonce}.err"
+  let stderr = @process.redirect_to_file(stderr_path, truncate=true, create=420) catch {
+    err => raise @bit.GitError::IoError("SSH stderr file failed: \{err}")
+  }
+  let run_cwd = resolve_process_cwd()
+  let pid = match (spec.extra_env, run_cwd) {
+    (None, None) =>
+      @process.spawn_orphan(
+        spec.cmd,
+        spec.args,
+        inherit_env=true,
+        stdin=stdin_input,
+        stdout=stdout_output,
+        stderr~,
+      ) catch {
+        e => {
+          cleanup_temp_files([stderr_path])
+          raise @bit.GitError::IoError("SSH spawn failed: \{e}")
+        }
+      }
+    (Some(env), None) =>
+      @process.spawn_orphan(
+        spec.cmd,
+        spec.args,
+        extra_env=env,
+        inherit_env=true,
+        stdin=stdin_input,
+        stdout=stdout_output,
+        stderr~,
+      ) catch {
+        e => {
+          cleanup_temp_files([stderr_path])
+          raise @bit.GitError::IoError("SSH spawn failed: \{e}")
+        }
+      }
+    (None, Some(cwd)) =>
+      @process.spawn_orphan(
+        spec.cmd,
+        spec.args,
+        inherit_env=true,
+        stdin=stdin_input,
+        stdout=stdout_output,
+        stderr~,
+        cwd~,
+      ) catch {
+        e => {
+          cleanup_temp_files([stderr_path])
+          raise @bit.GitError::IoError("SSH spawn failed: \{e}")
+        }
+      }
+    (Some(env), Some(cwd)) =>
+      @process.spawn_orphan(
+        spec.cmd,
+        spec.args,
+        extra_env=env,
+        inherit_env=true,
+        stdin=stdin_input,
+        stdout=stdout_output,
+        stderr~,
+        cwd~,
+      ) catch {
+        e => {
+          cleanup_temp_files([stderr_path])
+          raise @bit.GitError::IoError("SSH spawn failed: \{e}")
+        }
+      }
+  }
+  // Close stdin first — git-upload-pack sends refs then waits for input.
+  // Closing stdin causes it to exit (code 128), which unblocks read_all().
+  // Without this, we deadlock: read_all waits for EOF on stdout while
+  // git-upload-pack waits for data on stdin.
+  stdin_writer.close()
+  // Now read all ref advertisement from stdout
+  let response = stdout_reader.read_all() catch {
+    e => {
+      cleanup_temp_files([stderr_path])
+      raise @bit.GitError::IoError("SSH stdout read failed: \{e}")
+    }
+  }
+  stdout_reader.close()
+  let _code : Int = @process.wait_pid(pid) catch { _ => -1 }
+  cleanup_temp_files([stderr_path])
+  if response.binary().length() == 0 {
+    raise @bit.GitError::ProtocolError("SSH ref advertisement was empty")
+  }
+  response.binary()
+}
+
+///|
 pub async fn upload_pack_info_refs_process(
   remote : String,
   prefer_v2 : Bool,
 ) -> Bytes raise @bit.GitError {
+  let remote_spec = @protocol.parse_remote(remote)
+  if remote_spec.kind == @protocol.RemoteKind::Ssh {
+    let spec = build_upload_pack_process_spec(
+      remote_spec,
+      advertise_refs=true,
+      prefer_v2~,
+    )
+    return run_ssh_upload_pack_info_refs(spec)
+  }
   let proc = build_upload_pack_info_refs_process_spec(remote, prefer_v2)
   run_upload_pack_process(proc, None)
 }

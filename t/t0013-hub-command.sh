@@ -5,7 +5,7 @@
 source "$(dirname "$0")/test-lib-e2e.sh"
 
 test_expect_success 'hub help shows usage' '
-    git_cmd hub | grep -q "Usage: bit hub <subcommand>"
+    git_cmd hub | grep -q "bit hub.*is deprecated"
 '
 
 test_expect_success 'hub init creates default merge policy file' '
