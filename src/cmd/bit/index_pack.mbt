@@ -914,6 +914,43 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
             "), done.\n",
           )
         }
+        // When --fix-thin is used, the original pack may contain unresolved
+        // REF_DELTA entries whose bases are external.  Git's --fix-thin
+        // appends the missing base objects so deltas become self-contained.
+        // We recreate the pack from the resolved objects plus any external
+        // bases that were needed for delta resolution.
+        let (pack, hash_hex, objects) = if cfg.fix_thin {
+          // Collect IDs of objects already in the pack
+          let pack_ids : Map[String, Bool] = {}
+          for obj in objects {
+            pack_ids[@bitcore.hash_object_content(obj.obj_type, obj.data).to_hex()] = true
+          }
+          // Find external bases referenced by REF_DELTA entries in the
+          // original pack.  Scan the raw pack for type-7 headers and
+          // extract the 20-byte base hash following each.
+          let ref_delta_base_ids = scan_ref_delta_bases(pack)
+          // Add any base that wasn't already in the pack's objects
+          let all_objects : Array[@bitcore.PackObject] = Array::from_iter(
+            objects.iter(),
+          )
+          for base_hex in ref_delta_base_ids {
+            if not(pack_ids.contains(base_hex)) {
+              for base in bases {
+                let id = @bitcore.hash_object_content(base.obj_type, base.data)
+                if id.to_hex() == base_hex {
+                  all_objects.push(base)
+                  pack_ids[base_hex] = true
+                  break
+                }
+              }
+            }
+          }
+          let new_pack = @pack.create_packfile(all_objects)
+          let new_hash = pack_hash_hex(new_pack)
+          (new_pack, new_hash, all_objects)
+        } else {
+          (pack, hash_hex, objects)
+        }
         check_sha1_collisions_with_repo(fs, git_dir, objects)
         let fsck_warnings = check_pack_strict_and_fsck(
           fs,
@@ -926,12 +963,42 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
         for w in fsck_warnings {
           @stdio.stderr.write(w + "\n")
         }
-        let pack_dir = git_dir + "/objects/pack"
-        ensure_dir(pack_dir)
-        let pack_path = pack_dir + "/pack-" + hash_hex + ".pack"
+        // When --stdin is used with a pack path argument, write to that
+        // path (like git index-pack).  Otherwise write to objects/pack/.
+        let (pack_path, idx_path, rev_path, keep_path) = match cfg.pack_path {
+          Some(given_path) => {
+            let resolved = resolve_in_cwd(given_path)
+            let idx = if resolved.has_suffix(".pack") {
+              (try! resolved[:resolved.length() - 5]).to_string() + ".idx"
+            } else {
+              resolved + ".idx"
+            }
+            let rev = if resolved.has_suffix(".pack") {
+              (try! resolved[:resolved.length() - 5]).to_string() + ".rev"
+            } else {
+              resolved + ".rev"
+            }
+            let keep = if resolved.has_suffix(".pack") {
+              (try! resolved[:resolved.length() - 5]).to_string() + ".keep"
+            } else {
+              resolved + ".keep"
+            }
+            (resolved, idx, rev, keep)
+          }
+          None => {
+            let pack_dir = git_dir + "/objects/pack"
+            ensure_dir(pack_dir)
+            let pack_path = pack_dir + "/pack-" + hash_hex + ".pack"
+            let idx_path = pack_dir + "/pack-" + hash_hex + ".idx"
+            let rev_path = pack_dir + "/pack-" + hash_hex + ".rev"
+            let keep_path = pack_dir + "/pack-" + hash_hex + ".keep"
+            (pack_path, idx_path, rev_path, keep_path)
+          }
+        }
+        // Override idx path if -o was given
         let idx_path = match cfg.output_path {
           Some(path) => resolve_in_cwd(path)
-          None => pack_dir + "/pack-" + hash_hex + ".idx"
+          None => idx_path
         }
         fs.write_file(pack_path, pack)
         @pack.write_pack_index_from_objects_versioned(
@@ -943,10 +1010,8 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
           cfg.off64_threshold,
         )
         if write_rev {
-          let rev_path = pack_dir + "/pack-" + hash_hex + ".rev"
           @pack.write_reverse_index(fs, rev_path, pack, objects)
         }
-        let keep_path = pack_dir + "/pack-" + hash_hex + ".keep"
         write_keep_file(fs, keep_path, cfg.keep_msg)
         match trace2_event {
           Some(path) =>

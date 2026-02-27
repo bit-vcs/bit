@@ -1156,26 +1156,15 @@ fn dedup_objects(
 
 ///|
 fn sort_stdin_object_mode_objects(objects : Array[@bitcore.PackObject]) -> Unit {
+  // Sort by type only, preserving input order within each type (stable sort).
+  // This matches git's behaviour where objects are grouped by type and
+  // ordered by name-hash locality.  Preserving the input order (typically
+  // from `git ls-tree`, which sorts by filename) keeps similarly-named
+  // files adjacent, improving delta base selection and pack splitting.
   objects.sort_by(fn(a, b) {
     let a_type = a.obj_type.to_packfile_type()
     let b_type = b.obj_type.to_packfile_type()
-    if a_type != b_type {
-      return a_type - b_type
-    }
-    let a_size = a.data.length()
-    let b_size = b.data.length()
-    if a_size != b_size {
-      return b_size - a_size
-    }
-    let a_hex = @bitcore.hash_object_content(a.obj_type, a.data).to_hex()
-    let b_hex = @bitcore.hash_object_content(b.obj_type, b.data).to_hex()
-    if a_hex < b_hex {
-      -1
-    } else if a_hex > b_hex {
-      1
-    } else {
-      0
-    }
+    a_type - b_type
   })
 }
 
@@ -2608,6 +2597,14 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
       let reuse_only = cfg.window == 0
       // Split objects into groups based on packSizeLimit (only for file output, not stdout)
       let effective_limit = if cfg.stdout { None } else { pack_size_limit }
+      // git clamps minimum pack size to 1 MiB
+      match effective_limit {
+        Some(sz) =>
+          if sz > 0L && sz < 1048576L {
+            @stdio.stderr.write("warning: minimum pack size limit is 1 MiB\n")
+          }
+        None => ()
+      }
       let object_groups = split_objects_by_size_limit(objects, effective_limit)
       let mut total_delta_count = 0
       for group in object_groups {
@@ -2685,7 +2682,8 @@ fn split_objects_by_size_limit(
       if max_size <= 0L {
         return [objects]
       }
-      let effective_max = max_size
+      // git clamps minimum pack size to 1 MiB
+      let effective_max = if max_size < 1048576L { 1048576L } else { max_size }
       let groups : Array[Array[@bitcore.PackObject]] = []
       let mut current_group : Array[@bitcore.PackObject] = []
       let mut current_size = 0L
