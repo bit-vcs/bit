@@ -438,14 +438,16 @@ async fn check_file_against_index(
             unstaged_modified.push(path)
           } else if not(stat_matches) {
             let content = fs.read_file(abs)
-            let normalized = normalize_worktree_content(content, autocrlf)
+            let attrs = resolve_eol_attrs(fs, root, path)
+            let normalized = clean_for_storage(content, attrs, autocrlf)
             let id = @bit.hash_blob(normalized)
             if id != entry.id {
               unstaged_modified.push(path)
             }
           } else if racy_git {
             let content = fs.read_file(abs)
-            let normalized = normalize_worktree_content(content, autocrlf)
+            let attrs = resolve_eol_attrs(fs, root, path)
+            let normalized = clean_for_storage(content, attrs, autocrlf)
             let id = @bit.hash_blob(normalized)
             if id != entry.id {
               unstaged_modified.push(path)

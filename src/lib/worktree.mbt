@@ -165,7 +165,8 @@ pub fn add_paths(
     let abs = join_path(root, path)
     if rfs.is_file(abs) {
       let content = rfs.read_file(abs)
-      let normalized = normalize_worktree_content(content, autocrlf)
+      let attrs = resolve_eol_attrs(rfs, root, path)
+      let normalized = clean_for_storage(content, attrs, autocrlf)
       let id = write_loose_object(
         fs,
         actual_git_dir,
@@ -243,7 +244,8 @@ pub async fn add_paths_async(
         match info.kind {
           @bitio.WorktreeKindMeta::Regular => {
             let content = rfs.read_file(abs)
-            let normalized = normalize_worktree_content(content, autocrlf)
+            let attrs = resolve_eol_attrs(rfs, root, path)
+            let normalized = clean_for_storage(content, attrs, autocrlf)
             let id = write_loose_object(
               fs,
               actual_git_dir,
@@ -456,14 +458,14 @@ fn default_file_mode() -> Int {
 }
 
 ///|
-priv enum AutoCrlf {
+pub enum AutoCrlf {
   Off
   Input
   On
 }
 
 ///|
-fn read_autocrlf_setting(
+pub fn read_autocrlf_setting(
   fs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> AutoCrlf {
@@ -655,7 +657,10 @@ fn racy_git_enabled() -> Bool {
 }
 
 ///|
-fn normalize_worktree_content(content : Bytes, autocrlf : AutoCrlf) -> Bytes {
+pub fn normalize_worktree_content(
+  content : Bytes,
+  autocrlf : AutoCrlf,
+) -> Bytes {
   match autocrlf {
     Off => content
     Input | On =>
@@ -668,7 +673,7 @@ fn normalize_worktree_content(content : Bytes, autocrlf : AutoCrlf) -> Bytes {
 }
 
 ///|
-fn is_binary_bytes(content : Bytes) -> Bool {
+pub fn is_binary_bytes(content : Bytes) -> Bool {
   let limit = if content.length() > 8000 { 8000 } else { content.length() }
   for i in 0..<limit {
     if content[i] == b'\x00' {
@@ -679,7 +684,7 @@ fn is_binary_bytes(content : Bytes) -> Bool {
 }
 
 ///|
-fn normalize_crlf_to_lf(content : Bytes) -> Bytes {
+pub fn normalize_crlf_to_lf(content : Bytes) -> Bytes {
   let out : Array[Byte] = []
   let mut i = 0
   let mut changed = false
@@ -1333,4 +1338,41 @@ pub fn mv_path(
     out.push(entry)
   }
   write_index_entries(fs, actual_git_dir, out)
+}
+
+///|
+/// LF→CRLF expansion (smudge direction).
+pub fn convert_lf_to_crlf(content : Bytes) -> Bytes {
+  let out : Array[Byte] = []
+  let mut i = 0
+  let mut changed = false
+  while i < content.length() {
+    let b = content[i]
+    if b == b'\n' && (i == 0 || content[i - 1] != b'\r') {
+      out.push(b'\r')
+      out.push(b'\n')
+      changed = true
+    } else {
+      out.push(b)
+    }
+    i += 1
+  }
+  if not(changed) {
+    return content
+  }
+  Bytes::from_array(FixedArray::makei(out.length(), fn(i) { out[i] }))
+}
+
+///|
+/// Smudge: blob→working tree expansion.
+pub fn smudge_worktree_content(content : Bytes, autocrlf : AutoCrlf) -> Bytes {
+  match autocrlf {
+    Off | Input => content
+    On =>
+      if is_binary_bytes(content) {
+        content
+      } else {
+        convert_lf_to_crlf(content)
+      }
+  }
 }

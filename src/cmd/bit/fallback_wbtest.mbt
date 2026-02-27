@@ -1,5 +1,5 @@
 ///|
-test "fallback: need_real_git_for_autocrlf detects non-false values" {
+test "fallback: need_real_git_for_autocrlf always returns false (native handling)" {
   let fs = OsFs::new()
   let root = "/tmp/bit-test-fallback-autocrlf-" +
     get_current_timestamp().to_string()
@@ -20,30 +20,24 @@ test "fallback: need_real_git_for_autocrlf detects non-false values" {
     root + "/.git/config",
     string_to_bytes("[core]\nautocrlf = true\n"),
   )
-  assert_true(need_real_git_for_autocrlf(root))
+  assert_false(need_real_git_for_autocrlf(root))
 
   fs.write_file(
     root + "/.git/config",
     string_to_bytes("[core]\nautocrlf = input\n"),
   )
-  assert_true(need_real_git_for_autocrlf(root))
+  assert_false(need_real_git_for_autocrlf(root))
 
   fs.write_file(
     root + "/.git/config",
     string_to_bytes("[core]\nautocrlf = false\n"),
   )
   assert_false(need_real_git_for_autocrlf(root))
-
-  fs.write_file(
-    root + "/.git/config",
-    string_to_bytes("[core]\nautocrlf = mixed\n"),
-  )
-  assert_true(need_real_git_for_autocrlf(root))
   cleanup()
 }
 
 ///|
-test "fallback: need_real_git_for_gitattributes detects filter/text/eol attributes" {
+test "fallback: need_real_git_for_gitattributes only triggers for filter/working-tree-encoding" {
   let fs = OsFs::new()
   let root = "/tmp/bit-test-fallback-gitattr-" +
     get_current_timestamp().to_string()
@@ -63,18 +57,27 @@ test "fallback: need_real_git_for_gitattributes detects filter/text/eol attribut
     }
   }
 
+  // text/eol attributes no longer trigger fallback (handled natively)
   fs.write_file(root + "/.gitattributes", string_to_bytes("*.txt -text\n"))
-  assert_true(need_real_git_for_gitattributes(root))
+  assert_false(need_real_git_for_gitattributes(root))
 
   fs.write_file(root + "/.gitattributes", string_to_bytes("*.txt text\n"))
-  assert_true(need_real_git_for_gitattributes(root))
+  assert_false(need_real_git_for_gitattributes(root))
 
   fs.write_file(root + "/.gitattributes", string_to_bytes("*.txt eol=crlf\n"))
-  assert_true(need_real_git_for_gitattributes(root))
+  assert_false(need_real_git_for_gitattributes(root))
 
+  // filter= still triggers fallback
   fs.write_file(
     root + "/.gitattributes",
     string_to_bytes("*.txt filter=foo diff=bar\n"),
+  )
+  assert_true(need_real_git_for_gitattributes(root))
+
+  // working-tree-encoding= still triggers fallback
+  fs.write_file(
+    root + "/.gitattributes",
+    string_to_bytes("*.txt working-tree-encoding=UTF-16\n"),
   )
   assert_true(need_real_git_for_gitattributes(root))
 
@@ -114,19 +117,23 @@ test "fallback: need_real_git_for_filtering combines autocrlf and gitattributes"
   )
   assert_false(need_real_git_for_filtering(root))
 
-  // autocrlf triggers
+  // autocrlf=true no longer triggers (native handling)
   fs.write_file(
     root + "/.git/config",
     string_to_bytes("[core]\nautocrlf = true\n"),
   )
-  assert_true(need_real_git_for_filtering(root))
+  assert_false(need_real_git_for_filtering(root))
 
-  // gitattributes triggers (with autocrlf=false)
+  // text attribute no longer triggers (native handling)
   fs.write_file(
     root + "/.git/config",
     string_to_bytes("[core]\nautocrlf = false\n"),
   )
   fs.write_file(root + "/.gitattributes", string_to_bytes("*.txt text\n"))
+  assert_false(need_real_git_for_filtering(root))
+
+  // filter= still triggers
+  fs.write_file(root + "/.gitattributes", string_to_bytes("*.txt filter=lfs\n"))
   assert_true(need_real_git_for_filtering(root))
   cleanup()
 }

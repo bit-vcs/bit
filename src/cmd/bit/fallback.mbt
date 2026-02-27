@@ -1,17 +1,7 @@
 ///|
-fn need_real_git_for_autocrlf(root : String) -> Bool {
-  let fs = OsFs::new()
-  let git_dir = resolve_git_dir(fs, root)
-  match @bitlib.read_config_value(fs, git_dir + "/config", "core", "autocrlf") {
-    Some(value) =>
-      match @bitlib.config_strip_quotes(value).to_lower() {
-        "true" => true
-        "input" => true
-        "false" => false
-        _ => true
-      }
-    None => false
-  }
+fn need_real_git_for_autocrlf(_root : String) -> Bool {
+  // autocrlf is now handled natively
+  false
 }
 
 ///|
@@ -36,14 +26,7 @@ fn need_real_git_for_gitattributes(root : String) -> Bool {
       if token.length() == 0 {
         continue
       }
-      if token == "crlf" ||
-        token == "-crlf" ||
-        token == "text" ||
-        token == "-text" ||
-        token == "eol" ||
-        token == "filter" ||
-        token.has_prefix("eol=") ||
-        token.has_prefix("text=") ||
+      if token == "filter" ||
         token.has_prefix("filter=") ||
         token.has_prefix("working-tree-encoding=") {
         return true

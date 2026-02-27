@@ -116,7 +116,8 @@ pub async fn diff_worktree(
               content_changed = false
             } else {
               let content = fs.read_file(abs)
-              let normalized = normalize_worktree_content(content, autocrlf)
+              let attrs = resolve_eol_attrs(fs, root, path)
+              let normalized = clean_for_storage(content, attrs, autocrlf)
               let id = @bit.hash_blob(normalized)
               content_changed = id != entry.id
               if content_changed {

@@ -32,6 +32,8 @@ pub fn checkout(&@types.FileSystem, &@types.RepoFileSystem, String, String, deta
 
 pub fn cherry_pick(&@types.FileSystem, &@types.RepoFileSystem, String, @object.ObjectId, String, Int64) -> CherryPickResult raise @object.GitError
 
+pub fn clean_for_storage(Bytes, FileEolAttrs, AutoCrlf) -> Bytes
+
 pub fn clear_rebase_state(&@types.FileSystem, &@types.RepoFileSystem, String) -> Unit raise @object.GitError
 
 pub fn collect_commit_tree_only(ObjectDb, &@types.RepoFileSystem, @object.ObjectId) -> Array[@object.PackObject] raise @object.GitError
@@ -63,6 +65,8 @@ pub fn config_has_remote_section(Array[ConfigBlock], String) -> Bool
 pub fn config_strip_quotes(String) -> String
 
 pub fn content_merge(String, String, String, ContentMergeOptions) -> ContentMergeResult
+
+pub fn convert_lf_to_crlf(Bytes) -> Bytes
 
 pub fn copy_tree(&@types.FileSystem, &@types.RepoFileSystem, String, String) -> Unit raise @object.GitError
 
@@ -122,6 +126,8 @@ pub fn get_worktree_lock_reason(&@types.RepoFileSystem, String, String) -> Strin
 
 pub fn get_worktree_prunable_reason(&@types.RepoFileSystem, String, String) -> String? raise @object.GitError
 
+pub fn has_unsupported_gitattributes(&@types.RepoFileSystem, String) -> Bool
+
 pub fn init_repo(&@types.FileSystem, String, default_branch? : String, bare? : Bool) -> Unit raise @object.GitError
 
 pub fn init_repo_with_options(&@types.FileSystem, String, InitOptions) -> Unit raise @object.GitError
@@ -131,6 +137,8 @@ pub fn init_repo_with_options_with_repo_fs(&@types.FileSystem, &@types.RepoFileS
 pub fn is_ancestor_of(&@types.RepoFileSystem, String, @object.ObjectId, @object.ObjectId) -> Bool
 
 pub fn is_bare_git_dir(String) -> Bool
+
+pub fn is_binary_bytes(Bytes) -> Bool
 
 pub fn is_branch_checked_out(&@types.RepoFileSystem, String, String) -> String? raise @object.GitError
 
@@ -200,11 +208,15 @@ pub fn move_worktree(&@types.FileSystem, &@types.RepoFileSystem, String, String,
 
 pub fn mv_path(&@types.FileSystem, &@types.RepoFileSystem, String, String, String, force? : Bool) -> Unit raise @object.GitError
 
+pub fn normalize_crlf_to_lf(Bytes) -> Bytes
+
 pub fn normalize_remote_branch_name(String) -> String
 
 pub fn normalize_repo_path(String) -> String raise @object.GitError
 
 pub fn normalize_track_ref(String) -> String
+
+pub fn normalize_worktree_content(Bytes, AutoCrlf) -> Bytes
 
 pub fn parse_config_blocks(String) -> Array[ConfigBlock]
 
@@ -235,6 +247,8 @@ pub fn parse_upload_pack_request_v2(Bytes) -> UploadPackRequestV2 raise @object.
 pub fn prune_repo(&@types.FileSystem, &@types.RepoFileSystem, String) -> PruneResult raise @object.GitError
 
 pub fn prune_worktrees(&@types.FileSystem, &@types.RepoFileSystem, String, dry_run? : Bool) -> Array[String] raise @object.GitError
+
+pub fn read_autocrlf_setting(&@types.RepoFileSystem, String) -> AutoCrlf
 
 pub fn read_config_bool(&@types.RepoFileSystem, String, String, String) -> Bool?
 
@@ -312,6 +326,8 @@ pub fn repair_worktree(&@types.FileSystem, &@types.RepoFileSystem, String, workt
 
 pub fn reset(&@types.FileSystem, &@types.RepoFileSystem, String, String, ResetMode) -> @object.ObjectId raise @object.GitError
 
+pub fn resolve_eol_attrs(&@types.RepoFileSystem, String, String) -> FileEolAttrs
+
 pub fn resolve_gitdir(&@types.RepoFileSystem, String) -> String
 
 pub fn resolve_head_commit(&@types.RepoFileSystem, String) -> @object.ObjectId? raise @object.GitError
@@ -337,6 +353,10 @@ pub fn should_log_ref(&@types.RepoFileSystem, String, String, Bool) -> (Bool, Bo
 pub fn show_ref(&@types.RepoFileSystem, String) -> Array[(String, @object.ObjectId)] raise @object.GitError
 
 pub fn show_ref_text(&@types.RepoFileSystem, String) -> Array[String] raise @object.GitError
+
+pub fn smudge_for_checkout(Bytes, FileEolAttrs, AutoCrlf) -> Bytes
+
+pub fn smudge_worktree_content(Bytes, AutoCrlf) -> Bytes
 
 pub fn sort_branch_configs_by_name(Array[BranchConfig]) -> Unit
 
@@ -415,6 +435,12 @@ pub fn write_worktree_from_files(ObjectDb, &@types.FileSystem, &@types.RepoFileS
 // Errors
 
 // Types and methods
+pub enum AutoCrlf {
+  Off
+  Input
+  On
+}
+
 pub(all) struct BranchConfig {
   name : String
   mut remote : String?
@@ -484,10 +510,21 @@ pub enum DiffKind {
   Deleted
 }
 
+pub enum EolAttr {
+  Lf
+  Crlf
+  Unspecified
+}
+
 pub(all) struct FetchRefspec {
   negative : Bool
   src : String
   dst : String
+}
+
+pub struct FileEolAttrs {
+  text : TextAttr
+  eol : EolAttr
 }
 
 pub struct GcResult {
@@ -730,6 +767,13 @@ pub struct Status {
   unstaged_modified : Array[String]
   unstaged_deleted : Array[String]
   untracked : Array[String]
+}
+
+pub enum TextAttr {
+  Auto
+  Set
+  Unset
+  Unspecified
 }
 
 pub struct TreeFileEntry {

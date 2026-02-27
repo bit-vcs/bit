@@ -161,6 +161,7 @@ pub fn write_worktree_from_files(
       }
     }
   }
+  let autocrlf = read_autocrlf_setting(rfs, git_dir)
   let items = files.to_array()
   items.sort_by((left, right) => {
     let (left_path, _) = left
@@ -208,7 +209,9 @@ pub fn write_worktree_from_files(
         let full_path = join_path(root, path)
         let dir = parent_dir(full_path)
         fs.mkdir_p(dir)
-        fs.write_file(full_path, o.data)
+        let attrs = resolve_eol_attrs(rfs, root, path)
+        let output = smudge_for_checkout(o.data, attrs, autocrlf)
+        fs.write_file(full_path, output)
       }
     }
   }
@@ -236,6 +239,7 @@ pub fn write_worktree_and_build_index(
       }
     }
   }
+  let autocrlf = read_autocrlf_setting(rfs, git_dir)
   let items = files.to_array()
   items.sort_by((left, right) => {
     let (left_path, _) = left
@@ -294,7 +298,9 @@ pub fn write_worktree_and_build_index(
         if not(skip_write) {
           let dir = parent_dir(full_path)
           fs.mkdir_p(dir)
-          fs.write_file(full_path, o.data)
+          let attrs = resolve_eol_attrs(rfs, root, path)
+          let output = smudge_for_checkout(o.data, attrs, autocrlf)
+          fs.write_file(full_path, output)
         }
         // Get actual mtime from the file we just wrote
         let (mtime_sec, mtime_nsec) = match

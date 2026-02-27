@@ -1011,6 +1011,7 @@ fn storage_handle_hash_object(
     storage_print_line(id.to_hex())
     return
   }
+  let autocrlf = @bitlib.read_autocrlf_setting(rfs, git_dir)
   for path in args.paths {
     let abs = if path.has_prefix("/") {
       storage_normalize_path(path)
@@ -1018,9 +1019,17 @@ fn storage_handle_hash_object(
       storage_normalize_path(cwd + "/" + path)
     }
     let content = rfs.read_file(abs)
-    let id = @bit.hash_object_content(args.obj_type, content)
+    let prefix_len = root.length() + 1
+    let rel_path = if abs.has_prefix(root + "/") {
+      abs[prefix_len:].to_string()
+    } else {
+      abs
+    }
+    let attrs = @bitlib.resolve_eol_attrs(rfs, root, rel_path)
+    let normalized = @bitlib.clean_for_storage(content, attrs, autocrlf)
+    let id = @bit.hash_object_content(args.obj_type, normalized)
     if args.write_object {
-      ignore(@bitlib.write_loose_object(fs, git_dir, args.obj_type, content))
+      ignore(@bitlib.write_loose_object(fs, git_dir, args.obj_type, normalized))
     }
     storage_print_line(id.to_hex())
   }

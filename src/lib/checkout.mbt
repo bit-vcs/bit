@@ -21,6 +21,7 @@ pub fn restore_paths(
     let safe_path = normalize_checkout_path(e.path)
     index_map[safe_path] = e
   }
+  let autocrlf = read_autocrlf_setting(rfs, actual_git_dir)
   let db = ObjectDb::load(rfs, object_git_dir)
   for path in paths {
     let safe_path = normalize_checkout_path(path)
@@ -42,7 +43,9 @@ pub fn restore_paths(
             if dir.length() > 0 && dir != root {
               fs.mkdir_p(dir)
             }
-            fs.write_file(abs_path, o.data)
+            let attrs = resolve_eol_attrs(rfs, root, safe_path)
+            let output = smudge_for_checkout(o.data, attrs, autocrlf)
+            fs.write_file(abs_path, output)
           }
         }
       }

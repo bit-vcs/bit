@@ -39,7 +39,7 @@ pub fn fast_forward_to(
   let db = ObjectDb::load(rfs, git_dir)
   let tree_map = rebase_tree_map(db, rfs, target)
   rebase_update_head(fs, rfs, git_dir, target)
-  rebase_write_worktree(fs, db, rfs, root, tree_map)
+  rebase_write_worktree(fs, db, rfs, root, git_dir, tree_map)
   let entries = rebase_map_to_index(db, rfs, tree_map)
   write_index_entries(fs, git_dir, entries)
 }
@@ -95,7 +95,7 @@ pub fn rebase_onto(
         parent = new_id
       }
       rebase_update_head(fs, rfs, git_dir, parent)
-      rebase_write_worktree(fs, db, rfs, root, base_map)
+      rebase_write_worktree(fs, db, rfs, root, git_dir, base_map)
       let entries = rebase_map_to_index(db, rfs, base_map)
       write_index_entries(fs, git_dir, entries)
       parent
@@ -471,9 +471,10 @@ fn rebase_write_worktree(
   db : ObjectDb,
   rfs : &@bit.RepoFileSystem,
   root : String,
+  git_dir : String,
   map : Map[String, TreeEntryInfo],
 ) -> Unit raise @bit.GitError {
-  rebase_write_worktree_except(fs, db, rfs, root, map, [])
+  rebase_write_worktree_except(fs, db, rfs, root, git_dir, map, [])
 }
 
 ///|
@@ -483,9 +484,11 @@ fn rebase_write_worktree_except(
   db : ObjectDb,
   rfs : &@bit.RepoFileSystem,
   root : String,
+  git_dir : String,
   map : Map[String, TreeEntryInfo],
   except : Array[String],
 ) -> Unit raise @bit.GitError {
+  let autocrlf = read_autocrlf_setting(rfs, git_dir)
   let except_set : Map[String, Bool] = {}
   for path in except {
     except_set[path] = true
@@ -516,7 +519,9 @@ fn rebase_write_worktree_except(
         }
         let dir = rebase_parent_dir(full)
         fs.mkdir_p(dir)
-        fs.write_file(full, o.data)
+        let attrs = resolve_eol_attrs(rfs, root, path)
+        let output = smudge_for_checkout(o.data, attrs, autocrlf)
+        fs.write_file(full, output)
       }
       None => raise @bit.GitError::InvalidObject("Missing blob object")
     }
@@ -1028,7 +1033,7 @@ pub fn rebase_start(
       // This is crucial for correct conflict markers (HEAD = upstream, not feature branch)
       rebase_update_head(fs, rfs, git_dir, upstream)
       let upstream_map = rebase_tree_map(db, rfs, upstream)
-      rebase_write_worktree(fs, db, rfs, root, upstream_map)
+      rebase_write_worktree(fs, db, rfs, root, git_dir, upstream_map)
       let entries = rebase_map_to_index(db, rfs, upstream_map)
       write_index_entries(fs, git_dir, entries)
       // Start applying commits
@@ -1124,7 +1129,7 @@ pub fn rebase_abort(
   // Restore worktree to original HEAD
   let db = ObjectDb::load(rfs, git_dir)
   let tree_map = rebase_tree_map(db, rfs, s.orig_head)
-  rebase_write_worktree(fs, db, rfs, root, tree_map)
+  rebase_write_worktree(fs, db, rfs, root, git_dir, tree_map)
   let entries = rebase_map_to_index(db, rfs, tree_map)
   write_index_entries(fs, git_dir, entries)
   // Clear rebase state
@@ -1169,7 +1174,7 @@ pub fn rebase_skip(
     raise @bit.GitError::InvalidObject("No HEAD commit")
   }
   let tree_map = rebase_tree_map(db, rfs, h)
-  rebase_write_worktree(fs, db, rfs, root, tree_map)
+  rebase_write_worktree(fs, db, rfs, root, git_dir, tree_map)
   let entries = rebase_map_to_index(db, rfs, tree_map)
   write_index_entries(fs, git_dir, entries)
   // Continue with next commits
@@ -1196,7 +1201,7 @@ fn rebase_apply_next(
       raise @bit.GitError::InvalidObject("No HEAD after rebase")
     }
     let final_tree_map = rebase_tree_map(db, rfs, final_id)
-    rebase_write_worktree(fs, db, rfs, root, final_tree_map)
+    rebase_write_worktree(fs, db, rfs, root, git_dir, final_tree_map)
     let final_entries = rebase_map_to_index(db, rfs, final_tree_map)
     write_index_entries(fs, git_dir, final_entries)
     clear_rebase_state(fs, rfs, git_dir)
@@ -1244,7 +1249,9 @@ fn rebase_apply_next(
     }
     save_rebase_state(fs, git_dir, new_state)
     // Write partially merged state to worktree and index (skip conflicting files)
-    rebase_write_worktree_except(fs, db, rfs, root, base_map, conflicts)
+    rebase_write_worktree_except(
+      fs, db, rfs, root, git_dir, base_map, conflicts,
+    )
     let entries = rebase_map_to_index(db, rfs, base_map)
     write_index_entries(fs, git_dir, entries)
     return {
