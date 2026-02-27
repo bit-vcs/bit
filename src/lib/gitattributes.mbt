@@ -16,9 +16,15 @@ pub enum EolAttr {
 }
 
 ///|
+pub(all) struct FilterCmd {
+  run : async (String, String, String, Bytes) -> Bytes raise @bit.GitError
+}
+
+///|
 pub struct FileEolAttrs {
   text : TextAttr
   eol : EolAttr
+  filter : String?
 }
 
 ///|
@@ -30,7 +36,11 @@ pub fn resolve_eol_attrs(
 ) -> FileEolAttrs {
   let attr_path = join_path(root, ".gitattributes")
   if not(rfs.is_file(attr_path)) {
-    return { text: TextAttr::Unspecified, eol: EolAttr::Unspecified }
+    return {
+      text: TextAttr::Unspecified,
+      eol: EolAttr::Unspecified,
+      filter: None,
+    }
   }
   let content = @utf8.decode_lossy(
     (rfs.read_file(attr_path) catch { _ => Bytes::default() })[:],
@@ -44,6 +54,7 @@ pub fn resolve_eol_attrs(
   }
   let mut text : TextAttr = TextAttr::Unspecified
   let mut eol : EolAttr = EolAttr::Unspecified
+  let mut filter : String? = None
   for line_view in content.split("\n") {
     let line = line_view.to_string().trim().to_string()
     if line.length() == 0 || line.has_prefix("#") {
@@ -89,6 +100,11 @@ pub fn resolve_eol_attrs(
             eol = EolAttr::Crlf
           }
         }
+      } else if token.has_prefix("filter=") {
+        let value = String::unsafe_substring(token, start=7, end=token.length())
+        if value.length() > 0 {
+          filter = Some(value)
+        }
       } else if token == "crlf" {
         // Legacy: crlf is equivalent to text
         text = TextAttr::Set
@@ -99,7 +115,7 @@ pub fn resolve_eol_attrs(
       j += 1
     }
   }
-  { text, eol }
+  { text, eol, filter }
 }
 
 ///|
@@ -191,8 +207,94 @@ pub fn smudge_for_checkout(
 }
 
 ///|
-/// Check if .gitattributes has filter= or working-tree-encoding= that needs real git.
-pub fn has_unsupported_gitattributes(
+/// Check if .gitattributes has unsupported attributes (filter=lfs, working-tree-encoding).
+/// Generic filter= (other than lfs) is now handled natively.
+pub fn check_unsupported_gitattributes(
+  rfs : &@bit.RepoFileSystem,
+  root : String,
+) -> String? {
+  let attr_path = join_path(root, ".gitattributes")
+  if not(rfs.is_file(attr_path)) {
+    return None
+  }
+  let content = @utf8.decode_lossy(
+    (rfs.read_file(attr_path) catch { _ => Bytes::default() })[:],
+  )
+  for line_view in content.split("\n") {
+    let line = line_view.to_string().trim().to_string()
+    if line.length() == 0 || line.has_prefix("#") {
+      continue
+    }
+    for token_view in line.split(" ") {
+      let token = token_view.to_string().trim().to_string()
+      if token.length() == 0 {
+        continue
+      }
+      if token == "filter=lfs" || token.has_prefix("filter=lfs ") {
+        return Some("fatal: filter 'lfs' is not supported in standalone mode")
+      }
+      if token.has_prefix("working-tree-encoding=") {
+        return Some(
+          "fatal: working-tree-encoding is not supported in standalone mode",
+        )
+      }
+    }
+  }
+  None
+}
+
+///|
+/// Read filter clean/smudge commands from git config.
+pub fn read_filter_commands(
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+  filter_name : String,
+) -> (String?, String?) {
+  let section = "filter \"" + filter_name + "\""
+  let mut clean : String? = None
+  let mut smudge : String? = None
+  // Check global config first (lower priority)
+  match @bitio.env_get("HOME") {
+    None => ()
+    Some(home) => {
+      let candidates : Array[String] = []
+      if @bitio.env_get("XDG_CONFIG_HOME") is Some(base) {
+        candidates.push(base + "/git/config")
+      }
+      candidates.push(home + "/.gitconfig")
+      for path in candidates {
+        if rfs.is_file(path) {
+          match read_config_value(rfs, path, section, "clean") {
+            Some(v) => clean = Some(v)
+            None => ()
+          }
+          match read_config_value(rfs, path, section, "smudge") {
+            Some(v) => smudge = Some(v)
+            None => ()
+          }
+          break
+        }
+      }
+    }
+  }
+  // Local config overrides global
+  let local_path = join_path(git_dir, "config")
+  if rfs.is_file(local_path) {
+    match read_config_value(rfs, local_path, section, "clean") {
+      Some(v) => clean = Some(v)
+      None => ()
+    }
+    match read_config_value(rfs, local_path, section, "smudge") {
+      Some(v) => smudge = Some(v)
+      None => ()
+    }
+  }
+  (clean, smudge)
+}
+
+///|
+/// Check if .gitattributes has any filter= attributes (for storage runtime bypass).
+pub fn has_any_filter_attributes(
   rfs : &@bit.RepoFileSystem,
   root : String,
 ) -> Bool {
@@ -213,9 +315,7 @@ pub fn has_unsupported_gitattributes(
       if token.length() == 0 {
         continue
       }
-      if token == "filter" ||
-        token.has_prefix("filter=") ||
-        token.has_prefix("working-tree-encoding=") {
+      if token.has_prefix("filter=") {
         return true
       }
     }

@@ -10,8 +10,7 @@ async fn show_status_command_help() -> Unit {
 
 ///|
 fn status_need_real_git() -> Bool {
-  let root = get_work_root()
-  need_real_git_for_filtering(root)
+  false
 }
 
 ///|

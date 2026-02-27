@@ -4,6 +4,7 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
   let rfs : &@bitcore.RepoFileSystem = fs
   let git_dir = resolve_git_dir(rfs, root)
+  check_and_exit_unsupported_attrs(root)
   // Parse arguments
   let mut saw_separator = false
   let mut create_branch = false

@@ -24,6 +24,8 @@ pub async fn push_http_tree_only(&@types.RepoFileSystem, String, String, @object
 
 pub async fn resolve_remote_ref_id(String, String) -> (@object.ObjectId, String?)? raise @object.GitError
 
+pub async fn run_filter_command(String, String, String, Bytes) -> Bytes raise @object.GitError
+
 // Errors
 
 // Types and methods

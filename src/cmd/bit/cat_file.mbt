@@ -29,10 +29,7 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
     )
     @sys.exit(1)
   }
-  if cat_file_need_real_git_for_args(args) || need_real_git_for_filtering(root) {
-    ignore(run_real_git("cat-file", args))
-    return
-  }
+  check_and_exit_unsupported_attrs(root)
   let mut show_type = false
   let mut show_size = false
   let mut pretty_print = false
@@ -2806,14 +2803,4 @@ async fn cat_file_usage_fatal(message : String) -> Unit raise Error {
 async fn cat_file_usage_error(message : String) -> Unit raise Error {
   eprint_line("error: \{message}")
   @sys.exit(129)
-}
-
-///|
-fn cat_file_need_real_git_for_args(args : Array[String]) -> Bool {
-  for arg in args {
-    if arg == "--textconv" || arg == "--filters" {
-      return true
-    }
-  }
-  false
 }

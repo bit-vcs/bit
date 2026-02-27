@@ -1,6 +1,7 @@
 ///|
 async fn handle_cherry_pick(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
+  check_and_exit_unsupported_attrs(root)
   let git_dir = root + "/.git"
   let fs = OsFs::new()
   let wfs : &@bitcore.FileSystem = fs

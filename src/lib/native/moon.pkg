@@ -9,6 +9,7 @@ import {
   "moonbitlang/async" @async,
   "moonbitlang/async/fs" @afs,
   "moonbitlang/async/http" @http,
+  "moonbitlang/async/io" @aio,
   "moonbitlang/async/process" @process,
   "mizchi/zlib",
   "moonbitlang/core/encoding/utf8" @utf8,
@@ -30,6 +31,7 @@ warnings = "-29"
 options(
   targets: {
     "bench_worktree_entry_wbtest.mbt": [ "native" ],
+    "filter.mbt": [ "native" ],
     "ignore_async_test.mbt": [ "native" ],
     "promisor.mbt": [ "native" ],
     "remote_ref.mbt": [ "native" ],

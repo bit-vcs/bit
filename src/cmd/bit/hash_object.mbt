@@ -21,8 +21,7 @@ fn hash_object_storage_runtime_delegate_args(
 
 ///|
 fn hash_object_need_real_git(_args : Array[String]) -> Bool {
-  let root = get_work_root()
-  need_real_git_for_filtering(root)
+  false
 }
 
 ///|
@@ -48,5 +47,8 @@ async fn handle_hash_object(args : Array[String]) -> Unit raise Error {
       None => ()
     }
   }
-  ignore(run_real_git("hash-object", args))
+  eprint_line(
+    "fatal: hash-object with unsupported arguments is not available in standalone mode",
+  )
+  @sys.exit(128)
 }

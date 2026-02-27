@@ -65,6 +65,7 @@ fn looks_like_cached_diff_revision(token : String) -> Bool {
 ///|
 async fn handle_diff(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
+  check_and_exit_unsupported_attrs(root)
   let fs = OsFs::new()
   let rfs : &@bitcore.RepoFileSystem = fs
   let git_dir = resolve_git_dir(rfs, root)

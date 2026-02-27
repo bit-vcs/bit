@@ -4,6 +4,7 @@ async fn handle_reset(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
   let rfs : &@bitcore.RepoFileSystem = fs
   let git_dir = resolve_git_dir(rfs, root)
+  check_and_exit_unsupported_attrs(root)
   let skip_before_reset = reset_read_skip_worktree_paths(rfs, git_dir)
   let mut mode : @bitlib.ResetMode = @bitlib.ResetMode::Mixed
   let mut rev : String? = None

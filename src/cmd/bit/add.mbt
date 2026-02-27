@@ -39,8 +39,7 @@ async fn run_add_hook(
 
 ///|
 fn add_need_real_git() -> Bool {
-  let root = get_work_root()
-  need_real_git_for_filtering(root)
+  false
 }
 
 ///|
@@ -154,7 +153,16 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
       if pre_code != 0 {
         raise @bitcore.GitError::InvalidObject("pre-add hook failed")
       }
-      @bitlib.add_paths_async(fs, fs, root, all_paths)
+      let filter_cmd = @bitlib.FilterCmd::{
+        run: @bitlibnative.run_filter_command,
+      }
+      @bitlib.add_paths_async(
+        fs,
+        fs,
+        root,
+        all_paths,
+        run_filter_cmd=filter_cmd,
+      )
       stage_submodule_gitlinks(fs, root, all_paths)
 
       let post_code = run_add_hook(fs, root, git_dir, "post-add")
@@ -180,7 +188,16 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
     if pre_code != 0 {
       raise @bitcore.GitError::InvalidObject("pre-add hook failed")
     }
-    @bitlib.add_paths_async(fs, fs, root, stage_paths)
+    let filter_cmd = @bitlib.FilterCmd::{
+      run: @bitlibnative.run_filter_command,
+    }
+    @bitlib.add_paths_async(
+      fs,
+      fs,
+      root,
+      stage_paths,
+      run_filter_cmd=filter_cmd,
+    )
     stage_submodule_gitlinks(fs, root, stage_paths)
   }
   if not(force) && add_has_explicit_ignored_path(fs, root, paths) {

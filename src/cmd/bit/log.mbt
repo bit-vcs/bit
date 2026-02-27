@@ -24,8 +24,7 @@ fn is_short_count_flag(arg : String) -> Bool {
 
 ///|
 fn log_need_real_git() -> Bool {
-  let root = get_work_root()
-  need_real_git_for_filtering(root)
+  false
 }
 
 ///|

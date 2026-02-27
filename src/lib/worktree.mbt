@@ -15,6 +15,7 @@ pub struct Status {
 pub async fn status(
   fs : &@bit.RepoFileSystem,
   root : String,
+  run_filter_cmd? : FilterCmd,
 ) -> Status raise @bit.GitError {
   let profile = profile_enabled()
   let mut t0 = profile_start(profile)
@@ -30,7 +31,14 @@ pub async fn status(
   let index_entries = read_index_entries(fs, actual_git_dir)
   t0 = profile_lap(profile, "status read_index_entries", t0)
   let (unstaged_modified, unstaged_deleted, untracked) = index_guided_status_walk(
-    fs, root, index_entries, skip_worktree_paths, autocrlf, racy_git,
+    fs,
+    root,
+    actual_git_dir,
+    index_entries,
+    skip_worktree_paths,
+    autocrlf,
+    racy_git,
+    run_filter_cmd?,
   )
   t0 = profile_lap(profile, "status index_guided_walk", t0)
   // Build index_map for staged changes detection
@@ -201,6 +209,7 @@ pub async fn add_paths_async(
   rfs : &@bit.RepoFileSystem,
   root : String,
   paths : Array[String],
+  run_filter_cmd? : FilterCmd,
 ) -> Unit raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   let actual_git_dir = if rfs.is_file(git_dir) {
@@ -245,6 +254,18 @@ pub async fn add_paths_async(
           @bitio.WorktreeKindMeta::Regular => {
             let content = rfs.read_file(abs)
             let attrs = resolve_eol_attrs(rfs, root, path)
+            let content = match (attrs.filter, run_filter_cmd) {
+              (Some(name), Some(run_cmd)) => {
+                let (clean_cmd, _) = read_filter_commands(
+                  rfs, actual_git_dir, name,
+                )
+                match clean_cmd {
+                  Some(cmd) => (run_cmd.run)(root, actual_git_dir, cmd, content)
+                  None => content
+                }
+              }
+              _ => content
+            }
             let normalized = clean_for_storage(content, attrs, autocrlf)
             let id = write_loose_object(
               fs,

@@ -7,6 +7,7 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
     @sys.exit(1)
   }
   let root = get_work_root()
+  check_and_exit_unsupported_attrs(root)
   let git_dir = root + "/.git"
   let fs = OsFs::new()
   let wfs : &@bitcore.FileSystem = fs

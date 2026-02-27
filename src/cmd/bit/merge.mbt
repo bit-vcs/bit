@@ -3,6 +3,7 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
   let rfs : &@bitcore.RepoFileSystem = fs
   let root = get_work_root()
+  check_and_exit_unsupported_attrs(root)
   let git_dir = root + "/.git"
   let wfs : &@bitcore.FileSystem = fs
   let mut target_ref : String? = None

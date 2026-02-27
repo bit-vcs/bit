@@ -76,10 +76,12 @@ fn build_dir_index(
 async fn index_guided_status_walk(
   fs : &@bit.RepoFileSystem,
   root : String,
+  git_dir : String,
   index_entries : Array[IndexEntry],
   skip_worktree : Map[String, Bool],
   autocrlf : AutoCrlf,
   racy_git : Bool,
+  run_filter_cmd? : FilterCmd,
 ) -> (Array[String], Array[String], Array[String]) raise @bit.GitError {
   let dir_index = build_dir_index(index_entries, skip_worktree)
   let visited = FixedArray::make(index_entries.length(), false)
@@ -88,8 +90,20 @@ async fn index_guided_status_walk(
   let untracked : Array[String] = []
   let matcher = @ignore.Matcher::new()
   walk_dir_guided(
-    fs, root, "", index_entries, dir_index, visited, matcher, autocrlf, racy_git,
-    unstaged_modified, unstaged_deleted, untracked,
+    fs,
+    root,
+    git_dir,
+    "",
+    index_entries,
+    dir_index,
+    visited,
+    matcher,
+    autocrlf,
+    racy_git,
+    unstaged_modified,
+    unstaged_deleted,
+    untracked,
+    run_filter_cmd?,
   )
   // Post-walk sweep: any unvisited, non-skip-worktree entries are deleted
   for i, entry in index_entries {
@@ -107,6 +121,7 @@ async fn index_guided_status_walk(
 async fn walk_dir_guided(
   fs : &@bit.RepoFileSystem,
   root : String,
+  git_dir : String,
   rel : String,
   index_entries : Array[IndexEntry],
   dir_index : DirIndex,
@@ -117,6 +132,7 @@ async fn walk_dir_guided(
   unstaged_modified : Array[String],
   unstaged_deleted : Array[String],
   untracked : Array[String],
+  run_filter_cmd? : FilterCmd,
 ) -> Unit raise @bit.GitError {
   let dir = if rel == "" { root } else { join_path(root, rel) }
   // Try readdir_typed; if directory doesn't exist, all index entries here
@@ -189,11 +205,13 @@ async fn walk_dir_guided(
           check_file_against_index(
             fs,
             root,
+            git_dir,
             entry.path,
             entry,
             autocrlf,
             racy_git,
             unstaged_modified,
+            run_filter_cmd?,
           )
         }
         di += 1
@@ -264,21 +282,57 @@ async fn walk_dir_guided(
       if has_descendants {
         // Must recurse to detect deleted entries
         walk_dir_guided(
-          fs, root, child_rel, index_entries, dir_index, visited, matcher, autocrlf,
-          racy_git, unstaged_modified, unstaged_deleted, untracked,
+          fs,
+          root,
+          git_dir,
+          child_rel,
+          index_entries,
+          dir_index,
+          visited,
+          matcher,
+          autocrlf,
+          racy_git,
+          unstaged_modified,
+          unstaged_deleted,
+          untracked,
+          run_filter_cmd?,
         )
       } else if matcher.could_negate_under(child_rel) {
         // A negation rule could un-ignore children under this directory
         walk_dir_guided(
-          fs, root, child_rel, index_entries, dir_index, visited, matcher, autocrlf,
-          racy_git, unstaged_modified, unstaged_deleted, untracked,
+          fs,
+          root,
+          git_dir,
+          child_rel,
+          index_entries,
+          dir_index,
+          visited,
+          matcher,
+          autocrlf,
+          racy_git,
+          unstaged_modified,
+          unstaged_deleted,
+          untracked,
+          run_filter_cmd?,
         )
       }
       // Otherwise: skip entirely (major speedup)
     } else {
       walk_dir_guided(
-        fs, root, child_rel, index_entries, dir_index, visited, matcher, autocrlf,
-        racy_git, unstaged_modified, unstaged_deleted, untracked,
+        fs,
+        root,
+        git_dir,
+        child_rel,
+        index_entries,
+        dir_index,
+        visited,
+        matcher,
+        autocrlf,
+        racy_git,
+        unstaged_modified,
+        unstaged_deleted,
+        untracked,
+        run_filter_cmd?,
       )
     }
   }
@@ -399,11 +453,13 @@ fn mark_subtree_visited(
 async fn check_file_against_index(
   fs : &@bit.RepoFileSystem,
   root : String,
+  git_dir : String,
   path : String,
   entry : IndexEntry,
   autocrlf : AutoCrlf,
   racy_git : Bool,
   unstaged_modified : Array[String],
+  run_filter_cmd? : FilterCmd,
 ) -> Unit raise @bit.GitError {
   let abs = join_path(root, path)
   match @bitio.worktree_entry_meta(fs, abs) {
@@ -439,6 +495,16 @@ async fn check_file_against_index(
           } else if not(stat_matches) {
             let content = fs.read_file(abs)
             let attrs = resolve_eol_attrs(fs, root, path)
+            let content = match (attrs.filter, run_filter_cmd) {
+              (Some(name), Some(run_cmd)) => {
+                let (clean_cmd, _) = read_filter_commands(fs, git_dir, name)
+                match clean_cmd {
+                  Some(cmd) => (run_cmd.run)(root, git_dir, cmd, content)
+                  None => content
+                }
+              }
+              _ => content
+            }
             let normalized = clean_for_storage(content, attrs, autocrlf)
             let id = @bit.hash_blob(normalized)
             if id != entry.id {
@@ -447,6 +513,16 @@ async fn check_file_against_index(
           } else if racy_git {
             let content = fs.read_file(abs)
             let attrs = resolve_eol_attrs(fs, root, path)
+            let content = match (attrs.filter, run_filter_cmd) {
+              (Some(name), Some(run_cmd)) => {
+                let (clean_cmd, _) = read_filter_commands(fs, git_dir, name)
+                match clean_cmd {
+                  Some(cmd) => (run_cmd.run)(root, git_dir, cmd, content)
+                  None => content
+                }
+              }
+              _ => content
+            }
             let normalized = clean_for_storage(content, attrs, autocrlf)
             let id = @bit.hash_blob(normalized)
             if id != entry.id {

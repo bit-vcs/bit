@@ -22,6 +22,7 @@ pub struct DiffFile {
 pub async fn diff_worktree(
   fs : &@bit.RepoFileSystem,
   root : String,
+  run_filter_cmd? : FilterCmd,
 ) -> Array[DiffFile] raise @bit.GitError {
   let profile = profile_enabled()
   let mut t0 = profile_start(profile)
@@ -117,6 +118,16 @@ pub async fn diff_worktree(
             } else {
               let content = fs.read_file(abs)
               let attrs = resolve_eol_attrs(fs, root, path)
+              let content = match (attrs.filter, run_filter_cmd) {
+                (Some(name), Some(run_cmd)) => {
+                  let (clean_cmd, _) = read_filter_commands(fs, git_dir, name)
+                  match clean_cmd {
+                    Some(cmd) => (run_cmd.run)(root, git_dir, cmd, content)
+                    None => content
+                  }
+                }
+                _ => content
+              }
               let normalized = clean_for_storage(content, attrs, autocrlf)
               let id = @bit.hash_blob(normalized)
               content_changed = id != entry.id

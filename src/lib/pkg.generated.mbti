@@ -10,7 +10,7 @@ import {
 // Values
 pub fn add_paths(&@types.FileSystem, &@types.RepoFileSystem, String, Array[String]) -> Unit raise @object.GitError
 
-pub async fn add_paths_async(&@types.FileSystem, &@types.RepoFileSystem, String, Array[String]) -> Unit raise @object.GitError
+pub async fn add_paths_async(&@types.FileSystem, &@types.RepoFileSystem, String, Array[String], run_filter_cmd? : FilterCmd) -> Unit raise @object.GitError
 
 pub fn append_reflog(&@types.FileSystem, &@types.RepoFileSystem, String, String, @object.ObjectId, @object.ObjectId, String, String, Int64, String, String) -> Unit raise @object.GitError
 
@@ -27,6 +27,8 @@ pub fn build_upload_pack_advertisement(&@types.RepoFileSystem, String, agent? : 
 pub fn build_upload_pack_config_with_overrides(&@types.RepoFileSystem, String, Map[String, String]) -> UploadPackConfig
 
 pub fn check_shorthand_ambiguity(String, (String) -> Bool) -> String?
+
+pub fn check_unsupported_gitattributes(&@types.RepoFileSystem, String) -> String?
 
 pub fn checkout(&@types.FileSystem, &@types.RepoFileSystem, String, String, detach? : Bool, update_worktree? : Bool, update_index? : Bool) -> @object.ObjectId raise @object.GitError
 
@@ -100,7 +102,7 @@ pub fn diff_text(Array[DiffFile]) -> Array[String]
 
 pub fn diff_trees(&@types.RepoFileSystem, String, @object.ObjectId?, @object.ObjectId) -> Array[DiffFile] raise @object.GitError
 
-pub async fn diff_worktree(&@types.RepoFileSystem, String) -> Array[DiffFile] raise @object.GitError
+pub async fn diff_worktree(&@types.RepoFileSystem, String, run_filter_cmd? : FilterCmd) -> Array[DiffFile] raise @object.GitError
 
 pub fn fast_forward_to(&@types.FileSystem, &@types.RepoFileSystem, String, @object.ObjectId) -> Unit raise @object.GitError
 
@@ -126,7 +128,7 @@ pub fn get_worktree_lock_reason(&@types.RepoFileSystem, String, String) -> Strin
 
 pub fn get_worktree_prunable_reason(&@types.RepoFileSystem, String, String) -> String? raise @object.GitError
 
-pub fn has_unsupported_gitattributes(&@types.RepoFileSystem, String) -> Bool
+pub fn has_any_filter_attributes(&@types.RepoFileSystem, String) -> Bool
 
 pub fn init_repo(&@types.FileSystem, String, default_branch? : String, bare? : Bool) -> Unit raise @object.GitError
 
@@ -256,6 +258,8 @@ pub fn read_config_content(&@types.RepoFileSystem, String) -> String
 
 pub fn read_config_value(&@types.RepoFileSystem, String, String, String) -> String?
 
+pub fn read_filter_commands(&@types.RepoFileSystem, String, String) -> (String?, String?)
+
 pub fn read_head_ref(&@types.RepoFileSystem, String) -> HeadRef raise @object.GitError
 
 pub fn read_index_entries(&@types.RepoFileSystem, String) -> Array[IndexEntry] raise @object.GitError
@@ -382,7 +386,7 @@ pub fn stash_list(&@types.RepoFileSystem, String) -> Array[StashEntry] raise @ob
 
 pub async fn stash_push(&@types.FileSystem, &@types.RepoFileSystem, String, String, String, Int64) -> @object.ObjectId? raise @object.GitError
 
-pub async fn status(&@types.RepoFileSystem, String) -> Status raise @object.GitError
+pub async fn status(&@types.RepoFileSystem, String, run_filter_cmd? : FilterCmd) -> Status raise @object.GitError
 
 pub async fn status_porcelain(&@types.RepoFileSystem, String) -> Array[String] raise @object.GitError
 
@@ -525,6 +529,11 @@ pub(all) struct FetchRefspec {
 pub struct FileEolAttrs {
   text : TextAttr
   eol : EolAttr
+  filter : String?
+}
+
+pub(all) struct FilterCmd {
+  run : async (String, String, String, Bytes) -> Bytes raise @object.GitError
 }
 
 pub struct GcResult {

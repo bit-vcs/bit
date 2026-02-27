@@ -126,6 +126,7 @@ async fn handle_show(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let fs = OsFs::new()
   let git_dir = resolve_git_dir(fs, root)
+  check_and_exit_unsupported_attrs(root)
   // Parse: git show [--pretty=<format>] [<commit>]
   let mut rev = "HEAD"
   let revs : Array[String] = []

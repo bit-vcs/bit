@@ -4,6 +4,7 @@ async fn handle_switch(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
   let rfs : &@bitcore.RepoFileSystem = fs
   let git_dir = resolve_git_dir(rfs, root)
+  check_and_exit_unsupported_attrs(root)
   if fs.is_file(git_dir + "/MERGE_HEAD") {
     eprint_line("fatal: cannot switch branch while merging")
     @sys.exit(1)
