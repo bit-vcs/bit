@@ -33,8 +33,8 @@ pub fn max_delta_chain_length(data : Bytes) -> Int raise @bit.GitError {
   let depths : Array[Int] = []
   let pending : Array[PendingDelta] = []
   let by_offset : Map[Int, Int] = {}
-  let by_id : Map[String, @bit.PackObject] = {}
-  let by_id_depth : Map[String, Int] = {}
+  let by_id : Map[@bit.ObjectId, @bit.PackObject] = {}
+  let by_id_depth : Map[@bit.ObjectId, Int] = {}
   let mut max_depth = 0
   for _ in 0..<count {
     let obj_offset = offset
@@ -103,7 +103,7 @@ pub fn max_delta_chain_length(data : Bytes) -> Int raise @bit.GitError {
                 max_depth = depth
               }
               insert_pack_object_by_id(by_id, obj)
-              by_id_depth[obj_id.to_hex()] = depth
+              by_id_depth[obj_id] = depth
             } else {
               pending.push({
                 index: idx,
@@ -119,7 +119,7 @@ pub fn max_delta_chain_length(data : Bytes) -> Int raise @bit.GitError {
         (@bit.ObjectType::Blob, Bytes::from_array([]), after)
       }
       7 => {
-        let (base_id, after_ref) = read_ref_delta_id(data, offset)
+        let (base_oid, after_ref) = read_ref_delta_object_id(data, offset)
         let (delta, after) = @zlib.zlib_decompress_at(data, after_ref) catch {
           e => raise @bit.GitError::PackfileError("Zlib error: \{e}")
         }
@@ -141,7 +141,7 @@ pub fn max_delta_chain_length(data : Bytes) -> Int raise @bit.GitError {
         depths.push(0)
         let idx = objects.length() - 1
         by_offset[obj_offset] = idx
-        match by_id.get(base_id) {
+        match by_id.get(base_oid) {
           Some(base) => {
             let content = apply_delta(base.data, delta)
             let obj_id = @bit.hash_object_content(base.obj_type, content)
@@ -154,17 +154,21 @@ pub fn max_delta_chain_length(data : Bytes) -> Int raise @bit.GitError {
             )
             objects[idx] = obj
             resolved[idx] = true
-            let base_depth = by_id_depth.get(base_id).unwrap_or(0)
+            let base_depth = by_id_depth.get(base_oid).unwrap_or(0)
             let depth = base_depth + 1
             depths[idx] = depth
             if depth > max_depth {
               max_depth = depth
             }
             insert_pack_object_by_id(by_id, obj)
-            by_id_depth[obj_id.to_hex()] = depth
+            by_id_depth[obj_id] = depth
           }
           None =>
-            pending.push({ index: idx, base: DeltaBaseRef::Ref(base_id), delta })
+            pending.push({
+              index: idx,
+              base: DeltaBaseRef::Ref(base_oid),
+              delta,
+            })
         }
         (@bit.ObjectType::Blob, Bytes::from_array([]), after)
       }
@@ -185,7 +189,7 @@ pub fn max_delta_chain_length(data : Bytes) -> Int raise @bit.GitError {
       depths.push(0)
       by_offset[obj_offset] = objects.length() - 1
       insert_pack_object_by_id(by_id, obj)
-      by_id_depth[obj_id.to_hex()] = 0
+      by_id_depth[obj_id] = 0
     }
   }
   let mut progress = true
@@ -218,13 +222,13 @@ pub fn max_delta_chain_length(data : Bytes) -> Int raise @bit.GitError {
               max_depth = depth
             }
             insert_pack_object_by_id(by_id, obj)
-            by_id_depth[obj_id.to_hex()] = depth
+            by_id_depth[obj_id] = depth
             progress = true
           } else {
             next_pending.push(p)
           }
-        DeltaBaseRef::Ref(base_id) =>
-          match by_id.get(base_id) {
+        DeltaBaseRef::Ref(base_oid) =>
+          match by_id.get(base_oid) {
             Some(base) => {
               let content = apply_delta(base.data, p.delta)
               let obj_id = @bit.hash_object_content(base.obj_type, content)
@@ -238,14 +242,14 @@ pub fn max_delta_chain_length(data : Bytes) -> Int raise @bit.GitError {
               )
               objects[p.index] = obj
               resolved[p.index] = true
-              let base_depth = by_id_depth.get(base_id).unwrap_or(0)
+              let base_depth = by_id_depth.get(base_oid).unwrap_or(0)
               let depth = base_depth + 1
               depths[p.index] = depth
               if depth > max_depth {
                 max_depth = depth
               }
               insert_pack_object_by_id(by_id, obj)
-              by_id_depth[obj_id.to_hex()] = depth
+              by_id_depth[obj_id] = depth
               progress = true
             }
             None => next_pending.push(p)
@@ -277,7 +281,7 @@ pub fn parse_packfile_with_bases(
   verify_checksum? : Bool = true,
 ) -> Array[@bit.PackObject] raise @bit.GitError {
   let by_offset : Map[Int, Int] = {}
-  let by_id : Map[String, @bit.PackObject] = {}
+  let by_id : Map[@bit.ObjectId, @bit.PackObject] = {}
   for obj in bases {
     let id = @bit.hash_object_content(obj.obj_type, obj.data)
     let base_obj = @bit.PackObject::with_metadata(
@@ -311,7 +315,7 @@ pub fn parse_packfile_stream_with_bases(
   verify_checksum? : Bool = true,
 ) -> Unit raise @bit.GitError {
   let by_offset : Map[Int, @bit.PackObject] = {}
-  let by_id : Map[String, @bit.PackObject] = {}
+  let by_id : Map[@bit.ObjectId, @bit.PackObject] = {}
   for obj in bases {
     let id = @bit.hash_object_content(obj.obj_type, obj.data)
     let base_obj = @bit.PackObject::with_metadata(
@@ -328,11 +332,10 @@ pub fn parse_packfile_stream_with_bases(
 
 ///|
 fn insert_pack_object_by_id(
-  by_id : Map[String, @bit.PackObject],
+  by_id : Map[@bit.ObjectId, @bit.PackObject],
   obj : @bit.PackObject,
 ) -> Unit raise @bit.GitError {
-  let key = obj.id.to_hex()
-  match by_id.get(key) {
+  match by_id.get(obj.id) {
     Some(existing) =>
       if existing.obj_type != obj.obj_type ||
         not(Bytes::equal(existing.data, obj.data)) {
@@ -340,13 +343,13 @@ fn insert_pack_object_by_id(
       }
     None => ()
   }
-  by_id[key] = obj
+  by_id[obj.id] = obj
 }
 
 ///|
 priv enum DeltaBaseRef {
   Ofs(Int)
-  Ref(String)
+  Ref(@bit.ObjectId)
 }
 
 ///|
@@ -367,7 +370,7 @@ priv struct PendingDeltaStream {
 fn parse_packfile_internal(
   data : Bytes,
   by_offset : Map[Int, Int],
-  by_id : Map[String, @bit.PackObject],
+  by_id : Map[@bit.ObjectId, @bit.PackObject],
   verify_checksum? : Bool = true,
 ) -> Array[@bit.PackObject] raise @bit.GitError {
   if data.length() < 32 {
@@ -388,10 +391,8 @@ fn parse_packfile_internal(
   }
   let count = read_u32_be(data, 8)
   let mut offset = 12
-  let objects : Array[@bit.PackObject] = []
-  let resolved : Array[Bool] = []
-  let obj_offsets : Array[Int] = [] // Track offsets for CRC calculation
-  let obj_ends : Array[Int] = [] // Track end positions for CRC calculation
+  let objects : Array[@bit.PackObject] = Array::new(capacity=count)
+  let resolved : Array[Bool] = Array::new(capacity=count)
   let pending : Array[PendingDelta] = []
   for _ in 0..<count {
     let obj_offset = offset
@@ -435,8 +436,6 @@ fn parse_packfile_internal(
         )
         objects.push(placeholder)
         resolved.push(false)
-        obj_offsets.push(obj_offset)
-        obj_ends.push(after)
         let idx = objects.length() - 1
         by_offset[obj_offset] = idx
         match by_offset.get(base_offset) {
@@ -470,7 +469,7 @@ fn parse_packfile_internal(
         (@bit.ObjectType::Blob, Bytes::from_array([]), after)
       }
       7 => {
-        let (base_id, after_ref) = read_ref_delta_id(data, offset)
+        let (base_oid, after_ref) = read_ref_delta_object_id(data, offset)
         let (delta, after) = @zlib.zlib_decompress_at(data, after_ref) catch {
           e => raise @bit.GitError::PackfileError("Zlib error: \{e}")
         }
@@ -490,11 +489,9 @@ fn parse_packfile_internal(
         )
         objects.push(placeholder)
         resolved.push(false)
-        obj_offsets.push(obj_offset)
-        obj_ends.push(after)
         let idx = objects.length() - 1
         by_offset[obj_offset] = idx
-        match by_id.get(base_id) {
+        match by_id.get(base_oid) {
           Some(base) => {
             let content = apply_delta(base.data, delta)
             let obj_id = @bit.hash_object_content(base.obj_type, content)
@@ -510,7 +507,11 @@ fn parse_packfile_internal(
             insert_pack_object_by_id(by_id, obj)
           }
           None =>
-            pending.push({ index: idx, base: DeltaBaseRef::Ref(base_id), delta })
+            pending.push({
+              index: idx,
+              base: DeltaBaseRef::Ref(base_oid),
+              delta,
+            })
         }
         (@bit.ObjectType::Blob, Bytes::from_array([]), after)
       }
@@ -529,8 +530,6 @@ fn parse_packfile_internal(
       )
       objects.push(obj)
       resolved.push(true)
-      obj_offsets.push(obj_offset)
-      obj_ends.push(after)
       by_offset[obj_offset] = objects.length() - 1
       insert_pack_object_by_id(by_id, obj)
     }
@@ -565,8 +564,8 @@ fn parse_packfile_internal(
           } else {
             next_pending.push(p)
           }
-        DeltaBaseRef::Ref(base_id) =>
-          match by_id.get(base_id) {
+        DeltaBaseRef::Ref(base_oid) =>
+          match by_id.get(base_oid) {
             Some(base) => {
               let content = apply_delta(base.data, p.delta)
               let obj_id = @bit.hash_object_content(base.obj_type, content)
@@ -611,7 +610,7 @@ fn parse_packfile_internal(
 fn parse_packfile_stream_internal(
   data : Bytes,
   by_offset : Map[Int, @bit.PackObject],
-  by_id : Map[String, @bit.PackObject],
+  by_id : Map[@bit.ObjectId, @bit.PackObject],
   emit : (@bit.PackObject) -> Unit,
   verify_checksum? : Bool = true,
 ) -> Unit raise @bit.GitError {
@@ -685,7 +684,7 @@ fn parse_packfile_stream_internal(
         offset = after
       }
       7 => {
-        let (base_id, after_ref) = read_ref_delta_id(data, offset)
+        let (base_oid, after_ref) = read_ref_delta_object_id(data, offset)
         let (delta, after) = @zlib.zlib_decompress_at(data, after_ref) catch {
           e => raise @bit.GitError::PackfileError("Zlib error: \{e}")
         }
@@ -694,7 +693,7 @@ fn parse_packfile_stream_internal(
             "Delta size mismatch: expected=\{size}, got=\{delta.length()}",
           )
         }
-        match by_id.get(base_id) {
+        match by_id.get(base_oid) {
           Some(base) => {
             let content = apply_delta(base.data, delta)
             let obj = @bit.PackObject::new(base.obj_type, content)
@@ -705,7 +704,7 @@ fn parse_packfile_stream_internal(
           None =>
             pending.push({
               offset: obj_offset,
-              base: DeltaBaseRef::Ref(base_id),
+              base: DeltaBaseRef::Ref(base_oid),
               delta,
             })
         }
@@ -735,8 +734,8 @@ fn parse_packfile_stream_internal(
             }
             None => next_pending.push(p)
           }
-        Ref(base_id) =>
-          match by_id.get(base_id) {
+        Ref(base_oid) =>
+          match by_id.get(base_oid) {
             Some(base) => {
               let content = apply_delta(base.data, p.delta)
               let obj = @bit.PackObject::new(base.obj_type, content)
@@ -840,6 +839,21 @@ pub fn read_ofs_delta_offset(
 }
 
 ///|
+fn read_ref_delta_object_id(
+  data : Bytes,
+  start : Int,
+) -> (@bit.ObjectId, Int) raise @bit.GitError {
+  if start + 20 > data.length() {
+    raise @bit.GitError::PackfileError("Unexpected end of packfile delta")
+  }
+  let bytes : FixedArray[Byte] = FixedArray::make(20, b'\x00')
+  for i in 0..<20 {
+    bytes[i] = data[start + i]
+  }
+  (@bit.ObjectId::new(bytes), start + 20)
+}
+
+///|
 pub fn read_ref_delta_id(
   data : Bytes,
   start : Int,
@@ -865,7 +879,8 @@ pub fn apply_delta(base : Bytes, delta : Bytes) -> Bytes raise @bit.GitError {
   }
   let (result_size, off2) = read_delta_size(delta, offset)
   offset = off2
-  let out : Array[Byte] = []
+  let out : FixedArray[Byte] = FixedArray::make(result_size, b'\x00')
+  let mut out_pos = 0
   while offset < delta.length() {
     let opcode = delta[offset].to_int()
     offset += 1
@@ -907,7 +922,8 @@ pub fn apply_delta(base : Bytes, delta : Bytes) -> Bytes raise @bit.GitError {
         raise @bit.GitError::PackfileError("Delta copy out of range")
       }
       for i in 0..<cp_size {
-        out.push(base[cp_off + i])
+        out[out_pos] = base[cp_off + i]
+        out_pos += 1
       }
     } else {
       let literal_len = opcode & 0x7f
@@ -918,15 +934,16 @@ pub fn apply_delta(base : Bytes, delta : Bytes) -> Bytes raise @bit.GitError {
         raise @bit.GitError::PackfileError("Delta literal out of range")
       }
       for i in 0..<literal_len {
-        out.push(delta[offset + i])
+        out[out_pos] = delta[offset + i]
+        out_pos += 1
       }
       offset += literal_len
     }
   }
-  if out.length() != result_size {
+  if out_pos != result_size {
     raise @bit.GitError::PackfileError("Delta result size mismatch")
   }
-  Bytes::from_array(FixedArray::makei(out.length(), i => out[i]))
+  Bytes::from_array(out)
 }
 
 ///|
