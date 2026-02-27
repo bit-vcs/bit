@@ -13,6 +13,8 @@ pub fn build_pack_index(Bytes) -> Bytes raise @object.GitError
 
 pub fn build_pack_index_from_objects(Bytes, Array[@object.PackObject]) -> Bytes raise @object.GitError
 
+pub fn build_reverse_index(Bytes, Array[@object.PackObject]) -> Bytes raise @object.GitError
+
 pub fn crc32_range(Bytes, Int, Int) -> UInt raise @object.GitError
 
 pub fn create_blob_packfile(Bytes) -> Bytes
@@ -59,9 +61,11 @@ pub fn write_pack_index(&@types.FileSystem, String, Bytes) -> Unit raise @object
 
 pub fn write_pack_index_from_objects(&@types.FileSystem, String, Bytes, Array[@object.PackObject]) -> Unit raise @object.GitError
 
-pub fn write_pack_index_from_objects_versioned(&@types.FileSystem, String, Bytes, Array[@object.PackObject], Int) -> Unit raise @object.GitError
+pub fn write_pack_index_from_objects_versioned(&@types.FileSystem, String, Bytes, Array[@object.PackObject], Int, Int64?) -> Unit raise @object.GitError
 
 pub fn write_packfile_with_index(&@types.FileSystem, String, Bytes, Array[@object.PackObject]) -> Unit raise @object.GitError
+
+pub fn write_reverse_index(&@types.FileSystem, String, Bytes, Array[@object.PackObject]) -> Unit raise @object.GitError
 
 // Errors
 

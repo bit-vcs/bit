@@ -25,11 +25,7 @@ pub fn build_pack_index_from_objects(
   // Validate that object offsets are plausible for this pack.
   // Objects may carry stale offsets from a different (source) pack,
   // so we check: offset >= 12 (after header) and < pack_data_end.
-  let pack_data_end = if pack.length() >= 20 {
-    pack.length() - 20
-  } else {
-    0
-  }
+  let pack_data_end = if pack.length() >= 20 { pack.length() - 20 } else { 0 }
   let mut needs_parse = false
   for obj in objects {
     if obj.offset < 12 || obj.offset >= pack_data_end {
@@ -107,6 +103,113 @@ pub fn build_pack_index_from_objects(
 }
 
 ///|
+/// Build a v2 pack index with optional 64-bit offset threshold.
+/// When threshold is Some(n), offsets >= n are stored as 64-bit entries.
+fn build_pack_index_from_objects_with_threshold(
+  pack : Bytes,
+  objects : Array[@bit.PackObject],
+  threshold : Int64?,
+) -> Bytes raise @bit.GitError {
+  // Default: no 64-bit offsets
+  let off64_threshold = match threshold {
+    None => 0x80000000L // 2^31, only truly large offsets
+    Some(t) => t
+  }
+  // Validate that object offsets are plausible for this pack.
+  let pack_data_end = if pack.length() >= 20 { pack.length() - 20 } else { 0 }
+  let mut needs_parse = false
+  for obj in objects {
+    if obj.offset < 12 || obj.offset >= pack_data_end {
+      needs_parse = true
+      break
+    }
+  }
+  let parsed_objects = if needs_parse { parse_packfile(pack) } else { objects }
+  let entries : Array[PackIndexEntry] = []
+  for obj in parsed_objects {
+    entries.push({ id: obj.id, offset: obj.offset, crc: obj.crc32 })
+  }
+  entries.sort_by(fn(a, b) { compare_object_id(a.id, b.id) })
+  let counts : Array[Int] = Array::make(256, 0)
+  for entry in entries {
+    let first = entry.id.bytes[0].to_int()
+    counts[first] = counts[first] + 1
+  }
+  // Collect large offset entries
+  let large_offsets : Array[(Int, Int64)] = [] // (entry_index, offset_value)
+  for i, entry in entries {
+    if entry.offset.to_int64() >= off64_threshold {
+      large_offsets.push((i, entry.offset.to_int64()))
+    }
+  }
+  let out : Array[Byte] = []
+  // Index header: magic + version
+  out.push(b'\xff')
+  out.push(b't')
+  out.push(b'O')
+  out.push(b'c')
+  push_u32_be_from_int(out, 2)
+  // Fanout table
+  let mut sum = 0
+  for i in 0..<256 {
+    sum = sum + counts[i]
+    push_u32_be_from_int(out, sum)
+  }
+  // Object name table
+  for entry in entries {
+    for b in entry.id.bytes {
+      out.push(b)
+    }
+  }
+  // CRC32 table
+  for entry in entries {
+    push_u32_be_from_uint(out, entry.crc)
+  }
+  // Offsets table - mark large offsets with MSB set
+  let mut large_idx = 0
+  for i, entry in entries {
+    let mut is_large = false
+    if large_idx < large_offsets.length() && large_offsets[large_idx].0 == i {
+      is_large = true
+    }
+    if is_large {
+      // MSB set + index into 64-bit table
+      let marker = 0x80000000 | large_idx
+      push_u32_be_from_int(out, marker)
+      large_idx += 1
+    } else {
+      if entry.offset < 0 {
+        raise @bit.GitError::PackfileError("Negative pack offset")
+      }
+      push_u32_be_from_int(out, entry.offset)
+    }
+  }
+  // 64-bit offset table
+  for pair in large_offsets {
+    let offset = pair.1
+    // Write as 8-byte big-endian
+    push_u32_be_from_int(out, (offset >> 32).to_int())
+    push_u32_be_from_int(out, (offset & 0xFFFFFFFFL).to_int())
+  }
+  // Packfile checksum (trailer)
+  if pack.length() < 20 {
+    raise @bit.GitError::PackfileError("Packfile too short")
+  }
+  let trailer_offset = pack.length() - 20
+  let pack_checksum = read_trailer_id(pack, trailer_offset)
+  for b in pack_checksum.bytes {
+    out.push(b)
+  }
+  // Index checksum
+  let before_checksum = bytes_from_array(out)
+  let index_checksum = @bit.sha1(before_checksum)
+  for b in index_checksum.bytes {
+    out.push(b)
+  }
+  bytes_from_array(out)
+}
+
+///|
 /// Write a pack index to the filesystem.
 pub fn write_pack_index(
   fs : &@bit.FileSystem,
@@ -137,11 +240,12 @@ pub fn write_pack_index_from_objects_versioned(
   pack : Bytes,
   objects : Array[@bit.PackObject],
   version : Int,
+  off64_threshold : Int64?,
 ) -> Unit raise @bit.GitError {
   let idx = if version == 1 {
     build_pack_index_v1_from_objects(pack, objects)
   } else {
-    build_pack_index_from_objects(pack, objects)
+    build_pack_index_from_objects_with_threshold(pack, objects, off64_threshold)
   }
   fs.write_file(idx_path, idx)
 }
@@ -154,11 +258,7 @@ fn build_pack_index_v1_from_objects(
   objects : Array[@bit.PackObject],
 ) -> Bytes raise @bit.GitError {
   // Validate that object offsets are plausible for this pack.
-  let pack_data_end = if pack.length() >= 20 {
-    pack.length() - 20
-  } else {
-    0
-  }
+  let pack_data_end = if pack.length() >= 20 { pack.length() - 20 } else { 0 }
   let mut needs_parse = false
   for obj in objects {
     if obj.offset < 12 || obj.offset >= pack_data_end {
@@ -212,6 +312,13 @@ fn build_pack_index_v1_from_objects(
   let trailer_offset = pack.length() - 20
   let pack_checksum = read_trailer_id(pack, trailer_offset)
   for b in pack_checksum.bytes {
+    out.push(b)
+  }
+
+  // Index checksum (SHA-1 of all preceding bytes)
+  let before_checksum = bytes_from_array(out)
+  let index_checksum = @bit.sha1(before_checksum)
+  for b in index_checksum.bytes {
     out.push(b)
   }
   bytes_from_array(out)
@@ -379,4 +486,98 @@ pub fn write_packfile_with_index(
   let idx_path = @bit.join_path(pack_dir, base + ".idx")
   fs.write_file(pack_path, pack)
   write_pack_index_from_objects(fs, idx_path, pack, objects)
+}
+
+///|
+/// Build a reverse index (RIDX version 1) from packfile bytes and parsed objects.
+/// Format: magic("RIDX") + version(1) + hash_id(1) + position_table + pack_checksum + file_checksum
+/// The position_table maps from pack offset order to index position.
+pub fn build_reverse_index(
+  pack : Bytes,
+  objects : Array[@bit.PackObject],
+) -> Bytes raise @bit.GitError {
+  if pack.length() < 20 {
+    raise @bit.GitError::PackfileError("Packfile too short")
+  }
+  // Validate offsets; re-parse if stale
+  let pack_data_end = if pack.length() >= 20 { pack.length() - 20 } else { 0 }
+  let mut needs_parse = false
+  for obj in objects {
+    if obj.offset < 12 || obj.offset >= pack_data_end {
+      needs_parse = true
+      break
+    }
+  }
+  let objs = if needs_parse { parse_packfile(pack) } else { objects }
+
+  // Build index entries sorted by object id (same as pack index order)
+  let entries : Array[PackIndexEntry] = []
+  for obj in objs {
+    entries.push({ id: obj.id, offset: obj.offset, crc: obj.crc32 })
+  }
+  entries.sort_by((a, b) => compare_object_id(a.id, b.id))
+
+  // Build offset-sorted indices: for each position in offset order,
+  // store the index into the id-sorted entries array
+  let count = entries.length()
+  let indexed : Array[(Int, Int)] = [] // (offset, index_position)
+  for i in 0..<count {
+    indexed.push((entries[i].offset, i))
+  }
+  indexed.sort_by(fn(a, b) {
+    let (oa, _) = a
+    let (ob, _) = b
+    if oa < ob {
+      -1
+    } else if oa > ob {
+      1
+    } else {
+      0
+    }
+  })
+
+  let out : Array[Byte] = []
+  // Magic: "RIDX"
+  out.push(b'R')
+  out.push(b'I')
+  out.push(b'D')
+  out.push(b'X')
+  // Version: 1
+  push_u32_be_from_int(out, 1)
+  // Hash algorithm identifier: 1 = SHA-1
+  push_u32_be_from_int(out, 1)
+
+  // Position table: for each object in pack-offset order,
+  // the index position (in the .idx id-sorted table)
+  for i in 0..<count {
+    let (_, idx_pos) = indexed[i]
+    push_u32_be_from_int(out, idx_pos)
+  }
+
+  // Pack checksum (copy from pack trailer)
+  let trailer_offset = pack.length() - 20
+  let pack_checksum = read_trailer_id(pack, trailer_offset)
+  for b in pack_checksum.bytes {
+    out.push(b)
+  }
+
+  // RIDX file checksum
+  let before_checksum = bytes_from_array(out)
+  let file_checksum = @bit.sha1(before_checksum)
+  for b in file_checksum.bytes {
+    out.push(b)
+  }
+  bytes_from_array(out)
+}
+
+///|
+/// Write a reverse index (.rev) file to the filesystem.
+pub fn write_reverse_index(
+  fs : &@bit.FileSystem,
+  rev_path : String,
+  pack : Bytes,
+  objects : Array[@bit.PackObject],
+) -> Unit raise @bit.GitError {
+  let rev = build_reverse_index(pack, objects)
+  fs.write_file(rev_path, rev)
 }

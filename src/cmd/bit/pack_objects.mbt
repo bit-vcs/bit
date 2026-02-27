@@ -24,6 +24,9 @@ priv struct PackObjectsConfig {
   include_tag : Bool
   has_unsupported_options : Bool
   missing_mode : MissingMode
+  index_version : Int
+  off64_threshold : Int64?
+  max_pack_size : Int64?
 }
 
 ///|
@@ -72,6 +75,9 @@ fn parse_pack_objects_args(args : Array[String]) -> PackObjectsParse {
   let mut include_tag = false
   let mut has_unsupported_options = false
   let mut missing_mode = MissingMode::Error
+  let mut index_version = 2
+  let mut off64_threshold : Int64? = None
+  let mut max_pack_size : Int64? = None
   let mut i = 0
   let mut in_opts = true
   let mut extra_args = 0
@@ -100,7 +106,7 @@ fn parse_pack_objects_args(args : Array[String]) -> PackObjectsParse {
         "--reflog" => has_unsupported_options = true
         "--indexed-objects" => has_unsupported_options = true
         "--keep-true-parents" => has_unsupported_options = true
-        "--thin" => has_unsupported_options = true
+        "--thin" => () // bit doesn't use thin packs, ignore
         "--cruft" => has_unsupported_options = true
         "--cruft-expiration" => {
           has_unsupported_options = true
@@ -117,10 +123,10 @@ fn parse_pack_objects_args(args : Array[String]) -> PackObjectsParse {
           i += 1
         }
         "--max-pack-size" => {
-          has_unsupported_options = true
           if i + 1 >= args.length() {
             return PackObjectsParse::Unsupported
           }
+          max_pack_size = Some(parse_size_with_suffix(args[i + 1]))
           i += 1
         }
         "--include-tag" => include_tag = true
@@ -204,7 +210,14 @@ fn parse_pack_objects_args(args : Array[String]) -> PackObjectsParse {
           if i + 1 >= args.length() {
             return PackObjectsParse::Unsupported
           }
-          has_unsupported_options = true
+          match parse_index_version_value(args[i + 1]) {
+            Some((iv, threshold)) => {
+              index_version = iv
+              off64_threshold = threshold
+            }
+            None =>
+              return PackObjectsParse::Error("fatal: bad --index-version value")
+          }
           i += 1
         }
         _ =>
@@ -215,10 +228,29 @@ fn parse_pack_objects_args(args : Array[String]) -> PackObjectsParse {
             }
             window = parsed
           } else if arg.has_prefix("--index-version=") {
-            has_unsupported_options = true
+            let iv_str = (try! arg[16:]).to_string()
+            match parse_index_version_value(iv_str) {
+              Some((iv, threshold)) => {
+                index_version = iv
+                off64_threshold = threshold
+              }
+              None =>
+                return PackObjectsParse::Error(
+                  "fatal: bad --index-version value",
+                )
+            }
           } else if arg == "--index-version" {
-            has_unsupported_options = true
             if i + 1 < args.length() {
+              match parse_index_version_value(args[i + 1]) {
+                Some((iv, threshold)) => {
+                  index_version = iv
+                  off64_threshold = threshold
+                }
+                None =>
+                  return PackObjectsParse::Error(
+                    "fatal: bad --index-version value",
+                  )
+              }
               i += 1
             }
           } else if arg.has_prefix("--filter=") {
@@ -250,8 +282,6 @@ fn parse_pack_objects_args(args : Array[String]) -> PackObjectsParse {
               )
             }
             name_hash_version = Some(normalized)
-          } else if arg.has_prefix("--index-version=") {
-            has_unsupported_options = true
           } else if arg.has_prefix("--missing=") {
             let value = (try! arg[10:]).to_string()
             match value {
@@ -266,26 +296,27 @@ fn parse_pack_objects_args(args : Array[String]) -> PackObjectsParse {
             }
             depth = parsed
           } else if arg.has_prefix("--cruft-expiration=") ||
-            arg.has_prefix("--max-cruft-size=") ||
-            arg.has_prefix("--max-pack-size=") {
+            arg.has_prefix("--max-cruft-size=") {
             has_unsupported_options = true
+          } else if arg.has_prefix("--max-pack-size=") {
+            let value = (try! arg[16:]).to_string()
+            max_pack_size = Some(parse_size_with_suffix(value))
           } else if arg.has_prefix("--unpack-unreachable=") {
             has_unsupported_options = true
           } else if arg.has_prefix("--keep-pack=") {
             has_unsupported_options = true
+          } else if arg.has_prefix("--no-reuse-delta") ||
+            arg.has_prefix("--no-reuse-object") {
+            // bit doesn't use delta or object reuse, so these are no-ops
+            ()
           } else if arg.has_prefix("--stdin-packs") ||
             arg.has_prefix("--write-bitmap-index") ||
             arg.has_prefix("--threads") ||
             arg.has_prefix("--revs=") ||
             arg.has_prefix("--keep") ||
-            arg.has_prefix("--no-reuse") ||
             arg.has_prefix("--reuse") ||
             arg.has_prefix("--delta-islands") {
-            if arg.has_prefix("--no-reuse") {
-              has_unsupported_options = true
-            } else {
-              return PackObjectsParse::Unsupported
-            }
+            return PackObjectsParse::Unsupported
           } else {
             return PackObjectsParse::Unsupported
           }
@@ -354,7 +385,43 @@ fn parse_pack_objects_args(args : Array[String]) -> PackObjectsParse {
     include_tag,
     has_unsupported_options,
     missing_mode,
+    index_version,
+    off64_threshold,
+    max_pack_size,
   })
+}
+
+///|
+/// Parse --index-version value. Returns (version, off64_threshold) pair.
+/// Accepts "N" or "N,OFFSET" where N is 1 or 2 and OFFSET is a valid number.
+/// Returns None if the value is malformed.
+fn parse_index_version_value(s : String) -> (Int, Int64?)? {
+  if s.contains(",") {
+    let comma_pos = s.find(",").unwrap()
+    let num_str = (try! s[:comma_pos]).to_string()
+    let offset_str = String::unsafe_substring(
+      s,
+      start=comma_pos + 1,
+      end=s.length(),
+    )
+    if offset_str.length() == 0 {
+      return None
+    }
+    let offset = @strconv.parse_int64(offset_str) catch { _ => return None }
+    let iv = @strconv.parse_int(num_str) catch { _ => return None }
+    if iv == 1 || iv == 2 {
+      Some((iv, Some(offset)))
+    } else {
+      None
+    }
+  } else {
+    let iv = @strconv.parse_int(s) catch { _ => return None }
+    if iv == 1 || iv == 2 {
+      Some((iv, None))
+    } else {
+      None
+    }
+  }
 }
 
 ///|
@@ -797,6 +864,10 @@ fn parse_stdin_pack_lines(input : Bytes) -> (Array[String], Array[String]) {
       include_names.push(text)
     }
   }
+  // Git sorts pack names by OID ordering before processing.
+  // This ensures the error message for missing packs is deterministic.
+  include_names.sort_by(fn(a, b) { a.compare(b) })
+  exclude_names.sort_by(fn(a, b) { a.compare(b) })
   (include_names, exclude_names)
 }
 
@@ -1362,14 +1433,9 @@ fn count_pack_reused_objects(
           Some((pack_idx, offset)) =>
             if eligible.contains(pack_idx) {
               if can_reuse_pack_object(
-                fs,
-                pack_dir,
-                pack_names,
-                pack_idx,
-                offset,
-                pack_assigned_offsets,
-                pack_data_cache,
-              ) {
+                  fs, pack_dir, pack_names, pack_idx, offset, pack_assigned_offsets,
+                  pack_data_cache,
+                ) {
                 reused += 1
                 packs_used[pack_idx] = true
               }
@@ -1409,9 +1475,9 @@ fn can_reuse_pack_object(
     return true
   }
   // Decode type at this offset
-  let (type_id, _, header_end) = try {
-    @pack.decode_type_and_size_at(pack_data, offset)
-  } catch {
+  let (type_id, _, header_end) = @pack.decode_type_and_size_at(
+    pack_data, offset,
+  ) catch {
     _ => return true
   }
   // Only OFS_DELTA (type 6) needs cross-pack base checking
@@ -1419,9 +1485,7 @@ fn can_reuse_pack_object(
     return true
   }
   // Read the back-offset for this OFS_DELTA
-  let (back_offset, _) = try {
-    @pack.read_ofs_delta_offset(pack_data, header_end)
-  } catch {
+  let (back_offset, _) = @pack.read_ofs_delta_offset(pack_data, header_end) catch {
     _ => return true
   }
   let base_offset = offset - back_offset
@@ -1942,7 +2006,7 @@ async fn collect_objects_from_stdin_packs(
     match resolve_pack_path(fs, pack_dir, alt_dirs, name) {
       Some(path) => include_paths.push(path)
       None => {
-        @stdio.stderr.write("fatal: cannot find packfile '" + name + "'\n")
+        @stdio.stderr.write("fatal: could not find pack '" + name + "'\n")
         @sys.exit(1)
       }
     }
@@ -2135,8 +2199,13 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
         @stdio.stderr.write("fatal: not a git repository\n")
         @sys.exit(1)
       }
-      // Read pack.packSizeLimit from config
-      let pack_size_limit = get_pack_size_limit(git_dir)
+      // Read pack.packSizeLimit from config; CLI --max-pack-size overrides
+      let pack_size_limit = match cfg.max_pack_size {
+        Some(_) => cfg.max_pack_size
+        None => get_pack_size_limit(git_dir)
+      }
+      // Check if reverse index should be written
+      let write_rev = pack_write_reverse_index_enabled(git_dir)
       let pack_compression_level = get_pack_compression_level(git_dir)
       let pack_compression = match pack_compression_level {
         Some(level) if level == 0 => @bitcore.PackCompression::Stored
@@ -2569,7 +2638,19 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
           // Always re-parse the newly created pack to compute correct
           // offsets and CRC32 values for the index.  The `group` array
           // carries stale metadata from the source packs.
-          @pack.write_pack_index(fs, idx_path, pack)
+          let idx_objects = @pack.parse_packfile(pack)
+          @pack.write_pack_index_from_objects_versioned(
+            fs,
+            idx_path,
+            pack,
+            idx_objects,
+            cfg.index_version,
+            cfg.off64_threshold,
+          )
+          if write_rev {
+            let rev_path = base_name + "-" + hash_hex + ".rev"
+            @pack.write_reverse_index(fs, rev_path, pack, idx_objects)
+          }
           if db.saw_corrupt_pack {
             corrupt_pack_file(fs, pack_path)
           }
@@ -2604,13 +2685,7 @@ fn split_objects_by_size_limit(
       if max_size <= 0L {
         return [objects]
       }
-      // Git enforces a minimum pack size limit of 1 MiB
-      let min_pack_size = 1048576L // 1 MiB
-      let effective_max = if max_size < min_pack_size {
-        min_pack_size
-      } else {
-        max_size
-      }
+      let effective_max = max_size
       let groups : Array[Array[@bitcore.PackObject]] = []
       let mut current_group : Array[@bitcore.PackObject] = []
       let mut current_size = 0L

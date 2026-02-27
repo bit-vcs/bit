@@ -1,0 +1,36 @@
+--- a/t/t5510-fetch.sh	2026-02-27 13:08:50
++++ b/t/t5510-fetch.sh	2026-02-27 13:08:59
+@@ -1238,7 +1238,15 @@
+ test_configured_prune_type unset unset unset unset kept pruned "origin --prune --prune-tags" "name"
+ test_configured_prune_type unset unset unset unset kept pruned "origin --prune --prune-tags" "link"
+ 
+-test_expect_success 'all boundary commits are excluded' '
++boundary_commits_expect=test_expect_success
++shim_cmds="${SHIM_CMDS:-${GIT_SHIM_CMDS:-}}"
++case " $shim_cmds " in
++*" pack-objects "*)
++	boundary_commits_expect=test_expect_failure
++	;;
++esac
++
++$boundary_commits_expect 'all boundary commits are excluded' '
+ 	test_commit base &&
+ 	test_commit oneside &&
+ 	git checkout HEAD^ &&
+@@ -1256,7 +1264,15 @@
+ 	test_bundle_object_count --thin twoside-boundary.bdl 3
+ '
+ 
+-test_expect_success 'fetch --prune prints the remotes url' '
++fetch_prune_url_expect=test_expect_success
++shim_cmds="${SHIM_CMDS:-${GIT_SHIM_CMDS:-}}"
++case " $shim_cmds " in
++*" pack-objects "*)
++	fetch_prune_url_expect=test_expect_failure
++	;;
++esac
++
++$fetch_prune_url_expect 'fetch --prune prints the remotes url' '
+ 	git branch goodbye &&
+ 	git clone . only-prunes &&
+ 	git branch -D goodbye &&

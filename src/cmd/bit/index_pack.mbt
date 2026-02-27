@@ -12,6 +12,11 @@ priv struct IndexPackConfig {
   fsck_objects : Bool
   ignore_missing_email : Bool
   has_unsupported_options : Bool
+  index_version : Int
+  off64_threshold : Int64?
+  max_input_size : Int64?
+  write_rev_index : Bool?
+  verbose : Bool
 }
 
 ///|
@@ -45,6 +50,11 @@ fn parse_index_pack_args(args : Array[String]) -> IndexPackParse {
   let mut fsck_objects = false
   let mut ignore_missing_email = false
   let mut has_unsupported_options = false
+  let mut index_version = 2
+  let mut off64_threshold : Int64? = None
+  let mut max_input_size : Int64? = None
+  let mut write_rev_index : Bool? = None
+  let mut verbose = false
   let mut i = 0
   let mut in_opts = true
   let mut extra_args = 0
@@ -61,25 +71,29 @@ fn parse_index_pack_args(args : Array[String]) -> IndexPackParse {
         "--verify" => verify = true
         "--verify-stat-only" => verify_stat_only = true
         "--fix-thin" => fix_thin = true
-        "--rev-index" => has_unsupported_options = true
-        "--no-rev-index" => has_unsupported_options = true
+        "--rev-index" => write_rev_index = Some(true)
+        "--no-rev-index" => write_rev_index = Some(false)
         "--keep" => keep_msg = Some("")
         "--strict" => strict = true
         "--fsck-objects" => fsck_objects = true
-        "--index-version" => {
-          has_unsupported_options = true
+        "--index-version" =>
           if i + 1 < args.length() {
+            match parse_index_version_value(args[i + 1]) {
+              Some((iv, threshold)) => {
+                index_version = iv
+                off64_threshold = threshold
+              }
+              None => ()
+            }
             i += 1
           }
-        }
-        "--max-input-size" => {
-          has_unsupported_options = true
+        "--max-input-size" =>
           if i + 1 < args.length() {
+            max_input_size = Some(parse_size_with_suffix(args[i + 1]))
             i += 1
           }
-        }
-        "-v" => ()
-        "--verbose" => ()
+        "-v" => verbose = true
+        "--verbose" => verbose = true
         "--object-format" => {
           if i + 1 >= args.length() {
             return IndexPackParse::Unsupported
@@ -118,9 +132,17 @@ fn parse_index_pack_args(args : Array[String]) -> IndexPackParse {
           } else if arg.has_prefix("--verify-stat-only") {
             return IndexPackParse::Unsupported
           } else if arg.has_prefix("--index-version=") {
-            has_unsupported_options = true
+            let iv_str = (try! arg[16:]).to_string()
+            match parse_index_version_value(iv_str) {
+              Some((iv, threshold)) => {
+                index_version = iv
+                off64_threshold = threshold
+              }
+              None => ()
+            }
           } else if arg.has_prefix("--max-input-size=") {
-            has_unsupported_options = true
+            let value = (try! arg[17:]).to_string()
+            max_input_size = Some(parse_size_with_suffix(value))
           } else if arg.has_prefix("--threads") {
             has_unsupported_options = true
           } else if arg.has_prefix("--object-format") ||
@@ -174,6 +196,11 @@ fn parse_index_pack_args(args : Array[String]) -> IndexPackParse {
     fsck_objects,
     ignore_missing_email,
     has_unsupported_options,
+    index_version,
+    off64_threshold,
+    max_input_size,
+    write_rev_index,
+    verbose,
   })
 }
 
@@ -235,6 +262,22 @@ fn check_sha1_collisions_with_repo(
       None => ()
     }
   }
+}
+
+///|
+fn tag_missing_tagger(content : Bytes) -> Bool {
+  let text = @utf8.decode_lossy(content[:])
+  let mut found_tagger = false
+  for line_view in text.split("\n") {
+    let line = line_view.to_string()
+    if line.length() == 0 {
+      break
+    }
+    if line.has_prefix("tagger ") {
+      found_tagger = true
+    }
+  }
+  !found_tagger
 }
 
 ///|
@@ -321,9 +364,10 @@ fn check_pack_strict_and_fsck(
   strict : Bool,
   fsck_objects : Bool,
   ignore_missing_email : Bool,
-) -> Unit raise @bitcore.GitError {
+) -> Array[String] raise @bitcore.GitError {
+  let warnings : Array[String] = []
   if !strict && !fsck_objects {
-    return
+    return warnings
   }
   let pack_ids : Map[String, Bool] = {}
   for obj in objects {
@@ -345,6 +389,13 @@ fn check_pack_strict_and_fsck(
       obj.obj_type == @bitcore.ObjectType::Commit {
       if commit_has_missing_email(obj.data) {
         raise @bitcore.GitError::InvalidObject("missingEmail")
+      }
+    }
+    if (strict || fsck_objects) && obj.obj_type == @bitcore.ObjectType::Tag {
+      if tag_missing_tagger(obj.data) {
+        warnings.push(
+          "warning: tag " + obj.id.to_hex() + ": expected 'tagger' line",
+        )
       }
     }
     if strict {
@@ -372,6 +423,7 @@ fn check_pack_strict_and_fsck(
       }
     }
   }
+  warnings
 }
 
 ///|
@@ -510,6 +562,43 @@ fn verify_pack_index(idx : Bytes, pack : Bytes) -> String? {
 }
 
 ///|
+/// Verify a reverse index (.rev) file against its pack.
+fn verify_reverse_index(rev : Bytes, pack : Bytes) -> String? {
+  // RIDX format: magic(4) + version(4) + hash_id(4) + positions(N*4) + pack_checksum(20) + file_checksum(20)
+  if rev.length() < 52 {
+    return Some("reverse index too short")
+  }
+  // Check magic
+  if rev[0] != b'R' || rev[1] != b'I' || rev[2] != b'D' || rev[3] != b'X' {
+    return Some("invalid reverse index magic")
+  }
+  // Check version
+  let version = read_u32_be(rev, 4)
+  if version != 1 {
+    return Some("unsupported reverse index version: \{version}")
+  }
+  // Verify file checksum
+  let file_data_len = rev.length() - 20
+  let file_data = Bytes::from_array(
+    FixedArray::makei(file_data_len, i => rev[i]),
+  )
+  let computed = @bitcore.sha1(file_data)
+  let stored = read_sha1_at(rev, file_data_len)
+  if computed != stored {
+    return Some("reverse index checksum mismatch")
+  }
+  // Verify pack checksum
+  if pack.length() >= 20 {
+    let pack_cs = read_sha1_at(pack, pack.length() - 20)
+    let rev_pack_cs = read_sha1_at(rev, file_data_len - 20)
+    if pack_cs != rev_pack_cs {
+      return Some("pack checksum mismatch in reverse index")
+    }
+  }
+  None
+}
+
+///|
 /// Verify v1 pack index
 fn verify_pack_index_v1(idx : Bytes, pack : Bytes) -> String? {
   // v1 index: fanout[256] + entries[count] * (offset[4] + sha1[20])
@@ -536,7 +625,7 @@ fn verify_pack_index_v1(idx : Bytes, pack : Bytes) -> String? {
 
   // v1 entries: each entry is offset(4) + sha1(20) = 24 bytes
   let entries_start = 256 * 4
-  let expected_len = entries_start + count_i * 24 + 20 // + pack checksum
+  let expected_len = entries_start + count_i * 24 + 20 + 20 // + pack checksum + index checksum
   if idx.length() < expected_len {
     return Some("v1 index file truncated")
   }
@@ -640,9 +729,7 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
         @sys.exit(1)
       }
       if cfg.fix_thin && !cfg.stdin {
-        @stdio.stderr.write(
-          "bit index-pack: --fix-thin requires --stdin\n",
-        )
+        @stdio.stderr.write("bit index-pack: --fix-thin requires --stdin\n")
         @sys.exit(1)
       }
       let fs = OsFs::new()
@@ -653,9 +740,9 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
         @stdio.stderr.write("bit: SHA256 object format is not supported\n")
         @sys.exit(1)
       }
-      if pack_write_reverse_index_enabled(git_dir) {
-        @stdio.stderr.write("bit: unsupported index-pack options\n")
-        @sys.exit(1)
+      let write_rev = match cfg.write_rev_index {
+        Some(v) => v
+        None => pack_write_reverse_index_enabled(git_dir)
       }
       if cfg.verify_stat_only {
         let pack_path = match cfg.pack_path {
@@ -726,6 +813,36 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
             @sys.exit(1)
           }
           None => {
+            // Verify .rev file if --rev-index was given
+            if write_rev {
+              let rev_path = if pack_path.has_suffix(".pack") {
+                let base = (try! pack_path[:pack_path.length() - 5]).to_string()
+                base + ".rev"
+              } else {
+                pack_path + ".rev"
+              }
+              let rev = @fs.read_file_to_bytes(rev_path) catch {
+                err if @async.is_cancellation_error(err) => raise err
+                err => {
+                  @stdio.stderr.write(
+                    "error: could not read reverse index: " +
+                    err.to_string() +
+                    "\n",
+                  )
+                  @sys.exit(1)
+                  Bytes::default()
+                }
+              }
+              match verify_reverse_index(rev, pack) {
+                Some(err) => {
+                  @stdio.stderr.write(
+                    "error: reverse index validation error: " + err + "\n",
+                  )
+                  @sys.exit(1)
+                }
+                None => ()
+              }
+            }
             // Success - print the pack hash
             let hash_hex = pack_hash_hex(pack)
             @stdio.stdout.write(hash_hex + "\n")
@@ -735,6 +852,33 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
       }
       if cfg.stdin {
         let pack = read_all_stdin()
+        // Check --max-input-size
+        match cfg.max_input_size {
+          Some(max_size) if pack.length().to_int64() > max_size => {
+            @stdio.stderr.write(
+              "fatal: pack exceeds maximum allowed size (" +
+              max_size.to_string() +
+              " bytes)\n",
+            )
+            @sys.exit(1)
+          }
+          _ => ()
+        }
+        // Parse pack header to get object count for progress
+        let pack_obj_count = if pack.length() >= 12 {
+          read_u32_be(pack, 8)
+        } else {
+          0
+        }
+        if cfg.verbose {
+          @stdio.stderr.write(
+            "Receiving objects: 100% (" +
+            pack_obj_count.to_string() +
+            "/" +
+            pack_obj_count.to_string() +
+            "), done.\n",
+          )
+        }
         let hash_hex = pack_hash_hex(pack)
         if !fs.is_dir(git_dir) {
           @stdio.stderr.write("fatal: not a git repository\n")
@@ -743,7 +887,9 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
         let trace2_event = @sys.get_env_var("GIT_TRACE2_EVENT")
         match trace2_event {
           Some(path) =>
-            write_trace2_region_event(fs, path, "region_enter", "index-pack", "progress")
+            write_trace2_region_event(
+              fs, path, "region_enter", "index-pack", "progress",
+            )
           None => ()
         }
         let bases = if cfg.fix_thin {
@@ -759,8 +905,17 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
         } else {
           @pack.parse_packfile(pack)
         }
+        if cfg.verbose {
+          @stdio.stderr.write(
+            "Resolving deltas: 100% (" +
+            objects.length().to_string() +
+            "/" +
+            objects.length().to_string() +
+            "), done.\n",
+          )
+        }
         check_sha1_collisions_with_repo(fs, git_dir, objects)
-        check_pack_strict_and_fsck(
+        let fsck_warnings = check_pack_strict_and_fsck(
           fs,
           Some(git_dir),
           objects,
@@ -768,6 +923,9 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
           cfg.fsck_objects,
           cfg.ignore_missing_email,
         )
+        for w in fsck_warnings {
+          @stdio.stderr.write(w + "\n")
+        }
         let pack_dir = git_dir + "/objects/pack"
         ensure_dir(pack_dir)
         let pack_path = pack_dir + "/pack-" + hash_hex + ".pack"
@@ -776,12 +934,25 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
           None => pack_dir + "/pack-" + hash_hex + ".idx"
         }
         fs.write_file(pack_path, pack)
-        @pack.write_pack_index_from_objects(fs, idx_path, pack, objects)
+        @pack.write_pack_index_from_objects_versioned(
+          fs,
+          idx_path,
+          pack,
+          objects,
+          cfg.index_version,
+          cfg.off64_threshold,
+        )
+        if write_rev {
+          let rev_path = pack_dir + "/pack-" + hash_hex + ".rev"
+          @pack.write_reverse_index(fs, rev_path, pack, objects)
+        }
         let keep_path = pack_dir + "/pack-" + hash_hex + ".keep"
         write_keep_file(fs, keep_path, cfg.keep_msg)
         match trace2_event {
           Some(path) =>
-            write_trace2_region_event(fs, path, "region_leave", "index-pack", "progress")
+            write_trace2_region_event(
+              fs, path, "region_leave", "index-pack", "progress",
+            )
           None => ()
         }
         @stdio.stdout.write(hash_hex + "\n")
@@ -805,6 +976,18 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
           Bytes::default()
         }
       }
+      // Check --max-input-size for file mode
+      match cfg.max_input_size {
+        Some(max_size) if pack.length().to_int64() > max_size => {
+          @stdio.stderr.write(
+            "fatal: pack exceeds maximum allowed size (" +
+            max_size.to_string() +
+            " bytes)\n",
+          )
+          @sys.exit(1)
+        }
+        _ => ()
+      }
       let hash_hex = pack_hash_hex(pack)
       let idx_path = match cfg.output_path {
         Some(path) => resolve_in_cwd(path)
@@ -818,10 +1001,19 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
       }
       let objects = @pack.parse_packfile(pack)
       let bit_dir_opt = if fs.is_dir(git_dir) { Some(git_dir) } else { None }
+      // --fsck-objects requires a repository for object connectivity checks.
+      // --strict implies fsck but when running outside a repo, git skips the
+      // fsck checks and still generates the index successfully.
+      if cfg.fsck_objects && bit_dir_opt is None {
+        @stdio.stderr.write(
+          "fatal: cannot perform queued object checks outside of a repository\n",
+        )
+        @sys.exit(1)
+      }
       if bit_dir_opt is Some(dir) {
         check_sha1_collisions_with_repo(fs, dir, objects)
       }
-      check_pack_strict_and_fsck(
+      let fsck_warnings2 = check_pack_strict_and_fsck(
         fs,
         bit_dir_opt,
         objects,
@@ -829,7 +1021,27 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
         cfg.fsck_objects,
         cfg.ignore_missing_email,
       )
-      @pack.write_pack_index_from_objects(fs, idx_path, pack, objects)
+      for w in fsck_warnings2 {
+        @stdio.stderr.write(w + "\n")
+      }
+      @pack.write_pack_index_from_objects_versioned(
+        fs,
+        idx_path,
+        pack,
+        objects,
+        cfg.index_version,
+        cfg.off64_threshold,
+      )
+      if write_rev {
+        // Derive .rev path from idx output path (handles -o flag)
+        let rev_path = if idx_path.has_suffix(".idx") {
+          let base = (try! idx_path[:idx_path.length() - 4]).to_string()
+          base + ".rev"
+        } else {
+          idx_path + ".rev"
+        }
+        @pack.write_reverse_index(fs, rev_path, pack, objects)
+      }
       if cfg.keep_msg is Some(_) {
         let keep_path = if pack_path.has_suffix(".pack") {
           let base = (try! pack_path[:pack_path.length() - 5]).to_string()

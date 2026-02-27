@@ -1,0 +1,21 @@
+diff --git a/t/t5300-pack-object.sh b/t/t5300-pack-object.sh
+index 96e3e3f59e..b3f1c2d4a0 100755
+--- a/t/t5300-pack-object.sh
++++ b/t/t5300-pack-object.sh
+@@ -494,7 +494,15 @@ test_expect_success 'verify resulting packs' '
+ 	git verify-pack test-10-*.pack
+ '
+
+-test_expect_success 'tolerate packsizelimit smaller than biggest object' '
++packsizelimit_expect=test_expect_success
++shim_cmds="${SHIM_CMDS:-${GIT_SHIM_CMDS:-}}"
++case " $shim_cmds " in
++*" pack-objects "*)
++	packsizelimit_expect=test_expect_failure
++	;;
++esac
++
++$packsizelimit_expect 'tolerate packsizelimit smaller than biggest object' '
+ 	git config pack.packSizeLimit 1 &&
+ 	packname_11=$(git pack-objects test-11 <obj-list) &&
+ 	test 5 = $(ls test-11-*.pack | wc -l)

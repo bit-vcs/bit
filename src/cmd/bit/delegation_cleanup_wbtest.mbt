@@ -20,11 +20,12 @@ test "index-pack parser tracks unsupported options without delegation naming" {
     }
     _ => fail("expected index-pack parse ok")
   }
-  // --rev-index is still unsupported
+  // --rev-index is now handled natively (sets write_rev_index flag)
   match parse_index_pack_args(["--stdin", "--rev-index"]) {
     IndexPackParse::Ok(cfg) => {
       assert_true(cfg.stdin)
-      assert_true(cfg.has_unsupported_options)
+      assert_eq(cfg.write_rev_index, Some(true))
+      assert_false(cfg.has_unsupported_options)
     }
     _ => fail("expected index-pack parse ok")
   }
