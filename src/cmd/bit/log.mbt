@@ -363,6 +363,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
       max_count~,
       since=since_ts,
       until=until_ts,
+      include_parent_tree=show_stat || show_patch,
     )
     for entry in entries {
       print_line("commit " + entry.id.to_hex())

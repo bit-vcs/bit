@@ -18,6 +18,7 @@ pub fn log_head(
   max_count? : Int = 100,
   since? : Int64 = 0L,
   until? : Int64 = 9223372036854775807L,
+  include_parent_tree? : Bool = false,
 ) -> Array[LogEntry] raise @bit.GitError {
   let result : Array[LogEntry] = []
   let mut current = resolve_head_commit(fs, git_dir)
@@ -36,8 +37,9 @@ pub fn log_head(
             }
             let info = @bit.parse_commit(o.data)
             let entry = parse_log_entry(id, o.data, info.tree)
-            // Get parent tree for diff
-            let parent_tree : @bit.ObjectId? = if info.parents.length() > 0 {
+            // Get parent tree for diff (only when needed for --stat/--patch)
+            let parent_tree : @bit.ObjectId? = if include_parent_tree &&
+              info.parents.length() > 0 {
               let parent_obj = db.get(fs, info.parents[0])
               match parent_obj {
                 Some(po) => {
