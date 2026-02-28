@@ -79,9 +79,11 @@ async fn handle_upload_pack(args : Array[String]) -> Unit raise Error {
     }
     if advertise {
       let proto = @bitlib.get_protocol_version()
+      let agent = @sys.get_env_var("GIT_USER_AGENT").unwrap_or("git/moonbit")
       let out = @bitlib.build_upload_pack_advertisement(
         fs,
         root,
+        agent=agent,
         protocol_version=proto,
       )
       @stdio.stdout.write(out)
