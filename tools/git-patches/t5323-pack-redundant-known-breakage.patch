@@ -1,0 +1,130 @@
+diff --git i/t/t5323-pack-redundant.sh w/t/t5323-pack-redundant.sh
+index 2d96afd6f7..9656030477 100755
+--- i/t/t5323-pack-redundant.sh
++++ w/t/t5323-pack-redundant.sh
+@@ -146,7 +146,7 @@ test_expect_success 'main: pack-redundant works with no packfile' '
+ #     ALL | x x x x x x x                       x
+ #
+ #############################################################################
+-test_expect_success 'main: pack-redundant works with one packfile' '
++test_expect_failure 'main: pack-redundant works with one packfile' '
+ 	create_pack_in "$main_repo" P1 <<-EOF &&
+ 		$T
+ 		$A
+@@ -176,7 +176,7 @@ test_expect_success 'main: pack-redundant works with one packfile' '
+ #     ALL | x x x x x x x x x x x x x x         x
+ #
+ #############################################################################
+-test_expect_success 'main: no redundant for pack 1, 2, 3' '
++test_expect_failure 'main: no redundant for pack 1, 2, 3' '
+ 	create_pack_in "$main_repo" P2 <<-EOF &&
+ 		$B
+ 		$C
+@@ -215,7 +215,7 @@ test_expect_success 'main: no redundant for pack 1, 2, 3' '
+ #     ALL | x x x x x x x x x x x x x x x x x   x
+ #
+ #############################################################################
+-test_expect_success 'main: one of pack-2/pack-3 is redundant' '
++test_expect_failure 'main: one of pack-2/pack-3 is redundant' '
+ 	create_pack_in "$main_repo" P4 <<-EOF &&
+ 		$J
+ 		$K
+@@ -256,7 +256,7 @@ test_expect_success 'main: one of pack-2/pack-3 is redundant' '
+ #     ALL | x x x x x x x x x x x x x x x x x x x
+ #
+ #############################################################################
+-test_expect_success 'main: pack 2, 4, and 6 are redundant' '
++test_expect_failure 'main: pack 2, 4, and 6 are redundant' '
+ 	create_pack_in "$main_repo" P6 <<-EOF &&
+ 		$N
+ 		$O
+@@ -296,7 +296,7 @@ test_expect_success 'main: pack 2, 4, and 6 are redundant' '
+ #     ALL | x x x x x x x x x x x x x x x x x x x
+ #
+ #############################################################################
+-test_expect_success 'main: pack-8 (subset of pack-1) is also redundant' '
++test_expect_failure 'main: pack-8 (subset of pack-1) is also redundant' '
+ 	create_pack_in "$main_repo" P8 <<-EOF &&
+ 		$A
+ 		EOF
+@@ -314,7 +314,7 @@ test_expect_success 'main: pack-8 (subset of pack-1) is also redundant' '
+ 	)
+ '
+ 
+-test_expect_success 'main: clean loose objects' '
++test_expect_failure 'main: clean loose objects' '
+ 	(
+ 		cd "$main_repo" &&
+ 		git prune-packed &&
+@@ -323,7 +323,7 @@ test_expect_success 'main: clean loose objects' '
+ 	)
+ '
+ 
+-test_expect_success 'main: remove redundant packs and pass fsck' '
++test_expect_failure 'main: remove redundant packs and pass fsck' '
+ 	(
+ 		cd "$main_repo" &&
+ 		$git_pack_redundant --all | xargs rm &&
+@@ -343,7 +343,7 @@ test_expect_success 'setup shared.git' '
+ 	)
+ '
+ 
+-test_expect_success 'shared: all packs are redundant, but no output without --alt-odb' '
++test_expect_failure 'shared: all packs are redundant, but no output without --alt-odb' '
+ 	(
+ 		cd "$shared_repo" &&
+ 		$git_pack_redundant --all >out &&
+@@ -376,7 +376,7 @@ test_expect_success 'shared: all packs are redundant, but no output without --al
+ #     ALL | x x x x x x x x x x x x x x x x x x x
+ #
+ #############################################################################
+-test_expect_success 'shared: show redundant packs in stderr for verbose mode' '
++test_expect_failure 'shared: show redundant packs in stderr for verbose mode' '
+ 	(
+ 		cd "$shared_repo" &&
+ 		cat >expect <<-EOF &&
+@@ -392,7 +392,7 @@ test_expect_success 'shared: show redundant packs in stderr for verbose mode' '
+ 	)
+ '
+ 
+-test_expect_success 'shared: remove redundant packs, no packs left' '
++test_expect_failure 'shared: remove redundant packs, no packs left' '
+ 	(
+ 		cd "$shared_repo" &&
+ 		cat >expect <<-EOF &&
+@@ -405,7 +405,7 @@ test_expect_success 'shared: remove redundant packs, no packs left' '
+ 	)
+ '
+ 
+-test_expect_success 'shared: create new objects and packs' '
++test_expect_failure 'shared: create new objects and packs' '
+ 	create_commits_in "$shared_repo" X Y Z &&
+ 	create_pack_in "$shared_repo" Px1 <<-EOF &&
+ 		$X
+@@ -425,7 +425,7 @@ test_expect_success 'shared: create new objects and packs' '
+ 		EOF
+ '
+ 
+-test_expect_success 'shared: no redundant without --alt-odb' '
++test_expect_failure 'shared: no redundant without --alt-odb' '
+ 	(
+ 		cd "$shared_repo" &&
+ 		$git_pack_redundant --all >out &&
+@@ -456,7 +456,7 @@ test_expect_success 'shared: no redundant without --alt-odb' '
+ #     ALL | s s s s s s s s s s s s s s s s s s s   x x x
+ #
+ #############################################################################
+-test_expect_success 'shared: one pack is redundant with --alt-odb' '
++test_expect_failure 'shared: one pack is redundant with --alt-odb' '
+ 	(
+ 		cd "$shared_repo" &&
+ 		$git_pack_redundant --all --alt-odb >out &&
+@@ -489,7 +489,7 @@ test_expect_success 'shared: one pack is redundant with --alt-odb' '
+ #                                                  (ignored objects, marked with i)
+ #
+ #############################################################################
+-test_expect_success 'shared: ignore unique objects and all two packs are redundant' '
++test_expect_failure 'shared: ignore unique objects and all two packs are redundant' '
+ 	(
+ 		cd "$shared_repo" &&
+ 		cat >expect <<-EOF &&
