@@ -447,22 +447,17 @@ pub fn receive_build_status_response_with_proc(
       if found_rejected {
         continue
       }
-      // Check proc-receive results by original_refname (deduplicate)
+      // Check proc-receive results by original_refname
+      // report-status v1: one line per original refname using the original name
       if seen.contains(refname) {
         continue
       }
-      let mut found_proc = false
+      // Find first proc result for this original ref
       for pr in proc_results {
         if pr.original_refname == refname {
-          if not(found_proc) {
-            seen[refname] = true
-            found_proc = true
-          }
+          seen[refname] = true
           if pr.status == "ok" {
-            receive_push_bytes(
-              out,
-              @protocol.pktline_encode("ok \{pr.refname}\n"),
-            )
+            receive_push_bytes(out, @protocol.pktline_encode("ok \{refname}\n"))
           } else {
             let msg = if pr.message.length() > 0 {
               pr.message
@@ -471,9 +466,10 @@ pub fn receive_build_status_response_with_proc(
             }
             receive_push_bytes(
               out,
-              @protocol.pktline_encode("ng \{pr.refname} \{msg}\n"),
+              @protocol.pktline_encode("ng \{refname} \{msg}\n"),
             )
           }
+          break
         }
       }
     }
