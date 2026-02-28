@@ -12,6 +12,9 @@ pub struct ReceivePackRequest {
   updates : Array[RefUpdate]
   capabilities : Array[String]
   pack : Bytes
+  push_options : Array[String]
+  cert_push_options : Array[String]
+  has_push_cert : Bool
 }
 
 ///|
@@ -31,6 +34,8 @@ pub fn build_receive_pack_advertisement(
   protocol_version? : Int = 0,
   extra_haves? : Array[@bit.ObjectId] = [],
   git_dir_override? : String = "",
+  advertise_push_options? : Bool = false,
+  cert_nonce? : String = "",
 ) -> Bytes raise @bit.GitError {
   let git_dir = if git_dir_override.length() > 0 {
     git_dir_override
@@ -39,7 +44,7 @@ pub fn build_receive_pack_advertisement(
   }
   let refs = show_ref(fs, git_dir)
   refs.sort_by((a, b) => String::compare(a.0, b.0))
-  let caps = receive_default_caps(agent)
+  let caps = receive_default_caps(agent, advertise_push_options~, cert_nonce~)
   let out : Array[Byte] = []
   // Protocol v1: output version line before refs
   // (receive-pack has no v2, so v2 falls back to v0)
@@ -87,8 +92,12 @@ pub fn parse_receive_pack_request(
 ) -> ReceivePackRequest raise @bit.GitError {
   let updates : Array[RefUpdate] = []
   let capabilities : Array[String] = []
+  let cert_push_options : Array[String] = []
+  let mut has_push_cert = false
   let mut i = 0
   let mut first = true
+  let mut in_cert = false
+  let cert_lines : Array[String] = []
   while i + 4 <= data.length() {
     let len = receive_parse_pkt_len(data, i)
     if len == 0 {
@@ -100,6 +109,46 @@ pub fn parse_receive_pack_request(
     }
     let line = receive_bytes_to_string_range(data, i + 4, i + len)
     let mut line = receive_trim_line(line)
+    if in_cert {
+      if line == "push-cert-end" {
+        in_cert = false
+        // Parse certificate content for ref updates and push-options
+        receive_parse_cert_content(cert_lines, updates, cert_push_options)
+      } else {
+        cert_lines.push(line)
+      }
+      i += len
+      continue
+    }
+    // Check for push-cert start
+    let is_push_cert = line == "push-cert" || line.has_prefix("push-cert\u0000")
+    if is_push_cert {
+      has_push_cert = true
+      in_cert = true
+      // Extract capabilities from push-cert line (after NUL)
+      if first {
+        first = false
+        match line.find("\u0000") {
+          None => ()
+          Some(idx) => {
+            let caps_str = String::unsafe_substring(
+              line,
+              start=idx + 1,
+              end=line.length(),
+            )
+            let caps = receive_split_by_space(caps_str)
+            for c in caps {
+              if c.length() > 0 {
+                capabilities.push(c)
+              }
+            }
+          }
+        }
+      }
+      i += len
+      continue
+    }
+    // Normal ref update command
     if first {
       first = false
       match line.find("\u0000") {
@@ -130,8 +179,85 @@ pub fn parse_receive_pack_request(
     updates.push({ old_id, new_id, refname })
     i += len
   }
+  // Phase 2: Read push-options after flush (if push-options capability is negotiated)
+  let push_options : Array[String] = []
+  let mut has_push_options_cap = false
+  for cap in capabilities {
+    if cap == "push-options" {
+      has_push_options_cap = true
+      break
+    }
+  }
+  if has_push_options_cap && i + 4 <= data.length() {
+    while i + 4 <= data.length() {
+      let len = receive_parse_pkt_len(data, i)
+      if len == 0 {
+        i += 4
+        break
+      }
+      if len < 4 || i + len > data.length() {
+        break
+      }
+      let line = receive_bytes_to_string_range(data, i + 4, i + len)
+      let line = receive_trim_line(line)
+      push_options.push(line)
+      i += len
+    }
+  }
+  // Phase 3: Remaining data is pack
   let pack = receive_bytes_slice(data, i, data.length())
-  { updates, capabilities, pack }
+  {
+    updates,
+    capabilities,
+    pack,
+    push_options,
+    cert_push_options,
+    has_push_cert,
+  }
+}
+
+///|
+/// Parse push certificate content to extract ref updates and push-options.
+fn receive_parse_cert_content(
+  cert_lines : Array[String],
+  updates : Array[RefUpdate],
+  cert_push_options : Array[String],
+) -> Unit {
+  let mut in_body = false
+  let mut in_sig = false
+  for cert_line in cert_lines {
+    if in_sig {
+      continue
+    }
+    if not(in_body) {
+      if cert_line.length() == 0 {
+        in_body = true
+        continue
+      }
+      if cert_line.has_prefix("push-option ") {
+        let opt = String::unsafe_substring(
+          cert_line,
+          start=12,
+          end=cert_line.length(),
+        )
+        cert_push_options.push(opt)
+      }
+      continue
+    }
+    // In body: ref updates and GPG signature
+    if cert_line.has_prefix("-----BEGIN ") {
+      in_sig = true
+      continue
+    }
+    // Parse ref update line: <old> <new> <refname>
+    let parts = receive_split_by_space(cert_line)
+    if parts.length() >= 3 && parts[0].length() == 40 {
+      let old_id = @bit.ObjectId::from_hex(parts[0]) catch { _ => continue }
+      let new_id = @bit.ObjectId::from_hex(parts[1]) catch { _ => continue }
+      let refname = normalize_receive_refname(parts[2]) catch { _ => continue }
+      updates.push({ old_id, new_id, refname })
+    }
+  }
 }
 
 ///|
@@ -147,6 +273,32 @@ pub fn apply_receive_pack(
     git_dir_override
   } else {
     join_path(root, ".git")
+  }
+  // Check push-option inconsistency (cert vs protocol push-options)
+  if req.has_push_cert && req.push_options.length() > 0 {
+    let mut inconsistent = false
+    if req.cert_push_options.length() != req.push_options.length() {
+      inconsistent = true
+    } else {
+      for i in 0..<req.cert_push_options.length() {
+        if req.cert_push_options[i] != req.push_options[i] {
+          inconsistent = true
+          break
+        }
+      }
+    }
+    if inconsistent {
+      let rejected : Array[(String, String)] = []
+      for upd in req.updates {
+        rejected.push((upd.refname, "inconsistent push options"))
+      }
+      return {
+        updated: [],
+        rejected,
+        unpack_error: None,
+        connectivity_error_oid: None,
+      }
+    }
   }
   let mut pack_objects : Array[@bit.PackObject] = []
   if req.pack.length() > 0 {
@@ -458,7 +610,11 @@ fn receive_push_bytes(out : Array[Byte], data : Bytes) -> Unit {
 }
 
 ///|
-fn receive_default_caps(agent : String) -> String {
+fn receive_default_caps(
+  agent : String,
+  advertise_push_options? : Bool = false,
+  cert_nonce? : String = "",
+) -> String {
   let caps : Array[String] = [
     "report-status",
     "report-status-v2",
@@ -468,6 +624,12 @@ fn receive_default_caps(agent : String) -> String {
     "object-format=sha1",
     "agent=\{agent}",
   ]
+  if advertise_push_options {
+    caps.push("push-options")
+  }
+  if cert_nonce.length() > 0 {
+    caps.push("push-cert=\{cert_nonce}")
+  }
   caps.join(" ")
 }
 

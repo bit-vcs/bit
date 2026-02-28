@@ -20,7 +20,7 @@ pub fn apply_receive_pack(&@types.FileSystem, &@types.RepoFileSystem, String, Re
 
 pub fn apply_template(&@types.FileSystem, &@types.RepoFileSystem, String, String) -> Unit raise @object.GitError
 
-pub fn build_receive_pack_advertisement(&@types.RepoFileSystem, String, agent? : String, protocol_version? : Int, extra_haves? : Array[@object.ObjectId], git_dir_override? : String) -> Bytes raise @object.GitError
+pub fn build_receive_pack_advertisement(&@types.RepoFileSystem, String, agent? : String, protocol_version? : Int, extra_haves? : Array[@object.ObjectId], git_dir_override? : String, advertise_push_options? : Bool, cert_nonce? : String) -> Bytes raise @object.GitError
 
 pub fn build_upload_pack_advertisement(&@types.RepoFileSystem, String, agent? : String, protocol_version? : Int) -> Bytes raise @object.GitError
 
@@ -713,6 +713,9 @@ pub struct ReceivePackRequest {
   updates : Array[RefUpdate]
   capabilities : Array[String]
   pack : Bytes
+  push_options : Array[String]
+  cert_push_options : Array[String]
+  has_push_cert : Bool
 }
 
 pub struct ReceivePackResult {

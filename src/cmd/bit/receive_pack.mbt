@@ -40,6 +40,20 @@ async fn handle_receive_pack(args : Array[String]) -> Unit {
     @stdio.stderr.write("bit: SHA256 repositories are not supported\n")
     @sys.exit(1)
   }
+  // Read push-related config
+  let config_path = git_dir + "/config"
+  let advertise_push_options = match
+    @bitlib.read_config_bool(fs, config_path, "receive", "advertisepushoptions") {
+    Some(v) => v
+    None => false
+  }
+  let cert_nonce_seed = @bitlib.read_config_value(
+    fs, config_path, "receive", "certnonceseed",
+  )
+  let cert_nonce = match cert_nonce_seed {
+    Some(seed) => receive_generate_nonce(seed)
+    None => ""
+  }
   // Send advertisement: always for advertise-only mode, and in
   // bidirectional mode (no --stateless-rpc)
   if advertise || not(stateless_rpc) {
@@ -51,6 +65,8 @@ async fn handle_receive_pack(args : Array[String]) -> Unit {
       protocol_version=proto,
       extra_haves=haves,
       git_dir_override=git_dir,
+      advertise_push_options~,
+      cert_nonce~,
     )
     @stdio.stdout.write(out)
   }
@@ -182,6 +198,21 @@ async fn receive_collect_alternate_haves(
     }
   }
   haves
+}
+
+///|
+/// Generate a push certificate nonce from seed and current timestamp.
+/// Format: <timestamp>-<sha1_hex(seed + ":" + timestamp)>
+fn receive_generate_nonce(seed : String) -> String {
+  let ts = get_current_timestamp()
+  let ts_str = ts.to_string()
+  let state = @bitcore.Sha1State::new()
+  state.update_string(ts_str)
+  state.update_string(":")
+  state.update_string(seed)
+  let oid = state.finish()
+  let hex = oid.to_hex()
+  ts_str + "-" + hex
 }
 
 ///|
