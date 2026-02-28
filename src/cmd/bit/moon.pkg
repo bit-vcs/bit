@@ -145,6 +145,8 @@ options(
     "osfs.mbt": [ "native", "js" ],
     "pack_helpers.mbt": [ "native" ],
     "pack_objects.mbt": [ "native" ],
+    "pack_objects_cruft.mbt": [ "native" ],
+    "pack_redundant.mbt": [ "native" ],
     "pack_refs.mbt": [ "native" ],
     "prune.mbt": [ "native" ],
     "pull.mbt": [ "native" ],

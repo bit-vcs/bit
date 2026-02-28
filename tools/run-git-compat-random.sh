@@ -170,7 +170,7 @@ set +e
   tests="$(tools/select-git-tests.sh "$shard" "$shards" "$root_dir/tools/git-test-allowlist.txt")"
   GIT_SHIM_RANDOM_MODE=1 GIT_SHIM_RANDOM_RATIO="$ratio" GIT_SHIM_RANDOM_SEED="$seed" GIT_SHIM_RANDOM_SALT="$run_id-$shard-$shards" \
   SHIM_RANDOM_MODE=1 SHIM_RANDOM_RATIO="$ratio" SHIM_RANDOM_SEED="$seed" SHIM_RANDOM_SALT="$run_id-$shard-$shards" \
-  SHIM_MOON="$(pwd)/tools/git-shim/moon" SHIM_CMDS="receive-pack upload-pack pack-objects index-pack" \
+  SHIM_MOON="$(pwd)/tools/git-shim/moon" SHIM_CMDS="receive-pack upload-pack pack-objects index-pack pack-redundant" \
   GIT_TEST_INSTALLED="$(pwd)/tools/git-shim/bin" GIT_TEST_EXEC_PATH="$exec_path" \
   GIT_TEST_DEFAULT_HASH=sha1 \
   tools/run-git-test.sh T="$tests"

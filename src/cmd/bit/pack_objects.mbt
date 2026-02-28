@@ -27,6 +27,9 @@ priv struct PackObjectsConfig {
   index_version : Int
   off64_threshold : Int64?
   max_pack_size : Int64?
+  cruft : Bool
+  cruft_expiration : String?
+  max_cruft_size : Int64?
 }
 
 ///|
@@ -78,6 +81,9 @@ fn parse_pack_objects_args(args : Array[String]) -> PackObjectsParse {
   let mut index_version = 2
   let mut off64_threshold : Int64? = None
   let mut max_pack_size : Int64? = None
+  let mut cruft = false
+  let mut cruft_expiration : String? = None
+  let mut max_cruft_size : Int64? = None
   let mut i = 0
   let mut in_opts = true
   let mut extra_args = 0
@@ -107,19 +113,19 @@ fn parse_pack_objects_args(args : Array[String]) -> PackObjectsParse {
         "--indexed-objects" => has_unsupported_options = true
         "--keep-true-parents" => has_unsupported_options = true
         "--thin" => () // bit doesn't use thin packs, ignore
-        "--cruft" => has_unsupported_options = true
+        "--cruft" => cruft = true
         "--cruft-expiration" => {
-          has_unsupported_options = true
           if i + 1 >= args.length() {
             return PackObjectsParse::Unsupported
           }
+          cruft_expiration = Some(args[i + 1])
           i += 1
         }
         "--max-cruft-size" => {
-          has_unsupported_options = true
           if i + 1 >= args.length() {
             return PackObjectsParse::Unsupported
           }
+          max_cruft_size = Some(parse_size_with_suffix(args[i + 1]))
           i += 1
         }
         "--max-pack-size" => {
@@ -295,9 +301,12 @@ fn parse_pack_objects_args(args : Array[String]) -> PackObjectsParse {
               _ => return PackObjectsParse::Unsupported
             }
             depth = parsed
-          } else if arg.has_prefix("--cruft-expiration=") ||
-            arg.has_prefix("--max-cruft-size=") {
-            has_unsupported_options = true
+          } else if arg.has_prefix("--cruft-expiration=") {
+            let value = (try! arg[19:]).to_string()
+            cruft_expiration = Some(value)
+          } else if arg.has_prefix("--max-cruft-size=") {
+            let value = (try! arg[17:]).to_string()
+            max_cruft_size = Some(parse_size_with_suffix(value))
           } else if arg.has_prefix("--max-pack-size=") {
             let value = (try! arg[16:]).to_string()
             max_pack_size = Some(parse_size_with_suffix(value))
@@ -388,6 +397,9 @@ fn parse_pack_objects_args(args : Array[String]) -> PackObjectsParse {
     index_version,
     off64_threshold,
     max_pack_size,
+    cruft,
+    cruft_expiration,
+    max_cruft_size,
   })
 }
 
@@ -1029,7 +1041,8 @@ fn read_alternate_object_dirs(fs : OsFs, git_dir : String) -> Array[String] {
     return out
   }
   let data = fs.read_file(alt_path) catch { _ => return out }
-  let base_dir = parent_dir(alt_path)
+  // git resolves relative paths in alternates relative to the objects directory
+  let base_dir = git_dir + "/objects"
   let lines = split_lines_bytes(data)
   for line in lines {
     let trimmed = trim_line_bytes(line)
@@ -2223,7 +2236,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
         @stdio.stderr.write("bit: SHA256 repositories are not supported\n")
         @sys.exit(1)
       }
-      if cfg.has_unsupported_options {
+      if cfg.has_unsupported_options && !cfg.cruft {
         @stdio.stderr.write(
           "bit pack-objects: unsupported options in standalone mode\n",
         )
@@ -2265,6 +2278,126 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
         db.set_prefer_packed(true)
       }
       let lookup_dbs = load_object_lookup_dbs(fs, git_dir, db)
+      // Cruft mode: separate flow for collecting unreachable objects
+      if cfg.cruft {
+        let input = read_all_stdin()
+        let (keep_names, discard_names) = parse_cruft_stdin_lines(input)
+        let expiration = match cfg.cruft_expiration {
+          Some(exp_str) => parse_approxidate(exp_str)
+          None => 0L // "never" — keep all cruft objects
+        }
+        let cruft_size_limit : Int64? = match cfg.max_cruft_size {
+          Some(limit) => Some(limit)
+          None =>
+            match cfg.max_pack_size {
+              Some(limit) => Some(limit)
+              None => None
+            }
+        }
+        let (cruft_objects, mtime_map) = collect_cruft_objects(
+          fs,
+          git_dir,
+          db,
+          keep_names,
+          discard_names,
+          expiration,
+          cfg.missing_mode,
+        )
+        if cruft_objects.length() == 0 {
+          // Nothing to pack — still need to output an empty pack
+          // to satisfy git repack expectations
+        }
+        let base_name = match cfg.base_name {
+          Some(name) => resolve_in_cwd(name)
+          None => {
+            @stdio.stderr.write("fatal: missing base-name\n")
+            @sys.exit(1)
+            ""
+          }
+        }
+        // Create cruft pack(s) — may split if --max-cruft-size
+        let cruft_pack_list : Array[Bytes] = match cruft_size_limit {
+          Some(limit) if limit > 0L => {
+            let effective_limit = if limit < 1048576L {
+              @stdio.stderr.write("warning: minimum pack size limit is 1 MiB\n")
+              1048576L
+            } else {
+              limit
+            }
+            let (packs, _dc) = @pack.create_packfiles_with_size_limit(
+              cruft_objects,
+              cfg.delta_mode,
+              pack_compression,
+              false, // no reuse in cruft mode
+              cfg.depth,
+              effective_limit,
+            )
+            packs
+          }
+          _ =>
+            if cruft_objects.length() == 0 {
+              // Create an empty pack
+              let (pack, _dc) = @pack.create_packfile_with_delta_stats_compression_reuse(
+                [],
+                cfg.delta_mode,
+                pack_compression,
+                false,
+                cfg.depth,
+              )
+              [pack]
+            } else {
+              let (pack, _dc) = @pack.create_packfile_with_delta_stats_compression_reuse(
+                cruft_objects,
+                cfg.delta_mode,
+                pack_compression,
+                false,
+                cfg.depth,
+              )
+              [pack]
+            }
+        }
+        for pack in cruft_pack_list {
+          let hash_hex = pack_hash_hex(pack)
+          let pack_path = base_name + "-" + hash_hex + ".pack"
+          let idx_path = base_name + "-" + hash_hex + ".idx"
+          fs.write_file(pack_path, pack)
+          let idx_objects = @pack.parse_packfile(pack)
+          @pack.write_pack_index_from_objects_versioned(
+            fs,
+            idx_path,
+            pack,
+            idx_objects,
+            cfg.index_version,
+            cfg.off64_threshold,
+          )
+          if write_rev {
+            let rev_path = base_name + "-" + hash_hex + ".rev"
+            @pack.write_reverse_index(fs, rev_path, pack, idx_objects)
+          }
+          // Write .mtimes file for cruft pack
+          let mtimes_path = base_name + "-" + hash_hex + ".mtimes"
+          // Get sorted OIDs from the index (lexicographic order)
+          let sorted_ids = get_sorted_pack_ids(cruft_objects)
+          // For split packs, get the IDs in this specific pack
+          let pack_ids = if cruft_pack_list.length() > 1 {
+            // Collect IDs for objects in this specific pack
+            let ids : Array[String] = []
+            for obj in idx_objects {
+              ids.push(
+                @bitcore.hash_object_content(obj.obj_type, obj.data).to_hex(),
+              )
+            }
+            ids.sort_by(fn(a, b) { a.compare(b) })
+            ids
+          } else {
+            sorted_ids
+          }
+          let pack_checksum = get_pack_checksum_bytes(pack)
+          write_mtimes_file(fs, mtimes_path, pack_ids, mtime_map, pack_checksum)
+          @stdio.stdout.write(hash_hex + "\n")
+        }
+        return ()
+      }
       let mut objects : Array[@bitcore.PackObject] = []
       // Objects explicitly given by the user (e.g., tree/blob OIDs in --revs input)
       // that should bypass filter_spec application
@@ -2447,9 +2580,6 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
               None => default_sparse
             }
         }
-        // Sparse collection silently skips missing objects, so only use it
-        // when missing objects are allowed (allow_missing or local flags).
-        // Otherwise, use strict collection that detects missing objects.
         if use_sparse && allow_missing_for_local {
           objects = collect_sparse_objects_from_commits(
             db, fs, include_commits, exclude_commits,

@@ -965,6 +965,7 @@ async fn dispatch_known_command(
     "maintenance" => handle_maintenance(rest)
     "rev-list" => handle_rev_list(rest)
     "verify-pack" => handle_verify_pack(rest)
+    "pack-redundant" => handle_pack_redundant(rest)
     "unpack-objects" => handle_unpack_objects(rest)
     "bundle" => handle_bundle(rest)
     "read-tree" => handle_read_tree(rest)

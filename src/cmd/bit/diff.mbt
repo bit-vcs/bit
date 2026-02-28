@@ -15,7 +15,33 @@ fn find_git_dir(fs : OsFs) -> String {
     fs.is_dir(cwd + "/refs") {
     return cwd
   }
-  // Standard case: .git subdirectory
+  // Check for .git subdirectory
+  if fs.is_dir(cwd + "/.git") || fs.is_file(cwd + "/.git") {
+    return cwd + "/.git"
+  }
+  // Walk up parent directories to find a bare repo or .git directory
+  let mut current = cwd
+  let mut last = ""
+  while true {
+    let parent = parent_dir(current)
+    let next = if parent.length() == 0 { "." } else { parent }
+    if next == current || next == last {
+      break
+    }
+    last = current
+    current = next
+    // Check for bare repo
+    if fs.is_file(current + "/config") &&
+      fs.is_file(current + "/HEAD") &&
+      fs.is_dir(current + "/refs") {
+      return current
+    }
+    // Check for .git subdirectory
+    if fs.is_dir(current + "/.git") || fs.is_file(current + "/.git") {
+      return current + "/.git"
+    }
+  }
+  // Fallback: assume .git in cwd
   cwd + "/.git"
 }
 
