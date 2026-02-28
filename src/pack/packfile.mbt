@@ -550,6 +550,152 @@ pub fn create_packfile_with_delta_stats_compression(
 }
 
 ///|
+/// Write PACK header (magic + version 2 + placeholder object count)
+fn write_pack_header(result : Array[Byte]) -> Unit {
+  result.push(b'P')
+  result.push(b'A')
+  result.push(b'C')
+  result.push(b'K')
+  result.push(b'\x00')
+  result.push(b'\x00')
+  result.push(b'\x00')
+  result.push(b'\x02')
+  result.push(b'\x00')
+  result.push(b'\x00')
+  result.push(b'\x00')
+  result.push(b'\x00')
+}
+
+///|
+/// Fix up the object count in a PACK header (bytes 8-11)
+fn fixup_pack_header_count(result : Array[Byte], count : Int) -> Unit {
+  result[8] = ((count >> 24) & 0xff).to_byte()
+  result[9] = ((count >> 16) & 0xff).to_byte()
+  result[10] = ((count >> 8) & 0xff).to_byte()
+  result[11] = (count & 0xff).to_byte()
+}
+
+///|
+/// Finalize a pack: fix header count, compute and append SHA-1 trailer
+fn finalize_pack(result : Array[Byte], count : Int) -> Bytes {
+  fixup_pack_header_count(result, count)
+  let trailer = @bit.sha1_array_prefix(result, result.length())
+  for b in trailer.bytes {
+    result.push(b)
+  }
+  pack_array_to_bytes(result)
+}
+
+///|
+/// Create multiple packfiles respecting a size limit.
+/// Objects are written one by one; when adding an object would cause the
+/// pack (including the 20-byte SHA-1 trailer) to reach or exceed
+/// `size_limit`, the current pack is finalized and a new one is started.
+/// The first object in each pack is always written regardless of size.
+pub fn create_packfiles_with_size_limit(
+  objects : Array[@bit.PackObject],
+  delta_mode : @bit.PackDeltaMode,
+  compression : @bit.PackCompression,
+  reuse_only : Bool,
+  max_depth : Int,
+  size_limit : Int64,
+) -> (Array[Bytes], Int) {
+  let packs : Array[Bytes] = []
+  let mut total_delta_count = 0
+  if objects.length() == 0 {
+    packs.push(
+      finalize_pack(
+        {
+          let r : Array[Byte] = []
+          write_pack_header(r)
+          r
+        },
+        0,
+      ),
+    )
+    return (packs, 0)
+  }
+  let mut result : Array[Byte] = []
+  write_pack_header(result)
+  let mut offset = 12
+  let mut nr_written = 0
+  let last_by_type : Map[Int, (Int, @bit.PackObject, Int)] = {}
+  for obj in objects {
+    let key = obj.obj_type.to_packfile_type()
+    let mut base : (Int, @bit.PackObject)? = None
+    let mut base_depth = 0
+    match last_by_type.get(key) {
+      Some((bo, bobj, d)) => {
+        base = Some((bo, bobj))
+        base_depth = d
+      }
+      None => ()
+    }
+    let allow_delta = match base {
+      None => false
+      Some((_base_offset, base_obj)) =>
+        max_depth > 0 &&
+        base_depth < max_depth &&
+        (match delta_mode {
+          @bit.PackDeltaMode::NoDelta => false
+          _ => true
+        }) &&
+        (!reuse_only || (obj.offset >= 0 && base_obj.offset >= 0))
+    }
+    let mode = if allow_delta {
+      delta_mode
+    } else {
+      @bit.PackDeltaMode::NoDelta
+    }
+    // Pack object into a temporary buffer to measure its packed size
+    let temp : Array[Byte] = []
+    let (written, used_delta) = pack_object_with_delta(
+      obj, base, offset, temp, mode, compression,
+    )
+    // Check whether adding this object would bust the size limit
+    if nr_written >= 1 && (offset + written + 20).to_int64() >= size_limit {
+      // Finalize current pack
+      packs.push(finalize_pack(result, nr_written))
+      // Start a new pack
+      result = []
+      write_pack_header(result)
+      offset = 12
+      nr_written = 0
+      last_by_type.clear()
+      // Re-write the object without delta (base is in previous pack)
+      let (written2, _) = pack_object_with_delta(
+        obj,
+        None,
+        12,
+        result,
+        @bit.PackDeltaMode::NoDelta,
+        compression,
+      )
+      offset = 12 + written2
+      last_by_type[key] = (12, obj, 0)
+      nr_written = 1
+    } else {
+      // Object fits – append temp bytes to current pack
+      for b in temp {
+        result.push(b)
+      }
+      if used_delta {
+        total_delta_count += 1
+      }
+      let next_depth = if used_delta { base_depth + 1 } else { 0 }
+      last_by_type[key] = (offset, obj, next_depth)
+      offset += written
+      nr_written += 1
+    }
+  }
+  // Finalize last pack
+  if nr_written > 0 {
+    packs.push(finalize_pack(result, nr_written))
+  }
+  (packs, total_delta_count)
+}
+
+///|
 /// Create a packfile with delta stats, optional delta reuse, and depth limit
 pub fn create_packfile_with_delta_stats_compression_reuse(
   objects : Array[@bit.PackObject],

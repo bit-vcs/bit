@@ -2623,7 +2623,15 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
           objects.append(tags)
         }
       }
-      if stdin_object_mode {
+      // Sort objects by type/size for better delta compression, but only
+      // when there is no pack size limit.  When splitting packs by size
+      // the write order must match git's insertion order so that
+      // interleaved large/small objects produce the same pack boundaries.
+      let has_size_limit = match pack_size_limit {
+        Some(limit) => limit > 0L
+        None => false
+      }
+      if stdin_object_mode && !has_size_limit {
         sort_stdin_object_mode_objects(objects)
       }
       objects = dedup_objects(objects)
@@ -2655,19 +2663,59 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
         @stdio.stderr.write("pack-reused " + pack_reused.to_string() + "\n")
       }
       let reuse_only = cfg.window == 0
-      // Split objects into groups based on packSizeLimit (only for file output, not stdout)
-      let effective_limit = if cfg.stdout { None } else { pack_size_limit }
-      let object_groups = split_objects_by_size_limit(objects, effective_limit)
+      // Apply pack size limit (only for file output, not stdout)
+      let effective_limit : Int64? = if cfg.stdout {
+        None
+      } else {
+        match pack_size_limit {
+          Some(limit) =>
+            if limit > 0L && limit < 1048576L {
+              @stdio.stderr.write("warning: minimum pack size limit is 1 MiB\n")
+              Some(1048576L)
+            } else {
+              Some(limit)
+            }
+          None => None
+        }
+      }
       let mut total_delta_count = 0
-      for group in object_groups {
-        let (pack, delta_count) = @pack.create_packfile_with_delta_stats_compression_reuse(
-          group,
-          cfg.delta_mode,
-          pack_compression,
-          reuse_only,
-          cfg.depth,
-        )
-        total_delta_count += delta_count
+      let pack_list : Array[Bytes] = match effective_limit {
+        Some(limit) =>
+          if limit > 0L {
+            let (packs, dc) = @pack.create_packfiles_with_size_limit(
+              objects,
+              cfg.delta_mode,
+              pack_compression,
+              reuse_only,
+              cfg.depth,
+              limit,
+            )
+            total_delta_count += dc
+            packs
+          } else {
+            let (pack, dc) = @pack.create_packfile_with_delta_stats_compression_reuse(
+              objects,
+              cfg.delta_mode,
+              pack_compression,
+              reuse_only,
+              cfg.depth,
+            )
+            total_delta_count += dc
+            [pack]
+          }
+        _ => {
+          let (pack, dc) = @pack.create_packfile_with_delta_stats_compression_reuse(
+            objects,
+            cfg.delta_mode,
+            pack_compression,
+            reuse_only,
+            cfg.depth,
+          )
+          total_delta_count += dc
+          [pack]
+        }
+      }
+      for pack in pack_list {
         if cfg.stdout {
           @stdio.stdout.write(pack)
         } else {
@@ -2685,8 +2733,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
           let idx_path = base_name + "-" + hash_hex + ".idx"
           fs.write_file(pack_path, pack)
           // Always re-parse the newly created pack to compute correct
-          // offsets and CRC32 values for the index.  The `group` array
-          // carries stale metadata from the source packs.
+          // offsets and CRC32 values for the index.
           let idx_objects = @pack.parse_packfile(pack)
           @pack.write_pack_index_from_objects_versioned(
             fs,
@@ -2718,52 +2765,6 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
       if cfg.stdout {
         @sys.exit(0)
       }
-    }
-  }
-}
-
-///|
-/// Split objects into groups based on pack size limit
-fn split_objects_by_size_limit(
-  objects : Array[@bitcore.PackObject],
-  limit : Int64?,
-) -> Array[Array[@bitcore.PackObject]] {
-  match limit {
-    None => [objects]
-    Some(max_size) => {
-      if max_size <= 0L {
-        return [objects]
-      }
-      let effective_max = max_size
-      let groups : Array[Array[@bitcore.PackObject]] = []
-      let mut current_group : Array[@bitcore.PackObject] = []
-      let mut current_size = 0L
-      // Pack header is 12 bytes, trailer is 20 bytes
-      let pack_overhead = 32L
-      for obj in objects {
-        // Use raw size as conservative estimate (zlib typically achieves 50-70% compression
-        // but for random data like binary files, compression is minimal)
-        let obj_size = obj.data.length().to_int64()
-        // Add overhead for type/size encoding (variable, estimate ~5 bytes per object)
-        let estimated_size = obj_size + 5L
-        // If this object would exceed the limit, start a new group
-        // But always include at least one object per group
-        if current_group.length() > 0 &&
-          current_size + estimated_size + pack_overhead > effective_max {
-          groups.push(current_group)
-          current_group = []
-          current_size = 0L
-        }
-        current_group.push(obj)
-        current_size += estimated_size
-      }
-      if current_group.length() > 0 {
-        groups.push(current_group)
-      }
-      if groups.length() == 0 {
-        groups.push([])
-      }
-      groups
     }
   }
 }
