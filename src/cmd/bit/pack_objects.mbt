@@ -2520,31 +2520,19 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
               None => default_sparse
             }
         }
-        if use_sparse {
-          objects = if allow_missing_for_local {
-            try
-              collect_sparse_objects_from_commits(
-                db,
-                fs,
-                include_commits,
-                exclude_commits,
-                allow_missing=true,
-              )
-            catch {
-              _ => []
-            } noraise {
-              v => v
-            }
-          } else {
+        if use_sparse && allow_missing_for_local {
+          objects = try
             collect_sparse_objects_from_commits(
-              db, fs, include_commits, exclude_commits,
-            ) catch {
-              err if @async.is_cancellation_error(err) => raise err
-              err => {
-                report_collect_error(err)
-                []
-              }
-            }
+              db,
+              fs,
+              include_commits,
+              exclude_commits,
+              allow_missing=true,
+            )
+          catch {
+            _ => []
+          } noraise {
+            v => v
           }
         } else {
           let include_objects = if allow_missing_for_local {
