@@ -50,6 +50,7 @@ options(
     "apply.mbt": [ "native" ],
     "bench_e2e_clone_fetch_wbtest.mbt": [ "native" ],
     "bench_init_wbtest.mbt": [ "native" ],
+    "bench_log_wbtest.mbt": [ "native" ],
     "bench_midx_clone_wbtest.mbt": [ "native" ],
     "bench_status_wbtest.mbt": [ "native" ],
     "bisect.mbt": [ "native" ],

@@ -105,6 +105,8 @@ type HubSyncRuntimeOptions
 
 type HubWorkItemListOptions
 
+type LogWalkEntry
+
 type MboxPatch
 
 type OsClock

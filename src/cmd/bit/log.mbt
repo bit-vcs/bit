@@ -9,6 +9,28 @@ async fn show_log_command_help() -> Unit {
 }
 
 ///|
+/// Find byte index of ".." in arg, returning -1 if not found or if "..." is present.
+fn log_find_dotdot(arg : String) -> Int {
+  // Convert to array of chars for indexed access
+  let chars : Array[Char] = []
+  for c in arg {
+    chars.push(c)
+  }
+  let len = chars.length()
+  let mut i = 0
+  while i < len - 1 {
+    if chars[i] == '.' && chars[i + 1] == '.' {
+      if i + 2 < len && chars[i + 2] == '.' {
+        return -1 // triple dot, not a range
+      }
+      return i
+    }
+    i += 1
+  }
+  -1
+}
+
+///|
 fn is_short_count_flag(arg : String) -> Bool {
   if not(arg.has_prefix("-")) || arg.length() <= 1 {
     return false
@@ -187,6 +209,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
   let mut walk_reflogs = false
   let mut format : String? = None
   let revs : Array[String] = []
+  let range_excludes : Array[String] = []
   let mut i = 0
   while i < args.length() {
     let arg = args[i]
@@ -254,7 +277,24 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         until_ts = @strconv.parse_int64(val) catch { _ => 9223372036854775807L }
       }
       _ if arg.has_prefix("-") => warn_unimplemented_arg("log", arg)
-      _ => revs.push(arg)
+      _ => {
+        // Detect A..B range (but not A...B)
+        let dot_idx = log_find_dotdot(arg)
+        if dot_idx >= 0 {
+          let left = String::unsafe_substring(arg, start=0, end=dot_idx)
+          let right = String::unsafe_substring(
+            arg,
+            start=dot_idx + 2,
+            end=arg.length(),
+          )
+          if left.length() > 0 {
+            range_excludes.push(left)
+          }
+          revs.push(if right.length() > 0 { right } else { "HEAD" })
+        } else {
+          revs.push(arg)
+        }
+      }
     }
     i += 1
   }
@@ -343,9 +383,144 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
       None => ()
     }
   }
+  // Determine whether we need the new walk path
+  let need_walk = all_refs ||
+    decorate ||
+    revs.length() > 0 ||
+    range_excludes.length() > 0
   if graph {
-    log_with_graph(rfs, git_dir, max_count, oneline, all_refs, decorate)
+    log_with_graph(
+      rfs, git_dir, max_count, oneline, all_refs, decorate, since_ts, until_ts,
+    )
+  } else if need_walk {
+    // Build start_ids from revs
+    let start_ids : Array[@bitcore.ObjectId] = []
+    for rev in revs {
+      match @bitrepo.rev_parse(rfs, git_dir, rev) {
+        Some(id) => start_ids.push(id)
+        None =>
+          raise @bitcore.GitError::InvalidObject("Unknown revision: " + rev)
+      }
+    }
+    // Build exclude_ids from range_excludes
+    let exclude_ids : Map[String, Bool] = {}
+    for spec in range_excludes {
+      match @bitrepo.rev_parse(rfs, git_dir, spec) {
+        Some(id) => walk_commits_to_map(fs, git_dir, id, exclude_ids)
+        None =>
+          raise @bitcore.GitError::InvalidObject("Unknown revision: " + spec)
+      }
+    }
+    // --all: add all refs as start points
+    if all_refs {
+      let all_ref_list = @bitrepo.show_ref(rfs, git_dir)
+      for item in all_ref_list {
+        start_ids.push(item.1)
+      }
+    }
+    // Default to HEAD
+    if start_ids.length() == 0 {
+      match @bitrepo.rev_parse(rfs, git_dir, "HEAD") {
+        Some(id) => start_ids.push(id)
+        None => return
+      }
+    }
+    // Build decoration map
+    let ref_names : Map[String, Array[String]] = {}
+    if decorate || all_refs {
+      let all_ref_list = @bitrepo.show_ref(rfs, git_dir)
+      for item in all_ref_list {
+        let name = shorten_reflog_refname(item.0)
+        let hex = item.1.to_hex()
+        match ref_names.get(hex) {
+          Some(arr) => arr.push(name)
+          None => ref_names[hex] = [name]
+        }
+      }
+      // Add HEAD -> branch decoration
+      let head_path = git_dir + "/HEAD"
+      if rfs.is_file(head_path) {
+        let content = rfs.read_file(head_path) |> decode_bytes |> trim_string
+        if content.has_prefix("ref: refs/heads/") {
+          let branch = String::unsafe_substring(
+            content,
+            start=16,
+            end=content.length(),
+          )
+          match @bitrepo.rev_parse(rfs, git_dir, "HEAD") {
+            Some(head_id) => {
+              let hex = head_id.to_hex()
+              let deco = "HEAD -> " + branch
+              match ref_names.get(hex) {
+                Some(arr) => {
+                  // Insert at front, remove bare branch name if present
+                  let new_arr : Array[String] = [deco]
+                  for n in arr {
+                    if n != branch {
+                      new_arr.push(n)
+                    }
+                  }
+                  ref_names[hex] = new_arr
+                }
+                None => ref_names[hex] = [deco]
+              }
+            }
+            None => ()
+          }
+        }
+      }
+    }
+    // BFS walk
+    let entries = log_walk_commits(
+      rfs,
+      git_dir,
+      start_ids,
+      exclude_ids,
+      max_count,
+      since_ts,
+      until_ts,
+      show_stat || show_patch,
+    )
+    if oneline {
+      for entry in entries {
+        let short = (try! entry.id.to_hex()[:7]).to_string()
+        let deco = format_decoration(ref_names, entry.id.to_hex())
+        print_line(short + deco + " " + entry.message)
+      }
+    } else {
+      for entry in entries {
+        let deco = format_decoration(ref_names, entry.id.to_hex())
+        print_line("commit " + entry.id.to_hex() + deco)
+        print_line("Author: " + entry.author)
+        print_line("")
+        print_line("    " + entry.message)
+        print_line("")
+        if show_stat || show_patch {
+          let diff_files = @bitdiff.diff_trees(
+            rfs,
+            git_dir,
+            entry.parent_tree,
+            entry.tree,
+          )
+          if show_stat {
+            let stat_lines = @bitdiff.diff_stat(diff_files)
+            for line in stat_lines {
+              print_line(line)
+            }
+            print_line("")
+          }
+          if show_patch {
+            let patch_lines = @bitdiff.diff_text(diff_files)
+            for line in patch_lines {
+              print_line(line)
+            }
+            print_line("")
+          }
+        }
+      }
+    }
   } else if oneline {
+    // Fast path: simple HEAD walk
     let lines = @bitlib.log_head_oneline(
       fs,
       git_dir,
@@ -357,6 +532,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
       print_line(line)
     }
   } else {
+    // Fast path: simple HEAD walk (full format)
     let entries = @bitlib.log_head(
       fs,
       git_dir,
@@ -398,6 +574,228 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
 }
 
 ///|
+struct LogWalkEntry {
+  id : @bitcore.ObjectId
+  message : String
+  author : String
+  timestamp : Int64
+  tree : @bitcore.ObjectId
+  parent_tree : @bitcore.ObjectId?
+}
+
+///|
+fn format_decoration(
+  ref_names : Map[String, Array[String]],
+  hex : String,
+) -> String {
+  match ref_names.get(hex) {
+    Some(names) if names.length() > 0 => " (" + names.join(", ") + ")"
+    _ => ""
+  }
+}
+
+///|
+/// BFS walk from start_ids, excluding exclude_ids, with timestamp filtering.
+/// Returns entries sorted by timestamp descending.
+fn log_walk_commits(
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  start_ids : Array[@bitcore.ObjectId],
+  exclude_ids : Map[String, Bool],
+  max_count : Int,
+  since_ts : Int64,
+  until_ts : Int64,
+  include_parent_tree : Bool,
+) -> Array[LogWalkEntry] raise Error {
+  let db = @bitlib.ObjectDb::load(rfs, git_dir)
+  let result : Array[LogWalkEntry] = []
+  let visited : Map[String, Bool] = {}
+  // Priority queue: (timestamp, id) sorted desc by timestamp
+  // Use insertion-sorted array
+  let queue : Array[(Int64, @bitcore.ObjectId)] = []
+  for id in start_ids {
+    let hex = id.to_hex()
+    if not(visited.contains(hex)) && not(exclude_ids.contains(hex)) {
+      // Get timestamp for sorting
+      let ts = log_get_commit_timestamp(db, rfs, id)
+      log_queue_insert(queue, (ts, id))
+      visited[hex] = true
+    }
+  }
+  let mut emitted = 0
+  while queue.length() > 0 && emitted < max_count {
+    let (_, id) = queue[0]
+    // Remove front
+    let new_q : Array[(Int64, @bitcore.ObjectId)] = []
+    for i in 1..<queue.length() {
+      new_q.push(queue[i])
+    }
+    while queue.length() > 0 {
+      ignore(queue.unsafe_pop())
+    }
+    for item in new_q {
+      queue.push(item)
+    }
+    let hex = id.to_hex()
+    if exclude_ids.contains(hex) {
+      continue
+    }
+    // Get commit data
+    let obj = db.get(rfs, id)
+    guard obj is Some(o) else { continue }
+    let info = @bitcore.parse_commit(o.data)
+    // Add parents to queue
+    for parent in info.parents {
+      let phex = parent.to_hex()
+      if not(visited.contains(phex)) && not(exclude_ids.contains(phex)) {
+        visited[phex] = true
+        let pts = log_get_commit_timestamp(db, rfs, parent)
+        log_queue_insert(queue, (pts, parent))
+      }
+    }
+    // Build LogWalkEntry
+    let entry = log_parse_entry_from_obj(id, o.data, info.tree)
+    // Apply since/until filters using parsed timestamp
+    if entry.timestamp > until_ts {
+      continue // newer than until, skip but keep walking
+    }
+    if entry.timestamp < since_ts {
+      continue // older than since, skip but keep walking for branches
+    }
+    let parent_tree : @bitcore.ObjectId? = if include_parent_tree &&
+      info.parents.length() > 0 {
+      match db.get(rfs, info.parents[0]) {
+        Some(po) => {
+          let pi = @bitcore.parse_commit(po.data)
+          Some(pi.tree)
+        }
+        None => None
+      }
+    } else {
+      None
+    }
+    result.push({ ..entry, parent_tree, })
+    emitted += 1
+  }
+  result
+}
+
+///|
+/// Insert into timestamp-descending sorted array.
+fn log_queue_insert(
+  queue : Array[(Int64, @bitcore.ObjectId)],
+  item : (Int64, @bitcore.ObjectId),
+) -> Unit {
+  let ts = item.0
+  let mut pos = queue.length()
+  // Find insertion point (descending order)
+  for i in 0..<queue.length() {
+    if ts > queue[i].0 {
+      pos = i
+      break
+    }
+  }
+  queue.push(item) // push to end first
+  // Shift elements right
+  let mut j = queue.length() - 1
+  while j > pos {
+    queue[j] = queue[j - 1]
+    j -= 1
+  }
+  queue[pos] = item
+}
+
+///|
+fn log_get_commit_timestamp(
+  db : @bitlib.ObjectDb,
+  rfs : &@bitcore.RepoFileSystem,
+  id : @bitcore.ObjectId,
+) -> Int64 {
+  let obj = db.get(rfs, id) catch { _ => return 0L }
+  guard obj is Some(o) else { return 0L }
+  log_extract_author_timestamp(o.data)
+}
+
+///|
+fn log_extract_author_timestamp(data : Bytes) -> Int64 {
+  let text = decode_bytes(data)
+  for line_view in text.split("\n") {
+    let line = line_view.to_string()
+    if line.length() == 0 {
+      break
+    }
+    if line.has_prefix("author ") {
+      let rest = String::unsafe_substring(line, start=7, end=line.length())
+      let (_, ts) = log_parse_author_parts(rest)
+      return ts
+    }
+  }
+  0L
+}
+
+///|
+/// Parse author line "Name <email> TIMESTAMP +TZ" into (name, timestamp).
+fn log_parse_author_parts(rest : String) -> (String, Int64) {
+  let chars : Array[Char] = []
+  for c in rest {
+    chars.push(c)
+  }
+  let len = chars.length()
+  let mut last_sp = -1
+  let mut second_last_sp = -1
+  for i in 0..<len {
+    if chars[i] == ' ' {
+      second_last_sp = last_sp
+      last_sp = i
+    }
+  }
+  if second_last_sp >= 0 {
+    let name = String::unsafe_substring(rest, start=0, end=second_last_sp)
+    let ts_str = String::unsafe_substring(
+      rest,
+      start=second_last_sp + 1,
+      end=last_sp,
+    )
+    let ts = @strconv.parse_int64(ts_str) catch { _ => 0L }
+    (name, ts)
+  } else {
+    (rest, 0L)
+  }
+}
+
+///|
+fn log_parse_entry_from_obj(
+  id : @bitcore.ObjectId,
+  data : Bytes,
+  tree : @bitcore.ObjectId,
+) -> LogWalkEntry {
+  let text = decode_bytes(data)
+  let mut author = ""
+  let mut timestamp = 0L
+  let mut in_message = false
+  let message_lines : Array[String] = []
+  for line_view in text.split("\n") {
+    let line = line_view.to_string()
+    if in_message {
+      message_lines.push(line)
+      continue
+    }
+    if line.length() == 0 {
+      in_message = true
+      continue
+    }
+    if line.has_prefix("author ") {
+      let rest = String::unsafe_substring(line, start=7, end=line.length())
+      let (name, ts) = log_parse_author_parts(rest)
+      author = name
+      timestamp = ts
+    }
+  }
+  let message = if message_lines.length() > 0 { message_lines[0] } else { "" }
+  { id, message, author, timestamp, tree, parent_tree: None }
+}
+
+///|
 async fn log_with_graph(
   rfs : &@bitcore.RepoFileSystem,
   git_dir : String,
@@ -405,6 +803,8 @@ async fn log_with_graph(
   oneline : Bool,
   all_refs : Bool,
   decorate : Bool,
+  since_ts : Int64,
+  until_ts : Int64,
 ) -> Unit raise Error {
   let db = @bitlib.ObjectDb::load(rfs, git_dir)
   // Collect starting points
@@ -493,13 +893,11 @@ async fn log_with_graph(
       continue
     }
     visited[hex] = true
-    count += 1
     let obj = db.get(rfs, current)
     match obj {
       Some(o) => {
         let info = @bitcore.parse_commit(o.data)
-        commits.push((current, info.parents, col))
-        // Add parents to queue
+        // Add parents to queue regardless of timestamp filter
         for i, parent in info.parents {
           let parent_col = if i == 0 {
             col
@@ -514,6 +912,12 @@ async fn log_with_graph(
         // Clear this column if no more commits
         if info.parents.length() == 0 && col < active_columns.length() {
           active_columns[col] = None
+        }
+        // Apply since/until filters
+        let ts = log_extract_author_timestamp(o.data)
+        if ts <= until_ts && ts >= since_ts {
+          commits.push((current, info.parents, col))
+          count += 1
         }
       }
       None => ()

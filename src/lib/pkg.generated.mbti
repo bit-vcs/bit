@@ -190,7 +190,7 @@ pub fn load_rebase_state(&@types.RepoFileSystem, String) -> RebaseState? raise @
 
 pub fn lock_worktree(&@types.FileSystem, &@types.RepoFileSystem, String, String, reason~ : String?) -> Unit raise @object.GitError
 
-pub fn log_head(&@types.RepoFileSystem, String, max_count? : Int, since? : Int64, until? : Int64) -> Array[LogEntry] raise @object.GitError
+pub fn log_head(&@types.RepoFileSystem, String, max_count? : Int, since? : Int64, until? : Int64, include_parent_tree? : Bool) -> Array[LogEntry] raise @object.GitError
 
 pub fn log_head_oneline(&@types.RepoFileSystem, String, max_count? : Int, since? : Int64, until? : Int64) -> Array[String] raise @object.GitError
 
