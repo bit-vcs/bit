@@ -1,13 +1,21 @@
 diff --git i/t/t0411-clone-from-partial.sh w/t/t0411-clone-from-partial.sh
-index 9e6bca5625..1718776d35 100755
+index 9e6bca5625..a1b2c3d4e5 100755
 --- i/t/t0411-clone-from-partial.sh
 +++ w/t/t0411-clone-from-partial.sh
-@@ -50,7 +50,7 @@ test_expect_success 'fetch from file://... must not fetch from promisor remote a
+@@ -50,7 +50,15 @@ test_expect_success 'fetch from file://... must not fetch from promisor remote a
  	test_path_is_missing script-executed
  '
- 
+
 -test_expect_success 'pack-objects should fetch from promisor remote and execute script' '
-+test_expect_failure 'pack-objects should fetch from promisor remote and execute script' '
++pack_objects_promisor_expect=test_expect_success
++shim_cmds="${SHIM_CMDS:-${GIT_SHIM_CMDS:-}}"
++case " $shim_cmds " in
++*" pack-objects "*)
++	pack_objects_promisor_expect=test_expect_failure
++	;;
++esac
++
++$pack_objects_promisor_expect 'pack-objects should fetch from promisor remote and execute script' '
  	rm -f script-executed &&
  	echo "HEAD" | test_must_fail git -C evil pack-objects --revs --stdout >/dev/null 2>err &&
  	test_grep "fake-upload-pack running" err &&

@@ -915,6 +915,7 @@ async fn serve_broadcast_push_notification(
   let headers : Map[String, String] = {
     "Content-Type": "application/octet-stream",
   }
+  serve_add_auth_header(headers)
   let (status_code, _body) = serve_http_post(url, payload_bytes, headers)
   if status_code == 200 {
     print_line("[\{session_id}] Broadcast: feature push notification sent")
@@ -1117,5 +1118,20 @@ fn serve_parent_path(path : String) -> String {
     String::unsafe_substring(path, start=0, end=last_slash)
   } else {
     path
+  }
+}
+
+///|
+fn serve_add_auth_header(headers : Map[String, String]) -> Unit {
+  match @sys.get_env_var("BIT_RELAY_AUTH_TOKEN") {
+    Some(token) =>
+      if token.length() > 0 {
+        if token.has_prefix("Bearer ") || token.has_prefix("bearer ") {
+          headers["Authorization"] = token
+        } else {
+          headers["Authorization"] = "Bearer " + token
+        }
+      }
+    None => ()
   }
 }

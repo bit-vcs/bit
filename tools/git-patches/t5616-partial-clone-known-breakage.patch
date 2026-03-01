@@ -1,13 +1,21 @@
 diff --git a/t/t5616-partial-clone.sh b/t/t5616-partial-clone.sh
-index 1e354e057f..5a3d2c7e01 100755
+index 1e354e057f..a1b2c3d4e5 100755
 --- a/t/t5616-partial-clone.sh
 +++ b/t/t5616-partial-clone.sh
-@@ -829,7 +829,7 @@ test_expect_success 'when partial cloning, tolerate server not sending target of
+@@ -829,7 +829,15 @@ test_expect_success 'when partial cloning, tolerate server not sending target of
  	! test -e "$HTTPD_ROOT_PATH/one-time-script"
  '
 
 -test_expect_success PERL_TEST_HELPERS 'tolerate server sending REF_DELTA against missing promisor objects' '
-+test_expect_failure PERL_TEST_HELPERS 'tolerate server sending REF_DELTA against missing promisor objects' '
++ref_delta_promisor_expect=test_expect_success
++shim_cmds="${SHIM_CMDS:-${GIT_SHIM_CMDS:-}}"
++case " $shim_cmds " in
++*" pack-objects "*)
++	ref_delta_promisor_expect=test_expect_failure
++	;;
++esac
++
++$ref_delta_promisor_expect PERL_TEST_HELPERS 'tolerate server sending REF_DELTA against missing promisor objects' '
  	SERVER="$HTTPD_DOCUMENT_ROOT_PATH/server" &&
  	rm -rf "$SERVER" repo &&
  	test_create_repo "$SERVER" &&
