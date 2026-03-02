@@ -2400,6 +2400,13 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
         db.set_prefer_packed(true)
       }
       let lookup_dbs = load_object_lookup_dbs(fs, git_dir, db)
+      // Add alternate ODB packs to primary db so that db.get() finds
+      // objects from alternates (matches git behavior).
+      for i = 1; i < lookup_dbs.length(); i = i + 1 {
+        for pack in lookup_dbs[i].packs {
+          db.packs.push(pack)
+        }
+      }
       // Cruft mode: separate flow for collecting unreachable objects
       if cfg.cruft {
         let input = read_all_stdin()
