@@ -67,8 +67,8 @@ install:
 
 # Uninstall bit
 uninstall:
-    @rm -f ~/.local/bin/bit
-    @echo "Removed ~/.local/bin/bit"
+    @rm -f ~/.moon/bin/bit
+    @echo "Removed ~/.moon/bin/bit"
 
 # Run t00xx integration tests (legacy e2e set)
 e2e:

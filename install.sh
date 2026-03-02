@@ -5,7 +5,7 @@ set -euo pipefail
 # Usage: curl -fsSL https://raw.githubusercontent.com/mizchi/bit-vcs/main/install.sh | bash
 
 REPO="mizchi/bit-vcs"
-INSTALL_DIR="${BIT_INSTALL_DIR:-$HOME/.local/bin}"
+INSTALL_DIR="${BIT_INSTALL_DIR:-$HOME/.moon/bin}"
 BINARY_NAME="bit"
 
 # Colors
@@ -156,7 +156,7 @@ main() {
         echo ""
         echo "Add the following to your shell profile (.bashrc, .zshrc, etc.):"
         echo ""
-        echo "  export PATH=\"\$HOME/.local/bin:\$PATH\""
+        echo "  export PATH=\"\$HOME/.moon/bin:\$PATH\""
         echo ""
     fi
 

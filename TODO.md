@@ -1,8 +1,9 @@
 # TODO (Active Only)
 
-最終整理日: 2026-02-27
+最終整理日: 2026-03-02
 方針: 完了ログは一旦外し、未完了タスクのみ管理する。
-現バージョン: v0.24.3
+現バージョン: v0.26.3
+allowlist: 906/927 テスト（97.7%）
 
 ## P0: Git compatibility / 計測
 
@@ -21,6 +22,14 @@
   - [x] t5510 #187: index-pack --fix-thin に外部ベースオブジェクト追加 + pack_path 対応
   - [x] t5510 #188: fix-thin パック再生成で REF_DELTA 解消
   - [x] lib-bitmap `setup midx with base from later pack` (2 tests) — size descending ソート追加で修正（2026-02-27）
+- [x] pack-objects repack フラグ実装（2026-03-02, v0.26.0）
+  - [x] `--reflog`, `--non-empty`, `--indexed-objects` 実装
+  - [x] `--unpack-unreachable`, `--keep-pack` 等 no-op 受け入れ
+  - [x] t7700-repack allowlist 追加（4テスト `!BIT_PACK_OBJECTS` prereq skip）
+- [x] t1517-outside-repo allowlist 追加（2026-03-02）
+  - [x] `pack-redundant -h` 出力不一致 → expect_failure 追加、`upload-pack` 除外
+- [x] known-breakage パッチを `!BIT_PACK_OBJECTS` prereq skip 方式に統一（2026-03-02）
+  - [x] t0411, t5616, t7700, t7703 全て prereq skip に変更
 
 ## P1: Relay / P2P collaboration
 
@@ -45,16 +54,16 @@
 
 ## P3: Git互換の残タスク
 
-- [ ] Git 互換を一度に全件化するため、`hash-object` で確立した方針を順次展開する
-  - [ ] コマンド別に「storage runtime で実装不十分になりやすい領域」を洗い出す（filter / autocrlf / gitattributes / pathspec など）
-  - [ ] 各コマンドで `--random` でも壊れにくいフォールバックを設計し、`real git` と `storage runtime` の振り分け差を最小化する
-  - [ ] 方針適用ごとに既存テストを回して短時間で固定し、失敗は allowlist/full で再確認する
-  - [ ] フォールバックルールを横断的に共通化して、将来コマンド追加時の抜け漏れを抑制する
-- [ ] `t5540-http-push-webdav.sh`（known-breakage 登録済み）
-- [ ] `t9001-send-email.sh`（known-breakage 登録済み）
-- [ ] `t1300-config.sh` の残 `--config-env` ケース
-  - [x] shim の `resolve_real_git` shift バグ修正（2026-02-17）
-- [ ] `full allowlist (just git-t-allowlist-shim-strict)` を CI で完走させる
+### allowlist 残り（21 テスト）
+
+- t0: t0012, t0450（動的 `-h` テスト生成、shim コマンドの出力不一致でパッチ困難）
+- t7: t7450（test-tool submodule 依存、対応困難）
+- t9: svn/cvs/p4 (115 tests) は明示的にサポート外
+  - t9001/t9210/t9211: send-email/scalar — 未対応
+
+### その他
+
+- [ ] `--unpack-unreachable` の実装（現在 no-op、t7700 テスト 10/11/20/25 が skip 状態）
 - [ ] `--help` 移植: 外部 help テキスト実体の整備（必要コマンド分）
   - [x] spec 駆動化 / 回帰テスト / オプトイン外部読込 / shim fallback 判定（完了済み）
 

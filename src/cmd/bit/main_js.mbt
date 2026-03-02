@@ -2,7 +2,7 @@
 
 ///|
 /// bit version tag (update this and moon.mod.json together when releasing)
-let bit_version_tag : String = "2.47.0 (bit v0.24.2)"
+let bit_version_tag : String = "2.47.0 (bit v0.26.3)"
 
 ///|
 async fn main_js_async() -> Unit {
