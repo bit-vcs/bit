@@ -985,6 +985,11 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
     }
     @sys.exit(128)
   }
+  // Fast path: -t only needs the type string, skip display conversion
+  if show_type {
+    print_line(o.obj_type.to_string())
+    return ()
+  }
   let display_object_name = cat_file_batch_display_object_name(
     fs,
     git_dir,
@@ -1007,10 +1012,6 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
       }
     }
     @stdio.stdout.write(data)
-    return ()
-  }
-  if show_type {
-    print_line(o.obj_type.to_string())
     return ()
   }
   if show_size {
@@ -1075,7 +1076,7 @@ fn cat_file_load_object_dbs(
   let out : Array[@bitlib.ObjectDb] = []
   let object_dirs = cat_file_collect_object_dirs(fs, git_dir)
   for object_dir in object_dirs {
-    let alt_db = @bitlib.ObjectDb::load_from_objects_dir(fs, object_dir) catch {
+    let alt_db = @bitlib.ObjectDb::load_lazy_from_objects_dir(fs, object_dir) catch {
       _ => continue
     }
     alt_db.set_skip_verify(true)

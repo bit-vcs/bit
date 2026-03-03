@@ -48,6 +48,7 @@ options(
     "ai.mbt": [ "native" ],
     "am.mbt": [ "native" ],
     "apply.mbt": [ "native" ],
+    "bench_cat_file_wbtest.mbt": [ "native" ],
     "bench_e2e_clone_fetch_wbtest.mbt": [ "native" ],
     "bench_init_wbtest.mbt": [ "native" ],
     "bench_log_wbtest.mbt": [ "native" ],
