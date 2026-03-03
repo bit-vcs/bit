@@ -126,20 +126,35 @@ jobs:
           failed_tests=""
           passed=0
           failed=0
+          timing_log="test-timing-shard-${{ matrix.shard }}.tsv"
+          echo "# test	seconds" > "$timing_log"
           for t in $tests; do
+            t_start=$SECONDS
             if make -C third_party/git test T="$t" 2>&1 | tail -5; then
               passed=$((passed + 1))
             else
               failed=$((failed + 1))
               failed_tests="$failed_tests $t"
             fi
+            elapsed=$((SECONDS - t_start))
+            echo "$t	$elapsed" >> "$timing_log"
+            echo "::timing::$t	${elapsed}s"
           done
           echo "=== Summary ==="
           echo "Passed: $passed, Failed: $failed"
+          echo "=== Per-test timing ==="
+          cat "$timing_log"
           if [ -n "$failed_tests" ]; then
             echo "Failed tests:$failed_tests"
             exit 1
           fi
+
+      - name: Upload test timing
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-timing-shard-${{ matrix.shard }}
+          path: test-timing-shard-${{ matrix.shard }}.tsv
 
       - name: Generate compat table
         if: always()
