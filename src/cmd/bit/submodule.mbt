@@ -133,10 +133,34 @@ async fn handle_submodule_add(
   let name = path
   write_gitmodules_entry(fs, root, name, path, url, branch)
   let config_path = git_dir + "/config"
-  set_config(fs, config_path, "submodule." + name + ".url", url, false)
-  set_config(fs, config_path, "submodule." + name + ".path", path, false)
+  set_config(
+    fs,
+    config_path,
+    "submodule." + name + ".url",
+    url,
+    false,
+    (None : String?),
+    (None : String?),
+  )
+  set_config(
+    fs,
+    config_path,
+    "submodule." + name + ".path",
+    path,
+    false,
+    (None : String?),
+    (None : String?),
+  )
   if branch is Some(b) {
-    set_config(fs, config_path, "submodule." + name + ".branch", b, false)
+    set_config(
+      fs,
+      config_path,
+      "submodule." + name + ".branch",
+      b,
+      false,
+      (None : String?),
+      (None : String?),
+    )
   }
   let fetch_url = resolve_submodule_fetch_url(fs, root, git_dir, url)
   let target_id = resolve_submodule_head_id(fs, root, fetch_url)
@@ -145,10 +169,23 @@ async fn handle_submodule_add(
     @bitrepo.init_repo(fs, modules_dir, bare=true)
   }
   let modules_config = modules_dir + "/config"
-  set_config(fs, modules_config, "remote.origin.url", fetch_url, false)
   set_config(
-    fs, modules_config, "remote.origin.fetch", "+refs/heads/*:refs/remotes/origin/*",
+    fs,
+    modules_config,
+    "remote.origin.url",
+    fetch_url,
     false,
+    (None : String?),
+    (None : String?),
+  )
+  set_config(
+    fs,
+    modules_config,
+    "remote.origin.fetch",
+    "+refs/heads/*:refs/remotes/origin/*",
+    false,
+    (None : String?),
+    (None : String?),
   )
   fetch_submodule_objects(fs, root, modules_dir, fetch_url, target_id)
   let sub_path = root + "/" + path
@@ -186,6 +223,8 @@ async fn handle_submodule_add(
         "branch." + branch_name + ".remote",
         "origin",
         false,
+        (None : String?),
+        (None : String?),
       )
       set_config(
         fs,
@@ -193,6 +232,8 @@ async fn handle_submodule_add(
         "branch." + branch_name + ".merge",
         "refs/heads/" + branch_name,
         false,
+        (None : String?),
+        (None : String?),
       )
     }
     None => ()
@@ -497,20 +538,46 @@ async fn handle_submodule_update(
       print_line("Cloning into '\{sub.path}'...")
       @bitrepo.init_repo(wfs, modules_dir, bare=true)
       let config_path = modules_dir + "/config"
-      set_config(fs, config_path, "remote.origin.url", sub.url, false)
       set_config(
-        fs, config_path, "remote.origin.fetch", "+refs/heads/*:refs/remotes/origin/*",
+        fs,
+        config_path,
+        "remote.origin.url",
+        sub.url,
         false,
+        (None : String?),
+        (None : String?),
+      )
+      set_config(
+        fs,
+        config_path,
+        "remote.origin.fetch",
+        "+refs/heads/*:refs/remotes/origin/*",
+        false,
+        (None : String?),
+        (None : String?),
       )
       has_modules = true
     }
     if has_modules {
       let config_path = modules_dir + "/config"
       let fetch_url = resolve_submodule_fetch_url(fs, root, git_dir, sub.url)
-      set_config(fs, config_path, "remote.origin.url", fetch_url, false)
       set_config(
-        fs, config_path, "remote.origin.fetch", "+refs/heads/*:refs/remotes/origin/*",
+        fs,
+        config_path,
+        "remote.origin.url",
+        fetch_url,
         false,
+        (None : String?),
+        (None : String?),
+      )
+      set_config(
+        fs,
+        config_path,
+        "remote.origin.fetch",
+        "+refs/heads/*:refs/remotes/origin/*",
+        false,
+        (None : String?),
+        (None : String?),
       )
       fetch_submodule_objects(fs, root, modules_dir, fetch_url, target_id)
     }
@@ -582,8 +649,24 @@ fn ensure_submodule_gitdir_config(
 ) -> Unit raise Error {
   let config_path = modules_dir + "/config"
   let rel_work_tree = get_rel_path(modules_dir, work_tree)
-  set_config(fs, config_path, "core.worktree", rel_work_tree, false)
-  set_config(fs, config_path, "core.bare", "false", false)
+  set_config(
+    fs,
+    config_path,
+    "core.worktree",
+    rel_work_tree,
+    false,
+    (None : String?),
+    (None : String?),
+  )
+  set_config(
+    fs,
+    config_path,
+    "core.bare",
+    "false",
+    false,
+    (None : String?),
+    (None : String?),
+  )
 }
 
 ///|
@@ -910,7 +993,15 @@ async fn handle_submodule_set_url(
       )
   }
   let gitmodules_path = root + "/.gitmodules"
-  set_config(fs, gitmodules_path, "submodule.\{name}.url", newurl, false)
+  set_config(
+    fs,
+    gitmodules_path,
+    "submodule.\{name}.url",
+    newurl,
+    false,
+    (None : String?),
+    (None : String?),
+  )
 }
 
 ///|
@@ -958,11 +1049,26 @@ async fn handle_submodule_set_branch(
   }
   let gitmodules_path = root + "/.gitmodules"
   if default_branch {
-    unset_config(fs, gitmodules_path, "submodule.\{name}.branch", None, false)
+    unset_config(
+      fs,
+      gitmodules_path,
+      "submodule.\{name}.branch",
+      None,
+      false,
+      false,
+    )
   } else {
     match branch {
       Some(b) =>
-        set_config(fs, gitmodules_path, "submodule.\{name}.branch", b, false)
+        set_config(
+          fs,
+          gitmodules_path,
+          "submodule.\{name}.branch",
+          b,
+          false,
+          (None : String?),
+          (None : String?),
+        )
       None =>
         raise @bitcore.GitError::InvalidObject(
           "usage: git submodule set-branch (-b <branch>|-d) [--] <path>",

@@ -941,6 +941,8 @@ fn configure_reftable_ref_storage(
     "extensions.refStorage",
     "reftable",
     false,
+    (None : String?),
+    (None : String?),
   )
 }
 

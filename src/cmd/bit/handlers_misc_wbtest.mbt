@@ -6,8 +6,13 @@ test "config: set_config escapes double quotes in value" {
   fs.mkdir_p(root)
   let config_path = root + "/config"
   set_config(
-    fs, config_path, "remote.origin.uploadpack", "\"$TRASH_DIRECTORY/fake-upload-pack\"",
+    fs,
+    config_path,
+    "remote.origin.uploadpack",
+    "\"$TRASH_DIRECTORY/fake-upload-pack\"",
     false,
+    (None : String?),
+    (None : String?),
   )
   let content = decode_bytes(fs.read_file(config_path))
   assert_true(
@@ -36,8 +41,13 @@ test "config: set_config escapes quotes when appending to existing section" {
     #|  remote = origin
   fs.write_string(config_path, base_config)
   set_config(
-    fs, config_path, "remote.origin.uploadpack", "\"$TRASH_DIRECTORY/fake-upload-pack\"",
+    fs,
+    config_path,
+    "remote.origin.uploadpack",
+    "\"$TRASH_DIRECTORY/fake-upload-pack\"",
     false,
+    (None : String?),
+    (None : String?),
   )
   let content = decode_bytes(fs.read_file(config_path))
   assert_true(
@@ -104,30 +114,55 @@ test "config: get_config_value parses quoted values and inline comments" {
     #|  annotatedQuoted = "big blue"	# to be discarded
   fs.write_string(config_path, content)
   assert_true(
-    get_config_value(fs, config_path, "section.sparseAndTailQuoted") ==
+    get_config_value(
+      fs,
+      config_path,
+      "section.sparseAndTailQuoted",
+      None,
+      false,
+    ) ==
     Some("big \t blue "),
   )
   assert_true(
-    get_config_value(fs, config_path, "section.sparseAndBiggerTailQuoted") ==
+    get_config_value(
+      fs,
+      config_path,
+      "section.sparseAndBiggerTailQuoted",
+      None,
+      false,
+    ) ==
     Some("big \t blue \t "),
   )
   assert_true(
-    get_config_value(fs, config_path, "section.sparseAndBiggerTailQuotedPlus") ==
+    get_config_value(
+      fs,
+      config_path,
+      "section.sparseAndBiggerTailQuotedPlus",
+      None,
+      false,
+    ) ==
     Some("big \t blue \t "),
   )
   assert_true(
-    get_config_value(fs, config_path, "section.headAndTailQuoted") ==
+    get_config_value(fs, config_path, "section.headAndTailQuoted", None, false) ==
     Some("\tbig blue "),
   )
   assert_true(
-    get_config_value(fs, config_path, "section.headAndTailQuotedPlus") ==
+    get_config_value(
+      fs,
+      config_path,
+      "section.headAndTailQuotedPlus",
+      None,
+      false,
+    ) ==
     Some("\tbig blue "),
   )
   assert_true(
-    get_config_value(fs, config_path, "section.annotated") == Some("big blue"),
+    get_config_value(fs, config_path, "section.annotated", None, false) ==
+    Some("big blue"),
   )
   assert_true(
-    get_config_value(fs, config_path, "section.annotatedQuoted") ==
+    get_config_value(fs, config_path, "section.annotatedQuoted", None, false) ==
     Some("big blue"),
   )
   fs.remove_file(config_path) catch {
@@ -149,8 +184,24 @@ test "config: set_config updates section case-insensitively" {
     #|[section]
     #|  penguin = little blue
   fs.write_string(config_path, content)
-  set_config(fs, config_path, "Section.Movie", "BadPhysics", false)
-  set_config(fs, config_path, "SECTION.UPPERCASE", "true", false)
+  set_config(
+    fs,
+    config_path,
+    "Section.Movie",
+    "BadPhysics",
+    false,
+    (None : String?),
+    (None : String?),
+  )
+  set_config(
+    fs,
+    config_path,
+    "SECTION.UPPERCASE",
+    "true",
+    false,
+    (None : String?),
+    (None : String?),
+  )
   let actual = decode_bytes(fs.read_file(config_path))
   assert_true(actual.contains("[section]"))
   assert_true(actual.contains("\tMovie = BadPhysics"))

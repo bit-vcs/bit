@@ -216,7 +216,7 @@ fn parse_bool_value(value : String) -> Bool? {
   let trimmed = value.trim().to_string().to_lower()
   match trimmed {
     "true" | "yes" | "on" | "1" => Some(true)
-    "false" | "no" | "off" | "0" => Some(false)
+    "false" | "no" | "off" | "0" | "" => Some(false)
     _ => {
       let parsed = @strconv.parse_int(trimmed) catch { _ => return None }
       Some(parsed != 0)

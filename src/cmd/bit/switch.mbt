@@ -284,7 +284,7 @@ fn switch_get_config_value(
 ) -> String? raise Error {
   match get_config_override(key) {
     Some(value) => Some(value)
-    None => get_config_value(fs, git_dir + "/config", key)
+    None => get_config_value(fs, git_dir + "/config", key, None, false)
   }
 }
 
