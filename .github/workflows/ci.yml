@@ -129,17 +129,27 @@ jobs:
           timing_log="test-timing-shard-${{ matrix.shard }}.tsv"
           echo "# test	seconds" > "$timing_log"
           cd third_party/git/t
+          test_output="/tmp/git-test-output-$$.log"
           for t in $tests; do
+            # Strip third_party/git/t/ prefix if present
+            t_base="${t#third_party/git/t/}"
             t_start=$SECONDS
-            if bash "./$t" 2>&1 | tail -5; then
+            if timeout 600 bash "./$t_base" > "$test_output" 2>&1; then
+              tail -5 "$test_output"
               passed=$((passed + 1))
             else
+              exit_code=$?
+              tail -20 "$test_output"
+              if [ "$exit_code" -eq 124 ]; then
+                echo "TIMEOUT: $t_base exceeded 600s"
+              fi
               failed=$((failed + 1))
-              failed_tests="$failed_tests $t"
+              failed_tests="$failed_tests $t_base"
             fi
             elapsed=$((SECONDS - t_start))
-            echo "$t	$elapsed" >> "$GITHUB_WORKSPACE/$timing_log"
-            echo "::timing::$t	${elapsed}s"
+            echo "$t_base	$elapsed" >> "$GITHUB_WORKSPACE/$timing_log"
+            echo "::timing::$t_base	${elapsed}s"
+            rm -f "$test_output"
           done
           cd "$GITHUB_WORKSPACE"
           echo "=== Summary ==="
