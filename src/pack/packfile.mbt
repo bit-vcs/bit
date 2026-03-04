@@ -264,7 +264,7 @@ fn find_best_match(
       }
     }
     checked += 1
-    if checked > 64 {
+    if checked > 128 {
       break
     }
   }
@@ -276,7 +276,12 @@ fn find_best_match(
 }
 
 ///|
-fn build_delta(base : Bytes, target : Bytes) -> Bytes {
+fn build_delta_with_index(
+  base : Bytes,
+  target : Bytes,
+  index : Map[UInt, Array[Int]],
+  base_pow : UInt,
+) -> Bytes {
   let base_len = base.length()
   let target_len = target.length()
   let out : Array[Byte] = []
@@ -289,7 +294,6 @@ fn build_delta(base : Bytes, target : Bytes) -> Bytes {
     encode_delta_insert(target, 0, target_len, out)
     return Bytes::from_array(FixedArray::makei(out.length(), i => out[i]))
   }
-  let (index, base_pow) = build_block_index(base, delta_block_size)
   let mut t = 0
   let mut literal_start = 0
   let mut literal_len = 0
@@ -350,6 +354,20 @@ fn build_delta(base : Bytes, target : Bytes) -> Bytes {
 }
 
 ///|
+fn build_delta(base : Bytes, target : Bytes) -> Bytes {
+  let (index, base_pow) = build_block_index(base, delta_block_size)
+  build_delta_with_index(base, target, index, base_pow)
+}
+
+///|
+priv struct DeltaWindowEntry {
+  offset : Int
+  obj : @bit.PackObject
+  depth : Int
+  mut block_index : (Map[UInt, Array[Int]], UInt)?
+}
+
+///|
 fn pack_object_with_delta(
   obj : @bit.PackObject,
   base : (Int, @bit.PackObject)?,
@@ -357,6 +375,7 @@ fn pack_object_with_delta(
   result : Array[Byte],
   delta_mode : @bit.PackDeltaMode,
   compression : @bit.PackCompression,
+  precomputed_delta : Bytes?,
 ) -> (Int, Bool) {
   let obj_type = obj.obj_type.to_packfile_type()
   let data = obj.data
@@ -381,7 +400,10 @@ fn pack_object_with_delta(
   }
   // Delta path: compute delta first, only compress normal if delta loses
   let (base_offset, base_obj) = base.unwrap()
-  let delta = build_delta(base_obj.data, data)
+  let delta = match precomputed_delta {
+    Some(d) => d
+    None => build_delta(base_obj.data, data)
+  }
   let compressed_delta = compress_pack_data(delta, compression)
   // Estimate delta overhead
   let delta_overhead = match delta_mode {
@@ -530,7 +552,13 @@ pub fn create_packfile_with_delta_stats_compression(
     let key = obj.obj_type.to_packfile_type()
     let base = last_by_type.get(key)
     let (written, used_delta) = pack_object_with_delta(
-      obj, base, obj_offset, result, delta_mode, compression,
+      obj,
+      base,
+      obj_offset,
+      result,
+      delta_mode,
+      compression,
+      None,
     )
     offset = offset + written
     if used_delta {
@@ -599,6 +627,7 @@ pub fn create_packfiles_with_size_limit(
   reuse_only : Bool,
   max_depth : Int,
   size_limit : Int64,
+  window : Int,
 ) -> (Array[Bytes], Int) {
   let packs : Array[Bytes] = []
   let mut total_delta_count = 0
@@ -615,42 +644,74 @@ pub fn create_packfiles_with_size_limit(
     )
     return (packs, 0)
   }
+  // No sort — caller manages insertion order for size_limit packs
+  let window_size = if window > 0 { window } else { 1 }
   let mut result : Array[Byte] = []
   write_pack_header(result)
   let mut offset = 12
   let mut nr_written = 0
-  let last_by_type : Map[Int, (Int, @bit.PackObject, Int)] = {}
+  let window_by_type : Map[Int, Array[DeltaWindowEntry]] = {}
   for obj in objects {
     let key = obj.obj_type.to_packfile_type()
-    let mut base : (Int, @bit.PackObject)? = None
-    let mut base_depth = 0
-    match last_by_type.get(key) {
-      Some((bo, bobj, d)) => {
-        base = Some((bo, bobj))
-        base_depth = d
+    let entries = match window_by_type.get(key) {
+      Some(arr) => arr
+      None => {
+        let arr : Array[DeltaWindowEntry] = []
+        window_by_type[key] = arr
+        arr
       }
-      None => ()
     }
-    let allow_delta = match base {
-      None => false
-      Some((_base_offset, base_obj)) =>
-        max_depth > 0 &&
-        base_depth < max_depth &&
-        (match delta_mode {
-          @bit.PackDeltaMode::NoDelta => false
-          _ => true
-        }) &&
-        (!reuse_only || (obj.offset >= 0 && base_obj.offset >= 0))
+    // Find best delta from window
+    let can_delta = max_depth > 0 &&
+      (match delta_mode {
+        @bit.PackDeltaMode::NoDelta => false
+        _ => true
+      })
+    let mut best : (Int, @bit.PackObject, Bytes, Int)? = None
+    let mut best_size = obj.data.length()
+    if can_delta {
+      for i = entries.length() - 1; i >= 0; i = i - 1 {
+        let e = entries[i]
+        if e.depth >= max_depth {
+          continue
+        }
+        if reuse_only && (obj.offset < 0 || e.obj.offset < 0) {
+          continue
+        }
+        let (idx, pow) = match e.block_index {
+          Some(cached) => cached
+          None => {
+            let r = build_block_index(e.obj.data, delta_block_size)
+            e.block_index = Some(r)
+            r
+          }
+        }
+        let delta = build_delta_with_index(e.obj.data, obj.data, idx, pow)
+        if delta.length() < best_size {
+          best_size = delta.length()
+          best = Some((e.offset, e.obj, delta, e.depth))
+          if delta.length() < obj.data.length() / 2 {
+            break
+          }
+        }
+      }
     }
-    let mode = if allow_delta {
-      delta_mode
-    } else {
-      @bit.PackDeltaMode::NoDelta
+    let (base, precomputed) : ((Int, @bit.PackObject)?, Bytes?) = match best {
+      Some((bo, bobj, delta, _)) => (Some((bo, bobj)), Some(delta))
+      None => (None, None)
+    }
+    let best_depth = match best {
+      Some((_, _, _, d)) => d
+      None => 0
+    }
+    let mode = match best {
+      Some(_) => delta_mode
+      None => @bit.PackDeltaMode::NoDelta
     }
     // Pack object into a temporary buffer to measure its packed size
     let temp : Array[Byte] = []
     let (written, used_delta) = pack_object_with_delta(
-      obj, base, offset, temp, mode, compression,
+      obj, base, offset, temp, mode, compression, precomputed,
     )
     // Check whether adding this object would bust the size limit
     if nr_written >= 1 && (offset + written + 20).to_int64() >= size_limit {
@@ -661,7 +722,7 @@ pub fn create_packfiles_with_size_limit(
       write_pack_header(result)
       offset = 12
       nr_written = 0
-      last_by_type.clear()
+      window_by_type.clear()
       // Re-write the object without delta (base is in previous pack)
       let (written2, _) = pack_object_with_delta(
         obj,
@@ -670,9 +731,12 @@ pub fn create_packfiles_with_size_limit(
         result,
         @bit.PackDeltaMode::NoDelta,
         compression,
+        None,
       )
       offset = 12 + written2
-      last_by_type[key] = (12, obj, 0)
+      let new_entries : Array[DeltaWindowEntry] = []
+      new_entries.push({ offset: 12, obj, depth: 0, block_index: None })
+      window_by_type[key] = new_entries
       nr_written = 1
     } else {
       // Object fits – append temp bytes to current pack
@@ -682,8 +746,11 @@ pub fn create_packfiles_with_size_limit(
       if used_delta {
         total_delta_count += 1
       }
-      let next_depth = if used_delta { base_depth + 1 } else { 0 }
-      last_by_type[key] = (offset, obj, next_depth)
+      let next_depth = if used_delta { best_depth + 1 } else { 0 }
+      entries.push({ offset, obj, depth: next_depth, block_index: None })
+      if entries.length() > window_size {
+        ignore(entries.remove(0))
+      }
       offset += written
       nr_written += 1
     }
@@ -703,6 +770,7 @@ pub fn create_packfile_with_delta_stats_compression_reuse(
   compression : @bit.PackCompression,
   reuse_only : Bool,
   max_depth : Int,
+  window : Int,
 ) -> (Bytes, Int) {
   let result : Array[Byte] = []
 
@@ -725,47 +793,98 @@ pub fn create_packfile_with_delta_stats_compression_reuse(
   result.push(((count >> 8) & 0xff).to_byte())
   result.push((count & 0xff).to_byte())
 
-  // Pack each object with optional delta reuse / depth limit
+  // Sort objects: type asc, size desc (improves delta compression)
+  let sorted = objects.copy()
+  sorted.sort_by(fn(a, b) {
+    let at = a.obj_type.to_packfile_type()
+    let bt = b.obj_type.to_packfile_type()
+    if at != bt {
+      at - bt
+    } else {
+      b.data.length() - a.data.length()
+    }
+  })
+
+  // Pack each object with sliding window delta search
+  let window_size = if window > 0 { window } else { 1 }
   let mut offset = 12
-  let last_by_type : Map[Int, (Int, @bit.PackObject, Int)] = {}
+  let window_by_type : Map[Int, Array[DeltaWindowEntry]] = {}
   let mut delta_count = 0
-  for obj in objects {
+  for obj in sorted {
     let obj_offset = offset
     let key = obj.obj_type.to_packfile_type()
-    let mut base : (Int, @bit.PackObject)? = None
-    let mut base_depth = 0
-    match last_by_type.get(key) {
-      Some((base_offset, base_obj, depth)) => {
-        base = Some((base_offset, base_obj))
-        base_depth = depth
+    let entries = match window_by_type.get(key) {
+      Some(arr) => arr
+      None => {
+        let arr : Array[DeltaWindowEntry] = []
+        window_by_type[key] = arr
+        arr
       }
-      None => ()
     }
-    let allow_delta = match base {
-      None => false
-      Some((_base_offset, base_obj)) =>
-        max_depth > 0 &&
-        base_depth < max_depth &&
-        (match delta_mode {
-          @bit.PackDeltaMode::NoDelta => false
-          _ => true
-        }) &&
-        (!reuse_only || (obj.offset >= 0 && base_obj.offset >= 0))
+    // Find best delta from window
+    let can_delta = max_depth > 0 &&
+      (match delta_mode {
+        @bit.PackDeltaMode::NoDelta => false
+        _ => true
+      })
+    let mut best : (Int, @bit.PackObject, Bytes, Int)? = None
+    let mut best_size = obj.data.length()
+    if can_delta {
+      for i = entries.length() - 1; i >= 0; i = i - 1 {
+        let e = entries[i]
+        if e.depth >= max_depth {
+          continue
+        }
+        if reuse_only && (obj.offset < 0 || e.obj.offset < 0) {
+          continue
+        }
+        let (idx, pow) = match e.block_index {
+          Some(cached) => cached
+          None => {
+            let r = build_block_index(e.obj.data, delta_block_size)
+            e.block_index = Some(r)
+            r
+          }
+        }
+        let delta = build_delta_with_index(e.obj.data, obj.data, idx, pow)
+        if delta.length() < best_size {
+          best_size = delta.length()
+          best = Some((e.offset, e.obj, delta, e.depth))
+          if delta.length() < obj.data.length() / 2 {
+            break
+          }
+        }
+      }
     }
-    let mode = if allow_delta {
-      delta_mode
-    } else {
-      @bit.PackDeltaMode::NoDelta
+    let (base, precomputed) : ((Int, @bit.PackObject)?, Bytes?) = match best {
+      Some((bo, bobj, delta, _)) => (Some((bo, bobj)), Some(delta))
+      None => (None, None)
+    }
+    let best_depth = match best {
+      Some((_, _, _, d)) => d
+      None => 0
+    }
+    let mode = match best {
+      Some(_) => delta_mode
+      None => @bit.PackDeltaMode::NoDelta
     }
     let (written, used_delta) = pack_object_with_delta(
-      obj, base, obj_offset, result, mode, compression,
+      obj, base, obj_offset, result, mode, compression, precomputed,
     )
     offset = offset + written
     if used_delta {
       delta_count = delta_count + 1
     }
-    let next_depth = if used_delta { base_depth + 1 } else { 0 }
-    last_by_type[key] = (obj_offset, obj, next_depth)
+    let next_depth = if used_delta { best_depth + 1 } else { 0 }
+    entries.push({
+      offset: obj_offset,
+      obj,
+      depth: next_depth,
+      block_index: None,
+    })
+    if entries.length() > window_size {
+      ignore(entries.remove(0))
+    }
   }
 
   // Compute SHA-1 of everything so far

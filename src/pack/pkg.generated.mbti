@@ -29,9 +29,9 @@ pub fn create_packfile_with_delta_stats(Array[@object.PackObject], @object.PackD
 
 pub fn create_packfile_with_delta_stats_compression(Array[@object.PackObject], @object.PackDeltaMode, @object.PackCompression) -> (Bytes, Int)
 
-pub fn create_packfile_with_delta_stats_compression_reuse(Array[@object.PackObject], @object.PackDeltaMode, @object.PackCompression, Bool, Int) -> (Bytes, Int)
+pub fn create_packfile_with_delta_stats_compression_reuse(Array[@object.PackObject], @object.PackDeltaMode, @object.PackCompression, Bool, Int, Int) -> (Bytes, Int)
 
-pub fn create_packfiles_with_size_limit(Array[@object.PackObject], @object.PackDeltaMode, @object.PackCompression, Bool, Int, Int64) -> (Array[Bytes], Int)
+pub fn create_packfiles_with_size_limit(Array[@object.PackObject], @object.PackDeltaMode, @object.PackCompression, Bool, Int, Int64, Int) -> (Array[Bytes], Int)
 
 pub fn decode_type_and_size_at(Bytes, Int) -> (Int, Int, Int) raise @object.GitError
 

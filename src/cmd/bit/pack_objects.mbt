@@ -2460,6 +2460,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
               false, // no reuse in cruft mode
               cfg.depth,
               effective_limit,
+              cfg.window,
             )
             packs
           }
@@ -2472,6 +2473,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
                 pack_compression,
                 false,
                 cfg.depth,
+                cfg.window,
               )
               [pack]
             } else {
@@ -2481,6 +2483,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
                 pack_compression,
                 false,
                 cfg.depth,
+                cfg.window,
               )
               [pack]
             }
@@ -2972,6 +2975,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
               reuse_only,
               cfg.depth,
               limit,
+              cfg.window,
             )
             total_delta_count += dc
             packs
@@ -2982,6 +2986,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
               pack_compression,
               reuse_only,
               cfg.depth,
+              cfg.window,
             )
             total_delta_count += dc
             [pack]
@@ -2993,6 +2998,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
             pack_compression,
             reuse_only,
             cfg.depth,
+            cfg.window,
           )
           total_delta_count += dc
           [pack]
