@@ -171,7 +171,12 @@ pub fn create_branch(
   fs.mkdir_p(dir)
   let head = resolve_head_commit(rfs, git_dir)
   match head {
-    None => fs.write_string(ref_path, "")
+    None =>
+      if rfs.is_file(ref_path) {
+        fs.remove_file(ref_path) catch {
+          _ => ()
+        }
+      }
     Some(id) => fs.write_string(ref_path, id.to_hex() + "\n")
   }
 }

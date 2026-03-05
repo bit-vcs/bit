@@ -69,6 +69,31 @@ test "branch: switch branch updates head" {
 }
 
 ///|
+test "branch: create branch in unborn repo does not create empty ref file" {
+  let fs = setup_branch_fs()
+  fs.write_string("/repo/.git/HEAD", "ref: refs/heads/main\n")
+  create_branch(fs, fs, "/repo", "main")
+  assert_true(not(fs.is_file("/repo/.git/refs/heads/main")))
+}
+
+///|
+test "branch: switching unborn branches does not fail on empty refs" {
+  let fs = setup_branch_fs()
+  fs.write_string("/repo/.git/HEAD", "ref: refs/heads/main\n")
+  switch_branch(fs, fs, "/repo", "main", create=true, checkout_files=false)
+  switch_branch(
+    fs,
+    fs,
+    "/repo",
+    "foo-branch",
+    create=true,
+    checkout_files=false,
+  )
+  let head = fs.read_string("/repo/.git/HEAD")
+  assert_true(head.has_prefix("ref: refs/heads/foo-branch"))
+}
+
+///|
 test "branch: resolve_ref follows linked worktree commondir" {
   let fs = setup_branch_fs()
   fs.mkdir_p("/repo/.git/worktrees/wt")

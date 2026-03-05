@@ -66,3 +66,16 @@ test "rev-parse: --git-path prefers cwd-relative path for absolute git dir" {
     "objects/aa/bb",
   )
 }
+
+///|
+test "rev-parse: --git-dir uses relative path at repository root" {
+  assert_eq(rev_parse_display_git_dir("/repo", "/repo", "/repo/.git"), ".git")
+}
+
+///|
+test "rev-parse: --git-dir stays absolute from subdirectory" {
+  assert_eq(
+    rev_parse_display_git_dir("/repo/sub", "/repo", "/repo/.git"),
+    "/repo/.git",
+  )
+}

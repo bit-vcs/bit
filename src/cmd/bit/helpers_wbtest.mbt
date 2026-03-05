@@ -527,3 +527,39 @@ test "helpers: repo_object_format reads extensions.objectFormat" {
     _ => ()
   }
 }
+
+///|
+test "helpers: repository format v1 rejects unknown extensions" {
+  let fs = @bitcore.TestFs::new()
+  fs.mkdir_p("/repo/.git")
+  fs.write_string(
+    "/repo/.git/config", "[core]\n\trepositoryformatversion = 1\n[extensions]\n\tno-such-extension\n",
+  )
+  match repository_format_error(fs, "/repo/.git") {
+    Some(_) => ()
+    None => fail("expected repository format error")
+  }
+}
+
+///|
+test "helpers: repository format v0 rejects v1-only extensions" {
+  let fs = @bitcore.TestFs::new()
+  fs.mkdir_p("/repo/.git")
+  fs.write_string(
+    "/repo/.git/config", "[core]\n\trepositoryformatversion = 0\n[extensions]\n\tnoop-v1\n",
+  )
+  match repository_format_error(fs, "/repo/.git") {
+    Some(_) => ()
+    None => fail("expected repository format error")
+  }
+}
+
+///|
+test "helpers: repository format v1 allows preciousObjects" {
+  let fs = @bitcore.TestFs::new()
+  fs.mkdir_p("/repo/.git")
+  fs.write_string(
+    "/repo/.git/config", "[core]\n\trepositoryformatversion = 1\n[extensions]\n\tpreciousObjects = 1\n",
+  )
+  assert_eq(repository_format_error(fs, "/repo/.git"), None)
+}

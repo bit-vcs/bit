@@ -434,6 +434,127 @@ fn repo_compat_object_format(
 }
 
 ///|
+fn repository_format_error(
+  fs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+) -> String? {
+  let config_path = git_dir + "/config"
+  let mut version = 0
+  match
+    @bitlib.read_config_value(
+      fs, config_path, "core", "repositoryformatversion",
+    ) {
+    Some(raw_version) => {
+      let normalized = @bitlib.config_strip_quotes(trim_string(raw_version))
+      version = @strconv.parse_int(normalized) catch {
+        _ => return Some("fatal: invalid core.repositoryformatversion")
+      }
+    }
+    None => ()
+  }
+  if version < 0 || version > 1 {
+    return Some(
+      "fatal: unsupported repository format version: " + version.to_string(),
+    )
+  }
+  let config_content = @bitlib.read_config_content(fs, git_dir)
+  if config_content.length() == 0 {
+    return None
+  }
+  let mut in_extensions = false
+  for line in repository_config_split_lines(config_content) {
+    let trimmed = trim_string(line)
+    if trimmed.length() == 0 {
+      continue
+    }
+    if trimmed[0] == '#' || trimmed[0] == ';' {
+      continue
+    }
+    match parse_section_header_line(trimmed) {
+      Some((section, subsection, _, _)) => {
+        in_extensions = section.to_lower() == "extensions" && subsection is None
+        continue
+      }
+      None => ()
+    }
+    if not(in_extensions) {
+      continue
+    }
+    match repository_extension_key(trimmed) {
+      Some(extension_name) => {
+        let min_version = repository_extension_min_version(extension_name)
+        if min_version >= 0 {
+          if version < min_version {
+            return Some(
+              "fatal: repository extension requires higher format version: " +
+              extension_name,
+            )
+          }
+        } else if version >= 1 {
+          return Some("fatal: unknown repository extension: " + extension_name)
+        } else if extension_name.has_suffix("-v1") {
+          return Some(
+            "fatal: repository extension requires higher format version: " +
+            extension_name,
+          )
+        }
+      }
+      None => ()
+    }
+  }
+  None
+}
+
+///|
+fn repository_config_split_lines(content : String) -> Array[String] {
+  let lines : Array[String] = []
+  let mut start = 0
+  for i in 0..<content.length() {
+    if content[i] == '\n' {
+      lines.push(String::unsafe_substring(content, start~, end=i))
+      start = i + 1
+    }
+  }
+  if start < content.length() {
+    lines.push(String::unsafe_substring(content, start~, end=content.length()))
+  }
+  lines
+}
+
+///|
+fn repository_extension_key(line : String) -> String? {
+  let mut end = 0
+  while end < line.length() {
+    let c = line[end]
+    if c == ' ' || c == '\t' || c == '=' || c == '#' || c == ';' {
+      break
+    }
+    end += 1
+  }
+  if end == 0 {
+    None
+  } else {
+    Some(String::unsafe_substring(line, start=0, end~).to_lower())
+  }
+}
+
+///|
+fn repository_extension_min_version(extension_name : String) -> Int {
+  match extension_name {
+    "noop" => 0
+    "noop-v1" => 1
+    "preciousobjects" => 1
+    "objectformat" => 1
+    "compatobjectformat" => 1
+    "partialclone" => 1
+    "worktreeconfig" => 1
+    "relativeworktrees" => 1
+    "refstorage" => 1
+    _ => -1
+  }
+}
+
+///|
 fn get_author_string() -> String {
   match @sys.get_env_var("GIT_AUTHOR_NAME") {
     Some(name) => {

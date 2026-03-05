@@ -25,6 +25,13 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
   let rfs : &@bitcore.RepoFileSystem = fs
   let git_dir = resolve_git_dir(rfs, root)
+  match repository_format_error(rfs, git_dir) {
+    Some(err_msg) => {
+      eprint_line(err_msg)
+      @sys.exit(128)
+    }
+    None => ()
+  }
   let cwd_abs = @sys.get_env_var("PWD").unwrap_or(root)
   let abs_git_dir = if git_dir.has_prefix("/") {
     git_dir
@@ -119,7 +126,8 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
       continue
     }
     match arg {
-      "--git-dir" => print_line(git_dir)
+      "--git-dir" =>
+        print_line(rev_parse_display_git_dir(cwd_abs, root, git_dir))
       "--absolute-git-dir" => print_line(abs_git_dir)
       "--show-toplevel" => {
         let abs = if root == "." {
@@ -217,6 +225,30 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
   }
   ignore(show_ref_format)
   ignore(show_object_format)
+}
+
+///|
+fn rev_parse_display_git_dir(
+  cwd_abs : String,
+  root : String,
+  git_dir : String,
+) -> String {
+  if git_dir == ".git" || git_dir == ".bit" || git_dir == "." {
+    return git_dir
+  }
+  let root_abs = if root == "." { cwd_abs } else { root }
+  if cwd_abs == root_abs {
+    if git_dir == root_abs + "/.git" {
+      return ".git"
+    }
+    if git_dir == root_abs + "/.bit" {
+      return ".bit"
+    }
+    if git_dir == root_abs {
+      return "."
+    }
+  }
+  git_dir
 }
 
 ///|
