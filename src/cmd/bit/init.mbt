@@ -170,8 +170,14 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
         None
       }
   }
-  // Determine default branch
-  let branch = initial_branch.unwrap_or("main")
+  // Determine default branch: CLI flag > config > "main"
+  let branch = match initial_branch {
+    Some(b) => b
+    None => {
+      let config_branch = init_read_default_branch(fs)
+      config_branch.unwrap_or("main")
+    }
+  }
   // Determine actual git directory path for output message
   let actual_git_dir = match (resolved_sep_git_dir, effective_git_dir) {
     (Some(sep), _) => sep
@@ -335,4 +341,17 @@ async fn bootstrap_reftable_head_table(
     _ => return
   }
   fs.write_string(reftable_dir + "/tables.list", table_name + "\n")
+}
+
+///|
+fn init_read_default_branch(fs : OsFs) -> String? {
+  // Read init.defaultBranch from global config
+  let rfs : &@bitcore.RepoFileSystem = fs
+  match find_global_gitconfig_path() {
+    Some(path) =>
+      get_config_value(rfs, path, "init.defaultBranch", None, false) catch {
+        _ => None
+      }
+    None => None
+  }
 }

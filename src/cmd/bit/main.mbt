@@ -1089,6 +1089,8 @@ async fn dispatch_known_command(
     "bundle" => handle_bundle(rest)
     "read-tree" => handle_read_tree(rest)
     "update-index" => handle_update_index(rest)
+    "commit-tree" => handle_commit_tree(rest)
+    "diff-tree" => handle_diff_tree(rest)
     "mktree" => handle_mktree(rest)
     "request-pull" => handle_request_pull(rest)
     "send-pack" => handle_send_pack(rest)

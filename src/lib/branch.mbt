@@ -102,22 +102,83 @@ pub fn list_branches_text(
 }
 
 ///|
-/// List branches with commit hash (verbose mode).
+/// List branches with commit hash and subject (verbose mode).
 pub fn list_branches_verbose(
   fs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> Array[String] raise @bit.GitError {
   let lines : Array[String] = []
   let (head, branches) = list_branches(fs, git_dir)
+  let db = try! ObjectDb::load(fs, git_dir)
+  // Find max branch name length for padding
+  let mut max_len = 0
+  for b in branches {
+    if b.name.length() > max_len {
+      max_len = b.name.length()
+    }
+  }
   for b in branches {
     let marker = match head {
       Branch(name) => if name == b.name { "* " } else { "  " }
       Detached(_) => "  "
     }
     let short_hash = (try! b.id.to_hex()[:7]).to_string()
-    lines.push("\{marker}\{b.name} \{short_hash}")
+    let subject = branch_get_commit_subject(db, fs, b.id)
+    let padded_name = pad_right(b.name, max_len)
+    lines.push("\{marker}\{padded_name} \{short_hash} \{subject}")
   }
   lines
+}
+
+///|
+fn branch_get_commit_subject(
+  db : ObjectDb,
+  fs : &@bit.RepoFileSystem,
+  id : @bit.ObjectId,
+) -> String {
+  let obj = db.get(fs, id) catch { _ => return "" }
+  match obj {
+    None => ""
+    Some(o) => {
+      if o.obj_type != @bit.ObjectType::Commit {
+        return ""
+      }
+      extract_commit_subject(o.data)
+    }
+  }
+}
+
+///|
+fn extract_commit_subject(data : Bytes) -> String {
+  let text = @utf8.decode_lossy(data[:])
+  let mut in_header = true
+  for line_view in text.split("\n") {
+    let line = line_view.to_string()
+    if in_header {
+      if line.length() == 0 {
+        in_header = false
+      }
+      continue
+    }
+    // First non-empty line after blank line is the subject
+    if line.length() > 0 {
+      return line
+    }
+  }
+  ""
+}
+
+///|
+fn pad_right(s : String, width : Int) -> String {
+  if s.length() >= width {
+    return s
+  }
+  let buf = StringBuilder::new()
+  buf.write_string(s)
+  for i = s.length(); i < width; i = i + 1 {
+    buf.write_char(' ')
+  }
+  buf.to_string()
 }
 
 ///|

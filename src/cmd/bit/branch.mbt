@@ -25,6 +25,8 @@ async fn handle_branch(args : Array[String]) -> Unit raise Error {
   let mut set_upstream_to : String? = None
   let mut track_upstream = false
   let mut start_point : String? = None
+  let mut merged_filter : String? = None
+  let mut no_merged_filter : String? = None
   let mut i = 0
   while i < args.length() {
     let arg = args[i]
@@ -81,6 +83,26 @@ async fn handle_branch(args : Array[String]) -> Unit raise Error {
         i += 1
         continue
       }
+      "--merged" if i + 1 < args.length() && not(args[i + 1].has_prefix("-")) => {
+        merged_filter = Some(args[i + 1])
+        i += 2
+        continue
+      }
+      "--merged" => merged_filter = Some("HEAD")
+      "--no-merged" if i + 1 < args.length() && not(args[i + 1].has_prefix("-")) => {
+        no_merged_filter = Some(args[i + 1])
+        i += 2
+        continue
+      }
+      "--no-merged" => no_merged_filter = Some("HEAD")
+      _ if arg.has_prefix("--merged=") =>
+        merged_filter = Some(
+          String::unsafe_substring(arg, start=9, end=arg.length()),
+        )
+      _ if arg.has_prefix("--no-merged=") =>
+        no_merged_filter = Some(
+          String::unsafe_substring(arg, start=12, end=arg.length()),
+        )
       _ if not(arg.has_prefix("-")) => {
         if new_branch is None {
           new_branch = Some(arg)
@@ -238,13 +260,19 @@ async fn handle_branch(args : Array[String]) -> Unit raise Error {
                 if list_mode {
                   // List local branches
                   if not(show_remotes) {
-                    let lines = if verbose {
-                      @bitlib.list_branches_verbose(fs, git_dir)
+                    if merged_filter is Some(_) || no_merged_filter is Some(_) {
+                      branch_list_with_merge_filter(
+                        fs, git_dir, verbose, merged_filter, no_merged_filter,
+                      )
                     } else {
-                      @bitlib.list_branches_text(fs, git_dir)
-                    }
-                    for line in lines {
-                      print_line(line)
+                      let lines = if verbose {
+                        @bitlib.list_branches_verbose(fs, git_dir)
+                      } else {
+                        @bitlib.list_branches_text(fs, git_dir)
+                      }
+                      for line in lines {
+                        print_line(line)
+                      }
                     }
                   }
                   // List remote branches
@@ -259,6 +287,121 @@ async fn handle_branch(args : Array[String]) -> Unit raise Error {
           }
       }
   }
+}
+
+///|
+async fn branch_list_with_merge_filter(
+  fs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  verbose : Bool,
+  merged_filter : String?,
+  no_merged_filter : String?,
+) -> Unit raise Error {
+  let (head, branches) = @bitlib.list_branches(fs, git_dir)
+  // Resolve target commit for merged/no-merged check
+  let target_id : @bitcore.ObjectId? = match merged_filter {
+    Some(spec) =>
+      if spec == "HEAD" {
+        @bitlib.resolve_head_commit(fs, git_dir)
+      } else {
+        @bitrepo.rev_parse(fs, git_dir, spec)
+      }
+    None =>
+      match no_merged_filter {
+        Some(spec) =>
+          if spec == "HEAD" {
+            @bitlib.resolve_head_commit(fs, git_dir)
+          } else {
+            @bitrepo.rev_parse(fs, git_dir, spec)
+          }
+        None => @bitlib.resolve_head_commit(fs, git_dir)
+      }
+  }
+  guard target_id is Some(tid) else { return }
+  let db = @bitlib.ObjectDb::load(fs, git_dir)
+  // Find max name length for verbose padding
+  let mut max_len = 0
+  if verbose {
+    for b in branches {
+      if b.name.length() > max_len {
+        max_len = b.name.length()
+      }
+    }
+  }
+  for b in branches {
+    let is_merged = @bitlib.is_ancestor_of(fs, git_dir, b.id, tid)
+    let should_show = match (merged_filter, no_merged_filter) {
+      (Some(_), _) => is_merged
+      (_, Some(_)) => not(is_merged)
+      _ => true
+    }
+    if not(should_show) {
+      continue
+    }
+    if verbose {
+      let marker = match head {
+        @bitlib.HeadRef::Branch(name) =>
+          if name == b.name {
+            "* "
+          } else {
+            "  "
+          }
+        @bitlib.HeadRef::Detached(_) => "  "
+      }
+      let short_hash = (try! b.id.to_hex()[:7]).to_string()
+      let subject = branch_get_commit_subject(db, fs, b.id)
+      let padded_name = branch_pad_right(b.name, max_len)
+      print_line("\{marker}\{padded_name} \{short_hash} \{subject}")
+    } else {
+      let mark = if b.current { "*" } else { " " }
+      print_line("\{mark} \{b.name}")
+    }
+  }
+}
+
+///|
+fn branch_get_commit_subject(
+  db : @bitlib.ObjectDb,
+  fs : &@bitcore.RepoFileSystem,
+  id : @bitcore.ObjectId,
+) -> String {
+  let obj = db.get(fs, id) catch { _ => return "" }
+  match obj {
+    None => ""
+    Some(o) => {
+      if o.obj_type != @bitcore.ObjectType::Commit {
+        return ""
+      }
+      let text = @utf8.decode_lossy(o.data[:])
+      let mut in_header = true
+      for line_view in text.split("\n") {
+        let line = line_view.to_string()
+        if in_header {
+          if line.length() == 0 {
+            in_header = false
+          }
+          continue
+        }
+        if line.length() > 0 {
+          return line
+        }
+      }
+      ""
+    }
+  }
+}
+
+///|
+fn branch_pad_right(s : String, width : Int) -> String {
+  if s.length() >= width {
+    return s
+  }
+  let buf = StringBuilder::new()
+  buf.write_string(s)
+  for i = s.length(); i < width; i = i + 1 {
+    buf.write_char(' ')
+  }
+  buf.to_string()
 }
 
 ///|
