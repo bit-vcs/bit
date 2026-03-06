@@ -333,51 +333,95 @@ fn for_each_ref_atom(
     }
     "objectname" | "objectname:long" => id.to_hex()
     "objectname:short" => (try! id.to_hex()[:7]).to_string()
+    _ if atom.has_prefix("objectname:short=") => {
+      let n_str = String::unsafe_substring(atom, start=17, end=atom.length())
+      let n = @strconv.parse_int(n_str) catch { _ => 7 }
+      let hex = id.to_hex()
+      // git enforces minimum of 4 chars for short hashes
+      let min_n = if n < 4 { 4 } else { n }
+      let len = if min_n > hex.length() { hex.length() } else { min_n }
+      (try! hex[:len]).to_string()
+    }
     "objecttype" => obj_type
     "objectsize" => obj_size.to_string()
     "objectsize:disk" => "0"
     "deltabase" => "0000000000000000000000000000000000000000"
-    "tree" | "tree:short" => {
-      let text = decode_bytes(commit_data)
-      for line_view in text.split("\n") {
-        let line = line_view.to_string()
-        if line.has_prefix("tree ") {
-          let hash = String::unsafe_substring(line, start=5, end=line.length())
-          if atom == "tree:short" {
-            return (try! hash[:7]).to_string()
+    "tree" | "tree:short" =>
+      if is_tag {
+        ""
+      } else {
+        let text = decode_bytes(commit_data)
+        for line_view in text.split("\n") {
+          let line = line_view.to_string()
+          if line.has_prefix("tree ") {
+            let hash = String::unsafe_substring(
+              line,
+              start=5,
+              end=line.length(),
+            )
+            if atom == "tree:short" {
+              return (try! hash[:7]).to_string()
+            }
+            return hash
           }
-          return hash
         }
+        ""
       }
-      ""
-    }
-    "parent" => {
-      let text = decode_bytes(commit_data)
-      for line_view in text.split("\n") {
-        let line = line_view.to_string()
-        if line.has_prefix("parent ") {
-          return String::unsafe_substring(line, start=7, end=line.length())
+    _ if atom.has_prefix("tree:short=") =>
+      if is_tag {
+        ""
+      } else {
+        let n_str = String::unsafe_substring(atom, start=11, end=atom.length())
+        let n = @strconv.parse_int(n_str) catch { _ => 7 }
+        let text = decode_bytes(commit_data)
+        for line_view in text.split("\n") {
+          let line = line_view.to_string()
+          if line.has_prefix("tree ") {
+            let hash = String::unsafe_substring(
+              line,
+              start=5,
+              end=line.length(),
+            )
+            let min_n = if n < 4 { 4 } else { n }
+            let len = if min_n > hash.length() { hash.length() } else { min_n }
+            return (try! hash[:len]).to_string()
+          }
         }
-        if line.length() == 0 {
-          break
-        }
+        ""
       }
-      ""
-    }
-    "numparent" => {
-      let text = decode_bytes(commit_data)
-      let mut count = 0
-      for line_view in text.split("\n") {
-        let line = line_view.to_string()
-        if line.has_prefix("parent ") {
-          count += 1
+    "parent" =>
+      if is_tag {
+        ""
+      } else {
+        let text = decode_bytes(commit_data)
+        for line_view in text.split("\n") {
+          let line = line_view.to_string()
+          if line.has_prefix("parent ") {
+            return String::unsafe_substring(line, start=7, end=line.length())
+          }
+          if line.length() == 0 {
+            break
+          }
         }
-        if line.length() == 0 {
-          break
-        }
+        ""
       }
-      count.to_string()
-    }
+    "numparent" =>
+      if is_tag {
+        ""
+      } else {
+        let text = decode_bytes(commit_data)
+        let mut count = 0
+        for line_view in text.split("\n") {
+          let line = line_view.to_string()
+          if line.has_prefix("parent ") {
+            count += 1
+          }
+          if line.length() == 0 {
+            break
+          }
+        }
+        count.to_string()
+      }
     "raw" =>
       if is_tag {
         decode_bytes(tag_data)
@@ -719,6 +763,9 @@ fn for_each_ref_commit_atom(
     "authorname" => for_each_ref_ident_name(author)
     "authoremail" => for_each_ref_ident_email(author)
     "authoremail:trim" => for_each_ref_ident_email_trim(author)
+    "authoremail:localpart"
+    | "authoremail:trim,localpart"
+    | "authoremail:localpart,trim" => for_each_ref_ident_email_localpart(author)
     "authordate" => for_each_ref_ident_date(author)
     "authordate:short" => for_each_ref_ident_date_short(author)
     "authordate:iso8601" | "authordate:iso" =>
@@ -734,6 +781,10 @@ fn for_each_ref_commit_atom(
     "committername" => for_each_ref_ident_name(committer)
     "committeremail" => for_each_ref_ident_email(committer)
     "committeremail:trim" => for_each_ref_ident_email_trim(committer)
+    "committeremail:localpart"
+    | "committeremail:trim,localpart"
+    | "committeremail:localpart,trim" =>
+      for_each_ref_ident_email_localpart(committer)
     "committerdate" => for_each_ref_ident_date(committer)
     "committerdate:short" => for_each_ref_ident_date_short(committer)
     "committerdate:iso8601" | "committerdate:iso" =>
@@ -748,6 +799,9 @@ fn for_each_ref_commit_atom(
     "taggername" => for_each_ref_ident_name(tagger)
     "taggeremail" => for_each_ref_ident_email(tagger)
     "taggeremail:trim" => for_each_ref_ident_email_trim(tagger)
+    "taggeremail:localpart"
+    | "taggeremail:trim,localpart"
+    | "taggeremail:localpart,trim" => for_each_ref_ident_email_localpart(tagger)
     "taggerdate" => for_each_ref_ident_date(tagger)
     "taggerdate:short" => for_each_ref_ident_date_short(tagger)
     "taggerdate:iso8601" | "taggerdate:iso" =>
@@ -781,14 +835,23 @@ fn for_each_ref_commit_atom(
       sb.to_string()
     }
     "body" => body
-    "contents" | "contents:body" =>
+    "contents" =>
       if body.length() > 0 {
         subject + "\n" + body + "\n"
       } else {
         subject + "\n"
       }
+    "contents:body" => if body.length() > 0 { body + "\n" } else { "" }
     "contents:subject" => subject
     "contents:signature" => ""
+    "contents:size" => {
+      let full = if body.length() > 0 {
+        subject + "\n" + body + "\n"
+      } else {
+        subject + "\n"
+      }
+      full.to_array().length().to_string()
+    }
     _ => ""
   }
 }
@@ -827,6 +890,16 @@ fn for_each_ref_ident_email_trim(ident : String) -> String {
         None => ""
       }
     None => ""
+  }
+}
+
+///|
+fn for_each_ref_ident_email_localpart(ident : String) -> String {
+  // "Name <email@domain> timestamp tz" -> "email"
+  let email = for_each_ref_ident_email_trim(ident)
+  match email.find("@") {
+    Some(idx) => String::unsafe_substring(email, start=0, end=idx)
+    None => email
   }
 }
 
