@@ -320,6 +320,29 @@ if [ "$has_alias_override" -eq 0 ]; then
   done
 fi
 
+# If the subcommand args contain only -h, delegate to real git for usage
+if [ "$intercept" -eq 1 ]; then
+  has_h_flag=0
+  seen_subcmd=0
+  for arg in "$@"; do
+    if [ "$seen_subcmd" -eq 0 ]; then
+      case "$arg" in
+        -*) ;;
+        *) seen_subcmd=1 ;;
+      esac
+      continue
+    fi
+    if [ "$arg" = "-h" ]; then
+      has_h_flag=1
+      break
+    fi
+  done
+  if [ "$has_h_flag" -eq 1 ]; then
+    log "pass-h $subcmd $*"
+    intercept=0
+  fi
+fi
+
 if [ "$intercept" -eq 1 ]; then
   case "$subcmd" in
     pack-objects|index-pack)
