@@ -63,6 +63,56 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
         )
         i += 1
       }
+      "--no-rebase"
+      | "--ff"
+      | "--no-ff"
+      | "--ff-only"
+      | "--squash"
+      | "--no-squash"
+      | "--no-commit"
+      | "--stat"
+      | "--no-stat"
+      | "--verbose"
+      | "-v"
+      | "--quiet"
+      | "-q"
+      | "--progress"
+      | "--no-progress"
+      | "--autostash"
+      | "--no-autostash"
+      | "--allow-unrelated-histories" =>
+        // no-value flags, ignore
+        i += 1
+      "-s"
+      | "--strategy"
+      | "-X"
+      | "--strategy-option"
+      | "--depth"
+      | "--deepen"
+      | "--shallow-since"
+      | "--shallow-exclude"
+      | "-o"
+      | "--server-option"
+      | "--negotiation-tip"
+      | "--upload-pack"
+      | "--recurse-submodules"
+      | "--refmap"
+      | "--cleanup"
+      | "--log" if i + 1 < args.length() =>
+        // flags that consume the next argument as value
+        i += 2
+      _ if arg.has_prefix("-s") || arg.has_prefix("-X") =>
+        // -sours or -Xpatience form (value concatenated)
+        i += 1
+      _ if arg.has_prefix("--strategy=") ||
+        arg.has_prefix("--strategy-option=") ||
+        arg.has_prefix("--depth=") ||
+        arg.has_prefix("--recurse-submodules=") ||
+        arg.has_prefix("--cleanup=") ||
+        arg.has_prefix("--log=") ||
+        arg.has_prefix("--refmap=") =>
+        // --key=value form, single arg
+        i += 1
       _ if arg.has_prefix("-") => {
         warn_unimplemented_arg("pull", arg)
         i += 1

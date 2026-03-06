@@ -322,11 +322,8 @@ fn commit_repo_requires_standalone_error(
   fs : &@bitcore.RepoFileSystem,
   git_dir : String,
 ) -> Bool {
-  repo_object_format(fs, git_dir) != "sha1" ||
-  (match repo_compat_object_format(fs, git_dir) {
-    Some(format) => format != "sha1"
-    None => false
-  })
+  // Only check primary object format; compat format is informational
+  repo_object_format(fs, git_dir) != "sha1"
 }
 
 ///|

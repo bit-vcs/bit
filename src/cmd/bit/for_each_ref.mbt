@@ -135,8 +135,8 @@ async fn handle_for_each_ref(args : Array[String]) -> Unit raise Error {
 
 ///|
 fn for_each_ref_compare(
-  _fs : OsFs,
-  _git_dir : String,
+  fs : OsFs,
+  git_dir : String,
   a : (String, @bitcore.ObjectId),
   b : (String, @bitcore.ObjectId),
   field : String,
@@ -146,8 +146,55 @@ fn for_each_ref_compare(
     "objectname" => a.1.to_hex().compare(b.1.to_hex())
     _ if field.has_prefix("version:refname") || field == "v:refname" =>
       for_each_ref_version_compare(a.0, b.0)
+    _ if field.has_prefix("creatordate") ||
+      field.has_prefix("authordate") ||
+      field.has_prefix("committerdate") ||
+      field.has_prefix("taggerdate") => {
+      let ts_a = for_each_ref_get_timestamp(fs, git_dir, a.1, field)
+      let ts_b = for_each_ref_get_timestamp(fs, git_dir, b.1, field)
+      ts_a.compare(ts_b)
+    }
     _ => a.0.compare(b.0)
   }
+}
+
+///|
+fn for_each_ref_get_timestamp(
+  fs : OsFs,
+  git_dir : String,
+  id : @bitcore.ObjectId,
+  field : String,
+) -> Int64 {
+  let db = @bitlib.ObjectDb::load(fs, git_dir) catch { _ => return 0L }
+  let obj = db.get(fs, id) catch { _ => return 0L }
+  guard obj is Some(o) else { return 0L }
+  let text = decode_bytes(o.data)
+  let header = if field.has_prefix("author") {
+    "author "
+  } else if field.has_prefix("committer") {
+    "committer "
+  } else if field.has_prefix("tagger") {
+    "tagger "
+  } else {
+    // creator: tagger > committer > author
+    "committer "
+  }
+  for line_view in text.split("\n") {
+    let line = line_view.to_string()
+    if line.length() == 0 {
+      break
+    }
+    if line.has_prefix(header) {
+      let ident = String::unsafe_substring(
+        line,
+        start=header.length(),
+        end=line.length(),
+      )
+      let (ts, _) = for_each_ref_parse_ident_ts(ident)
+      return ts
+    }
+  }
+  0L
 }
 
 ///|
@@ -250,8 +297,8 @@ fn for_each_ref_format(
 
 ///|
 fn for_each_ref_atom(
-  _fs : OsFs,
-  _git_dir : String,
+  fs : OsFs,
+  git_dir : String,
   _db : @bitlib.ObjectDb,
   atom : String,
   refname : String,
@@ -263,25 +310,105 @@ fn for_each_ref_atom(
   is_tag : Bool,
 ) -> String {
   match atom {
-    "refname" => refname
+    "refname" | "refname:" => refname
     "refname:short" => for_each_ref_short_refname(refname)
-    "refname:lstrip=1" | "refname:strip=1" =>
-      for_each_ref_strip_refname(refname, 1)
-    "refname:lstrip=2" | "refname:strip=2" =>
-      for_each_ref_strip_refname(refname, 2)
-    "refname:rstrip=-1" => for_each_ref_rstrip_refname(refname, -1)
+    _ if atom.has_prefix("refname:lstrip=") || atom.has_prefix("refname:strip=") => {
+      let eq_pos = atom.find("=").unwrap()
+      let n_str = String::unsafe_substring(
+        atom,
+        start=eq_pos + 1,
+        end=atom.length(),
+      )
+      let n = @strconv.parse_int(n_str) catch { _ => 0 }
+      if n < 0 {
+        for_each_ref_lstrip_negative(refname, -n)
+      } else {
+        for_each_ref_strip_refname(refname, n)
+      }
+    }
+    _ if atom.has_prefix("refname:rstrip=") => {
+      let n_str = String::unsafe_substring(atom, start=15, end=atom.length())
+      let n = @strconv.parse_int(n_str) catch { _ => 0 }
+      for_each_ref_rstrip_n(refname, n)
+    }
     "objectname" | "objectname:long" => id.to_hex()
     "objectname:short" => (try! id.to_hex()[:7]).to_string()
     "objecttype" => obj_type
     "objectsize" => obj_size.to_string()
-    "*objectname" =>
+    "objectsize:disk" => "0"
+    "deltabase" => "0000000000000000000000000000000000000000"
+    "tree" | "tree:short" => {
+      let text = decode_bytes(commit_data)
+      for line_view in text.split("\n") {
+        let line = line_view.to_string()
+        if line.has_prefix("tree ") {
+          let hash = String::unsafe_substring(line, start=5, end=line.length())
+          if atom == "tree:short" {
+            return (try! hash[:7]).to_string()
+          }
+          return hash
+        }
+      }
+      ""
+    }
+    "parent" => {
+      let text = decode_bytes(commit_data)
+      for line_view in text.split("\n") {
+        let line = line_view.to_string()
+        if line.has_prefix("parent ") {
+          return String::unsafe_substring(line, start=7, end=line.length())
+        }
+        if line.length() == 0 {
+          break
+        }
+      }
+      ""
+    }
+    "numparent" => {
+      let text = decode_bytes(commit_data)
+      let mut count = 0
+      for line_view in text.split("\n") {
+        let line = line_view.to_string()
+        if line.has_prefix("parent ") {
+          count += 1
+        }
+        if line.length() == 0 {
+          break
+        }
+      }
+      count.to_string()
+    }
+    "raw" =>
       if is_tag {
-        // Dereference: get the target object name
+        decode_bytes(tag_data)
+      } else {
+        decode_bytes(commit_data)
+      }
+    "*objectname" | "*objectname:long" =>
+      if is_tag {
         let text = decode_bytes(tag_data)
         for line_view in text.split("\n") {
           let line = line_view.to_string()
           if line.has_prefix("object ") {
             return String::unsafe_substring(line, start=7, end=line.length())
+          }
+        }
+        ""
+      } else {
+        ""
+      }
+    "*objectname:short" =>
+      if is_tag {
+        let text = decode_bytes(tag_data)
+        for line_view in text.split("\n") {
+          let line = line_view.to_string()
+          if line.has_prefix("object ") {
+            let hash = String::unsafe_substring(
+              line,
+              start=7,
+              end=line.length(),
+            )
+            return (try! hash[:7]).to_string()
           }
         }
         ""
@@ -301,24 +428,28 @@ fn for_each_ref_atom(
       } else {
         ""
       }
-    "upstream"
-    | "upstream:short"
-    | "upstream:trackshort"
-    | "upstream:track"
-    | "upstream:track,nobracket"
-    | "upstream:remotename"
-    | "upstream:remoteref"
-    | "upstream:lstrip=2" => ""
-    "push"
-    | "push:short"
-    | "push:trackshort"
-    | "push:track"
-    | "push:remotename"
-    | "push:remoteref" => ""
-    "HEAD" =>
-      // Check if this ref is HEAD
-      ""
+    _ if atom == "upstream" || atom.has_prefix("upstream:") =>
+      for_each_ref_upstream_atom(fs, git_dir, atom, refname)
+    _ if atom == "push" || atom.has_prefix("push:") =>
+      for_each_ref_push_atom(fs, git_dir, atom, refname)
+    "HEAD" => {
+      let head_ref = @bitlib.read_head_ref(fs, git_dir) catch {
+        _ => return " "
+      }
+      match head_ref {
+        @bitlib.HeadRef::Branch(branch) =>
+          if refname == "refs/heads/" + branch {
+            "*"
+          } else {
+            " "
+          }
+        _ => " "
+      }
+    }
     "symref" => ""
+    "flag" =>
+      // Not fully implemented
+      ""
     _ if atom.has_prefix("authorname") ||
       atom.has_prefix("author") ||
       atom.has_prefix("committername") ||
@@ -371,11 +502,160 @@ fn for_each_ref_strip_refname(refname : String, count : Int) -> String {
 }
 
 ///|
-fn for_each_ref_rstrip_refname(refname : String, _count : Int) -> String {
-  // rstrip=-1 removes trailing component
-  match refname.rev_find("/") {
-    Some(idx) => String::unsafe_substring(refname, start=0, end=idx)
-    None => refname
+fn for_each_ref_lstrip_negative(refname : String, keep : Int) -> String {
+  // lstrip=-N keeps rightmost N components
+  let parts : Array[String] = []
+  for sv in refname.split("/") {
+    parts.push(sv.to_string())
+  }
+  if keep >= parts.length() {
+    return refname
+  }
+  let start = parts.length() - keep
+  let result : Array[String] = []
+  for i in start..<parts.length() {
+    result.push(parts[i])
+  }
+  result.join("/")
+}
+
+///|
+fn for_each_ref_rstrip_n(refname : String, n : Int) -> String {
+  let parts : Array[String] = []
+  for sv in refname.split("/") {
+    parts.push(sv.to_string())
+  }
+  if n >= 0 {
+    // rstrip=N removes last N components
+    let end = if parts.length() > n { parts.length() - n } else { 1 }
+    let result : Array[String] = []
+    for i in 0..<end {
+      result.push(parts[i])
+    }
+    result.join("/")
+  } else {
+    // rstrip=-N keeps first N components
+    let keep = -n
+    let end = if keep < parts.length() { keep } else { parts.length() }
+    let result : Array[String] = []
+    for i in 0..<end {
+      result.push(parts[i])
+    }
+    result.join("/")
+  }
+}
+
+///|
+fn for_each_ref_upstream_atom(
+  fs : OsFs,
+  git_dir : String,
+  atom : String,
+  refname : String,
+) -> String {
+  // Only local branches have upstream
+  guard refname.has_prefix("refs/heads/") else { return "" }
+  let branch = String::unsafe_substring(refname, start=11, end=refname.length())
+  let (_, branches) = @bitlib.read_repo_config(fs, git_dir)
+  guard branches.get(branch) is Some(cfg) else { return "" }
+  guard cfg.remote is Some(remote) else { return "" }
+  guard cfg.merges.length() > 0 else { return "" }
+  let merge = cfg.merges[0]
+  // Convert merge ref (refs/heads/X) to remote tracking ref (refs/remotes/origin/X)
+  let upstream_ref = if merge.has_prefix("refs/heads/") {
+    let branch_part = String::unsafe_substring(
+      merge,
+      start=11,
+      end=merge.length(),
+    )
+    "refs/remotes/" + remote + "/" + branch_part
+  } else {
+    merge
+  }
+  match atom {
+    "upstream" => upstream_ref
+    "upstream:short" => for_each_ref_short_refname(upstream_ref)
+    "upstream:remotename" => remote
+    "upstream:remoteref" =>
+      if merge.has_prefix("refs/heads/") {
+        merge
+      } else {
+        upstream_ref
+      }
+    "upstream:track" | "upstream:trackshort" | "upstream:track,nobracket" =>
+      // Simplified: would need to compute ahead/behind
+      ""
+    _ if atom.has_prefix("upstream:lstrip=") ||
+      atom.has_prefix("upstream:strip=") => {
+      let eq_pos = atom.find("=").unwrap()
+      let n_str = String::unsafe_substring(
+        atom,
+        start=eq_pos + 1,
+        end=atom.length(),
+      )
+      let n = @strconv.parse_int(n_str) catch { _ => 0 }
+      if n < 0 {
+        for_each_ref_lstrip_negative(upstream_ref, -n)
+      } else {
+        for_each_ref_strip_refname(upstream_ref, n)
+      }
+    }
+    _ if atom.has_prefix("upstream:rstrip=") => {
+      let n_str = String::unsafe_substring(atom, start=16, end=atom.length())
+      let n = @strconv.parse_int(n_str) catch { _ => 0 }
+      for_each_ref_rstrip_n(upstream_ref, n)
+    }
+    _ => upstream_ref
+  }
+}
+
+///|
+fn for_each_ref_push_atom(
+  fs : OsFs,
+  git_dir : String,
+  atom : String,
+  refname : String,
+) -> String {
+  // push is like upstream but for push remote
+  guard refname.has_prefix("refs/heads/") else { return "" }
+  let branch = String::unsafe_substring(refname, start=11, end=refname.length())
+  let (remotes, branches) = @bitlib.read_repo_config(fs, git_dir)
+  let remote = match branches.get(branch) {
+    Some(cfg) =>
+      match cfg.remote {
+        Some(r) => r
+        None => "origin"
+      }
+    None => "origin"
+  }
+  // Check if remote exists
+  guard remotes.get(remote) is Some(_) else { return "" }
+  let push_ref = "refs/remotes/" + remote + "/" + branch
+  match atom {
+    "push" => push_ref
+    "push:short" => for_each_ref_short_refname(push_ref)
+    "push:remotename" => remote
+    "push:remoteref" => "refs/heads/" + branch
+    "push:track" | "push:trackshort" | "push:track,nobracket" => ""
+    _ if atom.has_prefix("push:lstrip=") || atom.has_prefix("push:strip=") => {
+      let eq_pos = atom.find("=").unwrap()
+      let n_str = String::unsafe_substring(
+        atom,
+        start=eq_pos + 1,
+        end=atom.length(),
+      )
+      let n = @strconv.parse_int(n_str) catch { _ => 0 }
+      if n < 0 {
+        for_each_ref_lstrip_negative(push_ref, -n)
+      } else {
+        for_each_ref_strip_refname(push_ref, n)
+      }
+    }
+    _ if atom.has_prefix("push:rstrip=") => {
+      let n_str = String::unsafe_substring(atom, start=12, end=atom.length())
+      let n = @strconv.parse_int(n_str) catch { _ => 0 }
+      for_each_ref_rstrip_n(push_ref, n)
+    }
+    _ => push_ref
   }
 }
 
@@ -434,6 +714,8 @@ fn for_each_ref_commit_atom(
     author
   }
   match atom {
+    "author" => author
+    "committer" => committer
     "authorname" => for_each_ref_ident_name(author)
     "authoremail" => for_each_ref_ident_email(author)
     "authoremail:trim" => for_each_ref_ident_email_trim(author)

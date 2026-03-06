@@ -26,13 +26,14 @@ test "commit: sha256 repository requires standalone error" {
 }
 
 ///|
-test "commit: compatobjectformat=sha256 requires standalone error" {
+test "commit: compatobjectformat=sha256 does not require standalone error" {
   let fs = @bitcore.TestFs::new()
   fs.mkdir_p("/repo/.git")
+  // compat format is informational; primary sha1 is fine
   fs.write_string(
     "/repo/.git/config", "[extensions]\n\tcompatobjectformat = sha256\n",
   )
-  assert_true(commit_repo_requires_standalone_error(fs, "/repo/.git"))
+  assert_false(commit_repo_requires_standalone_error(fs, "/repo/.git"))
 
   fs.write_string(
     "/repo/.git/config", "[extensions]\n\tcompatobjectformat = sha1\n",

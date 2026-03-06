@@ -14,13 +14,13 @@ test "add: sha256 repository requires standalone error" {
 }
 
 ///|
-test "add: compatobjectformat=sha256 requires standalone error" {
+test "add: compatobjectformat=sha256 does not require standalone error" {
   let fs = @bitcore.TestFs::new()
   fs.mkdir_p("/repo/.git")
   fs.write_string(
     "/repo/.git/config", "[extensions]\n\tcompatobjectformat = sha256\n",
   )
-  assert_true(add_repo_requires_standalone_error(fs, "/repo/.git"))
+  assert_false(add_repo_requires_standalone_error(fs, "/repo/.git"))
 
   fs.write_string(
     "/repo/.git/config", "[extensions]\n\tcompatobjectformat = sha1\n",
