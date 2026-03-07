@@ -4,9 +4,11 @@
 # Note: allowlist may include tests with known breakages (broken) and is still accepted.
 # Note: SHA-256 related subtests are skipped (SHA-1 only).
 
-# basic / init
+# basic / init / help
 t0000-basic.sh
 t0001-init.sh
+t0012-help.sh
+t0450-txt-doc-vs-help.sh
 
 # plumbing commands
 t1006-cat-file.sh
@@ -215,6 +217,7 @@ t7421-submodule-summary-add.sh
 t7422-submodule-output.sh
 t7423-submodule-symlinks.sh
 t7424-submodule-mixed-ref-formats.sh
+t7450-bad-git-dotfiles.sh
 t7500-commit-template-squash-signoff.sh
 t7501-commit-basic-functionality.sh
 t7502-commit-porcelain.sh
