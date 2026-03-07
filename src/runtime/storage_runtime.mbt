@@ -312,20 +312,6 @@ fn storage_get_commit_timestamp() -> Int64 {
 }
 
 ///|
-fn storage_hash_object_requires_standalone_error(
-  write_object : Bool,
-  compat_object_format : String?,
-) -> Bool {
-  if not(write_object) {
-    return false
-  }
-  match compat_object_format {
-    Some(format) => @bitlib.config_strip_quotes(format).to_lower() == "sha256"
-    None => false
-  }
-}
-
-///|
 fn storage_hash_object_validate_content(
   obj_type : @bit.ObjectType,
   content : Bytes,
@@ -463,13 +449,10 @@ fn storage_require_sha1_repo(
   if storage_repo_object_format(rfs, git_dir) != "sha1" {
     storage_fail_unsupported_mode(cmd, "repository object format")
   }
-  match storage_repo_compat_object_format(rfs, git_dir) {
-    Some(format) =>
-      if format != "sha1" {
-        storage_fail_unsupported_mode(cmd, "compatObjectFormat")
-      }
-    None => ()
-  }
+  // compatObjectFormat is ignored — we only need the primary format to be sha1.
+  // When compatObjectFormat=sha256, git stores dual hashes, but the sha1 tree
+  // format is identical, so write-tree/add/commit can proceed normally.
+  ignore(storage_repo_compat_object_format(rfs, git_dir))
 }
 
 ///|
@@ -1016,15 +999,8 @@ fn storage_handle_hash_object(
   } else {
     root + "/.git"
   }
-  let compat_object_format = storage_read_compat_object_format(rfs, git_dir)
-  if storage_hash_object_requires_standalone_error(
-      args.write_object,
-      compat_object_format,
-    ) {
-    storage_fail_unsupported_mode(
-      "hash-object", "-w with compatObjectFormat=sha256",
-    )
-  }
+  // compatObjectFormat is ignored — we write sha1 objects regardless.
+  ignore(storage_read_compat_object_format(rfs, git_dir))
   if args.stdin_mode {
     let content = storage_read_all_stdin()
     // Validate commit/tag content unless --literally

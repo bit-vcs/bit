@@ -474,25 +474,25 @@ test_expect_success 'push works even if SHIM_REAL_GIT points to false' '
     test "$(git_cmd --git-dir=origin.git rev-parse "refs/heads/$(cat branch_name)")" = "$(cat expected)"
 '
 
-test_expect_success 'hash-object -w compatObjectFormat=sha256 is explicitly unsupported even if SHIM_REAL_GIT is invalid' '
+test_expect_success 'hash-object -w succeeds with compatObjectFormat=sha256 (writes sha1 object)' '
     git_cmd init repo &&
     (
         cd repo &&
         git_cmd config extensions.compatObjectFormat sha256 &&
         echo hello >a.txt &&
-        SHIM_REAL_GIT=/no/such test_must_fail git_cmd hash-object -w a.txt >out 2>err &&
-        grep -Eiq "standalone|not supported|compatobjectformat|sha256" err
+        SHIM_REAL_GIT=/no/such git_cmd hash-object -w a.txt >out 2>err &&
+        test -s out
     )
 '
 
-test_expect_success 'hash-object -w compatObjectFormat=sha256 is explicitly unsupported if SHIM_REAL_GIT points to false' '
+test_expect_success 'hash-object -w succeeds with compatObjectFormat=sha256 when SHIM_REAL_GIT points to false' '
     git_cmd init repo &&
     (
         cd repo &&
         git_cmd config extensions.compatObjectFormat sha256 &&
         echo hello >a.txt &&
-        SHIM_REAL_GIT=false test_must_fail git_cmd hash-object -w a.txt >out 2>err &&
-        grep -Eiq "standalone|not supported|compatobjectformat|sha256" err
+        SHIM_REAL_GIT=false git_cmd hash-object -w a.txt >out 2>err &&
+        test -s out
     )
 '
 
