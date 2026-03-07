@@ -836,7 +836,10 @@ fn parse_global_options(args : Array[String]) -> GlobalOptions {
     }
     if in_opts && arg == "-C" && i + 1 < args.length() {
       let raw = args[i + 1]
-      cwd = Some(resolve_global_path(raw, cwd))
+      // git treats -C "" as a no-op
+      if raw.length() > 0 {
+        cwd = Some(resolve_global_path(raw, cwd))
+      }
       i += 2
       continue
     }

@@ -286,7 +286,7 @@ async fn print_tree_entries(
       not(show_trees && should_recurse_for_filter && is_tree) {
       false // Don't print if path doesn't match filters (unless -t and traversing trees)
     } else if only_trees {
-      is_tree // Only print tree entries
+      is_tree || is_submodule // Print tree and submodule (commit) entries
     } else {
       not(recursive) || not(is_tree) || show_trees
     }
@@ -346,8 +346,9 @@ async fn print_tree_entries(
               entry.id,
               is_tree || is_submodule,
             )
+            let padded_size = ls_tree_pad_size(size, 7)
             print_line(
-              "\{mode_str} \{type_str} \{entry.id.to_hex()} \{size}\t\{display_path}",
+              "\{mode_str} \{type_str} \{entry.id.to_hex()} \{padded_size}\t\{display_path}",
             )
           } else {
             print_line(
@@ -459,6 +460,19 @@ fn ls_tree_format_output(
     buf.write_char(chars[i])
     i += 1
   }
+  buf.to_string()
+}
+
+///|
+fn ls_tree_pad_size(size : String, width : Int) -> String {
+  if size.length() >= width {
+    return size
+  }
+  let buf = StringBuilder::new()
+  for _ in 0..<(width - size.length()) {
+    buf.write_char(' ')
+  }
+  buf.write_string(size)
   buf.to_string()
 }
 

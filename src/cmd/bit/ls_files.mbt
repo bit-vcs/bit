@@ -443,6 +443,12 @@ fn normalize_ls_tree_filters(
       cwd_prefix + "/" + clean
     }
     let normalized = normalize_path(base)
+    // Reject paths that escape the tree root (e.g., "../" with --full-tree)
+    if normalized == ".." || normalized.has_prefix("../") {
+      raise @bitcore.GitError::InvalidObject(
+        "'\{filter}' is outside repository at '\{normalize_path(cwd_prefix)}'",
+      )
+    }
     if normalized != "." && normalized.length() > 0 {
       // Re-append trailing slash to preserve semantics
       if has_trailing_slash {

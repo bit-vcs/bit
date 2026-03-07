@@ -161,7 +161,13 @@ fn find_repo_root(start : String) -> String? {
 ///|
 fn get_work_root() -> String {
   match @sys.get_env_var("GIT_SHIM_CWD") {
-    Some(dir) => dir
+    Some(dir) =>
+      // -C dir sets CWD to a subdirectory; find the repo root from there
+      if is_bare_repo_dir(dir) {
+        dir
+      } else {
+        find_repo_root(dir).unwrap_or(dir)
+      }
     None =>
       match @sys.get_env_var("GIT_WORK_TREE") {
         Some(dir) => dir
