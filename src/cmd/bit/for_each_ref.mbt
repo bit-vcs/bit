@@ -11,6 +11,7 @@ async fn handle_for_each_ref(args : Array[String]) -> Unit raise Error {
   let points_at : Array[String] = []
   let mut merged : String? = None
   let mut no_merged : String? = None
+  let mut quote_style = ""
   let mut i = 0
   while i < args.length() {
     let arg = args[i]
@@ -53,6 +54,38 @@ async fn handle_for_each_ref(args : Array[String]) -> Unit raise Error {
         no_merged = Some(
           String::unsafe_substring(arg, start=12, end=arg.length()),
         )
+      "--shell" | "-s" => {
+        if quote_style != "" {
+          eprint_line("error: more than one quoting style")
+          @sys.exit(1)
+          return
+        }
+        quote_style = "shell"
+      }
+      "--perl" | "-p" => {
+        if quote_style != "" {
+          eprint_line("error: more than one quoting style")
+          @sys.exit(1)
+          return
+        }
+        quote_style = "perl"
+      }
+      "--python" => {
+        if quote_style != "" {
+          eprint_line("error: more than one quoting style")
+          @sys.exit(1)
+          return
+        }
+        quote_style = "python"
+      }
+      "--tcl" => {
+        if quote_style != "" {
+          eprint_line("error: more than one quoting style")
+          @sys.exit(1)
+          return
+        }
+        quote_style = "tcl"
+      }
       "--contains" | "--no-contains" | "--omit-empty" | "--stdin" => ()
       _ if arg.has_prefix("-") => warn_unimplemented_arg("for-each-ref", arg)
       _ => patterns.push(arg)
@@ -127,7 +160,9 @@ async fn handle_for_each_ref(args : Array[String]) -> Unit raise Error {
       break
     }
     let (refname, id) = item
-    let line = for_each_ref_format(fs, git_dir, db, format, refname, id)
+    let line = for_each_ref_format(
+      fs, git_dir, db, format, refname, id, quote_style,
+    )
     print_line(line)
     output_count += 1
   }
@@ -211,6 +246,7 @@ fn for_each_ref_format(
   format : String,
   refname : String,
   id : @bitcore.ObjectId,
+  quote_style : String,
 ) -> String {
   let out = StringBuilder::new()
   let chars = format.to_array()
@@ -278,7 +314,7 @@ fn for_each_ref_format(
           fs, git_dir, db, atom, refname, id, obj_type, obj_size, commit_data, tag_data,
           is_tag,
         )
-        out.write_string(value)
+        out.write_string(for_each_ref_quote(value, quote_style))
         i = end_pos + 1
       } else {
         out.write_char(chars[i])
@@ -293,6 +329,59 @@ fn for_each_ref_format(
     }
   }
   out.to_string()
+}
+
+///|
+fn for_each_ref_quote(value : String, style : String) -> String {
+  if style == "" {
+    return value
+  }
+  match style {
+    "shell" => {
+      let buf = StringBuilder::new()
+      buf.write_char('\'')
+      for c in value {
+        if c == '\'' {
+          buf.write_string("'\\''")
+        } else {
+          buf.write_char(c)
+        }
+      }
+      buf.write_char('\'')
+      buf.to_string()
+    }
+    "perl" | "python" => {
+      let buf = StringBuilder::new()
+      buf.write_char('"')
+      for c in value {
+        if c == '"' || c == '\\' || c == '$' || c == '@' {
+          buf.write_char('\\')
+        }
+        buf.write_char(c)
+      }
+      buf.write_char('"')
+      buf.to_string()
+    }
+    "tcl" => {
+      let buf = StringBuilder::new()
+      buf.write_char('"')
+      for c in value {
+        if c == '"' ||
+          c == '\\' ||
+          c == '[' ||
+          c == ']' ||
+          c == '$' ||
+          c == '{' ||
+          c == '}' {
+          buf.write_char('\\')
+        }
+        buf.write_char(c)
+      }
+      buf.write_char('"')
+      buf.to_string()
+    }
+    _ => value
+  }
 }
 
 ///|
@@ -873,14 +962,28 @@ fn for_each_ref_commit_atom(
     "authoremail:localpart"
     | "authoremail:trim,localpart"
     | "authoremail:localpart,trim" => for_each_ref_ident_email_localpart(author)
-    "authordate" => for_each_ref_ident_date(author)
+    "authordate" | "authordate:default" => for_each_ref_ident_date(author)
     "authordate:short" => for_each_ref_ident_date_short(author)
     "authordate:iso8601" | "authordate:iso" =>
       for_each_ref_ident_date_iso(author)
     "authordate:unix" => for_each_ref_ident_date_unix(author)
     "authordate:rfc2822" | "authordate:rfc" =>
       for_each_ref_ident_date_rfc(author)
+    "authordate:raw" => for_each_ref_ident_date_raw(author)
     "authordate:relative" => for_each_ref_ident_date(author) // simplified
+    "authordate:default-local" | "authordate:local" =>
+      for_each_ref_ident_date_local(author)
+    "authordate:short-local" => for_each_ref_ident_date_short_local(author)
+    "authordate:iso8601-local" | "authordate:iso-local" =>
+      for_each_ref_ident_date_iso_local(author)
+    "authordate:rfc2822-local" | "authordate:rfc-local" =>
+      for_each_ref_ident_date_rfc_local(author)
+    "authordate:raw-local" => for_each_ref_ident_date_raw_local(author)
+    "authordate:relative-local" => for_each_ref_ident_date(author) // relative is tz-independent
+    _ if atom.has_prefix("authordate:format-local:") => {
+      let fmt = String::unsafe_substring(atom, start=24, end=atom.length())
+      for_each_ref_ident_date_strftime_local(author, fmt)
+    }
     _ if atom.has_prefix("authordate:format:") => {
       let fmt = String::unsafe_substring(atom, start=18, end=atom.length())
       for_each_ref_ident_date_strftime(author, fmt)
@@ -892,14 +995,30 @@ fn for_each_ref_commit_atom(
     | "committeremail:trim,localpart"
     | "committeremail:localpart,trim" =>
       for_each_ref_ident_email_localpart(committer)
-    "committerdate" => for_each_ref_ident_date(committer)
+    "committerdate" | "committerdate:default" =>
+      for_each_ref_ident_date(committer)
     "committerdate:short" => for_each_ref_ident_date_short(committer)
     "committerdate:iso8601" | "committerdate:iso" =>
       for_each_ref_ident_date_iso(committer)
     "committerdate:unix" => for_each_ref_ident_date_unix(committer)
     "committerdate:rfc2822" | "committerdate:rfc" =>
       for_each_ref_ident_date_rfc(committer)
+    "committerdate:raw" => for_each_ref_ident_date_raw(committer)
     "committerdate:relative" => for_each_ref_ident_date(committer) // simplified
+    "committerdate:default-local" | "committerdate:local" =>
+      for_each_ref_ident_date_local(committer)
+    "committerdate:short-local" =>
+      for_each_ref_ident_date_short_local(committer)
+    "committerdate:iso8601-local" | "committerdate:iso-local" =>
+      for_each_ref_ident_date_iso_local(committer)
+    "committerdate:rfc2822-local" | "committerdate:rfc-local" =>
+      for_each_ref_ident_date_rfc_local(committer)
+    "committerdate:raw-local" => for_each_ref_ident_date_raw_local(committer)
+    "committerdate:relative-local" => for_each_ref_ident_date(committer) // relative is tz-independent
+    _ if atom.has_prefix("committerdate:format-local:") => {
+      let fmt = String::unsafe_substring(atom, start=27, end=atom.length())
+      for_each_ref_ident_date_strftime_local(committer, fmt)
+    }
     _ if atom.has_prefix("committerdate:format:") => {
       let fmt = String::unsafe_substring(atom, start=21, end=atom.length())
       for_each_ref_ident_date_strftime(committer, fmt)
@@ -910,26 +1029,54 @@ fn for_each_ref_commit_atom(
     "taggeremail:localpart"
     | "taggeremail:trim,localpart"
     | "taggeremail:localpart,trim" => for_each_ref_ident_email_localpart(tagger)
-    "taggerdate" => for_each_ref_ident_date(tagger)
+    "taggerdate" | "taggerdate:default" => for_each_ref_ident_date(tagger)
     "taggerdate:short" => for_each_ref_ident_date_short(tagger)
     "taggerdate:iso8601" | "taggerdate:iso" =>
       for_each_ref_ident_date_iso(tagger)
     "taggerdate:unix" => for_each_ref_ident_date_unix(tagger)
     "taggerdate:rfc2822" | "taggerdate:rfc" =>
       for_each_ref_ident_date_rfc(tagger)
+    "taggerdate:raw" => for_each_ref_ident_date_raw(tagger)
     "taggerdate:relative" => for_each_ref_ident_date(tagger) // simplified
+    "taggerdate:default-local" | "taggerdate:local" =>
+      for_each_ref_ident_date_local(tagger)
+    "taggerdate:short-local" => for_each_ref_ident_date_short_local(tagger)
+    "taggerdate:iso8601-local" | "taggerdate:iso-local" =>
+      for_each_ref_ident_date_iso_local(tagger)
+    "taggerdate:rfc2822-local" | "taggerdate:rfc-local" =>
+      for_each_ref_ident_date_rfc_local(tagger)
+    "taggerdate:raw-local" => for_each_ref_ident_date_raw_local(tagger)
+    "taggerdate:relative-local" => for_each_ref_ident_date(tagger) // relative is tz-independent
+    _ if atom.has_prefix("taggerdate:format-local:") => {
+      let fmt = String::unsafe_substring(atom, start=24, end=atom.length())
+      for_each_ref_ident_date_strftime_local(tagger, fmt)
+    }
     _ if atom.has_prefix("taggerdate:format:") => {
       let fmt = String::unsafe_substring(atom, start=18, end=atom.length())
       for_each_ref_ident_date_strftime(tagger, fmt)
     }
-    "creatordate" => for_each_ref_ident_date(creator)
+    "creatordate" | "creatordate:default" => for_each_ref_ident_date(creator)
     "creatordate:short" => for_each_ref_ident_date_short(creator)
     "creatordate:iso8601" | "creatordate:iso" =>
       for_each_ref_ident_date_iso(creator)
     "creatordate:unix" => for_each_ref_ident_date_unix(creator)
     "creatordate:rfc2822" | "creatordate:rfc" =>
       for_each_ref_ident_date_rfc(creator)
+    "creatordate:raw" => for_each_ref_ident_date_raw(creator)
     "creatordate:relative" => for_each_ref_ident_date(creator) // simplified
+    "creatordate:default-local" | "creatordate:local" =>
+      for_each_ref_ident_date_local(creator)
+    "creatordate:short-local" => for_each_ref_ident_date_short_local(creator)
+    "creatordate:iso8601-local" | "creatordate:iso-local" =>
+      for_each_ref_ident_date_iso_local(creator)
+    "creatordate:rfc2822-local" | "creatordate:rfc-local" =>
+      for_each_ref_ident_date_rfc_local(creator)
+    "creatordate:raw-local" => for_each_ref_ident_date_raw_local(creator)
+    "creatordate:relative-local" => for_each_ref_ident_date(creator) // relative is tz-independent
+    _ if atom.has_prefix("creatordate:format-local:") => {
+      let fmt = String::unsafe_substring(atom, start=25, end=atom.length())
+      for_each_ref_ident_date_strftime_local(creator, fmt)
+    }
     _ if atom.has_prefix("creatordate:format:") => {
       let fmt = String::unsafe_substring(atom, start=19, end=atom.length())
       for_each_ref_ident_date_strftime(creator, fmt)
@@ -1071,14 +1218,216 @@ fn for_each_ref_ident_date_rfc(ident : String) -> String {
 }
 
 ///|
-fn for_each_ref_ident_date_strftime(ident : String, _fmt : String) -> String {
-  // Simplified strftime - handle common patterns
+fn for_each_ref_ident_date_raw(ident : String) -> String {
   let (ts, tz) = for_each_ref_parse_ident_ts(ident)
   if ts == 0L {
     return ""
   }
-  // For now, use ISO format as default strftime output
-  format_timestamp_iso(ts, tz)
+  ts.to_string() + " " + tz
+}
+
+///|
+fn for_each_ref_ident_date_raw_local(ident : String) -> String {
+  let (ts, _tz) = for_each_ref_parse_ident_ts(ident)
+  if ts == 0L {
+    return ""
+  }
+  ts.to_string() + " +0000"
+}
+
+///|
+fn for_each_ref_ident_date_local(ident : String) -> String {
+  let (ts, _tz) = for_each_ref_parse_ident_ts(ident)
+  if ts == 0L {
+    return ""
+  }
+  format_timestamp_default_notz(ts, "+0000")
+}
+
+///|
+fn for_each_ref_ident_date_short_local(ident : String) -> String {
+  let (ts, _tz) = for_each_ref_parse_ident_ts(ident)
+  if ts == 0L {
+    return ""
+  }
+  format_timestamp_short(ts, "+0000")
+}
+
+///|
+fn for_each_ref_ident_date_iso_local(ident : String) -> String {
+  let (ts, _tz) = for_each_ref_parse_ident_ts(ident)
+  if ts == 0L {
+    return ""
+  }
+  format_timestamp_iso(ts, "+0000")
+}
+
+///|
+fn for_each_ref_ident_date_rfc_local(ident : String) -> String {
+  let (ts, _tz) = for_each_ref_parse_ident_ts(ident)
+  if ts == 0L {
+    return ""
+  }
+  format_timestamp_rfc2822(ts, "+0000")
+}
+
+///|
+fn for_each_ref_ident_date_strftime(ident : String, fmt : String) -> String {
+  let (ts, tz) = for_each_ref_parse_ident_ts(ident)
+  if ts == 0L {
+    return ""
+  }
+  format_timestamp_strftime(ts, tz, fmt)
+}
+
+///|
+fn for_each_ref_ident_date_strftime_local(
+  ident : String,
+  fmt : String,
+) -> String {
+  let (ts, _tz) = for_each_ref_parse_ident_ts(ident)
+  if ts == 0L {
+    return ""
+  }
+  format_timestamp_strftime(ts, "+0000", fmt)
+}
+
+///|
+fn format_timestamp_strftime(ts : Int64, tz : String, fmt : String) -> String {
+  let (year, month, day, hour, minute, second) = epoch_to_calendar(ts, tz)
+  let dow = day_of_week(year, month, day)
+  let dow_names = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+  let dow_full = [
+    "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
+  ]
+  let month_names = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov",
+    "Dec",
+  ]
+  let month_full = [
+    "January", "February", "March", "April", "May", "June", "July", "August", "September",
+    "October", "November", "December",
+  ]
+  let buf = StringBuilder::new()
+  let chars = fmt.to_array()
+  let len = chars.length()
+  let mut i = 0
+  while i < len {
+    if chars[i] == '%' && i + 1 < len {
+      i += 1
+      match chars[i] {
+        'Y' => buf.write_string(year.to_string())
+        'y' => buf.write_string(pad2(year % 100))
+        'm' => buf.write_string(pad2(month))
+        'd' => buf.write_string(pad2(day))
+        'e' =>
+          if day < 10 {
+            buf.write_string(" " + day.to_string())
+          } else {
+            buf.write_string(day.to_string())
+          }
+        'H' => buf.write_string(pad2(hour))
+        'M' => buf.write_string(pad2(minute))
+        'S' => buf.write_string(pad2(second))
+        'a' => buf.write_string(dow_names[dow])
+        'A' => buf.write_string(dow_full[dow])
+        'b' | 'h' => buf.write_string(month_names[month - 1])
+        'B' => buf.write_string(month_full[month - 1])
+        'w' => buf.write_string(dow.to_string())
+        'u' => buf.write_string((if dow == 0 { 7 } else { dow }).to_string())
+        'j' => {
+          let yday = day_of_year(year, month, day)
+          if yday < 10 {
+            buf.write_string("00" + yday.to_string())
+          } else if yday < 100 {
+            buf.write_string("0" + yday.to_string())
+          } else {
+            buf.write_string(yday.to_string())
+          }
+        }
+        'z' => buf.write_string(tz)
+        'Z' => buf.write_string("") // timezone name not available
+        's' => buf.write_string(ts.to_string())
+        'n' => buf.write_char('\n')
+        't' => buf.write_char('\t')
+        '%' => buf.write_char('%')
+        'I' => {
+          let h12 = if hour == 0 {
+            12
+          } else if hour > 12 {
+            hour - 12
+          } else {
+            hour
+          }
+          buf.write_string(pad2(h12))
+        }
+        'l' => {
+          let h12 = if hour == 0 {
+            12
+          } else if hour > 12 {
+            hour - 12
+          } else {
+            hour
+          }
+          if h12 < 10 {
+            buf.write_string(" " + h12.to_string())
+          } else {
+            buf.write_string(h12.to_string())
+          }
+        }
+        'p' => buf.write_string(if hour < 12 { "AM" } else { "PM" })
+        'P' => buf.write_string(if hour < 12 { "am" } else { "pm" })
+        'D' => {
+          buf.write_string(pad2(month))
+          buf.write_char('/')
+          buf.write_string(pad2(day))
+          buf.write_char('/')
+          buf.write_string(pad2(year % 100))
+        }
+        'F' => {
+          buf.write_string(year.to_string())
+          buf.write_char('-')
+          buf.write_string(pad2(month))
+          buf.write_char('-')
+          buf.write_string(pad2(day))
+        }
+        'T' | 'X' => {
+          buf.write_string(pad2(hour))
+          buf.write_char(':')
+          buf.write_string(pad2(minute))
+          buf.write_char(':')
+          buf.write_string(pad2(second))
+        }
+        'R' => {
+          buf.write_string(pad2(hour))
+          buf.write_char(':')
+          buf.write_string(pad2(minute))
+        }
+        _ => {
+          buf.write_char('%')
+          buf.write_char(chars[i])
+        }
+      }
+    } else {
+      buf.write_char(chars[i])
+    }
+    i += 1
+  }
+  buf.to_string()
+}
+
+///|
+fn day_of_year(year : Int, month : Int, day : Int) -> Int {
+  let days_in_months = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+  let is_leap = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
+  let mut yday = 0
+  for m in 0..<(month - 1) {
+    yday += days_in_months[m]
+    if m == 1 && is_leap {
+      yday += 1
+    }
+  }
+  yday + day
 }
 
 ///|

@@ -462,6 +462,20 @@ fn format_timestamp_default(ts : Int64, tz : String) -> String {
 }
 
 ///|
+fn format_timestamp_default_notz(ts : Int64, tz : String) -> String {
+  let (year, month, day, hour, minute, second) = epoch_to_calendar(ts, tz)
+  let dow = day_of_week(year, month, day)
+  let dow_names = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+  let month_names = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov",
+    "Dec",
+  ]
+  let dn = dow_names[dow]
+  let mn = month_names[month - 1]
+  "\{dn} \{mn} \{day} \{pad2(hour)}:\{pad2(minute)}:\{pad2(second)} \{year}"
+}
+
+///|
 fn format_timestamp_short(ts : Int64, tz : String) -> String {
   let (year, month, day, _, _, _) = epoch_to_calendar(ts, tz)
   "\{year}-\{pad2(month)}-\{pad2(day)}"
@@ -503,7 +517,7 @@ fn format_timestamp_rfc2822(ts : Int64, tz : String) -> String {
   ]
   let dn = dow_names[dow]
   let mn = month_names[month - 1]
-  let d = pad2(day)
+  let d = day.to_string()
   let y = year.to_string()
   let h = pad2(hour)
   let mi = pad2(minute)
