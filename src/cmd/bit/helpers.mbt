@@ -706,24 +706,31 @@ fn parse_iso_date_timestamp(raw : String) -> Int64? {
 
 ///|
 fn days_from_epoch(year : Int64, month : Int64, day : Int64) -> Int64 {
-  // Adjust for months before March (treat Jan/Feb as months 13/14 of previous year)
-  let mut y = year
-  let mut m = month
-  if m <= 2L {
-    y = y - 1L
-    m = m + 12L
+  let month_days : Array[Int64] = [
+    0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334,
+  ]
+  let y = year
+  let m = month
+  // Days in complete years since 1970
+  let mut days = 365L * (y - 1970L)
+  // Add leap days for complete years
+  // Leap year if divisible by 4, not by 100, or by 400
+  if y > 1970L {
+    days = days + (y - 1969L) / 4L - (y - 1901L) / 100L + (y - 1601L) / 400L
+  } else {
+    days = days - (1970L - y) / 4L + (1970L - y) / 100L - (1970L - y) / 400L
   }
-  // Days in years since epoch
-  let era_days = 365L * (y - 1970L) +
-    (y - 1969L) / 4L -
-    (y - 1901L) / 100L +
-    (y - 1601L) / 400L
-  // Days in months (using March-based month counting)
-  let month_days = (153L * (m - 3L) + 2L) / 5L + day - 1L
-  // Adjust: days from Jan 1 to Mar 1 in the adjusted year
-  // Jan has 31, Feb has 28 (non-leap adjustment handled by era_days)
-  let jan_feb_days = 31L + 28L
-  era_days + month_days - jan_feb_days
+  // Add days for complete months
+  days = days + month_days[(m - 1L).to_int()]
+  // Add leap day if after February in a leap year
+  if m > 2L {
+    let is_leap = (y % 4L == 0L && y % 100L != 0L) || y % 400L == 0L
+    if is_leap {
+      days = days + 1L
+    }
+  }
+  // Add days within the month
+  days + day - 1L
 }
 
 ///|
