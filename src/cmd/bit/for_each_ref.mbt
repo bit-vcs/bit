@@ -207,11 +207,17 @@ fn for_each_ref_compare(
     _ if field.has_prefix("creatordate") ||
       field.has_prefix("authordate") ||
       field.has_prefix("committerdate") ||
-      field.has_prefix("taggerdate") => {
-      let ts_a = for_each_ref_get_timestamp(fs, git_dir, a.1, field)
-      let ts_b = for_each_ref_get_timestamp(fs, git_dir, b.1, field)
-      ts_a.compare(ts_b)
-    }
+      field.has_prefix("taggerdate") =>
+      // If field has :format: suffix, sort by formatted string
+      if field.find(":format:") is Some(_) {
+        let val_a = for_each_ref_get_sort_value(fs, git_dir, a.1, field)
+        let val_b = for_each_ref_get_sort_value(fs, git_dir, b.1, field)
+        lexicographic_compare(val_a, val_b)
+      } else {
+        let ts_a = for_each_ref_get_timestamp(fs, git_dir, a.1, field)
+        let ts_b = for_each_ref_get_timestamp(fs, git_dir, b.1, field)
+        ts_a.compare(ts_b)
+      }
     _ => {
       // Generic field comparison: extract field value for each ref and compare
       let val_a = for_each_ref_get_sort_value(fs, git_dir, a.1, field)
@@ -232,6 +238,42 @@ fn for_each_ref_get_sort_value(
   let obj = db.get(fs, id) catch { _ => return "" }
   guard obj is Some(o) else { return "" }
   let text = decode_bytes(o.data)
+  // Handle date format fields for sorting
+  if field.find(":format:") is Some(fmt_pos) {
+    let fmt = String::unsafe_substring(
+      field,
+      start=fmt_pos + 8,
+      end=field.length(),
+    )
+    // Get timestamp using creator logic
+    let headers = if field.has_prefix("creator") {
+      ["tagger ", "committer ", "author "]
+    } else if field.has_prefix("author") {
+      ["author "]
+    } else if field.has_prefix("committer") {
+      ["committer "]
+    } else {
+      ["tagger "]
+    }
+    for h in headers {
+      for line_view in text.split("\n") {
+        let line = line_view.to_string()
+        if line.length() == 0 {
+          break
+        }
+        if line.has_prefix(h) {
+          let ident = String::unsafe_substring(
+            line,
+            start=h.length(),
+            end=line.length(),
+          )
+          let (ts, tz) = for_each_ref_parse_ident_ts(ident)
+          return format_timestamp_strftime(ts, tz, fmt)
+        }
+      }
+    }
+    return ""
+  }
   // Determine which ident header to use
   let header = if field.has_prefix("author") {
     "author "
@@ -239,6 +281,26 @@ fn for_each_ref_get_sort_value(
     "committer "
   } else if field.has_prefix("tagger") {
     "tagger "
+  } else if field.has_prefix("creator") {
+    // Creator: try tagger, then committer, then author
+    let headers = ["tagger ", "committer ", "author "]
+    for h in headers {
+      for line_view in text.split("\n") {
+        let line = line_view.to_string()
+        if line.length() == 0 {
+          break
+        }
+        if line.has_prefix(h) {
+          let ident = String::unsafe_substring(
+            line,
+            start=h.length(),
+            end=line.length(),
+          )
+          return ident
+        }
+      }
+    }
+    return ""
   } else {
     return ""
   }
@@ -334,15 +396,34 @@ fn for_each_ref_get_timestamp(
   let obj = db.get(fs, id) catch { _ => return 0L }
   guard obj is Some(o) else { return 0L }
   let text = decode_bytes(o.data)
+  if field.has_prefix("creator") {
+    // creator: try tagger first, then committer, then author
+    let headers = ["tagger ", "committer ", "author "]
+    for h in headers {
+      for line_view in text.split("\n") {
+        let line = line_view.to_string()
+        if line.length() == 0 {
+          break
+        }
+        if line.has_prefix(h) {
+          let ident = String::unsafe_substring(
+            line,
+            start=h.length(),
+            end=line.length(),
+          )
+          let (ts, _) = for_each_ref_parse_ident_ts(ident)
+          return ts
+        }
+      }
+    }
+    return 0L
+  }
   let header = if field.has_prefix("author") {
     "author "
   } else if field.has_prefix("committer") {
     "committer "
-  } else if field.has_prefix("tagger") {
-    "tagger "
   } else {
-    // creator: tagger > committer > author
-    "committer "
+    "tagger "
   }
   for line_view in text.split("\n") {
     let line = line_view.to_string()
