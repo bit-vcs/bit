@@ -1148,8 +1148,10 @@ async fn for_each_ref_atom(
       atom.has_prefix("tagger") ||
       atom.has_prefix("trailers") ||
       atom == "signature" ||
-      atom.has_prefix("signature:") =>
-      for_each_ref_commit_atom(atom, commit_data, tag_data, is_tag)
+      atom.has_prefix("signature:") => {
+      let mailmap = for_each_ref_read_mailmap(fs, git_dir)
+      for_each_ref_commit_atom(atom, commit_data, tag_data, is_tag, mailmap)
+    }
     _ if atom == "describe" || atom.has_prefix("describe:") =>
       for_each_ref_describe_atom(fs, git_dir, id, atom)
     _ if atom.has_prefix("*describe") => {
@@ -1568,6 +1570,7 @@ async fn for_each_ref_commit_atom(
   commit_data : Bytes,
   tag_data : Bytes,
   is_tag : Bool,
+  mailmap : Array[MailmapEntry],
 ) -> String {
   let text = if is_tag {
     decode_bytes(tag_data)
@@ -1682,13 +1685,20 @@ async fn for_each_ref_commit_atom(
     "tagger" => tagger
     "creator" => creator
     "authorname" => for_each_ref_ident_name(author)
+    "authorname:mailmap" =>
+      for_each_ref_ident_name(for_each_ref_apply_mailmap(author, mailmap))
     "authoremail" => for_each_ref_ident_email(author)
     "authoremail:trim" => for_each_ref_ident_email_trim(author)
     "authoremail:localpart"
     | "authoremail:trim,localpart"
     | "authoremail:localpart,trim" => for_each_ref_ident_email_localpart(author)
     _ if atom.has_prefix("authoremail:") =>
-      for_each_ref_validate_email_arg("authoremail", atom)
+      for_each_ref_resolve_name_or_email(
+        author,
+        "email",
+        String::unsafe_substring(atom, start=12, end=atom.length()),
+        mailmap,
+      )
     "authordate" | "authordate:default" => for_each_ref_ident_date(author)
     "authordate:short" => for_each_ref_ident_date_short(author)
     "authordate:iso8601" | "authordate:iso" =>
@@ -1716,6 +1726,8 @@ async fn for_each_ref_commit_atom(
       for_each_ref_ident_date_strftime(author, fmt)
     }
     "committername" => for_each_ref_ident_name(committer)
+    "committername:mailmap" =>
+      for_each_ref_ident_name(for_each_ref_apply_mailmap(committer, mailmap))
     "committeremail" => for_each_ref_ident_email(committer)
     "committeremail:trim" => for_each_ref_ident_email_trim(committer)
     "committeremail:localpart"
@@ -1723,7 +1735,12 @@ async fn for_each_ref_commit_atom(
     | "committeremail:localpart,trim" =>
       for_each_ref_ident_email_localpart(committer)
     _ if atom.has_prefix("committeremail:") =>
-      for_each_ref_validate_email_arg("committeremail", atom)
+      for_each_ref_resolve_name_or_email(
+        committer,
+        "email",
+        String::unsafe_substring(atom, start=15, end=atom.length()),
+        mailmap,
+      )
     "committerdate" | "committerdate:default" =>
       for_each_ref_ident_date(committer)
     "committerdate:short" => for_each_ref_ident_date_short(committer)
@@ -1753,13 +1770,20 @@ async fn for_each_ref_commit_atom(
       for_each_ref_ident_date_strftime(committer, fmt)
     }
     "taggername" => for_each_ref_ident_name(tagger)
+    "taggername:mailmap" =>
+      for_each_ref_ident_name(for_each_ref_apply_mailmap(tagger, mailmap))
     "taggeremail" => for_each_ref_ident_email(tagger)
     "taggeremail:trim" => for_each_ref_ident_email_trim(tagger)
     "taggeremail:localpart"
     | "taggeremail:trim,localpart"
     | "taggeremail:localpart,trim" => for_each_ref_ident_email_localpart(tagger)
     _ if atom.has_prefix("taggeremail:") =>
-      for_each_ref_validate_email_arg("taggeremail", atom)
+      for_each_ref_resolve_name_or_email(
+        tagger,
+        "email",
+        String::unsafe_substring(atom, start=12, end=atom.length()),
+        mailmap,
+      )
     "taggerdate" | "taggerdate:default" => for_each_ref_ident_date(tagger)
     "taggerdate:short" => for_each_ref_ident_date_short(tagger)
     "taggerdate:iso8601" | "taggerdate:iso" =>
@@ -1874,17 +1898,6 @@ fn for_each_ref_strip_cr(s : String) -> String {
   } else {
     s
   }
-}
-
-///|
-async fn for_each_ref_validate_email_arg(
-  atom_name : String,
-  _full_atom : String,
-) -> String {
-  // This should not be reached — validation is now done upfront
-  // in for_each_ref_validate_atom. If we get here, just return empty.
-  ignore(atom_name)
-  ""
 }
 
 ///|
@@ -2498,6 +2511,252 @@ fn for_each_ref_parse_ident_ts(ident : String) -> (Int64, String) {
       }
     }
     None => (0L, "+0000")
+  }
+}
+
+///|
+/// Mailmap entry: (old_email, old_name?, new_email?, new_name?)
+struct MailmapEntry {
+  old_email : String // case-insensitive match key (stored lowercase)
+  old_name : String // optional: match only if name also matches
+  new_email : String // replacement email (empty = keep original)
+  new_name : String // replacement name (empty = keep original)
+}
+
+///|
+fn for_each_ref_read_mailmap(
+  fs : OsFs,
+  git_dir : String,
+) -> Array[MailmapEntry] {
+  let entries : Array[MailmapEntry] = []
+  // .mailmap is in worktree root (parent of .git dir)
+  let worktree = if git_dir.has_suffix("/.git") {
+    String::unsafe_substring(git_dir, start=0, end=git_dir.length() - 5)
+  } else {
+    git_dir
+  }
+  let data = fs.read_file(worktree + "/.mailmap") catch { _ => return entries }
+  let text = decode_bytes(data)
+  for line_view in text.split("\n") {
+    let line = line_view.to_string()
+    if line.length() == 0 || line.has_prefix("#") {
+      continue
+    }
+    let trimmed = line
+    // Parse <email> occurrences
+    let emails : Array[String] = []
+    let email_positions : Array[(Int, Int)] = [] // (start_lt, end_gt)
+    let mut pos = 0
+    while pos < trimmed.length() {
+      match
+        String::unsafe_substring(trimmed, start=pos, end=trimmed.length()).find(
+          "<",
+        ) {
+        Some(rel_start) => {
+          let abs_start = pos + rel_start
+          match
+            String::unsafe_substring(
+              trimmed,
+              start=abs_start,
+              end=trimmed.length(),
+            ).find(">") {
+            Some(rel_end) => {
+              let abs_end = abs_start + rel_end
+              emails.push(
+                String::unsafe_substring(
+                  trimmed,
+                  start=abs_start + 1,
+                  end=abs_end,
+                ),
+              )
+              email_positions.push((abs_start, abs_end))
+              pos = abs_end + 1
+            }
+            None => break
+          }
+        }
+        None => break
+      }
+    }
+    if emails.length() == 1 {
+      // Form 1: Proper Name <commit@email>
+      let name_part = String::unsafe_substring(
+        trimmed,
+        start=0,
+        end=email_positions[0].0,
+      )
+      let new_name = for_each_ref_trim_string(name_part)
+      entries.push({
+        old_email: emails[0].to_lower(),
+        old_name: "",
+        new_email: "",
+        new_name,
+      })
+    } else if emails.length() == 2 {
+      let name_before_first = for_each_ref_trim_string(
+        String::unsafe_substring(trimmed, start=0, end=email_positions[0].0),
+      )
+      let name_between = for_each_ref_trim_string(
+        String::unsafe_substring(
+          trimmed,
+          start=email_positions[0].1 + 1,
+          end=email_positions[1].0,
+        ),
+      )
+      if name_before_first.length() == 0 && name_between.length() == 0 {
+        // Form 2: <proper@email> <commit@email>
+        entries.push({
+          old_email: emails[1].to_lower(),
+          old_name: "",
+          new_email: emails[0],
+          new_name: "",
+        })
+      } else if name_before_first.length() > 0 && name_between.length() == 0 {
+        // Form 3: Proper Name <proper@email> <commit@email>
+        entries.push({
+          old_email: emails[1].to_lower(),
+          old_name: "",
+          new_email: emails[0],
+          new_name: name_before_first,
+        })
+      } else if name_before_first.length() > 0 && name_between.length() > 0 {
+        // Form 4: Proper Name <proper@email> Commit Name <commit@email>
+        entries.push({
+          old_email: emails[1].to_lower(),
+          old_name: name_between,
+          new_email: emails[0],
+          new_name: name_before_first,
+        })
+      }
+    }
+  }
+  entries
+}
+
+///|
+fn for_each_ref_trim_string(s : String) -> String {
+  let chars = s.to_array()
+  let mut start = 0
+  let mut end = chars.length()
+  while start < end && (chars[start] == ' ' || chars[start] == '\t') {
+    start += 1
+  }
+  while end > start && (chars[end - 1] == ' ' || chars[end - 1] == '\t') {
+    end -= 1
+  }
+  if start == 0 && end == s.length() {
+    s
+  } else {
+    String::unsafe_substring(s, start~, end~)
+  }
+}
+
+///|
+fn for_each_ref_apply_mailmap(
+  ident : String,
+  mailmap : Array[MailmapEntry],
+) -> String {
+  if ident.length() == 0 || mailmap.length() == 0 {
+    return ident
+  }
+  let lt_pos = match ident.find("<") {
+    Some(p) => p
+    None => return ident
+  }
+  let gt_pos = match ident.find(">") {
+    Some(p) => p
+    None => return ident
+  }
+  let orig_name = for_each_ref_trim_string(
+    String::unsafe_substring(ident, start=0, end=lt_pos),
+  )
+  let orig_email = String::unsafe_substring(ident, start=lt_pos + 1, end=gt_pos)
+  let rest = String::unsafe_substring(
+    ident,
+    start=gt_pos + 1,
+    end=ident.length(),
+  )
+  let orig_email_lower = orig_email.to_lower()
+  for entry in mailmap {
+    if entry.old_email == orig_email_lower {
+      if entry.old_name.length() > 0 && entry.old_name != orig_name {
+        continue
+      }
+      let new_name = if entry.new_name.length() > 0 {
+        entry.new_name
+      } else {
+        orig_name
+      }
+      let new_email = if entry.new_email.length() > 0 {
+        entry.new_email
+      } else {
+        orig_email
+      }
+      return new_name + " <" + new_email + ">" + rest
+    }
+  }
+  ident
+}
+
+///|
+fn for_each_ref_resolve_name_or_email(
+  ident : String,
+  kind : String,
+  opts : String,
+  mailmap : Array[MailmapEntry],
+) -> String {
+  let mut use_mailmap = false
+  let mut use_trim = false
+  let mut use_localpart = false
+  let mut remaining = opts
+  while remaining.length() > 0 {
+    if remaining.has_prefix("mailmap") {
+      use_mailmap = true
+      remaining = String::unsafe_substring(
+        remaining,
+        start=7,
+        end=remaining.length(),
+      )
+    } else if remaining.has_prefix("trim") {
+      use_trim = true
+      remaining = String::unsafe_substring(
+        remaining,
+        start=4,
+        end=remaining.length(),
+      )
+    } else if remaining.has_prefix("localpart") {
+      use_localpart = true
+      remaining = String::unsafe_substring(
+        remaining,
+        start=9,
+        end=remaining.length(),
+      )
+    } else if remaining.has_prefix(",") {
+      remaining = String::unsafe_substring(
+        remaining,
+        start=1,
+        end=remaining.length(),
+      )
+    } else {
+      break
+    }
+  }
+  let resolved_ident = if use_mailmap {
+    for_each_ref_apply_mailmap(ident, mailmap)
+  } else {
+    ident
+  }
+  match kind {
+    "name" => for_each_ref_ident_name(resolved_ident)
+    "email" =>
+      if use_localpart {
+        for_each_ref_ident_email_localpart(resolved_ident)
+      } else if use_trim {
+        for_each_ref_ident_email_trim(resolved_ident)
+      } else {
+        for_each_ref_ident_email(resolved_ident)
+      }
+    _ => ""
   }
 }
 
