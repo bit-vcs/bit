@@ -346,6 +346,46 @@ fn for_each_ref_atom(
     "objectsize" => obj_size.to_string()
     "objectsize:disk" => "0"
     "deltabase" => "0000000000000000000000000000000000000000"
+    "*deltabase" => "0000000000000000000000000000000000000000"
+    "object" =>
+      if is_tag {
+        let text = decode_bytes(tag_data)
+        for line_view in text.split("\n") {
+          let line = line_view.to_string()
+          if line.has_prefix("object ") {
+            return String::unsafe_substring(line, start=7, end=line.length())
+          }
+        }
+        ""
+      } else {
+        ""
+      }
+    "type" =>
+      if is_tag {
+        let text = decode_bytes(tag_data)
+        for line_view in text.split("\n") {
+          let line = line_view.to_string()
+          if line.has_prefix("type ") {
+            return String::unsafe_substring(line, start=5, end=line.length())
+          }
+        }
+        ""
+      } else {
+        ""
+      }
+    "tag" =>
+      if is_tag {
+        let text = decode_bytes(tag_data)
+        for line_view in text.split("\n") {
+          let line = line_view.to_string()
+          if line.has_prefix("tag ") {
+            return String::unsafe_substring(line, start=4, end=line.length())
+          }
+        }
+        ""
+      } else {
+        ""
+      }
     "tree" | "tree:short" =>
       if is_tag {
         ""
@@ -710,7 +750,7 @@ fn for_each_ref_commit_atom(
   tag_data : Bytes,
   is_tag : Bool,
 ) -> String {
-  let text = if is_tag && (atom.has_prefix("tagger") || atom.has_prefix("tag")) {
+  let text = if is_tag {
     decode_bytes(tag_data)
   } else {
     decode_bytes(commit_data)
@@ -767,6 +807,8 @@ fn for_each_ref_commit_atom(
   match atom {
     "author" => author
     "committer" => committer
+    "tagger" => tagger
+    "creator" => creator
     "authorname" => for_each_ref_ident_name(author)
     "authoremail" => for_each_ref_ident_email(author)
     "authoremail:trim" => for_each_ref_ident_email_trim(author)
@@ -799,6 +841,7 @@ fn for_each_ref_commit_atom(
     "committerdate:unix" => for_each_ref_ident_date_unix(committer)
     "committerdate:rfc2822" | "committerdate:rfc" =>
       for_each_ref_ident_date_rfc(committer)
+    "committerdate:relative" => for_each_ref_ident_date(committer) // simplified
     _ if atom.has_prefix("committerdate:format:") => {
       let fmt = String::unsafe_substring(atom, start=21, end=atom.length())
       for_each_ref_ident_date_strftime(committer, fmt)
@@ -814,6 +857,9 @@ fn for_each_ref_commit_atom(
     "taggerdate:iso8601" | "taggerdate:iso" =>
       for_each_ref_ident_date_iso(tagger)
     "taggerdate:unix" => for_each_ref_ident_date_unix(tagger)
+    "taggerdate:rfc2822" | "taggerdate:rfc" =>
+      for_each_ref_ident_date_rfc(tagger)
+    "taggerdate:relative" => for_each_ref_ident_date(tagger) // simplified
     _ if atom.has_prefix("taggerdate:format:") => {
       let fmt = String::unsafe_substring(atom, start=18, end=atom.length())
       for_each_ref_ident_date_strftime(tagger, fmt)
@@ -825,6 +871,7 @@ fn for_each_ref_commit_atom(
     "creatordate:unix" => for_each_ref_ident_date_unix(creator)
     "creatordate:rfc2822" | "creatordate:rfc" =>
       for_each_ref_ident_date_rfc(creator)
+    "creatordate:relative" => for_each_ref_ident_date(creator) // simplified
     _ if atom.has_prefix("creatordate:format:") => {
       let fmt = String::unsafe_substring(atom, start=19, end=atom.length())
       for_each_ref_ident_date_strftime(creator, fmt)
