@@ -206,6 +206,8 @@ async fn handle_for_each_ref(args : Array[String]) -> Unit raise Error {
       }
     })
   }
+  // Validate format string upfront (before processing any refs)
+  for_each_ref_validate_format(format)
   // Load object db for object lookups
   let db = @bitlib.ObjectDb::load(fs, git_dir)
   // Output
@@ -224,6 +226,209 @@ async fn handle_for_each_ref(args : Array[String]) -> Unit raise Error {
     }
     print_line(line)
     output_count += 1
+  }
+}
+
+///|
+async fn for_each_ref_validate_format(format : String) -> Unit {
+  // Parse format string and validate atoms upfront
+  let chars = format.to_array()
+  let len = chars.length()
+  let mut i = 0
+  while i < len {
+    if chars[i] == '%' && i + 1 < len && chars[i + 1] == '(' {
+      let start = i + 2
+      let mut end_pos = start
+      while end_pos < len && chars[end_pos] != ')' {
+        end_pos = end_pos + 1
+      }
+      if end_pos < len {
+        let atom = String::from_array(
+          FixedArray::makei(end_pos - start, fn(j) { chars[start + j] }),
+        )
+        for_each_ref_validate_atom(atom)
+        i = end_pos + 1
+      } else {
+        i = i + 1
+      }
+    } else {
+      i = i + 1
+    }
+  }
+}
+
+///|
+async fn for_each_ref_validate_atom(atom : String) -> Unit {
+  // Validate describe atom options
+  if atom.has_prefix("describe:") {
+    let options_str = String::unsafe_substring(atom, start=9, end=atom.length())
+    let mut remaining = options_str
+    while remaining.length() > 0 {
+      let comma_pos = remaining.find(",")
+      let (opt, rest) = match comma_pos {
+        Some(pos) =>
+          (
+            String::unsafe_substring(remaining, start=0, end=pos),
+            String::unsafe_substring(
+              remaining,
+              start=pos + 1,
+              end=remaining.length(),
+            ),
+          )
+        None => (remaining, "")
+      }
+      if opt == "tags" ||
+        opt.has_prefix("abbrev=") ||
+        opt.has_prefix("match=") ||
+        opt.has_prefix("exclude=") {
+        // valid
+        ()
+      } else {
+        let bad = if rest.length() > 0 { opt + "," + rest } else { opt }
+        eprint_line("fatal: unrecognized %(describe) argument: " + bad)
+        @sys.exit(1)
+      }
+      remaining = rest
+    }
+  }
+  // Validate trailers options
+  if atom.has_prefix("trailers:") || atom.has_prefix("contents:trailers:") {
+    let opts = if atom.has_prefix("contents:trailers:") {
+      String::unsafe_substring(atom, start=18, end=atom.length())
+    } else {
+      String::unsafe_substring(atom, start=9, end=atom.length())
+    }
+    let mut remaining = opts
+    while remaining.length() > 0 {
+      let (opt, rest) = for_each_ref_split_trailer_opt(remaining)
+      if opt == "only" ||
+        opt == "only=yes" ||
+        opt == "only=true" ||
+        opt == "only=no" ||
+        opt == "only=false" ||
+        opt == "unfold" ||
+        opt == "valueonly" ||
+        opt.has_prefix("key=") ||
+        opt.has_prefix("separator=") ||
+        opt.has_prefix("key_value_separator=") {
+        // valid
+        ()
+      } else if opt == "key" {
+        eprint_line("fatal: expected %(trailers:key=<value>)")
+        @sys.exit(1)
+      } else {
+        eprint_line("fatal: unknown %(trailers) argument: " + remaining)
+        @sys.exit(1)
+      }
+      remaining = rest
+    }
+  }
+  // Validate email options using prefix-based greedy parsing (matching git)
+  if atom.has_prefix("authoremail:") ||
+    atom.has_prefix("committeremail:") ||
+    atom.has_prefix("taggeremail:") {
+    let colon_pos = match atom.find(":") {
+      Some(p) => p
+      None => return
+    }
+    let options_str = String::unsafe_substring(
+      atom,
+      start=colon_pos + 1,
+      end=atom.length(),
+    )
+    let atom_name = String::unsafe_substring(atom, start=0, end=colon_pos)
+    let mut remaining = options_str
+    while remaining.length() > 0 {
+      if remaining.has_prefix("mailmap") {
+        remaining = String::unsafe_substring(
+          remaining,
+          start=7,
+          end=remaining.length(),
+        )
+      } else if remaining.has_prefix("trim") {
+        remaining = String::unsafe_substring(
+          remaining,
+          start=4,
+          end=remaining.length(),
+        )
+      } else if remaining.has_prefix("localpart") {
+        remaining = String::unsafe_substring(
+          remaining,
+          start=9,
+          end=remaining.length(),
+        )
+      } else {
+        eprint_line(
+          "fatal: unrecognized %(" + atom_name + ") argument: " + remaining,
+        )
+        @sys.exit(1)
+      }
+      // After consuming a valid token, expect comma or end
+      if remaining.length() > 0 {
+        if remaining.has_prefix(",") {
+          remaining = String::unsafe_substring(
+            remaining,
+            start=1,
+            end=remaining.length(),
+          )
+          // If nothing after comma, report empty arg error
+          if remaining.length() == 0 {
+            eprint_line(
+              "fatal: unrecognized %(" + atom_name + ") argument: " + remaining,
+            )
+            @sys.exit(1)
+          }
+        } else {
+          // No comma, but not at end → error
+          eprint_line(
+            "fatal: unrecognized %(" + atom_name + ") argument: " + remaining,
+          )
+          @sys.exit(1)
+        }
+      }
+    }
+  }
+  // Validate HEAD
+  if atom.has_prefix("HEAD:") {
+    eprint_line("fatal: %(HEAD) does not take arguments")
+    @sys.exit(1)
+  }
+  // Validate subject
+  if atom.has_prefix("subject:") && atom != "subject:sanitize" {
+    let arg = String::unsafe_substring(atom, start=8, end=atom.length())
+    eprint_line("fatal: unrecognized %(subject) argument: " + arg)
+    @sys.exit(1)
+  }
+  // Validate refname
+  if atom.has_prefix("refname:") {
+    let arg = String::unsafe_substring(atom, start=8, end=atom.length())
+    match arg {
+      "" | "short" => ()
+      _ if arg.has_prefix("lstrip=") ||
+        arg.has_prefix("strip=") ||
+        arg.has_prefix("rstrip=") => ()
+      _ => {
+        eprint_line("fatal: unrecognized %(refname) argument: " + arg)
+        @sys.exit(1)
+      }
+    }
+  }
+  // rest is not supported
+  if atom == "rest" {
+    eprint_line("fatal: %(rest) atom used without %(format:ref-filter)")
+    @sys.exit(1)
+  }
+  // Validate contents
+  if atom.has_prefix("contents:") {
+    let arg = String::unsafe_substring(atom, start=9, end=atom.length())
+    match arg {
+      "body" | "subject" | "signature" | "size" => ()
+      _ if arg == "trailers" || arg.has_prefix("trailers:") => ()
+      _ => {
+        eprint_line("fatal: unrecognized %(contents) argument: " + arg)
+        @sys.exit(1)
+      }
+    }
   }
 }
 
@@ -486,7 +691,7 @@ fn for_each_ref_version_compare(a : String, b : String) -> Int {
 }
 
 ///|
-fn for_each_ref_format(
+async fn for_each_ref_format(
   fs : OsFs,
   git_dir : String,
   db : @bitlib.ObjectDb,
@@ -563,6 +768,45 @@ fn for_each_ref_format(
         )
         out.write_string(for_each_ref_quote(value, quote_style))
         i = end_pos + 1
+      } else {
+        out.write_char(chars[i])
+        i += 1
+      }
+    } else if chars[i] == '%' &&
+      i + 1 < len &&
+      chars[i + 1] == '0' &&
+      i + 2 < len {
+      // %0a = newline, %00 = NUL, etc. (hex escape)
+      let hex_ch = chars[i + 2]
+      let val = match hex_ch {
+        'a' | 'A' => Some('\n')
+        'd' | 'D' => Some('\r')
+        '0' => {
+          let nul : Char = Int::unsafe_to_char(0)
+          Some(nul)
+        }
+        _ => None
+      }
+      match val {
+        Some(c) => {
+          out.write_char(c)
+          i += 3
+        }
+        None => {
+          out.write_char(chars[i])
+          i += 1
+        }
+      }
+    } else if chars[i] == '%' &&
+      i + 1 < len &&
+      chars[i + 1] == 'x' &&
+      i + 3 < len {
+      // %xNN hex escape
+      let hi = for_each_ref_hex_digit(chars[i + 2])
+      let lo = for_each_ref_hex_digit(chars[i + 3])
+      if hi >= 0 && lo >= 0 {
+        out.write_char((hi * 16 + lo).unsafe_to_char())
+        i += 4
       } else {
         out.write_char(chars[i])
         i += 1
@@ -648,7 +892,7 @@ fn for_each_ref_quote(value : String, style : String) -> String {
 }
 
 ///|
-fn for_each_ref_atom(
+async fn for_each_ref_atom(
   fs : OsFs,
   git_dir : String,
   _db : @bitlib.ObjectDb,
@@ -882,6 +1126,11 @@ fn for_each_ref_atom(
         _ => " "
       }
     }
+    _ if atom.has_prefix("HEAD:") => {
+      eprint_line("fatal: %(HEAD) does not take arguments")
+      @sys.exit(1)
+      ""
+    }
     "symref" => ""
     "flag" =>
       // Not fully implemented
@@ -896,14 +1145,174 @@ fn for_each_ref_atom(
       atom.has_prefix("body") ||
       atom.has_prefix("contents") ||
       atom.has_prefix("taggername") ||
-      atom.has_prefix("tagger") =>
+      atom.has_prefix("tagger") ||
+      atom.has_prefix("trailers") ||
+      atom == "signature" ||
+      atom.has_prefix("signature:") =>
       for_each_ref_commit_atom(atom, commit_data, tag_data, is_tag)
+    _ if atom == "describe" || atom.has_prefix("describe:") =>
+      for_each_ref_describe_atom(fs, git_dir, id, atom)
+    _ if atom.has_prefix("*describe") => {
+      // Deref describe: for tags, describe the target object
+      let deref_atom = if atom == "*describe" {
+        "describe"
+      } else {
+        "describe" + String::unsafe_substring(atom, start=9, end=atom.length())
+      }
+      if is_tag {
+        let text = decode_bytes(tag_data)
+        for line_view in text.split("\n") {
+          let line = line_view.to_string()
+          if line.has_prefix("object ") {
+            let target_hex = String::unsafe_substring(
+              line,
+              start=7,
+              end=line.length(),
+            )
+            let target_id = @bitcore.ObjectId::from_hex(target_hex) catch {
+              _ => return ""
+            }
+            return for_each_ref_describe_atom(
+              fs, git_dir, target_id, deref_atom,
+            )
+          }
+        }
+        ""
+      } else {
+        ""
+      }
+    }
+    _ if atom.has_prefix("refname:") => {
+      let arg = String::unsafe_substring(atom, start=8, end=atom.length())
+      eprint_line("fatal: unrecognized %(refname) argument: " + arg)
+      @sys.exit(1)
+      ""
+    }
     _ if atom.has_prefix("color:") || atom == "color:reset" => ""
     _ if atom.has_prefix("align:") || atom == "end" => ""
     _ if atom.has_prefix("if") ||
       atom.has_prefix("then") ||
       atom.has_prefix("else") => ""
     _ => ""
+  }
+}
+
+///|
+async fn for_each_ref_describe_atom(
+  _fs : OsFs,
+  git_dir : String,
+  id : @bitcore.ObjectId,
+  atom : String,
+) -> String {
+  // Parse options from atom: "describe" or "describe:opt1,opt2,..."
+  let options_str = if atom == "describe" {
+    ""
+  } else if atom.has_prefix("describe:") {
+    String::unsafe_substring(atom, start=9, end=atom.length())
+  } else {
+    ""
+  }
+  let args : Array[String] = ["--git-dir=" + git_dir, "describe"]
+  // Parse comma-separated options
+  if options_str.length() > 0 {
+    let mut remaining = options_str
+    while remaining.length() > 0 {
+      let comma_pos = remaining.find(",")
+      let (opt, rest) = match comma_pos {
+        Some(pos) =>
+          (
+            String::unsafe_substring(remaining, start=0, end=pos),
+            String::unsafe_substring(
+              remaining,
+              start=pos + 1,
+              end=remaining.length(),
+            ),
+          )
+        None => (remaining, "")
+      }
+      if opt == "tags" {
+        args.push("--tags")
+      } else if opt.has_prefix("abbrev=") {
+        args.push("--" + opt)
+      } else if opt.has_prefix("match=") {
+        let val = String::unsafe_substring(opt, start=6, end=opt.length())
+        // Strip surrounding quotes if present
+        let clean = for_each_ref_strip_quotes(val)
+        args.push("--match")
+        args.push(clean)
+      } else if opt.has_prefix("exclude=") {
+        let val = String::unsafe_substring(opt, start=8, end=opt.length())
+        let clean = for_each_ref_strip_quotes(val)
+        args.push("--exclude")
+        args.push(clean)
+      } else {
+        // Bad argument — report from this option onward
+        let bad = if rest.length() > 0 { opt + "," + rest } else { opt }
+        eprint_line("fatal: unrecognized %(describe) argument: " + bad)
+        @sys.exit(1)
+      }
+      remaining = rest
+    }
+  }
+  args.push(id.to_hex())
+  // Find real git path
+  let git_exe = for_each_ref_find_real_git(git_dir)
+  // Redirect stderr to suppress error messages from git describe
+  let dev_null = @process.redirect_to_file("/dev/null")
+  let (code, stdout) = @process.collect_stdout(
+    git_exe,
+    args[:],
+    inherit_env=true,
+    stderr=dev_null,
+  )
+  if code != 0 {
+    return ""
+  }
+  // Trim trailing newline from output
+  let out = stdout.text() catch { _ => return "" }
+  let trimmed = if out.has_suffix("\n") {
+    String::unsafe_substring(out, start=0, end=out.length() - 1)
+  } else {
+    out
+  }
+  trimmed
+}
+
+///|
+fn for_each_ref_strip_quotes(s : String) -> String {
+  if s.length() >= 2 {
+    let first = s[0]
+    let last = s[s.length() - 1]
+    if (first == '"' && last == '"') || (first == '\'' && last == '\'') {
+      return String::unsafe_substring(s, start=1, end=s.length() - 1)
+    }
+  }
+  s
+}
+
+///|
+fn for_each_ref_find_real_git(git_dir : String) -> String {
+  // Try to find the real git executable
+  // Check SHIM_REAL_GIT env var first
+  match @sys.get_env_var("SHIM_REAL_GIT") {
+    Some(path) if path.length() > 0 => path
+    _ => {
+      // Try git-dir relative path
+      let fs = OsFs::new()
+      let real_git_path = git_dir + "/../tools/git-shim/real-git-path"
+      let data = fs.read_file(real_git_path) catch { _ => return "git" }
+      let path = decode_bytes(data)
+      let trimmed = if path.has_suffix("\n") {
+        String::unsafe_substring(path, start=0, end=path.length() - 1)
+      } else {
+        path
+      }
+      if trimmed.length() > 0 {
+        trimmed
+      } else {
+        "git"
+      }
+    }
   }
 }
 
@@ -1154,7 +1563,7 @@ fn for_each_ref_read_branch_pushremote(
 }
 
 ///|
-fn for_each_ref_commit_atom(
+async fn for_each_ref_commit_atom(
   atom : String,
   commit_data : Bytes,
   tag_data : Bytes,
@@ -1172,11 +1581,8 @@ fn for_each_ref_commit_atom(
   let mut author = ""
   let mut committer = ""
   let mut tagger = ""
-  let mut subject = ""
-  let mut body = ""
-  let mut in_body = false
   let mut past_headers = false
-  let body_lines : Array[String] = []
+  let message_lines : Array[String] = []
   for line_view in text.split("\n") {
     let raw_line = line_view.to_string()
     // Strip trailing \r for header/subject parsing (CRLF support)
@@ -1197,15 +1603,71 @@ fn for_each_ref_commit_atom(
       } else if line.has_prefix("tagger ") {
         tagger = String::unsafe_substring(line, start=7, end=line.length())
       }
-    } else if not(in_body) {
-      subject = line
-      in_body = true
     } else {
-      // Body lines preserve original \r for CRLF fidelity
-      body_lines.push(raw_line)
+      message_lines.push(raw_line)
     }
   }
-  body = body_lines.join("\n")
+  // Find signature start index
+  let mut sig_start = message_lines.length()
+  for i = 0; i < message_lines.length(); i = i + 1 {
+    let line = for_each_ref_strip_cr(message_lines[i])
+    if line == "-----BEGIN PGP SIGNATURE-----" ||
+      line == "-----BEGIN SSH SIGNATURE-----" {
+      sig_start = i
+      break
+    }
+  }
+  // Parse multiline subject from lines before signature
+  let mut subject_end = 0
+  for i = 0; i < sig_start; i = i + 1 {
+    let line = for_each_ref_strip_cr(message_lines[i])
+    if line.length() == 0 {
+      break
+    }
+    subject_end = i + 1
+  }
+  // Build subject (joined with space)
+  let subject_parts : Array[String] = []
+  for i = 0; i < subject_end; i = i + 1 {
+    subject_parts.push(for_each_ref_strip_cr(message_lines[i]))
+  }
+  let subject = subject_parts.join(" ")
+  // Find body start: skip blank lines after subject
+  let mut body_start = subject_end
+  while body_start < message_lines.length() {
+    if for_each_ref_strip_cr(message_lines[body_start]).length() > 0 {
+      break
+    }
+    body_start = body_start + 1
+  }
+  // body = everything from body_start to end (including signature)
+  let body_parts : Array[String] = []
+  for i = body_start; i < message_lines.length(); i = i + 1 {
+    body_parts.push(message_lines[i])
+  }
+  let body = if body_parts.length() > 0 { body_parts.join("\n") } else { "" }
+  // contents_body = from body_start to sig_start
+  let contents_body_parts : Array[String] = []
+  for i = body_start; i < sig_start; i = i + 1 {
+    contents_body_parts.push(message_lines[i])
+  }
+  let contents_body = if contents_body_parts.length() > 0 {
+    contents_body_parts.join("\n")
+  } else {
+    ""
+  }
+  // signature = from sig_start to end
+  let sig_parts : Array[String] = []
+  for i = sig_start; i < message_lines.length(); i = i + 1 {
+    sig_parts.push(message_lines[i])
+  }
+  let signature = if sig_parts.length() > 0 { sig_parts.join("\n") } else { "" }
+  // contents = full raw message (all message_lines joined)
+  let raw_message = if message_lines.length() > 0 {
+    message_lines.join("\n")
+  } else {
+    ""
+  }
   // Determine which ident to use for creator* atoms
   let creator = if tagger.length() > 0 {
     tagger
@@ -1225,6 +1687,8 @@ fn for_each_ref_commit_atom(
     "authoremail:localpart"
     | "authoremail:trim,localpart"
     | "authoremail:localpart,trim" => for_each_ref_ident_email_localpart(author)
+    _ if atom.has_prefix("authoremail:") =>
+      for_each_ref_validate_email_arg("authoremail", atom)
     "authordate" | "authordate:default" => for_each_ref_ident_date(author)
     "authordate:short" => for_each_ref_ident_date_short(author)
     "authordate:iso8601" | "authordate:iso" =>
@@ -1258,6 +1722,8 @@ fn for_each_ref_commit_atom(
     | "committeremail:trim,localpart"
     | "committeremail:localpart,trim" =>
       for_each_ref_ident_email_localpart(committer)
+    _ if atom.has_prefix("committeremail:") =>
+      for_each_ref_validate_email_arg("committeremail", atom)
     "committerdate" | "committerdate:default" =>
       for_each_ref_ident_date(committer)
     "committerdate:short" => for_each_ref_ident_date_short(committer)
@@ -1292,6 +1758,8 @@ fn for_each_ref_commit_atom(
     "taggeremail:localpart"
     | "taggeremail:trim,localpart"
     | "taggeremail:localpart,trim" => for_each_ref_ident_email_localpart(tagger)
+    _ if atom.has_prefix("taggeremail:") =>
+      for_each_ref_validate_email_arg("taggeremail", atom)
     "taggerdate" | "taggerdate:default" => for_each_ref_ident_date(tagger)
     "taggerdate:short" => for_each_ref_ident_date_short(tagger)
     "taggerdate:iso8601" | "taggerdate:iso" =>
@@ -1356,23 +1824,35 @@ fn for_each_ref_commit_atom(
       }
       sb.to_string()
     }
+    _ if atom.has_prefix("subject:") => {
+      let arg = String::unsafe_substring(atom, start=8, end=atom.length())
+      eprint_line("fatal: unrecognized %(subject) argument: " + arg)
+      @sys.exit(1)
+      ""
+    }
     "body" => body
-    "contents" =>
-      if body.length() > 0 {
-        subject + "\n" + body + "\n"
-      } else {
-        subject + "\n"
-      }
-    "contents:body" => if body.length() > 0 { body + "\n" } else { "" }
+    "contents" => raw_message
+    "contents:body" => contents_body
     "contents:subject" => subject
-    "contents:signature" => ""
-    "contents:size" => {
-      let full = if body.length() > 0 {
-        subject + "\n" + body + "\n"
-      } else {
-        subject + "\n"
-      }
-      full.to_array().length().to_string()
+    "contents:signature" => signature
+    "contents:size" => raw_message.to_array().length().to_string()
+    "trailers" => for_each_ref_format_trailers_atom(atom, raw_message)
+    _ if atom.has_prefix("trailers:") =>
+      for_each_ref_format_trailers_atom(atom, raw_message)
+    "contents:trailers" => {
+      let trailer_atom = "trailers"
+      for_each_ref_format_trailers_atom(trailer_atom, raw_message)
+    }
+    _ if atom.has_prefix("contents:trailers:") => {
+      let trailer_atom = "trailers" +
+        String::unsafe_substring(atom, start=17, end=atom.length())
+      for_each_ref_format_trailers_atom(trailer_atom, raw_message)
+    }
+    _ if atom.has_prefix("contents:") => {
+      let arg = String::unsafe_substring(atom, start=9, end=atom.length())
+      eprint_line("fatal: unrecognized %(contents) argument: " + arg)
+      @sys.exit(1)
+      ""
     }
     // Signature atoms — bit does not verify GPG signatures,
     // so return "N" (no signature) for grade and empty for others
@@ -1385,6 +1865,303 @@ fn for_each_ref_commit_atom(
     "signature:trustlevel" => ""
     _ => ""
   }
+}
+
+///|
+fn for_each_ref_strip_cr(s : String) -> String {
+  if s.has_suffix("\r") {
+    String::unsafe_substring(s, start=0, end=s.length() - 1)
+  } else {
+    s
+  }
+}
+
+///|
+async fn for_each_ref_validate_email_arg(
+  atom_name : String,
+  _full_atom : String,
+) -> String {
+  // This should not be reached — validation is now done upfront
+  // in for_each_ref_validate_atom. If we get here, just return empty.
+  ignore(atom_name)
+  ""
+}
+
+///|
+fn for_each_ref_parse_trailers(
+  message : String,
+) -> Array[(String, String, Bool)] {
+  // Find the last paragraph (trailer block) in the message
+  // A trailer line is "key: value" or a continuation line (starts with space/tab)
+  // Non-trailer lines in the block are kept with is_trailer=false
+  let lines : Array[String] = []
+  for line_view in message.split("\n") {
+    lines.push(line_view.to_string())
+  }
+  // Remove trailing empty lines
+  while lines.length() > 0 &&
+        for_each_ref_strip_cr(lines[lines.length() - 1]).length() == 0 {
+    ignore(lines.pop())
+  }
+  if lines.length() == 0 {
+    return []
+  }
+  // Find start of last paragraph (separated by blank line)
+  let mut para_start = lines.length()
+  for i = lines.length() - 1; i >= 0; i = i - 1 {
+    let line = for_each_ref_strip_cr(lines[i])
+    if line.length() == 0 {
+      break
+    }
+    para_start = i
+  }
+  // Parse trailer lines from last paragraph
+  let result : Array[(String, String, Bool)] = []
+  let mut i = para_start
+  while i < lines.length() {
+    let line = lines[i]
+    let stripped = for_each_ref_strip_cr(line)
+    // Check if this is a "key: value" line
+    match stripped.find(": ") {
+      Some(colon_pos) if colon_pos > 0 => {
+        let key = String::unsafe_substring(stripped, start=0, end=colon_pos)
+        let mut value = String::unsafe_substring(
+          stripped,
+          start=colon_pos + 2,
+          end=stripped.length(),
+        )
+        // Check for continuation lines
+        let mut j = i + 1
+        while j < lines.length() {
+          let next = lines[j]
+          let next_stripped = for_each_ref_strip_cr(next)
+          if next_stripped.length() > 0 &&
+            (next_stripped.has_prefix(" ") || next_stripped.has_prefix("\t")) {
+            value = value + "\n" + next_stripped
+            j = j + 1
+          } else {
+            break
+          }
+        }
+        result.push((key, value, true))
+        i = j
+      }
+      _ => {
+        // Non-trailer line (like "[ v2 updated patch description ]")
+        result.push((stripped, "", false))
+        i = i + 1
+      }
+    }
+  }
+  result
+}
+
+///|
+async fn for_each_ref_format_trailers_atom(
+  atom : String,
+  message : String,
+) -> String {
+  // Parse options from atom: "trailers" or "trailers:opt1,opt2,..."
+  let options_str = if atom == "trailers" {
+    ""
+  } else if atom.has_prefix("trailers:") {
+    String::unsafe_substring(atom, start=9, end=atom.length())
+  } else {
+    ""
+  }
+  // Parse options
+  let mut only = true // default: only=true (show only key:value trailers)
+  let mut only_set = false
+  let mut unfold = false
+  let mut valueonly = false
+  let keys : Array[String] = []
+  let mut separator : String? = None
+  let mut key_value_separator : String? = None
+  if options_str.length() > 0 {
+    // Parse comma-separated options, but key= values may contain commas in key=X,key=Y
+    let mut remaining = options_str
+    while remaining.length() > 0 {
+      let (opt, rest) = for_each_ref_split_trailer_opt(remaining)
+      if opt == "only" || opt == "only=yes" || opt == "only=true" {
+        only = true
+        only_set = true
+      } else if opt == "only=no" || opt == "only=false" {
+        only = false
+        only_set = true
+      } else if opt == "unfold" {
+        unfold = true
+      } else if opt == "valueonly" {
+        valueonly = true
+      } else if opt.has_prefix("key=") {
+        let key_val = String::unsafe_substring(opt, start=4, end=opt.length())
+        // Strip trailing colon if present
+        let key_clean = if key_val.has_suffix(":") {
+          String::unsafe_substring(key_val, start=0, end=key_val.length() - 1)
+        } else {
+          key_val
+        }
+        keys.push(key_clean)
+      } else if opt == "key" {
+        eprint_line("fatal: expected %(trailers:key=<value>)")
+        @sys.exit(1)
+      } else if opt.has_prefix("separator=") {
+        let sep_raw = String::unsafe_substring(opt, start=10, end=opt.length())
+        separator = Some(for_each_ref_decode_hex_escapes(sep_raw))
+      } else if opt.has_prefix("key_value_separator=") {
+        let sep_raw = String::unsafe_substring(opt, start=20, end=opt.length())
+        key_value_separator = Some(for_each_ref_decode_hex_escapes(sep_raw))
+      } else {
+        eprint_line("fatal: unknown %(trailers) argument: " + remaining)
+        @sys.exit(1)
+      }
+      remaining = rest
+    }
+  }
+  // Default: if no only= was set and no key filter, show all trailers (including non-trailer lines)
+  if not(only_set) && keys.length() == 0 {
+    only = false
+  }
+  let trailers = for_each_ref_parse_trailers(message)
+  // Filter and format
+  let output_lines : Array[String] = []
+  for trailer in trailers {
+    let (key, value, is_trailer) = trailer
+    // Apply key filter
+    if keys.length() > 0 {
+      if is_trailer {
+        let mut key_matched = false
+        for k in keys {
+          if key.to_lower() == k.to_lower() {
+            key_matched = true
+            break
+          }
+        }
+        if not(key_matched) {
+          continue
+        }
+        // Non-trailer lines: only include if only=no
+      } else if only {
+        continue
+      }
+    } else if only && not(is_trailer) {
+      continue
+    }
+    // Format the line
+    let line = if is_trailer {
+      let val = if unfold {
+        // Unfold continuation lines: replace \n followed by whitespace with single space
+        for_each_ref_unfold_trailer_value(value)
+      } else {
+        value
+      }
+      if valueonly {
+        val
+      } else {
+        let kvs = match key_value_separator {
+          Some(s) => s
+          None => ": "
+        }
+        key + kvs + val
+      }
+    } else {
+      key // non-trailer line, key holds the full line
+    }
+    output_lines.push(line)
+  }
+  // Join with separator
+  let sep = match separator {
+    Some(s) => s
+    None => "\n"
+  }
+  let result = output_lines.join(sep)
+  // Add trailing newline if using default separator and there are results
+  if separator is None && result.length() > 0 {
+    result + "\n"
+  } else {
+    result
+  }
+}
+
+///|
+fn for_each_ref_split_trailer_opt(s : String) -> (String, String) {
+  // Split on first comma that is not inside a key= value
+  // Special handling: "key=X" consumes up to next recognized option
+  let chars = s.to_array()
+  let len = chars.length()
+  let mut i = 0
+  while i < len {
+    if chars[i] == ',' {
+      return (
+        String::from_array(FixedArray::makei(i, fn(j) { chars[j] })),
+        String::from_array(
+          FixedArray::makei(len - i - 1, fn(j) { chars[i + 1 + j] }),
+        ),
+      )
+    }
+    i = i + 1
+  }
+  (s, "")
+}
+
+///|
+fn for_each_ref_decode_hex_escapes(s : String) -> String {
+  // Decode %xNN hex escapes
+  let chars = s.to_array()
+  let len = chars.length()
+  let buf = StringBuilder::new()
+  let mut i = 0
+  while i < len {
+    if i + 3 < len && chars[i] == '%' && chars[i + 1] == 'x' {
+      let hi = for_each_ref_hex_digit(chars[i + 2])
+      let lo = for_each_ref_hex_digit(chars[i + 3])
+      if hi >= 0 && lo >= 0 {
+        buf.write_char(Int::unsafe_to_char(hi * 16 + lo))
+        i = i + 4
+        continue
+      }
+    }
+    buf.write_char(chars[i])
+    i = i + 1
+  }
+  buf.to_string()
+}
+
+///|
+fn for_each_ref_hex_digit(c : Char) -> Int {
+  if c >= '0' && c <= '9' {
+    c.to_int() - '0'.to_int()
+  } else if c >= 'a' && c <= 'f' {
+    c.to_int() - 'a'.to_int() + 10
+  } else if c >= 'A' && c <= 'F' {
+    c.to_int() - 'A'.to_int() + 10
+  } else {
+    -1
+  }
+}
+
+///|
+fn for_each_ref_unfold_trailer_value(value : String) -> String {
+  // Replace newline+whitespace with single space
+  let buf = StringBuilder::new()
+  let chars = value.to_array()
+  let len = chars.length()
+  let mut i = 0
+  while i < len {
+    if chars[i] == '\n' &&
+      i + 1 < len &&
+      (chars[i + 1] == ' ' || chars[i + 1] == '\t') {
+      buf.write_char(' ')
+      // Skip the newline and leading whitespace
+      i = i + 1
+      while i < len && (chars[i] == ' ' || chars[i] == '\t') {
+        i = i + 1
+      }
+    } else {
+      buf.write_char(chars[i])
+      i = i + 1
+    }
+  }
+  buf.to_string()
 }
 
 ///|
