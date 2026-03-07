@@ -305,14 +305,19 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
       continue
     }
     match arg {
-      "--git-dir" =>
+      "--git-dir" => {
+        rev_parse_require_repo(in_repo)
         match path_format {
           Some("absolute") => print_line(abs_git_dir)
           Some("relative") =>
             print_line(rev_parse_make_relative(abs_git_dir, cwd_abs))
           _ => print_line(rev_parse_display_git_dir(cwd_abs, root, git_dir))
         }
-      "--absolute-git-dir" => print_line(abs_git_dir)
+      }
+      "--absolute-git-dir" => {
+        rev_parse_require_repo(in_repo)
+        print_line(abs_git_dir)
+      }
       "--git-common-dir" =>
         // For now, git-common-dir == git-dir (no worktree support)
         // Default: relative path from cwd (unlike --git-dir which returns absolute)
