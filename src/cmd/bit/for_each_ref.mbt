@@ -34,6 +34,7 @@ async fn handle_for_each_ref(args : Array[String]) -> Unit raise Error {
       }
       _ if arg.has_prefix("--format=") =>
         format = String::unsafe_substring(arg, start=9, end=arg.length())
+      "--no-sort" => sort_keys.clear()
       _ if arg.has_prefix("--sort=") =>
         sort_keys.push(String::unsafe_substring(arg, start=7, end=arg.length()))
       _ if arg.has_prefix("--count=") => {
@@ -106,7 +107,7 @@ async fn handle_for_each_ref(args : Array[String]) -> Unit raise Error {
     if patterns.length() > 0 {
       let mut matched = false
       for pattern in patterns {
-        if refname.has_prefix(pattern) || refname == pattern {
+        if for_each_ref_match_pattern(refname, pattern) {
           matched = true
           break
         }
@@ -119,7 +120,7 @@ async fn handle_for_each_ref(args : Array[String]) -> Unit raise Error {
     if excludes.length() > 0 {
       let mut excluded = false
       for excl in excludes {
-        if refname.has_prefix(excl) {
+        if for_each_ref_match_pattern(refname, excl) {
           excluded = true
           break
         }
@@ -144,24 +145,30 @@ async fn handle_for_each_ref(args : Array[String]) -> Unit raise Error {
     }
     filtered.push((refname, id))
   }
-  // Sort
+  // Sort — last --sort key is primary, first is least significant
+  // Use composite comparator: try keys in reverse order (primary first)
   if sort_keys.length() > 0 {
-    for key in sort_keys {
-      let descending = key.has_prefix("-")
-      let sort_field = if descending {
-        String::unsafe_substring(key, start=1, end=key.length())
-      } else {
-        key
-      }
-      filtered.sort_by(fn(a, b) {
-        let cmp = for_each_ref_compare(fs, git_dir, a, b, sort_field)
-        if descending {
-          -cmp
+    filtered.sort_by(fn(a, b) {
+      // Iterate from last key (most significant) to first
+      let mut idx = sort_keys.length() - 1
+      while idx >= 0 {
+        let key = sort_keys[idx]
+        let descending = key.has_prefix("-")
+        let sort_field = if descending {
+          String::unsafe_substring(key, start=1, end=key.length())
         } else {
-          cmp
+          key
         }
-      })
-    }
+        let cmp = for_each_ref_compare(fs, git_dir, a, b, sort_field)
+        let adjusted = if descending { -cmp } else { cmp }
+        if adjusted != 0 {
+          return adjusted
+        }
+        idx -= 1
+      }
+      // All keys equal — fall back on refname
+      lexicographic_compare(a.0, b.0)
+    })
   } else {
     // Default sort by refname (lexicographic, not shortlex)
     filtered.sort_by(fn(a, b) { lexicographic_compare(a.0, b.0) })
@@ -205,7 +212,95 @@ fn for_each_ref_compare(
       let ts_b = for_each_ref_get_timestamp(fs, git_dir, b.1, field)
       ts_a.compare(ts_b)
     }
-    _ => lexicographic_compare(a.0, b.0)
+    _ => {
+      // Generic field comparison: extract field value for each ref and compare
+      let val_a = for_each_ref_get_sort_value(fs, git_dir, a.1, field)
+      let val_b = for_each_ref_get_sort_value(fs, git_dir, b.1, field)
+      lexicographic_compare(val_a, val_b)
+    }
+  }
+}
+
+///|
+fn for_each_ref_get_sort_value(
+  fs : OsFs,
+  git_dir : String,
+  id : @bitcore.ObjectId,
+  field : String,
+) -> String {
+  let db = @bitlib.ObjectDb::load(fs, git_dir) catch { _ => return "" }
+  let obj = db.get(fs, id) catch { _ => return "" }
+  guard obj is Some(o) else { return "" }
+  let text = decode_bytes(o.data)
+  // Determine which ident header to use
+  let header = if field.has_prefix("author") {
+    "author "
+  } else if field.has_prefix("committer") {
+    "committer "
+  } else if field.has_prefix("tagger") {
+    "tagger "
+  } else {
+    return ""
+  }
+  for line_view in text.split("\n") {
+    let line = line_view.to_string()
+    if line.length() == 0 {
+      break
+    }
+    if line.has_prefix(header) {
+      let ident = String::unsafe_substring(
+        line,
+        start=header.length(),
+        end=line.length(),
+      )
+      // Extract email part: <...>
+      if field.has_suffix("email") {
+        match ident.find("<") {
+          Some(es) =>
+            match ident.find(">") {
+              Some(ee) if ee > es =>
+                return String::unsafe_substring(ident, start=es, end=ee + 1)
+              _ => ()
+            }
+          _ => ()
+        }
+      }
+      // Extract name part: everything before <
+      if field.has_suffix("name") {
+        match ident.find("<") {
+          Some(es) if es > 0 =>
+            return String::unsafe_substring(ident, start=0, end=es)
+              .trim_end(chars=" ")
+              .to_string()
+          _ => ()
+        }
+      }
+      return ident
+    }
+  }
+  ""
+}
+
+///|
+fn for_each_ref_match_pattern(refname : String, pattern : String) -> Bool {
+  // Simple glob matching for ref patterns
+  match pattern.find("*") {
+    Some(star_pos) => {
+      let prefix = String::unsafe_substring(pattern, start=0, end=star_pos)
+      let suffix = String::unsafe_substring(
+        pattern,
+        start=star_pos + 1,
+        end=pattern.length(),
+      )
+      if not(refname.has_prefix(prefix)) {
+        return false
+      }
+      if suffix.length() == 0 {
+        return true
+      }
+      refname.has_suffix(suffix)
+    }
+    None => refname.has_prefix(pattern) || refname == pattern
   }
 }
 
