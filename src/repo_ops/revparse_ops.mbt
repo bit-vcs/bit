@@ -26,6 +26,13 @@ pub fn rev_parse(
       }
     None => ()
   }
+  // ^{} — peel tags to the underlying object (any type)
+  if spec.has_suffix("^{}") && spec.length() > 3 {
+    let base_spec = substring_revparse(spec, 0, spec.length() - 3)
+    let base = rev_parse(fs, git_dir, base_spec)
+    guard base is Some(base_id) else { return None }
+    return peel_tags(fs, git_dir, base_id)
+  }
   match parse_peel_commit_spec(spec) {
     Some(base_spec) => {
       let base = rev_parse(fs, git_dir, base_spec)
@@ -262,6 +269,29 @@ fn parse_revparse_int64(s : String) -> Int64 {
     value = value * 10L + digit.to_int64()
   }
   value
+}
+
+///|
+fn peel_tags(
+  fs : &@types.RepoFileSystem,
+  git_dir : String,
+  id : @object.ObjectId,
+) -> @object.ObjectId? raise @object.GitError {
+  let db = @bitlib.ObjectDb::load(fs, git_dir)
+  let mut current = id
+  for _ in 0..<64 {
+    let obj = db.get(fs, current)
+    guard obj is Some(o) else { return Some(current) }
+    match o.obj_type {
+      @object.ObjectType::Tag =>
+        match parse_tag_object_target(o.data) {
+          Some(next) => current = next
+          None => return Some(current)
+        }
+      _ => return Some(current)
+    }
+  }
+  Some(current)
 }
 
 ///|
