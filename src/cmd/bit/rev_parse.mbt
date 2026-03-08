@@ -3725,12 +3725,12 @@ async fn rev_parse_handle_range_op(
         }
         return true
       }
-      // A..B = ^A B
+      // A..B = B ^A (git outputs right side first, then negated left)
       if symbolic_full_name {
         let left_name = resolve_symbolic_full_name(fs, git_dir, left_spec)
         let right_name = resolve_symbolic_full_name(fs, git_dir, right_spec)
-        print_line("^\{left_name.unwrap_or(left_spec)}")
         print_line(right_name.unwrap_or(right_spec))
+        print_line("^\{left_name.unwrap_or(left_spec)}")
       } else {
         let lhex = rev_parse_resolve_output_oid_hex(
           fs, git_dir, lid, output_object_format,
@@ -3740,12 +3740,12 @@ async fn rev_parse_handle_range_op(
         )
         match short_length {
           Some(length) => {
-            print_line("^" + shorten_oid_hex(lhex, length))
             print_line(shorten_oid_hex(rhex, length))
+            print_line("^" + shorten_oid_hex(lhex, length))
           }
           None => {
-            print_line("^" + lhex)
             print_line(rhex)
+            print_line("^" + lhex)
           }
         }
       }
@@ -4043,10 +4043,10 @@ async fn rev_parse_handle_parent_suffix(
       return true
     }
     let parent_id = parents[n - 1]
-    // ^-N = base^N..base = base ^base^N
+    // ^-N = base^N..base = base ^base^N (git outputs commit first, then ^parent)
     if symbolic_full_name {
-      print_line("^\{base_spec}^\{n}")
       print_line(base_spec)
+      print_line("^\{base_spec}^\{n}")
     } else {
       let phex = rev_parse_resolve_output_oid_hex(
         fs, git_dir, parent_id, output_object_format,
@@ -4056,12 +4056,12 @@ async fn rev_parse_handle_parent_suffix(
       )
       match short_length {
         Some(length) => {
-          print_line("^" + shorten_oid_hex(phex, length))
           print_line(shorten_oid_hex(hex, length))
+          print_line("^" + shorten_oid_hex(phex, length))
         }
         None => {
-          print_line("^" + phex)
           print_line(hex)
+          print_line("^" + phex)
         }
       }
     }
