@@ -14,6 +14,14 @@ tools/moon
 tools/real-git-path
 
 # Test artifacts
+/batch_check_output
+/batch_output
+/expect
+/expected-*
+/stdin
+/stdin0
+/compat-results-shard-*/
+/test-timing-shard-*/
 express/
 express-git/
 express-moongit/
