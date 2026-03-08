@@ -4137,8 +4137,13 @@ async fn for_each_ref_commit_atom(
       if n <= 0 {
         ""
       } else {
-        // Get first N lines of the commit/tag message
-        let msg = if raw_message.length() > 0 { raw_message } else { subject }
+        // Get first N lines of contents excluding signature
+        // (subject + blank line + body, no signature)
+        let msg = if contents_body.length() > 0 {
+          subject + "\n\n" + contents_body
+        } else {
+          subject
+        }
         let lines : Array[String] = []
         for line_view in msg.split("\n") {
           if lines.length() >= n {

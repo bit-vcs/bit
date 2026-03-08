@@ -232,7 +232,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
     let id = if effective_spec.find("@{") is Some(_) {
       match resolve_upstream_push_oid(fs, git_dir, effective_spec, quiet) {
         Some(oid) => Some(oid)
-        None => resolve_reflog_selector(fs, git_dir, effective_spec)
+        None => resolve_reflog_selector(fs, git_dir, effective_spec, quiet~)
       }
     } else {
       @bitrepo.rev_parse(fs, git_dir, effective_spec)
@@ -542,7 +542,8 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
           let id = if effective_arg.find("@{") is Some(_) {
             match resolve_upstream_push_oid(fs, git_dir, effective_arg, quiet) {
               Some(oid) => Some(oid)
-              None => resolve_reflog_selector(fs, git_dir, effective_arg)
+              None =>
+                resolve_reflog_selector(fs, git_dir, effective_arg, quiet~)
             }
           } else {
             @bitrepo.rev_parse(fs, git_dir, effective_arg)
@@ -692,7 +693,8 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
             match resolve_upstream_push_oid(fs, git_dir, effective_arg, quiet) {
               Some(oid) => Some(oid)
               None =>
-                match resolve_reflog_selector(fs, git_dir, effective_arg) {
+                match
+                  resolve_reflog_selector(fs, git_dir, effective_arg, quiet~) {
                   Some(oid) => Some(oid)
                   None =>
                     // Fallback to rev_parse for cases like HEAD:@{upstream} (tree path)
@@ -923,8 +925,12 @@ fn parse_reflog_selector(spec : String) -> (String, Int)? {
         number = number * 10 + (c.to_int() - '0'.to_int())
       }
       let raw_ref = String::unsafe_substring(spec, start=0, end=idx)
-      let refname = if raw_ref.length() == 0 || raw_ref == "HEAD" {
+      let refname = if raw_ref == "HEAD" {
         "HEAD"
+      } else if raw_ref.length() == 0 {
+        // Bare @{N} — use empty string as marker; resolve_reflog_selector
+        // will map this to the current branch (not HEAD)
+        ""
       } else if raw_ref.has_prefix("refs/") {
         raw_ref
       } else {
@@ -961,8 +967,12 @@ fn parse_reflog_date_selector(spec : String) -> (String, String)? {
         return None
       }
       let raw_ref = String::unsafe_substring(spec, start=0, end=idx)
-      let refname = if raw_ref.length() == 0 || raw_ref == "HEAD" {
+      let refname = if raw_ref == "HEAD" {
         "HEAD"
+      } else if raw_ref.length() == 0 {
+        // Bare @{date} — use empty string as marker; resolved later
+        // to current branch
+        ""
       } else if raw_ref.has_prefix("refs/") {
         raw_ref
       } else {
@@ -1209,6 +1219,7 @@ async fn resolve_reflog_by_date(
   git_dir : String,
   refname : String,
   at_time : Int64,
+  quiet? : Bool = false,
 ) -> @bitcore.ObjectId? raise Error {
   let entries = @bitrepo.read_reflog(fs, git_dir, refname)
   let len = entries.length()
@@ -1233,7 +1244,7 @@ async fn resolve_reflog_by_date(
       match prev_ooid {
         Some(po) => {
           result_oid = Some(entry.new_id)
-          if po != entry.new_id {
+          if po != entry.new_id && not(quiet) {
             eprint_line(
               "warning: log for ref \{refname} has gap after \{cutoff_date}",
             )
@@ -1245,17 +1256,19 @@ async fn resolve_reflog_by_date(
           } else {
             let current = @bitrepo.rev_parse(fs, git_dir, refname)
             result_oid = current
-            match current {
-              Some(cur_oid) =>
-                if cur_oid != entry.new_id {
+            if not(quiet) {
+              match current {
+                Some(cur_oid) =>
+                  if cur_oid != entry.new_id {
+                    eprint_line(
+                      "warning: log for ref \{refname} unexpectedly ended on \{cutoff_date}",
+                    )
+                  }
+                None =>
                   eprint_line(
                     "warning: log for ref \{refname} unexpectedly ended on \{cutoff_date}",
                   )
-                }
-              None =>
-                eprint_line(
-                  "warning: log for ref \{refname} unexpectedly ended on \{cutoff_date}",
-                )
+              }
             }
           }
       }
@@ -1275,9 +1288,11 @@ async fn resolve_reflog_by_date(
   } else {
     oldest.old_id
   }
-  eprint_line(
-    "warning: log for '\{display_ref}' only goes back to \{oldest_date}",
-  )
+  if not(quiet) {
+    eprint_line(
+      "warning: log for '\{display_ref}' only goes back to \{oldest_date}",
+    )
+  }
   Some(oid)
 }
 
@@ -1286,26 +1301,59 @@ async fn resolve_reflog_selector(
   fs : &@bitcore.RepoFileSystem,
   git_dir : String,
   spec : String,
+  quiet? : Bool = false,
 ) -> @bitcore.ObjectId? raise Error {
   match parse_reflog_selector(spec) {
     Some(parsed) => {
-      let refname = parsed.0
+      let mut refname = parsed.0
       let index = parsed.1
+      // Bare @{N}: resolve "" to current branch refname
+      if refname.length() == 0 {
+        match @bitlib.read_head_ref(fs, git_dir) {
+          @bitlib.HeadRef::Branch(name) => refname = "refs/heads/" + name
+          @bitlib.HeadRef::Detached(_) =>
+            // Detached HEAD: bare @{N} is nonsensical
+            return None
+        }
+      }
       let entries = @bitrepo.read_reflog(fs, git_dir, refname)
       let len = entries.length()
-      if index >= len {
-        return None
+      if index == 0 && len == 0 {
+        // @{0} with empty reflog: fall back to reading the ref directly
+        return @bitlib.resolve_ref(fs, git_dir, refname)
       }
-      Some(entries[len - 1 - index].new_id)
+      if index < len {
+        return Some(entries[len - 1 - index].new_id)
+      }
+      if index == len && len > 0 {
+        // @{N} where N == len: return old_id of the oldest entry
+        // But if old_id is zero (ref was created at that point), there's
+        // no valid state before that
+        let old_id = entries[0].old_id
+        if old_id != @bitcore.ObjectId::zero() {
+          return Some(old_id)
+        }
+      }
+      None
     }
     None =>
       match parse_reflog_date_selector(spec) {
-        Some((refname, date_str)) =>
+        Some(parsed) => {
+          let mut refname = parsed.0
+          let date_str = parsed.1
+          // Bare @{date}: resolve "" to current branch refname
+          if refname.length() == 0 {
+            match @bitlib.read_head_ref(fs, git_dir) {
+              @bitlib.HeadRef::Branch(name) => refname = "refs/heads/" + name
+              @bitlib.HeadRef::Detached(_) => refname = "HEAD"
+            }
+          }
           match parse_reflog_date(date_str) {
             Some(at_time) =>
-              resolve_reflog_by_date(fs, git_dir, refname, at_time)
+              resolve_reflog_by_date(fs, git_dir, refname, at_time, quiet~)
             None => None
           }
+        }
         None => None
       }
   }
