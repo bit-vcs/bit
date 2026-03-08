@@ -1172,8 +1172,10 @@ fn parse_approxidate_relative(s : String) -> Int64? {
   if lower == "yesterday" {
     return Some(now - 86400L)
   }
+  // Split by spaces and dots (git treats both as separators)
+  let normalized = lower.replace_all(old=".", new=" ")
   let parts : Array[String] = []
-  for p in lower.split(" ") {
+  for p in normalized.split(" ") {
     let ps = p.to_string()
     if ps.length() > 0 {
       parts.push(ps)
