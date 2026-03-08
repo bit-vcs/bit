@@ -103,7 +103,11 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
   let mut refresh = false
   let mut dry_run = false
   let mut ignore_missing = false
+  let mut ignore_errors = false
+  let mut ignore_errors_explicit = false
+  let mut verbose = false
   let mut interactive = false
+  let mut chmod_mode : String? = None // "+x" or "-x"
   let mut end_of_options = false
   let paths : Array[String] = []
   for raw_arg in args {
@@ -118,13 +122,44 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
       "--refresh" if not(end_of_options) => refresh = true
       "-n" | "--dry-run" if not(end_of_options) => dry_run = true
       "--ignore-missing" if not(end_of_options) => ignore_missing = true
+      "--ignore-errors" if not(end_of_options) => {
+        ignore_errors = true
+        ignore_errors_explicit = true
+      }
+      "--no-ignore-errors" if not(end_of_options) => {
+        ignore_errors = false
+        ignore_errors_explicit = true
+      }
+      "-v" | "--verbose" if not(end_of_options) => verbose = true
       "--interactive" if not(end_of_options) => interactive = true
+      "--chmod=+x" if not(end_of_options) => chmod_mode = Some("+x")
+      "--chmod=-x" if not(end_of_options) => chmod_mode = Some("-x")
       _ if end_of_options || not(arg.has_prefix("-")) => paths.push(arg)
       _ if arg.has_prefix("-") => warn_unimplemented_arg("add", arg)
       _ => ()
     }
   }
+  // Read add.ignore-errors config (only if not explicitly set via CLI flag)
+  if not(ignore_errors_explicit) {
+    let rfs2 : &@bitcore.RepoFileSystem = fs
+    let config_path2 = git_dir + "/config"
+    if fs.is_file(config_path2) {
+      let ie_val = @bitlib.read_config_bool(
+        rfs2,
+        config_path2,
+        "add",
+        "ignore-errors",
+      ).unwrap_or(false)
+      if ie_val {
+        ignore_errors = true
+      }
+    }
+  }
   if dry_run {
+    if chmod_mode is Some(cm) {
+      handle_add_chmod_dry_run(fs, root, git_dir, paths, cm)
+      return
+    }
     handle_add_dry_run(fs, root, paths, force~, ignore_missing~, interactive~)
     return
   }
@@ -133,6 +168,11 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
   }
   if refresh {
     add_refresh_index_entries(fs, root, paths)
+    return
+  }
+  // Handle --chmod=[+-]x
+  if chmod_mode is Some(mode) {
+    handle_add_chmod(fs, root, git_dir, paths, mode, verbose)
     return
   }
   if add_all {
@@ -188,6 +228,7 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
     return
   }
   let stage_paths = expand_add_stage_paths(fs, root, paths, force)
+  let mut had_error = false
   if stage_paths.length() > 0 {
     let pre_code = run_add_hook(fs, root, git_dir, "pre-add")
     if pre_code != 0 {
@@ -196,19 +237,54 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
     let filter_cmd = @bitlib.FilterCmd::{
       run: @bitlibnative.run_filter_command,
     }
-    let crlf_warnings : Array[String] = []
-    @bitlib.add_paths_async(
-      fs,
-      fs,
-      root,
-      stage_paths,
-      run_filter_cmd=filter_cmd,
-      warnings=crlf_warnings,
-    )
-    for msg in crlf_warnings {
-      eprint_line(msg)
+    if ignore_errors {
+      // When --ignore-errors or add.ignore-errors is set, add files one by one
+      // so that failures on individual files don't prevent other files from being added
+      let succeeded : Array[String] = []
+      for p in stage_paths {
+        let crlf_warnings : Array[String] = []
+        let single_result : Result[Unit, Error] = try? @bitlib.add_paths_async(
+          fs,
+          fs,
+          root,
+          [p],
+          run_filter_cmd=filter_cmd,
+          warnings=crlf_warnings,
+        )
+        match single_result {
+          Ok(_) => {
+            succeeded.push(p)
+            if verbose {
+              eprint_line("add '\{p}'")
+            }
+          }
+          Err(_) => had_error = true
+        }
+        for msg in crlf_warnings {
+          eprint_line(msg)
+        }
+      }
+      stage_submodule_gitlinks(fs, root, succeeded)
+    } else {
+      let crlf_warnings : Array[String] = []
+      @bitlib.add_paths_async(
+        fs,
+        fs,
+        root,
+        stage_paths,
+        run_filter_cmd=filter_cmd,
+        warnings=crlf_warnings,
+      )
+      for msg in crlf_warnings {
+        eprint_line(msg)
+      }
+      if verbose {
+        for p in stage_paths {
+          eprint_line("add '\{p}'")
+        }
+      }
+      stage_submodule_gitlinks(fs, root, stage_paths)
     }
-    stage_submodule_gitlinks(fs, root, stage_paths)
   }
   if not(force) && add_has_explicit_ignored_path(fs, root, paths) {
     eprint_line(
@@ -223,6 +299,10 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
       eprint_line("fatal: pathspec '\{spec}' did not match any files")
       @sys.exit(1)
     }
+  }
+  if had_error {
+    eprint_line("fatal: adding files failed")
+    @sys.exit(1)
   }
   if stage_paths.length() > 0 {
     let post_code = run_add_hook(fs, root, git_dir, "post-add")
@@ -777,6 +857,166 @@ fn add_has_ignored_under(
     }
   }
   false
+}
+
+///|
+/// Handle git add --chmod=[+-]x: update the mode of index entries
+async fn handle_add_chmod(
+  fs : OsFs,
+  root : String,
+  git_dir : String,
+  paths : Array[String],
+  mode : String,
+  verbose : Bool,
+) -> Unit raise Error {
+  let target_mode = if mode == "+x" { 0o100755 } else { 0o100644 }
+  let rfs : &@bitcore.RepoFileSystem = fs
+  // First, add the files normally (stages new files)
+  let stage_paths = expand_add_stage_paths(rfs, root, paths, false)
+  if stage_paths.length() > 0 {
+    let filter_cmd = @bitlib.FilterCmd::{
+      run: @bitlibnative.run_filter_command,
+    }
+    let crlf_warnings : Array[String] = []
+    @bitlib.add_paths_async(
+      fs,
+      fs,
+      root,
+      stage_paths,
+      run_filter_cmd=filter_cmd,
+      warnings=crlf_warnings,
+    )
+    for msg in crlf_warnings {
+      eprint_line(msg)
+    }
+  }
+  // Now read index and update modes
+  let entries = @bitlib.read_index_entries(rfs, git_dir)
+  let matched_paths = add_resolve_chmod_paths(rfs, root, paths, entries)
+  let mut had_error = false
+  let updated : Array[@bitlib.IndexEntry] = []
+  for entry in entries {
+    if matched_paths.contains(entry.path) {
+      // Check if it's a regular file (not symlink/gitlink)
+      if add_is_regular_file_mode(entry.mode) {
+        updated.push(
+          @bitlib.IndexEntry::new(
+            entry.path,
+            entry.id,
+            target_mode,
+            entry.size,
+            mtime_sec=entry.mtime_sec,
+            mtime_nsec=entry.mtime_nsec,
+          ),
+        )
+        if verbose {
+          eprint_line("add '\{entry.path}'")
+        }
+      } else {
+        // Cannot chmod non-regular files (symlinks, submodules)
+        eprint_line("cannot chmod \{mode} '\{entry.path}'")
+        had_error = true
+        updated.push(entry)
+      }
+    } else {
+      updated.push(entry)
+    }
+  }
+  @bitlib.write_index_entries(fs, git_dir, updated)
+  if had_error {
+    @sys.exit(1)
+  }
+}
+
+///|
+/// Handle git add --chmod=[+-]x --dry-run
+async fn handle_add_chmod_dry_run(
+  fs : OsFs,
+  root : String,
+  git_dir : String,
+  paths : Array[String],
+  mode : String,
+) -> Unit raise Error {
+  let rfs : &@bitcore.RepoFileSystem = fs
+  let entries = @bitlib.read_index_entries(rfs, git_dir)
+  let stage_paths = expand_add_stage_paths(rfs, root, paths, false)
+  let matched_paths = add_resolve_chmod_paths(rfs, root, paths, entries)
+  let mut had_error = false
+  for p in stage_paths {
+    print_line("add '\{p}'")
+  }
+  // Check for unmatched pathspecs
+  for raw_path in paths {
+    let path = add_normalize_input_path(root, raw_path)
+    if path == "." || path.length() == 0 {
+      continue
+    }
+    let in_index = matched_paths.contains(path)
+    let in_stage = stage_paths.iter().any(fn(p) { p == path })
+    let abs = root + "/" + path
+    let is_dir_match = if rfs.is_dir(abs) {
+      entries.iter().any(fn(e) { e.path.has_prefix(path + "/") }) ||
+        stage_paths.iter().any(fn(p) { p.has_prefix(path + "/") })
+    } else {
+      false
+    }
+    if not(in_index) && not(in_stage) && not(is_dir_match) {
+      eprint_line("fatal: pathspec '\{path}' did not match any files")
+      @sys.exit(128)
+    }
+  }
+  for entry in entries {
+    if matched_paths.contains(entry.path) {
+      if not(add_is_regular_file_mode(entry.mode)) {
+        eprint_line("cannot chmod \{mode} '\{entry.path}'")
+        had_error = true
+      }
+    }
+  }
+  if had_error {
+    @sys.exit(1)
+  }
+}
+
+///|
+/// Resolve paths for chmod: expand "." and directory paths to matching index entries
+fn add_resolve_chmod_paths(
+  fs : &@bitcore.RepoFileSystem,
+  root : String,
+  paths : Array[String],
+  entries : Array[@bitlib.IndexEntry],
+) -> Map[String, Bool] {
+  let result : Map[String, Bool] = {}
+  for raw_path in paths {
+    let path = add_normalize_input_path(root, raw_path)
+    if path == "." || path.length() == 0 {
+      // Match all entries
+      for entry in entries {
+        result[entry.path] = true
+      }
+    } else {
+      let abs = root + "/" + path
+      if fs.is_dir(abs) {
+        let prefix = path + "/"
+        for entry in entries {
+          if entry.path.has_prefix(prefix) || entry.path == path {
+            result[entry.path] = true
+          }
+        }
+      } else {
+        // Only add to result if the path exists in the index
+        if entries.iter().any(fn(e) { e.path == path }) {
+          result[path] = true
+        }
+      }
+    }
+  }
+  result
+}
+
+///|
+fn add_is_regular_file_mode(mode : Int) -> Bool {
+  mode == 0o100644 || mode == 0o100755
 }
 
 ///|
