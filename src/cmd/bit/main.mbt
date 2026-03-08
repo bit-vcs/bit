@@ -974,7 +974,7 @@ fn command_handles_builtin_help(cmd : String) -> Bool {
   for
     name in [
       "receive-pack", "upload-pack", "pack-objects", "index-pack", "scalar", "branch",
-      "merge", "reflog",
+      "merge", "reflog", "rev-parse",
     ] {
     if cmd == name {
       return true

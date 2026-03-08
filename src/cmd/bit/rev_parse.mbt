@@ -21,6 +21,16 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
     }
     return
   }
+  // Handle --parseopt before any repo checks (it doesn't need a repo)
+  for i = 0; i < args.length(); i = i + 1 {
+    if args[i] == "--parseopt" {
+      handle_parseopt(args)
+      return
+    }
+    if args[i] == "--" {
+      break
+    }
+  }
   let root = get_work_root()
   let fs = OsFs::new()
   let rfs : &@bitcore.RepoFileSystem = fs
@@ -61,6 +71,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
   let mut default_rev : String? = None
   let mut symbolic_full_name = false
   let mut path_format : String? = None // "absolute" or "relative"
+  let mut prefix : String? = None // --prefix <dir>
   let mut output_object_format : String? = None
   let output_object_format_arg_indices : Map[Int, Bool] = {}
   let mut arg_index = 0
@@ -75,6 +86,15 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
           default_rev = Some(args[arg_index + 1])
           arg_index += 2
           continue
+        }
+      "--prefix" =>
+        if arg_index + 1 < args.length() {
+          prefix = Some(args[arg_index + 1])
+          arg_index += 2
+          continue
+        } else {
+          eprint_line("fatal: --prefix requires an argument")
+          @sys.exit(128)
         }
       "--show-ref-format" => show_ref_format = true
       "--show-object-format" => show_object_format = true
@@ -157,7 +177,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
             vi += 1
             continue
           }
-          "--output-object-format" | "--default" => {
+          "--output-object-format" | "--default" | "--prefix" => {
             vi += 2
             continue
           }
@@ -199,7 +219,10 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
       None => spec
     }
     let id = if effective_spec.find("@{") is Some(_) {
-      resolve_reflog_selector(fs, git_dir, effective_spec)
+      match resolve_upstream_push_oid(fs, git_dir, effective_spec, quiet) {
+        Some(oid) => Some(oid)
+        None => resolve_reflog_selector(fs, git_dir, effective_spec)
+      }
     } else {
       @bitrepo.rev_parse(fs, git_dir, effective_spec)
     }
@@ -476,7 +499,11 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
             // Everything after "--" is a path
             while process_index < args.length() {
               if not(revs_only) {
-                print_line(args[process_index])
+                let file_arg = args[process_index]
+                match prefix {
+                  Some(p) => print_line(p + file_arg)
+                  None => print_line(file_arg)
+                }
               }
               process_index += 1
             }
@@ -491,7 +518,10 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
             None => rev_arg
           }
           let id = if effective_arg.find("@{") is Some(_) {
-            resolve_reflog_selector(fs, git_dir, effective_arg)
+            match resolve_upstream_push_oid(fs, git_dir, effective_arg, quiet) {
+              Some(oid) => Some(oid)
+              None => resolve_reflog_selector(fs, git_dir, effective_arg)
+            }
           } else {
             @bitrepo.rev_parse(fs, git_dir, effective_arg)
           }
@@ -533,6 +563,11 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
         process_index += 2
         continue
       }
+      "--prefix" => {
+        // Skip the next argument (the prefix value), already handled in pre-pass
+        process_index += 2
+        continue
+      }
       _ if arg.has_prefix("--since=") || arg.has_prefix("--after=") => {
         // Convert --since=DATE to --max-age=TIMESTAMP
         let date_str = if arg.has_prefix("--since=") {
@@ -552,6 +587,24 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
         let timestamp = parse_date_to_timestamp(date_str)
         print_line("--min-age=\{timestamp}")
       }
+      "--" => {
+        if not(revs_only) {
+          print_line("--")
+        }
+        process_index += 1
+        // Everything after "--" is a file path
+        while process_index < args.length() {
+          if not(revs_only) {
+            let file_arg = args[process_index]
+            match prefix {
+              Some(p) => print_line(p + file_arg)
+              None => print_line(file_arg)
+            }
+          }
+          process_index += 1
+        }
+        break
+      }
       "--bisect" =>
         // Output refs/bisect/bad-* (positive) and ^refs/bisect/good-* (negated)
         if symbolic_full_name {
@@ -562,13 +615,18 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
       _ if arg.has_prefix("-") => warn_unimplemented_arg("rev-parse", arg)
       _ => {
         // Expand @{-N} prefix to actual branch name
-        let effective_arg = match parse_at_minus_prefix(arg) {
+        let effective_arg0 = match parse_at_minus_prefix(arg) {
           Some((n, rest)) =>
             match resolve_at_minus(fs, git_dir, n) {
               Some(branch) => branch + rest
               None => arg
             }
           None => arg
+        }
+        // Apply --prefix to revision:./path and revision:../path
+        let effective_arg = match prefix {
+          Some(p) => rev_parse_apply_prefix_to_colon_path(effective_arg0, p)
+          None => effective_arg0
         }
         if abbrev_ref {
           let name = resolve_abbrev_ref_name(fs, git_dir, effective_arg)
@@ -582,7 +640,16 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
               }
           }
         } else if symbolic_full_name {
-          let name = resolve_symbolic_full_name(fs, git_dir, effective_arg)
+          // Try upstream/push resolution first for @{upstream}/@{push} specs
+          let name = if effective_arg.find("@{") is Some(_) {
+            match
+              resolve_upstream_push_symbolic(fs, git_dir, effective_arg, quiet) {
+              Some(value) => Some(value)
+              None => resolve_symbolic_full_name(fs, git_dir, effective_arg)
+            }
+          } else {
+            resolve_symbolic_full_name(fs, git_dir, effective_arg)
+          }
           match name {
             Some(value) => print_line(value)
             None =>
@@ -600,7 +667,16 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
             not(effective_arg.has_prefix(":/")) {
             resolve_index_path_oid(fs, git_dir, effective_arg)
           } else if effective_arg.find("@{") is Some(_) {
-            resolve_reflog_selector(fs, git_dir, effective_arg)
+            match resolve_upstream_push_oid(fs, git_dir, effective_arg, quiet) {
+              Some(oid) => Some(oid)
+              None =>
+                match resolve_reflog_selector(fs, git_dir, effective_arg) {
+                  Some(oid) => Some(oid)
+                  None =>
+                    // Fallback to rev_parse for cases like HEAD:@{upstream} (tree path)
+                    @bitrepo.rev_parse(fs, git_dir, effective_arg)
+                }
+            }
           } else {
             @bitrepo.rev_parse(fs, git_dir, effective_arg)
           }
@@ -616,7 +692,10 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
               }
             }
             None =>
-              if not(revs_only) {
+              if prefix is Some(p) {
+                // With --prefix, treat unresolved args as file paths
+                print_line(p + arg)
+              } else if not(revs_only) {
                 raise @bitcore.GitError::InvalidObject(
                   "unknown revision: " + arg,
                 )
@@ -630,6 +709,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
   ignore(show_ref_format)
   ignore(show_object_format)
   ignore(path_format)
+  ignore(prefix)
 }
 
 ///|
@@ -913,6 +993,105 @@ fn parse_at_minus_prefix(spec : String) -> (Int, String)? {
   }
   let rest = String::unsafe_substring(spec, start=i + 1, end=spec.length())
   Some((n, rest))
+}
+
+///|
+/// Try to resolve a @{upstream}/@{u}/@{push}/@{p} spec to a ref name.
+/// Returns:
+///   Some(Ok(ref_name_or_with_rest)) — resolved successfully
+///   Some(Err(msg))                  — spec IS upstream/push but resolution failed
+///   None                            — spec is NOT upstream/push syntax
+fn try_resolve_upstream_push_ref(
+  fs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  spec : String,
+) -> Result[String, String]? {
+  match @bitrepo.parse_upstream_push_spec(spec) {
+    None => None
+    Some((branch, kind, rest)) => {
+      let ref_result : Result[String, String] = Ok(
+        if kind == "upstream" {
+          @bitrepo.resolve_upstream_ref(fs, git_dir, branch)
+        } else {
+          @bitrepo.resolve_push_ref(fs, git_dir, branch)
+        },
+      ) catch {
+        @bitcore.GitError::InvalidObject(msg) => Err(msg)
+        e => Err(e.to_string())
+      }
+      match ref_result {
+        Ok(ref_name) =>
+          if rest.length() > 0 {
+            Some(Ok(ref_name + rest))
+          } else {
+            Some(Ok(ref_name))
+          }
+        Err(msg) => Some(Err(msg))
+      }
+    }
+  }
+}
+
+///|
+/// Resolve @{upstream}/@{push} spec to a symbolic ref name.
+/// Returns None if the spec is not upstream/push syntax.
+/// On resolution failure, outputs fatal error and exits 128.
+async fn resolve_upstream_push_symbolic(
+  fs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  spec : String,
+  quiet : Bool,
+) -> String? raise Error {
+  match try_resolve_upstream_push_ref(fs, git_dir, spec) {
+    None => None
+    Some(Ok(ref_name)) =>
+      if ref_name.find("@{") is Some(_) {
+        // Has suffix after @{u}/@{push}, e.g. my-side@{u}@{1}
+        let id = resolve_reflog_selector(fs, git_dir, ref_name)
+        match id {
+          Some(oid) => Some(oid.to_hex())
+          None => None
+        }
+      } else {
+        Some(ref_name)
+      }
+    Some(Err(msg)) => {
+      if not(quiet) {
+        eprint_line("fatal: " + msg)
+      }
+      @sys.exit(128)
+      None
+    }
+  }
+}
+
+///|
+/// Resolve @{upstream}/@{push} spec to an OID.
+/// Returns None if the spec is not upstream/push syntax.
+/// On resolution failure, outputs fatal error and exits 128.
+async fn resolve_upstream_push_oid(
+  fs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  spec : String,
+  quiet : Bool,
+) -> @bitcore.ObjectId? raise Error {
+  match try_resolve_upstream_push_ref(fs, git_dir, spec) {
+    None => None
+    Some(Ok(ref_name)) =>
+      if ref_name.find("@{") is Some(_) {
+        // Has suffix, e.g. my-side@{u}@{1} → refs/remotes/origin/side@{1}
+        resolve_reflog_selector(fs, git_dir, ref_name)
+      } else {
+        @bitrepo.rev_parse(fs, git_dir, ref_name)
+      }
+    Some(Err(msg)) => {
+      if not(quiet) {
+        eprint_line("fatal: " + msg)
+      }
+      @sys.exit(128)
+      None
+    }
+  }
 }
 
 ///|
@@ -1594,4 +1773,965 @@ fn rev_parse_read_bisect_refs(
     }
   }
   result
+}
+
+///|
+/// Apply --prefix to revision:path specs where the path is relative (./ or ../).
+/// For example, with prefix "sub1/":
+///   "HEAD:./file1" → "HEAD:sub1/file1"
+///   "HEAD:../top" → "HEAD:top" (sub1/ + ../top → top)
+///   "HEAD:top" → "HEAD:top" (absolute path, not affected)
+fn rev_parse_apply_prefix_to_colon_path(
+  spec : String,
+  prefix : String,
+) -> String {
+  // Find the colon separator (revision:path)
+  guard spec.find(":") is Some(colon_idx) else { return spec }
+  guard colon_idx > 0 else { return spec }
+  let path_part = String::unsafe_substring(
+    spec,
+    start=colon_idx + 1,
+    end=spec.length(),
+  )
+  // Only apply prefix when path starts with ./ or ../
+  if not(path_part.has_prefix("./")) && not(path_part.has_prefix("../")) {
+    return spec
+  }
+  let rev_part = String::unsafe_substring(spec, start=0, end=colon_idx)
+  let combined = prefix + path_part
+  // Normalize ./ and ../ components
+  let normalized = rev_parse_normalize_path(combined)
+  rev_part + ":" + normalized
+}
+
+///|
+/// Normalize a path by resolving . and .. components.
+/// "sub1/./file1" → "sub1/file1"
+/// "sub1/../top" → "top"
+fn rev_parse_normalize_path(path : String) -> String {
+  let parts = path.split("/")
+  let result : Array[String] = []
+  for part in parts {
+    let s = part.to_string()
+    if s == "." {
+      continue
+    } else if s == ".." {
+      if result.length() > 0 {
+        let _ = result.pop()
+      }
+    } else {
+      result.push(s)
+    }
+  }
+  result.join("/")
+}
+
+///|
+enum ParseoptOptType {
+  ParseoptOption
+  ParseoptGroup
+} derive(Eq)
+
+///|
+struct ParseoptOpt {
+  opt_type : ParseoptOptType
+  short_name : Char
+  long_name : String
+  help : String
+  argh : String
+  has_arg : Bool
+  opt_arg : Bool
+  non_neg : Bool
+  hidden : Bool
+}
+
+///|
+async fn handle_parseopt(args : Array[String]) -> Unit raise Error {
+  let mut keep_dashdash = false
+  let mut stop_at_non_option = false
+  let mut stuck_long = false
+  let mut dashdash_idx = -1
+  for i = 0; i < args.length(); i = i + 1 {
+    match args[i] {
+      "--parseopt" => continue
+      "--keep-dashdash" => keep_dashdash = true
+      "--stop-at-non-option" => stop_at_non_option = true
+      "--stuck-long" => stuck_long = true
+      "--" => {
+        dashdash_idx = i
+        break
+      }
+      _ => ()
+    }
+  }
+  if dashdash_idx < 0 {
+    eprint_line("usage: git rev-parse --parseopt [<options>] -- [<args>...]")
+    @sys.exit(129)
+  }
+  let parse_args : Array[String] = []
+  for i = dashdash_idx + 1; i < args.length(); i = i + 1 {
+    parse_args.push(args[i])
+  }
+  let stdin_bytes = read_all_stdin()
+  let stdin_str = decode_bytes(stdin_bytes)
+  let lines = parseopt_split_lines(stdin_str)
+  let usage_lines : Array[String] = []
+  let mut spec_start = 0
+  let mut found_separator = false
+  for i = 0; i < lines.length(); i = i + 1 {
+    if lines[i] == "--" {
+      spec_start = i + 1
+      found_separator = true
+      break
+    }
+    usage_lines.push(lines[i])
+  }
+  if not(found_separator) {
+    eprint_line("fatal: premature end of input")
+    @sys.exit(128)
+  }
+  if usage_lines.length() == 0 {
+    eprint_line("fatal: no usage string given before the `--' separator")
+    @sys.exit(128)
+  }
+  let opts = parseopt_parse_spec(lines, spec_start)
+  let mut show_help = false
+  let mut show_help_all = false
+  for arg in parse_args {
+    if arg == "-h" || arg == "--help" {
+      show_help = true
+      break
+    }
+    if arg == "--help-all" {
+      show_help_all = true
+      break
+    }
+    if arg == "--" {
+      break
+    }
+  }
+  if show_help || show_help_all {
+    let help = parseopt_format_help(usage_lines, opts, show_help_all)
+    parseopt_print_string("cat <<\\EOF\n")
+    parseopt_print_string(help)
+    parseopt_print_string("EOF\n")
+    @sys.exit(129)
+  }
+  let result = parseopt_parse_args(
+    parse_args, opts, keep_dashdash, stop_at_non_option, stuck_long, usage_lines,
+  )
+  print_line(result)
+}
+
+///|
+fn parseopt_split_lines(s : String) -> Array[String] {
+  let lines : Array[String] = []
+  let buf = StringBuilder::new()
+  for c in s {
+    if c == '\n' {
+      lines.push(buf.to_string())
+      buf.reset()
+    } else {
+      buf.write_char(c)
+    }
+  }
+  let last = buf.to_string()
+  if last.length() > 0 {
+    lines.push(last)
+  }
+  lines
+}
+
+///|
+async fn parseopt_parse_spec(
+  lines : Array[String],
+  start : Int,
+) -> Array[ParseoptOpt] raise Error {
+  let opts : Array[ParseoptOpt] = []
+  for i = start; i < lines.length(); i = i + 1 {
+    let line = lines[i]
+    if line.length() == 0 {
+      continue
+    }
+    let help_idx = parseopt_find_space(line)
+    match help_idx {
+      None => {
+        let header_text = parseopt_skipspaces(line)
+        opts.push({
+          opt_type: ParseoptGroup,
+          short_name: '\u0000',
+          long_name: "",
+          help: header_text,
+          argh: "",
+          has_arg: false,
+          opt_arg: false,
+          non_neg: false,
+          hidden: false,
+        })
+      }
+      Some(idx) => {
+        if idx == 0 {
+          let header_text = parseopt_skipspaces(line)
+          opts.push({
+            opt_type: ParseoptGroup,
+            short_name: '\u0000',
+            long_name: "",
+            help: header_text,
+            argh: "",
+            has_arg: false,
+            opt_arg: false,
+            non_neg: false,
+            hidden: false,
+          })
+          continue
+        }
+        let name_part = String::unsafe_substring(line, start=0, end=idx)
+        let help_text = parseopt_skipspaces(
+          String::unsafe_substring(line, start=idx, end=line.length()),
+        )
+        let flags_idx = parseopt_find_flags(name_part)
+        let name_str = if flags_idx < name_part.length() {
+          String::unsafe_substring(name_part, start=0, end=flags_idx)
+        } else {
+          name_part
+        }
+        if name_str.length() == 0 {
+          eprint_line("fatal: missing opt-spec before option flags")
+          @sys.exit(128)
+        }
+        let mut has_arg = false
+        let mut opt_arg = false
+        let mut non_neg = false
+        let mut hidden = false
+        let mut argh_start = flags_idx
+        for fi = flags_idx; fi < name_part.length(); fi = fi + 1 {
+          let fc = name_part[fi]
+          if fc == '=' {
+            has_arg = true
+            argh_start = fi + 1
+          } else if fc == '?' {
+            opt_arg = true
+            argh_start = fi + 1
+          } else if fc == '!' {
+            non_neg = true
+            argh_start = fi + 1
+          } else if fc == '*' {
+            hidden = true
+            argh_start = fi + 1
+          } else {
+            break
+          }
+        }
+        let argh = if argh_start < name_part.length() {
+          String::unsafe_substring(
+            name_part,
+            start=argh_start,
+            end=name_part.length(),
+          )
+        } else {
+          ""
+        }
+        let mut short_name : Char = '\u0000'
+        let mut long_name = ""
+        if name_str.length() == 1 {
+          short_name = name_str[0].to_int().unsafe_to_char()
+        } else if name_str.length() > 1 && name_str[1] == ',' {
+          short_name = name_str[0].to_int().unsafe_to_char()
+          long_name = String::unsafe_substring(
+            name_str,
+            start=2,
+            end=name_str.length(),
+          )
+        } else {
+          long_name = name_str
+        }
+        opts.push({
+          opt_type: ParseoptOption,
+          short_name,
+          long_name,
+          help: help_text,
+          argh,
+          has_arg,
+          opt_arg,
+          non_neg,
+          hidden,
+        })
+      }
+    }
+  }
+  opts
+}
+
+///|
+fn parseopt_find_space(s : String) -> Int? {
+  for i = 0; i < s.length(); i = i + 1 {
+    let c = s[i]
+    if c == ' ' || c == '\t' {
+      return Some(i)
+    }
+  }
+  None
+}
+
+///|
+fn parseopt_skipspaces(s : String) -> String {
+  let mut i = 0
+  while i < s.length() {
+    let c = s[i]
+    if c != ' ' && c != '\t' {
+      break
+    }
+    i = i + 1
+  }
+  String::unsafe_substring(s, start=i, end=s.length())
+}
+
+///|
+fn parseopt_find_flags(s : String) -> Int {
+  for i = 0; i < s.length(); i = i + 1 {
+    let c = s[i]
+    if c == '*' || c == '=' || c == '?' || c == '!' {
+      return i
+    }
+  }
+  s.length()
+}
+
+///|
+fn parseopt_format_help(
+  usage_lines : Array[String],
+  opts : Array[ParseoptOpt],
+  show_all : Bool,
+) -> String {
+  let out = StringBuilder::new()
+  let mut blurb_start = -1
+  for i = 0; i < usage_lines.length(); i = i + 1 {
+    if usage_lines[i].length() == 0 {
+      blurb_start = i
+      break
+    }
+  }
+  let usage_end = if blurb_start >= 0 {
+    blurb_start
+  } else {
+    usage_lines.length()
+  }
+  for i = 0; i < usage_end; i = i + 1 {
+    let line = usage_lines[i]
+    if i == 0 {
+      out.write_string("usage: ")
+      out.write_string(line)
+      out.write_char('\n')
+    } else {
+      out.write_string("   or: ")
+      out.write_string(line)
+      out.write_char('\n')
+    }
+  }
+  if blurb_start >= 0 {
+    out.write_char('\n')
+    for j = blurb_start + 1; j < usage_lines.length(); j = j + 1 {
+      let bline = usage_lines[j]
+      if bline.length() == 0 {
+        out.write_char('\n')
+      } else {
+        out.write_string("    ")
+        out.write_string(bline)
+        out.write_char('\n')
+      }
+    }
+  }
+  let all_long_names : Array[String] = []
+  for opt in opts {
+    if opt.long_name.length() > 0 {
+      all_long_names.push(opt.long_name)
+    }
+  }
+  let mut has_visible_opts = false
+  for opt in opts {
+    if opt.opt_type == ParseoptOption && (show_all || not(opt.hidden)) {
+      has_visible_opts = true
+      break
+    }
+  }
+  if not(has_visible_opts) {
+    out.write_char('\n')
+    return out.to_string()
+  }
+  let mut need_newline = true
+  for opt in opts {
+    match opt.opt_type {
+      ParseoptGroup => {
+        out.write_char('\n')
+        need_newline = false
+        if opt.help.length() > 0 {
+          out.write_string(opt.help)
+          out.write_char('\n')
+        }
+        continue
+      }
+      ParseoptOption => ()
+    }
+    if not(show_all) && opt.hidden {
+      continue
+    }
+    if need_newline {
+      out.write_char('\n')
+      need_newline = false
+    }
+    let mut pos = 4
+    out.write_string("    ")
+    if opt.short_name != '\u0000' {
+      out.write_char('-')
+      out.write_char(opt.short_name)
+      pos = pos + 2
+    }
+    if opt.short_name != '\u0000' && opt.long_name.length() > 0 {
+      out.write_string(", ")
+      pos = pos + 2
+    }
+    if opt.long_name.length() > 0 {
+      let long_name = opt.long_name
+      let mut positive_name : String? = None
+      if opt.non_neg || long_name.has_prefix("no-") {
+        out.write_string("--")
+        out.write_string(long_name)
+        pos = pos + 2 + long_name.length()
+        if long_name.has_prefix("no-") && not(opt.non_neg) {
+          positive_name = Some(
+            String::unsafe_substring(long_name, start=3, end=long_name.length()),
+          )
+        }
+      } else {
+        out.write_string("--[no-]")
+        out.write_string(long_name)
+        pos = pos + 7 + long_name.length()
+      }
+      let argh_str = parseopt_format_argh(opt)
+      out.write_string(argh_str)
+      pos = pos + argh_str.length()
+      parseopt_write_padded_help(out, pos, opt.help)
+      match positive_name {
+        Some(pname) => {
+          let mut found = false
+          for ln in all_long_names {
+            if ln == pname {
+              found = true
+              break
+            }
+          }
+          if not(found) {
+            out.write_string("    --")
+            out.write_string(pname)
+            let ppos = 4 + 2 + pname.length()
+            parseopt_write_padded_help(out, ppos, "opposite of --no-" + pname)
+          }
+        }
+        None => ()
+      }
+    } else {
+      let argh_str = parseopt_format_argh_short(opt)
+      out.write_string(argh_str)
+      pos = pos + argh_str.length()
+      parseopt_write_padded_help(out, pos, opt.help)
+    }
+  }
+  out.write_char('\n')
+  out.to_string()
+}
+
+///|
+fn parseopt_format_argh(opt : ParseoptOpt) -> String {
+  if not(opt.has_arg) && not(opt.opt_arg) {
+    return ""
+  }
+  let has_custom_argh = opt.argh.length() > 0
+  let argh = if has_custom_argh { opt.argh } else { "..." }
+  let literal = not(has_custom_argh) || parseopt_argh_is_literal(argh)
+  if opt.opt_arg {
+    if opt.long_name.length() > 0 {
+      if literal {
+        "[=" + argh + "]"
+      } else {
+        "[=<" + argh + ">]"
+      }
+    } else if literal {
+      "[" + argh + "]"
+    } else {
+      "[<" + argh + ">]"
+    }
+  } else if literal {
+    " " + argh
+  } else {
+    " <" + argh + ">"
+  }
+}
+
+///|
+fn parseopt_format_argh_short(opt : ParseoptOpt) -> String {
+  if not(opt.has_arg) && not(opt.opt_arg) {
+    return ""
+  }
+  let has_custom_argh = opt.argh.length() > 0
+  let argh = if has_custom_argh { opt.argh } else { "..." }
+  let literal = not(has_custom_argh) || parseopt_argh_is_literal(argh)
+  if opt.opt_arg {
+    if literal {
+      "[" + argh + "]"
+    } else {
+      "[<" + argh + ">]"
+    }
+  } else if literal {
+    " " + argh
+  } else {
+    " <" + argh + ">"
+  }
+}
+
+///|
+fn parseopt_argh_is_literal(argh : String) -> Bool {
+  for c in argh {
+    if c == '<' ||
+      c == '>' ||
+      c == '(' ||
+      c == ')' ||
+      c == '[' ||
+      c == ']' ||
+      c == '|' {
+      return true
+    }
+  }
+  false
+}
+
+///|
+fn parseopt_write_padded_help(
+  out : StringBuilder,
+  pos : Int,
+  help_text : String,
+) -> Unit {
+  let usage_opts_width = 26
+  if pos < usage_opts_width {
+    for p = pos; p < usage_opts_width; p = p + 1 {
+      out.write_char(' ')
+    }
+  } else {
+    out.write_char('\n')
+    for p = 0; p < usage_opts_width; p = p + 1 {
+      out.write_char(' ')
+    }
+  }
+  out.write_string(help_text)
+  out.write_char('\n')
+}
+
+///|
+async fn parseopt_parse_args(
+  args : Array[String],
+  opts : Array[ParseoptOpt],
+  keep_dashdash : Bool,
+  stop_at_non_option : Bool,
+  stuck_long : Bool,
+  usage_lines : Array[String],
+) -> String raise Error {
+  let parsed = StringBuilder::new()
+  parsed.write_string("set --")
+  let remaining : Array[String] = []
+  let mut i = 0
+  while i < args.length() {
+    let arg = args[i]
+    if arg == "--" {
+      if keep_dashdash {
+        remaining.push("--")
+      }
+      i = i + 1
+      while i < args.length() {
+        remaining.push(args[i])
+        i = i + 1
+      }
+      break
+    }
+    if arg.length() > 0 && arg[0] == '-' && arg.length() > 1 {
+      if arg.length() > 1 && arg[1] == '-' {
+        let result = parseopt_match_long(arg, opts, stuck_long, args, i)
+        match result {
+          ParseoptMatchOk(output, consumed) => {
+            parsed.write_string(output)
+            i = i + consumed
+            continue
+          }
+          ParseoptMatchError(msg) => {
+            eprint_line(msg)
+            let help = parseopt_format_help(usage_lines, opts, false)
+            eprint_string(help)
+            @sys.exit(129)
+          }
+        }
+      } else {
+        let result = parseopt_match_short(arg, opts, stuck_long, args, i)
+        match result {
+          ParseoptMatchOk(output, consumed) => {
+            parsed.write_string(output)
+            i = i + consumed
+            continue
+          }
+          ParseoptMatchError(msg) => {
+            eprint_line(msg)
+            let help = parseopt_format_help(usage_lines, opts, false)
+            eprint_string(help)
+            @sys.exit(129)
+          }
+        }
+      }
+    } else {
+      if stop_at_non_option {
+        while i < args.length() {
+          remaining.push(args[i])
+          i = i + 1
+        }
+        break
+      }
+      remaining.push(arg)
+      i = i + 1
+    }
+  }
+  parsed.write_string(" --")
+  for r in remaining {
+    parsed.write_char(' ')
+    parsed.write_string(shell_single_quote(r))
+  }
+  parsed.to_string()
+}
+
+///|
+enum ParseoptMatchResult {
+  ParseoptMatchOk(String, Int)
+  ParseoptMatchError(String)
+}
+
+///|
+fn parseopt_match_long(
+  arg : String,
+  opts : Array[ParseoptOpt],
+  stuck_long : Bool,
+  all_args : Array[String],
+  arg_idx : Int,
+) -> ParseoptMatchResult {
+  let arg_without_dashes = String::unsafe_substring(
+    arg,
+    start=2,
+    end=arg.length(),
+  )
+  let mut opt_name = arg_without_dashes
+  let mut opt_value : String? = None
+  match parseopt_find_char(arg_without_dashes, '=') {
+    Some(eq_idx) => {
+      opt_name = String::unsafe_substring(
+        arg_without_dashes,
+        start=0,
+        end=eq_idx,
+      )
+      opt_value = Some(
+        String::unsafe_substring(
+          arg_without_dashes,
+          start=eq_idx + 1,
+          end=arg_without_dashes.length(),
+        ),
+      )
+    }
+    None => ()
+  }
+  let mut is_unset = false
+  let mut no_stripped = opt_name
+  let mut arg_starts_with_no_no = false
+  if opt_name.has_prefix("no-") {
+    let after_no = String::unsafe_substring(
+      opt_name,
+      start=3,
+      end=opt_name.length(),
+    )
+    if after_no.has_prefix("no-") {
+      arg_starts_with_no_no = true
+      no_stripped = String::unsafe_substring(
+        after_no,
+        start=3,
+        end=after_no.length(),
+      )
+    } else {
+      is_unset = true
+      no_stripped = after_no
+    }
+  }
+  let mut exact_match : (ParseoptOpt, Bool)? = None
+  let mut abbrev_match : (ParseoptOpt, Bool)? = None
+  let mut ambiguous_match : (ParseoptOpt, Bool)? = None
+  for opt in opts {
+    if opt.opt_type != ParseoptOption {
+      continue
+    }
+    if opt.long_name.length() == 0 {
+      continue
+    }
+    let long_name = opt.long_name
+    let allow_unset = not(opt.non_neg)
+    let mut opt_unset = false
+    let mut check_name = long_name
+    if long_name.has_prefix("no-") {
+      opt_unset = true
+      check_name = String::unsafe_substring(
+        long_name,
+        start=3,
+        end=long_name.length(),
+      )
+    } else if arg_starts_with_no_no {
+      continue
+    }
+    let xor_unset = if is_unset { not(opt_unset) } else { opt_unset }
+    if xor_unset && not(allow_unset) {
+      continue
+    }
+    let effective_unset = if is_unset { not(opt_unset) } else { opt_unset }
+    if no_stripped == check_name {
+      exact_match = Some((opt, effective_unset))
+      break
+    }
+    if check_name.has_prefix(no_stripped) {
+      match abbrev_match {
+        Some(_) => ambiguous_match = abbrev_match
+        None => ()
+      }
+      abbrev_match = Some((opt, effective_unset))
+    }
+    if allow_unset &&
+      not(is_unset) &&
+      not(arg_starts_with_no_no) &&
+      not(opt_unset) {
+      let full_neg = "no-" + long_name
+      if full_neg.has_prefix(opt_name) && opt_name.length() < full_neg.length() {
+        match abbrev_match {
+          Some(_) => ambiguous_match = abbrev_match
+          None => ()
+        }
+        abbrev_match = Some((opt, true))
+      }
+    }
+  }
+  let disallow_abbreviated = match
+    @sys.get_env_var("GIT_TEST_DISALLOW_ABBREVIATED_OPTIONS") {
+    Some(v) => v == "true" || v == "1" || v == "yes"
+    None => false
+  }
+  let matched = match exact_match {
+    Some(m) => Some(m)
+    None => {
+      if disallow_abbreviated {
+        match abbrev_match {
+          Some(_) =>
+            return ParseoptMatchError(
+              "error: disallowed abbreviated or ambiguous option '" +
+              opt_name +
+              "'",
+            )
+          None => ()
+        }
+      }
+      match ambiguous_match {
+        Some(amb) => {
+          let (amb_opt, amb_unset) = amb
+          let (abb_opt, abb_unset) = abbrev_match.unwrap()
+          let amb_prefix = if amb_unset { "no-" } else { "" }
+          let abb_prefix = if abb_unset { "no-" } else { "" }
+          return ParseoptMatchError(
+            "error: ambiguous option: " +
+            opt_name +
+            " (could be --" +
+            amb_prefix +
+            amb_opt.long_name +
+            " or --" +
+            abb_prefix +
+            abb_opt.long_name +
+            ")",
+          )
+        }
+        None => ()
+      }
+      abbrev_match
+    }
+  }
+  match matched {
+    None => ParseoptMatchError("error: unknown option `" + opt_name + "'")
+    Some((opt, unset)) =>
+      parseopt_format_matched_long(
+        opt, unset, opt_value, stuck_long, all_args, arg_idx,
+      )
+  }
+}
+
+///|
+fn parseopt_format_matched_long(
+  opt : ParseoptOpt,
+  unset : Bool,
+  opt_value : String?,
+  stuck_long : Bool,
+  all_args : Array[String],
+  arg_idx : Int,
+) -> ParseoptMatchResult {
+  let out = StringBuilder::new()
+  let mut consumed = 1
+  if unset {
+    out.write_string(" --no-")
+    if opt.long_name.has_prefix("no-") {
+      out.write_string(opt.long_name)
+    } else {
+      out.write_string(opt.long_name)
+    }
+  } else if opt.short_name != '\u0000' && not(stuck_long) {
+    out.write_string(" -")
+    out.write_char(opt.short_name)
+  } else if opt.long_name.length() > 0 {
+    out.write_string(" --")
+    out.write_string(opt.long_name)
+  } else {
+    out.write_string(" -")
+    out.write_char(opt.short_name)
+  }
+  if opt.has_arg || opt.opt_arg {
+    match opt_value {
+      Some(v) => {
+        if stuck_long && opt.long_name.length() > 0 && not(unset) {
+          let out2 = StringBuilder::new()
+          out2.write_string(" --")
+          out2.write_string(opt.long_name)
+          out2.write_char('=')
+          out2.write_string(shell_single_quote(v))
+          return ParseoptMatchOk(out2.to_string(), consumed)
+        }
+        if not(stuck_long) {
+          out.write_char(' ')
+        } else if opt.long_name.length() > 0 {
+          out.write_char('=')
+        }
+        out.write_string(shell_single_quote(v))
+      }
+      None =>
+        if opt.has_arg && not(opt.opt_arg) {
+          if arg_idx + 1 < all_args.length() {
+            let next_val = all_args[arg_idx + 1]
+            consumed = 2
+            if stuck_long && opt.long_name.length() > 0 {
+              out.write_char('=')
+              out.write_string(shell_single_quote(next_val))
+            } else {
+              out.write_char(' ')
+              out.write_string(shell_single_quote(next_val))
+            }
+          } else {
+            return ParseoptMatchError(
+              "error: option `" + opt.long_name + "' requires a value",
+            )
+          }
+        }
+    }
+  }
+  ParseoptMatchOk(out.to_string(), consumed)
+}
+
+///|
+fn parseopt_match_short(
+  arg : String,
+  opts : Array[ParseoptOpt],
+  stuck_long : Bool,
+  all_args : Array[String],
+  arg_idx : Int,
+) -> ParseoptMatchResult {
+  let out = StringBuilder::new()
+  let mut consumed = 1
+  let mut ci = 1
+  while ci < arg.length() {
+    let ch = arg[ci].to_int().unsafe_to_char()
+    let mut found_opt : ParseoptOpt? = None
+    for opt in opts {
+      if opt.opt_type == ParseoptOption && opt.short_name == ch {
+        found_opt = Some(opt)
+        break
+      }
+    }
+    match found_opt {
+      None =>
+        return ParseoptMatchError(
+          "error: unknown switch `" + ch.to_string() + "'",
+        )
+      Some(opt) => {
+        if stuck_long && opt.long_name.length() > 0 {
+          out.write_string(" --")
+          out.write_string(opt.long_name)
+        } else {
+          out.write_string(" -")
+          out.write_char(ch)
+        }
+        if opt.has_arg || opt.opt_arg {
+          let rest_start = ci + 1
+          if rest_start < arg.length() {
+            let rest = String::unsafe_substring(
+              arg,
+              start=rest_start,
+              end=arg.length(),
+            )
+            if stuck_long && opt.long_name.length() > 0 {
+              out.write_char('=')
+              out.write_string(shell_single_quote(rest))
+            } else {
+              if not(stuck_long) {
+                out.write_char(' ')
+              }
+              out.write_string(shell_single_quote(rest))
+            }
+            ci = arg.length()
+          } else {
+            if opt.has_arg && not(opt.opt_arg) {
+              if arg_idx + consumed < all_args.length() {
+                let next_val = all_args[arg_idx + consumed]
+                consumed = consumed + 1
+                if stuck_long && opt.long_name.length() > 0 {
+                  out.write_char('=')
+                  out.write_string(shell_single_quote(next_val))
+                } else {
+                  out.write_char(' ')
+                  out.write_string(shell_single_quote(next_val))
+                }
+              } else {
+                return ParseoptMatchError(
+                  "error: option `" + ch.to_string() + "' requires a value",
+                )
+              }
+            }
+            ci = ci + 1
+          }
+          continue
+        }
+        ci = ci + 1
+      }
+    }
+  }
+  ParseoptMatchOk(out.to_string(), consumed)
+}
+
+///|
+fn parseopt_find_char(s : String, ch : Char) -> Int? {
+  for i = 0; i < s.length(); i = i + 1 {
+    if s[i].to_int() == ch.to_int() {
+      return Some(i)
+    }
+  }
+  None
+}
+
+///|
+async fn eprint_string(s : String) -> Unit {
+  @stdio.stderr.write(str_to_bytes(s))
+}
+
+///|
+async fn parseopt_print_string(s : String) -> Unit {
+  @stdio.stdout.write(str_to_bytes(s))
 }

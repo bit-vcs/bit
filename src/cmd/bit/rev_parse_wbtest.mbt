@@ -79,3 +79,55 @@ test "rev-parse: --git-dir stays absolute from subdirectory" {
     "/repo/.git",
   )
 }
+
+///|
+test "rev-parse: apply prefix to colon path with ./" {
+  assert_eq(
+    rev_parse_apply_prefix_to_colon_path("HEAD:./file1", "sub1/"),
+    "HEAD:sub1/file1",
+  )
+}
+
+///|
+test "rev-parse: apply prefix to colon path with ../" {
+  assert_eq(
+    rev_parse_apply_prefix_to_colon_path("HEAD:../top", "sub1/"),
+    "HEAD:top",
+  )
+}
+
+///|
+test "rev-parse: prefix not applied to absolute colon path" {
+  assert_eq(
+    rev_parse_apply_prefix_to_colon_path("HEAD:top", "sub1/"),
+    "HEAD:top",
+  )
+}
+
+///|
+test "rev-parse: apply empty prefix to colon path" {
+  assert_eq(rev_parse_apply_prefix_to_colon_path("HEAD:./top", ""), "HEAD:top")
+}
+
+///|
+test "rev-parse: apply prefix two-levels deep" {
+  assert_eq(
+    rev_parse_apply_prefix_to_colon_path("HEAD:./file2", "sub1/sub2/"),
+    "HEAD:sub1/sub2/file2",
+  )
+}
+
+///|
+test "rev-parse: normalize path resolves .." {
+  assert_eq(rev_parse_normalize_path("sub1/../top"), "top")
+}
+
+///|
+test "rev-parse: normalize path resolves ." {
+  assert_eq(rev_parse_normalize_path("sub1/./file1"), "sub1/file1")
+}
+
+///|
+test "rev-parse: no colon means no prefix applied" {
+  assert_eq(rev_parse_apply_prefix_to_colon_path("HEAD", "sub1/"), "HEAD")
+}

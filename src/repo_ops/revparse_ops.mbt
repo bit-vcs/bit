@@ -666,6 +666,355 @@ fn resolve_abbrev_ref_id(
 }
 
 ///|
+/// Parse a spec containing @{upstream}, @{u}, @{push}, or @{p} (case-insensitive).
+/// Returns (branch_name_or_empty, "upstream"|"push", rest_after_closing_brace) or None.
+/// Finds the LAST @{ occurrence to handle branch names containing @.
+pub fn parse_upstream_push_spec(spec : String) -> (String, String, String)? {
+  let chars = spec.to_array()
+  let len = chars.length()
+  // Scan right-to-left for @{ that contains upstream/u/push/p.
+  // We iterate from right to left so that branch names with @ are handled:
+  // e.g. fun@ny@{u} → finds @{u} at the end, branch = "fun@ny"
+  // For chained specs like my-side@{u}@{1}, we need the FIRST matching @{.
+  // Strategy: collect all @{ positions, then try from leftmost to rightmost.
+  let at_brace_positions : Array[Int] = []
+  for i = 0; i < len - 1; i = i + 1 {
+    if chars[i] == '@' && chars[i + 1] == '{' {
+      at_brace_positions.push(i)
+    }
+  }
+  // Try each @{ position from left to right
+  for pos in at_brace_positions {
+    // Find matching closing brace
+    let mut close_idx = -1
+    for i = pos + 2; i < len; i = i + 1 {
+      if chars[i] == '}' {
+        close_idx = i
+        break
+      }
+    }
+    if close_idx < 0 {
+      continue
+    }
+    // Extract content between @{ and }
+    let content = substring_revparse(spec, pos + 2, close_idx)
+    let content_lower = content.to_lower()
+    let kind = if content_lower == "upstream" || content_lower == "u" {
+      "upstream"
+    } else if content_lower == "push" || content_lower == "p" {
+      "push"
+    } else {
+      continue
+    }
+    let branch = substring_revparse(spec, 0, pos)
+    // If branch contains ':', this is a tree:path spec, not upstream/push
+    if branch.find(":") is Some(_) {
+      return None
+    }
+    let rest = substring_revparse(spec, close_idx + 1, len)
+    return Some((branch, kind, rest))
+  }
+  None
+}
+
+///|
+/// Resolve @{upstream} for a branch. Returns the upstream tracking ref name.
+/// Errors with descriptive messages matching git behavior.
+pub fn resolve_upstream_ref(
+  fs : &@types.RepoFileSystem,
+  git_dir : String,
+  branch : String,
+) -> String raise @object.GitError {
+  // If branch is empty, use HEAD
+  let branch_name = if branch == "" || branch == "HEAD" || branch == "@" {
+    match @bitlib.read_head_ref(fs, git_dir) {
+      @bitlib.HeadRef::Branch(name) => name
+      @bitlib.HeadRef::Detached(_) =>
+        raise @object.GitError::InvalidObject("HEAD does not point to a branch")
+    }
+    // Strip refs/heads/ prefix if present
+  } else if branch.has_prefix("refs/heads/") {
+    // refs/heads/X@{upstream} should NOT resolve (git behavior)
+    raise @object.GitError::InvalidObject(
+      "no upstream configured for branch '" + branch + "'",
+    )
+  } else {
+    branch
+  }
+  // Check branch exists
+  let branch_ref = "refs/heads/" + branch_name
+  let branch_exists = match @bitlib.resolve_ref(fs, git_dir, branch_ref) {
+    Some(_) => true
+    None => false
+  }
+  if not(branch_exists) {
+    raise @object.GitError::InvalidObject(
+      "no such branch: '" + branch_name + "'",
+    )
+  }
+  // Read config
+  let (_, branches) = @bitlib.read_repo_config(fs, git_dir)
+  let cfg = match branches.get(branch_name) {
+    Some(c) => c
+    None =>
+      raise @object.GitError::InvalidObject(
+        "no upstream configured for branch '" + branch_name + "'",
+      )
+  }
+  let remote = match cfg.remote {
+    Some(r) => r
+    None =>
+      raise @object.GitError::InvalidObject(
+        "no upstream configured for branch '" + branch_name + "'",
+      )
+  }
+  if cfg.merges.length() == 0 {
+    raise @object.GitError::InvalidObject(
+      "no upstream configured for branch '" + branch_name + "'",
+    )
+  }
+  let merge = cfg.merges[0]
+  // Convert merge ref to tracking ref
+  if merge.has_prefix("refs/heads/") {
+    let branch_part = substring_revparse(merge, 11, merge.length())
+    // Check if this remote actually fetches this ref
+    // For remote "." (local tracking), the ref is the merge ref itself
+    if remote == "." {
+      return merge
+    }
+    let tracking_ref = "refs/remotes/" + remote + "/" + branch_part
+    // Verify the remote-tracking ref exists (or at least could exist)
+    // git checks if the remote's fetch refspec maps this
+    let (remotes, _) = @bitlib.read_repo_config(fs, git_dir)
+    match remotes.get(remote) {
+      Some(remote_cfg) => {
+        // Check if any fetch refspec maps the merge ref
+        let fetch_specs = @bitlib.parse_fetch_refspecs(remote_cfg.fetch)
+        let mut mapped = false
+        for spec in fetch_specs {
+          if spec.negative {
+            continue
+          }
+          if @bitlib.refspec_map_dst(spec.src, spec.dst, merge) is Some(_) {
+            mapped = true
+            break
+          }
+        }
+        if not(mapped) {
+          raise @object.GitError::InvalidObject(
+            "upstream branch '" +
+            merge +
+            "' not stored as a remote-tracking branch",
+          )
+        }
+      }
+      None => ()
+    }
+    tracking_ref
+  } else {
+    merge
+  }
+}
+
+///|
+/// Resolve @{push} for a branch. Returns the push tracking ref name.
+pub fn resolve_push_ref(
+  fs : &@types.RepoFileSystem,
+  git_dir : String,
+  branch : String,
+) -> String raise @object.GitError {
+  // If branch is empty, use HEAD
+  let branch_name = if branch == "" || branch == "HEAD" || branch == "@" {
+    match @bitlib.read_head_ref(fs, git_dir) {
+      @bitlib.HeadRef::Branch(name) => name
+      @bitlib.HeadRef::Detached(_) =>
+        raise @object.GitError::InvalidObject("HEAD does not point to a branch")
+    }
+  } else if branch.has_prefix("refs/heads/") {
+    raise @object.GitError::InvalidObject(
+      "no upstream configured for branch '" + branch + "'",
+    )
+  } else {
+    branch
+  }
+  // Read config
+  let (remotes, branches) = @bitlib.read_repo_config(fs, git_dir)
+  // Determine push remote
+  // Priority: branch.<name>.pushRemote > remote.pushDefault > branch.<name>.remote
+  let content = @bitlib.read_config_content(fs, git_dir)
+  let blocks = @bitlib.parse_config_blocks(content)
+  let mut push_remote : String? = None
+  // 1. branch.<name>.pushRemote
+  for block in blocks {
+    if block.section == Some("branch") && block.name == Some(branch_name) {
+      for line in block.lines {
+        match @bitlib.parse_config_kv(line) {
+          Some((key, value)) if key == "pushremote" => {
+            push_remote = Some(value)
+            break
+          }
+          _ => ()
+        }
+      }
+    }
+  }
+  // 2. remote.pushDefault
+  if push_remote is None {
+    for block in blocks {
+      if block.section == Some("remote") && block.name is None {
+        for line in block.lines {
+          match @bitlib.parse_config_kv(line) {
+            Some((key, value)) if key == "pushdefault" => {
+              push_remote = Some(value)
+              break
+            }
+            _ => ()
+          }
+        }
+      }
+    }
+  }
+  // 3. branch.<name>.remote
+  if push_remote is None {
+    match branches.get(branch_name) {
+      Some(cfg) => push_remote = cfg.remote
+      None => ()
+    }
+  }
+  let remote = match push_remote {
+    Some(r) => r
+    None =>
+      raise @object.GitError::InvalidObject(
+        "no upstream configured for branch '" + branch_name + "'",
+      )
+  }
+  // Check if remote exists
+  guard remotes.get(remote) is Some(remote_cfg) else {
+    raise @object.GitError::InvalidObject(
+      "no upstream configured for branch '" + branch_name + "'",
+    )
+  }
+  // Read push.default
+  let mut push_default_str : String? = None
+  for block in blocks {
+    if block.section == Some("push") && block.name is None {
+      for line in block.lines {
+        match @bitlib.parse_config_kv(line) {
+          Some((key, value)) if key == "default" => {
+            push_default_str = Some(value)
+            break
+          }
+          _ => ()
+        }
+      }
+    }
+  }
+  let push_default = match push_default_str {
+    Some(v) =>
+      match v.to_lower() {
+        "upstream" => "upstream"
+        "current" => "current"
+        "matching" => "matching"
+        "nothing" => "nothing"
+        _ => "simple"
+      }
+    None => "simple"
+  }
+  // Try push refspecs first (applies regardless of push.default)
+  let local_ref = "refs/heads/" + branch_name
+  let push_specs = @bitlib.parse_push_refspecs(remote_cfg.push)
+  for spec in push_specs {
+    match @bitlib.refspec_map_dst(spec.src, spec.dst, local_ref) {
+      Some(dst) =>
+        if dst.has_prefix("refs/heads/") {
+          let dst_branch = substring_revparse(dst, 11, dst.length())
+          return "refs/remotes/" + remote + "/" + dst_branch
+        } else {
+          return "refs/remotes/" + remote + "/" + branch_name
+        }
+      None => continue
+    }
+  }
+  // Determine the push destination ref based on push.default
+  match push_default {
+    "nothing" =>
+      raise @object.GitError::InvalidObject(
+        "push has no destination (push.default is 'nothing')",
+      )
+    "upstream" => {
+      let cfg = match branches.get(branch_name) {
+        Some(c) => c
+        None =>
+          raise @object.GitError::InvalidObject(
+            "no upstream configured for branch '" + branch_name + "'",
+          )
+      }
+      guard cfg.merges.length() > 0 else {
+        raise @object.GitError::InvalidObject(
+          "no upstream configured for branch '" + branch_name + "'",
+        )
+      }
+      let merge = cfg.merges[0]
+      if merge.has_prefix("refs/heads/") {
+        let bp = substring_revparse(merge, 11, merge.length())
+        "refs/remotes/" + remote + "/" + bp
+      } else {
+        "refs/remotes/" + remote + "/" + branch_name
+      }
+    }
+    "simple" => {
+      // simple: like upstream if same remote and same branch name
+      let cfg = branches.get(branch_name)
+      let upstream_remote = match cfg {
+        Some(c) => c.remote
+        None => None
+      }
+      // Check if triangular (push remote != upstream remote)
+      let is_triangular = match upstream_remote {
+        Some(ur) => ur != remote
+        None => true
+      }
+      if is_triangular {
+        raise @object.GitError::InvalidObject(
+          "no upstream configured for branch '" + branch_name + "'",
+        )
+      }
+      // Check upstream branch name matches local branch name
+      let upstream_branch = match cfg {
+        Some(c) =>
+          if c.merges.length() > 0 {
+            let m = c.merges[0]
+            if m.has_prefix("refs/heads/") {
+              Some(substring_revparse(m, 11, m.length()))
+            } else {
+              None
+            }
+          } else {
+            None
+          }
+        None => None
+      }
+      match upstream_branch {
+        Some(ub) =>
+          if ub != branch_name {
+            raise @object.GitError::InvalidObject(
+              "no upstream configured for branch '" + branch_name + "'",
+            )
+          }
+        None =>
+          raise @object.GitError::InvalidObject(
+            "no upstream configured for branch '" + branch_name + "'",
+          )
+      }
+      "refs/remotes/" + remote + "/" + branch_name
+    }
+    _ =>
+      // "current" or "matching" — push to same branch name on remote
+      "refs/remotes/" + remote + "/" + branch_name
+  }
+}
+
+///|
 /// Resolve base reference (without suffix)
 fn resolve_base_ref(
   fs : &@types.RepoFileSystem,

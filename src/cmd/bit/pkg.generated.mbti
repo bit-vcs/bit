@@ -126,6 +126,13 @@ type OsObjectStore
 
 type OsRefStore
 
+type ParseoptMatchResult
+
+type ParseoptOpt
+
+type ParseoptOptType
+pub impl Eq for ParseoptOptType
+
 type PushDefaultMode
 
 type PushParsedRefspec

@@ -22,9 +22,15 @@ pub fn init_repo_with_options(&@types.FileSystem, &@types.RepoFileSystem, String
 
 pub fn init_repo_with_options_with_repo_fs(&@types.FileSystem, &@types.RepoFileSystem, String, @lib.InitOptions) -> Unit raise @object.GitError
 
+pub fn parse_upstream_push_spec(String) -> (String, String, String)?
+
 pub fn read_reflog(&@types.RepoFileSystem, String, String) -> Array[@lib.ReflogEntry] raise @object.GitError
 
 pub fn reflog_exists(&@types.RepoFileSystem, String, String) -> Bool
+
+pub fn resolve_push_ref(&@types.RepoFileSystem, String, String) -> String raise @object.GitError
+
+pub fn resolve_upstream_ref(&@types.RepoFileSystem, String, String) -> String raise @object.GitError
 
 pub fn rev_parse(&@types.RepoFileSystem, String, String) -> @object.ObjectId? raise @object.GitError
 
