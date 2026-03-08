@@ -3628,6 +3628,15 @@ async fn rev_parse_handle_range_op(
         }
         return true
       }
+      // Verify both are commits (... only works with commits)
+      let left_is_commit = rev_parse_is_commit(fs, git_dir, lid)
+      let right_is_commit = rev_parse_is_commit(fs, git_dir, rid)
+      if not(left_is_commit) || not(right_is_commit) {
+        if not(quiet) && not(revs_only) {
+          raise @bitcore.GitError::InvalidObject("unknown revision: " + arg)
+        }
+        return true
+      }
       // A...B = A B ^merge-base(A,B)
       if symbolic_full_name {
         let left_name = resolve_symbolic_full_name(fs, git_dir, left_spec)
@@ -3788,6 +3797,44 @@ async fn rev_parse_find_merge_base(
     }
   }
   None
+}
+
+///|
+/// Check if an object is a commit (or a tag pointing to a commit).
+async fn rev_parse_is_commit(
+  fs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  oid : @bitcore.ObjectId,
+) -> Bool raise Error {
+  let db = @bitlib.ObjectDb::load(fs, git_dir)
+  let mut current = oid
+  for _ in 0..<8 {
+    let obj = db.get(fs, current)
+    match obj {
+      Some(o) =>
+        match o.obj_type {
+          @bitcore.ObjectType::Commit => return true
+          @bitcore.ObjectType::Tag => {
+            let info = @bitcore.parse_commit(o.data) catch { _ => return false }
+            ignore(info)
+            // Parse tag target
+            let text = decode_bytes(o.data)
+            match rev_parse_extract_tag_target_name(text) {
+              Some(target_hex) => {
+                let target_id = @bitcore.ObjectId::from_hex(target_hex) catch {
+                  _ => return false
+                }
+                current = target_id
+              }
+              None => return false
+            }
+          }
+          _ => return false
+        }
+      None => return false
+    }
+  }
+  false
 }
 
 ///|
