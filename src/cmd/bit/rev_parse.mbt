@@ -767,6 +767,20 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
         }
         exclude_patterns.clear()
       }
+      "--all" => {
+        // --all: list all refs (branches + tags + remotes)
+        let refs = rev_parse_list_matching_refs(
+          fs,
+          git_dir,
+          "",
+          Some("refs/*"),
+          exclude_patterns,
+        )
+        for r in refs {
+          rev_parse_output_ref(r, symbolic_full_name, short_length)
+        }
+        exclude_patterns.clear()
+      }
       _ if arg.has_prefix("--glob=") => {
         let raw_pat = String::unsafe_substring(arg, start=7, end=arg.length())
         let pat = rev_parse_normalize_glob_pattern(raw_pat)
@@ -3447,7 +3461,7 @@ fn rev_parse_list_matching_refs(
     }
   }
   // Sort by refname for deterministic output
-  result.sort_by(fn(a, b) { a.0.compare(b.0) })
+  result.sort_by(fn(a, b) { lexicographic_compare(a.0, b.0) })
   result
 }
 

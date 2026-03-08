@@ -1,0 +1,13 @@
+diff --git i/t/t6018-rev-list-glob.sh w/t/t6018-rev-list-glob.sh
+index c824c1a25c..a1b3c5d2e1 100755
+--- i/t/t6018-rev-list-glob.sh
++++ w/t/t6018-rev-list-glob.sh
+@@ -84,7 +84,7 @@ test_expect_failure 'rev-parse accepts --glob as detached option' '
+
+ '
+
+-test_expect_failure 'rev-parse is not confused by option-like glob' '
++test_expect_success 'rev-parse is not confused by option-like glob' '
+
+ 	compare rev-parse "main" "--glob --symbolic main"
+
