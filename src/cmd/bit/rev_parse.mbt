@@ -81,6 +81,8 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
   let mut abbrev_ref = false
   let mut default_rev : String? = None
   let mut symbolic_full_name = false
+  let exclude_patterns : Array[String] = []
+  let exclude_hidden : Map[String, Bool] = {} // section -> seen
   let mut path_format : String? = None // "absolute" or "relative"
   let mut prefix : String? = None // --prefix <dir>
   let mut output_object_format : String? = None
@@ -635,6 +637,152 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
         } else {
           rev_parse_print_bisect(fs, git_dir)
         }
+      _ if arg.has_prefix("--exclude=") => {
+        let pat = String::unsafe_substring(arg, start=10, end=arg.length())
+        exclude_patterns.push(pat)
+      }
+      _ if arg.has_prefix("--exclude-hidden=") => {
+        let section = String::unsafe_substring(arg, start=17, end=arg.length())
+        if exclude_hidden.contains(section) {
+          eprint_line("fatal: --exclude-hidden= passed more than once")
+          @sys.exit(128)
+        }
+        exclude_hidden[section] = true
+      }
+      "--branches" => {
+        if exclude_hidden.length() > 0 {
+          eprint_line(
+            "error: options '--exclude-hidden' and '--branches' cannot be used together",
+          )
+          @sys.exit(1)
+        }
+        let refs = rev_parse_list_matching_refs(
+          fs,
+          git_dir,
+          "refs/heads/",
+          None,
+          exclude_patterns,
+        )
+        for r in refs {
+          rev_parse_output_ref(r, symbolic_full_name, short_length)
+        }
+        exclude_patterns.clear()
+      }
+      _ if arg.has_prefix("--branches=") => {
+        let pat = String::unsafe_substring(arg, start=11, end=arg.length())
+        // Check --exclude-hidden conflict
+        if exclude_hidden.length() > 0 {
+          eprint_line(
+            "error: options '--exclude-hidden' and '--branches' cannot be used together",
+          )
+          @sys.exit(1)
+        }
+        let refs = rev_parse_list_matching_refs(
+          fs,
+          git_dir,
+          "refs/heads/",
+          Some(pat),
+          exclude_patterns,
+        )
+        for r in refs {
+          rev_parse_output_ref(r, symbolic_full_name, short_length)
+        }
+        exclude_patterns.clear()
+      }
+      "--tags" => {
+        if exclude_hidden.length() > 0 {
+          eprint_line(
+            "error: options '--exclude-hidden' and '--tags' cannot be used together",
+          )
+          @sys.exit(1)
+        }
+        let refs = rev_parse_list_matching_refs(
+          fs,
+          git_dir,
+          "refs/tags/",
+          None,
+          exclude_patterns,
+        )
+        for r in refs {
+          rev_parse_output_ref(r, symbolic_full_name, short_length)
+        }
+        exclude_patterns.clear()
+      }
+      _ if arg.has_prefix("--tags=") => {
+        let pat = String::unsafe_substring(arg, start=7, end=arg.length())
+        if exclude_hidden.length() > 0 {
+          eprint_line(
+            "error: options '--exclude-hidden' and '--tags' cannot be used together",
+          )
+          @sys.exit(1)
+        }
+        let refs = rev_parse_list_matching_refs(
+          fs,
+          git_dir,
+          "refs/tags/",
+          Some(pat),
+          exclude_patterns,
+        )
+        for r in refs {
+          rev_parse_output_ref(r, symbolic_full_name, short_length)
+        }
+        exclude_patterns.clear()
+      }
+      "--remotes" => {
+        if exclude_hidden.length() > 0 {
+          eprint_line(
+            "error: options '--exclude-hidden' and '--remotes' cannot be used together",
+          )
+          @sys.exit(1)
+        }
+        let refs = rev_parse_list_matching_refs(
+          fs,
+          git_dir,
+          "refs/remotes/",
+          None,
+          exclude_patterns,
+        )
+        for r in refs {
+          rev_parse_output_ref(r, symbolic_full_name, short_length)
+        }
+        exclude_patterns.clear()
+      }
+      _ if arg.has_prefix("--remotes=") => {
+        let pat = String::unsafe_substring(arg, start=10, end=arg.length())
+        if exclude_hidden.length() > 0 {
+          eprint_line(
+            "error: options '--exclude-hidden' and '--remotes' cannot be used together",
+          )
+          @sys.exit(1)
+        }
+        let refs = rev_parse_list_matching_refs(
+          fs,
+          git_dir,
+          "refs/remotes/",
+          Some(pat),
+          exclude_patterns,
+        )
+        for r in refs {
+          rev_parse_output_ref(r, symbolic_full_name, short_length)
+        }
+        exclude_patterns.clear()
+      }
+      _ if arg.has_prefix("--glob=") => {
+        let raw_pat = String::unsafe_substring(arg, start=7, end=arg.length())
+        let pat = rev_parse_normalize_glob_pattern(raw_pat)
+        // --glob uses "" prefix and full pattern match
+        let refs = rev_parse_list_matching_refs(
+          fs,
+          git_dir,
+          "",
+          Some(pat),
+          exclude_patterns,
+        )
+        for r in refs {
+          rev_parse_output_ref(r, symbolic_full_name, short_length)
+        }
+        // --glob does NOT clear exclude patterns (unlike --branches/--tags/--remotes)
+      }
       _ if arg.has_prefix("-") => warn_unimplemented_arg("rev-parse", arg)
       _ => {
         // Expand @{-N} prefix to actual branch name
@@ -3160,4 +3308,162 @@ async fn eprint_string(s : String) -> Unit {
 ///|
 async fn parseopt_print_string(s : String) -> Unit {
   @stdio.stdout.write(str_to_bytes(s))
+}
+
+///|
+async fn rev_parse_output_ref(
+  ref_entry : (String, @bitcore.ObjectId),
+  symbolic_full_name : Bool,
+  short_length : Int?,
+) -> Unit raise Error {
+  if symbolic_full_name {
+    print_line(ref_entry.0)
+  } else {
+    let hex = ref_entry.1.to_hex()
+    match short_length {
+      Some(length) => print_line(shorten_oid_hex(hex, length))
+      None => print_line(hex)
+    }
+  }
+}
+
+///|
+/// Glob match for ref patterns. Supports `*` (any chars) and `?` (single char).
+/// Non-glob patterns match as exact or path prefix (with `/` boundary).
+fn rev_parse_glob_match(text : String, pattern : String) -> Bool {
+  let has_star = pattern.find("*") is Some(_)
+  let has_question = pattern.find("?") is Some(_)
+  if not(has_star) && not(has_question) {
+    // Non-glob: exact match or path-prefix match
+    text == pattern ||
+    (
+      text.has_prefix(pattern) &&
+      pattern.length() < text.length() &&
+      (pattern[pattern.length() - 1] == '/' || text[pattern.length()] == '/')
+    )
+  } else {
+    // Glob match with * and ?
+    let t = text.to_array()
+    let p = pattern.to_array()
+    rev_parse_glob_match_inner(t, 0, p, 0)
+  }
+}
+
+///|
+fn rev_parse_glob_match_inner(
+  t : Array[Char],
+  ti : Int,
+  p : Array[Char],
+  pi : Int,
+) -> Bool {
+  let mut ti = ti
+  let mut pi = pi
+  while pi < p.length() {
+    if p[pi] == '*' {
+      pi += 1
+      // Try matching * against 0..N chars
+      for k = ti; k <= t.length(); k = k + 1 {
+        if rev_parse_glob_match_inner(t, k, p, pi) {
+          return true
+        }
+      }
+      return false
+    } else if p[pi] == '?' {
+      if ti >= t.length() {
+        return false
+      }
+      ti += 1
+      pi += 1
+    } else {
+      if ti >= t.length() || t[ti] != p[pi] {
+        return false
+      }
+      ti += 1
+      pi += 1
+    }
+  }
+  ti == t.length()
+}
+
+///|
+/// List refs matching a glob pattern under a given prefix, applying exclude patterns.
+/// prefix: "refs/heads/", "refs/tags/", "refs/remotes/", or "" for --glob
+/// pattern: optional sub-pattern (e.g., "subspace/*" for --branches=subspace/*)
+/// exclude_patterns: list of patterns to exclude (from --exclude)
+fn rev_parse_list_matching_refs(
+  fs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  prefix : String,
+  pattern : String?,
+  exclude_patterns : Array[String],
+) -> Array[(String, @bitcore.ObjectId)] {
+  let all_refs = @bitlib.list_refs_with_ids(fs, git_dir, Some(prefix))
+  let result : Array[(String, @bitcore.ObjectId)] = []
+  for refname, oid in all_refs {
+    // Apply glob pattern if specified
+    match pattern {
+      Some(pat) => {
+        // The pattern matches against the portion after prefix
+        let short_name = if refname.has_prefix(prefix) {
+          String::unsafe_substring(
+            refname,
+            start=prefix.length(),
+            end=refname.length(),
+          )
+        } else {
+          refname
+        }
+        // Build full pattern: prefix + pattern (for --glob, prefix is already in pattern)
+        let full_pattern = if prefix.length() > 0 { prefix + pat } else { pat }
+        if not(rev_parse_glob_match(refname, full_pattern)) {
+          continue
+        }
+        // Also try short name match for simple patterns
+        ignore(short_name)
+      }
+      None => ()
+    }
+    // Apply exclude patterns
+    let mut excluded = false
+    for excl in exclude_patterns {
+      // Exclude matches against short name (after refs/heads/, refs/tags/, etc.)
+      let short_name = if refname.has_prefix("refs/heads/") {
+        String::unsafe_substring(refname, start=11, end=refname.length())
+      } else if refname.has_prefix("refs/tags/") {
+        String::unsafe_substring(refname, start=10, end=refname.length())
+      } else if refname.has_prefix("refs/remotes/") {
+        String::unsafe_substring(refname, start=13, end=refname.length())
+      } else {
+        refname
+      }
+      if rev_parse_glob_match(short_name, excl) ||
+        rev_parse_glob_match(refname, excl) {
+        excluded = true
+        break
+      }
+    }
+    if not(excluded) {
+      result.push((refname, oid))
+    }
+  }
+  // Sort by refname for deterministic output
+  result.sort_by(fn(a, b) { a.0.compare(b.0) })
+  result
+}
+
+///|
+/// Normalize a glob pattern, expanding shorthand prefixes.
+/// "heads/*" -> "refs/heads/*", "refs/heads/*" -> "refs/heads/*"
+fn rev_parse_normalize_glob_pattern(pattern : String) -> String {
+  if pattern.has_prefix("refs/") {
+    pattern
+  } else if pattern.has_prefix("heads/") {
+    "refs/" + pattern
+  } else if pattern.has_prefix("tags/") {
+    "refs/" + pattern
+  } else if pattern.has_prefix("remotes/") {
+    "refs/" + pattern
+  } else {
+    "refs/" + pattern
+  }
 }
