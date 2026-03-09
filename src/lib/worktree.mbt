@@ -182,13 +182,27 @@ pub fn add_paths(
         normalized,
       )
       let size = content.length()
+      let meta = @bitio.worktree_entry_meta_sync(rfs, abs)
+      let mtime_sec = meta.map(info => info.mtime_sec.unwrap_or(0)).unwrap_or(0)
+      let mtime_nsec = meta
+        .map(info => info.mtime_nsec.unwrap_or(0))
+        .unwrap_or(0)
+      let dev = meta.map(info => info.dev.unwrap_or(0)).unwrap_or(0)
+      let ino = meta.map(info => info.ino.unwrap_or(0)).unwrap_or(0)
+      let uid = meta.map(info => info.uid.unwrap_or(0)).unwrap_or(0)
+      let gid = meta.map(info => info.gid.unwrap_or(0)).unwrap_or(0)
       map[path] = {
         path,
         id,
         mode: default_file_mode(),
         size,
-        mtime_sec: 0,
-        mtime_nsec: 0,
+        mtime_sec,
+        mtime_nsec,
+        intent_to_add: false,
+        dev,
+        ino,
+        uid,
+        gid,
       }
     } else {
       map.remove(path)
@@ -286,6 +300,10 @@ pub async fn add_paths_async(
             )
             let size = content.length()
             let (mtime_sec, mtime_nsec) = info.mtime()
+            let dev = info.dev.unwrap_or(0)
+            let ino = info.ino.unwrap_or(0)
+            let uid = info.uid.unwrap_or(0)
+            let gid = info.gid.unwrap_or(0)
             let mode = if core_filemode {
               info.mode
             } else {
@@ -294,7 +312,19 @@ pub async fn add_paths_async(
                 None => default_file_mode()
               }
             }
-            map[path] = { path, id, mode, size, mtime_sec, mtime_nsec }
+            map[path] = {
+              path,
+              id,
+              mode,
+              size,
+              mtime_sec,
+              mtime_nsec,
+              intent_to_add: false,
+              dev,
+              ino,
+              uid,
+              gid,
+            }
           }
           @bitio.WorktreeKindMeta::Symlink =>
             match @bitio.read_symlink_target_path(abs) {
@@ -308,6 +338,10 @@ pub async fn add_paths_async(
                 )
                 let size = bytes.length()
                 let (mtime_sec, mtime_nsec) = info.mtime()
+                let dev = info.dev.unwrap_or(0)
+                let ino = info.ino.unwrap_or(0)
+                let uid = info.uid.unwrap_or(0)
+                let gid = info.gid.unwrap_or(0)
                 map[path] = {
                   path,
                   id,
@@ -315,6 +349,11 @@ pub async fn add_paths_async(
                   size,
                   mtime_sec,
                   mtime_nsec,
+                  intent_to_add: false,
+                  dev,
+                  ino,
+                  uid,
+                  gid,
                 }
               }
               None => ()
@@ -1119,6 +1158,11 @@ pub fn write_tree_from_index(
             size: e.size,
             mtime_sec: e.mtime_sec,
             mtime_nsec: e.mtime_nsec,
+            intent_to_add: e.intent_to_add,
+            dev: e.dev,
+            ino: e.ino,
+            uid: e.uid,
+            gid: e.gid,
           })
         }
       }
@@ -1183,6 +1227,11 @@ fn write_tree_from_entries(
               size: e.size,
               mtime_sec: e.mtime_sec,
               mtime_nsec: e.mtime_nsec,
+              intent_to_add: e.intent_to_add,
+              dev: e.dev,
+              ino: e.ino,
+              uid: e.uid,
+              gid: e.gid,
             })
           None =>
             dir_map[name] = [
@@ -1193,6 +1242,11 @@ fn write_tree_from_entries(
                 size: e.size,
                 mtime_sec: e.mtime_sec,
                 mtime_nsec: e.mtime_nsec,
+                intent_to_add: e.intent_to_add,
+                dev: e.dev,
+                ino: e.ino,
+                uid: e.uid,
+                gid: e.gid,
               },
             ]
         }
@@ -1631,6 +1685,11 @@ pub fn mv_path(
     size: src_entry.size,
     mtime_sec: src_entry.mtime_sec,
     mtime_nsec: src_entry.mtime_nsec,
+    intent_to_add: src_entry.intent_to_add,
+    dev: src_entry.dev,
+    ino: src_entry.ino,
+    uid: src_entry.uid,
+    gid: src_entry.gid,
   }
   // Move file on disk
   let content = rfs.read_file(src_abs)

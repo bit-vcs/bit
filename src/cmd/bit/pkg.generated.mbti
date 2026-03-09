@@ -109,6 +109,8 @@ type HubWorkItemListOptions
 
 type LogWalkEntry
 
+type LsFilesTrackedEntry
+
 type MailmapEntry
 
 type MboxPatch

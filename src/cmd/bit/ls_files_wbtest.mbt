@@ -11,6 +11,21 @@ test "ls-files: directory prefix filter works" {
 }
 
 ///|
+test "ls-files: trailing slash filter matches directory output" {
+  assert_true(ls_files_matches_filters("untracked/deep/", ["untracked/deep/"]))
+  assert_true(
+    ls_files_matches_filters("partially_tracked/untracked_dir/", [
+      "partially_tracked/",
+    ]),
+  )
+}
+
+///|
+test "ls-files: wildcard directory filter matches directory output" {
+  assert_true(ls_files_matches_filters("untracked/deep/", ["untracked/?*"]))
+}
+
+///|
 test "ls-files: wildcard prefix filter" {
   let long_name = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
   assert_true(ls_files_matches_filters(long_name, ["a*"]))
@@ -23,10 +38,57 @@ test "ls-files: normalize keeps wildcard filter as-is" {
 }
 
 ///|
+test "ls-files: absolute filter inside repo becomes repo-relative" {
+  assert_eq(normalize_ls_files_filters(["/repo/subs/link"], "subs", "/repo"), [
+    "subs/link",
+  ])
+}
+
+///|
+test "ls-files: absolute filter outside repo stays absolute" {
+  assert_eq(normalize_ls_files_filters(["/outside/link"], "subs", "/repo"), [
+    "/outside/link",
+  ])
+}
+
+///|
+test "ls-files: normalize preserves pathspec magic" {
+  assert_eq(
+    normalize_ls_files_filters([":(exclude)../submodule"], "b", "/repo"),
+    [":(exclude)submodule"],
+  )
+}
+
+///|
 test "ls-files: wildcard filter matches index scan" {
   let entries = [ls_files_entry("a_long_path.txt"), ls_files_entry("other.txt")]
-  assert_true(ls_files_filter_has_match("a*", entries))
-  assert_true(not(ls_files_filter_has_match("b*", entries)))
+  assert_true(
+    entries
+    .iter()
+    .any(fn(entry) { ls_files_pathspec_matches(entry.path, "a*") }),
+  )
+  assert_true(
+    not(
+      entries
+      .iter()
+      .any(fn(entry) { ls_files_pathspec_matches(entry.path, "b*") }),
+    ),
+  )
+}
+
+///|
+test "ls-files: icase pathspec matches case-insensitively" {
+  assert_true(ls_files_matches_filters("submodule/f.TXT", [":(icase)*.txt"]))
+  assert_true(
+    ls_files_matches_filters("submodule/subsub/e.txt", [":(icase)*.txt"]),
+  )
+}
+
+///|
+test "ls-files: exclude pathspec removes matching entries" {
+  let filters = [":(icase)*.txt", ":(exclude)submodule/subsub/*"]
+  assert_true(ls_files_matches_filters("submodule/g.txt", filters))
+  assert_true(not(ls_files_matches_filters("submodule/subsub/e.txt", filters)))
 }
 
 ///|
@@ -36,7 +98,18 @@ test "ls-files: compare directory and file suffix order" {
 }
 
 ///|
+test "ls-files: display path relativizes sibling and parent paths" {
+  assert_eq(make_display_path("top/x", "top/sub"), "../x")
+  assert_eq(
+    make_display_path("never-mind-me", "top/sub"),
+    "../../never-mind-me",
+  )
+  assert_eq(make_display_path("top/dir/", "top/sub"), "../dir/")
+}
+
+///|
 test "ls-files: untracked directory compression" {
+  assert_true(ls_files_is_within_untracked_dir("untracked/deep", ["untracked"]))
   assert_true(
     ls_files_is_within_untracked_dir("partially_tracked/untracked/file.txt", [
       "partially_tracked/untracked",

@@ -183,19 +183,19 @@ CI 失敗: **101/906** (2026-03-09, commit b3f62de)
 ## P3.5: realgit 委譲の削減
 
 方針: CI SHIM_STRICT=1 で bit に通すコマンドを段階的に増やす。
-CI SHIM_CMDS: 14 コマンド (config show-ref for-each-ref rev-parse cat-file hash-object ls-tree write-tree commit-tree receive-pack upload-pack pack-objects index-pack shell)
+CI SHIM_CMDS: 17 コマンド (init add ls-files tag config show-ref for-each-ref rev-parse cat-file hash-object ls-tree write-tree commit-tree receive-pack upload-pack pack-objects index-pack shell)
 
 ### Tier 1: 超高頻度（1000+ 呼出）
 - [ ] `checkout` (3765)
 - [ ] `commit` (3596)
-- [ ] `add` (3268)
+- [x] `add` (3268)
 - [ ] `reset` (1923)
 - [ ] `branch` (1749)
-- [ ] `init` (1667)
-- [ ] `tag` (1199)
+- [x] `init` (1667)
+- [x] `tag` (1199)
 - [ ] `diff` (1196)
 - [ ] `log` (1173)
-- [ ] `ls-files` (1162)
+- [x] `ls-files` (1162)
 
 ### Tier 2: 高頻度（400–999 呼出）
 - [ ] `rebase` (991), `clone` (953), `merge` (889), `update-ref` (824)

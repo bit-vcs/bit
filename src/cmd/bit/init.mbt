@@ -745,9 +745,7 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
   if ref_format == "reftable" && not(is_reinit) {
     bootstrap_reftable_head_table(fs, actual_git_dir, branch)
   }
-  if ref_format == "reftable" {
-    apply_reftable_shared_permissions(fs, actual_git_dir, shared_mode)
-  }
+  apply_init_shared_permissions(fs, actual_git_dir, shared_mode)
   // After --separate-git-dir move, update linked worktree gitdir pointers.
   // When the main git dir moves (e.g., mainwt/.git → seprepo/), each linked
   // worktree's .git file still points to the old location. We need to update
@@ -824,46 +822,101 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
 }
 
 ///|
-async fn apply_reftable_shared_permissions(
+async fn apply_init_shared_permissions(
   fs : OsFs,
   git_dir : String,
   shared_mode : String?,
 ) -> Unit {
-  let chmod_mode = match shared_mode {
+  match init_shared_file_mode(shared_mode) {
+    Some(file_mode) => {
+      let dir_mode = init_shared_dir_mode(file_mode)
+      init_apply_shared_permissions_recursive(fs, git_dir, file_mode, dir_mode) catch {
+        _ => ()
+      }
+    }
+    None => ()
+  }
+}
+
+///|
+fn init_shared_file_mode(shared_mode : String?) -> Int? {
+  match shared_mode {
     Some(value) => {
       let normalized = value.to_lower()
-      if normalized == "world" ||
+      if normalized == "" ||
+        normalized == "false" ||
+        normalized == "umask" ||
+        normalized == "0" {
+        None
+      } else if normalized == "group" ||
+        normalized == "true" ||
+        normalized == "1" {
+        Some(0o660)
+      } else if normalized == "world" ||
         normalized == "all" ||
         normalized == "everybody" ||
         normalized == "2" {
         Some(0o664)
       } else {
-        None
+        init_parse_octal_mode(normalized)
       }
     }
     None => None
   }
-  match chmod_mode {
-    Some(mode) => {
-      let reftable_dir = git_dir + "/reftable"
-      let tables_list_path = reftable_dir + "/tables.list"
-      if fs.is_file(tables_list_path) {
-        @asyncfs.chmod(tables_list_path[:], mode) catch {
-          _ => ()
-        }
-      }
-      if fs.is_dir(reftable_dir) {
-        for entry in fs.readdir(reftable_dir) {
-          if entry.has_suffix(".ref") {
-            let table_path = reftable_dir + "/" + entry
-            @asyncfs.chmod(table_path[:], mode) catch {
-              _ => ()
-            }
-          }
-        }
-      }
+}
+
+///|
+fn init_shared_dir_mode(file_mode : Int) -> Int {
+  let mut dir_mode = file_mode | 0o2000
+  if (file_mode & 0o600) != 0 {
+    dir_mode = dir_mode | 0o100
+  }
+  if (file_mode & 0o060) != 0 {
+    dir_mode = dir_mode | 0o010
+  }
+  if (file_mode & 0o006) != 0 {
+    dir_mode = dir_mode | 0o001
+  }
+  dir_mode
+}
+
+///|
+fn init_parse_octal_mode(raw : String) -> Int? {
+  if raw == "" {
+    return None
+  }
+  let mut value = 0
+  for ch in raw {
+    if ch < '0' || ch > '7' {
+      return None
     }
-    None => ()
+    value = value * 8 + (ch.to_int() - '0'.to_int())
+  }
+  Some(value)
+}
+
+///|
+async fn init_apply_shared_permissions_recursive(
+  fs : OsFs,
+  path : String,
+  file_mode : Int,
+  dir_mode : Int,
+) -> Unit raise Error {
+  if fs.is_dir(path) {
+    @asyncfs.chmod(path[:], dir_mode)
+    for entry in fs.readdir(path) {
+      if entry == "." || entry == ".." {
+        continue
+      }
+      init_apply_shared_permissions_recursive(
+        fs,
+        path + "/" + entry,
+        file_mode,
+        dir_mode,
+      )
+    }
+  } else if fs.is_file(path) {
+    @asyncfs.chmod(path[:], file_mode)
   }
 }
 
@@ -953,18 +1006,29 @@ fn compute_relative_path(from_dir : String, to_path : String) -> String {
 ///|
 /// Normalize a path by resolving `.` and `..` components.
 fn init_normalize_path(p : String) -> String {
+  let is_absolute = p.has_prefix("/")
   let parts = p.split("/")
   let result : Array[String] = []
   for part in parts {
     match part {
-      "." => continue
-      ".." => if result.length() > 1 { let _ = result.pop() }
-      "" if result.length() > 0 => continue
+      "" | "." => continue
+      ".." =>
+        if result.length() > 0 && result[result.length() - 1] != ".." {
+          let _ = result.pop()
+        } else if not(is_absolute) {
+          result.push("..")
+        }
       _ => result.push(part.to_string())
     }
   }
   if result.length() == 0 {
-    "/"
+    if is_absolute {
+      "/"
+    } else {
+      "."
+    }
+  } else if is_absolute {
+    "/" + result.join("/")
   } else {
     result.join("/")
   }

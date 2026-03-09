@@ -78,7 +78,7 @@ pub fn create_branch(&@types.FileSystem, &@types.RepoFileSystem, String, String)
 
 pub fn create_branch_at(&@types.FileSystem, &@types.RepoFileSystem, String, String, @object.ObjectId) -> Unit raise @object.GitError
 
-pub fn create_lightweight_tag(&@types.FileSystem, String, String, @object.ObjectId) -> Unit raise @object.GitError
+pub fn create_lightweight_tag(&@types.FileSystem, &@types.RepoFileSystem, String, String, @object.ObjectId) -> Unit raise @object.GitError
 
 pub fn create_reflog(&@types.FileSystem, &@types.RepoFileSystem, String, String) -> Unit raise @object.GitError
 
@@ -283,6 +283,8 @@ pub fn read_skip_worktree_paths(&@types.RepoFileSystem, String) -> Map[String, B
 pub fn read_sparse_patterns(&@types.RepoFileSystem, String) -> Array[String] raise @object.GitError
 
 pub fn read_subdir_attributes(&@types.RepoFileSystem, String) -> (String, String, String)?
+
+pub fn read_unmerged_paths(&@types.RepoFileSystem, String) -> Map[String, Bool]
 
 pub fn rebase_abort(&@types.FileSystem, &@types.RepoFileSystem, String) -> Unit raise @object.GitError
 
@@ -575,8 +577,13 @@ pub struct IndexEntry {
   size : Int
   mtime_sec : Int
   mtime_nsec : Int
+  intent_to_add : Bool
+  dev : Int
+  ino : Int
+  uid : Int
+  gid : Int
 }
-pub fn IndexEntry::new(String, @object.ObjectId, Int, Int, mtime_sec? : Int, mtime_nsec? : Int) -> Self
+pub fn IndexEntry::new(String, @object.ObjectId, Int, Int, mtime_sec? : Int, mtime_nsec? : Int, intent_to_add? : Bool, dev? : Int, ino? : Int, uid? : Int, gid? : Int) -> Self
 
 pub(all) struct InitOptions {
   default_branch : String

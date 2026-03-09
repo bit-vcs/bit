@@ -1521,6 +1521,73 @@ async fn for_each_ref_peel_to_commit(
 }
 
 ///|
+fn for_each_ref_object_type_name(obj_type : @bitcore.ObjectType) -> String {
+  match obj_type {
+    @bitcore.ObjectType::Commit => "commit"
+    @bitcore.ObjectType::Tree => "tree"
+    @bitcore.ObjectType::Blob => "blob"
+    @bitcore.ObjectType::Tag => "tag"
+  }
+}
+
+///|
+fn for_each_ref_peel_terminal_object(
+  fs : OsFs,
+  db : @bitlib.ObjectDb,
+  id : @bitcore.ObjectId,
+) -> (@bitcore.ObjectId, String)? {
+  let mut current_id = id
+  for _ in 0..<100 {
+    let obj = db.get(fs, current_id) catch { _ => return None }
+    match obj {
+      Some(o) =>
+        if o.obj_type == @bitcore.ObjectType::Tag {
+          let tag_text = decode_bytes(o.data)
+          let mut target_hex = ""
+          for line_view in tag_text.split("\n") {
+            let line = line_view.to_string()
+            if line.has_prefix("object ") {
+              target_hex = String::unsafe_substring(
+                line,
+                start=7,
+                end=line.length(),
+              )
+              break
+            }
+          }
+          if target_hex == "" {
+            return None
+          }
+          current_id = @bitcore.ObjectId::from_hex(target_hex) catch {
+            _ => return None
+          }
+        } else {
+          return Some((current_id, for_each_ref_object_type_name(o.obj_type)))
+        }
+      None => return None
+    }
+  }
+  None
+}
+
+///|
+fn for_each_ref_peel_to_commit_sync(
+  fs : OsFs,
+  db : @bitlib.ObjectDb,
+  id : @bitcore.ObjectId,
+) -> @bitcore.ObjectId? {
+  match for_each_ref_peel_terminal_object(fs, db, id) {
+    Some((terminal_id, terminal_type)) =>
+      if terminal_type == "commit" {
+        Some(terminal_id)
+      } else {
+        None
+      }
+    None => None
+  }
+}
+
+///|
 // Check if ancestor_id is an ancestor of (or equal to) descendant_id.
 // Uses BFS walking from descendant through parent chain.
 async fn for_each_ref_is_ancestor(
@@ -2586,7 +2653,42 @@ async fn for_each_ref_atom(
       // Not fully implemented
       ""
     _ if atom.has_prefix("is-base:") => is_base_value
-    _ if atom.has_prefix("ahead-behind:") => "0 0" // TODO: full ahead-behind
+    _ if atom.has_prefix("ahead-behind:") => {
+      let committish = String::unsafe_substring(
+        atom,
+        start=13,
+        end=atom.length(),
+      )
+      let local_commit = for_each_ref_peel_to_commit_sync(fs, db, id)
+      guard local_commit is Some(local_id) else {
+        match for_each_ref_peel_terminal_object(fs, db, id) {
+          Some((bad_id, bad_type)) =>
+            if bad_type != "commit" {
+              eprint_line(
+                "error: object " +
+                bad_id.to_hex() +
+                " is a " +
+                bad_type +
+                ", not a commit",
+              )
+            }
+          None => ()
+        }
+        return ""
+      }
+      let upstream_opt = @bitrepo.rev_parse(fs, git_dir, committish) catch {
+        _ => None
+      }
+      guard upstream_opt is Some(upstream_id) else { return "" }
+      let upstream_commit = for_each_ref_peel_to_commit_sync(
+        fs, db, upstream_id,
+      )
+      guard upstream_commit is Some(upstream_commit_id) else { return "" }
+      let (ahead, behind) = for_each_ref_ahead_behind_commits(
+        fs, db, local_id, upstream_commit_id,
+      )
+      "\{ahead} \{behind}"
+    }
     "worktreepath" =>
       // Check if this ref's branch is checked out in a worktree
       if refname.has_prefix("refs/heads/") {
@@ -3738,11 +3840,27 @@ fn for_each_ref_ahead_behind(
   let local_opt = @bitrepo.rev_parse(fs, git_dir, local_ref) catch {
     _ => return (0, 0)
   }
-  guard local_opt is Some(local_id) else { return (0, 0) }
+  guard local_opt is Some(local_resolved_id) else { return (0, 0) }
+  let local_commit = for_each_ref_peel_to_commit_sync(fs, db, local_resolved_id)
+  guard local_commit is Some(local_id) else { return (0, 0) }
   let upstream_opt = @bitrepo.rev_parse(fs, git_dir, upstream_ref) catch {
     _ => return (0, 0)
   }
-  guard upstream_opt is Some(upstream_id) else { return (0, 0) }
+  guard upstream_opt is Some(upstream_resolved_id) else { return (0, 0) }
+  let upstream_commit = for_each_ref_peel_to_commit_sync(
+    fs, db, upstream_resolved_id,
+  )
+  guard upstream_commit is Some(upstream_id) else { return (0, 0) }
+  for_each_ref_ahead_behind_commits(fs, db, local_id, upstream_id)
+}
+
+///|
+fn for_each_ref_ahead_behind_commits(
+  fs : OsFs,
+  db : @bitlib.ObjectDb,
+  local_id : @bitcore.ObjectId,
+  upstream_id : @bitcore.ObjectId,
+) -> (Int, Int) {
   if local_id.to_hex() == upstream_id.to_hex() {
     return (0, 0)
   }

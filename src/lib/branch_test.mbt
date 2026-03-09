@@ -141,3 +141,56 @@ test "branch: delete_branch prunes empty parent directories for nested refs" {
   assert_true(not(fs.is_file("/repo/.git/refs/heads/branch/conflict")))
   assert_true(not(fs.is_dir("/repo/.git/refs/heads/branch")))
 }
+
+///|
+test "branch: create_lightweight_tag rejects conflicting parent ref path" {
+  let fs = @bit.TestFs::new()
+  fs.mkdir_p("/repo/.git/refs/tags/foo")
+  fs.write_string(
+    "/repo/.git/refs/tags/foo/bar", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
+  )
+  let result = try? create_lightweight_tag(
+    fs,
+    fs,
+    "/repo/.git",
+    "foo",
+    @bit.ObjectId::from_hex("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+  )
+  assert_true(result is Err(_))
+  assert_true(fs.is_file("/repo/.git/refs/tags/foo/bar"))
+  assert_true(not(fs.is_file("/repo/.git/refs/tags/foo")))
+}
+
+///|
+test "branch: create_lightweight_tag rejects conflicting packed ref path" {
+  let fs = @bit.TestFs::new()
+  fs.write_string(
+    "/repo/.git/packed-refs", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa refs/tags/foo/bar\n",
+  )
+  let result = try? create_lightweight_tag(
+    fs,
+    fs,
+    "/repo/.git",
+    "foo",
+    @bit.ObjectId::from_hex("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+  )
+  assert_true(result is Err(_))
+  assert_true(not(fs.is_file("/repo/.git/refs/tags/foo")))
+}
+
+///|
+test "branch: create_lightweight_tag creates parent directories for nested refs" {
+  let fs = @bit.TestFs::new()
+  create_lightweight_tag(
+    fs,
+    fs,
+    "/repo/.git",
+    "foo/bar",
+    @bit.ObjectId::from_hex("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+  )
+  assert_true(fs.is_dir("/repo/.git/refs/tags/foo"))
+  assert_eq(
+    fs.read_string("/repo/.git/refs/tags/foo/bar"),
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n",
+  )
+}

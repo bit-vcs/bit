@@ -8,6 +8,11 @@ pub struct IndexEntry {
   size : Int
   mtime_sec : Int
   mtime_nsec : Int
+  intent_to_add : Bool
+  dev : Int
+  ino : Int
+  uid : Int
+  gid : Int
 }
 
 ///|
@@ -18,8 +23,25 @@ pub fn IndexEntry::new(
   size : Int,
   mtime_sec? : Int = 0,
   mtime_nsec? : Int = 0,
+  intent_to_add? : Bool = false,
+  dev? : Int = 0,
+  ino? : Int = 0,
+  uid? : Int = 0,
+  gid? : Int = 0,
 ) -> IndexEntry {
-  { path, id, mode, size, mtime_sec, mtime_nsec }
+  {
+    path,
+    id,
+    mode,
+    size,
+    mtime_sec,
+    mtime_nsec,
+    intent_to_add,
+    dev,
+    ino,
+    uid,
+    gid,
+  }
 }
 
 ///|
@@ -64,10 +86,16 @@ pub fn read_index_entries(
     offset += 4
     let mtime_nsec = index_read_u32_be(data, offset)
     offset += 4
-    offset += 8 // skip dev, ino (2 u32)
+    let dev = index_read_u32_be(data, offset)
+    offset += 4
+    let ino = index_read_u32_be(data, offset)
+    offset += 4
     let mode = index_read_u32_be(data, offset)
     offset += 4
-    offset += 8 // skip uid, gid (2 u32)
+    let uid = index_read_u32_be(data, offset)
+    offset += 4
+    let gid = index_read_u32_be(data, offset)
+    offset += 4
     let size = index_read_u32_be(data, offset)
     offset += 4
     let id = index_read_object_id(data, offset)
@@ -76,8 +104,12 @@ pub fn read_index_entries(
     let flags = index_read_u16_be(data, offset)
     offset += 2
     let stage = (flags >> 12) & 0x3
-    // Check extended flag (bit 14) - if set, skip 2 more bytes
     let has_extended = (flags & 0x4000) != 0
+    let ext_flags = if has_extended {
+      index_read_u16_be(data, offset)
+    } else {
+      0
+    }
     if has_extended {
       offset += 2
     }
@@ -95,7 +127,19 @@ pub fn read_index_entries(
     if stage != 0 {
       has_conflicts = true
     }
-    entries.push({ path: path_str, id, mode, size, mtime_sec, mtime_nsec })
+    entries.push({
+      path: path_str,
+      id,
+      mode,
+      size,
+      mtime_sec,
+      mtime_nsec,
+      intent_to_add: index_ext_flags_has_intent_to_add(ext_flags),
+      dev,
+      ino,
+      uid,
+      gid,
+    })
     stages.push(stage)
   }
   if has_conflicts {
@@ -193,6 +237,57 @@ pub fn read_skip_worktree_paths(
 }
 
 ///|
+pub fn read_unmerged_paths(
+  fs : &@bit.RepoFileSystem,
+  git_dir : String,
+) -> Map[String, Bool] {
+  let out : Map[String, Bool] = {}
+  let index_path = join_path(git_dir, "index")
+  if not(fs.is_file(index_path)) {
+    return out
+  }
+  let data = fs.read_file(index_path) catch { _ => return out }
+  if data.length() < 12 + 20 {
+    return out
+  }
+  if not(
+      data[0] == b'D' && data[1] == b'I' && data[2] == b'R' && data[3] == b'C',
+    ) {
+    return out
+  }
+  let version = index_read_u32_be(data, 4) catch { _ => return out }
+  if version != 2 && version != 3 {
+    return out
+  }
+  let count = index_read_u32_be(data, 8) catch { _ => return out }
+  let mut offset = 12
+  for _ in 0..<count {
+    if offset + 62 > data.length() {
+      return out
+    }
+    let flags = index_read_u16_be(data, offset + 60) catch { _ => return out }
+    let stage = (flags >> 12) & 0x3
+    let has_extended = (flags & 0x4000) != 0
+    let fixed_size = if has_extended { 64 } else { 62 }
+    let path_start = offset + fixed_size
+    let mut i = path_start
+    while i < data.length() && data[i] != b'\x00' {
+      i += 1
+    }
+    if i >= data.length() {
+      return out
+    }
+    if stage != 0 {
+      out[@utf8.decode_lossy(data[path_start:i])] = true
+    }
+    let path_len = i - path_start
+    let entry_size = (fixed_size + path_len + 1 + 7) / 8 * 8
+    offset += entry_size
+  }
+  out
+}
+
+///|
 pub fn write_skip_worktree_paths(
   fs : &@bit.FileSystem,
   git_dir : String,
@@ -221,8 +316,8 @@ pub fn write_skip_worktree_paths(
 }
 
 ///|
-fn index_entry_buf_size(path_len : Int, skip_worktree : Bool) -> Int {
-  let fixed_size = if skip_worktree { 64 } else { 62 }
+fn index_entry_buf_size(path_len : Int, has_extended : Bool) -> Int {
+  let fixed_size = if has_extended { 64 } else { 62 }
   (fixed_size + path_len + 1 + 7) / 8 * 8
 }
 
@@ -239,8 +334,11 @@ fn write_index_entry_to_buf(
   fa_set_u32_be(buf, pos + 4, e.mtime_nsec) // ctime_nsec
   fa_set_u32_be(buf, pos + 8, e.mtime_sec) // mtime_sec
   fa_set_u32_be(buf, pos + 12, e.mtime_nsec) // mtime_nsec
-  // dev, ino, uid, gid are zero (filled by make)
+  fa_set_u32_be(buf, pos + 16, e.dev)
+  fa_set_u32_be(buf, pos + 20, e.ino)
   fa_set_u32_be(buf, pos + 24, e.mode) // mode
+  fa_set_u32_be(buf, pos + 28, e.uid)
+  fa_set_u32_be(buf, pos + 32, e.gid)
   fa_set_u32_be(buf, pos + 36, e.size) // file_size
   pos += 40
   // object id (20 bytes)
@@ -251,13 +349,15 @@ fn write_index_entry_to_buf(
   // flags
   let name_len = if e.path.length() < 0x0fff { e.path.length() } else { 0x0fff }
   let mut flags = name_len
-  if skip_worktree {
+  let ext_flags = index_extended_flags(e.intent_to_add, skip_worktree)
+  let has_extended = ext_flags != 0
+  if has_extended {
     flags = flags | 0x4000
   }
   fa_set_u16_be(buf, pos, flags)
   pos += 2
-  if skip_worktree {
-    fa_set_u16_be(buf, pos, 0x4000)
+  if has_extended {
+    fa_set_u16_be(buf, pos, ext_flags)
     pos += 2
   }
   // path bytes
@@ -266,7 +366,7 @@ fn write_index_entry_to_buf(
     pos += 1
   }
   // NUL + padding to 8-byte alignment (already zeroed)
-  entry_start + index_entry_buf_size(e.path.length(), skip_worktree)
+  entry_start + index_entry_buf_size(e.path.length(), has_extended)
 }
 
 ///|
@@ -281,7 +381,10 @@ fn write_index_buf(
       Some(m) => m.contains(e.path)
       None => false
     }
-    total_size += index_entry_buf_size(e.path.length(), is_skip)
+    total_size += index_entry_buf_size(
+      e.path.length(),
+      index_extended_flags(e.intent_to_add, is_skip) != 0,
+    )
   }
   total_size += 20 // SHA1 checksum
   let buf : FixedArray[Byte] = FixedArray::make(total_size, b'\x00')
@@ -368,6 +471,23 @@ fn index_read_object_id(
     bytes[i] = data[start + i]
   }
   @bit.ObjectId::new(bytes)
+}
+
+///|
+fn index_extended_flags(intent_to_add : Bool, skip_worktree : Bool) -> Int {
+  let mut flags = 0
+  if intent_to_add {
+    flags = flags | 0x2000
+  }
+  if skip_worktree {
+    flags = flags | 0x4000
+  }
+  flags
+}
+
+///|
+fn index_ext_flags_has_intent_to_add(ext_flags : Int) -> Bool {
+  (ext_flags & 0x2000) != 0
 }
 
 ///|

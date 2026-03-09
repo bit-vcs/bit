@@ -621,6 +621,13 @@ async fn run_main_for_args(args : Array[String]) -> Unit {
     @sys.set_env_var("GIT_CONFIG_OVERRIDES", encoded.join("\n"))
   }
   let fs = OsFs::new()
+  match missing_global_cwd_error(fs, opts.cwd, opts.cwd_raw) {
+    Some(msg) => {
+      eprint_line(msg)
+      @sys.exit(128)
+    }
+    None => ()
+  }
   // Set working directory if -C was used
   match opts.cwd {
     Some(dir) => {
@@ -665,11 +672,33 @@ struct GlobalOptions {
   subcmd : String?
   rest : Array[String]
   cwd : String?
+  cwd_raw : String?
   git_dir : String?
   work_tree : String?
   unsupported_global : Bool
   bare : Bool
   config_overrides : Array[(String, String)]
+}
+
+///|
+fn missing_global_cwd_error(
+  fs : &@bitcore.RepoFileSystem,
+  cwd : String?,
+  cwd_raw : String?,
+) -> String? {
+  match cwd {
+    Some(dir) =>
+      if fs.is_dir(dir) {
+        None
+      } else {
+        Some(
+          "fatal: cannot change to '" +
+          cwd_raw.unwrap_or(dir) +
+          "': No such file or directory",
+        )
+      }
+    None => None
+  }
 }
 
 ///|
@@ -815,6 +844,7 @@ fn parse_global_options(args : Array[String]) -> GlobalOptions {
   let mut i = 1
   let mut in_opts = true
   let mut cwd : String? = None
+  let mut cwd_raw : String? = None
   let mut git_dir : String? = None
   let mut work_tree : String? = None
   let mut unsupported_global = false
@@ -838,6 +868,7 @@ fn parse_global_options(args : Array[String]) -> GlobalOptions {
       let raw = args[i + 1]
       // git treats -C "" as a no-op
       if raw.length() > 0 {
+        cwd_raw = Some(raw)
         cwd = Some(resolve_global_path(raw, cwd))
       }
       i += 2
@@ -906,6 +937,7 @@ fn parse_global_options(args : Array[String]) -> GlobalOptions {
     subcmd,
     rest,
     cwd,
+    cwd_raw,
     git_dir,
     work_tree,
     unsupported_global,

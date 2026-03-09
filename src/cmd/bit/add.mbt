@@ -99,9 +99,12 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
     }
   }
   let mut add_all = false
+  let mut update_only = false
+  let mut ignore_removal = false
   let mut force = false
   let mut refresh = false
   let mut dry_run = false
+  let mut intent_to_add = false
   let mut ignore_missing = false
   let mut ignore_errors = false
   let mut ignore_errors_explicit = false
@@ -118,8 +121,12 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
     }
     match arg {
       "-A" | "--all" if not(end_of_options) => add_all = true
+      "-u" | "--update" if not(end_of_options) => update_only = true
+      "--no-all" | "--ignore-removal" if not(end_of_options) =>
+        ignore_removal = true
       "-f" | "--force" if not(end_of_options) => force = true
       "--refresh" if not(end_of_options) => refresh = true
+      "-N" | "--intent-to-add" if not(end_of_options) => intent_to_add = true
       "-n" | "--dry-run" if not(end_of_options) => dry_run = true
       "--ignore-missing" if not(end_of_options) => ignore_missing = true
       "--ignore-errors" if not(end_of_options) => {
@@ -145,10 +152,7 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
     let config_path2 = git_dir + "/config"
     if fs.is_file(config_path2) {
       let ie_val = @bitlib.read_config_bool(
-        rfs2,
-        config_path2,
-        "add",
-        "ignore-errors",
+        rfs2, config_path2, "add", "ignore-errors",
       ).unwrap_or(false)
       if ie_val {
         ignore_errors = true
@@ -158,6 +162,10 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
   if dry_run {
     if chmod_mode is Some(cm) {
       handle_add_chmod_dry_run(fs, root, git_dir, paths, cm)
+      return
+    }
+    if update_only {
+      handle_add_update_dry_run(fs, root, paths)
       return
     }
     handle_add_dry_run(fs, root, paths, force~, ignore_missing~, interactive~)
@@ -217,7 +225,7 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
     }
     return
   }
-  if paths.length() == 0 {
+  if paths.length() == 0 && not(update_only) {
     eprint_line("Nothing specified, nothing added.")
     if add_should_show_empty_pathspec_hint(fs, root) {
       eprint_line("hint: Maybe you wanted to say 'git add .'?")
@@ -227,63 +235,97 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
     }
     return
   }
-  let stage_paths = expand_add_stage_paths(fs, root, paths, force)
+  let requested_paths = if update_only {
+    add_collect_update_requested_paths(fs, root, paths)
+  } else {
+    expand_add_stage_paths(fs, root, paths, force)
+  }
+  let requested_stage_paths = requested_paths
+  let stage_paths = if ignore_removal && not(update_only) {
+    let unmerged_paths = @bitlib.read_unmerged_paths(fs, git_dir)
+    match
+      add_filter_stage_paths_for_no_all(
+        fs, root, requested_stage_paths, unmerged_paths,
+      ) {
+      Ok(filtered) => filtered
+      Err(path) => {
+        eprint_line(
+          "fatal: unable to stat '\{path}': No such file or directory",
+        )
+        @sys.exit(1)
+        []
+      }
+    }
+  } else {
+    requested_stage_paths
+  }
   let mut had_error = false
   if stage_paths.length() > 0 {
     let pre_code = run_add_hook(fs, root, git_dir, "pre-add")
     if pre_code != 0 {
       raise @bitcore.GitError::InvalidObject("pre-add hook failed")
     }
-    let filter_cmd = @bitlib.FilterCmd::{
-      run: @bitlibnative.run_filter_command,
-    }
-    if ignore_errors {
-      // When --ignore-errors or add.ignore-errors is set, add files one by one
-      // so that failures on individual files don't prevent other files from being added
-      let succeeded : Array[String] = []
-      for p in stage_paths {
-        let crlf_warnings : Array[String] = []
-        let single_result : Result[Unit, Error] = try? @bitlib.add_paths_async(
-          fs,
-          fs,
-          root,
-          [p],
-          run_filter_cmd=filter_cmd,
-          warnings=crlf_warnings,
-        )
-        match single_result {
-          Ok(_) => {
-            succeeded.push(p)
-            if verbose {
-              eprint_line("add '\{p}'")
-            }
-          }
-          Err(_) => had_error = true
-        }
-        for msg in crlf_warnings {
-          eprint_line(msg)
-        }
-      }
-      stage_submodule_gitlinks(fs, root, succeeded)
-    } else {
-      let crlf_warnings : Array[String] = []
-      @bitlib.add_paths_async(
-        fs,
-        fs,
-        root,
-        stage_paths,
-        run_filter_cmd=filter_cmd,
-        warnings=crlf_warnings,
+    if intent_to_add {
+      let intent_paths = add_apply_intent_to_add(
+        fs, fs, root, git_dir, stage_paths,
       )
-      for msg in crlf_warnings {
-        eprint_line(msg)
-      }
       if verbose {
-        for p in stage_paths {
+        for p in intent_paths {
           eprint_line("add '\{p}'")
         }
       }
-      stage_submodule_gitlinks(fs, root, stage_paths)
+    } else {
+      let filter_cmd = @bitlib.FilterCmd::{
+        run: @bitlibnative.run_filter_command,
+      }
+      if ignore_errors {
+        // When --ignore-errors or add.ignore-errors is set, add files one by one
+        // so that failures on individual files don't prevent other files from being added
+        let succeeded : Array[String] = []
+        for p in stage_paths {
+          let crlf_warnings : Array[String] = []
+          let single_result : Result[Unit, Error] = try? @bitlib.add_paths_async(
+            fs,
+            fs,
+            root,
+            [p],
+            run_filter_cmd=filter_cmd,
+            warnings=crlf_warnings,
+          )
+          match single_result {
+            Ok(_) => {
+              succeeded.push(p)
+              if verbose {
+                eprint_line("add '\{p}'")
+              }
+            }
+            Err(_) => had_error = true
+          }
+          for msg in crlf_warnings {
+            eprint_line(msg)
+          }
+        }
+        stage_submodule_gitlinks(fs, root, succeeded)
+      } else {
+        let crlf_warnings : Array[String] = []
+        @bitlib.add_paths_async(
+          fs,
+          fs,
+          root,
+          stage_paths,
+          run_filter_cmd=filter_cmd,
+          warnings=crlf_warnings,
+        )
+        for msg in crlf_warnings {
+          eprint_line(msg)
+        }
+        if verbose {
+          for p in stage_paths {
+            eprint_line("add '\{p}'")
+          }
+        }
+        stage_submodule_gitlinks(fs, root, stage_paths)
+      }
     }
   }
   if not(force) && add_has_explicit_ignored_path(fs, root, paths) {
@@ -293,7 +335,7 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
     eprint_line("hint: Use -f if you really want to add them.")
     @sys.exit(1)
   }
-  if stage_paths.length() == 0 {
+  if requested_paths.length() == 0 && not(update_only && paths.length() == 0) {
     let first = add_first_non_empty_pathspec(paths)
     if first is Some(spec) {
       eprint_line("fatal: pathspec '\{spec}' did not match any files")
@@ -318,6 +360,177 @@ fn add_repo_requires_standalone_error(
   git_dir : String,
 ) -> Bool {
   repo_object_format(fs, git_dir) != "sha1"
+}
+
+///|
+fn add_filter_stage_paths_for_no_all(
+  fs : &@bitcore.RepoFileSystem,
+  root : String,
+  stage_paths : Array[String],
+  unmerged_paths : Map[String, Bool],
+) -> Result[Array[String], String] {
+  let out : Array[String] = []
+  for path in stage_paths {
+    let abs = root + "/" + path
+    if fs.is_file(abs) || fs.is_dir(abs) {
+      out.push(path)
+      continue
+    }
+    if unmerged_paths.contains(path) {
+      return Err(path)
+    }
+  }
+  Ok(out)
+}
+
+///|
+fn add_apply_intent_to_add(
+  fs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
+  root : String,
+  git_dir : String,
+  stage_paths : Array[String],
+) -> Array[String] raise Error {
+  let entries = @bitlib.read_index_entries(rfs, git_dir)
+  let map : Map[String, @bitlib.IndexEntry] = {}
+  for entry in entries {
+    map[entry.path] = entry
+  }
+  let mut empty_id : @bitcore.ObjectId? = None
+  let staged : Array[String] = []
+  for path in stage_paths {
+    if map.contains(path) {
+      continue
+    }
+    let abs = root + "/" + path
+    if not(rfs.is_file(abs)) {
+      continue
+    }
+    let id = match empty_id {
+      Some(existing) => existing
+      None => {
+        let created = @bitlib.write_loose_object(
+          fs,
+          git_dir,
+          @bitcore.ObjectType::Blob,
+          Bytes::default(),
+        )
+        empty_id = Some(created)
+        created
+      }
+    }
+    map[path] = @bitlib.IndexEntry::new(
+      path,
+      id,
+      0o100644,
+      0,
+      intent_to_add=true,
+    )
+    staged.push(path)
+  }
+  if staged.length() == 0 {
+    return staged
+  }
+  let updated : Array[@bitlib.IndexEntry] = []
+  for item in map.to_array() {
+    let (_, entry) = item
+    updated.push(entry)
+  }
+  @bitlib.write_index_entries(fs, git_dir, updated)
+  staged
+}
+
+///|
+async fn add_collect_update_requested_paths(
+  fs : &@bitcore.RepoFileSystem,
+  root : String,
+  raw_paths : Array[String],
+) -> Array[String] raise Error {
+  let git_dir = resolve_git_dir(fs, root)
+  let entries = @bitlib.read_index_entries(fs, git_dir)
+  let tracked_paths : Array[String] = []
+  for entry in entries {
+    tracked_paths.push(entry.path)
+  }
+  if raw_paths.length() == 0 {
+    return tracked_paths
+  }
+  let selected : Map[String, Bool] = {}
+  for raw in raw_paths {
+    let (pattern_raw, icase) = add_parse_refresh_pathspec(raw)
+    let pattern = add_normalize_input_path(root, pattern_raw)
+    if pattern.length() == 0 {
+      continue
+    }
+    let mut matched = false
+    for path in tracked_paths {
+      if add_refresh_pathspec_matches(pattern, icase, path) {
+        matched = true
+        selected[path] = true
+      }
+    }
+    if not(matched) {
+      eprint_line(
+        "error: pathspec '\{raw}' did not match any file(s) known to git",
+      )
+      @sys.exit(1)
+    }
+  }
+  let out : Array[String] = []
+  for item in selected.to_array() {
+    let (path, _) = item
+    out.push(path)
+  }
+  out
+}
+
+///|
+async fn add_collect_update_stage_paths(
+  fs : &@bitcore.RepoFileSystem,
+  root : String,
+  requested_paths : Array[String],
+) -> Array[String] raise Error {
+  let status = @bitlib.status(fs, root)
+  if requested_paths.length() == 0 {
+    let out : Array[String] = []
+    out.append(status.unstaged_modified)
+    out.append(status.unstaged_deleted)
+    return out
+  }
+  let requested : Map[String, Bool] = {}
+  for path in requested_paths {
+    requested[path] = true
+  }
+  let out : Array[String] = []
+  for path in status.unstaged_modified {
+    if requested.contains(path) {
+      out.push(path)
+    }
+  }
+  for path in status.unstaged_deleted {
+    if requested.contains(path) {
+      out.push(path)
+    }
+  }
+  out
+}
+
+///|
+async fn handle_add_update_dry_run(
+  fs : OsFs,
+  root : String,
+  raw_paths : Array[String],
+) -> Unit raise Error {
+  let requested_paths = add_collect_update_requested_paths(fs, root, raw_paths)
+  let stage_paths = add_collect_update_stage_paths(fs, root, requested_paths)
+  for path in stage_paths {
+    let abs = root + "/" + path
+    if fs.is_file(abs) {
+      print_line("add '\{path}'")
+    } else {
+      print_line("remove '\{path}'")
+    }
+  }
 }
 
 ///|
@@ -525,6 +738,11 @@ async fn add_refresh_index_entries(
         size,
         mtime_sec~,
         mtime_nsec~,
+        intent_to_add=entry.intent_to_add,
+        dev=entry.dev,
+        ino=entry.ino,
+        uid=entry.uid,
+        gid=entry.gid,
       ),
     )
   }
@@ -606,9 +824,23 @@ fn normalize_add_path(path : String) -> String {
 
 ///|
 fn add_normalize_input_path(root : String, raw_path : String) -> String {
-  let normalized = normalize_add_path(raw_path)
-  if normalized.length() == 0 {
-    return normalized
+  let path = normalize_add_path(raw_path)
+  if path.length() == 0 {
+    return path
+  }
+  let normalized = if not(path.has_prefix("/")) {
+    let cwd_rel = add_repo_relative_cwd(root)
+    if cwd_rel.length() > 0 {
+      if path == "." {
+        normalize_path(cwd_rel)
+      } else {
+        normalize_path(cwd_rel + "/" + path)
+      }
+    } else {
+      normalize_path(path)
+    }
+  } else {
+    normalize_path(path)
   }
   let root_prefix = if root.has_suffix("/") { root } else { root + "/" }
   if normalized.has_prefix(root_prefix) {
@@ -628,6 +860,47 @@ fn add_normalize_input_path(root : String, raw_path : String) -> String {
     )
   }
   normalized
+}
+
+///|
+fn add_repo_relative_cwd(root : String) -> String {
+  let cwd = match @sys.get_env_var("GIT_SHIM_CWD") {
+    Some(dir) => dir
+    None =>
+      match @sys.get_env_var("GIT_SHIM_PWD") {
+        Some(dir) => dir
+        None =>
+          match @env.current_dir() {
+            Some(dir) => dir
+            None => return ""
+          }
+      }
+  }
+  let root_prefix = if root.has_suffix("/") { root } else { root + "/" }
+  if cwd == root {
+    return ""
+  }
+  if cwd.has_prefix(root_prefix) {
+    return normalize_add_path(
+      String::unsafe_substring(
+        cwd,
+        start=root_prefix.length(),
+        end=cwd.length(),
+      ),
+    )
+  }
+  let cwd_folded = cwd.to_lower()
+  let root_folded = root_prefix.to_lower()
+  if cwd_folded.has_prefix(root_folded) {
+    return normalize_add_path(
+      String::unsafe_substring(
+        cwd,
+        start=root_prefix.length(),
+        end=cwd.length(),
+      ),
+    )
+  }
+  ""
 }
 
 ///|
@@ -907,6 +1180,11 @@ async fn handle_add_chmod(
             entry.size,
             mtime_sec=entry.mtime_sec,
             mtime_nsec=entry.mtime_nsec,
+            intent_to_add=entry.intent_to_add,
+            dev=entry.dev,
+            ino=entry.ino,
+            uid=entry.uid,
+            gid=entry.gid,
           ),
         )
         if verbose {
@@ -956,7 +1234,7 @@ async fn handle_add_chmod_dry_run(
     let abs = root + "/" + path
     let is_dir_match = if rfs.is_dir(abs) {
       entries.iter().any(fn(e) { e.path.has_prefix(path + "/") }) ||
-        stage_paths.iter().any(fn(p) { p.has_prefix(path + "/") })
+      stage_paths.iter().any(fn(p) { p.has_prefix(path + "/") })
     } else {
       false
     }
@@ -1003,11 +1281,9 @@ fn add_resolve_chmod_paths(
             result[entry.path] = true
           }
         }
-      } else {
         // Only add to result if the path exists in the index
-        if entries.iter().any(fn(e) { e.path == path }) {
-          result[path] = true
-        }
+      } else if entries.iter().any(fn(e) { e.path == path }) {
+        result[path] = true
       }
     }
   }

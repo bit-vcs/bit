@@ -1,20 +1,42 @@
 ///|
 async fn handle_ls_files(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
-  let git_dir = root + "/.git"
   let fs = OsFs::new()
+  let git_dir = resolve_git_dir(fs, root)
   let mut show_stage = false
   let mut show_others = false
+  let mut show_ignored = false
   let mut show_deleted = false
+  let mut show_modified = false
+  let mut show_killed = false
+  let mut show_unmerged = false
   let mut show_directory = false
   let mut no_empty_directory = false
   let mut recurse_submodules = false
   let mut use_nul = false
   let mut error_unmatch = false
   let mut show_eol = false
+  let mut exclude_standard = false
+  let exclude_patterns : Array[String] = []
+  let exclude_from_files : Array[String] = []
+  let mut exclude_per_directory : String? = None
   let raw_filters : Array[String] = []
   let mut parse_options = true
+  let mut pending_value_flag : String? = None
   for arg in args {
+    match pending_value_flag {
+      Some(flag) => {
+        match flag {
+          "exclude" => exclude_patterns.push(arg)
+          "exclude-from" => exclude_from_files.push(arg)
+          "exclude-per-directory" => exclude_per_directory = Some(arg)
+          _ => ()
+        }
+        pending_value_flag = None
+        continue
+      }
+      None => ()
+    }
     if parse_options && arg == "--" {
       parse_options = false
       continue
@@ -24,38 +46,79 @@ async fn handle_ls_files(args : Array[String]) -> Unit raise Error {
         "-s" | "--stage" => show_stage = true
         "-c" | "--cached" => () // default mode, no-op
         "-o" | "--others" => show_others = true
+        "-i" | "--ignored" => show_ignored = true
         "-d" | "--deleted" => show_deleted = true
+        "-m" | "--modified" => show_modified = true
+        "-k" | "--killed" => show_killed = true
+        "-u" | "--unmerged" => show_unmerged = true
         "--directory" => show_directory = true
         "--no-empty-directory" => no_empty_directory = true
         "--recurse-submodules" => recurse_submodules = true
         "--error-unmatch" => error_unmatch = true
         "--eol" => show_eol = true
+        "--exclude-standard" => exclude_standard = true
+        "--exclude" => pending_value_flag = Some("exclude")
+        "--exclude-from" => pending_value_flag = Some("exclude-from")
+        "--exclude-per-directory" =>
+          pending_value_flag = Some("exclude-per-directory")
         "-z" => use_nul = true
-        _ if arg.has_prefix("-") => warn_unimplemented_arg("ls-files", arg)
+        _ if arg.has_prefix("--exclude=") =>
+          exclude_patterns.push(
+            String::unsafe_substring(arg, start=10, end=arg.length()),
+          )
+        _ if arg.has_prefix("--exclude-from=") =>
+          exclude_from_files.push(
+            String::unsafe_substring(arg, start=15, end=arg.length()),
+          )
+        _ if arg.has_prefix("--exclude-per-directory=") =>
+          exclude_per_directory = Some(
+            String::unsafe_substring(arg, start=24, end=arg.length()),
+          )
+        _ if arg.has_prefix("-") => ls_files_usage_error()
         _ => raw_filters.push(arg)
       }
     } else {
       raw_filters.push(arg)
     }
   }
+  if pending_value_flag is Some(_) {
+    ls_files_usage_error()
+  }
+  if recurse_submodules && error_unmatch {
+    eprint_line(
+      "ls-files --recurse-submodules does not support --error-unmatch",
+    )
+    @sys.exit(1)
+  }
+  if recurse_submodules &&
+    (
+      show_deleted ||
+      show_modified ||
+      show_others ||
+      show_killed ||
+      show_unmerged
+    ) {
+    eprint_line("ls-files --recurse-submodules: unsupported mode")
+    @sys.exit(1)
+  }
+  if show_unmerged {
+    ls_files_usage_error()
+  }
   let terminator = if use_nul { "\u0000" } else { "\n" }
   let cwd_prefix = compute_cwd_prefix(root)
-  let filters = normalize_ls_tree_filters(raw_filters, cwd_prefix)
-  let entries = @bitlib.read_index_entries(fs, git_dir)
-  if error_unmatch {
-    for filter in filters {
-      if not(ls_files_filter_has_match(filter, entries)) {
-        raise @bitcore.GitError::InvalidObject(
-          "pathspec '\{filter}' did not match any files",
-        )
-      }
-    }
+  let root_abs = ls_files_repo_root_abs(root)
+  let filters = normalize_ls_files_filters(raw_filters, cwd_prefix, root_abs)
+  let path_filters = if raw_filters.length() == 0 && cwd_prefix.length() > 0 {
+    [cwd_prefix]
+  } else {
+    filters
   }
+  let entries = @bitlib.read_index_entries(fs, git_dir)
   if show_eol {
     let db = @bitlib.ObjectDb::load_lazy(fs, git_dir)
     // Tracked entries (cached or deleted)
     for e in entries {
-      if not(ls_files_matches_filters(e.path, filters)) {
+      if not(ls_files_matches_filters(e.path, path_filters)) {
         continue
       }
       let abs = root + "/" + e.path
@@ -84,8 +147,9 @@ async fn handle_ls_files(args : Array[String]) -> Unit raise Error {
       // Resolve gitattributes
       let attrs = @bitlib.resolve_eol_attrs(fs, root, e.path)
       let attr_str = format_eol_attr(attrs)
+      let display_path = make_display_path(e.path, cwd_prefix)
       print_str(
-        "i/\{i_eol}\tw/\{w_eol}\tattr/\{attr_str}\t\{e.path}" + terminator,
+        "i/\{i_eol}\tw/\{w_eol}\tattr/\{attr_str}\t\{display_path}" + terminator,
       )
     }
     // Untracked files (show_others)
@@ -99,7 +163,7 @@ async fn handle_ls_files(args : Array[String]) -> Unit raise Error {
         if tracked.contains(path) {
           continue
         }
-        if not(ls_files_matches_filters(path, filters)) {
+        if not(ls_files_matches_filters(path, path_filters)) {
           continue
         }
         let abs = root + "/" + path
@@ -111,7 +175,35 @@ async fn handle_ls_files(args : Array[String]) -> Unit raise Error {
         }
         let attrs = @bitlib.resolve_eol_attrs(fs, root, path)
         let attr_str = format_eol_attr(attrs)
-        print_str("i/\tw/\{w_eol}\tattr/\{attr_str}\t\{path}" + terminator)
+        let display_path = make_display_path(path, cwd_prefix)
+        print_str(
+          "i/\tw/\{w_eol}\tattr/\{attr_str}\t\{display_path}" + terminator,
+        )
+      }
+    }
+    return ()
+  }
+  if show_ignored && not(show_others) {
+    let entry_map : Map[String, @bitlib.IndexEntry] = {}
+    for entry in entries {
+      entry_map[entry.path] = entry
+    }
+    for entry in entries {
+      if not(ls_files_matches_filters(entry.path, path_filters)) {
+        continue
+      }
+      if ls_files_cached_entry_is_ignored(
+          fs,
+          root,
+          git_dir,
+          entry_map,
+          entry.path,
+          exclude_standard,
+          exclude_patterns,
+          exclude_from_files,
+          exclude_per_directory,
+        ) {
+        print_str(make_display_path(entry.path, cwd_prefix) + terminator)
       }
     }
     return ()
@@ -119,9 +211,11 @@ async fn handle_ls_files(args : Array[String]) -> Unit raise Error {
   if show_others {
     // Build set of tracked paths and their parent directories
     let tracked : Map[String, Bool] = {}
+    let entry_map : Map[String, @bitlib.IndexEntry] = {}
     let tracked_dirs : Map[String, Bool] = {}
     for e in entries {
       tracked[e.path] = true
+      entry_map[e.path] = e
       // Mark all parent directories as tracked
       let mut path = e.path
       while true {
@@ -135,24 +229,47 @@ async fn handle_ls_files(args : Array[String]) -> Unit raise Error {
         }
       }
     }
-    let all_files = @ignore.list_working_files_async(fs, root)
+    let (all_files, ignored_dirs) = ls_files_collect_other_paths(
+      fs,
+      root,
+      git_dir,
+      tracked,
+      entry_map,
+      show_ignored~,
+      exclude_standard~,
+      exclude_patterns,
+      exclude_from_files,
+      exclude_per_directory,
+    )
     let untracked_file_set : Map[String, Bool] = {}
     for path in all_files {
-      if tracked.contains(path) {
-        continue
-      }
       untracked_file_set[path] = true
     }
     if show_directory {
       // Show untracked directories and explicit file matches that can bypass
       // directory output.
-      let wildcard_file_filters : Array[String] = filters.filter(fn(filter) {
+      let wildcard_file_filters : Array[String] = path_filters.filter(fn(
+        filter,
+      ) {
+        let (_raw, is_exclude, _is_icase) = parse_pathspec_magic(filter)
+        not(is_exclude) &&
         ls_files_filter_has_wildcard(filter) &&
         ls_files_filter_prefers_file_output(filter)
       })
+      let ignore_file_filters : Array[String] = exclude_patterns.filter(fn(
+        pattern,
+      ) {
+        ls_files_filter_has_wildcard(pattern) &&
+        ls_files_filter_prefers_file_output(pattern)
+      })
+      let disable_directory_compression = show_ignored &&
+        path_filters.length() == 0 &&
+        ignore_file_filters.length() > 0
       let explicit_file_filters : Map[String, Bool] = {}
-      for filter in filters {
-        if not(ls_files_filter_has_wildcard(filter)) &&
+      for filter in path_filters {
+        let (_raw, is_exclude, _is_icase) = parse_pathspec_magic(filter)
+        if not(is_exclude) &&
+          not(ls_files_filter_has_wildcard(filter)) &&
           untracked_file_set.contains(filter) {
           explicit_file_filters[filter] = true
         }
@@ -160,9 +277,15 @@ async fn handle_ls_files(args : Array[String]) -> Unit raise Error {
       let outputs : Array[String] = []
       let output_set : Map[String, Bool] = {}
       let compress_dirs : Array[String] = []
-      for dir in collect_untracked_dirs(fs, root, tracked_dirs) {
+      for
+        dir in ls_files_collect_candidate_dirs(
+          all_files, ignored_dirs, tracked_dirs,
+        ) {
+        if disable_directory_compression {
+          continue
+        }
         let out_path = dir + "/"
-        let should_output = if filters.length() == 0 {
+        let should_output = if path_filters.length() == 0 {
           let parent = match dir.rev_find("/") {
             Some(idx) => String::unsafe_substring(dir, start=0, end=idx)
             None => ""
@@ -173,11 +296,14 @@ async fn handle_ls_files(args : Array[String]) -> Unit raise Error {
             parent.length() == 0 || tracked_dirs.contains(parent)
           }
         } else {
-          ls_files_matches_filters(out_path, filters)
+          ls_files_matches_filters(out_path, path_filters)
         }
         if should_output {
           if no_empty_directory &&
             not(ls_files_has_matching_file(dir, all_files, untracked_file_set)) {
+            continue
+          }
+          if ls_files_is_within_untracked_dir(dir, compress_dirs) {
             continue
           }
           if not(output_set.contains(out_path)) {
@@ -187,12 +313,13 @@ async fn handle_ls_files(args : Array[String]) -> Unit raise Error {
           }
         }
       }
-      if filters.length() == 0 {
+      if path_filters.length() == 0 {
         for file in all_files {
           if not(untracked_file_set.contains(file)) {
             continue
           }
-          if ls_files_is_within_untracked_dir(file, compress_dirs) {
+          if not(disable_directory_compression) &&
+            ls_files_is_within_untracked_dir(file, compress_dirs) {
             continue
           }
           if not(output_set.contains(file)) {
@@ -226,20 +353,73 @@ async fn handle_ls_files(args : Array[String]) -> Unit raise Error {
       }
       outputs.sort_by(fn(a, b) { ls_files_compare_paths(a, b) })
       for output in outputs {
-        print_str(output + terminator)
+        print_str(make_display_path(output, cwd_prefix) + terminator)
+      }
+      if error_unmatch {
+        let unmatched = ls_files_collect_unmatched_raw_filters(
+          raw_filters, cwd_prefix, root_abs, all_files,
+        )
+        if unmatched.length() > 0 {
+          ls_files_exit_error_unmatch(unmatched)
+        }
       }
     } else {
       // Show untracked files
       let outputs : Array[String] = []
       for path in all_files {
         if untracked_file_set.contains(path) &&
-          ls_files_matches_filters(path, filters) {
+          ls_files_matches_filters(path, path_filters) {
           outputs.push(path)
         }
       }
       outputs.sort_by(fn(a, b) { ls_files_compare_paths(a, b) })
       for output in outputs {
-        print_str(output + terminator)
+        print_str(make_display_path(output, cwd_prefix) + terminator)
+      }
+      if error_unmatch {
+        let unmatched = ls_files_collect_unmatched_raw_filters(
+          raw_filters, cwd_prefix, root_abs, all_files,
+        )
+        if unmatched.length() > 0 {
+          ls_files_exit_error_unmatch(unmatched)
+        }
+      }
+    }
+    return ()
+  }
+  if show_modified || show_killed {
+    let outputs : Array[String] = []
+    let output_set : Map[String, Bool] = {}
+    if show_modified {
+      let modified_paths = ls_files_collect_modified_paths(fs, root, entries)
+      for path in modified_paths {
+        if ls_files_matches_filters(path, path_filters) &&
+          not(output_set.contains(path)) {
+          output_set[path] = true
+          outputs.push(path)
+        }
+      }
+    }
+    if show_killed {
+      let killed_paths = ls_files_collect_killed_paths(fs, root, entries)
+      for path in killed_paths {
+        if ls_files_matches_filters(path, path_filters) &&
+          not(output_set.contains(path)) {
+          output_set[path] = true
+          outputs.push(path)
+        }
+      }
+    }
+    outputs.sort_by(fn(a, b) { ls_files_compare_paths(a, b) })
+    for output in outputs {
+      print_str(make_display_path(output, cwd_prefix) + terminator)
+    }
+    if error_unmatch {
+      let unmatched = ls_files_collect_unmatched_raw_filters(
+        raw_filters, cwd_prefix, root_abs, outputs,
+      )
+      if unmatched.length() > 0 {
+        ls_files_exit_error_unmatch(unmatched)
       }
     }
     return ()
@@ -248,77 +428,271 @@ async fn handle_ls_files(args : Array[String]) -> Unit raise Error {
     // Show deleted files (in index but not in worktree)
     for e in entries {
       let abs = root + "/" + e.path
-      if not(fs.is_file(abs)) && ls_files_matches_filters(e.path, filters) {
-        print_str(e.path + terminator)
+      if not(fs.is_file(abs)) && ls_files_matches_filters(e.path, path_filters) {
+        print_str(make_display_path(e.path, cwd_prefix) + terminator)
       }
     }
     return ()
   }
-  // Default: show cached (indexed) files
-  // Parse submodules first if needed (to skip submodule entries)
-  let submodules = if recurse_submodules {
-    parse_gitmodules(fs, root)
-  } else {
-    []
-  }
-  let submod_paths : Map[String, Bool] = {}
-  for submod in submodules {
-    submod_paths[submod.path] = true
+  // Default: show cached (indexed) files, optionally recursing into submodules.
+  let tracked_entries = ls_files_collect_cached_entries(
+    fs,
+    root,
+    git_dir,
+    "",
+    recurse_submodules~,
+  )
+  let tracked_candidate_paths : Array[String] = []
+  for entry in tracked_entries {
+    tracked_candidate_paths.push(entry.path)
   }
   if show_stage {
-    for e in entries {
-      // Skip submodule entries (mode 160000) when recursing
-      if recurse_submodules && e.mode == 0o160000 {
+    for entry in tracked_entries {
+      if not(ls_files_matches_filters(entry.path, path_filters)) {
         continue
       }
-      if not(ls_files_matches_filters(e.path, filters)) {
-        continue
-      }
-      let mode = format_mode(e.mode)
-      // Stage is always 0 for normal entries (no merge conflict)
-      print_str("\{mode} \{e.id.to_hex()} 0\t\{e.path}" + terminator)
+      let mode = format_mode(entry.mode)
+      let display_path = make_display_path(entry.path, cwd_prefix)
+      print_str("\{mode} \{entry.id.to_hex()} 0\t\{display_path}" + terminator)
     }
-    // Recurse into submodules
-    for submod in submodules {
-      let sub_git_dir = root + "/" + submod.path + "/.git"
-      if fs.is_dir(sub_git_dir) || fs.is_file(sub_git_dir) {
-        let actual_git_dir = @bitlib.resolve_gitdir(fs, sub_git_dir)
-        let sub_entries = @bitlib.read_index_entries(fs, actual_git_dir)
-        for se in sub_entries {
-          let mode = format_mode(se.mode)
-          let full_path = submod.path + "/" + se.path
-          if not(ls_files_matches_filters(full_path, filters)) {
-            continue
-          }
-          print_str("\{mode} \{se.id.to_hex()} 0\t\{full_path}" + terminator)
-        }
+    if error_unmatch {
+      let unmatched = ls_files_collect_unmatched_raw_filters(
+        raw_filters, cwd_prefix, root_abs, tracked_candidate_paths,
+      )
+      if unmatched.length() > 0 {
+        ls_files_exit_error_unmatch(unmatched)
       }
     }
   } else {
-    for e in entries {
-      // Skip submodule entries (mode 160000) when recursing
-      if recurse_submodules && e.mode == 0o160000 {
+    for entry in tracked_entries {
+      if not(ls_files_matches_filters(entry.path, path_filters)) {
         continue
       }
-      if not(ls_files_matches_filters(e.path, filters)) {
-        continue
-      }
-      print_str(e.path + terminator)
+      print_str(make_display_path(entry.path, cwd_prefix) + terminator)
     }
-    // Recurse into submodules
-    for submod in submodules {
-      let sub_git_dir = root + "/" + submod.path + "/.git"
-      if fs.is_dir(sub_git_dir) || fs.is_file(sub_git_dir) {
-        let actual_git_dir = @bitlib.resolve_gitdir(fs, sub_git_dir)
-        let sub_entries = @bitlib.read_index_entries(fs, actual_git_dir)
-        for se in sub_entries {
-          let full_path = submod.path + "/" + se.path
-          if not(ls_files_matches_filters(full_path, filters)) {
-            continue
+    if error_unmatch {
+      let unmatched = ls_files_collect_unmatched_raw_filters(
+        raw_filters, cwd_prefix, root_abs, tracked_candidate_paths,
+      )
+      if unmatched.length() > 0 {
+        ls_files_exit_error_unmatch(unmatched)
+      }
+    }
+  }
+}
+
+///|
+async fn ls_files_usage_error() -> Unit {
+  eprint_line("usage: git ls-files [<options>] [<file>...]")
+  @sys.exit(129)
+}
+
+///|
+async fn ls_files_exit_error_unmatch(unmatched : Array[String]) -> Unit {
+  for raw in unmatched {
+    eprint_line(
+      "error: pathspec '\{raw}' did not match any file(s) known to git",
+    )
+  }
+  eprint_line("Did you forget to 'git add'?")
+  @sys.exit(1)
+}
+
+///|
+async fn ls_files_collect_killed_paths(
+  fs : &@bitcore.RepoFileSystem,
+  root : String,
+  entries : Array[@bitlib.IndexEntry],
+) -> Array[String] raise Error {
+  let tracked_modes : Map[String, Int] = {}
+  let tracked_paths : Array[String] = []
+  for entry in entries {
+    tracked_modes[entry.path] = entry.mode
+    tracked_paths.push(entry.path)
+  }
+  let visible_paths = @ignore.list_working_files_async(fs, root)
+  let killed : Array[String] = []
+  let killed_set : Map[String, Bool] = {}
+  for path in visible_paths {
+    if tracked_modes.contains(path) {
+      continue
+    }
+    let mut current = path
+    let mut obstructs = false
+    while true {
+      match current.rev_find("/") {
+        Some(idx) => {
+          current = String::unsafe_substring(current, start=0, end=idx)
+          match tracked_modes.get(current) {
+            Some(mode) => {
+              if mode != 0o160000 {
+                obstructs = true
+              }
+              break
+            }
+            None => ()
           }
-          print_str(full_path + terminator)
+        }
+        None => break
+      }
+    }
+    if not(obstructs) {
+      let prefix = path + "/"
+      for tracked_path in tracked_paths {
+        if tracked_path.has_prefix(prefix) {
+          obstructs = true
+          break
         }
       }
+    }
+    if obstructs && not(killed_set.contains(path)) {
+      killed_set[path] = true
+      killed.push(path)
+    }
+  }
+  killed
+}
+
+///|
+async fn ls_files_collect_modified_paths(
+  fs : &@bitcore.RepoFileSystem,
+  root : String,
+  entries : Array[@bitlib.IndexEntry],
+) -> Array[String] raise Error {
+  let modified : Array[String] = []
+  let modified_set : Map[String, Bool] = {}
+  let diffs = @bitdiff.diff_worktree(fs, root)
+  for diff in diffs {
+    if not(modified_set.contains(diff.path)) {
+      modified_set[diff.path] = true
+      modified.push(diff.path)
+    }
+  }
+  for entry in entries {
+    if entry.mode != 0o160000 {
+      continue
+    }
+    let sub_git_dir = root + "/" + entry.path + "/.git"
+    if not(fs.is_dir(sub_git_dir)) && not(fs.is_file(sub_git_dir)) {
+      continue
+    }
+    let actual_git_dir = @bitlib.resolve_gitdir(fs, sub_git_dir)
+    match @bitlib.resolve_head_commit(fs, actual_git_dir) {
+      Some(head) =>
+        if head != entry.id && not(modified_set.contains(entry.path)) {
+          modified_set[entry.path] = true
+          modified.push(entry.path)
+        }
+      None => ()
+    }
+  }
+  modified
+}
+
+///|
+fn ls_files_repo_root_abs(root : String) -> String {
+  if root.has_prefix("/") {
+    return normalize_path(root)
+  }
+  let base_dir = match @sys.get_env_var("GIT_SHIM_PWD") {
+    Some(dir) => Some(dir)
+    None =>
+      match @env.current_dir() {
+        Some(dir) => Some(dir)
+        None => @sys.get_env_var("PWD")
+      }
+  }
+  match base_dir {
+    Some(dir) =>
+      if root == "." {
+        find_repo_root(dir).unwrap_or(normalize_path(dir))
+      } else {
+        normalize_path(dir + "/" + root)
+      }
+    None => normalize_path(root)
+  }
+}
+
+///|
+fn normalize_ls_files_filters(
+  filters : Array[String],
+  cwd_prefix : String,
+  root_abs : String,
+) -> Array[String] raise Error {
+  let out : Array[String] = []
+  for filter in filters {
+    let (raw, is_exclude, is_icase) = parse_pathspec_magic(filter)
+    let mut clean = raw
+    let has_trailing_slash = clean.has_suffix("/") && clean.length() > 1
+    if has_trailing_slash {
+      clean = String::unsafe_substring(clean, start=0, end=clean.length() - 1)
+    }
+    let base = if clean == "" || clean == "." {
+      cwd_prefix
+    } else if clean.has_prefix("/") {
+      ls_files_relativize_absolute_filter(clean, root_abs)
+    } else if cwd_prefix.length() == 0 {
+      clean
+    } else {
+      cwd_prefix + "/" + clean
+    }
+    let normalized = normalize_path(base)
+    if normalized == ".." || normalized.has_prefix("../") {
+      raise @bitcore.GitError::InvalidObject(
+        "'\{filter}' is outside repository at '\{normalize_path(cwd_prefix)}'",
+      )
+    }
+    if normalized != "." && normalized.length() > 0 {
+      let normalized_filter = if has_trailing_slash {
+        normalized + "/"
+      } else {
+        normalized
+      }
+      out.push(compose_pathspec_magic(normalized_filter, is_exclude, is_icase))
+    }
+  }
+  out
+}
+
+///|
+fn compose_pathspec_magic(
+  pattern : String,
+  is_exclude : Bool,
+  is_icase : Bool,
+) -> String {
+  let magics : Array[String] = []
+  if is_icase {
+    magics.push("icase")
+  }
+  if is_exclude {
+    magics.push("exclude")
+  }
+  if magics.length() == 0 {
+    pattern
+  } else {
+    let magic_text = magics.join(",")
+    ":(\{magic_text})" + pattern
+  }
+}
+
+///|
+fn ls_files_relativize_absolute_filter(
+  raw : String,
+  root_abs : String,
+) -> String {
+  let normalized_filter = normalize_path(raw)
+  if normalized_filter == root_abs {
+    "."
+  } else {
+    let root_prefix = if root_abs == "/" { "/" } else { root_abs + "/" }
+    if normalized_filter.has_prefix(root_prefix) {
+      String::unsafe_substring(
+        normalized_filter,
+        start=root_prefix.length(),
+        end=normalized_filter.length(),
+      )
+    } else {
+      normalized_filter
     }
   }
 }
@@ -328,6 +702,141 @@ struct SubmoduleInfo {
   name : String
   path : String
   url : String
+}
+
+///|
+struct LsFilesTrackedEntry {
+  path : String
+  mode : Int
+  id : @bitcore.ObjectId
+}
+
+///|
+fn ls_files_collect_cached_entries(
+  fs : &@bitcore.RepoFileSystem,
+  root : String,
+  git_dir : String,
+  prefix : String,
+  recurse_submodules? : Bool = false,
+) -> Array[LsFilesTrackedEntry] raise Error {
+  if recurse_submodules {
+    ls_files_validate_repo_config(fs, git_dir)
+  }
+  let entries = @bitlib.read_index_entries(fs, git_dir)
+  if not(recurse_submodules) {
+    return entries.map(fn(entry) {
+      { path: prefix + entry.path, mode: entry.mode, id: entry.id }
+    })
+  }
+  let submodules = parse_gitmodules(fs, root)
+  let out : Array[LsFilesTrackedEntry] = []
+  for entry in entries {
+    if entry.mode != 0o160000 {
+      out.push({ path: prefix + entry.path, mode: entry.mode, id: entry.id })
+      continue
+    }
+    match ls_files_find_submodule_by_path(submodules, entry.path) {
+      Some(submodule) => {
+        if not(ls_files_submodule_is_active(fs, git_dir, submodule.name)) {
+          out.push({ path: prefix + entry.path, mode: entry.mode, id: entry.id })
+          continue
+        }
+        let sub_root = root + "/" + submodule.path
+        let sub_git_marker = sub_root + "/.git"
+        if not(fs.is_dir(sub_git_marker)) && not(fs.is_file(sub_git_marker)) {
+          out.push({ path: prefix + entry.path, mode: entry.mode, id: entry.id })
+          continue
+        }
+        let sub_git_dir = @bitlib.resolve_gitdir(fs, sub_git_marker)
+        for
+          sub_entry in ls_files_collect_cached_entries(
+            fs,
+            sub_root,
+            sub_git_dir,
+            prefix + submodule.path + "/",
+            recurse_submodules=true,
+          ) {
+          out.push(sub_entry)
+        }
+      }
+      None =>
+        out.push({ path: prefix + entry.path, mode: entry.mode, id: entry.id })
+    }
+  }
+  out
+}
+
+///|
+fn ls_files_find_submodule_by_path(
+  submodules : Array[SubmoduleInfo],
+  path : String,
+) -> SubmoduleInfo? {
+  for submodule in submodules {
+    if submodule.path == path {
+      return Some(submodule)
+    }
+  }
+  None
+}
+
+///|
+fn ls_files_read_config_bool_strict(
+  fs : &@bitcore.RepoFileSystem,
+  config_path : String,
+  section : String,
+  name : String,
+) -> Bool? raise Error {
+  match @bitlib.read_config_value(fs, config_path, section, name) {
+    Some(value) => {
+      let lower = value.to_lower()
+      if lower == "true" || lower == "1" || lower == "yes" {
+        Some(true)
+      } else if lower == "false" || lower == "0" || lower == "no" {
+        Some(false)
+      } else {
+        raise @bitcore.GitError::InvalidObject(
+          "bad boolean config value '\{value}' for '\{section}.\{name}'",
+        )
+      }
+    }
+    None => None
+  }
+}
+
+///|
+fn ls_files_validate_repo_config(
+  fs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+) -> Unit raise Error {
+  let config_path = git_dir + "/config"
+  ignore(ls_files_read_config_bool_strict(fs, config_path, "index", "sparse"))
+  let use_worktree_config = ls_files_read_config_bool_strict(
+    fs, config_path, "extensions", "worktreeConfig",
+  ).unwrap_or(false)
+  if use_worktree_config {
+    ignore(
+      ls_files_read_config_bool_strict(
+        fs,
+        git_dir + "/config.worktree",
+        "index",
+        "sparse",
+      ),
+    )
+  }
+}
+
+///|
+fn ls_files_submodule_is_active(
+  fs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  name : String,
+) -> Bool raise Error {
+  ls_files_read_config_bool_strict(
+    fs,
+    git_dir + "/config",
+    "submodule \"\{name}\"",
+    "active",
+  ).unwrap_or(true)
 }
 
 ///|
@@ -390,10 +899,10 @@ fn parse_gitmodules(
 }
 
 ///|
-fn parse_pathspec_magic(filter : String) -> (String, Bool) {
+fn parse_pathspec_magic(filter : String) -> (String, Bool, Bool) {
   if filter.has_prefix(":!") {
     let rest = String::unsafe_substring(filter, start=2, end=filter.length())
-    return (rest, true)
+    return (rest, true, false)
   }
   if filter.has_prefix(":(") {
     match filter.find(")") {
@@ -405,12 +914,13 @@ fn parse_pathspec_magic(filter : String) -> (String, Bool) {
           end=filter.length(),
         )
         let is_exclude = magic.contains("exclude") || magic.contains("!")
-        (rest, is_exclude)
+        let is_icase = magic.contains("icase")
+        (rest, is_exclude, is_icase)
       }
-      None => (filter, false)
+      None => (filter, false, false)
     }
   } else {
-    (filter, false)
+    (filter, false, false)
   }
 }
 
@@ -421,7 +931,7 @@ fn normalize_ls_tree_filters(
 ) -> Array[String] raise Error {
   let out : Array[String] = []
   for filter in filters {
-    let (raw, is_exclude) = parse_pathspec_magic(filter)
+    let (raw, is_exclude, _is_icase) = parse_pathspec_magic(filter)
     if is_exclude {
       raise @bitcore.GitError::InvalidObject(
         "pathspec magic not supported by this command: 'exclude' (mnemonic: '!')",
@@ -436,7 +946,7 @@ fn normalize_ls_tree_filters(
     let base = if clean == "" || clean == "." {
       cwd_prefix
     } else if clean.has_prefix("/") {
-      String::unsafe_substring(clean, start=1, end=clean.length())
+      clean
     } else if cwd_prefix.length() == 0 {
       clean
     } else {
@@ -491,35 +1001,52 @@ fn compute_cwd_prefix(root : String) -> String {
 }
 
 ///|
-fn count_path_segments(path : String) -> Int {
-  let mut count = 0
-  for part_view in path.split("/") {
-    let part = part_view.to_string()
-    if part.length() > 0 {
-      count += 1
-    }
-  }
-  count
-}
-
-///|
 fn make_display_path(path : String, cwd_prefix : String) -> String {
   if cwd_prefix.length() == 0 {
     return path
   }
-  if path == cwd_prefix {
-    return "."
+  let has_trailing_slash = path.has_suffix("/") && path.length() > 1
+  let normalized_path = if has_trailing_slash {
+    String::unsafe_substring(path, start=0, end=path.length() - 1)
+  } else {
+    path
   }
-  let prefix = cwd_prefix + "/"
-  if path.has_prefix(prefix) {
-    return (try! path[prefix.length():]).to_string()
+  if normalized_path == cwd_prefix {
+    return if has_trailing_slash { "./" } else { "." }
   }
-  let depth = count_path_segments(cwd_prefix)
-  let mut rel = ""
-  for _ in 0..<depth {
-    rel = rel + "../"
+  let path_parts : Array[String] = []
+  for part_view in normalized_path.split("/") {
+    let part = part_view.to_string()
+    if part.length() > 0 {
+      path_parts.push(part)
+    }
   }
-  rel + path
+  let cwd_parts : Array[String] = []
+  for part_view in cwd_prefix.split("/") {
+    let part = part_view.to_string()
+    if part.length() > 0 {
+      cwd_parts.push(part)
+    }
+  }
+  let mut common = 0
+  while common < path_parts.length() &&
+        common < cwd_parts.length() &&
+        path_parts[common] == cwd_parts[common] {
+    common += 1
+  }
+  let parts : Array[String] = []
+  for _ in common..<cwd_parts.length() {
+    parts.push("..")
+  }
+  for i in common..<path_parts.length() {
+    parts.push(path_parts[i])
+  }
+  let rel = if parts.length() == 0 { "." } else { parts.join("/") }
+  if has_trailing_slash && rel != "." {
+    rel + "/"
+  } else {
+    rel
+  }
 }
 
 ///|
@@ -532,12 +1059,31 @@ fn ls_files_matches_filters(path : String, filters : Array[String]) -> Bool {
   } else {
     path
   }
+  let include_filters : Array[String] = []
+  let exclude_filters : Array[String] = []
   for filter in filters {
-    if ls_files_pathspec_matches(normalized, filter) {
-      return true
+    let (_raw, is_exclude, _is_icase) = parse_pathspec_magic(filter)
+    if is_exclude {
+      exclude_filters.push(filter)
+    } else {
+      include_filters.push(filter)
     }
   }
-  false
+  let included = if include_filters.length() == 0 {
+    true
+  } else {
+    include_filters
+    .iter()
+    .any(fn(filter) { ls_files_pathspec_matches(normalized, filter) })
+  }
+  if not(included) {
+    return false
+  }
+  not(
+    exclude_filters
+    .iter()
+    .any(fn(filter) { ls_files_pathspec_matches(normalized, filter) }),
+  )
 }
 
 ///|
@@ -596,42 +1142,84 @@ fn ls_files_compare_paths(left : String, right : String) -> Int {
 }
 
 ///|
-fn ls_files_filter_has_match(
-  filter : String,
-  entries : Array[@bitlib.IndexEntry],
-) -> Bool {
-  for entry in entries {
-    if ls_files_pathspec_matches(entry.path, filter) {
-      return true
+fn ls_files_collect_unmatched_raw_filters(
+  raw_filters : Array[String],
+  cwd_prefix : String,
+  root_abs : String,
+  candidate_paths : Array[String],
+) -> Array[String] raise Error {
+  let unmatched : Array[String] = []
+  for raw in raw_filters {
+    let normalized_filters = normalize_ls_files_filters(
+      [raw],
+      cwd_prefix,
+      root_abs,
+    )
+    let include_filters = normalized_filters.filter(fn(filter) {
+      let (_raw, is_exclude, _is_icase) = parse_pathspec_magic(filter)
+      not(is_exclude)
+    })
+    let matched = if include_filters.length() == 0 {
+      candidate_paths.length() > 0
+    } else {
+      include_filters
+      .iter()
+      .any(fn(filter) {
+        candidate_paths
+        .iter()
+        .any(fn(path) { ls_files_pathspec_matches(path, filter) })
+      })
+    }
+    if not(matched) {
+      unmatched.push(raw)
     }
   }
-  false
+  unmatched
 }
 
 ///|
 fn ls_files_pathspec_matches(path : String, pattern : String) -> Bool {
-  if ls_files_filter_has_wildcard(pattern) {
-    ls_files_simple_wildcard_match(path, pattern)
+  let (raw_pattern, _is_exclude, is_icase) = parse_pathspec_magic(pattern)
+  let normalized_pattern = if raw_pattern.has_suffix("/") &&
+    raw_pattern.length() > 1 {
+    String::unsafe_substring(raw_pattern, start=0, end=raw_pattern.length() - 1)
   } else {
-    path == pattern || path.has_prefix(pattern + "/")
+    raw_pattern
+  }
+  let match_path = if is_icase { path.to_lower() } else { path }
+  let match_pattern = if is_icase {
+    normalized_pattern.to_lower()
+  } else {
+    normalized_pattern
+  }
+  if ls_files_filter_has_wildcard(pattern) {
+    ls_files_simple_wildcard_match(match_path, match_pattern)
+  } else {
+    match_path == match_pattern || match_path.has_prefix(match_pattern + "/")
   }
 }
 
 ///|
 fn ls_files_filter_has_wildcard(pattern : String) -> Bool {
-  pattern.find("*") is Some(_) ||
-  pattern.find("?") is Some(_) ||
-  pattern.find("[") is Some(_)
+  let (raw_pattern, _is_exclude, _is_icase) = parse_pathspec_magic(pattern)
+  raw_pattern.find("*") is Some(_) ||
+  raw_pattern.find("?") is Some(_) ||
+  raw_pattern.find("[") is Some(_)
 }
 
 ///|
 fn ls_files_filter_prefers_file_output(pattern : String) -> Bool {
   // Heuristic for `--directory`:
   // wildcard patterns that have an extension-like final segment are treated as file globs.
-  let segment = match pattern.rev_find("/") {
+  let (raw_pattern, _is_exclude, _is_icase) = parse_pathspec_magic(pattern)
+  let segment = match raw_pattern.rev_find("/") {
     Some(idx) =>
-      String::unsafe_substring(pattern, start=idx + 1, end=pattern.length())
-    None => pattern
+      String::unsafe_substring(
+        raw_pattern,
+        start=idx + 1,
+        end=raw_pattern.length(),
+      )
+    None => raw_pattern
   }
   segment.contains(".")
 }
@@ -683,54 +1271,312 @@ fn ls_files_simple_wildcard_match(path : String, pattern : String) -> Bool {
 }
 
 ///|
-/// Collect untracked directories at the top level
-fn collect_untracked_dirs(
+fn ls_files_collect_other_paths(
   fs : &@bitcore.RepoFileSystem,
   root : String,
-  tracked_dirs : Map[String, Bool],
-) -> Array[String] raise @bitcore.GitError {
-  let result : Array[String] = []
-  collect_untracked_dirs_recursive(fs, root, "", tracked_dirs, result)
-  result.sort_by(fn(a, b) { ls_files_compare_paths(a, b) })
-  result
+  git_dir : String,
+  tracked : Map[String, Bool],
+  entry_map : Map[String, @bitlib.IndexEntry],
+  show_ignored? : Bool = false,
+  exclude_standard? : Bool = false,
+  exclude_patterns : Array[String],
+  exclude_from_files : Array[String],
+  exclude_per_directory : String?,
+) -> (Array[String], Array[String]) raise Error {
+  let matcher = @ignore.Matcher::new()
+  let db = @bitlib.ObjectDb::load_lazy(fs, git_dir)
+  ls_files_add_global_exclude_rules(
+    fs, root, git_dir, matcher, exclude_standard, exclude_from_files,
+  )
+  let per_directory_files : Array[String] = []
+  if exclude_standard {
+    per_directory_files.push(".gitignore")
+  }
+  match exclude_per_directory {
+    Some(name) =>
+      if not(per_directory_files.contains(name)) {
+        per_directory_files.push(name)
+      }
+    None => ()
+  }
+  let files : Array[String] = []
+  let dirs : Array[String] = []
+  ls_files_walk_other_files(
+    fs, root, "", tracked, entry_map, matcher, db, per_directory_files, exclude_patterns,
+    files, dirs, show_ignored,
+  )
+  (files, dirs)
 }
 
 ///|
-fn collect_untracked_dirs_recursive(
+fn ls_files_add_global_exclude_rules(
   fs : &@bitcore.RepoFileSystem,
   root : String,
-  prefix : String,
-  tracked_dirs : Map[String, Bool],
-  out : Array[String],
-) -> Unit raise @bitcore.GitError {
-  let dir = if prefix == "" { root } else { root + "/" + prefix }
-  if prefix != "" {
+  git_dir : String,
+  matcher : @ignore.Matcher,
+  exclude_standard : Bool,
+  exclude_from_files : Array[String],
+) -> Unit raise Error {
+  if exclude_standard {
+    ls_files_add_exclude_file_rules(fs, matcher, git_dir + "/info/exclude")
+    let config_path = git_dir + "/config"
+    if fs.is_file(config_path) {
+      match @bitlib.read_config_value(fs, config_path, "core", "excludesfile") {
+        Some(raw) => {
+          let resolved = ls_files_resolve_exclude_file_path(root, git_dir, raw)
+          ls_files_add_exclude_file_rules(fs, matcher, resolved)
+        }
+        None => ()
+      }
+    }
+  }
+  for raw in exclude_from_files {
+    let resolved = ls_files_resolve_exclude_file_path(root, git_dir, raw)
+    ls_files_add_exclude_file_rules(fs, matcher, resolved)
+  }
+}
+
+///|
+fn ls_files_add_exclude_file_rules(
+  fs : &@bitcore.RepoFileSystem,
+  matcher : @ignore.Matcher,
+  path : String,
+) -> Unit raise Error {
+  if fs.is_file(path) {
+    let content = @utf8.decode_lossy(fs.read_file(path)[:])
+    matcher.add_rules("", content)
+  }
+}
+
+///|
+fn ls_files_add_cli_exclude_rules(
+  matcher : @ignore.Matcher,
+  patterns : Array[String],
+) -> Unit {
+  for pattern in patterns {
+    matcher.add_rules("", pattern + "\n")
+    if pattern.has_prefix("**/") {
+      let alt = String::unsafe_substring(pattern, start=3, end=pattern.length())
+      matcher.add_rules("", alt + "\n")
+    }
+  }
+}
+
+///|
+fn ls_files_add_per_directory_rules(
+  fs : &@bitcore.RepoFileSystem,
+  root : String,
+  rel : String,
+  entry_map : Map[String, @bitlib.IndexEntry],
+  matcher : @ignore.Matcher,
+  db : @bitlib.ObjectDb,
+  per_directory_files : Array[String],
+) -> Unit raise Error {
+  let dir = if rel == "" { root } else { root + "/" + rel }
+  for name in per_directory_files {
+    let file_rel = if rel == "" { name } else { rel + "/" + name }
+    let path = if rel == "" { root + "/" + name } else { dir + "/" + name }
+    if fs.is_file(path) {
+      let content = @utf8.decode_lossy(fs.read_file(path)[:])
+      matcher.add_rules(rel, content)
+    } else {
+      match entry_map.get(file_rel) {
+        Some(entry) =>
+          match db.get(fs, entry.id) {
+            Some(obj) if obj.obj_type == @bitcore.ObjectType::Blob => {
+              let content = @utf8.decode_lossy(obj.data[:])
+              matcher.add_rules(rel, content)
+            }
+            _ => ()
+          }
+        None => ()
+      }
+    }
+  }
+}
+
+///|
+fn ls_files_cached_entry_is_ignored(
+  fs : &@bitcore.RepoFileSystem,
+  root : String,
+  git_dir : String,
+  entry_map : Map[String, @bitlib.IndexEntry],
+  path : String,
+  exclude_standard : Bool,
+  exclude_patterns : Array[String],
+  exclude_from_files : Array[String],
+  exclude_per_directory : String?,
+) -> Bool raise Error {
+  let matcher = @ignore.Matcher::new()
+  let db = @bitlib.ObjectDb::load_lazy(fs, git_dir)
+  ls_files_add_global_exclude_rules(
+    fs, root, git_dir, matcher, exclude_standard, exclude_from_files,
+  )
+  let per_directory_files : Array[String] = []
+  if exclude_standard {
+    per_directory_files.push(".gitignore")
+  }
+  match exclude_per_directory {
+    Some(name) =>
+      if not(per_directory_files.contains(name)) {
+        per_directory_files.push(name)
+      }
+    None => ()
+  }
+  ls_files_add_per_directory_rules(
+    fs, root, "", entry_map, matcher, db, per_directory_files,
+  )
+  let mut current = ""
+  let segments : Array[String] = []
+  for segment_view in path.split("/") {
+    let segment = segment_view.to_string()
+    if segment.length() > 0 {
+      segments.push(segment)
+    }
+  }
+  let last = segments.length()
+  let mut idx = 0
+  for segment in segments {
+    if idx >= last - 1 {
+      break
+    }
+    current = if current == "" { segment } else { current + "/" + segment }
+    ls_files_add_per_directory_rules(
+      fs, root, current, entry_map, matcher, db, per_directory_files,
+    )
+    idx += 1
+  }
+  ls_files_add_cli_exclude_rules(matcher, exclude_patterns)
+  matcher.is_ignored(path, false)
+}
+
+///|
+fn ls_files_resolve_exclude_file_path(
+  root : String,
+  git_dir : String,
+  raw : String,
+) -> String {
+  if raw.has_prefix("/") {
+    return raw
+  }
+  if raw.has_prefix(".git/") {
+    let suffix = String::unsafe_substring(raw, start=5, end=raw.length())
+    return git_dir + "/" + suffix
+  }
+  root + "/" + raw
+}
+
+///|
+fn ls_files_walk_other_files(
+  fs : &@bitcore.RepoFileSystem,
+  root : String,
+  rel : String,
+  tracked : Map[String, Bool],
+  entry_map : Map[String, @bitlib.IndexEntry],
+  matcher : @ignore.Matcher,
+  db : @bitlib.ObjectDb,
+  per_directory_files : Array[String],
+  exclude_patterns : Array[String],
+  files_out : Array[String],
+  dirs_out : Array[String],
+  show_ignored : Bool,
+) -> Unit raise Error {
+  let dir = if rel == "" { root } else { root + "/" + rel }
+  if rel != "" {
     let dot_git_marker = dir + "/.git"
     let bit_marker = dir + "/.bit"
     if fs.is_file(dot_git_marker) ||
       fs.is_dir(dot_git_marker) ||
       fs.is_file(bit_marker) ||
       fs.is_dir(bit_marker) {
-      return ()
+      return
     }
   }
-  let items = fs.readdir(dir)
-  for name in items {
-    if name == "." || name == ".." || name == ".git" || name == ".bit" {
+  let prev_len = matcher.len()
+  ls_files_add_per_directory_rules(
+    fs, root, rel, entry_map, matcher, db, per_directory_files,
+  )
+  ls_files_add_cli_exclude_rules(matcher, exclude_patterns)
+  for name in fs.readdir(dir) {
+    if name == "." ||
+      name == ".." ||
+      name == ".git" ||
+      name == ".bit" ||
+      name == ".jj" {
       continue
     }
-    if name == ".jj" {
+    let child_rel = if rel == "" { name } else { rel + "/" + name }
+    let child_path = root + "/" + child_rel
+    let is_dir = fs.is_dir(child_path)
+    let ignored = matcher.is_ignored(child_rel, is_dir)
+    if is_dir {
+      if not(dirs_out.contains(child_rel)) {
+        dirs_out.push(child_rel)
+      }
+      if ignored {
+        if show_ignored {
+          ls_files_walk_other_files(
+            fs, root, child_rel, tracked, entry_map, matcher, db, per_directory_files,
+            exclude_patterns, files_out, dirs_out, show_ignored,
+          )
+        }
+      } else {
+        ls_files_walk_other_files(
+          fs, root, child_rel, tracked, entry_map, matcher, db, per_directory_files,
+          exclude_patterns, files_out, dirs_out, show_ignored,
+        )
+      }
       continue
     }
-    let rel_path = if prefix == "" { name } else { prefix + "/" + name }
-    let abs_path = root + "/" + rel_path
-    if fs.is_dir(abs_path) {
-      collect_untracked_dirs_recursive(fs, root, rel_path, tracked_dirs, out)
+    if tracked.contains(child_rel) {
+      continue
+    }
+    if show_ignored {
+      if ignored {
+        files_out.push(child_rel)
+      }
+    } else if not(ignored) {
+      files_out.push(child_rel)
     }
   }
-  if prefix != "" && not(tracked_dirs.contains(prefix)) {
-    out.push(prefix)
+  matcher.truncate(prev_len)
+}
+
+///|
+fn ls_files_collect_candidate_dirs(
+  files : Array[String],
+  explicit_dirs : Array[String],
+  tracked_dirs : Map[String, Bool],
+) -> Array[String] {
+  let seen : Map[String, Bool] = {}
+  for file in files {
+    let mut current = file
+    while true {
+      match current.rev_find("/") {
+        Some(idx) => {
+          let dir = String::unsafe_substring(current, start=0, end=idx)
+          if tracked_dirs.contains(dir) {
+            break
+          }
+          seen[dir] = true
+          current = dir
+        }
+        None => break
+      }
+    }
   }
+  for dir in explicit_dirs {
+    if not(tracked_dirs.contains(dir)) {
+      seen[dir] = true
+    }
+  }
+  let out : Array[String] = []
+  for item in seen.to_array() {
+    let (dir, _) = item
+    out.push(dir)
+  }
+  out.sort_by(fn(a, b) { ls_files_compare_paths(a, b) })
+  out
 }
 
 ///|

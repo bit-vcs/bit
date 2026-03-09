@@ -112,6 +112,11 @@ pub fn tree_files_to_index(
         size: 0,
         mtime_sec: 0,
         mtime_nsec: 0,
+        intent_to_add: false,
+        dev: 0,
+        ino: 0,
+        uid: 0,
+        gid: 0,
       })
       continue
     }
@@ -132,6 +137,11 @@ pub fn tree_files_to_index(
           size: o.data.length(),
           mtime_sec: 0,
           mtime_nsec: 0,
+          intent_to_add: false,
+          dev: 0,
+          ino: 0,
+          uid: 0,
+          gid: 0,
         })
       }
     }
@@ -272,6 +282,11 @@ pub fn write_worktree_and_build_index(
         size: 0,
         mtime_sec: 0,
         mtime_nsec: 0,
+        intent_to_add: false,
+        dev: 0,
+        ino: 0,
+        uid: 0,
+        gid: 0,
       })
       continue
     }
@@ -317,6 +332,11 @@ pub fn write_worktree_and_build_index(
           size: o.data.length(),
           mtime_sec,
           mtime_nsec,
+          intent_to_add: false,
+          dev: 0,
+          ino: 0,
+          uid: 0,
+          gid: 0,
         })
       }
     }

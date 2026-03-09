@@ -54,6 +54,25 @@ test "index: write_skip_worktree_paths marks extended flag entries" {
 }
 
 ///|
+test "index: read_index_entries preserves intent-to-add entries" {
+  let fs = @bit.TestFs::new()
+  init_repo(fs, "/repo")
+  let empty = @bit.ObjectId::from_hex(
+    "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+  )
+  let entries = [
+    IndexEntry::new("file", empty, 0o100644, 0, intent_to_add=true),
+  ]
+  write_index_entries(fs, "/repo/.git", entries)
+
+  let actual = read_index_entries(fs, "/repo/.git")
+  assert_eq(actual.length(), 1)
+  assert_eq(actual[0].path, "file")
+  assert_true(actual[0].intent_to_add)
+  assert_eq(actual[0].id.to_hex(), empty.to_hex())
+}
+
+///|
 fn index_test_mark_single_entry_skip_worktree(
   fs : @bit.TestFs,
   index_path : String,

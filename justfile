@@ -175,7 +175,7 @@ git-t-allowlist-shim-strict: build
     echo "$real_git" > tools/git-shim/real-git-path; \
     SHIM_REAL_GIT="$real_git" SHIM_REAL_GIT_FALLBACK="$fallback_real_git" SHIM_EXEC_PATH="$exec_path" \
     SHIM_MOON="$(pwd)/tools/git-shim/moon" \
-    SHIM_CMDS="receive-pack upload-pack pack-objects index-pack shell" SHIM_STRICT=1 \
+    SHIM_CMDS="init add ls-files tag receive-pack upload-pack pack-objects index-pack shell" SHIM_STRICT=1 \
     GIT_TEST_INSTALLED="$shim_dir" GIT_TEST_EXEC_PATH="$exec_path" \
     GIT_TEST_DEFAULT_HASH=sha1 \
     CPATH="$prefix/include" LDFLAGS="-L$prefix/lib" LIBRARY_PATH="$prefix/lib" \
@@ -266,7 +266,7 @@ git-t-one test_file: build
     echo "$real_git" > tools/git-shim/real-git-path; \
     SHIM_REAL_GIT="$real_git" SHIM_REAL_GIT_FALLBACK="$fallback_real_git" SHIM_EXEC_PATH="$exec_path" \
     SHIM_MOON="$(pwd)/tools/git-shim/moon" \
-    SHIM_CMDS="receive-pack upload-pack pack-objects index-pack shell" SHIM_STRICT=1 \
+    SHIM_CMDS="init receive-pack upload-pack pack-objects index-pack shell" SHIM_STRICT=1 \
     GIT_TEST_INSTALLED="$shim_dir" GIT_TEST_EXEC_PATH="$exec_path" \
     GIT_TEST_DEFAULT_HASH=sha1 \
     CPATH="$prefix/include" LDFLAGS="-L$prefix/lib" LIBRARY_PATH="$prefix/lib" \
@@ -292,7 +292,7 @@ git-t-one-no-real-git test_file: build
     echo "$real_git" > tools/git-shim/real-git-path; \
     SHIM_REAL_GIT="$real_git" SHIM_REAL_GIT_FALLBACK="$fallback_real_git" SHIM_EXEC_PATH="$exec_path" \
     SHIM_MOON="$(pwd)/tools/git-shim/moon" \
-    SHIM_CMDS="receive-pack upload-pack pack-objects index-pack shell" SHIM_STRICT=1 \
+    SHIM_CMDS="init receive-pack upload-pack pack-objects index-pack shell" SHIM_STRICT=1 \
     GIT_TEST_INSTALLED="$shim_dir" GIT_TEST_EXEC_PATH="$exec_path" \
     GIT_TEST_DEFAULT_HASH=sha1 \
     CPATH="$prefix/include" LDFLAGS="-L$prefix/lib" LIBRARY_PATH="$prefix/lib" \
@@ -318,7 +318,7 @@ git-t-one-remote test_file: build
     echo "$real_git" > tools/git-shim/real-git-path; \
     SHIM_REAL_GIT="$real_git" SHIM_REAL_GIT_FALLBACK="$fallback_real_git" SHIM_EXEC_PATH="$exec_path" \
     SHIM_MOON="$(pwd)/tools/git-shim/moon" \
-    SHIM_CMDS="receive-pack upload-pack pack-objects index-pack remote shell" SHIM_STRICT=1 \
+    SHIM_CMDS="init receive-pack upload-pack pack-objects index-pack remote shell" SHIM_STRICT=1 \
     GIT_TEST_INSTALLED="$shim_dir" GIT_TEST_EXEC_PATH="$exec_path" \
     GIT_TEST_DEFAULT_HASH=sha1 \
     CPATH="$prefix/include" LDFLAGS="-L$prefix/lib" LIBRARY_PATH="$prefix/lib" \

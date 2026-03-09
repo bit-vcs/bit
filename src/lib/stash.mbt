@@ -179,6 +179,11 @@ fn build_worktree_index(
         size: content.length(),
         mtime_sec: 0,
         mtime_nsec: 0,
+        intent_to_add: false,
+        dev: 0,
+        ino: 0,
+        uid: 0,
+        gid: 0,
       })
     }
     // Skip deleted files

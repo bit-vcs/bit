@@ -823,14 +823,15 @@ pub fn delete_tag(
 /// Create a lightweight tag.
 pub fn create_lightweight_tag(
   fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   name : String,
   target : @bit.ObjectId,
 ) -> Unit raise @bit.GitError {
-  let tags_dir = join_path(git_dir, "refs/tags")
-  fs.mkdir_p(tags_dir)
   let refname = normalize_tag_ref(name)
+  validate_tag_ref_path(rfs, git_dir, refname)
   let ref_path = join_path(git_dir, refname)
+  fs.mkdir_p(parent_dir(ref_path))
   fs.write_string(ref_path, target.to_hex() + "\n")
 }
 
@@ -852,6 +853,8 @@ pub fn create_annotated_tag(
   guard target_obj is Some(obj) else {
     raise @bit.GitError::InvalidObject("unknown object: \{target.to_hex()}")
   }
+  let refname = normalize_tag_ref(name)
+  validate_tag_ref_path(rfs, git_dir, refname)
   let target_type = match obj.obj_type {
     @bit.ObjectType::Blob => "blob"
     @bit.ObjectType::Tree => "tree"
@@ -859,16 +862,82 @@ pub fn create_annotated_tag(
     @bit.ObjectType::Tag => "tag"
   }
   // Create tag object
-  let tag_content = "object \{target.to_hex()}\ntype \{target_type}\ntag \{name}\ntagger \{tagger} \{timestamp} \{timezone}\n\n\{message}\n"
+  let tag_content = if message.length() == 0 {
+    "object \{target.to_hex()}\ntype \{target_type}\ntag \{name}\ntagger \{tagger} \{timestamp} \{timezone}\n\n"
+  } else {
+    "object \{target.to_hex()}\ntype \{target_type}\ntag \{name}\ntagger \{tagger} \{timestamp} \{timezone}\n\n\{message}\n"
+  }
   let tag_bytes = @utf8.encode(tag_content)
   let (tag_id, compressed) = @bit.create_object(@bit.ObjectType::Tag, tag_bytes)
   write_object_bytes(fs, git_dir, tag_id, compressed)
   // Create ref pointing to tag object
-  let tags_dir = join_path(git_dir, "refs/tags")
-  fs.mkdir_p(tags_dir)
-  let refname = normalize_tag_ref(name)
   let ref_path = join_path(git_dir, refname)
+  fs.mkdir_p(parent_dir(ref_path))
   fs.write_string(ref_path, tag_id.to_hex() + "\n")
+}
+
+///|
+fn validate_tag_ref_path(
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+  refname : String,
+) -> Unit raise @bit.GitError {
+  let parts : Array[String] = []
+  for part_view in refname.split("/") {
+    parts.push(part_view.to_string())
+  }
+  let mut current = git_dir
+  for i in 0..<(parts.length() - 1) {
+    current = join_path(current, parts[i])
+    if rfs.is_file(current) {
+      raise @bit.GitError::InvalidObject(
+        "cannot create ref due to path conflict: \{refname}",
+      )
+    }
+  }
+  let ref_path = join_path(git_dir, refname)
+  if rfs.is_dir(ref_path) {
+    raise @bit.GitError::InvalidObject(
+      "cannot create ref due to path conflict: \{refname}",
+    )
+  }
+  let packed_path = join_path(git_dir, "packed-refs")
+  if has_packed_ref_path_conflict(rfs, packed_path, refname) {
+    raise @bit.GitError::InvalidObject(
+      "cannot create ref due to path conflict: \{refname}",
+    )
+  }
+}
+
+///|
+fn has_packed_ref_path_conflict(
+  fs : &@bit.RepoFileSystem,
+  packed_path : String,
+  refname : String,
+) -> Bool {
+  if not(fs.is_file(packed_path)) {
+    return false
+  }
+  let text = @utf8.decode_lossy(fs.read_file(packed_path)[:]) catch {
+    _ => return false
+  }
+  let refname_prefix = refname + "/"
+  for line_view in text.split("\n") {
+    let line = trim_line(line_view.to_string())
+    if line.length() == 0 || line.has_prefix("#") || line.has_prefix("^") {
+      continue
+    }
+    let space = line.find(" ")
+    guard space is Some(idx) else { continue }
+    if idx + 1 >= line.length() {
+      continue
+    }
+    let name = String::unsafe_substring(line, start=idx + 1, end=line.length())
+    if name.has_prefix(refname_prefix) || refname.has_prefix(name + "/") {
+      return true
+    }
+  }
+  false
 }
 
 ///|

@@ -408,6 +408,11 @@ fn rebase_write_tree_from_map(
       size: 0,
       mtime_sec: 0,
       mtime_nsec: 0,
+      intent_to_add: false,
+      dev: 0,
+      ino: 0,
+      uid: 0,
+      gid: 0,
     })
   }
   entries.sort_by((a, b) => String::lexical_compare(a.path, b.path))
@@ -439,6 +444,11 @@ fn rebase_write_tree_recursive(
               size: e.size,
               mtime_sec: e.mtime_sec,
               mtime_nsec: e.mtime_nsec,
+              intent_to_add: e.intent_to_add,
+              dev: e.dev,
+              ino: e.ino,
+              uid: e.uid,
+              gid: e.gid,
             })
           None =>
             dir_map[name] = [
@@ -449,6 +459,11 @@ fn rebase_write_tree_recursive(
                 size: e.size,
                 mtime_sec: e.mtime_sec,
                 mtime_nsec: e.mtime_nsec,
+                intent_to_add: e.intent_to_add,
+                dev: e.dev,
+                ino: e.ino,
+                uid: e.uid,
+                gid: e.gid,
               },
             ]
         }
@@ -546,6 +561,11 @@ fn rebase_map_to_index(
         size: 0,
         mtime_sec: 0,
         mtime_nsec: 0,
+        intent_to_add: false,
+        dev: 0,
+        ino: 0,
+        uid: 0,
+        gid: 0,
       })
       continue
     }
@@ -562,6 +582,11 @@ fn rebase_map_to_index(
           size: o.data.length(),
           mtime_sec: 0,
           mtime_nsec: 0,
+          intent_to_add: false,
+          dev: 0,
+          ino: 0,
+          uid: 0,
+          gid: 0,
         })
       }
       None => raise @bit.GitError::InvalidObject("Missing blob object")
