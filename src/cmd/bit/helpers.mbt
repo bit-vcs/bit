@@ -7,11 +7,7 @@ fn bytes_from_array(arr : Array[Byte]) -> Bytes {
 
 ///|
 fn str_to_bytes(s : String) -> Bytes {
-  let arr : Array[Byte] = []
-  for c in s {
-    arr.push(c.to_int().to_byte())
-  }
-  bytes_from_array(arr)
+  @utf8.encode(s)
 }
 
 ///|

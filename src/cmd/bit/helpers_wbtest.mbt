@@ -303,6 +303,43 @@ test "main: parse_global_options keeps ls-files pathspec" {
 }
 
 ///|
+test "helpers: get_work_root finds repo root from PWD when shim pwd is absent" {
+  let fs = OsFs::new()
+  let root = "/tmp/bit-test-get-work-root-pwd-" +
+    get_current_timestamp().to_string()
+  let subdir = root + "/sub"
+  cleanup_tree(fs, root)
+  fs.mkdir_p(root + "/.git")
+  fs.mkdir_p(subdir)
+  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
+  let prev_pwd = @sys.get_env_var("PWD")
+  let prev_git_dir = @sys.get_env_var("GIT_DIR")
+  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
+  @sys.unset_env_var("GIT_SHIM_PWD")
+  @sys.set_env_var("PWD", subdir)
+  @sys.unset_env_var("GIT_DIR")
+  @sys.unset_env_var("GIT_WORK_TREE")
+  assert_eq(get_work_root(), root)
+  match prev_shim_pwd {
+    Some(value) => @sys.set_env_var("GIT_SHIM_PWD", value)
+    None => @sys.unset_env_var("GIT_SHIM_PWD")
+  }
+  match prev_pwd {
+    Some(value) => @sys.set_env_var("PWD", value)
+    None => @sys.unset_env_var("PWD")
+  }
+  match prev_git_dir {
+    Some(value) => @sys.set_env_var("GIT_DIR", value)
+    None => @sys.unset_env_var("GIT_DIR")
+  }
+  match prev_work_tree {
+    Some(value) => @sys.set_env_var("GIT_WORK_TREE", value)
+    None => @sys.unset_env_var("GIT_WORK_TREE")
+  }
+  cleanup_tree(fs, root)
+}
+
+///|
 async test "main: show_command_help supports pr alias" {
   let ok = show_command_help("pr", silent=true)
   assert_true(ok)
@@ -562,4 +599,9 @@ test "helpers: repository format v1 allows preciousObjects" {
     "/repo/.git/config", "[core]\n\trepositoryformatversion = 1\n[extensions]\n\tpreciousObjects = 1\n",
   )
   assert_eq(repository_format_error(fs, "/repo/.git"), None)
+}
+
+///|
+test "helpers: str_to_bytes preserves utf8 output" {
+  assert_eq(str_to_bytes("å äö\n"), @utf8.encode("å äö\n"))
 }

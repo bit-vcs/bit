@@ -18,5 +18,5 @@ index a7ec21eda5..ff363abc52 100755
 +		test_cmp expect actual
 +	fi
  '
-
+ 
  test_expect_success 'clone repo (detached HEAD points to tag)' '

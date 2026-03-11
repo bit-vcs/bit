@@ -1,4 +1,335 @@
 ///|
+fn push_delete_current_branch_policy(
+  has_remote_ref : Bool,
+  checked_out_worktree : String?,
+  deny_delete_current : String?,
+) -> (Bool, Bool) {
+  if not(has_remote_ref) || checked_out_worktree is None {
+    return (false, false)
+  }
+  match deny_delete_current {
+    Some(mode) =>
+      if mode == "false" || mode == "ignore" {
+        (false, false)
+      } else if mode == "warn" {
+        (false, true)
+      } else {
+        (true, false)
+      }
+    None => (true, false)
+  }
+}
+
+///|
+fn push_resolve_mirror_refspecs(
+  option_mirror : Bool,
+  remote_mirror : Bool,
+  explicit_refspec_count : Int,
+  push_all : Bool,
+  push_tags : Bool,
+  delete_mode : Bool,
+) -> Array[String]? raise @bitcore.GitError {
+  let mirror_active = option_mirror || remote_mirror
+  if not(mirror_active) {
+    return None
+  }
+  if explicit_refspec_count > 0 || push_all || push_tags || delete_mode {
+    raise @bitcore.GitError::InvalidObject(
+      "push --mirror does not take refspec",
+    )
+  }
+  Some(["+refs/*:refs/*"])
+}
+
+///|
+struct PushUpstreamConfigUpdate {
+  branch_name : String
+  merge_ref : String
+}
+
+///|
+enum PushLeaseExpectation {
+  RemoteTracking
+  Explicit(@bitcore.ObjectId?)
+}
+
+///|
+fn push_should_emit_progress(progress_override : Bool?, quiet : Bool) -> Bool {
+  if quiet {
+    false
+  } else {
+    match progress_override {
+      Some(value) => value
+      None => false
+    }
+  }
+}
+
+///|
+fn push_normalize_lease_refname(refname : String) -> String {
+  if refname.has_prefix("refs/") {
+    refname
+  } else {
+    "refs/heads/" + refname
+  }
+}
+
+///|
+fn push_parse_force_with_lease_value(
+  fs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  value : String,
+) -> (String, PushLeaseExpectation) raise @bitcore.GitError {
+  guard value.length() > 0 else {
+    raise @bitcore.GitError::InvalidObject(
+      "push: --force-with-lease requires a ref name",
+    )
+  }
+  match value.find(":") {
+    Some(idx) => {
+      let refname = push_normalize_lease_refname(
+        String::unsafe_substring(value, start=0, end=idx),
+      )
+      let expect_expr = String::unsafe_substring(
+        value,
+        start=idx + 1,
+        end=value.length(),
+      )
+      if expect_expr.length() == 0 {
+        (refname, PushLeaseExpectation::Explicit(None))
+      } else {
+        let expect_id = @bitrepo.rev_parse(fs, git_dir, expect_expr) catch {
+          _ => None
+        }
+        guard expect_id is Some(id) else {
+          raise @bitcore.GitError::InvalidObject(
+            "push: invalid --force-with-lease expectation",
+          )
+        }
+        (refname, PushLeaseExpectation::Explicit(Some(id)))
+      }
+    }
+    None =>
+      (
+        push_normalize_lease_refname(value),
+        PushLeaseExpectation::RemoteTracking,
+      )
+  }
+}
+
+///|
+fn push_remote_tracking_refname(
+  remote_name : String,
+  dest_ref : String,
+) -> String? {
+  match branch_name_from_head_ref(dest_ref) {
+    Some(branch_name) => Some("refs/remotes/" + remote_name + "/" + branch_name)
+    None => None
+  }
+}
+
+///|
+fn push_resolve_lease_expectation(
+  fs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  remote_name : String,
+  dest_ref : String,
+  cover_all : Bool,
+  lease_rules : Map[String, PushLeaseExpectation],
+) -> (Bool, @bitcore.ObjectId?)? {
+  match lease_rules.get(dest_ref) {
+    Some(PushLeaseExpectation::Explicit(expected)) => Some((false, expected))
+    Some(PushLeaseExpectation::RemoteTracking) =>
+      match push_remote_tracking_refname(remote_name, dest_ref) {
+        Some(tracking_ref) =>
+          Some(
+            (
+              true,
+              @bitlib.resolve_ref(fs, git_dir, tracking_ref) catch {
+                _ => None
+              },
+            ),
+          )
+        None => None
+      }
+    None =>
+      if cover_all {
+        match push_remote_tracking_refname(remote_name, dest_ref) {
+          Some(tracking_ref) =>
+            Some(
+              (
+                true,
+                @bitlib.resolve_ref(fs, git_dir, tracking_ref) catch {
+                  _ => None
+                },
+              ),
+            )
+          None => None
+        }
+      } else {
+        None
+      }
+  }
+}
+
+///|
+fn push_force_if_includes_satisfied(
+  fs : &@bitcore.RepoFileSystem,
+  db : @bitlib.ObjectDb,
+  git_dir : String,
+  source_ref : String,
+  expected_old : @bitcore.ObjectId?,
+) -> Bool {
+  guard expected_old is Some(expected_id) else { return true }
+  let local_tip = if source_ref.length() == 0 {
+    @bitlib.resolve_head_commit(fs, git_dir) catch {
+      _ => None
+    }
+  } else {
+    Some(resolve_push_source_id(fs, git_dir, source_ref)) catch {
+      _ => None
+    }
+  }
+  guard local_tip is Some(local_id) else { return false }
+  let local_commit = peel_to_commit(db, fs, local_id)
+  if local_commit is Some(commit_id) &&
+    is_ancestor_commit(db, fs, expected_id, commit_id) {
+    return true
+  }
+  for refname in push_force_if_includes_reflog_refnames(fs, git_dir, source_ref) {
+    let entries = @bitrepo.read_reflog(fs, git_dir, refname) catch { _ => [] }
+    for entry in entries {
+      if push_force_if_includes_candidate_matches(
+          db,
+          fs,
+          expected_id,
+          entry.old_id,
+        ) ||
+        push_force_if_includes_candidate_matches(
+          db,
+          fs,
+          expected_id,
+          entry.new_id,
+        ) {
+        return true
+      }
+    }
+  }
+  false
+}
+
+///|
+fn push_force_if_includes_candidate_matches(
+  db : @bitlib.ObjectDb,
+  fs : &@bitcore.RepoFileSystem,
+  expected_id : @bitcore.ObjectId,
+  candidate_id : @bitcore.ObjectId,
+) -> Bool {
+  if candidate_id == @bitcore.ObjectId::zero() {
+    return false
+  }
+  let commit_id = peel_to_commit(db, fs, candidate_id)
+  commit_id is Some(actual) && is_ancestor_commit(db, fs, expected_id, actual)
+}
+
+///|
+fn push_force_if_includes_reflog_refnames(
+  fs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  source_ref : String,
+) -> Array[String] {
+  let refnames : Array[String] = []
+  let append_refname = fn(refname : String) {
+    if refname.length() > 0 && not(refnames.contains(refname)) {
+      refnames.push(refname)
+    }
+  }
+  if source_ref.length() == 0 || source_ref == "HEAD" {
+    append_refname("HEAD")
+    let head_ref = (@bitlib.read_head_ref(fs, git_dir) |> Some) catch {
+      _ => None
+    }
+    match head_ref {
+      Some(Branch(name)) => append_refname("refs/heads/" + name)
+      Some(Detached(_)) => ()
+      None => ()
+    }
+    return refnames
+  }
+  if source_ref.has_prefix("refs/") {
+    append_refname(source_ref)
+    return refnames
+  }
+  let branch_ref = "refs/heads/" + source_ref
+  let branch_exists = (@bitlib.resolve_ref(fs, git_dir, branch_ref) |> Some) catch {
+    _ => None
+  }
+  if branch_exists is Some(Some(_)) ||
+    @bitrepo.reflog_exists(fs, git_dir, branch_ref) {
+    append_refname(branch_ref)
+  }
+  refnames
+}
+
+///|
+fn push_append_upstream_config_update(
+  updates : Array[PushUpstreamConfigUpdate],
+  source_ref : String,
+  dest_ref : String,
+  current_branch : String,
+  delete_ref : Bool,
+) -> Unit {
+  if delete_ref || branch_name_from_head_ref(dest_ref) is None {
+    return
+  }
+  let branch_name = if source_ref == "HEAD" {
+    Some(current_branch)
+  } else {
+    branch_name_from_head_ref(source_ref)
+  }
+  match branch_name {
+    Some(name) => updates.push({ branch_name: name, merge_ref: dest_ref })
+    None => ()
+  }
+}
+
+///|
+fn push_write_upstream_config_updates(
+  fs : OsFs,
+  git_dir : String,
+  remote_name : String,
+  updates : Array[PushUpstreamConfigUpdate],
+) -> Array[String] raise @bitcore.GitError {
+  let merge_by_branch : Map[String, String] = {}
+  let ordered_branches : Array[String] = []
+  let messages : Array[String] = []
+  for update in updates {
+    if merge_by_branch.get(update.branch_name) is None {
+      ordered_branches.push(update.branch_name)
+    }
+    merge_by_branch[update.branch_name] = update.merge_ref
+  }
+  for branch_name in ordered_branches {
+    guard merge_by_branch.get(branch_name) is Some(merge_ref) else { continue }
+    @bitlib.set_config_key(
+      fs, fs, git_dir, "branch", branch_name, "remote", remote_name,
+    )
+    @bitlib.set_config_key(
+      fs, fs, git_dir, "branch", branch_name, "merge", merge_ref,
+    )
+    let remote_branch_name = if merge_ref.has_prefix("refs/heads/") {
+      (try! merge_ref[11:]).to_string()
+    } else {
+      merge_ref
+    }
+    messages.push(
+      "Branch '\{branch_name}' set up to track remote branch '\{remote_branch_name}' from '\{remote_name}'.",
+    )
+  }
+  messages
+}
+
+///|
 async fn handle_push(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
   let root = get_work_root()
@@ -13,12 +344,17 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
   let mut set_upstream = false
   let mut push_all = false
   let mut push_tags = false
+  let mut push_mirror = false
   let mut follow_tags = false
   let mut push_prune = false
   let mut dry_run = false
   let mut delete_mode = false
   let mut porcelain = false
   let mut quiet = false
+  let mut progress_override : Bool? = None
+  let mut force_if_includes_override : Bool? = None
+  let mut force_with_lease_cover_all = false
+  let force_with_lease_values : Array[String] = []
   let mut relay_preferred_sender_opt : String? = None
   let mut relay_preferred_repo_opt : String? = None
   let positional_args : Array[String] = []
@@ -38,8 +374,12 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
         set_upstream = true
         i += 1
       }
-      "--all" => {
+      "--all" | "--branches" => {
         push_all = true
+        i += 1
+      }
+      "--mirror" => {
+        push_mirror = true
         i += 1
       }
       "--tags" => {
@@ -60,6 +400,32 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
       }
       "--dry-run" => {
         dry_run = true
+        i += 1
+      }
+      "--progress" => {
+        progress_override = Some(true)
+        i += 1
+      }
+      "--no-progress" => {
+        progress_override = Some(false)
+        i += 1
+      }
+      "--force-if-includes" => {
+        force_if_includes_override = Some(true)
+        i += 1
+      }
+      "--no-force-if-includes" => {
+        force_if_includes_override = Some(false)
+        i += 1
+      }
+      "--force-with-lease" => {
+        force_with_lease_cover_all = true
+        i += 1
+      }
+      _ if arg.has_prefix("--force-with-lease=") => {
+        force_with_lease_values.push(
+          String::unsafe_substring(arg, start=19, end=arg.length()),
+        )
         i += 1
       }
       "-d" | "--delete" => {
@@ -220,6 +586,17 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
         false,
       )
   }
+  let push_use_force_if_includes = match force_if_includes_override {
+    Some(value) => value
+    None =>
+      match overrides.get("push.useforceifincludes") {
+        Some(v) => parse_config_bool_string(Some(v))
+        None =>
+          @bitlib.read_config_bool(
+            fs, config_path, "push", "useforceifincludes",
+          ).unwrap_or(false)
+      }
+  }
   let protocol_version = match overrides.get("protocol.version") {
     Some(v) => v
     None => @sys.get_env_var("GIT_TEST_PROTOCOL_VERSION").unwrap_or("2")
@@ -342,11 +719,17 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
           remotes, effective_branch_remote, effective_remote_pushdefault,
         )
     }
+    let tentative_remote_mirror = match remote_configs.get(tentative_remote) {
+      Some(rc) => rc.mirror
+      None => false
+    }
     let configured_specs = match remote_configs.get(tentative_remote) {
       Some(rc) => rc.push
       None => []
     }
-    if configured_specs.length() > 0 {
+    if push_mirror || tentative_remote_mirror {
+      remote_name = tentative_remote
+    } else if configured_specs.length() > 0 {
       remote_name = tentative_remote
       for spec in configured_specs {
         refspec_args.push(spec)
@@ -375,12 +758,35 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
       }
     }
   }
+  let remote_mirror_enabled = match remote_configs.get(remote_name) {
+    Some(rc) => rc.mirror
+    None => false
+  }
+  let mut push_mirror_active = false
+  match
+    push_resolve_mirror_refspecs(
+      push_mirror,
+      remote_mirror_enabled,
+      explicit_refspecs_raw.length(),
+      push_all,
+      push_tags,
+      delete_mode,
+    ) {
+    Some(mirror_refspecs) => {
+      push_mirror_active = true
+      force = true
+      push_prune = true
+      default_plan = None
+      refspec_args.clear()
+      for spec in mirror_refspecs {
+        refspec_args.push(spec)
+      }
+    }
+    None => ()
+  }
   let parsed_refspecs = parse_push_refspecs_with_presence(refspec_args)
   for spec in parsed_refspecs {
     let src_spec = spec.src
-    if spec.src == spec.dst {
-      continue
-    }
     let has_head_ref = @bitlib.resolve_ref(
         fs,
         git_dir,
@@ -493,16 +899,21 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
     None => false
   }
   let mut auto_set_upstream_needed = false
-  let mut upstream_refname : String? = None
   match default_plan {
-    Some(plan) => {
-      auto_set_upstream_needed = plan.auto_set_upstream
-      if not(plan.delete_ref) {
-        upstream_refname = Some(plan.dest_ref)
-      }
-    }
+    Some(plan) => auto_set_upstream_needed = plan.auto_set_upstream
     None => ()
   }
+  let force_with_lease_rules : Map[String, PushLeaseExpectation] = {}
+  for value in force_with_lease_values {
+    let (refname, expectation) = push_parse_force_with_lease_value(
+      fs, git_dir, value,
+    )
+    force_with_lease_rules[refname] = expectation
+  }
+  let track_upstream_config = not(dry_run) &&
+    not(push_mirror_active) &&
+    (set_upstream || auto_set_upstream_needed)
+  let emit_progress = push_should_emit_progress(progress_override, quiet)
   if helper_is_testgit &&
     refspec_args.length() == 0 &&
     not(push_all) &&
@@ -674,6 +1085,20 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
                       source_ref: "",
                       dest_ref,
                       delete_ref: true,
+                      force: spec_force,
+                    })
+                    continue
+                  }
+                  if spec.src.contains("*") || spec.dst.contains("*") {
+                    if not(spec.src.contains("*") && spec.dst.contains("*")) {
+                      raise @bitcore.GitError::InvalidObject(
+                        "Invalid wildcard push refspec",
+                      )
+                    }
+                    push_plans.push({
+                      source_ref: spec.src,
+                      dest_ref: spec.dst,
+                      delete_ref: false,
                       force: spec_force,
                     })
                     continue
@@ -860,17 +1285,54 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
             parsed_refspecs,
             push_plans.length(),
           )
-          if upstream_refname is None &&
-            push_plans.length() == 1 &&
-            not(push_plans[0].delete_ref) {
-            upstream_refname = Some(push_plans[0].dest_ref)
-          }
           let porcelain_lines : Array[PushPorcelainLine] = []
           let mut porcelain_failed = false
           let resolved_updates : Array[PushResolvedUpdate] = []
+          let upstream_config_updates : Array[PushUpstreamConfigUpdate] = []
           for plan_item in push_plans {
             if plan_item.delete_ref {
               let hidden_ref = is_hidden_ref(plan_item.dest_ref, push_hide_refs)
+              let old_opt = @bitlib.resolve_ref(fs, rgd, plan_item.dest_ref)
+              let mut lease_stale = false
+              match
+                push_resolve_lease_expectation(
+                  fs,
+                  git_dir,
+                  remote_name,
+                  plan_item.dest_ref,
+                  force_with_lease_cover_all,
+                  force_with_lease_rules,
+                ) {
+                Some((tracking_based, expected_old)) =>
+                  if not(plan_item.force) && old_opt != expected_old {
+                    lease_stale = true
+                  } else if not(plan_item.force) &&
+                    tracking_based &&
+                    push_use_force_if_includes &&
+                    not(
+                      push_force_if_includes_satisfied(
+                        fs, local_db, git_dir, "", expected_old,
+                      ),
+                    ) {
+                    lease_stale = true
+                  }
+                None => ()
+              }
+              if lease_stale {
+                if porcelain {
+                  porcelain_lines.push({
+                    flag: "!",
+                    src: plan_item.source_ref,
+                    dst: plan_item.dest_ref,
+                    status: "[rejected] (stale info)",
+                  })
+                  porcelain_failed = true
+                  continue
+                } else {
+                  eprint_line("stale info")
+                  raise @bitcore.GitError::InvalidObject("stale info")
+                }
+              }
               let checked_out_worktree_for_delete = match
                 branch_name_from_head_ref(plan_item.dest_ref) {
                 Some(branch_name) =>
@@ -887,21 +1349,11 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
                   }
                 None => None
               }
-              let mut delete_checked_out_rejected = false
-              let mut delete_checked_out_warn = false
-              if checked_out_worktree_for_delete is Some(_) {
-                match deny_delete_current {
-                  Some(mode) =>
-                    if mode == "false" || mode == "ignore" {
-                      ()
-                    } else if mode == "warn" {
-                      delete_checked_out_warn = true
-                    } else {
-                      delete_checked_out_rejected = true
-                    }
-                  None => delete_checked_out_rejected = true
-                }
-              }
+              let (delete_checked_out_rejected, delete_checked_out_warn) = push_delete_current_branch_policy(
+                old_opt is Some(_),
+                checked_out_worktree_for_delete,
+                deny_delete_current,
+              )
               let delete_rejection = select_push_rejection_status(
                 false, false, delete_checked_out_rejected, hidden_ref,
               )
@@ -924,7 +1376,6 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
               if delete_checked_out_warn {
                 eprint_line("warning: updating the current branch")
               }
-              let old_opt = @bitlib.resolve_ref(fs, rgd, plan_item.dest_ref)
               let old_id = match old_opt {
                 Some(id) => id
                 None => @bitcore.ObjectId::zero()
@@ -949,6 +1400,7 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
                 refname: plan_item.dest_ref,
                 delete_ref: true,
                 should_apply: old_opt is Some(_),
+                force_update: false,
                 update_instead_worktree: None,
               })
               continue
@@ -972,6 +1424,47 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
                       Some(id) => id
                       None => @bitcore.ObjectId::zero()
                     }
+                    let mut lease_stale = false
+                    let mut lease_passed = false
+                    let mut effective_force_update = plan_item.force
+                    match
+                      push_resolve_lease_expectation(
+                        fs, git_dir, remote_name, dst_refname, force_with_lease_cover_all,
+                        force_with_lease_rules,
+                      ) {
+                      Some((tracking_based, expected_old)) =>
+                        if not(plan_item.force) && old_opt != expected_old {
+                          lease_stale = true
+                        } else {
+                          lease_passed = true
+                          if not(plan_item.force) &&
+                            tracking_based &&
+                            push_use_force_if_includes &&
+                            not(
+                              push_force_if_includes_satisfied(
+                                fs, local_db, git_dir, src_refname, expected_old,
+                              ),
+                            ) {
+                            lease_stale = true
+                          }
+                        }
+                      None => ()
+                    }
+                    if lease_stale {
+                      if porcelain {
+                        porcelain_lines.push({
+                          flag: "!",
+                          src: src_refname,
+                          dst: dst_refname,
+                          status: "[rejected] (stale info)",
+                        })
+                        porcelain_failed = true
+                        continue
+                      } else {
+                        eprint_line("stale info")
+                        raise @bitcore.GitError::InvalidObject("stale info")
+                      }
+                    }
                     let mut non_fast_forward = false
                     let mut tag_conflict = false
                     if old_opt is Some(existing_old) &&
@@ -988,6 +1481,13 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
                       if dst_refname.has_prefix("refs/tags/") {
                         tag_conflict = true
                       }
+                    }
+                    if lease_passed &&
+                      not(plan_item.force) &&
+                      (non_fast_forward || tag_conflict) {
+                      effective_force_update = true
+                      non_fast_forward = false
+                      tag_conflict = false
                     }
                     let checked_out_worktree = match
                       branch_name_from_head_ref(dst_refname) {
@@ -1055,10 +1555,7 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
                     }
                     if porcelain {
                       let (flag, status) = classify_push_porcelain_success(
-                        old_id,
-                        local_id,
-                        false,
-                        plan_item.force,
+                        old_id, local_id, false, effective_force_update,
                       )
                       porcelain_lines.push({
                         flag,
@@ -1073,8 +1570,15 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
                       refname: dst_refname,
                       delete_ref: false,
                       should_apply: old_id != local_id,
+                      force_update: effective_force_update,
                       update_instead_worktree,
                     })
+                    if track_upstream_config {
+                      push_append_upstream_config_update(
+                        upstream_config_updates, src_refname, dst_refname, current_branch,
+                        false,
+                      )
+                    }
                   }
                   None => ()
                 }
@@ -1097,6 +1601,55 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
               Some(id) => id
               None => @bitcore.ObjectId::zero()
             }
+            let mut lease_stale = false
+            let mut lease_passed = false
+            let mut effective_force_update = plan_item.force
+            match
+              push_resolve_lease_expectation(
+                fs,
+                git_dir,
+                remote_name,
+                plan_item.dest_ref,
+                force_with_lease_cover_all,
+                force_with_lease_rules,
+              ) {
+              Some((tracking_based, expected_old)) =>
+                if not(plan_item.force) && old_opt != expected_old {
+                  lease_stale = true
+                } else {
+                  lease_passed = true
+                  if not(plan_item.force) &&
+                    tracking_based &&
+                    push_use_force_if_includes &&
+                    not(
+                      push_force_if_includes_satisfied(
+                        fs,
+                        local_db,
+                        git_dir,
+                        plan_item.source_ref,
+                        expected_old,
+                      ),
+                    ) {
+                    lease_stale = true
+                  }
+                }
+              None => ()
+            }
+            if lease_stale {
+              if porcelain {
+                porcelain_lines.push({
+                  flag: "!",
+                  src: plan_item.source_ref,
+                  dst: plan_item.dest_ref,
+                  status: "[rejected] (stale info)",
+                })
+                porcelain_failed = true
+                continue
+              } else {
+                eprint_line("stale info")
+                raise @bitcore.GitError::InvalidObject("stale info")
+              }
+            }
             let mut non_fast_forward = false
             let mut tag_conflict = false
             if old_opt is Some(existing_old) &&
@@ -1109,6 +1662,13 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
               if plan_item.dest_ref.has_prefix("refs/tags/") {
                 tag_conflict = true
               }
+            }
+            if lease_passed &&
+              not(plan_item.force) &&
+              (non_fast_forward || tag_conflict) {
+              effective_force_update = true
+              non_fast_forward = false
+              tag_conflict = false
             }
             let checked_out_worktree = match
               branch_name_from_head_ref(plan_item.dest_ref) {
@@ -1175,10 +1735,7 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
             }
             if porcelain {
               let (flag, status) = classify_push_porcelain_success(
-                old_id,
-                local_id,
-                false,
-                plan_item.force,
+                old_id, local_id, false, effective_force_update,
               )
               porcelain_lines.push({
                 flag,
@@ -1193,8 +1750,18 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
               refname: plan_item.dest_ref,
               delete_ref: false,
               should_apply: old_id != local_id,
+              force_update: effective_force_update,
               update_instead_worktree,
             })
+            if track_upstream_config {
+              push_append_upstream_config_update(
+                upstream_config_updates,
+                plan_item.source_ref,
+                plan_item.dest_ref,
+                current_branch,
+                false,
+              )
+            }
           }
           ensure_consistent_alias_updates(fs, rgd, resolved_updates)
           if porcelain_failed {
@@ -1222,6 +1789,9 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
               }
             }
             if has_object_updates {
+              if emit_progress {
+                eprint_line("Writing objects: 100% (1/1), done.")
+              }
               let rfs : &@bitcore.RepoFileSystem = fs
               let transferred_object_ids : Map[String, Bool] = {}
               for row in resolved_updates {
@@ -1366,6 +1936,28 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
               )
               ignore(run_push_hook_with_args(fs, rgd, "post-update", post_refs))
             }
+            if not(porcelain || quiet) {
+              for row in resolved_updates {
+                if not(row.should_apply) {
+                  continue
+                }
+                if row.delete_ref && row.old_id != @bitcore.ObjectId::zero() {
+                  eprint_line("[deleted]")
+                } else if row.force_update {
+                  eprint_line("[forced update]")
+                }
+              }
+            }
+            if track_upstream_config {
+              let upstream_messages = push_write_upstream_config_updates(
+                fs, git_dir, remote_name, upstream_config_updates,
+              )
+              if not(quiet) {
+                for message in upstream_messages {
+                  print_line(message)
+                }
+              }
+            }
           }
           if porcelain {
             for line in porcelain_lines {
@@ -1384,6 +1976,9 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
           }
         }
         None => {
+          if emit_progress && not(dry_run) {
+            eprint_line("Writing objects: 100% (1/1), done.")
+          }
           let result = @bitlibnative.push_http(
             fs,
             root,
@@ -1433,25 +2028,6 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
   emit_push_trace_event(fs, "write_pack_file/wrote", wrote_count)
   if push_negotiate && not(negotiation_failed) {
     emit_push_trace_event(fs, "total_rounds", "1")
-  }
-  if not(push_all) &&
-    upstream_refname is Some(refname) &&
-    (set_upstream || auto_set_upstream_needed) {
-    let branch_name = current_branch
-    @bitlib.set_config_key(
-      fs, fs, git_dir, "branch", branch_name, "remote", remote_name,
-    )
-    @bitlib.set_config_key(
-      fs, fs, git_dir, "branch", branch_name, "merge", refname,
-    )
-    let remote_branch_name = if refname.has_prefix("refs/heads/") {
-      (try! refname[11:]).to_string()
-    } else {
-      refname
-    }
-    print_line(
-      "Branch '\{branch_name}' set up to track remote branch '\{remote_branch_name}' from '\{remote_name}'.",
-    )
   }
 }
 

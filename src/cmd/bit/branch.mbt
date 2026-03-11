@@ -22,6 +22,7 @@ async fn handle_branch(args : Array[String]) -> Unit raise Error {
   let mut show_all = false
   let mut show_remotes = false
   let mut verbose = false
+  let mut column_mode : String? = None
   let mut set_upstream_to : String? = None
   let mut track_upstream = false
   let mut start_point : String? = None
@@ -31,21 +32,30 @@ async fn handle_branch(args : Array[String]) -> Unit raise Error {
   while i < args.length() {
     let arg = args[i]
     match arg {
-      "-m" | "-M" if i + 2 < args.length() => {
-        rename_from = Some(args[i + 1])
-        rename_to = Some(args[i + 2])
+      "-m" | "-M" => {
         rename_force = arg == "-M"
         list_mode = false
-        i += 3
-        continue
-      }
-      "-m" | "-M" if i + 1 < args.length() => {
-        rename_current = true
-        rename_to = Some(args[i + 1])
-        rename_force = arg == "-M"
-        list_mode = false
-        i += 2
-        continue
+        let mut base = i + 1
+        if base < args.length() &&
+          (args[base] == "-f" || args[base] == "--force") {
+          rename_force = true
+          base += 1
+        }
+        if base + 1 < args.length() {
+          rename_from = Some(args[base])
+          rename_to = Some(args[base + 1])
+          i = base + 2
+          continue
+        }
+        if base < args.length() {
+          rename_current = true
+          rename_to = Some(args[base])
+          i = base + 1
+          continue
+        }
+        @stdio.stderr.write("error: branch name required\n")
+        @sys.exit(128)
+        return
       }
       "-d" | "--delete" if i + 1 < args.length() => {
         delete_branch = Some(args[i + 1])
@@ -64,6 +74,12 @@ async fn handle_branch(args : Array[String]) -> Unit raise Error {
       "-a" | "--all" => show_all = true
       "-r" | "--remotes" => show_remotes = true
       "-v" | "--verbose" => verbose = true
+      "--column" => column_mode = Some("always")
+      "--no-column" => column_mode = Some("never")
+      _ if arg.has_prefix("--column=") =>
+        column_mode = Some(
+          String::unsafe_substring(arg, start=9, end=arg.length()),
+        )
       "-t" | "--track" => {
         track_upstream = true
         list_mode = false
@@ -116,6 +132,21 @@ async fn handle_branch(args : Array[String]) -> Unit raise Error {
     }
     i += 1
   }
+  let config_path = git_dir + "/config"
+  let column_ui = branch_last_config_value(fs, config_path, "column", "ui")
+  let column_branch = branch_last_config_value(
+    fs, config_path, "column", "branch",
+  )
+  let (column_active, column_dense, explicit_column_enabled) = branch_resolve_column_mode(
+    column_mode, verbose, column_ui, column_branch,
+  )
+  if verbose && explicit_column_enabled {
+    @stdio.stderr.write(
+      "fatal: options '--column' and '--verbose' cannot be used together\n",
+    )
+    @sys.exit(128)
+    return
+  }
   match set_upstream_to {
     Some(upstream) => {
       let branch_name = match new_branch {
@@ -163,6 +194,7 @@ async fn handle_branch(args : Array[String]) -> Unit raise Error {
               if from_name == to_name {
                 ()
               } else {
+                let (author, email, timestamp, timezone) = branch_get_committer_identity()
                 @bitlib.rename_branch(
                   fs,
                   fs,
@@ -170,6 +202,10 @@ async fn handle_branch(args : Array[String]) -> Unit raise Error {
                   from_name,
                   to_name,
                   force=rename_force,
+                  author~,
+                  email~,
+                  timestamp~,
+                  timezone~,
                 )
               }
             None => ()
@@ -180,6 +216,7 @@ async fn handle_branch(args : Array[String]) -> Unit raise Error {
               Some(to_name) => {
                 let current = get_current_branch(fs, git_dir)
                 if current != to_name {
+                  let (author, email, timestamp, timezone) = branch_get_committer_identity()
                   @bitlib.rename_branch(
                     fs,
                     fs,
@@ -187,6 +224,10 @@ async fn handle_branch(args : Array[String]) -> Unit raise Error {
                     current,
                     to_name,
                     force=rename_force,
+                    author~,
+                    email~,
+                    timestamp~,
+                    timezone~,
                   )
                 }
               }
@@ -211,13 +252,20 @@ async fn handle_branch(args : Array[String]) -> Unit raise Error {
                 }
                 match start_point {
                   Some(sp) => {
-                    let commit_id = @bitrepo.rev_parse(fs, git_dir, sp)
+                    let commit_id = branch_resolve_start_point(fs, git_dir, sp)
                     guard commit_id is Some(id) else {
                       raise @bitcore.GitError::InvalidObject(
                         "unknown revision: \{sp}",
                       )
                     }
-                    @bitlib.create_branch_at(fs, fs, root, name, id)
+                    @bitlib.create_branch_at(
+                      fs,
+                      fs,
+                      root,
+                      name,
+                      id,
+                      start_point=Some(sp),
+                    )
                   }
                   None => @bitlib.create_branch(fs, fs, root, name)
                 }
@@ -270,7 +318,16 @@ async fn handle_branch(args : Array[String]) -> Unit raise Error {
                       } else {
                         @bitlib.list_branches_text(fs, git_dir)
                       }
-                      for line in lines {
+                      let output_lines = if column_active && not(verbose) {
+                        branch_format_columns(
+                          lines,
+                          branch_term_columns(),
+                          dense=column_dense,
+                        )
+                      } else {
+                        lines
+                      }
+                      for line in output_lines {
                         print_line(line)
                       }
                     }
@@ -402,6 +459,293 @@ fn branch_pad_right(s : String, width : Int) -> String {
     buf.write_char(' ')
   }
   buf.to_string()
+}
+
+///|
+fn branch_last_config_value(
+  fs : &@bitcore.RepoFileSystem,
+  config_path : String,
+  section : String,
+  key : String,
+) -> String? {
+  let values = @bitlib.read_config_values(fs, config_path, section, key)
+  values.last()
+}
+
+///|
+fn branch_parse_column_tokens(value : String) -> Array[String] {
+  let tokens : Array[String] = []
+  for comma_part in value.split(",") {
+    let chunk = comma_part.to_string()
+    for space_part in chunk.split(" ") {
+      let token = space_part.to_string().trim().to_string()
+      if token.length() > 0 {
+        tokens.push(token)
+      }
+    }
+  }
+  tokens
+}
+
+///|
+fn branch_apply_column_mode(
+  enabled_state : String,
+  dense : Bool,
+  value : String,
+) -> (String, Bool) raise @bitcore.GitError {
+  let mut next_enabled_state = enabled_state
+  let mut next_dense = dense
+  let mut saw_enable = false
+  let mut saw_layout = false
+  for token in branch_parse_column_tokens(value) {
+    match token {
+      "always" | "yes" => {
+        next_enabled_state = "enabled"
+        saw_enable = true
+      }
+      "never" | "no" => {
+        next_enabled_state = "disabled"
+        saw_enable = true
+      }
+      "auto" => {
+        next_enabled_state = "auto"
+        saw_enable = true
+      }
+      "column" => saw_layout = true
+      "dense" => next_dense = true
+      "nodense" => next_dense = false
+      _ =>
+        raise @bitcore.GitError::InvalidObject("unsupported option '\{token}'")
+    }
+  }
+  if saw_layout && not(saw_enable) {
+    next_enabled_state = "enabled"
+  }
+  (next_enabled_state, next_dense)
+}
+
+///|
+fn branch_resolve_column_mode(
+  cli_mode : String?,
+  verbose : Bool,
+  column_ui : String?,
+  column_branch : String?,
+) -> (Bool, Bool, Bool) raise @bitcore.GitError {
+  let mut enabled_state = "disabled"
+  let mut dense = false
+  if not(verbose) {
+    match column_ui {
+      Some(value) => {
+        let (next_enabled_state, next_dense) = branch_apply_column_mode(
+          enabled_state, dense, value,
+        )
+        enabled_state = next_enabled_state
+        dense = next_dense
+      }
+      None => ()
+    }
+    match column_branch {
+      Some(value) => {
+        let (next_enabled_state, next_dense) = branch_apply_column_mode(
+          enabled_state, dense, value,
+        )
+        enabled_state = next_enabled_state
+        dense = next_dense
+      }
+      None => ()
+    }
+  }
+  let mut explicit_column_enabled = false
+  match cli_mode {
+    Some(value) => {
+      let (next_enabled_state, next_dense) = branch_apply_column_mode(
+        enabled_state, dense, value,
+      )
+      enabled_state = next_enabled_state
+      dense = next_dense
+      explicit_column_enabled = enabled_state == "enabled"
+    }
+    None => ()
+  }
+  (enabled_state == "enabled", dense, explicit_column_enabled)
+}
+
+///|
+fn branch_term_columns() -> Int {
+  match @sys.get_env_var("COLUMNS") {
+    Some(raw) => {
+      let parsed = @strconv.parse_int(raw) catch { _ => 80 }
+      if parsed > 1 {
+        parsed
+      } else {
+        2
+      }
+    }
+    None => 80
+  }
+}
+
+///|
+fn branch_column_linear_index(rows : Int, cols : Int, x : Int, y : Int) -> Int {
+  ignore(cols)
+  x * rows + y
+}
+
+///|
+fn branch_column_widths(
+  lengths : Array[Int],
+  rows : Int,
+  cols : Int,
+) -> Array[Int] {
+  let widths = Array::make(cols, 0)
+  for x in 0..<cols {
+    let mut width = 0
+    for y in 0..<rows {
+      let idx = branch_column_linear_index(rows, cols, x, y)
+      if idx < lengths.length() {
+        width = width.max(lengths[idx])
+      }
+    }
+    widths[x] = width
+  }
+  widths
+}
+
+///|
+fn branch_format_columns(
+  items : Array[String],
+  term_columns : Int,
+  dense? : Bool = false,
+) -> Array[String] {
+  let lines : Array[String] = []
+  if items.length() == 0 {
+    return lines
+  }
+  let padding = 1
+  let lengths : Array[Int] = []
+  let mut max_width = 0
+  for item in items {
+    let width = item.length()
+    lengths.push(width)
+    max_width = max_width.max(width)
+  }
+  let initial_width = max_width + padding
+  let available_width = if term_columns > 1 { term_columns - 1 } else { 1 }
+  let mut cols = available_width / initial_width
+  if cols == 0 {
+    cols = 1
+  }
+  let mut rows = items.length() / cols
+  if items.length() % cols != 0 {
+    rows += 1
+  }
+  let mut widths = Array::make(cols, max_width)
+  if dense {
+    while rows > 1 {
+      let next_rows = rows - 1
+      let mut next_cols = items.length() / next_rows
+      if items.length() % next_rows != 0 {
+        next_cols += 1
+      }
+      let next_widths = branch_column_widths(lengths, next_rows, next_cols)
+      let mut total_width = 0
+      for width in next_widths {
+        total_width += width + padding
+      }
+      if total_width > available_width {
+        break
+      }
+      rows = next_rows
+      cols = next_cols
+      widths = next_widths
+    }
+    widths = branch_column_widths(lengths, rows, cols)
+  }
+  for y in 0..<rows {
+    let mut line = ""
+    for x in 0..<cols {
+      let idx = branch_column_linear_index(rows, cols, x, y)
+      if idx >= items.length() {
+        break
+      }
+      line += items[idx]
+      let newline = x == cols - 1 || idx + rows >= items.length()
+      if not(newline) {
+        let cell_width = widths[x] + padding
+        line += " ".repeat(cell_width - lengths[idx])
+      }
+    }
+    lines.push(line)
+  }
+  lines
+}
+
+///|
+fn branch_parse_merge_base_specs(spec : String) -> (String, String)? {
+  match spec.find("...") {
+    Some(idx) => {
+      let left = String::unsafe_substring(spec, start=0, end=idx)
+      let right = String::unsafe_substring(
+        spec,
+        start=idx + 3,
+        end=spec.length(),
+      )
+      Some(
+        (
+          if left.length() == 0 {
+            "HEAD"
+          } else {
+            left
+          },
+          if right.length() == 0 {
+            "HEAD"
+          } else {
+            right
+          },
+        ),
+      )
+    }
+    None => None
+  }
+}
+
+///|
+async fn branch_resolve_start_point(
+  fs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  spec : String,
+) -> @bitcore.ObjectId? raise Error {
+  match branch_parse_merge_base_specs(spec) {
+    Some((left_spec, right_spec)) => {
+      let left_id = @bitrepo.rev_parse(fs, git_dir, left_spec)
+      let right_id = @bitrepo.rev_parse(fs, git_dir, right_spec)
+      match (left_id, right_id) {
+        (Some(left), Some(right)) =>
+          rev_parse_find_merge_base(fs, git_dir, left, right)
+        _ => None
+      }
+    }
+    None => @bitrepo.rev_parse(fs, git_dir, spec)
+  }
+}
+
+///|
+fn branch_get_committer_identity() -> (String, String, Int64, String) {
+  let name = match @sys.get_env_var("GIT_COMMITTER_NAME") {
+    Some(n) => n
+    None => @sys.get_env_var("USER").unwrap_or("Unknown")
+  }
+  let email = match @sys.get_env_var("GIT_COMMITTER_EMAIL") {
+    Some(e) => e
+    None =>
+      match @sys.get_env_var("USER") {
+        Some(u) => u + "@localhost"
+        None => "unknown@localhost"
+      }
+  }
+  let timestamp = get_commit_timestamp()
+  let timezone = get_commit_timezone()
+  (name, email, timestamp, timezone)
 }
 
 ///|

@@ -23,7 +23,8 @@ pub fn log_head(
   let result : Array[LogEntry] = []
   let mut current = resolve_head_commit(fs, git_dir)
   let mut count = 0
-  let db = ObjectDb::load_lazy(fs, git_dir)
+  let object_git_dir = log_resolve_common_git_dir(fs, git_dir)
+  let db = ObjectDb::load_lazy(fs, object_git_dir)
   while count < max_count {
     match current {
       None => break
@@ -36,11 +37,12 @@ pub fn log_head(
               raise @bit.GitError::InvalidObject("Object is not a commit")
             }
             let info = @bit.parse_commit(o.data)
+            let parents = log_resolve_parents(fs, git_dir, id, info.parents)
             let entry = parse_log_entry(id, o.data, info.tree)
             // Get parent tree for diff (only when needed for --stat/--patch)
             let parent_tree : @bit.ObjectId? = if include_parent_tree &&
-              info.parents.length() > 0 {
-              let parent_obj = db.get(fs, info.parents[0])
+              parents.length() > 0 {
+              let parent_obj = db.get(fs, parents[0])
               match parent_obj {
                 Some(po) => {
                   let parent_info = @bit.parse_commit(po.data)
@@ -60,11 +62,7 @@ pub fn log_head(
               result.push({ ..entry, parent_tree, })
               count += 1
             }
-            current = if info.parents.length() > 0 {
-              Some(info.parents[0])
-            } else {
-              None
-            }
+            current = if parents.length() > 0 { Some(parents[0]) } else { None }
           }
         }
       }
@@ -159,6 +157,91 @@ fn parse_int64(s : String) -> Int64 {
     result = result * 10L + digit.to_int64()
   }
   result
+}
+
+///|
+fn log_resolve_parents(
+  fs : &@bit.RepoFileSystem,
+  git_dir : String,
+  commit_id : @bit.ObjectId,
+  default_parents : Array[@bit.ObjectId],
+) -> Array[@bit.ObjectId] {
+  match log_read_graft_parents(fs, git_dir, commit_id) {
+    Some(parents) => parents
+    None => default_parents
+  }
+}
+
+///|
+fn log_read_graft_parents(
+  fs : &@bit.RepoFileSystem,
+  git_dir : String,
+  commit_id : @bit.ObjectId,
+) -> Array[@bit.ObjectId]? {
+  let graft_path = join_path(
+    log_resolve_common_git_dir(fs, git_dir),
+    "info/grafts",
+  )
+  if not(fs.is_file(graft_path)) {
+    return None
+  }
+  let content = decode_bytes_lossy(
+    fs.read_file(graft_path) catch {
+      _ => return None
+    },
+  )
+  let commit_hex = commit_id.to_hex()
+  for line_view in content.split("\n") {
+    let line = trim_string(line_view.to_string())
+    if line.length() == 0 || line.has_prefix("#") {
+      continue
+    }
+    let tokens : Array[String] = []
+    for token_view in line.split(" ") {
+      let token = trim_string(token_view.to_string())
+      if token.length() > 0 {
+        tokens.push(token)
+      }
+    }
+    if tokens.length() == 0 || tokens[0] != commit_hex {
+      continue
+    }
+    let parents : Array[@bit.ObjectId] = []
+    for i in 1..<tokens.length() {
+      let parent_hex = tokens[i]
+      if parent_hex.length() == 40 {
+        let parent_id = @bit.ObjectId::from_hex(parent_hex) catch {
+          _ => continue
+        }
+        parents.push(parent_id)
+      }
+    }
+    return Some(parents)
+  }
+  None
+}
+
+///|
+fn log_resolve_common_git_dir(
+  fs : &@bit.RepoFileSystem,
+  git_dir : String,
+) -> String {
+  let commondir_path = join_path(git_dir, "commondir")
+  if not(fs.is_file(commondir_path)) {
+    return git_dir
+  }
+  let raw = @utf8.decode_lossy(
+    (fs.read_file(commondir_path) catch { _ => Bytes::default() })[:],
+  )
+  let rel = trim_string(raw)
+  if rel.length() == 0 {
+    return git_dir
+  }
+  if rel.has_prefix("/") {
+    normalize_path(rel)
+  } else {
+    normalize_path(join_path(git_dir, rel))
+  }
 }
 
 ///|

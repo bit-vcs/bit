@@ -81,6 +81,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
   let mut abbrev_ref = false
   let mut default_rev : String? = None
   let mut symbolic_full_name = false
+  let mut symbolic_full_name_index : Int? = None
   let exclude_patterns : Array[String] = []
   let exclude_hidden : Map[String, Bool] = {} // section -> seen
   let mut path_format : String? = None // "absolute" or "relative"
@@ -113,7 +114,12 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
       "--show-object-format" => show_object_format = true
       "--short" => short_length = Some(7)
       "--abbrev-ref" => abbrev_ref = true
-      "--symbolic-full-name" => symbolic_full_name = true
+      "--symbolic-full-name" => {
+        symbolic_full_name = true
+        if symbolic_full_name_index is None {
+          symbolic_full_name_index = Some(arg_index)
+        }
+      }
       "--output-object-format" => {
         output_object_format_arg_indices[arg_index] = true
         if arg_index + 1 >= args.length() {
@@ -259,6 +265,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
     return
   }
   ignore(quiet)
+  let git_path_cwd_abs = rev_parse_git_path_output_cwd(cwd_abs)
   let mut process_index = 0
   while process_index < args.length() {
     if output_object_format_arg_indices.contains(process_index) {
@@ -266,6 +273,10 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
       continue
     }
     let arg = args[process_index]
+    let symbolic_full_name_active = match symbolic_full_name_index {
+      Some(idx) => symbolic_full_name && process_index > idx
+      None => false
+    }
     if arg == "--git-path" {
       if process_index + 1 >= args.length() {
         eprint_line("fatal: option '--git-path' requires a value")
@@ -273,7 +284,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
       }
       let requested = args[process_index + 1]
       let result = rev_parse_resolve_git_path_with_config(
-        fs, cwd_abs, git_dir, abs_git_dir, requested, path_format,
+        fs, git_path_cwd_abs, git_dir, abs_git_dir, requested, path_format,
       )
       print_line(result)
       process_index += 2
@@ -282,7 +293,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
     if arg.has_prefix("--git-path=") {
       let requested = String::unsafe_substring(arg, start=11, end=arg.length())
       let result = rev_parse_resolve_git_path_with_config(
-        fs, cwd_abs, git_dir, abs_git_dir, requested, path_format,
+        fs, git_path_cwd_abs, git_dir, abs_git_dir, requested, path_format,
       )
       print_line(result)
       process_index += 1
@@ -482,6 +493,10 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
         process_index += 1
         while process_index < args.length() {
           let rev_arg = args[process_index]
+          let end_symbolic_full_name_active = match symbolic_full_name_index {
+            Some(idx) => symbolic_full_name && process_index > idx
+            None => false
+          }
           // "--" still acts as separator in this mode
           if rev_arg == "--" {
             if not(revs_only) {
@@ -511,15 +526,15 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
           }
           // Handle ^@, ^!, ^- parent suffixes (multi-output)
           if rev_parse_handle_parent_suffix(
-              fs, git_dir, rev_arg, effective_arg, symbolic_full_name, short_length,
-              output_object_format, quiet, revs_only,
+              fs, git_dir, rev_arg, effective_arg, end_symbolic_full_name_active,
+              short_length, output_object_format, quiet, revs_only,
             ) {
             process_index += 1
             continue
           }
           if rev_parse_handle_range_op(
-              fs, git_dir, rev_arg, effective_arg, symbolic_full_name, short_length,
-              output_object_format, quiet, revs_only,
+              fs, git_dir, rev_arg, effective_arg, end_symbolic_full_name_active,
+              short_length, output_object_format, quiet, revs_only,
             ) {
             process_index += 1
             continue
@@ -643,7 +658,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
       }
       "--bisect" =>
         // Output refs/bisect/bad-* (positive) and ^refs/bisect/good-* (negated)
-        if symbolic_full_name {
+        if symbolic_full_name_active {
           rev_parse_print_bisect_symbolic(fs, git_dir)
         } else {
           rev_parse_print_bisect(fs, git_dir)
@@ -675,7 +690,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
           exclude_patterns,
         )
         for r in refs {
-          rev_parse_output_ref(r, symbolic_full_name, short_length)
+          rev_parse_output_ref(r, symbolic_full_name_active, short_length)
         }
         exclude_patterns.clear()
       }
@@ -696,7 +711,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
           exclude_patterns,
         )
         for r in refs {
-          rev_parse_output_ref(r, symbolic_full_name, short_length)
+          rev_parse_output_ref(r, symbolic_full_name_active, short_length)
         }
         exclude_patterns.clear()
       }
@@ -715,7 +730,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
           exclude_patterns,
         )
         for r in refs {
-          rev_parse_output_ref(r, symbolic_full_name, short_length)
+          rev_parse_output_ref(r, symbolic_full_name_active, short_length)
         }
         exclude_patterns.clear()
       }
@@ -735,7 +750,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
           exclude_patterns,
         )
         for r in refs {
-          rev_parse_output_ref(r, symbolic_full_name, short_length)
+          rev_parse_output_ref(r, symbolic_full_name_active, short_length)
         }
         exclude_patterns.clear()
       }
@@ -754,7 +769,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
           exclude_patterns,
         )
         for r in refs {
-          rev_parse_output_ref(r, symbolic_full_name, short_length)
+          rev_parse_output_ref(r, symbolic_full_name_active, short_length)
         }
         exclude_patterns.clear()
       }
@@ -774,7 +789,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
           exclude_patterns,
         )
         for r in refs {
-          rev_parse_output_ref(r, symbolic_full_name, short_length)
+          rev_parse_output_ref(r, symbolic_full_name_active, short_length)
         }
         exclude_patterns.clear()
       }
@@ -788,7 +803,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
           exclude_patterns,
         )
         for r in refs {
-          rev_parse_output_ref(r, symbolic_full_name, short_length)
+          rev_parse_output_ref(r, symbolic_full_name_active, short_length)
         }
         exclude_patterns.clear()
       }
@@ -804,7 +819,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
           exclude_patterns,
         )
         for r in refs {
-          rev_parse_output_ref(r, symbolic_full_name, short_length)
+          rev_parse_output_ref(r, symbolic_full_name_active, short_length)
         }
         // --glob does NOT clear exclude patterns (unlike --branches/--tags/--remotes)
       }
@@ -826,16 +841,16 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
         }
         // Handle ^@, ^!, ^- parent suffixes (multi-output)
         if rev_parse_handle_parent_suffix(
-            fs, git_dir, arg, effective_arg, symbolic_full_name, short_length, output_object_format,
-            quiet, revs_only,
+            fs, git_dir, arg, effective_arg, symbolic_full_name_active, short_length,
+            output_object_format, quiet, revs_only,
           ) {
           process_index += 1
           continue
         }
         // Handle .. and ... range operators
         if rev_parse_handle_range_op(
-            fs, git_dir, arg, effective_arg, symbolic_full_name, short_length, output_object_format,
-            quiet, revs_only,
+            fs, git_dir, arg, effective_arg, symbolic_full_name_active, short_length,
+            output_object_format, quiet, revs_only,
           ) {
           process_index += 1
           continue
@@ -847,7 +862,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
             start=1,
             end=effective_arg.length(),
           )
-          if symbolic_full_name {
+          if symbolic_full_name_active {
             let name = resolve_symbolic_full_name(fs, git_dir, neg_spec)
             match name {
               Some(value) => print_line("^\{value}")
@@ -892,7 +907,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
                 )
               }
           }
-        } else if symbolic_full_name {
+        } else if symbolic_full_name_active {
           // Try upstream/push resolution first for @{upstream}/@{push} specs
           let name = if effective_arg.find("@{") is Some(_) {
             match
@@ -1028,25 +1043,66 @@ fn rev_parse_resolve_git_path_with_config(
       None => ()
     }
   }
+  let mut target_git_dir = abs_git_dir
+  if rev_parse_git_path_uses_common_dir(requested_path) {
+    target_git_dir = rev_parse_resolve_common_git_dir(fs, abs_git_dir)
+  }
+  let abs = if target_git_dir.has_suffix("/") {
+    target_git_dir + requested_path
+  } else {
+    target_git_dir + "/" + requested_path
+  }
   // Fall through to normal resolution
   match path_format {
-    Some("absolute") => {
-      let abs = if abs_git_dir.has_suffix("/") {
-        abs_git_dir + requested_path
+    Some("absolute") => abs
+    Some("relative") => rev_parse_make_relative(abs, cwd_abs)
+    _ =>
+      if target_git_dir != abs_git_dir {
+        abs
       } else {
-        abs_git_dir + "/" + requested_path
+        rev_parse_resolve_git_path(cwd_abs, git_dir, requested_path)
       }
-      abs
-    }
-    Some("relative") => {
-      let abs = if abs_git_dir.has_suffix("/") {
-        abs_git_dir + requested_path
-      } else {
-        abs_git_dir + "/" + requested_path
-      }
-      rev_parse_make_relative(abs, cwd_abs)
-    }
-    _ => rev_parse_resolve_git_path(cwd_abs, git_dir, requested_path)
+  }
+}
+
+///|
+fn rev_parse_git_path_uses_common_dir(requested_path : String) -> Bool {
+  requested_path == "objects" ||
+  requested_path.has_prefix("objects/") ||
+  requested_path == "refs" ||
+  requested_path.has_prefix("refs/") ||
+  requested_path == "packed-refs" ||
+  requested_path == "config" ||
+  requested_path == "hooks" ||
+  requested_path.has_prefix("hooks/") ||
+  requested_path == "info" ||
+  requested_path.has_prefix("info/") ||
+  requested_path == "logs/refs" ||
+  requested_path.has_prefix("logs/refs/")
+}
+
+///|
+fn rev_parse_resolve_common_git_dir(
+  fs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+) -> String {
+  let commondir_path = git_dir + "/commondir"
+  if not(fs.is_file(commondir_path)) {
+    return git_dir
+  }
+  let raw = decode_bytes(
+    fs.read_file(commondir_path) catch {
+      _ => return git_dir
+    },
+  )
+  let rel = trim_string(raw)
+  if rel.length() == 0 {
+    return git_dir
+  }
+  if rel.has_prefix("/") {
+    normalize_path(rel)
+  } else {
+    normalize_path(git_dir + "/" + rel)
   }
 }
 
@@ -1079,6 +1135,11 @@ fn rev_parse_resolve_git_path(
   }
   // Always compute relative from cwd
   rev_parse_make_relative(abs_target, cwd_abs)
+}
+
+///|
+fn rev_parse_git_path_output_cwd(cwd_abs : String) -> String {
+  @sys.get_env_var("GIT_SHIM_CALLER_PWD").unwrap_or(cwd_abs)
 }
 
 ///|
@@ -2056,13 +2117,8 @@ fn rev_parse_is_bare_repository(
   git_dir : String,
   root : String,
 ) -> Bool {
-  // Check core.bare config first
-  let config_path = git_dir + "/config"
-  match @bitlib.read_config_value(fs, config_path, "core", "bare") {
-    Some(value) => {
-      let v = @bitlib.config_strip_quotes(value).to_lower()
-      return v == "true" || v == "yes" || v == "1"
-    }
+  match rev_parse_read_worktree_config_bool(fs, git_dir, "core", "bare") {
+    Some(value) => return value
     None => ()
   }
   // If git_dir == root (no separate work tree), it's bare
@@ -2077,6 +2133,46 @@ fn rev_parse_is_bare_repository(
     abs_root + "/" + git_dir
   }
   abs_git_dir == abs_root
+}
+
+///|
+fn rev_parse_read_worktree_config_bool(
+  fs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  section : String,
+  name : String,
+) -> Bool? {
+  let common_git_dir = rev_parse_resolve_common_git_dir(fs, git_dir)
+  let config_path = common_git_dir + "/config"
+  let mut value = @bitlib.read_config_value(fs, config_path, section, name)
+  let use_worktree_config = match
+    @bitlib.read_config_value(fs, config_path, "extensions", "worktreeConfig") {
+    Some(raw) => rev_parse_parse_config_bool(raw).unwrap_or(false)
+    None => false
+  }
+  if use_worktree_config {
+    match
+      @bitlib.read_config_value(fs, git_dir + "/config.worktree", section, name) {
+      Some(worktree_value) => value = Some(worktree_value)
+      None => ()
+    }
+  }
+  match value {
+    Some(raw) => rev_parse_parse_config_bool(raw)
+    None => None
+  }
+}
+
+///|
+fn rev_parse_parse_config_bool(raw : String) -> Bool? {
+  let value = @bitlib.config_strip_quotes(raw).to_lower()
+  if value == "true" || value == "yes" || value == "1" {
+    Some(true)
+  } else if value == "false" || value == "no" || value == "0" {
+    Some(false)
+  } else {
+    None
+  }
 }
 
 ///|

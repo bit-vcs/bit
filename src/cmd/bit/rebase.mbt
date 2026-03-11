@@ -65,7 +65,8 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
   if do_continue {
     // Check if interactive rebase is in progress
     let rebase_merge_dir = git_dir + "/rebase-merge"
-    if rfs.is_dir(rebase_merge_dir) {
+    if rfs.is_dir(rebase_merge_dir) &&
+      not(rebase_merge_dir_uses_builtin_state(rfs, rebase_merge_dir)) {
       interactive_rebase_continue(wfs, rfs, root, git_dir)
     } else {
       let result = @bitlib.rebase_continue(fs, fs, root)
@@ -76,10 +77,13 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
   // Handle --abort
   if do_abort {
     let rebase_merge_dir = git_dir + "/rebase-merge"
-    if rfs.is_dir(rebase_merge_dir) {
+    if rfs.is_dir(rebase_merge_dir) &&
+      not(rebase_merge_dir_uses_builtin_state(rfs, rebase_merge_dir)) {
       interactive_rebase_abort(wfs, rfs, root, git_dir)
     } else {
-      @bitlib.rebase_abort(fs, fs, root)
+      @bitlib.rebase_abort(fs, fs, root) catch {
+        _ => @bitlib.clear_rebase_state(fs, fs, git_dir)
+      }
     }
     print_line("Rebase aborted")
     return ()
@@ -87,7 +91,8 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
   // Handle --skip
   if do_skip {
     let rebase_merge_dir = git_dir + "/rebase-merge"
-    if rfs.is_dir(rebase_merge_dir) {
+    if rfs.is_dir(rebase_merge_dir) &&
+      not(rebase_merge_dir_uses_builtin_state(rfs, rebase_merge_dir)) {
       interactive_rebase_skip(wfs, rfs, root, git_dir)
     } else {
       let result = @bitlib.rebase_skip(fs, fs, root)
@@ -117,7 +122,16 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
     }
     interactive_rebase_start(wfs, rfs, root, git_dir, id, onto_id)
   } else {
-    let result = @bitlib.rebase_start(fs, fs, root, id)
+    let result = match onto {
+      Some(o) => {
+        let onto_id = @bitrepo.rev_parse(fs, git_dir, o)
+        guard onto_id is Some(oid) else {
+          raise @bitcore.GitError::InvalidObject("unknown revision: \{o}")
+        }
+        @bitlib.rebase_start_with_onto(fs, fs, root, oid, id)
+      }
+      None => @bitlib.rebase_start(fs, fs, root, id)
+    }
     print_rebase_result(result)
   }
 }
@@ -125,11 +139,30 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
 ///|
 fn rebase_args_require_standalone_error(args : Array[String]) -> Bool {
   for arg in args {
-    if arg == "-i" ||
-      arg == "--interactive" ||
-      arg == "--continue" ||
-      arg == "--abort" ||
-      arg == "--skip" {
+    if arg == "-i" || arg == "--interactive" {
+      return true
+    }
+  }
+  false
+}
+
+///|
+fn rebase_merge_dir_uses_builtin_state(
+  rfs : &@bitcore.RepoFileSystem,
+  rebase_merge_dir : String,
+) -> Bool {
+  if rfs.is_file(rebase_merge_dir + "/stopped-sha") {
+    return true
+  }
+  if rfs.is_file(rebase_merge_dir + "/head-name") {
+    let head_name = trim_string(
+      decode_bytes(
+        rfs.read_file(rebase_merge_dir + "/head-name") catch {
+          _ => Bytes::default()
+        },
+      ),
+    )
+    if head_name.has_prefix("refs/") {
       return true
     }
   }

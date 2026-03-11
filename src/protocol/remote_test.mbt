@@ -177,3 +177,46 @@ test "ssh_remote_to_https returns none for non-ssh remotes" {
   )
   inspect(ssh_remote_to_https("file:///tmp/repo.git"), content="None")
 }
+
+///|
+test "select_default_wants ignores zero oid refs in empty repo" {
+  let zero = @bit.ObjectId::zero()
+  let refs : Array[(@bit.ObjectId, String)] = [
+    (zero, "HEAD"),
+    (zero, "refs/heads/main"),
+  ]
+  let symrefs : Map[String, String] = { "HEAD": "refs/heads/main" }
+  let wants = select_default_wants(refs, symrefs)
+  assert_eq(wants.length(), 0)
+}
+
+///|
+test "select_default_ref ignores zero oid refs in empty repo" {
+  let zero = @bit.ObjectId::zero()
+  let refs : Array[(@bit.ObjectId, String)] = [
+    (zero, "HEAD"),
+    (zero, "refs/heads/main"),
+  ]
+  let symrefs : Map[String, String] = { "HEAD": "refs/heads/main" }
+  assert_eq(select_default_ref(refs, symrefs), None)
+}
+
+///|
+test "select_default_ref keeps non-zero symref target" {
+  let zero = @bit.ObjectId::zero()
+  let main_id = @bit.ObjectId::from_hex(
+    "1111111111111111111111111111111111111111",
+  )
+  let refs : Array[(@bit.ObjectId, String)] = [
+    (zero, "HEAD"),
+    (main_id, "refs/heads/main"),
+  ]
+  let symrefs : Map[String, String] = { "HEAD": "refs/heads/main" }
+  assert_eq(
+    select_default_ref(refs, symrefs),
+    Some(("refs/heads/main", main_id)),
+  )
+  let wants = select_default_wants(refs, symrefs)
+  assert_eq(wants.length(), 1)
+  assert_eq(wants[0].to_hex(), main_id.to_hex())
+}

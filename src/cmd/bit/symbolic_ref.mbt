@@ -1,7 +1,6 @@
 ///|
 async fn handle_symbolic_ref(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
-  let git_dir = root + "/.git"
   let fs = OsFs::new()
   let mut delete_mode = false
   let mut short_mode = false
@@ -21,11 +20,7 @@ async fn handle_symbolic_ref(args : Array[String]) -> Unit raise Error {
     )
   }
   let name = symbolic_ref_normalize_refname(positional[0])
-  let ref_path = if name == "HEAD" {
-    git_dir + "/HEAD"
-  } else {
-    git_dir + "/" + name
-  }
+  let ref_path = symbolic_ref_resolve_ref_path(fs, root, name)
   if delete_mode {
     if fs.is_file(ref_path) {
       fs.remove_file(ref_path)
@@ -65,6 +60,20 @@ async fn handle_symbolic_ref(args : Array[String]) -> Unit raise Error {
 }
 
 ///|
+fn symbolic_ref_resolve_ref_path(
+  fs : &@bitcore.RepoFileSystem,
+  root : String,
+  name : String,
+) -> String {
+  let git_dir = resolve_git_dir(fs, root)
+  if name == "HEAD" {
+    normalize_path(git_dir + "/HEAD")
+  } else {
+    normalize_path(git_dir + "/" + name)
+  }
+}
+
+///|
 fn symbolic_ref_normalize_refname(
   name : String,
 ) -> String raise @bitcore.GitError {
@@ -97,6 +106,16 @@ test "symbolic-ref: normalize rejects bare ref name" {
 test "symbolic-ref: normalize rejects path traversal" {
   let _ = symbolic_ref_normalize_refname("../config") catch { _ => return () }
   assert_true(false)
+}
+
+///|
+test "symbolic-ref: resolves HEAD through submodule gitdir file" {
+  let fs = @bitcore.TestFs::new()
+  fs.mkdir_p("/repo/.git/modules/sub/refs/heads")
+  fs.write_string("/repo/sub/.git", "gitdir: ../.git/modules/sub\n")
+  fs.write_string("/repo/.git/modules/sub/HEAD", "ref: refs/heads/main\n")
+  let ref_path = symbolic_ref_resolve_ref_path(fs, "/repo/sub", "HEAD")
+  assert_eq(ref_path, "/repo/.git/modules/sub/HEAD")
 }
 
 ///|

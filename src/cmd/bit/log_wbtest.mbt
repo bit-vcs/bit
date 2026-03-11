@@ -1,12 +1,15 @@
 ///|
 test "log: storage runtime routing only for oneline subset" {
-  assert_true(log_should_use_storage_runtime(["--oneline"]))
   assert_true(log_should_use_storage_runtime(["--oneline", "-n", "3"]))
   assert_true(log_should_use_storage_runtime(["--oneline", "--max-count=2"]))
+  assert_true(log_should_use_storage_runtime(["--oneline", "-3"]))
 
+  assert_false(log_should_use_storage_runtime(["--oneline"]))
   assert_false(log_should_use_storage_runtime(["-n", "3"]))
   assert_false(log_should_use_storage_runtime(["--graph", "--oneline"]))
   assert_false(log_should_use_storage_runtime(["HEAD"]))
+  assert_false(log_should_use_storage_runtime(["--oneline", "HEAD"]))
+  assert_false(log_should_use_storage_runtime(["--oneline", "--source", "v1"]))
 }
 
 ///|
@@ -20,6 +23,48 @@ test "log: storage runtime not used for --all, --decorate, ranges" {
   assert_false(log_should_use_storage_runtime(["main..develop"]))
   assert_false(log_should_use_storage_runtime(["HEAD~3"]))
   assert_false(log_should_use_storage_runtime(["main"]))
+}
+
+///|
+test "log: storage runtime disabled by repo config overrides" {
+  let fs = @bitcore.TestFs::new()
+  ignore(try? @bitlib.init_repo(fs, "/repo"))
+  let base_config = fs.read_string("/repo/.git/config")
+
+  assert_true(
+    log_should_use_storage_runtime_in_repo(fs, "/repo/.git", [
+      "--oneline", "-n", "3",
+    ]),
+  )
+
+  fs.write_string("/repo/.git/config", base_config + "\n[log]\n\tdecorate\n")
+  assert_false(
+    log_should_use_storage_runtime_in_repo(fs, "/repo/.git", [
+      "--oneline", "-n", "3",
+    ]),
+  )
+
+  fs.write_string(
+    "/repo/.git/config",
+    base_config + "\n[core]\n\tabbrev = 12\n",
+  )
+  assert_false(
+    log_should_use_storage_runtime_in_repo(fs, "/repo/.git", [
+      "--oneline", "-n", "3",
+    ]),
+  )
+}
+
+///|
+test "log: config reader handles inline section key" {
+  let fs = @bitcore.TestFs::new()
+  ignore(try? @bitlib.init_repo(fs, "/repo"))
+  let base_config = fs.read_string("/repo/.git/config")
+  fs.write_string("/repo/.git/config", base_config + "\n[log] decorate\n")
+
+  let entries = log_read_config_entries(fs, "/repo/.git", "log", "decorate")
+  assert_eq(entries.length(), 1)
+  assert_false(entries[0].has_value)
 }
 
 ///|
@@ -40,6 +85,122 @@ test "log: log_find_dotdot parses A..B ranges" {
 }
 
 ///|
+test "log: log_find_tripledot parses A...B ranges" {
+  assert_eq(log_find_tripledot("main...topic"), 4)
+  assert_eq(log_find_tripledot("...topic"), 0)
+  assert_eq(log_find_tripledot("main..."), 4)
+  assert_eq(log_find_tripledot("main..topic"), -1)
+  assert_eq(log_find_tripledot("HEAD"), -1)
+}
+
+///|
+test "log: branch pattern matching handles exact and nested names" {
+  assert_true(log_branch_pattern_matches("main", "main"))
+  assert_true(log_branch_pattern_matches("topic/sub", "topic"))
+  assert_true(log_branch_pattern_matches("topic/sub", "topic/*"))
+  assert_false(log_branch_pattern_matches("main", "does-not-exist"))
+}
+
+///|
+test "log: reflog target selection prefers branch patterns over HEAD" {
+  let fs = @bitcore.TestFs::new()
+  fs.mkdir_p("/repo/.git/refs/heads/root1")
+  fs.mkdir_p("/repo/.git/refs/heads/root2")
+  fs.write_string("/repo/.git/HEAD", "ref: refs/heads/main\n")
+  fs.write_string(
+    "/repo/.git/refs/heads/root1/branch1", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
+  )
+  fs.write_string(
+    "/repo/.git/refs/heads/root1/branch2", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n",
+  )
+  fs.write_string(
+    "/repo/.git/refs/heads/root2/branch1", "cccccccccccccccccccccccccccccccccccccccc\n",
+  )
+
+  let targets = log_collect_reflog_targets(fs, "/repo/.git", [], ["root*"])
+  assert_eq(targets, ["root1/branch1", "root1/branch2", "root2/branch1"])
+  assert_eq(log_collect_reflog_targets(fs, "/repo/.git", [], []), ["HEAD"])
+}
+
+///|
+test "log: reflog selector helpers split and format explicit selectors" {
+  assert_eq(log_split_reflog_target("HEAD@{0}"), ("HEAD", Some("0")))
+  assert_eq(log_split_reflog_target("HEAD@{now}"), ("HEAD", Some("now")))
+  assert_eq(
+    log_format_reflog_selector("HEAD", 0, 1112911993L, "-0700", None, "raw"),
+    "HEAD@{1112911993 -0700}",
+  )
+  assert_eq(
+    log_format_reflog_selector(
+      "HEAD",
+      0,
+      1112911993L,
+      "-0700",
+      Some("0"),
+      "raw",
+    ),
+    "HEAD@{0}",
+  )
+}
+
+///|
+test "log: format_reflog_entry keeps %gD selector without message" {
+  assert_eq(
+    format_reflog_entry(
+      Some("%gD"),
+      "root1/branch1@{0}",
+      "branch: Created from main",
+    ),
+    "root1/branch1@{0}",
+  )
+  assert_eq(
+    format_reflog_entry(
+      Some("%gD %gs"),
+      "root1/branch1@{0}",
+      "branch: Created from main",
+    ),
+    "root1/branch1@{0} branch: Created from main",
+  )
+}
+
+///|
+test "log: format_commit_string honors reflog placeholders" {
+  let id = @bitcore.ObjectId::from_hex(
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  )
+  let tree = @bitcore.ObjectId::from_hex(
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  )
+  let data : CommitFormatData = {
+    id,
+    tree,
+    parents: [],
+    abbrev_len: 7,
+    author_name: "Test User",
+    author_email: "test@example.com",
+    author_timestamp: 1700000000L,
+    author_tz: "+0000",
+    committer_name: "Test User",
+    committer_email: "test@example.com",
+    committer_timestamp: 1700000000L,
+    committer_tz: "+0000",
+    subject: "sixth",
+    body: "",
+    message: "sixth",
+    ref_names: {},
+    date_format: "",
+    reflog_selector_short: Some("HEAD@{0}"),
+    reflog_selector: Some("HEAD@{0}"),
+    reflog_message: Some("commit: sixth"),
+  }
+
+  assert_eq(
+    format_commit_string("%gD %gs %H", data),
+    "HEAD@{0} commit: sixth aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  )
+}
+
+///|
 test "log: format_decoration" {
   let ref_names : Map[String, Array[String]] = {}
   // No decoration
@@ -52,6 +213,37 @@ test "log: format_decoration" {
   assert_eq(
     format_decoration(ref_names, "def5678"),
     " (HEAD -> main, origin/main)",
+  )
+}
+
+///|
+test "log: decoration pattern matching handles HEAD and trailing slash" {
+  assert_true(log_decoration_pattern_matches("HEAD", "HEAD"))
+  assert_false(log_decoration_pattern_matches("refs/heads/main", "HEAD"))
+  assert_true(log_decoration_pattern_matches("refs/tags/reach", "tags/"))
+  assert_true(
+    log_decoration_pattern_matches("refs/heads/topic/sub", "heads/topic"),
+  )
+  assert_false(
+    log_decoration_pattern_matches("refs/heads/topic-2", "heads/topic"),
+  )
+}
+
+///|
+test "log: decoration ref visibility respects defaults and clear mode" {
+  assert_false(
+    log_should_include_decoration_ref("refs/hidden/tangle", [], [], false),
+  )
+  assert_true(
+    log_should_include_decoration_ref("refs/hidden/tangle", [], [], true),
+  )
+  assert_false(
+    log_should_include_decoration_ref(
+      "refs/heads/octopus-a",
+      ["heads/*"],
+      ["heads/octopus*"],
+      true,
+    ),
   )
 }
 
@@ -74,10 +266,11 @@ test "log: log_parse_entry_from_obj" {
   let tree = @bitcore.ObjectId::from_hex(
     "0000000000000000000000000000000000000000",
   )
-  let entry = log_parse_entry_from_obj(id, data, tree)
+  let entry = log_parse_entry_from_obj(id, data, tree, 0)
   assert_eq(entry.message, "Test commit message")
   assert_eq(entry.author, "Test User <test@example.com>")
   assert_eq(entry.timestamp, 1700000000L)
+  assert_eq(entry.parent_count, 0)
 }
 
 ///|
@@ -107,4 +300,341 @@ test "log: log_queue_insert maintains descending order" {
   assert_eq(queue[0].0, 300L)
   assert_eq(queue[1].0, 200L)
   assert_eq(queue[2].0, 100L)
+}
+
+///|
+fn log_test_commit(
+  fs : @bitcore.TestFs,
+  root : String,
+  path : String,
+  content : String,
+  message : String,
+  ts : Int64,
+) -> @bitcore.ObjectId raise Error {
+  fs.write_string(root + "/" + path, content)
+  @bitlib.add_paths(fs, fs, root, [path])
+  @bitlib.commit(
+    fs,
+    fs,
+    root,
+    message + "\n",
+    "Test User <test@example.com>",
+    ts,
+  )
+}
+
+///|
+test "log: build ref names peels nested annotated tags" {
+  let fs = @bitcore.TestFs::new()
+  ignore(try? @bitlib.init_repo(fs, "/repo"))
+  ignore(try? log_test_commit(fs, "/repo", "file.txt", "one\n", "one", 1L))
+  let head = log_test_commit(fs, "/repo", "file.txt", "two\n", "two", 2L) catch {
+    err => fail("unexpected commit error: \{err}")
+  }
+
+  ignore(
+    try? @bitlib.create_lightweight_tag(
+      fs, fs, "/repo/.git", "lightweight", head,
+    ),
+  )
+  ignore(
+    try? @bitlib.create_annotated_tag(
+      fs, fs, "/repo/.git", "annotated", head, "annotated", "Test User <test@example.com>",
+      3L,
+    ),
+  )
+  ignore(try? @bitlib.create_branch_at(fs, fs, "/repo", "reach", head))
+  ignore(
+    try? @bitlib.create_annotated_tag(
+      fs, fs, "/repo/.git", "double-0", head, "double-0", "Test User <test@example.com>",
+      4L,
+    ),
+  )
+  let double_0 = @bitrepo.rev_parse(fs, "/repo/.git", "refs/tags/double-0").unwrap_or(
+    @bitcore.ObjectId::from_hex("0000000000000000000000000000000000000000"),
+  )
+  ignore(
+    try? @bitlib.create_annotated_tag(
+      fs, fs, "/repo/.git", "double-1", double_0, "double-1", "Test User <test@example.com>",
+      5L,
+    ),
+  )
+
+  let ref_names = log_build_ref_names(fs, "/repo/.git", {
+    mode: LogDecorationDisplayMode::Short,
+    include_patterns: [],
+    exclude_patterns: [],
+    include_all_refs: false,
+  }) catch {
+    _ => {}
+  }
+  match ref_names.get(head.to_hex()) {
+    Some(names) =>
+      assert_eq(names, [
+        "HEAD -> main", "tag: lightweight", "tag: double-1", "tag: double-0", "tag: annotated",
+        "reach",
+      ])
+    None => fail("expected decorations for HEAD commit")
+  }
+
+  let full_ref_names = log_build_ref_names(fs, "/repo/.git", {
+    mode: LogDecorationDisplayMode::Full,
+    include_patterns: [],
+    exclude_patterns: [],
+    include_all_refs: false,
+  }) catch {
+    _ => {}
+  }
+  match full_ref_names.get(head.to_hex()) {
+    Some(names) =>
+      assert_eq(names, [
+        "HEAD -> refs/heads/main", "tag: refs/tags/lightweight", "tag: refs/tags/double-1",
+        "tag: refs/tags/double-0", "tag: refs/tags/annotated", "refs/heads/reach",
+      ])
+    None => fail("expected full decorations for HEAD commit")
+  }
+}
+
+///|
+test "log: resolve targets preserves tag revision names" {
+  let fs = @bitcore.TestFs::new()
+  ignore(try? @bitlib.init_repo(fs, "/repo"))
+  let head = log_test_commit(fs, "/repo", "file.txt", "one\n", "one", 1L) catch {
+    err => fail("unexpected commit error: \{err}")
+  }
+  ignore(try? @bitlib.create_branch_at(fs, fs, "/repo", "source-a", head))
+  ignore(
+    try? @bitlib.create_annotated_tag(
+      fs, fs, "/repo/.git", "source-tag", head, "source-tag", "Test User <test@example.com>",
+      2L,
+    ),
+  )
+
+  let targets = log_resolve_targets(
+    fs,
+    "/repo/.git",
+    ["source-tag", "source-a"],
+    [],
+    false,
+    default_head=false,
+  ) catch {
+    err => fail("unexpected resolve error: \{err}")
+  }
+  assert_eq(targets.length(), 2)
+  assert_eq(targets[0].0, "source-tag")
+  assert_eq(targets[1].0, "source-a")
+}
+
+///|
+test "log: grafts affect fast-path history in main and linked worktrees" {
+  let fs = @bitcore.TestFs::new()
+  ignore(try? @bitlib.init_repo(fs, "/repo"))
+  let abc = log_test_commit(fs, "/repo", "file.txt", "abc\n", "abc", 1L) catch {
+    err => fail("unexpected commit error: \{err}")
+  }
+  ignore(
+    log_test_commit(fs, "/repo", "file.txt", "def\n", "def", 2L) catch {
+      err => fail("unexpected commit error: \{err}")
+    },
+  )
+  let xyz = log_test_commit(fs, "/repo", "file.txt", "xyz\n", "xyz", 3L) catch {
+    err => fail("unexpected commit error: \{err}")
+  }
+  fs.write_string(
+    "/repo/.git/info/grafts",
+    xyz.to_hex() + " " + abc.to_hex() + "\n",
+  )
+
+  let main_lines = @bitlib.log_head_oneline(fs, "/repo/.git", max_count=2) catch {
+    err => fail("unexpected log error: \{err}")
+  }
+  assert_eq(main_lines.length(), 2)
+  assert_true(main_lines[0].has_suffix(" xyz"))
+  assert_true(main_lines[1].has_suffix(" abc"))
+
+  ignore(
+    try? @bitlib.create_worktree(
+      fs,
+      fs,
+      "/repo",
+      "/grafted",
+      Some("main"),
+      detach=true,
+      new_branch=None,
+    ),
+  )
+  let linked_lines = @bitlib.log_head_oneline(
+    fs,
+    "/repo/.git/worktrees/grafted",
+    max_count=2,
+  ) catch {
+    err => fail("unexpected linked log error: \{err}")
+  }
+  assert_eq(linked_lines.length(), 2)
+  assert_true(linked_lines[0].has_suffix(" xyz"))
+  assert_true(linked_lines[1].has_suffix(" abc"))
+}
+
+///|
+test "log: apply wrap spec indents and wraps subject text" {
+  let wrapped = log_apply_wrap("This is the sixth commit.", {
+    width: 11,
+    indent1: 1,
+    indent2: 2,
+  })
+  assert_eq(wrapped, " This is\n  the sixth\n  commit.")
+}
+
+///|
+test "log: format_commit_string honors %w prefix" {
+  let id = @bitcore.ObjectId::from_hex(
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  )
+  let tree = @bitcore.ObjectId::from_hex(
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  )
+  let data : CommitFormatData = {
+    id,
+    tree,
+    parents: [],
+    abbrev_len: 7,
+    author_name: "Test User",
+    author_email: "test@example.com",
+    author_timestamp: 1700000000L,
+    author_tz: "+0000",
+    committer_name: "Test User",
+    committer_email: "test@example.com",
+    committer_timestamp: 1700000000L,
+    committer_tz: "+0000",
+    subject: "sixth",
+    body: "",
+    message: "sixth",
+    ref_names: {},
+    date_format: "",
+    reflog_selector_short: None,
+    reflog_selector: None,
+    reflog_message: None,
+  }
+  let wrapped = format_commit_string("%w(11,1,2)This is the %s commit.", data)
+  assert_eq(wrapped, " This is\n  the sixth\n  commit.")
+
+  let explicit_breaks = format_commit_string(
+    "%w(,1,2)This is%nthe %s%ncommit.", data,
+  )
+  assert_eq(explicit_breaks, " This is\n  the sixth\n  commit.")
+
+  let sanitized_data : CommitFormatData = {
+    id,
+    tree,
+    parents: [],
+    abbrev_len: 7,
+    author_name: "Test User",
+    author_email: "test@example.com",
+    author_timestamp: 1700000000L,
+    author_tz: "+0000",
+    committer_name: "Test User",
+    committer_email: "test@example.com",
+    committer_timestamp: 1700000000L,
+    committer_tz: "+0000",
+    subject: "Merge tag 'reach'",
+    body: "",
+    message: "Merge tag 'reach'",
+    ref_names: {},
+    date_format: "",
+    reflog_selector_short: None,
+    reflog_selector: None,
+    reflog_message: None,
+  }
+  let sanitized = format_commit_string("%f", sanitized_data)
+  assert_eq(sanitized, "Merge-tag-reach")
+}
+
+///|
+test "log: abbrev helpers respect bool and numeric config" {
+  assert_eq(log_parse_abbrev_length_value("false"), Some(40))
+  assert_eq(log_parse_abbrev_length_value("9000"), Some(40))
+  assert_eq(log_parse_abbrev_length_value("3"), Some(4))
+  assert_eq(log_parse_abbrev_length_value("12"), Some(12))
+  assert_eq(log_abbrev_hex("0123456789abcdef", 7), "0123456")
+  assert_eq(log_abbrev_hex("012345", 40), "012345")
+}
+
+///|
+test "log: diff-filter parser splits include and exclude bits" {
+  let include_bits : Map[String, Bool] = {}
+  let exclude : Map[String, Bool] = {}
+  log_add_diff_filter_chars("Ra", include_bits, exclude)
+  log_add_diff_filter_chars("d", include_bits, exclude)
+  assert_true(include_bits.contains("R"))
+  assert_true(exclude.contains("A"))
+  assert_true(exclude.contains("D"))
+  assert_false(include_bits.contains("D"))
+}
+
+///|
+test "log: diff-filter matching respects positive and negative bits" {
+  let statuses : Map[String, Bool] = { "R": true }
+  let include_bits : Map[String, Bool] = { "R": true }
+  let exclude : Map[String, Bool] = { "A": true }
+  assert_true(log_has_diff_filter(include_bits, exclude))
+  assert_true(
+    log_commit_matches_diff_filter_with_statuses(
+      statuses, include_bits, exclude,
+    ),
+  )
+
+  statuses["A"] = true
+  assert_false(
+    log_commit_matches_diff_filter_with_statuses(
+      statuses, include_bits, exclude,
+    ),
+  )
+
+  let negative_only_statuses : Map[String, Bool] = { "A": true, "D": true }
+  let negative_only_include : Map[String, Bool] = {}
+  let negative_only_exclude : Map[String, Bool] = { "D": true }
+  assert_true(
+    log_commit_matches_diff_filter_with_statuses(
+      negative_only_statuses, negative_only_include, negative_only_exclude,
+    ),
+  )
+
+  let deleted_only_statuses : Map[String, Bool] = { "D": true }
+  assert_false(
+    log_commit_matches_diff_filter_with_statuses(
+      deleted_only_statuses, negative_only_include, negative_only_exclude,
+    ),
+  )
+}
+
+///|
+test "log: grep helper supports any-match and all-match" {
+  let patterns = ["second", "initial"]
+  assert_true(
+    log_grep_patterns_match(
+      "second commit message",
+      patterns,
+      GrepPatternType::Fixed,
+      false,
+      false,
+    ),
+  )
+  assert_false(
+    log_grep_patterns_match(
+      "second commit message",
+      patterns,
+      GrepPatternType::Fixed,
+      false,
+      true,
+    ),
+  )
+  assert_true(
+    log_grep_patterns_match(
+      "second initial",
+      patterns,
+      GrepPatternType::Fixed,
+      false,
+      true,
+    ),
+  )
 }

@@ -1,12 +1,37 @@
 ///|
-async fn handle_format_patch(args : Array[String]) -> Unit raise Error {
-  let root = get_work_root()
-  let git_dir = root + "/.git"
-  let fs = OsFs::new()
-  let wfs : &@bitcore.FileSystem = fs
-  let rfs : &@bitcore.RepoFileSystem = fs
-  // Parse options
-  let mut output_dir = "."
+struct FormatPatchOptions {
+  output_dir : String?
+  output_file : String?
+  start_number : Int
+  numbered : Bool
+  stdout_mode : Bool
+  cover_letter : Bool
+  revisions : Array[String]
+  grep_patterns : Array[String]
+  grep_pattern_type_override : GrepPatternType?
+  grep_ignore_case : Bool
+  signature : String?
+  signature_file : String?
+  no_signature : Bool
+}
+
+///|
+fn is_format_patch_count_arg(arg : String) -> Bool {
+  if arg.length() <= 1 || arg[0] != '-' {
+    return false
+  }
+  for c in String::unsafe_substring(arg, start=1, end=arg.length()) {
+    if c < '0' || c > '9' {
+      return false
+    }
+  }
+  true
+}
+
+///|
+fn parse_format_patch_options(args : Array[String]) -> FormatPatchOptions {
+  let mut output_dir : String? = None
+  let mut output_file : String? = None
   let mut start_number = 1
   let mut numbered = false
   let mut stdout_mode = false
@@ -15,16 +40,31 @@ async fn handle_format_patch(args : Array[String]) -> Unit raise Error {
   let grep_patterns : Array[String] = []
   let mut grep_pattern_type_override : GrepPatternType? = None
   let mut grep_ignore_case = false
+  let mut signature : String? = None
+  let mut signature_file : String? = None
+  let mut no_signature = false
   let mut i = 0
   while i < args.length() {
     let arg = args[i]
     match arg {
       "-o" | "--output-directory" if i + 1 < args.length() => {
-        output_dir = args[i + 1]
+        output_dir = Some(args[i + 1])
+        i += 2
+      }
+      "--output" if i + 1 < args.length() => {
+        output_file = Some(args[i + 1])
         i += 2
       }
       "--start-number" if i + 1 < args.length() => {
         start_number = parse_int(args[i + 1])
+        i += 2
+      }
+      "--signature" if i + 1 < args.length() => {
+        signature = Some(args[i + 1])
+        i += 2
+      }
+      "--signature-file" if i + 1 < args.length() => {
+        signature_file = Some(args[i + 1])
         i += 2
       }
       "-n" | "--numbered" => {
@@ -37,6 +77,10 @@ async fn handle_format_patch(args : Array[String]) -> Unit raise Error {
       }
       "--cover-letter" => {
         cover_letter = true
+        i += 1
+      }
+      "--no-signature" => {
+        no_signature = true
         i += 1
       }
       "--grep" if i + 1 < args.length() => {
@@ -69,66 +113,231 @@ async fn handle_format_patch(args : Array[String]) -> Unit raise Error {
         grep_pattern_type_override = Some(GrepPatternType::Basic)
         i += 1
       }
-      _ if arg.has_prefix("-o") => {
-        output_dir = String::unsafe_substring(arg, start=2, end=arg.length())
+      _ if arg.has_prefix("--output-directory=") => {
+        output_dir = Some(
+          String::unsafe_substring(arg, start=19, end=arg.length()),
+        )
         i += 1
       }
-      _ if not(arg.has_prefix("-")) => {
+      _ if arg.has_prefix("--output=") => {
+        output_file = Some(
+          String::unsafe_substring(arg, start=9, end=arg.length()),
+        )
+        i += 1
+      }
+      _ if arg.has_prefix("--signature=") => {
+        signature = Some(
+          String::unsafe_substring(arg, start=12, end=arg.length()),
+        )
+        i += 1
+      }
+      _ if arg.has_prefix("--signature-file=") => {
+        signature_file = Some(
+          String::unsafe_substring(arg, start=17, end=arg.length()),
+        )
+        i += 1
+      }
+      _ if arg.has_prefix("-o") => {
+        output_dir = Some(
+          String::unsafe_substring(arg, start=2, end=arg.length()),
+        )
+        i += 1
+      }
+      _ if is_format_patch_count_arg(arg) || not(arg.has_prefix("-")) => {
         revisions.push(arg)
         i += 1
       }
       _ => i += 1
     }
   }
-  // Parse revision range
+  {
+    output_dir,
+    output_file,
+    start_number,
+    numbered,
+    stdout_mode,
+    cover_letter,
+    revisions,
+    grep_patterns,
+    grep_pattern_type_override,
+    grep_ignore_case,
+    signature,
+    signature_file,
+    no_signature,
+  }
+}
+
+///|
+fn read_format_patch_signature_file(path : String) -> String? {
+  Some(@fs.read_file_to_string(path)) catch {
+    _ => None
+  }
+}
+
+///|
+fn format_patch_default_signature() -> String {
+  match bit_version_tag.find(" (bit ") {
+    Some(idx) => String::unsafe_substring(bit_version_tag, start=0, end=idx)
+    None => bit_version_tag
+  }
+}
+
+///|
+fn resolve_format_patch_signature(
+  git_dir : String,
+  opts : FormatPatchOptions,
+) -> String? {
+  if opts.no_signature {
+    return None
+  }
+  match opts.signature {
+    Some(sig) => return if sig.length() == 0 { None } else { Some(sig) }
+    None => ()
+  }
+  match opts.signature_file {
+    Some(path) => return read_format_patch_signature_file(path)
+    None => ()
+  }
+  match bit_config_get(git_dir, "format", "signature") {
+    Some(sig) => return if sig.length() == 0 { None } else { Some(sig) }
+    None => ()
+  }
+  match bit_config_get(git_dir, "format", "signaturefile") {
+    Some(path) => return read_format_patch_signature_file(path)
+    None => ()
+  }
+  Some(format_patch_default_signature())
+}
+
+///|
+fn format_patch_signature_suffix(signature : String?) -> String {
+  match signature {
+    None => ""
+    Some(sig) =>
+      if sig.length() == 0 {
+        ""
+      } else if sig[sig.length() - 1] == '\n' {
+        "-- \n" + sig + "\n"
+      } else {
+        "-- \n" + sig + "\n\n"
+      }
+  }
+}
+
+///|
+fn format_patch_concat(parts : Array[String]) -> String {
+  let sb = StringBuilder::new()
+  for part in parts {
+    sb.write_string(part)
+  }
+  sb.to_string()
+}
+
+///|
+async fn handle_format_patch(args : Array[String]) -> Unit raise Error {
+  let root = get_work_root()
+  let git_dir = root + "/.git"
+  let fs = OsFs::new()
+  let wfs : &@bitcore.FileSystem = fs
+  let rfs : &@bitcore.RepoFileSystem = fs
+  let opts = parse_format_patch_options(args)
+  if opts.stdout_mode &&
+    (opts.output_dir is Some(_) || opts.output_file is Some(_)) {
+    @stdio.stderr.write("fatal: multiple output destinations specified\n")
+    @sys.exit(128)
+  }
+  if opts.output_dir is Some(_) && opts.output_file is Some(_) {
+    @stdio.stderr.write("fatal: multiple output destinations specified\n")
+    @sys.exit(128)
+  }
   let (base_commit, commits) = parse_format_patch_revisions(
-    rfs, git_dir, revisions,
+    rfs,
+    git_dir,
+    opts.revisions,
   )
   if commits.length() == 0 {
     @stdio.stderr.write("fatal: no commits specified")
     @sys.exit(128)
   }
   let grep_pattern_type = resolve_grep_pattern_type(
-    rfs, git_dir, grep_pattern_type_override,
+    rfs,
+    git_dir,
+    opts.grep_pattern_type_override,
   )
   let db = @bitlib.ObjectDb::load(rfs, git_dir)
   let commits = filter_format_patch_commits_by_grep(
-    db, rfs, commits, grep_patterns, grep_pattern_type, grep_ignore_case,
+    db,
+    rfs,
+    commits,
+    opts.grep_patterns,
+    grep_pattern_type,
+    opts.grep_ignore_case,
   )
   if commits.length() == 0 {
     return
   }
-  // Create output directory if needed
-  if not(stdout_mode) && not(rfs.is_dir(output_dir)) {
+  let signature = resolve_format_patch_signature(git_dir, opts)
+  let output_dir = match opts.output_dir {
+    Some(dir) => dir
+    None =>
+      if opts.stdout_mode || opts.output_file is Some(_) {
+        "."
+      } else {
+        bit_config_get(git_dir, "format", "outputDirectory").unwrap_or(".")
+      }
+  }
+  if not(opts.stdout_mode) &&
+    opts.output_file is None &&
+    not(rfs.is_dir(output_dir)) {
     wfs.mkdir_p(output_dir)
   }
   let total = commits.length()
-  // Generate cover letter if requested
-  if cover_letter && not(stdout_mode) {
-    let cover_path = output_dir + "/0000-cover-letter.patch"
-    let cover_content = generate_cover_letter(commits.length())
-    wfs.write_string(cover_path, cover_content)
-    print_line(cover_path)
+  let stdout_parts : Array[String] = []
+  if opts.cover_letter {
+    let cover_content = generate_cover_letter(commits.length(), signature)
+    if opts.stdout_mode || opts.output_file is Some(_) {
+      stdout_parts.push(cover_content)
+    } else {
+      let cover_path = output_dir + "/0000-cover-letter.patch"
+      wfs.write_string(cover_path, cover_content)
+      print_line(cover_path)
+    }
   }
-  // Generate patches
   for idx in 0..<commits.length() {
     let commit_id = commits[idx]
-    let patch_num = start_number + idx
+    let patch_num = opts.start_number + idx
     let patch = generate_patch(
-      db, rfs, commit_id, base_commit, patch_num, total, numbered,
+      db,
+      rfs,
+      git_dir,
+      commit_id,
+      base_commit,
+      patch_num,
+      total,
+      opts.numbered,
+      signature,
     )
-    if stdout_mode {
-      print_line(patch)
-      if idx < commits.length() - 1 {
-        print_line("--")
-      }
+    if opts.stdout_mode || opts.output_file is Some(_) {
+      stdout_parts.push(patch)
     } else {
       let filename = format_patch_filename(
-        db, rfs, commit_id, patch_num, total, numbered,
+        db,
+        rfs,
+        commit_id,
+        patch_num,
+        total,
+        opts.numbered,
       )
       let patch_path = output_dir + "/" + filename
       wfs.write_string(patch_path, patch)
       print_line(patch_path)
+    }
+  }
+  if opts.stdout_mode || opts.output_file is Some(_) {
+    let output = format_patch_concat(stdout_parts)
+    match opts.output_file {
+      Some(path) => wfs.write_string(path, output)
+      None => print_str(output)
     }
   }
   ignore(base_commit)
@@ -146,7 +355,60 @@ fn parse_format_patch_revisions(
     guard head is Some(h) else { return (None, []) }
     return (None, [h])
   }
-  let rev = revisions[0]
+  let mut count_arg : String? = None
+  let mut range_arg : String? = None
+  let mut single_arg : String? = None
+  for revision in revisions {
+    if revision.find("..") is Some(_) {
+      range_arg = Some(revision)
+    } else if is_format_patch_count_arg(revision) {
+      count_arg = Some(revision)
+    } else {
+      single_arg = Some(revision)
+    }
+  }
+  match range_arg {
+    Some(rev) =>
+      match rev.find("..") {
+        Some(idx) => {
+          let base_ref = String::unsafe_substring(rev, start=0, end=idx)
+          let end_ref = String::unsafe_substring(
+            rev,
+            start=idx + 2,
+            end=rev.length(),
+          )
+          let base_id = @bitrepo.rev_parse(rfs, git_dir, base_ref)
+          let end_id = @bitrepo.rev_parse(
+            rfs,
+            git_dir,
+            if end_ref.length() == 0 {
+              "HEAD"
+            } else {
+              end_ref
+            },
+          )
+          guard base_id is Some(bid) && end_id is Some(eid) else {
+            return (None, [])
+          }
+          let commits = collect_commits_in_range(rfs, git_dir, bid, eid)
+          return (Some(bid), commits)
+        }
+        None => ()
+      }
+    None => ()
+  }
+  match count_arg {
+    Some(rev) => {
+      let n = parse_int(
+        String::unsafe_substring(rev, start=1, end=rev.length()),
+      )
+      let end_ref = single_arg.unwrap_or("HEAD")
+      let commits = collect_last_n_commits_from(rfs, git_dir, n, end_ref)
+      return (None, commits)
+    }
+    None => ()
+  }
+  let rev = single_arg.unwrap_or(revisions[0])
   // Check for range notation
   match rev.find("..") {
     Some(idx) => {
@@ -179,7 +441,7 @@ fn parse_format_patch_revisions(
         let n = parse_int(
           String::unsafe_substring(rev, start=1, end=rev.length()),
         )
-        let commits = collect_last_n_commits(rfs, git_dir, n)
+        let commits = collect_last_n_commits_from(rfs, git_dir, n, "HEAD")
         (None, commits)
       } else {
         // Single commit
@@ -197,33 +459,47 @@ fn collect_commits_in_range(
   base : @bitcore.ObjectId,
   end : @bitcore.ObjectId,
 ) -> Array[@bitcore.ObjectId] raise Error {
-  let db = @bitlib.ObjectDb::load(rfs, git_dir)
-  let result : Array[@bitcore.ObjectId] = []
-  let mut current = end
-  let base_hex = base.to_hex()
-  while current.to_hex() != base_hex {
-    result.push(current)
-    let obj = db.get(rfs, current)
-    guard obj is Some(o) else { break }
-    let info = @bitcore.parse_commit(o.data)
-    if info.parents.length() == 0 {
-      break
-    }
-    current = info.parents[0]
+  let excluded : Map[String, Bool] = {}
+  let base_entries = log_walk_commits(
+    rfs,
+    git_dir,
+    [base],
+    {},
+    2147483647,
+    0L,
+    9223372036854775807L,
+    false,
+  )
+  for entry in base_entries {
+    excluded[entry.id.to_hex()] = true
   }
-  // Reverse to get chronological order
+  let entries = log_walk_commits(
+    rfs,
+    git_dir,
+    [end],
+    excluded,
+    2147483647,
+    0L,
+    9223372036854775807L,
+    false,
+  )
+  let result : Array[@bitcore.ObjectId] = []
+  for entry in entries {
+    result.push(entry.id)
+  }
   result.rev_in_place()
   result
 }
 
 ///|
-fn collect_last_n_commits(
+fn collect_last_n_commits_from(
   rfs : &@bitcore.RepoFileSystem,
   git_dir : String,
   n : Int,
+  end_ref : String,
 ) -> Array[@bitcore.ObjectId] raise Error {
   let db = @bitlib.ObjectDb::load(rfs, git_dir)
-  let head = @bitrepo.rev_parse(rfs, git_dir, "HEAD")
+  let head = @bitrepo.rev_parse(rfs, git_dir, end_ref)
   guard head is Some(h) else { return [] }
   let result : Array[@bitcore.ObjectId] = []
   let mut current = h
@@ -271,7 +547,7 @@ fn filter_format_patch_commits_by_grep(
 }
 
 ///|
-fn generate_cover_letter(num_patches : Int) -> String {
+fn generate_cover_letter(num_patches : Int, signature : String?) -> String {
   let sb = StringBuilder::new()
   sb.write_string(
     "From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001\n",
@@ -280,6 +556,7 @@ fn generate_cover_letter(num_patches : Int) -> String {
   sb.write_string(num_patches.to_string())
   sb.write_string("] *** SUBJECT HERE ***\n\n")
   sb.write_string("*** BLURB HERE ***\n\n")
+  sb.write_string(format_patch_signature_suffix(signature))
   sb.to_string()
 }
 
@@ -287,11 +564,13 @@ fn generate_cover_letter(num_patches : Int) -> String {
 fn generate_patch(
   db : @bitlib.ObjectDb,
   rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
   commit_id : @bitcore.ObjectId,
   _base : @bitcore.ObjectId?,
   patch_num : Int,
   total : Int,
   numbered : Bool,
+  signature : String?,
 ) -> String raise Error {
   let obj = db.get(rfs, commit_id)
   guard obj is Some(o) else {
@@ -340,9 +619,10 @@ fn generate_patch(
   } else {
     None
   }
-  let diff = generate_commit_diff(db, rfs, commit_id, parent_id)
+  let diff = generate_commit_diff(db, rfs, git_dir, commit_id, parent_id)
   sb.write_string(diff)
-  sb.write_string("\n-- \n\{bit_version_tag}\n\n")
+  sb.write_string("\n")
+  sb.write_string(format_patch_signature_suffix(signature))
   sb.to_string()
 }
 
@@ -432,6 +712,7 @@ fn format_email_date(ts : Int64, tz : String) -> String {
 fn generate_commit_diff(
   db : @bitlib.ObjectDb,
   rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
   commit_id : @bitcore.ObjectId,
   parent_id : @bitcore.ObjectId?,
 ) -> String raise Error {
@@ -452,80 +733,8 @@ fn generate_commit_diff(
     }
     None => None
   }
-  // Generate diff between trees
-  diff_trees(db, rfs, parent_tree, tree, "")
-}
-
-///|
-fn diff_trees(
-  db : @bitlib.ObjectDb,
-  rfs : &@bitcore.RepoFileSystem,
-  old_tree : @bitcore.ObjectId?,
-  new_tree : @bitcore.ObjectId,
-  prefix : String,
-) -> String raise Error {
-  let sb = StringBuilder::new()
-  let new_entries = get_tree_entries(db, rfs, new_tree)
-  let old_entries : Map[String, @bitcore.TreeEntry] = {}
-  match old_tree {
-    Some(ot) => {
-      let entries = get_tree_entries(db, rfs, ot)
-      for e in entries {
-        old_entries[e.name] = e
-      }
-    }
-    None => ()
-  }
-  // Check for new/modified files
-  for entry in new_entries {
-    let path = if prefix.length() > 0 {
-      prefix + "/" + entry.name
-    } else {
-      entry.name
-    }
-    if entry.mode == "40000" {
-      // Directory - recurse
-      let old_subtree = match old_entries.get(entry.name) {
-        Some(oe) if oe.mode == "40000" => Some(oe.id)
-        _ => None
-      }
-      let sub_diff = diff_trees(db, rfs, old_subtree, entry.id, path)
-      sb.write_string(sub_diff)
-    } else {
-      // File
-      match old_entries.get(entry.name) {
-        Some(oe) if oe.id.to_hex() != entry.id.to_hex() => {
-          // Modified
-          let diff = diff_blobs(db, rfs, Some(oe.id), entry.id, path)
-          sb.write_string(diff)
-        }
-        None => {
-          // New file
-          let diff = diff_blobs(db, rfs, None, entry.id, path)
-          sb.write_string(diff)
-        }
-        _ => ()
-      }
-    }
-  }
-  // Check for deleted files
-  for name, entry in old_entries {
-    if entry.mode != "40000" {
-      let mut found = false
-      for ne in new_entries {
-        if ne.name == name {
-          found = true
-          break
-        }
-      }
-      if not(found) {
-        let path = if prefix.length() > 0 { prefix + "/" + name } else { name }
-        let diff = diff_blobs(db, rfs, Some(entry.id), entry.id, path) // Deleted
-        sb.write_string(diff)
-      }
-    }
-  }
-  sb.to_string()
+  let diff_files = @bitdiff.diff_trees(rfs, git_dir, parent_tree, tree, db~)
+  @bitdiff.diff_text(diff_files).join("\n")
 }
 
 ///|
@@ -537,69 +746,6 @@ fn get_tree_entries(
   let obj = db.get(rfs, tree_id)
   guard obj is Some(o) else { return [] }
   @bitcore.parse_tree(o.data)
-}
-
-///|
-fn diff_blobs(
-  db : @bitlib.ObjectDb,
-  rfs : &@bitcore.RepoFileSystem,
-  old_id : @bitcore.ObjectId?,
-  new_id : @bitcore.ObjectId,
-  path : String,
-) -> String raise Error {
-  let sb = StringBuilder::new()
-  let old_content = match old_id {
-    Some(oid) => {
-      let obj = db.get(rfs, oid)
-      match obj {
-        Some(o) => decode_bytes(o.data)
-        None => ""
-      }
-    }
-    None => ""
-  }
-  let new_obj = db.get(rfs, new_id)
-  let new_content = match new_obj {
-    Some(o) => decode_bytes(o.data)
-    None => ""
-  }
-  sb.write_string("diff --git a/")
-  sb.write_string(path)
-  sb.write_string(" b/")
-  sb.write_string(path)
-  sb.write_string("\n")
-  if old_id is None {
-    sb.write_string("new file mode 100644\n")
-  }
-  sb.write_string("--- ")
-  if old_id is Some(_) {
-    sb.write_string("a/")
-    sb.write_string(path)
-  } else {
-    sb.write_string("/dev/null")
-  }
-  sb.write_string("\n+++ b/")
-  sb.write_string(path)
-  sb.write_string("\n")
-  // Simple line-by-line diff
-  let old_lines = split_lines(old_content)
-  let new_lines = split_lines(new_content)
-  sb.write_string("@@ -1,")
-  sb.write_string(old_lines.length().to_string())
-  sb.write_string(" +1,")
-  sb.write_string(new_lines.length().to_string())
-  sb.write_string(" @@\n")
-  for line in old_lines {
-    sb.write_string("-")
-    sb.write_string(line)
-    sb.write_string("\n")
-  }
-  for line in new_lines {
-    sb.write_string("+")
-    sb.write_string(line)
-    sb.write_string("\n")
-  }
-  sb.to_string()
 }
 
 ///|

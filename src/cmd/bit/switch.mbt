@@ -165,7 +165,7 @@ async fn handle_switch(args : Array[String]) -> Unit raise Error {
     let previous_location = current_checkout_location(rfs, git_dir)
     match target_id {
       Some(id) => {
-        @bitlib.create_branch_at(fs, rfs, root, branch_name, id)
+        @bitlib.create_branch_at(fs, rfs, root, branch_name, id, start_point~)
         switch_apply_tracking_config(
           fs, rfs, git_dir, branch_name, start_point, track_mode,
         )
@@ -251,6 +251,15 @@ fn normalize_switch_branch_ref(name : String) -> String raise @bitcore.GitError 
 }
 
 ///|
+fn switch_short_branch_name(name : String) -> String {
+  if name.has_prefix("refs/heads/") {
+    String::unsafe_substring(name, start=11, end=name.length())
+  } else {
+    name
+  }
+}
+
+///|
 fn switch_write_head_ref(
   fs : &@bitcore.FileSystem,
   git_dir : String,
@@ -265,7 +274,8 @@ fn switch_branch_in_use_path(
   root : String,
   branch : String,
 ) -> String? raise Error {
-  match @bitlib.is_branch_checked_out(fs, root, branch) {
+  let branch_name = switch_short_branch_name(branch)
+  match @bitlib.is_branch_checked_out(fs, root, branch_name) {
     Some(path) =>
       if normalize_path(path) == normalize_path(root) {
         None
@@ -375,19 +385,20 @@ fn switch_apply_tracking_config(
     }
   }
   let source_branch = switch_start_branch_name(rfs, git_dir, start_point)
+  let branch_name = switch_short_branch_name(branch)
   match mode {
     Some("direct") =>
       match source_branch {
         Some(source) => {
           @bitlib.set_config_key(
-            fs, rfs, git_dir, "branch", branch, "remote", ".",
+            fs, rfs, git_dir, "branch", branch_name, "remote", ".",
           )
           @bitlib.set_config_key(
             fs,
             rfs,
             git_dir,
             "branch",
-            branch,
+            branch_name,
             "merge",
             "refs/heads/" + source,
           )
@@ -403,7 +414,7 @@ fn switch_apply_tracking_config(
               match cfg.remote {
                 Some(remote) =>
                   @bitlib.set_config_key(
-                    fs, rfs, git_dir, "branch", branch, "remote", remote,
+                    fs, rfs, git_dir, "branch", branch_name, "remote", remote,
                   )
                 None => ()
               }
@@ -413,7 +424,7 @@ fn switch_apply_tracking_config(
                   rfs,
                   git_dir,
                   "branch",
-                  branch,
+                  branch_name,
                   "merge",
                   cfg.merges[0],
                 )

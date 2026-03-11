@@ -48,6 +48,11 @@ pub async fn diff_worktree(
   for entry in index_entries {
     let path = entry.path
     if is_gitlink_mode_int(entry.mode) {
+      let sub_diff = diff_worktree_gitlink_change(fs, root, entry)
+      match sub_diff {
+        Some(file) => out.push(file)
+        None => ()
+      }
       continue
     }
     if skip_worktree_paths.contains(path) {
@@ -192,6 +197,84 @@ pub async fn diff_worktree(
 }
 
 ///|
+fn diff_gitlink_content(id : @bit.ObjectId) -> Bytes {
+  @utf8.encode("Subproject commit \{id.to_hex()}\n"[:])
+}
+
+///|
+fn diff_gitlink_content_oid(content : Bytes?) -> String? {
+  match content {
+    Some(data) => {
+      let text = @utf8.decode_lossy(data[:])
+      let prefix = "Subproject commit "
+      guard text.has_prefix(prefix) else { return None }
+      let mut oid = String::unsafe_substring(
+        text,
+        start=prefix.length(),
+        end=text.length(),
+      )
+      if oid.has_suffix("\n") {
+        oid = String::unsafe_substring(oid, start=0, end=oid.length() - 1)
+      }
+      if oid.length() == 40 {
+        Some(oid)
+      } else {
+        None
+      }
+    }
+    None => None
+  }
+}
+
+///|
+fn diff_content_for_entry(
+  db : @bitlib.ObjectDb,
+  fs : &@bit.RepoFileSystem,
+  id : @bit.ObjectId,
+  mode : Int,
+) -> Bytes? raise @bit.GitError {
+  if is_gitlink_mode_int(mode) {
+    Some(diff_gitlink_content(id))
+  } else {
+    diff_read_blob(db, fs, id)
+  }
+}
+
+///|
+fn diff_worktree_gitlink_change(
+  fs : &@bit.RepoFileSystem,
+  root : String,
+  entry : @bitlib.IndexEntry,
+) -> DiffFile? {
+  let sub_root = @bit.join_path(root, entry.path)
+  if not(fs.is_dir(sub_root)) {
+    return None
+  }
+  let sub_git = @bit.join_path(sub_root, ".git")
+  if not(fs.is_file(sub_git)) && not(fs.is_dir(sub_git)) {
+    return None
+  }
+  let sub_git_dir = @bitlib.resolve_gitdir(fs, sub_git)
+  let head_id = @bitlib.resolve_head_commit(fs, sub_git_dir) catch { _ => None }
+  match head_id {
+    Some(id) =>
+      if id != entry.id {
+        Some({
+          path: entry.path,
+          kind: DiffKind::Modified,
+          old_content: Some(diff_gitlink_content(entry.id)),
+          new_content: Some(diff_gitlink_content(id)),
+          old_mode: Some(entry.mode),
+          new_mode: Some(entry.mode),
+        })
+      } else {
+        None
+      }
+    None => None
+  }
+}
+
+///|
 /// Diff index against HEAD (`git diff --cached`).
 pub fn diff_index(
   fs : &@bit.RepoFileSystem,
@@ -210,7 +293,7 @@ pub fn diff_index(
     let (path, entry) = item
     match head_entries.get(path) {
       None => {
-        let new = diff_read_blob(db, fs, entry.id)
+        let new = diff_content_for_entry(db, fs, entry.id, entry.mode)
         // Skip if blob not found (e.g., submodule)
         if new is Some(_) {
           out.push({
@@ -229,8 +312,8 @@ pub fn diff_index(
           let mut old : Bytes? = None
           let mut new : Bytes? = None
           if content_changed {
-            old = diff_read_blob(db, fs, h.id)
-            new = diff_read_blob(db, fs, entry.id)
+            old = diff_content_for_entry(db, fs, h.id, h.mode)
+            new = diff_content_for_entry(db, fs, entry.id, entry.mode)
             // Skip if either blob not found (e.g., submodule)
             if old is None || new is None {
               continue
@@ -250,7 +333,7 @@ pub fn diff_index(
   for item in head_entries.to_array() {
     let (path, h) = item
     if not(index_map.contains(path)) {
-      let old = diff_read_blob(db, fs, h.id)
+      let old = diff_content_for_entry(db, fs, h.id, h.mode)
       // Skip if blob not found (e.g., submodule)
       if old is Some(_) {
         out.push({
@@ -313,7 +396,9 @@ pub fn diff_text(
 
 ///|
 fn diff_blob_short_id(data : Bytes) -> String {
-  let hex = @bit.hash_blob(data).to_hex()
+  let hex = diff_gitlink_content_oid(Some(data)).unwrap_or_else(fn() {
+    @bit.hash_blob(data).to_hex()
+  })
   String::unsafe_substring(hex, start=0, end=7)
 }
 
@@ -853,7 +938,7 @@ pub fn diff_trees(
   for path, entry in new_entries {
     match old_entries.get(path) {
       None => {
-        let new_content = diff_read_blob(db, fs, entry.id)
+        let new_content = diff_content_for_entry(db, fs, entry.id, entry.mode)
         if new_content is Some(_) {
           out.push({
             path,
@@ -867,8 +952,13 @@ pub fn diff_trees(
       }
       Some(old_entry) =>
         if old_entry.id != entry.id || old_entry.mode != entry.mode {
-          let old_content = diff_read_blob(db, fs, old_entry.id)
-          let new_content = diff_read_blob(db, fs, entry.id)
+          let old_content = diff_content_for_entry(
+            db,
+            fs,
+            old_entry.id,
+            old_entry.mode,
+          )
+          let new_content = diff_content_for_entry(db, fs, entry.id, entry.mode)
           out.push({
             path,
             kind: DiffKind::Modified,
@@ -883,7 +973,7 @@ pub fn diff_trees(
   // Deleted
   for path, entry in old_entries {
     if not(new_entries.contains(path)) {
-      let old_content = diff_read_blob(db, fs, entry.id)
+      let old_content = diff_content_for_entry(db, fs, entry.id, entry.mode)
       if old_content is Some(_) {
         out.push({
           path,

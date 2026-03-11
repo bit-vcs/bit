@@ -14,12 +14,15 @@ pub struct BranchInfo {
 }
 
 ///|
-fn resolve_worktree_git_dir(fs : &@bit.RepoFileSystem, root : String) -> String {
+fn resolve_worktree_git_dir(
+  fs : &@bit.RepoFileSystem,
+  root : String,
+) -> String raise @bit.GitError {
   let bit_path = join_path(root, ".git")
   if fs.is_dir(bit_path) {
     bit_path
   } else if fs.is_file(bit_path) {
-    resolve_gitdir(fs, bit_path)
+    resolve_commondir(fs, resolve_gitdir(fs, bit_path))
   } else if fs.is_file(join_path(root, "HEAD")) &&
     fs.is_dir(join_path(root, "objects")) {
     root
@@ -35,6 +38,17 @@ pub fn read_head_ref(
   git_dir : String,
 ) -> HeadRef raise @bit.GitError {
   let head_path = join_path(git_dir, "HEAD")
+  match @bitio.read_symlink_target_path(head_path) {
+    Some(target) if target.has_prefix("refs/") => {
+      let name = if target.has_prefix("refs/heads/") {
+        String::unsafe_substring(target, start=11, end=target.length())
+      } else {
+        target
+      }
+      return HeadRef::Branch(name)
+    }
+    _ => ()
+  }
   let line = read_ref_line(fs, head_path)
   if line.has_prefix("ref: ") {
     let refname = String::unsafe_substring(line, start=5, end=line.length())
@@ -218,15 +232,91 @@ fn collect_remote_refs(
 }
 
 ///|
+fn branch_is_bare_repo(
+  rfs : &@bit.RepoFileSystem,
+  root : String,
+  git_dir : String,
+) -> Bool {
+  normalize_path(root) == normalize_path(git_dir) &&
+  rfs.is_file(join_path(root, "HEAD")) &&
+  rfs.is_dir(join_path(root, "objects"))
+}
+
+///|
+fn branch_creation_source_label(
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+  start_point : String?,
+) -> String raise @bit.GitError {
+  match start_point {
+    Some(source) => source
+    None =>
+      match read_head_ref(rfs, git_dir) {
+        Branch(name) => name
+        Detached(_) => "HEAD"
+      }
+  }
+}
+
+///|
+fn append_branch_creation_reflog(
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  root : String,
+  git_dir : String,
+  refname : String,
+  new_id : @bit.ObjectId,
+  start_point : String?,
+  author : String,
+  email : String,
+  timestamp : Int64,
+  timezone : String,
+) -> Unit raise @bit.GitError {
+  let is_bare = branch_is_bare_repo(rfs, root, git_dir)
+  let (should_log, _) = should_log_ref(rfs, git_dir, refname, is_bare)
+  if not(should_log) {
+    return
+  }
+  let source_label = branch_creation_source_label(rfs, git_dir, start_point)
+  append_reflog(
+    fs,
+    rfs,
+    git_dir,
+    refname,
+    @bit.ObjectId::zero(),
+    new_id,
+    author,
+    email,
+    timestamp,
+    timezone,
+    "branch: Created from " + source_label,
+  )
+}
+
+///|
 /// Create a local branch pointing at current HEAD.
 pub fn create_branch(
   fs : &@bit.FileSystem,
   rfs : &@bit.RepoFileSystem,
   root : String,
   name : String,
+  start_point? : String? = None,
+  author? : String = "unknown",
+  email? : String = "unknown",
+  timestamp? : Int64 = 0L,
+  timezone? : String = "+0000",
 ) -> Unit raise @bit.GitError {
   let git_dir = resolve_worktree_git_dir(rfs, root)
   let refname = branch_ref_name(name)
+  if resolve_ref(rfs, git_dir, refname) is Some(_) {
+    match branch_checked_out_path(rfs, root, name) {
+      Some(path) =>
+        raise @bit.GitError::InvalidObject(
+          "branch '\{name}' is checked out at '\{path}'",
+        )
+      None => ()
+    }
+  }
   let ref_path = join_path(git_dir, refname)
   let dir = parent_dir(ref_path)
   fs.mkdir_p(dir)
@@ -238,7 +328,13 @@ pub fn create_branch(
           _ => ()
         }
       }
-    Some(id) => fs.write_string(ref_path, id.to_hex() + "\n")
+    Some(id) => {
+      fs.write_string(ref_path, id.to_hex() + "\n")
+      append_branch_creation_reflog(
+        fs, rfs, root, git_dir, refname, id, start_point, author, email, timestamp,
+        timezone,
+      )
+    }
   }
 }
 
@@ -250,14 +346,31 @@ pub fn create_branch_at(
   root : String,
   name : String,
   commit_id : @bit.ObjectId,
+  start_point? : String? = None,
+  author? : String = "unknown",
+  email? : String = "unknown",
+  timestamp? : Int64 = 0L,
+  timezone? : String = "+0000",
 ) -> Unit raise @bit.GitError {
   let git_dir = resolve_worktree_git_dir(rfs, root)
   let refname = branch_ref_name(name)
+  if resolve_ref(rfs, git_dir, refname) is Some(_) {
+    match branch_checked_out_path(rfs, root, name) {
+      Some(path) =>
+        raise @bit.GitError::InvalidObject(
+          "branch '\{name}' is checked out at '\{path}'",
+        )
+      None => ()
+    }
+  }
   let ref_path = join_path(git_dir, refname)
   let dir = parent_dir(ref_path)
   fs.mkdir_p(dir)
-  ignore(rfs)
   fs.write_string(ref_path, commit_id.to_hex() + "\n")
+  append_branch_creation_reflog(
+    fs, rfs, root, git_dir, refname, commit_id, start_point, author, email, timestamp,
+    timezone,
+  )
 }
 
 ///|
@@ -305,15 +418,12 @@ pub fn delete_branch(
   force? : Bool = false,
 ) -> Unit raise @bit.GitError {
   let git_dir = resolve_worktree_git_dir(rfs, root)
-  let head = read_head_ref(rfs, git_dir)
-  match head {
-    Branch(current) =>
-      if current == name {
-        raise @bit.GitError::InvalidObject(
-          "Cannot delete branch '\{name}' checked out at '\{root}'",
-        )
-      }
-    Detached(_) => ()
+  match branch_checked_out_path(rfs, root, name) {
+    Some(path) =>
+      raise @bit.GitError::InvalidObject(
+        "Cannot delete branch '\{name}' checked out at '\{path}'",
+      )
+    None => ()
   }
   let refname = branch_ref_name(name)
   let ref_path = join_path(git_dir, refname)
@@ -356,6 +466,13 @@ pub fn delete_branch(
   if rfs.is_file(packed_path) {
     remove_from_packed_refs(fs, rfs, packed_path, refname)
   }
+  delete_reflog(fs, rfs, git_dir, refname)
+  prune_empty_ref_parent_dirs(
+    fs,
+    rfs,
+    join_path(git_dir, "logs/" + refname),
+    join_path(git_dir, "logs/refs/heads"),
+  )
 }
 
 ///|
@@ -367,19 +484,50 @@ pub fn rename_branch(
   old_name : String,
   new_name : String,
   force? : Bool = false,
+  author? : String = "Unknown",
+  email? : String = "unknown@localhost",
+  timestamp? : Int64 = 0L,
+  timezone? : String = "+0000",
 ) -> Unit raise @bit.GitError {
   let git_dir = resolve_worktree_git_dir(rfs, root)
   let old_ref = branch_ref_name(old_name)
   let new_ref = branch_ref_name(new_name)
   let old_path = join_path(git_dir, old_ref)
   let new_path = join_path(git_dir, new_ref)
+  if old_name != new_name {
+    match branch_checked_out_path(rfs, root, new_name) {
+      Some(path) =>
+        raise @bit.GitError::InvalidObject(
+          "branch '\{new_name}' is checked out at '\{path}'",
+        )
+      None => ()
+    }
+  }
+  let checked_out_head_paths = branch_checked_out_head_paths(
+    rfs, root, git_dir, old_name,
+  )
   let old_id = match resolve_ref(rfs, git_dir, old_ref) {
     Some(id) => id
     None => raise @bit.GitError::InvalidObject("branch '\{old_name}' not found")
   }
+  let old_log = join_path(git_dir, "logs/" + old_ref)
+  let old_log_data = if rfs.is_file(old_log) {
+    Some(rfs.read_file(old_log))
+  } else {
+    None
+  }
   let packed_path = join_path(git_dir, "packed-refs")
-  let new_exists = rfs.is_file(new_path) ||
+  validate_branch_rename_target_path(rfs, git_dir, old_path, old_ref, new_ref)
+  let new_packed_exists = if rfs.is_file(packed_path) {
     resolve_packed_ref(rfs, packed_path, new_ref) is Some(_)
+  } else {
+    false
+  }
+  let new_exists = (
+      rfs.is_file(new_path) &&
+      not(branch_is_dangling_symref(rfs, git_dir, new_ref, new_path))
+    ) ||
+    new_packed_exists
   if new_exists {
     if not(force) {
       raise @bit.GitError::InvalidObject("branch '\{new_name}' already exists")
@@ -391,32 +539,141 @@ pub fn rename_branch(
       remove_from_packed_refs(fs, rfs, packed_path, new_ref)
     }
   }
-  let dir = parent_dir(new_path)
-  fs.mkdir_p(dir)
-  fs.write_string(new_path, old_id.to_hex() + "\n")
   if rfs.is_file(old_path) {
     fs.remove_file(old_path)
+    prune_empty_ref_parent_dirs(
+      fs,
+      rfs,
+      old_path,
+      join_path(git_dir, "refs/heads"),
+    )
   }
   if rfs.is_file(packed_path) {
     remove_from_packed_refs(fs, rfs, packed_path, old_ref)
   }
-  let head = read_head_ref(rfs, git_dir)
-  match head {
-    Branch(name) =>
-      if name == old_name {
-        let head_path = join_path(git_dir, "HEAD")
-        fs.write_string(head_path, "ref: \{new_ref}\n")
-      }
-    Detached(_) => ()
-  }
-  let old_log = join_path(git_dir, "logs/" + old_ref)
   if rfs.is_file(old_log) {
-    let new_log = join_path(git_dir, "logs/" + new_ref)
-    let parent = parent_dir(new_log)
-    fs.mkdir_p(parent)
-    let data = rfs.read_file(old_log)
-    fs.write_file(new_log, data)
     fs.remove_file(old_log)
+    prune_empty_ref_parent_dirs(
+      fs,
+      rfs,
+      old_log,
+      join_path(git_dir, "logs/refs/heads"),
+    )
+  }
+  let dir = parent_dir(new_path)
+  fs.mkdir_p(dir)
+  fs.write_string(new_path, old_id.to_hex() + "\n")
+  let rename_message = "Branch: renamed \{old_ref} to \{new_ref}"
+  match old_log_data {
+    Some(data) => {
+      let new_log = join_path(git_dir, "logs/" + new_ref)
+      let parent = parent_dir(new_log)
+      fs.mkdir_p(parent)
+      fs.write_file(new_log, data)
+    }
+    None => ()
+  }
+  append_reflog(
+    fs, rfs, git_dir, new_ref, old_id, old_id, author, email, timestamp, timezone,
+    rename_message,
+  )
+  let main_head_path = join_path(git_dir, "HEAD")
+  let mut had_locked_worktree_head = false
+  for head_path in checked_out_head_paths {
+    let lock_path = head_path + ".lock"
+    if rfs.is_file(lock_path) {
+      had_locked_worktree_head = true
+      continue
+    }
+    fs.write_string(head_path, "ref: \{new_ref}\n")
+    if head_path == main_head_path {
+      append_reflog(
+        fs, rfs, git_dir, "HEAD", old_id, old_id, author, email, timestamp, timezone,
+        rename_message,
+      )
+    }
+  }
+  if had_locked_worktree_head {
+    raise @bit.GitError::InvalidObject(
+      "failed to update HEAD for one or more worktrees",
+    )
+  }
+}
+
+///|
+fn branch_checked_out_path(
+  rfs : &@bit.RepoFileSystem,
+  root : String,
+  branch : String,
+) -> String? raise @bit.GitError {
+  is_branch_checked_out(rfs, root, branch)
+}
+
+///|
+fn branch_checked_out_head_paths(
+  rfs : &@bit.RepoFileSystem,
+  root : String,
+  git_dir : String,
+  branch : String,
+) -> Array[String] raise @bit.GitError {
+  let head_paths : Array[String] = []
+  let worktrees = list_worktrees(rfs, root)
+  for wt in worktrees {
+    match wt.branch {
+      Some(b) if b == branch =>
+        if wt.is_main {
+          head_paths.push(join_path(git_dir, "HEAD"))
+        } else {
+          match find_worktree_admin_dir(rfs, git_dir, wt.path) {
+            Some(admin_dir) => head_paths.push(join_path(admin_dir, "HEAD"))
+            None => ()
+          }
+        }
+      _ => ()
+    }
+  }
+  head_paths
+}
+
+///|
+fn branch_is_dangling_symref(
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+  refname : String,
+  ref_path : String,
+) -> Bool raise @bit.GitError {
+  if not(rfs.is_file(ref_path)) {
+    return false
+  }
+  let line = read_ref_line(rfs, ref_path)
+  if not(line.has_prefix("ref: ")) {
+    return false
+  }
+  resolve_ref(rfs, git_dir, refname) is None
+}
+
+///|
+fn validate_branch_rename_target_path(
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+  old_path : String,
+  old_ref : String,
+  new_ref : String,
+) -> Unit raise @bit.GitError {
+  let parts : Array[String] = []
+  for part_view in new_ref.split("/") {
+    parts.push(part_view.to_string())
+  }
+  let mut current = git_dir
+  for i in 0..<(parts.length() - 1) {
+    current = join_path(current, parts[i])
+    if rfs.is_file(current) && current != old_path {
+      raise @bit.GitError::InvalidObject("branch '\{new_ref}' already exists")
+    }
+  }
+  let new_path = join_path(git_dir, new_ref)
+  if rfs.is_dir(new_path) && not(old_ref.has_prefix(new_ref + "/")) {
+    raise @bit.GitError::InvalidObject("branch '\{new_ref}' already exists")
   }
 }
 
@@ -811,12 +1068,28 @@ fn collect_packed_tags(
 /// Delete a tag.
 pub fn delete_tag(
   fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
   git_dir : String,
   name : String,
 ) -> Unit raise @bit.GitError {
   let refname = normalize_tag_ref(name)
   let ref_path = join_path(git_dir, refname)
-  fs.remove_file(ref_path)
+  if rfs.is_file(ref_path) {
+    fs.remove_file(ref_path)
+    prune_empty_ref_parent_dirs(
+      fs,
+      rfs,
+      ref_path,
+      join_path(git_dir, "refs/tags"),
+    )
+  }
+  delete_reflog(fs, rfs, git_dir, refname)
+  prune_empty_ref_parent_dirs(
+    fs,
+    rfs,
+    join_path(git_dir, "logs/" + refname),
+    join_path(git_dir, "logs/refs/tags"),
+  )
 }
 
 ///|

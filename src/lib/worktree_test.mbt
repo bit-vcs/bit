@@ -29,6 +29,24 @@ async test "worktree: status/add/commit" {
 }
 
 ///|
+async test "worktree: commit writes HEAD and branch reflogs" {
+  let fs = setup_repo()
+  fs.write_string("/repo/a.txt", "hello\n")
+  add_paths(fs, fs, "/repo", ["a.txt"])
+  ignore(
+    commit(
+      fs, fs, "/repo", "msg\nbody\n", "Test <test@example.com>", 1700000000L,
+    ),
+  )
+  let head_log = read_reflog(fs, "/repo/.git", "HEAD")
+  let branch_log = read_reflog(fs, "/repo/.git", "refs/heads/main")
+  assert_eq(head_log.length(), 1)
+  assert_eq(branch_log.length(), 1)
+  assert_eq(head_log[0].message, "commit (initial): msg")
+  assert_eq(branch_log[0].message, "commit (initial): msg")
+}
+
+///|
 async test "worktree: modified after commit" {
   let fs = setup_repo()
   fs.write_string("/repo/a.txt", "hello\n")
@@ -121,4 +139,105 @@ async test "worktree: allow_empty creates initial commit" {
   )
   let ref_text = fs.read_string("/repo/.git/refs/heads/main")
   assert_true(ref_text.contains(commit_id.to_hex()))
+}
+
+///|
+async test "worktree: amend preserves gitlink entries without local object" {
+  let fs = setup_repo()
+  fs.write_string("/repo/a.txt", "hello\n")
+  add_paths(fs, fs, "/repo", ["a.txt"])
+  ignore(
+    commit(fs, fs, "/repo", "base\n", "Test <test@example.com>", 1700000000L),
+  )
+  let entries = read_index_entries(fs, "/repo/.git")
+  entries.push(
+    IndexEntry::new(
+      "submodule",
+      @bit.ObjectId::from_hex("e598ccc29ff366687aa04587483454a7925521ae"),
+      0o160000,
+      0,
+    ),
+  )
+  write_index_entries(fs, "/repo/.git", entries)
+  let amended = commit_amend(
+    fs, fs, "/repo", "amended\n", "Test <test@example.com>", 1700000001L,
+  )
+  let db = ObjectDb::load_lazy(fs, "/repo/.git")
+  let commit_obj = db.get(fs, amended).unwrap()
+  let commit_info = @bit.parse_commit(commit_obj.data)
+  let tree_obj = db.get(fs, commit_info.tree).unwrap()
+  let tree_entries = @bit.parse_tree(tree_obj.data)
+  assert_eq(tree_entries.length(), 2)
+  assert_eq(tree_entries[1].mode, "160000")
+  assert_eq(tree_entries[1].name, "submodule")
+  assert_eq(
+    tree_entries[1].id.to_hex(),
+    "e598ccc29ff366687aa04587483454a7925521ae",
+  )
+}
+
+///|
+async test "worktree: mv_path moves gitlink directory" {
+  let fs = setup_repo()
+  let gitlink_id = @bit.ObjectId::from_hex(
+    "e598ccc29ff366687aa04587483454a7925521ae",
+  )
+  write_index_entries(fs, "/repo/.git", [
+    IndexEntry::new("child", gitlink_id, 0o160000, 0),
+  ])
+  fs.mkdir_p("/repo/child")
+  fs.write_string("/repo/child/.git", "gitdir: ../.git/modules/child\n")
+
+  mv_path(fs, fs, "/repo", "child", "child_old")
+
+  let entries = read_index_entries(fs, "/repo/.git")
+  assert_eq(entries.length(), 1)
+  assert_eq(entries[0].path, "child_old")
+  assert_false(fs.is_dir("/repo/child"))
+  assert_true(fs.is_dir("/repo/child_old"))
+  assert_eq(
+    fs.read_string("/repo/child_old/.git"),
+    "gitdir: ../.git/modules/child\n",
+  )
+}
+
+///|
+async test "worktree: mv_path updates gitmodules path for gitlink rename" {
+  let fs = setup_repo()
+  let gitlink_id = @bit.ObjectId::from_hex(
+    "e598ccc29ff366687aa04587483454a7925521ae",
+  )
+  fs.write_string(
+    "/repo/.gitmodules", "[submodule \"a\"]\n\tpath = a\n\turl = ../submodule\n",
+  )
+  add_paths(fs, fs, "/repo", [".gitmodules"])
+  let entries = read_index_entries(fs, "/repo/.git")
+  entries.push(IndexEntry::new("a", gitlink_id, 0o160000, 0))
+  write_index_entries(fs, "/repo/.git", entries)
+  fs.mkdir_p("/repo/a")
+  fs.write_string("/repo/a/.git", "gitdir: ../.git/modules/a\n")
+
+  mv_path(fs, fs, "/repo", "a", "b")
+
+  assert_eq(
+    fs.read_string("/repo/.gitmodules"),
+    "[submodule \"a\"]\n\tpath = b\n\turl = ../submodule\n",
+  )
+  let updated_entries = read_index_entries(fs, "/repo/.git")
+  let mut gitmodules_entry : IndexEntry? = None
+  for entry in updated_entries {
+    if entry.path == ".gitmodules" {
+      gitmodules_entry = Some(entry)
+      break
+    }
+  }
+  guard gitmodules_entry is Some(entry) else {
+    fail("expected .gitmodules entry in index after move")
+  }
+  let db = ObjectDb::load_lazy(fs, "/repo/.git")
+  let gitmodules_obj = db.get(fs, entry.id).unwrap()
+  assert_eq(
+    @utf8.decode_lossy(gitmodules_obj.data),
+    "[submodule \"a\"]\n\tpath = b\n\turl = ../submodule\n",
+  )
 }

@@ -86,17 +86,15 @@ fn resolve_commit_editor() -> String? {
 
 ///|
 async fn run_editor_on_path(editor_cmd : String, path : String) -> Int {
-  let parts = split_alias_command(editor_cmd)
-  if parts.length() == 0 {
+  let command = editor_cmd.trim().to_string()
+  if command.length() == 0 {
     return 1
   }
-  let bin = parts[0]
-  let args : Array[String] = []
-  for i = 1; i < parts.length(); i = i + 1 {
-    args.push(parts[i])
-  }
-  args.push(path)
-  @process.run(bin, args, inherit_env=true)
+  @process.run(
+    "/bin/sh",
+    ["-c", command + " \"$1\"", "sh", path],
+    inherit_env=true,
+  )
 }
 
 ///|

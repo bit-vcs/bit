@@ -103,6 +103,31 @@ fn restore_identity_for_storage_runtime_wbtest(
 }
 
 ///|
+fn setup_commit_date_for_storage_runtime_wbtest(
+  author_date : String,
+  committer_date : String,
+) -> (String?, String?) {
+  let prev_author_date = @sys.get_env_var("GIT_AUTHOR_DATE")
+  let prev_committer_date = @sys.get_env_var("GIT_COMMITTER_DATE")
+  @sys.set_env_var("GIT_AUTHOR_DATE", author_date)
+  @sys.set_env_var("GIT_COMMITTER_DATE", committer_date)
+  (prev_author_date, prev_committer_date)
+}
+
+///|
+fn restore_commit_date_for_storage_runtime_wbtest(
+  prev_author_date : String?,
+  prev_committer_date : String?,
+) -> Unit {
+  restore_env_var_for_storage_runtime_wbtest(
+    "GIT_AUTHOR_DATE", prev_author_date,
+  )
+  restore_env_var_for_storage_runtime_wbtest(
+    "GIT_COMMITTER_DATE", prev_committer_date,
+  )
+}
+
+///|
 fn storage_runtime_wbtest_init_command(quiet? : Bool = true) -> StorageCommand {
   StorageCommand::Init({
     quiet,
@@ -229,6 +254,69 @@ test "storage runtime: init/add/commit/status/log on TestFs" {
   ) catch {
     err => fail("log failed: \{err}")
   }
+  restore_identity_for_storage_runtime_wbtest(
+    prev_author_name, prev_author_email, prev_committer_name, prev_committer_email,
+  )
+  restore_env_var_for_storage_runtime_wbtest(
+    "BIT_STORAGE_RUNTIME_QUIET", prev_quiet,
+  )
+}
+
+///|
+test "storage runtime: commit keeps committer timezone in object and reflog" {
+  let fs = @bit.TestFs::new()
+  let root = "/repo-storage-runtime-commit-timezone"
+  let prev_quiet = setup_storage_runtime_quiet_for_wbtest()
+  let (
+    prev_author_name,
+    prev_author_email,
+    prev_committer_name,
+    prev_committer_email,
+  ) = setup_identity_for_storage_runtime_wbtest()
+  let (prev_author_date, prev_committer_date) = setup_commit_date_for_storage_runtime_wbtest(
+    "1112911993 -0700", "1112911993 -0700",
+  )
+  run_storage_command(fs, fs, root, storage_runtime_wbtest_init_command()) catch {
+    err => fail("init failed: \{err}")
+  }
+  fs.write_string(root + "/a.txt", "hello\n")
+  run_storage_command(
+    fs,
+    fs,
+    root,
+    storage_runtime_wbtest_add_command(["a.txt"]),
+  ) catch {
+    err => fail("add failed: \{err}")
+  }
+  run_storage_command(
+    fs,
+    fs,
+    root,
+    storage_runtime_wbtest_commit_command("first commit"),
+  ) catch {
+    err => fail("commit failed: \{err}")
+  }
+  let git_dir = root + "/.git"
+  let head = @bitlib.resolve_head_commit(fs, git_dir).unwrap()
+  let db = @bitlib.ObjectDb::load_lazy(fs, git_dir)
+  let commit_obj = db.get(fs, head).unwrap()
+  let commit_text = @utf8.decode_lossy(commit_obj.data[:]).to_string()
+  let reflog_entries = @bitlib.read_reflog(fs, git_dir, "HEAD")
+  assert_true(
+    commit_text.contains(
+      "author Storage Test <storage@example.com> 1112911993 -0700",
+    ),
+  )
+  assert_true(
+    commit_text.contains(
+      "committer Storage Test <storage@example.com> 1112911993 -0700",
+    ),
+  )
+  assert_eq(reflog_entries.length(), 1)
+  assert_eq(reflog_entries[0].timezone, "-0700")
+  restore_commit_date_for_storage_runtime_wbtest(
+    prev_author_date, prev_committer_date,
+  )
   restore_identity_for_storage_runtime_wbtest(
     prev_author_name, prev_author_email, prev_committer_name, prev_committer_email,
   )

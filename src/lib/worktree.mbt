@@ -382,6 +382,7 @@ pub fn commit(
   committer? : String = author,
   committer_timestamp? : Int64 = author_timestamp,
   allow_empty? : Bool = false,
+  timezone? : String = "+0000",
 ) -> @bit.ObjectId raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   let actual_git_dir = if rfs.is_file(git_dir) {
@@ -432,12 +433,27 @@ pub fn commit(
     None => []
   }
   let commit = @bit.Commit::new(
-    tree_id, parents, author, author_timestamp, "+0000", committer, committer_timestamp,
-    "+0000", message,
+    tree_id, parents, author, author_timestamp, timezone, committer, committer_timestamp,
+    timezone, message,
   )
   let (commit_id, compressed) = @bit.create_commit(commit)
   write_object_bytes(fs, actual_git_dir, commit_id, compressed)
   update_head_ref(fs, rfs, actual_git_dir, commit_id)
+  append_head_update_reflogs(
+    fs,
+    rfs,
+    actual_git_dir,
+    parent.unwrap_or(@bit.ObjectId::zero()),
+    commit_id,
+    if parent is None {
+      "commit (initial): " + worktree_commit_subject(message)
+    } else {
+      "commit: " + worktree_commit_subject(message)
+    },
+    committer~,
+    timestamp=committer_timestamp,
+    timezone~,
+  )
   commit_id
 }
 
@@ -1063,6 +1079,41 @@ pub fn update_head_ref(
 }
 
 ///|
+fn append_head_update_reflogs(
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+  old_id : @bit.ObjectId,
+  new_id : @bit.ObjectId,
+  message : String,
+  committer? : String = "unknown <unknown>",
+  timestamp? : Int64 = 0L,
+  timezone? : String = reflog_env_timezone(),
+) -> Unit raise @bit.GitError {
+  let (author, email) = reflog_parse_identity(committer)
+  let (should_log_head, _) = should_log_ref(rfs, git_dir, "HEAD", false)
+  if should_log_head {
+    append_reflog(
+      fs, rfs, git_dir, "HEAD", old_id, new_id, author, email, timestamp, timezone,
+      message,
+    )
+  }
+  match read_head_ref(rfs, git_dir) {
+    Branch(name) => {
+      let refname = "refs/heads/" + name
+      let (should_log_branch, _) = should_log_ref(rfs, git_dir, refname, false)
+      if should_log_branch {
+        append_reflog(
+          fs, rfs, git_dir, refname, old_id, new_id, author, email, timestamp, timezone,
+          message,
+        )
+      }
+    }
+    Detached(_) => ()
+  }
+}
+
+///|
 fn update_head_ref_reftable(
   fs : &@bit.FileSystem,
   rfs : &@bit.RepoFileSystem,
@@ -1201,16 +1252,18 @@ fn write_tree_from_entries(
     if worktree_is_zero_object_id(e.id) {
       continue
     }
-    match object_db {
-      Some(db) =>
-        match db.get(rfs, e.id) {
-          None =>
-            raise @bit.GitError::InvalidObject(
-              "Object not found: " + e.id.to_hex(),
-            )
-          Some(_) => ()
-        }
-      None => ()
+    if not(is_gitlink_mode_int(e.mode)) {
+      match object_db {
+        Some(db) =>
+          match db.get(rfs, e.id) {
+            None =>
+              raise @bit.GitError::InvalidObject(
+                "Object not found: " + e.id.to_hex(),
+              )
+            Some(_) => ()
+          }
+        None => ()
+      }
     }
     match split_first(e.path) {
       (name, None) => {
@@ -1512,6 +1565,7 @@ pub fn commit_amend(
   author_timestamp : Int64,
   committer? : String = author,
   committer_timestamp? : Int64 = author_timestamp,
+  timezone? : String = "+0000",
 ) -> @bit.ObjectId raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   let actual_git_dir = if rfs.is_file(git_dir) {
@@ -1542,13 +1596,56 @@ pub fn commit_amend(
     None => []
   }
   let commit = @bit.Commit::new(
-    tree_id, parents, author, author_timestamp, "+0000", committer, committer_timestamp,
-    "+0000", message,
+    tree_id, parents, author, author_timestamp, timezone, committer, committer_timestamp,
+    timezone, message,
   )
   let (commit_id, compressed) = @bit.create_commit(commit)
   write_object_bytes(fs, actual_git_dir, commit_id, compressed)
   update_head_ref(fs, rfs, actual_git_dir, commit_id)
+  append_head_update_reflogs(
+    fs,
+    rfs,
+    actual_git_dir,
+    current_head.unwrap_or(@bit.ObjectId::zero()),
+    commit_id,
+    "commit (amend): " + worktree_commit_subject(message),
+    committer~,
+    timestamp=committer_timestamp,
+    timezone~,
+  )
   commit_id
+}
+
+///|
+fn worktree_commit_subject(message : String) -> String {
+  match message.find("\n") {
+    Some(idx) => String::unsafe_substring(message, start=0, end=idx)
+    None => message
+  }
+}
+
+///|
+fn reflog_parse_identity(identity : String) -> (String, String) {
+  let trimmed = identity.trim().to_string()
+  match trimmed.find("<") {
+    Some(start) =>
+      match trimmed.find(">") {
+        Some(end) if end > start => {
+          let name = String::unsafe_substring(trimmed, start=0, end=start)
+            .trim()
+            .to_string()
+          let email = String::unsafe_substring(trimmed, start=start + 1, end~)
+          (if name.length() == 0 { "unknown" } else { name }, email)
+        }
+        _ => (trimmed, "unknown")
+      }
+    None => (trimmed, "unknown")
+  }
+}
+
+///|
+fn reflog_env_timezone() -> String {
+  "+0000"
 }
 
 ///|
@@ -1569,6 +1666,7 @@ pub fn rm_paths(
     git_dir
   }
   let entries = read_index_entries(rfs, actual_git_dir)
+  let skip_worktree_paths = read_skip_worktree_paths(rfs, actual_git_dir)
   let map : Map[String, IndexEntry] = {}
   for e in entries {
     map[e.path] = e
@@ -1579,9 +1677,16 @@ pub fn rm_paths(
   } else {
     paths
   }
+  let removed_submodule_paths : Array[String] = []
   ignore(force)
   for path in all_paths {
     let norm_path = normalize_rel_path(path)
+    let tracked_entry = map.get(norm_path)
+    match map.get(norm_path) {
+      Some(entry) if is_gitlink_mode_int(entry.mode) =>
+        removed_submodule_paths.push(norm_path)
+      _ => ()
+    }
     // Remove from index
     map.remove(norm_path)
     // Remove from working tree unless --cached
@@ -1589,15 +1694,145 @@ pub fn rm_paths(
       let abs = join_path(root, norm_path)
       if rfs.is_file(abs) {
         fs.remove_file(abs)
+        rm_prune_empty_parent_dirs(fs, rfs, root, norm_path)
+      } else if tracked_entry is Some(entry) &&
+        is_gitlink_mode_int(entry.mode) &&
+        rfs.is_dir(abs) {
+        remove_worktree_path_recursive(fs, rfs, abs)
+        rm_prune_empty_parent_dirs(fs, rfs, root, norm_path)
       }
     }
   }
   let out : Array[IndexEntry] = []
+  let remaining_skip_worktree_paths : Map[String, Bool] = {}
   for item in map.to_array() {
-    let (_, entry) = item
+    let (path, entry) = item
     out.push(entry)
+    if skip_worktree_paths.contains(path) {
+      remaining_skip_worktree_paths[path] = true
+    }
   }
-  write_index_entries(fs, actual_git_dir, out)
+  let remaining_skip_paths : Array[String] = []
+  for item in remaining_skip_worktree_paths.to_array() {
+    let (path, _) = item
+    remaining_skip_paths.push(path)
+  }
+  write_skip_worktree_paths(fs, actual_git_dir, remaining_skip_paths)
+  write_index_entries_with_skip_worktree(
+    fs, actual_git_dir, out, remaining_skip_worktree_paths,
+  )
+  if not(cached) {
+    rm_update_gitmodules_after_submodule_removal(
+      fs, rfs, root, removed_submodule_paths,
+    )
+  }
+}
+
+///|
+fn rm_update_gitmodules_after_submodule_removal(
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  root : String,
+  removed_submodule_paths : Array[String],
+) -> Unit raise @bit.GitError {
+  if removed_submodule_paths.length() == 0 {
+    return
+  }
+  let gitmodules_path = join_path(root, ".gitmodules")
+  if not(rfs.is_file(gitmodules_path)) {
+    return
+  }
+  let removed_paths : Map[String, Bool] = {}
+  for path in removed_submodule_paths {
+    removed_paths[path] = true
+  }
+  let content = decode_bytes_lossy(rfs.read_file(gitmodules_path))
+  let updated = rm_remove_gitmodules_sections_by_path(content, removed_paths)
+  if updated == content {
+    return
+  }
+  fs.write_string(gitmodules_path, updated)
+  add_paths(fs, rfs, root, [".gitmodules"])
+}
+
+///|
+fn rm_remove_gitmodules_sections_by_path(
+  content : String,
+  removed_paths : Map[String, Bool],
+) -> String {
+  let out : Array[String] = []
+  let mut section_lines : Array[String] = []
+  let mut in_submodule = false
+  let mut current_path : String? = None
+  let mut have_section = false
+  let flush_section = fn() {
+    if not(have_section) {
+      return
+    }
+    if in_submodule &&
+      current_path is Some(path) &&
+      removed_paths.contains(path) {
+      return
+    }
+    for line in section_lines {
+      out.push(line)
+    }
+  }
+  for line_view in content.split("\n") {
+    let line = line_view.to_string()
+    let trimmed = line.trim(chars=" \t").to_string()
+    if trimmed.has_prefix("[") && trimmed.has_suffix("]") {
+      flush_section()
+      section_lines = [line]
+      have_section = true
+      in_submodule = trimmed.has_prefix("[submodule \"") &&
+        trimmed.has_suffix("\"]")
+      current_path = None
+      continue
+    }
+    if not(have_section) {
+      out.push(line)
+      continue
+    }
+    section_lines.push(line)
+    if in_submodule && trimmed.has_prefix("path = ") {
+      current_path = Some(
+        String::unsafe_substring(trimmed, start=7, end=trimmed.length()),
+      )
+    }
+  }
+  flush_section()
+  out.join("\n")
+}
+
+///|
+fn rm_prune_empty_parent_dirs(
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  root : String,
+  path : String,
+) -> Unit {
+  let mut current = match path.rev_find("/") {
+    Some(idx) => String::unsafe_substring(path, start=0, end=idx)
+    None => return
+  }
+  while current.length() > 0 {
+    let abs = join_path(root, current)
+    if not(rfs.is_dir(abs)) {
+      return
+    }
+    let entries = rfs.readdir(abs) catch { _ => return }
+    if entries.length() > 0 {
+      return
+    }
+    fs.remove_dir(abs) catch {
+      _ => return
+    }
+    current = match current.rev_find("/") {
+      Some(idx) => String::unsafe_substring(current, start=0, end=idx)
+      None => return
+    }
+  }
 }
 
 ///|
@@ -1659,11 +1894,11 @@ pub fn mv_path(
   let src_abs = join_path(root, src_norm)
   let dst_abs = join_path(root, dst_norm)
   // Check source exists
-  if not(rfs.is_file(src_abs)) {
+  if not(rfs.is_file(src_abs)) && not(rfs.is_dir(src_abs)) {
     raise @bit.GitError::InvalidObject("source '\{source}' does not exist")
   }
   // Check dest doesn't exist (unless force)
-  if rfs.is_file(dst_abs) && not(force) {
+  if (rfs.is_file(dst_abs) || rfs.is_dir(dst_abs)) && not(force) {
     raise @bit.GitError::InvalidObject("destination '\{dest}' already exists")
   }
   // Read index
@@ -1692,9 +1927,25 @@ pub fn mv_path(
     gid: src_entry.gid,
   }
   // Move file on disk
-  let content = rfs.read_file(src_abs)
-  fs.write_file(dst_abs, content)
-  fs.remove_file(src_abs)
+  if rfs.is_dir(src_abs) {
+    mv_copy_directory_recursive(fs, rfs, src_abs, dst_abs)
+    let src_gitfile = join_path(src_abs, ".git")
+    let dst_gitfile = join_path(dst_abs, ".git")
+    if rfs.is_file(src_gitfile) && rfs.is_file(dst_gitfile) {
+      mv_rewrite_gitfile_after_directory_move(
+        fs, rfs, src_abs, dst_abs, dst_gitfile,
+      )
+    }
+    remove_worktree_path_recursive(fs, rfs, src_abs)
+  } else {
+    let content = rfs.read_file(src_abs)
+    let dst_dir = parent_dir(dst_abs)
+    if dst_dir.length() > 0 {
+      fs.mkdir_p(dst_dir)
+    }
+    fs.write_file(dst_abs, content)
+    fs.remove_file(src_abs)
+  }
   // Write index
   let out : Array[IndexEntry] = []
   for item in map.to_array() {
@@ -1702,6 +1953,109 @@ pub fn mv_path(
     out.push(entry)
   }
   write_index_entries(fs, actual_git_dir, out)
+  if is_gitlink_mode_int(src_entry.mode) {
+    mv_update_submodule_paths_after_move(
+      fs, rfs, root, actual_git_dir, src_norm, dst_norm,
+    )
+  }
+}
+
+///|
+fn mv_update_submodule_paths_after_move(
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  root : String,
+  git_dir : String,
+  src_path : String,
+  dst_path : String,
+) -> Unit raise @bit.GitError {
+  let gitmodules_path = join_path(root, ".gitmodules")
+  if rfs.is_file(gitmodules_path) {
+    let content = decode_bytes_lossy(rfs.read_file(gitmodules_path))
+    let updated = mv_update_submodule_path_in_config(
+      content, src_path, dst_path,
+    )
+    if updated != content {
+      fs.write_string(gitmodules_path, updated)
+      add_paths(fs, rfs, root, [".gitmodules"])
+    }
+  }
+  let config_path = join_path(git_dir, "config")
+  if rfs.is_file(config_path) {
+    let content = decode_bytes_lossy(rfs.read_file(config_path))
+    let updated = mv_update_submodule_path_in_config(
+      content, src_path, dst_path,
+    )
+    if updated != content {
+      fs.write_string(config_path, updated)
+    }
+  }
+}
+
+///|
+fn mv_update_submodule_path_in_config(
+  content : String,
+  src_path : String,
+  dst_path : String,
+) -> String {
+  let out : Array[String] = []
+  let mut in_submodule = false
+  for line_view in content.split("\n") {
+    let line = line_view.to_string()
+    let trimmed = line.trim()
+    if trimmed.has_prefix("[") && trimmed.has_suffix("]") {
+      in_submodule = trimmed.has_prefix("[submodule \"")
+      out.push(line)
+      continue
+    }
+    if in_submodule && trimmed == "path = " + src_path {
+      out.push("\tpath = " + dst_path)
+    } else {
+      out.push(line)
+    }
+  }
+  out.join("\n")
+}
+
+///|
+fn mv_copy_directory_recursive(
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  src : String,
+  dst : String,
+) -> Unit raise @bit.GitError {
+  fs.mkdir_p(dst)
+  for entry in rfs.readdir(src) {
+    let src_child = join_path(src, entry)
+    let dst_child = join_path(dst, entry)
+    if rfs.is_dir(src_child) {
+      mv_copy_directory_recursive(fs, rfs, src_child, dst_child)
+    } else if rfs.is_file(src_child) {
+      fs.write_file(dst_child, rfs.read_file(src_child))
+    }
+  }
+}
+
+///|
+fn mv_rewrite_gitfile_after_directory_move(
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  src_abs : String,
+  dst_abs : String,
+  dst_gitfile : String,
+) -> Unit raise @bit.GitError {
+  let content = trim_worktree_text(decode_bytes(rfs.read_file(dst_gitfile)))
+  if not(content.has_prefix("gitdir: ")) {
+    return ()
+  }
+  let rel_gitdir = String::unsafe_substring(
+    content,
+    start=8,
+    end=content.length(),
+  )
+  let modules_dir = normalize_path(src_abs + "/" + rel_gitdir)
+  let rewritten = tree_ops_get_rel_path(dst_abs, modules_dir)
+  fs.write_string(dst_gitfile, "gitdir: \{rewritten}\n")
 }
 
 ///|

@@ -631,10 +631,22 @@ async fn run_main_for_args(args : Array[String]) -> Unit {
   // Set working directory if -C was used
   match opts.cwd {
     Some(dir) => {
+      let caller_pwd = match @sys.get_env_var("GIT_SHIM_PWD") {
+        Some(value) => Some(value)
+        None =>
+          match @sys.get_env_var("GIT_SHIM_CWD") {
+            Some(value) => Some(value)
+            None => @sys.get_env_var("PWD")
+          }
+      }
+      match caller_pwd {
+        Some(value) => @sys.set_env_var("GIT_SHIM_CALLER_PWD", value)
+        None => @sys.unset_env_var("GIT_SHIM_CALLER_PWD")
+      }
       @sys.set_env_var("GIT_SHIM_CWD", dir)
       @sys.set_env_var("GIT_SHIM_PWD", dir)
     }
-    None => ()
+    None => @sys.unset_env_var("GIT_SHIM_CALLER_PWD")
   }
   let aliases = load_global_aliases(fs)
   apply_alias_overrides(aliases, opts.config_overrides)
@@ -783,6 +795,30 @@ fn has_global_config_injection(args : Array[String]) -> Bool {
 }
 
 ///|
+fn can_handle_global_config_in_shim(opts : GlobalOptions) -> Bool {
+  match opts.subcmd {
+    Some(cmd) => {
+      let supported = match cmd {
+        "log" | "whatchanged" =>
+          ["core.abbrev", "log.abbrevcommit", "grep.patterntype"]
+        _ => []
+      }
+      if supported.length() == 0 || opts.config_overrides.length() == 0 {
+        return false
+      }
+      for entry in opts.config_overrides {
+        let key = entry.0.to_lower()
+        if not(supported.iter().any(value => value == key)) {
+          return false
+        }
+      }
+      true
+    }
+    None => false
+  }
+}
+
+///|
 fn should_delegate_to_real_git(
   args : Array[String],
   opts : GlobalOptions,
@@ -805,10 +841,19 @@ fn should_delegate_to_real_git(
     has_env_parameters ||
     has_env_pairs ||
     has_env_pairs_without_count
+  let shim_handles_config = has_global_config &&
+    not(has_env_parameters) &&
+    not(has_env_pairs) &&
+    not(has_env_pairs_without_count) &&
+    can_handle_global_config_in_shim(opts)
   match opts.subcmd {
     Some(cmd) =>
-      if cmd == "config" || cmd == "worktree" || cmd == "status" {
+      if cmd == "config" || cmd == "status" {
         true
+      } else if cmd == "worktree" {
+        false
+      } else if shim_handles_config {
+        false
       } else {
         has_config_env
       }
@@ -1048,6 +1093,7 @@ async fn dispatch_known_command(
     "add" => handle_add(rest)
     "commit" => handle_commit(rest)
     "log" => handle_log(rest)
+    "whatchanged" => handle_whatchanged(rest)
     "show" => handle_show(rest)
     "tree" => handle_tree(rest)
     "cat" => handle_cat(rest)
@@ -1097,7 +1143,7 @@ async fn dispatch_known_command(
     "gc" => handle_gc(rest)
     "clean" => handle_clean(rest)
     "grep" => handle_grep(rest)
-    "submodule" => handle_submodule(rest)
+    "submodule" | "submodule--helper" => handle_submodule(rest)
     "revert" => handle_revert(rest)
     "notes" => handle_notes(rest)
     "bisect" => handle_bisect(rest)

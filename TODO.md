@@ -18,18 +18,12 @@ CI 失敗: **101/906** (2026-03-09, commit b3f62de)
 | t1091-sparse-checkout-builtin.sh | 1/74 | sparse-checkout |
 | t1601-index-bogus.sh | 1/4 | bogus index |
 | t1700-split-index.sh | 1/29 | split index |
-| t2017-checkout-orphan.sh | 1/13 | orphan checkout |
-| t2023-checkout-m.sh | 1/5 | checkout -m merge |
-| t2082-parallel-checkout-attributes.sh | 1/5 | parallel checkout |
-| t2203-add-intent.sh | 1/19 | add --intent-to-add |
-| t3200-branch.sh | 1/167 | branch 操作 |
 | t3404-rebase-interactive.sh | 1/132 | rebase -i |
 | t3408-rebase-multi-line.sh | 1/2 | rebase multi-line |
 | t4010-diff-pathspec.sh | 1/17 | diff pathspec |
 | t5318-commit-graph.sh | 1/109 | commit-graph |
 | t5404-tracking-branches.sh | 1/7 | tracking branches |
 | t5537-fetch-shallow.sh | 1/16 | fetch shallow |
-| t5616-partial-clone.sh | 1/47 | partial clone |
 | t6006-rev-list-format.sh | 1/80 | `%-b` format modifier |
 | t6020-bundle-misc.sh | 1/37 | bundle |
 | t6060-merge-index.sh | 1/7 | merge-index |
@@ -38,7 +32,6 @@ CI 失敗: **101/906** (2026-03-09, commit b3f62de)
 | t6426-merge-skip-unneeded-updates.sh | 1/13 | merge skip updates |
 | t6700-tree-depth.sh | 1/10 | tree depth |
 | t7003-filter-branch.sh | 1/48 | filter-branch |
-| t7102-reset.sh | 1/38 | reset |
 | t8008-blame-formats.sh | 1/5 | blame format |
 | t9305-fast-import-signatures.sh | 1/15 | fast-import signatures |
 | t9903-bash-prompt.sh | 1/67 | bash prompt |
@@ -50,7 +43,6 @@ CI 失敗: **101/906** (2026-03-09, commit b3f62de)
 | t0033-safe-directory.sh | 3/22 | safe.directory 設定 |
 | t0041-usage.sh | 3/16 | usage メッセージ |
 | t0601-reffiles-pack-refs.sh | 3/47 | pack-refs |
-| t1400-update-ref.sh | 4/313 | date-based reflog, per-worktree refs |
 | t1463-refs-optimize.sh | 3/47 | refs optimize |
 | t1500-rev-parse.sh | 4/81 | `--path-format`, `--show-ref-format` |
 | t1504-ceiling-dirs.sh | 2/44 | ceiling dirs |
@@ -72,7 +64,6 @@ CI 失敗: **101/906** (2026-03-09, commit b3f62de)
 | t6030-bisect-porcelain.sh | 4/96 | bisect porcelain |
 | t6601-path-walk.sh | 2/15 | path-walk |
 | t7424-submodule-mixed-ref-formats.sh | 2/7 | submodule ref formats |
-| t7500-commit-template-squash-signoff.sh | 2/57 | commit template/signoff |
 | t9350-fast-export.sh | 2/73 | fast-export |
 | t9502-gitweb-standalone-parse-output.sh | 2/20 | gitweb parse |
 
@@ -83,7 +74,6 @@ CI 失敗: **101/906** (2026-03-09, commit b3f62de)
 | t0001-init.sh | 6/101 | init |
 | t0021-conversion.sh | 7/42 | filter=clean/smudge |
 | t0028-working-tree-encoding.sh | 4/22 | working-tree-encoding |
-| t0410-partial-clone.sh | 7/38 | partial clone |
 | t1415-worktree-refs.sh | 5/10 | worktree refs |
 | t1450-fsck.sh | 8/95 | fsck validation |
 | t5505-remote.sh | 1/129 | remote |
@@ -120,7 +110,6 @@ CI 失敗: **101/906** (2026-03-09, commit b3f62de)
 | t6423-merge-rename-directories.sh | 17/80 | directory rename |
 | t6424-merge-unrelated-index-changes.sh | 11/19 | index preservation |
 | t7002-mv-sparse-checkout.sh | 14/22 | mv sparse checkout |
-| t7064-wtstatus-pv2.sh | 16/28 | status --porcelain=v2 |
 | t7400-submodule-basic.sh | 8/124 | submodule basic |
 
 ### 横断カテゴリ別サマリ
@@ -183,31 +172,52 @@ CI 失敗: **101/906** (2026-03-09, commit b3f62de)
 ## P3.5: realgit 委譲の削減
 
 方針: CI SHIM_STRICT=1 で bit に通すコマンドを段階的に増やす。
-CI SHIM_CMDS: 17 コマンド (init add ls-files tag config show-ref for-each-ref rev-parse cat-file hash-object ls-tree write-tree commit-tree receive-pack upload-pack pack-objects index-pack shell)
+CI SHIM_CMDS: 51 コマンド (init add diff diff-files diff-index ls-files tag branch checkout switch commit log show reflog reset update-ref status merge rebase clone push fetch pull mv notes stash rm submodule worktree config show-ref for-each-ref rev-parse symbolic-ref cherry-pick remote cat-file hash-object ls-tree write-tree commit-tree receive-pack upload-pack pack-objects index-pack format-patch describe gc clean sparse-checkout blame shell)
 
 ### Tier 1: 超高頻度（1000+ 呼出）
-- [ ] `checkout` (3765)
-- [ ] `commit` (3596)
+- [x] `checkout` (3765)
+- [x] `commit` (3596)
 - [x] `add` (3268)
-- [ ] `reset` (1923)
-- [ ] `branch` (1749)
+- [x] `reset` (1923)
+- [x] `branch` (1749)
 - [x] `init` (1667)
 - [x] `tag` (1199)
-- [ ] `diff` (1196)
-- [ ] `log` (1173)
+- [x] `diff` (1196)
+- [x] `log` (1173)
 - [x] `ls-files` (1162)
 
 ### Tier 2: 高頻度（400–999 呼出）
-- [ ] `rebase` (991), `clone` (953), `merge` (889), `update-ref` (824)
-- [ ] `status` (608), `submodule` (603), `notes` (600), `push` (534)
-- [ ] `mv` (488), `stash` (472), `rm` (470), `fetch` (461)
-- [ ] `worktree` (421), `bisect` (420)
+- [x] `rebase` (991)
+- [x] `clone` (953)
+- [x] `merge` (889)
+- [x] `update-ref` (824)
+- [x] `status` (608)
+- [x] `push` (534)
+- [x] `notes` (600)
+- [x] `submodule` (603)
+- [x] `fetch` (461)
+- [x] `mv` (488)
+- [x] `stash` (472)
+- [x] `rm` (470)
+- [x] `worktree` (421)
+- [ ] `bisect` (420)
 
 ### Tier 3-4: 中低頻度
-- [ ] `show` (362), `symbolic-ref` (335), `cherry-pick` (324), `grep` (312)
-- [ ] `format-patch` (300), `remote` (298), `reflog` (296), `switch` (251)
-- [ ] `pull` (250), `clean` (232), `diff-index` (219), `diff-files` (170)
-- [ ] `sparse-checkout` (113), `blame` (110), `gc` (81), `describe` (53)
+- [x] `show` (362)
+- [x] `symbolic-ref` (335)
+- [x] `cherry-pick` (324)
+- [x] `switch` (251)
+- [x] `remote` (298)
+- [ ] `grep` (312)
+- [x] `format-patch` (300)
+- [x] `reflog` (296)
+- [x] `diff-index` (219), `diff-files` (170)
+- [x] `pull` (250)
+- [x] `clean` (232)
+- [x] `sparse-checkout` (113)
+- [x] `blame` (110)
+- [x] `gc` (81)
+- [x] `describe` (53)
 
 ### 未実装コマンド（新規実装候補）
 - [ ] `update-index` (720), `rev-list` (521), `apply` (398), `repack` (302)

@@ -187,6 +187,14 @@ fn cleanup_clone_wbtest_tree(fs : OsFs, path : String) -> Unit {
 }
 
 ///|
+fn restore_clone_env(name : String, value : String?) -> Unit {
+  match value {
+    Some(v) => @sys.set_env_var(name, v)
+    None => @sys.unset_env_var(name)
+  }
+}
+
+///|
 test "clone: configure_reftable_ref_storage writes reftable metadata" {
   let fs = OsFs::new()
   let root = "/tmp/bit-clone-reftable-" + get_current_timestamp().to_string()
@@ -201,6 +209,61 @@ test "clone: configure_reftable_ref_storage writes reftable metadata" {
   let config = decode_bytes(fs.read_file(root + "/config"))
   assert_true(config.contains("[extensions]"))
   assert_true(config.contains("refStorage = reftable"))
+  cleanup_clone_wbtest_tree(fs, root)
+}
+
+///|
+test "clone: command root prefers shim pwd when cwd is absent" {
+  let prev_cwd = @sys.get_env_var("GIT_SHIM_CWD")
+  let prev_pwd = @sys.get_env_var("GIT_SHIM_PWD")
+  @sys.unset_env_var("GIT_SHIM_CWD")
+  @sys.set_env_var("GIT_SHIM_PWD", "/tmp/bit-clone-command-root")
+  let resolved = clone_command_root("/tmp/bit-clone-fallback")
+  restore_clone_env("GIT_SHIM_CWD", prev_cwd)
+  restore_clone_env("GIT_SHIM_PWD", prev_pwd)
+  assert_eq(resolved, "/tmp/bit-clone-command-root")
+}
+
+///|
+test "clone: recurse-submodules option keeps exact filter value" {
+  assert_eq(
+    clone_parse_recurse_submodules_filter("--recurse-submodules=sub0"),
+    "sub0",
+  )
+  assert_eq(
+    clone_parse_recurse_submodules_filter("--recurse-submodules=:(exclude)sub0"),
+    ":(exclude)sub0",
+  )
+}
+
+///|
+test "clone: recurse submodule filters are forwarded to update args" {
+  assert_eq(
+    clone_build_recurse_submodules_args([".", ":(exclude)sub0"], false),
+    ["update", "--init", "--recursive", ".", ":(exclude)sub0"],
+  )
+  assert_eq(clone_build_recurse_submodules_args(["sub0"], true), [
+    "update", "--init", "--recursive", "-q", "sub0",
+  ])
+}
+
+///|
+test "clone: recurse submodule filters are written as config multivar" {
+  let fs = OsFs::new()
+  let root = "/tmp/bit-clone-submodule-active-" +
+    get_current_timestamp().to_string()
+  cleanup_clone_wbtest_tree(fs, root)
+  fs.mkdir_p(root)
+  fs.write_string(root + "/config", "[core]\n\trepositoryformatversion = 0\n")
+  clone_configure_submodule_active_filters(fs, root, [".", ":(exclude)sub0"])
+  let values = get_all_config_values(
+    fs,
+    root + "/config",
+    "submodule.active",
+    (None : String?),
+    false,
+  )
+  assert_eq(values, [".", ":(exclude)sub0"])
   cleanup_clone_wbtest_tree(fs, root)
 }
 
@@ -257,5 +320,76 @@ async test "clone: run_postclone_hook skips execution when skip-hooks is enabled
     err => fail("unexpected error: \{err}")
   }
   assert_false(fs.is_file(root + "/postclone-marker"))
+  cleanup_clone_wbtest_tree(fs, root)
+}
+
+///|
+test "clone transport tracking: writes origin head and branch config for checked out branch" {
+  let fs = OsFs::new()
+  let root = "/tmp/bit-clone-transport-tracking-" +
+    get_current_timestamp().to_string()
+  let git_dir = root + "/.git"
+  let head_id = @bitcore.ObjectId::from_hex(
+    "1111111111111111111111111111111111111111",
+  )
+  cleanup_clone_wbtest_tree(fs, root)
+  fs.mkdir_p(git_dir + "/refs/heads")
+  fs.write_string(git_dir + "/HEAD", "ref: refs/heads/main\n")
+  fs.write_string(git_dir + "/refs/heads/main", head_id.to_hex() + "\n")
+  let config_text =
+    #|[core]
+    #|	repositoryformatversion = 0
+    #|[remote "origin"]
+    #|	url = /src
+    #|	fetch = +refs/heads/*:refs/remotes/origin/*
+    #|
+  fs.write_string(git_dir + "/config", config_text)
+  finalize_transport_clone_tracking(fs, git_dir, "origin", false) catch {
+    err => fail("unexpected error: \{err}")
+  }
+  assert_eq(
+    @bitlib.resolve_ref(fs, git_dir, "refs/remotes/origin/main").map(fn(id) {
+      id.to_hex()
+    }),
+    Some(head_id.to_hex()),
+  )
+  let remote_head = decode_bytes(
+    fs.read_file(git_dir + "/refs/remotes/origin/HEAD"),
+  )
+  assert_eq(remote_head, "ref: refs/remotes/origin/main\n")
+  let config = decode_bytes(fs.read_file(git_dir + "/config"))
+  assert_true(config.contains("[branch \"main\"]"))
+  assert_true(config.contains("remote = origin"))
+  assert_true(config.contains("merge = refs/heads/main"))
+  cleanup_clone_wbtest_tree(fs, root)
+}
+
+///|
+test "clone empty transport: initializes empty repo metadata" {
+  let fs = OsFs::new()
+  let root = "/tmp/bit-clone-empty-transport-" +
+    get_current_timestamp().to_string()
+  let zero = @bitcore.ObjectId::zero()
+  let refs : Array[(@bitcore.ObjectId, String)] = [
+    (zero, "HEAD"),
+    (zero, "refs/heads/main"),
+  ]
+  cleanup_clone_wbtest_tree(fs, root)
+  let initialized = initialize_empty_transport_clone(
+    fs, root, "/remote/src.git", false, "origin", "files", refs,
+  ) catch {
+    err => fail("unexpected error: \{err}")
+  }
+  assert_true(initialized)
+  let git_dir = root + "/.git"
+  assert_eq(
+    decode_bytes(fs.read_file(git_dir + "/HEAD")),
+    "ref: refs/heads/main\n",
+  )
+  let config = decode_bytes(fs.read_file(git_dir + "/config"))
+  assert_true(config.contains("[remote \"origin\"]"))
+  assert_true(config.contains("url = /remote/src.git"))
+  assert_true(config.contains("[branch \"main\"]"))
+  assert_false(fs.is_file(git_dir + "/refs/heads/main"))
   cleanup_clone_wbtest_tree(fs, root)
 }

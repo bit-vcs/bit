@@ -21,6 +21,24 @@ fn add_abs_path(path : String) -> String {
 }
 
 ///|
+async fn delegate_add_to_real_git(args : Array[String], cwd : String) -> Unit {
+  let argv : Array[String] = ["add"]
+  for arg in args {
+    argv.push(arg)
+  }
+  let code = @process.run(
+    resolve_real_git_for_dispatch(),
+    argv,
+    inherit_env=true,
+    cwd=add_abs_path(cwd),
+    stdin=@stdio.stdin,
+    stdout=@stdio.stdout,
+    stderr=@stdio.stderr,
+  )
+  @sys.exit(code)
+}
+
+///|
 async fn run_add_hook(
   fs : OsFs,
   root : String,
@@ -78,11 +96,9 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
   let rfs : &@bitcore.RepoFileSystem = fs
   let git_dir = resolve_git_dir(rfs, root)
-  if add_repo_requires_standalone_error(rfs, git_dir) {
-    eprint_line(
-      "fatal: add with this repository object format is not supported in standalone mode",
-    )
-    @sys.exit(1)
+  if add_repo_requires_real_git(rfs, git_dir) {
+    delegate_add_to_real_git(args, root)
+    return
   }
   if add_should_use_storage_runtime(args) {
     match add_storage_runtime_delegate_args(args) {
@@ -355,7 +371,7 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
 }
 
 ///|
-fn add_repo_requires_standalone_error(
+fn add_repo_requires_real_git(
   fs : &@bitcore.RepoFileSystem,
   git_dir : String,
 ) -> Bool {
@@ -944,6 +960,7 @@ async fn expand_add_stage_paths(
   force : Bool,
 ) -> Array[String] raise Error {
   let out : Array[String] = []
+  let seen : Map[String, Bool] = {}
   let visible_paths = if force {
     []
   } else {
@@ -976,42 +993,48 @@ async fn expand_add_stage_paths(
       continue
     }
     if force {
-      expand_force_add_path(fs, root, path, out)
+      expand_force_add_path(fs, root, path, seen, out)
       continue
     }
     if path == "." {
       for p in visible_paths {
-        out.push(p)
+        add_push_unique_stage_path(seen, out, p)
       }
+      add_collect_embedded_repo_paths(fs, root, "", seen, out)
       continue
     }
     let abs = root + "/" + path
     if fs.is_dir(abs) {
+      if add_is_embedded_repo_dir(fs, root, path) {
+        add_push_unique_stage_path(seen, out, path)
+        continue
+      }
       let prefix = path + "/"
       for p in visible_paths {
         if p.has_prefix(prefix) {
-          out.push(p)
+          add_push_unique_stage_path(seen, out, p)
         }
       }
+      add_collect_embedded_repo_paths(fs, root, path, seen, out)
       continue
     }
     if visible_map.get(path) is Some(_) {
-      out.push(path)
+      add_push_unique_stage_path(seen, out, path)
       continue
     }
     match visible_folded.get(path.to_lower()) {
       Some(actual) => {
-        out.push(actual)
+        add_push_unique_stage_path(seen, out, actual)
         continue
       }
       None => ()
     }
     if tracked_map.contains(path) {
-      out.push(path)
+      add_push_unique_stage_path(seen, out, path)
       continue
     }
     match tracked_folded.get(path.to_lower()) {
-      Some(actual) => out.push(actual)
+      Some(actual) => add_push_unique_stage_path(seen, out, actual)
       None => ()
     }
   }
@@ -1019,10 +1042,81 @@ async fn expand_add_stage_paths(
 }
 
 ///|
+fn add_push_unique_stage_path(
+  seen : Map[String, Bool],
+  out : Array[String],
+  path : String,
+) -> Unit {
+  if path.length() == 0 || seen.contains(path) {
+    return
+  }
+  seen[path] = true
+  out.push(path)
+}
+
+///|
+fn add_is_embedded_repo_dir(
+  fs : &@bitcore.RepoFileSystem,
+  root : String,
+  rel : String,
+) -> Bool {
+  if rel.length() == 0 {
+    return false
+  }
+  let abs = root + "/" + rel
+  if not(fs.is_dir(abs)) {
+    return false
+  }
+  let dot_git = abs + "/.git"
+  let bit_dir = abs + "/.bit"
+  fs.is_file(dot_git) ||
+  fs.is_dir(dot_git) ||
+  fs.is_file(bit_dir) ||
+  fs.is_dir(bit_dir)
+}
+
+///|
+fn add_collect_embedded_repo_paths(
+  fs : &@bitcore.RepoFileSystem,
+  root : String,
+  rel : String,
+  seen : Map[String, Bool],
+  out : Array[String],
+) -> Unit raise Error {
+  let dir = if rel.length() == 0 { root } else { root + "/" + rel }
+  if not(fs.is_dir(dir)) {
+    return
+  }
+  for name in fs.readdir(dir) {
+    if name == "." ||
+      name == ".." ||
+      name == ".git" ||
+      name == ".bit" ||
+      name == ".jj" {
+      continue
+    }
+    let child_rel = if rel.length() == 0 { name } else { rel + "/" + name }
+    let child_abs = root + "/" + child_rel
+    if not(fs.is_dir(child_abs)) {
+      continue
+    }
+    if @ignore.is_ignored_path(fs, root, child_rel, true) {
+      continue
+    }
+    if add_is_embedded_repo_dir(fs, root, child_rel) {
+      add_push_unique_stage_path(seen, out, child_rel)
+    } else {
+      add_collect_embedded_repo_paths(fs, root, child_rel, seen, out)
+    }
+  }
+}
+
+///|
 fn expand_force_add_path(
   fs : &@bitcore.RepoFileSystem,
   root : String,
   path : String,
+  seen : Map[String, Bool],
   out : Array[String],
 ) -> Unit raise Error {
   if path == "." {
@@ -1031,9 +1125,13 @@ fn expand_force_add_path(
   }
   let abs = root + "/" + path
   if fs.is_dir(abs) {
+    if add_is_embedded_repo_dir(fs, root, path) {
+      add_push_unique_stage_path(seen, out, path)
+      return
+    }
     collect_all_addable_paths(fs, root, path, out)
   } else {
-    out.push(path)
+    add_push_unique_stage_path(seen, out, path)
   }
 }
 
@@ -1059,7 +1157,11 @@ fn collect_all_addable_paths(
     let child_rel = if rel.length() == 0 { name } else { rel + "/" + name }
     let child_abs = root + "/" + child_rel
     if fs.is_dir(child_abs) {
-      collect_all_addable_paths(fs, root, child_rel, out)
+      if add_is_embedded_repo_dir(fs, root, child_rel) {
+        out.push(child_rel)
+      } else {
+        collect_all_addable_paths(fs, root, child_rel, out)
+      }
     } else {
       out.push(child_rel)
     }

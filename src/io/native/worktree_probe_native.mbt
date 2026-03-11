@@ -24,7 +24,7 @@ pub fn init_worktree_probe() -> Unit {
 ///|
 fn native_lstat_meta(abs_path : String) -> @bitio.WorktreeEntryMeta? {
   let path_buf = native_string_to_cstring(abs_path)
-  let buf = Bytes::new(28)
+  let buf = Bytes::new(44)
   let ret = bit_lstat(path_buf, buf)
   if ret < 0 {
     return None
@@ -41,6 +41,10 @@ fn native_lstat_meta(abs_path : String) -> @bitio.WorktreeEntryMeta? {
     // Symlink
     let mtime_sec = native_read_i64_le(buf, 12)
     let mtime_nsec = native_read_i64_le(buf, 20)
+    let dev = native_read_u32_le(buf, 28)
+    let ino = native_read_u32_le(buf, 32)
+    let uid = native_read_u32_le(buf, 36)
+    let gid = native_read_u32_le(buf, 40)
     return Some(
       @bitio.WorktreeEntryMeta::new(
         @bitio.WorktreeKindMeta::symlink(),
@@ -48,6 +52,10 @@ fn native_lstat_meta(abs_path : String) -> @bitio.WorktreeEntryMeta? {
         None,
         Some(mtime_sec),
         Some(mtime_nsec),
+        dev=Some(dev),
+        ino=Some(ino),
+        uid=Some(uid),
+        gid=Some(gid),
       ),
     )
   }
@@ -61,6 +69,10 @@ fn native_lstat_meta(abs_path : String) -> @bitio.WorktreeEntryMeta? {
   let size = native_read_i64_le(buf, 4)
   let mtime_sec = native_read_i64_le(buf, 12)
   let mtime_nsec = native_read_i64_le(buf, 20)
+  let dev = native_read_u32_le(buf, 28)
+  let ino = native_read_u32_le(buf, 32)
+  let uid = native_read_u32_le(buf, 36)
+  let gid = native_read_u32_le(buf, 40)
   Some(
     @bitio.WorktreeEntryMeta::new(
       @bitio.WorktreeKindMeta::regular(),
@@ -68,8 +80,20 @@ fn native_lstat_meta(abs_path : String) -> @bitio.WorktreeEntryMeta? {
       Some(size),
       Some(mtime_sec),
       Some(mtime_nsec),
+      dev=Some(dev),
+      ino=Some(ino),
+      uid=Some(uid),
+      gid=Some(gid),
     ),
   )
+}
+
+///|
+fn native_read_u32_le(buf : Bytes, offset : Int) -> Int {
+  buf[offset].to_int() |
+  (buf[offset + 1].to_int() << 8) |
+  (buf[offset + 2].to_int() << 16) |
+  (buf[offset + 3].to_int() << 24)
 }
 
 ///|

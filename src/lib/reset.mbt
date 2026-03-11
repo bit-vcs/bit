@@ -14,6 +14,9 @@ pub fn reset(
   root : String,
   spec : String,
   mode : ResetMode,
+  committer? : String = "unknown <unknown>",
+  timestamp? : Int64 = 0L,
+  timezone? : String = "+0000",
 ) -> @bit.ObjectId raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   let actual_git_dir = if rfs.is_file(git_dir) {
@@ -26,7 +29,21 @@ pub fn reset(
     None => raise @bit.GitError::InvalidObject("Invalid ref: \{spec}")
     Some(id) => id
   }
+  let old_head = resolve_head_commit(rfs, actual_git_dir).unwrap_or(
+    @bit.ObjectId::zero(),
+  )
   update_head_ref(fs, rfs, actual_git_dir, target)
+  append_head_update_reflogs(
+    fs,
+    rfs,
+    actual_git_dir,
+    old_head,
+    target,
+    "reset: moving to " + spec,
+    committer~,
+    timestamp~,
+    timezone~,
+  )
   match mode {
     Soft => target
     Mixed => {

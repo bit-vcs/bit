@@ -48,6 +48,62 @@ fn collect_global_path_overrides_for_delegate() -> Array[String] {
 }
 
 ///|
+fn fetch_resolve_default_remote(
+  remotes : Map[String, @bitlib.RemoteConfig],
+  remote_name : String,
+  remote_url : String?,
+) -> (String, String?) {
+  let mut matched_name : String? = None
+  match remote_url {
+    Some(url) => {
+      let mut ambiguous = false
+      for name, remote_config in remotes {
+        if remote_config.urls.length() > 0 && remote_config.urls[0] == url {
+          match matched_name {
+            Some(_) => {
+              ambiguous = true
+              break
+            }
+            None => matched_name = Some(name)
+          }
+        }
+      }
+      if not(ambiguous) {
+        match matched_name {
+          Some(name) => return (name, Some(url))
+          None => ()
+        }
+      }
+    }
+    None => ()
+  }
+  let mut single_name : String? = None
+  let mut single_url : String? = remote_url
+  let mut multiple = false
+  for name, remote_config in remotes {
+    match single_name {
+      Some(_) => {
+        multiple = true
+        break
+      }
+      None => {
+        single_name = Some(name)
+        if remote_config.urls.length() > 0 {
+          single_url = Some(remote_config.urls[0])
+        }
+      }
+    }
+  }
+  if not(multiple) {
+    match single_name {
+      Some(name) => return (name, single_url)
+      None => ()
+    }
+  }
+  (remote_name, remote_url)
+}
+
+///|
 async fn handle_fetch(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
   let rfs : &@bitcore.RepoFileSystem = fs
@@ -80,6 +136,13 @@ async fn handle_fetch(args : Array[String]) -> Unit raise Error {
         None => ()
       }
     @bitlib.HeadRef::Detached(_) => ()
+  }
+  if remote_name == "origin" {
+    let (resolved_remote_name, resolved_remote_url) = fetch_resolve_default_remote(
+      remotes, remote_name, remote_url,
+    )
+    remote_name = resolved_remote_name
+    remote_url = resolved_remote_url
   }
   let mut explicit_filter_flag = false
   let mut explicit_no_filter = false

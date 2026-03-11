@@ -97,7 +97,19 @@ async fn handle_reset(args : Array[String]) -> Unit raise Error {
     @sys.exit(1)
   }
   let orig_head = @bitlib.resolve_ref(rfs, git_dir, "HEAD")
-  let commit_id = @bitlib.reset(fs, rfs, root, spec, mode)
+  let committer = get_committer_string()
+  let timestamp = get_commit_timestamp()
+  let timezone = get_commit_timezone()
+  let commit_id = @bitlib.reset(
+    fs,
+    rfs,
+    root,
+    spec,
+    mode,
+    committer~,
+    timestamp~,
+    timezone~,
+  )
   reset_write_orig_head(fs, git_dir, orig_head)
   let mixed_mode = match mode {
     @bitlib.ResetMode::Mixed => true
@@ -227,11 +239,19 @@ fn reset_pathspec_matches(spec : String, path : String) -> Bool {
 
 ///|
 fn reset_normalize_path(path : String) -> String {
-  if path.has_prefix("./") {
+  let mut normalized = if path.has_prefix("./") {
     String::unsafe_substring(path, start=2, end=path.length())
   } else {
     path
   }
+  while normalized.length() > 1 && normalized.has_suffix("/") {
+    normalized = String::unsafe_substring(
+      normalized,
+      start=0,
+      end=normalized.length() - 1,
+    )
+  }
+  normalized
 }
 
 ///|
@@ -372,6 +392,11 @@ async fn reset_refresh_index_entries(
             content.length(),
             mtime_sec~,
             mtime_nsec~,
+            intent_to_add=entry.intent_to_add,
+            dev=entry.dev,
+            ino=entry.ino,
+            uid=entry.uid,
+            gid=entry.gid,
           )
         } else {
           changed = true

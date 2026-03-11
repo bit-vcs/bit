@@ -45,3 +45,92 @@ test "checkout: annotated tag peels to commit" {
   let head = fs.read_string("/repo/.git/HEAD")
   assert_true(head.has_prefix(base.to_hex()))
 }
+
+///|
+test "checkout: removes empty gitlink directory when target commit omits submodule" {
+  let fs = setup_repo_checkout()
+  fs.write_string("/repo/a.txt", "one\n")
+  add_paths(fs, fs, "/repo", ["a.txt"])
+  let initial = commit(
+    fs, fs, "/repo", "initial\n", "Test <t@example.com>", 1700000200L,
+  )
+  let entries = read_index_entries(fs, "/repo/.git")
+  entries.push(
+    IndexEntry::new(
+      "submodule",
+      @bit.ObjectId::from_hex("e598ccc29ff366687aa04587483454a7925521ae"),
+      0o160000,
+      0,
+    ),
+  )
+  write_index_entries(fs, "/repo/.git", entries)
+  ignore(
+    commit(
+      fs, fs, "/repo", "with-submodule\n", "Test <t@example.com>", 1700000201L,
+    ),
+  )
+  fs.mkdir_p("/repo/submodule")
+  assert_true(fs.is_dir("/repo/submodule"))
+  ignore(checkout(fs, fs, "/repo", initial.to_hex()))
+  assert_false(fs.is_dir("/repo/submodule"))
+}
+
+///|
+test "checkout: restores gitlink worktree from modules dir" {
+  let fs = setup_repo_checkout()
+  fs.write_string("/repo/a.txt", "one\n")
+  add_paths(fs, fs, "/repo", ["a.txt"])
+  let initial = commit(
+    fs, fs, "/repo", "initial\n", "Test <t@example.com>", 1700000300L,
+  )
+
+  init_repo_with_options(fs, "/repo/vendor/sub", {
+    default_branch: "main",
+    bare: false,
+    separate_git_dir: Some("/repo/.git/modules/example"),
+    template_dir: None,
+    ref_format: "files",
+    object_format: "sha1",
+    is_reinit: false,
+    git_dir: None,
+    work_tree: Some("/repo/vendor/sub"),
+    shared: None,
+  })
+  fs.write_string("/repo/vendor/sub/a", "sub\n")
+  add_paths(fs, fs, "/repo/vendor/sub", ["a"])
+  let submodule_commit = commit(
+    fs, fs, "/repo/vendor/sub", "submodule\n", "Test <t@example.com>", 1700000301L,
+  )
+
+  fs.write_string(
+    "/repo/.gitmodules", "[submodule \"example\"]\n\tpath = vendor/sub\n\turl = ../example\n",
+  )
+  add_paths(fs, fs, "/repo", [".gitmodules"])
+  let entries = read_index_entries(fs, "/repo/.git")
+  entries.push(IndexEntry::new("vendor/sub", submodule_commit, 0o160000, 0))
+  write_index_entries(fs, "/repo/.git", entries)
+  let with_submodule = commit(
+    fs, fs, "/repo", "with-submodule\n", "Test <t@example.com>", 1700000302L,
+  )
+  let db = ObjectDb::load_lazy(fs, "/repo/.git")
+  let files = collect_tree_files_from_commit(db, fs, with_submodule)
+  assert_true(files.contains("vendor/sub"))
+  assert_eq(files["vendor/sub"].mode, 0o160000)
+
+  ignore(checkout(fs, fs, "/repo", initial.to_hex()))
+  assert_false(fs.is_dir("/repo/vendor/sub"))
+
+  ignore(checkout(fs, fs, "/repo", with_submodule.to_hex()))
+  assert_true(fs.is_file("/repo/vendor/sub/.git"))
+  assert_true(
+    fs.read_string("/repo/vendor/sub/.git").contains(".git/modules/example"),
+  )
+  assert_eq(fs.read_string("/repo/vendor/sub/a"), "sub\n")
+  assert_eq(
+    fs.read_string("/repo/.git/modules/example/HEAD"),
+    submodule_commit.to_hex() + "\n",
+  )
+  let submodule_entries = read_index_entries(fs, "/repo/.git/modules/example")
+  assert_eq(submodule_entries.length(), 1)
+  assert_eq(submodule_entries[0].path, "a")
+}

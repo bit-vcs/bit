@@ -48,9 +48,6 @@ pub async fn diff_worktree(
   let out : Array[DiffFile] = []
   for entry in index_entries {
     let path = entry.path
-    if is_gitlink_mode_int(entry.mode) {
-      continue
-    }
     if skip_worktree_paths.contains(path) {
       continue
     }

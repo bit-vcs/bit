@@ -68,6 +68,69 @@ test "rev-parse: --git-path prefers cwd-relative path for absolute git dir" {
 }
 
 ///|
+test "rev-parse: --git-path prefers caller pwd under -C" {
+  let prev = @sys.get_env_var("GIT_SHIM_CALLER_PWD")
+  @sys.set_env_var("GIT_SHIM_CALLER_PWD", "/repo")
+  assert_eq(rev_parse_git_path_output_cwd("/repo/there"), "/repo")
+  match prev {
+    Some(value) => @sys.set_env_var("GIT_SHIM_CALLER_PWD", value)
+    None => @sys.unset_env_var("GIT_SHIM_CALLER_PWD")
+  }
+}
+
+///|
+test "rev-parse: --git-path uses common dir for linked worktree objects" {
+  let fs = @bitcore.TestFs::new()
+  fs.mkdir_p("/repo/.git/worktrees/linked")
+  fs.write_string("/repo/.git/worktrees/linked/commondir", "../..\n")
+  assert_eq(
+    rev_parse_resolve_git_path_with_config(
+      fs,
+      "/repo/linked",
+      ".git/worktrees/linked",
+      "/repo/.git/worktrees/linked",
+      "objects",
+      None,
+    ),
+    "/repo/.git/objects",
+  )
+}
+
+///|
+test "rev-parse: --is-bare-repository reads shared worktreeConfig-aware core.bare" {
+  let fs = @bitcore.TestFs::new()
+  fs.mkdir_p("/repo/.git/worktrees/linked")
+  fs.write_string(
+    "/repo/.git/config", "[core]\n\tbare = true\n[extensions]\n\tworktreeConfig = true\n",
+  )
+  fs.write_string("/repo/.git/worktrees/linked/commondir", "../..\n")
+  assert_true(
+    rev_parse_is_bare_repository(
+      fs, "/repo/.git/worktrees/linked", "/repo/linked",
+    ),
+  )
+}
+
+///|
+test "rev-parse: --is-bare-repository lets config.worktree override shared core.bare" {
+  let fs = @bitcore.TestFs::new()
+  fs.mkdir_p("/repo/.git/worktrees/linked")
+  fs.write_string(
+    "/repo/.git/config", "[core]\n\tbare = false\n[extensions]\n\tworktreeConfig = true\n",
+  )
+  fs.write_string("/repo/.git/worktrees/linked/commondir", "../..\n")
+  fs.write_string(
+    "/repo/.git/worktrees/linked/config.worktree", "[core]\n\tbare = true\n",
+  )
+  assert_true(
+    rev_parse_is_bare_repository(
+      fs, "/repo/.git/worktrees/linked", "/repo/linked",
+    ),
+  )
+  assert_false(rev_parse_is_bare_repository(fs, "/repo/.git", "/repo"))
+}
+
+///|
 test "rev-parse: --git-dir uses relative path at repository root" {
   assert_eq(rev_parse_display_git_dir("/repo", "/repo", "/repo/.git"), ".git")
 }

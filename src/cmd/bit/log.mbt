@@ -9,6 +9,102 @@ async fn show_log_command_help() -> Unit {
 }
 
 ///|
+fn log_parse_bool_value(value : String) -> Bool? {
+  match trim_string(value).to_lower() {
+    "true" | "yes" | "on" | "1" => Some(true)
+    "false" | "no" | "off" | "0" | "" => Some(false)
+    _ => None
+  }
+}
+
+///|
+fn log_normalize_abbrev_length(value : Int) -> Int {
+  if value <= 0 {
+    7
+  } else if value < 4 {
+    4
+  } else if value >= 40 {
+    40
+  } else {
+    value
+  }
+}
+
+///|
+fn log_parse_abbrev_length_value(value : String) -> Int? {
+  let trimmed = trim_string(value)
+  match log_parse_bool_value(trimmed) {
+    Some(false) => Some(40)
+    Some(true) => Some(7)
+    None => {
+      let parsed = @strconv.parse_int(trimmed) catch { _ => return None }
+      Some(log_normalize_abbrev_length(parsed))
+    }
+  }
+}
+
+///|
+fn log_resolve_abbrev_length(
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  cli_override : Int?,
+  no_abbrev : Bool,
+) -> Int {
+  if no_abbrev {
+    return 40
+  }
+  match cli_override {
+    Some(value) => log_normalize_abbrev_length(value)
+    None =>
+      match get_config_override("core.abbrev") {
+        Some(value) => log_parse_abbrev_length_value(value).unwrap_or(7)
+        None =>
+          match
+            @bitlib.read_config_value(
+              rfs,
+              git_dir + "/config",
+              "core",
+              "abbrev",
+            ) {
+            Some(value) => log_parse_abbrev_length_value(value).unwrap_or(7)
+            None => 7
+          }
+      }
+  }
+}
+
+///|
+fn log_resolve_abbrev_commit(
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  cli_override : Bool?,
+) -> Bool {
+  match cli_override {
+    Some(value) => value
+    None =>
+      match get_config_override("log.abbrevCommit") {
+        Some(value) => log_parse_bool_value(value).unwrap_or(false)
+        None =>
+          @bitlib.read_config_bool(
+            rfs,
+            git_dir + "/config",
+            "log",
+            "abbrevcommit",
+          ).unwrap_or(false)
+      }
+  }
+}
+
+///|
+fn log_abbrev_hex(hex : String, abbrev_len : Int) -> String {
+  if abbrev_len >= hex.length() {
+    hex
+  } else {
+    String::unsafe_substring(hex, start=0, end=abbrev_len)
+  }
+}
+
+///|
 /// Find byte index of ".." in arg, returning -1 if not found or if "..." is present.
 fn log_find_dotdot(arg : String) -> Int {
   // Convert to array of chars for indexed access
@@ -23,6 +119,23 @@ fn log_find_dotdot(arg : String) -> Int {
       if i + 2 < len && chars[i + 2] == '.' {
         return -1 // triple dot, not a range
       }
+      return i
+    }
+    i += 1
+  }
+  -1
+}
+
+///|
+fn log_find_tripledot(arg : String) -> Int {
+  let chars : Array[Char] = []
+  for c in arg {
+    chars.push(c)
+  }
+  let len = chars.length()
+  let mut i = 0
+  while i < len - 2 {
+    if chars[i] == '.' && chars[i + 1] == '.' && chars[i + 2] == '.' {
       return i
     }
     i += 1
@@ -56,6 +169,30 @@ fn log_storage_runtime_delegate_args(
   if log_need_real_git() {
     return None
   }
+  let mut seen_oneline = false
+  let mut seen_limit = false
+  let mut i = 0
+  while i < args.length() {
+    let arg = args[i]
+    match arg {
+      "--oneline" => seen_oneline = true
+      "-n" | "--max-count" => {
+        seen_limit = true
+        if i + 1 < args.length() {
+          i += 1
+        } else {
+          return None
+        }
+      }
+      _ if arg.has_prefix("--max-count=") => seen_limit = true
+      _ if is_short_count_flag(arg) => seen_limit = true
+      _ => return None
+    }
+    i += 1
+  }
+  if not(seen_oneline) || not(seen_limit) {
+    return None
+  }
   let parsed = storage_runtime_parse_command("log", args) catch {
     _ => return None
   }
@@ -71,10 +208,531 @@ fn log_should_use_storage_runtime(args : Array[String]) -> Bool {
 }
 
 ///|
+fn log_storage_runtime_blocked_by_repo_config(
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+) -> Bool {
+  log_read_config_entries(rfs, git_dir, "log", "decorate").length() > 0 ||
+  log_read_config_entries(rfs, git_dir, "log", "excludeDecoration").length() > 0 ||
+  log_read_config_entries(rfs, git_dir, "log", "abbrevCommit").length() > 0 ||
+  log_read_config_entries(rfs, git_dir, "core", "abbrev").length() > 0
+}
+
+///|
+fn log_should_use_storage_runtime_in_repo(
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  args : Array[String],
+) -> Bool {
+  log_should_use_storage_runtime(args) &&
+  not(log_storage_runtime_blocked_by_repo_config(rfs, git_dir))
+}
+
+///|
+fn log_glob_match(pattern : String, text : String) -> Bool {
+  let p = pattern.to_array()
+  let t = text.to_array()
+  let plen = p.length()
+  let tlen = t.length()
+  let mut pi = 0
+  let mut ti = 0
+  let mut star_pi = -1
+  let mut star_ti = -1
+  while ti < tlen {
+    if pi < plen && (p[pi] == t[ti] || p[pi] == '?') {
+      pi += 1
+      ti += 1
+    } else if pi < plen && p[pi] == '*' {
+      star_pi = pi
+      star_ti = ti
+      pi += 1
+    } else if star_pi >= 0 {
+      pi = star_pi + 1
+      star_ti += 1
+      ti = star_ti
+    } else {
+      return false
+    }
+  }
+  while pi < plen && p[pi] == '*' {
+    pi += 1
+  }
+  pi == plen
+}
+
+///|
+priv enum LogDecorationDisplayMode {
+  Disabled
+  Short
+  Full
+}
+
+///|
+priv struct LogConfigEntry {
+  has_value : Bool
+  value : String
+}
+
+///|
+priv struct LogDecorationOptions {
+  mode : LogDecorationDisplayMode
+  include_patterns : Array[String]
+  exclude_patterns : Array[String]
+  include_all_refs : Bool
+}
+
+///|
+priv struct LogDecorationRef {
+  refname : String
+  display_name : String
+  is_head : Bool
+  is_tag : Bool
+  is_lightweight_tag : Bool
+}
+
+///|
+fn log_parse_decorate_mode(value : String) -> LogDecorationDisplayMode? {
+  match trim_string(value).to_lower() {
+    "" | "true" | "yes" | "on" | "1" | "short" =>
+      Some(LogDecorationDisplayMode::Short)
+    "full" => Some(LogDecorationDisplayMode::Full)
+    "false" | "no" | "off" | "0" => Some(LogDecorationDisplayMode::Disabled)
+    _ => None
+  }
+}
+
+///|
+fn log_decoration_mode_is_none(mode : LogDecorationDisplayMode) -> Bool {
+  match mode {
+    LogDecorationDisplayMode::Disabled => true
+    _ => false
+  }
+}
+
+///|
+fn log_decoration_mode_is_full(mode : LogDecorationDisplayMode) -> Bool {
+  match mode {
+    LogDecorationDisplayMode::Full => true
+    _ => false
+  }
+}
+
+///|
+fn log_normalize_decoration_pattern(pattern : String) -> String {
+  let trimmed = trim_string(pattern)
+  if trimmed == "HEAD" || trimmed.has_prefix("refs/") {
+    trimmed
+  } else {
+    "refs/" + trimmed
+  }
+}
+
+///|
+fn log_decoration_pattern_matches(refname : String, pattern : String) -> Bool {
+  let normalized = log_normalize_decoration_pattern(pattern)
+  if normalized == "HEAD" {
+    return refname == "HEAD"
+  }
+  let has_glob = normalized.contains("*") ||
+    normalized.contains("?") ||
+    normalized.contains("[")
+  if has_glob {
+    return log_glob_match(normalized, refname)
+  }
+  let prefix = if normalized.has_suffix("/") {
+    normalized
+  } else {
+    normalized + "/"
+  }
+  refname == normalized || refname.has_prefix(prefix)
+}
+
+///|
+fn log_ref_hidden_by_default(refname : String) -> Bool {
+  refname.has_prefix("refs/hidden/") ||
+  refname.has_prefix("refs/prefetch/") ||
+  refname.has_prefix("refs/rewritten/")
+}
+
+///|
+fn log_read_config_entries(
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  section : String,
+  key : String,
+) -> Array[LogConfigEntry] {
+  let entries : Array[LogConfigEntry] = []
+  let content = @bitlib.read_config_content(rfs, git_dir)
+  let mut current_section = ""
+  let section_lower = section.to_lower()
+  let key_lower = key.to_lower()
+  for raw_line_view in content.split("\n") {
+    let raw_line = raw_line_view.to_string()
+    let line = trim_string(raw_line)
+    if line.length() == 0 || line.has_prefix("#") || line.has_prefix(";") {
+      continue
+    }
+    let mut config_line = line
+    if line.has_prefix("[") {
+      match line.find("]") {
+        Some(end_idx) => {
+          let inner = trim_string(
+            String::unsafe_substring(line, start=1, end=end_idx),
+          )
+          current_section = match inner.find(" ") {
+            Some(idx) =>
+              String::unsafe_substring(inner, start=0, end=idx).to_lower()
+            None => inner.to_lower()
+          }
+          config_line = trim_string(
+            String::unsafe_substring(line, start=end_idx + 1, end=line.length()),
+          )
+          if config_line.length() == 0 {
+            continue
+          }
+        }
+        None => continue
+      }
+    }
+    if current_section != section_lower {
+      continue
+    }
+    match config_line.find("=") {
+      Some(eq_idx) => {
+        let found_key = trim_string(
+          String::unsafe_substring(config_line, start=0, end=eq_idx),
+        ).to_lower()
+        if found_key == key_lower {
+          let value = trim_string(
+            String::unsafe_substring(
+              config_line,
+              start=eq_idx + 1,
+              end=config_line.length(),
+            ),
+          )
+          entries.push({ has_value: true, value })
+        }
+      }
+      None => {
+        let raw_token = match config_line.find(" ") {
+          Some(idx) => String::unsafe_substring(config_line, start=0, end=idx)
+          None => config_line
+        }
+        let token = raw_token.to_lower()
+        if token == key_lower {
+          entries.push({ has_value: false, value: "" })
+        }
+      }
+    }
+  }
+  let override_key = section_lower + "." + key_lower
+  match @sys.get_env_var("GIT_CONFIG_OVERRIDES") {
+    Some(data) =>
+      for line_view in data.split("\n") {
+        let line = line_view.to_string()
+        if line.length() == 0 {
+          continue
+        }
+        match line.find("=") {
+          Some(eq_idx) => {
+            let found_key = String::unsafe_substring(line, start=0, end=eq_idx).to_lower()
+            if found_key == override_key {
+              entries.push({
+                has_value: true,
+                value: String::unsafe_substring(
+                  line,
+                  start=eq_idx + 1,
+                  end=line.length(),
+                ),
+              })
+            }
+          }
+          None =>
+            if line.to_lower() == override_key {
+              entries.push({ has_value: false, value: "" })
+            }
+        }
+      }
+    None => ()
+  }
+  entries
+}
+
+///|
+fn log_resolve_decorate_mode(
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  cli_override : LogDecorationDisplayMode?,
+  implied_by_format : Bool,
+  config_allowed : Bool,
+) -> LogDecorationDisplayMode {
+  match cli_override {
+    Some(mode) => mode
+    None => {
+      if config_allowed {
+        let config_entries = log_read_config_entries(
+          rfs, git_dir, "log", "decorate",
+        )
+        if config_entries.length() > 0 {
+          let entry = config_entries[config_entries.length() - 1]
+          if not(entry.has_value) {
+            return LogDecorationDisplayMode::Short
+          }
+          return log_parse_decorate_mode(entry.value).unwrap_or(
+            LogDecorationDisplayMode::Disabled,
+          )
+        }
+      }
+      if implied_by_format {
+        LogDecorationDisplayMode::Short
+      } else {
+        LogDecorationDisplayMode::Disabled
+      }
+    }
+  }
+}
+
+///|
+fn log_read_exclude_decoration_patterns(
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+) -> Array[String] {
+  let entries = log_read_config_entries(
+    rfs, git_dir, "log", "excludeDecoration",
+  )
+  let out : Array[String] = []
+  for entry in entries {
+    if entry.has_value {
+      out.push(entry.value)
+    }
+  }
+  out
+}
+
+///|
+fn log_has_missing_exclude_decoration_value(
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+) -> Bool {
+  let entries = log_read_config_entries(
+    rfs, git_dir, "log", "excludeDecoration",
+  )
+  entries.iter().any(fn(entry) { not(entry.has_value) })
+}
+
+///|
+fn log_initial_decoration_set_all(
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+) -> Bool {
+  match get_config_override("log.initialDecorationSet") {
+    Some(value) => trim_string(value).to_lower() == "all"
+    None =>
+      match
+        @bitlib.read_config_value(
+          rfs,
+          git_dir + "/config",
+          "log",
+          "initialdecorationset",
+        ) {
+        Some(value) => trim_string(value).to_lower() == "all"
+        None => false
+      }
+  }
+}
+
+///|
+fn log_should_include_decoration_ref(
+  refname : String,
+  include_patterns : Array[String],
+  exclude_patterns : Array[String],
+  include_all_refs : Bool,
+) -> Bool {
+  if not(include_all_refs) && log_ref_hidden_by_default(refname) {
+    return false
+  }
+  if include_patterns.length() > 0 &&
+    not(
+      include_patterns
+      .iter()
+      .any(p => log_decoration_pattern_matches(refname, p)),
+    ) {
+    return false
+  }
+  if exclude_patterns
+    .iter()
+    .any(p => log_decoration_pattern_matches(refname, p)) {
+    return false
+  }
+  true
+}
+
+///|
+fn log_clear_string_array(values : Array[String]) -> Unit {
+  while values.length() > 0 {
+    ignore(values.pop())
+  }
+}
+
+///|
+fn log_extend_string_array(dst : Array[String], src : Array[String]) -> Unit {
+  for value in src {
+    dst.push(value)
+  }
+}
+
+///|
+fn log_shorten_refname_for_decoration(refname : String) -> String {
+  if refname.has_prefix("refs/heads/") {
+    String::unsafe_substring(refname, start=11, end=refname.length())
+  } else if refname.has_prefix("refs/tags/") {
+    String::unsafe_substring(refname, start=10, end=refname.length())
+  } else if refname.has_prefix("refs/remotes/") {
+    String::unsafe_substring(refname, start=13, end=refname.length())
+  } else {
+    refname
+  }
+}
+
+///|
+fn log_format_decoration_refname(
+  refname : String,
+  mode : LogDecorationDisplayMode,
+) -> String {
+  if refname.has_prefix("refs/tags/") {
+    let tag_name = if log_decoration_mode_is_full(mode) {
+      refname
+    } else {
+      String::unsafe_substring(refname, start=10, end=refname.length())
+    }
+    "tag: " + tag_name
+  } else if log_decoration_mode_is_full(mode) {
+    refname
+  } else {
+    log_shorten_refname_for_decoration(refname)
+  }
+}
+
+///|
+fn log_make_decoration_options(
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  cli_mode : LogDecorationDisplayMode?,
+  cli_include_patterns : Array[String],
+  cli_exclude_patterns : Array[String],
+  clear_decorations : Bool,
+  implied_by_format : Bool,
+  config_allowed : Bool,
+  simplify_by_decoration : Bool,
+) -> LogDecorationOptions {
+  let mode = log_resolve_decorate_mode(
+    rfs, git_dir, cli_mode, implied_by_format, config_allowed,
+  )
+  let exclude_patterns : Array[String] = []
+  if cli_include_patterns.length() == 0 {
+    log_extend_string_array(
+      exclude_patterns,
+      log_read_exclude_decoration_patterns(rfs, git_dir),
+    )
+  }
+  log_extend_string_array(exclude_patterns, cli_exclude_patterns)
+  {
+    mode,
+    include_patterns: cli_include_patterns,
+    exclude_patterns,
+    include_all_refs: clear_decorations ||
+    simplify_by_decoration ||
+    log_initial_decoration_set_all(rfs, git_dir),
+  }
+}
+
+///|
+fn log_should_emit_simplified_entry(
+  ref_names : Map[String, Array[String]],
+  hex : String,
+  parent_count : Int,
+) -> Bool {
+  match ref_names.get(hex) {
+    Some(names) if names.length() > 0 => true
+    _ => parent_count == 0
+  }
+}
+
+///|
+fn log_branch_pattern_matches(short_name : String, pattern : String) -> Bool {
+  if pattern.length() == 0 || pattern == "*" {
+    return true
+  }
+  if pattern.contains("*") || pattern.contains("?") {
+    return log_glob_match(pattern, short_name)
+  }
+  short_name == pattern || short_name.has_prefix(pattern + "/")
+}
+
+///|
+fn log_string_desc_before(a : String, b : String) -> Bool {
+  let aa = a.to_array()
+  let bb = b.to_array()
+  let min_len = if aa.length() < bb.length() {
+    aa.length()
+  } else {
+    bb.length()
+  }
+  for i in 0..<min_len {
+    let ac = aa[i].to_int()
+    let bc = bb[i].to_int()
+    if ac != bc {
+      return ac > bc
+    }
+  }
+  aa.length() > bb.length()
+}
+
+///|
+fn log_add_revision_input(
+  arg : String,
+  revs : Array[String],
+  range_excludes : Array[String],
+  symmetric_ranges : Array[(String, String)],
+) -> Unit {
+  let tripledot_idx = log_find_tripledot(arg)
+  if tripledot_idx >= 0 {
+    let left = String::unsafe_substring(arg, start=0, end=tripledot_idx)
+    let right = String::unsafe_substring(
+      arg,
+      start=tripledot_idx + 3,
+      end=arg.length(),
+    )
+    let left_spec = if left.length() > 0 { left } else { "HEAD" }
+    let right_spec = if right.length() > 0 { right } else { "HEAD" }
+    revs.push(left_spec)
+    revs.push(right_spec)
+    symmetric_ranges.push((left_spec, right_spec))
+    return
+  }
+  let dot_idx = log_find_dotdot(arg)
+  if dot_idx >= 0 {
+    let left = String::unsafe_substring(arg, start=0, end=dot_idx)
+    let right = String::unsafe_substring(
+      arg,
+      start=dot_idx + 2,
+      end=arg.length(),
+    )
+    if left.length() > 0 {
+      range_excludes.push(left)
+    }
+    revs.push(if right.length() > 0 { right } else { "HEAD" })
+    return
+  }
+  revs.push(arg)
+}
+
+///|
 struct CommitFormatData {
   id : @bitcore.ObjectId
   tree : @bitcore.ObjectId
   parents : Array[@bitcore.ObjectId]
+  abbrev_len : Int
   author_name : String
   author_email : String
   author_timestamp : Int64
@@ -88,6 +746,9 @@ struct CommitFormatData {
   message : String
   ref_names : Map[String, Array[String]]
   date_format : String
+  reflog_selector_short : String?
+  reflog_selector : String?
+  reflog_message : String?
 }
 
 ///|
@@ -97,7 +758,11 @@ fn parse_commit_format_data(
   tree : @bitcore.ObjectId,
   parents : Array[@bitcore.ObjectId],
   ref_names : Map[String, Array[String]],
+  abbrev_len? : Int = 7,
   date_format? : String = "",
+  reflog_selector_short? : String? = None,
+  reflog_selector? : String? = None,
+  reflog_message? : String? = None,
 ) -> CommitFormatData {
   let text = decode_bytes(data)
   let mut author_name = ""
@@ -167,6 +832,7 @@ fn parse_commit_format_data(
     id,
     tree,
     parents,
+    abbrev_len,
     author_name,
     author_email,
     author_timestamp,
@@ -180,6 +846,9 @@ fn parse_commit_format_data(
     message,
     ref_names,
     date_format,
+    reflog_selector_short,
+    reflog_selector,
+    reflog_message,
   }
 }
 
@@ -248,11 +917,1141 @@ fn parse_ident_parts(ident : String) -> (String, String, Int64, String) {
 }
 
 ///|
+struct LogWrapSpec {
+  width : Int
+  indent1 : Int
+  indent2 : Int
+}
+
+///|
+fn log_parse_wrap_spec(text : String) -> LogWrapSpec {
+  let parts : Array[String] = []
+  for part in text.split(",") {
+    parts.push(part.to_string())
+  }
+  let width = if parts.length() > 0 && parts[0].length() > 0 {
+    @strconv.parse_int(parts[0]) catch {
+      _ => 0
+    }
+  } else {
+    0
+  }
+  let indent1 = if parts.length() > 1 && parts[1].length() > 0 {
+    @strconv.parse_int(parts[1]) catch {
+      _ => 0
+    }
+  } else {
+    0
+  }
+  let indent2 = if parts.length() > 2 && parts[2].length() > 0 {
+    @strconv.parse_int(parts[2]) catch {
+      _ => 0
+    }
+  } else {
+    0
+  }
+  { width, indent1, indent2 }
+}
+
+///|
+fn log_indent_string(count : Int) -> String {
+  let out = StringBuilder::new()
+  for _ in 0..<count {
+    out.write_char(' ')
+  }
+  out.to_string()
+}
+
+///|
+fn log_apply_wrap(text : String, spec : LogWrapSpec) -> String {
+  let lines : Array[String] = []
+  let mut first_output_line = true
+  for raw_line_view in text.split("\n") {
+    let raw_line = raw_line_view.to_string()
+    let indent = if first_output_line { spec.indent1 } else { spec.indent2 }
+    if spec.width <= 0 {
+      lines.push(log_indent_string(indent) + raw_line)
+      first_output_line = false
+      continue
+    }
+    let words : Array[String] = []
+    for word_view in raw_line.split(" ") {
+      let word = word_view.to_string()
+      if word.length() > 0 {
+        words.push(word)
+      }
+    }
+    if words.length() == 0 {
+      lines.push(log_indent_string(indent))
+      first_output_line = false
+      continue
+    }
+    let mut current = log_indent_string(indent)
+    let mut current_len = indent
+    let mut word_i = 0
+    while word_i < words.length() {
+      let word = words[word_i]
+      let word_len = word.length()
+      let needs_space = current_len > indent
+      let added_len = if needs_space { 1 + word_len } else { word_len }
+      if needs_space && current_len + added_len > spec.width {
+        lines.push(current)
+        current = log_indent_string(spec.indent2) + word
+        current_len = spec.indent2 + word_len
+      } else {
+        if needs_space {
+          current = current + " " + word
+        } else {
+          current = current + word
+        }
+        current_len += added_len
+      }
+      first_output_line = false
+      word_i += 1
+    }
+    lines.push(current)
+  }
+  lines.join("\n")
+}
+
+///|
+async fn log_emit_output(
+  text : String,
+  trailing_newline : Bool,
+  line_prefix : String,
+) -> Unit raise Error {
+  if line_prefix.length() == 0 {
+    if trailing_newline {
+      print_line(text)
+    } else {
+      print_str(text)
+    }
+    return
+  }
+  if text.length() == 0 {
+    if trailing_newline {
+      print_line(line_prefix)
+    }
+    return
+  }
+  let lines : Array[String] = []
+  for line_view in text.split("\n") {
+    lines.push(line_view.to_string())
+  }
+  for i in 0..<lines.length() {
+    let prefixed = line_prefix + lines[i]
+    if i + 1 < lines.length() || trailing_newline {
+      print_line(prefixed)
+    } else {
+      print_str(prefixed)
+    }
+  }
+}
+
+///|
+fn log_build_ref_names(
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  options : LogDecorationOptions,
+) -> Map[String, Array[String]] raise Error {
+  let ref_entries : Map[String, Array[LogDecorationRef]] = {}
+  let all_ref_list = @bitrepo.show_ref(rfs, git_dir)
+  let db = @bitlib.ObjectDb::load(rfs, log_resolve_common_git_dir(rfs, git_dir))
+  for item in all_ref_list {
+    if not(
+        log_should_include_decoration_ref(
+          item.0,
+          options.include_patterns,
+          options.exclude_patterns,
+          options.include_all_refs,
+        ),
+      ) {
+      continue
+    }
+    let resolved = if item.0.has_prefix("refs/tags/") {
+      @bitrepo.rev_parse(rfs, git_dir, item.0 + "^{commit}") catch {
+        _ => None
+      }
+    } else {
+      Some(item.1)
+    }
+    let is_tag = item.0.has_prefix("refs/tags/")
+    guard resolved is Some(target_id) else { continue }
+    let hex = target_id.to_hex()
+    let display_name = log_format_decoration_refname(item.0, options.mode)
+    let is_lightweight_tag = if is_tag {
+      match db.get(rfs, item.1) {
+        Some(o) => o.obj_type != @bitcore.ObjectType::Tag
+        None => false
+      }
+    } else {
+      false
+    }
+    let entry : LogDecorationRef = {
+      refname: item.0,
+      display_name,
+      is_head: false,
+      is_tag,
+      is_lightweight_tag,
+    }
+    match ref_entries.get(hex) {
+      Some(arr) => arr.push(entry)
+      None => ref_entries[hex] = [entry]
+    }
+  }
+  let head_path = git_dir + "/HEAD"
+  if rfs.is_file(head_path) {
+    let content = rfs.read_file(head_path) |> decode_bytes |> trim_string
+    if content.has_prefix("ref: ") &&
+      log_should_include_decoration_ref(
+        "HEAD",
+        options.include_patterns,
+        options.exclude_patterns,
+        options.include_all_refs,
+      ) {
+      let head_ref = String::unsafe_substring(
+        content,
+        start=5,
+        end=content.length(),
+      )
+      match @bitrepo.rev_parse(rfs, git_dir, "HEAD") {
+        Some(head_id) => {
+          let hex = head_id.to_hex()
+          let head_target = if log_decoration_mode_is_full(options.mode) {
+            head_ref
+          } else {
+            log_shorten_refname_for_decoration(head_ref)
+          }
+          let deco = "HEAD -> " + head_target
+          let head_entry : LogDecorationRef = {
+            refname: "HEAD",
+            display_name: deco,
+            is_head: true,
+            is_tag: false,
+            is_lightweight_tag: false,
+          }
+          match ref_entries.get(hex) {
+            Some(arr) => {
+              let new_arr : Array[LogDecorationRef] = [head_entry]
+              for existing in arr {
+                if existing.refname != head_ref {
+                  new_arr.push(existing)
+                }
+              }
+              ref_entries[hex] = new_arr
+            }
+            None => ref_entries[hex] = [head_entry]
+          }
+        }
+        None => ()
+      }
+    }
+  }
+  let ref_names : Map[String, Array[String]] = {}
+  for hex, entries in ref_entries {
+    let head_names : Array[String] = []
+    let plain_names : Array[String] = []
+    let tag_entries : Array[LogDecorationRef] = []
+    for entry in entries {
+      if entry.is_head {
+        head_names.push(entry.display_name)
+      } else if entry.is_tag {
+        tag_entries.push(entry)
+      } else {
+        plain_names.push(entry.display_name)
+      }
+    }
+    let sorted_tag_entries : Array[LogDecorationRef] = []
+    for entry in tag_entries {
+      let mut pos = sorted_tag_entries.length()
+      for i in 0..<sorted_tag_entries.length() {
+        let current = sorted_tag_entries[i]
+        let should_insert_before = if entry.is_lightweight_tag !=
+          current.is_lightweight_tag {
+          entry.is_lightweight_tag
+        } else {
+          log_string_desc_before(entry.display_name, current.display_name)
+        }
+        if should_insert_before {
+          pos = i
+          break
+        }
+      }
+      sorted_tag_entries.push(entry)
+      let mut j = sorted_tag_entries.length() - 1
+      while j > pos {
+        sorted_tag_entries[j] = sorted_tag_entries[j - 1]
+        j -= 1
+      }
+      sorted_tag_entries[pos] = entry
+    }
+    let sorted_tags : Array[String] = []
+    for entry in sorted_tag_entries {
+      sorted_tags.push(entry.display_name)
+    }
+    ref_names[hex] = head_names + sorted_tags + plain_names
+  }
+  ref_names
+}
+
+///|
+fn log_resolve_common_git_dir(
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+) -> String {
+  let commondir_path = git_dir + "/commondir"
+  if not(rfs.is_file(commondir_path)) {
+    return git_dir
+  }
+  let raw = @utf8.decode_lossy(
+    (rfs.read_file(commondir_path) catch { _ => Bytes::default() })[:],
+  )
+  let rel = trim_string(raw)
+  if rel.length() == 0 {
+    return git_dir
+  }
+  if rel.has_prefix("/") {
+    normalize_path(rel)
+  } else {
+    normalize_path(git_dir + "/" + rel)
+  }
+}
+
+///|
+fn log_resolve_parents(
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  commit_id : @bitcore.ObjectId,
+  default_parents : Array[@bitcore.ObjectId],
+) -> Array[@bitcore.ObjectId] {
+  match log_read_graft_parents(rfs, git_dir, commit_id) {
+    Some(parents) => parents
+    None => default_parents
+  }
+}
+
+///|
+fn log_read_graft_parents(
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  commit_id : @bitcore.ObjectId,
+) -> Array[@bitcore.ObjectId]? {
+  let graft_path = log_resolve_common_git_dir(rfs, git_dir) + "/info/grafts"
+  if not(rfs.is_file(graft_path)) {
+    return None
+  }
+  let content = @utf8.decode_lossy(
+    (rfs.read_file(graft_path) catch { _ => return None })[:],
+  )
+  let commit_hex = commit_id.to_hex()
+  for line_view in content.split("\n") {
+    let line = trim_string(line_view.to_string())
+    if line.length() == 0 || line.has_prefix("#") {
+      continue
+    }
+    let tokens : Array[String] = []
+    for token_view in line.split(" ") {
+      let token = trim_string(token_view.to_string())
+      if token.length() > 0 {
+        tokens.push(token)
+      }
+    }
+    if tokens.length() == 0 || tokens[0] != commit_hex {
+      continue
+    }
+    let parents : Array[@bitcore.ObjectId] = []
+    for i in 1..<tokens.length() {
+      let parent_hex = tokens[i]
+      if parent_hex.length() == 40 {
+        let parent_id = @bitcore.ObjectId::from_hex(parent_hex) catch {
+          _ => continue
+        }
+        parents.push(parent_id)
+      }
+    }
+    return Some(parents)
+  }
+  None
+}
+
+///|
+fn log_resolve_default_head(
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+) -> @bitcore.ObjectId raise Error {
+  match @bitrepo.rev_parse(rfs, git_dir, "HEAD") {
+    Some(id) => id
+    None =>
+      raise @bitcore.GitError::InvalidObject(
+        "your current branch does not have any commits yet",
+      )
+  }
+}
+
+///|
+fn log_collect_branch_targets(
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  patterns : Array[String],
+) -> Array[(String, @bitcore.ObjectId)] {
+  let targets : Array[(String, @bitcore.ObjectId)] = []
+  if patterns.length() == 0 {
+    return targets
+  }
+  let refs = @bitlib.list_refs_with_ids(rfs, git_dir, Some("refs/heads/"))
+  let entries = refs.to_array()
+  entries.sort_by((a, b) => a.0.compare(b.0))
+  let active_patterns = patterns
+  for entry in entries {
+    let refname = entry.0
+    let id = entry.1
+    let short_name = String::unsafe_substring(
+      refname,
+      start=11,
+      end=refname.length(),
+    )
+    let mut matched = false
+    for pattern in active_patterns {
+      if log_branch_pattern_matches(short_name, pattern) {
+        matched = true
+        break
+      }
+    }
+    if matched {
+      targets.push((short_name, id))
+    }
+  }
+  targets
+}
+
+///|
+fn log_resolve_targets(
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  revs : Array[String],
+  branch_patterns : Array[String],
+  all_refs : Bool,
+  default_head? : Bool = true,
+  ignore_missing? : Bool = false,
+) -> Array[(String, @bitcore.ObjectId)] raise Error {
+  let targets : Array[(String, @bitcore.ObjectId)] = []
+  let db = @bitlib.ObjectDb::load(rfs, git_dir)
+  if all_refs {
+    let refs = @bitlib.list_refs_with_ids(rfs, git_dir, None)
+    for name, id in refs {
+      targets.push((name, id))
+    }
+    targets.sort_by((a, b) => a.0.compare(b.0))
+  }
+  for target in log_collect_branch_targets(rfs, git_dir, branch_patterns) {
+    targets.push(target)
+  }
+  for rev in revs {
+    let resolved = @bitrepo.rev_parse(rfs, git_dir, rev)
+    guard resolved is Some(id) else {
+      if ignore_missing {
+        continue
+      }
+      raise @bitcore.GitError::InvalidObject("Unknown revision: " + rev)
+    }
+    let target_id = (@bitrepo.rev_parse(rfs, git_dir, rev + "^{commit}") catch {
+      _ => None
+    }).unwrap_or(id)
+    if ignore_missing && db.get(rfs, target_id) is None {
+      continue
+    }
+    targets.push((rev, target_id))
+  }
+  if targets.length() == 0 && default_head {
+    targets.push(("HEAD", log_resolve_default_head(rfs, git_dir)))
+  }
+  targets
+}
+
+///|
+fn log_collect_reflog_targets(
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  revs : Array[String],
+  branch_patterns : Array[String],
+) -> Array[String] {
+  let targets : Array[String] = []
+  if revs.length() > 0 {
+    targets.append(revs)
+    return targets
+  }
+  if branch_patterns.length() > 0 {
+    for target in log_collect_branch_targets(rfs, git_dir, branch_patterns) {
+      targets.push(target.0)
+    }
+    return targets
+  }
+  ["HEAD"]
+}
+
+///|
+fn log_sort_targets_by_time(
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  targets : Array[(String, @bitcore.ObjectId)],
+) -> Array[(String, @bitcore.ObjectId)] raise Error {
+  let db = @bitlib.ObjectDb::load(rfs, git_dir)
+  let ordered : Array[(Int64, Int, (String, @bitcore.ObjectId))] = []
+  for i in 0..<targets.length() {
+    let target = targets[i]
+    let ts = log_get_commit_timestamp(db, rfs, target.1)
+    ordered.push((ts, i, target))
+  }
+  ordered.sort_by((a, b) => {
+    if a.0 == b.0 {
+      a.1.compare(b.1)
+    } else {
+      b.0.compare(a.0)
+    }
+  })
+  let sorted : Array[(String, @bitcore.ObjectId)] = []
+  for item in ordered {
+    sorted.push(item.2)
+  }
+  sorted
+}
+
+///|
+fn log_find_merge_base(
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  left : @bitcore.ObjectId,
+  right : @bitcore.ObjectId,
+) -> @bitcore.ObjectId? raise Error {
+  let db = @bitlib.ObjectDb::load(rfs, git_dir)
+  let left_ancestors : Map[String, Bool] = {}
+  let left_queue : Array[@bitcore.ObjectId] = [left]
+  while left_queue.length() > 0 {
+    let current = left_queue.unsafe_pop()
+    let hex = current.to_hex()
+    if left_ancestors.contains(hex) {
+      continue
+    }
+    left_ancestors[hex] = true
+    let obj = db.get(rfs, current)
+    match obj {
+      Some(o) =>
+        if o.obj_type == @bitcore.ObjectType::Commit {
+          let info = @bitcore.parse_commit(o.data)
+          for parent in info.parents {
+            left_queue.push(parent)
+          }
+        }
+      None => ()
+    }
+  }
+  let seen : Map[String, Bool] = {}
+  let right_queue : Array[@bitcore.ObjectId] = [right]
+  while right_queue.length() > 0 {
+    let current = right_queue.unsafe_pop()
+    let hex = current.to_hex()
+    if seen.contains(hex) {
+      continue
+    }
+    seen[hex] = true
+    if left_ancestors.contains(hex) {
+      return Some(current)
+    }
+    let obj = db.get(rfs, current)
+    match obj {
+      Some(o) =>
+        if o.obj_type == @bitcore.ObjectType::Commit {
+          let info = @bitcore.parse_commit(o.data)
+          for parent in info.parents {
+            right_queue.push(parent)
+          }
+        }
+      None => ()
+    }
+  }
+  None
+}
+
+///|
+fn log_build_commit_sources(
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  start_targets : Array[(String, @bitcore.ObjectId)],
+  exclude_ids : Map[String, Bool],
+  first_parent? : Bool = false,
+) -> Map[String, String] raise Error {
+  let db = @bitlib.ObjectDb::load(rfs, git_dir)
+  let out : Map[String, String] = {}
+  let visited : Map[String, Bool] = {}
+  let queue : Array[(Int64, Int, @bitcore.ObjectId, String)] = []
+  let mut seq = 0
+  for target in start_targets {
+    let name = target.0
+    let id = target.1
+    let hex = id.to_hex()
+    if visited.contains(hex) || exclude_ids.contains(hex) {
+      continue
+    }
+    visited[hex] = true
+    let ts = log_get_commit_timestamp(db, rfs, id)
+    let item = (ts, seq, id, name)
+    let mut pos = queue.length()
+    for i in 0..<queue.length() {
+      let existing = queue[i]
+      if ts > existing.0 || (ts == existing.0 && seq < existing.1) {
+        pos = i
+        break
+      }
+    }
+    queue.push(item)
+    let mut j = queue.length() - 1
+    while j > pos {
+      queue[j] = queue[j - 1]
+      j -= 1
+    }
+    queue[pos] = item
+    seq += 1
+  }
+  while queue.length() > 0 {
+    let (_, _, id, name) = queue[0]
+    let new_q : Array[(Int64, Int, @bitcore.ObjectId, String)] = []
+    for i in 1..<queue.length() {
+      new_q.push(queue[i])
+    }
+    while queue.length() > 0 {
+      ignore(queue.unsafe_pop())
+    }
+    for item in new_q {
+      queue.push(item)
+    }
+    let hex = id.to_hex()
+    if exclude_ids.contains(hex) {
+      continue
+    }
+    out[hex] = name
+    let obj = db.get(rfs, id)
+    guard obj is Some(o) else { continue }
+    if o.obj_type != @bitcore.ObjectType::Commit {
+      continue
+    }
+    let info = @bitcore.parse_commit(o.data)
+    let parents_to_walk = if first_parent && info.parents.length() > 0 {
+      [info.parents[0]]
+    } else {
+      info.parents
+    }
+    for parent in parents_to_walk {
+      let phex = parent.to_hex()
+      if visited.contains(phex) || exclude_ids.contains(phex) {
+        continue
+      }
+      visited[phex] = true
+      let pts = log_get_commit_timestamp(db, rfs, parent)
+      let item = (pts, seq, parent, name)
+      let mut pos = queue.length()
+      for i in 0..<queue.length() {
+        let existing = queue[i]
+        if pts > existing.0 || (pts == existing.0 && seq < existing.1) {
+          pos = i
+          break
+        }
+      }
+      queue.push(item)
+      let mut j = queue.length() - 1
+      while j > pos {
+        queue[j] = queue[j - 1]
+        j -= 1
+      }
+      queue[pos] = item
+      seq += 1
+    }
+  }
+  out
+}
+
+///|
+fn log_diff_filter_key(ch : Char) -> String? {
+  match ch {
+    'A' | 'a' => Some("A")
+    'C' | 'c' => Some("C")
+    'D' | 'd' => Some("D")
+    'M' | 'm' => Some("M")
+    'R' | 'r' => Some("R")
+    _ => None
+  }
+}
+
+///|
+fn log_add_diff_filter_chars(
+  filter : String,
+  include_bits : Map[String, Bool],
+  exclude : Map[String, Bool],
+) -> Unit {
+  for ch in filter.to_array() {
+    match log_diff_filter_key(ch) {
+      Some(key) =>
+        if ch >= 'a' && ch <= 'z' {
+          exclude[key] = true
+        } else {
+          include_bits[key] = true
+        }
+      None => ()
+    }
+  }
+}
+
+///|
+fn log_has_diff_filter(
+  include_bits : Map[String, Bool],
+  exclude : Map[String, Bool],
+) -> Bool {
+  include_bits.length() > 0 || exclude.length() > 0
+}
+
+///|
+fn log_diff_content_oid(content : Bytes?) -> @bitcore.ObjectId? {
+  match content {
+    Some(bytes) =>
+      Some(@bitcore.hash_object_content(@bitcore.ObjectType::Blob, bytes))
+    None => None
+  }
+}
+
+///|
+fn log_commit_diff_statuses(
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  db : @bitlib.ObjectDb,
+  commit_id : @bitcore.ObjectId,
+  detect_renames : Bool,
+  detect_copies : Bool,
+) -> Map[String, Bool] raise Error {
+  let statuses : Map[String, Bool] = {}
+  let obj = db.get(rfs, commit_id)
+  guard obj is Some(o) else { return statuses }
+  let info = @bitcore.parse_commit(o.data)
+  let old_tree : @bitcore.ObjectId? = if info.parents.length() > 0 {
+    match db.get(rfs, info.parents[0]) {
+      Some(parent_obj) => Some(@bitcore.parse_commit(parent_obj.data).tree)
+      None => None
+    }
+  } else {
+    None
+  }
+  let diff_files = @bitdiff.diff_trees(rfs, git_dir, old_tree, info.tree, db~)
+  let added : Array[(String, @bitcore.ObjectId)] = []
+  let deleted : Array[(String, @bitcore.ObjectId)] = []
+  for file in diff_files {
+    match file.kind {
+      @bitdiff.DiffKind::Added =>
+        match log_diff_content_oid(file.new_content) {
+          Some(oid) => added.push((file.path, oid))
+          None => statuses["A"] = true
+        }
+      @bitdiff.DiffKind::Deleted =>
+        match log_diff_content_oid(file.old_content) {
+          Some(oid) => deleted.push((file.path, oid))
+          None => statuses["D"] = true
+        }
+      @bitdiff.DiffKind::Modified => statuses["M"] = true
+    }
+  }
+  let renamed_added : Map[String, Bool] = {}
+  let renamed_deleted : Map[String, Bool] = {}
+  if detect_renames {
+    for add_item in added {
+      let added_path = add_item.0
+      let added_oid = add_item.1
+      for del_item in deleted {
+        let deleted_path = del_item.0
+        let deleted_oid = del_item.1
+        if renamed_added.contains(added_path) ||
+          renamed_deleted.contains(deleted_path) {
+          continue
+        }
+        if added_oid == deleted_oid {
+          renamed_added[added_path] = true
+          renamed_deleted[deleted_path] = true
+          statuses["R"] = true
+          break
+        }
+      }
+    }
+  }
+  if detect_copies {
+    match old_tree {
+      Some(old_tree_id) => {
+        let old_entries = commit_collect_tree_entries(rfs, db, old_tree_id)
+        for add_item in added {
+          let added_path = add_item.0
+          let added_oid = add_item.1
+          if renamed_added.contains(added_path) {
+            continue
+          }
+          let mut copied = false
+          for old_path, old_oid in old_entries {
+            if old_path != added_path && old_oid == added_oid {
+              copied = true
+              break
+            }
+          }
+          if copied {
+            statuses["C"] = true
+          }
+        }
+      }
+      None => ()
+    }
+  }
+  for file in diff_files {
+    match file.kind {
+      @bitdiff.DiffKind::Added =>
+        if not(renamed_added.contains(file.path)) {
+          statuses["A"] = true
+        }
+      @bitdiff.DiffKind::Deleted =>
+        if not(renamed_deleted.contains(file.path)) {
+          statuses["D"] = true
+        }
+      @bitdiff.DiffKind::Modified => ()
+    }
+  }
+  statuses
+}
+
+///|
+fn log_commit_matches_diff_filter_with_statuses(
+  statuses : Map[String, Bool],
+  include_bits : Map[String, Bool],
+  exclude : Map[String, Bool],
+) -> Bool {
+  if not(log_has_diff_filter(include_bits, exclude)) {
+    return true
+  }
+  if include_bits.length() == 0 {
+    for key, _ in statuses {
+      if not(exclude.contains(key)) {
+        return true
+      }
+    }
+    return false
+  }
+  for key, _ in exclude {
+    if statuses.contains(key) {
+      return false
+    }
+  }
+  for key, _ in include_bits {
+    if statuses.contains(key) {
+      return true
+    }
+  }
+  false
+}
+
+///|
+fn log_commit_matches_diff_filter(
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  db : @bitlib.ObjectDb,
+  commit_id : @bitcore.ObjectId,
+  include_bits : Map[String, Bool],
+  exclude : Map[String, Bool],
+  detect_renames : Bool,
+  detect_copies : Bool,
+) -> Bool raise Error {
+  if not(log_has_diff_filter(include_bits, exclude)) {
+    return true
+  }
+  let statuses = log_commit_diff_statuses(
+    rfs, git_dir, db, commit_id, detect_renames, detect_copies,
+  )
+  log_commit_matches_diff_filter_with_statuses(statuses, include_bits, exclude)
+}
+
+///|
+priv struct LogRawResult {
+  sort_key : String
+  old_mode : String
+  new_mode : String
+  old_id : @bitcore.ObjectId
+  new_id : @bitcore.ObjectId
+  status : String
+  old_path : String
+  new_path : String
+}
+
+///|
+fn log_format_raw_result(result : LogRawResult, abbrev_len : Int) -> String {
+  let old_hex = log_abbrev_hex(result.old_id.to_hex(), abbrev_len)
+  let new_hex = log_abbrev_hex(result.new_id.to_hex(), abbrev_len)
+  let path_part = if result.status.has_prefix("R") ||
+    result.status.has_prefix("C") {
+    result.old_path + "\t" + result.new_path
+  } else {
+    result.new_path
+  }
+  ":\{result.old_mode} \{result.new_mode} \{old_hex} \{new_hex} \{result.status}\t\{path_part}"
+}
+
+///|
+fn log_collect_raw_results(
+  rfs : &@bitcore.RepoFileSystem,
+  db : @bitlib.ObjectDb,
+  old_tree : @bitcore.ObjectId?,
+  new_tree : @bitcore.ObjectId,
+  detect_renames : Bool,
+  detect_copies : Bool,
+) -> Array[LogRawResult] raise Error {
+  let old_entries : Map[String, DiffTreeEntry] = {}
+  let new_entries : Map[String, DiffTreeEntry] = {}
+  match old_tree {
+    Some(tree_id) =>
+      diff_tree_collect_entries(db, rfs, tree_id, "", true, false, old_entries)
+    None => ()
+  }
+  diff_tree_collect_entries(db, rfs, new_tree, "", true, false, new_entries)
+  let zero_id = @bitcore.ObjectId::zero()
+  let results : Array[LogRawResult] = []
+  let added : Array[(String, DiffTreeEntry)] = []
+  let deleted : Array[(String, DiffTreeEntry)] = []
+  for path, entry in new_entries {
+    match old_entries.get(path) {
+      None => added.push((path, entry))
+      Some(old_entry) =>
+        if old_entry.id != entry.id || old_entry.mode != entry.mode {
+          let status = if old_entry.mode != entry.mode &&
+            old_entry.id == entry.id {
+            "T"
+          } else {
+            "M"
+          }
+          results.push({
+            sort_key: path,
+            old_mode: old_entry.mode,
+            new_mode: entry.mode,
+            old_id: old_entry.id,
+            new_id: entry.id,
+            status,
+            old_path: path,
+            new_path: path,
+          })
+        }
+    }
+  }
+  for path, entry in old_entries {
+    if not(new_entries.contains(path)) {
+      deleted.push((path, entry))
+    }
+  }
+  let renamed_added : Map[String, LogRawResult] = {}
+  let renamed_deleted : Map[String, Bool] = {}
+  if detect_renames {
+    for add_item in added {
+      let new_path = add_item.0
+      let new_entry = add_item.1
+      for del_item in deleted {
+        let old_path = del_item.0
+        let old_entry = del_item.1
+        if renamed_added.contains(new_path) ||
+          renamed_deleted.contains(old_path) {
+          continue
+        }
+        if new_entry.id == old_entry.id {
+          renamed_added[new_path] = {
+            sort_key: new_path,
+            old_mode: old_entry.mode,
+            new_mode: new_entry.mode,
+            old_id: old_entry.id,
+            new_id: new_entry.id,
+            status: "R100",
+            old_path,
+            new_path,
+          }
+          renamed_deleted[old_path] = true
+          break
+        }
+      }
+    }
+  }
+  let copied_added : Map[String, LogRawResult] = {}
+  if detect_copies {
+    for add_item in added {
+      let new_path = add_item.0
+      let new_entry = add_item.1
+      if renamed_added.contains(new_path) {
+        continue
+      }
+      for old_path, old_entry in old_entries {
+        if old_path != new_path && old_entry.id == new_entry.id {
+          copied_added[new_path] = {
+            sort_key: new_path,
+            old_mode: old_entry.mode,
+            new_mode: new_entry.mode,
+            old_id: old_entry.id,
+            new_id: new_entry.id,
+            status: "C100",
+            old_path,
+            new_path,
+          }
+          break
+        }
+      }
+    }
+  }
+  for add_item in added {
+    let path = add_item.0
+    let entry = add_item.1
+    match renamed_added.get(path) {
+      Some(result) => results.push(result)
+      None =>
+        match copied_added.get(path) {
+          Some(result) => results.push(result)
+          None =>
+            results.push({
+              sort_key: path,
+              old_mode: "000000",
+              new_mode: entry.mode,
+              old_id: zero_id,
+              new_id: entry.id,
+              status: "A",
+              old_path: path,
+              new_path: path,
+            })
+        }
+    }
+  }
+  for del_item in deleted {
+    let path = del_item.0
+    let entry = del_item.1
+    if renamed_deleted.contains(path) {
+      continue
+    }
+    results.push({
+      sort_key: path,
+      old_mode: entry.mode,
+      new_mode: "000000",
+      old_id: entry.id,
+      new_id: zero_id,
+      status: "D",
+      old_path: path,
+      new_path: path,
+    })
+  }
+  results.sort_by(fn(a, b) { String::compare(a.sort_key, b.sort_key) })
+  results
+}
+
+///|
+fn log_grep_patterns_match(
+  message : String,
+  patterns : Array[String],
+  pattern_type : GrepPatternType,
+  ignore_case : Bool,
+  all_match : Bool,
+) -> Bool {
+  if patterns.length() == 0 {
+    return true
+  }
+  if not(all_match) {
+    return grep_patterns_match_message(
+      message, patterns, pattern_type, ignore_case,
+    )
+  }
+  for pattern in patterns {
+    if not(
+        grep_message_matches_pattern(
+          message, pattern, pattern_type, ignore_case,
+        ),
+      ) {
+      return false
+    }
+  }
+  true
+}
+
+///|
+fn log_commit_matches_text_filters(
+  rfs : &@bitcore.RepoFileSystem,
+  db : @bitlib.ObjectDb,
+  commit_id : @bitcore.ObjectId,
+  grep_patterns : Array[String],
+  pattern_type : GrepPatternType,
+  ignore_case : Bool,
+  invert_grep : Bool,
+  all_match : Bool,
+  author_pattern : String?,
+  committer_pattern : String?,
+) -> Bool raise Error {
+  if grep_patterns.length() == 0 &&
+    author_pattern is None &&
+    committer_pattern is None {
+    return true
+  }
+  let obj = db.get(rfs, commit_id)
+  guard obj is Some(o) else { return false }
+  let info = @bitcore.parse_commit(o.data)
+  let data = parse_commit_format_data(
+    commit_id,
+    o.data,
+    info.tree,
+    info.parents,
+    {},
+  )
+  let message_match = log_grep_patterns_match(
+    data.message,
+    grep_patterns,
+    pattern_type,
+    ignore_case,
+    all_match,
+  )
+  let effective_message_match = if grep_patterns.length() > 0 && invert_grep {
+    not(message_match)
+  } else {
+    message_match
+  }
+  if not(effective_message_match) {
+    return false
+  }
+  match author_pattern {
+    Some(pattern) => {
+      let author_text = data.author_name + " <" + data.author_email + ">"
+      if not(
+          grep_message_matches_pattern(
+            author_text, pattern, pattern_type, ignore_case,
+          ),
+        ) {
+        return false
+      }
+    }
+    None => ()
+  }
+  match committer_pattern {
+    Some(pattern) => {
+      let committer_text = data.committer_name +
+        " <" +
+        data.committer_email +
+        ">"
+      if not(
+          grep_message_matches_pattern(
+            committer_text, pattern, pattern_type, ignore_case,
+          ),
+        ) {
+        return false
+      }
+    }
+    None => ()
+  }
+  true
+}
+
+///|
 fn format_commit_string(fmt : String, data : CommitFormatData) -> String {
   let out = StringBuilder::new()
   let chars = fmt.to_array()
   let len = chars.length()
   let mut i = 0
+  let mut wrap_spec : LogWrapSpec? = None
   while i < len {
     if chars[i] == '%' && i + 1 < len {
       let next = chars[i + 1]
@@ -262,7 +2061,7 @@ fn format_commit_string(fmt : String, data : CommitFormatData) -> String {
           i += 2
         }
         'h' => {
-          out.write_string((try! data.id.to_hex()[:7]).to_string())
+          out.write_string(log_abbrev_hex(data.id.to_hex(), data.abbrev_len))
           i += 2
         }
         'T' => {
@@ -270,7 +2069,7 @@ fn format_commit_string(fmt : String, data : CommitFormatData) -> String {
           i += 2
         }
         't' => {
-          out.write_string((try! data.tree.to_hex()[:7]).to_string())
+          out.write_string(log_abbrev_hex(data.tree.to_hex(), data.abbrev_len))
           i += 2
         }
         'P' => {
@@ -280,7 +2079,7 @@ fn format_commit_string(fmt : String, data : CommitFormatData) -> String {
         }
         'p' => {
           let parent_shorts = data.parents.map(fn(p) {
-            (try! p.to_hex()[:7]).to_string()
+            log_abbrev_hex(p.to_hex(), data.abbrev_len)
           })
           out.write_string(parent_shorts.join(" "))
           i += 2
@@ -383,6 +2182,36 @@ fn format_commit_string(fmt : String, data : CommitFormatData) -> String {
           out.write_string(data.subject)
           i += 2
         }
+        'f' => {
+          out.write_string(log_sanitize_subject_for_format(data.subject))
+          i += 2
+        }
+        'g' if i + 2 < len => {
+          let spec = chars[i + 2]
+          match spec {
+            'd' => {
+              out.write_string(data.reflog_selector_short.unwrap_or(""))
+              i += 3
+            }
+            'D' => {
+              out.write_string(
+                data.reflog_selector.unwrap_or(
+                  data.reflog_selector_short.unwrap_or(""),
+                ),
+              )
+              i += 3
+            }
+            's' => {
+              out.write_string(data.reflog_message.unwrap_or(""))
+              i += 3
+            }
+            _ => {
+              out.write_char('%')
+              out.write_char('g')
+              i += 2
+            }
+          }
+        }
         'b' => {
           out.write_string(data.body)
           i += 2
@@ -419,6 +2248,26 @@ fn format_commit_string(fmt : String, data : CommitFormatData) -> String {
           }
           i += 2
         }
+        'w' if i + 2 < len && chars[i + 2] == '(' => {
+          let mut end = i + 3
+          while end < len && chars[end] != ')' {
+            end += 1
+          }
+          if end < len {
+            let spec_builder = StringBuilder::new()
+            let mut j = i + 3
+            while j < end {
+              spec_builder.write_char(chars[j])
+              j += 1
+            }
+            wrap_spec = Some(log_parse_wrap_spec(spec_builder.to_string()))
+            i = end + 1
+          } else {
+            out.write_char('%')
+            out.write_char('w')
+            i += 2
+          }
+        }
         _ => {
           out.write_char('%')
           out.write_char(next)
@@ -430,7 +2279,34 @@ fn format_commit_string(fmt : String, data : CommitFormatData) -> String {
       i += 1
     }
   }
-  out.to_string()
+  let rendered = out.to_string()
+  match wrap_spec {
+    Some(spec) => log_apply_wrap(rendered, spec)
+    None => rendered
+  }
+}
+
+///|
+fn log_sanitize_subject_for_format(s : String) -> String {
+  let sb = StringBuilder::new()
+  let mut last_was_dash = false
+  for c in s {
+    if (c >= 'a' && c <= 'z') ||
+      (c >= 'A' && c <= 'Z') ||
+      (c >= '0' && c <= '9') {
+      sb.write_char(c)
+      last_was_dash = false
+    } else if not(last_was_dash) {
+      sb.write_char('-')
+      last_was_dash = true
+    }
+  }
+  let result = sb.to_string()
+  if result.length() > 0 && result[result.length() - 1] == '-' {
+    String::unsafe_substring(result, start=0, end=result.length() - 1)
+  } else {
+    result
+  }
 }
 
 ///|
@@ -445,6 +2321,97 @@ fn format_date_by_mode(ts : Int64, tz : String, mode : String) -> String {
     "default" | "" => format_timestamp_default(ts, tz)
     _ => format_timestamp_default(ts, tz)
   }
+}
+
+///|
+fn log_split_reflog_target(rev : String) -> (String, String?) {
+  guard rev.has_suffix("}") else { return (rev, None) }
+  match rev.rev_find("@{") {
+    Some(idx) => {
+      let base = String::unsafe_substring(rev, start=0, end=idx)
+      let selector = String::unsafe_substring(
+        rev,
+        start=idx + 2,
+        end=rev.length() - 1,
+      )
+      let normalized_base = if base.length() == 0 { "HEAD" } else { base }
+      if selector.length() == 0 {
+        (rev, None)
+      } else {
+        (normalized_base, Some(selector))
+      }
+    }
+    None => (rev, None)
+  }
+}
+
+///|
+fn log_parse_reflog_selector_index(selector : String) -> Int? {
+  if selector.length() == 0 {
+    return None
+  }
+  for ch in selector {
+    if ch < '0' || ch > '9' {
+      return None
+    }
+  }
+  Some(@strconv.parse_int(selector)) catch {
+    _ => None
+  }
+}
+
+///|
+fn log_reflog_selector_uses_date(
+  explicit_selector : String?,
+  date_format : String,
+) -> Bool {
+  match explicit_selector {
+    Some(selector) => log_parse_reflog_selector_index(selector) is None
+    None => date_format.length() > 0
+  }
+}
+
+///|
+fn log_resolve_reflog_start_index(
+  entry_count : Int,
+  explicit_selector : String?,
+) -> Int? {
+  match explicit_selector {
+    Some(selector) =>
+      match log_parse_reflog_selector_index(selector) {
+        Some(index) if index >= 0 && index < entry_count => Some(index)
+        Some(_) => None
+        None => Some(0)
+      }
+    None => Some(0)
+  }
+}
+
+///|
+fn log_format_reflog_selector(
+  display_ref : String,
+  index : Int,
+  timestamp : Int64,
+  timezone : String,
+  explicit_selector : String?,
+  date_format : String,
+) -> String {
+  let selector_text = if log_reflog_selector_uses_date(
+      explicit_selector, date_format,
+    ) {
+    format_date_by_mode(
+      timestamp,
+      timezone,
+      if date_format.length() == 0 {
+        "default"
+      } else {
+        date_format
+      },
+    )
+  } else {
+    index.to_string()
+  }
+  display_ref + "@{" + selector_text + "}"
 }
 
 ///|
@@ -599,6 +2566,7 @@ fn resolve_log_reflog_refname(
   git_dir : String,
   rev : String,
 ) -> String? {
+  let (rev, _) = log_split_reflog_target(rev)
   if rev == "HEAD" {
     return Some("HEAD")
   }
@@ -640,11 +2608,104 @@ fn shorten_reflog_refname(refname : String) -> String {
 }
 
 ///|
+async fn log_emit_default_commit_entry(
+  entry : LogWalkEntry,
+  ref_names : Map[String, Array[String]],
+  abbrev_commit : Bool,
+  abbrev_len : Int,
+  date_format : String,
+  line_prefix : String,
+  show_stat : Bool,
+  show_patch : Bool,
+  show_raw : Bool,
+  raw_detect_renames : Bool,
+  detect_copies : Bool,
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  db : @bitlib.ObjectDb,
+  reflog_selector? : String? = None,
+  reflog_identity? : String? = None,
+  reflog_message? : String? = None,
+) -> Unit raise Error {
+  let deco = format_decoration(ref_names, entry.id.to_hex())
+  let header_hex = if abbrev_commit {
+    log_abbrev_hex(entry.id.to_hex(), abbrev_len)
+  } else {
+    entry.id.to_hex()
+  }
+  log_emit_output("commit " + header_hex + deco, true, line_prefix)
+  match (reflog_selector, reflog_identity, reflog_message) {
+    (Some(selector), Some(identity), Some(message)) => {
+      log_emit_output(
+        "Reflog: " + selector + " (" + identity + ")",
+        true,
+        line_prefix,
+      )
+      log_emit_output("Reflog message: " + message, true, line_prefix)
+    }
+    _ => ()
+  }
+  log_emit_output("Author: " + entry.author, true, line_prefix)
+  let date_str = format_date_by_mode(
+    entry.timestamp,
+    log_extract_author_tz(entry.author),
+    date_format,
+  )
+  log_emit_output("Date:   " + date_str, true, line_prefix)
+  log_emit_output("", true, line_prefix)
+  log_emit_output("    " + entry.message, true, line_prefix)
+  log_emit_output("", true, line_prefix)
+  if show_stat || show_patch {
+    let diff_files = @bitdiff.diff_trees(
+      rfs,
+      git_dir,
+      entry.parent_tree,
+      entry.tree,
+      db~,
+    )
+    if show_stat {
+      let stat_lines = @bitdiff.diff_stat(diff_files)
+      for line in stat_lines {
+        log_emit_output(line, true, line_prefix)
+      }
+      log_emit_output("", true, line_prefix)
+    }
+    if show_patch {
+      let patch_lines = @bitdiff.diff_text(diff_files)
+      for line in patch_lines {
+        log_emit_output(line, true, line_prefix)
+      }
+      log_emit_output("", true, line_prefix)
+    }
+  }
+  if show_raw {
+    let raw_results = log_collect_raw_results(
+      rfs,
+      db,
+      entry.parent_tree,
+      entry.tree,
+      raw_detect_renames,
+      detect_copies,
+    )
+    for raw_result in raw_results {
+      log_emit_output(
+        log_format_raw_result(raw_result, abbrev_len),
+        true,
+        line_prefix,
+      )
+    }
+    log_emit_output("", true, line_prefix)
+  }
+}
+
+///|
 fn format_reflog_entry(fmt : String?, gd : String, message : String) -> String {
   match fmt {
     Some("%gd") => gd
+    Some("%gD") => gd
     Some("%gs") => message
     Some("%gd %gs") => gd + " " + message
+    Some("%gD %gs") => gd + " " + message
     Some(_) => gd + " " + message
     None => gd + " " + message
   }
@@ -688,7 +2749,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
   let rfs : &@bitcore.RepoFileSystem = fs
   let git_dir = resolve_git_dir(fs, root)
-  if log_should_use_storage_runtime(args) {
+  if log_should_use_storage_runtime_in_repo(rfs, git_dir, args) {
     match log_storage_runtime_delegate_args(args) {
       Some(log_args) => {
         @runtime.run_storage_command(
@@ -705,32 +2766,167 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
   let mut oneline = false
   let mut graph = false
   let mut all_refs = false
-  let mut decorate = false
+  let mut decorate_mode_override : LogDecorationDisplayMode? = None
   let mut show_stat = false
   let mut show_patch = false
-  let mut max_count = 10
+  let mut max_count = 2147483647
   let mut since_ts = 0L
   let mut until_ts = 9223372036854775807L
   let mut no_walk = false
+  let mut no_walk_unsorted = false
   let mut walk_reflogs = false
   let mut reverse = false
   let mut first_parent = false
+  let mut source = false
+  let mut stdin_mode = false
+  let mut ignore_missing = false
   let mut date_format = ""
+  let mut line_prefix = ""
+  let mut detect_renames = false
+  let mut detect_copies = false
+  let mut raw_detect_renames = true
+  let mut show_raw = false
+  let mut no_merges = false
+  let mut abbrev_commit_override : Bool? = None
+  let mut abbrev_len_override : Int? = None
+  let mut no_abbrev = false
+  let grep_patterns : Array[String] = []
+  let mut grep_pattern_type_override : GrepPatternType? = None
+  let mut grep_ignore_case = false
+  let mut invert_grep = false
+  let mut all_match = false
+  let mut author_pattern : String? = None
+  let mut committer_pattern : String? = None
   let mut format : String? = None
+  let decoration_include_patterns : Array[String] = []
+  let decoration_exclude_patterns : Array[String] = []
+  let mut clear_decorations = false
+  let mut simplify_by_decoration = false
+  let diff_filter_include : Map[String, Bool] = {}
+  let diff_filter_exclude : Map[String, Bool] = {}
+  let branch_patterns : Array[String] = []
   let revs : Array[String] = []
   let range_excludes : Array[String] = []
+  let symmetric_ranges : Array[(String, String)] = []
+  let mut saw_revision_input = false
+  let mut end_of_options = false
   let mut i = 0
   while i < args.length() {
     let arg = args[i]
+    if end_of_options {
+      saw_revision_input = true
+      log_add_revision_input(arg, revs, range_excludes, symmetric_ranges)
+      i += 1
+      continue
+    }
     match arg {
       "--oneline" => oneline = true
       "--graph" => graph = true
       "--all" => all_refs = true
-      "--no-walk" => no_walk = true
+      "--end-of-options" => end_of_options = true
+      "--source" => source = true
+      "--stdin" => stdin_mode = true
+      "--ignore-missing" => ignore_missing = true
+      "--exclude-promisor-objects" =>
+        raise @bitcore.GitError::InvalidObject(
+          "unsupported option: --exclude-promisor-objects",
+        )
+      "--branches" => {
+        branch_patterns.push("*")
+        saw_revision_input = true
+      }
+      "--no-walk" => {
+        no_walk = true
+        no_walk_unsorted = false
+      }
       "-g" | "--walk-reflogs" => walk_reflogs = true
-      "--decorate" => decorate = true
+      "--decorate" =>
+        decorate_mode_override = Some(LogDecorationDisplayMode::Short)
+      "--no-decorate" =>
+        decorate_mode_override = Some(LogDecorationDisplayMode::Disabled)
+      "--decorate-refs" if i + 1 < args.length() => {
+        decoration_include_patterns.push(args[i + 1])
+        i += 1
+      }
+      "--decorate-refs" =>
+        raise @bitcore.GitError::InvalidObject(
+          "option `--decorate-refs` requires a value",
+        )
+      "--decorate-refs-exclude" if i + 1 < args.length() => {
+        decoration_exclude_patterns.push(args[i + 1])
+        i += 1
+      }
+      "--decorate-refs-exclude" =>
+        raise @bitcore.GitError::InvalidObject(
+          "option `--decorate-refs-exclude` requires a value",
+        )
+      "--clear-decorations" => {
+        log_clear_string_array(decoration_include_patterns)
+        log_clear_string_array(decoration_exclude_patterns)
+        clear_decorations = true
+      }
+      "--simplify-by-decoration" => simplify_by_decoration = true
+      "--raw" => show_raw = true
       "--stat" => show_stat = true
       "-p" | "--patch" => show_patch = true
+      "--no-merges" => no_merges = true
+      "--abbrev-commit" => abbrev_commit_override = Some(true)
+      "--no-abbrev-commit" => abbrev_commit_override = Some(false)
+      "--no-abbrev" => no_abbrev = true
+      "--abbrev" if i + 1 < args.length() => {
+        let parsed = @strconv.parse_int(args[i + 1]) catch { _ => 7 }
+        abbrev_len_override = Some(log_normalize_abbrev_length(parsed))
+        i += 1
+      }
+      "--no-renames" => {
+        detect_renames = false
+        detect_copies = false
+        raw_detect_renames = false
+      }
+      "-M" => {
+        detect_renames = true
+        raw_detect_renames = true
+      }
+      "-C" => {
+        detect_renames = true
+        detect_copies = true
+        raw_detect_renames = true
+      }
+      "--diff-filter" if i + 1 < args.length() => {
+        log_add_diff_filter_chars(
+          args[i + 1],
+          diff_filter_include,
+          diff_filter_exclude,
+        )
+        i += 1
+      }
+      "--grep" if i + 1 < args.length() => {
+        grep_patterns.push(args[i + 1])
+        i += 1
+      }
+      "--grep" =>
+        raise @bitcore.GitError::InvalidObject(
+          "option `--grep` requires a value",
+        )
+      "--author" if i + 1 < args.length() => {
+        author_pattern = Some(args[i + 1])
+        i += 1
+      }
+      "--committer" if i + 1 < args.length() => {
+        committer_pattern = Some(args[i + 1])
+        i += 1
+      }
+      "-i" | "--regexp-ignore-case" => grep_ignore_case = true
+      "--invert-grep" => invert_grep = true
+      "--all-match" => all_match = true
+      "-F" | "--fixed-strings" =>
+        grep_pattern_type_override = Some(GrepPatternType::Fixed)
+      "-E" | "--extended-regexp" =>
+        grep_pattern_type_override = Some(GrepPatternType::Extended)
+      "-P" | "--perl-regexp" =>
+        grep_pattern_type_override = Some(GrepPatternType::Perl)
+      "--basic-regexp" =>
+        grep_pattern_type_override = Some(GrepPatternType::Basic)
       "--format" if i + 1 < args.length() => {
         format = Some(args[i + 1])
         i += 1
@@ -765,6 +2961,18 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         let value = String::unsafe_substring(arg, start=9, end=arg.length())
         format = Some(value)
       }
+      _ if arg.has_prefix("--decorate=") => {
+        let value = String::unsafe_substring(arg, start=11, end=arg.length())
+        decorate_mode_override = Some(
+          log_parse_decorate_mode(value).unwrap_or(
+            LogDecorationDisplayMode::Disabled,
+          ),
+        )
+      }
+      _ if arg.has_prefix("--decorate-refs=") =>
+        decoration_include_patterns.push((try! arg[16:]).to_string())
+      _ if arg.has_prefix("--decorate-refs-exclude=") =>
+        decoration_exclude_patterns.push((try! arg[24:]).to_string())
       _ if arg.has_prefix("-n") && arg.length() > 2 => {
         let num_str = (try! arg[2:]).to_string()
         max_count = @strconv.parse_int(num_str)
@@ -777,6 +2985,33 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         let num_str = (try! arg[12:]).to_string()
         max_count = @strconv.parse_int(num_str)
       }
+      _ if arg.has_prefix("--diff-filter=") => {
+        let value = (try! arg[14:]).to_string()
+        log_add_diff_filter_chars(
+          value, diff_filter_include, diff_filter_exclude,
+        )
+      }
+      _ if arg.has_prefix("--grep=") =>
+        grep_patterns.push((try! arg[7:]).to_string())
+      _ if arg.has_prefix("--author=") =>
+        author_pattern = Some((try! arg[9:]).to_string())
+      _ if arg.has_prefix("--committer=") =>
+        committer_pattern = Some((try! arg[12:]).to_string())
+      _ if arg.has_prefix("--branches=") => {
+        branch_patterns.push((try! arg[11:]).to_string())
+        saw_revision_input = true
+      }
+      _ if arg.has_prefix("--abbrev=") => {
+        let parsed = @strconv.parse_int((try! arg[9:]).to_string()) catch {
+          _ => 7
+        }
+        abbrev_len_override = Some(log_normalize_abbrev_length(parsed))
+      }
+      _ if arg.has_prefix("--no-walk=") => {
+        no_walk = true
+        let mode = (try! arg[10:]).to_string()
+        no_walk_unsorted = mode == "unsorted"
+      }
       _ if arg.has_prefix("--since=") => {
         let val = (try! arg[8:]).to_string()
         since_ts = @strconv.parse_int64(val) catch { _ => 0L }
@@ -785,6 +3020,12 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         let val = (try! arg[8:]).to_string()
         until_ts = @strconv.parse_int64(val) catch { _ => 9223372036854775807L }
       }
+      "--line-prefix" if i + 1 < args.length() => {
+        line_prefix = args[i + 1]
+        i += 1
+      }
+      _ if arg.has_prefix("--line-prefix=") =>
+        line_prefix = (try! arg[14:]).to_string()
       "--reverse" => reverse = true
       "--first-parent" => first_parent = true
       "--date" if i + 1 < args.length() => {
@@ -794,56 +3035,217 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
       _ if arg.has_prefix("--date=") => date_format = (try! arg[7:]).to_string()
       _ if arg.has_prefix("-") => warn_unimplemented_arg("log", arg)
       _ => {
-        // Detect A..B range (but not A...B)
-        let dot_idx = log_find_dotdot(arg)
-        if dot_idx >= 0 {
-          let left = String::unsafe_substring(arg, start=0, end=dot_idx)
-          let right = String::unsafe_substring(
-            arg,
-            start=dot_idx + 2,
-            end=arg.length(),
-          )
-          if left.length() > 0 {
-            range_excludes.push(left)
-          }
-          revs.push(if right.length() > 0 { right } else { "HEAD" })
-        } else {
-          revs.push(arg)
-        }
+        saw_revision_input = true
+        log_add_revision_input(arg, revs, range_excludes, symmetric_ranges)
       }
     }
     i += 1
   }
-  if walk_reflogs {
-    let targets : Array[String] = if revs.length() > 0 {
-      revs
-    } else {
-      ["HEAD"]
+  if stdin_mode {
+    let input = decode_bytes(read_all_stdin())
+    for line_view in input.split("\n") {
+      let line = trim_string(line_view.to_string())
+      if line.length() == 0 || line.has_prefix("#") {
+        continue
+      }
+      saw_revision_input = true
+      if line.has_prefix("^") {
+        range_excludes.push(
+          String::unsafe_substring(line, start=1, end=line.length()),
+        )
+      } else {
+        log_add_revision_input(line, revs, range_excludes, symmetric_ranges)
+      }
     }
+  }
+  if graph && no_walk {
+    raise @bitcore.GitError::InvalidObject(
+      "options '--graph' and '--no-walk' cannot be used together",
+    )
+  }
+  if graph && reverse {
+    raise @bitcore.GitError::InvalidObject(
+      "options '--graph' and '--reverse' cannot be used together",
+    )
+  }
+  if graph && walk_reflogs {
+    raise @bitcore.GitError::InvalidObject(
+      "options '--graph' and '--walk-reflogs' cannot be used together",
+    )
+  }
+  let grep_pattern_type = resolve_grep_pattern_type(
+    rfs, git_dir, grep_pattern_type_override,
+  )
+  let abbrev_len = log_resolve_abbrev_length(
+    rfs, git_dir, abbrev_len_override, no_abbrev,
+  )
+  let abbrev_commit = log_resolve_abbrev_commit(
+    rfs, git_dir, abbrev_commit_override,
+  )
+  let has_commit_filters = log_has_diff_filter(
+      diff_filter_include, diff_filter_exclude,
+    ) ||
+    grep_patterns.length() > 0 ||
+    author_pattern is Some(_) ||
+    committer_pattern is Some(_)
+  if ignore_missing &&
+    saw_revision_input &&
+    range_excludes.length() == 0 &&
+    symmetric_ranges.length() == 0 {
+    let explicit_targets = log_resolve_targets(
+      rfs,
+      git_dir,
+      revs,
+      branch_patterns,
+      false,
+      default_head=false,
+      ignore_missing=true,
+    )
+    if explicit_targets.length() == 0 {
+      return
+    }
+  }
+  if walk_reflogs {
+    let targets = log_collect_reflog_targets(
+      rfs, git_dir, revs, branch_patterns,
+    )
+    let normalized_reflog_format = match format {
+      Some(raw_fmt) if raw_fmt.has_prefix("tformat:") =>
+        Some((try! raw_fmt[8:]).to_string())
+      Some(raw_fmt) if raw_fmt.has_prefix("format:") =>
+        Some((try! raw_fmt[7:]).to_string())
+      Some(raw_fmt) => Some(raw_fmt)
+      None => None
+    }
+    let reflog_oneline = match normalized_reflog_format {
+      Some(raw_fmt) => raw_fmt == "oneline"
+      None => oneline
+    }
+    let reflog_object_git_dir = log_resolve_common_git_dir(rfs, git_dir)
+    let reflog_db = @bitlib.ObjectDb::load_lazy(rfs, reflog_object_git_dir)
     let mut emitted = 0
     for target in targets {
       if emitted >= max_count {
         break
       }
+      let (target_base, explicit_selector) = log_split_reflog_target(target)
       let refname = resolve_log_reflog_refname(rfs, git_dir, target)
       guard refname is Some(actual_refname) else {
         raise @bitcore.GitError::InvalidObject("Unknown revision: " + target)
       }
-      let display_ref = if target.has_prefix("refs/") {
+      let display_ref = if target_base.has_prefix("refs/") {
         shorten_reflog_refname(actual_refname)
       } else {
-        target
+        target_base
       }
       let entries = @bitrepo.read_reflog(rfs, git_dir, actual_refname)
-      let mut idx = 0
-      let mut entry_i = entries.length()
-      while entry_i > 0 && emitted < max_count {
-        entry_i -= 1
-        let entry = entries[entry_i]
-        let gd = display_ref + "@{" + idx.to_string() + "}"
-        print_line(format_reflog_entry(format, gd, entry.message))
+      let start_index = log_resolve_reflog_start_index(
+        entries.length(),
+        explicit_selector,
+      )
+      guard start_index is Some(start_reflog_index) else {
+        raise @bitcore.GitError::InvalidObject("Unknown revision: " + target)
+      }
+      let mut reflog_index = start_reflog_index
+      while reflog_index < entries.length() && emitted < max_count {
+        let entry = entries[entries.length() - 1 - reflog_index]
+        let gd = log_format_reflog_selector(
+          display_ref,
+          reflog_index,
+          entry.timestamp,
+          entry.timezone,
+          explicit_selector,
+          date_format,
+        )
+        if reflog_oneline {
+          let rendered = log_abbrev_hex(entry.new_id.to_hex(), abbrev_len) +
+            " " +
+            gd +
+            ": " +
+            entry.message
+          log_emit_output(rendered, true, line_prefix)
+          emitted += 1
+          reflog_index += 1
+          continue
+        }
+        if format is None {
+          match
+            log_load_entry(
+              reflog_db,
+              rfs,
+              git_dir,
+              entry.new_id,
+              show_stat || show_patch || show_raw,
+            ) {
+            Some(log_entry) => {
+              log_emit_default_commit_entry(
+                log_entry,
+                {},
+                abbrev_commit,
+                abbrev_len,
+                date_format,
+                line_prefix,
+                show_stat,
+                show_patch,
+                show_raw,
+                raw_detect_renames,
+                detect_copies,
+                rfs,
+                git_dir,
+                reflog_db,
+                reflog_selector=Some(gd),
+                reflog_identity=Some(entry.author + " <" + entry.email + ">"),
+                reflog_message=Some(entry.message),
+              )
+              if (show_stat || show_patch || show_raw) &&
+                reflog_index + 1 < entries.length() &&
+                emitted + 1 < max_count {
+                log_emit_output("", true, line_prefix)
+              }
+              emitted += 1
+              reflog_index += 1
+              continue
+            }
+            None => ()
+          }
+        }
+        let rendered = match normalized_reflog_format {
+          Some(fmt) =>
+            match reflog_db.get(rfs, entry.new_id) {
+              Some(obj) if obj.obj_type == @bitcore.ObjectType::Commit => {
+                let info = @bitcore.parse_commit(obj.data)
+                let parents = log_resolve_parents(
+                  rfs,
+                  git_dir,
+                  entry.new_id,
+                  info.parents,
+                )
+                let commit_data = parse_commit_format_data(
+                  entry.new_id,
+                  obj.data,
+                  info.tree,
+                  parents,
+                  {},
+                  abbrev_len~,
+                  date_format~,
+                  reflog_selector_short=Some(gd),
+                  reflog_selector=Some(gd),
+                  reflog_message=Some(entry.message),
+                )
+                format_commit_string(fmt, commit_data)
+              }
+              _ =>
+                if fmt == "%H" {
+                  entry.new_id.to_hex()
+                } else {
+                  format_reflog_entry(Some(fmt), gd, entry.message)
+                }
+            }
+          None => format_reflog_entry(None, gd, entry.message)
+        }
+        log_emit_output(rendered, true, line_prefix)
         emitted += 1
-        idx += 1
+        reflog_index += 1
       }
     }
     return
@@ -859,227 +3261,759 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
     } else {
       (raw_fmt, true)
     }
-    let db = @bitlib.ObjectDb::load(rfs, git_dir)
-    let ref_names_map : Map[String, Array[String]] = {}
-    let targets : Array[(String, @bitcore.ObjectId)] = []
-    if all_refs || no_walk {
-      let refs = @bitlib.list_refs_with_ids(rfs, git_dir, None)
-      for name, id in refs {
-        targets.push((name, id))
-      }
-      targets.sort_by((a, b) => a.0.compare(b.0))
+    let warn_missing_exclude_decoration = decoration_include_patterns.length() ==
+      0 &&
+      log_has_missing_exclude_decoration_value(rfs, git_dir)
+    if warn_missing_exclude_decoration {
+      eprint_line("error: missing value for 'log.excludeDecoration'")
     }
-    for rev in revs {
-      let resolved = @bitrepo.rev_parse(rfs, git_dir, rev)
-      guard resolved is Some(id) else {
-        raise @bitcore.GitError::InvalidObject("Unknown revision: " + rev)
-      }
-      targets.push((rev, id))
+    let decoration_options = log_make_decoration_options(
+      rfs,
+      git_dir,
+      decorate_mode_override,
+      decoration_include_patterns,
+      decoration_exclude_patterns,
+      clear_decorations,
+      actual_fmt.contains("%d") || actual_fmt.contains("%D"),
+      raw_fmt != "raw",
+      simplify_by_decoration,
+    )
+    let selection_ref_names = if not(
+        log_decoration_mode_is_none(decoration_options.mode),
+      ) ||
+      simplify_by_decoration {
+      log_build_ref_names(rfs, git_dir, decoration_options)
+    } else {
+      {}
     }
-    if targets.length() == 0 {
-      let head = @bitrepo.rev_parse(rfs, git_dir, "HEAD")
-      guard head is Some(id) else { return }
-      targets.push(("HEAD", id))
+    let ref_names_map = if not(
+        log_decoration_mode_is_none(decoration_options.mode),
+      ) {
+      selection_ref_names
+    } else {
+      {}
     }
+    let db = @bitlib.ObjectDb::load(
+      rfs,
+      log_resolve_common_git_dir(rfs, git_dir),
+    )
     let seen : Map[String, Bool] = {}
-    let mut emitted = 0
-    for target in targets {
-      if emitted >= max_count {
-        break
-      }
-      let id = target.1
-      let hex = id.to_hex()
-      if seen.contains(hex) {
-        continue
-      }
-      seen[hex] = true
-      let obj = db.get(rfs, id)
-      guard obj is Some(o) else { continue }
-      let info = @bitcore.parse_commit(o.data)
-      let commit_data = parse_commit_format_data(
-        id,
-        o.data,
-        info.tree,
-        info.parents,
-        ref_names_map,
-        date_format~,
+    let formatted_lines : Array[String] = []
+    if no_walk {
+      let resolved_targets = log_resolve_targets(
+        rfs,
+        git_dir,
+        revs,
+        branch_patterns,
+        all_refs,
+        default_head=not(saw_revision_input),
+        ignore_missing~,
       )
-      let line = format_commit_string(actual_fmt, commit_data)
-      if is_tformat {
-        print_line(line)
+      let targets = if no_walk_unsorted {
+        resolved_targets
       } else {
-        print_str(line)
+        log_sort_targets_by_time(rfs, git_dir, resolved_targets)
       }
-      emitted += 1
+      for target in targets {
+        if formatted_lines.length() >= max_count {
+          break
+        }
+        let id = target.1
+        let hex = id.to_hex()
+        if seen.contains(hex) {
+          continue
+        }
+        if not(
+            log_commit_matches_text_filters(
+              rfs, db, id, grep_patterns, grep_pattern_type, grep_ignore_case, invert_grep,
+              all_match, author_pattern, committer_pattern,
+            ),
+          ) {
+          continue
+        }
+        if not(
+            log_commit_matches_diff_filter(
+              rfs, git_dir, db, id, diff_filter_include, diff_filter_exclude, detect_renames,
+              detect_copies,
+            ),
+          ) {
+          continue
+        }
+        seen[hex] = true
+        let obj = db.get(rfs, id)
+        guard obj is Some(o) else { continue }
+        let info = @bitcore.parse_commit(o.data)
+        let parents = log_resolve_parents(rfs, git_dir, id, info.parents)
+        if no_merges && parents.length() > 1 {
+          continue
+        }
+        if simplify_by_decoration &&
+          not(
+            log_should_emit_simplified_entry(
+              selection_ref_names,
+              hex,
+              parents.length(),
+            ),
+          ) {
+          continue
+        }
+        let commit_data = parse_commit_format_data(
+          id,
+          o.data,
+          info.tree,
+          parents,
+          ref_names_map,
+          abbrev_len~,
+          date_format~,
+        )
+        formatted_lines.push(format_commit_string(actual_fmt, commit_data))
+      }
+    } else {
+      let start_targets = log_resolve_targets(
+        rfs,
+        git_dir,
+        revs,
+        branch_patterns,
+        all_refs,
+        default_head=not(saw_revision_input),
+        ignore_missing~,
+      )
+      let start_ids : Array[@bitcore.ObjectId] = []
+      for target in start_targets {
+        start_ids.push(target.1)
+      }
+      if start_ids.length() == 0 {
+        if saw_revision_input {
+          return
+        }
+        start_ids.push(log_resolve_default_head(rfs, git_dir))
+      }
+      let exclude_ids : Map[String, Bool] = {}
+      for spec in range_excludes {
+        match @bitrepo.rev_parse(rfs, git_dir, spec) {
+          Some(id) => walk_commits_to_map(fs, git_dir, id, exclude_ids)
+          None if ignore_missing => ()
+          None =>
+            raise @bitcore.GitError::InvalidObject("Unknown revision: " + spec)
+        }
+      }
+      for pair in symmetric_ranges {
+        let left_spec = pair.0
+        let right_spec = pair.1
+        match
+          (
+            @bitrepo.rev_parse(rfs, git_dir, left_spec),
+            @bitrepo.rev_parse(rfs, git_dir, right_spec),
+          ) {
+          (Some(left_id), Some(right_id)) =>
+            match log_find_merge_base(rfs, git_dir, left_id, right_id) {
+              Some(base_id) =>
+                walk_commits_to_map(fs, git_dir, base_id, exclude_ids)
+              None => ()
+            }
+          _ if ignore_missing => ()
+          _ =>
+            raise @bitcore.GitError::InvalidObject(
+              "Unknown revision in symmetric range",
+            )
+        }
+      }
+      let entries = log_walk_commits(
+        rfs,
+        git_dir,
+        start_ids,
+        exclude_ids,
+        if has_commit_filters {
+          2147483647
+        } else {
+          max_count
+        },
+        since_ts,
+        until_ts,
+        false,
+        first_parent~,
+      )
+      if reverse {
+        entries.rev_in_place()
+      }
+      for entry in entries {
+        let hex = entry.id.to_hex()
+        if seen.contains(hex) {
+          continue
+        }
+        if not(
+            log_commit_matches_text_filters(
+              rfs,
+              db,
+              entry.id,
+              grep_patterns,
+              grep_pattern_type,
+              grep_ignore_case,
+              invert_grep,
+              all_match,
+              author_pattern,
+              committer_pattern,
+            ),
+          ) {
+          continue
+        }
+        if not(
+            log_commit_matches_diff_filter(
+              rfs,
+              git_dir,
+              db,
+              entry.id,
+              diff_filter_include,
+              diff_filter_exclude,
+              detect_renames,
+              detect_copies,
+            ),
+          ) {
+          continue
+        }
+        seen[hex] = true
+        let obj = db.get(rfs, entry.id)
+        guard obj is Some(o) else { continue }
+        let info = @bitcore.parse_commit(o.data)
+        let parents = log_resolve_parents(rfs, git_dir, entry.id, info.parents)
+        if no_merges && parents.length() > 1 {
+          continue
+        }
+        if simplify_by_decoration &&
+          not(
+            log_should_emit_simplified_entry(
+              selection_ref_names,
+              hex,
+              parents.length(),
+            ),
+          ) {
+          continue
+        }
+        let commit_data = parse_commit_format_data(
+          entry.id,
+          o.data,
+          entry.tree,
+          parents,
+          ref_names_map,
+          abbrev_len~,
+          date_format~,
+        )
+        formatted_lines.push(format_commit_string(actual_fmt, commit_data))
+        if formatted_lines.length() >= max_count {
+          break
+        }
+      }
     }
+    log_emit_output(formatted_lines.join("\n"), is_tformat, line_prefix)
     return
   }
   // Show subdir-clone info if applicable (only in full format)
   if not(oneline) {
     match get_subdir_info(fs, git_dir) {
       Some((remote, path, base)) => {
-        print_line("# subdir-clone: \{path} from \{remote}")
-        print_line("# base: \{base[:7].to_string()}")
-        print_line("")
+        log_emit_output(
+          "# subdir-clone: \{path} from \{remote}",
+          true,
+          line_prefix,
+        )
+        log_emit_output("# base: \{base[:7].to_string()}", true, line_prefix)
+        log_emit_output("", true, line_prefix)
       }
       None => ()
     }
   }
+  if decoration_include_patterns.length() == 0 &&
+    log_has_missing_exclude_decoration_value(rfs, git_dir) {
+    eprint_line("error: missing value for 'log.excludeDecoration'")
+  }
+  let decoration_options = log_make_decoration_options(
+    rfs, git_dir, decorate_mode_override, decoration_include_patterns, decoration_exclude_patterns,
+    clear_decorations, false, true, simplify_by_decoration,
+  )
+  let show_decorations = not(
+    log_decoration_mode_is_none(decoration_options.mode),
+  )
   // Determine whether we need the new walk path
   let need_walk = all_refs ||
-    decorate ||
+    show_decorations ||
+    decoration_include_patterns.length() > 0 ||
+    decoration_exclude_patterns.length() > 0 ||
+    clear_decorations ||
+    simplify_by_decoration ||
+    show_raw ||
+    no_merges ||
+    abbrev_commit ||
+    abbrev_len != 7 ||
+    log_has_diff_filter(diff_filter_include, diff_filter_exclude) ||
+    grep_patterns.length() > 0 ||
+    author_pattern is Some(_) ||
+    committer_pattern is Some(_) ||
+    saw_revision_input ||
+    source ||
     revs.length() > 0 ||
-    range_excludes.length() > 0
+    range_excludes.length() > 0 ||
+    branch_patterns.length() > 0 ||
+    symmetric_ranges.length() > 0
   if graph {
     log_with_graph(
-      rfs, git_dir, max_count, oneline, all_refs, decorate, since_ts, until_ts, revs,
-      range_excludes, first_parent,
+      rfs, git_dir, max_count, oneline, all_refs, show_decorations, since_ts, until_ts,
+      revs, range_excludes, first_parent,
     )
-  } else if need_walk {
-    // Build start_ids from revs
-    let start_ids : Array[@bitcore.ObjectId] = []
-    for rev in revs {
-      match @bitrepo.rev_parse(rfs, git_dir, rev) {
-        Some(id) => start_ids.push(id)
-        None =>
-          raise @bitcore.GitError::InvalidObject("Unknown revision: " + rev)
+  } else if no_walk {
+    let resolved_targets = log_resolve_targets(
+      rfs,
+      git_dir,
+      revs,
+      branch_patterns,
+      all_refs,
+      default_head=not(saw_revision_input),
+      ignore_missing~,
+    )
+    let targets = if no_walk_unsorted {
+      resolved_targets
+    } else {
+      log_sort_targets_by_time(rfs, git_dir, resolved_targets)
+    }
+    let selection_ref_names = if show_decorations || simplify_by_decoration {
+      log_build_ref_names(rfs, git_dir, decoration_options)
+    } else {
+      {}
+    }
+    let ref_names = if show_decorations { selection_ref_names } else { {} }
+    let db = @bitlib.ObjectDb::load(rfs, git_dir)
+    let seen : Map[String, Bool] = {}
+    if oneline {
+      let lines : Array[String] = []
+      for target in targets {
+        if lines.length() >= max_count {
+          break
+        }
+        let id = target.1
+        let hex = id.to_hex()
+        if seen.contains(hex) {
+          continue
+        }
+        if not(
+            log_commit_matches_text_filters(
+              rfs, db, id, grep_patterns, grep_pattern_type, grep_ignore_case, invert_grep,
+              all_match, author_pattern, committer_pattern,
+            ),
+          ) {
+          continue
+        }
+        if not(
+            log_commit_matches_diff_filter(
+              rfs, git_dir, db, id, diff_filter_include, diff_filter_exclude, detect_renames,
+              detect_copies,
+            ),
+          ) {
+          continue
+        }
+        seen[hex] = true
+        match log_load_entry(db, rfs, git_dir, id, false) {
+          Some(entry) => {
+            if no_merges && entry.parent_count > 1 {
+              continue
+            }
+            if simplify_by_decoration &&
+              not(
+                log_should_emit_simplified_entry(
+                  selection_ref_names,
+                  hex,
+                  entry.parent_count,
+                ),
+              ) {
+              continue
+            }
+            let short = log_abbrev_hex(entry.id.to_hex(), abbrev_len)
+            let deco = format_decoration(ref_names, hex)
+            let line = if source {
+              short + deco + "\t" + target.0 + " " + entry.message
+            } else {
+              short + deco + " " + entry.message
+            }
+            lines.push(line)
+          }
+          None => ()
+        }
       }
+      log_emit_output(lines.join("\n"), true, line_prefix)
+    } else {
+      for target in targets {
+        let id = target.1
+        let hex = id.to_hex()
+        if seen.contains(hex) {
+          continue
+        }
+        if not(
+            log_commit_matches_text_filters(
+              rfs, db, id, grep_patterns, grep_pattern_type, grep_ignore_case, invert_grep,
+              all_match, author_pattern, committer_pattern,
+            ),
+          ) {
+          continue
+        }
+        if not(
+            log_commit_matches_diff_filter(
+              rfs, git_dir, db, id, diff_filter_include, diff_filter_exclude, detect_renames,
+              detect_copies,
+            ),
+          ) {
+          continue
+        }
+        seen[hex] = true
+        match
+          log_load_entry(
+            db,
+            rfs,
+            git_dir,
+            id,
+            show_stat || show_patch || show_raw,
+          ) {
+          Some(entry) => {
+            if no_merges && entry.parent_count > 1 {
+              continue
+            }
+            if simplify_by_decoration &&
+              not(
+                log_should_emit_simplified_entry(
+                  selection_ref_names,
+                  hex,
+                  entry.parent_count,
+                ),
+              ) {
+              continue
+            }
+            let deco = format_decoration(ref_names, hex)
+            let header_hex = if abbrev_commit {
+              log_abbrev_hex(entry.id.to_hex(), abbrev_len)
+            } else {
+              entry.id.to_hex()
+            }
+            log_emit_output("commit " + header_hex + deco, true, line_prefix)
+            log_emit_output("Author: " + entry.author, true, line_prefix)
+            let date_str = format_date_by_mode(
+              entry.timestamp,
+              log_extract_author_tz(entry.author),
+              date_format,
+            )
+            log_emit_output("Date:   " + date_str, true, line_prefix)
+            log_emit_output("", true, line_prefix)
+            log_emit_output("    " + entry.message, true, line_prefix)
+            log_emit_output("", true, line_prefix)
+            if show_stat || show_patch {
+              let diff_files = @bitdiff.diff_trees(
+                rfs,
+                git_dir,
+                entry.parent_tree,
+                entry.tree,
+                db~,
+              )
+              if show_stat {
+                let stat_lines = @bitdiff.diff_stat(diff_files)
+                for line in stat_lines {
+                  log_emit_output(line, true, line_prefix)
+                }
+                log_emit_output("", true, line_prefix)
+              }
+              if show_patch {
+                let patch_lines = @bitdiff.diff_text(diff_files)
+                for line in patch_lines {
+                  log_emit_output(line, true, line_prefix)
+                }
+                log_emit_output("", true, line_prefix)
+              }
+            }
+            if show_raw {
+              let raw_results = log_collect_raw_results(
+                rfs,
+                db,
+                entry.parent_tree,
+                entry.tree,
+                raw_detect_renames,
+                detect_copies,
+              )
+              for raw_result in raw_results {
+                log_emit_output(
+                  log_format_raw_result(raw_result, abbrev_len),
+                  true,
+                  line_prefix,
+                )
+              }
+              log_emit_output("", true, line_prefix)
+            }
+          }
+          None => ()
+        }
+      }
+    }
+  } else if need_walk {
+    let start_targets = log_resolve_targets(
+      rfs,
+      git_dir,
+      revs,
+      branch_patterns,
+      all_refs,
+      default_head=not(saw_revision_input),
+      ignore_missing~,
+    )
+    // Build start_ids from explicit targets
+    let start_ids : Array[@bitcore.ObjectId] = []
+    for target in start_targets {
+      start_ids.push(target.1)
     }
     // Build exclude_ids from range_excludes
     let exclude_ids : Map[String, Bool] = {}
     for spec in range_excludes {
       match @bitrepo.rev_parse(rfs, git_dir, spec) {
         Some(id) => walk_commits_to_map(fs, git_dir, id, exclude_ids)
+        None if ignore_missing => ()
         None =>
           raise @bitcore.GitError::InvalidObject("Unknown revision: " + spec)
       }
     }
-    // --all: add all refs as start points
-    if all_refs {
-      let all_ref_list = @bitrepo.show_ref(rfs, git_dir)
-      for item in all_ref_list {
-        start_ids.push(item.1)
+    for pair in symmetric_ranges {
+      let left_spec = pair.0
+      let right_spec = pair.1
+      match
+        (
+          @bitrepo.rev_parse(rfs, git_dir, left_spec),
+          @bitrepo.rev_parse(rfs, git_dir, right_spec),
+        ) {
+        (Some(left_id), Some(right_id)) =>
+          match log_find_merge_base(rfs, git_dir, left_id, right_id) {
+            Some(base_id) =>
+              walk_commits_to_map(fs, git_dir, base_id, exclude_ids)
+            None => ()
+          }
+        _ if ignore_missing => ()
+        _ =>
+          raise @bitcore.GitError::InvalidObject(
+            "Unknown revision in symmetric range",
+          )
       }
     }
     // Default to HEAD
     if start_ids.length() == 0 {
-      match @bitrepo.rev_parse(rfs, git_dir, "HEAD") {
-        Some(id) => start_ids.push(id)
-        None => return
+      if saw_revision_input {
+        return
       }
+      start_ids.push(log_resolve_default_head(rfs, git_dir))
     }
-    // Build decoration map
-    let ref_names : Map[String, Array[String]] = {}
-    if decorate || all_refs {
-      let all_ref_list = @bitrepo.show_ref(rfs, git_dir)
-      for item in all_ref_list {
-        let name = shorten_reflog_refname(item.0)
-        let hex = item.1.to_hex()
-        match ref_names.get(hex) {
-          Some(arr) => arr.push(name)
-          None => ref_names[hex] = [name]
-        }
-      }
-      // Add HEAD -> branch decoration
-      let head_path = git_dir + "/HEAD"
-      if rfs.is_file(head_path) {
-        let content = rfs.read_file(head_path) |> decode_bytes |> trim_string
-        if content.has_prefix("ref: refs/heads/") {
-          let branch = String::unsafe_substring(
-            content,
-            start=16,
-            end=content.length(),
-          )
-          match @bitrepo.rev_parse(rfs, git_dir, "HEAD") {
-            Some(head_id) => {
-              let hex = head_id.to_hex()
-              let deco = "HEAD -> " + branch
-              match ref_names.get(hex) {
-                Some(arr) => {
-                  // Insert at front, remove bare branch name if present
-                  let new_arr : Array[String] = [deco]
-                  for n in arr {
-                    if n != branch {
-                      new_arr.push(n)
-                    }
-                  }
-                  ref_names[hex] = new_arr
-                }
-                None => ref_names[hex] = [deco]
-              }
-            }
-            None => ()
-          }
-        }
-      }
-    }
-    // BFS walk
-    let walk_db = if show_stat || show_patch {
-      Some(@bitlib.ObjectDb::load(rfs, git_dir))
+    let selection_ref_names = if show_decorations || simplify_by_decoration {
+      log_build_ref_names(rfs, git_dir, decoration_options)
     } else {
-      None
+      {}
     }
+    let ref_names = if show_decorations { selection_ref_names } else { {} }
+    let source_names = if source {
+      log_build_commit_sources(
+        rfs,
+        git_dir,
+        start_targets,
+        exclude_ids,
+        first_parent~,
+      )
+    } else {
+      {}
+    }
+    let walk_db = @bitlib.ObjectDb::load(
+      rfs,
+      log_resolve_common_git_dir(rfs, git_dir),
+    )
     let entries = log_walk_commits(
       rfs,
       git_dir,
       start_ids,
       exclude_ids,
-      max_count,
+      if has_commit_filters {
+        2147483647
+      } else {
+        max_count
+      },
       since_ts,
       until_ts,
-      show_stat || show_patch,
+      show_stat || show_patch || show_raw,
       first_parent~,
     )
     if reverse {
       entries.rev_in_place()
     }
     if oneline {
+      let mut emitted = 0
       for entry in entries {
-        let short = (try! entry.id.to_hex()[:7]).to_string()
+        if emitted >= max_count {
+          break
+        }
+        if no_merges && entry.parent_count > 1 {
+          continue
+        }
+        if simplify_by_decoration &&
+          not(
+            log_should_emit_simplified_entry(
+              selection_ref_names,
+              entry.id.to_hex(),
+              entry.parent_count,
+            ),
+          ) {
+          continue
+        }
+        if not(
+            log_commit_matches_text_filters(
+              rfs,
+              walk_db,
+              entry.id,
+              grep_patterns,
+              grep_pattern_type,
+              grep_ignore_case,
+              invert_grep,
+              all_match,
+              author_pattern,
+              committer_pattern,
+            ),
+          ) {
+          continue
+        }
+        if not(
+            log_commit_matches_diff_filter(
+              rfs,
+              git_dir,
+              walk_db,
+              entry.id,
+              diff_filter_include,
+              diff_filter_exclude,
+              detect_renames,
+              detect_copies,
+            ),
+          ) {
+          continue
+        }
+        let short = log_abbrev_hex(entry.id.to_hex(), abbrev_len)
         let deco = format_decoration(ref_names, entry.id.to_hex())
-        print_line(short + deco + " " + entry.message)
+        let line = if source {
+          match source_names.get(entry.id.to_hex()) {
+            Some(name) => short + deco + "\t" + name + " " + entry.message
+            None => short + deco + " " + entry.message
+          }
+        } else {
+          short + deco + " " + entry.message
+        }
+        log_emit_output(line, true, line_prefix)
+        emitted += 1
       }
     } else {
+      let mut emitted = 0
       for entry in entries {
+        if emitted >= max_count {
+          break
+        }
+        if no_merges && entry.parent_count > 1 {
+          continue
+        }
+        if simplify_by_decoration &&
+          not(
+            log_should_emit_simplified_entry(
+              selection_ref_names,
+              entry.id.to_hex(),
+              entry.parent_count,
+            ),
+          ) {
+          continue
+        }
+        if not(
+            log_commit_matches_text_filters(
+              rfs,
+              walk_db,
+              entry.id,
+              grep_patterns,
+              grep_pattern_type,
+              grep_ignore_case,
+              invert_grep,
+              all_match,
+              author_pattern,
+              committer_pattern,
+            ),
+          ) {
+          continue
+        }
+        if not(
+            log_commit_matches_diff_filter(
+              rfs,
+              git_dir,
+              walk_db,
+              entry.id,
+              diff_filter_include,
+              diff_filter_exclude,
+              detect_renames,
+              detect_copies,
+            ),
+          ) {
+          continue
+        }
         let deco = format_decoration(ref_names, entry.id.to_hex())
-        print_line("commit " + entry.id.to_hex() + deco)
-        print_line("Author: " + entry.author)
+        let header_hex = if abbrev_commit {
+          log_abbrev_hex(entry.id.to_hex(), abbrev_len)
+        } else {
+          entry.id.to_hex()
+        }
+        log_emit_output("commit " + header_hex + deco, true, line_prefix)
+        log_emit_output("Author: " + entry.author, true, line_prefix)
         let date_str = format_date_by_mode(
           entry.timestamp,
           log_extract_author_tz(entry.author),
           date_format,
         )
-        print_line("Date:   " + date_str)
-        print_line("")
-        print_line("    " + entry.message)
-        print_line("")
+        log_emit_output("Date:   " + date_str, true, line_prefix)
+        log_emit_output("", true, line_prefix)
+        log_emit_output("    " + entry.message, true, line_prefix)
+        log_emit_output("", true, line_prefix)
         if show_stat || show_patch {
           let diff_files = @bitdiff.diff_trees(
             rfs,
             git_dir,
             entry.parent_tree,
             entry.tree,
-            db=walk_db.unwrap(),
+            db=walk_db,
           )
           if show_stat {
             let stat_lines = @bitdiff.diff_stat(diff_files)
             for line in stat_lines {
-              print_line(line)
+              log_emit_output(line, true, line_prefix)
             }
-            print_line("")
+            log_emit_output("", true, line_prefix)
           }
           if show_patch {
             let patch_lines = @bitdiff.diff_text(diff_files)
             for line in patch_lines {
-              print_line(line)
+              log_emit_output(line, true, line_prefix)
             }
-            print_line("")
+            log_emit_output("", true, line_prefix)
           }
         }
+        if show_raw {
+          let raw_results = log_collect_raw_results(
+            rfs,
+            walk_db,
+            entry.parent_tree,
+            entry.tree,
+            raw_detect_renames,
+            detect_copies,
+          )
+          for raw_result in raw_results {
+            log_emit_output(
+              log_format_raw_result(raw_result, abbrev_len),
+              true,
+              line_prefix,
+            )
+          }
+          log_emit_output("", true, line_prefix)
+        }
+        emitted += 1
       }
     }
   } else if oneline {
     // Fast path: simple HEAD walk
+    ignore(log_resolve_default_head(rfs, git_dir))
     let lines = @bitlib.log_head_oneline(
       fs,
       git_dir,
@@ -1091,10 +4025,11 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
       lines.rev_in_place()
     }
     for line in lines {
-      print_line(line)
+      log_emit_output(line, true, line_prefix)
     }
   } else {
     // Fast path: simple HEAD walk (full format)
+    ignore(log_resolve_default_head(rfs, git_dir))
     let entries = @bitlib.log_head(
       fs,
       git_dir,
@@ -1107,22 +4042,24 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
       entries.rev_in_place()
     }
     let log_db = if show_stat || show_patch {
-      Some(@bitlib.ObjectDb::load(rfs, git_dir))
+      Some(
+        @bitlib.ObjectDb::load(rfs, log_resolve_common_git_dir(rfs, git_dir)),
+      )
     } else {
       None
     }
     for entry in entries {
-      print_line("commit " + entry.id.to_hex())
-      print_line("Author: " + entry.author)
+      log_emit_output("commit " + entry.id.to_hex(), true, line_prefix)
+      log_emit_output("Author: " + entry.author, true, line_prefix)
       let date_str = format_date_by_mode(
         entry.timestamp,
         log_extract_author_tz(entry.author),
         date_format,
       )
-      print_line("Date:   " + date_str)
-      print_line("")
-      print_line("    " + entry.message)
-      print_line("")
+      log_emit_output("Date:   " + date_str, true, line_prefix)
+      log_emit_output("", true, line_prefix)
+      log_emit_output("    " + entry.message, true, line_prefix)
+      log_emit_output("", true, line_prefix)
       if show_stat || show_patch {
         let diff_files = @bitdiff.diff_trees(
           rfs,
@@ -1134,20 +4071,50 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         if show_stat {
           let stat_lines = @bitdiff.diff_stat(diff_files)
           for line in stat_lines {
-            print_line(line)
+            log_emit_output(line, true, line_prefix)
           }
-          print_line("")
+          log_emit_output("", true, line_prefix)
         }
         if show_patch {
           let patch_lines = @bitdiff.diff_text(diff_files)
           for line in patch_lines {
-            print_line(line)
+            log_emit_output(line, true, line_prefix)
           }
-          print_line("")
+          log_emit_output("", true, line_prefix)
         }
       }
     }
   }
+}
+
+///|
+async fn handle_whatchanged(args : Array[String]) -> Unit raise Error {
+  let forwarded : Array[String] = []
+  let mut acknowledged = false
+  let mut show_help = false
+  for arg in args {
+    match arg {
+      "--i-still-use-this" => acknowledged = true
+      "-h" | "--help" => show_help = true
+      _ => forwarded.push(arg)
+    }
+  }
+  if show_help {
+    show_simple_command_help(
+      "git whatchanged --i-still-use-this [<options>] [<revision-range>] [--] [<pathspec>...]",
+      summary="Show raw commit history without merges.",
+    )
+    return
+  }
+  if not(acknowledged) {
+    @stdio.stderr.write(
+      "'git whatchanged' is nominated for removal.\n\nhint: You can replace 'git whatchanged <opts>' with:\nhint:\tgit log <opts> --raw --no-merges\nhint: Or make an alias:\nhint:\tgit config set --global alias.whatchanged 'log --raw --no-merges'\n\nIf you still use this command, here's what you can do:\n\n- read https://git-scm.com/docs/BreakingChanges.html\n- check if anyone has discussed this on the mailing\n  list and if they came up with something that can\n  help you: https://lore.kernel.org/git/?q=git%20whatchanged\n- send an email to <git@vger.kernel.org> to let us\n  know that you still use this command and were unable\n  to determine a suitable replacement\n\nfatal: refusing to run without --i-still-use-this\n",
+    )
+    @sys.exit(128)
+  }
+  let log_args : Array[String] = ["--raw", "--no-merges"]
+  log_args.append(forwarded)
+  handle_log(log_args)
 }
 
 ///|
@@ -1158,6 +4125,7 @@ struct LogWalkEntry {
   timestamp : Int64
   tree : @bitcore.ObjectId
   parent_tree : @bitcore.ObjectId?
+  parent_count : Int
 }
 
 ///|
@@ -1185,7 +4153,7 @@ fn log_walk_commits(
   include_parent_tree : Bool,
   first_parent? : Bool = false,
 ) -> Array[LogWalkEntry] raise Error {
-  let db = @bitlib.ObjectDb::load(rfs, git_dir)
+  let db = @bitlib.ObjectDb::load(rfs, log_resolve_common_git_dir(rfs, git_dir))
   let result : Array[LogWalkEntry] = []
   let visited : Map[String, Bool] = {}
   // Priority queue: (timestamp, id) sorted desc by timestamp
@@ -1222,11 +4190,12 @@ fn log_walk_commits(
     let obj = db.get(rfs, id)
     guard obj is Some(o) else { continue }
     let info = @bitcore.parse_commit(o.data)
+    let parents = log_resolve_parents(rfs, git_dir, id, info.parents)
     // Add parents to queue (limited to first parent if --first-parent)
-    let parents_to_walk = if first_parent && info.parents.length() > 0 {
-      [info.parents[0]]
+    let parents_to_walk = if first_parent && parents.length() > 0 {
+      [parents[0]]
     } else {
-      info.parents
+      parents
     }
     for parent in parents_to_walk {
       let phex = parent.to_hex()
@@ -1237,7 +4206,12 @@ fn log_walk_commits(
       }
     }
     // Build LogWalkEntry
-    let entry = log_parse_entry_from_obj(id, o.data, info.tree)
+    let entry = log_parse_entry_from_obj(
+      id,
+      o.data,
+      info.tree,
+      parents.length(),
+    )
     // Apply since/until filters using parsed timestamp
     if entry.timestamp > until_ts {
       continue // newer than until, skip but keep walking
@@ -1246,8 +4220,8 @@ fn log_walk_commits(
       continue // older than since, skip but keep walking for branches
     }
     let parent_tree : @bitcore.ObjectId? = if include_parent_tree &&
-      info.parents.length() > 0 {
-      match db.get(rfs, info.parents[0]) {
+      parents.length() > 0 {
+      match db.get(rfs, parents[0]) {
         Some(po) => {
           let pi = @bitcore.parse_commit(po.data)
           Some(pi.tree)
@@ -1351,6 +4325,7 @@ fn log_parse_entry_from_obj(
   id : @bitcore.ObjectId,
   data : Bytes,
   tree : @bitcore.ObjectId,
+  parent_count : Int,
 ) -> LogWalkEntry {
   let text = decode_bytes(data)
   let mut author = ""
@@ -1375,7 +4350,35 @@ fn log_parse_entry_from_obj(
     }
   }
   let message = if message_lines.length() > 0 { message_lines[0] } else { "" }
-  { id, message, author, timestamp, tree, parent_tree: None }
+  { id, message, author, timestamp, tree, parent_tree: None, parent_count }
+}
+
+///|
+fn log_load_entry(
+  db : @bitlib.ObjectDb,
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  id : @bitcore.ObjectId,
+  include_parent_tree : Bool,
+) -> LogWalkEntry? raise Error {
+  let obj = db.get(rfs, id)
+  guard obj is Some(o) else { return None }
+  let info = @bitcore.parse_commit(o.data)
+  let parents = log_resolve_parents(rfs, git_dir, id, info.parents)
+  let entry = log_parse_entry_from_obj(id, o.data, info.tree, parents.length())
+  let parent_tree : @bitcore.ObjectId? = if include_parent_tree &&
+    parents.length() > 0 {
+    match db.get(rfs, parents[0]) {
+      Some(parent_obj) => {
+        let parent_info = @bitcore.parse_commit(parent_obj.data)
+        Some(parent_info.tree)
+      }
+      None => None
+    }
+  } else {
+    None
+  }
+  Some({ ..entry, parent_tree, })
 }
 
 ///|

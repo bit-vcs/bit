@@ -16,6 +16,111 @@ pub struct MergeResult {
 }
 
 ///|
+priv struct MergePreservedGitlink {
+  path : String
+  backup_path : String
+}
+
+///|
+fn merge_preserve_removed_gitlinks(
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  root : String,
+  git_dir : String,
+  files : Map[String, TreeFileEntry],
+) -> Array[MergePreservedGitlink] raise @bit.GitError {
+  let entries = read_index_entries(rfs, git_dir)
+  let preserved : Array[MergePreservedGitlink] = []
+  let backup_root = ".bit-merge-preserve"
+  let mut backup_index = 0
+  for entry in entries {
+    if files.contains(entry.path) || not(is_gitlink_mode_int(entry.mode)) {
+      continue
+    }
+    let full_path = join_path(root, entry.path)
+    let git_marker = join_path(full_path, ".git")
+    if not(rfs.is_dir(full_path)) {
+      continue
+    }
+    if not(rfs.is_file(git_marker) || rfs.is_dir(git_marker)) {
+      continue
+    }
+    let backup_path = join_path(backup_root, backup_index.to_string())
+    let backup_abs = join_path(root, backup_path)
+    mv_copy_directory_recursive(fs, rfs, full_path, backup_abs)
+    let backup_gitfile = join_path(backup_abs, ".git")
+    if rfs.is_file(git_marker) && rfs.is_file(backup_gitfile) {
+      mv_rewrite_gitfile_after_directory_move(
+        fs, rfs, full_path, backup_abs, backup_gitfile,
+      )
+    }
+    remove_worktree_path_recursive(fs, rfs, full_path)
+    preserved.push({ path: entry.path, backup_path })
+    backup_index += 1
+  }
+  preserved
+}
+
+///|
+fn merge_restore_preserved_gitlinks(
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  root : String,
+  preserved : Array[MergePreservedGitlink],
+) -> Unit raise @bit.GitError {
+  for item in preserved {
+    let full_path = join_path(root, item.path)
+    if rfs.is_dir(full_path) {
+      continue
+    }
+    let backup_abs = join_path(root, item.backup_path)
+    if not(rfs.is_dir(backup_abs)) {
+      continue
+    }
+    mv_copy_directory_recursive(fs, rfs, backup_abs, full_path)
+    let backup_gitfile = join_path(backup_abs, ".git")
+    let full_gitfile = join_path(full_path, ".git")
+    if rfs.is_file(backup_gitfile) && rfs.is_file(full_gitfile) {
+      mv_rewrite_gitfile_after_directory_move(
+        fs, rfs, backup_abs, full_path, full_gitfile,
+      )
+    }
+    remove_worktree_path_recursive(fs, rfs, backup_abs)
+  }
+  let backup_root = join_path(root, ".bit-merge-preserve")
+  if rfs.is_dir(backup_root) {
+    remove_worktree_path_recursive(fs, rfs, backup_root)
+  }
+}
+
+///|
+fn merge_fast_forward(
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  root : String,
+  git_dir : String,
+  target : @bit.ObjectId,
+) -> Unit raise @bit.GitError {
+  let db = ObjectDb::load(rfs, git_dir)
+  let files = collect_tree_files_from_commit(db, rfs, target)
+  let preserved = merge_preserve_removed_gitlinks(fs, rfs, root, git_dir, files)
+  write_worktree_from_files(
+    db,
+    fs,
+    rfs,
+    root,
+    git_dir,
+    files,
+    remove_missing=true,
+    preserve_removed_gitlinks=true,
+  )
+  let entries = tree_files_to_index(db, rfs, files)
+  write_index_entries(fs, git_dir, entries)
+  update_head_ref(fs, rfs, git_dir, target)
+  merge_restore_preserved_gitlinks(fs, rfs, root, preserved)
+}
+
+///|
 pub fn merge(
   fs : &@bit.FileSystem,
   rfs : &@bit.RepoFileSystem,
@@ -27,7 +132,14 @@ pub fn merge(
 ) -> MergeResult raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   let head = match resolve_head_commit(rfs, git_dir) {
-    None => raise @bit.GitError::InvalidObject("HEAD not found")
+    None =>
+      match read_head_ref(rfs, git_dir) {
+        Branch(_) => {
+          merge_fast_forward(fs, rfs, root, git_dir, target)
+          return { status: FastForward, commit_id: Some(target), conflicts: [] }
+        }
+        Detached(_) => raise @bit.GitError::InvalidObject("HEAD not found")
+      }
     Some(id) => id
   }
   if head == target {
@@ -35,7 +147,7 @@ pub fn merge(
   }
   let db = ObjectDb::load(rfs, git_dir)
   if merge_is_ancestor(db, rfs, head, target) {
-    let _ = reset(fs, rfs, root, target.to_hex(), ResetMode::Hard)
+    merge_fast_forward(fs, rfs, root, git_dir, target)
     return { status: FastForward, commit_id: Some(target), conflicts: [] }
   }
   if merge_is_ancestor(db, rfs, target, head) {
@@ -88,6 +200,22 @@ pub fn merge(
     }
   }
   if conflicts.length() > 0 {
+    write_worktree_from_files(
+      db,
+      fs,
+      rfs,
+      root,
+      git_dir,
+      merged,
+      remove_missing=false,
+    )
+    let entries = merge_conflicted_index_entries(
+      db, rfs, base_files, ours, theirs, merged, conflicts,
+    )
+    write_index_stage_entries(fs, git_dir, entries)
+    fs.write_string(git_dir + "/MERGE_HEAD", target.to_hex() + "\n")
+    fs.write_string(git_dir + "/ORIG_HEAD", head.to_hex() + "\n")
+    fs.write_string(git_dir + "/MERGE_MSG", message + "\n")
     conflicts.sort()
     return { status: Conflicted, commit_id: None, conflicts }
   }
@@ -118,6 +246,66 @@ pub fn merge(
   write_object_bytes(fs, git_dir, commit_id, compressed)
   update_head_ref(fs, rfs, git_dir, commit_id)
   { status: Merged, commit_id: Some(commit_id), conflicts: [] }
+}
+
+///|
+fn merge_conflicted_index_entries(
+  db : ObjectDb,
+  fs : &@bit.RepoFileSystem,
+  base : Map[String, TreeFileEntry],
+  ours : Map[String, TreeFileEntry],
+  theirs : Map[String, TreeFileEntry],
+  merged : Map[String, TreeFileEntry],
+  conflicts : Array[String],
+) -> Array[IndexStageEntry] raise @bit.GitError {
+  let out : Array[IndexStageEntry] = []
+  let merged_entries = tree_files_to_index(db, fs, merged)
+  for entry in merged_entries {
+    out.push({ entry, stage: 0 })
+  }
+  for path in conflicts {
+    match base.get(path) {
+      Some(info) =>
+        out.push({
+          entry: merge_tree_file_to_index_entry(db, fs, path, info),
+          stage: 1,
+        })
+      None => ()
+    }
+    match ours.get(path) {
+      Some(info) =>
+        out.push({
+          entry: merge_tree_file_to_index_entry(db, fs, path, info),
+          stage: 2,
+        })
+      None => ()
+    }
+    match theirs.get(path) {
+      Some(info) =>
+        out.push({
+          entry: merge_tree_file_to_index_entry(db, fs, path, info),
+          stage: 3,
+        })
+      None => ()
+    }
+  }
+  out
+}
+
+///|
+fn merge_tree_file_to_index_entry(
+  db : ObjectDb,
+  fs : &@bit.RepoFileSystem,
+  path : String,
+  info : TreeFileEntry,
+) -> IndexEntry raise @bit.GitError {
+  let files : Map[String, TreeFileEntry] = {}
+  files[path] = info
+  let entries = tree_files_to_index(db, fs, files)
+  if entries.length() == 0 {
+    raise @bit.GitError::InvalidObject("Missing merge index entry: " + path)
+  }
+  entries[0]
 }
 
 ///|

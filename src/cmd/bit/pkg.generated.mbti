@@ -79,7 +79,15 @@ type CommitFormatData
 
 type DenyCurrentBranchDecision
 
+type DiffCheckIssue
+
+type DiffNoIndexEntry
+
+type DiffOutputSelection
+
 type FetchHeadEntry
+
+type FormatPatchOptions
 
 type GitHubImportProvider
 
@@ -109,6 +117,8 @@ type HubWorkItemListOptions
 
 type LogWalkEntry
 
+type LogWrapSpec
+
 type LsFilesTrackedEntry
 
 type MailmapEntry
@@ -137,6 +147,8 @@ pub impl Eq for ParseoptOptType
 
 type PushDefaultMode
 
+type PushLeaseExpectation
+
 type PushParsedRefspec
 
 type PushPorcelainLine
@@ -148,6 +160,8 @@ type PushResolvedUpdate
 type PushSourceKind
 
 type PushTargetPlan
+
+type PushUpstreamConfigUpdate
 
 type RebaseAiArgs
 
@@ -179,9 +193,19 @@ pub(all) enum SubdirDiffKind {
   Deleted
 }
 
+type SubmoduleAddArgs
+
+type SubmoduleDispatch
+
 type SubmoduleInfo
+pub impl Eq for SubmoduleInfo
+pub impl Show for SubmoduleInfo
 
 type UploadPackTransport
+
+type WorktreeLocalRefsStatus
+
+type WorktreeRemoteGuess
 
 // Type aliases
 

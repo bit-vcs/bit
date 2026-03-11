@@ -1,0 +1,13 @@
+diff --git a/t/t3600-rm.sh b/t/t3600-rm.sh
+index b294bffac8..5f885f495d 100755
+--- a/t/t3600-rm.sh
++++ b/t/t3600-rm.sh
+@@ -786,7 +786,7 @@ test_expect_success SYMLINKS 'rm across a symlinked leading path (no index)' '
+ 	test_path_is_file e/f
+ '
+ 
+-test_expect_failure SYMLINKS 'rm across a symlinked leading path (w/ index)' '
++test_expect_success SYMLINKS 'rm across a symlinked leading path (w/ index)' '
+ 	rm -rf d e &&
+ 	mkdir d &&
+ 	echo content >d/f &&

@@ -34,6 +34,767 @@ test "pull: initial head target uses detached HEAD" {
 }
 
 ///|
+test "pull: explicit refspec keeps fetch and merge target aligned" {
+  let parsed = pull_parse_explicit_refspec(Some("main:main"))
+  assert_eq(parsed.fetch_refspecs, ["main:main"])
+  assert_eq(parsed.merge_ref, Some("refs/heads/main"))
+  assert_eq(parsed.target_ref, Some("refs/heads/main"))
+  assert_eq(parsed.upstream_ref, Some("refs/heads/main"))
+}
+
+///|
+test "pull: validation rejects detached HEAD without refspec" {
+  let message = pull_pre_fetch_validation_error(
+    true,
+    None,
+    None,
+    None,
+    false,
+    None,
+    true,
+  )
+  assert_eq(message, Some("You are not currently on a branch."))
+}
+
+///|
+test "pull: validation rejects remote without branch when HEAD exists" {
+  let message = pull_pre_fetch_validation_error(
+    false,
+    Some("test_remote"),
+    None,
+    None,
+    false,
+    None,
+    true,
+  )
+  assert_eq(message, Some("Please specify a branch on the command line."))
+}
+
+///|
+test "pull: validation allows unborn branch without explicit merge ref" {
+  let message = pull_pre_fetch_validation_error(
+    false,
+    Some(".."),
+    None,
+    None,
+    false,
+    None,
+    false,
+  )
+  assert_eq(message, None)
+}
+
+///|
+test "pull: validation reports missing tracking information" {
+  let message = pull_pre_fetch_validation_error(
+    false,
+    None,
+    None,
+    Some("origin"),
+    false,
+    None,
+    true,
+  )
+  assert_eq(
+    message,
+    Some("There is no tracking information for the current branch."),
+  )
+}
+
+///|
+test "pull: missing target error prefers wildcard message" {
+  let message = pull_missing_target_error_message(
+    Some("refs/nonexisting1/*:refs/nonexisting2/*"),
+    None,
+    ["refs/nonexisting1/*:refs/nonexisting2/*"],
+    "refs/nonexisting2/*",
+  )
+  assert_true(message.contains("no candidates for merging"))
+}
+
+///|
+test "pull: missing target error prefers tracking ref message" {
+  let message = pull_missing_target_error_message(
+    None,
+    Some("refs/heads/nonexisting"),
+    [],
+    "refs/remotes/origin/nonexisting",
+  )
+  assert_true(message.contains("no such ref was fetched"))
+}
+
+///|
+test "pull: merge ref becomes implicit fetch refspec" {
+  let target_ref = pull_target_ref(
+    "origin",
+    Some("refs/heads/not-in-refspec"),
+    None,
+  )
+  assert_eq(
+    pull_fetch_refspecs([], Some("refs/heads/not-in-refspec"), target_ref),
+    ["refs/heads/not-in-refspec:refs/remotes/origin/not-in-refspec"],
+  )
+}
+
+///|
+test "pull: in-progress merge error prefers unmerged files" {
+  assert_eq(
+    pull_in_progress_error(true, true),
+    Some("Pulling is not possible because you have unmerged files."),
+  )
+  assert_eq(
+    pull_in_progress_error(false, true),
+    Some("You have not concluded your merge (MERGE_HEAD exists)."),
+  )
+  assert_eq(pull_in_progress_error(false, false), None)
+}
+
+///|
+test "pull: pull.autostash overrides mode-specific config" {
+  let fs = @bitcore.TestFs::new()
+  let git_dir = "/repo/.git"
+  fs.mkdir_p(git_dir)
+  fs.write_string(
+    git_dir + "/config",
+    (
+      #|[pull]
+      #|  autostash = false
+      #|[rebase]
+      #|  autostash = true
+      #|[merge]
+      #|  autostash = true
+      #|
+    ),
+  )
+  assert_false(pull_autostash_enabled(fs, git_dir, true, None))
+  assert_false(pull_autostash_enabled(fs, git_dir, false, None))
+  assert_true(pull_autostash_enabled(fs, git_dir, true, Some(true)))
+  assert_false(pull_autostash_enabled(fs, git_dir, false, Some(false)))
+}
+
+///|
+test "pull: rebase mode prefers branch config over pull.rebase" {
+  let fs = @bitcore.TestFs::new()
+  let git_dir = "/repo/.git"
+  fs.mkdir_p(git_dir)
+  fs.write_string(
+    git_dir + "/config",
+    (
+      #|[pull]
+      #|  rebase = true
+      #|
+    ),
+  )
+  assert_eq(
+    pull_resolve_rebase_behavior(fs, git_dir, Some(false), None),
+    (false, false),
+  )
+  assert_eq(
+    pull_resolve_rebase_behavior(fs, git_dir, Some(true), None),
+    (true, false),
+  )
+}
+
+///|
+test "pull: rebase mode parses interactive and rejects invalid config" {
+  let fs = @bitcore.TestFs::new()
+  let git_dir = "/repo/.git"
+  fs.mkdir_p(git_dir)
+  fs.write_string(
+    git_dir + "/config",
+    (
+      #|[pull]
+      #|  rebase = interactive
+      #|
+    ),
+  )
+  assert_eq(pull_resolve_rebase_behavior(fs, git_dir, None, None), (true, true))
+  assert_eq(pull_parse_rebase_behavior_value("i", "--rebase"), (true, true))
+  fs.write_string(
+    git_dir + "/config",
+    (
+      #|[pull]
+      #|  rebase = invalid
+      #|
+    ),
+  )
+  let rejected = try {
+    ignore(pull_resolve_rebase_behavior(fs, git_dir, None, None))
+    false
+  } catch {
+    @bitcore.GitError::InvalidObject(msg) =>
+      msg == "Invalid value for pull.rebase: invalid"
+    _ => false
+  }
+  assert_true(rejected)
+}
+
+///|
+async test "pull: local fetch with main:main writes target ref and FETCH_HEAD" {
+  @bitnative.init_native_io()
+  let fs = OsFs::new()
+  let root = "/tmp/bit-test pull fetch explicit trash directory-" +
+    get_current_timestamp().to_string()
+  cleanup_tree(fs, root)
+  fs.mkdir_p(root)
+  let dst_dir = root + "/dst"
+
+  commit_wbtest_run_git(root, ["init", "--initial-branch=main", "-q"])
+  commit_wbtest_run_git(root, ["config", "user.name", "Test User"])
+  commit_wbtest_run_git(root, ["config", "user.email", "test@example.com"])
+  fs.write_string(root + "/file", "file\n")
+  commit_wbtest_run_git(root, ["add", "file"])
+  commit_wbtest_run_git(root, ["commit", "-q", "-m", "initial"])
+
+  commit_wbtest_run_git(root, ["init", "--initial-branch=main", "-q", "dst"])
+
+  fetch_from_remote(
+    fs,
+    dst_dir + "/.git",
+    dst_dir,
+    "__pull_tmp__",
+    "..",
+    ["main:main"],
+    update_head_ok=true,
+    quiet=true,
+  )
+
+  assert_true(
+    @bitlib.resolve_ref(fs, dst_dir + "/.git", "refs/heads/main") is Some(_),
+  )
+  assert_true(resolve_fetch_head_oid(fs, dst_dir + "/.git") is Some(_))
+
+  cleanup_tree(fs, root)
+}
+
+///|
+async test "pull: local fetch for main writes remote-tracking ref and FETCH_HEAD" {
+  @bitnative.init_native_io()
+  let fs = OsFs::new()
+  let root = "/tmp/bit-test pull fetch merge-ref trash directory-" +
+    get_current_timestamp().to_string()
+  cleanup_tree(fs, root)
+  fs.mkdir_p(root)
+  let dst_dir = root + "/dst"
+
+  commit_wbtest_run_git(root, ["init", "--initial-branch=main", "-q"])
+  commit_wbtest_run_git(root, ["config", "user.name", "Test User"])
+  commit_wbtest_run_git(root, ["config", "user.email", "test@example.com"])
+  fs.write_string(root + "/file", "file\n")
+  commit_wbtest_run_git(root, ["add", "file"])
+  commit_wbtest_run_git(root, ["commit", "-q", "-m", "initial"])
+
+  commit_wbtest_run_git(root, ["init", "--initial-branch=main", "-q", "dst"])
+
+  fetch_from_remote(
+    fs,
+    dst_dir + "/.git",
+    dst_dir,
+    "__pull_tmp__",
+    "..",
+    [],
+    quiet=true,
+  )
+
+  assert_true(
+    @bitlib.resolve_ref(fs, dst_dir + "/.git", "refs/remotes/__pull_tmp__/main")
+    is Some(_),
+  )
+  assert_true(resolve_fetch_head_oid(fs, dst_dir + "/.git") is Some(_))
+
+  cleanup_tree(fs, root)
+}
+
+///|
+async test "pull: branch remote dot pulls from current repo config" {
+  @bitnative.init_native_io()
+  let fs = OsFs::new()
+  let root = "/tmp/bit-test pull branch-remote-dot trash directory-" +
+    get_current_timestamp().to_string()
+  cleanup_tree(fs, root)
+  fs.mkdir_p(root)
+  let prev_cwd = @sys.get_env_var("GIT_SHIM_CWD")
+
+  commit_wbtest_run_git(root, ["init", "--initial-branch=main", "-q"])
+  commit_wbtest_run_git(root, ["config", "user.name", "Test User"])
+  commit_wbtest_run_git(root, ["config", "user.email", "test@example.com"])
+  fs.write_string(root + "/file", "file\n")
+  commit_wbtest_run_git(root, ["add", "file"])
+  commit_wbtest_run_git(root, ["commit", "-q", "-m", "original"])
+  commit_wbtest_run_git(root, ["branch", "copy", "main"])
+  commit_wbtest_run_git(root, ["config", "branch.copy.remote", "."])
+  commit_wbtest_run_git(root, ["config", "branch.copy.merge", "refs/heads/main"])
+  fs.write_string(root + "/file", "updated\n")
+  commit_wbtest_run_git(root, ["commit", "-q", "-a", "-m", "updated"])
+  commit_wbtest_run_git(root, ["checkout", "-q", "copy"])
+
+  @sys.set_env_var("GIT_SHIM_CWD", root)
+  handle_pull([])
+
+  assert_eq(
+    decode_bytes(fs.read_file(root + "/file") catch { _ => Bytes::default() }),
+    "updated\n",
+  )
+  assert_true(
+    decode_bytes(
+      fs.read_file(root + "/.git/logs/HEAD") catch {
+        _ => Bytes::default()
+      },
+    ).contains("pull: Fast-forward"),
+  )
+
+  restore_env_var_for_fetch_wbtest("GIT_SHIM_CWD", prev_cwd)
+  cleanup_tree(fs, root)
+}
+
+///|
+async test "pull: command path pulls into unborn branch from parent repo" {
+  @bitnative.init_native_io()
+  let fs = OsFs::new()
+  let root = "/tmp/bit-test pull command unborn trash directory-" +
+    get_current_timestamp().to_string()
+  cleanup_tree(fs, root)
+  fs.mkdir_p(root)
+  let dst_dir = root + "/dst"
+  let prev_cwd = @sys.get_env_var("GIT_SHIM_CWD")
+
+  commit_wbtest_run_git(root, ["init", "--initial-branch=main", "-q"])
+  commit_wbtest_run_git(root, ["config", "user.name", "Test User"])
+  commit_wbtest_run_git(root, ["config", "user.email", "test@example.com"])
+  fs.write_string(root + "/file", "file\n")
+  commit_wbtest_run_git(root, ["add", "file"])
+  commit_wbtest_run_git(root, ["commit", "-q", "-m", "initial"])
+
+  commit_wbtest_run_git(root, ["init", "--initial-branch=main", "-q", "dst"])
+
+  @sys.set_env_var("GIT_SHIM_CWD", dst_dir)
+  handle_pull(["..", "main:main"])
+
+  assert_eq(
+    decode_bytes(
+      fs.read_file(dst_dir + "/file") catch {
+        _ => Bytes::default()
+      },
+    ),
+    "file\n",
+  )
+  assert_true(@bitlib.resolve_head_commit(fs, dst_dir + "/.git") is Some(_))
+
+  restore_env_var_for_fetch_wbtest("GIT_SHIM_CWD", prev_cwd)
+  cleanup_tree(fs, root)
+}
+
+///|
+async test "pull: command path keeps staged new file on unborn branch" {
+  @bitnative.init_native_io()
+  let fs = OsFs::new()
+  let root = "/tmp/bit-test pull command preserve-index trash directory-" +
+    get_current_timestamp().to_string()
+  cleanup_tree(fs, root)
+  fs.mkdir_p(root)
+  let dst_dir = root + "/dst"
+  let prev_cwd = @sys.get_env_var("GIT_SHIM_CWD")
+
+  commit_wbtest_run_git(root, ["init", "--initial-branch=main", "-q"])
+  commit_wbtest_run_git(root, ["config", "user.name", "Test User"])
+  commit_wbtest_run_git(root, ["config", "user.email", "test@example.com"])
+  fs.write_string(root + "/file", "file\n")
+  commit_wbtest_run_git(root, ["add", "file"])
+  commit_wbtest_run_git(root, ["commit", "-q", "-m", "initial"])
+
+  commit_wbtest_run_git(root, ["init", "--initial-branch=main", "-q", "dst"])
+  fs.write_string(dst_dir + "/newfile", "new tracked file\n")
+  commit_wbtest_run_git(dst_dir, ["add", "newfile"])
+
+  @sys.set_env_var("GIT_SHIM_CWD", dst_dir)
+  handle_pull(["..", "main"])
+
+  assert_eq(
+    decode_bytes(
+      fs.read_file(dst_dir + "/newfile") catch {
+        _ => Bytes::default()
+      },
+    ),
+    "new tracked file\n",
+  )
+  let entries = @bitlib.read_index_entries(fs, dst_dir + "/.git")
+  let mut found_newfile = false
+  for entry in entries {
+    if entry.path == "newfile" {
+      found_newfile = true
+      break
+    }
+  }
+  assert_true(found_newfile)
+
+  restore_env_var_for_fetch_wbtest("GIT_SHIM_CWD", prev_cwd)
+  cleanup_tree(fs, root)
+}
+
+///|
+async test "pull: command path rejects octopus into unborn branch" {
+  @bitnative.init_native_io()
+  let fs = OsFs::new()
+  let root = "/tmp/bit-test pull command octopus trash directory-" +
+    get_current_timestamp().to_string()
+  cleanup_tree(fs, root)
+  fs.mkdir_p(root)
+  let dst_dir = root + "/dst"
+  let prev_cwd = @sys.get_env_var("GIT_SHIM_CWD")
+
+  commit_wbtest_run_git(root, ["init", "--initial-branch=main", "-q"])
+  commit_wbtest_run_git(root, ["config", "user.name", "Test User"])
+  commit_wbtest_run_git(root, ["config", "user.email", "test@example.com"])
+  fs.write_string(root + "/file", "file\n")
+  commit_wbtest_run_git(root, ["add", "file"])
+  commit_wbtest_run_git(root, ["commit", "-q", "-m", "initial"])
+
+  commit_wbtest_run_git(root, ["init", "--initial-branch=main", "-q", "dst"])
+
+  let mut failed = false
+  @sys.set_env_var("GIT_SHIM_CWD", dst_dir)
+  ignore(handle_pull(["..", "main", "main"]) catch { _ => failed = true })
+
+  assert_true(failed)
+  assert_false(fs.is_file(dst_dir + "/file"))
+
+  restore_env_var_for_fetch_wbtest("GIT_SHIM_CWD", prev_cwd)
+  cleanup_tree(fs, root)
+}
+
+///|
+async test "pull: rebase rejects staged changes on unborn branch" {
+  @bitnative.init_native_io()
+  let fs = OsFs::new()
+  let root = "/tmp/bit-test pull unborn-rebase-index trash directory-" +
+    get_current_timestamp().to_string()
+  cleanup_tree(fs, root)
+  fs.mkdir_p(root)
+  let dst_dir = root + "/dst"
+  let prev_cwd = @sys.get_env_var("GIT_SHIM_CWD")
+
+  commit_wbtest_run_git(root, ["init", "--initial-branch=main", "-q"])
+  commit_wbtest_run_git(root, ["config", "user.name", "Test User"])
+  commit_wbtest_run_git(root, ["config", "user.email", "test@example.com"])
+  fs.write_string(root + "/file", "file\n")
+  commit_wbtest_run_git(root, ["add", "file"])
+  commit_wbtest_run_git(root, ["commit", "-q", "-m", "initial"])
+
+  commit_wbtest_run_git(root, ["init", "--initial-branch=main", "-q", "dst"])
+  fs.write_string(dst_dir + "/staged-file", "staged-file\n")
+  commit_wbtest_run_git(dst_dir, ["add", "staged-file"])
+
+  let rejected = try {
+    @sys.set_env_var("GIT_SHIM_CWD", dst_dir)
+    ignore(handle_pull(["--rebase", "..", "main"]))
+    false
+  } catch {
+    @bitcore.GitError::InvalidObject(msg) =>
+      msg.contains("unborn branch with changes added to the index")
+    _ => false
+  }
+
+  assert_true(rejected)
+  let entries = @bitlib.read_index_entries(fs, dst_dir + "/.git")
+  let mut found_staged_file = false
+  for entry in entries {
+    if entry.path == "staged-file" {
+      found_staged_file = true
+      break
+    }
+  }
+  assert_true(found_staged_file)
+  assert_eq(
+    decode_bytes(
+      fs.read_file(dst_dir + "/staged-file") catch {
+        _ => Bytes::default()
+      },
+    ),
+    "staged-file\n",
+  )
+
+  restore_env_var_for_fetch_wbtest("GIT_SHIM_CWD", prev_cwd)
+  cleanup_tree(fs, root)
+}
+
+///|
+async test "pull: rebase uses previous target as fork point for rebased upstream" {
+  @bitnative.init_native_io()
+  let fs = OsFs::new()
+  let root = "/tmp/bit-test pull rebased-upstream trash directory-" +
+    get_current_timestamp().to_string()
+  cleanup_tree(fs, root)
+  fs.mkdir_p(root)
+  let prev_cwd = @sys.get_env_var("GIT_SHIM_CWD")
+
+  commit_wbtest_run_git(root, ["init", "--initial-branch=main", "-q"])
+  commit_wbtest_run_git(root, ["config", "user.name", "Test User"])
+  commit_wbtest_run_git(root, ["config", "user.email", "test@example.com"])
+  fs.write_string(root + "/file", "file\n")
+  commit_wbtest_run_git(root, ["add", "file"])
+  commit_wbtest_run_git(root, ["commit", "-q", "-m", "original"])
+
+  commit_wbtest_run_git(root, ["branch", "copy", "main"])
+  commit_wbtest_run_git(root, ["checkout", "-q", "copy"])
+  fs.write_string(root + "/file", "modified again\n")
+  commit_wbtest_run_git(root, ["commit", "-q", "-a", "-m", "file"])
+
+  commit_wbtest_run_git(root, ["checkout", "-q", "-b", "to-rebase"])
+  fs.write_string(root + "/file2", "new\n")
+  commit_wbtest_run_git(root, ["add", "file2"])
+  commit_wbtest_run_git(root, ["commit", "-q", "-m", "new file"])
+
+  commit_wbtest_run_git(root, ["remote", "add", "-f", "me", "."])
+
+  commit_wbtest_run_git(root, ["checkout", "-q", "copy"])
+  commit_wbtest_run_git(root, ["reset", "--hard", "HEAD^"])
+  fs.write_string(root + "/file", "conflicting modification\n")
+  commit_wbtest_run_git(root, ["commit", "-q", "-a", "-m", "conflict"])
+
+  commit_wbtest_run_git(root, ["checkout", "-q", "to-rebase"])
+  @sys.set_env_var("GIT_SHIM_CWD", root)
+  handle_pull(["--rebase", "me", "copy"])
+
+  assert_eq(
+    decode_bytes(fs.read_file(root + "/file") catch { _ => Bytes::default() }),
+    "conflicting modification\n",
+  )
+  assert_eq(
+    decode_bytes(fs.read_file(root + "/file2") catch { _ => Bytes::default() }),
+    "new\n",
+  )
+  assert_eq(@bitlib.read_unmerged_paths(fs, root + "/.git").length(), 0)
+
+  restore_env_var_for_fetch_wbtest("GIT_SHIM_CWD", prev_cwd)
+  cleanup_tree(fs, root)
+}
+
+///|
+async test "pull: updates checked-out branch worktree when fetch advances it" {
+  @bitnative.init_native_io()
+  let fs = OsFs::new()
+  let root = "/tmp/bit-test pull fetch-updates-head trash directory-" +
+    get_current_timestamp().to_string()
+  cleanup_tree(fs, root)
+  fs.mkdir_p(root)
+  let prev_cwd = @sys.get_env_var("GIT_SHIM_CWD")
+
+  commit_wbtest_run_git(root, ["init", "--initial-branch=main", "-q"])
+  commit_wbtest_run_git(root, ["config", "user.name", "Test User"])
+  commit_wbtest_run_git(root, ["config", "user.email", "test@example.com"])
+  fs.write_string(root + "/file", "base\n")
+  commit_wbtest_run_git(root, ["add", "file"])
+  commit_wbtest_run_git(root, ["commit", "-q", "-m", "base"])
+  fs.write_string(root + "/file", "file\n")
+  commit_wbtest_run_git(root, ["commit", "-q", "-a", "-m", "original"])
+  commit_wbtest_run_git(root, ["checkout", "-q", "-b", "second", "main"])
+  fs.write_string(root + "/file", "modified\n")
+  commit_wbtest_run_git(root, ["commit", "-q", "-a", "-m", "modified"])
+  let second_id = @bitlib.resolve_ref(fs, root + "/.git", "refs/heads/second")
+  commit_wbtest_run_git(root, ["checkout", "-q", "-b", "third", "second^"])
+  fs.write_string(root + "/expect", "file\n")
+
+  @sys.set_env_var("GIT_SHIM_CWD", root)
+  handle_pull([".", "second:third"])
+
+  assert_eq(
+    decode_bytes(fs.read_file(root + "/file") catch { _ => Bytes::default() }),
+    "modified\n",
+  )
+  assert_eq(
+    @bitlib.resolve_ref(fs, root + "/.git", "refs/heads/third"),
+    second_id,
+  )
+  assert_true(
+    decode_bytes(
+      fs.read_file(root + "/.git/logs/HEAD") catch {
+        _ => Bytes::default()
+      },
+    ).contains("pull . second:third: Fast-forward"),
+  )
+
+  restore_env_var_for_fetch_wbtest("GIT_SHIM_CWD", prev_cwd)
+  cleanup_tree(fs, root)
+}
+
+///|
+async test "pull: refuses dirty worktree when fetch advances current branch" {
+  @bitnative.init_native_io()
+  let fs = OsFs::new()
+  let root = "/tmp/bit-test pull fetch-updates-head-dirty trash directory-" +
+    get_current_timestamp().to_string()
+  cleanup_tree(fs, root)
+  fs.mkdir_p(root)
+  let prev_cwd = @sys.get_env_var("GIT_SHIM_CWD")
+
+  commit_wbtest_run_git(root, ["init", "--initial-branch=main", "-q"])
+  commit_wbtest_run_git(root, ["config", "user.name", "Test User"])
+  commit_wbtest_run_git(root, ["config", "user.email", "test@example.com"])
+  fs.write_string(root + "/file", "base\n")
+  commit_wbtest_run_git(root, ["add", "file"])
+  commit_wbtest_run_git(root, ["commit", "-q", "-m", "base"])
+  fs.write_string(root + "/file", "file\n")
+  commit_wbtest_run_git(root, ["commit", "-q", "-a", "-m", "original"])
+  commit_wbtest_run_git(root, ["checkout", "-q", "-b", "second", "main"])
+  fs.write_string(root + "/file", "modified\n")
+  commit_wbtest_run_git(root, ["commit", "-q", "-a", "-m", "modified"])
+  let second_id = @bitlib.resolve_ref(fs, root + "/.git", "refs/heads/second")
+  commit_wbtest_run_git(root, ["checkout", "-q", "-b", "third", "second^"])
+  fs.write_string(root + "/file", "conflict\n")
+
+  let rejected = try {
+    @sys.set_env_var("GIT_SHIM_CWD", root)
+    ignore(handle_pull([".", "second:third"]))
+    false
+  } catch {
+    @bitcore.GitError::InvalidObject(msg) =>
+      msg == "Cannot fast-forward your working tree"
+    _ => false
+  }
+
+  assert_true(rejected)
+  assert_eq(
+    decode_bytes(fs.read_file(root + "/file") catch { _ => Bytes::default() }),
+    "conflict\n",
+  )
+  assert_eq(
+    @bitlib.resolve_ref(fs, root + "/.git", "refs/heads/third"),
+    second_id,
+  )
+
+  restore_env_var_for_fetch_wbtest("GIT_SHIM_CWD", prev_cwd)
+  cleanup_tree(fs, root)
+}
+
+///|
+async test "pull: rebase rejects multiple explicit refspecs" {
+  @bitnative.init_native_io()
+  let fs = OsFs::new()
+  let root = "/tmp/bit-test pull rebase-multi trash directory-" +
+    get_current_timestamp().to_string()
+  cleanup_tree(fs, root)
+  fs.mkdir_p(root)
+  let prev_cwd = @sys.get_env_var("GIT_SHIM_CWD")
+
+  commit_wbtest_run_git(root, ["init", "--initial-branch=main", "-q"])
+  commit_wbtest_run_git(root, ["config", "user.name", "Test User"])
+  commit_wbtest_run_git(root, ["config", "user.email", "test@example.com"])
+  fs.write_string(root + "/file", "base\n")
+  commit_wbtest_run_git(root, ["add", "file"])
+  commit_wbtest_run_git(root, ["commit", "-q", "-m", "base"])
+  commit_wbtest_run_git(root, ["branch", "copy", "main"])
+  fs.write_string(root + "/file", "modified\n")
+  commit_wbtest_run_git(root, ["commit", "-q", "-a", "-m", "modified"])
+
+  let rejected = try {
+    @sys.set_env_var("GIT_SHIM_CWD", root)
+    ignore(handle_pull(["--rebase", ".", "copy", "main"]))
+    false
+  } catch {
+    @bitcore.GitError::InvalidObject(msg) =>
+      msg.contains("Cannot rebase onto multiple branches")
+    _ => false
+  }
+
+  assert_true(rejected)
+  restore_env_var_for_fetch_wbtest("GIT_SHIM_CWD", prev_cwd)
+  cleanup_tree(fs, root)
+}
+
+///|
+async test "pull: rebase autostash preserves staged file on fast-forward" {
+  @bitnative.init_native_io()
+  let fs = OsFs::new()
+  let root = "/tmp/bit-test pull rebase-autostash trash directory-" +
+    get_current_timestamp().to_string()
+  cleanup_tree(fs, root)
+  fs.mkdir_p(root)
+  let prev_cwd = @sys.get_env_var("GIT_SHIM_CWD")
+
+  commit_wbtest_run_git(root, ["init", "--initial-branch=main", "-q"])
+  commit_wbtest_run_git(root, ["config", "user.name", "Test User"])
+  commit_wbtest_run_git(root, ["config", "user.email", "test@example.com"])
+  fs.write_string(root + "/file", "file\n")
+  commit_wbtest_run_git(root, ["add", "file"])
+  commit_wbtest_run_git(root, ["commit", "-q", "-m", "original"])
+  commit_wbtest_run_git(root, ["branch", "copy", "main"])
+  fs.write_string(root + "/file", "modified again\n")
+  commit_wbtest_run_git(root, ["commit", "-q", "-a", "-m", "file"])
+  commit_wbtest_run_git(root, ["checkout", "-q", "-b", "to-rebase", "copy"])
+  fs.write_string(root + "/new_file", "dirty\n")
+  commit_wbtest_run_git(root, ["add", "new_file"])
+  commit_wbtest_run_git(root, ["config", "rebase.autostash", "true"])
+
+  @sys.set_env_var("GIT_SHIM_CWD", root)
+  handle_pull(["--rebase", ".", "main"])
+
+  assert_eq(
+    decode_bytes(
+      fs.read_file(root + "/new_file") catch {
+        _ => Bytes::default()
+      },
+    ),
+    "dirty\n",
+  )
+  assert_eq(
+    decode_bytes(fs.read_file(root + "/file") catch { _ => Bytes::default() }),
+    "modified again\n",
+  )
+  assert_eq(@bitlib.stash_list(fs, root + "/.git").length(), 0)
+
+  restore_env_var_for_fetch_wbtest("GIT_SHIM_CWD", prev_cwd)
+  cleanup_tree(fs, root)
+}
+
+///|
+async test "pull: unborn conflict detection only keeps colliding paths" {
+  let fs = @bitcore.TestFs::new()
+  fs.mkdir_p("/repo/.git")
+  fs.write_string("/repo/.git/HEAD", "ref: refs/heads/main\n")
+  fs.write_string("/repo/file", "file\n")
+  fs.write_string("/repo/extra", "extra\n")
+  let file_id = @bitcore.ObjectId::from_hex(
+    "1111111111111111111111111111111111111111",
+  )
+  let newfile_id = @bitcore.ObjectId::from_hex(
+    "2222222222222222222222222222222222222222",
+  )
+  @bitlib.write_index_entries(fs, "/repo/.git", [
+    @bitlib.IndexEntry::new("file", file_id, 0o100644, 5),
+    @bitlib.IndexEntry::new("newfile", newfile_id, 0o100644, 8),
+  ])
+  let status = @bitlib.status(fs, "/repo")
+  let target_modes : Map[String, Int] = {}
+  target_modes["file"] = 0o100644
+  target_modes["extra"] = 0o100644
+  let conflicts = pull_collect_initial_conflicting_paths(status, target_modes)
+  assert_eq(conflicts.length(), 2)
+  assert_true(conflicts.contains("file"))
+  assert_true(conflicts.contains("extra"))
+}
+
+///|
+test "pull: unborn preserve index entries outside target tree" {
+  let keep_id = @bitcore.ObjectId::from_hex(
+    "0123456789abcdef0123456789abcdef01234567",
+  )
+  let drop_id = @bitcore.ObjectId::from_hex(
+    "89abcdef0123456789abcdef0123456789abcdef",
+  )
+  let entries = [
+    @bitlib.IndexEntry::new("keep", keep_id, 0o100644, 1),
+    @bitlib.IndexEntry::new("drop", drop_id, 0o100644, 1),
+  ]
+  let target_modes : Map[String, Int] = {}
+  target_modes["drop"] = 0o100644
+  let preserved = pull_collect_initial_preserved_index_entries(
+    entries, target_modes,
+  )
+  assert_eq(preserved.length(), 1)
+  assert_eq(preserved[0].path, "keep")
+}
+
+///|
 test "fetch transport: http url uses http transport" {
   let transport = resolve_upload_pack_transport(
     "https://github.com/mizchi/bit-vcs.git",

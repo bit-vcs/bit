@@ -7,6 +7,46 @@ fn restore_env_var_for_push_wbtest(name : String, prev : String?) -> Unit {
 }
 
 ///|
+fn setup_force_if_includes_push_wbtest_repo() -> @bitcore.TestFs {
+  let fs = @bitcore.TestFs::new()
+  ignore(try? @bitlib.init_repo(fs, "/repo"))
+  fs
+}
+
+///|
+test "push-delete-current: missing ref is allowed even when current branch is checked out" {
+  let (rejected, warned) = push_delete_current_branch_policy(
+    false,
+    Some("/repo"),
+    None,
+  )
+  assert_false(rejected)
+  assert_false(warned)
+}
+
+///|
+test "push-delete-current: warn mode warns without rejecting" {
+  let (rejected, warned) = push_delete_current_branch_policy(
+    true,
+    Some("/repo"),
+    Some("warn"),
+  )
+  assert_false(rejected)
+  assert_true(warned)
+}
+
+///|
+test "push-delete-current: default rejects existing checked-out branch" {
+  let (rejected, warned) = push_delete_current_branch_policy(
+    true,
+    Some("/repo"),
+    None,
+  )
+  assert_true(rejected)
+  assert_false(warned)
+}
+
+///|
 test "push-default: upstream uses configured tracking" {
   let plan = resolve_push_target_plan(
     None,
@@ -185,6 +225,54 @@ test "push-default: colon refspec is treated as matching" {
 }
 
 ///|
+test "push force-if-includes: branch reflog allows local rebase rewrite" {
+  let fs = setup_force_if_includes_push_wbtest_repo()
+  fs.write_string("/repo/a.txt", "A\n")
+  @bitlib.add_paths(fs, fs, "/repo", ["a.txt"])
+  let commit_a = @bitlib.commit(
+    fs, fs, "/repo", "A", "Test <test@example.com>", 1700000000L,
+  )
+
+  fs.write_string("/repo/b.txt", "B\n")
+  @bitlib.add_paths(fs, fs, "/repo", ["b.txt"])
+  let commit_b = @bitlib.commit(
+    fs, fs, "/repo", "B", "Test <test@example.com>", 1700000001L,
+  )
+
+  fs.write_string("/repo/c.txt", "C\n")
+  @bitlib.add_paths(fs, fs, "/repo", ["c.txt"])
+  let commit_c = @bitlib.commit(
+    fs, fs, "/repo", "C", "Test <test@example.com>", 1700000002L,
+  )
+
+  @bitlib.create_branch_at(fs, fs, "/repo", "rewritten", commit_a)
+  @bitlib.switch_branch(fs, fs, "/repo", "rewritten", checkout_files=true)
+  fs.write_string("/repo/d.txt", "D\n")
+  @bitlib.add_paths(fs, fs, "/repo", ["d.txt"])
+  let commit_d = @bitlib.commit(
+    fs, fs, "/repo", "D", "Test <test@example.com>", 1700000003L,
+  )
+
+  fs.write_string("/repo/.git/HEAD", "ref: refs/heads/main\n")
+  fs.write_string("/repo/.git/refs/heads/main", commit_d.to_hex() + "\n")
+  @bitrepo.append_reflog(
+    fs, fs, "/repo/.git", "refs/heads/main", commit_c, commit_d, "Test", "test@example.com",
+    1700000004L, "+0000", "rebase finished: refs/heads/main onto rewritten",
+  )
+
+  let db = @bitlib.ObjectDb::load(fs, "/repo/.git")
+  assert_true(
+    push_force_if_includes_satisfied(
+      fs,
+      db,
+      "/repo/.git",
+      "refs/heads/main",
+      Some(commit_b),
+    ),
+  )
+}
+
+///|
 test "push matching-refspec: fails when no branch candidates exist" {
   let parsed = parse_push_refspecs_with_presence([":"])
   let _ = ensure_matching_refspec_has_candidates(parsed, 0) catch {
@@ -197,6 +285,26 @@ test "push matching-refspec: fails when no branch candidates exist" {
 test "push matching-refspec: allows at least one candidate" {
   let parsed = parse_push_refspecs_with_presence([":"])
   ensure_matching_refspec_has_candidates(parsed, 1)
+}
+
+///|
+test "push-mirror: explicit option uses wildcard refspec" {
+  let specs = push_resolve_mirror_refspecs(true, false, 0, false, false, false)
+  assert_eq(specs, Some(["+refs/*:refs/*"]))
+}
+
+///|
+test "push-mirror: remote config enables wildcard refspec" {
+  let specs = push_resolve_mirror_refspecs(false, true, 0, false, false, false)
+  assert_eq(specs, Some(["+refs/*:refs/*"]))
+}
+
+///|
+test "push-mirror: mirrored remote rejects explicit refspec" {
+  let _ = push_resolve_mirror_refspecs(false, true, 1, false, false, false) catch {
+    _ => return ()
+  }
+  fail("expected mirror refspec conflict")
 }
 
 ///|
@@ -562,6 +670,43 @@ test "push transfer: tag that points to blob copies tagged blob object" {
 }
 
 ///|
+test "push transfer: alternates avoid copying reachable parent commits" {
+  let fs = @bitcore.TestFs::new()
+  ignore(try? @bitrepo.init_repo(fs, "/src"))
+  ignore(try? @bitrepo.init_repo(fs, "/alt", bare=true))
+  ignore(try? @bitrepo.init_repo(fs, "/dst", bare=true))
+  fs.write_string("/src/file", "one\n")
+  @bitlib.add_paths(fs, fs, "/src", ["file"])
+  let first = @bitlib.commit(
+    fs, fs, "/src", "first\n", "Test <test@example.com>", 1700000000L,
+  )
+  fs.write_string("/src/file", "two\n")
+  @bitlib.add_paths(fs, fs, "/src", ["file"])
+  let second = @bitlib.commit(
+    fs, fs, "/src", "second\n", "Test <test@example.com>", 1700000001L,
+  )
+  let src_db = @bitlib.ObjectDb::load(fs, "/src/.git")
+  let warmup_ids : Map[String, Bool] = {}
+  copy_wanted_object_graph(fs, fs, src_db, "/alt", first, warmup_ids) catch {
+    _ => fail("copy_wanted_object_graph warmup failed")
+  }
+  fs.mkdir_p("/dst/objects/info")
+  fs.write_string("/dst/objects/info/alternates", "../../alt/objects\n")
+  let transferred_object_ids : Map[String, Bool] = {}
+  copy_wanted_object_graph(
+    fs, fs, src_db, "/dst", second, transferred_object_ids,
+  ) catch {
+    _ => fail("copy_wanted_object_graph failed")
+  }
+  fs.remove_file("/dst/objects/info/alternates")
+  let dst_db = @bitlib.ObjectDb::load(fs, "/dst")
+  let copied_second = dst_db.get(fs, second) catch { _ => None }
+  let copied_first = dst_db.get(fs, first) catch { _ => None }
+  assert_true(copied_second is Some(_))
+  assert_true(copied_first is None)
+}
+
+///|
 test "push delete: prune_empty_parent_dirs removes empty nested ref dirs" {
   let fs = @bitcore.TestFs::new()
   fs.write_string(
@@ -573,4 +718,65 @@ test "push delete: prune_empty_parent_dirs removes empty nested ref dirs" {
   )
   assert_true(not(fs.is_dir("/repo/.git/refs/heads/branch")))
   assert_true(fs.is_dir("/repo/.git/refs/heads"))
+}
+
+///|
+test "push-upstream: explicit source branch updates that branch config" {
+  let updates : Array[PushUpstreamConfigUpdate] = []
+  push_append_upstream_config_update(
+    updates, "refs/heads/topic_2", "refs/heads/other2", "main", false,
+  )
+  assert_eq(updates.length(), 1)
+  assert_eq(updates[0].branch_name, "topic_2")
+  assert_eq(updates[0].merge_ref, "refs/heads/other2")
+}
+
+///|
+test "push-upstream: HEAD maps to current branch" {
+  let updates : Array[PushUpstreamConfigUpdate] = []
+  push_append_upstream_config_update(
+    updates, "HEAD", "refs/heads/headbranch", "headbranch", false,
+  )
+  assert_eq(updates.length(), 1)
+  assert_eq(updates[0].branch_name, "headbranch")
+  assert_eq(updates[0].merge_ref, "refs/heads/headbranch")
+}
+
+///|
+test "push-upstream: delete refs do not update tracking config" {
+  let updates : Array[PushUpstreamConfigUpdate] = []
+  push_append_upstream_config_update(
+    updates, "refs/heads/topic_2", "refs/heads/topic_2", "main", true,
+  )
+  assert_eq(updates.length(), 0)
+}
+
+///|
+test "push-progress: quiet and no-progress suppress output" {
+  assert_true(push_should_emit_progress(Some(true), false))
+  assert_false(push_should_emit_progress(Some(false), false))
+  assert_false(push_should_emit_progress(Some(true), true))
+}
+
+///|
+test "push-lease: parse empty explicit expectation" {
+  let fs = @bitcore.TestFs::new()
+  ignore(try? @bitrepo.init_repo(fs, "/repo"))
+  let (refname, expectation) = push_parse_force_with_lease_value(
+    fs, "/repo/.git", "branch:",
+  )
+  assert_eq(refname, "refs/heads/branch")
+  match expectation {
+    PushLeaseExpectation::Explicit(None) => ()
+    _ => fail("expected explicit empty lease expectation")
+  }
+}
+
+///|
+test "push-lease: remote tracking refname follows pushed remote" {
+  assert_eq(
+    push_remote_tracking_refname("origin-push", "refs/heads/main"),
+    Some("refs/remotes/origin-push/main"),
+  )
+  assert_eq(push_remote_tracking_refname("origin", "refs/tags/v1"), None)
 }

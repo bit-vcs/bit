@@ -134,11 +134,12 @@ pub fn select_default_wants(
   symrefs : Map[String, String],
 ) -> Array[@bit.ObjectId] {
   let wants : Array[@bit.ObjectId] = []
+  let zero = @bit.ObjectId::zero()
   match symrefs.get("HEAD") {
     Some(target) =>
       for item in refs {
         let (id, name) = item
-        if name == target {
+        if name == target && id != zero {
           wants.push(id)
           return wants
         }
@@ -147,14 +148,19 @@ pub fn select_default_wants(
   }
   for item in refs {
     let (id, name) = item
-    if name == "HEAD" {
+    if name == "HEAD" && id != zero {
       wants.push(id)
       return wants
     }
   }
   if refs.length() > 0 {
-    let (id, _) = refs[0]
-    wants.push(id)
+    for item in refs {
+      let (id, _) = item
+      if id != zero {
+        wants.push(id)
+        break
+      }
+    }
   }
   wants
 }
@@ -164,11 +170,12 @@ pub fn select_default_ref(
   refs : Array[(@bit.ObjectId, String)],
   symrefs : Map[String, String],
 ) -> (String, @bit.ObjectId)? {
+  let zero = @bit.ObjectId::zero()
   match symrefs.get("HEAD") {
     Some(target) =>
       for item in refs {
         let (id, name) = item
-        if name == target {
+        if name == target && id != zero {
           return Some((name, id))
         }
       }
@@ -176,13 +183,15 @@ pub fn select_default_ref(
   }
   for item in refs {
     let (id, name) = item
-    if name == "HEAD" {
+    if name == "HEAD" && id != zero {
       return Some((name, id))
     }
   }
-  if refs.length() > 0 {
-    let (id, name) = refs[0]
-    return Some((name, id))
+  for item in refs {
+    let (id, name) = item
+    if id != zero {
+      return Some((name, id))
+    }
   }
   None
 }

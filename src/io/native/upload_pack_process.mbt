@@ -454,6 +454,25 @@ fn build_upload_pack_remote_command(path : String) -> String {
 }
 
 ///|
+fn resolve_upload_pack_local_command() -> String {
+  match @sys.get_env_var("SHIM_EXEC_PATH") {
+    Some(exec_path) =>
+      if exec_path.length() > 0 {
+        return exec_path + "/git-upload-pack"
+      }
+    None => ()
+  }
+  match @sys.get_env_var("GIT_EXEC_PATH") {
+    Some(exec_path) =>
+      if exec_path.length() > 0 {
+        return exec_path + "/git-upload-pack"
+      }
+    None => ()
+  }
+  "git-upload-pack"
+}
+
+///|
 fn quote_shell_arg_single(value : String) -> String {
   let b = StringBuilder::new()
   b.write_char('\'')
@@ -488,7 +507,7 @@ fn build_upload_pack_file_spec(
   } else {
     None
   }
-  { cmd: "git-upload-pack", args, extra_env }
+  { cmd: resolve_upload_pack_local_command(), args, extra_env }
 }
 
 ///|

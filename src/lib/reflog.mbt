@@ -260,6 +260,17 @@ pub fn should_log_ref(
         (not(is_bare) && refname == "HEAD"),
         false,
       )
-    _ => (false, false)
+    Some("false") | Some("0") => (false, false)
+    _ =>
+      if is_bare {
+        (false, false)
+      } else {
+        (
+          refname.has_prefix("refs/heads/") ||
+          refname.has_prefix("refs/remotes/") ||
+          refname == "HEAD",
+          false,
+        )
+      }
   }
 }

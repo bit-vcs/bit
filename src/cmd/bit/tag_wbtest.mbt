@@ -22,6 +22,21 @@ test "tag: cleanup file message strips comments and surrounding blanks" {
 }
 
 ///|
+test "tag: sha256 repository requires real git fallback" {
+  let fs = @bitcore.TestFs::new()
+  fs.mkdir_p("/repo/.git")
+  fs.write_string(
+    "/repo/.git/config", "[extensions]\n\tobjectformat = sha256\n",
+  )
+  assert_true(tag_repo_requires_real_git(fs, "/repo/.git"))
+
+  fs.write_string(
+    "/repo/.git/config", "[core]\n\trepositoryformatversion = 0\n",
+  )
+  assert_false(tag_repo_requires_real_git(fs, "/repo/.git"))
+}
+
+///|
 test "tag: cleanup treats comment-only inline messages as empty" {
   assert_eq(tag_cleanup_message("#comment"), "")
   assert_eq(tag_cleanup_message("     "), "")

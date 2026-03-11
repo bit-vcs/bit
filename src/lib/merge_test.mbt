@@ -75,6 +75,15 @@ test "merge: content-level merge with conflict" {
   let content = fs.read_string("/repo/file.txt")
   assert_true(content.contains("<<<<<<< HEAD"))
   assert_true(content.contains(">>>>>>> incoming"))
+  let staged = read_index_stage_entries(fs, "/repo/.git")
+  assert_eq(staged.length(), 3)
+  assert_eq(staged[0].entry.path, "file.txt")
+  assert_eq(staged[0].stage, 1)
+  assert_eq(staged[1].stage, 2)
+  assert_eq(staged[2].stage, 3)
+  assert_true(
+    fs.read_string("/repo/.git/MERGE_HEAD").contains(feature_commit.to_hex()),
+  )
 }
 
 ///|
@@ -138,4 +147,100 @@ test "merge: file-level merge without conflicts" {
       }
     }
   }
+}
+
+///|
+test "merge: unborn branch fast-forwards to target" {
+  let fs = setup_repo_merge()
+  fs.write_string("/repo/file.txt", "base\n")
+  add_paths(fs, fs, "/repo", ["file.txt"])
+  let target = commit(
+    fs, fs, "/repo", "base", "Test <t@example.com>", 1700000000L,
+  )
+  fs.remove_file("/repo/.git/refs/heads/main") catch {
+    _ => ()
+  }
+  fs.remove_file("/repo/.git/index") catch {
+    _ => ()
+  }
+  fs.remove_file("/repo/file.txt") catch {
+    _ => ()
+  }
+  let result = merge(
+    fs, fs, "/repo", target, "merge", "Test <t@example.com>", 1700000001L,
+  )
+  match result.status {
+    FastForward => ()
+    _ => fail("expected fast-forward merge")
+  }
+  assert_eq(result.commit_id, Some(target))
+  let head_ref = fs.read_string("/repo/.git/refs/heads/main")
+  assert_true(head_ref.contains(target.to_hex()))
+  assert_eq(fs.read_string("/repo/file.txt"), "base\n")
+}
+
+///|
+test "merge: fast-forward preserves initialized submodule on removal" {
+  let fs = setup_repo_merge()
+  fs.write_string("/repo/a.txt", "one\n")
+  add_paths(fs, fs, "/repo", ["a.txt"])
+  ignore(
+    commit(fs, fs, "/repo", "initial", "Test <t@example.com>", 1700000100L),
+  )
+
+  init_repo_with_options(fs, "/repo/vendor/sub", {
+    default_branch: "main",
+    bare: false,
+    separate_git_dir: Some("/repo/.git/modules/example"),
+    template_dir: None,
+    ref_format: "files",
+    object_format: "sha1",
+    is_reinit: false,
+    git_dir: None,
+    work_tree: Some("/repo/vendor/sub"),
+    shared: None,
+  })
+  fs.write_string("/repo/vendor/sub/a", "sub\n")
+  add_paths(fs, fs, "/repo/vendor/sub", ["a"])
+  let submodule_commit = commit(
+    fs, fs, "/repo/vendor/sub", "submodule", "Test <t@example.com>", 1700000101L,
+  )
+  fs.write_string(
+    "/repo/.gitmodules", "[submodule \"example\"]\n\tpath = vendor/sub\n\turl = ../example\n",
+  )
+  add_paths(fs, fs, "/repo", [".gitmodules"])
+  let entries = read_index_entries(fs, "/repo/.git")
+  entries.push(IndexEntry::new("vendor/sub", submodule_commit, 0o160000, 0))
+  write_index_entries(fs, "/repo/.git", entries)
+  ignore(
+    commit(
+      fs, fs, "/repo", "with-submodule", "Test <t@example.com>", 1700000102L,
+    ),
+  )
+
+  switch_branch(fs, fs, "/repo", "feature", create=true, checkout_files=false)
+  let remove_entries = read_index_entries(fs, "/repo/.git")
+  let remaining : Array[IndexEntry] = []
+  for entry in remove_entries {
+    if entry.path != ".gitmodules" && entry.path != "vendor/sub" {
+      remaining.push(entry)
+    }
+  }
+  write_index_entries(fs, "/repo/.git", remaining)
+  let remove_commit = commit(
+    fs, fs, "/repo", "remove-submodule", "Test <t@example.com>", 1700000103L,
+  )
+
+  switch_branch(fs, fs, "/repo", "main", checkout_files=false)
+  let result = merge(
+    fs, fs, "/repo", remove_commit, "merge", "Test <t@example.com>", 1700000104L,
+  )
+
+  match result.status {
+    FastForward => ()
+    _ => fail("expected fast-forward merge")
+  }
+  assert_true(fs.is_dir("/repo/vendor/sub"))
+  assert_true(fs.is_file("/repo/vendor/sub/.git"))
+  assert_eq(fs.read_string("/repo/vendor/sub/a"), "sub\n")
 }

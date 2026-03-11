@@ -1,9 +1,261 @@
 ///|
+fn resolve_real_git_for_blame() -> String {
+  match @sys.get_env_var("SHIM_REAL_GIT") {
+    Some(path) =>
+      if path.length() > 0 {
+        path
+      } else {
+        @sys.get_env_var("GIT_SHIM_REAL_GIT").unwrap_or("/usr/bin/git")
+      }
+    None => @sys.get_env_var("GIT_SHIM_REAL_GIT").unwrap_or("/usr/bin/git")
+  }
+}
+
+///|
+async fn delegate_blame_to_real_git(args : Array[String], cwd : String) -> Unit {
+  let argv : Array[String] = ["blame"]
+  for arg in args {
+    argv.push(arg)
+  }
+  let code = @process.run(
+    resolve_real_git_for_blame(),
+    argv,
+    inherit_env=true,
+    cwd~,
+    stdin=@stdio.stdin,
+    stdout=@stdio.stdout,
+    stderr=@stdio.stderr,
+  )
+  @sys.exit(code)
+}
+
+///|
+fn blame_has_textconv_args(args : Array[String]) -> Bool {
+  for arg in args {
+    if arg == "--textconv" || arg == "--no-textconv" {
+      return true
+    }
+  }
+  false
+}
+
+///|
+fn blame_builtin_supports_args(
+  fs : &@bitcore.RepoFileSystem,
+  root : String,
+  args : Array[String],
+) -> Bool {
+  if not(fs.is_dir(root + "/.git")) {
+    return false
+  }
+  let mut saw_double_dash = false
+  let mut positional_count = 0
+  let mut i = 0
+  while i < args.length() {
+    let arg = args[i]
+    if saw_double_dash {
+      positional_count += 1
+      i += 1
+      continue
+    }
+    match arg {
+      "-l" | "--incremental" | "-w" | "-M" | "-C" => i += 1
+      "-L" => {
+        if i + 1 >= args.length() {
+          return false
+        }
+        i += 2
+      }
+      "--" => {
+        saw_double_dash = true
+        i += 1
+      }
+      _ if arg.has_prefix("-L") => i += 1
+      _ if arg.has_prefix("-") => return false
+      _ => {
+        positional_count += 1
+        i += 1
+      }
+    }
+  }
+  positional_count == 1
+}
+
+///|
+fn blame_extract_target_path(
+  root : String,
+  fs : &@bitcore.RepoFileSystem,
+  args : Array[String],
+) -> String? {
+  let mut file_path : String? = None
+  let mut i = 0
+  while i < args.length() {
+    let arg = args[i]
+    match arg {
+      "--" => {
+        if i + 1 < args.length() {
+          return Some(args[i + 1])
+        }
+        return file_path
+      }
+      "-L" if i + 1 < args.length() => i += 2
+      _ if arg.has_prefix("-L") => i += 1
+      _ if not(arg.has_prefix("-")) => {
+        if file_path is None {
+          let test_path = root + "/" + arg
+          if fs.is_file(test_path) {
+            file_path = Some(arg)
+          }
+        }
+        i += 1
+      }
+      _ => i += 1
+    }
+  }
+  file_path
+}
+
+///|
+fn blame_read_path_diff_driver(
+  fs : &@bitcore.RepoFileSystem,
+  root : String,
+  path : String,
+) -> String? {
+  let normalized = if path.has_prefix("/") {
+    String::unsafe_substring(path, start=1, end=path.length())
+  } else if path.has_prefix("./") {
+    String::unsafe_substring(path, start=2, end=path.length())
+  } else {
+    path
+  }
+  let attr_path = root + "/.gitattributes"
+  if not(fs.is_file(attr_path)) {
+    return None
+  }
+  let text = decode_bytes(
+    fs.read_file(attr_path) catch {
+      _ => Bytes::default()
+    },
+  )
+  let mut diff_driver : String? = None
+  for line_view in text.split("\n") {
+    let line = trim_string(line_view.to_string())
+    if line.length() == 0 || line.has_prefix("#") {
+      continue
+    }
+    let tokens = line.split(" ")
+    let words : Array[String] = []
+    for token_view in tokens {
+      let token = trim_string(token_view.to_string())
+      if token.length() > 0 {
+        words.push(token)
+      }
+    }
+    if words.length() < 2 {
+      continue
+    }
+    if !cat_file_attr_pattern_matches(normalized, words[0]) {
+      continue
+    }
+    let mut j = 1
+    while j < words.length() {
+      let token = words[j]
+      if token.has_prefix("diff=") {
+        let value = trim_string(
+          String::unsafe_substring(token, start=5, end=token.length()),
+        )
+        if value.length() > 0 {
+          diff_driver = Some(value)
+        }
+      }
+      j += 1
+    }
+  }
+  diff_driver
+}
+
+///|
+fn blame_path_uses_textconv(
+  fs : &@bitcore.RepoFileSystem,
+  root : String,
+  git_dir : String,
+  path : String,
+) -> Bool {
+  match blame_read_path_diff_driver(fs, root, path) {
+    Some(driver) => {
+      let config_path = git_dir + "/config"
+      let section = "diff \"" + driver + "\""
+      match @bitlib.read_config_value(fs, config_path, section, "textconv") {
+        Some(cmd) => trim_string(cmd).length() > 0
+        None => false
+      }
+    }
+    None => false
+  }
+}
+
+///|
+fn blame_config_get(
+  fs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  section : String,
+  key : String,
+) -> String? {
+  let content = fs.read_file(git_dir + "/config") catch { _ => return None }
+  let content = decode_bytes(content)
+  parse_git_config_value(content, section, key)
+}
+
+///|
+fn blame_repo_prefers_real_git(
+  fs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+) -> Bool {
+  match blame_config_get(fs, git_dir, "blame", "showEmail") {
+    Some(value) => {
+      let normalized = trim_string(value).to_lower()
+      normalized.length() == 0 ||
+      normalized == "true" ||
+      normalized == "yes" ||
+      normalized == "on" ||
+      normalized == "1"
+    }
+    None => false
+  }
+}
+
+///|
+fn blame_repo_requires_real_git(
+  fs : &@bitcore.RepoFileSystem,
+  root : String,
+  git_dir : String,
+  args : Array[String],
+) -> Bool {
+  if not(blame_builtin_supports_args(fs, root, args)) {
+    return true
+  }
+  if blame_repo_prefers_real_git(fs, git_dir) {
+    return true
+  }
+  if blame_has_textconv_args(args) {
+    return true
+  }
+  match blame_extract_target_path(root, fs, args) {
+    Some(path) => blame_path_uses_textconv(fs, root, git_dir, path)
+    None => false
+  }
+}
+
+///|
 async fn handle_blame(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let git_dir = root + "/.git"
   let fs = OsFs::new()
   let rfs : &@bitcore.RepoFileSystem = fs
+  if blame_repo_requires_real_git(rfs, root, git_dir, args) {
+    delegate_blame_to_real_git(args, root)
+    return
+  }
   // Parse options
   let mut long_sha = false
   let mut porcelain = false
@@ -14,7 +266,8 @@ async fn handle_blame(args : Array[String]) -> Unit raise Error {
   let mut line_start = 0
   let mut line_end = 0
   let mut commit_ref = "HEAD"
-  let mut file_path : String? = None
+  let positionals : Array[String] = []
+  let mut saw_double_dash = false
   let mut i = 0
   while i < args.length() {
     let arg = args[i]
@@ -57,28 +310,23 @@ async fn handle_blame(args : Array[String]) -> Unit raise Error {
         line_end = parsed.1
         i += 1
       }
-      _ if not(arg.has_prefix("-")) =>
-        // Could be commit ref or file path
-        if file_path is None {
-          // First positional - check if it looks like a file
-          let test_path = root + "/" + arg
-          if fs.is_file(test_path) {
-            file_path = Some(arg)
-          } else {
-            commit_ref = arg
-          }
-          i += 1
-        } else {
-          i += 1
-        }
       "--" => {
-        // After -- comes file path
-        if i + 1 < args.length() {
-          file_path = Some(args[i + 1])
-        }
-        i += 2
+        saw_double_dash = true
+        i += 1
+      }
+      _ if saw_double_dash || not(arg.has_prefix("-")) => {
+        positionals.push(arg)
+        i += 1
       }
       _ => i += 1
+    }
+  }
+  let file_path = match positionals.length() {
+    0 => None
+    1 => Some(positionals[0])
+    _ => {
+      commit_ref = positionals[0]
+      Some(positionals[positionals.length() - 1])
     }
   }
   guard file_path is Some(path) else {

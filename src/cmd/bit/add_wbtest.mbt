@@ -1,31 +1,31 @@
 ///|
-test "add: sha256 repository requires standalone error" {
+test "add: sha256 repository requires real git fallback" {
   let fs = @bitcore.TestFs::new()
   fs.mkdir_p("/repo/.git")
   fs.write_string(
     "/repo/.git/config", "[extensions]\n\tobjectformat = sha256\n",
   )
-  assert_true(add_repo_requires_standalone_error(fs, "/repo/.git"))
+  assert_true(add_repo_requires_real_git(fs, "/repo/.git"))
 
   fs.write_string(
     "/repo/.git/config", "[core]\n\trepositoryformatversion = 0\n",
   )
-  assert_false(add_repo_requires_standalone_error(fs, "/repo/.git"))
+  assert_false(add_repo_requires_real_git(fs, "/repo/.git"))
 }
 
 ///|
-test "add: compatobjectformat=sha256 does not require standalone error" {
+test "add: compatobjectformat=sha256 does not require real git fallback" {
   let fs = @bitcore.TestFs::new()
   fs.mkdir_p("/repo/.git")
   fs.write_string(
     "/repo/.git/config", "[extensions]\n\tcompatobjectformat = sha256\n",
   )
-  assert_false(add_repo_requires_standalone_error(fs, "/repo/.git"))
+  assert_false(add_repo_requires_real_git(fs, "/repo/.git"))
 
   fs.write_string(
     "/repo/.git/config", "[extensions]\n\tcompatobjectformat = sha1\n",
   )
-  assert_false(add_repo_requires_standalone_error(fs, "/repo/.git"))
+  assert_false(add_repo_requires_real_git(fs, "/repo/.git"))
 }
 
 ///|
@@ -113,6 +113,32 @@ test "add: no-all rejects removed unmerged paths" {
     Ok(_) => fail("expected missing unmerged path error")
     Err(path) => assert_eq(path, "gone")
   }
+}
+
+///|
+async test "add: explicit submodule directory expands to gitlink path" {
+  let fs = @bitcore.TestFs::new()
+  fs.mkdir_p("/repo/.git")
+  fs.mkdir_p("/repo/submod/.git")
+  fs.write_string("/repo/submod/first.t", "first\n")
+
+  let staged = expand_add_stage_paths(fs, "/repo", ["submod"], false)
+  assert_eq(staged.length(), 1)
+  assert_eq(staged[0], "submod")
+}
+
+///|
+async test "add: dot expansion includes submodule gitlink path" {
+  let fs = @bitcore.TestFs::new()
+  fs.mkdir_p("/repo/.git")
+  fs.write_string("/repo/file", "root\n")
+  fs.mkdir_p("/repo/submod/.git")
+  fs.write_string("/repo/submod/first.t", "first\n")
+
+  let staged = expand_add_stage_paths(fs, "/repo", ["."], false)
+  assert_true(staged.contains("file"))
+  assert_true(staged.contains("submod"))
+  assert_false(staged.contains("submod/first.t"))
 }
 
 ///|

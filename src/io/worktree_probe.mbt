@@ -26,6 +26,10 @@ pub struct WorktreeEntryMeta {
   size : Int?
   mtime_sec : Int?
   mtime_nsec : Int?
+  dev : Int?
+  ino : Int?
+  uid : Int?
+  gid : Int?
 }
 
 ///|
@@ -45,8 +49,12 @@ pub fn WorktreeEntryMeta::new(
   size : Int?,
   mtime_sec : Int?,
   mtime_nsec : Int?,
+  dev? : Int? = None,
+  ino? : Int? = None,
+  uid? : Int? = None,
+  gid? : Int? = None,
 ) -> WorktreeEntryMeta {
-  { kind, mode, size, mtime_sec, mtime_nsec }
+  { kind, mode, size, mtime_sec, mtime_nsec, dev, ino, uid, gid }
 }
 
 ///|

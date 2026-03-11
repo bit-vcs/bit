@@ -1,4 +1,203 @@
 ///|
+async fn delegate_reflog_to_real_git(
+  args : Array[String],
+  cwd : String,
+) -> Unit {
+  let argv : Array[String] = ["reflog"]
+  for arg in args {
+    argv.push(arg)
+  }
+  let code = @process.run(
+    resolve_real_git_for_dispatch(),
+    argv,
+    inherit_env=true,
+    cwd~,
+    stdin=@stdio.stdin,
+    stdout=@stdio.stdout,
+    stderr=@stdio.stderr,
+  )
+  @sys.exit(code)
+}
+
+///|
+fn reflog_show_builtin_supports_args(args : Array[String]) -> Bool {
+  let mut saw_refname = false
+  let mut i = 0
+  while i < args.length() {
+    let arg = args[i]
+    match arg {
+      "--no-abbrev-commit"
+      | "-i"
+      | "--regexp-ignore-case"
+      | "-F"
+      | "--fixed-strings"
+      | "-E"
+      | "--extended-regexp"
+      | "-P"
+      | "--perl-regexp"
+      | "--basic-regexp" => i += 1
+      "-n" | "--max-count" | "--grep" => {
+        if i + 1 >= args.length() {
+          return false
+        }
+        i += 2
+      }
+      _ if arg.has_prefix("--max-count=") || arg.has_prefix("--grep=") => i += 1
+      _ if reflog_parse_short_max_count(arg) is Some(_) => i += 1
+      "--" => return false
+      _ if arg.has_prefix("-") => return false
+      _ => {
+        if saw_refname || arg.contains("@{") {
+          return false
+        }
+        saw_refname = true
+        i += 1
+      }
+    }
+  }
+  true
+}
+
+///|
+fn reflog_requires_real_git(args : Array[String]) -> Bool {
+  if args.length() == 0 {
+    return false
+  }
+  match args[0] {
+    "show" => not(reflog_show_builtin_supports_args(collect_args(args, 1)))
+    "exists" => if args.length() != 2 { true } else { args[1].contains("@{") }
+    "expire" => not(reflog_expire_builtin_supports_args(collect_args(args, 1)))
+    "delete" | "drop" | "list" | "write" => true
+    _ => not(reflog_show_builtin_supports_args(args))
+  }
+}
+
+///|
+fn reflog_expire_builtin_supports_args(args : Array[String]) -> Bool {
+  if args.length() == 0 {
+    return false
+  }
+  for arg in args {
+    if arg.has_prefix("-") || arg.contains("@{") {
+      return false
+    }
+  }
+  true
+}
+
+///|
+fn reflog_glob_match(pattern : String, text : String) -> Bool {
+  let p = pattern.to_array()
+  let t = text.to_array()
+  let plen = p.length()
+  let tlen = t.length()
+  let mut pi = 0
+  let mut ti = 0
+  let mut star_pi = -1
+  let mut star_ti = -1
+  while ti < tlen {
+    if pi < plen && (p[pi] == t[ti] || p[pi] == '?') {
+      pi += 1
+      ti += 1
+    } else if pi < plen && p[pi] == '*' {
+      star_pi = pi
+      star_ti = ti
+      pi += 1
+    } else if star_pi >= 0 {
+      pi = star_pi + 1
+      star_ti += 1
+      ti = star_ti
+    } else {
+      return false
+    }
+  }
+  while pi < plen && p[pi] == '*' {
+    pi += 1
+  }
+  pi == plen
+}
+
+///|
+fn reflog_expire_mode_supported(mode : String) -> Bool {
+  let normalized = mode.trim().to_lower()
+  normalized == "now" || normalized == "never" || normalized == "false"
+}
+
+///|
+fn reflog_expire_mode_for_ref(
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  refname : String,
+) -> String? {
+  let content = @bitlib.read_config_content(rfs, git_dir)
+  let blocks = @bitlib.parse_config_blocks(content)
+  let mut global_mode : String? = None
+  let mut pattern_mode : String? = None
+  for block in blocks {
+    guard block.section is Some(section) else { continue }
+    if section != "gc" {
+      continue
+    }
+    for line in block.lines {
+      match @bitlib.parse_config_kv(line) {
+        Some((key, value)) if key == "reflogexpire" =>
+          match block.name {
+            Some(pattern) =>
+              if reflog_glob_match(pattern, refname) {
+                pattern_mode = Some(value)
+              }
+            None => global_mode = Some(value)
+          }
+        _ => ()
+      }
+    }
+  }
+  match pattern_mode {
+    Some(_) => pattern_mode
+    None => global_mode
+  }
+}
+
+///|
+fn reflog_builtin_expire_refs(
+  fs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  refs : Array[String],
+) -> Bool raise Error {
+  let normalized_refs : Array[String] = []
+  let modes : Array[String] = []
+  for refname_arg in refs {
+    let normalized = normalize_reflog_refname(rfs, git_dir, refname_arg)
+    if not(reflog_ref_exists_or_resolves(rfs, git_dir, normalized)) {
+      raise @bitcore.GitError::InvalidObject(
+        "error: reflog could not be found: '\{refname_arg}'",
+      )
+    }
+    let mode = reflog_expire_mode_for_ref(rfs, git_dir, normalized)
+    guard mode is Some(raw_mode) else { return false }
+    if not(reflog_expire_mode_supported(raw_mode)) {
+      return false
+    }
+    normalized_refs.push(normalized)
+    modes.push(raw_mode.trim().to_string().to_lower())
+  }
+  for i in 0..<normalized_refs.length() {
+    if modes[i] == "now" {
+      let reflog_path = if normalized_refs[i] == "HEAD" {
+        git_dir + "/logs/HEAD"
+      } else {
+        git_dir + "/logs/" + normalized_refs[i]
+      }
+      if rfs.is_file(reflog_path) {
+        fs.write_string(reflog_path, "")
+      }
+    }
+  }
+  true
+}
+
+///|
 priv struct ReflogShowArgs {
   refname : String
   no_abbrev_commit : Bool
@@ -16,11 +215,16 @@ async fn handle_reflog(args : Array[String]) -> Unit raise Error {
   let rfs : &@bitcore.RepoFileSystem = fs
   let wfs : &@bitcore.FileSystem = fs
   let empty_grep_patterns : Array[String] = []
+  if reflog_requires_real_git(args) {
+    delegate_reflog_to_real_git(args, root)
+    return
+  }
   if args.length() == 0 {
     // Default to show HEAD
     show_reflog(
       rfs,
       git_dir,
+      "HEAD",
       "HEAD",
       false,
       None,
@@ -43,11 +247,12 @@ async fn handle_reflog(args : Array[String]) -> Unit raise Error {
         git_dir,
         parsed.grep_pattern_type_override,
       )
-      let refname = normalize_reflog_refname(parsed.refname)
+      let refname = normalize_reflog_refname(rfs, git_dir, parsed.refname)
       show_reflog(
         rfs,
         git_dir,
         refname,
+        parsed.refname,
         parsed.no_abbrev_commit,
         parsed.max_count,
         parsed.grep_patterns,
@@ -56,11 +261,11 @@ async fn handle_reflog(args : Array[String]) -> Unit raise Error {
       )
     }
     "exists" => {
-      if rest.length() == 0 {
+      if rest.length() != 1 || (rest[0].has_prefix("-") && rest[0] != "-") {
         @stdio.stderr.write("usage: git reflog exists <ref>")
-        @sys.exit(1)
+        @sys.exit(129)
       }
-      let refname = normalize_reflog_refname(rest[0])
+      let refname = normalize_reflog_refname(rfs, git_dir, rest[0])
       if @bitrepo.reflog_exists(rfs, git_dir, refname) {
         @sys.exit(0)
       } else {
@@ -72,12 +277,27 @@ async fn handle_reflog(args : Array[String]) -> Unit raise Error {
         @stdio.stderr.write("usage: git reflog delete <ref>")
         @sys.exit(1)
       }
-      let refname = normalize_reflog_refname(rest[0])
+      let refname = normalize_reflog_refname(rfs, git_dir, rest[0])
       @bitrepo.delete_reflog(wfs, rfs, git_dir, refname)
     }
     "expire" =>
-      // For now, just a no-op (would need to implement expiry logic)
-      ()
+      try {
+        if not(reflog_builtin_expire_refs(wfs, rfs, git_dir, rest)) {
+          delegate_reflog_to_real_git(args, root)
+        }
+      } catch {
+        err =>
+          match err {
+            @bitcore.GitError::InvalidObject(msg) =>
+              if msg.has_prefix("error: reflog could not be found: ") {
+                @stdio.stderr.write(msg + "\n")
+                @sys.exit(255)
+              } else {
+                raise err
+              }
+            _ => raise err
+          }
+      }
     _ => {
       let show_args : Array[String] = []
       show_args.push(subcmd)
@@ -88,12 +308,13 @@ async fn handle_reflog(args : Array[String]) -> Unit raise Error {
         git_dir,
         parsed.grep_pattern_type_override,
       )
-      let refname = normalize_reflog_refname(parsed.refname)
+      let refname = normalize_reflog_refname(rfs, git_dir, parsed.refname)
       // Treat as a ref name for show
       show_reflog(
         rfs,
         git_dir,
         refname,
+        parsed.refname,
         parsed.no_abbrev_commit,
         parsed.max_count,
         parsed.grep_patterns,
@@ -109,6 +330,7 @@ async fn show_reflog(
   fs : &@bitcore.RepoFileSystem,
   git_dir : String,
   refname : String,
+  display_refname : String,
   no_abbrev_commit : Bool,
   max_count : Int?,
   grep_patterns : Array[String],
@@ -143,7 +365,7 @@ async fn show_reflog(
       } else {
         String::unsafe_substring(entry.id.to_hex(), start=0, end=7)
       }
-      print_line("\{sha} HEAD@{\{fallback_index}}: \{message}")
+      print_line("\{sha} \{display_refname}@{\{fallback_index}}: \{message}")
       fallback_index += 1
       printed += 1
     }
@@ -173,7 +395,7 @@ async fn show_reflog(
     } else {
       String::unsafe_substring(entry.new_id.to_hex(), start=0, end=7)
     }
-    print_line("\{sha} \{refname}@{\{i}}: \{entry.message}")
+    print_line("\{sha} \{display_refname}@{\{i}}: \{entry.message}")
     printed += 1
   }
 }
@@ -190,6 +412,9 @@ fn parse_reflog_show_args(args : Array[String]) -> ReflogShowArgs {
   let mut i = 0
   while i < args.length() {
     let arg = args[i]
+    if arg == "--" {
+      break
+    }
     match arg {
       "--no-abbrev-commit" => no_abbrev_commit = true
       "-n" | "--max-count" if i + 1 < args.length() => {
@@ -239,13 +464,50 @@ fn parse_reflog_show_args(args : Array[String]) -> ReflogShowArgs {
 }
 
 ///|
-fn normalize_reflog_refname(refname : String) -> String raise @bitcore.GitError {
+fn normalize_reflog_refname(
+  fs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  refname : String,
+) -> String raise @bitcore.GitError {
   if refname == "HEAD" {
     return refname
   }
-  @bitlib.normalize_repo_path(refname) catch {
+  let normalized = @bitlib.normalize_repo_path(refname) catch {
     _ => raise @bitcore.GitError::InvalidObject("invalid refname: " + refname)
   }
+  if reflog_ref_exists_or_resolves(fs, git_dir, normalized) {
+    return normalized
+  }
+  if normalized.has_prefix("heads/") ||
+    normalized.has_prefix("tags/") ||
+    normalized.has_prefix("remotes/") {
+    return "refs/" + normalized
+  }
+  let branch_ref = "refs/heads/" + normalized
+  if reflog_ref_exists_or_resolves(fs, git_dir, branch_ref) {
+    return branch_ref
+  }
+  let remote_ref = "refs/remotes/" + normalized
+  if reflog_ref_exists_or_resolves(fs, git_dir, remote_ref) {
+    return remote_ref
+  }
+  let tag_ref = "refs/tags/" + normalized
+  if reflog_ref_exists_or_resolves(fs, git_dir, tag_ref) {
+    return tag_ref
+  }
+  normalized
+}
+
+///|
+fn reflog_ref_exists_or_resolves(
+  fs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  refname : String,
+) -> Bool raise @bitcore.GitError {
+  if @bitrepo.reflog_exists(fs, git_dir, refname) {
+    return true
+  }
+  @bitlib.resolve_ref(fs, git_dir, refname) is Some(_)
 }
 
 ///|

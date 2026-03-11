@@ -988,10 +988,21 @@ pub fn clear_rebase_state(
   // Remove all files in state_dir
   let files = rfs.readdir(state_dir)
   for file in files {
-    fs.remove_file(join_path(state_dir, file))
+    let path = join_path(state_dir, file)
+    if rfs.is_dir(path) {
+      fs.remove_dir(path) catch {
+        _ => ()
+      }
+    } else {
+      fs.remove_file(path) catch {
+        _ => ()
+      }
+    }
   }
   // Remove the directory
-  fs.remove_dir(state_dir)
+  fs.remove_dir(state_dir) catch {
+    _ => ()
+  }
 }
 
 ///|
@@ -1000,6 +1011,18 @@ pub fn rebase_start(
   fs : &@bit.FileSystem,
   rfs : &@bit.RepoFileSystem,
   root : String,
+  upstream : @bit.ObjectId,
+) -> RebaseResult raise @bit.GitError {
+  rebase_start_with_onto(fs, rfs, root, upstream, upstream)
+}
+
+///|
+/// Start a rebase operation with an explicit new base.
+pub fn rebase_start_with_onto(
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  root : String,
+  onto : @bit.ObjectId,
   upstream : @bit.ObjectId,
 ) -> RebaseResult raise @bit.GitError {
   let git_dir = join_path(root, ".git")
@@ -1012,15 +1035,15 @@ pub fn rebase_start(
   let head = resolve_head_commit(rfs, git_dir)
   match head {
     None => {
-      fast_forward_to(fs, rfs, root, upstream)
+      fast_forward_to(fs, rfs, root, onto)
       return {
         status: RebaseStatus::Complete,
-        commit_id: Some(upstream),
+        commit_id: Some(onto),
         conflicts: [],
       }
     }
     Some(h) => {
-      if h == upstream {
+      if h == onto && h == upstream {
         return {
           status: RebaseStatus::NothingToRebase,
           commit_id: Some(h),
@@ -1030,6 +1053,14 @@ pub fn rebase_start(
       let db = ObjectDb::load(rfs, git_dir)
       let chain = rebase_collect_chain(db, rfs, h, upstream)
       if chain.length() == 0 {
+        if h != onto {
+          fast_forward_to(fs, rfs, root, onto)
+          return {
+            status: RebaseStatus::Complete,
+            commit_id: Some(onto),
+            conflicts: [],
+          }
+        }
         return {
           status: RebaseStatus::NothingToRebase,
           commit_id: Some(h),
@@ -1043,7 +1074,7 @@ pub fn rebase_start(
       }
       // Create initial state
       let state : RebaseState = {
-        onto: upstream,
+        onto,
         orig_head: h,
         head_name,
         todo: chain,
@@ -1055,12 +1086,11 @@ pub fn rebase_start(
         author_tz: "+0000",
       }
       save_rebase_state(fs, git_dir, state)
-      // Move HEAD to upstream before applying commits
-      // This is crucial for correct conflict markers (HEAD = upstream, not feature branch)
-      rebase_update_head(fs, rfs, git_dir, upstream)
-      let upstream_map = rebase_tree_map(db, rfs, upstream)
-      rebase_write_worktree(fs, db, rfs, root, git_dir, upstream_map)
-      let entries = rebase_map_to_index(db, rfs, upstream_map)
+      // Move HEAD to the new base before applying commits.
+      rebase_update_head(fs, rfs, git_dir, onto)
+      let onto_map = rebase_tree_map(db, rfs, onto)
+      rebase_write_worktree(fs, db, rfs, root, git_dir, onto_map)
+      let entries = rebase_map_to_index(db, rfs, onto_map)
       write_index_entries(fs, git_dir, entries)
       // Start applying commits
       rebase_apply_next(fs, rfs, root, state)
@@ -1112,11 +1142,15 @@ pub fn rebase_continue(
   // Update state: move current to done, clear current
   let new_done = s.done.copy()
   new_done.push(current_id)
+  let new_todo = s.todo.copy()
+  if new_todo.length() > 0 {
+    ignore(new_todo.remove(0))
+  }
   let new_state : RebaseState = {
     onto: s.onto,
     orig_head: s.orig_head,
     head_name: s.head_name,
-    todo: s.todo,
+    todo: new_todo,
     done: new_done,
     current: None,
     message: "",
@@ -1155,9 +1189,13 @@ pub fn rebase_abort(
   // Restore worktree to original HEAD
   let db = ObjectDb::load(rfs, git_dir)
   let tree_map = rebase_tree_map(db, rfs, s.orig_head)
-  rebase_write_worktree(fs, db, rfs, root, git_dir, tree_map)
-  let entries = rebase_map_to_index(db, rfs, tree_map)
-  write_index_entries(fs, git_dir, entries)
+  rebase_write_worktree(fs, db, rfs, root, git_dir, tree_map) catch {
+    _ => ()
+  }
+  let entries = rebase_map_to_index(db, rfs, tree_map) catch { _ => [] }
+  write_index_entries(fs, git_dir, entries) catch {
+    _ => ()
+  }
   // Clear rebase state
   clear_rebase_state(fs, rfs, git_dir)
 }
@@ -1174,18 +1212,20 @@ pub fn rebase_skip(
   guard state is Some(s) else {
     raise @bit.GitError::InvalidObject("No rebase in progress")
   }
-  guard s.current is Some(current_id) else {
+  guard s.current is Some(_) else {
     raise @bit.GitError::InvalidObject("No commit to skip")
   }
-  // Move current to done (skipped)
-  let new_done = s.done.copy()
-  new_done.push(current_id)
+  // Drop the current commit from the remaining todo list.
+  let new_todo = s.todo.copy()
+  if new_todo.length() > 0 {
+    ignore(new_todo.remove(0))
+  }
   let new_state : RebaseState = {
     onto: s.onto,
     orig_head: s.orig_head,
     head_name: s.head_name,
-    todo: s.todo,
-    done: new_done,
+    todo: new_todo,
+    done: s.done,
     current: None,
     message: "",
     author: "",
@@ -1208,6 +1248,233 @@ pub fn rebase_skip(
 }
 
 ///|
+fn rebase_tree_entry_matches(
+  lhs : TreeEntryInfo?,
+  rhs : TreeEntryInfo?,
+) -> Bool {
+  match (lhs, rhs) {
+    (Some(left), Some(right)) => left.id == right.id && left.mode == right.mode
+    (None, None) => true
+    _ => false
+  }
+}
+
+///|
+fn rebase_compute_patch_id(
+  db : ObjectDb,
+  fs : &@bit.RepoFileSystem,
+  commit_id : @bit.ObjectId,
+) -> String {
+  let obj = db.get(fs, commit_id) catch { _ => return commit_id.to_hex() }
+  match obj {
+    Some(o) if o.obj_type == @bit.ObjectType::Commit => {
+      let info = @bit.parse_commit(o.data) catch {
+        _ => return commit_id.to_hex()
+      }
+      let tree_entries = rebase_get_patch_tree_entries(db, fs, info.tree, "")
+      let parent_entries : Array[(String, String)] = if info.parents.length() >
+        0 {
+        let parent_obj = db.get(fs, info.parents[0]) catch {
+          _ => return commit_id.to_hex()
+        }
+        match parent_obj {
+          Some(parent_commit) if parent_commit.obj_type ==
+            @bit.ObjectType::Commit => {
+            let parent_info = @bit.parse_commit(parent_commit.data) catch {
+              _ => return commit_id.to_hex()
+            }
+            rebase_get_patch_tree_entries(db, fs, parent_info.tree, "")
+          }
+          _ => []
+        }
+      } else {
+        []
+      }
+      let diff = rebase_compute_patch_tree_diff(parent_entries, tree_entries)
+      diff.sort_by((a, b) => a.0.compare(b.0))
+      let parts : Array[String] = []
+      for item in diff {
+        let (path, change) = item
+        parts.push(path + ":" + change)
+      }
+      let content = parts.join("\n")
+      let bytes = Bytes::from_array(
+        FixedArray::makei(content.length(), fn(i) {
+          content[i].to_int().to_byte()
+        }),
+      )
+      @bit.sha1(bytes).to_hex()
+    }
+    _ => commit_id.to_hex()
+  }
+}
+
+///|
+fn rebase_get_patch_tree_entries(
+  db : ObjectDb,
+  fs : &@bit.RepoFileSystem,
+  tree_id : @bit.ObjectId,
+  prefix : String,
+) -> Array[(String, String)] {
+  let result : Array[(String, String)] = []
+  let obj = db.get(fs, tree_id) catch { _ => return result }
+  match obj {
+    Some(o) if o.obj_type == @bit.ObjectType::Tree => {
+      let entries = @bit.parse_tree(o.data) catch { _ => return result }
+      for entry in entries {
+        let path = if prefix.length() == 0 {
+          entry.name
+        } else {
+          prefix + "/" + entry.name
+        }
+        if entry.mode.has_prefix("04") {
+          for sub in rebase_get_patch_tree_entries(db, fs, entry.id, path) {
+            result.push(sub)
+          }
+        } else {
+          result.push((path, entry.id.to_hex()))
+        }
+      }
+    }
+    _ => ()
+  }
+  result
+}
+
+///|
+fn rebase_compute_patch_tree_diff(
+  parent : Array[(String, String)],
+  current : Array[(String, String)],
+) -> Array[(String, String)] {
+  let parent_map : Map[String, String] = {}
+  for item in parent {
+    let (path, id) = item
+    parent_map[path] = id
+  }
+  let diff : Array[(String, String)] = []
+  for item in current {
+    let (path, id) = item
+    match parent_map.get(path) {
+      Some(parent_id) => if parent_id != id { diff.push((path, "M:" + id)) }
+      None => diff.push((path, "A:" + id))
+    }
+  }
+  let current_map : Map[String, String] = {}
+  for item in current {
+    let (path, id) = item
+    current_map[path] = id
+  }
+  for item in parent {
+    let (path, _) = item
+    if not(current_map.contains(path)) {
+      diff.push((path, "D"))
+    }
+  }
+  diff
+}
+
+///|
+fn rebase_patch_id_exists_in_ancestors(
+  db : ObjectDb,
+  fs : &@bit.RepoFileSystem,
+  commit_id : @bit.ObjectId,
+  head_id : @bit.ObjectId,
+) -> Bool raise @bit.GitError {
+  let target_patch_id = rebase_compute_patch_id(db, fs, commit_id)
+  let visited : Map[String, Bool] = {}
+  let queue : Array[@bit.ObjectId] = [head_id]
+  while queue.length() > 0 {
+    let current = queue.remove(0)
+    let hex = current.to_hex()
+    if visited.contains(hex) {
+      continue
+    }
+    visited[hex] = true
+    if rebase_compute_patch_id(db, fs, current) == target_patch_id {
+      return true
+    }
+    let obj = db.get(fs, current)
+    match obj {
+      Some(o) if o.obj_type == @bit.ObjectType::Commit => {
+        let info = @bit.parse_commit(o.data)
+        for parent in info.parents {
+          queue.push(parent)
+        }
+      }
+      _ => ()
+    }
+  }
+  false
+}
+
+///|
+fn rebase_change_already_applied(
+  db : ObjectDb,
+  rfs : &@bit.RepoFileSystem,
+  base : Map[String, TreeEntryInfo],
+  parent_map : Map[String, TreeEntryInfo],
+  ch : Change,
+) -> Bool {
+  let current = base.get(ch.path)
+  match ch.kind {
+    ChangeKind::Added => rebase_tree_entry_matches(current, ch.entry)
+    ChangeKind::Deleted => current is None
+    ChangeKind::Modified =>
+      match (current, parent_map.get(ch.path), ch.entry) {
+        (Some(base_entry), Some(parent_entry), Some(target_entry)) => {
+          if base_entry.id == target_entry.id &&
+            base_entry.mode == target_entry.mode {
+            return true
+          }
+          if base_entry.mode != parent_entry.mode ||
+            base_entry.mode != target_entry.mode {
+            return false
+          }
+          let base_data = rebase_get_blob_data(db, rfs, base_entry.id)
+          let parent_data = rebase_get_blob_data(db, rfs, parent_entry.id)
+          let target_data = rebase_get_blob_data(db, rfs, target_entry.id)
+          if is_binary_content(base_data) ||
+            is_binary_content(parent_data) ||
+            is_binary_content(target_data) {
+            return false
+          }
+          let base_content = get_blob_content(db, rfs, base_entry.id)
+          let parent_content = get_blob_content(db, rfs, parent_entry.id)
+          let target_content = get_blob_content(db, rfs, target_entry.id)
+          let merge_result = content_merge(
+            parent_content,
+            base_content,
+            target_content,
+            ContentMergeOptions::default(),
+          )
+          not(merge_result.has_conflicts) &&
+          merge_result.content == base_content
+        }
+        _ => false
+      }
+  }
+}
+
+///|
+fn rebase_changes_already_applied(
+  db : ObjectDb,
+  rfs : &@bit.RepoFileSystem,
+  base : Map[String, TreeEntryInfo],
+  parent_map : Map[String, TreeEntryInfo],
+  changes : Array[Change],
+) -> Bool {
+  if changes.length() == 0 {
+    return false
+  }
+  for ch in changes {
+    if not(rebase_change_already_applied(db, rfs, base, parent_map, ch)) {
+      return false
+    }
+  }
+  true
+}
+
+///|
 /// Apply the next commit in the todo list.
 fn rebase_apply_next(
   fs : &@bit.FileSystem,
@@ -1217,9 +1484,7 @@ fn rebase_apply_next(
 ) -> RebaseResult raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   let db = ObjectDb::load(rfs, git_dir)
-  // Find the next commit to apply
-  let next_idx = state.done.length()
-  if next_idx >= state.todo.length() {
+  if state.todo.length() == 0 {
     // All done, finalize rebase
     // Restore branch ref if applicable
     let head = resolve_head_commit(rfs, git_dir)
@@ -1239,7 +1504,7 @@ fn rebase_apply_next(
     }
     return { status: RebaseStatus::Complete, commit_id: head, conflicts: [] }
   }
-  let commit_id = state.todo[next_idx]
+  let commit_id = state.todo[0]
   let info = rebase_parse_commit_full(db, rfs, commit_id)
   let parent_id = if info.parents.length() > 0 {
     info.parents[0]
@@ -1255,6 +1520,25 @@ fn rebase_apply_next(
   let parent_map = rebase_tree_map(db, rfs, parent_id)
   let commit_map = rebase_tree_map_from_tree(db, rfs, info.tree)
   let changes = rebase_diff_maps(parent_map, commit_map)
+  if rebase_patch_id_exists_in_ancestors(db, rfs, commit_id, base_id) ||
+    rebase_changes_already_applied(db, rfs, base_map, parent_map, changes) {
+    let new_todo = state.todo.copy()
+    ignore(new_todo.remove(0))
+    let new_state : RebaseState = {
+      onto: state.onto,
+      orig_head: state.orig_head,
+      head_name: state.head_name,
+      todo: new_todo,
+      done: state.done,
+      current: None,
+      message: "",
+      author: "",
+      author_time: 0L,
+      author_tz: "+0000",
+    }
+    save_rebase_state(fs, git_dir, new_state)
+    return rebase_apply_next(fs, rfs, root, new_state)
+  }
   // Try to apply changes, detecting conflicts
   let conflicts = rebase_apply_changes_with_conflicts(
     db, rfs, fs, root, base_map, parent_map, changes,
@@ -1305,11 +1589,13 @@ fn rebase_apply_next(
   // Update state and continue
   let new_done = state.done.copy()
   new_done.push(commit_id)
+  let new_todo = state.todo.copy()
+  ignore(new_todo.remove(0))
   let new_state : RebaseState = {
     onto: state.onto,
     orig_head: state.orig_head,
     head_name: state.head_name,
-    todo: state.todo,
+    todo: new_todo,
     done: new_done,
     current: None,
     message: "",

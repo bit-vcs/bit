@@ -21,9 +21,11 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
   // Read remote URL - prefer subdir-clone remote, then config
   let mut remote_name = "origin"
   let mut remote_url : String? = get_effective_remote_url(fs, git_dir)
-  let mut rebase = false
+  let mut cli_rebase_behavior : (Bool, Bool)? = None
+  let mut autostash : Bool? = None
+  let mut verify_signatures : Bool? = None
   let mut arg_remote : String? = None
-  let mut arg_refspec : String? = None
+  let arg_refspecs : Array[String] = []
   let mut pull_adhoc_remote = false
   let mut relay_preferred_sender_opt : String? = None
   let mut relay_preferred_repo_opt : String? = None
@@ -32,7 +34,34 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
     let arg = args[i]
     match arg {
       "--rebase" | "-r" => {
-        rebase = true
+        cli_rebase_behavior = Some((true, false))
+        i += 1
+      }
+      "--no-rebase" => {
+        cli_rebase_behavior = Some((false, false))
+        i += 1
+      }
+      _ if arg.has_prefix("--rebase=") => {
+        let value = String::unsafe_substring(arg, start=9, end=arg.length())
+        cli_rebase_behavior = Some(
+          pull_parse_rebase_behavior_value(value, "--rebase"),
+        )
+        i += 1
+      }
+      "--autostash" => {
+        autostash = Some(true)
+        i += 1
+      }
+      "--no-autostash" => {
+        autostash = Some(false)
+        i += 1
+      }
+      "--verify-signatures" => {
+        verify_signatures = Some(true)
+        i += 1
+      }
+      "--no-verify-signatures" => {
+        verify_signatures = Some(false)
         i += 1
       }
       "--relay-sender" if i + 1 < args.length() => {
@@ -63,8 +92,9 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
         )
         i += 1
       }
-      "--no-rebase"
-      | "--ff"
+      "--ff"
+      | "-f"
+      | "--force"
       | "--no-ff"
       | "--ff-only"
       | "--squash"
@@ -78,8 +108,6 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
       | "-q"
       | "--progress"
       | "--no-progress"
-      | "--autostash"
-      | "--no-autostash"
       | "--allow-unrelated-histories" =>
         // no-value flags, ignore
         i += 1
@@ -120,13 +148,15 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
       _ => {
         if arg_remote is None {
           arg_remote = Some(arg)
-        } else if arg_refspec is None {
-          arg_refspec = Some(arg)
+        } else {
+          arg_refspecs.push(arg)
         }
         i += 1
       }
     }
   }
+  let arg_refspec = arg_refspecs.get(0)
+  let explicit_refspec = pull_parse_explicit_refspec(arg_refspec)
   // Apply explicit remote argument
   match arg_remote {
     Some(r) =>
@@ -149,41 +179,82 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
   }
   // Resolve upstream from branch config when available
   let head_ref = @bitlib.read_head_ref(fs, git_dir)
+  let current_head_target = match head_ref {
+    @bitlib.HeadRef::Branch(branch) => "refs/heads/" + branch
+    @bitlib.HeadRef::Detached(_) => "HEAD"
+  }
+  let mut current_branch_remote_cfg : String? = None
+  let mut current_branch_rebase_cfg : Bool? = None
+  let mut current_branch_has_merge = false
   let mut merge_ref : String? = None
   match head_ref {
     @bitlib.HeadRef::Branch(branch) => {
       match branches.get(branch) {
         Some(cfg) => {
+          current_branch_remote_cfg = cfg.remote
+          current_branch_rebase_cfg = cfg.rebase
+          current_branch_has_merge = cfg.merges.length() > 0
           if cfg.remote is Some(r) && arg_remote is None {
-            remote_name = r
-            pull_adhoc_remote = false
-            match @bitlib.get_remote_url(fs, git_dir, r) {
-              Some(u) => remote_url = Some(u)
-              None => ()
+            if r == "." {
+              // branch.*.remote=. pulls from the current repository without
+              // requiring a configured [remote "."]. Keep its temporary refs
+              // isolated like `git pull . ...`.
+              remote_name = "__pull_tmp__"
+              pull_adhoc_remote = true
+              remote_url = Some(".")
+            } else {
+              remote_name = r
+              pull_adhoc_remote = false
+              match @bitlib.get_remote_url(fs, git_dir, r) {
+                Some(u) => remote_url = Some(u)
+                None => ()
+              }
             }
           }
-          if cfg.merges.length() > 0 {
+          let use_branch_merge = match arg_remote {
+            None => true
+            Some(explicit_remote) => cfg.remote == Some(explicit_remote)
+          }
+          if use_branch_merge && cfg.merges.length() > 0 {
             merge_ref = Some(cfg.merges[0])
           }
         }
         None => ()
       }
-      if merge_ref is None && arg_refspec is None {
+      if merge_ref is None && arg_refspec is None && arg_remote is None {
         merge_ref = Some("refs/heads/" + branch)
       }
     }
     _ => ()
   }
+  let (rebase, interactive_rebase) = pull_resolve_rebase_behavior(
+    fs, git_dir, current_branch_rebase_cfg, cli_rebase_behavior,
+  )
+  match verify_signatures {
+    Some(true) if rebase =>
+      eprint_line("warning: ignoring --verify-signatures for rebase")
+    _ => ()
+  }
   // Apply explicit refspec argument
-  match arg_refspec {
-    Some(r) =>
-      if r.has_prefix("refs/") {
-        merge_ref = Some(r)
-      } else {
-        merge_ref = Some("refs/heads/" + r)
-      }
+  match explicit_refspec.merge_ref {
+    Some(r) => merge_ref = Some(r)
     None => ()
   }
+  let target_ref = pull_target_ref(
+    remote_name,
+    merge_ref,
+    explicit_refspec.target_ref,
+  )
+  let upstream_ref = pull_upstream_ref(
+    remote_name,
+    merge_ref,
+    explicit_refspec.upstream_ref,
+  )
+  let fetch_refspecs = pull_fetch_refspecs(
+    explicit_refspec.fetch_refspecs,
+    merge_ref,
+    target_ref,
+  )
   guard remote_url is Some(initial_url) else {
     raise @bitcore.GitError::InvalidObject("No remote configured")
   }
@@ -207,43 +278,94 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
     print_line("Relay peer selected: \{relay_sender} -> \{relay_fetch_url}")
     pull_url = relay_fetch_url
   }
+  let pre_fetch_head = @bitlib.resolve_ref(fs, git_dir, "HEAD")
+  let pre_fetch_target_id = @bitlib.resolve_ref(fs, git_dir, target_ref)
+  match
+    pull_pre_fetch_validation_error(
+      head_ref is @bitlib.HeadRef::Detached(_),
+      arg_remote,
+      arg_refspec,
+      current_branch_remote_cfg,
+      current_branch_has_merge,
+      merge_ref,
+      pre_fetch_head is Some(_),
+    ) {
+    Some(message) => raise @bitcore.GitError::InvalidObject(message)
+    None => ()
+  }
+  match
+    pull_in_progress_error(
+      @bitlib.read_unmerged_paths(rfs, git_dir).length() > 0,
+      rfs.is_file(git_dir + "/MERGE_HEAD"),
+    ) {
+    Some(message) => raise @bitcore.GitError::InvalidObject(message)
+    None => ()
+  }
+  let fetch_updates_checked_out_head = explicit_refspec.target_ref is Some(_) &&
+    target_ref == current_head_target
+  let autostash_enabled = pull_autostash_enabled(fs, git_dir, rebase, autostash)
+  if pre_fetch_head is Some(_) &&
+    not(fetch_updates_checked_out_head) &&
+    not(autostash_enabled) &&
+    pull_has_uncommitted_changes(@bitlib.status(fs, root)) {
+    raise @bitcore.GitError::InvalidObject(
+      "Cannot pull because you have uncommitted changes.",
+    )
+  }
+  if rebase && arg_refspecs.length() > 1 {
+    raise @bitcore.GitError::InvalidObject(
+      "Cannot rebase onto multiple branches.",
+    )
+  }
+  if pre_fetch_head is None && arg_refspecs.length() > 1 {
+    raise @bitcore.GitError::InvalidObject(
+      "Cannot merge multiple branches into empty HEAD.",
+    )
+  }
+  let bare_repo = @bitlib.is_bare_git_dir(git_dir)
+  let initial_unborn_status = if pre_fetch_head is None && not(bare_repo) {
+    Some(@bitlib.status(fs, root))
+  } else {
+    None
+  }
+  let initial_unborn_entries = if pre_fetch_head is None && not(bare_repo) {
+    @bitlib.read_index_entries(fs, git_dir)
+  } else {
+    []
+  }
+  if pre_fetch_head is None && rebase && initial_unborn_entries.length() > 0 {
+    raise @bitcore.GitError::InvalidObject(
+      "Updating an unborn branch with changes added to the index.",
+    )
+  }
+  let pre_fetch_checked_out_head_status = if pre_fetch_head is Some(_) &&
+    fetch_updates_checked_out_head &&
+    not(bare_repo) {
+    Some(@bitlib.status(fs, root))
+  } else {
+    None
+  }
   print_line("Fetching from \{pull_url}...")
-  fetch_from_remote(fs, git_dir, root, remote_name, pull_url, [])
-  let target_ref = match merge_ref {
-    Some(r) =>
-      if r.has_prefix("refs/remotes/") {
-        r
-      } else if r.has_prefix("refs/heads/") {
-        let name = String::unsafe_substring(r, start=11, end=r.length())
-        "refs/remotes/" + remote_name + "/" + name
-      } else if r.has_prefix("refs/") {
-        r
-      } else {
-        "refs/remotes/" + remote_name + "/" + r
-      }
-    None => "refs/remotes/" + remote_name + "/HEAD"
-  }
-  let upstream_ref = match merge_ref {
-    Some(r) => {
-      let remote_prefix = "refs/remotes/" + remote_name + "/"
-      if r.has_prefix("refs/heads/") {
-        r
-      } else if r.has_prefix(remote_prefix) {
-        let name = String::unsafe_substring(
-          r,
-          start=remote_prefix.length(),
-          end=r.length(),
-        )
-        "refs/heads/" + name
-      } else if r.has_prefix("refs/") {
-        r
-      } else {
-        "refs/heads/" + r
-      }
-    }
-    None => "HEAD"
-  }
+  fetch_from_remote(
+    fs,
+    git_dir,
+    root,
+    remote_name,
+    pull_url,
+    fetch_refspecs,
+    update_head_ok=explicit_refspec.target_ref is Some(_),
+  )
   let mut target_id = @bitlib.resolve_ref(fs, git_dir, target_ref)
+  if target_id is None {
+    target_id = resolve_fetch_head_oid(fs, git_dir)
+    match (target_id, explicit_refspec.target_ref) {
+      (Some(id), Some(explicit_target)) =>
+        if explicit_target.has_prefix("refs/") {
+          write_ref_file(fs, git_dir, explicit_target, id)
+        }
+      _ => ()
+    }
+  }
   if target_id is None {
     match @bitlib.resolve_local_repo_path(fs, root, pull_url) {
       Some(src_path) =>
@@ -278,12 +400,41 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
     }
   }
   guard target_id is Some(tid) else {
-    raise @bitcore.GitError::InvalidObject("Unknown ref: " + target_ref)
+    raise @bitcore.GitError::InvalidObject(
+      pull_missing_target_error_message(
+        arg_refspec,
+        merge_ref,
+        explicit_refspec.fetch_refspecs,
+        target_ref,
+      ),
+    )
   }
   let db = @bitlib.ObjectDb::load(fs, git_dir)
   let target_modes = collect_commit_tree_modes(db, fs, tid)
-  let current_head = @bitlib.resolve_ref(fs, git_dir, "HEAD")
-  match current_head {
+  match (pre_fetch_head, pre_fetch_checked_out_head_status) {
+    (Some(old_id), Some(status)) =>
+      if old_id != tid {
+        eprint_line("fetch updated the current branch head")
+        if not(pull_can_fast_forward_checked_out_head(status, target_modes)) {
+          if pull_adhoc_remote {
+            @bitlib.remove_remote_refs(fs, fs, git_dir, remote_name)
+          }
+          raise @bitcore.GitError::InvalidObject(
+            "Cannot fast-forward your working tree",
+          )
+        }
+        pull_update_checked_out_head_worktree(fs, git_dir, root, tid)
+        pull_append_fast_forward_reflog(
+          fs, fs, git_dir, current_head_target, old_id, tid, args,
+        )
+        if pull_adhoc_remote {
+          @bitlib.remove_remote_refs(fs, fs, git_dir, remote_name)
+        }
+        return
+      }
+    _ => ()
+  }
+  match pre_fetch_head {
     Some(head_id) => {
       let head_modes = collect_commit_tree_modes(db, fs, head_id)
       match
@@ -297,18 +448,53 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
     }
     None => ()
   }
-  if current_head is None {
+  if pre_fetch_head is None {
     let head_target = match @bitlib.read_head_ref(fs, git_dir) {
       @bitlib.HeadRef::Branch(branch) =>
         resolve_initial_pull_head_target(Some(branch))
       @bitlib.HeadRef::Detached(_) => resolve_initial_pull_head_target(None)
+    }
+    let preserved_entries : Array[@bitlib.IndexEntry] = []
+    let preserved_files : Map[String, Bytes] = {}
+    if not(bare_repo) {
+      let current_status = match initial_unborn_status {
+        Some(status) => status
+        None => @bitlib.status(fs, root)
+      }
+      let conflicting_paths = pull_collect_initial_conflicting_paths(
+        current_status, target_modes,
+      )
+      if conflicting_paths.length() > 0 {
+        raise @bitcore.GitError::InvalidObject(
+          "Pulling into an unborn branch would overwrite local changes: " +
+          conflicting_paths[0],
+        )
+      }
+      for
+        entry in pull_collect_initial_preserved_index_entries(
+          initial_unborn_entries, target_modes,
+        ) {
+        preserved_entries.push(entry)
+      }
+      let preserved_paths : Array[String] = []
+      for entry in preserved_entries {
+        preserved_paths.push(entry.path)
+      }
+      for path in current_status.untracked {
+        if not(target_modes.contains(path)) {
+          preserved_paths.push(path)
+        }
+      }
+      for path, data in pull_snapshot_worktree_files(fs, root, preserved_paths) {
+        preserved_files[path] = data
+      }
     }
     if head_target == "HEAD" {
       fs.write_string(git_dir + "/HEAD", tid.to_hex() + "\n")
     } else {
       write_ref_file(fs, git_dir, head_target, tid)
     }
-    if not(@bitlib.is_bare_git_dir(git_dir)) {
+    if not(bare_repo) {
       if head_target.has_prefix("refs/heads/") {
         let branch = String::unsafe_substring(
           head_target,
@@ -319,6 +505,16 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
       } else {
         ignore(run_checkout_with_sensitive_hooks(fs, fs, root, tid.to_hex()))
       }
+      pull_restore_initial_checkout_state(
+        fs, fs, git_dir, root, preserved_entries, preserved_files,
+      )
+    }
+    match pre_fetch_head {
+      Some(old_id) =>
+        pull_append_fast_forward_reflog(
+          fs, fs, git_dir, head_target, old_id, tid, args,
+        )
+      None => ()
     }
     print_line("Fast-forward")
     if pull_adhoc_remote {
@@ -326,13 +522,69 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
     }
     return
   }
-  if rebase {
-    let id = @bitlib.rebase_onto(fs, fs, root, tid)
-    print_line("Updated to \{id.to_hex()}")
-    return
-  }
   let author = get_author_string()
   let timestamp = get_commit_timestamp()
+  let autostash_state = if autostash_enabled && pre_fetch_head is Some(_) {
+    pull_create_autostash(fs, fs, root, git_dir, author, timestamp)
+  } else {
+    None
+  }
+  if rebase {
+    let reflog_refs : Array[String] = [target_ref]
+    if pull_url == "." && upstream_ref != target_ref {
+      reflog_refs.push(upstream_ref)
+    }
+    let rebase_upstream = match pre_fetch_head {
+      Some(head_id) =>
+        pull_resolve_rebase_upstream(
+          fs, git_dir, head_id, reflog_refs, tid, pre_fetch_target_id,
+        )
+      None => tid
+    }
+    if interactive_rebase {
+      interactive_rebase_start(fs, fs, root, git_dir, rebase_upstream, tid)
+      if not(rfs.is_dir(git_dir + "/rebase-merge")) {
+        pull_apply_autostash(fs, fs, git_dir, root, autostash_state)
+      }
+    } else {
+      let result = @bitlib.rebase_start_with_onto(
+        fs, fs, root, tid, rebase_upstream,
+      )
+      match result.status {
+        @bitlib.RebaseStatus::Complete =>
+          match result.commit_id {
+            Some(id) => {
+              if id == tid {
+                match pre_fetch_head {
+                  Some(old_id) if old_id != id =>
+                    pull_append_fast_forward_reflog(
+                      fs, fs, git_dir, current_head_target, old_id, id, args,
+                    )
+                  _ => ()
+                }
+                print_line("Fast-forward")
+              } else {
+                print_line("Updated to \{id.to_hex()}")
+              }
+              pull_apply_autostash(fs, fs, git_dir, root, autostash_state)
+            }
+            None => {
+              print_line("Successfully rebased.")
+              pull_apply_autostash(fs, fs, git_dir, root, autostash_state)
+            }
+          }
+        @bitlib.RebaseStatus::NothingToRebase => {
+          print_line("Current branch is up to date.")
+          pull_apply_autostash(fs, fs, git_dir, root, autostash_state)
+        }
+        @bitlib.RebaseStatus::Conflict => {
+          pull_eprint_rebase_conflict(result.conflicts)
+          raise @bitcore.GitError::InvalidObject("Rebase conflict")
+        }
+      }
+    }
+    return
+  }
   let msg = "Merge " + target_ref
   let result = run_merge_with_sensitive_hooks(
     fs, fs, root, tid, msg, author, timestamp,
@@ -342,10 +594,26 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
     @bitlib.MergeStatus::FastForward =>
       match result.commit_id {
         Some(id) => {
+          match pre_fetch_head {
+            Some(old_id) =>
+              pull_append_fast_forward_reflog(
+                fs, fs, git_dir, current_head_target, old_id, id, args,
+              )
+            None => ()
+          }
           let short = String::unsafe_substring(id.to_hex(), start=0, end=7)
           print_line("Fast-forward to \{short}")
         }
-        None => print_line("Fast-forward")
+        None => {
+          match pre_fetch_head {
+            Some(old_id) =>
+              pull_append_fast_forward_reflog(
+                fs, fs, git_dir, current_head_target, old_id, tid, args,
+              )
+            None => ()
+          }
+          print_line("Fast-forward")
+        }
       }
     @bitlib.MergeStatus::Merged =>
       match result.commit_id {
@@ -363,8 +631,266 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
       print_line("Automatic merge failed; fix conflicts and then commit.")
     }
   }
+  match result.status {
+    @bitlib.MergeStatus::Conflicted => ()
+    _ => pull_apply_autostash(fs, fs, git_dir, root, autostash_state)
+  }
   if pull_adhoc_remote {
     @bitlib.remove_remote_refs(fs, fs, git_dir, remote_name)
+  }
+  let exit_code = pull_merge_status_exit_code(result.status)
+  if exit_code != 0 {
+    @sys.exit(exit_code)
+  }
+}
+
+///|
+fn pull_parse_rebase_behavior_value(
+  value : String,
+  source : String,
+) -> (Bool, Bool) raise @bitcore.GitError {
+  let lower = value.trim().to_lower()
+  match lower {
+    "true" | "1" | "yes" | "on" | "" | "merges" | "m" | "preserve" =>
+      (true, false)
+    "false" | "0" | "no" | "off" => (false, false)
+    "interactive" | "i" => (true, true)
+    _ =>
+      raise @bitcore.GitError::InvalidObject(
+        "Invalid value for \{source}: \{value}",
+      )
+  }
+}
+
+///|
+fn pull_resolve_rebase_behavior(
+  fs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  branch_rebase : Bool?,
+  cli_behavior : (Bool, Bool)?,
+) -> (Bool, Bool) raise @bitcore.GitError {
+  match cli_behavior {
+    Some(behavior) => behavior
+    None =>
+      match branch_rebase {
+        Some(true) => (true, false)
+        Some(false) => (false, false)
+        None => {
+          let pull_rebase_values = read_config_values(
+            fs, git_dir, "pull", "rebase",
+          )
+          guard pull_rebase_values.length() > 0 else { return (false, false) }
+          pull_parse_rebase_behavior_value(
+            pull_rebase_values[pull_rebase_values.length() - 1],
+            "pull.rebase",
+          )
+        }
+      }
+  }
+}
+
+///|
+fn pull_autostash_enabled(
+  fs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  rebase : Bool,
+  cli_value : Bool?,
+) -> Bool {
+  match cli_value {
+    Some(value) => value
+    None => {
+      let config_path = git_dir + "/config"
+      match @bitlib.read_config_value(fs, config_path, "pull", "autostash") {
+        Some(value) => parse_config_bool_string(Some(value))
+        None =>
+          if rebase {
+            @bitlib.read_config_bool(fs, config_path, "rebase", "autostash").unwrap_or(
+              false,
+            )
+          } else {
+            @bitlib.read_config_bool(fs, config_path, "merge", "autostash").unwrap_or(
+              false,
+            )
+          }
+      }
+    }
+  }
+}
+
+///|
+fn pull_has_uncommitted_changes(status : @bitlib.Status) -> Bool {
+  status.staged_added.length() > 0 ||
+  status.staged_modified.length() > 0 ||
+  status.staged_deleted.length() > 0 ||
+  status.unstaged_modified.length() > 0 ||
+  status.unstaged_deleted.length() > 0
+}
+
+///|
+fn pull_resolve_rebase_upstream(
+  fs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  head_id : @bitcore.ObjectId,
+  reflog_refs : Array[String],
+  target_id : @bitcore.ObjectId,
+  pre_fetch_target_id : @bitcore.ObjectId?,
+) -> @bitcore.ObjectId {
+  match pre_fetch_target_id {
+    Some(id) if id != target_id &&
+      @bitlib.is_ancestor_of(fs, git_dir, id, head_id) => return id
+    _ => ()
+  }
+  for refname in reflog_refs {
+    let entries = @bitlib.read_reflog(fs, git_dir, refname) catch { _ => [] }
+    let mut i = entries.length()
+    while i > 0 {
+      i -= 1
+      let entry = entries[i]
+      if entry.old_id != target_id &&
+        @bitlib.is_ancestor_of(fs, git_dir, entry.old_id, head_id) {
+        return entry.old_id
+      }
+      if entry.new_id != target_id &&
+        @bitlib.is_ancestor_of(fs, git_dir, entry.new_id, head_id) {
+        return entry.new_id
+      }
+    }
+  }
+  target_id
+}
+
+///|
+async fn pull_apply_autostash(
+  fs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  root : String,
+  state : PullAutostashState?,
+) -> Unit raise Error {
+  match state {
+    None => return
+    Some(state) => {
+      @bitlib.stash_drop(fs, rfs, root, 0)
+      let restored_index_paths : Map[String, Bool] = {}
+      for entry in state.index_entries {
+        restored_index_paths[entry.path] = true
+      }
+      let deleted_paths : Map[String, Bool] = {}
+      for path in state.deleted_paths {
+        deleted_paths[path] = true
+      }
+      let merged_entries : Array[@bitlib.IndexEntry] = []
+      for entry in @bitlib.read_index_entries(rfs, git_dir) {
+        if restored_index_paths.contains(entry.path) ||
+          deleted_paths.contains(entry.path) {
+          continue
+        }
+        merged_entries.push(entry)
+      }
+      for entry in state.index_entries {
+        merged_entries.push(entry)
+      }
+      @bitlib.write_index_entries(fs, git_dir, merged_entries)
+      for path, data in state.worktree_files {
+        match pull_parent_dir(path) {
+          Some(parent) => fs.mkdir_p(root + "/" + parent)
+          None => ()
+        }
+        fs.write_file(root + "/" + path, data)
+      }
+      for path in state.deleted_paths {
+        let abs = root + "/" + path
+        if rfs.is_file(abs) || rfs.is_dir(abs) {
+          fs.remove_file(abs) catch {
+            _ => ()
+          }
+        }
+      }
+      print_line("Applied autostash.")
+    }
+  }
+}
+
+///|
+async fn pull_eprint_rebase_conflict(
+  conflicts : Array[String],
+) -> Unit raise Error {
+  eprint_line("CONFLICT: Merge conflict in:")
+  for path in conflicts {
+    eprint_line("  \{path}")
+  }
+  eprint_line("")
+  eprint_line(
+    "Resolve all conflicts manually, then run \"git rebase --continue\".",
+  )
+  eprint_line(
+    "To abort and return to the original state, run \"git rebase --abort\".",
+  )
+  eprint_line("To skip this commit, run \"git rebase --skip\".")
+}
+
+///|
+async fn pull_create_autostash(
+  fs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
+  root : String,
+  git_dir : String,
+  author : String,
+  timestamp : Int64,
+) -> PullAutostashState? raise Error {
+  let status = @bitlib.status(rfs, root)
+  let state = pull_capture_autostash_state(rfs, root, git_dir, status)
+  match @bitlib.stash_push(fs, rfs, root, "autostash", author, timestamp) {
+    Some(_) => Some(state)
+    None => None
+  }
+}
+
+///|
+fn pull_capture_autostash_state(
+  fs : &@bitcore.RepoFileSystem,
+  root : String,
+  git_dir : String,
+  status : @bitlib.Status,
+) -> PullAutostashState raise Error {
+  let staged_paths : Map[String, Bool] = {}
+  let worktree_paths : Map[String, Bool] = {}
+  let deleted_paths : Map[String, Bool] = {}
+  for path in status.staged_added {
+    staged_paths[path] = true
+    worktree_paths[path] = true
+  }
+  for path in status.staged_modified {
+    staged_paths[path] = true
+    worktree_paths[path] = true
+  }
+  for path in status.unstaged_modified {
+    worktree_paths[path] = true
+  }
+  for path in status.staged_deleted {
+    deleted_paths[path] = true
+  }
+  for path in status.unstaged_deleted {
+    deleted_paths[path] = true
+  }
+  let index_entries : Array[@bitlib.IndexEntry] = []
+  for entry in @bitlib.read_index_entries(fs, git_dir) {
+    if staged_paths.contains(entry.path) {
+      index_entries.push(entry)
+    }
+  }
+  let worktree_path_list : Array[String] = []
+  for path, _ in worktree_paths {
+    worktree_path_list.push(path)
+  }
+  let deleted_path_list : Array[String] = []
+  for path, _ in deleted_paths {
+    deleted_path_list.push(path)
+  }
+  {
+    index_entries,
+    worktree_files: pull_snapshot_worktree_files(fs, root, worktree_path_list),
+    deleted_paths: deleted_path_list,
   }
 }
 
@@ -373,6 +899,64 @@ fn pull_remote_uses_relay_signaling(remote_url : String) -> Bool {
   remote_url.has_prefix("relay+http://") ||
   remote_url.has_prefix("relay+https://") ||
   remote_url.has_prefix("relay://")
+}
+
+///|
+fn pull_in_progress_error(
+  has_unmerged : Bool,
+  has_merge_head : Bool,
+) -> String? {
+  if has_unmerged {
+    Some("Pulling is not possible because you have unmerged files.")
+  } else if has_merge_head {
+    Some("You have not concluded your merge (MERGE_HEAD exists).")
+  } else {
+    None
+  }
+}
+
+///|
+fn pull_update_checked_out_head_worktree(
+  fs : OsFs,
+  git_dir : String,
+  root : String,
+  new_id : @bitcore.ObjectId,
+) -> Unit raise @bitcore.GitError {
+  let db = @bitlib.ObjectDb::load(fs, git_dir)
+  let files = @bitlib.collect_tree_files_from_commit(db, fs, new_id)
+  @bitlib.write_worktree_from_files(
+    db,
+    fs,
+    fs,
+    root,
+    git_dir,
+    files,
+    remove_missing=true,
+    preserve_removed_gitlinks=true,
+  )
+  let entries = @bitlib.tree_files_to_index(db, fs, files)
+  @bitlib.write_index_entries(fs, git_dir, entries)
+}
+
+///|
+fn pull_merge_status_exit_code(status : @bitlib.MergeStatus) -> Int {
+  match status {
+    @bitlib.MergeStatus::Conflicted => 1
+    _ => 0
+  }
+}
+
+///|
+fn pull_can_fast_forward_checked_out_head(
+  status : @bitlib.Status,
+  target_modes : Map[String, Int],
+) -> Bool {
+  status.staged_added.length() == 0 &&
+  status.staged_modified.length() == 0 &&
+  status.staged_deleted.length() == 0 &&
+  status.unstaged_modified.length() == 0 &&
+  status.unstaged_deleted.length() == 0 &&
+  pull_collect_initial_conflicting_paths(status, target_modes).length() == 0
 }
 
 ///|
@@ -387,6 +971,384 @@ fn pull_normalize_optional_value(value : String?) -> String? {
       }
     }
     None => None
+  }
+}
+
+///|
+priv struct PullExplicitRefspec {
+  fetch_refspecs : Array[String]
+  merge_ref : String?
+  target_ref : String?
+  upstream_ref : String?
+}
+
+///|
+priv struct PullAutostashState {
+  index_entries : Array[@bitlib.IndexEntry]
+  worktree_files : Map[String, Bytes]
+  deleted_paths : Array[String]
+}
+
+///|
+fn pull_strip_force_prefix(spec : String) -> String {
+  if spec.has_prefix("+") {
+    String::unsafe_substring(spec, start=1, end=spec.length())
+  } else {
+    spec
+  }
+}
+
+///|
+fn pull_normalize_explicit_source_ref(src : String) -> String {
+  if src.has_prefix("refs/") {
+    src
+  } else {
+    "refs/heads/" + src
+  }
+}
+
+///|
+fn pull_parse_explicit_refspec(spec : String?) -> PullExplicitRefspec {
+  match spec {
+    None =>
+      {
+        fetch_refspecs: [],
+        merge_ref: None,
+        target_ref: None,
+        upstream_ref: None,
+      }
+    Some(raw_spec) => {
+      let parse_spec = pull_strip_force_prefix(raw_spec)
+      if parse_spec.find(":") is Some(_) {
+        let (src, dst) = @bitlib.parse_refspec_pair(parse_spec)
+        let source_ref = if src.length() == 0 {
+          None
+        } else {
+          Some(pull_normalize_explicit_source_ref(src))
+        }
+        let target_ref = if dst.length() == 0 {
+          None
+        } else {
+          Some(normalize_fetch_destination_ref(dst, source_ref))
+        }
+        {
+          fetch_refspecs: [raw_spec],
+          merge_ref: source_ref,
+          target_ref,
+          upstream_ref: source_ref,
+        }
+      } else {
+        let merge_ref = if parse_spec.has_prefix("refs/") {
+          Some(parse_spec)
+        } else {
+          Some("refs/heads/" + parse_spec)
+        }
+        {
+          fetch_refspecs: [],
+          merge_ref,
+          target_ref: None,
+          upstream_ref: merge_ref,
+        }
+      }
+    }
+  }
+}
+
+///|
+fn pull_collect_initial_conflicting_paths(
+  status : @bitlib.Status,
+  target_modes : Map[String, Int],
+) -> Array[String] {
+  let conflicts : Map[String, Bool] = {}
+  for path in status.untracked {
+    if target_modes.contains(path) {
+      conflicts[path] = true
+    }
+  }
+  for path in status.staged_added {
+    if target_modes.contains(path) {
+      conflicts[path] = true
+    }
+  }
+  for path in status.staged_modified {
+    if target_modes.contains(path) {
+      conflicts[path] = true
+    }
+  }
+  for path in status.staged_deleted {
+    if target_modes.contains(path) {
+      conflicts[path] = true
+    }
+  }
+  for path in status.unstaged_modified {
+    if target_modes.contains(path) {
+      conflicts[path] = true
+    }
+  }
+  for path in status.unstaged_deleted {
+    if target_modes.contains(path) {
+      conflicts[path] = true
+    }
+  }
+  let out = Array::from_iter(conflicts.keys())
+  out.sort()
+  out
+}
+
+///|
+fn pull_collect_initial_preserved_index_entries(
+  entries : Array[@bitlib.IndexEntry],
+  target_modes : Map[String, Int],
+) -> Array[@bitlib.IndexEntry] {
+  let preserved : Array[@bitlib.IndexEntry] = []
+  for entry in entries {
+    if not(target_modes.contains(entry.path)) {
+      preserved.push(entry)
+    }
+  }
+  preserved
+}
+
+///|
+fn pull_parent_dir(path : String) -> String? {
+  match path.rev_find("/") {
+    Some(idx) if idx > 0 =>
+      Some(String::unsafe_substring(path, start=0, end=idx))
+    _ => None
+  }
+}
+
+///|
+fn pull_snapshot_worktree_files(
+  fs : &@bitcore.RepoFileSystem,
+  root : String,
+  paths : Array[String],
+) -> Map[String, Bytes] {
+  let snapshot : Map[String, Bytes] = {}
+  for path in paths {
+    let full_path = root + "/" + path
+    if fs.is_file(full_path) {
+      snapshot[path] = fs.read_file(full_path) catch { _ => Bytes::default() }
+    }
+  }
+  snapshot
+}
+
+///|
+fn pull_restore_initial_checkout_state(
+  fs : &@bitcore.RepoFileSystem,
+  file_fs : &@bitcore.FileSystem,
+  git_dir : String,
+  root : String,
+  preserved_entries : Array[@bitlib.IndexEntry],
+  preserved_files : Map[String, Bytes],
+) -> Unit raise Error {
+  if preserved_entries.length() > 0 {
+    let merged_entries = @bitlib.read_index_entries(fs, git_dir)
+    for entry in preserved_entries {
+      merged_entries.push(entry)
+    }
+    @bitlib.write_index_entries(file_fs, git_dir, merged_entries)
+  }
+  for path, data in preserved_files {
+    let full_path = root + "/" + path
+    match pull_parent_dir(full_path) {
+      Some(parent) => file_fs.mkdir_p(parent)
+      None => ()
+    }
+    file_fs.write_file(full_path, data)
+  }
+}
+
+///|
+fn pull_pre_fetch_validation_error(
+  head_is_detached : Bool,
+  arg_remote : String?,
+  arg_refspec : String?,
+  current_branch_remote_cfg : String?,
+  current_branch_has_merge : Bool,
+  merge_ref : String?,
+  has_head : Bool,
+) -> String? {
+  if head_is_detached && arg_refspec is None {
+    Some("You are not currently on a branch.")
+  } else if arg_remote is None &&
+    arg_refspec is None &&
+    current_branch_remote_cfg is Some(_) &&
+    not(current_branch_has_merge) &&
+    has_head {
+    Some("There is no tracking information for the current branch.")
+  } else if arg_remote is Some(_) && merge_ref is None && has_head {
+    Some("Please specify a branch on the command line.")
+  } else {
+    None
+  }
+}
+
+///|
+fn pull_has_wildcard_refspec(refspecs : Array[String]) -> Bool {
+  for refspec in refspecs {
+    if refspec.contains("*") {
+      return true
+    }
+  }
+  false
+}
+
+///|
+fn pull_missing_target_error_message(
+  arg_refspec : String?,
+  merge_ref : String?,
+  fetch_refspecs : Array[String],
+  target_ref : String,
+) -> String {
+  if arg_refspec is None && merge_ref is Some(merge_target) {
+    "Your configuration specifies to merge with the ref '\{merge_target}', but no such ref was fetched."
+  } else if pull_has_wildcard_refspec(fetch_refspecs) {
+    "There are no candidates for merging among the refs that you just fetched."
+  } else {
+    "Unknown ref: " + target_ref
+  }
+}
+
+///|
+fn pull_target_ref(
+  remote_name : String,
+  merge_ref : String?,
+  explicit_target_ref : String?,
+) -> String {
+  match explicit_target_ref {
+    Some(r) => r
+    None =>
+      match merge_ref {
+        Some(r) =>
+          if r.has_prefix("refs/remotes/") {
+            r
+          } else if r.has_prefix("refs/heads/") {
+            let name = String::unsafe_substring(r, start=11, end=r.length())
+            "refs/remotes/" + remote_name + "/" + name
+          } else if r.has_prefix("refs/") {
+            r
+          } else {
+            "refs/remotes/" + remote_name + "/" + r
+          }
+        None => "refs/remotes/" + remote_name + "/HEAD"
+      }
+  }
+}
+
+///|
+fn pull_upstream_ref(
+  remote_name : String,
+  merge_ref : String?,
+  explicit_upstream_ref : String?,
+) -> String {
+  match explicit_upstream_ref {
+    Some(r) => r
+    None =>
+      match merge_ref {
+        Some(r) => {
+          let remote_prefix = "refs/remotes/" + remote_name + "/"
+          if r.has_prefix("refs/heads/") {
+            r
+          } else if r.has_prefix(remote_prefix) {
+            let name = String::unsafe_substring(
+              r,
+              start=remote_prefix.length(),
+              end=r.length(),
+            )
+            "refs/heads/" + name
+          } else if r.has_prefix("refs/") {
+            r
+          } else {
+            "refs/heads/" + r
+          }
+        }
+        None => "HEAD"
+      }
+  }
+}
+
+///|
+fn pull_fetch_refspecs(
+  explicit_fetch_refspecs : Array[String],
+  merge_ref : String?,
+  target_ref : String,
+) -> Array[String] {
+  let refspecs : Array[String] = []
+  for refspec in explicit_fetch_refspecs {
+    refspecs.push(refspec)
+  }
+  if refspecs.length() > 0 {
+    return refspecs
+  }
+  match merge_ref {
+    Some(refname) =>
+      if refname.has_prefix("refs/heads/") {
+        refspecs.push(refname + ":" + target_ref)
+      }
+    None => ()
+  }
+  refspecs
+}
+
+///|
+fn pull_reflog_action(args : Array[String]) -> String {
+  if args.is_empty() {
+    "pull"
+  } else {
+    "pull " + args.join(" ")
+  }
+}
+
+///|
+fn pull_reflog_identity() -> (String, String) {
+  let name = match @sys.get_env_var("GIT_COMMITTER_NAME") {
+    Some(n) => n
+    None => @sys.get_env_var("USER").unwrap_or("Unknown")
+  }
+  let email = match @sys.get_env_var("GIT_COMMITTER_EMAIL") {
+    Some(e) => e
+    None =>
+      match @sys.get_env_var("USER") {
+        Some(u) => u + "@localhost"
+        None => "unknown@localhost"
+      }
+  }
+  (name, email)
+}
+
+///|
+fn pull_append_fast_forward_reflog(
+  fs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  head_target : String,
+  old_id : @bitcore.ObjectId,
+  new_id : @bitcore.ObjectId,
+  args : Array[String],
+) -> Unit raise Error {
+  let (name, email) = pull_reflog_identity()
+  let timestamp = get_commit_timestamp()
+  let timezone = get_commit_timezone()
+  let message = pull_reflog_action(args) + ": Fast-forward"
+  let (should_log_head, _) = @bitlib.should_log_ref(rfs, git_dir, "HEAD", false)
+  if should_log_head {
+    @bitlib.append_reflog(
+      fs, rfs, git_dir, "HEAD", old_id, new_id, name, email, timestamp, timezone,
+      message,
+    )
+  }
+  if head_target.has_prefix("refs/heads/") {
+    let (should_log_branch, _) = @bitlib.should_log_ref(
+      rfs, git_dir, head_target, false,
+    )
+    if should_log_branch {
+      @bitlib.append_reflog(
+        fs, rfs, git_dir, head_target, old_id, new_id, name, email, timestamp, timezone,
+        message,
+      )
+    }
   }
 }
 
@@ -1483,6 +2445,7 @@ struct PushResolvedUpdate {
   refname : String
   delete_ref : Bool
   should_apply : Bool
+  force_update : Bool
   update_instead_worktree : String?
 }
 

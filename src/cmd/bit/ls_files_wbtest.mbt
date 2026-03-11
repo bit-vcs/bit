@@ -108,6 +108,23 @@ test "ls-files: display path relativizes sibling and parent paths" {
 }
 
 ///|
+test "ls-files: cwd prefix falls back to PWD when shim pwd is absent" {
+  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
+  let prev_pwd = @sys.get_env_var("PWD")
+  @sys.unset_env_var("GIT_SHIM_PWD")
+  @sys.set_env_var("PWD", "/repo/sub")
+  assert_eq(compute_cwd_prefix("/repo"), "sub")
+  match prev_shim_pwd {
+    Some(value) => @sys.set_env_var("GIT_SHIM_PWD", value)
+    None => @sys.unset_env_var("GIT_SHIM_PWD")
+  }
+  match prev_pwd {
+    Some(value) => @sys.set_env_var("PWD", value)
+    None => @sys.unset_env_var("PWD")
+  }
+}
+
+///|
 test "ls-files: untracked directory compression" {
   assert_true(ls_files_is_within_untracked_dir("untracked/deep", ["untracked"]))
   assert_true(

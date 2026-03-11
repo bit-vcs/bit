@@ -101,9 +101,6 @@ async fn handle_ls_files(args : Array[String]) -> Unit raise Error {
     eprint_line("ls-files --recurse-submodules: unsupported mode")
     @sys.exit(1)
   }
-  if show_unmerged {
-    ls_files_usage_error()
-  }
   let terminator = if use_nul { "\u0000" } else { "\n" }
   let cwd_prefix = compute_cwd_prefix(root)
   let root_abs = ls_files_repo_root_abs(root)
@@ -112,6 +109,36 @@ async fn handle_ls_files(args : Array[String]) -> Unit raise Error {
     [cwd_prefix]
   } else {
     filters
+  }
+  if show_unmerged {
+    let stage_entries = @bitlib.read_index_stage_entries(fs, git_dir)
+    let candidate_paths : Array[String] = []
+    for item in stage_entries {
+      if item.stage != 0 {
+        candidate_paths.push(item.entry.path)
+      }
+    }
+    for item in stage_entries {
+      if item.stage == 0 ||
+        not(ls_files_matches_filters(item.entry.path, path_filters)) {
+        continue
+      }
+      let mode = format_mode(item.entry.mode)
+      let display_path = make_display_path(item.entry.path, cwd_prefix)
+      print_str(
+        "\{mode} \{item.entry.id.to_hex()} \{item.stage}\t\{display_path}" +
+        terminator,
+      )
+    }
+    if error_unmatch {
+      let unmatched = ls_files_collect_unmatched_raw_filters(
+        raw_filters, cwd_prefix, root_abs, candidate_paths,
+      )
+      if unmatched.length() > 0 {
+        ls_files_exit_error_unmatch(unmatched)
+      }
+    }
+    return ()
   }
   let entries = @bitlib.read_index_entries(fs, git_dir)
   if show_eol {
@@ -702,7 +729,7 @@ struct SubmoduleInfo {
   name : String
   path : String
   url : String
-}
+} derive(Eq, Show)
 
 ///|
 struct LsFilesTrackedEntry {
@@ -973,7 +1000,15 @@ fn normalize_ls_tree_filters(
 
 ///|
 fn compute_cwd_prefix(root : String) -> String {
-  match @sys.get_env_var("GIT_SHIM_PWD") {
+  let cwd = match @sys.get_env_var("GIT_SHIM_PWD") {
+    Some(dir) => Some(dir)
+    None =>
+      match @sys.get_env_var("PWD") {
+        Some(dir) => Some(dir)
+        None => @env.current_dir()
+      }
+  }
+  match cwd {
     None => ""
     Some(cwd) => {
       let cwd_abs = normalize_path(cwd)

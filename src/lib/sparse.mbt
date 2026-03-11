@@ -228,6 +228,7 @@ pub fn matches_sparse_pattern(path : String, patterns : Array[String]) -> Bool {
 ///|
 /// Simple glob-like pattern matching for sparse checkout.
 fn sparse_path_matches(path : String, pattern : String) -> Bool {
+  let anchored = pattern.has_prefix("/")
   let normalized_pattern = if pattern.has_prefix("/") &&
     pattern != "/*" &&
     pattern != "!/*/" {
@@ -256,7 +257,7 @@ fn sparse_path_matches(path : String, pattern : String) -> Bool {
       start=0,
       end=normalized_pattern.length() - 1,
     )
-    return path == dir || path.has_prefix(dir + "/")
+    return sparse_path_matches_unanchored_prefix(path, dir, anchored)
   }
   if normalized_pattern.has_suffix("/*") {
     // Match files directly in directory
@@ -308,7 +309,22 @@ fn sparse_path_matches(path : String, pattern : String) -> Bool {
     }
   }
   // Exact match or path prefix
-  path == normalized_pattern || path.has_prefix(normalized_pattern + "/")
+  sparse_path_matches_unanchored_prefix(path, normalized_pattern, anchored)
+}
+
+///|
+fn sparse_path_matches_unanchored_prefix(
+  path : String,
+  pattern : String,
+  anchored : Bool,
+) -> Bool {
+  if anchored {
+    return path == pattern || path.has_prefix(pattern + "/")
+  }
+  path == pattern ||
+  path.has_prefix(pattern + "/") ||
+  path.has_suffix("/" + pattern) ||
+  path.contains("/" + pattern + "/")
 }
 
 ///|

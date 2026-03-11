@@ -58,9 +58,9 @@ pub fn collect_tree_files(ObjectDb, &@types.RepoFileSystem, @object.ObjectId) ->
 
 pub fn collect_tree_files_from_commit(ObjectDb, &@types.RepoFileSystem, @object.ObjectId) -> Map[String, TreeFileEntry] raise @object.GitError
 
-pub fn commit(&@types.FileSystem, &@types.RepoFileSystem, String, String, String, Int64, committer? : String, committer_timestamp? : Int64, allow_empty? : Bool) -> @object.ObjectId raise @object.GitError
+pub fn commit(&@types.FileSystem, &@types.RepoFileSystem, String, String, String, Int64, committer? : String, committer_timestamp? : Int64, allow_empty? : Bool, timezone? : String) -> @object.ObjectId raise @object.GitError
 
-pub fn commit_amend(&@types.FileSystem, &@types.RepoFileSystem, String, String, String, Int64, committer? : String, committer_timestamp? : Int64) -> @object.ObjectId raise @object.GitError
+pub fn commit_amend(&@types.FileSystem, &@types.RepoFileSystem, String, String, String, Int64, committer? : String, committer_timestamp? : Int64, timezone? : String) -> @object.ObjectId raise @object.GitError
 
 pub fn config_has_remote_section(Array[ConfigBlock], String) -> Bool
 
@@ -74,21 +74,21 @@ pub fn copy_tree(&@types.FileSystem, &@types.RepoFileSystem, String, String) -> 
 
 pub fn create_annotated_tag(&@types.FileSystem, &@types.RepoFileSystem, String, String, @object.ObjectId, String, String, Int64, timezone? : String) -> Unit raise @object.GitError
 
-pub fn create_branch(&@types.FileSystem, &@types.RepoFileSystem, String, String) -> Unit raise @object.GitError
+pub fn create_branch(&@types.FileSystem, &@types.RepoFileSystem, String, String, start_point? : String?, author? : String, email? : String, timestamp? : Int64, timezone? : String) -> Unit raise @object.GitError
 
-pub fn create_branch_at(&@types.FileSystem, &@types.RepoFileSystem, String, String, @object.ObjectId) -> Unit raise @object.GitError
+pub fn create_branch_at(&@types.FileSystem, &@types.RepoFileSystem, String, String, @object.ObjectId, start_point? : String?, author? : String, email? : String, timestamp? : Int64, timezone? : String) -> Unit raise @object.GitError
 
 pub fn create_lightweight_tag(&@types.FileSystem, &@types.RepoFileSystem, String, String, @object.ObjectId) -> Unit raise @object.GitError
 
 pub fn create_reflog(&@types.FileSystem, &@types.RepoFileSystem, String, String) -> Unit raise @object.GitError
 
-pub fn create_worktree(&@types.FileSystem, &@types.RepoFileSystem, String, String, String?, detach? : Bool, force? : Bool, new_branch~ : String?) -> Unit raise @object.GitError
+pub fn create_worktree(&@types.FileSystem, &@types.RepoFileSystem, String, String, String?, detach? : Bool, force? : Bool, new_branch~ : String?, relative_paths? : Bool?, orphan? : Bool) -> Unit raise @object.GitError
 
 pub fn delete_branch(&@types.FileSystem, &@types.RepoFileSystem, String, String, force? : Bool) -> Unit raise @object.GitError
 
 pub fn delete_reflog(&@types.FileSystem, &@types.RepoFileSystem, String, String) -> Unit raise @object.GitError
 
-pub fn delete_tag(&@types.FileSystem, String, String) -> Unit raise @object.GitError
+pub fn delete_tag(&@types.FileSystem, &@types.RepoFileSystem, String, String) -> Unit raise @object.GitError
 
 pub fn detect_git_dir(&@types.RepoFileSystem, String) -> (String, Bool)?
 
@@ -206,7 +206,7 @@ pub fn move_tree(&@types.FileSystem, &@types.RepoFileSystem, String, String) -> 
 
 pub fn move_tree_safe(&@types.FileSystem, &@types.RepoFileSystem, String, String) -> Unit raise @object.GitError
 
-pub fn move_worktree(&@types.FileSystem, &@types.RepoFileSystem, String, String, String, force? : Bool) -> Unit raise @object.GitError
+pub fn move_worktree(&@types.FileSystem, &@types.RepoFileSystem, String, String, String, force? : Bool, force_level? : Int, relative_paths? : Bool?) -> Unit raise @object.GitError
 
 pub fn mv_path(&@types.FileSystem, &@types.RepoFileSystem, String, String, String, force? : Bool) -> Unit raise @object.GitError
 
@@ -250,6 +250,8 @@ pub fn prune_repo(&@types.FileSystem, &@types.RepoFileSystem, String) -> PruneRe
 
 pub fn prune_worktrees(&@types.FileSystem, &@types.RepoFileSystem, String, dry_run? : Bool) -> Array[String] raise @object.GitError
 
+pub fn prune_worktrees_detailed(&@types.FileSystem, &@types.RepoFileSystem, String, dry_run? : Bool, expire_before_sec? : Int64?) -> Array[PrunedWorktreeEntry] raise @object.GitError
+
 pub fn read_autocrlf_setting(&@types.RepoFileSystem, String) -> AutoCrlf
 
 pub fn read_config_bool(&@types.RepoFileSystem, String, String, String) -> Bool?
@@ -267,6 +269,8 @@ pub fn read_filter_commands(&@types.RepoFileSystem, String, String) -> (String?,
 pub fn read_head_ref(&@types.RepoFileSystem, String) -> HeadRef raise @object.GitError
 
 pub fn read_index_entries(&@types.RepoFileSystem, String) -> Array[IndexEntry] raise @object.GitError
+
+pub fn read_index_stage_entries(&@types.RepoFileSystem, String) -> Array[IndexStageEntry] raise @object.GitError
 
 pub fn read_local_remote_head_state(&@types.RepoFileSystem, String, String) -> RemoteHeadState
 
@@ -295,6 +299,8 @@ pub fn rebase_onto(&@types.FileSystem, &@types.RepoFileSystem, String, @object.O
 pub fn rebase_skip(&@types.FileSystem, &@types.RepoFileSystem, String) -> RebaseResult raise @object.GitError
 
 pub fn rebase_start(&@types.FileSystem, &@types.RepoFileSystem, String, @object.ObjectId) -> RebaseResult raise @object.GitError
+
+pub fn rebase_start_with_onto(&@types.FileSystem, &@types.RepoFileSystem, String, @object.ObjectId, @object.ObjectId) -> RebaseResult raise @object.GitError
 
 pub fn receive_build_status_response(ReceivePackResult) -> Bytes
 
@@ -326,9 +332,9 @@ pub fn remove_remote_refs(&@types.FileSystem, &@types.RepoFileSystem, String, St
 
 pub fn remove_tree(&@types.FileSystem, &@types.RepoFileSystem, String) -> Unit
 
-pub fn remove_worktree(&@types.FileSystem, &@types.RepoFileSystem, String, String, force? : Bool) -> Unit raise @object.GitError
+pub fn remove_worktree(&@types.FileSystem, &@types.RepoFileSystem, String, String, force? : Bool, force_level? : Int) -> Unit raise @object.GitError
 
-pub fn rename_branch(&@types.FileSystem, &@types.RepoFileSystem, String, String, String, force? : Bool) -> Unit raise @object.GitError
+pub fn rename_branch(&@types.FileSystem, &@types.RepoFileSystem, String, String, String, force? : Bool, author? : String, email? : String, timestamp? : Int64, timezone? : String) -> Unit raise @object.GitError
 
 pub fn rename_packed_refs_prefix(&@types.FileSystem, &@types.RepoFileSystem, String, String, String, String, String) -> Unit raise @object.GitError
 
@@ -338,7 +344,9 @@ pub fn repack_repo(&@types.FileSystem, &@types.RepoFileSystem, String) -> Repack
 
 pub fn repair_worktree(&@types.FileSystem, &@types.RepoFileSystem, String, worktree_paths? : Array[String]) -> Array[String] raise @object.GitError
 
-pub fn reset(&@types.FileSystem, &@types.RepoFileSystem, String, String, ResetMode) -> @object.ObjectId raise @object.GitError
+pub fn repair_worktree_detailed(&@types.FileSystem, &@types.RepoFileSystem, String, worktree_paths? : Array[String], relative_paths? : Bool?) -> WorktreeRepairResult raise @object.GitError
+
+pub fn reset(&@types.FileSystem, &@types.RepoFileSystem, String, String, ResetMode, committer? : String, timestamp? : Int64, timezone? : String) -> @object.ObjectId raise @object.GitError
 
 pub fn resolve_eol_attrs(&@types.RepoFileSystem, String, String) -> FileEolAttrs
 
@@ -442,9 +450,9 @@ pub fn write_tree_from_index(&@types.FileSystem, &@types.RepoFileSystem, String,
 
 pub fn write_tree_to_worktree(ObjectDb, &@types.RepoFileSystem, &@types.FileSystem, @object.ObjectId, String) -> Unit raise @object.GitError
 
-pub fn write_worktree_and_build_index(ObjectDb, &@types.FileSystem, &@types.RepoFileSystem, String, String, Map[String, TreeFileEntry], remove_missing? : Bool) -> Array[IndexEntry] raise @object.GitError
+pub fn write_worktree_and_build_index(ObjectDb, &@types.FileSystem, &@types.RepoFileSystem, String, String, Map[String, TreeFileEntry], remove_missing? : Bool, preserve_removed_gitlinks? : Bool) -> Array[IndexEntry] raise @object.GitError
 
-pub fn write_worktree_from_files(ObjectDb, &@types.FileSystem, &@types.RepoFileSystem, String, String, Map[String, TreeFileEntry], remove_missing? : Bool) -> Unit raise @object.GitError
+pub fn write_worktree_from_files(ObjectDb, &@types.FileSystem, &@types.RepoFileSystem, String, String, Map[String, TreeFileEntry], remove_missing? : Bool, preserve_removed_gitlinks? : Bool) -> Unit raise @object.GitError
 
 // Errors
 
@@ -585,6 +593,11 @@ pub struct IndexEntry {
 }
 pub fn IndexEntry::new(String, @object.ObjectId, Int, Int, mtime_sec? : Int, mtime_nsec? : Int, intent_to_add? : Bool, dev? : Int, ino? : Int, uid? : Int, gid? : Int) -> Self
 
+pub struct IndexStageEntry {
+  entry : IndexEntry
+  stage : Int
+}
+
 pub(all) struct InitOptions {
   default_branch : String
   bare : Bool
@@ -687,6 +700,11 @@ pub fn PromisorDb::new(&@types.RepoFileSystem, String, lazy_load? : Bool, fetch_
 
 pub struct PruneResult {
   pruned : Array[@object.ObjectId]
+}
+
+pub(all) struct PrunedWorktreeEntry {
+  name : String
+  reason : String
 }
 
 pub(all) struct PushRefspec {
@@ -858,7 +876,15 @@ pub(all) struct WorktreeInfo {
   branch : String?
   locked : Bool
   is_main : Bool
+  is_bare : Bool
 }
+
+pub(all) struct WorktreeRepairResult {
+  repaired : Array[String]
+  warnings : Array[String]
+}
+pub impl Eq for WorktreeRepairResult
+pub impl Show for WorktreeRepairResult
 
 // Type aliases
 

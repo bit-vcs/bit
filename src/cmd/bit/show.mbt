@@ -17,6 +17,32 @@ priv struct ShowCommitInfo {
 }
 
 ///|
+priv struct ShowTagInfo {
+  target : @bitcore.ObjectId
+  name : String
+  tagger : String
+  timestamp : Int64
+  timezone : String
+  message : String
+}
+
+///|
+priv struct ShowArgs {
+  revs : Array[String]
+  range_excludes : Array[String]
+  pretty_raw : Bool
+  pretty_format : String?
+  quiet : Bool
+  oneline : Bool
+  grep_patterns : Array[String]
+  grep_pattern_type_override : GrepPatternType?
+  grep_ignore_case : Bool
+  graph_requested : Bool
+  walk_mode : Bool
+  max_count : Int
+}
+
+///|
 fn parse_show_commit(data : Bytes) -> ShowCommitInfo {
   let text = decode_bytes(data)
   let mut author = ""
@@ -122,21 +148,125 @@ fn parse_timezone_offset_seconds(timezone : String) -> Int {
 }
 
 ///|
-async fn handle_show(args : Array[String]) -> Unit raise Error {
-  let root = get_work_root()
-  let fs = OsFs::new()
-  let git_dir = resolve_git_dir(fs, root)
-  check_and_exit_unsupported_attrs(root)
-  // Parse: git show [--pretty=<format>] [<commit>]
-  let mut rev = "HEAD"
+fn show_parse_person_ident(rest : String) -> (String, Int64, String) {
+  let mut ident = rest
+  let mut timestamp = 0L
+  let mut timezone = "+0000"
+  let mut last_space = rest.rev_find(" ")
+  if last_space is Some(tz_idx) {
+    let before_tz = String::unsafe_substring(rest, start=0, end=tz_idx)
+    timezone = String::unsafe_substring(
+      rest,
+      start=tz_idx + 1,
+      end=rest.length(),
+    )
+    last_space = before_tz.rev_find(" ")
+    if last_space is Some(time_idx) {
+      ident = String::unsafe_substring(before_tz, start=0, end=time_idx)
+      let time_str = String::unsafe_substring(
+        before_tz,
+        start=time_idx + 1,
+        end=before_tz.length(),
+      )
+      for c in time_str {
+        if c >= '0' && c <= '9' {
+          let digit = c.to_int() - '0'.to_int()
+          timestamp = timestamp * 10L + digit.to_int64()
+        }
+      }
+    } else {
+      ident = before_tz
+    }
+  }
+  (ident, timestamp, timezone)
+}
+
+///|
+fn show_parse_tag_info(data : Bytes) -> ShowTagInfo? {
+  let text = decode_bytes(data)
+  let mut target : @bitcore.ObjectId? = None
+  let mut name = ""
+  let mut tagger = ""
+  let mut timestamp = 0L
+  let mut timezone = "+0000"
+  let mut in_message = false
+  let message_lines : Array[String] = []
+  for line_view in text.split("\n") {
+    let line = line_view.to_string()
+    if in_message {
+      message_lines.push(line)
+      continue
+    }
+    if line.length() == 0 {
+      in_message = true
+      continue
+    }
+    if line.has_prefix("object ") {
+      let hex = String::unsafe_substring(line, start=7, end=line.length())
+      target = Some(@bitcore.ObjectId::from_hex(hex) catch { _ => return None })
+    } else if line.has_prefix("tag ") {
+      name = String::unsafe_substring(line, start=4, end=line.length())
+    } else if line.has_prefix("tagger ") {
+      let rest = String::unsafe_substring(line, start=7, end=line.length())
+      let (parsed_tagger, parsed_timestamp, parsed_timezone) = show_parse_person_ident(
+        rest,
+      )
+      tagger = parsed_tagger
+      timestamp = parsed_timestamp
+      timezone = parsed_timezone
+    }
+  }
+  match target {
+    Some(target_id) =>
+      Some({
+        target: target_id,
+        name,
+        tagger,
+        timestamp,
+        timezone,
+        message: message_lines.join("\n"),
+      })
+    None => None
+  }
+}
+
+///|
+fn show_is_directory_mode(mode : String) -> Bool {
+  mode == "40000" || mode == "040000"
+}
+
+///|
+fn show_render_tree_lines(
+  spec : String,
+  entries : Array[@bitcore.TreeEntry],
+) -> Array[String] {
+  let lines : Array[String] = ["tree \{spec}", ""]
+  for entry in entries {
+    let name = if show_is_directory_mode(entry.mode) {
+      entry.name + "/"
+    } else {
+      entry.name
+    }
+    lines.push(name)
+  }
+  lines
+}
+
+///|
+fn show_parse_args(args : Array[String]) -> ShowArgs {
   let revs : Array[String] = []
+  let range_excludes : Array[String] = []
+  let symmetric_ranges : Array[(String, String)] = []
+  let grep_patterns : Array[String] = []
   let mut pretty_raw = false
   let mut pretty_format : String? = None
   let mut quiet = false
   let mut oneline = false
-  let grep_patterns : Array[String] = []
   let mut grep_pattern_type_override : GrepPatternType? = None
   let mut grep_ignore_case = false
+  let mut graph_requested = false
+  let mut walk_mode = false
+  let mut max_count = 1
   let mut i = 0
   while i < args.length() {
     let arg = args[i]
@@ -149,6 +279,12 @@ async fn handle_show(args : Array[String]) -> Unit raise Error {
       quiet = true
     } else if arg == "--oneline" {
       oneline = true
+    } else if arg == "--graph" {
+      graph_requested = true
+    } else if is_short_count_flag(arg) {
+      let raw = String::unsafe_substring(arg, start=1, end=arg.length())
+      max_count = @strconv.parse_int(raw) catch { _ => 1 }
+      walk_mode = true
     } else if arg.has_prefix("--pretty=format:") {
       pretty_format = Some(
         String::unsafe_substring(arg, start=16, end=arg.length()),
@@ -182,111 +318,102 @@ async fn handle_show(args : Array[String]) -> Unit raise Error {
       grep_pattern_type_override = Some(GrepPatternType::Perl)
     } else if arg == "--basic-regexp" {
       grep_pattern_type_override = Some(GrepPatternType::Basic)
+    } else if arg.has_prefix("^") &&
+      arg.length() > 1 &&
+      not(arg.has_prefix("^{")) {
+      range_excludes.push(
+        String::unsafe_substring(arg, start=1, end=arg.length()),
+      )
+      walk_mode = true
     } else if not(arg.has_prefix("-")) {
-      rev = arg
-      revs.push(arg)
-    } else {
-      warn_unimplemented_arg("show", arg)
+      if log_find_dotdot(arg) >= 0 || log_find_tripledot(arg) >= 0 {
+        log_add_revision_input(arg, revs, range_excludes, symmetric_ranges)
+        walk_mode = true
+      } else {
+        revs.push(arg)
+      }
     }
     i += 1
   }
-  let grep_pattern_type = resolve_grep_pattern_type(
-    fs, git_dir, grep_pattern_type_override,
-  )
-  if oneline && quiet {
-    let targets : Array[String] = if revs.length() > 0 {
-      revs
+  {
+    revs,
+    range_excludes,
+    pretty_raw,
+    pretty_format,
+    quiet,
+    oneline,
+    grep_patterns,
+    grep_pattern_type_override,
+    grep_ignore_case,
+    graph_requested,
+    walk_mode,
+    max_count,
+  }
+}
+
+///|
+fn show_lines_to_block(lines : Array[String]) -> String {
+  if lines.length() == 0 {
+    ""
+  } else {
+    lines.join("\n") + "\n"
+  }
+}
+
+///|
+fn show_concat_blocks(blocks : Array[String], compact : Bool) -> String {
+  if blocks.length() == 0 {
+    return ""
+  }
+  let mut out = blocks[0]
+  for i in 1..<blocks.length() {
+    if compact {
+      if not(out.has_suffix("\n")) {
+        out = out + "\n"
+      }
     } else {
-      ["HEAD"]
+      if not(out.has_suffix("\n")) {
+        out = out + "\n"
+      }
+      out = out + "\n"
     }
-    let db = @bitlib.ObjectDb::load(fs, git_dir)
-    for target in targets {
-      let id = @bitrepo.rev_parse(fs, git_dir, target)
-      guard id is Some(commit_id) else {
-        raise @bitcore.GitError::InvalidObject("unknown revision: \{target}")
-      }
-      let obj = db.get(fs, commit_id)
-      guard obj is Some(o) else {
-        raise @bitcore.GitError::InvalidObject(
-          "Object not found: \{commit_id.to_hex()}",
-        )
-      }
-      if o.obj_type != @bitcore.ObjectType::Commit {
-        continue
-      }
-      let info = parse_show_commit(o.data)
-      if not(
-          grep_patterns_match_message(
-            info.message,
-            grep_patterns,
-            grep_pattern_type,
-            grep_ignore_case,
-          ),
-        ) {
-        continue
-      }
-      let short = String::unsafe_substring(commit_id.to_hex(), start=0, end=7)
-      print_line(short + " " + show_first_message_line(info.message))
-    }
-    return ()
+    out = out + blocks[i]
   }
-  // Resolve revision
-  let id = @bitrepo.rev_parse(fs, git_dir, rev)
-  guard id is Some(commit_id) else {
-    raise @bitcore.GitError::InvalidObject("unknown revision: \{rev}")
-  }
-  // Load object
-  let db = @bitlib.ObjectDb::load(fs, git_dir)
-  let obj = db.get(fs, commit_id)
-  guard obj is Some(o) else {
-    raise @bitcore.GitError::InvalidObject(
-      "Object not found: \{commit_id.to_hex()}",
-    )
-  }
-  // `git show <blob-ish>` should print blob contents directly.
-  if o.obj_type == @bitcore.ObjectType::Blob {
-    @stdio.stdout.write(o.data)
-    return ()
-  }
-  if o.obj_type != @bitcore.ObjectType::Commit {
-    raise @bitcore.GitError::InvalidObject(
-      "Not a commit: \{commit_id.to_hex()}",
-    )
-  }
-  // Parse commit for tree/parents
-  let commit_info = @bitcore.parse_commit(o.data)
-  // If --pretty=raw, output raw commit object content
-  if pretty_raw {
-    print_line("commit \{commit_id.to_hex()}")
-    // Output the raw commit object as text
-    let text = decode_bytes(o.data)
-    print_str(text)
-    if not(text.has_suffix("\n")) {
-      print_line("")
-    }
-    return ()
-  }
-  if pretty_format is Some(fmt) {
-    match fmt {
-      "%h" => {
-        let short = String::unsafe_substring(commit_id.to_hex(), start=0, end=7)
-        print_line(short)
-        return ()
-      }
-      "%H" => {
-        print_line(commit_id.to_hex())
-        return ()
-      }
-      "%s" => {
-        let info = parse_show_commit(o.data)
-        print_line(show_first_message_line(info.message))
-        return ()
-      }
-      _ => warn_unimplemented_arg("show", "--pretty=format:\{fmt}")
+  out
+}
+
+///|
+fn show_resolve_index_object_id(
+  fs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  target : String,
+) -> @bitcore.ObjectId? {
+  guard target.has_prefix(":") && target.length() > 1 else { return None }
+  let path = String::unsafe_substring(target, start=1, end=target.length())
+  let entries = @bitlib.read_index_entries(fs, git_dir) catch { _ => [] }
+  for entry in entries {
+    if entry.path == path {
+      return Some(entry.id)
     }
   }
-  // Parse full commit details
-  let show_info = parse_show_commit(o.data)
+  None
+}
+
+///|
+fn show_render_commit_block(
+  db : @bitlib.ObjectDb,
+  fs : &@bitcore.RepoFileSystem,
+  commit_id : @bitcore.ObjectId,
+  data : Bytes,
+  pretty_raw : Bool,
+  pretty_format : String?,
+  quiet : Bool,
+  oneline : Bool,
+  grep_patterns : Array[String],
+  grep_pattern_type : GrepPatternType,
+  grep_ignore_case : Bool,
+) -> String? raise Error {
+  let show_info = parse_show_commit(data)
   if not(
       grep_patterns_match_message(
         show_info.message,
@@ -295,43 +422,272 @@ async fn handle_show(args : Array[String]) -> Unit raise Error {
         grep_ignore_case,
       ),
     ) {
-    return ()
+    return None
   }
-  // Print commit info
-  print_line("commit \{commit_id.to_hex()}")
-  print_line("Author: \{show_info.author}")
-  print_line(
+  if pretty_raw {
+    let text = decode_bytes(data)
+    let mut block = "commit \{commit_id.to_hex()}\n" + text
+    if not(text.has_suffix("\n")) {
+      block = block + "\n"
+    }
+    return Some(block)
+  }
+  if pretty_format is Some(fmt) {
+    match fmt {
+      "%h" => {
+        let short = String::unsafe_substring(commit_id.to_hex(), start=0, end=7)
+        return Some(short + "\n")
+      }
+      "%H" => return Some(commit_id.to_hex() + "\n")
+      "%s" => return Some(show_first_message_line(show_info.message) + "\n")
+      _ => ()
+    }
+  }
+  if oneline {
+    let short = String::unsafe_substring(commit_id.to_hex(), start=0, end=7)
+    return Some(short + " " + show_first_message_line(show_info.message) + "\n")
+  }
+  let commit_info = @bitcore.parse_commit(data)
+  let lines : Array[String] = [
+    "commit \{commit_id.to_hex()}",
+    "Author: \{show_info.author}",
     "Date:   \{format_show_date(show_info.timestamp, show_info.timezone)}",
-  )
-  print_line("")
-  // Print message with indentation
+    "",
+  ]
   for line_view in show_info.message.split("\n") {
-    print_line("    \{line_view.to_string()}")
+    lines.push("    \{line_view.to_string()}")
   }
-  print_line("")
-  // Show diff against parent (simplified)
+  lines.push("")
   if not(quiet) && commit_info.parents.length() > 0 {
     let parent_id = commit_info.parents[0]
     let parent_files = @bitlib.collect_tree_files_from_commit(db, fs, parent_id)
     let current_files = @bitlib.collect_tree_files_from_commit(
       db, fs, commit_id,
     )
-    // Show changed files
     for item in current_files.to_array() {
       let (path, entry) = item
       match parent_files.get(path) {
-        None => print_line("diff --git a/\{path} b/\{path}\nnew file")
+        None => lines.push("diff --git a/\{path} b/\{path}\nnew file")
         Some(parent_entry) =>
           if entry.id != parent_entry.id {
-            print_line("diff --git a/\{path} b/\{path}")
+            lines.push("diff --git a/\{path} b/\{path}")
           }
       }
     }
     for item in parent_files.to_array() {
       let (path, _) = item
       if not(current_files.contains(path)) {
-        print_line("diff --git a/\{path} b/\{path}\ndeleted file")
+        lines.push("diff --git a/\{path} b/\{path}\ndeleted file")
       }
     }
   }
+  Some(show_lines_to_block(lines))
+}
+
+///|
+fn show_render_object_block(
+  fs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  spec : String,
+  id : @bitcore.ObjectId,
+  db : @bitlib.ObjectDb,
+  pretty_raw : Bool,
+  pretty_format : String?,
+  quiet : Bool,
+  oneline : Bool,
+  grep_patterns : Array[String],
+  grep_pattern_type : GrepPatternType,
+  grep_ignore_case : Bool,
+) -> String? raise Error {
+  let obj = db.get(fs, id)
+  guard obj is Some(o) else {
+    raise @bitcore.GitError::InvalidObject("Object not found: \{id.to_hex()}")
+  }
+  match o.obj_type {
+    @bitcore.ObjectType::Blob => Some(decode_bytes(o.data))
+    @bitcore.ObjectType::Tree =>
+      Some(
+        show_lines_to_block(
+          show_render_tree_lines(spec, @bitcore.parse_tree(o.data)),
+        ),
+      )
+    @bitcore.ObjectType::Commit =>
+      show_render_commit_block(
+        db,
+        fs,
+        id,
+        o.data,
+        pretty_raw,
+        pretty_format,
+        quiet,
+        oneline,
+        grep_patterns,
+        grep_pattern_type,
+        grep_ignore_case,
+      )
+    @bitcore.ObjectType::Tag => {
+      let tag_info = show_parse_tag_info(o.data)
+      guard tag_info is Some(info) else {
+        raise @bitcore.GitError::InvalidObject(
+          "Invalid tag object: \{id.to_hex()}",
+        )
+      }
+      let target_block = show_render_object_block(
+        fs,
+        git_dir,
+        spec,
+        info.target,
+        db,
+        pretty_raw,
+        pretty_format,
+        quiet,
+        oneline,
+        grep_patterns,
+        grep_pattern_type,
+        grep_ignore_case,
+      )
+      guard target_block is Some(rendered_target) else { return None }
+      let lines : Array[String] = ["tag \{info.name}"]
+      if info.tagger.length() > 0 {
+        lines.push("Tagger: \{info.tagger}")
+        lines.push("Date:   \{format_show_date(info.timestamp, info.timezone)}")
+        lines.push("")
+      }
+      if info.message.length() > 0 {
+        for line_view in info.message.split("\n") {
+          lines.push("    \{line_view.to_string()}")
+        }
+        lines.push("")
+      }
+      Some(
+        show_concat_blocks([show_lines_to_block(lines), rendered_target], false),
+      )
+    }
+  }
+}
+
+///|
+async fn handle_show(args : Array[String]) -> Unit raise Error {
+  let root = get_work_root()
+  let fs = OsFs::new()
+  let git_dir = resolve_git_dir(fs, root)
+  check_and_exit_unsupported_attrs(root)
+  let options = show_parse_args(args)
+  if options.graph_requested {
+    raise @bitcore.GitError::InvalidObject(
+      "options '--graph' and '--no-walk' cannot be used together",
+    )
+  }
+  let grep_pattern_type = resolve_grep_pattern_type(
+    fs,
+    git_dir,
+    options.grep_pattern_type_override,
+  )
+  let db = @bitlib.ObjectDb::load(fs, git_dir)
+  if options.walk_mode {
+    let targets = log_resolve_targets(
+      fs,
+      git_dir,
+      options.revs,
+      [],
+      false,
+      default_head=options.revs.length() == 0,
+    )
+    let start_ids : Array[@bitcore.ObjectId] = []
+    for target in targets {
+      let (_, id) = target
+      start_ids.push(id)
+    }
+    let exclude_ids : Map[String, Bool] = {}
+    let exclude_targets = log_resolve_targets(
+      fs,
+      git_dir,
+      options.range_excludes,
+      [],
+      false,
+      default_head=false,
+    )
+    for target in exclude_targets {
+      let (_, exclude_id) = target
+      walk_commits_to_map(fs, git_dir, exclude_id, exclude_ids)
+    }
+    let max_count = if options.max_count > 0 {
+      options.max_count
+    } else {
+      1 << 30
+    }
+    let blocks : Array[String] = []
+    for
+      entry in log_walk_commits(
+        fs, git_dir, start_ids, exclude_ids, max_count, -9223372036854775807L, 9223372036854775807L,
+        false,
+      ) {
+      let obj = db.get(fs, entry.id)
+      guard obj is Some(o) else { continue }
+      guard o.obj_type == @bitcore.ObjectType::Commit else { continue }
+      match
+        show_render_commit_block(
+          db,
+          fs,
+          entry.id,
+          o.data,
+          options.pretty_raw,
+          options.pretty_format,
+          options.quiet,
+          options.oneline,
+          options.grep_patterns,
+          grep_pattern_type,
+          options.grep_ignore_case,
+        ) {
+        Some(block) => blocks.push(block)
+        None => ()
+      }
+    }
+    print_str(
+      show_concat_blocks(
+        blocks,
+        options.pretty_format is Some(_) || options.oneline,
+      ),
+    )
+    return ()
+  }
+  let targets : Array[String] = if options.revs.length() > 0 {
+    options.revs
+  } else {
+    ["HEAD"]
+  }
+  let blocks : Array[String] = []
+  for target in targets {
+    let id = match show_resolve_index_object_id(fs, git_dir, target) {
+      Some(index_id) => Some(index_id)
+      None => @bitrepo.rev_parse(fs, git_dir, target)
+    }
+    guard id is Some(resolved_id) else {
+      raise @bitcore.GitError::InvalidObject("unknown revision: \{target}")
+    }
+    match
+      show_render_object_block(
+        fs,
+        git_dir,
+        target,
+        resolved_id,
+        db,
+        options.pretty_raw,
+        options.pretty_format,
+        options.quiet,
+        options.oneline,
+        options.grep_patterns,
+        grep_pattern_type,
+        options.grep_ignore_case,
+      ) {
+      Some(block) => blocks.push(block)
+      None => ()
+    }
+  }
+  print_str(
+    show_concat_blocks(
+      blocks,
+      options.pretty_format is Some(_) || options.oneline,
+    ),
+  )
 }

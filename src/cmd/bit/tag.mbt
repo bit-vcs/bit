@@ -1,9 +1,39 @@
 ///|
+async fn delegate_tag_to_real_git(args : Array[String], cwd : String) -> Unit {
+  let argv : Array[String] = ["tag"]
+  for arg in args {
+    argv.push(arg)
+  }
+  let code = @process.run(
+    resolve_real_git_for_dispatch(),
+    argv,
+    inherit_env=true,
+    cwd~,
+    stdin=@stdio.stdin,
+    stdout=@stdio.stdout,
+    stderr=@stdio.stderr,
+  )
+  @sys.exit(code)
+}
+
+///|
+fn tag_repo_requires_real_git(
+  fs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+) -> Bool {
+  repo_object_format(fs, git_dir) != "sha1"
+}
+
+///|
 async fn handle_tag(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let fs = OsFs::new()
   let rfs : &@bitcore.RepoFileSystem = fs
   let git_dir = resolve_git_dir(rfs, root)
+  if tag_repo_requires_real_git(rfs, git_dir) {
+    delegate_tag_to_real_git(args, root)
+    return
+  }
   let mut list_mode = false
   let mut explicit_list = false
   let mut delete_mode = false
@@ -327,7 +357,7 @@ async fn handle_tag(args : Array[String]) -> Unit raise Error {
     }
     for name in delete_tags {
       let id = @bitlib.resolve_ref(fs, git_dir, "refs/tags/" + name)
-      @bitlib.delete_tag(fs, git_dir, name)
+      @bitlib.delete_tag(fs, fs, git_dir, name)
       match id {
         Some(oid) =>
           eprint_line(
@@ -505,7 +535,7 @@ async fn handle_tag(args : Array[String]) -> Unit raise Error {
   )
   if force {
     if @bitlib.resolve_ref(fs, git_dir, "refs/tags/" + name) is Some(_) {
-      @bitlib.delete_tag(fs, git_dir, name)
+      @bitlib.delete_tag(fs, fs, git_dir, name)
     }
   }
   let tagger = get_committer_string()

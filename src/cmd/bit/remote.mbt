@@ -1348,82 +1348,18 @@ async fn remote_update(
   prune : Bool,
 ) -> Unit raise Error {
   let (remotes, _) = @bitlib.read_repo_config(fs, git_dir)
-  let config_path = git_dir + "/config"
   let blocks = @bitlib.parse_config_blocks(
     @bitlib.read_config_content(fs, git_dir),
   )
-  let names : Array[String] = []
-  let seen : Map[String, Bool] = {}
-  let mut default_update = false
-  if targets.length() == 0 {
-    let group = @bitlib.read_config_value(fs, config_path, "remotes", "default")
-    match group {
-      Some(value) => {
-        default_update = false
-        let items = @bitlib.split_whitespace_all(value)
-        for name in items {
-          if not(seen.contains(name)) {
-            seen[name] = true
-            names.push(name)
-          }
-        }
-      }
-      None => {
-        default_update = true
-        for name, _ in remotes {
-          if not(seen.contains(name)) {
-            seen[name] = true
-            names.push(name)
-          }
-        }
-      }
+  let (names, default_update, missing) = remote_update_collect_targets(
+    remotes, blocks, targets,
+  )
+  match missing {
+    Some(target) => {
+      eprint_line("fatal: no such remote or remote group: \{target}")
+      @sys.exit(1)
     }
-  } else {
-    for target in targets {
-      if target == "default" {
-        let group = @bitlib.read_config_value(
-          fs, config_path, "remotes", "default",
-        )
-        match group {
-          Some(value) => {
-            let items = @bitlib.split_whitespace_all(value)
-            for name in items {
-              if not(seen.contains(name)) {
-                seen[name] = true
-                names.push(name)
-              }
-            }
-          }
-          None => {
-            default_update = true
-            for name, _ in remotes {
-              if not(seen.contains(name)) {
-                seen[name] = true
-                names.push(name)
-              }
-            }
-          }
-        }
-        continue
-      }
-      let group = @bitlib.read_config_value(fs, config_path, "remotes", target)
-      match group {
-        Some(value) => {
-          let items = @bitlib.split_whitespace_all(value)
-          for name in items {
-            if not(seen.contains(name)) {
-              seen[name] = true
-              names.push(name)
-            }
-          }
-        }
-        None =>
-          if not(seen.contains(target)) {
-            seen[target] = true
-            names.push(target)
-          }
-      }
-    }
+    None => ()
   }
   for name in names {
     if default_update && @bitlib.remote_skip_default_update(blocks, name) {
@@ -1441,6 +1377,85 @@ async fn remote_update(
       None => ()
     }
   }
+}
+
+///|
+fn remote_update_collect_targets(
+  remotes : Map[String, @bitlib.RemoteConfig],
+  blocks : Array[@bitlib.ConfigBlock],
+  targets : Array[String],
+) -> (Array[String], Bool, String?) {
+  let names : Array[String] = []
+  let seen : Map[String, Bool] = {}
+  let mut default_update = false
+  let add_name = fn(name : String) {
+    if not(seen.contains(name)) {
+      seen[name] = true
+      names.push(name)
+    }
+  }
+  let add_group = fn(group_name : String) {
+    let members = remote_update_group_members(blocks, group_name)
+    for name in members {
+      add_name(name)
+    }
+    members.length() > 0
+  }
+  if targets.length() == 0 {
+    if not(add_group("default")) {
+      default_update = true
+      for name, _ in remotes {
+        add_name(name)
+      }
+    }
+    return (names, default_update, None)
+  }
+  for target in targets {
+    if target == "default" {
+      if not(add_group("default")) {
+        default_update = true
+        for name, _ in remotes {
+          add_name(name)
+        }
+      }
+      continue
+    }
+    if add_group(target) {
+      continue
+    }
+    if remotes.get(target) is Some(_) {
+      add_name(target)
+      continue
+    }
+    return ([], default_update, Some(target))
+  }
+  (names, default_update, None)
+}
+
+///|
+fn remote_update_group_members(
+  blocks : Array[@bitlib.ConfigBlock],
+  group_name : String,
+) -> Array[String] {
+  let members : Array[String] = []
+  let group_key = group_name.to_lower()
+  for block in blocks {
+    if block.section != Some("remotes") || block.name is Some(_) {
+      continue
+    }
+    for line in block.lines {
+      match @bitlib.parse_config_kv(line) {
+        Some((key, value)) if key == group_key => {
+          let items = @bitlib.split_whitespace_all(value)
+          for name in items {
+            members.push(name)
+          }
+        }
+        _ => ()
+      }
+    }
+  }
+  members
 }
 
 ///|
@@ -2674,7 +2689,9 @@ async fn fetch_local_repo(
     Some(path) => append_text_file(fs, path, "")
     None => ()
   }
-  eprint_line("From \{display_url}")
+  if not(quiet) {
+    eprint_line("From \{display_url}")
+  }
   let src_db = @bitlib.ObjectDb::load(fs, src_git_dir)
   let (remotes, branches) = @bitlib.read_repo_config(fs, git_dir)
   let rc = remotes
@@ -3272,6 +3289,65 @@ fn parse_tag_target(data : Bytes) -> @bitcore.ObjectId? {
 }
 
 ///|
+fn push_destination_has_object(
+  fs : &@bitcore.RepoFileSystem,
+  dst_git_dir : String,
+  id : @bitcore.ObjectId,
+) -> Bool {
+  let seen_objects_dirs : Map[String, Bool] = {}
+  push_objects_dir_has_object(
+    fs,
+    dst_git_dir + "/objects",
+    id,
+    seen_objects_dirs,
+  )
+}
+
+///|
+fn push_objects_dir_has_object(
+  fs : &@bitcore.RepoFileSystem,
+  objects_dir : String,
+  id : @bitcore.ObjectId,
+  seen_objects_dirs : Map[String, Bool],
+) -> Bool {
+  let normalized_dir = normalize_path(objects_dir)
+  if seen_objects_dirs.contains(normalized_dir) {
+    return false
+  }
+  seen_objects_dirs[normalized_dir] = true
+  let db = @bitlib.ObjectDb::load_lazy_from_objects_dir(fs, normalized_dir) catch {
+    _ => return false
+  }
+  let existing = db.get(fs, id) catch { _ => None }
+  if existing is Some(_) {
+    return true
+  }
+  let alternates_path = normalized_dir + "/info/alternates"
+  if not(fs.is_file(alternates_path)) {
+    return false
+  }
+  let alternate_bytes = fs.read_file(alternates_path) catch {
+    _ => return false
+  }
+  let text = decode_bytes(alternate_bytes)
+  for line_view in text.split("\n") {
+    let line = trim_string(line_view.to_string())
+    if line.length() == 0 {
+      continue
+    }
+    let alt_objects_dir = if line.has_prefix("/") {
+      normalize_path(line)
+    } else {
+      normalize_path(normalized_dir + "/" + line)
+    }
+    if push_objects_dir_has_object(fs, alt_objects_dir, id, seen_objects_dirs) {
+      return true
+    }
+  }
+  false
+}
+
+///|
 fn copy_wanted_object_graph(
   fs : &@bitcore.FileSystem,
   rfs : &@bitcore.RepoFileSystem,
@@ -3282,6 +3358,10 @@ fn copy_wanted_object_graph(
 ) -> Unit raise Error {
   let wanted_hex = wanted_id.to_hex()
   if transferred_object_ids.contains(wanted_hex) {
+    return
+  }
+  if push_destination_has_object(rfs, dst_git_dir, wanted_id) {
+    transferred_object_ids[wanted_hex] = true
     return
   }
   let wanted_obj_opt = src_db.get(rfs, wanted_id) catch { _ => None }
@@ -3306,6 +3386,10 @@ fn copy_wanted_object_graph(
       )
       let copy_hex = copy_id.to_hex()
       if transferred_object_ids.contains(copy_hex) {
+        continue
+      }
+      if push_destination_has_object(rfs, dst_git_dir, copy_id) {
+        transferred_object_ids[copy_hex] = true
         continue
       }
       transferred_object_ids[copy_hex] = true

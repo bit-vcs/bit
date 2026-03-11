@@ -70,9 +70,13 @@ pub struct WorktreeEntryMeta {
   size : Int?
   mtime_sec : Int?
   mtime_nsec : Int?
+  dev : Int?
+  ino : Int?
+  uid : Int?
+  gid : Int?
 }
 pub fn WorktreeEntryMeta::mtime(Self) -> (Int, Int)
-pub fn WorktreeEntryMeta::new(WorktreeKindMeta, Int, Int?, Int?, Int?) -> Self
+pub fn WorktreeEntryMeta::new(WorktreeKindMeta, Int, Int?, Int?, Int?, dev? : Int?, ino? : Int?, uid? : Int?, gid? : Int?) -> Self
 
 pub enum WorktreeKind {
   Regular

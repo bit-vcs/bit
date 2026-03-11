@@ -204,18 +204,24 @@ fn get_work_root() -> String {
                     find_repo_root(pwd).unwrap_or(".")
                   }
                 None => {
-                  if @env.current_dir() is Some(dir) {
-                    if is_bare_repo_dir(dir) {
-                      return dir
-                    }
-                  }
-                  if is_bare_repo_dir(".") {
-                    return "."
-                  }
                   if @sys.get_env_var("PWD") is Some(pwd) {
                     if is_bare_repo_dir(pwd) {
                       return pwd
                     }
+                    if find_repo_root(pwd) is Some(root) {
+                      return root
+                    }
+                  }
+                  if @env.current_dir() is Some(dir) {
+                    if is_bare_repo_dir(dir) {
+                      return dir
+                    }
+                    if find_repo_root(dir) is Some(root) {
+                      return root
+                    }
+                  }
+                  if is_bare_repo_dir(".") {
+                    return "."
                   }
                   "."
                 }

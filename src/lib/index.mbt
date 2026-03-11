@@ -16,6 +16,12 @@ pub struct IndexEntry {
 }
 
 ///|
+pub struct IndexStageEntry {
+  entry : IndexEntry
+  stage : Int
+}
+
+///|
 pub fn IndexEntry::new(
   path : String,
   id : @bit.ObjectId,
@@ -49,11 +55,61 @@ pub fn read_index_entries(
   fs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> Array[IndexEntry] raise @bit.GitError {
+  let staged_entries = read_index_stage_entries(fs, git_dir)
+  let mut has_conflicts = false
+  for item in staged_entries {
+    if item.stage != 0 {
+      has_conflicts = true
+      break
+    }
+  }
+  if has_conflicts {
+    let selected : Map[String, (Int, IndexEntry)] = {}
+    for item in staged_entries {
+      let prio = index_stage_priority(item.stage)
+      let entry = item.entry
+      match selected.get(entry.path) {
+        Some((prev_prio, _)) =>
+          if prio > prev_prio {
+            selected[entry.path] = (prio, entry)
+          }
+        None => selected[entry.path] = (prio, entry)
+      }
+    }
+    let deduped : Array[IndexEntry] = []
+    for item in selected.to_array() {
+      let (_, value) = item
+      let (_, entry) = value
+      deduped.push(entry)
+    }
+    deduped.sort_by((a, b) => index_path_compare_git_order(a.path, b.path))
+    deduped
+  } else {
+    let entries : Array[IndexEntry] = []
+    for item in staged_entries {
+      entries.push(item.entry)
+    }
+    entries
+  }
+}
+
+///|
+pub fn read_index_stage_entries(
+  fs : &@bit.RepoFileSystem,
+  git_dir : String,
+) -> Array[IndexStageEntry] raise @bit.GitError {
   let path = join_path(git_dir, "index")
   if not(fs.is_file(path)) {
     return []
   }
   let data = fs.read_file(path)
+  index_read_stage_entries_from_bytes(data)
+}
+
+///|
+fn index_read_stage_entries_from_bytes(
+  data : Bytes,
+) -> Array[IndexStageEntry] raise @bit.GitError {
   if data.length() < 12 + 20 {
     raise @bit.GitError::InvalidObject("Index file too short")
   }
@@ -68,11 +124,7 @@ pub fn read_index_entries(
   }
   let count = index_read_u32_be(data, 8)
   let mut offset = 12
-  // Fast path: parse directly into sorted array when no conflict stages.
-  // Index file entries are already sorted, so no re-sort needed.
-  let entries : Array[IndexEntry] = Array::new(capacity=count)
-  let stages : Array[Int] = Array::new(capacity=count)
-  let mut has_conflicts = false
+  let entries : Array[IndexStageEntry] = Array::new(capacity=count)
   for _ in 0..<count {
     let entry_start = offset
     if offset + 62 > data.length() {
@@ -124,49 +176,24 @@ pub fn read_index_entries(
     let path_len = path_end - path_start
     let entry_size = (fixed_size + path_len + 1 + 7) / 8 * 8
     offset = entry_start + entry_size
-    if stage != 0 {
-      has_conflicts = true
-    }
     entries.push({
-      path: path_str,
-      id,
-      mode,
-      size,
-      mtime_sec,
-      mtime_nsec,
-      intent_to_add: index_ext_flags_has_intent_to_add(ext_flags),
-      dev,
-      ino,
-      uid,
-      gid,
+      entry: {
+        path: path_str,
+        id,
+        mode,
+        size,
+        mtime_sec,
+        mtime_nsec,
+        intent_to_add: index_ext_flags_has_intent_to_add(ext_flags),
+        dev,
+        ino,
+        uid,
+        gid,
+      },
+      stage,
     })
-    stages.push(stage)
   }
-  if has_conflicts {
-    // Slow path: deduplicate by stage priority
-    let selected : Map[String, (Int, IndexEntry)] = {}
-    for i in 0..<entries.length() {
-      let prio = index_stage_priority(stages[i])
-      let entry = entries[i]
-      match selected.get(entry.path) {
-        Some((prev_prio, _)) =>
-          if prio > prev_prio {
-            selected[entry.path] = (prio, entry)
-          }
-        None => selected[entry.path] = (prio, entry)
-      }
-    }
-    let deduped : Array[IndexEntry] = []
-    for item in selected.to_array() {
-      let (_, value) = item
-      let (_, entry) = value
-      deduped.push(entry)
-    }
-    deduped.sort_by((a, b) => index_path_compare_git_order(a.path, b.path))
-    deduped
-  } else {
-    entries
-  }
+  entries
 }
 
 ///|
@@ -242,47 +269,11 @@ pub fn read_unmerged_paths(
   git_dir : String,
 ) -> Map[String, Bool] {
   let out : Map[String, Bool] = {}
-  let index_path = join_path(git_dir, "index")
-  if not(fs.is_file(index_path)) {
-    return out
-  }
-  let data = fs.read_file(index_path) catch { _ => return out }
-  if data.length() < 12 + 20 {
-    return out
-  }
-  if not(
-      data[0] == b'D' && data[1] == b'I' && data[2] == b'R' && data[3] == b'C',
-    ) {
-    return out
-  }
-  let version = index_read_u32_be(data, 4) catch { _ => return out }
-  if version != 2 && version != 3 {
-    return out
-  }
-  let count = index_read_u32_be(data, 8) catch { _ => return out }
-  let mut offset = 12
-  for _ in 0..<count {
-    if offset + 62 > data.length() {
-      return out
+  let entries = read_index_stage_entries(fs, git_dir) catch { _ => return out }
+  for item in entries {
+    if item.stage != 0 {
+      out[item.entry.path] = true
     }
-    let flags = index_read_u16_be(data, offset + 60) catch { _ => return out }
-    let stage = (flags >> 12) & 0x3
-    let has_extended = (flags & 0x4000) != 0
-    let fixed_size = if has_extended { 64 } else { 62 }
-    let path_start = offset + fixed_size
-    let mut i = path_start
-    while i < data.length() && data[i] != b'\x00' {
-      i += 1
-    }
-    if i >= data.length() {
-      return out
-    }
-    if stage != 0 {
-      out[@utf8.decode_lossy(data[path_start:i])] = true
-    }
-    let path_len = i - path_start
-    let entry_size = (fixed_size + path_len + 1 + 7) / 8 * 8
-    offset += entry_size
   }
   out
 }
@@ -326,6 +317,7 @@ fn write_index_entry_to_buf(
   buf : FixedArray[Byte],
   pos : Int,
   e : IndexEntry,
+  stage : Int,
   skip_worktree : Bool,
 ) -> Int {
   let entry_start = pos
@@ -348,7 +340,7 @@ fn write_index_entry_to_buf(
   pos += 20
   // flags
   let name_len = if e.path.length() < 0x0fff { e.path.length() } else { 0x0fff }
-  let mut flags = name_len
+  let mut flags = name_len | ((stage & 0x3) << 12)
   let ext_flags = index_extended_flags(e.intent_to_add, skip_worktree)
   let has_extended = ext_flags != 0
   if has_extended {
@@ -401,7 +393,7 @@ fn write_index_buf(
       Some(m) => m.contains(e.path)
       None => false
     }
-    pos = write_index_entry_to_buf(buf, pos, e, is_skip)
+    pos = write_index_entry_to_buf(buf, pos, e, 0, is_skip)
   }
   // SHA1 checksum over header + entries
   let content_bytes = Bytes::from_array(buf[:pos])
@@ -454,6 +446,55 @@ pub fn write_index_entries_with_skip_worktree(
   let sorted = entries.copy()
   sorted.sort_by((a, b) => index_path_compare_git_order(a.path, b.path))
   let buf = write_index_buf(sorted, Some(skip_worktree_paths))
+  let index_path = join_path(git_dir, "index")
+  fs.write_file(index_path, Bytes::from_array(buf[:]))
+}
+
+///|
+fn write_index_stage_buf(entries : Array[IndexStageEntry]) -> FixedArray[Byte] {
+  let mut total_size = 12
+  for item in entries {
+    total_size += index_entry_buf_size(
+      item.entry.path.length(),
+      index_extended_flags(item.entry.intent_to_add, false) != 0,
+    )
+  }
+  total_size += 20
+  let buf : FixedArray[Byte] = FixedArray::make(total_size, b'\x00')
+  buf[0] = b'D'
+  buf[1] = b'I'
+  buf[2] = b'R'
+  buf[3] = b'C'
+  fa_set_u32_be(buf, 4, 2)
+  fa_set_u32_be(buf, 8, entries.length())
+  let mut pos = 12
+  for item in entries {
+    pos = write_index_entry_to_buf(buf, pos, item.entry, item.stage, false)
+  }
+  let content_bytes = Bytes::from_array(buf[:pos])
+  let checksum = @bit.sha1(content_bytes)
+  for i in 0..<20 {
+    buf[pos + i] = checksum.bytes[i]
+  }
+  buf
+}
+
+///|
+fn write_index_stage_entries(
+  fs : &@bit.FileSystem,
+  git_dir : String,
+  entries : Array[IndexStageEntry],
+) -> Unit raise @bit.GitError {
+  let sorted = entries.copy()
+  sorted.sort_by(fn(a, b) {
+    let path_cmp = index_path_compare_git_order(a.entry.path, b.entry.path)
+    if path_cmp != 0 {
+      path_cmp
+    } else {
+      Int::compare(a.stage, b.stage)
+    }
+  })
+  let buf = write_index_stage_buf(sorted)
   let index_path = join_path(git_dir, "index")
   fs.write_file(index_path, Bytes::from_array(buf[:]))
 }

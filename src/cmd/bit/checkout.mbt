@@ -9,7 +9,11 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
   let mut saw_separator = false
   let mut create_branch = false
   let mut force_create = false
-  let targets : Array[String] = []
+  let mut force_checkout = false
+  let mut orphan_branch = false
+  let mut track_branch = false
+  let pre_separator_targets : Array[String] = []
+  let post_separator_targets : Array[String] = []
   let mut i = 0
   while i < args.length() {
     let arg = args[i]
@@ -20,20 +24,63 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
         create_branch = true
         force_create = true
       }
-      "-" => targets.push(arg)
+      "--track" => track_branch = true
+      "-f" | "--force" => force_checkout = true
+      "--orphan" => orphan_branch = true
+      "-" =>
+        if saw_separator {
+          post_separator_targets.push(arg)
+        } else {
+          pre_separator_targets.push(arg)
+        }
       _ if arg.has_prefix("-") => warn_unimplemented_arg("checkout", arg)
-      _ => targets.push(arg)
+      _ =>
+        if saw_separator {
+          post_separator_targets.push(arg)
+        } else {
+          pre_separator_targets.push(arg)
+        }
     }
     i += 1
   }
-  if targets.length() == 0 {
+  let targets = pre_separator_targets
+  if not(saw_separator) && targets.length() == 0 {
     raise @bitcore.GitError::InvalidObject("No target specified for checkout")
+  }
+  if is_bare_repo_dir(root) {
+    raise @bitcore.GitError::InvalidObject(
+      "this operation must be run in a work tree",
+    )
+  }
+  if orphan_branch {
+    if saw_separator || targets.length() != 1 {
+      raise @bitcore.GitError::InvalidObject("No branch specified")
+    }
+    let previous_location = current_checkout_location(rfs, git_dir)
+    let branch_name = targets[0]
+    match checkout_branch_in_use_path(rfs, root, branch_name) {
+      Some(path) => checkout_raise_branch_in_use(branch_name, path)
+      None => ()
+    }
+    if @bitlib.resolve_ref(fs, git_dir, "refs/heads/" + branch_name) is Some(_) {
+      raise @bitcore.GitError::InvalidObject(
+        "branch '\{branch_name}' already exists",
+      )
+    }
+    fs.write_string(git_dir + "/HEAD", "ref: refs/heads/" + branch_name + "\n")
+    @bitlib.write_index_entries(fs, git_dir, [])
+    save_previous_checkout_location(fs, git_dir, previous_location)
+    return ()
   }
   // git checkout -b <branch> [start-point]
   if create_branch {
     let previous_location = current_checkout_location(rfs, git_dir)
     let branch_name = targets[0]
     let start_point = if targets.length() > 1 { Some(targets[1]) } else { None }
+    match checkout_branch_in_use_path(rfs, root, branch_name) {
+      Some(path) => checkout_raise_branch_in_use(branch_name, path)
+      None => ()
+    }
     // Check if branch already exists
     let branch_exists = @bitlib.resolve_ref(
         fs,
@@ -59,6 +106,11 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
         let _ = checkout_with_promisor_retry(fs, root, ref_name, detach=true)
         // Then create and switch to new branch
         @bitlib.switch_branch(fs, fs, root, branch_name, create=true)
+        if track_branch {
+          checkout_apply_tracking_config(
+            fs, rfs, git_dir, branch_name, ref_name,
+          )
+        }
       }
       None =>
         // Same commit, just create branch ref and update HEAD
@@ -74,38 +126,333 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
     save_previous_checkout_location(fs, git_dir, previous_location)
     return ()
   }
-  // If -- was used, treat all targets as file paths
+  // If -- was used, treat suffix arguments as file paths, optionally from a tree-ish.
   if saw_separator {
-    @bitlib.restore_paths(fs, fs, root, targets)
+    if post_separator_targets.length() == 0 {
+      raise @bitcore.GitError::InvalidObject("No paths specified for checkout")
+    }
+    if targets.length() == 0 {
+      @bitlib.restore_paths(fs, fs, root, post_separator_targets)
+    } else if targets.length() == 1 {
+      checkout_restore_paths_from_spec(
+        fs,
+        rfs,
+        root,
+        git_dir,
+        targets[0],
+        post_separator_targets,
+      )
+    } else {
+      raise @bitcore.GitError::InvalidObject(
+        "Only one tree-ish can be used with path checkout",
+      )
+    }
     return ()
   }
   // Single target: determine if it's a branch or file
   if targets.length() == 1 {
     let target = resolve_checkout_target(rfs, git_dir, targets[0])
-    let previous_location = current_checkout_location(rfs, git_dir)
-    let is_file = fs.is_file(root + "/" + target)
+    let is_path = fs.is_file(root + "/" + target) ||
+      fs.is_dir(root + "/" + target) ||
+      checkout_target_is_tracked_path(rfs, git_dir, target)
     let is_branch = @bitlib.resolve_ref(fs, git_dir, "refs/heads/" + target)
       is Some(_)
+    let current_branch_matches = match @bitlib.read_head_ref(rfs, git_dir) {
+      Branch(name) => name == target
+      _ => false
+    }
+    if is_branch && current_branch_matches {
+      return ()
+    }
+    let previous_location = current_checkout_location(rfs, git_dir)
+    let previous_head_id = @bitrepo.rev_parse(rfs, git_dir, "HEAD")
     let mut switched_head = false
-    if is_file && is_branch {
+    let mut switched_head_id : @bitcore.ObjectId? = None
+    let mut switched_target : String? = None
+    if is_path && is_branch {
       // Ambiguous - default to branch (like git)
-      let _ = checkout_with_promisor_retry(fs, root, target)
+      match checkout_branch_in_use_path(rfs, root, target) {
+        Some(path) => checkout_raise_branch_in_use(target, path)
+        None => ()
+      }
+      switched_head_id = Some(checkout_with_promisor_retry(fs, root, target))
+      switched_target = Some(targets[0])
       switched_head = true
-    } else if is_file {
+    } else if is_path {
       // Restore single file
       @bitlib.restore_paths(fs, fs, root, [target])
     } else {
       // Try as branch/commit
-      let _ = checkout_with_promisor_retry(fs, root, target)
+      match checkout_branch_in_use_path(rfs, root, target) {
+        Some(path) => checkout_raise_branch_in_use(target, path)
+        None => ()
+      }
+      switched_head_id = Some(checkout_with_promisor_retry(fs, root, target))
+      switched_target = Some(targets[0])
       switched_head = true
     }
     if switched_head {
+      if force_checkout {
+        checkout_cleanup_merge_state_files(fs, git_dir)
+      }
+      match (previous_head_id, switched_head_id) {
+        (Some(old_id), Some(new_id)) =>
+          checkout_append_head_reflog(
+            fs,
+            rfs,
+            git_dir,
+            previous_location.unwrap_or(old_id.to_hex()),
+            switched_target.unwrap_or(targets[0]),
+            old_id,
+            new_id,
+          )
+        _ => ()
+      }
       save_previous_checkout_location(fs, git_dir, previous_location)
     }
   } else {
     // Multiple targets: treat as file paths
     @bitlib.restore_paths(fs, fs, root, targets)
   }
+}
+
+///|
+fn checkout_cleanup_merge_state_files(
+  fs : &@bitcore.FileSystem,
+  git_dir : String,
+) -> Unit raise Error {
+  let files = ["MERGE_HEAD", "MERGE_MSG", "MERGE_MODE", "SQUASH_MSG"]
+  for file in files {
+    fs.remove_file(git_dir + "/" + file) catch {
+      err if @async.is_cancellation_error(err) => raise err
+      _ => ()
+    }
+  }
+}
+
+///|
+fn checkout_append_head_reflog(
+  fs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  from_label : String,
+  to_label : String,
+  old_id : @bitcore.ObjectId,
+  new_id : @bitcore.ObjectId,
+) -> Unit raise Error {
+  let name = match @sys.get_env_var("GIT_COMMITTER_NAME") {
+    Some(n) => n
+    None => @sys.get_env_var("USER").unwrap_or("Unknown")
+  }
+  let email = match @sys.get_env_var("GIT_COMMITTER_EMAIL") {
+    Some(e) => e
+    None =>
+      match @sys.get_env_var("USER") {
+        Some(u) => u + "@localhost"
+        None => "unknown@localhost"
+      }
+  }
+  @bitlib.append_reflog(
+    fs,
+    rfs,
+    git_dir,
+    "HEAD",
+    old_id,
+    new_id,
+    name,
+    email,
+    get_commit_timestamp(),
+    get_commit_timezone(),
+    "checkout: moving from " + from_label + " to " + to_label,
+  )
+}
+
+///|
+fn checkout_branch_in_use_path(
+  fs : &@bitcore.RepoFileSystem,
+  root : String,
+  branch : String,
+) -> String? raise Error {
+  let git_dir = resolve_git_dir(fs, root)
+  match @bitlib.read_head_ref(fs, git_dir) {
+    Branch(current) if current == branch => return None
+    _ => ()
+  }
+  match @bitlib.is_branch_checked_out(fs, root, branch) {
+    Some(path) =>
+      if normalize_path(path) == normalize_path(root) {
+        None
+      } else {
+        Some(path)
+      }
+    None => None
+  }
+}
+
+///|
+fn checkout_raise_branch_in_use(
+  branch : String,
+  path : String,
+) -> Unit raise Error {
+  raise @bitcore.GitError::InvalidObject(
+    "'\{branch}' is already used by worktree at '\{path}'",
+  )
+}
+
+///|
+fn checkout_parse_tracking_source(
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  spec : String,
+) -> (String, String)? {
+  let normalized = if spec.has_prefix("refs/remotes/") {
+    String::unsafe_substring(
+      spec,
+      start="refs/remotes/".length(),
+      end=spec.length(),
+    )
+  } else {
+    spec
+  }
+  let parts : Array[String] = []
+  for part in normalized.split("/") {
+    parts.push(part.to_string())
+  }
+  if parts.length() < 2 {
+    return None
+  }
+  let remote = parts[0]
+  let (remotes, _) = @bitlib.read_repo_config(rfs, git_dir)
+  if not(remotes.contains(remote)) {
+    return None
+  }
+  let branch = String::unsafe_substring(
+    normalized,
+    start=remote.length() + 1,
+    end=normalized.length(),
+  )
+  Some((remote, "refs/heads/" + branch))
+}
+
+///|
+fn checkout_apply_tracking_config(
+  fs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  branch_name : String,
+  start_point : String,
+) -> Unit raise Error {
+  match checkout_parse_tracking_source(rfs, git_dir, start_point) {
+    Some((remote, merge_ref)) => {
+      @bitlib.set_config_key(
+        fs, rfs, git_dir, "branch", branch_name, "remote", remote,
+      )
+      @bitlib.set_config_key(
+        fs, rfs, git_dir, "branch", branch_name, "merge", merge_ref,
+      )
+    }
+    None => ()
+  }
+}
+
+///|
+fn checkout_restore_paths_from_spec(
+  fs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
+  root : String,
+  git_dir : String,
+  spec : String,
+  paths : Array[String],
+) -> Unit raise Error {
+  let target = resolve_checkout_target(rfs, git_dir, spec)
+  let resolved = @bitrepo.rev_parse(rfs, git_dir, target)
+  guard resolved is Some(raw_id) else {
+    raise @bitcore.GitError::InvalidObject("Invalid ref: \{target}")
+  }
+  let commit_id = @bitrepo.rev_parse(rfs, git_dir, target + "^{commit}").unwrap_or(
+    raw_id,
+  )
+  let object_git_dir = checkout_resolve_common_git_dir(rfs, git_dir)
+  let db = @bitlib.ObjectDb::load(rfs, object_git_dir)
+  let files = @bitlib.collect_tree_files_from_commit(db, rfs, commit_id)
+  let selected : Map[String, @bitlib.TreeFileEntry] = {}
+  for path in paths {
+    let safe_path = @bitlib.normalize_repo_path(path)
+    match files.get(safe_path) {
+      Some(entry) => selected[safe_path] = entry
+      None =>
+        raise @bitcore.GitError::InvalidObject(
+          "error: pathspec '\{path}' did not match any file(s) known to git",
+        )
+    }
+  }
+  let restored_entries = @bitlib.write_worktree_and_build_index(
+    db, fs, rfs, root, git_dir, selected,
+  )
+  let merged_entries : Array[@bitlib.IndexEntry] = []
+  let selected_paths : Map[String, Bool] = {}
+  for path, _ in selected {
+    selected_paths[path] = true
+  }
+  for entry in @bitlib.read_index_entries(rfs, git_dir) {
+    if not(selected_paths.contains(entry.path)) {
+      merged_entries.push(entry)
+    }
+  }
+  for entry in restored_entries {
+    merged_entries.push(entry)
+  }
+  @bitlib.write_index_entries(fs, git_dir, merged_entries)
+}
+
+///|
+fn checkout_resolve_common_git_dir(
+  fs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+) -> String {
+  let commondir_path = git_dir + "/commondir"
+  if not(fs.is_file(commondir_path)) {
+    return git_dir
+  }
+  let raw = decode_bytes(fs.read_file(commondir_path) catch { _ => b"" })
+  let rel = trim_string(raw)
+  if rel.length() == 0 {
+    return git_dir
+  }
+  if rel.has_prefix("/") {
+    normalize_path(rel)
+  } else {
+    normalize_path(git_dir + "/" + rel)
+  }
+}
+
+///|
+fn checkout_target_is_tracked_path(
+  fs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  target : String,
+) -> Bool {
+  if target == "-" {
+    return false
+  }
+  let normalized = if target.has_prefix("./") {
+    String::unsafe_substring(target, start=2, end=target.length())
+  } else {
+    target
+  }
+  if normalized.length() == 0 {
+    return false
+  }
+  let path = @bitlib.normalize_repo_path(normalized) catch { _ => return false }
+  let entries = @bitlib.read_index_entries(fs, git_dir) catch {
+    _ => return false
+  }
+  for entry in entries {
+    if entry.path == path || entry.path.has_prefix(path + "/") {
+      return true
+    }
+  }
+  false
 }
 
 ///|
@@ -271,6 +618,14 @@ fn current_checkout_location(
   git_dir : String,
 ) -> String? raise Error {
   let head_path = git_dir + "/HEAD"
+  match @bitio.read_symlink_target_path(head_path) {
+    Some(target) if target.has_prefix("refs/heads/") =>
+      return Some(
+        String::unsafe_substring(target, start=11, end=target.length()),
+      )
+    Some(target) if target.has_prefix("refs/") => return Some(target)
+    _ => ()
+  }
   if not(fs.is_file(head_path)) {
     return None
   }

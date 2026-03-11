@@ -312,6 +312,56 @@ fn storage_get_commit_timestamp() -> Int64 {
 }
 
 ///|
+fn storage_is_valid_timezone_token(token : String) -> Bool {
+  if token.length() != 5 {
+    return false
+  }
+  let sign = token[0]
+  if sign != '+' && sign != '-' {
+    return false
+  }
+  for i in 1..<5 {
+    let ch = token[i]
+    if ch < '0' || ch > '9' {
+      return false
+    }
+  }
+  true
+}
+
+///|
+fn storage_parse_git_env_timezone(raw : String) -> String? {
+  let fields : Array[String] = []
+  for part_view in raw.split(" ") {
+    let part = part_view.to_string()
+    if part.length() > 0 {
+      fields.push(part)
+    }
+  }
+  if fields.length() < 2 {
+    return None
+  }
+  let tz = fields[fields.length() - 1]
+  if storage_is_valid_timezone_token(tz) {
+    Some(tz)
+  } else {
+    None
+  }
+}
+
+///|
+fn storage_get_commit_timezone() -> String {
+  match @sys.get_env_var("GIT_COMMITTER_DATE") {
+    Some(raw) =>
+      match storage_parse_git_env_timezone(raw) {
+        Some(tz) => tz
+        None => "+0000"
+      }
+    None => "+0000"
+  }
+}
+
+///|
 fn storage_hash_object_validate_content(
   obj_type : @bit.ObjectType,
   content : Bytes,
@@ -574,6 +624,7 @@ fn storage_handle_commit(
     }
   }
   let timestamp = storage_get_commit_timestamp()
+  let timezone = storage_get_commit_timezone()
   let committer = storage_get_committer_string()
   let committer_timestamp = timestamp
   let commit_id = @bitlib.commit(
@@ -586,6 +637,7 @@ fn storage_handle_commit(
     committer~,
     committer_timestamp~,
     allow_empty=args.allow_empty,
+    timezone~,
   )
   if not(args.quiet) {
     let short_id = (try! commit_id.to_hex()[:7]).to_string()

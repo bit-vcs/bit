@@ -5,6 +5,7 @@ fn setup_branch_fs() -> @bit.TestFs {
   let fs = @bit.TestFs::new()
   fs.mkdir_p("/repo/.git")
   fs.mkdir_p("/repo/.git/refs/heads")
+  fs.mkdir_p("/repo/.git/objects")
   fs
 }
 
@@ -127,6 +128,96 @@ test "branch: create_branch_at writes refs in bare repository root" {
 }
 
 ///|
+test "branch: create_branch writes reflog from current branch" {
+  let fs = setup_branch_fs()
+  fs.write_string("/repo/.git/HEAD", "ref: refs/heads/main\n")
+  fs.write_string(
+    "/repo/.git/refs/heads/main", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
+  )
+
+  create_branch(fs, fs, "/repo", "topic")
+
+  let entries = read_reflog(fs, "/repo/.git", "refs/heads/topic")
+  assert_eq(entries.length(), 1)
+  assert_eq(
+    entries[0].new_id.to_hex(),
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  )
+  assert_eq(entries[0].message, "branch: Created from main")
+}
+
+///|
+test "branch: create_branch_at writes reflog with explicit start point" {
+  let fs = setup_branch_fs()
+  fs.write_string("/repo/.git/HEAD", "ref: refs/heads/main\n")
+  fs.write_string(
+    "/repo/.git/refs/heads/main", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
+  )
+
+  create_branch_at(
+    fs,
+    fs,
+    "/repo",
+    "topic",
+    @bit.ObjectId::from_hex("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+    start_point=Some("main^"),
+  )
+
+  let entries = read_reflog(fs, "/repo/.git", "refs/heads/topic")
+  assert_eq(entries.length(), 1)
+  assert_eq(
+    entries[0].new_id.to_hex(),
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  )
+  assert_eq(entries[0].message, "branch: Created from main^")
+}
+
+///|
+test "branch: create_branch_at rejects checked out branch" {
+  let fs = setup_branch_fs()
+  fs.write_string("/repo/.git/HEAD", "ref: refs/heads/topic\n")
+  fs.write_string(
+    "/repo/.git/refs/heads/topic", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
+  )
+  let result = try? create_branch_at(
+    fs,
+    fs,
+    "/repo",
+    "topic",
+    @bit.ObjectId::from_hex("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+  )
+  assert_true(result is Err(_))
+  assert_eq(
+    fs.read_string("/repo/.git/refs/heads/topic"),
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
+  )
+}
+
+///|
+test "branch: create_branch_at rejects branch checked out in linked worktree" {
+  let fs = setup_branch_fs()
+  fs.write_string("/repo/.git/HEAD", "ref: refs/heads/main\n")
+  fs.write_string(
+    "/repo/.git/refs/heads/main", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
+  )
+  fs.write_string(
+    "/repo/.git/refs/heads/topic", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
+  )
+  fs.mkdir_p("/repo/.git/worktrees/wt1")
+  fs.write_string("/repo/.git/worktrees/wt1/gitdir", "/worktree1/.git\n")
+  fs.write_string("/repo/.git/worktrees/wt1/HEAD", "ref: refs/heads/topic\n")
+  fs.write_string("/repo/.git/worktrees/wt1/commondir", "../..\n")
+  let result = try? create_branch_at(
+    fs,
+    fs,
+    "/repo",
+    "topic",
+    @bit.ObjectId::from_hex("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+  )
+  assert_true(result is Err(_))
+}
+
+///|
 test "branch: delete_branch prunes empty parent directories for nested refs" {
   let fs = setup_branch_fs()
   fs.write_string("/repo/.git/HEAD", "ref: refs/heads/main\n")
@@ -140,6 +231,177 @@ test "branch: delete_branch prunes empty parent directories for nested refs" {
   delete_branch(fs, fs, "/repo", "branch/conflict", force=true)
   assert_true(not(fs.is_file("/repo/.git/refs/heads/branch/conflict")))
   assert_true(not(fs.is_dir("/repo/.git/refs/heads/branch")))
+}
+
+///|
+test "branch: delete_branch rejects branch checked out in linked worktree" {
+  let fs = setup_branch_fs()
+  fs.write_string("/repo/.git/HEAD", "ref: refs/heads/main\n")
+  fs.write_string(
+    "/repo/.git/refs/heads/main", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
+  )
+  fs.write_string(
+    "/repo/.git/refs/heads/topic", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n",
+  )
+  fs.mkdir_p("/repo/.git/worktrees/wt1")
+  fs.write_string("/repo/.git/worktrees/wt1/gitdir", "/worktree1/.git\n")
+  fs.write_string("/repo/.git/worktrees/wt1/HEAD", "ref: refs/heads/topic\n")
+  fs.write_string("/repo/.git/worktrees/wt1/commondir", "../..\n")
+  let result = try? delete_branch(fs, fs, "/repo", "topic", force=true)
+  assert_true(result is Err(_))
+  assert_true(fs.is_file("/repo/.git/refs/heads/topic"))
+}
+
+///|
+test "branch: delete_branch removes reflog for deleted ref" {
+  let fs = setup_branch_fs()
+  fs.write_string("/repo/.git/HEAD", "ref: refs/heads/main\n")
+  fs.write_string(
+    "/repo/.git/refs/heads/main", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
+  )
+  fs.write_string(
+    "/repo/.git/refs/heads/topic", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n",
+  )
+  fs.write_string(
+    "/repo/.git/logs/refs/heads/topic", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb Test <test@example.com> 0 +0000\tbranch: Created from main\n",
+  )
+  delete_branch(fs, fs, "/repo", "topic", force=true)
+  assert_true(not(fs.is_file("/repo/.git/logs/refs/heads/topic")))
+}
+
+///|
+test "branch: rename_branch rejects target checked out in linked worktree" {
+  let fs = setup_branch_fs()
+  fs.write_string("/repo/.git/HEAD", "ref: refs/heads/main\n")
+  fs.write_string(
+    "/repo/.git/refs/heads/main", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
+  )
+  fs.write_string(
+    "/repo/.git/refs/heads/bar", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n",
+  )
+  fs.write_string(
+    "/repo/.git/refs/heads/foo", "cccccccccccccccccccccccccccccccccccccccc\n",
+  )
+  fs.mkdir_p("/repo/.git/worktrees/wt1")
+  fs.write_string("/repo/.git/worktrees/wt1/gitdir", "/worktree1/.git\n")
+  fs.write_string("/repo/.git/worktrees/wt1/HEAD", "ref: refs/heads/foo\n")
+  fs.write_string("/repo/.git/worktrees/wt1/commondir", "../..\n")
+  let result = try? rename_branch(fs, fs, "/repo", "bar", "foo", force=true)
+  assert_true(result is Err(_))
+}
+
+///|
+test "branch: rename_branch can move parent ref to nested child" {
+  let fs = setup_branch_fs()
+  fs.write_string("/repo/.git/HEAD", "ref: refs/heads/main\n")
+  fs.write_string(
+    "/repo/.git/refs/heads/main", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
+  )
+  fs.write_string(
+    "/repo/.git/refs/heads/m", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n",
+  )
+  fs.write_string(
+    "/repo/.git/logs/refs/heads/m", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb Test <test@example.com> 0 +0000\tbranch: Created from main\n",
+  )
+  rename_branch(fs, fs, "/repo", "m", "m/m")
+  assert_true(not(fs.is_file("/repo/.git/refs/heads/m")))
+  assert_eq(
+    fs.read_string("/repo/.git/refs/heads/m/m"),
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n",
+  )
+  assert_true(fs.is_file("/repo/.git/logs/refs/heads/m/m"))
+}
+
+///|
+test "branch: rename_branch updates linked worktree HEADs" {
+  let fs = setup_branch_fs()
+  fs.write_string("/repo/.git/HEAD", "ref: refs/heads/main\n")
+  fs.write_string(
+    "/repo/.git/refs/heads/main", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
+  )
+  fs.write_string(
+    "/repo/.git/refs/heads/baz", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n",
+  )
+  fs.mkdir_p("/repo/.git/worktrees/wt1")
+  fs.write_string("/repo/.git/worktrees/wt1/gitdir", "/worktree1/.git\n")
+  fs.write_string("/repo/.git/worktrees/wt1/HEAD", "ref: refs/heads/baz\n")
+  fs.write_string("/repo/.git/worktrees/wt1/commondir", "../..\n")
+  rename_branch(fs, fs, "/repo", "baz", "bam")
+  assert_eq(
+    fs.read_string("/repo/.git/worktrees/wt1/HEAD"),
+    "ref: refs/heads/bam\n",
+  )
+}
+
+///|
+test "branch: rename_branch from linked worktree root updates common refs" {
+  let fs = setup_branch_fs()
+  fs.write_string("/repo/.git/HEAD", "ref: refs/heads/main\n")
+  fs.write_string(
+    "/repo/.git/refs/heads/main", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
+  )
+  fs.write_string(
+    "/repo/.git/refs/heads/baz", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n",
+  )
+  fs.mkdir_p("/repo/.git/worktrees/wt1")
+  fs.write_string("/repo/.git/worktrees/wt1/gitdir", "/worktree/.git\n")
+  fs.write_string("/repo/.git/worktrees/wt1/HEAD", "ref: refs/heads/baz\n")
+  fs.write_string("/repo/.git/worktrees/wt1/commondir", "../..\n")
+  fs.write_string("/worktree/.git", "gitdir: /repo/.git/worktrees/wt1\n")
+  rename_branch(fs, fs, "/worktree", "baz", "bam")
+  assert_true(not(fs.is_file("/repo/.git/refs/heads/baz")))
+  assert_eq(
+    fs.read_string("/repo/.git/refs/heads/bam"),
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n",
+  )
+  assert_eq(
+    fs.read_string("/repo/.git/worktrees/wt1/HEAD"),
+    "ref: refs/heads/bam\n",
+  )
+}
+
+///|
+test "branch: rename_branch can move nested child to parent" {
+  let fs = setup_branch_fs()
+  fs.write_string("/repo/.git/HEAD", "ref: refs/heads/main\n")
+  fs.write_string(
+    "/repo/.git/refs/heads/main", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
+  )
+  fs.mkdir_p("/repo/.git/refs/heads/n")
+  fs.write_string(
+    "/repo/.git/refs/heads/n/n", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n",
+  )
+  fs.write_string(
+    "/repo/.git/logs/refs/heads/n/n", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb Test <test@example.com> 0 +0000\tbranch: Created from main\n",
+  )
+  rename_branch(fs, fs, "/repo", "n/n", "n")
+  assert_true(not(fs.is_dir("/repo/.git/refs/heads/n/n")))
+  assert_eq(
+    fs.read_string("/repo/.git/refs/heads/n"),
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n",
+  )
+  assert_true(fs.is_file("/repo/.git/logs/refs/heads/n"))
+}
+
+///|
+test "branch: rename_branch replaces dangling symref target" {
+  let fs = setup_branch_fs()
+  fs.write_string("/repo/.git/HEAD", "ref: refs/heads/main\n")
+  fs.write_string(
+    "/repo/.git/refs/heads/main", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
+  )
+  fs.write_string(
+    "/repo/.git/refs/heads/m", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n",
+  )
+  fs.write_string(
+    "/repo/.git/refs/heads/broken_symref", "ref: refs/heads/i_am_broken\n",
+  )
+  rename_branch(fs, fs, "/repo", "m", "broken_symref")
+  assert_eq(
+    fs.read_string("/repo/.git/refs/heads/broken_symref"),
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n",
+  )
+  assert_true(not(fs.is_file("/repo/.git/refs/heads/m")))
 }
 
 ///|
@@ -193,4 +455,24 @@ test "branch: create_lightweight_tag creates parent directories for nested refs"
     fs.read_string("/repo/.git/refs/tags/foo/bar"),
     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n",
   )
+}
+
+///|
+test "branch: delete_tag removes reflog and prunes empty parent directories" {
+  let fs = @bit.TestFs::new()
+  fs.mkdir_p("/repo/.git/refs/tags/foo")
+  fs.mkdir_p("/repo/.git/logs/refs/tags/foo")
+  fs.write_string(
+    "/repo/.git/refs/tags/foo/bar", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
+  )
+  fs.write_string(
+    "/repo/.git/logs/refs/tags/foo/bar", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb A U Thor <a@example.com> 1 +0000\ttag: tagging\n",
+  )
+
+  delete_tag(fs, fs, "/repo/.git", "foo/bar")
+
+  assert_true(not(fs.exists("/repo/.git/refs/tags/foo/bar")))
+  assert_true(not(fs.exists("/repo/.git/logs/refs/tags/foo/bar")))
+  assert_true(not(fs.exists("/repo/.git/refs/tags/foo")))
+  assert_true(not(fs.exists("/repo/.git/logs/refs/tags/foo")))
 }

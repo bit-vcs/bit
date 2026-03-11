@@ -246,6 +246,21 @@ test "sparse: leading slash negation is normalized" {
 }
 
 ///|
+test "sparse: unanchored directory pattern matches nested path" {
+  let patterns = ["y/"]
+  assert_true(matches_sparse_pattern("x/y/file.txt", patterns))
+  assert_true(matches_sparse_pattern("y/file.txt", patterns))
+  assert_false(matches_sparse_pattern("x/z/file.txt", patterns))
+}
+
+///|
+test "sparse: unanchored negation excludes nested path" {
+  let patterns = ["y/", "!x/y/z"]
+  assert_true(matches_sparse_pattern("x/y/file.txt", patterns))
+  assert_false(matches_sparse_pattern("x/y/z/file.txt", patterns))
+}
+
+///|
 test "shallow_sparse: combined scenario" {
   // Shallow clone + sparse checkout: minimal local objects
   let fs = @bit.TestFs::new()
