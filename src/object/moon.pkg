@@ -1,6 +1,7 @@
 import {
   "mizchi/zlib",
   "mizchi/bit/hash" @hash,
+  "moonbitlang/core/encoding/utf8" @utf8,
 }
 
 warnings = "-29"

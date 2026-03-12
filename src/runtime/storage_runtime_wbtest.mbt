@@ -152,7 +152,13 @@ fn storage_runtime_wbtest_commit_command(
   allow_empty? : Bool = false,
   quiet? : Bool = true,
 ) -> StorageCommand {
-  StorageCommand::Commit({ message, all_modified, allow_empty, quiet })
+  StorageCommand::Commit({
+    message,
+    all_modified,
+    allow_empty,
+    quiet,
+    encoding: "UTF-8",
+  })
 }
 
 ///|

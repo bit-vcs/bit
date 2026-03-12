@@ -187,6 +187,7 @@ pub struct Commit {
   commit_time : Int64
   committer_tz : String
   message : String
+  encoding : String
 }
 
 ///|
@@ -200,6 +201,7 @@ pub fn Commit::new(
   commit_time : Int64,
   committer_tz : String,
   message : String,
+  encoding? : String = "UTF-8",
 ) -> Commit {
   {
     tree,
@@ -211,6 +213,7 @@ pub fn Commit::new(
     commit_time,
     committer_tz,
     message,
+    encoding,
   }
 }
 

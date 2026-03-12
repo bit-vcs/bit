@@ -56,8 +56,9 @@ pub struct Commit {
   commit_time : Int64
   committer_tz : String
   message : String
+  encoding : String
 }
-pub fn Commit::new(ObjectId, Array[ObjectId], String, Int64, String, String, Int64, String, String) -> Self
+pub fn Commit::new(ObjectId, Array[ObjectId], String, Int64, String, String, Int64, String, String, encoding? : String) -> Self
 
 pub struct ObjectId {
   bytes : FixedArray[Byte]

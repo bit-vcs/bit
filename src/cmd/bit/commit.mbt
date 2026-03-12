@@ -93,7 +93,13 @@ fn commit_storage_runtime_delegate_args(
   if not(parsed.quiet) && get_subdir_info(fs, git_dir) is Some(_) {
     return None
   }
-  Some(parsed)
+  Some({
+    message: parsed.message,
+    all_modified: parsed.all_modified,
+    allow_empty: parsed.allow_empty,
+    quiet: parsed.quiet,
+    encoding: resolve_commit_message_encoding(git_dir),
+  })
 }
 
 ///|
@@ -124,7 +130,7 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
       None => ()
     }
   }
-  let commit_message_encoding = resolve_commit_message_encoding()
+  let commit_message_encoding = resolve_commit_message_encoding(git_dir)
   // Track message source for mutual exclusivity checks
   let messages : Array[String] = []
   let mut message_source : String = "" // "m", "F", "C", "c"
@@ -443,11 +449,21 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
       committer~,
       committer_timestamp~,
       timezone=commit_timezone,
+      encoding=commit_message_encoding,
     )
   } else if merge_heads.length() > 0 {
     commit_with_merge_heads(
-      fs, fs, root, msg, author, author_timestamp, committer, committer_timestamp,
-      merge_heads, allow_empty,
+      fs,
+      fs,
+      root,
+      msg,
+      author,
+      author_timestamp,
+      committer,
+      committer_timestamp,
+      merge_heads,
+      allow_empty,
+      encoding=commit_message_encoding,
     )
   } else {
     @bitlib.commit(
@@ -461,6 +477,7 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
       committer_timestamp~,
       allow_empty~,
       timezone=commit_timezone,
+      encoding=commit_message_encoding,
     )
   }
   if should_cleanup_merge_state {
@@ -592,6 +609,7 @@ fn commit_with_merge_heads(
   committer_timestamp : Int64,
   merge_heads : Array[@bitcore.ObjectId],
   allow_empty : Bool,
+  encoding? : String = "UTF-8",
 ) -> @bitcore.ObjectId raise Error {
   let git_dir = resolve_git_dir(rfs, root)
   let head_parent = @bitlib.resolve_head_commit(rfs, git_dir)
@@ -650,8 +668,16 @@ fn commit_with_merge_heads(
     parents.push(merge_head)
   }
   let commit = @bitcore.Commit::new(
-    tree_id, parents, author, author_timestamp, "+0000", committer, committer_timestamp,
-    "+0000", message,
+    tree_id,
+    parents,
+    author,
+    author_timestamp,
+    "+0000",
+    committer,
+    committer_timestamp,
+    "+0000",
+    message,
+    encoding~,
   )
   let (commit_id, compressed) = @bitcore.create_commit(commit)
   @bitlib.write_object_bytes(fs, git_dir, commit_id, compressed)
@@ -1154,7 +1180,7 @@ fn read_commit_message_from_revision(
 }
 
 ///|
-fn resolve_commit_message_encoding() -> String {
+fn resolve_commit_message_encoding(git_dir : String) -> String {
   let overrides = @bitlib.parse_config_overrides()
   match overrides.get("i18n.commitencoding") {
     Some(value) => {
@@ -1165,7 +1191,18 @@ fn resolve_commit_message_encoding() -> String {
         "UTF-8"
       }
     }
-    None => "UTF-8"
+    None =>
+      match bit_config_get(git_dir, "i18n", "commitEncoding") {
+        Some(value) => {
+          let trimmed = trim_string(value)
+          if trimmed.length() > 0 {
+            trimmed
+          } else {
+            "UTF-8"
+          }
+        }
+        None => "UTF-8"
+      }
   }
 }
 

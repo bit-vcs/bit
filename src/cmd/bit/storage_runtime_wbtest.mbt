@@ -104,6 +104,7 @@ fn cmd_storage_commit_command(message : String) -> @runtime.StorageCommand {
     all_modified: false,
     allow_empty: false,
     quiet: true,
+    encoding: "UTF-8",
   })
 }
 
@@ -257,6 +258,7 @@ test "storage runtime parser: commit normal and missing message" {
         all_modified: false,
         allow_empty: false,
         quiet: false,
+        encoding: "",
       })
     }
   }

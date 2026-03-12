@@ -99,6 +99,43 @@ test "create commit with parent" {
 }
 
 ///|
+fn object_test_ascii_bytes(s : String) -> Array[Byte] {
+  let out : Array[Byte] = []
+  for c in s {
+    out.push(c.to_int().to_byte())
+  }
+  out
+}
+
+///|
+test "serialize commit preserves non-utf8 encoding header and bytes" {
+  let tree_id = ObjectId::from_hex("4b825dc642cb6eb9a060e54bf8d69288fbee4904")
+  let commit = Commit::new(
+    tree_id,
+    [],
+    "Test Author <test@example.com>",
+    1700000000L,
+    "+0000",
+    "Test Author <test@example.com>",
+    1700000000L,
+    "+0000",
+    "changed (geändert) foo\n",
+    encoding="ISO-8859-1",
+  )
+  let actual = serialize_commit_content(commit).to_array()
+  let expected = object_test_ascii_bytes(
+    "tree 4b825dc642cb6eb9a060e54bf8d69288fbee4904\n" +
+    "author Test Author <test@example.com> 1700000000 +0000\n" +
+    "committer Test Author <test@example.com> 1700000000 +0000\n" +
+    "encoding ISO-8859-1\n\n" +
+    "changed (ge",
+  )
+  expected.push(b'\xe4')
+  expected.append(object_test_ascii_bytes("ndert) foo\n"))
+  assert_true(actual == expected)
+}
+
+///|
 test "ObjectType to_string" {
   inspect(ObjectType::Blob.to_string(), content="blob")
   inspect(ObjectType::Tree.to_string(), content="tree")

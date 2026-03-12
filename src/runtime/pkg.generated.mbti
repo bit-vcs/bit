@@ -33,6 +33,7 @@ pub(all) struct StorageCommitArgs {
   all_modified : Bool
   allow_empty : Bool
   quiet : Bool
+  encoding : String
 }
 
 pub(all) struct StorageHashObjectArgs {

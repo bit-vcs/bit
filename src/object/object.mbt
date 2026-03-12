@@ -17,6 +17,99 @@ fn string_to_byte_array(s : String) -> Array[Byte] {
 }
 
 ///|
+fn object_append_bytes(out : Array[Byte], data : Bytes) -> Unit {
+  for b in data {
+    out.push(b)
+  }
+}
+
+///|
+fn object_append_utf8_string(out : Array[Byte], s : String) -> Unit {
+  object_append_bytes(out, @utf8.encode(s))
+}
+
+///|
+fn object_normalize_encoding_name(value : String) -> String {
+  let out = StringBuilder::new()
+  for c in value.trim().to_lower() {
+    if c == '-' || c == '_' || c == ' ' {
+      continue
+    }
+    out.write_char(c)
+  }
+  out.to_string()
+}
+
+///|
+fn object_is_utf8_encoding(encoding : String) -> Bool {
+  let normalized = object_normalize_encoding_name(encoding)
+  normalized == "" || normalized == "utf8"
+}
+
+///|
+fn object_is_iso_8859_1_encoding(encoding : String) -> Bool {
+  let normalized = object_normalize_encoding_name(encoding)
+  normalized == "iso88591" || normalized == "latin1" || normalized == "latin"
+}
+
+///|
+fn object_commit_message_bytes(
+  message : String,
+  encoding : String,
+) -> Array[Byte] {
+  if object_is_iso_8859_1_encoding(encoding) {
+    let out : Array[Byte] = []
+    for c in message {
+      let code = c.to_int()
+      if code <= 0xff {
+        out.push(code.to_byte())
+      } else {
+        object_append_bytes(out, @utf8.encode(c.to_string()))
+      }
+    }
+    out
+  } else {
+    @utf8.encode(message).to_array()
+  }
+}
+
+///|
+fn object_serialize_commit_content_array(commit : Commit) -> Array[Byte] {
+  let content : Array[Byte] = []
+  object_append_utf8_string(content, "tree ")
+  object_append_utf8_string(content, commit.tree.to_hex())
+  content.push(b'\n')
+  for parent in commit.parents {
+    object_append_utf8_string(content, "parent ")
+    object_append_utf8_string(content, parent.to_hex())
+    content.push(b'\n')
+  }
+  object_append_utf8_string(content, "author ")
+  object_append_utf8_string(content, commit.author)
+  object_append_utf8_string(content, " ")
+  object_append_utf8_string(content, commit.author_time.to_string())
+  object_append_utf8_string(content, " ")
+  object_append_utf8_string(content, commit.author_tz)
+  content.push(b'\n')
+  object_append_utf8_string(content, "committer ")
+  object_append_utf8_string(content, commit.committer)
+  object_append_utf8_string(content, " ")
+  object_append_utf8_string(content, commit.commit_time.to_string())
+  object_append_utf8_string(content, " ")
+  object_append_utf8_string(content, commit.committer_tz)
+  content.push(b'\n')
+  if commit.encoding.length() > 0 &&
+    not(object_is_utf8_encoding(commit.encoding)) {
+    object_append_utf8_string(content, "encoding ")
+    object_append_utf8_string(content, commit.encoding)
+    content.push(b'\n')
+  }
+  content.push(b'\n')
+  content.append(object_commit_message_bytes(commit.message, commit.encoding))
+  content
+}
+
+///|
 /// Create a Git object and return its ID and compressed data
 /// Format: {type} {size}\0{content} -> SHA-1 -> zlib compress
 pub fn create_object(
@@ -94,47 +187,7 @@ pub fn create_tree(entries : Array[TreeEntry]) -> (ObjectId, Bytes) {
 ///|
 /// Create a commit object
 pub fn create_commit(commit : Commit) -> (ObjectId, Bytes) {
-  let content = StringBuilder::new()
-
-  // tree
-  content.write_string("tree ")
-  content.write_string(commit.tree.to_hex())
-  content.write_char('\n')
-
-  // parents
-  for parent in commit.parents {
-    content.write_string("parent ")
-    content.write_string(parent.to_hex())
-    content.write_char('\n')
-  }
-
-  // author
-  content.write_string("author ")
-  content.write_string(commit.author)
-  content.write_string(" ")
-  content.write_string(commit.author_time.to_string())
-  content.write_string(" ")
-  content.write_string(commit.author_tz)
-  content.write_char('\n')
-
-  // committer
-  content.write_string("committer ")
-  content.write_string(commit.committer)
-  content.write_string(" ")
-  content.write_string(commit.commit_time.to_string())
-  content.write_string(" ")
-  content.write_string(commit.committer_tz)
-  content.write_char('\n')
-
-  // blank line
-  content.write_char('\n')
-
-  // message
-  content.write_string(commit.message)
-  create_object(
-    ObjectType::Commit,
-    array_to_bytes(string_to_byte_array(content.to_string())),
-  )
+  create_object(ObjectType::Commit, serialize_commit_content(commit))
 }
 
 ///|
@@ -166,32 +219,7 @@ pub fn serialize_tree(entries : Array[TreeEntry]) -> Bytes {
 ///|
 /// Serialize commit to raw content bytes (without git object header)
 pub fn serialize_commit_content(commit : Commit) -> Bytes {
-  let content = StringBuilder::new()
-  content.write_string("tree ")
-  content.write_string(commit.tree.to_hex())
-  content.write_char('\n')
-  for parent in commit.parents {
-    content.write_string("parent ")
-    content.write_string(parent.to_hex())
-    content.write_char('\n')
-  }
-  content.write_string("author ")
-  content.write_string(commit.author)
-  content.write_string(" ")
-  content.write_string(commit.author_time.to_string())
-  content.write_string(" ")
-  content.write_string(commit.author_tz)
-  content.write_char('\n')
-  content.write_string("committer ")
-  content.write_string(commit.committer)
-  content.write_string(" ")
-  content.write_string(commit.commit_time.to_string())
-  content.write_string(" ")
-  content.write_string(commit.committer_tz)
-  content.write_char('\n')
-  content.write_char('\n')
-  content.write_string(commit.message)
-  content.to_string() |> string_to_byte_array |> array_to_bytes
+  array_to_bytes(object_serialize_commit_content_array(commit))
 }
 
 ///|

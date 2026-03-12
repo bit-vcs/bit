@@ -383,6 +383,7 @@ pub fn commit(
   committer_timestamp? : Int64 = author_timestamp,
   allow_empty? : Bool = false,
   timezone? : String = "+0000",
+  encoding? : String = "UTF-8",
 ) -> @bit.ObjectId raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   let actual_git_dir = if rfs.is_file(git_dir) {
@@ -433,8 +434,16 @@ pub fn commit(
     None => []
   }
   let commit = @bit.Commit::new(
-    tree_id, parents, author, author_timestamp, timezone, committer, committer_timestamp,
-    timezone, message,
+    tree_id,
+    parents,
+    author,
+    author_timestamp,
+    timezone,
+    committer,
+    committer_timestamp,
+    timezone,
+    message,
+    encoding~,
   )
   let (commit_id, compressed) = @bit.create_commit(commit)
   write_object_bytes(fs, actual_git_dir, commit_id, compressed)
@@ -1569,6 +1578,7 @@ pub fn commit_amend(
   committer? : String = author,
   committer_timestamp? : Int64 = author_timestamp,
   timezone? : String = "+0000",
+  encoding? : String = "UTF-8",
 ) -> @bit.ObjectId raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   let actual_git_dir = if rfs.is_file(git_dir) {
@@ -1599,8 +1609,16 @@ pub fn commit_amend(
     None => []
   }
   let commit = @bit.Commit::new(
-    tree_id, parents, author, author_timestamp, timezone, committer, committer_timestamp,
-    timezone, message,
+    tree_id,
+    parents,
+    author,
+    author_timestamp,
+    timezone,
+    committer,
+    committer_timestamp,
+    timezone,
+    message,
+    encoding~,
   )
   let (commit_id, compressed) = @bit.create_commit(commit)
   write_object_bytes(fs, actual_git_dir, commit_id, compressed)

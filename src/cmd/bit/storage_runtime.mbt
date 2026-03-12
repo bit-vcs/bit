@@ -216,7 +216,7 @@ fn storage_runtime_parse_commit_args(
       "storage runtime commit requires -m/--message",
     )
   }
-  { message: msg, all_modified, allow_empty, quiet }
+  { message: msg, all_modified, allow_empty, quiet, encoding: "" }
 }
 
 ///|

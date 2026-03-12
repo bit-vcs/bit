@@ -18,6 +18,7 @@ pub(all) struct StorageCommitArgs {
   all_modified : Bool
   allow_empty : Bool
   quiet : Bool
+  encoding : String
 }
 
 ///|
@@ -638,6 +639,7 @@ fn storage_handle_commit(
     committer_timestamp~,
     allow_empty=args.allow_empty,
     timezone~,
+    encoding=args.encoding,
   )
   if not(args.quiet) {
     let short_id = (try! commit_id.to_hex()[:7]).to_string()
