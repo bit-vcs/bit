@@ -1,6 +1,57 @@
 ///| Pack handlers: rev-list, verify-pack, unpack-objects, bundle
 
 ///|
+fn rev_list_config_get(
+  fs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  dotted_key : String,
+  section : String,
+  key : String,
+) -> String? {
+  match get_config_override(dotted_key) {
+    Some(value) => {
+      let trimmed = trim_string(value)
+      if trimmed.length() > 0 {
+        Some(trimmed)
+      } else {
+        None
+      }
+    }
+    None => bit_config_get(git_dir, section, key)
+  }
+}
+
+///|
+fn rev_list_resolve_output_encoding(
+  fs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+) -> String {
+  match
+    rev_list_config_get(
+      fs, git_dir, "i18n.logOutputEncoding", "i18n", "logOutputEncoding",
+    ) {
+    Some(value) => value
+    None =>
+      rev_list_config_get(
+        fs, git_dir, "i18n.commitEncoding", "i18n", "commitEncoding",
+      ).unwrap_or("UTF-8")
+  }
+}
+
+///|
+async fn rev_list_write_text(
+  text : String,
+  output_encoding : String,
+) -> Unit raise Error {
+  let encoded = reset_convert_encoding(
+    @utf8.encode(text),
+    "UTF-8",
+    output_encoding,
+  )
+  @stdio.stdout.write(encoded)
+}
+
+///|
 async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
   let git_dir = find_git_dir(fs)
@@ -274,9 +325,10 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
         (raw_fmt, true)
       }
       let ref_names : Map[String, Array[String]] = {}
+      let output_encoding = rev_list_resolve_output_encoding(fs, git_dir)
       for idx, id in sliced_result {
         // Print commit header line
-        print_line("commit " + id.to_hex())
+        rev_list_write_text("commit " + id.to_hex() + "\n", output_encoding)
         // Read commit data and format
         match db.get(fs, id) {
           Some(obj) if obj.obj_type == @bitcore.ObjectType::Commit => {
@@ -289,11 +341,11 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
               ref_names,
             )
             let formatted = format_commit_string(fmt, fdata)
-            print_str(formatted)
+            rev_list_write_text(formatted, output_encoding)
             if use_newline_sep {
-              print_str("\n")
+              rev_list_write_text("\n", output_encoding)
             } else if idx < sliced_result.length() - 1 {
-              print_str("\n")
+              rev_list_write_text("\n", output_encoding)
             }
           }
           _ => ()

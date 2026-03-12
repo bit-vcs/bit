@@ -826,6 +826,7 @@ struct CommitFormatData {
   tree : @bitcore.ObjectId
   parents : Array[@bitcore.ObjectId]
   abbrev_len : Int
+  encoding : String
   author_name : String
   author_email : String
   author_timestamp : Int64
@@ -846,6 +847,42 @@ struct CommitFormatData {
 }
 
 ///|
+fn log_extract_commit_message_and_encoding(data : Bytes) -> (Bytes, String?) {
+  let mut offset = 0
+  let mut encoding : String? = None
+  while offset <= data.length() {
+    let line_start = offset
+    while offset < data.length() && data[offset] != b'\n' {
+      offset += 1
+    }
+    let mut line_end = offset
+    if line_end > line_start && data[line_end - 1] == b'\r' {
+      line_end -= 1
+    }
+    let line = decode_bytes(reset_slice_bytes(data, line_start, line_end))
+    if line.length() == 0 {
+      let message_start = if offset < data.length() {
+        offset + 1
+      } else {
+        offset
+      }
+      return (reset_slice_bytes(data, message_start, data.length()), encoding)
+    }
+    if line.has_prefix("encoding ") {
+      encoding = Some(
+        trim_string(String::unsafe_substring(line, start=9, end=line.length())),
+      )
+    }
+    if offset < data.length() {
+      offset += 1
+    } else {
+      break
+    }
+  }
+  (Bytes::default(), encoding)
+}
+
+///|
 fn parse_commit_format_data(
   id : @bitcore.ObjectId,
   data : Bytes,
@@ -860,6 +897,13 @@ fn parse_commit_format_data(
   reflog_message? : String? = None,
 ) -> CommitFormatData {
   let text = decode_bytes(data)
+  let (message_bytes, explicit_encoding) = log_extract_commit_message_and_encoding(
+    data,
+  )
+  let source_encoding = reset_detect_commit_subject_encoding(
+    message_bytes, explicit_encoding,
+  )
+  let message_text = decode_commit_message_bytes(message_bytes, source_encoding)
   let mut author_name = ""
   let mut author_email = ""
   let mut author_timestamp = 0L
@@ -868,18 +912,9 @@ fn parse_commit_format_data(
   let mut committer_email = ""
   let mut committer_timestamp = 0L
   let mut committer_tz = "+0000"
-  let mut in_message = false
   let message_lines : Array[String] = []
   for line_view in text.split("\n") {
     let line = line_view.to_string()
-    if in_message {
-      message_lines.push(line)
-      continue
-    }
-    if line.length() == 0 {
-      in_message = true
-      continue
-    }
     if line.has_prefix("author ") {
       let rest = String::unsafe_substring(line, start=7, end=line.length())
       let (name, email, ts, tz) = parse_ident_parts(rest)
@@ -895,6 +930,9 @@ fn parse_commit_format_data(
       committer_timestamp = ts
       committer_tz = tz
     }
+  }
+  for line_view in message_text.split("\n") {
+    message_lines.push(line_view.to_string())
   }
   // Remove trailing empty lines from message
   while message_lines.length() > 0 &&
@@ -928,6 +966,7 @@ fn parse_commit_format_data(
     tree,
     parents,
     abbrev_len,
+    encoding: explicit_encoding.unwrap_or(""),
     author_name,
     author_email,
     author_timestamp,
@@ -2159,244 +2198,306 @@ fn log_commit_matches_text_filters(
 }
 
 ///|
-fn format_commit_string(fmt : String, data : CommitFormatData) -> String {
+fn log_string_without_last_char(text : String) -> String {
+  let chars = text.to_array()
+  if chars.length() == 0 {
+    text
+  } else {
+    String::from_array(chars[:chars.length() - 1])
+  }
+}
+
+///|
+fn log_repeat_char(c : Char, count : Int) -> String {
   let out = StringBuilder::new()
+  let mut i = 0
+  while i < count {
+    out.write_char(c)
+    i += 1
+  }
+  out.to_string()
+}
+
+///|
+fn log_apply_width_directive(
+  text : String,
+  width : Int,
+  mode : String,
+) -> String {
+  if width <= 0 {
+    return ""
+  }
+  let chars = text.to_array()
+  let len = chars.length()
+  if len <= width {
+    return text + log_repeat_char(' ', width - len)
+  }
+  if width <= 2 {
+    return String::from_array(chars[:width])
+  }
+  let keep = width - 2
+  match mode {
+    "ltrunc" => ".." + String::from_array(chars[len - keep:])
+    "mtrunc" => {
+      let left = keep / 2
+      let right = keep - left
+      String::from_array(chars[:left]) +
+      ".." +
+      String::from_array(chars[len - right:])
+    }
+    _ => String::from_array(chars[:keep]) + ".."
+  }
+}
+
+///|
+fn log_format_commit_spec(
+  chars : Array[Char],
+  spec_idx : Int,
+  data : CommitFormatData,
+) -> (String, Int) {
+  if spec_idx >= chars.length() {
+    return ("", spec_idx)
+  }
+  let spec = chars[spec_idx]
+  match spec {
+    'H' => (data.id.to_hex(), spec_idx + 1)
+    'h' => (log_abbrev_hex(data.id.to_hex(), data.abbrev_len), spec_idx + 1)
+    'm' => (data.left_right_marker, spec_idx + 1)
+    'T' => (data.tree.to_hex(), spec_idx + 1)
+    't' => (log_abbrev_hex(data.tree.to_hex(), data.abbrev_len), spec_idx + 1)
+    'e' => (data.encoding, spec_idx + 1)
+    'P' => {
+      let parent_hexes = data.parents.map(fn(p) { p.to_hex() })
+      (parent_hexes.join(" "), spec_idx + 1)
+    }
+    'p' => {
+      let parent_shorts = data.parents.map(fn(p) {
+        log_abbrev_hex(p.to_hex(), data.abbrev_len)
+      })
+      (parent_shorts.join(" "), spec_idx + 1)
+    }
+    'a' if spec_idx + 1 < chars.length() => {
+      let subspec = chars[spec_idx + 1]
+      match subspec {
+        'n' => (data.author_name, spec_idx + 2)
+        'e' => (data.author_email, spec_idx + 2)
+        't' => (data.author_timestamp.to_string(), spec_idx + 2)
+        'i' =>
+          (
+            format_timestamp_iso(data.author_timestamp, data.author_tz),
+            spec_idx + 2,
+          )
+        'd' =>
+          (
+            format_date_by_mode(
+              data.author_timestamp,
+              data.author_tz,
+              data.date_format,
+            ),
+            spec_idx + 2,
+          )
+        'D' =>
+          (
+            format_timestamp_rfc2822(data.author_timestamp, data.author_tz),
+            spec_idx + 2,
+          )
+        _ => ("%a", spec_idx + 1)
+      }
+    }
+    'c' if spec_idx + 1 < chars.length() => {
+      let subspec = chars[spec_idx + 1]
+      match subspec {
+        'n' => (data.committer_name, spec_idx + 2)
+        'e' => (data.committer_email, spec_idx + 2)
+        't' => (data.committer_timestamp.to_string(), spec_idx + 2)
+        'i' =>
+          (
+            format_timestamp_iso(data.committer_timestamp, data.committer_tz),
+            spec_idx + 2,
+          )
+        'd' =>
+          (
+            format_date_by_mode(
+              data.committer_timestamp,
+              data.committer_tz,
+              data.date_format,
+            ),
+            spec_idx + 2,
+          )
+        'D' =>
+          (
+            format_timestamp_rfc2822(
+              data.committer_timestamp,
+              data.committer_tz,
+            ),
+            spec_idx + 2,
+          )
+        _ => ("%c", spec_idx + 1)
+      }
+    }
+    's' => (data.subject, spec_idx + 1)
+    'f' => (log_sanitize_subject_for_format(data.subject), spec_idx + 1)
+    'g' if spec_idx + 1 < chars.length() => {
+      let subspec = chars[spec_idx + 1]
+      match subspec {
+        'd' => (data.reflog_selector_short.unwrap_or(""), spec_idx + 2)
+        'D' =>
+          (
+            data.reflog_selector.unwrap_or(
+              data.reflog_selector_short.unwrap_or(""),
+            ),
+            spec_idx + 2,
+          )
+        's' => (data.reflog_message.unwrap_or(""), spec_idx + 2)
+        _ => ("%g", spec_idx + 1)
+      }
+    }
+    'b' => (data.body, spec_idx + 1)
+    'B' => (data.message, spec_idx + 1)
+    'n' => ("\n", spec_idx + 1)
+    '%' => ("%", spec_idx + 1)
+    'd' => {
+      let hex = data.id.to_hex()
+      let rendered = match data.ref_names.get(hex) {
+        Some(names) if names.length() > 0 => " (" + names.join(", ") + ")"
+        _ => ""
+      }
+      (rendered, spec_idx + 1)
+    }
+    'D' => {
+      let hex = data.id.to_hex()
+      let rendered = match data.ref_names.get(hex) {
+        Some(names) if names.length() > 0 => names.join(", ")
+        _ => ""
+      }
+      (rendered, spec_idx + 1)
+    }
+    _ => ("%" + spec.to_string(), spec_idx + 1)
+  }
+}
+
+///|
+fn log_format_commit_width_spec(
+  chars : Array[Char],
+  percent_idx : Int,
+  data : CommitFormatData,
+) -> (String, Int)? {
+  if percent_idx + 2 >= chars.length() ||
+    chars[percent_idx + 1] != '<' ||
+    chars[percent_idx + 2] != '(' {
+    return None
+  }
+  let mut end = percent_idx + 3
+  while end < chars.length() && chars[end] != ')' {
+    end += 1
+  }
+  if end >= chars.length() || end + 2 >= chars.length() || chars[end + 1] != '%' {
+    return None
+  }
+  let spec_text = String::from_array(chars[percent_idx + 3:end])
+  let spec_chars = spec_text.to_array()
+  let mut comma_idx = -1
+  let mut spec_idx = 0
+  while spec_idx < spec_chars.length() {
+    if spec_chars[spec_idx] == ',' {
+      comma_idx = spec_idx
+      break
+    }
+    spec_idx += 1
+  }
+  let width_text = if comma_idx >= 0 {
+    String::from_array(spec_chars[:comma_idx])
+  } else {
+    spec_text
+  }
+  let width = @strconv.parse_int(width_text) catch { _ => -1 }
+  if width < 0 {
+    return None
+  }
+  let mode = if comma_idx >= 0 {
+    String::from_array(spec_chars[comma_idx + 1:])
+  } else {
+    "trunc"
+  }
+  let (raw_text, next_idx) = log_format_commit_spec(chars, end + 2, data)
+  Some((log_apply_width_directive(raw_text, width, mode), next_idx))
+}
+
+///|
+fn format_commit_string(fmt : String, data : CommitFormatData) -> String {
   let chars = fmt.to_array()
   let len = chars.length()
   let mut i = 0
   let mut wrap_spec : LogWrapSpec? = None
+  let mut rendered = ""
   while i < len {
     if chars[i] == '%' && i + 1 < len {
       let next = chars[i + 1]
       match next {
-        'H' => {
-          out.write_string(data.id.to_hex())
-          i += 2
-        }
-        'h' => {
-          out.write_string(log_abbrev_hex(data.id.to_hex(), data.abbrev_len))
-          i += 2
-        }
-        'm' => {
-          out.write_string(data.left_right_marker)
-          i += 2
-        }
-        'T' => {
-          out.write_string(data.tree.to_hex())
-          i += 2
-        }
-        't' => {
-          out.write_string(log_abbrev_hex(data.tree.to_hex(), data.abbrev_len))
-          i += 2
-        }
-        'P' => {
-          let parent_hexes = data.parents.map(fn(p) { p.to_hex() })
-          out.write_string(parent_hexes.join(" "))
-          i += 2
-        }
-        'p' => {
-          let parent_shorts = data.parents.map(fn(p) {
-            log_abbrev_hex(p.to_hex(), data.abbrev_len)
-          })
-          out.write_string(parent_shorts.join(" "))
-          i += 2
-        }
-        'a' if i + 2 < len => {
-          let spec = chars[i + 2]
-          match spec {
-            'n' => {
-              out.write_string(data.author_name)
-              i += 3
-            }
-            'e' => {
-              out.write_string(data.author_email)
-              i += 3
-            }
-            't' => {
-              out.write_string(data.author_timestamp.to_string())
-              i += 3
-            }
-            'i' => {
-              out.write_string(
-                format_timestamp_iso(data.author_timestamp, data.author_tz),
-              )
-              i += 3
-            }
-            'd' => {
-              out.write_string(
-                format_date_by_mode(
-                  data.author_timestamp,
-                  data.author_tz,
-                  data.date_format,
-                ),
-              )
-              i += 3
-            }
-            'D' => {
-              out.write_string(
-                format_timestamp_rfc2822(data.author_timestamp, data.author_tz),
-              )
-              i += 3
-            }
-            _ => {
-              out.write_char('%')
-              out.write_char('a')
-              i += 2
-            }
-          }
-        }
-        'c' if i + 2 < len => {
-          let spec = chars[i + 2]
-          match spec {
-            'n' => {
-              out.write_string(data.committer_name)
-              i += 3
-            }
-            'e' => {
-              out.write_string(data.committer_email)
-              i += 3
-            }
-            't' => {
-              out.write_string(data.committer_timestamp.to_string())
-              i += 3
-            }
-            'i' => {
-              out.write_string(
-                format_timestamp_iso(
-                  data.committer_timestamp,
-                  data.committer_tz,
-                ),
-              )
-              i += 3
-            }
-            'd' => {
-              out.write_string(
-                format_date_by_mode(
-                  data.committer_timestamp,
-                  data.committer_tz,
-                  data.date_format,
-                ),
-              )
-              i += 3
-            }
-            'D' => {
-              out.write_string(
-                format_timestamp_rfc2822(
-                  data.committer_timestamp,
-                  data.committer_tz,
-                ),
-              )
-              i += 3
-            }
-            _ => {
-              out.write_char('%')
-              out.write_char('c')
-              i += 2
-            }
-          }
-        }
-        's' => {
-          out.write_string(data.subject)
-          i += 2
-        }
-        'f' => {
-          out.write_string(log_sanitize_subject_for_format(data.subject))
-          i += 2
-        }
-        'g' if i + 2 < len => {
-          let spec = chars[i + 2]
-          match spec {
-            'd' => {
-              out.write_string(data.reflog_selector_short.unwrap_or(""))
-              i += 3
-            }
-            'D' => {
-              out.write_string(
-                data.reflog_selector.unwrap_or(
-                  data.reflog_selector_short.unwrap_or(""),
-                ),
-              )
-              i += 3
-            }
-            's' => {
-              out.write_string(data.reflog_message.unwrap_or(""))
-              i += 3
-            }
-            _ => {
-              out.write_char('%')
-              out.write_char('g')
-              i += 2
-            }
-          }
-        }
-        'b' => {
-          out.write_string(data.body)
-          i += 2
-        }
-        'B' => {
-          out.write_string(data.message)
-          i += 2
-        }
-        'n' => {
-          out.write_char('\n')
-          i += 2
-        }
-        '%' => {
-          out.write_char('%')
-          i += 2
-        }
-        'd' => {
-          // Decoration with parens
-          let hex = data.id.to_hex()
-          match data.ref_names.get(hex) {
-            Some(names) if names.length() > 0 =>
-              out.write_string(" (" + names.join(", ") + ")")
-            _ => ()
-          }
-          i += 2
-        }
-        'D' => {
-          // Decoration without parens
-          let hex = data.id.to_hex()
-          match data.ref_names.get(hex) {
-            Some(names) if names.length() > 0 =>
-              out.write_string(names.join(", "))
-            _ => ()
-          }
-          i += 2
-        }
         'w' if i + 2 < len && chars[i + 2] == '(' => {
           let mut end = i + 3
           while end < len && chars[end] != ')' {
             end += 1
           }
           if end < len {
-            let spec_builder = StringBuilder::new()
-            let mut j = i + 3
-            while j < end {
-              spec_builder.write_char(chars[j])
-              j += 1
-            }
-            wrap_spec = Some(log_parse_wrap_spec(spec_builder.to_string()))
+            let spec_text = String::from_array(chars[i + 3:end])
+            wrap_spec = Some(log_parse_wrap_spec(spec_text))
             i = end + 1
           } else {
-            out.write_char('%')
-            out.write_char('w')
+            rendered = rendered + "%w"
             i += 2
           }
         }
+        '<' =>
+          match log_format_commit_width_spec(chars, i, data) {
+            Some((text, next_idx)) => {
+              rendered = rendered + text
+              i = next_idx
+            }
+            None => {
+              rendered = rendered + "%<"
+              i += 2
+            }
+          }
+        '-' | '+' | ' ' if i + 2 < len => {
+          let (text, next_idx) = log_format_commit_spec(chars, i + 2, data)
+          if next_idx == i + 2 {
+            rendered = rendered + "%" + next.to_string()
+            i += 2
+          } else {
+            match next {
+              '-' =>
+                if text.length() == 0 &&
+                  rendered.length() > 0 &&
+                  rendered.to_array()[rendered.to_array().length() - 1] == '\n' {
+                  rendered = log_string_without_last_char(rendered)
+                } else {
+                  rendered = rendered + text
+                }
+              '+' => {
+                let prefix = if text.length() > 0 { "\n" + text } else { "" }
+                rendered = rendered + prefix
+              }
+              ' ' => {
+                let prefix = if text.length() > 0 { " " + text } else { "" }
+                rendered = rendered + prefix
+              }
+              _ => ()
+            }
+            i = next_idx
+          }
+        }
         _ => {
-          out.write_char('%')
-          out.write_char(next)
-          i += 2
+          let (text, next_idx) = log_format_commit_spec(chars, i + 1, data)
+          rendered = rendered + text
+          i = next_idx
         }
       }
     } else {
-      out.write_char(chars[i])
+      rendered = rendered + chars[i].to_string()
       i += 1
     }
   }
-  let rendered = out.to_string()
   match wrap_spec {
     Some(spec) => log_apply_wrap(rendered, spec)
     None => rendered

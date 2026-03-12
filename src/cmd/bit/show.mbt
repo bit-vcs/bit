@@ -468,7 +468,17 @@ fn show_render_commit_block(
       }
       "%H" => return Some(commit_id.to_hex() + "\n")
       "%s" => return Some(show_first_message_line(show_info.message) + "\n")
-      _ => ()
+      _ => {
+        let commit_info = @bitcore.parse_commit(data)
+        let format_data = parse_commit_format_data(
+          commit_id,
+          data,
+          commit_info.tree,
+          commit_info.parents,
+          {},
+        )
+        return Some(format_commit_string(fmt, format_data))
+      }
     }
   }
   if oneline {

@@ -73,3 +73,57 @@ test "show: resolves :path against index entries" {
   )
   assert_eq(show_resolve_index_object_id(fs, git_dir, ":missing"), None)
 }
+
+///|
+test "show: pretty format uses generic commit formatter" {
+  let fs = @bitcore.TestFs::new()
+  let git_dir = "/repo/.git"
+  fs.mkdir_p(git_dir)
+  let db = @bitlib.ObjectDb::load(fs, git_dir)
+  let zero = show_wbtest_zero_id()
+  let date = format_show_date(1700000000L, "+0900")
+  let commit_text = "tree " +
+    zero.to_hex() +
+    "\nauthor Alice <alice@example.com> 1700000000 +0900\ncommitter Alice <alice@example.com> 1700000000 +0900\n\nsubject\n\nbody line\n"
+  let rendered = show_render_commit_block(
+    db,
+    fs,
+    zero,
+    str_to_bytes(commit_text),
+    false,
+    Some("%an,%ae,%ad%n"),
+    true,
+    false,
+    [],
+    GrepPatternType::Basic,
+    false,
+  ).unwrap()
+  let expected = "Alice,alice@example.com,\{date}\n"
+  assert_eq(rendered, expected)
+}
+
+///|
+test "show: pretty format honors body modifiers" {
+  let fs = @bitcore.TestFs::new()
+  let git_dir = "/repo/.git"
+  fs.mkdir_p(git_dir)
+  let db = @bitlib.ObjectDb::load(fs, git_dir)
+  let zero = show_wbtest_zero_id()
+  let commit_text = "tree " +
+    zero.to_hex() +
+    "\nauthor Alice <alice@example.com> 1700000000 +0900\ncommitter Alice <alice@example.com> 1700000000 +0900\n\nsubject\n\nbody line\n"
+  let rendered = show_render_commit_block(
+    db,
+    fs,
+    zero,
+    str_to_bytes(commit_text),
+    false,
+    Some("%s%+bThanks%n"),
+    true,
+    false,
+    [],
+    GrepPatternType::Basic,
+    false,
+  ).unwrap()
+  assert_eq(rendered, "subject\nbody line\nThanks\n")
+}

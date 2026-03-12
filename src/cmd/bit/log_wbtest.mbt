@@ -164,18 +164,20 @@ test "log: format_reflog_entry keeps %gD selector without message" {
 }
 
 ///|
-test "log: format_commit_string honors reflog placeholders" {
-  let id = @bitcore.ObjectId::from_hex(
-    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-  )
-  let tree = @bitcore.ObjectId::from_hex(
-    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-  )
-  let data : CommitFormatData = {
+fn log_test_format_data(
+  subject : String,
+  body? : String = "",
+  message? : String = subject,
+  encoding? : String = "",
+) -> CommitFormatData {
+  let id = @bitcore.ObjectId::new(FixedArray::make(20, b'\xaa'))
+  let tree = @bitcore.ObjectId::new(FixedArray::make(20, b'\xbb'))
+  {
     id,
     tree,
     parents: [],
     abbrev_len: 7,
+    encoding,
     author_name: "Test User",
     author_email: "test@example.com",
     author_timestamp: 1700000000L,
@@ -184,16 +186,21 @@ test "log: format_commit_string honors reflog placeholders" {
     committer_email: "test@example.com",
     committer_timestamp: 1700000000L,
     committer_tz: "+0000",
-    subject: "sixth",
-    body: "",
-    message: "sixth",
+    subject,
+    body,
+    message,
     ref_names: {},
     date_format: "",
     left_right_marker: "",
     reflog_selector_short: Some("HEAD@{0}"),
     reflog_selector: Some("HEAD@{0}"),
-    reflog_message: Some("commit: sixth"),
+    reflog_message: Some("commit: " + subject),
   }
+}
+
+///|
+test "log: format_commit_string honors reflog placeholders" {
+  let data = log_test_format_data("sixth")
 
   assert_eq(
     format_commit_string("%gD %gs %H", data),
@@ -214,6 +221,7 @@ test "log: format_commit_string honors left-right marker" {
     tree,
     parents: [],
     abbrev_len: 7,
+    encoding: "",
     author_name: "Test User",
     author_email: "test@example.com",
     author_timestamp: 1700000000L,
@@ -234,6 +242,54 @@ test "log: format_commit_string honors left-right marker" {
   }
 
   assert_eq(format_commit_string("%m %s", data), "> sixth")
+}
+
+///|
+test "log: format_commit_string honors line and space modifiers" {
+  let without_body = log_test_format_data("subject")
+  let with_body = log_test_format_data(
+    "subject",
+    body="body line",
+    message="subject\n\nbody line",
+  )
+
+  assert_eq(format_commit_string("x%n%-b", without_body), "x")
+  assert_eq(format_commit_string("x%+b", without_body), "x")
+  assert_eq(format_commit_string("x% b", without_body), "x")
+  assert_eq(format_commit_string("x%n%-b", with_body), "x\nbody line")
+  assert_eq(format_commit_string("x%+b", with_body), "x\nbody line")
+  assert_eq(format_commit_string("x% b", with_body), "x body line")
+  assert_eq(format_commit_string("x% s", without_body), "x subject")
+  assert_eq(
+    format_commit_string(
+      "%e",
+      log_test_format_data("subject", encoding="ISO-8859-1"),
+    ),
+    "ISO-8859-1",
+  )
+}
+
+///|
+test "log: format_commit_string honors truncation and width padding" {
+  let long_subject = log_test_format_data("abcdefghijklmnopqrstuvwxyz")
+  let short_subject = log_test_format_data("short")
+
+  assert_eq(
+    format_commit_string("%<(20,trunc)%s", long_subject),
+    "abcdefghijklmnopqr..",
+  )
+  assert_eq(
+    format_commit_string("%<(20,mtrunc)%s", long_subject),
+    "abcdefghi..rstuvwxyz",
+  )
+  assert_eq(
+    format_commit_string("%<(20,ltrunc)%s", long_subject),
+    "..ijklmnopqrstuvwxyz",
+  )
+  assert_eq(
+    format_commit_string("%<(20,trunc)%s", short_subject),
+    "short               ",
+  )
 }
 
 ///|
@@ -580,6 +636,7 @@ test "log: format_commit_string honors %w prefix" {
     tree,
     parents: [],
     abbrev_len: 7,
+    encoding: "",
     author_name: "Test User",
     author_email: "test@example.com",
     author_timestamp: 1700000000L,
@@ -611,6 +668,7 @@ test "log: format_commit_string honors %w prefix" {
     tree,
     parents: [],
     abbrev_len: 7,
+    encoding: "",
     author_name: "Test User",
     author_email: "test@example.com",
     author_timestamp: 1700000000L,
