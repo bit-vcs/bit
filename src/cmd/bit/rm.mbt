@@ -27,6 +27,7 @@ async fn handle_rm(args : Array[String]) -> Unit raise Error {
     raise @bitcore.GitError::InvalidObject("No pathspec given")
   }
   let actual_git_dir = resolve_git_dir(fs, root)
+  let head_exists = @bitlib.resolve_head_commit(fs, actual_git_dir) is Some(_)
   let entries = @bitlib.read_index_entries(fs, actual_git_dir)
   let cwd_prefix = compute_cwd_prefix(root)
   let root_abs = ls_files_repo_root_abs(root)
@@ -63,7 +64,7 @@ async fn handle_rm(args : Array[String]) -> Unit raise Error {
     }
     @sys.exit(1)
   }
-  if opts.cached && not(opts.force) {
+  if opts.cached && not(opts.force) && head_exists {
     let st = @bitlib.status(fs, root)
     let staged_but_not_head : Map[String, Bool] = {}
     let intent_to_add_paths : Map[String, Bool] = {}
@@ -103,7 +104,7 @@ async fn handle_rm(args : Array[String]) -> Unit raise Error {
       }
     }
     let (both_dirty, staged_only, local_only) = rm_collect_conflict_paths(
-      st, removed_paths, missing_worktree_paths,
+      st, removed_paths, missing_worktree_paths, head_exists,
     )
     if both_dirty.length() > 0 ||
       staged_only.length() > 0 ||
@@ -178,6 +179,23 @@ fn parse_rm_options(args : Array[String]) -> RmOptions {
       continue
     }
     if parse_options {
+      if arg.has_prefix("-") && not(arg.has_prefix("--")) && arg.length() > 2 {
+        let mut recognized_short_cluster = true
+        for i = 1; i < arg.length(); i = i + 1 {
+          match arg.get_char(i).unwrap() {
+            'f' => force = true
+            'r' => recursive = true
+            'q' => quiet = true
+            _ => {
+              recognized_short_cluster = false
+              break
+            }
+          }
+        }
+        if recognized_short_cluster {
+          continue
+        }
+      }
       match arg {
         "--cached" => cached = true
         "-f" | "--force" => force = true
@@ -614,15 +632,18 @@ fn rm_collect_conflict_paths(
   status : @bitlib.Status,
   removed_paths : Array[String],
   missing_worktree_paths : Map[String, Bool],
+  head_exists : Bool,
 ) -> (Array[String], Array[String], Array[String]) {
   let staged_modified : Map[String, Bool] = {}
   let staged_added : Map[String, Bool] = {}
   let unstaged_modified : Map[String, Bool] = {}
-  for path in status.staged_modified {
-    staged_modified[path] = true
-  }
-  for path in status.staged_added {
-    staged_added[path] = true
+  if head_exists {
+    for path in status.staged_modified {
+      staged_modified[path] = true
+    }
+    for path in status.staged_added {
+      staged_added[path] = true
+    }
   }
   for path in status.unstaged_modified {
     unstaged_modified[path] = true

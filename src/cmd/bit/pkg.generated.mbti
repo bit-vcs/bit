@@ -93,7 +93,9 @@ type GitHubImportProvider
 
 type GlobalOptions
 
-type GrepPatternType
+type GrepColorSpec
+
+type GrepFunctionContextSpec
 
 type HubDumpOptions
 
@@ -168,6 +170,10 @@ type RebaseAiArgs
 type RebaseTodoEntry
 
 type RemoteTrackingHeadState
+
+type RestoreConflictRecord
+
+type RestoreConflictStage
 
 type RmOptions
 

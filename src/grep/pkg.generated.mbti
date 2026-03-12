@@ -1,0 +1,126 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/bit/grep"
+
+import {
+  "mizchi/bit/object",
+  "mizchi/bit/types",
+}
+
+// Values
+pub fn extract_commit_message_from_raw(Bytes) -> String
+
+pub fn grep_collect_expr_match_spans(String, GrepExpr, GrepPatternType, Bool, word_regexp? : Bool) -> Array[GrepMatchSpan]
+
+pub fn grep_eval_expr(String, GrepExpr, GrepPatternType, Bool, word_regexp? : Bool) -> GrepExprMatch
+
+pub fn grep_first_match_span(String, String, GrepPatternType, Bool, word_regexp? : Bool) -> GrepMatchSpan?
+
+pub fn grep_message_matches_pattern(String, String, GrepPatternType, Bool) -> Bool
+
+pub fn grep_or_expr_from_patterns(Array[String]) -> GrepExpr?
+
+pub fn grep_patterns_first_match_span(String, Array[String], GrepPatternType, Bool, word_regexp? : Bool) -> GrepMatchSpan?
+
+pub fn grep_patterns_match_message(String, Array[String], GrepPatternType, Bool) -> Bool
+
+pub fn list_index_candidate_paths(&@types.RepoFileSystem, String, Array[String], max_depth? : Int) -> Array[String] raise @object.GitError
+
+pub fn list_plain_worktree_candidate_paths(&@types.RepoFileSystem, String, Array[String], max_depth? : Int, exclude_standard? : Bool) -> Array[String] raise @object.GitError
+
+pub fn list_tracked_worktree_candidate_paths(&@types.RepoFileSystem, String, Array[String], max_depth? : Int) -> Array[String] raise @object.GitError
+
+pub fn list_treeish_candidate_paths(&@types.RepoFileSystem, String, String, Array[String], max_depth? : Int) -> Array[String] raise @object.GitError
+
+pub fn list_untracked_worktree_candidate_paths(&@types.RepoFileSystem, String, String, Array[String], max_depth? : Int) -> Array[String] raise @object.GitError
+
+pub fn parse_grep_expr(Array[GrepExprToken]) -> GrepExpr raise @object.GitError
+
+pub fn parse_grep_pattern_type_name(String) -> GrepPatternType
+
+pub fn resolve_grep_pattern_type(&@types.RepoFileSystem, String, GrepPatternType?, String?) -> GrepPatternType
+
+pub fn search_index(&@types.RepoFileSystem, String, Array[String], Array[String], pattern_type? : GrepPatternType, ignore_case? : Bool, invert_match? : Bool, word_regexp? : Bool, max_depth? : Int) -> Array[GrepFileMatch] raise @object.GitError
+
+pub fn search_index_expr(&@types.RepoFileSystem, String, GrepExpr, Array[String], pattern_type? : GrepPatternType, ignore_case? : Bool, invert_match? : Bool, word_regexp? : Bool, max_depth? : Int) -> Array[GrepFileMatch] raise @object.GitError
+
+pub fn search_plain_worktree_expr(&@types.RepoFileSystem, String, GrepExpr, Array[String], pattern_type? : GrepPatternType, ignore_case? : Bool, invert_match? : Bool, word_regexp? : Bool, max_depth? : Int, exclude_standard? : Bool) -> Array[GrepFileMatch] raise @object.GitError
+
+pub fn search_tracked_worktree(&@types.RepoFileSystem, String, String, Array[String], Array[String], pattern_type? : GrepPatternType, ignore_case? : Bool, invert_match? : Bool, word_regexp? : Bool, max_depth? : Int) -> Array[GrepFileMatch] raise @object.GitError
+
+pub fn search_tracked_worktree_expr(&@types.RepoFileSystem, String, String, GrepExpr, Array[String], pattern_type? : GrepPatternType, ignore_case? : Bool, invert_match? : Bool, word_regexp? : Bool, max_depth? : Int) -> Array[GrepFileMatch] raise @object.GitError
+
+pub fn search_treeish(&@types.RepoFileSystem, String, String, Array[String], Array[String], pattern_type? : GrepPatternType, ignore_case? : Bool, invert_match? : Bool, word_regexp? : Bool, max_depth? : Int) -> Array[GrepFileMatch] raise @object.GitError
+
+pub fn search_treeish_expr(&@types.RepoFileSystem, String, String, GrepExpr, Array[String], pattern_type? : GrepPatternType, ignore_case? : Bool, invert_match? : Bool, word_regexp? : Bool, max_depth? : Int) -> Array[GrepFileMatch] raise @object.GitError
+
+pub fn search_untracked_worktree_expr(&@types.RepoFileSystem, String, String, GrepExpr, Array[String], pattern_type? : GrepPatternType, ignore_case? : Bool, invert_match? : Bool, word_regexp? : Bool, max_depth? : Int) -> Array[GrepFileMatch] raise @object.GitError
+
+pub fn validate_grep_expr(GrepExpr, GrepPatternType) -> Unit raise @object.GitError
+
+pub fn validate_grep_patterns(Array[String], GrepPatternType) -> Unit raise @object.GitError
+
+// Errors
+
+// Types and methods
+pub(all) enum GrepExpr {
+  Pattern(String)
+  And(GrepExpr, GrepExpr)
+  Or(GrepExpr, GrepExpr)
+  Not(GrepExpr)
+}
+pub impl Eq for GrepExpr
+pub impl Show for GrepExpr
+
+pub(all) struct GrepExprMatch {
+  matched : Bool
+  span : GrepMatchSpan?
+}
+pub impl Eq for GrepExprMatch
+pub impl Show for GrepExprMatch
+
+pub(all) enum GrepExprToken {
+  Pattern(String)
+  And
+  Or
+  Not
+  LParen
+  RParen
+}
+pub impl Eq for GrepExprToken
+pub impl Show for GrepExprToken
+
+pub(all) struct GrepFileMatch {
+  path : String
+  matches : Array[GrepLineMatch]
+}
+pub impl Eq for GrepFileMatch
+pub impl Show for GrepFileMatch
+
+pub(all) struct GrepLineMatch {
+  line_number : Int
+  column : Int
+  line : String
+}
+pub impl Eq for GrepLineMatch
+pub impl Show for GrepLineMatch
+
+pub(all) struct GrepMatchSpan {
+  start_column : Int
+  end_column : Int
+}
+pub impl Eq for GrepMatchSpan
+pub impl Show for GrepMatchSpan
+
+pub(all) enum GrepPatternType {
+  Fixed
+  Basic
+  Extended
+  Perl
+}
+pub impl Eq for GrepPatternType
+pub impl Show for GrepPatternType
+
+// Type aliases
+
+// Traits
+

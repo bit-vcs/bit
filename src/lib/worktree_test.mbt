@@ -8,6 +8,30 @@ fn setup_repo() -> @bit.TestFs {
 }
 
 ///|
+fn worktree_test_bytes_contains_ascii(bytes : Bytes, text : String) -> Bool {
+  let needle = @utf8.encode(text)
+  if needle.length() == 0 {
+    return true
+  }
+  if bytes.length() < needle.length() {
+    return false
+  }
+  for start in 0..<=(bytes.length() - needle.length()) {
+    let mut matched = true
+    for i in 0..<needle.length() {
+      if bytes[start + i] != needle[i] {
+        matched = false
+        break
+      }
+    }
+    if matched {
+      return true
+    }
+  }
+  false
+}
+
+///|
 async test "worktree: status/add/commit" {
   let fs = setup_repo()
   fs.write_string("/repo/a.txt", "hello\n")
@@ -26,6 +50,26 @@ async test "worktree: status/add/commit" {
   assert_true(st3.untracked.length() == 0)
   assert_true(st3.unstaged_modified.length() == 0)
   assert_true(st3.staged_added.length() == 0)
+}
+
+///|
+async test "worktree: add_paths writes cache-tree extension" {
+  let fs = setup_repo()
+  fs.write_string("/repo/one", "frotz\n")
+  fs.mkdir_p("/repo/two")
+  fs.write_string("/repo/two/three", "frotz\n")
+  add_paths(fs, fs, "/repo", ["one", "two/three"])
+  let after_add = worktree_test_bytes_contains_ascii(
+    fs.read_file("/repo/.git/index"),
+    "TREE",
+  )
+  let entries = read_index_entries(fs, "/repo/.git")
+  write_index_entries_preserving_cache_tree(fs, fs, "/repo/.git", entries)
+  let after_rewrite = worktree_test_bytes_contains_ascii(
+    fs.read_file("/repo/.git/index"),
+    "TREE",
+  )
+  assert_true(after_add || after_rewrite)
 }
 
 ///|

@@ -189,6 +189,7 @@ test "log: format_commit_string honors reflog placeholders" {
     message: "sixth",
     ref_names: {},
     date_format: "",
+    left_right_marker: "",
     reflog_selector_short: Some("HEAD@{0}"),
     reflog_selector: Some("HEAD@{0}"),
     reflog_message: Some("commit: sixth"),
@@ -198,6 +199,87 @@ test "log: format_commit_string honors reflog placeholders" {
     format_commit_string("%gD %gs %H", data),
     "HEAD@{0} commit: sixth aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   )
+}
+
+///|
+test "log: format_commit_string honors left-right marker" {
+  let id = @bitcore.ObjectId::from_hex(
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  )
+  let tree = @bitcore.ObjectId::from_hex(
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  )
+  let data : CommitFormatData = {
+    id,
+    tree,
+    parents: [],
+    abbrev_len: 7,
+    author_name: "Test User",
+    author_email: "test@example.com",
+    author_timestamp: 1700000000L,
+    author_tz: "+0000",
+    committer_name: "Test User",
+    committer_email: "test@example.com",
+    committer_timestamp: 1700000000L,
+    committer_tz: "+0000",
+    subject: "sixth",
+    body: "",
+    message: "sixth",
+    ref_names: {},
+    date_format: "",
+    left_right_marker: ">",
+    reflog_selector_short: None,
+    reflog_selector: None,
+    reflog_message: None,
+  }
+
+  assert_eq(format_commit_string("%m %s", data), "> sixth")
+}
+
+///|
+test "log: identity patterns use union semantics" {
+  assert_true(
+    log_identity_patterns_match(
+      "Thor <thor@example.com>",
+      ["Thor", "Aster"],
+      GrepPatternType::Basic,
+      false,
+    ),
+  )
+  assert_true(
+    log_identity_patterns_match(
+      "Thor <thor@example.com>",
+      ["Aster", "thor@example\\.com>$"],
+      GrepPatternType::Basic,
+      false,
+    ),
+  )
+  assert_false(
+    log_identity_patterns_match(
+      "Thor <thor@example.com>",
+      ["Aster", "-0700"],
+      GrepPatternType::Basic,
+      false,
+    ),
+  )
+}
+
+///|
+test "log: grep reflog requires walk_reflogs" {
+  let raised = try {
+    log_validate_reflog_grep_options(false, ["commit: third"])
+    false
+  } catch {
+    _ => true
+  }
+  assert_true(raised)
+  let ok = try {
+    log_validate_reflog_grep_options(true, ["commit: third"])
+    true
+  } catch {
+    _ => false
+  }
+  assert_true(ok)
 }
 
 ///|
@@ -511,6 +593,7 @@ test "log: format_commit_string honors %w prefix" {
     message: "sixth",
     ref_names: {},
     date_format: "",
+    left_right_marker: "",
     reflog_selector_short: None,
     reflog_selector: None,
     reflog_message: None,
@@ -541,6 +624,7 @@ test "log: format_commit_string honors %w prefix" {
     message: "Merge tag 'reach'",
     ref_names: {},
     date_format: "",
+    left_right_marker: "",
     reflog_selector_short: None,
     reflog_selector: None,
     reflog_message: None,

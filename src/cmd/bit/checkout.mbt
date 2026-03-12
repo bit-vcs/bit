@@ -68,7 +68,6 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
       )
     }
     fs.write_string(git_dir + "/HEAD", "ref: refs/heads/" + branch_name + "\n")
-    @bitlib.write_index_entries(fs, git_dir, [])
     save_previous_checkout_location(fs, git_dir, previous_location)
     return ()
   }
@@ -364,45 +363,106 @@ fn checkout_restore_paths_from_spec(
   spec : String,
   paths : Array[String],
 ) -> Unit raise Error {
+  checkout_restore_paths_from_spec_mode(
+    fs,
+    rfs,
+    root,
+    git_dir,
+    spec,
+    paths,
+    update_worktree=true,
+    update_index=true,
+  )
+}
+
+///|
+fn checkout_restore_remove_worktree_path(
+  fs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
+  root : String,
+  path : String,
+) -> Unit {
+  let abs_path = root + "/" + path
+  if rfs.is_dir(abs_path) {
+    @bitlib.subdir_remove_dir(rfs, fs, abs_path)
+  } else {
+    fs.remove_file(abs_path) catch {
+      _ => ()
+    }
+  }
+}
+
+///|
+fn checkout_restore_paths_from_spec_mode(
+  fs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
+  root : String,
+  git_dir : String,
+  spec : String,
+  paths : Array[String],
+  update_worktree? : Bool = true,
+  update_index? : Bool = true,
+) -> Unit raise Error {
   let target = resolve_checkout_target(rfs, git_dir, spec)
   let resolved = @bitrepo.rev_parse(rfs, git_dir, target)
   guard resolved is Some(raw_id) else {
     raise @bitcore.GitError::InvalidObject("Invalid ref: \{target}")
   }
-  let commit_id = @bitrepo.rev_parse(rfs, git_dir, target + "^{commit}").unwrap_or(
+  let tree_id = @bitrepo.rev_parse(rfs, git_dir, target + "^{tree}").unwrap_or(
     raw_id,
   )
   let object_git_dir = checkout_resolve_common_git_dir(rfs, git_dir)
   let db = @bitlib.ObjectDb::load(rfs, object_git_dir)
-  let files = @bitlib.collect_tree_files_from_commit(db, rfs, commit_id)
+  let files = @bitlib.collect_tree_files(db, rfs, tree_id)
+  let current_entries = @bitlib.read_index_entries(rfs, git_dir)
+  let tracked_paths : Map[String, Bool] = {}
+  for entry in current_entries {
+    tracked_paths[entry.path] = true
+  }
   let selected : Map[String, @bitlib.TreeFileEntry] = {}
+  let removed_paths : Map[String, Bool] = {}
   for path in paths {
     let safe_path = @bitlib.normalize_repo_path(path)
     match files.get(safe_path) {
       Some(entry) => selected[safe_path] = entry
       None =>
-        raise @bitcore.GitError::InvalidObject(
-          "error: pathspec '\{path}' did not match any file(s) known to git",
-        )
+        if tracked_paths.contains(safe_path) {
+          removed_paths[safe_path] = true
+        } else {
+          raise @bitcore.GitError::InvalidObject(
+            "error: pathspec '\{path}' did not match any file(s) known to git",
+          )
+        }
     }
   }
-  let restored_entries = @bitlib.write_worktree_and_build_index(
-    db, fs, rfs, root, git_dir, selected,
-  )
-  let merged_entries : Array[@bitlib.IndexEntry] = []
-  let selected_paths : Map[String, Bool] = {}
-  for path, _ in selected {
-    selected_paths[path] = true
+  if update_worktree {
+    if selected.to_array().length() > 0 {
+      @bitlib.write_worktree_from_files(db, fs, rfs, root, git_dir, selected)
+    }
+    for path, _ in removed_paths {
+      checkout_restore_remove_worktree_path(fs, rfs, root, path)
+    }
   }
-  for entry in @bitlib.read_index_entries(rfs, git_dir) {
-    if not(selected_paths.contains(entry.path)) {
+  if update_index {
+    let restored_entries = @bitlib.tree_files_to_index(db, rfs, selected)
+    let selected_paths : Map[String, Bool] = {}
+    for path, _ in selected {
+      selected_paths[path] = true
+    }
+    for path, _ in removed_paths {
+      selected_paths[path] = true
+    }
+    let merged_entries : Array[@bitlib.IndexEntry] = []
+    for entry in current_entries {
+      if not(selected_paths.contains(entry.path)) {
+        merged_entries.push(entry)
+      }
+    }
+    for entry in restored_entries {
       merged_entries.push(entry)
     }
+    @bitlib.write_index_entries(fs, git_dir, merged_entries)
   }
-  for entry in restored_entries {
-    merged_entries.push(entry)
-  }
-  @bitlib.write_index_entries(fs, git_dir, merged_entries)
 }
 
 ///|

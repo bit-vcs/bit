@@ -44,6 +44,39 @@ test "main: log supported -c overrides stay in shim" {
 }
 
 ///|
+test "main: grep supported -c overrides stay in shim" {
+  let opts = parse_global_options(["bit", "-c", "grep.threads=0", "grep", "."])
+  assert_false(
+    should_delegate_to_real_git(
+      ["bit", "-c", "grep.threads=0", "grep", "."],
+      opts,
+    ),
+  )
+  let opts2 = parse_global_options([
+    "bit", "-c", "grep.patternType=fixed", "grep", "hello",
+  ])
+  assert_false(
+    should_delegate_to_real_git(
+      ["bit", "-c", "grep.patternType=fixed", "grep", "hello"],
+      opts2,
+    ),
+  )
+}
+
+///|
+test "main: config overrides use last matching value" {
+  let prev = @sys.get_env_var("GIT_CONFIG_OVERRIDES")
+  @sys.set_env_var(
+    "GIT_CONFIG_OVERRIDES", "grep.patternType=extended\ngrep.patternType=default\ngrep.patternType=fixed",
+  )
+  assert_eq(get_config_override("grep.patternType"), Some("fixed"))
+  match prev {
+    Some(value) => @sys.set_env_var("GIT_CONFIG_OVERRIDES", value)
+    None => @sys.unset_env_var("GIT_CONFIG_OVERRIDES")
+  }
+}
+
+///|
 test "main: unsupported -c overrides still delegate" {
   let opts = parse_global_options(["bit", "-c", "log.decorate=full", "log"])
   assert_true(

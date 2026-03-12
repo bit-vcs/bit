@@ -48,13 +48,15 @@ pub fn reset(
     Soft => target
     Mixed => {
       let db = ObjectDb::load(rfs, object_git_dir)
+      let tree_id = reset_resolve_target_tree_id(db, rfs, target)
       let files = collect_tree_files_from_commit(db, rfs, target)
       let entries = tree_files_to_index(db, rfs, files)
-      write_index_entries(fs, actual_git_dir, entries)
+      write_index_entries_with_tree(fs, rfs, actual_git_dir, entries, tree_id)
       target
     }
     Hard => {
       let db = ObjectDb::load(rfs, object_git_dir)
+      let tree_id = reset_resolve_target_tree_id(db, rfs, target)
       let files = collect_tree_files_from_commit(db, rfs, target)
       write_worktree_from_files(
         db,
@@ -66,9 +68,23 @@ pub fn reset(
         remove_missing=true,
       )
       let entries = tree_files_to_index(db, rfs, files)
-      write_index_entries(fs, actual_git_dir, entries)
+      write_index_entries_with_tree(fs, rfs, actual_git_dir, entries, tree_id)
       target
     }
+  }
+}
+
+///|
+fn reset_resolve_target_tree_id(
+  db : ObjectDb,
+  fs : &@bit.RepoFileSystem,
+  target : @bit.ObjectId,
+) -> @bit.ObjectId raise @bit.GitError {
+  match db.get(fs, target) {
+    Some(obj) if obj.obj_type == @bit.ObjectType::Commit =>
+      @bit.parse_commit(obj.data).tree
+    Some(_) => raise @bit.GitError::InvalidObject("Object is not a commit")
+    None => raise @bit.GitError::InvalidObject("Missing commit object")
   }
 }
 

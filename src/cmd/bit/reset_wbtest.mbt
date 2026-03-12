@@ -73,3 +73,52 @@ async test "reset pathspec: trailing slash unstages submodule gitlink" {
   add_test_restore_env("GIT_ALLOW_PROTOCOL", prev_allow_protocol)
   cleanup_tree(fs, root)
 }
+
+///|
+async test "reset: hard restores a valid root cache-tree for indexed-object negation" {
+  @bitnative.init_native_io()
+  let fs = OsFs::new()
+  let root = "/tmp/bit-test-reset-hard-indexed-objects-" +
+    get_current_timestamp().to_string()
+  cleanup_tree(fs, root)
+  fs.mkdir_p(root)
+  let repo_dir = root + "/repo"
+
+  add_test_run_git(root, ["init", "--initial-branch=main", "-q", "repo"])
+  add_test_run_git(repo_dir, ["config", "user.name", "Test User"])
+  add_test_run_git(repo_dir, ["config", "user.email", "test@example.com"])
+  fs.write_string(repo_dir + "/one", "frotz\n")
+  fs.mkdir_p(repo_dir + "/two")
+  fs.write_string(repo_dir + "/two/three", "frotz\n")
+  add_test_run_git(repo_dir, ["add", "one", "two/three"])
+  add_test_run_git(repo_dir, ["commit", "-q", "-m", "that"])
+  add_test_run_git(repo_dir, ["commit", "--allow-empty", "-q", "-m", "another"])
+  fs.write_string(repo_dir + "/only-in-index", "only-in-index\n")
+  add_test_run_git(repo_dir, ["add", "only-in-index"])
+
+  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
+  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @sys.get_env_var("GIT_DIR")
+  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
+  @sys.set_env_var("GIT_SHIM_CWD", repo_dir)
+  @sys.set_env_var("GIT_SHIM_PWD", repo_dir)
+  @sys.unset_env_var("GIT_DIR")
+  @sys.unset_env_var("GIT_WORK_TREE")
+  handle_reset(["--hard", "HEAD"])
+
+  let head = add_test_trim_trailing_newline(
+    add_test_git_stdout(repo_dir, ["rev-parse", "HEAD"]),
+  )
+  let actual = add_test_trim_trailing_newline(
+    add_test_git_stdout(repo_dir, [
+      "rev-list", "-1", "--objects", "HEAD", "--not", "--indexed-objects",
+    ]),
+  )
+  assert_eq(actual, head)
+
+  add_test_restore_env("GIT_SHIM_CWD", prev_shim_cwd)
+  add_test_restore_env("GIT_SHIM_PWD", prev_shim_pwd)
+  add_test_restore_env("GIT_DIR", prev_git_dir)
+  add_test_restore_env("GIT_WORK_TREE", prev_work_tree)
+  cleanup_tree(fs, root)
+}

@@ -38,6 +38,7 @@ async fn show_help() -> Unit {
     #|   checkout    Switch branches or restore working tree files
     #|   merge       Join two or more development histories together
     #|   rebase      Reapply commits on top of another base tip
+    #|   restore     Restore working tree files
     #|   ai           AI helpers (rebase, merge, commit, cherry-pick, revert)
     #|   rebase-ai    AI-assisted rebase conflict resolution (OpenRouter kimi-k2, alias for ai rebase)
     #|   reset       Reset current HEAD to the specified state
@@ -142,6 +143,10 @@ fn show_command_help_specs() -> Array[(String, String, String)] {
     ),
     (
       "checkout", "git checkout [<options>] <branch>", "Switch branches or restore working tree files.",
+    ),
+    (
+      "restore", "git restore [<options>] [--source=<tree-ish>] [--staged] [--worktree] [--] <pathspec>...",
+      "Restore working tree files.",
     ),
     ("switch", "git switch [<options>] <branch>", "Switch branches."),
     (
@@ -801,6 +806,7 @@ fn can_handle_global_config_in_shim(opts : GlobalOptions) -> Bool {
       let supported = match cmd {
         "log" | "whatchanged" =>
           ["core.abbrev", "log.abbrevcommit", "grep.patterntype"]
+        "grep" => ["grep.patterntype", "grep.threads"]
         _ => []
       }
       if supported.length() == 0 || opts.config_overrides.length() == 0 {
@@ -1100,6 +1106,7 @@ async fn dispatch_known_command(
     // Branch operations
     "branch" => handle_branch(rest)
     "checkout" => handle_checkout(rest)
+    "restore" => handle_restore(rest)
     "switch" => handle_switch(rest)
     "reset" => handle_reset(rest)
     "rebase" => handle_rebase(rest)

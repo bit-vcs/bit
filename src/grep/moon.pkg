@@ -1,0 +1,17 @@
+import {
+  "mizchi/bit" @bit,
+  "mizchi/bit/lib" @bitlib,
+  "mizchi/bit/repo_ops" @bitrepo,
+  "mizchi/bit/ignore" @ignore,
+  "mizchi/bit/io" @bitio,
+  "moonbitlang/core/encoding/utf8" @utf8,
+}
+
+warnings = "-29"
+
+options(
+  targets: {
+    "pattern_wbtest.mbt": [ "native" ],
+    "search_wbtest.mbt": [ "native" ],
+  },
+)

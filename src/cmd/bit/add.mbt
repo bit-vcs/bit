@@ -452,7 +452,7 @@ fn add_apply_intent_to_add(
     let (_, entry) = item
     updated.push(entry)
   }
-  @bitlib.write_index_entries(fs, git_dir, updated)
+  @bitlib.write_index_entries_preserving_cache_tree(fs, rfs, git_dir, updated)
   staged
 }
 
@@ -762,7 +762,7 @@ async fn add_refresh_index_entries(
       ),
     )
   }
-  @bitlib.write_index_entries(fs, git_dir, refreshed)
+  @bitlib.write_index_entries_preserving_cache_tree(fs, fs, git_dir, refreshed)
 }
 
 ///|
@@ -1302,7 +1302,7 @@ async fn handle_add_chmod(
       updated.push(entry)
     }
   }
-  @bitlib.write_index_entries(fs, git_dir, updated)
+  @bitlib.write_index_entries_preserving_cache_tree(fs, fs, git_dir, updated)
   if had_error {
     @sys.exit(1)
   }

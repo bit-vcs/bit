@@ -213,7 +213,7 @@ pub fn add_paths(
     let (_, entry) = item
     out.push(entry)
   }
-  write_index_entries(fs, actual_git_dir, out)
+  write_index_entries_preserving_cache_tree(fs, rfs, actual_git_dir, out)
 }
 
 ///|
@@ -367,7 +367,7 @@ pub async fn add_paths_async(
     let (_, entry) = item
     out.push(entry)
   }
-  write_index_entries(fs, actual_git_dir, out)
+  write_index_entries_preserving_cache_tree(fs, rfs, actual_git_dir, out)
 }
 
 ///|
@@ -454,6 +454,9 @@ pub fn commit(
     timestamp=committer_timestamp,
     timezone~,
   )
+  if entries.length() > 0 {
+    write_index_entries_with_tree(fs, rfs, actual_git_dir, entries, tree_id)
+  }
   commit_id
 }
 

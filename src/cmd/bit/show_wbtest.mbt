@@ -67,5 +67,9 @@ test "show: resolves :path against index entries" {
     show_resolve_index_object_id(fs, git_dir, ":staged-file"),
     Some(zero),
   )
+  assert_eq(
+    show_resolve_index_object_id(fs, git_dir, ":./staged-file"),
+    Some(zero),
+  )
   assert_eq(show_resolve_index_object_id(fs, git_dir, ":missing"), None)
 }

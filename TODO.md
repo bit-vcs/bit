@@ -172,7 +172,7 @@ CI 失敗: **101/906** (2026-03-09, commit b3f62de)
 ## P3.5: realgit 委譲の削減
 
 方針: CI SHIM_STRICT=1 で bit に通すコマンドを段階的に増やす。
-CI SHIM_CMDS: 51 コマンド (init add diff diff-files diff-index ls-files tag branch checkout switch commit log show reflog reset update-ref status merge rebase clone push fetch pull mv notes stash rm submodule worktree config show-ref for-each-ref rev-parse symbolic-ref cherry-pick remote cat-file hash-object ls-tree write-tree commit-tree receive-pack upload-pack pack-objects index-pack format-patch describe gc clean sparse-checkout blame shell)
+CI SHIM_CMDS: 54 コマンド (init add diff diff-files diff-index ls-files tag branch checkout switch commit log show reflog reset update-ref update-index status merge rebase clone push fetch pull mv notes stash rm submodule worktree config show-ref for-each-ref rev-parse symbolic-ref cherry-pick remote cat-file hash-object ls-tree write-tree commit-tree receive-pack upload-pack pack-objects index-pack format-patch describe gc clean sparse-checkout restore blame grep shell)
 
 ### Tier 1: 超高頻度（1000+ 呼出）
 - [x] `checkout` (3765)
@@ -191,6 +191,7 @@ CI SHIM_CMDS: 51 コマンド (init add diff diff-files diff-index ls-files tag 
 - [x] `clone` (953)
 - [x] `merge` (889)
 - [x] `update-ref` (824)
+- [x] `update-index` (720)
 - [x] `status` (608)
 - [x] `push` (534)
 - [x] `notes` (600)
@@ -208,22 +209,24 @@ CI SHIM_CMDS: 51 コマンド (init add diff diff-files diff-index ls-files tag 
 - [x] `cherry-pick` (324)
 - [x] `switch` (251)
 - [x] `remote` (298)
-- [ ] `grep` (312)
+- [x] `grep` (312)
+  - [ ] big grep ベンチマークを取る
 - [x] `format-patch` (300)
 - [x] `reflog` (296)
 - [x] `diff-index` (219), `diff-files` (170)
 - [x] `pull` (250)
 - [x] `clean` (232)
 - [x] `sparse-checkout` (113)
+- [x] `restore` (117)
 - [x] `blame` (110)
 - [x] `gc` (81)
 - [x] `describe` (53)
 
 ### 未実装コマンド（新規実装候補）
-- [ ] `update-index` (720), `rev-list` (521), `apply` (398), `repack` (302)
+- [ ] `rev-list` (521), `apply` (398), `repack` (302)
 - [ ] `am` (235), `diff-tree` (224), `fast-import` (196), `read-tree` (176)
 - [ ] `fsck` (159), `commit-graph` (137), `multi-pack-index` (133)
-- [ ] `ls-remote` (127), `restore` (117), `bundle` (110), `stripspace` (108)
+- [ ] `ls-remote` (127), `bundle` (110), `stripspace` (108)
 
 ## P4: WASM / クロスプラットフォーム
 

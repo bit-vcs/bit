@@ -389,7 +389,9 @@ fn show_resolve_index_object_id(
   target : String,
 ) -> @bitcore.ObjectId? {
   guard target.has_prefix(":") && target.length() > 1 else { return None }
-  let path = String::unsafe_substring(target, start=1, end=target.length())
+  let path = cat_file_normalize_spec_path(
+    String::unsafe_substring(target, start=1, end=target.length()),
+  )
   let entries = @bitlib.read_index_entries(fs, git_dir) catch { _ => [] }
   for entry in entries {
     if entry.path == path {
@@ -397,6 +399,32 @@ fn show_resolve_index_object_id(
     }
   }
   None
+}
+
+///|
+fn show_resolve_target_object_id(
+  fs : OsFs,
+  git_dir : String,
+  target : String,
+  db : @bitlib.ObjectDb,
+) -> @bitcore.ObjectId? raise Error {
+  match show_resolve_index_object_id(fs, git_dir, target) {
+    Some(index_id) => Some(index_id)
+    None =>
+      match cat_file_split_object_path_spec(target) {
+        Some((rev_part, path_part)) =>
+          match cat_file_rev_parse_with_compat(fs, git_dir, rev_part) {
+            Some(base_id) =>
+              match
+                cat_file_find_tree_entry_from_base(db, fs, base_id, path_part) {
+                Some(entry) => Some(entry.id)
+                None => None
+              }
+            None => None
+          }
+        None => @bitrepo.rev_parse(fs, git_dir, target)
+      }
+  }
 }
 
 ///|
@@ -658,10 +686,7 @@ async fn handle_show(args : Array[String]) -> Unit raise Error {
   }
   let blocks : Array[String] = []
   for target in targets {
-    let id = match show_resolve_index_object_id(fs, git_dir, target) {
-      Some(index_id) => Some(index_id)
-      None => @bitrepo.rev_parse(fs, git_dir, target)
-    }
+    let id = show_resolve_target_object_id(fs, git_dir, target, db)
     guard id is Some(resolved_id) else {
       raise @bitcore.GitError::InvalidObject("unknown revision: \{target}")
     }

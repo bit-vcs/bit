@@ -5,8 +5,11 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
   let git_dir = find_git_dir(fs)
   let mut max_count : Int? = None
+  let mut skip_count = 0
   let mut count_only = false
   let mut objects = false
+  let mut indexed_objects = false
+  let mut indexed_objects_negated = false
   let mut quiet = false
   let mut reverse = false
   let mut first_parent = false
@@ -23,17 +26,13 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
     let arg = args[i]
     match arg {
       "-n" | "--max-count" if i + 1 < args.length() => {
-        max_count = Some(
-          @strconv.parse_int(args[i + 1]) catch {
-            err if @async.is_cancellation_error(err) => raise err
-            _ => 0
-          },
-        )
+        max_count = Some(rev_list_parse_int_or_die(args[i + 1]))
         i += 2
         continue
       }
       "--count" => count_only = true
       "--objects" | "--objects-edge" => objects = true
+      "--indexed-objects" => indexed_objects = true
       "--quiet" | "-q" => quiet = true
       "--reverse" => reverse = true
       "--ancestry-path" => () // Ignored for now
@@ -44,8 +43,18 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
       "--use-bitmap-index" => use_bitmap = true
       "--no-use-bitmap-index" => ()
       "--no-object-names" => no_object_names = true
+      "--object-names" => no_object_names = false
       _ if arg.has_prefix("--format=") =>
         format = Some(String::unsafe_substring(arg, start=9, end=arg.length()))
+      "--skip" if i + 1 < args.length() => {
+        skip_count = rev_list_parse_int_or_die(args[i + 1])
+        i += 2
+        continue
+      }
+      "--skip" => {
+        eprint_line("fatal: option '--skip' requires a value")
+        @sys.exit(128)
+      }
       "--not" => {
         // Next refs are excludes until another --not
         i += 1
@@ -53,6 +62,12 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
           let next = args[i]
           if next == "--not" {
             break
+          }
+          if next == "--indexed-objects" {
+            indexed_objects = true
+            indexed_objects_negated = true
+            i += 1
+            continue
           }
           if not(next.has_prefix("-")) {
             excludes.push(next)
@@ -63,12 +78,23 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
       }
       _ if arg.has_prefix("--max-count=") => {
         let val = String::unsafe_substring(arg, start=12, end=arg.length())
-        max_count = Some(
-          @strconv.parse_int(val) catch {
-            err if @async.is_cancellation_error(err) => raise err
-            _ => 0
-          },
-        )
+        max_count = Some(rev_list_parse_int_or_die(val))
+      }
+      _ if arg.has_prefix("--skip=") => {
+        let val = String::unsafe_substring(arg, start=7, end=arg.length())
+        skip_count = rev_list_parse_int_or_die(val)
+      }
+      _ if arg.has_prefix("-n") && arg.length() > 2 => {
+        let val = String::unsafe_substring(arg, start=2, end=arg.length())
+        max_count = Some(rev_list_parse_int_or_die(val))
+      }
+      _ if rev_list_is_short_max_count_arg(arg) => {
+        let val = String::unsafe_substring(arg, start=1, end=arg.length())
+        max_count = Some(rev_list_parse_int_or_die(val))
+      }
+      _ if rev_list_is_long_numeric_option(arg) => {
+        eprint_line("fatal: unrecognized argument: " + arg)
+        @sys.exit(128)
       }
       _ if arg.has_prefix("^") =>
         excludes.push(String::unsafe_substring(arg, start=1, end=arg.length()))
@@ -103,7 +129,7 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
     }
   }
   // If no refs specified, default to HEAD
-  if refs.length() == 0 {
+  if refs.length() == 0 && not(indexed_objects) {
     refs.push("HEAD")
   }
   // Handle --test-bitmap
@@ -132,8 +158,7 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
   let db = @bitlib.ObjectDb::load(fs, git_dir)
   let visited : Map[String, Bool] = {}
   let result : Array[@bitcore.ObjectId] = []
-  let object_ids : Array[(@bitcore.ObjectId, String)] = []
-  let limit = max_count.unwrap_or(2147483647)
+  let limit = rev_list_collection_limit(skip_count, max_count)
   // BFS/DFS traversal
   let queue : Array[@bitcore.ObjectId] = []
   for id in start_ids {
@@ -147,17 +172,10 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
     }
     visited[hex] = true
     result.push(id)
-    if objects {
-      object_ids.push((id, ""))
-    }
     // Get commit and add parents
     match db.get(fs, id) {
       Some(obj) if obj.obj_type == @bitcore.ObjectType::Commit => {
         let info = @bitcore.parse_commit(obj.data)
-        if objects {
-          // Also collect tree objects
-          collect_tree_objects(db, fs, info.tree, object_ids, visited)
-        }
         if first_parent && info.parents.length() > 0 {
           if not(visited.contains(info.parents[0].to_hex())) {
             queue.push(info.parents[0])
@@ -176,13 +194,66 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
   // Apply reverse if requested
   if reverse {
     result.rev_in_place()
-    if objects {
-      object_ids.rev_in_place()
+  }
+  let result_window = rev_list_window(result.length(), skip_count, max_count)
+  let sliced_result : Array[@bitcore.ObjectId] = []
+  let mut result_idx = result_window.0
+  while result_idx < result_window.1 {
+    sliced_result.push(result[result_idx])
+    result_idx += 1
+  }
+  let object_ids : Array[(@bitcore.ObjectId, String)] = []
+  let indexed_path_ids : Map[String, String] = {}
+  if objects {
+    let object_seen : Map[String, Bool] = {}
+    let indexed_visible_objects = if indexed_objects {
+      let index_entries = @bitlib.read_index_entries(fs, git_dir) catch {
+        _ => []
+      }
+      let result = rev_list_collect_index_objects(
+        db, fs, git_dir, index_entries,
+      )
+      for item in result.1.to_array() {
+        indexed_path_ids[item.0] = item.1
+      }
+      result.0
+    } else {
+      []
+    }
+    for id in sliced_result {
+      object_ids.push((id, ""))
+      match db.get(fs, id) {
+        Some(obj) if obj.obj_type == @bitcore.ObjectType::Commit => {
+          let info = @bitcore.parse_commit(obj.data)
+          if indexed_objects_negated {
+            collect_tree_objects_excluding_index(
+              db,
+              fs,
+              info.tree,
+              object_ids,
+              object_seen,
+              indexed_path_ids,
+            )
+          } else {
+            collect_tree_objects(db, fs, info.tree, object_ids, object_seen)
+          }
+        }
+        _ => ()
+      }
+    }
+    if indexed_objects && not(indexed_objects_negated) {
+      for item in indexed_visible_objects {
+        let hex = item.0.to_hex()
+        if not(object_seen.contains(hex)) {
+          object_seen[hex] = true
+          object_ids.push(item)
+        }
+      }
     }
   }
   // Output
   if count_only {
-    print_line(result.length().to_string())
+    print_line(sliced_result.length().to_string())
     return
   }
   if quiet {
@@ -203,7 +274,7 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
         (raw_fmt, true)
       }
       let ref_names : Map[String, Array[String]] = {}
-      for idx, id in result {
+      for idx, id in sliced_result {
         // Print commit header line
         print_line("commit " + id.to_hex())
         // Read commit data and format
@@ -221,7 +292,7 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
             print_str(formatted)
             if use_newline_sep {
               print_str("\n")
-            } else if idx < result.length() - 1 {
+            } else if idx < sliced_result.length() - 1 {
               print_str("\n")
             }
           }
@@ -230,14 +301,14 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
       }
     }
     None =>
-      for id in result {
+      for id in sliced_result {
         print_line(id.to_hex())
       }
   }
   // Output objects (trees, blobs) if --objects
   if objects {
     let commit_set : Map[String, Bool] = {}
-    for r in result {
+    for r in sliced_result {
       commit_set[r.to_hex()] = true
     }
     for item in object_ids {
@@ -251,6 +322,81 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
         }
       }
     }
+  }
+}
+
+///|
+fn rev_list_is_digit(c : Char) -> Bool {
+  c >= '0' && c <= '9'
+}
+
+///|
+fn rev_list_is_short_max_count_arg(arg : String) -> Bool {
+  arg.length() > 1 &&
+  arg.get_char(0).unwrap() == '-' &&
+  not(arg.has_prefix("--")) &&
+  rev_list_is_digit(arg.get_char(1).unwrap())
+}
+
+///|
+fn rev_list_is_long_numeric_option(arg : String) -> Bool {
+  arg.length() > 2 &&
+  arg.has_prefix("--") &&
+  rev_list_is_digit(arg.get_char(2).unwrap())
+}
+
+///|
+async fn rev_list_parse_int_or_die(value : String) -> Int raise Error {
+  @strconv.parse_int(value) catch {
+    err if @async.is_cancellation_error(err) => raise err
+    _ => {
+      eprint_line("fatal: not an integer: " + value)
+      @sys.exit(128)
+      0
+    }
+  }
+}
+
+///|
+fn rev_list_normalize_skip(skip_count : Int) -> Int {
+  if skip_count < 0 {
+    0
+  } else {
+    skip_count
+  }
+}
+
+///|
+fn rev_list_normalize_max_count(max_count : Int?) -> Int? {
+  match max_count {
+    Some(count) if count >= 0 => Some(count)
+    _ => None
+  }
+}
+
+///|
+fn rev_list_collection_limit(skip_count : Int, max_count : Int?) -> Int {
+  let normalized_skip = rev_list_normalize_skip(skip_count)
+  match rev_list_normalize_max_count(max_count) {
+    Some(count) => normalized_skip + count
+    None => 2147483647
+  }
+}
+
+///|
+fn rev_list_window(
+  length : Int,
+  skip_count : Int,
+  max_count : Int?,
+) -> (Int, Int) {
+  let normalized_skip = rev_list_normalize_skip(skip_count)
+  let start = if normalized_skip > length { length } else { normalized_skip }
+  match rev_list_normalize_max_count(max_count) {
+    Some(count) => {
+      let end = start + count
+      (start, if end > length { length } else { end })
+    }
+    None => (start, length)
   }
 }
 
@@ -332,6 +478,207 @@ fn collect_tree_objects(
     }
     _ => ()
   }
+}
+
+///|
+fn collect_tree_objects_excluding_index(
+  db : @bitlib.ObjectDb,
+  fs : OsFs,
+  tree_id : @bitcore.ObjectId,
+  out : Array[(@bitcore.ObjectId, String)],
+  visited : Map[String, Bool],
+  indexed_path_ids : Map[String, String],
+  parent_path? : String = "",
+) -> Unit {
+  let hex = tree_id.to_hex()
+  if visited.contains(hex) {
+    return ()
+  }
+  match indexed_path_ids.get(parent_path) {
+    Some(index_hex) if index_hex == hex => return ()
+    _ => ()
+  }
+  if parent_path.length() > 0 {
+    visited[hex] = true
+    out.push((tree_id, parent_path))
+  }
+  let obj = db.get(fs, tree_id) catch { _ => return () }
+  match obj {
+    Some(o) if o.obj_type == @bitcore.ObjectType::Tree => {
+      let entries = @bitcore.parse_tree(o.data) catch { _ => return () }
+      for entry in entries {
+        let entry_path = if parent_path.length() == 0 {
+          entry.name
+        } else {
+          parent_path + "/" + entry.name
+        }
+        let entry_hex = entry.id.to_hex()
+        if entry.mode.has_prefix("40") {
+          collect_tree_objects_excluding_index(
+            db,
+            fs,
+            entry.id,
+            out,
+            visited,
+            indexed_path_ids,
+            parent_path=entry_path,
+          )
+        } else {
+          match indexed_path_ids.get(entry_path) {
+            Some(index_hex) if index_hex == entry_hex => continue
+            _ => ()
+          }
+          if not(visited.contains(entry_hex)) {
+            visited[entry_hex] = true
+            out.push((entry.id, entry_path))
+          }
+        }
+      }
+    }
+    _ => ()
+  }
+}
+
+///|
+fn rev_list_collect_index_objects(
+  db : @bitlib.ObjectDb,
+  fs : OsFs,
+  git_dir : String,
+  entries : Array[@bitlib.IndexEntry],
+) -> (Array[(@bitcore.ObjectId, String)], Map[String, String]) raise Error {
+  let visible : Array[(@bitcore.ObjectId, String)] = []
+  let unique_ids : Map[String, Bool] = {}
+  let path_ids : Map[String, String] = {}
+  let index_by_path : Map[String, @bitlib.IndexEntry] = {}
+  for entry in entries {
+    let hex = entry.id.to_hex()
+    if rev_list_is_zero_object_id_hex(hex) {
+      continue
+    }
+    index_by_path[entry.path] = entry
+    path_ids[entry.path] = hex
+    if not(unique_ids.contains(hex)) {
+      unique_ids[hex] = true
+      visible.push((entry.id, entry.path))
+    }
+  }
+  let head_id = @bitrepo.rev_parse(fs, git_dir, "HEAD") catch { _ => None }
+  match head_id {
+    Some(id) => {
+      let obj = db.get(fs, id)
+      match obj {
+        Some(commit_obj) if commit_obj.obj_type == @bitcore.ObjectType::Commit => {
+          let info = @bitcore.parse_commit(commit_obj.data)
+          let matched_paths : Map[String, Bool] = {}
+          ignore(
+            rev_list_collect_matching_index_trees(
+              db,
+              fs,
+              info.tree,
+              index_by_path,
+              matched_paths,
+              visible,
+              unique_ids,
+              path_ids,
+            ),
+          )
+        }
+        _ => ()
+      }
+    }
+    None => ()
+  }
+  (visible, path_ids)
+}
+
+///|
+fn rev_list_collect_matching_index_trees(
+  db : @bitlib.ObjectDb,
+  fs : OsFs,
+  tree_id : @bitcore.ObjectId,
+  index_by_path : Map[String, @bitlib.IndexEntry],
+  matched_paths : Map[String, Bool],
+  visible : Array[(@bitcore.ObjectId, String)],
+  unique_ids : Map[String, Bool],
+  path_ids : Map[String, String],
+  parent_path? : String = "",
+) -> Bool raise Error {
+  let obj = db.get(fs, tree_id)
+  match obj {
+    Some(o) if o.obj_type == @bitcore.ObjectType::Tree => {
+      let entries = @bitcore.parse_tree(o.data) catch { _ => return false }
+      for entry in entries {
+        let entry_path = if parent_path.length() == 0 {
+          entry.name
+        } else {
+          parent_path + "/" + entry.name
+        }
+        if entry.mode.has_prefix("40") {
+          if not(
+              rev_list_collect_matching_index_trees(
+                db,
+                fs,
+                entry.id,
+                index_by_path,
+                matched_paths,
+                visible,
+                unique_ids,
+                path_ids,
+                parent_path=entry_path,
+              ),
+            ) {
+            return false
+          }
+        } else {
+          match index_by_path.get(entry_path) {
+            Some(index_entry) => {
+              if index_entry.id.to_hex() != entry.id.to_hex() {
+                return false
+              }
+              if index_entry.mode != rev_list_tree_mode_to_int(entry.mode) {
+                return false
+              }
+              matched_paths[entry_path] = true
+            }
+            None => return false
+          }
+        }
+      }
+      let hex = tree_id.to_hex()
+      path_ids[parent_path] = hex
+      if parent_path.length() > 0 && not(unique_ids.contains(hex)) {
+        unique_ids[hex] = true
+        visible.push((tree_id, parent_path))
+      }
+      true
+    }
+    _ => false
+  }
+}
+
+///|
+fn rev_list_path_in_prefix(path : String, prefix : String) -> Bool {
+  if prefix.length() == 0 {
+    true
+  } else {
+    path.has_prefix(prefix)
+  }
+}
+
+///|
+fn rev_list_tree_mode_to_int(mode : String) -> Int {
+  match mode {
+    "100644" => 0o100644
+    "100755" => 0o100755
+    "120000" => 0o120000
+    "160000" => 0o160000
+    _ => 0
+  }
+}
+
+///|
+fn rev_list_is_zero_object_id_hex(hex : String) -> Bool {
+  hex == "0000000000000000000000000000000000000000"
 }
 
 ///|

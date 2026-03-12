@@ -28,6 +28,98 @@ pub struct FileEolAttrs {
 }
 
 ///|
+pub fn resolve_diff_driver(
+  rfs : &@bit.RepoFileSystem,
+  root : String,
+  path : String,
+) -> String? {
+  let attr_path = join_path(root, ".gitattributes")
+  guard rfs.is_file(attr_path) else { return None }
+  let content = @utf8.decode_lossy(
+    (rfs.read_file(attr_path) catch { _ => Bytes::default() })[:],
+  )
+  let normalized = gitattr_normalize_path(path)
+  let mut diff_driver : String? = None
+  for line_view in content.split("\n") {
+    let line = line_view.to_string().trim().to_string()
+    if line.length() == 0 || line.has_prefix("#") {
+      continue
+    }
+    let words : Array[String] = []
+    for token_view in line.split(" ") {
+      let token = token_view.to_string().trim().to_string()
+      if token.length() > 0 {
+        words.push(token)
+      }
+    }
+    if words.length() < 2 {
+      continue
+    }
+    if not(gitattr_pattern_matches(normalized, words[0])) {
+      continue
+    }
+    let mut j = 1
+    while j < words.length() {
+      let token = words[j]
+      if token == "-diff" {
+        diff_driver = None
+      } else if token.has_prefix("diff=") {
+        let value = String::unsafe_substring(token, start=5, end=token.length())
+        diff_driver = if value.length() == 0 { None } else { Some(value) }
+      }
+      j += 1
+    }
+  }
+  diff_driver
+}
+
+///|
+pub fn read_diff_function_patterns(
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+  diff_driver : String,
+) -> (String?, String?) {
+  let section = "diff \"" + diff_driver + "\""
+  let mut funcname : String? = None
+  let mut xfuncname : String? = None
+  match @bitio.env_get("HOME") {
+    None => ()
+    Some(home) => {
+      let candidates : Array[String] = []
+      if @bitio.env_get("XDG_CONFIG_HOME") is Some(base) {
+        candidates.push(base + "/git/config")
+      }
+      candidates.push(home + "/.gitconfig")
+      for path in candidates {
+        if rfs.is_file(path) {
+          match read_config_value(rfs, path, section, "funcname") {
+            Some(v) => funcname = Some(gitattributes_unquote_config_value(v))
+            None => ()
+          }
+          match read_config_value(rfs, path, section, "xfuncname") {
+            Some(v) => xfuncname = Some(gitattributes_unquote_config_value(v))
+            None => ()
+          }
+          break
+        }
+      }
+    }
+  }
+  let local_path = join_path(git_dir, "config")
+  if rfs.is_file(local_path) {
+    match read_config_value(rfs, local_path, section, "funcname") {
+      Some(v) => funcname = Some(gitattributes_unquote_config_value(v))
+      None => ()
+    }
+    match read_config_value(rfs, local_path, section, "xfuncname") {
+      Some(v) => xfuncname = Some(gitattributes_unquote_config_value(v))
+      None => ()
+    }
+  }
+  (funcname, xfuncname)
+}
+
+///|
 /// Parse .gitattributes and resolve eol attributes for a given path.
 pub fn resolve_eol_attrs(
   rfs : &@bit.RepoFileSystem,
@@ -45,13 +137,7 @@ pub fn resolve_eol_attrs(
   let content = @utf8.decode_lossy(
     (rfs.read_file(attr_path) catch { _ => Bytes::default() })[:],
   )
-  let normalized = if path.has_prefix("/") {
-    String::unsafe_substring(path, start=1, end=path.length())
-  } else if path.has_prefix("./") {
-    String::unsafe_substring(path, start=2, end=path.length())
-  } else {
-    path
-  }
+  let normalized = gitattr_normalize_path(path)
   let mut text : TextAttr = TextAttr::Unspecified
   let mut eol : EolAttr = EolAttr::Unspecified
   let mut filter : String? = None
@@ -120,6 +206,26 @@ pub fn resolve_eol_attrs(
     text = Set
   }
   { text, eol, filter }
+}
+
+///|
+fn gitattr_normalize_path(path : String) -> String {
+  if path.has_prefix("/") {
+    String::unsafe_substring(path, start=1, end=path.length())
+  } else if path.has_prefix("./") {
+    String::unsafe_substring(path, start=2, end=path.length())
+  } else {
+    path
+  }
+}
+
+///|
+fn gitattributes_unquote_config_value(value : String) -> String {
+  if value.length() >= 2 && value.has_prefix("\"") && value.has_suffix("\"") {
+    String::unsafe_substring(value, start=1, end=value.length() - 1)
+  } else {
+    value
+  }
 }
 
 ///|

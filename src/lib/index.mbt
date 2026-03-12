@@ -22,6 +22,28 @@ pub struct IndexStageEntry {
 }
 
 ///|
+pub struct ResolveUndoStage {
+  mode : Int
+  id : @bit.ObjectId
+}
+
+///|
+pub struct ResolveUndoEntry {
+  path : String
+  base : ResolveUndoStage?
+  ours : ResolveUndoStage?
+  theirs : ResolveUndoStage?
+}
+
+///|
+priv struct IndexCacheTree {
+  name : String
+  entry_count : Int
+  oid : @bit.ObjectId?
+  subtrees : Array[IndexCacheTree]
+}
+
+///|
 pub fn IndexEntry::new(
   path : String,
   id : @bit.ObjectId,
@@ -48,6 +70,11 @@ pub fn IndexEntry::new(
     uid,
     gid,
   }
+}
+
+///|
+pub fn IndexStageEntry::new(entry : IndexEntry, stage : Int) -> IndexStageEntry {
+  { entry, stage }
 }
 
 ///|
@@ -104,6 +131,19 @@ pub fn read_index_stage_entries(
   }
   let data = fs.read_file(path)
   index_read_stage_entries_from_bytes(data)
+}
+
+///|
+pub fn read_resolve_undo_entries(
+  fs : &@bit.RepoFileSystem,
+  git_dir : String,
+) -> Array[ResolveUndoEntry] raise @bit.GitError {
+  let path = join_path(git_dir, "index")
+  if not(fs.is_file(path)) {
+    return []
+  }
+  let data = fs.read_file(path)
+  index_read_resolve_undo_entries_from_bytes(data)
 }
 
 ///|
@@ -197,6 +237,551 @@ fn index_read_stage_entries_from_bytes(
 }
 
 ///|
+fn index_read_resolve_undo_entries_from_bytes(
+  data : Bytes,
+) -> Array[ResolveUndoEntry] raise @bit.GitError {
+  if data.length() < 12 + 20 {
+    return []
+  }
+  if not(
+      data[0] == b'D' && data[1] == b'I' && data[2] == b'R' && data[3] == b'C',
+    ) {
+    raise @bit.GitError::InvalidObject("Invalid index header")
+  }
+  let version = index_read_u32_be(data, 4)
+  if version != 2 && version != 3 {
+    raise @bit.GitError::InvalidObject("Unsupported index version: \{version}")
+  }
+  let count = index_read_u32_be(data, 8)
+  let checksum_start = data.length() - 20
+  let mut offset = 12
+  for _ in 0..<count {
+    let entry_start = offset
+    if offset + 62 > checksum_start {
+      raise @bit.GitError::InvalidObject("Index entry truncated")
+    }
+    let flags = index_read_u16_be(data, offset + 60)
+    let has_extended = (flags & 0x4000) != 0
+    let fixed_size = if has_extended { 64 } else { 62 }
+    let path_start = entry_start + fixed_size
+    let mut path_end = path_start
+    while path_end < checksum_start && data[path_end] != b'\x00' {
+      path_end += 1
+    }
+    if path_end >= checksum_start {
+      raise @bit.GitError::InvalidObject("Index entry truncated")
+    }
+    let path_len = path_end - path_start
+    let entry_size = (fixed_size + path_len + 1 + 7) / 8 * 8
+    offset = entry_start + entry_size
+  }
+  while offset + 8 <= checksum_start {
+    let signature = @utf8.decode_lossy(data[offset:offset + 4])
+    let chunk_size = index_read_u32_be(data, offset + 4)
+    let body_start = offset + 8
+    let body_end = body_start + chunk_size
+    if body_end > checksum_start {
+      raise @bit.GitError::InvalidObject("Index extension truncated")
+    }
+    if signature == "REUC" {
+      let chunk_view = data[body_start:body_end]
+      return index_parse_resolve_undo_chunk(
+        Bytes::from_array(
+          FixedArray::makei(chunk_view.length(), fn(i) { chunk_view[i] }),
+        ),
+      )
+    }
+    offset = body_end
+  }
+  []
+}
+
+///|
+fn index_parse_resolve_undo_chunk(
+  data : Bytes,
+) -> Array[ResolveUndoEntry] raise @bit.GitError {
+  let entries : Array[ResolveUndoEntry] = []
+  let mut offset = 0
+  while offset < data.length() {
+    let (path, next_offset) = index_read_nul_terminated_string(data, offset)
+    let (base_mode, base_mode_end) = index_read_nul_terminated_octal(
+      data, next_offset,
+    )
+    let (ours_mode, ours_mode_end) = index_read_nul_terminated_octal(
+      data, base_mode_end,
+    )
+    let (theirs_mode, theirs_mode_end) = index_read_nul_terminated_octal(
+      data, ours_mode_end,
+    )
+    let mut cursor = theirs_mode_end
+    let base = if base_mode == 0 {
+      None
+    } else {
+      let id = index_read_object_id(data, cursor)
+      cursor += 20
+      let stage : ResolveUndoStage = { mode: base_mode, id }
+      Some(stage)
+    }
+    let ours = if ours_mode == 0 {
+      None
+    } else {
+      let id = index_read_object_id(data, cursor)
+      cursor += 20
+      let stage : ResolveUndoStage = { mode: ours_mode, id }
+      Some(stage)
+    }
+    let theirs = if theirs_mode == 0 {
+      None
+    } else {
+      let id = index_read_object_id(data, cursor)
+      cursor += 20
+      let stage : ResolveUndoStage = { mode: theirs_mode, id }
+      Some(stage)
+    }
+    entries.push({ path, base, ours, theirs })
+    offset = cursor
+  }
+  entries
+}
+
+///|
+fn index_read_entries_end_offset(
+  data : Bytes,
+  count : Int,
+) -> Int raise @bit.GitError {
+  let checksum_start = data.length() - 20
+  let mut offset = 12
+  for _ in 0..<count {
+    let entry_start = offset
+    if offset + 62 > checksum_start {
+      raise @bit.GitError::InvalidObject("Index entry truncated")
+    }
+    let flags = index_read_u16_be(data, offset + 60)
+    let has_extended = (flags & 0x4000) != 0
+    let fixed_size = if has_extended { 64 } else { 62 }
+    let path_start = entry_start + fixed_size
+    let mut path_end = path_start
+    while path_end < checksum_start && data[path_end] != b'\x00' {
+      path_end += 1
+    }
+    if path_end >= checksum_start {
+      raise @bit.GitError::InvalidObject("Index entry truncated")
+    }
+    let path_len = path_end - path_start
+    let entry_size = (fixed_size + path_len + 1 + 7) / 8 * 8
+    offset = entry_start + entry_size
+  }
+  offset
+}
+
+///|
+fn index_find_extension_chunk(
+  data : Bytes,
+  signature : String,
+) -> Bytes? raise @bit.GitError {
+  if data.length() < 12 + 20 {
+    return None
+  }
+  let count = index_read_u32_be(data, 8)
+  let checksum_start = data.length() - 20
+  let mut offset = index_read_entries_end_offset(data, count)
+  while offset + 8 <= checksum_start {
+    let current_sig = @utf8.decode_lossy(data[offset:offset + 4])
+    let chunk_size = index_read_u32_be(data, offset + 4)
+    let body_start = offset + 8
+    let body_end = body_start + chunk_size
+    if body_end > checksum_start {
+      raise @bit.GitError::InvalidObject("Index extension truncated")
+    }
+    if current_sig == signature {
+      let chunk_view = data[body_start:body_end]
+      return Some(
+        Bytes::from_array(
+          FixedArray::makei(chunk_view.length(), fn(i) { chunk_view[i] }),
+        ),
+      )
+    }
+    offset = body_end
+  }
+  None
+}
+
+///|
+fn index_parse_signed_decimal(
+  data : Bytes,
+  start : Int,
+) -> (Int, Int) raise @bit.GitError {
+  if start >= data.length() {
+    raise @bit.GitError::InvalidObject("Invalid cache-tree extension")
+  }
+  let mut sign = 1
+  let mut cursor = start
+  if data[cursor] == b'-' {
+    sign = -1
+    cursor += 1
+  }
+  if cursor >= data.length() || data[cursor] < b'0' || data[cursor] > b'9' {
+    raise @bit.GitError::InvalidObject("Invalid cache-tree extension")
+  }
+  let mut value = 0
+  while cursor < data.length() && data[cursor] >= b'0' && data[cursor] <= b'9' {
+    value = value * 10 + (data[cursor].to_int() - b'0'.to_int())
+    cursor += 1
+  }
+  (sign * value, cursor)
+}
+
+///|
+fn index_parse_cache_tree_node(
+  data : Bytes,
+  start : Int,
+) -> (IndexCacheTree, Int) raise @bit.GitError {
+  let (name, after_name) = index_read_nul_terminated_string(data, start)
+  let (entry_count, after_entry_count) = index_parse_signed_decimal(
+    data, after_name,
+  )
+  if after_entry_count >= data.length() || data[after_entry_count] != b' ' {
+    raise @bit.GitError::InvalidObject("Invalid cache-tree extension")
+  }
+  let (subtree_nr, after_subtree_nr) = index_parse_signed_decimal(
+    data,
+    after_entry_count + 1,
+  )
+  if after_subtree_nr >= data.length() || data[after_subtree_nr] != b'\n' {
+    raise @bit.GitError::InvalidObject("Invalid cache-tree extension")
+  }
+  let mut cursor = after_subtree_nr + 1
+  let oid = if entry_count >= 0 {
+    let parsed = index_read_object_id(data, cursor)
+    cursor += 20
+    Some(parsed)
+  } else {
+    None
+  }
+  let subtrees : Array[IndexCacheTree] = []
+  for _ in 0..<subtree_nr {
+    let (subtree, next_cursor) = index_parse_cache_tree_node(data, cursor)
+    subtrees.push(subtree)
+    cursor = next_cursor
+  }
+  ({ name, entry_count, oid, subtrees }, cursor)
+}
+
+///|
+fn index_read_cache_tree_from_bytes(
+  data : Bytes,
+) -> IndexCacheTree? raise @bit.GitError {
+  match index_find_extension_chunk(data, "TREE") {
+    Some(chunk) => {
+      let (tree, end_offset) = index_parse_cache_tree_node(chunk, 0)
+      if end_offset != chunk.length() {
+        raise @bit.GitError::InvalidObject("Invalid cache-tree extension")
+      }
+      Some(tree)
+    }
+    None => None
+  }
+}
+
+///|
+fn index_append_ascii_bytes(target : Array[Byte], text : String) -> Unit {
+  for c in text {
+    target.push(c.to_int().to_byte())
+  }
+}
+
+///|
+fn index_append_u32_be(target : Array[Byte], value : Int) -> Unit {
+  target.push(((value >> 24) & 0xFF).to_byte())
+  target.push(((value >> 16) & 0xFF).to_byte())
+  target.push(((value >> 8) & 0xFF).to_byte())
+  target.push((value & 0xFF).to_byte())
+}
+
+///|
+fn index_append_cache_tree_node(
+  target : Array[Byte],
+  tree : IndexCacheTree,
+) -> Unit {
+  index_append_ascii_bytes(target, tree.name)
+  target.push(b'\x00')
+  index_append_ascii_bytes(target, tree.entry_count.to_string())
+  target.push(b' ')
+  index_append_ascii_bytes(target, tree.subtrees.length().to_string())
+  target.push(b'\n')
+  match tree.oid {
+    Some(id) if tree.entry_count >= 0 =>
+      for i in 0..<20 {
+        target.push(id.bytes[i])
+      }
+    _ => ()
+  }
+  for subtree in tree.subtrees {
+    index_append_cache_tree_node(target, subtree)
+  }
+}
+
+///|
+fn index_cache_tree_extension_bytes(tree : IndexCacheTree) -> Array[Byte] {
+  let body : Array[Byte] = []
+  index_append_cache_tree_node(body, tree)
+  let extension : Array[Byte] = [b'T', b'R', b'E', b'E']
+  index_append_u32_be(extension, body.length())
+  extension.append(body)
+  extension
+}
+
+///|
+fn index_cache_tree_invalidate_path(
+  tree : IndexCacheTree,
+  path : String,
+) -> IndexCacheTree {
+  let invalidated_entry_count = -1
+  let slash_idx = index_find_first_slash(path)
+  match slash_idx {
+    None => {
+      let kept : Array[IndexCacheTree] = []
+      for subtree in tree.subtrees {
+        if subtree.name != path {
+          kept.push(subtree)
+        }
+      }
+      {
+        name: tree.name,
+        entry_count: invalidated_entry_count,
+        oid: None,
+        subtrees: kept,
+      }
+    }
+    Some(idx) => {
+      let head = path[:idx].to_string()
+      let tail = path[idx + 1:].to_string()
+      let updated : Array[IndexCacheTree] = []
+      for subtree in tree.subtrees {
+        if subtree.name == head {
+          updated.push(index_cache_tree_invalidate_path(subtree, tail))
+        } else {
+          updated.push(subtree)
+        }
+      }
+      {
+        name: tree.name,
+        entry_count: invalidated_entry_count,
+        oid: None,
+        subtrees: updated,
+      }
+    }
+  }
+}
+
+///|
+fn index_find_first_slash(path : String) -> Int? {
+  for i = 0; i < path.length(); i = i + 1 {
+    if path[i] == '/' {
+      return Some(i)
+    }
+  }
+  None
+}
+
+///|
+fn index_entry_signature(entry : IndexEntry) -> String {
+  entry.id.to_hex() + ":" + entry.mode.to_string()
+}
+
+///|
+fn index_collect_changed_paths(
+  old_entries : Array[IndexEntry],
+  new_entries : Array[IndexEntry],
+) -> Array[String] {
+  let old_by_path : Map[String, String] = {}
+  for entry in old_entries {
+    old_by_path[entry.path] = index_entry_signature(entry)
+  }
+  let new_by_path : Map[String, String] = {}
+  for entry in new_entries {
+    new_by_path[entry.path] = index_entry_signature(entry)
+  }
+  let changed : Array[String] = []
+  let seen : Map[String, Bool] = {}
+  for item in old_by_path.to_array() {
+    let (path, old_sig) = item
+    match new_by_path.get(path) {
+      Some(new_sig) if new_sig == old_sig => ()
+      _ =>
+        if not(seen.contains(path)) {
+          seen[path] = true
+          changed.push(path)
+        }
+    }
+  }
+  for item in new_by_path.to_array() {
+    let (path, _) = item
+    if not(old_by_path.contains(path)) && not(seen.contains(path)) {
+      seen[path] = true
+      changed.push(path)
+    }
+  }
+  changed
+}
+
+///|
+fn index_preserve_cache_tree(
+  fs : &@bit.RepoFileSystem,
+  git_dir : String,
+  sorted : Array[IndexEntry],
+) -> IndexCacheTree? {
+  let index_path = join_path(git_dir, "index")
+  let raw = fs.read_file(index_path) catch { _ => return None }
+  let previous_tree = index_read_cache_tree_from_bytes(raw) catch {
+    _ => return None
+  }
+  guard previous_tree is Some(tree) else { return None }
+  let staged = index_read_stage_entries_from_bytes(raw) catch {
+    _ => return None
+  }
+  let old_entries : Array[IndexEntry] = []
+  for item in staged {
+    if item.stage == 0 {
+      old_entries.push(item.entry)
+    } else {
+      return None
+    }
+  }
+  let changed_paths = index_collect_changed_paths(old_entries, sorted)
+  let mut preserved = tree
+  for path in changed_paths {
+    preserved = index_cache_tree_invalidate_path(preserved, path)
+  }
+  Some(preserved)
+}
+
+///|
+fn index_build_cache_tree_from_entries(
+  entries : Array[IndexEntry],
+  name? : String = "",
+) -> IndexCacheTree {
+  let file_entries : Array[@bit.TreeEntry] = []
+  let dir_map : Map[String, Array[IndexEntry]] = {}
+  let subtrees : Array[IndexCacheTree] = []
+  let mut entry_count = 0
+  for entry in entries {
+    if worktree_is_zero_object_id(entry.id) {
+      continue
+    }
+    match split_first(entry.path) {
+      (entry_name, None) => {
+        entry_count += 1
+        file_entries.push(
+          @bit.TreeEntry::new(mode_to_string(entry.mode), entry_name, entry.id),
+        )
+      }
+      (entry_name, Some(rest)) =>
+        match dir_map.get(entry_name) {
+          Some(list) =>
+            list.push({
+              path: rest,
+              id: entry.id,
+              mode: entry.mode,
+              size: entry.size,
+              mtime_sec: entry.mtime_sec,
+              mtime_nsec: entry.mtime_nsec,
+              intent_to_add: entry.intent_to_add,
+              dev: entry.dev,
+              ino: entry.ino,
+              uid: entry.uid,
+              gid: entry.gid,
+            })
+          None =>
+            dir_map[entry_name] = [
+              {
+                path: rest,
+                id: entry.id,
+                mode: entry.mode,
+                size: entry.size,
+                mtime_sec: entry.mtime_sec,
+                mtime_nsec: entry.mtime_nsec,
+                intent_to_add: entry.intent_to_add,
+                dev: entry.dev,
+                ino: entry.ino,
+                uid: entry.uid,
+                gid: entry.gid,
+              },
+            ]
+        }
+    }
+  }
+  for item in dir_map.to_array() {
+    let (dir_name, list) = item
+    let subtree = index_build_cache_tree_from_entries(list, name=dir_name)
+    file_entries.push(
+      @bit.TreeEntry::new("40000", dir_name, subtree.oid.unwrap()),
+    )
+    subtrees.push(subtree)
+    entry_count += subtree.entry_count
+  }
+  file_entries.sort_by(fn(a, b) {
+    let a_key = if a.mode == "40000" { a.name + "/" } else { a.name }
+    let b_key = if b.mode == "40000" { b.name + "/" } else { b.name }
+    compare_strings_lexicographic(a_key, b_key)
+  })
+  subtrees.sort_by(fn(a, b) { compare_strings_lexicographic(a.name, b.name) })
+  let (tree_id, _) = @bit.create_tree(file_entries)
+  { name, entry_count, oid: Some(tree_id), subtrees }
+}
+
+///|
+fn index_prepare_cache_tree(
+  fs : &@bit.RepoFileSystem,
+  git_dir : String,
+  sorted : Array[IndexEntry],
+) -> IndexCacheTree {
+  match index_preserve_cache_tree(fs, git_dir, sorted) {
+    Some(tree) => tree
+    None => index_build_cache_tree_from_entries(sorted)
+  }
+}
+
+///|
+fn index_read_nul_terminated_string(
+  data : Bytes,
+  start : Int,
+) -> (String, Int) raise @bit.GitError {
+  let mut end = start
+  while end < data.length() && data[end] != b'\x00' {
+    end += 1
+  }
+  if end >= data.length() {
+    raise @bit.GitError::InvalidObject("Unexpected end of resolve-undo data")
+  }
+  (@utf8.decode_lossy(data[start:end]), end + 1)
+}
+
+///|
+fn index_read_nul_terminated_octal(
+  data : Bytes,
+  start : Int,
+) -> (Int, Int) raise @bit.GitError {
+  let (text, next) = index_read_nul_terminated_string(data, start)
+  (index_parse_octal_value(text), next)
+}
+
+///|
+fn index_parse_octal_value(text : String) -> Int raise @bit.GitError {
+  if text.length() == 0 {
+    raise @bit.GitError::InvalidObject("Invalid resolve-undo mode")
+  }
+  let mut value = 0
+  for c in text {
+    if c < '0' || c > '7' {
+      raise @bit.GitError::InvalidObject("Invalid resolve-undo mode")
+    }
+    value = value * 8 + (c.to_int() - '0'.to_int())
+  }
+  value
+}
+
+///|
 /// Read skip-worktree paths from both bit sidecar and index extended flags.
 pub fn read_skip_worktree_paths(
   fs : &@bit.RepoFileSystem,
@@ -264,6 +849,53 @@ pub fn read_skip_worktree_paths(
 }
 
 ///|
+pub fn read_assume_unchanged_paths(
+  fs : &@bit.RepoFileSystem,
+  git_dir : String,
+) -> Map[String, Bool] {
+  let out : Map[String, Bool] = {}
+  let index_path = join_path(git_dir, "index")
+  if not(fs.is_file(index_path)) {
+    return out
+  }
+  let data = fs.read_file(index_path) catch { _ => return out }
+  if data.length() < 12 + 20 {
+    return out
+  }
+  if not(
+      data[0] == b'D' && data[1] == b'I' && data[2] == b'R' && data[3] == b'C',
+    ) {
+    return out
+  }
+  let count = index_read_u32_be(data, 8) catch { _ => return out }
+  let mut offset = 12
+  for _ in 0..<count {
+    if offset + 62 > data.length() {
+      return out
+    }
+    let flags = index_read_u16_be(data, offset + 60) catch { _ => return out }
+    let stage = (flags >> 12) & 0x3
+    let has_extended = (flags & 0x4000) != 0
+    let fixed_size = if has_extended { 64 } else { 62 }
+    let path_start = offset + fixed_size
+    let mut i = path_start
+    while i < data.length() && data[i] != b'\x00' {
+      i += 1
+    }
+    if i >= data.length() {
+      return out
+    }
+    if stage == 0 && (flags & 0x8000) != 0 {
+      out[@utf8.decode_lossy(data[path_start:i])] = true
+    }
+    let path_len = i - path_start
+    let entry_size = (fixed_size + path_len + 1 + 7) / 8 * 8
+    offset += entry_size
+  }
+  out
+}
+
+///|
 pub fn read_unmerged_paths(
   fs : &@bit.RepoFileSystem,
   git_dir : String,
@@ -319,6 +951,7 @@ fn write_index_entry_to_buf(
   e : IndexEntry,
   stage : Int,
   skip_worktree : Bool,
+  assume_unchanged : Bool,
 ) -> Int {
   let entry_start = pos
   let mut pos = pos
@@ -343,6 +976,9 @@ fn write_index_entry_to_buf(
   let mut flags = name_len | ((stage & 0x3) << 12)
   let ext_flags = index_extended_flags(e.intent_to_add, skip_worktree)
   let has_extended = ext_flags != 0
+  if stage == 0 && assume_unchanged {
+    flags = flags | 0x8000
+  }
   if has_extended {
     flags = flags | 0x4000
   }
@@ -365,19 +1001,28 @@ fn write_index_entry_to_buf(
 fn write_index_buf(
   sorted : Array[IndexEntry],
   skip_worktree_paths : Map[String, Bool]?,
+  assume_unchanged_paths : Map[String, Bool]?,
+  cache_tree? : IndexCacheTree? = None,
 ) -> FixedArray[Byte] {
   // Pre-calculate total buffer size
   let mut total_size = 12 // header: "DIRC" + version + count
+  let mut version = 2
   for e in sorted {
     let is_skip = match skip_worktree_paths {
       Some(m) => m.contains(e.path)
       None => false
     }
-    total_size += index_entry_buf_size(
-      e.path.length(),
-      index_extended_flags(e.intent_to_add, is_skip) != 0,
-    )
+    let has_extended = index_extended_flags(e.intent_to_add, is_skip) != 0
+    if has_extended {
+      version = 3
+    }
+    total_size += index_entry_buf_size(e.path.length(), has_extended)
   }
+  let cache_tree_extension = match cache_tree {
+    Some(tree) => index_cache_tree_extension_bytes(tree)
+    None => []
+  }
+  total_size += cache_tree_extension.length()
   total_size += 20 // SHA1 checksum
   let buf : FixedArray[Byte] = FixedArray::make(total_size, b'\x00')
   // Header
@@ -385,7 +1030,7 @@ fn write_index_buf(
   buf[1] = b'I'
   buf[2] = b'R'
   buf[3] = b'C'
-  fa_set_u32_be(buf, 4, 2) // version
+  fa_set_u32_be(buf, 4, version)
   fa_set_u32_be(buf, 8, sorted.length()) // count
   let mut pos = 12
   for e in sorted {
@@ -393,8 +1038,16 @@ fn write_index_buf(
       Some(m) => m.contains(e.path)
       None => false
     }
-    pos = write_index_entry_to_buf(buf, pos, e, 0, is_skip)
+    let is_assume = match assume_unchanged_paths {
+      Some(m) => m.contains(e.path)
+      None => false
+    }
+    pos = write_index_entry_to_buf(buf, pos, e, 0, is_skip, is_assume)
   }
+  for i in 0..<cache_tree_extension.length() {
+    buf[pos + i] = cache_tree_extension[i]
+  }
+  pos += cache_tree_extension.length()
   // SHA1 checksum over header + entries
   let content_bytes = Bytes::from_array(buf[:pos])
   let checksum = @bit.sha1(content_bytes)
@@ -412,7 +1065,43 @@ pub fn write_index_entries(
 ) -> Unit raise @bit.GitError {
   let sorted = entries.copy()
   sorted.sort_by((a, b) => index_path_compare_git_order(a.path, b.path))
-  let buf = write_index_buf(sorted, None)
+  let buf = write_index_buf(sorted, None, None)
+  let index_path = join_path(git_dir, "index")
+  fs.write_file(index_path, Bytes::from_array(buf[:]))
+}
+
+///|
+pub fn write_index_entries_preserving_cache_tree(
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+  entries : Array[IndexEntry],
+) -> Unit raise @bit.GitError {
+  let sorted = entries.copy()
+  sorted.sort_by((a, b) => index_path_compare_git_order(a.path, b.path))
+  let cache_tree = index_prepare_cache_tree(rfs, git_dir, sorted)
+  let buf = write_index_buf(sorted, None, None, cache_tree=Some(cache_tree))
+  let index_path = join_path(git_dir, "index")
+  fs.write_file(index_path, Bytes::from_array(buf[:]))
+}
+
+///|
+pub fn write_index_entries_with_tree(
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+  entries : Array[IndexEntry],
+  tree_id : @bit.ObjectId,
+) -> Unit raise @bit.GitError {
+  ignore(rfs)
+  let sorted = entries.copy()
+  sorted.sort_by((a, b) => index_path_compare_git_order(a.path, b.path))
+  let cache_tree = index_build_cache_tree_from_entries(sorted)
+  match cache_tree.oid {
+    Some(id) if id == tree_id => ()
+    _ => ()
+  }
+  let buf = write_index_buf(sorted, None, None, cache_tree=Some(cache_tree))
   let index_path = join_path(git_dir, "index")
   fs.write_file(index_path, Bytes::from_array(buf[:]))
 }
@@ -445,7 +1134,26 @@ pub fn write_index_entries_with_skip_worktree(
 ) -> Unit raise @bit.GitError {
   let sorted = entries.copy()
   sorted.sort_by((a, b) => index_path_compare_git_order(a.path, b.path))
-  let buf = write_index_buf(sorted, Some(skip_worktree_paths))
+  let buf = write_index_buf(sorted, Some(skip_worktree_paths), None)
+  let index_path = join_path(git_dir, "index")
+  fs.write_file(index_path, Bytes::from_array(buf[:]))
+}
+
+///|
+pub fn write_index_entries_with_flags(
+  fs : &@bit.FileSystem,
+  git_dir : String,
+  entries : Array[IndexEntry],
+  skip_worktree_paths : Map[String, Bool],
+  assume_unchanged_paths : Map[String, Bool],
+) -> Unit raise @bit.GitError {
+  let sorted = entries.copy()
+  sorted.sort_by((a, b) => index_path_compare_git_order(a.path, b.path))
+  let buf = write_index_buf(
+    sorted,
+    Some(skip_worktree_paths),
+    Some(assume_unchanged_paths),
+  )
   let index_path = join_path(git_dir, "index")
   fs.write_file(index_path, Bytes::from_array(buf[:]))
 }
@@ -453,11 +1161,14 @@ pub fn write_index_entries_with_skip_worktree(
 ///|
 fn write_index_stage_buf(entries : Array[IndexStageEntry]) -> FixedArray[Byte] {
   let mut total_size = 12
+  let mut version = 2
   for item in entries {
-    total_size += index_entry_buf_size(
-      item.entry.path.length(),
-      index_extended_flags(item.entry.intent_to_add, false) != 0,
-    )
+    let has_extended = index_extended_flags(item.entry.intent_to_add, false) !=
+      0
+    if has_extended {
+      version = 3
+    }
+    total_size += index_entry_buf_size(item.entry.path.length(), has_extended)
   }
   total_size += 20
   let buf : FixedArray[Byte] = FixedArray::make(total_size, b'\x00')
@@ -465,11 +1176,18 @@ fn write_index_stage_buf(entries : Array[IndexStageEntry]) -> FixedArray[Byte] {
   buf[1] = b'I'
   buf[2] = b'R'
   buf[3] = b'C'
-  fa_set_u32_be(buf, 4, 2)
+  fa_set_u32_be(buf, 4, version)
   fa_set_u32_be(buf, 8, entries.length())
   let mut pos = 12
   for item in entries {
-    pos = write_index_entry_to_buf(buf, pos, item.entry, item.stage, false)
+    pos = write_index_entry_to_buf(
+      buf,
+      pos,
+      item.entry,
+      item.stage,
+      false,
+      false,
+    )
   }
   let content_bytes = Bytes::from_array(buf[:pos])
   let checksum = @bit.sha1(content_bytes)
@@ -480,7 +1198,7 @@ fn write_index_stage_buf(entries : Array[IndexStageEntry]) -> FixedArray[Byte] {
 }
 
 ///|
-fn write_index_stage_entries(
+pub fn write_index_stage_entries(
   fs : &@bit.FileSystem,
   git_dir : String,
   entries : Array[IndexStageEntry],

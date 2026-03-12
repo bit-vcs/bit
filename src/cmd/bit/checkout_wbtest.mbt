@@ -552,7 +552,9 @@ async fn checkout_wbtest_case_orphan_branch() -> Unit raise Error {
     "orphan1\n",
   )
   assert_false(fs.is_file(repo_dir + "/.git/refs/heads/orphan1"))
-  assert_eq(@bitlib.read_index_entries(fs, repo_dir + "/.git").length(), 0)
+  assert_eq(@bitlib.read_index_entries(fs, repo_dir + "/.git").length(), 1)
+  assert_eq(add_test_git_stdout(repo_dir, ["ls-files"]), "init.t\n")
+  assert_eq(@fs.read_file_to_string(repo_dir + "/init.t"), "main\n")
 
   add_test_restore_env("GIT_SHIM_CWD", prev_shim_cwd)
   add_test_restore_env("GIT_SHIM_PWD", prev_shim_pwd)

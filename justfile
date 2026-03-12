@@ -175,7 +175,7 @@ git-t-allowlist-shim-strict: build
     echo "$real_git" > tools/git-shim/real-git-path; \
     SHIM_REAL_GIT="$real_git" SHIM_REAL_GIT_FALLBACK="$fallback_real_git" SHIM_EXEC_PATH="$exec_path" \
     SHIM_MOON="$(pwd)/tools/git-shim/moon" \
-    SHIM_CMDS="init add diff diff-files diff-index ls-files tag branch checkout switch commit log show reflog reset update-ref status merge rebase clone push fetch pull mv notes stash rm submodule worktree config show-ref for-each-ref rev-parse symbolic-ref cherry-pick remote cat-file hash-object ls-tree write-tree commit-tree receive-pack upload-pack pack-objects index-pack format-patch describe gc clean sparse-checkout blame shell" SHIM_STRICT=1 \
+    SHIM_CMDS="init add diff diff-files diff-index ls-files tag branch checkout switch commit log show reflog reset update-ref update-index status merge rebase clone push fetch pull mv notes stash rm submodule worktree config show-ref for-each-ref rev-parse symbolic-ref cherry-pick remote cat-file hash-object ls-tree write-tree commit-tree receive-pack upload-pack pack-objects index-pack format-patch describe gc clean sparse-checkout restore blame grep shell" SHIM_STRICT=1 \
     GIT_TEST_INSTALLED="$shim_dir" GIT_TEST_EXEC_PATH="$exec_path" \
     GIT_TEST_DEFAULT_HASH=sha1 \
     CPATH="$prefix/include" LDFLAGS="-L$prefix/lib" LIBRARY_PATH="$prefix/lib" \
@@ -199,7 +199,7 @@ git-t-allowlist-shim-random: build
       fallback_real_git=""; \
     fi; \
     shim_dir="$(pwd)/tools/git-shim/bin"; \
-    shim_cmds="init status add commit log show branch checkout switch reset rebase stash cherry-pick diff diff-files diff-index merge tag rm mv config sparse-checkout rev-parse cat-file ls-files hash-object ls-tree write-tree show-ref update-ref symbolic-ref reflog worktree gc clean grep submodule revert notes bisect describe blame format-patch shortlog remote clone fetch pull push receive-pack upload-pack pack-objects index-pack shell"; \
+    shim_cmds="init status add commit log show branch checkout switch reset rebase stash cherry-pick diff diff-files diff-index merge tag rm mv config sparse-checkout restore rev-parse cat-file ls-files hash-object ls-tree write-tree show-ref update-ref symbolic-ref reflog worktree gc clean grep submodule revert notes bisect describe blame format-patch shortlog remote clone fetch pull push receive-pack upload-pack pack-objects index-pack shell"; \
     ratio="${SHIM_RANDOM_RATIO:-50}"; \
     echo "$real_git" > tools/git-shim/real-git-path; \
     SHIM_REAL_GIT="$real_git" SHIM_REAL_GIT_FALLBACK="$fallback_real_git" SHIM_EXEC_PATH="$exec_path" \
@@ -381,7 +381,7 @@ git-t-full test_file: build
     echo "$real_git" > tools/git-shim/real-git-path; \
     SHIM_REAL_GIT="$real_git" SHIM_REAL_GIT_FALLBACK="$fallback_real_git" SHIM_EXEC_PATH="$exec_path" \
     SHIM_MOON="$(pwd)/tools/git-shim/moon" \
-    SHIM_CMDS="init status add commit log show branch checkout switch reset rebase stash cherry-pick diff diff-files diff-index merge tag rm mv config sparse-checkout rev-parse cat-file ls-files hash-object ls-tree write-tree show-ref update-ref symbolic-ref reflog worktree gc clean grep submodule revert notes bisect describe blame format-patch shortlog remote clone fetch pull push receive-pack upload-pack pack-objects index-pack shell" SHIM_STRICT=1 \
+    SHIM_CMDS="init status add commit log show branch checkout switch reset rebase stash cherry-pick diff diff-files diff-index merge tag rm mv config sparse-checkout restore rev-parse cat-file ls-files hash-object ls-tree write-tree show-ref update-ref update-index symbolic-ref reflog worktree gc clean grep submodule revert notes bisect describe blame format-patch shortlog remote clone fetch pull push receive-pack upload-pack pack-objects index-pack shell" SHIM_STRICT=1 \
     GIT_TEST_INSTALLED="$shim_dir" GIT_TEST_EXEC_PATH="$exec_path" \
     GIT_TEST_DEFAULT_HASH=sha1 \
     CPATH="$prefix/include" LDFLAGS="-L$prefix/lib" LIBRARY_PATH="$prefix/lib" \

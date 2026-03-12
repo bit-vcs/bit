@@ -50,6 +50,7 @@ fn get_config_override(key : String) -> String? {
   let overrides = @sys.get_env_var("GIT_CONFIG_OVERRIDES")
   match overrides {
     Some(data) => {
+      let mut found : String? = None
       for line_view in data.split("\n") {
         let line = line_view.to_string()
         match line.find("=") {
@@ -57,7 +58,7 @@ fn get_config_override(key : String) -> String? {
             let k = String::unsafe_substring(line, start=0, end=eq_idx)
             // Case-insensitive comparison for config keys
             if k.to_lower() == key.to_lower() {
-              return Some(
+              found = Some(
                 String::unsafe_substring(
                   line,
                   start=eq_idx + 1,
@@ -69,7 +70,7 @@ fn get_config_override(key : String) -> String? {
           None => ()
         }
       }
-      None
+      found
     }
     None => None
   }

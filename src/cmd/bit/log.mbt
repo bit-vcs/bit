@@ -728,6 +728,99 @@ fn log_add_revision_input(
 }
 
 ///|
+fn log_assign_left_right_marker(
+  markers : Map[String, String],
+  hex : String,
+  marker : String,
+) -> Unit {
+  match markers.get(hex) {
+    Some(existing) if existing == marker => ()
+    Some(_) => markers[hex] = "-"
+    None => markers[hex] = marker
+  }
+}
+
+///|
+fn log_build_left_right_markers(
+  fs : OsFs,
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  symmetric_ranges : Array[(String, String)],
+  ignore_missing : Bool,
+) -> Map[String, String] raise Error {
+  let db = @bitlib.ObjectDb::load(rfs, log_resolve_common_git_dir(rfs, git_dir))
+  let markers : Map[String, String] = {}
+  for pair in symmetric_ranges {
+    let left_spec = pair.0
+    let right_spec = pair.1
+    match
+      (
+        @bitrepo.rev_parse(rfs, git_dir, left_spec),
+        @bitrepo.rev_parse(rfs, git_dir, right_spec),
+      ) {
+      (Some(left_id), Some(right_id)) => {
+        let left_commit = match peel_to_commit(db, rfs, left_id) {
+          Some(id) => id
+          None => left_id
+        }
+        let right_commit = match peel_to_commit(db, rfs, right_id) {
+          Some(id) => id
+          None => right_id
+        }
+        let left_seen : Map[String, Bool] = {}
+        let right_seen : Map[String, Bool] = {}
+        let merge_base_seen : Map[String, Bool] = {}
+        walk_commits_to_map(fs, git_dir, left_commit, left_seen)
+        walk_commits_to_map(fs, git_dir, right_commit, right_seen)
+        match log_find_merge_base(rfs, git_dir, left_commit, right_commit) {
+          Some(base_id) =>
+            walk_commits_to_map(fs, git_dir, base_id, merge_base_seen)
+          None => ()
+        }
+        let left_entries : Array[(String, Bool)] = left_seen.iter().collect()
+        for entry in left_entries {
+          let hex = entry.0
+          if merge_base_seen.contains(hex) {
+            continue
+          }
+          log_assign_left_right_marker(
+            markers,
+            hex,
+            if right_seen.contains(hex) {
+              "-"
+            } else {
+              "<"
+            },
+          )
+        }
+        let right_entries : Array[(String, Bool)] = right_seen.iter().collect()
+        for entry in right_entries {
+          let hex = entry.0
+          if merge_base_seen.contains(hex) {
+            continue
+          }
+          log_assign_left_right_marker(
+            markers,
+            hex,
+            if left_seen.contains(hex) {
+              "-"
+            } else {
+              ">"
+            },
+          )
+        }
+      }
+      _ if ignore_missing => ()
+      _ =>
+        raise @bitcore.GitError::InvalidObject(
+          "Unknown revision in symmetric range",
+        )
+    }
+  }
+  markers
+}
+
+///|
 struct CommitFormatData {
   id : @bitcore.ObjectId
   tree : @bitcore.ObjectId
@@ -746,6 +839,7 @@ struct CommitFormatData {
   message : String
   ref_names : Map[String, Array[String]]
   date_format : String
+  left_right_marker : String
   reflog_selector_short : String?
   reflog_selector : String?
   reflog_message : String?
@@ -760,6 +854,7 @@ fn parse_commit_format_data(
   ref_names : Map[String, Array[String]],
   abbrev_len? : Int = 7,
   date_format? : String = "",
+  left_right_marker? : String = "",
   reflog_selector_short? : String? = None,
   reflog_selector? : String? = None,
   reflog_message? : String? = None,
@@ -846,6 +941,7 @@ fn parse_commit_format_data(
     message,
     ref_names,
     date_format,
+    left_right_marker,
     reflog_selector_short,
     reflog_selector,
     reflog_message,
@@ -1971,6 +2067,36 @@ fn log_grep_patterns_match(
 }
 
 ///|
+fn log_identity_patterns_match(
+  text : String,
+  patterns : Array[String],
+  pattern_type : GrepPatternType,
+  ignore_case : Bool,
+) -> Bool {
+  if patterns.length() == 0 {
+    return true
+  }
+  for pattern in patterns {
+    if grep_message_matches_pattern(text, pattern, pattern_type, ignore_case) {
+      return true
+    }
+  }
+  false
+}
+
+///|
+fn log_validate_reflog_grep_options(
+  walk_reflogs : Bool,
+  grep_reflog_patterns : Array[String],
+) -> Unit raise Error {
+  if grep_reflog_patterns.length() > 0 && not(walk_reflogs) {
+    raise @bitcore.GitError::InvalidObject(
+      "fatal: the option '--grep-reflog' requires '--walk-reflogs'",
+    )
+  }
+}
+
+///|
 fn log_commit_matches_text_filters(
   rfs : &@bitcore.RepoFileSystem,
   db : @bitlib.ObjectDb,
@@ -1980,12 +2106,12 @@ fn log_commit_matches_text_filters(
   ignore_case : Bool,
   invert_grep : Bool,
   all_match : Bool,
-  author_pattern : String?,
-  committer_pattern : String?,
+  author_patterns : Array[String],
+  committer_patterns : Array[String],
 ) -> Bool raise Error {
   if grep_patterns.length() == 0 &&
-    author_pattern is None &&
-    committer_pattern is None {
+    author_patterns.length() == 0 &&
+    committer_patterns.length() == 0 {
     return true
   }
   let obj = db.get(rfs, commit_id)
@@ -2013,34 +2139,21 @@ fn log_commit_matches_text_filters(
   if not(effective_message_match) {
     return false
   }
-  match author_pattern {
-    Some(pattern) => {
-      let author_text = data.author_name + " <" + data.author_email + ">"
-      if not(
-          grep_message_matches_pattern(
-            author_text, pattern, pattern_type, ignore_case,
-          ),
-        ) {
-        return false
-      }
-    }
-    None => ()
+  let author_text = data.author_name + " <" + data.author_email + ">"
+  if not(
+      log_identity_patterns_match(
+        author_text, author_patterns, pattern_type, ignore_case,
+      ),
+    ) {
+    return false
   }
-  match committer_pattern {
-    Some(pattern) => {
-      let committer_text = data.committer_name +
-        " <" +
-        data.committer_email +
-        ">"
-      if not(
-          grep_message_matches_pattern(
-            committer_text, pattern, pattern_type, ignore_case,
-          ),
-        ) {
-        return false
-      }
-    }
-    None => ()
+  let committer_text = data.committer_name + " <" + data.committer_email + ">"
+  if not(
+      log_identity_patterns_match(
+        committer_text, committer_patterns, pattern_type, ignore_case,
+      ),
+    ) {
+    return false
   }
   true
 }
@@ -2062,6 +2175,10 @@ fn format_commit_string(fmt : String, data : CommitFormatData) -> String {
         }
         'h' => {
           out.write_string(log_abbrev_hex(data.id.to_hex(), data.abbrev_len))
+          i += 2
+        }
+        'm' => {
+          out.write_string(data.left_right_marker)
           i += 2
         }
         'T' => {
@@ -2777,6 +2894,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
   let mut walk_reflogs = false
   let mut reverse = false
   let mut first_parent = false
+  let mut left_right = false
   let mut source = false
   let mut stdin_mode = false
   let mut ignore_missing = false
@@ -2791,12 +2909,13 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
   let mut abbrev_len_override : Int? = None
   let mut no_abbrev = false
   let grep_patterns : Array[String] = []
+  let grep_reflog_patterns : Array[String] = []
   let mut grep_pattern_type_override : GrepPatternType? = None
   let mut grep_ignore_case = false
   let mut invert_grep = false
   let mut all_match = false
-  let mut author_pattern : String? = None
-  let mut committer_pattern : String? = None
+  let author_patterns : Array[String] = []
+  let committer_patterns : Array[String] = []
   let mut format : String? = None
   let decoration_include_patterns : Array[String] = []
   let decoration_exclude_patterns : Array[String] = []
@@ -2825,6 +2944,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
       "--all" => all_refs = true
       "--end-of-options" => end_of_options = true
       "--source" => source = true
+      "--left-right" => left_right = true
       "--stdin" => stdin_mode = true
       "--ignore-missing" => ignore_missing = true
       "--exclude-promisor-objects" =>
@@ -2908,12 +3028,20 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         raise @bitcore.GitError::InvalidObject(
           "option `--grep` requires a value",
         )
+      "--grep-reflog" if i + 1 < args.length() => {
+        grep_reflog_patterns.push(args[i + 1])
+        i += 1
+      }
+      "--grep-reflog" =>
+        raise @bitcore.GitError::InvalidObject(
+          "option `--grep-reflog` requires a value",
+        )
       "--author" if i + 1 < args.length() => {
-        author_pattern = Some(args[i + 1])
+        author_patterns.push(args[i + 1])
         i += 1
       }
       "--committer" if i + 1 < args.length() => {
-        committer_pattern = Some(args[i + 1])
+        committer_patterns.push(args[i + 1])
         i += 1
       }
       "-i" | "--regexp-ignore-case" => grep_ignore_case = true
@@ -2993,10 +3121,12 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
       }
       _ if arg.has_prefix("--grep=") =>
         grep_patterns.push((try! arg[7:]).to_string())
+      _ if arg.has_prefix("--grep-reflog=") =>
+        grep_reflog_patterns.push((try! arg[14:]).to_string())
       _ if arg.has_prefix("--author=") =>
-        author_pattern = Some((try! arg[9:]).to_string())
+        author_patterns.push((try! arg[9:]).to_string())
       _ if arg.has_prefix("--committer=") =>
-        committer_pattern = Some((try! arg[12:]).to_string())
+        committer_patterns.push((try! arg[12:]).to_string())
       _ if arg.has_prefix("--branches=") => {
         branch_patterns.push((try! arg[11:]).to_string())
         saw_revision_input = true
@@ -3086,8 +3216,9 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
       diff_filter_include, diff_filter_exclude,
     ) ||
     grep_patterns.length() > 0 ||
-    author_pattern is Some(_) ||
-    committer_pattern is Some(_)
+    author_patterns.length() > 0 ||
+    committer_patterns.length() > 0
+  log_validate_reflog_grep_options(walk_reflogs, grep_reflog_patterns)
   if ignore_missing &&
     saw_revision_input &&
     range_excludes.length() == 0 &&
@@ -3149,6 +3280,35 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
       let mut reflog_index = start_reflog_index
       while reflog_index < entries.length() && emitted < max_count {
         let entry = entries[entries.length() - 1 - reflog_index]
+        if not(
+            log_grep_patterns_match(
+              entry.message,
+              grep_reflog_patterns,
+              grep_pattern_type,
+              grep_ignore_case,
+              all_match,
+            ),
+          ) {
+          reflog_index += 1
+          continue
+        }
+        if not(
+            log_commit_matches_text_filters(
+              rfs,
+              reflog_db,
+              entry.new_id,
+              grep_patterns,
+              grep_pattern_type,
+              grep_ignore_case,
+              invert_grep,
+              all_match,
+              author_patterns,
+              committer_patterns,
+            ),
+          ) {
+          reflog_index += 1
+          continue
+        }
         let gd = log_format_reflog_selector(
           display_ref,
           reflog_index,
@@ -3297,6 +3457,13 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
       rfs,
       log_resolve_common_git_dir(rfs, git_dir),
     )
+    let left_right_markers = if left_right && symmetric_ranges.length() > 0 {
+      log_build_left_right_markers(
+        fs, rfs, git_dir, symmetric_ranges, ignore_missing,
+      )
+    } else {
+      {}
+    }
     let seen : Map[String, Bool] = {}
     let formatted_lines : Array[String] = []
     if no_walk {
@@ -3326,7 +3493,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         if not(
             log_commit_matches_text_filters(
               rfs, db, id, grep_patterns, grep_pattern_type, grep_ignore_case, invert_grep,
-              all_match, author_pattern, committer_pattern,
+              all_match, author_patterns, committer_patterns,
             ),
           ) {
           continue
@@ -3365,6 +3532,10 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
           ref_names_map,
           abbrev_len~,
           date_format~,
+          left_right_marker=match left_right_markers.get(hex) {
+            Some(marker) => marker
+            None => ""
+          },
         )
         formatted_lines.push(format_commit_string(actual_fmt, commit_data))
       }
@@ -3451,8 +3622,8 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
               grep_ignore_case,
               invert_grep,
               all_match,
-              author_pattern,
-              committer_pattern,
+              author_patterns,
+              committer_patterns,
             ),
           ) {
           continue
@@ -3497,6 +3668,10 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
           ref_names_map,
           abbrev_len~,
           date_format~,
+          left_right_marker=match left_right_markers.get(hex) {
+            Some(marker) => marker
+            None => ""
+          },
         )
         formatted_lines.push(format_commit_string(actual_fmt, commit_data))
         if formatted_lines.length() >= max_count {
@@ -3504,7 +3679,9 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         }
       }
     }
-    log_emit_output(formatted_lines.join("\n"), is_tformat, line_prefix)
+    if formatted_lines.length() > 0 {
+      log_emit_output(formatted_lines.join("\n"), is_tformat, line_prefix)
+    }
     return
   }
   // Show subdir-clone info if applicable (only in full format)
@@ -3546,8 +3723,9 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
     abbrev_len != 7 ||
     log_has_diff_filter(diff_filter_include, diff_filter_exclude) ||
     grep_patterns.length() > 0 ||
-    author_pattern is Some(_) ||
-    committer_pattern is Some(_) ||
+    grep_reflog_patterns.length() > 0 ||
+    author_patterns.length() > 0 ||
+    committer_patterns.length() > 0 ||
     saw_revision_input ||
     source ||
     revs.length() > 0 ||
@@ -3596,7 +3774,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         if not(
             log_commit_matches_text_filters(
               rfs, db, id, grep_patterns, grep_pattern_type, grep_ignore_case, invert_grep,
-              all_match, author_pattern, committer_pattern,
+              all_match, author_patterns, committer_patterns,
             ),
           ) {
           continue
@@ -3637,7 +3815,9 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
           None => ()
         }
       }
-      log_emit_output(lines.join("\n"), true, line_prefix)
+      if lines.length() > 0 {
+        log_emit_output(lines.join("\n"), true, line_prefix)
+      }
     } else {
       for target in targets {
         let id = target.1
@@ -3648,7 +3828,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         if not(
             log_commit_matches_text_filters(
               rfs, db, id, grep_patterns, grep_pattern_type, grep_ignore_case, invert_grep,
-              all_match, author_pattern, committer_pattern,
+              all_match, author_patterns, committer_patterns,
             ),
           ) {
           continue
@@ -3821,6 +4001,13 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
       rfs,
       log_resolve_common_git_dir(rfs, git_dir),
     )
+    let left_right_markers = if left_right && symmetric_ranges.length() > 0 {
+      log_build_left_right_markers(
+        fs, rfs, git_dir, symmetric_ranges, ignore_missing,
+      )
+    } else {
+      {}
+    }
     let entries = log_walk_commits(
       rfs,
       git_dir,
@@ -3868,8 +4055,8 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
               grep_ignore_case,
               invert_grep,
               all_match,
-              author_pattern,
-              committer_pattern,
+              author_patterns,
+              committer_patterns,
             ),
           ) {
           continue
@@ -3890,13 +4077,18 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         }
         let short = log_abbrev_hex(entry.id.to_hex(), abbrev_len)
         let deco = format_decoration(ref_names, entry.id.to_hex())
+        let marker_prefix = match left_right_markers.get(entry.id.to_hex()) {
+          Some(marker) => marker + " "
+          None => ""
+        }
         let line = if source {
           match source_names.get(entry.id.to_hex()) {
-            Some(name) => short + deco + "\t" + name + " " + entry.message
-            None => short + deco + " " + entry.message
+            Some(name) =>
+              marker_prefix + short + deco + "\t" + name + " " + entry.message
+            None => marker_prefix + short + deco + " " + entry.message
           }
         } else {
-          short + deco + " " + entry.message
+          marker_prefix + short + deco + " " + entry.message
         }
         log_emit_output(line, true, line_prefix)
         emitted += 1
@@ -3930,8 +4122,8 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
               grep_ignore_case,
               invert_grep,
               all_match,
-              author_pattern,
-              committer_pattern,
+              author_patterns,
+              committer_patterns,
             ),
           ) {
           continue
@@ -3956,7 +4148,15 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         } else {
           entry.id.to_hex()
         }
-        log_emit_output("commit " + header_hex + deco, true, line_prefix)
+        let marker_prefix = match left_right_markers.get(entry.id.to_hex()) {
+          Some(marker) => marker + " "
+          None => ""
+        }
+        log_emit_output(
+          "commit " + marker_prefix + header_hex + deco,
+          true,
+          line_prefix,
+        )
         log_emit_output("Author: " + entry.author, true, line_prefix)
         let date_str = format_date_by_mode(
           entry.timestamp,

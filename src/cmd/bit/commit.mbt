@@ -656,6 +656,9 @@ fn commit_with_merge_heads(
   let (commit_id, compressed) = @bitcore.create_commit(commit)
   @bitlib.write_object_bytes(fs, git_dir, commit_id, compressed)
   @bitlib.update_head_ref(fs, rfs, git_dir, commit_id)
+  if entries.length() > 0 {
+    @bitlib.write_index_entries_with_tree(fs, rfs, git_dir, entries, tree_id)
+  }
   commit_id
 }
 

@@ -2181,7 +2181,11 @@ fn cat_file_hex_to_byte_array(hex : String) -> Array[Byte]? {
 fn cat_file_path_from_spec(spec : String) -> String? {
   match cat_file_find_path_separator_index(spec) {
     Some(idx) if idx + 1 < spec.length() =>
-      Some(String::unsafe_substring(spec, start=idx + 1, end=spec.length()))
+      Some(
+        cat_file_normalize_spec_path(
+          String::unsafe_substring(spec, start=idx + 1, end=spec.length()),
+        ),
+      )
     _ => None
   }
 }
@@ -2193,10 +2197,22 @@ fn cat_file_split_object_path_spec(spec : String) -> (String, String)? {
       Some(
         (
           String::unsafe_substring(spec, start=0, end=idx),
-          String::unsafe_substring(spec, start=idx + 1, end=spec.length()),
+          cat_file_normalize_spec_path(
+            String::unsafe_substring(spec, start=idx + 1, end=spec.length()),
+          ),
         ),
       )
     _ => None
+  }
+}
+
+///|
+fn cat_file_normalize_spec_path(path : String) -> String {
+  if path.length() == 0 {
+    return path
+  }
+  @bitlib.normalize_repo_path(path) catch {
+    _ => path
   }
 }
 
@@ -2245,9 +2261,10 @@ fn cat_file_find_index_entry(
   git_dir : String,
   path : String,
 ) -> @bitlib.IndexEntry? {
+  let normalized = cat_file_normalize_spec_path(path)
   let entries = @bitlib.read_index_entries(fs, git_dir) catch { _ => [] }
   for entry in entries {
-    if entry.path == path {
+    if entry.path == normalized {
       return Some(entry)
     }
   }
