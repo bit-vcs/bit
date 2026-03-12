@@ -75,6 +75,39 @@ test "tag: editor template starts with blank line when message is absent" {
 }
 
 ///|
+test "tag: short option bundles expand annotate and message" {
+  assert_eq(tag_expand_short_bundles(["-am", "msg", "v1"]), [
+    "-a", "-m", "msg", "v1",
+  ])
+  assert_eq(tag_expand_short_bundles(["-ammsg", "v1"]), ["-a", "-mmsg", "v1"])
+  assert_eq(tag_expand_short_bundles(["-n2", "v1"]), ["-n2", "v1"])
+}
+
+///|
+async test "tag: short option bundle -am creates annotated tag" {
+  @bitnative.init_native_io()
+  let fs = OsFs::new()
+  let root = "/tmp/bit-test-tag-short-bundle-" +
+    get_current_timestamp().to_string()
+  cleanup_tree(fs, root)
+  fs.mkdir_p(root)
+  let repo_dir = root + "/repo"
+
+  grep_test_run_git(root, ["init", "-q", "repo"])
+  grep_test_run_git(repo_dir, ["config", "user.name", "Test User"])
+  grep_test_run_git(repo_dir, ["config", "user.email", "test@example.com"])
+  fs.write_string(repo_dir + "/tracked.txt", "seed\n")
+  grep_test_run_git(repo_dir, ["add", "tracked.txt"])
+  grep_test_run_git(repo_dir, ["commit", "-q", "-m", "initial"])
+  grep_test_run_git(repo_dir, ["tag", "-am", "bundled", "v1", "HEAD"])
+
+  let tag_body = grep_test_git_stdout(repo_dir, ["cat-file", "tag", "v1"])
+  assert_true(tag_body.contains("\n\nbundled\n"))
+
+  cleanup_tree(fs, root)
+}
+
+///|
 test "tag: sort field aliases normalize to refname variants" {
   assert_eq(tag_normalize_sort_field("tag"), "refname")
   assert_eq(tag_normalize_sort_field("version:tag"), "version:refname")

@@ -26,6 +26,7 @@ fn tag_repo_requires_real_git(
 
 ///|
 async fn handle_tag(args : Array[String]) -> Unit raise Error {
+  let args = tag_expand_short_bundles(args)
   let root = get_work_root()
   let fs = OsFs::new()
   let rfs : &@bitcore.RepoFileSystem = fs
@@ -564,6 +565,75 @@ async fn handle_tag(args : Array[String]) -> Unit raise Error {
     Some(path) => if fs.is_file(path) { fs.remove_file(path) catch { _ => () } }
     None => ()
   }
+}
+
+///|
+fn tag_expand_short_bundles(args : Array[String]) -> Array[String] {
+  let expanded : Array[String] = []
+  for arg in args {
+    match tag_expand_short_bundle_arg(arg) {
+      Some(tokens) =>
+        for token in tokens {
+          expanded.push(token)
+        }
+      None => expanded.push(arg)
+    }
+  }
+  expanded
+}
+
+///|
+fn tag_expand_short_bundle_arg(arg : String) -> Array[String]? {
+  if arg.length() <= 2 || not(arg.has_prefix("-")) || arg.has_prefix("--") {
+    return None
+  }
+  let chars = arg.to_array()
+  let tokens : Array[String] = []
+  let mut i = 1
+  while i < chars.length() {
+    let short = chars[i]
+    match short {
+      'a' | 'd' | 'e' | 'f' | 'i' | 'l' | 's' | 'v' => {
+        tokens.push("-" + short.to_string())
+        i += 1
+      }
+      'n' => {
+        if i + 1 < chars.length() {
+          let rest = String::from_array(chars[i + 1:])
+          if tag_string_is_digits(rest) {
+            tokens.push("-n" + rest)
+            return Some(tokens)
+          } else {
+            return None
+          }
+        }
+        tokens.push("-n")
+        i += 1
+      }
+      'm' | 'F' => {
+        if i + 1 < chars.length() {
+          tokens.push(
+            "-" + short.to_string() + String::from_array(chars[i + 1:]),
+          )
+        } else {
+          tokens.push("-" + short.to_string())
+        }
+        return Some(tokens)
+      }
+      _ => return None
+    }
+  }
+  Some(tokens)
+}
+
+///|
+fn tag_string_is_digits(value : String) -> Bool {
+  for ch in value.to_array() {
+    if ch < '0' || ch > '9' {
+      return false
+    }
+  }
+  true
 }
 
 ///|
