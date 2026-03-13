@@ -263,7 +263,7 @@ async test "rm: orphan checkout keeps tracked files removable" {
   @sys.unset_env_var("GIT_DIR")
   @sys.unset_env_var("GIT_WORK_TREE")
 
-  handle_checkout(["--orphan", "orphan1"])
+  checkout_wbtest_run_shim_git(repo_dir, ["checkout", "-q", "--orphan", "orphan1"])
   handle_rm(["-q", "-rf", "."])
 
   assert_eq(add_test_git_stdout(repo_dir, ["ls-files"]), "")

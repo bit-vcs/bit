@@ -13,6 +13,7 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
   let mut orphan_branch = false
   let mut track_branch = false
   let mut detach_head = false
+  let mut quiet = false
   let pre_separator_targets : Array[String] = []
   let post_separator_targets : Array[String] = []
   let mut i = 0
@@ -25,6 +26,7 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
         create_branch = true
         force_create = true
       }
+      "-q" | "--quiet" => quiet = true
       "--track" => track_branch = true
       "-f" | "--force" => force_checkout = true
       "--detach" => detach_head = true
@@ -55,6 +57,7 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
   if not(saw_separator) && targets.length() == 0 {
     raise @bitcore.GitError::InvalidObject("No target specified for checkout")
   }
+  ignore(quiet)
   if is_bare_repo_dir(root) {
     raise @bitcore.GitError::InvalidObject(
       "this operation must be run in a work tree",

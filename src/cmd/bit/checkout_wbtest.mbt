@@ -1,4 +1,80 @@
 ///|
+let checkout_wbtest_shim_lock : @async.Semaphore = @async.Semaphore::new(
+  1,
+  initial_value=1,
+)
+
+///|
+fn checkout_wbtest_safe_dir_component(path : String) -> String {
+  let buf = StringBuilder::new()
+  for ch in path {
+    if (ch >= 'a' && ch <= 'z') ||
+      (ch >= 'A' && ch <= 'Z') ||
+      (ch >= '0' && ch <= '9') {
+      buf.write_char(ch)
+    } else {
+      buf.write_char('_')
+    }
+  }
+  buf.to_string()
+}
+
+///|
+async fn checkout_wbtest_collect_shim_git_output(
+  cwd : String,
+  args : Array[String],
+) -> (Int, String, String) raise Error {
+  checkout_wbtest_shim_lock.acquire()
+  defer checkout_wbtest_shim_lock.release()
+  let repo_root = @env.current_dir().unwrap_or(".")
+  let shim_git = repo_root + "/tools/git-shim/bin/git"
+  let shim_moon = "/tmp/bit-checkout-shim-moon.sh"
+  let target_dir = "/tmp/bit-checkout-shim-target-" +
+    checkout_wbtest_safe_dir_component(cwd)
+  let fs = OsFs::new()
+  fs.write_string(
+    shim_moon,
+    "#!/bin/sh\nset -eu\ncd '\{repo_root}'\nexec moon run --target native --target-dir '\{target_dir}' src/cmd/bit -- \"$@\"\n",
+  )
+  let chmod_code = @process.run("chmod", ["+x", shim_moon], inherit_env=true)
+  assert_eq(chmod_code, 0)
+  let env : Map[String, String] = {
+    "SHIM_REAL_GIT": repo_root + "/third_party/git/git",
+    "SHIM_EXEC_PATH": repo_root + "/third_party/git",
+    "SHIM_MOON": shim_moon,
+    "SHIM_CMDS": "checkout",
+    "SHIM_STRICT": "1",
+  }
+  let git_args : Array[String] = ["-C", cwd]
+  for arg in args {
+    git_args.push(arg)
+  }
+  let (code, stdout, stderr) = @process.collect_output(
+    shim_git,
+    git_args[:],
+    extra_env=env,
+    inherit_env=true,
+  )
+  let stdout_text = stdout.text() catch { _ => "" }
+  let stderr_text = stderr.text() catch { _ => "" }
+  (code, stdout_text, stderr_text)
+}
+
+///|
+async fn checkout_wbtest_run_shim_git(
+  cwd : String,
+  args : Array[String],
+) -> Unit raise Error {
+  let (code, stdout, stderr) = checkout_wbtest_collect_shim_git_output(
+    cwd,
+    args,
+  )
+  assert_eq(code, 0)
+  assert_eq(stdout, "")
+  assert_eq(stderr, "")
+}
+
+///|
 test "checkout: tracked path detection sees deleted gitmodules in index" {
   let fs = @bitcore.TestFs::new()
   @bitlib.init_repo(fs, "/repo")
@@ -53,7 +129,7 @@ async fn checkout_wbtest_case_treeish_restore() -> Unit raise Error {
   @sys.set_env_var("GIT_SHIM_PWD", repo_dir)
   @sys.unset_env_var("GIT_DIR")
   @sys.unset_env_var("GIT_WORK_TREE")
-  handle_checkout(["newmain", "--", "init.t"])
+  checkout_wbtest_run_shim_git(repo_dir, ["checkout", "-q", "newmain", "--", "init.t"])
 
   assert_eq(decode_bytes(fs.read_file(repo_dir + "/init.t")), "newmain\n")
   assert_eq(
@@ -95,12 +171,12 @@ async fn checkout_wbtest_case_switch_back_to_main() -> Unit raise Error {
   @sys.unset_env_var("GIT_DIR")
   @sys.unset_env_var("GIT_WORK_TREE")
 
-  handle_checkout(["-b", "newbranch"])
+  checkout_wbtest_run_shim_git(repo_dir, ["checkout", "-q", "-b", "newbranch"])
   fs.write_string(repo_dir + "/myworld", "hello\n")
   add_test_run_git(repo_dir, ["add", "myworld"])
   add_test_run_git(repo_dir, ["commit", "-q", "-m", "myworld"])
 
-  handle_checkout(["main"])
+  checkout_wbtest_run_shim_git(repo_dir, ["checkout", "-q", "main"])
 
   assert_eq(
     add_test_git_stdout(repo_dir, ["symbolic-ref", "--short", "HEAD"]),
@@ -152,12 +228,12 @@ async fn checkout_wbtest_case_switch_back_with_detached_worktree() -> Unit raise
   @sys.unset_env_var("GIT_DIR")
   @sys.unset_env_var("GIT_WORK_TREE")
 
-  handle_checkout(["-b", "newbranch"])
+  checkout_wbtest_run_shim_git(repo_dir, ["checkout", "-q", "-b", "newbranch"])
   fs.write_string(repo_dir + "/myworld", "hello\n")
   add_test_run_git(repo_dir, ["add", "myworld"])
   add_test_run_git(repo_dir, ["commit", "-q", "-m", "myworld"])
 
-  handle_checkout(["main"])
+  checkout_wbtest_run_shim_git(repo_dir, ["checkout", "-q", "main"])
 
   assert_eq(
     add_test_git_stdout(repo_dir, ["symbolic-ref", "--short", "HEAD"]),
@@ -198,12 +274,12 @@ async fn checkout_wbtest_case_switch_back_after_shim_commit() -> Unit raise Erro
   @sys.unset_env_var("GIT_DIR")
   @sys.unset_env_var("GIT_WORK_TREE")
 
-  handle_checkout(["-b", "newbranch"])
+  checkout_wbtest_run_shim_git(repo_dir, ["checkout", "-q", "-b", "newbranch"])
   fs.write_string(repo_dir + "/myworld", "hello\n")
   handle_add(["myworld"])
   handle_commit(["-q", "-m", "myworld"])
 
-  handle_checkout(["main"])
+  checkout_wbtest_run_shim_git(repo_dir, ["checkout", "-q", "main"])
 
   assert_eq(
     add_test_git_stdout(repo_dir, ["symbolic-ref", "--short", "HEAD"]),
@@ -460,7 +536,7 @@ async fn checkout_wbtest_case_recheckout_current_branch_with_symlink_head() -> U
   @sys.unset_env_var("GIT_DIR")
   @sys.unset_env_var("GIT_WORK_TREE")
 
-  handle_checkout(["newmain"])
+  checkout_wbtest_run_shim_git(linked_dir, ["checkout", "-q", "newmain"])
 
   assert_eq(
     add_test_git_stdout(linked_dir, ["symbolic-ref", "HEAD"]),
@@ -545,7 +621,7 @@ async fn checkout_wbtest_case_orphan_branch() -> Unit raise Error {
   @sys.unset_env_var("GIT_DIR")
   @sys.unset_env_var("GIT_WORK_TREE")
 
-  handle_checkout(["--orphan", "orphan1"])
+  checkout_wbtest_run_shim_git(repo_dir, ["checkout", "-q", "--orphan", "orphan1"])
 
   assert_eq(
     add_test_git_stdout(repo_dir, ["symbolic-ref", "--short", "HEAD"]),
@@ -596,7 +672,7 @@ async fn checkout_wbtest_case_checkout_updates_head_reflog() -> Unit raise Error
   let before = @bitrepo.read_reflog(fs, repo_dir + "/.git", "HEAD")
   assert_eq(before.length(), 2)
 
-  handle_checkout(["side"])
+  checkout_wbtest_run_shim_git(repo_dir, ["checkout", "-q", "side"])
 
   let side_id = @bitcore.ObjectId::from_hex(
     trim_string(add_test_git_stdout(repo_dir, ["rev-parse", "side"])),
@@ -605,7 +681,7 @@ async fn checkout_wbtest_case_checkout_updates_head_reflog() -> Unit raise Error
   assert_eq(after_branch.length(), 3)
   assert_eq(after_branch[after_branch.length() - 1].new_id, side_id)
 
-  handle_checkout(["main^0"])
+  checkout_wbtest_run_shim_git(repo_dir, ["checkout", "-q", "main^0"])
 
   let main_id = @bitcore.ObjectId::from_hex(
     trim_string(add_test_git_stdout(repo_dir, ["rev-parse", "main"])),
@@ -657,7 +733,7 @@ async fn checkout_wbtest_case_force_checkout_clears_merge_state() -> Unit raise 
   @sys.unset_env_var("GIT_DIR")
   @sys.unset_env_var("GIT_WORK_TREE")
 
-  handle_checkout(["-f", "side"])
+  checkout_wbtest_run_shim_git(repo_dir, ["checkout", "-q", "-f", "side"])
 
   assert_false(fs.is_file(repo_dir + "/.git/MERGE_HEAD"))
   assert_false(fs.is_file(repo_dir + "/.git/MERGE_MSG"))
@@ -705,7 +781,7 @@ async fn checkout_wbtest_case_treeish_restore_updates_index() -> Unit raise Erro
   @sys.set_env_var("GIT_SHIM_PWD", repo_dir)
   @sys.unset_env_var("GIT_DIR")
   @sys.unset_env_var("GIT_WORK_TREE")
-  handle_checkout(["HEAD", "--", "file"])
+  checkout_wbtest_run_shim_git(repo_dir, ["checkout", "-q", "HEAD", "--", "file"])
 
   assert_eq(decode_bytes(fs.read_file(repo_dir + "/file")), "base\n")
   assert_eq(
@@ -751,7 +827,7 @@ async fn checkout_wbtest_case_treeish_restore_without_separator() -> Unit raise 
   @sys.set_env_var("GIT_SHIM_PWD", repo_dir)
   @sys.unset_env_var("GIT_DIR")
   @sys.unset_env_var("GIT_WORK_TREE")
-  handle_checkout(["side", "file"])
+  checkout_wbtest_run_shim_git(repo_dir, ["checkout", "-q", "side", "file"])
 
   assert_eq(decode_bytes(fs.read_file(repo_dir + "/file")), "side\n")
   assert_eq(
@@ -794,7 +870,10 @@ async fn checkout_wbtest_case_track_sets_branch_config() -> Unit raise Error {
   @sys.set_env_var("GIT_SHIM_PWD", repo_dir)
   @sys.unset_env_var("GIT_DIR")
   @sys.unset_env_var("GIT_WORK_TREE")
-  handle_checkout(["--track", "-b", "topic", "me/main"])
+  checkout_wbtest_run_shim_git(
+    repo_dir,
+    ["checkout", "-q", "--track", "-b", "topic", "me/main"],
+  )
 
   assert_eq(
     add_test_git_stdout(repo_dir, ["config", "--get", "branch.topic.remote"]),
@@ -841,7 +920,7 @@ async fn checkout_wbtest_case_detach_head_without_target() -> Unit raise Error {
   @sys.set_env_var("GIT_SHIM_PWD", repo_dir)
   @sys.unset_env_var("GIT_DIR")
   @sys.unset_env_var("GIT_WORK_TREE")
-  handle_checkout(["--detach"])
+  checkout_wbtest_run_shim_git(repo_dir, ["checkout", "-q", "--detach"])
 
   assert_eq(
     trim_string(decode_bytes(fs.read_file(repo_dir + "/.git/HEAD"))),
@@ -882,9 +961,9 @@ async fn checkout_wbtest_case_previous_checkout_syntax() -> Unit raise Error {
   @sys.unset_env_var("GIT_DIR")
   @sys.unset_env_var("GIT_WORK_TREE")
 
-  handle_checkout(["-b", "topic"])
-  handle_checkout(["main"])
-  handle_checkout(["@{-1}"])
+  checkout_wbtest_run_shim_git(repo_dir, ["checkout", "-q", "-b", "topic"])
+  checkout_wbtest_run_shim_git(repo_dir, ["checkout", "-q", "main"])
+  checkout_wbtest_run_shim_git(repo_dir, ["checkout", "-q", "@{-1}"])
 
   assert_eq(
     add_test_git_stdout(repo_dir, ["symbolic-ref", "--short", "HEAD"]),
