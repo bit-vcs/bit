@@ -56,7 +56,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -106,7 +106,7 @@ jobs:
           shim_dir="$(pwd)/tools/git-shim/bin"
           echo "$real_git" > tools/git-shim/real-git-path
 
-          tests=$(tools/select-git-tests.sh "${{ matrix.shard }}" 5 tools/git-test-allowlist.txt)
+          tests=$(tools/select-git-tests.sh "${{ matrix.shard }}" 10 tools/git-test-allowlist.txt)
           echo "Shard ${{ matrix.shard }}: $(echo "$tests" | wc -w | tr -d ' ') tests"
 
           export SHIM_REAL_GIT="$real_git" SHIM_EXEC_PATH="$exec_path" \

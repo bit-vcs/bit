@@ -35,6 +35,10 @@ test-update:
     moon test --update --target js -p mizchi/bit -p mizchi/bit/lib
     moon test --update --target native --no-parallelize -j 1
 
+# Refresh git-compat shard weights from recent GitHub Actions timing artifacts
+update-git-test-runtime-seconds branch='main' runs='10' shards='10':
+    python3 tools/update-git-test-runtime-seconds.py --branch {{branch}} --runs {{runs}} --shards {{shards}}
+
 # Run main (native)
 run:
     moon run src/main --target native
