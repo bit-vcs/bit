@@ -220,7 +220,7 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
     match effective_git_dir {
       Some(gd) => {
         let basename = match gd.rev_find("/") {
-          Some(idx) => (try? gd[idx + 1:]).unwrap_or(gd).to_string()
+          Some(idx) => string_slice_from(gd, idx + 1)
           None => gd
         }
         if basename != ".git" {
@@ -333,15 +333,13 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
       let content = decode_bytes((try? fs.read_file(resolved)).unwrap_or(b""))
       let trimmed = content.trim_end(chars="\r\n").to_string()
       if trimmed.has_prefix("gitdir: ") {
-        let linked = (try? trimmed[8:]).unwrap_or(trimmed).to_string()
+        let linked = string_slice_from(trimmed, 8)
         resolved = if linked.has_prefix("/") {
           linked
         } else {
           match dot_git_path.rev_find("/") {
             Some(idx) =>
-              (try? dot_git_path[:idx]).unwrap_or(dot_git_path).to_string() +
-              "/" +
-              linked
+              string_slice_to(dot_git_path, idx) + "/" + linked
             None => linked
           }
         }
@@ -406,7 +404,7 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
         .trim_end(chars="\r\n")
         .to_string()
       if gf_content.has_prefix("gitdir: ") {
-        let linked = (try? gf_content[8:]).unwrap_or(gf_content).to_string()
+        let linked = string_slice_from(gf_content, 8)
         let resolved = if linked.has_prefix("/") {
           linked
         } else {
@@ -642,7 +640,7 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
         .trim_end(chars="\r\n")
         .to_string()
       if gf.has_prefix("gitdir: ") {
-        let linked = (try? gf[8:]).unwrap_or(gf).to_string()
+        let linked = string_slice_from(gf, 8)
         let abs_linked = if linked.has_prefix("/") {
           linked
         } else {
@@ -715,11 +713,10 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
         .trim_end(chars="\r\n")
         .to_string()
       if content.has_prefix("gitdir: ") {
-        let old_wt_dir = (try? content[8:]).unwrap_or(content).to_string()
+        let old_wt_dir = string_slice_from(content, 8)
         // Extract worktree name from old path (e.g., .../worktrees/linkwt → linkwt)
         let wt_name = match old_wt_dir.rev_find("/") {
-          Some(idx) =>
-            (try? old_wt_dir[idx + 1:]).unwrap_or(old_wt_dir).to_string()
+          Some(idx) => string_slice_from(old_wt_dir, idx + 1)
           None => old_wt_dir
         }
         let new_wt_dir = actual_git_dir + "/worktrees/" + wt_name

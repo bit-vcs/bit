@@ -929,7 +929,7 @@ fn commit_is_trailer_line(line : String) -> Bool {
   match trimmed.find(": ") {
     Some(idx) => {
       // Token must be non-empty and contain only word chars and hyphens
-      let token = (trimmed[:idx] catch { _ => return false }).to_string()
+      let token = string_slice_to(trimmed, idx)
       if token.length() == 0 {
         return false
       }
@@ -1335,11 +1335,7 @@ fn parse_commit_date(date_str : String) -> Int64 {
   // - @timestamp: "@1234567890"
   // - ISO 8601: "2024-01-01T12:00:00"
   if date_str.has_prefix("@") {
-    let ts_str = try date_str[1:] catch {
-      _ => return 0L
-    } noraise {
-      s => s.to_string()
-    }
+    let ts_str = string_slice_from(date_str, 1)
     return parse_int64(ts_str)
   }
   // Try parsing as unix timestamp
