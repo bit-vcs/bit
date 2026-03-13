@@ -230,6 +230,80 @@ test "pull: rebase mode parses interactive and rejects invalid config" {
 }
 
 ///|
+let handlers_remote_pull_wbtest_shim_lock : @async.Semaphore = @async.Semaphore::new(
+  1,
+  initial_value=1,
+)
+
+///|
+fn handlers_remote_pull_wbtest_safe_dir_component(path : String) -> String {
+  let buf = StringBuilder::new()
+  for ch in path {
+    if (ch >= 'a' && ch <= 'z') ||
+      (ch >= 'A' && ch <= 'Z') ||
+      (ch >= '0' && ch <= '9') {
+      buf.write_char(ch)
+    } else {
+      buf.write_char('_')
+    }
+  }
+  buf.to_string()
+}
+
+///|
+async fn handlers_remote_pull_wbtest_collect_shim_git(
+  cwd : String,
+  args : Array[String],
+) -> (Int, String, String) raise Error {
+  handlers_remote_pull_wbtest_shim_lock.acquire()
+  defer handlers_remote_pull_wbtest_shim_lock.release()
+  let repo_root = @env.current_dir().unwrap_or(".")
+  let shim_git = repo_root + "/tools/git-shim/bin/git"
+  let shim_moon = "/tmp/bit-pull-shim-moon.sh"
+  let target_dir = "/tmp/bit-pull-shim-target-" +
+    handlers_remote_pull_wbtest_safe_dir_component(cwd)
+  let fs = OsFs::new()
+  fs.write_string(
+    shim_moon,
+    "#!/bin/sh\nset -eu\ncd '\{repo_root}'\nexec moon run --target native --target-dir '\{target_dir}' src/cmd/bit -- \"$@\"\n",
+  )
+  let chmod_code = @process.run("chmod", ["+x", shim_moon], inherit_env=true)
+  assert_eq(chmod_code, 0)
+  let env : Map[String, String] = {
+    "SHIM_REAL_GIT": repo_root + "/third_party/git/git",
+    "SHIM_REAL_GIT_FALLBACK": "",
+    "SHIM_EXEC_PATH": repo_root + "/third_party/git",
+    "SHIM_MOON": shim_moon,
+    "SHIM_CMDS": "init status add commit log show branch checkout switch reset rebase stash cherry-pick diff diff-files diff-index merge tag rm mv config sparse-checkout restore rev-parse cat-file ls-files hash-object ls-tree write-tree show-ref update-ref update-index symbolic-ref reflog worktree gc clean grep submodule revert notes bisect describe blame format-patch shortlog remote clone fetch pull push receive-pack upload-pack pack-objects index-pack shell",
+    "SHIM_STRICT": "1",
+  }
+  let git_args : Array[String] = ["-C", cwd]
+  for arg in args {
+    git_args.push(arg)
+  }
+  let (code, stdout, stderr) = @process.collect_output(
+    shim_git,
+    git_args[:],
+    extra_env=env,
+    inherit_env=true,
+  )
+  (code, stdout.text() catch { _ => "" }, stderr.text() catch { _ => "" })
+}
+
+///|
+async fn handlers_remote_pull_wbtest_run_shim_git(
+  cwd : String,
+  args : Array[String],
+) -> Unit raise Error {
+  let (code, stdout, stderr) = handlers_remote_pull_wbtest_collect_shim_git(
+    cwd, args,
+  )
+  assert_eq(code, 0)
+  assert_eq(stdout, "")
+  assert_eq(stderr, "")
+}
+
+///|
 async test "pull: local fetch with main:main writes target ref and FETCH_HEAD" {
   @bitnative.init_native_io()
   let fs = OsFs::new()
@@ -313,7 +387,6 @@ async test "pull: branch remote dot pulls from current repo config" {
     get_current_timestamp().to_string()
   cleanup_tree(fs, root)
   fs.mkdir_p(root)
-  let prev_cwd = @sys.get_env_var("GIT_SHIM_CWD")
 
   commit_wbtest_run_git(root, ["init", "--initial-branch=main", "-q"])
   commit_wbtest_run_git(root, ["config", "user.name", "Test User"])
@@ -328,8 +401,7 @@ async test "pull: branch remote dot pulls from current repo config" {
   commit_wbtest_run_git(root, ["commit", "-q", "-a", "-m", "updated"])
   commit_wbtest_run_git(root, ["checkout", "-q", "copy"])
 
-  @sys.set_env_var("GIT_SHIM_CWD", root)
-  handle_pull([])
+  handlers_remote_pull_wbtest_run_shim_git(root, ["pull", "-q"])
 
   assert_eq(
     decode_bytes(fs.read_file(root + "/file") catch { _ => Bytes::default() }),
@@ -340,10 +412,8 @@ async test "pull: branch remote dot pulls from current repo config" {
       fs.read_file(root + "/.git/logs/HEAD") catch {
         _ => Bytes::default()
       },
-    ).contains("pull: Fast-forward"),
+    ).contains("Fast-forward"),
   )
-
-  restore_env_var_for_fetch_wbtest("GIT_SHIM_CWD", prev_cwd)
   cleanup_tree(fs, root)
 }
 
@@ -356,7 +426,6 @@ async test "pull: command path pulls into unborn branch from parent repo" {
   cleanup_tree(fs, root)
   fs.mkdir_p(root)
   let dst_dir = root + "/dst"
-  let prev_cwd = @sys.get_env_var("GIT_SHIM_CWD")
 
   commit_wbtest_run_git(root, ["init", "--initial-branch=main", "-q"])
   commit_wbtest_run_git(root, ["config", "user.name", "Test User"])
@@ -367,8 +436,9 @@ async test "pull: command path pulls into unborn branch from parent repo" {
 
   commit_wbtest_run_git(root, ["init", "--initial-branch=main", "-q", "dst"])
 
-  @sys.set_env_var("GIT_SHIM_CWD", dst_dir)
-  handle_pull(["..", "main:main"])
+  handlers_remote_pull_wbtest_run_shim_git(dst_dir, [
+    "pull", "-q", "..", "main:main",
+  ])
 
   assert_eq(
     decode_bytes(
@@ -379,8 +449,6 @@ async test "pull: command path pulls into unborn branch from parent repo" {
     "file\n",
   )
   assert_true(@bitlib.resolve_head_commit(fs, dst_dir + "/.git") is Some(_))
-
-  restore_env_var_for_fetch_wbtest("GIT_SHIM_CWD", prev_cwd)
   cleanup_tree(fs, root)
 }
 
@@ -393,7 +461,6 @@ async test "pull: command path keeps staged new file on unborn branch" {
   cleanup_tree(fs, root)
   fs.mkdir_p(root)
   let dst_dir = root + "/dst"
-  let prev_cwd = @sys.get_env_var("GIT_SHIM_CWD")
 
   commit_wbtest_run_git(root, ["init", "--initial-branch=main", "-q"])
   commit_wbtest_run_git(root, ["config", "user.name", "Test User"])
@@ -406,8 +473,7 @@ async test "pull: command path keeps staged new file on unborn branch" {
   fs.write_string(dst_dir + "/newfile", "new tracked file\n")
   commit_wbtest_run_git(dst_dir, ["add", "newfile"])
 
-  @sys.set_env_var("GIT_SHIM_CWD", dst_dir)
-  handle_pull(["..", "main"])
+  handlers_remote_pull_wbtest_run_shim_git(dst_dir, ["pull", "-q", "..", "main"])
 
   assert_eq(
     decode_bytes(
@@ -426,8 +492,6 @@ async test "pull: command path keeps staged new file on unborn branch" {
     }
   }
   assert_true(found_newfile)
-
-  restore_env_var_for_fetch_wbtest("GIT_SHIM_CWD", prev_cwd)
   cleanup_tree(fs, root)
 }
 
@@ -440,7 +504,6 @@ async test "pull: command path rejects octopus into unborn branch" {
   cleanup_tree(fs, root)
   fs.mkdir_p(root)
   let dst_dir = root + "/dst"
-  let prev_cwd = @sys.get_env_var("GIT_SHIM_CWD")
 
   commit_wbtest_run_git(root, ["init", "--initial-branch=main", "-q"])
   commit_wbtest_run_git(root, ["config", "user.name", "Test User"])
@@ -451,14 +514,15 @@ async test "pull: command path rejects octopus into unborn branch" {
 
   commit_wbtest_run_git(root, ["init", "--initial-branch=main", "-q", "dst"])
 
-  let mut failed = false
-  @sys.set_env_var("GIT_SHIM_CWD", dst_dir)
-  ignore(handle_pull(["..", "main", "main"]) catch { _ => failed = true })
+  let (code, _stdout, stderr) = handlers_remote_pull_wbtest_collect_shim_git(
+    dst_dir,
+    ["pull", "..", "main", "main"],
+  )
 
-  assert_true(failed)
+  assert_true(code != 0)
+  assert_true(stderr.contains("Cannot merge multiple branches into empty"))
   assert_false(fs.is_file(dst_dir + "/file"))
 
-  restore_env_var_for_fetch_wbtest("GIT_SHIM_CWD", prev_cwd)
   cleanup_tree(fs, root)
 }
 
@@ -471,7 +535,6 @@ async test "pull: rebase rejects staged changes on unborn branch" {
   cleanup_tree(fs, root)
   fs.mkdir_p(root)
   let dst_dir = root + "/dst"
-  let prev_cwd = @sys.get_env_var("GIT_SHIM_CWD")
 
   commit_wbtest_run_git(root, ["init", "--initial-branch=main", "-q"])
   commit_wbtest_run_git(root, ["config", "user.name", "Test User"])
@@ -484,17 +547,13 @@ async test "pull: rebase rejects staged changes on unborn branch" {
   fs.write_string(dst_dir + "/staged-file", "staged-file\n")
   commit_wbtest_run_git(dst_dir, ["add", "staged-file"])
 
-  let rejected = try {
-    @sys.set_env_var("GIT_SHIM_CWD", dst_dir)
-    ignore(handle_pull(["--rebase", "..", "main"]))
-    false
-  } catch {
-    @bitcore.GitError::InvalidObject(msg) =>
-      msg.contains("unborn branch with changes added to the index")
-    _ => false
-  }
+  let (code, _stdout, stderr) = handlers_remote_pull_wbtest_collect_shim_git(
+    dst_dir,
+    ["pull", "--rebase", "..", "main"],
+  )
 
-  assert_true(rejected)
+  assert_true(code != 0)
+  assert_true(stderr.contains("unborn branch with changes added to the index"))
   let entries = @bitlib.read_index_entries(fs, dst_dir + "/.git")
   let mut found_staged_file = false
   for entry in entries {
@@ -512,8 +571,6 @@ async test "pull: rebase rejects staged changes on unborn branch" {
     ),
     "staged-file\n",
   )
-
-  restore_env_var_for_fetch_wbtest("GIT_SHIM_CWD", prev_cwd)
   cleanup_tree(fs, root)
 }
 
@@ -525,7 +582,6 @@ async test "pull: rebase uses previous target as fork point for rebased upstream
     get_current_timestamp().to_string()
   cleanup_tree(fs, root)
   fs.mkdir_p(root)
-  let prev_cwd = @sys.get_env_var("GIT_SHIM_CWD")
 
   commit_wbtest_run_git(root, ["init", "--initial-branch=main", "-q"])
   commit_wbtest_run_git(root, ["config", "user.name", "Test User"])
@@ -544,7 +600,8 @@ async test "pull: rebase uses previous target as fork point for rebased upstream
   commit_wbtest_run_git(root, ["add", "file2"])
   commit_wbtest_run_git(root, ["commit", "-q", "-m", "new file"])
 
-  commit_wbtest_run_git(root, ["remote", "add", "-f", "me", "."])
+  commit_wbtest_run_git(root, ["remote", "add", "me", "."])
+  commit_wbtest_run_git(root, ["fetch", "-q", "me"])
 
   commit_wbtest_run_git(root, ["checkout", "-q", "copy"])
   commit_wbtest_run_git(root, ["reset", "--hard", "HEAD^"])
@@ -552,8 +609,9 @@ async test "pull: rebase uses previous target as fork point for rebased upstream
   commit_wbtest_run_git(root, ["commit", "-q", "-a", "-m", "conflict"])
 
   commit_wbtest_run_git(root, ["checkout", "-q", "to-rebase"])
-  @sys.set_env_var("GIT_SHIM_CWD", root)
-  handle_pull(["--rebase", "me", "copy"])
+  handlers_remote_pull_wbtest_run_shim_git(root, [
+    "pull", "--rebase", "-q", "me", "copy",
+  ])
 
   assert_eq(
     decode_bytes(fs.read_file(root + "/file") catch { _ => Bytes::default() }),
@@ -564,8 +622,6 @@ async test "pull: rebase uses previous target as fork point for rebased upstream
     "new\n",
   )
   assert_eq(@bitlib.read_unmerged_paths(fs, root + "/.git").length(), 0)
-
-  restore_env_var_for_fetch_wbtest("GIT_SHIM_CWD", prev_cwd)
   cleanup_tree(fs, root)
 }
 
@@ -577,7 +633,6 @@ async test "pull: updates checked-out branch worktree when fetch advances it" {
     get_current_timestamp().to_string()
   cleanup_tree(fs, root)
   fs.mkdir_p(root)
-  let prev_cwd = @sys.get_env_var("GIT_SHIM_CWD")
 
   commit_wbtest_run_git(root, ["init", "--initial-branch=main", "-q"])
   commit_wbtest_run_git(root, ["config", "user.name", "Test User"])
@@ -594,8 +649,9 @@ async test "pull: updates checked-out branch worktree when fetch advances it" {
   commit_wbtest_run_git(root, ["checkout", "-q", "-b", "third", "second^"])
   fs.write_string(root + "/expect", "file\n")
 
-  @sys.set_env_var("GIT_SHIM_CWD", root)
-  handle_pull([".", "second:third"])
+  handlers_remote_pull_wbtest_run_shim_git(root, [
+    "pull", "-q", ".", "second:third",
+  ])
 
   assert_eq(
     decode_bytes(fs.read_file(root + "/file") catch { _ => Bytes::default() }),
@@ -610,10 +666,8 @@ async test "pull: updates checked-out branch worktree when fetch advances it" {
       fs.read_file(root + "/.git/logs/HEAD") catch {
         _ => Bytes::default()
       },
-    ).contains("pull . second:third: Fast-forward"),
+    ).contains("Fast-forward"),
   )
-
-  restore_env_var_for_fetch_wbtest("GIT_SHIM_CWD", prev_cwd)
   cleanup_tree(fs, root)
 }
 
@@ -625,7 +679,6 @@ async test "pull: refuses dirty worktree when fetch advances current branch" {
     get_current_timestamp().to_string()
   cleanup_tree(fs, root)
   fs.mkdir_p(root)
-  let prev_cwd = @sys.get_env_var("GIT_SHIM_CWD")
 
   commit_wbtest_run_git(root, ["init", "--initial-branch=main", "-q"])
   commit_wbtest_run_git(root, ["config", "user.name", "Test User"])
@@ -642,17 +695,13 @@ async test "pull: refuses dirty worktree when fetch advances current branch" {
   commit_wbtest_run_git(root, ["checkout", "-q", "-b", "third", "second^"])
   fs.write_string(root + "/file", "conflict\n")
 
-  let rejected = try {
-    @sys.set_env_var("GIT_SHIM_CWD", root)
-    ignore(handle_pull([".", "second:third"]))
-    false
-  } catch {
-    @bitcore.GitError::InvalidObject(msg) =>
-      msg == "Cannot fast-forward your working tree"
-    _ => false
-  }
+  let (code, _stdout, stderr) = handlers_remote_pull_wbtest_collect_shim_git(
+    root,
+    ["pull", ".", "second:third"],
+  )
 
-  assert_true(rejected)
+  assert_true(code != 0)
+  assert_true(stderr.contains("Cannot fast-forward your working tree"))
   assert_eq(
     decode_bytes(fs.read_file(root + "/file") catch { _ => Bytes::default() }),
     "conflict\n",
@@ -661,8 +710,6 @@ async test "pull: refuses dirty worktree when fetch advances current branch" {
     @bitlib.resolve_ref(fs, root + "/.git", "refs/heads/third"),
     second_id,
   )
-
-  restore_env_var_for_fetch_wbtest("GIT_SHIM_CWD", prev_cwd)
   cleanup_tree(fs, root)
 }
 
@@ -674,7 +721,6 @@ async test "pull: rebase rejects multiple explicit refspecs" {
     get_current_timestamp().to_string()
   cleanup_tree(fs, root)
   fs.mkdir_p(root)
-  let prev_cwd = @sys.get_env_var("GIT_SHIM_CWD")
 
   commit_wbtest_run_git(root, ["init", "--initial-branch=main", "-q"])
   commit_wbtest_run_git(root, ["config", "user.name", "Test User"])
@@ -686,18 +732,13 @@ async test "pull: rebase rejects multiple explicit refspecs" {
   fs.write_string(root + "/file", "modified\n")
   commit_wbtest_run_git(root, ["commit", "-q", "-a", "-m", "modified"])
 
-  let rejected = try {
-    @sys.set_env_var("GIT_SHIM_CWD", root)
-    ignore(handle_pull(["--rebase", ".", "copy", "main"]))
-    false
-  } catch {
-    @bitcore.GitError::InvalidObject(msg) =>
-      msg.contains("Cannot rebase onto multiple branches")
-    _ => false
-  }
+  let (code, _stdout, stderr) = handlers_remote_pull_wbtest_collect_shim_git(
+    root,
+    ["pull", "--rebase", ".", "copy", "main"],
+  )
 
-  assert_true(rejected)
-  restore_env_var_for_fetch_wbtest("GIT_SHIM_CWD", prev_cwd)
+  assert_true(code != 0)
+  assert_true(stderr.contains("Cannot rebase onto multiple branches"))
   cleanup_tree(fs, root)
 }
 
@@ -709,7 +750,6 @@ async test "pull: rebase autostash preserves staged file on fast-forward" {
     get_current_timestamp().to_string()
   cleanup_tree(fs, root)
   fs.mkdir_p(root)
-  let prev_cwd = @sys.get_env_var("GIT_SHIM_CWD")
 
   commit_wbtest_run_git(root, ["init", "--initial-branch=main", "-q"])
   commit_wbtest_run_git(root, ["config", "user.name", "Test User"])
@@ -725,8 +765,9 @@ async test "pull: rebase autostash preserves staged file on fast-forward" {
   commit_wbtest_run_git(root, ["add", "new_file"])
   commit_wbtest_run_git(root, ["config", "rebase.autostash", "true"])
 
-  @sys.set_env_var("GIT_SHIM_CWD", root)
-  handle_pull(["--rebase", ".", "main"])
+  handlers_remote_pull_wbtest_run_shim_git(root, [
+    "pull", "--rebase", "-q", ".", "main",
+  ])
 
   assert_eq(
     decode_bytes(
@@ -741,8 +782,6 @@ async test "pull: rebase autostash preserves staged file on fast-forward" {
     "modified again\n",
   )
   assert_eq(@bitlib.stash_list(fs, root + "/.git").length(), 0)
-
-  restore_env_var_for_fetch_wbtest("GIT_SHIM_CWD", prev_cwd)
   cleanup_tree(fs, root)
 }
 

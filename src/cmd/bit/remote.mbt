@@ -3136,7 +3136,9 @@ async fn fetch_from_remote(
   let default_ref = @protocol.select_default_ref(refs, symrefs)
   match default_ref {
     None => {
-      print_line("No refs to fetch")
+      if not(quiet) {
+        print_line("No refs to fetch")
+      }
       return ()
     }
     Some((refname, commit_id)) => {
@@ -3155,7 +3157,9 @@ async fn fetch_from_remote(
       if prev_id is Some(pid) && pid == commit_id {
         return ()
       }
-      print_line("Fetching from \{remote_url}...")
+      if not(quiet) {
+        print_line("Fetching from \{remote_url}...")
+      }
       let pack = match transport {
         UploadPackTransport::Http =>
           @bitnative.fetch_pack_http(remote_url, [commit_id], true, filter~)
@@ -3187,13 +3191,20 @@ async fn fetch_from_remote(
         }
       }
       write_ref_file(fs, git_dir, remote_ref, commit_id)
-      print_line("From \{remote_url}")
+      if not(quiet) {
+        print_line("From \{remote_url}")
+      }
       match prev_id {
-        None => print_line(" * [new branch] \{refname} -> \{remote_ref}")
+        None =>
+          if not(quiet) {
+            print_line(" * [new branch] \{refname} -> \{remote_ref}")
+          }
         Some(pid) =>
-          print_line(
-            "   \{pid.to_hex()}..\{commit_id.to_hex()}  \{refname} -> \{remote_ref}",
-          )
+          if not(quiet) {
+            print_line(
+              "   \{pid.to_hex()}..\{commit_id.to_hex()}  \{refname} -> \{remote_ref}",
+            )
+          }
       }
     }
   }

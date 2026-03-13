@@ -1909,7 +1909,7 @@ async test "submodule add: detached local source still copies target history" {
   fs.write_string(source_dir + "/b", "two\n")
   submodule_wbtest_run_git(source_dir, ["add", "b"])
   submodule_wbtest_run_git(source_dir, ["commit", "-q", "-m", "two"])
-  submodule_wbtest_run_git(source_dir, ["checkout", "--detach", "HEAD"])
+  submodule_wbtest_run_git(source_dir, ["checkout", "--detach", "-q", "HEAD"])
 
   submodule_wbtest_run_git(root, [
     "init", "--initial-branch=main", "-q", "super",

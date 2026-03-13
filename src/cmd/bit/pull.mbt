@@ -24,6 +24,7 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
   let mut cli_rebase_behavior : (Bool, Bool)? = None
   let mut autostash : Bool? = None
   let mut verify_signatures : Bool? = None
+  let mut quiet = false
   let mut arg_remote : String? = None
   let arg_refspecs : Array[String] = []
   let mut pull_adhoc_remote = false
@@ -104,13 +105,15 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
       | "--no-stat"
       | "--verbose"
       | "-v"
-      | "--quiet"
-      | "-q"
       | "--progress"
       | "--no-progress"
       | "--allow-unrelated-histories" =>
         // no-value flags, ignore
         i += 1
+      "--quiet" | "-q" => {
+        quiet = true
+        i += 1
+      }
       "-s"
       | "--strategy"
       | "-X"
@@ -275,7 +278,9 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
       preferred_sender~,
       preferred_repo~,
     )
-    print_line("Relay peer selected: \{relay_sender} -> \{relay_fetch_url}")
+    if not(quiet) {
+      print_line("Relay peer selected: \{relay_sender} -> \{relay_fetch_url}")
+    }
     pull_url = relay_fetch_url
   }
   let pre_fetch_head = @bitlib.resolve_ref(fs, git_dir, "HEAD")
@@ -345,7 +350,9 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
   } else {
     None
   }
-  print_line("Fetching from \{pull_url}...")
+  if not(quiet) {
+    print_line("Fetching from \{pull_url}...")
+  }
   fetch_from_remote(
     fs,
     git_dir,
@@ -354,6 +361,7 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
     pull_url,
     fetch_refspecs,
     update_head_ok=explicit_refspec.target_ref is Some(_),
+    quiet=quiet,
   )
   let mut target_id = @bitlib.resolve_ref(fs, git_dir, target_ref)
   if target_id is None {
@@ -414,7 +422,9 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
   match (pre_fetch_head, pre_fetch_checked_out_head_status) {
     (Some(old_id), Some(status)) =>
       if old_id != tid {
-        eprint_line("fetch updated the current branch head")
+        if not(quiet) {
+          eprint_line("fetch updated the current branch head")
+        }
         if not(pull_can_fast_forward_checked_out_head(status, target_modes)) {
           if pull_adhoc_remote {
             @bitlib.remove_remote_refs(fs, fs, git_dir, remote_name)
@@ -516,7 +526,9 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
         )
       None => ()
     }
-    print_line("Fast-forward")
+    if not(quiet) {
+      print_line("Fast-forward")
+    }
     if pull_adhoc_remote {
       @bitlib.remove_remote_refs(fs, fs, git_dir, remote_name)
     }
@@ -544,7 +556,7 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
     if interactive_rebase {
       interactive_rebase_start(fs, fs, root, git_dir, rebase_upstream, tid)
       if not(rfs.is_dir(git_dir + "/rebase-merge")) {
-        pull_apply_autostash(fs, fs, git_dir, root, autostash_state)
+        pull_apply_autostash(fs, fs, git_dir, root, autostash_state, quiet)
       }
     } else {
       let result = @bitlib.rebase_start_with_onto(
@@ -562,20 +574,28 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
                     )
                   _ => ()
                 }
-                print_line("Fast-forward")
+                if not(quiet) {
+                  print_line("Fast-forward")
+                }
               } else {
-                print_line("Updated to \{id.to_hex()}")
+                if not(quiet) {
+                  print_line("Updated to \{id.to_hex()}")
+                }
               }
-              pull_apply_autostash(fs, fs, git_dir, root, autostash_state)
+              pull_apply_autostash(fs, fs, git_dir, root, autostash_state, quiet)
             }
             None => {
-              print_line("Successfully rebased.")
-              pull_apply_autostash(fs, fs, git_dir, root, autostash_state)
+              if not(quiet) {
+                print_line("Successfully rebased.")
+              }
+              pull_apply_autostash(fs, fs, git_dir, root, autostash_state, quiet)
             }
           }
         @bitlib.RebaseStatus::NothingToRebase => {
-          print_line("Current branch is up to date.")
-          pull_apply_autostash(fs, fs, git_dir, root, autostash_state)
+          if not(quiet) {
+            print_line("Current branch is up to date.")
+          }
+          pull_apply_autostash(fs, fs, git_dir, root, autostash_state, quiet)
         }
         @bitlib.RebaseStatus::Conflict => {
           pull_eprint_rebase_conflict(result.conflicts)
@@ -590,7 +610,10 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
     fs, fs, root, tid, msg, author, timestamp,
   )
   match result.status {
-    @bitlib.MergeStatus::AlreadyUpToDate => print_line("Already up to date.")
+    @bitlib.MergeStatus::AlreadyUpToDate =>
+      if not(quiet) {
+        print_line("Already up to date.")
+      }
     @bitlib.MergeStatus::FastForward =>
       match result.commit_id {
         Some(id) => {
@@ -602,7 +625,9 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
             None => ()
           }
           let short = String::unsafe_substring(id.to_hex(), start=0, end=7)
-          print_line("Fast-forward to \{short}")
+          if not(quiet) {
+            print_line("Fast-forward to \{short}")
+          }
         }
         None => {
           match pre_fetch_head {
@@ -612,16 +637,20 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
               )
             None => ()
           }
-          print_line("Fast-forward")
+          if not(quiet) {
+            print_line("Fast-forward")
+          }
         }
       }
     @bitlib.MergeStatus::Merged =>
       match result.commit_id {
         Some(id) => {
           let short = String::unsafe_substring(id.to_hex(), start=0, end=7)
-          print_line("Merge made by the 'ort' strategy. [\{short}]")
+          if not(quiet) {
+            print_line("Merge made by the 'ort' strategy. [\{short}]")
+          }
         }
-        None => print_line("Merged")
+        None => if not(quiet) { print_line("Merged") }
       }
     @bitlib.MergeStatus::Conflicted => {
       print_line("CONFLICT (content): Merge conflict in the following files:")
@@ -633,7 +662,7 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
   }
   match result.status {
     @bitlib.MergeStatus::Conflicted => ()
-    _ => pull_apply_autostash(fs, fs, git_dir, root, autostash_state)
+    _ => pull_apply_autostash(fs, fs, git_dir, root, autostash_state, quiet)
   }
   if pull_adhoc_remote {
     @bitlib.remove_remote_refs(fs, fs, git_dir, remote_name)
@@ -766,6 +795,7 @@ async fn pull_apply_autostash(
   git_dir : String,
   root : String,
   state : PullAutostashState?,
+  quiet : Bool,
 ) -> Unit raise Error {
   match state {
     None => return
@@ -806,7 +836,9 @@ async fn pull_apply_autostash(
           }
         }
       }
-      print_line("Applied autostash.")
+      if not(quiet) {
+        print_line("Applied autostash.")
+      }
     }
   }
 }

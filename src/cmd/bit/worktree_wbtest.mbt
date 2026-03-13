@@ -795,7 +795,7 @@ async fn worktree_wbtest_case_guess_remote_uses_configured_remote_name() -> Unit
   @sys.unset_env_var("GIT_DIR")
   @sys.unset_env_var("GIT_WORK_TREE")
 
-  worktree_wbtest_run_shim_git(["fetch"])
+  worktree_wbtest_run_shim_git(["fetch", "-q"])
   worktree_wbtest_run_shim_git(["worktree", "add", "--guess-remote", "foo"])
 
   assert_true(fs.is_dir(repo_dir + "/foo"))
