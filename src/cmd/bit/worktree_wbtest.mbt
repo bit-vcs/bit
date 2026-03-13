@@ -1,4 +1,66 @@
 ///|
+let worktree_wbtest_shim_lock : @async.Semaphore = @async.Semaphore::new(
+  1,
+  initial_value=1,
+)
+
+///|
+fn worktree_wbtest_current_shim_cwd() -> String {
+  @sys.get_env_var("GIT_SHIM_CWD").unwrap_or(".")
+}
+
+///|
+async fn worktree_wbtest_collect_shim_git(
+  args : Array[String],
+) -> (Int, String, String) raise Error {
+  worktree_wbtest_shim_lock.acquire()
+  defer worktree_wbtest_shim_lock.release()
+  let repo_root = @env.current_dir().unwrap_or(".")
+  let shim_git = repo_root + "/tools/git-shim/bin/git"
+  let shim_moon = "/tmp/bit-worktree-shim-moon.sh"
+  let target_dir = "/tmp/bit-worktree-shim-target"
+  let fs = OsFs::new()
+  fs.write_string(
+    shim_moon,
+    "#!/bin/sh\nset -eu\ncd '\{repo_root}'\nexec moon run --target native --target-dir '\{target_dir}' src/cmd/bit -- \"$@\"\n",
+  )
+  let chmod_code = @process.run("chmod", ["+x", shim_moon], inherit_env=true)
+  assert_eq(chmod_code, 0)
+  let env : Map[String, String] = {
+    "SHIM_REAL_GIT": repo_root + "/third_party/git/git",
+    "SHIM_EXEC_PATH": repo_root + "/third_party/git",
+    "SHIM_MOON": shim_moon,
+    "SHIM_CMDS": "worktree fetch",
+    "SHIM_STRICT": "1",
+  }
+  let git_args : Array[String] = ["-C", worktree_wbtest_current_shim_cwd()]
+  for arg in args {
+    git_args.push(arg)
+  }
+  let (code, stdout, stderr) = @process.collect_output(
+    shim_git,
+    git_args[:],
+    extra_env=env,
+    inherit_env=true,
+  )
+  let stdout_text = stdout.text() catch { _ => "" }
+  let stderr_text = stderr.text() catch { _ => "" }
+  let normalized_code = if code == 0 &&
+    (stderr_text.has_prefix("fatal:") || stderr_text.contains(" failed: ")) {
+    1
+  } else {
+    code
+  }
+  (normalized_code, stdout_text, stderr_text)
+}
+
+///|
+async fn worktree_wbtest_run_shim_git(args : Array[String]) -> Unit raise Error {
+  let (code, _stdout, _stderr) = worktree_wbtest_collect_shim_git(args)
+  assert_eq(code, 0)
+}
+
+///|
 
 ///|
 test "worktree: quote path uses utf8 octal escapes" {
@@ -93,7 +155,7 @@ async fn worktree_wbtest_case_dash_shorthand() -> Unit raise Error {
   @sys.unset_env_var("GIT_DIR")
   @sys.unset_env_var("GIT_WORK_TREE")
 
-  handle_worktree(["add", "short-hand", "-"])
+  worktree_wbtest_run_shim_git(["worktree", "add", "short-hand", "-"])
 
   assert_eq(
     add_test_git_stdout(root + "/repo/short-hand", [
@@ -141,7 +203,7 @@ async fn worktree_wbtest_case_relative_path_from_cwd() -> Unit raise Error {
   @sys.unset_env_var("GIT_DIR")
   @sys.unset_env_var("GIT_WORK_TREE")
 
-  handle_worktree(["add", "--detach", "here", "main"])
+  worktree_wbtest_run_shim_git(["worktree", "add", "--detach", "here", "main"])
 
   assert_true(fs.is_file(sub_dir + "/here/.git"))
   assert_false(fs.is_dir(repo_dir + "/here"))
@@ -183,8 +245,9 @@ async fn worktree_wbtest_case_lock_reason() -> Unit raise Error {
   @sys.unset_env_var("GIT_DIR")
   @sys.unset_env_var("GIT_WORK_TREE")
 
-  handle_worktree([
-    "add", "--detach", "--lock", "--reason", "why not", "here-with-lock", "main",
+  worktree_wbtest_run_shim_git([
+    "worktree", "add", "--detach", "--lock", "--reason", "why not", "here-with-lock",
+    "main",
   ])
 
   assert_eq(
@@ -232,7 +295,7 @@ async fn worktree_wbtest_case_detach_defaults_to_head() -> Unit raise Error {
   @sys.unset_env_var("GIT_WORK_TREE")
 
   let expected_head = add_test_git_stdout(repo_dir, ["rev-parse", "HEAD"])
-  handle_worktree(["add", "--detach", "detached-here"])
+  worktree_wbtest_run_shim_git(["worktree", "add", "--detach", "detached-here"])
 
   assert_eq(
     add_test_git_stdout(repo_dir + "/detached-here", ["rev-parse", "HEAD"]),
@@ -277,7 +340,7 @@ async fn worktree_wbtest_case_explicit_head_creates_detached_worktree() -> Unit 
   @sys.unset_env_var("GIT_WORK_TREE")
 
   let expected_head = add_test_git_stdout(repo_dir, ["rev-parse", "HEAD"])
-  handle_worktree(["add", "head-explicit", "HEAD"])
+  worktree_wbtest_run_shim_git(["worktree", "add", "head-explicit", "HEAD"])
 
   assert_eq(
     add_test_git_stdout(repo_dir + "/head-explicit", ["rev-parse", "HEAD"]),
@@ -328,9 +391,11 @@ async fn worktree_wbtest_case_prune_keeps_recent_checkout() -> Unit raise Error 
   @sys.unset_env_var("GIT_DIR")
   @sys.unset_env_var("GIT_WORK_TREE")
 
-  handle_worktree(["add", "jlm", "HEAD"])
+  worktree_wbtest_run_shim_git(["worktree", "add", "jlm", "HEAD"])
   cleanup_tree(fs, repo_dir + "/jlm")
-  handle_worktree(["prune", "--verbose", "--expire=2.days.ago"])
+  worktree_wbtest_run_shim_git([
+    "worktree", "prune", "--verbose", "--expire=2.days.ago",
+  ])
 
   assert_true(fs.is_dir(repo_dir + "/.git/worktrees/jlm"))
 
@@ -375,7 +440,7 @@ async fn worktree_wbtest_case_existing_branch_dwim() -> Unit raise Error {
   @sys.unset_env_var("GIT_WORK_TREE")
 
   let expected_head = add_test_git_stdout(repo_dir, ["rev-parse", "dwim"])
-  handle_worktree(["add", "dwim"])
+  worktree_wbtest_run_shim_git(["worktree", "add", "dwim"])
 
   assert_eq(
     add_test_git_stdout(repo_dir + "/dwim", ["rev-parse", "HEAD"]),
@@ -420,7 +485,7 @@ async fn worktree_wbtest_case_force_allows_current_branch_dwim() -> Unit raise E
   @sys.unset_env_var("GIT_DIR")
   @sys.unset_env_var("GIT_WORK_TREE")
 
-  handle_worktree(["add", "--force", "test-branch"])
+  worktree_wbtest_run_shim_git(["worktree", "add", "--force", "test-branch"])
 
   assert_eq(
     add_test_git_stdout(repo_dir + "/test-branch", ["symbolic-ref", "HEAD"]),
@@ -476,12 +541,12 @@ async fn worktree_wbtest_case_copies_filtered_worktree_config() -> Unit raise Er
   @sys.unset_env_var("GIT_DIR")
   @sys.unset_env_var("GIT_WORK_TREE")
 
-  handle_worktree(["add", there4_dir, "main"])
+  worktree_wbtest_run_shim_git(["worktree", "add", there4_dir, "main"])
 
   @sys.set_env_var("GIT_SHIM_CWD", there4_dir)
   @sys.set_env_var("GIT_SHIM_PWD", there4_dir)
   @sys.set_env_var("GIT_SHIM_CALLER_PWD", there4_dir)
-  handle_worktree(["add", "--detach", there5_dir])
+  worktree_wbtest_run_shim_git(["worktree", "add", "--detach", there5_dir])
 
   let there4_config = decode_bytes(
     fs.read_file(source_dir + "/worktrees/there4/config.worktree"),
@@ -537,7 +602,9 @@ async fn worktree_wbtest_case_relative_paths_option() -> Unit raise Error {
   @sys.unset_env_var("GIT_DIR")
   @sys.unset_env_var("GIT_WORK_TREE")
 
-  handle_worktree(["add", "--detach", "--relative-paths", "relative", "main"])
+  worktree_wbtest_run_shim_git([
+    "worktree", "add", "--detach", "--relative-paths", "relative", "main",
+  ])
 
   assert_eq(
     decode_bytes(fs.read_file(repo_dir + "/relative/.git")),
@@ -589,8 +656,12 @@ async fn worktree_wbtest_case_config_relative_paths_default_and_override() -> Un
   @sys.unset_env_var("GIT_DIR")
   @sys.unset_env_var("GIT_WORK_TREE")
 
-  handle_worktree(["add", "--detach", "config-relative", "main"])
-  handle_worktree(["add", "--detach", "--no-relative-paths", "absolute", "main"])
+  worktree_wbtest_run_shim_git([
+    "worktree", "add", "--detach", "config-relative", "main",
+  ])
+  worktree_wbtest_run_shim_git([
+    "worktree", "add", "--detach", "--no-relative-paths", "absolute", "main",
+  ])
 
   assert_eq(
     decode_bytes(fs.read_file(repo_dir + "/config-relative/.git")),
@@ -643,7 +714,7 @@ async fn worktree_wbtest_case_infers_orphan_without_guess_remote() -> Unit raise
   @sys.unset_env_var("GIT_DIR")
   @sys.unset_env_var("GIT_WORK_TREE")
 
-  handle_worktree(["add", "--no-guess-remote", "foo"])
+  worktree_wbtest_run_shim_git(["worktree", "add", "--no-guess-remote", "foo"])
 
   assert_true(fs.is_dir(repo_dir + "/foo"))
   assert_eq(
@@ -724,8 +795,8 @@ async fn worktree_wbtest_case_guess_remote_uses_configured_remote_name() -> Unit
   @sys.unset_env_var("GIT_DIR")
   @sys.unset_env_var("GIT_WORK_TREE")
 
-  handle_fetch([])
-  handle_worktree(["add", "--guess-remote", "foo"])
+  worktree_wbtest_run_shim_git(["fetch"])
+  worktree_wbtest_run_shim_git(["worktree", "add", "--guess-remote", "foo"])
 
   assert_true(fs.is_dir(repo_dir + "/foo"))
   assert_eq(
@@ -774,13 +845,12 @@ async fn worktree_wbtest_case_repair_rejects_invalid_path() -> Unit raise Error 
   @sys.unset_env_var("GIT_DIR")
   @sys.unset_env_var("GIT_WORK_TREE")
 
-  let err = try {
-    handle_worktree(["repair", "/notvalid"])
-    None
-  } catch {
-    err => Some(err.to_string())
-  }
-  assert_true(err.unwrap_or("").contains("not a valid path"))
+  let (invalid_code, _stdout, invalid_stderr) = worktree_wbtest_collect_shim_git([
+      "worktree", "repair", "/notvalid",
+    ],
+  )
+  assert_true(invalid_code != 0)
+  assert_true(invalid_stderr.contains("not a valid path"))
 
   add_test_restore_env("GIT_SHIM_CWD", prev_shim_cwd)
   add_test_restore_env("GIT_SHIM_PWD", prev_shim_pwd)
@@ -815,13 +885,11 @@ async fn worktree_wbtest_case_repair_rejects_git_dir_directory() -> Unit raise E
   @sys.unset_env_var("GIT_DIR")
   @sys.unset_env_var("GIT_WORK_TREE")
 
-  let err = try {
-    handle_worktree(["repair", "not-a-worktree"])
-    None
-  } catch {
-    err => Some(err.to_string())
-  }
-  assert_true(err.unwrap_or("").contains(".git is not a file"))
+  let (gitdir_code, _stdout, gitdir_stderr) = worktree_wbtest_collect_shim_git([
+    "worktree", "repair", "not-a-worktree",
+  ])
+  assert_true(gitdir_code != 0)
+  assert_true(gitdir_stderr.contains(".git is not a file"))
 
   add_test_restore_env("GIT_SHIM_CWD", prev_shim_cwd)
   add_test_restore_env("GIT_SHIM_PWD", prev_shim_pwd)
@@ -866,14 +934,13 @@ async fn worktree_wbtest_case_repair_rejects_non_repo_gitfile() -> Unit raise Er
   @sys.unset_env_var("GIT_DIR")
   @sys.unset_env_var("GIT_WORK_TREE")
 
-  let err = try {
-    handle_worktree(["repair", "side"])
-    None
-  } catch {
-    err => Some(err.to_string())
-  }
+  let (nonrepo_code, _stdout, nonrepo_stderr) = worktree_wbtest_collect_shim_git([
+      "worktree", "repair", "side",
+    ],
+  )
+  assert_true(nonrepo_code != 0)
   assert_true(
-    err.unwrap_or("").contains(".git file does not reference a repository"),
+    nonrepo_stderr.contains(".git file does not reference a repository"),
   )
 
   add_test_restore_env("GIT_SHIM_CWD", prev_shim_cwd)
@@ -886,6 +953,8 @@ async fn worktree_wbtest_case_repair_rejects_non_repo_gitfile() -> Unit raise Er
 
 ///|
 async test "worktree: add command path cases stay compatible" {
+  cmd_bit_wbtest_env_lock.acquire()
+  defer cmd_bit_wbtest_env_lock.release()
   worktree_wbtest_case_dash_shorthand()
   worktree_wbtest_case_relative_path_from_cwd()
   worktree_wbtest_case_lock_reason()

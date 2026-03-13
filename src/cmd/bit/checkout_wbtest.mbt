@@ -201,7 +201,7 @@ async fn checkout_wbtest_case_switch_back_after_shim_commit() -> Unit raise Erro
   handle_checkout(["-b", "newbranch"])
   fs.write_string(repo_dir + "/myworld", "hello\n")
   handle_add(["myworld"])
-  handle_commit(["-m", "myworld"])
+  handle_commit(["-q", "-m", "myworld"])
 
   handle_checkout(["main"])
 
@@ -900,6 +900,8 @@ async fn checkout_wbtest_case_previous_checkout_syntax() -> Unit raise Error {
 
 ///|
 async test "checkout: command path cases stay compatible" {
+  cmd_bit_wbtest_env_lock.acquire()
+  defer cmd_bit_wbtest_env_lock.release()
   checkout_wbtest_case_treeish_restore()
   checkout_wbtest_case_treeish_restore_updates_index()
   checkout_wbtest_case_treeish_restore_without_separator()

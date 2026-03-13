@@ -132,6 +132,8 @@ fn update_index_wbtest_restore_cwd(prev : String?) -> Unit {
 ///|
 async test "update-index: assume-unchanged works for sparse missing path" {
   @bitnative.init_native_io()
+  cmd_bit_wbtest_env_lock.acquire()
+  defer cmd_bit_wbtest_env_lock.release()
   let fs = OsFs::new()
   let root = "/tmp/bit-test-update-index-assume-unchanged-" +
     get_current_timestamp().to_string()
