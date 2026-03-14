@@ -25,23 +25,12 @@ jobs:
         run: moon update
       - name: just check
         run: just check
-      - name: Run JS and WASM tests
+      - name: Run tests
+        timeout-minutes: 30
         run: |
           moon test --target js -p mizchi/bit -p mizchi/bit/lib
           moon test --target wasm -p mizchi/bit/runtime -f storage_runtime_wbtest.mbt
-      - name: Run native tests (non-wbtest)
-        timeout-minutes: 10
-        run: |
-          moon test --target native --no-parallelize -j 1 \
-            -p mizchi/bit -p mizchi/bit/lib -p mizchi/bit/repo_ops \
-            -p mizchi/bit/protocol -p mizchi/bit/diff -p mizchi/bit/grep \
-            -p mizchi/bit/hash -p mizchi/bit/ignore -p mizchi/bit/object \
-            -p mizchi/bit/pack -p mizchi/bit/runtime -p mizchi/bit/io
-      - name: Run native wbtests (cmd/bit)
-        timeout-minutes: 20
-        run: |
-          moon test --target native --no-parallelize -j 1 \
-            -p mizchi/bit/cmd/bit
+          moon test --target native --no-parallelize -j 1
 
   distributed-test:
     runs-on: ubuntu-latest
