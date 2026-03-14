@@ -145,7 +145,13 @@ fn sparse_enable_worktree_config(
   let config_path = join_path(git_dir, "config")
   let config = sparse_read_or_default_config(rfs, config_path)
   let config_with_extension = sparse_upsert_section_bool(
-    sparse_upsert_section_value(config, "core", "repositoryformatversion", "1"),
+    sparse_upsert_core_bool(
+      sparse_upsert_section_value(
+        config, "core", "repositoryformatversion", "1",
+      ),
+      "sparseCheckout",
+      true,
+    ),
     "extensions",
     "worktreeConfig",
     true,
@@ -982,6 +988,12 @@ fn sparse_update_worktree(
       let protected_skip_paths : Map[String, Bool] = {}
       for entry in current_entries {
         if matches_sparse_pattern(entry.path, patterns) {
+          continue
+        }
+        // Reapply should still prune root-level skipped files back to the
+        // current sparse patterns, while preserving dirty paths inside skipped
+        // directories that may coexist with user files.
+        if preserve_index && not(entry.path.contains("/")) {
           continue
         }
         if sparse_worktree_matches_index_entry(

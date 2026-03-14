@@ -103,7 +103,11 @@ fn storage_runtime_parse_init_args(
         continue
       }
       _ if arg.has_prefix("--initial-branch=") =>
-        default_branch = String::unsafe_substring(arg, start=17, end=arg.length())
+        default_branch = String::unsafe_substring(
+          arg,
+          start=17,
+          end=arg.length(),
+        )
       _ if arg.has_prefix("--ref-format=") => {
         let value = String::unsafe_substring(arg, start=13, end=arg.length()).to_lower()
         if value != "files" {
@@ -196,7 +200,9 @@ fn storage_runtime_parse_commit_args(
         continue
       }
       _ if arg.has_prefix("--message=") => {
-        message = Some(String::unsafe_substring(arg, start=10, end=arg.length()))
+        message = Some(
+          String::unsafe_substring(arg, start=10, end=arg.length()),
+        )
         i += 1
         continue
       }

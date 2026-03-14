@@ -58,9 +58,9 @@ pub fn collect_tree_files(ObjectDb, &@types.RepoFileSystem, @object.ObjectId) ->
 
 pub fn collect_tree_files_from_commit(ObjectDb, &@types.RepoFileSystem, @object.ObjectId) -> Map[String, TreeFileEntry] raise @object.GitError
 
-pub fn commit(&@types.FileSystem, &@types.RepoFileSystem, String, String, String, Int64, committer? : String, committer_timestamp? : Int64, allow_empty? : Bool, timezone? : String, encoding? : String) -> @object.ObjectId raise @object.GitError
+pub fn commit(&@types.FileSystem, &@types.RepoFileSystem, String, String, String, Int64, committer? : String, committer_timestamp? : Int64, allow_empty? : Bool, timezone? : String, encoding? : String, author_timezone? : String?, committer_timezone? : String?) -> @object.ObjectId raise @object.GitError
 
-pub fn commit_amend(&@types.FileSystem, &@types.RepoFileSystem, String, String, String, Int64, committer? : String, committer_timestamp? : Int64, timezone? : String, encoding? : String) -> @object.ObjectId raise @object.GitError
+pub fn commit_amend(&@types.FileSystem, &@types.RepoFileSystem, String, String, String, Int64, committer? : String, committer_timestamp? : Int64, timezone? : String, encoding? : String, author_timezone? : String?, committer_timezone? : String?) -> @object.ObjectId raise @object.GitError
 
 pub fn config_has_remote_section(Array[ConfigBlock], String) -> Bool
 

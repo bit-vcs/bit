@@ -238,10 +238,18 @@ fn relay_ws_url(
   room_token~ : String?,
 ) -> String {
   let ws_base = if base_url.has_prefix("https://") {
-    let rest = String::unsafe_substring(base_url, start=8, end=base_url.length())
+    let rest = String::unsafe_substring(
+      base_url,
+      start=8,
+      end=base_url.length(),
+    )
     "wss://" + rest
   } else if base_url.has_prefix("http://") {
-    let rest = String::unsafe_substring(base_url, start=7, end=base_url.length())
+    let rest = String::unsafe_substring(
+      base_url,
+      start=7,
+      end=base_url.length(),
+    )
     "ws://" + rest
   } else {
     "ws://" + base_url

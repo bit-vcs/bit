@@ -102,28 +102,28 @@ fn sparse_checkout_path_is_directory_like(
   rfs : &@bitcore.RepoFileSystem,
   root : String,
   path : String,
-) -> Bool raise Error {
+) -> Bool? raise Error {
   let worktree_path = root + "/" + path
   if rfs.is_dir(worktree_path) {
-    return true
+    return Some(true)
   }
   if rfs.is_file(worktree_path) {
-    return false
+    return Some(false)
   }
   let git_dir = resolve_git_dir(rfs, root)
   if not(rfs.is_file(git_dir + "/index")) {
-    return false
+    return None
   }
   let entries = @bitlib.read_index_entries(rfs, git_dir)
   for entry in entries {
     if entry.path.has_prefix(path + "/") {
-      return true
+      return Some(true)
     }
     if entry.path == path {
-      return false
+      return Some(false)
     }
   }
-  false
+  None
 }
 
 ///|
@@ -140,17 +140,20 @@ fn sparse_checkout_validate_literal_patterns(
   for pattern in patterns {
     match sparse_checkout_normalize_literal_pattern(pattern) {
       Some(path) =>
-        if not(sparse_checkout_path_is_directory_like(rfs, root, path)) {
-          if cone_mode {
-            raise @bitcore.GitError::InvalidObject(
-              "\{pattern} is not a directory",
-            )
+        match sparse_checkout_path_is_directory_like(rfs, root, path) {
+          Some(false) => {
+            if cone_mode {
+              raise @bitcore.GitError::InvalidObject(
+                "\{pattern} is not a directory",
+              )
+            }
+            if not(pattern.has_prefix("/")) {
+              return Some(
+                "warning: pass a leading slash before paths such as '\{pattern}' if you want a single file",
+              )
+            }
           }
-          if not(pattern.has_prefix("/")) {
-            return Some(
-              "warning: pass a leading slash before paths such as '\{pattern}' if you want a single file",
-            )
-          }
+          _ => ()
         }
       _ => ()
     }

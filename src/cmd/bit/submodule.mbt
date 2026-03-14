@@ -2154,10 +2154,13 @@ async fn handle_submodule_init(
   args : Array[String],
   quiet? : Bool = false,
 ) -> Unit raise Error {
+  let mut quiet = quiet
   let raw_paths : Array[String] = []
   for arg in args {
-    if not(arg.has_prefix("-")) {
-      raw_paths.push(arg)
+    match arg {
+      "-q" | "--quiet" => quiet = true
+      _ if not(arg.has_prefix("-")) => raw_paths.push(arg)
+      _ => ()
     }
   }
   let rfs : &@bitcore.RepoFileSystem = fs
@@ -2901,11 +2904,13 @@ async fn handle_submodule_deinit(
 ) -> Unit raise Error {
   let mut force = false
   let mut all = false
+  let mut quiet = false
   let paths : Array[String] = []
   for arg in args {
     match arg {
       "-f" | "--force" => force = true
       "--all" => all = true
+      "-q" | "--quiet" => quiet = true
       _ if not(arg.has_prefix("-")) => paths.push(arg)
       _ => ()
     }
@@ -3045,14 +3050,16 @@ async fn handle_submodule_deinit(
     if not(rfs.is_dir(sub_path)) && not(rfs.is_file(sub_path)) {
       fs.mkdir_p(sub_path)
     }
-    match registered_url {
-      Some(url) =>
-        print_line(
-          "Submodule '\{sub.name}' (\{url}) unregistered for path '\{display_path}'",
-        )
-      None => ()
+    if not(quiet) {
+      match registered_url {
+        Some(url) =>
+          print_line(
+            "Submodule '\{sub.name}' (\{url}) unregistered for path '\{display_path}'",
+          )
+        None => ()
+      }
     }
-    if cleared_worktree {
+    if cleared_worktree && not(quiet) {
       print_line("Cleared directory '\{display_path}'")
     }
   }
@@ -3211,10 +3218,12 @@ async fn handle_submodule_sync(
   args : Array[String],
 ) -> Unit raise Error {
   let mut recursive = false
+  let mut quiet = false
   let paths : Array[String] = []
   for arg in args {
     match arg {
       "--recursive" => recursive = true
+      "-q" | "--quiet" => quiet = true
       _ if not(arg.has_prefix("-")) => paths.push(arg)
       _ => ()
     }
@@ -3275,7 +3284,9 @@ async fn handle_submodule_sync(
       let updated = update_remote_origin(content, sync_origin_url)
       wfs.write_string(sub_config, updated)
     }
-    print_line("Synchronizing submodule url for '\{sub.path}'")
+    if not(quiet) {
+      print_line("Synchronizing submodule url for '\{sub.path}'")
+    }
     // Handle recursive
     if recursive {
       let nested = sub_path + "/.gitmodules"

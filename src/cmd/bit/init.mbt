@@ -338,8 +338,7 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
           linked
         } else {
           match dot_git_path.rev_find("/") {
-            Some(idx) =>
-              string_slice_to(dot_git_path, idx) + "/" + linked
+            Some(idx) => string_slice_to(dot_git_path, idx) + "/" + linked
             None => linked
           }
         }

@@ -430,9 +430,9 @@ fn index_test_replace_single_entry_with_stages(
     patched.append(entry_copy)
   }
   patched.append(trailing)
-  let content = Bytes::from_array(FixedArray::makei(patched.length(), fn(i) {
-    patched[i]
-  }))
+  let content = Bytes::from_array(
+    FixedArray::makei(patched.length(), fn(i) { patched[i] }),
+  )
   let checksum = @bit.sha1(content)
   for i in 0..<20 {
     patched.push(checksum.bytes[i])
