@@ -104,12 +104,16 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
   let mut format : String? = None
   let mut pretty_color_cli_mode : String? = None
   let mut topo_order = false
-  let mut date_order = false
+  let date_order = false
   let mut parents = false
   let mut header = false
   let mut use_nul = false
   let mut boundary = false
   let mut left_right = false
+  let mut max_parents : Int? = None
+  let mut min_parents : Int? = None
+  let mut graph = false
+  let mut no_walk = false
   let refs : Array[String] = []
   let excludes : Array[String] = []
   let mut i = 0
@@ -128,14 +132,41 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
       "--reverse" => reverse = true
       "--ancestry-path" => () // Ignored for now
       "--topo-order" => topo_order = true
-      "--date-order" => date_order = true
+      "--date-order" => ignore(date_order) // date order is now default
       "--parents" => parents = true
       "--header" => header = true
       "-z" => use_nul = true
       "--boundary" => boundary = true
       "--left-right" => left_right = true
-      "--no-walk" | "--do-walk" | "--no-walk=sorted" | "--no-walk=unsorted" =>
-        ()
+      "--no-walk" | "--no-walk=sorted" | "--no-walk=unsorted" => no_walk = true
+      "--do-walk" => no_walk = false
+      "--merges" => min_parents = Some(2)
+      "--no-merges" => max_parents = Some(1)
+      "--min-parents" if i + 1 < args.length() => {
+        min_parents = Some(rev_list_parse_int_or_die(args[i + 1]))
+        i += 2
+        continue
+      }
+      "--max-parents" if i + 1 < args.length() => {
+        max_parents = Some(rev_list_parse_int_or_die(args[i + 1]))
+        i += 2
+        continue
+      }
+      _ if arg.has_prefix("--min-parents=") =>
+        min_parents = Some(
+          rev_list_parse_int_or_die(
+            String::unsafe_substring(arg, start=14, end=arg.length()),
+          ),
+        )
+      _ if arg.has_prefix("--max-parents=") =>
+        max_parents = Some(
+          rev_list_parse_int_or_die(
+            String::unsafe_substring(arg, start=14, end=arg.length()),
+          ),
+        )
+      "--graph" => graph = true
+      "--no-min-parents" => min_parents = None
+      "--no-max-parents" => max_parents = None
       "--first-parent" => first_parent = true
       "--all" => all = true
       "--stdin" => stdin = true
@@ -251,28 +282,46 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
       }
     }
   }
-  // If --all, add all refs
+  // --graph --no-walk is forbidden
+  if graph && no_walk {
+    eprint_line(
+      "fatal: options '--graph' and '--no-walk' cannot be used together",
+    )
+    @sys.exit(1)
+  }
+  // If --all, add all refs including detached HEAD
   if all {
     let all_refs = @bitrepo.show_ref(fs, git_dir)
     for item in all_refs {
       let (name, _) = item
       refs.push(name)
     }
+    // Also include HEAD (detached head case)
+    refs.push("HEAD")
   }
   // If no refs specified, default to HEAD
   if refs.length() == 0 && not(indexed_objects) {
     refs.push("HEAD")
   }
+  ignore(graph)
+  ignore(no_walk)
   // Handle --test-bitmap
   if test_bitmap {
     rev_list_test_bitmap(fs, git_dir)
     return
   }
-  // Resolve starting commits
+  // Resolve starting commits (deduplicate)
   let start_ids : Array[@bitcore.ObjectId] = []
+  let start_seen : Map[String, Bool] = {}
   for spec in refs {
     match @bitrepo.rev_parse(fs, git_dir, spec) {
-      Some(id) => start_ids.push(id)
+      Some(id) => {
+        let hex = id.to_hex()
+        if not(start_seen.contains(hex)) {
+          start_seen[hex] = true
+          start_ids.push(id)
+        }
+      }
       None => ()
     }
   }
@@ -322,10 +371,39 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
       _ => ()
     }
   }
-  // Apply topo/date order before slicing so skip/max-count select from sorted
+  // Apply parent count filter (--merges, --no-merges, --min/max-parents)
+  if min_parents is Some(_) || max_parents is Some(_) {
+    let filtered : Array[@bitcore.ObjectId] = []
+    for id in result {
+      let parent_count = match db.get(fs, id) {
+        Some(obj) if obj.obj_type == @bitcore.ObjectType::Commit => {
+          let info = @bitcore.parse_commit(obj.data)
+          info.parents.length()
+        }
+        _ => 0
+      }
+      let min_ok = match min_parents {
+        Some(min) => parent_count >= min
+        None => true
+      }
+      let max_ok = match max_parents {
+        Some(max) => parent_count <= max
+        None => true
+      }
+      if min_ok && max_ok {
+        filtered.push(id)
+      }
+    }
+    result.clear()
+    for id in filtered {
+      result.push(id)
+    }
+  }
+  // Apply ordering. git defaults to date order (committer timestamp desc).
   if topo_order {
     rev_list_topo_sort(db, fs, result)
-  } else if date_order {
+  } else {
+    // Default: date order (same as git's default chronological ordering)
     rev_list_date_sort(db, fs, result)
   }
   if reverse {

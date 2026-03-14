@@ -72,7 +72,7 @@ async fn rev_list_test_run_shim_git(
     "SHIM_REAL_GIT": wbtest_resolve_real_git(repo_root),
     "SHIM_REAL_GIT_FALLBACK": "",
     "SHIM_EXEC_PATH": repo_root + "/third_party/git",
-    "SHIM_MOON": repo_root + "/tools/git-shim/moon",
+    "SHIM_MOON": repo_root + "/_build/native/release/build/cmd/bit/bit.exe",
     "SHIM_CMDS": "init status add commit log show branch checkout switch reset rebase stash cherry-pick diff diff-files diff-index merge tag rm mv config sparse-checkout restore rev-parse cat-file ls-files hash-object ls-tree write-tree show-ref update-ref update-index symbolic-ref reflog worktree gc clean grep submodule revert notes bisect describe blame format-patch shortlog remote clone fetch pull push receive-pack upload-pack pack-objects index-pack shell",
     "SHIM_STRICT": "1",
   }
@@ -102,7 +102,7 @@ async fn rev_list_test_shim_git_stdout(
     "SHIM_REAL_GIT": wbtest_resolve_real_git(repo_root),
     "SHIM_REAL_GIT_FALLBACK": "",
     "SHIM_EXEC_PATH": repo_root + "/third_party/git",
-    "SHIM_MOON": repo_root + "/tools/git-shim/moon",
+    "SHIM_MOON": repo_root + "/_build/native/release/build/cmd/bit/bit.exe",
     "SHIM_CMDS": "init status add commit log show branch checkout switch reset rebase stash cherry-pick diff diff-files diff-index merge tag rm mv config sparse-checkout restore rev-parse cat-file ls-files hash-object ls-tree write-tree show-ref update-ref update-index symbolic-ref reflog worktree gc clean grep submodule revert notes bisect describe blame format-patch shortlog remote clone fetch pull push receive-pack upload-pack pack-objects index-pack shell",
     "SHIM_STRICT": "1",
   }
