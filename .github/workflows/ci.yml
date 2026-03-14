@@ -25,6 +25,8 @@ jobs:
         run: moon update
       - name: just check
         run: just check
+      - name: Build native binary for wbtests
+        run: moon build --target native --release
       - name: Run JS and WASM tests
         run: |
           moon test --target js -p mizchi/bit -p mizchi/bit/lib
