@@ -25,12 +25,16 @@ jobs:
         run: moon update
       - name: just check
         run: just check
-      - name: Run tests
-        timeout-minutes: 30
+      - name: Run JS and WASM tests
         run: |
           moon test --target js -p mizchi/bit -p mizchi/bit/lib
           moon test --target wasm -p mizchi/bit/runtime -f storage_runtime_wbtest.mbt
-          moon test --target native --no-parallelize -j 1
+          # Kill any orphan moon processes and remove stale lock before native tests
+          pkill -f "moon" || true
+          rm -f _build/.moon-lock
+      - name: Run native tests
+        timeout-minutes: 30
+        run: moon test --target native --no-parallelize -j 1
 
   distributed-test:
     runs-on: ubuntu-latest
