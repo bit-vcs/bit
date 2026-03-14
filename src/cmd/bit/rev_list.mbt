@@ -322,7 +322,12 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
       _ => ()
     }
   }
-  // Apply reverse if requested
+  // Apply topo/date order before slicing so skip/max-count select from sorted
+  if topo_order {
+    rev_list_topo_sort(db, fs, result)
+  } else if date_order {
+    rev_list_date_sort(db, fs, result)
+  }
   if reverse {
     result.rev_in_place()
   }
@@ -382,12 +387,6 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
       }
     }
   }
-  // Apply topo-order if requested
-  if topo_order {
-    rev_list_topo_sort(db, fs, sliced_result)
-  } else if date_order {
-    rev_list_date_sort(db, fs, sliced_result)
-  }
   // Output
   if count_only {
     if objects {
@@ -402,7 +401,6 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
     return
   }
   ignore(left_right)
-  ignore(use_nul) // used for NUL output in non-format paths
   // Output commits
   match format {
     Some(raw_fmt) => {

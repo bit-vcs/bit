@@ -157,7 +157,7 @@ async fn bisect_mark(
   }
   wfs.write_string(bisect_log_path, existing_log + log_entry)
   if auto_next {
-    let root = bisect_root_from_git_dir(rfs, git_dir)
+    let root = bisect_root_from_git_dir(git_dir)
     bisect_next(wfs, rfs, root, git_dir)
   }
 }
@@ -189,7 +189,7 @@ async fn bisect_skip(
     _ => ""
   }
   wfs.write_string(bisect_log_path, existing_log + log_entry)
-  let root = bisect_root_from_git_dir(rfs, git_dir)
+  let root = bisect_root_from_git_dir(git_dir)
   bisect_next(wfs, rfs, root, git_dir)
 }
 
@@ -309,6 +309,11 @@ fn bisect_get_candidates(
   for g in goods {
     mark_ancestors(db, rfs, g, good_set)
   }
+  // Pre-build skip set for O(1) lookup
+  let skip_set : Map[String, Bool] = {}
+  for s in skips {
+    skip_set[s.to_hex()] = true
+  }
   let candidates : Array[@bitcore.ObjectId] = []
   let visited : Map[String, Bool] = {}
   let queue : Array[@bitcore.ObjectId] = [bad]
@@ -316,21 +321,11 @@ fn bisect_get_candidates(
     let current = queue.pop()
     guard current is Some(cid) else { break }
     let hex = cid.to_hex()
-    if visited.get(hex).unwrap_or(false) {
+    if visited.contains(hex) || good_set.contains(hex) {
       continue
     }
-    visited.set(hex, true)
-    if good_set.get(hex).unwrap_or(false) {
-      continue
-    }
-    let mut is_skipped = false
-    for s in skips {
-      if s.to_hex() == hex {
-        is_skipped = true
-        break
-      }
-    }
-    if not(is_skipped) && cid != bad {
+    visited[hex] = true
+    if not(skip_set.contains(hex)) && cid != bad {
       candidates.push(cid)
     }
     let obj = db.get(rfs, cid)
@@ -359,10 +354,10 @@ fn mark_ancestors(
     let current = queue.pop()
     guard current is Some(cid) else { break }
     let hex = cid.to_hex()
-    if set.get(hex).unwrap_or(false) {
+    if set.contains(hex) {
       continue
     }
-    set.set(hex, true)
+    set[hex] = true
     let obj = db.get(rfs, cid) catch { _ => None }
     match obj {
       Some(o) => {
@@ -784,17 +779,11 @@ fn bisect_shell_quote_args(args : Array[String]) -> String {
 }
 
 ///|
-/// Resolve work root from git_dir. Falls back to parent directory.
-fn bisect_root_from_git_dir(
-  rfs : &@bitcore.RepoFileSystem,
-  git_dir : String,
-) -> String {
-  // If git_dir ends with "/.git", strip it to get root
+/// Resolve work root from git_dir.
+fn bisect_root_from_git_dir(git_dir : String) -> String {
   if git_dir.has_suffix("/.git") {
     String::unsafe_substring(git_dir, start=0, end=git_dir.length() - 5)
   } else {
-    // Check for GIT_WORK_TREE or fall back
-    ignore(rfs)
     git_dir + "/.."
   }
 }

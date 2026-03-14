@@ -32,7 +32,6 @@ async fn bisect_wbtest_setup_session(
   let bisect_log_path = git_dir + "/BISECT_LOG"
   let bisect_terms_path = git_dir + "/BISECT_TERMS"
   let bisect_refs_dir = git_dir + "/refs/bisect"
-  ignore(rfs)
   wfs.mkdir_p(bisect_refs_dir)
   let head_content = decode_bytes(rfs.read_file(git_dir + "/HEAD"))
   let current_branch = if head_content.has_prefix("ref: refs/heads/") {
