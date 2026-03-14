@@ -58,10 +58,20 @@ async fn sparse_checkout_wbtest_shim_moon_path(
 ) -> String raise Error {
   let fs = OsFs::new()
   let wrapper_path = "/tmp/bit-sparse-shim-moon.sh"
-  let target_dir = "/tmp/bit-sparse-shim-target"
+  // Build the native binary first so exit codes propagate correctly
+  // (moon run swallows non-zero exit codes)
+  let bit_exe = repo_root + "/target/native/release/build/cmd/bit/bit.exe"
+  if not(fs.is_file(bit_exe)) {
+    let build_code = @process.run(
+      "moon",
+      ["build", "--target", "native", "--release"],
+      inherit_env=true,
+    )
+    assert_eq(build_code, 0)
+  }
   fs.write_string(
     wrapper_path,
-    "#!/bin/sh\nset -eu\ncd '\{repo_root}'\nexec moon run --target native --target-dir '\{target_dir}' src/cmd/bit -- \"$@\"\n",
+    "#!/bin/sh\nset -eu\nexec '\{bit_exe}' \"$@\"\n",
   )
   let chmod_code = @process.run("chmod", ["+x", wrapper_path], inherit_env=true)
   assert_eq(chmod_code, 0)

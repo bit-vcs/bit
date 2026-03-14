@@ -91,12 +91,19 @@ async fn update_index_wbtest_run_sparse_checkout_shim(
   let repo_root = @env.current_dir().unwrap_or(".")
   let shim_git = repo_root + "/tools/git-shim/bin/git"
   let shim_moon = "/tmp/bit-update-index-sparse-shim-moon.sh"
-  let target_dir = "/tmp/bit-update-index-sparse-shim-target"
   let fs = OsFs::new()
-  fs.write_string(
-    shim_moon,
-    "#!/bin/sh\nset -eu\ncd '\{repo_root}'\nexec moon run --target native --target-dir '\{target_dir}' src/cmd/bit -- \"$@\"\n",
-  )
+  // Build the native binary first so exit codes propagate correctly
+  // (moon run swallows non-zero exit codes)
+  let bit_exe = repo_root + "/target/native/release/build/cmd/bit/bit.exe"
+  if not(fs.is_file(bit_exe)) {
+    let build_code = @process.run(
+      "moon",
+      ["build", "--target", "native", "--release"],
+      inherit_env=true,
+    )
+    assert_eq(build_code, 0)
+  }
+  fs.write_string(shim_moon, "#!/bin/sh\nset -eu\nexec '\{bit_exe}' \"$@\"\n")
   let chmod_code = @process.run("chmod", ["+x", shim_moon], inherit_env=true)
   assert_eq(chmod_code, 0)
   let env : Map[String, String] = {
