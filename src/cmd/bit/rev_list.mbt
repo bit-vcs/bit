@@ -117,6 +117,7 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
   let refs : Array[String] = []
   let excludes : Array[String] = []
   let rev_list_exclude_patterns : Array[String] = []
+  let mut had_ref_source = false
   let mut i = 0
   while i < args.length() {
     let arg = args[i]
@@ -170,36 +171,59 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
       "--no-max-parents" => max_parents = None
       "--first-parent" => first_parent = true
       "--all" => all = true
-      "--branches" =>
-        rev_list_add_typed_refs(fs, git_dir, "refs/heads/", "", refs)
-      "--tags" =>
-        rev_list_add_typed_refs(fs, git_dir, "refs/tags/", "", refs)
-      "--remotes" =>
-        rev_list_add_typed_refs(fs, git_dir, "refs/remotes/", "", refs)
-      _ if arg.has_prefix("--branches=") =>
+      "--branches" => {
+        had_ref_source = true
+        rev_list_add_typed_refs(
+          fs, git_dir, "refs/heads/", "", rev_list_exclude_patterns, refs,
+        )
+      }
+      "--tags" => {
+        had_ref_source = true
+        rev_list_add_typed_refs(
+          fs, git_dir, "refs/tags/", "", rev_list_exclude_patterns, refs,
+        )
+      }
+      "--remotes" => {
+        had_ref_source = true
+        rev_list_add_typed_refs(
+          fs, git_dir, "refs/remotes/", "", rev_list_exclude_patterns, refs,
+        )
+      }
+      _ if arg.has_prefix("--branches=") => {
+        had_ref_source = true
         rev_list_add_typed_refs(
           fs, git_dir, "refs/heads/",
-          String::unsafe_substring(arg, start=11, end=arg.length()), refs,
+          String::unsafe_substring(arg, start=11, end=arg.length()),
+          rev_list_exclude_patterns, refs,
         )
-      _ if arg.has_prefix("--tags=") =>
+      }
+      _ if arg.has_prefix("--tags=") => {
+        had_ref_source = true
         rev_list_add_typed_refs(
           fs, git_dir, "refs/tags/",
-          String::unsafe_substring(arg, start=7, end=arg.length()), refs,
+          String::unsafe_substring(arg, start=7, end=arg.length()),
+          rev_list_exclude_patterns, refs,
         )
-      _ if arg.has_prefix("--remotes=") =>
+      }
+      _ if arg.has_prefix("--remotes=") => {
+        had_ref_source = true
         rev_list_add_typed_refs(
           fs, git_dir, "refs/remotes/",
-          String::unsafe_substring(arg, start=10, end=arg.length()), refs,
+          String::unsafe_substring(arg, start=10, end=arg.length()),
+          rev_list_exclude_patterns, refs,
         )
+      }
       _ if arg.has_prefix("--exclude=") => {
         let pattern = String::unsafe_substring(arg, start=10, end=arg.length())
         rev_list_exclude_patterns.push(pattern)
       }
       _ if arg.has_prefix("--glob=") => {
+        had_ref_source = true
         let pattern = String::unsafe_substring(arg, start=7, end=arg.length())
         rev_list_add_glob_refs(fs, git_dir, pattern, refs)
       }
       "--glob" if i + 1 < args.length() => {
+        had_ref_source = true
         rev_list_add_glob_refs(fs, git_dir, args[i + 1], refs)
         i += 2
         continue
@@ -211,7 +235,7 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
       "--stdin" => stdin = true
       "--test-bitmap" => test_bitmap = true
       "--use-bitmap-index" => use_bitmap = true
-      "--no-use-bitmap-index" => ()
+      "--no-use-bitmap-index" | "--ignore-missing" => ()
       "--no-object-names" => no_object_names = true
       "--object-names" => no_object_names = false
       "--color" | "--color=always" => pretty_color_cli_mode = Some("always")
@@ -399,19 +423,28 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
     let all_refs = @bitrepo.show_ref(fs, git_dir)
     for item in all_refs {
       let (name, _) = item
-      refs.push(name)
+      if not(rev_list_ref_excluded(name, rev_list_exclude_patterns)) {
+        refs.push(name)
+      }
     }
-    // Also include HEAD (detached head case)
-    refs.push("HEAD")
+    // For detached HEAD: only add if HEAD doesn't point to a branch
+    // and no exclude patterns are active (git --all doesn't include HEAD separately)
+    if rev_list_exclude_patterns.length() == 0 {
+      let head_ref = @bitlib.read_head_ref(fs, git_dir)
+      match head_ref {
+        @bitlib.HeadRef::Detached(_) => refs.push("HEAD")
+        _ => ()
+      }
+    }
   }
-  // Apply --exclude patterns to filter refs
+  // Apply --exclude patterns to filter refs (for glob-added refs)
   if rev_list_exclude_patterns.length() > 0 {
     let filtered : Array[String] = []
     for r in refs {
       let mut excluded = false
       for pat in rev_list_exclude_patterns {
         let full_pat = if pat.has_prefix("refs/") { pat } else { "refs/" + pat }
-        if full_pat.contains("*") {
+        if full_pat.contains("*") || full_pat.contains("?") {
           if rev_list_glob_match(full_pat, r) {
             excluded = true
             break
@@ -430,8 +463,10 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
       refs.push(r)
     }
   }
-  // If no refs specified, default to HEAD
-  if refs.length() == 0 && not(indexed_objects) {
+  // If no refs specified and no explicit ref source was given, default to HEAD
+  if refs.length() == 0 && excludes.length() == 0 && not(indexed_objects) &&
+    not(stdin) && not(all) && not(had_ref_source) &&
+    rev_list_exclude_patterns.length() == 0 {
     refs.push("HEAD")
   }
   ignore(graph)
@@ -448,7 +483,8 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
     match @bitrepo.rev_parse(fs, git_dir, spec) {
       Some(id) => {
         let hex = id.to_hex()
-        if not(start_seen.contains(hex)) {
+        if id != @bitcore.ObjectId::zero() &&
+          not(start_seen.contains(hex)) {
           start_seen[hex] = true
           start_ids.push(id)
         }
@@ -1419,17 +1455,91 @@ fn rev_list_extract_committer_timestamp(data : Bytes) -> Int64 {
 /// Add refs of a specific type with optional pattern filter.
 /// prefix: "refs/heads/", "refs/tags/", "refs/remotes/"
 /// pattern: glob within the type (e.g., "subspace/*"), empty = all
+/// Check if a ref name matches any exclude pattern.
+/// Check if a ref name matches any exclude pattern within a namespace.
+/// e.g., for prefix "refs/heads/" and pattern "subspace-*",
+/// checks if the ref's suffix after prefix matches the pattern.
+fn rev_list_ref_excluded_in_namespace(
+  name : String,
+  prefix : String,
+  exclude_patterns : Array[String],
+) -> Bool {
+  if exclude_patterns.length() == 0 {
+    return false
+  }
+  let suffix = String::unsafe_substring(
+    name, start=prefix.length(), end=name.length(),
+  )
+  for pat in exclude_patterns {
+    let effective = if pat.has_suffix("/") { pat + "*" } else { pat }
+    // Try matching against the suffix (within namespace)
+    if effective.contains("*") || effective.contains("?") {
+      if rev_list_glob_match(effective, suffix) {
+        return true
+      }
+    } else if suffix == effective || suffix.has_prefix(effective + "/") {
+      return true
+    }
+    // Also try full-path match
+    let full_pat = if pat.has_prefix("refs/") { pat } else { "refs/" + pat }
+    let full_eff = if full_pat.has_suffix("/") {
+      full_pat + "*"
+    } else {
+      full_pat
+    }
+    if full_eff.contains("*") || full_eff.contains("?") {
+      if rev_list_glob_match(full_eff, name) {
+        return true
+      }
+    } else if name == full_eff || name.has_prefix(full_eff + "/") {
+      return true
+    }
+  }
+  false
+}
+
+///|
+fn rev_list_ref_excluded(
+  name : String,
+  exclude_patterns : Array[String],
+) -> Bool {
+  for pat in exclude_patterns {
+    let full_pat = if pat.has_prefix("refs/") { pat } else { "refs/" + pat }
+    let effective = if full_pat.has_suffix("/") {
+      full_pat + "*"
+    } else {
+      full_pat
+    }
+    if effective.contains("*") || effective.contains("?") {
+      if rev_list_glob_match(effective, name) {
+        return true
+      }
+    } else if name == effective || name.has_prefix(effective + "/") {
+      return true
+    }
+  }
+  false
+}
+
+///|
 fn rev_list_add_typed_refs(
   fs : OsFs,
   git_dir : String,
   prefix : String,
   pattern : String,
+  exclude_patterns : Array[String],
   out : Array[String],
 ) -> Unit {
   let all_refs = @bitrepo.show_ref(fs, git_dir) catch { _ => [] }
   for item in all_refs {
     let name = item.0
     if name.has_prefix(prefix) {
+      // Check exclude patterns within the typed namespace
+      if rev_list_ref_excluded_in_namespace(
+        name, prefix, exclude_patterns,
+      ) {
+        continue
+      }
       if pattern.length() == 0 {
         out.push(name)
       } else {
@@ -1442,7 +1552,7 @@ fn rev_list_add_typed_refs(
         } else {
           pattern
         }
-        if full_pattern.contains("*") {
+        if full_pattern.contains("*") || full_pattern.contains("?") {
           if rev_list_glob_match(full_pattern, suffix) {
             out.push(name)
           }
@@ -1477,7 +1587,7 @@ fn rev_list_add_glob_refs(
   } else {
     base_pattern
   }
-  let has_star = full_pattern.contains("*")
+  let has_star = full_pattern.contains("*") || full_pattern.contains("?")
   for item in all_refs {
     let name = item.0
     if has_star {
@@ -1512,7 +1622,19 @@ fn rev_list_glob_match(pattern : String, text : String) -> Bool {
   let mut star_pi = -1
   let mut star_ti = -1
   while ti < t_chars.length() {
-    if pi < p_chars.length() && p_chars[pi] == t_chars[ti] {
+    if pi < p_chars.length() && p_chars[pi] == '?' {
+      // ? matches exactly one character (but not /)
+      if t_chars[ti] != '/' {
+        pi += 1
+        ti += 1
+      } else if star_pi >= 0 {
+        pi = star_pi + 1
+        star_ti += 1
+        ti = star_ti
+      } else {
+        return false
+      }
+    } else if pi < p_chars.length() && p_chars[pi] == t_chars[ti] {
       pi += 1
       ti += 1
     } else if pi < p_chars.length() && p_chars[pi] == '*' {
