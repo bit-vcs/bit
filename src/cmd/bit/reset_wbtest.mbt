@@ -69,6 +69,11 @@ async test "reset pathspec: trailing slash unstages submodule gitlink" {
   @sys.set_env_var("GIT_SHIM_PWD", super_dir)
   @sys.unset_env_var("GIT_DIR")
   @sys.unset_env_var("GIT_WORK_TREE")
+  defer add_test_restore_env("GIT_SHIM_CWD", prev_shim_cwd)
+  defer add_test_restore_env("GIT_SHIM_PWD", prev_shim_pwd)
+  defer add_test_restore_env("GIT_DIR", prev_git_dir)
+  defer add_test_restore_env("GIT_WORK_TREE", prev_work_tree)
+  defer add_test_restore_env("GIT_ALLOW_PROTOCOL", prev_allow_protocol)
   handle_reset(["init/"])
 
   let diff_after = reset_wbtest_git_exit_code(super_dir, [
@@ -76,11 +81,6 @@ async test "reset pathspec: trailing slash unstages submodule gitlink" {
   ])
   assert_eq(diff_after, 0)
 
-  add_test_restore_env("GIT_SHIM_CWD", prev_shim_cwd)
-  add_test_restore_env("GIT_SHIM_PWD", prev_shim_pwd)
-  add_test_restore_env("GIT_DIR", prev_git_dir)
-  add_test_restore_env("GIT_WORK_TREE", prev_work_tree)
-  add_test_restore_env("GIT_ALLOW_PROTOCOL", prev_allow_protocol)
   cleanup_tree(fs, root)
 }
 
@@ -116,6 +116,10 @@ async test "reset: hard restores a valid root cache-tree for indexed-object nega
   @sys.set_env_var("GIT_SHIM_PWD", repo_dir)
   @sys.unset_env_var("GIT_DIR")
   @sys.unset_env_var("GIT_WORK_TREE")
+  defer add_test_restore_env("GIT_SHIM_CWD", prev_shim_cwd)
+  defer add_test_restore_env("GIT_SHIM_PWD", prev_shim_pwd)
+  defer add_test_restore_env("GIT_DIR", prev_git_dir)
+  defer add_test_restore_env("GIT_WORK_TREE", prev_work_tree)
   handle_reset(["-q", "--hard", "HEAD"])
 
   let head = add_test_trim_trailing_newline(
@@ -128,9 +132,5 @@ async test "reset: hard restores a valid root cache-tree for indexed-object nega
   )
   assert_eq(actual, head)
 
-  add_test_restore_env("GIT_SHIM_CWD", prev_shim_cwd)
-  add_test_restore_env("GIT_SHIM_PWD", prev_shim_pwd)
-  add_test_restore_env("GIT_DIR", prev_git_dir)
-  add_test_restore_env("GIT_WORK_TREE", prev_work_tree)
   cleanup_tree(fs, root)
 }

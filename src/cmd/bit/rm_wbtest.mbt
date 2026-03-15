@@ -221,6 +221,10 @@ async test "rm: stage-only missing submodule is removable" {
   @sys.set_env_var("GIT_SHIM_PWD", super_dir)
   @sys.unset_env_var("GIT_DIR")
   @sys.unset_env_var("GIT_WORK_TREE")
+  defer submodule_wbtest_restore_env("GIT_SHIM_CWD", prev_shim_cwd)
+  defer submodule_wbtest_restore_env("GIT_SHIM_PWD", prev_shim_pwd)
+  defer submodule_wbtest_restore_env("GIT_DIR", prev_git_dir)
+  defer submodule_wbtest_restore_env("GIT_WORK_TREE", prev_work_tree)
 
   handle_rm(["-q", "repo"])
 
@@ -228,10 +232,6 @@ async test "rm: stage-only missing submodule is removable" {
   assert_false(status.contains("repo"))
   assert_true(status.contains("A  .gitmodules"))
 
-  submodule_wbtest_restore_env("GIT_SHIM_CWD", prev_shim_cwd)
-  submodule_wbtest_restore_env("GIT_SHIM_PWD", prev_shim_pwd)
-  submodule_wbtest_restore_env("GIT_DIR", prev_git_dir)
-  submodule_wbtest_restore_env("GIT_WORK_TREE", prev_work_tree)
   cleanup_tree(fs, root)
 }
 

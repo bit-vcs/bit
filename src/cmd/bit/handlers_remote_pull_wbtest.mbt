@@ -304,6 +304,11 @@ async test "pull: local fetch with main:main writes target ref and FETCH_HEAD" {
   fs.mkdir_p(root)
   let dst_dir = root + "/dst"
 
+  // Protect against GIT_SHIM_CWD pollution from other tests
+  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
+  @sys.unset_env_var("GIT_SHIM_CWD")
+  defer add_test_restore_env("GIT_SHIM_CWD", prev_shim_cwd)
+
   commit_wbtest_run_git(root, ["init", "--initial-branch=main", "-q"])
   commit_wbtest_run_git(root, ["config", "user.name", "Test User"])
   commit_wbtest_run_git(root, ["config", "user.email", "test@example.com"])
@@ -341,6 +346,11 @@ async test "pull: local fetch for main writes remote-tracking ref and FETCH_HEAD
   cleanup_tree(fs, root)
   fs.mkdir_p(root)
   let dst_dir = root + "/dst"
+
+  // Protect against GIT_SHIM_CWD pollution from other tests
+  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
+  @sys.unset_env_var("GIT_SHIM_CWD")
+  defer add_test_restore_env("GIT_SHIM_CWD", prev_shim_cwd)
 
   commit_wbtest_run_git(root, ["init", "--initial-branch=main", "-q"])
   commit_wbtest_run_git(root, ["config", "user.name", "Test User"])

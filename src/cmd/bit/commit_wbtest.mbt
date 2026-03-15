@@ -3,9 +3,13 @@ async fn commit_wbtest_run_git(
   cwd : String,
   args : Array[String],
 ) -> Unit raise Error {
+  let full_args : Array[String] = ["-c", "protocol.file.allow=always"]
+  for arg in args {
+    full_args.push(arg)
+  }
   let (code, _, _) = @process.collect_output(
     "git",
-    args[:],
+    full_args[:],
     inherit_env=true,
     cwd~,
   )
@@ -17,9 +21,13 @@ async fn commit_wbtest_git_stderr(
   cwd : String,
   args : Array[String],
 ) -> (Int, String) raise Error {
+  let full_args : Array[String] = ["-c", "protocol.file.allow=always"]
+  for arg in args {
+    full_args.push(arg)
+  }
   let (code, _, stderr) = @process.collect_output(
     "git",
-    args[:],
+    full_args[:],
     inherit_env=true,
     cwd~,
   )
@@ -212,13 +220,26 @@ async test "commit: amend preserves distinct author and committer dates" {
   cleanup_tree(fs, root)
   fs.mkdir_p(root)
 
+  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
   let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @sys.get_env_var("GIT_DIR")
+  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
   let prev_author_name = @sys.get_env_var("GIT_AUTHOR_NAME")
   let prev_author_email = @sys.get_env_var("GIT_AUTHOR_EMAIL")
   let prev_committer_name = @sys.get_env_var("GIT_COMMITTER_NAME")
   let prev_committer_email = @sys.get_env_var("GIT_COMMITTER_EMAIL")
   let prev_author_date = @sys.get_env_var("GIT_AUTHOR_DATE")
   let prev_committer_date = @sys.get_env_var("GIT_COMMITTER_DATE")
+  defer add_test_restore_env("GIT_SHIM_CWD", prev_shim_cwd)
+  defer add_test_restore_env("GIT_SHIM_PWD", prev_shim_pwd)
+  defer add_test_restore_env("GIT_DIR", prev_git_dir)
+  defer add_test_restore_env("GIT_WORK_TREE", prev_work_tree)
+  defer add_test_restore_env("GIT_AUTHOR_NAME", prev_author_name)
+  defer add_test_restore_env("GIT_AUTHOR_EMAIL", prev_author_email)
+  defer add_test_restore_env("GIT_COMMITTER_NAME", prev_committer_name)
+  defer add_test_restore_env("GIT_COMMITTER_EMAIL", prev_committer_email)
+  defer add_test_restore_env("GIT_AUTHOR_DATE", prev_author_date)
+  defer add_test_restore_env("GIT_COMMITTER_DATE", prev_committer_date)
 
   commit_wbtest_run_git(root, ["init", "--initial-branch=main", "-q", "."])
   commit_wbtest_run_git(root, ["config", "user.name", "Test User"])
@@ -230,6 +251,9 @@ async test "commit: amend preserves distinct author and committer dates" {
   fs.write_string(root + "/a.txt", "after\n")
   commit_wbtest_run_git(root, ["add", "a.txt"])
 
+  @sys.unset_env_var("GIT_SHIM_CWD")
+  @sys.unset_env_var("GIT_DIR")
+  @sys.unset_env_var("GIT_WORK_TREE")
   @sys.set_env_var("GIT_SHIM_PWD", root)
   @sys.set_env_var("GIT_AUTHOR_NAME", "Author User")
   @sys.set_env_var("GIT_AUTHOR_EMAIL", "author@example.com")
@@ -259,35 +283,6 @@ async test "commit: amend preserves distinct author and committer dates" {
     ),
   )
 
-  match prev_shim_pwd {
-    Some(value) => @sys.set_env_var("GIT_SHIM_PWD", value)
-    None => @sys.unset_env_var("GIT_SHIM_PWD")
-  }
-  match prev_author_name {
-    Some(value) => @sys.set_env_var("GIT_AUTHOR_NAME", value)
-    None => @sys.unset_env_var("GIT_AUTHOR_NAME")
-  }
-  match prev_author_email {
-    Some(value) => @sys.set_env_var("GIT_AUTHOR_EMAIL", value)
-    None => @sys.unset_env_var("GIT_AUTHOR_EMAIL")
-  }
-  match prev_committer_name {
-    Some(value) => @sys.set_env_var("GIT_COMMITTER_NAME", value)
-    None => @sys.unset_env_var("GIT_COMMITTER_NAME")
-  }
-  match prev_committer_email {
-    Some(value) => @sys.set_env_var("GIT_COMMITTER_EMAIL", value)
-    None => @sys.unset_env_var("GIT_COMMITTER_EMAIL")
-  }
-  match prev_author_date {
-    Some(value) => @sys.set_env_var("GIT_AUTHOR_DATE", value)
-    None => @sys.unset_env_var("GIT_AUTHOR_DATE")
-  }
-  match prev_committer_date {
-    Some(value) => @sys.set_env_var("GIT_COMMITTER_DATE", value)
-    None => @sys.unset_env_var("GIT_COMMITTER_DATE")
-  }
-
   cleanup_tree(fs, root)
 }
 
@@ -302,7 +297,10 @@ async test "commit: merge state commit records MERGE_HEAD as second parent" {
   cleanup_tree(fs, root)
   fs.mkdir_p(root)
 
+  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
   let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @sys.get_env_var("GIT_DIR")
+  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
 
   commit_wbtest_run_git(root, ["init", "--initial-branch=main", "-q", "."])
   commit_wbtest_run_git(root, ["config", "user.name", "Test User"])
@@ -331,6 +329,13 @@ async test "commit: merge state commit records MERGE_HEAD as second parent" {
   commit_wbtest_run_git(root, ["add", "file"])
 
   @sys.set_env_var("GIT_SHIM_PWD", root)
+  @sys.unset_env_var("GIT_SHIM_CWD")
+  @sys.unset_env_var("GIT_DIR")
+  @sys.unset_env_var("GIT_WORK_TREE")
+  defer add_test_restore_env("GIT_SHIM_CWD", prev_shim_cwd)
+  defer add_test_restore_env("GIT_SHIM_PWD", prev_shim_pwd)
+  defer add_test_restore_env("GIT_DIR", prev_git_dir)
+  defer add_test_restore_env("GIT_WORK_TREE", prev_work_tree)
   handle_commit(["-q", "-a", "-m", "merge"]) catch {
     err => fail("handle_commit failed: \{err}")
   }
@@ -343,11 +348,6 @@ async test "commit: merge state commit records MERGE_HEAD as second parent" {
   assert_eq(info.parents.length(), 2)
   assert_eq(info.parents[1].to_hex(), merge_head)
   assert_false(fs.is_file(root + "/.git/MERGE_HEAD"))
-
-  match prev_shim_pwd {
-    Some(value) => @sys.set_env_var("GIT_SHIM_PWD", value)
-    None => @sys.unset_env_var("GIT_SHIM_PWD")
-  }
 
   cleanup_tree(fs, root)
 }
