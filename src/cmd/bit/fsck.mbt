@@ -86,12 +86,13 @@ async fn handle_fsck(args : Array[String]) -> Unit raise Error {
   if not(no_reflogs) {
     fsck_collect_reflog_tips(fs, git_dir, ref_tips)
   }
-  // Walk from all tips
+  // Walk from all tips — use cursor instead of queue.remove(0) for O(1) dequeue
   for tip in ref_tips {
     errors += fsck_walk_object(db, fs, tip, reachable, missing)
   }
   // Phase 5: Enumerate all objects and find dangling/unreachable
-  let all_objects = fsck_enumerate_all_objects(db, objects_dir, fs)
+  // Reuse db.loose_paths and db.packs for enumeration instead of re-scanning filesystem
+  let all_objects = fsck_enumerate_all_objects_fast(db, objects_dir, fs)
   if show_dangling || show_unreachable {
     for hex in all_objects {
       if not(reachable.contains(hex)) {
@@ -302,16 +303,10 @@ async fn fsck_verify_loose_objects(fs : OsFs, objects_dir : String) -> Int {
           continue
         }
       }
-      // Parse header to extract type and content
-      let obj = fsck_parse_loose_object(raw) catch {
-        _ => {
-          eprint_line("error: \{hex}: object corrupt: \{path}")
-          errors += 1
-          continue
-        }
-      }
-      // Verify hash
-      let computed = @bitcore.hash_object_content(obj.obj_type, obj.data)
+      // Verify hash directly on raw (header+content) — avoids content copy
+      // Git loose objects are stored as "<type> <size>\0<content>",
+      // and SHA-1 is computed on exactly that byte sequence.
+      let computed = @bitcore.sha1(raw)
       if computed.to_hex() != hex {
         eprint_line(
           "error: hash mismatch for \{hex} (expected \{computed.to_hex()})",
@@ -355,10 +350,12 @@ async fn fsck_walk_object(
   missing : Map[String, Bool],
 ) -> Int {
   let mut errors = 0
-  // BFS walk
+  // BFS walk with cursor (avoids O(n) queue.remove(0))
   let queue : Array[@bitcore.ObjectId] = [id]
-  while queue.length() > 0 {
-    let current = queue.remove(0)
+  let mut cursor = 0
+  while cursor < queue.length() {
+    let current = queue[cursor]
+    cursor += 1
     let hex = current.to_hex()
     if reachable.contains(hex) {
       continue
@@ -445,39 +442,21 @@ async fn fsck_walk_object(
 }
 
 ///|
-fn fsck_enumerate_all_objects(
+/// Enumerate all objects using db's already-loaded loose_paths and pack indexes.
+/// Avoids re-scanning the filesystem when ObjectDb::load already did it.
+fn fsck_enumerate_all_objects_fast(
   db : @bitlib.ObjectDb,
-  objects_dir : String,
-  fs : OsFs,
+  _objects_dir : String,
+  _fs : OsFs,
 ) -> Array[String] {
   let all : Array[String] = []
   let seen : Map[String, Bool] = {}
-  if not(fs.is_dir(objects_dir)) {
-    return all
-  }
-  // Loose objects
-  let entries = fs.readdir(objects_dir) catch { _ => return all }
-  for entry in entries {
-    if entry == "info" || entry == "pack" {
-      continue
-    }
-    if entry.length() != 2 {
-      continue
-    }
-    let subdir = objects_dir + "/" + entry
-    if not(fs.is_dir(subdir)) {
-      continue
-    }
-    let files = fs.readdir(subdir) catch { _ => continue }
-    for name in files {
-      if name.length() != 38 {
-        continue
-      }
-      let hex = entry + name
-      if not(seen.contains(hex)) {
-        seen[hex] = true
-        all.push(hex)
-      }
+  // Loose objects from db.loose_paths (already collected during ObjectDb::load)
+  for item in db.loose_paths.to_array() {
+    let hex = item.0
+    if not(seen.contains(hex)) {
+      seen[hex] = true
+      all.push(hex)
     }
   }
   // Packed objects from loaded indexes
@@ -638,52 +617,6 @@ fn fsck_trim(s : String) -> String {
 ///|
 fn fsck_is_hex_char(c : Char) -> Bool {
   (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
-}
-
-///|
-/// Parse a raw (decompressed) loose object into type + data.
-/// Format: "<type> <size>\0<content>"
-fn fsck_parse_loose_object(raw : Bytes) -> @bitcore.PackObject raise Error {
-  // Find the NUL separator
-  let mut nul_pos = -1
-  for i in 0..<raw.length() {
-    if raw[i] == b'\x00' {
-      nul_pos = i
-      break
-    }
-  }
-  if nul_pos < 0 {
-    raise @bitcore.GitError::InvalidObject("missing NUL in loose object header")
-  }
-  // Parse header
-  let header = StringBuilder::new()
-  for i in 0..<nul_pos {
-    header.write_char(raw[i].to_int().unsafe_to_char())
-  }
-  let header_str = header.to_string()
-  let space = header_str.find(" ")
-  let type_str = match space {
-    Some(idx) => String::unsafe_substring(header_str, start=0, end=idx)
-    None =>
-      raise @bitcore.GitError::InvalidObject(
-        "missing space in loose object header",
-      )
-  }
-  let obj_type : @bitcore.ObjectType = match type_str {
-    "commit" => @bitcore.ObjectType::Commit
-    "tree" => @bitcore.ObjectType::Tree
-    "blob" => @bitcore.ObjectType::Blob
-    "tag" => @bitcore.ObjectType::Tag
-    _ =>
-      raise @bitcore.GitError::InvalidObject("unknown object type: " + type_str)
-  }
-  let content_start = nul_pos + 1
-  let content_len = raw.length() - content_start
-  let content = Bytes::from_array(
-    FixedArray::makei(content_len, fn(i) { raw[content_start + i] }),
-  )
-  let id = @bitcore.hash_object_content(obj_type, content)
-  @bitcore.PackObject::with_metadata(obj_type, content, id, 0, 0U)
 }
 
 ///|
