@@ -50,18 +50,58 @@ bit push origin feature
 - Git config: reads global aliases from `~/.gitconfig` (or `GIT_CONFIG_GLOBAL`) only.
 - Shell aliases (prefixed with `!`) are not supported.
 
-### Standalone Test Coverage (Current)
+### Implemented Commands (73)
 
-Standalone coverage is validated with `git_cmd` in `t/test-lib-e2e.sh`, which runs `bit --no-git-fallback ...` (no real-git dependency in these tests).
+```
+init add diff diff-files diff-index ls-files tag branch checkout switch
+commit log show reflog reset update-ref update-index status merge rebase
+clone push fetch pull mv notes stash rm submodule worktree config show-ref
+for-each-ref rev-parse symbolic-ref cherry-pick remote cat-file hash-object
+ls-tree write-tree commit-tree receive-pack upload-pack pack-objects
+index-pack format-patch describe gc clean sparse-checkout restore blame
+grep shell rev-list bisect diff-tree read-tree fsck am apply bundle cherry
+revert prune pack-refs mktree shortlog verify-pack unpack-objects
+maintenance range-diff show-branch repack
+```
 
-Current standalone integration coverage (`t/t0001-*.sh` to `t/t0021-*.sh`) includes:
+### Git-Compat Test Results
+
+Validated against upstream git test suite (`third_party/git/t/`) via the shim layer. 908 test files in allowlist.
+
+| Test | Result | Notes |
+|------|--------|-------|
+| t1300-config | 485/485 | |
+| t1450-fsck | 95/95 | |
+| t3200-branch | 167/167 | |
+| t3206-range-diff | 48/48 | |
+| t3500-cherry | 4/4 | |
+| t3501-revert-cherry-pick | 21/21 | |
+| t3507-cherry-pick-conflict | 44/44 | |
+| t4100-apply-stat | 19/19 | all 41 apply tests pass |
+| t4150-am | 87/87 | all 11 am tests pass |
+| t4201-shortlog | 32/32 | |
+| t5300-pack-object | 52/52 | |
+| t5304-prune | 32/32 | |
+| t5510-fetch | 215/215 | |
+| t5607-clone-bundle | 16/16 | all 7 bundle tests pass |
+| t6020-bundle-misc | 37/37 | |
+| t6101-rev-parse-parents | 38/38 | |
+| t6300-for-each-ref | 427/428 | 1 fail: SSH signature |
+| t6302-for-each-ref-filter | 62/62 | |
+| t7003-filter-branch | 48/48 | |
+| t7700-repack | 25/47 | see below |
+| t7900-maintenance | 72/72 | |
+
+### Standalone Test Coverage
+
+Standalone coverage is validated with `git_cmd` in `t/test-lib-e2e.sh`, which runs `bit --no-git-fallback ...` (no real-git dependency in these tests). 30/30 pass.
+
+Current standalone integration coverage (`t/t0001-*.sh` to `t/t0024-*.sh`) includes:
 
 - repository lifecycle and core porcelain: `init`, `status`, `add`, `commit`, `branch`, `checkout`/`switch`, `reset`, `log`, `tag`
 - transport-style workflows in standalone mode: `clone`, `fetch`, `pull`, `push`, `bundle`
 - plumbing used by normal flows: `hash-object`, `cat-file`, `ls-files`, `ls-tree`, `write-tree`, `update-ref`, `fsck`
 - feature flows: `hub`, `ai` (`rebase`, `merge`, `cherry-pick`, `revert`, `commit`; `rebase-ai` is alias), `mcp`, `hq`
-
-Representative files: `t/t0001-init.sh`, `t/t0003-plumbing.sh`, `t/t0005-fallback.sh`, `t/t0018-commit-workflow.sh`, `t/t0019-clone-local.sh`, `t/t0020-push-fetch-pull.sh`, `t/t0021-hq-get.sh`.
 
 ### Explicitly Unsupported In Standalone Mode
 
@@ -171,7 +211,7 @@ db.set(fs, fs, "users/alice/profile", value, ts)
 db.sync_with_peer(fs, fs, peer_url)
 ```
 
-### Hub - Git-Native Huboration
+### Hub - Git-Native Collaboration
 
 Pull Requests and Issues stored as Git objects:
 
