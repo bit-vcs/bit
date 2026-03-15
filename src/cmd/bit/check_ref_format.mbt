@@ -42,11 +42,17 @@ async fn handle_check_ref_format(args : Array[String]) -> Unit raise Error {
     }
     return
   }
-  if not(check_ref_format_valid(refname, allow_onelevel~)) {
-    @sys.exit(1)
-  }
   if normalize {
-    print_line(check_ref_format_normalize(refname))
+    // Normalize first (collapse slashes), then validate
+    let normalized = check_ref_format_normalize(refname)
+    if not(check_ref_format_valid(normalized, allow_onelevel~)) {
+      @sys.exit(1)
+    }
+    print_line(normalized)
+  } else {
+    if not(check_ref_format_valid(refname, allow_onelevel~)) {
+      @sys.exit(1)
+    }
   }
 }
 
