@@ -164,6 +164,8 @@ options(
     "mcp.mbt": [ "native" ],
     "mcp_wbtest.mbt": [ "native" ],
     "merge.mbt": [ "native" ],
+    "merge_file.mbt": [ "native" ],
+    "merge_tree.mbt": [ "native" ],
     "merge_wbtest.mbt": [ "native" ],
     "mktag_cmd.mbt": [ "native" ],
     "mktree.mbt": [ "native" ],

@@ -11,6 +11,7 @@ pub enum MergeFavor {
   NoFavor
   FavorOurs
   FavorTheirs
+  FavorUnion
 }
 
 ///|
@@ -43,6 +44,46 @@ pub fn ContentMergeOptions::favor_ours() -> ContentMergeOptions {
 ///|
 pub fn ContentMergeOptions::favor_theirs() -> ContentMergeOptions {
   { ..ContentMergeOptions::default(), favor: MergeFavor::FavorTheirs }
+}
+
+///|
+pub fn ContentMergeOptions::favor_union() -> ContentMergeOptions {
+  { ..ContentMergeOptions::default(), favor: MergeFavor::FavorUnion }
+}
+
+///|
+pub fn ContentMergeOptions::new(
+  conflict_style~ : ConflictStyle = ConflictStyle::Merge,
+  ours_label~ : String = "HEAD",
+  base_label~ : String = "parent",
+  theirs_label~ : String = "incoming",
+  marker_size~ : Int = 7,
+  favor~ : MergeFavor = MergeFavor::NoFavor,
+) -> ContentMergeOptions {
+  { conflict_style, ours_label, base_label, theirs_label, marker_size, favor }
+}
+
+///|
+pub fn ContentMergeOptions::with_diff3(self : ContentMergeOptions) -> ContentMergeOptions {
+  { ..self, conflict_style: ConflictStyle::Diff3 }
+}
+
+///|
+pub fn ContentMergeOptions::with_labels(
+  self : ContentMergeOptions,
+  ours~ : String,
+  base~ : String,
+  theirs~ : String,
+) -> ContentMergeOptions {
+  { ..self, ours_label: ours, base_label: base, theirs_label: theirs }
+}
+
+///|
+pub fn ContentMergeOptions::with_marker_size(
+  self : ContentMergeOptions,
+  size : Int,
+) -> ContentMergeOptions {
+  { ..self, marker_size: size }
 }
 
 ///|
@@ -493,6 +534,14 @@ pub fn content_merge(
             for line in theirs {
               sb.write_string(line)
             }
+          MergeFavor::FavorUnion => {
+            for line in ours {
+              sb.write_string(line)
+            }
+            for line in theirs {
+              sb.write_string(line)
+            }
+          }
           MergeFavor::NoFavor => {
             conflict_count = conflict_count + 1
             sb.write_string(

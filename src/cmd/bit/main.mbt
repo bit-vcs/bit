@@ -177,6 +177,9 @@ fn show_command_help_specs() -> Array[(String, String, String)] {
       "merge-base", "git merge-base [-a | --all] <commit> <commit>...", "Find common ancestor between commits.",
     ),
     (
+      "merge-tree", "git merge-tree [--write-tree] [<options>] <branch1> <branch2>", "Perform merge without touching index or working tree.",
+    ),
+    (
       "stash", "git stash [<options>] [<message>]", "Stash the changes in a dirty working directory.",
     ),
     (
@@ -1177,6 +1180,8 @@ async fn dispatch_known_command(
     "diff-index" => handle_diff_index(rest)
     "merge" => handle_merge(rest)
     "merge-base" => handle_merge_base(rest)
+    "merge-file" => handle_merge_file(rest)
+    "merge-tree" => handle_merge_tree(rest)
     "tag" => handle_tag(rest)
     "rm" => handle_rm(rest)
     "mv" => handle_mv(rest)
