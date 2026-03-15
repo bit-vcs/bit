@@ -960,7 +960,7 @@ fn all_subcommands() -> Array[(String, String)] {
     "checkout", "cherry", "cherry-pick", "clean", "clone", "commit", "completion",
     "x/hooks", "x/doc", "config", "debug", "describe", "diff", "diff-files", "fetch",
     "format-patch", "fsck", "gc", "grep", "hash-object", "help", "hq", "hub", "index-pack",
-    "init", "issue", "log", "ls-files", "ls-tree", "maintenance", "mcp", "merge",
+    "init", "issue", "log", "ls-files", "ls-tree", "maintenance", "mcp", "merge", "merge-base",
     "mktree", "multi-pack-index", "mv", "notes", "pack-objects", "pack-refs", "pr",
     "prune", "pull", "push", "range-diff", "read-tree", "repo", "rebase", "receive-pack",
     "reflog", "relay", "remote", "repack", "request-pull", "reset", "restore", "rev-list",

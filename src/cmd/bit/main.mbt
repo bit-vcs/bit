@@ -83,6 +83,7 @@ async fn show_help() -> Unit {
     #|   hash-object     Compute object ID and optionally creates a blob
     #|   index-pack      Build pack index file for an existing packed archive
     #|   ls-files        Show information about files in the index
+    #|   ls-remote       List references in a remote repository
     #|   ls-tree         List the contents of a tree object
     #|   pack-objects    Create a packed archive of objects
     #|   receive-pack    Receive what is pushed into the repository
@@ -93,6 +94,8 @@ async fn show_help() -> Unit {
     #|   unpack-objects  Unpack objects from a packed archive
     #|   update-ref      Update the object name stored in a ref safely
     #|   upload-pack     Send objects packed back to git-fetch-pack
+    #|   stripspace      Clean up whitespace in text
+    #|   var             Print a Git logical variable
     #|   verify-pack     Validate packed Git archive files
     #|   write-tree      Create a tree object from the current index
     #|
@@ -160,6 +163,9 @@ fn show_command_help_specs() -> Array[(String, String, String)] {
     ),
     (
       "merge", "git merge [<options>] <commit>...", "Join two or more development histories together.",
+    ),
+    (
+      "merge-base", "git merge-base [-a | --all] <commit> <commit>...", "Find common ancestor between commits.",
     ),
     (
       "stash", "git stash [<options>] [<message>]", "Stash the changes in a dirty working directory.",
@@ -309,10 +315,20 @@ fn show_command_help_specs() -> Array[(String, String, String)] {
       "git-upload-pack", "git upload-pack [<options>] <git-dir>", "Send objects packed back to git-fetch-pack.",
     ),
     (
+      "var", "git var [-l | <variable>]", "Print a Git logical variable.",
+    ),
+    (
       "verify-pack", "git verify-pack [<options>] <pack>...", "Validate packed Git archive files.",
     ),
     (
       "write-tree", "git write-tree", "Create a tree object from the current index.",
+    ),
+    (
+      "stripspace", "git stripspace [-s | -c]", "Read text on stdin and clean up the formatting.",
+    ),
+    (
+      "ls-remote", "git ls-remote [--heads] [--tags] [--refs] [-q] <repository> [<refs>...]",
+      "List references in a remote repository.",
     ),
     (
       "range-diff", "git range-diff [<options>] <range1> <range2>", "Compare two commit ranges.",
@@ -1057,7 +1073,7 @@ fn command_handles_builtin_help(cmd : String) -> Bool {
   for
     name in [
       "receive-pack", "upload-pack", "pack-objects", "index-pack", "scalar", "branch",
-      "merge", "reflog", "rev-parse",
+      "merge", "merge-base", "reflog", "rev-parse",
     ] {
     if cmd == name {
       return true
@@ -1120,6 +1136,7 @@ async fn dispatch_known_command(
     "diff-files" => handle_diff_files(rest)
     "diff-index" => handle_diff_index(rest)
     "merge" => handle_merge(rest)
+    "merge-base" => handle_merge_base(rest)
     "tag" => handle_tag(rest)
     "rm" => handle_rm(rest)
     "mv" => handle_mv(rest)
@@ -1185,6 +1202,9 @@ async fn dispatch_known_command(
     "x/doc" => handle_x_doc(rest)
     "scalar" => handle_scalar(rest)
     "shell" => handle_shell(rest)
+    "var" => handle_var(rest)
+    "stripspace" => handle_stripspace(rest)
+    "ls-remote" => handle_ls_remote(rest)
     "version" => print_line("git version \{bit_version_tag}")
     // Error for unknown commands
     _ => {
