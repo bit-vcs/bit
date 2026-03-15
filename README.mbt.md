@@ -82,6 +82,67 @@ The following are intentionally rejected with explicit standalone-mode errors (c
   - The shim delegates to `SHIM_REAL_GIT` by default.
   - CI `git-compat` (`.github/workflows/ci.yml`) runs upstream `git/t` via this shim (`SHIM_REAL_GIT`, `SHIM_MOON`, `SHIM_CMDS`).
 
+### Unimplemented Features
+
+The following features are not yet implemented. Flags listed here are parsed and silently ignored or produce a warning.
+
+#### Fundamentally Missing
+
+| Feature | Description |
+|---------|-------------|
+| SHA-256 | `--object-format=sha256` repositories not supported |
+| Reftable | `--ref-format=reftable` backend not supported |
+| Bitmap writing | `pack-objects --write-bitmap-index` does not generate `.bitmap` files |
+| Multi-pack-index writing | `repack --write-midx` is a no-op |
+| Commit-graph | No commit-graph generation or reading |
+| SSH transport | Only HTTPS remotes; `git@host:repo` URLs not supported |
+| GPG signing | `commit -S`, `tag -s`, signature verification |
+| Interactive add | `add -p` / `add -i` delegate to real git when available |
+| Interactive rebase | `rebase -i` rejected in standalone mode |
+| Sparse index | Sparse index format not fully supported |
+| Custom merge drivers | `.gitattributes` merge drivers not supported |
+
+#### Porcelain Commands - Missing Options
+
+| Command | Missing |
+|---------|---------|
+| `add` | `-p` (patch), `-i` (interactive) - delegates to git |
+| `checkout` | `--patch`, `--ours`, `--theirs`, `--merge` |
+| `commit` | `-S` (GPG sign), `--fixup`, `--squash` |
+| `diff` | `-O` (orderfile), `--word-diff`, `--color-words` |
+| `log` | `--graph` rendering (text output only) |
+| `merge` | Octopus merge (3+ heads), custom merge strategies |
+| `rebase` | `-i` (interactive), `--root`, `--autosquash` |
+| `stash` | `create`, `store` (low-level plumbing) |
+| `clean` | `-X` (remove only ignored files, needs gitignore parser) |
+| `mv` | `--dry-run`, `--verbose`, `--sparse` |
+
+#### Plumbing Commands - Missing Options
+
+| Command | Missing |
+|---------|---------|
+| `pack-objects` | `--write-bitmap-index` (bitmap generation), `tree:N` filter (N>0) |
+| `repack` | `--write-midx` (MIDX generation), bitmap auto-creation in bare repos |
+| `unpack-objects` | `-r` (recover), `--strict` |
+| `apply` | `--reject` (rejection file generation) |
+| `clone` | `--filter` (partial clone) |
+| `update-ref` | `--stdin` transaction status output |
+
+#### repack Test Coverage (t7700: 25/47)
+
+Passing: basic `-a`/`-d`/`-q`/`-l`/`-n`, `--keep-pack`, `--filter` (basic), `--geometric`, `--unpack-unreachable`, `--keep-unreachable`, server info update, `.keep` file handling, incremental repack.
+
+Not passing:
+
+| Category | Tests | Reason |
+|----------|-------|--------|
+| `--write-midx` | 9 | MIDX generation not implemented |
+| `--filter` (advanced) | 5 | Requires `test-tool find-pack` |
+| Alternate ODB | 4 | Alternate object detection edge cases |
+| Bitmap writing | 2 | `.bitmap` file generation not implemented |
+| `GIT_TRACE2_EVENT` | 1 | git internal tracing, not applicable |
+| Pending objects | 1 | `--path-walk` + fsck output format |
+
 ## Environment Variables
 
 - `BIT_BENCH_GIT_DIR`: override .git path for bench_real (x/fs benchmarks).
