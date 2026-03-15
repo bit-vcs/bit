@@ -169,6 +169,43 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
       "--no-max-parents" => max_parents = None
       "--first-parent" => first_parent = true
       "--all" => all = true
+      "--branches" => {
+        let branch_refs = @bitrepo.show_ref(fs, git_dir) catch { _ => [] }
+        for item in branch_refs {
+          if item.0.has_prefix("refs/heads/") {
+            refs.push(item.0)
+          }
+        }
+      }
+      "--tags" => {
+        let tag_refs = @bitrepo.show_ref(fs, git_dir) catch { _ => [] }
+        for item in tag_refs {
+          if item.0.has_prefix("refs/tags/") {
+            refs.push(item.0)
+          }
+        }
+      }
+      "--remotes" => {
+        let remote_refs = @bitrepo.show_ref(fs, git_dir) catch { _ => [] }
+        for item in remote_refs {
+          if item.0.has_prefix("refs/remotes/") {
+            refs.push(item.0)
+          }
+        }
+      }
+      _ if arg.has_prefix("--glob=") => {
+        let pattern = String::unsafe_substring(arg, start=7, end=arg.length())
+        rev_list_add_glob_refs(fs, git_dir, pattern, refs)
+      }
+      "--glob" if i + 1 < args.length() => {
+        rev_list_add_glob_refs(fs, git_dir, args[i + 1], refs)
+        i += 2
+        continue
+      }
+      "--glob" => {
+        eprint_line("fatal: Option '--glob' requires a value")
+        @sys.exit(128)
+      }
       "--stdin" => stdin = true
       "--test-bitmap" => test_bitmap = true
       "--use-bitmap-index" => use_bitmap = true
@@ -200,10 +237,33 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
           if next == "--indexed-objects" {
             indexed_objects = true
             indexed_objects_negated = true
-            i += 1
-            continue
-          }
-          if not(next.has_prefix("-")) {
+          } else if next == "--branches" {
+            let branch_refs = @bitrepo.show_ref(fs, git_dir) catch { _ => [] }
+            for item in branch_refs {
+              if item.0.has_prefix("refs/heads/") {
+                excludes.push(item.0)
+              }
+            }
+          } else if next == "--tags" {
+            let tag_refs = @bitrepo.show_ref(fs, git_dir) catch { _ => [] }
+            for item in tag_refs {
+              if item.0.has_prefix("refs/tags/") {
+                excludes.push(item.0)
+              }
+            }
+          } else if next == "--remotes" {
+            let remote_refs = @bitrepo.show_ref(fs, git_dir) catch { _ => [] }
+            for item in remote_refs {
+              if item.0.has_prefix("refs/remotes/") {
+                excludes.push(item.0)
+              }
+            }
+          } else if next.has_prefix("--glob=") {
+            let pattern = String::unsafe_substring(
+              next, start=7, end=next.length(),
+            )
+            rev_list_add_glob_refs(fs, git_dir, pattern, excludes)
+          } else if not(next.has_prefix("-")) {
             excludes.push(next)
           }
           i += 1
@@ -269,16 +329,59 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
   // Read from stdin if requested
   if stdin {
     let input = decode_bytes(read_all_stdin())
+    let mut stdin_not_mode = false
     for line_view in input.split("\n") {
       let line = trim_string(line_view.to_string())
-      if line.length() > 0 && not(line.has_prefix("#")) {
-        if line.has_prefix("^") {
-          excludes.push(
-            String::unsafe_substring(line, start=1, end=line.length()),
-          )
-        } else {
-          refs.push(line)
+      if line.length() == 0 || line.has_prefix("#") {
+        continue
+      }
+      if line == "--not" {
+        stdin_not_mode = not(stdin_not_mode)
+      } else if line == "--all" {
+        all = true
+      } else if line == "--branches" {
+        let branch_refs = @bitrepo.show_ref(fs, git_dir) catch { _ => [] }
+        for item in branch_refs {
+          if item.0.has_prefix("refs/heads/") {
+            if stdin_not_mode { excludes.push(item.0) } else { refs.push(item.0) }
+          }
         }
+      } else if line == "--tags" {
+        let tag_refs = @bitrepo.show_ref(fs, git_dir) catch { _ => [] }
+        for item in tag_refs {
+          if item.0.has_prefix("refs/tags/") {
+            if stdin_not_mode { excludes.push(item.0) } else { refs.push(item.0) }
+          }
+        }
+      } else if line == "--remotes" {
+        let remote_refs = @bitrepo.show_ref(fs, git_dir) catch { _ => [] }
+        for item in remote_refs {
+          if item.0.has_prefix("refs/remotes/") {
+            if stdin_not_mode { excludes.push(item.0) } else { refs.push(item.0) }
+          }
+        }
+      } else if line.has_prefix("--glob=") {
+        let pattern = String::unsafe_substring(line, start=7, end=line.length())
+        if stdin_not_mode {
+          rev_list_add_glob_refs(fs, git_dir, pattern, excludes)
+        } else {
+          rev_list_add_glob_refs(fs, git_dir, pattern, refs)
+        }
+      } else if line == "--glob" {
+        eprint_line("fatal: Option '--glob' requires a value")
+        @sys.exit(128)
+      } else if line == "--end-of-options" {
+        () // accept, no-op
+      } else if line == "--" {
+        () // pathspec separator, ignore
+      } else if line.has_prefix("^") {
+        excludes.push(
+          String::unsafe_substring(line, start=1, end=line.length()),
+        )
+      } else if stdin_not_mode {
+        excludes.push(line)
+      } else {
+        refs.push(line)
       }
     }
   }
@@ -1281,6 +1384,73 @@ fn rev_list_extract_committer_timestamp(data : Bytes) -> Int64 {
     }
   }
   0L
+}
+
+///|
+/// Add refs matching a glob pattern (e.g., "refs/heads" matches all branches).
+fn rev_list_add_glob_refs(
+  fs : OsFs,
+  git_dir : String,
+  pattern : String,
+  out : Array[String],
+) -> Unit {
+  let all_refs = @bitrepo.show_ref(fs, git_dir) catch { _ => [] }
+  // glob pattern: if it doesn't contain *, treat as prefix match
+  // "refs/heads" matches "refs/heads/main", "refs/heads/feature", etc.
+  let has_star = pattern.contains("*")
+  for item in all_refs {
+    let name = item.0
+    if has_star {
+      if rev_list_glob_match(pattern, name) {
+        out.push(name)
+      }
+    } else {
+      // Prefix match with / boundary
+      if name.has_prefix(pattern) {
+        if pattern.length() >= name.length() ||
+          name.get_char(pattern.length()) == Some('/') {
+          out.push(name)
+        }
+      }
+    }
+  }
+}
+
+///|
+/// Simple glob matching with * wildcard.
+fn rev_list_glob_match(pattern : String, text : String) -> Bool {
+  let p_chars : Array[Char] = []
+  let t_chars : Array[Char] = []
+  for ch in pattern {
+    p_chars.push(ch)
+  }
+  for ch in text {
+    t_chars.push(ch)
+  }
+  let mut pi = 0
+  let mut ti = 0
+  let mut star_pi = -1
+  let mut star_ti = -1
+  while ti < t_chars.length() {
+    if pi < p_chars.length() && p_chars[pi] == t_chars[ti] {
+      pi += 1
+      ti += 1
+    } else if pi < p_chars.length() && p_chars[pi] == '*' {
+      star_pi = pi
+      star_ti = ti
+      pi += 1
+    } else if star_pi >= 0 {
+      pi = star_pi + 1
+      star_ti += 1
+      ti = star_ti
+    } else {
+      return false
+    }
+  }
+  while pi < p_chars.length() && p_chars[pi] == '*' {
+    pi += 1
+  }
+  pi >= p_chars.length()
 }
 
 ///|
