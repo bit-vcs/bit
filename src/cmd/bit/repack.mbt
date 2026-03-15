@@ -105,11 +105,12 @@ async fn handle_repack(args : Array[String]) -> Unit raise Error {
   ignore(write_midx)
   // Build pack-objects arguments
   let po_args : Array[String] = ["pack-objects", "--delta-base-offset"]
-  // --all and --reflog require --revs mode
-  if all {
-    po_args.push("--all")
-    po_args.push("--reflog")
-  } else {
+  // Always pass --all --reflog to enumerate objects.
+  // When -a is not set, also pass --unpacked --incremental to filter
+  // so only loose objects are packed (existing packs are kept).
+  po_args.push("--all")
+  po_args.push("--reflog")
+  if not(all) {
     po_args.push("--unpacked")
     po_args.push("--incremental")
   }
@@ -146,9 +147,11 @@ async fn handle_repack(args : Array[String]) -> Unit raise Error {
   ensure_dir(pack_dir)
   let pack_prefix = pack_dir + "/pack"
   po_args.push(pack_prefix)
-  // Collect existing packs before repacking (for -d cleanup)
+  // Collect existing packs before repacking (for -d cleanup).
+  // When -a is not set (incremental mode), only loose objects are packed,
+  // so existing packs are NOT redundant and must be kept.
   let old_packs : Array[String] = []
-  if delete_redundant {
+  if delete_redundant && all {
     let entries = fs.readdir(pack_dir) catch { _ => [] }
     for entry in entries {
       if entry.has_suffix(".pack") {

@@ -21,6 +21,7 @@ make_origin_and_work() {
         git_cmd add file.txt &&
         git_cmd commit -m "initial commit"
     ) &&
+    DEFAULT_BRANCH=$(git_cmd -C source_tmp rev-parse --abbrev-ref HEAD) &&
     git_cmd clone --bare source_tmp origin.git &&
     rm -rf source_tmp &&
     git_cmd clone origin.git work &&
@@ -125,10 +126,10 @@ test_expect_success "bit-relay unsigned: clone/push and source issue reaches clo
         echo "relay-change" > relay-change.txt &&
         git_cmd add relay-change.txt &&
         git_cmd commit -m "relay roundtrip commit" &&
-        git_cmd push "$relay_url" main --relay-sender node-a --relay-repo relay-e2e
+        git_cmd push "$relay_url" "$DEFAULT_BRANCH" --relay-sender node-a --relay-repo relay-e2e
     ) &&
     relay_head=$(git_cmd -C relay-clone rev-parse HEAD) &&
-    origin_head=$(git_cmd -C origin.git rev-parse refs/heads/main) &&
+    origin_head=$(git_cmd -C origin.git rev-parse "refs/heads/$DEFAULT_BRANCH") &&
     test "$relay_head" = "$origin_head" &&
     (cd work &&
         git_cmd hub init &&

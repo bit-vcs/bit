@@ -9,6 +9,7 @@ source "$(dirname "$0")/test-lib-e2e.sh"
 
 # Helper: create bare origin.git with one commit, clone to work dir.
 # Sets up file:// URLs so push/fetch/pull work.
+# Sets DEFAULT_BRANCH to the name of the initial branch.
 make_origin_and_work() {
     git_cmd init source_tmp &&
     (cd source_tmp &&
@@ -16,6 +17,7 @@ make_origin_and_work() {
         git_cmd add file.txt &&
         git_cmd commit -m "initial commit"
     ) &&
+    DEFAULT_BRANCH=$(git_cmd -C source_tmp rev-parse --abbrev-ref HEAD) &&
     git_cmd clone --bare source_tmp origin.git &&
     rm -rf source_tmp &&
     git_cmd clone origin.git work &&
@@ -41,6 +43,7 @@ make_named_origin_and_work() {
         git_cmd add peer.txt &&
         git_cmd commit -m "initial ${name}"
     ) &&
+    DEFAULT_BRANCH=$(git_cmd -C "source_${name}" rev-parse --abbrev-ref HEAD) &&
     git_cmd clone --bare "source_${name}" "origin-${name}.git" &&
     rm -rf "source_${name}" &&
     git_cmd clone "origin-${name}.git" "work-${name}" &&
@@ -109,10 +112,10 @@ test_expect_success 'push to bare repo updates ref' '
         echo "update" > file.txt &&
         git_cmd add file.txt &&
         git_cmd commit -m "second" &&
-        git_cmd push origin main
+        git_cmd push origin "$DEFAULT_BRANCH"
     ) &&
     commit_work=$(git_cmd -C work rev-parse HEAD) &&
-    commit_origin=$(git_cmd -C origin.git show-ref | awk '"'"'$2=="refs/heads/main" { print $1 }'"'"') &&
+    commit_origin=$(git_cmd -C origin.git show-ref | awk "\$2==\"refs/heads/$DEFAULT_BRANCH\" { print \$1 }") &&
     test "$commit_work" = "$commit_origin"
 '
 
@@ -136,16 +139,16 @@ test_expect_success 'push --force overwrites non-fast-forward' '
         echo "diverge" > file.txt &&
         git_cmd add file.txt &&
         git_cmd commit -m "diverge" &&
-        git_cmd push origin main
+        git_cmd push origin "$DEFAULT_BRANCH"
     ) &&
     (cd work &&
         echo "conflict" > file.txt &&
         git_cmd add file.txt &&
         git_cmd commit -m "conflict" &&
-        git_cmd push --force origin main
+        git_cmd push --force origin "$DEFAULT_BRANCH"
     ) &&
     commit_work=$(git_cmd -C work rev-parse HEAD) &&
-    commit_origin=$(git_cmd -C origin.git show-ref | awk '"'"'$2=="refs/heads/main" { print $1 }'"'"') &&
+    commit_origin=$(git_cmd -C origin.git show-ref | awk "\$2==\"refs/heads/$DEFAULT_BRANCH\" { print \$1 }") &&
     test "$commit_work" = "$commit_origin"
 '
 
@@ -156,13 +159,13 @@ test_expect_success 'push rejects non-fast-forward without --force' '
         echo "diverge" > file.txt &&
         git_cmd add file.txt &&
         git_cmd commit -m "diverge" &&
-        git_cmd push origin main
+        git_cmd push origin "$DEFAULT_BRANCH"
     ) &&
     (cd work &&
         echo "conflict" > file.txt &&
         git_cmd add file.txt &&
         git_cmd commit -m "conflict" &&
-        test_must_fail git_cmd push origin main
+        test_must_fail git_cmd push origin "$DEFAULT_BRANCH"
     )
 '
 
@@ -213,18 +216,18 @@ test_expect_success 'push -u sets upstream tracking' '
 test_expect_success 'fetch updates remote-tracking refs' '
     make_origin_and_work &&
     clone_work2 &&
-    before_ref=$(git_cmd -C work2 show-ref | awk '"'"'$2=="refs/remotes/origin/main" { print $1 }'"'"') &&
+    before_ref=$(git_cmd -C work2 show-ref | awk "\$2==\"refs/remotes/origin/$DEFAULT_BRANCH\" { print \$1 }") &&
     (cd work &&
         echo "new" > new.txt &&
         git_cmd add new.txt &&
         git_cmd commit -m "new file" &&
-        git_cmd push origin main
+        git_cmd push origin "$DEFAULT_BRANCH"
     ) &&
     (cd work2 &&
         git_cmd fetch origin &&
-        after_ref=$(git_cmd show-ref | awk '"'"'$2=="refs/remotes/origin/main" { print $1 }'"'"') &&
+        after_ref=$(git_cmd show-ref | awk "\$2==\"refs/remotes/origin/$DEFAULT_BRANCH\" { print \$1 }") &&
         test "$before_ref" != "$after_ref" &&
-        git_cmd cat-file -p origin/main | grep -q "new file"
+        git_cmd cat-file -p "origin/$DEFAULT_BRANCH" | grep -q "new file"
     )
 '
 
@@ -238,11 +241,11 @@ test_expect_success 'fetch after remote push sees new commits' '
         echo "c3" > c3.txt &&
         git_cmd add c3.txt &&
         git_cmd commit -m "commit three" &&
-        git_cmd push origin main
+        git_cmd push origin "$DEFAULT_BRANCH"
     ) &&
     (cd work2 &&
         git_cmd fetch origin &&
-        latest=$(git_cmd show-ref | awk '"'"'$2=="refs/remotes/origin/main" { print $1 }'"'"') &&
+        latest=$(git_cmd show-ref | awk "\$2==\"refs/remotes/origin/$DEFAULT_BRANCH\" { print \$1 }") &&
         git_cmd cat-file -p "$latest" | grep -q "commit three" &&
         parent=$(git_cmd cat-file -p "$latest" | grep "^parent " | cut -d" " -f2) &&
         git_cmd cat-file -p "$parent" | grep -q "commit two"
@@ -256,7 +259,7 @@ test_expect_success 'fetch does not modify local branches' '
         echo "new" > new.txt &&
         git_cmd add new.txt &&
         git_cmd commit -m "pushed" &&
-        git_cmd push origin main
+        git_cmd push origin "$DEFAULT_BRANCH"
     ) &&
     (cd work2 &&
         local_before=$(git_cmd rev-parse HEAD) &&
@@ -283,9 +286,9 @@ test_expect_success 'fetch with no changes is no-op' '
     make_origin_and_work &&
     clone_work2 &&
     (cd work2 &&
-        ref_before=$(git_cmd rev-parse origin/main) &&
+        ref_before=$(git_cmd rev-parse "origin/$DEFAULT_BRANCH") &&
         git_cmd fetch origin &&
-        ref_after=$(git_cmd rev-parse origin/main) &&
+        ref_after=$(git_cmd rev-parse "origin/$DEFAULT_BRANCH") &&
         test "$ref_before" = "$ref_after"
     )
 '
@@ -297,18 +300,18 @@ test_expect_success 'fetch git@host:path remote updates remote-tracking refs' '
     export BIT_TEST_SSH_LOG="$(pwd)/ssh.log" &&
     origin_abs="$(pwd)/origin.git" &&
     git_cmd clone "git@localhost:$origin_abs" work2 &&
-    before_ref=$(git_cmd -C work2 show-ref | awk '"'"'$2=="refs/remotes/origin/main" { print $1 }'"'"') &&
+    before_ref=$(git_cmd -C work2 show-ref | awk "\$2==\"refs/remotes/origin/$DEFAULT_BRANCH\" { print \$1 }") &&
     (cd work &&
         echo "ssh-fetch" > ssh-fetch.txt &&
         git_cmd add ssh-fetch.txt &&
         git_cmd commit -m "ssh fetch commit" &&
-        git_cmd push origin main
+        git_cmd push origin "$DEFAULT_BRANCH"
     ) &&
     (cd work2 &&
         git_cmd fetch origin &&
-        after_ref=$(git_cmd show-ref | awk '"'"'$2=="refs/remotes/origin/main" { print $1 }'"'"') &&
+        after_ref=$(git_cmd show-ref | awk "\$2==\"refs/remotes/origin/$DEFAULT_BRANCH\" { print \$1 }") &&
         test "$before_ref" != "$after_ref" &&
-        git_cmd cat-file -p origin/main | grep -q "ssh fetch commit"
+        git_cmd cat-file -p "origin/$DEFAULT_BRANCH" | grep -q "ssh fetch commit"
     ) &&
     test_grep "git-upload-pack" "$BIT_TEST_SSH_LOG"
 '
@@ -324,10 +327,10 @@ test_expect_success 'pull fast-forward updates' '
         echo "ff" > ff.txt &&
         git_cmd add ff.txt &&
         git_cmd commit -m "fast forward" &&
-        git_cmd push origin main
+        git_cmd push origin "$DEFAULT_BRANCH"
     ) &&
     (cd work2 &&
-        git_cmd pull origin main &&
+        git_cmd pull origin "$DEFAULT_BRANCH" &&
         test_file_exists ff.txt &&
         git_cmd log --oneline | grep -q "fast forward"
     )
@@ -340,13 +343,13 @@ test_expect_success 'pull creates merge commit when diverged' '
         echo "remote change" > remote.txt &&
         git_cmd add remote.txt &&
         git_cmd commit -m "remote side" &&
-        git_cmd push origin main
+        git_cmd push origin "$DEFAULT_BRANCH"
     ) &&
     (cd work2 &&
         echo "local change" > local.txt &&
         git_cmd add local.txt &&
         git_cmd commit -m "local side" &&
-        git_cmd pull origin main &&
+        git_cmd pull origin "$DEFAULT_BRANCH" &&
         git_cmd log --oneline | grep -q "Merge"
     )
 '
@@ -358,13 +361,13 @@ test_expect_success 'pull --rebase rebases onto upstream' '
         echo "upstream" > upstream.txt &&
         git_cmd add upstream.txt &&
         git_cmd commit -m "upstream change" &&
-        git_cmd push origin main
+        git_cmd push origin "$DEFAULT_BRANCH"
     ) &&
     (cd work2 &&
         echo "local" > local.txt &&
         git_cmd add local.txt &&
         git_cmd commit -m "local change" &&
-        git_cmd pull --rebase origin main &&
+        git_cmd pull --rebase origin "$DEFAULT_BRANCH" &&
         git_cmd log --oneline | grep -q "local change" &&
         git_cmd log --oneline | grep -q "upstream change" &&
         ! git_cmd log --oneline | grep -q "Merge"
@@ -386,7 +389,7 @@ test_expect_success 'pull on up-to-date repo is no-op' '
     clone_work2 &&
     (cd work2 &&
         head_before=$(git_cmd rev-parse HEAD) &&
-        git_cmd pull origin main &&
+        git_cmd pull origin "$DEFAULT_BRANCH" &&
         head_after=$(git_cmd rev-parse HEAD) &&
         test "$head_before" = "$head_after"
     )
@@ -399,10 +402,10 @@ test_expect_success 'pull updates working tree files' '
         echo "new content" > file.txt &&
         git_cmd add file.txt &&
         git_cmd commit -m "update file" &&
-        git_cmd push origin main
+        git_cmd push origin "$DEFAULT_BRANCH"
     ) &&
     (cd work2 &&
-        git_cmd pull origin main &&
+        git_cmd pull origin "$DEFAULT_BRANCH" &&
         content=$(cat file.txt) &&
         test "$content" = "new content"
 	    )
@@ -433,16 +436,16 @@ test_expect_success "relay clone/push/fetch/pull roundtrip via clone-announce pe
         echo "relay-change" > relay-change.txt &&
         git_cmd add relay-change.txt &&
         git_cmd commit -m "relay roundtrip commit" &&
-        git_cmd push "$relay_url" main --relay-sender node-a --relay-repo relay-roundtrip
+        git_cmd push "$relay_url" "$DEFAULT_BRANCH" --relay-sender node-a --relay-repo relay-roundtrip
     ) &&
     relay_head=$(git_cmd -C relay-clone rev-parse HEAD) &&
-    origin_head=$(git_cmd -C origin.git show-ref | awk '"'"'$2=="refs/heads/main" { print $1 }'"'"') &&
+    origin_head=$(git_cmd -C origin.git show-ref | awk "\$2==\"refs/heads/$DEFAULT_BRANCH\" { print \$1 }") &&
     test "$relay_head" = "$origin_head" &&
     (cd work &&
         git_cmd fetch "$relay_url" --relay-sender node-a --relay-repo relay-roundtrip &&
-        fetched_head=$(git_cmd rev-parse refs/remotes/origin/main) &&
+        fetched_head=$(git_cmd rev-parse "refs/remotes/origin/$DEFAULT_BRANCH") &&
         test "$fetched_head" = "$origin_head" &&
-        git_cmd pull "$relay_url" main --relay-sender node-a --relay-repo relay-roundtrip &&
+        git_cmd pull "$relay_url" "$DEFAULT_BRANCH" --relay-sender node-a --relay-repo relay-roundtrip &&
         test_file_exists relay-change.txt &&
         git_cmd log --oneline | grep -q "relay roundtrip commit"
     ) &&
@@ -477,11 +480,11 @@ test_expect_success "relay peer selection priority sender>repo>first works acros
         echo "sender-priority" > sender-priority.txt &&
         git_cmd add sender-priority.txt &&
         git_cmd commit -m "sender priority push" &&
-        git_cmd push "$relay_url" main --relay-sender node-a --relay-repo repo-b
+        git_cmd push "$relay_url" "$DEFAULT_BRANCH" --relay-sender node-a --relay-repo repo-b
     ) &&
     sender_head=$(git_cmd -C client-sender rev-parse HEAD) &&
-    origin_a_head=$(git_cmd -C origin-a.git rev-parse refs/heads/main) &&
-    origin_b_head=$(git_cmd -C origin-b.git rev-parse refs/heads/main) &&
+    origin_a_head=$(git_cmd -C origin-a.git rev-parse "refs/heads/$DEFAULT_BRANCH") &&
+    origin_b_head=$(git_cmd -C origin-b.git rev-parse "refs/heads/$DEFAULT_BRANCH") &&
     test "$sender_head" = "$origin_a_head" &&
     test "$sender_head" != "$origin_b_head" &&
     git_cmd clone "$relay_url" client-repo --relay-sender node-z --relay-repo repo-b &&
@@ -490,14 +493,14 @@ test_expect_success "relay peer selection priority sender>repo>first works acros
         echo "repo-fallback" > repo-fallback.txt &&
         git_cmd add repo-fallback.txt &&
         git_cmd commit -m "repo fallback update" &&
-        git_cmd push origin main
+        git_cmd push origin "$DEFAULT_BRANCH"
     ) &&
-    expected_b_head=$(git_cmd -C origin-b.git rev-parse refs/heads/main) &&
+    expected_b_head=$(git_cmd -C origin-b.git rev-parse "refs/heads/$DEFAULT_BRANCH") &&
     (cd client-repo &&
         git_cmd fetch "$relay_url" --relay-sender node-z --relay-repo repo-b &&
-        fetched_head=$(git_cmd rev-parse refs/remotes/origin/main) &&
+        fetched_head=$(git_cmd rev-parse "refs/remotes/origin/$DEFAULT_BRANCH") &&
         test "$fetched_head" = "$expected_b_head" &&
-        git_cmd pull "$relay_url" main --relay-sender node-z --relay-repo repo-b &&
+        git_cmd pull "$relay_url" "$DEFAULT_BRANCH" --relay-sender node-z --relay-repo repo-b &&
         test_file_exists repo-fallback.txt
     ) &&
     git_cmd clone "$relay_url" client-first --relay-sender node-z --relay-repo repo-z &&

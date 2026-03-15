@@ -6,6 +6,7 @@ source "$(dirname "$0")/test-lib-e2e.sh"
 
 test_expect_success 'rebase-ai: clean rebase succeeds without OPENROUTER_API_KEY when no conflict' '
     git_cmd init &&
+    base_branch=$(git_cmd rev-parse --abbrev-ref HEAD) &&
     echo "base" > shared.txt &&
     git_cmd add shared.txt &&
     git_cmd commit -m "base" &&
@@ -13,17 +14,18 @@ test_expect_success 'rebase-ai: clean rebase succeeds without OPENROUTER_API_KEY
     echo "feature" > feature.txt &&
     git_cmd add feature.txt &&
     git_cmd commit -m "feature" &&
-    git_cmd checkout main &&
+    git_cmd checkout "$base_branch" &&
     echo "main" > main.txt &&
     git_cmd add main.txt &&
     git_cmd commit -m "main" &&
     git_cmd checkout feature &&
-    OPENROUTER_API_KEY="" git_cmd rebase-ai main >/dev/null &&
+    OPENROUTER_API_KEY="" git_cmd rebase-ai "$base_branch" >/dev/null &&
     test_path_is_missing .git/rebase-merge
 '
 
 test_expect_success 'rebase-ai: conflict requires OPENROUTER_API_KEY and --abort works' '
     git_cmd init &&
+    base_branch=$(git_cmd rev-parse --abbrev-ref HEAD) &&
     echo "base" > conflict.txt &&
     git_cmd add conflict.txt &&
     git_cmd commit -m "base" &&
@@ -31,12 +33,12 @@ test_expect_success 'rebase-ai: conflict requires OPENROUTER_API_KEY and --abort
     echo "feature" > conflict.txt &&
     git_cmd add conflict.txt &&
     git_cmd commit -m "feature" &&
-    git_cmd checkout main &&
+    git_cmd checkout "$base_branch" &&
     echo "main" > conflict.txt &&
     git_cmd add conflict.txt &&
     git_cmd commit -m "main" &&
     git_cmd checkout feature &&
-    if OPENROUTER_API_KEY="" git_cmd rebase-ai main >rebase.out 2>rebase.err; then
+    if OPENROUTER_API_KEY="" git_cmd rebase-ai "$base_branch" >rebase.out 2>rebase.err; then
         false
     else
         grep -q "OPENROUTER_API_KEY" rebase.err
@@ -48,6 +50,7 @@ test_expect_success 'rebase-ai: conflict requires OPENROUTER_API_KEY and --abort
 
 test_expect_success 'rebase-ai: --agent-loop conflict requires OPENROUTER_API_KEY and --abort works' '
     git_cmd init &&
+    base_branch=$(git_cmd rev-parse --abbrev-ref HEAD) &&
     echo "base" > conflict.txt &&
     git_cmd add conflict.txt &&
     git_cmd commit -m "base" &&
@@ -55,12 +58,12 @@ test_expect_success 'rebase-ai: --agent-loop conflict requires OPENROUTER_API_KE
     echo "feature" > conflict.txt &&
     git_cmd add conflict.txt &&
     git_cmd commit -m "feature" &&
-    git_cmd checkout main &&
+    git_cmd checkout "$base_branch" &&
     echo "main" > conflict.txt &&
     git_cmd add conflict.txt &&
     git_cmd commit -m "main" &&
     git_cmd checkout feature &&
-    if OPENROUTER_API_KEY="" git_cmd rebase-ai --agent-loop main >loop.out 2>loop.err; then
+    if OPENROUTER_API_KEY="" git_cmd rebase-ai --agent-loop "$base_branch" >loop.out 2>loop.err; then
         false
     else
         grep -q "OPENROUTER_API_KEY" loop.err

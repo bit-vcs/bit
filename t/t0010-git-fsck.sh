@@ -28,16 +28,17 @@ test_expect_success 'git fsck passes after rebase' '
     echo "base" > a.txt &&
     git_cmd add a.txt &&
     git_cmd commit -m "c1" &&
+    base_branch="$(git_cmd rev-parse --abbrev-ref HEAD)" &&
     git_cmd checkout -b feature &&
     echo "feature" > feature.txt &&
     git_cmd add feature.txt &&
     git_cmd commit -m "c2" &&
-    if ! git_cmd checkout main; then git_cmd checkout master; fi &&
+    git_cmd checkout "$base_branch" &&
     echo "main" > main.txt &&
     git_cmd add main.txt &&
     git_cmd commit -m "c3" &&
     git_cmd checkout feature &&
-    git_cmd rebase main &&
+    git_cmd rebase "$base_branch" &&
     command git fsck --strict &&
     command git status --porcelain=2 >/dev/null
 '

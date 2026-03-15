@@ -61,6 +61,8 @@ pub enum AliasResolution {
   Shell(String)
 }
 
+type BisectNextResult
+
 type BlameLine
 
 type BlameOptions
@@ -146,6 +148,8 @@ type ParseoptOpt
 
 type ParseoptOptType
 pub impl Eq for ParseoptOptType
+
+type PatchInfo
 
 type PushDefaultMode
 

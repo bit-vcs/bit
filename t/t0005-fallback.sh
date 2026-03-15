@@ -207,16 +207,17 @@ test_expect_success 'rebase works even if SHIM_REAL_GIT points to false' '
         echo base >a.txt &&
         git_cmd add a.txt &&
         git_cmd commit -m "base commit" &&
+        base_branch="$(git_cmd rev-parse --abbrev-ref HEAD)" &&
         git_cmd checkout -b feature &&
-        echo feature >>a.txt &&
-        git_cmd add a.txt &&
+        echo feature >feature.txt &&
+        git_cmd add feature.txt &&
         git_cmd commit -m "feature commit" &&
-        git_cmd checkout main &&
-        echo main >>a.txt &&
-        git_cmd add a.txt &&
+        git_cmd checkout "$base_branch" &&
+        echo main >main.txt &&
+        git_cmd add main.txt &&
         git_cmd commit -m "main commit" &&
         git_cmd checkout feature &&
-        SHIM_REAL_GIT=false git_cmd rebase main &&
+        SHIM_REAL_GIT=false git_cmd rebase "$base_branch" &&
         test "$(git_cmd rev-parse --abbrev-ref HEAD)" = "feature"
     )
 '
@@ -567,6 +568,7 @@ test_expect_success 'index-pack --threads is accepted with warning in standalone
         git_cmd commit -m "first commit" &&
         git_cmd repack -ad &&
         pack=$(ls .git/objects/pack/pack-*.pack | head -1) &&
+        chmod u+w .git/objects/pack/* &&
         SHIM_REAL_GIT=false git_cmd index-pack --threads=2 "$pack" 2>err &&
         grep -q "no threads support" err
     )

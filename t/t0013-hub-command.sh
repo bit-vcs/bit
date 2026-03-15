@@ -35,12 +35,13 @@ test_expect_success 'hub pr lifecycle: create close reopen status' '
     echo "base" > README.md &&
     git_cmd add README.md &&
     git_cmd commit -m "base" &&
+    base_branch="$(git_cmd rev-parse --abbrev-ref HEAD)" &&
     git_cmd checkout -b feature/hub &&
     echo "feature" > feature.txt &&
     git_cmd add feature.txt &&
     git_cmd commit -m "feature" &&
     git_cmd hub init >/dev/null &&
-    pr_out=$(git_cmd hub pr create --title "Hub PR" --body "Body" --head refs/heads/feature/hub --base refs/heads/main) &&
+    pr_out=$(git_cmd hub pr create --title "Hub PR" --body "Body" --head refs/heads/feature/hub --base "refs/heads/$base_branch") &&
     pr_id=$(printf "%s\n" "$pr_out" | head -n1 | cut -d" " -f2) &&
     test -n "$pr_id" &&
     git_cmd hub pr list --open | grep -q "Hub PR" &&
@@ -64,12 +65,13 @@ test_expect_success 'hub pr proposal: propose/list/import keeps canonical PRs se
     echo "base" > README.md &&
     git_cmd add README.md &&
     git_cmd commit -m "base" &&
+    base_branch="$(git_cmd rev-parse --abbrev-ref HEAD)" &&
     git_cmd checkout -b feature/proposal &&
     echo "proposal" > proposal.txt &&
     git_cmd add proposal.txt &&
     git_cmd commit -m "proposal" &&
     git_cmd hub init >/dev/null &&
-    proposal_out=$(git_cmd hub pr propose --title "Proposal PR" --body "Body" --head refs/heads/feature/proposal --base refs/heads/main) &&
+    proposal_out=$(git_cmd hub pr propose --title "Proposal PR" --body "Body" --head refs/heads/feature/proposal --base "refs/heads/$base_branch") &&
     proposal_id=$(printf "%s\n" "$proposal_out" | head -n1 | cut -d" " -f2) &&
     test -n "$proposal_id" &&
     git_cmd hub pr proposals | grep -q "Proposal PR" &&
@@ -83,6 +85,7 @@ test_expect_success 'hub pr merge policy: required approvals blocks and then all
     echo "base" > README.md &&
     git_cmd add README.md &&
     git_cmd commit -m "base" &&
+    base_branch="$(git_cmd rev-parse --abbrev-ref HEAD)" &&
     git_cmd checkout -b feature/policy-approve &&
     echo "feature" > policy.txt &&
     git_cmd add policy.txt &&
@@ -94,7 +97,7 @@ required_approvals = 1
 allow_request_changes = true
 require_signed_records = false
 EOF
-    pr_out=$(git_cmd hub pr create --title "Policy PR" --body "Body" --head refs/heads/feature/policy-approve --base refs/heads/main) &&
+    pr_out=$(git_cmd hub pr create --title "Policy PR" --body "Body" --head refs/heads/feature/policy-approve --base "refs/heads/$base_branch") &&
     pr_id=$(printf "%s\n" "$pr_out" | head -n1 | cut -d" " -f2) &&
     test -n "$pr_id" &&
     if git_cmd hub pr merge "$pr_id" >merge.out 2>merge.err; then
@@ -113,6 +116,7 @@ test_expect_success 'hub pr merge policy: request-changes can block merge' '
     echo "base" > README.md &&
     git_cmd add README.md &&
     git_cmd commit -m "base" &&
+    base_branch="$(git_cmd rev-parse --abbrev-ref HEAD)" &&
     git_cmd checkout -b feature/policy-rc &&
     echo "feature" > blocked.txt &&
     git_cmd add blocked.txt &&
@@ -124,7 +128,7 @@ required_approvals = 0
 allow_request_changes = false
 require_signed_records = false
 EOF
-    pr_out=$(git_cmd hub pr create --title "Blocked PR" --body "Body" --head refs/heads/feature/policy-rc --base refs/heads/main) &&
+    pr_out=$(git_cmd hub pr create --title "Blocked PR" --body "Body" --head refs/heads/feature/policy-rc --base "refs/heads/$base_branch") &&
     pr_id=$(printf "%s\n" "$pr_out" | head -n1 | cut -d" " -f2) &&
     test -n "$pr_id" &&
     source_commit=$(git_cmd rev-parse refs/heads/feature/policy-rc) &&
@@ -141,6 +145,7 @@ test_expect_success 'hub pr merge policy: require_signed_records fails without s
     echo "base" > README.md &&
     git_cmd add README.md &&
     git_cmd commit -m "base" &&
+    base_branch="$(git_cmd rev-parse --abbrev-ref HEAD)" &&
     git_cmd checkout -b feature/policy-signed &&
     echo "feature" > unsigned.txt &&
     git_cmd add unsigned.txt &&
@@ -152,7 +157,7 @@ required_approvals = 0
 allow_request_changes = true
 require_signed_records = true
 EOF
-    pr_out=$(git_cmd hub pr create --title "Signed PR" --body "Body" --head refs/heads/feature/policy-signed --base refs/heads/main) &&
+    pr_out=$(git_cmd hub pr create --title "Signed PR" --body "Body" --head refs/heads/feature/policy-signed --base "refs/heads/$base_branch") &&
     pr_id=$(printf "%s\n" "$pr_out" | head -n1 | cut -d" " -f2) &&
     test -n "$pr_id" &&
     if git_cmd hub pr merge "$pr_id" >merge.out 2>merge.err; then
@@ -167,6 +172,7 @@ test_expect_success 'hub pr merge policy: require_signed_records allows merge wi
     echo "base" > README.md &&
     git_cmd add README.md &&
     git_cmd commit -m "base" &&
+    base_branch="$(git_cmd rev-parse --abbrev-ref HEAD)" &&
     git_cmd checkout -b feature/policy-signed-ok &&
     echo "feature" > signed-ok.txt &&
     git_cmd add signed-ok.txt &&
@@ -178,7 +184,7 @@ required_approvals = 0
 allow_request_changes = true
 require_signed_records = true
 EOF
-    pr_out=$(BIT_COLLAB_SIGN_KEY=sign-key-1 git_cmd hub pr create --title "Signed OK PR" --body "Body" --head refs/heads/feature/policy-signed-ok --base refs/heads/main) &&
+    pr_out=$(BIT_COLLAB_SIGN_KEY=sign-key-1 git_cmd hub pr create --title "Signed OK PR" --body "Body" --head refs/heads/feature/policy-signed-ok --base "refs/heads/$base_branch") &&
     pr_id=$(printf "%s\n" "$pr_out" | head -n1 | cut -d" " -f2) &&
     test -n "$pr_id" &&
     BIT_COLLAB_SIGN_KEY=sign-key-1 git_cmd hub pr merge "$pr_id" >/dev/null &&
@@ -190,6 +196,7 @@ test_expect_success 'hub pr merge policy: require_signed_records rejects merge w
     echo "base" > README.md &&
     git_cmd add README.md &&
     git_cmd commit -m "base" &&
+    base_branch="$(git_cmd rev-parse --abbrev-ref HEAD)" &&
     git_cmd checkout -b feature/policy-signed-wrong &&
     echo "feature" > signed-wrong.txt &&
     git_cmd add signed-wrong.txt &&
@@ -201,7 +208,7 @@ required_approvals = 0
 allow_request_changes = true
 require_signed_records = true
 EOF
-    pr_out=$(BIT_COLLAB_SIGN_KEY=writer-key git_cmd hub pr create --title "Signed Wrong Key PR" --body "Body" --head refs/heads/feature/policy-signed-wrong --base refs/heads/main) &&
+    pr_out=$(BIT_COLLAB_SIGN_KEY=writer-key git_cmd hub pr create --title "Signed Wrong Key PR" --body "Body" --head refs/heads/feature/policy-signed-wrong --base "refs/heads/$base_branch") &&
     pr_id=$(printf "%s\n" "$pr_out" | head -n1 | cut -d" " -f2) &&
     test -n "$pr_id" &&
     if BIT_COLLAB_SIGN_KEY=reader-key git_cmd hub pr merge "$pr_id" >merge.out 2>merge.err; then
@@ -216,6 +223,7 @@ test_expect_success 'hub pr merge policy: require_signed_records + required_work
     echo "base" > README.md &&
     git_cmd add README.md &&
     git_cmd commit -m "base" &&
+    base_branch="$(git_cmd rev-parse --abbrev-ref HEAD)" &&
     git_cmd checkout -b feature/policy-signed-workflow &&
     echo "feature" > signed-workflow.txt &&
     git_cmd add signed-workflow.txt &&
@@ -228,7 +236,7 @@ allow_request_changes = true
 require_signed_records = true
 required_workflows = ["test"]
 EOF
-    pr_out=$(BIT_COLLAB_SIGN_KEY=sign-key-2 git_cmd hub pr create --title "Signed Workflow PR" --body "Body" --head refs/heads/feature/policy-signed-workflow --base refs/heads/main) &&
+    pr_out=$(BIT_COLLAB_SIGN_KEY=sign-key-2 git_cmd hub pr create --title "Signed Workflow PR" --body "Body" --head refs/heads/feature/policy-signed-workflow --base "refs/heads/$base_branch") &&
     pr_id=$(printf "%s\n" "$pr_out" | head -n1 | cut -d" " -f2) &&
     test -n "$pr_id" &&
     git_cmd hub pr workflow submit "$pr_id" --task test --status success --fingerprint fp-unsigned --txn txn-unsigned >/dev/null &&
@@ -247,11 +255,12 @@ test_expect_success 'hub pr merge policy: required_workflows blocks until workfl
     echo "base" > README.md &&
     git_cmd add README.md &&
     git_cmd commit -m "base" &&
+    base_branch="$(git_cmd rev-parse --abbrev-ref HEAD)" &&
     git_cmd checkout -b feature/policy-workflow &&
     echo "feature" > workflow.txt &&
     git_cmd add workflow.txt &&
     git_cmd commit -m "feature" &&
-    git_cmd checkout main &&
+    git_cmd checkout "$base_branch" &&
     git_cmd hub init >/dev/null &&
     cat > .git/hub/policy.toml <<-\EOF &&
 [merge]
@@ -260,7 +269,7 @@ allow_request_changes = true
 require_signed_records = false
 required_workflows = ["test"]
 EOF
-    pr_out=$(git_cmd hub pr create --title "Workflow PR" --body "Body" --head refs/heads/feature/policy-workflow --base refs/heads/main) &&
+    pr_out=$(git_cmd hub pr create --title "Workflow PR" --body "Body" --head refs/heads/feature/policy-workflow --base "refs/heads/$base_branch") &&
     pr_id=$(printf "%s\n" "$pr_out" | head -n1 | cut -d" " -f2) &&
     test -n "$pr_id" &&
     if git_cmd hub pr merge "$pr_id" >merge.out 2>merge.err; then
@@ -288,6 +297,7 @@ test_expect_success 'hub search: query and type filter' '
     echo "base" > README.md &&
     git_cmd add README.md &&
     git_cmd commit -m "base" &&
+    base_branch="$(git_cmd rev-parse --abbrev-ref HEAD)" &&
     git_cmd checkout -b feature/search &&
     echo "feature" > search.txt &&
     git_cmd add search.txt &&
@@ -296,7 +306,7 @@ test_expect_success 'hub search: query and type filter' '
     issue_out=$(git_cmd hub issue create --title "Search Issue" --body "issue keyword-issue") &&
     issue_id=$(printf "%s\n" "$issue_out" | head -n1 | cut -d" " -f2) &&
     test -n "$issue_id" &&
-    pr_out=$(git_cmd hub pr create --title "Search PR" --body "pr keyword-pr" --head refs/heads/feature/search --base refs/heads/main) &&
+    pr_out=$(git_cmd hub pr create --title "Search PR" --body "pr keyword-pr" --head refs/heads/feature/search --base "refs/heads/$base_branch") &&
     pr_id=$(printf "%s\n" "$pr_out" | head -n1 | cut -d" " -f2) &&
     test -n "$pr_id" &&
     all_out=$(git_cmd hub search "Search") &&
@@ -312,12 +322,13 @@ test_expect_success 'hub search: comment/review and limit filter' '
     echo "base" > README.md &&
     git_cmd add README.md &&
     git_cmd commit -m "base" &&
+    base_branch="$(git_cmd rev-parse --abbrev-ref HEAD)" &&
     git_cmd checkout -b feature/search-detail &&
     echo "feature" > detail.txt &&
     git_cmd add detail.txt &&
     git_cmd commit -m "feature" &&
     git_cmd hub init >/dev/null &&
-    pr_out=$(git_cmd hub pr create --title "Detail PR" --body "detail body" --head refs/heads/feature/search-detail --base refs/heads/main) &&
+    pr_out=$(git_cmd hub pr create --title "Detail PR" --body "detail body" --head refs/heads/feature/search-detail --base "refs/heads/$base_branch") &&
     pr_id=$(printf "%s\n" "$pr_out" | head -n1 | cut -d" " -f2) &&
     test -n "$pr_id" &&
     git_cmd hub pr comment "$pr_id" --body "token-comment" >/dev/null &&
