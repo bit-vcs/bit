@@ -47,7 +47,6 @@ async fn handle_fsck(args : Array[String]) -> Unit raise Error {
   ignore(specific_objects)
   let mut errors = 0
   let objects_dir = git_dir + "/objects"
-  // Load object database
   let db = @bitlib.ObjectDb::load(fs, git_dir)
   // Phase 1: Check HEAD and get resolved OID
   let (head_errors, head_oid) = fsck_check_and_resolve_head(fs, git_dir)
@@ -60,47 +59,38 @@ async fn handle_fsck(args : Array[String]) -> Unit raise Error {
   if not(connectivity_only) {
     errors += fsck_verify_packs(fs, objects_dir)
   }
-  // Phase 4: Connectivity check - walk from all refs
-  let reachable : Map[String, Bool] = {}
-  let missing : Map[String, Bool] = {}
+  // Phase 4: Connectivity check via pure lib function
   let ref_tips : Array[@bitcore.ObjectId] = []
-  // Collect all ref tips
   let refs = @bitrepo.show_ref(fs, git_dir)
   for item in refs {
     ref_tips.push(item.1)
   }
-  // Add HEAD OID
   match head_oid {
     Some(id) => ref_tips.push(id)
     None => ()
   }
-  // Add reflog entries if not --no-reflogs
   if not(no_reflogs) {
     fsck_collect_reflog_tips(fs, git_dir, ref_tips)
   }
-  // Walk from all tips
   let need_extra = show_root || show_tags
-  let root_commits : Array[String] = []
-  let tag_objects : Array[String] = []
-  for tip in ref_tips {
-    errors += fsck_walk_object(
-      db,
-      fs,
-      tip,
-      reachable,
-      missing,
-      need_extra~,
-      root_commits~,
-      tag_objects~,
-    )
+  let result = @bitlib.fsck_connectivity_check(
+    db,
+    fs,
+    ref_tips,
+    collect_extra=need_extra,
+  )
+  errors += result.errors
+  // Report missing objects
+  for hex, _ in result.missing {
+    eprint_line("error: \{hex}: missing object")
   }
   // Phase 5: Enumerate and report dangling/unreachable
   let need_all = show_dangling || show_unreachable || lost_found
   if need_all {
-    let all_objects = fsck_enumerate_all_objects(db)
+    let all_objects = @bitlib.fsck_enumerate_objects(db)
     for hex in all_objects {
-      if not(reachable.contains(hex)) {
-        let obj_type = fsck_get_object_type(db, fs, hex)
+      if not(result.reachable.contains(hex)) {
+        let obj_type = @bitlib.fsck_object_type(db, fs, hex)
         if show_unreachable {
           eprint_line("unreachable \{obj_type} \{hex}")
         } else if show_dangling {
@@ -109,17 +99,16 @@ async fn handle_fsck(args : Array[String]) -> Unit raise Error {
       }
     }
     if lost_found {
-      fsck_write_lost_found(fs, git_dir, db, all_objects, reachable)
+      fsck_write_lost_found(fs, git_dir, db, all_objects, result.reachable)
     }
   }
-  // Report root commits and tags (collected during walk)
   if show_root {
-    for hex in root_commits {
+    for hex in result.root_commits {
       eprint_line("root \{hex}")
     }
   }
   if show_tags {
-    for hex in tag_objects {
+    for hex in result.tag_objects {
       eprint_line("tagged \{hex}")
     }
   }
@@ -133,7 +122,6 @@ async fn handle_fsck(args : Array[String]) -> Unit raise Error {
 
 ///|
 /// Check HEAD validity and return (error_count, resolved_oid).
-/// Merges fsck_check_head + fsck_read_head to avoid reading HEAD twice.
 async fn fsck_check_and_resolve_head(
   fs : OsFs,
   git_dir : String,
@@ -163,7 +151,6 @@ async fn fsck_check_and_resolve_head(
     if not(refname.has_prefix("refs/heads/")) {
       eprint_line("warning: HEAD points to non-branch '\{refname}'")
     }
-    // Resolve the ref
     let resolved = fsck_resolve_ref(fs, git_dir, refname)
     return (0, resolved)
   }
@@ -190,7 +177,6 @@ fn fsck_resolve_ref(
   git_dir : String,
   refname : String,
 ) -> @bitcore.ObjectId? {
-  // Try loose ref
   let ref_path = git_dir + "/" + refname
   if fs.is_file(ref_path) {
     let ref_content = @utf8.decode_lossy(fs.read_file(ref_path)[:]) catch {
@@ -200,7 +186,6 @@ fn fsck_resolve_ref(
     let id = @bitcore.ObjectId::from_hex(hex) catch { _ => return None }
     return Some(id)
   }
-  // Try packed-refs
   let packed_path = git_dir + "/packed-refs"
   if not(fs.is_file(packed_path)) {
     return None
@@ -267,12 +252,8 @@ async fn fsck_verify_loose_objects(fs : OsFs, objects_dir : String) -> Int {
           continue
         }
       }
-      // SHA-1 of raw loose object bytes (header+content) = object ID
-      let computed = @bitcore.sha1(raw)
-      if computed.to_hex() != hex {
-        eprint_line(
-          "error: hash mismatch for \{hex} (expected \{computed.to_hex()})",
-        )
+      if not(@bitlib.fsck_verify_loose_hash(raw, hex)) {
+        eprint_line("error: hash mismatch for \{hex}")
         errors += 1
       }
     }
@@ -303,153 +284,6 @@ async fn fsck_verify_packs(fs : OsFs, objects_dir : String) -> Int {
 }
 
 ///|
-/// BFS walk from a single tip, collecting reachable objects.
-/// When need_extra is true, also collects root commits and tag objects
-/// during the walk to avoid a second pass over all objects.
-async fn fsck_walk_object(
-  db : @bitlib.ObjectDb,
-  fs : OsFs,
-  id : @bitcore.ObjectId,
-  reachable : Map[String, Bool],
-  missing : Map[String, Bool],
-  need_extra? : Bool = false,
-  root_commits? : Array[String] = [],
-  tag_objects? : Array[String] = [],
-) -> Int {
-  let mut errors = 0
-  let queue : Array[@bitcore.ObjectId] = [id]
-  let mut cursor = 0
-  while cursor < queue.length() {
-    let current = queue[cursor]
-    cursor += 1
-    let hex = current.to_hex()
-    if reachable.contains(hex) {
-      continue
-    }
-    reachable[hex] = true
-    let obj = db.get(fs, current) catch {
-      _ => {
-        if not(missing.contains(hex)) {
-          missing[hex] = true
-          eprint_line("error: \{hex}: missing object")
-          errors += 1
-        }
-        continue
-      }
-    }
-    match obj {
-      None =>
-        if not(missing.contains(hex)) {
-          missing[hex] = true
-          eprint_line("error: \{hex}: missing object")
-          errors += 1
-        }
-      Some(o) =>
-        match o.obj_type {
-          @bitcore.ObjectType::Commit => {
-            let info = @bitcore.parse_commit(o.data) catch {
-              _ => {
-                eprint_line("error: \{hex}: bad commit object")
-                errors += 1
-                continue
-              }
-            }
-            if need_extra && info.parents.length() == 0 {
-              root_commits.push(hex)
-            }
-            if not(reachable.contains(info.tree.to_hex())) {
-              queue.push(info.tree)
-            }
-            for parent in info.parents {
-              if not(reachable.contains(parent.to_hex())) {
-                queue.push(parent)
-              }
-            }
-          }
-          @bitcore.ObjectType::Tree => {
-            let entries = @bitcore.parse_tree(o.data) catch {
-              _ => {
-                eprint_line("error: \{hex}: bad tree object")
-                errors += 1
-                continue
-              }
-            }
-            for entry in entries {
-              if not(reachable.contains(entry.id.to_hex())) {
-                queue.push(entry.id)
-              }
-            }
-          }
-          @bitcore.ObjectType::Tag => {
-            if need_extra {
-              tag_objects.push(hex)
-            }
-            let text = @utf8.decode_lossy(o.data[:])
-            for line_view in text.split("\n") {
-              let line = line_view.to_string()
-              if line.length() == 0 {
-                break
-              }
-              if line.has_prefix("object ") {
-                let target_hex = String::unsafe_substring(
-                  line,
-                  start=7,
-                  end=line.length(),
-                )
-                let target = @bitcore.ObjectId::from_hex(target_hex) catch {
-                  _ => continue
-                }
-                if not(reachable.contains(target.to_hex())) {
-                  queue.push(target)
-                }
-                break
-              }
-            }
-          }
-          @bitcore.ObjectType::Blob => ()
-        }
-    }
-  }
-  errors
-}
-
-///|
-/// Enumerate all object hex IDs using db's already-loaded data.
-fn fsck_enumerate_all_objects(db : @bitlib.ObjectDb) -> Array[String] {
-  let all : Array[String] = []
-  let seen : Map[String, Bool] = {}
-  for hex, _ in db.loose_paths {
-    if not(seen.contains(hex)) {
-      seen[hex] = true
-      all.push(hex)
-    }
-  }
-  for pack in db.packs {
-    for id in pack.ids {
-      if not(seen.contains(id)) {
-        seen[id] = true
-        all.push(id)
-      }
-    }
-  }
-  all
-}
-
-///|
-fn fsck_get_object_type(
-  db : @bitlib.ObjectDb,
-  fs : OsFs,
-  hex : String,
-) -> String {
-  let id = @bitcore.ObjectId::from_hex(hex) catch { _ => return "blob" }
-  let obj = db.get(fs, id) catch { _ => return "blob" }
-  match obj {
-    None => "blob"
-    Some(o) => o.obj_type.to_string()
-  }
-}
-
-///|
 fn fsck_collect_reflog_tips(
   fs : OsFs,
   git_dir : String,
@@ -469,8 +303,7 @@ fn fsck_collect_reflog_tips_dir(
   dir : String,
   tips : Array[@bitcore.ObjectId],
 ) -> Unit {
-  let zero = @bitcore.ObjectId::zero()
-  let zero_hex = zero.to_hex()
+  let zero_hex = @bitcore.ObjectId::zero().to_hex()
   let entries = fs.readdir(dir) catch { _ => return }
   for entry in entries {
     let path = dir + "/" + entry
@@ -509,15 +342,9 @@ fn fsck_write_lost_found(
   let lf_dir = git_dir + "/lost-found"
   let commit_dir = lf_dir + "/commit"
   let other_dir = lf_dir + "/other"
-  ensure_dir(lf_dir) catch {
-    _ => return
-  }
-  ensure_dir(commit_dir) catch {
-    _ => return
-  }
-  ensure_dir(other_dir) catch {
-    _ => return
-  }
+  ensure_dir(lf_dir) catch { _ => return }
+  ensure_dir(commit_dir) catch { _ => return }
+  ensure_dir(other_dir) catch { _ => return }
   for hex in all_objects {
     if reachable.contains(hex) {
       continue
@@ -532,9 +359,7 @@ fn fsck_write_lost_found(
         } else {
           other_dir
         }
-        @fs.write_bytes_to_file(dir + "/" + hex, o.data) catch {
-          _ => ()
-        }
+        @fs.write_bytes_to_file(dir + "/" + hex, o.data) catch { _ => () }
       }
     }
   }
