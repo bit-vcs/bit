@@ -109,6 +109,12 @@ async fn show_help() -> Unit {
     #|   interpret-trailers  Add or parse trailers in commit messages
     #|   column          Display data in columns
     #|   update-server-info  Update auxiliary info for dumb HTTP serving
+    #|   verify-tag      Verify the GPG signature of tags
+    #|   fetch-pack      Receive missing objects from another repository
+    #|   credential      Retrieve and store user credentials
+    #|   difftool        Show changes using common diff tools
+    #|   rerere          Reuse recorded resolution of conflicted merges
+    #|   mailinfo        Extract patch info from a single e-mail message
     #|
     #|See 'git help <command>' for more information on a specific command.
   print_line(help)
@@ -403,6 +409,29 @@ fn show_command_help_specs() -> Array[(String, String, String)] {
     ),
     (
       "column", "git column [--mode=<mode>] [--width=<n>] [--padding=<n>]", "Display data in columns.",
+    ),
+    (
+      "verify-tag", "git verify-tag [-v | --verbose] [--raw] [--format=<format>] <tag>...",
+      "Verify the GPG signature of tags.",
+    ),
+    (
+      "fetch-pack", "git fetch-pack [--all] [--stdin] [--quiet] [--keep] [--thin] <url> [<ref>...]",
+      "Receive missing objects from another repository.",
+    ),
+    (
+      "credential", "git credential <fill|approve|reject>", "Retrieve and store user credentials.",
+    ),
+    (
+      "difftool", "git difftool [--tool=<tool>] [-y] [-d] [<commit>] [-- <path>...]",
+      "Show changes using common diff tools.",
+    ),
+    (
+      "rerere", "git rerere [clear | forget <path>... | diff | status | gc]",
+      "Reuse recorded resolution of conflicted merges.",
+    ),
+    (
+      "mailinfo", "git mailinfo [-b] [--scissors | --no-scissors] <msg> <patch>",
+      "Extracts patch and authorship from a single e-mail message.",
     ),
     ("version", "git version", "Show version information."),
     ("pr", "bit pr <subcommand> [<args>]", "Manage pull requests."),
@@ -1257,6 +1286,12 @@ async fn dispatch_known_command(
     "x/doc" => handle_x_doc(rest)
     "scalar" => handle_scalar(rest)
     "shell" => handle_shell(rest)
+    "verify-tag" => handle_verify_tag(rest)
+    "fetch-pack" => handle_fetch_pack(rest)
+    "credential" => handle_credential(rest)
+    "difftool" => handle_difftool(rest)
+    "rerere" => handle_rerere(rest)
+    "mailinfo" => handle_mailinfo(rest)
     "var" => handle_var(rest)
     "stripspace" => handle_stripspace(rest)
     "ls-remote" => handle_ls_remote(rest)
