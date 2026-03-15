@@ -20,6 +20,8 @@ async fn handle_repack(args : Array[String]) -> Unit raise Error {
   let mut geometric_factor : String = ""
   let mut keep_unreachable = false
   let mut unpack_unreachable_arg : String = ""
+  let mut name_hash_version : String = ""
+  let mut path_walk = false
   let mut i = 0
   while i < args.length() {
     let arg = args[i]
@@ -76,6 +78,19 @@ async fn handle_repack(args : Array[String]) -> Unit raise Error {
       if i < args.length() {
         geometric_factor = args[i]
       }
+    } else if arg.has_prefix("--name-hash-version=") {
+      name_hash_version = String::unsafe_substring(
+        arg,
+        start=20,
+        end=arg.length(),
+      )
+    } else if arg == "--name-hash-version" {
+      i += 1
+      if i < args.length() {
+        name_hash_version = args[i]
+      }
+    } else if arg == "--path-walk" {
+      path_walk = true
     } else if arg.has_prefix("-") &&
       not(arg.has_prefix("--")) &&
       arg.length() > 1 {
@@ -176,6 +191,12 @@ async fn handle_repack(args : Array[String]) -> Unit raise Error {
   }
   if geometric_factor.length() > 0 {
     po_args.push("--geometric=" + geometric_factor)
+  }
+  if name_hash_version.length() > 0 {
+    po_args.push("--name-hash-version=" + name_hash_version)
+  }
+  if path_walk {
+    po_args.push("--path-walk")
   }
   for kp in keep_packs {
     po_args.push("--keep-pack=" + kp)
