@@ -21,15 +21,16 @@ async fn handle_verify_tag(args : Array[String]) -> Unit raise Error {
         )
         return
       }
-      _ if arg.has_prefix("--format=") =>
-        format = Some(arg[9:].to_string())
+      _ if arg.has_prefix("--format=") => format = Some(arg[9:].to_string())
       _ if arg.has_prefix("-") => warn_unimplemented_arg("verify-tag", arg)
       _ => positional.push(arg)
     }
     i += 1
   }
   if positional.length() == 0 {
-    eprint_line("usage: git verify-tag [-v | --verbose] [--raw] [--format=<format>] <tag>...")
+    eprint_line(
+      "usage: git verify-tag [-v | --verbose] [--raw] [--format=<format>] <tag>...",
+    )
     @sys.exit(1)
     return
   }

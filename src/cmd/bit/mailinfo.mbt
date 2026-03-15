@@ -31,7 +31,9 @@ async fn handle_mailinfo(args : Array[String]) -> Unit raise Error {
     i += 1
   }
   if positional.length() < 2 {
-    eprint_line("usage: git mailinfo [-b] [--scissors | --no-scissors] <msg> <patch>")
+    eprint_line(
+      "usage: git mailinfo [-b] [--scissors | --no-scissors] <msg> <patch>",
+    )
     @sys.exit(1)
     return
   }
@@ -148,11 +150,7 @@ fn mailinfo_strip_patch_prefix(subject : String) -> String {
     Some(idx) =>
       if subject.has_prefix("[") {
         trim_string(
-          String::unsafe_substring(
-            subject,
-            start=idx + 1,
-            end=subject.length(),
-          ),
+          String::unsafe_substring(subject, start=idx + 1, end=subject.length()),
         )
       } else {
         subject

@@ -33,12 +33,10 @@ async fn handle_difftool(args : Array[String]) -> Unit raise Error {
         i += 1
         tool = Some(args[i])
       }
-      _ if arg.has_prefix("--tool=") =>
-        tool = Some(arg[7:].to_string())
+      _ if arg.has_prefix("--tool=") => tool = Some(arg[7:].to_string())
       _ if arg.has_prefix("-t") && arg.length() > 2 =>
         tool = Some(arg[2:].to_string())
-      _ if arg.has_prefix("--extcmd=") =>
-        extcmd = Some(arg[9:].to_string())
+      _ if arg.has_prefix("--extcmd=") => extcmd = Some(arg[9:].to_string())
       _ if arg == "--" => {
         // Remaining args are paths
         let mut j = i + 1
@@ -63,9 +61,8 @@ async fn handle_difftool(args : Array[String]) -> Unit raise Error {
         Some(cmd) => cmd
         None => {
           // Try config: diff.tool, then merge.tool
-          let config_tool = match @bitlib.read_config_value(
-            fs, config_path, "diff", "tool",
-          ) {
+          let config_tool = match
+            @bitlib.read_config_value(fs, config_path, "diff", "tool") {
             Some(t) => Some(t)
             None => @bitlib.read_config_value(fs, config_path, "merge", "tool")
           }

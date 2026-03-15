@@ -235,7 +235,8 @@ fn fast_import_load_marks(
   }
 }
 
-///| Simple line-oriented parser for fast-import stream.
+///|
+/// Simple line-oriented parser for fast-import stream.
 /// We work on the string representation but also keep the raw bytes
 /// for binary data sections.
 struct FastImportParser {
@@ -284,7 +285,8 @@ fn FastImportParser::skip_line(self : FastImportParser) -> Unit {
   }
 }
 
-///| Read data command: `data <count>\n<bytes>` or `data <<DELIM\n...\nDELIM\n`
+///|
+/// Read data command: `data <count>\n<bytes>` or `data <<DELIM\n...\nDELIM\n`
 fn FastImportParser::read_data(self : FastImportParser) -> Bytes {
   let line = self.consume_line()
   if not(line.has_prefix("data ")) {
@@ -362,7 +364,8 @@ fn FastImportParser::read_data(self : FastImportParser) -> Bytes {
   }
 }
 
-///| Count bytes in a string (ASCII characters = 1 byte each)
+///|
+/// Count bytes in a string (ASCII characters = 1 byte each)
 fn fast_import_string_byte_count(s : String) -> Int {
   let mut count = 0
   for _c in s {
@@ -371,7 +374,8 @@ fn fast_import_string_byte_count(s : String) -> Int {
   count
 }
 
-///| Resolve a dataref: either `:N` (mark) or 40-char hex SHA
+///|
+/// Resolve a dataref: either `:N` (mark) or 40-char hex SHA
 fn fast_import_resolve_dataref(
   ref_str : String,
   marks : Map[Int, @bitcore.ObjectId],
@@ -385,13 +389,16 @@ fn fast_import_resolve_dataref(
     let mark_num = @strconv.parse_int(mark_str) catch { _ => 0 }
     marks.get(mark_num).unwrap_or(@bitcore.ObjectId::zero())
   } else if ref_str.length() == 40 {
-    @bitcore.ObjectId::from_hex(ref_str) catch { _ => @bitcore.ObjectId::zero() }
+    @bitcore.ObjectId::from_hex(ref_str) catch {
+      _ => @bitcore.ObjectId::zero()
+    }
   } else {
     @bitcore.ObjectId::zero()
   }
 }
 
-///| Resolve a committish: mark, hex, or ref name
+///|
+/// Resolve a committish: mark, hex, or ref name
 fn fast_import_resolve_committish(
   ref_str : String,
   marks : Map[Int, @bitcore.ObjectId],
@@ -425,13 +432,16 @@ fn fast_import_resolve_committish(
   )
   let hex = fast_import_trim(content)
   if hex.length() == 40 {
-    @bitcore.ObjectId::from_hex(hex) catch { _ => @bitcore.ObjectId::zero() }
+    @bitcore.ObjectId::from_hex(hex) catch {
+      _ => @bitcore.ObjectId::zero()
+    }
   } else {
     @bitcore.ObjectId::zero()
   }
 }
 
-///| Trim whitespace from string
+///|
+/// Trim whitespace from string
 fn fast_import_trim(s : String) -> String {
   let mut start = 0
   let mut end = s.length()
@@ -440,13 +450,21 @@ fn fast_import_trim(s : String) -> String {
     chars.push(c)
   }
   while start < end &&
-    (chars[start] == ' ' || chars[start] == '\n' || chars[start] == '\r' ||
-    chars[start] == '\t') {
+        (
+          chars[start] == ' ' ||
+          chars[start] == '\n' ||
+          chars[start] == '\r' ||
+          chars[start] == '\t'
+        ) {
     start += 1
   }
   while end > start &&
-    (chars[end - 1] == ' ' || chars[end - 1] == '\n' || chars[end - 1] == '\r' ||
-    chars[end - 1] == '\t') {
+        (
+          chars[end - 1] == ' ' ||
+          chars[end - 1] == '\n' ||
+          chars[end - 1] == '\r' ||
+          chars[end - 1] == '\t'
+        ) {
     end -= 1
   }
   if start == 0 && end == s.length() {
@@ -460,7 +478,8 @@ fn fast_import_trim(s : String) -> String {
   }
 }
 
-///| Parse a blob command
+///|
+/// Parse a blob command
 async fn fast_import_parse_blob(
   parser : FastImportParser,
   marks : Map[Int, @bitcore.ObjectId],
@@ -492,10 +511,9 @@ async fn fast_import_parse_blob(
   }
 }
 
-///| Parse author/committer line: `Name <email> timestamp tz`
-fn fast_import_parse_ident(
-  line : String,
-) -> (String, Int64, String) {
+///|
+/// Parse author/committer line: `Name <email> timestamp tz`
+fn fast_import_parse_ident(line : String) -> (String, Int64, String) {
   // Format: "Name <email> timestamp tz"
   // Find the last '>' to split ident from timestamp
   let chars : Array[Char] = []
@@ -514,7 +532,7 @@ fn fast_import_parse_ident(
   }
   // ident is everything up to and including '>'
   let ident_buf = StringBuilder::new()
-  for i in 0..=gt_pos {
+  for i in 0..<=gt_pos {
     ident_buf.write_char(chars[i])
   }
   let ident = ident_buf.to_string()
@@ -539,7 +557,8 @@ fn fast_import_parse_ident(
   }
 }
 
-///| Parse a commit command
+///|
+/// Parse a commit command
 async fn fast_import_parse_commit(
   parser : FastImportParser,
   marks : Map[Int, @bitcore.ObjectId],
@@ -680,7 +699,7 @@ async fn fast_import_parse_commit(
       // Rename: R <old> <new>
       let rest = String::unsafe_substring(line, start=2, end=line.length())
       match fast_import_split_two_paths(rest) {
-        Some((old_path, new_path)) => {
+        Some((old_path, new_path)) =>
           match tree_state.get(old_path) {
             Some(entry) => {
               tree_state.remove(old_path)
@@ -688,7 +707,6 @@ async fn fast_import_parse_commit(
             }
             None => ()
           }
-        }
         None => ()
       }
     } else if line.has_prefix("C ") {
@@ -696,12 +714,11 @@ async fn fast_import_parse_commit(
       // Copy: C <old> <new>
       let rest = String::unsafe_substring(line, start=2, end=line.length())
       match fast_import_split_two_paths(rest) {
-        Some((old_path, new_path)) => {
+        Some((old_path, new_path)) =>
           match tree_state.get(old_path) {
             Some(entry) => tree_state[new_path] = entry
             None => ()
           }
-        }
         None => ()
       }
     } else if line.has_prefix("N ") {
@@ -715,15 +732,8 @@ async fn fast_import_parse_commit(
   let tree_id = fast_import_build_tree(tree_state, fs, git_dir)
   // Create commit
   let commit = @bitcore.Commit::new(
-    tree_id,
-    parents,
-    author_ident,
-    author_time,
-    author_tz,
-    committer_ident,
-    committer_time,
-    committer_tz,
-    message,
+    tree_id, parents, author_ident, author_time, author_tz, committer_ident, committer_time,
+    committer_tz, message,
   )
   let (commit_id, compressed) = @bitcore.create_commit(commit)
   @bitlib.write_object_bytes(fs, git_dir, commit_id, compressed)
@@ -734,7 +744,8 @@ async fn fast_import_parse_commit(
   branch_heads[ref_name] = commit_id
 }
 
-///| Parse inline data or resolve dataref for M command
+///|
+/// Parse inline data or resolve dataref for M command
 async fn fast_import_parse_filemodify(
   line : String,
   marks : Map[Int, @bitcore.ObjectId],
@@ -787,7 +798,8 @@ async fn fast_import_parse_filemodify(
   }
 }
 
-///| Unquote a C-style quoted path (e.g., "foo/bar" → foo/bar)
+///|
+/// Unquote a C-style quoted path (e.g., "foo/bar" → foo/bar)
 fn fast_import_unquote_path(path : String) -> String {
   if path.has_prefix("\"") && path.length() > 1 {
     // Remove quotes and unescape
@@ -841,7 +853,8 @@ fn fast_import_unquote_path(path : String) -> String {
   }
 }
 
-///| Split two space-separated paths, handling quoted paths
+///|
+/// Split two space-separated paths, handling quoted paths
 fn fast_import_split_two_paths(s : String) -> (String, String)? {
   if s.has_prefix("\"") {
     // First path is quoted — find closing quote
@@ -869,11 +882,7 @@ fn fast_import_split_two_paths(s : String) -> (String, String)? {
     match s.find(" ") {
       Some(sp) => {
         let first = String::unsafe_substring(s, start=0, end=sp)
-        let second = String::unsafe_substring(
-          s,
-          start=sp + 1,
-          end=s.length(),
-        )
+        let second = String::unsafe_substring(s, start=sp + 1, end=s.length())
         Some((first, fast_import_unquote_path(second)))
       }
       None => None
@@ -881,7 +890,8 @@ fn fast_import_split_two_paths(s : String) -> (String, String)? {
   }
 }
 
-///| Load tree entries recursively from a commit into the flat path map
+///|
+/// Load tree entries recursively from a commit into the flat path map
 async fn fast_import_load_tree_recursive(
   db : @bitlib.ObjectDb,
   fs : &@bitcore.RepoFileSystem,
@@ -902,7 +912,8 @@ async fn fast_import_load_tree_recursive(
   }
 }
 
-///| Recursively load tree entries into flat path map
+///|
+/// Recursively load tree entries into flat path map
 async fn fast_import_load_tree_entries(
   db : @bitlib.ObjectDb,
   fs : &@bitcore.RepoFileSystem,
@@ -923,9 +934,7 @@ async fn fast_import_load_tree_entries(
         }
         if entry.mode == "40000" || entry.mode == "040000" {
           // Recurse into subtree
-          fast_import_load_tree_entries(
-            db, fs, entry.id, full_path, tree_state,
-          )
+          fast_import_load_tree_entries(db, fs, entry.id, full_path, tree_state)
         } else {
           tree_state[full_path] = (entry.mode, entry.id)
         }
@@ -934,7 +943,8 @@ async fn fast_import_load_tree_entries(
   }
 }
 
-///| Build a tree hierarchy from flat path→(mode, id) map.
+///|
+/// Build a tree hierarchy from flat path→(mode, id) map.
 /// Returns the root tree ObjectId.
 async fn fast_import_build_tree(
   tree_state : Map[String, (String, @bitcore.ObjectId)],
@@ -1003,7 +1013,8 @@ async fn fast_import_build_tree(
   tree_id
 }
 
-///| Parse a tag command
+///|
+/// Parse a tag command
 async fn fast_import_parse_tag(
   parser : FastImportParser,
   marks : Map[Int, @bitcore.ObjectId],
@@ -1092,7 +1103,8 @@ async fn fast_import_parse_tag(
   osfs.write_string(ref_path, tag_id.to_hex() + "\n")
 }
 
-///| Parse a reset command
+///|
+/// Parse a reset command
 async fn fast_import_parse_reset(
   parser : FastImportParser,
   marks : Map[Int, @bitcore.ObjectId],

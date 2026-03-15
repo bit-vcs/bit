@@ -26,7 +26,9 @@ async fn handle_rerere(args : Array[String]) -> Unit {
     let unmerged = @bitlib.read_unmerged_paths(fs, git_dir)
     if unmerged.length() > 0 {
       // Ensure rr-cache directory exists
-      fs.mkdir_p(rr_cache_dir) catch { _ => () }
+      fs.mkdir_p(rr_cache_dir) catch {
+        _ => ()
+      }
     }
     // Minimal: no-op for recording (requires full conflict hashing)
     return
@@ -57,10 +59,7 @@ async fn handle_rerere(args : Array[String]) -> Unit {
 }
 
 ///|
-async fn rerere_clear(
-  fs : OsFs,
-  rr_cache_dir : String,
-) -> Unit {
+async fn rerere_clear(fs : OsFs, rr_cache_dir : String) -> Unit {
   // Remove all entries in rr-cache
   let entries = fs.readdir(rr_cache_dir) catch { _ => return }
   for entry in entries {
@@ -68,18 +67,19 @@ async fn rerere_clear(
     if fs.is_dir(path) {
       let sub_entries = fs.readdir(path) catch { _ => continue }
       for sub in sub_entries {
-        fs.remove_file(path + "/" + sub) catch { _ => () }
+        fs.remove_file(path + "/" + sub) catch {
+          _ => ()
+        }
       }
     }
-    fs.remove_file(path) catch { _ => () }
+    fs.remove_file(path) catch {
+      _ => ()
+    }
   }
 }
 
 ///|
-async fn rerere_diff(
-  fs : OsFs,
-  rr_cache_dir : String,
-) -> Unit {
+async fn rerere_diff(fs : OsFs, rr_cache_dir : String) -> Unit {
   // Show diff of recorded resolutions
   let entries = fs.readdir(rr_cache_dir) catch { _ => return }
   for entry in entries {
@@ -95,10 +95,7 @@ async fn rerere_diff(
 }
 
 ///|
-async fn rerere_status(
-  fs : OsFs,
-  rr_cache_dir : String,
-) -> Unit {
+async fn rerere_status(fs : OsFs, rr_cache_dir : String) -> Unit {
   // Show files with recorded resolutions
   let entries = fs.readdir(rr_cache_dir) catch { _ => return }
   for entry in entries {
@@ -110,10 +107,7 @@ async fn rerere_status(
 }
 
 ///|
-async fn rerere_gc(
-  fs : OsFs,
-  rr_cache_dir : String,
-) -> Unit {
+async fn rerere_gc(fs : OsFs, rr_cache_dir : String) -> Unit {
   // Remove old entries without postimage (unresolved)
   let entries = fs.readdir(rr_cache_dir) catch { _ => return }
   for entry in entries {
@@ -123,9 +117,13 @@ async fn rerere_gc(
       if not(fs.is_file(postimage)) {
         let sub_entries = fs.readdir(path) catch { _ => continue }
         for sub in sub_entries {
-          fs.remove_file(path + "/" + sub) catch { _ => () }
+          fs.remove_file(path + "/" + sub) catch {
+            _ => ()
+          }
         }
-        fs.remove_file(path) catch { _ => () }
+        fs.remove_file(path) catch {
+          _ => ()
+        }
       }
     }
   }

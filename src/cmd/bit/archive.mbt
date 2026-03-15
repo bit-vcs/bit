@@ -81,9 +81,10 @@ async fn handle_archive(args : Array[String]) -> Unit raise Error {
       eprint_line("fatal: not a tree object")
       @sys.exit(128)
       // unreachable
-      (@bitcore.ObjectId::from_hex(
-        "0000000000000000000000000000000000000000",
-      ), 0L)
+      (
+        @bitcore.ObjectId::from_hex("0000000000000000000000000000000000000000"),
+        0L,
+      )
     }
   }
   // Collect files from tree
@@ -170,11 +171,10 @@ async fn handle_archive(args : Array[String]) -> Unit raise Error {
   }
   let result = bytes_from_array(out)
   match output_file {
-    Some(path) => {
+    Some(path) =>
       @fs.write_bytes_to_file(path, result) catch {
         err => raise io_error(err)
       }
-    }
     None => @stdio.stdout.write(result)
   }
 }
@@ -198,7 +198,7 @@ fn archive_parse_committer_timestamp(data : Bytes) -> Int64 {
         }
       }
       if gt_pos >= 0 && gt_pos + 2 < rest.length() {
-        let after_email = rest[(gt_pos + 2):].to_string()
+        let after_email = rest[gt_pos + 2:].to_string()
         // "timestamp tz"
         let parts = after_email.split(" ")
         let parts_arr : Array[String] = []
@@ -395,7 +395,7 @@ fn tar_split_path(path : String) -> (String, String) {
   }
   if best_slash >= 0 {
     let prefix_part = path[:best_slash].to_string()
-    let name_part = path[(best_slash + 1):].to_string()
+    let name_part = path[best_slash + 1:].to_string()
     (name_part, prefix_part)
   } else {
     // Can't split; truncate name

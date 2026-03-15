@@ -49,9 +49,7 @@ async fn handle_fast_export(args : Array[String]) -> Unit raise Error {
   match signed_tags {
     "strip" | "warn-strip" | "verbatim" | "abort" | "warn" => ()
     _ => {
-      eprint_line(
-        "fatal: Unknown signed-tags mode: \{signed_tags}",
-      )
+      eprint_line("fatal: Unknown signed-tags mode: \{signed_tags}")
       @sys.exit(1)
     }
   }
@@ -201,12 +199,15 @@ async fn handle_fast_export(args : Array[String]) -> Unit raise Error {
           for path, file_entry in tree_files {
             let mode_str = fast_export_format_mode(file_entry.mode)
             if no_data {
-              file_ops.push(
-                "M \{mode_str} \{file_entry.id.to_hex()} \{path}",
-              )
+              file_ops.push("M \{mode_str} \{file_entry.id.to_hex()} \{path}")
             } else {
               let blob_mark = fast_export_ensure_blob(
-                db, fs, file_entry.id, blob_marks, buf, show_original_ids,
+                db,
+                fs,
+                file_entry.id,
+                blob_marks,
+                buf,
+                show_original_ids,
                 next_mark,
               )
               next_mark = next_mark + blob_mark.1
@@ -221,7 +222,9 @@ async fn handle_fast_export(args : Array[String]) -> Unit raise Error {
             Some(pobj) => {
               let parent_info = @bitcore.parse_commit(pobj.data)
               let parent_files = @bitlib.collect_tree_files(
-                db, fs, parent_info.tree,
+                db,
+                fs,
+                parent_info.tree,
               )
               // Find modified/added files
               for path, file_entry in tree_files {
@@ -238,8 +241,13 @@ async fn handle_fast_export(args : Array[String]) -> Unit raise Error {
                     )
                   } else {
                     let blob_mark = fast_export_ensure_blob(
-                      db, fs, file_entry.id, blob_marks, buf,
-                      show_original_ids, next_mark,
+                      db,
+                      fs,
+                      file_entry.id,
+                      blob_marks,
+                      buf,
+                      show_original_ids,
+                      next_mark,
                     )
                     next_mark = next_mark + blob_mark.1
                     file_ops.push("M \{mode_str} :\{blob_mark.0} \{path}")
@@ -253,7 +261,7 @@ async fn handle_fast_export(args : Array[String]) -> Unit raise Error {
                 }
               }
             }
-            None => {
+            None =>
               // Parent missing, treat as full tree
               for path, file_entry in tree_files {
                 let mode_str = fast_export_format_mode(file_entry.mode)
@@ -263,14 +271,18 @@ async fn handle_fast_export(args : Array[String]) -> Unit raise Error {
                   )
                 } else {
                   let blob_mark = fast_export_ensure_blob(
-                    db, fs, file_entry.id, blob_marks, buf,
-                    show_original_ids, next_mark,
+                    db,
+                    fs,
+                    file_entry.id,
+                    blob_marks,
+                    buf,
+                    show_original_ids,
+                    next_mark,
                   )
                   next_mark = next_mark + blob_mark.1
                   file_ops.push("M \{mode_str} :\{blob_mark.0} \{path}")
                 }
               }
-            }
           }
         }
         // Assign mark to this commit
@@ -308,8 +320,7 @@ async fn handle_fast_export(args : Array[String]) -> Unit raise Error {
         if info.parents.length() > 0 {
           let parent_hex = info.parents[0].to_hex()
           match mark_map.get(parent_hex) {
-            Some(parent_mark) =>
-              buf.write_string("from :\{parent_mark}\n")
+            Some(parent_mark) => buf.write_string("from :\{parent_mark}\n")
             None => ()
           }
         }
@@ -317,8 +328,7 @@ async fn handle_fast_export(args : Array[String]) -> Unit raise Error {
         for i in 1..<info.parents.length() {
           let parent_hex = info.parents[i].to_hex()
           match mark_map.get(parent_hex) {
-            Some(parent_mark) =>
-              buf.write_string("merge :\{parent_mark}\n")
+            Some(parent_mark) => buf.write_string("merge :\{parent_mark}\n")
             None => ()
           }
         }
@@ -353,8 +363,11 @@ async fn handle_fast_export(args : Array[String]) -> Unit raise Error {
           let has_sig = tag_text.contains("-----BEGIN PGP SIGNATURE-----") ||
             tag_text.contains("-----BEGIN SSH SIGNATURE-----")
           if has_sig &&
-            (signed_tags == "abort" || signed_tags == "strip" || signed_tags ==
-            "warn-strip") {
+            (
+              signed_tags == "abort" ||
+              signed_tags == "strip" ||
+              signed_tags == "warn-strip"
+            ) {
             if signed_tags == "abort" {
               eprint_line(
                 "fatal: Encountered signed tag \{tag_name}; use --signed-tags=<mode> to handle it.",
@@ -362,9 +375,7 @@ async fn handle_fast_export(args : Array[String]) -> Unit raise Error {
               @sys.exit(1)
             }
             if signed_tags == "warn-strip" || signed_tags == "warn" {
-              eprint_line(
-                "warning: Stripping signature from tag \{tag_name}",
-              )
+              eprint_line("warning: Stripping signature from tag \{tag_name}")
             }
           }
           // Find target commit mark

@@ -109,6 +109,11 @@ async fn show_help() -> Unit {
     #|   interpret-trailers  Add or parse trailers in commit messages
     #|   column          Display data in columns
     #|   update-server-info  Update auxiliary info for dumb HTTP serving
+    #|   check-attr      Display gitattributes information
+    #|   check-ignore    Check whether paths are excluded by .gitignore
+    #|   show-index      Show packed archive index
+    #|   get-tar-commit-id  Extract commit ID from an archive created by git archive
+    #|   verify-commit   Verify the GPG signature of commits
     #|   verify-tag      Verify the GPG signature of tags
     #|   fetch-pack      Receive missing objects from another repository
     #|   credential      Retrieve and store user credentials
@@ -411,6 +416,26 @@ fn show_command_help_specs() -> Array[(String, String, String)] {
       "column", "git column [--mode=<mode>] [--width=<n>] [--padding=<n>]", "Display data in columns.",
     ),
     (
+      "check-attr", "git check-attr [-a | --all | <attr>...] [--] <pathname>...",
+      "Display gitattributes information.",
+    ),
+    (
+      "check-ignore", "git check-ignore [<options>] <pathname>...",
+      "Check whether paths are excluded by .gitignore.",
+    ),
+    (
+      "show-index", "git show-index",
+      "Show packed archive index.",
+    ),
+    (
+      "get-tar-commit-id", "git get-tar-commit-id",
+      "Extract commit ID from an archive created by git archive.",
+    ),
+    (
+      "verify-commit", "git verify-commit [-v | --verbose] [--raw] <commit>...",
+      "Verify the GPG signature of commits.",
+    ),
+    (
       "verify-tag", "git verify-tag [-v | --verbose] [--raw] [--format=<format>] <tag>...",
       "Verify the GPG signature of tags.",
     ),
@@ -426,8 +451,7 @@ fn show_command_help_specs() -> Array[(String, String, String)] {
       "Show changes using common diff tools.",
     ),
     (
-      "rerere", "git rerere [clear | forget <path>... | diff | status | gc]",
-      "Reuse recorded resolution of conflicted merges.",
+      "rerere", "git rerere [clear | forget <path>... | diff | status | gc]", "Reuse recorded resolution of conflicted merges.",
     ),
     (
       "mailinfo", "git mailinfo [-b] [--scissors | --no-scissors] <msg> <patch>",
@@ -1250,7 +1274,7 @@ async fn dispatch_known_command(
     "notes" => handle_notes(rest)
     "bisect" => handle_bisect(rest)
     "describe" => handle_describe(rest)
-    "blame" => handle_blame(rest)
+    "blame" | "annotate" => handle_blame(rest)
     "format-patch" => handle_format_patch(rest)
     "shortlog" => handle_shortlog(rest)
     "am" => handle_am(rest)
@@ -1287,6 +1311,11 @@ async fn dispatch_known_command(
     "x/doc" => handle_x_doc(rest)
     "scalar" => handle_scalar(rest)
     "shell" => handle_shell(rest)
+    "check-attr" => handle_check_attr(rest)
+    "check-ignore" => handle_check_ignore(rest)
+    "show-index" => handle_show_index(rest)
+    "get-tar-commit-id" => handle_get_tar_commit_id(rest)
+    "verify-commit" => handle_verify_commit(rest)
     "verify-tag" => handle_verify_tag(rest)
     "fetch-pack" => handle_fetch_pack(rest)
     "credential" => handle_credential(rest)
