@@ -286,10 +286,13 @@ fn parse_patches(patch : String) -> Array[PatchInfo] {
             if hunkline.has_prefix("diff ") {
               break
             }
-            if hunkline.has_prefix("+") && not(hunkline.has_prefix("+++")) {
+            if hunkline.has_prefix("+") &&
+              not(hunkline.has_prefix("+++ ")) &&
+              hunkline != "+++" {
               additions += 1
             } else if hunkline.has_prefix("-") &&
-              not(hunkline.has_prefix("---")) {
+              not(hunkline.has_prefix("--- ")) &&
+              hunkline != "---" {
               deletions += 1
             }
             i += 1
