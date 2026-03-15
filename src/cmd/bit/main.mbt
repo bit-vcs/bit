@@ -85,6 +85,8 @@ async fn show_help() -> Unit {
     #|   ls-files        Show information about files in the index
     #|   ls-remote       List references in a remote repository
     #|   ls-tree         List the contents of a tree object
+    #|   fast-export     Output a fast-import-compatible stream
+    #|   fast-import     Backend for fast Git data importers
     #|   pack-objects    Create a packed archive of objects
     #|   receive-pack    Receive what is pushed into the repository
     #|   rev-list        List commit objects in reverse chronological order
@@ -221,6 +223,12 @@ fn show_command_help_specs() -> Array[(String, String, String)] {
     ),
     (
       "describe", "git describe [<options>] <commit-ish>", "Give an object a human readable name based on a ref.",
+    ),
+    (
+      "fast-export", "git fast-export [<options>] [<rev-list-args>]", "Output a fast-import-compatible stream.",
+    ),
+    (
+      "fast-import", "git fast-import [<options>]", "Backend for fast Git data importers.",
     ),
     (
       "format-patch", "git format-patch [<options>] <since>..<until>", "Prepare patches for e-mail submission.",
@@ -1228,6 +1236,8 @@ async fn dispatch_known_command(
     "pack-redundant" => handle_pack_redundant(rest)
     "unpack-objects" => handle_unpack_objects(rest)
     "bundle" => handle_bundle(rest)
+    "fast-export" => handle_fast_export(rest)
+    "fast-import" => handle_fast_import(rest)
     "read-tree" => handle_read_tree(rest)
     "update-index" => handle_update_index(rest)
     "commit-tree" => handle_commit_tree(rest)

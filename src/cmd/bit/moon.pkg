@@ -97,6 +97,8 @@ options(
     "diff_tree.mbt": [ "native" ],
     "diff_wbtest.mbt": [ "native" ],
     "doc.mbt": [ "native" ],
+    "fast_export.mbt": [ "native" ],
+    "fast_import.mbt": [ "native" ],
     "fallback.mbt": [ "native" ],
     "fallback_wbtest.mbt": [ "native" ],
     "fetch.mbt": [ "native" ],
