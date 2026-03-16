@@ -420,16 +420,11 @@ fn show_command_help_specs() -> Array[(String, String, String)] {
       "Display gitattributes information.",
     ),
     (
-      "check-ignore", "git check-ignore [<options>] <pathname>...",
-      "Check whether paths are excluded by .gitignore.",
+      "check-ignore", "git check-ignore [<options>] <pathname>...", "Check whether paths are excluded by .gitignore.",
     ),
+    ("show-index", "git show-index", "Show packed archive index."),
     (
-      "show-index", "git show-index",
-      "Show packed archive index.",
-    ),
-    (
-      "get-tar-commit-id", "git get-tar-commit-id",
-      "Extract commit ID from an archive created by git archive.",
+      "get-tar-commit-id", "git get-tar-commit-id", "Extract commit ID from an archive created by git archive.",
     ),
     (
       "verify-commit", "git verify-commit [-v | --verbose] [--raw] <commit>...",

@@ -81,7 +81,9 @@ async fn handle_check_ignore(args : Array[String]) -> Unit raise Error {
     let root_ignore = root + "/.gitignore"
     if fs.is_file(root_ignore) {
       let content = decode_bytes(
-        fs.read_file(root_ignore) catch { _ => Bytes::default() },
+        fs.read_file(root_ignore) catch {
+          _ => Bytes::default()
+        },
       )
       path_matcher.add_rules("", content)
     }
@@ -89,7 +91,9 @@ async fn handle_check_ignore(args : Array[String]) -> Unit raise Error {
     let exclude_path = git_dir + "/info/exclude"
     if fs.is_file(exclude_path) {
       let content = decode_bytes(
-        fs.read_file(exclude_path) catch { _ => Bytes::default() },
+        fs.read_file(exclude_path) catch {
+          _ => Bytes::default()
+        },
       )
       path_matcher.add_rules("", content)
     }
@@ -98,15 +102,13 @@ async fn handle_check_ignore(args : Array[String]) -> Unit raise Error {
     let mut base = ""
     let seg_limit = segments.length() - 1
     for j in 0..<seg_limit {
-      base = if base == "" {
-        segments[j]
-      } else {
-        base + "/" + segments[j]
-      }
+      base = if base == "" { segments[j] } else { base + "/" + segments[j] }
       let dir_ignore = root + "/" + base + "/.gitignore"
       if fs.is_file(dir_ignore) {
         let content = decode_bytes(
-          fs.read_file(dir_ignore) catch { _ => Bytes::default() },
+          fs.read_file(dir_ignore) catch {
+            _ => Bytes::default()
+          },
         )
         path_matcher.add_rules(base, content)
       }
@@ -171,7 +173,12 @@ fn check_ignore_find_rule(
   let mut last_pattern = ""
   // Check root .gitignore
   let root_result = check_ignore_scan_file(
-    fs, root + "/.gitignore", ".gitignore", "", rel_path, is_dir,
+    fs,
+    root + "/.gitignore",
+    ".gitignore",
+    "",
+    rel_path,
+    is_dir,
   )
   if root_result.1 > 0 {
     last_source = root_result.0
@@ -193,11 +200,7 @@ fn check_ignore_find_rule(
   let mut base = ""
   let seg_limit = segments.length() - 1
   for j in 0..<seg_limit {
-    base = if base == "" {
-      segments[j]
-    } else {
-      base + "/" + segments[j]
-    }
+    base = if base == "" { segments[j] } else { base + "/" + segments[j] }
     let dir_result = check_ignore_scan_file(
       fs,
       root + "/" + base + "/.gitignore",

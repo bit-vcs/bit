@@ -612,12 +612,7 @@ pub fn create_packfile_with_delta_stats_compression(
             built
           }
         }
-        let delta = build_delta_with_index(
-          entry.obj.data,
-          obj.data,
-          idx,
-          bpow,
-        )
+        let delta = build_delta_with_index(entry.obj.data, obj.data, idx, bpow)
         if delta.length() < best_delta_size {
           best_delta_size = delta.length()
           best_base = Some((entry.offset, entry.obj))
@@ -630,13 +625,7 @@ pub fn create_packfile_with_delta_stats_compression(
       }
     }
     let (written, used_delta) = pack_object_with_delta(
-      obj,
-      best_base,
-      obj_offset,
-      result,
-      delta_mode,
-      compression,
-      best_delta,
+      obj, best_base, obj_offset, result, delta_mode, compression, best_delta,
     )
     offset = offset + written
     if used_delta {

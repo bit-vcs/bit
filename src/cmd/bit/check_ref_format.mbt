@@ -49,10 +49,8 @@ async fn handle_check_ref_format(args : Array[String]) -> Unit raise Error {
       @sys.exit(1)
     }
     print_line(normalized)
-  } else {
-    if not(check_ref_format_valid(refname, allow_onelevel~)) {
-      @sys.exit(1)
-    }
+  } else if not(check_ref_format_valid(refname, allow_onelevel~)) {
+    @sys.exit(1)
   }
 }
 

@@ -28,10 +28,9 @@ async fn handle_get_tar_commit_id(args : Array[String]) -> Unit raise Error {
   let commit_id = tar_extract_pax_comment(data)
   match commit_id {
     Some(id) => print_line(id)
-    None => {
+    None =>
       // No commit ID found
       @sys.exit(1)
-    }
   }
 }
 
@@ -112,11 +111,7 @@ fn tar_find_pax_comment(data : Bytes, start : Int, end : Int) -> String? {
           end=line.length(),
         )
         if rest.has_prefix("comment=") {
-          let value = String::unsafe_substring(
-            rest,
-            start=8,
-            end=rest.length(),
-          )
+          let value = String::unsafe_substring(rest, start=8, end=rest.length())
           // Validate it looks like a hex OID (40 or 64 chars)
           if (value.length() == 40 || value.length() == 64) &&
             is_hex_string(value) {

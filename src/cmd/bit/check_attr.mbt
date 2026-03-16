@@ -41,29 +41,27 @@ async fn handle_check_attr(args : Array[String]) -> Unit raise Error {
   if all {
     // All positional args are paths
     paths.append(positional)
-  } else {
     // First positional args (before --) are attrs, rest are paths
     // If -- was used, positional only has paths and we need attrs from before
     // Re-parse: attrs come before --, paths come after
-    if past_dashdash {
-      // positional has paths (after --), need to re-extract attrs from args
-      let mut j = 0
-      while j < args.length() {
-        let a = args[j]
-        if a == "--" {
-          break
-        }
-        if not(a.has_prefix("-")) {
-          attrs.push(a)
-        }
-        j += 1
+  } else if past_dashdash {
+    // positional has paths (after --), need to re-extract attrs from args
+    let mut j = 0
+    while j < args.length() {
+      let a = args[j]
+      if a == "--" {
+        break
       }
-    } else if positional.length() > 0 {
-      // First arg is attr, rest are paths
-      attrs.push(positional[0])
-      for k in 1..<positional.length() {
-        paths.push(positional[k])
+      if not(a.has_prefix("-")) {
+        attrs.push(a)
       }
+      j += 1
+    }
+  } else if positional.length() > 0 {
+    // First arg is attr, rest are paths
+    attrs.push(positional[0])
+    for k in 1..<positional.length() {
+      paths.push(positional[k])
     }
   }
   // Read paths from stdin if --stdin
@@ -96,9 +94,7 @@ async fn handle_check_attr(args : Array[String]) -> Unit raise Error {
     if all {
       // Print all resolved attributes
       for entry in resolved {
-        print_str(
-          path + field_sep + entry.0 + field_sep + entry.1 + line_sep,
-        )
+        print_str(path + field_sep + entry.0 + field_sep + entry.1 + line_sep)
       }
     } else {
       // Print requested attributes
@@ -127,7 +123,9 @@ fn check_attr_load_rules(
   let root_attr = root + "/.gitattributes"
   if fs.is_file(root_attr) {
     let content = decode_bytes(
-      fs.read_file(root_attr) catch { _ => Bytes::default() },
+      fs.read_file(root_attr) catch {
+        _ => Bytes::default()
+      },
     )
     check_attr_parse_rules(content, rules)
   }
@@ -135,7 +133,9 @@ fn check_attr_load_rules(
   let info_attr = git_dir + "/info/attributes"
   if fs.is_file(info_attr) {
     let content = decode_bytes(
-      fs.read_file(info_attr) catch { _ => Bytes::default() },
+      fs.read_file(info_attr) catch {
+        _ => Bytes::default()
+      },
     )
     check_attr_parse_rules(content, rules)
   }
@@ -183,9 +183,7 @@ fn check_attr_parse_rules(
         end += 1
       }
       if end > start {
-        words.push(
-          String::unsafe_substring(trimmed, start~, end~),
-        )
+        words.push(String::unsafe_substring(trimmed, start~, end~))
       }
       start = end
     }
@@ -209,11 +207,7 @@ fn check_attr_parse_rules(
       } else {
         match token.find("=") {
           Some(eq_idx) => {
-            let attr_name = String::unsafe_substring(
-              token,
-              start=0,
-              end=eq_idx,
-            )
+            let attr_name = String::unsafe_substring(token, start=0, end=eq_idx)
             let attr_value = String::unsafe_substring(
               token,
               start=eq_idx + 1,

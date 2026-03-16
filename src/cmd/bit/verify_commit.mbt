@@ -20,16 +20,13 @@ async fn handle_verify_commit(args : Array[String]) -> Unit raise Error {
         )
         return
       }
-      _ if arg.has_prefix("-") =>
-        warn_unimplemented_arg("verify-commit", arg)
+      _ if arg.has_prefix("-") => warn_unimplemented_arg("verify-commit", arg)
       _ => positional.push(arg)
     }
     i += 1
   }
   if positional.length() == 0 {
-    eprint_line(
-      "usage: git verify-commit [-v | --verbose] [--raw] <commit>...",
-    )
+    eprint_line("usage: git verify-commit [-v | --verbose] [--raw] <commit>...")
     @sys.exit(1)
     return
   }
@@ -40,9 +37,7 @@ async fn handle_verify_commit(args : Array[String]) -> Unit raise Error {
     let commit_id = match @bitrepo.rev_parse(fs, git_dir, commit_name) {
       Some(id) => id
       None => {
-        eprint_line(
-          "error: object " + commit_name + " is a non-commit object.",
-        )
+        eprint_line("error: object " + commit_name + " is a non-commit object.")
         had_error = true
         continue
       }
@@ -66,9 +61,7 @@ async fn handle_verify_commit(args : Array[String]) -> Unit raise Error {
           if verbose {
             let tree_val = verify_commit_extract_field(text, "tree")
             let author_val = verify_commit_extract_field(text, "author")
-            let committer_val = verify_commit_extract_field(
-              text, "committer",
-            )
+            let committer_val = verify_commit_extract_field(text, "committer")
             eprint_line("tree " + tree_val)
             eprint_line("author " + author_val)
             eprint_line("committer " + committer_val)
@@ -85,9 +78,7 @@ async fn handle_verify_commit(args : Array[String]) -> Unit raise Error {
         }
       }
       Some(_) => {
-        eprint_line(
-          "error: object " + commit_name + " is a non-commit object.",
-        )
+        eprint_line("error: object " + commit_name + " is a non-commit object.")
         had_error = true
       }
       None => {
@@ -131,7 +122,11 @@ fn verify_commit_extract_sig(text : String) -> String? {
           break
         }
       }
-      if result.length() > 0 { Some(result) } else { None }
+      if result.length() > 0 {
+        Some(result)
+      } else {
+        None
+      }
     }
     None => None
   }

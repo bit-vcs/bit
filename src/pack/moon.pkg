@@ -23,8 +23,8 @@ warnings = "-29"
 
 options(
   targets: {
-    "bench_test.mbt": [ "native" ],
     "bench_profile_test.mbt": [ "native" ],
+    "bench_test.mbt": [ "native" ],
     "bit_oracle_pack_test.mbt": [ "native" ],
     "pack_index_write_test.mbt": [ "native" ],
   },

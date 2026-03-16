@@ -9,6 +9,8 @@ import {
 // Values
 pub fn apply_delta(Bytes, Bytes) -> Bytes raise @object.GitError
 
+pub fn build_delta_pub(Bytes, Bytes) -> Bytes
+
 pub fn build_pack_index(Bytes) -> Bytes raise @object.GitError
 
 pub fn build_pack_index_from_objects(Bytes, Array[@object.PackObject]) -> Bytes raise @object.GitError
