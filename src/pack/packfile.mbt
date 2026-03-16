@@ -254,12 +254,22 @@ fn find_best_match(
   let mut best_len = 0
   let mut best_off = 0
   let mut checked = 0
+  let max_candidates = 32
   for off in candidates {
     if off + block_size > base.length() {
       continue
     }
+    // Quick 4-byte prefix check before full comparison
+    if base[off] != target[target_pos] ||
+      base[off + 1] != target[target_pos + 1] {
+      checked += 1
+      if checked >= max_candidates {
+        break
+      }
+      continue
+    }
     let mut ok = true
-    for i = 0; i < block_size; i = i + 1 {
+    for i = 2; i < block_size; i = i + 1 {
       if base[off + i] != target[target_pos + i] {
         ok = false
         break
@@ -268,17 +278,21 @@ fn find_best_match(
     if ok {
       let mut len = block_size
       while target_pos + len < target.length() &&
-            off + len < base.length() &&
-            base[off + len] == target[target_pos + len] {
+        off + len < base.length() &&
+        base[off + len] == target[target_pos + len] {
         len += 1
       }
       if len > best_len {
         best_len = len
         best_off = off
+        // Good enough match: skip remaining candidates
+        if best_len >= block_size * 2 {
+          break
+        }
       }
     }
     checked += 1
-    if checked > 128 {
+    if checked >= max_candidates {
       break
     }
   }
