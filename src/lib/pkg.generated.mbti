@@ -12,6 +12,8 @@ pub fn add_paths(&@types.FileSystem, &@types.RepoFileSystem, String, Array[Strin
 
 pub async fn add_paths_async(&@types.FileSystem, &@types.RepoFileSystem, String, Array[String], run_filter_cmd? : FilterCmd, warnings? : Array[String]) -> Unit raise @object.GitError
 
+pub fn add_trailer(String, String, String) -> String
+
 pub fn append_reflog(&@types.FileSystem, &@types.RepoFileSystem, String, String, @object.ObjectId, @object.ObjectId, String, String, Int64, String, String) -> Unit raise @object.GitError
 
 pub fn apply_config_overrides(Map[String, RemoteConfig], Map[String, BranchConfig], Array[(String, String)]) -> Unit
@@ -142,6 +144,24 @@ pub fn expand_sparse_skip_worktree_paths(&@types.RepoFileSystem, String, Array[I
 
 pub fn fast_forward_to(&@types.FileSystem, &@types.RepoFileSystem, String, @object.ObjectId) -> Unit raise @object.GitError
 
+pub fn fast_import_parse_data(Array[String], Int) -> FastImportDataResult
+
+pub fn fast_import_parse_dataref(String) -> (Int, String)
+
+pub fn fast_import_parse_file_op(String) -> FastImportFileOp?
+
+pub fn fast_import_parse_ident(String) -> FastImportIdent?
+
+pub fn fast_import_parse_marks(String) -> Array[(Int, String)]
+
+pub fn fast_import_parse_split_two_paths(String) -> (String, String)?
+
+pub fn fast_import_parse_string_byte_count(String) -> Int
+
+pub fn fast_import_parse_trim(String) -> String
+
+pub fn fast_import_parse_unquote_path(String) -> String
+
 pub fn find_config_key_line_from_content(String, String) -> Int?
 
 pub fn find_tree_entry(ObjectDb, &@types.RepoFileSystem, @object.ObjectId, String) -> @object.TreeEntry? raise @object.GitError
@@ -258,6 +278,12 @@ pub fn matches_sparse_pattern(String, Array[String]) -> Bool
 
 pub fn merge(&@types.FileSystem, &@types.RepoFileSystem, String, @object.ObjectId, String, String, Int64) -> MergeResult raise @object.GitError
 
+pub fn merge_base_all(ObjectDb, &@types.RepoFileSystem, @object.ObjectId, @object.ObjectId) -> Array[@object.ObjectId] raise @object.GitError
+
+pub fn merge_base_independent(ObjectDb, &@types.RepoFileSystem, Array[@object.ObjectId]) -> Array[@object.ObjectId] raise @object.GitError
+
+pub fn merge_base_is_ancestor(ObjectDb, &@types.RepoFileSystem, @object.ObjectId, @object.ObjectId) -> Bool raise @object.GitError
+
 pub fn month_name_to_number(String) -> Int?
 
 pub fn move_directory(&@types.RepoFileSystem, &@types.FileSystem, String, String) -> Unit
@@ -333,6 +359,8 @@ pub fn parse_section_header(String) -> (String, String?)
 pub fn parse_section_header_line(String) -> (String, String?, String, Bool)?
 
 pub fn parse_tag_object(String) -> @object.ObjectId? raise
+
+pub fn parse_trailers(String) -> Array[(String, String)]
 
 pub fn parse_upload_pack_request(Bytes) -> UploadPackRequest raise @object.GitError
 
@@ -544,6 +572,18 @@ pub fn subdir_remove_dir(&@types.RepoFileSystem, &@types.FileSystem, String) -> 
 
 pub fn switch_branch(&@types.FileSystem, &@types.RepoFileSystem, String, String, create? : Bool, checkout_files? : Bool) -> Unit raise @object.GitError
 
+pub fn tar_emit_parent_dirs(Array[Byte], String, Int64, Map[String, Bool]) -> Unit
+
+pub fn tar_format_octal(Int64, Int) -> String
+
+pub fn tar_make_header(String, Int, Int, Int64, Byte, String) -> FixedArray[Byte]
+
+pub fn tar_parse_committer_timestamp(Bytes) -> Int64
+
+pub fn tar_split_path(String) -> (String, String)
+
+pub fn tar_write_string(FixedArray[Byte], Int, String, Int) -> Unit
+
 pub fn tree_files_to_index(ObjectDb, &@types.RepoFileSystem, Map[String, TreeFileEntry]) -> Array[IndexEntry] raise @object.GitError
 
 pub fn unlock_worktree(&@types.FileSystem, &@types.RepoFileSystem, String, String) -> Unit raise @object.GitError
@@ -677,6 +717,27 @@ pub enum EolAttr {
   Lf
   Crlf
   Unspecified
+}
+
+pub(all) struct FastImportDataResult {
+  content : Bytes
+  next_line : Int
+}
+
+pub(all) enum FastImportFileOp {
+  Modify(mode~ : String, dataref~ : String, path~ : String)
+  Delete(path~ : String)
+  DeleteAll
+  Rename(old_path~ : String, new_path~ : String)
+  Copy(old_path~ : String, new_path~ : String)
+}
+pub impl Eq for FastImportFileOp
+pub impl Show for FastImportFileOp
+
+pub(all) struct FastImportIdent {
+  ident : String
+  timestamp : Int64
+  tz : String
 }
 
 pub(all) struct FetchRefspec {

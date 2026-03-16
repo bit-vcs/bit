@@ -361,15 +361,23 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
           None => refs.push(arg)
         }
       }
-      _ if not(arg.has_prefix("-")) => {
+      _ if not(arg.has_prefix("-")) =>
         // Handle ^@, ^!, ^-N parent suffixes
         if arg.has_suffix("^@") {
           // commit^@ = all parents of commit
-          let base = String::unsafe_substring(arg, start=0, end=arg.length() - 2)
+          let base = String::unsafe_substring(
+            arg,
+            start=0,
+            end=arg.length() - 2,
+          )
           refs.push(base + "^@")
         } else if arg.has_suffix("^!") {
           // commit^! = commit ^commit^1 ^commit^2 ...
-          let base = String::unsafe_substring(arg, start=0, end=arg.length() - 2)
+          let base = String::unsafe_substring(
+            arg,
+            start=0,
+            end=arg.length() - 2,
+          )
           refs.push(base + "^!")
         } else if arg.contains("^-") {
           // commit^-N = commit^N..commit (parent exclusion range)
@@ -393,9 +401,7 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
                   refs.push(base)
                 } else {
                   // Invalid: garbage after ^-
-                  eprint_line(
-                    "fatal: invalid parent exclusion: '\{arg}'",
-                  )
+                  eprint_line("fatal: invalid parent exclusion: '\{arg}'")
                   @sys.exit(128)
                 }
               }
@@ -405,7 +411,6 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
         } else {
           refs.push(arg)
         }
-      }
       _ if arg.has_prefix("-") => warn_unimplemented_arg("rev-list", arg)
       _ => ()
     }

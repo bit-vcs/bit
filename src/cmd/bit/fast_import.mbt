@@ -208,29 +208,12 @@ fn fast_import_load_marks(
   content : String,
   marks : Map[Int, @bitcore.ObjectId],
 ) -> Unit {
-  for line_view in content.split("\n") {
-    let line = line_view.to_string()
-    if line.length() == 0 {
-      continue
-    }
-    if line.has_prefix(":") {
-      match line.find(" ") {
-        Some(sp) => {
-          let mark_str = String::unsafe_substring(line, start=1, end=sp)
-          let hex = String::unsafe_substring(
-            line,
-            start=sp + 1,
-            end=line.length(),
-          )
-          let mark_num = @strconv.parse_int(mark_str) catch { _ => 0 }
-          if mark_num > 0 && hex.length() == 40 {
-            marks[mark_num] = @bitcore.ObjectId::from_hex(hex) catch {
-              _ => @bitcore.ObjectId::zero()
-            }
-          }
-        }
-        None => ()
-      }
+  let parsed = @bitlib.fast_import_parse_marks(content)
+  for pair in parsed {
+    let mark_num = pair.0
+    let hex = pair.1
+    marks[mark_num] = @bitcore.ObjectId::from_hex(hex) catch {
+      _ => @bitcore.ObjectId::zero()
     }
   }
 }
@@ -288,90 +271,9 @@ fn FastImportParser::skip_line(self : FastImportParser) -> Unit {
 ///|
 /// Read data command: `data <count>\n<bytes>` or `data <<DELIM\n...\nDELIM\n`
 fn FastImportParser::read_data(self : FastImportParser) -> Bytes {
-  let line = self.consume_line()
-  if not(line.has_prefix("data ")) {
-    return Bytes::new(0)
-  }
-  let rest = String::unsafe_substring(line, start=5, end=line.length())
-  if rest.has_prefix("<<") {
-    // Delimited form
-    let delim = String::unsafe_substring(rest, start=2, end=rest.length())
-    let buf : Array[Byte] = []
-    while self.has_more() {
-      let l = self.consume_line()
-      if l == delim {
-        break
-      }
-      if buf.length() > 0 {
-        buf.push(b'\n')
-      }
-      for c in l {
-        buf.push(c.to_int().to_byte())
-      }
-    }
-    bytes_from_array(buf)
-  } else {
-    // Exact byte count form
-    let count = @strconv.parse_int(rest) catch { _ => 0 }
-    if count == 0 {
-      return Bytes::new(0)
-    }
-    // We need to read exactly `count` bytes from the remaining lines.
-    // Since we pre-split by \n, we need to reconstruct bytes from lines
-    // accounting for the newlines between them.
-    let buf : Array[Byte] = []
-    let mut remaining = count
-    while remaining > 0 && self.has_more() {
-      let l = self.lines[self.line_idx]
-      // Each line was split by \n, so between lines there's an implicit \n
-      let line_bytes = fast_import_string_byte_count(l)
-      if buf.length() > 0 {
-        // Account for the \n separator that was stripped by split
-        if remaining > 0 {
-          buf.push(b'\n')
-          remaining -= 1
-        }
-      }
-      if line_bytes <= remaining {
-        // Consume entire line
-        for c in l {
-          buf.push(c.to_int().to_byte())
-        }
-        remaining -= line_bytes
-        self.line_idx += 1
-      } else {
-        // Partial line: take only `remaining` bytes
-        let mut taken = 0
-        for c in l {
-          if taken >= remaining {
-            break
-          }
-          buf.push(c.to_int().to_byte())
-          taken += 1
-        }
-        remaining = 0
-        // Don't consume line - but we need to handle this carefully.
-        // In practice, data sections end on line boundaries.
-        // We advance past this line since we've read into it.
-        self.line_idx += 1
-      }
-    }
-    // After data, there may be a trailing LF (blank line) — consume it
-    if self.has_more() && self.peek_line().length() == 0 {
-      self.skip_line()
-    }
-    bytes_from_array(buf)
-  }
-}
-
-///|
-/// Count bytes in a string (ASCII characters = 1 byte each)
-fn fast_import_string_byte_count(s : String) -> Int {
-  let mut count = 0
-  for _c in s {
-    count += 1
-  }
-  count
+  let result = @bitlib.fast_import_parse_data(self.lines, self.line_idx)
+  self.line_idx = result.next_line
+  result.content
 }
 
 ///|
@@ -380,16 +282,11 @@ fn fast_import_resolve_dataref(
   ref_str : String,
   marks : Map[Int, @bitcore.ObjectId],
 ) -> @bitcore.ObjectId {
-  if ref_str.has_prefix(":") {
-    let mark_str = String::unsafe_substring(
-      ref_str,
-      start=1,
-      end=ref_str.length(),
-    )
-    let mark_num = @strconv.parse_int(mark_str) catch { _ => 0 }
+  let (mark_num, hex) = @bitlib.fast_import_parse_dataref(ref_str)
+  if mark_num > 0 {
     marks.get(mark_num).unwrap_or(@bitcore.ObjectId::zero())
-  } else if ref_str.length() == 40 {
-    @bitcore.ObjectId::from_hex(ref_str) catch {
+  } else if hex.length() == 40 {
+    @bitcore.ObjectId::from_hex(hex) catch {
       _ => @bitcore.ObjectId::zero()
     }
   } else {
@@ -443,39 +340,7 @@ fn fast_import_resolve_committish(
 ///|
 /// Trim whitespace from string
 fn fast_import_trim(s : String) -> String {
-  let mut start = 0
-  let mut end = s.length()
-  let chars : Array[Char] = []
-  for c in s {
-    chars.push(c)
-  }
-  while start < end &&
-        (
-          chars[start] == ' ' ||
-          chars[start] == '\n' ||
-          chars[start] == '\r' ||
-          chars[start] == '\t'
-        ) {
-    start += 1
-  }
-  while end > start &&
-        (
-          chars[end - 1] == ' ' ||
-          chars[end - 1] == '\n' ||
-          chars[end - 1] == '\r' ||
-          chars[end - 1] == '\t'
-        ) {
-    end -= 1
-  }
-  if start == 0 && end == s.length() {
-    s
-  } else {
-    let buf = StringBuilder::new()
-    for i in start..<end {
-      buf.write_char(chars[i])
-    }
-    buf.to_string()
-  }
+  @bitlib.fast_import_parse_trim(s)
 }
 
 ///|
@@ -514,46 +379,9 @@ async fn fast_import_parse_blob(
 ///|
 /// Parse author/committer line: `Name <email> timestamp tz`
 fn fast_import_parse_ident(line : String) -> (String, Int64, String) {
-  // Format: "Name <email> timestamp tz"
-  // Find the last '>' to split ident from timestamp
-  let chars : Array[Char] = []
-  for c in line {
-    chars.push(c)
-  }
-  let mut gt_pos = -1
-  for i = chars.length() - 1; i >= 0; i = i - 1 {
-    if chars[i] == '>' {
-      gt_pos = i
-      break
-    }
-  }
-  if gt_pos < 0 {
-    return (line, 0L, "+0000")
-  }
-  // ident is everything up to and including '>'
-  let ident_buf = StringBuilder::new()
-  for i in 0..<=gt_pos {
-    ident_buf.write_char(chars[i])
-  }
-  let ident = ident_buf.to_string()
-  // After '>' there should be " timestamp tz"
-  let rest_buf = StringBuilder::new()
-  for i in (gt_pos + 1)..<chars.length() {
-    rest_buf.write_char(chars[i])
-  }
-  let rest = fast_import_trim(rest_buf.to_string())
-  // Split rest by space: "timestamp tz"
-  match rest.find(" ") {
-    Some(sp) => {
-      let ts_str = String::unsafe_substring(rest, start=0, end=sp)
-      let tz = String::unsafe_substring(rest, start=sp + 1, end=rest.length())
-      let ts = @strconv.parse_int64(ts_str) catch { _ => 0L }
-      (ident, ts, tz)
-    }
-    None => {
-      let ts = @strconv.parse_int64(rest) catch { _ => 0L }
-      (ident, ts, "+0000")
-    }
+  match @bitlib.fast_import_parse_ident(line) {
+    Some(id) => (id.ident, id.timestamp, id.tz)
+    None => (line, 0L, "+0000")
   }
 }
 
@@ -801,93 +629,13 @@ async fn fast_import_parse_filemodify(
 ///|
 /// Unquote a C-style quoted path (e.g., "foo/bar" → foo/bar)
 fn fast_import_unquote_path(path : String) -> String {
-  if path.has_prefix("\"") && path.length() > 1 {
-    // Remove quotes and unescape
-    let inner = String::unsafe_substring(path, start=1, end=path.length())
-    let inner = if inner.length() > 0 {
-      // Check for trailing quote
-      let chars : Array[Char] = []
-      for c in inner {
-        chars.push(c)
-      }
-      if chars.length() > 0 && chars[chars.length() - 1] == '"' {
-        let buf = StringBuilder::new()
-        for i in 0..<(chars.length() - 1) {
-          buf.write_char(chars[i])
-        }
-        buf.to_string()
-      } else {
-        inner
-      }
-    } else {
-      inner
-    }
-    // Simple unescape: handle \\, \n, \t, \"
-    let chars : Array[Char] = []
-    for c in inner {
-      chars.push(c)
-    }
-    let buf = StringBuilder::new()
-    let mut i = 0
-    while i < chars.length() {
-      if chars[i] == '\\' && i + 1 < chars.length() {
-        match chars[i + 1] {
-          'n' => buf.write_char('\n')
-          't' => buf.write_char('\t')
-          '\\' => buf.write_char('\\')
-          '"' => buf.write_char('"')
-          _ => {
-            buf.write_char('\\')
-            buf.write_char(chars[i + 1])
-          }
-        }
-        i += 2
-      } else {
-        buf.write_char(chars[i])
-        i += 1
-      }
-    }
-    buf.to_string()
-  } else {
-    path
-  }
+  @bitlib.fast_import_parse_unquote_path(path)
 }
 
 ///|
 /// Split two space-separated paths, handling quoted paths
 fn fast_import_split_two_paths(s : String) -> (String, String)? {
-  if s.has_prefix("\"") {
-    // First path is quoted — find closing quote
-    let chars : Array[Char] = []
-    for c in s {
-      chars.push(c)
-    }
-    let mut i = 1
-    while i < chars.length() {
-      if chars[i] == '"' && (i == 0 || chars[i - 1] != '\\') {
-        let first = String::unsafe_substring(s, start=0, end=i + 1)
-        let rest = if i + 2 < chars.length() {
-          String::unsafe_substring(s, start=i + 2, end=chars.length())
-        } else {
-          ""
-        }
-        return Some(
-          (fast_import_unquote_path(first), fast_import_unquote_path(rest)),
-        )
-      }
-      i += 1
-    }
-    None
-  } else {
-    match s.find(" ") {
-      Some(sp) => {
-        let first = String::unsafe_substring(s, start=0, end=sp)
-        let second = String::unsafe_substring(s, start=sp + 1, end=s.length())
-        Some((first, fast_import_unquote_path(second)))
-      }
-      None => None
-    }
-  }
+  @bitlib.fast_import_parse_split_two_paths(s)
 }
 
 ///|

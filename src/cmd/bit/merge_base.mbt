@@ -178,37 +178,8 @@ async fn merge_base_is_ancestor(
   ancestor : @bitcore.ObjectId,
   descendant : @bitcore.ObjectId,
 ) -> Bool raise Error {
-  let ancestor_hex = ancestor.to_hex()
-  let descendant_hex = descendant.to_hex()
-  if ancestor_hex == descendant_hex {
-    return true
-  }
   let db = @bitlib.ObjectDb::load(fs, git_dir)
-  let visited : Map[String, Bool] = {}
-  let queue : Array[@bitcore.ObjectId] = [descendant]
-  while queue.length() > 0 {
-    let current = queue.unsafe_pop()
-    let hex = current.to_hex()
-    if hex == ancestor_hex {
-      return true
-    }
-    if visited.contains(hex) {
-      continue
-    }
-    visited[hex] = true
-    let obj = db.get(fs, current)
-    match obj {
-      Some(o) =>
-        if o.obj_type == @bitcore.ObjectType::Commit {
-          let info = @bitcore.parse_commit(o.data)
-          for parent in info.parents {
-            queue.push(parent)
-          }
-        }
-      None => ()
-    }
-  }
-  false
+  @bitlib.merge_base_is_ancestor(db, fs, ancestor, descendant)
 }
 
 ///|
@@ -221,115 +192,7 @@ async fn merge_base_all(
   b : @bitcore.ObjectId,
 ) -> Array[@bitcore.ObjectId] raise Error {
   let db = @bitlib.ObjectDb::load(fs, git_dir)
-  // Collect all ancestors of A (including A itself)
-  let ancestors_a : Map[String, Bool] = {}
-  let q1 : Array[@bitcore.ObjectId] = [a]
-  while q1.length() > 0 {
-    let current = q1.unsafe_pop()
-    let hex = current.to_hex()
-    if ancestors_a.contains(hex) {
-      continue
-    }
-    ancestors_a[hex] = true
-    let obj = db.get(fs, current)
-    match obj {
-      Some(o) =>
-        if o.obj_type == @bitcore.ObjectType::Commit {
-          let info = @bitcore.parse_commit(o.data)
-          for parent in info.parents {
-            q1.push(parent)
-          }
-        }
-      None => ()
-    }
-  }
-  // BFS from B, collect all common ancestors
-  let common : Array[@bitcore.ObjectId] = []
-  let common_set : Map[String, Bool] = {}
-  let seen : Map[String, Bool] = {}
-  let q2 : Array[@bitcore.ObjectId] = [b]
-  while q2.length() > 0 {
-    let current = q2.unsafe_pop()
-    let hex = current.to_hex()
-    if seen.contains(hex) {
-      continue
-    }
-    seen[hex] = true
-    if ancestors_a.contains(hex) {
-      if not(common_set.contains(hex)) {
-        common.push(current)
-        common_set[hex] = true
-      }
-      // Don't traverse further — ancestors of this are also common but "deeper"
-      continue
-    }
-    let obj = db.get(fs, current)
-    match obj {
-      Some(o) =>
-        if o.obj_type == @bitcore.ObjectType::Commit {
-          let info = @bitcore.parse_commit(o.data)
-          for parent in info.parents {
-            q2.push(parent)
-          }
-        }
-      None => ()
-    }
-  }
-  // Filter: remove any common ancestor that is an ancestor of another common ancestor.
-  // A merge base is a common ancestor not reachable from any other common ancestor.
-  if common.length() <= 1 {
-    return common
-  }
-  let result : Array[@bitcore.ObjectId] = []
-  for ci in 0..<common.length() {
-    let candidate = common[ci]
-    let candidate_hex = candidate.to_hex()
-    let mut is_ancestor_of_another = false
-    for cj in 0..<common.length() {
-      if ci == cj {
-        continue
-      }
-      // Check if candidate is ancestor of common[cj]
-      let other = common[cj]
-      let other_hex = other.to_hex()
-      if candidate_hex == other_hex {
-        continue
-      }
-      // BFS from other to see if candidate is reachable
-      let visited2 : Map[String, Bool] = {}
-      let q3 : Array[@bitcore.ObjectId] = [other]
-      while q3.length() > 0 {
-        let cur = q3.unsafe_pop()
-        let chex = cur.to_hex()
-        if chex == candidate_hex {
-          is_ancestor_of_another = true
-          break
-        }
-        if visited2.contains(chex) {
-          continue
-        }
-        visited2[chex] = true
-        let obj = db.get(fs, cur)
-        match obj {
-          Some(o) =>
-            if o.obj_type == @bitcore.ObjectType::Commit {
-              let info = @bitcore.parse_commit(o.data)
-              for parent in info.parents {
-                q3.push(parent)
-              }
-            }
-          None => ()
-        }
-      }
-      if is_ancestor_of_another {
-        break
-      }
-    }
-    if not(is_ancestor_of_another) {
-      result.push(candidate)
-    }
-  }
-  result
+  @bitlib.merge_base_all(db, fs, a, b)
 }
 
 ///|
@@ -360,24 +223,8 @@ async fn merge_base_independent(
   git_dir : String,
   commits : Array[@bitcore.ObjectId],
 ) -> Array[@bitcore.ObjectId] raise Error {
-  let result : Array[@bitcore.ObjectId] = []
-  for idx_i in 0..<commits.length() {
-    let candidate = commits[idx_i]
-    let mut reachable = false
-    for idx_j in 0..<commits.length() {
-      if idx_i == idx_j {
-        continue
-      }
-      if merge_base_is_ancestor(fs, git_dir, candidate, commits[idx_j]) {
-        reachable = true
-        break
-      }
-    }
-    if not(reachable) {
-      result.push(candidate)
-    }
-  }
-  result
+  let db = @bitlib.ObjectDb::load(fs, git_dir)
+  @bitlib.merge_base_independent(db, fs, commits)
 }
 
 ///|

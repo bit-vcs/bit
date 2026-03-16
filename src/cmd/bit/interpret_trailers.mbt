@@ -84,10 +84,12 @@ async fn handle_interpret_trailers(args : Array[String]) -> Unit raise Error {
   }
   if only_trailers {
     // Parse and print existing trailers only
-    let existing = interpret_trailers_parse(input)
+    let existing = @bitlib.parse_trailers(input)
     let result = StringBuilder::new()
     for trailer in existing {
-      result.write_string(trailer)
+      result.write_string(trailer.0)
+      result.write_string(": ")
+      result.write_string(trailer.1)
       result.write_char('\n')
     }
     if not(no_divider) && existing.length() > 0 {
@@ -97,146 +99,30 @@ async fn handle_interpret_trailers(args : Array[String]) -> Unit raise Error {
     print_str(result.to_string())
     return
   }
-  // Build output: message body + trailer block
-  let (body, existing) = interpret_trailers_split(input)
-  let all_trailers : Array[String] = []
-  all_trailers.append(existing)
-  // Add new trailers
+  // Build output: add all new trailers to the message
+  let mut output = input
   for trailer in trailers {
-    all_trailers.push(interpret_trailers_normalize(trailer))
-  }
-  let result = StringBuilder::new()
-  result.write_string(body)
-  // Ensure blank line before trailers if body doesn't end with one
-  if body.length() > 0 && not(body.has_suffix("\n\n")) {
-    if body.has_suffix("\n") {
-      result.write_char('\n')
-    } else {
-      result.write_string("\n\n")
+    let normalized = interpret_trailers_normalize(trailer)
+    // Parse the normalized trailer into key and value
+    match normalized.find(": ") {
+      Some(idx) => {
+        let key = String::unsafe_substring(normalized, start=0, end=idx)
+        let value = String::unsafe_substring(
+          normalized,
+          start=idx + 2,
+          end=normalized.length(),
+        )
+        output = @bitlib.add_trailer(output, key, value)
+      }
+      None => output = @bitlib.add_trailer(output, normalized, "")
     }
   }
-  for trailer in all_trailers {
-    result.write_string(trailer)
-    result.write_char('\n')
-  }
-  let output = result.to_string()
   if in_place && positional.length() > 0 {
     fs.write_file(positional[0], str_to_bytes(output)) catch {
       err => raise err
     }
   } else {
     print_str(output)
-  }
-}
-
-///|
-fn interpret_trailers_parse(input : String) -> Array[String] {
-  // Find trailer block at end of message
-  let lines : Array[String] = []
-  for line_view in input.split("\n") {
-    lines.push(line_view.to_string())
-  }
-  // Remove trailing empty lines
-  while lines.length() > 0 &&
-        trim_string(lines[lines.length() - 1]).length() == 0 {
-    ignore(lines.pop())
-  }
-  // Walk backwards to find trailer block
-  let trailers : Array[String] = []
-  let mut i = lines.length() - 1
-  while i >= 0 {
-    let line = lines[i]
-    if interpret_trailers_is_trailer(line) {
-      trailers.push(line)
-      i -= 1
-    } else {
-      break
-    }
-  }
-  // Reverse since we collected backwards
-  trailers.rev()
-}
-
-///|
-fn interpret_trailers_split(input : String) -> (String, Array[String]) {
-  // Split into body and existing trailers
-  let lines : Array[String] = []
-  for line_view in input.split("\n") {
-    lines.push(line_view.to_string())
-  }
-  // Remove trailing empty line from split
-  if lines.length() > 0 && lines[lines.length() - 1].length() == 0 {
-    ignore(lines.pop())
-  }
-  // Walk backwards to find trailer block
-  let trailer_start = {
-    let mut idx = lines.length()
-    let mut i = lines.length() - 1
-    while i >= 0 {
-      let line = lines[i]
-      if interpret_trailers_is_trailer(line) {
-        idx = i
-        i -= 1
-      } else if trim_string(line).length() == 0 {
-        // blank line before trailers is part of separator
-        break
-      } else {
-        break
-      }
-    }
-    idx
-  }
-  let trailers : Array[String] = []
-  let mut ti = trailer_start
-  while ti < lines.length() {
-    trailers.push(lines[ti])
-    ti += 1
-  }
-  // Body is everything before trailer_start
-  let body_sb = StringBuilder::new()
-  let mut bi = 0
-  while bi < trailer_start {
-    body_sb.write_string(lines[bi])
-    body_sb.write_char('\n')
-    bi += 1
-  }
-  (body_sb.to_string(), trailers)
-}
-
-///|
-fn interpret_trailers_is_trailer(line : String) -> Bool {
-  // A trailer line has format "Key: Value" or "Key = Value"
-  // Key must start with a letter/digit and contain no whitespace before separator
-  match line.find(": ") {
-    Some(idx) => {
-      if idx == 0 {
-        return false
-      }
-      let key = String::unsafe_substring(line, start=0, end=idx)
-      // Key should not contain spaces
-      for c in key.to_array() {
-        if c == ' ' || c == '\t' {
-          return false
-        }
-      }
-      true
-    }
-    None =>
-      match line.find(" = ") {
-        Some(idx) => {
-          if idx == 0 {
-            return false
-          }
-          let key = String::unsafe_substring(line, start=0, end=idx)
-          for c in key.to_array() {
-            if c == ' ' || c == '\t' {
-              return false
-            }
-          }
-          true
-        }
-        None => false
-      }
   }
 }
 
