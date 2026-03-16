@@ -120,6 +120,14 @@ async fn show_help() -> Unit {
     #|   difftool        Show changes using common diff tools
     #|   rerere          Reuse recorded resolution of conflicted merges
     #|   mailinfo        Extract patch info from a single e-mail message
+    #|   mailsplit       Split mbox file into individual messages
+    #|   merge-index     Run a merge for each unmerged file in the index
+    #|   merge-one-file  Standard merge helper for merge-index
+    #|   http-fetch      Download objects via dumb HTTP
+    #|   quiltimport     Import a quilt patch series
+    #|   check-mailmap   Show canonical names and email addresses of contacts
+    #|   unpack-file     Create a temp file holding a blob's contents
+    #|   web--browse     Open URL in a web browser
     #|
     #|See 'git help <command>' for more information on a specific command.
   print_line(help)
@@ -451,6 +459,38 @@ fn show_command_help_specs() -> Array[(String, String, String)] {
     (
       "mailinfo", "git mailinfo [-b] [--scissors | --no-scissors] <msg> <patch>",
       "Extracts patch and authorship from a single e-mail message.",
+    ),
+    (
+      "mailsplit", "git mailsplit [-o<dir>] [-b] [--] <mbox>...",
+      "Split mbox file into individual messages.",
+    ),
+    (
+      "merge-index", "git merge-index [-o] [-q] <merge-program> (-a | <file>...)",
+      "Run a merge for each unmerged file in the index.",
+    ),
+    (
+      "merge-one-file", "git merge-one-file <base-hash> <base-mode> <our-hash> <our-mode> <their-hash> <their-mode> <path>",
+      "Standard merge helper for merge-index.",
+    ),
+    (
+      "http-fetch", "git http-fetch [-v] [-w <filename>] <commit-id> <url>",
+      "Download objects from a remote repository via dumb HTTP.",
+    ),
+    (
+      "quiltimport", "git quiltimport [--dry-run] [--author <author>] [--patches <dir>]",
+      "Import a quilt patch series.",
+    ),
+    (
+      "check-mailmap", "git check-mailmap [--stdin] <contact>...",
+      "Show canonical names and email addresses of contacts.",
+    ),
+    (
+      "unpack-file", "git unpack-file <blob-id>",
+      "Creates a file holding the contents of the blob specified by blob-id.",
+    ),
+    (
+      "web--browse", "git web--browse [--browser=<browser>] <url>...",
+      "Open one or more URLs in a web browser.",
     ),
     ("version", "git version", "Show version information."),
     ("pr", "bit pr <subcommand> [<args>]", "Manage pull requests."),
@@ -1318,6 +1358,11 @@ async fn dispatch_known_command(
     "difftool" => handle_difftool(rest)
     "rerere" => handle_rerere(rest)
     "mailinfo" => handle_mailinfo(rest)
+    "mailsplit" => handle_mailsplit(rest)
+    "merge-index" => handle_merge_index(rest)
+    "merge-one-file" => handle_merge_one_file(rest)
+    "http-fetch" => handle_http_fetch(rest)
+    "quiltimport" => handle_quiltimport(rest)
     "var" => handle_var(rest)
     "stripspace" => handle_stripspace(rest)
     "ls-remote" => handle_ls_remote(rest)
@@ -1326,6 +1371,9 @@ async fn dispatch_known_command(
     "count-objects" => handle_count_objects(rest)
     "name-rev" => handle_name_rev(rest)
     "update-server-info" => handle_update_server_info(rest)
+    "check-mailmap" => handle_check_mailmap(rest)
+    "unpack-file" => handle_unpack_file(rest)
+    "web--browse" => handle_web_browse(rest)
     "version" => print_line("git version \{bit_version_tag}")
     // Error for unknown commands
     _ => {
