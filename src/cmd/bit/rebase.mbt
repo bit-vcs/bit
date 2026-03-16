@@ -22,7 +22,7 @@ async fn delegate_rebase_to_real_git(
 ///|
 fn rebase_requires_real_git(args : Array[String]) -> Bool {
   for arg in args {
-    if arg == "--root" || arg == "--force-rebase" || arg == "--no-force-rebase" {
+    if arg == "--root" {
       return true
     }
   }
@@ -52,6 +52,7 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
   let mut do_abort = false
   let mut do_skip = false
   let mut interactive = false
+  let mut force_rebase = false
   let mut onto : String? = None
   let mut upstream : String? = None
   let mut i = 0
@@ -72,6 +73,14 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
       }
       "-i" | "--interactive" => {
         interactive = true
+        i += 1
+      }
+      "--force-rebase" | "--no-ff" | "-f" => {
+        force_rebase = true
+        i += 1
+      }
+      "--no-force-rebase" | "--ff" => {
+        force_rebase = false
         i += 1
       }
       "--onto" if i + 1 < args.length() => {
@@ -163,9 +172,9 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
         guard onto_id is Some(oid) else {
           raise @bitcore.GitError::InvalidObject("unknown revision: \{o}")
         }
-        @bitlib.rebase_start_with_onto(fs, fs, root, oid, id)
+        @bitlib.rebase_start_with_onto(fs, fs, root, oid, id, force_rebase~)
       }
-      None => @bitlib.rebase_start(fs, fs, root, id)
+      None => @bitlib.rebase_start_with_onto(fs, fs, root, id, id, force_rebase~)
     }
     print_rebase_result(result)
   }

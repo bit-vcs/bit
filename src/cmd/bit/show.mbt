@@ -1,12 +1,7 @@
 ///|
 
 ///|
-fn show_requires_real_git(args : Array[String]) -> Bool {
-  for arg in args {
-    if arg == "--pretty=reference" || arg == "--format=reference" {
-      return true
-    }
-  }
+fn show_requires_real_git(_args : Array[String]) -> Bool {
   false
 }
 
@@ -151,6 +146,15 @@ fn format_show_date(timestamp : Int64, timezone : String) -> String {
   let wd = weekday_names[weekday]
   let mn = month_names[month - 1]
   "\{wd} \{mn} \{day} \{pad_left_zero(hours.to_string(), 2)}:\{pad_left_zero(minutes.to_string(), 2)}:\{pad_left_zero(seconds.to_string(), 2)} \{year} \{timezone}"
+}
+
+///|
+fn format_show_date_iso_short(timestamp : Int64, timezone : String) -> String {
+  let tz_offset = parse_timezone_offset_seconds(timezone)
+  let local_seconds = timestamp.to_int() + tz_offset
+  let days = local_seconds / 86400
+  let (year, month, day) = days_to_date(days)
+  "\{year}-\{pad_left_zero(month.to_string(), 2)}-\{pad_left_zero(day.to_string(), 2)}"
 }
 
 ///|
@@ -518,6 +522,14 @@ fn show_render_commit_block(
   }
   if pretty_format is Some(fmt) {
     match fmt {
+      "reference" => {
+        let short = String::unsafe_substring(commit_id.to_hex(), start=0, end=7)
+        let title = show_first_message_line(show_info.message)
+        let date = format_show_date_iso_short(
+          show_info.timestamp, show_info.timezone,
+        )
+        return Some("\{short} (\{title}, \{date})\n")
+      }
       "%h" => {
         let short = String::unsafe_substring(commit_id.to_hex(), start=0, end=7)
         return Some(short + "\n")

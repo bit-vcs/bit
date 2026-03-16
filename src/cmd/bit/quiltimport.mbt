@@ -82,14 +82,16 @@ async fn handle_quiltimport(args : Array[String]) -> Unit raise Error {
       continue
     }
     print_line("Applying \{patch_name}")
-    // Try git am first for mbox-style patches
+    // Use bit's own am/apply/commit instead of delegating to real git
+    let bit_exe = @sys.get_cli_args()[0]
+    // Try bit am first for mbox-style patches
     let am_args : Array[String] = ["am", "--3way"]
     if author.length() > 0 {
       am_args.push("--author=" + author)
     }
     am_args.push(patch_path)
     let code = @process.run(
-      resolve_real_git_for_dispatch(),
+      bit_exe,
       am_args,
       inherit_env=true,
       cwd=root,
@@ -98,9 +100,9 @@ async fn handle_quiltimport(args : Array[String]) -> Unit raise Error {
       stderr=@stdio.stderr,
     )
     if code != 0 {
-      // Fall back to git apply + manual commit
+      // Fall back to bit apply + manual commit
       let apply_code = @process.run(
-        resolve_real_git_for_dispatch(),
+        bit_exe,
         ["apply", "--index", patch_path],
         inherit_env=true,
         cwd=root,
@@ -122,7 +124,7 @@ async fn handle_quiltimport(args : Array[String]) -> Unit raise Error {
         commit_args.push("--author=" + author)
       }
       let commit_code = @process.run(
-        resolve_real_git_for_dispatch(),
+        bit_exe,
         commit_args,
         inherit_env=true,
         cwd=root,

@@ -65,9 +65,10 @@ fn reflog_requires_real_git(args : Array[String]) -> Bool {
   }
   match args[0] {
     "show" => not(reflog_show_builtin_supports_args(collect_args(args, 1)))
-    "exists" => if args.length() != 2 { true } else { args[1].contains("@{") }
+    "exists" => false
     "expire" => not(reflog_expire_builtin_supports_args(collect_args(args, 1)))
-    "delete" | "drop" | "list" | "write" => true
+    "delete" | "drop" | "write" => false
+    "list" => true
     _ => not(reflog_show_builtin_supports_args(args))
   }
 }
@@ -265,20 +266,63 @@ async fn handle_reflog(args : Array[String]) -> Unit raise Error {
         @stdio.stderr.write("usage: git reflog exists <ref>")
         @sys.exit(129)
       }
-      let refname = normalize_reflog_refname(rfs, git_dir, rest[0])
+      let ref_arg = rest[0]
+      // Handle ref@{N} format: extract ref name
+      let refname = match ref_arg.find("@{") {
+        Some(at_idx) => {
+          let base = String::unsafe_substring(ref_arg, start=0, end=at_idx)
+          normalize_reflog_refname(rfs, git_dir, base)
+        }
+        None => normalize_reflog_refname(rfs, git_dir, ref_arg)
+      }
       if @bitrepo.reflog_exists(rfs, git_dir, refname) {
         @sys.exit(0)
       } else {
         @sys.exit(1)
       }
     }
-    "delete" => {
+    "delete" | "drop" => {
       if rest.length() == 0 {
-        @stdio.stderr.write("usage: git reflog delete <ref>")
+        @stdio.stderr.write("usage: git reflog delete <ref>@{<n>}")
         @sys.exit(1)
       }
-      let refname = normalize_reflog_refname(rfs, git_dir, rest[0])
-      @bitrepo.delete_reflog(wfs, rfs, git_dir, refname)
+      let ref_arg = rest[rest.length() - 1]
+      // Parse ref@{N} format
+      match ref_arg.find("@{") {
+        Some(at_idx) => {
+          let base = String::unsafe_substring(ref_arg, start=0, end=at_idx)
+          let refname = normalize_reflog_refname(rfs, git_dir, base)
+          // Extract N from @{N}
+          let closing = ref_arg.find("}")
+          guard closing is Some(close_idx) else {
+            eprint_line("fatal: invalid reflog entry: \{ref_arg}")
+            @sys.exit(1)
+            return
+          }
+          let n_str = String::unsafe_substring(
+            ref_arg, start=at_idx + 2, end=close_idx,
+          )
+          let n = @strconv.parse_int(n_str) catch {
+            _ => {
+              eprint_line("fatal: invalid reflog entry index: \{n_str}")
+              @sys.exit(1)
+              return
+            }
+          }
+          reflog_delete_entry(wfs, rfs, git_dir, refname, n)
+        }
+        None => {
+          // No @{N} — delete entire reflog
+          let refname = normalize_reflog_refname(rfs, git_dir, ref_arg)
+          @bitrepo.delete_reflog(wfs, rfs, git_dir, refname)
+        }
+      }
+    }
+    "write" => {
+      // Ensure reflog file exists for the given ref (or HEAD)
+      let ref_arg = if rest.length() > 0 { rest[0] } else { "HEAD" }
+      let refname = normalize_reflog_refname(rfs, git_dir, ref_arg)
+      @bitrepo.create_reflog(wfs, rfs, git_dir, refname)
     }
     "expire" =>
       try {
@@ -539,6 +583,58 @@ fn reflog_limit_reached(max_count : Int?, printed : Int) -> Bool {
     Some(limit) => printed >= limit
     None => false
   }
+}
+
+///|
+/// Delete a specific reflog entry by index (newest-first order).
+async fn reflog_delete_entry(
+  wfs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  refname : String,
+  index : Int,
+) -> Unit raise Error {
+  let entries = @bitrepo.read_reflog(rfs, git_dir, refname)
+  let len = entries.length()
+  if len == 0 {
+    eprint_line("fatal: no reflog for '\{refname}'")
+    @sys.exit(1)
+    return
+  }
+  // Index 0 = newest = last entry in the array
+  let array_idx = len - 1 - index
+  if array_idx < 0 || array_idx >= len {
+    eprint_line("fatal: reflog entry \{refname}@{\{index}} does not exist")
+    @sys.exit(1)
+    return
+  }
+  // Rebuild reflog without the deleted entry
+  let reflog_path = @bitlib.get_reflog_path(git_dir, refname)
+  let content = @utf8.decode_lossy(rfs.read_file(reflog_path)[:])
+  let lines : Array[String] = []
+  for line_view in content.split("\n") {
+    let line = line_view.to_string()
+    if line.length() > 0 {
+      lines.push(line)
+    }
+  }
+  if array_idx >= lines.length() {
+    eprint_line("fatal: reflog entry \{refname}@{\{index}} does not exist")
+    @sys.exit(1)
+    return
+  }
+  let new_lines : Array[String] = []
+  for i in 0..<lines.length() {
+    if i != array_idx {
+      new_lines.push(lines[i])
+    }
+  }
+  let new_content = if new_lines.length() > 0 {
+    new_lines.join("\n") + "\n"
+  } else {
+    ""
+  }
+  wfs.write_string(reflog_path, new_content)
 }
 
 ///|

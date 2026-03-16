@@ -1000,6 +1000,7 @@ pub fn rebase_start_with_onto(
   root : String,
   onto : @bit.ObjectId,
   upstream : @bit.ObjectId,
+  force_rebase~ : Bool = false,
 ) -> RebaseResult raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   // Check if rebase already in progress
@@ -1019,7 +1020,7 @@ pub fn rebase_start_with_onto(
       }
     }
     Some(h) => {
-      if h == onto && h == upstream {
+      if not(force_rebase) && h == onto && h == upstream {
         return {
           status: RebaseStatus::NothingToRebase,
           commit_id: Some(h),
@@ -1029,18 +1030,20 @@ pub fn rebase_start_with_onto(
       let db = ObjectDb::load(rfs, git_dir)
       let chain = rebase_collect_chain(db, rfs, h, upstream)
       if chain.length() == 0 {
-        if h != onto {
-          fast_forward_to(fs, rfs, root, onto)
+        if not(force_rebase) {
+          if h != onto {
+            fast_forward_to(fs, rfs, root, onto)
+            return {
+              status: RebaseStatus::Complete,
+              commit_id: Some(onto),
+              conflicts: [],
+            }
+          }
           return {
-            status: RebaseStatus::Complete,
-            commit_id: Some(onto),
+            status: RebaseStatus::NothingToRebase,
+            commit_id: Some(h),
             conflicts: [],
           }
-        }
-        return {
-          status: RebaseStatus::NothingToRebase,
-          commit_id: Some(h),
-          conflicts: [],
         }
       }
       // Get head name for later restoration
