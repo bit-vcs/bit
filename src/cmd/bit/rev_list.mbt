@@ -361,7 +361,51 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
           None => refs.push(arg)
         }
       }
-      _ if not(arg.has_prefix("-")) => refs.push(arg)
+      _ if not(arg.has_prefix("-")) => {
+        // Handle ^@, ^!, ^-N parent suffixes
+        if arg.has_suffix("^@") {
+          // commit^@ = all parents of commit
+          let base = String::unsafe_substring(arg, start=0, end=arg.length() - 2)
+          refs.push(base + "^@")
+        } else if arg.has_suffix("^!") {
+          // commit^! = commit ^commit^1 ^commit^2 ...
+          let base = String::unsafe_substring(arg, start=0, end=arg.length() - 2)
+          refs.push(base + "^!")
+        } else if arg.contains("^-") {
+          // commit^-N = commit^N..commit (parent exclusion range)
+          let caret_pos = arg.rev_find("^-")
+          match caret_pos {
+            Some(pos) => {
+              let base = String::unsafe_substring(arg, start=0, end=pos)
+              let suffix = String::unsafe_substring(
+                arg,
+                start=pos + 2,
+                end=arg.length(),
+              )
+              if suffix.length() == 0 {
+                // ^- means ^-1 (first parent)
+                excludes.push(base + "^1")
+                refs.push(base)
+              } else {
+                let n = @strconv.parse_int(suffix) catch { _ => -1 }
+                if n > 0 {
+                  excludes.push(base + "^" + n.to_string())
+                  refs.push(base)
+                } else {
+                  // Invalid: garbage after ^-
+                  eprint_line(
+                    "fatal: invalid parent exclusion: '\{arg}'",
+                  )
+                  @sys.exit(128)
+                }
+              }
+            }
+            None => refs.push(arg)
+          }
+        } else {
+          refs.push(arg)
+        }
+      }
       _ if arg.has_prefix("-") => warn_unimplemented_arg("rev-list", arg)
       _ => ()
     }
