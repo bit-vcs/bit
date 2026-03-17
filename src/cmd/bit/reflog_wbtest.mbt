@@ -26,8 +26,8 @@ test "reflog: show with pathspec delegates to real git" {
 }
 
 ///|
-test "reflog: drop delegates to real git" {
-  assert_true(reflog_requires_real_git(["drop", "refs/heads/main"]))
+test "reflog: drop handled natively" {
+  assert_false(reflog_requires_real_git(["drop", "refs/heads/main"]))
 }
 
 ///|

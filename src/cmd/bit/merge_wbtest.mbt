@@ -103,7 +103,7 @@ async test "merge: command path supports strategy ours via fallback" {
 }
 
 ///|
-async test "merge: command path falls back when target is a merge commit" {
+async test "merge: handles merge commit target natively" {
   @bitnative.init_native_io()
   let fs = OsFs::new()
   let root = "/tmp/bit-test-merge-merge-target-" +

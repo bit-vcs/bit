@@ -189,9 +189,9 @@ test "show: pretty format honors body modifiers" {
 }
 
 ///|
-test "show: reference pretty format delegates to real git" {
-  assert_true(show_requires_real_git(["-s", "--pretty=reference", "HEAD"]))
-  assert_true(show_requires_real_git(["--format=reference", "HEAD"]))
+test "show: reference pretty format handled natively" {
+  assert_false(show_requires_real_git(["-s", "--pretty=reference", "HEAD"]))
+  assert_false(show_requires_real_git(["--format=reference", "HEAD"]))
   assert_false(show_requires_real_git(["-s", "--pretty=%s", "HEAD"]))
 }
 
