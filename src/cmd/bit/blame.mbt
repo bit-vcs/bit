@@ -203,7 +203,12 @@ fn blame_config_get(
 ) -> String? {
   let content = fs.read_file(git_dir + "/config") catch { _ => return None }
   let content = decode_bytes(content)
-  parse_git_config_value(content, section, key)
+  @config_parse.get_config_value_from_content(
+    content,
+    section + "." + key,
+    None,
+    false,
+  )
 }
 
 ///|

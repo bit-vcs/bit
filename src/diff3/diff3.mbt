@@ -1,13 +1,13 @@
 ///| Content-level 3-way merge using Myers diff + diff3 algorithm
 
 ///|
-pub enum ConflictStyle {
+pub(all) enum ConflictStyle {
   Merge
   Diff3
 }
 
 ///|
-pub enum MergeFavor {
+pub(all) enum MergeFavor {
   NoFavor
   FavorOurs
   FavorTheirs
@@ -15,7 +15,7 @@ pub enum MergeFavor {
 }
 
 ///|
-pub struct ContentMergeOptions {
+pub(all) struct ContentMergeOptions {
   conflict_style : ConflictStyle
   ours_label : String
   base_label : String
@@ -89,7 +89,7 @@ pub fn ContentMergeOptions::with_marker_size(
 }
 
 ///|
-pub struct ContentMergeResult {
+pub(all) struct ContentMergeResult {
   content : String
   has_conflicts : Bool
   conflict_count : Int
@@ -578,7 +578,7 @@ pub fn content_merge(
 }
 
 ///|
-fn is_binary_content(data : Bytes) -> Bool {
+pub fn is_binary_content(data : Bytes) -> Bool {
   let check_len = if data.length() < 8000 { data.length() } else { 8000 }
   for i in 0..<check_len {
     if data[i] == b'\x00' {

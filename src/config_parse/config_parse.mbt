@@ -133,7 +133,7 @@ fn config_has_unquoted_comment_before_backslash(value : String) -> Bool {
 ///|
 /// Trim whitespace (space, tab, newline, carriage return) from both ends.
 fn config_trim(s : String) -> String {
-  trim_string(s)
+  @string_utils.trim_string(s)
 }
 
 ///|
@@ -755,8 +755,8 @@ pub fn encode_config_value(value : String) -> String {
 pub fn parse_bool_keyword_value(value : String) -> Bool? {
   let trimmed = value.trim().to_string().to_lower()
   match trimmed {
-    "true" | "yes" | "on" => Some(true)
-    "false" | "no" | "off" | "" => Some(false)
+    "true" | "yes" | "on" | "1" => Some(true)
+    "false" | "no" | "off" | "0" | "" => Some(false)
     _ => None
   }
 }
@@ -787,7 +787,7 @@ pub fn parse_config_int_value(val : String) -> (Int64?, String?) {
 
 ///|
 /// Parse a size value with optional k/m/g suffix.
-fn config_parse_size_value(value : String) -> Int64? {
+pub fn config_parse_size_value(value : String) -> Int64? {
   let trimmed = value.trim().to_string().to_lower()
   if trimmed.length() == 0 {
     return None

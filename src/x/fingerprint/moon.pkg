@@ -1,7 +1,7 @@
 import {
   "mizchi/bit" @bit,
   "mizchi/bit/lib" @bitlib,
-  "mizchi/bit/ignore" @bitignore,
+  "mizchi/bit/string_utils" @string_utils,
   "mizchi/bit/osfs" @osfs,
   "moonbitlang/async" @async,
   "moonbitlang/async/process" @process,

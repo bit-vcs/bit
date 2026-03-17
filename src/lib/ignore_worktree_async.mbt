@@ -6,7 +6,7 @@ pub async fn list_working_files_async(
   fs : &@bit.RepoFileSystem,
   root : String,
 ) -> Array[String] raise @bit.GitError {
-  let matcher = Matcher::new()
+  let matcher = @ignore.Matcher::new()
   let out : Array[String] = []
   walk_dir_async(fs, root, "", matcher, out)
   out
@@ -23,7 +23,7 @@ async fn walk_dir_async(
   fs : &@bit.RepoFileSystem,
   root : String,
   rel : String,
-  matcher : Matcher,
+  matcher : @ignore.Matcher,
   out : Array[String],
 ) -> Unit raise @bit.GitError {
   let dir = if rel == "" { root } else { @bit.join_path(root, rel) }
@@ -50,7 +50,7 @@ async fn walk_dir_async_typed(
   root : String,
   rel : String,
   dir : String,
-  matcher : Matcher,
+  matcher : @ignore.Matcher,
   out : Array[String],
   typed_entries : Array[(String, Int)],
 ) -> Unit raise @bit.GitError {
@@ -124,7 +124,7 @@ async fn walk_dir_async_fallback(
   root : String,
   rel : String,
   dir : String,
-  matcher : Matcher,
+  matcher : @ignore.Matcher,
   out : Array[String],
 ) -> Unit raise @bit.GitError {
   let entries = fs.readdir(dir)

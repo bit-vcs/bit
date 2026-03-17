@@ -10,11 +10,7 @@ async fn show_log_command_help() -> Unit {
 
 ///|
 fn log_parse_bool_value(value : String) -> Bool? {
-  match trim_string(value).to_lower() {
-    "true" | "yes" | "on" | "1" => Some(true)
-    "false" | "no" | "off" | "0" | "" => Some(false)
-    _ => None
-  }
+  @config_parse.parse_bool_keyword_value(value)
 }
 
 ///|

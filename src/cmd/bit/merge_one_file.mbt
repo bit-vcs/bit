@@ -57,12 +57,12 @@ async fn handle_merge_one_file(args : Array[String]) -> Unit raise Error {
   let our_text = merge_one_file_read_blob(dbs, fs, our_hash)
   let their_text = merge_one_file_read_blob(dbs, fs, their_hash)
   // Perform 3-way merge
-  let opts = @bitlib.ContentMergeOptions::default().with_labels(
+  let opts = @diff3.ContentMergeOptions::default().with_labels(
     ours="ours",
     base="base",
     theirs="theirs",
   )
-  let result = @bitlib.content_merge(base_text, our_text, their_text, opts)
+  let result = @diff3.content_merge(base_text, our_text, their_text, opts)
   // Write result to working tree
   let full_path = root + "/" + path
   let parent = parent_dir(full_path)

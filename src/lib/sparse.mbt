@@ -1143,5 +1143,5 @@ fn sparse_prune_empty_dirs(
 
 ///|
 fn sparse_trim(s : String) -> String {
-  trim_string(s)
+  @string_utils.trim_string(s)
 }

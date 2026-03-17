@@ -807,7 +807,11 @@ fn index_build_cache_tree_from_entries(
       (entry_name, None) => {
         entry_count += 1
         file_entries.push(
-          @bit.TreeEntry::new(mode_to_string(entry.mode), entry_name, entry.id),
+          @bit.TreeEntry::new(
+            @string_utils.mode_to_string(entry.mode),
+            entry_name,
+            entry.id,
+          ),
         )
       }
       (entry_name, Some(rest)) =>

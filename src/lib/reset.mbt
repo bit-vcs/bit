@@ -100,7 +100,7 @@ fn reset_resolve_common_git_dir(
   let raw = @utf8.decode_lossy(
     (fs.read_file(commondir_path) catch { _ => Bytes::default() })[:],
   )
-  let rel = trim_string(raw)
+  let rel = @string_utils.trim_string(raw)
   if rel.length() == 0 {
     return git_dir
   }

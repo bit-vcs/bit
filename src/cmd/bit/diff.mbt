@@ -145,19 +145,126 @@ fn diff_noprefix_enabled_from_config(
 }
 
 ///|
-fn diff_need_real_git(fs : &@bitcore.RepoFileSystem, git_dir : String) -> Bool {
+fn diff_need_real_git(
+  _fs : &@bitcore.RepoFileSystem,
+  _git_dir : String,
+) -> Bool {
+  false
+}
+
+///|
+fn diff_get_external_command(
+  fs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+) -> String? {
   match @sys.get_env_var("GIT_EXTERNAL_DIFF") {
-    Some(value) if value.trim().length() > 0 => return true
+    Some(value) if value.trim().length() > 0 =>
+      return Some(value.trim().to_string())
     _ => ()
   }
   match get_config_override("diff.external") {
-    Some(value) if value.trim().length() > 0 => return true
+    Some(value) if value.trim().length() > 0 =>
+      return Some(value.trim().to_string())
     _ => ()
   }
   let config_path = git_dir + "/config"
   match diff_last_config_value(fs, config_path, "diff", "external") {
-    Some(value) => value.trim().length() > 0
-    None => false
+    Some(value) if value.trim().length() > 0 => Some(value.trim().to_string())
+    _ => None
+  }
+}
+
+///|
+async fn diff_run_external(
+  external_cmd : String,
+  root : String,
+  files : Array[@bitdiff.DiffFile],
+) -> Unit raise Error {
+  let zero_oid = diff_index_zero_oid_hex()
+  let ts = get_current_timestamp().to_string()
+  let mut counter = 0
+  for file in files {
+    let path = file.path
+    let old_mode = diff_index_mode_string(file.old_mode)
+    let new_mode = diff_index_mode_string(file.new_mode)
+    let old_hex = diff_index_content_oid_string(file.old_content)
+    let new_hex = diff_index_content_oid_string(file.new_content)
+    // Create temp files for old and new content
+    let tmp_base = "/tmp/bit-ext-diff-" + ts + "-" + counter.to_string()
+    counter += 1
+    let old_tmp = match file.kind {
+      @bitdiff.DiffKind::Added => "/dev/null"
+      _ => {
+        let tmp_path = tmp_base + "-old"
+        match file.old_content {
+          Some(bytes) =>
+            @fs.write_bytes_to_file(tmp_path, bytes) catch {
+              err => raise io_error(err)
+            }
+          None =>
+            @fs.write_bytes_to_file(tmp_path, Bytes::new(0)) catch {
+              err => raise io_error(err)
+            }
+        }
+        tmp_path
+      }
+    }
+    let new_tmp = match file.kind {
+      @bitdiff.DiffKind::Deleted => "/dev/null"
+      _ => {
+        let tmp_path = tmp_base + "-new"
+        match file.new_content {
+          Some(bytes) =>
+            @fs.write_bytes_to_file(tmp_path, bytes) catch {
+              err => raise io_error(err)
+            }
+          None =>
+            @fs.write_bytes_to_file(tmp_path, Bytes::new(0)) catch {
+              err => raise io_error(err)
+            }
+        }
+        tmp_path
+      }
+    }
+    let old_hex_arg = match file.kind {
+      @bitdiff.DiffKind::Added => zero_oid
+      _ => old_hex
+    }
+    let new_hex_arg = match file.kind {
+      @bitdiff.DiffKind::Deleted => zero_oid
+      _ => new_hex
+    }
+    let old_mode_arg = match file.kind {
+      @bitdiff.DiffKind::Added => "000000"
+      _ => old_mode
+    }
+    let new_mode_arg = match file.kind {
+      @bitdiff.DiffKind::Deleted => "000000"
+      _ => new_mode
+    }
+    // Run external diff program; exit code is ignored (git behavior)
+    let _code = @process.run(
+      external_cmd,
+      [
+        path, old_tmp, old_hex_arg, old_mode_arg, new_tmp, new_hex_arg, new_mode_arg,
+      ],
+      inherit_env=true,
+      cwd=root,
+      stdin=@stdio.stdin,
+      stdout=@stdio.stdout,
+      stderr=@stdio.stderr,
+    )
+    // Clean up temp files
+    if old_tmp != "/dev/null" {
+      @fs.remove_file(old_tmp) catch {
+        _ => ()
+      }
+    }
+    if new_tmp != "/dev/null" {
+      @fs.remove_file(new_tmp) catch {
+        _ => ()
+      }
+    }
   }
 }
 
@@ -1641,6 +1748,17 @@ async fn handle_diff(args : Array[String]) -> Unit raise Error {
     files
   }
   let display_files = diff_apply_relative_files(files, relative_prefix)
+  // If an external diff program is configured, use it instead of built-in output
+  match diff_get_external_command(rfs, git_dir) {
+    Some(ext_cmd) if not(check_mode) && not(quiet) => {
+      diff_run_external(ext_cmd, root, files)
+      if exit_code && display_files.length() > 0 {
+        @sys.exit(1)
+      }
+      return
+    }
+    _ => ()
+  }
   let check_issues = if check_mode {
     diff_collect_check_issues(rfs, root, files)
   } else {

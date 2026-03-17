@@ -1,0 +1,20 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/bit/string_utils"
+
+// Values
+pub fn decode_bytes(Bytes) -> String
+
+pub fn mode_to_string(Int) -> String
+
+pub fn to_octal_string(Int) -> String
+
+pub fn trim_string(String) -> String
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits
+

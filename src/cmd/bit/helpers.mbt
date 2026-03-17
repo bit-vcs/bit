@@ -257,12 +257,12 @@ fn prepend_arg(first : String, rest : Array[String]) -> Array[String] {
 
 ///|
 fn decode_bytes(data : Bytes) -> String {
-  @bitlib.decode_bytes(data)
+  @string_utils.decode_bytes(data)
 }
 
 ///|
 fn trim_string(s : String) -> String {
-  @bitlib.trim_string(s)
+  @string_utils.trim_string(s)
 }
 
 ///|
@@ -554,7 +554,82 @@ fn get_author_string() -> String {
       let email = @sys.get_env_var("GIT_AUTHOR_EMAIL").unwrap_or("unknown")
       name + " <" + email + ">"
     }
+    None => get_identity_from_config()
+  }
+}
+
+///|
+fn get_identity_from_config() -> String {
+  // Try reading user.name/user.email from git config
+  let root = get_work_root()
+  let git_dir = root + "/.git"
+  let config_path = git_dir + "/config"
+  let content = @fs.read_file_to_string(config_path) catch { _ => "" }
+  let name = if content.length() > 0 {
+    @config_parse.get_config_value_from_content(
+      content,
+      "user.name",
+      None,
+      false,
+    )
+  } else {
+    None
+  }
+  let email = if content.length() > 0 {
+    @config_parse.get_config_value_from_content(
+      content,
+      "user.email",
+      None,
+      false,
+    )
+  } else {
+    None
+  }
+  // Also check ~/.gitconfig (global config)
+  let home = @sys.get_env_var("HOME").unwrap_or("")
+  let global_content = if home.length() > 0 {
+    @fs.read_file_to_string(home + "/.gitconfig") catch {
+      _ => ""
+    }
+  } else {
+    ""
+  }
+  let name = match name {
+    Some(_) => name
     None =>
+      if global_content.length() > 0 {
+        @config_parse.get_config_value_from_content(
+          global_content,
+          "user.name",
+          None,
+          false,
+        )
+      } else {
+        None
+      }
+  }
+  let email = match email {
+    Some(_) => email
+    None =>
+      if global_content.length() > 0 {
+        @config_parse.get_config_value_from_content(
+          global_content,
+          "user.email",
+          None,
+          false,
+        )
+      } else {
+        None
+      }
+  }
+  match (name, email) {
+    (Some(n), Some(e)) => n + " <" + e + ">"
+    (Some(n), None) => n + " <" + n + "@localhost>"
+    (None, Some(e)) => {
+      let user = @sys.get_env_var("USER").unwrap_or("Unknown")
+      user + " <" + e + ">"
+    }
+    (None, None) =>
       match @sys.get_env_var("USER") {
         Some(u) => u + " <" + u + "@localhost>"
         None => "Unknown <unknown@localhost>"

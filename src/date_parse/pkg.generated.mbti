@@ -1,0 +1,32 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/bit/date_parse"
+
+// Values
+pub fn date_is_leap_year(Int) -> Bool
+
+pub fn days_since_epoch(Int, Int, Int) -> Int
+
+pub fn month_name_to_number(String) -> Int?
+
+pub fn parse_approxidate(String, Int64) -> Int64?
+
+pub fn parse_approxidate_human(String) -> Int64?
+
+pub fn parse_approxidate_iso8601(String) -> Int64
+
+pub fn parse_approxidate_iso_date(String) -> Int64?
+
+pub fn parse_approxidate_relative(String, Int64) -> Int64?
+
+pub fn parse_date_digits(Array[Char], Int, Int) -> Int
+
+pub fn parse_int_from_string(String) -> Int
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits
+

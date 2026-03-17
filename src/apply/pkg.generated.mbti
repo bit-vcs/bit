@@ -1,0 +1,37 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/bit/apply"
+
+// Values
+pub fn make_rename_display(String, String) -> String
+
+pub fn parse_diff_git_header(String) -> (String, String)
+
+pub fn parse_patches(String) -> Array[PatchInfo]
+
+pub fn parse_pct(String) -> Int
+
+pub fn reverse_patch(String) -> String
+
+// Errors
+
+// Types and methods
+pub(all) struct PatchInfo {
+  display_name : String
+  additions : Int
+  deletions : Int
+  is_rename : Bool
+  is_copy : Bool
+  is_new : Bool
+  is_delete : Bool
+  old_name : String
+  new_name : String
+  old_mode : String
+  new_mode : String
+  similarity_index : Int
+  dissimilarity_index : Int
+}
+
+// Type aliases
+
+// Traits
+

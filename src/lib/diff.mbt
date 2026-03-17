@@ -33,7 +33,7 @@ pub async fn diff_worktree(
   t0 = profile_lap(profile, "diff_worktree read_index_entries", t0)
   let db = ObjectDb::load_lazy(fs, git_dir)
   t0 = profile_lap(profile, "diff_worktree load_db", t0)
-  let cached_files = @ignore.working_files_cache(root)
+  let cached_files = working_files_cache(root)
   let cache_map : Map[String, Bool] = {}
   let mut cache_ready = false
   match cached_files {
@@ -52,7 +52,7 @@ pub async fn diff_worktree(
       continue
     }
     if cache_ready && not(cache_map.contains(path)) {
-      let ignored = @ignore.is_ignored_path(fs, root, path, false)
+      let ignored = is_ignored_path(fs, root, path, false)
       if not(ignored) {
         let old = diff_read_blob(db, fs, entry.id)
         // Skip if blob not found (e.g., submodule)
@@ -347,7 +347,7 @@ fn diff_emit_index_line(
   }
   let mut line = "index \{old_short}..\{new_short}"
   match mode {
-    Some(file_mode) => line += " " + mode_to_string(file_mode)
+    Some(file_mode) => line += " " + @string_utils.mode_to_string(file_mode)
     None => ()
   }
   out.push(line)
@@ -415,19 +415,21 @@ fn diff_emit_modes(out : Array[String], f : DiffFile) -> Unit {
   match f.kind {
     Added =>
       match f.new_mode {
-        Some(mode) => out.push("new file mode " + mode_to_string(mode))
+        Some(mode) =>
+          out.push("new file mode " + @string_utils.mode_to_string(mode))
         None => ()
       }
     Deleted =>
       match f.old_mode {
-        Some(mode) => out.push("deleted file mode " + mode_to_string(mode))
+        Some(mode) =>
+          out.push("deleted file mode " + @string_utils.mode_to_string(mode))
         None => ()
       }
     Modified =>
       match (f.old_mode, f.new_mode) {
         (Some(old), Some(new)) if old != new => {
-          out.push("old mode " + mode_to_string(old))
-          out.push("new mode " + mode_to_string(new))
+          out.push("old mode " + @string_utils.mode_to_string(old))
+          out.push("new mode " + @string_utils.mode_to_string(new))
         }
         _ => ()
       }

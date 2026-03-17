@@ -122,3 +122,30 @@ test "matcher truncate" {
   assert_false(m.is_ignored("src/file.bak", false))
   assert_true(m.is_ignored("file.txt", false))
 }
+
+///|
+test "git-aware glob filter" {
+  let m = @ignore.Matcher::new()
+  m.add_rules("", "*.log\n/dist/\nbuild/\n")
+  m.add_rules("src", "*.generated.*\n!keep.generated.ts\n")
+  let files : Array[String] = [
+    "src/app.ts", "src/data.generated.js", "src/keep.generated.ts", "dist/bundle.js",
+    "lib/build/out.o", "server.log",
+  ]
+  let visible = files.filter(fn(p) { not(m.is_ignored(p, false)) })
+  assert_eq(visible.length(), 2)
+  assert_true(visible.contains("src/app.ts"))
+  assert_true(visible.contains("src/keep.generated.ts"))
+}
+
+///|
+test "directory traversal backtracking" {
+  let m = @ignore.Matcher::new()
+  m.add_rules("", "*.tmp\n")
+  let saved = m.len()
+  m.add_rules("src", "*.bak\n")
+  assert_true(m.is_ignored("src/file.bak", false))
+  m.truncate(saved)
+  assert_false(m.is_ignored("src/file.bak", false))
+  assert_true(m.is_ignored("any/path/file.tmp", false))
+}

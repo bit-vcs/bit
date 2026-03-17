@@ -775,7 +775,7 @@ fn rebase_split_first(path : String) -> (String, String?) {
 
 ///|
 fn rebase_mode_to_string(mode : Int) -> String {
-  mode_to_string(mode)
+  @string_utils.mode_to_string(mode)
 }
 
 ///|
@@ -1412,19 +1412,19 @@ fn rebase_change_already_applied(
           let base_data = rebase_get_blob_data(db, rfs, base_entry.id)
           let parent_data = rebase_get_blob_data(db, rfs, parent_entry.id)
           let target_data = rebase_get_blob_data(db, rfs, target_entry.id)
-          if is_binary_content(base_data) ||
-            is_binary_content(parent_data) ||
-            is_binary_content(target_data) {
+          if @diff3.is_binary_content(base_data) ||
+            @diff3.is_binary_content(parent_data) ||
+            @diff3.is_binary_content(target_data) {
             return false
           }
           let base_content = get_blob_content(db, rfs, base_entry.id)
           let parent_content = get_blob_content(db, rfs, parent_entry.id)
           let target_content = get_blob_content(db, rfs, target_entry.id)
-          let merge_result = content_merge(
+          let merge_result = @diff3.content_merge(
             parent_content,
             base_content,
             target_content,
-            ContentMergeOptions::default(),
+            @diff3.ContentMergeOptions::default(),
           )
           not(merge_result.has_conflicts) &&
           merge_result.content == base_content
@@ -1666,7 +1666,8 @@ fn rebase_apply_changes_with_conflicts(
               let theirs_content = get_blob_content(db, rfs, entry.id)
               let ours_data = rebase_get_blob_data(db, rfs, b.id)
               let theirs_data = rebase_get_blob_data(db, rfs, entry.id)
-              if is_binary_content(ours_data) || is_binary_content(theirs_data) {
+              if @diff3.is_binary_content(ours_data) ||
+                @diff3.is_binary_content(theirs_data) {
                 write_conflict_file(
                   db,
                   rfs,
@@ -1679,11 +1680,11 @@ fn rebase_apply_changes_with_conflicts(
                 )
                 conflicts.push(path)
               } else {
-                let merge_result = content_merge(
+                let merge_result = @diff3.content_merge(
                   merge_base_content,
                   ours_content,
                   theirs_content,
-                  ContentMergeOptions::default(),
+                  @diff3.ContentMergeOptions::default(),
                 )
                 if merge_result.has_conflicts {
                   // Write conflict markers
@@ -1777,15 +1778,17 @@ fn write_conflict_file(
     Some(e) => get_blob_content(db, rfs, e.id)
     None => ""
   }
-  let opts : ContentMergeOptions = {
-    conflict_style: ConflictStyle::Diff3,
+  let opts : @diff3.ContentMergeOptions = {
+    conflict_style: @diff3.ConflictStyle::Diff3,
     ours_label: "HEAD",
     base_label: "parent",
     theirs_label: "incoming",
     marker_size: 7,
-    favor: MergeFavor::NoFavor,
+    favor: @diff3.MergeFavor::NoFavor,
   }
-  let result = content_merge(base_content, ours_content, theirs_content, opts)
+  let result = @diff3.content_merge(
+    base_content, ours_content, theirs_content, opts,
+  )
   fs.write_string(full_path, result.content)
 }
 

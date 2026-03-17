@@ -185,7 +185,7 @@ pub fn delete_reflog(
 
 ///|
 fn trim_whitespace(s : String) -> String {
-  trim_string(s)
+  @string_utils.trim_string(s)
 }
 
 ///|

@@ -313,14 +313,14 @@ fn read_remote_url_from_config(
   if not(fs.is_file(config_path)) {
     return None
   }
-  let config_content = decode_bytes(
+  let config_content = @string_utils.decode_bytes(
     fs.read_file(config_path) catch {
       _ => return None
     },
   )
   let mut in_remote_section = false
   for line_view in config_content.split("\n") {
-    let line = trim_string(line_view.to_string())
+    let line = @string_utils.trim_string(line_view.to_string())
     if line.has_prefix("[remote ") {
       in_remote_section = true
       continue

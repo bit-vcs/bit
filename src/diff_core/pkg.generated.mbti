@@ -1,0 +1,27 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/bit/diff_core"
+
+// Values
+pub fn count_lines(Bytes) -> Int
+
+pub fn format_range(Int, Int) -> String
+
+pub fn myers_diff(Array[String], Array[String]) -> Array[DiffEditOp]
+
+pub fn split_lines(Bytes) -> Array[String]
+
+pub fn unified_hunks(Array[String], Bytes?, Bytes?, context_lines? : Int) -> Unit
+
+// Errors
+
+// Types and methods
+pub(all) enum DiffEditOp {
+  Keep(Int, Int)
+  Delete(Int)
+  Insert(Int)
+}
+
+// Type aliases
+
+// Traits
+

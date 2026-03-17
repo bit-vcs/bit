@@ -174,15 +174,16 @@ pub fn merge(
     // Skip binary files
     let ours_data = merge_get_blob_data(db, rfs, candidate.ours_id)
     let theirs_data = merge_get_blob_data(db, rfs, candidate.theirs_id)
-    if is_binary_content(ours_data) || is_binary_content(theirs_data) {
+    if @diff3.is_binary_content(ours_data) ||
+      @diff3.is_binary_content(theirs_data) {
       conflicts.push(candidate.path)
       continue
     }
-    let result = content_merge(
+    let result = @diff3.content_merge(
       base_content,
       ours_content,
       theirs_content,
-      ContentMergeOptions::default(),
+      @diff3.ContentMergeOptions::default(),
     )
     if result.has_conflicts {
       // Write conflict markers to worktree

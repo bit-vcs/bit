@@ -12,7 +12,7 @@ pub fn is_ignored_path(
   if rel_path == ".jj" || rel_path.has_prefix(".jj/") {
     return true
   }
-  let matcher = Matcher::new()
+  let matcher = @ignore.Matcher::new()
   let segments = split_path_segments(rel_path)
   let mut base = ""
   // root .gitignore
@@ -42,7 +42,7 @@ pub fn list_working_files(
   fs : &@bit.RepoFileSystem,
   root : String,
 ) -> Array[String] raise @bit.GitError {
-  let matcher = Matcher::new()
+  let matcher = @ignore.Matcher::new()
   let out : Array[String] = []
   walk_dir(fs, root, "", matcher, out)
   out
@@ -53,7 +53,7 @@ fn walk_dir(
   fs : &@bit.RepoFileSystem,
   root : String,
   rel : String,
-  matcher : Matcher,
+  matcher : @ignore.Matcher,
   out : Array[String],
 ) -> Unit raise @bit.GitError {
   let dir = if rel == "" { root } else { @bit.join_path(root, rel) }
@@ -80,7 +80,7 @@ fn walk_dir_typed(
   root : String,
   rel : String,
   dir : String,
-  matcher : Matcher,
+  matcher : @ignore.Matcher,
   out : Array[String],
   typed_entries : Array[(String, Int)],
 ) -> Unit raise @bit.GitError {
@@ -149,7 +149,7 @@ fn walk_dir_fallback(
   root : String,
   rel : String,
   dir : String,
-  matcher : Matcher,
+  matcher : @ignore.Matcher,
   out : Array[String],
 ) -> Unit raise @bit.GitError {
   let entries = fs.readdir(dir)

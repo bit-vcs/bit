@@ -555,7 +555,7 @@ async fn handle_add_dry_run(
   if ignore_missing {
     let ignored : Array[String] = []
     for spec in unmatched {
-      if @ignore.is_ignored_path(fs, root, spec, false) {
+      if @bitlib.is_ignored_path(fs, root, spec, false) {
         ignored.push(spec)
       }
     }
@@ -599,7 +599,7 @@ async fn add_collect_unmatched_pathspecs(
   let visible_paths = if force {
     []
   } else {
-    @ignore.list_working_files_async(fs, root)
+    @bitlib.list_working_files_async(fs, root)
   }
   let visible_map : Map[String, Bool] = {}
   let visible_folded : Map[String, String] = {}
@@ -935,7 +935,7 @@ async fn expand_add_stage_paths(
   let visible_paths = if force {
     []
   } else {
-    @ignore.list_working_files_async(fs, root)
+    @bitlib.list_working_files_async(fs, root)
   }
   let git_dir = resolve_git_dir(fs, root)
   let tracked_entries = @bitlib.read_index_entries(fs, git_dir)
@@ -1071,7 +1071,7 @@ fn add_collect_embedded_repo_paths(
     if not(fs.is_dir(child_abs)) {
       continue
     }
-    if @ignore.is_ignored_path(fs, root, child_rel, true) {
+    if @bitlib.is_ignored_path(fs, root, child_rel, true) {
       continue
     }
     if add_is_embedded_repo_dir(fs, root, child_rel) {
@@ -1167,7 +1167,7 @@ fn add_has_explicit_ignored_path(
       if add_has_ignored_under(fs, root, rel) {
         return true
       }
-    } else if @ignore.is_ignored_path(fs, root, rel, false) {
+    } else if @bitlib.is_ignored_path(fs, root, rel, false) {
       return true
     }
   }
@@ -1195,7 +1195,7 @@ fn add_has_ignored_under(
     let child_rel = if rel.length() == 0 { name } else { rel + "/" + name }
     let child_abs = root + "/" + child_rel
     let is_dir = fs.is_dir(child_abs)
-    if @ignore.is_ignored_path(fs, root, child_rel, is_dir) {
+    if @bitlib.is_ignored_path(fs, root, child_rel, is_dir) {
       return true
     }
     if is_dir && add_has_ignored_under(fs, root, child_rel) {

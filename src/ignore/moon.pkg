@@ -1,17 +1,5 @@
 import {
-  "mizchi/bit" @bit,
-  "mizchi/bit/io" @bitio,
-  "moonbitlang/core/encoding/utf8" @utf8,
-}
-
-import {
   "moonbitlang/core/bench" @bench,
-  "moonbitlang/x/fs" @fs,
-  "mizchi/bit/osfs" @osfs,
 } for "test"
 
 warnings = "-29"
-
-options(
-  targets: { "bench_working_files_test.mbt": [ "native" ] },
-)

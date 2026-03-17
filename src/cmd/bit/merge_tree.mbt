@@ -94,11 +94,11 @@ async fn handle_merge_tree(args : Array[String]) -> Unit raise Error {
       merged[candidate.path] = { id: candidate.ours_id, mode: candidate.mode }
       continue
     }
-    let result = @bitlib.content_merge(
+    let result = @diff3.content_merge(
       base_content,
       ours_content,
       theirs_content,
-      @bitlib.ContentMergeOptions::default(),
+      @diff3.ContentMergeOptions::default(),
     )
     if result.has_conflicts {
       // Write conflict-marker content as blob
@@ -417,5 +417,5 @@ fn merge_tree_write_tree(
 
 ///|
 fn merge_tree_mode_to_string(mode : Int) -> String {
-  @bitlib.mode_to_string(mode)
+  @string_utils.mode_to_string(mode)
 }

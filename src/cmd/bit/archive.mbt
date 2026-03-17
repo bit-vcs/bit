@@ -74,7 +74,7 @@ async fn handle_archive(args : Array[String]) -> Unit raise Error {
     @bitcore.ObjectType::Tree => (oid, 0L)
     @bitcore.ObjectType::Commit => {
       let info = @bitcore.parse_commit(o.data)
-      let ts = @bitlib.tar_parse_committer_timestamp(o.data)
+      let ts = @tar.tar_parse_committer_timestamp(o.data)
       (info.tree, ts)
     }
     _ => {
@@ -118,7 +118,7 @@ async fn handle_archive(args : Array[String]) -> Unit raise Error {
   let emitted_dirs : Map[String, Bool] = {}
   // If prefix ends with '/', emit a directory entry for it
   if prefix.length() > 0 && prefix[prefix.length() - 1] == '/' {
-    let hdr = @bitlib.tar_make_header(prefix, 0o40755, 0, mtime, b'5', "")
+    let hdr = @tar.tar_make_header(prefix, 0o40755, 0, mtime, b'5', "")
     for b in hdr {
       out.push(b)
     }
@@ -129,14 +129,14 @@ async fn handle_archive(args : Array[String]) -> Unit raise Error {
     let entry = files.get(path)
     guard entry is Some(fe) else { continue }
     // Emit parent directory entries as needed
-    @bitlib.tar_emit_parent_dirs(out, full_path, mtime, emitted_dirs)
+    @tar.tar_emit_parent_dirs(out, full_path, mtime, emitted_dirs)
     let mode = fe.mode
     if mode == 0o120000 {
       // Symlink: blob content is the link target
       let blob = db.get(fs, fe.id)
       guard blob is Some(b) else { continue }
       let link_target = @utf8.decode_lossy(b.data[:])
-      let hdr = @bitlib.tar_make_header(
+      let hdr = @tar.tar_make_header(
         full_path, mode, 0, mtime, b'2', link_target,
       )
       for byte in hdr {
@@ -149,9 +149,7 @@ async fn handle_archive(args : Array[String]) -> Unit raise Error {
       let data = b.data
       let size = data.length()
       let typeflag : Byte = b'0'
-      let hdr = @bitlib.tar_make_header(
-        full_path, mode, size, mtime, typeflag, "",
-      )
+      let hdr = @tar.tar_make_header(full_path, mode, size, mtime, typeflag, "")
       for byte in hdr {
         out.push(byte)
       }

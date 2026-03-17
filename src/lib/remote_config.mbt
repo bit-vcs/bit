@@ -44,12 +44,12 @@ pub(all) struct ConfigBlock {
 
 ///|
 fn decode_bytes_lossy(data : Bytes) -> String {
-  decode_bytes(data)
+  @string_utils.decode_bytes(data)
 }
 
 ///|
 fn trim_string_internal(s : String) -> String {
-  trim_string(s)
+  @string_utils.trim_string(s)
 }
 
 ///|

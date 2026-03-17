@@ -365,7 +365,7 @@ pub fn list_untracked_worktree_candidate_paths(
   for entry in tracked_entries {
     tracked[entry.path] = true
   }
-  let visible_paths = @ignore.list_working_files(fs, root)
+  let visible_paths = @bitlib.list_working_files(fs, root)
   let out : Array[String] = []
   for path in visible_paths {
     if tracked.contains(path) {

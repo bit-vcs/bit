@@ -102,7 +102,7 @@ fn fingerprint_path_ignored(
 
 ///|
 fn decode_bytes(data : Bytes) -> String {
-  @bitlib.decode_bytes(data)
+  @string_utils.decode_bytes(data)
 }
 
 ///|
@@ -296,7 +296,7 @@ fn index_entries_after_add_all(
     }
     staged[e.path] = e
   }
-  let working_files = @bitignore.list_working_files(fs, root) catch { _ => [] }
+  let working_files = @bitlib.list_working_files(fs, root) catch { _ => [] }
   let present : Map[String, Bool] = {}
   for rel in working_files {
     if fingerprint_path_ignored(rel, ignore_entries) {

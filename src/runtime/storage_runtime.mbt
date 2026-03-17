@@ -93,7 +93,7 @@ pub fn run_storage_command(
 
 ///|
 fn storage_trim_string(s : String) -> String {
-  @bitlib.trim_string(s)
+  @string_utils.trim_string(s)
 }
 
 ///|
@@ -261,11 +261,21 @@ fn storage_get_author_string() -> String {
       let email = @sys.get_env_var("GIT_AUTHOR_EMAIL").unwrap_or("unknown")
       name + " <" + email + ">"
     }
-    None =>
-      match @sys.get_env_var("USER") {
-        Some(user) => user + " <" + user + "@localhost>"
-        None => "Unknown <unknown@localhost>"
-      }
+    None => storage_get_user_from_config()
+  }
+}
+
+///|
+fn storage_get_user_from_config() -> String {
+  // env BIT_COMMIT_AUTHOR is set by cmd/bit commit handler
+  // to pass resolved author from git config
+  match @sys.get_env_var("BIT_COMMIT_AUTHOR") {
+    Some(a) if a.length() > 0 => return a
+    _ => ()
+  }
+  match @sys.get_env_var("USER") {
+    Some(user) => user + " <" + user + "@localhost>"
+    None => "Unknown <unknown@localhost>"
   }
 }
 
@@ -276,7 +286,12 @@ fn storage_get_committer_string() -> String {
       let email = @sys.get_env_var("GIT_COMMITTER_EMAIL").unwrap_or("unknown")
       name + " <" + email + ">"
     }
-    None => storage_get_author_string()
+    None =>
+      // env BIT_COMMIT_COMMITTER is set by cmd/bit commit handler
+      match @sys.get_env_var("BIT_COMMIT_COMMITTER") {
+        Some(c) if c.length() > 0 => c
+        _ => storage_get_author_string()
+      }
   }
 }
 
@@ -808,7 +823,7 @@ fn storage_collect_status_snapshot(
   for entry in entries {
     index_map[entry.path] = entry
   }
-  let files = @ignore.list_working_files(rfs, root)
+  let files = @bitlib.list_working_files(rfs, root)
   files.sort()
   let visited : Map[String, Bool] = {}
   let untracked : Array[String] = []

@@ -208,7 +208,7 @@ fn fast_import_load_marks(
   content : String,
   marks : Map[Int, @bitcore.ObjectId],
 ) -> Unit {
-  let parsed = @bitlib.fast_import_parse_marks(content)
+  let parsed = @fast_import.fast_import_parse_marks(content)
   for pair in parsed {
     let mark_num = pair.0
     let hex = pair.1
@@ -271,7 +271,7 @@ fn FastImportParser::skip_line(self : FastImportParser) -> Unit {
 ///|
 /// Read data command: `data <count>\n<bytes>` or `data <<DELIM\n...\nDELIM\n`
 fn FastImportParser::read_data(self : FastImportParser) -> Bytes {
-  let result = @bitlib.fast_import_parse_data(self.lines, self.line_idx)
+  let result = @fast_import.fast_import_parse_data(self.lines, self.line_idx)
   self.line_idx = result.next_line
   result.content
 }
@@ -282,7 +282,7 @@ fn fast_import_resolve_dataref(
   ref_str : String,
   marks : Map[Int, @bitcore.ObjectId],
 ) -> @bitcore.ObjectId {
-  let (mark_num, hex) = @bitlib.fast_import_parse_dataref(ref_str)
+  let (mark_num, hex) = @fast_import.fast_import_parse_dataref(ref_str)
   if mark_num > 0 {
     marks.get(mark_num).unwrap_or(@bitcore.ObjectId::zero())
   } else if hex.length() == 40 {
@@ -340,7 +340,7 @@ fn fast_import_resolve_committish(
 ///|
 /// Trim whitespace from string
 fn fast_import_trim(s : String) -> String {
-  @bitlib.fast_import_parse_trim(s)
+  @fast_import.fast_import_parse_trim(s)
 }
 
 ///|
@@ -379,7 +379,7 @@ async fn fast_import_parse_blob(
 ///|
 /// Parse author/committer line: `Name <email> timestamp tz`
 fn fast_import_parse_ident(line : String) -> (String, Int64, String) {
-  match @bitlib.fast_import_parse_ident(line) {
+  match @fast_import.fast_import_parse_ident(line) {
     Some(id) => (id.ident, id.timestamp, id.tz)
     None => (line, 0L, "+0000")
   }
@@ -629,13 +629,13 @@ async fn fast_import_parse_filemodify(
 ///|
 /// Unquote a C-style quoted path (e.g., "foo/bar" → foo/bar)
 fn fast_import_unquote_path(path : String) -> String {
-  @bitlib.fast_import_parse_unquote_path(path)
+  @fast_import.fast_import_parse_unquote_path(path)
 }
 
 ///|
 /// Split two space-separated paths, handling quoted paths
 fn fast_import_split_two_paths(s : String) -> (String, String)? {
-  @bitlib.fast_import_parse_split_two_paths(s)
+  @fast_import.fast_import_parse_split_two_paths(s)
 }
 
 ///|

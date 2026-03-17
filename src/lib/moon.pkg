@@ -8,6 +8,9 @@ import {
   "mizchi/bit/protocol" @protocol,
   "mizchi/bit/ignore" @ignore,
   "mizchi/bit/reftable" @reftable,
+  "mizchi/bit/string_utils" @string_utils,
+  "mizchi/bit/date_parse" @date_parse,
+  "mizchi/bit/diff3" @diff3,
   "mizchi/zlib",
   "moonbitlang/core/bench" @bench,
   "moonbitlang/core/encoding/utf8",
@@ -33,5 +36,6 @@ options(
     "bench_index_diff_test.mbt": [ "native" ],
     "bench_ops_test.mbt": [ "native" ],
     "bench_status_test.mbt": [ "native" ],
+    "bench_working_files_test.mbt": [ "native" ],
   },
 )

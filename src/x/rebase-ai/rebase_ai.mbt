@@ -194,7 +194,7 @@ fn has_conflict_markers(content : String) -> Bool {
 
 ///|
 fn decode_bytes(data : Bytes) -> String {
-  @bitlib.decode_bytes(data)
+  @string_utils.decode_bytes(data)
 }
 
 ///|

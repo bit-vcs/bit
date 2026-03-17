@@ -1149,12 +1149,12 @@ fn normalize_config_args(args : Array[String]) -> Array[String] {
 /// Sentinel value for config keys with no '=' sign (value-less keys).
 /// Internal to config.mbt — external callers should not see this.
 fn config_novalue() -> String {
-  @bitlib.config_novalue()
+  @config_parse.config_novalue()
 }
 
 ///|
 fn is_config_novalue(s : String) -> Bool {
-  @bitlib.is_config_novalue(s)
+  @config_parse.is_config_novalue(s)
 }
 
 ///|
@@ -1246,12 +1246,12 @@ fn split_config_lines_preserve_cr(content : String) -> Array[String] {
 /// For dot notation `[section.Sub]`, the subsection is LOWERCASED (git compat).
 /// For quoted `[section "Sub"]`, the subsection is preserved as-is.
 fn parse_section_header_line(line : String) -> (String, String?, String, Bool)? {
-  @bitlib.parse_section_header_line(line)
+  @config_parse.parse_section_header_line(line)
 }
 
 ///|
 fn is_valid_section_name(name : String) -> Bool {
-  @bitlib.is_valid_section_name(name)
+  @config_parse.is_valid_section_name(name)
 }
 
 ///|
@@ -1525,7 +1525,7 @@ fn section_matches_for_insert(
   query_subsection : String?,
   is_dot_form : Bool,
 ) -> Bool {
-  @bitlib.section_matches_for_insert(
+  @config_parse.section_matches_for_insert(
     header_section, header_subsection, query_section, query_subsection, is_dot_form,
   )
 }
@@ -1535,12 +1535,12 @@ fn section_matches_for_insert(
 /// Returns (section, subsection?, key_name) or None.
 /// Validates that the key name starts with an alphabetic character (git compat).
 fn parse_config_key(key : String) -> (String, String?, String)? {
-  @bitlib.parse_config_key(key)
+  @config_parse.parse_config_key(key)
 }
 
 ///|
 fn find_config_key_line_from_content(content : String, key : String) -> Int? {
-  @bitlib.find_config_key_line_from_content(content, key)
+  @config_parse.find_config_key_line_from_content(content, key)
 }
 
 ///|
@@ -1636,7 +1636,7 @@ fn ends_with_unescaped_backslash(s : String) -> Bool {
 
 ///|
 fn config_lines_from_content(content : String) -> Array[String] {
-  @bitlib.config_lines_from_content(content)
+  @config_parse.config_lines_from_content(content)
 }
 
 ///|
@@ -1834,7 +1834,7 @@ fn get_config_value_from_content(
   value_pattern : String?,
   fixed_value : Bool,
 ) -> String? {
-  @bitlib.get_config_value_from_content(
+  @config_parse.get_config_value_from_content(
     content, key, value_pattern, fixed_value,
   )
 }
@@ -1862,7 +1862,7 @@ fn get_all_config_values_from_content(
   value_pattern : String?,
   fixed_value : Bool,
 ) -> Array[String] {
-  @bitlib.get_all_config_values_from_content(
+  @config_parse.get_all_config_values_from_content(
     content, key, value_pattern, fixed_value,
   )
 }
@@ -1886,7 +1886,7 @@ fn matches_value_filter(
 
 ///|
 fn parse_config_value(raw : String) -> String {
-  @bitlib.parse_config_value(raw)
+  @config_parse.parse_config_value(raw)
 }
 
 ///|
@@ -1926,7 +1926,7 @@ fn format_comment_suffix(comment : String?) -> String {
 /// Encode a config value for writing, escaping special characters and
 /// quoting when needed (leading/trailing space, #, ;).
 fn encode_config_value(value : String) -> String {
-  @bitlib.encode_config_value(value)
+  @config_parse.encode_config_value(value)
 }
 
 ///|
@@ -1983,7 +1983,7 @@ fn format_config_output_value(
     match parse_bool_keyword_value(val) {
       Some(b) => if b { "true" } else { "false" }
       None =>
-        match parse_size_value(val) {
+        match @config_parse.config_parse_size_value(val) {
           Some(n) => n.to_string()
           None =>
             raise @bitcore.GitError::InvalidObject(
@@ -2062,12 +2062,12 @@ fn format_config_output_value(
 
 ///|
 fn parse_bool_keyword_value(value : String) -> Bool? {
-  @bitlib.parse_bool_keyword_value(value)
+  @config_parse.parse_bool_keyword_value(value)
 }
 
 ///|
 fn parse_config_int_value(val : String) -> (Int64?, String?) {
-  @bitlib.parse_config_int_value(val)
+  @config_parse.parse_config_int_value(val)
 }
 
 ///|
@@ -2155,7 +2155,7 @@ fn format_bool_for_write(v : String) -> String raise Error {
 
 ///|
 fn format_int_for_write(v : String) -> String raise Error {
-  match parse_size_value(v) {
+  match @config_parse.config_parse_size_value(v) {
     Some(n) => n.to_string()
     None =>
       raise @bitcore.GitError::InvalidObject("bad numeric config value '\{v}'")
@@ -2167,7 +2167,7 @@ fn format_bool_or_int_for_write(v : String) -> String raise Error {
   match parse_bool_keyword_value(v) {
     Some(b) => if b { "true" } else { "false" }
     None =>
-      match parse_size_value(v) {
+      match @config_parse.config_parse_size_value(v) {
         Some(n) => n.to_string()
         None =>
           raise @bitcore.GitError::InvalidObject(

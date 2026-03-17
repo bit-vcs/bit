@@ -1,0 +1,50 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/bit/diff3"
+
+// Values
+pub fn content_merge(String, String, String, ContentMergeOptions) -> ContentMergeResult
+
+pub fn is_binary_content(Bytes) -> Bool
+
+// Errors
+
+// Types and methods
+pub(all) enum ConflictStyle {
+  Merge
+  Diff3
+}
+
+pub(all) struct ContentMergeOptions {
+  conflict_style : ConflictStyle
+  ours_label : String
+  base_label : String
+  theirs_label : String
+  marker_size : Int
+  favor : MergeFavor
+}
+pub fn ContentMergeOptions::default() -> Self
+pub fn ContentMergeOptions::favor_ours() -> Self
+pub fn ContentMergeOptions::favor_theirs() -> Self
+pub fn ContentMergeOptions::favor_union() -> Self
+pub fn ContentMergeOptions::new(conflict_style? : ConflictStyle, ours_label? : String, base_label? : String, theirs_label? : String, marker_size? : Int, favor? : MergeFavor) -> Self
+pub fn ContentMergeOptions::with_diff3(Self) -> Self
+pub fn ContentMergeOptions::with_labels(Self, ours~ : String, base~ : String, theirs~ : String) -> Self
+pub fn ContentMergeOptions::with_marker_size(Self, Int) -> Self
+
+pub(all) struct ContentMergeResult {
+  content : String
+  has_conflicts : Bool
+  conflict_count : Int
+}
+
+pub(all) enum MergeFavor {
+  NoFavor
+  FavorOurs
+  FavorTheirs
+  FavorUnion
+}
+
+// Type aliases
+
+// Traits
+

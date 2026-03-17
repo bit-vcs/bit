@@ -95,6 +95,9 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
   if commit_should_use_storage_runtime(args) {
     match commit_storage_runtime_delegate_args(fs, git_dir, args) {
       Some(commit_args) => {
+        // Pass resolved author/committer to storage_runtime via env bridge
+        @sys.set_env_var("BIT_COMMIT_AUTHOR", get_author_string())
+        @sys.set_env_var("BIT_COMMIT_COMMITTER", get_committer_string())
         @runtime.run_storage_command(
           fs,
           rfs,

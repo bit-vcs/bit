@@ -7,7 +7,7 @@ fn remote_decode_bytes_lossy(data : Bytes) -> String {
 
 ///|
 fn remote_trim_string(s : String) -> String {
-  trim_string(s)
+  @string_utils.trim_string(s)
 }
 
 ///|

@@ -314,6 +314,8 @@ async fn handlers_remote_pull_wbtest_run_shim_git(
 ///|
 async test "pull: local fetch with main:main writes target ref and FETCH_HEAD" {
   @bitnative.init_native_io()
+  cmd_bit_wbtest_env_lock.acquire()
+  defer cmd_bit_wbtest_env_lock.release()
   let fs = OsFs::new()
   let root = "/tmp/bit-test pull fetch explicit trash directory-" +
     get_current_timestamp().to_string()
@@ -366,6 +368,8 @@ async test "pull: local fetch with main:main writes target ref and FETCH_HEAD" {
 ///|
 async test "pull: local fetch for main writes remote-tracking ref and FETCH_HEAD" {
   @bitnative.init_native_io()
+  cmd_bit_wbtest_env_lock.acquire()
+  defer cmd_bit_wbtest_env_lock.release()
   let fs = OsFs::new()
   let root = "/tmp/bit-test pull fetch merge-ref trash directory-" +
     get_current_timestamp().to_string()
@@ -418,6 +422,8 @@ async test "pull: local fetch for main writes remote-tracking ref and FETCH_HEAD
 ///|
 async test "pull: branch remote dot pulls from current repo config" {
   @bitnative.init_native_io()
+  cmd_bit_wbtest_env_lock.acquire()
+  defer cmd_bit_wbtest_env_lock.release()
   let fs = OsFs::new()
   let root = "/tmp/bit-test pull branch-remote-dot trash directory-" +
     get_current_timestamp().to_string()
@@ -456,6 +462,8 @@ async test "pull: branch remote dot pulls from current repo config" {
 ///|
 async test "pull: command path pulls into unborn branch from parent repo" {
   @bitnative.init_native_io()
+  cmd_bit_wbtest_env_lock.acquire()
+  defer cmd_bit_wbtest_env_lock.release()
   let fs = OsFs::new()
   let root = "/tmp/bit-test pull command unborn trash directory-" +
     get_current_timestamp().to_string()
@@ -491,6 +499,8 @@ async test "pull: command path pulls into unborn branch from parent repo" {
 ///|
 async test "pull: command path keeps staged new file on unborn branch" {
   @bitnative.init_native_io()
+  cmd_bit_wbtest_env_lock.acquire()
+  defer cmd_bit_wbtest_env_lock.release()
   let fs = OsFs::new()
   let root = "/tmp/bit-test pull command preserve-index trash directory-" +
     get_current_timestamp().to_string()
@@ -534,6 +544,8 @@ async test "pull: command path keeps staged new file on unborn branch" {
 ///|
 async test "pull: command path rejects octopus into unborn branch" {
   @bitnative.init_native_io()
+  cmd_bit_wbtest_env_lock.acquire()
+  defer cmd_bit_wbtest_env_lock.release()
   let fs = OsFs::new()
   let root = "/tmp/bit-test pull command octopus trash directory-" +
     get_current_timestamp().to_string()
@@ -565,6 +577,8 @@ async test "pull: command path rejects octopus into unborn branch" {
 ///|
 async test "pull: rebase rejects staged changes on unborn branch" {
   @bitnative.init_native_io()
+  cmd_bit_wbtest_env_lock.acquire()
+  defer cmd_bit_wbtest_env_lock.release()
   let fs = OsFs::new()
   let root = "/tmp/bit-test pull unborn-rebase-index trash directory-" +
     get_current_timestamp().to_string()
@@ -613,6 +627,8 @@ async test "pull: rebase rejects staged changes on unborn branch" {
 ///|
 async test "pull: rebase uses previous target as fork point for rebased upstream" {
   @bitnative.init_native_io()
+  cmd_bit_wbtest_env_lock.acquire()
+  defer cmd_bit_wbtest_env_lock.release()
   let fs = OsFs::new()
   let root = "/tmp/bit-test pull rebased-upstream trash directory-" +
     get_current_timestamp().to_string()
@@ -664,6 +680,8 @@ async test "pull: rebase uses previous target as fork point for rebased upstream
 ///|
 async test "pull: updates checked-out branch worktree when fetch advances it" {
   @bitnative.init_native_io()
+  cmd_bit_wbtest_env_lock.acquire()
+  defer cmd_bit_wbtest_env_lock.release()
   let fs = OsFs::new()
   let root = "/tmp/bit-test pull fetch-updates-head trash directory-" +
     get_current_timestamp().to_string()
@@ -710,6 +728,8 @@ async test "pull: updates checked-out branch worktree when fetch advances it" {
 ///|
 async test "pull: refuses dirty worktree when fetch advances current branch" {
   @bitnative.init_native_io()
+  cmd_bit_wbtest_env_lock.acquire()
+  defer cmd_bit_wbtest_env_lock.release()
   let fs = OsFs::new()
   let root = "/tmp/bit-test pull fetch-updates-head-dirty trash directory-" +
     get_current_timestamp().to_string()
@@ -752,6 +772,8 @@ async test "pull: refuses dirty worktree when fetch advances current branch" {
 ///|
 async test "pull: rebase rejects multiple explicit refspecs" {
   @bitnative.init_native_io()
+  cmd_bit_wbtest_env_lock.acquire()
+  defer cmd_bit_wbtest_env_lock.release()
   let fs = OsFs::new()
   let root = "/tmp/bit-test pull rebase-multi trash directory-" +
     get_current_timestamp().to_string()
@@ -781,6 +803,8 @@ async test "pull: rebase rejects multiple explicit refspecs" {
 ///|
 async test "pull: rebase autostash preserves staged file on fast-forward" {
   @bitnative.init_native_io()
+  cmd_bit_wbtest_env_lock.acquire()
+  defer cmd_bit_wbtest_env_lock.release()
   let fs = OsFs::new()
   let root = "/tmp/bit-test pull rebase-autostash trash directory-" +
     get_current_timestamp().to_string()

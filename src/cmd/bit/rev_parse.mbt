@@ -1084,18 +1084,7 @@ fn rev_parse_resolve_git_path_with_config(
 
 ///|
 fn rev_parse_git_path_uses_common_dir(requested_path : String) -> Bool {
-  requested_path == "objects" ||
-  requested_path.has_prefix("objects/") ||
-  requested_path == "refs" ||
-  requested_path.has_prefix("refs/") ||
-  requested_path == "packed-refs" ||
-  requested_path == "config" ||
-  requested_path == "hooks" ||
-  requested_path.has_prefix("hooks/") ||
-  requested_path == "info" ||
-  requested_path.has_prefix("info/") ||
-  requested_path == "logs/refs" ||
-  requested_path.has_prefix("logs/refs/")
+  @bitlib.rev_parse_git_path_uses_common_dir(requested_path)
 }
 
 ///|
@@ -1228,139 +1217,41 @@ fn resolve_index_path_oid(
 
 ///|
 fn parse_index_pathspec(spec : String) -> (Int, String?) {
-  if not(spec.has_prefix(":")) || spec.length() <= 1 {
-    return (0, None)
-  }
-  let rest = String::unsafe_substring(spec, start=1, end=spec.length())
-  let mut stage = 0
-  let mut path = rest
-  if rest.length() >= 3 && rest[0] >= '0' && rest[0] <= '3' && rest[1] == ':' {
-    stage = rest[0].to_int() - '0'.to_int()
-    path = String::unsafe_substring(rest, start=2, end=rest.length())
-  }
-  if path.length() == 0 {
-    (stage, None)
-  } else {
-    (stage, Some(path))
-  }
+  @bitlib.parse_index_pathspec(spec)
 }
 
 ///|
 fn normalize_index_pathspec_path(path : String) -> String {
-  let mut out = path
-  while out.has_prefix("./") {
-    out = String::unsafe_substring(out, start=2, end=out.length())
-  }
-  while out.length() > 1 && out.has_suffix("/") {
-    out = String::unsafe_substring(out, start=0, end=out.length() - 1)
-  }
-  out
+  @bitlib.normalize_index_pathspec_path(path)
 }
 
 ///|
 fn parse_rev_parse_short_length(value : String) -> Int? {
-  if value.length() == 0 {
-    return None
-  }
-  let mut result = 0
-  for c in value {
-    if c < '0' || c > '9' {
-      return None
-    }
-    result = result * 10 + (c.to_int() - '0'.to_int())
-  }
-  Some(result)
+  @bitlib.parse_rev_parse_short_length(value)
 }
 
 ///|
 fn parse_reflog_selector(spec : String) -> (String, Int)? {
-  guard spec.has_suffix("}") else { return None }
-  match spec.find("@{") {
-    Some(idx) => {
-      let number_start = idx + 2
-      guard number_start < spec.length() - 1 else { return None }
-      let number_text = String::unsafe_substring(
-        spec,
-        start=number_start,
-        end=spec.length() - 1,
-      )
-      let mut number = 0
-      for c in number_text {
-        if c < '0' || c > '9' {
-          return None
-        }
-        number = number * 10 + (c.to_int() - '0'.to_int())
-      }
-      let raw_ref = String::unsafe_substring(spec, start=0, end=idx)
-      let refname = if raw_ref == "HEAD" {
-        "HEAD"
-      } else if raw_ref.length() == 0 {
-        // Bare @{N} — use empty string as marker; resolve_reflog_selector
-        // will map this to the current branch (not HEAD)
-        ""
-      } else if raw_ref.has_prefix("refs/") {
-        raw_ref
-      } else {
-        "refs/heads/" + raw_ref
-      }
-      Some((refname, number))
-    }
-    None => None
-  }
+  @bitlib.parse_reflog_selector(spec)
 }
 
 ///|
 /// Parse a reflog date selector like "main@{May 25 2005}" or "HEAD@{2005-05-26}".
 /// Returns (refname, date_string) if the @{...} content looks like a date.
 fn parse_reflog_date_selector(spec : String) -> (String, String)? {
-  guard spec.has_suffix("}") else { return None }
-  match spec.find("@{") {
-    Some(idx) => {
-      let content_start = idx + 2
-      guard content_start < spec.length() - 1 else { return None }
-      let content = String::unsafe_substring(
-        spec,
-        start=content_start,
-        end=spec.length() - 1,
-      )
-      let mut all_digits = true
-      for c in content {
-        if c < '0' || c > '9' {
-          all_digits = false
-          break
-        }
-      }
-      if all_digits {
-        return None
-      }
-      let raw_ref = String::unsafe_substring(spec, start=0, end=idx)
-      let refname = if raw_ref == "HEAD" {
-        "HEAD"
-      } else if raw_ref.length() == 0 {
-        // Bare @{date} — use empty string as marker; resolved later
-        // to current branch
-        ""
-      } else if raw_ref.has_prefix("refs/") {
-        raw_ref
-      } else {
-        "refs/heads/" + raw_ref
-      }
-      Some((refname, content))
-    }
-    None => None
-  }
+  @bitlib.parse_reflog_date_selector(spec)
 }
 
 ///|
 fn parse_reflog_date(date_str : String) -> Int64? {
-  @bitlib.parse_approxidate(date_str, get_current_timestamp())
+  @date_parse.parse_approxidate(date_str, get_current_timestamp())
 }
 
-// Date parsing functions delegated to @bitlib (src/lib/date_parse.mbt).
+// Date parsing functions delegated to @date_parse (src/date_parse/date_parse.mbt).
 // parse_approxidate_iso8601, parse_approxidate_iso_date,
 // month_name_to_number, parse_approxidate_human,
-// reflog_parse_int_string (now @bitlib.parse_int_from_string),
-// parse_approxidate_relative are all in @bitlib.
+// reflog_parse_int_string (now @date_parse.parse_int_from_string),
+// parse_approxidate_relative are all in @date_parse.
 
 ///|
 async fn resolve_reflog_by_date(
@@ -1548,24 +1439,7 @@ fn resolve_at_minus(
 /// Parse @{-N} from the beginning of a spec.
 /// Returns (N, rest_of_spec) if spec starts with @{-N}.
 fn parse_at_minus_prefix(spec : String) -> (Int, String)? {
-  guard spec.has_prefix("@{-") else { return None }
-  let chars = spec.to_array()
-  let mut i = 3
-  let mut n = 0
-  let mut found_digit = false
-  while i < chars.length() && chars[i] != '}' {
-    if chars[i] < '0' || chars[i] > '9' {
-      return None
-    }
-    n = n * 10 + (chars[i].to_int() - '0'.to_int())
-    found_digit = true
-    i += 1
-  }
-  guard found_digit && i < chars.length() && chars[i] == '}' else {
-    return None
-  }
-  let rest = String::unsafe_substring(spec, start=i + 1, end=spec.length())
-  Some((n, rest))
+  @bitlib.parse_at_minus_prefix(spec)
 }
 
 ///|
@@ -1724,14 +1598,7 @@ fn resolve_symbolic_full_name(
 
 ///|
 fn shorten_oid_hex(hex : String, requested : Int) -> String {
-  let mut length = requested
-  if length < 4 {
-    length = 4
-  }
-  if length > hex.length() {
-    length = hex.length()
-  }
-  String::unsafe_substring(hex, start=0, end=length)
+  @bitlib.shorten_oid_hex(hex, requested)
 }
 
 ///|
@@ -1773,20 +1640,7 @@ fn resolve_fetch_head_oid(
 
 ///|
 fn shell_single_quote(value : String) -> String {
-  let out = StringBuilder::new()
-  out.write_char('\'')
-  for c in value {
-    if c == '\'' {
-      out.write_char('\'')
-      out.write_char('\\')
-      out.write_char('\'')
-      out.write_char('\'')
-    } else {
-      out.write_char(c)
-    }
-  }
-  out.write_char('\'')
-  out.to_string()
+  @bitlib.shell_single_quote(value)
 }
 
 ///|
@@ -1859,15 +1713,7 @@ fn rev_parse_parse_tag_target_with_compat(
 
 ///|
 fn rev_parse_extract_tag_target_name(tag_text : String) -> String? {
-  for line_view in tag_text.split("\n") {
-    let line = line_view.to_string()
-    if line.has_prefix("object ") {
-      return Some(
-        trim_string(String::unsafe_substring(line, start=7, end=line.length())),
-      )
-    }
-  }
-  None
+  @bitlib.rev_parse_extract_tag_target_name(tag_text)
 }
 
 ///|
@@ -1962,27 +1808,12 @@ fn rev_parse_read_worktree_config_bool(
 
 ///|
 fn rev_parse_parse_config_bool(raw : String) -> Bool? {
-  let value = @bitlib.config_strip_quotes(raw).to_lower()
-  if value == "true" || value == "yes" || value == "1" {
-    Some(true)
-  } else if value == "false" || value == "no" || value == "0" {
-    Some(false)
-  } else {
-    None
-  }
+  @bitlib.rev_parse_parse_config_bool(raw)
 }
 
 ///|
 fn rev_parse_is_inside_git_dir(cwd_abs : String, abs_git_dir : String) -> Bool {
-  if cwd_abs == abs_git_dir {
-    return true
-  }
-  let prefix = if abs_git_dir.has_suffix("/") {
-    abs_git_dir
-  } else {
-    abs_git_dir + "/"
-  }
-  cwd_abs.has_prefix(prefix)
+  @bitlib.rev_parse_is_inside_git_dir(cwd_abs, abs_git_dir)
 }
 
 ///|
@@ -2146,104 +1977,15 @@ fn rev_parse_resolve_abs_root(root : String, cwd_abs : String) -> String {
 
 ///|
 fn rev_parse_make_relative(abs_target : String, cwd_abs : String) -> String {
-  if abs_target == cwd_abs {
-    return "./"
-  }
-  let cwd_prefix = if cwd_abs.has_suffix("/") { cwd_abs } else { cwd_abs + "/" }
-  if abs_target.has_prefix(cwd_prefix) {
-    return String::unsafe_substring(
-      abs_target,
-      start=cwd_prefix.length(),
-      end=abs_target.length(),
-    )
-  }
-  // Count how many segments we need to go up
-  let mut common_len = 0
-  let target_chars = abs_target.to_array()
-  let cwd_chars = cwd_abs.to_array()
-  let min_len = if target_chars.length() < cwd_chars.length() {
-    target_chars.length()
-  } else {
-    cwd_chars.length()
-  }
-  for i in 0..<min_len {
-    if target_chars[i] != cwd_chars[i] {
-      break
-    }
-    if target_chars[i] == '/' {
-      common_len = i + 1
-    }
-  }
-  if common_len == 0 && min_len > 0 {
-    common_len = 1
-  }
-  let remaining_cwd = String::unsafe_substring(
-    cwd_abs,
-    start=common_len,
-    end=cwd_abs.length(),
-  )
-  let remaining_target = String::unsafe_substring(
-    abs_target,
-    start=common_len,
-    end=abs_target.length(),
-  )
-  let depth = remaining_cwd.iter().filter(fn(c) { c == '/' }).count() + 1
-  let parts : Array[String] = []
-  for _ in 0..<depth {
-    parts.push("..")
-  }
-  let up = parts.join("/")
-  if remaining_target.length() == 0 {
-    up
-  } else {
-    up + "/" + remaining_target
-  }
+  @bitlib.rev_parse_make_relative(abs_target, cwd_abs)
 }
 
 ///|
 fn parse_date_to_timestamp(date_str : String) -> Int64 {
-  // Try parsing ISO 8601 format: YYYY-MM-DDTHH:MM:SSZ
-  if date_str.find("T") is Some(_) {
-    return parse_iso8601_timestamp(date_str)
-  }
-  // Try parsing as a raw timestamp
-  let mut is_numeric = true
-  for c in date_str {
-    if c < '0' || c > '9' {
-      is_numeric = false
-      break
-    }
-  }
-  if is_numeric && date_str.length() > 0 {
-    let mut result = 0L
-    for c in date_str {
-      result = result * 10L + (c.to_int() - '0'.to_int()).to_int64()
-    }
-    return result
-  }
-  0L
+  @bitlib.parse_date_to_timestamp(date_str)
 }
 
-///|
-fn parse_iso8601_timestamp(date_str : String) -> Int64 {
-  let s = date_str.to_array()
-  if s.length() < 19 {
-    return 0L
-  }
-  let year = @bitlib.parse_date_digits(s, 0, 4)
-  let month = @bitlib.parse_date_digits(s, 5, 7)
-  let day = @bitlib.parse_date_digits(s, 8, 10)
-  let hour = @bitlib.parse_date_digits(s, 11, 13)
-  let minute = @bitlib.parse_date_digits(s, 14, 16)
-  let second = @bitlib.parse_date_digits(s, 17, 19)
-  let days = @bitlib.days_since_epoch(year, month, day)
-  days.to_int64() * 86400L +
-  hour.to_int64() * 3600L +
-  minute.to_int64() * 60L +
-  second.to_int64()
-}
-
-// parse_date_digits and days_since_epoch delegated to @bitlib (src/lib/date_parse.mbt).
+// parse_date_digits and days_since_epoch delegated to @date_parse (src/date_parse/date_parse.mbt).
 
 ///|
 async fn rev_parse_print_bisect_symbolic(
@@ -2365,7 +2107,6 @@ fn rev_parse_apply_prefix_to_colon_path(
   spec : String,
   prefix : String,
 ) -> String {
-  // Find the colon separator (revision:path)
   guard spec.find(":") is Some(colon_idx) else { return spec }
   guard colon_idx > 0 else { return spec }
   let path_part = String::unsafe_substring(
@@ -2373,37 +2114,18 @@ fn rev_parse_apply_prefix_to_colon_path(
     start=colon_idx + 1,
     end=spec.length(),
   )
-  // Only apply prefix when path starts with ./ or ../
   if not(path_part.has_prefix("./")) && not(path_part.has_prefix("../")) {
     return spec
   }
   let rev_part = String::unsafe_substring(spec, start=0, end=colon_idx)
   let combined = prefix + path_part
-  // Normalize ./ and ../ components
   let normalized = rev_parse_normalize_path(combined)
   rev_part + ":" + normalized
 }
 
 ///|
-/// Normalize a path by resolving . and .. components.
-/// "sub1/./file1" → "sub1/file1"
-/// "sub1/../top" → "top"
 fn rev_parse_normalize_path(path : String) -> String {
-  let parts = path.split("/")
-  let result : Array[String] = []
-  for part in parts {
-    let s = part.to_string()
-    if s == "." {
-      continue
-    } else if s == ".." {
-      if result.length() > 0 {
-        let _ = result.pop()
-      }
-    } else {
-      result.push(s)
-    }
-  }
-  result.join("/")
+  @bitlib.rev_parse_normalize_path(path)
 }
 
 ///|
@@ -2505,21 +2227,7 @@ async fn handle_parseopt(args : Array[String]) -> Unit raise Error {
 
 ///|
 fn parseopt_split_lines(s : String) -> Array[String] {
-  let lines : Array[String] = []
-  let buf = StringBuilder::new()
-  for c in s {
-    if c == '\n' {
-      lines.push(buf.to_string())
-      buf.reset()
-    } else {
-      buf.write_char(c)
-    }
-  }
-  let last = buf.to_string()
-  if last.length() > 0 {
-    lines.push(last)
-  }
-  lines
+  @bitlib.parseopt_split_lines(s)
 }
 
 ///|
@@ -2644,37 +2352,17 @@ async fn parseopt_parse_spec(
 
 ///|
 fn parseopt_find_space(s : String) -> Int? {
-  for i = 0; i < s.length(); i = i + 1 {
-    let c = s[i]
-    if c == ' ' || c == '\t' {
-      return Some(i)
-    }
-  }
-  None
+  @bitlib.parseopt_find_space(s)
 }
 
 ///|
 fn parseopt_skipspaces(s : String) -> String {
-  let mut i = 0
-  while i < s.length() {
-    let c = s[i]
-    if c != ' ' && c != '\t' {
-      break
-    }
-    i = i + 1
-  }
-  String::unsafe_substring(s, start=i, end=s.length())
+  @bitlib.parseopt_skipspaces(s)
 }
 
 ///|
 fn parseopt_find_flags(s : String) -> Int {
-  for i = 0; i < s.length(); i = i + 1 {
-    let c = s[i]
-    if c == '*' || c == '=' || c == '?' || c == '!' {
-      return i
-    }
-  }
-  s.length()
+  @bitlib.parseopt_find_flags(s)
 }
 
 ///|
@@ -3298,12 +2986,7 @@ fn parseopt_match_short(
 
 ///|
 fn parseopt_find_char(s : String, ch : Char) -> Int? {
-  for i = 0; i < s.length(); i = i + 1 {
-    if s[i].to_int() == ch.to_int() {
-      return Some(i)
-    }
-  }
-  None
+  @bitlib.parseopt_find_char(s, ch)
 }
 
 ///|
@@ -3337,58 +3020,7 @@ async fn rev_parse_output_ref(
 /// Glob match for ref patterns. Supports `*` (any chars) and `?` (single char).
 /// Non-glob patterns match as exact or path prefix (with `/` boundary).
 fn rev_parse_glob_match(text : String, pattern : String) -> Bool {
-  let has_star = pattern.find("*") is Some(_)
-  let has_question = pattern.find("?") is Some(_)
-  if not(has_star) && not(has_question) {
-    // Non-glob: exact match or path-prefix match
-    text == pattern ||
-    (
-      text.has_prefix(pattern) &&
-      pattern.length() < text.length() &&
-      (pattern[pattern.length() - 1] == '/' || text[pattern.length()] == '/')
-    )
-  } else {
-    // Glob match with * and ?
-    let t = text.to_array()
-    let p = pattern.to_array()
-    rev_parse_glob_match_inner(t, 0, p, 0)
-  }
-}
-
-///|
-fn rev_parse_glob_match_inner(
-  t : Array[Char],
-  ti : Int,
-  p : Array[Char],
-  pi : Int,
-) -> Bool {
-  let mut ti = ti
-  let mut pi = pi
-  while pi < p.length() {
-    if p[pi] == '*' {
-      pi += 1
-      // Try matching * against 0..N chars
-      for k = ti; k <= t.length(); k = k + 1 {
-        if rev_parse_glob_match_inner(t, k, p, pi) {
-          return true
-        }
-      }
-      return false
-    } else if p[pi] == '?' {
-      if ti >= t.length() {
-        return false
-      }
-      ti += 1
-      pi += 1
-    } else {
-      if ti >= t.length() || t[ti] != p[pi] {
-        return false
-      }
-      ti += 1
-      pi += 1
-    }
-  }
-  ti == t.length()
+  @bitlib.rev_parse_glob_match(text, pattern)
 }
 
 ///|
@@ -3723,48 +3355,7 @@ async fn rev_parse_is_commit(
 /// Returns (base_spec, suffix_type) or None if no parent suffix found.
 /// suffix_type: "@" for ^@, "!" for ^!, "-N" for ^-N (N >= 1)
 fn rev_parse_parse_parent_suffix(spec : String) -> (String, String)? {
-  // Check for ^@ suffix
-  if spec.has_suffix("^@") && spec.length() > 2 {
-    let base = String::unsafe_substring(spec, start=0, end=spec.length() - 2)
-    return Some((base, "@"))
-  }
-  // Check for ^! suffix
-  if spec.has_suffix("^!") && spec.length() > 2 {
-    let base = String::unsafe_substring(spec, start=0, end=spec.length() - 2)
-    return Some((base, "!"))
-  }
-  // Check for ^-N or ^- suffix
-  // Find last ^- in the spec
-  let chars = spec.to_array()
-  let len = chars.length()
-  // Search backwards for "^-"
-  for i = len - 1; i >= 1; i = i - 1 {
-    if chars[i - 1] == '^' && chars[i] == '-' {
-      let base = String::unsafe_substring(spec, start=0, end=i - 1)
-      if base.length() == 0 {
-        return None
-      }
-      let rest = String::unsafe_substring(spec, start=i + 1, end=len)
-      if rest.length() == 0 {
-        // ^- means ^-1
-        return Some((base, "-1"))
-      }
-      // Check rest is all digits
-      let mut all_digits = true
-      for c in rest {
-        if c < '0' || c > '9' {
-          all_digits = false
-          break
-        }
-      }
-      if all_digits {
-        return Some((base, "-" + rest))
-      }
-      // Contains non-digit after ^-N: invalid (e.g., ^-1x, ^-^)
-      return Some((base, "-invalid:" + rest))
-    }
-  }
-  None
+  @bitlib.rev_parse_parse_parent_suffix(spec)
 }
 
 ///|
@@ -3939,17 +3530,7 @@ async fn rev_parse_handle_parent_suffix(
 /// Normalize a glob pattern, expanding shorthand prefixes.
 /// "heads/*" -> "refs/heads/*", "refs/heads/*" -> "refs/heads/*"
 fn rev_parse_normalize_glob_pattern(pattern : String) -> String {
-  if pattern.has_prefix("refs/") {
-    pattern
-  } else if pattern.has_prefix("heads/") {
-    "refs/" + pattern
-  } else if pattern.has_prefix("tags/") {
-    "refs/" + pattern
-  } else if pattern.has_prefix("remotes/") {
-    "refs/" + pattern
-  } else {
-    "refs/" + pattern
-  }
+  @bitlib.rev_parse_normalize_glob_pattern(pattern)
 }
 
 ///|

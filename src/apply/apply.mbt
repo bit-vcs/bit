@@ -1,5 +1,5 @@
 ///|
-pub struct PatchInfo {
+pub(all) struct PatchInfo {
   display_name : String
   additions : Int
   deletions : Int

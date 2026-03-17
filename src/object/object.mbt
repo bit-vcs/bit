@@ -105,7 +105,12 @@ fn object_serialize_commit_content_array(commit : Commit) -> Array[Byte] {
     content.push(b'\n')
   }
   content.push(b'\n')
-  content.append(object_commit_message_bytes(commit.message, commit.encoding))
+  let msg_bytes = object_commit_message_bytes(commit.message, commit.encoding)
+  content.append(msg_bytes)
+  // Git always terminates commit messages with a newline
+  if msg_bytes.length() == 0 || msg_bytes[msg_bytes.length() - 1] != b'\n' {
+    content.push(b'\n')
+  }
   content
 }
 

@@ -1460,7 +1460,7 @@ async fn cat_file_parse_object_filter_spec_or_exit(
   }
   if spec.has_prefix("blob:limit=") {
     let limit_str = String::unsafe_substring(spec, start=11, end=spec.length())
-    let limit = parse_size_value(limit_str)
+    let limit = @config_parse.config_parse_size_value(limit_str)
     guard limit is Some(max_size) else {
       return cat_file_filter_die_fatal("fatal: invalid filter-spec '\{spec}'")
     }

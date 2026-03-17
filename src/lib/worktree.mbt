@@ -480,7 +480,7 @@ fn expand_paths(
   paths : Array[String],
 ) -> Array[String] raise @bit.GitError {
   let result : Array[String] = []
-  let all = @ignore.list_working_files(fs, root)
+  let all = list_working_files(fs, root)
   for p in paths {
     let path = normalize_rel_path(p)
     // Handle "." specially - add all files
@@ -512,7 +512,7 @@ async fn expand_paths_async(
   paths : Array[String],
 ) -> Array[String] raise @bit.GitError {
   let result : Array[String] = []
-  let all = @ignore.list_working_files_async(fs, root)
+  let all = list_working_files_async(fs, root)
   for p in paths {
     let path = normalize_rel_path(p)
     // Handle "." specially - add all files
@@ -1285,7 +1285,7 @@ fn write_tree_from_entries(
     }
     match split_first(e.path) {
       (name, None) => {
-        let mode = mode_to_string(e.mode)
+        let mode = @string_utils.mode_to_string(e.mode)
         file_entries.push(@bit.TreeEntry::new(mode, name, e.id))
       }
       (name, Some(rest)) =>
@@ -2043,7 +2043,9 @@ fn mv_rewrite_gitfile_after_directory_move(
   dst_abs : String,
   dst_gitfile : String,
 ) -> Unit raise @bit.GitError {
-  let content = trim_worktree_text(decode_bytes(rfs.read_file(dst_gitfile)))
+  let content = trim_worktree_text(
+    @string_utils.decode_bytes(rfs.read_file(dst_gitfile)),
+  )
   if not(content.has_prefix("gitdir: ")) {
     return ()
   }

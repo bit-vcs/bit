@@ -84,7 +84,7 @@ async fn handle_interpret_trailers(args : Array[String]) -> Unit raise Error {
   }
   if only_trailers {
     // Parse and print existing trailers only
-    let existing = @bitlib.parse_trailers(input)
+    let existing = @trailers.parse_trailers(input)
     let result = StringBuilder::new()
     for trailer in existing {
       result.write_string(trailer.0)
@@ -112,9 +112,9 @@ async fn handle_interpret_trailers(args : Array[String]) -> Unit raise Error {
           start=idx + 2,
           end=normalized.length(),
         )
-        output = @bitlib.add_trailer(output, key, value)
+        output = @trailers.add_trailer(output, key, value)
       }
-      None => output = @bitlib.add_trailer(output, normalized, "")
+      None => output = @trailers.add_trailer(output, normalized, "")
     }
   }
   if in_place && positional.length() > 0 {

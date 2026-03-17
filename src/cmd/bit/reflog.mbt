@@ -1,92 +1,4 @@
 ///|
-async fn delegate_reflog_to_real_git(
-  args : Array[String],
-  cwd : String,
-) -> Unit {
-  let argv : Array[String] = ["reflog"]
-  for arg in args {
-    argv.push(arg)
-  }
-  let code = @process.run(
-    resolve_real_git_for_dispatch(),
-    argv,
-    inherit_env=true,
-    cwd~,
-    stdin=@stdio.stdin,
-    stdout=@stdio.stdout,
-    stderr=@stdio.stderr,
-  )
-  @sys.exit(code)
-}
-
-///|
-fn reflog_show_builtin_supports_args(args : Array[String]) -> Bool {
-  let mut saw_refname = false
-  let mut i = 0
-  while i < args.length() {
-    let arg = args[i]
-    match arg {
-      "--no-abbrev-commit"
-      | "-i"
-      | "--regexp-ignore-case"
-      | "-F"
-      | "--fixed-strings"
-      | "-E"
-      | "--extended-regexp"
-      | "-P"
-      | "--perl-regexp"
-      | "--basic-regexp" => i += 1
-      "-n" | "--max-count" | "--grep" => {
-        if i + 1 >= args.length() {
-          return false
-        }
-        i += 2
-      }
-      _ if arg.has_prefix("--max-count=") || arg.has_prefix("--grep=") => i += 1
-      _ if reflog_parse_short_max_count(arg) is Some(_) => i += 1
-      "--" => return false
-      _ if arg.has_prefix("-") => return false
-      _ => {
-        if saw_refname || arg.contains("@{") {
-          return false
-        }
-        saw_refname = true
-        i += 1
-      }
-    }
-  }
-  true
-}
-
-///|
-fn reflog_requires_real_git(args : Array[String]) -> Bool {
-  if args.length() == 0 {
-    return false
-  }
-  match args[0] {
-    "show" => not(reflog_show_builtin_supports_args(collect_args(args, 1)))
-    "exists" => false
-    "expire" => not(reflog_expire_builtin_supports_args(collect_args(args, 1)))
-    "delete" | "drop" | "write" => false
-    "list" => true
-    _ => not(reflog_show_builtin_supports_args(args))
-  }
-}
-
-///|
-fn reflog_expire_builtin_supports_args(args : Array[String]) -> Bool {
-  if args.length() == 0 {
-    return false
-  }
-  for arg in args {
-    if arg.has_prefix("-") || arg.contains("@{") {
-      return false
-    }
-  }
-  true
-}
-
-///|
 fn reflog_glob_match(pattern : String, text : String) -> Bool {
   let p = pattern.to_array()
   let t = text.to_array()
@@ -116,12 +28,6 @@ fn reflog_glob_match(pattern : String, text : String) -> Bool {
     pi += 1
   }
   pi == plen
-}
-
-///|
-fn reflog_expire_mode_supported(mode : String) -> Bool {
-  let normalized = mode.trim().to_lower()
-  normalized == "now" || normalized == "never" || normalized == "false"
 }
 
 ///|
@@ -160,42 +66,84 @@ fn reflog_expire_mode_for_ref(
 }
 
 ///|
-fn reflog_builtin_expire_refs(
-  fs : &@bitcore.FileSystem,
+/// Parse an expire value into seconds-from-epoch cutoff timestamp.
+/// Returns None for "never"/"false", Some(cutoff_ts) for "now" or time-based values.
+fn reflog_parse_expire_value(value : String, now : Int64) -> Int64? {
+  let normalized = value.trim().to_string().to_lower()
+  if normalized == "never" || normalized == "false" {
+    return None
+  }
+  if normalized == "now" || normalized == "all" {
+    // Expire everything: cutoff is far in the future
+    return Some(now + 999999999L)
+  }
+  // Try parsing as approxidate
+  match @date_parse.parse_approxidate(value.trim().to_string(), now) {
+    Some(ts) => Some(ts)
+    None => None
+  }
+}
+
+///|
+/// Get the effective expire cutoff timestamp for a ref.
+/// Returns None if entries should never expire.
+fn reflog_get_expire_cutoff(
   rfs : &@bitcore.RepoFileSystem,
   git_dir : String,
-  refs : Array[String],
-) -> Bool raise Error {
-  let normalized_refs : Array[String] = []
-  let modes : Array[String] = []
-  for refname_arg in refs {
-    let normalized = normalize_reflog_refname(rfs, git_dir, refname_arg)
-    if not(reflog_ref_exists_or_resolves(rfs, git_dir, normalized)) {
-      raise @bitcore.GitError::InvalidObject(
-        "error: reflog could not be found: '\{refname_arg}'",
-      )
-    }
-    let mode = reflog_expire_mode_for_ref(rfs, git_dir, normalized)
-    guard mode is Some(raw_mode) else { return false }
-    if not(reflog_expire_mode_supported(raw_mode)) {
-      return false
-    }
-    normalized_refs.push(normalized)
-    modes.push(raw_mode.trim().to_string().to_lower())
-  }
-  for i in 0..<normalized_refs.length() {
-    if modes[i] == "now" {
-      let reflog_path = if normalized_refs[i] == "HEAD" {
-        git_dir + "/logs/HEAD"
-      } else {
-        git_dir + "/logs/" + normalized_refs[i]
-      }
-      if rfs.is_file(reflog_path) {
-        fs.write_string(reflog_path, "")
+  refname : String,
+  explicit_expire : String?,
+  now : Int64,
+) -> Int64? {
+  match explicit_expire {
+    Some(val) => reflog_parse_expire_value(val, now)
+    None => {
+      // Check config
+      let mode = reflog_expire_mode_for_ref(rfs, git_dir, refname)
+      match mode {
+        Some(val) => reflog_parse_expire_value(val, now)
+        None => {
+          // Default: 90 days
+          let default_expire_seconds = 90L * 86400L
+          Some(now - default_expire_seconds)
+        }
       }
     }
   }
-  true
+}
+
+///|
+/// Walk the logs/ directory recursively and collect all refnames that have reflogs.
+fn reflog_list_all_refs(
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+) -> Array[String] raise Error {
+  let logs_dir = git_dir + "/logs"
+  let refs : Array[String] = []
+  if not(rfs.is_dir(logs_dir)) {
+    return refs
+  }
+  reflog_walk_logs_dir(rfs, logs_dir, "", refs)
+  refs.sort_by(fn(a, b) { lexicographic_compare(a, b) })
+  refs
+}
+
+///|
+fn reflog_walk_logs_dir(
+  rfs : &@bitcore.RepoFileSystem,
+  base_dir : String,
+  prefix : String,
+  result : Array[String],
+) -> Unit raise Error {
+  let entries = rfs.readdir(base_dir)
+  for name in entries {
+    let full_path = base_dir + "/" + name
+    let refname = if prefix.length() == 0 { name } else { prefix + "/" + name }
+    if rfs.is_dir(full_path) {
+      reflog_walk_logs_dir(rfs, full_path, refname, result)
+    } else if rfs.is_file(full_path) {
+      result.push(refname)
+    }
+  }
 }
 
 ///|
@@ -206,6 +154,64 @@ priv struct ReflogShowArgs {
   grep_patterns : Array[String]
   grep_pattern_type_override : GrepPatternType?
   grep_ignore_case : Bool
+  oneline : Bool
+  format : String
+  date_format : String
+  show_all : Bool
+}
+
+///|
+priv struct ReflogExpireArgs {
+  expire : String?
+  expire_unreachable : String?
+  all : Bool
+  dry_run : Bool
+  verbose : Bool
+  refs : Array[String]
+}
+
+///|
+fn parse_reflog_expire_args(args : Array[String]) -> ReflogExpireArgs {
+  let mut expire : String? = None
+  let mut expire_unreachable : String? = None
+  let mut all = false
+  let mut dry_run = false
+  let mut verbose = false
+  let refs : Array[String] = []
+  let mut i = 0
+  while i < args.length() {
+    let arg = args[i]
+    match arg {
+      "--all" => all = true
+      "-n" | "--dry-run" => dry_run = true
+      "--verbose" => verbose = true
+      _ if arg.has_prefix("--expire=") =>
+        expire = Some(String::unsafe_substring(arg, start=9, end=arg.length()))
+      _ if arg.has_prefix("--expire-unreachable=") =>
+        expire_unreachable = Some(
+          String::unsafe_substring(arg, start=21, end=arg.length()),
+        )
+      "--expire" if i + 1 < args.length() => {
+        expire = Some(args[i + 1])
+        i += 1
+      }
+      "--expire-unreachable" if i + 1 < args.length() => {
+        expire_unreachable = Some(args[i + 1])
+        i += 1
+      }
+      "--" => {
+        // Everything after -- is refs
+        for j in (i + 1)..<args.length() {
+          refs.push(args[j])
+        }
+        break
+      }
+      _ if arg.has_prefix("-") => () // ignore unknown flags
+      _ => refs.push(arg)
+    }
+    i += 1
+  }
+  { expire, expire_unreachable, all, dry_run, verbose, refs }
 }
 
 ///|
@@ -216,10 +222,6 @@ async fn handle_reflog(args : Array[String]) -> Unit raise Error {
   let rfs : &@bitcore.RepoFileSystem = fs
   let wfs : &@bitcore.FileSystem = fs
   let empty_grep_patterns : Array[String] = []
-  if reflog_requires_real_git(args) {
-    delegate_reflog_to_real_git(args, root)
-    return
-  }
   if args.length() == 0 {
     // Default to show HEAD
     show_reflog(
@@ -232,6 +234,9 @@ async fn handle_reflog(args : Array[String]) -> Unit raise Error {
       empty_grep_patterns,
       GrepPatternType::Basic,
       false,
+      false,
+      "",
+      "",
     )
     return
   }
@@ -248,18 +253,42 @@ async fn handle_reflog(args : Array[String]) -> Unit raise Error {
         git_dir,
         parsed.grep_pattern_type_override,
       )
-      let refname = normalize_reflog_refname(rfs, git_dir, parsed.refname)
-      show_reflog(
-        rfs,
-        git_dir,
-        refname,
-        parsed.refname,
-        parsed.no_abbrev_commit,
-        parsed.max_count,
-        parsed.grep_patterns,
-        grep_pattern_type,
-        parsed.grep_ignore_case,
-      )
+      if parsed.show_all {
+        let all_refs = reflog_list_all_refs(rfs, git_dir)
+        for ref_name in all_refs {
+          let display = ref_name
+          show_reflog(
+            rfs,
+            git_dir,
+            ref_name,
+            display,
+            parsed.no_abbrev_commit,
+            parsed.max_count,
+            parsed.grep_patterns,
+            grep_pattern_type,
+            parsed.grep_ignore_case,
+            parsed.oneline,
+            parsed.format,
+            parsed.date_format,
+          )
+        }
+      } else {
+        let refname = normalize_reflog_refname(rfs, git_dir, parsed.refname)
+        show_reflog(
+          rfs,
+          git_dir,
+          refname,
+          parsed.refname,
+          parsed.no_abbrev_commit,
+          parsed.max_count,
+          parsed.grep_patterns,
+          grep_pattern_type,
+          parsed.grep_ignore_case,
+          parsed.oneline,
+          parsed.format,
+          parsed.date_format,
+        )
+      }
     }
     "exists" => {
       if rest.length() != 1 || (rest[0].has_prefix("-") && rest[0] != "-") {
@@ -326,12 +355,14 @@ async fn handle_reflog(args : Array[String]) -> Unit raise Error {
       let refname = normalize_reflog_refname(rfs, git_dir, ref_arg)
       @bitrepo.create_reflog(wfs, rfs, git_dir, refname)
     }
+    "list" => {
+      let all_refs = reflog_list_all_refs(rfs, git_dir)
+      for ref_name in all_refs {
+        print_line(ref_name)
+      }
+    }
     "expire" =>
-      try {
-        if not(reflog_builtin_expire_refs(wfs, rfs, git_dir, rest)) {
-          delegate_reflog_to_real_git(args, root)
-        }
-      } catch {
+      handle_reflog_expire(wfs, rfs, git_dir, rest) catch {
         err =>
           match err {
             @bitcore.GitError::InvalidObject(msg) =>
@@ -354,21 +385,187 @@ async fn handle_reflog(args : Array[String]) -> Unit raise Error {
         git_dir,
         parsed.grep_pattern_type_override,
       )
-      let refname = normalize_reflog_refname(rfs, git_dir, parsed.refname)
-      // Treat as a ref name for show
-      show_reflog(
-        rfs,
-        git_dir,
-        refname,
-        parsed.refname,
-        parsed.no_abbrev_commit,
-        parsed.max_count,
-        parsed.grep_patterns,
-        grep_pattern_type,
-        parsed.grep_ignore_case,
-      )
+      if parsed.show_all {
+        let all_refs = reflog_list_all_refs(rfs, git_dir)
+        for ref_name in all_refs {
+          let display = ref_name
+          show_reflog(
+            rfs,
+            git_dir,
+            ref_name,
+            display,
+            parsed.no_abbrev_commit,
+            parsed.max_count,
+            parsed.grep_patterns,
+            grep_pattern_type,
+            parsed.grep_ignore_case,
+            parsed.oneline,
+            parsed.format,
+            parsed.date_format,
+          )
+        }
+      } else {
+        let refname = normalize_reflog_refname(rfs, git_dir, parsed.refname)
+        // Treat as a ref name for show
+        show_reflog(
+          rfs,
+          git_dir,
+          refname,
+          parsed.refname,
+          parsed.no_abbrev_commit,
+          parsed.max_count,
+          parsed.grep_patterns,
+          grep_pattern_type,
+          parsed.grep_ignore_case,
+          parsed.oneline,
+          parsed.format,
+          parsed.date_format,
+        )
+      }
     }
   }
+}
+
+///|
+async fn handle_reflog_expire(
+  wfs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  args : Array[String],
+) -> Unit raise Error {
+  let parsed = parse_reflog_expire_args(args)
+  let now = get_current_timestamp()
+  let refs_to_expire : Array[String] = []
+  if parsed.all {
+    let all_refs = reflog_list_all_refs(rfs, git_dir)
+    refs_to_expire.append(all_refs)
+  } else if parsed.refs.length() > 0 {
+    for ref_arg in parsed.refs {
+      let normalized = normalize_reflog_refname(rfs, git_dir, ref_arg)
+      if not(reflog_ref_exists_or_resolves(rfs, git_dir, normalized)) {
+        raise @bitcore.GitError::InvalidObject(
+          "error: reflog could not be found: '\{ref_arg}'",
+        )
+      }
+      refs_to_expire.push(normalized)
+    }
+  } else {
+    // Default to HEAD
+    refs_to_expire.push("HEAD")
+  }
+  for refname in refs_to_expire {
+    reflog_expire_single_ref(
+      wfs,
+      rfs,
+      git_dir,
+      refname,
+      parsed.expire,
+      parsed.expire_unreachable,
+      now,
+      parsed.dry_run,
+      parsed.verbose,
+    )
+  }
+}
+
+///|
+async fn reflog_expire_single_ref(
+  wfs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  refname : String,
+  explicit_expire : String?,
+  _explicit_expire_unreachable : String?,
+  now : Int64,
+  dry_run : Bool,
+  verbose : Bool,
+) -> Unit raise Error {
+  let cutoff = reflog_get_expire_cutoff(
+    rfs, git_dir, refname, explicit_expire, now,
+  )
+  // If cutoff is None, entries never expire
+  guard cutoff is Some(cutoff_ts) else { return }
+  let entries = @bitrepo.read_reflog(rfs, git_dir, refname)
+  if entries.length() == 0 {
+    return
+  }
+  let reflog_path = @bitlib.get_reflog_path(git_dir, refname)
+  let content = @utf8.decode_lossy(rfs.read_file(reflog_path)[:])
+  let lines : Array[String] = []
+  for line_view in content.split("\n") {
+    let line = line_view.to_string()
+    if line.length() > 0 {
+      lines.push(line)
+    }
+  }
+  let new_lines : Array[String] = []
+  let mut entry_idx = 0
+  for line in lines {
+    if entry_idx < entries.length() {
+      let entry = entries[entry_idx]
+      if entry.timestamp >= cutoff_ts {
+        // Keep this entry (it's newer than cutoff)
+        new_lines.push(line)
+        // Expire this entry
+      } else if verbose {
+        eprint_line(
+          "would prune \{refname}@{\{entries.length() - 1 - entry_idx}}",
+        )
+      }
+      entry_idx += 1
+    } else {
+      new_lines.push(line)
+    }
+  }
+  if not(dry_run) {
+    let new_content = if new_lines.length() > 0 {
+      new_lines.join("\n") + "\n"
+    } else {
+      ""
+    }
+    wfs.write_string(reflog_path, new_content)
+  }
+}
+
+///|
+fn reflog_format_entry_line(
+  entry : @bitlib.ReflogEntry,
+  display_refname : String,
+  index : Int,
+  no_abbrev_commit : Bool,
+  oneline : Bool,
+  format : String,
+  date_format : String,
+) -> String {
+  let sha = if no_abbrev_commit {
+    entry.new_id.to_hex()
+  } else {
+    String::unsafe_substring(entry.new_id.to_hex(), start=0, end=7)
+  }
+  let selector = if date_format.length() > 0 {
+    let date_str = format_date_by_mode(
+      entry.timestamp,
+      entry.timezone,
+      date_format,
+    )
+    "\{display_refname}@{\{date_str}}"
+  } else {
+    "\{display_refname}@{\{index}}"
+  }
+  if oneline || format == "oneline" {
+    return "\{sha} \{selector}: \{entry.message}"
+  }
+  if format.length() > 0 {
+    match format {
+      "short" =>
+        return "commit \{sha}\nReflog: \{selector} (\{entry.author} <\{entry.email}>)\nReflog message: \{entry.message}\n"
+      "medium" =>
+        return "commit \{sha}\nReflog: \{selector} (\{entry.author} <\{entry.email}>)\nReflog message: \{entry.message}\nDate:   \{format_timestamp_default(entry.timestamp, entry.timezone)}\n"
+      _ => ()
+    }
+  }
+  // Default format: same as before
+  "\{sha} \{selector}: \{entry.message}"
 }
 
 ///|
@@ -382,6 +579,9 @@ async fn show_reflog(
   grep_patterns : Array[String],
   grep_pattern_type : GrepPatternType,
   grep_ignore_case : Bool,
+  oneline : Bool,
+  format : String,
+  date_format : String,
 ) -> Unit raise Error {
   let entries = @bitrepo.read_reflog(fs, git_dir, refname)
   if entries.length() == 0 && refname == "HEAD" {
@@ -436,12 +636,10 @@ async fn show_reflog(
       ) {
       continue
     }
-    let sha = if no_abbrev_commit {
-      entry.new_id.to_hex()
-    } else {
-      String::unsafe_substring(entry.new_id.to_hex(), start=0, end=7)
-    }
-    print_line("\{sha} \{display_refname}@{\{i}}: \{entry.message}")
+    let line = reflog_format_entry_line(
+      entry, display_refname, i, no_abbrev_commit, oneline, format, date_format,
+    )
+    print_line(line)
     printed += 1
   }
 }
@@ -455,6 +653,10 @@ fn parse_reflog_show_args(args : Array[String]) -> ReflogShowArgs {
   let grep_patterns : Array[String] = []
   let mut grep_pattern_type_override : GrepPatternType? = None
   let mut grep_ignore_case = false
+  let mut oneline = false
+  let mut format = ""
+  let mut date_format = ""
+  let mut show_all = false
   let mut i = 0
   while i < args.length() {
     let arg = args[i]
@@ -462,7 +664,9 @@ fn parse_reflog_show_args(args : Array[String]) -> ReflogShowArgs {
       break
     }
     match arg {
-      "--no-abbrev-commit" => no_abbrev_commit = true
+      "--no-abbrev-commit" | "--no-abbrev" => no_abbrev_commit = true
+      "--oneline" => oneline = true
+      "--all" => show_all = true
       "-n" | "--max-count" if i + 1 < args.length() => {
         max_count = parse_reflog_max_count_value(args[i + 1])
         i += 1
@@ -481,6 +685,12 @@ fn parse_reflog_show_args(args : Array[String]) -> ReflogShowArgs {
         grep_patterns.push(
           String::unsafe_substring(arg, start=7, end=arg.length()),
         )
+      _ if arg.has_prefix("--format=") =>
+        format = String::unsafe_substring(arg, start=9, end=arg.length())
+      _ if arg.has_prefix("--pretty=") =>
+        format = String::unsafe_substring(arg, start=9, end=arg.length())
+      _ if arg.has_prefix("--date=") =>
+        date_format = String::unsafe_substring(arg, start=7, end=arg.length())
       "-i" | "--regexp-ignore-case" => grep_ignore_case = true
       "-F" | "--fixed-strings" =>
         grep_pattern_type_override = Some(GrepPatternType::Fixed)
@@ -506,6 +716,10 @@ fn parse_reflog_show_args(args : Array[String]) -> ReflogShowArgs {
     grep_patterns,
     grep_pattern_type_override,
     grep_ignore_case,
+    oneline,
+    format,
+    date_format,
+    show_all,
   }
 }
 

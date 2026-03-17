@@ -12,8 +12,6 @@ pub fn add_paths(&@types.FileSystem, &@types.RepoFileSystem, String, Array[Strin
 
 pub async fn add_paths_async(&@types.FileSystem, &@types.RepoFileSystem, String, Array[String], run_filter_cmd? : FilterCmd, warnings? : Array[String]) -> Unit raise @object.GitError
 
-pub fn add_trailer(String, String, String) -> String
-
 pub fn append_reflog(&@types.FileSystem, &@types.RepoFileSystem, String, String, @object.ObjectId, @object.ObjectId, String, String, Int64, String, String) -> Unit raise @object.GitError
 
 pub fn apply_config_overrides(Map[String, RemoteConfig], Map[String, BranchConfig], Array[(String, String)]) -> Unit
@@ -80,15 +78,7 @@ pub fn commit_strip_message(String) -> String
 
 pub fn config_has_remote_section(Array[ConfigBlock], String) -> Bool
 
-pub fn config_lines_from_content(String) -> Array[String]
-
-pub fn config_novalue() -> String
-
-pub fn config_preprocess_lines_with_line_numbers(Array[String]) -> Array[(String, Int)]
-
 pub fn config_strip_quotes(String) -> String
-
-pub fn content_merge(String, String, String, ContentMergeOptions) -> ContentMergeResult
 
 pub fn convert_lf_to_crlf(Bytes) -> Bytes
 
@@ -105,12 +95,6 @@ pub fn create_lightweight_tag(&@types.FileSystem, &@types.RepoFileSystem, String
 pub fn create_reflog(&@types.FileSystem, &@types.RepoFileSystem, String, String) -> Unit raise @object.GitError
 
 pub fn create_worktree(&@types.FileSystem, &@types.RepoFileSystem, String, String, String?, detach? : Bool, force? : Bool, new_branch~ : String?, relative_paths? : Bool?, orphan? : Bool) -> Unit raise @object.GitError
-
-pub fn date_is_leap_year(Int) -> Bool
-
-pub fn days_since_epoch(Int, Int, Int) -> Int
-
-pub fn decode_bytes(Bytes) -> String
 
 pub fn decode_commit_message_bytes(Bytes, String) -> String
 
@@ -138,33 +122,11 @@ pub fn diff_trees(&@types.RepoFileSystem, String, @object.ObjectId?, @object.Obj
 
 pub async fn diff_worktree(&@types.RepoFileSystem, String, run_filter_cmd? : FilterCmd) -> Array[DiffFile] raise @object.GitError
 
-pub fn encode_config_value(String) -> String
-
 pub fn expand_sparse_index_entries(&@types.RepoFileSystem, String, Array[IndexEntry]) -> Array[IndexEntry] raise @object.GitError
 
 pub fn expand_sparse_skip_worktree_paths(&@types.RepoFileSystem, String, Array[IndexEntry], Map[String, Bool]) -> Map[String, Bool] raise @object.GitError
 
 pub fn fast_forward_to(&@types.FileSystem, &@types.RepoFileSystem, String, @object.ObjectId) -> Unit raise @object.GitError
-
-pub fn fast_import_parse_data(Array[String], Int) -> FastImportDataResult
-
-pub fn fast_import_parse_dataref(String) -> (Int, String)
-
-pub fn fast_import_parse_file_op(String) -> FastImportFileOp?
-
-pub fn fast_import_parse_ident(String) -> FastImportIdent?
-
-pub fn fast_import_parse_marks(String) -> Array[(Int, String)]
-
-pub fn fast_import_parse_split_two_paths(String) -> (String, String)?
-
-pub fn fast_import_parse_string_byte_count(String) -> Int
-
-pub fn fast_import_parse_trim(String) -> String
-
-pub fn fast_import_parse_unquote_path(String) -> String
-
-pub fn find_config_key_line_from_content(String, String) -> Int?
 
 pub fn find_tree_entry(ObjectDb, &@types.RepoFileSystem, @object.ObjectId, String) -> @object.TreeEntry? raise @object.GitError
 
@@ -179,10 +141,6 @@ pub fn fsck_object_type(ObjectDb, &@types.RepoFileSystem, String) -> String
 pub fn fsck_verify_loose_hash(Bytes, String) -> Bool
 
 pub fn gc_repo(&@types.FileSystem, &@types.RepoFileSystem, String) -> GcResult raise @object.GitError
-
-pub fn get_all_config_values_from_content(String, String, String?, Bool) -> Array[String]
-
-pub fn get_config_value_from_content(String, String, String?, Bool) -> String?
 
 pub fn get_effective_remote_url(&@types.RepoFileSystem, String) -> String?
 
@@ -216,7 +174,7 @@ pub fn is_binary_bytes(Bytes) -> Bool
 
 pub fn is_branch_checked_out(&@types.RepoFileSystem, String, String) -> String? raise @object.GitError
 
-pub fn is_config_novalue(String) -> Bool
+pub fn is_ignored_path(&@types.RepoFileSystem, String, String, Bool) -> Bool raise @object.GitError
 
 pub fn is_mirror_fetch_config(RemoteConfig) -> Bool
 
@@ -233,8 +191,6 @@ pub fn is_sparse_checkout_enabled(&@types.RepoFileSystem, String) -> Bool
 pub fn is_subdir_clone(&@types.RepoFileSystem, String) -> Bool
 
 pub fn is_valid_remote_name(String) -> Bool
-
-pub fn is_valid_section_name(String) -> Bool
 
 pub fn legacy_remote_exists(&@types.RepoFileSystem, String, String) -> Bool
 
@@ -256,6 +212,10 @@ pub fn list_remotes_verbose(&@types.RepoFileSystem, String) -> Array[(String, St
 
 pub fn list_tags(&@types.RepoFileSystem, String) -> Array[String]
 
+pub fn list_working_files(&@types.RepoFileSystem, String) -> Array[String] raise @object.GitError
+
+pub async fn list_working_files_async(&@types.RepoFileSystem, String) -> Array[String] raise @object.GitError
+
 pub fn list_worktrees(&@types.RepoFileSystem, String) -> Array[WorktreeInfo] raise @object.GitError
 
 pub fn load_all_objects_from_fs(&@types.RepoFileSystem, String) -> Array[@object.PackObject] raise @object.GitError
@@ -272,8 +232,6 @@ pub fn log_head(&@types.RepoFileSystem, String, max_count? : Int, since? : Int64
 
 pub fn log_head_oneline(&@types.RepoFileSystem, String, max_count? : Int, since? : Int64, until? : Int64) -> Array[String] raise @object.GitError
 
-pub fn make_rename_display(String, String) -> String
-
 pub fn match_url_pattern(String, String) -> Bool
 
 pub fn matches_sparse_pattern(String, Array[String]) -> Bool
@@ -285,10 +243,6 @@ pub fn merge_base_all(ObjectDb, &@types.RepoFileSystem, @object.ObjectId, @objec
 pub fn merge_base_independent(ObjectDb, &@types.RepoFileSystem, Array[@object.ObjectId]) -> Array[@object.ObjectId] raise @object.GitError
 
 pub fn merge_base_is_ancestor(ObjectDb, &@types.RepoFileSystem, @object.ObjectId, @object.ObjectId) -> Bool raise @object.GitError
-
-pub fn mode_to_string(Int) -> String
-
-pub fn month_name_to_number(String) -> Int?
 
 pub fn move_directory(&@types.RepoFileSystem, &@types.FileSystem, String, String) -> Unit
 
@@ -302,6 +256,8 @@ pub fn mv_path(&@types.FileSystem, &@types.RepoFileSystem, String, String, Strin
 
 pub fn normalize_crlf_to_lf(Bytes) -> Bytes
 
+pub fn normalize_index_pathspec_path(String) -> String
+
 pub fn normalize_remote_branch_name(String) -> String
 
 pub fn normalize_repo_path(String) -> String raise @object.GitError
@@ -310,23 +266,9 @@ pub fn normalize_track_ref(String) -> String
 
 pub fn normalize_worktree_content(Bytes, AutoCrlf) -> Bytes
 
-pub fn parse_approxidate(String, Int64) -> Int64?
-
-pub fn parse_approxidate_human(String) -> Int64?
-
-pub fn parse_approxidate_iso8601(String) -> Int64
-
-pub fn parse_approxidate_iso_date(String) -> Int64?
-
-pub fn parse_approxidate_relative(String, Int64) -> Int64?
-
-pub fn parse_bool_keyword_value(String) -> Bool?
+pub fn parse_at_minus_prefix(String) -> (Int, String)?
 
 pub fn parse_config_blocks(String) -> Array[ConfigBlock]
-
-pub fn parse_config_int_value(String) -> (Int64?, String?)
-
-pub fn parse_config_key(String) -> (String, String?, String)?
 
 pub fn parse_config_kv(String) -> (String, String)?
 
@@ -334,41 +276,47 @@ pub fn parse_config_override_pairs() -> Array[(String, String)]
 
 pub fn parse_config_overrides() -> Map[String, String]
 
-pub fn parse_config_value(String) -> String
-
-pub fn parse_date_digits(Array[Char], Int, Int) -> Int
-
-pub fn parse_diff_git_header(String) -> (String, String)
+pub fn parse_date_to_timestamp(String) -> Int64
 
 pub fn parse_fetch_refspecs(Array[String]) -> Array[FetchRefspec]
 
 pub fn parse_github_shorthand(String) -> GitHubShorthand?
 
-pub fn parse_int_from_string(String) -> Int
+pub fn parse_index_pathspec(String) -> (Int, String?)
 
-pub fn parse_patches(String) -> Array[PatchInfo]
-
-pub fn parse_pct(String) -> Int
+pub fn parse_iso8601_timestamp(String) -> Int64
 
 pub fn parse_push_refspecs(Array[String]) -> Array[PushRefspec]
 
 pub fn parse_receive_pack_request(Bytes) -> ReceivePackRequest raise @object.GitError
 
+pub fn parse_reflog_date_selector(String) -> (String, String)?
+
+pub fn parse_reflog_selector(String) -> (String, Int)?
+
 pub fn parse_refspec_pair(String) -> (String, String)
 
 pub fn parse_remote_config(String) -> (Map[String, RemoteConfig], Map[String, BranchConfig])
 
+pub fn parse_rev_parse_short_length(String) -> Int?
+
 pub fn parse_section_header(String) -> (String, String?)
 
-pub fn parse_section_header_line(String) -> (String, String?, String, Bool)?
-
 pub fn parse_tag_object(String) -> @object.ObjectId? raise
-
-pub fn parse_trailers(String) -> Array[(String, String)]
 
 pub fn parse_upload_pack_request(Bytes) -> UploadPackRequest raise @object.GitError
 
 pub fn parse_upload_pack_request_v2(Bytes) -> UploadPackRequestV2 raise @object.GitError
+
+pub fn parseopt_find_char(String, Char) -> Int?
+
+pub fn parseopt_find_flags(String) -> Int
+
+pub fn parseopt_find_space(String) -> Int?
+
+pub fn parseopt_skipspaces(String) -> String
+
+pub fn parseopt_split_lines(String) -> Array[String]
 
 pub fn prune_repo(&@types.FileSystem, &@types.RepoFileSystem, String) -> PruneResult raise @object.GitError
 
@@ -508,15 +456,35 @@ pub fn rev_list_window(Int, Int, Int?) -> (Int, Int)
 
 pub fn rev_parse(&@types.RepoFileSystem, String, String) -> @object.ObjectId? raise @object.GitError
 
-pub fn reverse_patch(String) -> String
+pub fn rev_parse_apply_prefix_to_colon_path(String, String) -> String
+
+pub fn rev_parse_extract_tag_target_name(String) -> String?
+
+pub fn rev_parse_git_path_uses_common_dir(String) -> Bool
+
+pub fn rev_parse_glob_match(String, String) -> Bool
+
+pub fn rev_parse_is_inside_git_dir(String, String) -> Bool
+
+pub fn rev_parse_make_relative(String, String) -> String
+
+pub fn rev_parse_normalize_glob_pattern(String) -> String
+
+pub fn rev_parse_normalize_path(String) -> String
+
+pub fn rev_parse_parse_config_bool(String) -> Bool?
+
+pub fn rev_parse_parse_parent_suffix(String) -> (String, String)?
 
 pub fn rewrite_packed_refs(&@types.FileSystem, &@types.RepoFileSystem, String, (String) -> String?) -> Unit raise @object.GitError
 
 pub fn rm_paths(&@types.FileSystem, &@types.RepoFileSystem, String, Array[String], cached? : Bool, force? : Bool, recursive? : Bool) -> Unit raise @object.GitError
 
-pub fn section_matches_for_insert(String, String?, String, String?, Bool) -> Bool
-
 pub fn set_config_key(&@types.FileSystem, &@types.RepoFileSystem, String, String, String, String, String) -> Unit raise @object.GitError
+
+pub fn shell_single_quote(String) -> String
+
+pub fn shorten_oid_hex(String, Int) -> String
 
 pub fn should_log_ref(&@types.RepoFileSystem, String, String, Bool) -> (Bool, Bool) raise @object.GitError
 
@@ -576,23 +544,7 @@ pub fn subdir_remove_dir(&@types.RepoFileSystem, &@types.FileSystem, String) -> 
 
 pub fn switch_branch(&@types.FileSystem, &@types.RepoFileSystem, String, String, create? : Bool, checkout_files? : Bool) -> Unit raise @object.GitError
 
-pub fn tar_emit_parent_dirs(Array[Byte], String, Int64, Map[String, Bool]) -> Unit
-
-pub fn tar_format_octal(Int64, Int) -> String
-
-pub fn tar_make_header(String, Int, Int, Int64, Byte, String) -> FixedArray[Byte]
-
-pub fn tar_parse_committer_timestamp(Bytes) -> Int64
-
-pub fn tar_split_path(String) -> (String, String)
-
-pub fn tar_write_string(FixedArray[Byte], Int, String, Int) -> Unit
-
-pub fn to_octal_string(Int) -> String
-
 pub fn tree_files_to_index(ObjectDb, &@types.RepoFileSystem, Map[String, TreeFileEntry]) -> Array[IndexEntry] raise @object.GitError
-
-pub fn trim_string(String) -> String
 
 pub fn unlock_worktree(&@types.FileSystem, &@types.RepoFileSystem, String, String) -> Unit raise @object.GitError
 
@@ -607,6 +559,8 @@ pub fn update_subdir_base(&@types.FileSystem, &@types.RepoFileSystem, String, St
 pub fn upload_pack(&@types.RepoFileSystem, String, UploadPackRequest) -> Bytes raise @object.GitError
 
 pub fn upload_pack_v2(&@types.RepoFileSystem, String, UploadPackRequestV2, UploadPackConfig) -> Bytes raise @object.GitError
+
+pub fn working_files_cache(String) -> Array[String]?
 
 pub fn write_index_entries(&@types.FileSystem, String, Array[IndexEntry]) -> Unit raise @object.GitError
 
@@ -678,34 +632,6 @@ pub(all) struct ConfigBlock {
   mut lines : Array[String]
 }
 
-pub enum ConflictStyle {
-  Merge
-  Diff3
-}
-
-pub struct ContentMergeOptions {
-  conflict_style : ConflictStyle
-  ours_label : String
-  base_label : String
-  theirs_label : String
-  marker_size : Int
-  favor : MergeFavor
-}
-pub fn ContentMergeOptions::default() -> Self
-pub fn ContentMergeOptions::favor_ours() -> Self
-pub fn ContentMergeOptions::favor_theirs() -> Self
-pub fn ContentMergeOptions::favor_union() -> Self
-pub fn ContentMergeOptions::new(conflict_style? : ConflictStyle, ours_label? : String, base_label? : String, theirs_label? : String, marker_size? : Int, favor? : MergeFavor) -> Self
-pub fn ContentMergeOptions::with_diff3(Self) -> Self
-pub fn ContentMergeOptions::with_labels(Self, ours~ : String, base~ : String, theirs~ : String) -> Self
-pub fn ContentMergeOptions::with_marker_size(Self, Int) -> Self
-
-pub struct ContentMergeResult {
-  content : String
-  has_conflicts : Bool
-  conflict_count : Int
-}
-
 pub struct DiffFile {
   path : String
   kind : DiffKind
@@ -725,27 +651,6 @@ pub enum EolAttr {
   Lf
   Crlf
   Unspecified
-}
-
-pub(all) struct FastImportDataResult {
-  content : Bytes
-  next_line : Int
-}
-
-pub(all) enum FastImportFileOp {
-  Modify(mode~ : String, dataref~ : String, path~ : String)
-  Delete(path~ : String)
-  DeleteAll
-  Rename(old_path~ : String, new_path~ : String)
-  Copy(old_path~ : String, new_path~ : String)
-}
-pub impl Eq for FastImportFileOp
-pub impl Show for FastImportFileOp
-
-pub(all) struct FastImportIdent {
-  ident : String
-  timestamp : Int64
-  tz : String
 }
 
 pub(all) struct FetchRefspec {
@@ -850,13 +755,6 @@ pub struct LogEntry {
   parent_tree : @object.ObjectId?
 }
 
-pub enum MergeFavor {
-  NoFavor
-  FavorOurs
-  FavorTheirs
-  FavorUnion
-}
-
 pub struct MergeResult {
   status : MergeStatus
   commit_id : @object.ObjectId?
@@ -901,22 +799,6 @@ pub struct PackIndex {
 pub fn PackIndex::find_id_by_offset(Self, Int64) -> String?
 pub fn PackIndex::find_offset(Self, @object.ObjectId) -> Int64?
 pub fn PackIndex::find_offset_hex(Self, String) -> Int64?
-
-pub struct PatchInfo {
-  display_name : String
-  additions : Int
-  deletions : Int
-  is_rename : Bool
-  is_copy : Bool
-  is_new : Bool
-  is_delete : Bool
-  old_name : String
-  new_name : String
-  old_mode : String
-  new_mode : String
-  similarity_index : Int
-  dissimilarity_index : Int
-}
 
 pub struct PromisorDb {
   db : ObjectDb

@@ -47,7 +47,7 @@ async fn handle_apply(args : Array[String]) -> Unit raise Error {
   // Check for corrupt hunk headers (overflow)
   check_corrupt_hunk_headers(patch_content)
   if reverse {
-    let reversed = @bitlib.reverse_patch(patch_content)
+    let reversed = @apply.reverse_patch(patch_content)
     if check_mode {
       if not(quiet) {
         print_line("Patch would apply cleanly.")
@@ -82,7 +82,7 @@ fn print_patch_stats_sync(
   numstat : Bool,
   summary : Bool,
 ) -> Unit {
-  let patches = @bitlib.parse_patches(patch)
+  let patches = @apply.parse_patches(patch)
   if numstat {
     for p in patches {
       println("\{p.additions}\t\{p.deletions}\t\{p.display_name}")
@@ -187,7 +187,7 @@ fn print_patch_stats_sync(
         }
       } else if p.is_rename || p.is_copy {
         let renamecopy = if p.is_rename { "rename" } else { "copy" }
-        let display = @bitlib.make_rename_display(p.old_name, p.new_name)
+        let display = @apply.make_rename_display(p.old_name, p.new_name)
         println(" \{renamecopy} \{display} (\{p.similarity_index}%)")
         // Also show mode change without name
         if p.old_mode != "" && p.new_mode != "" && p.old_mode != p.new_mode {

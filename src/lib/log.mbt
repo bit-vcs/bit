@@ -192,13 +192,13 @@ fn log_read_graft_parents(
   )
   let commit_hex = commit_id.to_hex()
   for line_view in content.split("\n") {
-    let line = trim_string(line_view.to_string())
+    let line = @string_utils.trim_string(line_view.to_string())
     if line.length() == 0 || line.has_prefix("#") {
       continue
     }
     let tokens : Array[String] = []
     for token_view in line.split(" ") {
-      let token = trim_string(token_view.to_string())
+      let token = @string_utils.trim_string(token_view.to_string())
       if token.length() > 0 {
         tokens.push(token)
       }
@@ -233,7 +233,7 @@ fn log_resolve_common_git_dir(
   let raw = @utf8.decode_lossy(
     (fs.read_file(commondir_path) catch { _ => Bytes::default() })[:],
   )
-  let rel = trim_string(raw)
+  let rel = @string_utils.trim_string(raw)
   if rel.length() == 0 {
     return git_dir
   }

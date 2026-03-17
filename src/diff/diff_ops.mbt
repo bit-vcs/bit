@@ -32,7 +32,7 @@ pub async fn diff_worktree(
   t0 = profile_lap(profile, "diff_worktree read_index_entries", t0)
   let db = @bitlib.ObjectDb::load_lazy(fs, git_dir)
   t0 = profile_lap(profile, "diff_worktree load_db", t0)
-  let cached_files = @ignore.working_files_cache(root)
+  let cached_files = @bitlib.working_files_cache(root)
   let cache_map : Map[String, Bool] = {}
   let mut cache_ready = false
   match cached_files {
@@ -59,7 +59,7 @@ pub async fn diff_worktree(
       continue
     }
     if cache_ready && not(cache_map.contains(path)) {
-      let ignored = @ignore.is_ignored_path(fs, root, path, false)
+      let ignored = @bitlib.is_ignored_path(fs, root, path, false)
       if not(ignored) {
         let old = diff_read_blob(db, fs, entry.id)
         // Skip if blob not found (e.g., submodule)
@@ -434,92 +434,6 @@ fn diff_emit_index_line(
 }
 
 ///|
-priv enum DiffEditOp {
-  Keep(Int, Int) // old_idx, new_idx
-  Delete(Int) // old_idx
-  Insert(Int) // new_idx
-}
-
-///|
-fn diff_myers(old : Array[String], new : Array[String]) -> Array[DiffEditOp] {
-  let n = old.length()
-  let m = new.length()
-  if n == 0 && m == 0 {
-    return []
-  }
-  if n == 0 {
-    return Array::makei(m, fn(j) { DiffEditOp::Insert(j) })
-  }
-  if m == 0 {
-    return Array::makei(n, fn(i) { DiffEditOp::Delete(i) })
-  }
-  let max = n + m
-  let size = 2 * max + 1
-  let v : Array[Int] = Array::make(size, 0)
-  let traces : Array[Array[Int]] = []
-  let mut found = false
-  let mut final_d = 0
-  for d = 0; d <= max; d = d + 1 {
-    traces.push(v.copy())
-    for k = -d; k <= d; k = k + 2 {
-      let idx = k + max
-      let mut x = if k == -d || (k != d && v[idx - 1] < v[idx + 1]) {
-        v[idx + 1]
-      } else {
-        v[idx - 1] + 1
-      }
-      let mut y = x - k
-      while x < n && y < m && old[x] == new[y] {
-        x = x + 1
-        y = y + 1
-      }
-      v[idx] = x
-      if x >= n && y >= m {
-        final_d = d
-        found = true
-        break
-      }
-    }
-    if found {
-      break
-    }
-  }
-  let edits : Array[DiffEditOp] = []
-  let mut cx = n
-  let mut cy = m
-  for d = final_d; d > 0; d = d - 1 {
-    let prev_v = traces[d]
-    let k = cx - cy
-    let idx = k + max
-    let prev_k = if k == -d || (k != d && prev_v[idx - 1] < prev_v[idx + 1]) {
-      k + 1
-    } else {
-      k - 1
-    }
-    let prev_x = prev_v[prev_k + max]
-    let prev_y = prev_x - prev_k
-    while cx > prev_x && cy > prev_y {
-      cx = cx - 1
-      cy = cy - 1
-      edits.push(DiffEditOp::Keep(cx, cy))
-    }
-    if cx > prev_x {
-      cx = cx - 1
-      edits.push(DiffEditOp::Delete(cx))
-    } else if cy > prev_y {
-      cy = cy - 1
-      edits.push(DiffEditOp::Insert(cy))
-    }
-  }
-  while cx > 0 && cy > 0 {
-    cx = cx - 1
-    cy = cy - 1
-    edits.push(DiffEditOp::Keep(cx, cy))
-  }
-  edits.rev()
-}
-
-///|
 
 ///|
 fn diff_emit_unified_hunks(
@@ -528,209 +442,7 @@ fn diff_emit_unified_hunks(
   new_content : Bytes?,
   context_lines : Int,
 ) -> Unit {
-  guard old_content is Some(_) || new_content is Some(_) else { return }
-  let old_lines = match old_content {
-    Some(data) => diff_split_lines_no_trailing_empty(data)
-    None => []
-  }
-  let new_lines = match new_content {
-    Some(data) => diff_split_lines_no_trailing_empty(data)
-    None => []
-  }
-  let old_has_trailing_nl = match old_content {
-    Some(data) => data.length() > 0 && data[data.length() - 1] == b'\n'
-    None => true
-  }
-  let new_has_trailing_nl = match new_content {
-    Some(data) => data.length() > 0 && data[data.length() - 1] == b'\n'
-    None => true
-  }
-  if old_lines.length() == 0 && new_lines.length() == 0 {
-    return
-  }
-  let edits = diff_myers(old_lines, new_lines)
-  // Build annotated lines with old/new line numbers
-  let annotated : Array[(Int, Int, Int, String)] = [] // (kind, old_lineno, new_lineno, text)
-  for edit in edits {
-    match edit {
-      DiffEditOp::Keep(oi, ni) => annotated.push((0, oi, ni, old_lines[oi]))
-      DiffEditOp::Delete(oi) => annotated.push((1, oi, -1, old_lines[oi]))
-      DiffEditOp::Insert(ni) => annotated.push((2, -1, ni, new_lines[ni]))
-    }
-  }
-  // Find change ranges (non-Keep runs) and group into hunks with context
-  let changes : Array[(Int, Int)] = [] // (start_idx, end_idx) in annotated
-  let mut i = 0
-  while i < annotated.length() {
-    if annotated[i].0 != 0 {
-      let start = i
-      while i < annotated.length() && annotated[i].0 != 0 {
-        i += 1
-      }
-      changes.push((start, i))
-    } else {
-      i += 1
-    }
-  }
-  if changes.length() == 0 {
-    return
-  }
-  // Group changes into hunks: merge if gap between changes <= 2*context_lines
-  let hunks : Array[(Int, Int)] = [] // (start, end) in annotated, inclusive of context
-  let mut hunk_start = if changes[0].0 > context_lines {
-    changes[0].0 - context_lines
-  } else {
-    0
-  }
-  let mut hunk_end = if changes[0].1 + context_lines < annotated.length() {
-    changes[0].1 + context_lines
-  } else {
-    annotated.length()
-  }
-  for ci = 1; ci < changes.length(); ci = ci + 1 {
-    let (cs, ce) = changes[ci]
-    let ctx_start = if cs > context_lines { cs - context_lines } else { 0 }
-    if ctx_start <= hunk_end {
-      // Merge with current hunk
-      hunk_end = if ce + context_lines < annotated.length() {
-        ce + context_lines
-      } else {
-        annotated.length()
-      }
-    } else {
-      hunks.push((hunk_start, hunk_end))
-      hunk_start = ctx_start
-      hunk_end = if ce + context_lines < annotated.length() {
-        ce + context_lines
-      } else {
-        annotated.length()
-      }
-    }
-  }
-  hunks.push((hunk_start, hunk_end))
-  // Emit each hunk
-  for hunk in hunks {
-    let (hs, he) = hunk
-    // Calculate old/new start line and count
-    let mut old_start = 0
-    let mut old_count = 0
-    let mut new_start = 0
-    let mut new_count = 0
-    let mut first_old = true
-    let mut first_new = true
-    for j = hs; j < he; j = j + 1 {
-      let (kind, oi, ni, _) = annotated[j]
-      match kind {
-        0 => {
-          // context
-          if first_old {
-            old_start = oi + 1
-            first_old = false
-          }
-          if first_new {
-            new_start = ni + 1
-            first_new = false
-          }
-          old_count += 1
-          new_count += 1
-        }
-        1 => {
-          // delete
-          if first_old {
-            old_start = oi + 1
-            first_old = false
-          }
-          old_count += 1
-        }
-        _ => {
-          // insert
-          if first_new {
-            new_start = ni + 1
-            first_new = false
-          }
-          new_count += 1
-        }
-      }
-    }
-    if first_old {
-      old_start = if old_lines.length() == 0 { 0 } else { old_count }
-    }
-    if first_new {
-      new_start = if new_lines.length() == 0 { 0 } else { new_count }
-    }
-    let old_range = diff_format_range(old_start, old_count)
-    let new_range = diff_format_range(new_start, new_count)
-    out.push("@@ -\{old_range} +\{new_range} @@")
-    // Emit lines with no-newline markers where needed
-    // git emits "\ No newline at end of file" after the last -/+ line
-    // if the corresponding file doesn't end with newline
-    let mut last_del_is_eof = false
-    let mut last_ins_is_eof = false
-    for j = hs; j < he; j = j + 1 {
-      let (kind, oi, ni, text) = annotated[j]
-      match kind {
-        0 => {
-          // Before context line, check if previous delete was last old line
-          if last_del_is_eof {
-            out.push("\\ No newline at end of file")
-            last_del_is_eof = false
-          }
-          if last_ins_is_eof {
-            out.push("\\ No newline at end of file")
-            last_ins_is_eof = false
-          }
-          out.push(" " + text)
-        }
-        1 => {
-          if last_ins_is_eof {
-            out.push("\\ No newline at end of file")
-            last_ins_is_eof = false
-          }
-          out.push("-" + text)
-          last_del_is_eof = not(old_has_trailing_nl) &&
-            oi == old_lines.length() - 1
-        }
-        _ => {
-          if last_del_is_eof {
-            out.push("\\ No newline at end of file")
-            last_del_is_eof = false
-          }
-          out.push("+" + text)
-          last_ins_is_eof = not(new_has_trailing_nl) &&
-            ni == new_lines.length() - 1
-        }
-      }
-    }
-    if last_del_is_eof || last_ins_is_eof {
-      out.push("\\ No newline at end of file")
-    }
-  }
-}
-
-///|
-fn diff_format_range(start : Int, count : Int) -> String {
-  if count == 0 {
-    "\{start},0"
-  } else if count == 1 {
-    start.to_string()
-  } else {
-    "\{start},\{count}"
-  }
-}
-
-///|
-fn diff_split_lines_no_trailing_empty(data : Bytes) -> Array[String] {
-  let text = @utf8.decode_lossy(data[:])
-  let lines : Array[String] = []
-  for line_view in text.split("\n") {
-    lines.push(line_view.to_string())
-  }
-  if text.has_suffix("\n") &&
-    lines.length() > 0 &&
-    lines[lines.length() - 1].length() == 0 {
-    ignore(lines.pop())
-  }
-  lines
+  @diff_core.unified_hunks(out, old_content, new_content, context_lines~)
 }
 
 ///|
@@ -808,16 +520,7 @@ fn count_line_changes(old : Bytes?, new : Bytes?) -> (Int, Int) {
 
 ///|
 fn count_lines(data : Bytes) -> Int {
-  let mut count = 0
-  for b in data {
-    if b == b'\n' {
-      count = count + 1
-    }
-  }
-  if data.length() > 0 && data[data.length() - 1] != b'\n' {
-    count = count + 1
-  }
-  count
+  @diff_core.count_lines(data)
 }
 
 ///|
@@ -992,7 +695,7 @@ fn is_gitlink_mode_int(mode : Int) -> Bool {
 
 ///|
 fn mode_to_string(mode : Int) -> String {
-  @bitlib.mode_to_string(mode)
+  @string_utils.mode_to_string(mode)
 }
 
 ///|

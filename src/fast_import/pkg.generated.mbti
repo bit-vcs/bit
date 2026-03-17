@@ -1,0 +1,50 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/bit/fast_import"
+
+// Values
+pub fn fast_import_parse_data(Array[String], Int) -> FastImportDataResult
+
+pub fn fast_import_parse_dataref(String) -> (Int, String)
+
+pub fn fast_import_parse_file_op(String) -> FastImportFileOp?
+
+pub fn fast_import_parse_ident(String) -> FastImportIdent?
+
+pub fn fast_import_parse_marks(String) -> Array[(Int, String)]
+
+pub fn fast_import_parse_split_two_paths(String) -> (String, String)?
+
+pub fn fast_import_parse_string_byte_count(String) -> Int
+
+pub fn fast_import_parse_trim(String) -> String
+
+pub fn fast_import_parse_unquote_path(String) -> String
+
+// Errors
+
+// Types and methods
+pub(all) struct FastImportDataResult {
+  content : Bytes
+  next_line : Int
+}
+
+pub(all) enum FastImportFileOp {
+  Modify(mode~ : String, dataref~ : String, path~ : String)
+  Delete(path~ : String)
+  DeleteAll
+  Rename(old_path~ : String, new_path~ : String)
+  Copy(old_path~ : String, new_path~ : String)
+}
+pub impl Eq for FastImportFileOp
+pub impl Show for FastImportFileOp
+
+pub(all) struct FastImportIdent {
+  ident : String
+  timestamp : Int64
+  tz : String
+}
+
+// Type aliases
+
+// Traits
+

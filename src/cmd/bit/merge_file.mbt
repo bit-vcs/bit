@@ -60,10 +60,10 @@ async fn handle_merge_file(args : Array[String]) -> Unit raise Error {
   let theirs_label = if labels.length() > 2 { labels[2] } else { other_arg }
   // Build options using builder pattern
   let mut options = match favor {
-    "ours" => @bitlib.ContentMergeOptions::favor_ours()
-    "theirs" => @bitlib.ContentMergeOptions::favor_theirs()
-    "union" => @bitlib.ContentMergeOptions::favor_union()
-    _ => @bitlib.ContentMergeOptions::default()
+    "ours" => @diff3.ContentMergeOptions::favor_ours()
+    "theirs" => @diff3.ContentMergeOptions::favor_theirs()
+    "union" => @diff3.ContentMergeOptions::favor_union()
+    _ => @diff3.ContentMergeOptions::default()
   }
   options = options.with_labels(
     ours=ours_label,
@@ -80,7 +80,7 @@ async fn handle_merge_file(args : Array[String]) -> Unit raise Error {
   let texts = merge_file_read_inputs(
     object_id_mode, current_arg, base_arg, other_arg,
   )
-  let result = @bitlib.content_merge(texts.1, texts.0, texts.2, options)
+  let result = @diff3.content_merge(texts.1, texts.0, texts.2, options)
   // Output result
   if object_id_mode {
     let fs = OsFs::new()

@@ -192,7 +192,7 @@ async fn handle_ls_files(args : Array[String]) -> Unit raise Error {
       for e in entries {
         tracked[e.path] = true
       }
-      let all_files = @ignore.list_working_files_async(fs, root)
+      let all_files = @bitlib.list_working_files_async(fs, root)
       for path in all_files {
         if tracked.contains(path) {
           continue
@@ -545,7 +545,7 @@ async fn ls_files_collect_killed_paths(
     tracked_modes[entry.path] = entry.mode
     tracked_paths.push(entry.path)
   }
-  let visible_paths = @ignore.list_working_files_async(fs, root)
+  let visible_paths = @bitlib.list_working_files_async(fs, root)
   let killed : Array[String] = []
   let killed_set : Map[String, Bool] = {}
   for path in visible_paths {

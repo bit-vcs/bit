@@ -1,8 +1,9 @@
 import {
   "mizchi/bit" @bit,
-  "mizchi/bit/ignore" @ignore,
+  "mizchi/bit/diff_core" @diff_core,
   "mizchi/bit/io" @bitio,
   "mizchi/bit/lib" @bitlib,
+  "mizchi/bit/string_utils" @string_utils,
   "moonbitlang/core/bench" @bench,
   "moonbitlang/core/encoding/utf8" @utf8,
 }
