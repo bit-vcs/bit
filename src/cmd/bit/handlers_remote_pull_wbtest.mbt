@@ -280,6 +280,10 @@ async fn handlers_remote_pull_wbtest_collect_shim_git(
     "SHIM_MOON": shim_moon,
     "SHIM_CMDS": "init status add commit log show branch checkout switch reset rebase stash cherry-pick diff diff-files diff-index merge tag rm mv config sparse-checkout restore rev-parse cat-file ls-files hash-object ls-tree write-tree show-ref update-ref update-index symbolic-ref reflog worktree gc clean grep submodule revert notes bisect describe blame format-patch shortlog remote clone fetch pull push receive-pack upload-pack pack-objects index-pack shell",
     "SHIM_STRICT": "1",
+    "GIT_SHIM_CWD": "",
+    "GIT_SHIM_PWD": "",
+    "GIT_DIR": "",
+    "GIT_WORK_TREE": "",
   }
   let git_args : Array[String] = ["-C", cwd]
   for arg in args {
