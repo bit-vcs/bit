@@ -110,8 +110,13 @@ async fn shell_run_service_command(command_line : String) -> Unit raise Error {
             err if @async.is_cancellation_error(err) => raise err
             err => exit_with_error("receive-pack", err)
           }
+        "git-upload-archive" =>
+          handle_upload_archive([path]) catch {
+            err if @async.is_cancellation_error(err) => raise err
+            err => exit_with_error("upload-archive", err)
+          }
         _ => {
-          eprint_line("fatal: 'git-upload-archive' is not supported")
+          eprint_line("fatal: unrecognized command")
           @sys.exit(1)
         }
       }

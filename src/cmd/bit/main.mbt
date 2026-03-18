@@ -95,6 +95,7 @@ async fn show_help() -> Unit {
     #|   symbolic-ref    Read, modify and delete symbolic refs
     #|   unpack-objects  Unpack objects from a packed archive
     #|   update-ref      Update the object name stored in a ref safely
+    #|   upload-archive  Send archive back to git-archive --remote
     #|   upload-pack     Send objects packed back to git-fetch-pack
     #|   stripspace      Clean up whitespace in text
     #|   var             Print a Git logical variable
@@ -126,6 +127,7 @@ async fn show_help() -> Unit {
     #|   http-fetch      Download objects via dumb HTTP
     #|   quiltimport     Import a quilt patch series
     #|   check-mailmap   Show canonical names and email addresses of contacts
+    #|   checkout-index  Copy files from the index to the working tree
     #|   unpack-file     Create a temp file holding a blob's contents
     #|   web--browse     Open URL in a web browser
     #|
@@ -282,6 +284,9 @@ fn show_command_help_specs() -> Array[(String, String, String)] {
     (
       "prune", "git prune [<options>]", "Prune all unreachable objects from the object database.",
     ),
+    (
+      "prune-packed", "git prune-packed [-n | --dry-run] [-q | --quiet]", "Remove extra objects that are already in pack files.",
+    ),
     ("reflog", "git reflog [<options>] [<ref>]", "Manage reflog information."),
     (
       "repack", "git repack [<options>]", "Pack unpacked objects in a repository.",
@@ -347,6 +352,12 @@ fn show_command_help_specs() -> Array[(String, String, String)] {
     (
       "update-ref", "git update-ref [<options>] <refname> <newvalue> [<oldvalue>]",
       "Update the object name stored in a ref safely.",
+    ),
+    (
+      "upload-archive", "git upload-archive <repository>", "Send archive back to git-archive --remote.",
+    ),
+    (
+      "git-upload-archive", "git upload-archive <repository>", "Send archive back to git-archive --remote.",
     ),
     (
       "upload-pack", "git upload-pack [<options>] <git-dir>", "Send objects packed back to git-fetch-pack.",
@@ -480,6 +491,10 @@ fn show_command_help_specs() -> Array[(String, String, String)] {
     ),
     (
       "check-mailmap", "git check-mailmap [--stdin] <contact>...", "Show canonical names and email addresses of contacts.",
+    ),
+    (
+      "checkout-index", "git checkout-index [-a] [-f] [-n] [-u] [--prefix=<string>] [--temp] [--stdin] [-z] [--] [<file>...]",
+      "Copy files from the index to the working tree.",
     ),
     (
       "unpack-file", "git unpack-file <blob-id>", "Creates a file holding the contents of the blob specified by blob-id.",
@@ -1187,6 +1202,7 @@ fn normalize_dispatch_command(cmd : String) -> String {
   for
     entry in [
       ("git-receive-pack", "receive-pack"),
+      ("git-upload-archive", "upload-archive"),
       ("git-upload-pack", "upload-pack"),
       ("show-branch", "show-branches"),
       ("--version", "version"),
@@ -1231,6 +1247,7 @@ async fn dispatch_known_command(
     "help" => handle_help(rest)
     // Pack operations
     "receive-pack" => handle_receive_pack(rest)
+    "upload-archive" => handle_upload_archive(rest)
     "upload-pack" => handle_upload_pack(rest)
     "pack-objects" => handle_pack_objects(rest)
     "index-pack" => handle_index_pack(rest)
@@ -1293,6 +1310,7 @@ async fn dispatch_known_command(
     "write-tree" => handle_write_tree(rest)
     "show-ref" => handle_show_ref(rest)
     "for-each-ref" => handle_for_each_ref(rest)
+    "for-each-repo" => handle_for_each_repo(rest)
     "update-ref" => handle_update_ref(rest)
     "symbolic-ref" => handle_symbolic_ref(rest)
     "reflog" => handle_reflog(rest)
@@ -1312,6 +1330,7 @@ async fn dispatch_known_command(
     "apply" => handle_apply(rest)
     "fsck" => handle_fsck(rest)
     "prune" => handle_prune(rest)
+    "prune-packed" => handle_prune_packed(rest)
     "pack-refs" => handle_pack_refs(rest)
     "repack" => handle_repack(rest)
     "maintenance" => handle_maintenance(rest)
@@ -1367,8 +1386,10 @@ async fn dispatch_known_command(
     "name-rev" => handle_name_rev(rest)
     "update-server-info" => handle_update_server_info(rest)
     "check-mailmap" => handle_check_mailmap(rest)
+    "checkout-index" => handle_checkout_index(rest)
     "unpack-file" => handle_unpack_file(rest)
     "web--browse" => handle_web_browse(rest)
+    "replace" => handle_replace(rest)
     "filter-branch" => handle_filter_branch(rest)
     "version" => print_line("git version \{bit_version_tag}")
     // Error for unknown commands

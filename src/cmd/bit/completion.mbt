@@ -962,12 +962,12 @@ fn all_subcommands() -> Array[(String, String)] {
     "format-patch", "fsck", "gc", "grep", "hash-object", "help", "hq", "hub", "index-pack",
     "init", "issue", "log", "ls-files", "ls-tree", "maintenance", "mcp", "merge",
     "merge-base", "mktree", "multi-pack-index", "mv", "notes", "pack-objects", "pack-refs",
-    "pr", "prune", "pull", "push", "range-diff", "read-tree", "repo", "rebase", "receive-pack",
-    "reflog", "relay", "remote", "repack", "request-pull", "reset", "restore", "rev-list",
-    "rev-parse", "revert", "rm", "send-pack", "shortlog", "show", "show-branch",
-    "show-ref", "sparse-checkout", "stash", "status", "subdir-clone", "submodule",
-    "switch", "symbolic-ref", "tag", "tree", "unpack-objects", "update-index", "update-ref",
-    "upload-pack", "verify-pack", "worktree", "workspace", "ws", "write-tree",
+    "pr", "prune", "prune-packed", "pull", "push", "range-diff", "read-tree", "repo",
+    "rebase", "receive-pack", "reflog", "relay", "remote", "repack", "request-pull",
+    "reset", "restore", "rev-list", "rev-parse", "revert", "rm", "send-pack", "shortlog",
+    "show", "show-branch", "show-ref", "sparse-checkout", "stash", "status", "subdir-clone",
+    "submodule", "switch", "symbolic-ref", "tag", "tree", "unpack-objects", "update-index",
+    "update-ref", "upload-pack", "verify-pack", "worktree", "workspace", "ws", "write-tree",
   ]
   let out = []
   for cmd in names {
