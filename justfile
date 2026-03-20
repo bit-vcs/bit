@@ -64,6 +64,93 @@ build:
     cp "$bin_path" tools/git-shim/moon
     @chmod +x tools/git-shim/moon
 
+# Build JS-exported lib module
+build-js-lib:
+    moon build --target js --release src/lib
+
+# Verify JS-exported lib on a pure in-memory host
+test-js-lib: build-js-lib
+    node tools/verify-libgit2-js.mjs
+
+# Measure JS-exported lib size (raw + gzip)
+size-js-lib: build-js-lib
+    @file="_build/js/release/build/lib/lib.js"; \
+    raw_bytes=$(wc -c < "$file" | tr -d ' '); \
+    gzip_bytes=$(gzip -c "$file" | wc -c | tr -d ' '); \
+    echo "file=$file"; \
+    echo "raw_bytes=$raw_bytes"; \
+    echo "gzip_bytes=$gzip_bytes"
+
+# Run a representative git-ops consumer script against the JS lib exports
+test-js-lib-git-ops: build-js-lib
+    node tools/lib-js-git-ops.mjs
+
+# Run a minimal consumer script against the JS lib exports
+test-js-lib-minimal: build-js-lib
+    node tools/lib-js-minimal.mjs
+
+# Bundle the representative git-ops script with tree shaking enabled
+bundle-js-lib-git-ops: build-js-lib
+    mkdir -p target
+    bun build --target browser --format esm --production \
+      --outfile target/lib-js-git-ops.bundle.mjs \
+      tools/lib-js-git-ops.mjs
+
+# Bundle the minimal script with tree shaking enabled
+bundle-js-lib-minimal: build-js-lib
+    mkdir -p target
+    bun build --target browser --format esm --production \
+      --outfile target/lib-js-minimal.bundle.mjs \
+      tools/lib-js-minimal.mjs
+
+# Verify the bundled git-ops script still runs
+test-js-lib-git-ops-bundle: bundle-js-lib-git-ops
+    node target/lib-js-git-ops.bundle.mjs
+
+# Verify the bundled minimal script still runs
+test-js-lib-minimal-bundle: bundle-js-lib-minimal
+    node target/lib-js-minimal.bundle.mjs
+
+# Measure the bundled git-ops script size (raw + gzip)
+size-js-lib-git-ops-bundle: bundle-js-lib-git-ops
+    @file="target/lib-js-git-ops.bundle.mjs"; \
+    raw_bytes=$(wc -c < "$file" | tr -d ' '); \
+    gzip_bytes=$(gzip -c "$file" | wc -c | tr -d ' '); \
+    echo "file=$file"; \
+    echo "raw_bytes=$raw_bytes"; \
+    echo "gzip_bytes=$gzip_bytes"
+
+# Measure the bundled minimal script size (raw + gzip)
+size-js-lib-minimal-bundle: bundle-js-lib-minimal
+    @file="target/lib-js-minimal.bundle.mjs"; \
+    raw_bytes=$(wc -c < "$file" | tr -d ' '); \
+    gzip_bytes=$(gzip -c "$file" | wc -c | tr -d ' '); \
+    echo "file=$file"; \
+    echo "raw_bytes=$raw_bytes"; \
+    echo "gzip_bytes=$gzip_bytes"
+
+# Verify minimal API usage stays materially smaller after tree shaking
+verify-js-lib-treeshake: bundle-js-lib-minimal bundle-js-lib-git-ops
+    node tools/verify-lib-js-treeshake.mjs
+
+# Build the GitHub Pages demo artifact
+build-pages-demo: build-js-lib
+    mkdir -p target/pages
+    bun build --target browser --format esm \
+      --outfile target/pages/app.js \
+      docs/demo/main.js
+    cp docs/demo/index.html target/pages/index.html
+    cp docs/demo/styles.css target/pages/styles.css
+
+# Measure the built GitHub Pages demo JS bundle
+size-pages-demo: build-pages-demo
+    @file="target/pages/app.js"; \
+    raw_bytes=$(wc -c < "$file" | tr -d ' '); \
+    gzip_bytes=$(gzip -c "$file" | wc -c | tr -d ' '); \
+    echo "file=$file"; \
+    echo "raw_bytes=$raw_bytes"; \
+    echo "gzip_bytes=$gzip_bytes"
+
 # Install bit to ~/.moon/bin
 install:
     moon install ./src/cmd/bit
@@ -95,7 +182,7 @@ test-ai:
     bash tools/test-ai.sh
 
 # Pre-release check
-release-check: fmt info check test e2e
+release-check: fmt info check test verify-js-lib-treeshake e2e
 
 # Run Git's upstream test suite (submodule at third_party/git)
 git-t: build

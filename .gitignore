@@ -45,4 +45,5 @@ version.ts
 xxxx
 .bench-baseline
 .local
-npm/
+npm/bit.js
+npm/lib.raw.js

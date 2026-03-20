@@ -32,10 +32,40 @@ import {
 warnings = "-29"
 
 options(
+  link: {
+    "js": {
+      "exports": [
+        "js_create_memory_host:createMemoryHost",
+        "js_destroy_host:destroyHost",
+        "js_host_write_string:hostWriteString",
+        "js_host_read_string:hostReadString",
+        "js_git_init:init",
+        "js_add_paths:add",
+        "js_status:status",
+        "js_status_porcelain:statusPorcelain",
+        "js_commit:commit",
+        "js_build_commit_payload:buildCommitPayload",
+        "js_commit_signed:commitSigned",
+        "js_log:log",
+        "js_checkout:checkout",
+        "js_checkout_b:checkoutB",
+        "js_branch_list:branchList",
+        "js_branch_create:branchCreate",
+        "js_branch_delete:branchDelete",
+        "js_rm_paths:rm",
+        "js_mv_path:mv",
+      ],
+      "format": "esm",
+    },
+  },
   targets: {
     "bench_index_diff_test.mbt": [ "native" ],
     "bench_ops_test.mbt": [ "native" ],
     "bench_status_test.mbt": [ "native" ],
     "bench_working_files_test.mbt": [ "native" ],
+    "js_api_exports.mbt": [ "js" ],
+    "js_export_types.mbt": [ "js" ],
+    "js_exports_wbtest.mbt": [ "js" ],
+    "js_host_bridge.mbt": [ "js" ],
   },
 )

@@ -1,0 +1,66 @@
+name: Pages Demo
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/pages-demo.yml"
+      - "docs/demo/**"
+      - "justfile"
+      - "moon.mod.json"
+      - "src/lib/**"
+      - "tools/bit-git.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-demo
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install just
+        uses: extractions/setup-just@v2
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install MoonBit CLI
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Moon update
+        run: moon update
+
+      - name: Build demo artifact
+        run: just build-pages-demo
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: target/pages
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
