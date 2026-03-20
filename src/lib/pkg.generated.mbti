@@ -200,11 +200,15 @@ pub fn js_branch_delete(Int, String, String) -> Result[Unit, String]
 
 pub fn js_branch_list(Int, String) -> Result[Array[JsBranchInfo], String]
 
+pub fn js_branch_rename(Int, String, String, String, Bool, String, String, Int, String) -> Result[Unit, String]
+
 pub fn js_build_commit_payload(Int, String, String, String, Int) -> Result[String, String]
 
 pub fn js_checkout(Int, String, String) -> Result[Unit, String]
 
 pub fn js_checkout_b(Int, String, String) -> Result[Unit, String]
+
+pub fn js_cherry_pick(Int, String, String, String, Int, Bool, String, String) -> Result[JsCherryPickResult, String]
 
 pub fn js_commit(Int, String, String, String, Int) -> Result[String, String]
 
@@ -214,21 +218,73 @@ pub fn js_create_memory_host() -> Int
 
 pub fn js_destroy_host(Int) -> Unit
 
+pub fn js_diff_index(Int, String) -> Result[Array[String], String]
+
+pub fn js_diff_index_stat(Int, String) -> Result[Array[String], String]
+
+pub async fn js_diff_worktree(Int, String) -> Result[Array[String], String]
+
+pub async fn js_diff_worktree_stat(Int, String) -> Result[Array[String], String]
+
+pub async fn js_fetch_remote(Int, String, String, Int, String, Bool) -> Result[JsFetchResult, String]
+
+pub fn js_get_remote_url(Int, String, String) -> Result[String, String]
+
 pub fn js_git_init(Int, String, String) -> Result[Unit, String]
 
 pub fn js_host_read_string(Int, String) -> Result[String, String]
 
 pub fn js_host_write_string(Int, String, String) -> Result[Unit, String]
 
+pub fn js_list_remotes(Int, String) -> Result[Array[String], String]
+
 pub fn js_log(Int, String, Int) -> Result[Array[JsLogEntry], String]
+
+pub fn js_merge(Int, String, String, String, String, Int) -> Result[JsMergeResult, String]
 
 pub fn js_mv_path(Int, String, String, String) -> Result[Unit, String]
 
+pub async fn js_push_remote(Int, String, String, Int, String, Bool) -> Result[String, String]
+
+pub fn js_rebase_abort(Int, String) -> Result[Unit, String]
+
+pub fn js_rebase_continue(Int, String) -> Result[JsRebaseResult, String]
+
+pub fn js_rebase_skip(Int, String) -> Result[JsRebaseResult, String]
+
+pub fn js_rebase_start(Int, String, String) -> Result[JsRebaseResult, String]
+
+pub fn js_rebase_start_with_onto(Int, String, String, String) -> Result[JsRebaseResult, String]
+
+pub fn js_reset(Int, String, String, String) -> Result[String, String]
+
+pub fn js_restore_paths(Int, String, Array[String]) -> Result[Unit, String]
+
+pub fn js_rev_parse(Int, String, String) -> Result[String, String]
+
 pub fn js_rm_paths(Int, String, Array[String], Bool) -> Result[Unit, String]
+
+pub fn js_show_ref(Int, String) -> Result[Array[JsRefInfo], String]
+
+pub fn js_stash_apply(Int, String, Int, Bool) -> Result[Unit, String]
+
+pub fn js_stash_drop(Int, String, Int) -> Result[Unit, String]
+
+pub fn js_stash_list(Int, String) -> Result[Array[JsStashEntry], String]
+
+pub async fn js_stash_push(Int, String, String, String, Int) -> Result[String, String]
 
 pub fn js_status(Int, String) -> Result[Status, String]
 
 pub fn js_status_porcelain(Int, String) -> Result[Array[String], String]
+
+pub fn js_tag_create_annotated(Int, String, String, String, String, String, Int) -> Result[Unit, String]
+
+pub fn js_tag_create_lightweight(Int, String, String, String) -> Result[Unit, String]
+
+pub fn js_tag_delete(Int, String, String) -> Result[Unit, String]
+
+pub fn js_tag_list(Int, String) -> Result[Array[String], String]
 
 pub fn legacy_remote_exists(&@types.RepoFileSystem, String, String) -> Bool
 
@@ -782,6 +838,23 @@ pub struct JsBranchInfo {
 pub impl Eq for JsBranchInfo
 pub impl Show for JsBranchInfo
 
+pub struct JsCherryPickResult {
+  status : String
+  commit_id : String
+  conflicts : Array[String]
+}
+pub impl Eq for JsCherryPickResult
+pub impl Show for JsCherryPickResult
+
+pub struct JsFetchResult {
+  status : String
+  commit_id : String
+  refname : String
+  remote_ref : String
+}
+pub impl Eq for JsFetchResult
+pub impl Show for JsFetchResult
+
 pub struct JsLogEntry {
   id : String
   author : String
@@ -790,6 +863,36 @@ pub struct JsLogEntry {
 }
 pub impl Eq for JsLogEntry
 pub impl Show for JsLogEntry
+
+pub struct JsMergeResult {
+  status : String
+  commit_id : String
+  conflicts : Array[String]
+}
+pub impl Eq for JsMergeResult
+pub impl Show for JsMergeResult
+
+pub struct JsRebaseResult {
+  status : String
+  commit_id : String
+  conflicts : Array[String]
+}
+pub impl Eq for JsRebaseResult
+pub impl Show for JsRebaseResult
+
+pub struct JsRefInfo {
+  name : String
+  id : String
+}
+pub impl Eq for JsRefInfo
+pub impl Show for JsRefInfo
+
+pub struct JsStashEntry {
+  id : String
+  message : String
+}
+pub impl Eq for JsStashEntry
+pub impl Show for JsStashEntry
 
 pub struct LazyPackIndex {
   idx_path : String

@@ -72,6 +72,9 @@ build-js-lib:
 test-js-lib: build-js-lib
     node tools/verify-libgit2-js.mjs
 
+test-js-lib-relay: build-js-lib
+    node tools/verify-libgit2-relay.mjs
+
 # Measure JS-exported lib size (raw + gzip)
 size-js-lib: build-js-lib
     @file="_build/js/release/build/lib/lib.js"; \

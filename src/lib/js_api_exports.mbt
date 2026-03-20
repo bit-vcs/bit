@@ -13,6 +13,20 @@ fn[T] js_wrap_error(f : () -> T raise @bit.GitError) -> Result[T, String] {
 }
 
 ///|
+async fn[T] js_wrap_error_async(
+  f : async () -> T raise @bit.GitError,
+) -> Result[T, String] {
+  Ok(f()) catch {
+    @bit.GitError::IoError(error) => Err(error)
+    @bit.GitError::InvalidObject(error) => Err(error)
+    @bit.GitError::HashMismatch(expected, actual) =>
+      Err("hash mismatch: \{expected} vs \{actual}")
+    @bit.GitError::PackfileError(error) => Err("packfile error: \{error}")
+    @bit.GitError::ProtocolError(error) => Err("protocol error: \{error}")
+  }
+}
+
+///|
 fn js_resolve_git_dir(
   fs : LibJsHostFs,
   root : String,
@@ -141,6 +155,93 @@ fn js_find_commit_header_end(payload : Bytes) -> Int raise @bit.GitError {
     i += 1
   }
   raise @bit.GitError::InvalidObject("Malformed commit payload")
+}
+
+///|
+fn js_resolve_revision(
+  fs : LibJsHostFs,
+  root : String,
+  spec : String,
+) -> @bit.ObjectId raise @bit.GitError {
+  let git_dir = js_resolve_git_dir(fs, root)
+  match rev_parse(fs, git_dir, spec) {
+    Some(id) => id
+    None => raise @bit.GitError::InvalidObject("Unknown revision: " + spec)
+  }
+}
+
+///|
+fn js_commit_id_or_empty(id : @bit.ObjectId?) -> String {
+  match id {
+    Some(value) => value.to_hex()
+    None => ""
+  }
+}
+
+///|
+fn js_merge_status_text(status : MergeStatus) -> String {
+  match status {
+    AlreadyUpToDate => "already_up_to_date"
+    FastForward => "fast_forward"
+    Merged => "merged"
+    Conflicted => "conflicted"
+  }
+}
+
+///|
+fn js_rebase_status_text(status : RebaseStatus) -> String {
+  match status {
+    RebaseStatus::Complete => "complete"
+    RebaseStatus::Conflict => "conflict"
+    RebaseStatus::NothingToRebase => "nothing_to_rebase"
+  }
+}
+
+///|
+fn js_cherry_pick_status_text(status : CherryPickStatus) -> String {
+  match status {
+    CherryPickStatus::Success => "success"
+    CherryPickStatus::Conflict => "conflict"
+  }
+}
+
+///|
+fn js_reset_mode_text(mode : String) -> ResetMode raise @bit.GitError {
+  match mode {
+    "soft" => ResetMode::Soft
+    "mixed" => ResetMode::Mixed
+    "hard" => ResetMode::Hard
+    _ => raise @bit.GitError::InvalidObject("Unknown reset mode: " + mode)
+  }
+}
+
+///|
+fn js_convert_merge_result(result : MergeResult) -> JsMergeResult {
+  {
+    status: js_merge_status_text(result.status),
+    commit_id: js_commit_id_or_empty(result.commit_id),
+    conflicts: result.conflicts,
+  }
+}
+
+///|
+fn js_convert_rebase_result(result : RebaseResult) -> JsRebaseResult {
+  {
+    status: js_rebase_status_text(result.status),
+    commit_id: js_commit_id_or_empty(result.commit_id),
+    conflicts: result.conflicts,
+  }
+}
+
+///|
+fn js_convert_cherry_pick_result(
+  result : CherryPickResult,
+) -> JsCherryPickResult {
+  {
+    status: js_cherry_pick_status_text(result.status),
+    commit_id: js_commit_id_or_empty(result.commit_id),
+    conflicts: result.conflicts,
+  }
 }
 
 ///|
@@ -380,6 +481,65 @@ pub fn js_log(
 }
 
 ///|
+pub fn js_rev_parse(
+  host_id : Int,
+  root : String,
+  spec : String,
+) -> Result[String, String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error(() => {
+    let git_dir = js_resolve_git_dir(fs, root)
+    match rev_parse(fs, git_dir, spec) {
+      Some(id) => id.to_hex()
+      None => ""
+    }
+  })
+}
+
+///|
+pub fn js_show_ref(
+  host_id : Int,
+  root : String,
+) -> Result[Array[JsRefInfo], String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error(() => {
+    let git_dir = js_resolve_git_dir(fs, root)
+    let refs = show_ref(fs, git_dir)
+    let result : Array[JsRefInfo] = []
+    for item in refs {
+      let (name, id) = item
+      result.push({ name, id: id.to_hex() })
+    }
+    result
+  })
+}
+
+///|
+pub fn js_merge(
+  host_id : Int,
+  root : String,
+  target : String,
+  message : String,
+  author : String,
+  timestamp_secs : Int,
+) -> Result[JsMergeResult, String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error(() => {
+    let target_id = js_resolve_revision(fs, root, target)
+    let merged = merge(
+      fs,
+      fs,
+      root,
+      target_id,
+      message,
+      author,
+      timestamp_secs.to_int64(),
+    )
+    js_convert_merge_result(merged)
+  })
+}
+
+///|
 pub fn js_checkout(
   host_id : Int,
   root : String,
@@ -400,6 +560,16 @@ pub fn js_checkout_b(
     create_branch(fs, fs, root, branch_name)
     ignore(checkout(fs, fs, root, branch_name))
   })
+}
+
+///|
+pub fn js_restore_paths(
+  host_id : Int,
+  root : String,
+  paths : Array[String],
+) -> Result[Unit, String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error(() => restore_paths(fs, fs, root, paths))
 }
 
 ///|
@@ -441,6 +611,605 @@ pub fn js_branch_delete(
 ) -> Result[Unit, String] {
   let fs = js_make_host_fs(host_id)
   js_wrap_error(() => delete_branch(fs, fs, root, name))
+}
+
+///|
+pub fn js_branch_rename(
+  host_id : Int,
+  root : String,
+  old_name : String,
+  new_name : String,
+  force : Bool,
+  author : String,
+  email : String,
+  timestamp_secs : Int,
+  timezone : String,
+) -> Result[Unit, String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error(() => {
+    rename_branch(
+      fs,
+      fs,
+      root,
+      old_name,
+      new_name,
+      force~,
+      author~,
+      email~,
+      timestamp=timestamp_secs.to_int64(),
+      timezone~,
+    )
+  })
+}
+
+///|
+pub fn js_tag_list(
+  host_id : Int,
+  root : String,
+) -> Result[Array[String], String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error(() => list_tags(fs, js_resolve_git_dir(fs, root)))
+}
+
+///|
+pub fn js_tag_delete(
+  host_id : Int,
+  root : String,
+  name : String,
+) -> Result[Unit, String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error(() => delete_tag(fs, fs, js_resolve_git_dir(fs, root), name))
+}
+
+///|
+pub fn js_tag_create_lightweight(
+  host_id : Int,
+  root : String,
+  name : String,
+  target : String,
+) -> Result[Unit, String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error(() => {
+    let git_dir = js_resolve_git_dir(fs, root)
+    let target_id = js_resolve_revision(fs, root, target)
+    create_lightweight_tag(fs, fs, git_dir, name, target_id)
+  })
+}
+
+///|
+pub fn js_tag_create_annotated(
+  host_id : Int,
+  root : String,
+  name : String,
+  target : String,
+  message : String,
+  tagger : String,
+  timestamp_secs : Int,
+) -> Result[Unit, String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error(() => {
+    let git_dir = js_resolve_git_dir(fs, root)
+    let target_id = js_resolve_revision(fs, root, target)
+    create_annotated_tag(
+      fs,
+      fs,
+      git_dir,
+      name,
+      target_id,
+      message,
+      tagger,
+      timestamp_secs.to_int64(),
+    )
+  })
+}
+
+///|
+pub fn js_rebase_start(
+  host_id : Int,
+  root : String,
+  upstream : String,
+) -> Result[JsRebaseResult, String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error(() => {
+    let upstream_id = js_resolve_revision(fs, root, upstream)
+    js_convert_rebase_result(rebase_start(fs, fs, root, upstream_id))
+  })
+}
+
+///|
+pub fn js_rebase_start_with_onto(
+  host_id : Int,
+  root : String,
+  onto : String,
+  upstream : String,
+) -> Result[JsRebaseResult, String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error(() => {
+    let onto_id = js_resolve_revision(fs, root, onto)
+    let upstream_id = js_resolve_revision(fs, root, upstream)
+    js_convert_rebase_result(
+      rebase_start_with_onto(fs, fs, root, onto_id, upstream_id),
+    )
+  })
+}
+
+///|
+pub fn js_rebase_continue(
+  host_id : Int,
+  root : String,
+) -> Result[JsRebaseResult, String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error(() => js_convert_rebase_result(rebase_continue(fs, fs, root)))
+}
+
+///|
+pub fn js_rebase_abort(host_id : Int, root : String) -> Result[Unit, String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error(() => rebase_abort(fs, fs, root))
+}
+
+///|
+pub fn js_rebase_skip(
+  host_id : Int,
+  root : String,
+) -> Result[JsRebaseResult, String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error(() => js_convert_rebase_result(rebase_skip(fs, fs, root)))
+}
+
+///|
+pub fn js_reset(
+  host_id : Int,
+  root : String,
+  spec : String,
+  mode : String,
+) -> Result[String, String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error(() => {
+    reset(fs, fs, root, spec, js_reset_mode_text(mode)).to_hex()
+  })
+}
+
+///|
+pub fn js_stash_list(
+  host_id : Int,
+  root : String,
+) -> Result[Array[JsStashEntry], String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error(() => {
+    let git_dir = js_resolve_git_dir(fs, root)
+    let entries = stash_list(fs, git_dir)
+    let result : Array[JsStashEntry] = []
+    for entry in entries {
+      result.push({ id: entry.id.to_hex(), message: entry.message })
+    }
+    result
+  })
+}
+
+///|
+pub async fn js_stash_push(
+  host_id : Int,
+  root : String,
+  message : String,
+  author : String,
+  timestamp_secs : Int,
+) -> Result[String, String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error_async(async fn() -> String raise @bit.GitError {
+    match stash_push(fs, fs, root, message, author, timestamp_secs.to_int64()) {
+      Some(id) => id.to_hex()
+      None => ""
+    }
+  })
+}
+
+///|
+pub fn js_stash_apply(
+  host_id : Int,
+  root : String,
+  index : Int,
+  drop : Bool,
+) -> Result[Unit, String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error(() => stash_apply(fs, fs, root, index, drop))
+}
+
+///|
+pub fn js_stash_drop(
+  host_id : Int,
+  root : String,
+  index : Int,
+) -> Result[Unit, String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error(() => stash_drop(fs, fs, root, index))
+}
+
+///|
+pub fn js_cherry_pick(
+  host_id : Int,
+  root : String,
+  target : String,
+  author : String,
+  timestamp_secs : Int,
+  no_commit : Bool,
+  message_suffix : String,
+  signoff_committer : String,
+) -> Result[JsCherryPickResult, String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error(() => {
+    let target_id = js_resolve_revision(fs, root, target)
+    js_convert_cherry_pick_result(
+      cherry_pick(
+        fs,
+        fs,
+        root,
+        target_id,
+        author,
+        timestamp_secs.to_int64(),
+        no_commit~,
+        message_suffix~,
+        signoff_committer~,
+      ),
+    )
+  })
+}
+
+///|
+pub async fn js_diff_worktree(
+  host_id : Int,
+  root : String,
+) -> Result[Array[String], String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error_async(async fn() -> Array[String] raise @bit.GitError {
+    diff_text(diff_worktree(fs, root))
+  })
+}
+
+///|
+pub async fn js_diff_worktree_stat(
+  host_id : Int,
+  root : String,
+) -> Result[Array[String], String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error_async(async fn() -> Array[String] raise @bit.GitError {
+    diff_stat(diff_worktree(fs, root))
+  })
+}
+
+///|
+pub fn js_diff_index(
+  host_id : Int,
+  root : String,
+) -> Result[Array[String], String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error(() => diff_text(diff_index(fs, root)))
+}
+
+///|
+pub fn js_diff_index_stat(
+  host_id : Int,
+  root : String,
+) -> Result[Array[String], String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error(() => diff_stat(diff_index(fs, root)))
+}
+
+///|
+pub fn js_list_remotes(
+  host_id : Int,
+  root : String,
+) -> Result[Array[String], String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error(() => list_remotes(fs, js_resolve_git_dir(fs, root)))
+}
+
+///|
+pub fn js_get_remote_url(
+  host_id : Int,
+  root : String,
+  name : String,
+) -> Result[String, String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error(() => {
+    get_remote_url(fs, js_resolve_git_dir(fs, root), name).unwrap_or("")
+  })
+}
+
+///|
+fn js_normalize_push_refname(refname : String) -> String raise @bit.GitError {
+  let normalized = normalize_repo_path(refname) catch {
+    _ => raise @bit.GitError::InvalidObject("invalid refname: " + refname)
+  }
+  if normalized.has_prefix("refs/") {
+    normalized
+  } else {
+    "refs/heads/" + normalized
+  }
+}
+
+///|
+fn js_default_push_refname(
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+) -> String raise @bit.GitError {
+  match read_head_ref(rfs, git_dir) {
+    HeadRef::Branch(name) => "refs/heads/" + name
+    HeadRef::Detached(_) =>
+      raise @bit.GitError::InvalidObject(
+        "refname is required when HEAD is detached",
+      )
+  }
+}
+
+///|
+fn js_find_remote_ref(
+  refs : Array[(@bit.ObjectId, String)],
+  refname : String,
+) -> @bit.ObjectId {
+  for item in refs {
+    let (id, current_refname) = item
+    if current_refname == refname {
+      return id
+    }
+  }
+  @bit.ObjectId::zero()
+}
+
+///|
+fn js_is_ancestor(
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+  base : @bit.ObjectId,
+  target : @bit.ObjectId,
+) -> Bool raise @bit.GitError {
+  let db = ObjectDb::load(rfs, git_dir)
+  let mut current = target
+  while true {
+    if current == base {
+      return true
+    }
+    let obj = db.get(rfs, current)
+    match obj {
+      None => return false
+      Some(value) => {
+        if value.obj_type != @bit.ObjectType::Commit {
+          return false
+        }
+        let info = @bit.parse_commit(value.data)
+        if info.parents.length() == 0 {
+          return false
+        }
+        current = info.parents[0]
+      }
+    }
+  }
+  false
+}
+
+///|
+fn js_remote_tracking_refname(refname : String) -> String raise @bit.GitError {
+  let normalized = normalize_repo_path(refname) catch {
+    _ => raise @bit.GitError::InvalidObject("invalid refname: " + refname)
+  }
+  if normalized.has_prefix("refs/heads/") {
+    let name = String::unsafe_substring(
+      normalized,
+      start=11,
+      end=normalized.length(),
+    )
+    "refs/remotes/origin/" + name
+  } else if normalized == "HEAD" {
+    "refs/remotes/origin/HEAD"
+  } else if normalized.has_prefix("refs/") {
+    "refs/remotes/origin/" + normalized
+  } else {
+    raise @bit.GitError::InvalidObject("invalid refname: " + refname)
+  }
+}
+
+///|
+fn js_format_fetch_head_description(
+  source_refname : String?,
+  remote_url : String,
+) -> String {
+  match source_refname {
+    Some(refname) if refname.has_prefix("refs/heads/") => {
+      let branch = String::unsafe_substring(
+        refname,
+        start=11,
+        end=refname.length(),
+      )
+      "branch '" + branch + "' of " + remote_url
+    }
+    Some(refname) if refname.has_prefix("refs/tags/") => {
+      let tag = String::unsafe_substring(
+        refname,
+        start=10,
+        end=refname.length(),
+      )
+      "tag '" + tag + "' of " + remote_url
+    }
+    Some(refname) => refname + " of " + remote_url
+    None => remote_url
+  }
+}
+
+///|
+fn js_select_fetch_target(
+  refs : Array[(@bit.ObjectId, String)],
+  symrefs : Map[String, String],
+  refspec : String,
+) -> (String, @bit.ObjectId)? raise @bit.GitError {
+  if refspec.length() == 0 {
+    match @protocol.select_default_ref(refs, symrefs) {
+      Some((refname, id)) => return Some((refname, id))
+      None => return None
+    }
+  }
+  let candidates : Array[String] = []
+  let normalized = normalize_repo_path(refspec) catch {
+    _ => raise @bit.GitError::InvalidObject("invalid refspec: " + refspec)
+  }
+  if normalized == "HEAD" {
+    candidates.push("HEAD")
+    match symrefs.get("HEAD") {
+      Some(target) => candidates.push(target)
+      None => ()
+    }
+  } else if normalized.has_prefix("refs/") {
+    candidates.push(normalized)
+  } else {
+    candidates.push("refs/heads/" + normalized)
+    candidates.push("refs/tags/" + normalized)
+    candidates.push(normalized)
+  }
+  for candidate in candidates {
+    for item in refs {
+      let (id, refname) = item
+      if refname == candidate {
+        return Some((refname, id))
+      }
+    }
+  }
+  None
+}
+
+///|
+pub async fn js_fetch_remote(
+  host_id : Int,
+  root : String,
+  remote_url : String,
+  transport_id : Int,
+  refspec : String,
+  prefer_v2 : Bool,
+) -> Result[JsFetchResult, String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error_async(async fn() -> JsFetchResult raise @bit.GitError {
+    let git_dir = js_resolve_git_dir(fs, root)
+    let (refs, _caps, _version, symrefs) = @bitnative.discover_upload_refs_with_http(
+      remote_url,
+      prefer_v2,
+      async fn(
+        url : String,
+        headers : Map[String, String],
+      ) -> (@bit.HttpResponse, Bytes) raise @bit.GitError {
+        js_transport_get(transport_id, url, headers)
+      },
+      async fn(
+        url : String,
+        body : Bytes,
+        headers : Map[String, String],
+      ) -> (@bit.HttpResponse, Bytes) raise @bit.GitError {
+        js_transport_post(transport_id, url, body, headers)
+      },
+    )
+    match js_select_fetch_target(refs, symrefs, refspec) {
+      None => { status: "empty", commit_id: "", refname: "", remote_ref: "" }
+      Some((refname, commit_id)) => {
+        let pack = @bitnative.fetch_pack_with_http(
+          remote_url,
+          [commit_id],
+          prefer_v2,
+          0,
+          @protocol.FilterSpec::NoFilter,
+          async fn(
+            url : String,
+            headers : Map[String, String],
+          ) -> (@bit.HttpResponse, Bytes) raise @bit.GitError {
+            js_transport_get(transport_id, url, headers)
+          },
+          async fn(
+            url : String,
+            body : Bytes,
+            headers : Map[String, String],
+          ) -> (@bit.HttpResponse, Bytes) raise @bit.GitError {
+            js_transport_post(transport_id, url, body, headers)
+          },
+        )
+        let objects = @pack.parse_packfile(pack)
+        fs.mkdir_p(join_path(git_dir, "objects/pack"))
+        @pack.write_packfile_with_index(fs, git_dir, pack, objects)
+        let remote_ref = js_remote_tracking_refname(refname)
+        let remote_ref_path = join_path(git_dir, remote_ref)
+        fs.mkdir_p(rebase_parent_dir(remote_ref_path))
+        fs.write_string(remote_ref_path, commit_id.to_hex() + "\n")
+        fs.write_string(
+          join_path(git_dir, "FETCH_HEAD"),
+          commit_id.to_hex() +
+          "\t\t" +
+          js_format_fetch_head_description(Some(refname), remote_url) +
+          "\n",
+        )
+        {
+          status: "fetched",
+          commit_id: commit_id.to_hex(),
+          refname,
+          remote_ref,
+        }
+      }
+    }
+  })
+}
+
+///|
+pub async fn js_push_remote(
+  host_id : Int,
+  root : String,
+  remote_url : String,
+  transport_id : Int,
+  refname : String,
+  force : Bool,
+) -> Result[String, String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error_async(async fn() -> String raise @bit.GitError {
+    let git_dir = js_resolve_git_dir(fs, root)
+    let head = resolve_head_commit(fs, git_dir)
+    guard head is Some(head_id) else {
+      raise @bit.GitError::InvalidObject("HEAD not found")
+    }
+    let target_ref = if refname.length() == 0 {
+      js_default_push_refname(fs, git_dir)
+    } else {
+      js_normalize_push_refname(refname)
+    }
+    let db = ObjectDb::load(fs, git_dir)
+    let objects = collect_reachable_objects(db, fs, head_id)
+    let pack = @pack.create_packfile(objects)
+    let remote = @protocol.Remote::new(remote_url)
+    let (refs, _caps) = @protocol.discover_refs_with_http(remote, async fn(
+      url : String,
+      headers : Map[String, String],
+    ) -> (@bit.HttpResponse, Bytes) raise @bit.GitError {
+      js_transport_get(transport_id, url, headers)
+    })
+    let old_id = js_find_remote_ref(refs, target_ref)
+    if not(force) && old_id != @bit.ObjectId::zero() {
+      if not(js_is_ancestor(fs, git_dir, old_id, head_id)) {
+        raise @bit.GitError::InvalidObject(
+          "Updates were rejected because the tip of your current branch is behind its remote counterpart. Use force to override.",
+        )
+      }
+    }
+    let req = @protocol.PushRequest::new(old_id, head_id, target_ref, pack)
+    @protocol.push_with_http(
+      remote,
+      req,
+      async fn(
+        url : String,
+        headers : Map[String, String],
+      ) -> (@bit.HttpResponse, Bytes) raise @bit.GitError {
+        js_transport_get(transport_id, url, headers)
+      },
+      async fn(
+        url : String,
+        body : Bytes,
+        headers : Map[String, String],
+      ) -> (@bit.HttpResponse, Bytes) raise @bit.GitError {
+        js_transport_post(transport_id, url, body, headers)
+      },
+    )
+  })
 }
 
 ///|
