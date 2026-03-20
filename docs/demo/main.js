@@ -48,7 +48,6 @@ const elements = {
   consoleTitle: document.querySelector("#console-title"),
   consoleSubtitle: document.querySelector("#console-subtitle"),
   storageBanner: document.querySelector("#storage-banner"),
-  focusView: document.querySelector("#focus-view"),
   connectStorage: document.querySelector("#connect-storage"),
   reloadStorage: document.querySelector("#reload-storage"),
   clearStorage: document.querySelector("#clear-storage"),
@@ -221,7 +220,7 @@ const renderHistory = (view) => {
     elements.historyView.innerHTML = `<p class="history-empty">No commits yet.</p>`;
     return;
   }
-  elements.historyView.innerHTML = view.logEntries.map((entry) => `
+  elements.historyView.innerHTML = view.logEntries.slice(0, 4).map((entry) => `
     <article class="history-item">
       <header>
         <span>${entry.id.slice(0, 7)}</span>
@@ -285,53 +284,6 @@ const renderEventLog = () => {
   `).join("");
 };
 
-const renderFocus = (controller, view) => {
-  const currentBranch = view.branches.find((branch) => branch.isCurrent)?.name ?? "main";
-  const statusSummary = summarizeStatus(view.currentStatus);
-  const recentEvent = eventLog[0];
-  const workingFiles = view.summary.workingFiles
-    .map((path) => trimRelativePath(path.replace(`${REPO_ROOT}/`, "")))
-    .slice(0, 4);
-
-  elements.focusView.innerHTML = `
-    <article class="focus-card">
-      <h3>Now</h3>
-      <div class="focus-metrics">
-        <span class="status-chip">HEAD ${currentBranch}</span>
-        <span class="status-chip">${statusSummary.staged} staged</span>
-        <span class="status-chip">${statusSummary.unstaged} unstaged</span>
-        <span class="status-chip">${statusSummary.untracked} untracked</span>
-      </div>
-    </article>
-    <article class="focus-card">
-      <h3>Editing</h3>
-      <p><code>${state.filePath || DEFAULT_FILE_PATH}</code></p>
-      <div class="focus-metrics">
-        ${workingFiles.length
-          ? workingFiles.map((path) => (
-            `<button class="snapshot-chip" data-focus-path="${path}" type="button">${path}</button>`
-          )).join("")
-          : `<span class="status-chip">No files yet</span>`}
-      </div>
-    </article>
-    <article class="focus-card">
-      <h3>Latest activity</h3>
-      <p>${recentEvent?.message ?? controller.getBanner()}</p>
-      <div class="focus-note">${recentEvent ? recentEvent.at.toLocaleTimeString() : controller.accentTone}</div>
-    </article>
-  `;
-
-  for (const button of elements.focusView.querySelectorAll("[data-focus-path]")) {
-    button.addEventListener("click", () => {
-      state.filePath = button.dataset.focusPath;
-      if (!loadSnapshotIntoEditor()) {
-        logEvent(`File ${state.filePath} is not present in this repo`, "error");
-      }
-      render();
-    });
-  }
-};
-
 const renderBranchStrip = (view) => {
   if (!view.repoReady) {
     elements.branchStrip.innerHTML = `<span class="branch-chip">main</span>`;
@@ -380,7 +332,6 @@ const render = () => {
   elements.fileContent.value = state.fileContent;
   elements.commitMessage.value = state.commitMessage;
   elements.branchName.value = state.branchName;
-  renderFocus(controller, view);
   renderStatus(view);
   renderHistory(view);
   renderSnapshot(controller, view);
@@ -397,10 +348,12 @@ const render = () => {
   elements.checkoutBranch.disabled = !repoReady;
   elements.clearStorage.disabled = controller.id === "memory" && !repoReady;
 
+  const statusSummary = summarizeStatus(view.currentStatus);
   const bannerBits = [
-    `${view.summary.fileCount} files`,
-    `${view.summary.gitObjectCount} git objects`,
     `HEAD ${currentBranch}`,
+    `${statusSummary.staged} staged`,
+    `${statusSummary.unstaged} unstaged`,
+    `${statusSummary.untracked} untracked`,
   ];
   if (controller.persistence.connectedName) {
     bannerBits.push(`folder ${controller.persistence.connectedName}`);

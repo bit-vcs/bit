@@ -17,11 +17,8 @@
     <div class="page-shell">
       <header class="hero">
         <p class="eyebrow">bit / browser demo</p>
-        <h1>Git playground, trimmed down.</h1>
-        <p class="hero-copy">
-          Edit one file, stage it, commit it, and switch storage backends.
-          The rest stays tucked away unless you need it.
-        </p>
+        <h1>Git playground</h1>
+        <p class="hero-copy">One-file edit loop across memory, IndexedDB, and local folder storage.</p>
       </header>
 
       <main class="workspace">
@@ -42,14 +39,13 @@
               <button id="seed-repo" class="primary" type="button">Create sample repo</button>
             </div>
             <div id="storage-banner" class="storage-banner"></div>
-            <div id="focus-view" class="focus-grid"></div>
           </section>
 
           <div class="main-grid">
             <section class="panel editor-panel">
               <div class="panel-header">
                 <h3>Working File</h3>
-                <p>Keep the edit loop front and center.</p>
+                <p>Edit first. Stage and commit from the right column.</p>
               </div>
               <label class="field">
                 <span>Relative path</span>
@@ -62,8 +58,6 @@
               <div class="button-row">
                 <button id="load-file" class="secondary" type="button">Load file</button>
                 <button id="save-file" class="primary" type="button">Save file</button>
-                <button id="stage-file" class="secondary" type="button">Stage file</button>
-                <button id="stage-all" class="secondary" type="button">Stage all</button>
               </div>
             </section>
 
@@ -78,19 +72,28 @@
 
               <section class="panel commit-panel">
                 <div class="panel-header">
-                  <h3>Commit & Branch</h3>
-                  <p>Stage, commit, and switch branches without scrolling away.</p>
+                  <h3>Commit</h3>
+                  <p>1. Stage the change. 2. Write the message. 3. Commit staged changes.</p>
+                </div>
+                <div id="status-view" class="status-grid compact-status"></div>
+                <div class="button-row commit-actions">
+                  <button id="stage-file" class="secondary" type="button">Stage file</button>
+                  <button id="stage-all" class="secondary" type="button">Stage all</button>
+                  <button id="commit-file" class="primary" type="button">Commit staged changes</button>
                 </div>
                 <label class="field">
                   <span>Commit message</span>
                   <input id="commit-message" type="text" value="demo: update notes" />
                 </label>
+                <div class="panel-header branch-header">
+                  <h3>Branch</h3>
+                  <p>Secondary flow for switching or creating branches.</p>
+                </div>
                 <label class="field">
                   <span>Branch name</span>
                   <input id="branch-name" type="text" value="feature/demo" />
                 </label>
                 <div class="button-row">
-                  <button id="commit-file" class="primary" type="button">Commit staged changes</button>
                   <button id="create-branch" class="secondary" type="button">Create branch</button>
                   <button id="checkout-branch" class="secondary" type="button">Checkout branch</button>
                 </div>

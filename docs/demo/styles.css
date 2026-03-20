@@ -62,10 +62,10 @@ code {
 }
 
 .hero {
-  padding: 1.4rem 1.5rem;
-  margin-bottom: 1rem;
+  padding: 0.95rem 1.2rem;
+  margin-bottom: 0.8rem;
   border: 1px solid var(--line);
-  border-radius: 28px;
+  border-radius: 22px;
   background:
     linear-gradient(135deg, rgba(255, 248, 236, 0.95), rgba(248, 238, 222, 0.84)),
     var(--surface);
@@ -91,17 +91,17 @@ code {
 }
 
 .hero h1 {
-  font-size: clamp(2.2rem, 5vw, 3.4rem);
-  line-height: 0.98;
-  max-width: 14ch;
+  font-size: clamp(1.6rem, 3vw, 2.2rem);
+  line-height: 1;
+  max-width: none;
 }
 
 .hero-copy {
-  max-width: 44rem;
-  margin: 0.7rem 0 0;
+  max-width: 38rem;
+  margin: 0.35rem 0 0;
   color: var(--muted);
-  font-size: 0.98rem;
-  line-height: 1.6;
+  font-size: 0.92rem;
+  line-height: 1.45;
 }
 
 .workspace {
@@ -200,7 +200,7 @@ code {
 
 .main-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.85fr);
+  grid-template-columns: minmax(0, 1.35fr) minmax(340px, 0.9fr);
   gap: 1rem;
   align-items: start;
 }
@@ -209,44 +209,6 @@ code {
 .details-grid {
   display: grid;
   gap: 1rem;
-}
-
-.focus-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.75rem;
-}
-
-.focus-card {
-  padding: 0.85rem 0.95rem;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(32, 21, 13, 0.08);
-}
-
-.focus-card h3 {
-  margin: 0 0 0.45rem;
-  font-size: 0.82rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-.focus-card p {
-  margin: 0;
-  line-height: 1.5;
-}
-
-.focus-metrics {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
-}
-
-.focus-note {
-  margin-top: 0.45rem;
-  font-size: 0.82rem;
-  color: var(--muted);
 }
 
 .toolbar {
@@ -263,6 +225,19 @@ code {
 
 .editor-panel {
   min-height: 100%;
+}
+
+.commit-panel {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.commit-actions {
+  margin-top: 0.2rem;
+}
+
+.branch-header {
+  margin-top: 0.3rem;
 }
 
 .field {
@@ -362,6 +337,10 @@ button:disabled {
   padding: 0.68rem 0.75rem;
 }
 
+.commit-panel .status-grid {
+  margin-top: -0.1rem;
+}
+
 .status-group h4,
 .snapshot-item h4 {
   margin: 0 0 0.55rem;
@@ -442,7 +421,6 @@ button:disabled {
 
 @media (max-width: 1060px) {
   .main-grid,
-  .focus-grid,
   .storage-cards {
     grid-template-columns: 1fr;
   }
@@ -469,6 +447,6 @@ button:disabled {
   }
 
   .hero h1 {
-    font-size: clamp(2.2rem, 11vw, 3.7rem);
+    font-size: clamp(1.5rem, 8vw, 2rem);
   }
 }
