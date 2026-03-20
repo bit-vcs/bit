@@ -13,7 +13,7 @@ import {
   DEFAULT_FILE_PATH,
   REPO_ROOT,
   absoluteFilePath,
-  createStorageControllers,
+  createIndexedDbController,
   summarizeWorkingSnapshot,
   timestampLabel,
 } from "./storage.js";
@@ -22,20 +22,20 @@ const sampleReadme = `# bit browser demo
 
 This repo is running fully in the browser.
 
-- same Git core
-- different persistence strategy
+- IndexedDB persistence
 - backend-first host contract
+- one-file edit loop
 `;
 
 const sampleNotes = `# Today
 
-Switch between storage modes, edit this file, stage it, and commit again.
+Edit this file, stage it, and commit again.
 `;
 
 const eventLog = [];
-const storageControllers = createStorageControllers();
+const controller = createIndexedDbController();
+
 const state = {
-  activeStorageId: storageControllers[0].id,
   filePath: DEFAULT_FILE_PATH,
   fileContent: sampleNotes,
   commitMessage: "demo: update notes",
@@ -44,35 +44,28 @@ const state = {
 };
 
 const elements = {
-  storageCards: document.querySelector("#storage-cards"),
   consoleTitle: document.querySelector("#console-title"),
   consoleSubtitle: document.querySelector("#console-subtitle"),
   storageBanner: document.querySelector("#storage-banner"),
-  connectStorage: document.querySelector("#connect-storage"),
-  reloadStorage: document.querySelector("#reload-storage"),
-  clearStorage: document.querySelector("#clear-storage"),
-  seedRepo: document.querySelector("#seed-repo"),
+  resetRepo: document.querySelector("#reset-repo"),
   filePath: document.querySelector("#file-path"),
   fileContent: document.querySelector("#file-content"),
   loadFile: document.querySelector("#load-file"),
   saveFile: document.querySelector("#save-file"),
   stageFile: document.querySelector("#stage-file"),
   stageAll: document.querySelector("#stage-all"),
+  commitMeta: document.querySelector("#commit-meta"),
+  changeMapView: document.querySelector("#change-map-view"),
   commitMessage: document.querySelector("#commit-message"),
   branchName: document.querySelector("#branch-name"),
   commitFile: document.querySelector("#commit-file"),
   createBranch: document.querySelector("#create-branch"),
   checkoutBranch: document.querySelector("#checkout-branch"),
   branchStrip: document.querySelector("#branch-strip"),
-  statusView: document.querySelector("#status-view"),
   historyView: document.querySelector("#history-view"),
   snapshotView: document.querySelector("#snapshot-view"),
   eventLog: document.querySelector("#event-log"),
 };
-
-const getActiveController = () => (
-  storageControllers.find((controller) => controller.id === state.activeStorageId)
-);
 
 const trimRelativePath = (value) => value.replace(/^\/+/, "").trim();
 
@@ -86,42 +79,14 @@ const logEvent = (message, tone = "info") => {
   eventLog.splice(24);
 };
 
-const runMutation = async (label, operation) => {
-  const controller = getActiveController();
-  try {
-    const result = await operation(controller);
-    if (controller.id !== "memory") {
-      await controller.persist();
-    }
-    logEvent(label, "info");
-    render(result);
-  } catch (error) {
-    console.error(error);
-    logEvent(`${label}: ${error instanceof Error ? error.message : String(error)}`, "error");
-    render();
-  }
-};
-
-const loadSnapshotIntoEditor = () => {
-  const controller = getActiveController();
-  const absolutePath = absoluteFilePath(state.filePath);
-  if (!controller.host.isFile(absolutePath)) {
-    return false;
-  }
-  state.fileContent = controller.host.readString(absolutePath);
-  return true;
-};
-
-const collectStatusGroups = (currentStatus) => {
-  return [
-    ["Untracked", currentStatus.untracked],
-    ["Staged Added", currentStatus.stagedAdded],
-    ["Staged Modified", currentStatus.stagedModified],
-    ["Staged Deleted", currentStatus.stagedDeleted],
-    ["Unstaged Modified", currentStatus.unstagedModified],
-    ["Unstaged Deleted", currentStatus.unstagedDeleted],
-  ];
-};
+const collectStatusGroups = (currentStatus) => [
+  ["Staged Added", currentStatus.stagedAdded],
+  ["Staged Modified", currentStatus.stagedModified],
+  ["Staged Deleted", currentStatus.stagedDeleted],
+  ["Unstaged Modified", currentStatus.unstagedModified],
+  ["Unstaged Deleted", currentStatus.unstagedDeleted],
+  ["Untracked", currentStatus.untracked],
+];
 
 const summarizeStatus = (currentStatus) => ({
   staged: currentStatus.stagedAdded.length
@@ -131,7 +96,16 @@ const summarizeStatus = (currentStatus) => ({
   untracked: currentStatus.untracked.length,
 });
 
-const readControllerView = (controller) => {
+const emptyStatus = () => ({
+  stagedAdded: [],
+  stagedModified: [],
+  stagedDeleted: [],
+  unstagedModified: [],
+  unstagedDeleted: [],
+  untracked: [],
+});
+
+const readView = () => {
   const summary = summarizeWorkingSnapshot(controller.host);
   const repoReady = controller.isRepoInitialized();
   if (!repoReady) {
@@ -140,79 +114,146 @@ const readControllerView = (controller) => {
       summary,
       branches: [],
       logEntries: [],
-      currentStatus: {
-        stagedAdded: [],
-        stagedModified: [],
-        stagedDeleted: [],
-        unstagedModified: [],
-        unstagedDeleted: [],
-        untracked: [],
-      },
+      currentStatus: emptyStatus(),
     };
   }
-  const branches = branchList(controller.host, REPO_ROOT);
-  const logEntries = log(controller.host, REPO_ROOT, 8);
-  const currentStatus = status(controller.host, REPO_ROOT);
-  return { repoReady, summary, branches, logEntries, currentStatus };
+
+  return {
+    repoReady,
+    summary,
+    branches: branchList(controller.host, REPO_ROOT),
+    logEntries: log(controller.host, REPO_ROOT, 8),
+    currentStatus: status(controller.host, REPO_ROOT),
+  };
 };
 
-const renderStorageCards = () => {
-  elements.storageCards.innerHTML = "";
-  for (const controller of storageControllers) {
-    const card = document.createElement("button");
-    card.type = "button";
-    card.className = `storage-card ${controller.accentClass} ${
-      controller.id === state.activeStorageId ? "active" : ""
-    }`;
-    const summary = controller.summarize();
-    card.innerHTML = `
-      <h3>${controller.title}</h3>
-      <p>${controller.description}</p>
-      <div class="storage-meta-row">
-        <span class="storage-meta">${controller.accentTone}</span>
-        <span class="storage-meta">${summary.fileCount} files</span>
-        <span class="storage-meta">${summary.gitObjectCount} git objects</span>
-      </div>
-    `;
-    card.addEventListener("click", async () => {
-      state.activeStorageId = controller.id;
-      if (!controller.ready) {
-        try {
-          await controller.hydrate();
-          logEvent(`Loaded ${controller.title} state`, "info");
-        } catch (error) {
-          logEvent(`Failed to load ${controller.title}: ${error.message}`, "error");
-        }
-      }
-      if (!loadSnapshotIntoEditor()) {
-        state.fileContent = sampleNotes;
-      }
-      render();
-    });
-    elements.storageCards.append(card);
+const createSampleRepo = async () => {
+  controller.host.reset();
+  init(controller.host, REPO_ROOT, "main");
+  controller.host.writeString(absoluteFilePath("README.md"), sampleReadme);
+  controller.host.writeString(absoluteFilePath(DEFAULT_FILE_PATH), sampleNotes);
+  add(controller.host, REPO_ROOT, ["README.md", DEFAULT_FILE_PATH]);
+  commit(
+    controller.host,
+    REPO_ROOT,
+    "demo: seed sample repo",
+    DEFAULT_AUTHOR,
+    Math.floor(Date.now() / 1000),
+  );
+  state.filePath = DEFAULT_FILE_PATH;
+  state.fileContent = controller.host.readString(absoluteFilePath(DEFAULT_FILE_PATH));
+  state.branchName = "feature/demo";
+  state.selectedBranch = "main";
+};
+
+const loadSnapshotIntoEditor = () => {
+  const absolutePath = absoluteFilePath(state.filePath);
+  if (!controller.host.isFile(absolutePath)) {
+    return false;
+  }
+  state.fileContent = controller.host.readString(absolutePath);
+  return true;
+};
+
+const focusFile = (relativePath) => {
+  state.filePath = relativePath;
+  if (!loadSnapshotIntoEditor()) {
+    logEvent(`File ${state.filePath} is not present in this repo`, "error");
+  }
+  render();
+};
+
+const runMutation = async (label, operation) => {
+  try {
+    const result = await operation();
+    await controller.persist();
+    logEvent(label, "info");
+    render(result);
+  } catch (error) {
+    console.error(error);
+    logEvent(`${label}: ${error instanceof Error ? error.message : String(error)}`, "error");
+    render();
   }
 };
 
-const renderStatus = (view) => {
+const renderCommitMeta = (view) => {
+  const currentBranch = view.branches.find((branch) => branch.isCurrent)?.name ?? "main";
+  const statusSummary = summarizeStatus(view.currentStatus);
+  const chips = [
+    `HEAD ${currentBranch}`,
+    `${statusSummary.staged} staged`,
+    `${statusSummary.unstaged} unstaged`,
+    `${statusSummary.untracked} untracked`,
+  ];
+  if (controller.lastSavedAt) {
+    chips.push(`saved ${timestampLabel(controller.lastSavedAt)}`);
+  }
+  elements.commitMeta.innerHTML = chips.map((value) => (
+    `<span class="status-chip">${value}</span>`
+  )).join("");
+};
+
+const renderChangeMap = (view) => {
   if (!view.repoReady) {
-    elements.statusView.innerHTML = `<p class="status-empty">Create the sample repo to start staging and committing files.</p>`;
+    elements.changeMapView.innerHTML = `
+      <article class="status-group status-group-clean">
+        <h4>Preparing sample repo</h4>
+        <p class="status-empty">The default repo is being created in IndexedDB.</p>
+      </article>
+    `;
     return;
   }
-  const groups = collectStatusGroups(view.currentStatus)
-    .filter(([, items]) => items.length > 0)
-    .map(([title, items]) => `
-      <article class="status-group">
-        <h4>${title}</h4>
-        <ul class="status-list">${items.map((item) => `<li><code>${item}</code></li>`).join("")}</ul>
-      </article>
-    `)
-    .join("");
-  elements.statusView.innerHTML = groups || `
-    <article class="status-group status-group-clean">
-      <h4>Working tree clean</h4>
-      <p class="status-empty">No staged or unstaged changes right now.</p>
+
+  const currentPath = state.filePath;
+  const currentGroups = collectStatusGroups(view.currentStatus)
+    .filter(([, items]) => items.includes(currentPath))
+    .map(([title]) => title);
+  const nonEmptyGroups = collectStatusGroups(view.currentStatus)
+    .filter(([, items]) => items.length > 0);
+
+  const focusCard = `
+    <article class="status-group focus-group">
+      <h4>Editing now</h4>
+      <p class="focus-path"><code>${currentPath}</code></p>
+      <p class="status-empty">
+        ${currentGroups.length
+          ? `Current file appears in ${currentGroups.join(", ")}.`
+          : "Current file has no staged or unstaged change yet."}
+      </p>
     </article>
   `;
+
+  const changeGroups = nonEmptyGroups.map(([title, items]) => `
+    <article class="status-group">
+      <h4>${title}</h4>
+      <ul class="status-list">
+        ${items.map((item) => `
+          <li>
+            <button
+              class="change-link ${item === currentPath ? "current" : ""}"
+              data-path="${item}"
+              type="button"
+            >
+              <code>${item}</code>
+            </button>
+          </li>
+        `).join("")}
+      </ul>
+    </article>
+  `).join("");
+
+  elements.changeMapView.innerHTML = focusCard + (changeGroups || `
+    <article class="status-group status-group-clean">
+      <h4>Working tree clean</h4>
+      <p class="status-empty">Save or edit a file to create a visible change here.</p>
+    </article>
+  `);
+
+  for (const button of elements.changeMapView.querySelectorAll("[data-path]")) {
+    button.addEventListener("click", () => {
+      focusFile(button.dataset.path);
+    });
+  }
 };
 
 const renderHistory = (view) => {
@@ -220,7 +261,8 @@ const renderHistory = (view) => {
     elements.historyView.innerHTML = `<p class="history-empty">No commits yet.</p>`;
     return;
   }
-  elements.historyView.innerHTML = view.logEntries.slice(0, 4).map((entry) => `
+
+  elements.historyView.innerHTML = view.logEntries.slice(0, 6).map((entry) => `
     <article class="history-item">
       <header>
         <span>${entry.id.slice(0, 7)}</span>
@@ -232,12 +274,16 @@ const renderHistory = (view) => {
   `).join("");
 };
 
-const renderSnapshot = (controller, view) => {
+const renderSnapshot = (view) => {
   const summary = view.summary;
   const workingFiles = summary.workingFiles.length
     ? `<ul>${summary.workingFiles.map((path) => {
       const relative = trimRelativePath(path.replace(`${REPO_ROOT}/`, ""));
-      return `<li><button class="snapshot-chip" data-path="${relative}" type="button">${relative}</button></li>`;
+      return `
+        <li>
+          <button class="snapshot-chip" data-path="${relative}" type="button">${relative}</button>
+        </li>
+      `;
     }).join("")}</ul>`
     : `<p class="snapshot-empty">No working tree files yet.</p>`;
 
@@ -259,18 +305,14 @@ const renderSnapshot = (controller, view) => {
       <ul>
         <li>last load: ${timestampLabel(controller.lastLoadedAt)}</li>
         <li>last save: ${timestampLabel(controller.lastSavedAt)}</li>
-        <li>mode: ${controller.accentTone}</li>
+        <li>mode: IndexedDB</li>
       </ul>
     </article>
   `;
 
   for (const button of elements.snapshotView.querySelectorAll("[data-path]")) {
     button.addEventListener("click", () => {
-      state.filePath = button.dataset.path;
-      if (!loadSnapshotIntoEditor()) {
-        logEvent(`File ${state.filePath} is not present in this repo`, "error");
-      }
-      render();
+      focusFile(button.dataset.path);
     });
   }
 };
@@ -289,10 +331,12 @@ const renderBranchStrip = (view) => {
     elements.branchStrip.innerHTML = `<span class="branch-chip">main</span>`;
     return;
   }
+
   const current = view.branches.find((branch) => branch.isCurrent);
   if (current) {
     state.selectedBranch = current.name;
   }
+
   elements.branchStrip.innerHTML = view.branches.map((branch) => `
     <button
       class="branch-chip"
@@ -303,6 +347,7 @@ const renderBranchStrip = (view) => {
       ${branch.name}${branch.isCurrent ? " · current" : ""}
     </button>
   `).join("");
+
   for (const button of elements.branchStrip.querySelectorAll("[data-branch]")) {
     button.addEventListener("click", () => {
       state.selectedBranch = button.dataset.branch;
@@ -313,32 +358,23 @@ const renderBranchStrip = (view) => {
 };
 
 const render = () => {
-  const controller = getActiveController();
-  const view = readControllerView(controller);
-  const currentBranch = view.branches.find((branch) => branch.isCurrent)?.name ?? "main";
+  const view = readView();
+  const repoReady = view.repoReady;
 
-  renderStorageCards();
-  elements.consoleTitle.textContent = controller.title;
-  elements.consoleSubtitle.textContent = controller.description;
-  elements.storageBanner.textContent = controller.getBanner();
-  elements.connectStorage.textContent = controller.id === "filesystem"
-    ? controller.persistence.isConnected
-      ? `Connected: ${controller.persistence.connectedName}`
-      : controller.persistence.connectLabel
-    : controller.persistence.connectLabel;
-  elements.connectStorage.disabled = controller.id !== "filesystem";
-  elements.reloadStorage.disabled = controller.id === "memory";
+  elements.consoleTitle.textContent = "IndexedDB demo";
+  elements.consoleSubtitle.textContent = "Changes persist in this browser and the sample repo is created automatically.";
   elements.filePath.value = state.filePath;
   elements.fileContent.value = state.fileContent;
   elements.commitMessage.value = state.commitMessage;
   elements.branchName.value = state.branchName;
-  renderStatus(view);
+
+  renderCommitMeta(view);
+  renderChangeMap(view);
   renderHistory(view);
-  renderSnapshot(controller, view);
+  renderSnapshot(view);
   renderBranchStrip(view);
   renderEventLog();
 
-  const repoReady = view.repoReady;
   elements.loadFile.disabled = !repoReady;
   elements.saveFile.disabled = !repoReady;
   elements.stageFile.disabled = !repoReady;
@@ -346,87 +382,19 @@ const render = () => {
   elements.commitFile.disabled = !repoReady;
   elements.createBranch.disabled = !repoReady;
   elements.checkoutBranch.disabled = !repoReady;
-  elements.clearStorage.disabled = controller.id === "memory" && !repoReady;
 
-  const statusSummary = summarizeStatus(view.currentStatus);
-  const bannerBits = [
-    `HEAD ${currentBranch}`,
-    `${statusSummary.staged} staged`,
-    `${statusSummary.unstaged} unstaged`,
-    `${statusSummary.untracked} untracked`,
-  ];
-  if (controller.persistence.connectedName) {
-    bannerBits.push(`folder ${controller.persistence.connectedName}`);
-  }
-  elements.storageBanner.innerHTML = bannerBits.map((value) => (
-    `<span class="status-chip">${value}</span>`
-  )).join(" ");
+  elements.storageBanner.innerHTML = `
+    <span class="status-chip">IndexedDB persistence</span>
+    <span class="status-chip">current file ${state.filePath}</span>
+    <span class="status-chip">saved ${timestampLabel(controller.lastSavedAt)}</span>
+  `;
 };
 
-const createSampleRepo = async (controller) => {
-  controller.host.reset();
-  init(controller.host, REPO_ROOT, "main");
-  controller.host.writeString(absoluteFilePath("README.md"), sampleReadme);
-  controller.host.writeString(absoluteFilePath(DEFAULT_FILE_PATH), sampleNotes);
-  add(controller.host, REPO_ROOT, ["README.md", DEFAULT_FILE_PATH]);
-  commit(
-    controller.host,
-    REPO_ROOT,
-    "demo: seed sample repo",
-    DEFAULT_AUTHOR,
-    Math.floor(Date.now() / 1000),
-  );
-  state.filePath = DEFAULT_FILE_PATH;
-  state.fileContent = controller.host.readString(absoluteFilePath(DEFAULT_FILE_PATH));
-  state.branchName = "feature/demo";
-  state.selectedBranch = "main";
-};
-
-elements.connectStorage.addEventListener("click", async () => {
-  const controller = getActiveController();
-  if (controller.id !== "filesystem") return;
-  try {
-    await controller.connect();
-    if (!loadSnapshotIntoEditor()) {
-      state.fileContent = sampleNotes;
-    }
-    logEvent(
-      controller.persistence.isConnected
-        ? `Connected local folder ${controller.persistence.connectedName}`
-        : "Local folder disconnected",
-      "info",
-    );
-    render();
-  } catch (error) {
-    logEvent(`Folder connection failed: ${error.message}`, "error");
-    render();
-  }
-});
-
-elements.reloadStorage.addEventListener("click", async () => {
-  const controller = getActiveController();
-  try {
-    await controller.hydrate();
-    if (!loadSnapshotIntoEditor()) {
-      state.fileContent = sampleNotes;
-    }
-    logEvent(`Reloaded ${controller.title} storage`, "info");
-    render();
-  } catch (error) {
-    logEvent(`Reload failed: ${error.message}`, "error");
-    render();
-  }
-});
-
-elements.clearStorage.addEventListener("click", async () => {
-  await runMutation("Cleared demo storage", async (controller) => {
+elements.resetRepo.addEventListener("click", async () => {
+  await runMutation("Reset sample repo", async () => {
     await controller.clear();
-    state.fileContent = sampleNotes;
+    await createSampleRepo();
   });
-});
-
-elements.seedRepo.addEventListener("click", async () => {
-  await runMutation("Created sample repo", createSampleRepo);
 });
 
 elements.loadFile.addEventListener("click", () => {
@@ -440,25 +408,25 @@ elements.loadFile.addEventListener("click", () => {
 });
 
 elements.saveFile.addEventListener("click", async () => {
-  await runMutation(`Saved ${state.filePath}`, async (controller) => {
+  await runMutation(`Saved ${state.filePath}`, async () => {
     controller.host.writeString(absoluteFilePath(state.filePath), state.fileContent);
   });
 });
 
 elements.stageFile.addEventListener("click", async () => {
-  await runMutation(`Staged ${state.filePath}`, async (controller) => {
+  await runMutation(`Staged ${state.filePath}`, async () => {
     add(controller.host, REPO_ROOT, [state.filePath]);
   });
 });
 
 elements.stageAll.addEventListener("click", async () => {
-  await runMutation("Staged all working tree changes", async (controller) => {
+  await runMutation("Staged all working tree changes", async () => {
     add(controller.host, REPO_ROOT, ["."]);
   });
 });
 
 elements.commitFile.addEventListener("click", async () => {
-  await runMutation(`Committed ${state.commitMessage}`, async (controller) => {
+  await runMutation(`Committed ${state.commitMessage}`, async () => {
     commit(
       controller.host,
       REPO_ROOT,
@@ -470,14 +438,14 @@ elements.commitFile.addEventListener("click", async () => {
 });
 
 elements.createBranch.addEventListener("click", async () => {
-  await runMutation(`Created branch ${state.branchName}`, async (controller) => {
+  await runMutation(`Created branch ${state.branchName}`, async () => {
     branchCreate(controller.host, REPO_ROOT, state.branchName);
     state.selectedBranch = state.branchName;
   });
 });
 
 elements.checkoutBranch.addEventListener("click", async () => {
-  await runMutation(`Checked out ${state.branchName}`, async (controller) => {
+  await runMutation(`Checked out ${state.branchName}`, async () => {
     checkout(controller.host, REPO_ROOT, state.branchName);
     state.selectedBranch = state.branchName;
   });
@@ -500,15 +468,32 @@ elements.branchName.addEventListener("input", (event) => {
 });
 
 const boot = async () => {
-  for (const controller of storageControllers) {
+  try {
+    await controller.hydrate();
+  } catch (error) {
+    console.error(error);
+    logEvent(`Failed to load IndexedDB state: ${error.message}`, "error");
+  }
+
+  if (!controller.isRepoInitialized()) {
     try {
-      await controller.hydrate();
+      await createSampleRepo();
+      await controller.persist();
+      logEvent("Created sample repo", "info");
     } catch (error) {
       console.error(error);
-      logEvent(`Failed to load ${controller.title}: ${error.message}`, "error");
+      logEvent(`Failed to create sample repo: ${error.message}`, "error");
     }
   }
-  loadSnapshotIntoEditor();
+
+  const summary = summarizeWorkingSnapshot(controller.host);
+  if (!controller.host.isFile(absoluteFilePath(state.filePath)) && summary.workingFiles.length > 0) {
+    state.filePath = trimRelativePath(summary.workingFiles[0].replace(`${REPO_ROOT}/`, ""));
+  }
+  if (!loadSnapshotIntoEditor()) {
+    state.fileContent = sampleNotes;
+  }
+
   render();
   logEvent("Demo ready", "info");
   render();

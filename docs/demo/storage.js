@@ -536,7 +536,7 @@ const createPersistence = (id) => {
   return createMemoryPersistence();
 };
 
-export const createStorageControllers = () => STORAGE_MODES.map((mode) => {
+const createStorageController = (mode) => {
   const host = createSnapshotHost();
   const persistence = createPersistence(mode.id);
 
@@ -599,7 +599,13 @@ export const createStorageControllers = () => STORAGE_MODES.map((mode) => {
       return host.isDir(joinPath(REPO_ROOT, ".git"));
     },
   };
-});
+};
+
+export const createStorageControllers = () => STORAGE_MODES.map(createStorageController);
+
+export const createIndexedDbController = () => createStorageController(STORAGE_MODES.find((mode) => (
+  mode.id === "indexeddb"
+)));
 
 export const absoluteFilePath = (relativePath) => joinPath(REPO_ROOT, relativePath);
 

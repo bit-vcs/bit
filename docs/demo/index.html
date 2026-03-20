@@ -9,7 +9,7 @@
     <title>bit JS Demo</title>
     <meta
       name="description"
-      content="Git in the browser with in-memory, IndexedDB, and File System Access persistence."
+      content="Git in the browser with IndexedDB persistence and a focused edit-stage-commit loop."
     />
     <link rel="stylesheet" href="./styles.css" />
   </head>
@@ -18,34 +18,27 @@
       <header class="hero">
         <p class="eyebrow">bit / browser demo</p>
         <h1>Git playground</h1>
-        <p class="hero-copy">One-file edit loop across memory, IndexedDB, and local folder storage.</p>
+        <p class="hero-copy">IndexedDB-backed edit, stage, and commit loop.</p>
       </header>
 
       <main class="workspace">
-        <section class="console">
-          <section class="panel storage-panel">
-            <div class="section-heading compact-heading">
-              <h2 id="console-title">Workspace</h2>
-              <p id="console-subtitle">Loading demo state…</p>
-            </div>
-            <div id="storage-cards" class="storage-cards compact-cards"></div>
-          </section>
+        <section class="panel topbar-panel">
+          <div class="section-heading compact-heading">
+            <h2 id="console-title">IndexedDB demo</h2>
+            <p id="console-subtitle">Loading saved repo…</p>
+          </div>
+          <div class="toolbar">
+            <button id="reset-repo" class="primary" type="button">Reset sample repo</button>
+          </div>
+          <div id="storage-banner" class="storage-banner"></div>
+        </section>
 
-          <section class="panel overview-panel">
-            <div class="toolbar">
-              <button id="connect-storage" class="secondary" type="button"></button>
-              <button id="reload-storage" class="secondary" type="button">Reload persisted repo</button>
-              <button id="clear-storage" class="danger" type="button">Clear demo storage</button>
-              <button id="seed-repo" class="primary" type="button">Create sample repo</button>
-            </div>
-            <div id="storage-banner" class="storage-banner"></div>
-          </section>
-
-          <div class="main-grid">
+        <div class="main-grid">
+          <div class="left-stack">
             <section class="panel editor-panel">
               <div class="panel-header">
                 <h3>Working File</h3>
-                <p>Edit first. Stage and commit from the right column.</p>
+                <p>Edit the focused file here.</p>
               </div>
               <label class="field">
                 <span>Relative path</span>
@@ -61,76 +54,69 @@
               </div>
             </section>
 
-            <div class="side-stack">
-              <section class="panel">
-                <div class="panel-header">
-                  <h3>Current Changes</h3>
-                  <p>Only the groups with active changes stay visible.</p>
-                </div>
-                <div id="status-view" class="status-grid compact-status"></div>
-              </section>
-
-              <section class="panel commit-panel">
-                <div class="panel-header">
-                  <h3>Commit</h3>
-                  <p>1. Stage the change. 2. Write the message. 3. Commit staged changes.</p>
-                </div>
-                <div id="status-view" class="status-grid compact-status"></div>
-                <div class="button-row commit-actions">
-                  <button id="stage-file" class="secondary" type="button">Stage file</button>
-                  <button id="stage-all" class="secondary" type="button">Stage all</button>
-                  <button id="commit-file" class="primary" type="button">Commit staged changes</button>
-                </div>
-                <label class="field">
-                  <span>Commit message</span>
-                  <input id="commit-message" type="text" value="demo: update notes" />
-                </label>
-                <div class="panel-header branch-header">
-                  <h3>Branch</h3>
-                  <p>Secondary flow for switching or creating branches.</p>
-                </div>
-                <label class="field">
-                  <span>Branch name</span>
-                  <input id="branch-name" type="text" value="feature/demo" />
-                </label>
-                <div class="button-row">
-                  <button id="create-branch" class="secondary" type="button">Create branch</button>
-                  <button id="checkout-branch" class="secondary" type="button">Checkout branch</button>
-                </div>
-                <div id="branch-strip" class="branch-strip"></div>
-              </section>
-
-              <section class="panel">
-                <div class="panel-header">
-                  <h3>Recent History</h3>
-                  <p>Latest commits only.</p>
-                </div>
-                <div id="history-view" class="history-list"></div>
-              </section>
-            </div>
+            <section class="panel commit-panel">
+              <div class="panel-header">
+                <h3>Commit & Branch</h3>
+                <p>Stage current changes, write the message, then commit.</p>
+              </div>
+              <div id="commit-meta" class="storage-meta-row"></div>
+              <div id="change-map-view" class="change-map"></div>
+              <div class="button-row commit-actions">
+                <button id="stage-file" class="secondary" type="button">Stage file</button>
+                <button id="stage-all" class="secondary" type="button">Stage all</button>
+                <button id="commit-file" class="primary" type="button">Commit staged changes</button>
+              </div>
+              <label class="field">
+                <span>Commit message</span>
+                <input id="commit-message" type="text" value="demo: update notes" />
+              </label>
+              <div class="panel-header branch-header">
+                <h3>Branch</h3>
+                <p>Create or switch branches after the commit flow.</p>
+              </div>
+              <label class="field">
+                <span>Branch name</span>
+                <input id="branch-name" type="text" value="feature/demo" />
+              </label>
+              <div class="button-row">
+                <button id="create-branch" class="secondary" type="button">Create branch</button>
+                <button id="checkout-branch" class="secondary" type="button">Checkout branch</button>
+              </div>
+              <div id="branch-strip" class="branch-strip"></div>
+            </section>
           </div>
 
-          <details class="panel details-panel">
-            <summary>Storage details and event log</summary>
-            <div class="details-grid">
-              <section>
-                <div class="panel-header minor-header">
-                  <h3>Snapshot</h3>
-                  <p>Persistence footprint and working files.</p>
-                </div>
-                <div id="snapshot-view" class="snapshot-list"></div>
-              </section>
+          <div class="right-stack">
+            <section class="panel history-panel">
+              <div class="panel-header">
+                <h3>Recent History</h3>
+                <p>Latest commits first.</p>
+              </div>
+              <div id="history-view" class="history-list"></div>
+            </section>
 
-              <section>
-                <div class="panel-header minor-header">
-                  <h3>Event Log</h3>
-                  <p>Recent repo and persistence actions.</p>
-                </div>
-                <ol id="event-log" class="event-log"></ol>
-              </section>
-            </div>
-          </details>
-        </section>
+            <details class="panel details-panel">
+              <summary>Storage details and event log</summary>
+              <div class="details-grid">
+                <section>
+                  <div class="panel-header minor-header">
+                    <h3>Snapshot</h3>
+                    <p>Persistence footprint and working files.</p>
+                  </div>
+                  <div id="snapshot-view" class="snapshot-list"></div>
+                </section>
+
+                <section>
+                  <div class="panel-header minor-header">
+                    <h3>Event Log</h3>
+                    <p>Recent repo and persistence actions.</p>
+                  </div>
+                  <ol id="event-log" class="event-log"></ol>
+                </section>
+              </div>
+            </details>
+          </div>
+        </div>
       </main>
     </div>
 

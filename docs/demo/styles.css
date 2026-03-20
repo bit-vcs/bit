@@ -58,14 +58,14 @@ code {
 .page-shell {
   width: min(1160px, calc(100vw - 2rem));
   margin: 0 auto;
-  padding: 1.2rem 0 3rem;
+  padding: 0.9rem 0 3rem;
 }
 
 .hero {
-  padding: 0.95rem 1.2rem;
-  margin-bottom: 0.8rem;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.65rem;
   border: 1px solid var(--line);
-  border-radius: 22px;
+  border-radius: 18px;
   background:
     linear-gradient(135deg, rgba(255, 248, 236, 0.95), rgba(248, 238, 222, 0.84)),
     var(--surface);
@@ -73,11 +73,11 @@ code {
 }
 
 .eyebrow {
-  margin: 0 0 0.7rem;
+  margin: 0 0 0.3rem;
   color: var(--warm);
   text-transform: uppercase;
   letter-spacing: 0.18em;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 700;
 }
 
@@ -91,17 +91,17 @@ code {
 }
 
 .hero h1 {
-  font-size: clamp(1.6rem, 3vw, 2.2rem);
+  font-size: clamp(1.3rem, 2.3vw, 1.8rem);
   line-height: 1;
   max-width: none;
 }
 
 .hero-copy {
-  max-width: 38rem;
-  margin: 0.35rem 0 0;
+  max-width: 32rem;
+  margin: 0.2rem 0 0;
   color: var(--muted);
-  font-size: 0.92rem;
-  line-height: 1.45;
+  font-size: 0.84rem;
+  line-height: 1.35;
 }
 
 .workspace {
@@ -193,26 +193,34 @@ code {
   padding: 1rem;
 }
 
-.storage-panel,
-.overview-panel {
-  gap: 0.85rem;
-}
-
 .main-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(340px, 0.9fr);
+  grid-template-columns: minmax(0, 1.18fr) minmax(320px, 0.82fr);
   gap: 1rem;
   align-items: start;
 }
 
-.side-stack,
+.left-stack,
+.right-stack,
 .details-grid {
   display: grid;
   gap: 1rem;
 }
 
+.topbar-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.8rem;
+  align-items: center;
+}
+
+.topbar-panel .storage-banner {
+  grid-column: 1 / -1;
+}
+
 .toolbar {
   align-items: center;
+  justify-content: flex-end;
 }
 
 .storage-banner {
@@ -230,6 +238,11 @@ code {
 .commit-panel {
   display: grid;
   gap: 0.75rem;
+}
+
+.change-map {
+  display: grid;
+  gap: 0.65rem;
 }
 
 .commit-actions {
@@ -341,6 +354,30 @@ button:disabled {
   margin-top: -0.1rem;
 }
 
+.focus-group {
+  background: rgba(247, 243, 236, 0.95);
+}
+
+.focus-path {
+  margin: 0 0 0.35rem;
+}
+
+.change-link {
+  width: 100%;
+  display: inline-flex;
+  justify-content: flex-start;
+  border: 1px solid rgba(32, 21, 13, 0.1);
+  border-radius: 12px;
+  padding: 0.48rem 0.7rem;
+  background: rgba(32, 21, 13, 0.04);
+  color: var(--text);
+}
+
+.change-link.current {
+  border-color: rgba(197, 93, 23, 0.42);
+  background: rgba(197, 93, 23, 0.1);
+}
+
 .status-group h4,
 .snapshot-item h4 {
   margin: 0 0 0.55rem;
@@ -422,6 +459,10 @@ button:disabled {
 @media (max-width: 1060px) {
   .main-grid,
   .storage-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .topbar-panel {
     grid-template-columns: 1fr;
   }
 
