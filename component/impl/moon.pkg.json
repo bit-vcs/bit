@@ -1,18 +1,10 @@
-import {
-  "bit/component/gen/cabi" @cabi,
-  "bit/component/gen/interface/mizchi/bit/filesystem" @wit_fs,
-  "bit/component/gen/interface/mizchi/bit/http-client" @wit_http,
-  "mizchi/bit" @bit,
-  "mizchi/bit/lib" @bitlib,
-  "mizchi/bit/protocol" @protocol,
-  "mizchi/bit/pack" @pack,
-}
-
-options(
+{
   "is-main": true,
-  link: {
+  "import": [
+    { "path": "bit/component/gen/cabi", "alias": "cabi" }
+  ],
+  "link": {
     "wasm": {
-      "export-memory-name": "memory",
       "exports": [
         "cabi_realloc:cabi_realloc",
         "wasmExportAdd:mizchi:bit/git-ops#add",
@@ -30,11 +22,11 @@ options(
         "wasmExportStatusPorcelain:mizchi:bit/git-ops#status-porcelain",
         "wasmExportClone:mizchi:bit/git-network-ops#clone",
         "wasmExportFetch:mizchi:bit/git-network-ops#fetch",
-        "wasmExportPush:mizchi:bit/git-network-ops#push",
+        "wasmExportPush:mizchi:bit/git-network-ops#push"
       ],
+      "export-memory-name": "memory"
     },
     "wasm-gc": {
-      "export-memory-name": "memory",
       "exports": [
         "cabi_realloc:cabi_realloc",
         "wasmExportAdd:mizchi:bit/git-ops#add",
@@ -52,8 +44,9 @@ options(
         "wasmExportStatusPorcelain:mizchi:bit/git-ops#status-porcelain",
         "wasmExportClone:mizchi:bit/git-network-ops#clone",
         "wasmExportFetch:mizchi:bit/git-network-ops#fetch",
-        "wasmExportPush:mizchi:bit/git-network-ops#push",
+        "wasmExportPush:mizchi:bit/git-network-ops#push"
       ],
-    },
-  },
-)
+      "export-memory-name": "memory"
+    }
+  }
+}

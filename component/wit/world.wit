@@ -1,4 +1,4 @@
-package bit:git;
+package mizchi:bit;
 
 interface filesystem {
   mkdir-p: func(path: string) -> result<_, string>;

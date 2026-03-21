@@ -187,7 +187,7 @@ pub fn status(root : String) -> Result[StatusResult, String] {
     for entry in entries {
       index_map[entry.path] = entry
     }
-    let files = @ignore.list_working_files(fs, root)
+    let files = @bitlib.list_working_files(fs, root)
     files.sort()
     let visited : Map[String, Bool] = {}
     let untracked : Array[String] = []
@@ -248,7 +248,6 @@ pub fn status(root : String) -> Result[StatusResult, String] {
     }
   })
 }
-
 ///|
 pub fn status_porcelain(root : String) -> Result[Array[String], String] {
   match status(root) {
