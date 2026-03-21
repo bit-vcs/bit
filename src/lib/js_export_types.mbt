@@ -28,6 +28,12 @@ pub struct JsStashEntry {
 } derive(Show, Eq)
 
 ///|
+pub struct JsRemoteVerboseEntry {
+  name : String
+  value : String
+} derive(Show, Eq)
+
+///|
 pub struct JsMergeResult {
   status : String
   commit_id : String

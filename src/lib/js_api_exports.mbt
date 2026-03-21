@@ -216,6 +216,11 @@ fn js_reset_mode_text(mode : String) -> ResetMode raise @bit.GitError {
 }
 
 ///|
+fn js_optional_text(value : String) -> String? {
+  if value.length() == 0 { None } else { Some(value) }
+}
+
+///|
 fn js_convert_merge_result(result : MergeResult) -> JsMergeResult {
   {
     status: js_merge_status_text(result.status),
@@ -411,6 +416,17 @@ pub fn js_status_porcelain(
 }
 
 ///|
+pub async fn js_status_text(
+  host_id : Int,
+  root : String,
+) -> Result[String, String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error_async(async fn() -> String raise @bit.GitError {
+    status_text(fs, root)
+  })
+}
+
+///|
 pub fn js_commit(
   host_id : Int,
   root : String,
@@ -422,6 +438,40 @@ pub fn js_commit(
   js_wrap_error(() => {
     let prepared = js_prepare_commit(fs, root, message, author, timestamp_secs)
     js_finalize_commit(fs, prepared, prepared.payload).to_hex()
+  })
+}
+
+///|
+pub fn js_commit_amend(
+  host_id : Int,
+  root : String,
+  message : String,
+  author : String,
+  author_timestamp_secs : Int,
+  committer : String,
+  committer_timestamp_secs : Int,
+  timezone : String,
+  encoding : String,
+  author_timezone : String,
+  committer_timezone : String,
+) -> Result[String, String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error(() => {
+    commit_amend(
+      fs,
+      fs,
+      root,
+      message,
+      author,
+      author_timestamp_secs.to_int64(),
+      committer=if committer.length() == 0 { author } else { committer },
+      committer_timestamp=committer_timestamp_secs.to_int64(),
+      timezone=if timezone.length() == 0 { "+0000" } else { timezone },
+      encoding=if encoding.length() == 0 { "UTF-8" } else { encoding },
+      author_timezone=js_optional_text(author_timezone),
+      committer_timezone=js_optional_text(committer_timezone),
+    )
+      .to_hex()
   })
 }
 
@@ -559,6 +609,20 @@ pub fn js_checkout_b(
   js_wrap_error(() => {
     create_branch(fs, fs, root, branch_name)
     ignore(checkout(fs, fs, root, branch_name))
+  })
+}
+
+///|
+pub fn js_switch_branch(
+  host_id : Int,
+  root : String,
+  name : String,
+  create : Bool,
+  checkout_files : Bool,
+) -> Result[Unit, String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error(() => {
+    switch_branch(fs, fs, root, name, create~, checkout_files~)
   })
 }
 
@@ -905,6 +969,23 @@ pub fn js_list_remotes(
 }
 
 ///|
+pub fn js_list_remotes_verbose(
+  host_id : Int,
+  root : String,
+) -> Result[Array[JsRemoteVerboseEntry], String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error(() => {
+    let entries = list_remotes_verbose(fs, js_resolve_git_dir(fs, root))
+    let result : Array[JsRemoteVerboseEntry] = []
+    for item in entries {
+      let (name, value) = item
+      result.push({ name, value })
+    }
+    result
+  })
+}
+
+///|
 pub fn js_get_remote_url(
   host_id : Int,
   root : String,
@@ -913,6 +994,94 @@ pub fn js_get_remote_url(
   let fs = js_make_host_fs(host_id)
   js_wrap_error(() => {
     get_remote_url(fs, js_resolve_git_dir(fs, root), name).unwrap_or("")
+  })
+}
+
+///|
+pub fn js_sparse_checkout_init(
+  host_id : Int,
+  root : String,
+  cone : Bool,
+) -> Result[Unit, String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error(() => sparse_checkout_init(fs, fs, root, cone~))
+}
+
+///|
+pub fn js_sparse_checkout_set(
+  host_id : Int,
+  root : String,
+  patterns : Array[String],
+) -> Result[Unit, String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error(() => sparse_checkout_set(fs, fs, root, patterns))
+}
+
+///|
+pub fn js_sparse_checkout_add(
+  host_id : Int,
+  root : String,
+  patterns : Array[String],
+) -> Result[Unit, String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error(() => sparse_checkout_add(fs, fs, root, patterns))
+}
+
+///|
+pub fn js_sparse_checkout_disable(
+  host_id : Int,
+  root : String,
+) -> Result[Unit, String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error(() => sparse_checkout_disable(fs, fs, root))
+}
+
+///|
+pub fn js_sparse_checkout_reapply(
+  host_id : Int,
+  root : String,
+) -> Result[Unit, String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error(() => sparse_checkout_reapply(fs, fs, root))
+}
+
+///|
+pub fn js_sparse_checkout_enabled(
+  host_id : Int,
+  root : String,
+) -> Result[Bool, String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error(() => is_sparse_checkout_enabled(fs, js_resolve_git_dir(fs, root)))
+}
+
+///|
+pub fn js_sparse_checkout_cone_enabled(
+  host_id : Int,
+  root : String,
+) -> Result[Bool, String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error(() => {
+    is_sparse_checkout_cone_enabled(fs, js_resolve_git_dir(fs, root))
+  })
+}
+
+///|
+pub fn js_sparse_checkout_patterns(
+  host_id : Int,
+  root : String,
+) -> Result[Array[String], String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error(() => read_sparse_patterns(fs, js_resolve_git_dir(fs, root)))
+}
+
+///|
+pub fn js_sparse_checkout_display_patterns(
+  host_id : Int,
+  root : String,
+) -> Result[Array[String], String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error(() => {
+    read_sparse_display_patterns(fs, js_resolve_git_dir(fs, root))
   })
 }
 

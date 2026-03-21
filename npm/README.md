@@ -43,10 +43,12 @@ import {
   branchList,
   buildCommitPayload,
   commit,
+  commitAmend,
   commitWithSigner,
   createFetchTransport,
   fetch,
   init,
+  listRemotesVerbose,
   log,
   merge,
   relayListClonePeers,
@@ -54,6 +56,8 @@ import {
   push,
   rebaseStart,
   status,
+  statusText,
+  switchBranch,
   writeString,
 } from "@mizchi/bit/lib";
 
@@ -87,6 +91,17 @@ console.log(mergeResult.status);
 
 const rebaseResult = rebaseStart(backend, "/repo", "origin/main");
 console.log(rebaseResult.status);
+
+switchBranch(backend, "/repo", "feature", { create: true });
+const amendedCommitId = commitAmend(
+  backend,
+  "/repo",
+  "amended commit",
+  "Example <example@example.com>",
+  1700000002,
+);
+console.log(await statusText(backend, "/repo"));
+console.log(listRemotesVerbose(backend, "/repo"));
 
 const payload = buildCommitPayload(
   backend,
@@ -258,16 +273,21 @@ Required backend methods:
 - `buildCommitPayload()` returns the unsigned commit payload text you should hand to your signer.
 - `commitSigned()` writes a signed commit from an armored signature string.
 - `commitWithSigner()` is the ergonomic async wrapper for browser `crypto.subtle` style signers.
+- `commitAmend()` exposes `git commit --amend` style history replacement.
 - `revParse()` and `showRef()` expose ref resolution helpers.
 - `merge()` resolves a revision string such as `feature`, `origin/main`, or `HEAD^`.
 - `rebaseStart()` / `rebaseStartWithOnto()` / `rebaseContinue()` / `rebaseAbort()` / `rebaseSkip()` expose the rebase state machine.
+- `statusText()` exposes the human-readable porcelain status summary.
 - `restore()` and `reset()` expose the working tree/index reset flow.
+- `switchBranch()` exposes branch switching with `{ create, checkoutFiles }`.
 - `branchRename()` exposes `git branch -m` style renames.
 - `tagList()` / `tagCreateLightweight()` / `tagCreateAnnotated()` / `tagDelete()` expose tag operations.
 - `stashList()` / `stashPush()` / `stashApply()` / `stashPop()` / `stashDrop()` expose stash operations.
 - `cherryPick()` exposes single-commit cherry-pick with `noCommit`, `messageSuffix`, and `signoffCommitter` options.
 - `diffWorktree()` / `diffWorktreeStat()` and `diffIndex()` / `diffIndexStat()` return unified diff lines and `--stat`-style summaries.
-- `listRemotes()` and `getRemoteUrl()` expose read-only remote config helpers.
+- `listRemotes()`, `listRemotesVerbose()`, and `getRemoteUrl()` expose read-only remote config helpers.
+- `sparseCheckoutInit()` / `sparseCheckoutSet()` / `sparseCheckoutAdd()` / `sparseCheckoutDisable()` / `sparseCheckoutReapply()` expose sparse checkout control.
+- `sparseCheckoutEnabled()`, `sparseCheckoutConeEnabled()`, `sparseCheckoutPatterns()`, and `sparseCheckoutDisplayPatterns()` expose sparse checkout state.
 - `fetch()` and `push()` are async and require an injected transport. Use `createFetchTransport(fetch)` for browser or worker `fetch`.
 - `fetch()` and `push()` also understand relay signaling remotes and will resolve a peer before using Git smart HTTP.
 - `relayListClonePeers()` returns `{ sender, cloneUrl, repo }[]`.

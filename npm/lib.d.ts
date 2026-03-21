@@ -39,6 +39,11 @@ export interface BitGitRefInfo {
   id: string;
 }
 
+export interface BitGitRemoteVerboseEntry {
+  name: string;
+  value: string;
+}
+
 export interface BitGitStashEntry {
   id: string;
   message: string;
@@ -143,6 +148,20 @@ export interface BitGitBranchRenameOptions {
   timezone?: string;
 }
 
+export interface BitGitSwitchBranchOptions {
+  create?: boolean;
+  checkoutFiles?: boolean;
+}
+
+export interface BitGitCommitAmendOptions {
+  committer?: string;
+  committerTimestampSec?: number;
+  timezone?: string;
+  encoding?: string;
+  authorTimezone?: string;
+  committerTimezone?: string;
+}
+
 export type BitGitCommitSigner = (
   payload: string,
 ) => string | Promise<string>;
@@ -201,12 +220,24 @@ export declare function add(
 ): void;
 export declare function status(backend: BitGitBackend, root: string): BitGitStatus;
 export declare function statusPorcelain(backend: BitGitBackend, root: string): string[];
+export declare function statusText(
+  backend: BitGitBackend,
+  root: string,
+): Promise<string>;
 export declare function commit(
   backend: BitGitBackend,
   root: string,
   message: string,
   author: string,
   timestampSec?: number,
+): string;
+export declare function commitAmend(
+  backend: BitGitBackend,
+  root: string,
+  message: string,
+  author: string,
+  authorTimestampSec?: number,
+  options?: BitGitCommitAmendOptions,
 ): string;
 export declare function buildCommitPayload(
   backend: BitGitBackend,
@@ -255,6 +286,12 @@ export declare function merge(
 ): BitGitMergeResult;
 export declare function checkout(backend: BitGitBackend, root: string, target: string): void;
 export declare function checkoutB(backend: BitGitBackend, root: string, branchName: string): void;
+export declare function switchBranch(
+  backend: BitGitBackend,
+  root: string,
+  name: string,
+  options?: BitGitSwitchBranchOptions,
+): void;
 export declare function restore(
   backend: BitGitBackend,
   root: string,
@@ -371,11 +408,54 @@ export declare function listRemotes(
   backend: BitGitBackend,
   root: string,
 ): string[];
+export declare function listRemotesVerbose(
+  backend: BitGitBackend,
+  root: string,
+): BitGitRemoteVerboseEntry[];
 export declare function getRemoteUrl(
   backend: BitGitBackend,
   root: string,
   name: string,
 ): string | null;
+export declare function sparseCheckoutInit(
+  backend: BitGitBackend,
+  root: string,
+  cone?: boolean,
+): void;
+export declare function sparseCheckoutSet(
+  backend: BitGitBackend,
+  root: string,
+  patterns: Iterable<string> | ArrayLike<string>,
+): void;
+export declare function sparseCheckoutAdd(
+  backend: BitGitBackend,
+  root: string,
+  patterns: Iterable<string> | ArrayLike<string>,
+): void;
+export declare function sparseCheckoutDisable(
+  backend: BitGitBackend,
+  root: string,
+): void;
+export declare function sparseCheckoutReapply(
+  backend: BitGitBackend,
+  root: string,
+): void;
+export declare function sparseCheckoutEnabled(
+  backend: BitGitBackend,
+  root: string,
+): boolean;
+export declare function sparseCheckoutConeEnabled(
+  backend: BitGitBackend,
+  root: string,
+): boolean;
+export declare function sparseCheckoutPatterns(
+  backend: BitGitBackend,
+  root: string,
+): string[];
+export declare function sparseCheckoutDisplayPatterns(
+  backend: BitGitBackend,
+  root: string,
+): string[];
 export declare function fetch(
   backend: BitGitBackend,
   root: string,

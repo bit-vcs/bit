@@ -634,3 +634,219 @@ async test "js exports: stash diff and cherry-pick" {
 
   js_destroy_host(host_id)
 }
+
+///|
+async test "js exports: status text amend switch branch and remote verbose" {
+  let host_id = js_create_memory_host()
+
+  js_exports_unwrap_ok("init", js_git_init(host_id, "/repo", "main"))
+  js_exports_unwrap_ok(
+    "write a",
+    js_host_write_string(host_id, "/repo/a.txt", "one\n"),
+  )
+  let initial_status_text = js_exports_unwrap_ok(
+    "statusText initial",
+    js_status_text(host_id, "/repo"),
+  )
+  assert_true(initial_status_text.contains("On branch main"))
+  assert_true(initial_status_text.contains("No commits yet"))
+
+  js_exports_unwrap_ok("add a", js_add_paths(host_id, "/repo", ["a.txt"]))
+  let staged_status_text = js_exports_unwrap_ok(
+    "statusText staged",
+    js_status_text(host_id, "/repo"),
+  )
+  assert_true(staged_status_text.contains("Changes to be committed"))
+  ignore(
+    js_exports_unwrap_ok(
+      "commit",
+      js_commit(host_id, "/repo", "first", "Tester <tester@example.com>", 1700000400),
+    ),
+  )
+
+  js_exports_unwrap_ok(
+    "switchBranch feature",
+    js_switch_branch(host_id, "/repo", "feature", true, true),
+  )
+  let feature_head = js_exports_unwrap_ok(
+    "head feature",
+    js_host_read_string(host_id, "/repo/.git/HEAD"),
+  )
+  assert_eq(feature_head, "ref: refs/heads/feature\n")
+
+  js_exports_unwrap_ok(
+    "write feature",
+    js_host_write_string(host_id, "/repo/a.txt", "feature\n"),
+  )
+  js_exports_unwrap_ok("add feature", js_add_paths(host_id, "/repo", ["a.txt"]))
+  ignore(
+    js_exports_unwrap_ok(
+      "commit feature",
+      js_commit(host_id, "/repo", "feature", "Tester <tester@example.com>", 1700000401),
+    ),
+  )
+  let original_head = js_exports_unwrap_ok(
+    "head before amend",
+    js_rev_parse(host_id, "/repo", "HEAD"),
+  )
+  let amended = js_exports_unwrap_ok(
+    "commitAmend",
+    js_commit_amend(
+      host_id,
+      "/repo",
+      "feature amended",
+      "Tester <tester@example.com>",
+      1700000402,
+      "Tester <tester@example.com>",
+      1700000402,
+      "+0000",
+      "UTF-8",
+      "",
+      "",
+    ),
+  )
+  assert_true(amended.length() == 40)
+  assert_true(amended != original_head)
+  let log_entries = js_exports_unwrap_ok("log", js_log(host_id, "/repo", 2))
+  assert_eq(log_entries[0].message, "feature amended")
+
+  js_exports_unwrap_ok(
+    "switchBranch main",
+    js_switch_branch(host_id, "/repo", "main", false, true),
+  )
+  assert_eq(
+    js_exports_unwrap_ok("read main file", js_host_read_string(host_id, "/repo/a.txt")),
+    "one\n",
+  )
+
+  js_exports_unwrap_ok(
+    "write config",
+    js_host_write_string(
+      host_id,
+      "/repo/.git/config",
+      "[remote \"origin\"]\n\turl = https://example.com/fetch.git\n\tpushurl = https://example.com/push.git\n",
+    ),
+  )
+  let remotes = js_exports_unwrap_ok(
+    "listRemotesVerbose",
+    js_list_remotes_verbose(host_id, "/repo"),
+  )
+  assert_eq(remotes.length(), 2)
+  assert_eq(remotes[0].name, "origin")
+  assert_true(remotes[0].value.contains("(fetch)"))
+  assert_true(remotes[1].value.contains("(push)"))
+
+  js_destroy_host(host_id)
+}
+
+///|
+test "js exports: sparse checkout flow" {
+  let host_id = js_create_memory_host()
+
+  js_exports_unwrap_ok("init sparse", js_git_init(host_id, "/sparse", "main"))
+  js_exports_unwrap_ok(
+    "write keep",
+    js_host_write_string(host_id, "/sparse/keep/file.txt", "keep\n"),
+  )
+  js_exports_unwrap_ok(
+    "write skip",
+    js_host_write_string(host_id, "/sparse/skip/file.txt", "skip\n"),
+  )
+  js_exports_unwrap_ok(
+    "add sparse",
+    js_add_paths(host_id, "/sparse", ["keep/file.txt", "skip/file.txt"]),
+  )
+  ignore(
+    js_exports_unwrap_ok(
+      "commit sparse",
+      js_commit(host_id, "/sparse", "base", "Tester <tester@example.com>", 1700000500),
+    ),
+  )
+
+  js_exports_unwrap_ok(
+    "sparseCheckoutInit",
+    js_sparse_checkout_init(host_id, "/sparse", false),
+  )
+  js_exports_unwrap_ok(
+    "sparseCheckoutSet",
+    js_sparse_checkout_set(host_id, "/sparse", ["keep"]),
+  )
+  assert_true(
+    js_exports_unwrap_ok(
+      "sparseCheckoutEnabled",
+      js_sparse_checkout_enabled(host_id, "/sparse"),
+    ),
+  )
+  assert_false(
+    js_exports_unwrap_ok(
+      "sparseCheckoutConeEnabled",
+      js_sparse_checkout_cone_enabled(host_id, "/sparse"),
+    ),
+  )
+  assert_eq(
+    js_exports_unwrap_ok(
+      "sparseDisplayPatterns",
+      js_sparse_checkout_display_patterns(host_id, "/sparse"),
+    ),
+    ["keep"],
+  )
+  assert_true(
+    js_exports_unwrap_ok(
+      "read keep",
+      js_host_read_string(host_id, "/sparse/keep/file.txt"),
+    ) == "keep\n",
+  )
+  assert_true(
+    js_exports_unwrap_ok(
+      "status after sparse set",
+      js_status(host_id, "/sparse"),
+    ).unstaged_deleted.contains("skip/file.txt"),
+  )
+
+  js_exports_unwrap_ok(
+    "sparseCheckoutAdd",
+    js_sparse_checkout_add(host_id, "/sparse", ["skip"]),
+  )
+  let patterns_after_add = js_exports_unwrap_ok(
+    "sparseDisplayPatterns after add",
+    js_sparse_checkout_display_patterns(host_id, "/sparse"),
+  )
+  assert_true(patterns_after_add.contains("keep"))
+  assert_true(patterns_after_add.contains("skip"))
+  js_exports_unwrap_ok(
+    "sparseCheckoutReapply",
+    js_sparse_checkout_reapply(host_id, "/sparse"),
+  )
+  assert_eq(
+    js_exports_unwrap_ok(
+      "read skip",
+      js_host_read_string(host_id, "/sparse/skip/file.txt"),
+    ),
+    "skip\n",
+  )
+
+  js_exports_unwrap_ok(
+    "sparseCheckoutDisable",
+    js_sparse_checkout_disable(host_id, "/sparse"),
+  )
+  assert_false(
+    js_exports_unwrap_ok(
+      "sparseCheckoutEnabled after disable",
+      js_sparse_checkout_enabled(host_id, "/sparse"),
+    ),
+  )
+  let patterns = js_exports_unwrap_ok(
+    "sparseCheckoutPatterns",
+    js_sparse_checkout_patterns(host_id, "/sparse"),
+  )
+  assert_true(patterns.length() > 0)
+  assert_eq(
+    js_exports_unwrap_ok(
+      "read skip after disable",
+      js_host_read_string(host_id, "/sparse/skip/file.txt"),
+    ),
+    "skip\n",
+  )
+
+  js_destroy_host(host_id)
+}

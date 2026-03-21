@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { inflateSync } from "node:zlib";
+import { pathToFileURL } from "node:url";
 
-const bitGit = await import(new URL("./bit-git.mjs", import.meta.url));
+const defaultBitGit = await import(new URL("./bit-git.mjs", import.meta.url));
 
 function createVirtualHost() {
   const encoder = new TextEncoder();
@@ -120,7 +121,7 @@ function createVirtualHost() {
   };
 }
 
-function runRepoFlow(api, root, author) {
+function runRepoFlow(bitGit, api, root, author) {
   bitGit.init(api, root, "main");
   bitGit.writeString(api, `${root}/hello.txt`, "hello\n");
 
@@ -169,7 +170,7 @@ function readLooseCommitText(backend, root, commitId) {
   return raw.subarray(headerEnd + 1).toString("utf8");
 }
 
-async function runSignedCommitFlow(api, root, author) {
+async function runSignedCommitFlow(bitGit, api, root, author) {
   bitGit.init(api, root, "main");
   bitGit.writeString(api, `${root}/signed.txt`, "signed\n");
   bitGit.add(api, root, ["signed.txt"]);
@@ -215,7 +216,7 @@ async function runSignedCommitFlow(api, root, author) {
   return { commitId, payload, commitText };
 }
 
-function runMergeFlow(api, root, author) {
+function runMergeFlow(bitGit, api, root, author) {
   bitGit.init(api, root, "main");
   bitGit.writeString(api, `${root}/file.txt`, "line1\nline2\nline3\nline4\n");
   bitGit.add(api, root, ["file.txt"]);
@@ -244,7 +245,7 @@ function runMergeFlow(api, root, author) {
   return mergeResult;
 }
 
-function runRebaseFlow(api, root, author) {
+function runRebaseFlow(bitGit, api, root, author) {
   bitGit.init(api, root, "main");
   bitGit.writeString(api, `${root}/a.txt`, "A\n");
   bitGit.add(api, root, ["a.txt"]);
@@ -261,14 +262,14 @@ function runRebaseFlow(api, root, author) {
   bitGit.commit(api, root, "B", author, 1700000202);
 
   bitGit.checkout(api, root, "topic");
-  const rebaseResult = bitGit.rebaseStart(api, root, "main");
+  const rebaseResult = bitGit.rebase(api, root, "main");
   assert.equal(rebaseResult.status, "complete");
   assert.equal(bitGit.readString(api, `${root}/b.txt`), "B\n");
   assert.equal(bitGit.readString(api, `${root}/d.txt`), "D\n");
   return rebaseResult;
 }
 
-function runRefsTagsResetFlow(api, root, author) {
+function runRefsTagsResetFlow(bitGit, api, root, author) {
   bitGit.init(api, root, "main");
   bitGit.writeString(api, `${root}/a.txt`, "one\n");
   bitGit.add(api, root, ["a.txt"]);
@@ -328,7 +329,92 @@ function runRefsTagsResetFlow(api, root, author) {
   return { first, refs, branches, tags };
 }
 
-async function runStashDiffCherryPickFlow(api, root, author) {
+async function runStatusAmendSwitchRemoteFlow(bitGit, api, root, author) {
+  bitGit.init(api, root, "main");
+  bitGit.writeString(api, `${root}/a.txt`, "one\n");
+
+  const initialStatusText = await bitGit.statusText(api, root);
+  assert.ok(initialStatusText.includes("On branch main"));
+  assert.ok(initialStatusText.includes("No commits yet"));
+
+  bitGit.add(api, root, ["a.txt"]);
+  const stagedStatusText = await bitGit.statusText(api, root);
+  assert.ok(stagedStatusText.includes("Changes to be committed"));
+  assert.ok(stagedStatusText.includes("staged: a.txt"));
+
+  bitGit.commit(api, root, "first", author, 1700000450);
+  bitGit.switchBranch(api, root, "feature", { create: true });
+  assert.equal(bitGit.readString(api, `${root}/.git/HEAD`), "ref: refs/heads/feature\n");
+
+  bitGit.writeString(api, `${root}/a.txt`, "feature\n");
+  bitGit.add(api, root, ["a.txt"]);
+  bitGit.commit(api, root, "feature", author, 1700000451);
+
+  const originalHead = bitGit.revParse(api, root, "HEAD");
+  const amendedHead = bitGit.commitAmend(
+    api,
+    root,
+    "feature amended",
+    author,
+    1700000452,
+    {
+      committer: author,
+      committerTimestampSec: 1700000452,
+    },
+  );
+  assert.equal(typeof amendedHead, "string");
+  assert.equal(amendedHead.length, 40);
+  assert.notEqual(amendedHead, originalHead);
+  assert.equal(bitGit.log(api, root, 1)[0]?.message, "feature amended");
+
+  bitGit.switchBranch(api, root, "main");
+  assert.equal(bitGit.readString(api, `${root}/a.txt`), "one\n");
+
+  bitGit.writeString(
+    api,
+    `${root}/.git/config`,
+    "[remote \"origin\"]\n\turl = https://example.com/fetch.git\n\tpushurl = https://example.com/push.git\n",
+  );
+  const remotes = bitGit.listRemotesVerbose(api, root);
+  assert.equal(remotes.length, 2);
+  assert.equal(remotes[0]?.name, "origin");
+  assert.match(remotes[0]?.value ?? "", /\(fetch\)/);
+  assert.match(remotes[1]?.value ?? "", /\(push\)/);
+
+  return { amendedHead, remotes };
+}
+
+function runSparseCheckoutFlow(bitGit, api, root, author) {
+  bitGit.init(api, root, "main");
+  bitGit.writeString(api, `${root}/keep/file.txt`, "keep\n");
+  bitGit.writeString(api, `${root}/skip/file.txt`, "skip\n");
+  bitGit.add(api, root, ["keep/file.txt", "skip/file.txt"]);
+  bitGit.commit(api, root, "base", author, 1700000460);
+
+  bitGit.sparseCheckoutInit(api, root, false);
+  bitGit.sparseCheckoutSet(api, root, ["keep"]);
+  assert.equal(bitGit.sparseCheckoutEnabled(api, root), true);
+  assert.equal(bitGit.sparseCheckoutConeEnabled(api, root), false);
+  assert.deepEqual(bitGit.sparseCheckoutDisplayPatterns(api, root), ["keep"]);
+  assert.equal(bitGit.readString(api, `${root}/keep/file.txt`), "keep\n");
+  assert.ok(bitGit.status(api, root).unstagedDeleted.includes("skip/file.txt"));
+
+  bitGit.sparseCheckoutAdd(api, root, ["skip"]);
+  const patternsAfterAdd = bitGit.sparseCheckoutDisplayPatterns(api, root);
+  assert.ok(patternsAfterAdd.includes("keep"));
+  assert.ok(patternsAfterAdd.includes("skip"));
+  bitGit.sparseCheckoutReapply(api, root);
+  assert.equal(bitGit.readString(api, `${root}/skip/file.txt`), "skip\n");
+
+  bitGit.sparseCheckoutDisable(api, root);
+  assert.equal(bitGit.sparseCheckoutEnabled(api, root), false);
+  assert.ok(bitGit.sparseCheckoutPatterns(api, root).length > 0);
+  assert.equal(bitGit.readString(api, `${root}/skip/file.txt`), "skip\n");
+
+  return { patternsAfterAdd };
+}
+
+async function runStashDiffCherryPickFlow(bitGit, api, root, author) {
   bitGit.init(api, root, "main");
   bitGit.writeString(api, `${root}/a.txt`, "base\n");
   bitGit.add(api, root, ["a.txt"]);
@@ -378,63 +464,331 @@ async function runStashDiffCherryPickFlow(api, root, author) {
   return { stashId, stashEntries, cherryPickResult };
 }
 
-const memoryApi = bitGit.createMemoryHost();
-const memoryResult = runRepoFlow(
-  memoryApi,
-  "/repo-memory",
-  "Verifier <verifier@example.com>",
-);
+function runFileOpsFlow(bitGit, api, root, author) {
+  bitGit.init(api, root, "main");
+  assert.deepEqual(bitGit.statusPorcelain(api, root), []);
 
-const customBackend = createVirtualHost();
-const customResult = runRepoFlow(
-  customBackend,
-  "/repo-custom",
-  "Custom Host <custom@example.com>",
-);
+  bitGit.writeString(api, `${root}/README.md`, "# repo\n");
+  assert.ok(bitGit.statusPorcelain(api, root).includes("?? README.md"));
 
-const signedResult = await runSignedCommitFlow(
-  memoryApi,
-  "/repo-signed",
-  "Signer <signer@example.com>",
-);
-const mergeResult = runMergeFlow(
-  memoryApi,
-  "/repo-merge",
-  "Merger <merger@example.com>",
-);
-const rebaseResult = runRebaseFlow(
-  memoryApi,
-  "/repo-rebase",
-  "Rebaser <rebaser@example.com>",
-);
-const refsTagsResetResult = runRefsTagsResetFlow(
-  memoryApi,
-  "/repo-refs",
-  "Refs <refs@example.com>",
-);
-const stashDiffCherryPickResult = await runStashDiffCherryPickFlow(
-  memoryApi,
-  "/repo-stash",
-  "Stash <stash@example.com>",
-);
+  bitGit.add(api, root, ["README.md"]);
+  assert.ok(bitGit.statusPorcelain(api, root).includes("A  README.md"));
+  bitGit.commit(api, root, "initial commit", author, 1700000700);
+  assert.deepEqual(bitGit.statusPorcelain(api, root), []);
 
-assert.equal(typeof bitGit.createFetchTransport, "function");
-assert.equal(typeof bitGit.fetch, "function");
-assert.equal(typeof bitGit.push, "function");
+  bitGit.branchCreate(api, root, "topic");
+  assert.ok(bitGit.branchList(api, root).some((branch) => branch.name === "topic"));
+  bitGit.branchDelete(api, root, "topic");
+  assert.ok(!bitGit.branchList(api, root).some((branch) => branch.name === "topic"));
 
-bitGit.destroyHost(memoryApi);
-bitGit.destroyHost(customBackend);
+  bitGit.writeString(api, `${root}/notes.txt`, "notes\n");
+  bitGit.add(api, root, ["notes.txt"]);
+  bitGit.commit(api, root, "add notes", author, 1700000701);
 
-console.log(JSON.stringify(
-  {
-    memoryResult,
-    customResult,
-    signedResult,
-    mergeResult,
-    rebaseResult,
-    refsTagsResetResult,
-    stashDiffCherryPickResult,
-  },
-  null,
-  2,
-));
+  bitGit.mv(api, root, "notes.txt", "memo.txt");
+  const afterMove = bitGit.status(api, root);
+  assert.ok(afterMove.stagedAdded.includes("memo.txt"));
+  assert.ok(afterMove.stagedDeleted.includes("notes.txt"));
+  bitGit.commit(api, root, "rename notes", author, 1700000702);
+
+  bitGit.rm(api, root, ["memo.txt"]);
+  const afterRm = bitGit.status(api, root);
+  assert.ok(afterRm.stagedDeleted.includes("memo.txt"));
+  bitGit.commit(api, root, "remove memo", author, 1700000703);
+
+  bitGit.writeString(api, `${root}/cached.txt`, "cached\n");
+  bitGit.add(api, root, ["cached.txt"]);
+  bitGit.commit(api, root, "add cached", author, 1700000704);
+  bitGit.rm(api, root, ["cached.txt"], { cached: true });
+  assert.equal(bitGit.readString(api, `${root}/cached.txt`), "cached\n");
+  assert.ok(bitGit.status(api, root).stagedDeleted.includes("cached.txt"));
+
+  return { afterMove, afterRm };
+}
+
+function runDirectSignedCommitFlow(bitGit, api, root, author) {
+  bitGit.init(api, root, "main");
+  bitGit.writeString(api, `${root}/signed.txt`, "signed\n");
+  bitGit.add(api, root, ["signed.txt"]);
+  const commitId = bitGit.commitSigned(
+    api,
+    root,
+    "signed direct",
+    author,
+    "-----BEGIN TEST SIGNATURE-----\nabc456\n-----END TEST SIGNATURE-----\n",
+    1700000800,
+  );
+  const commitText = readLooseCommitText(api, root, commitId);
+  assert.match(commitText, /gpgsig -----BEGIN TEST SIGNATURE-----/);
+  assert.match(commitText, /abc456/);
+  return { commitId, commitText };
+}
+
+function setupConflictRepo(bitGit, api, root, author) {
+  bitGit.init(api, root, "main");
+  bitGit.writeString(api, `${root}/file.txt`, "base\n");
+  bitGit.add(api, root, ["file.txt"]);
+  const baseId = bitGit.commit(api, root, "base", author, 1700000900);
+
+  bitGit.checkoutB(api, root, "topic");
+  bitGit.writeString(api, `${root}/file.txt`, "topic\n");
+  bitGit.add(api, root, ["file.txt"]);
+  const topicId = bitGit.commit(api, root, "topic", author, 1700000901);
+
+  bitGit.checkout(api, root, "main");
+  bitGit.writeString(api, `${root}/file.txt`, "main\n");
+  bitGit.add(api, root, ["file.txt"]);
+  const mainId = bitGit.commit(api, root, "main", author, 1700000902);
+
+  bitGit.checkout(api, root, "topic");
+  return { baseId, topicId, mainId };
+}
+
+function runRebaseOntoFlow(bitGit, api, root, author) {
+  bitGit.init(api, root, "main");
+  bitGit.writeString(api, `${root}/a.txt`, "A\n");
+  bitGit.add(api, root, ["a.txt"]);
+  const commitA = bitGit.commit(api, root, "A", author, 1700001000);
+
+  bitGit.branchCreate(api, root, "topic");
+  bitGit.checkout(api, root, "topic");
+  bitGit.writeString(api, `${root}/d.txt`, "D\n");
+  bitGit.add(api, root, ["d.txt"]);
+  bitGit.commit(api, root, "D", author, 1700001001);
+  bitGit.writeString(api, `${root}/e.txt`, "E\n");
+  bitGit.add(api, root, ["e.txt"]);
+  bitGit.commit(api, root, "E", author, 1700001002);
+
+  bitGit.checkout(api, root, "main");
+  bitGit.writeString(api, `${root}/b.txt`, "B\n");
+  bitGit.add(api, root, ["b.txt"]);
+  bitGit.commit(api, root, "B", author, 1700001003);
+  bitGit.writeString(api, `${root}/c.txt`, "C\n");
+  bitGit.add(api, root, ["c.txt"]);
+  const commitC = bitGit.commit(api, root, "C", author, 1700001004);
+
+  bitGit.checkout(api, root, "topic");
+  const result = bitGit.rebaseStartWithOnto(api, root, commitC, commitA);
+  assert.equal(result.status, "complete");
+  assert.equal(bitGit.readString(api, `${root}/b.txt`), "B\n");
+  assert.equal(bitGit.readString(api, `${root}/c.txt`), "C\n");
+  assert.equal(bitGit.readString(api, `${root}/d.txt`), "D\n");
+  assert.equal(bitGit.readString(api, `${root}/e.txt`), "E\n");
+  return result;
+}
+
+function runRebaseControlFlow(bitGit, api, root, author) {
+  const continueRoot = `${root}-continue`;
+  setupConflictRepo(bitGit, api, continueRoot, author);
+  const continueStart = bitGit.rebase(api, continueRoot, "main");
+  assert.equal(continueStart.status, "conflict");
+  assert.deepEqual(continueStart.conflicts, ["file.txt"]);
+  bitGit.writeString(api, `${continueRoot}/file.txt`, "resolved\n");
+  bitGit.add(api, continueRoot, ["file.txt"]);
+  const continueResult = bitGit.rebaseContinue(api, continueRoot);
+  assert.equal(continueResult.status, "complete");
+  assert.equal(bitGit.readString(api, `${continueRoot}/file.txt`), "resolved\n");
+
+  const abortRoot = `${root}-abort`;
+  const abortRepo = setupConflictRepo(bitGit, api, abortRoot, author);
+  const abortStart = bitGit.rebaseStart(api, abortRoot, "main");
+  assert.equal(abortStart.status, "conflict");
+  bitGit.rebaseAbort(api, abortRoot);
+  assert.equal(bitGit.revParse(api, abortRoot, "HEAD"), abortRepo.topicId);
+  assert.equal(bitGit.readString(api, `${abortRoot}/file.txt`), "topic\n");
+
+  const skipRoot = `${root}-skip`;
+  const skipRepo = setupConflictRepo(bitGit, api, skipRoot, author);
+  const skipStart = bitGit.rebaseStart(api, skipRoot, "main");
+  assert.equal(skipStart.status, "conflict");
+  const skipResult = bitGit.rebaseSkip(api, skipRoot);
+  assert.equal(skipResult.status, "complete");
+  assert.equal(skipResult.commitId, skipRepo.mainId);
+  assert.equal(bitGit.readString(api, `${skipRoot}/file.txt`), "main\n");
+
+  return { continueResult, abortStart, skipResult };
+}
+
+async function runStashPopFlow(bitGit, api, root, author) {
+  bitGit.init(api, root, "main");
+  bitGit.writeString(api, `${root}/a.txt`, "base\n");
+  bitGit.add(api, root, ["a.txt"]);
+  bitGit.commit(api, root, "base", author, 1700001100);
+
+  bitGit.writeString(api, `${root}/a.txt`, "working\n");
+  const stashId = await bitGit.stashPush(api, root, "stash for pop", author, 1700001101);
+  assert.equal(stashId.length, 40);
+  assert.equal(bitGit.stashList(api, root).length, 1);
+  bitGit.stashPop(api, root, 0);
+  assert.equal(bitGit.stashList(api, root).length, 0);
+  assert.equal(bitGit.readString(api, `${root}/a.txt`), "working\n");
+  return { stashId };
+}
+
+async function runTransportHelperFlow(bitGit) {
+  const calls = [];
+  const transport = bitGit.createFetchTransport(async (url, init = {}) => {
+    calls.push({
+      url,
+      method: init.method ?? "GET",
+      headers: init.headers ?? {},
+      body: init.body ? Array.from(new Uint8Array(init.body)) : [],
+    });
+    if ((init.method ?? "GET") === "GET") {
+      return new Response("get-body", { status: 201 });
+    }
+    return new Response(new Uint8Array([9, 8, 7]), { status: 202 });
+  });
+
+  const getResult = await transport.get("https://example.com/info", { Accept: "x-test" });
+  assert.equal(getResult.status, 201);
+  assert.equal(new TextDecoder().decode(getResult.body), "get-body");
+
+  const postResult = await transport.post(
+    "https://example.com/post",
+    new Uint8Array([1, 2, 3]),
+    { "Content-Type": "application/octet-stream" },
+  );
+  assert.equal(postResult.status, 202);
+  assert.deepEqual(Array.from(postResult.body), [9, 8, 7]);
+  assert.deepEqual(calls, [
+    {
+      url: "https://example.com/info",
+      method: "GET",
+      headers: { Accept: "x-test" },
+      body: [],
+    },
+    {
+      url: "https://example.com/post",
+      method: "POST",
+      headers: { "Content-Type": "application/octet-stream" },
+      body: [1, 2, 3],
+    },
+  ]);
+
+  return { calls };
+}
+
+export async function verifyBitGitModule(bitGit = defaultBitGit) {
+  const memoryApi = bitGit.createMemoryHost();
+  const customBackend = createVirtualHost();
+  try {
+    const memoryResult = runRepoFlow(
+      bitGit,
+      memoryApi,
+      "/repo-memory",
+      "Verifier <verifier@example.com>",
+    );
+
+    const customResult = runRepoFlow(
+      bitGit,
+      customBackend,
+      "/repo-custom",
+      "Custom Host <custom@example.com>",
+    );
+
+    const signedResult = await runSignedCommitFlow(
+      bitGit,
+      memoryApi,
+      "/repo-signed",
+      "Signer <signer@example.com>",
+    );
+    const directSignedResult = runDirectSignedCommitFlow(
+      bitGit,
+      memoryApi,
+      "/repo-signed-direct",
+      "Signer <signer@example.com>",
+    );
+    const mergeResult = runMergeFlow(
+      bitGit,
+      memoryApi,
+      "/repo-merge",
+      "Merger <merger@example.com>",
+    );
+    const rebaseResult = runRebaseFlow(
+      bitGit,
+      memoryApi,
+      "/repo-rebase",
+      "Rebaser <rebaser@example.com>",
+    );
+    const rebaseOntoResult = runRebaseOntoFlow(
+      bitGit,
+      memoryApi,
+      "/repo-rebase-onto",
+      "Rebase Onto <onto@example.com>",
+    );
+    const rebaseControlResult = runRebaseControlFlow(
+      bitGit,
+      memoryApi,
+      "/repo-rebase-control",
+      "Rebase Control <control@example.com>",
+    );
+    const refsTagsResetResult = runRefsTagsResetFlow(
+      bitGit,
+      memoryApi,
+      "/repo-refs",
+      "Refs <refs@example.com>",
+    );
+    const statusAmendSwitchRemoteResult = await runStatusAmendSwitchRemoteFlow(
+      bitGit,
+      memoryApi,
+      "/repo-status",
+      "Status <status@example.com>",
+    );
+    const fileOpsResult = runFileOpsFlow(
+      bitGit,
+      memoryApi,
+      "/repo-files",
+      "Files <files@example.com>",
+    );
+    const sparseCheckoutResult = runSparseCheckoutFlow(
+      bitGit,
+      memoryApi,
+      "/repo-sparse",
+      "Sparse <sparse@example.com>",
+    );
+    const stashDiffCherryPickResult = await runStashDiffCherryPickFlow(
+      bitGit,
+      memoryApi,
+      "/repo-stash",
+      "Stash <stash@example.com>",
+    );
+    const stashPopResult = await runStashPopFlow(
+      bitGit,
+      memoryApi,
+      "/repo-stash-pop",
+      "Stash Pop <stash-pop@example.com>",
+    );
+    const transportHelperResult = await runTransportHelperFlow(bitGit);
+
+    return {
+      memoryResult,
+      customResult,
+      signedResult,
+      directSignedResult,
+      mergeResult,
+      rebaseResult,
+      rebaseOntoResult,
+      rebaseControlResult,
+      refsTagsResetResult,
+      statusAmendSwitchRemoteResult,
+      fileOpsResult,
+      sparseCheckoutResult,
+      stashDiffCherryPickResult,
+      stashPopResult,
+      transportHelperResult,
+    };
+  } finally {
+    bitGit.destroyHost(memoryApi);
+    bitGit.destroyHost(customBackend);
+  }
+}
+
+export async function verifyBitGitJsBuild() {
+  return verifyBitGitModule(defaultBitGit);
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const result = await verifyBitGitJsBuild();
+  console.log(JSON.stringify(result, null, 2));
+}

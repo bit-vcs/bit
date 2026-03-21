@@ -212,6 +212,8 @@ pub fn js_cherry_pick(Int, String, String, String, Int, Bool, String, String) ->
 
 pub fn js_commit(Int, String, String, String, Int) -> Result[String, String]
 
+pub fn js_commit_amend(Int, String, String, String, Int, String, Int, String, String, String, String) -> Result[String, String]
+
 pub fn js_commit_signed(Int, String, String, String, Int, String) -> Result[String, String]
 
 pub fn js_create_memory_host() -> Int
@@ -237,6 +239,8 @@ pub fn js_host_read_string(Int, String) -> Result[String, String]
 pub fn js_host_write_string(Int, String, String) -> Result[Unit, String]
 
 pub fn js_list_remotes(Int, String) -> Result[Array[String], String]
+
+pub fn js_list_remotes_verbose(Int, String) -> Result[Array[JsRemoteVerboseEntry], String]
 
 pub fn js_log(Int, String, Int) -> Result[Array[JsLogEntry], String]
 
@@ -266,6 +270,24 @@ pub fn js_rm_paths(Int, String, Array[String], Bool) -> Result[Unit, String]
 
 pub fn js_show_ref(Int, String) -> Result[Array[JsRefInfo], String]
 
+pub fn js_sparse_checkout_add(Int, String, Array[String]) -> Result[Unit, String]
+
+pub fn js_sparse_checkout_cone_enabled(Int, String) -> Result[Bool, String]
+
+pub fn js_sparse_checkout_disable(Int, String) -> Result[Unit, String]
+
+pub fn js_sparse_checkout_display_patterns(Int, String) -> Result[Array[String], String]
+
+pub fn js_sparse_checkout_enabled(Int, String) -> Result[Bool, String]
+
+pub fn js_sparse_checkout_init(Int, String, Bool) -> Result[Unit, String]
+
+pub fn js_sparse_checkout_patterns(Int, String) -> Result[Array[String], String]
+
+pub fn js_sparse_checkout_reapply(Int, String) -> Result[Unit, String]
+
+pub fn js_sparse_checkout_set(Int, String, Array[String]) -> Result[Unit, String]
+
 pub fn js_stash_apply(Int, String, Int, Bool) -> Result[Unit, String]
 
 pub fn js_stash_drop(Int, String, Int) -> Result[Unit, String]
@@ -277,6 +299,10 @@ pub async fn js_stash_push(Int, String, String, String, Int) -> Result[String, S
 pub fn js_status(Int, String) -> Result[Status, String]
 
 pub fn js_status_porcelain(Int, String) -> Result[Array[String], String]
+
+pub async fn js_status_text(Int, String) -> Result[String, String]
+
+pub fn js_switch_branch(Int, String, String, Bool, Bool) -> Result[Unit, String]
 
 pub fn js_tag_create_annotated(Int, String, String, String, String, String, Int) -> Result[Unit, String]
 
@@ -886,6 +912,13 @@ pub struct JsRefInfo {
 }
 pub impl Eq for JsRefInfo
 pub impl Show for JsRefInfo
+
+pub struct JsRemoteVerboseEntry {
+  name : String
+  value : String
+}
+pub impl Eq for JsRemoteVerboseEntry
+pub impl Show for JsRemoteVerboseEntry
 
 pub struct JsStashEntry {
   id : String

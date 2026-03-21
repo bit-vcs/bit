@@ -29,6 +29,8 @@ test:
     moon test --target js -p mizchi/bit -p mizchi/bit/lib
     moon test --target wasm -p mizchi/bit/runtime -f storage_runtime_wbtest.mbt
     moon test --target native --no-parallelize -j 1
+    just test-git-compat-allowlist
+    just test-js-build
 
 # Update snapshot tests (both js and native)
 test-update:
@@ -67,6 +69,18 @@ build:
 # Build JS-exported lib module
 build-js-lib:
     moon build --target js --release src/lib
+
+# Sync the checked-in npm wrapper's raw JS payload with the current build
+sync-npm-lib-raw: build-js-lib
+    cp _build/js/release/build/lib/lib.js npm/lib.raw.js
+
+# Run automated Node tests against the built JS lib and npm wrapper
+test-js-build: sync-npm-lib-raw bundle-js-lib-minimal bundle-js-lib-git-ops
+    node --test tools/js-build.test.mjs tools/npm-lib.test.mjs
+
+# Guard compat-random allowlist against known upstream-oracle failures
+test-git-compat-allowlist:
+    node --test tools/git-compat-allowlist.test.mjs
 
 # Verify JS-exported lib on a pure in-memory host
 test-js-lib: build-js-lib

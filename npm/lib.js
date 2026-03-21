@@ -9,6 +9,7 @@ import {
   checkout as rawCheckout,
   checkoutB as rawCheckoutB,
   commit as rawCommit,
+  commitAmend as rawCommitAmend,
   commitSigned as rawCommitSigned,
   diffIndex as rawDiffIndex,
   diffIndexStat as rawDiffIndexStat,
@@ -21,6 +22,7 @@ import {
   hostWriteString as rawHostWriteString,
   init as rawInit,
   listRemotes as rawListRemotes,
+  listRemotesVerbose as rawListRemotesVerbose,
   log as rawLog,
   merge as rawMerge,
   mv as rawMv,
@@ -39,8 +41,19 @@ import {
   stashDrop as rawStashDrop,
   stashList as rawStashList,
   stashPush as rawStashPush,
+  statusText as rawStatusText,
   status as rawStatus,
   statusPorcelain as rawStatusPorcelain,
+  sparseCheckoutAdd as rawSparseCheckoutAdd,
+  sparseCheckoutConeEnabled as rawSparseCheckoutConeEnabled,
+  sparseCheckoutDisable as rawSparseCheckoutDisable,
+  sparseCheckoutDisplayPatterns as rawSparseCheckoutDisplayPatterns,
+  sparseCheckoutEnabled as rawSparseCheckoutEnabled,
+  sparseCheckoutInit as rawSparseCheckoutInit,
+  sparseCheckoutPatterns as rawSparseCheckoutPatterns,
+  sparseCheckoutReapply as rawSparseCheckoutReapply,
+  sparseCheckoutSet as rawSparseCheckoutSet,
+  switchBranch as rawSwitchBranch,
   tagCreateAnnotated as rawTagCreateAnnotated,
   tagCreateLightweight as rawTagCreateLightweight,
   tagDelete as rawTagDelete,
@@ -362,6 +375,11 @@ const toRefInfo = (value) => ({
   id: value.id,
 });
 
+const toRemoteVerboseEntry = (value) => ({
+  name: value.name,
+  value: value.value,
+});
+
 const toStashEntry = (value) => ({
   id: value.id,
   message: value.message,
@@ -569,6 +587,10 @@ export const statusPorcelain = (backend, root) => (
   Array.from(unwrap("statusPorcelain", rawStatusPorcelain(toHostId(backend), root)))
 );
 
+export const statusText = async (backend, root) => (
+  await unwrapAsync("statusText", rawStatusText(toHostId(backend), root))
+);
+
 export const commit = (
   backend,
   root,
@@ -577,6 +599,32 @@ export const commit = (
   timestampSec = Math.floor(Date.now() / 1000),
 ) => (
   unwrap("commit", rawCommit(toHostId(backend), root, message, author, Math.trunc(timestampSec)))
+);
+
+export const commitAmend = (
+  backend,
+  root,
+  message,
+  author,
+  authorTimestampSec = Math.floor(Date.now() / 1000),
+  options = {},
+) => (
+  unwrap(
+    "commitAmend",
+    rawCommitAmend(
+      toHostId(backend),
+      root,
+      message,
+      author,
+      Math.trunc(authorTimestampSec),
+      options.committer ?? "",
+      Math.trunc(options.committerTimestampSec ?? authorTimestampSec),
+      options.timezone ?? "",
+      options.encoding ?? "",
+      options.authorTimezone ?? "",
+      options.committerTimezone ?? "",
+    ),
+  )
 );
 
 export const buildCommitPayload = (
@@ -663,6 +711,19 @@ export const checkout = (backend, root, target) => {
 
 export const checkoutB = (backend, root, branchName) => {
   unwrap("checkoutB", rawCheckoutB(toHostId(backend), root, branchName));
+};
+
+export const switchBranch = (backend, root, name, options = {}) => {
+  unwrap(
+    "switchBranch",
+    rawSwitchBranch(
+      toHostId(backend),
+      root,
+      name,
+      Boolean(options.create),
+      options.checkoutFiles !== false,
+    ),
+  );
 };
 
 export const restore = (backend, root, paths) => {
@@ -853,8 +914,59 @@ export const listRemotes = (backend, root) => (
   Array.from(unwrap("listRemotes", rawListRemotes(toHostId(backend), root)))
 );
 
+export const listRemotesVerbose = (backend, root) => (
+  Array.from(unwrap("listRemotesVerbose", rawListRemotesVerbose(toHostId(backend), root)))
+    .map(toRemoteVerboseEntry)
+);
+
 export const getRemoteUrl = (backend, root, name) => (
   toMaybeString(unwrap("getRemoteUrl", rawGetRemoteUrl(toHostId(backend), root, name)))
+);
+
+export const sparseCheckoutInit = (backend, root, cone = false) => {
+  unwrap("sparseCheckoutInit", rawSparseCheckoutInit(toHostId(backend), root, Boolean(cone)));
+};
+
+export const sparseCheckoutSet = (backend, root, patterns) => {
+  unwrap("sparseCheckoutSet", rawSparseCheckoutSet(toHostId(backend), root, Array.from(patterns)));
+};
+
+export const sparseCheckoutAdd = (backend, root, patterns) => {
+  unwrap("sparseCheckoutAdd", rawSparseCheckoutAdd(toHostId(backend), root, Array.from(patterns)));
+};
+
+export const sparseCheckoutDisable = (backend, root) => {
+  unwrap("sparseCheckoutDisable", rawSparseCheckoutDisable(toHostId(backend), root));
+};
+
+export const sparseCheckoutReapply = (backend, root) => {
+  unwrap("sparseCheckoutReapply", rawSparseCheckoutReapply(toHostId(backend), root));
+};
+
+export const sparseCheckoutEnabled = (backend, root) => (
+  Boolean(unwrap("sparseCheckoutEnabled", rawSparseCheckoutEnabled(toHostId(backend), root)))
+);
+
+export const sparseCheckoutConeEnabled = (backend, root) => (
+  Boolean(
+    unwrap(
+      "sparseCheckoutConeEnabled",
+      rawSparseCheckoutConeEnabled(toHostId(backend), root),
+    ),
+  )
+);
+
+export const sparseCheckoutPatterns = (backend, root) => (
+  Array.from(unwrap("sparseCheckoutPatterns", rawSparseCheckoutPatterns(toHostId(backend), root)))
+);
+
+export const sparseCheckoutDisplayPatterns = (backend, root) => (
+  Array.from(
+    unwrap(
+      "sparseCheckoutDisplayPatterns",
+      rawSparseCheckoutDisplayPatterns(toHostId(backend), root),
+    ),
+  )
 );
 
 export const fetch = async (

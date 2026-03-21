@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
+import { pathToFileURL } from "node:url";
 
-const bitGit = await import(new URL("./bit-git.mjs", import.meta.url));
+const defaultBitGit = await import(new URL("./bit-git.mjs", import.meta.url));
 
 function jsonBody(value) {
   return new TextEncoder().encode(JSON.stringify(value));
 }
 
-async function verifyRelayHelpers() {
+async function verifyRelayHelpers(bitGit) {
   const calls = [];
   const relayUrl = "relay+https://relay.example.com/base?room=team-a&room_token=token-1";
   const transport = {
@@ -103,7 +104,7 @@ async function verifyRelayHelpers() {
   });
 }
 
-async function verifyFetchAndPushResolveRelay() {
+async function verifyFetchAndPushResolveRelay(bitGit) {
   const calls = [];
   const relayUrl = "relay+https://relay.example.com/base?room=team-a";
   const transport = {
@@ -173,7 +174,17 @@ async function verifyFetchAndPushResolveRelay() {
   );
 }
 
-await verifyRelayHelpers();
-await verifyFetchAndPushResolveRelay();
+export async function verifyRelayModule(bitGit = defaultBitGit) {
+  await verifyRelayHelpers(bitGit);
+  await verifyFetchAndPushResolveRelay(bitGit);
+  return "ok";
+}
 
-console.log("ok");
+export async function verifyRelayJsBuild() {
+  return verifyRelayModule(defaultBitGit);
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const result = await verifyRelayJsBuild();
+  console.log(result);
+}
