@@ -76,7 +76,7 @@ sync-npm-lib-raw: build-js-lib
 
 # Run automated Node tests against the built JS lib and npm wrapper
 test-js-build: sync-npm-lib-raw bundle-js-lib-minimal bundle-js-lib-git-ops
-    node --test tools/js-build.test.mjs tools/npm-lib.test.mjs
+    node --test tools/js-build.test.mjs tools/npm-lib.test.mjs tools/demo-relay.test.mjs tools/demo-editor-link.test.mjs
 
 # Guard compat-random allowlist against known upstream-oracle failures
 test-git-compat-allowlist:
