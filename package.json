@@ -1,7 +1,7 @@
 {
   "name": "@mizchi/bit",
   "private": true,
-  "version": "0.24.2",
+  "version": "0.34.0",
   "type": "module",
   "exports": {
     ".": {
