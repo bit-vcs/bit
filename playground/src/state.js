@@ -67,15 +67,6 @@ const firstWorkingFile = (summary) => {
 
 const cloneRelaySessions = (sessions) => sessions.map((session) => ({ ...session }));
 
-export const STATUS_GROUPS = [
-  ["stagedAdded", "Staged Added"],
-  ["stagedModified", "Staged Modified"],
-  ["stagedDeleted", "Staged Deleted"],
-  ["unstagedModified", "Unstaged Modified"],
-  ["unstagedDeleted", "Unstaged Deleted"],
-  ["untracked", "Untracked"],
-];
-
 export const createPlaygroundApp = ({
   controller = createIndexedDbController(),
   fetchImpl = globalThis.fetch?.bind(globalThis),

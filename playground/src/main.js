@@ -1,5 +1,15 @@
 import { runPlaygroundCommand } from "./commands.js";
-import { STATUS_GROUPS, createPlaygroundApp } from "./state.js";
+import { createPlaygroundApp } from "./state.js";
+import {
+  createTerminalBuffer,
+  quoteArgument,
+  renderBranchListHtml,
+  renderFilesListHtml,
+  renderHeroMetaHtml,
+  renderHistoryListHtml,
+  renderRelaySessionsHtml,
+  renderStatusListHtml,
+} from "./view.js";
 
 const app = createPlaygroundApp();
 
@@ -36,15 +46,7 @@ const elements = {
   terminalLog: document.querySelector("#terminal-log"),
 };
 
-const terminalEntries = [];
-
-const escapeHtml = (value) => String(value ?? "")
-  .replaceAll("&", "&amp;")
-  .replaceAll("<", "&lt;")
-  .replaceAll(">", "&gt;")
-  .replaceAll("\"", "&quot;");
-
-const quoteArgument = (value) => `"${String(value ?? "").replaceAll("\\", "\\\\").replaceAll("\"", "\\\"")}"`;
+const terminal = createTerminalBuffer();
 
 const syncDraftFromInputs = () => {
   app.setEditorPath(elements.filePath.value);
@@ -59,24 +61,11 @@ const syncDraftFromInputs = () => {
 };
 
 const pushTerminal = (lines, tone = "info") => {
-  for (const line of Array.isArray(lines) ? lines : [lines]) {
-    terminalEntries.push({
-      id: crypto.randomUUID(),
-      line: String(line),
-      tone,
-    });
-  }
-  while (terminalEntries.length > 96) {
-    terminalEntries.shift();
-  }
+  terminal.push(lines, tone);
 };
 
 const renderTerminal = () => {
-  elements.terminalOutput.innerHTML = terminalEntries.map((entry) => `
-    <li class="terminal-line tone-${entry.tone}">
-      <code>${escapeHtml(entry.line)}</code>
-    </li>
-  `).join("");
+  elements.terminalOutput.innerHTML = terminal.renderHtml();
   const lastEntry = elements.terminalOutput.lastElementChild;
   if (lastEntry) {
     lastEntry.scrollIntoView({ block: "end" });
@@ -84,117 +73,28 @@ const renderTerminal = () => {
 };
 
 const renderHeader = (snapshot) => {
-  const status = snapshot.view.currentStatus;
-  const staged = status.stagedAdded.length + status.stagedModified.length + status.stagedDeleted.length;
-  const unstaged = status.unstagedModified.length + status.unstagedDeleted.length;
-  const chips = [
-    `profile ${snapshot.profile}`,
-    `HEAD ${snapshot.currentBranch}`,
-    `${staged} staged`,
-    `${unstaged} unstaged`,
-  ];
-  if (snapshot.controller.lastSavedAt) {
-    chips.push(`saved ${app.formatTimestamp(snapshot.controller.lastSavedAt)}`);
-  }
-  elements.heroMeta.innerHTML = chips.map((chip) => `<span class="meta-chip">${escapeHtml(chip)}</span>`).join("");
+  elements.heroMeta.innerHTML = renderHeroMetaHtml(snapshot, app.formatTimestamp);
   elements.storageBanner.textContent = snapshot.storageBanner;
 };
 
 const renderFiles = (snapshot) => {
-  const files = app.listFiles();
-  if (files.length === 0) {
-    elements.filesList.innerHTML = `<li class="empty-row">No files yet.</li>`;
-    return;
-  }
-  elements.filesList.innerHTML = files.map((path) => `
-    <li>
-      <button
-        class="list-button ${path === snapshot.editor.path ? "is-current" : ""}"
-        type="button"
-        data-open-path="${escapeHtml(path)}"
-      >
-        <code>${escapeHtml(path)}</code>
-      </button>
-    </li>
-  `).join("");
+  elements.filesList.innerHTML = renderFilesListHtml(app.listFiles(), snapshot.editor.path);
 };
 
 const renderStatus = (snapshot) => {
-  const groups = STATUS_GROUPS
-    .map(([key, label]) => ({ label, items: snapshot.view.currentStatus[key] ?? [] }))
-    .filter((group) => group.items.length > 0);
-  if (groups.length === 0) {
-    elements.statusList.innerHTML = `<li class="empty-row">Working tree clean.</li>`;
-    return;
-  }
-  elements.statusList.innerHTML = groups.map((group) => `
-    <li class="status-group">
-      <strong>${escapeHtml(group.label)}</strong>
-      <div class="status-items">
-        ${group.items.map((item) => `
-          <button class="mini-chip" type="button" data-open-path="${escapeHtml(item)}">
-            <code>${escapeHtml(item)}</code>
-          </button>
-        `).join("")}
-      </div>
-    </li>
-  `).join("");
+  elements.statusList.innerHTML = renderStatusListHtml(snapshot.view.currentStatus);
 };
 
 const renderHistory = (snapshot) => {
-  if (snapshot.view.logEntries.length === 0) {
-    elements.historyList.innerHTML = `<li class="empty-row">No commits yet.</li>`;
-    return;
-  }
-  elements.historyList.innerHTML = snapshot.view.logEntries.slice(0, 8).map((entry) => `
-    <li class="history-item">
-      <div class="history-meta">
-        <code>${escapeHtml(entry.id.slice(0, 7))}</code>
-        <span>${escapeHtml(new Date(entry.timestamp * 1000).toLocaleString())}</span>
-      </div>
-      <strong>${escapeHtml(entry.message)}</strong>
-      <span>${escapeHtml(entry.author)}</span>
-    </li>
-  `).join("");
+  elements.historyList.innerHTML = renderHistoryListHtml(snapshot.view.logEntries);
 };
 
 const renderBranches = (snapshot) => {
-  if (snapshot.view.branches.length === 0) {
-    elements.branchList.innerHTML = `<li class="empty-row">No branches yet.</li>`;
-    return;
-  }
-  elements.branchList.innerHTML = snapshot.view.branches.map((branch) => `
-    <li>
-      <button
-        class="list-button ${branch.isCurrent ? "is-current" : ""}"
-        type="button"
-        data-checkout-branch="${escapeHtml(branch.name)}"
-      >
-        <span>${branch.isCurrent ? "current" : "branch"}</span>
-        <code>${escapeHtml(branch.name)}</code>
-      </button>
-    </li>
-  `).join("");
+  elements.branchList.innerHTML = renderBranchListHtml(snapshot.view.branches);
 };
 
 const renderRelay = (snapshot) => {
-  const relay = snapshot.relay;
-  if (relay.sessions.length === 0) {
-    elements.relaySessions.innerHTML = `<li class="empty-row">No hosted editors.</li>`;
-    return;
-  }
-  elements.relaySessions.innerHTML = relay.sessions.map((session) => `
-    <li>
-      <button
-        class="list-button ${session.sessionId === relay.selectedSessionId ? "is-current" : ""}"
-        type="button"
-        data-session-id="${escapeHtml(session.sessionId)}"
-      >
-        <span>${escapeHtml(session.label)}</span>
-        <code>${escapeHtml(session.sessionId)}</code>
-      </button>
-    </li>
-  `).join("");
+  elements.relaySessions.innerHTML = renderRelaySessionsHtml(snapshot.relay);
 };
 
 const render = () => {
