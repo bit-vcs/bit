@@ -5,7 +5,7 @@ Experimental Git implementation in MoonBit.
 This package exposes:
 
 - `bit` CLI
-- a tree-shakable JS library API at `@mizchi/bit/lib`
+- a tree-shakable JS library API at `@mizchi/bit`
 
 ## Install
 
@@ -39,7 +39,7 @@ Every operation accepts your backend as the first argument.
 ```ts
 import {
   add,
-  type BitGitBackend,
+  type BitBackend,
   branchList,
   buildCommitPayload,
   commit,
@@ -59,9 +59,9 @@ import {
   statusText,
   switchBranch,
   writeString,
-} from "@mizchi/bit/lib";
+} from "@mizchi/bit";
 
-declare const backend: BitGitBackend;
+declare const backend: BitBackend;
 
 init(backend, "/repo", "main");
 writeString(backend, "/repo/hello.txt", "hello\n");
@@ -158,7 +158,7 @@ import {
   push,
   relayListClonePeers,
   relayResolveRemote,
-} from "@mizchi/bit/lib";
+} from "@mizchi/bit";
 
 const transport = createFetchTransport(globalThis.fetch);
 
@@ -218,7 +218,7 @@ You can pass any backend object directly as the first argument.
 The backend contract is synchronous.
 
 ```ts
-import { init, writeString, add, commit } from "@mizchi/bit/lib";
+import { init, writeString, add, commit } from "@mizchi/bit";
 
 const backend = {
   mkdirP(path) {},
@@ -268,7 +268,7 @@ Required backend methods:
 ## API Notes
 
 - Every operation takes the backend as its first argument.
-- `createMemoryHost()` returns an in-memory backend for tests, workers, and browser-style environments.
+- `createMemoryBackend()` returns an in-memory backend for tests, workers, and browser-style environments.
 - There is no `createHost()` wrapper API. Pass the backend object itself through your call sites.
 - `buildCommitPayload()` returns the unsigned commit payload text you should hand to your signer.
 - `commitSigned()` writes a signed commit from an armored signature string.

@@ -74,9 +74,19 @@ build-js-lib:
 sync-npm-lib-raw: build-js-lib
     cp _build/js/release/build/lib/lib.js npm/lib.raw.js
 
+# Install local frontend tooling for the Vite playground
+playground-install:
+    pnpm install
+
+# Start the Vite-powered playground in one command
+playground-dev:
+    moon build --target js --release src/lib
+    @if [ ! -d node_modules ]; then pnpm install; fi
+    pnpm run playground:dev
+
 # Run automated Node tests against the built JS lib and npm wrapper
 test-js-build: sync-npm-lib-raw bundle-js-lib-minimal bundle-js-lib-git-ops
-    node --test tools/js-build.test.mjs tools/npm-lib.test.mjs tools/demo-relay.test.mjs tools/demo-editor-link.test.mjs
+    node --test tools/js-build.test.mjs tools/npm-lib.test.mjs tools/demo-relay.test.mjs tools/demo-editor-link.test.mjs tools/playground-commands.test.mjs
 
 # Guard compat-random allowlist against known upstream-oracle failures
 test-git-compat-allowlist:
@@ -156,12 +166,21 @@ build-docs-demo: build-js-lib
       --outfile docs/demo/app.js \
       docs/demo/main.js
 
+# Build the checked-in browser playground bundle served from /docs
+build-docs-playground: build-js-lib
+    @if [ ! -d node_modules ]; then pnpm install; fi
+    pnpm run playground:build
+
 # Build the GitHub Pages demo artifact
-build-pages-demo: build-docs-demo
+build-pages-demo: build-docs-demo build-docs-playground
     mkdir -p target/pages
     cp docs/demo/index.html target/pages/index.html
     cp docs/demo/styles.css target/pages/styles.css
     cp docs/demo/app.js target/pages/app.js
+    mkdir -p target/pages/playground
+    cp docs/playground/index.html target/pages/playground/index.html
+    cp docs/playground/styles.css target/pages/playground/styles.css
+    cp docs/playground/app.js target/pages/playground/app.js
 
 # Measure the built GitHub Pages demo JS bundle
 size-pages-demo: build-pages-demo

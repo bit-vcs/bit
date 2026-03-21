@@ -1,0 +1,25 @@
+{
+  "name": "@mizchi/bit",
+  "private": true,
+  "version": "0.24.2",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./npm/lib.d.ts",
+      "default": "./npm/lib.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "playground:dev": "vite --config vite.playground.config.mjs",
+    "playground:build": "vite build --config vite.playground.config.mjs",
+    "playground:preview": "vite preview --config vite.playground.config.mjs"
+  },
+  "devDependencies": {
+    "vite": "^8.0.1",
+    "vite-plugin-moonbit": "^0.1.5"
+  }
+}
