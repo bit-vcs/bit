@@ -3,8 +3,9 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
+const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const bitJs = join(__dirname, "..", "bit.js");
+const bitCjs = join(__dirname, "..", "bit.cjs");
 
-// MoonBit JS output uses process.argv directly
-await import(bitJs);
+// MoonBit CLI output assumes CommonJS even when the package itself is ESM.
+require(bitCjs);

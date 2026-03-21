@@ -15,6 +15,7 @@
       "default": "./lib.js"
     },
     "./bit.js": "./bit.js",
+    "./bit.cjs": "./bit.cjs",
     "./package.json": "./package.json"
   },
   "bin": {
@@ -23,6 +24,7 @@
   "files": [
     "bin/",
     "bit.js",
+    "bit.cjs",
     "lib.js",
     "lib.d.ts",
     "lib.raw.js",

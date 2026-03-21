@@ -70,9 +70,17 @@ build:
 build-js-lib:
     moon build --target js --release src/lib
 
+# Build JS CLI bundle for the npm wrapper
+build-js-cli:
+    moon build --target js --release src/cmd/bit
+
 # Sync the checked-in npm wrapper's raw JS payload with the current build
 sync-npm-lib-raw: build-js-lib
     cp _build/js/release/build/lib/lib.js npm/lib.raw.js
+
+# Sync the npm CLI's CommonJS payload with the current JS build
+sync-npm-bit-cjs: build-js-cli
+    cp _build/js/release/build/cmd/bit/bit.js npm/bit.cjs
 
 # Install local frontend tooling for the Vite playground
 playground-install:
@@ -85,8 +93,8 @@ playground-dev:
     pnpm run playground:dev
 
 # Run automated Node tests against the built JS lib and npm wrapper
-test-js-build: sync-npm-lib-raw bundle-js-lib-minimal bundle-js-lib-git-ops
-    node --test tools/js-build.test.mjs tools/npm-lib.test.mjs tools/demo-relay.test.mjs tools/demo-editor-link.test.mjs tools/playground-commands.test.mjs tools/playground-view.test.mjs
+test-js-build: sync-npm-lib-raw sync-npm-bit-cjs bundle-js-lib-minimal bundle-js-lib-git-ops
+    node --test tools/js-build.test.mjs tools/npm-lib.test.mjs tools/npm-cli.test.mjs tools/demo-relay.test.mjs tools/demo-editor-link.test.mjs tools/playground-commands.test.mjs tools/playground-view.test.mjs
 
 # Guard compat-random allowlist against known upstream-oracle failures
 test-git-compat-allowlist:
