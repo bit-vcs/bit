@@ -30,6 +30,7 @@ struct HubSearchOptions {
   author : String?
   labels : Array[String]
   limit : Int?
+  format_json : Bool
 }
 
 ///|
@@ -283,6 +284,14 @@ fn parse_hub_search_options(
         i += 1
         continue
       }
+      "--format" if i + 1 < args.length() => {
+        i += 2
+        continue
+      }
+      _ if arg.has_prefix("--format=") => {
+        i += 1
+        continue
+      }
       "-h" | "--help" | "help" => {
         i += 1
         continue
@@ -303,7 +312,21 @@ fn parse_hub_search_options(
   } else {
     Some(query_parts.join(" "))
   }
-  { query, types, state, author, labels, limit }
+  let mut format_json = false
+  let mut k = 0
+  while k < args.length() {
+    if args[k] == "--format" && k + 1 < args.length() && args[k + 1] == "json" {
+      format_json = true
+    }
+    if args[k].has_prefix("--format=") {
+      let val = String::unsafe_substring(args[k], start=9, end=args[k].length())
+      if val == "json" {
+        format_json = true
+      }
+    }
+    k += 1
+  }
+  { query, types, state, author, labels, limit, format_json }
 }
 
 ///|
@@ -423,6 +446,7 @@ async fn handle_hub_search(args : Array[String]) -> Unit raise Error {
   let (objects, refs, _clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
   let results : Array[String] = []
+  let matched_issues : Array[@hub.Issue] = []
 
   if include_pr || include_pr_comment || include_pr_review {
     let prs = hub.list_prs(objects)
@@ -518,6 +542,7 @@ async fn handle_hub_search(args : Array[String]) -> Unit raise Error {
         results.push(
           "issue #\{issue.id()} [\{issue.state().to_string()}] \{issue.title()}",
         )
+        matched_issues.push(issue)
       }
       if include_issue_comment {
         let comments = hub.list_issue_comments(objects, issue.id())
@@ -544,11 +569,23 @@ async fn handle_hub_search(args : Array[String]) -> Unit raise Error {
   }
 
   if results.length() == 0 {
-    print_line("No matches")
+    if options.format_json {
+      print_line("[]")
+    } else {
+      print_line("No matches")
+    }
     return ()
   }
-  for result in results {
-    print_line(result)
+  if options.format_json && matched_issues.length() > 0 {
+    let parts : Array[String] = []
+    for issue in matched_issues {
+      parts.push(format_issue_json(issue))
+    }
+    print_line("[" + parts.join(",") + "]")
+  } else {
+    for result in results {
+      print_line(result)
+    }
   }
 }
 
@@ -588,6 +625,7 @@ async fn handle_hub_search_with_defaults(
   let (objects, refs, _clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
   let results : Array[String] = []
+  let matched_issues : Array[@hub.Issue] = []
 
   if include_pr || include_pr_comment || include_pr_review {
     let prs = hub.list_prs(objects)
@@ -683,6 +721,7 @@ async fn handle_hub_search_with_defaults(
         results.push(
           "issue #\{issue.id()} [\{issue.state().to_string()}] \{issue.title()}",
         )
+        matched_issues.push(issue)
       }
       if include_issue_comment {
         let comments = hub.list_issue_comments(objects, issue.id())
@@ -709,10 +748,22 @@ async fn handle_hub_search_with_defaults(
   }
 
   if results.length() == 0 {
-    print_line("No matches")
+    if options.format_json {
+      print_line("[]")
+    } else {
+      print_line("No matches")
+    }
     return ()
   }
-  for result in results {
-    print_line(result)
+  if options.format_json && matched_issues.length() > 0 {
+    let parts : Array[String] = []
+    for issue in matched_issues {
+      parts.push(format_issue_json(issue))
+    }
+    print_line("[" + parts.join(",") + "]")
+  } else {
+    for result in results {
+      print_line(result)
+    }
   }
 }
