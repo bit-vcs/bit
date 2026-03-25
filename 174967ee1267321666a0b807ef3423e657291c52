@@ -1,0 +1,16 @@
+version 1
+key hub/work-item/0b61060a/meta
+kind work-item
+clock test <test@example.com>=1
+timestamp 1774452545
+node test <test@example.com>
+deleted 0
+
+work-item 0b61060a
+title test worktree issue
+author test <test@example.com>
+created 1774452545
+updated 1774452545
+state open
+label bug
+
