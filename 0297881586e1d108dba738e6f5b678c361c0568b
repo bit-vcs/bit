@@ -1,0 +1,18 @@
+version 1
+key hub/work-item/a19ca263/meta
+kind work-item
+clock test <test@example.com>=1
+timestamp 1774441608
+node test <test@example.com>
+deleted 0
+
+work-item a19ca263
+title File/directory conflict (newfile~HEAD rename)
+author test <test@example.com>
+created 1774441608
+updated 1774441608
+state open
+label P0
+label merge
+
+t6422 tests 7-8: merge が rename 先にディレクトリがある場合に ~HEAD suffix で回避する機能
