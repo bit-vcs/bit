@@ -349,6 +349,7 @@ pub struct WorkItem {
   assignees : Array[String]
   linked_prs : Array[String]
   patch : WorkItemPatch?
+  parent_id : String?
 }
 
 ///|
@@ -364,6 +365,7 @@ pub fn WorkItem::new(
   assignees? : Array[String] = [],
   linked_prs? : Array[String] = [],
   patch? : WorkItemPatch? = None,
+  parent_id? : String? = None,
 ) -> WorkItem {
   {
     id,
@@ -377,6 +379,7 @@ pub fn WorkItem::new(
     assignees,
     linked_prs,
     patch,
+    parent_id,
   }
 }
 
@@ -491,6 +494,7 @@ pub fn WorkItem::to_issue(self : WorkItem) -> Issue? {
               labels=self.labels,
               assignees=self.assignees,
               linked_prs=self.linked_prs,
+              parent_id=self.parent_id,
             ),
           )
       }
@@ -710,6 +714,7 @@ pub struct Issue {
   labels : Array[String]
   assignees : Array[String]
   linked_prs : Array[String] // Related PRs
+  parent_id : String?
 }
 
 ///|
@@ -724,6 +729,7 @@ pub fn Issue::new(
   labels? : Array[String] = [],
   assignees? : Array[String] = [],
   linked_prs? : Array[String] = [],
+  parent_id? : String? = None,
 ) -> Issue {
   {
     id,
@@ -736,6 +742,7 @@ pub fn Issue::new(
     labels,
     assignees,
     linked_prs,
+    parent_id,
   }
 }
 
@@ -802,6 +809,7 @@ pub fn Issue::to_work_item(self : Issue) -> WorkItem {
     labels=self.labels,
     assignees=self.assignees,
     linked_prs=self.linked_prs,
+    parent_id=self.parent_id,
   )
 }
 

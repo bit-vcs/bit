@@ -264,6 +264,25 @@ async fn handle_hub_issue_list(args : Array[String]) -> Unit raise Error {
     handle_hub_work_item_list(args)
     return ()
   }
+  // Parse --all and --parent flags
+  let mut show_all = false
+  let mut filter_parent : String? = None
+  let mut j = 0
+  while j < args.length() {
+    match args[j] {
+      "--all" => show_all = true
+      "--parent" if j + 1 < args.length() => {
+        filter_parent = Some(args[j + 1])
+        j += 1
+      }
+      _ if args[j].has_prefix("--parent=") =>
+        filter_parent = Some(
+          String::unsafe_substring(args[j], start=9, end=args[j].length()),
+        )
+      _ => ()
+    }
+    j += 1
+  }
   let state = match options.state {
     None => None
     Some(work_item_state) => work_item_state.to_issue_state()
@@ -272,7 +291,25 @@ async fn handle_hub_issue_list(args : Array[String]) -> Unit raise Error {
   let git_dir = root + "/.git"
   let (objects, refs, _clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
-  let issues = hub.list_issues(objects, state~)
+  let all_issues = hub.list_issues(objects, state~)
+  // Filter by parent
+  let issues : Array[@hub.Issue] = []
+  for issue in all_issues {
+    match filter_parent {
+      Some(pid) =>
+        // Show only children of specified parent
+        if issue.parent_id == Some(pid) {
+          issues.push(issue)
+        }
+      None =>
+        if show_all {
+          issues.push(issue)
+        } else if issue.parent_id is None {
+          // Default: show only top-level issues
+          issues.push(issue)
+        }
+    }
+  }
   let raw_limit = options.limit.unwrap_or(issues.length())
   let limit = if raw_limit < issues.length() {
     raw_limit
@@ -482,6 +519,24 @@ async fn handle_hub_issue_get(args : Array[String]) -> Unit raise Error {
     raise @bitcore.GitError::InvalidObject("Issue not found: \{id}")
   }
   print_line(val.serialize())
+  // Show parent info
+  match val.parent_id {
+    Some(pid) =>
+      match hub.get_issue(objects, pid) {
+        Some(parent) =>
+          print_line("parent: #\{parent.id} \{parent.title}")
+        None => print_line("parent: #\{pid} (not found)")
+      }
+    None => ()
+  }
+  // Show sub-issues
+  let children = hub.list_sub_issues(objects, id)
+  if children.length() > 0 {
+    print_line("sub-issues:")
+    for child in children {
+      print_line("  #\{child.id} [\{child.state}] \{child.title}")
+    }
+  }
 }
 
 ///|
@@ -527,6 +582,7 @@ async fn handle_hub_issue_create(args : Array[String]) -> Unit raise Error {
   let mut body : String? = None
   let labels : Array[String] = []
   let assignees : Array[String] = []
+  let mut parent_id : String? = None
   let mut i = 0
   while i < args.length() {
     let arg = args[i]
@@ -578,6 +634,18 @@ async fn handle_hub_issue_create(args : Array[String]) -> Unit raise Error {
         i += 1
         continue
       }
+      "--parent" | "-p" if i + 1 < args.length() => {
+        parent_id = Some(args[i + 1])
+        i += 2
+        continue
+      }
+      _ if arg.has_prefix("--parent=") => {
+        parent_id = Some(
+          String::unsafe_substring(arg, start=9, end=arg.length()),
+        )
+        i += 1
+        continue
+      }
       _ if arg.has_prefix("-") => {
         warn_unimplemented_arg("issue create", arg)
         i += 1
@@ -607,6 +675,7 @@ async fn handle_hub_issue_create(args : Array[String]) -> Unit raise Error {
     get_author_string(),
     labels~,
     assignees~,
+    parent_id~,
   )
   print_line(issue.serialize())
 }

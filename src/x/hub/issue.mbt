@@ -12,6 +12,7 @@ pub fn Hub::create_issue(
   author : String,
   labels? : Array[String] = [],
   assignees? : Array[String] = [],
+  parent_id? : String? = None,
 ) -> Issue raise @bit.GitError {
   let timestamp = clock.now()
   let issue_id = generate_entity_id(
@@ -30,6 +31,7 @@ pub fn Hub::create_issue(
     IssueState::Open,
     labels~,
     assignees~,
+    parent_id~,
   )
   ignore(
     self.store.put_record(
@@ -129,6 +131,7 @@ pub fn Hub::update_issue(
     labels=new_labels,
     assignees=new_assignees,
     linked_prs=existing.linked_prs,
+    parent_id=existing.parent_id,
   )
   ignore(
     self.store.put_record(
@@ -171,6 +174,7 @@ pub fn Hub::close_issue(
     labels=existing.labels,
     assignees=existing.assignees,
     linked_prs=existing.linked_prs,
+    parent_id=existing.parent_id,
   )
   ignore(
     self.store.put_record(
@@ -212,6 +216,7 @@ pub fn Hub::reopen_issue(
     labels=existing.labels,
     assignees=existing.assignees,
     linked_prs=existing.linked_prs,
+    parent_id=existing.parent_id,
   )
   ignore(
     self.store.put_record(
@@ -224,6 +229,24 @@ pub fn Hub::reopen_issue(
       existing.author,
     ),
   )
+}
+
+///|
+/// List sub-issues of a parent issue
+pub fn Hub::list_sub_issues(
+  self : Hub,
+  objects : &@lib.ObjectStore,
+  parent_id : String,
+  state? : IssueState? = None,
+) -> Array[Issue] {
+  let all_issues = self.list_issues(objects, state~)
+  let result : Array[Issue] = []
+  for issue in all_issues {
+    if issue.parent_id == Some(parent_id) {
+      result.push(issue)
+    }
+  }
+  result
 }
 
 ///|

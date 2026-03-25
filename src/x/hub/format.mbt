@@ -205,6 +205,14 @@ pub fn WorkItem::serialize(self : WorkItem) -> String {
     sb.write_string(pr_id)
     sb.write_char('\n')
   }
+  match self.parent_id {
+    Some(pid) => {
+      sb.write_string("parent ")
+      sb.write_string(pid)
+      sb.write_char('\n')
+    }
+    None => ()
+  }
   match self.patch {
     None => ()
     Some(patch) => {
@@ -276,6 +284,7 @@ pub fn parse_work_item(text : String) -> WorkItem raise PrError {
   let mut target_commit_hex : String? = None
   let closes_issues : Array[String] = []
   let mut merge_commit : @bit.ObjectId? = None
+  let mut parent_id : String? = None
   let body_lines : Array[String] = []
   let mut in_body = false
   for line_view in text.split("\n") {
@@ -308,6 +317,7 @@ pub fn parse_work_item(text : String) -> WorkItem raise PrError {
           "label" => labels.push(value)
           "assignee" => assignees.push(value)
           "linked-pr" => linked_prs.push(value)
+          "parent" => parent_id = Some(value)
           "source" => source_branch = Some(value)
           "source-repo" => source_repo = Some(value)
           "source-ref" => source_ref = Some(value)
@@ -366,6 +376,7 @@ pub fn parse_work_item(text : String) -> WorkItem raise PrError {
     assignees~,
     linked_prs~,
     patch~,
+    parent_id~,
   )
 }
 
@@ -666,6 +677,14 @@ pub fn Issue::serialize(self : Issue) -> String {
     sb.write_string(pr_id)
     sb.write_char('\n')
   }
+  match self.parent_id {
+    Some(pid) => {
+      sb.write_string("parent ")
+      sb.write_string(pid)
+      sb.write_char('\n')
+    }
+    None => ()
+  }
   sb.write_char('\n')
   sb.write_string(self.body)
   sb.to_string()
@@ -683,6 +702,7 @@ pub fn parse_legacy_issue(text : String) -> Issue raise PrError {
   let labels : Array[String] = []
   let assignees : Array[String] = []
   let linked_prs : Array[String] = []
+  let mut parent_id : String? = None
   let body_lines : Array[String] = []
   let mut in_body = false
   for line_view in text.split("\n") {
@@ -715,6 +735,7 @@ pub fn parse_legacy_issue(text : String) -> Issue raise PrError {
           "label" => labels.push(value)
           "assignee" => assignees.push(value)
           "linked-pr" => linked_prs.push(value)
+          "parent" => parent_id = Some(value)
           _ => ()
         }
       }
@@ -734,6 +755,7 @@ pub fn parse_legacy_issue(text : String) -> Issue raise PrError {
     labels~,
     assignees~,
     linked_prs~,
+    parent_id~,
   )
 }
 
