@@ -129,6 +129,8 @@ pub fn merge(
   message : String,
   author : String,
   timestamp : Int64,
+  ours_label? : String = "HEAD",
+  theirs_label? : String = "incoming",
 ) -> MergeResult raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   let head = match resolve_head_commit(rfs, git_dir) {
@@ -183,7 +185,9 @@ pub fn merge(
       base_content,
       ours_content,
       theirs_content,
-      @diff3.ContentMergeOptions::default(),
+      @diff3.ContentMergeOptions::default().with_labels(
+        ours=ours_label, base="", theirs=theirs_label,
+      ),
     )
     if result.has_conflicts {
       // Write conflict markers to worktree
@@ -257,11 +261,15 @@ pub fn merge(
       merged[candidate.path] = { id: ours_blob_id, mode: candidate.mode }
     } else {
       // Different content - final merge with conflict markers
+      // Use common prefix lines as base so shared content stays outside markers
+      let common_base = merge_common_line_prefix(ours_text, theirs_text)
       let final_result = @diff3.content_merge(
-        "",
+        common_base,
         ours_text,
         theirs_text,
-        @diff3.ContentMergeOptions::default(),
+        @diff3.ContentMergeOptions::default().with_labels(
+        ours=ours_label, base="", theirs=theirs_label,
+      ),
       )
       let full_path = join_path(root, candidate.path)
       let dir = rebase_parent_dir(full_path)
@@ -733,6 +741,39 @@ fn merge_entry_eq(a : TreeFileEntry?, b : TreeFileEntry?) -> Bool {
     (Some(x), Some(y)) => x.id == y.id && x.mode == y.mode
     _ => false
   }
+}
+
+///| Extract common prefix lines from two texts for use as merge base.
+fn merge_common_line_prefix(a : String, b : String) -> String {
+  let a_arr : Array[String] = []
+  for part in a.split("\n") {
+    a_arr.push(part.to_string())
+  }
+  let b_arr : Array[String] = []
+  for part in b.split("\n") {
+    b_arr.push(part.to_string())
+  }
+  let result = StringBuilder::new()
+  let limit = if a_arr.length() < b_arr.length() {
+    a_arr.length()
+  } else {
+    b_arr.length()
+  }
+  let mut count = 0
+  for i in 0..<limit {
+    if a_arr[i] == b_arr[i] {
+      count += 1
+    } else {
+      break
+    }
+  }
+  for i in 0..<count {
+    result.write_string(a_arr[i])
+    if i < count - 1 || a.contains("\n") {
+      result.write_char('\n')
+    }
+  }
+  result.to_string()
 }
 
 ///| Resolve a rename's content by doing a 3-way merge.

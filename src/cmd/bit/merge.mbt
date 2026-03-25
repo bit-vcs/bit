@@ -299,7 +299,7 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
   if squash {
     // Squash merge: apply changes but don't commit
     let result = run_merge_with_sensitive_hooks(
-      fs, fs, root, tid, msg, author, timestamp,
+      fs, fs, root, tid, msg, author, timestamp, theirs_label=refspec,
     )
     match result.status {
       @bitlib.MergeStatus::AlreadyUpToDate =>
@@ -414,7 +414,7 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
   ignore(allow_unrelated)
   ignore(strategy)
   let result = run_merge_with_sensitive_hooks(
-    fs, fs, root, tid, msg, author, timestamp,
+    fs, fs, root, tid, msg, author, timestamp, theirs_label=refspec,
   )
   match result.status {
     @bitlib.MergeStatus::AlreadyUpToDate =>
