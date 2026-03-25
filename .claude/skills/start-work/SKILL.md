@@ -1,113 +1,148 @@
 ---
 name: start-work
-description: "Start implementation work with worktree isolation and bit issue coordination. Use when beginning non-trivial code changes: after plan mode, creating branches, implementing features, fixing bugs, or refactoring. Also use when the user mentions worktree, bit issue, session coordination, or parallel work."
+description: "Manage implementation sessions with worktree isolation and bit issue coordination. Use when: starting non-trivial code changes, resuming previous work, entering plan mode, creating branches, or doing parallel work. Triggers on keywords: worktree, bit issue, session, parallel work, resume, continue."
 ---
 
-# Overview
+# Worktree Session Coordination
 
-Coordinate parallel Claude Code sessions using `bit issue` and git worktrees. Each session declares its Target Files via a bit issue so other sessions can detect and avoid file conflicts.
+Coordinate parallel Claude Code sessions using `bit issue` and git worktrees. Each session declares Target Files via a bit issue so other sessions can detect and avoid file conflicts.
 
-Since all worktrees share the same `.git` directory, `bit issue` commands work transparently from any worktree — no `GIT_DIR` workaround needed (bit >= 0.35.2).
+`bit issue` works transparently from any worktree — no `GIT_DIR` workaround needed.
 
-## Session Lifecycle
+## Decide: New Session or Resume
 
+```bash
+# Check for existing open sessions
+bit issue list --open
 ```
-  EnterWorktree → bit issue create (Target Files) → work → bit issue close → ExitWorktree
-```
 
-## 1. Read the Plan File
+- **Open session exists for this branch** → go to [Resume Session](#resume-session)
+- **No existing session** → go to [New Session](#new-session)
 
-Plan files are `.gitignore`d and not shared across worktrees. Read the plan **before** entering the worktree, or use the main repo's absolute path.
+---
+
+## New Session
+
+### 1. Read the Plan
+
+Plan files are `.gitignore`d. Read **before** entering the worktree, or via main repo absolute path.
 
 ```bash
 ls -t <main-repo-path>/plans/*.md 2>/dev/null | head -1
 ```
 
-If no plan file exists (minor work), omit the Plan section from the issue body.
+### 2. Enter Worktree & Declare Scope
 
-## 2. Enter Worktree & Create Issue
-
-After worktree creation, create a bit issue declaring your scope.
-
-### Create a session issue
+After worktree creation, create a bit issue. Use `bit issue list --open --label "session:<branch>"` to count existing issues and assign the next sequence number.
 
 ```bash
+# Count existing issues for this session to determine next seq number
+bit issue list --open --label "session:<branch-name>"
+# → N issues found → next seq = N+1
+
 bit issue create \
-  --title "[session:<branch-name>] <summary>" \
+  --title "[session:<branch-name>#<seq>] <summary>" \
   --label "session:<branch-name>" \
   --body "$(cat <<'BODY'
 ## Session Info
 
 - **branch**: <branch-name>
 - **worktree**: <worktree-absolute-path>
+- **seq**: <seq>
 
 ## Target Files
 
 - path/to/file.ts (modify|create|delete)
-- path/to/other.ts (modify)
 
 ## Plan
 
-<plan content if available>
+<plan content or omit>
 BODY
 )"
 ```
 
-**Create the issue before starting work** so other sessions can see your scope immediately.
+**Create before starting work** so other sessions see your scope immediately.
 
-## 3. Cross-Session Awareness
-
-Check for overlapping Target Files at these points:
-
-1. **After issue create** — race condition mitigation
-2. **On scope change** — when modifying files not in original Target Files
-3. **Before close** — final check
+### 3. Check for Overlap
 
 ```bash
-bit issue list --open --label "session:<branch-name>"  # your session
-bit issue list --open                                   # all sessions
-bit issue view <id>                                     # check specific session
+bit issue list --open                    # all sessions
+bit issue view <other-session-id>        # check specific
 ```
 
-### Overlap Detection
-
 ```
-overlap = |my Target Files ∩ other Target Files| / |my Target Files|
+overlap = |my files ∩ other files| / |my files|
 
 - 0%:   proceed
 - <50%: exclude overlapping files, record in comment
 - ≥50%: ask user
 ```
 
-### Dynamic Updates
+### 4. Work
+
+Record scope changes as they happen:
 
 ```bash
-# Record scope changes
-bit issue comment add <id> --body "Target Files added: path/to/new.ts (modify) - reason: ..."
+bit issue comment add <id> --body "Target added: path/to/new.ts (modify) — reason: ..."
 ```
 
-## 4. Completion
+### 5. Complete
 
 Close the issue **before** removing the worktree.
 
 ```bash
-bit issue comment add <id> --body "Done: <summary of changes>"
+bit issue comment add <id> --body "Done: <summary>"
 bit issue close <id>
-# Then ExitWorktree / remove worktree
 ```
 
-## 5. Error Handling
+---
+
+## Resume Session
+
+### 1. Find the Session
+
+```bash
+bit issue list --open --label "session:<branch-name>"
+# or
+bit issue list --open
+```
+
+### 2. Restore Context
+
+```bash
+bit issue view <id>              # plan + target files
+bit issue comment list <id>      # scope changes + progress
+git worktree list                # verify worktree exists
+```
+
+### 3. Continue
+
+- **Worktree exists** → `cd` into it, continue work
+- **Worktree gone** → create new worktree on same branch, issue context still valid
+
+### 4. Clean Up Orphans
+
+If a session's worktree is gone with no committed work:
+
+```bash
+bit issue comment add <id> --body "Orphan: worktree removed"
+bit issue close <id>
+```
+
+---
+
+## Error Handling
 
 | Situation | Response |
 |-----------|----------|
 | bit command fails | Notify user, continue without coordination |
 | bit not installed | Solo mode — skip coordination |
-| Orphan issue (worktree gone) | `git worktree list` to verify, exclude from overlap detection |
+| Orphan issue | `git worktree list` to verify, exclude from overlap detection |
 
-## Key Commands Reference
+## Commands Reference
 
 ```bash
-bit issue init                          # Initialize hub store (first time)
+bit issue init                            # first-time setup
 bit issue create --title "..." --label "..." --body "..."
 bit issue list [--open] [--closed] [--all] [--label <name>] [--parent <id>]
 bit issue view <id>
@@ -116,5 +151,4 @@ bit issue close <id>
 bit issue reopen <id>
 bit issue comment add <id> --body "..."
 bit issue comment list <id>
-bit issue search <query>
 ```
