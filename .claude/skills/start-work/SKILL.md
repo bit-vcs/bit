@@ -30,12 +30,18 @@ If a plan file exists, read it before starting work. Plans may be `.gitignore`d 
 
 ### 2. Declare Scope
 
-Create a bit issue declaring your session and Target Files. Use `bit issue list --open --label "session:<branch>"` to count existing issues and assign the next sequence number.
+Create a bit issue declaring your session and Target Files.
+
+To assign a sequence number, count **all** issues (not just open) with the session label to avoid reuse after close/reopen cycles:
 
 ```bash
-bit issue list --open --label "session:<branch-name>"
+bit issue list --all --label "session:<branch-name>"
 # → N issues found → next seq = N+1
+```
 
+Multiple `--label` flags are supported for categorization.
+
+```bash
 bit issue create \
   --title "[session:<branch-name>#<seq>] <summary>" \
   --label "session:<branch-name>" \
@@ -59,17 +65,28 @@ BODY
 
 ### 3. Check for Overlap
 
+For each open issue that is **not yours**, view it and extract Target Files from the body. Compare against your own.
+
 ```bash
-bit issue list --open                    # all sessions
-bit issue view <other-session-id>        # check specific
+bit issue list --open                    # all open sessions
+bit issue view <other-session-id>        # read Target Files section
 ```
+
+Calculate overlap:
 
 ```
 overlap = |my files ∩ other files| / |my files|
 
 - 0%:   proceed
-- <50%: exclude overlapping files, record in comment
+- <50%: exclude overlapping files, update issue body + add comment
 - ≥50%: ask user
+```
+
+When excluding files, update the issue to reflect the revised scope:
+
+```bash
+bit issue update <id> --body "<revised body with excluded files removed>"
+bit issue comment add <id> --body "Excluded path/to/file.ts (owned by session X)"
 ```
 
 ### 4. Work
@@ -82,7 +99,7 @@ bit issue comment add <id> --body "Target added: path/to/new.ts (modify) — rea
 
 ### 5. Complete
 
-Close the issue when done.
+Close the issue when done. Close is idempotent (safe to call on already-closed issues).
 
 ```bash
 bit issue comment add <id> --body "Done: <summary>"
@@ -110,16 +127,18 @@ bit issue comment list <id>      # scope changes + progress
 
 ### 3. Continue
 
-The issue body contains the original plan and Target Files. Comments track scope changes and progress.
+The issue body contains the canonical Target Files and plan. Comments track scope changes and progress.
 
 ### 4. Clean Up Orphans
 
-If a session's work environment is gone with no committed work:
+If a session is abandoned with no committed work:
 
 ```bash
 bit issue comment add <id> --body "Orphan: session abandoned"
 bit issue close <id>
 ```
+
+Use `bit issue list --all` to find both open and closed sessions.
 
 ---
 
@@ -134,12 +153,12 @@ bit issue close <id>
 ## Commands Reference
 
 ```bash
-bit issue create --title "..." --label "..." --body "..."
+bit issue create --title "..." --label "..." [--label "..."] --body "..."
 bit issue list [--open] [--closed] [--all] [--label <name>] [--parent <id>]
 bit issue view <id>
-bit issue update <id> --title "..." --body "..."
-bit issue close <id>
-bit issue reopen <id>
+bit issue update <id> [--title "..."] [--body "..."] [--label "..."]
+bit issue close <id>                     # idempotent
+bit issue reopen <id>                    # idempotent
 bit issue comment add <id> --body "..."
 bit issue comment list <id>
 ```

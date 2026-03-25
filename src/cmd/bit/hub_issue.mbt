@@ -830,6 +830,14 @@ async fn handle_hub_issue_close(args : Array[String]) -> Unit raise Error {
   let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
+  let issue = hub.get_issue(objects, id)
+  guard issue is Some(existing) else {
+    raise @bitcore.GitError::InvalidObject("Issue not found: \{id}")
+  }
+  if existing.state == @hub.IssueState::Closed {
+    print_line("Issue #\{id} is already closed")
+    return ()
+  }
   hub.close_issue(objects, refs, clock, id)
   print_line("Closed issue #\{id}")
 }
@@ -859,6 +867,14 @@ async fn handle_hub_issue_reopen(args : Array[String]) -> Unit raise Error {
   let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
+  let issue = hub.get_issue(objects, id)
+  guard issue is Some(existing) else {
+    raise @bitcore.GitError::InvalidObject("Issue not found: \{id}")
+  }
+  if existing.state == @hub.IssueState::Open {
+    print_line("Issue #\{id} is already open")
+    return ()
+  }
   hub.reopen_issue(objects, refs, clock, id)
   print_line("Reopened issue #\{id}")
 }
