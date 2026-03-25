@@ -30,7 +30,7 @@ start_server() {
     local seed="${1:-0}"
     RELAY_PORT=$((12000 + ($$ + seed) % 30000))
     RELAY_LOG="$TRASH_DIR/relay-server.log"
-    node "$PROJECT_ROOT/tools/relay-test-server.js" "$RELAY_PORT" >"$RELAY_LOG" 2>&1 &
+    node "$PROJECT_ROOT/tools/relay-test-server.cjs" "$RELAY_PORT" >"$RELAY_LOG" 2>&1 &
     SERVER_PID=$!
     sleep 1
     kill -0 "$SERVER_PID"

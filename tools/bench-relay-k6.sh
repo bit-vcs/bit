@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SCENARIO_PATH="$SCRIPT_DIR/relay-k6-scenario.js"
-SERVER_PATH="$SCRIPT_DIR/relay-test-server.js"
+SERVER_PATH="$SCRIPT_DIR/relay-test-server.cjs"
 SIGNER_PATH="$SCRIPT_DIR/relay-k6-signer.js"
 
 if ! command -v k6 >/dev/null 2>&1; then

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Minimal relay server for hub sync e2e tests.
-// Usage: node relay-test-server.js <port>
+// Usage: node relay-test-server.cjs <port>
 
 const http = require('http');
 

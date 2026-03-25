@@ -83,7 +83,7 @@ RELAY_PID=""
 
 start_relay_test_server() {
     RELAY_PORT=$((12000 + RANDOM % 30000))
-    node "$PROJECT_ROOT/tools/relay-test-server.js" "$RELAY_PORT" > relay.log 2>&1 &
+    node "$PROJECT_ROOT/tools/relay-test-server.cjs" "$RELAY_PORT" > relay.log 2>&1 &
     RELAY_PID=$!
     sleep 1
     kill -0 "$RELAY_PID"
