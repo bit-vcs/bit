@@ -1,0 +1,18 @@
+version 1
+key hub/work-item/53824dda/meta
+kind work-item
+clock test <test@example.com>=1
+timestamp 1774441594
+node test <test@example.com>
+deleted 0
+
+work-item 53824dda
+title Sparse/Index テスト修正 (44 failures)
+author test <test@example.com>
+created 1774441594
+updated 1774441594
+state open
+label P0
+label sparse
+
+t1092(14), t7002(14), t3903(13), t1091(1), t3705(2)
