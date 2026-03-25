@@ -1,0 +1,23 @@
+version 1
+key hub/work-item/a0bb4cf7/meta
+kind work-item
+clock mizchi <miz404@gmail.com>=1
+timestamp 1774454013
+node mizchi <miz404@gmail.com>
+deleted 0
+
+work-item a0bb4cf7
+title [session:feat/add-validation#1] Add input validation docs
+author mizchi <miz404@gmail.com>
+created 1774454013
+updated 1774454013
+state open
+label session:feat/add-validation
+
+## Session Info
+- branch: feat/add-validation
+- worktree: /Users/mz/ghq/github.com/bit-vcs/bit/.claude/worktrees/agent-a946f187
+
+## Target Files
+- docs/sub-issues.md (modify)
+- docs/validation.md (create)
