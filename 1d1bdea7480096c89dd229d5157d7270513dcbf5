@@ -1,0 +1,17 @@
+version 1
+key hub/work-item/65377b23/meta
+kind work-item
+clock test <test@example.com>=1
+timestamp 1774441715
+node test <test@example.com>
+deleted 0
+
+work-item 65377b23
+title WASM target 機能カバレッジ拡大
+author test <test@example.com>
+created 1774441715
+updated 1774441715
+state open
+label P3
+label wasm
+
