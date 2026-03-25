@@ -325,6 +325,33 @@ pub fn merge(
       )
     }
   }
+  // Detect file/directory conflicts: a file path that collides with a directory
+  let file_dir_renames : Map[String, String] = {}
+  let merged_paths : Array[String] = []
+  for path, _ in merged {
+    merged_paths.push(path)
+  }
+  for path, _ in merged {
+    let prefix = path + "/"
+    for other_path in merged_paths {
+      if other_path.has_prefix(prefix) {
+        let new_path = path + "~HEAD"
+        file_dir_renames[path] = new_path
+        break
+      }
+    }
+  }
+  for old_path, new_path in file_dir_renames {
+    match merged.get(old_path) {
+      Some(entry) => {
+        merged.remove(old_path)
+        merged[new_path] = entry
+        conflicts.push(new_path)
+        all_conflict_types[new_path] = "file/directory"
+      }
+      None => ()
+    }
+  }
   if conflicts.length() > 0 {
     write_worktree_from_files(
       db,
