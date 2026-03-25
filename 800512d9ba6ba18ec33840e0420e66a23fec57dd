@@ -1,8 +1,8 @@
 version 1
 key hub/work-item/a0bb4cf7/meta
 kind work-item
-clock mizchi <miz404@gmail.com>=1
-timestamp 1774454013
+clock mizchi <miz404@gmail.com>=2
+timestamp 1774454038
 node mizchi <miz404@gmail.com>
 deleted 0
 
@@ -10,8 +10,8 @@ work-item a0bb4cf7
 title [session:feat/add-validation#1] Add input validation docs
 author mizchi <miz404@gmail.com>
 created 1774454013
-updated 1774454013
-state open
+updated 1774454038
+state closed
 label session:feat/add-validation
 
 ## Session Info
