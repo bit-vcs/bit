@@ -1,0 +1,16 @@
+version 1
+key hub/work-item/a03ac7b6/meta
+kind work-item
+clock mizchi <miz404@gmail.com>=1
+timestamp 1774453262
+node mizchi <miz404@gmail.com>
+deleted 0
+
+work-item a03ac7b6
+title worktree test
+author mizchi <miz404@gmail.com>
+created 1774453262
+updated 1774453262
+state open
+
+testing worktree support
