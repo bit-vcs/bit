@@ -553,7 +553,8 @@ async fn handle_hub_issue_get(args : Array[String]) -> Unit raise Error {
   for arg in args {
     match arg {
       "--format" => ()
-      "json" if format_json == false && issue_id is Some(_) => format_json = true
+      "json" if format_json == false && issue_id is Some(_) =>
+        format_json = true
       _ if arg.has_prefix("--format=") => {
         let val = String::unsafe_substring(arg, start=9, end=arg.length())
         if val == "json" {
