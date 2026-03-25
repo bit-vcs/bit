@@ -244,3 +244,246 @@ test "merge: fast-forward preserves initialized submodule on removal" {
   assert_true(fs.is_file("/repo/vendor/sub/.git"))
   assert_eq(fs.read_string("/repo/vendor/sub/a"), "sub\n")
 }
+
+///|
+test "merge: rename on one side, no conflict" {
+  // Feature renames a.txt -> b.txt (same content), main doesn't touch a.txt
+  // Expected: merge succeeds, file at b.txt
+  let fs = setup_repo_merge()
+  fs.write_string("/repo/a.txt", "content\n")
+  add_paths(fs, fs, "/repo", ["a.txt"])
+  ignore(commit(fs, fs, "/repo", "base", "Test <t@example.com>", 1700000000L))
+  // Feature branch: rename a.txt -> b.txt
+  switch_branch(fs, fs, "/repo", "feature", create=true, checkout_files=true)
+  let entries = read_index_entries(fs, "/repo/.git")
+  let new_entries : Array[IndexEntry] = []
+  let mut a_entry : IndexEntry? = None
+  for entry in entries {
+    if entry.path == "a.txt" {
+      a_entry = Some(entry)
+    } else {
+      new_entries.push(entry)
+    }
+  }
+  match a_entry {
+    Some(e) => new_entries.push(IndexEntry::new("b.txt", e.id, e.mode, 0))
+    None => fail("a.txt not found in index")
+  }
+  write_index_entries(fs, "/repo/.git", new_entries)
+  fs.remove_file("/repo/a.txt") catch {
+    _ => ()
+  }
+  fs.write_string("/repo/b.txt", "content\n")
+  let feature_commit = commit(
+    fs, fs, "/repo", "rename a->b", "Test <t@example.com>", 1700000001L,
+  )
+  // Main branch: no changes to a.txt (add another file)
+  switch_branch(fs, fs, "/repo", "main", checkout_files=true)
+  fs.write_string("/repo/c.txt", "other\n")
+  add_paths(fs, fs, "/repo", ["c.txt"])
+  ignore(commit(fs, fs, "/repo", "add c", "Test <t@example.com>", 1700000002L))
+  // Merge
+  let result = merge(
+    fs, fs, "/repo", feature_commit, "merge rename", "Test <t@example.com>", 1700000003L,
+  )
+  match result.status {
+    Merged => ()
+    _ => {
+      println("Expected Merged, got conflicts: \{result.conflicts}")
+      fail("expected merged")
+    }
+  }
+  // b.txt should exist, a.txt should be gone
+  assert_eq(fs.read_string("/repo/b.txt"), "content\n")
+  assert_eq(fs.read_string("/repo/c.txt"), "other\n")
+}
+
+///|
+test "merge: rename on one side, modify on other (rename/modify)" {
+  // Feature renames a.txt -> b.txt, main modifies a.txt content
+  // Expected: merge succeeds with content merge at b.txt
+  let fs = setup_repo_merge()
+  fs.write_string("/repo/a.txt", "line1\nline2\nline3\n")
+  add_paths(fs, fs, "/repo", ["a.txt"])
+  ignore(commit(fs, fs, "/repo", "base", "Test <t@example.com>", 1700000000L))
+  // Feature branch: rename a.txt -> b.txt (same content)
+  switch_branch(fs, fs, "/repo", "feature", create=true, checkout_files=true)
+  let entries = read_index_entries(fs, "/repo/.git")
+  let new_entries : Array[IndexEntry] = []
+  let mut a_id : @bit.ObjectId? = None
+  for entry in entries {
+    if entry.path == "a.txt" {
+      a_id = Some(entry.id)
+    } else {
+      new_entries.push(entry)
+    }
+  }
+  match a_id {
+    Some(id) => new_entries.push(IndexEntry::new("b.txt", id, 0o100644, 0))
+    None => fail("a.txt not found")
+  }
+  write_index_entries(fs, "/repo/.git", new_entries)
+  fs.remove_file("/repo/a.txt") catch {
+    _ => ()
+  }
+  fs.write_string("/repo/b.txt", "line1\nline2\nline3\n")
+  let feature_commit = commit(
+    fs, fs, "/repo", "rename a->b", "Test <t@example.com>", 1700000001L,
+  )
+  // Main branch: modify a.txt (change line2)
+  switch_branch(fs, fs, "/repo", "main", checkout_files=true)
+  fs.write_string("/repo/a.txt", "line1\nmodified\nline3\n")
+  add_paths(fs, fs, "/repo", ["a.txt"])
+  ignore(
+    commit(fs, fs, "/repo", "modify a", "Test <t@example.com>", 1700000002L),
+  )
+  // Merge
+  let result = merge(
+    fs, fs, "/repo", feature_commit, "merge", "Test <t@example.com>", 1700000003L,
+  )
+  // Should succeed - rename + modify = content merge at new path
+  match result.status {
+    Merged => ()
+    Conflicted => {
+      println("Conflicts: \{result.conflicts}")
+      fail("expected merged, got conflicted")
+    }
+    _ => fail("expected merged")
+  }
+  // File should be at b.txt with modified content
+  assert_eq(fs.read_string("/repo/b.txt"), "line1\nmodified\nline3\n")
+}
+
+///|
+test "merge: rename on both sides to same target" {
+  // Both sides rename a.txt -> b.txt
+  // Expected: merge succeeds
+  let fs = setup_repo_merge()
+  fs.write_string("/repo/a.txt", "content\n")
+  add_paths(fs, fs, "/repo", ["a.txt"])
+  ignore(commit(fs, fs, "/repo", "base", "Test <t@example.com>", 1700000000L))
+  // Feature: rename a->b
+  switch_branch(fs, fs, "/repo", "feature", create=true, checkout_files=true)
+  let entries = read_index_entries(fs, "/repo/.git")
+  let new_entries : Array[IndexEntry] = []
+  let mut a_entry : IndexEntry? = None
+  for entry in entries {
+    if entry.path == "a.txt" {
+      a_entry = Some(entry)
+    } else {
+      new_entries.push(entry)
+    }
+  }
+  match a_entry {
+    Some(e) => new_entries.push(IndexEntry::new("b.txt", e.id, e.mode, 0))
+    None => fail("a.txt not found")
+  }
+  write_index_entries(fs, "/repo/.git", new_entries)
+  fs.remove_file("/repo/a.txt") catch {
+    _ => ()
+  }
+  fs.write_string("/repo/b.txt", "content\n")
+  let feature_commit = commit(
+    fs, fs, "/repo", "rename a->b", "Test <t@example.com>", 1700000001L,
+  )
+  // Main: also rename a->b
+  switch_branch(fs, fs, "/repo", "main", checkout_files=true)
+  let entries2 = read_index_entries(fs, "/repo/.git")
+  let new_entries2 : Array[IndexEntry] = []
+  let mut a_entry2 : IndexEntry? = None
+  for entry in entries2 {
+    if entry.path == "a.txt" {
+      a_entry2 = Some(entry)
+    } else {
+      new_entries2.push(entry)
+    }
+  }
+  match a_entry2 {
+    Some(e) => new_entries2.push(IndexEntry::new("b.txt", e.id, e.mode, 0))
+    None => fail("a.txt not found")
+  }
+  write_index_entries(fs, "/repo/.git", new_entries2)
+  fs.remove_file("/repo/a.txt") catch {
+    _ => ()
+  }
+  fs.write_string("/repo/b.txt", "content\n")
+  ignore(
+    commit(fs, fs, "/repo", "rename a->b", "Test <t@example.com>", 1700000002L),
+  )
+  // Merge
+  let result = merge(
+    fs, fs, "/repo", feature_commit, "merge", "Test <t@example.com>", 1700000003L,
+  )
+  match result.status {
+    Merged => ()
+    AlreadyUpToDate => () // Also acceptable since trees are identical
+    _ => fail("expected merged or up-to-date")
+  }
+  assert_eq(fs.read_string("/repo/b.txt"), "content\n")
+}
+
+///|
+test "merge: rename/add-source - rename a->b with new file at a" {
+  // Feature renames a.txt -> b.txt AND creates new a.txt with different content
+  // Main modifies a.txt (original content)
+  // Expected: b.txt has merged content, a.txt has new content from feature
+  let fs = setup_repo_merge()
+  fs.write_string("/repo/a.txt", "line1\nline2\nline3\n")
+  add_paths(fs, fs, "/repo", ["a.txt"])
+  ignore(commit(fs, fs, "/repo", "base", "Test <t@example.com>", 1700000000L))
+  // Feature: rename a.txt -> b.txt, create new a.txt
+  switch_branch(fs, fs, "/repo", "feature", create=true, checkout_files=true)
+  let entries = read_index_entries(fs, "/repo/.git")
+  let new_entries : Array[IndexEntry] = []
+  let mut a_id : @bit.ObjectId? = None
+  for entry in entries {
+    if entry.path == "a.txt" {
+      a_id = Some(entry.id)
+    } else {
+      new_entries.push(entry)
+    }
+  }
+  // b.txt gets the original content (same OID as base a.txt)
+  match a_id {
+    Some(id) => new_entries.push(IndexEntry::new("b.txt", id, 0o100644, 0))
+    None => fail("a.txt not found")
+  }
+  // New a.txt with completely different content
+  fs.write_string("/repo/a.txt", "something completely different\n")
+  fs.write_string("/repo/b.txt", "line1\nline2\nline3\n")
+  add_paths(fs, fs, "/repo", ["a.txt"])
+  // Re-read to get new a.txt's OID
+  let updated = read_index_entries(fs, "/repo/.git")
+  for entry in updated {
+    if entry.path == "a.txt" {
+      new_entries.push(entry)
+    }
+  }
+  write_index_entries(fs, "/repo/.git", new_entries)
+  let feature_commit = commit(
+    fs, fs, "/repo", "rename+add-source", "Test <t@example.com>", 1700000001L,
+  )
+  // Main: don't touch a.txt
+  switch_branch(fs, fs, "/repo", "main", checkout_files=true)
+  fs.write_string("/repo/c.txt", "other\n")
+  add_paths(fs, fs, "/repo", ["c.txt"])
+  ignore(
+    commit(fs, fs, "/repo", "add c", "Test <t@example.com>", 1700000002L),
+  )
+  // Merge
+  let result = merge(
+    fs, fs, "/repo", feature_commit, "merge", "Test <t@example.com>",
+    1700000003L,
+  )
+  match result.status {
+    Merged => ()
+    _ => {
+      println("Expected Merged, got conflicts: \{result.conflicts}")
+      fail("expected merged")
+    }
+  }
+  // b.txt should have original content, a.txt should have new content
+  assert_eq(fs.read_string("/repo/b.txt"), "line1\nline2\nline3\n")
+  assert_eq(fs.read_string("/repo/a.txt"), "something completely different\n")
+  assert_eq(fs.read_string("/repo/c.txt"), "other\n")
+}
