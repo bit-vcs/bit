@@ -592,7 +592,7 @@ async fn handle_hub_issue_get(args : Array[String]) -> Unit raise Error {
     print_line(format_issue_json(val))
     return ()
   }
-  print_line(val.serialize())
+  print_line(format_issue_detail(val))
   // Show parent info
   match val.parent_id {
     Some(pid) =>
@@ -750,7 +750,7 @@ async fn handle_hub_issue_create(args : Array[String]) -> Unit raise Error {
     assignees~,
     parent_id~,
   )
-  print_line(issue.serialize())
+  print_line(format_issue_detail(issue))
 }
 
 ///|
@@ -854,7 +854,7 @@ async fn handle_hub_issue_update(args : Array[String]) -> Unit raise Error {
     labels=label_option,
     assignees=assignee_option,
   )
-  print_line(issue.serialize())
+  print_line(format_issue_detail(issue))
 }
 
 ///|

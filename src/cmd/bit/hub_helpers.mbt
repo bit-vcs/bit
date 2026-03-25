@@ -397,6 +397,60 @@ fn format_issue_json(issue : @hub.Issue) -> String {
 }
 
 ///|
+///|
+/// Format issue detail with human-readable timestamps for CLI display.
+/// Replaces raw epoch in serialize output with ISO-style dates.
+fn format_issue_detail(issue : @hub.Issue) -> String {
+  let raw = issue.serialize()
+  let sb = StringBuilder::new()
+  for line_view in raw.split("\n") {
+    let line = line_view.to_string()
+    if line.has_prefix("created ") {
+      let ts = line
+        .substring(start=8)
+        .to_string()
+      sb.write_string("created ")
+      sb.write_string(ts)
+      sb.write_string(" (")
+      sb.write_string(format_timestamp_iso(parse_int64_safe(ts), "+0000"))
+      sb.write_string(")")
+      sb.write_char('\n')
+    } else if line.has_prefix("updated ") {
+      let ts = line
+        .substring(start=8)
+        .to_string()
+      sb.write_string("updated ")
+      sb.write_string(ts)
+      sb.write_string(" (")
+      sb.write_string(format_timestamp_iso(parse_int64_safe(ts), "+0000"))
+      sb.write_string(")")
+      sb.write_char('\n')
+    } else {
+      sb.write_string(line)
+      sb.write_char('\n')
+    }
+  }
+  // Remove trailing newline
+  let result = sb.to_string()
+  if result.length() > 0 && result.unsafe_charcode_at(result.length() - 1) == 10 {
+    String::unsafe_substring(result, start=0, end=result.length() - 1)
+  } else {
+    result
+  }
+}
+
+///|
+fn parse_int64_safe(s : String) -> Int64 {
+  let mut result : Int64 = 0
+  for ch in s {
+    if ch >= '0' && ch <= '9' {
+      result = result * 10L + (ch.to_int() - 48).to_int64()
+    }
+  }
+  result
+}
+
+///|
 fn json_escape_string(s : String) -> String {
   let buf = StringBuilder::new()
   buf.write_string("\"")
