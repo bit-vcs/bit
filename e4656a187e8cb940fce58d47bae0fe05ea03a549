@@ -1,0 +1,17 @@
+version 1
+key hub/work-item/8d8418a3/meta
+kind work-item
+clock test <test@example.com>=1
+timestamp 1774441715
+node test <test@example.com>
+deleted 0
+
+work-item 8d8418a3
+title SSH トランスポート
+author test <test@example.com>
+created 1774441715
+updated 1774441715
+state open
+label P0.5
+
+現在 HTTPS のみ。SSH clone/push/fetch
