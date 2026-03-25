@@ -1,0 +1,18 @@
+version 1
+key hub/work-item/92555632/meta
+kind work-item
+clock test <test@example.com>=1
+timestamp 1774441608
+node test <test@example.com>
+deleted 0
+
+work-item 92555632
+title rename/rename(2to1) index entry 修正
+author test <test@example.com>
+created 1774441608
+updated 1774441608
+state open
+label P0
+label merge
+
+t6422 tests 12-13, 20: stage 2/3 の OID が resolved content でない。ls-files -o の untracked count 不一致
