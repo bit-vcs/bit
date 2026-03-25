@@ -1,0 +1,14 @@
+version 1
+key hub/issue/a0bb4cf7/comment/7b7c69cc
+kind issue.comment
+clock mizchi <miz404@gmail.com>=1
+timestamp 1774454033
+node mizchi <miz404@gmail.com>
+deleted 0
+
+comment 7b7c69cc
+issue a0bb4cf7
+author mizchi <miz404@gmail.com>
+created 1774454033
+
+Done: created docs/validation.md
