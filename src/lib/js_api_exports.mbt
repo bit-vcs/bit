@@ -217,7 +217,11 @@ fn js_reset_mode_text(mode : String) -> ResetMode raise @bit.GitError {
 
 ///|
 fn js_optional_text(value : String) -> String? {
-  if value.length() == 0 { None } else { Some(value) }
+  if value.length() == 0 {
+    None
+  } else {
+    Some(value)
+  }
 }
 
 ///|
@@ -470,8 +474,7 @@ pub fn js_commit_amend(
       encoding=if encoding.length() == 0 { "UTF-8" } else { encoding },
       author_timezone=js_optional_text(author_timezone),
       committer_timezone=js_optional_text(committer_timezone),
-    )
-      .to_hex()
+    ).to_hex()
   })
 }
 
@@ -1051,7 +1054,9 @@ pub fn js_sparse_checkout_enabled(
   root : String,
 ) -> Result[Bool, String] {
   let fs = js_make_host_fs(host_id)
-  js_wrap_error(() => is_sparse_checkout_enabled(fs, js_resolve_git_dir(fs, root)))
+  js_wrap_error(() => {
+    is_sparse_checkout_enabled(fs, js_resolve_git_dir(fs, root))
+  })
 }
 
 ///|

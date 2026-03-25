@@ -6,7 +6,7 @@ import {
   checkout,
   checkoutB,
   commit,
-  destroyHost,
+  destroyBackend,
   init,
   log,
   mv,
@@ -235,5 +235,5 @@ try {
     ),
   );
 } finally {
-  destroyHost(backend);
+  destroyBackend(backend);
 }

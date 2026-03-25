@@ -13,6 +13,9 @@ function writeJson(res, code, obj) {
   res.writeHead(code, {
     'Content-Type': 'application/json',
     'Cache-Control': 'no-cache',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   });
   res.end(body);
 }
@@ -38,6 +41,17 @@ function parsePositiveInt(raw, fallback) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://127.0.0.1:${port}`);
   const auth = req.headers.authorization || '';
+
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Max-Age': '86400',
+    });
+    res.end();
+    return;
+  }
 
   if (req.method === 'GET' && url.pathname === '/health') {
     writeJson(res, 200, { ok: true });
@@ -87,12 +101,13 @@ const server = http.createServer(async (req, res) => {
     const after = parsePositiveInt(url.searchParams.get('after') || '0', 0);
     const limit = parsePositiveInt(url.searchParams.get('limit') || '200', 200);
     const room = url.searchParams.get('room') || 'main';
-    const selected = envelopes.slice(after, after + limit);
+    const roomEnvelopes = envelopes.filter((envelope) => envelope.room === room);
+    const selected = roomEnvelopes.slice(after, after + limit);
     console.log(`AUTH poll ${auth}`);
     writeJson(res, 200, {
       ok: true,
       room,
-      next_cursor: envelopes.length,
+      next_cursor: roomEnvelopes.length,
       envelopes: selected,
     });
     return;

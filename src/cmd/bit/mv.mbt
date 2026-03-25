@@ -17,9 +17,10 @@ async fn handle_mv(args : Array[String]) -> Unit raise Error {
       "usage: git mv <source> <destination>",
     )
   }
-  let source = paths[0]
-  let dest = paths[1]
-  @bitlib.mv_path(fs, fs, root, source, dest, force~)
+  let dest = paths[paths.length() - 1]
+  for i in 0..<(paths.length() - 1) {
+    @bitlib.mv_path(fs, fs, root, paths[i], dest, force~)
+  }
 }
 
 ///|

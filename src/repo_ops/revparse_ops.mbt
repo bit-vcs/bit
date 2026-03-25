@@ -10,6 +10,26 @@ pub fn rev_parse(
     let needle = substring_revparse(spec, 2, spec.length())
     return resolve_commit_message_search_all_refs(fs, git_dir, needle)
   }
+  // :N:path — index stage entry lookup (e.g. :0:file, :2:file)
+  // :path — shorthand for :0:path
+  if spec.has_prefix(":") && not(spec.has_prefix(":/")) {
+    let rest = substring_revparse(spec, 1, spec.length())
+    let (target_stage, path) = if rest.length() >= 2 {
+      let ch = rest[0]
+      if (ch == '0' || ch == '1' || ch == '2' || ch == '3') &&
+        rest[1] == ':' {
+        let stage = ch.to_int() - '0'.to_int()
+        (stage, substring_revparse(rest, 2, rest.length()))
+      } else {
+        (0, rest)
+      }
+    } else {
+      (0, rest)
+    }
+    if path.length() > 0 {
+      return resolve_index_stage_entry(fs, git_dir, path, target_stage)
+    }
+  }
   match parse_commit_message_search_spec(spec) {
     Some((base_spec, needle)) =>
       return resolve_commit_message_search(fs, git_dir, base_spec, needle)
@@ -608,6 +628,87 @@ fn substring_revparse(s : String, start : Int, end : Int) -> String {
     result.write_char(chars[i])
   }
   result.to_string()
+}
+
+///| Resolve :N:path by looking up index stage entries.
+/// Parses the index binary format directly to find the entry with
+/// matching path and stage number.
+fn resolve_index_stage_entry(
+  fs : &@types.RepoFileSystem,
+  git_dir : String,
+  path : String,
+  stage : Int,
+) -> @object.ObjectId? raise @object.GitError {
+  let index_path = git_dir + "/index"
+  if not(fs.is_file(index_path)) {
+    return None
+  }
+  let data = fs.read_file(index_path)
+  if data.length() < 12 {
+    return None
+  }
+  if data[0] != b'D' || data[1] != b'I' || data[2] != b'R' || data[3] != b'C' {
+    return None
+  }
+  let version = revparse_read_u32_be(data, 4)
+  let num_entries = revparse_read_u32_be(data, 8)
+  let mut pos = 12
+  for _ in 0..<num_entries {
+    if pos + 62 > data.length() {
+      break
+    }
+    let id_pos = pos + 40
+    let id_bytes : FixedArray[Byte] = FixedArray::make(20, b'\x00')
+    for i in 0..<20 {
+      id_bytes[i] = data[id_pos + i]
+    }
+    let id = @object.ObjectId::new(id_bytes)
+    let flags_pos = id_pos + 20
+    let flags = (data[flags_pos].to_int() << 8) |
+      data[flags_pos + 1].to_int()
+    let entry_stage = (flags >> 12) & 0x3
+    let name_len = flags & 0x0FFF
+    let has_extended = version >= 3 && (flags & 0x4000) != 0
+    let mut path_start = flags_pos + 2
+    if has_extended {
+      path_start += 2
+    }
+    let actual_len = if name_len < 0x0FFF {
+      name_len
+    } else {
+      let mut len = 0
+      while path_start + len < data.length() &&
+        data[path_start + len] != b'\x00' {
+        len += 1
+      }
+      len
+    }
+    let entry_path_buf = StringBuilder::new()
+    for i in 0..<actual_len {
+      if path_start + i < data.length() {
+        entry_path_buf.write_char(
+          data[path_start + i].to_int().unsafe_to_char(),
+        )
+      }
+    }
+    let entry_path = entry_path_buf.to_string()
+    if entry_path == path && entry_stage == stage {
+      return Some(id)
+    }
+    // Advance to next entry (aligned to 8 bytes)
+    let entry_len = path_start + actual_len + 1 - pos
+    let padded = (entry_len + 7).land(0x7FFFFFF8)  // align to 8
+    pos += padded
+  }
+  None
+}
+
+///|
+fn revparse_read_u32_be(data : Bytes, pos : Int) -> Int {
+  (data[pos].to_int() << 24) |
+  (data[pos + 1].to_int() << 16) |
+  (data[pos + 2].to_int() << 8) |
+  data[pos + 3].to_int()
 }
 
 ///|

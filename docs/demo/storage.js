@@ -1,12 +1,26 @@
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
-const DB_NAME = "bit-demo-pages";
+export const readStorageProfileFromSearch = (search = "") => {
+  const params = new URLSearchParams(String(search).replace(/^\?/, ""));
+  const rawProfile = (params.get("profile") ?? "").trim();
+  if (!rawProfile) return "default";
+  const normalized = rawProfile
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/^\.+/, "")
+    .replace(/^-+|-+$/g, "");
+  return normalized || "default";
+};
+
+export const STORAGE_PROFILE = readStorageProfileFromSearch(globalThis.location?.search ?? "");
+
+const DB_NAME = `bit-demo-pages-${STORAGE_PROFILE}`;
 const DB_VERSION = 1;
 const SNAPSHOT_STORE = "snapshots";
 const HANDLE_STORE = "handles";
-const INDEXED_DB_SNAPSHOT_KEY = "indexeddb-demo-repo";
-const FILESYSTEM_HANDLE_KEY = "filesystem-demo-root";
+const INDEXED_DB_SNAPSHOT_KEY = `indexeddb-demo-repo:${STORAGE_PROFILE}`;
+const FILESYSTEM_HANDLE_KEY = `filesystem-demo-root:${STORAGE_PROFILE}`;
 const FILESYSTEM_MANAGED_DIR = ".bit-demo-repo";
 
 export const REPO_ROOT = "/playground";

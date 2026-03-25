@@ -143,7 +143,7 @@ async function verifyFetchAndPushResolveRelay(bitGit) {
     },
   };
 
-  const backend = bitGit.createMemoryHost();
+  const backend = bitGit.createMemoryBackend();
   bitGit.init(backend, "/repo");
   bitGit.writeString(backend, "/repo/file.txt", "hello\n");
   bitGit.add(backend, "/repo", ["file.txt"]);

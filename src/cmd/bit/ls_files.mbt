@@ -482,13 +482,18 @@ async fn handle_ls_files(args : Array[String]) -> Unit raise Error {
     tracked_candidate_paths.push(entry.path)
   }
   if show_stage {
-    for entry in tracked_entries {
-      if not(ls_files_matches_filters(entry.path, path_filters)) {
+    // Use stage entries to show actual stage numbers (0, 1, 2, 3)
+    let stage_entries = @bitlib.read_index_stage_entries(fs, git_dir)
+    for item in stage_entries {
+      if not(ls_files_matches_filters(item.entry.path, path_filters)) {
         continue
       }
-      let mode = format_mode(entry.mode)
-      let display_path = make_display_path(entry.path, cwd_prefix)
-      print_str("\{mode} \{entry.id.to_hex()} 0\t\{display_path}" + terminator)
+      let mode = format_mode(item.entry.mode)
+      let display_path = make_display_path(item.entry.path, cwd_prefix)
+      print_str(
+        "\{mode} \{item.entry.id.to_hex()} \{item.stage}\t\{display_path}" +
+        terminator,
+      )
     }
     if error_unmatch {
       let unmatched = ls_files_collect_unmatched_raw_filters(
@@ -742,8 +747,6 @@ struct SubmoduleInfo {
 ///|
 struct LsFilesTrackedEntry {
   path : String
-  mode : Int
-  id : @bitcore.ObjectId
 }
 
 ///|
@@ -766,26 +769,26 @@ fn ls_files_collect_cached_entries(
   }
   if not(recurse_submodules) {
     return entries.map(fn(entry) {
-      { path: prefix + entry.path, mode: entry.mode, id: entry.id }
+      { path: prefix + entry.path }
     })
   }
   let submodules = parse_gitmodules(fs, root)
   let out : Array[LsFilesTrackedEntry] = []
   for entry in entries {
     if entry.mode != 0o160000 {
-      out.push({ path: prefix + entry.path, mode: entry.mode, id: entry.id })
+      out.push({ path: prefix + entry.path })
       continue
     }
     match ls_files_find_submodule_by_path(submodules, entry.path) {
       Some(submodule) => {
         if not(ls_files_submodule_is_active(fs, git_dir, submodule.name)) {
-          out.push({ path: prefix + entry.path, mode: entry.mode, id: entry.id })
+          out.push({ path: prefix + entry.path })
           continue
         }
         let sub_root = root + "/" + submodule.path
         let sub_git_marker = sub_root + "/.git"
         if not(fs.is_dir(sub_git_marker)) && not(fs.is_file(sub_git_marker)) {
-          out.push({ path: prefix + entry.path, mode: entry.mode, id: entry.id })
+          out.push({ path: prefix + entry.path })
           continue
         }
         let sub_git_dir = @bitlib.resolve_gitdir(fs, sub_git_marker)
@@ -802,7 +805,7 @@ fn ls_files_collect_cached_entries(
         }
       }
       None =>
-        out.push({ path: prefix + entry.path, mode: entry.mode, id: entry.id })
+        out.push({ path: prefix + entry.path })
     }
   }
   out

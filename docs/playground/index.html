@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>bit Playground</title>
+    <meta
+      name="description"
+      content="Lightweight browser playground for editing, staging, committing, and relay-linking a bit repo."
+    />
+    <script type="module" crossorigin src="./app.js"></script>
+    <link rel="stylesheet" crossorigin href="./styles.css">
+  </head>
+  <body>
+    <div class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">bit / playground</p>
+          <h1>Lightweight editor</h1>
+        </div>
+        <div class="topbar-actions">
+          <div id="hero-meta" class="meta-row"></div>
+          <button id="reset-repo" class="button primary" type="button">Reset sample repo</button>
+        </div>
+      </header>
+
+      <p id="storage-banner" class="storage-banner"></p>
+
+      <main class="workspace">
+        <section class="panel editor-panel">
+          <div class="section-title">
+            <h2>Editor</h2>
+            <p>Edit a single file, then save and stage it.</p>
+          </div>
+
+          <label class="field">
+            <span>Relative path</span>
+            <div class="inline-field">
+              <input id="file-path" type="text" value="notes/today.md" />
+              <button id="open-file" class="button subtle" type="button">Open</button>
+            </div>
+          </label>
+
+          <label class="field grow">
+            <span>Content</span>
+            <textarea id="file-content" rows="20" spellcheck="false"></textarea>
+          </label>
+
+          <div class="toolbar">
+            <button id="save-file" class="button primary" type="button">Save</button>
+            <button id="stage-file" class="button subtle" type="button">Stage current file</button>
+          </div>
+
+          <div class="commit-grid">
+            <label class="field">
+              <span>Commit message</span>
+              <input id="commit-message" type="text" value="demo: update notes" />
+            </label>
+            <button id="commit-file" class="button primary" type="button">Commit staged</button>
+          </div>
+
+          <div class="branch-grid">
+            <label class="field">
+              <span>Branch name</span>
+              <input id="branch-name" type="text" value="feature/demo" />
+            </label>
+            <div class="toolbar">
+              <button id="create-branch" class="button subtle" type="button">Create branch</button>
+              <button id="checkout-branch" class="button subtle" type="button">Checkout</button>
+            </div>
+          </div>
+        </section>
+
+        <aside class="sidebar">
+          <section class="panel">
+            <div class="section-title">
+              <h2>Recent history</h2>
+              <p>Latest commits first.</p>
+            </div>
+            <ol id="history-list" class="stack-list"></ol>
+          </section>
+
+          <section class="panel">
+            <div class="section-title">
+              <h2>Files</h2>
+              <p>Open files from the working tree.</p>
+            </div>
+            <ol id="files-list" class="stack-list"></ol>
+          </section>
+
+          <section class="panel">
+            <div class="section-title">
+              <h2>Status</h2>
+              <p>Staged and unstaged changes.</p>
+            </div>
+            <ol id="status-list" class="stack-list"></ol>
+          </section>
+
+          <section class="panel">
+            <div class="section-title">
+              <h2>Branches</h2>
+              <p>Click to checkout.</p>
+            </div>
+            <ol id="branch-list" class="stack-list"></ol>
+          </section>
+
+          <section class="panel">
+            <div class="section-title">
+              <h2>Relay</h2>
+              <p>Optional host or connect flow.</p>
+            </div>
+
+            <label class="field">
+              <span>Relay remote</span>
+              <input
+                id="relay-url"
+                type="text"
+                placeholder="relay+https://relay.example.com/base?room=playground"
+              />
+            </label>
+
+            <label class="field">
+              <span>Editor label</span>
+              <input id="relay-editor-label" type="text" placeholder="editor-host" />
+            </label>
+
+            <label class="field">
+              <span>Auth token</span>
+              <input id="relay-auth-token" type="password" placeholder="optional bearer token" />
+            </label>
+
+            <div class="toolbar relay-toolbar">
+              <button id="relay-host" class="button subtle" type="button">Host</button>
+              <button id="relay-sessions-refresh" class="button subtle" type="button">Refresh</button>
+              <button id="relay-pull" class="button subtle" type="button">Pull</button>
+            </div>
+
+            <ol id="relay-sessions" class="stack-list"></ol>
+          </section>
+        </aside>
+      </main>
+
+      <section class="panel terminal-panel">
+        <div class="section-title">
+          <h2>Terminal</h2>
+          <p>Run direct commands against the same app state.</p>
+        </div>
+
+        <div class="toolbar terminal-shortcuts">
+          <button id="terminal-help" class="button ghost" type="button">help</button>
+          <button id="terminal-status" class="button ghost" type="button">status</button>
+          <button id="terminal-log" class="button ghost" type="button">log 5</button>
+        </div>
+
+        <ol id="terminal-output" class="terminal-output"></ol>
+
+        <form id="terminal-form" class="terminal-form">
+          <label class="terminal-prompt" for="terminal-input">$</label>
+          <input
+            id="terminal-input"
+            type="text"
+            placeholder='try: commit "demo: update notes"'
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </form>
+      </section>
+    </div>
+
+  </body>
+</html>

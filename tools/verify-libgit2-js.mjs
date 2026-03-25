@@ -670,7 +670,7 @@ async function runTransportHelperFlow(bitGit) {
 }
 
 export async function verifyBitGitModule(bitGit = defaultBitGit) {
-  const memoryApi = bitGit.createMemoryHost();
+  const memoryApi = bitGit.createMemoryBackend();
   const customBackend = createVirtualHost();
   try {
     const memoryResult = runRepoFlow(
@@ -779,8 +779,8 @@ export async function verifyBitGitModule(bitGit = defaultBitGit) {
       transportHelperResult,
     };
   } finally {
-    bitGit.destroyHost(memoryApi);
-    bitGit.destroyHost(customBackend);
+    bitGit.destroyBackend(memoryApi);
+    bitGit.destroyBackend(customBackend);
   }
 }
 

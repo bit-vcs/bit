@@ -1889,12 +1889,22 @@ pub fn mv_path(
     git_dir
   }
   let src_norm = normalize_rel_path(source)
-  let dst_norm = normalize_rel_path(dest)
+  let mut dst_norm = normalize_rel_path(dest)
   let src_abs = join_path(root, src_norm)
-  let dst_abs = join_path(root, dst_norm)
+  let mut dst_abs = join_path(root, dst_norm)
   // Check source exists
   if not(rfs.is_file(src_abs)) && not(rfs.is_dir(src_abs)) {
     raise @bit.GitError::InvalidObject("source '\{source}' does not exist")
+  }
+  // If dest is a directory, move source into it (like `mv file dir/`)
+  if rfs.is_dir(dst_abs) {
+    let basename = match src_norm.rev_find("/") {
+      Some(i) =>
+        String::unsafe_substring(src_norm, start=i + 1, end=src_norm.length())
+      None => src_norm
+    }
+    dst_norm = join_path(dst_norm, basename)
+    dst_abs = join_path(root, dst_norm)
   }
   // Check dest doesn't exist (unless force)
   if (rfs.is_file(dst_abs) || rfs.is_dir(dst_abs)) && not(force) {

@@ -9,7 +9,7 @@
     <title>bit JS Demo</title>
     <meta
       name="description"
-      content="Git in the browser with IndexedDB persistence and a focused edit-stage-commit loop."
+      content="Git in the browser with IndexedDB persistence, focused local editing, and optional bit-relay sync."
     />
     <link rel="stylesheet" href="./styles.css" />
   </head>
@@ -18,7 +18,7 @@
       <header class="hero">
         <p class="eyebrow">bit / browser demo</p>
         <h1>Git playground</h1>
-        <p class="hero-copy">IndexedDB-backed edit, stage, and commit loop.</p>
+        <p class="hero-copy">IndexedDB-backed edit, stage, commit, and relay sync.</p>
       </header>
 
       <main class="workspace">
@@ -93,6 +93,38 @@
                 <p>Latest commits first.</p>
               </div>
               <div id="history-view" class="history-list"></div>
+            </section>
+
+            <section class="panel relay-panel">
+              <div class="panel-header">
+                <h3>Editor Link</h3>
+                <p>Host this repo in one tab, then connect from another tab through bit-relay.</p>
+              </div>
+              <label class="field">
+                <span>Relay remote</span>
+                <input
+                  id="relay-url"
+                  type="text"
+                  placeholder="relay+https://relay.example.com/base?room=playground"
+                />
+              </label>
+              <div class="relay-inline-fields single-row-fields">
+                <label class="field compact-field">
+                  <span>Editor label</span>
+                  <input id="relay-editor-label" type="text" placeholder="host-a" />
+                </label>
+                <label class="field compact-field relay-auth-field">
+                  <span>Relay auth token</span>
+                  <input id="relay-auth-token" type="password" placeholder="optional bearer token" />
+                </label>
+              </div>
+              <div id="relay-meta" class="storage-meta-row"></div>
+              <div class="button-row">
+                <button id="relay-push" class="primary" type="button">Host this editor</button>
+                <button id="relay-discover" class="secondary" type="button">Refresh hosted editors</button>
+                <button id="relay-fetch" class="secondary" type="button">Connect selected</button>
+              </div>
+              <div id="relay-results" class="change-map relay-results"></div>
             </section>
 
             <details class="panel details-panel">

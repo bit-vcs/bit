@@ -1,6 +1,6 @@
 {
   "name": "@mizchi/bit",
-  "version": "0.24.2",
+  "version": "0.34.0",
   "description": "Pure MoonBit Git implementation (JS target)",
   "type": "module",
   "sideEffects": false,
@@ -10,11 +10,12 @@
     "url": "https://github.com/bit-vcs/bit"
   },
   "exports": {
-    "./lib": {
+    ".": {
       "types": "./lib.d.ts",
       "default": "./lib.js"
     },
     "./bit.js": "./bit.js",
+    "./bit.cjs": "./bit.cjs",
     "./package.json": "./package.json"
   },
   "bin": {
@@ -23,6 +24,7 @@
   "files": [
     "bin/",
     "bit.js",
+    "bit.cjs",
     "lib.js",
     "lib.d.ts",
     "lib.raw.js",

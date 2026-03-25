@@ -299,7 +299,7 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
   if squash {
     // Squash merge: apply changes but don't commit
     let result = run_merge_with_sensitive_hooks(
-      fs, fs, root, tid, msg, author, timestamp,
+      fs, fs, root, tid, msg, author, timestamp, theirs_label=refspec,
     )
     match result.status {
       @bitlib.MergeStatus::AlreadyUpToDate =>
@@ -328,10 +328,11 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
       }
       @bitlib.MergeStatus::Conflicted => {
         if not(quiet) {
-          print_line("CONFLICT: Merge conflict")
           for path in result.conflicts {
-            print_line("  \{path}")
+            let ctype = result.conflict_types.get(path).unwrap_or("content")
+            print_line("CONFLICT (\{ctype}): Merge conflict in \{path}")
           }
+          print_line("Automatic merge failed; fix conflicts and then commit.")
         }
         @sys.exit(1)
       }
@@ -414,7 +415,7 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
   ignore(allow_unrelated)
   ignore(strategy)
   let result = run_merge_with_sensitive_hooks(
-    fs, fs, root, tid, msg, author, timestamp,
+    fs, fs, root, tid, msg, author, timestamp, theirs_label=refspec,
   )
   match result.status {
     @bitlib.MergeStatus::AlreadyUpToDate =>
@@ -443,9 +444,9 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
       }
     @bitlib.MergeStatus::Conflicted => {
       if not(quiet) {
-        print_line("CONFLICT (content): Merge conflict in the following files:")
         for path in result.conflicts {
-          print_line("  \{path}")
+          let ctype = result.conflict_types.get(path).unwrap_or("content")
+          print_line("CONFLICT (\{ctype}): Merge conflict in \{path}")
         }
         print_line("Automatic merge failed; fix conflicts and then commit.")
       }

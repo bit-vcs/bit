@@ -85,7 +85,7 @@ const unwrap = (label, result) => {
       current = current._0;
       continue;
     }
-    throw new Error(`${label}: ${String(current._0 ?? "bit-git js error")}`);
+    throw new Error(`${label}: ${String(current._0 ?? "bit js error")}`);
   }
   return current;
 };
@@ -124,7 +124,7 @@ const toHostId = (backend) => {
   if (isBackendObject(backend)) {
     return registerBackend(backend);
   }
-  throw new TypeError("expected BitGit backend");
+  throw new TypeError("expected bit backend");
 };
 
 export const createFetchTransport = (fetchImpl) => {
@@ -162,7 +162,7 @@ const normalizeTransport = (transportOrFetch) => {
     fetchTransportCache.set(transportOrFetch, transport);
     return transport;
   }
-  throw new TypeError("expected BitGit transport or fetch implementation");
+  throw new TypeError("expected bit transport or fetch implementation");
 };
 
 const toTransportId = (transportOrFetch) => {
@@ -432,7 +432,7 @@ const toFetchResult = (value) => ({
   remoteRef: toMaybeString(value.remote_ref),
 });
 
-const createMemoryBackend = () => {
+const createMemoryBackendImpl = () => {
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
   const files = new Map();
@@ -549,11 +549,11 @@ const createMemoryBackend = () => {
   };
 };
 
-export const createMemoryHost = () => createMemoryBackend();
+export const createMemoryBackend = () => createMemoryBackendImpl();
 
-export const destroyHost = (backend) => {
+export const destroyBackend = (backend) => {
   if (!isBackendObject(backend)) {
-    throw new TypeError("expected BitGit backend");
+    throw new TypeError("expected bit backend");
   }
   const hostId = backendHostIds.get(backend);
   if (hostId === undefined) {

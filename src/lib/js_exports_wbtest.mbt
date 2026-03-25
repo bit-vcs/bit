@@ -660,7 +660,9 @@ async test "js exports: status text amend switch branch and remote verbose" {
   ignore(
     js_exports_unwrap_ok(
       "commit",
-      js_commit(host_id, "/repo", "first", "Tester <tester@example.com>", 1700000400),
+      js_commit(
+        host_id, "/repo", "first", "Tester <tester@example.com>", 1700000400,
+      ),
     ),
   )
 
@@ -682,7 +684,9 @@ async test "js exports: status text amend switch branch and remote verbose" {
   ignore(
     js_exports_unwrap_ok(
       "commit feature",
-      js_commit(host_id, "/repo", "feature", "Tester <tester@example.com>", 1700000401),
+      js_commit(
+        host_id, "/repo", "feature", "Tester <tester@example.com>", 1700000401,
+      ),
     ),
   )
   let original_head = js_exports_unwrap_ok(
@@ -692,17 +696,8 @@ async test "js exports: status text amend switch branch and remote verbose" {
   let amended = js_exports_unwrap_ok(
     "commitAmend",
     js_commit_amend(
-      host_id,
-      "/repo",
-      "feature amended",
-      "Tester <tester@example.com>",
-      1700000402,
-      "Tester <tester@example.com>",
-      1700000402,
-      "+0000",
-      "UTF-8",
-      "",
-      "",
+      host_id, "/repo", "feature amended", "Tester <tester@example.com>", 1700000402,
+      "Tester <tester@example.com>", 1700000402, "+0000", "UTF-8", "", "",
     ),
   )
   assert_true(amended.length() == 40)
@@ -715,16 +710,17 @@ async test "js exports: status text amend switch branch and remote verbose" {
     js_switch_branch(host_id, "/repo", "main", false, true),
   )
   assert_eq(
-    js_exports_unwrap_ok("read main file", js_host_read_string(host_id, "/repo/a.txt")),
+    js_exports_unwrap_ok(
+      "read main file",
+      js_host_read_string(host_id, "/repo/a.txt"),
+    ),
     "one\n",
   )
 
   js_exports_unwrap_ok(
     "write config",
     js_host_write_string(
-      host_id,
-      "/repo/.git/config",
-      "[remote \"origin\"]\n\turl = https://example.com/fetch.git\n\tpushurl = https://example.com/push.git\n",
+      host_id, "/repo/.git/config", "[remote \"origin\"]\n\turl = https://example.com/fetch.git\n\tpushurl = https://example.com/push.git\n",
     ),
   )
   let remotes = js_exports_unwrap_ok(
@@ -759,7 +755,9 @@ test "js exports: sparse checkout flow" {
   ignore(
     js_exports_unwrap_ok(
       "commit sparse",
-      js_commit(host_id, "/sparse", "base", "Tester <tester@example.com>", 1700000500),
+      js_commit(
+        host_id, "/sparse", "base", "Tester <tester@example.com>", 1700000500,
+      ),
     ),
   )
 
@@ -794,7 +792,8 @@ test "js exports: sparse checkout flow" {
     js_exports_unwrap_ok(
       "read keep",
       js_host_read_string(host_id, "/sparse/keep/file.txt"),
-    ) == "keep\n",
+    ) ==
+    "keep\n",
   )
   assert_true(
     js_exports_unwrap_ok(

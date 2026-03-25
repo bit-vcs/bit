@@ -1,4 +1,6 @@
 .DS_Store
+node_modules/
+.pnpm-store/
 _build/
 target/
 target
@@ -45,5 +47,5 @@ version.ts
 xxxx
 .bench-baseline
 .local
-npm/bit.js
+npm/bit.cjs
 npm/lib.raw.js

@@ -1,4 +1,4 @@
-export interface BitGitBackend {
+export interface BitBackend {
   mkdirP(path: string): void;
   writeFile(path: string, content: Uint8Array): void;
   writeString(path: string, content: string): void;
@@ -10,9 +10,9 @@ export interface BitGitBackend {
   isFile(path: string): boolean;
 }
 
-export type BitGitHost = BitGitBackend;
+export type BitHost = BitBackend;
 
-export interface BitGitStatus {
+export interface BitStatus {
   stagedAdded: string[];
   stagedModified: string[];
   stagedDeleted: string[];
@@ -21,81 +21,81 @@ export interface BitGitStatus {
   untracked: string[];
 }
 
-export interface BitGitBranchInfo {
+export interface BitBranchInfo {
   name: string;
   commitId: string;
   isCurrent: boolean;
 }
 
-export interface BitGitLogEntry {
+export interface BitLogEntry {
   id: string;
   author: string;
   message: string;
   timestamp: number;
 }
 
-export interface BitGitRefInfo {
+export interface BitRefInfo {
   name: string;
   id: string;
 }
 
-export interface BitGitRemoteVerboseEntry {
+export interface BitRemoteVerboseEntry {
   name: string;
   value: string;
 }
 
-export interface BitGitStashEntry {
+export interface BitStashEntry {
   id: string;
   message: string;
 }
 
-export type BitGitMergeStatus =
+export type BitMergeStatus =
   | "alreadyUpToDate"
   | "fastForward"
   | "merged"
   | "conflicted";
 
-export interface BitGitMergeResult {
-  status: BitGitMergeStatus;
+export interface BitMergeResult {
+  status: BitMergeStatus;
   commitId: string | null;
   conflicts: string[];
 }
 
-export type BitGitRebaseStatus =
+export type BitRebaseStatus =
   | "complete"
   | "conflict"
   | "nothingToRebase";
 
-export interface BitGitRebaseResult {
-  status: BitGitRebaseStatus;
+export interface BitRebaseResult {
+  status: BitRebaseStatus;
   commitId: string | null;
   conflicts: string[];
 }
 
-export type BitGitCherryPickStatus = "success" | "conflict";
+export type BitCherryPickStatus = "success" | "conflict";
 
-export interface BitGitCherryPickResult {
-  status: BitGitCherryPickStatus;
+export interface BitCherryPickResult {
+  status: BitCherryPickStatus;
   commitId: string | null;
   conflicts: string[];
 }
 
-export type BitGitFetchStatus = "empty" | "fetched";
+export type BitFetchStatus = "empty" | "fetched";
 
-export interface BitGitFetchResult {
-  status: BitGitFetchStatus;
+export interface BitFetchResult {
+  status: BitFetchStatus;
   commitId: string | null;
   refname: string | null;
   remoteRef: string | null;
 }
 
-export interface BitGitRelayPeer {
+export interface BitRelayPeer {
   sender: string;
   cloneUrl: string;
   repo: string | null;
 }
 
-export interface BitGitResolvedRemote {
+export interface BitResolvedRemote {
   via: "session" | "peer";
   url: string;
   sender: string | null;
@@ -103,44 +103,44 @@ export interface BitGitResolvedRemote {
   sessionId: string | null;
 }
 
-export interface BitGitTransportResponse {
+export interface BitTransportResponse {
   status: number;
   body?: Uint8Array | ArrayBuffer | ArrayLike<number> | string | null;
 }
 
-export interface BitGitTransport {
+export interface BitTransport {
   get(
     url: string,
     headers: Record<string, string>,
-  ): BitGitTransportResponse | Promise<BitGitTransportResponse>;
+  ): BitTransportResponse | Promise<BitTransportResponse>;
   post(
     url: string,
     body: Uint8Array,
     headers: Record<string, string>,
-  ): BitGitTransportResponse | Promise<BitGitTransportResponse>;
+  ): BitTransportResponse | Promise<BitTransportResponse>;
 }
 
-export interface BitGitFetchInit {
+export interface BitFetchInit {
   method?: string;
   headers?: Record<string, string>;
   body?: Uint8Array;
 }
 
-export interface BitGitFetchResponse {
+export interface BitFetchResponse {
   status: number;
   arrayBuffer(): Promise<ArrayBuffer>;
 }
 
-export type BitGitFetchImpl = (
+export type BitFetchImpl = (
   input: string | URL,
-  init?: BitGitFetchInit,
-) => Promise<BitGitFetchResponse>;
+  init?: BitFetchInit,
+) => Promise<BitFetchResponse>;
 
-export interface BitGitRmOptions {
+export interface BitRmOptions {
   cached?: boolean;
 }
 
-export interface BitGitBranchRenameOptions {
+export interface BitBranchRenameOptions {
   force?: boolean;
   author?: string;
   email?: string;
@@ -148,12 +148,12 @@ export interface BitGitBranchRenameOptions {
   timezone?: string;
 }
 
-export interface BitGitSwitchBranchOptions {
+export interface BitSwitchBranchOptions {
   create?: boolean;
   checkoutFiles?: boolean;
 }
 
-export interface BitGitCommitAmendOptions {
+export interface BitCommitAmendOptions {
   committer?: string;
   committerTimestampSec?: number;
   timezone?: string;
@@ -162,13 +162,13 @@ export interface BitGitCommitAmendOptions {
   committerTimezone?: string;
 }
 
-export type BitGitCommitSigner = (
+export type BitCommitSigner = (
   payload: string,
 ) => string | Promise<string>;
 
-export type BitGitResetMode = "soft" | "mixed" | "hard";
+export type BitResetMode = "soft" | "mixed" | "hard";
 
-export interface BitGitFetchOptions {
+export interface BitFetchOptions {
   refspec?: string;
   preferV2?: boolean;
   preferredSender?: string;
@@ -176,7 +176,7 @@ export interface BitGitFetchOptions {
   authToken?: string;
 }
 
-export interface BitGitPushOptions {
+export interface BitPushOptions {
   refname?: string;
   force?: boolean;
   preferredSender?: string;
@@ -184,70 +184,70 @@ export interface BitGitPushOptions {
   authToken?: string;
 }
 
-export interface BitGitRelayOptions {
+export interface BitRelayOptions {
   preferredSender?: string;
   preferredRepo?: string;
   authToken?: string;
 }
 
-export interface BitGitCherryPickOptions {
+export interface BitCherryPickOptions {
   noCommit?: boolean;
   messageSuffix?: string;
   signoffCommitter?: string;
   timestampSec?: number;
 }
 
-export declare function createMemoryHost(): BitGitBackend;
-export declare function destroyHost(backend: BitGitBackend): void;
-export declare function createFetchTransport(fetchImpl: BitGitFetchImpl): BitGitTransport;
+export declare function createMemoryBackend(): BitBackend;
+export declare function destroyBackend(backend: BitBackend): void;
+export declare function createFetchTransport(fetchImpl: BitFetchImpl): BitTransport;
 export declare function relayListClonePeers(
   remoteUrl: string,
-  transport: BitGitTransport | BitGitFetchImpl,
-  options?: Pick<BitGitRelayOptions, "authToken">,
-): Promise<BitGitRelayPeer[]>;
+  transport: BitTransport | BitFetchImpl,
+  options?: Pick<BitRelayOptions, "authToken">,
+): Promise<BitRelayPeer[]>;
 export declare function relayResolveRemote(
   remoteUrl: string,
-  transport: BitGitTransport | BitGitFetchImpl,
-  options?: BitGitRelayOptions,
-): Promise<BitGitResolvedRemote>;
-export declare function writeString(backend: BitGitBackend, path: string, content: string): void;
-export declare function readString(backend: BitGitBackend, path: string): string;
-export declare function init(backend: BitGitBackend, root: string, defaultBranch?: string): void;
+  transport: BitTransport | BitFetchImpl,
+  options?: BitRelayOptions,
+): Promise<BitResolvedRemote>;
+export declare function writeString(backend: BitBackend, path: string, content: string): void;
+export declare function readString(backend: BitBackend, path: string): string;
+export declare function init(backend: BitBackend, root: string, defaultBranch?: string): void;
 export declare function add(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
   paths: Iterable<string> | ArrayLike<string>,
 ): void;
-export declare function status(backend: BitGitBackend, root: string): BitGitStatus;
-export declare function statusPorcelain(backend: BitGitBackend, root: string): string[];
+export declare function status(backend: BitBackend, root: string): BitStatus;
+export declare function statusPorcelain(backend: BitBackend, root: string): string[];
 export declare function statusText(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
 ): Promise<string>;
 export declare function commit(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
   message: string,
   author: string,
   timestampSec?: number,
 ): string;
 export declare function commitAmend(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
   message: string,
   author: string,
   authorTimestampSec?: number,
-  options?: BitGitCommitAmendOptions,
+  options?: BitCommitAmendOptions,
 ): string;
 export declare function buildCommitPayload(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
   message: string,
   author: string,
   timestampSec?: number,
 ): string;
 export declare function commitSigned(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
   message: string,
   author: string,
@@ -255,72 +255,72 @@ export declare function commitSigned(
   timestampSec?: number,
 ): string;
 export declare function commitWithSigner(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
   message: string,
   author: string,
-  signer: BitGitCommitSigner,
+  signer: BitCommitSigner,
   timestampSec?: number,
 ): Promise<string>;
 export declare function log(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
   maxCount?: number,
-): BitGitLogEntry[];
+): BitLogEntry[];
 export declare function revParse(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
   spec: string,
 ): string | null;
 export declare function showRef(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
-): BitGitRefInfo[];
+): BitRefInfo[];
 export declare function merge(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
   target: string,
   message: string,
   author: string,
   timestampSec?: number,
-): BitGitMergeResult;
-export declare function checkout(backend: BitGitBackend, root: string, target: string): void;
-export declare function checkoutB(backend: BitGitBackend, root: string, branchName: string): void;
+): BitMergeResult;
+export declare function checkout(backend: BitBackend, root: string, target: string): void;
+export declare function checkoutB(backend: BitBackend, root: string, branchName: string): void;
 export declare function switchBranch(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
   name: string,
-  options?: BitGitSwitchBranchOptions,
+  options?: BitSwitchBranchOptions,
 ): void;
 export declare function restore(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
   paths: Iterable<string> | ArrayLike<string>,
 ): void;
-export declare function branchList(backend: BitGitBackend, root: string): BitGitBranchInfo[];
-export declare function branchCreate(backend: BitGitBackend, root: string, name: string): void;
-export declare function branchDelete(backend: BitGitBackend, root: string, name: string): void;
+export declare function branchList(backend: BitBackend, root: string): BitBranchInfo[];
+export declare function branchCreate(backend: BitBackend, root: string, name: string): void;
+export declare function branchDelete(backend: BitBackend, root: string, name: string): void;
 export declare function branchRename(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
   oldName: string,
   newName: string,
-  options?: BitGitBranchRenameOptions,
+  options?: BitBranchRenameOptions,
 ): void;
-export declare function tagList(backend: BitGitBackend, root: string): string[];
+export declare function tagList(backend: BitBackend, root: string): string[];
 export declare function tagDelete(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
   name: string,
 ): void;
 export declare function tagCreateLightweight(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
   name: string,
   target?: string,
 ): void;
 export declare function tagCreateAnnotated(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
   name: string,
   target: string,
@@ -329,155 +329,155 @@ export declare function tagCreateAnnotated(
   timestampSec?: number,
 ): void;
 export declare function rebaseStart(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
   upstream: string,
-): BitGitRebaseResult;
+): BitRebaseResult;
 export declare const rebase: typeof rebaseStart;
 export declare function rebaseStartWithOnto(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
   onto: string,
   upstream: string,
-): BitGitRebaseResult;
+): BitRebaseResult;
 export declare function rebaseContinue(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
-): BitGitRebaseResult;
-export declare function rebaseAbort(backend: BitGitBackend, root: string): void;
+): BitRebaseResult;
+export declare function rebaseAbort(backend: BitBackend, root: string): void;
 export declare function rebaseSkip(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
-): BitGitRebaseResult;
+): BitRebaseResult;
 export declare function reset(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
   target: string,
-  mode?: BitGitResetMode,
+  mode?: BitResetMode,
 ): string;
 export declare function stashList(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
-): BitGitStashEntry[];
+): BitStashEntry[];
 export declare function stashPush(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
   message: string,
   author: string,
   timestampSec?: number,
 ): Promise<string | null>;
 export declare function stashApply(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
   index?: number,
 ): void;
 export declare function stashPop(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
   index?: number,
 ): void;
 export declare function stashDrop(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
   index?: number,
 ): void;
 export declare function cherryPick(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
   target: string,
   author: string,
-  options?: BitGitCherryPickOptions,
-): BitGitCherryPickResult;
+  options?: BitCherryPickOptions,
+): BitCherryPickResult;
 export declare function diffWorktree(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
 ): Promise<string[]>;
 export declare function diffWorktreeStat(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
 ): Promise<string[]>;
 export declare function diffIndex(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
 ): string[];
 export declare function diffIndexStat(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
 ): string[];
 export declare function listRemotes(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
 ): string[];
 export declare function listRemotesVerbose(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
-): BitGitRemoteVerboseEntry[];
+): BitRemoteVerboseEntry[];
 export declare function getRemoteUrl(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
   name: string,
 ): string | null;
 export declare function sparseCheckoutInit(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
   cone?: boolean,
 ): void;
 export declare function sparseCheckoutSet(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
   patterns: Iterable<string> | ArrayLike<string>,
 ): void;
 export declare function sparseCheckoutAdd(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
   patterns: Iterable<string> | ArrayLike<string>,
 ): void;
 export declare function sparseCheckoutDisable(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
 ): void;
 export declare function sparseCheckoutReapply(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
 ): void;
 export declare function sparseCheckoutEnabled(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
 ): boolean;
 export declare function sparseCheckoutConeEnabled(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
 ): boolean;
 export declare function sparseCheckoutPatterns(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
 ): string[];
 export declare function sparseCheckoutDisplayPatterns(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
 ): string[];
 export declare function fetch(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
   remoteUrl: string,
-  transport: BitGitTransport | BitGitFetchImpl,
-  options?: BitGitFetchOptions,
-): Promise<BitGitFetchResult>;
+  transport: BitTransport | BitFetchImpl,
+  options?: BitFetchOptions,
+): Promise<BitFetchResult>;
 export declare function push(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
   remoteUrl: string,
-  transport: BitGitTransport | BitGitFetchImpl,
-  options?: BitGitPushOptions,
+  transport: BitTransport | BitFetchImpl,
+  options?: BitPushOptions,
 ): Promise<string>;
 export declare function rm(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
   paths: Iterable<string> | ArrayLike<string>,
-  options?: BitGitRmOptions,
+  options?: BitRmOptions,
 ): void;
 export declare function mv(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
   source: string,
   dest: string,

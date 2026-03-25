@@ -1,4 +1,4 @@
-export interface BitGitBackend {
+export interface BitBackend {
   mkdirP(path: string): void;
   writeFile(path: string, content: Uint8Array): void;
   writeString(path: string, content: string): void;
@@ -10,9 +10,9 @@ export interface BitGitBackend {
   isFile(path: string): boolean;
 }
 
-export type BitGitHost = BitGitBackend;
+export type BitHost = BitBackend;
 
-export interface BitGitStatus {
+export interface BitStatus {
   stagedAdded: string[];
   stagedModified: string[];
   stagedDeleted: string[];
@@ -21,55 +21,55 @@ export interface BitGitStatus {
   untracked: string[];
 }
 
-export interface BitGitBranchInfo {
+export interface BitBranchInfo {
   name: string;
   commitId: string;
   isCurrent: boolean;
 }
 
-export interface BitGitLogEntry {
+export interface BitLogEntry {
   id: string;
   author: string;
   message: string;
   timestamp: number;
 }
 
-export interface BitGitRmOptions {
+export interface BitRmOptions {
   cached?: boolean;
 }
 
-export type BitGitCommitSigner = (
+export type BitCommitSigner = (
   payload: string,
 ) => string | Promise<string>;
 
-export declare function createMemoryHost(): BitGitBackend;
-export declare function destroyHost(backend: BitGitBackend): void;
-export declare function writeString(backend: BitGitBackend, path: string, content: string): void;
-export declare function readString(backend: BitGitBackend, path: string): string;
-export declare function init(backend: BitGitBackend, root: string, defaultBranch?: string): void;
+export declare function createMemoryBackend(): BitBackend;
+export declare function destroyBackend(backend: BitBackend): void;
+export declare function writeString(backend: BitBackend, path: string, content: string): void;
+export declare function readString(backend: BitBackend, path: string): string;
+export declare function init(backend: BitBackend, root: string, defaultBranch?: string): void;
 export declare function add(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
   paths: Iterable<string> | ArrayLike<string>,
 ): void;
-export declare function status(backend: BitGitBackend, root: string): BitGitStatus;
-export declare function statusPorcelain(backend: BitGitBackend, root: string): string[];
+export declare function status(backend: BitBackend, root: string): BitStatus;
+export declare function statusPorcelain(backend: BitBackend, root: string): string[];
 export declare function commit(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
   message: string,
   author: string,
   timestampSec?: number,
 ): string;
 export declare function buildCommitPayload(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
   message: string,
   author: string,
   timestampSec?: number,
 ): string;
 export declare function commitSigned(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
   message: string,
   author: string,
@@ -77,31 +77,31 @@ export declare function commitSigned(
   timestampSec?: number,
 ): string;
 export declare function commitWithSigner(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
   message: string,
   author: string,
-  signer: BitGitCommitSigner,
+  signer: BitCommitSigner,
   timestampSec?: number,
 ): Promise<string>;
 export declare function log(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
   maxCount?: number,
-): BitGitLogEntry[];
-export declare function checkout(backend: BitGitBackend, root: string, target: string): void;
-export declare function checkoutB(backend: BitGitBackend, root: string, branchName: string): void;
-export declare function branchList(backend: BitGitBackend, root: string): BitGitBranchInfo[];
-export declare function branchCreate(backend: BitGitBackend, root: string, name: string): void;
-export declare function branchDelete(backend: BitGitBackend, root: string, name: string): void;
+): BitLogEntry[];
+export declare function checkout(backend: BitBackend, root: string, target: string): void;
+export declare function checkoutB(backend: BitBackend, root: string, branchName: string): void;
+export declare function branchList(backend: BitBackend, root: string): BitBranchInfo[];
+export declare function branchCreate(backend: BitBackend, root: string, name: string): void;
+export declare function branchDelete(backend: BitBackend, root: string, name: string): void;
 export declare function rm(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
   paths: Iterable<string> | ArrayLike<string>,
-  options?: BitGitRmOptions,
+  options?: BitRmOptions,
 ): void;
 export declare function mv(
-  backend: BitGitBackend,
+  backend: BitBackend,
   root: string,
   source: string,
   dest: string,
