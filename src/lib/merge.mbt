@@ -335,6 +335,13 @@ pub fn merge(
       merged,
       remove_missing=false,
     )
+    // Remove worktree files for paths that were renamed away
+    for path in file_result.removed_paths {
+      let full_path = join_path(root, path)
+      if rfs.is_file(full_path) {
+        fs.remove_file(full_path) catch { _ => () }
+      }
+    }
     let entries = merge_conflicted_index_entries_with_renames(
       db,
       rfs,
@@ -481,6 +488,8 @@ priv struct MergeFilesResult {
   rename_2to1 : Array[Rename2to1Candidate]
   /// Conflict type per path (e.g. "rename/delete", "rename/add")
   conflict_types : Map[String, String]
+  /// Paths that were renamed away and should be removed from worktree
+  removed_paths : Array[String]
 }
 
 ///|
@@ -514,6 +523,7 @@ fn merge_files(
   let needs_content_merge : Array[ContentMergeCandidate] = []
   let rename_2to1 : Array[Rename2to1Candidate] = []
   let conflict_types : Map[String, String] = {}
+  let removed_paths : Array[String] = []
   // Step 1: Detect renames on each side
   let ours_renames = merge_detect_renames(base, ours, db, rfs)
   let theirs_renames = merge_detect_renames(base, theirs, db, rfs)
@@ -542,6 +552,8 @@ fn merge_files(
           handled_paths[ours_old] = true
           handled_paths[theirs_old] = true
           handled_paths[theirs_new] = true
+          removed_paths.push(ours_old)
+          removed_paths.push(theirs_old)
         }
       None => ()
     }
@@ -657,6 +669,10 @@ fn merge_files(
         }
         handled_paths[old_path] = true
         handled_paths[new_path] = true
+        // Only mark old_path for removal if it's a clean rename (no conflict, no add-source)
+        if not(is_add_source) && not(conflict_types.contains(new_path)) {
+          removed_paths.push(old_path)
+        }
       }
     }
   }
@@ -721,6 +737,9 @@ fn merge_files(
     }
     handled_paths[old_path] = true
     handled_paths[new_path] = true
+    if not(is_add_source) && not(conflict_types.contains(new_path)) {
+      removed_paths.push(old_path)
+    }
   }
   // Step 4: Process remaining paths with standard logic
   let all_paths : Map[String, Bool] = {}
@@ -782,7 +801,14 @@ fn merge_files(
       }
     }
   }
-  { merged, conflicts, needs_content_merge, rename_2to1, conflict_types }
+  {
+    merged,
+    conflicts,
+    needs_content_merge,
+    rename_2to1,
+    conflict_types,
+    removed_paths,
+  }
 }
 
 ///|
