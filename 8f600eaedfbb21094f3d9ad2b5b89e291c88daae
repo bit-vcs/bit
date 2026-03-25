@@ -1,0 +1,14 @@
+version 1
+key hub/issue/9fe73c53/comment/f2e32939
+kind issue.comment
+clock mizchi <miz404@gmail.com>=1
+timestamp 1774454062
+node mizchi <miz404@gmail.com>
+deleted 0
+
+comment f2e32939
+issue 9fe73c53
+author mizchi <miz404@gmail.com>
+created 1774454062
+
+Done: created docs/logging.md (reduced scope)
