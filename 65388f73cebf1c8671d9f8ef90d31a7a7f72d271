@@ -1,0 +1,18 @@
+version 1
+key hub/work-item/bd7015c5/meta
+kind work-item
+clock test <test@example.com>=1
+timestamp 1774441594
+node test <test@example.com>
+deleted 0
+
+work-item bd7015c5
+title Merge engine: full shim テスト改善
+author test <test@example.com>
+created 1774441594
+updated 1774441594
+state open
+label P0
+label merge
+
+rename/rename(2to1) index entries, file/directory conflict, content similarity edge cases. full shim t6422: 4/19 pass → 全パス目標
