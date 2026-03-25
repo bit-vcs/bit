@@ -13,6 +13,8 @@ pub struct MergeResult {
   status : MergeStatus
   commit_id : @bit.ObjectId?
   conflicts : Array[String]
+  /// Conflict type per path: "content", "rename/delete", "rename/add", etc.
+  conflict_types : Map[String, String]
 }
 
 ///|
@@ -138,22 +140,22 @@ pub fn merge(
       match read_head_ref(rfs, git_dir) {
         Branch(_) => {
           merge_fast_forward(fs, rfs, root, git_dir, target)
-          return { status: FastForward, commit_id: Some(target), conflicts: [] }
+          return { status: FastForward, commit_id: Some(target), conflicts: [], conflict_types: {} }
         }
         Detached(_) => raise @bit.GitError::InvalidObject("HEAD not found")
       }
     Some(id) => id
   }
   if head == target {
-    return { status: AlreadyUpToDate, commit_id: Some(head), conflicts: [] }
+    return { status: AlreadyUpToDate, commit_id: Some(head), conflicts: [], conflict_types: {} }
   }
   let db = ObjectDb::load(rfs, git_dir)
   if merge_is_ancestor(db, rfs, head, target) {
     merge_fast_forward(fs, rfs, root, git_dir, target)
-    return { status: FastForward, commit_id: Some(target), conflicts: [] }
+    return { status: FastForward, commit_id: Some(target), conflicts: [], conflict_types: {} }
   }
   if merge_is_ancestor(db, rfs, target, head) {
-    return { status: AlreadyUpToDate, commit_id: Some(head), conflicts: [] }
+    return { status: AlreadyUpToDate, commit_id: Some(head), conflicts: [], conflict_types: {} }
   }
   let base = merge_find_base(db, rfs, head, target)
   let base_files = match base {
@@ -165,6 +167,7 @@ pub fn merge(
   let file_result = merge_files(base_files, ours, theirs)
   let merged = file_result.merged
   let conflicts = file_result.conflicts
+  let all_conflict_types = file_result.conflict_types
   // Try content-level merge for files modified on both sides
   for candidate in file_result.needs_content_merge {
     let base_content = match candidate.base_id {
@@ -179,6 +182,9 @@ pub fn merge(
     if @diff3.is_binary_content(ours_data) ||
       @diff3.is_binary_content(theirs_data) {
       conflicts.push(candidate.path)
+      if not(all_conflict_types.contains(candidate.path)) {
+        all_conflict_types[candidate.path] = "content"
+      }
       continue
     }
     let result = @diff3.content_merge(
@@ -196,6 +202,9 @@ pub fn merge(
       fs.mkdir_p(dir)
       fs.write_string(full_path, result.content)
       conflicts.push(candidate.path)
+      if not(all_conflict_types.contains(candidate.path)) {
+        all_conflict_types[candidate.path] = "content"
+      }
     } else {
       // Clean merge - create new blob
       let content_bytes = @utf8.encode(result.content)
@@ -276,6 +285,7 @@ pub fn merge(
       fs.mkdir_p(dir)
       fs.write_string(full_path, final_result.content)
       conflicts.push(candidate.path)
+      all_conflict_types[candidate.path] = "rename/rename"
       // Store stage entries for index
       rename_2to1_stages[candidate.path] = (
         { id: ours_blob_id, mode: candidate.mode },
@@ -308,7 +318,12 @@ pub fn merge(
     fs.write_string(git_dir + "/ORIG_HEAD", head.to_hex() + "\n")
     fs.write_string(git_dir + "/MERGE_MSG", message + "\n")
     conflicts.sort()
-    return { status: Conflicted, commit_id: None, conflicts }
+    return {
+      status: Conflicted,
+      commit_id: None,
+      conflicts,
+      conflict_types: all_conflict_types,
+    }
   }
   write_worktree_from_files(
     db,
@@ -336,7 +351,7 @@ pub fn merge(
   let (commit_id, compressed) = @bit.create_commit(commit)
   write_object_bytes(fs, git_dir, commit_id, compressed)
   update_head_ref(fs, rfs, git_dir, commit_id)
-  { status: Merged, commit_id: Some(commit_id), conflicts: [] }
+  { status: Merged, commit_id: Some(commit_id), conflicts: [], conflict_types: {} }
 }
 
 ///|
@@ -432,6 +447,8 @@ priv struct MergeFilesResult {
   conflicts : Array[String]
   needs_content_merge : Array[ContentMergeCandidate]
   rename_2to1 : Array[Rename2to1Candidate]
+  /// Conflict type per path (e.g. "rename/delete", "rename/add")
+  conflict_types : Map[String, String]
 }
 
 ///|
@@ -462,6 +479,7 @@ fn merge_files(
   let conflicts : Array[String] = []
   let needs_content_merge : Array[ContentMergeCandidate] = []
   let rename_2to1 : Array[Rename2to1Candidate] = []
+  let conflict_types : Map[String, String] = {}
   // Step 1: Detect renames on each side
   let ours_renames = merge_detect_renames(base, ours)
   let theirs_renames = merge_detect_renames(base, theirs)
@@ -542,6 +560,7 @@ fn merge_files(
             None => ()
           }
           conflicts.push(new_path)
+          conflict_types[new_path] = "rename/rename"
           handled_paths[old_path] = true
           handled_paths[new_path] = true
           handled_paths[theirs_new_path] = true
@@ -576,6 +595,7 @@ fn merge_files(
             // Theirs deleted old_path, ours renamed: rename/delete conflict
             merged[new_path] = o
             conflicts.push(new_path)
+            conflict_types[new_path] = "rename/delete"
           }
           _ =>
             match ours_entry {
@@ -587,6 +607,17 @@ fn merge_files(
         if is_add_source {
           match ours.get(old_path) {
             Some(new_file) => merged[old_path] = new_file
+            None => ()
+          }
+        }
+        // Check for rename/add-dest: theirs independently added a file at new_path
+        if not(base.contains(new_path)) {
+          match theirs.get(new_path) {
+            Some(_) => {
+              // Theirs added a file at same path as our rename target
+              conflicts.push(new_path)
+              conflict_types[new_path] = "rename/add"
+            }
             None => ()
           }
         }
@@ -629,6 +660,7 @@ fn merge_files(
         // Ours deleted old_path, theirs renamed: rename/delete conflict
         merged[new_path] = t
         conflicts.push(new_path)
+        conflict_types[new_path] = "rename/delete"
       }
       _ =>
         match theirs_entry {
@@ -640,6 +672,16 @@ fn merge_files(
     if is_add_source {
       match theirs.get(old_path) {
         Some(new_file) => merged[old_path] = new_file
+        None => ()
+      }
+    }
+    // Check for rename/add-dest: ours independently added a file at new_path
+    if not(base.contains(new_path)) {
+      match ours.get(new_path) {
+        Some(_) => {
+          conflicts.push(new_path)
+          conflict_types[new_path] = "rename/add"
+        }
         None => ()
       }
     }
@@ -698,13 +740,15 @@ fn merge_files(
             mode: ours_entry.mode,
           })
         }
-        _ =>
+        _ => {
           // One side deleted, other modified - file-level conflict
           conflicts.push(path)
+          conflict_types[path] = "modify/delete"
+        }
       }
     }
   }
-  { merged, conflicts, needs_content_merge, rename_2to1 }
+  { merged, conflicts, needs_content_merge, rename_2to1, conflict_types }
 }
 
 ///|

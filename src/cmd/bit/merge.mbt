@@ -328,10 +328,11 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
       }
       @bitlib.MergeStatus::Conflicted => {
         if not(quiet) {
-          print_line("CONFLICT: Merge conflict")
           for path in result.conflicts {
-            print_line("  \{path}")
+            let ctype = result.conflict_types.get(path).unwrap_or("content")
+            print_line("CONFLICT (\{ctype}): Merge conflict in \{path}")
           }
+          print_line("Automatic merge failed; fix conflicts and then commit.")
         }
         @sys.exit(1)
       }
@@ -443,9 +444,9 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
       }
     @bitlib.MergeStatus::Conflicted => {
       if not(quiet) {
-        print_line("CONFLICT (content): Merge conflict in the following files:")
         for path in result.conflicts {
-          print_line("  \{path}")
+          let ctype = result.conflict_types.get(path).unwrap_or("content")
+          print_line("CONFLICT (\{ctype}): Merge conflict in \{path}")
         }
         print_line("Automatic merge failed; fix conflicts and then commit.")
       }
