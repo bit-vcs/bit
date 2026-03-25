@@ -164,7 +164,7 @@ pub fn merge(
   }
   let ours = collect_tree_files_from_commit(db, rfs, head)
   let theirs = collect_tree_files_from_commit(db, rfs, target)
-  let file_result = merge_files(base_files, ours, theirs)
+  let file_result = merge_files(base_files, ours, theirs, db, rfs)
   let merged = file_result.merged
   let conflicts = file_result.conflicts
   let all_conflict_types = file_result.conflict_types
@@ -474,6 +474,8 @@ fn merge_files(
   base : Map[String, TreeFileEntry],
   ours : Map[String, TreeFileEntry],
   theirs : Map[String, TreeFileEntry],
+  db : ObjectDb,
+  rfs : &@bit.RepoFileSystem,
 ) -> MergeFilesResult {
   let merged : Map[String, TreeFileEntry] = {}
   let conflicts : Array[String] = []
@@ -481,8 +483,8 @@ fn merge_files(
   let rename_2to1 : Array[Rename2to1Candidate] = []
   let conflict_types : Map[String, String] = {}
   // Step 1: Detect renames on each side
-  let ours_renames = merge_detect_renames(base, ours)
-  let theirs_renames = merge_detect_renames(base, theirs)
+  let ours_renames = merge_detect_renames(base, ours, db, rfs)
+  let theirs_renames = merge_detect_renames(base, theirs, db, rfs)
   // Paths that are handled by rename logic (skip in normal processing)
   let handled_paths : Map[String, Bool] = {}
   // Step 1b: Detect rename/rename(2to1) - different files renamed to same target
