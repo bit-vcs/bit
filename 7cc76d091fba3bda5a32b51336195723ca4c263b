@@ -1,0 +1,17 @@
+version 1
+key hub/work-item/d0302c6a/meta
+kind work-item
+clock test <test@example.com>=1
+timestamp 1774453400
+node test <test@example.com>
+deleted 0
+
+work-item d0302c6a
+title label test
+author test <test@example.com>
+created 1774453400
+updated 1774453400
+state open
+label session:test-branch
+
+test
