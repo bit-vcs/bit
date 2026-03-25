@@ -482,13 +482,18 @@ async fn handle_ls_files(args : Array[String]) -> Unit raise Error {
     tracked_candidate_paths.push(entry.path)
   }
   if show_stage {
-    for entry in tracked_entries {
-      if not(ls_files_matches_filters(entry.path, path_filters)) {
+    // Use stage entries to show actual stage numbers (0, 1, 2, 3)
+    let stage_entries = @bitlib.read_index_stage_entries(fs, git_dir)
+    for item in stage_entries {
+      if not(ls_files_matches_filters(item.entry.path, path_filters)) {
         continue
       }
-      let mode = format_mode(entry.mode)
-      let display_path = make_display_path(entry.path, cwd_prefix)
-      print_str("\{mode} \{entry.id.to_hex()} 0\t\{display_path}" + terminator)
+      let mode = format_mode(item.entry.mode)
+      let display_path = make_display_path(item.entry.path, cwd_prefix)
+      print_str(
+        "\{mode} \{item.entry.id.to_hex()} \{item.stage}\t\{display_path}" +
+        terminator,
+      )
     }
     if error_unmatch {
       let unmatched = ls_files_collect_unmatched_raw_filters(

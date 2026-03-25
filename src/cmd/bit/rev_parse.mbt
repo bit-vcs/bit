@@ -1201,15 +1201,22 @@ fn resolve_index_path_oid(
 ) -> @bitcore.ObjectId? raise Error {
   let (stage, path_opt) = parse_index_pathspec(spec)
   guard path_opt is Some(path) else { return None }
-  // Current index reader keeps one entry per path; stage lookup is supported for :0:path only.
-  if stage != 0 {
-    return None
-  }
   let normalized = normalize_index_pathspec_path(path)
-  let entries = @bitlib.read_index_entries(fs, git_dir)
-  for entry in entries {
-    if normalize_index_pathspec_path(entry.path) == normalized {
-      return Some(entry.id)
+  if stage == 0 {
+    // Try stage 0 first from normal index
+    let entries = @bitlib.read_index_entries(fs, git_dir)
+    for entry in entries {
+      if normalize_index_pathspec_path(entry.path) == normalized {
+        return Some(entry.id)
+      }
+    }
+  }
+  // Search stage entries (supports stages 0-3)
+  let stage_entries = @bitlib.read_index_stage_entries(fs, git_dir)
+  for item in stage_entries {
+    if item.stage == stage &&
+      normalize_index_pathspec_path(item.entry.path) == normalized {
+      return Some(item.entry.id)
     }
   }
   None
