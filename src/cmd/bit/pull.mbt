@@ -609,7 +609,14 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
   }
   let msg = "Merge " + target_ref
   let result = run_merge_with_sensitive_hooks(
-    fs, fs, root, tid, msg, author, timestamp, theirs_label=target_ref,
+    fs,
+    fs,
+    root,
+    tid,
+    msg,
+    author,
+    timestamp,
+    theirs_label=target_ref,
   )
   match result.status {
     @bitlib.MergeStatus::AlreadyUpToDate =>

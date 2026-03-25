@@ -467,13 +467,10 @@ test "merge: rename/add-source - rename a->b with new file at a" {
   switch_branch(fs, fs, "/repo", "main", checkout_files=true)
   fs.write_string("/repo/c.txt", "other\n")
   add_paths(fs, fs, "/repo", ["c.txt"])
-  ignore(
-    commit(fs, fs, "/repo", "add c", "Test <t@example.com>", 1700000002L),
-  )
+  ignore(commit(fs, fs, "/repo", "add c", "Test <t@example.com>", 1700000002L))
   // Merge
   let result = merge(
-    fs, fs, "/repo", feature_commit, "merge", "Test <t@example.com>",
-    1700000003L,
+    fs, fs, "/repo", feature_commit, "merge", "Test <t@example.com>", 1700000003L,
   )
   match result.status {
     Merged => ()

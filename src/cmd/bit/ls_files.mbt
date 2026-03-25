@@ -768,9 +768,7 @@ fn ls_files_collect_cached_entries(
     @bitlib.expand_sparse_index_entries(fs, git_dir, raw_entries)
   }
   if not(recurse_submodules) {
-    return entries.map(fn(entry) {
-      { path: prefix + entry.path }
-    })
+    return entries.map(fn(entry) { { path: prefix + entry.path } })
   }
   let submodules = parse_gitmodules(fs, root)
   let out : Array[LsFilesTrackedEntry] = []
@@ -804,8 +802,7 @@ fn ls_files_collect_cached_entries(
           out.push(sub_entry)
         }
       }
-      None =>
-        out.push({ path: prefix + entry.path })
+      None => out.push({ path: prefix + entry.path })
     }
   }
   out

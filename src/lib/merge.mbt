@@ -140,22 +140,42 @@ pub fn merge(
       match read_head_ref(rfs, git_dir) {
         Branch(_) => {
           merge_fast_forward(fs, rfs, root, git_dir, target)
-          return { status: FastForward, commit_id: Some(target), conflicts: [], conflict_types: {} }
+          return {
+            status: FastForward,
+            commit_id: Some(target),
+            conflicts: [],
+            conflict_types: {},
+          }
         }
         Detached(_) => raise @bit.GitError::InvalidObject("HEAD not found")
       }
     Some(id) => id
   }
   if head == target {
-    return { status: AlreadyUpToDate, commit_id: Some(head), conflicts: [], conflict_types: {} }
+    return {
+      status: AlreadyUpToDate,
+      commit_id: Some(head),
+      conflicts: [],
+      conflict_types: {},
+    }
   }
   let db = ObjectDb::load(rfs, git_dir)
   if merge_is_ancestor(db, rfs, head, target) {
     merge_fast_forward(fs, rfs, root, git_dir, target)
-    return { status: FastForward, commit_id: Some(target), conflicts: [], conflict_types: {} }
+    return {
+      status: FastForward,
+      commit_id: Some(target),
+      conflicts: [],
+      conflict_types: {},
+    }
   }
   if merge_is_ancestor(db, rfs, target, head) {
-    return { status: AlreadyUpToDate, commit_id: Some(head), conflicts: [], conflict_types: {} }
+    return {
+      status: AlreadyUpToDate,
+      commit_id: Some(head),
+      conflicts: [],
+      conflict_types: {},
+    }
   }
   let base = merge_find_base(db, rfs, head, target)
   let base_files = match base {
@@ -193,7 +213,9 @@ pub fn merge(
       ours_content,
       theirs_content,
       @diff3.ContentMergeOptions::default().with_labels(
-        ours=ours_label, base="", theirs=theirs_label,
+        ours=ours_label,
+        base="",
+        theirs=theirs_label,
       ),
     )
     if result.has_conflicts {
@@ -234,7 +256,9 @@ pub fn merge(
           ours_text,
           theirs_text,
           @diff3.ContentMergeOptions::default().with_labels(
-            ours=ours_label, base="", theirs=theirs_label,
+            ours=ours_label,
+            base="",
+            theirs=theirs_label,
           ),
         )
         let full_path = join_path(root, candidate.path)
@@ -249,16 +273,18 @@ pub fn merge(
   // Handle rename/rename(2to1) conflicts
   for candidate in file_result.rename_2to1 {
     // Resolve ours side: merge(base[ours_old], ours[path], theirs[ours_old])
-    let ours_base_id = base_files.get(candidate.ours_old_path).map(fn(e) { e.id })
+    let ours_base_id = base_files
+      .get(candidate.ours_old_path)
+      .map(fn(e) { e.id })
     let ours_at_path = ours.get(candidate.path)
     let theirs_at_ours_old = theirs.get(candidate.ours_old_path)
     let ours_resolved = merge_resolve_rename_content(
       db, rfs, fs, git_dir, ours_base_id, ours_at_path, theirs_at_ours_old,
     )
     // Resolve theirs side: merge(base[theirs_old], ours[theirs_old], theirs[path])
-    let theirs_base_id = base_files.get(candidate.theirs_old_path).map(
-      fn(e) { e.id },
-    )
+    let theirs_base_id = base_files
+      .get(candidate.theirs_old_path)
+      .map(fn(e) { e.id })
     let ours_at_theirs_old = ours.get(candidate.theirs_old_path)
     let theirs_at_path = theirs.get(candidate.path)
     let theirs_resolved = merge_resolve_rename_content(
@@ -309,8 +335,10 @@ pub fn merge(
         ours_text,
         theirs_text,
         @diff3.ContentMergeOptions::default().with_labels(
-        ours=ours_label, base="", theirs=theirs_label,
-      ),
+          ours=ours_label,
+          base="",
+          theirs=theirs_label,
+        ),
       )
       let full_path = join_path(root, candidate.path)
       let dir = rebase_parent_dir(full_path)
@@ -366,18 +394,13 @@ pub fn merge(
     for path in file_result.removed_paths {
       let full_path = join_path(root, path)
       if rfs.is_file(full_path) {
-        fs.remove_file(full_path) catch { _ => () }
+        fs.remove_file(full_path) catch {
+          _ => ()
+        }
       }
     }
     let entries = merge_conflicted_index_entries_with_renames(
-      db,
-      rfs,
-      base_files,
-      ours,
-      theirs,
-      merged,
-      conflicts,
-      rename_conflict_stages,
+      db, rfs, base_files, ours, theirs, merged, conflicts, rename_conflict_stages,
     )
     write_index_stage_entries(fs, git_dir, entries)
     fs.write_string(git_dir + "/MERGE_HEAD", target.to_hex() + "\n")
@@ -417,7 +440,12 @@ pub fn merge(
   let (commit_id, compressed) = @bit.create_commit(commit)
   write_object_bytes(fs, git_dir, commit_id, compressed)
   update_head_ref(fs, rfs, git_dir, commit_id)
-  { status: Merged, commit_id: Some(commit_id), conflicts: [], conflict_types: {} }
+  {
+    status: Merged,
+    commit_id: Some(commit_id),
+    conflicts: [],
+    conflict_types: {},
+  }
 }
 
 ///|
@@ -528,7 +556,8 @@ priv struct ContentMergeCandidate {
   mode : Int
 }
 
-///| Two different files both renamed to the same target path.
+///|
+/// Two different files both renamed to the same target path.
 /// Requires resolving each side's rename/modify first, then merging results.
 priv struct Rename2to1Candidate {
   path : String
@@ -874,7 +903,8 @@ fn merge_entry_eq(a : TreeFileEntry?, b : TreeFileEntry?) -> Bool {
   }
 }
 
-///| Extract common prefix lines from two texts for use as merge base.
+///|
+/// Extract common prefix lines from two texts for use as merge base.
 fn merge_common_line_prefix(a : String, b : String) -> String {
   let a_arr : Array[String] = []
   for part in a.split("\n") {
@@ -907,7 +937,8 @@ fn merge_common_line_prefix(a : String, b : String) -> String {
   result.to_string()
 }
 
-///| Resolve a rename's content by doing a 3-way merge.
+///|
+/// Resolve a rename's content by doing a 3-way merge.
 /// Returns the resolved blob ID if a merge was needed, or None if no merge needed.
 fn merge_resolve_rename_content(
   db : ObjectDb,
@@ -961,7 +992,8 @@ fn merge_resolve_rename_content(
   Some((blob_id, ours_entry.unwrap().mode))
 }
 
-///| Create index stage entries for conflicts, including rename/rename(2to1) stages.
+///|
+/// Create index stage entries for conflicts, including rename/rename(2to1) stages.
 fn merge_conflicted_index_entries_with_renames(
   db : ObjectDb,
   fs : &@bit.RepoFileSystem,

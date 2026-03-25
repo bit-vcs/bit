@@ -16,8 +16,7 @@ pub fn rev_parse(
     let rest = substring_revparse(spec, 1, spec.length())
     let (target_stage, path) = if rest.length() >= 2 {
       let ch = rest[0]
-      if (ch == '0' || ch == '1' || ch == '2' || ch == '3') &&
-        rest[1] == ':' {
+      if (ch == '0' || ch == '1' || ch == '2' || ch == '3') && rest[1] == ':' {
         let stage = ch.to_int() - '0'.to_int()
         (stage, substring_revparse(rest, 2, rest.length()))
       } else {
@@ -630,7 +629,8 @@ fn substring_revparse(s : String, start : Int, end : Int) -> String {
   result.to_string()
 }
 
-///| Resolve :N:path by looking up index stage entries.
+///|
+/// Resolve :N:path by looking up index stage entries.
 /// Parses the index binary format directly to find the entry with
 /// matching path and stage number.
 fn resolve_index_stage_entry(
@@ -664,8 +664,7 @@ fn resolve_index_stage_entry(
     }
     let id = @object.ObjectId::new(id_bytes)
     let flags_pos = id_pos + 20
-    let flags = (data[flags_pos].to_int() << 8) |
-      data[flags_pos + 1].to_int()
+    let flags = (data[flags_pos].to_int() << 8) | data[flags_pos + 1].to_int()
     let entry_stage = (flags >> 12) & 0x3
     let name_len = flags & 0x0FFF
     let has_extended = version >= 3 && (flags & 0x4000) != 0
@@ -678,7 +677,7 @@ fn resolve_index_stage_entry(
     } else {
       let mut len = 0
       while path_start + len < data.length() &&
-        data[path_start + len] != b'\x00' {
+            data[path_start + len] != b'\x00' {
         len += 1
       }
       len
@@ -697,7 +696,7 @@ fn resolve_index_stage_entry(
     }
     // Advance to next entry (aligned to 8 bytes)
     let entry_len = path_start + actual_len + 1 - pos
-    let padded = (entry_len + 7).land(0x7FFFFFF8)  // align to 8
+    let padded = (entry_len + 7).land(0x7FFFFFF8) // align to 8
     pos += padded
   }
   None

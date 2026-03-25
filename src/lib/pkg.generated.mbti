@@ -236,7 +236,7 @@ pub fn match_url_pattern(String, String) -> Bool
 
 pub fn matches_sparse_pattern(String, Array[String]) -> Bool
 
-pub fn merge(&@types.FileSystem, &@types.RepoFileSystem, String, @object.ObjectId, String, String, Int64) -> MergeResult raise @object.GitError
+pub fn merge(&@types.FileSystem, &@types.RepoFileSystem, String, @object.ObjectId, String, String, Int64, ours_label? : String, theirs_label? : String) -> MergeResult raise @object.GitError
 
 pub fn merge_base_all(ObjectDb, &@types.RepoFileSystem, @object.ObjectId, @object.ObjectId) -> Array[@object.ObjectId] raise @object.GitError
 
@@ -759,6 +759,7 @@ pub struct MergeResult {
   status : MergeStatus
   commit_id : @object.ObjectId?
   conflicts : Array[String]
+  conflict_types : Map[String, String]
 }
 
 pub enum MergeStatus {

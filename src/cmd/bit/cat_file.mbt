@@ -2283,10 +2283,7 @@ fn cat_file_find_index_entry(
 fn cat_file_parse_index_spec(spec : String) -> (Int, String) {
   // spec starts with ":" and length > 1 (caller guarantees)
   let rest = String::unsafe_substring(spec, start=1, end=spec.length())
-  if rest.length() >= 2 &&
-    rest[0] >= '0' &&
-    rest[0] <= '3' &&
-    rest[1] == ':' {
+  if rest.length() >= 2 && rest[0] >= '0' && rest[0] <= '3' && rest[1] == ':' {
     let stage = rest[0].to_int() - '0'.to_int()
     let path = String::unsafe_substring(rest, start=2, end=rest.length())
     (stage, path)

@@ -8,7 +8,8 @@ priv struct SideRenames {
   add_source_paths : Map[String, Bool]
 }
 
-///| Detect renames between base and a side (ours or theirs).
+///|
+/// Detect renames between base and a side (ours or theirs).
 ///
 /// Phase 1: Exact OID matching (fast)
 /// Phase 2: Content similarity matching for unmatched pairs (threshold 50%)
@@ -145,7 +146,8 @@ fn merge_detect_renames(
   { old_to_new, add_source_paths }
 }
 
-///| Compute similarity score (0-100) between two text contents.
+///|
+/// Compute similarity score (0-100) between two text contents.
 /// Uses line-based comparison: score = 100 * common_lines / max(lines_a, lines_b)
 fn rename_similarity_score(a : String, b : String) -> Int {
   let a_lines : Array[String] = []

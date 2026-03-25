@@ -143,7 +143,7 @@ pub fn Hub::can_merge(Self, &@lib.ObjectStore, &@lib.RefStore, String) -> Bool r
 pub fn Hub::check_merge_policy(Self, &@lib.ObjectStore, &@lib.RefStore, String, PrMergePolicy, signing_key? : String?) -> Unit raise @object.GitError
 pub fn Hub::close_issue(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String) -> Unit raise @object.GitError
 pub fn Hub::close_pr(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String) -> Unit raise @object.GitError
-pub fn Hub::create_issue(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, String, labels? : Array[String], assignees? : Array[String]) -> Issue raise @object.GitError
+pub fn Hub::create_issue(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, String, labels? : Array[String], assignees? : Array[String], parent_id? : String?) -> Issue raise @object.GitError
 pub fn Hub::create_pr(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, String, String, String, source_repo? : String?, source_ref? : String?) -> PullRequest raise @object.GitError
 pub fn Hub::find_canonical_node(Self, &@lib.ObjectStore) -> String?
 pub fn Hub::get_issue(Self, &@lib.ObjectStore, String) -> Issue?
@@ -166,6 +166,7 @@ pub fn Hub::list_pr_proposals(Self, &@lib.ObjectStore) -> Array[PullRequest]
 pub fn Hub::list_pr_workflows(Self, &@lib.ObjectStore, String) -> Array[PrWorkflowResult]
 pub fn Hub::list_prs(Self, &@lib.ObjectStore, state? : PrState?) -> Array[PullRequest]
 pub fn Hub::list_reviews(Self, &@lib.ObjectStore, String) -> Array[PrReview]
+pub fn Hub::list_sub_issues(Self, &@lib.ObjectStore, String, state? : IssueState?) -> Array[Issue]
 pub fn Hub::list_work_items(Self, &@lib.ObjectStore, state? : WorkItemState?, kind? : WorkItemKind?) -> Array[WorkItem]
 pub fn Hub::load(&@lib.ObjectStore, &@lib.RefStore, node_id? : String, signing_key? : String?, require_signed? : Bool) -> Self raise @object.GitError
 pub fn Hub::merge_pr(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, strategy? : PrMergeStrategy) -> PrMergeResult raise @object.GitError
@@ -229,6 +230,7 @@ pub struct Issue {
   labels : Array[String]
   assignees : Array[String]
   linked_prs : Array[String]
+  parent_id : String?
 }
 pub fn Issue::assignees(Self) -> Array[String]
 pub fn Issue::author(Self) -> String
@@ -237,7 +239,7 @@ pub fn Issue::created_at(Self) -> Int64
 pub fn Issue::id(Self) -> String
 pub fn Issue::labels(Self) -> Array[String]
 pub fn Issue::linked_prs(Self) -> Array[String]
-pub fn Issue::new(String, String, String, String, Int64, Int64, IssueState, labels? : Array[String], assignees? : Array[String], linked_prs? : Array[String]) -> Self
+pub fn Issue::new(String, String, String, String, Int64, Int64, IssueState, labels? : Array[String], assignees? : Array[String], linked_prs? : Array[String], parent_id? : String?) -> Self
 pub fn Issue::serialize(Self) -> String
 pub fn Issue::state(Self) -> IssueState
 pub fn Issue::title(Self) -> String
@@ -490,6 +492,7 @@ pub struct WorkItem {
   assignees : Array[String]
   linked_prs : Array[String]
   patch : WorkItemPatch?
+  parent_id : String?
 }
 pub fn WorkItem::assignees(Self) -> Array[String]
 pub fn WorkItem::author(Self) -> String
@@ -499,7 +502,7 @@ pub fn WorkItem::id(Self) -> String
 pub fn WorkItem::kind(Self) -> WorkItemKind
 pub fn WorkItem::labels(Self) -> Array[String]
 pub fn WorkItem::linked_prs(Self) -> Array[String]
-pub fn WorkItem::new(String, String, String, String, Int64, Int64, WorkItemState, labels? : Array[String], assignees? : Array[String], linked_prs? : Array[String], patch? : WorkItemPatch?) -> Self
+pub fn WorkItem::new(String, String, String, String, Int64, Int64, WorkItemState, labels? : Array[String], assignees? : Array[String], linked_prs? : Array[String], patch? : WorkItemPatch?, parent_id? : String?) -> Self
 pub fn WorkItem::patch(Self) -> WorkItemPatch?
 pub fn WorkItem::serialize(Self) -> String
 pub fn WorkItem::state(Self) -> WorkItemState

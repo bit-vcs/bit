@@ -910,7 +910,14 @@ async fn run_merge_with_sensitive_hooks(
 ) -> @bitlib.MergeResult raise Error {
   hooks_ensure_sensitive_hook_approval(fs, rfs, root, "post-merge")
   @bitlib.merge(
-    fs, rfs, root, target, message, author, timestamp, theirs_label=theirs_label,
+    fs,
+    rfs,
+    root,
+    target,
+    message,
+    author,
+    timestamp,
+    theirs_label~,
   )
 }
 
