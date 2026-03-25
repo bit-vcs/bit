@@ -30,7 +30,7 @@ If a plan file exists, read it before starting work. Plans may be `.gitignore`d 
 
 ### 2. Declare Scope
 
-Create a bit issue declaring your session and Target Files.
+Create a bit issue declaring your session and Target Files. Use the current branch name for the session label (e.g., `session:feat/add-auth` or `session:main` if not using feature branches).
 
 To assign a sequence number, count **all** issues (not just open) with the session label to avoid reuse after close/reopen cycles:
 
@@ -75,11 +75,12 @@ bit issue view <other-session-id>        # read Target Files section
 Calculate overlap:
 
 ```
-overlap = |my modify/delete files ∩ other modify/delete files| / |my modify/delete files|
+overlapping = my modify/delete files ∩ other modify/delete files
+remaining   = my total targets - overlapping files
 
-- 0%:   proceed
-- <50%: exclude overlapping files, update issue body + add comment
-- ≥50%: ask user whether to proceed with exclusions or abort the session
+- 0 overlapping:              proceed
+- some overlapping, remaining > 0: exclude overlapping files, update issue body + add comment
+- all modify/delete files overlap:  ask user whether to proceed with exclusions or abort
 ```
 
 When excluding files, read the current body, remove excluded files, then update:
