@@ -893,12 +893,11 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
     }
     None =>
       if spec.has_prefix(":") && spec.length() > 1 {
-        let index_path = String::unsafe_substring(
-          spec,
-          start=1,
-          end=spec.length(),
+        // Parse :N:path (stage entry) or :path (stage 0)
+        let (stage, index_path) = cat_file_parse_index_spec(spec)
+        let index_entry = cat_file_find_index_entry_with_stage(
+          fs, git_dir, index_path, stage,
         )
-        let index_entry = cat_file_find_index_entry(fs, git_dir, index_path)
         guard index_entry is Some(entry) else {
           eprint_line("fatal: path '\{index_path}' does not exist in index")
           @sys.exit(128)
@@ -2219,6 +2218,14 @@ fn cat_file_normalize_spec_path(path : String) -> String {
 ///|
 fn cat_file_find_path_separator_index(spec : String) -> Int? {
   let chars = spec.to_array()
+  // :N:path (index stage entry, e.g. :2:b) — not a rev:path split
+  if chars.length() >= 3 &&
+    chars[0] == ':' &&
+    chars[1] >= '0' &&
+    chars[1] <= '3' &&
+    chars[2] == ':' {
+    return None
+  }
   let mut brace_depth = 0
   let mut i = 0
   while i < chars.length() {
@@ -2266,6 +2273,53 @@ fn cat_file_find_index_entry(
   for entry in entries {
     if entry.path == normalized {
       return Some(entry)
+    }
+  }
+  None
+}
+
+///|
+/// Parse :N:path or :path index spec. Returns (stage, path).
+fn cat_file_parse_index_spec(spec : String) -> (Int, String) {
+  // spec starts with ":" and length > 1 (caller guarantees)
+  let rest = String::unsafe_substring(spec, start=1, end=spec.length())
+  if rest.length() >= 2 &&
+    rest[0] >= '0' &&
+    rest[0] <= '3' &&
+    rest[1] == ':' {
+    let stage = rest[0].to_int() - '0'.to_int()
+    let path = String::unsafe_substring(rest, start=2, end=rest.length())
+    (stage, path)
+  } else {
+    (0, rest)
+  }
+}
+
+///|
+/// Find an index entry matching path and stage.
+fn cat_file_find_index_entry_with_stage(
+  fs : OsFs,
+  git_dir : String,
+  path : String,
+  stage : Int,
+) -> @bitlib.IndexEntry? {
+  let normalized = cat_file_normalize_spec_path(path)
+  if stage == 0 {
+    // Stage 0: use normal index entries
+    let entries = @bitlib.read_index_entries(fs, git_dir) catch { _ => [] }
+    for entry in entries {
+      if entry.path == normalized {
+        return Some(entry)
+      }
+    }
+  }
+  // Search stage entries for the requested stage
+  let stage_entries = @bitlib.read_index_stage_entries(fs, git_dir) catch {
+    _ => []
+  }
+  for item in stage_entries {
+    if item.stage == stage && item.entry.path == normalized {
+      return Some(item.entry)
     }
   }
   None
