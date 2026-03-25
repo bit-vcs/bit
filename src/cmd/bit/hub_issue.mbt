@@ -762,6 +762,7 @@ async fn handle_hub_issue_update(args : Array[String]) -> Unit raise Error {
   let mut issue_id : String? = None
   let mut title : String? = None
   let mut body : String? = None
+  let mut body_append : String? = None
   let labels : Array[String] = []
   let assignees : Array[String] = []
   let mut i = 0
@@ -776,6 +777,18 @@ async fn handle_hub_issue_update(args : Array[String]) -> Unit raise Error {
       "-m" | "-b" | "--message" | "--body" if i + 1 < args.length() => {
         body = Some(args[i + 1])
         i += 2
+        continue
+      }
+      "--body-append" if i + 1 < args.length() => {
+        body_append = Some(args[i + 1])
+        i += 2
+        continue
+      }
+      _ if arg.has_prefix("--body-append=") => {
+        body_append = Some(
+          String::unsafe_substring(arg, start=14, end=arg.length()),
+        )
+        i += 1
         continue
       }
       "--label" | "-l" if i + 1 < args.length() => {
@@ -833,6 +846,21 @@ async fn handle_hub_issue_update(args : Array[String]) -> Unit raise Error {
   }
   guard issue_id is Some(id) else {
     raise @bitcore.GitError::InvalidObject("Issue id is required")
+  }
+  // Handle --body-append: read existing body, append text
+  if body_append is Some(append_text) && body is None {
+    let root = get_work_root()
+    let git_dir = resolve_hub_git_dir(root)
+    let (objects, refs, _clock) = make_hub_stores(git_dir)
+    let hub = load_hub_store(objects, refs)
+    guard issue_id is Some(id) else {
+      raise @bitcore.GitError::InvalidObject("Issue id is required")
+    }
+    let existing = hub.get_issue(objects, id)
+    guard existing is Some(ex) else {
+      raise @bitcore.GitError::InvalidObject("Issue not found: \{id}")
+    }
+    body = Some(ex.body() + "\n" + append_text)
   }
   let label_option = if labels.length() > 0 { Some(labels) } else { None }
   let assignee_option = if assignees.length() > 0 {
