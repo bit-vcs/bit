@@ -1,0 +1,23 @@
+version 1
+key hub/work-item/9fe73c53/meta
+kind work-item
+clock mizchi <miz404@gmail.com>=1
+timestamp 1774454023
+node mizchi <miz404@gmail.com>
+deleted 0
+
+work-item 9fe73c53
+title [session:feat/improve-logging#1] Improve logging docs
+author mizchi <miz404@gmail.com>
+created 1774454023
+updated 1774454023
+state open
+label session:feat/improve-logging
+
+## Session Info
+- branch: feat/improve-logging
+- worktree: /Users/mz/ghq/github.com/bit-vcs/bit/.claude/worktrees/agent-a386fba6
+
+## Target Files
+- docs/sub-issues.md (modify)
+- docs/logging.md (create)
