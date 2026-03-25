@@ -65,7 +65,7 @@ BODY
 
 ### 3. Check for Overlap
 
-For each open issue that is **not yours**, view it and extract Target Files from the body. Compare against your own.
+For each open issue **other than the one you created in step 2**, view it and extract Target Files from the body. Only consider `modify` and `delete` operations for overlap — `create` files are unowned by definition.
 
 ```bash
 bit issue list --open                    # all open sessions
@@ -75,16 +75,17 @@ bit issue view <other-session-id>        # read Target Files section
 Calculate overlap:
 
 ```
-overlap = |my files ∩ other files| / |my files|
+overlap = |my modify/delete files ∩ other modify/delete files| / |my modify/delete files|
 
 - 0%:   proceed
 - <50%: exclude overlapping files, update issue body + add comment
-- ≥50%: ask user
+- ≥50%: ask user whether to proceed with exclusions or abort the session
 ```
 
-When excluding files, update the issue to reflect the revised scope:
+When excluding files, read the current body, remove excluded files, then update:
 
 ```bash
+bit issue view <id>                      # read current body
 bit issue update <id> --body "<revised body with excluded files removed>"
 bit issue comment add <id> --body "Excluded path/to/file.ts (owned by session X)"
 ```
