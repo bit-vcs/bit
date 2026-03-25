@@ -383,7 +383,9 @@ fn format_issue_json(issue : @hub.Issue) -> String {
   buf.write_string("{")
   buf.write_string("\"id\":" + json_escape_string(issue.id()))
   buf.write_string(",\"title\":" + json_escape_string(issue.title()))
-  buf.write_string(",\"state\":" + json_escape_string(issue.state().to_string()))
+  buf.write_string(
+    ",\"state\":" + json_escape_string(issue.state().to_string()),
+  )
   buf.write_string(",\"author\":" + json_escape_string(issue.author()))
   buf.write_string(",\"created_at\":" + issue.created_at().to_string())
   buf.write_string(",\"updated_at\":" + issue.updated_at().to_string())
@@ -397,6 +399,7 @@ fn format_issue_json(issue : @hub.Issue) -> String {
 }
 
 ///|
+
 ///|
 /// Format issue detail with human-readable timestamps for CLI display.
 /// Replaces raw epoch in serialize output with ISO-style dates.
@@ -406,9 +409,7 @@ fn format_issue_detail(issue : @hub.Issue) -> String {
   for line_view in raw.split("\n") {
     let line = line_view.to_string()
     if line.has_prefix("created ") {
-      let ts = line
-        .substring(start=8)
-        .to_string()
+      let ts = line[8:].to_string()
       sb.write_string("created ")
       sb.write_string(ts)
       sb.write_string(" (")
@@ -416,9 +417,7 @@ fn format_issue_detail(issue : @hub.Issue) -> String {
       sb.write_string(")")
       sb.write_char('\n')
     } else if line.has_prefix("updated ") {
-      let ts = line
-        .substring(start=8)
-        .to_string()
+      let ts = line[8:].to_string()
       sb.write_string("updated ")
       sb.write_string(ts)
       sb.write_string(" (")
@@ -432,7 +431,7 @@ fn format_issue_detail(issue : @hub.Issue) -> String {
   }
   // Remove trailing newline
   let result = sb.to_string()
-  if result.length() > 0 && result.unsafe_charcode_at(result.length() - 1) == 10 {
+  if result.length() > 0 && result.unsafe_get(result.length() - 1) == '\n' {
     String::unsafe_substring(result, start=0, end=result.length() - 1)
   } else {
     result
