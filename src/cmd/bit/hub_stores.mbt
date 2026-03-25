@@ -83,6 +83,36 @@ impl @bitlib.Clock for OsClock with now(self) {
 }
 
 ///|
+/// Resolve git_dir for hub operations, handling worktrees.
+/// In a worktree, .git is a file pointing to .git/worktrees/<name>.
+/// Hub data (refs/notes) lives in the shared common git dir.
+fn resolve_hub_git_dir(root : String) -> String {
+  let fs = OsFs::new()
+  let git_path = root + "/.git"
+  // Resolve .git file → actual gitdir (e.g. /repo/.git/worktrees/foo)
+  let git_dir = if fs.is_file(git_path) {
+    @bitlib.resolve_gitdir(fs, git_path)
+  } else {
+    git_path
+  }
+  // Resolve commondir → shared .git (e.g. /repo/.git)
+  let commondir_path = git_dir + "/commondir"
+  if fs.is_file(commondir_path) {
+    let raw = @utf8.decode_lossy(
+      (fs.read_file(commondir_path) catch { _ => Bytes::default() })[:],
+    )
+    let rel = raw.trim(chars=" \t\r\n").to_string()
+    if rel.length() > 0 {
+      if rel.has_prefix("/") {
+        return normalize_path(rel)
+      }
+      return normalize_path(git_dir + "/" + rel)
+    }
+  }
+  git_dir
+}
+
+///|
 fn make_hub_stores(
   git_dir : String,
 ) -> (&@bitlib.ObjectStore, &@bitlib.RefStore, &@bitlib.Clock) {
@@ -134,7 +164,7 @@ async fn handle_hub_init(args : Array[String]) -> Unit raise Error {
     }
   }
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   let fs = OsFs::new()
   let (objects, refs, _clock) = make_hub_stores(git_dir)
   let _ = init_hub_store(objects, refs)

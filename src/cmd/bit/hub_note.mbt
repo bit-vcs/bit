@@ -100,7 +100,7 @@ async fn handle_hub_note_add(args : Array[String]) -> Unit raise Error {
     }
   }
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let hub = init_hub_store(objects, refs)
   let note = hub.add_note(
@@ -158,7 +158,7 @@ async fn handle_hub_note_get(args : Array[String]) -> Unit raise Error {
     raise @bitcore.GitError::InvalidObject("Commit id is required")
   }
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, _clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
   let note = hub.get_note(
@@ -203,7 +203,7 @@ async fn handle_hub_note_list(args : Array[String]) -> Unit raise Error {
     }
   }
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, _clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
   let notes = hub.list_notes(objects, refs, ns=note_ns(ns))
@@ -258,7 +258,7 @@ async fn handle_hub_note_remove(args : Array[String]) -> Unit raise Error {
     raise @bitcore.GitError::InvalidObject("Commit id is required")
   }
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let hub = init_hub_store(objects, refs)
   hub.remove_note(

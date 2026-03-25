@@ -528,7 +528,7 @@ fn build_hub_sync_issue_url(
 ///|
 async fn handle_hub_sync_issue_url(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   let fs = OsFs::new()
   let options = parse_hub_sync_issue_url_options(
     args,
@@ -541,7 +541,7 @@ async fn handle_hub_sync_issue_url(args : Array[String]) -> Unit raise Error {
 ///|
 async fn handle_hub_sync_push(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   let fs = OsFs::new()
   let options = parse_hub_sync_runtime_options(
     args,
@@ -575,7 +575,7 @@ async fn handle_hub_sync_clone_announce(
   args : Array[String],
 ) -> Unit raise Error {
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   let fs = OsFs::new()
   let options = parse_hub_sync_clone_announce_options(
     args,
@@ -600,7 +600,7 @@ async fn handle_hub_sync_clone_announce(
 ///|
 async fn handle_hub_sync_clone_peers(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   let fs = OsFs::new()
   let options = parse_hub_sync_clone_peers_options(
     args,
@@ -748,7 +748,7 @@ async fn dispatch_hub_notify_events(
 ///|
 async fn handle_hub_sync_fetch(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   let fs = OsFs::new()
   let options = parse_hub_sync_runtime_options(
     args,

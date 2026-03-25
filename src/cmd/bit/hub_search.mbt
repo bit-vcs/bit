@@ -419,7 +419,7 @@ async fn handle_hub_search(args : Array[String]) -> Unit raise Error {
   )
 
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, _clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
   let results : Array[String] = []
@@ -584,7 +584,7 @@ async fn handle_hub_search_with_defaults(
   )
 
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, _clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
   let results : Array[String] = []

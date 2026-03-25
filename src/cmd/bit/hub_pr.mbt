@@ -106,7 +106,7 @@ async fn handle_hub_pr_list(args : Array[String]) -> Unit raise Error {
     Some(work_item_state) => Some(work_item_state.to_pr_state())
   }
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, _clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
   let prs = hub.list_prs(objects, state~)
@@ -131,7 +131,7 @@ async fn handle_hub_pr_proposals(args : Array[String]) -> Unit raise Error {
     Some(work_item_state) => Some(work_item_state.to_pr_state())
   }
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, _clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
   let candidates = hub.list_pr_proposals(objects)
@@ -168,7 +168,7 @@ async fn handle_hub_pr_status(args : Array[String]) -> Unit raise Error {
     }
   }
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, _clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
   let open_prs = hub.list_prs(objects, state=Some(@hub.PrState::Open))
@@ -320,7 +320,7 @@ async fn handle_hub_pr_import(args : Array[String]) -> Unit raise Error {
     raise @bitcore.GitError::InvalidObject("Limit must be positive")
   }
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   let fs = OsFs::new()
   let (stdout, _stderr) = match provider {
     GitHubImportProvider::GhCli => {
@@ -372,7 +372,7 @@ async fn handle_hub_pr_import_proposal(
     raise @bitcore.GitError::InvalidObject("Proposal id is required")
   }
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let hub = init_hub_store(objects, refs)
   let proposals = hub.list_pr_proposals(objects)
@@ -419,7 +419,7 @@ async fn handle_hub_pr_get(args : Array[String]) -> Unit raise Error {
     raise @bitcore.GitError::InvalidObject("PR id is required")
   }
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, _clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
   let pr = hub.get_pr(objects, id)
@@ -633,7 +633,7 @@ async fn parse_hub_pr_create_options(
 async fn handle_hub_pr_create(args : Array[String]) -> Unit raise Error {
   let options = parse_hub_pr_create_options(args, "hub pr create")
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let fs = OsFs::new()
   let source_repo_value = match options.source_repo {
@@ -669,7 +669,7 @@ async fn handle_hub_pr_create(args : Array[String]) -> Unit raise Error {
 async fn handle_hub_pr_propose(args : Array[String]) -> Unit raise Error {
   let options = parse_hub_pr_create_options(args, "hub pr propose")
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let fs = OsFs::new()
   let source_repo_value = match options.source_repo {
@@ -783,7 +783,7 @@ async fn handle_hub_pr_update(args : Array[String]) -> Unit raise Error {
   }
   let label_option = if labels.length() > 0 { Some(labels) } else { None }
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let hub = init_hub_store(objects, refs)
   let pr = hub.update_pr(
@@ -820,7 +820,7 @@ async fn handle_hub_pr_close(args : Array[String]) -> Unit raise Error {
     raise @bitcore.GitError::InvalidObject("PR id is required")
   }
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let hub = init_hub_store(objects, refs)
   hub.close_pr(objects, refs, clock, id)
@@ -849,7 +849,7 @@ async fn handle_hub_pr_reopen(args : Array[String]) -> Unit raise Error {
     raise @bitcore.GitError::InvalidObject("PR id is required")
   }
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let hub = init_hub_store(objects, refs)
   hub.reopen_pr(objects, refs, clock, id)
@@ -921,7 +921,7 @@ async fn handle_hub_pr_merge(args : Array[String]) -> Unit raise Error {
     raise @bitcore.GitError::InvalidObject("PR id is required")
   }
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   let fs = OsFs::new()
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let hub = init_hub_store(objects, refs)
@@ -1070,7 +1070,7 @@ async fn handle_hub_pr_comment_add(args : Array[String]) -> Unit raise Error {
     raise @bitcore.GitError::InvalidObject("Missing --body")
   }
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let hub = init_hub_store(objects, refs)
   let comment = hub.add_comment(
@@ -1110,7 +1110,7 @@ async fn handle_hub_pr_comment_list(args : Array[String]) -> Unit raise Error {
     raise @bitcore.GitError::InvalidObject("PR id is required")
   }
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, _clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
   let comments = hub.list_comments(objects, id)
@@ -1248,7 +1248,7 @@ async fn handle_hub_pr_review_submit(args : Array[String]) -> Unit raise Error {
   }
   let review_body = body.unwrap_or("")
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let hub = init_hub_store(objects, refs)
   let review = hub.submit_review(
@@ -1286,7 +1286,7 @@ async fn handle_hub_pr_review_list(args : Array[String]) -> Unit raise Error {
     raise @bitcore.GitError::InvalidObject("PR id is required")
   }
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, _clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
   let reviews = hub.list_reviews(objects, id)
@@ -1443,7 +1443,7 @@ async fn handle_hub_pr_workflow_submit(
     raise @bitcore.GitError::InvalidObject("Missing --status")
   }
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let hub = init_hub_store(objects, refs)
   let workflow = hub.record_pr_workflow(
@@ -1482,7 +1482,7 @@ async fn handle_hub_pr_workflow_list(args : Array[String]) -> Unit raise Error {
     raise @bitcore.GitError::InvalidObject("PR id is required")
   }
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, _clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
   let workflows = hub.list_pr_workflows(objects, id)
@@ -1511,7 +1511,7 @@ async fn handle_hub_pr_search(args : Array[String]) -> Unit raise Error {
 ///|
 async fn handle_hub_pr_init(_args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   ensure_hub_initialized(git_dir)
   print_line("Initialized hub metadata")
 }

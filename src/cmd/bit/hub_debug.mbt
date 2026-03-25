@@ -93,7 +93,7 @@ async fn handle_hub_dump(args : Array[String]) -> Unit raise Error {
   }
   let options = parse_hub_dump_options(args)
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, _clock) = make_hub_stores(git_dir)
   let store = @hub.HubStore::load(
     objects,

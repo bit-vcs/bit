@@ -288,7 +288,7 @@ async fn handle_hub_issue_list(args : Array[String]) -> Unit raise Error {
     Some(work_item_state) => work_item_state.to_issue_state()
   }
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, _clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
   let all_issues = hub.list_issues(objects, state~)
@@ -331,7 +331,7 @@ async fn handle_hub_issue_list(args : Array[String]) -> Unit raise Error {
 async fn handle_hub_work_item_list(args : Array[String]) -> Unit raise Error {
   let options = parse_hub_work_item_list_options(args)
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, _clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
   let items = hub.list_work_items(
@@ -466,7 +466,7 @@ async fn handle_hub_issue_import(args : Array[String]) -> Unit raise Error {
     raise @bitcore.GitError::InvalidObject("Limit must be positive")
   }
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   let fs = OsFs::new()
   let (stdout, _stderr) = match provider {
     GitHubImportProvider::GhCli => {
@@ -511,7 +511,7 @@ async fn handle_hub_issue_get(args : Array[String]) -> Unit raise Error {
     raise @bitcore.GitError::InvalidObject("Issue id is required")
   }
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, _clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
   let issue = hub.get_issue(objects, id)
@@ -523,8 +523,7 @@ async fn handle_hub_issue_get(args : Array[String]) -> Unit raise Error {
   match val.parent_id {
     Some(pid) =>
       match hub.get_issue(objects, pid) {
-        Some(parent) =>
-          print_line("parent: #\{parent.id} \{parent.title}")
+        Some(parent) => print_line("parent: #\{parent.id} \{parent.title}")
         None => print_line("parent: #\{pid} (not found)")
       }
     None => ()
@@ -566,7 +565,7 @@ async fn handle_hub_work_item_get(args : Array[String]) -> Unit raise Error {
     raise @bitcore.GitError::InvalidObject("Work item id is required")
   }
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, _clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
   let work_item = hub.get_work_item(objects, id)
@@ -663,7 +662,7 @@ async fn handle_hub_issue_create(args : Array[String]) -> Unit raise Error {
   }
   let issue_body = body.unwrap_or("")
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let hub = init_hub_store(objects, refs)
   let issue = hub.create_issue(
@@ -768,7 +767,7 @@ async fn handle_hub_issue_update(args : Array[String]) -> Unit raise Error {
     None
   }
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let hub = init_hub_store(objects, refs)
   let issue = hub.update_issue(
@@ -806,7 +805,7 @@ async fn handle_hub_issue_close(args : Array[String]) -> Unit raise Error {
     raise @bitcore.GitError::InvalidObject("Issue id is required")
   }
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let hub = init_hub_store(objects, refs)
   hub.close_issue(objects, refs, clock, id)
@@ -835,7 +834,7 @@ async fn handle_hub_issue_reopen(args : Array[String]) -> Unit raise Error {
     raise @bitcore.GitError::InvalidObject("Issue id is required")
   }
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let hub = init_hub_store(objects, refs)
   hub.reopen_issue(objects, refs, clock, id)
@@ -922,7 +921,7 @@ async fn handle_hub_issue_comment_add(args : Array[String]) -> Unit raise Error 
     raise @bitcore.GitError::InvalidObject("Missing --body")
   }
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let hub = init_hub_store(objects, refs)
   let comment = hub.add_issue_comment(
@@ -961,7 +960,7 @@ async fn handle_hub_issue_comment_list(
     raise @bitcore.GitError::InvalidObject("Issue id is required")
   }
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, _clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
   let comments = hub.list_issue_comments(objects, id)
@@ -983,7 +982,7 @@ async fn handle_hub_issue_link(args : Array[String]) -> Unit raise Error {
   let issue_id = args[0]
   let pr_id = args[1]
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let hub = init_hub_store(objects, refs)
   hub.link_pr_to_issue(objects, refs, clock, issue_id, pr_id)
@@ -1160,7 +1159,7 @@ fn resolve_claim_remote_url(
     Some(url) => url
     None => {
       let root = get_work_root()
-      let git_dir = root + "/.git"
+      let git_dir = resolve_hub_git_dir(root)
       let fs = OsFs::new()
       match get_effective_remote_url(fs, git_dir) {
         Some(url) => url
@@ -1301,7 +1300,7 @@ async fn handle_hub_issue_search(args : Array[String]) -> Unit raise Error {
 ///|
 async fn handle_hub_issue_init(_args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
-  let git_dir = root + "/.git"
+  let git_dir = resolve_hub_git_dir(root)
   ensure_hub_initialized(git_dir)
   print_line("Initialized hub metadata")
 }
