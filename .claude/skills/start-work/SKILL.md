@@ -142,7 +142,6 @@ bit issue close <id>
 ## Commands Reference
 
 ```bash
-bit issue init                            # first-time setup
 bit issue create --title "..." --label "..." --body "..."
 bit issue list [--open] [--closed] [--all] [--label <name>] [--parent <id>]
 bit issue view <id>

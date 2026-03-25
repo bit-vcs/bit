@@ -504,7 +504,7 @@ async fn handle_hub_issue_import(args : Array[String]) -> Unit raise Error {
     return ()
   }
   let (objects, refs, clock) = make_hub_stores(git_dir)
-  let hub = init_hub_store(objects, refs)
+  let hub = load_hub_store(objects, refs)
   let stats = hub.import_issues(objects, refs, clock, issues)
   print_line(
     "Imported issues: created \{stats.created()}, updated \{stats.updated()}",
@@ -686,7 +686,7 @@ async fn handle_hub_issue_create(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, clock) = make_hub_stores(git_dir)
-  let hub = init_hub_store(objects, refs)
+  let hub = load_hub_store(objects, refs)
   let issue = hub.create_issue(
     objects,
     refs,
@@ -791,7 +791,7 @@ async fn handle_hub_issue_update(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, clock) = make_hub_stores(git_dir)
-  let hub = init_hub_store(objects, refs)
+  let hub = load_hub_store(objects, refs)
   let issue = hub.update_issue(
     objects,
     refs,
@@ -829,7 +829,7 @@ async fn handle_hub_issue_close(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, clock) = make_hub_stores(git_dir)
-  let hub = init_hub_store(objects, refs)
+  let hub = load_hub_store(objects, refs)
   hub.close_issue(objects, refs, clock, id)
   print_line("Closed issue #\{id}")
 }
@@ -858,7 +858,7 @@ async fn handle_hub_issue_reopen(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, clock) = make_hub_stores(git_dir)
-  let hub = init_hub_store(objects, refs)
+  let hub = load_hub_store(objects, refs)
   hub.reopen_issue(objects, refs, clock, id)
   print_line("Reopened issue #\{id}")
 }
@@ -945,7 +945,7 @@ async fn handle_hub_issue_comment_add(args : Array[String]) -> Unit raise Error 
   let root = get_work_root()
   let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, clock) = make_hub_stores(git_dir)
-  let hub = init_hub_store(objects, refs)
+  let hub = load_hub_store(objects, refs)
   let comment = hub.add_issue_comment(
     objects,
     refs,
@@ -1006,7 +1006,7 @@ async fn handle_hub_issue_link(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, clock) = make_hub_stores(git_dir)
-  let hub = init_hub_store(objects, refs)
+  let hub = load_hub_store(objects, refs)
   hub.link_pr_to_issue(objects, refs, clock, issue_id, pr_id)
   print_line("Linked PR #\{pr_id} to issue #\{issue_id}")
 }

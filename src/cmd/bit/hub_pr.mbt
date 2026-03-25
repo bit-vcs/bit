@@ -336,7 +336,7 @@ async fn handle_hub_pr_import(args : Array[String]) -> Unit raise Error {
     return ()
   }
   let (objects, refs, clock) = make_hub_stores(git_dir)
-  let hub = init_hub_store(objects, refs)
+  let hub = load_hub_store(objects, refs)
   let stats = hub.import_prs(objects, refs, clock, prs)
   print_line(
     "Imported PRs: created \{stats.created()}, updated \{stats.updated()}",
@@ -374,7 +374,7 @@ async fn handle_hub_pr_import_proposal(
   let root = get_work_root()
   let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, clock) = make_hub_stores(git_dir)
-  let hub = init_hub_store(objects, refs)
+  let hub = load_hub_store(objects, refs)
   let proposals = hub.list_pr_proposals(objects)
   let mut selected : @hub.PullRequest? = None
   for proposal in proposals {
@@ -649,7 +649,7 @@ async fn handle_hub_pr_create(args : Array[String]) -> Unit raise Error {
       }
     None => Some(normalize_branch_ref(options.source_branch))
   }
-  let hub = init_hub_store(objects, refs)
+  let hub = load_hub_store(objects, refs)
   let pr = hub.create_pr(
     objects,
     refs,
@@ -685,7 +685,7 @@ async fn handle_hub_pr_propose(args : Array[String]) -> Unit raise Error {
       }
     None => Some(normalize_branch_ref(options.source_branch))
   }
-  let hub = init_hub_store(objects, refs)
+  let hub = load_hub_store(objects, refs)
   let proposal = hub.propose_pr(
     objects,
     refs,
@@ -785,7 +785,7 @@ async fn handle_hub_pr_update(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, clock) = make_hub_stores(git_dir)
-  let hub = init_hub_store(objects, refs)
+  let hub = load_hub_store(objects, refs)
   let pr = hub.update_pr(
     objects,
     refs,
@@ -822,7 +822,7 @@ async fn handle_hub_pr_close(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, clock) = make_hub_stores(git_dir)
-  let hub = init_hub_store(objects, refs)
+  let hub = load_hub_store(objects, refs)
   hub.close_pr(objects, refs, clock, id)
   print_line("Closed PR #\{id}")
 }
@@ -851,7 +851,7 @@ async fn handle_hub_pr_reopen(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, clock) = make_hub_stores(git_dir)
-  let hub = init_hub_store(objects, refs)
+  let hub = load_hub_store(objects, refs)
   hub.reopen_pr(objects, refs, clock, id)
   print_line("Reopened PR #\{id}")
 }
@@ -924,7 +924,7 @@ async fn handle_hub_pr_merge(args : Array[String]) -> Unit raise Error {
   let git_dir = resolve_hub_git_dir(root)
   let fs = OsFs::new()
   let (objects, refs, clock) = make_hub_stores(git_dir)
-  let hub = init_hub_store(objects, refs)
+  let hub = load_hub_store(objects, refs)
   let merge_policy = load_hub_merge_policy(fs, git_dir)
   hub.check_merge_policy(
     objects,
@@ -1072,7 +1072,7 @@ async fn handle_hub_pr_comment_add(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, clock) = make_hub_stores(git_dir)
-  let hub = init_hub_store(objects, refs)
+  let hub = load_hub_store(objects, refs)
   let comment = hub.add_comment(
     objects,
     refs,
@@ -1250,7 +1250,7 @@ async fn handle_hub_pr_review_submit(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, clock) = make_hub_stores(git_dir)
-  let hub = init_hub_store(objects, refs)
+  let hub = load_hub_store(objects, refs)
   let review = hub.submit_review(
     objects,
     refs,
@@ -1445,7 +1445,7 @@ async fn handle_hub_pr_workflow_submit(
   let root = get_work_root()
   let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, clock) = make_hub_stores(git_dir)
-  let hub = init_hub_store(objects, refs)
+  let hub = load_hub_store(objects, refs)
   let workflow = hub.record_pr_workflow(
     objects,
     refs,

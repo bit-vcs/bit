@@ -123,20 +123,8 @@ fn make_hub_stores(
 }
 
 ///|
+/// Load hub store, auto-initializing if needed.
 fn load_hub_store(
-  objects : &@bitlib.ObjectStore,
-  refs : &@bitlib.RefStore,
-) -> @hub.Hub raise @bitcore.GitError {
-  @hub.Hub::load(
-    objects,
-    refs,
-    signing_key=get_hub_signing_key(),
-    require_signed=get_hub_require_signed(),
-  )
-}
-
-///|
-fn init_hub_store(
   objects : &@bitlib.ObjectStore,
   refs : &@bitlib.RefStore,
 ) -> @hub.Hub raise @bitcore.GitError {
@@ -152,7 +140,7 @@ fn init_hub_store(
 fn ensure_hub_initialized(git_dir : String) -> Unit raise @bitcore.GitError {
   let fs = OsFs::new()
   let (objects, refs, _clock) = make_hub_stores(git_dir)
-  let _ = init_hub_store(objects, refs)
+  let _ = load_hub_store(objects, refs)
   ensure_hub_merge_policy_file(fs, git_dir)
 }
 
@@ -167,7 +155,7 @@ async fn handle_hub_init(args : Array[String]) -> Unit raise Error {
   let git_dir = resolve_hub_git_dir(root)
   let fs = OsFs::new()
   let (objects, refs, _clock) = make_hub_stores(git_dir)
-  let _ = init_hub_store(objects, refs)
+  let _ = load_hub_store(objects, refs)
   ensure_hub_merge_policy_file(fs, git_dir)
   print_line("Initialized hub metadata")
 }
