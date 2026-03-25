@@ -1,81 +1,80 @@
 # Sub-Issues
 
-bit hub の Issue は親子関係（sub-issue）をサポートしている。
-大きなタスクを小さな単位に分解し、進捗を追跡できる。
+bit hub issues support parent-child relationships (sub-issues), allowing you to break large tasks into smaller units and track progress.
 
-## 作成
+## Creating Sub-Issues
 
-`--parent` (`-p`) で親 Issue の ID を指定する。
+Use `--parent` (`-p`) to specify the parent issue ID.
 
 ```bash
-# 親 Issue を作成
-bit issue create --title "認証リファクタリング"
+# Create a parent issue
+bit issue create --title "Auth refactoring"
 
-# sub-issue を作成
-bit issue create --title "トークン検証の修正" --parent <parent-id>
-bit issue create --title "セッション管理の改善" -p <parent-id>
+# Create sub-issues
+bit issue create --title "Fix token validation" --parent <parent-id>
+bit issue create --title "Improve session management" -p <parent-id>
 ```
 
-`--parent=<id>` 形式も使える。
+The `--parent=<id>` form is also supported.
 
-## 一覧
+## Listing Issues
 
-デフォルトでは top-level（親を持たない）Issue のみ表示される。
+By default, only top-level issues (those without a parent) are shown.
 
 ```bash
-# top-level のみ（デフォルト）
+# Top-level only (default)
 bit issue list
 
-# 全 Issue（sub-issue 含む）
+# All issues including sub-issues
 bit issue list --all
 
-# 特定の親の sub-issue のみ
+# Sub-issues of a specific parent only
 bit issue list --parent <parent-id>
 ```
 
-`--state open` / `--state closed` と組み合わせ可能。
+Can be combined with `--state open` / `--state closed`.
 
-## 詳細表示
+## Viewing Details
 
-`bit issue get` は親情報と sub-issue の一覧を自動的に表示する。
+`bit issue get` automatically displays parent info and sub-issues.
 
 ```bash
 bit issue get <id>
 ```
 
-出力例:
+Example output for a parent issue:
 
 ```
 id iss-abc123
-title 認証リファクタリング
+title Auth refactoring
 state open
 ...
 sub-issues:
-  #iss-def456 [open] トークン検証の修正
-  #iss-ghi789 [closed] セッション管理の改善
+  #iss-def456 [open] Fix token validation
+  #iss-ghi789 [closed] Improve session management
 ```
 
-子 Issue の場合は親情報が表示される:
+For a child issue, parent info is shown:
 
 ```
 id iss-def456
-title トークン検証の修正
+title Fix token validation
 state open
 parent iss-abc123
 ...
-parent: #iss-abc123 認証リファクタリング
+parent: #iss-abc123 Auth refactoring
 ```
 
-## データモデル
+## Data Model
 
-- Issue に `parent_id : String?` フィールドが追加されている
-- シリアライズ形式: `parent <id>` ヘッダ行（parent_id がある場合のみ出力）
-- 既存の Issue（parent なし）との後方互換性あり
-- close / reopen / update 操作で parent_id は保持される
-- 子の自動 close（親 close 時）はスコープ外
+- Issue has a `parent_id : String?` field
+- Serialized as a `parent <id>` header line (only when parent_id is set)
+- Backward compatible with existing issues that have no parent
+- `parent_id` is preserved through close / reopen / update operations
+- Auto-closing children when a parent is closed is out of scope
 
-## 制限事項
+## Limitations
 
-- 深さ制限の強制なし（多段ネスト可能だが推奨しない）
-- reparenting（親の変更）は未対応
-- tree 表示モードは未実装
+- No depth limit enforced (deep nesting is possible but not recommended)
+- Reparenting (changing the parent) is not supported
+- Tree view mode is not implemented
