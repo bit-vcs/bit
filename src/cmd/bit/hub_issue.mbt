@@ -264,10 +264,11 @@ async fn handle_hub_issue_list(args : Array[String]) -> Unit raise Error {
     handle_hub_work_item_list(args)
     return ()
   }
-  // Parse --all, --parent, and --label flags
+  // Parse --all, --parent, --label, and --format flags
   let mut show_all = false
   let mut filter_parent : String? = None
   let filter_labels : Array[String] = []
+  let mut format_json = false
   let mut j = 0
   while j < args.length() {
     match args[j] {
@@ -288,6 +289,22 @@ async fn handle_hub_issue_list(args : Array[String]) -> Unit raise Error {
         filter_labels.push(
           String::unsafe_substring(args[j], start=8, end=args[j].length()),
         )
+      "--format" if j + 1 < args.length() => {
+        if args[j + 1] == "json" {
+          format_json = true
+        }
+        j += 1
+      }
+      _ if args[j].has_prefix("--format=") => {
+        let val = String::unsafe_substring(
+          args[j],
+          start=9,
+          end=args[j].length(),
+        )
+        if val == "json" {
+          format_json = true
+        }
+      }
       _ => ()
     }
     j += 1
@@ -339,13 +356,27 @@ async fn handle_hub_issue_list(args : Array[String]) -> Unit raise Error {
     issues.length()
   }
   if limit == 0 {
-    print_line("No issues")
+    if format_json {
+      print_line("[]")
+    } else {
+      print_line("No issues")
+    }
     return ()
   }
-  let mut i = 0
-  while i < limit {
-    issues[i] |> format_issue_summary |> print_line
-    i += 1
+  if format_json {
+    let parts : Array[String] = []
+    let mut i = 0
+    while i < limit {
+      parts.push(format_issue_json(issues[i]))
+      i += 1
+    }
+    print_line("[" + parts.join(",") + "]")
+  } else {
+    let mut i = 0
+    while i < limit {
+      issues[i] |> format_issue_summary |> print_line
+      i += 1
+    }
   }
 }
 
@@ -518,16 +549,33 @@ async fn handle_hub_issue_get(args : Array[String]) -> Unit raise Error {
     return ()
   }
   let mut issue_id : String? = None
+  let mut format_json = false
   for arg in args {
-    if arg.has_prefix("-") {
-      warn_unimplemented_arg("issue get", arg)
-      continue
+    match arg {
+      "--format" => ()
+      "json" if format_json == false && issue_id is Some(_) => format_json = true
+      _ if arg.has_prefix("--format=") => {
+        let val = String::unsafe_substring(arg, start=9, end=arg.length())
+        if val == "json" {
+          format_json = true
+        }
+      }
+      _ if arg.has_prefix("-") => warn_unimplemented_arg("issue get", arg)
+      _ =>
+        if issue_id is None {
+          issue_id = Some(arg)
+        } else {
+          warn_unimplemented_arg("issue get", arg)
+        }
     }
-    if issue_id is None {
-      issue_id = Some(arg)
-    } else {
-      warn_unimplemented_arg("issue get", arg)
+  }
+  // Re-parse --format json (two-token form)
+  let mut i = 0
+  while i < args.length() {
+    if args[i] == "--format" && i + 1 < args.length() && args[i + 1] == "json" {
+      format_json = true
     }
+    i += 1
   }
   guard issue_id is Some(id) else {
     raise @bitcore.GitError::InvalidObject("Issue id is required")
@@ -539,6 +587,10 @@ async fn handle_hub_issue_get(args : Array[String]) -> Unit raise Error {
   let issue = hub.get_issue(objects, id)
   guard issue is Some(val) else {
     raise @bitcore.GitError::InvalidObject("Issue not found: \{id}")
+  }
+  if format_json {
+    print_line(format_issue_json(val))
+    return ()
   }
   print_line(val.serialize())
   // Show parent info

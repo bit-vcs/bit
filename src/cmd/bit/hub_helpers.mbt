@@ -359,6 +359,62 @@ fn format_issue_summary(issue : @hub.Issue) -> String {
 }
 
 ///|
+fn format_issue_json(issue : @hub.Issue) -> String {
+  let labels = issue.labels()
+  let label_parts : Array[String] = []
+  for label in labels {
+    label_parts.push(json_escape_string(label))
+  }
+  let assignees = issue.assignees()
+  let assignee_parts : Array[String] = []
+  for a in assignees {
+    assignee_parts.push(json_escape_string(a))
+  }
+  let linked = issue.linked_prs()
+  let linked_parts : Array[String] = []
+  for p in linked {
+    linked_parts.push(json_escape_string(p))
+  }
+  let parent = match issue.parent_id {
+    Some(pid) => json_escape_string(pid)
+    None => "null"
+  }
+  let buf = StringBuilder::new()
+  buf.write_string("{")
+  buf.write_string("\"id\":" + json_escape_string(issue.id()))
+  buf.write_string(",\"title\":" + json_escape_string(issue.title()))
+  buf.write_string(",\"state\":" + json_escape_string(issue.state().to_string()))
+  buf.write_string(",\"author\":" + json_escape_string(issue.author()))
+  buf.write_string(",\"created_at\":" + issue.created_at().to_string())
+  buf.write_string(",\"updated_at\":" + issue.updated_at().to_string())
+  buf.write_string(",\"body\":" + json_escape_string(issue.body()))
+  buf.write_string(",\"labels\":[" + label_parts.join(",") + "]")
+  buf.write_string(",\"assignees\":[" + assignee_parts.join(",") + "]")
+  buf.write_string(",\"linked_prs\":[" + linked_parts.join(",") + "]")
+  buf.write_string(",\"parent_id\":" + parent)
+  buf.write_string("}")
+  buf.to_string()
+}
+
+///|
+fn json_escape_string(s : String) -> String {
+  let buf = StringBuilder::new()
+  buf.write_string("\"")
+  for ch in s {
+    match ch {
+      '"' => buf.write_string("\\\"")
+      '\\' => buf.write_string("\\\\")
+      '\n' => buf.write_string("\\n")
+      '\r' => buf.write_string("\\r")
+      '\t' => buf.write_string("\\t")
+      _ => buf.write_char(ch)
+    }
+  }
+  buf.write_string("\"")
+  buf.to_string()
+}
+
+///|
 fn format_work_item_summary(item : @hub.WorkItem) -> String {
   let id = item.id()
   let title = item.title()
