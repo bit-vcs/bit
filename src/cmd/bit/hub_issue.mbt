@@ -264,9 +264,10 @@ async fn handle_hub_issue_list(args : Array[String]) -> Unit raise Error {
     handle_hub_work_item_list(args)
     return ()
   }
-  // Parse --all and --parent flags
+  // Parse --all, --parent, and --label flags
   let mut show_all = false
   let mut filter_parent : String? = None
+  let filter_labels : Array[String] = []
   let mut j = 0
   while j < args.length() {
     match args[j] {
@@ -278,6 +279,14 @@ async fn handle_hub_issue_list(args : Array[String]) -> Unit raise Error {
       _ if args[j].has_prefix("--parent=") =>
         filter_parent = Some(
           String::unsafe_substring(args[j], start=9, end=args[j].length()),
+        )
+      "--label" | "-l" if j + 1 < args.length() => {
+        filter_labels.push(args[j + 1])
+        j += 1
+      }
+      _ if args[j].has_prefix("--label=") =>
+        filter_labels.push(
+          String::unsafe_substring(args[j], start=8, end=args[j].length()),
         )
       _ => ()
     }
@@ -292,9 +301,22 @@ async fn handle_hub_issue_list(args : Array[String]) -> Unit raise Error {
   let (objects, refs, _clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
   let all_issues = hub.list_issues(objects, state~)
-  // Filter by parent
+  // Filter by parent and label
   let issues : Array[@hub.Issue] = []
   for issue in all_issues {
+    // Label filter: issue must have all specified labels
+    if filter_labels.length() > 0 {
+      let mut has_all = true
+      for label in filter_labels {
+        if not(issue.labels.contains(label)) {
+          has_all = false
+          break
+        }
+      }
+      if not(has_all) {
+        continue
+      }
+    }
     match filter_parent {
       Some(pid) =>
         // Show only children of specified parent
