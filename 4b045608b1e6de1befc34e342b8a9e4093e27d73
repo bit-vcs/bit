@@ -1,0 +1,18 @@
+version 1
+key hub/work-item/bd8419b8/meta
+kind work-item
+clock test <test@example.com>=1
+timestamp 1774441608
+node test <test@example.com>
+deleted 0
+
+work-item bd8419b8
+title Complex rename chains (tests 17-19, 24)
+author test <test@example.com>
+created 1774441608
+updated 1774441608
+state open
+label P0
+label merge
+
+rename/add/delete, rename/rename(2to1)/delete/delete, rename chain combinations
