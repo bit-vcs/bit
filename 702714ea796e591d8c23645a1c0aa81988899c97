@@ -1,0 +1,18 @@
+version 1
+key hub/work-item/e2fb9b4c/meta
+kind work-item
+clock test <test@example.com>=1
+timestamp 1774441715
+node test <test@example.com>
+deleted 0
+
+work-item e2fb9b4c
+title pack-objects 高速化
+author test <test@example.com>
+created 1774441715
+updated 1774441715
+state open
+label P2
+label perf
+
+500obj bit=1970ms vs git=101ms (19.5x)
