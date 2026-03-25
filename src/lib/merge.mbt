@@ -168,6 +168,7 @@ pub fn merge(
   let merged = file_result.merged
   let conflicts = file_result.conflicts
   let all_conflict_types = file_result.conflict_types
+  let rename_conflict_stages : Map[String, (TreeFileEntry, TreeFileEntry)] = {}
   // Try content-level merge for files modified on both sides
   for candidate in file_result.needs_content_merge {
     let base_content = match candidate.base_id {
@@ -210,11 +211,42 @@ pub fn merge(
       let content_bytes = @utf8.encode(result.content)
       let (blob_id, compressed) = @bit.create_blob(content_bytes)
       write_object_bytes(fs, git_dir, blob_id, compressed)
-      merged[candidate.path] = { id: blob_id, mode: candidate.mode }
+      // If this path has a rename/add conflict, store resolved as stage 2
+      if all_conflict_types.get(candidate.path).unwrap_or("") == "rename/add" {
+        let resolved_entry : TreeFileEntry = {
+          id: blob_id,
+          mode: candidate.mode,
+        }
+        // Find theirs' independently added file for stage 3
+        let theirs_added = match theirs.get(candidate.path) {
+          Some(e) => e
+          None => resolved_entry
+        }
+        rename_conflict_stages[candidate.path] = (resolved_entry, theirs_added)
+        // Write conflict markers for worktree
+        let ours_text = merge_get_blob_text(db, rfs, blob_id)
+        let theirs_text = match theirs.get(candidate.path) {
+          Some(e) => merge_get_blob_text(db, rfs, e.id)
+          None => ""
+        }
+        let conflict_result = @diff3.content_merge(
+          "",
+          ours_text,
+          theirs_text,
+          @diff3.ContentMergeOptions::default().with_labels(
+            ours=ours_label, base="", theirs=theirs_label,
+          ),
+        )
+        let full_path = join_path(root, candidate.path)
+        let dir = rebase_parent_dir(full_path)
+        fs.mkdir_p(dir)
+        fs.write_string(full_path, conflict_result.content)
+      } else {
+        merged[candidate.path] = { id: blob_id, mode: candidate.mode }
+      }
     }
   }
   // Handle rename/rename(2to1) conflicts
-  let rename_2to1_stages : Map[String, (TreeFileEntry, TreeFileEntry)] = {}
   for candidate in file_result.rename_2to1 {
     // Resolve ours side: merge(base[ours_old], ours[path], theirs[ours_old])
     let ours_base_id = base_files.get(candidate.ours_old_path).map(fn(e) { e.id })
@@ -287,7 +319,7 @@ pub fn merge(
       conflicts.push(candidate.path)
       all_conflict_types[candidate.path] = "rename/rename"
       // Store stage entries for index
-      rename_2to1_stages[candidate.path] = (
+      rename_conflict_stages[candidate.path] = (
         { id: ours_blob_id, mode: candidate.mode },
         { id: theirs_blob_id, mode: candidate.mode },
       )
@@ -311,7 +343,7 @@ pub fn merge(
       theirs,
       merged,
       conflicts,
-      rename_2to1_stages,
+      rename_conflict_stages,
     )
     write_index_stage_entries(fs, git_dir, entries)
     fs.write_string(git_dir + "/MERGE_HEAD", target.to_hex() + "\n")
@@ -885,15 +917,21 @@ fn merge_conflicted_index_entries_with_renames(
   theirs : Map[String, TreeFileEntry],
   merged : Map[String, TreeFileEntry],
   conflicts : Array[String],
-  rename_2to1_stages : Map[String, (TreeFileEntry, TreeFileEntry)],
+  rename_conflict_stages : Map[String, (TreeFileEntry, TreeFileEntry)],
 ) -> Array[IndexStageEntry] raise @bit.GitError {
   let out : Array[IndexStageEntry] = []
+  let conflict_set : Map[String, Bool] = {}
+  for path in conflicts {
+    conflict_set[path] = true
+  }
   let merged_entries = tree_files_to_index(db, fs, merged)
   for entry in merged_entries {
-    out.push({ entry, stage: 0 })
+    if not(conflict_set.contains(entry.path)) {
+      out.push({ entry, stage: 0 })
+    }
   }
   for path in conflicts {
-    match rename_2to1_stages.get(path) {
+    match rename_conflict_stages.get(path) {
       Some(stages) => {
         // rename/rename(2to1): stage 2 = resolved ours, stage 3 = resolved theirs
         let (ours_stage, theirs_stage) = stages
