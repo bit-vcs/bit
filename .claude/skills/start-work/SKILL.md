@@ -1,18 +1,19 @@
 ---
 name: start-work
-description: "Manage implementation sessions with worktree isolation and bit issue coordination. Use when: starting non-trivial code changes, resuming previous work, entering plan mode, creating branches, or doing parallel work. Triggers on keywords: worktree, bit issue, session, parallel work, resume, continue."
+description: "Manage implementation sessions with bit issue coordination. Use when: starting non-trivial code changes, resuming previous work, entering plan mode, creating branches, or doing parallel work. Triggers on keywords: bit issue, session, parallel work, resume, continue."
 ---
 
-# Worktree Session Coordination
+# Session Coordination with bit issue
 
-Coordinate parallel Claude Code sessions using `bit issue` and git worktrees. Each session declares Target Files via a bit issue so other sessions can detect and avoid file conflicts.
+Coordinate parallel coding sessions using `bit issue`. Each session declares its Target Files via an issue so other sessions can detect and avoid file conflicts.
 
-`bit issue` works transparently from any worktree — no `GIT_DIR` workaround needed.
+This protocol is harness-agnostic — it works with any worktree setup, branch-based workflow, or single-repo workflow. Worktree creation and removal are the caller's responsibility.
+
+`bit issue` works transparently from any worktree.
 
 ## Decide: New Session or Resume
 
 ```bash
-# Check for existing open sessions
 bit issue list --open
 ```
 
@@ -23,20 +24,15 @@ bit issue list --open
 
 ## New Session
 
-### 1. Read the Plan
+### 1. Read the Plan (if available)
 
-Plan files are `.gitignore`d. Read **before** entering the worktree, or via main repo absolute path.
+If a plan file exists, read it before starting work. Plans may be `.gitignore`d and unavailable from worktrees — read from the main repo path if needed.
 
-```bash
-ls -t <main-repo-path>/plans/*.md 2>/dev/null | head -1
-```
+### 2. Declare Scope
 
-### 2. Enter Worktree & Declare Scope
-
-After worktree creation, create a bit issue. Use `bit issue list --open --label "session:<branch>"` to count existing issues and assign the next sequence number.
+Create a bit issue declaring your session and Target Files. Use `bit issue list --open --label "session:<branch>"` to count existing issues and assign the next sequence number.
 
 ```bash
-# Count existing issues for this session to determine next seq number
 bit issue list --open --label "session:<branch-name>"
 # → N issues found → next seq = N+1
 
@@ -47,8 +43,6 @@ bit issue create \
 ## Session Info
 
 - **branch**: <branch-name>
-- **worktree**: <worktree-absolute-path>
-- **seq**: <seq>
 
 ## Target Files
 
@@ -88,7 +82,7 @@ bit issue comment add <id> --body "Target added: path/to/new.ts (modify) — rea
 
 ### 5. Complete
 
-Close the issue **before** removing the worktree.
+Close the issue when done.
 
 ```bash
 bit issue comment add <id> --body "Done: <summary>"
@@ -112,20 +106,18 @@ bit issue list --open
 ```bash
 bit issue view <id>              # plan + target files
 bit issue comment list <id>      # scope changes + progress
-git worktree list                # verify worktree exists
 ```
 
 ### 3. Continue
 
-- **Worktree exists** → `cd` into it, continue work
-- **Worktree gone** → create new worktree on same branch, issue context still valid
+The issue body contains the original plan and Target Files. Comments track scope changes and progress.
 
 ### 4. Clean Up Orphans
 
-If a session's worktree is gone with no committed work:
+If a session's work environment is gone with no committed work:
 
 ```bash
-bit issue comment add <id> --body "Orphan: worktree removed"
+bit issue comment add <id> --body "Orphan: session abandoned"
 bit issue close <id>
 ```
 
@@ -137,7 +129,7 @@ bit issue close <id>
 |-----------|----------|
 | bit command fails | Notify user, continue without coordination |
 | bit not installed | Solo mode — skip coordination |
-| Orphan issue | `git worktree list` to verify, exclude from overlap detection |
+| Orphan issue | Verify session is still active, exclude from overlap detection if not |
 
 ## Commands Reference
 
