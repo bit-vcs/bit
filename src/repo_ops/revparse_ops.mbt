@@ -687,7 +687,7 @@ fn resolve_index_stage_entry(
     for i in 0..<actual_len {
       if path_start + i < data.length() {
         entry_path_buf.write_char(
-          Char::from_int(data[path_start + i].to_int()),
+          data[path_start + i].to_int().unsafe_to_char(),
         )
       }
     }

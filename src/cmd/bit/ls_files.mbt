@@ -747,8 +747,6 @@ struct SubmoduleInfo {
 ///|
 struct LsFilesTrackedEntry {
   path : String
-  mode : Int
-  id : @bitcore.ObjectId
 }
 
 ///|
@@ -771,26 +769,26 @@ fn ls_files_collect_cached_entries(
   }
   if not(recurse_submodules) {
     return entries.map(fn(entry) {
-      { path: prefix + entry.path, mode: entry.mode, id: entry.id }
+      { path: prefix + entry.path }
     })
   }
   let submodules = parse_gitmodules(fs, root)
   let out : Array[LsFilesTrackedEntry] = []
   for entry in entries {
     if entry.mode != 0o160000 {
-      out.push({ path: prefix + entry.path, mode: entry.mode, id: entry.id })
+      out.push({ path: prefix + entry.path })
       continue
     }
     match ls_files_find_submodule_by_path(submodules, entry.path) {
       Some(submodule) => {
         if not(ls_files_submodule_is_active(fs, git_dir, submodule.name)) {
-          out.push({ path: prefix + entry.path, mode: entry.mode, id: entry.id })
+          out.push({ path: prefix + entry.path })
           continue
         }
         let sub_root = root + "/" + submodule.path
         let sub_git_marker = sub_root + "/.git"
         if not(fs.is_dir(sub_git_marker)) && not(fs.is_file(sub_git_marker)) {
-          out.push({ path: prefix + entry.path, mode: entry.mode, id: entry.id })
+          out.push({ path: prefix + entry.path })
           continue
         }
         let sub_git_dir = @bitlib.resolve_gitdir(fs, sub_git_marker)
@@ -807,7 +805,7 @@ fn ls_files_collect_cached_entries(
         }
       }
       None =>
-        out.push({ path: prefix + entry.path, mode: entry.mode, id: entry.id })
+        out.push({ path: prefix + entry.path })
     }
   }
   out
