@@ -2,27 +2,27 @@
 
 ## Overview
 
-`src/x/agent/llm/` は LLM ベースのコーディングエージェントシステム。
-ファイル操作・コマンド実行をツールとして LLM に提供し、タスクを自律的に遂行する。
+`src/x/agent/llm/` is an LLM-based coding agent system.
+It provides file operations and command execution as tools to the LLM, enabling autonomous task completion.
 
 ## Package Structure
 
 ```
 src/x/agent/llm/
-  runner.mbt          # エージェント実行 (build_system_prompt, run_llm_agent)
-  tools.mbt           # ツール定義 + ToolRegistry 構築
+  runner.mbt          # Agent execution (build_system_prompt, run_llm_agent)
+  tools.mbt           # Tool definitions + ToolRegistry construction
   tool_env.mbt        # ToolEnvironment trait + NativeToolEnvironment
-  loop_detect.mbt     # LoopTracker (連続呼び出し検出 + 進捗ヒューリスティック)
+  loop_detect.mbt     # LoopTracker (consecutive call detection + progress heuristic)
   coord.mbt           # CoordinationBackend trait + FileCoordinationBackend
   coord_kv.mbt        # KvStore trait + KvCoordinationBackend + BitKvAdapter
-  orchestrator.mbt    # AgentRunner trait + 並列タスク分解・実行
+  orchestrator.mbt    # AgentRunner trait + parallel task decomposition/execution
 ```
 
 ## Core Traits
 
 ### ToolEnvironment
 
-エージェントのファイル操作・コマンド実行を抽象化。
+Abstracts file operations and command execution for the agent.
 
 ```
 read_file(path) -> String
@@ -34,13 +34,13 @@ search_text(pattern, path, glob, max_results) -> String
 run_command(command, work_dir, timeout_ms) -> String
 ```
 
-実装:
-- `NativeToolEnvironment`: shell (`cat`, `printf`, `rg`, etc.) 経由
-- `TestToolEnvironment`: in-memory Map (wbtest 用)
+Implementations:
+- `NativeToolEnvironment`: via shell (`cat`, `printf`, `rg`, etc.)
+- `TestToolEnvironment`: in-memory Map (for wbtest)
 
 ### CoordinationBackend
 
-エージェント間の状態管理を抽象化。
+Abstracts state management between agents.
 
 ```
 init_session / init_agent / write_status / write_step / write_pid
@@ -48,25 +48,25 @@ write_branch / append_event / read_status / read_all_agents
 read_events_since / cleanup
 ```
 
-実装:
-- `FileCoordinationBackend`: ファイルシステムベース (shell exec)
-- `KvCoordinationBackend`: KvStore trait 経由 (git-backed KV)
+Implementations:
+- `FileCoordinationBackend`: filesystem-based (shell exec)
+- `KvCoordinationBackend`: via KvStore trait (git-backed KV)
 
 ### KvStore
 
-KV ストアの抽象化 (`coord_kv.mbt` から `@kv` 依存を隔離)。
+KV store abstraction (isolates `@kv` dependency from `coord_kv.mbt`).
 
 ```
 get_string(key) / set_string(key, value) / delete(key)
 list(prefix) / list_recursive(prefix) / commit(message)
 ```
 
-実装:
-- `BitKvAdapter`: `@kv.Kv` をラップ (`bit_kv_store()` factory)
+Implementations:
+- `BitKvAdapter`: wraps `@kv.Kv` (`bit_kv_store()` factory)
 
 ### AgentRunner
 
-エージェントプロセスの実行方式を抽象化。
+Abstracts agent process execution method.
 
 ```
 spawn_agent(config, log_file) -> String   # handle (PID or agent_id)
@@ -74,65 +74,65 @@ wait_all(session_dir, timeout, log) -> Unit
 cancel_agent(handle) -> Unit
 ```
 
-実装:
-- `ProcessAgentRunner`: nohup でバックグラウンドプロセス spawn (並列)
-- `InProcessAgentRunner`: run_llm_agent を直接呼び出し (逐次)
-- `Cloudflare submit mode`: `POST /api/v1/jobs/submit` に subtask を投入
-  - submit 後は `GET /api/v1/jobs/:job_id` を polling して `done|failed|cancelled` を監視
+Implementations:
+- `ProcessAgentRunner`: background process spawn via nohup (parallel)
+- `InProcessAgentRunner`: directly calls run_llm_agent (sequential)
+- `Cloudflare submit mode`: submits subtasks to `POST /api/v1/jobs/submit`
+  - After submission, polls `GET /api/v1/jobs/:job_id` to monitor `done|failed|cancelled`
 
 ## System Prompt
 
-`build_system_prompt` は 5 フェーズのワークフローを LLM に指示:
+`build_system_prompt` instructs the LLM with a 5-phase workflow:
 
-1. **Explore** - `list_files_recursive` 1回 + `search_text` でコード探索
-2. **Plan** - 変更対象ファイルを特定、`read_file` で確認
-3. **Implement** - `write_file` で変更 (必須)
-4. **Verify** - `run_command` でテスト・型チェック
-5. **Complete** - ツール呼び出し停止、サマリー出力
+1. **Explore** - One `list_files_recursive` call + `search_text` for code exploration
+2. **Plan** - Identify target files, confirm with `read_file`
+3. **Implement** - Make changes with `write_file` (required)
+4. **Verify** - Run tests/type checks with `run_command`
+5. **Complete** - Stop tool calls, output summary
 
-Anti-patterns セクションで禁止事項を明示:
-- 同一パスへの `list_directory` 繰り返し
-- `read_file` の同一ファイル再読み
-- 探索だけで `write_file` を呼ばない
+The anti-patterns section explicitly prohibits:
+- Repeated `list_directory` calls on the same path
+- Re-reading the same file with `read_file`
+- Only exploring without calling `write_file`
 
-`detect_project_hints(work_dir)` で MoonBit プロジェクトを自動検出し、
-`moon check --deny-warn` / `moon test` / `moon fmt` を案内。
+`detect_project_hints(work_dir)` auto-detects MoonBit projects and
+suggests `moon check --deny-warn` / `moon test` / `moon fmt`.
 
 ## Tools (7 tools)
 
-| Tool | 説明 |
+| Tool | Description |
 |------|------|
-| `read_file` | ファイル読み取り。変更前に必ず読む |
-| `write_file` | ファイル書き込み (上書き)。進捗に必須 |
-| `list_directory` | ディレクトリ一覧 (浅い)。控えめに使用 |
-| `list_files_recursive` | 再帰ファイル一覧。最初に1回だけ |
-| `search_text` | ripgrep 検索。コード発見の主要手段 |
-| `run_command` | シェルコマンド実行。検証用 |
-| `remove_file` | ファイル削除 |
+| `read_file` | Read a file. Always read before modifying |
+| `write_file` | Write a file (overwrite). Required for progress |
+| `list_directory` | List directory contents (shallow). Use sparingly |
+| `list_files_recursive` | Recursive file listing. Use only once at the start |
+| `search_text` | ripgrep search. Primary means of code discovery |
+| `run_command` | Shell command execution. For verification |
+| `remove_file` | Delete a file |
 
-全ツールは `tracked_handler` でラップされ、LoopTracker が監視。
+All tools are wrapped with `tracked_handler` and monitored by LoopTracker.
 
 ## Loop Detection
 
-`LoopTracker` は 2 種類の問題を検出:
+`LoopTracker` detects two types of issues:
 
-### 1. 連続呼び出し検出
+### 1. Consecutive Call Detection
 
-同一 `(tool_name, key_arg)` が `max_repeat` 回 (default 3) 連続 → ナッジメッセージを返却。
-ハンドラ実行をスキップし、LLM にツール結果としてナッジを提示。
+The same `(tool_name, key_arg)` called `max_repeat` times (default 3) in a row triggers a nudge message.
+Handler execution is skipped, and the nudge is presented to the LLM as the tool result.
 
-### 2. 進捗ヒューリスティック
+### 2. Progress Heuristic
 
-`write_file` なしで `write_nudge_threshold` 回 (default 10) の read-only ツール呼び出し →
-進捗ナッジを返却。`write_file` 呼び出しでカウンタリセット。
+If `write_nudge_threshold` (default 10) read-only tool calls are made without any `write_file`,
+a progress nudge is returned. The counter resets on `write_file` calls.
 
-read-only ツール: `read_file`, `list_directory`, `list_files_recursive`, `search_text`
+Read-only tools: `read_file`, `list_directory`, `list_files_recursive`, `search_text`
 
 ## Orchestrator
 
 ### Task Decomposition
 
-`plan_subtasks` が LLM にファイルスコープ付きサブタスク分解を依頼:
+`plan_subtasks` asks the LLM to decompose into file-scoped subtasks:
 
 ```json
 [
@@ -141,15 +141,15 @@ read-only ツール: `read_file`, `list_directory`, `list_files_recursive`, `sea
 ]
 ```
 
-`validate_file_overlap` でファイル重複を検出。重複があれば single task にフォールバック。
+`validate_file_overlap` detects file overlaps. If overlaps exist, it falls back to a single task.
 
 ### Execution Flow
 
 1. Plan subtasks (LLM planner)
 2. Validate file overlap
-3. `exec_mode=cloudflare` の場合: Cloudflare orchestrator に subtask を submit し、job status を polling
-4. Cloudflare payload には `static_check_only=true` / `execution_backend=deno-worker` を含め、静的検査は Cloudflare・実行は Deno Worker に委譲
-5. それ以外: worktrees + coordination directory を作成
+3. If `exec_mode=cloudflare`: submit subtasks to the Cloudflare orchestrator and poll job status
+4. Cloudflare payload includes `static_check_only=true` / `execution_backend=deno-worker`, delegating static checks to Cloudflare and execution to Deno Workers
+5. Otherwise: create worktrees + coordination directory
 6. Spawn agents via AgentRunner (process or in-process)
 7. Monitor progress (stall detection, error pattern detection)
 8. Commit changes per worktree
@@ -157,17 +157,17 @@ read-only ツール: `read_file`, `list_directory`, `list_files_recursive`, `sea
 10. Cleanup
 11. Optional: create PR
 
-`bit agent llm --orchestrate` の主なモード:
+Main modes for `bit agent llm --orchestrate`:
 
-- `--exec-mode process` (default): 既存の並列プロセス実行
-- `--exec-mode in-process`: bit プロセス内で逐次実行 (self-agent モード)
-- `--exec-mode cloudflare --orchestrator-url <url>`: Cloudflare worker orchestrator へ投入（`cloudflare-static` / `cloudflare-static-deno` / `deno-remote` alias）
+- `--exec-mode process` (default): existing parallel process execution
+- `--exec-mode in-process`: sequential execution within the bit process (self-agent mode)
+- `--exec-mode cloudflare --orchestrator-url <url>`: submit to Cloudflare worker orchestrator (`cloudflare-static` / `cloudflare-static-deno` / `deno-remote` aliases)
 
 ### Monitor Decisions
 
-- `AllDone`: 全エージェント完了
-- `CancelAgent`: 3 連続エラー or 5 分間進捗なし → kill + Cancelled
-- `Continue`: 引き続き polling
+- `AllDone`: all agents completed
+- `CancelAgent`: 3 consecutive errors or no progress for 5 minutes -> kill + Cancelled
+- `Continue`: keep polling
 
 ## Dependency Graph
 
@@ -182,16 +182,16 @@ src/x/agent/llm/
   orchestrator.mbt   -> @llmlib, @strconv
 ```
 
-`@kv`/`@bit`/`@lib` への依存は `BitKvAdapter` に隔離済み。
-`coord_kv.mbt` から `BitKvAdapter` を分離すれば、パッケージ全体が独立可能。
+The dependency on `@kv`/`@bit`/`@lib` is isolated to `BitKvAdapter`.
+Separating `BitKvAdapter` from `coord_kv.mbt` would make the entire package independent.
 
 ## Test Coverage
 
 38 tests (all native-only):
 
-- `loop_detect_wbtest.mbt`: 連続検出、リセット、キー抽出、進捗ナッジ (9 tests)
-- `runner_wbtest.mbt`: プロンプト構造、ワークフローフェーズ、アンチパターン (7 tests)
-- `tools_wbtest.mbt`: ツール実行、説明ガイダンス (8 tests)
+- `loop_detect_wbtest.mbt`: consecutive detection, reset, key extraction, progress nudge (9 tests)
+- `runner_wbtest.mbt`: prompt structure, workflow phases, anti-patterns (7 tests)
+- `tools_wbtest.mbt`: tool execution, description guidance (8 tests)
 - `tool_env_wbtest.mbt`: TestToolEnvironment mock (11 tests)
 - `coord_wbtest.mbt`: FileCoordinationBackend (tests)
 - `coord_kv_wbtest.mbt`: KvCoordinationBackend (3 tests)
@@ -221,11 +221,11 @@ orchestrator_url, orchestrator_token
 
 ## Future: moonix Integration
 
-`ToolEnvironment` を moonix の `AgentRuntime` で実装することで:
+By implementing `ToolEnvironment` via moonix's `AgentRuntime`:
 
 - Snapshot/rollback per step
 - Capability-based security
-- Effect log (全外部操作の監査証跡)
-- Fork-based exploration (複数アプローチの並列試行)
+- Effect log (audit trail of all external operations)
+- Fork-based exploration (parallel trial of multiple approaches)
 
 See `docs/moonix-agent-integration.md`.

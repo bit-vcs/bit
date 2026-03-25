@@ -2,8 +2,8 @@
 
 ## Overview
 
-`ToolEnvironment` trait を moonix の `AgentRuntime` で実装し、
-エージェントの実行環境を sandbox + snapshot/rollback 付きに移行する。
+Implement the `ToolEnvironment` trait via moonix's `AgentRuntime`,
+migrating the agent execution environment to one with sandbox + snapshot/rollback support.
 
 ## Architecture
 

@@ -1,56 +1,56 @@
 # Distributed Testing Guide
 
-このドキュメントは `bit` の agent/orchestrator/Hub まわりを、
-「分散システムとして壊れ方まで含めて」検証するための運用ガイド。
+This document is an operational guide for verifying bit's agent/orchestrator/Hub components
+as a distributed system, including failure modes.
 
-## 1. テスト層
+## 1. Test Layers
 
-1. Pure logic (高速)
-- 目的: 判定ロジックの退行検出
-- 対象: `src/x/agent/llm/*_wbtest.mbt`, `src/x/agent/agent_test.mbt`
-- 例: 停滞検知、連続エラー検知、サブタスク競合検知
+1. Pure logic (fast)
+- Purpose: Detect regressions in decision logic
+- Target: `src/x/agent/llm/*_wbtest.mbt`, `src/x/agent/agent_test.mbt`
+- Examples: Stall detection, consecutive error detection, subtask conflict detection
 
-2. Coordination/State (中速)
-- 目的: coordination dir の read/write 整合性検証
-- 対象: `src/x/agent/llm/coord_wbtest.mbt`
-- 例: event append の連番、status/step の round-trip
+2. Coordination/State (medium)
+- Purpose: Verify read/write consistency of the coordination dir
+- Target: `src/x/agent/llm/coord_wbtest.mbt`
+- Examples: Sequential numbering of event appends, status/step round-trip
 
-3. Hub/Sync contract (中速)
-- 目的: PR/Issue/Review の表現と同期契約の検証
-- 対象: `src/x/hub/*_test.mbt`, `src/x/hub/*_wbtest.mbt`, `src/x/hub/native/*_wbtest.mbt`
+3. Hub/Sync contract (medium)
+- Purpose: Verify PR/Issue/Review representation and sync contracts
+- Target: `src/x/hub/*_test.mbt`, `src/x/hub/*_wbtest.mbt`, `src/x/hub/native/*_wbtest.mbt`
 
-4. End-to-end simulation (重い)
-- 目的: モック provider を含む agent loop の疎通
-- 対象: `src/x/agent/llm/agent_e2e_wbtest.mbt`
+4. End-to-end simulation (heavy)
+- Purpose: End-to-end connectivity of the agent loop including mock providers
+- Target: `src/x/agent/llm/agent_e2e_wbtest.mbt`
 
-## 2. 重要な不変条件 (Invariants)
+## 2. Key Invariants
 
-1. Coordination event は追記され、既存 event を上書きしない
-2. 同一サブタスク集合でファイル write-scope が衝突しない
-3. agent 状態遷移は `pending -> running -> (done|failed|cancelled)` を保つ
-4. 連続エラーや長時間停滞を検知したら `cancel` 判断へ遷移する
-5. Hub の serialize/deserialize 往復で意味情報を失わない
+1. Coordination events are append-only and never overwrite existing events
+2. File write-scopes must not conflict within the same subtask set
+3. Agent state transitions maintain `pending -> running -> (done|failed|cancelled)`
+4. Consecutive errors or prolonged stalls trigger a transition to `cancel`
+5. Hub serialize/deserialize round-trips must not lose semantic information
 
-## 3. 実行コマンド
+## 3. Execution Commands
 
 ```bash
-# 分散系に絞った検証
+# Run distributed-system-focused verification
 just test-distributed
 
-# 追加で全体回帰
+# Additionally, run full regression
 just test
 just check
 ```
 
-## 4. 障害注入 (Fault Injection) の最小セット
+## 4. Minimal Fault Injection Set
 
-1. 連続 error event を注入して cancel 判定を確認
-2. step time を古くして stall 判定を確認
-3. file scope を重複させて planner の single-task fallback を確認
-4. hub sync で空/壊れた payload を入力してエラー経路を確認
+1. Inject consecutive error events and verify the cancel decision
+2. Set step time to an old value and verify stall detection
+3. Duplicate file scopes and verify the planner's single-task fallback
+4. Feed empty/corrupted payloads into hub sync and verify error paths
 
-## 5. 運用ルール
+## 5. Operational Rules
 
-1. 新しい orchestrator 仕様を追加したら、最低 1 つは失敗系テストを同時追加
-2. bugfix は「再現テスト (Red) -> 修正 (Green)」を必須にする
-3. Cloudflare/外部 LLM 依存の E2E は別ジョブで分離し、ローカルではモック中心に回す
+1. When adding a new orchestrator feature, always add at least one failure-case test simultaneously
+2. Bug fixes must follow the "reproduction test (Red) -> fix (Green)" pattern
+3. E2E tests that depend on Cloudflare/external LLMs are isolated in a separate job; local testing is primarily mock-based

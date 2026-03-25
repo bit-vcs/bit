@@ -1,45 +1,45 @@
 # bit agent - P2P Agent PR Huboration
 
-AI エージェントが自律的に PR を作成・レビュー・マージする仕組み。
+A system where AI agents autonomously create, review, and merge PRs.
 
-## 概要
+## Overview
 
-`bit agent` は、bit の hub (PR/レビュー) 基盤の上に構築されたオーケストレーション層。エージェントがタスクを受け取り、ファイル編集 → コミット → PR 作成 → push という一連の流れを自動化する。また、polling daemon として動作し、他のエージェントが作成した PR を自動でレビュー・マージすることもできる。
+`bit agent` is an orchestration layer built on top of bit's hub (PR/review) infrastructure. An agent receives a task and automates the entire flow of file editing, committing, PR creation, and pushing. It can also run as a polling daemon that automatically reviews and merges PRs created by other agents.
 
 ```
-Agent A: タスク実行 → PR 作成 → push
-Agent B: fetch → PR 検証 → レビュー submit → auto-merge → push
+Agent A: Execute task → Create PR → push
+Agent B: fetch → Verify PR → Submit review → auto-merge → push
 ```
 
-## 前提条件
+## Prerequisites
 
-- `bit` がインストール済み
-- リモートリポジトリが `bit receive-pack` を受け付けること（bit サーバーまたは git 互換サーバー）
-- `bit hub init` 済みのリポジトリ
+- `bit` is installed
+- The remote repository accepts `bit receive-pack` (bit server or git-compatible server)
+- The repository has been initialized with `bit hub init`
 
-## セットアップ
+## Setup
 
 ```bash
-# リポジトリを初期化
+# Initialize the repository
 mkdir my-repo && cd my-repo
 bit init
 bit hub init
 
-# リモートサーバーを起動（別ターミナル）
+# Start the remote server (in a separate terminal)
 cd my-repo && bit receive-pack --http :8080
 ```
 
-## コマンド
+## Commands
 
-### `bit agent run` - タスク実行
+### `bit agent run` - Task Execution
 
-JSON ファイルで定義されたタスクを実行し、PR を作成して push する。
+Executes a task defined in a JSON file, creates a PR, and pushes it.
 
 ```bash
 bit agent run --task task.json --remote http://localhost:8080
 ```
 
-#### タスク JSON フォーマット
+#### Task JSON Format
 
 ```json
 {
@@ -62,26 +62,26 @@ bit agent run --task task.json --remote http://localhost:8080
 }
 ```
 
-| フィールド | 必須 | 説明 |
+| Field | Required | Description |
 |---|---|---|
-| `id` | yes | タスクの一意な ID |
-| `description` | no | コミットメッセージに使われる説明 |
-| `pr_title` | no | PR タイトル（デフォルト: id） |
-| `pr_body` | no | PR 本文 |
-| `source_branch` | no | ソースブランチ名（デフォルト: `agent/{id}`） |
-| `edits` | no | ファイル編集の配列 |
+| `id` | yes | Unique ID for the task |
+| `description` | no | Description used in the commit message |
+| `pr_title` | no | PR title (default: id) |
+| `pr_body` | no | PR body |
+| `source_branch` | no | Source branch name (default: `agent/{id}`) |
+| `edits` | no | Array of file edits |
 
-edits の各要素:
+Each element of edits:
 
-| フィールド | 説明 |
+| Field | Description |
 |---|---|
-| `type` | `"write"` または `"delete"` |
-| `path` | ファイルパス |
-| `content` | ファイル内容（`write` 時のみ） |
+| `type` | `"write"` or `"delete"` |
+| `path` | File path |
+| `content` | File content (only for `write`) |
 
 ### `bit agent serve` - Polling Daemon
 
-定期的にリモートから hub notes を fetch し、未レビューの PR を検証してレビューを submit する。`--auto-merge` を付けると、approved な PR を自動マージして push する。
+Periodically fetches hub notes from the remote, verifies unreviewed PRs, and submits reviews. With `--auto-merge`, it automatically merges approved PRs and pushes.
 
 ```bash
 bit agent serve \
@@ -93,47 +93,47 @@ bit agent serve \
   --agent-id "ci-bot"
 ```
 
-| オプション | デフォルト | 説明 |
+| Option | Default | Description |
 |---|---|---|
-| `--remote <url>` | (必須) | リモートリポジトリの URL |
-| `--branch <name>` | `main` | 対象ブランチ |
-| `--validate <cmd>` | (なし) | PR 検証に使うシェルコマンド |
-| `--auto-merge` | off | approved PR を自動マージ |
-| `--interval <ms>` | `5000` | ポーリング間隔（ミリ秒） |
-| `--agent-id <id>` | git author | エージェントの識別子 |
+| `--remote <url>` | (required) | Remote repository URL |
+| `--branch <name>` | `main` | Target branch |
+| `--validate <cmd>` | (none) | Shell command used to validate the PR |
+| `--auto-merge` | off | Automatically merge approved PRs |
+| `--interval <ms>` | `5000` | Polling interval (milliseconds) |
+| `--agent-id <id>` | git author | Agent identifier |
 
-#### Daemon の動作サイクル
+#### Daemon Operation Cycle
 
-1. `hub_fetch` でリモートから notes を同期
-2. Open な PR を一覧
-3. 自分が author でない未レビューの PR に対して:
-   - `--validate` コマンドを実行
-   - exit 0 → Approved、それ以外 → RequestChanges としてレビュー submit
-4. `--auto-merge` が有効なら、approved な PR をマージして push
-5. `hub_push` で結果をリモートに同期
-6. `--interval` ミリ秒待機して 1 に戻る
+1. Sync notes from the remote via `hub_fetch`
+2. List open PRs
+3. For unreviewed PRs where the agent is not the author:
+   - Run the `--validate` command
+   - exit 0 → Submit review as Approved; otherwise → Submit as RequestChanges
+4. If `--auto-merge` is enabled, merge approved PRs and push
+5. Sync results to the remote via `hub_push`
+6. Wait for `--interval` milliseconds, then return to step 1
 
-### `bit agent status` - ステータス表示
+### `bit agent status` - Status Display
 
-PR の一覧と承認状態を表示する。
+Displays the list of PRs and their approval status.
 
 ```bash
 bit agent status --remote http://localhost:8080
 ```
 
-## 使用例: 2 エージェント間の自動コラボレーション
+## Usage Example: Automatic Collaboration Between 2 Agents
 
 ```bash
-# ---- 共有リポジトリを準備 ----
+# ---- Prepare the shared repository ----
 mkdir shared && cd shared
 bit init && bit hub init
-# 初期コミットを作成
+# Create an initial commit
 echo "# Project" > README.md
 bit add README.md && bit commit -m "init"
-# サーバー起動
+# Start the server
 bit receive-pack --http :8080 &
 
-# ---- Agent A: タスクを実行 ----
+# ---- Agent A: Execute the task ----
 cd /tmp && mkdir agent-a && cd agent-a
 bit clone http://localhost:8080 .
 bit hub init
@@ -154,26 +154,26 @@ EOF
 bit agent run --task task.json --remote http://localhost:8080 --agent-id agent-a
 # => PR created: xxxx
 
-# ---- Agent B: レビュー＆マージ ----
+# ---- Agent B: Review & Merge ----
 cd /tmp && mkdir agent-b && cd agent-b
 bit clone http://localhost:8080 .
 bit hub init
 
-# 1回だけ poll して自動レビュー＋マージ
+# Poll once for automatic review + merge
 bit agent serve \
   --remote http://localhost:8080 \
   --validate "echo ok" \
   --auto-merge \
   --agent-id agent-b \
-  --interval 999999  # Ctrl+C で止める
+  --interval 999999  # Stop with Ctrl+C
 
-# ---- 結果確認 ----
+# ---- Verify the result ----
 cd /tmp/shared
 bit agent status
 # => xxxx [merged] [approved] Add hello.txt (by agent-a)
 ```
 
-## アーキテクチャ
+## Architecture
 
 ```
 src/x/agent/              -- pure: workflow + policy
@@ -189,9 +189,9 @@ src/cmd/bit/
   handlers_agent.mbt      -- CLI: bit agent run/serve/status
 ```
 
-pure 層 (`src/x/agent/`) はファイルシステムやネットワークに依存せず、`&ObjectStore`, `&RefStore`, `&Clock`, `&WorkingTree` のトレイト参照のみに依存する。native 層がこれらの具体的な実装を注入する。
+The pure layer (`src/x/agent/`) does not depend on the filesystem or network; it depends only on trait references: `&ObjectStore`, `&RefStore`, `&Clock`, `&WorkingTree`. The native layer injects the concrete implementations of these.
 
-### 依存グラフ
+### Dependency Graph
 
 ```
 src/x/agent/         → @bit, @lib, @hub (pure)
@@ -199,12 +199,12 @@ src/x/agent/native/  → @agent, @hub_native, @bitfs, @osfs, @bitnative, @protoc
 src/cmd/bit/          → @agent, @agent_native (native, handlers_agent.mbt only)
 ```
 
-## 既存コンポーネントの再利用
+## Reuse of Existing Components
 
-| コンポーネント | 用途 |
+| Component | Purpose |
 |---|---|
-| `x/hub` Hub | PR 作成・マージ・レビュー・承認チェック |
-| `x/hub/native` hub_push/fetch | Notes の push/fetch |
-| `x/fs` Fs | サンドボックスファイルシステム |
-| `native` push | ブランチの push |
-| `lib` ObjectStore/RefStore/Clock/WorkingTree | DI トレイト |
+| `x/hub` Hub | PR creation, merging, review, approval checks |
+| `x/hub/native` hub_push/fetch | Notes push/fetch |
+| `x/fs` Fs | Sandboxed filesystem |
+| `native` push | Branch push |
+| `lib` ObjectStore/RefStore/Clock/WorkingTree | DI traits |

@@ -1,44 +1,44 @@
 # bit-relay Protocol Specification (Draft)
 
-## 1. 目的とスコープ
+## 1. Purpose and Scope
 
-この仕様は、`bit hub sync` が利用する relay プロトコルを定義する。  
-対象は以下。
+This specification defines the relay protocol used by `bit hub sync`.
+It covers the following:
 
-- Relay サーバーの HTTP / WebSocket API
-- `bit` クライアントの relay 利用方式（明示 relay URL と smart-http fallback）
-- `hub.record` ペイロードの最小契約
+- Relay server HTTP / WebSocket API
+- How the `bit` client uses the relay (explicit relay URL and smart-http fallback)
+- Minimum contract for `hub.record` payloads
 
-Git smart-http 自体の仕様（`/info/refs`, pack protocol）は本仕様の対象外。
+The Git smart-http specification itself (`/info/refs`, pack protocol) is out of scope.
 
-## 2. 用語
+## 2. Terminology
 
-- `Room`: relay 内の論理チャネル。既定値は `main`。
-- `Envelope`: relay で中継される 1 メッセージ。
-- `Cursor`: room 内 envelope 配列の 0-based 位置を表す整数。
-- `HubRecord`: `bit x/hub` が保持するレコード（テキストシリアライズ）。
+- `Room`: A logical channel within the relay. Default is `main`.
+- `Envelope`: A single message relayed by the relay.
+- `Cursor`: A 0-based integer representing a position in the room's envelope array.
+- `HubRecord`: A record held by `bit x/hub` (text-serialized).
 
-## 3. URL とトランスポート選択
+## 3. URL and Transport Selection
 
-`bit hub sync` は以下の URL を受け付ける。
+`bit hub sync` accepts the following URLs:
 
 - `relay+http://host[:port]`
 - `relay+https://host[:port]`
-- `relay://host[:port]`（`http://` として扱う）
-- `http://...` / `https://...`（smart-http を先に試行）
+- `relay://host[:port]` (treated as `http://`)
+- `http://...` / `https://...` (tries smart-http first)
 
-### 3.1 明示 relay
+### 3.1 Explicit Relay
 
-`relay+http(s)://...` または `relay://...` の場合、`bit` は relay API を直接利用する。
+For `relay+http(s)://...` or `relay://...`, `bit` directly uses the relay API.
 
-### 3.2 smart-http fallback
+### 3.2 Smart-http Fallback
 
-`http(s)://...` の場合、`bit` はまず smart-http push/fetch を試行する。  
-その際に **ProtocolError かつメッセージに `HTTP 404` を含む場合のみ** relay にフォールバックする。
+For `http(s)://...`, `bit` first attempts smart-http push/fetch.
+It falls back to relay **only when a ProtocolError with a message containing `HTTP 404` occurs**.
 
-## 4. Envelope スキーマ
+## 4. Envelope Schema
 
-relay が保持・返却する envelope の JSON 形は以下。
+The JSON shape of envelopes stored and returned by the relay is as follows:
 
 ```json
 {
@@ -68,11 +68,11 @@ query parameter:
 - `sender` (required)
 - `topic` (optional, default `notify`)
 - `id` (optional, default `${sender}-${Date.now()}`)
-- `sig` (optional; envelope.signature に格納)
+- `sig` (optional; stored in envelope.signature)
 
 request body:
 
-- JSON テキスト（`bit` からは object を送る）
+- JSON text (the `bit` client sends an object)
 
 response:
 
@@ -82,7 +82,7 @@ response:
 { "ok": true, "accepted": true, "cursor": 1 }
 ```
 
-`accepted=false` は重複 ID による重複受信（idempotent）を意味する。
+`accepted=false` indicates duplicate reception due to a duplicate ID (idempotent).
 
 error:
 
@@ -90,17 +90,17 @@ error:
 - `400` + `{"ok":false,"error":"unsupported topic: <topic>"}`
 - `400` + `{"ok":false,"error":"invalid json payload"}`
 
-### 重複判定
+### Duplicate Detection
 
-実装上、同一 room で同一 `id` の envelope は重複として拒否される（`accepted=false`）。
+In the implementation, an envelope with the same `id` in the same room is rejected as a duplicate (`accepted=false`).
 
 ### 5.2 `GET /api/v1/poll`
 
 query parameter:
 
 - `room` (optional, default `main`)
-- `after` (optional, default `0`, `after < 0` は `0` に正規化)
-- `limit` (optional, default `100`, `limit <= 0` は `1` に正規化)
+- `after` (optional, default `0`, `after < 0` is normalized to `0`)
+- `limit` (optional, default `100`, `limit <= 0` is normalized to `1`)
 
 response:
 
@@ -115,11 +115,11 @@ response:
 }
 ```
 
-`next_cursor = after + envelopes.length`。
+`next_cursor = after + envelopes.length`.
 
 ### 5.3 `GET /health`
 
-疎通確認用。
+Used for connectivity checks.
 
 ```json
 { "status": "ok", "service": "bit-relay" }
@@ -130,12 +130,12 @@ response:
 endpoint:
 
 - `GET /ws?room=<room>`
-- `Upgrade: websocket` 必須（なければ `426`）
+- `Upgrade: websocket` is required (returns `426` otherwise)
 
-サーバー送信:
+Server-sent messages:
 
-- 接続直後: `{"type":"ready"}`
-- `publish` が `accepted=true` のとき:
+- Immediately after connection: `{"type":"ready"}`
+- When `publish` results in `accepted=true`:
 
 ```json
 {
@@ -146,44 +146,44 @@ endpoint:
 }
 ```
 
-クライアント送信:
+Client-sent messages:
 
-- `{"type":"ping"}` を送ると `{"type":"pong"}` が返る
+- Sending `{"type":"ping"}` returns `{"type":"pong"}`
 
-## 7. `bit` クライアント契約
+## 7. `bit` Client Contract
 
 ### 7.1 Push (`bit hub sync push`)
 
-relay モード時:
+In relay mode:
 
-1. `refs/notes/hub` を読み込む（なければ失敗）
-2. `hub/` 配下レコード（削除 tombstone 含む）を列挙
-3. 各 record を次で `POST /api/v1/publish`:
+1. Read `refs/notes/hub` (fail if absent)
+2. Enumerate records under `hub/` (including deletion tombstones)
+3. `POST /api/v1/publish` for each record with:
    - `room=main`
    - `sender=bit`
    - `topic=notify`
-   - `id=<record.serialize() の blob-id(hex)>`
+   - `id=<blob-id(hex) of record.serialize()>`
    - body:
      - `{"kind":"hub.record","record":"<serialized HubRecord>"}`
-4. `accepted=true` 件数を集計
+4. Tally the count of `accepted=true` responses
 
 ### 7.2 Fetch (`bit hub sync fetch`)
 
-relay モード時:
+In relay mode:
 
-1. ローカル cursor を `.git/hub/relay-cursor/<hash(remote_base_url)>` から読む（未存在は `0`）
+1. Read the local cursor from `.git/hub/relay-cursor/<hash(remote_base_url)>` (default `0` if absent)
 2. `GET /api/v1/poll?room=main&after=<cursor>&limit=200`
-3. envelope の `payload.kind == "hub.record"` のみ取り込み
-4. `payload.record` を `HubRecord` として parse/merge
-5. 変更があれば `refs/notes/hub` にコミット
-6. `next_cursor` を保存
+3. Only process envelopes where `payload.kind == "hub.record"`
+4. Parse/merge `payload.record` as a `HubRecord`
+5. If there are changes, commit to `refs/notes/hub`
+6. Save `next_cursor`
 
-## 8. `hub.record` ペイロード
+## 8. `hub.record` Payload
 
-relay が中継する payload の `record` は、`bit` の `HubRecord::serialize()` 文字列である。  
-ヘッダ + 空行 + body 形式。
+The `record` in the payload relayed by the relay is a `bit` `HubRecord::serialize()` string.
+It follows a header + blank line + body format.
 
-例:
+Example:
 
 ```text
 version 1
@@ -197,15 +197,15 @@ deleted 0
 {"title":"relay-issue-1","body":"relay-body-1"}
 ```
 
-## 9. 互換性メモ
+## 9. Compatibility Notes
 
-- 現行 relay 実装は `topic=notify` のみ受理する。
-- 認証・署名検証は未実装（`sig` は透過保存のみ）。
-- relay は unknown envelope/payload field をそのまま保持・返却する。
+- The current relay implementation only accepts `topic=notify`.
+- Authentication and signature verification are not implemented (`sig` is stored transparently only).
+- The relay preserves and returns unknown envelope/payload fields as-is.
 
-## 10. Clone シグナリング（追加）
+## 10. Clone Signaling (Addition)
 
-`bit clone` のデータ転送は peer-to-peer で行い、relay は peer 発見だけを担う。
+Data transfer for `bit clone` is performed peer-to-peer; the relay is only used for peer discovery.
 
 - publish:
   - `topic=notify`
@@ -213,37 +213,37 @@ deleted 0
   - `payload.clone_url=<smart-http endpoint>`
   - `payload.repo=<optional repo label>`
 - poll:
-  - `GET /api/v1/poll` の `envelopes` から `payload.kind=bit.clone.announce.v1` を抽出
-  - 同一 `sender` の複数 announce は最後の 1 件を有効とする
+  - Extract envelopes with `payload.kind=bit.clone.announce.v1` from `GET /api/v1/poll`
+  - For multiple announces from the same `sender`, only the latest one is considered valid
 
 CLI:
 
 - `bit hub sync clone-announce [<remote-url>] --url <clone-url> [--repo <repo>]`
 - `bit hub sync clone-peers [<remote-url>] [--include-self]`
-- `bit clone relay+http(s)://<relay-host> [--relay-sender <sender>] [--relay-repo <repo>]` は `clone-peers` と同じ発見ロジックで peer を 1 件選んで clone する
-  - 既定は最初の peer
-  - `BIT_RELAY_CLONE_SENDER=<sender>` を設定するとその sender を優先
-  - `BIT_RELAY_CLONE_REPO=<repo>` または `--relay-repo` で repo 名一致 peer を優先（sender 指定があれば sender 優先）
-- `bit fetch relay+http(s)://<relay-host> [--relay-sender <sender>] [--relay-repo <repo>]` も同じ発見ロジックで peer を 1 件選んで fetch する
-  - `BIT_RELAY_FETCH_SENDER=<sender>` / `BIT_RELAY_FETCH_REPO=<repo>` で既定優先条件を指定できる
-- `bit pull relay+http(s)://<relay-host> [--relay-sender <sender>] [--relay-repo <repo>]` も同じ発見ロジックで peer を 1 件選んで pull する
-  - `BIT_RELAY_PULL_SENDER=<sender>` / `BIT_RELAY_PULL_REPO=<repo>` で既定優先条件を指定できる
-- `bit push relay+http(s)://<relay-host> [--relay-sender <sender>] [--relay-repo <repo>]` も同じ発見ロジックで peer を 1 件選んで push する
-  - `BIT_RELAY_PUSH_SENDER=<sender>` / `BIT_RELAY_PUSH_REPO=<repo>` で既定優先条件を指定できる
+- `bit clone relay+http(s)://<relay-host> [--relay-sender <sender>] [--relay-repo <repo>]` uses the same discovery logic as `clone-peers` to select one peer and clone from it
+  - Defaults to the first peer
+  - Setting `BIT_RELAY_CLONE_SENDER=<sender>` prioritizes that sender
+  - `BIT_RELAY_CLONE_REPO=<repo>` or `--relay-repo` prioritizes peers matching the repo name (sender takes priority if both are specified)
+- `bit fetch relay+http(s)://<relay-host> [--relay-sender <sender>] [--relay-repo <repo>]` uses the same discovery logic to select one peer and fetch from it
+  - `BIT_RELAY_FETCH_SENDER=<sender>` / `BIT_RELAY_FETCH_REPO=<repo>` specify default priority conditions
+- `bit pull relay+http(s)://<relay-host> [--relay-sender <sender>] [--relay-repo <repo>]` uses the same discovery logic to select one peer and pull from it
+  - `BIT_RELAY_PULL_SENDER=<sender>` / `BIT_RELAY_PULL_REPO=<repo>` specify default priority conditions
+- `bit push relay+http(s)://<relay-host> [--relay-sender <sender>] [--relay-repo <repo>]` uses the same discovery logic to select one peer and push to it
+  - `BIT_RELAY_PUSH_SENDER=<sender>` / `BIT_RELAY_PUSH_REPO=<repo>` specify default priority conditions
 
 ---
 
-この仕様は現行実装（`bit` と `bit-relay`）に合わせた draft であり、将来の topic 拡張や認証追加で更新される。
+This specification is a draft aligned with the current implementation (`bit` and `bit-relay`) and will be updated as topic extensions and authentication are added.
 
-## 11. ベンチマーク（k6）
+## 11. Benchmarks (k6)
 
-- シナリオ: `tools/relay-k6-scenario.js`
-- ローカル relay 起動付き実行:
+- Scenario: `tools/relay-k6-scenario.js`
+- Run with local relay startup:
   - `bash tools/bench-relay-k6.sh`
-- 例（15秒、publish 120 req/s, poll 12 VU）:
+- Example (15 seconds, publish 120 req/s, poll 12 VU):
   - `K6_BENCH_DURATION=15s K6_PUBLISH_RATE=120 K6_POLL_VUS=12 bash tools/bench-relay-k6.sh`
-- 署名必須 relay（Cloudflare Worker など）で poll のみ測る場合:
+- For poll-only benchmarking on a signature-required relay (e.g., Cloudflare Worker):
   - `RELAY_BASE_URL=https://bit-relay.mizchi.workers.dev K6_PUBLISH_RATE=0 K6_POLL_VUS=20 bash tools/bench-relay-k6.sh`
-- 署名必須 relay で publish も測る場合（ローカル signer 自動起動）:
+- For benchmarking with publish on a signature-required relay (auto-starts local signer):
   - `RELAY_BASE_URL=https://bit-relay.mizchi.workers.dev RELAY_SIGN_PRIVATE_KEY_FILE=~/.config/bit/relay-ed25519.pem K6_PUBLISH_RATE=80 K6_POLL_VUS=8 bash tools/bench-relay-k6.sh`
-  - 必要に応じて `RELAY_SIGN_PUBLIC_KEY=<base64url>` で公開鍵を明示指定できる
+  - The public key can be explicitly specified with `RELAY_SIGN_PUBLIC_KEY=<base64url>` if needed

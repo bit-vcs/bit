@@ -1,29 +1,29 @@
 # Package Layout (WIP)
 
-`src/` を責務単位で分割し、必要な機能だけ import できる構成に段階移行するためのメモ。
+Notes for incrementally migrating `src/` into responsibility-based packages so that only the needed functionality is imported.
 
-## 現在の分割
+## Current Split
 
 - `mizchi/bit/remote`
-  - ローカル/remote-helper URL の解決
-  - `.git` ファイル解決 (`resolve_gitdir`)
-  - bare/worktree 判定 (`detect_git_dir`)
-  - `user/repo`, `user/repo:path`, `@ref` などの shorthand 解析
-  - shorthand とローカルディレクトリ衝突判定
+  - Local/remote-helper URL resolution
+  - `.git` file resolution (`resolve_gitdir`)
+  - bare/worktree detection (`detect_git_dir`)
+  - Shorthand parsing for `user/repo`, `user/repo:path`, `@ref`, etc.
+  - Shorthand and local directory collision detection
 - `mizchi/bit/refs`
-  - loose refs / packed-refs の列挙
-  - packed-refs の書き換え、remote tracking refs の掃除
+  - Enumeration of loose refs / packed-refs
+  - Rewriting packed-refs, cleaning up remote tracking refs
 - `mizchi/bit/pack_ops`
-  - pack 用 object 収集 API (`collect_reachable_objects` など) の入口
+  - Entry point for pack object collection APIs (`collect_reachable_objects`, etc.)
 - `mizchi/bit/worktree`
-  - status/add/commit/rm/mv など worktree 操作 API の入口
+  - Entry point for worktree operation APIs such as status/add/commit/rm/mv
 
-`mizchi/bit/lib` には後方互換の facade を残しているため、既存呼び出しはそのまま動作する。
+A backward-compatible facade is kept in `mizchi/bit/lib`, so existing call sites continue to work as-is.
 
-## 方針
+## Policy
 
-- 新規実装はまず機能別 package に置く
-- `lib` は互換 facade として薄く保つ
-- 呼び出し側は必要に応じて feature package を直接 import する
+- New implementations go into feature-specific packages first
+- `lib` is kept as a thin compatibility facade
+- Call sites directly import the feature package as needed
 
-この方針により、将来的に command/binary ごとに依存を最小化しやすくする。
+This policy makes it easier to minimize dependencies per command/binary in the future.

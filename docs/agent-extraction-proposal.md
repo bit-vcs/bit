@@ -1,203 +1,203 @@
 # Agent System Extraction Proposal
 
-## 問いの整理
+## Framing the Questions
 
-1. agent 層を別リポジトリに切り出すべきか
-2. moonix 上で shell エミュレーション環境を渡して作業させるべきか
+1. Should the agent layer be extracted into a separate repository?
+2. Should we provide a shell emulation environment on moonix for agents to work in?
 
-## 現状の依存グラフ
+## Current Dependency Graph
 
 ```
-src/x/agent/llm/          mizchi/llm (外部)
+src/x/agent/llm/          mizchi/llm (external)
   coord.mbt                  @ffi.exec_sync (shell)
   orchestrator.mbt           @json
   runner.mbt                 @strconv
   tools.mbt
-  ← git 層への依存: ZERO
+  ← dependency on git layer: ZERO
 
-src/x/agent/               mizchi/bit (本体)
-  types.mbt                  @bit.ObjectId (型のみ)
+src/x/agent/               mizchi/bit (main repo)
+  types.mbt                  @bit.ObjectId (type only)
   workflow.mbt               &@lib.ObjectStore (trait)
   policy.mbt                 &@lib.RefStore (trait)
                              &@lib.Clock (trait)
                              &@lib.WorkingTree (trait)
                              @hub.Hub
-  ← git 層への依存: trait 参照のみ、実装非依存
+  ← dependency on git layer: trait references only, no implementation dependency
 
-src/x/agent/native/        mizchi/bit (本体)
+src/x/agent/native/        mizchi/bit (main repo)
   runner.mbt                 @bit.*, @lib.ObjectDb
   server.mbt                 @pack, @protocol, @bitnative
-  ← git 層への依存: TIGHT (native adapter)
+  ← dependency on git layer: TIGHT (native adapter)
 ```
 
-## 結論: 切り出すべき。ただし切り出し粒度が重要
+## Conclusion: Should be extracted, but the extraction granularity matters
 
-### agent/llm は今すぐ切り出せる
+### agent/llm can be extracted immediately
 
-`src/x/agent/llm/` は git 層への依存がゼロ。依存は `mizchi/llm` (外部 LLM ライブラリ) とシェルコマンドのみ。これは独立パッケージとして成立する。
+`src/x/agent/llm/` has zero dependency on the git layer. Its dependencies are only `mizchi/llm` (external LLM library) and shell commands. This can stand on its own as an independent package.
 
-問題は **tools.mbt が raw shell で全てやっている** こと:
+The problem is that **tools.mbt does everything via raw shell**:
 
 ```moonbit
-// 現在の tools.mbt — shell_escape + exec で直接操作
+// Current tools.mbt — direct manipulation via shell_escape + exec
 fn(input) {
   let path = resolve_path(work_dir, json_get_str(input, "path"))
   exec("cat " + shell_escape(path))
 }
 ```
 
-これは:
-- セキュリティリスク (command injection の表面積が大きい)
-- テスト不能 (実際のファイルシステムが必要)
-- 環境依存 (macOS/Linux のコマンド差異)
-- リプレイ不能 (実行は不可逆)
+This results in:
+- Security risk (large command injection surface area)
+- Untestable (requires an actual filesystem)
+- Environment-dependent (command differences between macOS/Linux)
+- Non-replayable (execution is irreversible)
 
-### agent/core は hub protocol 確定後に切り出せる
+### agent/core can be extracted after the hub protocol is finalized
 
-`src/x/agent/` の `workflow.mbt` と `policy.mbt` は trait 経由で git 層を使う。依存は:
+`workflow.mbt` and `policy.mbt` in `src/x/agent/` use the git layer via traits. Their dependencies are:
 
-- `@bit.ObjectId` — 型のみ
-- `&@lib.ObjectStore` / `&@lib.RefStore` / `&@lib.WorkingTree` / `&@lib.Clock` — trait 参照
+- `@bit.ObjectId` — type only
+- `&@lib.ObjectStore` / `&@lib.RefStore` / `&@lib.WorkingTree` / `&@lib.Clock` — trait references
 - `@hub.Hub` — hub API
 
-hub protocol が安定すれば、trait 定義とともに切り出せる。
+Once the hub protocol stabilizes, this can be extracted along with the trait definitions.
 
-### hub protocol の未確定事項
+### Unresolved Items in the Hub Protocol
 
-| 項目 | 影響 | 優先度 |
-|------|------|--------|
-| Vector clock merge semantics | 分散同期の正しさ | CRITICAL |
-| Note commit timestamp (現在 0L 固定) | causality tracking | CRITICAL |
-| PR source_commit の post-merge semantics | merge 後の状態管理 | HIGH |
-| Tombstone compaction policy | ストレージ肥大化 | MEDIUM |
-| Close vs Rejected 区別 | ワークフロー設計 | LOW |
+| Item | Impact | Priority |
+|------|--------|----------|
+| Vector clock merge semantics | Correctness of distributed sync | CRITICAL |
+| Note commit timestamp (currently fixed at 0L) | Causality tracking | CRITICAL |
+| PR source_commit post-merge semantics | Post-merge state management | HIGH |
+| Tombstone compaction policy | Storage bloat | MEDIUM |
+| Close vs Rejected distinction | Workflow design | LOW |
 
-## moonix をエージェント実行環境にすべきか: YES
+## Should moonix be the agent execution environment: YES
 
-### moonix が提供するもの
+### What moonix provides
 
 ```
 AgentRuntime
-  ├── GitBackedFs (snapshot/rollback 付き仮想FS)
+  ├── GitBackedFs (virtual FS with snapshot/rollback)
   ├── CapabilitySet (FsRead, FsWrite, NetConnect... ACL)
-  ├── EffectLog (不可逆操作の監査ログ)
+  ├── EffectLog (audit log for irreversible operations)
   ├── POSIX context (fd, env, cwd)
-  ├── MCP client/server (ツール呼び出しプロトコル)
-  └── A2A protocol (エージェント間通信)
+  ├── MCP client/server (tool invocation protocol)
+  └── A2A protocol (agent-to-agent communication)
 ```
 
-### 現在の agent/llm vs moonix 上の agent
+### Current agent/llm vs. Agent on moonix
 
-| 観点 | 現在 (shell 直叩き) | moonix 上 |
-|------|-------------------|-----------|
-| ファイル操作 | `exec("cat ...")` | `runtime.fs.read_file(path)` |
-| 書き込み | `exec("printf ... > ...")` | `runtime.fs.write_file(path, data)` |
-| スナップショット | git worktree + 手動 commit | `runtime.snapshot("checkpoint")` |
-| ロールバック | 不可能 (worktree 削除のみ) | `runtime.rollback(commit_id)` |
-| 権限制御 | なし | Capability-based ACL |
-| 監査ログ | なし | EffectLog (全外部操作を記録) |
-| テスト | 実 FS 必要 | MemFs でユニットテスト可能 |
-| 並列エージェント | worktree 分離 | fork() で分岐 |
-| セキュリティ | shell injection リスク | sandbox mode |
+| Aspect | Current (direct shell) | On moonix |
+|--------|----------------------|-----------|
+| File operations | `exec("cat ...")` | `runtime.fs.read_file(path)` |
+| Writing | `exec("printf ... > ...")` | `runtime.fs.write_file(path, data)` |
+| Snapshots | git worktree + manual commit | `runtime.snapshot("checkpoint")` |
+| Rollback | Not possible (only worktree deletion) | `runtime.rollback(commit_id)` |
+| Permission control | None | Capability-based ACL |
+| Audit log | None | EffectLog (records all external operations) |
+| Testing | Requires real FS | Unit-testable with MemFs |
+| Parallel agents | worktree isolation | Fork to branch |
+| Security | Shell injection risk | Sandbox mode |
 
-### moonix を使うと orchestration が根本的に変わる
+### Using moonix fundamentally changes orchestration
 
-現在のモデル:
+Current model:
 
 ```
-Orchestrator (プロセス)
-  ├── nohup bit agent llm ... &   ← OS プロセス spawn
-  ├── coordination dir polling     ← ファイルシステム polling
+Orchestrator (process)
+  ├── nohup bit agent llm ... &   ← OS process spawn
+  ├── coordination dir polling     ← filesystem polling
   └── git merge                    ← shell command
 ```
 
-moonix モデル:
+moonix model:
 
 ```
 Orchestrator (in-process)
   ├── runtime_0 = AgentRuntime::sandbox()
-  │     runtime_0.fs = GitBackedFs (agent-0 の作業空間)
+  │     runtime_0.fs = GitBackedFs (agent-0's workspace)
   ├── runtime_1 = AgentRuntime::sandbox()
-  │     runtime_1.fs = GitBackedFs (agent-1 の作業空間)
-  ├── 各 runtime に LLM agent loop を実行
+  │     runtime_1.fs = GitBackedFs (agent-1's workspace)
+  ├── Run LLM agent loop in each runtime
   │     tool_call("write_file", ...) → runtime.fs.write_file(...)
   │     tool_call("read_file", ...)  → runtime.fs.read_file(...)
   │     tool_call("run_command", ...) → runtime.effect_log.record(...)
-  ├── snapshot per step (自動)
+  ├── Automatic snapshot per step
   │     runtime.snapshot("step-3")
-  ├── エラー時 rollback
+  ├── Rollback on error
   │     runtime.rollback(last_good_snapshot)
-  └── merge: GitBackedFs 同士の 3-way merge
+  └── merge: 3-way merge between GitBackedFs instances
 ```
 
-利点:
-- **OS プロセス spawn 不要** — in-process で並列実行可能
-- **coordination dir 不要** — runtime の状態を直接参照
-- **snapshot/rollback が組み込み** — エージェントの試行錯誤が安全
-- **fork で探索** — 複数アプローチを分岐して比較可能
-- **EffectLog** — 外部 API 呼び出しの完全な監査証跡
-- **Capability** — エージェントごとに権限を制限可能
+Benefits:
+- **No OS process spawn required** — parallel execution in-process
+- **No coordination dir required** — directly reference runtime state
+- **Built-in snapshot/rollback** — safe trial-and-error for agents
+- **Fork for exploration** — branch and compare multiple approaches
+- **EffectLog** — complete audit trail of external API calls
+- **Capability** — restrict permissions per agent
 
-### shell emulation について
+### On shell emulation
 
-moonix の shell parser は完成しているが **実行エンジンが xsh 待ちで disabled**。
+The moonix shell parser is complete, but the **execution engine is disabled pending xsh**.
 
-2つの選択肢:
+Two options:
 
-**A. shell emulation を待つ**
-- `run_command` ツールが moonix 内で完結
-- エージェントが `moon test` や `rg` を仮想シェルで実行
-- 完全なサンドボックス
+**A. Wait for shell emulation**
+- `run_command` tool completes entirely within moonix
+- Agents run `moon test` and `rg` in the virtual shell
+- Full sandbox
 
-**B. shell は host delegation で先に進む**
-- `run_command` は capability-gated で host の shell に委譲
-- EffectLog に記録 (ProcessSpawn effect)
-- moonix の FS 操作 + snapshot/rollback は使う
-- shell emulation は後から差し替え
+**B. Move forward with host delegation for shell**
+- `run_command` delegates to the host shell, gated by capabilities
+- Recorded in EffectLog (ProcessSpawn effect)
+- moonix FS operations + snapshot/rollback are still used
+- Shell emulation can be swapped in later
 
-推奨: **B**。shell emulation の完成を待つと agent 開発がブロックされる。host delegation + EffectLog で十分な監査は可能。
+Recommendation: **B**. Waiting for shell emulation completion would block agent development. Host delegation + EffectLog provides sufficient auditing.
 
-## 提案するアーキテクチャ
+## Proposed Architecture
 
-### パッケージ構成
+### Package Structure
 
 ```
-mizchi/bit                    # git 互換実装 (現在のまま)
+mizchi/bit                    # git-compatible implementation (unchanged)
   src/
   src/x/hub/              # hub protocol
   src/x/kv/                  # KV store + gossip
 
-mizchi/moonix                 # 仮想実行環境 (現在のまま)
+mizchi/moonix                 # virtual execution environment (unchanged)
   src/runtime/
   src/gitfs/
   src/capability/
   src/effect/
   src/ai/                    # MCP, A2A types
 
-mizchi/bit-agent (NEW)        # エージェントシステム
+mizchi/bit-agent (NEW)        # agent system
   src/
     core/                    # AgentConfig, AgentTask, TaskResult
     llm/                     # LLM providers, agent loop
     tools/                   # MCP-compatible tool definitions
-    orchestrator/            # 並列 orchestration
+    orchestrator/            # parallel orchestration
     coord/                   # coordination protocol
-  依存:
-    mizchi/moonix            # 実行環境 (AgentRuntime, GitBackedFs)
-    mizchi/llm               # LLM プロバイダ
+  dependencies:
+    mizchi/moonix            # execution environment (AgentRuntime, GitBackedFs)
+    mizchi/llm               # LLM provider
     mizchi/bit               # (optional) native git adapter
     mizchi/bit/x/hub      # (optional) PR/review integration
 ```
 
-### ツール定義の変更
+### Tool Definition Changes
 
-現在 (`shell_escape + exec`):
+Current (`shell_escape + exec`):
 ```moonbit
 registry.register("read_file", ..., fn(input) {
   exec("cat " + shell_escape(path))
 })
 ```
 
-moonix 上:
+On moonix:
 ```moonbit
 registry.register("read_file", ..., fn(input) {
   let bytes = runtime.fs.read_file(path)  // raise FsError
@@ -205,56 +205,56 @@ registry.register("read_file", ..., fn(input) {
 })
 ```
 
-### coordination の変更
+### Coordination Changes
 
-現在 (ファイルシステム polling):
+Current (filesystem polling):
 ```moonbit
 coord_write_status(dir, agent_id, Running)
 // → printf 'running' > /tmp/.../agents/agent-0/status
 ```
 
-moonix 上 (in-memory 直接参照):
+On moonix (direct in-memory reference):
 ```moonbit
-// orchestrator が各 runtime の状態を直接持つ
+// orchestrator directly holds each runtime's state
 agents[i].status = Running
 agents[i].step = runtime.current_step()
 agents[i].snapshot = runtime.fs.head()
 ```
 
-coordination dir が不要になり、KV への移行パスも明確になる:
-- ローカル: in-memory Map
-- 分散: KV gossip
+The coordination dir becomes unnecessary, and the migration path to KV becomes clear:
+- Local: in-memory Map
+- Distributed: KV gossip
 
-## 移行ステップ
+## Migration Steps
 
-### Phase 0: hub protocol 確定
-- Vector clock merge semantics を仕様化
-- Note timestamp 問題を解決
-- `docs/hub-protocol.md` に contract を文書化
+### Phase 0: Finalize the hub protocol
+- Specify vector clock merge semantics
+- Resolve the note timestamp issue
+- Document the contract in `docs/hub-protocol.md`
 
-### Phase 1: moonix に agent tool adapter を追加
-- `mizchi/moonix/src/ai/tools/` に MCP-compatible ツール定義
+### Phase 1: Add agent tool adapter to moonix
+- MCP-compatible tool definitions in `mizchi/moonix/src/ai/tools/`
 - `read_file`, `write_file`, `list_directory` → `runtime.fs.*`
 - `run_command` → host delegation + EffectLog
 - `search_text` → host delegation (rg) or in-memory grep
 
-### Phase 2: bit-agent リポジトリ作成
-- `src/x/agent/llm/` を移動
-- tools.mbt を moonix adapter に差し替え
-- runner.mbt の shell exec を `AgentRuntime` 経由に変更
-- orchestrator を in-process 並列に書き換え
+### Phase 2: Create the bit-agent repository
+- Move `src/x/agent/llm/`
+- Replace tools.mbt with moonix adapter
+- Change runner.mbt's shell exec to go through `AgentRuntime`
+- Rewrite orchestrator for in-process parallelism
 
-### Phase 3: coordination を KV 互換に
-- in-memory coordination (ローカル)
-- KV gossip coordination (分散)
-- hub integration (PR/review)
+### Phase 3: Make coordination KV-compatible
+- In-memory coordination (local)
+- KV gossip coordination (distributed)
+- Hub integration (PR/review)
 
-## まとめ
+## Summary
 
-| 判断 | 結論 | 理由 |
-|------|------|------|
-| agent を別リポに切り出すか | YES | llm 層は git 依存ゼロ、core 層は trait のみ |
-| moonix 上で動かすか | YES | sandbox, snapshot/rollback, EffectLog, capability |
-| shell emulation を待つか | NO | host delegation で先に進む |
-| hub 確定が先か | YES | agent の workflow/policy が hub に依存 |
-| いつ切り出すか | Phase 0 (hub) → Phase 1 (moonix tools) → Phase 2 (extract) |
+| Decision | Conclusion | Reason |
+|----------|-----------|--------|
+| Extract agent to a separate repo? | YES | llm layer has zero git dependency; core layer uses only traits |
+| Run on moonix? | YES | Sandbox, snapshot/rollback, EffectLog, capability |
+| Wait for shell emulation? | NO | Move forward with host delegation |
+| Finalize hub first? | YES | Agent workflow/policy depends on hub |
+| When to extract? | Phase 0 (hub) → Phase 1 (moonix tools) → Phase 2 (extract) |
