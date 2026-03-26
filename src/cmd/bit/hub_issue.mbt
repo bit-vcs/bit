@@ -671,6 +671,7 @@ async fn handle_hub_issue_create(args : Array[String]) -> Unit raise Error {
   let mut body : String? = None
   let labels : Array[String] = []
   let assignees : Array[String] = []
+  let links : Array[String] = []
   let mut parent_id : String? = None
   let mut i = 0
   while i < args.length() {
@@ -723,6 +724,16 @@ async fn handle_hub_issue_create(args : Array[String]) -> Unit raise Error {
         i += 1
         continue
       }
+      "--link" if i + 1 < args.length() => {
+        links.push(args[i + 1])
+        i += 2
+        continue
+      }
+      _ if arg.has_prefix("--link=") => {
+        links.push(String::unsafe_substring(arg, start=7, end=arg.length()))
+        i += 1
+        continue
+      }
       "--parent" | "-p" if i + 1 < args.length() => {
         parent_id = Some(args[i + 1])
         i += 2
@@ -750,7 +761,16 @@ async fn handle_hub_issue_create(args : Array[String]) -> Unit raise Error {
   guard title is Some(t) else {
     raise @bitcore.GitError::InvalidObject("Missing --title")
   }
-  let issue_body = body.unwrap_or("")
+  let mut issue_body = body.unwrap_or("")
+  // Append cross-repo links
+  if links.length() > 0 {
+    if issue_body.length() > 0 {
+      issue_body = issue_body + "\n"
+    }
+    for link in links {
+      issue_body = issue_body + "\nLink: " + link
+    }
+  }
   let root = get_work_root()
   let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, clock) = make_hub_stores(git_dir)
