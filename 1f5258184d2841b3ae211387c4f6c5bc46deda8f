@@ -1,0 +1,14 @@
+version 1
+key hub/issue/f9d70c5d/comment/8d956f39
+kind issue.comment
+clock mz <mz@localhost>=1
+timestamp 1774503626
+node mz <mz@localhost>
+deleted 0
+
+comment 8d956f39
+issue f9d70c5d
+author mz <mz@localhost>
+created 1774503626
+
+Done: hash-object --object-format=sha256 implemented and verified
