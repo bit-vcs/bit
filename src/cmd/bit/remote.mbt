@@ -1901,6 +1901,7 @@ async fn clone_local_repo(
   remote_name? : String = "origin",
   reference_alternates? : Array[String] = [],
   ref_format? : String = "files",
+  template_dir? : String? = None,
 ) -> Unit raise Error {
   guard @bitlib.detect_git_dir(fs, src_path) is Some((src_git_dir, _)) else {
     raise @bitcore.GitError::InvalidObject("Not a git repository: \{src_path}")
@@ -1947,6 +1948,7 @@ async fn clone_local_repo(
     separate_git_dir~,
     ref_format~,
     object_format=source_object_format,
+    template_dir~,
   )
   // Copy object database
   @bitlib.copy_tree(fs, fs, src_git_dir + "/objects", dest_git_dir + "/objects")
@@ -2058,13 +2060,14 @@ fn init_clone_destination(
   separate_git_dir? : String? = None,
   ref_format? : String = "files",
   object_format? : String = "sha1",
+  template_dir? : String? = None,
 ) -> String raise Error {
   if bare {
     @bitlib.init_repo_with_options_with_repo_fs(fs, fs, dest_path, {
       default_branch,
       bare: true,
       separate_git_dir: None,
-      template_dir: None,
+      template_dir,
       ref_format,
       object_format,
       is_reinit: false,
@@ -2081,7 +2084,7 @@ fn init_clone_destination(
           default_branch,
           bare: false,
           separate_git_dir: Some(path),
-          template_dir: None,
+          template_dir,
           ref_format,
           object_format,
           is_reinit: false,
@@ -2096,7 +2099,7 @@ fn init_clone_destination(
           default_branch,
           bare: false,
           separate_git_dir: None,
-          template_dir: None,
+          template_dir,
           ref_format,
           object_format,
           is_reinit: false,
@@ -2229,6 +2232,7 @@ async fn clone_local_bundle(
   separate_git_dir? : String? = None,
   remote_name? : String = "origin",
   ref_format? : String = "files",
+  template_dir? : String? = None,
 ) -> Unit raise Error {
   let (_header, _prereqs, refs, pack_data) = parse_bundle_file(fs, bundle_path)
   let (head_id, default_branch, detached_head) = resolve_bundle_head(refs)
@@ -2240,6 +2244,7 @@ async fn clone_local_bundle(
     bare,
     separate_git_dir~,
     ref_format~,
+    template_dir~,
   )
   // Write pack data from bundle (skip checksum - bundle already verified)
   @pack.write_pack_and_index(fs, dest_git_dir, pack_data, verify_checksum=false)

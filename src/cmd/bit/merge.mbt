@@ -509,6 +509,25 @@ async fn handle_octopus_merge(
   guard original_head is Some(orig_hid) else {
     raise @bitcore.GitError::InvalidObject("Cannot resolve HEAD")
   }
+  // Save current reflog state so we can truncate intermediate entries later
+  let head_reflog_before = @bitlib.read_reflog(rfs, git_dir, "HEAD") catch {
+    _ => []
+  }
+  let head_reflog_count_before = head_reflog_before.length()
+  let head_ref_opt = (@bitlib.read_head_ref(rfs, git_dir) |> Some) catch {
+    _ => None
+  }
+  let branch_refname : String? = match head_ref_opt {
+    Some(Branch(name)) => Some("refs/heads/" + name)
+    _ => None
+  }
+  let branch_reflog_count_before = match branch_refname {
+    Some(refname) => {
+      let entries = @bitlib.read_reflog(rfs, git_dir, refname) catch { _ => [] }
+      entries.length()
+    }
+    None => 0
+  }
   // Merge each head sequentially (each creates a commit, then we reset HEAD)
   for i = 0; i < resolved_ids.length(); i = i + 1 {
     let tid = resolved_ids[i]
@@ -616,9 +635,93 @@ async fn handle_octopus_merge(
   } else {
     wfs.write_string(head_path, commit_id.to_hex() + "\n")
   }
+  // Truncate reflog to remove intermediate merge entries, then add one entry
+  // for the final octopus commit. This prevents git fsck from reporting
+  // "invalid reflog entry" errors for unreachable intermediate commits.
+  let octopus_reflog_msg = "merge: " + msg
+  truncate_and_append_reflog(
+    wfs, rfs, git_dir, "HEAD", head_reflog_count_before, orig_hid, commit_id, author,
+    timestamp, octopus_reflog_msg,
+  )
+  match branch_refname {
+    Some(refname) =>
+      truncate_and_append_reflog(
+        wfs, rfs, git_dir, refname, branch_reflog_count_before, orig_hid, commit_id,
+        author, timestamp, octopus_reflog_msg,
+      )
+    None => ()
+  }
   let short = String::unsafe_substring(commit_id.to_hex(), start=0, end=7)
   if not(quiet) {
     print_line("Merge made by the 'octopus' strategy. [\{short}]")
+  }
+}
+
+///|
+/// Truncate reflog to keep only entries before the intermediate merges,
+/// then append a single entry for the final octopus merge commit.
+fn truncate_and_append_reflog(
+  wfs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  refname : String,
+  keep_count : Int,
+  old_id : @bitcore.ObjectId,
+  new_id : @bitcore.ObjectId,
+  author : String,
+  timestamp : Int64,
+  message : String,
+) -> Unit {
+  let reflog_path = @bitlib.get_reflog_path(git_dir, refname)
+  if not(rfs.is_file(reflog_path)) {
+    return
+  }
+  // Read current reflog content
+  let content = @utf8.decode_lossy(
+    (rfs.read_file(reflog_path) catch { _ => return })[:],
+  ).to_string()
+  // Split into lines and keep only entries before the intermediate merges
+  let lines : Array[String] = []
+  for line_view in content.split("\n") {
+    let line = line_view.to_string()
+    if line.length() > 0 {
+      lines.push(line)
+    }
+  }
+  // Keep only the first keep_count lines (entries before octopus merge started)
+  let buf = StringBuilder::new()
+  for i = 0; i < keep_count && i < lines.length(); i = i + 1 {
+    buf.write_string(lines[i])
+    buf.write_string("\n")
+  }
+  // Parse author identity for the reflog entry
+  let (author_name, author_email) = parse_reflog_author(author)
+  // Append the single octopus merge entry
+  buf.write_string(
+    "\{old_id.to_hex()} \{new_id.to_hex()} \{author_name} <\{author_email}> \{timestamp} +0000\t\{message}\n",
+  )
+  wfs.write_string(reflog_path, buf.to_string()) catch {
+    _ => ()
+  }
+}
+
+///|
+/// Parse an author string like "Name <email> timestamp +tz" into (name, email).
+fn parse_reflog_author(author : String) -> (String, String) {
+  let trimmed = author.trim().to_string()
+  match trimmed.find("<") {
+    Some(start) =>
+      match trimmed.find(">") {
+        Some(end) if end > start => {
+          let name = String::unsafe_substring(trimmed, start=0, end=start)
+            .trim()
+            .to_string()
+          let email = String::unsafe_substring(trimmed, start=start + 1, end~)
+          (if name.length() == 0 { "unknown" } else { name }, email)
+        }
+        _ => (trimmed, "unknown")
+      }
+    None => (trimmed, "unknown")
   }
 }
 

@@ -57,6 +57,7 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
   let mut remote_name = "origin"
   let mut ref_spec : String? = None
   let mut ref_format = clone_default_ref_format()
+  let mut template_dir : String? = None
   let mut ssh_ip_option : String? = None
   let mut relay_preferred_sender_opt : String? = None
   let mut relay_preferred_repo_opt : String? = None
@@ -266,6 +267,18 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
       has_filter_flag = true
       let filter_str = String::unsafe_substring(arg, start=9, end=arg.length())
       filter = parse_filter_spec(filter_str)
+      i += 1
+      continue
+    }
+    if arg == "--template" && i + 1 < args.length() {
+      template_dir = Some(args[i + 1])
+      i += 2
+      continue
+    }
+    if arg.has_prefix("--template=") {
+      template_dir = Some(
+        String::unsafe_substring(arg, start=11, end=arg.length()),
+      )
       i += 1
       continue
     }
@@ -499,6 +512,7 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
         separate_git_dir~,
         remote_name~,
         ref_format~,
+        template_dir~,
       )
       if not(bare) && not(no_checkout) {
         match @bitlib.resolve_head_commit(fs, clone_git_dir) {
@@ -554,7 +568,14 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
           no_checkout~,
         )
         let initialized_empty_clone = initialize_empty_transport_clone(
-          fs, clone_root, remote_display, bare, remote_name, ref_format, refs,
+          fs,
+          clone_root,
+          remote_display,
+          bare,
+          remote_name,
+          ref_format,
+          refs,
+          template_dir~,
         )
         if bare && not(initialized_empty_clone) {
           promote_transport_clone_to_bare_layout(fs, clone_root)
@@ -594,6 +615,7 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
           remote_name~,
           reference_alternates=reference_object_dirs,
           ref_format~,
+          template_dir~,
         )
         if not(bare) && not(filter.is_partial()) {
           if not(no_checkout) {
@@ -930,6 +952,7 @@ fn initialize_empty_transport_clone(
   remote_name : String,
   ref_format : String,
   refs : Array[(@bitcore.ObjectId, String)],
+  template_dir? : String? = None,
 ) -> Bool raise Error {
   let bootstrap_head_path = if bare {
     clone_root + "/.git/HEAD"
@@ -946,6 +969,7 @@ fn initialize_empty_transport_clone(
     default_branch,
     bare,
     ref_format~,
+    template_dir~,
   )
   let fetch_specs = ["+refs/heads/*:refs/remotes/" + remote_name + "/*"]
   remote_add(fs, fs, git_dir, remote_name, remote_url, fetch_specs, false, None)
