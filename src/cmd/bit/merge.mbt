@@ -127,12 +127,20 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
     }
     i += 1
   }
-  // Handle octopus merge (>1 head): print clear error
+  // Handle octopus merge (>1 head)
   if merge_heads.length() > 1 {
-    @stdio.stderr.write(
-      "error: merge: octopus merge (multiple merge heads) is not supported\n",
+    handle_octopus_merge(
+      fs,
+      root,
+      git_dir,
+      merge_heads,
+      message,
+      author=get_author_string(),
+      timestamp=get_commit_timestamp(),
+      quiet~,
+      no_ff~,
     )
-    @sys.exit(1)
+    return
   }
   // Validate strategy
   match strategy {
@@ -466,6 +474,151 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
       }
       @sys.exit(1)
     }
+  }
+}
+
+///|
+async fn handle_octopus_merge(
+  fs : OsFs,
+  root : String,
+  git_dir : String,
+  heads : Array[String],
+  message : String?,
+  author~ : String,
+  timestamp~ : Int64,
+  quiet~ : Bool,
+  no_ff~ : Bool,
+) -> Unit raise Error {
+  let rfs : &@bitcore.RepoFileSystem = fs
+  let wfs : &@bitcore.FileSystem = fs
+  // Resolve all merge heads
+  let resolved_ids : Array[@bitcore.ObjectId] = []
+  let labels : Array[String] = []
+  for refspec in heads {
+    let target_id = @bitrepo.rev_parse(fs, git_dir, refspec)
+    guard target_id is Some(tid) else {
+      raise @bitcore.GitError::InvalidObject(
+        "merge: \{refspec} - not something we can merge",
+      )
+    }
+    resolved_ids.push(tid)
+    labels.push(refspec)
+  }
+  // Save original HEAD before any merges
+  let original_head = @bitrepo.rev_parse(rfs, git_dir, "HEAD")
+  guard original_head is Some(orig_hid) else {
+    raise @bitcore.GitError::InvalidObject("Cannot resolve HEAD")
+  }
+  // Merge each head sequentially (each creates a commit, then we reset HEAD)
+  for i = 0; i < resolved_ids.length(); i = i + 1 {
+    let tid = resolved_ids[i]
+    let label = labels[i]
+    let cur_head = @bitrepo.rev_parse(rfs, git_dir, "HEAD")
+    match cur_head {
+      Some(hid) => if is_ancestor(rfs, git_dir, tid, hid) { continue }
+      None => ()
+    }
+    let step_msg = "Merge branch '\{label}'"
+    let result = run_merge_with_sensitive_hooks(
+      fs,
+      fs,
+      root,
+      tid,
+      step_msg,
+      author,
+      timestamp,
+      theirs_label=label,
+    )
+    match result.status {
+      @bitlib.MergeStatus::AlreadyUpToDate => continue
+      @bitlib.MergeStatus::FastForward | @bitlib.MergeStatus::Merged => ()
+      @bitlib.MergeStatus::Conflicted => {
+        // Restore HEAD to original
+        ignore(
+          @bitlib.reset(
+            wfs,
+            rfs,
+            root,
+            orig_hid.to_hex(),
+            @bitlib.ResetMode::Hard,
+          ),
+        )
+        if not(quiet) {
+          for path in result.conflicts {
+            let ctype = result.conflict_types.get(path).unwrap_or("content")
+            print_line("CONFLICT (\{ctype}): Merge conflict in \{path}")
+          }
+          print_line(
+            "Automatic merge failed; fix conflicts and then commit the result.",
+          )
+        }
+        @sys.exit(1)
+      }
+    }
+  }
+  ignore(no_ff)
+  // Get the merged tree from current HEAD
+  let merged_head = @bitrepo.rev_parse(rfs, git_dir, "HEAD")
+  guard merged_head is Some(current_head) else {
+    raise @bitcore.GitError::InvalidObject("Cannot resolve HEAD after merge")
+  }
+  let db = @bitlib.ObjectDb::load(rfs, git_dir)
+  let head_obj = db.get(rfs, current_head)
+  guard head_obj is Some(ho) else {
+    raise @bitcore.GitError::InvalidObject("Cannot read HEAD commit")
+  }
+  let head_info = @bitcore.parse_commit(ho.data)
+  // Build parent list: original HEAD + all merge heads
+  let all_parents : Array[@bitcore.ObjectId] = [orig_hid]
+  for id in resolved_ids {
+    all_parents.push(id)
+  }
+  // Build merge message
+  let msg = match message {
+    Some(m) => m
+    None => {
+      let buf = StringBuilder::new()
+      buf.write_string("Merge")
+      for i = 0; i < labels.length(); i = i + 1 {
+        if i == 0 {
+          buf.write_string(" branches '")
+        } else {
+          buf.write_string(", '")
+        }
+        buf.write_string(labels[i])
+        buf.write_string("'")
+      }
+      buf.to_string()
+    }
+  }
+  let tree_id = head_info.tree
+  let commit = @bitcore.Commit::new(
+    tree_id,
+    all_parents,
+    author,
+    timestamp,
+    "+0000",
+    author,
+    timestamp,
+    "+0000",
+    msg + "\n",
+  )
+  let (commit_id, commit_data) = @bitcore.create_commit(commit)
+  @bitlib.write_object_bytes(wfs, git_dir, commit_id, commit_data)
+  // Update HEAD ref
+  let head_path = git_dir + "/HEAD"
+  let head_content = rfs.read_file(head_path) |> decode_bytes |> trim_string
+  if head_content.has_prefix("ref: ") {
+    let ref_path = git_dir +
+      "/" +
+      String::unsafe_substring(head_content, start=5, end=head_content.length())
+    wfs.write_string(ref_path, commit_id.to_hex() + "\n")
+  } else {
+    wfs.write_string(head_path, commit_id.to_hex() + "\n")
+  }
+  let short = String::unsafe_substring(commit_id.to_hex(), start=0, end=7)
+  if not(quiet) {
+    print_line("Merge made by the 'octopus' strategy. [\{short}]")
   }
 }
 
