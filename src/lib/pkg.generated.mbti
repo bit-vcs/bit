@@ -625,6 +625,21 @@ pub enum CherryPickStatus {
   Conflict
 }
 
+pub struct CommitGraphFile {
+  data : Bytes
+  hash_size : Int
+  num_commits : Int
+  oidf_offset : Int
+  oidl_offset : Int
+  cdat_offset : Int
+  edge_offset : Int
+}
+pub fn CommitGraphFile::find_commit(Self, @object.ObjectId) -> Int
+pub fn CommitGraphFile::get_oid(Self, Int) -> @object.ObjectId
+pub fn CommitGraphFile::load(&@types.RepoFileSystem, String) -> Self? raise @object.GitError
+pub fn CommitGraphFile::read_commit(Self, Int) -> (@object.ObjectId, Array[@object.ObjectId], Int64)
+pub fn CommitGraphFile::synthesize_commit_object(Self, Int, @object.ObjectId) -> @object.PackObject
+
 pub(all) struct ConfigBlock {
   mut header : String?
   mut section : String?
@@ -780,7 +795,10 @@ pub struct ObjectDb {
   mut prefer_packed : Bool
   mut saw_corrupt_pack : Bool
   mut skip_verify : Bool
+  mut commit_graph : CommitGraphFile?
 }
+pub fn ObjectDb::disable_commit_graph(Self) -> Unit
+pub fn ObjectDb::enable_commit_graph(Self, &@types.RepoFileSystem, String) -> Unit
 pub fn ObjectDb::find_delta_base(Self, &@types.RepoFileSystem, @object.ObjectId) -> @object.ObjectId? raise @object.GitError
 pub fn ObjectDb::find_object_disk_size(Self, &@types.RepoFileSystem, @object.ObjectId) -> Int? raise @object.GitError
 pub fn ObjectDb::get(Self, &@types.RepoFileSystem, @object.ObjectId) -> @object.PackObject? raise @object.GitError
