@@ -1,0 +1,43 @@
+version 1
+key hub/work-item/f9d70c5d/meta
+kind work-item
+clock mz <mz@localhost>=1
+timestamp 1774501147
+node mz <mz@localhost>
+deleted 0
+
+work-item f9d70c5d
+title [session:main#29] SHA-256 object hash support + submodule/rev-parse fixes
+author mz <mz@localhost>
+created 1774501147
+updated 1774501147
+state open
+label session:main
+
+## Session Info
+
+- **branch**: main
+
+## Target Files
+
+- src/hash/sha256.mbt (create)
+- src/hash/sha256_test.mbt (create)
+- src/hash/moon.pkg (modify)
+- src/object/hash_algorithm.mbt (create)
+- src/object/sha256.mbt (create)
+- src/object/sha256_test.mbt (create)
+- src/object/hasher.mbt (create)
+- src/object/types.mbt (modify)
+- src/types/git_types.mbt (modify)
+- src/cmd/bit/main.mbt (modify)
+- src/cmd/bit/rev_parse.mbt (modify)
+
+## Plan
+
+Phase 1 of SHA-256 object hash support:
+1. SHA-256 hasher using moonbitlang/x/crypto
+2. HashAlgorithm enum (Sha1 | Sha256)
+3. ObjectId variable-length (20 or 32 bytes)
+4. HashState abstraction
+5. submodule -c delegation fix
+6. --show-superproject-working-tree implementation
