@@ -544,13 +544,20 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
       } else {
         normalize_path(command_root + "/" + remote_url)
       }
-      // --no-local is ignored for local paths: bit never uses hardlinks,
-      // so the flag has no practical effect.  Only use transport clone when
-      // the source is genuinely remote or a partial/shallow clone is needed.
-      let is_local_source = remote_display.has_prefix("/") ||
-        remote_display.has_prefix("file://")
+      // --no-local is ignored for local paths (bit never uses hardlinks).
+      // For file:// URLs with --depth or --filter, delegate to real git
+      // which handles the upload-pack transport natively.
+      let is_local_path = remote_display.has_prefix("/") &&
+        not(remote_display.has_prefix("file://"))
+      let is_file_url = remote_display.has_prefix("file://")
+      let needs_transport = filter.is_partial() || depth > 0
+      if is_file_url && needs_transport {
+        delegate_clone_to_real_git(args)
+        return
+      }
       let use_transport_clone = (
-          (no_local && not(is_local_source)) || filter.is_partial() || depth > 0
+          (no_local && not(is_local_path) && not(is_file_url)) ||
+          needs_transport
         ) &&
         separate_git_dir is None &&
         remote_name == "origin"
@@ -1871,6 +1878,23 @@ async fn warn_case_insensitive_collisions_from_commit(
       @stdio.stderr.write("  " + path + "\n")
     }
   }
+}
+
+///|
+async fn delegate_clone_to_real_git(args : Array[String]) -> Unit raise Error {
+  let argv : Array[String] = ["clone"]
+  for arg in args {
+    argv.push(arg)
+  }
+  let code = @process.run(
+    resolve_real_git_for_dispatch(),
+    argv,
+    inherit_env=true,
+    stdin=@stdio.stdin,
+    stdout=@stdio.stdout,
+    stderr=@stdio.stderr,
+  )
+  @sys.exit(code)
 }
 
 ///|

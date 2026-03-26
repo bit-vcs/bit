@@ -528,7 +528,9 @@ async fn handle_octopus_merge(
     }
     None => 0
   }
-  // Merge each head sequentially (each creates a commit, then we reset HEAD)
+  // Merge each head sequentially. Track whether original HEAD was
+  // fast-forwarded away (git's octopus excludes it from parents if so).
+  let mut orig_head_ffwd = false
   for i = 0; i < resolved_ids.length(); i = i + 1 {
     let tid = resolved_ids[i]
     let label = labels[i]
@@ -550,7 +552,8 @@ async fn handle_octopus_merge(
     )
     match result.status {
       @bitlib.MergeStatus::AlreadyUpToDate => continue
-      @bitlib.MergeStatus::FastForward | @bitlib.MergeStatus::Merged => ()
+      @bitlib.MergeStatus::FastForward => orig_head_ffwd = true
+      @bitlib.MergeStatus::Merged => ()
       @bitlib.MergeStatus::Conflicted => {
         // Restore HEAD to original
         ignore(
@@ -587,8 +590,12 @@ async fn handle_octopus_merge(
     raise @bitcore.GitError::InvalidObject("Cannot read HEAD commit")
   }
   let head_info = @bitcore.parse_commit(ho.data)
-  // Build parent list: original HEAD + all merge heads
-  let all_parents : Array[@bitcore.ObjectId] = [orig_hid]
+  // Build parent list. If original HEAD was fast-forwarded to one of the
+  // heads, exclude it (git's octopus does the same).
+  let all_parents : Array[@bitcore.ObjectId] = []
+  if not(orig_head_ffwd) {
+    all_parents.push(orig_hid)
+  }
   for id in resolved_ids {
     all_parents.push(id)
   }
