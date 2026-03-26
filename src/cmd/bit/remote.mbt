@@ -1971,7 +1971,8 @@ async fn clone_local_repo(
       }
     None => ()
   }
-  if mirror {
+  if mirror || bare {
+    // bare clone: copy all refs directly (like git clone --bare)
     let refs = @bitlib.list_refs_with_ids(fs, src_git_dir, None)
     for refname, id in refs {
       if refname.has_prefix("refs/") {

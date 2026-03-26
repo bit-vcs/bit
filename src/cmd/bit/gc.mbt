@@ -35,6 +35,17 @@ async fn handle_gc(args : Array[String]) -> Unit raise Error {
       print_line("Found \{result.dangling.length()} dangling objects")
     }
   }
+  // Update commit-graph after gc (delegate to real git)
+  let git_dir = resolve_git_dir(fs, root)
+  let real_git = resolve_real_git_for_dispatch()
+  ignore(
+    @process.run(
+      real_git,
+      ["commit-graph", "write", "--reachable", "--changed-paths"],
+      cwd=root,
+      extra_env={ "GIT_DIR": git_dir },
+    ),
+  )
 }
 
 ///|

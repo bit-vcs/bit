@@ -530,7 +530,14 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
       } else {
         normalize_path(command_root + "/" + remote_url)
       }
-      let use_transport_clone = (no_local || filter.is_partial() || depth > 0) &&
+      // --no-local is ignored for local paths: bit never uses hardlinks,
+      // so the flag has no practical effect.  Only use transport clone when
+      // the source is genuinely remote or a partial/shallow clone is needed.
+      let is_local_source = remote_display.has_prefix("/") ||
+        remote_display.has_prefix("file://")
+      let use_transport_clone = (
+          (no_local && not(is_local_source)) || filter.is_partial() || depth > 0
+        ) &&
         separate_git_dir is None &&
         remote_name == "origin"
       if use_transport_clone {
