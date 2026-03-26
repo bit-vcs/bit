@@ -87,6 +87,7 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
   }
   let fs = OsFs::new()
   let git_dir = find_git_dir(fs)
+  check_commit_graph_paranoia(fs, git_dir)
   let mut max_count : Int? = None
   let mut skip_count = 0
   let mut count_only = false

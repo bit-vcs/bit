@@ -100,6 +100,7 @@ options(
     "clone_wbtest.mbt": [ "native" ],
     "column.mbt": [ "native" ],
     "commit.mbt": [ "native" ],
+    "commit_graph.mbt": [ "native" ],
     "commit_tree.mbt": [ "native" ],
     "commit_wbtest.mbt": [ "native" ],
     "completion.mbt": [ "native" ],

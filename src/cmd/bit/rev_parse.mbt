@@ -35,6 +35,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
   let rfs : &@bitcore.RepoFileSystem = fs
   let git_dir = resolve_git_dir(rfs, root)
+  check_commit_graph_paranoia(fs, git_dir)
   // Check if we're actually in a git repository
   let in_repo = rfs.is_file(git_dir + "/HEAD") || is_bare_repo_dir(git_dir)
   if in_repo {

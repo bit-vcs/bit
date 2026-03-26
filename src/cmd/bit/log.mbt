@@ -3305,6 +3305,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
   let rfs : &@bitcore.RepoFileSystem = fs
   let git_dir = resolve_git_dir(fs, root)
+  validate_commit_graph_hash_version(fs, git_dir)
   if log_should_use_storage_runtime_in_repo(rfs, git_dir, args) {
     match log_storage_runtime_delegate_args(args) {
       Some(log_args) => {
