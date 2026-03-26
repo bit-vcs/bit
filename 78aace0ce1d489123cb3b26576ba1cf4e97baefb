@@ -1,0 +1,16 @@
+version 1
+key hub/work-item/77804fe1/meta
+kind work-item
+clock test <test@example.com>=1
+timestamp 1774526488
+node test <test@example.com>
+deleted 0
+
+work-item 77804fe1
+title relay persistence test
+author test <test@example.com>
+created 1774526488
+updated 1774526488
+state open
+
+Testing offline catch-up
