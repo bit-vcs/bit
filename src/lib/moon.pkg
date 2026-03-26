@@ -31,6 +31,7 @@ import {
   "moonbitlang/async" @async,
   "moonbitlang/core/bench" @bench,
   "mizchi/bit/osfs" @osfs,
+  "mizchi/bit/x/fs" @bitfs,
 } for "wbtest"
 
 warnings = "-29"

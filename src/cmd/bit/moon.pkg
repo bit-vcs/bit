@@ -229,6 +229,7 @@ options(
     "relay_ci_review.mbt": [ "native" ],
     "relay_js.mbt": [ "js" ],
     "relay_watch.mbt": [ "native" ],
+    "relay_watch_wbtest.mbt": [ "native" ],
     "remote.mbt": [ "native" ],
     "remote_wbtest.mbt": [ "native" ],
     "repack.mbt": [ "native" ],
