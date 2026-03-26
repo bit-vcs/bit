@@ -117,11 +117,11 @@ pub fn CommitGraphFile::get_oid(
   self : CommitGraphFile,
   pos : Int,
 ) -> @bit.ObjectId {
-  @bit.ObjectId::from_bytes_at(
-    self.data,
-    self.oidl_offset + pos * self.hash_size,
-    hash_size=self.hash_size,
-  )
+  let offset = self.oidl_offset + pos * self.hash_size
+  if offset + self.hash_size > self.data.length() {
+    return @bit.ObjectId::zero()
+  }
+  @bit.ObjectId::from_bytes_at(self.data, offset, hash_size=self.hash_size)
 }
 
 ///|
@@ -131,6 +131,9 @@ pub fn CommitGraphFile::read_commit(
   pos : Int,
 ) -> (@bit.ObjectId, Array[@bit.ObjectId], Int64) {
   let entry = self.cdat_offset + pos * (self.hash_size + 16)
+  if entry + self.hash_size + 16 > self.data.length() {
+    return (@bit.ObjectId::zero(), [], 0L)
+  }
   let tree_oid = @bit.ObjectId::from_bytes_at(
     self.data,
     entry,
@@ -146,29 +149,29 @@ pub fn CommitGraphFile::read_commit(
     date_low.to_int64().land(0xffffffffL)
   // Parents
   let parents : Array[@bit.ObjectId] = []
-  if parent1_raw != 0x70000000 {
-    // GRAPH_PARENT_NONE = 0x70000000
+  if parent1_raw != 0x70000000 && parent1_raw < self.num_commits {
     parents.push(self.get_oid(parent1_raw))
   }
   if parent2_raw == 0x70000000 {
-    // no second parent
     ()
   } else if (parent2_raw & 0x80000000) != 0 {
-    // GRAPH_EXTRA_EDGES_NEEDED
     let edge_pos = parent2_raw & 0x7fffffff
     if self.edge_offset > 0 {
       let mut ei = edge_pos
-      while true {
+      let max_edges = (self.data.length() - self.edge_offset) / 4
+      while ei < max_edges {
         let edge_val = cgraph_read_u32(self.data, self.edge_offset + ei * 4)
         let parent_pos = edge_val & 0x3fffffff
-        parents.push(self.get_oid(parent_pos))
+        if parent_pos < self.num_commits {
+          parents.push(self.get_oid(parent_pos))
+        }
         if (edge_val & 0x80000000) != 0 {
-          break // GRAPH_LAST_EDGE
+          break
         }
         ei += 1
       }
     }
-  } else {
+  } else if parent2_raw < self.num_commits {
     parents.push(self.get_oid(parent2_raw))
   }
   (tree_oid, parents, timestamp)

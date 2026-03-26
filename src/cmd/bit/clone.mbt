@@ -141,8 +141,14 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
       i += 1
       continue
     }
-    if arg == "--no-local" {
-      no_local = true
+    if arg == "--no-local" ||
+      arg == "--no-hardlinks" ||
+      arg == "-l" ||
+      arg == "--local" {
+      // bit never uses hardlinks; these flags are accepted but ignored
+      if arg == "--no-local" {
+        no_local = true
+      }
       i += 1
       continue
     }
