@@ -78,13 +78,14 @@ fn relay_resolve_room_arg(arg : String) -> (String, String) {
 ///|
 /// Watch a relay room for real-time updates (poll-based).
 async fn handle_relay_watch(args : Array[String]) -> Unit raise Error {
-  if args.length() == 0 {
-    eprint_line("Usage: bit relay watch <owner/repo> [--interval <seconds>]")
-    @sys.exit(1)
+  let mut room_arg = if args.length() > 0 && not(args[0].has_prefix("-")) {
+    args[0]
+  } else {
+    "."
   }
-  let mut room_arg = args[0]
   let mut interval_sec = 3
-  let mut i = 1
+  let start = if room_arg == "." { 0 } else { 1 }
+  let mut i = start
   while i < args.length() {
     if (args[i] == "--interval" || args[i] == "-i") && i + 1 < args.length() {
       interval_sec = @strconv.parse_int(args[i + 1]) catch { _ => 3 }
@@ -231,11 +232,11 @@ fn relay_watch_summarize_hub_record(payload : Map[String, Json]) -> String {
 ///|
 /// Show who is active in a relay room.
 async fn handle_relay_status(args : Array[String]) -> Unit raise Error {
-  if args.length() == 0 {
-    eprint_line("Usage: bit relay status <owner/repo>")
-    @sys.exit(1)
+  let mut room_arg = if args.length() > 0 && not(args[0].has_prefix("-")) {
+    args[0]
+  } else {
+    "."
   }
-  let mut room_arg = args[0]
   if room_arg == "." {
     let fs = OsFs::new()
     let root = get_work_root()
