@@ -1,9 +1,9 @@
 ///| Git object types and common errors
 
 ///|
-/// SHA-1 object identifier (20 bytes)
+/// Object identifier (20 bytes for SHA-1, 32 bytes for SHA-256)
 pub struct ObjectId {
-  bytes : FixedArray[Byte] // 20 bytes
+  bytes : FixedArray[Byte]
 }
 
 ///|
@@ -12,8 +12,8 @@ pub fn ObjectId::new(bytes : FixedArray[Byte]) -> ObjectId {
 }
 
 ///|
-pub fn ObjectId::zero() -> ObjectId {
-  { bytes: FixedArray::make(20, b'\x00') }
+pub fn ObjectId::zero(algo? : HashAlgorithm = Sha1) -> ObjectId {
+  { bytes: FixedArray::make(algo.hash_size(), b'\x00') }
 }
 
 ///|
@@ -28,29 +28,41 @@ pub fn ObjectId::is_zero(self : ObjectId) -> Bool {
 }
 
 ///|
-/// Convert ObjectId to Bytes (20 bytes) - zero-copy when possible
+/// Return the byte length of this ObjectId (20 for SHA-1, 32 for SHA-256).
+pub fn ObjectId::hash_size(self : ObjectId) -> Int {
+  self.bytes.length()
+}
+
+///|
+/// Convert ObjectId to Bytes - zero-copy when possible
 pub fn ObjectId::to_bytes(self : ObjectId) -> Bytes {
   Bytes::from_array(self.bytes.iter().collect())
 }
 
 ///|
-/// Create ObjectId from Bytes (must be exactly 20 bytes)
+/// Create ObjectId from Bytes (must be exactly 20 or 32 bytes)
 pub fn ObjectId::from_bytes(data : Bytes) -> ObjectId raise GitError {
-  if data.length() != 20 {
+  if data.length() != 20 && data.length() != 32 {
     raise GitError::InvalidObject("Invalid ObjectId length: \{data.length()}")
   }
-  let bytes = FixedArray::make(20, b'\x00')
-  for i in 0..<20 {
+  let len = data.length()
+  let bytes = FixedArray::make(len, b'\x00')
+  for i in 0..<len {
     bytes[i] = data[i]
   }
   { bytes, }
 }
 
 ///|
-/// Create ObjectId from Bytes at offset (for parsing packed data)
-pub fn ObjectId::from_bytes_at(data : Bytes, offset : Int) -> ObjectId {
-  let bytes = FixedArray::make(20, b'\x00')
-  for i in 0..<20 {
+/// Create ObjectId from Bytes at offset (for parsing packed data).
+/// Reads `hash_size` bytes (default 20 for SHA-1).
+pub fn ObjectId::from_bytes_at(
+  data : Bytes,
+  offset : Int,
+  hash_size? : Int = 20,
+) -> ObjectId {
+  let bytes = FixedArray::make(hash_size, b'\x00')
+  for i in 0..<hash_size {
     bytes[i] = data[offset + i]
   }
   { bytes, }
@@ -58,12 +70,13 @@ pub fn ObjectId::from_bytes_at(data : Bytes, offset : Int) -> ObjectId {
 
 ///|
 pub fn ObjectId::from_hex(hex : String) -> ObjectId raise GitError {
-  if hex.length() != 40 {
+  if hex.length() != 40 && hex.length() != 64 {
     raise GitError::InvalidObject("Invalid hex length: \{hex.length()}")
   }
-  let bytes = FixedArray::make(20, b'\x00')
+  let byte_len = hex.length() / 2
+  let bytes = FixedArray::make(byte_len, b'\x00')
   let chars = hex.to_array()
-  for i = 0; i < 20; i = i + 1 {
+  for i = 0; i < byte_len; i = i + 1 {
     let hi = hex_char_to_int(chars[i * 2])
     let lo = hex_char_to_int(chars[i * 2 + 1])
     bytes[i] = ((hi << 4) | lo).to_byte()
@@ -112,7 +125,10 @@ pub impl Show for ObjectId with output(self, logger) {
 
 ///|
 pub impl Eq for ObjectId with equal(self, other) {
-  for i = 0; i < 20; i = i + 1 {
+  if self.bytes.length() != other.bytes.length() {
+    return false
+  }
+  for i = 0; i < self.bytes.length(); i = i + 1 {
     if self.bytes[i] != other.bytes[i] {
       return false
     }
@@ -123,7 +139,8 @@ pub impl Eq for ObjectId with equal(self, other) {
 ///|
 /// Check if a hex string represents the zero (null) object id.
 pub fn ObjectId::is_zero_hex(hex : String) -> Bool {
-  hex == "0000000000000000000000000000000000000000"
+  hex == "0000000000000000000000000000000000000000" ||
+  hex == "0000000000000000000000000000000000000000000000000000000000000000"
 }
 
 ///|

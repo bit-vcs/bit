@@ -959,9 +959,7 @@ fn resolve_packed_ref(
 
 ///|
 fn parse_ref_object_id(hex : String) -> @bit.ObjectId? raise @bit.GitError {
-  // lib/object currently represents only SHA-1 ObjectId values.
-  // Treat SHA-256 refs as unresolved so callers can degrade gracefully.
-  if hex.length() == 64 {
+  if hex.length() != 40 && hex.length() != 64 {
     return None
   }
   Some(@bit.ObjectId::from_hex(hex))

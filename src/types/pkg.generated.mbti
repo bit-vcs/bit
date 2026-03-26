@@ -29,6 +29,10 @@ pub using @object {type Commit}
 
 pub using @object {type GitError}
 
+pub using @object {type HashAlgorithm}
+
+pub using @object {type HashState}
+
 pub using @object {type ObjectId}
 
 pub using @object {type ObjectType}
@@ -40,6 +44,8 @@ pub using @object {type PackDeltaMode}
 pub using @object {type PackObject}
 
 pub using @object {type Sha1State}
+
+pub using @object {type Sha256State}
 
 pub using @object {type TreeEntry}
 

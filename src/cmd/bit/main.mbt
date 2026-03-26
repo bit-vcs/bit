@@ -1018,7 +1018,9 @@ fn should_delegate_to_real_git(
     Some(cmd) =>
       if cmd == "config" || cmd == "status" {
         true
-      } else if cmd == "worktree" {
+      } else if cmd == "worktree" ||
+        cmd == "submodule" ||
+        cmd == "submodule--helper" {
         false
       } else if shim_handles_config {
         false

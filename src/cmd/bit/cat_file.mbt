@@ -644,7 +644,7 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
             }
         }
         if resolved_oid is None &&
-          spec.length() == 40 &&
+          (spec.length() == 40 || spec.length() == 64) &&
           cat_file_is_hex_string(spec) {
           let parsed_id = @bitcore.ObjectId::from_hex(spec)
           resolved_oid = Some(parsed_id)

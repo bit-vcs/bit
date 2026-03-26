@@ -309,9 +309,9 @@ fn find_loose_path_by_hex(
   match db.loose_paths.get(hex) {
     Some(path) => Some(path)
     None =>
-      if hex.length() == 40 {
+      if hex.length() == 40 || hex.length() == 64 {
         let prefix = String::unsafe_substring(hex, start=0, end=2)
-        let suffix = String::unsafe_substring(hex, start=2, end=40)
+        let suffix = String::unsafe_substring(hex, start=2, end=hex.length())
         let path = db.objects_dir + "/" + prefix + "/" + suffix
         if fs.is_file(path) {
           db.loose_paths[hex] = path
@@ -394,9 +394,9 @@ fn get_loose_by_hex(
   let loose_path = match db.loose_paths.get(hex) {
     Some(path) => Some(path)
     None =>
-      if hex.length() == 40 {
+      if hex.length() == 40 || hex.length() == 64 {
         let prefix = String::unsafe_substring(hex, start=0, end=2)
-        let suffix = String::unsafe_substring(hex, start=2, end=40)
+        let suffix = String::unsafe_substring(hex, start=2, end=hex.length())
         let path = db.objects_dir + "/" + prefix + "/" + suffix
         if fs.is_file(path) {
           db.loose_paths[hex] = path
@@ -416,7 +416,16 @@ fn get_loose_by_hex(
       }
       let obj = parse_loose_object(raw)
       if not(db.skip_verify) {
-        let computed = @bit.hash_object_content(obj.obj_type, obj.data).to_hex()
+        let verify_algo : @object.HashAlgorithm = if hex.length() == 64 {
+          @object.HashAlgorithm::Sha256
+        } else {
+          @object.HashAlgorithm::Sha1
+        }
+        let computed = @object.hash_object_content_with_algo(
+          verify_algo,
+          obj.obj_type,
+          obj.data,
+        ).to_hex()
         if computed != hex {
           raise @bit.GitError::HashMismatch(computed, hex)
         }
@@ -600,9 +609,9 @@ fn get_by_hex(
     Some(path) => Some(path)
     None =>
       // Try constructing path directly (lazy loading)
-      if hex.length() == 40 {
+      if hex.length() == 40 || hex.length() == 64 {
         let prefix = String::unsafe_substring(hex, start=0, end=2)
-        let suffix = String::unsafe_substring(hex, start=2, end=40)
+        let suffix = String::unsafe_substring(hex, start=2, end=hex.length())
         let path = db.objects_dir + "/" + prefix + "/" + suffix
         if fs.is_file(path) {
           db.loose_paths[hex] = path // cache for future lookups
@@ -622,7 +631,16 @@ fn get_by_hex(
       }
       let obj = parse_loose_object(raw)
       if not(db.skip_verify) {
-        let computed = @bit.hash_object_content(obj.obj_type, obj.data).to_hex()
+        let verify_algo : @object.HashAlgorithm = if hex.length() == 64 {
+          @object.HashAlgorithm::Sha256
+        } else {
+          @object.HashAlgorithm::Sha1
+        }
+        let computed = @object.hash_object_content_with_algo(
+          verify_algo,
+          obj.obj_type,
+          obj.data,
+        ).to_hex()
         if computed != hex {
           raise @bit.GitError::HashMismatch(computed, hex)
         }

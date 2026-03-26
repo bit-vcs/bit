@@ -1,5 +1,6 @@
 import {
   "mizchi/bit" @bit,
+  "mizchi/bit/object" @object,
   "mizchi/bit/io" @bitio,
   "mizchi/bit/io/native" @bitnative,
   "mizchi/bit/refs" @bitrefs,

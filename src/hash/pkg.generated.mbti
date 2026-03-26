@@ -1,6 +1,10 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "mizchi/bit/hash"
 
+import {
+  "moonbitlang/x/crypto",
+}
+
 // Values
 pub fn hex_char_to_int(Char) -> Int raise
 
@@ -19,6 +23,14 @@ pub fn sha1_array_raw(Array[Byte]) -> FixedArray[Byte]
 pub fn sha1_prefix_raw(Bytes, Int) -> FixedArray[Byte]
 
 pub fn sha1_raw(Bytes) -> FixedArray[Byte]
+
+pub fn sha256_array_prefix_raw(Array[Byte], Int) -> FixedArray[Byte]
+
+pub fn sha256_array_raw(Array[Byte]) -> FixedArray[Byte]
+
+pub fn sha256_prefix_raw(Bytes, Int) -> FixedArray[Byte]
+
+pub fn sha256_raw(Bytes) -> FixedArray[Byte]
 
 pub fn short_hex(String, Int) -> String
 
@@ -39,6 +51,17 @@ pub fn Sha1State::update(Self, Bytes) -> Unit
 pub fn Sha1State::update_byte(Self, Byte) -> Unit
 pub fn Sha1State::update_slice(Self, Bytes, Int, Int) -> Unit
 pub fn Sha1State::update_string(Self, String) -> Unit
+
+pub struct Sha256State {
+  inner : @crypto.SHA256
+}
+pub fn Sha256State::finish_raw(Self) -> FixedArray[Byte]
+pub fn Sha256State::new() -> Self
+pub fn Sha256State::reset(Self) -> Unit
+pub fn Sha256State::update(Self, Bytes) -> Unit
+pub fn Sha256State::update_byte(Self, Byte) -> Unit
+pub fn Sha256State::update_slice(Self, Bytes, Int, Int) -> Unit
+pub fn Sha256State::update_string(Self, String) -> Unit
 
 // Type aliases
 

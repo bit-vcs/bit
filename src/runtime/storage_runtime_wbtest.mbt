@@ -188,9 +188,13 @@ fn storage_runtime_wbtest_hash_object_command(
   StorageCommand::HashObject({
     write_object,
     stdin_mode,
+    stdin_paths: false,
+    no_filters: false,
     literally: false,
     obj_type,
     paths,
+    object_format: "",
+    path_hint: "",
   })
 }
 

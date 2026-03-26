@@ -297,16 +297,36 @@ fn storage_runtime_parse_hash_object_args(
 ) -> @runtime.StorageHashObjectArgs raise Error {
   let mut write_object = false
   let mut stdin_mode = false
+  let mut stdin_paths = false
+  let mut no_filters = false
   let mut literally = false
   let mut obj_type = "blob"
+  let mut object_format = ""
+  let mut path_hint = ""
   let paths : Array[String] = []
   let mut i = 0
   while i < args.length() {
     let arg = args[i]
     match arg {
       "-w" => write_object = true
-      "--stdin" => stdin_mode = true
+      "--stdin" =>
+        if stdin_mode {
+          raise @bitcore.GitError::InvalidObject(
+            "Multiple --stdin arguments are not supported",
+          )
+        } else {
+          stdin_mode = true
+        }
+      "--stdin-paths" => stdin_paths = true
+      "--no-filters" => no_filters = true
       "--literally" => literally = true
+      "--path" if i + 1 < args.length() => {
+        path_hint = args[i + 1]
+        i += 2
+        continue
+      }
+      _ if arg.has_prefix("--path=") =>
+        path_hint = String::unsafe_substring(arg, start=7, end=arg.length())
       "-t" if i + 1 < args.length() => {
         obj_type = args[i + 1]
         i += 2
@@ -314,17 +334,58 @@ fn storage_runtime_parse_hash_object_args(
       }
       _ if arg.has_prefix("-t") && arg.length() > 2 =>
         obj_type = String::unsafe_substring(arg, start=2, end=arg.length())
+      _ if arg.has_prefix("--object-format=") =>
+        object_format = String::unsafe_substring(
+          arg,
+          start=16,
+          end=arg.length(),
+        )
+      "--object-format" if i + 1 < args.length() => {
+        object_format = args[i + 1]
+        i += 2
+        continue
+      }
+      "--" => {
+        i += 1
+        while i < args.length() {
+          paths.push(args[i])
+          i += 1
+        }
+        break
+      }
       _ if not(arg.has_prefix("-")) => paths.push(arg)
       _ => storage_runtime_fail_unsupported_option("hash-object", arg)
     }
     i += 1
   }
+  if stdin_mode && stdin_paths {
+    raise @bitcore.GitError::InvalidObject(
+      "Can't use --stdin and --stdin-paths together",
+    )
+  }
+  if no_filters && path_hint.length() > 0 {
+    raise @bitcore.GitError::InvalidObject("Can't use --path with --no-filters")
+  }
+  if stdin_paths && paths.length() > 0 {
+    raise @bitcore.GitError::InvalidObject(
+      "Can't pass filenames as arguments with --stdin-paths",
+    )
+  }
+  if stdin_paths && path_hint.length() > 0 {
+    raise @bitcore.GitError::InvalidObject(
+      "Can't use --path with --stdin-paths",
+    )
+  }
   {
     write_object,
     stdin_mode,
+    stdin_paths,
+    no_filters,
     literally,
     obj_type: storage_runtime_parse_object_type(obj_type),
     paths,
+    object_format,
+    path_hint,
   }
 }
 

@@ -455,6 +455,13 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
             )
         }
       }
+      "--show-superproject-working-tree" => {
+        let result = rev_parse_find_superproject_working_tree(fs, git_dir, root)
+        match result {
+          Some(path) => print_line(path)
+          None => ()
+        }
+      }
       "--show-object-format" => print_line(repo_object_format(fs, git_dir))
       _ if arg.has_prefix("--show-object-format=") => {
         let mode = String::unsafe_substring(arg, start=21, end=arg.length())
@@ -3549,4 +3556,64 @@ fn rev_parse_detached_glob_pattern(args : Array[String], idx : Int) -> String? {
     return None
   }
   Some(rev_parse_normalize_glob_pattern(args[idx + 1]))
+}
+
+///|
+fn rev_parse_last_slash(s : String) -> Int {
+  let chars = s.to_array()
+  let mut last = -1
+  for i = 0; i < chars.length(); i = i + 1 {
+    if chars[i] == '/' {
+      last = i
+    }
+  }
+  last
+}
+
+///|
+/// Find the superproject working tree for a submodule.
+fn rev_parse_find_superproject_working_tree(
+  fs : OsFs,
+  git_dir : String,
+  root : String,
+) -> String? {
+  let dot_git = root + "/.git"
+  let rfs : &@bitcore.RepoFileSystem = fs
+  let content_bytes = rfs.read_file(dot_git) catch { _ => return None }
+  let content = @string_utils.decode_bytes(content_bytes)
+  let trimmed = content.trim().to_string()
+  guard trimmed.has_prefix("gitdir: ") else { return None }
+  let gitdir_raw = String::unsafe_substring(
+    trimmed,
+    start=8,
+    end=trimmed.length(),
+  )
+  let gitdir_abs = if gitdir_raw.has_prefix("/") {
+    gitdir_raw
+  } else {
+    normalize_path(root + "/" + gitdir_raw)
+  }
+  // Walk up from gitdir to find a component named ".git"
+  let mut dir = gitdir_abs
+  for _i = 0; _i < 10; _i = _i + 1 {
+    let slash = rev_parse_last_slash(dir)
+    if slash <= 0 {
+      break
+    }
+    dir = String::unsafe_substring(dir, start=0, end=slash)
+    let base_slash = rev_parse_last_slash(dir)
+    let basename = if base_slash >= 0 {
+      String::unsafe_substring(dir, start=base_slash + 1, end=dir.length())
+    } else {
+      dir
+    }
+    if basename == ".git" {
+      if base_slash > 0 {
+        return Some(String::unsafe_substring(dir, start=0, end=base_slash))
+      }
+      break
+    }
+  }
+  ignore(git_dir)
+  None
 }

@@ -38,9 +38,13 @@ pub(all) struct StorageLogArgs {
 pub(all) struct StorageHashObjectArgs {
   write_object : Bool
   stdin_mode : Bool
+  stdin_paths : Bool
+  no_filters : Bool
   literally : Bool
   obj_type : @bit.ObjectType
   paths : Array[String]
+  object_format : String
+  path_hint : String
 }
 
 ///|
@@ -179,47 +183,6 @@ fn storage_resolve_git_dir(rfs : &@bit.RepoFileSystem, root : String) -> String 
       } else {
         default_git_dir
       }
-  }
-}
-
-///|
-fn storage_repo_object_format(
-  rfs : &@bit.RepoFileSystem,
-  git_dir : String,
-) -> String {
-  match
-    @bitlib.read_config_value(
-      rfs,
-      git_dir + "/config",
-      "extensions",
-      "objectformat",
-    ) {
-    Some(value) => if value.to_lower() == "sha256" { "sha256" } else { "sha1" }
-    None => "sha1"
-  }
-}
-
-///|
-fn storage_repo_compat_object_format(
-  rfs : &@bit.RepoFileSystem,
-  git_dir : String,
-) -> String? {
-  match
-    @bitlib.read_config_value(
-      rfs,
-      git_dir + "/config",
-      "extensions",
-      "compatobjectformat",
-    ) {
-    Some(value) => {
-      let normalized = @bitlib.config_strip_quotes(value).to_lower()
-      if normalized == "sha1" || normalized == "sha256" {
-        Some(normalized)
-      } else {
-        None
-      }
-    }
-    None => None
   }
 }
 
@@ -511,21 +474,6 @@ fn storage_print_line(text : String) -> Unit {
 }
 
 ///|
-fn storage_require_sha1_repo(
-  cmd : String,
-  rfs : &@bit.RepoFileSystem,
-  git_dir : String,
-) -> Unit raise Error {
-  if storage_repo_object_format(rfs, git_dir) != "sha1" {
-    storage_fail_unsupported_mode(cmd, "repository object format")
-  }
-  // compatObjectFormat is ignored — we only need the primary format to be sha1.
-  // When compatObjectFormat=sha256, git stores dual hashes, but the sha1 tree
-  // format is identical, so write-tree/add/commit can proceed normally.
-  ignore(storage_repo_compat_object_format(rfs, git_dir))
-}
-
-///|
 fn storage_handle_init(
   fs : &@bit.FileSystem,
   rfs : &@bit.RepoFileSystem,
@@ -572,18 +520,18 @@ fn storage_handle_add(
   args : StorageAddArgs,
 ) -> Unit raise Error {
   let git_dir = storage_resolve_git_dir(rfs, root)
-  storage_require_sha1_repo("add", rfs, git_dir)
+  let algo = storage_resolve_hash_algorithm(rfs, git_dir, "")
   if args.add_all {
     let add_all_paths = storage_collect_add_all_paths(rfs, root)
     if add_all_paths.length() > 0 {
-      @bitlib.add_paths(fs, rfs, root, add_all_paths)
+      @bitlib.add_paths(fs, rfs, root, add_all_paths, algo~)
     }
     return
   }
   if args.paths.length() == 0 {
     raise @bit.GitError::InvalidObject("add requires pathspec")
   }
-  @bitlib.add_paths(fs, rfs, root, args.paths)
+  @bitlib.add_paths(fs, rfs, root, args.paths, algo~)
 }
 
 ///|
@@ -629,7 +577,7 @@ fn storage_handle_commit(
   args : StorageCommitArgs,
 ) -> Unit raise Error {
   let git_dir = storage_resolve_git_dir(rfs, root)
-  storage_require_sha1_repo("commit", rfs, git_dir)
+  let algo = storage_resolve_hash_algorithm(rfs, git_dir, "")
   guard args.message.length() > 0 else {
     raise @bit.GitError::InvalidObject(
       "storage runtime commit requires -m/--message",
@@ -663,6 +611,7 @@ fn storage_handle_commit(
     encoding=args.encoding,
     author_timezone=Some(author_timezone),
     committer_timezone=Some(timezone),
+    algo~,
   )
   if not(args.quiet) {
     let short_id = String::unsafe_substring(commit_id.to_hex(), start=0, end=7)
@@ -1082,17 +1031,72 @@ fn storage_handle_hash_object(
   }
   // compatObjectFormat is ignored — we write sha1 objects regardless.
   ignore(storage_read_compat_object_format(rfs, git_dir))
+  let algo = storage_resolve_hash_algorithm(rfs, git_dir, args.object_format)
   if args.stdin_mode {
     let content = storage_read_all_stdin()
-    // Validate commit/tag content unless --literally
     if not(args.literally) {
       storage_hash_object_validate_content(args.obj_type, content)
     }
-    let id = @bit.hash_object_content(args.obj_type, content)
+    let id = @object.hash_object_content_with_algo(algo, args.obj_type, content)
     if args.write_object {
-      ignore(@bitlib.write_loose_object(fs, git_dir, args.obj_type, content))
+      let (_, compressed) = @object.create_object_with_algo(
+        algo,
+        args.obj_type,
+        content,
+      )
+      @bitlib.write_object_bytes(fs, git_dir, id, compressed)
     }
     storage_print_line(id.to_hex())
+    if args.paths.length() == 0 && not(args.stdin_paths) {
+      return
+    }
+  }
+  if args.stdin_paths {
+    let stdin_content = storage_read_all_stdin()
+    let text = @string_utils.decode_bytes(stdin_content)
+    let autocrlf = @bitlib.read_autocrlf_setting(rfs, git_dir)
+    for line_view in text.split("\n") {
+      let line = line_view.to_string()
+      if line.length() == 0 {
+        continue
+      }
+      let abs = if line.has_prefix("/") {
+        storage_normalize_path(line)
+      } else {
+        storage_normalize_path(cwd + "/" + line)
+      }
+      let content = rfs.read_file(abs)
+      let prefix_len = root.length() + 1
+      let rel_path = if abs.has_prefix(root + "/") {
+        abs[prefix_len:].to_string()
+      } else {
+        abs
+      }
+      let attrs = if args.no_filters {
+        @bitlib.resolve_eol_attrs(rfs, root, "")
+      } else {
+        @bitlib.resolve_eol_attrs(rfs, root, rel_path)
+      }
+      let normalized = if args.no_filters {
+        content
+      } else {
+        @bitlib.clean_for_storage(content, attrs, autocrlf)
+      }
+      let id = @object.hash_object_content_with_algo(
+        algo,
+        args.obj_type,
+        normalized,
+      )
+      if args.write_object {
+        let (_, compressed) = @object.create_object_with_algo(
+          algo,
+          args.obj_type,
+          normalized,
+        )
+        @bitlib.write_object_bytes(fs, git_dir, id, compressed)
+      }
+      storage_print_line(id.to_hex())
+    }
     return
   }
   let autocrlf = @bitlib.read_autocrlf_setting(rfs, git_dir)
@@ -1109,14 +1113,36 @@ fn storage_handle_hash_object(
     } else {
       abs
     }
-    let attrs = @bitlib.resolve_eol_attrs(rfs, root, rel_path)
-    let normalized = @bitlib.clean_for_storage(content, attrs, autocrlf)
+    let filter_rel = if args.path_hint.length() > 0 {
+      args.path_hint
+    } else {
+      rel_path
+    }
+    let attrs = if args.no_filters {
+      @bitlib.resolve_eol_attrs(rfs, root, "")
+    } else {
+      @bitlib.resolve_eol_attrs(rfs, root, filter_rel)
+    }
+    let normalized = if args.no_filters {
+      content
+    } else {
+      @bitlib.clean_for_storage(content, attrs, autocrlf)
+    }
     if not(args.literally) {
       storage_hash_object_validate_content(args.obj_type, normalized)
     }
-    let id = @bit.hash_object_content(args.obj_type, normalized)
+    let id = @object.hash_object_content_with_algo(
+      algo,
+      args.obj_type,
+      normalized,
+    )
     if args.write_object {
-      ignore(@bitlib.write_loose_object(fs, git_dir, args.obj_type, normalized))
+      let (_, compressed) = @object.create_object_with_algo(
+        algo,
+        args.obj_type,
+        normalized,
+      )
+      @bitlib.write_object_bytes(fs, git_dir, id, compressed)
     }
     storage_print_line(id.to_hex())
   }
@@ -1141,6 +1167,36 @@ fn storage_read_compat_object_format(
 }
 
 ///|
+fn storage_resolve_hash_algorithm(
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+  explicit_format : String,
+) -> @object.HashAlgorithm {
+  if explicit_format.length() > 0 {
+    return if explicit_format.to_lower() == "sha256" {
+      @object.HashAlgorithm::Sha256
+    } else {
+      @object.HashAlgorithm::Sha1
+    }
+  }
+  match
+    @bitlib.read_config_value(
+      rfs,
+      git_dir + "/config",
+      "extensions",
+      "objectformat",
+    ) {
+    Some(value) =>
+      if value.to_lower() == "sha256" {
+        @object.HashAlgorithm::Sha256
+      } else {
+        @object.HashAlgorithm::Sha1
+      }
+    None => @object.HashAlgorithm::Sha1
+  }
+}
+
+///|
 fn storage_handle_write_tree(
   fs : &@bit.FileSystem,
   rfs : &@bit.RepoFileSystem,
@@ -1148,7 +1204,7 @@ fn storage_handle_write_tree(
   args : StorageWriteTreeArgs,
 ) -> Unit raise Error {
   let git_dir = storage_resolve_git_dir(rfs, root)
-  storage_require_sha1_repo("write-tree", rfs, git_dir)
+  let algo = storage_resolve_hash_algorithm(rfs, git_dir, "")
   let entries = @bitlib.read_index_entries(rfs, git_dir)
   let tree_id = @bitlib.write_tree_from_index(
     fs,
@@ -1157,6 +1213,7 @@ fn storage_handle_write_tree(
     entries,
     prefix=args.prefix,
     missing_ok=args.missing_ok,
+    algo~,
   )
   storage_print_line(tree_id.to_hex())
 }

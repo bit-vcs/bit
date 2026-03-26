@@ -155,6 +155,7 @@ pub fn add_paths(
   rfs : &@bit.RepoFileSystem,
   root : String,
   paths : Array[String],
+  algo? : @object.HashAlgorithm = @object.HashAlgorithm::Sha1,
 ) -> Unit raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   let actual_git_dir = if rfs.is_file(git_dir) {
@@ -180,6 +181,7 @@ pub fn add_paths(
         actual_git_dir,
         @bit.ObjectType::Blob,
         normalized,
+        algo~,
       )
       let size = content.length()
       let meta = @bitio.worktree_entry_meta_sync(rfs, abs)
@@ -386,6 +388,7 @@ pub fn commit(
   encoding? : String = "UTF-8",
   author_timezone? : String? = None,
   committer_timezone? : String? = None,
+  algo? : @object.HashAlgorithm = @object.HashAlgorithm::Sha1,
 ) -> @bit.ObjectId raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   let actual_git_dir = if rfs.is_file(git_dir) {
@@ -412,7 +415,10 @@ pub fn commit(
         match parent_tree {
           Some(tree) => tree
           None => {
-            let (empty_tree_id, empty_tree_compressed) = @bit.create_tree([])
+            let (empty_tree_id, empty_tree_compressed) = @object.create_tree_with_algo(
+              algo,
+              [],
+            )
             write_object_bytes(
               fs, actual_git_dir, empty_tree_id, empty_tree_compressed,
             )
@@ -421,7 +427,10 @@ pub fn commit(
         }
       }
       None => {
-        let (empty_tree_id, empty_tree_compressed) = @bit.create_tree([])
+        let (empty_tree_id, empty_tree_compressed) = @object.create_tree_with_algo(
+          algo,
+          [],
+        )
         write_object_bytes(
           fs, actual_git_dir, empty_tree_id, empty_tree_compressed,
         )
@@ -429,7 +438,14 @@ pub fn commit(
       }
     }
   } else {
-    write_tree_from_index(fs, rfs, actual_git_dir, entries, missing_ok=true)
+    write_tree_from_index(
+      fs,
+      rfs,
+      actual_git_dir,
+      entries,
+      missing_ok=true,
+      algo~,
+    )
   }
   let parents = match parent {
     Some(p) => [p]
@@ -449,7 +465,7 @@ pub fn commit(
     message,
     encoding~,
   )
-  let (commit_id, compressed) = @bit.create_commit(commit)
+  let (commit_id, compressed) = @object.create_commit_with_algo(algo, commit)
   write_object_bytes(fs, actual_git_dir, commit_id, compressed)
   update_head_ref(fs, rfs, actual_git_dir, commit_id)
   append_head_update_reflogs(
@@ -1018,8 +1034,11 @@ pub fn write_loose_object(
   git_dir : String,
   obj_type : @bit.ObjectType,
   content : Bytes,
+  algo? : @object.HashAlgorithm = @object.HashAlgorithm::Sha1,
 ) -> @bit.ObjectId raise @bit.GitError {
-  let (id, compressed) = @bit.create_object(obj_type, content)
+  let (id, compressed) = @object.create_object_with_algo(
+    algo, obj_type, content,
+  )
   write_object_bytes(fs, git_dir, id, compressed)
   id
 }
@@ -1202,6 +1221,7 @@ pub fn write_tree_from_index(
   entries : Array[IndexEntry],
   prefix? : String? = None,
   missing_ok? : Bool = false,
+  algo? : @object.HashAlgorithm = @object.HashAlgorithm::Sha1,
 ) -> @bit.ObjectId raise @bit.GitError {
   // If prefix is specified, filter entries and strip prefix from paths
   let rel_entries = match prefix {
@@ -1253,7 +1273,7 @@ pub fn write_tree_from_index(
   } else {
     Some(ObjectDb::load_lazy(rfs, git_dir))
   }
-  write_tree_from_entries(fs, rfs, git_dir, rel_entries, object_db)
+  write_tree_from_entries(fs, rfs, git_dir, rel_entries, object_db, algo~)
 }
 
 ///|
@@ -1263,6 +1283,7 @@ fn write_tree_from_entries(
   git_dir : String,
   entries : Array[IndexEntry],
   object_db : ObjectDb?,
+  algo? : @object.HashAlgorithm = @object.HashAlgorithm::Sha1,
 ) -> @bit.ObjectId raise @bit.GitError {
   let file_entries : Array[@bit.TreeEntry] = []
   let dir_map : Map[String, Array[IndexEntry]] = {}
@@ -1325,7 +1346,14 @@ fn write_tree_from_entries(
   }
   for item in dir_map.to_array() {
     let (dir_name, list) = item
-    let sub_id = write_tree_from_entries(fs, rfs, git_dir, list, object_db)
+    let sub_id = write_tree_from_entries(
+      fs,
+      rfs,
+      git_dir,
+      list,
+      object_db,
+      algo~,
+    )
     file_entries.push(@bit.TreeEntry::new("40000", dir_name, sub_id))
   }
   // Git sorts tree entries by name, with directories having "/" appended for comparison
@@ -1334,7 +1362,7 @@ fn write_tree_from_entries(
     let b_key = if b.mode == "40000" { b.name + "/" } else { b.name }
     compare_strings_lexicographic(a_key, b_key)
   })
-  let (tree_id, compressed) = @bit.create_tree(file_entries)
+  let (tree_id, compressed) = @object.create_tree_with_algo(algo, file_entries)
   write_object_bytes(fs, git_dir, tree_id, compressed)
   tree_id
 }
@@ -1555,6 +1583,7 @@ pub fn commit_amend(
   encoding? : String = "UTF-8",
   author_timezone? : String? = None,
   committer_timezone? : String? = None,
+  algo? : @object.HashAlgorithm = @object.HashAlgorithm::Sha1,
 ) -> @bit.ObjectId raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   let actual_git_dir = if rfs.is_file(git_dir) {
@@ -1566,7 +1595,7 @@ pub fn commit_amend(
   if entries.length() == 0 {
     raise @bit.GitError::InvalidObject("Empty index")
   }
-  let tree_id = write_tree_from_index(fs, rfs, actual_git_dir, entries)
+  let tree_id = write_tree_from_index(fs, rfs, actual_git_dir, entries, algo~)
   // Get the parent of the current HEAD (grandparent of new commit)
   let current_head = resolve_head_commit(rfs, actual_git_dir)
   let parents = match current_head {
@@ -1598,7 +1627,7 @@ pub fn commit_amend(
     message,
     encoding~,
   )
-  let (commit_id, compressed) = @bit.create_commit(commit)
+  let (commit_id, compressed) = @object.create_commit_with_algo(algo, commit)
   write_object_bytes(fs, actual_git_dir, commit_id, compressed)
   update_head_ref(fs, rfs, actual_git_dir, commit_id)
   append_head_update_reflogs(

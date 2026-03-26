@@ -717,7 +717,7 @@ fn resolve_abbrev_ref_id(
   spec : String,
 ) -> @object.ObjectId? raise @object.GitError {
   if spec.length() < 4 ||
-    spec.length() >= 40 ||
+    spec.length() >= 64 ||
     not(@bithash.is_hex_string(spec)) {
     return None
   }
@@ -1135,7 +1135,8 @@ fn resolve_base_ref(
     spec.has_prefix("remotes/") {
     return @bitlib.resolve_ref(fs, git_dir, "refs/" + spec)
   }
-  if spec.length() == 40 && @bithash.is_hex_string(spec) {
+  if (spec.length() == 40 || spec.length() == 64) &&
+    @bithash.is_hex_string(spec) {
     match @object.ObjectId::from_hex(spec) {
       id => return Some(id)
     }

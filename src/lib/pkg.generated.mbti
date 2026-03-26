@@ -8,7 +8,7 @@ import {
 }
 
 // Values
-pub fn add_paths(&@types.FileSystem, &@types.RepoFileSystem, String, Array[String]) -> Unit raise @object.GitError
+pub fn add_paths(&@types.FileSystem, &@types.RepoFileSystem, String, Array[String], algo? : @object.HashAlgorithm) -> Unit raise @object.GitError
 
 pub async fn add_paths_async(&@types.FileSystem, &@types.RepoFileSystem, String, Array[String], run_filter_cmd? : FilterCmd, warnings? : Array[String]) -> Unit raise @object.GitError
 
@@ -66,9 +66,9 @@ pub fn collect_tree_files(ObjectDb, &@types.RepoFileSystem, @object.ObjectId) ->
 
 pub fn collect_tree_files_from_commit(ObjectDb, &@types.RepoFileSystem, @object.ObjectId) -> Map[String, TreeFileEntry] raise @object.GitError
 
-pub fn commit(&@types.FileSystem, &@types.RepoFileSystem, String, String, String, Int64, committer? : String, committer_timestamp? : Int64, allow_empty? : Bool, timezone? : String, encoding? : String, author_timezone? : String?, committer_timezone? : String?) -> @object.ObjectId raise @object.GitError
+pub fn commit(&@types.FileSystem, &@types.RepoFileSystem, String, String, String, Int64, committer? : String, committer_timestamp? : Int64, allow_empty? : Bool, timezone? : String, encoding? : String, author_timezone? : String?, committer_timezone? : String?, algo? : @object.HashAlgorithm) -> @object.ObjectId raise @object.GitError
 
-pub fn commit_amend(&@types.FileSystem, &@types.RepoFileSystem, String, String, String, Int64, committer? : String, committer_timestamp? : Int64, timezone? : String, encoding? : String, author_timezone? : String?, committer_timezone? : String?) -> @object.ObjectId raise @object.GitError
+pub fn commit_amend(&@types.FileSystem, &@types.RepoFileSystem, String, String, String, Int64, committer? : String, committer_timestamp? : Int64, timezone? : String, encoding? : String, author_timezone? : String?, committer_timezone? : String?, algo? : @object.HashAlgorithm) -> @object.ObjectId raise @object.GitError
 
 pub fn commit_apply_signoff(String, committer~ : String) -> String
 
@@ -574,7 +574,7 @@ pub fn write_index_entries_with_tree(&@types.FileSystem, &@types.RepoFileSystem,
 
 pub fn write_index_stage_entries(&@types.FileSystem, String, Array[IndexStageEntry]) -> Unit raise @object.GitError
 
-pub fn write_loose_object(&@types.FileSystem, String, @object.ObjectType, Bytes) -> @object.ObjectId raise @object.GitError
+pub fn write_loose_object(&@types.FileSystem, String, @object.ObjectType, Bytes, algo? : @object.HashAlgorithm) -> @object.ObjectId raise @object.GitError
 
 pub fn write_object_bytes(&@types.FileSystem, String, @object.ObjectId, Bytes) -> Unit raise @object.GitError
 
@@ -584,7 +584,7 @@ pub fn write_sparse_patterns(&@types.FileSystem, &@types.RepoFileSystem, String,
 
 pub fn write_subdir_attributes(&@types.FileSystem, String, String, String, @object.ObjectId) -> Unit
 
-pub fn write_tree_from_index(&@types.FileSystem, &@types.RepoFileSystem, String, Array[IndexEntry], prefix? : String?, missing_ok? : Bool) -> @object.ObjectId raise @object.GitError
+pub fn write_tree_from_index(&@types.FileSystem, &@types.RepoFileSystem, String, Array[IndexEntry], prefix? : String?, missing_ok? : Bool, algo? : @object.HashAlgorithm) -> @object.ObjectId raise @object.GitError
 
 pub fn write_tree_to_worktree(ObjectDb, &@types.RepoFileSystem, &@types.FileSystem, @object.ObjectId, String) -> Unit raise @object.GitError
 

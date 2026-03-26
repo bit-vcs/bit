@@ -14,6 +14,6 @@ test "hash-object: storage runtime routing follows parser support" {
     is Some(_),
   )
   assert_true(
-    hash_object_storage_runtime_delegate_args(["--stdin-paths"]) is None,
+    hash_object_storage_runtime_delegate_args(["--stdin-paths"]) is Some(_),
   )
 }

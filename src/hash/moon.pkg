@@ -1,5 +1,6 @@
 import {
   "moonbitlang/core/encoding/utf8" @utf8,
+  "moonbitlang/x/crypto" @crypto,
 }
 
 warnings = "-29"

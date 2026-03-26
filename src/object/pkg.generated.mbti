@@ -14,15 +14,23 @@ pub fn create_blob_string(String) -> (ObjectId, Bytes)
 
 pub fn create_commit(Commit) -> (ObjectId, Bytes)
 
+pub fn create_commit_with_algo(HashAlgorithm, Commit) -> (ObjectId, Bytes)
+
 pub fn create_object(ObjectType, Bytes) -> (ObjectId, Bytes)
 
+pub fn create_object_with_algo(HashAlgorithm, ObjectType, Bytes) -> (ObjectId, Bytes)
+
 pub fn create_tree(Array[TreeEntry]) -> (ObjectId, Bytes)
+
+pub fn create_tree_with_algo(HashAlgorithm, Array[TreeEntry]) -> (ObjectId, Bytes)
 
 pub fn hash_blob(Bytes) -> ObjectId
 
 pub fn hash_blob_string(String) -> ObjectId
 
 pub fn hash_object_content(ObjectType, Bytes) -> ObjectId
+
+pub fn hash_object_content_with_algo(HashAlgorithm, ObjectType, Bytes) -> ObjectId
 
 pub fn serialize_commit_content(Commit) -> Bytes
 
@@ -35,6 +43,14 @@ pub fn sha1_array(Array[Byte]) -> ObjectId
 pub fn sha1_array_prefix(Array[Byte], Int) -> ObjectId
 
 pub fn sha1_prefix(Bytes, Int) -> ObjectId
+
+pub fn sha256(Bytes) -> ObjectId
+
+pub fn sha256_array(Array[Byte]) -> ObjectId
+
+pub fn sha256_array_prefix(Array[Byte], Int) -> ObjectId
+
+pub fn sha256_prefix(Bytes, Int) -> ObjectId
 
 // Errors
 pub(all) suberror GitError {
@@ -62,18 +78,43 @@ pub struct Commit {
 }
 pub fn Commit::new(ObjectId, Array[ObjectId], String, Int64, String, String, Int64, String, String, encoding? : String) -> Self
 
+pub(all) enum HashAlgorithm {
+  Sha1
+  Sha256
+}
+pub fn HashAlgorithm::from_string(String) -> Self raise GitError
+pub fn HashAlgorithm::hash_size(Self) -> Int
+pub fn HashAlgorithm::hex_size(Self) -> Int
+pub fn HashAlgorithm::name(Self) -> String
+pub fn HashAlgorithm::zero_hex(Self) -> String
+pub impl Eq for HashAlgorithm
+pub impl Show for HashAlgorithm
+
+pub(all) enum HashState {
+  HS1(Sha1State)
+  HS256(Sha256State)
+}
+pub fn HashState::finish(Self) -> ObjectId
+pub fn HashState::new(HashAlgorithm) -> Self
+pub fn HashState::reset(Self) -> Unit
+pub fn HashState::update(Self, Bytes) -> Unit
+pub fn HashState::update_byte(Self, Byte) -> Unit
+pub fn HashState::update_slice(Self, Bytes, Int, Int) -> Unit
+pub fn HashState::update_string(Self, String) -> Unit
+
 pub struct ObjectId {
   bytes : FixedArray[Byte]
 }
 pub fn ObjectId::from_bytes(Bytes) -> Self raise GitError
-pub fn ObjectId::from_bytes_at(Bytes, Int) -> Self
+pub fn ObjectId::from_bytes_at(Bytes, Int, hash_size? : Int) -> Self
 pub fn ObjectId::from_hex(String) -> Self raise GitError
+pub fn ObjectId::hash_size(Self) -> Int
 pub fn ObjectId::is_zero(Self) -> Bool
 pub fn ObjectId::is_zero_hex(String) -> Bool
 pub fn ObjectId::new(FixedArray[Byte]) -> Self
 pub fn ObjectId::to_bytes(Self) -> Bytes
 pub fn ObjectId::to_hex(Self) -> String
-pub fn ObjectId::zero() -> Self
+pub fn ObjectId::zero(algo? : HashAlgorithm) -> Self
 pub impl Eq for ObjectId
 pub impl Hash for ObjectId
 pub impl Show for ObjectId
@@ -120,6 +161,17 @@ pub fn Sha1State::update(Self, Bytes) -> Unit
 pub fn Sha1State::update_byte(Self, Byte) -> Unit
 pub fn Sha1State::update_slice(Self, Bytes, Int, Int) -> Unit
 pub fn Sha1State::update_string(Self, String) -> Unit
+
+pub struct Sha256State {
+  inner : @hash.Sha256State
+}
+pub fn Sha256State::finish(Self) -> ObjectId
+pub fn Sha256State::new() -> Self
+pub fn Sha256State::reset(Self) -> Unit
+pub fn Sha256State::update(Self, Bytes) -> Unit
+pub fn Sha256State::update_byte(Self, Byte) -> Unit
+pub fn Sha256State::update_slice(Self, Bytes, Int, Int) -> Unit
+pub fn Sha256State::update_string(Self, String) -> Unit
 
 pub struct TreeEntry {
   mode : String

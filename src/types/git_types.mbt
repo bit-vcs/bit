@@ -26,3 +26,12 @@ pub type PackCompression = @object.PackCompression
 
 ///|
 pub type Sha1State = @object.Sha1State
+
+///|
+pub type Sha256State = @object.Sha256State
+
+///|
+pub type HashAlgorithm = @object.HashAlgorithm
+
+///|
+pub type HashState = @object.HashState
