@@ -117,7 +117,7 @@ test "relay: relay_resolve_control_endpoint parses room and token query" {
 test "relay: relay_resolve_control_endpoint rejects invalid room name" {
   ignore(
     relay_resolve_control_endpoint(
-      "relay+https://relay.example.com?room=invalid/room",
+      "relay+https://relay.example.com?room=invalid room!",
     ) catch {
       @bit.GitError::InvalidObject(message) => {
         assert_true(message.contains("invalid relay room"))

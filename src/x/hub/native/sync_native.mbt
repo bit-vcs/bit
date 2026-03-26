@@ -193,12 +193,12 @@ fn relay_room_leading_char(c : Char) -> Bool {
 
 ///|
 fn relay_room_safe_char(c : Char) -> Bool {
-  relay_room_leading_char(c) || c == '.' || c == '_' || c == '-'
+  relay_room_leading_char(c) || c == '.' || c == '_' || c == '-' || c == '/'
 }
 
 ///|
 fn relay_is_valid_room_name(room : String) -> Bool {
-  if room.length() == 0 || room.length() > 64 {
+  if room.length() == 0 || room.length() > 128 {
     return false
   }
   let mut first = true

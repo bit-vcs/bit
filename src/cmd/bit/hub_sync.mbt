@@ -171,7 +171,31 @@ fn parse_hub_sync_runtime_options(
       }
     }
   }
-  { remote_url, auth_token, signing_key, require_signed, conflict_policy }
+  // Resolve namespace shorthand: "owner/repo" → default relay + room
+  let resolved_url = match remote_url {
+    Some(url) =>
+      if url.has_prefix("relay+") ||
+        url.has_prefix("http://") ||
+        url.has_prefix("https://") ||
+        url.has_prefix("relay://") {
+        Some(url)
+      } else {
+        // Treat as namespace/room name → use default relay
+        let base = match @sys.get_env_var("BIT_RELAY_URL") {
+          Some(u) => u
+          None => "relay+https://bit-relay.mizchi.workers.dev"
+        }
+        Some(base + "/?room=" + url)
+      }
+    None => None
+  }
+  {
+    remote_url: resolved_url,
+    auth_token,
+    signing_key,
+    require_signed,
+    conflict_policy,
+  }
 }
 
 ///|
@@ -421,12 +445,12 @@ fn hub_sync_room_leading_char(c : Char) -> Bool {
 
 ///|
 fn hub_sync_room_safe_char(c : Char) -> Bool {
-  hub_sync_room_leading_char(c) || c == '.' || c == '_' || c == '-'
+  hub_sync_room_leading_char(c) || c == '.' || c == '_' || c == '-' || c == '/'
 }
 
 ///|
 fn hub_sync_is_valid_room_name(room : String) -> Bool {
-  if room.length() == 0 || room.length() > 64 {
+  if room.length() == 0 || room.length() > 128 {
     return false
   }
   let mut first = true

@@ -1448,22 +1448,33 @@ fn issue_default_relay_url() -> String {
 }
 
 ///|
-async fn issue_fetch_from_relay(relay_url : String) -> Unit raise Error {
+async fn issue_fetch_from_relay(relay_arg : String) -> Unit raise Error {
   let root = get_work_root()
   let git_dir = resolve_hub_git_dir(root)
   let fs = OsFs::new()
   ensure_hub_initialized(git_dir)
-  // Derive room from repo name or use URL's room parameter
-  let effective_url = if relay_url.contains("?room=") {
-    relay_url
-  } else {
-    // Auto-derive room from git remote origin
-    let room = issue_derive_relay_room(fs, git_dir)
-    if relay_url.contains("?") {
-      relay_url + "&room=" + room
+  // Resolve relay argument:
+  //   "relay+https://..." or "relay+http://..."  → full URL
+  //   "owner/repo"                               → namespace (room = owner/repo)
+  //   other                                      → room name
+  let effective_url = if relay_arg.has_prefix("relay+") ||
+    relay_arg.has_prefix("http://") ||
+    relay_arg.has_prefix("https://") {
+    // Full URL — append room if missing
+    if relay_arg.contains("?room=") {
+      relay_arg
     } else {
-      relay_url + "/?room=" + room
+      let room = issue_derive_relay_room(fs, git_dir)
+      if relay_arg.contains("?") {
+        relay_arg + "&room=" + room
+      } else {
+        relay_arg + "/?room=" + room
+      }
     }
+  } else {
+    // Namespace or room name (e.g., "mizchi/vibe-lang" or "my-project")
+    let base = issue_default_relay_url()
+    base + "/?room=" + relay_arg
   }
   let (objects, refs, _clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
