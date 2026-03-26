@@ -67,6 +67,7 @@ fn repack_git_dir(
     return None
   }
   let objects = collect_reachable_objects_from_commits(db, rfs, roots)
+  collect_reachable_tag_objects(db, rfs, ref_ids, objects)
   repack_from_objects(fs, git_dir, objects)
 }
 
@@ -85,6 +86,10 @@ fn gc_git_dir(
   } else {
     collect_reachable_objects_from_commits(db, rfs, roots)
   }
+  // Also include tag objects that refs point to directly (annotated tags).
+  collect_reachable_tag_objects(db, rfs, ref_ids, reachable)
+  // Also include objects referenced by reflogs (intermediate merge commits etc.)
+  collect_reflog_referenced_objects(db, rfs, git_dir, reachable)
   let reachable_hex : Map[String, Bool] = {}
   for obj in reachable {
     let id = @bit.hash_object_content(obj.obj_type, obj.data)
@@ -131,6 +136,7 @@ fn prune_git_dir(
     return { pruned: [] }
   }
   let reachable = collect_reachable_objects_from_commits(db, rfs, roots)
+  collect_reachable_tag_objects(db, rfs, ref_ids, reachable)
   let reachable_hex : Map[String, Bool] = {}
   for obj in reachable {
     let id = @bit.hash_object_content(obj.obj_type, obj.data)
@@ -300,6 +306,119 @@ fn trim_line_gc(line : String) -> String {
     s = String::unsafe_substring(s, start=0, end=s.length() - 1)
   }
   s
+}
+
+///|
+fn collect_reflog_referenced_objects(
+  db : ObjectDb,
+  fs : &@bit.RepoFileSystem,
+  git_dir : String,
+  objects : Array[@bit.PackObject],
+) -> Unit raise @bit.GitError {
+  let seen : Map[String, Bool] = {}
+  for obj in objects {
+    seen[@bit.hash_object_content(obj.obj_type, obj.data).to_hex()] = true
+  }
+  // Walk all reflog files and collect referenced OIDs
+  let reflog_ids = collect_all_reflog_ids(fs, git_dir)
+  for id in reflog_ids {
+    let hex = id.to_hex()
+    if seen.contains(hex) || id.is_zero() {
+      continue
+    }
+    match db.get(fs, id) {
+      Some(obj) => {
+        seen[hex] = true
+        objects.push(obj)
+        // If it's a commit, also collect its tree and blobs
+        if obj.obj_type == @bit.ObjectType::Commit {
+          let sub = collect_reachable_objects_from_commits(db, fs, [id])
+          for s in sub {
+            let sh = @bit.hash_object_content(s.obj_type, s.data).to_hex()
+            if not(seen.contains(sh)) {
+              seen[sh] = true
+              objects.push(s)
+            }
+          }
+        }
+      }
+      None => ()
+    }
+  }
+}
+
+///|
+fn collect_all_reflog_ids(
+  fs : &@bit.RepoFileSystem,
+  git_dir : String,
+) -> Array[@bit.ObjectId] raise @bit.GitError {
+  let ids : Array[@bit.ObjectId] = []
+  let logs_dir = git_dir + "/logs"
+  if not(fs.is_dir(logs_dir)) {
+    return ids
+  }
+  collect_reflog_ids_recursive(fs, logs_dir, ids)
+  ids
+}
+
+///|
+fn collect_reflog_ids_recursive(
+  fs : &@bit.RepoFileSystem,
+  dir : String,
+  ids : Array[@bit.ObjectId],
+) -> Unit raise @bit.GitError {
+  let entries = fs.readdir(dir) catch { _ => return }
+  for name in entries {
+    let path = dir + "/" + name
+    if fs.is_dir(path) {
+      collect_reflog_ids_recursive(fs, path, ids)
+    } else if fs.is_file(path) {
+      let content = @utf8.decode_lossy(
+        (fs.read_file(path) catch { _ => continue })[:],
+      ).to_string()
+      for line_view in content.split("\n") {
+        let line = line_view.to_string()
+        if line.length() < 82 {
+          continue
+        }
+        // Format: old_hex new_hex ...
+        let old_hex = String::unsafe_substring(line, start=0, end=40)
+        let new_hex = String::unsafe_substring(line, start=41, end=81)
+        if @bithash.is_hex_string(old_hex) {
+          ids.push(@bit.ObjectId::from_hex(old_hex))
+        }
+        if @bithash.is_hex_string(new_hex) {
+          ids.push(@bit.ObjectId::from_hex(new_hex))
+        }
+      }
+    }
+  }
+}
+
+///|
+fn collect_reachable_tag_objects(
+  db : ObjectDb,
+  fs : &@bit.RepoFileSystem,
+  ref_ids : Array[@bit.ObjectId],
+  objects : Array[@bit.PackObject],
+) -> Unit raise @bit.GitError {
+  let seen : Map[String, Bool] = {}
+  for obj in objects {
+    seen[@bit.hash_object_content(obj.obj_type, obj.data).to_hex()] = true
+  }
+  for id in ref_ids {
+    let hex = id.to_hex()
+    if seen.contains(hex) {
+      continue
+    }
+    match db.get(fs, id) {
+      Some(obj) if obj.obj_type == @bit.ObjectType::Tag => {
+        seen[hex] = true
+        objects.push(obj)
+      }
+      _ => ()
+    }
+  }
 }
 
 ///|
