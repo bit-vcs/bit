@@ -92,11 +92,7 @@ fn parse_hub_serve_options(args : Array[String]) -> HubServeOptions? {
     None =>
       match @sys.get_env_var("BIT_RELAY_URL") {
         Some(u) => u
-        None => {
-          println("Error: relay URL required")
-          print_hub_serve_usage()
-          return None
-        }
+        None => "relay+https://bit-relay.mizchi.workers.dev"
       }
   }
   Some({ relay_url: url, _repo: repo, allow_push, broadcast, auto_fetch, room })

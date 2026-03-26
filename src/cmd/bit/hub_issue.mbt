@@ -264,15 +264,25 @@ async fn handle_hub_issue_list(args : Array[String]) -> Unit raise Error {
     handle_hub_work_item_list(args)
     return ()
   }
-  // Parse --all, --parent, --label, and --format flags
+  // Parse --all, --parent, --label, --format, and --relay flags
   let mut show_all = false
   let mut filter_parent : String? = None
   let filter_labels : Array[String] = []
   let mut format_json = false
+  let mut relay_url : String? = None
   let mut j = 0
   while j < args.length() {
     match args[j] {
       "--all" => show_all = true
+      "--relay" if j + 1 < args.length() && not(args[j + 1].has_prefix("-")) => {
+        relay_url = Some(args[j + 1])
+        j += 1
+      }
+      "--relay" => relay_url = Some(issue_default_relay_url())
+      _ if args[j].has_prefix("--relay=") =>
+        relay_url = Some(
+          String::unsafe_substring(args[j], start=8, end=args[j].length()),
+        )
       "--parent" if j + 1 < args.length() => {
         filter_parent = Some(args[j + 1])
         j += 1
@@ -308,6 +318,11 @@ async fn handle_hub_issue_list(args : Array[String]) -> Unit raise Error {
       _ => ()
     }
     j += 1
+  }
+  // Fetch from relay before listing if --relay is specified
+  match relay_url {
+    Some(url) => issue_fetch_from_relay(url)
+    None => ()
   }
   let state = match options.state {
     None => None
@@ -1422,4 +1437,101 @@ async fn handle_hub_issue_init(_args : Array[String]) -> Unit raise Error {
   let git_dir = resolve_hub_git_dir(root)
   ensure_hub_initialized(git_dir)
   print_line("Initialized hub metadata")
+}
+
+///|
+fn issue_default_relay_url() -> String {
+  match @sys.get_env_var("BIT_RELAY_URL") {
+    Some(url) => url
+    None => "relay+https://bit-relay.mizchi.workers.dev"
+  }
+}
+
+///|
+async fn issue_fetch_from_relay(relay_url : String) -> Unit raise Error {
+  let root = get_work_root()
+  let git_dir = resolve_hub_git_dir(root)
+  let fs = OsFs::new()
+  ensure_hub_initialized(git_dir)
+  // Derive room from repo name or use URL's room parameter
+  let effective_url = if relay_url.contains("?room=") {
+    relay_url
+  } else {
+    // Auto-derive room from git remote origin
+    let room = issue_derive_relay_room(fs, git_dir)
+    if relay_url.contains("?") {
+      relay_url + "&room=" + room
+    } else {
+      relay_url + "/?room=" + room
+    }
+  }
+  let (objects, refs, _clock) = make_hub_stores(git_dir)
+  let hub = load_hub_store(objects, refs)
+  let result = @hub_native.hub_fetch(
+    hub,
+    fs,
+    fs,
+    git_dir,
+    effective_url,
+    signing_key=(None : String?),
+    require_signed=(None : Bool?),
+    auth_token=(None : String?),
+    conflict_policy=(None : @hub.RecordMergePolicy?),
+  )
+  if result.success() {
+    eprint_line(result.message())
+  } else {
+    eprint_line("relay fetch: " + result.message())
+  }
+}
+
+///|
+fn issue_derive_relay_room(fs : OsFs, git_dir : String) -> String {
+  let rfs : &@bitcore.RepoFileSystem = fs
+  // Try remote.origin.url → extract owner/repo
+  match
+    @bitlib.read_config_value(
+      rfs,
+      git_dir + "/config",
+      "remote \"origin\"",
+      "url",
+    ) {
+    Some(url) => {
+      // Extract repo name from URL patterns like:
+      //   git@github.com:owner/repo.git
+      //   https://github.com/owner/repo.git
+      let trimmed = if url.has_suffix(".git") {
+        String::unsafe_substring(url, start=0, end=url.length() - 4)
+      } else {
+        url
+      }
+      // Find last path component(s)
+      let mut last_slash = -1
+      let mut second_last_slash = -1
+      let chars = trimmed.to_array()
+      for i = 0; i < chars.length(); i = i + 1 {
+        if chars[i] == '/' || chars[i] == ':' {
+          second_last_slash = last_slash
+          last_slash = i
+        }
+      }
+      if second_last_slash >= 0 {
+        // owner/repo
+        String::unsafe_substring(
+          trimmed,
+          start=second_last_slash + 1,
+          end=trimmed.length(),
+        )
+      } else if last_slash >= 0 {
+        String::unsafe_substring(
+          trimmed,
+          start=last_slash + 1,
+          end=trimmed.length(),
+        )
+      } else {
+        trimmed
+      }
+    }
+    None => "default"
+  }
 }
