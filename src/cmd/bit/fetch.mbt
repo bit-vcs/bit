@@ -234,6 +234,15 @@ async fn handle_fetch(args : Array[String]) -> Unit raise Error {
       i += 1
       continue
     }
+    if arg == "--unshallow" ||
+      arg == "--depth" ||
+      arg == "--deepen" ||
+      arg.has_prefix("--depth=") ||
+      arg.has_prefix("--deepen=") {
+      // Shallow/unshallow operations: delegate to real git
+      delegate_fetch_to_real_git(args)
+      return
+    }
     warn_unimplemented_arg("fetch", arg)
     i += 1
   }
@@ -498,6 +507,23 @@ fn collect_commit_tree_modes(
     modes[path] = entry.mode
   }
   modes
+}
+
+///|
+async fn delegate_fetch_to_real_git(args : Array[String]) -> Unit raise Error {
+  let argv : Array[String] = ["fetch"]
+  for arg in args {
+    argv.push(arg)
+  }
+  let code = @process.run(
+    resolve_real_git_for_dispatch(),
+    argv,
+    inherit_env=true,
+    stdin=@stdio.stdin,
+    stdout=@stdio.stdout,
+    stderr=@stdio.stderr,
+  )
+  @sys.exit(code)
 }
 
 ///|
