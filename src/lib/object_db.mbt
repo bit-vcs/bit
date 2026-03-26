@@ -110,6 +110,7 @@ pub struct ObjectDb {
   mut prefer_packed : Bool
   mut saw_corrupt_pack : Bool
   mut skip_verify : Bool
+  mut commit_graph : CommitGraphFile?
 }
 
 ///|
@@ -150,7 +151,9 @@ pub fn ObjectDb::load(
   fs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> ObjectDb raise @bit.GitError {
-  ObjectDb::load_from_objects_dir(fs, join_path(git_dir, "objects"))
+  let db = ObjectDb::load_from_objects_dir(fs, join_path(git_dir, "objects"))
+  db.commit_graph = CommitGraphFile::load(fs, git_dir) catch { _ => None }
+  db
 }
 
 ///|
@@ -185,6 +188,7 @@ pub fn ObjectDb::load_from_objects_dir(
     prefer_packed: false,
     saw_corrupt_pack: false,
     skip_verify: false,
+    commit_graph: None,
   }
 }
 
@@ -194,7 +198,12 @@ pub fn ObjectDb::load_lazy(
   fs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> ObjectDb raise @bit.GitError {
-  ObjectDb::load_lazy_from_objects_dir(fs, join_path(git_dir, "objects"))
+  let db = ObjectDb::load_lazy_from_objects_dir(
+    fs,
+    join_path(git_dir, "objects"),
+  )
+  db.commit_graph = CommitGraphFile::load(fs, git_dir) catch { _ => None }
+  db
 }
 
 ///|
@@ -224,6 +233,7 @@ pub fn ObjectDb::load_lazy_from_objects_dir(
     prefer_packed: false,
     saw_corrupt_pack: false,
     skip_verify: false,
+    commit_graph: None,
   }
 }
 
@@ -237,6 +247,23 @@ pub fn ObjectDb::set_prefer_packed(self : ObjectDb, value : Bool) -> Unit {
 ///|
 pub fn ObjectDb::set_skip_verify(self : ObjectDb, value : Bool) -> Unit {
   self.skip_verify = value
+}
+
+///|
+pub fn ObjectDb::disable_commit_graph(self : ObjectDb) -> Unit {
+  self.commit_graph = None
+}
+
+///|
+pub fn ObjectDb::enable_commit_graph(
+  self : ObjectDb,
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+) -> Unit {
+  if self.commit_graph is Some(_) {
+    return
+  }
+  self.commit_graph = CommitGraphFile::load(rfs, git_dir) catch { _ => None }
 }
 
 ///|
@@ -261,10 +288,34 @@ pub fn ObjectDb::get(
       Some(obj) => return Some(obj)
       None => ()
     }
-    return get_loose_by_hex(self, fs, hex)
+    match get_loose_by_hex(self, fs, hex) {
+      Some(obj) => return Some(obj)
+      None => ()
+    }
+  } else {
+    // !prefer_packed: loose already tried, now try packs
+    match get_from_packs(self, fs, hex, seen) {
+      Some(obj) => return Some(obj)
+      None => ()
+    }
   }
-  // !prefer_packed: loose already tried, now try packs
-  get_from_packs(self, fs, hex, seen)
+  // Fallback: try commit-graph for missing commit objects
+  get_from_commit_graph(self, id)
+}
+
+///|
+fn get_from_commit_graph(db : ObjectDb, id : @bit.ObjectId) -> @bit.PackObject? {
+  match db.commit_graph {
+    Some(graph) => {
+      let pos = graph.find_commit(id)
+      if pos >= 0 {
+        Some(graph.synthesize_commit_object(pos, id))
+      } else {
+        None
+      }
+    }
+    None => None
+  }
 }
 
 ///|

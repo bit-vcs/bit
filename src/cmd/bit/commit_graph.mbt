@@ -104,7 +104,9 @@ async fn check_commit_graph_paranoia(
     return
   }
   let num_commits = oidl_len / hash_size
+  // Use ObjectDb WITHOUT commit-graph fallback for paranoia check
   let db = @bitlib.ObjectDb::load(rfs, git_dir)
+  db.disable_commit_graph()
   for i = 0; i < num_commits; i = i + 1 {
     let oid_start = oidl_offset + i * hash_size
     if oid_start + hash_size > data.length() {
