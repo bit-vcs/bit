@@ -93,9 +93,11 @@ check-ignore show-index get-tar-commit-id verify-commit annotate
 
 ベースライン (2026-03-04): 500obj bit=1970ms vs git=101ms (19.5x)
 
-- [ ] スライディングウィンドウ (--window)
-- [ ] build_delta ブロックインデックス再利用
-- [ ] find_best_match 候補数制限緩和 (64 → 128-256)
+- [x] スライディングウィンドウ (--window) — 実装済み (window=10, configurable)
+- [x] build_delta ブロックインデックス再利用 — 実装済み (DeltaWindowEntry にキャッシュ)
+- [x] find_best_match 候補数制限緩和 — 32 → 128 に拡大、4バイトprefix check、early-exit閾値 4x に引き上げ
+- [ ] delta出力バッファ事前確保 — 実装済み (capacity=target_len/2+32)
+- [ ] pack-objects ベンチマーク再計測（最新ベースライン未取得）
 
 ## P3: WASM / クロスプラットフォーム
 

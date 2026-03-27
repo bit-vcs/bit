@@ -254,14 +254,20 @@ fn find_best_match(
   let mut best_len = 0
   let mut best_off = 0
   let mut checked = 0
-  let max_candidates = 32
+  let max_candidates = 128
+  let base_len = base.length()
+  let target_len = target.length()
+  let t0 = target[target_pos]
+  let t1 = target[target_pos + 1]
+  let t2 = target[target_pos + 2]
+  let t3 = target[target_pos + 3]
   for off in candidates {
-    if off + block_size > base.length() {
+    if off + block_size > base_len {
       continue
     }
     // Quick 4-byte prefix check before full comparison
-    if base[off] != target[target_pos] ||
-      base[off + 1] != target[target_pos + 1] {
+    if base[off] != t0 || base[off + 1] != t1 ||
+      base[off + 2] != t2 || base[off + 3] != t3 {
       checked += 1
       if checked >= max_candidates {
         break
@@ -269,7 +275,7 @@ fn find_best_match(
       continue
     }
     let mut ok = true
-    for i = 2; i < block_size; i = i + 1 {
+    for i = 4; i < block_size; i = i + 1 {
       if base[off + i] != target[target_pos + i] {
         ok = false
         break
@@ -277,8 +283,8 @@ fn find_best_match(
     }
     if ok {
       let mut len = block_size
-      while target_pos + len < target.length() &&
-            off + len < base.length() &&
+      while target_pos + len < target_len &&
+            off + len < base_len &&
             base[off + len] == target[target_pos + len] {
         len += 1
       }
@@ -286,7 +292,7 @@ fn find_best_match(
         best_len = len
         best_off = off
         // Good enough match: skip remaining candidates
-        if best_len >= block_size * 2 {
+        if best_len >= block_size * 4 {
           break
         }
       }
@@ -304,6 +310,16 @@ fn find_best_match(
 }
 
 ///|
+fn out_to_bytes(out : Array[Byte]) -> Bytes {
+  let len = out.length()
+  let arr = FixedArray::make(len, b'\x00')
+  for i in 0..<len {
+    arr[i] = out[i]
+  }
+  Bytes::from_array(arr)
+}
+
+///|
 fn build_delta_with_index(
   base : Bytes,
   target : Bytes,
@@ -312,15 +328,16 @@ fn build_delta_with_index(
 ) -> Bytes {
   let base_len = base.length()
   let target_len = target.length()
-  let out : Array[Byte] = []
+  // Pre-allocate output buffer: delta is typically smaller than target
+  let out : Array[Byte] = Array::new(capacity=target_len / 2 + 32)
   encode_delta_size(base_len, out)
   encode_delta_size(target_len, out)
   if target_len == 0 {
-    return Bytes::from_array(FixedArray::makei(out.length(), i => out[i]))
+    return out_to_bytes(out)
   }
   if base_len < delta_block_size || target_len < delta_block_size {
     encode_delta_insert(target, 0, target_len, out)
-    return Bytes::from_array(FixedArray::makei(out.length(), i => out[i]))
+    return out_to_bytes(out)
   }
   let mut t = 0
   let mut literal_start = 0
@@ -378,7 +395,7 @@ fn build_delta_with_index(
   if literal_len > 0 {
     encode_delta_insert(target, literal_start, literal_len, out)
   }
-  Bytes::from_array(FixedArray::makei(out.length(), i => out[i]))
+  out_to_bytes(out)
 }
 
 ///|
