@@ -1,12 +1,22 @@
 # TODO (Active Only)
 
-最終整理日: 2026-03-16
+最終整理日: 2026-03-27
 方針: 完了ログは一旦外し、未完了タスクのみ管理する。
-現バージョン: v0.31.0
-allowlist: 908 テスト（重複除去済み）
-CI SHIM_CMDS: **108 コマンド**
+現バージョン: v0.36.0
+allowlist: 906 テスト（重複除去済み）
+CI SHIM_CMDS: **108 コマンド** (全コマンドをCIに登録済み)
 CI unit test: **1637/1637 全パス** (2026-03-16)
 e2e: **30/30 全パス** (2026-03-16)
+
+### v0.31.0 → v0.36.0 の主な変更
+
+- SHA-256 オブジェクトハッシュ対応 (dual SHA-1/SHA-256)
+- Octopus merge (multi-head merge) 実装
+- Commit-graph reader (ObjectDb 統合)
+- Relay watch / CI status / review / presence コマンド
+- Sub-issue 対応 (bit-hub)
+- Merge engine: rename detection, file/directory conflict detection
+- cat-file :N:path 対応
 
 ## P0: Git compatibility
 
@@ -66,7 +76,8 @@ check-ignore show-index get-tar-commit-id verify-commit annotate
 
 - [ ] Bitmap ファイル書き出し (`pack-objects --write-bitmap-index`)
 - [ ] Multi-pack-index 書き出し (`repack --write-midx`)
-- [ ] Commit-graph 生成・読込
+- [x] Commit-graph 読込 (実装済み)
+- [ ] Commit-graph 生成 (書き出し)
 - [ ] SSH トランスポート (HTTPS のみ)
 - [ ] GPG/SSH 署名 (`commit -S`, `tag -s`)
 - [ ] Interactive add (`add -p` / `add -i`)
