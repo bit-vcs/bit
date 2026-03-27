@@ -2,7 +2,7 @@
 
 ## 1. Purpose and Scope
 
-This specification defines the relay protocol used by `bit hub sync`.
+This specification defines the relay protocol used by `bit relay sync`.
 It covers the following:
 
 - Relay server HTTP / WebSocket API
@@ -20,7 +20,7 @@ The Git smart-http specification itself (`/info/refs`, pack protocol) is out of 
 
 ## 3. URL and Transport Selection
 
-`bit hub sync` accepts the following URLs:
+`bit relay sync` accepts the following URLs:
 
 - `relay+http://host[:port]`
 - `relay+https://host[:port]`
@@ -152,11 +152,11 @@ Client-sent messages:
 
 ## 7. `bit` Client Contract
 
-### 7.1 Push (`bit hub sync push`)
+### 7.1 Push (`bit relay sync push`)
 
 In relay mode:
 
-1. Read `refs/notes/hub` (fail if absent)
+1. Read `refs/notes/bit-hub` (fail if absent)
 2. Enumerate records under `hub/` (including deletion tombstones)
 3. `POST /api/v1/publish` for each record with:
    - `room=main`
@@ -167,7 +167,7 @@ In relay mode:
      - `{"kind":"hub.record","record":"<serialized HubRecord>"}`
 4. Tally the count of `accepted=true` responses
 
-### 7.2 Fetch (`bit hub sync fetch`)
+### 7.2 Fetch (`bit relay sync fetch`)
 
 In relay mode:
 
@@ -175,7 +175,7 @@ In relay mode:
 2. `GET /api/v1/poll?room=main&after=<cursor>&limit=200`
 3. Only process envelopes where `payload.kind == "hub.record"`
 4. Parse/merge `payload.record` as a `HubRecord`
-5. If there are changes, commit to `refs/notes/hub`
+5. If there are changes, commit to `refs/notes/bit-hub`
 6. Save `next_cursor`
 
 ## 8. `hub.record` Payload
@@ -218,8 +218,8 @@ Data transfer for `bit clone` is performed peer-to-peer; the relay is only used 
 
 CLI:
 
-- `bit hub sync clone-announce [<remote-url>] --url <clone-url> [--repo <repo>]`
-- `bit hub sync clone-peers [<remote-url>] [--include-self]`
+- `bit relay sync clone-announce [<remote-url>] --url <clone-url> [--repo <repo>]`
+- `bit relay sync clone-peers [<remote-url>] [--include-self]`
 - `bit clone relay+http(s)://<relay-host> [--relay-sender <sender>] [--relay-repo <repo>]` uses the same discovery logic as `clone-peers` to select one peer and clone from it
   - Defaults to the first peer
   - Setting `BIT_RELAY_CLONE_SENDER=<sender>` prioritizes that sender

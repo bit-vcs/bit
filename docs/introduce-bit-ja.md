@@ -126,7 +126,8 @@ db.sync_with_peer(fs, fs, peer_url)  // Gossip protocol で同期
 
 ## 実験実装: bit/x/hub
 
-GitHub/GitLab に依存しない、Git ネイティブなコラボレーション機能です。Pull Request / Issue は `refs/notes/bit-hub` に記録され、`bit hub sync push/fetch` で同期できます。
+`bit/x/hub` は `bit issue` と `bit pr` の背後にあるコラボレーション層です。
+GitHub/GitLab に依存せず、ローカル GitHub のように使えるワークフローを提供します。Pull Request / Issue は `refs/notes/bit-hub` に記録され、`bit relay sync push/fetch` で同期できます。
 
 ```moonbit
 let hub = Hub::init(fs, fs, git_dir)
@@ -141,7 +142,7 @@ let pr = hub.create_pr(
 )
 ```
 
-CLI では `bit hub pr/issue/note/sync` が利用でき、`bit agent` からもこの基盤を使って PR 作成・レビュー・マージを行えます。現状は実験段階で、`gh` 依存の import や CLI テストの拡充を進めています。
+CLI では `bit issue`、`bit pr`、`bit debug`、`bit relay sync` が利用できます。エージェントやオーケストレーション関連の設計メモはリポジトリ内にありますが、この checkout には現時点で `bit agent` というトップレベル CLI はありません。
 
 ## Git テストスイート互換性
 

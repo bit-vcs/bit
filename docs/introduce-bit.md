@@ -124,7 +124,8 @@ Use case: when many AI agents parallelize work from the same base state, they ca
 
 ## Experimental: bit/x/hub
 
-Git-native hub workflow without GitHub/GitLab. PRs and issues are stored under `refs/notes/bit-hub` and can be synchronized via `bit hub sync push/fetch`.
+`bit/x/hub` is the collaboration layer behind `bit issue` and `bit pr`.
+It provides a local GitHub-like workflow without GitHub/GitLab. PRs and issues are stored under `refs/notes/bit-hub` and can be synchronized via `bit relay sync push/fetch`.
 
 ```moonbit
 let hub = Hub::init(fs, fs, git_dir)
@@ -139,7 +140,7 @@ let pr = hub.create_pr(
 )
 ```
 
-The CLI already supports `bit hub pr/issue/note/sync`, and `bit agent` builds on this layer for PR creation/review/merge workflows. It is still experimental, with ongoing work on provider abstraction for import and broader CLI test coverage.
+The CLI already exposes `bit issue`, `bit pr`, `bit debug`, and `bit relay sync`. Related agent/orchestration work exists as design notes in the repository, but there is no current `bit agent` top-level CLI command in this checkout.
 
 ## Limitations
 

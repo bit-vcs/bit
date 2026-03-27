@@ -1,4 +1,11 @@
-# moonix Agent Integration Design
+# Historical moonix Agent Integration Design
+
+## Status
+
+This document is a design note for a proposed integration path.
+It references `mizchi/bit/x/agent/llm/`, which does not exist in the current checkout.
+
+Treat the architecture below as a proposal, not as implemented repository structure.
 
 ## Overview
 

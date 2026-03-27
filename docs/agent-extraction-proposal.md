@@ -1,11 +1,18 @@
-# Agent System Extraction Proposal
+# Historical Agent System Extraction Proposal
+
+## Status
+
+This document is a historical proposal.
+It references `src/x/agent/*` and related agent paths that do not exist in the current checkout.
+
+Treat the contents below as design exploration, not as a description of the current repository state.
 
 ## Framing the Questions
 
 1. Should the agent layer be extracted into a separate repository?
 2. Should we provide a shell emulation environment on moonix for agents to work in?
 
-## Current Dependency Graph
+## Dependency Graph At Proposal Time
 
 ```
 src/x/agent/llm/          mizchi/llm (external)

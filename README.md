@@ -1,6 +1,6 @@
 # bit
 
-Git implementation in [MoonBit](https://docs.moonbitlang.com) with practical compatibility extensions.
+Git implementation in [MoonBit](https://docs.moonbitlang.com) with practical compatibility extensions and a built-in local GitHub-like collaboration layer.
 
 > **Warning**: This is an experimental implementation. Do not use in production. Data corruption may occur in worst case scenarios. Always keep backups of important repositories.
 
@@ -38,17 +38,48 @@ bit push origin feature
 
 ## Bit Extension Commands Quick Guide
 
+### bit pr / bit issue
+
+`bit issue` and `bit pr` give you a local GitHub-like workflow backed by repository data.
+Use them to track work, discuss changes, and merge branches without depending on GitHub/GitLab.
+When you want to share metadata across machines or teammates, sync it separately with `bit relay sync`.
+
+```bash
+# Initialize PR / Issue metadata once per repository
+bit pr init
+
+# Local issues
+bit issue create --title "Cache invalidation bug" --body "status view stays stale"
+bit issue list --open
+
+# Local pull requests
+bit pr create --title "Fix cache invalidation" --body "refresh status after write" \
+  --head feature/cache-fix --base main
+bit pr list --open
+bit pr review <pr-id> --approve --commit <commit-hex>
+bit pr merge <pr-id>
+
+# Optional relay sync for PR / Issue metadata
+bit relay sync push <remote-url>
+bit relay sync fetch <remote-url>
+
+# Optional links and search
+bit issue link <issue-id> <pr-id>
+bit pr search "cache"
+bit issue search "cache"
+```
+
 ### bit fingerprint
 
-`bit fingerprint` is currently a feature set (workspace/hub integration), not a standalone top-level command.
+`bit fingerprint` is currently a feature set (workspace/PR workflow integration), not a standalone top-level command.
 
 ```bash
 # Workspace flow uses per-node directory fingerprints
 BIT_WORKSPACE_FINGERPRINT_MODE=git bit workspace flow test
 BIT_WORKSPACE_FINGERPRINT_MODE=fast bit workspace flow test
 
-# Hub workflow records can carry a workspace fingerprint
-bit hub pr workflow submit 123 \
+# PR workflow records can carry a workspace fingerprint
+bit pr workflow submit 123 \
   --task test --status success \
   --fingerprint <workspace-fingerprint> \
   --txn <txn-id>
@@ -72,29 +103,6 @@ bit clone https://github.com/user/repo/blob/main/README.md
 ```
 
 Cloned subdirectories have their own `.git` directory. When placed inside another git repository, git treats them as embedded repositories (similar to submodules), and the parent repo does not commit their contents.
-
-### bit hub
-
-Git-native PR/Issue workflow stored in repository data.
-
-```bash
-bit hub init
-
-# PR / Issue
-bit hub pr list --open
-bit hub issue list --open
-
-# Sync metadata
-bit hub sync push
-bit hub sync fetch
-
-# Search
-bit hub search "cache" --type pr --state open
-
-# Shortcuts
-bit pr list --open
-bit issue list --open
-```
 
 ### bit ai
 
@@ -255,9 +263,9 @@ db.set(fs, fs, "users/alice/profile", value, ts)
 db.sync_with_peer(fs, fs, peer_url)
 ```
 
-### Hub - Git-Native Huboration
+### PR / Issue Metadata (`Hub` library)
 
-Pull Requests and Issues stored as Git objects:
+The CLI uses the `Hub` library internally. Pull requests and issues are stored as Git objects:
 
 ```moonbit
 let hub = Hub::init(fs, fs, git_dir)

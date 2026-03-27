@@ -1,6 +1,6 @@
 # Sub-Issues
 
-bit hub issues support parent-child relationships (sub-issues), allowing you to break large tasks into smaller units and track progress.
+`bit issue` supports parent-child relationships (sub-issues), allowing you to break large tasks into smaller units and track progress.
 
 ## Creating Sub-Issues
 

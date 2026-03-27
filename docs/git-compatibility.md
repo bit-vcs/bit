@@ -177,5 +177,5 @@ Full upstream run (`just git-t`) summary on macOS (2026-02-07):
 
 ## Related Distributed/Agent Tests
 
-- `just test-distributed`: focused checks for `x/agent`, `x/hub`, `x/kv`
+- `just test-distributed`: focused checks for `x/mcp`, `x/rebase-ai`, `x/hub`, `x/hub/native`, `x/kv`
 - strategy and invariants: `docs/distributed-testing.md`

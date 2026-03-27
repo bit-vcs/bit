@@ -1,6 +1,6 @@
 # bit
 
-Git implementation in [MoonBit](https://docs.moonbitlang.com) - fully compatible with some extensions.
+Git implementation in [MoonBit](https://docs.moonbitlang.com) with practical compatibility extensions and a built-in local GitHub-like collaboration layer.
 
 > **Warning**: This is an experimental implementation. Do not use in production. Data corruption may occur in worst case scenarios. Always keep backups of important repositories.
 
@@ -41,6 +41,32 @@ bit checkout -b feature
 bit add .
 bit commit -m "changes"
 bit push origin feature
+```
+
+## Local Collaboration (`bit issue` / `bit pr`)
+
+`bit issue` and `bit pr` give you a local GitHub-like workflow backed by repository data.
+Use them to track work, discuss changes, and merge branches without depending on GitHub/GitLab.
+When you want to share metadata across machines or teammates, sync it separately with `bit relay sync`.
+
+```bash
+# Initialize PR / Issue metadata once per repository
+bit pr init
+
+# Local issues
+bit issue create --title "Cache invalidation bug" --body "status view stays stale"
+bit issue list --open
+
+# Local pull requests
+bit pr create --title "Fix cache invalidation" --body "refresh status after write" \
+  --head feature/cache-fix --base main
+bit pr list --open
+bit pr review <pr-id> --approve --commit <commit-hex>
+bit pr merge <pr-id>
+
+# Optional relay sync for PR / Issue metadata
+bit relay sync push <remote-url>
+bit relay sync fetch <remote-url>
 ```
 
 ## Compatibility
@@ -106,7 +132,7 @@ Current standalone integration coverage (`t/t0001-*.sh` to `t/t0024-*.sh`) inclu
 - repository lifecycle and core porcelain: `init`, `status`, `add`, `commit`, `branch`, `checkout`/`switch`, `reset`, `log`, `tag`
 - transport-style workflows in standalone mode: `clone`, `fetch`, `pull`, `push`, `bundle`
 - plumbing used by normal flows: `hash-object`, `cat-file`, `ls-files`, `ls-tree`, `write-tree`, `update-ref`, `fsck`
-- feature flows: `hub`, `ai` (`rebase`, `merge`, `cherry-pick`, `revert`, `commit`; `rebase-ai` is alias), `mcp`, `hq`
+- feature flows: local collaboration (`pr`, `issue`, `debug`, `relay`), `ai` (`rebase`, `merge`, `cherry-pick`, `revert`, `commit`; `rebase-ai` is alias), `mcp`, `hq`
 
 ### Explicitly Unsupported In Standalone Mode
 
@@ -216,9 +242,9 @@ db.set(fs, fs, "users/alice/profile", value, ts)
 db.sync_with_peer(fs, fs, peer_url)
 ```
 
-### Hub - Git-Native Collaboration
+### PR / Issue Metadata (`Hub` library)
 
-Pull Requests and Issues stored as Git objects:
+The CLI uses the `Hub` library internally. Pull requests and issues are stored as Git objects:
 
 ```moonbit
 let hub = Hub::init(fs, fs, git_dir)

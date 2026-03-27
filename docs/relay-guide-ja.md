@@ -2,8 +2,8 @@
 
 ## 概要
 
-`bit relay` は bit-relay サーバーを介したリポジトリ共有と hub メタデータ同期のためのコマンド群です。
-NAT/ファイアウォール越しの git clone/fetch/push と、issue・PR などの hub メタデータの配信・取得ができます。
+`bit relay` は bit-relay サーバーを介したリポジトリ共有と PR / Issue メタデータ同期のためのコマンド群です。
+NAT/ファイアウォール越しの git clone/fetch/push と、`bit issue` / `bit pr` で扱うメタデータの配信・取得ができます。
 
 ## セットアップ
 
@@ -79,17 +79,19 @@ bit clone relay+https://relay.example.com/abc123
 bit relay serve relay+https://relay.example.com --allow-push --broadcast --auto-fetch
 ```
 
-## hub メタデータ同期 (`bit relay sync`)
+## PR / Issue メタデータ同期 (`bit relay sync`)
 
-issue・PR などの hub メタデータを relay サーバー経由で同期します。
+`bit issue` / `bit pr` のメタデータを relay サーバー経由で同期します。
 
-### push: ローカルの hub データを relay に publish
+初回だけ、対象リポジトリで `bit pr init` を実行して PR / Issue メタデータを初期化しておくと安全です。
+
+### push: ローカルの PR / Issue データを relay に publish
 
 ```bash
 bit relay sync push relay+https://relay.example.com
 ```
 
-### fetch: relay から hub データを取得
+### fetch: relay から PR / Issue データを取得
 
 ```bash
 bit relay sync fetch relay+https://relay.example.com
@@ -126,28 +128,29 @@ bit relay sync fetch relay+https://relay.example.com --require-signed
 
 ```bash
 # リーダー: issue を作成して relay に publish
-bit hub issue create --title "バグ修正" --body "ログイン画面のエラー"
+bit pr init
+bit issue create --title "バグ修正" --body "ログイン画面のエラー"
 bit relay sync push relay+https://relay.example.com
 
 # メンバー: relay から issue を取得
 bit relay sync fetch relay+https://relay.example.com
-bit hub issue list
+bit issue list
 ```
 
 ### 2. PR レビュー + merge
 
 ```bash
 # 開発者: PR を作成して push
-bit hub pr create --title "機能追加" --source feature --target main
+bit pr create --title "機能追加" --head feature --base main
 bit relay sync push relay+https://relay.example.com
 
 # レビュアー: PR を取得してレビュー
 bit relay sync fetch relay+https://relay.example.com
-bit hub pr list
-bit hub pr review 1 --approve --commit <hex>
+bit pr list
+bit pr review <pr-id> --approve --commit <hex>
 
 # マージ
-bit hub pr merge 1
+bit pr merge <pr-id>
 bit relay sync push relay+https://relay.example.com
 ```
 
@@ -165,15 +168,19 @@ bit push
 
 ## 移行ガイド
 
-以前の `bit hub serve` / `bit hub sync` は `bit relay serve` / `bit relay sync` に移動しました。
+以前の `bit hub` 系コマンドは `bit issue` / `bit pr` / `bit relay` に分かれました。
 旧コマンドは引き続き動作しますが、移行メッセージが表示されます。
 
 ```bash
 # 旧 (非推奨)
+bit hub issue list
+bit hub pr list
 bit hub serve relay+https://...
 bit hub sync push relay+https://...
 
 # 新
+bit issue list
+bit pr list
 bit relay serve relay+https://...
 bit relay sync push relay+https://...
 ```
