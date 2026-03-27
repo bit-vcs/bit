@@ -80,7 +80,7 @@ check-ignore show-index get-tar-commit-id verify-commit annotate
 - [ ] Commit-graph 生成 (書き出し)
 - [x] SSH トランスポート — ネイティブ `ssh` コマンドに委譲で動作。in-process SSH は未実装
 - [ ] GPG/SSH 署名 (`commit -S`, `tag -s`) — フラグ認識のみ、`--signoff` は動作
-- [ ] Interactive add (`add -p` / `add -i`) — ⚠ `-p` を無言で `-A` に置換しており危険。要修正
+- [ ] Interactive add (`add -p` / `add -i`) — エラーで拒否するよう修正済み。実装は未着手
 - [ ] Interactive rebase (`rebase -i`) — 部分実装 (pick/reword/edit/squash/fixup/drop)、スタンドアロンモード不可
 
 ## P1: Relay / P2P collaboration

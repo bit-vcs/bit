@@ -1,7 +1,7 @@
 ///|
 fn has_interactive_add_flag(args : Array[String]) -> Bool {
   for arg in args {
-    if arg == "-p" || arg == "--patch" {
+    if arg == "-p" || arg == "--patch" || arg == "-i" || arg == "--interactive" {
       return true
     }
   }
@@ -9,27 +9,12 @@ fn has_interactive_add_flag(args : Array[String]) -> Bool {
 }
 
 ///|
-fn normalize_add_interactive_args(args : Array[String]) -> Array[String] {
-  let normalized : Array[String] = []
-  for arg in args {
-    if arg == "-p" || arg == "--patch" {
-      continue
-    }
-    normalized.push(arg)
-  }
-  if normalized.length() == 0 {
-    normalized.push("-A")
-  }
-  normalized
-}
-
-///|
 async fn default_add_interactive_runner(args : Array[String]) -> Int {
-  let add_args = normalize_add_interactive_args(args)
-  handle_add(add_args) catch {
-    _ => return 1
-  }
-  0
+  eprint_line(
+    "fatal: interactive add (add -p / add -i) is not yet implemented",
+  )
+  ignore(args)
+  1
 }
 
 ///|
