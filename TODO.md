@@ -74,7 +74,7 @@ check-ignore show-index get-tar-commit-id verify-commit annotate
 
 ## P0.5: 未実装機能
 
-- [ ] Bitmap ファイル書き出し (`pack-objects --write-bitmap-index`) — フラグはパースするが書き出しなし
+- [x] Bitmap ファイル書き出し (`pack-objects --write-bitmap-index`) — EWAH 圧縮、type bitmap、per-tip reachable bitmap、SHA-1 trailer
 - [ ] Multi-pack-index 書き出し (`repack --write-midx`) — `ignore(write_midx)` でスタブ
 - [x] Commit-graph 読込 (実装済み)
 - [ ] Commit-graph 生成 (書き出し)
