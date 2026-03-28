@@ -1062,7 +1062,7 @@ async fn handle_update_index_paths(
   for path in raw_paths {
     let normalized_path = normalize_update_index_path(path)
     let full_path = update_index_join_root(root, normalized_path)
-    let exists = fs.is_file(full_path) ||
+    let exists = @bitio.lstat_entry_meta(full_path) is Some(_) ||
       update_index_read_gitlink_entry(fs, root, normalized_path) is Some(_)
     let tracked_path = tracked.contains(normalized_path)
     if force_remove || (remove_requested && (tracked_path || not(exists))) {
