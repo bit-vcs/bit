@@ -1723,7 +1723,8 @@ async fn handle_diff(args : Array[String]) -> Unit raise Error {
         }
       } else {
         match ref_target {
-          Some(spec) => diff_cached_against_ref(fs, rfs, root, git_dir, spec)
+          Some(spec) =>
+            diff_worktree_against_ref(fs, rfs, root, git_dir, spec)
           None => @bitdiff.diff_worktree(fs, root)
         }
       }
@@ -2477,6 +2478,77 @@ fn diff_index_to_octal(value : Int) -> String {
 }
 
 ///|
+/// Diff working tree against a ref (for `git diff <ref>` without --cached).
+/// Combines index-vs-ref with worktree-vs-index to produce ref-vs-worktree.
+async fn diff_worktree_against_ref(
+  fs : OsFs,
+  rfs : &@bitcore.RepoFileSystem,
+  root : String,
+  git_dir : String,
+  spec : String,
+) -> Array[@bitdiff.DiffFile] raise Error {
+  let cached = diff_cached_against_ref(fs, rfs, root, git_dir, spec)
+  let worktree = @bitdiff.diff_worktree(rfs, root)
+  // Build maps for efficient lookup
+  let cached_map : Map[String, @bitdiff.DiffFile] = {}
+  for file in cached {
+    cached_map[file.path] = file
+  }
+  let worktree_map : Map[String, @bitdiff.DiffFile] = {}
+  for file in worktree {
+    worktree_map[file.path] = file
+  }
+  let result : Array[@bitdiff.DiffFile] = []
+  let seen : Map[String, Bool] = {}
+  // Process all paths from both diffs
+  for file in cached {
+    seen[file.path] = true
+    match worktree_map.get(file.path) {
+      Some(wt) =>
+        // Both cached and worktree have changes for this path.
+        // The effective diff is: old from ref (cached.old), new from worktree (wt.new)
+        match wt.kind {
+          @bitdiff.DiffKind::Deleted =>
+            // File was in ref but deleted from worktree
+            result.push({
+              path: file.path,
+              kind: @bitdiff.DiffKind::Deleted,
+              old_content: file.old_content,
+              new_content: None,
+              old_mode: file.old_mode,
+              new_mode: None,
+            })
+          _ =>
+            // File modified: combine old from ref with new from worktree
+            result.push({
+              path: file.path,
+              kind: file.kind,
+              old_content: file.old_content,
+              new_content: wt.new_content,
+              old_mode: file.old_mode,
+              new_mode: match wt.new_mode {
+                Some(m) => Some(m)
+                None => file.new_mode
+              },
+            })
+        }
+      None =>
+        // Only in cached diff — pass through as-is
+        result.push(file)
+    }
+  }
+  for file in worktree {
+    if not(seen.contains(file.path)) {
+      // Only in worktree diff — the file exists in index identical to ref,
+      // but has working tree changes
+      result.push(file)
+    }
+  }
+  result.sort_by(fn(a, b) { String::compare(a.path, b.path) })
+  result
+}
+
+///|
 fn diff_cached_against_ref(
   fs : OsFs,
   rfs : &@bitcore.RepoFileSystem,
@@ -3144,6 +3216,16 @@ async fn diff_no_index_read_path(
 ) -> Bytes raise Error {
   if abs_path == "-" {
     return read_all_stdin()
+  }
+  // For broken symlinks, read the target path string (not the target file content)
+  match @bitio.read_symlink_target_path(abs_path) {
+    Some(target) =>
+      // Only treat as symlink content if the target doesn't exist (broken symlink)
+      if not(fs.is_file(abs_path)) && not(fs.is_dir(abs_path)) &&
+        not(diff_no_index_is_named_pipe(abs_path)) {
+        return @utf8.encode(target)
+      }
+    None => ()
   }
   if diff_no_index_uses_stream_read(fs, abs_path) {
     let (code, stdout) = @process.collect_stdout(
