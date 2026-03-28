@@ -22,14 +22,6 @@ priv struct CgraphCommitEntry {
 }
 
 ///|
-fn cgraph_write_u32(buf : Array[Byte], value : Int) -> Unit {
-  buf.push(((value >> 24) & 0xff).to_byte())
-  buf.push(((value >> 16) & 0xff).to_byte())
-  buf.push(((value >> 8) & 0xff).to_byte())
-  buf.push((value & 0xff).to_byte())
-}
-
-///|
 fn cgraph_compare_oid_bytes(
   a : FixedArray[Byte],
   b : FixedArray[Byte],
@@ -208,36 +200,38 @@ async fn write_commit_graph(
   buf.push(b'\x00') // number of base graphs = 0
   // Chunk TOC
   // OIDF
-  cgraph_write_u32(buf, 0x4f494446)
-  cgraph_write_u32(buf, 0)
-  cgraph_write_u32(buf, oidf_start)
+  midx_push_u32(buf, 0x4f494446)
+  midx_push_u32(buf, 0)
+  midx_push_u32(buf, oidf_start)
   // OIDL
-  cgraph_write_u32(buf, 0x4f49444c)
-  cgraph_write_u32(buf, 0)
-  cgraph_write_u32(buf, oidl_start)
+  midx_push_u32(buf, 0x4f49444c)
+  midx_push_u32(buf, 0)
+  midx_push_u32(buf, oidl_start)
   // CDAT
-  cgraph_write_u32(buf, 0x43444154)
-  cgraph_write_u32(buf, 0)
-  cgraph_write_u32(buf, cdat_start)
+  midx_push_u32(buf, 0x43444154)
+  midx_push_u32(buf, 0)
+  midx_push_u32(buf, cdat_start)
   // EDGE (if needed)
   if needs_edge {
-    cgraph_write_u32(buf, 0x45444745)
-    cgraph_write_u32(buf, 0)
-    cgraph_write_u32(buf, edge_start)
+    midx_push_u32(buf, 0x45444745)
+    midx_push_u32(buf, 0)
+    midx_push_u32(buf, edge_start)
   }
   // Terminator
-  cgraph_write_u32(buf, 0)
-  cgraph_write_u32(buf, 0)
-  cgraph_write_u32(buf, end_offset)
-  // OIDF: 256-entry fanout table
+  midx_push_u32(buf, 0)
+  midx_push_u32(buf, 0)
+  midx_push_u32(buf, end_offset)
+  // OIDF: 256-entry fanout table (histogram approach, O(N))
+  let fanout : Array[Int] = Array::make(256, 0)
+  for entry in entries {
+    fanout[entry.oid.bytes[0].to_int()] += 1
+  }
+  // Convert counts to cumulative sums
+  for i in 1..<256 {
+    fanout[i] += fanout[i - 1]
+  }
   for i in 0..<256 {
-    let mut count = 0
-    for entry in entries {
-      if entry.oid.bytes[0].to_int() <= i {
-        count += 1
-      }
-    }
-    cgraph_write_u32(buf, count)
+    midx_push_u32(buf, fanout[i])
   }
   // OIDL: sorted OIDs
   for entry in entries {
@@ -256,27 +250,27 @@ async fn write_commit_graph(
     // Parent 1
     if entry.parents.length() > 0 {
       let p1_pos = pos_map.get(entry.parents[0].to_hex()).unwrap_or(0x70000000)
-      cgraph_write_u32(buf, p1_pos)
+      midx_push_u32(buf, p1_pos)
     } else {
-      cgraph_write_u32(buf, 0x70000000)
+      midx_push_u32(buf, 0x70000000)
     }
     // Parent 2
     if entry.parents.length() == 0 || entry.parents.length() == 1 {
-      cgraph_write_u32(buf, 0x70000000)
+      midx_push_u32(buf, 0x70000000)
     } else if entry.parents.length() == 2 {
       let p2_pos = pos_map.get(entry.parents[1].to_hex()).unwrap_or(0x70000000)
-      cgraph_write_u32(buf, p2_pos)
+      midx_push_u32(buf, p2_pos)
     } else {
       // Octopus merge: point to EDGE chunk with high bit set
-      cgraph_write_u32(buf, edge_pos | 0x80000000)
+      midx_push_u32(buf, edge_pos | 0x80000000)
       edge_pos += entry.parents.length() - 1
     }
     // Generation number + date
     // Use generation = 1 (simple; could compute topological generation in future)
     let date_hi = ((entry.commit_timestamp >> 32) & 0x3L).to_int()
     let gen = 1
-    cgraph_write_u32(buf, (gen << 2) | date_hi)
-    cgraph_write_u32(buf, (entry.commit_timestamp & 0xffffffffL).to_int())
+    midx_push_u32(buf, (gen << 2) | date_hi)
+    midx_push_u32(buf, (entry.commit_timestamp & 0xffffffffL).to_int())
   }
   // EDGE chunk (if needed)
   if needs_edge {
@@ -289,19 +283,17 @@ async fn write_commit_graph(
             .unwrap_or(0x70000000)
           if pi == entry.parents.length() - 1 {
             // Last entry: set terminator bit (0x80000000)
-            cgraph_write_u32(buf, p_pos | 0x80000000)
+            midx_push_u32(buf, p_pos | 0x80000000)
           } else {
-            cgraph_write_u32(buf, p_pos)
+            midx_push_u32(buf, p_pos)
           }
         }
       }
     }
   }
   // SHA-1 checksum trailer
-  let body = Bytes::from_array(
-    FixedArray::makei(buf.length(), fn(i) { buf[i] }),
-  )
-  let trailer = @bitcore.sha1(body)
+  let body_arr = FixedArray::makei(buf.length(), fn(i) { buf[i] })
+  let trailer = @bitcore.sha1(Bytes::from_array(body_arr))
   for b in trailer.bytes {
     buf.push(b)
   }

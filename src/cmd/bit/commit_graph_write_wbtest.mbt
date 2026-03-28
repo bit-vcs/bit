@@ -1,9 +1,9 @@
 ///| Tests for commit-graph writer
 
 ///|
-test "cgraph: write_u32" {
+test "cgraph: write_u32 via midx_push_u32" {
   let buf : Array[Byte] = []
-  cgraph_write_u32(buf, 0x43475048)
+  midx_push_u32(buf, 0x43475048)
   assert_eq(buf[0].to_int(), 0x43)
   assert_eq(buf[1].to_int(), 0x47)
   assert_eq(buf[2].to_int(), 0x50)

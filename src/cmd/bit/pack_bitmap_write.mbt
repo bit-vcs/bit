@@ -18,68 +18,6 @@ priv struct BitmapTip {
 }
 
 ///|
-fn bitmap_push_u16(out : Array[Byte], value : Int) -> Unit {
-  out.push(((value >> 8) & 0xff).to_byte())
-  out.push((value & 0xff).to_byte())
-}
-
-///|
-fn bitmap_push_u32(out : Array[Byte], value : Int) -> Unit {
-  out.push(((value >> 24) & 0xff).to_byte())
-  out.push(((value >> 16) & 0xff).to_byte())
-  out.push(((value >> 8) & 0xff).to_byte())
-  out.push((value & 0xff).to_byte())
-}
-
-///|
-fn bitmap_push_u64_parts(out : Array[Byte], hi : Int, lo : Int) -> Unit {
-  bitmap_push_u32(out, hi)
-  bitmap_push_u32(out, lo)
-}
-
-///|
-fn bitmap_build_ewah(bit_size : Int, positions : Array[Int]) -> Array[Byte] {
-  let word_count = if bit_size <= 0 { 0 } else { (bit_size + 63) / 64 }
-  let word_hi : Array[Int] = Array::make(word_count, 0)
-  let word_lo : Array[Int] = Array::make(word_count, 0)
-  for pos in positions {
-    if pos < 0 || pos >= bit_size {
-      continue
-    }
-    let word_idx = pos / 64
-    let bit = pos % 64
-    if bit < 32 {
-      word_lo[word_idx] = word_lo[word_idx] | (1 << bit)
-    } else {
-      word_hi[word_idx] = word_hi[word_idx] | (1 << (bit - 32))
-    }
-  }
-  let out : Array[Byte] = []
-  bitmap_push_u32(out, bit_size)
-  bitmap_push_u32(out, word_count + 1)
-  // RLW: bit 0 = run bit, bits [1..32] = running length, bits [33..63] = literal count
-  // Literal-only: run bit=0, running_length=0, literal_count=word_count
-  let rlw_hi = word_count << 1
-  let rlw_lo = 0
-  bitmap_push_u64_parts(out, rlw_hi, rlw_lo)
-  for i in 0..<word_count {
-    bitmap_push_u64_parts(out, word_hi[i], word_lo[i])
-  }
-  bitmap_push_u32(out, 0) // trailing RLW position
-  out
-}
-
-///|
-fn bitmap_object_type_code(obj_type : @bitcore.ObjectType) -> Int {
-  match obj_type {
-    @bitcore.ObjectType::Commit => 1
-    @bitcore.ObjectType::Tree => 2
-    @bitcore.ObjectType::Blob => 3
-    @bitcore.ObjectType::Tag => 4
-  }
-}
-
-///|
 fn bitmap_collect_tips(
   fs : OsFs,
   git_dir : String,
@@ -141,7 +79,6 @@ async fn write_pack_bitmap(
   bitmap_path : String,
   pack : Bytes,
   idx_objects : Array[@bitcore.PackObject],
-  objects : Array[@bitcore.PackObject],
 ) -> Unit raise Error {
   let object_count = idx_objects.length()
   if object_count == 0 {
@@ -155,7 +92,7 @@ async fn write_pack_bitmap(
   // Determine object types
   let type_by_pos : Array[Int] = Array::make(object_count, -1)
   for pack_pos, obj in idx_objects {
-    type_by_pos[pack_pos] = bitmap_object_type_code(obj.obj_type)
+    type_by_pos[pack_pos] = midx_object_type_code(obj.obj_type)
   }
   // Build type bitmaps
   let commit_positions : Array[Int] = []
@@ -205,13 +142,6 @@ async fn write_pack_bitmap(
     }
     reachable_positions_by_tip.push(positions)
   }
-  // Build name hash cache from original objects
-  let name_hash_by_pos : Array[Int] = Array::make(object_count, 0)
-  // We don't have per-object path info from the pack itself,
-  // so name hash cache is left as zeros (valid per spec).
-  ignore(objects)
-  ignore(name_hash_by_pos)
-  let has_name_hash = false
   // Extract pack checksum (last 20 bytes of pack)
   let checksum_offset = pack.length() - 20
   let checksum = FixedArray::makei(20, fn(i) { pack[checksum_offset + i] })
@@ -223,54 +153,44 @@ async fn write_pack_bitmap(
   out.push(b'T')
   out.push(b'M')
   // Version: 1
-  bitmap_push_u16(out, 1)
+  midx_push_u16(out, 1)
   // Options: bit 0 = full DAG closure
-  let mut bitmap_options = 1
-  if has_name_hash {
-    bitmap_options = bitmap_options | 4
-  }
-  bitmap_push_u16(out, bitmap_options)
+  midx_push_u16(out, 1)
   // Tip count
-  bitmap_push_u32(out, bitmap_tips.length())
+  midx_push_u32(out, bitmap_tips.length())
   // Pack checksum
   for b in checksum {
     out.push(b)
   }
   // Type bitmaps (commit, tree, blob, tag)
-  let commits_bitmap = bitmap_build_ewah(object_count, commit_positions)
+  let commits_bitmap = midx_build_ewah_bitmap(object_count, commit_positions)
   for b in commits_bitmap {
     out.push(b)
   }
-  let trees_bitmap = bitmap_build_ewah(object_count, tree_positions)
+  let trees_bitmap = midx_build_ewah_bitmap(object_count, tree_positions)
   for b in trees_bitmap {
     out.push(b)
   }
-  let blobs_bitmap = bitmap_build_ewah(object_count, blob_positions)
+  let blobs_bitmap = midx_build_ewah_bitmap(object_count, blob_positions)
   for b in blobs_bitmap {
     out.push(b)
   }
-  let tags_bitmap = bitmap_build_ewah(object_count, tag_positions)
+  let tags_bitmap = midx_build_ewah_bitmap(object_count, tag_positions)
   for b in tags_bitmap {
     out.push(b)
   }
   // Per-tip entries
   for i in 0..<bitmap_tips.length() {
-    bitmap_push_u32(out, bitmap_tips[i].pack_pos)
+    midx_push_u32(out, bitmap_tips[i].pack_pos)
     // Flags: 0x01 = bitmap is valid
     out.push(b'\x00')
     out.push(b'\x01')
-    let reachable_bitmap = bitmap_build_ewah(
+    let reachable_bitmap = midx_build_ewah_bitmap(
       object_count,
       reachable_positions_by_tip[i],
     )
     for b in reachable_bitmap {
       out.push(b)
-    }
-  }
-  // Name hash cache (if enabled)
-  if has_name_hash {
-    for hash in name_hash_by_pos {
-      bitmap_push_u32(out, hash)
     }
   }
   // SHA-1 trailer over the body
