@@ -79,6 +79,7 @@ async fn write_pack_bitmap(
   bitmap_path : String,
   pack : Bytes,
   idx_objects : Array[@bitcore.PackObject],
+  db : @bitlib.ObjectDb,
 ) -> Unit raise Error {
   let object_count = idx_objects.length()
   if object_count == 0 {
@@ -124,7 +125,6 @@ async fn write_pack_bitmap(
   }
   bitmap_tips.sort_by(fn(a, b) { a.pack_pos - b.pack_pos })
   // Collect reachable objects for each tip
-  let db = @bitlib.ObjectDb::load(fs, git_dir)
   let reachable_positions_by_tip : Array[Array[Int]] = []
   for tip in bitmap_tips {
     let reachable = @bitlib.collect_reachable_objects(db, fs, tip.id) catch {

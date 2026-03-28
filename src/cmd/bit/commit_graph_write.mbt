@@ -40,42 +40,6 @@ fn cgraph_compare_oid_bytes(
   0
 }
 
-///|
-fn cgraph_extract_committer_timestamp(data : Bytes) -> Int64 {
-  let text = @utf8.decode_lossy(data[:])
-  for line_view in text.split("\n") {
-    let line = line_view.to_string()
-    if line.length() == 0 {
-      break
-    }
-    if line.has_prefix("committer ") {
-      let rest = String::unsafe_substring(line, start=10, end=line.length())
-      // Find '>' to locate end of email
-      let mut gt_pos = -1
-      for ci in 0..<rest.length() {
-        if rest[ci] == '>' {
-          gt_pos = ci
-        }
-      }
-      if gt_pos >= 0 && gt_pos + 2 < rest.length() {
-        let after_email = String::unsafe_substring(
-          rest,
-          start=gt_pos + 2,
-          end=rest.length(),
-        )
-        // "timestamp tz"
-        for part_view in after_email.split(" ") {
-          let part = part_view.to_string()
-          if part.length() > 0 {
-            let ts = @strconv.parse_int64(part) catch { _ => continue }
-            return ts
-          }
-        }
-      }
-    }
-  }
-  0L
-}
 
 ///|
 /// Write a commit-graph file for all reachable commits in the repository.
@@ -142,7 +106,7 @@ async fn write_commit_graph(
       Some(o) =>
         if o.obj_type == @bitcore.ObjectType::Commit {
           let info = @bitcore.parse_commit(o.data) catch { _ => continue }
-          let ts = cgraph_extract_committer_timestamp(o.data)
+          let ts = @tar.tar_parse_committer_timestamp(o.data)
           entries.push({ oid: cid, tree: info.tree, parents: info.parents, commit_timestamp: ts })
         }
       None => ()

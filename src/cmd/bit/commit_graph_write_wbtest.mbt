@@ -37,12 +37,12 @@ test "cgraph: compare_oid_bytes less" {
 test "cgraph: extract_committer_timestamp" {
   let commit_text = "tree aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\nauthor Test <test@test.com> 1700000000 +0000\ncommitter Test <test@test.com> 1700000001 +0000\n\ntest commit\n"
   let data = @utf8.encode(commit_text)
-  assert_eq(cgraph_extract_committer_timestamp(data), 1700000001L)
+  assert_eq(@tar.tar_parse_committer_timestamp(data), 1700000001L)
 }
 
 ///|
 test "cgraph: extract_committer_timestamp missing" {
   let commit_text = "tree aaaa\n\nno committer\n"
   let data = @utf8.encode(commit_text)
-  assert_eq(cgraph_extract_committer_timestamp(data), 0L)
+  assert_eq(@tar.tar_parse_committer_timestamp(data), 0L)
 }
