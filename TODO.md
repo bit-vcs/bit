@@ -1,6 +1,6 @@
 # TODO (Active Only)
 
-最終整理日: 2026-03-27
+最終整理日: 2026-03-28
 方針: 完了ログは一旦外し、未完了タスクのみ管理する。
 現バージョン: v0.36.0
 allowlist: 906 テスト（重複除去済み）
@@ -64,7 +64,7 @@ check-ignore show-index get-tar-commit-id verify-commit annotate
 | **Merge engine** | 5 | 56 | t6416, t6422, t6423, t6424, t6426 |
 | **Sparse/Index** | 5 | 44 | t1092(14), t7002(14), t3903(13), t1091(1), t3705(2) |
 | **Reftable/Refs** | 3 | 42 | t1460(25), t0610(14), t1463(3) |
-| **Object/Hash** | 3 | 110 | t1451(62), t1006(31), t1007(17) |
+| **Object/Hash** | 3 | 110 | t1451(62), t1006(50※), t1007(0) |
 
 ### スコープ外テスト
 
