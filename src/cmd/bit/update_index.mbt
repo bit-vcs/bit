@@ -17,6 +17,7 @@ async fn handle_update_index(args : Array[String]) -> Unit raise Error {
   let mut verbose = false
   let mut skip_worktree_mode : Bool? = None
   let mut assume_unchanged_mode : Bool? = None
+  let mut replace = false
   let mut current_chmod : String? = None
   let mut show_index_version = false
   let mut set_index_version : Int? = None
@@ -32,7 +33,7 @@ async fn handle_update_index(args : Array[String]) -> Unit raise Error {
       "--again" => again = true
       "--remove" => remove = true
       "--force-remove" => force_remove = true
-      "--replace" => ()
+      "--replace" => replace = true
       "--refresh" => refresh = true
       "--really-refresh" => refresh = true
       "-q" => quiet = true
@@ -210,6 +211,47 @@ async fn handle_update_index(args : Array[String]) -> Unit raise Error {
       }
     }
   }
+  // Check D/F conflicts for --cacheinfo entries
+  if direct_updates.length() > 0 && not(replace) {
+    let existing_entries_for_df = @bitlib.read_index_entries(fs, git_dir)
+    let existing_paths : Map[String, Bool] = {}
+    for entry in existing_entries_for_df {
+      existing_paths[normalize_update_index_path(entry.path)] = true
+    }
+    for rm_path in direct_remove_paths {
+      ignore(existing_paths.remove(rm_path))
+    }
+    for entry in direct_updates {
+      let new_path = normalize_update_index_path(entry.path)
+      // Check if any existing entry is a prefix (file blocks directory)
+      let parts = new_path.split("/").collect()
+      let mut prefix = ""
+      for k = 0; k < parts.length() - 1; k = k + 1 {
+        if prefix.length() > 0 {
+          prefix = prefix + "/" + parts[k].to_string()
+        } else {
+          prefix = parts[k].to_string()
+        }
+        if existing_paths.contains(prefix) {
+          eprint_line(
+            "error: '\{new_path}' appears as both a file and as a directory",
+          )
+          @sys.exit(1)
+        }
+      }
+      // Check if new file blocks existing directory entries
+      let new_prefix = new_path + "/"
+      for entry2 in existing_entries_for_df {
+        let ep = normalize_update_index_path(entry2.path)
+        if ep.has_prefix(new_prefix) {
+          eprint_line(
+            "error: '\{new_path}' appears as both a file and as a directory",
+          )
+          @sys.exit(1)
+        }
+      }
+    }
+  }
   if direct_stage_updates.length() > 0 {
     let remove_set : Map[String, Bool] = {}
     let replace_set : Map[String, Bool] = {}
@@ -229,6 +271,21 @@ async fn handle_update_index(args : Array[String]) -> Unit raise Error {
       if remove_set.contains(normalized_path) ||
         replace_set.contains(normalized_path) {
         continue
+      }
+      // When --replace is set, remove D/F conflicting entries
+      if replace {
+        let mut df_conflict = false
+        for du in direct_updates {
+          let du_path = normalize_update_index_path(du.path)
+          if normalized_path.has_prefix(du_path + "/") ||
+            du_path.has_prefix(normalized_path + "/") {
+            df_conflict = true
+            break
+          }
+        }
+        if df_conflict {
+          continue
+        }
       }
       merged_stage_entries.push(@bitlib.IndexStageEntry::new(entry, 0))
     }
@@ -255,7 +312,8 @@ async fn handle_update_index(args : Array[String]) -> Unit raise Error {
       (skip_worktree_mode is None && assume_unchanged_mode is None)
     ) {
     handle_update_index_paths(
-      fs, root, git_dir, paths, add, remove, force_remove, ignore_missing, quiet,
+      fs, root, git_dir, paths, add, remove, force_remove, replace, ignore_missing,
+      quiet,
     )
   }
   if chmod_updates.length() > 0 {
@@ -1048,6 +1106,7 @@ async fn handle_update_index_paths(
   add_requested : Bool,
   remove_requested : Bool,
   force_remove : Bool,
+  replace : Bool,
   ignore_missing : Bool,
   quiet : Bool,
 ) -> Unit raise Error {
@@ -1086,6 +1145,28 @@ async fn handle_update_index_paths(
       }
     }
     @sys.exit(1)
+  }
+  // Handle --replace: remove D/F conflicting entries before staging
+  if replace && add_paths.length() > 0 {
+    let df_removes : Array[String] = []
+    for add_path in add_paths {
+      let prefix = add_path + "/"
+      // Adding path0/file2 → remove existing "path0" (file conflicting with dir)
+      for entry in existing_entries {
+        let entry_path = normalize_update_index_path(entry.path)
+        // If we're adding "a/b" and "a" exists as a file, remove "a"
+        if add_path.has_prefix(entry_path + "/") {
+          df_removes.push(entry_path)
+        }
+        // If we're adding "a" and "a/b" exists, remove "a/b"
+        if entry_path.has_prefix(prefix) {
+          df_removes.push(entry_path)
+        }
+      }
+    }
+    if df_removes.length() > 0 {
+      update_index_remove_paths(fs, git_dir, df_removes)
+    }
   }
   update_index_stage_paths(fs, root, git_dir, add_paths)
   update_index_remove_paths(fs, git_dir, remove_paths)
