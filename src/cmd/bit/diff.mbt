@@ -2183,6 +2183,38 @@ async fn diff_collect_raw_changes_against_index(
     if not(diff_path_matches_filters(entry.path, filters)) {
       continue
     }
+    // Match git's stat-based behavior: when the index has zero stat data
+    // (e.g. after read-tree), report files as modified without hashing.
+    // git diff-files never rehashes; it only checks the stat cache.
+    let stat_invalid = entry.mtime_sec == 0 && entry.mtime_nsec == 0
+    if stat_invalid {
+      let abs = root + "/" + entry.path
+      let meta = @bitio.lstat_entry_meta(abs)
+      if meta is Some(_) {
+        diff_push_change_sorted(
+          changes,
+          {
+            path: entry.path,
+            status: "M",
+            old_mode: Some(entry.mode),
+            old_id: Some(entry.id),
+            new_mode: Some(entry.mode),
+          },
+        )
+      } else {
+        diff_push_change_sorted(
+          changes,
+          {
+            path: entry.path,
+            status: "D",
+            old_mode: Some(entry.mode),
+            old_id: Some(entry.id),
+            new_mode: None,
+          },
+        )
+      }
+      continue
+    }
     let observed = diff_observe_worktree_path(fs, root, git_dir, entry.path)
     match
       diff_raw_worktree_change(
