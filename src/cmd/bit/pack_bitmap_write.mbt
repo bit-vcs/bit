@@ -128,10 +128,9 @@ async fn write_pack_bitmap(
   let reachable_positions_by_tip : Array[Array[Int]] = []
   for tip in bitmap_tips {
     let reachable = @bitlib.collect_reachable_objects(db, fs, tip.id) catch {
-      _ => {
+      _ =>
         // If we can't walk the graph, skip bitmap writing
         return
-      }
     }
     let positions : Array[Int] = []
     for obj in reachable {
@@ -194,7 +193,9 @@ async fn write_pack_bitmap(
     }
   }
   // SHA-1 trailer over the body
-  let body = Bytes::from_array(FixedArray::makei(out.length(), fn(i) { out[i] }))
+  let body = Bytes::from_array(
+    FixedArray::makei(out.length(), fn(i) { out[i] }),
+  )
   let trailer = @bitcore.sha1(body)
   for b in trailer.bytes {
     out.push(b)

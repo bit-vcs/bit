@@ -1537,8 +1537,10 @@ async fn handle_diff(args : Array[String]) -> Unit raise Error {
             paths.push(arg)
           }
         "-M" | "--find-renames" | "-C" | "--find-copies" => ()
-        _ if arg.has_prefix("-M") || arg.has_prefix("--find-renames=") ||
-          arg.has_prefix("-C") || arg.has_prefix("--find-copies=") => ()
+        _ if arg.has_prefix("-M") ||
+          arg.has_prefix("--find-renames=") ||
+          arg.has_prefix("-C") ||
+          arg.has_prefix("--find-copies=") => ()
         _ if arg.has_prefix("--") =>
           if diff_is_tolerated_unimplemented_option(arg) {
             warn_unimplemented_arg("diff", arg)
@@ -1723,8 +1725,7 @@ async fn handle_diff(args : Array[String]) -> Unit raise Error {
         }
       } else {
         match ref_target {
-          Some(spec) =>
-            diff_worktree_against_ref(fs, rfs, root, git_dir, spec)
+          Some(spec) => diff_worktree_against_ref(fs, rfs, root, git_dir, spec)
           None => @bitdiff.diff_worktree(fs, root)
         }
       }
@@ -1838,10 +1839,19 @@ async fn handle_diff_files(args : Array[String]) -> Unit raise Error {
         "--name-only" => name_only = true
         "--name-status" => name_status = true
         "--ignore-submodules" => ignore_submodules = true
-        "-p" | "--patch" | "--patch-with-raw" | "--patch-with-stat" |
-        "--raw" | "--stat" | "--shortstat" | "--summary" | "--numstat" |
-        "--dirstat" | "--cumulative" | "--dirstat-by-file" |
-        "--compact-summary" => {
+        "-p"
+        | "--patch"
+        | "--patch-with-raw"
+        | "--patch-with-stat"
+        | "--raw"
+        | "--stat"
+        | "--shortstat"
+        | "--summary"
+        | "--numstat"
+        | "--dirstat"
+        | "--cumulative"
+        | "--dirstat-by-file"
+        | "--compact-summary" => {
           delegate_to_diff = true
           no_patch_only = false
         }
@@ -1932,10 +1942,20 @@ async fn handle_diff_index(args : Array[String]) -> Unit raise Error {
         "--name-only" => name_only = true
         "--raw" => ()
         "--cached" => cached = true
-        "-p" | "--patch" | "--patch-with-raw" | "--patch-with-stat" |
-        "--stat" | "--shortstat" | "--summary" | "--numstat" |
-        "--dirstat" | "--cumulative" | "--dirstat-by-file" |
-        "--compact-summary" | "-M" | "--find-renames" => {
+        "-p"
+        | "--patch"
+        | "--patch-with-raw"
+        | "--patch-with-stat"
+        | "--stat"
+        | "--shortstat"
+        | "--summary"
+        | "--numstat"
+        | "--dirstat"
+        | "--cumulative"
+        | "--dirstat-by-file"
+        | "--compact-summary"
+        | "-M"
+        | "--find-renames" => {
           delegate_to_diff = true
           no_patch_only = false
         }
@@ -2084,7 +2104,14 @@ fn diff_raw_worktree_change(
   match (old_mode, observed.mode) {
     (None, None) => None
     (Some(mode), None) =>
-      Some({ path, status: "D", old_mode: Some(mode), old_id, new_mode: None, new_id: None })
+      Some({
+        path,
+        status: "D",
+        old_mode: Some(mode),
+        old_id,
+        new_mode: None,
+        new_id: None,
+      })
     (None, Some(mode)) =>
       Some({
         path,
@@ -2254,29 +2281,23 @@ async fn diff_collect_raw_changes_against_index(
       let abs = root + "/" + entry.path
       let meta = @bitio.lstat_entry_meta(abs)
       if meta is Some(_) {
-        diff_push_change_sorted(
-          changes,
-          {
-            path: entry.path,
-            status: "M",
-            old_mode: Some(entry.mode),
-            old_id: Some(entry.id),
-            new_mode: Some(entry.mode),
-            new_id: None,
-          },
-        )
+        diff_push_change_sorted(changes, {
+          path: entry.path,
+          status: "M",
+          old_mode: Some(entry.mode),
+          old_id: Some(entry.id),
+          new_mode: Some(entry.mode),
+          new_id: None,
+        })
       } else {
-        diff_push_change_sorted(
-          changes,
-          {
-            path: entry.path,
-            status: "D",
-            old_mode: Some(entry.mode),
-            old_id: Some(entry.id),
-            new_mode: None,
-            new_id: None,
-          },
-        )
+        diff_push_change_sorted(changes, {
+          path: entry.path,
+          status: "D",
+          old_mode: Some(entry.mode),
+          old_id: Some(entry.id),
+          new_mode: None,
+          new_id: None,
+        })
       }
       continue
     }
@@ -3229,7 +3250,8 @@ async fn diff_no_index_read_path(
   match @bitio.read_symlink_target_path(abs_path) {
     Some(target) =>
       // Only treat as symlink content if the target doesn't exist (broken symlink)
-      if not(fs.is_file(abs_path)) && not(fs.is_dir(abs_path)) &&
+      if not(fs.is_file(abs_path)) &&
+        not(fs.is_dir(abs_path)) &&
         not(diff_no_index_is_named_pipe(abs_path)) {
         return @utf8.encode(target)
       }

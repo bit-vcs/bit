@@ -10,9 +10,7 @@ fn has_interactive_add_flag(args : Array[String]) -> Bool {
 
 ///|
 async fn default_add_interactive_runner(args : Array[String]) -> Int {
-  eprint_line(
-    "fatal: interactive add (add -p / add -i) is not yet implemented",
-  )
+  eprint_line("fatal: interactive add (add -p / add -i) is not yet implemented")
   ignore(args)
   1
 }

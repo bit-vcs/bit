@@ -987,7 +987,9 @@ async fn worktree_wbtest_case_list_shows_main_and_linked() -> Unit raise Error {
   @sys.unset_env_var("GIT_DIR")
   @sys.unset_env_var("GIT_WORK_TREE")
 
-  worktree_wbtest_run_shim_git(["worktree", "add", "--detach", "linked1", "main"])
+  worktree_wbtest_run_shim_git([
+    "worktree", "add", "--detach", "linked1", "main",
+  ])
 
   let (code, stdout, _stderr) = worktree_wbtest_collect_shim_git([
     "worktree", "list",
@@ -1046,7 +1048,9 @@ async fn worktree_wbtest_case_remove_linked_worktree() -> Unit raise Error {
   @sys.unset_env_var("GIT_DIR")
   @sys.unset_env_var("GIT_WORK_TREE")
 
-  worktree_wbtest_run_shim_git(["worktree", "add", "--detach", "to-remove", "main"])
+  worktree_wbtest_run_shim_git([
+    "worktree", "add", "--detach", "to-remove", "main",
+  ])
   assert_true(fs.is_dir(repo_dir + "/to-remove"))
   assert_true(fs.is_dir(repo_dir + "/.git/worktrees/to-remove"))
 
@@ -1147,10 +1151,17 @@ async fn worktree_wbtest_case_move_worktree() -> Unit raise Error {
   @sys.unset_env_var("GIT_DIR")
   @sys.unset_env_var("GIT_WORK_TREE")
 
-  worktree_wbtest_run_shim_git(["worktree", "add", "--detach", "before-move", "main"])
+  worktree_wbtest_run_shim_git([
+    "worktree", "add", "--detach", "before-move", "main",
+  ])
   assert_true(fs.is_dir(repo_dir + "/before-move"))
 
-  worktree_wbtest_run_shim_git(["worktree", "move", "before-move", root + "/after-move"])
+  worktree_wbtest_run_shim_git([
+    "worktree",
+    "move",
+    "before-move",
+    root + "/after-move",
+  ])
   assert_false(fs.is_dir(repo_dir + "/before-move"))
   assert_true(fs.is_dir(root + "/after-move"))
 
@@ -1197,7 +1208,9 @@ async fn worktree_wbtest_case_lock_and_unlock() -> Unit raise Error {
   @sys.unset_env_var("GIT_DIR")
   @sys.unset_env_var("GIT_WORK_TREE")
 
-  worktree_wbtest_run_shim_git(["worktree", "add", "--detach", "locktest", "main"])
+  worktree_wbtest_run_shim_git([
+    "worktree", "add", "--detach", "locktest", "main",
+  ])
   assert_false(fs.is_file(repo_dir + "/.git/worktrees/locktest/locked"))
 
   // Lock without reason
@@ -1247,8 +1260,7 @@ async fn worktree_wbtest_case_lock_and_unlock() -> Unit raise Error {
 async fn worktree_wbtest_case_add_list_remove_e2e() -> Unit raise Error {
   @bitnative.init_native_io()
   let fs = OsFs::new()
-  let root = "/tmp/bit-test-worktree-e2e-" +
-    get_current_timestamp().to_string()
+  let root = "/tmp/bit-test-worktree-e2e-" + get_current_timestamp().to_string()
   cleanup_tree(fs, root)
   fs.mkdir_p(root)
   let repo_dir = root + "/repo"
@@ -1273,8 +1285,12 @@ async fn worktree_wbtest_case_add_list_remove_e2e() -> Unit raise Error {
   @sys.unset_env_var("GIT_WORK_TREE")
 
   // Add multiple worktrees
-  worktree_wbtest_run_shim_git(["worktree", "add", "-b", "feat1", "wt-feat1", "main"])
-  worktree_wbtest_run_shim_git(["worktree", "add", "--detach", "wt-detached", "main"])
+  worktree_wbtest_run_shim_git([
+    "worktree", "add", "-b", "feat1", "wt-feat1", "main",
+  ])
+  worktree_wbtest_run_shim_git([
+    "worktree", "add", "--detach", "wt-detached", "main",
+  ])
 
   // List should show 3 worktrees (main + 2 linked)
   let (_, list_out, _) = worktree_wbtest_collect_shim_git([

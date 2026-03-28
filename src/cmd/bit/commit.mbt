@@ -173,7 +173,8 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
         i += 2
         continue
       }
-      "-qam" | "-qma" | "-aqm" | "-amq" | "-maq" | "-mqa" if i + 1 < args.length() => {
+      "-qam" | "-qma" | "-aqm" | "-amq" | "-maq" | "-mqa" if i + 1 <
+        args.length() => {
         commit_check_message_source_conflict(message_source, "m")
         message_source = "m"
         all_modified = true

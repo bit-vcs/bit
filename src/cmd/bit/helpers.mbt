@@ -783,7 +783,11 @@ fn parse_iso_date_timestamp(raw : String) -> Int64? {
   let days = days_from_epoch(year, month, day)
   let mut ts = days * 86400L + hour * 3600L + minute * 60L + second
   // Adjust for timezone offset embedded in the string (e.g. +0200 or -0500)
-  let after_time = String::unsafe_substring(s, start=11 + time_end, end=s.length())
+  let after_time = String::unsafe_substring(
+    s,
+    start=11 + time_end,
+    end=s.length(),
+  )
   let tz_offset = parse_iso_tz_offset_seconds(after_time)
   ts = ts - tz_offset
   Some(ts)
@@ -796,7 +800,13 @@ fn parse_iso_tz_offset_seconds(s : String) -> Int64 {
   if t.length() < 5 {
     return 0L
   }
-  let sign : Int64 = if t[0] == '-' { -1L } else if t[0] == '+' { 1L } else { return 0L }
+  let sign : Int64 = if t[0] == '-' {
+    -1L
+  } else if t[0] == '+' {
+    1L
+  } else {
+    return 0L
+  }
   // +HHMM or +HH:MM
   let (hh_str, mm_str) = if t.length() >= 6 && t[3] == ':' {
     (
@@ -892,7 +902,11 @@ fn parse_git_env_timezone(raw : String) -> String? {
     }
     // Also handle +HH:MM format (6 chars)
     if s.length() >= 6 {
-      let tail6 = String::unsafe_substring(s, start=s.length() - 6, end=s.length())
+      let tail6 = String::unsafe_substring(
+        s,
+        start=s.length() - 6,
+        end=s.length(),
+      )
       if (tail6[0] == '+' || tail6[0] == '-') && tail6[3] == ':' {
         // Convert +HH:MM to +HHMM
         let sign = String::unsafe_substring(tail6, start=0, end=1)

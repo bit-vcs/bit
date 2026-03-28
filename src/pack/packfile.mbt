@@ -266,8 +266,10 @@ fn find_best_match(
       continue
     }
     // Quick 4-byte prefix check before full comparison
-    if base[off] != t0 || base[off + 1] != t1 ||
-      base[off + 2] != t2 || base[off + 3] != t3 {
+    if base[off] != t0 ||
+      base[off + 1] != t1 ||
+      base[off + 2] != t2 ||
+      base[off + 3] != t3 {
       checked += 1
       if checked >= max_candidates {
         break

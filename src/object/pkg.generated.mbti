@@ -75,8 +75,9 @@ pub struct Commit {
   committer_tz : String
   message : String
   encoding : String
+  verbatim_message : Bool
 }
-pub fn Commit::new(ObjectId, Array[ObjectId], String, Int64, String, String, Int64, String, String, encoding? : String) -> Self
+pub fn Commit::new(ObjectId, Array[ObjectId], String, Int64, String, String, Int64, String, String, encoding? : String, verbatim_message? : Bool) -> Self
 
 pub(all) enum HashAlgorithm {
   Sha1

@@ -107,7 +107,14 @@ async fn handle_commit_tree(args : Array[String]) -> Unit raise Error {
   let author = "\{author_name} <\{author_email}>"
   let committer = "\{committer_name} <\{committer_email}>"
   let commit = @bitcore.Commit::new(
-    tree_id, parents, author, author_ts, author_tz, committer, committer_ts, committer_tz,
+    tree_id,
+    parents,
+    author,
+    author_ts,
+    author_tz,
+    committer,
+    committer_ts,
+    committer_tz,
     msg,
     verbatim_message=true,
   )

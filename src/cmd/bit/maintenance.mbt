@@ -49,7 +49,9 @@ async fn handle_maintenance(args : Array[String]) -> Unit raise Error {
     Some("gc") => handle_gc([])
     Some("commit-graph") => {
       let git_dir = resolve_git_dir(fs, root)
-      write_commit_graph(fs, git_dir, true) catch { _ => () }
+      write_commit_graph(fs, git_dir, true) catch {
+        _ => ()
+      }
       if not(quiet) {
         print_line("Commit graph updated.")
       }

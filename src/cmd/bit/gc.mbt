@@ -37,7 +37,9 @@ async fn handle_gc(args : Array[String]) -> Unit raise Error {
   }
   // Update commit-graph after gc
   let git_dir = resolve_git_dir(fs, root)
-  write_commit_graph(fs, git_dir, true) catch { _ => () }
+  write_commit_graph(fs, git_dir, true) catch {
+    _ => ()
+  }
 }
 
 ///|

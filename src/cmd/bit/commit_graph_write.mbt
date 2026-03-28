@@ -40,7 +40,6 @@ fn cgraph_compare_oid_bytes(
   0
 }
 
-
 ///|
 /// Write a commit-graph file for all reachable commits in the repository.
 async fn write_commit_graph(
@@ -107,7 +106,12 @@ async fn write_commit_graph(
         if o.obj_type == @bitcore.ObjectType::Commit {
           let info = @bitcore.parse_commit(o.data) catch { _ => continue }
           let ts = @tar.tar_parse_committer_timestamp(o.data)
-          entries.push({ oid: cid, tree: info.tree, parents: info.parents, commit_timestamp: ts })
+          entries.push({
+            oid: cid,
+            tree: info.tree,
+            parents: info.parents,
+            commit_timestamp: ts,
+          })
         }
       None => ()
     }

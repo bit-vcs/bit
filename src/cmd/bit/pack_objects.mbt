@@ -3146,9 +3146,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
           }
           if cfg.write_bitmap && not(cfg.stdout) {
             let bitmap_path = base_name + "-" + hash_hex + ".bitmap"
-            write_pack_bitmap(
-              fs, git_dir, bitmap_path, pack, idx_objects, db,
-            )
+            write_pack_bitmap(fs, git_dir, bitmap_path, pack, idx_objects, db)
           }
           if db.saw_corrupt_pack {
             corrupt_pack_file(fs, pack_path)
