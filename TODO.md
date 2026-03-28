@@ -77,7 +77,7 @@ check-ignore show-index get-tar-commit-id verify-commit annotate
 - [x] Bitmap ファイル書き出し (`pack-objects --write-bitmap-index`) — EWAH 圧縮、type bitmap、per-tip reachable bitmap、SHA-1 trailer
 - [ ] Multi-pack-index 書き出し (`repack --write-midx`) — `ignore(write_midx)` でスタブ
 - [x] Commit-graph 読込 (実装済み)
-- [ ] Commit-graph 生成 (書き出し)
+- [x] Commit-graph 生成 (書き出し) — OIDF/OIDL/CDAT/EDGE チャンク、octopus merge 対応、gc/maintenance 統合
 - [x] SSH トランスポート — ネイティブ `ssh` コマンドに委譲で動作。in-process SSH は未実装
 - [ ] GPG/SSH 署名 (`commit -S`, `tag -s`) — フラグ認識のみ、`--signoff` は動作
 - [ ] Interactive add (`add -p` / `add -i`) — エラーで拒否するよう修正済み。実装は未着手

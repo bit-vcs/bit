@@ -101,6 +101,7 @@ options(
     "column.mbt": [ "native" ],
     "commit.mbt": [ "native" ],
     "commit_graph.mbt": [ "native" ],
+    "commit_graph_write.mbt": [ "native" ],
     "commit_tree.mbt": [ "native" ],
     "commit_wbtest.mbt": [ "native" ],
     "completion.mbt": [ "native" ],
