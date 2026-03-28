@@ -165,6 +165,23 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
         i += 2
         continue
       }
+      "-qm" | "-mq" if i + 1 < args.length() => {
+        commit_check_message_source_conflict(message_source, "m")
+        message_source = "m"
+        quiet = true
+        messages.push(args[i + 1])
+        i += 2
+        continue
+      }
+      "-qam" | "-qma" | "-aqm" | "-amq" | "-maq" | "-mqa" if i + 1 < args.length() => {
+        commit_check_message_source_conflict(message_source, "m")
+        message_source = "m"
+        all_modified = true
+        quiet = true
+        messages.push(args[i + 1])
+        i += 2
+        continue
+      }
       "--author" if i + 1 < args.length() => {
         author_override = Some(args[i + 1])
         i += 2
