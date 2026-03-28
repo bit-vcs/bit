@@ -75,7 +75,7 @@ check-ignore show-index get-tar-commit-id verify-commit annotate
 ## P0.5: 未実装機能
 
 - [x] Bitmap ファイル書き出し (`pack-objects --write-bitmap-index`) — EWAH 圧縮、type bitmap、per-tip reachable bitmap、SHA-1 trailer
-- [ ] Multi-pack-index 書き出し (`repack --write-midx`) — `ignore(write_midx)` でスタブ
+- [x] Multi-pack-index 書き出し (`repack --write-midx`) — midx_write() を repack から呼び出し統合
 - [x] Commit-graph 読込 (実装済み)
 - [x] Commit-graph 生成 (書き出し) — OIDF/OIDL/CDAT/EDGE チャンク、octopus merge 対応、gc/maintenance 統合
 - [x] SSH トランスポート — ネイティブ `ssh` コマンドに委譲で動作。in-process SSH は未実装
