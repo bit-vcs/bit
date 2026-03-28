@@ -284,6 +284,7 @@ test "diff: ignore-submodules filter removes gitlink raw changes" {
       old_mode: Some(0o100644),
       old_id: Some(old_id),
       new_mode: Some(0o100644),
+      new_id: None,
     },
     {
       path: "sub",
@@ -291,6 +292,7 @@ test "diff: ignore-submodules filter removes gitlink raw changes" {
       old_mode: Some(0o160000),
       old_id: Some(old_id),
       new_mode: None,
+      new_id: None,
     },
   ]
   let filtered = diff_filter_raw_submodule_changes(changes, true)
