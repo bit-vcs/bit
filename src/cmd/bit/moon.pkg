@@ -51,7 +51,7 @@ import {
   "moonbitlang/x/sys" @sys,
 }
 
-warnings = "-29-67"
+warnings = "-12-29-67"
 
 options(
   is_main: true,
