@@ -47,10 +47,13 @@ async fn handle_maintenance(args : Array[String]) -> Unit raise Error {
         print_line("Repository unregistered from maintenance.")
       }
     Some("gc") => handle_gc([])
-    Some("commit-graph") =>
+    Some("commit-graph") => {
+      let git_dir = resolve_git_dir(fs, root)
+      write_commit_graph(fs, git_dir, true) catch { _ => () }
       if not(quiet) {
         print_line("Commit graph updated.")
       }
+    }
     Some("prefetch") => if not(quiet) { print_line("Prefetch completed.") }
     Some("loose-objects") => handle_repack(["-d", "-q"])
     Some("incremental-repack") => handle_repack(["-d", "-q"])

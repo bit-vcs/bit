@@ -119,7 +119,6 @@ async fn handle_repack(args : Array[String]) -> Unit raise Error {
     i += 1
   }
   ignore(cruft)
-  ignore(write_midx)
   // Auto-enable bitmaps for bare repos (matches git behavior) unless
   // explicitly disabled via --no-write-bitmap-index or config.
   let is_bare = root == git_dir || is_bare_repo_dir(root)
@@ -302,6 +301,19 @@ async fn handle_repack(args : Array[String]) -> Unit raise Error {
   // Update server info (objects/info/packs) unless -n
   if not(no_update_server_info) {
     repack_update_server_info(fs, git_dir, pack_dir)
+  }
+  // Write multi-pack-index if requested
+  if write_midx {
+    midx_write(
+      fs,
+      pack_dir,
+      not(quiet),
+      None,
+      false,
+      write_bitmap,
+      no_write_bitmap,
+      None,
+    )
   }
 }
 

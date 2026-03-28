@@ -1,12 +1,22 @@
 # TODO (Active Only)
 
-最終整理日: 2026-03-16
+最終整理日: 2026-03-28
 方針: 完了ログは一旦外し、未完了タスクのみ管理する。
-現バージョン: v0.31.0
-allowlist: 908 テスト（重複除去済み）
-CI SHIM_CMDS: **108 コマンド**
+現バージョン: v0.36.0
+allowlist: 909 テスト（重複除去済み）
+CI SHIM_CMDS: **108 コマンド** (全コマンドをCIに登録済み)
 CI unit test: **1637/1637 全パス** (2026-03-16)
 e2e: **30/30 全パス** (2026-03-16)
+
+### v0.31.0 → v0.36.0 の主な変更
+
+- SHA-256 オブジェクトハッシュ対応 (dual SHA-1/SHA-256)
+- Octopus merge (multi-head merge) 実装
+- Commit-graph reader (ObjectDb 統合)
+- Relay watch / CI status / review / presence コマンド
+- Sub-issue 対応 (bit-hub)
+- Merge engine: rename detection, file/directory conflict detection
+- cat-file :N:path 対応
 
 ## P0: Git compatibility
 
@@ -51,10 +61,10 @@ check-ignore show-index get-tar-commit-id verify-commit annotate
 
 | カテゴリ | テスト数 | 合計失敗数 | 主要テスト |
 |----------|----------|------------|------------|
-| **Merge engine** | 5 | 56 | t6416, t6422, t6423, t6424, t6426 |
-| **Sparse/Index** | 5 | 44 | t1092(14), t7002(14), t3903(13), t1091(1), t3705(2) |
-| **Reftable/Refs** | 3 | 42 | t1460(25), t0610(14), t1463(3) |
-| **Object/Hash** | 3 | 110 | t1451(62), t1006(31), t1007(17) |
+| **Merge engine** | 5 | 0 | t6416, t6422, t6423, t6424, t6426 — 全パス |
+| **Sparse/Index** | 5 | 0 | t1092, t7002, t3903, t1091, t3705 — 全パス |
+| **Reftable/Refs** | 3 | 0 | t1460, t0610, t1463 — 全パス (known breakage のみ) |
+| **Object/Hash** | 3 | 0 | t1451, t1006, t1007 — 全パス |
 
 ### スコープ外テスト
 
@@ -64,13 +74,14 @@ check-ignore show-index get-tar-commit-id verify-commit annotate
 
 ## P0.5: 未実装機能
 
-- [ ] Bitmap ファイル書き出し (`pack-objects --write-bitmap-index`)
-- [ ] Multi-pack-index 書き出し (`repack --write-midx`)
-- [ ] Commit-graph 生成・読込
-- [ ] SSH トランスポート (HTTPS のみ)
-- [ ] GPG/SSH 署名 (`commit -S`, `tag -s`)
-- [ ] Interactive add (`add -p` / `add -i`)
-- [ ] Interactive rebase (`rebase -i`)
+- [x] Bitmap ファイル書き出し (`pack-objects --write-bitmap-index`) — EWAH 圧縮、type bitmap、per-tip reachable bitmap、SHA-1 trailer
+- [x] Multi-pack-index 書き出し (`repack --write-midx`) — midx_write() を repack から呼び出し統合
+- [x] Commit-graph 読込 (実装済み)
+- [x] Commit-graph 生成 (書き出し) — OIDF/OIDL/CDAT/EDGE チャンク、octopus merge 対応、gc/maintenance 統合
+- [x] SSH トランスポート — ネイティブ `ssh` コマンドに委譲で動作。in-process SSH は未実装
+- [ ] GPG/SSH 署名 (`commit -S`, `tag -s`) — フラグ認識のみ、`--signoff` は動作
+- [ ] Interactive add (`add -p` / `add -i`) — エラーで拒否するよう修正済み。実装は未着手
+- [ ] Interactive rebase (`rebase -i`) — 部分実装 (pick/reword/edit/squash/fixup/drop)、スタンドアロンモード不可
 
 ## P1: Relay / P2P collaboration
 
@@ -81,10 +92,13 @@ check-ignore show-index get-tar-commit-id verify-commit annotate
 ### pack-objects 高速化
 
 ベースライン (2026-03-04): 500obj bit=1970ms vs git=101ms (19.5x)
+最新計測 (2026-03-28): 500obj bit=58.5ms (delta: 61.3ms) vs git=42ms (**1.4x**) — 33.7x 高速化
 
-- [ ] スライディングウィンドウ (--window)
-- [ ] build_delta ブロックインデックス再利用
-- [ ] find_best_match 候補数制限緩和 (64 → 128-256)
+- [x] スライディングウィンドウ (--window) — 実装済み (window=10, configurable)
+- [x] build_delta ブロックインデックス再利用 — 実装済み (DeltaWindowEntry にキャッシュ)
+- [x] find_best_match 候補数制限緩和 — 32 → 128 に拡大、4バイトprefix check、early-exit閾値 4x に引き上げ
+- [x] delta出力バッファ事前確保 — 実装済み (capacity=target_len/2+32)
+- [x] pack-objects ベンチマーク再計測 — 1970ms→58.5ms (33.7x改善), git比 19.5x→1.4x
 
 ## P3: WASM / クロスプラットフォーム
 

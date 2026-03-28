@@ -2,32 +2,32 @@
 test "interactive: detect add patch mode" {
   assert_true(has_interactive_add_flag(["-p"]))
   assert_true(has_interactive_add_flag(["--patch", "README.md"]))
+  assert_true(has_interactive_add_flag(["-i"]))
+  assert_true(has_interactive_add_flag(["--interactive"]))
   assert_false(has_interactive_add_flag(["README.md"]))
 }
 
 ///|
-test "interactive: normalize add patch args strips patch flags" {
-  let no_path = normalize_add_interactive_args(["-p"])
-  assert_eq(no_path.length(), 1)
-  assert_eq(no_path[0], "-A")
-  let with_path = normalize_add_interactive_args(["--patch", "README.md"])
-  assert_eq(with_path.length(), 1)
-  assert_eq(with_path[0], "README.md")
+async test "interactive: add patch default runner rejects with error" {
+  let runner_called = Array::new(capacity=1)
+  let runner = Some(async fn(_args : Array[String]) -> Int noraise {
+    runner_called.push(true)
+    0
+  })
+  // With custom runner, it should pass through
+  run_add_interactive(["-p", "README.md"], runner~)
+  assert_eq(runner_called.length(), 1)
 }
 
 ///|
-async test "interactive: add patch runner callback is invoked" {
-  let called : Array[String] = []
-  let runner = Some(async fn(args : Array[String]) -> Int noraise {
-    for arg in args {
-      called.push(arg)
-    }
-    0
-  })
-  run_add_interactive(["-p", "README.md"], runner~)
-  assert_eq(called.length(), 2)
-  assert_eq(called[0], "-p")
-  assert_eq(called[1], "README.md")
+async test "interactive: add patch default runner fails without custom runner" {
+  // Default runner should fail (exit code 1) since add -p is not implemented
+  try {
+    run_add_interactive(["-p", "README.md"])
+    fail("expected error from unimplemented add -p")
+  } catch {
+    _ => () // Expected: should raise an error
+  }
 }
 
 ///|

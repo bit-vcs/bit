@@ -1536,6 +1536,9 @@ async fn handle_diff(args : Array[String]) -> Unit raise Error {
           } else {
             paths.push(arg)
           }
+        "-M" | "--find-renames" | "-C" | "--find-copies" => ()
+        _ if arg.has_prefix("-M") || arg.has_prefix("--find-renames=") ||
+          arg.has_prefix("-C") || arg.has_prefix("--find-copies=") => ()
         _ if arg.has_prefix("--") =>
           if diff_is_tolerated_unimplemented_option(arg) {
             warn_unimplemented_arg("diff", arg)
@@ -1720,7 +1723,8 @@ async fn handle_diff(args : Array[String]) -> Unit raise Error {
         }
       } else {
         match ref_target {
-          Some(spec) => diff_cached_against_ref(fs, rfs, root, git_dir, spec)
+          Some(spec) =>
+            diff_worktree_against_ref(fs, rfs, root, git_dir, spec)
           None => @bitdiff.diff_worktree(fs, root)
         }
       }
@@ -1815,6 +1819,8 @@ async fn handle_diff_files(args : Array[String]) -> Unit raise Error {
   let mut name_only = false
   let mut name_status = false
   let mut ignore_submodules = false
+  let mut delegate_to_diff = false
+  let mut no_patch_only = false
   let mut parse_options = true
   let filters : Array[String] = []
   for arg in args {
@@ -1832,6 +1838,17 @@ async fn handle_diff_files(args : Array[String]) -> Unit raise Error {
         "--name-only" => name_only = true
         "--name-status" => name_status = true
         "--ignore-submodules" => ignore_submodules = true
+        "-p" | "--patch" | "--patch-with-raw" | "--patch-with-stat" |
+        "--raw" | "--stat" | "--shortstat" | "--summary" | "--numstat" |
+        "--dirstat" | "--cumulative" | "--dirstat-by-file" |
+        "--compact-summary" => {
+          delegate_to_diff = true
+          no_patch_only = false
+        }
+        "-s" | "--no-patch" => {
+          no_patch_only = true
+          delegate_to_diff = false
+        }
         _ if arg.has_prefix("--ignore-submodules=") =>
           ignore_submodules = not(
             String::unsafe_substring(arg, start=20, end=arg.length())
@@ -1846,6 +1863,12 @@ async fn handle_diff_files(args : Array[String]) -> Unit raise Error {
       filters.push(arg)
     }
   }
+  // When output format flags beyond raw/name-only/name-status are present,
+  // delegate to handle_diff which handles all format combinations.
+  if delegate_to_diff {
+    handle_diff(args)
+    return
+  }
   let root = get_work_root()
   let fs = OsFs::new()
   let git_dir = resolve_git_dir(fs, root)
@@ -1857,7 +1880,7 @@ async fn handle_diff_files(args : Array[String]) -> Unit raise Error {
     if exit_code {
       @sys.exit(1)
     }
-    if not(quiet) {
+    if not(quiet) && not(no_patch_only) {
       if name_only {
         for change in changes {
           print_line(change.path)
@@ -1877,6 +1900,9 @@ async fn handle_diff_files(args : Array[String]) -> Unit raise Error {
   if ignore_submodules {
     return
   }
+  if no_patch_only {
+    return
+  }
   handle_diff(args)
 }
 
@@ -1886,6 +1912,8 @@ async fn handle_diff_index(args : Array[String]) -> Unit raise Error {
   let mut quiet = false
   let mut name_only = false
   let mut cached = false
+  let mut delegate_to_diff = false
+  let mut no_patch_only = false
   let mut parse_options = true
   let mut treeish : String? = None
   let filters : Array[String] = []
@@ -1904,7 +1932,22 @@ async fn handle_diff_index(args : Array[String]) -> Unit raise Error {
         "--name-only" => name_only = true
         "--raw" => ()
         "--cached" => cached = true
-        _ if arg.has_prefix("-") => warn_unimplemented_arg("diff-index", arg)
+        "-p" | "--patch" | "--patch-with-raw" | "--patch-with-stat" |
+        "--stat" | "--shortstat" | "--summary" | "--numstat" |
+        "--dirstat" | "--cumulative" | "--dirstat-by-file" |
+        "--compact-summary" | "-M" | "--find-renames" => {
+          delegate_to_diff = true
+          no_patch_only = false
+        }
+        "-s" | "--no-patch" => {
+          no_patch_only = true
+          delegate_to_diff = false
+        }
+        _ if arg.has_prefix("-M") || arg.has_prefix("--find-renames=") => {
+          delegate_to_diff = true
+          no_patch_only = false
+        }
+        _ if arg.has_prefix("-") => ()
         _ =>
           if treeish is None {
             treeish = Some(arg)
@@ -1916,6 +1959,20 @@ async fn handle_diff_index(args : Array[String]) -> Unit raise Error {
       filters.push(arg)
     }
   }
+  // When patch/stat/rename flags are present, delegate to handle_diff
+  // which supports full unified diff output.
+  if delegate_to_diff {
+    // Build args for handle_diff: insert the treeish if present
+    let diff_args : Array[String] = []
+    if cached {
+      diff_args.push("--cached")
+    }
+    for arg in args {
+      diff_args.push(arg)
+    }
+    handle_diff(diff_args)
+    return
+  }
   let root = get_work_root()
   let fs = OsFs::new()
   let rfs : &@bitcore.RepoFileSystem = fs
@@ -1926,7 +1983,7 @@ async fn handle_diff_index(args : Array[String]) -> Unit raise Error {
       fs, rfs, root, git_dir, target, filters,
     )
     let has_changes = changes.length() > 0
-    if not(quiet) {
+    if not(quiet) && not(no_patch_only) {
       if name_only {
         for change in changes {
           print_line(change.path)
@@ -1963,7 +2020,7 @@ async fn handle_diff_index(args : Array[String]) -> Unit raise Error {
     }
   }
   let has_changes = staged.length() > 0 || stale.length() > 0
-  if not(quiet) {
+  if not(quiet) && not(no_patch_only) {
     if name_only {
       for file in staged {
         print_line(file.path)
@@ -2003,6 +2060,7 @@ priv struct DiffRawWorktreeChange {
   old_mode : Int?
   old_id : @bitcore.ObjectId?
   new_mode : Int?
+  new_id : @bitcore.ObjectId?
 }
 
 ///|
@@ -2026,7 +2084,7 @@ fn diff_raw_worktree_change(
   match (old_mode, observed.mode) {
     (None, None) => None
     (Some(mode), None) =>
-      Some({ path, status: "D", old_mode: Some(mode), old_id, new_mode: None })
+      Some({ path, status: "D", old_mode: Some(mode), old_id, new_mode: None, new_id: None })
     (None, Some(mode)) =>
       Some({
         path,
@@ -2034,6 +2092,7 @@ fn diff_raw_worktree_change(
         old_mode: None,
         old_id: None,
         new_mode: Some(mode),
+        new_id: observed.id,
       })
     (Some(old_mode), Some(new_mode)) => {
       let same_kind = diff_mode_kind(old_mode) == diff_mode_kind(new_mode)
@@ -2055,6 +2114,7 @@ fn diff_raw_worktree_change(
           old_mode: Some(old_mode),
           old_id,
           new_mode: Some(new_mode),
+          new_id: observed.id,
         })
       }
     }
@@ -2069,7 +2129,10 @@ fn diff_format_raw_worktree_change(change : DiffRawWorktreeChange) -> String {
     Some(id) => id.to_hex()
     None => diff_index_zero_oid_hex()
   }
-  let new_oid = diff_index_zero_oid_hex()
+  let new_oid = match change.new_id {
+    Some(id) => id.to_hex()
+    None => diff_index_zero_oid_hex()
+  }
   ":\{old_mode} \{new_mode} \{old_oid} \{new_oid} \{change.status}\t\{change.path}"
 }
 
@@ -2181,6 +2244,40 @@ async fn diff_collect_raw_changes_against_index(
   let changes : Array[DiffRawWorktreeChange] = []
   for entry in entries {
     if not(diff_path_matches_filters(entry.path, filters)) {
+      continue
+    }
+    // Match git's stat-based behavior: when the index has zero stat data
+    // (e.g. after read-tree), report files as modified without hashing.
+    // git diff-files never rehashes; it only checks the stat cache.
+    let stat_invalid = entry.mtime_sec == 0 && entry.mtime_nsec == 0
+    if stat_invalid {
+      let abs = root + "/" + entry.path
+      let meta = @bitio.lstat_entry_meta(abs)
+      if meta is Some(_) {
+        diff_push_change_sorted(
+          changes,
+          {
+            path: entry.path,
+            status: "M",
+            old_mode: Some(entry.mode),
+            old_id: Some(entry.id),
+            new_mode: Some(entry.mode),
+            new_id: None,
+          },
+        )
+      } else {
+        diff_push_change_sorted(
+          changes,
+          {
+            path: entry.path,
+            status: "D",
+            old_mode: Some(entry.mode),
+            old_id: Some(entry.id),
+            new_mode: None,
+            new_id: None,
+          },
+        )
+      }
       continue
     }
     let observed = diff_observe_worktree_path(fs, root, git_dir, entry.path)
@@ -2386,6 +2483,77 @@ fn diff_index_to_octal(value : Int) -> String {
     sb.write_char(digit)
   }
   sb.to_string()
+}
+
+///|
+/// Diff working tree against a ref (for `git diff <ref>` without --cached).
+/// Combines index-vs-ref with worktree-vs-index to produce ref-vs-worktree.
+async fn diff_worktree_against_ref(
+  fs : OsFs,
+  rfs : &@bitcore.RepoFileSystem,
+  root : String,
+  git_dir : String,
+  spec : String,
+) -> Array[@bitdiff.DiffFile] raise Error {
+  let cached = diff_cached_against_ref(fs, rfs, root, git_dir, spec)
+  let worktree = @bitdiff.diff_worktree(rfs, root)
+  // Build maps for efficient lookup
+  let cached_map : Map[String, @bitdiff.DiffFile] = {}
+  for file in cached {
+    cached_map[file.path] = file
+  }
+  let worktree_map : Map[String, @bitdiff.DiffFile] = {}
+  for file in worktree {
+    worktree_map[file.path] = file
+  }
+  let result : Array[@bitdiff.DiffFile] = []
+  let seen : Map[String, Bool] = {}
+  // Process all paths from both diffs
+  for file in cached {
+    seen[file.path] = true
+    match worktree_map.get(file.path) {
+      Some(wt) =>
+        // Both cached and worktree have changes for this path.
+        // The effective diff is: old from ref (cached.old), new from worktree (wt.new)
+        match wt.kind {
+          @bitdiff.DiffKind::Deleted =>
+            // File was in ref but deleted from worktree
+            result.push({
+              path: file.path,
+              kind: @bitdiff.DiffKind::Deleted,
+              old_content: file.old_content,
+              new_content: None,
+              old_mode: file.old_mode,
+              new_mode: None,
+            })
+          _ =>
+            // File modified: combine old from ref with new from worktree
+            result.push({
+              path: file.path,
+              kind: file.kind,
+              old_content: file.old_content,
+              new_content: wt.new_content,
+              old_mode: file.old_mode,
+              new_mode: match wt.new_mode {
+                Some(m) => Some(m)
+                None => file.new_mode
+              },
+            })
+        }
+      None =>
+        // Only in cached diff — pass through as-is
+        result.push(file)
+    }
+  }
+  for file in worktree {
+    if not(seen.contains(file.path)) {
+      // Only in worktree diff — the file exists in index identical to ref,
+      // but has working tree changes
+      result.push(file)
+    }
+  }
+  result.sort_by(fn(a, b) { String::compare(a.path, b.path) })
+  result
 }
 
 ///|
@@ -3056,6 +3224,16 @@ async fn diff_no_index_read_path(
 ) -> Bytes raise Error {
   if abs_path == "-" {
     return read_all_stdin()
+  }
+  // For broken symlinks, read the target path string (not the target file content)
+  match @bitio.read_symlink_target_path(abs_path) {
+    Some(target) =>
+      // Only treat as symlink content if the target doesn't exist (broken symlink)
+      if not(fs.is_file(abs_path)) && not(fs.is_dir(abs_path)) &&
+        not(diff_no_index_is_named_pipe(abs_path)) {
+        return @utf8.encode(target)
+      }
+    None => ()
   }
   if diff_no_index_uses_stream_read(fs, abs_path) {
     let (code, stdout) = @process.collect_stdout(

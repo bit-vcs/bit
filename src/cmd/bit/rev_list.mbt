@@ -1408,7 +1408,7 @@ fn rev_list_topo_sort_impl(
         timestamps[hex] = if use_author_date {
           rev_list_extract_author_timestamp(obj.data)
         } else {
-          rev_list_extract_committer_timestamp(obj.data)
+          @tar.tar_parse_committer_timestamp(obj.data)
         }
       }
       _ => timestamps[hex] = 0L
@@ -1575,7 +1575,7 @@ fn rev_list_date_sort(
   for id in commits {
     match db.get(rfs, id) {
       Some(obj) if obj.obj_type == @bitcore.ObjectType::Commit =>
-        timestamps[id.to_hex()] = rev_list_extract_committer_timestamp(obj.data)
+        timestamps[id.to_hex()] = @tar.tar_parse_committer_timestamp(obj.data)
       _ => timestamps[id.to_hex()] = 0L
     }
   }
@@ -1590,39 +1590,6 @@ fn rev_list_date_sort(
     }
     commits[j + 1] = key
   }
-}
-
-///|
-/// Extract committer timestamp from raw commit data.
-fn rev_list_extract_committer_timestamp(data : Bytes) -> Int64 {
-  let text = @utf8.decode_lossy(data[:])
-  for line_view in text.split("\n") {
-    let line = line_view.to_string()
-    if line.length() == 0 {
-      break
-    }
-    if line.has_prefix("committer ") {
-      // committer Name <email> timestamp timezone
-      // Find last space before timezone
-      let mut last_space = -1
-      let mut second_last_space = -1
-      for i in 0..<line.length() {
-        if line.get_char(i).unwrap() == ' ' {
-          second_last_space = last_space
-          last_space = i
-        }
-      }
-      if second_last_space > 0 {
-        let ts_str = String::unsafe_substring(
-          line,
-          start=second_last_space + 1,
-          end=last_space,
-        )
-        return @strconv.parse_int64(ts_str) catch { _ => 0L }
-      }
-    }
-  }
-  0L
 }
 
 ///|

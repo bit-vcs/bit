@@ -217,6 +217,7 @@ t7421-submodule-summary-add.sh
 t7422-submodule-output.sh
 t7423-submodule-symlinks.sh
 t7424-submodule-mixed-ref-formats.sh
+t7450-bad-git-dotfiles.sh
 t7500-commit-template-squash-signoff.sh
 t7501-commit-basic-functionality.sh
 t7502-commit-porcelain.sh
@@ -603,7 +604,7 @@ t1406-submodule-ref-store.sh
 t1407-worktree-ref-store.sh
 t1408-packed-refs.sh
 t1409-avoid-packing-refs.sh
-# t1410-reflog.sh  # upstream oracle currently fails its own case 23 on 67ad421
+t1410-reflog.sh
 t1411-reflog-show.sh
 t1412-reflog-loop.sh
 t1413-reflog-detach.sh
@@ -783,7 +784,7 @@ t3511-cherry-pick-x.sh
 t3512-cherry-pick-submodule.sh
 t3513-revert-submodule.sh
 t3514-cherry-pick-revert-gpg.sh
-# t3600-rm.sh  # upstream oracle currently fails its own case 73 on 67ad421
+t3600-rm.sh
 t3601-rm-pathspec-file.sh
 t3602-rm-sparse-checkout.sh
 t3650-replay-basics.sh
