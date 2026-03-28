@@ -222,6 +222,7 @@ pub struct Commit {
   committer_tz : String
   message : String
   encoding : String
+  verbatim_message : Bool
 }
 
 ///|
@@ -236,6 +237,7 @@ pub fn Commit::new(
   committer_tz : String,
   message : String,
   encoding? : String = "UTF-8",
+  verbatim_message? : Bool = false,
 ) -> Commit {
   {
     tree,
@@ -248,6 +250,7 @@ pub fn Commit::new(
     committer_tz,
     message,
     encoding,
+    verbatim_message,
   }
 }
 

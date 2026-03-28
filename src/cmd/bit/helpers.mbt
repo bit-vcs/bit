@@ -781,7 +781,37 @@ fn parse_iso_date_timestamp(raw : String) -> Int64? {
   // Convert to Unix timestamp (UTC)
   // Days from epoch (1970-01-01) to the given date
   let days = days_from_epoch(year, month, day)
-  Some(days * 86400L + hour * 3600L + minute * 60L + second)
+  let mut ts = days * 86400L + hour * 3600L + minute * 60L + second
+  // Adjust for timezone offset embedded in the string (e.g. +0200 or -0500)
+  let after_time = String::unsafe_substring(s, start=11 + time_end, end=s.length())
+  let tz_offset = parse_iso_tz_offset_seconds(after_time)
+  ts = ts - tz_offset
+  Some(ts)
+}
+
+///|
+fn parse_iso_tz_offset_seconds(s : String) -> Int64 {
+  // Parse timezone offset like "+0200", "-0500", "+02:00", " +0200"
+  let t = s.trim().to_string()
+  if t.length() < 5 {
+    return 0L
+  }
+  let sign : Int64 = if t[0] == '-' { -1L } else if t[0] == '+' { 1L } else { return 0L }
+  // +HHMM or +HH:MM
+  let (hh_str, mm_str) = if t.length() >= 6 && t[3] == ':' {
+    (
+      String::unsafe_substring(t, start=1, end=3),
+      String::unsafe_substring(t, start=4, end=6),
+    )
+  } else {
+    (
+      String::unsafe_substring(t, start=1, end=3),
+      String::unsafe_substring(t, start=3, end=5),
+    )
+  }
+  let hh = @strconv.parse_int64(hh_str) catch { _ => return 0L }
+  let mm = @strconv.parse_int64(mm_str) catch { _ => return 0L }
+  sign * (hh * 3600L + mm * 60L)
 }
 
 ///|
@@ -846,15 +876,36 @@ fn parse_git_env_timezone(raw : String) -> String? {
       fields.push(part)
     }
   }
-  if fields.length() < 2 {
-    return None
+  if fields.length() >= 2 {
+    let tz = fields[fields.length() - 1]
+    if is_valid_timezone_token(tz) {
+      return Some(tz)
+    }
   }
-  let tz = fields[fields.length() - 1]
-  if is_valid_timezone_token(tz) {
-    Some(tz)
-  } else {
-    None
+  // Try extracting embedded timezone from ISO8601 format (e.g. "2005-04-01T15:14:15+0200")
+  let s = raw.trim().to_string()
+  if s.length() >= 5 {
+    // Check for +HHMM or -HHMM at end of string
+    let tail = String::unsafe_substring(s, start=s.length() - 5, end=s.length())
+    if is_valid_timezone_token(tail) {
+      return Some(tail)
+    }
+    // Also handle +HH:MM format (6 chars)
+    if s.length() >= 6 {
+      let tail6 = String::unsafe_substring(s, start=s.length() - 6, end=s.length())
+      if (tail6[0] == '+' || tail6[0] == '-') && tail6[3] == ':' {
+        // Convert +HH:MM to +HHMM
+        let sign = String::unsafe_substring(tail6, start=0, end=1)
+        let hh = String::unsafe_substring(tail6, start=1, end=3)
+        let mm = String::unsafe_substring(tail6, start=4, end=6)
+        let tz = sign + hh + mm
+        if is_valid_timezone_token(tz) {
+          return Some(tz)
+        }
+      }
+    }
   }
+  None
 }
 
 ///|

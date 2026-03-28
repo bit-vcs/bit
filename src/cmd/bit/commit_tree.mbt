@@ -109,6 +109,7 @@ async fn handle_commit_tree(args : Array[String]) -> Unit raise Error {
   let commit = @bitcore.Commit::new(
     tree_id, parents, author, author_ts, author_tz, committer, committer_ts, committer_tz,
     msg,
+    verbatim_message=true,
   )
   let (commit_id, compressed) = @bitcore.create_commit(commit)
   @bitlib.write_object_bytes(wfs, git_dir, commit_id, compressed)
