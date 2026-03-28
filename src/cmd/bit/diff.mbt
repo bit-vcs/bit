@@ -2060,6 +2060,7 @@ priv struct DiffRawWorktreeChange {
   old_mode : Int?
   old_id : @bitcore.ObjectId?
   new_mode : Int?
+  new_id : @bitcore.ObjectId?
 }
 
 ///|
@@ -2083,7 +2084,7 @@ fn diff_raw_worktree_change(
   match (old_mode, observed.mode) {
     (None, None) => None
     (Some(mode), None) =>
-      Some({ path, status: "D", old_mode: Some(mode), old_id, new_mode: None })
+      Some({ path, status: "D", old_mode: Some(mode), old_id, new_mode: None, new_id: None })
     (None, Some(mode)) =>
       Some({
         path,
@@ -2091,6 +2092,7 @@ fn diff_raw_worktree_change(
         old_mode: None,
         old_id: None,
         new_mode: Some(mode),
+        new_id: observed.id,
       })
     (Some(old_mode), Some(new_mode)) => {
       let same_kind = diff_mode_kind(old_mode) == diff_mode_kind(new_mode)
@@ -2112,6 +2114,7 @@ fn diff_raw_worktree_change(
           old_mode: Some(old_mode),
           old_id,
           new_mode: Some(new_mode),
+          new_id: observed.id,
         })
       }
     }
@@ -2126,7 +2129,10 @@ fn diff_format_raw_worktree_change(change : DiffRawWorktreeChange) -> String {
     Some(id) => id.to_hex()
     None => diff_index_zero_oid_hex()
   }
-  let new_oid = diff_index_zero_oid_hex()
+  let new_oid = match change.new_id {
+    Some(id) => id.to_hex()
+    None => diff_index_zero_oid_hex()
+  }
   ":\{old_mode} \{new_mode} \{old_oid} \{new_oid} \{change.status}\t\{change.path}"
 }
 
@@ -2256,6 +2262,7 @@ async fn diff_collect_raw_changes_against_index(
             old_mode: Some(entry.mode),
             old_id: Some(entry.id),
             new_mode: Some(entry.mode),
+            new_id: None,
           },
         )
       } else {
@@ -2267,6 +2274,7 @@ async fn diff_collect_raw_changes_against_index(
             old_mode: Some(entry.mode),
             old_id: Some(entry.id),
             new_mode: None,
+            new_id: None,
           },
         )
       }
