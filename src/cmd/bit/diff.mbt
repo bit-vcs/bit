@@ -1536,6 +1536,9 @@ async fn handle_diff(args : Array[String]) -> Unit raise Error {
           } else {
             paths.push(arg)
           }
+        "-M" | "--find-renames" | "-C" | "--find-copies" => ()
+        _ if arg.has_prefix("-M") || arg.has_prefix("--find-renames=") ||
+          arg.has_prefix("-C") || arg.has_prefix("--find-copies=") => ()
         _ if arg.has_prefix("--") =>
           if diff_is_tolerated_unimplemented_option(arg) {
             warn_unimplemented_arg("diff", arg)
@@ -1815,6 +1818,8 @@ async fn handle_diff_files(args : Array[String]) -> Unit raise Error {
   let mut name_only = false
   let mut name_status = false
   let mut ignore_submodules = false
+  let mut delegate_to_diff = false
+  let mut no_patch_only = false
   let mut parse_options = true
   let filters : Array[String] = []
   for arg in args {
@@ -1832,6 +1837,17 @@ async fn handle_diff_files(args : Array[String]) -> Unit raise Error {
         "--name-only" => name_only = true
         "--name-status" => name_status = true
         "--ignore-submodules" => ignore_submodules = true
+        "-p" | "--patch" | "--patch-with-raw" | "--patch-with-stat" |
+        "--raw" | "--stat" | "--shortstat" | "--summary" | "--numstat" |
+        "--dirstat" | "--cumulative" | "--dirstat-by-file" |
+        "--compact-summary" => {
+          delegate_to_diff = true
+          no_patch_only = false
+        }
+        "-s" | "--no-patch" => {
+          no_patch_only = true
+          delegate_to_diff = false
+        }
         _ if arg.has_prefix("--ignore-submodules=") =>
           ignore_submodules = not(
             String::unsafe_substring(arg, start=20, end=arg.length())
@@ -1846,6 +1862,12 @@ async fn handle_diff_files(args : Array[String]) -> Unit raise Error {
       filters.push(arg)
     }
   }
+  // When output format flags beyond raw/name-only/name-status are present,
+  // delegate to handle_diff which handles all format combinations.
+  if delegate_to_diff {
+    handle_diff(args)
+    return
+  }
   let root = get_work_root()
   let fs = OsFs::new()
   let git_dir = resolve_git_dir(fs, root)
@@ -1857,7 +1879,7 @@ async fn handle_diff_files(args : Array[String]) -> Unit raise Error {
     if exit_code {
       @sys.exit(1)
     }
-    if not(quiet) {
+    if not(quiet) && not(no_patch_only) {
       if name_only {
         for change in changes {
           print_line(change.path)
@@ -1877,6 +1899,9 @@ async fn handle_diff_files(args : Array[String]) -> Unit raise Error {
   if ignore_submodules {
     return
   }
+  if no_patch_only {
+    return
+  }
   handle_diff(args)
 }
 
@@ -1886,6 +1911,8 @@ async fn handle_diff_index(args : Array[String]) -> Unit raise Error {
   let mut quiet = false
   let mut name_only = false
   let mut cached = false
+  let mut delegate_to_diff = false
+  let mut no_patch_only = false
   let mut parse_options = true
   let mut treeish : String? = None
   let filters : Array[String] = []
@@ -1904,7 +1931,22 @@ async fn handle_diff_index(args : Array[String]) -> Unit raise Error {
         "--name-only" => name_only = true
         "--raw" => ()
         "--cached" => cached = true
-        _ if arg.has_prefix("-") => warn_unimplemented_arg("diff-index", arg)
+        "-p" | "--patch" | "--patch-with-raw" | "--patch-with-stat" |
+        "--stat" | "--shortstat" | "--summary" | "--numstat" |
+        "--dirstat" | "--cumulative" | "--dirstat-by-file" |
+        "--compact-summary" | "-M" | "--find-renames" => {
+          delegate_to_diff = true
+          no_patch_only = false
+        }
+        "-s" | "--no-patch" => {
+          no_patch_only = true
+          delegate_to_diff = false
+        }
+        _ if arg.has_prefix("-M") || arg.has_prefix("--find-renames=") => {
+          delegate_to_diff = true
+          no_patch_only = false
+        }
+        _ if arg.has_prefix("-") => ()
         _ =>
           if treeish is None {
             treeish = Some(arg)
@@ -1916,6 +1958,20 @@ async fn handle_diff_index(args : Array[String]) -> Unit raise Error {
       filters.push(arg)
     }
   }
+  // When patch/stat/rename flags are present, delegate to handle_diff
+  // which supports full unified diff output.
+  if delegate_to_diff {
+    // Build args for handle_diff: insert the treeish if present
+    let diff_args : Array[String] = []
+    if cached {
+      diff_args.push("--cached")
+    }
+    for arg in args {
+      diff_args.push(arg)
+    }
+    handle_diff(diff_args)
+    return
+  }
   let root = get_work_root()
   let fs = OsFs::new()
   let rfs : &@bitcore.RepoFileSystem = fs
@@ -1926,7 +1982,7 @@ async fn handle_diff_index(args : Array[String]) -> Unit raise Error {
       fs, rfs, root, git_dir, target, filters,
     )
     let has_changes = changes.length() > 0
-    if not(quiet) {
+    if not(quiet) && not(no_patch_only) {
       if name_only {
         for change in changes {
           print_line(change.path)
@@ -1963,7 +2019,7 @@ async fn handle_diff_index(args : Array[String]) -> Unit raise Error {
     }
   }
   let has_changes = staged.length() > 0 || stale.length() > 0
-  if not(quiet) {
+  if not(quiet) && not(no_patch_only) {
     if name_only {
       for file in staged {
         print_line(file.path)
