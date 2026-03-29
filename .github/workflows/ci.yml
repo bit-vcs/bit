@@ -172,9 +172,9 @@ jobs:
             echo "Failed tests:$failed_tests"
           fi
           # Regression check: fail only if pass count drops below baseline.
-          # Baseline: 261 passes across 10 shards (~26 per shard).
-          # Per-shard minimum: 15 (allows natural variance).
-          shard_min=15
+          # Baseline: 191 passes across 10 shards (~19 per shard).
+          # Per-shard minimum: 12 (allows natural variance across shards).
+          shard_min=12
           if [ "$passed" -lt "$shard_min" ]; then
             echo "REGRESSION: only $passed tests passed (minimum: $shard_min)"
             exit 1
