@@ -27,6 +27,66 @@ test "init: shared directory mode derives traversal bits and setgid" {
 }
 
 ///|
+async test "init: --object-format sha256 creates SHA-256 repo with valid config" {
+  @bitnative.init_native_io()
+  let fs = OsFs::new()
+  let root = "/tmp/bit-test-init-sha256-" + get_current_timestamp().to_string()
+  cleanup_tree(fs, root)
+
+  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
+  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @sys.get_env_var("GIT_DIR")
+  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
+  @sys.unset_env_var("GIT_DIR")
+  @sys.unset_env_var("GIT_WORK_TREE")
+  @sys.unset_env_var("GIT_SHIM_CWD")
+  @sys.set_env_var("GIT_SHIM_PWD", ".")
+
+  handle_init(["-q", "--object-format", "sha256", root])
+
+  // Verify repo structure
+  assert_true(fs.is_dir(root + "/.git"))
+  assert_true(fs.is_file(root + "/.git/HEAD"))
+
+  // Verify config has objectformat = sha256
+  let config_text = decode_bytes(fs.read_file(root + "/.git/config"))
+  assert_true(config_text.contains("objectFormat = sha256"))
+
+  // Verify SHA-256 hashing produces 64-char hex OIDs
+  let content = Bytes::from_array(@utf8.encode("hello sha256\n").to_array())
+  let id = @bitobject.hash_object_content_with_algo(
+    @bitobject.HashAlgorithm::Sha256,
+    @bitcore.ObjectType::Blob,
+    content,
+  )
+  assert_eq(id.to_hex().length(), 64)
+  assert_eq(id.hash_size(), 32)
+
+  // Verify SHA-1 produces 40-char hex OIDs (baseline)
+  let id_sha1 = @bitobject.hash_object_content_with_algo(
+    @bitobject.HashAlgorithm::Sha1,
+    @bitcore.ObjectType::Blob,
+    content,
+  )
+  assert_eq(id_sha1.to_hex().length(), 40)
+  assert_eq(id_sha1.hash_size(), 20)
+
+  // Verify SHA-256 and SHA-1 produce different hashes
+  assert_true(id.to_hex() != id_sha1.to_hex())
+
+  // Verify round-trip: hex -> ObjectId -> hex
+  let recovered = @bitcore.ObjectId::from_hex(id.to_hex())
+  assert_eq(recovered.to_hex(), id.to_hex())
+  assert_eq(recovered.hash_size(), 32)
+
+  add_test_restore_env("GIT_SHIM_CWD", prev_shim_cwd)
+  add_test_restore_env("GIT_SHIM_PWD", prev_shim_pwd)
+  add_test_restore_env("GIT_DIR", prev_git_dir)
+  add_test_restore_env("GIT_WORK_TREE", prev_work_tree)
+  cleanup_tree(fs, root)
+}
+
+///|
 async test "init: respects GIT_TEST_DEFAULT_INITIAL_BRANCH_NAME" {
   @bitnative.init_native_io()
   let fs = OsFs::new()
