@@ -279,8 +279,9 @@ pub fn read_resolve_undo_entries(
 ///|
 fn index_read_stage_entries_from_bytes(
   data : Bytes,
+  hash_size? : Int = 20,
 ) -> Array[IndexStageEntry] raise @bit.GitError {
-  if data.length() < 12 + 20 {
+  if data.length() < 32 {
     raise @bit.GitError::InvalidObject("Index file too short")
   }
   if not(
@@ -321,7 +322,7 @@ fn index_read_stage_entries_from_bytes(
     let size = index_read_u32_be(data, offset)
     offset += 4
     let id = index_read_object_id(data, offset)
-    offset += 20
+    offset += hash_size
     // flags (u16)
     let flags = index_read_u16_be(data, offset)
     offset += 2
@@ -336,7 +337,7 @@ fn index_read_stage_entries_from_bytes(
       offset += 2
     }
     // Read path directly from bytes (avoid intermediate Array[Byte] + StringBuilder)
-    let fixed_size = if has_extended { 64 } else { 62 }
+    let fixed_size = 40 + hash_size + 2 + (if has_extended { 2 } else { 0 })
     let path_start = entry_start + fixed_size
     let mut path_end = path_start
     while path_end < data.length() && data[path_end] != b'\x00' {
@@ -369,8 +370,9 @@ fn index_read_stage_entries_from_bytes(
 ///|
 fn index_read_resolve_undo_entries_from_bytes(
   data : Bytes,
+  hash_size? : Int = 20,
 ) -> Array[ResolveUndoEntry] raise @bit.GitError {
-  if data.length() < 12 + 20 {
+  if data.length() < 32 {
     return []
   }
   if not(
@@ -383,7 +385,7 @@ fn index_read_resolve_undo_entries_from_bytes(
     raise @bit.GitError::InvalidObject("Unsupported index version: \{version}")
   }
   let count = index_read_u32_be(data, 8)
-  let checksum_start = data.length() - 20
+  let checksum_start = data.length() - hash_size
   let mut offset = 12
   for _ in 0..<count {
     let entry_start = offset
@@ -392,7 +394,7 @@ fn index_read_resolve_undo_entries_from_bytes(
     }
     let flags = index_read_u16_be(data, offset + 60)
     let has_extended = (flags & 0x4000) != 0
-    let fixed_size = if has_extended { 64 } else { 62 }
+    let fixed_size = 40 + hash_size + 2 + (if has_extended { 2 } else { 0 })
     let path_start = entry_start + fixed_size
     let mut path_end = path_start
     while path_end < checksum_start && data[path_end] != b'\x00' {
@@ -429,6 +431,7 @@ fn index_read_resolve_undo_entries_from_bytes(
 ///|
 fn index_parse_resolve_undo_chunk(
   data : Bytes,
+  hash_size? : Int = 20,
 ) -> Array[ResolveUndoEntry] raise @bit.GitError {
   let entries : Array[ResolveUndoEntry] = []
   let mut offset = 0
@@ -448,7 +451,7 @@ fn index_parse_resolve_undo_chunk(
       None
     } else {
       let id = index_read_object_id(data, cursor)
-      cursor += 20
+      cursor += hash_size
       let stage : ResolveUndoStage = { mode: base_mode, id }
       Some(stage)
     }
@@ -456,7 +459,7 @@ fn index_parse_resolve_undo_chunk(
       None
     } else {
       let id = index_read_object_id(data, cursor)
-      cursor += 20
+      cursor += hash_size
       let stage : ResolveUndoStage = { mode: ours_mode, id }
       Some(stage)
     }
@@ -464,7 +467,7 @@ fn index_parse_resolve_undo_chunk(
       None
     } else {
       let id = index_read_object_id(data, cursor)
-      cursor += 20
+      cursor += hash_size
       let stage : ResolveUndoStage = { mode: theirs_mode, id }
       Some(stage)
     }
@@ -478,8 +481,9 @@ fn index_parse_resolve_undo_chunk(
 fn index_read_entries_end_offset(
   data : Bytes,
   count : Int,
+  hash_size? : Int = 20,
 ) -> Int raise @bit.GitError {
-  let checksum_start = data.length() - 20
+  let checksum_start = data.length() - hash_size
   let mut offset = 12
   for _ in 0..<count {
     let entry_start = offset
@@ -488,7 +492,7 @@ fn index_read_entries_end_offset(
     }
     let flags = index_read_u16_be(data, offset + 60)
     let has_extended = (flags & 0x4000) != 0
-    let fixed_size = if has_extended { 64 } else { 62 }
+    let fixed_size = 40 + hash_size + 2 + (if has_extended { 2 } else { 0 })
     let path_start = entry_start + fixed_size
     let mut path_end = path_start
     while path_end < checksum_start && data[path_end] != b'\x00' {
@@ -508,12 +512,13 @@ fn index_read_entries_end_offset(
 fn index_find_extension_chunk(
   data : Bytes,
   signature : String,
+  hash_size? : Int = 20,
 ) -> Bytes? raise @bit.GitError {
-  if data.length() < 12 + 20 {
+  if data.length() < 32 {
     return None
   }
   let count = index_read_u32_be(data, 8)
-  let checksum_start = data.length() - 20
+  let checksum_start = data.length() - hash_size
   let mut offset = index_read_entries_end_offset(data, count)
   while offset + 8 <= checksum_start {
     let current_sig = @utf8.decode_lossy(data[offset:offset + 4])
@@ -565,6 +570,7 @@ fn index_parse_signed_decimal(
 fn index_parse_cache_tree_node(
   data : Bytes,
   start : Int,
+  hash_size? : Int = 20,
 ) -> (IndexCacheTree, Int) raise @bit.GitError {
   let (name, after_name) = index_read_nul_terminated_string(data, start)
   let (entry_count, after_entry_count) = index_parse_signed_decimal(
@@ -582,8 +588,8 @@ fn index_parse_cache_tree_node(
   }
   let mut cursor = after_subtree_nr + 1
   let oid = if entry_count >= 0 {
-    let parsed = index_read_object_id(data, cursor)
-    cursor += 20
+    let parsed = index_read_object_id(data, cursor, hash_size~)
+    cursor += hash_size
     Some(parsed)
   } else {
     None
@@ -641,8 +647,8 @@ fn index_append_cache_tree_node(
   target.push(b'\n')
   match tree.oid {
     Some(id) if tree.entry_count >= 0 =>
-      for i in 0..<20 {
-        target.push(id.bytes[i])
+      for b in id.bytes {
+        target.push(b)
       }
     _ => ()
   }
@@ -924,6 +930,7 @@ fn index_parse_octal_value(text : String) -> Int raise @bit.GitError {
 pub fn read_skip_worktree_paths(
   fs : &@bit.RepoFileSystem,
   git_dir : String,
+  hash_size? : Int = 20,
 ) -> Map[String, Bool] {
   let out : Map[String, Bool] = {}
   let sidecar_path = join_path(git_dir, "bit-skip-worktree")
@@ -943,7 +950,7 @@ pub fn read_skip_worktree_paths(
     return out
   }
   let data = fs.read_file(index_path) catch { _ => return out }
-  if data.length() < 12 + 20 {
+  if data.length() < 32 {
     return out
   }
   if not(
@@ -967,7 +974,7 @@ pub fn read_skip_worktree_paths(
     } else {
       0
     }
-    let fixed_size = if has_extended { 64 } else { 62 }
+    let fixed_size = 40 + hash_size + 2 + (if has_extended { 2 } else { 0 })
     let path_start = offset + fixed_size
     let mut i = path_start
     while i < data.length() && data[i] != b'\x00' {
@@ -990,6 +997,7 @@ pub fn read_skip_worktree_paths(
 pub fn read_assume_unchanged_paths(
   fs : &@bit.RepoFileSystem,
   git_dir : String,
+  hash_size? : Int = 20,
 ) -> Map[String, Bool] {
   let out : Map[String, Bool] = {}
   let index_path = join_path(git_dir, "index")
@@ -997,7 +1005,7 @@ pub fn read_assume_unchanged_paths(
     return out
   }
   let data = fs.read_file(index_path) catch { _ => return out }
-  if data.length() < 12 + 20 {
+  if data.length() < 32 {
     return out
   }
   if not(
@@ -1014,7 +1022,7 @@ pub fn read_assume_unchanged_paths(
     let flags = index_read_u16_be(data, offset + 60) catch { _ => return out }
     let stage = (flags >> 12) & 0x3
     let has_extended = (flags & 0x4000) != 0
-    let fixed_size = if has_extended { 64 } else { 62 }
+    let fixed_size = 40 + hash_size + 2 + (if has_extended { 2 } else { 0 })
     let path_start = offset + fixed_size
     let mut i = path_start
     while i < data.length() && data[i] != b'\x00' {
@@ -1077,8 +1085,12 @@ pub fn write_skip_worktree_paths(
 }
 
 ///|
-fn index_entry_buf_size(path_len : Int, has_extended : Bool) -> Int {
-  let fixed_size = if has_extended { 64 } else { 62 }
+fn index_entry_buf_size(
+  path_len : Int,
+  has_extended : Bool,
+  hash_size? : Int = 20,
+) -> Int {
+  let fixed_size = 40 + hash_size + 2 + (if has_extended { 2 } else { 0 })
   (fixed_size + path_len + 1 + 7) / 8 * 8
 }
 
@@ -1104,11 +1116,11 @@ fn write_index_entry_to_buf(
   fa_set_u32_be(buf, pos + 32, e.gid)
   fa_set_u32_be(buf, pos + 36, e.size) // file_size
   pos += 40
-  // object id (20 bytes)
-  for i in 0..<20 {
+  // object id
+  for i in 0..<e.id.bytes.length() {
     buf[pos + i] = e.id.bytes[i]
   }
-  pos += 20
+  pos += e.id.bytes.length()
   // flags
   let path_bytes = @utf8.encode(e.path)
   let path_byte_len = path_bytes.length()
@@ -1143,6 +1155,7 @@ fn write_index_buf(
   skip_worktree_paths : Map[String, Bool]?,
   assume_unchanged_paths : Map[String, Bool]?,
   cache_tree? : IndexCacheTree? = None,
+  hash_size? : Int = 20,
 ) -> FixedArray[Byte] {
   // Pre-calculate total buffer size
   let mut total_size = 12 // header: "DIRC" + version + count
@@ -1166,7 +1179,7 @@ fn write_index_buf(
     None => []
   }
   total_size += cache_tree_extension.length()
-  total_size += 20 // SHA1 checksum
+  total_size += hash_size // hash checksum
   let buf : FixedArray[Byte] = FixedArray::make(total_size, b'\x00')
   // Header
   buf[0] = b'D'
@@ -1191,10 +1204,10 @@ fn write_index_buf(
     buf[pos + i] = cache_tree_extension[i]
   }
   pos += cache_tree_extension.length()
-  // SHA1 checksum over header + entries
+  // Hash checksum over header + entries
   let content_bytes = Bytes::from_array(buf[:pos])
-  let checksum = @bit.sha1(content_bytes)
-  for i in 0..<20 {
+  let checksum = @bit.hash_prefix(content_bytes, pos, hash_size~)
+  for i in 0..<hash_size {
     buf[pos + i] = checksum.bytes[i]
   }
   buf
@@ -1338,7 +1351,10 @@ pub fn write_index_entries_with_flags(
 }
 
 ///|
-fn write_index_stage_buf(entries : Array[IndexStageEntry]) -> FixedArray[Byte] {
+fn write_index_stage_buf(
+  entries : Array[IndexStageEntry],
+  hash_size? : Int = 20,
+) -> FixedArray[Byte] {
   let mut total_size = 12
   let mut version = 2
   for item in entries {
@@ -1352,7 +1368,7 @@ fn write_index_stage_buf(entries : Array[IndexStageEntry]) -> FixedArray[Byte] {
       has_extended,
     )
   }
-  total_size += 20
+  total_size += hash_size
   let buf : FixedArray[Byte] = FixedArray::make(total_size, b'\x00')
   buf[0] = b'D'
   buf[1] = b'I'
@@ -1372,8 +1388,8 @@ fn write_index_stage_buf(entries : Array[IndexStageEntry]) -> FixedArray[Byte] {
     )
   }
   let content_bytes = Bytes::from_array(buf[:pos])
-  let checksum = @bit.sha1(content_bytes)
-  for i in 0..<20 {
+  let checksum = @bit.hash_prefix(content_bytes, pos, hash_size~)
+  for i in 0..<hash_size {
     buf[pos + i] = checksum.bytes[i]
   }
   buf
@@ -1403,12 +1419,13 @@ pub fn write_index_stage_entries(
 fn index_read_object_id(
   data : Bytes,
   start : Int,
+  hash_size? : Int = 20,
 ) -> @bit.ObjectId raise @bit.GitError {
-  if start + 20 > data.length() {
+  if start + hash_size > data.length() {
     raise @bit.GitError::InvalidObject("Unexpected end of index data")
   }
-  let bytes : FixedArray[Byte] = FixedArray::make(20, b'\x00')
-  for i in 0..<20 {
+  let bytes : FixedArray[Byte] = FixedArray::make(hash_size, b'\x00')
+  for i in 0..<hash_size {
     bytes[i] = data[start + i]
   }
   @bit.ObjectId::new(bytes)

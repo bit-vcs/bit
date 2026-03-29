@@ -406,7 +406,7 @@ fn pack_object_disk_size_at(
   offset : Int64,
 ) -> Int? raise @bit.GitError {
   let data = get_pack_bytes(db, fs, pack.pack_path)
-  if data.length() <= 20 {
+  if data.length() <= 32 {
     return None
   }
   let mut next_offset : Int64? = None
@@ -423,7 +423,7 @@ fn pack_object_disk_size_at(
   }
   let end_offset = match next_offset {
     Some(found) => found
-    None => (data.length() - 20).to_int64()
+    None => (data.length() - 20).to_int64() // TODO: use hash_size for SHA-256 packs
   }
   if end_offset < offset {
     return None
@@ -894,6 +894,7 @@ fn load_pack_objects(
 fn parse_pack_index_v1(
   data : Bytes,
   pack_path : String,
+  hash_size? : Int = 20,
 ) -> PackIndex raise @bit.GitError {
   if data.length() < 256 * 4 {
     raise @bit.GitError::InvalidObject("Index file too short")
@@ -910,18 +911,19 @@ fn parse_pack_index_v1(
   }
   let count = count64.to_int()
   let entries_start = offset
-  let expected_len = entries_start + count * 24 + 20
+  let entry_size = 4 + hash_size
+  let expected_len = entries_start + count * entry_size + hash_size
   if data.length() < expected_len {
     raise @bit.GitError::InvalidObject("Index file truncated (v1)")
   }
   let ids : Array[String] = []
   let offsets : Array[Int64] = []
   for i in 0..<count {
-    let base = entries_start + i * 24
+    let base = entries_start + i * entry_size
     let off = read_u32_be_at64(data, base)
     offsets.push(off)
-    let bytes : FixedArray[Byte] = FixedArray::make(20, b'\x00')
-    for j in 0..<20 {
+    let bytes : FixedArray[Byte] = FixedArray::make(hash_size, b'\x00')
+    for j in 0..<hash_size {
       bytes[j] = data[base + 4 + j]
     }
     ids.push(@bit.ObjectId::new(bytes).to_hex())
@@ -933,13 +935,14 @@ fn parse_pack_index_v1(
 fn parse_pack_index(
   data : Bytes,
   pack_path : String,
+  hash_size? : Int = 20,
 ) -> PackIndex raise @bit.GitError {
   if data.length() < 8 {
     raise @bit.GitError::InvalidObject("Index file too short")
   }
   let magic = read_u32_be_at64(data, 0)
   if magic != 0xff744f63L {
-    return parse_pack_index_v1(data, pack_path)
+    return parse_pack_index_v1(data, pack_path, hash_size~)
   }
   let version = read_u32_be_at64(data, 4)
   if version != 2L {
@@ -960,14 +963,14 @@ fn parse_pack_index(
   let count = count64.to_int()
   let ids : Array[String] = []
   for _ in 0..<count {
-    if offset + 20 > data.length() {
+    if offset + hash_size > data.length() {
       raise @bit.GitError::InvalidObject("Index file truncated (ids)")
     }
-    let bytes : FixedArray[Byte] = FixedArray::make(20, b'\x00')
-    for i in 0..<20 {
+    let bytes : FixedArray[Byte] = FixedArray::make(hash_size, b'\x00')
+    for i in 0..<hash_size {
       bytes[i] = data[offset + i]
     }
-    offset += 20
+    offset += hash_size
     ids.push(@bit.ObjectId::new(bytes).to_hex())
   }
   // Skip CRC32 table

@@ -942,7 +942,7 @@ fn parse_todo_file(
     if parts.length() >= 2 && parts[0] == "pick" {
       let id = @bit.ObjectId::from_hex(parts[1]) catch { _ => continue }
       result.push(id)
-    } else if parts.length() >= 1 && parts[0].length() == 40 {
+    } else if parts.length() >= 1 && (parts[0].length() == 40 || parts[0].length() == 64) {
       let id = @bit.ObjectId::from_hex(parts[0]) catch { _ => continue }
       result.push(id)
     }

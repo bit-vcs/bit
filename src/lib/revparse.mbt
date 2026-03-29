@@ -535,7 +535,7 @@ fn resolve_base_ref(
     spec.has_prefix("remotes/") {
     return resolve_ref(fs, git_dir, "refs/" + spec)
   }
-  if spec.length() == 40 && @bithash.is_hex_string(spec) {
+  if (spec.length() == 40 || spec.length() == 64) && @bithash.is_hex_string(spec) {
     match @bit.ObjectId::from_hex(spec) {
       id => return Some(id)
     }

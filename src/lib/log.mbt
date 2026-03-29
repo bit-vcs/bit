@@ -209,7 +209,7 @@ fn log_read_graft_parents(
     let parents : Array[@bit.ObjectId] = []
     for i in 1..<tokens.length() {
       let parent_hex = tokens[i]
-      if parent_hex.length() == 40 {
+      if parent_hex.length() == 40 || parent_hex.length() == 64 {
         let parent_id = @bit.ObjectId::from_hex(parent_hex) catch {
           _ => continue
         }
