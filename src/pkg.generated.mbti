@@ -23,11 +23,17 @@ pub fn create_object(@object.ObjectType, Bytes) -> (@object.ObjectId, Bytes)
 
 pub fn create_tree(Array[@object.TreeEntry]) -> (@object.ObjectId, Bytes)
 
+pub fn hash_array_prefix(Array[Byte], Int, hash_size? : Int) -> @object.ObjectId
+
 pub fn hash_blob(Bytes) -> @object.ObjectId
 
 pub fn hash_blob_string(String) -> @object.ObjectId
 
 pub fn hash_object_content(@object.ObjectType, Bytes) -> @object.ObjectId
+
+pub fn hash_object_content_with_algo(@object.HashAlgorithm, @object.ObjectType, Bytes) -> @object.ObjectId
+
+pub fn hash_prefix(Bytes, Int, hash_size? : Int) -> @object.ObjectId
 
 pub fn join_path(String, String) -> String
 
@@ -49,6 +55,10 @@ pub fn sha1_array_prefix(Array[Byte], Int) -> @object.ObjectId
 
 pub fn sha1_prefix(Bytes, Int) -> @object.ObjectId
 
+pub fn sha256_array_prefix(Array[Byte], Int) -> @object.ObjectId
+
+pub fn sha256_prefix(Bytes, Int) -> @object.ObjectId
+
 pub fn write_git_metadata(@repo.ObjectStore, @object.ObjectId, String, String, &@types.FileSystem, String) -> Unit raise @object.GitError
 
 // Errors
@@ -61,6 +71,10 @@ pub using @object {type Commit}
 pub using @repo {type CommitInfo}
 
 pub using @object {type GitError}
+
+pub using @object {type HashAlgorithm}
+
+pub using @object {type HashState}
 
 pub using @types {type HttpResponse}
 
@@ -79,6 +93,8 @@ pub using @object {type PackDeltaMode}
 pub using @object {type PackObject}
 
 pub using @object {type Sha1State}
+
+pub using @object {type Sha256State}
 
 pub using @io {type TestFs}
 

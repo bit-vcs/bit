@@ -324,7 +324,7 @@ pub fn prune_worktrees(&@types.FileSystem, &@types.RepoFileSystem, String, dry_r
 
 pub fn prune_worktrees_detailed(&@types.FileSystem, &@types.RepoFileSystem, String, dry_run? : Bool, expire_before_sec? : Int64?) -> Array[PrunedWorktreeEntry] raise @object.GitError
 
-pub fn read_assume_unchanged_paths(&@types.RepoFileSystem, String) -> Map[String, Bool]
+pub fn read_assume_unchanged_paths(&@types.RepoFileSystem, String, hash_size? : Int) -> Map[String, Bool]
 
 pub fn read_autocrlf_setting(&@types.RepoFileSystem, String) -> AutoCrlf
 
@@ -360,7 +360,7 @@ pub fn read_repo_config(&@types.RepoFileSystem, String) -> (Map[String, RemoteCo
 
 pub fn read_resolve_undo_entries(&@types.RepoFileSystem, String) -> Array[ResolveUndoEntry] raise @object.GitError
 
-pub fn read_skip_worktree_paths(&@types.RepoFileSystem, String) -> Map[String, Bool]
+pub fn read_skip_worktree_paths(&@types.RepoFileSystem, String, hash_size? : Int) -> Map[String, Bool]
 
 pub fn read_sparse_display_patterns(&@types.RepoFileSystem, String) -> Array[String] raise @object.GitError
 

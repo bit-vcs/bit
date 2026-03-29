@@ -11,9 +11,9 @@ pub fn apply_delta(Bytes, Bytes) -> Bytes raise @object.GitError
 
 pub fn build_delta_pub(Bytes, Bytes) -> Bytes
 
-pub fn build_pack_index(Bytes) -> Bytes raise @object.GitError
+pub fn build_pack_index(Bytes, hash_size? : Int) -> Bytes raise @object.GitError
 
-pub fn build_pack_index_from_objects(Bytes, Array[@object.PackObject]) -> Bytes raise @object.GitError
+pub fn build_pack_index_from_objects(Bytes, Array[@object.PackObject], hash_size? : Int) -> Bytes raise @object.GitError
 
 pub fn build_reverse_index(Bytes, Array[@object.PackObject]) -> Bytes raise @object.GitError
 
@@ -45,21 +45,21 @@ pub fn generate_test_packfile() -> Bytes
 
 pub fn hex_dump(Bytes) -> String
 
-pub fn max_delta_chain_length(Bytes) -> Int raise @object.GitError
+pub fn max_delta_chain_length(Bytes, hash_size? : Int) -> Int raise @object.GitError
 
 pub fn packfile_type_to_object_type(Int) -> @object.ObjectType raise @object.GitError
 
-pub fn parse_packfile(Bytes, verify_checksum? : Bool) -> Array[@object.PackObject] raise @object.GitError
+pub fn parse_packfile(Bytes, verify_checksum? : Bool, hash_size? : Int) -> Array[@object.PackObject] raise @object.GitError
 
-pub fn parse_packfile_stream(Bytes, (@object.PackObject) -> Unit, verify_checksum? : Bool) -> Unit raise @object.GitError
+pub fn parse_packfile_stream(Bytes, (@object.PackObject) -> Unit, verify_checksum? : Bool, hash_size? : Int) -> Unit raise @object.GitError
 
-pub fn parse_packfile_stream_with_bases(Bytes, Array[@object.PackObject], (@object.PackObject) -> Unit, verify_checksum? : Bool) -> Unit raise @object.GitError
+pub fn parse_packfile_stream_with_bases(Bytes, Array[@object.PackObject], (@object.PackObject) -> Unit, verify_checksum? : Bool, hash_size? : Int) -> Unit raise @object.GitError
 
-pub fn parse_packfile_with_bases(Bytes, Array[@object.PackObject], verify_checksum? : Bool) -> Array[@object.PackObject] raise @object.GitError
+pub fn parse_packfile_with_bases(Bytes, Array[@object.PackObject], verify_checksum? : Bool, hash_size? : Int) -> Array[@object.PackObject] raise @object.GitError
 
 pub fn read_ofs_delta_offset(Bytes, Int) -> (Int, Int) raise @object.GitError
 
-pub fn read_ref_delta_id(Bytes, Int) -> (String, Int) raise @object.GitError
+pub fn read_ref_delta_id(Bytes, Int, hash_size? : Int) -> (String, Int) raise @object.GitError
 
 pub fn write_pack_and_index(&@types.FileSystem, String, Bytes, verify_checksum? : Bool) -> Unit raise @object.GitError
 

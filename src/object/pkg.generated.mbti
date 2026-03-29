@@ -24,6 +24,8 @@ pub fn create_tree(Array[TreeEntry]) -> (ObjectId, Bytes)
 
 pub fn create_tree_with_algo(HashAlgorithm, Array[TreeEntry]) -> (ObjectId, Bytes)
 
+pub fn hash_array_prefix(Array[Byte], Int, hash_size? : Int) -> ObjectId
+
 pub fn hash_blob(Bytes) -> ObjectId
 
 pub fn hash_blob_string(String) -> ObjectId
@@ -31,6 +33,8 @@ pub fn hash_blob_string(String) -> ObjectId
 pub fn hash_object_content(ObjectType, Bytes) -> ObjectId
 
 pub fn hash_object_content_with_algo(HashAlgorithm, ObjectType, Bytes) -> ObjectId
+
+pub fn hash_prefix(Bytes, Int, hash_size? : Int) -> ObjectId
 
 pub fn serialize_commit_content(Commit) -> Bytes
 
