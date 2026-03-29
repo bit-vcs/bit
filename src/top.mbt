@@ -36,8 +36,12 @@ pub using @repo {
 
 ///|
 pub using @object {
+  type HashAlgorithm,
+  type HashState,
+  type Sha256State,
   create_object,
   hash_object_content,
+  hash_object_content_with_algo,
   create_blob,
   create_blob_string,
   create_tree,
@@ -50,4 +54,8 @@ pub using @object {
   sha1,
   sha1_array_prefix,
   sha1_array,
+  sha256_prefix,
+  sha256_array_prefix,
+  hash_prefix,
+  hash_array_prefix,
 }

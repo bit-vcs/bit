@@ -9,9 +9,12 @@ priv struct PackIndexEntry {
 
 ///|
 /// Build a pack index (v2) from packfile bytes.
-pub fn build_pack_index(pack : Bytes) -> Bytes raise @bit.GitError {
-  let objects = parse_packfile(pack)
-  build_pack_index_from_objects(pack, objects)
+pub fn build_pack_index(
+  pack : Bytes,
+  hash_size? : Int = 20,
+) -> Bytes raise @bit.GitError {
+  let objects = parse_packfile(pack, hash_size~)
+  build_pack_index_from_objects(pack, objects, hash_size~)
 }
 
 ///|
@@ -21,11 +24,16 @@ pub fn build_pack_index(pack : Bytes) -> Bytes raise @bit.GitError {
 pub fn build_pack_index_from_objects(
   pack : Bytes,
   objects : Array[@bit.PackObject],
+  hash_size? : Int = 20,
 ) -> Bytes raise @bit.GitError {
   // Validate that object offsets are plausible for this pack.
   // Objects may carry stale offsets from a different (source) pack,
   // so we check: offset >= 12 (after header) and < pack_data_end.
-  let pack_data_end = if pack.length() >= 20 { pack.length() - 20 } else { 0 }
+  let pack_data_end = if pack.length() >= hash_size {
+    pack.length() - hash_size
+  } else {
+    0
+  }
   let mut needs_parse = false
   for obj in objects {
     if obj.offset < 12 || obj.offset >= pack_data_end {
@@ -36,9 +44,9 @@ pub fn build_pack_index_from_objects(
 
   // If objects have stale/invalid offsets, re-parse the pack to get correct values
   if needs_parse {
-    return build_pack_index(pack)
+    return build_pack_index(pack, hash_size~)
   }
-  if pack.length() < 20 {
+  if pack.length() < hash_size {
     raise @bit.GitError::PackfileError("Packfile too short")
   }
 
@@ -46,10 +54,10 @@ pub fn build_pack_index_from_objects(
   objects.sort_by(fn(a, b) { compare_object_id(a.id, b.id) })
 
   let n = objects.length()
-  // idx v2: header(8) + fanout(1024) + names(N*20) + crc(N*4) + offsets(N*4)
-  //       + pack_checksum(20) + idx_checksum(20)
-  let total_size = 1072 + n * 28
-  let content_size = total_size - 20
+  // idx v2: header(8) + fanout(1024) + names(N*hash_size) + crc(N*4) + offsets(N*4)
+  //       + pack_checksum(hash_size) + idx_checksum(hash_size)
+  let total_size = 8 + 1024 + n * (hash_size + 8) + hash_size * 2
+  let content_size = total_size - hash_size
   let out : FixedArray[Byte] = FixedArray::make(total_size, b'\x00')
   let mut pos = 0
 
@@ -77,7 +85,7 @@ pub fn build_pack_index_from_objects(
 
   // Object name table
   for obj in objects {
-    for i in 0..<20 {
+    for i in 0..<hash_size {
       out[pos] = obj.id.bytes[i]
       pos += 1
     }
@@ -99,16 +107,16 @@ pub fn build_pack_index_from_objects(
   }
 
   // Pack checksum (trailer)
-  let trailer_offset = pack.length() - 20
-  for i in 0..<20 {
+  let trailer_offset = pack.length() - hash_size
+  for i in 0..<hash_size {
     out[pos] = pack[trailer_offset + i]
     pos += 1
   }
 
-  // Index checksum: SHA-1 of everything before this point
+  // Index checksum: hash of everything before this point
   let tmp_bytes = Bytes::from_array(out)
-  let index_checksum = @bit.sha1_prefix(tmp_bytes, content_size)
-  for i in 0..<20 {
+  let index_checksum = @bit.hash_prefix(tmp_bytes, content_size, hash_size~)
+  for i in 0..<hash_size {
     out[pos] = index_checksum.bytes[i]
     pos += 1
   }
@@ -122,6 +130,7 @@ fn build_pack_index_from_objects_with_threshold(
   pack : Bytes,
   objects : Array[@bit.PackObject],
   threshold : Int64?,
+  hash_size? : Int = 20,
 ) -> Bytes raise @bit.GitError {
   // Default: no 64-bit offsets
   let off64_threshold = match threshold {
@@ -129,7 +138,11 @@ fn build_pack_index_from_objects_with_threshold(
     Some(t) => t
   }
   // Validate that object offsets are plausible for this pack.
-  let pack_data_end = if pack.length() >= 20 { pack.length() - 20 } else { 0 }
+  let pack_data_end = if pack.length() >= hash_size {
+    pack.length() - hash_size
+  } else {
+    0
+  }
   let mut needs_parse = false
   for obj in objects {
     if obj.offset < 12 || obj.offset >= pack_data_end {
@@ -137,7 +150,11 @@ fn build_pack_index_from_objects_with_threshold(
       break
     }
   }
-  let parsed_objects = if needs_parse { parse_packfile(pack) } else { objects }
+  let parsed_objects = if needs_parse {
+    parse_packfile(pack, hash_size~)
+  } else {
+    objects
+  }
   let entries : Array[PackIndexEntry] = []
   for obj in parsed_objects {
     entries.push({ id: obj.id, offset: obj.offset, crc: obj.crc32 })
@@ -205,17 +222,19 @@ fn build_pack_index_from_objects_with_threshold(
     push_u32_be_from_int(out, (offset & 0xFFFFFFFFL).to_int())
   }
   // Packfile checksum (trailer)
-  if pack.length() < 20 {
+  if pack.length() < hash_size {
     raise @bit.GitError::PackfileError("Packfile too short")
   }
-  let trailer_offset = pack.length() - 20
-  let pack_checksum = read_trailer_id(pack, trailer_offset)
+  let trailer_offset = pack.length() - hash_size
+  let pack_checksum = read_trailer_id(pack, trailer_offset, hash_size~)
   for b in pack_checksum.bytes {
     out.push(b)
   }
   // Index checksum
   let before_checksum = bytes_from_array(out)
-  let index_checksum = @bit.sha1(before_checksum)
+  let index_checksum = @bit.hash_prefix(
+    before_checksum, before_checksum.length(), hash_size~,
+  )
   for b in index_checksum.bytes {
     out.push(b)
   }
@@ -269,9 +288,14 @@ pub fn write_pack_index_from_objects_versioned(
 fn build_pack_index_v1_from_objects(
   pack : Bytes,
   objects : Array[@bit.PackObject],
+  hash_size? : Int = 20,
 ) -> Bytes raise @bit.GitError {
   // Validate that object offsets are plausible for this pack.
-  let pack_data_end = if pack.length() >= 20 { pack.length() - 20 } else { 0 }
+  let pack_data_end = if pack.length() >= hash_size {
+    pack.length() - hash_size
+  } else {
+    0
+  }
   let mut needs_parse = false
   for obj in objects {
     if obj.offset < 12 || obj.offset >= pack_data_end {
@@ -282,8 +306,8 @@ fn build_pack_index_v1_from_objects(
 
   // If objects have stale/invalid offsets, re-parse the pack to get correct values
   if needs_parse {
-    let parsed = parse_packfile(pack)
-    return build_pack_index_v1_from_objects(pack, parsed)
+    let parsed = parse_packfile(pack, hash_size~)
+    return build_pack_index_v1_from_objects(pack, parsed, hash_size~)
   }
   let entries : Array[PackIndexEntry] = []
   for obj in objects {
@@ -319,18 +343,20 @@ fn build_pack_index_v1_from_objects(
   }
 
   // Packfile checksum (trailer)
-  if pack.length() < 20 {
+  if pack.length() < hash_size {
     raise @bit.GitError::PackfileError("Packfile too short")
   }
-  let trailer_offset = pack.length() - 20
-  let pack_checksum = read_trailer_id(pack, trailer_offset)
+  let trailer_offset = pack.length() - hash_size
+  let pack_checksum = read_trailer_id(pack, trailer_offset, hash_size~)
   for b in pack_checksum.bytes {
     out.push(b)
   }
 
-  // Index checksum (SHA-1 of all preceding bytes)
+  // Index checksum (hash of all preceding bytes)
   let before_checksum = bytes_from_array(out)
-  let index_checksum = @bit.sha1(before_checksum)
+  let index_checksum = @bit.hash_prefix(
+    before_checksum, before_checksum.length(), hash_size~,
+  )
   for b in index_checksum.bytes {
     out.push(b)
   }
@@ -339,7 +365,8 @@ fn build_pack_index_v1_from_objects(
 
 ///|
 fn compare_object_id(a : @bit.ObjectId, b : @bit.ObjectId) -> Int {
-  for i in 0..<20 {
+  let len = a.bytes.length()
+  for i in 0..<len {
     let av = a.bytes[i].to_int()
     let bv = b.bytes[i].to_int()
     if av != bv {

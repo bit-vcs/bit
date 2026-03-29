@@ -428,6 +428,7 @@ fn pack_object_with_delta(
   delta_mode : @bit.PackDeltaMode,
   compression : @bit.PackCompression,
   precomputed_delta : Bytes?,
+  hash_size? : Int = 20,
 ) -> (Int, Bool) {
   let obj_type = obj.obj_type.to_packfile_type()
   let data = obj.data
@@ -463,7 +464,7 @@ fn pack_object_with_delta(
       let back_offset = obj_offset - base_offset
       type_and_size_len(delta.length()) + ofs_delta_len(back_offset)
     }
-    @bit.PackDeltaMode::RefDelta => type_and_size_len(delta.length()) + 20
+    @bit.PackDeltaMode::RefDelta => type_and_size_len(delta.length()) + hash_size
     @bit.PackDeltaMode::NoDelta => 0 // unreachable
   }
   let delta_total = delta_overhead + compressed_delta.length()
@@ -539,7 +540,7 @@ fn pack_object_with_delta(
 ///   [version]        4 bytes (big-endian, always 2)
 ///   [object count]   4 bytes (big-endian)
 ///   [...objects...]  variable
-///   [SHA-1 trailer]  20 bytes
+///   [hash trailer]   20 or 32 bytes
 pub fn create_packfile(objects : Array[@bit.PackObject]) -> Bytes {
   create_packfile_with_delta(objects, @bit.PackDeltaMode::OfsDelta)
 }
@@ -708,10 +709,14 @@ fn fixup_pack_header_count(result : Array[Byte], count : Int) -> Unit {
 }
 
 ///|
-/// Finalize a pack: fix header count, compute and append SHA-1 trailer
-fn finalize_pack(result : Array[Byte], count : Int) -> Bytes {
+/// Finalize a pack: fix header count, compute and append hash trailer
+fn finalize_pack(
+  result : Array[Byte],
+  count : Int,
+  hash_size? : Int = 20,
+) -> Bytes {
   fixup_pack_header_count(result, count)
-  let trailer = @bit.sha1_array_prefix(result, result.length())
+  let trailer = @bit.hash_array_prefix(result, result.length(), hash_size~)
   for b in trailer.bytes {
     result.push(b)
   }
@@ -721,7 +726,7 @@ fn finalize_pack(result : Array[Byte], count : Int) -> Bytes {
 ///|
 /// Create multiple packfiles respecting a size limit.
 /// Objects are written one by one; when adding an object would cause the
-/// pack (including the 20-byte SHA-1 trailer) to reach or exceed
+/// pack (including the hash trailer) to reach or exceed
 /// `size_limit`, the current pack is finalized and a new one is started.
 /// The first object in each pack is always written regardless of size.
 pub fn create_packfiles_with_size_limit(

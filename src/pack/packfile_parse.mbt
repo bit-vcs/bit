@@ -5,13 +5,17 @@
 pub fn parse_packfile(
   data : Bytes,
   verify_checksum? : Bool = true,
+  hash_size? : Int = 20,
 ) -> Array[@bit.PackObject] raise @bit.GitError {
-  parse_packfile_with_bases(data, [], verify_checksum~)
+  parse_packfile_with_bases(data, [], verify_checksum~, hash_size~)
 }
 
 ///|
 /// Compute the maximum delta chain length in a packfile
-pub fn max_delta_chain_length(data : Bytes) -> Int raise @bit.GitError {
+pub fn max_delta_chain_length(
+  data : Bytes,
+  hash_size? : Int = 20,
+) -> Int raise @bit.GitError {
   if data.length() < 32 {
     raise @bit.GitError::PackfileError("Packfile too short")
   }
@@ -261,12 +265,12 @@ pub fn max_delta_chain_length(data : Bytes) -> Int raise @bit.GitError {
   if pending_list.length() > 0 {
     raise @bit.GitError::PackfileError("Unresolved delta objects")
   }
-  let trailer_offset = data.length() - 20
+  let trailer_offset = data.length() - hash_size
   if offset != trailer_offset {
     raise @bit.GitError::PackfileError("Packfile length mismatch")
   }
-  let computed = @bit.sha1_prefix(data, trailer_offset)
-  let trailer = read_trailer_id(data, trailer_offset)
+  let computed = @bit.hash_prefix(data, trailer_offset, hash_size~)
+  let trailer = read_trailer_id(data, trailer_offset, hash_size~)
   if computed != trailer {
     raise @bit.GitError::HashMismatch(computed.to_hex(), trailer.to_hex())
   }
@@ -279,6 +283,7 @@ pub fn parse_packfile_with_bases(
   data : Bytes,
   bases : Array[@bit.PackObject],
   verify_checksum? : Bool = true,
+  hash_size? : Int = 20,
 ) -> Array[@bit.PackObject] raise @bit.GitError {
   let by_offset : Map[Int, Int] = {}
   let by_id : Map[@bit.ObjectId, @bit.PackObject] = {}
@@ -293,7 +298,7 @@ pub fn parse_packfile_with_bases(
     )
     insert_pack_object_by_id(by_id, base_obj)
   }
-  parse_packfile_internal(data, by_offset, by_id, verify_checksum~)
+  parse_packfile_internal(data, by_offset, by_id, verify_checksum~, hash_size~)
 }
 
 ///|
@@ -302,8 +307,9 @@ pub fn parse_packfile_stream(
   data : Bytes,
   emit : (@bit.PackObject) -> Unit,
   verify_checksum? : Bool = true,
+  hash_size? : Int = 20,
 ) -> Unit raise @bit.GitError {
-  parse_packfile_stream_with_bases(data, [], emit, verify_checksum~)
+  parse_packfile_stream_with_bases(data, [], emit, verify_checksum~, hash_size~)
 }
 
 ///|
@@ -313,6 +319,7 @@ pub fn parse_packfile_stream_with_bases(
   bases : Array[@bit.PackObject],
   emit : (@bit.PackObject) -> Unit,
   verify_checksum? : Bool = true,
+  hash_size? : Int = 20,
 ) -> Unit raise @bit.GitError {
   let by_offset : Map[Int, @bit.PackObject] = {}
   let by_id : Map[@bit.ObjectId, @bit.PackObject] = {}
@@ -327,7 +334,9 @@ pub fn parse_packfile_stream_with_bases(
     )
     insert_pack_object_by_id(by_id, base_obj)
   }
-  parse_packfile_stream_internal(data, by_offset, by_id, emit, verify_checksum~)
+  parse_packfile_stream_internal(
+    data, by_offset, by_id, emit, verify_checksum~, hash_size~,
+  )
 }
 
 ///|
@@ -372,6 +381,7 @@ fn parse_packfile_internal(
   by_offset : Map[Int, Int],
   by_id : Map[@bit.ObjectId, @bit.PackObject],
   verify_checksum? : Bool = true,
+  hash_size? : Int = 20,
 ) -> Array[@bit.PackObject] raise @bit.GitError {
   if data.length() < 32 {
     raise @bit.GitError::PackfileError("Packfile too short")
@@ -592,13 +602,13 @@ fn parse_packfile_internal(
   if pending_list.length() > 0 {
     raise @bit.GitError::PackfileError("Unresolved delta objects")
   }
-  let trailer_offset = data.length() - 20
+  let trailer_offset = data.length() - hash_size
   if offset != trailer_offset {
     raise @bit.GitError::PackfileError("Packfile length mismatch")
   }
   if verify_checksum {
-    let computed = @bit.sha1_prefix(data, trailer_offset)
-    let trailer = read_trailer_id(data, trailer_offset)
+    let computed = @bit.hash_prefix(data, trailer_offset, hash_size~)
+    let trailer = read_trailer_id(data, trailer_offset, hash_size~)
     if computed != trailer {
       raise @bit.GitError::HashMismatch(computed.to_hex(), trailer.to_hex())
     }
@@ -613,6 +623,7 @@ fn parse_packfile_stream_internal(
   by_id : Map[@bit.ObjectId, @bit.PackObject],
   emit : (@bit.PackObject) -> Unit,
   verify_checksum? : Bool = true,
+  hash_size? : Int = 20,
 ) -> Unit raise @bit.GitError {
   if data.length() < 32 {
     raise @bit.GitError::PackfileError("Packfile too short")
@@ -756,13 +767,13 @@ fn parse_packfile_stream_internal(
   if pending_list.length() > 0 {
     raise @bit.GitError::PackfileError("Unresolved delta objects")
   }
-  let trailer_offset = data.length() - 20
+  let trailer_offset = data.length() - hash_size
   if offset != trailer_offset {
     raise @bit.GitError::PackfileError("Packfile length mismatch")
   }
   if verify_checksum {
-    let computed = @bit.sha1_prefix(data, trailer_offset)
-    let trailer = read_trailer_id(data, trailer_offset)
+    let computed = @bit.hash_prefix(data, trailer_offset, hash_size~)
+    let trailer = read_trailer_id(data, trailer_offset, hash_size~)
     if computed != trailer {
       raise @bit.GitError::HashMismatch(computed.to_hex(), trailer.to_hex())
     }
@@ -842,31 +853,33 @@ pub fn read_ofs_delta_offset(
 fn read_ref_delta_object_id(
   data : Bytes,
   start : Int,
+  hash_size? : Int = 20,
 ) -> (@bit.ObjectId, Int) raise @bit.GitError {
-  if start + 20 > data.length() {
+  if start + hash_size > data.length() {
     raise @bit.GitError::PackfileError("Unexpected end of packfile delta")
   }
-  let bytes : FixedArray[Byte] = FixedArray::make(20, b'\x00')
-  for i in 0..<20 {
+  let bytes : FixedArray[Byte] = FixedArray::make(hash_size, b'\x00')
+  for i in 0..<hash_size {
     bytes[i] = data[start + i]
   }
-  (@bit.ObjectId::new(bytes), start + 20)
+  (@bit.ObjectId::new(bytes), start + hash_size)
 }
 
 ///|
 pub fn read_ref_delta_id(
   data : Bytes,
   start : Int,
+  hash_size? : Int = 20,
 ) -> (String, Int) raise @bit.GitError {
-  if start + 20 > data.length() {
+  if start + hash_size > data.length() {
     raise @bit.GitError::PackfileError("Unexpected end of packfile delta")
   }
-  let bytes : FixedArray[Byte] = FixedArray::make(20, b'\x00')
-  for i in 0..<20 {
+  let bytes : FixedArray[Byte] = FixedArray::make(hash_size, b'\x00')
+  for i in 0..<hash_size {
     bytes[i] = data[start + i]
   }
   let id = @bit.ObjectId::new(bytes)
-  (id.to_hex(), start + 20)
+  (id.to_hex(), start + hash_size)
 }
 
 ///|
@@ -978,9 +991,13 @@ fn read_u32_be(data : Bytes, start : Int) -> Int raise @bit.GitError {
 }
 
 ///|
-fn read_trailer_id(data : Bytes, start : Int) -> @bit.ObjectId {
-  let bytes : FixedArray[Byte] = FixedArray::make(20, b'\x00')
-  for i in 0..<20 {
+fn read_trailer_id(
+  data : Bytes,
+  start : Int,
+  hash_size? : Int = 20,
+) -> @bit.ObjectId {
+  let bytes : FixedArray[Byte] = FixedArray::make(hash_size, b'\x00')
+  for i in 0..<hash_size {
     bytes[i] = data[start + i]
   }
   @bit.ObjectId::new(bytes)

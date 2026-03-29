@@ -18,6 +18,12 @@ let reftable_footer_size : Int = 68
 let hash_size : Int = 20
 
 ///|
+/// Get hash size for the given algorithm (for future SHA-256 reftable v2 support).
+pub fn reftable_hash_size(algo? : @object.HashAlgorithm = Sha1) -> Int {
+  algo.hash_size()
+}
+
+///|
 let block_type_ref : Byte = b'r'
 
 ///|

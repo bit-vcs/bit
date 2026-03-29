@@ -68,6 +68,30 @@ pub fn HashState::finish(self : HashState) -> ObjectId {
 }
 
 ///|
+/// Hash data prefix (first `len` bytes), dispatching by hash_size.
+pub fn hash_prefix(
+  data : Bytes,
+  len : Int,
+  hash_size? : Int = 20,
+) -> ObjectId {
+  if hash_size == 32 { sha256_prefix(data, len) } else { sha1_prefix(data, len) }
+}
+
+///|
+/// Hash Array prefix (first `len` bytes), dispatching by hash_size.
+pub fn hash_array_prefix(
+  data : Array[Byte],
+  len : Int,
+  hash_size? : Int = 20,
+) -> ObjectId {
+  if hash_size == 32 {
+    sha256_array_prefix(data, len)
+  } else {
+    sha1_array_prefix(data, len)
+  }
+}
+
+///|
 /// Hash object content using the specified algorithm.
 pub fn hash_object_content_with_algo(
   algo : HashAlgorithm,
