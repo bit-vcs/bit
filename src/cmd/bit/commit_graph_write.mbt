@@ -207,6 +207,30 @@ async fn write_commit_graph(
       buf.push(entry.oid.bytes[i])
     }
   }
+  // Compute topological generation numbers
+  // gen(root) = 1, gen(commit) = max(gen(parent) for parent in parents) + 1
+  let gen_map : Map[String, Int] = {}
+  // Iterative computation: keep passing until all generations are resolved
+  let mut changed = true
+  while changed {
+    changed = false
+    for entry in entries {
+      let hex = entry.oid.to_hex()
+      let current = gen_map.get(hex).unwrap_or(0)
+      let mut max_parent_gen = 0
+      for p in entry.parents {
+        let pg = gen_map.get(p.to_hex()).unwrap_or(0)
+        if pg > max_parent_gen {
+          max_parent_gen = pg
+        }
+      }
+      let expected = max_parent_gen + 1
+      if expected > current {
+        gen_map[hex] = expected
+        changed = true
+      }
+    }
+  }
   // CDAT: commit data entries
   // Track edge positions for octopus merges
   let mut edge_pos = 0
@@ -234,9 +258,8 @@ async fn write_commit_graph(
       edge_pos += entry.parents.length() - 1
     }
     // Generation number + date
-    // Use generation = 1 (simple; could compute topological generation in future)
     let date_hi = ((entry.commit_timestamp >> 32) & 0x3L).to_int()
-    let gen = 1
+    let gen = gen_map.get(entry.oid.to_hex()).unwrap_or(1)
     midx_push_u32(buf, (gen << 2) | date_hi)
     midx_push_u32(buf, (entry.commit_timestamp & 0xffffffffL).to_int())
   }
