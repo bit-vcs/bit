@@ -1,22 +1,31 @@
 # TODO (Active Only)
 
-最終整理日: 2026-03-28
+最終整理日: 2026-03-29
 方針: 完了ログは一旦外し、未完了タスクのみ管理する。
-現バージョン: v0.36.0
-allowlist: 909 テスト（重複除去済み）
+現バージョン: v0.38.0
+allowlist: 973 テスト
 CI SHIM_CMDS: **108 コマンド** (全コマンドをCIに登録済み)
-CI unit test: **1637/1637 全パス** (2026-03-16)
-e2e: **30/30 全パス** (2026-03-16)
+CI unit test: **1302/1302 全パス** (2026-03-29)
+CI git-compat: **全10 shard SUCCESS** (2026-03-29)
+CI random compat: **全5 shard SUCCESS** (2026-03-29)
+e2e: **30/30 全パス** (2026-03-29)
 
-### v0.31.0 → v0.36.0 の主な変更
+### v0.37.0 → v0.38.0 の主な変更
 
-- SHA-256 オブジェクトハッシュ対応 (dual SHA-1/SHA-256)
-- Octopus merge (multi-head merge) 実装
-- Commit-graph reader (ObjectDb 統合)
-- Relay watch / CI status / review / presence コマンド
-- Sub-issue 対応 (bit-hub)
-- Merge engine: rename detection, file/directory conflict detection
-- cat-file :N:path 対応
+- SHA-256 オブジェクトハッシュ基盤 (Phase 1-3 完了)
+  - HashAlgorithm enum, SHA-256 hasher, ObjectId 可変長化
+  - Pack/Index/Reftable の hash_size パラメータ化
+  - index-pack/pack-objects の SHA-256 rejection 除去
+  - lib 層 (index, object_db, revparse, log, rebase, receive_pack) の OID 長対応
+  - E2E テスト: init sha256 → object write/read → 検証
+- Commit-graph: topological generation number 計算（fsck 修正）
+- CI 安定化: test_expect_failure → prereq skip 変換、タイムアウトテスト除外
+
+## P0: SHA-256 残課題
+
+- [ ] packfile_parse の delta 解決後 OID 計算を algo 対応に (11箇所の hash_object_content → hash_object_content_with_algo)
+- [ ] commit-graph trailer を hash_size 対応に (sha1() → hash_prefix())
+- [ ] SHA-256 compat テスト (t1016) — GPG2 依存、GPG 署名実装後に対応
 
 ## P0: Git compatibility
 
@@ -43,42 +52,20 @@ check-ignore show-index get-tar-commit-id verify-commit annotate
 
 - `filter-branch` — 非推奨 (git-filter-repo 推奨)
 
-### lib 抽出済み (libgit API)
-
-| ファイル | pub 関数 | 内容 |
-|----------|---------|------|
-| config_parse.mbt | 14 | config ファイル解析・値取得・型変換 |
-| date_parse.mbt | 10 | approxidate (relative/human/ISO8601) |
-| commit_helpers.mbt | 5 | メッセージ整形・trailer・signoff |
-| fsck.mbt | 4 | connectivity check・object 列挙 |
-| bisect.mbt | 4 | 候補計算・祖先マーク |
-| apply.mbt | 6 | パッチパース・rename 表示 |
-| rev_list_helpers.mbt | 5 | glob・range・ページネーション |
-| diff_tree_helpers.mbt | 2 | hex 省略・フィルタ |
-| stash.mbt (+2) | 2 | パス収集・mode 変換 |
-
-### 横断カテゴリ別 未対応サマリ
-
-| カテゴリ | テスト数 | 合計失敗数 | 主要テスト |
-|----------|----------|------------|------------|
-| **Merge engine** | 5 | 0 | t6416, t6422, t6423, t6424, t6426 — 全パス |
-| **Sparse/Index** | 5 | 0 | t1092, t7002, t3903, t1091, t3705 — 全パス |
-| **Reftable/Refs** | 3 | 0 | t1460, t0610, t1463 — 全パス (known breakage のみ) |
-| **Object/Hash** | 3 | 0 | t1451, t1006, t1007 — 全パス |
-
 ### スコープ外テスト
 
-- SHA-256 compat (t1016), Perl Git.pm (t9700)
-- GPG/SSH 署名 (t7510, t7528), Reftable (t0610, t1460)
+- SHA-256 compat (t1016) — GPG2 依存
+- Perl Git.pm (t9700)
+- GPG/SSH 署名 (t7510, t7528)
 - svn/cvs/p4 (t9*)
+- 常時タイムアウト (t0008, t1400, t1901, t3305, t4056, t4124, t5300, t5310, t5326, t5333, t9300)
 
 ## P0.5: 未実装機能
 
-- [x] Bitmap ファイル書き出し (`pack-objects --write-bitmap-index`) — EWAH 圧縮、type bitmap、per-tip reachable bitmap、SHA-1 trailer
-- [x] Multi-pack-index 書き出し (`repack --write-midx`) — midx_write() を repack から呼び出し統合
-- [x] Commit-graph 読込 (実装済み)
-- [x] Commit-graph 生成 (書き出し) — OIDF/OIDL/CDAT/EDGE チャンク、octopus merge 対応、gc/maintenance 統合
-- [x] SSH トランスポート — ネイティブ `ssh` コマンドに委譲で動作。in-process SSH は未実装
+- [x] Bitmap ファイル書き出し
+- [x] Multi-pack-index 書き出し
+- [x] Commit-graph 読込・生成
+- [x] SSH トランスポート
 - [ ] GPG/SSH 署名 (`commit -S`, `tag -s`) — フラグ認識のみ、`--signoff` は動作
 - [ ] Interactive add (`add -p` / `add -i`) — エラーで拒否するよう修正済み。実装は未着手
 - [ ] Interactive rebase (`rebase -i`) — 部分実装 (pick/reword/edit/squash/fixup/drop)、スタンドアロンモード不可
@@ -93,12 +80,6 @@ check-ignore show-index get-tar-commit-id verify-commit annotate
 
 ベースライン (2026-03-04): 500obj bit=1970ms vs git=101ms (19.5x)
 最新計測 (2026-03-28): 500obj bit=58.5ms (delta: 61.3ms) vs git=42ms (**1.4x**) — 33.7x 高速化
-
-- [x] スライディングウィンドウ (--window) — 実装済み (window=10, configurable)
-- [x] build_delta ブロックインデックス再利用 — 実装済み (DeltaWindowEntry にキャッシュ)
-- [x] find_best_match 候補数制限緩和 — 32 → 128 に拡大、4バイトprefix check、early-exit閾値 4x に引き上げ
-- [x] delta出力バッファ事前確保 — 実装済み (capacity=target_len/2+32)
-- [x] pack-objects ベンチマーク再計測 — 1970ms→58.5ms (33.7x改善), git比 19.5x→1.4x
 
 ## P3: WASM / クロスプラットフォーム
 

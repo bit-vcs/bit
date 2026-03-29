@@ -1,6 +1,11 @@
 ///| Packfile parsing (deflate + delta)
 
 ///|
+fn hash_algo_from_size(hash_size : Int) -> @bit.HashAlgorithm {
+  if hash_size == 32 { @bit.HashAlgorithm::Sha256 } else { @bit.HashAlgorithm::Sha1 }
+}
+
+///|
 /// Parse a packfile into objects.
 pub fn parse_packfile(
   data : Bytes,
@@ -91,7 +96,7 @@ pub fn max_delta_chain_length(
               resolved[base_index] {
               let base = objects[base_index]
               let content = apply_delta(base.data, delta)
-              let obj_id = @bit.hash_object_content(base.obj_type, content)
+              let obj_id = @bit.hash_object_content_with_algo(hash_algo_from_size(hash_size),base.obj_type, content)
               let obj = @bit.PackObject::with_metadata(
                 base.obj_type,
                 content,
@@ -148,7 +153,7 @@ pub fn max_delta_chain_length(
         match by_id.get(base_oid) {
           Some(base) => {
             let content = apply_delta(base.data, delta)
-            let obj_id = @bit.hash_object_content(base.obj_type, content)
+            let obj_id = @bit.hash_object_content_with_algo(hash_algo_from_size(hash_size),base.obj_type, content)
             let obj = @bit.PackObject::with_metadata(
               base.obj_type,
               content,
@@ -184,7 +189,7 @@ pub fn max_delta_chain_length(
     offset = after
     if type_id == 1 || type_id == 2 || type_id == 3 || type_id == 4 {
       let crc = crc32_range(data, obj_offset, after)
-      let obj_id = @bit.hash_object_content(obj_type, content)
+      let obj_id = @bit.hash_object_content_with_algo(hash_algo_from_size(hash_size),obj_type, content)
       let obj = @bit.PackObject::with_metadata(
         obj_type, content, obj_id, obj_offset, crc,
       )
@@ -209,7 +214,7 @@ pub fn max_delta_chain_length(
             resolved[base_index] {
             let base = objects[base_index]
             let content = apply_delta(base.data, p.delta)
-            let obj_id = @bit.hash_object_content(base.obj_type, content)
+            let obj_id = @bit.hash_object_content_with_algo(hash_algo_from_size(hash_size),base.obj_type, content)
             let old = objects[p.index]
             let obj = @bit.PackObject::with_metadata(
               base.obj_type,
@@ -235,7 +240,7 @@ pub fn max_delta_chain_length(
           match by_id.get(base_oid) {
             Some(base) => {
               let content = apply_delta(base.data, p.delta)
-              let obj_id = @bit.hash_object_content(base.obj_type, content)
+              let obj_id = @bit.hash_object_content_with_algo(hash_algo_from_size(hash_size),base.obj_type, content)
               let old = objects[p.index]
               let obj = @bit.PackObject::with_metadata(
                 base.obj_type,
@@ -288,7 +293,7 @@ pub fn parse_packfile_with_bases(
   let by_offset : Map[Int, Int] = {}
   let by_id : Map[@bit.ObjectId, @bit.PackObject] = {}
   for obj in bases {
-    let id = @bit.hash_object_content(obj.obj_type, obj.data)
+    let id = @bit.hash_object_content_with_algo(hash_algo_from_size(hash_size),obj.obj_type, obj.data)
     let base_obj = @bit.PackObject::with_metadata(
       obj.obj_type,
       obj.data,
@@ -324,7 +329,7 @@ pub fn parse_packfile_stream_with_bases(
   let by_offset : Map[Int, @bit.PackObject] = {}
   let by_id : Map[@bit.ObjectId, @bit.PackObject] = {}
   for obj in bases {
-    let id = @bit.hash_object_content(obj.obj_type, obj.data)
+    let id = @bit.hash_object_content_with_algo(hash_algo_from_size(hash_size),obj.obj_type, obj.data)
     let base_obj = @bit.PackObject::with_metadata(
       obj.obj_type,
       obj.data,
@@ -453,7 +458,7 @@ fn parse_packfile_internal(
             if resolved[base_index] {
               let base = objects[base_index]
               let content = apply_delta(base.data, delta)
-              let obj_id = @bit.hash_object_content(base.obj_type, content)
+              let obj_id = @bit.hash_object_content_with_algo(hash_algo_from_size(hash_size),base.obj_type, content)
               let obj = @bit.PackObject::with_metadata(
                 base.obj_type,
                 content,
@@ -504,7 +509,7 @@ fn parse_packfile_internal(
         match by_id.get(base_oid) {
           Some(base) => {
             let content = apply_delta(base.data, delta)
-            let obj_id = @bit.hash_object_content(base.obj_type, content)
+            let obj_id = @bit.hash_object_content_with_algo(hash_algo_from_size(hash_size),base.obj_type, content)
             let obj = @bit.PackObject::with_metadata(
               base.obj_type,
               content,
@@ -534,7 +539,7 @@ fn parse_packfile_internal(
     if type_id == 1 || type_id == 2 || type_id == 3 || type_id == 4 {
       // Compute CRC32 and hash for non-delta objects
       let crc = crc32_range(data, obj_offset, after)
-      let obj_id = @bit.hash_object_content(obj_type, content)
+      let obj_id = @bit.hash_object_content_with_algo(hash_algo_from_size(hash_size),obj_type, content)
       let obj = @bit.PackObject::with_metadata(
         obj_type, content, obj_id, obj_offset, crc,
       )
@@ -557,7 +562,7 @@ fn parse_packfile_internal(
             resolved[base_index] {
             let base = objects[base_index]
             let content = apply_delta(base.data, p.delta)
-            let obj_id = @bit.hash_object_content(base.obj_type, content)
+            let obj_id = @bit.hash_object_content_with_algo(hash_algo_from_size(hash_size),base.obj_type, content)
             // Preserve offset and crc from placeholder
             let old = objects[p.index]
             let obj = @bit.PackObject::with_metadata(
@@ -578,7 +583,7 @@ fn parse_packfile_internal(
           match by_id.get(base_oid) {
             Some(base) => {
               let content = apply_delta(base.data, p.delta)
-              let obj_id = @bit.hash_object_content(base.obj_type, content)
+              let obj_id = @bit.hash_object_content_with_algo(hash_algo_from_size(hash_size),base.obj_type, content)
               // Preserve offset and crc from placeholder
               let old = objects[p.index]
               let obj = @bit.PackObject::with_metadata(

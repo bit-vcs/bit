@@ -282,9 +282,10 @@ async fn write_commit_graph(
       }
     }
   }
-  // SHA-1 checksum trailer
+  // Hash checksum trailer
   let body_arr = FixedArray::makei(buf.length(), fn(i) { buf[i] })
-  let trailer = @bitcore.sha1(Bytes::from_array(body_arr))
+  let body_bytes = Bytes::from_array(body_arr)
+  let trailer = @bitcore.hash_prefix(body_bytes, body_bytes.length(), hash_size~)
   for b in trailer.bytes {
     buf.push(b)
   }
