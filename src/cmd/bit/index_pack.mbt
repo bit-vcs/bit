@@ -433,7 +433,11 @@ fn check_pack_strict_and_fsck(
 ///|
 /// Verify pack index against pack file.
 /// Returns error message on failure, None on success.
-fn verify_pack_index(idx : Bytes, pack : Bytes) -> String? {
+fn verify_pack_index(
+  idx : Bytes,
+  pack : Bytes,
+  hash_size? : Int = 20,
+) -> String? {
   // Check minimum lengths
   if idx.length() < 8 {
     return Some("pack index too short")
@@ -445,21 +449,23 @@ fn verify_pack_index(idx : Bytes, pack : Bytes) -> String? {
   // Check index magic and version
   if idx[0] != b'\xff' || idx[1] != b't' || idx[2] != b'O' || idx[3] != b'c' {
     // v1 format - different structure
-    return verify_pack_index_v1(idx, pack)
+    return verify_pack_index_v1(idx, pack, hash_size~)
   }
   let version = read_u32_be(idx, 4)
   if version != 2 {
     return Some("unsupported index version: \{version}")
   }
 
-  // Verify index checksum (last 20 bytes)
-  if idx.length() < 40 {
+  // Verify index checksum (last hash_size bytes)
+  if idx.length() < hash_size * 2 {
     return Some("index file truncated")
   }
-  let idx_data_len = idx.length() - 20
+  let idx_data_len = idx.length() - hash_size
   let idx_data = Bytes::from_array(FixedArray::makei(idx_data_len, i => idx[i]))
-  let computed_idx_checksum = @bitcore.sha1(idx_data)
-  let stored_idx_checksum = read_hash_at(idx, idx_data_len)
+  let computed_idx_checksum = @bitcore.hash_prefix(
+    idx_data, idx_data_len, hash_size~,
+  )
+  let stored_idx_checksum = read_hash_at(idx, idx_data_len, hash_size~)
   if computed_idx_checksum != stored_idx_checksum {
     return Some("incorrect index checksum")
   }
@@ -482,26 +488,30 @@ fn verify_pack_index(idx : Bytes, pack : Bytes) -> String? {
 
   // Calculate table positions
   let ids_start = fanout_start + 256 * 4
-  let crc_start = ids_start + count_i * 20
+  let crc_start = ids_start + count_i * hash_size
   let offsets_start = crc_start + count_i * 4
 
   // Check if offset table fits
-  let min_idx_len = offsets_start + count_i * 4 + 20 + 20 // offsets + pack_checksum + idx_checksum
+  let min_idx_len = offsets_start + count_i * 4 + hash_size * 2 // offsets + pack_checksum + idx_checksum
   if idx.length() < min_idx_len {
     return Some("index file truncated (offsets)")
   }
 
   // Verify pack checksum stored in index matches actual pack
-  let pack_checksum_in_idx_offset = idx.length() - 40
-  let stored_pack_checksum = read_hash_at(idx, pack_checksum_in_idx_offset)
-  let pack_data_len = pack.length() - 20
+  let pack_checksum_in_idx_offset = idx.length() - hash_size * 2
+  let stored_pack_checksum = read_hash_at(
+    idx, pack_checksum_in_idx_offset, hash_size~,
+  )
+  let pack_data_len = pack.length() - hash_size
   if pack_data_len < 12 {
     return Some("pack file too short")
   }
   let pack_data = Bytes::from_array(
     FixedArray::makei(pack_data_len, i => pack[i]),
   )
-  let computed_pack_checksum = @bitcore.sha1(pack_data)
+  let computed_pack_checksum = @bitcore.hash_prefix(
+    pack_data, pack_data_len, hash_size~,
+  )
   if computed_pack_checksum != stored_pack_checksum {
     return Some("pack checksum mismatch")
   }
@@ -540,7 +550,7 @@ fn verify_pack_index(idx : Bytes, pack : Bytes) -> String? {
   }
 
   // Verify all offsets are within pack bounds
-  let pack_data_end = pack.length() - 20 // exclude trailer
+  let pack_data_end = pack.length() - hash_size // exclude trailer
   let mut ext_idx = 0
   for i in 0..<count_i {
     let offset_raw = read_u32_be_i64(idx, offsets_start + i * 4)
@@ -567,8 +577,12 @@ fn verify_pack_index(idx : Bytes, pack : Bytes) -> String? {
 
 ///|
 /// Verify a reverse index (.rev) file against its pack.
-fn verify_reverse_index(rev : Bytes, pack : Bytes) -> String? {
-  // RIDX format: magic(4) + version(4) + hash_id(4) + positions(N*4) + pack_checksum(20) + file_checksum(20)
+fn verify_reverse_index(
+  rev : Bytes,
+  pack : Bytes,
+  hash_size? : Int = 20,
+) -> String? {
+  // RIDX format: magic(4) + version(4) + hash_id(4) + positions(N*4) + pack_checksum(hash_size) + file_checksum(hash_size)
   if rev.length() < 52 {
     return Some("reverse index too short")
   }
@@ -582,19 +596,19 @@ fn verify_reverse_index(rev : Bytes, pack : Bytes) -> String? {
     return Some("unsupported reverse index version: \{version}")
   }
   // Verify file checksum
-  let file_data_len = rev.length() - 20
+  let file_data_len = rev.length() - hash_size
   let file_data = Bytes::from_array(
     FixedArray::makei(file_data_len, i => rev[i]),
   )
-  let computed = @bitcore.sha1(file_data)
-  let stored = read_hash_at(rev, file_data_len)
+  let computed = @bitcore.hash_prefix(file_data, file_data_len, hash_size~)
+  let stored = read_hash_at(rev, file_data_len, hash_size~)
   if computed != stored {
     return Some("reverse index checksum mismatch")
   }
   // Verify pack checksum
-  if pack.length() >= 20 {
-    let pack_cs = read_hash_at(pack, pack.length() - 20)
-    let rev_pack_cs = read_hash_at(rev, file_data_len - 20)
+  if pack.length() >= hash_size {
+    let pack_cs = read_hash_at(pack, pack.length() - hash_size, hash_size~)
+    let rev_pack_cs = read_hash_at(rev, file_data_len - hash_size, hash_size~)
     if pack_cs != rev_pack_cs {
       return Some("pack checksum mismatch in reverse index")
     }
@@ -604,8 +618,12 @@ fn verify_reverse_index(rev : Bytes, pack : Bytes) -> String? {
 
 ///|
 /// Verify v1 pack index
-fn verify_pack_index_v1(idx : Bytes, pack : Bytes) -> String? {
-  // v1 index: fanout[256] + entries[count] * (offset[4] + sha1[20])
+fn verify_pack_index_v1(
+  idx : Bytes,
+  pack : Bytes,
+  hash_size? : Int = 20,
+) -> String? {
+  // v1 index: fanout[256] + entries[count] * (offset[4] + oid[hash_size])
   // No magic header, starts directly with fanout
 
   if idx.length() < 256 * 4 {
@@ -627,24 +645,29 @@ fn verify_pack_index_v1(idx : Bytes, pack : Bytes) -> String? {
   }
   let count_i = count.to_int()
 
-  // v1 entries: each entry is offset(4) + sha1(20) = 24 bytes
+  // v1 entries: each entry is offset(4) + oid(hash_size) bytes
+  let entry_size = 4 + hash_size
   let entries_start = 256 * 4
-  let expected_len = entries_start + count_i * 24 + 20 + 20 // + pack checksum + index checksum
+  let expected_len = entries_start + count_i * entry_size + hash_size * 2 // + pack checksum + index checksum
   if idx.length() < expected_len {
     return Some("v1 index file truncated")
   }
 
   // Verify pack checksum
-  let pack_checksum_offset = entries_start + count_i * 24
-  let stored_pack_checksum = read_hash_at(idx, pack_checksum_offset)
-  let pack_data_len = pack.length() - 20
+  let pack_checksum_offset = entries_start + count_i * entry_size
+  let stored_pack_checksum = read_hash_at(
+    idx, pack_checksum_offset, hash_size~,
+  )
+  let pack_data_len = pack.length() - hash_size
   if pack_data_len < 12 {
     return Some("pack file too short")
   }
   let pack_data = Bytes::from_array(
     FixedArray::makei(pack_data_len, i => pack[i]),
   )
-  let computed_pack_checksum = @bitcore.sha1(pack_data)
+  let computed_pack_checksum = @bitcore.hash_prefix(
+    pack_data, pack_data_len, hash_size~,
+  )
   if computed_pack_checksum != stored_pack_checksum {
     return Some("pack checksum mismatch")
   }
@@ -661,9 +684,9 @@ fn verify_pack_index_v1(idx : Bytes, pack : Bytes) -> String? {
   }
 
   // Verify all offsets are within pack bounds
-  let pack_data_end = pack.length() - 20
+  let pack_data_end = pack.length() - hash_size
   for i in 0..<count_i {
-    let offset = read_u32_be_i64(idx, entries_start + i * 24)
+    let offset = read_u32_be_i64(idx, entries_start + i * entry_size)
     if offset < 12L {
       return Some("bogus object offset: \{offset} (before header)")
     }
@@ -739,7 +762,7 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
       }
       let fs = OsFs::new()
       let git_dir = find_git_dir(fs)
-      let _hash_size = if (cfg.object_format is Some(format) && format == "sha256") ||
+      let hash_size = if (cfg.object_format is Some(format) && format == "sha256") ||
         is_sha256_repo_from_env() {
         32
       } else {
@@ -812,7 +835,7 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
             Bytes::default()
           }
         }
-        match verify_pack_index(idx, pack) {
+        match verify_pack_index(idx, pack, hash_size~) {
           Some(err) => {
             @stdio.stderr.write("error: " + err + "\n")
             @sys.exit(1)
@@ -838,7 +861,7 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
                   Bytes::default()
                 }
               }
-              match verify_reverse_index(rev, pack) {
+              match verify_reverse_index(rev, pack, hash_size~) {
                 Some(err) => {
                   @stdio.stderr.write(
                     "error: reverse index validation error: " + err + "\n",

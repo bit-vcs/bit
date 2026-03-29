@@ -1248,8 +1248,11 @@ fn read_pack_objects(
 }
 
 ///|
-fn object_hex(obj : @bitcore.PackObject) -> String {
-  @bitcore.hash_object_content(obj.obj_type, obj.data).to_hex()
+fn object_hex(
+  obj : @bitcore.PackObject,
+  algo? : @bitobject.HashAlgorithm = Sha1,
+) -> String {
+  @bitobject.hash_object_content_with_algo(algo, obj.obj_type, obj.data).to_hex()
 }
 
 ///|
@@ -1742,10 +1745,13 @@ fn collect_loose_objects(
 fn append_commit_ids_from_objects(
   objects : Array[@bitcore.PackObject],
   out : Array[@bitcore.ObjectId],
+  algo? : @bitobject.HashAlgorithm = Sha1,
 ) -> Unit {
   for obj in objects {
     if obj.obj_type == @bitcore.ObjectType::Commit {
-      out.push(@bitcore.hash_object_content(obj.obj_type, obj.data))
+      out.push(
+        @bitobject.hash_object_content_with_algo(algo, obj.obj_type, obj.data),
+      )
     }
   }
 }
@@ -2455,7 +2461,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
       } else {
         @bitobject.HashAlgorithm::Sha1
       }
-      ignore(hash_algo)
+      ignore(hash_algo) // used in hash_object_content_with_algo calls below
       let trace2_event = @sys.get_env_var("GIT_TRACE2_EVENT")
       ignore(is_pack_reuse_config_enabled(git_dir))
       // Keep these flags visible for future compatibility tuning.
@@ -2608,7 +2614,9 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
             let ids : Array[String] = []
             for obj in idx_objects {
               ids.push(
-                @bitcore.hash_object_content(obj.obj_type, obj.data).to_hex(),
+                @bitobject.hash_object_content_with_algo(
+                  hash_algo, obj.obj_type, obj.data,
+                ).to_hex(),
               )
             }
             ids.sort_by(fn(a, b) { a.compare(b) })
@@ -2856,12 +2864,16 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
             )
             let exclude_set : Map[String, Bool] = {}
             for obj in exclude_objects {
-              let id = @bitcore.hash_object_content(obj.obj_type, obj.data)
+              let id = @bitobject.hash_object_content_with_algo(
+                hash_algo, obj.obj_type, obj.data,
+              )
               exclude_set[id.to_hex()] = true
             }
             let filtered : Array[@bitcore.PackObject] = []
             for obj in include_objects {
-              let id = @bitcore.hash_object_content(obj.obj_type, obj.data)
+              let id = @bitobject.hash_object_content_with_algo(
+                hash_algo, obj.obj_type, obj.data,
+              )
               if !exclude_set.contains(id.to_hex()) {
                 filtered.push(obj)
               }
@@ -2958,10 +2970,10 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
       if filter_exempt_objects.length() > 0 {
         let existing : Map[String, Bool] = {}
         for obj in objects {
-          existing[@bitcore.hash_object_content(obj.obj_type, obj.data).to_hex()] = true
+          existing[@bitobject.hash_object_content_with_algo(hash_algo, obj.obj_type, obj.data).to_hex()] = true
         }
         for obj in filter_exempt_objects {
-          let hex = @bitcore.hash_object_content(obj.obj_type, obj.data).to_hex()
+          let hex = @bitobject.hash_object_content_with_algo(hash_algo, obj.obj_type, obj.data).to_hex()
           if !existing.contains(hex) {
             objects.push(obj)
             existing[hex] = true
