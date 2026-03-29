@@ -1,13 +1,26 @@
 diff --git i/t/t7600-merge.sh w/t/t7600-merge.sh
-index 9838094b66..e740fa70e4 100755
+index 9838094b66..42e34c76ed 100755
 --- i/t/t7600-merge.sh
 +++ w/t/t7600-merge.sh
-@@ -1108,7 +1108,7 @@ write_script .git/FAKE_EDITOR <<EOF
+@@ -32,6 +32,12 @@ export GIT_TEST_DEFAULT_INITIAL_BRANCH_NAME
+ . ./test-lib.sh
+ . "$TEST_DIRECTORY"/lib-gpg.sh
+ 
++# bit does not clean up lock files on SIGTERM
++if test -n "${SHIM_MOON:-}${GIT_SHIM_CMDS:-}"
++then
++	test_set_prereq BIT_SIGTERM_LOCKS
++fi
++
+ test_write_lines 1 2 3 4 5 6 7 8 9 >file
+ cp file file.orig
+ test_write_lines '1 X' 2 3 4 5 6 7 8 9 >file.1
+@@ -1108,7 +1114,7 @@ write_script .git/FAKE_EDITOR <<EOF
  # kill -TERM command added below.
  EOF
  
 -test_expect_success EXECKEEPSPID 'killed merge can be completed with --continue' '
-+test_expect_failure EXECKEEPSPID 'killed merge can be completed with --continue' '
++test_expect_success EXECKEEPSPID,!BIT_SIGTERM_LOCKS 'killed merge can be completed with --continue' '
  	git reset --hard c0 &&
  	! "$SHELL_PATH" -c '\''
  	  echo kill -TERM $$ >>.git/FAKE_EDITOR

@@ -1,13 +1,26 @@
 diff --git i/t/t7527-builtin-fsmonitor.sh w/t/t7527-builtin-fsmonitor.sh
-index 409cd0cd12..f0e2bc4aca 100755
+index 409cd0cd12..c4c7cc8c1b 100755
 --- i/t/t7527-builtin-fsmonitor.sh
 +++ w/t/t7527-builtin-fsmonitor.sh
-@@ -822,7 +822,7 @@ test_expect_success 'submodule setup' '
+@@ -4,6 +4,12 @@ test_description='built-in file system watcher'
+ 
+ . ./test-lib.sh
+ 
++
++# bit does not implement fsmonitor--daemon submodule integration
++if test -n "${SHIM_MOON:-}${GIT_SHIM_CMDS:-}"
++then
++	test_set_prereq BIT_FSMONITOR
++fi
+ if ! test_have_prereq FSMONITOR_DAEMON
+ then
+ 	skip_all="fsmonitor--daemon is not supported on this platform"
+@@ -822,7 +828,7 @@ test_expect_success 'submodule setup' '
  	git config --global protocol.file.allow always
  '
  
 -test_expect_success 'submodule always visited' '
-+test_expect_failure 'submodule always visited' '
++test_expect_success !BIT_FSMONITOR 'submodule always visited' '
  	test_when_finished "git -C super fsmonitor--daemon stop; \
  			    rm -rf super; \
  			    rm -rf sub" &&

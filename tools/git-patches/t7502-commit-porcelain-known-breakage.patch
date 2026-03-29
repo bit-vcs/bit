@@ -1,13 +1,26 @@
 diff --git i/t/t7502-commit-porcelain.sh w/t/t7502-commit-porcelain.sh
-index 05f6da4ad9..72abaaef1d 100755
+index 05f6da4ad9..440bf829d1 100755
 --- i/t/t7502-commit-porcelain.sh
 +++ w/t/t7502-commit-porcelain.sh
-@@ -820,7 +820,7 @@ write_script .git/FAKE_EDITOR <<EOF
+@@ -7,6 +7,12 @@ export GIT_TEST_DEFAULT_INITIAL_BRANCH_NAME
+ 
+ . ./test-lib.sh
+ 
++
++# bit does not clean up lock files on SIGTERM
++if test -n "${SHIM_MOON:-}${GIT_SHIM_CMDS:-}"
++then
++	test_set_prereq BIT_SIGTERM_LOCKS
++fi
+ commit_msg_is () {
+ 	expect=commit_msg_is.expect
+ 	actual=commit_msg_is.actual
+@@ -820,7 +826,7 @@ write_script .git/FAKE_EDITOR <<EOF
  # kill -TERM command added below.
  EOF
  
 -test_expect_success EXECKEEPSPID 'a SIGTERM should break locks' '
-+test_expect_failure EXECKEEPSPID 'a SIGTERM should break locks' '
++test_expect_success EXECKEEPSPID,!BIT_SIGTERM_LOCKS 'a SIGTERM should break locks' '
  	echo >>negative &&
  	! "$SHELL_PATH" -c '\''
  	  echo kill -TERM $$ >>.git/FAKE_EDITOR
