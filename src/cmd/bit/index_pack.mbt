@@ -459,7 +459,7 @@ fn verify_pack_index(idx : Bytes, pack : Bytes) -> String? {
   let idx_data_len = idx.length() - 20
   let idx_data = Bytes::from_array(FixedArray::makei(idx_data_len, i => idx[i]))
   let computed_idx_checksum = @bitcore.sha1(idx_data)
-  let stored_idx_checksum = read_sha1_at(idx, idx_data_len)
+  let stored_idx_checksum = read_hash_at(idx, idx_data_len)
   if computed_idx_checksum != stored_idx_checksum {
     return Some("incorrect index checksum")
   }
@@ -493,7 +493,7 @@ fn verify_pack_index(idx : Bytes, pack : Bytes) -> String? {
 
   // Verify pack checksum stored in index matches actual pack
   let pack_checksum_in_idx_offset = idx.length() - 40
-  let stored_pack_checksum = read_sha1_at(idx, pack_checksum_in_idx_offset)
+  let stored_pack_checksum = read_hash_at(idx, pack_checksum_in_idx_offset)
   let pack_data_len = pack.length() - 20
   if pack_data_len < 12 {
     return Some("pack file too short")
@@ -587,14 +587,14 @@ fn verify_reverse_index(rev : Bytes, pack : Bytes) -> String? {
     FixedArray::makei(file_data_len, i => rev[i]),
   )
   let computed = @bitcore.sha1(file_data)
-  let stored = read_sha1_at(rev, file_data_len)
+  let stored = read_hash_at(rev, file_data_len)
   if computed != stored {
     return Some("reverse index checksum mismatch")
   }
   // Verify pack checksum
   if pack.length() >= 20 {
-    let pack_cs = read_sha1_at(pack, pack.length() - 20)
-    let rev_pack_cs = read_sha1_at(rev, file_data_len - 20)
+    let pack_cs = read_hash_at(pack, pack.length() - 20)
+    let rev_pack_cs = read_hash_at(rev, file_data_len - 20)
     if pack_cs != rev_pack_cs {
       return Some("pack checksum mismatch in reverse index")
     }
@@ -636,7 +636,7 @@ fn verify_pack_index_v1(idx : Bytes, pack : Bytes) -> String? {
 
   // Verify pack checksum
   let pack_checksum_offset = entries_start + count_i * 24
-  let stored_pack_checksum = read_sha1_at(idx, pack_checksum_offset)
+  let stored_pack_checksum = read_hash_at(idx, pack_checksum_offset)
   let pack_data_len = pack.length() - 20
   if pack_data_len < 12 {
     return Some("pack file too short")
@@ -700,9 +700,13 @@ fn read_u64_be(data : Bytes, offset : Int) -> Int64 {
 }
 
 ///|
-fn read_sha1_at(data : Bytes, offset : Int) -> @bitcore.ObjectId {
-  let bytes : FixedArray[Byte] = FixedArray::make(20, b'\x00')
-  for i in 0..<20 {
+fn read_hash_at(
+  data : Bytes,
+  offset : Int,
+  hash_size? : Int = 20,
+) -> @bitcore.ObjectId {
+  let bytes : FixedArray[Byte] = FixedArray::make(hash_size, b'\x00')
+  for i in 0..<hash_size {
     bytes[i] = data[offset + i]
   }
   @bitcore.ObjectId::new(bytes)
@@ -735,11 +739,11 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
       }
       let fs = OsFs::new()
       let git_dir = find_git_dir(fs)
-      let wants_sha256 = cfg.object_format is Some(format) && format == "sha256"
-      let repo_is_sha256 = is_sha256_repo_from_env()
-      if wants_sha256 || repo_is_sha256 {
-        @stdio.stderr.write("bit: SHA256 object format is not supported\n")
-        @sys.exit(1)
+      let _hash_size = if (cfg.object_format is Some(format) && format == "sha256") ||
+        is_sha256_repo_from_env() {
+        32
+      } else {
+        20
       }
       let write_rev = match cfg.write_rev_index {
         Some(v) => v

@@ -2448,14 +2448,14 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
         Some(_) => ()
         None => ()
       }
-      if cfg.object_format is Some(format) && format == "sha256" {
-        @stdio.stderr.write("bit: SHA256 object format is not supported\n")
-        @sys.exit(1)
+      let hash_algo : @bitobject.HashAlgorithm = if (cfg.object_format is Some(
+        format,
+      ) && format == "sha256") || is_sha256_repo_from_env() {
+        @bitobject.HashAlgorithm::Sha256
+      } else {
+        @bitobject.HashAlgorithm::Sha1
       }
-      if is_sha256_repo_from_env() {
-        @stdio.stderr.write("bit: SHA256 repositories are not supported\n")
-        @sys.exit(1)
-      }
+      ignore(hash_algo)
       let trace2_event = @sys.get_env_var("GIT_TRACE2_EVENT")
       ignore(is_pack_reuse_config_enabled(git_dir))
       // Keep these flags visible for future compatibility tuning.
