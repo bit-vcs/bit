@@ -83,20 +83,86 @@ impl @bitlib.Clock for OsClock with now(self) {
 }
 
 ///|
-/// Resolve git_dir for hub operations, handling worktrees.
-/// In a worktree, .git is a file pointing to .git/worktrees/<name>.
-/// Hub data (refs/notes) lives in the shared common git dir.
-fn resolve_hub_git_dir(root : String) -> String {
-  let fs = OsFs::new()
-  let git_path = root + "/.git"
-  // Resolve .git file → actual gitdir (e.g. /repo/.git/worktrees/foo)
-  let git_dir = if fs.is_file(git_path) {
-    @bitlib.resolve_gitdir(fs, git_path)
-  } else {
-    git_path
+priv enum HubRepoBackendKind {
+  Bit
+  Git
+}
+
+///|
+priv trait HubRepoBackend {
+  resolve_git_dir(Self, String) -> String
+  current_branch_name(Self, String) -> String?
+}
+
+///|
+priv struct BitHubRepoBackend {}
+
+///|
+priv struct GitHubRepoBackend {}
+
+///|
+fn parse_hub_repo_backend_kind(value : String) -> HubRepoBackendKind? {
+  match trim_string(value).to_lower() {
+    "bit" => Some(HubRepoBackendKind::Bit)
+    "git" | "libgit2" => Some(HubRepoBackendKind::Git)
+    _ => None
   }
-  // Resolve commondir → shared .git (e.g. /repo/.git)
-  let commondir_path = git_dir + "/commondir"
+}
+
+///|
+fn can_use_hub_git_backend() -> Bool {
+  hub_libgit2_is_loaded() == 1 || hub_libgit2_init() >= 0
+}
+
+///|
+fn resolve_hub_repo_backend_kind() -> HubRepoBackendKind {
+  match @sys.get_env_var("BIT_HUB_BACKEND") {
+    Some(raw) =>
+      match parse_hub_repo_backend_kind(raw) {
+        Some(HubRepoBackendKind::Bit) => HubRepoBackendKind::Bit
+        Some(HubRepoBackendKind::Git) =>
+          if can_use_hub_git_backend() {
+            HubRepoBackendKind::Git
+          } else {
+            HubRepoBackendKind::Bit
+          }
+        None =>
+          if can_use_hub_git_backend() {
+            HubRepoBackendKind::Git
+          } else {
+            HubRepoBackendKind::Bit
+          }
+      }
+    None =>
+      if can_use_hub_git_backend() {
+        HubRepoBackendKind::Git
+      } else {
+        HubRepoBackendKind::Bit
+      }
+  }
+}
+
+///|
+fn trim_trailing_path_separator(path : String) -> String {
+  let mut end = path.length()
+  while end > 1 {
+    if path.code_unit_at(end - 1).to_int() != 47 {
+      break
+    }
+    end -= 1
+  }
+  if end == path.length() {
+    path
+  } else {
+    String::unsafe_substring(path, start=0, end~)
+  }
+}
+
+///|
+fn resolve_hub_common_git_dir(git_dir : String) -> String {
+  let fs = OsFs::new()
+  let resolved_git_dir = normalize_path(trim_trailing_path_separator(git_dir))
+  let commondir_path = resolved_git_dir + "/commondir"
   if fs.is_file(commondir_path) {
     let raw = @utf8.decode_lossy(
       (fs.read_file(commondir_path) catch { _ => Bytes::default() })[:],
@@ -106,10 +172,95 @@ fn resolve_hub_git_dir(root : String) -> String {
       if rel.has_prefix("/") {
         return normalize_path(rel)
       }
-      return normalize_path(git_dir + "/" + rel)
+      return normalize_path(resolved_git_dir + "/" + rel)
     }
   }
-  git_dir
+  resolved_git_dir
+}
+
+///|
+fn resolve_hub_git_dir_with_bit_backend(root : String) -> String {
+  let fs = OsFs::new()
+  let git_path = root + "/.git"
+  let git_dir = if fs.is_file(git_path) {
+    @bitlib.resolve_gitdir(fs, git_path)
+  } else {
+    git_path
+  }
+  resolve_hub_common_git_dir(git_dir)
+}
+
+///|
+fn resolve_hub_git_dir_with_git_backend(root : String) -> String {
+  if not(can_use_hub_git_backend()) {
+    return resolve_hub_git_dir_with_bit_backend(root)
+  }
+  match hub_git_repository_path(root) {
+    Some(git_dir) => resolve_hub_common_git_dir(git_dir)
+    None => resolve_hub_git_dir_with_bit_backend(root)
+  }
+}
+
+///|
+impl HubRepoBackend for BitHubRepoBackend with resolve_git_dir(_self, root) {
+  resolve_hub_git_dir_with_bit_backend(root)
+}
+
+///|
+impl HubRepoBackend for BitHubRepoBackend with current_branch_name(_self, root) {
+  let git_dir = resolve_hub_git_dir_with_bit_backend(root)
+  detect_current_branch_name(git_dir)
+}
+
+///|
+impl HubRepoBackend for GitHubRepoBackend with resolve_git_dir(_self, root) {
+  resolve_hub_git_dir_with_git_backend(root)
+}
+
+///|
+impl HubRepoBackend for GitHubRepoBackend with current_branch_name(_self, root) {
+  if not(can_use_hub_git_backend()) {
+    let fallback = BitHubRepoBackend::{  }
+    return fallback.current_branch_name(root)
+  }
+  match hub_git_head_ref_name(root) {
+    Some(name) => parse_branch_ref_name(name)
+    None => {
+      let fallback = BitHubRepoBackend::{  }
+      fallback.current_branch_name(root)
+    }
+  }
+}
+
+///|
+/// Resolve git_dir for hub operations, handling worktrees.
+/// In a worktree, .git is a file pointing to .git/worktrees/<name>.
+/// Hub data (refs/notes) lives in the shared common git dir.
+fn resolve_hub_git_dir(root : String) -> String {
+  match resolve_hub_repo_backend_kind() {
+    HubRepoBackendKind::Bit => {
+      let backend = BitHubRepoBackend::{  }
+      backend.resolve_git_dir(root)
+    }
+    HubRepoBackendKind::Git => {
+      let backend = GitHubRepoBackend::{  }
+      backend.resolve_git_dir(root)
+    }
+  }
+}
+
+///|
+fn detect_hub_current_branch_name(root : String) -> String? {
+  match resolve_hub_repo_backend_kind() {
+    HubRepoBackendKind::Bit => {
+      let backend = BitHubRepoBackend::{  }
+      backend.current_branch_name(root)
+    }
+    HubRepoBackendKind::Git => {
+      let backend = GitHubRepoBackend::{  }
+      backend.current_branch_name(root)
+    }
+  }
 }
 
 ///|
