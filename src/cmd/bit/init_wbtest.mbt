@@ -79,6 +79,37 @@ async test "init: --object-format sha256 creates SHA-256 repo with valid config"
   assert_eq(recovered.to_hex(), id.to_hex())
   assert_eq(recovered.hash_size(), 32)
 
+  // Write object to SHA-256 repo and read it back
+  let git_dir = root + "/.git"
+  let (write_id, compressed) = @bitobject.create_object_with_algo(
+    @bitobject.HashAlgorithm::Sha256,
+    @bitcore.ObjectType::Blob,
+    content,
+  )
+  assert_eq(write_id.to_hex().length(), 64)
+  @bitlib.write_object_bytes(fs, git_dir, write_id, compressed)
+
+  // Verify the loose object file exists at correct path
+  let hex = write_id.to_hex()
+  let obj_path = git_dir +
+    "/objects/" +
+    String::unsafe_substring(hex, start=0, end=2) +
+    "/" +
+    String::unsafe_substring(hex, start=2, end=hex.length())
+  assert_true(fs.is_file(obj_path))
+
+  // Read back and verify content matches
+  let stored = fs.read_file(obj_path)
+  let decompressed = @zlib.zlib_decompress(stored)
+  let expected_header = "blob \{content.length()}\u0000"
+  let header_bytes = Bytes::from_array(
+    @utf8.encode(expected_header).to_array(),
+  )
+  // Verify decompressed data starts with correct header
+  for i in 0..<header_bytes.length() {
+    assert_eq(decompressed[i], header_bytes[i])
+  }
+
   add_test_restore_env("GIT_SHIM_CWD", prev_shim_cwd)
   add_test_restore_env("GIT_SHIM_PWD", prev_shim_pwd)
   add_test_restore_env("GIT_DIR", prev_git_dir)
