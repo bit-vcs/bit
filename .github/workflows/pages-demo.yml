@@ -69,5 +69,7 @@ jobs:
           just build-docs-demo
           just build-docs-playground
 
-      - name: Verify checked-in bundles are up to date
-        run: git diff --exit-code -- docs/demo/app.js docs/playground
+      - name: Verify checked-in playground bundle is up to date
+        run: |
+          # docs/demo/app.js is not byte-stable across Bun host platforms.
+          git diff --exit-code -- docs/playground
