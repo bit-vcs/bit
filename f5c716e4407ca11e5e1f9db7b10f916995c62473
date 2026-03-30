@@ -1,0 +1,29 @@
+version 1
+key hub/work-item/435cd726/meta
+kind work-item
+clock test <test@example.com>=1
+timestamp 1774856997
+node test <test@example.com>
+deleted 0
+
+work-item 435cd726
+title workflow run / check / artifact / log の保存基盤を実装する
+author test <test@example.com>
+created 1774856997
+updated 1774856997
+state open
+parent f2b91294
+
+目的
+- local / container / sandbox で走った workflow の実行結果を後から参照できるようにする
+
+やること
+- Run / Check / Artifact / Log の data model を定義する
+- run summary は Git metadata に、詳細 log / artifact は blob store に保存する
+- run id / task id / content hash を使った参照形式を定義する
+- bit pr workflow や UI から見える summary API を定義する
+
+完了条件
+- 実行結果の保存先と retention 方針が決まっている
+- CLI / API / UI が参照する共通 read model がある
+- PR merge gate が run summary / check summary を参照できる
