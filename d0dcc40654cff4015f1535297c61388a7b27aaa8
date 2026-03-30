@@ -1,8 +1,8 @@
 version 1
 key hub/work-item/f2b91294/meta
 kind work-item
-clock test <test@example.com>=1
-timestamp 1774856823
+clock test <test@example.com>=2
+timestamp 1774857144
 node test <test@example.com>
 deleted 0
 
@@ -10,7 +10,7 @@ work-item f2b91294
 title GitHub 互換の local-first / P2P タスク基盤を設計する
 author test <test@example.com>
 created 1774856823
-updated 1774856823
+updated 1774857144
 state open
 
 狙い
@@ -26,3 +26,13 @@ state open
 - actrun は runner core として一般化し、container / sandbox 実行と run log / artifact 保存を扱えるようにする
 
 この issue は親 issue。実装は sub-issue に分けて進める。
+
+sub-issues
+- #b629184f Hub schema v2: GitHub 用語を保ちつつ P2P 拡張できる record を定義する
+- #21b7e618 Hub source-of-truth を整理する: metadata は Git、sync は relay、logs/artifacts は blob store
+- #baff891b bit-relay: GitHub 非依存で issue/pr を publish/apply できる mutation API を実装する
+- #bec2b506 bit issue と GitHub Issues の sync adapter を実装する
+- #84d5cc59 actrun を generic workflow runner core に分離する
+- #435cd726 workflow run / check / artifact / log の保存基盤を実装する
+- #77353052 runner executor として container / Cloudflare sandbox を追加する
+- #9faafc07 bithub/ui に API-first な task UI を実装する
