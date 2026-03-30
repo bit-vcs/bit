@@ -321,6 +321,7 @@ async fn handle_hub_pr_import(args : Array[String]) -> Unit raise Error {
   }
   let root = get_work_root()
   let git_dir = resolve_hub_git_dir(root)
+  ensure_hub_initialized(git_dir, command_name="pr import")
   let fs = OsFs::new()
   let (stdout, _stderr) = match provider {
     GitHubImportProvider::GhCli => {
@@ -373,6 +374,7 @@ async fn handle_hub_pr_import_proposal(
   }
   let root = get_work_root()
   let git_dir = resolve_hub_git_dir(root)
+  ensure_hub_initialized(git_dir, command_name="pr import-proposal")
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
   let proposals = hub.list_pr_proposals(objects)
@@ -634,6 +636,7 @@ async fn handle_hub_pr_create(args : Array[String]) -> Unit raise Error {
   let options = parse_hub_pr_create_options(args, "hub pr create")
   let root = get_work_root()
   let git_dir = resolve_hub_git_dir(root)
+  ensure_hub_initialized(git_dir, command_name="pr create")
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let fs = OsFs::new()
   let source_repo_value = match options.source_repo {
@@ -670,6 +673,7 @@ async fn handle_hub_pr_propose(args : Array[String]) -> Unit raise Error {
   let options = parse_hub_pr_create_options(args, "hub pr propose")
   let root = get_work_root()
   let git_dir = resolve_hub_git_dir(root)
+  ensure_hub_initialized(git_dir, command_name="pr propose")
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let fs = OsFs::new()
   let source_repo_value = match options.source_repo {
@@ -784,6 +788,7 @@ async fn handle_hub_pr_update(args : Array[String]) -> Unit raise Error {
   let label_option = if labels.length() > 0 { Some(labels) } else { None }
   let root = get_work_root()
   let git_dir = resolve_hub_git_dir(root)
+  ensure_hub_initialized(git_dir, command_name="pr update")
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
   let pr = hub.update_pr(
@@ -821,6 +826,7 @@ async fn handle_hub_pr_close(args : Array[String]) -> Unit raise Error {
   }
   let root = get_work_root()
   let git_dir = resolve_hub_git_dir(root)
+  ensure_hub_initialized(git_dir, command_name="pr close")
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
   hub.close_pr(objects, refs, clock, id)
@@ -850,6 +856,7 @@ async fn handle_hub_pr_reopen(args : Array[String]) -> Unit raise Error {
   }
   let root = get_work_root()
   let git_dir = resolve_hub_git_dir(root)
+  ensure_hub_initialized(git_dir, command_name="pr reopen")
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
   hub.reopen_pr(objects, refs, clock, id)
@@ -922,6 +929,7 @@ async fn handle_hub_pr_merge(args : Array[String]) -> Unit raise Error {
   }
   let root = get_work_root()
   let git_dir = resolve_hub_git_dir(root)
+  ensure_hub_initialized(git_dir, command_name="pr merge")
   let fs = OsFs::new()
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
@@ -1071,6 +1079,7 @@ async fn handle_hub_pr_comment_add(args : Array[String]) -> Unit raise Error {
   }
   let root = get_work_root()
   let git_dir = resolve_hub_git_dir(root)
+  ensure_hub_initialized(git_dir, command_name="pr comment")
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
   let comment = hub.add_comment(
@@ -1249,6 +1258,7 @@ async fn handle_hub_pr_review_submit(args : Array[String]) -> Unit raise Error {
   let review_body = body.unwrap_or("")
   let root = get_work_root()
   let git_dir = resolve_hub_git_dir(root)
+  ensure_hub_initialized(git_dir, command_name="pr review")
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
   let review = hub.submit_review(
@@ -1444,6 +1454,7 @@ async fn handle_hub_pr_workflow_submit(
   }
   let root = get_work_root()
   let git_dir = resolve_hub_git_dir(root)
+  ensure_hub_initialized(git_dir, command_name="pr workflow")
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
   let workflow = hub.record_pr_workflow(
@@ -1512,6 +1523,6 @@ async fn handle_hub_pr_search(args : Array[String]) -> Unit raise Error {
 async fn handle_hub_pr_init(_args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let git_dir = resolve_hub_git_dir(root)
-  ensure_hub_initialized(git_dir)
+  ensure_hub_initialized(git_dir, command_name="pr", explicit=true)
   print_line("Initialized hub metadata")
 }

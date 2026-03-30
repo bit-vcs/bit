@@ -83,6 +83,261 @@ impl @bitlib.Clock for OsClock with now(self) {
 }
 
 ///|
+extern "C" fn hub_stdin_is_tty_native() -> Int = "hub_stdin_is_tty_native"
+
+///|
+struct HubOriginSyncPlan {
+  has_origin : Bool
+  add_fetch_notes : Bool
+  add_push_notes : Bool
+  add_default_push_refspec : Bool
+}
+
+///|
+fn hub_sync_config_path(git_dir : String) -> String {
+  git_dir + "/config"
+}
+
+///|
+fn hub_notes_fetch_refspec() -> String {
+  "+\{@hub.hub_notes_ref_name()}:\{@hub.hub_notes_ref_name()}"
+}
+
+///|
+fn hub_notes_push_refspec() -> String {
+  "\{@hub.hub_notes_ref_name()}:\{@hub.hub_notes_ref_name()}"
+}
+
+///|
+fn hub_default_push_refspec() -> String {
+  "refs/heads/*:refs/heads/*"
+}
+
+///|
+fn parse_hub_init_approval(input : String) -> Bool {
+  let normalized = input.trim(chars=" \t\r\n").to_lower()
+  normalized == "y" || normalized == "yes"
+}
+
+///|
+fn parse_hub_init_prompt_override(input : String) -> Bool? {
+  match input.trim(chars=" \t\r\n").to_lower() {
+    "1" | "true" | "yes" | "y" => Some(true)
+    "0" | "false" | "no" | "n" => Some(false)
+    _ => None
+  }
+}
+
+///|
+async fn read_hub_init_approval() -> Bool {
+  let bytes : Array[Byte] = []
+  let mut finished = false
+  while not(finished) {
+    match @stdio.stdin.read_some(max_len=1) {
+      None => finished = true
+      Some(chunk) =>
+        for b in chunk {
+          if b == 10 {
+            finished = true
+            break
+          }
+          if b == 13 {
+            continue
+          }
+          if bytes.length() <= 64 {
+            bytes.push(b)
+          }
+          if bytes.length() >= 64 {
+            finished = true
+            break
+          }
+      }
+    }
+  }
+  let text = @utf8.decode_lossy(bytes_from_array(bytes)[:])
+  parse_hub_init_approval(text)
+}
+
+///|
+fn hub_stdin_is_tty() -> Bool {
+  hub_stdin_is_tty_native() != 0
+}
+
+///|
+fn hub_should_prompt() -> Bool {
+  match @sys.get_env_var("BIT_HUB_INIT_PROMPT") {
+    Some(value) =>
+      parse_hub_init_prompt_override(value).unwrap_or(hub_stdin_is_tty())
+    None => hub_stdin_is_tty()
+  }
+}
+
+///|
+fn compute_hub_origin_sync_plan(content : String) -> HubOriginSyncPlan {
+  let (remotes, _branches) = @bitlib.parse_remote_config(content)
+  match remotes.get("origin") {
+    None => {
+      has_origin: false,
+      add_fetch_notes: false,
+      add_push_notes: false,
+      add_default_push_refspec: false,
+    }
+    Some(remote) => {
+      let add_fetch_notes = not(remote.fetch.contains(hub_notes_fetch_refspec()))
+      let add_push_notes = not(remote.push.contains(hub_notes_push_refspec()))
+      {
+        has_origin: true,
+        add_fetch_notes,
+        add_push_notes,
+        add_default_push_refspec: add_push_notes && remote.push.length() == 0,
+      }
+    }
+  }
+}
+
+///|
+fn load_hub_origin_sync_plan(
+  fs : OsFs,
+  git_dir : String,
+) -> HubOriginSyncPlan {
+  let config_path = hub_sync_config_path(git_dir)
+  let content = decode_bytes(fs.read_file(config_path) catch { _ => Bytes::default() })
+  compute_hub_origin_sync_plan(content)
+}
+
+///|
+fn apply_hub_origin_sync_plan(
+  fs : OsFs,
+  git_dir : String,
+  plan : HubOriginSyncPlan,
+) -> Unit raise Error {
+  if not(plan.has_origin) {
+    return ()
+  }
+  let config_path = hub_sync_config_path(git_dir)
+  if plan.add_default_push_refspec {
+    set_config(
+      fs,
+      config_path,
+      "remote.origin.push",
+      hub_default_push_refspec(),
+      true,
+      (None : String?),
+      (None : String?),
+    )
+  }
+  if plan.add_push_notes {
+    set_config(
+      fs,
+      config_path,
+      "remote.origin.push",
+      hub_notes_push_refspec(),
+      true,
+      (None : String?),
+      (None : String?),
+    )
+  }
+  if plan.add_fetch_notes {
+    set_config(
+      fs,
+      config_path,
+      "remote.origin.fetch",
+      hub_notes_fetch_refspec(),
+      true,
+      (None : String?),
+      (None : String?),
+    )
+  }
+}
+
+///|
+fn hub_metadata_is_initialized(fs : OsFs, git_dir : String) -> Bool {
+  fs.is_file(hub_merge_policy_path(git_dir))
+}
+
+///|
+async fn print_hub_init_metadata_prompt(
+  command_name : String,
+  git_dir : String,
+) -> Unit {
+  eprint_line(
+    "bit \{command_name}: initialize local hub metadata in this repository?",
+  )
+  eprint_line("  creates: \{hub_merge_policy_path(git_dir)}")
+  eprint_line("Continue? [y/N]")
+}
+
+///|
+async fn print_hub_init_sync_prompt(
+  command_name : String,
+  plan : HubOriginSyncPlan,
+) -> Unit {
+  eprint_line(
+    "bit \{command_name}: configure local git sync for hub metadata on 'origin'?",
+  )
+  if plan.add_fetch_notes {
+    eprint_line(
+      "  remote.origin.fetch += " + hub_notes_fetch_refspec(),
+    )
+  }
+  if plan.add_default_push_refspec {
+    eprint_line(
+      "  remote.origin.push += " + hub_default_push_refspec(),
+    )
+    eprint_line(
+      "  note: this makes plain `git push origin` use explicit refspecs",
+    )
+  }
+  if plan.add_push_notes {
+    eprint_line(
+      "  remote.origin.push += " + hub_notes_push_refspec(),
+    )
+  }
+  eprint_line("Apply these local config changes now? [y/N]")
+}
+
+///|
+async fn ensure_hub_initialized(
+  git_dir : String,
+  command_name? : String = "hub",
+  explicit? : Bool = false,
+) -> Unit raise Error {
+  let fs = OsFs::new()
+  let had_metadata = hub_metadata_is_initialized(fs, git_dir)
+  let interactive = hub_should_prompt()
+  if not(had_metadata) {
+    if interactive {
+      print_hub_init_metadata_prompt(command_name, git_dir)
+      if not(read_hub_init_approval()) {
+        eprint_line("fatal: hub metadata initialization was not approved")
+        @sys.exit(1)
+      }
+    }
+    let (objects, refs, _clock) = make_hub_stores(git_dir)
+    let _ = load_hub_store(objects, refs)
+    ensure_hub_merge_policy_file(fs, git_dir)
+  }
+  let plan = load_hub_origin_sync_plan(fs, git_dir)
+  if not(plan.has_origin) {
+    return ()
+  }
+  let needs_sync_config = plan.add_fetch_notes || plan.add_push_notes
+  if not(needs_sync_config) {
+    return ()
+  }
+  if not(explicit || not(had_metadata)) {
+    return ()
+  }
+  if not(interactive) {
+    return ()
+  }
+  print_hub_init_sync_prompt(command_name, plan)
+  if read_hub_init_approval() {
+    apply_hub_origin_sync_plan(fs, git_dir, plan)
+  }
+}
+
+///|
 /// Resolve git_dir for hub operations, handling worktrees.
 /// In a worktree, .git is a file pointing to .git/worktrees/<name>.
 /// Hub data (refs/notes) lives in the shared common git dir.
@@ -137,14 +392,6 @@ fn load_hub_store(
 }
 
 ///|
-fn ensure_hub_initialized(git_dir : String) -> Unit raise @bitcore.GitError {
-  let fs = OsFs::new()
-  let (objects, refs, _clock) = make_hub_stores(git_dir)
-  let _ = load_hub_store(objects, refs)
-  ensure_hub_merge_policy_file(fs, git_dir)
-}
-
-///|
 async fn handle_hub_init(args : Array[String]) -> Unit raise Error {
   for arg in args {
     if arg.has_prefix("-") {
@@ -153,9 +400,6 @@ async fn handle_hub_init(args : Array[String]) -> Unit raise Error {
   }
   let root = get_work_root()
   let git_dir = resolve_hub_git_dir(root)
-  let fs = OsFs::new()
-  let (objects, refs, _clock) = make_hub_stores(git_dir)
-  let _ = load_hub_store(objects, refs)
-  ensure_hub_merge_policy_file(fs, git_dir)
+  ensure_hub_initialized(git_dir, explicit=true)
   print_line("Initialized hub metadata")
 }

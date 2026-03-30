@@ -535,6 +535,7 @@ async fn handle_hub_issue_import(args : Array[String]) -> Unit raise Error {
   }
   let root = get_work_root()
   let git_dir = resolve_hub_git_dir(root)
+  ensure_hub_initialized(git_dir, command_name="issue import")
   let fs = OsFs::new()
   let (stdout, _stderr) = match provider {
     GitHubImportProvider::GhCli => {
@@ -773,6 +774,7 @@ async fn handle_hub_issue_create(args : Array[String]) -> Unit raise Error {
   }
   let root = get_work_root()
   let git_dir = resolve_hub_git_dir(root)
+  ensure_hub_initialized(git_dir, command_name="issue create")
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
   let issue = hub.create_issue(
@@ -906,6 +908,7 @@ async fn handle_hub_issue_update(args : Array[String]) -> Unit raise Error {
   }
   let root = get_work_root()
   let git_dir = resolve_hub_git_dir(root)
+  ensure_hub_initialized(git_dir, command_name="issue update")
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
   let issue = hub.update_issue(
@@ -944,6 +947,7 @@ async fn handle_hub_issue_close(args : Array[String]) -> Unit raise Error {
   }
   let root = get_work_root()
   let git_dir = resolve_hub_git_dir(root)
+  ensure_hub_initialized(git_dir, command_name="issue close")
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
   let issue = hub.get_issue(objects, id)
@@ -981,6 +985,7 @@ async fn handle_hub_issue_reopen(args : Array[String]) -> Unit raise Error {
   }
   let root = get_work_root()
   let git_dir = resolve_hub_git_dir(root)
+  ensure_hub_initialized(git_dir, command_name="issue reopen")
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
   let issue = hub.get_issue(objects, id)
@@ -1076,6 +1081,7 @@ async fn handle_hub_issue_comment_add(args : Array[String]) -> Unit raise Error 
   }
   let root = get_work_root()
   let git_dir = resolve_hub_git_dir(root)
+  ensure_hub_initialized(git_dir, command_name="issue comment")
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
   let comment = hub.add_issue_comment(
@@ -1137,6 +1143,7 @@ async fn handle_hub_issue_link(args : Array[String]) -> Unit raise Error {
   let pr_id = args[1]
   let root = get_work_root()
   let git_dir = resolve_hub_git_dir(root)
+  ensure_hub_initialized(git_dir, command_name="issue link")
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
   hub.link_pr_to_issue(objects, refs, clock, issue_id, pr_id)
@@ -1455,7 +1462,7 @@ async fn handle_hub_issue_search(args : Array[String]) -> Unit raise Error {
 async fn handle_hub_issue_init(_args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let git_dir = resolve_hub_git_dir(root)
-  ensure_hub_initialized(git_dir)
+  ensure_hub_initialized(git_dir, command_name="issue", explicit=true)
   print_line("Initialized hub metadata")
 }
 
@@ -1472,7 +1479,7 @@ async fn issue_fetch_from_relay(relay_arg : String) -> Unit raise Error {
   let root = get_work_root()
   let git_dir = resolve_hub_git_dir(root)
   let fs = OsFs::new()
-  ensure_hub_initialized(git_dir)
+  ensure_hub_initialized(git_dir, command_name="issue import")
   // Resolve relay argument:
   //   "relay+https://..." or "relay+http://..."  → full URL
   //   "owner/repo"                               → namespace (room = owner/repo)

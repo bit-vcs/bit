@@ -990,3 +990,77 @@ test "hub format: format_work_item_summary includes kind and state" {
   assert_true(out.contains("[issue/open]"))
   assert_true(out.contains("Unified title"))
 }
+
+///|
+test "hub init: parse approval accepts only yes-like answers" {
+  assert_true(parse_hub_init_approval("y"))
+  assert_true(parse_hub_init_approval(" Yes \n"))
+  assert_false(parse_hub_init_approval(""))
+  assert_false(parse_hub_init_approval("n"))
+  assert_false(parse_hub_init_approval("ok"))
+}
+
+///|
+test "hub init: parse prompt override handles force on off and invalid" {
+  assert_eq(parse_hub_init_prompt_override("1"), Some(true))
+  assert_eq(parse_hub_init_prompt_override("yes"), Some(true))
+  assert_eq(parse_hub_init_prompt_override("0"), Some(false))
+  assert_eq(parse_hub_init_prompt_override("No"), Some(false))
+  assert_eq(parse_hub_init_prompt_override("maybe"), None)
+}
+
+///|
+test "hub init: origin sync plan is empty without origin remote" {
+  let config_text =
+    #|[remote "upstream"]
+    #|  url = https://example.com/upstream.git
+    #|  fetch = +refs/heads/*:refs/remotes/upstream/*
+  let plan = compute_hub_origin_sync_plan(config_text)
+  assert_false(plan.has_origin)
+  assert_false(plan.add_fetch_notes)
+  assert_false(plan.add_push_notes)
+  assert_false(plan.add_default_push_refspec)
+}
+
+///|
+test "hub init: origin sync plan adds notes fetch and default push when origin has no push config" {
+  let config_text =
+    #|[remote "origin"]
+    #|  url = https://example.com/origin.git
+    #|  fetch = +refs/heads/*:refs/remotes/origin/*
+  let plan = compute_hub_origin_sync_plan(config_text)
+  assert_true(plan.has_origin)
+  assert_true(plan.add_fetch_notes)
+  assert_true(plan.add_push_notes)
+  assert_true(plan.add_default_push_refspec)
+}
+
+///|
+test "hub init: origin sync plan only adds notes push when origin already has push refspecs" {
+  let config_text =
+    #|[remote "origin"]
+    #|  url = https://example.com/origin.git
+    #|  fetch = +refs/heads/*:refs/remotes/origin/*
+    #|  push = HEAD:refs/heads/main
+  let plan = compute_hub_origin_sync_plan(config_text)
+  assert_true(plan.has_origin)
+  assert_true(plan.add_fetch_notes)
+  assert_true(plan.add_push_notes)
+  assert_false(plan.add_default_push_refspec)
+}
+
+///|
+test "hub init: origin sync plan is empty when notes sync is already configured" {
+  let config_text =
+    #|[remote "origin"]
+    #|  url = https://example.com/origin.git
+    #|  fetch = +refs/heads/*:refs/remotes/origin/*
+    #|  fetch = +refs/notes/bit-hub:refs/notes/bit-hub
+    #|  push = HEAD:refs/heads/main
+    #|  push = refs/notes/bit-hub:refs/notes/bit-hub
+  let plan = compute_hub_origin_sync_plan(config_text)
+  assert_true(plan.has_origin)
+  assert_false(plan.add_fetch_notes)
+  assert_false(plan.add_push_notes)
+  assert_false(plan.add_default_push_refspec)
+}

@@ -101,6 +101,7 @@ async fn handle_hub_note_add(args : Array[String]) -> Unit raise Error {
   }
   let root = get_work_root()
   let git_dir = resolve_hub_git_dir(root)
+  ensure_hub_initialized(git_dir, command_name="note")
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
   let note = hub.add_note(
@@ -259,6 +260,7 @@ async fn handle_hub_note_remove(args : Array[String]) -> Unit raise Error {
   }
   let root = get_work_root()
   let git_dir = resolve_hub_git_dir(root)
+  ensure_hub_initialized(git_dir, command_name="note")
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
   hub.remove_note(
