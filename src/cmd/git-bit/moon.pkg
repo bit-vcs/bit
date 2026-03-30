@@ -40,6 +40,7 @@ options(
     "hub_stores_wbtest.mbt": [ "native" ],
     "main.mbt": [ "native" ],
     "main_js.mbt": [ "js" ],
+    "main_wasm.mbt": [ "wasm-gc", "wasm" ],
     "osfs.mbt": [ "native" ],
     "time_native.mbt": [ "native" ],
   },
