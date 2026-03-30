@@ -1,0 +1,144 @@
+version 1
+key hub/issue/b629184f/comment/33e99389
+kind issue.comment
+clock test <test@example.com>=1
+timestamp 1774858220
+node test <test@example.com>
+deleted 0
+
+comment 33e99389
+issue b629184f
+author test <test@example.com>
+created 1774858220
+
+schema v2 draft
+
+基本方針
+- 外向きの概念は GitHub に合わせる: Issue / Pull Request / Review / Workflow Run / Check / Artifact
+- 内部の正規モデルは work-item 系 record を中心にする
+- Git には collaboration metadata を保存し、run log / artifact 本体は blob store に逃がす
+- relay は source of truth ではなく mutation transport / notify / sync index とする
+- GitHub は core schema ではなく upstream adapter として扱う
+
+record 一覧
+- hub.work-item.v2
+  - issue と pr の共通 record
+  - kind は issue | pull_request を持つ
+- hub.issue.comment.v2
+- hub.pr.review.v2
+- hub.run.summary.v2
+- hub.check.v2
+- hub.artifact.ref.v2
+- hub.sync.link.v2
+  - local id と GitHub issue number / node_id などの対応表
+
+共通 envelope fields
+- id
+- version
+- kind
+- created_at
+- updated_at
+- author
+- source: local | relay | github
+- sender
+- device_id
+- room
+- signature
+- sync_state: local_only | pending_push | synced | conflict
+- visibility: repo | room | private
+- upstream
+  - provider: github | none | future providers
+  - repo
+  - remote_id
+  - remote_number
+  - remote_url
+
+work-item v2 fields
+- id
+- kind: issue | pull_request
+- title
+- body
+- state
+  - issue: open | closed
+  - pr: open | closed | merged | draft
+- labels[]
+- assignees[]
+- linked_prs[]
+- parent_id
+- patch
+  - source_branch
+  - source_repo
+  - source_ref
+  - source_commit
+  - target_branch
+  - target_commit
+  - closes_issues[]
+  - merge_commit
+- workflow_summary
+  - latest_run_status
+  - required_checks[]
+  - successful_checks[]
+
+run summary v2 fields
+- run_id
+- work_item_id
+- workflow_name
+- trigger
+- executor
+  - local | container | cloudflare_sandbox
+- status: queued | running | success | failed | cancelled
+- started_at
+- finished_at
+- summary
+- check_ids[]
+- artifact_ids[]
+- log_ref
+
+check v2 fields
+- check_id
+- run_id
+- work_item_id
+- name
+- status: queued | running | success | failed | skipped
+- summary
+- started_at
+- finished_at
+- log_ref
+
+artifact ref v2 fields
+- artifact_id
+- run_id
+- work_item_id
+- name
+- content_type
+- size
+- digest
+- blob_url or object_key
+- retention
+
+issue / pr comment
+- body 本文は GitHub 互換を優先
+- threading は reply_to で維持
+- reactions は v2 では保留。必要なら comment extension record に逃がす
+
+review v2
+- pr_id
+- review_id
+- verdict: comment | approve | request_changes
+- body
+- commit_id
+- inline_comments は後続拡張 record でもよい
+
+互換方針
+- 既存の work-item record は読み込み互換を維持する
+- 書き込みは v2 に寄せるが、必要なら downgrade export path を持つ
+- issue / pr CLI は schema version を意識しない
+- migration は read-time upgrade を先行し、明示 migrate は後回し
+
+未決定
+- draft PR を work-item.state に含めるか extension field にするか
+- milestone / project 相当を core に含めるか
+- reactions / attachments / inline review comment を core v2 に入れるか
+- upstream conflict policy を last_write_wins にするか field-wise merge にするか
+
+この草案をベースに docs/hub-protocol.md を v2 対応に広げる。
