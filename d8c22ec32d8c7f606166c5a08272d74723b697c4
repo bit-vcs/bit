@@ -1,8 +1,8 @@
 version 1
 key hub/work-item/77353052/meta
 kind work-item
-clock test <test@example.com>=1
-timestamp 1774857024
+clock test <test@example.com>=2
+timestamp 1774857117
 node test <test@example.com>
 deleted 0
 
@@ -10,7 +10,7 @@ work-item 77353052
 title runner executor として container / Cloudflare sandbox を追加する
 author test <test@example.com>
 created 1774857024
-updated 1774857024
+updated 1774857117
 state open
 parent f2b91294
 
@@ -26,4 +26,4 @@ parent f2b91294
 完了条件
 - actrun core から executor を切り替えて実行できる
 - container / sandbox の capability 差分が docs 化されている
-- 최소 1 つの representative workflow が両 executor で回る
+- 少なくとも 1 つの representative workflow が両 executor で回る
