@@ -1,0 +1,33 @@
+version 1
+key hub/work-item/9b3bbf37/meta
+kind work-item
+clock test <test@example.com>=1
+timestamp 1774858080
+node test <test@example.com>
+deleted 0
+
+work-item 9b3bbf37
+title bit issue list の sub-issue 表示戦略と help 表記を整理する
+author test <test@example.com>
+created 1774858080
+updated 1774858080
+state open
+parent f2b91294
+
+現状
+- `bit issue list` はデフォルトで top-level issue のみ表示する
+- sub-issue は `--parent <id>` で見える
+- `--all` でも見えるが、help に出ていない
+
+問題
+- 親 issue から切った sub-issue が一覧に見えず、存在しないように見える
+- task 管理用途では UX 上の混乱が大きい
+
+やること
+- `bit issue list` の default 表示方針を決める
+- `--all` / `--parent` / sub-issue の扱いを help と README に明記する
+- 必要なら top-level / child の見せ方を summary 表示に反映する
+
+完了条件
+- list と get の表示差異が docs/help で説明されている
+- task 管理用途で sub-issue を見失わない UI/CLI になる
