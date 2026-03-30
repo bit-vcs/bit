@@ -1,0 +1,19 @@
+version 1
+key hub/issue/b629184f/comment/991a3efb
+kind issue.comment
+clock test <test@example.com>=1
+timestamp 1774858516
+node test <test@example.com>
+deleted 0
+
+comment 991a3efb
+issue b629184f
+author test <test@example.com>
+created 1774858516
+
+docs update
+- schema v2 draft を docs/hub-protocol.md に反映した
+- v1 current contract と v2 planned direction を同居させた
+- source-of-truth を Git / relay / blob store で明文化した
+
+次は source-of-truth の責務表を #21b7e618 に落とす。
