@@ -82,8 +82,22 @@ pub fn parse_commit(content : Bytes) -> CommitInfo raise @object.GitError {
 }
 
 ///|
-pub fn parse_tree(
+fn parse_tree_mode_is_octal(mode : String) -> Bool {
+  if mode.length() == 0 {
+    return false
+  }
+  for c in mode {
+    if c < '0' || c > '7' {
+      return false
+    }
+  }
+  true
+}
+
+///|
+fn parse_tree_with_hash_size(
   content : Bytes,
+  hash_size : Int,
 ) -> Array[@object.TreeEntry] raise @object.GitError {
   let entries : Array[@object.TreeEntry] = []
   let mut i = 0
@@ -96,6 +110,10 @@ pub fn parse_tree(
     }
     if i >= content.length() {
       raise @object.GitError::InvalidObject("Truncated tree entry mode")
+    }
+    let mode = mode_buf.to_string()
+    if not(parse_tree_mode_is_octal(mode)) {
+      raise @object.GitError::InvalidObject("Invalid tree entry mode")
     }
     i += 1 // skip space
     // Parse name - collect bytes and decode as UTF-8
@@ -112,18 +130,34 @@ pub fn parse_tree(
     })
     let name = @utf8.decode_lossy(Bytes::from_array(name_bytes)[:])
     i += 1 // skip NUL
-    if i + 20 > content.length() {
+    if i + hash_size > content.length() {
       raise @object.GitError::InvalidObject("Truncated tree entry id")
     }
-    let bytes : FixedArray[Byte] = FixedArray::make(20, b'\x00')
-    for j in 0..<20 {
-      bytes[j] = content[i + j]
-    }
-    i += 20
-    let id = @object.ObjectId::new(bytes)
-    entries.push(@object.TreeEntry::new(mode_buf.to_string(), name, id))
+    let id = @object.ObjectId::from_bytes_at(content, i, hash_size~)
+    i += hash_size
+    entries.push(@object.TreeEntry::new(mode, name, id))
   }
   entries
+}
+
+///|
+pub fn parse_tree(
+  content : Bytes,
+) -> Array[@object.TreeEntry] raise @object.GitError {
+  if content.length() == 0 {
+    return []
+  }
+  match
+    (
+      try? parse_tree_with_hash_size(content, 20),
+      try? parse_tree_with_hash_size(content, 32),
+    ) {
+    (Ok(entries), Err(_)) => entries
+    (Err(_), Ok(entries)) => entries
+    (Ok(entries), Ok(_)) => entries
+    (Err(_), Err(_)) =>
+      raise @object.GitError::InvalidObject("Invalid tree object")
+  }
 }
 
 ///|

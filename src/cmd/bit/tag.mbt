@@ -5,11 +5,11 @@ async fn handle_tag(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
   let rfs : &@bitcore.RepoFileSystem = fs
   let git_dir = resolve_git_dir(rfs, root)
-  ignore(rfs) // SHA-256 check removed — bit only supports SHA-1
   let mut list_mode = false
   let mut explicit_list = false
   let mut delete_mode = false
   let mut annotated = false
+  let mut sign_tag = false
   let mut force = false
   let mut ignore_case = false
   let mut create_reflog = false
@@ -224,7 +224,10 @@ async fn handle_tag(args : Array[String]) -> Unit raise Error {
         } else if target is None {
           target = Some(arg)
         }
-      "-s" | "--sign" => annotated = true
+      "-s" | "--sign" => {
+        annotated = true
+        sign_tag = true
+      }
       _ if arg.has_prefix("-") => warn_unimplemented_arg("tag", arg)
       _ => ()
     }
@@ -513,18 +516,26 @@ async fn handle_tag(args : Array[String]) -> Unit raise Error {
   let tagger = get_committer_string()
   let timestamp = get_commit_timestamp()
   let timezone = get_commit_timezone()
+  let tag_algo = signing_repo_hash_algorithm(fs, git_dir)
+  let should_sign = sign_tag
   if annotated {
-    @bitlib.create_annotated_tag(
-      fs,
-      fs,
-      git_dir,
-      name,
-      id,
-      tag_message,
-      tagger,
-      timestamp,
-      timezone~,
-    )
+    if should_sign {
+      tag_create_signed_annotated_tag(
+        fs, git_dir, root, name, id, tag_message, tagger, timestamp, timezone, tag_algo,
+      )
+    } else {
+      @bitlib.create_annotated_tag(
+        fs,
+        fs,
+        git_dir,
+        name,
+        id,
+        tag_message,
+        tagger,
+        timestamp,
+        timezone~,
+      )
+    }
   } else {
     @bitlib.create_lightweight_tag(fs, fs, git_dir, name, id)
   }
@@ -536,6 +547,49 @@ async fn handle_tag(args : Array[String]) -> Unit raise Error {
     Some(path) => if fs.is_file(path) { fs.remove_file(path) catch { _ => () } }
     None => ()
   }
+}
+
+///|
+async fn tag_create_signed_annotated_tag(
+  fs : OsFs,
+  git_dir : String,
+  root : String,
+  name : String,
+  target : @bitcore.ObjectId,
+  message : String,
+  tagger : String,
+  timestamp : Int64,
+  timezone : String,
+  algo : @bitobject.HashAlgorithm,
+) -> Unit raise Error {
+  let db = @bitlib.ObjectDb::load(fs, git_dir)
+  let target_obj = db.get(fs, target)
+  guard target_obj is Some(obj) else {
+    raise @bitcore.GitError::InvalidObject("unknown object: \{target.to_hex()}")
+  }
+  let target_type = match obj.obj_type {
+    @bitcore.ObjectType::Blob => "blob"
+    @bitcore.ObjectType::Tree => "tree"
+    @bitcore.ObjectType::Commit => "commit"
+    @bitcore.ObjectType::Tag => "tag"
+  }
+  let tag_content = if message.length() == 0 {
+    "object \{target.to_hex()}\ntype \{target_type}\ntag \{name}\ntagger \{tagger} \{timestamp} \{timezone}\n\n"
+  } else {
+    "object \{target.to_hex()}\ntype \{target_type}\ntag \{name}\ntagger \{tagger} \{timestamp} \{timezone}\n\n\{message}\n"
+  }
+  let payload = @utf8.encode(tag_content)
+  let signature = signing_sign_payload(fs, root, git_dir, payload, None)
+  let signed_payload = signing_append_tag_signature(payload, signature)
+  let (tag_id, compressed) = @bitobject.create_object_with_algo(
+    algo,
+    @bitcore.ObjectType::Tag,
+    signed_payload,
+  )
+  @bitlib.write_object_bytes(fs, git_dir, tag_id, compressed)
+  let ref_path = git_dir + "/refs/tags/" + name
+  fs.mkdir_p(parent_dir(ref_path))
+  fs.write_string(ref_path, tag_id.to_hex() + "\n")
 }
 
 ///|

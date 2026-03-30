@@ -378,6 +378,7 @@ fn add_apply_intent_to_add(
   git_dir : String,
   stage_paths : Array[String],
 ) -> Array[String] raise Error {
+  let algo = @bitlib.repo_hash_algorithm(rfs, git_dir)
   let entries = @bitlib.read_index_entries(rfs, git_dir)
   let map : Map[String, @bitlib.IndexEntry] = {}
   for entry in entries {
@@ -400,6 +401,14 @@ fn add_apply_intent_to_add(
           fs,
           git_dir,
           @bitcore.ObjectType::Blob,
+          Bytes::default(),
+          algo~,
+        )
+        @bitlib.compat_record_blob_mapping(
+          fs,
+          rfs,
+          git_dir,
+          created,
           Bytes::default(),
         )
         empty_id = Some(created)

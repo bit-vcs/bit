@@ -76,6 +76,20 @@ pub fn commit_is_trailer_line(String) -> Bool
 
 pub fn commit_strip_message(String) -> String
 
+pub fn compat_append_loose_object_idx(&@types.FileSystem, &@types.RepoFileSystem, String, @object.ObjectId, @object.ObjectId) -> Unit raise @object.GitError
+
+pub fn compat_lookup_loose_object_idx(&@types.RepoFileSystem, String, String) -> String?
+
+pub fn compat_lookup_object_id(&@types.RepoFileSystem, String, @object.ObjectId) -> @object.ObjectId?
+
+pub fn compat_record_annotated_tag_mapping(&@types.FileSystem, &@types.RepoFileSystem, String, @object.ObjectId, @object.ObjectId, String, String, String, String, Int64, String) -> Unit raise @object.GitError
+
+pub fn compat_record_blob_mapping(&@types.FileSystem, &@types.RepoFileSystem, String, @object.ObjectId, Bytes) -> Unit raise @object.GitError
+
+pub fn compat_record_commit_mapping(&@types.FileSystem, &@types.RepoFileSystem, String, @object.ObjectId, @object.Commit) -> Unit raise @object.GitError
+
+pub fn compat_record_tree_mapping(&@types.FileSystem, &@types.RepoFileSystem, String, @object.ObjectId, Array[@object.TreeEntry]) -> Unit raise @object.GitError
+
 pub fn config_has_remote_section(Array[ConfigBlock], String) -> Bool
 
 pub fn config_strip_quotes(String) -> String
@@ -426,6 +440,10 @@ pub fn repair_worktree(&@types.FileSystem, &@types.RepoFileSystem, String, workt
 
 pub fn repair_worktree_detailed(&@types.FileSystem, &@types.RepoFileSystem, String, worktree_paths? : Array[String], relative_paths? : Bool?) -> WorktreeRepairResult raise @object.GitError
 
+pub fn repo_compat_hash_algorithm(&@types.RepoFileSystem, String) -> @object.HashAlgorithm?
+
+pub fn repo_hash_algorithm(&@types.RepoFileSystem, String) -> @object.HashAlgorithm
+
 pub fn reset(&@types.FileSystem, &@types.RepoFileSystem, String, String, ResetMode, committer? : String, timestamp? : Int64, timezone? : String) -> @object.ObjectId raise @object.GitError
 
 pub fn resolve_diff_driver(&@types.RepoFileSystem, String, String) -> String?
@@ -562,17 +580,17 @@ pub fn upload_pack_v2(&@types.RepoFileSystem, String, UploadPackRequestV2, Uploa
 
 pub fn working_files_cache(String) -> Array[String]?
 
-pub fn write_index_entries(&@types.FileSystem, String, Array[IndexEntry]) -> Unit raise @object.GitError
+pub fn write_index_entries(&@types.FileSystem, String, Array[IndexEntry], hash_size? : Int) -> Unit raise @object.GitError
 
 pub fn write_index_entries_preserving_cache_tree(&@types.FileSystem, &@types.RepoFileSystem, String, Array[IndexEntry]) -> Unit raise @object.GitError
 
-pub fn write_index_entries_with_flags(&@types.FileSystem, String, Array[IndexEntry], Map[String, Bool], Map[String, Bool]) -> Unit raise @object.GitError
+pub fn write_index_entries_with_flags(&@types.FileSystem, String, Array[IndexEntry], Map[String, Bool], Map[String, Bool], hash_size? : Int) -> Unit raise @object.GitError
 
-pub fn write_index_entries_with_skip_worktree(&@types.FileSystem, String, Array[IndexEntry], Map[String, Bool]) -> Unit raise @object.GitError
+pub fn write_index_entries_with_skip_worktree(&@types.FileSystem, String, Array[IndexEntry], Map[String, Bool], hash_size? : Int) -> Unit raise @object.GitError
 
 pub fn write_index_entries_with_tree(&@types.FileSystem, &@types.RepoFileSystem, String, Array[IndexEntry], @object.ObjectId) -> Unit raise @object.GitError
 
-pub fn write_index_stage_entries(&@types.FileSystem, String, Array[IndexStageEntry]) -> Unit raise @object.GitError
+pub fn write_index_stage_entries(&@types.FileSystem, String, Array[IndexStageEntry], hash_size? : Int) -> Unit raise @object.GitError
 
 pub fn write_loose_object(&@types.FileSystem, String, @object.ObjectType, Bytes, algo? : @object.HashAlgorithm) -> @object.ObjectId raise @object.GitError
 

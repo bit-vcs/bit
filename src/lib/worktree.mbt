@@ -163,6 +163,10 @@ pub fn add_paths(
   } else {
     git_dir
   }
+  let effective_algo = match algo {
+    @object.HashAlgorithm::Sha1 => repo_hash_algorithm(rfs, actual_git_dir)
+    _ => algo
+  }
   let autocrlf = read_autocrlf_setting(rfs, actual_git_dir)
   let entries = read_index_entries(rfs, actual_git_dir)
   let map : Map[String, IndexEntry] = {}
@@ -181,8 +185,9 @@ pub fn add_paths(
         actual_git_dir,
         @bit.ObjectType::Blob,
         normalized,
-        algo~,
+        algo=effective_algo,
       )
+      compat_record_blob_mapping(fs, rfs, actual_git_dir, id, normalized)
       let size = content.length()
       let meta = @bitio.worktree_entry_meta_sync(rfs, abs)
       let mtime_sec = meta.map(info => info.mtime_sec.unwrap_or(0)).unwrap_or(0)
@@ -234,6 +239,7 @@ pub async fn add_paths_async(
   } else {
     git_dir
   }
+  let effective_algo = repo_hash_algorithm(rfs, actual_git_dir)
   let autocrlf = read_autocrlf_setting(rfs, actual_git_dir)
   let core_filemode = read_core_filemode_setting(rfs, actual_git_dir)
   let entries = read_index_entries(rfs, actual_git_dir)
@@ -299,7 +305,9 @@ pub async fn add_paths_async(
               actual_git_dir,
               @bit.ObjectType::Blob,
               normalized,
+              algo=effective_algo,
             )
+            compat_record_blob_mapping(fs, rfs, actual_git_dir, id, normalized)
             let size = content.length()
             let (mtime_sec, mtime_nsec) = info.mtime()
             let dev = info.dev.unwrap_or(0)
@@ -337,7 +345,9 @@ pub async fn add_paths_async(
                   actual_git_dir,
                   @bit.ObjectType::Blob,
                   bytes,
+                  algo=effective_algo,
                 )
+                compat_record_blob_mapping(fs, rfs, actual_git_dir, id, bytes)
                 let size = bytes.length()
                 let (mtime_sec, mtime_nsec) = info.mtime()
                 let dev = info.dev.unwrap_or(0)
@@ -396,6 +406,10 @@ pub fn commit(
   } else {
     git_dir
   }
+  let effective_algo = match algo {
+    @object.HashAlgorithm::Sha1 => repo_hash_algorithm(rfs, actual_git_dir)
+    _ => algo
+  }
   let parent = resolve_head_commit(rfs, actual_git_dir)
   let entries = read_index_entries(rfs, actual_git_dir)
   let tree_id = if entries.length() == 0 {
@@ -416,7 +430,7 @@ pub fn commit(
           Some(tree) => tree
           None => {
             let (empty_tree_id, empty_tree_compressed) = @object.create_tree_with_algo(
-              algo,
+              effective_algo,
               [],
             )
             write_object_bytes(
@@ -428,7 +442,7 @@ pub fn commit(
       }
       None => {
         let (empty_tree_id, empty_tree_compressed) = @object.create_tree_with_algo(
-          algo,
+          effective_algo,
           [],
         )
         write_object_bytes(
@@ -444,7 +458,7 @@ pub fn commit(
       actual_git_dir,
       entries,
       missing_ok=true,
-      algo~,
+      algo=effective_algo,
     )
   }
   let parents = match parent {
@@ -465,8 +479,11 @@ pub fn commit(
     message,
     encoding~,
   )
-  let (commit_id, compressed) = @object.create_commit_with_algo(algo, commit)
+  let (commit_id, compressed) = @object.create_commit_with_algo(
+    effective_algo, commit,
+  )
   write_object_bytes(fs, actual_git_dir, commit_id, compressed)
+  compat_record_commit_mapping(fs, rfs, actual_git_dir, commit_id, commit)
   update_head_ref(fs, rfs, actual_git_dir, commit_id)
   append_head_update_reflogs(
     fs,
@@ -1223,6 +1240,10 @@ pub fn write_tree_from_index(
   missing_ok? : Bool = false,
   algo? : @object.HashAlgorithm = @object.HashAlgorithm::Sha1,
 ) -> @bit.ObjectId raise @bit.GitError {
+  let effective_algo = match algo {
+    @object.HashAlgorithm::Sha1 => repo_hash_algorithm(rfs, git_dir)
+    _ => algo
+  }
   // If prefix is specified, filter entries and strip prefix from paths
   let rel_entries = match prefix {
     Some(p) => {
@@ -1273,7 +1294,14 @@ pub fn write_tree_from_index(
   } else {
     Some(ObjectDb::load_lazy(rfs, git_dir))
   }
-  write_tree_from_entries(fs, rfs, git_dir, rel_entries, object_db, algo~)
+  write_tree_from_entries(
+    fs,
+    rfs,
+    git_dir,
+    rel_entries,
+    object_db,
+    algo=effective_algo,
+  )
 }
 
 ///|
@@ -1285,6 +1313,10 @@ fn write_tree_from_entries(
   object_db : ObjectDb?,
   algo? : @object.HashAlgorithm = @object.HashAlgorithm::Sha1,
 ) -> @bit.ObjectId raise @bit.GitError {
+  let effective_algo = match algo {
+    @object.HashAlgorithm::Sha1 => repo_hash_algorithm(rfs, git_dir)
+    _ => algo
+  }
   let file_entries : Array[@bit.TreeEntry] = []
   let dir_map : Map[String, Array[IndexEntry]] = {}
   for e in entries {
@@ -1352,7 +1384,7 @@ fn write_tree_from_entries(
       git_dir,
       list,
       object_db,
-      algo~,
+      algo=effective_algo,
     )
     file_entries.push(@bit.TreeEntry::new("40000", dir_name, sub_id))
   }
@@ -1362,8 +1394,11 @@ fn write_tree_from_entries(
     let b_key = if b.mode == "40000" { b.name + "/" } else { b.name }
     compare_strings_lexicographic(a_key, b_key)
   })
-  let (tree_id, compressed) = @object.create_tree_with_algo(algo, file_entries)
+  let (tree_id, compressed) = @object.create_tree_with_algo(
+    effective_algo, file_entries,
+  )
   write_object_bytes(fs, git_dir, tree_id, compressed)
+  compat_record_tree_mapping(fs, rfs, git_dir, tree_id, file_entries)
   tree_id
 }
 
@@ -1591,11 +1626,21 @@ pub fn commit_amend(
   } else {
     git_dir
   }
+  let effective_algo = match algo {
+    @object.HashAlgorithm::Sha1 => repo_hash_algorithm(rfs, actual_git_dir)
+    _ => algo
+  }
   let entries = read_index_entries(rfs, actual_git_dir)
   if entries.length() == 0 {
     raise @bit.GitError::InvalidObject("Empty index")
   }
-  let tree_id = write_tree_from_index(fs, rfs, actual_git_dir, entries, algo~)
+  let tree_id = write_tree_from_index(
+    fs,
+    rfs,
+    actual_git_dir,
+    entries,
+    algo=effective_algo,
+  )
   // Get the parent of the current HEAD (grandparent of new commit)
   let current_head = resolve_head_commit(rfs, actual_git_dir)
   let parents = match current_head {
@@ -1627,8 +1672,11 @@ pub fn commit_amend(
     message,
     encoding~,
   )
-  let (commit_id, compressed) = @object.create_commit_with_algo(algo, commit)
+  let (commit_id, compressed) = @object.create_commit_with_algo(
+    effective_algo, commit,
+  )
   write_object_bytes(fs, actual_git_dir, commit_id, compressed)
+  compat_record_commit_mapping(fs, rfs, actual_git_dir, commit_id, commit)
   update_head_ref(fs, rfs, actual_git_dir, commit_id)
   append_head_update_reflogs(
     fs,

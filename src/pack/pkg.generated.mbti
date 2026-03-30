@@ -19,21 +19,21 @@ pub fn build_reverse_index(Bytes, Array[@object.PackObject]) -> Bytes raise @obj
 
 pub fn crc32_range(Bytes, Int, Int) -> UInt raise @object.GitError
 
-pub fn create_blob_packfile(Bytes) -> Bytes
+pub fn create_blob_packfile(Bytes, hash_size? : Int) -> Bytes
 
 pub fn create_commit_packfile(Bytes, String, @object.Commit) -> (@object.ObjectId, Bytes)
 
-pub fn create_packfile(Array[@object.PackObject]) -> Bytes
+pub fn create_packfile(Array[@object.PackObject], hash_size? : Int) -> Bytes
 
-pub fn create_packfile_with_delta(Array[@object.PackObject], @object.PackDeltaMode) -> Bytes
+pub fn create_packfile_with_delta(Array[@object.PackObject], @object.PackDeltaMode, hash_size? : Int) -> Bytes
 
-pub fn create_packfile_with_delta_stats(Array[@object.PackObject], @object.PackDeltaMode) -> (Bytes, Int)
+pub fn create_packfile_with_delta_stats(Array[@object.PackObject], @object.PackDeltaMode, hash_size? : Int) -> (Bytes, Int)
 
-pub fn create_packfile_with_delta_stats_compression(Array[@object.PackObject], @object.PackDeltaMode, @object.PackCompression) -> (Bytes, Int)
+pub fn create_packfile_with_delta_stats_compression(Array[@object.PackObject], @object.PackDeltaMode, @object.PackCompression, hash_size? : Int) -> (Bytes, Int)
 
-pub fn create_packfile_with_delta_stats_compression_reuse(Array[@object.PackObject], @object.PackDeltaMode, @object.PackCompression, Bool, Int, Int) -> (Bytes, Int)
+pub fn create_packfile_with_delta_stats_compression_reuse(Array[@object.PackObject], @object.PackDeltaMode, @object.PackCompression, Bool, Int, Int, hash_size? : Int) -> (Bytes, Int)
 
-pub fn create_packfiles_with_size_limit(Array[@object.PackObject], @object.PackDeltaMode, @object.PackCompression, Bool, Int, Int64, Int) -> (Array[Bytes], Int)
+pub fn create_packfiles_with_size_limit(Array[@object.PackObject], @object.PackDeltaMode, @object.PackCompression, Bool, Int, Int64, Int, hash_size? : Int) -> (Array[Bytes], Int)
 
 pub fn decode_type_and_size_at(Bytes, Int) -> (Int, Int, Int) raise @object.GitError
 

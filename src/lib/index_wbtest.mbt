@@ -1,4 +1,22 @@
 ///|
+fn index_wbtest_init_sha256_repo(fs : @bit.TestFs) -> Unit {
+  ignore(
+    try? init_repo_with_options(fs, "/repo", {
+      default_branch: "main",
+      bare: false,
+      separate_git_dir: None,
+      template_dir: None,
+      ref_format: "files",
+      object_format: "sha256",
+      is_reinit: false,
+      git_dir: None,
+      work_tree: None,
+      shared: None,
+    }),
+  )
+}
+
+///|
 test "index: read_index_entries accepts version 3 headers" {
   let fs = @bit.TestFs::new()
   init_repo(fs, "/repo")
@@ -51,6 +69,40 @@ test "index: write_skip_worktree_paths marks extended flag entries" {
   write_index_entries_with_skip_worktree(fs, "/repo/.git", entries, skip_set)
   let skip = read_skip_worktree_paths(fs, "/repo/.git")
   assert_true(skip.contains("a.txt"))
+}
+
+///|
+test "index: write_index_entries_with_flags preserves sha256 paths" {
+  let fs = @bit.TestFs::new()
+  index_wbtest_init_sha256_repo(fs)
+  let content = @utf8.encode("hello\n")
+  let blob_id = write_loose_object(
+    fs,
+    "/repo/.git",
+    @bit.ObjectType::Blob,
+    content,
+    algo=@bit.HashAlgorithm::Sha256,
+  )
+  let entries = [IndexEntry::new("hello", blob_id, 0o100644, content.length())]
+
+  write_index_entries_with_flags(fs, "/repo/.git", entries, {}, {})
+
+  let actual = read_index_entries(fs, "/repo/.git")
+  assert_eq(actual.length(), 1)
+  assert_eq(actual[0].path, "hello")
+  assert_eq(actual[0].id.to_hex(), blob_id.to_hex())
+}
+
+///|
+test "index: write_index_entries supports empty sha256 index" {
+  let fs = @bit.TestFs::new()
+  index_wbtest_init_sha256_repo(fs)
+
+  write_index_entries(fs, "/repo/.git", [], hash_size=32)
+
+  let actual = read_index_entries(fs, "/repo/.git")
+  assert_eq(actual.length(), 0)
+  assert_eq(fs.read_file("/repo/.git/index").length(), 44)
 }
 
 ///|

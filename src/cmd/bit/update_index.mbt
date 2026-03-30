@@ -293,7 +293,7 @@ async fn handle_update_index(args : Array[String]) -> Unit raise Error {
       merged_stage_entries.push(@bitlib.IndexStageEntry::new(entry, 0))
     }
     merged_stage_entries.append(direct_stage_updates)
-    @bitlib.write_index_stage_entries(fs, git_dir, merged_stage_entries)
+    update_index_write_stage_entries(fs, git_dir, merged_stage_entries)
   } else if direct_updates.length() > 0 || direct_remove_paths.length() > 0 {
     apply_update_index_entries(fs, git_dir, direct_updates, direct_remove_paths)
   }
@@ -552,7 +552,7 @@ fn apply_update_index_entries(
     let (_, entry) = item
     out.push(entry)
   }
-  @bitlib.write_index_entries(fs, git_dir, dedupe_index_entries_by_path(out))
+  update_index_write_entries(fs, git_dir, dedupe_index_entries_by_path(out))
 }
 
 ///|
@@ -571,6 +571,50 @@ fn dedupe_index_entries_by_path(
     out.push(entry)
   }
   out
+}
+
+///|
+fn update_index_repo_hash_size(fs : OsFs, git_dir : String) -> Int {
+  @bitlib.repo_hash_algorithm(fs, git_dir).hash_size()
+}
+
+///|
+fn update_index_write_entries(
+  fs : OsFs,
+  git_dir : String,
+  entries : Array[@bitlib.IndexEntry],
+) -> Unit raise Error {
+  let hash_size = update_index_repo_hash_size(fs, git_dir)
+  @bitlib.write_index_entries(fs, git_dir, entries, hash_size~)
+}
+
+///|
+fn update_index_write_entries_with_flags(
+  fs : OsFs,
+  git_dir : String,
+  entries : Array[@bitlib.IndexEntry],
+  skip_worktree_paths : Map[String, Bool],
+  assume_unchanged_paths : Map[String, Bool],
+) -> Unit raise Error {
+  let hash_size = update_index_repo_hash_size(fs, git_dir)
+  @bitlib.write_index_entries_with_flags(
+    fs,
+    git_dir,
+    entries,
+    skip_worktree_paths,
+    assume_unchanged_paths,
+    hash_size~,
+  )
+}
+
+///|
+fn update_index_write_stage_entries(
+  fs : OsFs,
+  git_dir : String,
+  entries : Array[@bitlib.IndexStageEntry],
+) -> Unit raise Error {
+  let hash_size = update_index_repo_hash_size(fs, git_dir)
+  @bitlib.write_index_stage_entries(fs, git_dir, entries, hash_size~)
 }
 
 ///|
@@ -627,7 +671,7 @@ fn update_skip_worktree_state(
     skip_worktree_paths[path] = true
   }
   let assume_unchanged_paths = @bitlib.read_assume_unchanged_paths(fs, git_dir)
-  @bitlib.write_index_entries_with_flags(
+  update_index_write_entries_with_flags(
     fs, git_dir, entries, skip_worktree_paths, assume_unchanged_paths,
   )
 }
@@ -649,7 +693,7 @@ fn update_assume_unchanged_state(
       assume_unchanged_paths.remove(path)
     }
   }
-  @bitlib.write_index_entries_with_flags(
+  update_index_write_entries_with_flags(
     fs, git_dir, entries, skip_worktree_paths, assume_unchanged_paths,
   )
 }
@@ -698,11 +742,12 @@ fn update_index_write_header_version(
   version : Int,
 ) -> Unit raise Error {
   let index_path = git_dir + "/index"
+  let hash_size = update_index_repo_hash_size(fs, git_dir)
   if not(fs.is_file(index_path)) {
-    @bitlib.write_index_entries(fs, git_dir, [])
+    update_index_write_entries(fs, git_dir, [])
   }
   let data = fs.read_file(index_path)
-  if data.length() < 32 {
+  if data.length() < 12 + hash_size {
     raise @bitcore.GitError::InvalidObject("Index entry truncated")
   }
   let arr : Array[Byte] = []
@@ -713,12 +758,12 @@ fn update_index_write_header_version(
   arr[5] = ((version >> 16) & 0xFF).to_byte()
   arr[6] = ((version >> 8) & 0xFF).to_byte()
   arr[7] = (version & 0xFF).to_byte()
-  let checksum_start = arr.length() - 20
+  let checksum_start = arr.length() - hash_size
   let content = Bytes::from_array(
     FixedArray::makei(checksum_start, fn(i) { arr[i] }),
   )
-  let checksum = @bitcore.sha1(content)
-  for i in 0..<20 {
+  let checksum = @bitcore.hash_prefix(content, checksum_start, hash_size~)
+  for i in 0..<hash_size {
     arr[checksum_start + i] = checksum.bytes[i]
   }
   fs.write_file(
@@ -757,7 +802,7 @@ async fn update_index_apply_chmod(
         filtered_entries.push(entry)
       }
     }
-    @bitlib.write_index_entries(fs, git_dir, filtered_entries)
+    update_index_write_entries(fs, git_dir, filtered_entries)
     @bitlib.add_paths_async(fs, fs, root, stage_paths)
   }
   let entries = @bitlib.read_index_entries(fs, git_dir)
@@ -793,7 +838,7 @@ async fn update_index_apply_chmod(
       None => updated.push(entry)
     }
   }
-  @bitlib.write_index_entries(fs, git_dir, updated)
+  update_index_write_entries(fs, git_dir, updated)
   if verbose {
     for op in ops {
       let (raw_path, mode) = op
@@ -1009,7 +1054,7 @@ fn update_index_write_entries_preserving_flags(
 ) -> Unit raise Error {
   let skip_worktree_paths = @bitlib.read_skip_worktree_paths(fs, git_dir)
   let assume_unchanged_paths = @bitlib.read_assume_unchanged_paths(fs, git_dir)
-  @bitlib.write_index_entries_with_flags(
+  update_index_write_entries_with_flags(
     fs, git_dir, entries, skip_worktree_paths, assume_unchanged_paths,
   )
 }
@@ -1323,7 +1368,7 @@ async fn handle_update_index_refresh(
       merged_stage_entries.push(@bitlib.IndexStageEntry::new(entry, 0))
     }
     merged_stage_entries.append(preserved_unmerged_stage_entries)
-    @bitlib.write_index_stage_entries(fs, git_dir, merged_stage_entries)
+    update_index_write_stage_entries(fs, git_dir, merged_stage_entries)
   } else if force_write || not(update_index_entries_equal(entries, refreshed)) {
     update_index_write_entries_preserving_flags(fs, git_dir, refreshed)
   }
@@ -1384,7 +1429,7 @@ async fn handle_update_index_again(
         filtered_entries.push(entry)
       }
     }
-    @bitlib.write_index_entries(fs, git_dir, filtered_entries)
+    update_index_write_entries(fs, git_dir, filtered_entries)
     @bitlib.add_paths_async(fs, fs, root, modified_paths)
   }
   if deleted_paths.length() > 0 {
@@ -1399,7 +1444,7 @@ async fn handle_update_index_again(
         filtered.push(entry)
       }
     }
-    @bitlib.write_index_entries(fs, git_dir, filtered)
+    update_index_write_entries(fs, git_dir, filtered)
   }
 }
 

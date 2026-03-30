@@ -254,7 +254,9 @@ fn parse_hub_issue_list_options(
 fn parse_hub_work_item_list_options(
   args : Array[String],
 ) -> HubWorkItemListOptions raise @bitcore.GitError {
-  parse_hub_list_options(args, "git-bit work-item list", "work item", true, true)
+  parse_hub_list_options(
+    args, "git-bit work-item list", "work item", true, true,
+  )
 }
 
 ///|

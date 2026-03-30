@@ -8,6 +8,39 @@ fn setup_repo() -> @bit.TestFs {
 }
 
 ///|
+fn setup_sha256_compat_repo() -> @bit.TestFs {
+  let fs = @bit.TestFs::new()
+  ignore(
+    try? init_repo_with_options(fs, "/repo", {
+      default_branch: "main",
+      bare: false,
+      separate_git_dir: None,
+      template_dir: None,
+      ref_format: "files",
+      object_format: "sha256",
+      is_reinit: false,
+      git_dir: None,
+      work_tree: None,
+      shared: None,
+    }),
+  )
+  fs.write_string(
+    "/repo/.git/config", "[core]\n\trepositoryformatversion = 1\n\tfilemode = true\n\tbare = false\n\tlogallrefupdates = true\n[extensions]\n\tobjectFormat = sha256\n\tcompatObjectFormat = sha1\n",
+  )
+  fs
+}
+
+///|
+fn worktree_test_object_path(git_dir : String, id : @bit.ObjectId) -> String {
+  let hex = id.to_hex()
+  git_dir +
+  "/objects/" +
+  String::unsafe_substring(hex, start=0, end=2) +
+  "/" +
+  String::unsafe_substring(hex, start=2, end=hex.length())
+}
+
+///|
 fn worktree_test_bytes_contains_ascii(bytes : Bytes, text : String) -> Bool {
   let needle = @utf8.encode(text)
   if needle.length() == 0 {
@@ -88,6 +121,81 @@ async test "worktree: commit writes HEAD and branch reflogs" {
   assert_eq(branch_log.length(), 1)
   assert_eq(head_log[0].message, "commit (initial): msg")
   assert_eq(branch_log[0].message, "commit (initial): msg")
+}
+
+///|
+async test "worktree: sha256 compat repo records loose-object-idx mappings" {
+  let fs = setup_sha256_compat_repo()
+  let git_dir = "/repo/.git"
+  let content = @utf8.encode("Hello World!\n")
+  fs.write_string("/repo/hello", "Hello World!\n")
+  add_paths(fs, fs, "/repo", ["hello"])
+  let commit_id = commit(
+    fs,
+    fs,
+    "/repo",
+    "Initial commit\n",
+    "A U Thor <author@example.com>",
+    1112354055L,
+    committer="C O Mitter <committer@example.com>",
+    committer_timestamp=1112354055L,
+    timezone="+0200",
+  )
+  let blob_storage = @object.hash_object_content_with_algo(
+    @object.HashAlgorithm::Sha256,
+    @bit.ObjectType::Blob,
+    content,
+  )
+  let blob_compat = @object.hash_object_content_with_algo(
+    @object.HashAlgorithm::Sha1,
+    @bit.ObjectType::Blob,
+    content,
+  )
+  let (expected_tree_compat, _) = @object.create_tree_with_algo(
+    @object.HashAlgorithm::Sha1,
+    [@bit.TreeEntry::new("100644", "hello", blob_compat)],
+  )
+  assert_true(fs.is_file(worktree_test_object_path(git_dir, blob_storage)))
+  assert_eq(
+    compat_lookup_loose_object_idx(fs, git_dir, blob_storage.to_hex()),
+    Some(blob_compat.to_hex()),
+  )
+  let commit_obj = ObjectDb::load(fs, git_dir).get(fs, commit_id).unwrap()
+  let tree_id = @bit.parse_commit(commit_obj.data).tree
+  let tree_obj = ObjectDb::load(fs, git_dir).get(fs, tree_id).unwrap()
+  let tree_entries = @bit.parse_tree(tree_obj.data)
+  assert_eq(tree_entries.length(), 1)
+  assert_eq(tree_entries[0].name, "hello")
+  assert_eq(tree_entries[0].mode, "100644")
+  assert_eq(tree_entries[0].id.to_hex(), blob_storage.to_hex())
+  let tree_compat = compat_lookup_loose_object_idx(
+    fs,
+    git_dir,
+    tree_id.to_hex(),
+  )
+  let commit_compat = compat_lookup_loose_object_idx(
+    fs,
+    git_dir,
+    commit_id.to_hex(),
+  )
+  assert_true(tree_compat is Some(_))
+  assert_true(commit_compat is Some(_))
+  assert_eq(tree_compat.unwrap(), expected_tree_compat.to_hex())
+  let (expected_commit_compat, _) = @object.create_commit_with_algo(
+    @object.HashAlgorithm::Sha1,
+    @bit.Commit::new(
+      expected_tree_compat,
+      [],
+      "A U Thor <author@example.com>",
+      1112354055L,
+      "+0200",
+      "C O Mitter <committer@example.com>",
+      1112354055L,
+      "+0200",
+      "Initial commit\n",
+    ),
+  )
+  assert_eq(commit_compat.unwrap(), expected_commit_compat.to_hex())
 }
 
 ///|

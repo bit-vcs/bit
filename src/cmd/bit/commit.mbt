@@ -87,12 +87,10 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
   let rfs : &@bitcore.RepoFileSystem = fs
   let git_dir = resolve_git_dir(rfs, root)
+  ignore(commit_args_require_standalone_error(args))
 
-  if commit_args_require_standalone_error(args) {
-    eprint_line("fatal: this commit mode is not supported in standalone mode")
-    @sys.exit(1)
-  }
-  if commit_should_use_storage_runtime(args) {
+  if commit_should_use_storage_runtime(args) &&
+    not(commit_signing_requested(git_dir, args)) {
     match commit_storage_runtime_delegate_args(fs, git_dir, args) {
       Some(commit_args) => {
         // Pass resolved author/committer to storage_runtime via env bridge
@@ -121,6 +119,8 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
   let mut no_edit = false
   let mut quiet = false
   let mut signoff = false
+  let mut gpg_sign : Bool? = None
+  let mut signing_key : String? = None
   let mut cleanup_mode = "default"
   let mut author_override : String? = None
   let mut date_override : String? = None
@@ -313,6 +313,11 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
       "--amend" => amend = true
       "--allow-empty" => allow_empty = true
       "--allow-empty-message" => allow_empty_message = true
+      "-S" | "--gpg-sign" => gpg_sign = Some(true)
+      "--no-gpg-sign" => {
+        gpg_sign = Some(false)
+        signing_key = None
+      }
       "--no-verify" | "-n" => no_verify = true
       "--no-edit" => no_edit = true
       "--edit" | "-e" => edit_flag = Some(true)
@@ -350,6 +355,24 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
             eprint_line("fatal: invalid cleanup mode `\{value}`")
             @sys.exit(128)
           }
+        }
+        i += 1
+        continue
+      }
+      _ if arg.has_prefix("--gpg-sign=") => {
+        gpg_sign = Some(true)
+        let value = string_slice_from(arg, 11)
+        if value.length() > 0 {
+          signing_key = Some(value)
+        }
+        i += 1
+        continue
+      }
+      _ if arg.has_prefix("-S") => {
+        gpg_sign = Some(true)
+        let value = string_slice_from(arg, 2)
+        if value.length() > 0 {
+          signing_key = Some(value)
         }
         i += 1
         continue
@@ -469,6 +492,11 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
   // Committer is always the current user
   let committer = get_committer_string()
   let committer_timestamp = default_timestamp
+  let commit_algo = signing_repo_hash_algorithm(fs, git_dir)
+  let should_sign = match gpg_sign {
+    Some(flag) => flag
+    None => signing_commit_config_enabled(git_dir)
+  }
   if not(no_verify) {
     let hook_status = run_pre_commit_hook(fs, root, git_dir)
     if hook_status != 0 {
@@ -476,20 +504,40 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
     }
   }
   let commit_id = if amend {
-    @bitlib.commit_amend(
-      fs,
-      fs,
-      root,
-      msg,
-      author,
-      author_timestamp,
-      committer~,
-      committer_timestamp~,
-      timezone=commit_timezone,
-      encoding=commit_message_encoding,
-      author_timezone=Some(resolved_author_timezone),
-      committer_timezone=Some(commit_timezone),
-    )
+    if should_sign {
+      commit_signed_amend(
+        fs,
+        fs,
+        root,
+        msg,
+        author,
+        author_timestamp,
+        committer~,
+        committer_timestamp~,
+        timezone=commit_timezone,
+        encoding=commit_message_encoding,
+        author_timezone=resolved_author_timezone,
+        committer_timezone=commit_timezone,
+        algo=commit_algo,
+        signing_key_override=signing_key,
+      )
+    } else {
+      @bitlib.commit_amend(
+        fs,
+        fs,
+        root,
+        msg,
+        author,
+        author_timestamp,
+        committer~,
+        committer_timestamp~,
+        timezone=commit_timezone,
+        encoding=commit_message_encoding,
+        author_timezone=Some(resolved_author_timezone),
+        committer_timezone=Some(commit_timezone),
+        algo=commit_algo,
+      )
+    }
   } else if merge_heads.length() > 0 {
     commit_with_merge_heads(
       fs,
@@ -505,6 +553,28 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
       encoding=commit_message_encoding,
       author_timezone=resolved_author_timezone,
       committer_timezone=commit_timezone,
+      algo=commit_algo,
+      sign=should_sign,
+      signing_fs=if should_sign { Some(fs) } else { None },
+      signing_key_override=signing_key,
+    )
+  } else if should_sign {
+    commit_signed(
+      fs,
+      fs,
+      root,
+      msg,
+      author,
+      author_timestamp,
+      committer~,
+      committer_timestamp~,
+      allow_empty~,
+      timezone=commit_timezone,
+      encoding=commit_message_encoding,
+      author_timezone=resolved_author_timezone,
+      committer_timezone=commit_timezone,
+      algo=commit_algo,
+      signing_key_override=signing_key,
     )
   } else {
     @bitlib.commit(
@@ -521,6 +591,7 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
       encoding=commit_message_encoding,
       author_timezone=Some(resolved_author_timezone),
       committer_timezone=Some(commit_timezone),
+      algo=commit_algo,
     )
   }
   if should_cleanup_merge_state {
@@ -632,7 +703,306 @@ fn read_merge_head_ids(
 }
 
 ///|
-fn commit_with_merge_heads(
+fn commit_subject_line(message : String) -> String {
+  match message.find("\n") {
+    Some(idx) => string_slice_to(message, idx)
+    None => message
+  }
+}
+
+///|
+fn commit_reflog_identity(identity : String) -> (String, String) {
+  let trimmed = identity.trim().to_string()
+  match trimmed.find("<") {
+    Some(start) =>
+      match trimmed.find(">") {
+        Some(end) if end > start => {
+          let name = string_slice_to(trimmed, start).trim().to_string()
+          let email = String::unsafe_substring(trimmed, start=start + 1, end~)
+          (if name.length() == 0 { "unknown" } else { name }, email)
+        }
+        _ => (trimmed, "unknown")
+      }
+    None => (trimmed, "unknown")
+  }
+}
+
+///|
+fn commit_append_update_reflogs(
+  fs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  old_id : @bitcore.ObjectId,
+  new_id : @bitcore.ObjectId,
+  message : String,
+  committer : String,
+  timestamp : Int64,
+  timezone : String,
+) -> Unit raise Error {
+  let (name, email) = commit_reflog_identity(committer)
+  let (should_log_head, _) = @bitlib.should_log_ref(rfs, git_dir, "HEAD", false)
+  if should_log_head {
+    @bitlib.append_reflog(
+      fs, rfs, git_dir, "HEAD", old_id, new_id, name, email, timestamp, timezone,
+      message,
+    )
+  }
+  match @bitlib.read_head_ref(rfs, git_dir) {
+    @bitlib.HeadRef::Branch(branch_name) => {
+      let refname = "refs/heads/" + branch_name
+      let (should_log_branch, _) = @bitlib.should_log_ref(
+        rfs, git_dir, refname, false,
+      )
+      if should_log_branch {
+        @bitlib.append_reflog(
+          fs, rfs, git_dir, refname, old_id, new_id, name, email, timestamp, timezone,
+          message,
+        )
+      }
+    }
+    _ => ()
+  }
+}
+
+///|
+async fn commit_write_object(
+  fs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
+  root : String,
+  git_dir : String,
+  commit : @bitcore.Commit,
+  entries : Array[@bitlib.IndexEntry],
+  tree_id : @bitcore.ObjectId,
+  old_id : @bitcore.ObjectId?,
+  reflog_message : String,
+  committer : String,
+  committer_timestamp : Int64,
+  committer_timezone : String,
+  algo : @bitobject.HashAlgorithm,
+  sign? : Bool = false,
+  signing_fs? : OsFs? = None,
+  signing_key_override? : String? = None,
+) -> @bitcore.ObjectId raise Error {
+  let payload = @bitobject.serialize_commit_content(commit)
+  let final_payload = if sign {
+    let signing_fs = match signing_fs {
+      Some(real_fs) => real_fs
+      None =>
+        raise @bitcore.GitError::InvalidObject(
+          "signing requires native filesystem access",
+        )
+    }
+    let signature = signing_sign_payload(
+      signing_fs, root, git_dir, payload, signing_key_override,
+    )
+    signing_inject_commit_signature(payload, signature)
+  } else {
+    payload
+  }
+  let (commit_id, compressed) = @bitobject.create_object_with_algo(
+    algo,
+    @bitcore.ObjectType::Commit,
+    final_payload,
+  )
+  @bitlib.write_object_bytes(fs, git_dir, commit_id, compressed)
+  @bitlib.update_head_ref(fs, rfs, git_dir, commit_id)
+  commit_append_update_reflogs(
+    fs,
+    rfs,
+    git_dir,
+    old_id.unwrap_or(@bitcore.ObjectId::zero()),
+    commit_id,
+    reflog_message,
+    committer,
+    committer_timestamp,
+    committer_timezone,
+  )
+  if entries.length() > 0 {
+    @bitlib.write_index_entries_with_tree(fs, rfs, git_dir, entries, tree_id)
+  }
+  commit_id
+}
+
+///|
+async fn commit_signed(
+  fs : OsFs,
+  rfs : &@bitcore.RepoFileSystem,
+  root : String,
+  message : String,
+  author : String,
+  author_timestamp : Int64,
+  committer? : String = author,
+  committer_timestamp? : Int64 = author_timestamp,
+  allow_empty? : Bool = false,
+  timezone? : String = "+0000",
+  encoding? : String = "UTF-8",
+  author_timezone? : String = "+0000",
+  committer_timezone? : String = "+0000",
+  algo? : @bitobject.HashAlgorithm = @bitobject.HashAlgorithm::Sha1,
+  signing_key_override? : String? = None,
+) -> @bitcore.ObjectId raise Error {
+  ignore(timezone)
+  let git_dir = resolve_git_dir(rfs, root)
+  let parent = @bitlib.resolve_head_commit(rfs, git_dir)
+  let entries = @bitlib.read_index_entries(rfs, git_dir)
+  let tree_id = if entries.length() == 0 {
+    if not(allow_empty) {
+      raise @bitcore.GitError::InvalidObject("Empty index")
+    }
+    match parent {
+      Some(parent_id) => {
+        let db = @bitlib.ObjectDb::load_lazy(rfs, git_dir)
+        let parent_tree = match db.get(rfs, parent_id) {
+          Some(obj) if obj.obj_type == @bitcore.ObjectType::Commit =>
+            (@bitcore.parse_commit(obj.data).tree |> Some) catch {
+              _ => None
+            }
+          _ => None
+        }
+        match parent_tree {
+          Some(tree) => tree
+          None => {
+            let (empty_tree_id, empty_tree_compressed) = @bitobject.create_tree_with_algo(
+              algo,
+              [],
+            )
+            @bitlib.write_object_bytes(
+              fs, git_dir, empty_tree_id, empty_tree_compressed,
+            )
+            empty_tree_id
+          }
+        }
+      }
+      None => {
+        let (empty_tree_id, empty_tree_compressed) = @bitobject.create_tree_with_algo(
+          algo,
+          [],
+        )
+        @bitlib.write_object_bytes(
+          fs, git_dir, empty_tree_id, empty_tree_compressed,
+        )
+        empty_tree_id
+      }
+    }
+  } else {
+    @bitlib.write_tree_from_index(
+      fs,
+      rfs,
+      git_dir,
+      entries,
+      missing_ok=true,
+      algo~,
+    )
+  }
+  let parents = match parent {
+    Some(parent_id) => [parent_id]
+    None => []
+  }
+  let commit = @bitcore.Commit::new(
+    tree_id,
+    parents,
+    author,
+    author_timestamp,
+    author_timezone,
+    committer,
+    committer_timestamp,
+    committer_timezone,
+    message,
+    encoding~,
+  )
+  commit_write_object(
+    fs,
+    rfs,
+    root,
+    git_dir,
+    commit,
+    entries,
+    tree_id,
+    parent,
+    if parent is None {
+      "commit (initial): " + commit_subject_line(message)
+    } else {
+      "commit: " + commit_subject_line(message)
+    },
+    committer,
+    committer_timestamp,
+    committer_timezone,
+    algo,
+    sign=true,
+    signing_fs=Some(fs),
+    signing_key_override~,
+  )
+}
+
+///|
+async fn commit_signed_amend(
+  fs : OsFs,
+  rfs : &@bitcore.RepoFileSystem,
+  root : String,
+  message : String,
+  author : String,
+  author_timestamp : Int64,
+  committer? : String = author,
+  committer_timestamp? : Int64 = author_timestamp,
+  timezone? : String = "+0000",
+  encoding? : String = "UTF-8",
+  author_timezone? : String = "+0000",
+  committer_timezone? : String = "+0000",
+  algo? : @bitobject.HashAlgorithm = @bitobject.HashAlgorithm::Sha1,
+  signing_key_override? : String? = None,
+) -> @bitcore.ObjectId raise Error {
+  ignore(timezone)
+  let git_dir = resolve_git_dir(rfs, root)
+  let entries = @bitlib.read_index_entries(rfs, git_dir)
+  if entries.length() == 0 {
+    raise @bitcore.GitError::InvalidObject("Empty index")
+  }
+  let tree_id = @bitlib.write_tree_from_index(fs, rfs, git_dir, entries, algo~)
+  let current_head = @bitlib.resolve_head_commit(rfs, git_dir)
+  let parents = match current_head {
+    Some(head_id) => {
+      let db = @bitlib.ObjectDb::load_lazy(rfs, git_dir)
+      match db.get(rfs, head_id) {
+        Some(obj) => @bitcore.parse_commit(obj.data).parents catch { _ => [] }
+        None => []
+      }
+    }
+    None => []
+  }
+  let commit = @bitcore.Commit::new(
+    tree_id,
+    parents,
+    author,
+    author_timestamp,
+    author_timezone,
+    committer,
+    committer_timestamp,
+    committer_timezone,
+    message,
+    encoding~,
+  )
+  commit_write_object(
+    fs,
+    rfs,
+    root,
+    git_dir,
+    commit,
+    entries,
+    tree_id,
+    current_head,
+    "commit (amend): " + commit_subject_line(message),
+    committer,
+    committer_timestamp,
+    committer_timezone,
+    algo,
+    sign=true,
+    signing_fs=Some(fs),
+    signing_key_override~,
+  )
+}
+
+///|
+async fn commit_with_merge_heads(
   fs : &@bitcore.FileSystem,
   rfs : &@bitcore.RepoFileSystem,
   root : String,
@@ -646,6 +1016,10 @@ fn commit_with_merge_heads(
   encoding? : String = "UTF-8",
   author_timezone? : String = "+0000",
   committer_timezone? : String = "+0000",
+  algo? : @bitobject.HashAlgorithm = @bitobject.HashAlgorithm::Sha1,
+  sign? : Bool = false,
+  signing_fs? : OsFs? = None,
+  signing_key_override? : String? = None,
 ) -> @bitcore.ObjectId raise Error {
   let git_dir = resolve_git_dir(rfs, root)
   let head_parent = @bitlib.resolve_head_commit(rfs, git_dir)
@@ -667,7 +1041,10 @@ fn commit_with_merge_heads(
         match parent_tree {
           Some(tree) => tree
           None => {
-            let (empty_tree_id, empty_tree_compressed) = @bitcore.create_tree([])
+            let (empty_tree_id, empty_tree_compressed) = @bitobject.create_tree_with_algo(
+              algo,
+              [],
+            )
             @bitlib.write_object_bytes(
               fs, git_dir, empty_tree_id, empty_tree_compressed,
             )
@@ -676,7 +1053,10 @@ fn commit_with_merge_heads(
         }
       }
       None => {
-        let (empty_tree_id, empty_tree_compressed) = @bitcore.create_tree([])
+        let (empty_tree_id, empty_tree_compressed) = @bitobject.create_tree_with_algo(
+          algo,
+          [],
+        )
         @bitlib.write_object_bytes(
           fs, git_dir, empty_tree_id, empty_tree_compressed,
         )
@@ -684,7 +1064,14 @@ fn commit_with_merge_heads(
       }
     }
   } else {
-    @bitlib.write_tree_from_index(fs, rfs, git_dir, entries)
+    @bitlib.write_tree_from_index(
+      fs,
+      rfs,
+      git_dir,
+      entries,
+      missing_ok=true,
+      algo~,
+    )
   }
   let parents : Array[@bitcore.ObjectId] = []
   let seen : Map[String, Bool] = {}
@@ -715,13 +1102,28 @@ fn commit_with_merge_heads(
     message,
     encoding~,
   )
-  let (commit_id, compressed) = @bitcore.create_commit(commit)
-  @bitlib.write_object_bytes(fs, git_dir, commit_id, compressed)
-  @bitlib.update_head_ref(fs, rfs, git_dir, commit_id)
-  if entries.length() > 0 {
-    @bitlib.write_index_entries_with_tree(fs, rfs, git_dir, entries, tree_id)
-  }
-  commit_id
+  commit_write_object(
+    fs,
+    rfs,
+    root,
+    git_dir,
+    commit,
+    entries,
+    tree_id,
+    head_parent,
+    if head_parent is None {
+      "commit (initial): " + commit_subject_line(message)
+    } else {
+      "commit: " + commit_subject_line(message)
+    },
+    committer,
+    committer_timestamp,
+    committer_timezone,
+    algo,
+    sign~,
+    signing_fs~,
+    signing_key_override~,
+  )
 }
 
 ///|
@@ -739,60 +1141,32 @@ fn cleanup_merge_state_files(
 }
 
 ///|
-fn commit_args_require_standalone_error(args : Array[String]) -> Bool {
-  let mut expect_value = false
+fn commit_args_require_standalone_error(_args : Array[String]) -> Bool {
+  false
+}
+
+///|
+fn commit_signing_requested(git_dir : String, args : Array[String]) -> Bool {
+  match commit_signing_override(args) {
+    Some(flag) => flag
+    None => signing_commit_config_enabled(git_dir)
+  }
+}
+
+///|
+fn commit_signing_override(args : Array[String]) -> Bool? {
   for arg in args {
-    if expect_value {
-      expect_value = false
-      continue
+    if arg == "--no-gpg-sign" {
+      return Some(false)
     }
     if arg == "-S" ||
       arg == "--gpg-sign" ||
-      arg == "--no-gpg-sign" ||
       arg.has_prefix("-S") ||
       arg.has_prefix("--gpg-sign=") {
-      return true
+      return Some(true)
     }
-    if arg == "-m" ||
-      arg == "--message" ||
-      arg == "-F" ||
-      arg == "--file" ||
-      arg == "-C" ||
-      arg == "--reuse-message" ||
-      arg == "-c" ||
-      arg == "--reedit-message" ||
-      arg == "--author" ||
-      arg == "--date" ||
-      arg == "-t" ||
-      arg == "--template" {
-      expect_value = true
-      continue
-    }
-    if arg.has_prefix("--message=") ||
-      arg.has_prefix("--author=") ||
-      arg.has_prefix("--date=") ||
-      arg.has_prefix("--file=") ||
-      arg.has_prefix("--reuse-message=") ||
-      arg.has_prefix("--reedit-message=") ||
-      arg.has_prefix("--template=") {
-      continue
-    }
-    if arg.has_prefix("-m") ||
-      arg.has_prefix("-F") ||
-      arg.has_prefix("-C") ||
-      arg.has_prefix("-c") ||
-      arg.has_prefix("-am") ||
-      arg.has_prefix("-ma") ||
-      arg.has_prefix("-t") {
-      continue
-    }
-    if arg.has_prefix("-") || arg == "--" {
-      continue
-    }
-    // Positional arguments are pathspecs — now supported
-    continue
   }
-  false
+  None
 }
 
 ///|

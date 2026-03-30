@@ -463,7 +463,9 @@ fn verify_pack_index(
   let idx_data_len = idx.length() - hash_size
   let idx_data = Bytes::from_array(FixedArray::makei(idx_data_len, i => idx[i]))
   let computed_idx_checksum = @bitcore.hash_prefix(
-    idx_data, idx_data_len, hash_size~,
+    idx_data,
+    idx_data_len,
+    hash_size~,
   )
   let stored_idx_checksum = read_hash_at(idx, idx_data_len, hash_size~)
   if computed_idx_checksum != stored_idx_checksum {
@@ -500,7 +502,9 @@ fn verify_pack_index(
   // Verify pack checksum stored in index matches actual pack
   let pack_checksum_in_idx_offset = idx.length() - hash_size * 2
   let stored_pack_checksum = read_hash_at(
-    idx, pack_checksum_in_idx_offset, hash_size~,
+    idx,
+    pack_checksum_in_idx_offset,
+    hash_size~,
   )
   let pack_data_len = pack.length() - hash_size
   if pack_data_len < 12 {
@@ -510,7 +514,9 @@ fn verify_pack_index(
     FixedArray::makei(pack_data_len, i => pack[i]),
   )
   let computed_pack_checksum = @bitcore.hash_prefix(
-    pack_data, pack_data_len, hash_size~,
+    pack_data,
+    pack_data_len,
+    hash_size~,
   )
   if computed_pack_checksum != stored_pack_checksum {
     return Some("pack checksum mismatch")
@@ -655,9 +661,7 @@ fn verify_pack_index_v1(
 
   // Verify pack checksum
   let pack_checksum_offset = entries_start + count_i * entry_size
-  let stored_pack_checksum = read_hash_at(
-    idx, pack_checksum_offset, hash_size~,
-  )
+  let stored_pack_checksum = read_hash_at(idx, pack_checksum_offset, hash_size~)
   let pack_data_len = pack.length() - hash_size
   if pack_data_len < 12 {
     return Some("pack file too short")
@@ -666,7 +670,9 @@ fn verify_pack_index_v1(
     FixedArray::makei(pack_data_len, i => pack[i]),
   )
   let computed_pack_checksum = @bitcore.hash_prefix(
-    pack_data, pack_data_len, hash_size~,
+    pack_data,
+    pack_data_len,
+    hash_size~,
   )
   if computed_pack_checksum != stored_pack_checksum {
     return Some("pack checksum mismatch")
@@ -762,7 +768,9 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
       }
       let fs = OsFs::new()
       let git_dir = find_git_dir(fs)
-      let hash_size = if (cfg.object_format is Some(format) && format == "sha256") ||
+      let hash_size = if (
+          cfg.object_format is Some(format) && format == "sha256"
+        ) ||
         is_sha256_repo_from_env() {
         32
       } else {
@@ -872,7 +880,7 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
               }
             }
             // Success - print the pack hash
-            let hash_hex = pack_hash_hex(pack)
+            let hash_hex = pack_hash_hex(pack, hash_size~)
             @stdio.stdout.write(hash_hex + "\n")
           }
         }
@@ -907,7 +915,7 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
             "), done.\n",
           )
         }
-        let hash_hex = pack_hash_hex(pack)
+        let hash_hex = pack_hash_hex(pack, hash_size~)
         if !fs.is_dir(git_dir) {
           @stdio.stderr.write("fatal: not a git repository\n")
           @sys.exit(1)
@@ -929,9 +937,9 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
           []
         }
         let objects = if cfg.fix_thin {
-          @pack.parse_packfile_with_bases(pack, bases)
+          @pack.parse_packfile_with_bases(pack, bases, hash_size~)
         } else {
-          @pack.parse_packfile(pack)
+          @pack.parse_packfile(pack, hash_size~)
         }
         if cfg.verbose {
           @stdio.stderr.write(
@@ -948,15 +956,25 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
         // We recreate the pack from the resolved objects plus any external
         // bases that were needed for delta resolution.
         let (pack, hash_hex, objects) = if cfg.fix_thin {
+          let hash_algo = if hash_size == 32 {
+            @bitobject.HashAlgorithm::Sha256
+          } else {
+            @bitobject.HashAlgorithm::Sha1
+          }
           // Collect IDs of objects already in the pack
           let pack_ids : Map[String, Bool] = {}
           for obj in objects {
-            pack_ids[@bitcore.hash_object_content(obj.obj_type, obj.data).to_hex()] = true
+            let hex = @bitobject.hash_object_content_with_algo(
+              hash_algo,
+              obj.obj_type,
+              obj.data,
+            ).to_hex()
+            pack_ids[hex] = true
           }
           // Find external bases referenced by REF_DELTA entries in the
           // original pack.  Scan the raw pack for type-7 headers and
-          // extract the 20-byte base hash following each.
-          let ref_delta_base_ids = scan_ref_delta_bases(pack)
+          // extract the hash-sized base ID following each.
+          let ref_delta_base_ids = scan_ref_delta_bases(pack, hash_size~)
           // Add any base that wasn't already in the pack's objects
           let all_objects : Array[@bitcore.PackObject] = Array::from_iter(
             objects.iter(),
@@ -964,7 +982,11 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
           for base_hex in ref_delta_base_ids {
             if not(pack_ids.contains(base_hex)) {
               for base in bases {
-                let id = @bitcore.hash_object_content(base.obj_type, base.data)
+                let id = @bitobject.hash_object_content_with_algo(
+                  hash_algo,
+                  base.obj_type,
+                  base.data,
+                )
                 if id.to_hex() == base_hex {
                   all_objects.push(base)
                   pack_ids[base_hex] = true
@@ -973,8 +995,8 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
               }
             }
           }
-          let new_pack = @pack.create_packfile(all_objects)
-          let new_hash = pack_hash_hex(new_pack)
+          let new_pack = @pack.create_packfile(all_objects, hash_size~)
+          let new_hash = pack_hash_hex(new_pack, hash_size~)
           (new_pack, new_hash, all_objects)
         } else {
           (pack, hash_hex, objects)
@@ -1081,7 +1103,7 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
         }
         _ => ()
       }
-      let hash_hex = pack_hash_hex(pack)
+      let hash_hex = pack_hash_hex(pack, hash_size~)
       let idx_path = match cfg.output_path {
         Some(path) => resolve_in_cwd(path)
         None =>
@@ -1092,7 +1114,7 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
             pack_path + ".idx"
           }
       }
-      let objects = @pack.parse_packfile(pack)
+      let objects = @pack.parse_packfile(pack, hash_size~)
       let bit_dir_opt = if fs.is_dir(git_dir) { Some(git_dir) } else { None }
       // --fsck-objects requires a repository for object connectivity checks.
       // --strict implies fsck but when running outside a repo, git skips the

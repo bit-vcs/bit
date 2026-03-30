@@ -476,3 +476,37 @@ test "branch: delete_tag removes reflog and prunes empty parent directories" {
   assert_true(not(fs.exists("/repo/.git/refs/tags/foo")))
   assert_true(not(fs.exists("/repo/.git/logs/refs/tags/foo")))
 }
+
+///|
+test "branch: create_annotated_tag uses storage hash and records compat mapping" {
+  let fs = setup_sha256_compat_repo()
+  fs.write_string("/repo/hello", "Hello World!\n")
+  add_paths(fs, fs, "/repo", ["hello"])
+  let commit_id = commit(
+    fs,
+    fs,
+    "/repo",
+    "Initial commit\n",
+    "A U Thor <author@example.com>",
+    1112354055L,
+    committer="C O Mitter <committer@example.com>",
+    committer_timestamp=1112354055L,
+    timezone="+0200",
+  )
+  create_annotated_tag(
+    fs,
+    fs,
+    "/repo/.git",
+    "v1",
+    commit_id,
+    "tag message",
+    "C O Mitter <committer@example.com>",
+    1112354055L,
+    timezone="+0200",
+  )
+  let tag_id = resolve_ref(fs, "/repo/.git", "refs/tags/v1").unwrap()
+  assert_true(fs.is_file(worktree_test_object_path("/repo/.git", tag_id)))
+  let compat = compat_lookup_loose_object_idx(fs, "/repo/.git", tag_id.to_hex())
+  assert_true(compat is Some(_))
+  assert_true(compat.unwrap().length() == 40)
+}

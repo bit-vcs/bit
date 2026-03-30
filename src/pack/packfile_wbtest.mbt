@@ -110,3 +110,98 @@ test "delta: encode_delta_size roundtrip" {
     assert_true(decoded == val)
   }
 }
+
+///|
+fn make_sha256_ref_delta_pack() -> (Bytes, @bit.ObjectId, @bit.ObjectId) {
+  let base = @utf8.encode("Hello, World! This is the base blob.\n")
+  let target = @utf8.encode("Hello, World! This is the updated blob.\n")
+
+  let pack : Array[Byte] = []
+  pack.push(b'P')
+  pack.push(b'A')
+  pack.push(b'C')
+  pack.push(b'K')
+  pack.push(b'\x00')
+  pack.push(b'\x00')
+  pack.push(b'\x00')
+  pack.push(b'\x02')
+  pack.push(b'\x00')
+  pack.push(b'\x00')
+  pack.push(b'\x00')
+  pack.push(b'\x02')
+
+  encode_type_and_size(
+    @bit.ObjectType::Blob.to_packfile_type(),
+    base.length(),
+    pack,
+  )
+  let compressed_base = compress_pack_data(base, @bit.PackCompression::Default)
+  for b in compressed_base {
+    pack.push(b)
+  }
+
+  let delta = build_delta(base, target)
+  encode_type_and_size(7, delta.length(), pack)
+  let base_id = @bit.hash_object_content_with_algo(
+    @bit.HashAlgorithm::Sha256,
+    @bit.ObjectType::Blob,
+    base,
+  )
+  for b in base_id.bytes {
+    pack.push(b)
+  }
+  let compressed_delta = compress_pack_data(
+    delta,
+    @bit.PackCompression::Default,
+  )
+  for b in compressed_delta {
+    pack.push(b)
+  }
+
+  let trailer = @bit.hash_array_prefix(pack, pack.length(), hash_size=32)
+  for b in trailer.bytes {
+    pack.push(b)
+  }
+  let pack_bytes = Bytes::from_array(
+    FixedArray::makei(pack.length(), fn(i) { pack[i] }),
+  )
+  let target_id = @bit.hash_object_content_with_algo(
+    @bit.HashAlgorithm::Sha256,
+    @bit.ObjectType::Blob,
+    target,
+  )
+  (pack_bytes, base_id, target_id)
+}
+
+///|
+test "packfile parse: sha256 REF_DELTA roundtrip" {
+  let (pack_bytes, base_id, target_id) = make_sha256_ref_delta_pack()
+  let objects = parse_packfile(pack_bytes, hash_size=32)
+  let ids : Array[String] = []
+  for obj in objects {
+    ids.push(obj.id.to_hex())
+  }
+  assert_true(objects.length() == 2)
+  assert_true(ids.contains(base_id.to_hex()))
+  assert_true(ids.contains(target_id.to_hex()))
+}
+
+///|
+test "packfile stream: sha256 REF_DELTA roundtrip" {
+  let (pack_bytes, base_id, target_id) = make_sha256_ref_delta_pack()
+  let streamed_ids : Array[String] = []
+  parse_packfile_stream(
+    pack_bytes,
+    fn(obj) { streamed_ids.push(obj.id.to_hex()) },
+    hash_size=32,
+  )
+  assert_true(streamed_ids.contains(base_id.to_hex()))
+  assert_true(streamed_ids.contains(target_id.to_hex()))
+}
+
+///|
+test "packfile depth: sha256 REF_DELTA roundtrip" {
+  let (pack_bytes, _, _) = make_sha256_ref_delta_pack()
+  let depth = max_delta_chain_length(pack_bytes, hash_size=32)
+  assert_true(depth == 1)
+}

@@ -233,7 +233,9 @@ fn build_pack_index_from_objects_with_threshold(
   // Index checksum
   let before_checksum = bytes_from_array(out)
   let index_checksum = @bit.hash_prefix(
-    before_checksum, before_checksum.length(), hash_size~,
+    before_checksum,
+    before_checksum.length(),
+    hash_size~,
   )
   for b in index_checksum.bytes {
     out.push(b)
@@ -355,7 +357,9 @@ fn build_pack_index_v1_from_objects(
   // Index checksum (hash of all preceding bytes)
   let before_checksum = bytes_from_array(out)
   let index_checksum = @bit.hash_prefix(
-    before_checksum, before_checksum.length(), hash_size~,
+    before_checksum,
+    before_checksum.length(),
+    hash_size~,
   )
   for b in index_checksum.bytes {
     out.push(b)

@@ -2,7 +2,11 @@
 
 ///|
 fn hash_algo_from_size(hash_size : Int) -> @bit.HashAlgorithm {
-  if hash_size == 32 { @bit.HashAlgorithm::Sha256 } else { @bit.HashAlgorithm::Sha1 }
+  if hash_size == 32 {
+    @bit.HashAlgorithm::Sha256
+  } else {
+    @bit.HashAlgorithm::Sha1
+  }
 }
 
 ///|
@@ -96,7 +100,11 @@ pub fn max_delta_chain_length(
               resolved[base_index] {
               let base = objects[base_index]
               let content = apply_delta(base.data, delta)
-              let obj_id = @bit.hash_object_content_with_algo(hash_algo_from_size(hash_size),base.obj_type, content)
+              let obj_id = @bit.hash_object_content_with_algo(
+                hash_algo_from_size(hash_size),
+                base.obj_type,
+                content,
+              )
               let obj = @bit.PackObject::with_metadata(
                 base.obj_type,
                 content,
@@ -128,7 +136,11 @@ pub fn max_delta_chain_length(
         (@bit.ObjectType::Blob, Bytes::from_array([]), after)
       }
       7 => {
-        let (base_oid, after_ref) = read_ref_delta_object_id(data, offset)
+        let (base_oid, after_ref) = read_ref_delta_object_id(
+          data,
+          offset,
+          hash_size~,
+        )
         let (delta, after) = @zlib.zlib_decompress_at(data, after_ref) catch {
           e => raise @bit.GitError::PackfileError("Zlib error: \{e}")
         }
@@ -153,7 +165,11 @@ pub fn max_delta_chain_length(
         match by_id.get(base_oid) {
           Some(base) => {
             let content = apply_delta(base.data, delta)
-            let obj_id = @bit.hash_object_content_with_algo(hash_algo_from_size(hash_size),base.obj_type, content)
+            let obj_id = @bit.hash_object_content_with_algo(
+              hash_algo_from_size(hash_size),
+              base.obj_type,
+              content,
+            )
             let obj = @bit.PackObject::with_metadata(
               base.obj_type,
               content,
@@ -189,7 +205,11 @@ pub fn max_delta_chain_length(
     offset = after
     if type_id == 1 || type_id == 2 || type_id == 3 || type_id == 4 {
       let crc = crc32_range(data, obj_offset, after)
-      let obj_id = @bit.hash_object_content_with_algo(hash_algo_from_size(hash_size),obj_type, content)
+      let obj_id = @bit.hash_object_content_with_algo(
+        hash_algo_from_size(hash_size),
+        obj_type,
+        content,
+      )
       let obj = @bit.PackObject::with_metadata(
         obj_type, content, obj_id, obj_offset, crc,
       )
@@ -214,7 +234,11 @@ pub fn max_delta_chain_length(
             resolved[base_index] {
             let base = objects[base_index]
             let content = apply_delta(base.data, p.delta)
-            let obj_id = @bit.hash_object_content_with_algo(hash_algo_from_size(hash_size),base.obj_type, content)
+            let obj_id = @bit.hash_object_content_with_algo(
+              hash_algo_from_size(hash_size),
+              base.obj_type,
+              content,
+            )
             let old = objects[p.index]
             let obj = @bit.PackObject::with_metadata(
               base.obj_type,
@@ -240,7 +264,11 @@ pub fn max_delta_chain_length(
           match by_id.get(base_oid) {
             Some(base) => {
               let content = apply_delta(base.data, p.delta)
-              let obj_id = @bit.hash_object_content_with_algo(hash_algo_from_size(hash_size),base.obj_type, content)
+              let obj_id = @bit.hash_object_content_with_algo(
+                hash_algo_from_size(hash_size),
+                base.obj_type,
+                content,
+              )
               let old = objects[p.index]
               let obj = @bit.PackObject::with_metadata(
                 base.obj_type,
@@ -293,7 +321,11 @@ pub fn parse_packfile_with_bases(
   let by_offset : Map[Int, Int] = {}
   let by_id : Map[@bit.ObjectId, @bit.PackObject] = {}
   for obj in bases {
-    let id = @bit.hash_object_content_with_algo(hash_algo_from_size(hash_size),obj.obj_type, obj.data)
+    let id = @bit.hash_object_content_with_algo(
+      hash_algo_from_size(hash_size),
+      obj.obj_type,
+      obj.data,
+    )
     let base_obj = @bit.PackObject::with_metadata(
       obj.obj_type,
       obj.data,
@@ -329,7 +361,11 @@ pub fn parse_packfile_stream_with_bases(
   let by_offset : Map[Int, @bit.PackObject] = {}
   let by_id : Map[@bit.ObjectId, @bit.PackObject] = {}
   for obj in bases {
-    let id = @bit.hash_object_content_with_algo(hash_algo_from_size(hash_size),obj.obj_type, obj.data)
+    let id = @bit.hash_object_content_with_algo(
+      hash_algo_from_size(hash_size),
+      obj.obj_type,
+      obj.data,
+    )
     let base_obj = @bit.PackObject::with_metadata(
       obj.obj_type,
       obj.data,
@@ -340,7 +376,12 @@ pub fn parse_packfile_stream_with_bases(
     insert_pack_object_by_id(by_id, base_obj)
   }
   parse_packfile_stream_internal(
-    data, by_offset, by_id, emit, verify_checksum~, hash_size~,
+    data,
+    by_offset,
+    by_id,
+    emit,
+    verify_checksum~,
+    hash_size~,
   )
 }
 
@@ -458,7 +499,11 @@ fn parse_packfile_internal(
             if resolved[base_index] {
               let base = objects[base_index]
               let content = apply_delta(base.data, delta)
-              let obj_id = @bit.hash_object_content_with_algo(hash_algo_from_size(hash_size),base.obj_type, content)
+              let obj_id = @bit.hash_object_content_with_algo(
+                hash_algo_from_size(hash_size),
+                base.obj_type,
+                content,
+              )
               let obj = @bit.PackObject::with_metadata(
                 base.obj_type,
                 content,
@@ -484,7 +529,11 @@ fn parse_packfile_internal(
         (@bit.ObjectType::Blob, Bytes::from_array([]), after)
       }
       7 => {
-        let (base_oid, after_ref) = read_ref_delta_object_id(data, offset)
+        let (base_oid, after_ref) = read_ref_delta_object_id(
+          data,
+          offset,
+          hash_size~,
+        )
         let (delta, after) = @zlib.zlib_decompress_at(data, after_ref) catch {
           e => raise @bit.GitError::PackfileError("Zlib error: \{e}")
         }
@@ -509,7 +558,11 @@ fn parse_packfile_internal(
         match by_id.get(base_oid) {
           Some(base) => {
             let content = apply_delta(base.data, delta)
-            let obj_id = @bit.hash_object_content_with_algo(hash_algo_from_size(hash_size),base.obj_type, content)
+            let obj_id = @bit.hash_object_content_with_algo(
+              hash_algo_from_size(hash_size),
+              base.obj_type,
+              content,
+            )
             let obj = @bit.PackObject::with_metadata(
               base.obj_type,
               content,
@@ -539,7 +592,11 @@ fn parse_packfile_internal(
     if type_id == 1 || type_id == 2 || type_id == 3 || type_id == 4 {
       // Compute CRC32 and hash for non-delta objects
       let crc = crc32_range(data, obj_offset, after)
-      let obj_id = @bit.hash_object_content_with_algo(hash_algo_from_size(hash_size),obj_type, content)
+      let obj_id = @bit.hash_object_content_with_algo(
+        hash_algo_from_size(hash_size),
+        obj_type,
+        content,
+      )
       let obj = @bit.PackObject::with_metadata(
         obj_type, content, obj_id, obj_offset, crc,
       )
@@ -562,7 +619,11 @@ fn parse_packfile_internal(
             resolved[base_index] {
             let base = objects[base_index]
             let content = apply_delta(base.data, p.delta)
-            let obj_id = @bit.hash_object_content_with_algo(hash_algo_from_size(hash_size),base.obj_type, content)
+            let obj_id = @bit.hash_object_content_with_algo(
+              hash_algo_from_size(hash_size),
+              base.obj_type,
+              content,
+            )
             // Preserve offset and crc from placeholder
             let old = objects[p.index]
             let obj = @bit.PackObject::with_metadata(
@@ -583,7 +644,11 @@ fn parse_packfile_internal(
           match by_id.get(base_oid) {
             Some(base) => {
               let content = apply_delta(base.data, p.delta)
-              let obj_id = @bit.hash_object_content_with_algo(hash_algo_from_size(hash_size),base.obj_type, content)
+              let obj_id = @bit.hash_object_content_with_algo(
+                hash_algo_from_size(hash_size),
+                base.obj_type,
+                content,
+              )
               // Preserve offset and crc from placeholder
               let old = objects[p.index]
               let obj = @bit.PackObject::with_metadata(
@@ -646,6 +711,7 @@ fn parse_packfile_stream_internal(
   }
   let count = read_u32_be(data, 8)
   let mut offset = 12
+  let algo = hash_algo_from_size(hash_size)
   let pending : Array[PendingDeltaStream] = []
   for _ in 0..<count {
     let obj_offset = offset
@@ -662,7 +728,10 @@ fn parse_packfile_stream_internal(
             "Object size mismatch: expected=\{size}, got=\{content.length()}",
           )
         }
-        let obj = @bit.PackObject::new(obj_type, content)
+        let obj_id = @bit.hash_object_content_with_algo(algo, obj_type, content)
+        let obj = @bit.PackObject::with_metadata(
+          obj_type, content, obj_id, obj_offset, 0U,
+        )
         by_offset[obj_offset] = obj
         insert_pack_object_by_id(by_id, obj)
         emit(obj)
@@ -685,7 +754,18 @@ fn parse_packfile_stream_internal(
         match by_offset.get(base_offset) {
           Some(base) => {
             let content = apply_delta(base.data, delta)
-            let obj = @bit.PackObject::new(base.obj_type, content)
+            let obj_id = @bit.hash_object_content_with_algo(
+              algo,
+              base.obj_type,
+              content,
+            )
+            let obj = @bit.PackObject::with_metadata(
+              base.obj_type,
+              content,
+              obj_id,
+              obj_offset,
+              0U,
+            )
             by_offset[obj_offset] = obj
             insert_pack_object_by_id(by_id, obj)
             emit(obj)
@@ -700,7 +780,11 @@ fn parse_packfile_stream_internal(
         offset = after
       }
       7 => {
-        let (base_oid, after_ref) = read_ref_delta_object_id(data, offset)
+        let (base_oid, after_ref) = read_ref_delta_object_id(
+          data,
+          offset,
+          hash_size~,
+        )
         let (delta, after) = @zlib.zlib_decompress_at(data, after_ref) catch {
           e => raise @bit.GitError::PackfileError("Zlib error: \{e}")
         }
@@ -712,7 +796,18 @@ fn parse_packfile_stream_internal(
         match by_id.get(base_oid) {
           Some(base) => {
             let content = apply_delta(base.data, delta)
-            let obj = @bit.PackObject::new(base.obj_type, content)
+            let obj_id = @bit.hash_object_content_with_algo(
+              algo,
+              base.obj_type,
+              content,
+            )
+            let obj = @bit.PackObject::with_metadata(
+              base.obj_type,
+              content,
+              obj_id,
+              obj_offset,
+              0U,
+            )
             by_offset[obj_offset] = obj
             insert_pack_object_by_id(by_id, obj)
             emit(obj)
@@ -742,7 +837,18 @@ fn parse_packfile_stream_internal(
           match by_offset.get(base_offset) {
             Some(base) => {
               let content = apply_delta(base.data, p.delta)
-              let obj = @bit.PackObject::new(base.obj_type, content)
+              let obj_id = @bit.hash_object_content_with_algo(
+                algo,
+                base.obj_type,
+                content,
+              )
+              let obj = @bit.PackObject::with_metadata(
+                base.obj_type,
+                content,
+                obj_id,
+                p.offset,
+                0U,
+              )
               by_offset[p.offset] = obj
               insert_pack_object_by_id(by_id, obj)
               emit(obj)
@@ -754,7 +860,18 @@ fn parse_packfile_stream_internal(
           match by_id.get(base_oid) {
             Some(base) => {
               let content = apply_delta(base.data, p.delta)
-              let obj = @bit.PackObject::new(base.obj_type, content)
+              let obj_id = @bit.hash_object_content_with_algo(
+                algo,
+                base.obj_type,
+                content,
+              )
+              let obj = @bit.PackObject::with_metadata(
+                base.obj_type,
+                content,
+                obj_id,
+                p.offset,
+                0U,
+              )
               by_offset[p.offset] = obj
               insert_pack_object_by_id(by_id, obj)
               emit(obj)

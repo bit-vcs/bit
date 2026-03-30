@@ -4,6 +4,7 @@
 async fn handle_read_tree(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
   let git_dir = find_git_dir(fs)
+  let hash_size = @bitlib.repo_hash_algorithm(fs, git_dir).hash_size()
   let mut merge = false
   let mut reset = false
   let mut update = false
@@ -40,7 +41,7 @@ async fn handle_read_tree(args : Array[String]) -> Unit raise Error {
   // Handle --empty: clear index
   if empty {
     if not(dry_run) {
-      @bitlib.write_index_entries(fs, git_dir, [])
+      @bitlib.write_index_entries(fs, git_dir, [], hash_size~)
     }
     return
   }
@@ -63,7 +64,7 @@ async fn handle_read_tree(args : Array[String]) -> Unit raise Error {
     let files = @bitlib.collect_tree_files(db, fs, tree_id)
     let entries = @bitlib.tree_files_to_index(db, fs, files)
     if not(dry_run) {
-      @bitlib.write_index_entries(fs, git_dir, entries)
+      @bitlib.write_index_entries(fs, git_dir, entries, hash_size~)
     }
     // Handle -u: update working tree (unless -i: index only)
     if update && not(dry_run) && not(index_only) {
@@ -98,7 +99,7 @@ async fn handle_read_tree(args : Array[String]) -> Unit raise Error {
     }
     let entries = @bitlib.tree_files_to_index(db, fs, merged_files)
     if not(dry_run) {
-      @bitlib.write_index_entries(fs, git_dir, entries)
+      @bitlib.write_index_entries(fs, git_dir, entries, hash_size~)
     }
     if update && not(dry_run) && not(index_only) {
       let root = get_work_root()

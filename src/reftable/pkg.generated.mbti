@@ -31,6 +31,8 @@ pub fn read_refs(Bytes) -> Array[RefRecord]?
 
 pub fn read_tables_list(&@types.RepoFileSystem, String) -> Array[String] raise @object.GitError
 
+pub fn reftable_hash_size(algo? : @object.HashAlgorithm) -> Int
+
 pub fn resolve_ref_reftable(&@types.RepoFileSystem, String, String) -> @object.ObjectId? raise @object.GitError
 
 pub fn write_reftable(Array[RefRecord], Int, UInt64, UInt64) -> Bytes

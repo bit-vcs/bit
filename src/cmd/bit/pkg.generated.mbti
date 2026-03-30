@@ -105,6 +105,8 @@ type GrepFunctionContextSpec
 
 type HubDumpOptions
 
+type HubOriginSyncPlan
+
 type HubPrCreateOptions
 
 type HubSearchOptions

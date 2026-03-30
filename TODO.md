@@ -23,8 +23,8 @@ e2e: **30/30 全パス** (2026-03-29)
 
 ## P0: SHA-256 残課題
 
-- [ ] packfile_parse の delta 解決後 OID 計算を algo 対応に (11箇所の hash_object_content → hash_object_content_with_algo)
-- [ ] commit-graph trailer を hash_size 対応に (sha1() → hash_prefix())
+- [x] packfile_parse の delta 解決後 OID 計算を algo 対応に (11箇所の hash_object_content → hash_object_content_with_algo)
+- [x] commit-graph trailer を hash_size 対応に (sha1() → hash_prefix())
 - [ ] SHA-256 compat テスト (t1016) — GPG2 依存、GPG 署名実装後に対応
 
 ## P0: Git compatibility
@@ -66,7 +66,7 @@ check-ignore show-index get-tar-commit-id verify-commit annotate
 - [x] Multi-pack-index 書き出し
 - [x] Commit-graph 読込・生成
 - [x] SSH トランスポート
-- [ ] GPG/SSH 署名 (`commit -S`, `tag -s`) — フラグ認識のみ、`--signoff` は動作
+- [x] GPG/SSH 署名 (`commit -S`, `tag -s`)
 - [ ] Interactive add (`add -p` / `add -i`) — エラーで拒否するよう修正済み。実装は未着手
 - [ ] Interactive rebase (`rebase -i`) — 部分実装 (pick/reword/edit/squash/fixup/drop)、スタンドアロンモード不可
 

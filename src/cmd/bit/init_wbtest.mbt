@@ -102,9 +102,7 @@ async test "init: --object-format sha256 creates SHA-256 repo with valid config"
   let stored = fs.read_file(obj_path)
   let decompressed = @zlib.zlib_decompress(stored)
   let expected_header = "blob \{content.length()}\u0000"
-  let header_bytes = Bytes::from_array(
-    @utf8.encode(expected_header).to_array(),
-  )
+  let header_bytes = Bytes::from_array(@utf8.encode(expected_header).to_array())
   // Verify decompressed data starts with correct header
   for i in 0..<header_bytes.length() {
     assert_eq(decompressed[i], header_bytes[i])

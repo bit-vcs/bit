@@ -16,28 +16,34 @@ fn resolve_in_cwd(path : String) -> String {
 }
 
 ///|
-fn pack_hash_id(pack : Bytes) -> @bitcore.ObjectId raise @bitcore.GitError {
-  if pack.length() < 20 {
+fn pack_hash_id(
+  pack : Bytes,
+  hash_size? : Int = 20,
+) -> @bitcore.ObjectId raise @bitcore.GitError {
+  if pack.length() < hash_size {
     raise @bitcore.GitError::PackfileError("Packfile too short")
   }
-  let start = pack.length() - 20
-  let bytes : FixedArray[Byte] = FixedArray::make(20, b'\x00')
-  for i in 0..<20 {
+  let start = pack.length() - hash_size
+  let bytes : FixedArray[Byte] = FixedArray::make(hash_size, b'\x00')
+  for i in 0..<hash_size {
     bytes[i] = pack[start + i]
   }
   @bitcore.ObjectId::new(bytes)
 }
 
 ///|
-fn pack_hash_hex(pack : Bytes) -> String raise @bitcore.GitError {
-  pack_hash_id(pack).to_hex()
+fn pack_hash_hex(
+  pack : Bytes,
+  hash_size? : Int = 20,
+) -> String raise @bitcore.GitError {
+  pack_hash_id(pack, hash_size~).to_hex()
 }
 
 ///|
 /// Scan a pack for REF_DELTA (type 7) entries and return their base object
 /// hex IDs.  This is used by --fix-thin to find which external bases need
 /// to be appended.
-fn scan_ref_delta_bases(pack : Bytes) -> Array[String] {
+fn scan_ref_delta_bases(pack : Bytes, hash_size? : Int = 20) -> Array[String] {
   let result : Array[String] = []
   if pack.length() < 12 {
     return result
@@ -48,7 +54,7 @@ fn scan_ref_delta_bases(pack : Bytes) -> Array[String] {
     pack[11].to_int()
   let mut offset = 12
   for _i in 0..<num_objects {
-    if offset >= pack.length() - 20 {
+    if offset >= pack.length() - hash_size {
       break
     }
     // Read type/size header
@@ -65,13 +71,13 @@ fn scan_ref_delta_bases(pack : Bytes) -> Array[String] {
     }
     match obj_type {
       7 => {
-        // REF_DELTA: next 20 bytes are base object hash
-        if offset + 20 > pack.length() {
+        // REF_DELTA: next hash_size bytes are base object hash
+        if offset + hash_size > pack.length() {
           return result
         }
-        let hex = bytes_to_hex_at(pack, offset, 20)
+        let hex = bytes_to_hex_at(pack, offset, hash_size)
         result.push(hex)
-        offset += 20
+        offset += hash_size
         // Skip compressed delta data
         offset = skip_zlib_data(pack, offset)
       }

@@ -1743,8 +1743,11 @@ fn cat_file_rev_parse_direct_or_loose(
   spec : String,
 ) -> @bitcore.ObjectId? raise Error {
   let direct = @bitrepo.rev_parse(fs, git_dir, spec)
-  if direct is Some(_) {
-    return direct
+  if direct is Some(id) {
+    let db = @bitlib.ObjectDb::load_lazy(fs, git_dir)
+    if (db.get(fs, id) catch { _ => None }) is Some(_) {
+      return direct
+    }
   }
   match cat_file_lookup_loose_object_idx(fs, git_dir, spec) {
     Some(mapped) => @bitrepo.rev_parse(fs, git_dir, mapped)
@@ -1943,7 +1946,8 @@ fn cat_file_convert_object_data_for_display(
   obj : @bitcore.PackObject,
   target_oid_len : Int,
 ) -> Bytes {
-  if target_oid_len != 64 {
+  let storage_oid_len = @bitlib.repo_hash_algorithm(fs, git_dir).hash_size() * 2
+  if target_oid_len == storage_oid_len {
     return obj.data
   }
   match obj.obj_type {

@@ -1135,6 +1135,7 @@ pub fn create_annotated_tag(
     @bit.ObjectType::Commit => "commit"
     @bit.ObjectType::Tag => "tag"
   }
+  let algo = repo_hash_algorithm(rfs, git_dir)
   // Create tag object
   let tag_content = if message.length() == 0 {
     "object \{target.to_hex()}\ntype \{target_type}\ntag \{name}\ntagger \{tagger} \{timestamp} \{timezone}\n\n"
@@ -1142,8 +1143,16 @@ pub fn create_annotated_tag(
     "object \{target.to_hex()}\ntype \{target_type}\ntag \{name}\ntagger \{tagger} \{timestamp} \{timezone}\n\n\{message}\n"
   }
   let tag_bytes = @utf8.encode(tag_content)
-  let (tag_id, compressed) = @bit.create_object(@bit.ObjectType::Tag, tag_bytes)
+  let (tag_id, compressed) = @object.create_object_with_algo(
+    algo,
+    @bit.ObjectType::Tag,
+    tag_bytes,
+  )
   write_object_bytes(fs, git_dir, tag_id, compressed)
+  compat_record_annotated_tag_mapping(
+    fs, rfs, git_dir, tag_id, target, target_type, name, message, tagger, timestamp,
+    timezone,
+  )
   // Create ref pointing to tag object
   let ref_path = join_path(git_dir, refname)
   fs.mkdir_p(parent_dir(ref_path))

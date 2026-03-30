@@ -263,7 +263,8 @@ fn receive_parse_cert_content(
     }
     // Parse ref update line: <old> <new> <refname>
     let parts = receive_split_by_space(cert_line)
-    if parts.length() >= 3 && (parts[0].length() == 40 || parts[0].length() == 64) {
+    if parts.length() >= 3 &&
+      (parts[0].length() == 40 || parts[0].length() == 64) {
       let old_id = @bit.ObjectId::from_hex(parts[0]) catch { _ => continue }
       let new_id = @bit.ObjectId::from_hex(parts[1]) catch { _ => continue }
       let refname = normalize_receive_refname(parts[2]) catch { _ => continue }

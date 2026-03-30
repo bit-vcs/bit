@@ -69,12 +69,12 @@ pub fn HashState::finish(self : HashState) -> ObjectId {
 
 ///|
 /// Hash data prefix (first `len` bytes), dispatching by hash_size.
-pub fn hash_prefix(
-  data : Bytes,
-  len : Int,
-  hash_size? : Int = 20,
-) -> ObjectId {
-  if hash_size == 32 { sha256_prefix(data, len) } else { sha1_prefix(data, len) }
+pub fn hash_prefix(data : Bytes, len : Int, hash_size? : Int = 20) -> ObjectId {
+  if hash_size == 32 {
+    sha256_prefix(data, len)
+  } else {
+    sha1_prefix(data, len)
+  }
 }
 
 ///|

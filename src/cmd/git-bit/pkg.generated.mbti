@@ -1,0 +1,42 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/bit/cmd/git-bit"
+
+import {
+  "mizchi/bit/object",
+  "mizchi/bit/types",
+}
+
+// Values
+
+// Errors
+
+// Types and methods
+type GitHubImportProvider
+
+type HubDumpOptions
+
+type HubPrCreateOptions
+
+type HubSearchOptions
+
+type HubSearchType
+
+type HubWorkItemListOptions
+
+type OsClock
+
+pub struct OsFs {
+  dummy : Int
+}
+pub fn OsFs::new() -> Self
+pub impl @types.FileSystem for OsFs
+pub impl @types.RepoFileSystem for OsFs
+
+type OsObjectStore
+
+type OsRefStore
+
+// Type aliases
+
+// Traits
+

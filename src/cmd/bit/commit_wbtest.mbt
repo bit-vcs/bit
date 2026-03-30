@@ -36,6 +36,45 @@ async fn commit_wbtest_git_stderr(
 }
 
 ///|
+async fn signing_wbtest_write_fake_gpg(
+  fs : OsFs,
+  path : String,
+) -> Unit raise Error {
+  fs.write_string(
+    path,
+    "#!/bin/sh\n" +
+    "cat >/dev/null\n" +
+    "printf '%s\\n' \\\n" +
+    "  '-----BEGIN TEST SIGNATURE-----' \\\n" +
+    "  'abc123' \\\n" +
+    "  '-----END TEST SIGNATURE-----'\n",
+  )
+  let chmod_code = @process.run("chmod", ["+x", path], inherit_env=true)
+  assert_eq(chmod_code, 0)
+}
+
+///|
+async fn signing_wbtest_write_fake_ssh_keygen(
+  fs : OsFs,
+  path : String,
+) -> Unit raise Error {
+  fs.write_string(
+    path,
+    "#!/bin/sh\n" +
+    "last=''\n" +
+    "for arg in \"$@\"; do\n" +
+    "  last=\"$arg\"\n" +
+    "done\n" +
+    "printf '%s\\n' \\\n" +
+    "  '-----BEGIN SSH SIGNATURE-----' \\\n" +
+    "  'sshabc' \\\n" +
+    "  '-----END SSH SIGNATURE-----' > \"${last}.sig\"\n",
+  )
+  let chmod_code = @process.run("chmod", ["+x", path], inherit_env=true)
+  assert_eq(chmod_code, 0)
+}
+
+///|
 fn commit_wbtest_find_entry(
   entries : Array[@bitlib.IndexEntry],
   path : String,
@@ -49,13 +88,15 @@ fn commit_wbtest_find_entry(
 }
 
 ///|
-test "commit: signing options require standalone error" {
-  assert_true(commit_args_require_standalone_error(["-S", "-m", "msg"]))
-  assert_true(
+test "commit: signing options are handled in standalone mode" {
+  assert_false(commit_args_require_standalone_error(["-S", "-m", "msg"]))
+  assert_false(
     commit_args_require_standalone_error(["-S/path/to/key", "-m", "msg"]),
   )
-  assert_true(commit_args_require_standalone_error(["--gpg-sign", "-m", "msg"]))
-  assert_true(
+  assert_false(
+    commit_args_require_standalone_error(["--gpg-sign", "-m", "msg"]),
+  )
+  assert_false(
     commit_args_require_standalone_error(["--gpg-sign=KEY", "-m", "msg"]),
   )
 }
@@ -323,6 +364,120 @@ async test "commit: merge state commit records MERGE_HEAD as second parent" {
   assert_eq(info.parents.length(), 2)
   assert_eq(info.parents[1].to_hex(), merge_head)
   assert_false(fs.is_file(root + "/.git/MERGE_HEAD"))
+
+  cleanup_tree(fs, root)
+}
+
+///|
+async test "commit: -S stores gpgsig header via configured signing program" {
+  @bitnative.init_native_io()
+  cmd_bit_wbtest_env_lock.acquire()
+  defer cmd_bit_wbtest_env_lock.release()
+  let fs = OsFs::new()
+  let root = "/tmp/bit-test-commit-gpg-sign-" +
+    get_current_timestamp().to_string()
+  cleanup_tree(fs, root)
+  fs.mkdir_p(root)
+
+  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
+  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @sys.get_env_var("GIT_DIR")
+  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
+  defer add_test_restore_env("GIT_SHIM_CWD", prev_shim_cwd)
+  defer add_test_restore_env("GIT_SHIM_PWD", prev_shim_pwd)
+  defer add_test_restore_env("GIT_DIR", prev_git_dir)
+  defer add_test_restore_env("GIT_WORK_TREE", prev_work_tree)
+
+  commit_wbtest_run_git(root, ["init", "--initial-branch=main", "-q", "."])
+  commit_wbtest_run_git(root, ["config", "user.name", "Test User"])
+  commit_wbtest_run_git(root, ["config", "user.email", "test@example.com"])
+  let signer = root + "/fake-gpg.sh"
+  signing_wbtest_write_fake_gpg(fs, signer)
+  commit_wbtest_run_git(root, ["config", "gpg.program", signer])
+  commit_wbtest_run_git(root, ["config", "gpg.format", "openpgp"])
+
+  fs.write_string(root + "/signed.txt", "signed\n")
+  commit_wbtest_run_git(root, ["add", "signed.txt"])
+
+  @sys.unset_env_var("GIT_SHIM_CWD")
+  @sys.unset_env_var("GIT_DIR")
+  @sys.unset_env_var("GIT_WORK_TREE")
+  @sys.set_env_var("GIT_SHIM_PWD", root)
+
+  handle_commit(["-q", "-S", "-m", "signed"]) catch {
+    err => fail("handle_commit failed: \{err}")
+  }
+
+  let git_dir = root + "/.git"
+  let head = @bitlib.resolve_head_commit(fs, git_dir).unwrap()
+  let db = @bitlib.ObjectDb::load_lazy(fs, git_dir)
+  let commit_obj = db.get(fs, head).unwrap()
+  let commit_text = @utf8.decode_lossy(commit_obj.data[:]).to_string()
+  assert_true(
+    commit_text.contains(
+      "gpgsig -----BEGIN TEST SIGNATURE-----\n abc123\n -----END TEST SIGNATURE-----\n",
+    ),
+  )
+
+  cleanup_tree(fs, root)
+}
+
+///|
+async test "commit: -S stores ssh signature header via ssh signing format" {
+  @bitnative.init_native_io()
+  cmd_bit_wbtest_env_lock.acquire()
+  defer cmd_bit_wbtest_env_lock.release()
+  let fs = OsFs::new()
+  let root = "/tmp/bit-test-commit-ssh-sign-" +
+    get_current_timestamp().to_string()
+  cleanup_tree(fs, root)
+  fs.mkdir_p(root)
+
+  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
+  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @sys.get_env_var("GIT_DIR")
+  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
+  defer add_test_restore_env("GIT_SHIM_CWD", prev_shim_cwd)
+  defer add_test_restore_env("GIT_SHIM_PWD", prev_shim_pwd)
+  defer add_test_restore_env("GIT_DIR", prev_git_dir)
+  defer add_test_restore_env("GIT_WORK_TREE", prev_work_tree)
+
+  commit_wbtest_run_git(root, ["init", "--initial-branch=main", "-q", "."])
+  commit_wbtest_run_git(root, ["config", "user.name", "Test User"])
+  commit_wbtest_run_git(root, ["config", "user.email", "test@example.com"])
+  let signer = root + "/fake-ssh-keygen.sh"
+  signing_wbtest_write_fake_ssh_keygen(fs, signer)
+  commit_wbtest_run_git(root, ["config", "gpg.program", signer])
+  commit_wbtest_run_git(root, ["config", "gpg.format", "ssh"])
+  fs.write_string(root + "/fake_ed25519", "not-a-real-key\n")
+  commit_wbtest_run_git(root, [
+    "config",
+    "user.signingkey",
+    root + "/fake_ed25519",
+  ])
+
+  fs.write_string(root + "/signed-ssh.txt", "signed ssh\n")
+  commit_wbtest_run_git(root, ["add", "signed-ssh.txt"])
+
+  @sys.unset_env_var("GIT_SHIM_CWD")
+  @sys.unset_env_var("GIT_DIR")
+  @sys.unset_env_var("GIT_WORK_TREE")
+  @sys.set_env_var("GIT_SHIM_PWD", root)
+
+  handle_commit(["-q", "-S", "-m", "signed ssh"]) catch {
+    err => fail("handle_commit failed: \{err}")
+  }
+
+  let git_dir = root + "/.git"
+  let head = @bitlib.resolve_head_commit(fs, git_dir).unwrap()
+  let db = @bitlib.ObjectDb::load_lazy(fs, git_dir)
+  let commit_obj = db.get(fs, head).unwrap()
+  let commit_text = @utf8.decode_lossy(commit_obj.data[:]).to_string()
+  assert_true(
+    commit_text.contains(
+      "gpgsig -----BEGIN SSH SIGNATURE-----\n sshabc\n -----END SSH SIGNATURE-----\n",
+    ),
+  )
 
   cleanup_tree(fs, root)
 }

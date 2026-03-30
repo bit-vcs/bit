@@ -1240,9 +1240,10 @@ fn resolve_pack_path(
 fn read_pack_objects(
   fs : OsFs,
   pack_path : String,
+  hash_size? : Int = 20,
 ) -> Array[@bitcore.PackObject] {
   let data = fs.read_file(pack_path) catch { _ => return [] }
-  @pack.parse_packfile(data) catch {
+  @pack.parse_packfile(data, hash_size~) catch {
     _ => []
   }
 }
@@ -2282,6 +2283,12 @@ async fn collect_objects_from_stdin_packs(
   include_names : Array[String],
   exclude_names : Array[String],
 ) -> Array[@bitcore.PackObject] {
+  let hash_size = if (cfg.object_format is Some(format) && format == "sha256") ||
+    is_sha256_repo(git_dir) {
+    32
+  } else {
+    20
+  }
   let pack_dir = git_dir + "/objects/pack"
   let alt_dirs = read_alternate_object_dirs(fs, git_dir)
   let include_paths : Array[String] = []
@@ -2316,7 +2323,7 @@ async fn collect_objects_from_stdin_packs(
   let include_objects : Array[@bitcore.PackObject] = []
   let seed_commits : Array[@bitcore.ObjectId] = []
   for path in include_paths {
-    let objs = read_pack_objects(fs, path)
+    let objs = read_pack_objects(fs, path, hash_size~)
     for obj in objs {
       include_objects.push(obj)
     }
@@ -2375,6 +2382,12 @@ async fn try_reuse_single_stdin_pack(
   include_names : Array[String],
   exclude_names : Array[String],
 ) -> Bool raise Error {
+  let hash_size = if (cfg.object_format is Some(format) && format == "sha256") ||
+    is_sha256_repo(git_dir) {
+    32
+  } else {
+    20
+  }
   if include_names.length() != 1 || exclude_names.length() != 0 {
     return false
   }
@@ -2407,7 +2420,7 @@ async fn try_reuse_single_stdin_pack(
     err if @async.is_cancellation_error(err) => raise err
     _ => return false
   }
-  let hash_hex = pack_hash_hex(pack)
+  let hash_hex = pack_hash_hex(pack, hash_size~)
   let base_name = match cfg.base_name {
     Some(name) => name
     None => {
@@ -2454,14 +2467,15 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
         Some(_) => ()
         None => ()
       }
-      let hash_algo : @bitobject.HashAlgorithm = if (cfg.object_format is Some(
-        format,
-      ) && format == "sha256") || is_sha256_repo_from_env() {
+      let hash_algo : @bitobject.HashAlgorithm = if (
+          cfg.object_format is Some(format) && format == "sha256"
+        ) ||
+        is_sha256_repo_from_env() {
         @bitobject.HashAlgorithm::Sha256
       } else {
         @bitobject.HashAlgorithm::Sha1
       }
-      ignore(hash_algo) // used in hash_object_content_with_algo calls below
+      let hash_size = hash_algo.hash_size()
       let trace2_event = @sys.get_env_var("GIT_TRACE2_EVENT")
       ignore(is_pack_reuse_config_enabled(git_dir))
       // Keep these flags visible for future compatibility tuning.
@@ -2559,6 +2573,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
               cfg.depth,
               effective_limit,
               cfg.window,
+              hash_size~,
             )
             packs
           }
@@ -2572,6 +2587,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
                 false,
                 cfg.depth,
                 cfg.window,
+                hash_size~,
               )
               [pack]
             } else {
@@ -2582,16 +2598,17 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
                 false,
                 cfg.depth,
                 cfg.window,
+                hash_size~,
               )
               [pack]
             }
         }
         for pack in cruft_pack_list {
-          let hash_hex = pack_hash_hex(pack)
+          let hash_hex = pack_hash_hex(pack, hash_size~)
           let pack_path = base_name + "-" + hash_hex + ".pack"
           let idx_path = base_name + "-" + hash_hex + ".idx"
           fs.write_file(pack_path, pack)
-          let idx_objects = @pack.parse_packfile(pack)
+          let idx_objects = @pack.parse_packfile(pack, hash_size~)
           @pack.write_pack_index_from_objects_versioned(
             fs,
             idx_path,
@@ -2615,7 +2632,9 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
             for obj in idx_objects {
               ids.push(
                 @bitobject.hash_object_content_with_algo(
-                  hash_algo, obj.obj_type, obj.data,
+                  hash_algo,
+                  obj.obj_type,
+                  obj.data,
                 ).to_hex(),
               )
             }
@@ -2865,14 +2884,18 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
             let exclude_set : Map[String, Bool] = {}
             for obj in exclude_objects {
               let id = @bitobject.hash_object_content_with_algo(
-                hash_algo, obj.obj_type, obj.data,
+                hash_algo,
+                obj.obj_type,
+                obj.data,
               )
               exclude_set[id.to_hex()] = true
             }
             let filtered : Array[@bitcore.PackObject] = []
             for obj in include_objects {
               let id = @bitobject.hash_object_content_with_algo(
-                hash_algo, obj.obj_type, obj.data,
+                hash_algo,
+                obj.obj_type,
+                obj.data,
               )
               if !exclude_set.contains(id.to_hex()) {
                 filtered.push(obj)
@@ -2970,10 +2993,18 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
       if filter_exempt_objects.length() > 0 {
         let existing : Map[String, Bool] = {}
         for obj in objects {
-          existing[@bitobject.hash_object_content_with_algo(hash_algo, obj.obj_type, obj.data).to_hex()] = true
+          existing[@bitobject.hash_object_content_with_algo(
+            hash_algo,
+            obj.obj_type,
+            obj.data,
+          ).to_hex()] = true
         }
         for obj in filter_exempt_objects {
-          let hex = @bitobject.hash_object_content_with_algo(hash_algo, obj.obj_type, obj.data).to_hex()
+          let hex = @bitobject.hash_object_content_with_algo(
+            hash_algo,
+            obj.obj_type,
+            obj.data,
+          ).to_hex()
           if !existing.contains(hex) {
             objects.push(obj)
             existing[hex] = true
@@ -3096,6 +3127,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
               cfg.depth,
               limit,
               cfg.window,
+              hash_size~,
             )
             total_delta_count += dc
             packs
@@ -3107,6 +3139,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
               reuse_only,
               cfg.depth,
               cfg.window,
+              hash_size~,
             )
             total_delta_count += dc
             [pack]
@@ -3119,6 +3152,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
             reuse_only,
             cfg.depth,
             cfg.window,
+            hash_size~,
           )
           total_delta_count += dc
           [pack]
@@ -3128,7 +3162,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
         if cfg.stdout {
           @stdio.stdout.write(pack)
         } else {
-          let hash_hex = pack_hash_hex(pack)
+          let hash_hex = pack_hash_hex(pack, hash_size~)
           let base_name = match cfg.base_name {
             Some(name) => name
             None => {
@@ -3143,7 +3177,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
           fs.write_file(pack_path, pack)
           // Always re-parse the newly created pack to compute correct
           // offsets and CRC32 values for the index.
-          let idx_objects = @pack.parse_packfile(pack)
+          let idx_objects = @pack.parse_packfile(pack, hash_size~)
           @pack.write_pack_index_from_objects_versioned(
             fs,
             idx_path,
@@ -3177,13 +3211,14 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
             true, // reuse_only
             cfg.depth,
             cfg.window,
+            hash_size~,
           )
-          let ft_hash = pack_hash_hex(ft_pack)
+          let ft_hash = pack_hash_hex(ft_pack, hash_size~)
           let ft_prefix = resolve_in_cwd(filter_to_prefix)
           let ft_pack_path = ft_prefix + "-" + ft_hash + ".pack"
           let ft_idx_path = ft_prefix + "-" + ft_hash + ".idx"
           fs.write_file(ft_pack_path, ft_pack)
-          let ft_idx_objects = @pack.parse_packfile(ft_pack)
+          let ft_idx_objects = @pack.parse_packfile(ft_pack, hash_size~)
           @pack.write_pack_index_from_objects_versioned(
             fs,
             ft_idx_path,

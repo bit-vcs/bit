@@ -194,6 +194,39 @@ test "packfile: REF_DELTA mode creates delta" {
 }
 
 ///|
+test "packfile: sha256 REF_DELTA mode creates delta" {
+  let base = @utf8.encode("Hello, World! This is a test content.\n")
+  let target = @utf8.encode("Hello, World! This is a test changed.\n")
+  let obj1 = @bit.PackObject::new(@bit.ObjectType::Blob, base)
+  let obj2 = @bit.PackObject::new(@bit.ObjectType::Blob, target)
+  let (pack, _) = create_packfile_with_delta_stats_compression(
+    [obj1, obj2],
+    @bit.PackDeltaMode::RefDelta,
+    @bit.PackCompression::Default,
+    hash_size=32,
+  )
+  assert_true(pack.length() > 44)
+  let objects = parse_packfile(pack, hash_size=32)
+  let ids : Array[String] = []
+  for obj in objects {
+    ids.push(obj.id.to_hex())
+  }
+  let base_id = @bit.hash_object_content_with_algo(
+    @bit.HashAlgorithm::Sha256,
+    @bit.ObjectType::Blob,
+    base,
+  )
+  let target_id = @bit.hash_object_content_with_algo(
+    @bit.HashAlgorithm::Sha256,
+    @bit.ObjectType::Blob,
+    target,
+  )
+  assert_true(objects.length() == 2)
+  assert_true(ids.contains(base_id.to_hex()))
+  assert_true(ids.contains(target_id.to_hex()))
+}
+
+///|
 test "packfile: NoDelta mode preserves all objects" {
   let base = @utf8.encode("Hello, World! This is a test content.\n")
   let target = @utf8.encode("Hello, World! This is a test changed.\n")

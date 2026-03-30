@@ -98,7 +98,9 @@ fn get_identity_from_config() -> String {
   }
   let home = @sys.get_env_var("HOME").unwrap_or("")
   let global_content = if home.length() > 0 {
-    @fs.read_file_to_string(home + "/.gitconfig") catch { _ => "" }
+    @fs.read_file_to_string(home + "/.gitconfig") catch {
+      _ => ""
+    }
   } else {
     ""
   }
@@ -164,6 +166,7 @@ fn get_hub_require_signed() -> Bool {
   }
 }
 
+///|
 fn format_timestamp_iso(ts : Int64, tz : String) -> String {
   let (year, month, day, hour, minute, second) = epoch_to_calendar(ts, tz)
   let y = year.to_string()
@@ -316,16 +319,19 @@ fn days_from_epoch(year : Int64, month : Int64, day : Int64) -> Int64 {
   ]
   let mut days = 365L * (year - 1970L)
   if year > 1970L {
-    days = days + (year - 1969L) / 4L - (year - 1901L) / 100L +
+    days = days +
+      (year - 1969L) / 4L -
+      (year - 1901L) / 100L +
       (year - 1601L) / 400L
   } else {
-    days = days - (1970L - year) / 4L + (1970L - year) / 100L -
+    days = days -
+      (1970L - year) / 4L +
+      (1970L - year) / 100L -
       (1970L - year) / 400L
   }
   days = days + month_days[(month - 1L).to_int()]
   if month > 2L {
-    let is_leap = (year % 4L == 0L && year % 100L != 0L) ||
-      year % 400L == 0L
+    let is_leap = (year % 4L == 0L && year % 100L != 0L) || year % 400L == 0L
     if is_leap {
       days += 1L
     }

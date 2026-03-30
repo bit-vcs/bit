@@ -453,6 +453,7 @@ fn pack_object_with_delta(
   }
   // Delta path: compute delta first, only compress normal if delta loses
   let (base_offset, base_obj) = base.unwrap()
+  let algo = hash_algo_from_size(hash_size)
   let delta = match precomputed_delta {
     Some(d) => d
     None => build_delta(base_obj.data, data)
@@ -464,7 +465,8 @@ fn pack_object_with_delta(
       let back_offset = obj_offset - base_offset
       type_and_size_len(delta.length()) + ofs_delta_len(back_offset)
     }
-    @bit.PackDeltaMode::RefDelta => type_and_size_len(delta.length()) + hash_size
+    @bit.PackDeltaMode::RefDelta =>
+      type_and_size_len(delta.length()) + hash_size
     @bit.PackDeltaMode::NoDelta => 0 // unreachable
   }
   let delta_total = delta_overhead + compressed_delta.length()
@@ -484,7 +486,11 @@ fn pack_object_with_delta(
         return (delta_total, true)
       }
       @bit.PackDeltaMode::RefDelta => {
-        let base_id = @bit.hash_object_content(base_obj.obj_type, base_obj.data)
+        let base_id = @bit.hash_object_content_with_algo(
+          algo,
+          base_obj.obj_type,
+          base_obj.data,
+        )
         encode_type_and_size(7, delta.length(), result)
         for b in base_id.bytes {
           result.push(b)
@@ -512,7 +518,11 @@ fn pack_object_with_delta(
         return (delta_total, true)
       }
       @bit.PackDeltaMode::RefDelta => {
-        let base_id = @bit.hash_object_content(base_obj.obj_type, base_obj.data)
+        let base_id = @bit.hash_object_content_with_algo(
+          algo,
+          base_obj.obj_type,
+          base_obj.data,
+        )
         encode_type_and_size(7, delta.length(), result)
         for b in base_id.bytes {
           result.push(b)
@@ -541,8 +551,11 @@ fn pack_object_with_delta(
 ///   [object count]   4 bytes (big-endian)
 ///   [...objects...]  variable
 ///   [hash trailer]   20 or 32 bytes
-pub fn create_packfile(objects : Array[@bit.PackObject]) -> Bytes {
-  create_packfile_with_delta(objects, @bit.PackDeltaMode::OfsDelta)
+pub fn create_packfile(
+  objects : Array[@bit.PackObject],
+  hash_size? : Int = 20,
+) -> Bytes {
+  create_packfile_with_delta(objects, @bit.PackDeltaMode::OfsDelta, hash_size~)
 }
 
 ///|
@@ -550,8 +563,13 @@ pub fn create_packfile(objects : Array[@bit.PackObject]) -> Bytes {
 pub fn create_packfile_with_delta(
   objects : Array[@bit.PackObject],
   delta_mode : @bit.PackDeltaMode,
+  hash_size? : Int = 20,
 ) -> Bytes {
-  let (pack, _) = create_packfile_with_delta_stats(objects, delta_mode)
+  let (pack, _) = create_packfile_with_delta_stats(
+    objects,
+    delta_mode,
+    hash_size~,
+  )
   pack
 }
 
@@ -560,11 +578,13 @@ pub fn create_packfile_with_delta(
 pub fn create_packfile_with_delta_stats(
   objects : Array[@bit.PackObject],
   delta_mode : @bit.PackDeltaMode,
+  hash_size? : Int = 20,
 ) -> (Bytes, Int) {
   create_packfile_with_delta_stats_compression(
     objects,
     delta_mode,
     @bit.PackCompression::Default,
+    hash_size~,
   )
 }
 
@@ -574,6 +594,7 @@ pub fn create_packfile_with_delta_stats_compression(
   objects : Array[@bit.PackObject],
   delta_mode : @bit.PackDeltaMode,
   compression : @bit.PackCompression,
+  hash_size? : Int = 20,
 ) -> (Bytes, Int) {
   let result : Array[Byte] = []
 
@@ -659,7 +680,14 @@ pub fn create_packfile_with_delta_stats_compression(
       }
     }
     let (written, used_delta) = pack_object_with_delta(
-      obj, best_base, obj_offset, result, delta_mode, compression, best_delta,
+      obj,
+      best_base,
+      obj_offset,
+      result,
+      delta_mode,
+      compression,
+      best_delta,
+      hash_size~,
     )
     offset = offset + written
     if used_delta {
@@ -672,8 +700,7 @@ pub fn create_packfile_with_delta_stats_compression(
     }
   }
 
-  // Compute SHA-1 of everything so far
-  let trailer = @bit.sha1_array_prefix(result, result.length())
+  let trailer = @bit.hash_array_prefix(result, result.length(), hash_size~)
 
   // Append trailer
   for b in trailer.bytes {
@@ -737,6 +764,7 @@ pub fn create_packfiles_with_size_limit(
   max_depth : Int,
   size_limit : Int64,
   window : Int,
+  hash_size? : Int = 20,
 ) -> (Array[Bytes], Int) {
   let packs : Array[Bytes] = []
   let mut total_delta_count = 0
@@ -749,6 +777,7 @@ pub fn create_packfiles_with_size_limit(
           r
         },
         0,
+        hash_size~,
       ),
     )
     return (packs, 0)
@@ -820,12 +849,20 @@ pub fn create_packfiles_with_size_limit(
     // Pack object into a temporary buffer to measure its packed size
     let temp : Array[Byte] = []
     let (written, used_delta) = pack_object_with_delta(
-      obj, base, offset, temp, mode, compression, precomputed,
+      obj,
+      base,
+      offset,
+      temp,
+      mode,
+      compression,
+      precomputed,
+      hash_size~,
     )
     // Check whether adding this object would bust the size limit
-    if nr_written >= 1 && (offset + written + 20).to_int64() >= size_limit {
+    if nr_written >= 1 &&
+      (offset + written + hash_size).to_int64() >= size_limit {
       // Finalize current pack
-      packs.push(finalize_pack(result, nr_written))
+      packs.push(finalize_pack(result, nr_written, hash_size~))
       // Start a new pack
       result = []
       write_pack_header(result)
@@ -841,6 +878,7 @@ pub fn create_packfiles_with_size_limit(
         @bit.PackDeltaMode::NoDelta,
         compression,
         None,
+        hash_size~,
       )
       offset = 12 + written2
       let new_entries : Array[DeltaWindowEntry] = []
@@ -866,7 +904,7 @@ pub fn create_packfiles_with_size_limit(
   }
   // Finalize last pack
   if nr_written > 0 {
-    packs.push(finalize_pack(result, nr_written))
+    packs.push(finalize_pack(result, nr_written, hash_size~))
   }
   (packs, total_delta_count)
 }
@@ -880,6 +918,7 @@ pub fn create_packfile_with_delta_stats_compression_reuse(
   reuse_only : Bool,
   max_depth : Int,
   window : Int,
+  hash_size? : Int = 20,
 ) -> (Bytes, Int) {
   let result : Array[Byte] = []
 
@@ -978,7 +1017,14 @@ pub fn create_packfile_with_delta_stats_compression_reuse(
       None => @bit.PackDeltaMode::NoDelta
     }
     let (written, used_delta) = pack_object_with_delta(
-      obj, base, obj_offset, result, mode, compression, precomputed,
+      obj,
+      base,
+      obj_offset,
+      result,
+      mode,
+      compression,
+      precomputed,
+      hash_size~,
     )
     offset = offset + written
     if used_delta {
@@ -996,8 +1042,7 @@ pub fn create_packfile_with_delta_stats_compression_reuse(
     }
   }
 
-  // Compute SHA-1 of everything so far
-  let trailer = @bit.sha1_array_prefix(result, result.length())
+  let trailer = @bit.hash_array_prefix(result, result.length(), hash_size~)
 
   // Append trailer
   for b in trailer.bytes {
@@ -1037,9 +1082,9 @@ pub fn encode_type_and_size(
 
 ///|
 /// Create a packfile containing a single blob
-pub fn create_blob_packfile(content : Bytes) -> Bytes {
+pub fn create_blob_packfile(content : Bytes, hash_size? : Int = 20) -> Bytes {
   let obj = @bit.PackObject::new(@bit.ObjectType::Blob, content)
-  create_packfile([obj])
+  create_packfile([obj], hash_size~)
 }
 
 ///|

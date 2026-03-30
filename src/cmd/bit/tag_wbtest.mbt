@@ -93,6 +93,58 @@ async test "tag: short option bundle -am creates annotated tag" {
 }
 
 ///|
+async test "tag: -s stores signature block via configured signing program" {
+  @bitnative.init_native_io()
+  cmd_bit_wbtest_env_lock.acquire()
+  defer cmd_bit_wbtest_env_lock.release()
+  let fs = OsFs::new()
+  let root = "/tmp/bit-test-tag-sign-" + get_current_timestamp().to_string()
+  cleanup_tree(fs, root)
+  fs.mkdir_p(root)
+  let repo_dir = root + "/repo"
+
+  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
+  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @sys.get_env_var("GIT_DIR")
+  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
+  defer add_test_restore_env("GIT_SHIM_CWD", prev_shim_cwd)
+  defer add_test_restore_env("GIT_SHIM_PWD", prev_shim_pwd)
+  defer add_test_restore_env("GIT_DIR", prev_git_dir)
+  defer add_test_restore_env("GIT_WORK_TREE", prev_work_tree)
+
+  grep_test_run_git(root, ["init", "-q", "repo"])
+  grep_test_run_git(repo_dir, ["config", "user.name", "Test User"])
+  grep_test_run_git(repo_dir, ["config", "user.email", "test@example.com"])
+  let signer = root + "/fake-gpg.sh"
+  signing_wbtest_write_fake_gpg(fs, signer)
+  grep_test_run_git(repo_dir, ["config", "gpg.program", signer])
+  grep_test_run_git(repo_dir, ["config", "gpg.format", "openpgp"])
+  fs.write_string(repo_dir + "/tracked.txt", "seed\n")
+  grep_test_run_git(repo_dir, ["add", "tracked.txt"])
+  grep_test_run_git(repo_dir, ["commit", "-q", "-m", "initial"])
+
+  @sys.unset_env_var("GIT_SHIM_CWD")
+  @sys.unset_env_var("GIT_DIR")
+  @sys.unset_env_var("GIT_WORK_TREE")
+  @sys.set_env_var("GIT_SHIM_PWD", repo_dir)
+
+  handle_tag(["-s", "-m", "signed tag", "v1"]) catch {
+    err => fail("handle_tag failed: \{err}")
+  }
+
+  let git_dir = repo_dir + "/.git"
+  let tag_id = @bitlib.resolve_ref(fs, git_dir, "refs/tags/v1").unwrap()
+  let db = @bitlib.ObjectDb::load_lazy(fs, git_dir)
+  let tag_obj = db.get(fs, tag_id).unwrap()
+  let tag_text = @utf8.decode_lossy(tag_obj.data[:]).to_string()
+  assert_true(tag_text.contains("signed tag\n-----BEGIN TEST SIGNATURE-----\n"))
+  assert_true(tag_text.contains("\nabc123\n"))
+  assert_true(tag_text.contains("\n-----END TEST SIGNATURE-----\n"))
+
+  cleanup_tree(fs, root)
+}
+
+///|
 test "tag: sort field aliases normalize to refname variants" {
   assert_eq(tag_normalize_sort_field("tag"), "refname")
   assert_eq(tag_normalize_sort_field("version:tag"), "version:refname")

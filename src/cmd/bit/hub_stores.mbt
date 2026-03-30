@@ -151,7 +151,7 @@ async fn read_hub_init_approval() -> Bool {
             finished = true
             break
           }
-      }
+        }
     }
   }
   let text = @utf8.decode_lossy(bytes_from_array(bytes)[:])
@@ -176,14 +176,17 @@ fn hub_should_prompt() -> Bool {
 fn compute_hub_origin_sync_plan(content : String) -> HubOriginSyncPlan {
   let (remotes, _branches) = @bitlib.parse_remote_config(content)
   match remotes.get("origin") {
-    None => {
-      has_origin: false,
-      add_fetch_notes: false,
-      add_push_notes: false,
-      add_default_push_refspec: false,
-    }
+    None =>
+      {
+        has_origin: false,
+        add_fetch_notes: false,
+        add_push_notes: false,
+        add_default_push_refspec: false,
+      }
     Some(remote) => {
-      let add_fetch_notes = not(remote.fetch.contains(hub_notes_fetch_refspec()))
+      let add_fetch_notes = not(
+        remote.fetch.contains(hub_notes_fetch_refspec()),
+      )
       let add_push_notes = not(remote.push.contains(hub_notes_push_refspec()))
       {
         has_origin: true,
@@ -196,12 +199,13 @@ fn compute_hub_origin_sync_plan(content : String) -> HubOriginSyncPlan {
 }
 
 ///|
-fn load_hub_origin_sync_plan(
-  fs : OsFs,
-  git_dir : String,
-) -> HubOriginSyncPlan {
+fn load_hub_origin_sync_plan(fs : OsFs, git_dir : String) -> HubOriginSyncPlan {
   let config_path = hub_sync_config_path(git_dir)
-  let content = decode_bytes(fs.read_file(config_path) catch { _ => Bytes::default() })
+  let content = decode_bytes(
+    fs.read_file(config_path) catch {
+      _ => Bytes::default()
+    },
+  )
   compute_hub_origin_sync_plan(content)
 }
 
@@ -276,22 +280,16 @@ async fn print_hub_init_sync_prompt(
     "bit \{command_name}: configure local git sync for hub metadata on 'origin'?",
   )
   if plan.add_fetch_notes {
-    eprint_line(
-      "  remote.origin.fetch += " + hub_notes_fetch_refspec(),
-    )
+    eprint_line("  remote.origin.fetch += " + hub_notes_fetch_refspec())
   }
   if plan.add_default_push_refspec {
-    eprint_line(
-      "  remote.origin.push += " + hub_default_push_refspec(),
-    )
+    eprint_line("  remote.origin.push += " + hub_default_push_refspec())
     eprint_line(
       "  note: this makes plain `git push origin` use explicit refspecs",
     )
   }
   if plan.add_push_notes {
-    eprint_line(
-      "  remote.origin.push += " + hub_notes_push_refspec(),
-    )
+    eprint_line("  remote.origin.push += " + hub_notes_push_refspec())
   }
   eprint_line("Apply these local config changes now? [y/N]")
 }

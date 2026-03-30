@@ -795,6 +795,24 @@ test "git compat: parse_tree with executable file" {
   assert_true(parsed[0].name == "script.sh")
 }
 
+///|
+test "git compat: parse_tree auto-detects sha256 entry ids" {
+  let blob_id = @bit.hash_object_content_with_algo(
+    @bit.HashAlgorithm::Sha256,
+    @bit.ObjectType::Blob,
+    Bytes::from_array([b'h', b'e', b'l', b'l', b'o', b'\n']),
+  )
+  let content = @bit.serialize_tree([
+    @bit.TreeEntry::new("100644", "hello.txt", blob_id),
+  ])
+
+  let parsed = @bit.parse_tree(content)
+  assert_true(parsed.length() == 1)
+  assert_true(parsed[0].mode == "100644")
+  assert_true(parsed[0].name == "hello.txt")
+  assert_true(parsed[0].id.to_hex() == blob_id.to_hex())
+}
+
 // =============================================================================
 // Commit Parsing Tests
 // =============================================================================

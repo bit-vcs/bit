@@ -11,7 +11,7 @@
 ///   - OIDL chunk: N × hash_size sorted OIDs
 ///   - CDAT chunk: N × (hash_size + 16) commit data
 ///   - EDGE chunk: extra parent edges for octopus merges
-///   - SHA-1 checksum trailer (20 bytes)
+///   - Hash checksum trailer (`hash_size` bytes)
 
 ///|
 priv struct CgraphCommitEntry {
@@ -285,7 +285,11 @@ async fn write_commit_graph(
   // Hash checksum trailer
   let body_arr = FixedArray::makei(buf.length(), fn(i) { buf[i] })
   let body_bytes = Bytes::from_array(body_arr)
-  let trailer = @bitcore.hash_prefix(body_bytes, body_bytes.length(), hash_size~)
+  let trailer = @bitcore.hash_prefix(
+    body_bytes,
+    body_bytes.length(),
+    hash_size~,
+  )
   for b in trailer.bytes {
     buf.push(b)
   }
