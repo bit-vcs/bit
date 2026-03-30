@@ -1,0 +1,29 @@
+version 1
+key hub/work-item/baff891b/meta
+kind work-item
+clock test <test@example.com>=1
+timestamp 1774856915
+node test <test@example.com>
+deleted 0
+
+work-item baff891b
+title bit-relay: GitHub 非依存で issue/pr を publish/apply できる mutation API を実装する
+author test <test@example.com>
+created 1774856915
+updated 1774856915
+state open
+parent f2b91294
+
+目的
+- GitHub webhook や admin API なしでも relay 経由で collaboration state を更新できるようにする
+
+やること
+- relay に issue / pr / comment / review 向け mutation API を追加する
+- 署名、idempotency、cursor、retry を考慮した apply path を作る
+- bit 側で relay publish / fetch だけで local metadata を更新できるようにする
+- GitHub 固有処理を adapter に分離する
+
+完了条件
+- GitHub なしのローカル relay で issue / pr の create/update/comment/review が往復できる
+- relay spec に mutation schema が追加されている
+- GitHub 関連の route と core route の境界が分かれている
