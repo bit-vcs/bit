@@ -32,7 +32,7 @@ fn print_hub_issue_usage() -> Unit {
   println("  watch [--stale-hours <n>] [--remote <url>] [--auth-token <token>]")
   println("  search [<query>...] [<options>]")
   println("  note <subcommand> [<args>]")
-  println("  init")
+  println("  init                                  (prompt before local metadata / sync setup)")
 }
 
 ///|

@@ -46,7 +46,13 @@ When you want to share metadata across machines or teammates, sync it separately
 
 ```bash
 # Initialize PR / Issue metadata once per repository
+# `bit pr init` / `bit issue init` ask before creating `.git/hub/policy.toml`
+# and before adding `refs/notes/bit-hub` sync settings to `remote.origin.*`.
 bit pr init
+
+# Force prompts on/off when scripting
+BIT_HUB_INIT_PROMPT=1 bit issue init
+BIT_HUB_INIT_PROMPT=0 bit pr init
 
 # Local issues
 bit issue create --title "Cache invalidation bug" --body "status view stays stale"

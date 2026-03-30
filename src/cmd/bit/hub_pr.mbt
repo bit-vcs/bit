@@ -48,7 +48,7 @@ fn print_hub_pr_usage() -> Unit {
   println("  workflow list <pr-id>")
   println("  search [<query>...] [<options>]")
   println("  note <subcommand> [<args>]")
-  println("  init")
+  println("  init                                  (prompt before local metadata / sync setup)")
 }
 
 ///|
