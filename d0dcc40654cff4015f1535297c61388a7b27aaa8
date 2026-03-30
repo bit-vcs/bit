@@ -1,8 +1,8 @@
 version 1
 key hub/work-item/f2b91294/meta
 kind work-item
-clock test <test@example.com>=2
-timestamp 1774857144
+clock test <test@example.com>=3
+timestamp 1774858111
 node test <test@example.com>
 deleted 0
 
@@ -10,7 +10,7 @@ work-item f2b91294
 title GitHub 互換の local-first / P2P タスク基盤を設計する
 author test <test@example.com>
 created 1774856823
-updated 1774857144
+updated 1774858111
 state open
 
 狙い
@@ -36,3 +36,5 @@ sub-issues
 - #435cd726 workflow run / check / artifact / log の保存基盤を実装する
 - #77353052 runner executor として container / Cloudflare sandbox を追加する
 - #9faafc07 bithub/ui に API-first な task UI を実装する
+
+- #9b3bbf37 bit issue list の sub-issue 表示戦略と help 表記を整理する
