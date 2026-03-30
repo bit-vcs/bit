@@ -1,0 +1,29 @@
+version 1
+key hub/work-item/84d5cc59/meta
+kind work-item
+clock test <test@example.com>=1
+timestamp 1774856972
+node test <test@example.com>
+deleted 0
+
+work-item 84d5cc59
+title actrun を generic workflow runner core に分離する
+author test <test@example.com>
+created 1774856972
+updated 1774856972
+state open
+parent f2b91294
+
+目的
+- GitHub Actions 互換 parser と実行 engine を分離し、runner 自体を汎用化する
+
+やること
+- WorkflowSpec / JobSpec / StepSpec / Executor / RunStore などの core contract を定義する
+- GitHub Actions YAML は adapter として扱う
+- local / container / sandbox 実行を共通 interface で扱えるようにする
+- bit / bithub / relay から参照しやすい API を定義する
+
+完了条件
+- actrun core と github-actions adapter の責務が分離されている
+- 実行系の interface が docs 化されている
+- 後続の log/artifact 保存 issue を受けられる構造になっている
