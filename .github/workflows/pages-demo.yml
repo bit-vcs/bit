@@ -64,12 +64,10 @@ jobs:
       - name: Install playground dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Rebuild checked-in browser bundles
+      - name: Build Pages demo artifact
         run: |
-          just build-docs-demo
-          just build-docs-playground
-
-      - name: Verify checked-in playground bundle is up to date
-        run: |
-          # docs/demo/app.js is not byte-stable across Bun host platforms.
-          git diff --exit-code -- docs/playground
+          # The checked-in docs bundles are not byte-stable across host platforms,
+          # so CI only verifies that the Pages artifact can be rebuilt.
+          just build-pages-demo
+          test -s target/pages/app.js
+          test -s target/pages/playground/app.js
