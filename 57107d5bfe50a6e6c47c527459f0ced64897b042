@@ -1,0 +1,30 @@
+version 1
+key hub/work-item/b629184f/meta
+kind work-item
+clock test <test@example.com>=1
+timestamp 1774856864
+node test <test@example.com>
+deleted 0
+
+work-item b629184f
+title Hub schema v2: GitHub 用語を保ちつつ P2P 拡張できる record を定義する
+author test <test@example.com>
+created 1774856864
+updated 1774856864
+state open
+parent f2b91294
+
+目的
+- 外向きの API / UI / CLI は GitHub 用語に合わせる
+- 内部 record は local-first / P2P / sync を拡張できるようにする
+
+やること
+- issue / pr / review / workflow / check / artifact の record schema を定義する
+- sync 用の upstream 情報、origin 情報、署名、sender/device、room などの拡張フィールドを定義する
+- 既存の work-item record との互換方針を決める
+- docs/hub-protocol.md を v2 草案に更新する
+
+完了条件
+- 外向き用語と内部 record の対応表がある
+- 互換方針と migration 方針が決まっている
+- 実装側で使う shared schema が確定している
