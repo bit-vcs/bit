@@ -177,7 +177,7 @@ async fn handle_hub_pr_status(args : Array[String]) -> Unit raise Error {
     return ()
   }
   let branch_ids : Array[String] = []
-  match detect_current_branch_name(git_dir) {
+  match detect_hub_current_branch_name(root) {
     Some(branch) => {
       print_line("Current branch: \{branch}")
       let mut branch_count = 0

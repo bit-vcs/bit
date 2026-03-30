@@ -9,7 +9,8 @@
     "mizchi/llm": "0.2.2",
     "mizchi/bitflow": "0.3.1",
     "mizchi/x": "0.1.4",
-    "bobzhang/toml": "0.1.7"
+    "bobzhang/toml": "0.1.7",
+    "mizchi/libgit2": "0.1.0"
   },
   "readme": "README.mbt.md",
   "repository": "https://github.com/mizchi/bit-vcs",
@@ -21,7 +22,6 @@
   ],
   "description": "Pure MoonBit Git implementation",
   "source": "src",
-  "preferred-target": "native",
   "exclude": [
     "component",
     "tools",
@@ -38,5 +38,6 @@
     "CLAUDE.md",
     "COMPAT_RESULTS.md",
     "TODO.md"
-  ]
+  ],
+  "preferred-target": "native"
 }
