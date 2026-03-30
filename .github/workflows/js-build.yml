@@ -7,6 +7,9 @@ on:
   pull_request:
   workflow_dispatch:
 
+env:
+  MOONBIT_VERSION: 0.1.20260309
+
 permissions:
   contents: read
 
@@ -32,7 +35,7 @@ jobs:
 
       - name: Install MoonBit CLI
         run: |
-          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash -s -- "$MOONBIT_VERSION"
           echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
 
       - name: Moon update
