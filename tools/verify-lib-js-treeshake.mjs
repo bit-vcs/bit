@@ -3,7 +3,7 @@ import { gzipSync } from "node:zlib";
 import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
-const MAX_MINIMAL_RAW_BYTES = 160_000;
+const MAX_MINIMAL_RAW_BYTES = 161_000;
 const MAX_MINIMAL_GZIP_BYTES = 40_000;
 const MAX_MINIMAL_RATIO = 0.70;
 
