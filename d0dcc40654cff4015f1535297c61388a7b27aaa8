@@ -1,0 +1,28 @@
+version 1
+key hub/work-item/f2b91294/meta
+kind work-item
+clock test <test@example.com>=1
+timestamp 1774856823
+node test <test@example.com>
+deleted 0
+
+work-item f2b91294
+title GitHub 互換の local-first / P2P タスク基盤を設計する
+author test <test@example.com>
+created 1774856823
+updated 1774856823
+state open
+
+狙い
+- GitHub に近い用語と操作感を保ち、学習コストを下げる
+- GitHub なしでも bit + bit-relay + bithub + actrun で issue / pr / review / workflow を回せるようにする
+- 必要に応じて GitHub と同期できる adapter を用意する
+
+基本方針
+- 表層 API は GitHub 用語に合わせる
+- ローカルと P2P を第一級に扱う
+- bithub は bithub/ui 以下に UI 実装を寄せ、API-first にする
+- bit-relay で GitHub を経由せずにローカルから変更を publish/apply できるようにする
+- actrun は runner core として一般化し、container / sandbox 実行と run log / artifact 保存を扱えるようにする
+
+この issue は親 issue。実装は sub-issue に分けて進める。
