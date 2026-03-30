@@ -170,7 +170,7 @@ bit mcp --help
 bit help mcp
 
 # Standalone MoonBit entrypoint (equivalent server implementation)
-moon run src/x/mcp --target native
+moon run src/x/mcp/cmd --target native
 ```
 
 ### bit hq

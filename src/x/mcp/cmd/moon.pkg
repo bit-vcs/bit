@@ -1,0 +1,14 @@
+import {
+  "mizchi/bit/x/mcp" @mcp,
+}
+
+warnings = "-29"
+
+options(
+  is_main: true,
+  targets: {
+    "main.mbt": [ "native" ],
+    "main_js.mbt": [ "js" ],
+    "main_wasm.mbt": [ "wasm-gc", "wasm" ],
+  },
+)
