@@ -36,7 +36,7 @@ test "integration: mount helix repo (lazy)" {
   let git_dir = get_helix_git_dir()
 
   // Skip if helix repo not available
-  if not(osfs.is_dir(git_dir)) {
+  if !(osfs.is_dir(git_dir)) {
     return
   }
   let commit_id = get_helix_head()
@@ -68,7 +68,7 @@ test "integration: mount helix repo (eager)" {
   let git_dir = get_helix_git_dir()
 
   // Skip if helix repo not available
-  if not(osfs.is_dir(git_dir)) {
+  if !(osfs.is_dir(git_dir)) {
     return
   }
   let commit_id = get_helix_head()
@@ -91,7 +91,7 @@ test "integration: mount helix repo (eager)" {
 test "integration: mount, modify, get changes" {
   let osfs = @osfs.OsFs::new()
   let git_dir = get_helix_git_dir()
-  if not(osfs.is_dir(git_dir)) {
+  if !(osfs.is_dir(git_dir)) {
     return
   }
   let commit_id = get_helix_head()
@@ -146,7 +146,7 @@ test "integration: mount, modify, get changes" {
 test "integration: generate diff" {
   let osfs = @osfs.OsFs::new()
   let git_dir = get_helix_git_dir()
-  if not(osfs.is_dir(git_dir)) {
+  if !(osfs.is_dir(git_dir)) {
     return
   }
   let commit_id = get_helix_head()
@@ -202,7 +202,7 @@ fn collect_changes(
   for path in working_files {
     let content = bitfs.read_file(osfs, path) catch { _ => Bytes::new(0) }
     // Check if file existed before
-    let is_new = not(file_exists_in_base(bitfs, osfs, path))
+    let is_new = !(file_exists_in_base(bitfs, osfs, path))
     let change_type = if is_new { "added" } else { "modified" }
     changes.push({ path, change_type, _content: Some(content) })
   }
@@ -249,7 +249,7 @@ fn format_changes(changes : Array[FileChange]) -> String {
 test "integration: demo workflow output" {
   let osfs = @osfs.OsFs::new()
   let git_dir = get_helix_git_dir()
-  if not(osfs.is_dir(git_dir)) {
+  if !(osfs.is_dir(git_dir)) {
     println("Skipping: helix repo not found")
     return
   }
@@ -284,7 +284,7 @@ test "integration: demo workflow output" {
 test "bench_integration: helix lazy mount" (b : @bench.T) {
   let osfs = @osfs.OsFs::new()
   let git_dir = get_helix_git_dir()
-  if not(osfs.is_dir(git_dir)) {
+  if !(osfs.is_dir(git_dir)) {
     return
   }
   let commit_id = try! get_helix_head()
@@ -296,7 +296,7 @@ test "bench_integration: helix lazy mount" (b : @bench.T) {
 test "bench_integration: helix read files" (b : @bench.T) {
   let osfs = @osfs.OsFs::new()
   let git_dir = get_helix_git_dir()
-  if not(osfs.is_dir(git_dir)) {
+  if !(osfs.is_dir(git_dir)) {
     return
   }
   let commit_id = try! get_helix_head()
@@ -316,7 +316,7 @@ test "bench_integration: helix read files" (b : @bench.T) {
 test "bench_integration: helix full workflow" (b : @bench.T) {
   let osfs = @osfs.OsFs::new()
   let git_dir = get_helix_git_dir()
-  if not(osfs.is_dir(git_dir)) {
+  if !(osfs.is_dir(git_dir)) {
     return
   }
   let commit_id = try! get_helix_head()

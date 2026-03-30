@@ -125,8 +125,8 @@ pub async fn push_http(
       let refs = @bitnative.discover_receive_refs_http(remote)
       let old_id = sync_find_ref(refs, refname)
       // Check fast-forward unless force
-      if not(force) && old_id != @bit.ObjectId::zero() {
-        if not(sync_is_ancestor(rfs, actual_git_dir, old_id, head_id)) {
+      if !(force) && old_id != @bit.ObjectId::zero() {
+        if !(sync_is_ancestor(rfs, actual_git_dir, old_id, head_id)) {
           raise @bit.GitError::InvalidObject(
             "Updates were rejected because the tip of your current branch is behind\nits remote counterpart. If you want to force the update, use 'git push --force'.",
           )

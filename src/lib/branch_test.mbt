@@ -74,7 +74,7 @@ test "branch: create branch in unborn repo does not create empty ref file" {
   let fs = setup_branch_fs()
   fs.write_string("/repo/.git/HEAD", "ref: refs/heads/main\n")
   create_branch(fs, fs, "/repo", "main")
-  assert_true(not(fs.is_file("/repo/.git/refs/heads/main")))
+  assert_true(!(fs.is_file("/repo/.git/refs/heads/main")))
 }
 
 ///|
@@ -229,8 +229,8 @@ test "branch: delete_branch prunes empty parent directories for nested refs" {
     "/repo/.git/refs/heads/branch/conflict", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n",
   )
   delete_branch(fs, fs, "/repo", "branch/conflict", force=true)
-  assert_true(not(fs.is_file("/repo/.git/refs/heads/branch/conflict")))
-  assert_true(not(fs.is_dir("/repo/.git/refs/heads/branch")))
+  assert_true(!(fs.is_file("/repo/.git/refs/heads/branch/conflict")))
+  assert_true(!(fs.is_dir("/repo/.git/refs/heads/branch")))
 }
 
 ///|
@@ -266,7 +266,7 @@ test "branch: delete_branch removes reflog for deleted ref" {
     "/repo/.git/logs/refs/heads/topic", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb Test <test@example.com> 0 +0000\tbranch: Created from main\n",
   )
   delete_branch(fs, fs, "/repo", "topic", force=true)
-  assert_true(not(fs.is_file("/repo/.git/logs/refs/heads/topic")))
+  assert_true(!(fs.is_file("/repo/.git/logs/refs/heads/topic")))
 }
 
 ///|
@@ -304,7 +304,7 @@ test "branch: rename_branch can move parent ref to nested child" {
     "/repo/.git/logs/refs/heads/m", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb Test <test@example.com> 0 +0000\tbranch: Created from main\n",
   )
   rename_branch(fs, fs, "/repo", "m", "m/m")
-  assert_true(not(fs.is_file("/repo/.git/refs/heads/m")))
+  assert_true(!(fs.is_file("/repo/.git/refs/heads/m")))
   assert_eq(
     fs.read_string("/repo/.git/refs/heads/m/m"),
     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n",
@@ -349,7 +349,7 @@ test "branch: rename_branch from linked worktree root updates common refs" {
   fs.write_string("/repo/.git/worktrees/wt1/commondir", "../..\n")
   fs.write_string("/worktree/.git", "gitdir: /repo/.git/worktrees/wt1\n")
   rename_branch(fs, fs, "/worktree", "baz", "bam")
-  assert_true(not(fs.is_file("/repo/.git/refs/heads/baz")))
+  assert_true(!(fs.is_file("/repo/.git/refs/heads/baz")))
   assert_eq(
     fs.read_string("/repo/.git/refs/heads/bam"),
     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n",
@@ -375,7 +375,7 @@ test "branch: rename_branch can move nested child to parent" {
     "/repo/.git/logs/refs/heads/n/n", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb Test <test@example.com> 0 +0000\tbranch: Created from main\n",
   )
   rename_branch(fs, fs, "/repo", "n/n", "n")
-  assert_true(not(fs.is_dir("/repo/.git/refs/heads/n/n")))
+  assert_true(!(fs.is_dir("/repo/.git/refs/heads/n/n")))
   assert_eq(
     fs.read_string("/repo/.git/refs/heads/n"),
     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n",
@@ -401,7 +401,7 @@ test "branch: rename_branch replaces dangling symref target" {
     fs.read_string("/repo/.git/refs/heads/broken_symref"),
     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n",
   )
-  assert_true(not(fs.is_file("/repo/.git/refs/heads/m")))
+  assert_true(!(fs.is_file("/repo/.git/refs/heads/m")))
 }
 
 ///|
@@ -420,7 +420,7 @@ test "branch: create_lightweight_tag rejects conflicting parent ref path" {
   )
   assert_true(result is Err(_))
   assert_true(fs.is_file("/repo/.git/refs/tags/foo/bar"))
-  assert_true(not(fs.is_file("/repo/.git/refs/tags/foo")))
+  assert_true(!(fs.is_file("/repo/.git/refs/tags/foo")))
 }
 
 ///|
@@ -437,7 +437,7 @@ test "branch: create_lightweight_tag rejects conflicting packed ref path" {
     @bit.ObjectId::from_hex("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
   )
   assert_true(result is Err(_))
-  assert_true(not(fs.is_file("/repo/.git/refs/tags/foo")))
+  assert_true(!(fs.is_file("/repo/.git/refs/tags/foo")))
 }
 
 ///|
@@ -471,10 +471,10 @@ test "branch: delete_tag removes reflog and prunes empty parent directories" {
 
   delete_tag(fs, fs, "/repo/.git", "foo/bar")
 
-  assert_true(not(fs.exists("/repo/.git/refs/tags/foo/bar")))
-  assert_true(not(fs.exists("/repo/.git/logs/refs/tags/foo/bar")))
-  assert_true(not(fs.exists("/repo/.git/refs/tags/foo")))
-  assert_true(not(fs.exists("/repo/.git/logs/refs/tags/foo")))
+  assert_true(!(fs.exists("/repo/.git/refs/tags/foo/bar")))
+  assert_true(!(fs.exists("/repo/.git/logs/refs/tags/foo/bar")))
+  assert_true(!(fs.exists("/repo/.git/refs/tags/foo")))
+  assert_true(!(fs.exists("/repo/.git/logs/refs/tags/foo")))
 }
 
 ///|

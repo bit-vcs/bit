@@ -1,13 +1,13 @@
 ///|
 test "ls-files: no wildcard filter matches exact path" {
   assert_true(ls_files_matches_filters("a.txt", ["a.txt"]))
-  assert_true(not(ls_files_matches_filters("dir/b.txt", ["a.txt"])))
+  assert_true(!(ls_files_matches_filters("dir/b.txt", ["a.txt"])))
 }
 
 ///|
 test "ls-files: directory prefix filter works" {
   assert_true(ls_files_matches_filters("dir/a.txt", ["dir"]))
-  assert_true(not(ls_files_matches_filters("other.txt", ["dir"])))
+  assert_true(!(ls_files_matches_filters("other.txt", ["dir"])))
 }
 
 ///|
@@ -29,7 +29,7 @@ test "ls-files: wildcard directory filter matches directory output" {
 test "ls-files: wildcard prefix filter" {
   let long_name = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
   assert_true(ls_files_matches_filters(long_name, ["a*"]))
-  assert_true(not(ls_files_matches_filters("b.txt", ["a*"])))
+  assert_true(!(ls_files_matches_filters("b.txt", ["a*"])))
 }
 
 ///|
@@ -68,7 +68,7 @@ test "ls-files: wildcard filter matches index scan" {
     .any(fn(entry) { ls_files_pathspec_matches(entry.path, "a*") }),
   )
   assert_true(
-    not(
+    !(
       entries
       .iter()
       .any(fn(entry) { ls_files_pathspec_matches(entry.path, "b*") }),
@@ -88,7 +88,7 @@ test "ls-files: icase pathspec matches case-insensitively" {
 test "ls-files: exclude pathspec removes matching entries" {
   let filters = [":(icase)*.txt", ":(exclude)submodule/subsub/*"]
   assert_true(ls_files_matches_filters("submodule/g.txt", filters))
-  assert_true(not(ls_files_matches_filters("submodule/subsub/e.txt", filters)))
+  assert_true(!(ls_files_matches_filters("submodule/subsub/e.txt", filters)))
 }
 
 ///|
@@ -133,7 +133,7 @@ test "ls-files: untracked directory compression" {
     ]),
   )
   assert_true(
-    not(
+    !(
       ls_files_is_within_untracked_dir("partially_tracked/tracked.txt", [
         "partially_tracked/untracked",
       ]),
@@ -146,7 +146,7 @@ test "ls-files: has matching file under directory" {
   let files = ["src/main.rs", "src/lib/main.rs", "readme.md"]
   let untracked : Map[String, Bool] = { "src/main.rs": true, "readme.md": true }
   assert_true(ls_files_has_matching_file("src", files, untracked))
-  assert_true(not(ls_files_has_matching_file("tests", files, untracked)))
+  assert_true(!(ls_files_has_matching_file("tests", files, untracked)))
 }
 
 ///|

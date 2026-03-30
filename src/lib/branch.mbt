@@ -203,7 +203,7 @@ pub fn list_remote_branches(
 ) -> Array[String] {
   let lines : Array[String] = []
   let refs_dir = join_path(git_dir, "refs/remotes")
-  if not(fs.is_dir(refs_dir)) {
+  if !(fs.is_dir(refs_dir)) {
     return lines
   }
   // Walk refs/remotes directory
@@ -274,7 +274,7 @@ fn append_branch_creation_reflog(
 ) -> Unit raise @bit.GitError {
   let is_bare = branch_is_bare_repo(rfs, root, git_dir)
   let (should_log, _) = should_log_ref(rfs, git_dir, refname, is_bare)
-  if not(should_log) {
+  if !(should_log) {
     return
   }
   let source_label = branch_creation_source_label(rfs, git_dir, start_point)
@@ -395,10 +395,10 @@ fn prune_empty_ref_parent_dirs(
   while current.length() > 0 &&
         current != stop_dir &&
         current.has_prefix(stop_dir + "/") {
-    if not(rfs.is_dir(current)) {
+    if !(rfs.is_dir(current)) {
       break
     }
-    if not(is_directory_empty(rfs, current)) {
+    if !(is_directory_empty(rfs, current)) {
       break
     }
     fs.remove_dir(current) catch {
@@ -431,11 +431,11 @@ pub fn delete_branch(
   let exists = rfs.is_file(ref_path) ||
     resolve_packed_ref(rfs, join_path(git_dir, "packed-refs"), refname)
     is Some(_)
-  if not(exists) {
+  if !(exists) {
     raise @bit.GitError::InvalidObject("branch '\{name}' not found")
   }
   // Check if branch is fully merged (unless force)
-  if not(force) {
+  if !(force) {
     let head_commit = resolve_head_commit(rfs, git_dir)
     let branch_id = match resolve_ref(rfs, git_dir, refname) {
       Some(id) => id
@@ -443,7 +443,7 @@ pub fn delete_branch(
     }
     match head_commit {
       Some(head_id) =>
-        if not(is_ancestor_of(rfs, git_dir, branch_id, head_id)) {
+        if !(is_ancestor_of(rfs, git_dir, branch_id, head_id)) {
           raise @bit.GitError::InvalidObject(
             "The branch '\{name}' is not fully merged.\nIf you are sure you want to delete it, run 'git branch -D \{name}'.",
           )
@@ -525,11 +525,11 @@ pub fn rename_branch(
   }
   let new_exists = (
       rfs.is_file(new_path) &&
-      not(branch_is_dangling_symref(rfs, git_dir, new_ref, new_path))
+      !(branch_is_dangling_symref(rfs, git_dir, new_ref, new_path))
     ) ||
     new_packed_exists
   if new_exists {
-    if not(force) {
+    if !(force) {
       raise @bit.GitError::InvalidObject("branch '\{new_name}' already exists")
     }
     if rfs.is_file(new_path) {
@@ -642,11 +642,11 @@ fn branch_is_dangling_symref(
   refname : String,
   ref_path : String,
 ) -> Bool raise @bit.GitError {
-  if not(rfs.is_file(ref_path)) {
+  if !(rfs.is_file(ref_path)) {
     return false
   }
   let line = read_ref_line(rfs, ref_path)
-  if not(line.has_prefix("ref: ")) {
+  if !(line.has_prefix("ref: ")) {
     return false
   }
   resolve_ref(rfs, git_dir, refname) is None
@@ -672,7 +672,7 @@ fn validate_branch_rename_target_path(
     }
   }
   let new_path = join_path(git_dir, new_ref)
-  if rfs.is_dir(new_path) && not(old_ref.has_prefix(new_ref + "/")) {
+  if rfs.is_dir(new_path) && !(old_ref.has_prefix(new_ref + "/")) {
     raise @bit.GitError::InvalidObject("branch '\{new_ref}' already exists")
   }
 }
@@ -735,7 +735,7 @@ pub fn switch_branch(
   let ref_path = join_path(git_dir, refname)
   if create {
     create_branch(fs, rfs, root, name)
-  } else if not(rfs.is_file(ref_path)) {
+  } else if !(rfs.is_file(ref_path)) {
     match resolve_ref(rfs, git_dir, refname) {
       None => raise @bit.GitError::InvalidObject("Invalid ref: \{name}")
       Some(_) => ()
@@ -776,7 +776,7 @@ fn resolve_ref_commondir(
   git_dir : String,
 ) -> String? {
   let commondir_path = join_path(git_dir, "commondir")
-  if not(fs.is_file(commondir_path)) {
+  if !(fs.is_file(commondir_path)) {
     return None
   }
   let rel = read_ref_line(fs, commondir_path) catch { _ => "" }
@@ -877,7 +877,7 @@ fn collect_packed_heads(
           start=idx + 1,
           end=line.length(),
         )
-        if not(refname.has_prefix("refs/heads/")) {
+        if !(refname.has_prefix("refs/heads/")) {
           continue
         }
         let name = String::unsafe_substring(
@@ -885,7 +885,7 @@ fn collect_packed_heads(
           start=11,
           end=refname.length(),
         )
-        if not(out.contains(name)) {
+        if !(out.contains(name)) {
           match parse_ref_object_id(id_hex) {
             Some(id) => out[name] = id
             None => ()
@@ -1020,7 +1020,7 @@ fn collect_tag_names(
     if fs.is_dir(path) {
       collect_tag_names(fs, path, name, out)
     } else if fs.is_file(path) {
-      if not(out.contains(name)) {
+      if !(out.contains(name)) {
         out.push(name)
       }
     }
@@ -1056,7 +1056,7 @@ fn collect_packed_tags(
             start=10,
             end=refname.length(),
           )
-          if not(out.contains(name)) {
+          if !(out.contains(name)) {
             out.push(name)
           }
         }
@@ -1198,7 +1198,7 @@ fn has_packed_ref_path_conflict(
   packed_path : String,
   refname : String,
 ) -> Bool {
-  if not(fs.is_file(packed_path)) {
+  if !(fs.is_file(packed_path)) {
     return false
   }
   let text = @utf8.decode_lossy(fs.read_file(packed_path)[:]) catch {

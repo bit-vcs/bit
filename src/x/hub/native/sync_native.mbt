@@ -204,11 +204,11 @@ fn relay_is_valid_room_name(room : String) -> Bool {
   let mut first = true
   for c in room {
     if first {
-      if not(relay_room_leading_char(c)) {
+      if !(relay_room_leading_char(c)) {
         return false
       }
       first = false
-    } else if not(relay_room_safe_char(c)) {
+    } else if !(relay_room_safe_char(c)) {
       return false
     }
   }
@@ -314,7 +314,7 @@ fn parse_relay_base_url(remote_url : String) -> String? {
 /// Matches: http(s)://host/git/<session_id> where session_id is 6-16 alphanumeric chars.
 /// Returns the base URL (everything before /git/).
 fn detect_relay_proxied_git_base(url : String) -> String? {
-  if not(is_http_url(url)) {
+  if !(is_http_url(url)) {
     return None
   }
   let git_path = "/git/"
@@ -343,7 +343,7 @@ fn detect_relay_proxied_git_base(url : String) -> String? {
     return None
   }
   for c in session {
-    if not(
+    if !(
         (c >= 'A' && c <= 'Z') ||
         (c >= 'a' && c <= 'z') ||
         (c >= '0' && c <= '9'),
@@ -434,7 +434,7 @@ fn relay_resolve_control_endpoint(
     }
     None => "main"
   }
-  if not(relay_is_valid_room_name(room)) {
+  if !(relay_is_valid_room_name(room)) {
     raise @bit.GitError::InvalidObject("invalid relay room: \{room}")
   }
   let room_token = relay_normalize_optional_text(
@@ -445,7 +445,7 @@ fn relay_resolve_control_endpoint(
 
 ///|
 fn should_fallback_to_relay(err : @bit.GitError, remote_url : String) -> Bool {
-  if not(is_http_url(remote_url)) {
+  if !(is_http_url(remote_url)) {
     return false
   }
   match err {
@@ -474,7 +474,7 @@ fn json_get_int(obj : Map[String, Json], key : String, fallback : Int) -> Int {
   match obj.get(key) {
     Some(Json::Number(value, ..)) => value.to_int()
     Some(Json::String(value)) =>
-      @strconv.parse_int(value) catch {
+      @string.parse_int(value) catch {
         _ => fallback
       }
     _ => fallback
@@ -566,7 +566,7 @@ fn parse_relay_poll_clone_peers(
         if sender.length() == 0 {
           continue
         }
-        if not(include_self) && sender == self_sender {
+        if !(include_self) && sender == self_sender {
           continue
         }
         guard envelope_obj.get("payload") is Some(Json::Object(payload_obj)) else {
@@ -680,9 +680,9 @@ fn relay_record_matches_signing_policy(
       match record.signature {
         Some(signature) =>
           signature == relay_compute_record_signature(record, key)
-        None => not(require_signed)
+        None => !(require_signed)
       }
-    None => not(require_signed)
+    None => !(require_signed)
   }
 }
 
@@ -730,7 +730,7 @@ fn apply_relay_record(
   record : @hub.HubRecord,
   conflict_policy : @hub.RecordMergePolicy,
 ) -> Bool raise @bit.GitError {
-  if not(
+  if !(
       relay_record_matches_signing_policy(
         record,
         store.signing_key(),
@@ -816,7 +816,7 @@ fn read_relay_cursor(
   remote_url : String,
 ) -> Int {
   let path = relay_cursor_path(git_dir, remote_url)
-  if not(rfs.is_file(path)) {
+  if !(rfs.is_file(path)) {
     return 0
   }
   let content = rfs.read_file(path) catch { _ => return 0 }
@@ -825,7 +825,7 @@ fn read_relay_cursor(
     Some(line) => line.to_string()
     None => ""
   }
-  @strconv.parse_int(first) catch {
+  @string.parse_int(first) catch {
     _ => 0
   }
 }

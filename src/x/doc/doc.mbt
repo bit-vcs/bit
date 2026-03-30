@@ -62,7 +62,7 @@ pub fn list_pages(
         break
       }
     }
-    if not(inserted) {
+    if !(inserted) {
       sorted.push(page)
     }
   }
@@ -80,7 +80,7 @@ pub fn read_page(
     Some(path) => path
     None => return Err(InvalidPageName(page_name))
   }
-  if not(rfs.is_file(path)) {
+  if !(rfs.is_file(path)) {
     return Err(PageNotFound(page))
   }
   Ok(decode_bytes(rfs.read_file(path)))
@@ -129,7 +129,7 @@ pub fn append_page(
   } else {
     ""
   }
-  if content.length() > 0 && not(content.has_suffix("\n")) {
+  if content.length() > 0 && !(content.has_suffix("\n")) {
     content = content + "\n"
   }
   content = content + "- [\{timestamp}] \{message}\n"
@@ -149,7 +149,7 @@ pub fn remove_page(
     Some(path) => path
     None => return Err(InvalidPageName(page_name))
   }
-  if not(rfs.is_file(path)) {
+  if !(rfs.is_file(path)) {
     return Err(PageNotFound(page))
   }
   wfs.remove_file(path)
@@ -159,7 +159,7 @@ pub fn remove_page(
 ///|
 fn resolve_page_path(root : String, page_name : String) -> String? {
   let page = normalize_page_name(page_name)
-  if not(is_valid_page_name(page)) {
+  if !(is_valid_page_name(page)) {
     return None
   }
   Some(docs_dir(root) + "/" + page + ".md")
@@ -173,7 +173,7 @@ fn collect_pages(
   prefix : String?,
   out : Array[String],
 ) -> Unit {
-  if not(rfs.is_dir(abs_dir)) {
+  if !(rfs.is_dir(abs_dir)) {
     return
   }
   let entries = rfs.readdir(abs_dir) catch { _ => [] }
@@ -191,7 +191,7 @@ fn collect_pages(
       collect_pages(rfs, abs_path, rel_path, prefix, out)
       continue
     }
-    if not(entry.has_suffix(".md")) {
+    if !(entry.has_suffix(".md")) {
       continue
     }
     let page = String::unsafe_substring(
@@ -200,7 +200,7 @@ fn collect_pages(
       end=rel_path.length() - 3,
     )
     match prefix {
-      Some(p) if not(page.has_prefix(p)) => continue
+      Some(p) if !(page.has_prefix(p)) => continue
       _ => ()
     }
     out.push(page)

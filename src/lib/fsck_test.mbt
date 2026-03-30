@@ -122,7 +122,7 @@ test "fsck_verify_loose_hash valid" {
   let expected = @bit.sha1(raw)
   assert_true(@lib.fsck_verify_loose_hash(raw, expected.to_hex()))
   assert_true(
-    not(
+    !(
       @lib.fsck_verify_loose_hash(
         raw, "0000000000000000000000000000000000000000",
       ),

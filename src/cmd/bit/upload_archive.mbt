@@ -12,7 +12,7 @@ async fn handle_upload_archive(args : Array[String]) -> Unit raise Error {
   // Parse repository path from args (last non-flag argument)
   let mut repo_path = ""
   for arg in args {
-    if not(arg.has_prefix("-")) {
+    if !(arg.has_prefix("-")) {
       repo_path = arg
     }
   }
@@ -28,7 +28,7 @@ async fn handle_upload_archive(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
   let git_dir = if root.has_suffix(".git") && !root.has_suffix("/.git") {
     root
-  } else if fs.is_file(root + "/HEAD") && not(fs.is_dir(root + "/.git")) {
+  } else if fs.is_file(root + "/HEAD") && !(fs.is_dir(root + "/.git")) {
     root
   } else {
     root + "/.git"
@@ -93,7 +93,7 @@ async fn handle_upload_archive(args : Array[String]) -> Unit raise Error {
     } else if arg.has_prefix("-") {
       // Skip other flags silently
       ()
-    } else if not(tree_ish_set) {
+    } else if !(tree_ish_set) {
       tree_ish = arg
       tree_ish_set = true
     } else {

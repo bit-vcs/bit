@@ -13,6 +13,7 @@ import {
   "moonbitlang/core/encoding/base64" @base64,
   "moonbitlang/core/encoding/utf8" @utf8,
   "moonbitlang/core/json" @json,
+  "moonbitlang/core/string" @string,
   "moonbitlang/x/sys" @sys,
   "moonbitlang/core/strconv" @strconv,
   "mizchi/x/websocket" @xws,

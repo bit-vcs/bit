@@ -442,7 +442,7 @@ fn pack_object_with_delta(
         None => false
       }
   }
-  if not(try_delta) {
+  if !(try_delta) {
     let compressed = compress_pack_data(data, compression)
     let normal_len = type_and_size_len(data.length()) + compressed.length()
     encode_type_and_size(obj_type, data.length(), result)

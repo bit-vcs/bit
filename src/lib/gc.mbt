@@ -99,7 +99,7 @@ fn gc_git_dir(
   let unreachable_hex : Array[String] = []
   for item in store.objects.to_array() {
     let (hex, _) = item
-    if not(reachable_hex.contains(hex)) {
+    if !(reachable_hex.contains(hex)) {
       unreachable_hex.push(hex)
     }
   }
@@ -145,7 +145,7 @@ fn prune_git_dir(
   let loose_hex = list_loose_object_hex(rfs, git_dir)
   let pruned : Array[@bit.ObjectId] = []
   for hex in loose_hex {
-    if not(reachable_hex.contains(hex)) {
+    if !(reachable_hex.contains(hex)) {
       pruned.push(@bit.ObjectId::from_hex(hex))
     }
   }
@@ -276,7 +276,7 @@ fn collect_packed_refs(
             matched = true
           }
         }
-        if matched && not(out.contains(refname)) {
+        if matched && !(out.contains(refname)) {
           out[refname] = @bit.ObjectId::from_hex(id_hex)
         }
       }
@@ -335,7 +335,7 @@ fn collect_reflog_referenced_objects(
           let sub = collect_reachable_objects_from_commits(db, fs, [id])
           for s in sub {
             let sh = @bit.hash_object_content(s.obj_type, s.data).to_hex()
-            if not(seen.contains(sh)) {
+            if !(seen.contains(sh)) {
               seen[sh] = true
               objects.push(s)
             }
@@ -354,7 +354,7 @@ fn collect_all_reflog_ids(
 ) -> Array[@bit.ObjectId] raise @bit.GitError {
   let ids : Array[@bit.ObjectId] = []
   let logs_dir = git_dir + "/logs"
-  if not(fs.is_dir(logs_dir)) {
+  if !(fs.is_dir(logs_dir)) {
     return ids
   }
   collect_reflog_ids_recursive(fs, logs_dir, ids)
@@ -435,7 +435,7 @@ fn resolve_commit_roots(
       None => ()
       Some(commit_id) => {
         let hex = commit_id.to_hex()
-        if not(seen.contains(hex)) {
+        if !(seen.contains(hex)) {
           seen[hex] = true
           roots.push(commit_id)
         }
@@ -518,7 +518,7 @@ fn prune_loose_objects(
   remove_reachable : Bool,
 ) -> Unit raise @bit.GitError {
   let objects_dir = join_path(git_dir, "objects")
-  if not(rfs.is_dir(objects_dir)) {
+  if !(rfs.is_dir(objects_dir)) {
     return
   }
   let entries = rfs.readdir(objects_dir)
@@ -530,7 +530,7 @@ fn prune_loose_objects(
       continue
     }
     let dir = join_path(objects_dir, entry)
-    if not(rfs.is_dir(dir)) {
+    if !(rfs.is_dir(dir)) {
       continue
     }
     let files = rfs.readdir(dir)
@@ -539,11 +539,11 @@ fn prune_loose_objects(
         continue
       }
       let path = join_path(dir, name)
-      if not(rfs.is_file(path)) {
+      if !(rfs.is_file(path)) {
         continue
       }
       let hex = entry + name
-      if not(remove_reachable) && keep.contains(hex) {
+      if !(remove_reachable) && keep.contains(hex) {
         continue
       }
       fs.remove_file(path)
@@ -558,7 +558,7 @@ fn list_loose_object_hex(
 ) -> Array[String] raise @bit.GitError {
   let out : Array[String] = []
   let objects_dir = join_path(git_dir, "objects")
-  if not(fs.is_dir(objects_dir)) {
+  if !(fs.is_dir(objects_dir)) {
     return out
   }
   let entries = fs.readdir(objects_dir)
@@ -570,7 +570,7 @@ fn list_loose_object_hex(
       continue
     }
     let dir = join_path(objects_dir, entry)
-    if not(fs.is_dir(dir)) {
+    if !(fs.is_dir(dir)) {
       continue
     }
     let files = fs.readdir(dir)
@@ -579,7 +579,7 @@ fn list_loose_object_hex(
         continue
       }
       let path = join_path(dir, name)
-      if not(fs.is_file(path)) {
+      if !(fs.is_file(path)) {
         continue
       }
       out.push(entry + name)
@@ -596,7 +596,7 @@ fn prune_packfiles(
   keep_pack_id : @bit.ObjectId,
 ) -> Unit raise @bit.GitError {
   let pack_dir = join_path(git_dir, "objects/pack")
-  if not(rfs.is_dir(pack_dir)) {
+  if !(rfs.is_dir(pack_dir)) {
     return
   }
   let base = "pack-" + keep_pack_id.to_hex()

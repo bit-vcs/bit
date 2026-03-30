@@ -35,7 +35,7 @@ test "branch: column config enables dense layout when non-verbose" {
   )
   assert_true(active)
   assert_true(dense)
-  assert_true(not(explicit_enabled))
+  assert_true(!(explicit_enabled))
 }
 
 ///|
@@ -46,8 +46,8 @@ test "branch: verbose ignores config columns but tracks explicit column" {
     Some("column"),
     Some("dense"),
   )
-  assert_true(not(config_active))
-  assert_true(not(config_explicit))
+  assert_true(!(config_active))
+  assert_true(!(config_explicit))
 
   let (explicit_active, explicit_dense, explicit_enabled) = branch_resolve_column_mode(
     Some("column"),
@@ -56,6 +56,6 @@ test "branch: verbose ignores config columns but tracks explicit column" {
     Some("dense"),
   )
   assert_true(explicit_active)
-  assert_true(not(explicit_dense))
+  assert_true(!(explicit_dense))
   assert_true(explicit_enabled)
 }

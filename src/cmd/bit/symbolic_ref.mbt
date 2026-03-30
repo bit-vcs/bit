@@ -9,7 +9,7 @@ async fn handle_symbolic_ref(args : Array[String]) -> Unit raise Error {
     match arg {
       "-d" | "--delete" => delete_mode = true
       "--short" => short_mode = true
-      _ if not(arg.has_prefix("-")) => positional.push(arg)
+      _ if !(arg.has_prefix("-")) => positional.push(arg)
       _ if arg.has_prefix("-") => warn_unimplemented_arg("symbolic-ref", arg)
       _ => ()
     }
@@ -29,7 +29,7 @@ async fn handle_symbolic_ref(args : Array[String]) -> Unit raise Error {
   }
   if positional.length() == 1 {
     // Read mode
-    if not(fs.is_file(ref_path)) {
+    if !(fs.is_file(ref_path)) {
       raise @bitcore.GitError::InvalidObject("ref \{name} not found")
     }
     let content = decode_bytes(fs.read_file(ref_path))

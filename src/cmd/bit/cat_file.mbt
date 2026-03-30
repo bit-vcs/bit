@@ -818,7 +818,7 @@ async fn handle_cat_file(args : Array[String]) -> Unit raise Error {
   }
   let mut expected_type : @bitcore.ObjectType? = None
   let mut obj_spec : String? = None
-  if not(show_type || show_size || pretty_print) && positionals.length() >= 2 {
+  if !(show_type || show_size || pretty_print) && positionals.length() >= 2 {
     match cat_file_parse_object_type_name(positionals[0]) {
       Some(obj_type) => {
         expected_type = Some(obj_type)
@@ -1200,7 +1200,7 @@ fn cat_file_collect_batch_all_objects(
     let (hex, _) = item
     ids.push(hex)
   }
-  if not(unordered) {
+  if !(unordered) {
     ids.sort()
   }
   let out : Array[@bitcore.ObjectId] = []
@@ -1236,7 +1236,7 @@ fn cat_file_collect_batch_all_object_disk_records(
       cat_file_append_pack_disk_records(fs, pack, out)
     }
   }
-  if not(unordered) {
+  if !(unordered) {
     out.sort_by((a, b) => {
       String::compare(
         a.id.to_hex() + " " + a.disk_size.to_string(),
@@ -1328,7 +1328,7 @@ fn cat_file_read_alternate_object_dirs(
 ) -> Array[String] {
   let out : Array[String] = []
   let alt_path = git_dir + "/objects/info/alternates"
-  if not(fs.is_file(alt_path)) {
+  if !(fs.is_file(alt_path)) {
     return out
   }
   let data = fs.read_file(alt_path) catch { _ => return out }
@@ -1345,7 +1345,7 @@ fn cat_file_read_alternate_object_dirs(
     } else {
       normalize_path(base_dir + "/" + line)
     }
-    if not(fs.is_dir(objects_dir)) {
+    if !(fs.is_dir(objects_dir)) {
       continue
     }
     if seen.contains(objects_dir) {
@@ -1651,7 +1651,7 @@ fn cat_file_validate_midx_large_offsets(
   objects_dir : String,
 ) -> Bool {
   let midx_path = objects_dir + "/pack/multi-pack-index"
-  if not(fs.is_file(midx_path)) {
+  if !(fs.is_file(midx_path)) {
     return false
   }
   let data = fs.read_file(midx_path) catch { _ => return false }
@@ -1837,7 +1837,7 @@ fn cat_file_find_reachable_commit_by_message(
         }
         let info = @bitcore.parse_commit(o.data) catch { _ => continue }
         for parent in info.parents {
-          if not(seen.contains(parent.to_hex())) {
+          if !(seen.contains(parent.to_hex())) {
             queue.push(parent)
           }
         }

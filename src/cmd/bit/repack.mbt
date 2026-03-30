@@ -92,7 +92,7 @@ async fn handle_repack(args : Array[String]) -> Unit raise Error {
     } else if arg == "--path-walk" {
       path_walk = true
     } else if arg.has_prefix("-") &&
-      not(arg.has_prefix("--")) &&
+      !(arg.has_prefix("--")) &&
       arg.length() > 1 {
       // Parse combined short flags like -ad, -adq, -Adl, etc.
       for j in 1..<arg.length() {
@@ -123,7 +123,7 @@ async fn handle_repack(args : Array[String]) -> Unit raise Error {
   // explicitly disabled via --no-write-bitmap-index or config.
   let is_bare = root == git_dir || is_bare_repo_dir(root)
   let bitmap_from_cmdline = write_bitmap
-  if not(write_bitmap) && not(no_write_bitmap) && all {
+  if !(write_bitmap) && !(no_write_bitmap) && all {
     // Check repack.writeBitmaps config, defaulting to true for bare repos
     let config_val = bit_config_get(git_dir, "repack", "writeBitmaps")
     match config_val {
@@ -133,7 +133,7 @@ async fn handle_repack(args : Array[String]) -> Unit raise Error {
   }
   // When bitmaps were auto-enabled (not explicitly from command line),
   // suppress them if .keep packs exist (git behavior).
-  if write_bitmap && not(bitmap_from_cmdline) && not(pack_kept_objects) {
+  if write_bitmap && !(bitmap_from_cmdline) && !(pack_kept_objects) {
     let entries = fs.readdir(pack_dir) catch { _ => [] }
     let has_keep = entries.iter().any(fn(e) { e.has_suffix(".keep") })
     if has_keep {
@@ -158,21 +158,21 @@ async fn handle_repack(args : Array[String]) -> Unit raise Error {
   // so only loose objects are packed (existing packs are kept).
   po_args.push("--all")
   po_args.push("--reflog")
-  if not(all) {
+  if !(all) {
     po_args.push("--unpacked")
     po_args.push("--incremental")
   }
   if local_only {
     po_args.push("--local")
   }
-  if not(pack_kept_objects) {
+  if !(pack_kept_objects) {
     po_args.push("--honor-pack-keep")
   }
   po_args.push("--non-empty")
   if quiet {
     po_args.push("-q")
   }
-  if write_bitmap && not(no_write_bitmap) {
+  if write_bitmap && !(no_write_bitmap) {
     po_args.push("--write-bitmap-index")
   }
   if keep_unreachable {
@@ -248,7 +248,7 @@ async fn handle_repack(args : Array[String]) -> Unit raise Error {
   ignore(dev_null)
   if code != 0 {
     let err_text = stderr_data.text() catch { _ => "" }
-    if err_text.length() > 0 && not(quiet) {
+    if err_text.length() > 0 && !(quiet) {
       @stdio.stderr.write(err_text)
     }
     // pack-objects returns 1 with --non-empty when nothing to pack — that's ok
@@ -276,7 +276,7 @@ async fn handle_repack(args : Array[String]) -> Unit raise Error {
       }
       let stem = midx_pack_stem(old_pack)
       // Skip packs with .keep files (unless --pack-kept-objects)
-      if not(pack_kept_objects) && fs.is_file(pack_dir + "/" + stem + ".keep") {
+      if !(pack_kept_objects) && fs.is_file(pack_dir + "/" + stem + ".keep") {
         continue
       }
       // Skip packs in --keep-pack list
@@ -299,7 +299,7 @@ async fn handle_repack(args : Array[String]) -> Unit raise Error {
     }
   }
   // Update server info (objects/info/packs) unless -n
-  if not(no_update_server_info) {
+  if !(no_update_server_info) {
     repack_update_server_info(fs, git_dir, pack_dir)
   }
   // Write multi-pack-index if requested
@@ -307,7 +307,7 @@ async fn handle_repack(args : Array[String]) -> Unit raise Error {
     midx_write(
       fs,
       pack_dir,
-      not(quiet),
+      !(quiet),
       None,
       false,
       write_bitmap,
@@ -373,7 +373,7 @@ fn repack_update_server_info(
   let entries = fs.readdir(pack_dir) catch { _ => return }
   let buf = StringBuilder::new()
   for entry in entries {
-    if entry.has_suffix(".pack") && not(entry.has_prefix(".tmp-")) {
+    if entry.has_suffix(".pack") && !(entry.has_prefix(".tmp-")) {
       buf.write_string("P ")
       buf.write_string(entry)
       buf.write_string("\n")
@@ -415,7 +415,7 @@ async fn repack_fallback(
   let result = @bitlib.repack_repo(fs, fs, root) catch { _ => None }
   match result {
     Some(info) => {
-      if not(quiet) {
+      if !(quiet) {
         let hex = info.pack_id.to_hex()
         print_line(
           "Repacked \{info.object_count} objects into pack-\{String::unsafe_substring(hex, start=0, end=8)}",
@@ -445,7 +445,7 @@ async fn repack_fallback(
         }
       }
     }
-    None => if not(quiet) { print_line("Nothing to repack.") }
+    None => if !(quiet) { print_line("Nothing to repack.") }
   }
 }
 

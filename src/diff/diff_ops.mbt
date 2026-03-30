@@ -58,9 +58,9 @@ pub async fn diff_worktree(
     if skip_worktree_paths.contains(path) {
       continue
     }
-    if cache_ready && not(cache_map.contains(path)) {
+    if cache_ready && !(cache_map.contains(path)) {
       let ignored = @bitlib.is_ignored_path(fs, root, path, false)
-      if not(ignored) {
+      if !(ignored) {
         let old = diff_read_blob(db, fs, entry.id)
         // Skip if blob not found (e.g., submodule)
         if old is Some(_) {
@@ -117,7 +117,7 @@ pub async fn diff_worktree(
                 }
               None => ()
             }
-            if not(mode_changed) && stat_matches {
+            if !(mode_changed) && stat_matches {
               content_changed = false
             } else {
               let content = fs.read_file(abs)
@@ -145,7 +145,7 @@ pub async fn diff_worktree(
                 }
               None => ()
             }
-            if not(mode_changed) && stat_matches {
+            if !(mode_changed) && stat_matches {
               content_changed = false
             } else {
               match @bitio.read_symlink_target_path(abs) {
@@ -247,11 +247,11 @@ fn diff_worktree_gitlink_change(
   entry : @bitlib.IndexEntry,
 ) -> DiffFile? {
   let sub_root = @bit.join_path(root, entry.path)
-  if not(fs.is_dir(sub_root)) {
+  if !(fs.is_dir(sub_root)) {
     return None
   }
   let sub_git = @bit.join_path(sub_root, ".git")
-  if not(fs.is_file(sub_git)) && not(fs.is_dir(sub_git)) {
+  if !(fs.is_file(sub_git)) && !(fs.is_dir(sub_git)) {
     return None
   }
   let sub_git_dir = @bitlib.resolve_gitdir(fs, sub_git)
@@ -332,7 +332,7 @@ pub fn diff_index(
   }
   for item in head_entries.to_array() {
     let (path, h) = item
-    if not(index_map.contains(path)) {
+    if !(index_map.contains(path)) {
       let old = diff_content_for_entry(db, fs, h.id, h.mode)
       // Skip if blob not found (e.g., submodule)
       if old is Some(_) {
@@ -670,7 +670,7 @@ pub fn diff_trees(
   }
   // Deleted
   for path, entry in old_entries {
-    if not(new_entries.contains(path)) {
+    if !(new_entries.contains(path)) {
       let old_content = diff_content_for_entry(db, fs, entry.id, entry.mode)
       if old_content is Some(_) {
         out.push({
@@ -862,7 +862,7 @@ fn normalize_crlf_to_lf(content : Bytes) -> Bytes {
     out.push(content[i])
     i += 1
   }
-  if not(changed) {
+  if !(changed) {
     return content
   }
   Bytes::from_array(FixedArray::makei(out.length(), i => out[i]))
@@ -891,7 +891,7 @@ fn profile_lap(
   label : String,
   start : @bench.Timestamp?,
 ) -> @bench.Timestamp? {
-  if not(enabled) {
+  if !(enabled) {
     return start
   }
   match start {

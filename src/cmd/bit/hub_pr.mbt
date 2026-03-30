@@ -197,7 +197,7 @@ async fn handle_hub_pr_status(args : Array[String]) -> Unit raise Error {
   let author = get_author_string()
   let mut mine_count = 0
   for pr in open_prs {
-    if pr.author() == author && not(branch_ids.contains(pr.id())) {
+    if pr.author() == author && !(branch_ids.contains(pr.id())) {
       if mine_count == 0 {
         print_line("Open pull requests authored by \{author}:")
       }
@@ -254,7 +254,7 @@ async fn handle_hub_pr_import(args : Array[String]) -> Unit raise Error {
         continue
       }
       "--limit" if i + 1 < args.length() => {
-        limit = @strconv.parse_int(args[i + 1]) catch {
+        limit = @string.parse_int(args[i + 1]) catch {
           _ =>
             raise @bitcore.GitError::InvalidObject(
               "Invalid limit: \{args[i + 1]}",
@@ -287,7 +287,7 @@ async fn handle_hub_pr_import(args : Array[String]) -> Unit raise Error {
         )
       _ if arg.has_prefix("--limit=") => {
         let value = String::unsafe_substring(arg, start=8, end=arg.length())
-        limit = @strconv.parse_int(value) catch {
+        limit = @string.parse_int(value) catch {
           _ => raise @bitcore.GitError::InvalidObject("Invalid limit: \{value}")
         }
         i += 1
@@ -1010,7 +1010,7 @@ async fn handle_hub_pr_comment_add(args : Array[String]) -> Unit raise Error {
         continue
       }
       "--line" if i + 1 < args.length() => {
-        line_number = args[i + 1] |> @strconv.parse_int |> Some
+        line_number = args[i + 1] |> @string.parse_int |> Some
         i += 2
         continue
       }
@@ -1045,7 +1045,7 @@ async fn handle_hub_pr_comment_add(args : Array[String]) -> Unit raise Error {
       }
       _ if arg.has_prefix("--line=") => {
         let value = String::unsafe_substring(arg, start=7, end=arg.length())
-        line_number = value |> @strconv.parse_int |> Some
+        line_number = value |> @string.parse_int |> Some
         i += 1
         continue
       }

@@ -40,7 +40,7 @@
 ///   "lib/build/out.o",       // ignored by build/
 ///   "server.log",            // ignored by *.log
 /// ]
-/// let visible = files.filter(fn(p) { not(m.is_ignored(p, false)) })
+/// let visible = files.filter(fn(p) { !(m.is_ignored(p, false)) })
 /// // visible = ["src/app.ts", "src/keep.generated.ts"]
 /// ```
 ///
@@ -162,7 +162,7 @@ pub fn Matcher::is_ignored(
   let mut ignored = false
   for rule in self.rules {
     if rule_applies(rule, rel_path, is_dir) {
-      ignored = not(rule.negated)
+      ignored = !(rule.negated)
     }
   }
   ignored
@@ -203,11 +203,11 @@ pub fn Matcher::could_negate_under(self : Matcher, dir_rel : String) -> Bool {
     return false
   }
   for rule in self.rules {
-    if not(rule.negated) {
+    if !(rule.negated) {
       continue
     }
     // Non-path-specific rules (no slash, not anchored) could match anywhere
-    if not(rule.has_slash) && not(rule.anchored) {
+    if !(rule.has_slash) && !(rule.anchored) {
       return true
     }
     // Path-specific rule: compute target path and check prefix overlap

@@ -67,14 +67,14 @@ pub fn search_tracked_worktree_expr(
   let db = @bitlib.ObjectDb::load(fs, git_dir)
   let matches : Array[GrepFileMatch] = []
   for entry in index_entries {
-    if not(grep_path_matches_filters(entry.path, paths, max_depth)) {
+    if !(grep_path_matches_filters(entry.path, paths, max_depth)) {
       continue
     }
     let abs_path = root + "/" + entry.path
     let has_worktree_file = fs.is_file(abs_path)
     let content = if assume_unchanged_paths.contains(entry.path) {
       if skip_worktree_paths.contains(entry.path) {
-        if not(has_worktree_file) {
+        if !(has_worktree_file) {
           continue
         }
         @utf8.decode_lossy(fs.read_file(abs_path)[:])
@@ -87,7 +87,7 @@ pub fn search_tracked_worktree_expr(
         @utf8.decode_lossy(blob.data[:])
       }
     } else if skip_worktree_paths.contains(entry.path) {
-      if not(has_worktree_file) {
+      if !(has_worktree_file) {
         continue
       }
       @utf8.decode_lossy(fs.read_file(abs_path)[:])
@@ -95,7 +95,7 @@ pub fn search_tracked_worktree_expr(
       if entry.intent_to_add {
         continue
       }
-      if not(has_worktree_file) {
+      if !(has_worktree_file) {
         continue
       }
       @utf8.decode_lossy(fs.read_file(abs_path)[:])
@@ -121,7 +121,7 @@ pub fn list_tracked_worktree_candidate_paths(
   let assume_unchanged_paths = @bitlib.read_assume_unchanged_paths(fs, git_dir)
   let out : Array[String] = []
   for entry in index_entries {
-    if not(grep_path_matches_filters(entry.path, paths, max_depth)) {
+    if !(grep_path_matches_filters(entry.path, paths, max_depth)) {
       continue
     }
     if entry.intent_to_add && assume_unchanged_paths.contains(entry.path) {
@@ -393,7 +393,7 @@ fn search_worktree_paths(
   let matches : Array[GrepFileMatch] = []
   for path in candidate_paths {
     let abs_path = root + "/" + path
-    if not(fs.is_file(abs_path)) {
+    if !(fs.is_file(abs_path)) {
       continue
     }
     let content = @utf8.decode_lossy(fs.read_file(abs_path)[:])
@@ -863,7 +863,7 @@ fn collect_line_matches(
       word_regexp~,
     )
     let matched = result.matched
-    let should_output = if invert_match { not(matched) } else { matched }
+    let should_output = if invert_match { !(matched) } else { matched }
     if should_output {
       let column = match result.span {
         Some(value) => value.start_column

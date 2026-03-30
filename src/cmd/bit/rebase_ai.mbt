@@ -14,7 +14,7 @@ struct RebaseAiArgs {
 
 ///|
 fn parse_rebase_ai_rounds(raw : String) -> Int raise @bitcore.GitError {
-  let parsed = @strconv.parse_int(raw) catch {
+  let parsed = @string.parse_int(raw) catch {
     _ =>
       raise @bitcore.GitError::InvalidObject(
         "rebase-ai: --max-ai-rounds expects a positive integer",
@@ -30,7 +30,7 @@ fn parse_rebase_ai_rounds(raw : String) -> Int raise @bitcore.GitError {
 
 ///|
 fn parse_rebase_ai_agent_steps(raw : String) -> Int raise @bitcore.GitError {
-  let parsed = @strconv.parse_int(raw) catch {
+  let parsed = @string.parse_int(raw) catch {
     _ =>
       raise @bitcore.GitError::InvalidObject(
         "rebase-ai: --agent-max-steps expects a positive integer",
@@ -140,7 +140,7 @@ fn parse_rebase_ai_args(
         i += 1
         continue
       }
-      _ if not(arg.has_prefix("-")) => {
+      _ if !(arg.has_prefix("-")) => {
         upstream = Some(arg)
         i += 1
         continue

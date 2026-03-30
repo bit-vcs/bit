@@ -4,7 +4,7 @@ fn push_delete_current_branch_policy(
   checked_out_worktree : String?,
   deny_delete_current : String?,
 ) -> (Bool, Bool) {
-  if not(has_remote_ref) || checked_out_worktree is None {
+  if !(has_remote_ref) || checked_out_worktree is None {
     return (false, false)
   }
   match deny_delete_current {
@@ -30,7 +30,7 @@ fn push_resolve_mirror_refspecs(
   delete_mode : Bool,
 ) -> Array[String]? raise @bitcore.GitError {
   let mirror_active = option_mirror || remote_mirror
-  if not(mirror_active) {
+  if !(mirror_active) {
     return None
   }
   if explicit_refspec_count > 0 || push_all || push_tags || delete_mode {
@@ -240,7 +240,7 @@ fn push_force_if_includes_reflog_refnames(
 ) -> Array[String] {
   let refnames : Array[String] = []
   let append_refname = fn(refname : String) {
-    if refname.length() > 0 && not(refnames.contains(refname)) {
+    if refname.length() > 0 && !(refnames.contains(refname)) {
       refnames.push(refname)
     }
   }
@@ -531,7 +531,7 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
         break
       }
     }
-    if not(has_main) {
+    if !(has_main) {
       fallback_branch = local_branches_for_default[0].name
     }
   }
@@ -669,9 +669,9 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
   }
   let mut legacy_push_url : String? = None
   if refspec_args.length() == 0 &&
-    not(push_all) &&
-    not(push_tags) &&
-    not(delete_mode) {
+    !(push_all) &&
+    !(push_tags) &&
+    !(delete_mode) {
     match (legacy_branch_remote, explicit_remote) {
       (Some((legacy_name, legacy_url, legacy_branch)), Some(explicit_name)) =>
         if explicit_name == legacy_name {
@@ -846,7 +846,7 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
     match push_detect_relay_session(resolved_push_url) {
       Some((base_url, session_id)) => {
         let proxied = base_url + "/git/" + session_id
-        if not(quiet) && not(porcelain) {
+        if !(quiet) && !(porcelain) {
           print_line("Pushing via relay session: \{session_id}")
         }
         resolved_push_url = proxied
@@ -868,7 +868,7 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
           preferred_sender~,
           preferred_repo~,
         )
-        if not(quiet) && not(porcelain) {
+        if !(quiet) && !(porcelain) {
           print_line(
             "Relay peer selected: \{relay_sender} -> \{relay_push_url}",
           )
@@ -910,13 +910,13 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
     )
     force_with_lease_rules[refname] = expectation
   }
-  let track_upstream_config = not(dry_run) &&
-    not(push_mirror_active) &&
+  let track_upstream_config = !(dry_run) &&
+    !(push_mirror_active) &&
     (set_upstream || auto_set_upstream_needed)
   let emit_progress = push_should_emit_progress(progress_override, quiet)
   if helper_is_testgit &&
     refspec_args.length() == 0 &&
-    not(push_all) &&
+    !(push_all) &&
     default_plan is Some(_) {
     if @sys.get_env_var("GIT_REMOTE_TESTGIT_NOREFSPEC") is Some(_) {
       raise @bitcore.GitError::InvalidObject(
@@ -959,7 +959,7 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
     Some((remote_url, subdir_path, base_hex)) => {
       if porcelain {
         print_line("To \{remote_url}")
-      } else if not(quiet) {
+      } else if !(quiet) {
         print_line("Pushing subdir-clone to \{remote_url}...")
         print_line("  Subdirectory: \{subdir_path}")
       }
@@ -986,7 +986,7 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
     None => {
       if porcelain {
         print_line("To \{push_target_display}")
-      } else if not(quiet) {
+      } else if !(quiet) {
         print_line("Pushing to \{url}...")
       }
       match @bitlib.resolve_local_repo_path(fs, root, url) {
@@ -1090,7 +1090,7 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
                     continue
                   }
                   if spec.src.contains("*") || spec.dst.contains("*") {
-                    if not(spec.src.contains("*") && spec.dst.contains("*")) {
+                    if !(spec.src.contains("*") && spec.dst.contains("*")) {
                       raise @bitcore.GitError::InvalidObject(
                         "Invalid wildcard push refspec",
                       )
@@ -1114,7 +1114,7 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
                   }
                   if source_is_other &&
                     spec.dst.length() > 0 &&
-                    not(spec.dst.has_prefix("refs/")) {
+                    !(spec.dst.has_prefix("refs/")) {
                     let has_existing = @bitlib.resolve_ref(
                         fs,
                         rgd,
@@ -1125,7 +1125,7 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
                       is Some(_) ||
                       @bitlib.resolve_ref(fs, rgd, "refs/remotes/" + spec.dst)
                       is Some(_)
-                    if not(has_existing) {
+                    if !(has_existing) {
                       raise @bitcore.GitError::InvalidObject(
                         "Cannot infer destination ref from source object id",
                       )
@@ -1268,7 +1268,7 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
                     break
                   }
                 }
-                if not(reachable) {
+                if !(reachable) {
                   continue
                 }
                 push_plans.push({
@@ -1304,12 +1304,12 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
                   force_with_lease_rules,
                 ) {
                 Some((tracking_based, expected_old)) =>
-                  if not(plan_item.force) && old_opt != expected_old {
+                  if !(plan_item.force) && old_opt != expected_old {
                     lease_stale = true
-                  } else if not(plan_item.force) &&
+                  } else if !(plan_item.force) &&
                     tracking_based &&
                     push_use_force_if_includes &&
-                    not(
+                    !(
                       push_force_if_includes_satisfied(
                         fs, local_db, git_dir, "", expected_old,
                       ),
@@ -1433,14 +1433,14 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
                         force_with_lease_rules,
                       ) {
                       Some((tracking_based, expected_old)) =>
-                        if not(plan_item.force) && old_opt != expected_old {
+                        if !(plan_item.force) && old_opt != expected_old {
                           lease_stale = true
                         } else {
                           lease_passed = true
-                          if not(plan_item.force) &&
+                          if !(plan_item.force) &&
                             tracking_based &&
                             push_use_force_if_includes &&
-                            not(
+                            !(
                               push_force_if_includes_satisfied(
                                 fs, local_db, git_dir, src_refname, expected_old,
                               ),
@@ -1469,9 +1469,9 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
                     let mut tag_conflict = false
                     if old_opt is Some(existing_old) &&
                       existing_old != local_id &&
-                      not(plan_item.force) {
+                      !(plan_item.force) {
                       if dst_refname.has_prefix("refs/heads/") &&
-                        not(
+                        !(
                           is_ancestor_commit(
                             local_db, fs, existing_old, local_id,
                           ),
@@ -1483,7 +1483,7 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
                       }
                     }
                     if lease_passed &&
-                      not(plan_item.force) &&
+                      !(plan_item.force) &&
                       (non_fast_forward || tag_conflict) {
                       effective_force_update = true
                       non_fast_forward = false
@@ -1513,7 +1513,7 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
                     let mut deny_decision : DenyCurrentBranchDecision? = Some(
                       DenyCurrentBranchDecision::Allow,
                     )
-                    if not(hidden_ref || non_fast_forward || tag_conflict) {
+                    if !(hidden_ref || non_fast_forward || tag_conflict) {
                       deny_decision = (enforce_receive_deny_current_branch(
                         deny_current_branch, checked_out_worktree, dst_refname,
                       )
@@ -1583,7 +1583,7 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
                   None => ()
                 }
               }
-              if not(matched) {
+              if !(matched) {
                 raise @bitcore.GitError::InvalidObject(
                   "Cannot resolve source ref: " + plan_item.source_ref,
                 )
@@ -1614,14 +1614,14 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
                 force_with_lease_rules,
               ) {
               Some((tracking_based, expected_old)) =>
-                if not(plan_item.force) && old_opt != expected_old {
+                if !(plan_item.force) && old_opt != expected_old {
                   lease_stale = true
                 } else {
                   lease_passed = true
-                  if not(plan_item.force) &&
+                  if !(plan_item.force) &&
                     tracking_based &&
                     push_use_force_if_includes &&
-                    not(
+                    !(
                       push_force_if_includes_satisfied(
                         fs,
                         local_db,
@@ -1654,9 +1654,9 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
             let mut tag_conflict = false
             if old_opt is Some(existing_old) &&
               existing_old != local_id &&
-              not(plan_item.force) {
+              !(plan_item.force) {
               if plan_item.dest_ref.has_prefix("refs/heads/") &&
-                not(is_ancestor_commit(local_db, fs, existing_old, local_id)) {
+                !(is_ancestor_commit(local_db, fs, existing_old, local_id)) {
                 non_fast_forward = true
               }
               if plan_item.dest_ref.has_prefix("refs/tags/") {
@@ -1664,7 +1664,7 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
               }
             }
             if lease_passed &&
-              not(plan_item.force) &&
+              !(plan_item.force) &&
               (non_fast_forward || tag_conflict) {
               effective_force_update = true
               non_fast_forward = false
@@ -1691,7 +1691,7 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
             let mut deny_decision : DenyCurrentBranchDecision? = Some(
               DenyCurrentBranchDecision::Allow,
             )
-            if not(hidden_ref || non_fast_forward || tag_conflict) {
+            if !(hidden_ref || non_fast_forward || tag_conflict) {
               deny_decision = (enforce_receive_deny_current_branch(
                 deny_current_branch,
                 checked_out_worktree,
@@ -1780,10 +1780,10 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
               "failed to push some refs to '\{url}'",
             )
           }
-          if not(dry_run) && resolved_updates.length() > 0 {
+          if !(dry_run) && resolved_updates.length() > 0 {
             let mut has_object_updates = false
             for row in resolved_updates {
-              if row.should_apply && not(row.delete_ref) {
+              if row.should_apply && !(row.delete_ref) {
                 has_object_updates = true
                 break
               }
@@ -1795,7 +1795,7 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
               let rfs : &@bitcore.RepoFileSystem = fs
               let transferred_object_ids : Map[String, Bool] = {}
               for row in resolved_updates {
-                if row.should_apply && not(row.delete_ref) {
+                if row.should_apply && !(row.delete_ref) {
                   copy_wanted_object_graph(
                     fs,
                     rfs,
@@ -1834,7 +1834,7 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
               }
             }
             for row in resolved_updates {
-              if not(row.should_apply) {
+              if !(row.should_apply) {
                 continue
               }
               if row.delete_ref {
@@ -1936,9 +1936,9 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
               )
               ignore(run_push_hook_with_args(fs, rgd, "post-update", post_refs))
             }
-            if not(porcelain || quiet) {
+            if !(porcelain || quiet) {
               for row in resolved_updates {
-                if not(row.should_apply) {
+                if !(row.should_apply) {
                   continue
                 }
                 if row.delete_ref && row.old_id != @bitcore.ObjectId::zero() {
@@ -1952,7 +1952,7 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
               let upstream_messages = push_write_upstream_config_updates(
                 fs, git_dir, remote_name, upstream_config_updates,
               )
-              if not(quiet) {
+              if !(quiet) {
                 for message in upstream_messages {
                   print_line(message)
                 }
@@ -1971,12 +1971,12 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
               )
             }
             print_line("Done")
-          } else if not(quiet) {
+          } else if !(quiet) {
             print_line("Push successful")
           }
         }
         None => {
-          if emit_progress && not(dry_run) {
+          if emit_progress && !(dry_run) {
             eprint_line("Writing objects: 100% (1/1), done.")
           }
           let result = @bitlibnative.push_http(
@@ -1986,7 +1986,7 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
             first_refname,
             force~,
           )
-          if not(porcelain || quiet) {
+          if !(porcelain || quiet) {
             print_line(result)
           }
         }
@@ -2020,13 +2020,13 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
       _ => ()
     }
   }
-  let wrote_count = if push_negotiate && not(negotiation_failed) {
+  let wrote_count = if push_negotiate && !(negotiation_failed) {
     "2"
   } else {
     "5"
   }
   emit_push_trace_event(fs, "write_pack_file/wrote", wrote_count)
-  if push_negotiate && not(negotiation_failed) {
+  if push_negotiate && !(negotiation_failed) {
     emit_push_trace_event(fs, "total_rounds", "1")
   }
 }
@@ -2071,7 +2071,7 @@ fn push_detect_relay_session(remote_url : String) -> (String, String)? {
     return None
   }
   for c in segment {
-    if not(push_is_session_id_char(c)) {
+    if !(push_is_session_id_char(c)) {
       return None
     }
   }

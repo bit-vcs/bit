@@ -112,7 +112,7 @@ pub fn cherry_pick(
   // Find deleted files
   for entry in parent_files.iter() {
     let (path, _) = entry
-    if not(commit_files.contains(path)) {
+    if !(commit_files.contains(path)) {
       deleted_files.push(path)
     }
   }

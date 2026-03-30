@@ -78,7 +78,7 @@ fn stripspace_clean(input : String, strip_comments : Bool) -> String {
   let mut prev_blank = true // Start true to strip leading blanks
   for line in processed {
     if line.length() == 0 {
-      if not(prev_blank) {
+      if !(prev_blank) {
         result.push("")
       }
       prev_blank = true

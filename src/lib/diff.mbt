@@ -51,9 +51,9 @@ pub async fn diff_worktree(
     if skip_worktree_paths.contains(path) {
       continue
     }
-    if cache_ready && not(cache_map.contains(path)) {
+    if cache_ready && !(cache_map.contains(path)) {
       let ignored = is_ignored_path(fs, root, path, false)
-      if not(ignored) {
+      if !(ignored) {
         let old = diff_read_blob(db, fs, entry.id)
         // Skip if blob not found (e.g., submodule)
         if old is Some(_) {
@@ -110,7 +110,7 @@ pub async fn diff_worktree(
                 }
               None => ()
             }
-            if not(mode_changed) && stat_matches {
+            if !(mode_changed) && stat_matches {
               content_changed = false
             } else {
               let content = fs.read_file(abs)
@@ -149,7 +149,7 @@ pub async fn diff_worktree(
                 }
               None => ()
             }
-            if not(mode_changed) && stat_matches {
+            if !(mode_changed) && stat_matches {
               content_changed = false
             } else {
               match @bitio.read_symlink_target_path(abs) {
@@ -262,7 +262,7 @@ pub fn diff_index(
   }
   for item in head_entries.to_array() {
     let (path, h) = item
-    if not(index_map.contains(path)) {
+    if !(index_map.contains(path)) {
       let old = diff_read_blob(db, fs, h.id)
       // Skip if blob not found (e.g., submodule)
       if old is Some(_) {
@@ -641,7 +641,7 @@ pub fn diff_trees(
   }
   // Deleted
   for path, entry in old_entries {
-    if not(new_entries.contains(path)) {
+    if !(new_entries.contains(path)) {
       let old_content = diff_read_blob(db, fs, entry.id)
       if old_content is Some(_) {
         out.push({

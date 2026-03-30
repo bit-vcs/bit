@@ -65,11 +65,11 @@ fn commit_storage_runtime_delegate_args(
   if commit_has_merge_state(fs, git_dir) {
     return None
   }
-  if not(commit_has_no_verify_flag(args)) &&
+  if !(commit_has_no_verify_flag(args)) &&
     fs.is_file(git_dir + "/hooks/pre-commit") {
     return None
   }
-  if not(parsed.quiet) && get_subdir_info(fs, git_dir) is Some(_) {
+  if !(parsed.quiet) && get_subdir_info(fs, git_dir) is Some(_) {
     return None
   }
   Some({
@@ -90,7 +90,7 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
   ignore(commit_args_require_standalone_error(args))
 
   if commit_should_use_storage_runtime(args) &&
-    not(commit_signing_requested(git_dir, args)) {
+    !(commit_signing_requested(git_dir, args)) {
     match commit_storage_runtime_delegate_args(fs, git_dir, args) {
       Some(commit_args) => {
         // Pass resolved author/committer to storage_runtime via env bridge
@@ -236,7 +236,7 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
         i += 2
         continue
       }
-      _ if arg.has_prefix("-m") && not(arg.has_prefix("-ma")) => {
+      _ if arg.has_prefix("-m") && !(arg.has_prefix("-ma")) => {
         commit_check_message_source_conflict(message_source, "m")
         message_source = "m"
         messages.push(string_slice_from(arg, 2))
@@ -450,7 +450,7 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
         allow_empty_message~,
       )
     }
-  } else if should_edit && not(no_edit) {
+  } else if should_edit && !(no_edit) {
     // -c or --edit: open editor with existing message
     message = read_commit_message_from_editor(
       fs,
@@ -466,7 +466,7 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
   }
   // Validate empty message
   let stripped_msg = commit_prepare_message_for_validation(msg, cleanup_mode)
-  if stripped_msg.length() == 0 && not(allow_empty_message) {
+  if stripped_msg.length() == 0 && !(allow_empty_message) {
     eprint_line("Aborting commit due to empty commit message.")
     @sys.exit(1)
   }
@@ -497,7 +497,7 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
     Some(flag) => flag
     None => signing_commit_config_enabled(git_dir)
   }
-  if not(no_verify) {
+  if !(no_verify) {
     let hook_status = run_pre_commit_hook(fs, root, git_dir)
     if hook_status != 0 {
       raise @bitcore.GitError::InvalidObject("pre-commit hook failed")
@@ -603,10 +603,10 @@ async fn handle_commit(args : Array[String]) -> Unit raise Error {
     Some(idx) => string_slice_to(msg, idx)
     None => msg
   }
-  if not(quiet) {
+  if !(quiet) {
     let branch_name = commit_get_current_branch(rfs, git_dir)
     let head_parent = @bitlib.resolve_head_commit(rfs, git_dir)
-    let is_root = head_parent is None && not(amend)
+    let is_root = head_parent is None && !(amend)
     let branch_display = match branch_name {
       Some(name) => if is_root { name + " (root-commit)" } else { name }
       None => if is_root { "(root-commit)" } else { "HEAD" }
@@ -684,7 +684,7 @@ fn read_merge_head_ids(
   git_dir : String,
 ) -> Array[@bitcore.ObjectId] raise Error {
   let path = git_dir + "/MERGE_HEAD"
-  if not(fs.is_file(path)) {
+  if !(fs.is_file(path)) {
     return []
   }
   let ids : Array[@bitcore.ObjectId] = []
@@ -846,7 +846,7 @@ async fn commit_signed(
   let parent = @bitlib.resolve_head_commit(rfs, git_dir)
   let entries = @bitlib.read_index_entries(rfs, git_dir)
   let tree_id = if entries.length() == 0 {
-    if not(allow_empty) {
+    if !(allow_empty) {
       raise @bitcore.GitError::InvalidObject("Empty index")
     }
     match parent {
@@ -1025,7 +1025,7 @@ async fn commit_with_merge_heads(
   let head_parent = @bitlib.resolve_head_commit(rfs, git_dir)
   let entries = @bitlib.read_index_entries(rfs, git_dir)
   let tree_id = if entries.length() == 0 {
-    if not(allow_empty) {
+    if !(allow_empty) {
       raise @bitcore.GitError::InvalidObject("Empty index")
     }
     match head_parent {
@@ -1301,7 +1301,7 @@ async fn commit_show_diffstat(
   }
   // Check deleted files
   for path, _ in old_entries {
-    if not(new_entries.contains(path)) {
+    if !(new_entries.contains(path)) {
       files_changed += 1
     }
   }
@@ -1322,7 +1322,7 @@ async fn commit_show_diffstat(
     }
   }
   for path, old_id in old_entries {
-    if not(new_entries.contains(path)) {
+    if !(new_entries.contains(path)) {
       deletions += commit_blob_line_count(rfs, db, old_id)
     }
   }
@@ -1431,8 +1431,8 @@ async fn commit_handle_pathspec_staging(
   for pathspec in pathspecs {
     let rel_path = commit_resolve_pathspec(root, pathspec)
     // Check if path exists in index or as a file
-    if not(index_paths.contains(rel_path)) &&
-      not(fs.is_file(root + "/" + rel_path)) {
+    if !(index_paths.contains(rel_path)) &&
+      !(fs.is_file(root + "/" + rel_path)) {
       eprint_line(
         "error: pathspec '\{pathspec}' did not match any file(s) known to git",
       )
@@ -1576,7 +1576,7 @@ fn abs_path(path : String) -> String {
 async fn run_pre_commit_hook(fs : OsFs, root : String, git_dir : String) -> Int {
   let hook_git_dir = abs_path(git_dir)
   let hook_path = hook_git_dir + "/hooks/pre-commit"
-  if not(fs.is_file(hook_path)) {
+  if !(fs.is_file(hook_path)) {
     return 0
   }
   let work_root = abs_path(root)

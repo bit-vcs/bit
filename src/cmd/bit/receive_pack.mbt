@@ -30,7 +30,7 @@ async fn handle_receive_pack(args : Array[String]) -> Unit {
   let fs = OsFs::new()
   let git_dir = if root.has_suffix(".git") && !root.has_suffix("/.git") {
     root
-  } else if fs.is_file(root + "/HEAD") && not(fs.is_dir(root + "/.git")) {
+  } else if fs.is_file(root + "/HEAD") && !(fs.is_dir(root + "/.git")) {
     // Bare repository without .git suffix
     root
   } else {
@@ -56,7 +56,7 @@ async fn handle_receive_pack(args : Array[String]) -> Unit {
   }
   // Send advertisement: always for advertise-only mode, and in
   // bidirectional mode (no --stateless-rpc)
-  if advertise || not(stateless_rpc) {
+  if advertise || !(stateless_rpc) {
     let haves = receive_collect_alternate_haves(fs, git_dir, root)
     let proto = @bitlib.get_protocol_version()
     let out = @bitlib.build_receive_pack_advertisement(
@@ -71,7 +71,7 @@ async fn handle_receive_pack(args : Array[String]) -> Unit {
     @stdio.stdout.write(out)
   }
   // Process commands (unless advertise-only mode)
-  if not(advertise) {
+  if !(advertise) {
     let input = read_all_stdin()
     let req = @bitlib.parse_receive_pack_request(input)
     // Determine client capabilities
@@ -97,7 +97,7 @@ async fn handle_receive_pack(args : Array[String]) -> Unit {
       req.updates,
       req.push_options,
     )
-    if not(pre_receive_ok) {
+    if !(pre_receive_ok) {
       // pre-receive rejected: report all refs as rejected
       let result : @bitlib.ReceivePackResult = {
         updated: [],
@@ -245,7 +245,7 @@ async fn receive_collect_alternate_haves(
 ) -> Array[@bitcore.ObjectId] {
   let haves : Array[@bitcore.ObjectId] = []
   let alternates_path = git_dir + "/objects/info/alternates"
-  if not(fs.is_file(alternates_path)) {
+  if !(fs.is_file(alternates_path)) {
     return haves
   }
   let data = fs.read_file(alternates_path) catch { _ => return haves }
@@ -273,7 +273,7 @@ async fn receive_collect_alternate_haves(
       git_dir + "/objects/" + line
     }
     // Strip /objects suffix to get the alternate git dir
-    if not(alt_objects_dir.has_suffix("/objects")) {
+    if !(alt_objects_dir.has_suffix("/objects")) {
       continue
     }
     let alt_git_dir = String::unsafe_substring(
@@ -430,7 +430,7 @@ fn receive_ref_matches_proc_patterns(
     // Prefix match with '/' boundary: refname == prefix || refname starts with prefix + "/"
     let matched = refname == prefix || refname.has_prefix(prefix + "/")
     if matched {
-      return not(negated)
+      return !(negated)
     }
   }
   false
@@ -448,7 +448,7 @@ async fn receive_run_hook(
   push_options : Array[String],
 ) -> Bool {
   let hook_path = git_dir + "/hooks/" + hook_name
-  if not(fs.is_file(hook_path)) {
+  if !(fs.is_file(hook_path)) {
     return true
   }
   // Compute hook path relative to root for execution with cwd=root.
@@ -521,7 +521,7 @@ async fn receive_run_proc_receive_hook(
   push_options : Array[String],
 ) -> Array[@bitlib.ReceivePackProcResult] {
   let hook_path = git_dir + "/hooks/proc-receive"
-  if not(fs.is_file(hook_path)) {
+  if !(fs.is_file(hook_path)) {
     return updates.map(fn(u) {
       (
         {
@@ -861,11 +861,11 @@ fn parse_filter_spec(spec : String) -> @protocol.FilterSpec {
     @protocol.FilterSpec::BlobNone
   } else if spec.has_prefix("blob:limit=") {
     let limit_str = String::unsafe_substring(spec, start=11, end=spec.length())
-    let limit = @strconv.parse_int64(limit_str) catch { _ => 0L }
+    let limit = @string.parse_int64(limit_str) catch { _ => 0L }
     @protocol.FilterSpec::BlobLimit(limit)
   } else if spec.has_prefix("tree:") {
     let depth_str = String::unsafe_substring(spec, start=5, end=spec.length())
-    let depth = @strconv.parse_int(depth_str) catch { _ => 0 }
+    let depth = @string.parse_int(depth_str) catch { _ => 0 }
     @protocol.FilterSpec::TreeDepth(depth)
   } else {
     @protocol.FilterSpec::NoFilter

@@ -37,7 +37,7 @@ async fn handle_fetch_pack(args : Array[String]) -> Unit raise Error {
         return
       }
       _ if arg.has_prefix("--depth=") =>
-        depth = Some(@strconv.parse_int(arg[8:].to_string()) catch { _ => 0 })
+        depth = Some(@string.parse_int(arg[8:].to_string()) catch { _ => 0 })
       _ if arg.has_prefix("--upload-pack=") =>
         upload_pack = Some(arg[14:].to_string())
       _ if arg.has_prefix("--exec=") => upload_pack = Some(arg[7:].to_string())
@@ -45,7 +45,7 @@ async fn handle_fetch_pack(args : Array[String]) -> Unit raise Error {
       _ if arg.has_prefix("--server-option=") => ()
       _ if arg.has_prefix("--negotiation-tip=") => ()
       _ if arg == "--" => ()
-      _ if not(arg.has_prefix("-")) => positional.push(arg)
+      _ if !(arg.has_prefix("-")) => positional.push(arg)
       _ if arg.has_prefix("-") => warn_unimplemented_arg("fetch-pack", arg)
       _ => ()
     }

@@ -305,7 +305,7 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
               end=next.length(),
             )
             rev_list_add_glob_refs(fs, git_dir, pattern, excludes)
-          } else if not(next.has_prefix("-")) {
+          } else if !(next.has_prefix("-")) {
             excludes.push(next)
           }
           i += 1
@@ -334,7 +334,7 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
       }
       _ if arg.has_prefix("^") =>
         excludes.push(String::unsafe_substring(arg, start=1, end=arg.length()))
-      _ if not(arg.has_prefix("-")) && arg.contains("..") => {
+      _ if !(arg.has_prefix("-")) && arg.contains("..") => {
         // Handle A..B (equivalent to ^A B) and A...B (symmetric difference)
         let dot_pos = rev_list_find_range_dots(arg)
         match dot_pos {
@@ -362,7 +362,7 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
           None => refs.push(arg)
         }
       }
-      _ if not(arg.has_prefix("-")) =>
+      _ if !(arg.has_prefix("-")) =>
         // Handle ^@, ^!, ^-N parent suffixes
         if arg.has_suffix("^@") {
           // commit^@ = all parents of commit
@@ -396,7 +396,7 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
                 excludes.push(base + "^1")
                 refs.push(base)
               } else {
-                let n = @strconv.parse_int(suffix) catch { _ => -1 }
+                let n = @string.parse_int(suffix) catch { _ => -1 }
                 if n > 0 {
                   excludes.push(base + "^" + n.to_string())
                   refs.push(base)
@@ -437,7 +437,7 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
         continue
       }
       if line == "--not" {
-        stdin_not_mode = not(stdin_not_mode)
+        stdin_not_mode = !(stdin_not_mode)
       } else if line == "--all" {
         all = true
       } else if line == "--branches" {
@@ -494,7 +494,7 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
         stdin_end_of_options = true
       } else if line == "--" {
         () // pathspec separator, ignore
-      } else if line.has_prefix("-") && not(line.has_prefix("^")) {
+      } else if line.has_prefix("-") && !(line.has_prefix("^")) {
         // Unknown option in stdin mode
         eprint_line("fatal: invalid option '\{line}' in --stdin mode")
         @sys.exit(128)
@@ -521,7 +521,7 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
     let all_refs = @bitrepo.show_ref(fs, git_dir)
     for item in all_refs {
       let (name, _) = item
-      if not(rev_list_ref_excluded(name, rev_list_exclude_patterns)) {
+      if !(rev_list_ref_excluded(name, rev_list_exclude_patterns)) {
         refs.push(name)
       }
     }
@@ -540,10 +540,10 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
   // If no refs specified and no explicit ref source was given, default to HEAD
   if refs.length() == 0 &&
     excludes.length() == 0 &&
-    not(indexed_objects) &&
-    not(stdin) &&
-    not(all) &&
-    not(had_ref_source) &&
+    !(indexed_objects) &&
+    !(stdin) &&
+    !(all) &&
+    !(had_ref_source) &&
     rev_list_exclude_patterns.length() == 0 {
     refs.push("HEAD")
   }
@@ -561,7 +561,7 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
     match @bitrepo.rev_parse(fs, git_dir, spec) {
       Some(id) => {
         let hex = id.to_hex()
-        if id != @bitcore.ObjectId::zero() && not(start_seen.contains(hex)) {
+        if id != @bitcore.ObjectId::zero() && !(start_seen.contains(hex)) {
           start_seen[hex] = true
           start_ids.push(id)
         }
@@ -600,12 +600,12 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
       Some(obj) if obj.obj_type == @bitcore.ObjectType::Commit => {
         let info = @bitcore.parse_commit(obj.data)
         if first_parent && info.parents.length() > 0 {
-          if not(visited.contains(info.parents[0].to_hex())) {
+          if !(visited.contains(info.parents[0].to_hex())) {
             queue.push(info.parents[0])
           }
         } else {
           for parent in info.parents {
-            if not(visited.contains(parent.to_hex())) {
+            if !(visited.contains(parent.to_hex())) {
               queue.push(parent)
             }
           }
@@ -709,10 +709,10 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
         _ => ()
       }
     }
-    if indexed_objects && not(indexed_objects_negated) {
+    if indexed_objects && !(indexed_objects_negated) {
       for item in indexed_visible_objects {
         let hex = item.0.to_hex()
-        if not(object_seen.contains(hex)) {
+        if !(object_seen.contains(hex)) {
           object_seen[hex] = true
           object_ids.push(item)
         }
@@ -828,7 +828,7 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
     for item in object_ids {
       let (id, path) = item
       let hex = id.to_hex()
-      if not(commit_set.contains(hex)) {
+      if !(commit_set.contains(hex)) {
         let line = if no_object_names || use_bitmap || path.length() == 0 {
           hex
         } else {
@@ -855,7 +855,7 @@ fn rev_list_is_digit(c : Char) -> Bool {
 fn rev_list_is_short_max_count_arg(arg : String) -> Bool {
   arg.length() > 1 &&
   arg.get_char(0).unwrap() == '-' &&
-  not(arg.has_prefix("--")) &&
+  !(arg.has_prefix("--")) &&
   rev_list_is_digit(arg.get_char(1).unwrap())
 }
 
@@ -868,7 +868,7 @@ fn rev_list_is_long_numeric_option(arg : String) -> Bool {
 
 ///|
 async fn rev_list_parse_int_or_die(value : String) -> Int raise Error {
-  @strconv.parse_int(value) catch {
+  @string.parse_int(value) catch {
     err if @async.is_cancellation_error(err) => raise err
     _ => {
       eprint_line("fatal: not an integer: " + value)
@@ -908,7 +908,7 @@ fn walk_commits_to_map(
       Some(o) if o.obj_type == @bitcore.ObjectType::Commit => {
         let info = @bitcore.parse_commit(o.data) catch { _ => continue }
         for parent in info.parents {
-          if not(out.contains(parent.to_hex())) {
+          if !(out.contains(parent.to_hex())) {
             queue.push(parent)
           }
         }
@@ -939,7 +939,7 @@ fn collect_tree_objects(
       let entries = @bitcore.parse_tree(o.data) catch { _ => return () }
       for entry in entries {
         let entry_hex = entry.id.to_hex()
-        if not(visited.contains(entry_hex)) {
+        if !(visited.contains(entry_hex)) {
           let entry_path = if parent_path.length() == 0 {
             entry.name
           } else {
@@ -1015,7 +1015,7 @@ fn collect_tree_objects_excluding_index(
             Some(index_hex) if index_hex == entry_hex => continue
             _ => ()
           }
-          if not(visited.contains(entry_hex)) {
+          if !(visited.contains(entry_hex)) {
             visited[entry_hex] = true
             out.push((entry.id, entry_path))
           }
@@ -1044,7 +1044,7 @@ fn rev_list_collect_index_objects(
     }
     index_by_path[entry.path] = entry
     path_ids[entry.path] = hex
-    if not(unique_ids.contains(hex)) {
+    if !(unique_ids.contains(hex)) {
       unique_ids[hex] = true
       visible.push((entry.id, entry.path))
     }
@@ -1101,7 +1101,7 @@ fn rev_list_collect_matching_index_trees(
           parent_path + "/" + entry.name
         }
         if entry.mode.has_prefix("40") {
-          if not(
+          if !(
               rev_list_collect_matching_index_trees(
                 db,
                 fs,
@@ -1133,7 +1133,7 @@ fn rev_list_collect_matching_index_trees(
       }
       let hex = tree_id.to_hex()
       path_ids[parent_path] = hex
-      if parent_path.length() > 0 && not(unique_ids.contains(hex)) {
+      if parent_path.length() > 0 && !(unique_ids.contains(hex)) {
         unique_ids[hex] = true
         visible.push((tree_id, parent_path))
       }
@@ -1261,7 +1261,7 @@ async fn rev_list_test_bitmap(fs : OsFs, git_dir : String) -> Unit raise Error {
       bmp_checksum_ok = false
     }
   }
-  if not(bmp_checksum_ok) {
+  if !(bmp_checksum_ok) {
     eprint_line("error: bitmap checksum mismatch")
     @sys.exit(1)
     return
@@ -1288,7 +1288,7 @@ async fn rev_list_test_bitmap(fs : OsFs, git_dir : String) -> Unit raise Error {
     }
     bmp_pos = bmp_pos + 4 + 4 + word_count * 8 + 4
   }
-  if not(valid) {
+  if !(valid) {
     eprint_line("error: bitmap structure invalid")
     @sys.exit(1)
     return
@@ -1485,7 +1485,7 @@ fn rev_list_topo_sort_impl(
         for phex in ps {
           let deg = in_degree.get(phex).unwrap_or(1) - 1
           in_degree[phex] = deg
-          if deg == 0 && not(emitted.get(phex).unwrap_or(false)) {
+          if deg == 0 && !(emitted.get(phex).unwrap_or(false)) {
             ready.push(phex)
           }
         }
@@ -1554,7 +1554,7 @@ fn rev_list_extract_author_timestamp(data : Bytes) -> Int64 {
           start=second_last_space + 1,
           end=last_space,
         )
-        return @strconv.parse_int64(ts_str) catch { _ => 0L }
+        return @string.parse_int64(ts_str) catch { _ => 0L }
       }
     }
   }

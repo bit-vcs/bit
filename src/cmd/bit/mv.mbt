@@ -7,7 +7,7 @@ async fn handle_mv(args : Array[String]) -> Unit raise Error {
   for arg in args {
     match arg {
       "-f" | "--force" => force = true
-      _ if not(arg.has_prefix("-")) => paths.push(arg)
+      _ if !(arg.has_prefix("-")) => paths.push(arg)
       _ if arg.has_prefix("-") => warn_unimplemented_arg("mv", arg)
       _ => ()
     }

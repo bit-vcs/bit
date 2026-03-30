@@ -49,7 +49,7 @@ fn bench_join_path(root : String, path : String) -> String {
 
 ///|
 fn bench_ensure_dir(path : String) -> Unit {
-  if not(@nfs.path_exists(path)) {
+  if !(@nfs.path_exists(path)) {
     @nfs.create_dir(path) catch {
       _ => ()
     }

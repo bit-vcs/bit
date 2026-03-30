@@ -62,7 +62,7 @@ async fn handle_show_ref(args : Array[String]) -> Unit raise Error {
     if show_ref_exists_without_resolution(fs, git_dir, refname) {
       @sys.exit(0)
     } else {
-      if not(quiet) {
+      if !(quiet) {
         eprint_line("error: reference does not exist")
       }
       @sys.exit(2)
@@ -80,13 +80,13 @@ async fn handle_show_ref(args : Array[String]) -> Unit raise Error {
           // Verify object exists (git checks this for dangling refs)
           let obj_exists = db.get(fs, id) catch { _ => None }
           if obj_exists is None {
-            if not(quiet) {
+            if !(quiet) {
               eprint_line(
                 "fatal: git show-ref: bad ref \{refname} (\{id.to_hex()})",
               )
             }
             has_missing = true
-          } else if not(quiet) {
+          } else if !(quiet) {
             if hash_only {
               print_line(id.to_hex())
             } else {
@@ -118,7 +118,7 @@ async fn handle_show_ref(args : Array[String]) -> Unit raise Error {
       Some(head_id) => {
         // --head always shows HEAD regardless of patterns
         matched_count += 1
-        if not(quiet) {
+        if !(quiet) {
           if hash_only {
             print_line(head_id.to_hex())
           } else {
@@ -135,7 +135,7 @@ async fn handle_show_ref(args : Array[String]) -> Unit raise Error {
       let is_head = refname.has_prefix("refs/heads/")
       let is_tag = refname.has_prefix("refs/tags/")
       let type_match = (heads_only && is_head) || (tags_only && is_tag)
-      if not(type_match) {
+      if !(type_match) {
         continue
       }
     }
@@ -149,12 +149,12 @@ async fn handle_show_ref(args : Array[String]) -> Unit raise Error {
           break
         }
       }
-      if not(matched) {
+      if !(matched) {
         continue
       }
     }
     matched_count += 1
-    if not(quiet) {
+    if !(quiet) {
       if hash_only {
         print_line(id.to_hex())
       } else {
@@ -227,7 +227,7 @@ fn show_ref_exists_without_resolution(
     let normalized = @bitlib.normalize_repo_path(refname) catch {
       _ => return false
     }
-    if not(normalized.has_prefix("refs/")) {
+    if !(normalized.has_prefix("refs/")) {
       return false
     }
     normalized
@@ -237,7 +237,7 @@ fn show_ref_exists_without_resolution(
     return true
   }
   let packed_refs_path = git_dir + "/packed-refs"
-  if not(fs.is_file(packed_refs_path)) {
+  if !(fs.is_file(packed_refs_path)) {
     return false
   }
   let content = decode_bytes(

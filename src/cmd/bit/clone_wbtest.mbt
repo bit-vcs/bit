@@ -171,7 +171,7 @@ fn cleanup_clone_wbtest_tree(fs : OsFs, path : String) -> Unit {
     }
     return
   }
-  if not(fs.is_dir(path)) {
+  if !(fs.is_dir(path)) {
     return
   }
   let entries = fs.readdir(path) catch { _ => [] }

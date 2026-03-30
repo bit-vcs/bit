@@ -20,11 +20,11 @@ pub fn reverse_patch(patch : String) -> String {
   let lines : Array[String] = []
   for line_view in patch.split("\n") {
     let line = line_view.to_string()
-    if line.has_prefix("+") && not(line.has_prefix("+++")) {
+    if line.has_prefix("+") && !(line.has_prefix("+++")) {
       lines.push(
         "-" + String::unsafe_substring(line, start=1, end=line.length()),
       )
-    } else if line.has_prefix("-") && not(line.has_prefix("---")) {
+    } else if line.has_prefix("-") && !(line.has_prefix("---")) {
       lines.push(
         "+" + String::unsafe_substring(line, start=1, end=line.length()),
       )
@@ -56,7 +56,7 @@ pub fn parse_patches(patch : String) -> Array[PatchInfo] {
     let line = all_lines[i]
     // Detect start of a diff (git format or non-git format)
     let is_git_diff = line.has_prefix("diff --git ")
-    let is_nongit_diff = not(is_git_diff) && line.has_prefix("diff ")
+    let is_nongit_diff = !(is_git_diff) && line.has_prefix("diff ")
     if is_git_diff || is_nongit_diff {
       let mut old_name = ""
       let mut new_name = ""
@@ -208,11 +208,11 @@ pub fn parse_patches(patch : String) -> Array[PatchInfo] {
               break
             }
             if hunkline.has_prefix("+") &&
-              not(hunkline.has_prefix("+++ ")) &&
+              !(hunkline.has_prefix("+++ ")) &&
               hunkline != "+++" {
               additions += 1
             } else if hunkline.has_prefix("-") &&
-              not(hunkline.has_prefix("--- ")) &&
+              !(hunkline.has_prefix("--- ")) &&
               hunkline != "---" {
               deletions += 1
             }

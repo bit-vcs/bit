@@ -264,7 +264,7 @@ fn write_tree_recursive(
   git_dir : String,
   node : TreeNode,
 ) -> @bit.ObjectId raise @bit.GitError {
-  if not(node.dirty) {
+  if !(node.dirty) {
     if node.base_tree_id is Some(base_tree_id) {
       return base_tree_id
     }

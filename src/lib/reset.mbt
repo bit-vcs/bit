@@ -94,7 +94,7 @@ fn reset_resolve_common_git_dir(
   git_dir : String,
 ) -> String {
   let commondir_path = join_path(git_dir, "commondir")
-  if not(fs.is_file(commondir_path)) {
+  if !(fs.is_file(commondir_path)) {
     return git_dir
   }
   let raw = @utf8.decode_lossy(

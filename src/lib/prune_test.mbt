@@ -39,5 +39,5 @@ test "prune: removes unreachable loose objects" {
   assert_true(fs.is_file(obj_path))
   let result = prune_repo(fs, fs, "/repo")
   assert_true(result.pruned.contains(orphan))
-  assert_true(not(fs.is_file(obj_path)))
+  assert_true(!(fs.is_file(obj_path)))
 }

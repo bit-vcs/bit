@@ -213,7 +213,7 @@ pub fn add_trailer(message : String, key : String, value : String) -> String {
   let result = StringBuilder::new()
   result.write_string(body)
   // Ensure blank line before trailers if body doesn't end with one
-  if body.length() > 0 && not(body.has_suffix("\n\n")) {
+  if body.length() > 0 && !(body.has_suffix("\n\n")) {
     if body.has_suffix("\n") {
       result.write_char('\n')
     } else {

@@ -30,7 +30,7 @@ fn storage_runtime_fail_unsupported_mode(
 
 ///|
 fn storage_runtime_is_short_count_flag(arg : String) -> Bool {
-  if not(arg.has_prefix("-")) || arg.length() <= 1 {
+  if !(arg.has_prefix("-")) || arg.length() <= 1 {
     return false
   }
   let raw = String::unsafe_substring(arg, start=1, end=arg.length())
@@ -142,19 +142,19 @@ fn storage_runtime_parse_add_args(
   let mut end_of_options = false
   let paths : Array[String] = []
   for arg in args {
-    if not(end_of_options) && arg == "--" {
+    if !(end_of_options) && arg == "--" {
       end_of_options = true
       continue
     }
     match arg {
-      "-A" | "--all" if not(end_of_options) => add_all = true
-      _ if end_of_options || not(arg.has_prefix("-")) => paths.push(arg)
+      "-A" | "--all" if !(end_of_options) => add_all = true
+      _ if end_of_options || !(arg.has_prefix("-")) => paths.push(arg)
       _ if arg.has_prefix("-") =>
         storage_runtime_fail_unsupported_option("add", arg)
       _ => ()
     }
   }
-  if not(add_all) && paths.length() == 0 {
+  if !(add_all) && paths.length() == 0 {
     raise @bitcore.GitError::InvalidObject("add requires pathspec")
   }
   { add_all, paths }
@@ -261,25 +261,25 @@ fn storage_runtime_parse_log_args(
     match arg {
       "--oneline" => oneline = true
       "-n" if i + 1 < args.length() => {
-        max_count = @strconv.parse_int(args[i + 1])
+        max_count = @string.parse_int(args[i + 1])
         i += 2
         continue
       }
       "--max-count" if i + 1 < args.length() => {
-        max_count = @strconv.parse_int(args[i + 1])
+        max_count = @string.parse_int(args[i + 1])
         i += 2
         continue
       }
       _ if arg.has_prefix("-n") && arg.length() > 2 =>
-        max_count = @strconv.parse_int(
+        max_count = @string.parse_int(
           String::unsafe_substring(arg, start=2, end=arg.length()),
         )
       _ if storage_runtime_is_short_count_flag(arg) => {
         let num_str = String::unsafe_substring(arg, start=1, end=arg.length())
-        max_count = @strconv.parse_int(num_str)
+        max_count = @string.parse_int(num_str)
       }
       _ if arg.has_prefix("--max-count=") =>
-        max_count = @strconv.parse_int(
+        max_count = @string.parse_int(
           String::unsafe_substring(arg, start=12, end=arg.length()),
         )
       _ if arg.has_prefix("-") =>
@@ -353,7 +353,7 @@ fn storage_runtime_parse_hash_object_args(
         }
         break
       }
-      _ if not(arg.has_prefix("-")) => paths.push(arg)
+      _ if !(arg.has_prefix("-")) => paths.push(arg)
       _ => storage_runtime_fail_unsupported_option("hash-object", arg)
     }
     i += 1
@@ -421,7 +421,7 @@ fn storage_runtime_parse_update_ref_args(
   for arg in args {
     match arg {
       "-d" | "--delete" => delete_mode = true
-      _ if not(arg.has_prefix("-")) => positional.push(arg)
+      _ if !(arg.has_prefix("-")) => positional.push(arg)
       _ => storage_runtime_fail_unsupported_option("update-ref", arg)
     }
   }

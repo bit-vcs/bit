@@ -176,9 +176,9 @@ fn Kv::do_merge(
           resolve_conflict(self, store, path, our_content, their_hash, strategy)
         }
       }
-    } else if in_theirs && not(in_ours) {
+    } else if in_theirs && !(in_ours) {
       // They added, we don't have
-      if not(in_base) {
+      if !(in_base) {
         // New file from them
         let their_hash = their_id.unwrap_or(@bit.ObjectId::zero())
         let content = get_blob_content(store, their_hash)
@@ -188,7 +188,7 @@ fn Kv::do_merge(
         }
       }
       // If in base but not in ours, we deleted it - keep deleted
-    } else if in_ours && not(in_theirs) {
+    } else if in_ours && !(in_theirs) {
       // We have, they don't
       if in_base {
         // They deleted, we still have

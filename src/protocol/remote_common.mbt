@@ -286,7 +286,7 @@ pub async fn push_with_http(
 ) -> String raise @bit.GitError {
   let (_, caps) = discover_refs_with_http(remote, http_get)
   let has_report_status = caps.contains("report-status")
-  if not(has_report_status) {
+  if !(has_report_status) {
     raise @bit.GitError::ProtocolError("Server does not support report-status")
   }
   let url = remote.receive_pack_url()

@@ -48,7 +48,7 @@ async fn handle_for_each_ref(args : Array[String]) -> Unit raise Error {
       _ if arg.has_prefix("--count=") => {
         let val = String::unsafe_substring(arg, start=8, end=arg.length())
         count = Some(
-          @strconv.parse_int(val) catch {
+          @string.parse_int(val) catch {
             err if @async.is_cancellation_error(err) => raise err
             _ => 0
           },
@@ -143,7 +143,7 @@ async fn handle_for_each_ref(args : Array[String]) -> Unit raise Error {
         if i + 1 < args.length() {
           i += 1
           count = Some(
-            @strconv.parse_int(args[i]) catch {
+            @string.parse_int(args[i]) catch {
               err if @async.is_cancellation_error(err) => raise err
               _ => 0
             },
@@ -193,7 +193,7 @@ async fn handle_for_each_ref(args : Array[String]) -> Unit raise Error {
           break
         }
       }
-      if not(matched) {
+      if !(matched) {
         continue
       }
     }
@@ -237,7 +237,7 @@ async fn handle_for_each_ref(args : Array[String]) -> Unit raise Error {
           _ => ()
         }
       }
-      if not(matches_points_at) {
+      if !(matches_points_at) {
         continue
       }
     }
@@ -281,7 +281,7 @@ async fn handle_for_each_ref(args : Array[String]) -> Unit raise Error {
           // --merged: ref's commit must be ancestor of (or equal to) merged_id
           match merged_id {
             Some(mid) =>
-              if not(for_each_ref_is_ancestor(fs, db_for_filter, cid, mid)) {
+              if !(for_each_ref_is_ancestor(fs, db_for_filter, cid, mid)) {
                 continue
               }
             None => ()
@@ -297,7 +297,7 @@ async fn handle_for_each_ref(args : Array[String]) -> Unit raise Error {
           // --contains: ref's commit must have contains_id as ancestor
           match contains_id {
             Some(coid) =>
-              if not(for_each_ref_is_ancestor(fs, db_for_filter, coid, cid)) {
+              if !(for_each_ref_is_ancestor(fs, db_for_filter, coid, cid)) {
                 continue
               }
             None => ()
@@ -488,7 +488,7 @@ async fn for_each_ref_collect_root_refs(
   for entry in entries {
     let name = entry
     // Root ref syntax: all uppercase, hyphens, underscores
-    if not(for_each_ref_is_root_ref_syntax(name)) {
+    if !(for_each_ref_is_root_ref_syntax(name)) {
       continue
     }
     // Skip pseudo refs (FETCH_HEAD, MERGE_HEAD)
@@ -503,7 +503,7 @@ async fn for_each_ref_collect_root_refs(
       continue
     }
     // Check if it's a root ref (HEAD, *_HEAD, or known irregular root refs)
-    if not(for_each_ref_is_root_ref(name)) {
+    if !(for_each_ref_is_root_ref(name)) {
       continue
     }
     // Read the ref file
@@ -536,7 +536,7 @@ fn for_each_ref_is_root_ref_syntax(name : String) -> Bool {
   }
   for i = 0; i < name.length(); i = i + 1 {
     let c = name[i]
-    if not((c >= 'A' && c <= 'Z') || c == '-' || c == '_') {
+    if !((c >= 'A' && c <= 'Z') || c == '-' || c == '_') {
       return false
     }
   }
@@ -998,7 +998,7 @@ async fn for_each_ref_validate_atom(atom : String) -> Unit {
       "body" | "subject" | "signature" | "size" => ()
       _ if arg.has_prefix("lines=") => {
         let n_str = String::unsafe_substring(arg, start=6, end=arg.length())
-        let n = @strconv.parse_int(n_str) catch { _ => -1 }
+        let n = @string.parse_int(n_str) catch { _ => -1 }
         if n < 0 {
           eprint_line("fatal: positive value expected contents:lines=" + n_str)
           @sys.exit(1)
@@ -1016,14 +1016,14 @@ async fn for_each_ref_validate_atom(atom : String) -> Unit {
     let val_str = String::unsafe_substring(atom, start=17, end=atom.length())
     let mut valid = false
     try {
-      let v = @strconv.parse_int(val_str)
+      let v = @string.parse_int(val_str)
       if v > 0 {
         valid = true
       }
     } catch {
       _ => ()
     }
-    if not(valid) {
+    if !(valid) {
       eprint_line("fatal: positive value expected objectname:short=" + val_str)
       @sys.exit(1)
     }
@@ -1039,7 +1039,7 @@ async fn for_each_ref_validate_atom(atom : String) -> Unit {
       start=colon_pos + 1,
       end=atom.length(),
     )
-    if not(for_each_ref_valid_date_format(date_arg)) {
+    if !(for_each_ref_valid_date_format(date_arg)) {
       eprint_line("fatal: unknown date format " + date_arg)
       @sys.exit(1)
     }
@@ -1062,7 +1062,7 @@ async fn for_each_ref_validate_atom(atom : String) -> Unit {
     }
   }
   // Validate unknown atom names (must be last check)
-  if not(for_each_ref_is_known_atom(atom)) {
+  if !(for_each_ref_is_known_atom(atom)) {
     eprint_line("fatal: unknown field name '" + atom + "'")
     @sys.exit(1)
   }
@@ -1451,7 +1451,7 @@ fn for_each_ref_match_pattern(refname : String, pattern : String) -> Bool {
         start=star_pos + 1,
         end=pattern.length(),
       )
-      if not(refname.has_prefix(prefix)) {
+      if !(refname.has_prefix(prefix)) {
         return false
       }
       if suffix.length() == 0 {
@@ -1723,7 +1723,7 @@ fn for_each_ref_format_needs_object(format : String) -> Bool {
           FixedArray::makei(end_pos - start, fn(j) { chars[start + j] }),
         )
         // Atoms that DON'T need object data
-        if not(
+        if !(
             atom == "refname" ||
             atom.has_prefix("refname:") ||
             atom == "objectname" ||
@@ -1805,10 +1805,10 @@ fn for_each_ref_parse_align_args(args : String) -> (Int, Int) {
         start=6,
         end=part_str.length(),
       )
-      width = @strconv.parse_int(wval) catch { _ => width }
+      width = @string.parse_int(wval) catch { _ => width }
     } else {
       // Try parsing as integer (width)
-      let parsed = @strconv.parse_int(part_str) catch { _ => 0 }
+      let parsed = @string.parse_int(part_str) catch { _ => 0 }
       if parsed > 0 {
         width = parsed
       }
@@ -1921,7 +1921,7 @@ async fn for_each_ref_format(
               None => break
             }
           }
-          if not(found_target) {
+          if !(found_target) {
             break
           }
         }
@@ -2029,9 +2029,9 @@ async fn for_each_ref_format(
           } else {
             // Simple %(if) - true if value is non-empty (git's is_empty: whitespace-only = empty)
             if_result = if if_cond_raw.length() > 0 {
-              not(for_each_ref_is_empty_bytes(if_cond_raw))
+              !(for_each_ref_is_empty_bytes(if_cond_raw))
             } else {
-              not(for_each_ref_is_empty_value(if_cond_value))
+              !(for_each_ref_is_empty_value(if_cond_value))
             }
           }
           if_state = 2 // then branch
@@ -2153,7 +2153,7 @@ async fn for_each_ref_format(
           continue
         }
         // In then/else branch, only output if condition matches
-        if if_state == 2 && not(if_result) {
+        if if_state == 2 && !(if_result) {
           i = end_pos + 1
           continue
         }
@@ -2379,7 +2379,7 @@ async fn for_each_ref_atom(
         start=eq_pos + 1,
         end=atom.length(),
       )
-      let n = @strconv.parse_int(n_str) catch { _ => 0 }
+      let n = @string.parse_int(n_str) catch { _ => 0 }
       if n < 0 {
         for_each_ref_lstrip_negative(refname, -n)
       } else {
@@ -2388,14 +2388,14 @@ async fn for_each_ref_atom(
     }
     _ if atom.has_prefix("refname:rstrip=") => {
       let n_str = String::unsafe_substring(atom, start=15, end=atom.length())
-      let n = @strconv.parse_int(n_str) catch { _ => 0 }
+      let n = @string.parse_int(n_str) catch { _ => 0 }
       for_each_ref_rstrip_n(refname, n)
     }
     "objectname" | "objectname:long" => id.to_hex()
     "objectname:short" => string_slice_to(id.to_hex(), 7)
     _ if atom.has_prefix("objectname:short=") => {
       let n_str = String::unsafe_substring(atom, start=17, end=atom.length())
-      let n = @strconv.parse_int(n_str) catch { _ => 7 }
+      let n = @string.parse_int(n_str) catch { _ => 7 }
       let hex = id.to_hex()
       // git enforces minimum of 4 chars for short hashes
       let min_n = if n < 4 { 4 } else { n }
@@ -2478,7 +2478,7 @@ async fn for_each_ref_atom(
         ""
       } else {
         let n_str = String::unsafe_substring(atom, start=11, end=atom.length())
-        let n = @strconv.parse_int(n_str) catch { _ => 7 }
+        let n = @string.parse_int(n_str) catch { _ => 7 }
         let text = decode_bytes(commit_data)
         for line_view in text.split("\n") {
           let line = line_view.to_string()
@@ -2749,7 +2749,7 @@ fn for_each_ref_if_output_active(
     0 => true // normal mode
     1 => false // evaluating condition, don't output
     2 => if_result // then branch: output if condition true
-    3 => not(if_result) // else branch: output if condition false
+    3 => !(if_result) // else branch: output if condition false
     _ => true
   }
 }
@@ -3046,7 +3046,7 @@ async fn for_each_ref_find_base(
   for item in commit_refs {
     let (refname, cid) = item
     let hex = cid.to_hex()
-    if not(commit_set.contains(hex)) {
+    if !(commit_set.contains(hex)) {
       commit_set[hex] = refname
     }
   }
@@ -3075,17 +3075,17 @@ async fn for_each_ref_find_base(
               start=7,
               end=line.length(),
             )
-            if not(visited.contains(parent_hex)) {
+            if !(visited.contains(parent_hex)) {
               visited[parent_hex] = true
               let parent_id = @bitcore.ObjectId::from_hex(parent_hex) catch {
                 _ => continue
               }
               queue.push(parent_id)
             }
-          } else if not(line.has_prefix("tree ")) &&
-            not(line.has_prefix("author ")) &&
-            not(line.has_prefix("committer ")) &&
-            not(line.has_prefix("parent ")) {
+          } else if !(line.has_prefix("tree ")) &&
+            !(line.has_prefix("author ")) &&
+            !(line.has_prefix("committer ")) &&
+            !(line.has_prefix("parent ")) {
             // Past header lines
             break
           }
@@ -3268,10 +3268,10 @@ fn for_each_ref_short_refname(
     let prefix = rule_prefixes[i]
     let suffix = rule_suffixes[i]
     // Check if refname matches this rule
-    if not(refname.has_prefix(prefix)) {
+    if !(refname.has_prefix(prefix)) {
       continue
     }
-    if suffix.length() > 0 && not(refname.has_suffix(suffix)) {
+    if suffix.length() > 0 && !(refname.has_suffix(suffix)) {
       continue
     }
     let short_name = String::unsafe_substring(
@@ -3295,7 +3295,7 @@ fn for_each_ref_short_refname(
         break
       }
     }
-    if not(ambiguous) {
+    if !(ambiguous) {
       return short_name
     }
   }
@@ -3432,7 +3432,7 @@ fn for_each_ref_symref_atom(
         start=eq_pos + 1,
         end=atom.length(),
       )
-      let n = @strconv.parse_int(n_str) catch { _ => 0 }
+      let n = @string.parse_int(n_str) catch { _ => 0 }
       if n < 0 {
         for_each_ref_lstrip_negative(target, -n)
       } else {
@@ -3441,7 +3441,7 @@ fn for_each_ref_symref_atom(
     }
     _ if atom.has_prefix("symref:rstrip=") => {
       let n_str = String::unsafe_substring(atom, start=14, end=atom.length())
-      let n = @strconv.parse_int(n_str) catch { _ => 0 }
+      let n = @string.parse_int(n_str) catch { _ => 0 }
       for_each_ref_rstrip_n(target, n)
     }
     _ => target
@@ -3494,7 +3494,7 @@ fn for_each_ref_upstream_atom(
           _ => None
         })
         is Some(_)
-      if not(upstream_exists) {
+      if !(upstream_exists) {
         // Upstream is gone
         if atom == "upstream:trackshort" {
           return ""
@@ -3555,7 +3555,7 @@ fn for_each_ref_upstream_atom(
         start=eq_pos + 1,
         end=atom.length(),
       )
-      let n = @strconv.parse_int(n_str) catch { _ => 0 }
+      let n = @string.parse_int(n_str) catch { _ => 0 }
       if n < 0 {
         for_each_ref_lstrip_negative(upstream_ref, -n)
       } else {
@@ -3564,7 +3564,7 @@ fn for_each_ref_upstream_atom(
     }
     _ if atom.has_prefix("upstream:rstrip=") => {
       let n_str = String::unsafe_substring(atom, start=16, end=atom.length())
-      let n = @strconv.parse_int(n_str) catch { _ => 0 }
+      let n = @string.parse_int(n_str) catch { _ => 0 }
       for_each_ref_rstrip_n(upstream_ref, n)
     }
     _ => upstream_ref
@@ -3676,7 +3676,7 @@ fn for_each_ref_push_atom(
           _ => None
         })
         is Some(_)
-      if not(push_exists) {
+      if !(push_exists) {
         if atom == "push:trackshort" {
           return ""
         }
@@ -3734,7 +3734,7 @@ fn for_each_ref_push_atom(
         start=eq_pos + 1,
         end=atom.length(),
       )
-      let n = @strconv.parse_int(n_str) catch { _ => 0 }
+      let n = @string.parse_int(n_str) catch { _ => 0 }
       if n < 0 {
         for_each_ref_lstrip_negative(push_ref, -n)
       } else {
@@ -3743,7 +3743,7 @@ fn for_each_ref_push_atom(
     }
     _ if atom.has_prefix("push:rstrip=") => {
       let n_str = String::unsafe_substring(atom, start=12, end=atom.length())
-      let n = @strconv.parse_int(n_str) catch { _ => 0 }
+      let n = @string.parse_int(n_str) catch { _ => 0 }
       for_each_ref_rstrip_n(push_ref, n)
     }
     _ => push_ref
@@ -3836,14 +3836,14 @@ fn for_each_ref_ahead_behind_commits(
   // Count ahead: commits reachable from local but not upstream
   let mut ahead = 0
   for entry in local_ancestors {
-    if not(upstream_ancestors.contains(entry.0)) {
+    if !(upstream_ancestors.contains(entry.0)) {
       ahead += 1
     }
   }
   // Count behind: commits reachable from upstream but not local
   let mut behind = 0
   for entry in upstream_ancestors {
-    if not(local_ancestors.contains(entry.0)) {
+    if !(local_ancestors.contains(entry.0)) {
       behind += 1
     }
   }
@@ -3870,7 +3870,7 @@ fn for_each_ref_walk_ancestors(
       Some(o) if o.obj_type == @bitcore.ObjectType::Commit => {
         let info = @bitcore.parse_commit(o.data) catch { _ => continue }
         for parent in info.parents {
-          if not(out.contains(parent.to_hex())) {
+          if !(out.contains(parent.to_hex())) {
             queue.push(parent)
           }
         }
@@ -3932,7 +3932,7 @@ async fn for_each_ref_commit_atom(
     } else {
       raw_line
     }
-    if not(past_headers) {
+    if !(past_headers) {
       if line.length() == 0 {
         past_headers = true
         continue
@@ -4215,7 +4215,7 @@ async fn for_each_ref_commit_atom(
     }
     _ if atom.has_prefix("contents:lines=") => {
       let n_str = String::unsafe_substring(atom, start=15, end=atom.length())
-      let n = @strconv.parse_int(n_str) catch { _ => 0 }
+      let n = @string.parse_int(n_str) catch { _ => 0 }
       if n <= 0 {
         ""
       } else {
@@ -4411,7 +4411,7 @@ async fn for_each_ref_format_trailers_atom(
     }
   }
   // Default: if no only= was set and no key filter, show all trailers (including non-trailer lines)
-  if not(only_set) && keys.length() == 0 {
+  if !(only_set) && keys.length() == 0 {
     only = false
   }
   let trailers = for_each_ref_parse_trailers(message)
@@ -4429,14 +4429,14 @@ async fn for_each_ref_format_trailers_atom(
             break
           }
         }
-        if not(key_matched) {
+        if !(key_matched) {
           continue
         }
         // Non-trailer lines: only include if only=no
       } else if only {
         continue
       }
-    } else if only && not(is_trailer) {
+    } else if only && !(is_trailer) {
       continue
     }
     // Format the line
@@ -4881,11 +4881,11 @@ fn for_each_ref_parse_ident_ts(ident : String) -> (Int64, String) {
             start=sp + 1,
             end=rest.length(),
           )
-          let ts = @strconv.parse_int64(ts_str) catch { _ => 0L }
+          let ts = @string.parse_int64(ts_str) catch { _ => 0L }
           (ts, tz)
         }
         None => {
-          let ts = @strconv.parse_int64(rest) catch { _ => 0L }
+          let ts = @string.parse_int64(rest) catch { _ => 0L }
           (ts, "+0000")
         }
       }

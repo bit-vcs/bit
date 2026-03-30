@@ -44,7 +44,7 @@ async fn handle_status(args : Array[String]) -> Unit raise Error {
   let mut git_dir = resolve_git_dir(fs, root)
   let mut has_git_dir = fs.is_dir(git_dir)
   let mut has_git_file = if has_git_dir { false } else { fs.is_file(git_dir) }
-  if not(has_git_dir) && not(has_git_file) {
+  if !(has_git_dir) && !(has_git_file) {
     match find_repo_root(".") {
       Some(found) => {
         root = found
@@ -58,7 +58,7 @@ async fn handle_status(args : Array[String]) -> Unit raise Error {
         )
     }
   }
-  if not(has_git_dir) && not(has_git_file) {
+  if !(has_git_dir) && !(has_git_file) {
     raise @bitcore.GitError::InvalidObject(
       "Not a git repository (or any of the parent directories): .git/.bit",
     )
@@ -94,7 +94,7 @@ async fn handle_status(args : Array[String]) -> Unit raise Error {
     }
   }
   // Show subdir-clone info if applicable (only in non-porcelain mode)
-  if not(porcelain) && not(short) {
+  if !(porcelain) && !(short) {
     match get_subdir_info(fs, git_dir) {
       Some((remote, path, base)) => {
         print_line("# subdir-clone: \{path} from \{remote}")

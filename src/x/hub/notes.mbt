@@ -225,7 +225,7 @@ fn update_notes_tree(
       new_entries.push(entry)
     }
   }
-  if not(found) {
+  if !(found) {
     new_entries.push(@bit.TreeEntry::new("100644", commit_hex, blob_id))
   }
   new_entries.sort_by((a, b) => String::compare(a.name, b.name))
@@ -278,7 +278,7 @@ fn remove_notes_tree_entry(
     }
     new_entries.push(entry)
   }
-  if not(found) {
+  if !(found) {
     return ()
   }
   new_entries.sort_by((a, b) => String::compare(a.name, b.name))

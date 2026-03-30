@@ -73,7 +73,7 @@ async fn handle_x_doc_show(
   match @xdoc.read_page(rfs, root, args[0]) {
     Ok(content) => {
       print_str(content)
-      if content.length() == 0 || not(content.has_suffix("\n")) {
+      if content.length() == 0 || !(content.has_suffix("\n")) {
         print_line("")
       }
     }
@@ -179,7 +179,7 @@ async fn handle_x_doc(args : Array[String]) -> Unit raise Error {
   let wfs : &@bitcore.FileSystem = fs
   let rfs : &@bitcore.RepoFileSystem = fs
   let git_dir = resolve_git_dir(rfs, root)
-  if not(rfs.is_dir(git_dir)) {
+  if !(rfs.is_dir(git_dir)) {
     eprint_line("fatal: not a git repository")
     @sys.exit(1)
   }

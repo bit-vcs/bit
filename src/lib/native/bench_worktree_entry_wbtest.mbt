@@ -24,7 +24,7 @@ fn bench_wt_join_path(root : String, path : String) -> String {
 
 ///|
 fn bench_wt_ensure_dir(path : String) -> Unit {
-  if not(@fs.path_exists(path)) {
+  if !(@fs.path_exists(path)) {
     @fs.create_dir(path) catch {
       _ => ()
     }

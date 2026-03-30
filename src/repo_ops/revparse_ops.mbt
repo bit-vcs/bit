@@ -12,7 +12,7 @@ pub fn rev_parse(
   }
   // :N:path — index stage entry lookup (e.g. :0:file, :2:file)
   // :path — shorthand for :0:path
-  if spec.has_prefix(":") && not(spec.has_prefix(":/")) {
+  if spec.has_prefix(":") && !(spec.has_prefix(":/")) {
     let rest = substring_revparse(spec, 1, spec.length())
     let (target_stage, path) = if rest.length() >= 2 {
       let ch = rest[0]
@@ -178,7 +178,7 @@ fn resolve_commit_message_search_all_refs(
   for item in refs {
     let (_, id) = item
     let hex = id.to_hex()
-    if not(seen_start.contains(hex)) {
+    if !(seen_start.contains(hex)) {
       seen_start[hex] = true
       starts.push(id)
     }
@@ -186,7 +186,7 @@ fn resolve_commit_message_search_all_refs(
   match @bitlib.resolve_head_commit(fs, git_dir) {
     Some(id) => {
       let hex = id.to_hex()
-      if not(seen_start.contains(hex)) {
+      if !(seen_start.contains(hex)) {
         seen_start[hex] = true
         starts.push(id)
       }
@@ -237,7 +237,7 @@ fn find_reachable_commit_by_message_from_many(
       Some(obj) =>
         if obj.obj_type == @object.ObjectType::Commit {
           let contains = commit_message_contains(obj.data, needle)
-          let matches = if negate { not(contains) } else { contains }
+          let matches = if negate { !(contains) } else { contains }
           if matches {
             let ts = parse_commit_committer_timestamp(obj.data)
             if best_id is None || ts > best_time {
@@ -247,7 +247,7 @@ fn find_reachable_commit_by_message_from_many(
           }
           let info = @repo.parse_commit(obj.data)
           for parent in info.parents {
-            if not(seen.contains(parent.to_hex())) {
+            if !(seen.contains(parent.to_hex())) {
               queue.push(parent)
             }
           }
@@ -500,7 +500,7 @@ fn parse_rev_suffix(spec : String) -> (String, String?) {
   // Validate suffix - only ^, ~, and digits after the first ^ or ~
   for i = suffix_start; i < len; i = i + 1 {
     let c = chars[i]
-    if not(c == '^' || c == '~' || (c >= '0' && c <= '9')) {
+    if !(c == '^' || c == '~' || (c >= '0' && c <= '9')) {
       // Invalid suffix character - no suffix
       return (spec, None)
     }
@@ -556,7 +556,7 @@ fn apply_rev_suffix(
         steps = steps * 10 + (chars[i].to_int() - '0'.to_int())
         i += 1
       }
-      if not(has_digits) {
+      if !(has_digits) {
         steps = 1
       }
       for _ in 0..<steps {
@@ -640,7 +640,7 @@ fn resolve_index_stage_entry(
   stage : Int,
 ) -> @object.ObjectId? raise @object.GitError {
   let index_path = git_dir + "/index"
-  if not(fs.is_file(index_path)) {
+  if !(fs.is_file(index_path)) {
     return None
   }
   let data = fs.read_file(index_path)
@@ -718,7 +718,7 @@ fn resolve_abbrev_ref_id(
 ) -> @object.ObjectId? raise @object.GitError {
   if spec.length() < 4 ||
     spec.length() >= 64 ||
-    not(@bithash.is_hex_string(spec)) {
+    !(@bithash.is_hex_string(spec)) {
     return None
   }
   let needle = @bithash.lower_hex_string(spec)
@@ -847,7 +847,7 @@ pub fn resolve_upstream_ref(
     Some(_) => true
     None => false
   }
-  if not(branch_exists) {
+  if !(branch_exists) {
     raise @object.GitError::InvalidObject(
       "no such branch: '" + branch_name + "'",
     )
@@ -900,7 +900,7 @@ pub fn resolve_upstream_ref(
             break
           }
         }
-        if not(mapped) {
+        if !(mapped) {
           raise @object.GitError::InvalidObject(
             "upstream branch '" +
             merge +
@@ -1302,7 +1302,7 @@ fn ref_collect_packed(
           start=idx + 1,
           end=line.length(),
         )
-        if not(out.contains(name)) {
+        if !(out.contains(name)) {
           out[name] = @object.ObjectId::from_hex(id_hex)
         }
       }

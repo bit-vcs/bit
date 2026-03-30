@@ -266,7 +266,7 @@ fn Kv::find_missing_objects(
   }
   // Find objects we have that they don't
   for entry in our_objects {
-    if not(their_objects.contains(entry.0)) {
+    if !(their_objects.contains(entry.0)) {
       let id = @bit.ObjectId::from_hex(entry.0) catch { _ => continue }
       let obj = store.get(id) catch { _ => continue }
       guard obj is Some(o) else { continue }

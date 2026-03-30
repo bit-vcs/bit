@@ -716,7 +716,7 @@ test "push delete: prune_empty_parent_dirs removes empty nested ref dirs" {
   prune_empty_parent_dirs(
     fs, fs, "/repo/.git/refs/heads/branch/conflict", "/repo/.git/refs/heads",
   )
-  assert_true(not(fs.is_dir("/repo/.git/refs/heads/branch")))
+  assert_true(!(fs.is_dir("/repo/.git/refs/heads/branch")))
   assert_true(fs.is_dir("/repo/.git/refs/heads"))
 }
 

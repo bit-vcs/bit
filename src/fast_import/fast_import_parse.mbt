@@ -18,7 +18,7 @@ pub fn fast_import_parse_data(
     return { content: Bytes::new(0), next_line: start }
   }
   let line = lines[start]
-  if not(line.has_prefix("data ")) {
+  if !(line.has_prefix("data ")) {
     return { content: Bytes::new(0), next_line: start + 1 }
   }
   let rest = String::unsafe_substring(line, start=5, end=line.length())
@@ -44,7 +44,7 @@ pub fn fast_import_parse_data(
     { content: fast_import_bytes_from_array(buf), next_line: idx }
   } else {
     // Exact byte count form
-    let count = @strconv.parse_int(rest) catch { _ => 0 }
+    let count = @string.parse_int(rest) catch { _ => 0 }
     if count == 0 {
       return { content: Bytes::new(0), next_line: start + 1 }
     }
@@ -135,11 +135,11 @@ pub fn fast_import_parse_ident(line : String) -> FastImportIdent? {
     Some(sp) => {
       let ts_str = String::unsafe_substring(rest, start=0, end=sp)
       let tz = String::unsafe_substring(rest, start=sp + 1, end=rest.length())
-      let ts = @strconv.parse_int64(ts_str) catch { _ => 0L }
+      let ts = @string.parse_int64(ts_str) catch { _ => 0L }
       Some({ ident, timestamp: ts, tz })
     }
     None => {
-      let ts = @strconv.parse_int64(rest) catch { _ => 0L }
+      let ts = @string.parse_int64(rest) catch { _ => 0L }
       Some({ ident, timestamp: ts, tz: "+0000" })
     }
   }
@@ -224,7 +224,7 @@ pub fn fast_import_parse_dataref(ref_str : String) -> (Int, String) {
       start=1,
       end=ref_str.length(),
     )
-    let mark_num = @strconv.parse_int(mark_str) catch { _ => 0 }
+    let mark_num = @string.parse_int(mark_str) catch { _ => 0 }
     (mark_num, "")
   } else {
     (0, ref_str)
@@ -249,7 +249,7 @@ pub fn fast_import_parse_marks(content : String) -> Array[(Int, String)] {
             start=sp + 1,
             end=line.length(),
           )
-          let mark_num = @strconv.parse_int(mark_str) catch { _ => 0 }
+          let mark_num = @string.parse_int(mark_str) catch { _ => 0 }
           if mark_num > 0 && hex.length() == 40 {
             result.push((mark_num, hex))
           }

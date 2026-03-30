@@ -21,7 +21,7 @@ async fn handle_unpack_objects(args : Array[String]) -> Unit raise Error {
   }
   // Parse the packfile
   let objects = @pack.parse_packfile(data)
-  if not(quiet) {
+  if !(quiet) {
     print_line(
       "Unpacking objects: 100% (\{objects.length()}/\{objects.length()}), done.",
     )

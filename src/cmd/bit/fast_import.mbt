@@ -70,7 +70,7 @@ async fn handle_fast_import(args : Array[String]) -> Unit raise Error {
                 start=sp + 1,
                 end=line.length(),
               )
-              let mark_num = @strconv.parse_int(mark_str) catch { _ => 0 }
+              let mark_num = @string.parse_int(mark_str) catch { _ => 0 }
               if mark_num > 0 && hex.length() == 40 {
                 marks[mark_num] = @bitcore.ObjectId::from_hex(hex)
               }
@@ -158,7 +158,7 @@ async fn handle_fast_import(args : Array[String]) -> Unit raise Error {
       parser.skip_line()
     }
   }
-  if require_done && not(done_seen) {
+  if require_done && !(done_seen) {
     eprint_line("fatal: stream did not end with 'done' command")
     @sys.exit(1)
   }
@@ -195,7 +195,7 @@ async fn handle_fast_import(args : Array[String]) -> Unit raise Error {
     fs.write_string(abs_path, buf.to_string())
   }
   // Print stats unless quiet
-  if not(quiet) {
+  if !(quiet) {
     let total = num_blobs + num_commits + num_tags
     eprint_line(
       "fast-import statistics: \{total} objects (\{num_blobs} blobs, \{num_commits} commits, \{num_tags} tags)",
@@ -361,7 +361,7 @@ async fn fast_import_parse_blob(
       start=6,
       end=mark_line.length(),
     )
-    mark_num = @strconv.parse_int(mark_str) catch { _ => 0 }
+    mark_num = @string.parse_int(mark_str) catch { _ => 0 }
   }
   // data
   let data = parser.read_data()
@@ -412,7 +412,7 @@ async fn fast_import_parse_commit(
       start=6,
       end=mark_line.length(),
     )
-    mark_num = @strconv.parse_int(mark_str) catch { _ => 0 }
+    mark_num = @string.parse_int(mark_str) catch { _ => 0 }
   }
   // Optional author
   let mut author_ident = ""
@@ -786,7 +786,7 @@ async fn fast_import_parse_tag(
       start=6,
       end=mark_line.length(),
     )
-    mark_num = @strconv.parse_int(mark_str) catch { _ => 0 }
+    mark_num = @string.parse_int(mark_str) catch { _ => 0 }
   }
   // from
   let mut target_id = @bitcore.ObjectId::zero()

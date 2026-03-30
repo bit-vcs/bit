@@ -148,7 +148,7 @@ test "reflog: expire rejects missing plain ref in builtin path" {
     let normalized = normalize_reflog_refname(
       fs, "/repo/.git", "does-not-exist",
     )
-    if not(reflog_ref_exists_or_resolves(fs, "/repo/.git", normalized)) {
+    if !(reflog_ref_exists_or_resolves(fs, "/repo/.git", normalized)) {
       raise @bitcore.GitError::InvalidObject(
         "error: reflog could not be found: 'does-not-exist'",
       )

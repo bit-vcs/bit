@@ -142,10 +142,10 @@ fn prune_empty_parent_dirs(
   while current.length() > 0 &&
         current != stop_dir &&
         current.has_prefix(stop_dir + "/") {
-    if not(rfs.is_dir(current)) {
+    if !(rfs.is_dir(current)) {
       break
     }
-    if not(is_empty_dir(rfs, current)) {
+    if !(is_empty_dir(rfs, current)) {
       break
     }
     fs.remove_dir(current) catch {
@@ -157,7 +157,7 @@ fn prune_empty_parent_dirs(
 
 ///|
 fn ref_namespace_root(refname : String) -> String {
-  if not(refname.has_prefix("refs/")) {
+  if !(refname.has_prefix("refs/")) {
     "refs"
   } else {
     let mut i = 0
@@ -268,7 +268,7 @@ async fn handle_remote(args : Array[String]) -> Unit raise Error {
       }
       let name = positional[0]
       let url = positional[1]
-      if (name |> @bitlib.is_valid_remote_name |> not) {
+      if !(name |> @bitlib.is_valid_remote_name) {
         die_remote(1, "fatal: '\{name}' is not a valid remote name")
       }
       let blocks = @bitlib.parse_config_blocks(
@@ -350,8 +350,8 @@ async fn handle_remote(args : Array[String]) -> Unit raise Error {
       let blocks = @bitlib.parse_config_blocks(
         @bitlib.read_config_content(fs, git_dir),
       )
-      if not(@bitlib.config_has_remote_section(blocks, name)) &&
-        not(@bitlib.legacy_remote_exists(fs, git_dir, name)) {
+      if !(@bitlib.config_has_remote_section(blocks, name)) &&
+        !(@bitlib.legacy_remote_exists(fs, git_dir, name)) {
         die_remote(2, "error: No such remote: '\{name}'")
       }
       remote_remove(fs, fs, git_dir, name)
@@ -373,7 +373,7 @@ async fn handle_remote(args : Array[String]) -> Unit raise Error {
       }
       let old_name = positional[0]
       let new_name = positional[1]
-      if (new_name |> @bitlib.is_valid_remote_name |> not) {
+      if !(new_name |> @bitlib.is_valid_remote_name) {
         die_remote(1, "fatal: '\{new_name}' is not a valid remote name")
       }
       let blocks = @bitlib.parse_config_blocks(
@@ -381,7 +381,7 @@ async fn handle_remote(args : Array[String]) -> Unit raise Error {
       )
       let old_exists = @bitlib.config_has_remote_section(blocks, old_name) ||
         @bitlib.legacy_remote_exists(fs, git_dir, old_name)
-      if not(old_exists) {
+      if !(old_exists) {
         die_remote(2, "error: No such remote: '\{old_name}'")
       }
       let new_exists = @bitlib.config_has_remote_section(blocks, new_name) ||
@@ -732,7 +732,7 @@ async fn remote_remove(
   name : String,
 ) -> Unit raise Error {
   let config_path = git_dir + "/config"
-  if not(rfs.is_file(config_path)) {
+  if !(rfs.is_file(config_path)) {
     raise @bitcore.GitError::InvalidObject("No such remote '\{name}'")
   }
   let content = decode_bytes(rfs.read_file(config_path))
@@ -813,7 +813,7 @@ async fn remote_remove(
       _ => new_blocks.push(block)
     }
   }
-  if not(found) {
+  if !(found) {
     raise @bitcore.GitError::InvalidObject("No such remote '\{name}'")
   }
   fs.write_string(config_path, @bitlib.render_config_blocks(new_blocks))
@@ -853,7 +853,7 @@ fn remote_set_url(
   if rfs.is_file(config_path + ".lock") {
     raise @bitcore.GitError::InvalidObject("config file is locked")
   }
-  if not(rfs.is_file(config_path)) {
+  if !(rfs.is_file(config_path)) {
     raise @bitcore.GitError::InvalidObject("No such remote '\{name}'")
   }
   let content = decode_bytes(rfs.read_file(config_path))
@@ -879,14 +879,14 @@ fn remote_set_url(
           Some(old) => {
             let filtered : Array[String] = []
             for u in changed_urls {
-              if not(@bitlib.match_url_pattern(old, u)) {
+              if !(@bitlib.match_url_pattern(old, u)) {
                 filtered.push(u)
               }
             }
             if filtered.length() == changed_urls.length() {
               raise @bitcore.GitError::InvalidObject("No such remote '\{name}'")
             }
-            if not(push) && filtered.length() == 0 {
+            if !(push) && filtered.length() == 0 {
               raise @bitcore.GitError::InvalidObject("No such remote '\{name}'")
             }
             changed_urls = filtered
@@ -908,14 +908,14 @@ fn remote_set_url(
                 let mut replaced = false
                 let updated_list : Array[String] = []
                 for u in changed_urls {
-                  if not(replaced) && @bitlib.match_url_pattern(old, u) {
+                  if !(replaced) && @bitlib.match_url_pattern(old, u) {
                     updated_list.push(nu)
                     replaced = true
                   } else {
                     updated_list.push(u)
                   }
                 }
-                if not(replaced) {
+                if !(replaced) {
                   raise @bitcore.GitError::InvalidObject(
                     "No such remote '\{name}'",
                   )
@@ -946,7 +946,7 @@ fn remote_set_url(
       new_blocks.push(block)
     }
   }
-  if not(found) {
+  if !(found) {
     raise @bitcore.GitError::InvalidObject("No such remote '\{name}'")
   }
   fs.write_string(config_path, @bitlib.render_config_blocks(new_blocks))
@@ -1024,7 +1024,7 @@ async fn remote_rename(
   }
   let legacy_remotes = git_dir + "/remotes/" + old_name
   let legacy_branches = git_dir + "/branches/" + old_name
-  if not(found_remote) && fs.is_file(legacy_remotes) {
+  if !(found_remote) && fs.is_file(legacy_remotes) {
     let text = decode_bytes(fs.read_file(legacy_remotes))
     let mut url : String? = None
     let fetches : Array[String] = []
@@ -1082,7 +1082,7 @@ async fn remote_rename(
       None => ()
     }
   }
-  if not(found_remote) && fs.is_file(legacy_branches) {
+  if !(found_remote) && fs.is_file(legacy_branches) {
     let text = decode_bytes(fs.read_file(legacy_branches)).trim().to_string()
     if text.length() > 0 {
       let (url, branch) = match text.find("#") {
@@ -1121,7 +1121,7 @@ async fn remote_rename(
       found_remote = true
     }
   }
-  if not(found_remote) {
+  if !(found_remote) {
     raise @bitcore.GitError::InvalidObject("No such remote '\{old_name}'")
   }
   if old_name != new_name && refspecs_need_update {
@@ -1302,12 +1302,12 @@ async fn remote_prune(
         break
       }
     }
-    if not(matched) {
+    if !(matched) {
       continue
     }
     match remote_ref {
       Some(rref) =>
-        if not(remote_refs.contains(rref)) {
+        if !(remote_refs.contains(rref)) {
           let display = local_ref.replace(old="refs/remotes/", new="")
           if dry_run {
             print_line(" * [would prune] \{display}")
@@ -1322,14 +1322,14 @@ async fn remote_prune(
       None => ()
     }
   }
-  if not(dry_run) {
+  if !(dry_run) {
     let head_path = git_dir + "/refs/remotes/" + name + "/HEAD"
     if fs.is_file(head_path) {
       let state = @bitlib.read_local_remote_head_state(fs, head_path, name)
       match state {
         @bitlib.RemoteHeadState::Symref(branch) => {
           let ref_path = git_dir + "/refs/remotes/" + name + "/" + branch
-          if not(fs.is_file(ref_path)) {
+          if !(fs.is_file(ref_path)) {
             print_line("warning: refs/remotes/\{name}/HEAD has become dangling")
           }
         }
@@ -1389,7 +1389,7 @@ fn remote_update_collect_targets(
   let seen : Map[String, Bool] = {}
   let mut default_update = false
   let add_name = fn(name : String) {
-    if not(seen.contains(name)) {
+    if !(seen.contains(name)) {
       seen[name] = true
       names.push(name)
     }
@@ -1402,7 +1402,7 @@ fn remote_update_collect_targets(
     members.length() > 0
   }
   if targets.length() == 0 {
-    if not(add_group("default")) {
+    if !(add_group("default")) {
       default_update = true
       for name, _ in remotes {
         add_name(name)
@@ -1412,7 +1412,7 @@ fn remote_update_collect_targets(
   }
   for target in targets {
     if target == "default" {
-      if not(add_group("default")) {
+      if !(add_group("default")) {
         default_update = true
         for name, _ in remotes {
           add_name(name)
@@ -1565,7 +1565,7 @@ fn get_committer_identity() -> (String, String, Int64, String) {
     Some(raw) => {
       let parts = @bitlib.split_whitespace_all(raw)
       if parts.length() > 0 {
-        timestamp = @strconv.parse_int64(parts[0]) catch { _ => timestamp }
+        timestamp = @string.parse_int64(parts[0]) catch { _ => timestamp }
       }
       if parts.length() > 1 {
         timezone = parts[1]
@@ -1728,7 +1728,7 @@ fn update_testgit_push_tracking(
       if tracking_current != Some(id) {
         write_ref_file(fs, git_dir, tracking_ref, id)
       }
-      if not(no_private_update) {
+      if !(no_private_update) {
         write_ref_file(
           fs,
           git_dir,
@@ -1868,7 +1868,7 @@ fn read_global_branch_autosetuprebase(
         None => return None
       }
   }
-  if not(fs.is_file(config_path)) {
+  if !(fs.is_file(config_path)) {
     return None
   }
   let content = decode_bytes(fs.read_file(config_path))
@@ -2003,11 +2003,11 @@ async fn clone_local_repo(
     mirror,
     None,
   )
-  if not(bare) && not(detached_head) {
+  if !(bare) && !(detached_head) {
     setup_clone_branch_tracking(fs, dest_git_dir, default_branch, remote_name)
   }
   // Initialize remote-tracking refs and pack non-HEAD entries to match git clone layout.
-  if not(mirror) {
+  if !(mirror) {
     for b in branches {
       write_ref_file(
         fs,
@@ -2017,7 +2017,7 @@ async fn clone_local_repo(
       )
     }
   }
-  if not(detached_head) && not(mirror) && branches.length() > 0 {
+  if !(detached_head) && !(mirror) && branches.length() > 0 {
     write_symref_file(
       fs,
       dest_git_dir,
@@ -2025,7 +2025,7 @@ async fn clone_local_repo(
       "refs/remotes/" + remote_name + "/" + default_branch,
     )
   }
-  if not(mirror) {
+  if !(mirror) {
     pack_remote_tracking_refs(fs, dest_git_dir, remote_name)
   }
   // Partial clone markers
@@ -2046,7 +2046,7 @@ async fn clone_local_repo(
     fs.write_string(promisor_path, remote_url + "\n")
   }
   // Populate working tree/index from the cloned commit snapshot.
-  if not(bare) && not(no_checkout) {
+  if !(bare) && !(no_checkout) {
     checkout_clone_head(fs, dest_path, head_id, default_branch, detached_head)
   }
 }
@@ -2251,7 +2251,7 @@ async fn clone_local_bundle(
   // Write refs from bundle
   match head_id {
     Some(id) =>
-      if not(detached_head) {
+      if !(detached_head) {
         write_ref_file(fs, dest_git_dir, "refs/heads/" + default_branch, id)
       } else {
         fs.write_string(dest_git_dir + "/HEAD", id.to_hex() + "\n")
@@ -2292,11 +2292,11 @@ async fn clone_local_bundle(
     false,
     None,
   )
-  if not(bare) && not(detached_head) {
+  if !(bare) && !(detached_head) {
     setup_clone_branch_tracking(fs, dest_git_dir, default_branch, remote_name)
   }
   // Write remote HEAD symref
-  if not(detached_head) && branches.length() > 0 {
+  if !(detached_head) && branches.length() > 0 {
     write_symref_file(
       fs,
       dest_git_dir,
@@ -2306,7 +2306,7 @@ async fn clone_local_bundle(
   }
   pack_remote_tracking_refs(fs, dest_git_dir, remote_name)
   // Checkout working tree
-  if not(bare) && not(no_checkout) {
+  if !(bare) && !(no_checkout) {
     checkout_clone_head(fs, dest_path, head_id, default_branch, detached_head)
   }
 }
@@ -2324,7 +2324,7 @@ fn read_clone_source_head_fallback(
       },
     )
     let head_line = trim_string(head_content)
-    if head_line.length() > 0 && not(head_line.has_prefix("ref: ")) {
+    if head_line.length() > 0 && !(head_line.has_prefix("ref: ")) {
       let head_id : @bitcore.ObjectId? = Some(
         @bitcore.ObjectId::from_hex(head_line),
       ) catch {
@@ -2489,7 +2489,7 @@ fn render_fetch_head_content(
     }
   }
   for entry in entries {
-    if not(entry.for_merge) {
+    if !(entry.for_merge) {
       ordered.push(entry)
     }
   }
@@ -2665,7 +2665,7 @@ fn update_remote_tracking_head_ref(
     return ()
   }
   match warning_message {
-    Some(msg) => if not(quiet) { println(msg) }
+    Some(msg) => if !(quiet) { println(msg) }
     None => ()
   }
 }
@@ -2695,7 +2695,7 @@ async fn fetch_local_repo(
     Some(path) => append_text_file(fs, path, "")
     None => ()
   }
-  if not(quiet) {
+  if !(quiet) {
     eprint_line("From \{display_url}")
   }
   let src_db = @bitlib.ObjectDb::load(fs, src_git_dir)
@@ -2828,7 +2828,7 @@ async fn fetch_local_repo(
       if normalized_dst.has_prefix("refs/tags/") {
         match @bitlib.resolve_ref(fs, git_dir, normalized_dst) {
           Some(existing) =>
-            if existing != head_id && not(spec_force) {
+            if existing != head_id && !(spec_force) {
               raise @bitcore.GitError::InvalidObject(
                 "would clobber existing tag",
               )
@@ -2853,7 +2853,7 @@ async fn fetch_local_repo(
     }
     if spec.src.length() == 0 ||
       spec.src.contains("*") ||
-      not(looks_like_object_id(spec.src)) {
+      !(looks_like_object_id(spec.src)) {
       continue
     }
     let object_id = @bitcore.ObjectId::from_hex(spec.src) catch {
@@ -2880,8 +2880,8 @@ async fn fetch_local_repo(
       let allowed = visible_advertised_oids.get(object_id_hex) is Some(_) ||
         (allow_tip_sha1_in_want && all_tip_oids.get(object_id_hex) is Some(_)) ||
         (allow_reachable_sha1_in_want && reachable_from_visible_tip)
-      if not(allowed) {
-        if allow_reachable_sha1_in_want && not(reachable_from_visible_tip) {
+      if !(allowed) {
+        if allow_reachable_sha1_in_want && !(reachable_from_visible_tip) {
           raise @bitcore.GitError::InvalidObject("not our ref " + object_id_hex)
         }
         raise @bitcore.GitError::InvalidObject(
@@ -2942,7 +2942,7 @@ async fn fetch_local_repo(
           if normalized_dst.has_prefix("refs/tags/") {
             match @bitlib.resolve_ref(fs, git_dir, normalized_dst) {
               Some(existing) =>
-                if existing != id && not(spec_force) {
+                if existing != id && !(spec_force) {
                   raise @bitcore.GitError::InvalidObject(
                     "would clobber existing tag",
                   )
@@ -2998,7 +2998,7 @@ async fn fetch_local_repo(
     git_dir + "/FETCH_HEAD",
     render_fetch_head_content(fetch_head_entries, remote_url),
   )
-  if explicit_refspecs.length() == 0 && not(mirror_fetch) {
+  if explicit_refspecs.length() == 0 && !(mirror_fetch) {
     match @bitlib.read_remote_head_branch(fs, src_git_dir) {
       Some(remote_head_branch) =>
         update_remote_tracking_head_ref(
@@ -3008,7 +3008,7 @@ async fn fetch_local_repo(
     }
   }
   for dst, id in mapped_refs {
-    if not(update_head_ok) && dst.has_prefix("refs/heads/") {
+    if !(update_head_ok) && dst.has_prefix("refs/heads/") {
       let branch_name = String::unsafe_substring(
         dst,
         start=11,
@@ -3034,7 +3034,7 @@ async fn fetch_local_repo(
     }
   }
   let tagopt = rc.tagopt
-  if not(fetches_tags) {
+  if !(fetches_tags) {
     match tagopt {
       Some("--no-tags") => ()
       Some("--tags") =>
@@ -3049,7 +3049,7 @@ async fn fetch_local_repo(
       _ =>
         if fetched_heads.length() > 0 {
           for refname, id in remote_refs {
-            if not(refname.has_prefix("refs/tags/")) {
+            if !(refname.has_prefix("refs/tags/")) {
               continue
             }
             let target = peel_to_commit(src_db, fs, id)
@@ -3113,7 +3113,7 @@ async fn fetch_from_remote(
     Some(dir) => dir
     None => root
   }
-  if not(force_transport) {
+  if !(force_transport) {
     match @bitlib.resolve_local_repo_path(fs, local_root, remote_url) {
       Some(src_path) => {
         fetch_local_repo(
@@ -3142,7 +3142,7 @@ async fn fetch_from_remote(
   let default_ref = @protocol.select_default_ref(refs, symrefs)
   match default_ref {
     None => {
-      if not(quiet) {
+      if !(quiet) {
         print_line("No refs to fetch")
       }
       return ()
@@ -3163,7 +3163,7 @@ async fn fetch_from_remote(
       if prev_id is Some(pid) && pid == commit_id {
         return ()
       }
-      if not(quiet) {
+      if !(quiet) {
         print_line("Fetching from \{remote_url}...")
       }
       let pack = match transport {
@@ -3190,23 +3190,23 @@ async fn fetch_from_remote(
           Some(db) => (db.get(fs, commit_id) catch { _ => None }) is Some(_)
           None => false
         }
-        if not(has_target) {
+        if !(has_target) {
           raise @bitcore.GitError::PackfileError(
             "No packfile returned and missing object \{commit_id.to_hex()}",
           )
         }
       }
       write_ref_file(fs, git_dir, remote_ref, commit_id)
-      if not(quiet) {
+      if !(quiet) {
         print_line("From \{remote_url}")
       }
       match prev_id {
         None =>
-          if not(quiet) {
+          if !(quiet) {
             print_line(" * [new branch] \{refname} -> \{remote_ref}")
           }
         Some(pid) =>
-          if not(quiet) {
+          if !(quiet) {
             print_line(
               "   \{pid.to_hex()}..\{commit_id.to_hex()}  \{refname} -> \{remote_ref}",
             )
@@ -3323,7 +3323,7 @@ fn push_objects_dir_has_object(
     return true
   }
   let alternates_path = normalized_dir + "/info/alternates"
-  if not(fs.is_file(alternates_path)) {
+  if !(fs.is_file(alternates_path)) {
     return false
   }
   let alternate_bytes = fs.read_file(alternates_path) catch {
@@ -3603,7 +3603,7 @@ async fn remote_show(
             break
           }
         }
-        if not(dest_ok) {
+        if !(dest_ok) {
           continue
         }
         if local_refs.contains(rname) {
@@ -3616,7 +3616,7 @@ async fn remote_show(
         emitted[rname] = true
       }
       for lname, _ in local_refs {
-        if not(emitted.contains(lname)) {
+        if !(emitted.contains(lname)) {
           print_line("    \{lname} stale (use 'git remote prune' to remove)")
         }
       }
@@ -3673,7 +3673,7 @@ async fn remote_show(
     }
   }
   if rc.push.length() > 0 || no_query {
-    let status_query = not(no_query) && remote_git_dir is Some(_)
+    let status_query = !(no_query) && remote_git_dir is Some(_)
     if status_query {
       print_line("  Local refs configured for 'git push':")
     } else {
@@ -3727,7 +3727,7 @@ async fn remote_show(
       }
       if status_query &&
         spec.src.has_prefix("refs/") &&
-        not(spec.src.has_prefix("refs/heads/")) {
+        !(spec.src.has_prefix("refs/heads/")) {
         continue
       }
       let src_display = if spec.src.length() == 0 {

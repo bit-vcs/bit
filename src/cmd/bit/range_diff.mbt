@@ -13,7 +13,7 @@ async fn handle_range_diff(args : Array[String]) -> Unit raise Error {
       }
       "--no-dual-color" | "--dual-color" | "--no-color" => ()
       _ if arg.has_prefix("--creation-factor=") => ()
-      _ if not(arg.has_prefix("-")) => ranges.push(arg)
+      _ if !(arg.has_prefix("-")) => ranges.push(arg)
       _ if arg.has_prefix("-") => warn_unimplemented_arg("range-diff", arg)
       _ => ()
     }
@@ -117,7 +117,7 @@ async fn handle_range_diff(args : Array[String]) -> Unit raise Error {
         break
       }
     }
-    if not(found) {
+    if !(found) {
       print_line(
         "-:  ------- > " +
         idx2.to_string() +

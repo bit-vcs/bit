@@ -70,7 +70,7 @@ pub fn init_repo_with_options(
   }
   let use_default_template_files = opts.template_dir is None
   let head_path = join_path(git_dir, "HEAD")
-  if opts.separate_git_dir is Some(_) && not(bare) {
+  if opts.separate_git_dir is Some(_) && !(bare) {
     fs.mkdir_p(root)
   }
   fs.mkdir_p(git_dir)
@@ -83,7 +83,7 @@ pub fn init_repo_with_options(
     fs.mkdir_p(join_path(git_dir, "hooks"))
     fs.mkdir_p(join_path(git_dir, "info"))
   }
-  if opts.separate_git_dir is Some(_) && not(bare) {
+  if opts.separate_git_dir is Some(_) && !(bare) {
     let gitfile_path = join_path(root, ".git")
     fs.remove_dir(gitfile_path) catch {
       _ => ()
@@ -93,7 +93,7 @@ pub fn init_repo_with_options(
     }
     fs.write_string(gitfile_path, "gitdir: " + git_dir + "\n")
   }
-  if not(opts.is_reinit) {
+  if !(opts.is_reinit) {
     fs.write_string(head_path, "ref: refs/heads/" + opts.default_branch + "\n")
   }
   let bare_str = if bare { "true" } else { "false" }
@@ -110,7 +110,7 @@ pub fn init_repo_with_options(
     Some(wt) => config = config + "\tworktree = " + wt + "\n"
     None => ()
   }
-  if not(bare) {
+  if !(bare) {
     config = config + "\tlogallrefupdates = true\n"
   }
   if opts.ref_format == "reftable" {
@@ -161,7 +161,7 @@ pub fn init_repo_with_options_with_repo_fs(
   let use_default_template_files = opts.template_dir is None
   let head_path = join_path(git_dir, "HEAD")
   // Create work tree directory if needed (for --separate-git-dir)
-  if opts.separate_git_dir is Some(_) && not(bare) {
+  if opts.separate_git_dir is Some(_) && !(bare) {
     fs.mkdir_p(root)
   }
   // Create git directory structure
@@ -176,7 +176,7 @@ pub fn init_repo_with_options_with_repo_fs(
     fs.mkdir_p(join_path(git_dir, "info"))
   }
   // If separate-git-dir, create .git file pointing to actual git dir
-  if opts.separate_git_dir is Some(_) && not(bare) {
+  if opts.separate_git_dir is Some(_) && !(bare) {
     let gitfile_path = join_path(root, ".git")
     let existing_git_dir = if rfs.is_dir(gitfile_path) {
       Some(gitfile_path)
@@ -203,7 +203,7 @@ pub fn init_repo_with_options_with_repo_fs(
     fs.write_string(gitfile_path, "gitdir: " + git_dir + "\n")
   }
   // Write HEAD only on fresh init (not re-init)
-  if not(opts.is_reinit) {
+  if !(opts.is_reinit) {
     fs.write_string(head_path, "ref: refs/heads/" + opts.default_branch + "\n")
   }
   // Create/update config file with appropriate bare setting
@@ -223,7 +223,7 @@ pub fn init_repo_with_options_with_repo_fs(
     None => ()
   }
   // Write core.logallrefupdates for non-bare repos
-  if not(bare) {
+  if !(bare) {
     config = config + "\tlogallrefupdates = true\n"
   }
   if opts.ref_format == "reftable" {
@@ -278,7 +278,7 @@ fn copy_dir_recursive(
   src : String,
   dst : String,
 ) -> Unit raise @bit.GitError {
-  if not(rfs.is_dir(src)) {
+  if !(rfs.is_dir(src)) {
     return
   }
   wfs.mkdir_p(dst)
@@ -293,7 +293,7 @@ fn copy_dir_recursive(
       copy_dir_recursive(wfs, rfs, src_path, dst_path)
     } else if rfs.is_file(src_path) {
       // Don't overwrite existing files
-      if not(rfs.is_file(dst_path)) {
+      if !(rfs.is_file(dst_path)) {
         let content = rfs.read_file(src_path)
         wfs.write_file(dst_path, content)
       }

@@ -49,7 +49,7 @@ async fn handle_merge_tree(args : Array[String]) -> Unit raise Error {
   let db = @bitlib.ObjectDb::load(fs, git_dir)
   // Find merge base
   let base_id = merge_tree_find_base(db, fs, ours_id, theirs_id)
-  if base_id is None && not(allow_unrelated) {
+  if base_id is None && !(allow_unrelated) {
     eprint_line(
       "fatal: refusing to merge unrelated histories (use --allow-unrelated-histories to override)",
     )

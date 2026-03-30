@@ -85,7 +85,7 @@ fn normalize_local_path(path : String) -> String {
     } else if part == ".." {
       if parts.length() > 0 && parts[parts.length() - 1] != ".." {
         let _ = parts.pop()
-      } else if not(path.has_prefix("/")) {
+      } else if !(path.has_prefix("/")) {
         parts.push(part)
       }
     } else {
@@ -211,7 +211,7 @@ pub fn resolve_gitdir(fs : &@bit.RepoFileSystem, bit_path : String) -> String {
       end=trimmed.length(),
     )
     // If relative path, resolve relative to parent of .git file
-    if not(target.has_prefix("/")) {
+    if !(target.has_prefix("/")) {
       let parent = match bit_path.rev_find("/") {
         Some(i) => String::unsafe_substring(bit_path, start=0, end=i)
         None => "."

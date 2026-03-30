@@ -114,7 +114,7 @@ async fn handle_hq_get(args : Array[String]) -> Unit raise Error {
           branch = Some(args[i])
         }
       "--depth" if i + 1 < args.length() => {
-        depth = @strconv.parse_int(args[i + 1]) catch {
+        depth = @string.parse_int(args[i + 1]) catch {
           err => {
             if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
               raise err
@@ -126,7 +126,7 @@ async fn handle_hq_get(args : Array[String]) -> Unit raise Error {
       }
       _ if arg.has_prefix("--depth=") => {
         let depth_str = String::unsafe_substring(arg, start=8, end=arg.length())
-        depth = @strconv.parse_int(depth_str) catch {
+        depth = @string.parse_int(depth_str) catch {
           err => {
             if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
               raise err
@@ -269,7 +269,7 @@ async fn handle_hq_get(args : Array[String]) -> Unit raise Error {
 ///|
 /// hq list command handler
 async fn handle_hq_list(args : Array[String]) -> Unit {
-  let query : String? = if args.length() > 0 && not(args[0].has_prefix("-")) {
+  let query : String? = if args.length() > 0 && !(args[0].has_prefix("-")) {
     Some(args[0])
   } else {
     None
@@ -296,7 +296,7 @@ fn list_repos_recursive(
   if fs.is_dir(current + "/.git") {
     // Apply query filter
     match query {
-      Some(q) if not(rel_path.contains(q)) => ()
+      Some(q) if !(rel_path.contains(q)) => ()
       _ => repos.push(rel_path)
     }
     return repos

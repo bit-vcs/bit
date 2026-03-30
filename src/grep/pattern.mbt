@@ -186,7 +186,7 @@ pub fn grep_eval_expr(
         ignore_case,
         word_regexp~,
       )
-      { matched: not(result.matched), span: result.span }
+      { matched: !(result.matched), span: result.span }
     }
   }
 }
@@ -219,7 +219,7 @@ pub fn grep_collect_expr_match_spans(
         ignore_case,
         word_regexp~,
       )
-      if not(left.matched && right.matched) {
+      if !(left.matched && right.matched) {
         return []
       }
       let out : Array[GrepMatchSpan] = []
@@ -432,7 +432,7 @@ fn grep_fixed_first_match_span(
       Some(rel_idx) => {
         let start = offset + rel_idx
         let end_column = start + pattern_len
-        if not(word_regexp) || grep_is_word_match(chars, start, end_column) {
+        if !(word_regexp) || grep_is_word_match(chars, start, end_column) {
           return Some({ start_column: start + 1, end_column })
         }
         offset = start + 1
@@ -459,7 +459,7 @@ fn grep_collect_fixed_match_spans(
       Some(rel_idx) => {
         let start = offset + rel_idx
         let end_column = start + pattern_len
-        if not(word_regexp) || grep_is_word_match(chars, start, end_column) {
+        if !(word_regexp) || grep_is_word_match(chars, start, end_column) {
           spans.push({ start_column: start + 1, end_column })
           offset = if end_column > start { end_column } else { start + 1 }
         } else {
@@ -488,7 +488,7 @@ fn grep_regex_like_first_match_span(
         text_chars, start, pattern_chars, pattern_type,
       ) {
       Some(end_column) =>
-        if not(word_regexp) || grep_is_word_match(text_chars, start, end_column) {
+        if !(word_regexp) || grep_is_word_match(text_chars, start, end_column) {
           return Some({ start_column: start + 1, end_column })
         }
       None => ()
@@ -515,7 +515,7 @@ fn grep_collect_regex_like_match_spans(
         text_chars, start, pattern_chars, pattern_type,
       ) {
       Some(end_column) =>
-        if not(word_regexp) || grep_is_word_match(text_chars, start, end_column) {
+        if !(word_regexp) || grep_is_word_match(text_chars, start, end_column) {
           spans.push({ start_column: start + 1, end_column })
           start = if end_column > start { end_column } else { start + 1 }
         } else {
@@ -590,7 +590,7 @@ fn grep_regex_like_match_here(
     }
     Some('+') => {
       if ti >= text.length() ||
-        not(grep_regex_like_atom_matches(atom, text[ti])) {
+        !(grep_regex_like_atom_matches(atom, text[ti])) {
         return None
       }
       let mut max_ti = ti + 1
@@ -618,7 +618,7 @@ fn grep_regex_like_match_here(
       if ti >= text.length() {
         return None
       }
-      if not(grep_regex_like_atom_matches(atom, text[ti])) {
+      if !(grep_regex_like_atom_matches(atom, text[ti])) {
         return None
       }
       grep_regex_like_match_here(
@@ -834,7 +834,7 @@ fn grep_append_unique_spans(
         break
       }
     }
-    if not(inserted) {
+    if !(inserted) {
       out.push(span)
     }
   }
@@ -856,7 +856,7 @@ fn grep_is_word_match(
   } else {
     grep_is_word_char(text[end_column])
   }
-  not(before_is_word) && not(after_is_word)
+  !(before_is_word) && !(after_is_word)
 }
 
 ///|

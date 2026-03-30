@@ -26,7 +26,7 @@ fn clone_maybe_enable_sparse_checkout(
   sparse_checkout : Bool,
   bare : Bool,
 ) -> Unit raise Error {
-  if not(sparse_checkout) || bare {
+  if !(sparse_checkout) || bare {
     return
   }
   @bitlib.sparse_checkout_init(fs, fs, root, cone=true)
@@ -67,7 +67,7 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
     if arg == "--depth" && i + 1 < args.length() {
       // Parse depth value
       let depth_str = args[i + 1]
-      depth = @strconv.parse_int(depth_str) catch {
+      depth = @string.parse_int(depth_str) catch {
         err => {
           if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
             raise err
@@ -80,7 +80,7 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
     }
     if arg.has_prefix("--depth=") {
       let depth_str = String::unsafe_substring(arg, start=8, end=arg.length())
-      depth = @strconv.parse_int(depth_str) catch {
+      depth = @string.parse_int(depth_str) catch {
         err => {
           if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
             raise err
@@ -454,7 +454,7 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
   }
   let mut clone_root = target
   let mut use_env_work_tree = false
-  if not(bare) {
+  if !(bare) {
     match @sys.get_env_var("GIT_WORK_TREE") {
       Some(work_tree) => {
         clone_root = absolutize_clone_path(
@@ -469,7 +469,7 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
       None => ()
     }
   }
-  if not(quiet) {
+  if !(quiet) {
     if bare {
       print_line("Cloning into bare repository '\{relative_target}'...")
     } else {
@@ -520,7 +520,7 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
         ref_format~,
         template_dir~,
       )
-      if not(bare) && not(no_checkout) {
+      if !(bare) && !(no_checkout) {
         match @bitlib.resolve_head_commit(fs, clone_git_dir) {
           Some(commit_id) => {
             warn_case_insensitive_collisions_from_commit(
@@ -554,7 +554,7 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
       // For file:// URLs with --depth or --filter, delegate to real git
       // which handles the upload-pack transport natively.
       let is_local_path = remote_display.has_prefix("/") &&
-        not(remote_display.has_prefix("file://"))
+        !(remote_display.has_prefix("file://"))
       let is_file_url = remote_display.has_prefix("file://")
       let needs_transport = filter.is_partial() || depth > 0
       if is_file_url && needs_transport {
@@ -562,7 +562,7 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
         return
       }
       let use_transport_clone = (
-          (no_local && not(is_local_path) && not(is_file_url)) ||
+          (no_local && !(is_local_path) && !(is_file_url)) ||
           needs_transport
         ) &&
         separate_git_dir is None &&
@@ -590,17 +590,17 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
           refs,
           template_dir~,
         )
-        if bare && not(initialized_empty_clone) {
+        if bare && !(initialized_empty_clone) {
           promote_transport_clone_to_bare_layout(fs, clone_root)
         }
-        if ref_format == "reftable" && not(initialized_empty_clone) {
+        if ref_format == "reftable" && !(initialized_empty_clone) {
           configure_reftable_ref_storage(fs, clone_git_dir)
         }
-        if refs.length() == 0 && not(initialized_empty_clone) {
+        if refs.length() == 0 && !(initialized_empty_clone) {
           raise @bitcore.GitError::InvalidObject("Clone failed: no refs found")
         }
         finalize_transport_clone_tracking(fs, clone_git_dir, remote_name, bare)
-        if clone_filter.is_partial() && not(no_checkout) && not(bare) {
+        if clone_filter.is_partial() && !(no_checkout) && !(bare) {
           let checkout_spec = read_head_checkout_spec_for_clone(
             fs, clone_git_dir,
           )
@@ -630,8 +630,8 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
           ref_format~,
           template_dir~,
         )
-        if not(bare) && not(filter.is_partial()) {
-          if not(no_checkout) {
+        if !(bare) && !(filter.is_partial()) {
+          if !(no_checkout) {
             match @bitlib.resolve_head_commit(fs, clone_git_dir) {
               Some(commit_id) => {
                 warn_case_insensitive_collisions_from_commit(
@@ -646,9 +646,9 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
           }
         }
         if ref_spec is Some(refname) &&
-          not(bare) &&
-          not(filter.is_partial()) &&
-          not(no_checkout) {
+          !(bare) &&
+          !(filter.is_partial()) &&
+          !(no_checkout) {
           let local_branch_ref = "refs/heads/" + refname
           if @bitlib.resolve_ref(fs, clone_git_dir, local_branch_ref) is Some(_) {
             let checked_id = run_checkout_with_sensitive_hooks(
@@ -715,17 +715,17 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
       let initialized_empty_clone = initialize_empty_transport_clone(
         fs, clone_root, remote_url, bare, remote_name, ref_format, refs,
       )
-      if bare && not(initialized_empty_clone) {
+      if bare && !(initialized_empty_clone) {
         promote_transport_clone_to_bare_layout(fs, clone_root)
       }
-      if ref_format == "reftable" && not(initialized_empty_clone) {
+      if ref_format == "reftable" && !(initialized_empty_clone) {
         configure_reftable_ref_storage(fs, clone_git_dir)
       }
-      if refs.length() == 0 && not(initialized_empty_clone) {
+      if refs.length() == 0 && !(initialized_empty_clone) {
         raise @bitcore.GitError::InvalidObject("Clone failed: no refs found")
       }
       finalize_transport_clone_tracking(fs, clone_git_dir, remote_name, bare)
-      if clone_filter.is_partial() && not(no_checkout) && not(bare) {
+      if clone_filter.is_partial() && !(no_checkout) && !(bare) {
         let checkout_spec = read_head_checkout_spec_for_clone(fs, clone_git_dir)
         let checked_id = checkout_with_promisor_retry_clone(
           fs, clone_root, checkout_spec,
@@ -737,8 +737,8 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
           fs, fs, clone_root, clone_git_dir, checked_id,
         )
       }
-      if not(bare) && not(clone_filter.is_partial()) {
-        if not(no_checkout) {
+      if !(bare) && !(clone_filter.is_partial()) {
+        if !(no_checkout) {
           match @bitlib.resolve_head_commit(fs, clone_git_dir) {
             Some(commit_id) => {
               warn_case_insensitive_collisions_from_commit(
@@ -753,9 +753,9 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
         }
       }
       if ref_spec is Some(refname) &&
-        not(bare) &&
-        not(clone_filter.is_partial()) &&
-        not(no_checkout) {
+        !(bare) &&
+        !(clone_filter.is_partial()) &&
+        !(no_checkout) {
         match resolve_remote_ref_id(remote_url, refname) {
           Some((commit_id, branch)) => {
             let mut db = @bitlib.ObjectDb::load_lazy(fs, clone_git_dir)
@@ -845,7 +845,7 @@ async fn handle_clone(args : Array[String]) -> Unit raise Error {
   }
   emit_clone_bundle_trace_events(fs, bundle_uris)
   clone_maybe_enable_sparse_checkout(fs, clone_root, sparse_checkout, bare)
-  if recurse_submodules && not(bare) && not(no_checkout) {
+  if recurse_submodules && !(bare) && !(no_checkout) {
     clone_configure_submodule_active_filters(
       fs, clone_git_dir, recurse_submodule_filters,
     )
@@ -986,7 +986,7 @@ fn initialize_empty_transport_clone(
   )
   let fetch_specs = ["+refs/heads/*:refs/remotes/" + remote_name + "/*"]
   remote_add(fs, fs, git_dir, remote_name, remote_url, fetch_specs, false, None)
-  if not(bare) {
+  if !(bare) {
     setup_clone_branch_tracking(fs, git_dir, default_branch, remote_name)
   }
   true
@@ -1017,7 +1017,7 @@ fn finalize_transport_clone_tracking(
             remote_branch_ref,
           )
           pack_remote_tracking_refs(fs, git_dir, remote_name)
-          if not(bare) {
+          if !(bare) {
             setup_clone_branch_tracking(
               fs, git_dir, default_branch, remote_name,
             )
@@ -1105,7 +1105,7 @@ fn clone_detect_relay_session(remote_url : String) -> (String, String)? {
     return None
   }
   for c in segment {
-    if not(clone_is_session_id_char(c)) {
+    if !(clone_is_session_id_char(c)) {
       return None
     }
   }
@@ -1219,7 +1219,7 @@ fn configure_reftable_ref_storage(
   let reftable_dir = git_dir + "/reftable"
   fs.mkdir_p(reftable_dir)
   let tables_list_path = reftable_dir + "/tables.list"
-  if not(fs.is_file(tables_list_path)) {
+  if !(fs.is_file(tables_list_path)) {
     fs.write_string(tables_list_path, "")
   }
   set_config(
@@ -1239,7 +1239,7 @@ async fn resolve_clone_transport_filter(
   prefer_v2 : Bool,
   requested : @protocol.FilterSpec,
 ) -> @protocol.FilterSpec raise Error {
-  if not(requested.is_partial()) {
+  if !(requested.is_partial()) {
     return requested
   }
   let (_, caps, version, _symrefs) = @bitnative.discover_upload_refs_http(
@@ -1271,7 +1271,7 @@ fn clone_caps_contain_token(caps : Array[String], token : String) -> Bool {
       return true
     }
     // Skip expensive word splitting if token is not a substring of cap
-    if not(cap.contains(token)) {
+    if !(cap.contains(token)) {
       continue
     }
     let words = clone_split_words(cap)
@@ -1328,7 +1328,7 @@ async fn discover_clone_bundle_uris(
   prefer_v2 : Bool,
   config_overrides : Map[String, String],
 ) -> Array[String] raise Error {
-  if not(clone_config_is_true(config_overrides, "transfer.bundleuri")) {
+  if !(clone_config_is_true(config_overrides, "transfer.bundleuri")) {
     return []
   }
   let spec = @protocol.parse_remote(remote)
@@ -1341,7 +1341,7 @@ async fn discover_clone_bundle_uris(
   if version != @protocol.ProtocolVersion::V2 {
     return []
   }
-  if not(clone_caps_contain_token(caps, "bundle-uri")) {
+  if !(clone_caps_contain_token(caps, "bundle-uri")) {
     return []
   }
   let req = build_bundle_uri_request_for_clone()
@@ -1443,7 +1443,7 @@ fn parse_bundle_uri_lines_for_clone(lines : Array[String]) -> Array[String] {
           heuristic = value.to_lower()
           continue
         }
-        if not(key.has_prefix("bundle.")) {
+        if !(key.has_prefix("bundle.")) {
           continue
         }
         let tail = String::unsafe_substring(key, start=7, end=key.length())
@@ -1458,14 +1458,14 @@ fn parse_bundle_uri_lines_for_clone(lines : Array[String]) -> Array[String] {
             if name.length() == 0 {
               continue
             }
-            if not(seen_name.contains(name)) {
+            if !(seen_name.contains(name)) {
               seen_name[name] = true
               names_in_order.push(name)
             }
             if field == "uri" {
               uri_by_name[name] = value
             } else if field == "creationtoken" {
-              let token = @strconv.parse_int(value) catch { _ => 0 }
+              let token = @string.parse_int(value) catch { _ => 0 }
               token_by_name[name] = token
             }
           }
@@ -1540,7 +1540,7 @@ async fn run_postclone_hook(
   }
   hooks_ensure_sensitive_hook_approval(wfs, rfs, root, "postclone")
   let hook_path = git_dir + "/hooks/postclone"
-  if not(rfs.is_file(hook_path)) {
+  if !(rfs.is_file(hook_path)) {
     return ()
   }
   let code = @process.run(hook_path, [], inherit_env=true, cwd=root) catch {
@@ -1616,7 +1616,7 @@ fn cleanup_failed_clone(
 ///|
 fn promote_transport_clone_to_bare_layout(fs : OsFs, root : String) -> Unit {
   let nested_git_dir = root + "/.git"
-  if not(fs.is_dir(nested_git_dir)) {
+  if !(fs.is_dir(nested_git_dir)) {
     return ()
   }
   let root_entries = fs.readdir(root) catch { _ => [] }
@@ -1675,7 +1675,7 @@ fn ensure_clone_path_available(fs : OsFs, path : String) -> Unit raise Error {
       "path exists and is not dir: " + path,
     )
   }
-  if fs.is_dir(path) && not(is_empty_dir(fs, path)) {
+  if fs.is_dir(path) && !(is_empty_dir(fs, path)) {
     raise @bitcore.GitError::InvalidObject(
       "destination path exists and is not an empty directory: " + path,
     )
@@ -1703,7 +1703,7 @@ fn resolve_local_clone_checkout_target(
 ///|
 fn read_head_checkout_spec_for_clone(fs : OsFs, git_dir : String) -> String {
   let head_path = git_dir + "/HEAD"
-  if not(fs.is_file(head_path)) {
+  if !(fs.is_file(head_path)) {
     return "HEAD"
   }
   let head = trim_string(
@@ -1747,7 +1747,7 @@ async fn checkout_with_promisor_retry_clone(
               Some(db) => db
               None => {
                 let db = @bitlibnative.native_promisor_db(fs, git_dir)
-                if not(db.has_promisor()) {
+                if !(db.has_promisor()) {
                   raise err
                 }
                 promisor_db = Some(db)
@@ -1865,7 +1865,7 @@ async fn warn_case_insensitive_collisions_from_commit(
   git_dir : String,
   commit_id : @bitcore.ObjectId,
 ) -> Unit raise Error {
-  if not(worktree_is_case_insensitive_for_clone(fs, git_dir)) {
+  if !(worktree_is_case_insensitive_for_clone(fs, git_dir)) {
     return
   }
   let db = @bitlib.ObjectDb::load_lazy(fs, git_dir) catch { _ => return }

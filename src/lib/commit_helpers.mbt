@@ -70,7 +70,7 @@ pub fn commit_is_trailer_line(line : String) -> Bool {
         return false
       }
       for c in token {
-        if not(
+        if !(
             (c >= 'a' && c <= 'z') ||
             (c >= 'A' && c <= 'Z') ||
             (c >= '0' && c <= '9') ||
@@ -108,7 +108,7 @@ pub fn commit_apply_signoff(msg : String, committer~ : String) -> String {
   // Determine if we need a blank line separator.
   // A blank line is needed if the last non-blank line is not a trailer.
   let need_blank = if last_nonblank >= 0 {
-    not(commit_is_trailer_line(lines[last_nonblank]))
+    !(commit_is_trailer_line(lines[last_nonblank]))
   } else {
     true
   }

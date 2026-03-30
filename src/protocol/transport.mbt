@@ -50,7 +50,7 @@ pub fn parse_remote(remote : String) -> RemoteSpec {
           start=idx + 2,
           end=remote.length(),
         )
-        if host.length() > 0 && path.length() > 0 && not(host.contains("/")) {
+        if host.length() > 0 && path.length() > 0 && !(host.contains("/")) {
           return {
             kind: RemoteKind::Ssh,
             raw: remote,
@@ -65,14 +65,14 @@ pub fn parse_remote(remote : String) -> RemoteSpec {
   }
   // scp-style: [user@]host:path
   let colon = remote.find(":")
-  if colon is Some(idx) && not(remote.has_prefix("/")) {
+  if colon is Some(idx) && !(remote.has_prefix("/")) {
     let host = String::unsafe_substring(remote, start=0, end=idx)
     let path = String::unsafe_substring(
       remote,
       start=idx + 1,
       end=remote.length(),
     )
-    if host.length() > 0 && path.length() > 0 && not(host.contains("/")) {
+    if host.length() > 0 && path.length() > 0 && !(host.contains("/")) {
       return {
         kind: RemoteKind::Ssh,
         raw: remote,

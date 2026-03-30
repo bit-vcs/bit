@@ -292,7 +292,7 @@ fn diff_current_relative_prefix(root : String) -> String {
   let cwd = diff_effective_cwd(root)
   let root_norm = normalize_path(root)
   let cwd_norm = normalize_path(cwd)
-  if cwd_norm == root_norm || not(is_path_prefix(cwd_norm, root_norm)) {
+  if cwd_norm == root_norm || !(is_path_prefix(cwd_norm, root_norm)) {
     return ""
   }
   let mut suffix = String::unsafe_substring(
@@ -372,7 +372,7 @@ fn diff_apply_relative_path(path : String, prefix : String) -> String? {
   if trimmed.length() == 0 {
     return Some(path)
   }
-  if not(path.has_prefix(trimmed)) {
+  if !(path.has_prefix(trimmed)) {
     return None
   }
   let mut rest = String::unsafe_substring(
@@ -534,7 +534,7 @@ fn diff_filter_ignore_all_space(
   for file in files {
     let mode_changed = file.old_mode != file.new_mode
     if mode_changed ||
-      not(diff_ignore_all_space_equal(file.old_content, file.new_content)) {
+      !(diff_ignore_all_space_equal(file.old_content, file.new_content)) {
       out.push(file)
     }
   }
@@ -600,7 +600,7 @@ fn diff_conflict_marker_size(
   path : String,
 ) -> Int {
   let attr_path = root + "/.gitattributes"
-  if not(fs.is_file(attr_path)) {
+  if !(fs.is_file(attr_path)) {
     return 7
   }
   let content = @utf8.decode_lossy(
@@ -620,14 +620,14 @@ fn diff_conflict_marker_size(
       }
     }
     if words.length() < 2 ||
-      not(diff_gitattributes_pattern_matches(path, words[0])) {
+      !(diff_gitattributes_pattern_matches(path, words[0])) {
       continue
     }
     for i in 1..<words.length() {
       let word = words[i]
       if word.has_prefix("conflict-marker-size=") {
         let raw = String::unsafe_substring(word, start=21, end=word.length())
-        let parsed = @strconv.parse_int(raw) catch { _ => 7 }
+        let parsed = @string.parse_int(raw) catch { _ => 7 }
         if parsed > 0 {
           size = parsed
         }
@@ -934,7 +934,7 @@ fn diff_format_stat_label(
   file : @bitdiff.DiffFile,
   compact_summary : Bool,
 ) -> String {
-  if not(compact_summary) {
+  if !(compact_summary) {
     return file.path
   }
   let suffix = match file.kind {
@@ -1199,7 +1199,7 @@ fn diff_extra_unmerged_name_only_paths(
   }
   let extra : Array[String] = []
   for path, _ in unmerged_paths {
-    if not(diff_path_matches_filters(path, filters)) {
+    if !(diff_path_matches_filters(path, filters)) {
       continue
     }
     let display_path = match relative_prefix {
@@ -1282,7 +1282,7 @@ fn diff_should_auto_no_index(
   path_a : String,
   path_b : String,
 ) -> Bool {
-  if not(
+  if !(
       diff_no_index_operand_exists(fs, root, path_a) &&
       diff_no_index_operand_exists(fs, root, path_b),
     ) {
@@ -1333,11 +1333,11 @@ fn diff_has_dirty_submodules(
 ) -> Bool raise Error {
   let index_entries = @bitlib.read_index_entries(rfs, git_dir)
   for entry in index_entries {
-    if not(is_gitlink_mode_for_diff(entry.mode)) {
+    if !(is_gitlink_mode_for_diff(entry.mode)) {
       continue
     }
     if filters.length() > 0 &&
-      not(
+      !(
         filters
         .iter()
         .any(fn(filter) { ls_files_pathspec_matches(entry.path, filter) }),
@@ -1345,7 +1345,7 @@ fn diff_has_dirty_submodules(
       continue
     }
     let sub_root = root + "/" + entry.path
-    if not(fs.is_dir(sub_root)) {
+    if !(fs.is_dir(sub_root)) {
       continue
     }
     let sub_git_dir = resolve_git_dir(rfs, sub_root)
@@ -1516,15 +1516,15 @@ async fn handle_diff(args : Array[String]) -> Unit raise Error {
         }
         _ if arg.has_prefix("-U") && arg.length() > 2 => {
           let num_str = string_slice_from(arg, 2)
-          context_lines = @strconv.parse_int(num_str)
+          context_lines = @string.parse_int(num_str)
         }
         _ if arg.has_prefix("--unified=") => {
           let num_str = string_slice_from(arg, 10)
-          context_lines = @strconv.parse_int(num_str)
+          context_lines = @string.parse_int(num_str)
         }
-        _ if not(arg.has_prefix("-")) =>
-          if not(no_index) &&
-            not(diff_is_existing_fs_path(fs, root, arg)) &&
+        _ if !(arg.has_prefix("-")) =>
+          if !(no_index) &&
+            !(diff_is_existing_fs_path(fs, root, arg)) &&
             (arg.contains("^!") || arg.contains("..")) {
             if range_spec is None {
               range_spec = Some(arg)
@@ -1551,8 +1551,8 @@ async fn handle_diff(args : Array[String]) -> Unit raise Error {
         _ if arg.has_prefix("-") => warn_unimplemented_arg("diff", arg)
         _ => ()
       }
-    } else if not(no_index) &&
-      not(diff_is_existing_fs_path(fs, root, arg)) &&
+    } else if !(no_index) &&
+      !(diff_is_existing_fs_path(fs, root, arg)) &&
       (arg.contains("^!") || arg.contains("..")) {
       if range_spec is None {
         range_spec = Some(arg)
@@ -1601,7 +1601,7 @@ async fn handle_diff(args : Array[String]) -> Unit raise Error {
   } else {
     paths
   }
-  if not(no_index) &&
+  if !(no_index) &&
     range_spec is None &&
     ref_target is None &&
     path_args.length() >= 2 &&
@@ -1629,7 +1629,7 @@ async fn handle_diff(args : Array[String]) -> Unit raise Error {
     let no_prefix = diff_noprefix_enabled_from_config(rfs, git_dir)
     let path_a_is_dir = fs.is_dir(no_index_abs_a)
     let path_b_is_dir = fs.is_dir(no_index_abs_b)
-    if no_index_filters.length() > 0 && not(path_a_is_dir && path_b_is_dir) {
+    if no_index_filters.length() > 0 && !(path_a_is_dir && path_b_is_dir) {
       diff_print_no_index_usage()
       @sys.exit(129)
     }
@@ -1644,7 +1644,7 @@ async fn handle_diff(args : Array[String]) -> Unit raise Error {
       ),
       relative_prefix,
     )
-    if not(quiet) {
+    if !(quiet) {
       for
         line in diff_collect_no_index_output_lines(
           entries, output, context_lines, no_prefix,
@@ -1755,7 +1755,7 @@ async fn handle_diff(args : Array[String]) -> Unit raise Error {
   let display_files = diff_apply_relative_files(files, relative_prefix)
   // If an external diff program is configured, use it instead of built-in output
   match diff_get_external_command(rfs, git_dir) {
-    Some(ext_cmd) if not(check_mode) && not(quiet) => {
+    Some(ext_cmd) if !(check_mode) && !(quiet) => {
       diff_run_external(ext_cmd, root, files)
       if exit_code && display_files.length() > 0 {
         @sys.exit(1)
@@ -1771,16 +1771,16 @@ async fn handle_diff(args : Array[String]) -> Unit raise Error {
   }
   let has_dirty_submodules = submodule_mode &&
     exit_code &&
-    not(cached) &&
+    !(cached) &&
     range_spec is None &&
     diff_has_dirty_submodules(fs, rfs, root, git_dir, normalized_path_args)
   if check_mode {
     for issue in check_issues {
       print_line("\{issue.path}:\{issue.line}: \{issue.message}")
     }
-  } else if not(quiet) {
+  } else if !(quiet) {
     let extra_unmerged = if output.name_only &&
-      not(cached) &&
+      !(cached) &&
       ref_target is None &&
       range_spec is None {
       diff_extra_unmerged_name_only_paths(
@@ -1860,13 +1860,13 @@ async fn handle_diff_files(args : Array[String]) -> Unit raise Error {
           delegate_to_diff = false
         }
         _ if arg.has_prefix("--ignore-submodules=") =>
-          ignore_submodules = not(
+          ignore_submodules = !(
             String::unsafe_substring(arg, start=20, end=arg.length())
             .trim()
             .to_lower() ==
             "none",
           )
-        _ if not(arg.has_prefix("-")) => filters.push(arg)
+        _ if !(arg.has_prefix("-")) => filters.push(arg)
         _ => ()
       }
     } else {
@@ -1890,7 +1890,7 @@ async fn handle_diff_files(args : Array[String]) -> Unit raise Error {
     if exit_code {
       @sys.exit(1)
     }
-    if not(quiet) && not(no_patch_only) {
+    if !(quiet) && !(no_patch_only) {
       if name_only {
         for change in changes {
           print_line(change.path)
@@ -1998,12 +1998,12 @@ async fn handle_diff_index(args : Array[String]) -> Unit raise Error {
   let rfs : &@bitcore.RepoFileSystem = fs
   let git_dir = resolve_git_dir(rfs, root)
   let target = treeish.unwrap_or("HEAD")
-  if not(cached) {
+  if !(cached) {
     let changes = diff_collect_raw_changes_against_tree(
       fs, rfs, root, git_dir, target, filters,
     )
     let has_changes = changes.length() > 0
-    if not(quiet) && not(no_patch_only) {
+    if !(quiet) && !(no_patch_only) {
       if name_only {
         for change in changes {
           print_line(change.path)
@@ -2035,12 +2035,12 @@ async fn handle_diff_index(args : Array[String]) -> Unit raise Error {
   }
   let stale : Array[@bitlib.IndexEntry] = []
   for entry in stale_all {
-    if not(staged_paths.contains(entry.path)) {
+    if !(staged_paths.contains(entry.path)) {
       stale.push(entry)
     }
   }
   let has_changes = staged.length() > 0 || stale.length() > 0
-  if not(quiet) && not(no_patch_only) {
+  if !(quiet) && !(no_patch_only) {
     if name_only {
       for file in staged {
         print_line(file.path)
@@ -2053,7 +2053,7 @@ async fn handle_diff_index(args : Array[String]) -> Unit raise Error {
         print_line(
           format_diff_index_line_from_diff_file(
             file,
-            worktree_compare=not(cached),
+            worktree_compare=!(cached),
           ),
         )
       }
@@ -2183,7 +2183,7 @@ fn diff_filter_raw_submodule_changes(
   changes : Array[DiffRawWorktreeChange],
   ignore_submodules : Bool,
 ) -> Array[DiffRawWorktreeChange] {
-  if not(ignore_submodules) {
+  if !(ignore_submodules) {
     return changes
   }
   let filtered : Array[DiffRawWorktreeChange] = []
@@ -2193,7 +2193,7 @@ fn diff_filter_raw_submodule_changes(
       (_, Some(0o160000)) => true
       _ => false
     }
-    if not(is_gitlink) {
+    if !(is_gitlink) {
       filtered.push(change)
     }
   }
@@ -2270,7 +2270,7 @@ async fn diff_collect_raw_changes_against_index(
   let entries = @bitlib.read_index_entries(fs, git_dir)
   let changes : Array[DiffRawWorktreeChange] = []
   for entry in entries {
-    if not(diff_path_matches_filters(entry.path, filters)) {
+    if !(diff_path_matches_filters(entry.path, filters)) {
       continue
     }
     // Match git's stat-based behavior: when the index has zero stat data
@@ -2342,14 +2342,14 @@ async fn diff_collect_raw_changes_against_tree(
   let paths : Array[String] = []
   for entry in tree_entries {
     let path = entry.0
-    if diff_path_matches_filters(path, filters) && not(seen.contains(path)) {
+    if diff_path_matches_filters(path, filters) && !(seen.contains(path)) {
       seen[path] = true
       paths.push(path)
     }
   }
   for entry in index_entries {
     let path = entry.path
-    if diff_path_matches_filters(path, filters) && not(seen.contains(path)) {
+    if diff_path_matches_filters(path, filters) && !(seen.contains(path)) {
       seen[path] = true
       paths.push(path)
     }
@@ -2382,14 +2382,14 @@ async fn collect_diff_index_stale_entries(
   let entries = @bitlib.read_index_entries(fs, git_dir)
   let stale : Array[@bitlib.IndexEntry] = []
   for entry in entries {
-    if not(diff_path_matches_filters(entry.path, filters)) {
+    if !(diff_path_matches_filters(entry.path, filters)) {
       continue
     }
     if is_gitlink_mode_for_diff(entry.mode) {
       continue
     }
     let mut is_stale = entry.mtime_sec == 0 && entry.mtime_nsec == 0
-    if not(is_stale) {
+    if !(is_stale) {
       let abs = root + "/" + entry.path
       let mtime_result : Result[(Int64, Int), Error] = try? @asyncfs.mtime(
         abs,
@@ -2402,7 +2402,7 @@ async fn collect_diff_index_stale_entries(
           }
         Err(_) => is_stale = true
       }
-      if not(is_stale) && entry.mode != 0o120000 {
+      if !(is_stale) && entry.mode != 0o120000 {
         let size_result : Result[Bytes, Error] = try? fs.read_file(abs)
         match size_result {
           Ok(content) => if content.length() != entry.size { is_stale = true }
@@ -2567,7 +2567,7 @@ async fn diff_worktree_against_ref(
     }
   }
   for file in worktree {
-    if not(seen.contains(file.path)) {
+    if !(seen.contains(file.path)) {
       // Only in worktree diff — the file exists in index identical to ref,
       // but has working tree changes
       result.push(file)
@@ -2654,7 +2654,7 @@ async fn try_handle_submodule_range_diff(
   let changes : Array[(String, @bitcore.ObjectId, @bitcore.ObjectId)] = []
   for item in new_entries.to_array() {
     let (path, new_entry) = item
-    if not(is_gitlink_mode_for_diff(new_entry.mode)) {
+    if !(is_gitlink_mode_for_diff(new_entry.mode)) {
       continue
     }
     match old_entries.get(path) {
@@ -2819,11 +2819,11 @@ fn resolve_submodule_git_dir_candidates(
     candidates.push(worktree_git)
   }
   let linked_modules = git_dir + "/modules/" + submodule_name
-  if rfs.is_dir(linked_modules) && not(candidates.contains(linked_modules)) {
+  if rfs.is_dir(linked_modules) && !(candidates.contains(linked_modules)) {
     candidates.push(linked_modules)
   }
   let common_modules = repo_git_dir + "/modules/" + submodule_name
-  if rfs.is_dir(common_modules) && not(candidates.contains(common_modules)) {
+  if rfs.is_dir(common_modules) && !(candidates.contains(common_modules)) {
     candidates.push(common_modules)
   }
   candidates
@@ -3087,10 +3087,10 @@ fn diff_no_index_patch_lines(
       if i == 0 {
         lines.push("diff --git \{header_old_label} \{header_new_label}")
       } else if line.has_prefix("index ") {
-        if not(diff_no_index_should_suppress_index(entry)) {
+        if !(diff_no_index_should_suppress_index(entry)) {
           lines.push(line)
         }
-      } else if not(replaced_old) && line.has_prefix("--- ") {
+      } else if !(replaced_old) && line.has_prefix("--- ") {
         replaced_old = true
         if mode_only {
           continue
@@ -3100,7 +3100,7 @@ fn diff_no_index_patch_lines(
           _ => "--- \{old_label}"
         }
         lines.push(old_line)
-      } else if not(replaced_new) && line.has_prefix("+++ ") {
+      } else if !(replaced_new) && line.has_prefix("+++ ") {
         replaced_new = true
         if mode_only {
           continue
@@ -3223,7 +3223,7 @@ async fn diff_no_index_is_file_like(fs : OsFs, abs_path : String) -> Bool {
   diff_no_index_is_named_pipe(abs_path) ||
   (
     @bitio.read_symlink_target_path(abs_path) is Some(_) &&
-    not(fs.is_dir(abs_path))
+    !(fs.is_dir(abs_path))
   )
 }
 
@@ -3233,8 +3233,8 @@ async fn diff_no_index_uses_stream_read(fs : OsFs, abs_path : String) -> Bool {
   diff_no_index_is_named_pipe(abs_path) ||
   (
     @bitio.read_symlink_target_path(abs_path) is Some(_) &&
-    not(fs.is_file(abs_path)) &&
-    not(fs.is_dir(abs_path))
+    !(fs.is_file(abs_path)) &&
+    !(fs.is_dir(abs_path))
   )
 }
 
@@ -3250,9 +3250,9 @@ async fn diff_no_index_read_path(
   match @bitio.read_symlink_target_path(abs_path) {
     Some(target) =>
       // Only treat as symlink content if the target doesn't exist (broken symlink)
-      if not(fs.is_file(abs_path)) &&
-        not(fs.is_dir(abs_path)) &&
-        not(diff_no_index_is_named_pipe(abs_path)) {
+      if !(fs.is_file(abs_path)) &&
+        !(fs.is_dir(abs_path)) &&
+        !(diff_no_index_is_named_pipe(abs_path)) {
         return @utf8.encode(target)
       }
     None => ()
@@ -3431,8 +3431,8 @@ fn diff_no_index_file_mode(fs : OsFs, abs_path : String) -> Int {
     return 0o100644
   }
   if @bitio.read_symlink_target_path(abs_path) is Some(_) &&
-    not(fs.is_file(abs_path)) &&
-    not(fs.is_dir(abs_path)) {
+    !(fs.is_file(abs_path)) &&
+    !(fs.is_dir(abs_path)) {
     return 0o100644
   }
   ignore(fs)
@@ -3586,7 +3586,7 @@ async fn diff_no_index_dirs(
       continue
     }
     set_b[name] = true
-    if not(set_a.contains(name)) {
+    if !(set_a.contains(name)) {
       all_names.push(name)
     }
   }
@@ -3636,7 +3636,7 @@ async fn diff_no_index_dirs(
           suppress_index: false,
         })
       }
-    } else if in_a && not(in_b) {
+    } else if in_a && !(in_b) {
       if fs.is_file(path_a) {
         let content = diff_no_index_read_path(fs, path_a)
         out.push({
@@ -3655,7 +3655,7 @@ async fn diff_no_index_dirs(
       } else if fs.is_dir(path_a) {
         diff_no_index_push_dir_entries(fs, out, path_a, rel_a, false)
       }
-    } else if not(in_a) && in_b {
+    } else if !(in_a) && in_b {
       if fs.is_file(path_b) {
         let content = diff_no_index_read_path(fs, path_b)
         out.push({

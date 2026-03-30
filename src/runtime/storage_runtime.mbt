@@ -115,7 +115,7 @@ fn storage_normalize_path(path : String) -> String {
     } else if part == ".." {
       if parts.length() > 0 && parts[parts.length() - 1] != ".." {
         let _ = parts.pop()
-      } else if not(path.has_prefix("/")) {
+      } else if !(path.has_prefix("/")) {
         parts.push(part)
       }
     } else {
@@ -200,10 +200,10 @@ fn storage_parse_git_env_timestamp(raw : String) -> Int64? {
     Some(part) =>
       if part.has_prefix("@") {
         let numeric = String::unsafe_substring(part, start=1, end=part.length())
-        let parsed = @strconv.parse_int64(numeric) catch { _ => return None }
+        let parsed = @string.parse_int64(numeric) catch { _ => return None }
         Some(parsed)
       } else {
-        let parsed = @strconv.parse_int64(part) catch { _ => return None }
+        let parsed = @string.parse_int64(part) catch { _ => return None }
         Some(parsed)
       }
     None => None
@@ -352,13 +352,13 @@ fn storage_hash_object_validate_content(
   match obj_type {
     @bit.ObjectType::Commit => {
       let text = @utf8.decode_lossy(content[:])
-      if not(text.has_prefix("tree ")) {
+      if !(text.has_prefix("tree ")) {
         raise @bit.GitError::InvalidObject("corrupt commit")
       }
     }
     @bit.ObjectType::Tag => {
       let text = @utf8.decode_lossy(content[:])
-      if not(text.has_prefix("object ")) {
+      if !(text.has_prefix("object ")) {
         raise @bit.GitError::InvalidObject("corrupt tag")
       }
     }
@@ -506,7 +506,7 @@ fn storage_handle_init(
     shared: None,
   }
   @bitrepo.init_repo_with_options_with_repo_fs(fs, rfs, root, opts)
-  if not(args.quiet) {
+  if !(args.quiet) {
     let git_dir = storage_resolve_git_dir(rfs, root)
     storage_print_line("Initialized empty Git repository in " + git_dir + "/")
   }
@@ -613,7 +613,7 @@ fn storage_handle_commit(
     committer_timezone=Some(timezone),
     algo~,
   )
-  if not(args.quiet) {
+  if !(args.quiet) {
     let short_id = String::unsafe_substring(commit_id.to_hex(), start=0, end=7)
     let first_line = match args.message.find("\n") {
       Some(idx) => String::unsafe_substring(args.message, start=0, end=idx)
@@ -656,7 +656,7 @@ fn storage_resolve_common_git_dir(
   git_dir : String,
 ) -> String {
   let commondir_path = git_dir + "/commondir"
-  if not(rfs.is_file(commondir_path)) {
+  if !(rfs.is_file(commondir_path)) {
     return git_dir
   }
   let raw = storage_decode_bytes(
@@ -797,7 +797,7 @@ fn storage_collect_status_snapshot(
       continue
     }
     let abs_path = root + "/" + entry.path
-    if not(rfs.is_file(abs_path)) {
+    if !(rfs.is_file(abs_path)) {
       unstaged_deleted.push(entry.path)
     }
   }
@@ -962,7 +962,7 @@ fn storage_status_text_lines(
       out.push("  " + path)
     }
   }
-  if not(has_staged) && not(has_unstaged) && status.untracked.length() == 0 {
+  if !(has_staged) && !(has_unstaged) && status.untracked.length() == 0 {
     out.push("")
     out.push("nothing to commit, working tree clean")
   }
@@ -1034,7 +1034,7 @@ fn storage_handle_hash_object(
   let algo = storage_resolve_hash_algorithm(rfs, git_dir, args.object_format)
   if args.stdin_mode {
     let content = storage_read_all_stdin()
-    if not(args.literally) {
+    if !(args.literally) {
       storage_hash_object_validate_content(args.obj_type, content)
     }
     let id = @object.hash_object_content_with_algo(algo, args.obj_type, content)
@@ -1047,7 +1047,7 @@ fn storage_handle_hash_object(
       @bitlib.write_object_bytes(fs, git_dir, id, compressed)
     }
     storage_print_line(id.to_hex())
-    if args.paths.length() == 0 && not(args.stdin_paths) {
+    if args.paths.length() == 0 && !(args.stdin_paths) {
       return
     }
   }
@@ -1128,7 +1128,7 @@ fn storage_handle_hash_object(
     } else {
       @bitlib.clean_for_storage(content, attrs, autocrlf)
     }
-    if not(args.literally) {
+    if !(args.literally) {
       storage_hash_object_validate_content(args.obj_type, normalized)
     }
     let id = @object.hash_object_content_with_algo(
@@ -1247,7 +1247,7 @@ fn storage_handle_update_ref(
   let new_id = storage_resolve_object_id(rfs, git_dir, new_value)
   let ref_path = git_dir + "/" + args.refname
   let dir = storage_parent_dir(ref_path)
-  if dir.length() > 0 && not(rfs.is_dir(dir)) {
+  if dir.length() > 0 && !(rfs.is_dir(dir)) {
     fs.mkdir_p(dir)
   }
   fs.write_string(ref_path, new_id.to_hex() + "\n")

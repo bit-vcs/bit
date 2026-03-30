@@ -6,6 +6,7 @@ import {
   "mizchi/bit/string_utils" @string_utils,
   "moonbitlang/core/encoding/utf8" @utf8,
   "moonbitlang/core/env" @env,
+  "moonbitlang/core/string" @string,
   "moonbitlang/core/strconv" @strconv,
   "moonbitlang/x/sys" @sys,
 }

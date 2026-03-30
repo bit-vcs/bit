@@ -188,7 +188,7 @@ pub fn tar_parse_committer_timestamp(data : Bytes) -> Int64 {
         }
         if parts_arr.length() >= 1 {
           let ts_str = parts_arr[0]
-          let ts = @strconv.parse_int64(ts_str) catch { _ => 0L }
+          let ts = @string.parse_int64(ts_str) catch { _ => 0L }
           return ts
         }
       }
@@ -230,7 +230,7 @@ pub fn tar_emit_parent_dirs(
   let mut di = dirs.length() - 1
   while di >= 0 {
     let dir = dirs[di]
-    if not(emitted.contains(dir)) {
+    if !(emitted.contains(dir)) {
       emitted[dir] = true
       let hdr = tar_make_header(dir, 0o40755, 0, mtime, b'5', "")
       for b in hdr {

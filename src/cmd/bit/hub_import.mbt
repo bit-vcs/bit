@@ -196,7 +196,7 @@ fn json_get_int64(
   match obj.get(key) {
     Some(Json::Number(value, ..)) => value.to_int64()
     Some(Json::String(value)) =>
-      @strconv.parse_int64(value) catch {
+      @string.parse_int64(value) catch {
         _ => fallback
       }
     _ => fallback

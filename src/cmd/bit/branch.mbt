@@ -99,13 +99,13 @@ async fn handle_branch(args : Array[String]) -> Unit raise Error {
         i += 1
         continue
       }
-      "--merged" if i + 1 < args.length() && not(args[i + 1].has_prefix("-")) => {
+      "--merged" if i + 1 < args.length() && !(args[i + 1].has_prefix("-")) => {
         merged_filter = Some(args[i + 1])
         i += 2
         continue
       }
       "--merged" => merged_filter = Some("HEAD")
-      "--no-merged" if i + 1 < args.length() && not(args[i + 1].has_prefix("-")) => {
+      "--no-merged" if i + 1 < args.length() && !(args[i + 1].has_prefix("-")) => {
         no_merged_filter = Some(args[i + 1])
         i += 2
         continue
@@ -119,7 +119,7 @@ async fn handle_branch(args : Array[String]) -> Unit raise Error {
         no_merged_filter = Some(
           String::unsafe_substring(arg, start=12, end=arg.length()),
         )
-      _ if not(arg.has_prefix("-")) => {
+      _ if !(arg.has_prefix("-")) => {
         if new_branch is None {
           new_branch = Some(arg)
         } else if start_point is None {
@@ -243,7 +243,7 @@ async fn handle_branch(args : Array[String]) -> Unit raise Error {
                   @sys.exit(1)
                 }
                 let refname = normalize_local_branch_ref(name)
-                if not(force_create) &&
+                if !(force_create) &&
                   @bitlib.resolve_ref(fs, git_dir, refname) is Some(_) {
                   @stdio.stderr.write(
                     "fatal: a branch named '\{name}' already exists",
@@ -307,7 +307,7 @@ async fn handle_branch(args : Array[String]) -> Unit raise Error {
               None =>
                 if list_mode {
                   // List local branches
-                  if not(show_remotes) {
+                  if !(show_remotes) {
                     if merged_filter is Some(_) || no_merged_filter is Some(_) {
                       branch_list_with_merge_filter(
                         fs, git_dir, verbose, merged_filter, no_merged_filter,
@@ -318,7 +318,7 @@ async fn handle_branch(args : Array[String]) -> Unit raise Error {
                       } else {
                         @bitlib.list_branches_text(fs, git_dir)
                       }
-                      let output_lines = if column_active && not(verbose) {
+                      let output_lines = if column_active && !(verbose) {
                         branch_format_columns(
                           lines,
                           branch_term_columns(),
@@ -389,10 +389,10 @@ async fn branch_list_with_merge_filter(
     let is_merged = @bitlib.is_ancestor_of(fs, git_dir, b.id, tid)
     let should_show = match (merged_filter, no_merged_filter) {
       (Some(_), _) => is_merged
-      (_, Some(_)) => not(is_merged)
+      (_, Some(_)) => !(is_merged)
       _ => true
     }
-    if not(should_show) {
+    if !(should_show) {
       continue
     }
     if verbose {
@@ -518,7 +518,7 @@ fn branch_apply_column_mode(
         raise @bitcore.GitError::InvalidObject("unsupported option '\{token}'")
     }
   }
-  if saw_layout && not(saw_enable) {
+  if saw_layout && !(saw_enable) {
     next_enabled_state = "enabled"
   }
   (next_enabled_state, next_dense)
@@ -533,7 +533,7 @@ fn branch_resolve_column_mode(
 ) -> (Bool, Bool, Bool) raise @bitcore.GitError {
   let mut enabled_state = "disabled"
   let mut dense = false
-  if not(verbose) {
+  if !(verbose) {
     match column_ui {
       Some(value) => {
         let (next_enabled_state, next_dense) = branch_apply_column_mode(
@@ -574,7 +574,7 @@ fn branch_resolve_column_mode(
 fn branch_term_columns() -> Int {
   match @sys.get_env_var("COLUMNS") {
     Some(raw) => {
-      let parsed = @strconv.parse_int(raw) catch { _ => 80 }
+      let parsed = @string.parse_int(raw) catch { _ => 80 }
       if parsed > 1 {
         parsed
       } else {
@@ -670,7 +670,7 @@ fn branch_format_columns(
       }
       line += items[idx]
       let newline = x == cols - 1 || idx + rows >= items.length()
-      if not(newline) {
+      if !(newline) {
         let cell_width = widths[x] + padding
         line += " ".repeat(cell_width - lengths[idx])
       }

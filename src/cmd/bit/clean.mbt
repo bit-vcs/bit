@@ -21,13 +21,13 @@ async fn handle_clean(args : Array[String]) -> Unit raise Error {
         force = true
         remove_dirs = true
       }
-      _ if not(arg.has_prefix("-")) => paths.push(arg)
+      _ if !(arg.has_prefix("-")) => paths.push(arg)
       _ if arg.has_prefix("-") => warn_unimplemented_arg("clean", arg)
       _ => ()
     }
   }
   // git clean requires -f unless -n is specified
-  if not(force) && not(dry_run) {
+  if !(force) && !(dry_run) {
     @stdio.stderr.write(
       "fatal: clean.requireForce defaults to true and neither -i, -n, nor -f given; refusing to clean",
     )
@@ -62,7 +62,7 @@ async fn handle_clean(args : Array[String]) -> Unit raise Error {
       print_line("Would remove \{path}")
     } else if fs.is_file(abs_path) {
       fs.remove_file(abs_path)
-      if not(quiet) {
+      if !(quiet) {
         print_line("Removing \{path}")
       }
       // Track parent directory for potential removal
@@ -70,7 +70,7 @@ async fn handle_clean(args : Array[String]) -> Unit raise Error {
         match path.rev_find("/") {
           Some(idx) => {
             let parent = String::unsafe_substring(path, start=0, end=idx)
-            if not(dirs_to_check.contains(parent)) {
+            if !(dirs_to_check.contains(parent)) {
               dirs_to_check.push(parent)
             }
           }
@@ -79,13 +79,13 @@ async fn handle_clean(args : Array[String]) -> Unit raise Error {
       }
     } else if fs.is_dir(abs_path) && remove_dirs {
       remove_dir_recursive(fs, abs_path)
-      if not(quiet) {
+      if !(quiet) {
         print_line("Removing \{path}/")
       }
     }
   }
   // Remove empty directories if -d flag
-  if remove_dirs && not(dry_run) {
+  if remove_dirs && !(dry_run) {
     // Sort by depth (deepest first)
     dirs_to_check.sort_by((a, b) => b.length() - a.length())
     for dir in dirs_to_check {
@@ -102,7 +102,7 @@ async fn handle_clean(args : Array[String]) -> Unit raise Error {
             err if @async.is_cancellation_error(err) => raise err
             _ => ()
           }
-          if not(quiet) {
+          if !(quiet) {
             print_line("Removing \{dir}/")
           }
         }

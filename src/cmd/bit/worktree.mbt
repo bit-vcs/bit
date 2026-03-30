@@ -57,7 +57,7 @@ fn worktree_resolve_common_git_dir(
   git_dir : String,
 ) -> String {
   let commondir_path = git_dir + "/commondir"
-  if not(fs.is_file(commondir_path)) {
+  if !(fs.is_file(commondir_path)) {
     return git_dir
   }
   let raw = decode_bytes(
@@ -99,7 +99,7 @@ fn worktree_quote_path(path : String) -> String {
       break
     }
   }
-  if not(needs_quote) {
+  if !(needs_quote) {
     return path
   }
   let buf = StringBuilder::new()
@@ -207,7 +207,7 @@ fn worktree_has_ref_files(
   fs : &@bitcore.RepoFileSystem,
   dir : String,
 ) -> Bool raise Error {
-  if not(fs.is_dir(dir)) {
+  if !(fs.is_dir(dir)) {
     return false
   }
   for entry in fs.readdir(dir) {
@@ -364,7 +364,7 @@ async fn worktree_should_infer_orphan(
   match worktree_local_refs_status(fs, git_dir, common_git_dir) {
     WorktreeLocalRefsStatus::Available => return false
     WorktreeLocalRefsStatus::InvalidHead(path, contents) => {
-      if not(quiet) {
+      if !(quiet) {
         worktree_print_invalid_head_warning(path, contents)
       }
       return false
@@ -378,14 +378,14 @@ async fn worktree_should_infer_orphan(
     if worktree_has_ref_files(fs, common_git_dir + "/refs/remotes") {
       return false
     }
-    if not(force) && @bitlib.list_remotes(fs, common_git_dir).length() > 0 {
+    if !(force) && @bitlib.list_remotes(fs, common_git_dir).length() > 0 {
       eprint_line(
         "fatal: No local or remote refs exist despite at least one remote present, stopping; use 'add -f' to override or fetch a remote first",
       )
       @sys.exit(128)
     }
   }
-  if not(quiet) {
+  if !(quiet) {
     eprint_line("No possible source branch, inferring '--orphan'")
   }
   if track_requested {
@@ -493,7 +493,7 @@ async fn handle_worktree_list(args : Array[String]) -> Unit raise Error {
     }
   }
   // -z requires --porcelain
-  if nul_terminated && not(porcelain) {
+  if nul_terminated && !(porcelain) {
     eprint_line("fatal: -z requires --porcelain")
     @sys.exit(1)
   }
@@ -538,7 +538,7 @@ async fn handle_worktree_list(args : Array[String]) -> Unit raise Error {
           None => print_str("locked\{sep}")
         }
       }
-      if not(wt.is_main) {
+      if !(wt.is_main) {
         let prunable = @bitlib.get_worktree_prunable_reason(fs, root, wt.path)
         match prunable {
           Some(r) => print_str("prunable \{r}\{sep}")
@@ -579,7 +579,7 @@ async fn handle_worktree_list(args : Array[String]) -> Unit raise Error {
           None => ()
         }
       }
-      if not(wt.is_main) {
+      if !(wt.is_main) {
         let prunable = @bitlib.get_worktree_prunable_reason(fs, root, wt.path)
         match prunable {
           Some(r) => print_line("\tprunable: \{r}")
@@ -604,7 +604,7 @@ async fn handle_worktree_list(args : Array[String]) -> Unit raise Error {
       if wt.locked {
         suffix = suffix + " locked"
       }
-      if not(wt.is_main) {
+      if !(wt.is_main) {
         let prunable = @bitlib.get_worktree_prunable_reason(fs, root, wt.path)
         if prunable is Some(_) {
           suffix = suffix + " prunable"
@@ -761,7 +761,7 @@ async fn handle_worktree_add(args : Array[String]) -> Unit raise Error {
     eprint_line("usage: git worktree add [<options>] <path> [<commit-ish>]")
     @sys.exit(1)
   }
-  if lock_reason is Some(_) && not(lock) {
+  if lock_reason is Some(_) && !(lock) {
     eprint_line("fatal: --reason requires --lock")
     @sys.exit(1)
   }
@@ -802,7 +802,7 @@ async fn handle_worktree_add(args : Array[String]) -> Unit raise Error {
   } else if detach {
     if branch == "HEAD" {
       match worktree_local_refs_status(fs, git_dir, common_git_dir) {
-        WorktreeLocalRefsStatus::InvalidHead(path, contents) if not(quiet) =>
+        WorktreeLocalRefsStatus::InvalidHead(path, contents) if !(quiet) =>
           worktree_print_invalid_head_warning(path, contents)
         _ => ()
       }
@@ -826,7 +826,7 @@ async fn handle_worktree_add(args : Array[String]) -> Unit raise Error {
           Some(remote_guess) => {
             branch = remote_guess.refname
             new_branch = Some(dwim_branch)
-            if not(no_track) {
+            if !(no_track) {
               tracking_remote = Some(remote_guess.remote_name)
               tracking_merge = Some("refs/heads/" + dwim_branch)
             }
@@ -847,14 +847,14 @@ async fn handle_worktree_add(args : Array[String]) -> Unit raise Error {
         )
       }
     }
-  } else if not(detach) {
+  } else if !(detach) {
     if branch != "-" && @bitlib.rev_parse(fs, common_git_dir, branch) is None {
       match worktree_guess_remote_branch(fs, common_git_dir, branch) {
         Some(remote_guess) => {
           let branch_name = branch
           new_branch = Some(branch_name)
           branch = remote_guess.refname
-          if not(no_track) {
+          if !(no_track) {
             tracking_remote = Some(remote_guess.remote_name)
             tracking_merge = Some("refs/heads/" + branch_name)
           }
@@ -864,16 +864,16 @@ async fn handle_worktree_add(args : Array[String]) -> Unit raise Error {
     }
     if branch == "HEAD" {
       match worktree_local_refs_status(fs, git_dir, common_git_dir) {
-        WorktreeLocalRefsStatus::InvalidHead(path, contents) if not(quiet) =>
+        WorktreeLocalRefsStatus::InvalidHead(path, contents) if !(quiet) =>
           worktree_print_invalid_head_warning(path, contents)
         _ => ()
       }
     }
   }
-  if not(orphan) &&
+  if !(orphan) &&
     branch != "-" &&
     @bitlib.rev_parse(fs, common_git_dir, branch) is None {
-    if not(quiet) && commit_ish is None {
+    if !(quiet) && commit_ish is None {
       let hint_branch = if used_new_branch_options { new_branch } else { None }
       worktree_print_orphan_hint(wt_path, hint_branch)
     }
@@ -918,7 +918,7 @@ async fn handle_worktree_add(args : Array[String]) -> Unit raise Error {
     _ => ()
   }
   // Print success message
-  if not(quiet) {
+  if !(quiet) {
     match (new_branch, detach, commit_ish, branch) {
       (Some(b), _, _, _) => print_line("Preparing worktree (new branch '\{b}')")
       (None, true, _, _) => print_line("Preparing worktree (detached HEAD)")
@@ -941,7 +941,7 @@ async fn handle_worktree_remove(args : Array[String]) -> Unit raise Error {
   for arg in args {
     match arg {
       "--force" | "-f" => force_count += 1
-      _ if not(arg.has_prefix("-")) => path = Some(arg)
+      _ if !(arg.has_prefix("-")) => path = Some(arg)
       _ if arg.has_prefix("-") => warn_unimplemented_arg("worktree", arg)
       _ => ()
     }
@@ -976,7 +976,7 @@ async fn handle_worktree_prune(args : Array[String]) -> Unit raise Error {
         expire_before_sec = worktree_parse_expire_before_sec(
           String::unsafe_substring(arg, start=9, end=arg.length()),
         )
-      _ if not(arg.has_prefix("-")) => {
+      _ if !(arg.has_prefix("-")) => {
         eprint_line("fatal: too many arguments")
         @sys.exit(128)
       }
@@ -1035,7 +1035,7 @@ async fn handle_worktree_lock(args : Array[String]) -> Unit raise Error {
       }
       _ if arg.has_prefix("--reason=") =>
         reason = Some(string_slice_from(arg, 9))
-      _ if not(arg.has_prefix("-")) => path = Some(arg)
+      _ if !(arg.has_prefix("-")) => path = Some(arg)
       _ if arg.has_prefix("-") => warn_unimplemented_arg("worktree", arg)
       _ => ()
     }
@@ -1054,7 +1054,7 @@ async fn handle_worktree_unlock(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
   let mut path : String? = None
   for arg in args {
-    if not(arg.has_prefix("-")) {
+    if !(arg.has_prefix("-")) {
       path = Some(arg)
     } else {
       warn_unimplemented_arg("worktree", arg)
@@ -1079,7 +1079,7 @@ async fn handle_worktree_move(args : Array[String]) -> Unit raise Error {
       "--force" | "-f" => force_count += 1
       "--relative-paths" => relative_paths = Some(true)
       "--no-relative-paths" => relative_paths = Some(false)
-      _ if not(arg.has_prefix("-")) => positional.push(arg)
+      _ if !(arg.has_prefix("-")) => positional.push(arg)
       _ if arg.has_prefix("-") => warn_unimplemented_arg("worktree", arg)
       _ => ()
     }
@@ -1112,7 +1112,7 @@ async fn handle_worktree_repair(args : Array[String]) -> Unit raise Error {
     match arg {
       "--relative-paths" => relative_paths = Some(true)
       "--no-relative-paths" => relative_paths = Some(false)
-      _ if not(arg.has_prefix("-")) => paths.push(arg)
+      _ if !(arg.has_prefix("-")) => paths.push(arg)
       _ => warn_unimplemented_arg("worktree", arg)
     }
   }

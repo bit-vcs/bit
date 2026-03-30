@@ -17,7 +17,7 @@ pub fn SubdirRepo::commit(
   timestamp? : Int64 = 0L,
 ) -> @bit.ObjectId raise SubdirError {
   // 変更がなければエラー
-  if not(self.is_dirty()) {
+  if !(self.is_dirty()) {
     raise IoError("nothing to commit")
   }
   // 親コミットを取得

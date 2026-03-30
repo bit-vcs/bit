@@ -84,7 +84,7 @@ pub fn merge_base_all(
     }
     seen[hex] = true
     if ancestors_a.contains(hex) {
-      if not(common_set.contains(hex)) {
+      if !(common_set.contains(hex)) {
         common.push(current)
         common_set[hex] = true
       }
@@ -151,7 +151,7 @@ pub fn merge_base_all(
         break
       }
     }
-    if not(is_ancestor_of_another) {
+    if !(is_ancestor_of_another) {
       result.push(candidate)
     }
   }
@@ -178,7 +178,7 @@ pub fn merge_base_independent(
         break
       }
     }
-    if not(reachable) {
+    if !(reachable) {
       result.push(candidate)
     }
   }

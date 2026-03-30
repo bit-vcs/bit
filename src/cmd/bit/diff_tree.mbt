@@ -59,14 +59,14 @@ async fn handle_diff_tree(args : Array[String]) -> Unit raise Error {
         )
       _ if arg.has_prefix("--abbrev=") => {
         let val = String::unsafe_substring(arg, start=9, end=arg.length())
-        abbrev = Some(@strconv.parse_int(val))
+        abbrev = Some(@string.parse_int(val))
       }
       _ if arg.has_prefix("-M") => () // -M50% etc - rename detection threshold
       _ if arg.has_prefix("-C") => () // -C50% etc - copy detection threshold
       _ if arg.has_prefix("-l") => () // -l0 etc - rename limit
       _ if arg.has_prefix("--pretty") => () // --pretty, --pretty=format:...
       _ if arg.has_prefix("--format") => () // --format=...
-      _ if not(arg.has_prefix("-")) => positional.push(arg)
+      _ if !(arg.has_prefix("-")) => positional.push(arg)
       _ if arg.has_prefix("-") => warn_unimplemented_arg("diff-tree", arg)
       _ => ()
     }
@@ -124,7 +124,7 @@ async fn handle_diff_tree(args : Array[String]) -> Unit raise Error {
     let new_id = commit_tree_resolve_hex(rfs, git_dir, positional[1])
     let old_tree = diff_tree_resolve_to_tree(db, rfs, old_id)
     let new_tree = diff_tree_resolve_to_tree(db, rfs, new_id)
-    if not(suppress) {
+    if !(suppress) {
       diff_tree_output(
         db,
         rfs,
@@ -176,7 +176,7 @@ async fn diff_tree_process_commit(
   // For merge commits (>1 parent), skip output unless -c/--cc (which we accept but don't implement yet)
   if info.parents.length() > 1 {
     // Print commit id line for merge commits but no diff
-    if not(no_commit_id) {
+    if !(no_commit_id) {
       print_line(commit_id.to_hex())
     }
     return
@@ -195,10 +195,10 @@ async fn diff_tree_process_commit(
   } else {
     return
   }
-  if not(no_commit_id) {
+  if !(no_commit_id) {
     print_line(commit_id.to_hex())
   }
-  if not(suppress) {
+  if !(suppress) {
     diff_tree_output(
       db,
       fs,
@@ -341,7 +341,7 @@ async fn diff_tree_output(
     }
   }
   for path, entry in old_entries {
-    if not(new_entries.contains(path)) {
+    if !(new_entries.contains(path)) {
       if diff_tree_filter_matches(diff_filter, "D") {
         results.push((path, entry.mode, "000000", entry.id, zero_id, "D"))
       }

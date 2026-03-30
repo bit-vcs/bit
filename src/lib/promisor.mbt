@@ -7,7 +7,7 @@ pub fn read_promisor_remote(
   git_dir : String,
 ) -> String? {
   let promisor_path = promisor_join_path(git_dir, "objects/info/promisor")
-  if not(fs.is_file(promisor_path)) {
+  if !(fs.is_file(promisor_path)) {
     return None
   }
   let content = fs.read_file(promisor_path) catch { _ => return None }
@@ -108,7 +108,7 @@ pub async fn PromisorDb::fetch_missing(
   let to_fetch : Array[@bit.ObjectId] = []
   for id in ids {
     let hex = id.to_hex()
-    if not(self.fetched.contains(hex)) {
+    if !(self.fetched.contains(hex)) {
       to_fetch.push(id)
       self.fetched.set(hex, true)
     }

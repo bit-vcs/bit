@@ -870,7 +870,7 @@ pub fn load_rebase_state(
   git_dir : String,
 ) -> RebaseState? raise @bit.GitError {
   let state_dir = join_path(git_dir, "rebase-merge")
-  if not(fs.is_dir(state_dir)) {
+  if !(fs.is_dir(state_dir)) {
     return None
   }
   let onto_hex = read_file_trimmed(fs, join_path(state_dir, "onto"))
@@ -926,7 +926,7 @@ fn parse_todo_file(
   path : String,
 ) -> Array[@bit.ObjectId] {
   let result : Array[@bit.ObjectId] = []
-  if not(fs.is_file(path)) {
+  if !(fs.is_file(path)) {
     return result
   }
   let content = @utf8.decode_lossy(
@@ -959,7 +959,7 @@ pub fn clear_rebase_state(
   git_dir : String,
 ) -> Unit raise @bit.GitError {
   let state_dir = join_path(git_dir, "rebase-merge")
-  if not(rfs.is_dir(state_dir)) {
+  if !(rfs.is_dir(state_dir)) {
     return ()
   }
   // Remove all files in state_dir
@@ -1021,7 +1021,7 @@ pub fn rebase_start_with_onto(
       }
     }
     Some(h) => {
-      if not(force_rebase) && h == onto && h == upstream {
+      if !(force_rebase) && h == onto && h == upstream {
         return {
           status: RebaseStatus::NothingToRebase,
           commit_id: Some(h),
@@ -1031,7 +1031,7 @@ pub fn rebase_start_with_onto(
       let db = ObjectDb::load(rfs, git_dir)
       let chain = rebase_collect_chain(db, rfs, h, upstream)
       if chain.length() == 0 {
-        if not(force_rebase) {
+        if !(force_rebase) {
           if h != onto {
             fast_forward_to(fs, rfs, root, onto)
             return {
@@ -1346,7 +1346,7 @@ fn rebase_compute_patch_tree_diff(
   }
   for item in parent {
     let (path, _) = item
-    if not(current_map.contains(path)) {
+    if !(current_map.contains(path)) {
       diff.push((path, "D"))
     }
   }
@@ -1427,7 +1427,7 @@ fn rebase_change_already_applied(
             target_content,
             @diff3.ContentMergeOptions::default(),
           )
-          not(merge_result.has_conflicts) &&
+          !(merge_result.has_conflicts) &&
           merge_result.content == base_content
         }
         _ => false
@@ -1447,7 +1447,7 @@ fn rebase_changes_already_applied(
     return false
   }
   for ch in changes {
-    if not(rebase_change_already_applied(db, rfs, base, parent_map, ch)) {
+    if !(rebase_change_already_applied(db, rfs, base, parent_map, ch)) {
       return false
     }
   }

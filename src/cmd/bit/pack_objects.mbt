@@ -192,7 +192,7 @@ fn parse_pack_objects_args(args : Array[String]) -> PackObjectsParse {
             return PackObjectsParse::Unsupported
           }
           let value = args[i + 1]
-          let parsed = @strconv.parse_int(value) catch {
+          let parsed = @string.parse_int(value) catch {
             _ => return PackObjectsParse::Unsupported
           }
           window = parsed
@@ -203,7 +203,7 @@ fn parse_pack_objects_args(args : Array[String]) -> PackObjectsParse {
             return PackObjectsParse::Unsupported
           }
           let value = args[i + 1]
-          let parsed = @strconv.parse_int(value) catch {
+          let parsed = @string.parse_int(value) catch {
             _ => return PackObjectsParse::Unsupported
           }
           depth = parsed
@@ -214,7 +214,7 @@ fn parse_pack_objects_args(args : Array[String]) -> PackObjectsParse {
             return PackObjectsParse::Unsupported
           }
           let value = args[i + 1]
-          let parsed = @strconv.parse_int(value) catch {
+          let parsed = @string.parse_int(value) catch {
             _ => return PackObjectsParse::Unsupported
           }
           let normalized = if parsed < 0 { 1 } else { parsed }
@@ -243,7 +243,7 @@ fn parse_pack_objects_args(args : Array[String]) -> PackObjectsParse {
         _ =>
           if arg.has_prefix("--window=") {
             let value = string_slice_from(arg, 9)
-            let parsed = @strconv.parse_int(value) catch {
+            let parsed = @string.parse_int(value) catch {
               _ => return PackObjectsParse::Unsupported
             }
             window = parsed
@@ -294,7 +294,7 @@ fn parse_pack_objects_args(args : Array[String]) -> PackObjectsParse {
             }
           } else if arg.has_prefix("--name-hash-version=") {
             let value = string_slice_from(arg, 20)
-            let parsed = @strconv.parse_int(value) catch {
+            let parsed = @string.parse_int(value) catch {
               _ => return PackObjectsParse::Unsupported
             }
             let normalized = if parsed < 0 { 1 } else { parsed }
@@ -313,7 +313,7 @@ fn parse_pack_objects_args(args : Array[String]) -> PackObjectsParse {
             }
           } else if arg.has_prefix("--depth=") {
             let value = string_slice_from(arg, 8)
-            let parsed = @strconv.parse_int(value) catch {
+            let parsed = @string.parse_int(value) catch {
               _ => return PackObjectsParse::Unsupported
             }
             depth = parsed
@@ -446,15 +446,15 @@ fn parse_index_version_value(s : String) -> (Int, Int64?)? {
     if offset_str.length() == 0 {
       return None
     }
-    let offset = @strconv.parse_int64(offset_str) catch { _ => return None }
-    let iv = @strconv.parse_int(num_str) catch { _ => return None }
+    let offset = @string.parse_int64(offset_str) catch { _ => return None }
+    let iv = @string.parse_int(num_str) catch { _ => return None }
     if iv == 1 || iv == 2 {
       Some((iv, Some(offset)))
     } else {
       None
     }
   } else {
-    let iv = @strconv.parse_int(s) catch { _ => return None }
+    let iv = @string.parse_int(s) catch { _ => return None }
     if iv == 1 || iv == 2 {
       Some((iv, None))
     } else {
@@ -489,18 +489,18 @@ fn parse_size_with_suffix(s : String) -> Int64 {
   let last = s[s.length() - 1]
   if last == 'k' || last == 'K' {
     let num_str = String::unsafe_substring(s, start=0, end=s.length() - 1)
-    let num = @strconv.parse_int64(num_str) catch { _ => 0L }
+    let num = @string.parse_int64(num_str) catch { _ => 0L }
     num * 1024L
   } else if last == 'm' || last == 'M' {
     let num_str = String::unsafe_substring(s, start=0, end=s.length() - 1)
-    let num = @strconv.parse_int64(num_str) catch { _ => 0L }
+    let num = @string.parse_int64(num_str) catch { _ => 0L }
     num * 1024L * 1024L
   } else if last == 'g' || last == 'G' {
     let num_str = String::unsafe_substring(s, start=0, end=s.length() - 1)
-    let num = @strconv.parse_int64(num_str) catch { _ => 0L }
+    let num = @string.parse_int64(num_str) catch { _ => 0L }
     num * 1024L * 1024L * 1024L
   } else {
-    @strconv.parse_int64(s) catch {
+    @string.parse_int64(s) catch {
       _ => 0L
     }
   }
@@ -516,7 +516,7 @@ fn parse_pack_filter_spec(spec : String) -> @protocol.FilterSpec {
     @protocol.FilterSpec::BlobLimit(limit)
   } else if spec.has_prefix("tree:") {
     let depth_str = String::unsafe_substring(spec, start=5, end=spec.length())
-    let depth = @strconv.parse_int(depth_str) catch { _ => 0 }
+    let depth = @string.parse_int(depth_str) catch { _ => 0 }
     @protocol.FilterSpec::TreeDepth(depth)
   } else if spec.has_prefix("sparse:path=") {
     // sparse:path has been dropped for security reasons - return error indicator
@@ -1028,11 +1028,11 @@ fn collect_pack_ids_from_dir(fs : OsFs, pack_dir : String) -> Map[String, Bool] 
   let entries = fs.readdir(pack_dir) catch { _ => [] }
   for entry in entries {
     let name = normalize_dir_entry(entry)
-    if not(name.has_suffix(".idx")) {
+    if !(name.has_suffix(".idx")) {
       continue
     }
     let idx_path = pack_dir + "/" + name
-    if not(fs.is_file(idx_path)) {
+    if !(fs.is_file(idx_path)) {
       continue
     }
     let ids = collect_pack_index_ids(fs, idx_path)
@@ -1056,12 +1056,12 @@ fn collect_pack_ids_from_marker(
   let entries = fs.readdir(pack_dir) catch { _ => [] }
   for entry in entries {
     let name = normalize_dir_entry(entry)
-    if not(name.has_suffix(suffix)) {
+    if !(name.has_suffix(suffix)) {
       continue
     }
     let base = string_slice_to(name, name.length() - suffix.length())
     let idx_path = pack_dir + "/" + base + ".idx"
-    if not(fs.is_file(idx_path)) {
+    if !(fs.is_file(idx_path)) {
       continue
     }
     let ids = collect_pack_index_ids(fs, idx_path)
@@ -1089,7 +1089,7 @@ fn collect_pack_ids_from_names(
       name
     }
     let idx_path = pack_dir + "/" + stem + ".idx"
-    if not(fs.is_file(idx_path)) {
+    if !(fs.is_file(idx_path)) {
       continue
     }
     let ids = collect_pack_index_ids(fs, idx_path)
@@ -1115,7 +1115,7 @@ fn collect_loose_object_ids(
     if name == "info" || name == "pack" {
       continue
     }
-    if name.length() != 2 || (name |> is_hex_string |> not) {
+    if name.length() != 2 || !(name |> is_hex_string) {
       continue
     }
     let subdir = objects_dir + "/" + name
@@ -1125,7 +1125,7 @@ fn collect_loose_object_ids(
     let files = fs.readdir(subdir) catch { _ => [] }
     for file in files {
       let filename = normalize_dir_entry(file)
-      if filename.length() != 38 || (filename |> is_hex_string |> not) {
+      if filename.length() != 38 || !(filename |> is_hex_string) {
         continue
       }
       out[name + filename] = true
@@ -1138,7 +1138,7 @@ fn collect_loose_object_ids(
 fn read_alternate_object_dirs(fs : OsFs, git_dir : String) -> Array[String] {
   let out : Array[String] = []
   let alt_path = git_dir + "/objects/info/alternates"
-  if not(fs.is_file(alt_path)) {
+  if !(fs.is_file(alt_path)) {
     return out
   }
   let data = fs.read_file(alt_path) catch { _ => return out }
@@ -1264,7 +1264,7 @@ fn dedup_objects(
   let out : Array[@bitcore.PackObject] = []
   for obj in objects {
     let hex = object_hex(obj)
-    if not(seen.contains(hex)) {
+    if !(seen.contains(hex)) {
       seen[hex] = true
       out.push(obj)
     }
@@ -1299,7 +1299,7 @@ fn filter_objects(
   let out : Array[@bitcore.PackObject] = []
   for obj in objects {
     let hex = object_hex(obj)
-    if not(exclude.contains(hex)) {
+    if !(exclude.contains(hex)) {
       out.push(obj)
     }
   }
@@ -3190,7 +3190,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
             let rev_path = base_name + "-" + hash_hex + ".rev"
             @pack.write_reverse_index(fs, rev_path, pack, idx_objects)
           }
-          if cfg.write_bitmap && not(cfg.stdout) {
+          if cfg.write_bitmap && !(cfg.stdout) {
             let bitmap_path = base_name + "-" + hash_hex + ".bitmap"
             write_pack_bitmap(fs, git_dir, bitmap_path, pack, idx_objects, db)
           }
@@ -3345,7 +3345,7 @@ async fn loosen_unused_packed_objects(
   }
   for entry in entries {
     let name = normalize_dir_entry(entry)
-    if not(name.has_suffix(".idx")) {
+    if !(name.has_suffix(".idx")) {
       continue
     }
     // Check if this pack has a .keep file
@@ -3354,7 +3354,7 @@ async fn loosen_unused_packed_objects(
       continue
     }
     let idx_path = pack_dir + "/" + name
-    if not(fs.is_file(idx_path)) {
+    if !(fs.is_file(idx_path)) {
       continue
     }
     // Get pack file mtime for expiration check

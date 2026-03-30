@@ -66,7 +66,7 @@ pub fn fast_directory_fingerprint(
   root : String,
   ignore_entries? : Array[String] = [".", "..", ".git", ".bit"],
 ) -> String {
-  if not(fs.is_dir(root)) {
+  if !(fs.is_dir(root)) {
     return @bit.hash_blob_string("missing").to_hex()
   }
   let files : Array[String] = []
@@ -140,7 +140,7 @@ fn resolve_git_dir(fs : &@bit.RepoFileSystem, root : String) -> String {
     let text = decode_bytes(bytes)
     for line_view in text.split("\n") {
       let line = trim_string(line_view.to_string())
-      if not(line.has_prefix("gitdir:")) {
+      if !(line.has_prefix("gitdir:")) {
         continue
       }
       let raw = trim_string(
@@ -333,7 +333,7 @@ pub fn bit_compat_directory_fingerprint(
   root : String,
   ignore_entries? : Array[String] = [".", "..", ".git", ".bit"],
 ) -> String {
-  if not(fs.is_dir(root)) {
+  if !(fs.is_dir(root)) {
     return @bit.hash_blob_string("missing").to_hex()
   }
   let entries = index_entries_after_add_all(fs, root, ignore_entries)

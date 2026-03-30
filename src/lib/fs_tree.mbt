@@ -87,7 +87,7 @@ pub fn move_tree_safe(
   src : String,
   dest : String,
 ) -> Unit raise @bit.GitError {
-  if not(rfs.is_dir(src)) {
+  if !(rfs.is_dir(src)) {
     return ()
   }
   if dest.has_prefix(src + "/") {

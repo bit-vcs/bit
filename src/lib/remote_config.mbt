@@ -164,7 +164,7 @@ pub fn render_config_blocks(blocks : Array[ConfigBlock]) -> String {
     }
   }
   let mut content = lines.join("\n")
-  if content.length() > 0 && not(content.has_suffix("\n")) {
+  if content.length() > 0 && !(content.has_suffix("\n")) {
     content = content + "\n"
   }
   content
@@ -300,7 +300,7 @@ pub fn split_config_key(
   section : String,
 ) -> (String, String)? {
   let prefix = section + "."
-  if not(full_key.has_prefix(prefix)) {
+  if !(full_key.has_prefix(prefix)) {
     return None
   }
   let rest = String::unsafe_substring(
@@ -457,7 +457,7 @@ pub fn read_repo_config(
   git_dir : String,
 ) -> (Map[String, RemoteConfig], Map[String, BranchConfig]) {
   let config_path = git_dir + "/config"
-  if not(fs.is_file(config_path)) {
+  if !(fs.is_file(config_path)) {
     return ({}, {})
   }
   let content = decode_bytes_lossy(
@@ -530,7 +530,7 @@ pub fn get_remote_url(
   name : String,
 ) -> String? {
   let config_path = git_dir + "/config"
-  if not(fs.is_file(config_path)) {
+  if !(fs.is_file(config_path)) {
     return None
   }
   let content = decode_bytes_lossy(
@@ -730,7 +730,7 @@ pub fn is_mirror_fetch_config(rc : RemoteConfig) -> Bool {
     if dst == "refs/*" {
       return true
     }
-    if dst.has_prefix("refs/") && not(dst.has_prefix("refs/remotes/")) {
+    if dst.has_prefix("refs/") && !(dst.has_prefix("refs/remotes/")) {
       return true
     }
   }
@@ -747,7 +747,7 @@ pub fn remote_set_branches(
   add : Bool,
 ) -> Unit raise @bit.GitError {
   let config_path = git_dir + "/config"
-  if not(rfs.is_file(config_path)) {
+  if !(rfs.is_file(config_path)) {
     raise @bit.GitError::InvalidObject("No such remote '\{name}'")
   }
   let content = decode_bytes_lossy(rfs.read_file(config_path))
@@ -779,7 +779,7 @@ pub fn remote_set_branches(
         break
       }
     }
-    if not(exists) {
+    if !(exists) {
       updated_specs.push(spec)
     }
   }
@@ -810,7 +810,7 @@ pub fn remote_set_branches(
       new_blocks.push(block)
     }
   }
-  if not(found) {
+  if !(found) {
     raise @bit.GitError::InvalidObject("No such remote '\{name}'")
   }
   fs.write_string(config_path, render_config_blocks(new_blocks))
@@ -847,7 +847,7 @@ pub fn set_config_key(
       continue
     }
     if in_section && trimmed.has_prefix("[") {
-      if not(key_set) {
+      if !(key_set) {
         lines.push("\t\{key} = \{value}")
         key_set = true
       }
@@ -861,7 +861,7 @@ pub fn set_config_key(
     lines.push(line)
   }
   if found_section {
-    if in_section && not(key_set) {
+    if in_section && !(key_set) {
       lines.push("\t\{key} = \{value}")
     }
   } else {

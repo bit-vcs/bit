@@ -214,9 +214,9 @@ pub fn Hub::list_node_heartbeats(
           match k {
             "node_id" => node_id = v
             "commit_count" =>
-              commit_count = @strconv.parse_int(v) catch { _ => 0 }
+              commit_count = @string.parse_int(v) catch { _ => 0 }
             "main_tip" => main_tip = v
-            "timestamp" => timestamp = @strconv.parse_int64(v) catch { _ => 0L }
+            "timestamp" => timestamp = @string.parse_int64(v) catch { _ => 0L }
             _ => ()
           }
         }
@@ -271,7 +271,7 @@ pub fn Hub::list_pr_proposals(
   let result : Array[PullRequest] = []
   let records = self.store.list_records(objects, pr_proposal_prefix())
   for record in records {
-    if not(record.key.has_suffix("/meta")) || record.kind != "pr-proposal" {
+    if !(record.key.has_suffix("/meta")) || record.kind != "pr-proposal" {
       continue
     }
     let pr = parse_legacy_pull_request(record.payload) catch { _ => continue }

@@ -228,7 +228,7 @@ pub fn expand_sparse_index_entries(
   entries : Array[IndexEntry],
 ) -> Array[IndexEntry] raise @bit.GitError {
   let has_sparse_dir = entries.any(index_entry_is_sparse_dir)
-  if not(has_sparse_dir) {
+  if !(has_sparse_dir) {
     return entries
   }
   let db = ObjectDb::load(fs, git_dir)
@@ -257,7 +257,7 @@ pub fn expand_sparse_skip_worktree_paths(
   skip_worktree_paths : Map[String, Bool],
 ) -> Map[String, Bool] raise @bit.GitError {
   let has_sparse_dir = entries.any(index_entry_is_sparse_dir)
-  if not(has_sparse_dir) {
+  if !(has_sparse_dir) {
     return skip_worktree_paths
   }
   let db = ObjectDb::load(fs, git_dir)
@@ -267,7 +267,7 @@ pub fn expand_sparse_skip_worktree_paths(
     expanded[path] = true
   }
   for entry in entries {
-    if not(skip_worktree_paths.contains(entry.path)) {
+    if !(skip_worktree_paths.contains(entry.path)) {
       continue
     }
     if index_entry_is_sparse_dir(entry) {
@@ -294,7 +294,7 @@ pub fn read_index_stage_entries(
   git_dir : String,
 ) -> Array[IndexStageEntry] raise @bit.GitError {
   let path = join_path(git_dir, "index")
-  if not(fs.is_file(path)) {
+  if !(fs.is_file(path)) {
     return []
   }
   let data = fs.read_file(path)
@@ -310,7 +310,7 @@ pub fn read_resolve_undo_entries(
   git_dir : String,
 ) -> Array[ResolveUndoEntry] raise @bit.GitError {
   let path = join_path(git_dir, "index")
-  if not(fs.is_file(path)) {
+  if !(fs.is_file(path)) {
     return []
   }
   let data = fs.read_file(path)
@@ -328,7 +328,7 @@ fn index_read_stage_entries_from_bytes(
   if data.length() < 32 {
     raise @bit.GitError::InvalidObject("Index file too short")
   }
-  if not(
+  if !(
       data[0] == b'D' && data[1] == b'I' && data[2] == b'R' && data[3] == b'C',
     ) {
     raise @bit.GitError::InvalidObject("Invalid index header")
@@ -419,7 +419,7 @@ fn index_read_resolve_undo_entries_from_bytes(
   if data.length() < 32 {
     return []
   }
-  if not(
+  if !(
       data[0] == b'D' && data[1] == b'I' && data[2] == b'R' && data[3] == b'C',
     ) {
     raise @bit.GitError::InvalidObject("Invalid index header")
@@ -799,7 +799,7 @@ fn index_collect_changed_paths(
     match new_by_path.get(path) {
       Some(new_sig) if new_sig == old_sig => ()
       _ =>
-        if not(seen.contains(path)) {
+        if !(seen.contains(path)) {
           seen[path] = true
           changed.push(path)
         }
@@ -807,7 +807,7 @@ fn index_collect_changed_paths(
   }
   for item in new_by_path.to_array() {
     let (path, _) = item
-    if not(old_by_path.contains(path)) && not(seen.contains(path)) {
+    if !(old_by_path.contains(path)) && !(seen.contains(path)) {
       seen[path] = true
       changed.push(path)
     }
@@ -1004,14 +1004,14 @@ pub fn read_skip_worktree_paths(
     }
   }
   let index_path = join_path(git_dir, "index")
-  if not(fs.is_file(index_path)) {
+  if !(fs.is_file(index_path)) {
     return out
   }
   let data = fs.read_file(index_path) catch { _ => return out }
   if data.length() < 32 {
     return out
   }
-  if not(
+  if !(
       data[0] == b'D' && data[1] == b'I' && data[2] == b'R' && data[3] == b'C',
     ) {
     return out
@@ -1069,14 +1069,14 @@ pub fn read_assume_unchanged_paths(
   }
   let out : Map[String, Bool] = {}
   let index_path = join_path(git_dir, "index")
-  if not(fs.is_file(index_path)) {
+  if !(fs.is_file(index_path)) {
     return out
   }
   let data = fs.read_file(index_path) catch { _ => return out }
   if data.length() < 32 {
     return out
   }
-  if not(
+  if !(
       data[0] == b'D' && data[1] == b'I' && data[2] == b'R' && data[3] == b'C',
     ) {
     return out

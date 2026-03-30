@@ -18,7 +18,7 @@ fn is_hex_string(s : String) -> Bool {
     return false
   }
   for c in s {
-    if (c |> is_hex_char |> not) {
+    if !(c |> is_hex_char) {
       return false
     }
   }

@@ -17,6 +17,7 @@ import {
   "moonbitlang/async/js_async" @js_async,
   "moonbitlang/core/bench" @bench,
   "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/string" @string,
   "moonbitlang/core/strconv",
 }
 

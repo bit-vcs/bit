@@ -120,7 +120,7 @@ fn parse_work_item_state_for_list(
       "Unknown \{unknown_state_label} state: \{value}",
     )
   }
-  if not(allow_merged) && parsed == @hub.WorkItemState::Merged {
+  if !(allow_merged) && parsed == @hub.WorkItemState::Merged {
     raise @bitcore.GitError::InvalidObject(
       "Unknown \{unknown_state_label} state: \{value}",
     )
@@ -276,7 +276,7 @@ async fn handle_hub_issue_list(args : Array[String]) -> Unit raise Error {
   while j < args.length() {
     match args[j] {
       "--all" => show_all = true
-      "--relay" if j + 1 < args.length() && not(args[j + 1].has_prefix("-")) => {
+      "--relay" if j + 1 < args.length() && !(args[j + 1].has_prefix("-")) => {
         relay_url = Some(args[j + 1])
         j += 1
       }
@@ -342,12 +342,12 @@ async fn handle_hub_issue_list(args : Array[String]) -> Unit raise Error {
     if filter_labels.length() > 0 {
       let mut has_all = true
       for label in filter_labels {
-        if not(issue.labels.contains(label)) {
+        if !(issue.labels.contains(label)) {
           has_all = false
           break
         }
       }
-      if not(has_all) {
+      if !(has_all) {
         continue
       }
     }
@@ -470,7 +470,7 @@ async fn handle_hub_issue_import(args : Array[String]) -> Unit raise Error {
         continue
       }
       "--limit" if i + 1 < args.length() => {
-        limit = @strconv.parse_int(args[i + 1]) catch {
+        limit = @string.parse_int(args[i + 1]) catch {
           _ =>
             raise @bitcore.GitError::InvalidObject(
               "Invalid limit: \{args[i + 1]}",
@@ -503,7 +503,7 @@ async fn handle_hub_issue_import(args : Array[String]) -> Unit raise Error {
         )
       _ if arg.has_prefix("--limit=") => {
         let value = String::unsafe_substring(arg, start=8, end=arg.length())
-        limit = @strconv.parse_int(value) catch {
+        limit = @string.parse_int(value) catch {
           _ => raise @bitcore.GitError::InvalidObject("Invalid limit: \{value}")
         }
         i += 1
@@ -1271,7 +1271,7 @@ async fn handle_hub_issue_claims(args : Array[String]) -> Unit raise Error {
         continue
       }
       "--stale-hours" if i + 1 < args.length() => {
-        stale_hours = @strconv.parse_int(args[i + 1]) catch { _ => 24 }
+        stale_hours = @string.parse_int(args[i + 1]) catch { _ => 24 }
         i += 2
         continue
       }
@@ -1362,7 +1362,7 @@ async fn handle_hub_issue_watch(args : Array[String]) -> Unit raise Error {
         continue
       }
       "--stale-hours" if i + 1 < args.length() => {
-        stale_hours = @strconv.parse_int(args[i + 1]) catch { _ => 24 }
+        stale_hours = @string.parse_int(args[i + 1]) catch { _ => 24 }
         i += 2
         continue
       }

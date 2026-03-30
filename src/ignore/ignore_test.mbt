@@ -132,7 +132,7 @@ test "git-aware glob filter" {
     "src/app.ts", "src/data.generated.js", "src/keep.generated.ts", "dist/bundle.js",
     "lib/build/out.o", "server.log",
   ]
-  let visible = files.filter(fn(p) { not(m.is_ignored(p, false)) })
+  let visible = files.filter(fn(p) { !(m.is_ignored(p, false)) })
   assert_eq(visible.length(), 2)
   assert_true(visible.contains("src/app.ts"))
   assert_true(visible.contains("src/keep.generated.ts"))

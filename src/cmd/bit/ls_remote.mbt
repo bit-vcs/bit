@@ -72,10 +72,10 @@ async fn handle_ls_remote(args : Array[String]) -> Unit raise Error {
   for pair in refs {
     let (oid, refname) = pair
     // Apply filters
-    if show_heads && not(refname.has_prefix("refs/heads/")) {
+    if show_heads && !(refname.has_prefix("refs/heads/")) {
       continue
     }
-    if show_tags && not(refname.has_prefix("refs/tags/")) {
+    if show_tags && !(refname.has_prefix("refs/tags/")) {
       continue
     }
     if show_refs_only {
@@ -93,7 +93,7 @@ async fn handle_ls_remote(args : Array[String]) -> Unit raise Error {
           break
         }
       }
-      if not(matched) {
+      if !(matched) {
         continue
       }
     }

@@ -18,7 +18,7 @@ async fn switch_wbtest_run_shim_git(
   // Build the native binary first so exit codes propagate correctly
   // (moon run swallows non-zero exit codes)
   let bit_exe = repo_root + "/_build/native/release/build/cmd/bit/bit.exe"
-  if not(fs.is_file(bit_exe)) {
+  if !(fs.is_file(bit_exe)) {
     let build_code = @process.run(
       "moon",
       ["build", "--target", "native", "--release"],
@@ -216,7 +216,7 @@ async fn switch_wbtest_case_create_branch_in_unborn_repo_keeps_ref_unborn() -> U
     decode_bytes(fs.read_file(git_dir + "/HEAD")),
     "ref: refs/heads/topic\n",
   )
-  assert_true(not(fs.is_file(git_dir + "/refs/heads/topic")))
+  assert_true(!(fs.is_file(git_dir + "/refs/heads/topic")))
 
   fs.write_string(repo_dir + "/topic.t", "topic\n")
   add_test_run_git(repo_dir, ["add", "topic.t"])

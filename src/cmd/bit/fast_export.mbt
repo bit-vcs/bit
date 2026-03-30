@@ -83,7 +83,7 @@ async fn handle_fast_export(args : Array[String]) -> Unit raise Error {
               break
             }
           }
-          if not(found) {
+          if !(found) {
             target_refs.push((name, id))
           }
         }
@@ -130,7 +130,7 @@ async fn handle_fast_export(args : Array[String]) -> Unit raise Error {
       if line.length() > 0 && line[0] == ':' {
         let parts = fast_export_split_first_space(line[1:].to_string())
         if parts.0.length() > 0 && parts.1.length() > 0 {
-          let mark_num = @strconv.parse_int(parts.0) catch { _ => 0 }
+          let mark_num = @string.parse_int(parts.0) catch { _ => 0 }
           if mark_num > 0 {
             mark_map[parts.1] = mark_num
             if mark_num >= next_mark {
@@ -256,7 +256,7 @@ async fn handle_fast_export(args : Array[String]) -> Unit raise Error {
               }
               // Find deleted files
               for path, _entry in parent_files {
-                if not(tree_files.contains(path)) {
+                if !(tree_files.contains(path)) {
                   file_ops.push("D \{path}")
                 }
               }
@@ -313,7 +313,7 @@ async fn handle_fast_export(args : Array[String]) -> Unit raise Error {
         let msg_bytes = @utf8.encode(message)
         buf.write_string("data \{msg_bytes.length()}\n")
         buf.write_string(message)
-        if not(message.has_suffix("\n")) {
+        if !(message.has_suffix("\n")) {
           buf.write_string("\n")
         }
         // from (first parent)
@@ -395,7 +395,7 @@ async fn handle_fast_export(args : Array[String]) -> Unit raise Error {
               let tag_msg_bytes = @utf8.encode(tag_message)
               buf.write_string("data \{tag_msg_bytes.length()}\n")
               buf.write_string(tag_message)
-              if not(tag_message.has_suffix("\n")) {
+              if !(tag_message.has_suffix("\n")) {
                 buf.write_string("\n")
               }
               buf.write_string("\n")

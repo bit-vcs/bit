@@ -15,7 +15,7 @@ async fn handle_show_branches(args : Array[String]) -> Unit raise Error {
       "-a" | "--all" => show_all = true
       "-r" | "--remotes" => show_remotes = true
       "--more" if i + 1 < args.length() => {
-        max_count = @strconv.parse_int(args[i + 1]) catch {
+        max_count = @string.parse_int(args[i + 1]) catch {
           err if @async.is_cancellation_error(err) => raise err
           _ => 10
         }
@@ -24,12 +24,12 @@ async fn handle_show_branches(args : Array[String]) -> Unit raise Error {
       }
       _ if arg.has_prefix("--more=") => {
         let val = String::unsafe_substring(arg, start=7, end=arg.length())
-        max_count = @strconv.parse_int(val) catch {
+        max_count = @string.parse_int(val) catch {
           err if @async.is_cancellation_error(err) => raise err
           _ => 10
         }
       }
-      _ if not(arg.has_prefix("-")) => specific_branches.push(arg)
+      _ if !(arg.has_prefix("-")) => specific_branches.push(arg)
       _ if arg.has_prefix("-") => warn_unimplemented_arg("show-branch", arg)
       _ => ()
     }

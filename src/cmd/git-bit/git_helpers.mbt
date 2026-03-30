@@ -204,10 +204,10 @@ fn parse_git_env_timestamp(raw : String) -> Int64? {
     Some(part) =>
       if part.has_prefix("@") {
         let numeric = String::unsafe_substring(part, start=1, end=part.length())
-        let parsed = @strconv.parse_int64(numeric) catch { _ => return None }
+        let parsed = @string.parse_int64(numeric) catch { _ => return None }
         Some(parsed)
       } else {
-        let parsed = @strconv.parse_int64(part) catch { _ => -1L }
+        let parsed = @string.parse_int64(part) catch { _ => -1L }
         if parsed >= 0L {
           Some(parsed)
         } else {
@@ -231,13 +231,13 @@ fn parse_iso_date_timestamp(raw : String) -> Int64? {
   if sep != ' ' && sep != 'T' {
     return None
   }
-  let year = @strconv.parse_int64(String::unsafe_substring(s, start=0, end=4)) catch {
+  let year = @string.parse_int64(String::unsafe_substring(s, start=0, end=4)) catch {
     _ => return None
   }
-  let month = @strconv.parse_int64(String::unsafe_substring(s, start=5, end=7)) catch {
+  let month = @string.parse_int64(String::unsafe_substring(s, start=5, end=7)) catch {
     _ => return None
   }
-  let day = @strconv.parse_int64(String::unsafe_substring(s, start=8, end=10)) catch {
+  let day = @string.parse_int64(String::unsafe_substring(s, start=8, end=10)) catch {
     _ => return None
   }
   let time_str = String::unsafe_substring(s, start=11, end=s.length())
@@ -253,18 +253,18 @@ fn parse_iso_date_timestamp(raw : String) -> Int64? {
   if time_part.length() < 5 || time_part[2] != ':' {
     return None
   }
-  let hour = @strconv.parse_int64(
+  let hour = @string.parse_int64(
     String::unsafe_substring(time_part, start=0, end=2),
   ) catch {
     _ => return None
   }
-  let minute = @strconv.parse_int64(
+  let minute = @string.parse_int64(
     String::unsafe_substring(time_part, start=3, end=5),
   ) catch {
     _ => return None
   }
   let second = if time_part.length() >= 8 && time_part[5] == ':' {
-    @strconv.parse_int64(String::unsafe_substring(time_part, start=6, end=8)) catch {
+    @string.parse_int64(String::unsafe_substring(time_part, start=6, end=8)) catch {
       _ => 0L
     }
   } else {
@@ -307,8 +307,8 @@ fn parse_iso_tz_offset_seconds(s : String) -> Int64 {
       String::unsafe_substring(t, start=3, end=5),
     )
   }
-  let hh = @strconv.parse_int64(hh_str) catch { _ => return 0L }
-  let mm = @strconv.parse_int64(mm_str) catch { _ => return 0L }
+  let hh = @string.parse_int64(hh_str) catch { _ => return 0L }
+  let mm = @string.parse_int64(mm_str) catch { _ => return 0L }
   sign * (hh * 3600L + mm * 60L)
 }
 

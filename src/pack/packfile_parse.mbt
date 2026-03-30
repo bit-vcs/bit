@@ -28,7 +28,7 @@ pub fn max_delta_chain_length(
   if data.length() < 32 {
     raise @bit.GitError::PackfileError("Packfile too short")
   }
-  if not(
+  if !(
       data[0] == b'P' && data[1] == b'A' && data[2] == b'C' && data[3] == b'K',
     ) {
     raise @bit.GitError::PackfileError("Invalid packfile magic")
@@ -393,7 +393,7 @@ fn insert_pack_object_by_id(
   match by_id.get(obj.id) {
     Some(existing) =>
       if existing.obj_type != obj.obj_type ||
-        not(Bytes::equal(existing.data, obj.data)) {
+        !(Bytes::equal(existing.data, obj.data)) {
         raise @bit.GitError::PackfileError("SHA1 COLLISION FOUND")
       }
     None => ()
@@ -434,7 +434,7 @@ fn parse_packfile_internal(
   }
 
   // Magic: "PACK"
-  if not(
+  if !(
       data[0] == b'P' && data[1] == b'A' && data[2] == b'C' && data[3] == b'K',
     ) {
     raise @bit.GitError::PackfileError("Invalid packfile magic")
@@ -698,7 +698,7 @@ fn parse_packfile_stream_internal(
   if data.length() < 32 {
     raise @bit.GitError::PackfileError("Packfile too short")
   }
-  if not(
+  if !(
       data[0] == b'P' && data[1] == b'A' && data[2] == b'C' && data[3] == b'K',
     ) {
     raise @bit.GitError::PackfileError("Invalid packfile magic")
@@ -881,7 +881,7 @@ fn parse_packfile_stream_internal(
           }
       }
     }
-    if not(progress) {
+    if !(progress) {
       break
     }
     pending_list = next_pending

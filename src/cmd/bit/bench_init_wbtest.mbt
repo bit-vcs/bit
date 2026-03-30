@@ -18,7 +18,7 @@ let bench_startup_repeat : Int = 3
 
 ///|
 fn ensure_bench_dir(path : String) -> Unit {
-  if not(@fs.path_exists(path)) {
+  if !(@fs.path_exists(path)) {
     @fs.create_dir(path) catch {
       _ => ()
     }

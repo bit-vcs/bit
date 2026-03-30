@@ -13,14 +13,14 @@ pub fn hq_roots(
   let roots : Array[String] = []
   // Check BHQ_ROOT first
   match env_get("BHQ_ROOT") {
-    Some(root) if not(root.is_empty()) => roots.push(expand_home(root))
+    Some(root) if !(root.is_empty()) => roots.push(expand_home(root))
     _ => ()
   }
   // Add ghq.root values
   let ghq_roots = bit_config_get_all("ghq.root")
   for root in ghq_roots {
     let expanded = expand_home(root)
-    if not(roots.contains(expanded)) {
+    if !(roots.contains(expanded)) {
       roots.push(expanded)
     }
   }

@@ -83,7 +83,7 @@ fn normalize_path(path : String) -> String {
     } else if part == ".." {
       if parts.length() > 0 && parts[parts.length() - 1] != ".." {
         let _ = parts.pop()
-      } else if not(path.has_prefix("/")) {
+      } else if !(path.has_prefix("/")) {
         parts.push(part)
       }
     } else {
@@ -538,10 +538,10 @@ fn strip_workspace_comment(raw : String) -> String {
       continue
     }
     if ch == '"' {
-      in_string = not(in_string)
+      in_string = !(in_string)
       continue
     }
-    if ch == '#' && not(in_string) {
+    if ch == '#' && !(in_string) {
       return String::unsafe_substring(raw, start=0, end=i)
     }
   }
@@ -554,7 +554,7 @@ fn parse_toml_string(raw : String) -> String? {
   if text.length() < 2 {
     return None
   }
-  if not(text.has_prefix("\"")) || not(text.has_suffix("\"")) {
+  if !(text.has_prefix("\"")) || !(text.has_suffix("\"")) {
     return None
   }
   let inner = String::unsafe_substring(text, start=1, end=text.length() - 1)
@@ -579,7 +579,7 @@ fn parse_toml_bool(raw : String, default : Bool) -> Bool {
 ///|
 fn parse_toml_string_array(raw : String) -> Array[String] {
   let text = trim_string(raw)
-  if text.length() < 2 || not(text.has_prefix("[")) || not(text.has_suffix("]")) {
+  if text.length() < 2 || !(text.has_prefix("[")) || !(text.has_suffix("]")) {
     return []
   }
   let inner = String::unsafe_substring(text, start=1, end=text.length() - 1)
@@ -704,7 +704,7 @@ fn parse_workspace_manifest(text : String) -> WorkspaceManifest {
           }
           None =>
             if key == "version" {
-              version = @strconv.parse_int(value[:]) catch { _ => version }
+              version = @string.parse_int(value[:]) catch { _ => version }
             }
         }
       }
@@ -901,12 +901,12 @@ fn workspace_manifest_issues(
   let issues : Array[String] = []
   for node in manifest.nodes {
     let node_root = workspace_node_abs_path(workspace_root, node.path)
-    if not(path_is_within_workspace_root(workspace_root, node_root)) {
+    if !(path_is_within_workspace_root(workspace_root, node_root)) {
       issues.push("node '\{node.id}' path escapes workspace root: \{node.path}")
       continue
     }
     if include_repo_checks {
-      if not(fs.is_dir(node_root)) {
+      if !(fs.is_dir(node_root)) {
         issues.push("node '\{node.id}' path does not exist: \{node.path}")
       }
       if workspace_node_git_dir(fs, node_root) is None {
@@ -943,7 +943,7 @@ fn workspace_node_git_dir(fs : @osfs.OsFs, node_root : String) -> String? {
   let marker_exists = fs.is_dir(marker) ||
     fs.is_file(marker) ||
     is_bare_repo_dir(node_root)
-  if not(marker_exists) {
+  if !(marker_exists) {
     return None
   }
   let git_dir = resolve_git_dir(fs, node_root)
@@ -1062,7 +1062,7 @@ fn workspace_collect_nested_repo_paths(
       relative_root + "/" + entry
     }
     let child_root = node_root + "/" + relative_path
-    if not(fs.is_dir(child_root)) {
+    if !(fs.is_dir(child_root)) {
       continue
     }
     let marker = default_repo_marker_path(fs, child_root)
@@ -1134,7 +1134,7 @@ fn read_workspace_lock_commits(
   workspace_root : String,
 ) -> Map[String, String] {
   let path = workspace_lock_path(fs, workspace_root)
-  if not(fs.is_file(path)) {
+  if !(fs.is_file(path)) {
     return {}
   }
   let text = decode_bytes(fs.read_file(path)) catch { _ => return {} }
@@ -1159,7 +1159,7 @@ fn read_workspace_lock_signatures(
   workspace_root : String,
 ) -> Map[String, String] {
   let path = workspace_lock_path(fs, workspace_root)
-  if not(fs.is_file(path)) {
+  if !(fs.is_file(path)) {
     return {}
   }
   let text = decode_bytes(fs.read_file(path)) catch { _ => return {} }
@@ -1189,7 +1189,7 @@ fn read_workspace_flow_cache(
   workspace_root : String,
 ) -> Map[String, String] {
   let path = workspace_flow_cache_path(fs, workspace_root)
-  if not(fs.is_file(path)) {
+  if !(fs.is_file(path)) {
     return {}
   }
   let text = decode_bytes(fs.read_file(path)) catch { _ => return {} }
@@ -1278,7 +1278,7 @@ fn read_successful_push_nodes(
   txn_id : String,
 ) -> Map[String, Bool] {
   let path = workspace_txn_path(fs, workspace_root, txn_id)
-  if not(fs.is_file(path)) {
+  if !(fs.is_file(path)) {
     return {}
   }
   let text = decode_bytes(fs.read_file(path)) catch { _ => return {} }
@@ -1560,7 +1560,7 @@ pub fn workspace_translate_implicit_command(
   if cmd == "workspace" || cmd == "ws" || cmd == "repo" {
     return (cmd, rest)
   }
-  if not(is_workspace_subcommand_name(cmd)) {
+  if !(is_workspace_subcommand_name(cmd)) {
     return (cmd, rest)
   }
   let probe = resolve_workspace_probe_dir(cwd)
@@ -1627,7 +1627,7 @@ fn workspace_slug(raw : String) -> String {
 fn workspace_bitflow_fs_adapter(fs : @osfs.OsFs) -> @bitflow.FsAdapter {
   @bitflow.FsAdapter::new(
     fn(path : String) {
-      if not(fs.is_file(path)) {
+      if !(fs.is_file(path)) {
         return None
       }
       let content : Result[Bytes, Error] = try? fs.read_file(path)
@@ -1743,7 +1743,7 @@ fn workspace_parse_star_flow_ir(
   } else {
     normalize_path(workspace_root + "/" + star_path)
   }
-  if not(fs.is_file(absolute_star_path)) {
+  if !(fs.is_file(absolute_star_path)) {
     raise @bit.GitError::InvalidObject(
       "workspace flow: star file not found: " + absolute_star_path,
     )
@@ -1768,7 +1768,7 @@ fn workspace_parse_star_flow_ir(
           break
         }
       }
-      if not(found) {
+      if !(found) {
         raise @bit.GitError::InvalidObject(
           "workspace flow: star target task not found: " + task_id,
         )
@@ -1815,7 +1815,7 @@ async fn handle_workspace_init(args : Array[String]) -> Unit raise Error {
   }
   let start = resolve_workspace_probe_dir(None)
   match find_workspace_root_from(start) {
-    Some(existing_root) if not(force) => {
+    Some(existing_root) if !(force) => {
       println("workspace already initialized at " + existing_root)
       return
     }
@@ -1928,7 +1928,7 @@ async fn handle_workspace_commit(
   for node in ordered {
     let node_root = workspace_node_abs_path(workspace_root, node.path)
     let repo_exists = workspace_node_git_dir(fs, node_root) is Some(_)
-    if not(repo_exists) {
+    if !(repo_exists) {
       workspace_record_step(
         steps, node, "commit", "failed", "repository marker not found",
       )
@@ -1938,7 +1938,7 @@ async fn handle_workspace_commit(
       continue
     }
     let dirty = workspace_is_node_dirty(fs, node_root)
-    if not(dirty) && not(allow_empty) {
+    if !(dirty) && !(allow_empty) {
       workspace_record_step(steps, node, "commit", "skipped", "clean")
       continue
     }
@@ -2030,7 +2030,7 @@ async fn handle_workspace_push(
     }
     let node_root = workspace_node_abs_path(workspace_root, node.path)
     let repo_exists = workspace_node_git_dir(fs, node_root) is Some(_)
-    if not(repo_exists) {
+    if !(repo_exists) {
       workspace_record_step(
         steps, node, "push", "failed", "repository marker not found",
       )
@@ -2209,7 +2209,7 @@ async fn handle_workspace_flow(
       "--config" => {
         if i + 1 < args.length() {
           let value = args[i + 1]
-          if not(value.has_prefix("-")) {
+          if !(value.has_prefix("-")) {
             star_path = Some(value)
             i += 2
             continue
@@ -2227,7 +2227,7 @@ async fn handle_workspace_flow(
       "-c" => {
         if i + 1 < args.length() {
           let value = args[i + 1]
-          if not(value.has_prefix("-")) {
+          if !(value.has_prefix("-")) {
             star_path = Some(value)
             i += 2
             continue
@@ -2251,7 +2251,7 @@ async fn handle_workspace_flow(
         star_var_cli_args.push("--var")
         if i + 1 < args.length() {
           let value = args[i + 1]
-          if not(value.has_prefix("-")) {
+          if !(value.has_prefix("-")) {
             star_var_cli_args.push(value)
             i += 2
             continue
@@ -2458,7 +2458,7 @@ async fn handle_workspace_flow(
       guard task_map.get(task_id) is Some(task_spec) else { continue }
       let blocked_deps : Array[String] = []
       for dep in task_spec.needs {
-        if not(task_success.get(dep).unwrap_or(false)) {
+        if !(task_success.get(dep).unwrap_or(false)) {
           blocked_deps.push(dep)
         }
       }
@@ -2503,7 +2503,7 @@ async fn handle_workspace_flow(
           break
         }
       }
-      if not(no_cache) && not(dep_ran) {
+      if !(no_cache) && !(dep_ran) {
         match decision {
           Some(value) if value.hit => {
             workspace_record_step_raw(
@@ -2551,7 +2551,7 @@ async fn handle_workspace_flow(
           task_spec.id,
         )
         task_success[task_spec.id] = true
-        if not(no_cache) && fingerprint.length() > 0 {
+        if !(no_cache) && fingerprint.length() > 0 {
           flow_cache[cache_key] = fingerprint
         }
       } else {
@@ -2565,7 +2565,7 @@ async fn handle_workspace_flow(
           "task '\{task_spec.id}' failed with exit \{code}",
         )
         task_success[task_spec.id] = false
-        if not(no_cache) {
+        if !(no_cache) {
           flow_cache.remove(cache_key)
         }
         if task_spec.required {
@@ -2574,7 +2574,7 @@ async fn handle_workspace_flow(
       }
     }
     let _ = ensure_workspace_meta_dir(fs, workspace_root)
-    if not(no_cache) {
+    if !(no_cache) {
       write_workspace_flow_cache(fs, workspace_root, flow_cache)
     }
     let state = if required_failed { "partial_failed" } else { "completed" }
@@ -2708,7 +2708,7 @@ async fn handle_workspace_flow(
         continue
       }
       let dep_ok = node_success.get(dep).unwrap_or(false)
-      if not(dep_ok) {
+      if !(dep_ok) {
         blocked_deps.push(dep)
       }
     }
@@ -2728,7 +2728,7 @@ async fn handle_workspace_flow(
     }
     let node_root = workspace_node_abs_path(workspace_root, node.path)
     let repo_exists = node_repo_exists.get(node.id).unwrap_or(false)
-    if not(repo_exists) {
+    if !(repo_exists) {
       workspace_record_step(
         steps, node, "flow", "failed", "repository marker not found",
       )
@@ -2758,8 +2758,8 @@ async fn handle_workspace_flow(
             break
           }
         }
-        if not(no_cache) &&
-          not(dep_ran) &&
+        if !(no_cache) &&
+          !(dep_ran) &&
           cache_hit_by_node.get(node.id).unwrap_or(false) {
           workspace_record_step(steps, node, "flow", "cached", task)
           node_success[node.id] = true
@@ -2787,7 +2787,7 @@ async fn handle_workspace_flow(
           workspace_record_step(steps, node, "flow", "success", task)
           node_success[node.id] = true
           node_ran[node.id] = true
-          if not(no_cache) {
+          if !(no_cache) {
             flow_cache[cache_key] = fingerprint
           }
         } else {
@@ -2800,7 +2800,7 @@ async fn handle_workspace_flow(
           )
           node_success[node.id] = false
           node_ran[node.id] = true
-          if not(no_cache) {
+          if !(no_cache) {
             flow_cache.remove(cache_key)
           }
           if node.required {
@@ -2822,7 +2822,7 @@ async fn handle_workspace_flow(
     }
   }
   let _ = ensure_workspace_meta_dir(fs, workspace_root)
-  if not(no_cache) {
+  if !(no_cache) {
     write_workspace_flow_cache(fs, workspace_root, flow_cache)
   }
   let state = if required_failed { "partial_failed" } else { "completed" }

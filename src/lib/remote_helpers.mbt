@@ -212,7 +212,7 @@ pub fn read_local_remote_head_state(
   head_path : String,
   remote_name : String,
 ) -> RemoteHeadState {
-  if not(fs.is_file(head_path)) {
+  if !(fs.is_file(head_path)) {
     return RemoteHeadState::Missing
   }
   let content = try? fs.read_file(head_path)
@@ -246,7 +246,7 @@ pub fn read_remote_head_branch(
   remote_git_dir : String,
 ) -> String? {
   let head_path = remote_git_dir + "/HEAD"
-  if not(fs.is_file(head_path)) {
+  if !(fs.is_file(head_path)) {
     return None
   }
   let content = try? fs.read_file(head_path)
@@ -371,7 +371,7 @@ pub fn match_url_pattern(pattern : String, value : String) -> Bool {
         matched = true
         vi += 1
       }
-      if not(matched) {
+      if !(matched) {
         return false
       }
     } else {

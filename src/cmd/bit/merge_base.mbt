@@ -266,7 +266,7 @@ async fn merge_base_fork_point(
         let oid_hex = oid.to_hex()
         // Prefer merge-base that equals a reflog entry (true fork point)
         if m_hex == oid_hex {
-          if not(best_is_reflog_entry) {
+          if !(best_is_reflog_entry) {
             best = Some(m)
             best_is_reflog_entry = true
           } else {
@@ -279,7 +279,7 @@ async fn merge_base_fork_point(
               None => best = Some(m)
             }
           }
-        } else if not(best_is_reflog_entry) {
+        } else if !(best_is_reflog_entry) {
           match best {
             Some(prev) =>
               if merge_base_is_ancestor(fs, git_dir, prev, m) {

@@ -8,7 +8,7 @@ async fn handle_verify_pack(args : Array[String]) -> Unit raise Error {
     match arg {
       "-v" | "--verbose" => verbose = true
       "-s" | "--stat-only" => stat_only = true
-      _ if not(arg.has_prefix("-")) => pack_files.push(arg)
+      _ if !(arg.has_prefix("-")) => pack_files.push(arg)
       _ if arg.has_prefix("-") => warn_unimplemented_arg("verify-pack", arg)
       _ => ()
     }
@@ -40,7 +40,7 @@ async fn verify_single_pack(
     pack_path
   }
   let pack_file = base_path + ".pack"
-  if not(fs.is_file(pack_file)) {
+  if !(fs.is_file(pack_file)) {
     raise @bitcore.GitError::InvalidObject("pack file not found: " + pack_file)
   }
   let data = fs.read_file(pack_file)
@@ -61,7 +61,7 @@ async fn verify_single_pack(
     }
     total_size += obj.data.length()
   }
-  if verbose && not(stat_only) {
+  if verbose && !(stat_only) {
     // Print each object
     for obj in objects {
       let id = @bitcore.hash_object_content(obj.obj_type, obj.data)

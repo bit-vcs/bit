@@ -36,7 +36,7 @@ fn ensure_dir(path : String) -> Unit raise @bit.GitError {
       current + "/" + part
     }
     let exists = @fs.is_dir(current) catch { _ => false }
-    if not(exists) {
+    if !(exists) {
       @fs.create_dir(current) catch {
         err => raise io_error(err)
       }

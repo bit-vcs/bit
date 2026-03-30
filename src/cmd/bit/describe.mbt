@@ -23,7 +23,7 @@ async fn handle_describe(args : Array[String]) -> Unit raise Error {
         )
       _ if arg.has_prefix("--dirty=") =>
         dirty_mark = String::unsafe_substring(arg, start=8, end=arg.length())
-      _ if not(arg.has_prefix("-")) => commit_ref = arg
+      _ if !(arg.has_prefix("-")) => commit_ref = arg
       _ => ()
     }
   }
@@ -34,7 +34,7 @@ async fn handle_describe(args : Array[String]) -> Unit raise Error {
   }
   // Get all tags
   let tags = get_all_tags(rfs, git_dir, use_tags)
-  if tags.length() == 0 && not(always) {
+  if tags.length() == 0 && !(always) {
     @stdio.stderr.write("fatal: No names found, cannot describe anything.")
     @sys.exit(128)
   }
@@ -42,7 +42,7 @@ async fn handle_describe(args : Array[String]) -> Unit raise Error {
   let result = find_closest_tag(rfs, git_dir, tid, tags)
   match result {
     Some((tag_name, distance, tag_commit)) => {
-      let output = if distance == 0 && not(long_format) {
+      let output = if distance == 0 && !(long_format) {
         tag_name + dirty_mark
       } else {
         let short_sha = String::unsafe_substring(
@@ -80,7 +80,7 @@ fn get_all_tags(
 ) -> Map[String, @bitcore.ObjectId] raise Error {
   let tags : Map[String, @bitcore.ObjectId] = {}
   let tags_dir = git_dir + "/refs/tags"
-  if not(rfs.is_dir(tags_dir)) {
+  if !(rfs.is_dir(tags_dir)) {
     return tags
   }
   let entries = rfs.readdir(tags_dir) catch { _ => return tags }
@@ -162,7 +162,7 @@ fn find_closest_tag(
       Some(o) => {
         let info = @bitcore.parse_commit(o.data)
         for p in info.parents {
-          if not(visited.get(p.to_hex()).unwrap_or(false)) {
+          if !(visited.get(p.to_hex()).unwrap_or(false)) {
             queue.push((p, distance + 1))
           }
         }

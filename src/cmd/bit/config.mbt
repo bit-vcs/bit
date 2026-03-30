@@ -298,7 +298,7 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
     replace_all_mode ||
     unset_mode ||
     unset_all ||
-    (not(get_mode) && value is Some(_))
+    (!(get_mode) && value is Some(_))
   if config_path == "-" && write_to_config {
     eprint_line("fatal: writing to stdin is not supported")
     @sys.exit(1)
@@ -357,7 +357,7 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
   }
   // Check if specified config file exists (required for explicit scope modes in read operations)
   let is_read_op = list_mode || get_mode || get_all_mode || get_regexp_mode
-  if is_read_op && config_path != "-" && not(@fs.path_exists(config_path)) {
+  if is_read_op && config_path != "-" && !(@fs.path_exists(config_path)) {
     if config_path_override is Some(_) ||
       (global_mode && @sys.get_env_var("GIT_CONFIG_GLOBAL") is Some(_)) ||
       (system_mode && @sys.get_env_var("GIT_CONFIG_SYSTEM") is Some(_)) {
@@ -376,9 +376,9 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
     }
     let need_multi_source = (show_scope || show_origin) &&
       config_path_override is None &&
-      not(global_mode) &&
-      not(system_mode) &&
-      not(local_mode)
+      !(global_mode) &&
+      !(system_mode) &&
+      !(local_mode)
     if need_multi_source {
       // Multi-source list with scope/origin prefix
       let rfs3 : &@bitcore.RepoFileSystem = fs
@@ -534,16 +534,16 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
           )
         None => false
       }
-      if not(found) {
+      if !(found) {
         @sys.exit(1)
       }
     } else {
       // Multi-source get-regexp when no explicit scope
       let need_multi_source = (show_scope || show_origin) &&
         config_path_override is None &&
-        not(global_mode) &&
-        not(system_mode) &&
-        not(local_mode)
+        !(global_mode) &&
+        !(system_mode) &&
+        !(local_mode)
       let mut found = false
       if need_multi_source {
         let rfs4 : &@bitcore.RepoFileSystem = fs
@@ -659,7 +659,7 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
           origin=regexp_origin,
         )
       }
-      if not(found) {
+      if !(found) {
         @sys.exit(1)
       }
     }
@@ -704,14 +704,14 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
   }
   guard key is Some(k) else {
     // No key given: check if any action mode was specified
-    if not(get_mode) &&
-      not(get_all_mode) &&
-      not(unset_mode) &&
-      not(unset_all) &&
-      not(replace_all_mode) &&
-      not(remove_section_mode) &&
-      not(rename_section_mode) &&
-      not(get_regexp_mode) {
+    if !(get_mode) &&
+      !(get_all_mode) &&
+      !(unset_mode) &&
+      !(unset_all) &&
+      !(replace_all_mode) &&
+      !(remove_section_mode) &&
+      !(rename_section_mode) &&
+      !(get_regexp_mode) {
       eprint_line("error: no action specified")
       @sys.exit(2)
     }
@@ -817,14 +817,14 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
     // Read config
     if fixed_value_mode {
       let has_pattern = value_pattern is Some(_) || value is Some(_)
-      if not(has_pattern) {
+      if !(has_pattern) {
         raise @bitcore.GitError::InvalidObject(
           "value required for --fixed-value",
         )
       }
     }
     if get_all_mode {
-      let vp : String? = if get_mode && not(get_color_mode) {
+      let vp : String? = if get_mode && !(get_color_mode) {
         match value_pattern {
           Some(p) => Some(p)
           None => value
@@ -897,7 +897,7 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
         }
       }
     } else {
-      let vp : String? = if get_mode && not(get_color_mode) {
+      let vp : String? = if get_mode && !(get_color_mode) {
         match value_pattern {
           Some(p) => Some(p)
           None => value
@@ -1286,7 +1286,7 @@ async fn validate_config_file(config_path : String, content : String) -> Unit {
         }
       }
     }
-    if not(in_section) {
+    if !(in_section) {
       // Line outside any section — syntax error
       eprint_line("fatal: bad config line \{line_num} in \{location}")
       @sys.exit(128)
@@ -1301,7 +1301,7 @@ async fn validate_config_file(config_path : String, content : String) -> Unit {
         // Valid key: only alphanumeric + '-'
         let mut valid_key = true
         for c in kpart {
-          if not(
+          if !(
               (c >= 'a' && c <= 'z') ||
               (c >= 'A' && c <= 'Z') ||
               (c >= '0' && c <= '9') ||
@@ -1311,7 +1311,7 @@ async fn validate_config_file(config_path : String, content : String) -> Unit {
             break
           }
         }
-        if not(valid_key) {
+        if !(valid_key) {
           eprint_line("fatal: bad config line \{line_num} in \{location}")
           @sys.exit(128)
         }
@@ -1335,15 +1335,15 @@ async fn validate_config_file(config_path : String, content : String) -> Unit {
             continue
           }
           if c == '"' {
-            in_quote = not(in_quote)
+            in_quote = !(in_quote)
           }
           // Check for unquoted comment — stop scanning
-          if not(in_quote) && (c == '#' || c == ';') {
+          if !(in_quote) && (c == '#' || c == ';') {
             break
           }
         }
         // Check if continuation line (escaped newline at end)
-        if in_quote && not(escaped) && not(val_part.has_suffix("\\")) {
+        if in_quote && !(escaped) && !(val_part.has_suffix("\\")) {
           // Unclosed quote without continuation
           eprint_line("fatal: bad config line \{line_num} in \{location}")
           @sys.exit(128)
@@ -1393,8 +1393,8 @@ fn remove_empty_sections(
               " \t",
             )
             has_keys = after.length() > 0 &&
-              not(after[0] == '#') &&
-              not(after[0] == ';')
+              !(after[0] == '#') &&
+              !(after[0] == ';')
           }
           None => has_keys = false
         }
@@ -1423,7 +1423,7 @@ fn remove_empty_sections(
   let remove_headers : Array[Int] = []
   for range in section_ranges {
     let (idx, matches, keys, comments) = range
-    if matches && not(keys) && not(comments) {
+    if matches && !(keys) && !(comments) {
       // Don't remove if a preceding comment (not part of continuation) exists
       // before the section header. Scan backwards skipping blank lines.
       let mut skip_section = false
@@ -1444,7 +1444,7 @@ fn remove_empty_sections(
               is_continuation = true
             }
           }
-          if not(is_continuation) {
+          if !(is_continuation) {
             skip_section = true
           }
         }
@@ -1480,7 +1480,7 @@ fn remove_empty_sections(
   }
   let result : Array[String] = []
   for i, line in lines {
-    if not(remove_set[i]) {
+    if !(remove_set[i]) {
       result.push(line)
     }
   }
@@ -1586,7 +1586,7 @@ fn is_continuation_context(line : String) -> Bool {
         start=ei + 1,
         end=line.length(),
       )
-      not(has_unquoted_comment_before_backslash(after_eq))
+      !(has_unquoted_comment_before_backslash(after_eq))
     }
   }
 }
@@ -1601,10 +1601,10 @@ fn has_unquoted_comment_before_backslash(value : String) -> Bool {
     if c == '"' {
       // Check if it's escaped
       let escaped = if i > 0 { value[i - 1] == '\\' } else { false }
-      if not(escaped) {
-        in_quote = not(in_quote)
+      if !(escaped) {
+        in_quote = !(in_quote)
       }
-    } else if not(in_quote) && (c == '#' || c == ';') {
+    } else if !(in_quote) && (c == '#' || c == ';') {
       last_comment_pos = i
       break
     }
@@ -1648,7 +1648,7 @@ async fn list_config(
   scope? : String = "",
   origin? : String = "",
 ) -> Unit raise Error {
-  if not(fs.is_file(config_path)) {
+  if !(fs.is_file(config_path)) {
     return
   }
   let content = decode_bytes(fs.read_file(config_path))
@@ -1676,7 +1676,7 @@ async fn list_config_from_content(
         current_section = sec.to_lower()
         current_subsection = sub
         // Handle inline key-value after section header
-        if rest.length() > 0 && not(rest[0] == '#') && not(rest[0] == ';') {
+        if rest.length() > 0 && !(rest[0] == '#') && !(rest[0] == ';') {
           let eq_idx = rest.find("=")
           match eq_idx {
             Some(ei) => {
@@ -1754,8 +1754,8 @@ async fn list_config_from_content(
             // Value-less key (no = sign)
             let key_part = trim_chars(trimmed, " \t").to_lower()
             if key_part.length() > 0 &&
-              not(key_part[0] == '#') &&
-              not(key_part[0] == ';') {
+              !(key_part[0] == '#') &&
+              !(key_part[0] == ';') {
               let full_key = match current_subsection {
                 Some(s) => current_section + "." + s + "." + key_part
                 None => current_section + "." + key_part
@@ -1819,7 +1819,7 @@ fn get_config_value(
   value_pattern : String?,
   fixed_value : Bool,
 ) -> String? raise Error {
-  if not(fs.is_file(config_path)) {
+  if !(fs.is_file(config_path)) {
     return None
   }
   let raw_content = decode_bytes(fs.read_file(config_path))
@@ -1847,7 +1847,7 @@ fn get_all_config_values(
   value_pattern : String?,
   fixed_value : Bool,
 ) -> Array[String] raise Error {
-  if not(fs.is_file(config_path)) {
+  if !(fs.is_file(config_path)) {
     return []
   }
   let raw_content = decode_bytes(fs.read_file(config_path))
@@ -2347,7 +2347,7 @@ fn regex_char_class_matches(pc : Array[Char], pi : Int, c : Char) -> Bool {
     i += 1
   }
   if negate {
-    not(matched)
+    !(matched)
   } else {
     matched
   }
@@ -2364,7 +2364,7 @@ fn config_value_pattern_matches(text : String, pattern : String) -> Bool {
   }
   let result = config_regex_matches(text, actual)
   if negate {
-    not(result)
+    !(result)
   } else {
     result
   }
@@ -2409,7 +2409,7 @@ fn set_config_with_fixed_value(
   }
   let encoded_value = encode_config_value(value)
   let comment_suffix = format_comment_suffix(comment)
-  if not(rfs.is_file(config_path)) {
+  if !(rfs.is_file(config_path)) {
     // Create new config file
     wfs.write_string(
       config_path,
@@ -2534,7 +2534,7 @@ fn set_config_with_fixed_value(
       match parse_section_header_line(trimmed) {
         Some((hs, hsub, rest, _)) => {
           in_sec2 = section_header_matches(hs, hsub, section, subsection)
-          if in_sec2 && not(replaced) && rest.length() > 0 {
+          if in_sec2 && !(replaced) && rest.length() > 0 {
             let inline_eq_idx = rest.find("=")
             let mut inline_match = false
             match inline_eq_idx {
@@ -2575,7 +2575,7 @@ fn set_config_with_fixed_value(
           result.push(line)
         }
         None => {
-          if in_sec2 && not(replaced) {
+          if in_sec2 && !(replaced) {
             let eq_idx = trimmed.find("=")
             match eq_idx {
               Some(idx) => {
@@ -2630,7 +2630,7 @@ fn set_config_with_fixed_value(
     let trimmed = trim_string(line)
     match parse_section_header_line(trimmed) {
       Some((hs, hsub, rest, dot_form)) => {
-        if in_section && not(found) {
+        if in_section && !(found) {
           // Insert at end of previous section
           result.push("\t" + name + " = " + encoded_value + comment_suffix)
           found = true
@@ -2643,7 +2643,7 @@ fn set_config_with_fixed_value(
           section_end = i
         }
         // Handle inline key-value after section header: [section] key = value
-        if in_section && rest.length() > 0 && not(add_mode) {
+        if in_section && rest.length() > 0 && !(add_mode) {
           let rest_eq = rest.find("=")
           match rest_eq {
             Some(rei) => {
@@ -2668,7 +2668,7 @@ fn set_config_with_fixed_value(
         result.push(line)
       }
       None => {
-        if in_section && not(add_mode) {
+        if in_section && !(add_mode) {
           let eq_idx = trimmed.find("=")
           match eq_idx {
             Some(idx) => {
@@ -2694,7 +2694,7 @@ fn set_config_with_fixed_value(
       }
     }
   }
-  if not(found) {
+  if !(found) {
     if in_section || in_section_for_insert {
       // In matching section at end of file, append here
       result.push("\t" + name + " = " + encoded_value + comment_suffix)
@@ -2704,7 +2704,7 @@ fn set_config_with_fixed_value(
       let new_result : Array[String] = []
       for i, line in result {
         new_result.push(line)
-        if i == section_end && not(found) {
+        if i == section_end && !(found) {
           new_result.push("\t" + name + " = " + encoded_value + comment_suffix)
           found = true
         }
@@ -2715,7 +2715,7 @@ fn set_config_with_fixed_value(
       )
       return
     }
-    if not(found) {
+    if !(found) {
       // Add new section at end
       result.push(section_header)
       result.push("\t" + name + " = " + encoded_value + comment_suffix)
@@ -2735,7 +2735,7 @@ fn unset_config(
 ) -> Unit raise Error {
   let rfs : &@bitcore.RepoFileSystem = fs
   let wfs : &@bitcore.FileSystem = fs
-  if not(rfs.is_file(config_path)) {
+  if !(rfs.is_file(config_path)) {
     return
   }
   guard parse_config_key(key) is Some((section, subsection, name)) else {
@@ -2748,7 +2748,7 @@ fn unset_config(
     ignore(lines.pop())
   }
   // First pass: count matching entries for ambiguous detection
-  if not(unset_all) && value_pattern is None {
+  if !(unset_all) && value_pattern is None {
     let match_count = count_config_matches(lines, section, subsection, name_l)
     if match_count > 1 {
       raise @bitcore.GitError::InvalidObject("key '\{key}' has multiple values")
@@ -2823,7 +2823,7 @@ fn unset_config(
                 if unset_all {
                   continue
                 }
-                if not(removed) {
+                if !(removed) {
                   removed = true
                   continue
                 }
@@ -2862,7 +2862,7 @@ fn unset_config(
               val, value_pattern, fixed_value,
             )
             if should_remove {
-              if unset_all || not(removed) {
+              if unset_all || !(removed) {
                 removed = true
                 // Check if line has continuation
                 if line.has_suffix("\\") {
@@ -2876,7 +2876,7 @@ fn unset_config(
         None => {
           let key_only = trim_chars(trimmed, " \t")
           if key_only.to_lower() == name_l && value_pattern is None {
-            if unset_all || not(removed) {
+            if unset_all || !(removed) {
               removed = true
               continue
             }
@@ -2886,7 +2886,7 @@ fn unset_config(
     }
     result.push(line)
   }
-  if not(removed) {
+  if !(removed) {
     @sys.exit(5)
   }
   let cleaned = remove_empty_sections(result, section, subsection)
@@ -2980,7 +2980,7 @@ fn replace_all_config(
   let encoded_value = encode_config_value(value)
   let comment_suffix = format_comment_suffix(comment)
   let new_line = "\t" + name + " = " + encoded_value + comment_suffix
-  if not(rfs.is_file(config_path)) {
+  if !(rfs.is_file(config_path)) {
     let section_header = match subsection {
       Some(sub) => "[\{section} \"\{sub}\"]"
       None => "[\{section}]"
@@ -3199,7 +3199,7 @@ async fn get_regexp_config(
   scope? : String = "",
   origin? : String = "",
 ) -> Bool raise Error {
-  if not(fs.is_file(config_path)) {
+  if !(fs.is_file(config_path)) {
     return false
   }
   let raw_content = decode_bytes(fs.read_file(config_path))
@@ -3274,7 +3274,7 @@ async fn get_regexp_config_from_content(
           None => {
             // Value-less key
             let kp = trim_chars(trimmed, " \t").to_lower()
-            if kp.length() > 0 && not(kp[0] == '#') && not(kp[0] == ';') {
+            if kp.length() > 0 && !(kp[0] == '#') && !(kp[0] == ';') {
               (Some(kp), config_novalue())
             } else {
               ((None : String?), "")
@@ -3348,7 +3348,7 @@ fn remove_config_section_file(
 ) -> Unit raise Error {
   let rfs : &@bitcore.RepoFileSystem = fs
   let wfs : &@bitcore.FileSystem = fs
-  if not(rfs.is_file(config_path)) {
+  if !(rfs.is_file(config_path)) {
     return
   }
   let parts : Array[String] = []
@@ -3390,7 +3390,7 @@ fn remove_config_section_file(
       None => if in_section { continue } else { result.push(line) }
     }
   }
-  if not(found_section) {
+  if !(found_section) {
     raise @bitcore.GitError::InvalidObject("no such section: '\{section_key}'")
   }
   wfs.write_string(config_path, ensure_trailing_newline(result.join("\n")))
@@ -3405,7 +3405,7 @@ fn rename_config_section(
 ) -> Unit raise Error {
   let rfs : &@bitcore.RepoFileSystem = fs
   let wfs : &@bitcore.FileSystem = fs
-  if not(rfs.is_file(config_path)) {
+  if !(rfs.is_file(config_path)) {
     raise @bitcore.GitError::InvalidObject("no such section: '\{old_name}'")
   }
   // Reject empty names
@@ -3425,7 +3425,7 @@ fn rename_config_section(
     new_sec_parts.push(p.to_string())
   }
   let new_sec_name = new_sec_parts[0]
-  if not(is_valid_section_name(new_sec_name)) {
+  if !(is_valid_section_name(new_sec_name)) {
     raise @bitcore.GitError::InvalidObject(
       "invalid section name: '\{new_name}'",
     )
@@ -3514,7 +3514,7 @@ fn rename_config_section(
       None => result.push(line)
     }
   }
-  if not(found) {
+  if !(found) {
     raise @bitcore.GitError::InvalidObject("no such section: '\{old_name}'")
   }
   wfs.write_string(config_path, ensure_trailing_newline(result.join("\n")))

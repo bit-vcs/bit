@@ -31,11 +31,11 @@ async fn handle_merge_file(args : Array[String]) -> Unit raise Error {
       _ =>
         if arg.has_prefix("--marker-size=") {
           let val = arg[14:].to_string()
-          marker_size = @strconv.parse_int(val) catch { _ => 7 }
+          marker_size = @string.parse_int(val) catch { _ => 7 }
         } else if arg.has_prefix("-L") {
           labels.push(arg[2:].to_string())
         } else if arg.has_prefix("-") {
-          if not(quiet) {
+          if !(quiet) {
             eprint_line("fatal: unknown option '\{arg}'")
           }
           @sys.exit(128)

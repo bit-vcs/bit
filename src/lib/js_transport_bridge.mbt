@@ -91,7 +91,7 @@ fn js_transport_parse_response(
     start=split + 1,
     end=raw.length(),
   )
-  let status = @strconv.parse_int(status_raw) catch {
+  let status = @string.parse_int(status_raw) catch {
     _ => raise @bit.GitError::ProtocolError("Invalid JS transport status")
   }
   (@bit.HttpResponse::new(status), js_transport_base64_decode(body_b64))

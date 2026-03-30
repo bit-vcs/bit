@@ -63,7 +63,7 @@ pub async fn status_text(
       sb.write_string("  " + path + "\n")
     }
   }
-  if not(has_staged) && not(has_unstaged) && st.untracked.length() == 0 {
+  if !(has_staged) && !(has_unstaged) && st.untracked.length() == 0 {
     sb.write_string("\nnothing to commit, working tree clean\n")
   }
   sb.to_string()

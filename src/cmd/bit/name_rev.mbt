@@ -114,13 +114,13 @@ fn name_rev_build_ref_map(
   for item in all_refs {
     let (name, id) = item
     // Filter by tags if requested
-    if tags_only && not(name.has_prefix("refs/tags/")) {
+    if tags_only && !(name.has_prefix("refs/tags/")) {
       continue
     }
     // Filter by pattern if given
     match refs_pattern {
       Some(pattern) =>
-        if not(name_rev_match_pattern(name, pattern)) {
+        if !(name_rev_match_pattern(name, pattern)) {
           continue
         }
       None => ()
@@ -170,7 +170,7 @@ fn name_rev_build_name_map(
     let commit_id = name_rev_deref_tag(rfs, db, ref_id)
     let hex = commit_id.to_hex()
     // Direct match: ref points at this commit
-    if not(name_map.contains(hex)) {
+    if !(name_map.contains(hex)) {
       name_map.set(hex, ref_name)
     }
     // Walk parents with BFS up to a depth limit
@@ -198,7 +198,7 @@ fn name_rev_build_name_map(
         let dist = depth + 1
         let name = "\{ref_name}~\{dist}"
         // Only set if not already named (prefer shorter names)
-        if not(name_map.contains(parent_hex)) {
+        if !(name_map.contains(parent_hex)) {
           name_map.set(parent_hex, name)
         }
         queue.push((parent, dist))

@@ -98,7 +98,7 @@ fn commit_edit_buffer_template(initial_message : String?) -> String {
   match initial_message {
     Some(msg) => {
       sb.write_string(msg)
-      if not(msg.has_suffix("\n")) {
+      if !(msg.has_suffix("\n")) {
         sb.write_string("\n")
       }
       sb.write_string("\n")
@@ -174,7 +174,7 @@ async fn read_commit_message_from_editor(
     Some(edit) => edit(path)
     None => default_commit_message_editor(path)
   }
-  if not(edited) {
+  if !(edited) {
     return None
   }
   guard fs.is_file(path) else { return None }

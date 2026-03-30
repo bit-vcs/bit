@@ -32,7 +32,7 @@ test "fs_tree: move_tree_safe handles nested destinations" {
   fs.write_string("/src/a.txt", "hello\n")
   move_tree_safe(fs, fs, "/src", "/src/nested")
   assert_true(fs.is_file("/src/nested/a.txt"))
-  assert_true(not(fs.is_file("/src/a.txt")))
+  assert_true(!(fs.is_file("/src/a.txt")))
 }
 
 ///|
@@ -42,6 +42,6 @@ test "fs_tree: remove_ref_path removes file and directory" {
   fs.write_string("/refs/tags/v1/tag", "def")
   remove_ref_path(fs, fs, "/refs/heads/main")
   remove_ref_path(fs, fs, "/refs/tags")
-  assert_true(not(fs.is_file("/refs/heads/main")))
-  assert_true(not(fs.is_dir("/refs/tags")))
+  assert_true(!(fs.is_file("/refs/heads/main")))
+  assert_true(!(fs.is_dir("/refs/tags")))
 }

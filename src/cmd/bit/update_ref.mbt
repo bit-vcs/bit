@@ -42,10 +42,10 @@ fn update_ref_storage_runtime_delegate_args(
   let normalized_refname = @bitlib.normalize_repo_path(parsed.refname) catch {
     _ => return None
   }
-  if not(parsed.refname.has_prefix("refs/")) {
+  if !(parsed.refname.has_prefix("refs/")) {
     return None
   }
-  if not(normalized_refname.has_prefix("refs/")) {
+  if !(normalized_refname.has_prefix("refs/")) {
     return None
   }
   if resolve_symbolic_ref_target(fs, git_dir, normalized_refname) is Some(_) {
@@ -108,7 +108,7 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
         message = Some(args[i + 1])
         i += 1
       }
-      _ if not(arg.has_prefix("-")) => positional.push(arg)
+      _ if !(arg.has_prefix("-")) => positional.push(arg)
       _ if arg.has_prefix("-") => warn_unimplemented_arg("update-ref", arg)
       _ => ()
     }
@@ -218,7 +218,7 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
               }
             }
           }
-          if not(ok) {
+          if !(ok) {
             eprint_line("fatal: update-ref: verify failed for " + tokens[1])
             @sys.exit(1)
           }
@@ -241,7 +241,7 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
     let refname = resolve_update_target_ref(
       fs, actual_git_dir, input_refname, no_deref,
     )
-    if not(no_deref) &&
+    if !(no_deref) &&
       has_symbolic_ref_cycle(fs, actual_git_dir, input_refname) {
       @stdio.stderr.write(
         "error: cannot lock ref '\{input_refname}': unable to resolve reference '\{input_refname}'",
@@ -336,7 +336,7 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
   let refname = resolve_update_target_ref(
     fs, actual_git_dir, input_refname, no_deref,
   )
-  if not(no_deref) && has_symbolic_ref_cycle(fs, actual_git_dir, input_refname) {
+  if !(no_deref) && has_symbolic_ref_cycle(fs, actual_git_dir, input_refname) {
     @stdio.stderr.write(
       "error: cannot lock ref '\{input_refname}': unable to resolve reference '\{input_refname}'",
     )
@@ -389,7 +389,7 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
     None => ""
     Some(i) => String::unsafe_substring(ref_path, start=0, end=i)
   }
-  if dir.length() > 0 && not(fs.is_dir(dir)) {
+  if dir.length() > 0 && !(fs.is_dir(dir)) {
     fs.mkdir_p(dir)
   }
   // Write the ref
@@ -469,14 +469,14 @@ fn resolve_symbolic_ref_target(
   let mut depth = 0
   while depth < 8 {
     let ref_path = git_dir + "/" + current
-    if not(fs.is_file(ref_path)) {
+    if !(fs.is_file(ref_path)) {
       return if current == refname { None } else { Some(current) }
     }
     let content = decode_bytes(fs.read_file(ref_path)) catch {
       _ => return if current == refname { None } else { Some(current) }
     }
     let line = trim_chars(content, " \t\r\n")
-    if not(line.has_prefix("ref: ")) {
+    if !(line.has_prefix("ref: ")) {
       return if current == refname { None } else { Some(current) }
     }
     current = String::unsafe_substring(line, start=5, end=line.length())
@@ -518,7 +518,7 @@ fn delete_packed_ref_entry(
   refname : String,
 ) -> Unit raise Error {
   let packed_refs_path = git_dir + "/packed-refs"
-  if not(fs.is_file(packed_refs_path)) {
+  if !(fs.is_file(packed_refs_path)) {
     return ()
   }
   let content = decode_bytes(fs.read_file(packed_refs_path)) catch {
@@ -536,8 +536,8 @@ fn delete_packed_ref_entry(
     }
     skip_peeled = false
     if line.length() > 0 &&
-      not(line.has_prefix("#")) &&
-      not(line.has_prefix("^")) {
+      !(line.has_prefix("#")) &&
+      !(line.has_prefix("^")) {
       let space_idx = line.find(" ")
       match space_idx {
         Some(i) => {
@@ -579,14 +579,14 @@ fn has_symbolic_ref_cycle(
     }
     visited.push(current)
     let ref_path = git_dir + "/" + current
-    if not(fs.is_file(ref_path)) {
+    if !(fs.is_file(ref_path)) {
       return false
     }
     let content = decode_bytes(fs.read_file(ref_path)) catch {
       _ => return false
     }
     let line = trim_chars(content, " \t\r\n")
-    if not(line.has_prefix("ref: ")) {
+    if !(line.has_prefix("ref: ")) {
       return false
     }
     current = String::unsafe_substring(line, start=5, end=line.length())
@@ -750,7 +750,7 @@ async fn handle_update_ref_reftable(
       "-d" | "--delete" => delete_mode = true
       "--create-reflog" | "--no-deref" => ()
       "-m" if i + 1 < args.length() => i += 1
-      _ if not(arg.has_prefix("-")) => positional.push(arg)
+      _ if !(arg.has_prefix("-")) => positional.push(arg)
       _ => ()
     }
     i += 1
@@ -772,7 +772,7 @@ async fn handle_update_ref_reftable(
     0UL
   }
   let next_index = max_update_index + 1UL
-  if not(delete_mode) && positional.length() < 2 {
+  if !(delete_mode) && positional.length() < 2 {
     @stdio.stderr.write("fatal: update-ref requires a value argument\n")
     @sys.exit(1)
   }

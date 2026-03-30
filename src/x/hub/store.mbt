@@ -326,9 +326,9 @@ fn compare_clock(a : Map[String, Int64], b : Map[String, Int64]) -> Int {
       b_gt = true
     }
   }
-  if a_gt && not(b_gt) {
+  if a_gt && !(b_gt) {
     1
-  } else if b_gt && not(a_gt) {
+  } else if b_gt && !(a_gt) {
     -1
   } else {
     0
@@ -451,10 +451,10 @@ pub fn merge_record_bytes_with_policy(
   let theirs_text = @utf8.decode_lossy(theirs[:])
   let ours_record = parse_hub_record(ours_text)
   let theirs_record = parse_hub_record(theirs_text)
-  if (ours_record |> is_valid_record |> not) && is_valid_record(theirs_record) {
+  if !(ours_record |> is_valid_record) && is_valid_record(theirs_record) {
     return theirs
   }
-  if (theirs_record |> is_valid_record |> not) {
+  if !(theirs_record |> is_valid_record) {
     return ours
   }
   let winner = select_merge_winner(ours_record, theirs_record, conflict_policy)
@@ -528,9 +528,9 @@ fn verify_record_by_policy(store : HubStore, record : HubRecord) -> Bool {
     Some(key) =>
       match record.signature {
         Some(_) => verify_record_signature(record, key)
-        None => not(store.require_signed)
+        None => !(store.require_signed)
       }
-    None => not(store.require_signed)
+    None => !(store.require_signed)
   }
 }
 
@@ -563,7 +563,7 @@ pub fn HubStore::get_record(
         Some(blob_obj) => {
           let text = @utf8.decode_lossy(blob_obj.data[:])
           let record = parse_hub_record(text)
-          if not(verify_record_by_policy(self, record)) {
+          if !(verify_record_by_policy(self, record)) {
             None
           } else if record.deleted {
             None
@@ -682,13 +682,13 @@ pub fn HubStore::list_records(
       Some(blob_obj) => {
         let text = @utf8.decode_lossy(blob_obj.data[:])
         let record = parse_hub_record(text)
-        if not(verify_record_by_policy(self, record)) {
+        if !(verify_record_by_policy(self, record)) {
           continue
         }
-        if not(record.key.has_prefix(prefix)) {
+        if !(record.key.has_prefix(prefix)) {
           continue
         }
-        if not(include_deleted_val) && record.deleted {
+        if !(include_deleted_val) && record.deleted {
           continue
         }
         result.push(record)

@@ -119,7 +119,7 @@ fn reflog_list_all_refs(
 ) -> Array[String] raise Error {
   let logs_dir = git_dir + "/logs"
   let refs : Array[String] = []
-  if not(rfs.is_dir(logs_dir)) {
+  if !(rfs.is_dir(logs_dir)) {
     return refs
   }
   reflog_walk_logs_dir(rfs, logs_dir, "", refs)
@@ -333,7 +333,7 @@ async fn handle_reflog(args : Array[String]) -> Unit raise Error {
             start=at_idx + 2,
             end=close_idx,
           )
-          let n = @strconv.parse_int(n_str) catch {
+          let n = @string.parse_int(n_str) catch {
             _ => {
               eprint_line("fatal: invalid reflog entry index: \{n_str}")
               @sys.exit(1)
@@ -442,7 +442,7 @@ async fn handle_reflog_expire(
   } else if parsed.refs.length() > 0 {
     for ref_arg in parsed.refs {
       let normalized = normalize_reflog_refname(rfs, git_dir, ref_arg)
-      if not(reflog_ref_exists_or_resolves(rfs, git_dir, normalized)) {
+      if !(reflog_ref_exists_or_resolves(rfs, git_dir, normalized)) {
         raise @bitcore.GitError::InvalidObject(
           "error: reflog could not be found: '\{ref_arg}'",
         )
@@ -517,7 +517,7 @@ async fn reflog_expire_single_ref(
       new_lines.push(line)
     }
   }
-  if not(dry_run) {
+  if !(dry_run) {
     let new_content = if new_lines.length() > 0 {
       new_lines.join("\n") + "\n"
     } else {
@@ -599,7 +599,7 @@ async fn show_reflog(
         break
       }
       let message = "commit: " + entry.message
-      if not(
+      if !(
           grep_patterns_match_message(
             message, grep_patterns, grep_pattern_type, grep_ignore_case,
           ),
@@ -626,7 +626,7 @@ async fn show_reflog(
     }
     let idx = len - 1 - i
     let entry = entries[idx]
-    if not(
+    if !(
         grep_patterns_match_message(
           entry.message,
           grep_patterns,
@@ -702,7 +702,7 @@ fn parse_reflog_show_args(args : Array[String]) -> ReflogShowArgs {
         grep_pattern_type_override = Some(GrepPatternType::Basic)
       _ if arg.has_prefix("-") => ()
       _ =>
-        if not(has_refname) {
+        if !(has_refname) {
           refname = arg
           has_refname = true
         }
@@ -780,12 +780,12 @@ fn parse_reflog_max_count_value(value : String) -> Int? {
       return None
     }
   }
-  Some(@strconv.parse_int(value) catch { _ => return None })
+  Some(@string.parse_int(value) catch { _ => return None })
 }
 
 ///|
 fn reflog_parse_short_max_count(arg : String) -> Int? {
-  if arg.length() <= 1 || not(arg.has_prefix("-")) {
+  if arg.length() <= 1 || !(arg.has_prefix("-")) {
     return None
   }
   parse_reflog_max_count_value(

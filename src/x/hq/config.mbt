@@ -17,13 +17,13 @@ pub fn load_config(
   let home = env_get("HOME").unwrap_or("/home/user")
   // Check BHQ_ROOT environment variable first
   match env_get("BHQ_ROOT") {
-    Some(root) if not(root.is_empty()) =>
+    Some(root) if !(root.is_empty()) =>
       HqConfig::new(expand_home_with(root, home))
     _ =>
       // If ghq_compat mode, check ghq.root
       if ghq_compat {
         match bit_config_get("ghq.root") {
-          Some(root) if not(root.is_empty()) =>
+          Some(root) if !(root.is_empty()) =>
             HqConfig::new(expand_home_with(root, home), ghq_compat=true)
           _ => HqConfig::new(expand_home_with(default_bhq_root, home))
         }

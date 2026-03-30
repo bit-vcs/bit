@@ -79,9 +79,9 @@ async fn handle_for_each_repo(args : Array[String]) -> Unit raise Error {
     // Expand ~ to HOME
     let path = for_each_repo_expand_path(val)
     // Check if directory exists
-    if not(rfs.is_dir(path)) {
+    if !(rfs.is_dir(path)) {
       eprint_line("error: cannot change to '\{path}'")
-      if not(keep_going) {
+      if !(keep_going) {
         @sys.exit(1)
       }
       result = 1
@@ -89,7 +89,7 @@ async fn handle_for_each_repo(args : Array[String]) -> Unit raise Error {
     }
     let ret = run_git_command(command_args, cwd=Some(path))
     if ret != 0 {
-      if not(keep_going) {
+      if !(keep_going) {
         @sys.exit(ret)
       }
       result = 1

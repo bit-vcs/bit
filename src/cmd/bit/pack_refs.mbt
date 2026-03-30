@@ -21,8 +21,8 @@ fn handle_pack_refs(args : Array[String]) -> Unit raise Error {
     for line_view in content.split("\n") {
       let line = line_view.to_string()
       if line.length() > 0 &&
-        not(line.has_prefix("#")) &&
-        not(line.has_prefix("^")) {
+        !(line.has_prefix("#")) &&
+        !(line.has_prefix("^")) {
         let parts : Array[String] = line
           .split(" ")
           .map(v => v.to_string())
@@ -70,7 +70,7 @@ fn collect_refs_to_pack(
   refs : Array[(String, String)],
   all : Bool,
 ) -> Unit raise Error {
-  if not(fs.is_dir(dir)) {
+  if !(fs.is_dir(dir)) {
     return
   }
   let entries = fs.readdir(dir)

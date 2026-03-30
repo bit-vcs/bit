@@ -31,10 +31,10 @@ async fn handle_ls_tree(args : Array[String]) -> Unit raise Error {
       _ if arg.has_prefix("--format=") => format_str = Some(arg[9:].to_string())
       _ if arg.has_prefix("--abbrev=") => {
         let v = arg[9:].to_string()
-        _abbrev = Some(@strconv.parse_int(v)) catch { _ => Some(7) }
+        _abbrev = Some(@string.parse_int(v)) catch { _ => Some(7) }
       }
       "--abbrev" => _abbrev = Some(7)
-      _ if not(arg.has_prefix("-")) => positional.push(arg)
+      _ if !(arg.has_prefix("-")) => positional.push(arg)
       _ if arg.has_prefix("-") => warn_unimplemented_arg("ls-tree", arg)
       _ => ()
     }
@@ -246,7 +246,7 @@ async fn print_tree_entries(
       }
       (match_found, recurse_needed)
     }
-    if not(matches_filter) && not(should_recurse_for_filter) {
+    if !(matches_filter) && !(should_recurse_for_filter) {
       continue
     }
     // Skip submodule entries when recurse_submodules is enabled
@@ -298,13 +298,13 @@ async fn print_tree_entries(
     // With -d, only show tree entries
     // With -r, don't print tree entries unless -t is also specified
     // With -t and path filters, show tree entries we're traversing through
-    let should_print = if not(matches_filter) &&
-      not(show_trees && should_recurse_for_filter && is_tree) {
+    let should_print = if !(matches_filter) &&
+      !(show_trees && should_recurse_for_filter && is_tree) {
       false // Don't print if path doesn't match filters (unless -t and traversing trees)
     } else if only_trees {
       is_tree || is_submodule // Print tree and submodule (commit) entries
     } else {
-      not(recursive) || not(is_tree) || show_trees
+      !(recursive) || !(is_tree) || show_trees
     }
     if should_print {
       let display_path = make_display_path(path, cwd_prefix)
@@ -540,7 +540,7 @@ fn c_quote_path(path : String) -> String {
       break
     }
   }
-  if not(needs_quote) {
+  if !(needs_quote) {
     return path
   }
   let buf = StringBuilder::new()

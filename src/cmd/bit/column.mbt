@@ -28,7 +28,7 @@ async fn handle_column(args : Array[String]) -> Unit raise Error {
       _ if arg.has_prefix("--raw-mode=") => {
         let val = String::unsafe_substring(arg, start=11, end=arg.length())
         // Raw mode is a numeric value
-        let n = @strconv.parse_int(val) catch { _ => 0 }
+        let n = @string.parse_int(val) catch { _ => 0 }
         // Bit 0-1: layout (0=column, 1=row, 2=plain)
         let layout = n & 0x3
         match layout {
@@ -39,11 +39,11 @@ async fn handle_column(args : Array[String]) -> Unit raise Error {
       }
       _ if arg.has_prefix("--width=") => {
         let val = String::unsafe_substring(arg, start=8, end=arg.length())
-        width = @strconv.parse_int(val) catch { _ => 80 }
+        width = @string.parse_int(val) catch { _ => 80 }
       }
       _ if arg.has_prefix("--padding=") => {
         let val = String::unsafe_substring(arg, start=10, end=arg.length())
-        padding = @strconv.parse_int(val) catch { _ => 1 }
+        padding = @string.parse_int(val) catch { _ => 1 }
       }
       _ if arg.has_prefix("--indent=") => () // accept but ignore
       _ if arg.has_prefix("-") => warn_unimplemented_arg("column", arg)

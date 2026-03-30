@@ -108,8 +108,8 @@ async fn bisect_start(
     if arg == "--" {
       break
     }
-    if not(arg.has_prefix("-")) {
-      if not(bad_set) {
+    if !(arg.has_prefix("-")) {
+      if !(bad_set) {
         bisect_mark(wfs, rfs, git_dir, ["bad", arg], "bad")
         bad_set = true
       } else {
@@ -132,7 +132,7 @@ async fn bisect_mark(
   let bisect_start_path = git_dir + "/BISECT_START"
   let bisect_log_path = git_dir + "/BISECT_LOG"
   let bisect_refs_dir = git_dir + "/refs/bisect"
-  if not(rfs.is_file(bisect_start_path)) {
+  if !(rfs.is_file(bisect_start_path)) {
     @stdio.stderr.write("error: not in a bisect session")
     @stdio.stderr.write("use 'git bisect start' first")
     @sys.exit(1)
@@ -172,7 +172,7 @@ async fn bisect_skip(
   let bisect_start_path = git_dir + "/BISECT_START"
   let bisect_log_path = git_dir + "/BISECT_LOG"
   let bisect_refs_dir = git_dir + "/refs/bisect"
-  if not(rfs.is_file(bisect_start_path)) {
+  if !(rfs.is_file(bisect_start_path)) {
     @stdio.stderr.write("error: not in a bisect session")
     @sys.exit(1)
   }
@@ -202,7 +202,7 @@ fn bisect_compute_next(
 ) -> BisectNextResult raise Error {
   let bisect_refs_dir = git_dir + "/refs/bisect"
   let bad_path = bisect_refs_dir + "/bad"
-  if not(rfs.is_file(bad_path)) {
+  if !(rfs.is_file(bad_path)) {
     return Waiting("status: waiting for bad commit")
   }
   let bad_hex = rfs.read_file(bad_path) |> decode_bytes |> trim_string
@@ -454,7 +454,7 @@ async fn bisect_replay(
   }
   let filename = args[1]
   let fs = OsFs::new()
-  if not(fs.is_file(filename)) {
+  if !(fs.is_file(filename)) {
     raise @bitcore.GitError::InvalidObject(
       "cannot read file '\{filename}' for replaying",
     )
@@ -507,7 +507,7 @@ async fn bisect_visualize(
 ) -> Unit raise Error {
   let bisect_refs_dir = git_dir + "/refs/bisect"
   let bad_path = bisect_refs_dir + "/bad"
-  if not(rfs.is_file(bad_path)) {
+  if !(rfs.is_file(bad_path)) {
     raise @bitcore.GitError::InvalidObject(
       "bisect visualize requires a bad commit",
     )
@@ -543,7 +543,7 @@ async fn bisect_terms(
   _args : Array[String],
 ) -> Unit raise Error {
   let bisect_terms_path = git_dir + "/BISECT_TERMS"
-  if not(rfs.is_file(bisect_terms_path)) {
+  if !(rfs.is_file(bisect_terms_path)) {
     raise @bitcore.GitError::InvalidObject("no terms saved")
   }
   let content = decode_bytes(rfs.read_file(bisect_terms_path))
@@ -644,7 +644,7 @@ async fn bisect_log(
   git_dir : String,
 ) -> Unit raise Error {
   let bisect_log_path = git_dir + "/BISECT_LOG"
-  if not(rfs.is_file(bisect_log_path)) {
+  if !(rfs.is_file(bisect_log_path)) {
     @stdio.stderr.write("error: no bisect log found")
     @sys.exit(1)
   }

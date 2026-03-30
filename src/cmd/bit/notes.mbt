@@ -70,7 +70,7 @@ async fn handle_notes(args : Array[String]) -> Unit raise Error {
             i += 1
             continue
           }
-          _ if not(arg.has_prefix("-")) => {
+          _ if !(arg.has_prefix("-")) => {
             commit_ref = arg
             i += 1
             continue
@@ -106,7 +106,7 @@ async fn handle_notes(args : Array[String]) -> Unit raise Error {
             i += 1
             continue
           }
-          _ if not(arg.has_prefix("-")) => {
+          _ if !(arg.has_prefix("-")) => {
             commit_ref = arg
             i += 1
             continue
@@ -142,7 +142,7 @@ async fn handle_notes(args : Array[String]) -> Unit raise Error {
             i += 1
             continue
           }
-          _ if not(arg.has_prefix("-")) => {
+          _ if !(arg.has_prefix("-")) => {
             commit_ref = arg
             i += 1
             continue
@@ -169,7 +169,7 @@ async fn handle_notes(args : Array[String]) -> Unit raise Error {
             i += 1
             continue
           }
-          _ if not(arg.has_prefix("-")) => {
+          _ if !(arg.has_prefix("-")) => {
             if from_ref is None {
               from_ref = Some(arg)
             } else if to_ref is None {
@@ -215,7 +215,7 @@ async fn handle_notes(args : Array[String]) -> Unit raise Error {
             i += 1
             continue
           }
-          _ if not(arg.has_prefix("-")) => {
+          _ if !(arg.has_prefix("-")) => {
             other_ref = Some(arg)
             i += 1
             continue
@@ -262,7 +262,7 @@ async fn handle_notes(args : Array[String]) -> Unit raise Error {
             i += 1
             continue
           }
-          _ if not(arg.has_prefix("-")) => {
+          _ if !(arg.has_prefix("-")) => {
             if from_ref is None {
               from_ref = Some(arg)
             } else if to_ref is None {
@@ -328,7 +328,7 @@ async fn notes_list(
   git_dir : String,
   notes_ref_path : String,
 ) -> Unit raise Error {
-  if not(rfs.is_file(notes_ref_path)) {
+  if !(rfs.is_file(notes_ref_path)) {
     return
   }
   let ref_content = decode_bytes(rfs.read_file(notes_ref_path))
@@ -361,7 +361,7 @@ async fn notes_show(
   }
   let target_hex = tid.to_hex()
   // Check if notes ref exists
-  if not(rfs.is_file(notes_ref_path)) {
+  if !(rfs.is_file(notes_ref_path)) {
     @stdio.stderr.write("error: no note found for \{target_hex}")
     @sys.exit(1)
   }
@@ -441,7 +441,7 @@ async fn notes_add(
             let existing = @bitcore.parse_tree(to.data)
             for e in existing {
               if e.name == target_hex {
-                if not(force) {
+                if !(force) {
                   @stdio.stderr.write(
                     "error: note already exists for \{target_hex}",
                   )
@@ -603,7 +603,7 @@ async fn notes_copy(
     @sys.exit(1)
   }
   // Load notes tree
-  if not(rfs.is_file(notes_ref_path)) {
+  if !(rfs.is_file(notes_ref_path)) {
     @stdio.stderr.write("error: no note found for \{from_hex}")
     @sys.exit(1)
   }
@@ -645,7 +645,7 @@ async fn notes_copy(
     @stdio.stderr.write("error: no note found for \{from_hex}")
     @sys.exit(1)
   }
-  if dest_exists && not(force) {
+  if dest_exists && !(force) {
     @stdio.stderr.write("error: note already exists for \{to_hex}")
     @sys.exit(1)
   }
@@ -687,7 +687,7 @@ async fn notes_remove(
   }
   let target_hex = tid.to_hex()
   // Check if notes ref exists
-  if not(rfs.is_file(notes_ref_path)) {
+  if !(rfs.is_file(notes_ref_path)) {
     @stdio.stderr.write("error: no note found for \{target_hex}")
     @sys.exit(1)
   }
@@ -717,7 +717,7 @@ async fn notes_remove(
       entries.push(e)
     }
   }
-  if not(found) {
+  if !(found) {
     @stdio.stderr.write("error: no note found for \{target_hex}")
     @sys.exit(1)
   }
@@ -753,7 +753,7 @@ async fn notes_prune(
   notes_ref_path : String,
 ) -> Unit raise Error {
   // Check if notes ref exists
-  if not(rfs.is_file(notes_ref_path)) {
+  if !(rfs.is_file(notes_ref_path)) {
     return
   }
   let ref_content = decode_bytes(rfs.read_file(notes_ref_path))
@@ -813,7 +813,7 @@ async fn load_notes_tree(
   git_dir : String,
   notes_ref_path : String,
 ) -> (@bitcore.ObjectId, Array[@bitcore.TreeEntry])? raise Error {
-  if not(rfs.is_file(notes_ref_path)) {
+  if !(rfs.is_file(notes_ref_path)) {
     return None
   }
   let ref_content = decode_bytes(rfs.read_file(notes_ref_path))
@@ -1075,7 +1075,7 @@ async fn notes_rewrite(
     }
   }
   guard source is Some(src) else { return }
-  if dest_exists && not(force) {
+  if dest_exists && !(force) {
     @stdio.stderr.write("error: note already exists for \{to_hex}")
     @sys.exit(1)
   }

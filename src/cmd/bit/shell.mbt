@@ -75,7 +75,7 @@ fn shell_parse_interactive_command(line : String) -> (String, Array[String]) {
 async fn shell_read_interactive_command_line() -> String {
   let line_bytes : Array[Byte] = []
   let mut done = false
-  while not(done) {
+  while !(done) {
     match @stdio.stdin.read_some(max_len=256) {
       None => break
       Some(chunk) =>
@@ -130,7 +130,7 @@ async fn shell_run_service_command(command_line : String) -> Unit raise Error {
 ///|
 async fn shell_run_interactive(fs : OsFs) -> Unit {
   let command_line = shell_read_interactive_command_line()
-  if not(fs.is_dir("git-shell-commands")) {
+  if !(fs.is_dir("git-shell-commands")) {
     eprint_line("fatal: interactive git shell is not enabled")
     @sys.exit(1)
   }
@@ -140,12 +140,12 @@ async fn shell_run_interactive(fs : OsFs) -> Unit {
   let (command_name, command_args) = shell_parse_interactive_command(
     command_line,
   )
-  if not(shell_is_safe_interactive_name(command_name)) {
+  if !(shell_is_safe_interactive_name(command_name)) {
     eprint_line("fatal: unrecognized command")
     @sys.exit(1)
   }
   let script_path = "git-shell-commands/" + command_name
-  if not(fs.is_file(script_path)) {
+  if !(fs.is_file(script_path)) {
     eprint_line("fatal: unrecognized command")
     @sys.exit(1)
   }

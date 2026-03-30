@@ -48,7 +48,7 @@ async fn handle_grep(args : Array[String]) -> Unit raise Error {
     if options_terminated {
       if use_expr && grep_expr_expects_pattern(expr_tokens) {
         grep_push_expr_pattern(expr_tokens, arg)
-      } else if not(use_expr) && patterns.length() == 0 {
+      } else if !(use_expr) && patterns.length() == 0 {
         grep_append_pattern(patterns, expr_tokens, use_expr, arg)
       } else if arg == "--" {
         pathspec_only = true
@@ -235,7 +235,7 @@ async fn handle_grep(args : Array[String]) -> Unit raise Error {
         i += 1
       }
       "--and" => {
-        if not(use_expr) {
+        if !(use_expr) {
           grep_move_patterns_to_expr_tokens(patterns, expr_tokens)
           use_expr = true
         }
@@ -243,7 +243,7 @@ async fn handle_grep(args : Array[String]) -> Unit raise Error {
         i += 1
       }
       "--or" => {
-        if not(use_expr) {
+        if !(use_expr) {
           grep_move_patterns_to_expr_tokens(patterns, expr_tokens)
           use_expr = true
         }
@@ -251,7 +251,7 @@ async fn handle_grep(args : Array[String]) -> Unit raise Error {
         i += 1
       }
       "--not" => {
-        if not(use_expr) {
+        if !(use_expr) {
           grep_move_patterns_to_expr_tokens(patterns, expr_tokens)
           use_expr = true
         }
@@ -290,7 +290,7 @@ async fn handle_grep(args : Array[String]) -> Unit raise Error {
       }
       "--recursive" => i += 1
       "--max-depth" if i + 1 < args.length() => {
-        max_depth = @strconv.parse_int(args[i + 1]) catch {
+        max_depth = @string.parse_int(args[i + 1]) catch {
           _ =>
             raise @bitcore.GitError::InvalidObject(
               "fatal: invalid max count: " + args[i + 1],
@@ -300,7 +300,7 @@ async fn handle_grep(args : Array[String]) -> Unit raise Error {
       }
       _ if arg.has_prefix("--max-depth=") => {
         let value = String::unsafe_substring(arg, start=12, end=arg.length())
-        max_depth = @strconv.parse_int(value) catch {
+        max_depth = @string.parse_int(value) catch {
           _ =>
             raise @bitcore.GitError::InvalidObject(
               "fatal: invalid max count: " + value,
@@ -375,7 +375,7 @@ async fn handle_grep(args : Array[String]) -> Unit raise Error {
       "--threads" if i + 1 < args.length() => i += 2
       _ if arg.has_prefix("--threads=") => i += 1
       "(" | "\\(" => {
-        if not(use_expr) {
+        if !(use_expr) {
           grep_move_patterns_to_expr_tokens(patterns, expr_tokens)
           use_expr = true
         }
@@ -383,24 +383,24 @@ async fn handle_grep(args : Array[String]) -> Unit raise Error {
         i += 1
       }
       ")" | "\\)" => {
-        if not(use_expr) {
+        if !(use_expr) {
           grep_move_patterns_to_expr_tokens(patterns, expr_tokens)
           use_expr = true
         }
         expr_tokens.push(@bitgrep.GrepExprToken::RParen)
         i += 1
       }
-      _ if not(arg.has_prefix("-")) => {
+      _ if !(arg.has_prefix("-")) => {
         if use_expr && grep_expr_expects_pattern(expr_tokens) {
           grep_push_expr_pattern(expr_tokens, arg)
-        } else if not(use_expr) && patterns.length() == 0 {
+        } else if !(use_expr) && patterns.length() == 0 {
           grep_append_pattern(patterns, expr_tokens, use_expr, arg)
         } else if no_index &&
           treeish is None &&
           grep_has_future_pathspec_separator(args, i + 1) &&
           grep_token_is_treeish(fs, git_dir, arg) {
           treeish = Some(arg)
-        } else if not(no_index) &&
+        } else if !(no_index) &&
           treeish is None &&
           paths.length() == 0 &&
           (
@@ -542,7 +542,7 @@ async fn handle_grep(args : Array[String]) -> Unit raise Error {
         )
       }
   }
-  let raw_matches = if recurse_submodules && not(no_index) && treeish is None {
+  let raw_matches = if recurse_submodules && !(no_index) && treeish is None {
     grep_merge_file_matches(
       raw_matches,
       grep_collect_recurse_submodule_matches(
@@ -554,7 +554,7 @@ async fn handle_grep(args : Array[String]) -> Unit raise Error {
     raw_matches
   }
   let matches = grep_limit_file_matches(raw_matches, max_count)
-  if quiet && not(files_without_match) {
+  if quiet && !(files_without_match) {
     if matches.length() > 0 {
       return
     }
@@ -624,7 +624,7 @@ async fn handle_grep(args : Array[String]) -> Unit raise Error {
       let display_path = grep_format_output_path_raw(
         search_root, treeish, path, show_full_name,
       )
-      if not(quiet) {
+      if !(quiet) {
         grep_print_path_atom(display_path, null_terminated)
       }
     }
@@ -634,7 +634,7 @@ async fn handle_grep(args : Array[String]) -> Unit raise Error {
       }
       @sys.exit(1)
     }
-    if not(had_output) {
+    if !(had_output) {
       @sys.exit(1)
     }
     return
@@ -669,7 +669,7 @@ async fn handle_grep(args : Array[String]) -> Unit raise Error {
       if printed_any {
         if show_break {
           print_line("")
-        } else if not(show_heading) {
+        } else if !(show_heading) {
           print_line(grep_color_wrap("--", color_spec.separator))
         }
       }
@@ -686,7 +686,7 @@ async fn handle_grep(args : Array[String]) -> Unit raise Error {
       if printed_any {
         if show_break {
           print_line("")
-        } else if not(show_heading) {
+        } else if !(show_heading) {
           print_line(grep_color_wrap("--", color_spec.separator))
         }
       }
@@ -924,7 +924,7 @@ fn grep_expr_expects_pattern(
 
 ///|
 fn grep_parse_context_length(value : String) -> Int raise Error {
-  let parsed = @strconv.parse_int(value) catch {
+  let parsed = @string.parse_int(value) catch {
     _ =>
       raise @bitcore.GitError::InvalidObject(
         "fatal: invalid context length argument: " + value,
@@ -940,7 +940,7 @@ fn grep_parse_context_length(value : String) -> Int raise Error {
 
 ///|
 fn grep_parse_max_count(value : String) -> Int raise Error {
-  @strconv.parse_int(value) catch {
+  @string.parse_int(value) catch {
     _ =>
       raise @bitcore.GitError::InvalidObject(
         "fatal: invalid max count: " + value,
@@ -1181,7 +1181,7 @@ fn grep_build_prefix(
 ) -> String {
   let sep = sign.to_string()
   let out = StringBuilder::new()
-  if not(show_heading) {
+  if !(show_heading) {
     out.write_string(grep_color_wrap(file_path, color_spec.filename))
     out.write_string(grep_color_wrap(sep, color_spec.separator))
   }
@@ -1236,7 +1236,7 @@ async fn grep_print_file_match_with_context(
   )
   let matched_columns : Map[Int, Int] = {}
   for item in file_match.matches {
-    if not(matched_columns.contains(item.line_number)) {
+    if !(matched_columns.contains(item.line_number)) {
       matched_columns[item.line_number] = item.column
     }
   }
@@ -1289,7 +1289,7 @@ async fn grep_print_file_match_with_context(
     } else {
       None
     }
-    if not(first_range) {
+    if !(first_range) {
       print_line(grep_color_wrap("--", color_spec.separator))
     }
     first_range = false
@@ -1392,14 +1392,14 @@ async fn grep_print_whole_function_match(
   }
   let matched_columns : Map[Int, Int] = {}
   for item in file_match.matches {
-    if not(matched_columns.contains(item.line_number)) {
+    if !(matched_columns.contains(item.line_number)) {
       matched_columns[item.line_number] = item.column
     }
   }
   let mut first_range = true
   for i in 0..<printed_ranges.length() {
     let (range_start, range_end) = printed_ranges[i]
-    if not(first_range) {
+    if !(first_range) {
       print_line(grep_color_wrap("--", color_spec.separator))
     }
     first_range = false
@@ -1614,7 +1614,7 @@ fn grep_extend_header_to_leading_comments(
   let mut current = header_line
   while current > 1 {
     let prev = trim_string(lines[current - 2])
-    if prev == "" || not(prev.has_prefix("#")) {
+    if prev == "" || !(prev.has_prefix("#")) {
       break
     }
     current -= 1
@@ -1902,11 +1902,11 @@ async fn grep_resolve_no_index_paths(
       normalize_path(root + "/" + raw_path)
     }
     let exists = fs.is_file(abs_path) || fs.is_dir(abs_path)
-    if not(exists) {
+    if !(exists) {
       eprint_line("fatal: no such path in the working tree: '" + raw_path + "'")
       @sys.exit(128)
     }
-    if not(grep_path_is_within_root(normalized_root, abs_path)) {
+    if !(grep_path_is_within_root(normalized_root, abs_path)) {
       eprint_line("fatal: '" + raw_path + "' is outside the directory tree")
       @sys.exit(128)
     }
@@ -1981,7 +1981,7 @@ fn grep_collect_recurse_submodule_matches(
     let submodule_paths = grep_submodule_relative_paths(paths, full_path)
     guard submodule_paths is Some(local_paths) else { continue }
     let sub_root = root + "/" + entry.path
-    if not(fs.is_dir(sub_root)) {
+    if !(fs.is_dir(sub_root)) {
       continue
     }
     let sub_git_dir = resolve_git_dir(fs, sub_root)
@@ -2164,7 +2164,7 @@ fn grep_invocation_repo_relative_path(root : String) -> String? {
     return Some("")
   }
   let root_prefix = normalized_root + "/"
-  if not(normalized_cwd.has_prefix(root_prefix)) {
+  if !(normalized_cwd.has_prefix(root_prefix)) {
     return None
   }
   Some(

@@ -33,5 +33,5 @@ async test "ignore async: symlink dir is not traversed" {
   let files = @bitlib.list_working_files_async(fs, root)
   assert_true(files.contains("real/file.txt"))
   assert_true(files.contains("link"))
-  assert_true(not(files.contains("link/file.txt")))
+  assert_true(!(files.contains("link/file.txt")))
 }

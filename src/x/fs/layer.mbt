@@ -64,7 +64,7 @@ pub fn Fs::flatten_layers(
   backing_fs : &@bit.FileSystem,
   rfs : &@bit.RepoFileSystem,
 ) -> @bit.ObjectId raise @bit.GitError {
-  if self.layers.length() == 0 && not(self.working.is_dirty()) {
+  if self.layers.length() == 0 && !(self.working.is_dirty()) {
     return self.base_tree
   }
   let root = TreeNode::new_dir()

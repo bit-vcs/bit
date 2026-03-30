@@ -45,11 +45,11 @@ async fn handle_check_ref_format(args : Array[String]) -> Unit raise Error {
   if normalize {
     // Normalize first (collapse slashes), then validate
     let normalized = check_ref_format_normalize(refname)
-    if not(check_ref_format_valid(normalized, allow_onelevel~)) {
+    if !(check_ref_format_valid(normalized, allow_onelevel~)) {
       @sys.exit(1)
     }
     print_line(normalized)
-  } else if not(check_ref_format_valid(refname, allow_onelevel~)) {
+  } else if !(check_ref_format_valid(refname, allow_onelevel~)) {
     @sys.exit(1)
   }
 }
@@ -123,7 +123,7 @@ fn check_ref_format_valid(
     i += 1
   }
   // Must have at least one slash unless allow_onelevel
-  if not(has_slash) && not(allow_onelevel) {
+  if !(has_slash) && !(allow_onelevel) {
     return false
   }
   true
@@ -137,7 +137,7 @@ fn check_ref_format_normalize(refname : String) -> String {
   let mut prev_slash = false
   for c in chars {
     if c == '/' {
-      if not(prev_slash) {
+      if !(prev_slash) {
         result.write_char('/')
       }
       prev_slash = true

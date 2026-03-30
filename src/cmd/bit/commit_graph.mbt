@@ -7,7 +7,7 @@ async fn validate_commit_graph_hash_version(
 ) -> Unit {
   let rfs : &@bitcore.RepoFileSystem = fs
   let graph_path = git_dir + "/objects/info/commit-graph"
-  if not(rfs.is_file(graph_path)) {
+  if !(rfs.is_file(graph_path)) {
     return
   }
   let data = rfs.read_file(graph_path) catch { _ => return }
@@ -45,7 +45,7 @@ async fn check_commit_graph_paranoia(
   }
   let rfs : &@bitcore.RepoFileSystem = fs
   let graph_path = git_dir + "/objects/info/commit-graph"
-  if not(rfs.is_file(graph_path)) {
+  if !(rfs.is_file(graph_path)) {
     return
   }
   let data = rfs.read_file(graph_path) catch { _ => return }
@@ -116,7 +116,7 @@ async fn check_commit_graph_paranoia(
     // Check if object exists in the database (loose or packed)
     let hex = oid.to_hex()
     let exists = commit_graph_object_exists(db, rfs, hex)
-    if not(exists) {
+    if !(exists) {
       eprint_line(
         "error: commit \{hex} exists in commit-graph but not in the object database",
       )

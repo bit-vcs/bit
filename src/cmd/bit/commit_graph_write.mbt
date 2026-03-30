@@ -295,7 +295,7 @@ async fn write_commit_graph(
   }
   // Write file
   let info_dir = git_dir + "/objects/info"
-  if not(rfs.is_dir(info_dir)) {
+  if !(rfs.is_dir(info_dir)) {
     fs.mkdir_p(info_dir)
   }
   let graph_path = info_dir + "/commit-graph"
@@ -328,7 +328,7 @@ fn cgraph_walk_commits(
           out.push(id)
           let info = @bitcore.parse_commit(o.data) catch { _ => continue }
           for parent in info.parents {
-            if not(seen.contains(parent.to_hex())) {
+            if !(seen.contains(parent.to_hex())) {
               stack.push(parent)
             }
           }

@@ -39,7 +39,7 @@ async fn handle_am(args : Array[String]) -> Unit raise Error {
         directory = Some(
           String::unsafe_substring(arg, start=12, end=arg.length()),
         )
-      _ if not(arg.has_prefix("-")) => mbox_files.push(arg)
+      _ if !(arg.has_prefix("-")) => mbox_files.push(arg)
       _ => ()
     }
     i += 1
@@ -57,7 +57,7 @@ async fn handle_am(args : Array[String]) -> Unit raise Error {
         fs.write_string(git_dir + "/HEAD", orig_head + "\n")
       }
       remove_dir_recursive(fs, am_dir)
-      if not(quiet) {
+      if !(quiet) {
         print_line("Aborting.")
       }
     }
@@ -65,13 +65,13 @@ async fn handle_am(args : Array[String]) -> Unit raise Error {
   }
   // Handle --skip
   if skip {
-    if not(fs.is_dir(am_dir)) {
+    if !(fs.is_dir(am_dir)) {
       raise @bitcore.GitError::InvalidObject("No am in progress")
     }
     let next_file = am_dir + "/next"
     if fs.is_file(next_file) {
       let next = fs.read_file(next_file) |> decode_bytes |> trim_string
-      let n = @strconv.parse_int(next) catch {
+      let n = @string.parse_int(next) catch {
         err if @async.is_cancellation_error(err) => raise err
         _ => 1
       }
@@ -81,7 +81,7 @@ async fn handle_am(args : Array[String]) -> Unit raise Error {
   }
   // Handle --continue or apply new patches
   if continue_am {
-    if not(fs.is_dir(am_dir)) {
+    if !(fs.is_dir(am_dir)) {
       raise @bitcore.GitError::InvalidObject("No am in progress")
     }
     apply_remaining_patches(
@@ -95,7 +95,7 @@ async fn handle_am(args : Array[String]) -> Unit raise Error {
     let input = decode_bytes(input_bytes)
     if input.length() > 0 {
       fs.mkdir_p(am_dir)
-      let patches = parse_mbox(input, keep_cr && not(no_keep_cr))
+      let patches = parse_mbox(input, keep_cr && !(no_keep_cr))
       if patches.length() == 0 {
         remove_dir_recursive(fs, am_dir)
         raise @bitcore.GitError::InvalidObject("No patches found in input")
@@ -124,7 +124,7 @@ async fn handle_am(args : Array[String]) -> Unit raise Error {
     let all_patches : Array[MboxPatch] = []
     for file in mbox_files {
       let content = decode_bytes(fs.read_file(file))
-      let patches = parse_mbox(content, keep_cr && not(no_keep_cr))
+      let patches = parse_mbox(content, keep_cr && !(no_keep_cr))
       for p in patches {
         all_patches.push(p)
       }
@@ -277,11 +277,11 @@ async fn apply_remaining_patches(
 ) -> Unit raise Error {
   let last_str = fs.read_file(am_dir + "/last") |> decode_bytes |> trim_string
   let next_str = fs.read_file(am_dir + "/next") |> decode_bytes |> trim_string
-  let last = @strconv.parse_int(last_str) catch {
+  let last = @string.parse_int(last_str) catch {
     err if @async.is_cancellation_error(err) => raise err
     _ => 0
   }
-  let mut next = @strconv.parse_int(next_str) catch {
+  let mut next = @string.parse_int(next_str) catch {
     err if @async.is_cancellation_error(err) => raise err
     _ => 1
   }
@@ -289,7 +289,7 @@ async fn apply_remaining_patches(
     let patch_file = am_dir + "/" + zero_pad(next, 4)
     let msg_file = am_dir + "/msg-" + zero_pad(next, 4)
     let info_file = am_dir + "/info-" + zero_pad(next, 4)
-    if not(fs.is_file(patch_file)) {
+    if !(fs.is_file(patch_file)) {
       next += 1
       fs.write_string(am_dir + "/next", next.to_string())
       continue
@@ -320,7 +320,7 @@ async fn apply_remaining_patches(
         }
       }
     }
-    if not(quiet) {
+    if !(quiet) {
       print_line("Applying: \{subject}")
     }
     apply_patch_to_worktree(fs, root, patch_content, three_way)
@@ -476,7 +476,7 @@ fn apply_patch_to_worktree(
 
 ///|
 fn parse_hunk_header(line : String) -> (Int, Int, Int, Int)? {
-  if not(line.has_prefix("@@ ")) {
+  if !(line.has_prefix("@@ ")) {
     return None
   }
   let content = String::unsafe_substring(line, start=3, end=line.length())
@@ -510,12 +510,12 @@ fn parse_range(s : String) -> (Int, Int) {
     Some(idx) => {
       let start_str = String::unsafe_substring(s, start=0, end=idx)
       let count_str = String::unsafe_substring(s, start=idx + 1, end=s.length())
-      let start = @strconv.parse_int(start_str) catch { _ => 1 }
-      let count = @strconv.parse_int(count_str) catch { _ => 1 }
+      let start = @string.parse_int(start_str) catch { _ => 1 }
+      let count = @string.parse_int(count_str) catch { _ => 1 }
       (start, count)
     }
     None => {
-      let start = @strconv.parse_int(s) catch { _ => 1 }
+      let start = @string.parse_int(s) catch { _ => 1 }
       (start, 1)
     }
   }

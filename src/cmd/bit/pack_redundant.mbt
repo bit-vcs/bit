@@ -16,16 +16,16 @@ fn load_pack_idx_entries(
   let entries = fs.readdir(pack_dir) catch { _ => return result }
   for entry in entries {
     let name = normalize_dir_entry(entry)
-    if not(name.has_suffix(".idx")) {
+    if !(name.has_suffix(".idx")) {
       continue
     }
     let idx_path = pack_dir + "/" + name
-    if not(fs.is_file(idx_path)) {
+    if !(fs.is_file(idx_path)) {
       continue
     }
     let base = String::unsafe_substring(name, start=0, end=name.length() - 4)
     let pack_path = pack_dir + "/" + base + ".pack"
-    if not(fs.is_file(pack_path)) {
+    if !(fs.is_file(pack_path)) {
       continue
     }
     let data = fs.read_file(idx_path) catch { _ => continue }
@@ -66,7 +66,7 @@ async fn handle_pack_redundant(args : Array[String]) -> Unit raise Error {
       _ => pack_filenames.push(arg)
     }
   }
-  if not(i_still_use_this) {
+  if !(i_still_use_this) {
     @stdio.stderr.write(
       "WARNING: git pack-redundant has been nominated for removal.\nIf you still use this command, please add an extra\noption, '--i-still-use-this', on the command line and\nlet us know you still use it by sending an e-mail\nto git@vger.kernel.org. Thanks.\n",
     )
@@ -139,7 +139,7 @@ async fn handle_pack_redundant(args : Array[String]) -> Unit raise Error {
   }
   // Read stdin ignore objects (only if stdin is not a tty)
   let is_tty = pack_redundant_stdin_is_tty()
-  if not(is_tty) {
+  if !(is_tty) {
     let input = read_all_stdin()
     let lines = split_lines_bytes(input)
     for line in lines {
@@ -210,7 +210,7 @@ async fn handle_pack_redundant(args : Array[String]) -> Unit raise Error {
   // Output redundant packs: idx path first, then pack path
   // Use paths relative to git_dir (prefixed with "./" like git does)
   for pack in local_packs {
-    if not(min_paths.contains(pack.pack_path)) {
+    if !(min_paths.contains(pack.pack_path)) {
       let rel_pack = make_relative_to_git_dir(pack.pack_path, git_dir)
       let rel_idx = pack_path_to_idx(rel_pack)
       print_line(rel_idx)
@@ -255,7 +255,7 @@ fn pack_redundant_minimize(
   let covered_by_essential : Map[String, Bool] = {}
   for item in all_objects {
     let (id, _) = item
-    if not(missing.contains(id)) {
+    if !(missing.contains(id)) {
       covered_by_essential[id] = true
     }
   }

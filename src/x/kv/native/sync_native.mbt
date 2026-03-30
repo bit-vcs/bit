@@ -24,7 +24,7 @@ fn json_get_int64(
   match obj.get(key) {
     Some(Json::Number(value, ..)) => value.to_int64()
     Some(Json::String(value)) =>
-      @strconv.parse_int64(value) catch {
+      @string.parse_int64(value) catch {
         _ => fallback
       }
     _ => fallback
@@ -72,7 +72,7 @@ fn parse_vector_clock(value : Json) -> Result[@kv.VectorClock, String] {
     match entry.1 {
       Json::Number(number, ..) => clocks[key] = number.to_int64()
       Json::String(text) => {
-        let parsed = @strconv.parse_int64(text) catch {
+        let parsed = @string.parse_int64(text) catch {
           _ => return Err("invalid clock value: \{text}")
         }
         clocks[key] = parsed
@@ -378,11 +378,11 @@ async fn exchange_http_peer(
   msg : @kv.GossipMessage,
   headers : Map[String, String],
 ) -> Result[@kv.GossipMessage?, String] {
-  if not(is_http_endpoint(peer.endpoint)) {
+  if !(is_http_endpoint(peer.endpoint)) {
     return Err("peer endpoint is not http(s): \{peer.endpoint}")
   }
   let request_headers = headers.copy()
-  if not(request_headers.contains("Content-Type")) {
+  if !(request_headers.contains("Content-Type")) {
     request_headers["Content-Type"] = "application/json"
   }
   let payload = encode_gossip_message(msg)
@@ -406,7 +406,7 @@ async fn exchange_websocket_peer(
   msg : @kv.GossipMessage,
   headers : Map[String, String],
 ) -> Result[@kv.GossipMessage?, String] {
-  if not(is_websocket_endpoint(peer.endpoint)) {
+  if !(is_websocket_endpoint(peer.endpoint)) {
     return Err("peer endpoint is not ws(s): \{peer.endpoint}")
   }
   let conn = @xws.Conn::connect(peer.endpoint, headers~) catch {

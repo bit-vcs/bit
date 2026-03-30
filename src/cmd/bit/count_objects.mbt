@@ -30,7 +30,7 @@ async fn handle_count_objects(args : Array[String]) -> Unit raise Error {
   for i = 0; i < 256; i = i + 1 {
     let hex = count_objects_hex_byte(i)
     let subdir = objects_dir + "/" + hex
-    if not(rfs.is_dir(subdir)) {
+    if !(rfs.is_dir(subdir)) {
       continue
     }
     let entries = rfs.readdir(subdir) catch { _ => continue }
@@ -46,7 +46,7 @@ async fn handle_count_objects(args : Array[String]) -> Unit raise Error {
       loose_size += data.length().to_int64()
     }
   }
-  if not(verbose) {
+  if !(verbose) {
     let size_kb = (loose_size + 1023L) / 1024L
     if human_readable {
       print_line(
@@ -80,7 +80,7 @@ async fn handle_count_objects(args : Array[String]) -> Unit raise Error {
         ()
       } else if entry != "." &&
         entry != ".." &&
-        not(entry.has_prefix("multi-pack-index")) {
+        !(entry.has_prefix("multi-pack-index")) {
         garbage_count += 1
         let gpath = pack_dir + "/" + entry
         let data = rfs.read_file(gpath) catch { _ => continue }
@@ -141,7 +141,7 @@ fn count_objects_hex_byte(n : Int) -> String {
 
 ///|
 fn count_objects_format_size(bytes : Int64, human : Bool) -> String {
-  if not(human) {
+  if !(human) {
     let kb = (bytes + 1023L) / 1024L
     return "\{kb} kilobytes"
   }

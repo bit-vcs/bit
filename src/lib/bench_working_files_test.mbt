@@ -30,7 +30,7 @@ let bench_large_root : String = join_path(bench_root_base, "large")
 
 ///|
 fn ensure_dir(path : String) -> Unit {
-  if not(@fs.path_exists(path)) {
+  if !(@fs.path_exists(path)) {
     @fs.create_dir(path) catch {
       _ => ()
     }
@@ -47,7 +47,7 @@ fn ensure_bench_repo(root : String, file_count : Int, dir_count : Int) -> Unit {
   ensure_dir(root)
   ensure_dir(join_path(root, ".git"))
   let ignore_path = join_path(root, ".gitignore")
-  if not(@fs.path_exists(ignore_path)) {
+  if !(@fs.path_exists(ignore_path)) {
     @fs.write_string_to_file(ignore_path, "ignore*\n") catch {
       _ => ()
     }

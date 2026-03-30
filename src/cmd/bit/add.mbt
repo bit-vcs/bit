@@ -29,7 +29,7 @@ async fn run_add_hook(
 ) -> Int {
   let hook_git_dir = add_abs_path(git_dir)
   let hook_path = hook_git_dir + "/hooks/" + hook_name
-  if not(fs.is_file(hook_path)) {
+  if !(fs.is_file(hook_path)) {
     return 0
   }
   @process.run(hook_path, [], inherit_env=true, cwd=add_abs_path(root)) catch {
@@ -110,39 +110,39 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
   let paths : Array[String] = []
   for raw_arg in args {
     let arg = raw_arg
-    if not(end_of_options) && arg == "--" {
+    if !(end_of_options) && arg == "--" {
       end_of_options = true
       continue
     }
     match arg {
-      "-A" | "--all" if not(end_of_options) => add_all = true
-      "-u" | "--update" if not(end_of_options) => update_only = true
-      "--no-all" | "--ignore-removal" if not(end_of_options) =>
+      "-A" | "--all" if !(end_of_options) => add_all = true
+      "-u" | "--update" if !(end_of_options) => update_only = true
+      "--no-all" | "--ignore-removal" if !(end_of_options) =>
         ignore_removal = true
-      "-f" | "--force" if not(end_of_options) => force = true
-      "--refresh" if not(end_of_options) => refresh = true
-      "-N" | "--intent-to-add" if not(end_of_options) => intent_to_add = true
-      "-n" | "--dry-run" if not(end_of_options) => dry_run = true
-      "--ignore-missing" if not(end_of_options) => ignore_missing = true
-      "--ignore-errors" if not(end_of_options) => {
+      "-f" | "--force" if !(end_of_options) => force = true
+      "--refresh" if !(end_of_options) => refresh = true
+      "-N" | "--intent-to-add" if !(end_of_options) => intent_to_add = true
+      "-n" | "--dry-run" if !(end_of_options) => dry_run = true
+      "--ignore-missing" if !(end_of_options) => ignore_missing = true
+      "--ignore-errors" if !(end_of_options) => {
         ignore_errors = true
         ignore_errors_explicit = true
       }
-      "--no-ignore-errors" if not(end_of_options) => {
+      "--no-ignore-errors" if !(end_of_options) => {
         ignore_errors = false
         ignore_errors_explicit = true
       }
-      "-v" | "--verbose" if not(end_of_options) => verbose = true
-      "--interactive" if not(end_of_options) => interactive = true
-      "--chmod=+x" if not(end_of_options) => chmod_mode = Some("+x")
-      "--chmod=-x" if not(end_of_options) => chmod_mode = Some("-x")
-      _ if end_of_options || not(arg.has_prefix("-")) => paths.push(arg)
+      "-v" | "--verbose" if !(end_of_options) => verbose = true
+      "--interactive" if !(end_of_options) => interactive = true
+      "--chmod=+x" if !(end_of_options) => chmod_mode = Some("+x")
+      "--chmod=-x" if !(end_of_options) => chmod_mode = Some("-x")
+      _ if end_of_options || !(arg.has_prefix("-")) => paths.push(arg)
       _ if arg.has_prefix("-") => warn_unimplemented_arg("add", arg)
       _ => ()
     }
   }
   // Read add.ignore-errors config (only if not explicitly set via CLI flag)
-  if not(ignore_errors_explicit) {
+  if !(ignore_errors_explicit) {
     let rfs2 : &@bitcore.RepoFileSystem = fs
     let config_path2 = git_dir + "/config"
     if fs.is_file(config_path2) {
@@ -220,7 +220,7 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
     }
     return
   }
-  if paths.length() == 0 && not(update_only) {
+  if paths.length() == 0 && !(update_only) {
     eprint_line("Nothing specified, nothing added.")
     if add_should_show_empty_pathspec_hint(fs, root) {
       eprint_line("hint: Maybe you wanted to say 'git add .'?")
@@ -236,7 +236,7 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
     expand_add_stage_paths(fs, root, paths, force)
   }
   let requested_stage_paths = requested_paths
-  let stage_paths = if ignore_removal && not(update_only) {
+  let stage_paths = if ignore_removal && !(update_only) {
     let unmerged_paths = @bitlib.read_unmerged_paths(fs, git_dir)
     match
       add_filter_stage_paths_for_no_all(
@@ -323,14 +323,14 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
       }
     }
   }
-  if not(force) && add_has_explicit_ignored_path(fs, root, paths) {
+  if !(force) && add_has_explicit_ignored_path(fs, root, paths) {
     eprint_line(
       "The following paths are ignored by one of your .gitignore files.",
     )
     eprint_line("hint: Use -f if you really want to add them.")
     @sys.exit(1)
   }
-  if requested_paths.length() == 0 && not(update_only && paths.length() == 0) {
+  if requested_paths.length() == 0 && !(update_only && paths.length() == 0) {
     let first = add_first_non_empty_pathspec(paths)
     if first is Some(spec) {
       eprint_line("fatal: pathspec '\{spec}' did not match any files")
@@ -391,7 +391,7 @@ fn add_apply_intent_to_add(
       continue
     }
     let abs = root + "/" + path
-    if not(rfs.is_file(abs)) {
+    if !(rfs.is_file(abs)) {
       continue
     }
     let id = match empty_id {
@@ -465,7 +465,7 @@ async fn add_collect_update_requested_paths(
         selected[path] = true
       }
     }
-    if not(matched) {
+    if !(matched) {
       eprint_line(
         "error: pathspec '\{raw}' did not match any file(s) known to git",
       )
@@ -546,7 +546,7 @@ async fn handle_add_dry_run(
   }
   let stage_paths = expand_add_stage_paths(fs, root, paths, force)
   let unmatched = add_collect_unmatched_pathspecs(fs, root, paths, force)
-  if unmatched.length() > 0 && not(ignore_missing) {
+  if unmatched.length() > 0 && !(ignore_missing) {
     eprint_line("fatal: pathspec '\{unmatched[0]}' did not match any files")
     @sys.exit(1)
   }
@@ -601,7 +601,7 @@ async fn add_collect_unmatched_pathspecs(
     let normalized = normalize_add_path(entry.path)
     tracked[normalized] = true
     let folded = normalized.to_lower()
-    if not(tracked_folded.contains(folded)) {
+    if !(tracked_folded.contains(folded)) {
       tracked_folded[folded] = normalized
     }
   }
@@ -615,7 +615,7 @@ async fn add_collect_unmatched_pathspecs(
   for p in visible_paths {
     visible_map[p] = true
     let folded = p.to_lower()
-    if not(visible_folded.contains(folded)) {
+    if !(visible_folded.contains(folded)) {
       visible_folded[folded] = p
     }
   }
@@ -639,7 +639,7 @@ async fn add_collect_unmatched_pathspecs(
     } else {
       false
     }
-    if not(matched) {
+    if !(matched) {
       out.push(path)
     }
   }
@@ -690,7 +690,7 @@ async fn add_refresh_index_entries(
           selected[path] = true
         }
       }
-      if not(matched) {
+      if !(matched) {
         eprint_line("fatal: pathspec '\{raw}' did not match any files")
         @sys.exit(1)
       }
@@ -698,12 +698,12 @@ async fn add_refresh_index_entries(
   }
   let refreshed : Array[@bitlib.IndexEntry] = []
   for entry in entries {
-    if not(selected.contains(entry.path)) {
+    if !(selected.contains(entry.path)) {
       refreshed.push(entry)
       continue
     }
     let abs = root + "/" + entry.path
-    if not(fs.is_file(abs)) {
+    if !(fs.is_file(abs)) {
       refreshed.push(entry)
       continue
     }
@@ -824,7 +824,7 @@ fn add_normalize_input_path(root : String, raw_path : String) -> String {
   if path.length() == 0 {
     return path
   }
-  let normalized = if not(path.has_prefix("/")) {
+  let normalized = if !(path.has_prefix("/")) {
     let cwd_rel = add_repo_relative_cwd(root)
     if cwd_rel.length() > 0 {
       if path == "." {
@@ -954,7 +954,7 @@ async fn expand_add_stage_paths(
     let normalized = normalize_add_path(entry.path)
     tracked_map[normalized] = true
     let folded = normalized.to_lower()
-    if not(tracked_folded.contains(folded)) {
+    if !(tracked_folded.contains(folded)) {
       tracked_folded[folded] = normalized
     }
   }
@@ -963,7 +963,7 @@ async fn expand_add_stage_paths(
   for p in visible_paths {
     visible_map[p] = true
     let folded = p.to_lower()
-    if not(visible_folded.contains(folded)) {
+    if !(visible_folded.contains(folded)) {
       visible_folded[folded] = p
     }
   }
@@ -1044,7 +1044,7 @@ fn add_is_embedded_repo_dir(
     return false
   }
   let abs = root + "/" + rel
-  if not(fs.is_dir(abs)) {
+  if !(fs.is_dir(abs)) {
     return false
   }
   let dot_git = abs + "/.git"
@@ -1064,7 +1064,7 @@ fn add_collect_embedded_repo_paths(
   out : Array[String],
 ) -> Unit raise Error {
   let dir = if rel.length() == 0 { root } else { root + "/" + rel }
-  if not(fs.is_dir(dir)) {
+  if !(fs.is_dir(dir)) {
     return
   }
   for name in fs.readdir(dir) {
@@ -1077,7 +1077,7 @@ fn add_collect_embedded_repo_paths(
     }
     let child_rel = if rel.length() == 0 { name } else { rel + "/" + name }
     let child_abs = root + "/" + child_rel
-    if not(fs.is_dir(child_abs)) {
+    if !(fs.is_dir(child_abs)) {
       continue
     }
     if @bitlib.is_ignored_path(fs, root, child_rel, true) {
@@ -1123,7 +1123,7 @@ fn collect_all_addable_paths(
   out : Array[String],
 ) -> Unit raise Error {
   let dir = if rel.length() == 0 { root } else { root + "/" + rel }
-  if not(fs.is_dir(dir)) {
+  if !(fs.is_dir(dir)) {
     return
   }
   for name in fs.readdir(dir) {
@@ -1190,7 +1190,7 @@ fn add_has_ignored_under(
   rel : String,
 ) -> Bool raise Error {
   let dir = if rel.length() == 0 { root } else { root + "/" + rel }
-  if not(fs.is_dir(dir)) {
+  if !(fs.is_dir(dir)) {
     return false
   }
   for name in fs.readdir(dir) {
@@ -1320,14 +1320,14 @@ async fn handle_add_chmod_dry_run(
     } else {
       false
     }
-    if not(in_index) && not(in_stage) && not(is_dir_match) {
+    if !(in_index) && !(in_stage) && !(is_dir_match) {
       eprint_line("fatal: pathspec '\{path}' did not match any files")
       @sys.exit(128)
     }
   }
   for entry in entries {
     if matched_paths.contains(entry.path) {
-      if not(add_is_regular_file_mode(entry.mode)) {
+      if !(add_is_regular_file_mode(entry.mode)) {
         eprint_line("cannot chmod \{mode} '\{entry.path}'")
         had_error = true
       }

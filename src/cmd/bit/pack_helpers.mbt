@@ -147,7 +147,7 @@ fn parse_bool_value(value : String) -> Bool? {
     Some(v) => Some(v)
     None => {
       let trimmed = value.trim().to_string()
-      let parsed = @strconv.parse_int(trimmed) catch { _ => return None }
+      let parsed = @string.parse_int(trimmed) catch { _ => return None }
       Some(parsed != 0)
     }
   }
@@ -222,7 +222,7 @@ fn get_pack_size_limit(git_dir : String) -> Int64? {
 
 ///|
 fn parse_compression_level(value : String) -> Int? {
-  let parsed = @strconv.parse_int(value) catch { _ => return None }
+  let parsed = @string.parse_int(value) catch { _ => return None }
   let mut level = parsed
   if level < 0 {
     level = 0

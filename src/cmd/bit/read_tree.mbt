@@ -32,7 +32,7 @@ async fn handle_read_tree(args : Array[String]) -> Unit raise Error {
       }
       _ if arg.has_prefix("--prefix=") => ()
       _ if arg.has_prefix("--index-output=") => ()
-      _ if not(arg.has_prefix("-")) => tree_refs.push(arg)
+      _ if !(arg.has_prefix("-")) => tree_refs.push(arg)
       _ if arg.has_prefix("-") => warn_unimplemented_arg("read-tree", arg)
       _ => ()
     }
@@ -40,7 +40,7 @@ async fn handle_read_tree(args : Array[String]) -> Unit raise Error {
   }
   // Handle --empty: clear index
   if empty {
-    if not(dry_run) {
+    if !(dry_run) {
       @bitlib.write_index_entries(fs, git_dir, [], hash_size~)
     }
     return
@@ -63,11 +63,11 @@ async fn handle_read_tree(args : Array[String]) -> Unit raise Error {
     }
     let files = @bitlib.collect_tree_files(db, fs, tree_id)
     let entries = @bitlib.tree_files_to_index(db, fs, files)
-    if not(dry_run) {
+    if !(dry_run) {
       @bitlib.write_index_entries(fs, git_dir, entries, hash_size~)
     }
     // Handle -u: update working tree (unless -i: index only)
-    if update && not(dry_run) && not(index_only) {
+    if update && !(dry_run) && !(index_only) {
       let root = get_work_root()
       @bitlib.write_worktree_from_files(
         db,
@@ -98,10 +98,10 @@ async fn handle_read_tree(args : Array[String]) -> Unit raise Error {
       }
     }
     let entries = @bitlib.tree_files_to_index(db, fs, merged_files)
-    if not(dry_run) {
+    if !(dry_run) {
       @bitlib.write_index_entries(fs, git_dir, entries, hash_size~)
     }
-    if update && not(dry_run) && not(index_only) {
+    if update && !(dry_run) && !(index_only) {
       let root = get_work_root()
       @bitlib.write_worktree_from_files(
         db,

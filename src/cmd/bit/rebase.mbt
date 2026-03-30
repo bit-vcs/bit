@@ -87,7 +87,7 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
         onto = Some(args[i + 1])
         i += 2
       }
-      _ if not(arg.has_prefix("-")) => {
+      _ if !(arg.has_prefix("-")) => {
         upstream = Some(arg)
         i += 1
       }
@@ -110,7 +110,7 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
     // Check if interactive rebase is in progress
     let rebase_merge_dir = git_dir + "/rebase-merge"
     if rfs.is_dir(rebase_merge_dir) &&
-      not(rebase_merge_dir_uses_builtin_state(rfs, rebase_merge_dir)) {
+      !(rebase_merge_dir_uses_builtin_state(rfs, rebase_merge_dir)) {
       interactive_rebase_continue(wfs, rfs, root, git_dir)
     } else {
       let result = @bitlib.rebase_continue(fs, fs, root)
@@ -122,7 +122,7 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
   if do_abort {
     let rebase_merge_dir = git_dir + "/rebase-merge"
     if rfs.is_dir(rebase_merge_dir) &&
-      not(rebase_merge_dir_uses_builtin_state(rfs, rebase_merge_dir)) {
+      !(rebase_merge_dir_uses_builtin_state(rfs, rebase_merge_dir)) {
       interactive_rebase_abort(wfs, rfs, root, git_dir)
     } else {
       @bitlib.rebase_abort(fs, fs, root) catch {
@@ -136,7 +136,7 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
   if do_skip {
     let rebase_merge_dir = git_dir + "/rebase-merge"
     if rfs.is_dir(rebase_merge_dir) &&
-      not(rebase_merge_dir_uses_builtin_state(rfs, rebase_merge_dir)) {
+      !(rebase_merge_dir_uses_builtin_state(rfs, rebase_merge_dir)) {
       interactive_rebase_skip(wfs, rfs, root, git_dir)
     } else {
       let result = @bitlib.rebase_skip(fs, fs, root)
@@ -638,9 +638,9 @@ fn remove_first_non_comment_line(content : String) -> String {
   let mut skipped_first = false
   for line_view in content.split("\n") {
     let line = line_view.to_string()
-    if not(skipped_first) {
+    if !(skipped_first) {
       let trimmed = trim_string(line)
-      if trimmed.length() > 0 && not(trimmed.has_prefix("#")) {
+      if trimmed.length() > 0 && !(trimmed.has_prefix("#")) {
         skipped_first = true
         continue
       }
@@ -1094,7 +1094,7 @@ fn find_tree_subtree(
         break
       }
     }
-    if not(found) {
+    if !(found) {
       return None
     }
   }

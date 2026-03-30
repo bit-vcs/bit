@@ -381,7 +381,7 @@ fn write_pack_promisor_marker_http(
   match default_ref {
     Some((_, head_id)) => {
       let head_line = head_id.to_hex() + " HEAD"
-      if not(seen.contains(head_line)) {
+      if !(seen.contains(head_line)) {
         seen[head_line] = true
         marker_lines.push(head_line)
       }

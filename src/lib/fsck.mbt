@@ -39,7 +39,7 @@ pub fn fsck_connectivity_check(
     reachable[hex] = true
     let obj = db.get(fs, current) catch {
       _ => {
-        if not(missing.contains(hex)) {
+        if !(missing.contains(hex)) {
           missing[hex] = true
           errors += 1
         }
@@ -48,7 +48,7 @@ pub fn fsck_connectivity_check(
     }
     match obj {
       None =>
-        if not(missing.contains(hex)) {
+        if !(missing.contains(hex)) {
           missing[hex] = true
           errors += 1
         }
@@ -65,12 +65,12 @@ pub fn fsck_connectivity_check(
               root_commits.push(hex)
             }
             let tree_hex = info.tree.to_hex()
-            if not(reachable.contains(tree_hex)) {
+            if !(reachable.contains(tree_hex)) {
               queue.push(info.tree)
             }
             for parent in info.parents {
               let phex = parent.to_hex()
-              if not(reachable.contains(phex)) {
+              if !(reachable.contains(phex)) {
                 queue.push(parent)
               }
             }
@@ -84,7 +84,7 @@ pub fn fsck_connectivity_check(
             }
             for entry in entries {
               let ehex = entry.id.to_hex()
-              if not(reachable.contains(ehex)) {
+              if !(reachable.contains(ehex)) {
                 queue.push(entry.id)
               }
             }
@@ -121,7 +121,7 @@ fn fsck_walk_tag(
         end=line.length(),
       )
       let target = @bit.ObjectId::from_hex(target_hex) catch { _ => return }
-      if not(reachable.contains(target.to_hex())) {
+      if !(reachable.contains(target.to_hex())) {
         queue.push(target)
       }
       break
@@ -135,14 +135,14 @@ pub fn fsck_enumerate_objects(db : ObjectDb) -> Array[String] {
   let all : Array[String] = []
   let seen : Map[String, Bool] = {}
   for hex, _ in db.loose_paths {
-    if not(seen.contains(hex)) {
+    if !(seen.contains(hex)) {
       seen[hex] = true
       all.push(hex)
     }
   }
   for pack in db.packs {
     for id in pack.ids {
-      if not(seen.contains(id)) {
+      if !(seen.contains(id)) {
         seen[id] = true
         all.push(id)
       }

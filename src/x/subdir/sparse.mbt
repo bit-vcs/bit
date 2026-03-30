@@ -15,7 +15,7 @@ pub fn is_module_sparse_enabled(
   let module_name = path_to_module_name(normalized_path)
   let module_dir = git_dir + "/modules/" + module_name
   let config_path = module_dir + "/config"
-  if not(rfs.is_file(config_path)) {
+  if !(rfs.is_file(config_path)) {
     return false
   }
   let content = rfs.read_file(config_path) catch { _ => return false }
@@ -51,7 +51,7 @@ pub fn read_module_sparse_patterns(
   let module_name = path_to_module_name(normalized_path)
   let module_dir = git_dir + "/modules/" + module_name
   let sparse_path = module_dir + "/info/sparse-checkout"
-  if not(rfs.is_file(sparse_path)) {
+  if !(rfs.is_file(sparse_path)) {
     return []
   }
   let content = rfs.read_file(sparse_path) catch { _ => return [] }
@@ -59,7 +59,7 @@ pub fn read_module_sparse_patterns(
   let patterns : Array[String] = []
   for line_view in text.split("\n") {
     let line = sparse_trim(line_view.to_string())
-    if line.length() > 0 && not(line.has_prefix("#")) {
+    if line.length() > 0 && !(line.has_prefix("#")) {
       patterns.push(line)
     }
   }
@@ -101,7 +101,7 @@ pub fn init_module_sparse(
   let module_name = path_to_module_name(normalized_path)
   let module_dir = git_dir + "/modules/" + module_name
   // モジュールが初期化済みかチェック
-  if not(rfs.is_dir(module_dir)) {
+  if !(rfs.is_dir(module_dir)) {
     raise IoError("module not initialized: " + subdir_path)
   }
   // config に sparseCheckout = true を追加
@@ -112,7 +112,7 @@ pub fn init_module_sparse(
     "[core]\n"
   }
   // sparseCheckout = true を追加
-  if not(config.contains("sparseCheckout")) {
+  if !(config.contains("sparseCheckout")) {
     if config.contains("[core]") {
       config = config.replace(
         old="[core]",
@@ -123,7 +123,7 @@ pub fn init_module_sparse(
     }
   }
   // cone mode を追加
-  if cone && not(config.contains("sparseCheckoutCone")) {
+  if cone && !(config.contains("sparseCheckoutCone")) {
     if config.contains("[core]") {
       config = config.replace(
         old="sparseCheckout = true",
@@ -140,7 +140,7 @@ pub fn init_module_sparse(
     _ => ()
   }
   let sparse_path = module_dir + "/info/sparse-checkout"
-  if not(rfs.is_file(sparse_path)) {
+  if !(rfs.is_file(sparse_path)) {
     fs.write_file(sparse_path, string_to_bytes_sparse("/*\n!/*/\n")) catch {
       _ => raise IoError("failed to write initial sparse-checkout")
     }
@@ -157,7 +157,7 @@ pub fn set_module_sparse_patterns(
   patterns : Array[String],
 ) -> Unit raise SubdirError {
   // sparse checkout が初期化されていなければ初期化
-  if not(is_module_sparse_enabled(rfs, git_dir, subdir_path)) {
+  if !(is_module_sparse_enabled(rfs, git_dir, subdir_path)) {
     init_module_sparse(fs, rfs, git_dir, subdir_path) catch {
       e => raise e
     }
@@ -177,14 +177,14 @@ pub fn add_module_sparse_patterns(
   new_patterns : Array[String],
 ) -> Unit raise SubdirError {
   // sparse checkout が初期化されていなければ初期化
-  if not(is_module_sparse_enabled(rfs, git_dir, subdir_path)) {
+  if !(is_module_sparse_enabled(rfs, git_dir, subdir_path)) {
     init_module_sparse(fs, rfs, git_dir, subdir_path) catch {
       e => raise e
     }
   }
   let existing = read_module_sparse_patterns(rfs, git_dir, subdir_path)
   for p in new_patterns {
-    if not(existing.contains(p)) {
+    if !(existing.contains(p)) {
       existing.push(p)
     }
   }
@@ -261,7 +261,7 @@ fn sparse_path_matches(path : String, pattern : String) -> Bool {
   }
   // "/*" - ルート直下のファイル
   if normalized_pattern == "/*" {
-    return not(path.contains("/"))
+    return !(path.contains("/"))
   }
   // "!/*/" - ルート直下のディレクトリを除外
   if normalized_pattern == "!/*/" {
@@ -293,7 +293,7 @@ fn sparse_path_matches(path : String, pattern : String) -> Bool {
         start=dir.length() + 1,
         end=path.length(),
       )
-      return not(rest.contains("/"))
+      return !(rest.contains("/"))
     }
     return false
   }
@@ -333,7 +333,7 @@ fn match_double_star(path : String, pattern : String) -> Bool {
   let prefix = parts_arr[0]
   let suffix = parts_arr[1]
   // プレフィックスチェック
-  if prefix.length() > 0 && not(path.has_prefix(prefix)) {
+  if prefix.length() > 0 && !(path.has_prefix(prefix)) {
     return false
   }
   // サフィックスのパス部分を取得（ファイル名のみ）

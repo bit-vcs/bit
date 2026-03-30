@@ -20,7 +20,7 @@ async fn handle_commit_tree(args : Array[String]) -> Unit raise Error {
       "-p" if i + 1 < args.length() => {
         let parent_hex = args[i + 1]
         let parent_id = commit_tree_resolve_hex(rfs, git_dir, parent_hex)
-        if not(parents.contains(parent_id)) {
+        if !(parents.contains(parent_id)) {
           parents.push(parent_id)
         }
         i += 2
@@ -51,7 +51,7 @@ async fn handle_commit_tree(args : Array[String]) -> Unit raise Error {
           String::unsafe_substring(arg, start=2, end=arg.length()),
         )
       _ if arg.has_prefix("--gpg-sign=") => ()
-      _ if not(arg.has_prefix("-")) && tree_hex is None => tree_hex = Some(arg)
+      _ if !(arg.has_prefix("-")) && tree_hex is None => tree_hex = Some(arg)
       _ if arg.has_prefix("-") => warn_unimplemented_arg("commit-tree", arg)
       _ => ()
     }
@@ -136,7 +136,7 @@ fn get_commit_tree_ident(
   let mut email = email_from_env.unwrap_or("")
   let name_set = name_from_env is Some(_)
   let email_set = email_from_env is Some(_)
-  if (not(name_set) && name == "") || (not(email_set) && email == "") {
+  if (!(name_set) && name == "") || (!(email_set) && email == "") {
     let config_path = git_dir + "/config"
     if fs.is_file(config_path) {
       let content = decode_bytes(
@@ -156,7 +156,7 @@ fn get_commit_tree_ident(
           continue
         }
         if in_user {
-          if not(name_set) && name == "" && line.has_prefix("name") {
+          if !(name_set) && name == "" && line.has_prefix("name") {
             match line.find("=") {
               Some(idx) =>
                 name = trim_chars(
@@ -170,7 +170,7 @@ fn get_commit_tree_ident(
               None => ()
             }
           }
-          if not(email_set) && email == "" && line.has_prefix("email") {
+          if !(email_set) && email == "" && line.has_prefix("email") {
             match line.find("=") {
               Some(idx) =>
                 email = trim_chars(

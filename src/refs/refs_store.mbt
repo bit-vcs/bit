@@ -40,7 +40,7 @@ pub fn collect_loose_ref_ids(
   out : Map[String, @bit.ObjectId],
   filter_prefix : String?,
 ) -> Unit {
-  if not(fs.is_dir(dir)) {
+  if !(fs.is_dir(dir)) {
     return ()
   }
   let entries = fs.readdir(dir) catch { _ => [] }
@@ -53,7 +53,7 @@ pub fn collect_loose_ref_ids(
     if fs.is_dir(path) {
       collect_loose_ref_ids(fs, path, name, out, filter_prefix)
     } else if fs.is_file(path) {
-      if filter_prefix is Some(pfx) && not(name.has_prefix(pfx)) {
+      if filter_prefix is Some(pfx) && !(name.has_prefix(pfx)) {
         continue
       }
       let content = decode_bytes_lossy_refs(
@@ -79,7 +79,7 @@ pub fn collect_packed_ref_ids(
   filter_prefix : String?,
 ) -> Unit {
   let packed_path = git_dir + "/packed-refs"
-  if not(fs.is_file(packed_path)) {
+  if !(fs.is_file(packed_path)) {
     return ()
   }
   let packed = fs.read_file(packed_path) catch { _ => Bytes::default() }
@@ -105,7 +105,7 @@ pub fn collect_packed_ref_ids(
           start=idx + 1,
           end=line.length(),
         )
-        if filter_prefix is Some(pfx) && not(refname.has_prefix(pfx)) {
+        if filter_prefix is Some(pfx) && !(refname.has_prefix(pfx)) {
           continue
         }
         if out.contains(refname) {
@@ -155,7 +155,7 @@ pub fn rewrite_packed_refs(
   transform : (String) -> String?,
 ) -> Unit raise @bit.GitError {
   let packed_path = git_dir + "/packed-refs"
-  if not(rfs.is_file(packed_path)) {
+  if !(rfs.is_file(packed_path)) {
     return ()
   }
   let data = rfs.read_file(packed_path) catch { _ => Bytes::default() }
@@ -173,7 +173,7 @@ pub fn rewrite_packed_refs(
       continue
     }
     if line.has_prefix("^") {
-      if not(skip_peeled) {
+      if !(skip_peeled) {
         lines.push(line)
       }
       continue
@@ -284,7 +284,7 @@ pub fn list_remote_tracking_refs(
   let refs = list_refs_with_ids(fs, git_dir, Some(prefix))
   let out : Map[String, @bit.ObjectId] = {}
   for refname, id in refs {
-    if not(refname.has_prefix(prefix)) {
+    if !(refname.has_prefix(prefix)) {
       continue
     }
     let name = String::unsafe_substring(

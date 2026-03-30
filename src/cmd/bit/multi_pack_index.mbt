@@ -37,7 +37,7 @@ async fn handle_multi_pack_index(args : Array[String]) -> Unit raise Error {
       "--progress" => progress = true
       "--no-progress" => progress = false
       "--batch-size" if i + 1 < args.length() => {
-        batch_size = @strconv.parse_int(args[i + 1]) catch {
+        batch_size = @string.parse_int(args[i + 1]) catch {
           err if @async.is_cancellation_error(err) => raise err
           _ => 0
         }
@@ -45,7 +45,7 @@ async fn handle_multi_pack_index(args : Array[String]) -> Unit raise Error {
         continue
       }
       _ if arg.has_prefix("--batch-size=") =>
-        batch_size = @strconv.parse_int(arg[13:].to_string()) catch {
+        batch_size = @string.parse_int(arg[13:].to_string()) catch {
           err if @async.is_cancellation_error(err) => raise err
           _ => 0
         }
@@ -94,7 +94,7 @@ async fn handle_multi_pack_index(args : Array[String]) -> Unit raise Error {
   let has_incremental_chain = fs.is_file(incremental_chain_path)
   match subcommand {
     Some("write") | Some("verify") =>
-      if object_dir is None && not(fs.is_dir(git_dir)) {
+      if object_dir is None && !(fs.is_dir(git_dir)) {
         eprint_line(
           "fatal: not a git repository (or any of the parent directories): .git",
         )
@@ -172,7 +172,7 @@ async fn midx_write(
   let midx_path = pack_dir + "/multi-pack-index"
   let has_existing_midx = fs.is_file(midx_path)
   let existing_midx_packs : Array[String] = []
-  if has_existing_midx && not(stdin_packs) {
+  if has_existing_midx && !(stdin_packs) {
     match midx_read_pack_usage(fs, pack_dir) {
       Some((pack_names, _)) =>
         for pack_name in pack_names {
@@ -217,7 +217,7 @@ async fn midx_write(
       String::unsafe_substring(pack_name, start=0, end=pack_name.length() - 5) +
       ".idx"
     let pack_path = pack_dir + "/" + pack_name
-    if not(fs.is_file(idx_path)) || not(fs.is_file(pack_path)) {
+    if !(fs.is_file(idx_path)) || !(fs.is_file(pack_path)) {
       eprint_line("could not load pack")
       @sys.exit(1)
       return
@@ -239,7 +239,7 @@ async fn midx_write(
       String::unsafe_substring(pack_name, start=0, end=pack_name.length() - 5) +
       ".idx"
     let pack_path = pack_dir + "/" + pack_name
-    if not(fs.is_file(idx_path)) || not(fs.is_file(pack_path)) {
+    if !(fs.is_file(idx_path)) || !(fs.is_file(pack_path)) {
       eprint_line("could not load pack")
       @sys.exit(1)
       return
@@ -317,7 +317,7 @@ async fn midx_write(
   if has_existing_midx {
     match midx_try_read_file(fs, midx_path) {
       Some(existing) => {
-        if not(midx_has_valid_checksum(existing)) {
+        if !(midx_has_valid_checksum(existing)) {
           eprint_line("error: checksum.mismatch in existing multi-pack-index")
         }
         if midx_bytes_equal(existing, midx_bytes) {
@@ -373,7 +373,7 @@ async fn midx_verify(
   progress : Bool,
 ) -> Unit raise Error {
   let midx_path = pack_dir + "/multi-pack-index"
-  if not(fs.is_file(midx_path)) {
+  if !(fs.is_file(midx_path)) {
     eprint_line("error: could not open multi-pack-index")
     @sys.exit(1)
     return
@@ -387,7 +387,7 @@ async fn midx_verify(
     @sys.exit(1)
     return
   }
-  if not(
+  if !(
       data[0] == b'M' && data[1] == b'I' && data[2] == b'D' && data[3] == b'X',
     ) {
     eprint_line("error: multi-pack-index signature is invalid")
@@ -585,7 +585,7 @@ async fn midx_verify(
       idx_name
     }
     let pack_path = pack_dir + "/" + pack_name
-    if not(fs.is_file(idx_path)) || not(fs.is_file(pack_path)) {
+    if !(fs.is_file(idx_path)) || !(fs.is_file(pack_path)) {
       eprint_line("error: failed to load pack in position " + i.to_string())
       has_error = true
       pack_entries.push([])
@@ -695,7 +695,7 @@ async fn midx_verify(
         break
       }
     }
-    if not(found) {
+    if !(found) {
       eprint_line(
         "error: failed to load pack entry for oid[" +
         i.to_string() +
@@ -719,7 +719,7 @@ async fn midx_expire(
   progress : Bool,
 ) -> Unit raise Error {
   let midx_path = pack_dir + "/multi-pack-index"
-  if not(fs.is_file(midx_path)) {
+  if !(fs.is_file(midx_path)) {
     if progress {
       eprint_line("No multi-pack-index to expire")
     }
@@ -813,7 +813,7 @@ async fn midx_repack(
     }
     let pack_path = pack_dir + "/" + pack_name
     let idx_path = pack_dir + "/" + midx_pack_stem(pack_name) + ".idx"
-    if not(fs.is_file(pack_path)) || not(fs.is_file(idx_path)) {
+    if !(fs.is_file(pack_path)) || !(fs.is_file(idx_path)) {
       continue
     }
     let pack_mtime = midx_pack_mtime(pack_path)
@@ -1042,7 +1042,7 @@ fn midx_read_pack_usage(
   pack_dir : String,
 ) -> (Array[String], Array[Int])? {
   let midx_path = pack_dir + "/multi-pack-index"
-  if not(fs.is_file(midx_path)) {
+  if !(fs.is_file(midx_path)) {
     return None
   }
   let data = fs.read_file(midx_path) catch { _ => return None }
@@ -1108,7 +1108,7 @@ fn midx_find_pack_files(fs : OsFs, pack_dir : String) -> Array[String] {
   let files : Array[String] = []
   let entries = fs.readdir(pack_dir) catch { _ => return files }
   for entry in entries {
-    if entry.has_suffix(".pack") && not(entry.has_prefix(".")) {
+    if entry.has_suffix(".pack") && !(entry.has_prefix(".")) {
       files.push(entry)
     }
   }
@@ -1186,7 +1186,7 @@ fn midx_select_pack_files_from_stdin(
     match midx_normalize_stdin_pack_name(name) {
       Some(pack_name) =>
         if all_pack_set.contains(pack_name) &&
-          not(selected_set.contains(pack_name)) {
+          !(selected_set.contains(pack_name)) {
           selected_set[pack_name] = true
           selected.push(pack_name)
         }
@@ -1208,7 +1208,7 @@ fn midx_select_pack_files_from_stdin(
   }
   let filtered : Array[String] = []
   for name in selected {
-    if not(excluded_set.contains(name)) {
+    if !(excluded_set.contains(name)) {
       filtered.push(name)
     }
   }
@@ -1772,7 +1772,7 @@ fn midx_collect_bitmap_tips(
   let mut drop_idx = -1
   if candidates.length() > 100 {
     for idx, candidate in candidates {
-      if not(candidate.preferred) {
+      if !(candidate.preferred) {
         drop_idx = idx
         break
       }
@@ -1803,7 +1803,7 @@ fn midx_add_bitmap_candidate(
     Some(existing_idx) =>
       if preferred && existing_idx >= 0 && existing_idx < out.length() {
         let existing = out[existing_idx]
-        if not(existing.preferred) {
+        if !(existing.preferred) {
           out[existing_idx] = {
             id: existing.id,
             midx_pos: existing.midx_pos,
@@ -2410,7 +2410,7 @@ fn midx_u32_lt(a : Int, b : Int) -> Bool {
   let a_neg = a < 0
   let b_neg = b < 0
   if a_neg != b_neg {
-    not(a_neg) && b_neg
+    !(a_neg) && b_neg
   } else {
     a < b
   }
@@ -2778,7 +2778,7 @@ async fn midx_write_incremental(
       let mono_packs = midx_read_packs_from_midx_data(mono_data)
       let mut mono_valid = mono_packs.length() > 0
       for mp in mono_packs {
-        if not(fs.is_file(pack_dir + "/" + mp)) {
+        if !(fs.is_file(pack_dir + "/" + mp)) {
           mono_valid = false
           break
         }
@@ -2815,7 +2815,7 @@ async fn midx_write_incremental(
   let all_packs = midx_find_pack_files(fs, pack_dir)
   let new_packs : Array[String] = []
   for pack_name in all_packs {
-    if not(known_packs.contains(pack_name)) {
+    if !(known_packs.contains(pack_name)) {
       new_packs.push(pack_name)
     }
   }
@@ -2858,7 +2858,7 @@ async fn midx_write_incremental(
       String::unsafe_substring(pack_name, start=0, end=pack_name.length() - 5) +
       ".idx"
     let pack_path = pack_dir + "/" + pack_name
-    if not(fs.is_file(idx_path)) || not(fs.is_file(pack_path)) {
+    if !(fs.is_file(idx_path)) || !(fs.is_file(pack_path)) {
       continue
     }
     if normalized_preferred.length() > 0 && pack_name == normalized_preferred {
@@ -2884,7 +2884,7 @@ async fn midx_write_incremental(
       Some(lid) if lid == entry.id => continue
       _ =>
         // Also skip OIDs already in existing layers
-        if not(existing_oids.contains(entry.id.to_hex())) {
+        if !(existing_oids.contains(entry.id.to_hex())) {
           unique_entries.push(entry)
           last_id = Some(entry.id)
         } else {
@@ -2913,14 +2913,14 @@ async fn midx_write_incremental(
       let layer_data = fs.read_file(layer_path) catch { _ => continue }
       let layer_packs = midx_read_packs_from_midx_data(layer_data)
       for lp in layer_packs {
-        if not(midx_array_has_string(all_bitmap_packs, lp)) {
+        if !(midx_array_has_string(all_bitmap_packs, lp)) {
           all_bitmap_packs.push(lp)
         }
       }
     }
     // Add new packs
     for np in new_packs {
-      if not(midx_array_has_string(all_bitmap_packs, np)) {
+      if !(midx_array_has_string(all_bitmap_packs, np)) {
         all_bitmap_packs.push(np)
       }
     }
@@ -2931,7 +2931,7 @@ async fn midx_write_incremental(
         "/" +
         String::unsafe_substring(pack_name, start=0, end=pack_name.length() - 5) +
         ".idx"
-      if not(fs.is_file(idx_path)) {
+      if !(fs.is_file(idx_path)) {
         continue
       }
       let entries = midx_read_pack_index(fs, idx_path, pack_idx, 0)
@@ -3044,7 +3044,7 @@ async fn midx_verify_chain(
   let mut has_error = false
   for hash in hashes {
     let layer_path = inc_dir + "/multi-pack-index-" + hash + ".midx"
-    if not(fs.is_file(layer_path)) {
+    if !(fs.is_file(layer_path)) {
       eprint_line("error: could not open multi-pack-index layer: " + layer_path)
       has_error = true
       continue
@@ -3062,7 +3062,7 @@ async fn midx_verify_chain(
       has_error = true
       continue
     }
-    if not(
+    if !(
         data[0] == b'M' && data[1] == b'I' && data[2] == b'D' && data[3] == b'X',
       ) {
       eprint_line(

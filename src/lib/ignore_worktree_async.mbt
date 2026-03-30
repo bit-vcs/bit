@@ -91,12 +91,12 @@ async fn walk_dir_async_typed(
       // Symlink: check if it points to a directory
       let child_path = @bit.join_path(root, child_rel)
       fs.is_dir(child_path) &&
-      not(@bitio.read_symlink_target_path(child_path) is Some(_))
+      !(@bitio.read_symlink_target_path(child_path) is Some(_))
     } else if d_type == 0 {
       // DT_UNKNOWN: fall back to stat
       let child_path = @bit.join_path(root, child_rel)
       if fs.is_dir(child_path) {
-        not(@bitio.read_symlink_target_path(child_path) is Some(_))
+        !(@bitio.read_symlink_target_path(child_path) is Some(_))
       } else {
         false
       }
@@ -161,7 +161,7 @@ async fn walk_dir_async_fallback(
     let child_rel = if rel == "" { name } else { rel + "/" + name }
     let child_path = @bit.join_path(root, child_rel)
     let is_dir = if fs.is_dir(child_path) {
-      not(@bitio.read_symlink_target_path(child_path) is Some(_))
+      !(@bitio.read_symlink_target_path(child_path) is Some(_))
     } else {
       false
     }

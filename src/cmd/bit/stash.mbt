@@ -16,7 +16,7 @@ async fn handle_stash(args : Array[String]) -> Unit raise Error {
     }
   }
   let rest : Array[String] = if args.length() > 0 &&
-    not(args[0].has_prefix("-")) {
+    !(args[0].has_prefix("-")) {
     args.iter().drop(1).collect()
   } else {
     args.iter().collect()
@@ -144,10 +144,10 @@ fn parse_stash_index(args : Array[String]) -> Int {
   for arg in args {
     if arg.has_prefix("stash@{") && arg.has_suffix("}") {
       let num_str = String::unsafe_substring(arg, start=7, end=arg.length() - 1)
-      let n = @strconv.parse_int(num_str) catch { _ => continue }
+      let n = @string.parse_int(num_str) catch { _ => continue }
       return n
     }
-    let n = @strconv.parse_int(arg) catch { _ => continue }
+    let n = @string.parse_int(arg) catch { _ => continue }
     return n
   }
   0

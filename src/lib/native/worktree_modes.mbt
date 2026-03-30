@@ -117,7 +117,7 @@ fn detect_case_insensitive_collision_skips(
   paths : Array[String],
 ) -> Map[String, Bool] raise @bit.GitError {
   let skip : Map[String, Bool] = {}
-  if not(worktree_is_case_insensitive(fs, rfs, git_dir)) {
+  if !(worktree_is_case_insensitive(fs, rfs, git_dir)) {
     return skip
   }
   let mut i = 0
@@ -170,7 +170,7 @@ async fn remove_path_if_exists(path : String) -> Unit raise @bit.GitError {
     err if @async.is_cancellation_error(err) => abort("cancelled")
     _ => false
   }
-  if not(exists) {
+  if !(exists) {
     return
   }
   let kind_result : Result[@afs.FileKind, Error] = try? @afs.kind(

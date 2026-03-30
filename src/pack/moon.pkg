@@ -2,6 +2,7 @@ import {
   "mizchi/bit" @bit,
   "mizchi/zlib",
   "moonbitlang/core/encoding/utf8" @utf8,
+  "moonbitlang/core/string" @string,
 }
 
 import {

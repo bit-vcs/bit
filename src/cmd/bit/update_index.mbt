@@ -133,7 +133,7 @@ async fn handle_update_index(args : Array[String]) -> Unit raise Error {
         }
         break
       }
-      _ if not(arg.has_prefix("-")) =>
+      _ if !(arg.has_prefix("-")) =>
         match current_chmod {
           Some(mode) => chmod_updates.push((arg, mode))
           None => paths.push(arg)
@@ -212,7 +212,7 @@ async fn handle_update_index(args : Array[String]) -> Unit raise Error {
     }
   }
   // Check D/F conflicts for --cacheinfo entries
-  if direct_updates.length() > 0 && not(replace) {
+  if direct_updates.length() > 0 && !(replace) {
     let existing_entries_for_df = @bitlib.read_index_entries(fs, git_dir)
     let existing_paths : Map[String, Bool] = {}
     for entry in existing_entries_for_df {
@@ -418,7 +418,7 @@ fn parse_update_index_info_line(
                   }
                 }
               4 =>
-                if not(is_update_index_object_type(fields[1])) {
+                if !(is_update_index_object_type(fields[1])) {
                   None
                 } else {
                   match parse_update_index_stage(fields[3]) {
@@ -468,7 +468,7 @@ fn parse_update_index_cacheinfo(
 
 ///|
 fn parse_update_index_stage(value : String) -> Int? {
-  let parsed = @strconv.parse_int(value) catch { _ => return None }
+  let parsed = @string.parse_int(value) catch { _ => return None }
   if parsed >= 0 && parsed <= 3 {
     Some(parsed)
   } else {
@@ -706,7 +706,7 @@ async fn update_index_usage() -> Unit {
 
 ///|
 fn parse_update_index_version(value : String) -> Int? {
-  let parsed = @strconv.parse_int(value) catch { _ => return None }
+  let parsed = @string.parse_int(value) catch { _ => return None }
   if parsed == 2 || parsed == 3 || parsed == 4 {
     Some(parsed)
   } else {
@@ -717,14 +717,14 @@ fn parse_update_index_version(value : String) -> Int? {
 ///|
 fn update_index_read_header_version(fs : OsFs, git_dir : String) -> Int {
   let index_path = git_dir + "/index"
-  if not(fs.is_file(index_path)) {
+  if !(fs.is_file(index_path)) {
     return 2
   }
   let data = fs.read_file(index_path) catch { _ => return 2 }
   if data.length() < 12 {
     return 2
   }
-  if not(
+  if !(
       data[0] == b'D' && data[1] == b'I' && data[2] == b'R' && data[3] == b'C',
     ) {
     return 2
@@ -743,7 +743,7 @@ fn update_index_write_header_version(
 ) -> Unit raise Error {
   let index_path = git_dir + "/index"
   let hash_size = update_index_repo_hash_size(fs, git_dir)
-  if not(fs.is_file(index_path)) {
+  if !(fs.is_file(index_path)) {
     update_index_write_entries(fs, git_dir, [])
   }
   let data = fs.read_file(index_path)
@@ -785,7 +785,7 @@ async fn update_index_apply_chmod(
   for op in ops {
     let (raw_path, _) = op
     let normalized = normalize_update_index_path(raw_path)
-    if not(seen.contains(normalized)) {
+    if !(seen.contains(normalized)) {
       stage_paths.push(normalized)
       seen[normalized] = true
     }
@@ -798,7 +798,7 @@ async fn update_index_apply_chmod(
     }
     let filtered_entries : Array[@bitlib.IndexEntry] = []
     for entry in existing_entries {
-      if not(stage_set.contains(normalize_update_index_path(entry.path))) {
+      if !(stage_set.contains(normalize_update_index_path(entry.path))) {
         filtered_entries.push(entry)
       }
     }
@@ -1084,7 +1084,7 @@ async fn update_index_stage_paths(
   }
   let filtered_entries : Array[@bitlib.IndexEntry] = []
   for e in existing_entries {
-    if not(add_set.contains(normalize_update_index_path(e.path))) {
+    if !(add_set.contains(normalize_update_index_path(e.path))) {
       filtered_entries.push(e)
     }
   }
@@ -1135,7 +1135,7 @@ fn update_index_remove_paths(
   }
   let filtered : Array[@bitlib.IndexEntry] = []
   for e in entries {
-    if not(remove_set.contains(normalize_update_index_path(e.path))) {
+    if !(remove_set.contains(normalize_update_index_path(e.path))) {
       filtered.push(e)
     }
   }
@@ -1169,7 +1169,7 @@ async fn handle_update_index_paths(
     let exists = @bitio.lstat_entry_meta(full_path) is Some(_) ||
       update_index_read_gitlink_entry(fs, root, normalized_path) is Some(_)
     let tracked_path = tracked.contains(normalized_path)
-    if force_remove || (remove_requested && (tracked_path || not(exists))) {
+    if force_remove || (remove_requested && (tracked_path || !(exists))) {
       remove_paths.push(normalized_path)
     } else if exists {
       if add_requested || tracked_path {
@@ -1184,7 +1184,7 @@ async fn handle_update_index_paths(
     }
   }
   if errors.length() > 0 {
-    if not(quiet) {
+    if !(quiet) {
       for path in errors {
         eprint_line("error: " + path + ": does not exist")
       }
@@ -1245,7 +1245,7 @@ async fn handle_update_index_refresh(
     deleted[path] = true
   }
   let unmerged_paths = @bitlib.read_unmerged_paths(fs, git_dir)
-  if not(allow_unmerged) {
+  if !(allow_unmerged) {
     let selected_unmerged_paths : Map[String, Bool] = {}
     for item in stage_entries {
       let normalized_path = normalize_update_index_path(item.entry.path)
@@ -1255,7 +1255,7 @@ async fn handle_update_index_refresh(
       }
     }
     if selected_unmerged_paths.length() > 0 {
-      if not(quiet) {
+      if !(quiet) {
         for item in selected_unmerged_paths.to_array() {
           let (path, _) = item
           print_line(path)
@@ -1277,7 +1277,7 @@ async fn handle_update_index_refresh(
   let mut force_write = false
   for entry in entries {
     let normalized_path = normalize_update_index_path(entry.path)
-    if requested.length() > 0 && not(requested.contains(normalized_path)) {
+    if requested.length() > 0 && !(requested.contains(normalized_path)) {
       refreshed.push(entry)
       continue
     }
@@ -1291,7 +1291,7 @@ async fn handle_update_index_refresh(
       }
       if update_index_gitlink_is_modified(fs, root, normalized_path, entry.id) {
         has_error = true
-        if not(quiet) {
+        if !(quiet) {
           print_line(normalized_path)
         }
       }
@@ -1299,9 +1299,9 @@ async fn handle_update_index_refresh(
     }
     if deleted.contains(normalized_path) {
       refreshed.push(entry)
-      if not(ignore_missing) {
+      if !(ignore_missing) {
         has_error = true
-        if not(quiet) {
+        if !(quiet) {
           print_line(normalized_path)
         }
       }
@@ -1310,7 +1310,7 @@ async fn handle_update_index_refresh(
     if modified.contains(normalized_path) {
       refreshed.push(entry)
       has_error = true
-      if not(quiet) {
+      if !(quiet) {
         print_line(normalized_path)
       }
       continue
@@ -1328,7 +1328,7 @@ async fn handle_update_index_refresh(
           } else {
             refreshed.push(entry)
             has_error = true
-            if not(quiet) {
+            if !(quiet) {
               print_line(normalized_path)
             }
           }
@@ -1353,9 +1353,9 @@ async fn handle_update_index_refresh(
       }
       None => {
         refreshed.push(entry)
-        if not(ignore_missing) {
+        if !(ignore_missing) {
           has_error = true
-          if not(quiet) {
+          if !(quiet) {
             print_line(normalized_path)
           }
         }
@@ -1369,7 +1369,7 @@ async fn handle_update_index_refresh(
     }
     merged_stage_entries.append(preserved_unmerged_stage_entries)
     update_index_write_stage_entries(fs, git_dir, merged_stage_entries)
-  } else if force_write || not(update_index_entries_equal(entries, refreshed)) {
+  } else if force_write || !(update_index_entries_equal(entries, refreshed)) {
     update_index_write_entries_preserving_flags(fs, git_dir, refreshed)
   }
   if has_error {
@@ -1414,7 +1414,7 @@ async fn handle_update_index_again(
       deleted_paths.push(path)
     }
   }
-  if deleted_paths.length() > 0 && not(remove_missing) {
+  if deleted_paths.length() > 0 && !(remove_missing) {
     @sys.exit(1)
   }
   if modified_paths.length() > 0 {
@@ -1425,7 +1425,7 @@ async fn handle_update_index_again(
     }
     let filtered_entries : Array[@bitlib.IndexEntry] = []
     for entry in existing_entries {
-      if not(add_set.contains(normalize_update_index_path(entry.path))) {
+      if !(add_set.contains(normalize_update_index_path(entry.path))) {
         filtered_entries.push(entry)
       }
     }
@@ -1440,7 +1440,7 @@ async fn handle_update_index_again(
     }
     let filtered : Array[@bitlib.IndexEntry] = []
     for entry in entries {
-      if not(deleted_set.contains(normalize_update_index_path(entry.path))) {
+      if !(deleted_set.contains(normalize_update_index_path(entry.path))) {
         filtered.push(entry)
       }
     }

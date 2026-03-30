@@ -22,11 +22,11 @@ async fn handle_merge_index(args : Array[String]) -> Unit raise Error {
       "-o" => one_shot = true
       "-q" => quiet = true
       "-a" => process_all = true
-      _ if not(found_program) && not(arg.has_prefix("-")) => {
+      _ if !(found_program) && !(arg.has_prefix("-")) => {
         merge_program = arg
         found_program = true
       }
-      _ if found_program && not(arg.has_prefix("-")) => files.push(arg)
+      _ if found_program && !(arg.has_prefix("-")) => files.push(arg)
       _ if arg.has_prefix("-") => warn_unimplemented_arg("merge-index", arg)
       _ => ()
     }
@@ -39,7 +39,7 @@ async fn handle_merge_index(args : Array[String]) -> Unit raise Error {
     @sys.exit(1)
     return
   }
-  if not(process_all) && files.length() == 0 {
+  if !(process_all) && files.length() == 0 {
     eprint_line(
       "usage: git merge-index [-o] [-q] <merge-program> (-a | <file>...)",
     )
@@ -65,7 +65,7 @@ async fn handle_merge_index(args : Array[String]) -> Unit raise Error {
   let null_oid = "0000000000000000000000000000000000000000"
   // Process each unmerged file
   for path, stages in unmerged {
-    if not(process_all) && not(files.contains(path)) {
+    if !(process_all) && !(files.contains(path)) {
       continue
     }
     // Find stage 1 (base), 2 (ours), 3 (theirs)
@@ -108,11 +108,11 @@ async fn handle_merge_index(args : Array[String]) -> Unit raise Error {
       stderr=@stdio.stderr,
     )
     if code != 0 {
-      if not(quiet) {
+      if !(quiet) {
         eprint_line("merge program failed for \{path}")
       }
       had_failures = true
-      if not(one_shot) {
+      if !(one_shot) {
         @sys.exit(1)
         return
       }
