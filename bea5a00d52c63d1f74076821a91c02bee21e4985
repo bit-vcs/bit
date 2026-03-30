@@ -1,0 +1,29 @@
+version 1
+key hub/work-item/9faafc07/meta
+kind work-item
+clock test <test@example.com>=1
+timestamp 1774857087
+node test <test@example.com>
+deleted 0
+
+work-item 9faafc07
+title bithub/ui に API-first な task UI を実装する
+author test <test@example.com>
+created 1774857087
+updated 1774857087
+state open
+parent f2b91294
+
+目的
+- GitHub ライクな task UI を bithub に集約し、bit-relay / bit metadata を操作できるようにする
+
+やること
+- bithub/ui 以下に issues / prs / runs / artifacts 向け UI を配置する
+- API contract を先に定義し、UI は API client として実装する
+- issue list/detail、pr list/detail、run list/detail、artifact browser の最小画面を作る
+- relay presence / sync status / conflict status を表示できるようにする
+
+完了条件
+- UI 実装の配置と shared API schema が決まっている
+- issue と run の主要画面が閲覧できる
+- 書き込み操作が API 経由で行える
