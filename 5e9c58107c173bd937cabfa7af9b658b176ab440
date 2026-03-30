@@ -1,0 +1,56 @@
+version 1
+key hub/issue/21b7e618/comment/ccc4364b
+kind issue.comment
+clock test <test@example.com>=1
+timestamp 1774858567
+node test <test@example.com>
+deleted 0
+
+comment ccc4364b
+issue 21b7e618
+author test <test@example.com>
+created 1774858567
+
+source-of-truth draft
+
+責務表
+- Git notes (`refs/notes/bit-hub`)
+  - canonical
+  - work-item, issue/pr metadata, comments, reviews, workflow summary, check summary, sync mapping を保持する
+- bit-relay
+  - non-canonical
+  - mutation transport, notify transport, replay cursor, fan-out, P2P sync index を担当する
+- blob/object storage
+  - canonical for runtime payloads
+  - full logs, step logs, artifacts, cache payload を保持する
+- local runner workspace
+  - ephemeral
+  - 実行中の working directory, temp files, intermediate outputs を保持する
+- bithub read model
+  - derived
+  - Git metadata と blob ref と relay status から画面表示を構成する
+- GitHub adapter
+  - external mirror
+  - GitHub Issues / PRs / workflow state との同期窓口。core の source of truth ではない
+
+write path
+1. user action or API call creates a local mutation
+2. bit writes canonical metadata to Git notes
+3. bit publishes the mutation to relay for fan-out
+4. relay peers fetch/apply into their local Git notes
+5. run execution writes logs/artifacts to blob store and summary back to Git
+6. optional GitHub adapter pushes or pulls mapped records
+
+idempotency / conflict
+- Git metadata は record key 単位で idempotent write を前提にする
+- relay は message id 単位で dedupe する
+- blob store は content digest 単位で dedupe する
+- GitHub sync conflict は `hub.sync.link.v2` と local updated_at / remote updated_at を使って判定する
+
+設計ルール
+- merge gate が必要とする情報は Git に置く
+- UI が重い payload を読む場合は blob ref をたどる
+- relay 障害時も local Git metadata の読み書きは継続できる
+- GitHub が落ちていても core collaboration は継続できる
+
+次に docs に責務表を反映するか、relay mutation API の contract に進む。
