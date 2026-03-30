@@ -1,0 +1,35 @@
+version 1
+key hub/work-item/21b7e618/meta
+kind work-item
+clock test <test@example.com>=1
+timestamp 1774856888
+node test <test@example.com>
+deleted 0
+
+work-item 21b7e618
+title Hub source-of-truth を整理する: metadata は Git、sync は relay、logs/artifacts は blob store
+author test <test@example.com>
+created 1774856888
+updated 1774856888
+state open
+parent f2b91294
+
+決めること
+- 何を Git に保存するか
+- 何を relay / object store に保存するか
+- 何を cache とみなすか
+
+提案
+- issue / pr / review / labels / comments / workflow summary / check summary は Git notes を canonical にする
+- relay は publish / subscribe / mutation transport と index に使う
+- run log / artifact / cache は blob store を canonical にし、Git には要約と参照だけ残す
+
+やること
+- source-of-truth の責務表を作る
+- bit / bit-relay / bithub / actrun の read/write 境界を定義する
+- sync / retry / idempotency / conflict resolution の基本方針を決める
+
+完了条件
+- component ごとの責務が docs に明文化されている
+- metadata と runtime data の保存先が固定されている
+- 実装時の adapter 境界が分かる
