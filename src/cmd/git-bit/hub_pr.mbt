@@ -1,6 +1,6 @@
 ///|
 fn print_hub_pr_usage() -> Unit {
-  println("Usage: bit pr <subcommand> [<args>]")
+  println("Usage: git-bit pr <subcommand> [<args>]")
   println("")
   println("Subcommands:")
   println(
@@ -80,7 +80,7 @@ async fn handle_hub_pr(args : Array[String]) -> Unit raise Error {
     "init" => handle_hub_pr_init(rest)
     "help" | "-h" | "--help" => print_hub_pr_usage()
     _ => {
-      eprint_line("bit pr: unknown subcommand '\{subcmd}'")
+      eprint_line("git-bit pr: unknown subcommand '\{subcmd}'")
       print_hub_pr_usage()
       @sys.exit(1)
     }
@@ -91,7 +91,7 @@ async fn handle_hub_pr(args : Array[String]) -> Unit raise Error {
 fn parse_hub_pr_list_options(
   args : Array[String],
 ) -> HubWorkItemListOptions raise @bitcore.GitError {
-  parse_hub_list_options(args, "bit pr list", "PR", true, true)
+  parse_hub_list_options(args, "git-bit pr list", "PR", true, true)
 }
 
 ///|
@@ -177,7 +177,7 @@ async fn handle_hub_pr_status(args : Array[String]) -> Unit raise Error {
     return ()
   }
   let branch_ids : Array[String] = []
-  match detect_current_branch_name(git_dir) {
+  match detect_hub_current_branch_name(root) {
     Some(branch) => {
       print_line("Current branch: \{branch}")
       let mut branch_count = 0
@@ -232,7 +232,7 @@ async fn handle_hub_pr_import(args : Array[String]) -> Unit raise Error {
       }
       "--repo" =>
         raise @bitcore.GitError::InvalidObject(
-          "hub pr import: --repo requires a value",
+          "git-bit pr import: --repo requires a value",
         )
       _ if arg.has_prefix("--repo=") => {
         repo = Some(String::unsafe_substring(arg, start=7, end=arg.length()))
@@ -246,7 +246,7 @@ async fn handle_hub_pr_import(args : Array[String]) -> Unit raise Error {
       }
       "--state" =>
         raise @bitcore.GitError::InvalidObject(
-          "hub pr import: --state requires a value",
+          "git-bit pr import: --state requires a value",
         )
       _ if arg.has_prefix("--state=") => {
         state = String::unsafe_substring(arg, start=8, end=arg.length())
@@ -265,7 +265,7 @@ async fn handle_hub_pr_import(args : Array[String]) -> Unit raise Error {
       }
       "--limit" =>
         raise @bitcore.GitError::InvalidObject(
-          "hub pr import: --limit requires a value",
+          "git-bit pr import: --limit requires a value",
         )
       "--provider" if i + 1 < args.length() => {
         provider = parse_github_import_provider_option(args[i + 1])
@@ -274,7 +274,7 @@ async fn handle_hub_pr_import(args : Array[String]) -> Unit raise Error {
       }
       "--provider" =>
         raise @bitcore.GitError::InvalidObject(
-          "hub pr import: --provider requires a value",
+          "git-bit pr import: --provider requires a value",
         )
       "--input" if i + 1 < args.length() => {
         input_path = Some(args[i + 1])
@@ -283,7 +283,7 @@ async fn handle_hub_pr_import(args : Array[String]) -> Unit raise Error {
       }
       "--input" =>
         raise @bitcore.GitError::InvalidObject(
-          "hub pr import: --input requires a value",
+          "git-bit pr import: --input requires a value",
         )
       _ if arg.has_prefix("--limit=") => {
         let value = String::unsafe_substring(arg, start=8, end=arg.length())
@@ -328,7 +328,7 @@ async fn handle_hub_pr_import(args : Array[String]) -> Unit raise Error {
       gh_pr_list(repo_name, state_value, limit)
     }
     GitHubImportProvider::JsonFile =>
-      read_import_json_from_file(fs, "hub pr import", input_path)
+      read_import_json_from_file(fs, "git-bit pr import", input_path)
   }
   let prs = parse_gh_prs(stdout)
   if prs.length() == 0 {
@@ -967,7 +967,7 @@ async fn handle_hub_pr_comment(args : Array[String]) -> Unit raise Error {
     "list" => handle_hub_pr_comment_list(rest)
     "help" | "-h" | "--help" => print_hub_pr_usage()
     _ => {
-      eprint_line("bit pr comment: unknown subcommand '\{subcmd}'")
+      eprint_line("git-bit pr comment: unknown subcommand '\{subcmd}'")
       print_hub_pr_usage()
       @sys.exit(1)
     }
@@ -1137,7 +1137,7 @@ async fn handle_hub_pr_review(args : Array[String]) -> Unit raise Error {
     "list" => handle_hub_pr_review_list(rest)
     "help" | "-h" | "--help" => print_hub_pr_usage()
     _ => {
-      eprint_line("bit pr review: unknown subcommand '\{subcmd}'")
+      eprint_line("git-bit pr review: unknown subcommand '\{subcmd}'")
       print_hub_pr_usage()
       @sys.exit(1)
     }
@@ -1312,7 +1312,7 @@ async fn handle_hub_pr_workflow(args : Array[String]) -> Unit raise Error {
     "list" => handle_hub_pr_workflow_list(rest)
     "help" | "-h" | "--help" => print_hub_pr_usage()
     _ => {
-      eprint_line("bit pr workflow: unknown subcommand '\{subcmd}'")
+      eprint_line("git-bit pr workflow: unknown subcommand '\{subcmd}'")
       print_hub_pr_usage()
       @sys.exit(1)
     }

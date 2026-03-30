@@ -55,12 +55,7 @@ warnings = "-12-29-67"
 
 options(
   is_main: true,
-  "native-stub": [
-    "bench_suppress_stub.c",
-    "hub_libgit2_stub.c",
-    "sigpipe_stub.c",
-    "time_stub.c",
-  ],
+  "native-stub": [ "bench_suppress_stub.c", "sigpipe_stub.c", "time_stub.c" ],
   targets: {
     "add.mbt": [ "native" ],
     "add_wbtest.mbt": [ "native" ],
@@ -172,12 +167,10 @@ options(
     "hub_helpers.mbt": [ "native" ],
     "hub_import.mbt": [ "native" ],
     "hub_issue.mbt": [ "native" ],
-    "hub_libgit2_native.mbt": [ "native" ],
     "hub_note.mbt": [ "native" ],
     "hub_pr.mbt": [ "native" ],
     "hub_search.mbt": [ "native" ],
     "hub_stores.mbt": [ "native" ],
-    "hub_stores_wbtest.mbt": [ "native" ],
     "hub_sync.mbt": [ "native" ],
     "index_pack.mbt": [ "native" ],
     "init.mbt": [ "native" ],

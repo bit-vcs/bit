@@ -1,4 +1,19 @@
 ///|
+fn cleanup_tree(fs : OsFs, path : String) -> Unit {
+  if fs.is_dir(path) {
+    @bitlib.remove_tree(fs, fs, path)
+  }
+}
+
+///|
+fn add_test_restore_env(name : String, value : String?) -> Unit {
+  match value {
+    Some(val) => @sys.set_env_var(name, val)
+    None => @sys.unset_env_var(name)
+  }
+}
+
+///|
 test "hub backend: parse backend kind aliases" {
   match parse_hub_repo_backend_kind("bit") {
     Some(HubRepoBackendKind::Bit) => ()
@@ -44,7 +59,6 @@ test "hub backend: resolve shared git dir follows commondir file" {
 
 ///|
 async test "hub backend: git backend resolves git dir and current branch" {
-  @bitnative.init_native_io()
   if not(can_use_hub_git_backend()) {
     return ()
   }
@@ -69,7 +83,7 @@ async test "hub backend: git backend resolves git dir and current branch" {
   @sys.unset_env_var("GIT_DIR")
   @sys.unset_env_var("GIT_WORK_TREE")
 
-  handle_init(["-q", root])
+  @bitrepo.init_repo(fs, root, default_branch="main")
 
   assert_eq(resolve_hub_git_dir(root), root + "/.git")
   assert_eq(detect_hub_current_branch_name(root), Some("main"))

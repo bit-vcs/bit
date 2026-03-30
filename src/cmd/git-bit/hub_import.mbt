@@ -347,10 +347,22 @@ fn parse_gh_issues(text : String) -> Array[@hub.Issue] raise @bitcore.GitError {
 }
 
 ///|
+fn parse_branch_ref_name(ref_name : String) -> String? {
+  let text = trim_string(ref_name)
+  if text.has_prefix("refs/heads/") {
+    Some(String::unsafe_substring(text, start=11, end=text.length()))
+  } else {
+    None
+  }
+}
+
+///|
 fn parse_head_branch_name(head_content : String) -> String? {
   let text = trim_string(head_content)
-  if text.has_prefix("ref: refs/heads/") {
-    Some(String::unsafe_substring(text, start=16, end=text.length()))
+  if text.has_prefix("ref: ") {
+    parse_branch_ref_name(
+      String::unsafe_substring(text, start=5, end=text.length()),
+    )
   } else {
     None
   }
