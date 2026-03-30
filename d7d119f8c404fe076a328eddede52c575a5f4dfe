@@ -1,0 +1,34 @@
+version 1
+key hub/work-item/bec2b506/meta
+kind work-item
+clock test <test@example.com>=1
+timestamp 1774856949
+node test <test@example.com>
+deleted 0
+
+work-item bec2b506
+title bit issue と GitHub Issues の sync adapter を実装する
+author test <test@example.com>
+created 1774856949
+updated 1774856949
+state open
+parent f2b91294
+
+目的
+- bit issue を GitHub Issues と双方向同期できるようにする
+
+スコープ
+- まずは issue のみを対象にする
+- title / body / state / labels / assignees / comments を同期対象にする
+- PR / review / workflow sync は後続 issue に分ける
+
+やること
+- local issue id と GitHub issue number/node_id の対応 record を定義する
+- pull / push / dry-run / conflict policy を実装する
+- webhook なしでも定期 pull で追従できるようにする
+- 後で webhook / relay trigger と接続できる形にする
+
+完了条件
+- `bit issue sync pull|push` 相当の CLI が定義されている
+- mapping record と conflict policy が docs 化されている
+- 少なくとも issue create/update/close/comment が同期できる
