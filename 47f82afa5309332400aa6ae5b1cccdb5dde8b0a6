@@ -1,0 +1,63 @@
+version 1
+key hub/issue/9b3bbf37/comment/ab76af5e
+kind issue.comment
+clock test <test@example.com>=1
+timestamp 1774858698
+node test <test@example.com>
+deleted 0
+
+comment ab76af5e
+issue 9b3bbf37
+author test <test@example.com>
+created 1774858698
+
+proposal
+
+結論
+- sub-issue の存在は default list でも見えるべき
+- ただし default で全 child を常に展開するのは避ける
+
+提案する CLI 挙動
+1. default (`bit issue list`)
+- top-level issue のみ表示
+- 親 issue には child count を出す
+- 例: `#f2b91294 [open] ... (sub: 9)`
+
+2. tree view (`bit issue list --tree`)
+- parent/child を indent 表示する
+- default depth は 1 でよい
+- 必要なら後で `--depth <n>` を追加できるようにしておく
+
+3. flat view (`bit issue list --all`)
+- 既存どおり全件フラット表示
+- summary に `parent: <id>` を出すと追いやすい
+
+4. child-only view (`bit issue list --parent <id>`)
+- 既存どおり特定 parent の child だけ表示
+
+5. get view (`bit issue get <id>`)
+- 現状どおり parent と sub-issues を表示
+- summary count と detail list の両方があるとよい
+
+help / docs
+- `bit issue help` に `--all`, `--tree`, `--parent <id>` を明記する
+- README の task 管理例に parent/child の見え方を追加する
+
+summary 表示案
+- default: `#id [state] title (sub: N)`
+- flat with child: `#id [state] title (parent: PARENT_ID)`
+- tree child: `  #id [state] title`
+
+設計意図
+- 存在を見失わない
+- default list の一覧性を壊さない
+- GitHub ライクな理解コストを維持する
+
+実装順
+- まず help/doc を直す
+- 次に summary formatter に child count / parent 表示を追加する
+- 最後に `--tree` を実装する
+
+open question
+- default list で child count だけにするか、最初の数件だけ inline preview するか
+  - 現時点では count のみ推奨
