@@ -992,6 +992,105 @@ test "hub format: format_work_item_summary includes kind and state" {
 }
 
 ///|
+test "hub format: format_issue_summary shows sub counts and parent context" {
+  let parent = @hub.Issue::new(
+    "i-parent",
+    "Parent issue",
+    "body",
+    "alice",
+    1L,
+    1L,
+    @hub.IssueState::Open,
+  )
+  let child = @hub.Issue::new(
+    "i-child",
+    "Child issue",
+    "body",
+    "alice",
+    2L,
+    2L,
+    @hub.IssueState::Open,
+    parent_id=Some("i-parent"),
+  )
+  let parent_out = format_issue_summary(parent, child_count=2)
+  assert_true(parent_out.contains("#i-parent"))
+  assert_true(parent_out.contains("(sub: 2)"))
+  let child_out = format_issue_summary(child, show_parent=true)
+  assert_true(child_out.contains("#i-child"))
+  assert_true(child_out.contains("(parent: i-parent)"))
+  let nested_out = format_issue_summary(child, child_count=1, show_parent=true)
+  assert_true(nested_out.contains("sub: 1"))
+  assert_true(nested_out.contains("parent: i-parent"))
+}
+
+///|
+test "hub issue list: collect_issue_list_lines shows top-level counts and tree" {
+  let parent = @hub.Issue::new(
+    "i-parent",
+    "Parent issue",
+    "body",
+    "alice",
+    1L,
+    1L,
+    @hub.IssueState::Open,
+  )
+  let child = @hub.Issue::new(
+    "i-child",
+    "Child issue",
+    "body",
+    "alice",
+    2L,
+    2L,
+    @hub.IssueState::Open,
+    parent_id=Some("i-parent"),
+  )
+  let grandchild = @hub.Issue::new(
+    "i-grandchild",
+    "Grandchild issue",
+    "body",
+    "alice",
+    3L,
+    3L,
+    @hub.IssueState::Open,
+    parent_id=Some("i-child"),
+  )
+  let sibling = @hub.Issue::new(
+    "i-sibling",
+    "Sibling issue",
+    "body",
+    "alice",
+    4L,
+    4L,
+    @hub.IssueState::Open,
+  )
+  let issues = [parent, child, grandchild, sibling]
+
+  let top_level = collect_issue_list_lines(issues, false, false, None)
+  assert_eq(top_level.length(), 2)
+  assert_true(top_level[0].contains("#i-parent"))
+  assert_true(top_level[0].contains("(sub: 1)"))
+  assert_true(top_level[1].contains("#i-sibling"))
+
+  let flat = collect_issue_list_lines(issues, true, false, None)
+  assert_eq(flat.length(), 4)
+  assert_true(flat[1].contains("parent: i-parent"))
+  assert_true(flat[1].contains("sub: 1"))
+  assert_true(flat[2].contains("parent: i-child"))
+
+  let tree = collect_issue_list_lines(issues, false, true, None)
+  assert_eq(tree.length(), 4)
+  assert_eq(tree[0], "#i-parent [open] Parent issue (sub: 1)")
+  assert_eq(tree[1], "  #i-child [open] Child issue (sub: 1)")
+  assert_eq(tree[2], "    #i-grandchild [open] Grandchild issue")
+  assert_eq(tree[3], "#i-sibling [open] Sibling issue")
+
+  let child_only = collect_issue_list_lines(issues, false, true, Some("i-parent"))
+  assert_eq(child_only.length(), 2)
+  assert_eq(child_only[0], "#i-child [open] Child issue (sub: 1)")
+  assert_eq(child_only[1], "  #i-grandchild [open] Grandchild issue")
+}
+
+///|
 test "hub init: parse approval accepts only yes-like answers" {
   assert_true(parse_hub_init_approval("y"))
   assert_true(parse_hub_init_approval(" Yes \n"))

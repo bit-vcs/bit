@@ -3,7 +3,9 @@ fn print_hub_issue_usage() -> Unit {
   println("Usage: bit issue <subcommand> [<args>]")
   println("")
   println("Subcommands:")
-  println("  list [--state <open|closed> | --open | --closed] [--limit <n>]")
+  println(
+    "  list [--state <open|closed> | --open | --closed] [--limit <n>] [--all | --tree | --parent <id>]",
+  )
   println(
     "  import [--repo <owner/repo>] [--state <open|closed|all>] [--limit <n>]",
   )
@@ -258,6 +260,150 @@ fn parse_hub_work_item_list_options(
 }
 
 ///|
+fn build_issue_child_counts(
+  issues : Array[@hub.Issue],
+) -> Map[String, Int] {
+  let counts : Map[String, Int] = {}
+  for issue in issues {
+    match issue.parent_id {
+      Some(pid) => counts[pid] = counts.get(pid).unwrap_or(0) + 1
+      None => ()
+    }
+  }
+  counts
+}
+
+///|
+fn build_issue_children_map(
+  issues : Array[@hub.Issue],
+) -> Map[String, Array[@hub.Issue]] {
+  let children : Map[String, Array[@hub.Issue]] = {}
+  for issue in issues {
+    match issue.parent_id {
+      Some(pid) =>
+        match children.get(pid) {
+          Some(arr) => arr.push(issue)
+          None => children[pid] = [issue]
+        }
+      None => ()
+    }
+  }
+  children
+}
+
+///|
+fn issue_tree_indent(depth : Int) -> String {
+  let sb = StringBuilder::new()
+  let mut i = 0
+  while i < depth {
+    sb.write_string("  ")
+    i += 1
+  }
+  sb.to_string()
+}
+
+///|
+fn append_issue_tree_lines(
+  lines : Array[String],
+  issue : @hub.Issue,
+  child_counts : Map[String, Int],
+  children_map : Map[String, Array[@hub.Issue]],
+  depth : Int,
+) -> Unit {
+  let child_count = child_counts.get(issue.id()).unwrap_or(0)
+  lines.push(
+    format_issue_summary(
+      issue,
+      child_count~,
+      indent=issue_tree_indent(depth),
+    ),
+  )
+  match children_map.get(issue.id()) {
+    Some(children) =>
+      for child in children {
+        append_issue_tree_lines(
+          lines,
+          child,
+          child_counts,
+          children_map,
+          depth + 1,
+        )
+      }
+    None => ()
+  }
+}
+
+///|
+fn collect_issue_list_lines(
+  filtered_issues : Array[@hub.Issue],
+  show_all : Bool,
+  tree : Bool,
+  filter_parent : String?,
+) -> Array[String] {
+  let child_counts = build_issue_child_counts(filtered_issues)
+  let children_map = build_issue_children_map(filtered_issues)
+  let lines : Array[String] = []
+  if tree {
+    for issue in filtered_issues {
+      match filter_parent {
+        Some(pid) =>
+          if issue.parent_id == Some(pid) {
+            append_issue_tree_lines(lines, issue, child_counts, children_map, 0)
+          }
+        None =>
+          if issue.parent_id is None {
+            append_issue_tree_lines(lines, issue, child_counts, children_map, 0)
+          }
+      }
+    }
+    return lines
+  }
+  for issue in filtered_issues {
+    match filter_parent {
+      Some(pid) =>
+        if issue.parent_id == Some(pid) {
+          let child_count = child_counts.get(issue.id()).unwrap_or(0)
+          lines.push(format_issue_summary(issue, child_count~))
+        }
+      None =>
+        if show_all || issue.parent_id is None {
+          let child_count = child_counts.get(issue.id()).unwrap_or(0)
+          let show_parent = match issue.parent_id {
+            Some(_) => show_all
+            None => false
+          }
+          lines.push(
+            format_issue_summary(issue, child_count~, show_parent~),
+          )
+        }
+    }
+  }
+  lines
+}
+
+///|
+fn select_issue_list_items(
+  filtered_issues : Array[@hub.Issue],
+  show_all : Bool,
+  filter_parent : String?,
+) -> Array[@hub.Issue] {
+  let issues : Array[@hub.Issue] = []
+  for issue in filtered_issues {
+    match filter_parent {
+      Some(pid) =>
+        if issue.parent_id == Some(pid) {
+          issues.push(issue)
+        }
+      None =>
+        if show_all || issue.parent_id is None {
+          issues.push(issue)
+        }
+    }
+  }
+  issues
+}
+
+///|
 async fn handle_hub_issue_list(args : Array[String]) -> Unit raise Error {
   let options = parse_hub_issue_list_options(args)
   if options.kind is Some(_) {
@@ -266,6 +412,7 @@ async fn handle_hub_issue_list(args : Array[String]) -> Unit raise Error {
   }
   // Parse --all, --parent, --label, --format, and --relay flags
   let mut show_all = false
+  let mut show_tree = false
   let mut filter_parent : String? = None
   let filter_labels : Array[String] = []
   let mut format_json = false
@@ -274,6 +421,7 @@ async fn handle_hub_issue_list(args : Array[String]) -> Unit raise Error {
   while j < args.length() {
     match args[j] {
       "--all" => show_all = true
+      "--tree" => show_tree = true
       "--relay" if j + 1 < args.length() && not(args[j + 1].has_prefix("-")) => {
         relay_url = Some(args[j + 1])
         j += 1
@@ -333,10 +481,9 @@ async fn handle_hub_issue_list(args : Array[String]) -> Unit raise Error {
   let (objects, refs, _clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
   let all_issues = hub.list_issues(objects, state~)
-  // Filter by parent and label
-  let issues : Array[@hub.Issue] = []
+  // Filter by label first so child counts and tree rendering reflect visible items.
+  let filtered_issues : Array[@hub.Issue] = []
   for issue in all_issues {
-    // Label filter: issue must have all specified labels
     if filter_labels.length() > 0 {
       let mut has_all = true
       for label in filter_labels {
@@ -349,26 +496,27 @@ async fn handle_hub_issue_list(args : Array[String]) -> Unit raise Error {
         continue
       }
     }
-    match filter_parent {
-      Some(pid) =>
-        // Show only children of specified parent
-        if issue.parent_id == Some(pid) {
-          issues.push(issue)
-        }
-      None =>
-        if show_all {
-          issues.push(issue)
-        } else if issue.parent_id is None {
-          // Default: show only top-level issues
-          issues.push(issue)
-        }
-    }
+    filtered_issues.push(issue)
   }
-  let raw_limit = options.limit.unwrap_or(issues.length())
-  let limit = if raw_limit < issues.length() {
+  let selected_issues = select_issue_list_items(
+    filtered_issues,
+    show_all,
+    filter_parent,
+  )
+  let lines = collect_issue_list_lines(
+    filtered_issues,
+    show_all,
+    show_tree,
+    filter_parent,
+  )
+  let raw_limit = options.limit.unwrap_or(
+    if format_json { selected_issues.length() } else { lines.length() },
+  )
+  let total = if format_json { selected_issues.length() } else { lines.length() }
+  let limit = if raw_limit < total {
     raw_limit
   } else {
-    issues.length()
+    total
   }
   if limit == 0 {
     if format_json {
@@ -382,14 +530,14 @@ async fn handle_hub_issue_list(args : Array[String]) -> Unit raise Error {
     let parts : Array[String] = []
     let mut i = 0
     while i < limit {
-      parts.push(format_issue_json(issues[i]))
+      parts.push(format_issue_json(selected_issues[i]))
       i += 1
     }
     print_line("[" + parts.join(",") + "]")
   } else {
     let mut i = 0
     while i < limit {
-      issues[i] |> format_issue_summary |> print_line
+      lines[i] |> print_line
       i += 1
     }
   }

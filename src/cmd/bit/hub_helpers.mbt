@@ -351,11 +351,32 @@ fn format_pr_summary(pr : @hub.PullRequest) -> String {
 }
 
 ///|
-fn format_issue_summary(issue : @hub.Issue) -> String {
+fn format_issue_summary(
+  issue : @hub.Issue,
+  child_count? : Int = 0,
+  show_parent? : Bool = false,
+  indent? : String = "",
+) -> String {
   let id = issue.id()
   let title = issue.title()
   let state = issue.state().to_string()
-  "#\{id} [\{state}] \{title}"
+  let sb = StringBuilder::new()
+  sb.write_string(indent)
+  sb.write_string("#\{id} [\{state}] \{title}")
+  let detail_parts : Array[String] = []
+  if child_count > 0 {
+    detail_parts.push("sub: \{child_count}")
+  }
+  if show_parent {
+    match issue.parent_id {
+      Some(pid) => detail_parts.push("parent: \{pid}")
+      None => ()
+    }
+  }
+  if detail_parts.length() > 0 {
+    sb.write_string(" (" + detail_parts.join(", ") + ")")
+  }
+  sb.to_string()
 }
 
 ///|

@@ -61,7 +61,10 @@ BIT_HUB_INIT_PROMPT=0 bit pr init
 
 # Local issues
 bit issue create --title "Cache invalidation bug" --body "status view stays stale"
-bit issue list --open
+bit issue list --open             # top-level issues, with sub-issue counts
+bit issue list --tree             # parent/child tree
+bit issue list --all              # flat list including children
+bit issue list --parent <issue-id>
 
 # Local pull requests
 bit pr create --title "Fix cache invalidation" --body "refresh status after write" \
