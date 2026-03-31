@@ -233,7 +233,7 @@ Timestamps are Unix epoch seconds. `parent_id` is `null` for top-level issues.
 - **`update --label` replaces all labels**: Pass all desired labels every time. Omitting an existing label removes it.
 - **Closing a parent does not close children**: Each sub-issue must be closed individually.
 - **`close` is idempotent but messages differ**: First call prints `Closed issue #<id>`, subsequent calls print `Issue #<id> is already closed`. Both are success (exit 0).
-- **`comment list` is newest-first**: Comments are returned in reverse chronological order.
+- **`comment list` is oldest-first**: Comments are returned in chronological order (oldest first).
 - **`--tree` is unreliable**: The flag is accepted but currently renders a flat list without indentation. Use `--parent <id>` for reliable sub-issue listing.
 - **CLI `--help` is incomplete**: Some flags (`--all`, `--body-append`, `--format`, `--parent`) work but are not shown in `--help` output. This skill doc is the authoritative reference.
 
