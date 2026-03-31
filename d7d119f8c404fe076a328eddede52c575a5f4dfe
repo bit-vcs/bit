@@ -1,8 +1,8 @@
 version 1
 key hub/work-item/bec2b506/meta
 kind work-item
-clock test <test@example.com>=1
-timestamp 1774856949
+clock test <test@example.com>=2
+timestamp 1774969708
 node test <test@example.com>
 deleted 0
 
@@ -10,25 +10,50 @@ work-item bec2b506
 title bit issue と GitHub Issues の sync adapter を実装する
 author test <test@example.com>
 created 1774856949
-updated 1774856949
+updated 1774969708
 state open
 parent f2b91294
 
-目的
-- bit issue を GitHub Issues と双方向同期できるようにする
+## 目的
 
-スコープ
+bit issue を GitHub Issues と双方向同期できるようにする。
+
+## スコープ
+
 - まずは issue のみを対象にする
 - title / body / state / labels / assignees / comments を同期対象にする
 - PR / review / workflow sync は後続 issue に分ける
 
-やること
-- local issue id と GitHub issue number/node_id の対応 record を定義する
-- pull / push / dry-run / conflict policy を実装する
-- webhook なしでも定期 pull で追従できるようにする
-- 後で webhook / relay trigger と接続できる形にする
+## CLI 設計
 
-完了条件
+```
+bit issue sync pull  [--repo <owner/repo>] [--since <datetime>] [--dry-run]
+bit issue sync push  [--repo <owner/repo>] [--dry-run] [--label <filter>]
+bit issue sync       [--repo <owner/repo>] [--dry-run] [--conflict <policy>]
+bit issue sync status [--repo <owner/repo>]
+```
+
+## Conflict Policy
+
+- **github-wins** (default): GitHub 側が常に勝つ
+- **bit-wins**: bit 側が常に勝つ
+- **newer-wins**: updated_at が新しい方が勝つ
+- **manual**: conflict をスキップしてレポート
+
+## 除外ルール
+
+- `session:*` ラベルの issue は push 対象外 (ローカル作業用)
+- sub-issue の親子関係は GitHub 側では表現しない
+
+## 実装順序
+
+1. #4e8ca08b mapping record (基盤)
+2. #501a2162 sync pull (GitHub → bit)
+3. #f68d9604 sync push (bit → GitHub)
+4. #17631bfe 統合 sync コマンド + status + import 改善
+
+## 完了条件
+
 - `bit issue sync pull|push` 相当の CLI が定義されている
 - mapping record と conflict policy が docs 化されている
 - 少なくとも issue create/update/close/comment が同期できる
