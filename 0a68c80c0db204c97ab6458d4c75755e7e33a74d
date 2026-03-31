@@ -1,8 +1,8 @@
 version 1
 key hub/work-item/fe160276/meta
 kind work-item
-clock test <test@example.com>=1
-timestamp 1774970273
+clock test <test@example.com>=2
+timestamp 1774970279
 node test <test@example.com>
 deleted 0
 
@@ -10,9 +10,10 @@ work-item fe160276
 title [eval-round1] test issue
 author test <test@example.com>
 created 1774970273
-updated 1774970273
+updated 1774970279
 state open
 label test
 parent bec2b506
 
 Round 1 evaluation test
+Appended in round 1
