@@ -1,7 +1,7 @@
 version 1
 key hub/work-item/3f946e1d/meta
 kind work-item
-clock test <test@example.com>=5
+clock test <test@example.com>=6
 timestamp 1774970325
 node test <test@example.com>
 deleted 0
@@ -11,7 +11,7 @@ title [eval-round2] renamed
 author test <test@example.com>
 created 1774970285
 updated 1774970325
-state open
+state closed
 label test
 label edge-case
 
