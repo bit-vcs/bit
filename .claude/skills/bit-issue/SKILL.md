@@ -23,7 +23,13 @@ This configures `refs/notes/bit-hub` refspecs on origin so issues travel with `g
 bit issue create --title "Add error handling to parser" \
   --label "bug" --label "priority:high" \
   --body "Parser panics on malformed input at line 42"
+# Output:
+#   issue abc12345
+#   title Add error handling to parser
+#   ...
 ```
+
+The first line of output is `issue <id>` — extract the ID from there (e.g., `abc12345`).
 
 ### List issues
 
@@ -59,6 +65,15 @@ bit issue comment add <id> --body "Fixed in commit abc123"
 bit issue close <id>                    # idempotent
 ```
 
+**Label behavior**: `--label` **replaces** the entire label set. To add a label while keeping existing ones, include all labels:
+
+```bash
+# NG: drops existing labels
+bit issue update <id> --label "in-progress"
+# OK: keeps "bug" and adds "in-progress"
+bit issue update <id> --label "bug" --label "in-progress"
+```
+
 ## Sub-issues
 
 Break complex tasks into smaller items:
@@ -72,10 +87,13 @@ bit issue create --title "Refactor HTTP client" --label "epic"
 bit issue create --title "Extract connection pool" --parent abc12345
 bit issue create --title "Add retry logic" --parent abc12345
 
-# View hierarchy
-bit issue list --tree
+# View children (all states by default)
 bit issue list --parent abc12345
+bit issue list --parent abc12345 --state open        # open children only
+bit issue list --parent abc12345 --label "bug"       # filter children by label
 ```
+
+Note: Closing a parent does **not** auto-close its children. Close each sub-issue individually.
 
 ## Search
 
@@ -184,12 +202,38 @@ bit issue watch                         # stream claim/unclaim events in real-ti
 | `bit issue claims` | List active claims (optional) |
 | `bit issue watch` | Stream claim events in real-time (optional) |
 
+## JSON Output Schema
+
+`--format json` returns an array of objects:
+
+```json
+[{
+  "id": "bec2b506",
+  "title": "Issue title",
+  "state": "open",
+  "author": "name <email>",
+  "created_at": 1774856949,
+  "updated_at": 1774856949,
+  "body": "Issue body text",
+  "labels": ["bug", "priority:high"],
+  "assignees": [],
+  "linked_prs": [],
+  "parent_id": null
+}]
+```
+
+Timestamps are Unix epoch seconds. `parent_id` is `null` for top-level issues.
+
 ## Gotchas
 
 - **`list` shows all states by default**: Use `--state open` or `--state closed` to filter. Without `--state`, both open and closed issues are shown.
 - **`list` hides sub-issues by default**: Use `--all` to include them. `--parent <id>` shows all states of children by default.
 - **`get` does not show comments**: Use `bit issue comment list <id>` separately to read comments.
 - **`search` returns all states**: Open and closed issues are both returned unless `--state` is specified.
+- **`update --label` replaces all labels**: Pass all desired labels every time. Omitting an existing label removes it.
+- **Closing a parent does not close children**: Each sub-issue must be closed individually.
+- **`close` is idempotent but messages differ**: First call prints `Closed issue #<id>`, subsequent calls print `Issue #<id> is already closed`. Both are success (exit 0).
+- **`comment list` is newest-first**: Comments are returned in reverse chronological order.
 - **`--tree` is unreliable**: The flag is accepted but currently renders a flat list without indentation. Use `--parent <id>` for reliable sub-issue listing.
 - **CLI `--help` is incomplete**: Some flags (`--all`, `--body-append`, `--format`, `--parent`) work but are not shown in `--help` output. This skill doc is the authoritative reference.
 
