@@ -1,8 +1,8 @@
 version 1
 key hub/work-item/e1d8ab74/meta
 kind work-item
-clock test <test@example.com>=1
-timestamp 1774970272
+clock test <test@example.com>=2
+timestamp 1774970323
 node test <test@example.com>
 deleted 0
 
@@ -10,8 +10,8 @@ work-item e1d8ab74
 title [eval-round3] parent
 author test <test@example.com>
 created 1774970272
-updated 1774970272
-state open
+updated 1774970323
+state closed
 label test
 
 parent issue
