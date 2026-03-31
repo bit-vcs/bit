@@ -1,0 +1,48 @@
+version 1
+key hub/work-item/f68d9604/meta
+kind work-item
+clock test <test@example.com>=1
+timestamp 1774969679
+node test <test@example.com>
+deleted 0
+
+work-item f68d9604
+title bit issue sync push: bit → GitHub の差分反映
+author test <test@example.com>
+created 1774969679
+updated 1774969679
+state open
+label hub
+parent bec2b506
+
+## 概要
+
+bit issue の変更を GitHub Issues に反映する push コマンド。
+
+## CLI
+
+```
+bit issue sync push [--repo <owner/repo>] [--dry-run] [--label <filter>]
+```
+
+## 動作
+
+1. mapping のある issue: `last_bit_updated_at > last_synced_at` のものを検出
+2. mapping のない issue: 新規作成対象として検出 (`--label` でフィルタ可能)
+3. 新規 bit issue → `gh issue create` + mapping 作成
+4. 更新された bit issue → `gh issue edit` で GitHub を更新
+5. close/reopen → state 同期
+6. コメント → `gh issue comment` (重複チェック付き)
+
+## 注意
+
+- sub-issue の親子関係は GitHub 側では表現しない (GitHub に sub-issue 機能はないため)
+- `session:*` ラベルの issue は push 対象外にする (ローカル作業用)
+- push 前に pull して conflict を解決する (push は pull 込み)
+
+## 完了条件
+
+- `bit issue sync push` で新規 issue が GitHub に作成される
+- 既存 issue の title/body/state/labels 更新が反映される
+- `--dry-run` で変更プレビューが出る
+- session issue が除外される
