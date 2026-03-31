@@ -27,6 +27,11 @@ async fn[T] js_wrap_error_async(
 }
 
 ///|
+fn[T] js_export_promise(f : async () -> T) -> @js_async.Promise[T] {
+  @js_async.Promise::from_async(f)
+}
+
+///|
 fn js_resolve_git_dir(
   fs : LibJsHostFs,
   root : String,
@@ -428,6 +433,14 @@ pub async fn js_status_text(
   js_wrap_error_async(async fn() -> String raise @bit.GitError {
     status_text(fs, root)
   })
+}
+
+///|
+pub fn js_status_text_promise(
+  host_id : Int,
+  root : String,
+) -> @js_async.Promise[Result[String, String]] {
+  js_export_promise(async fn() { js_status_text(host_id, root) })
 }
 
 ///|
@@ -872,6 +885,19 @@ pub async fn js_stash_push(
 }
 
 ///|
+pub fn js_stash_push_promise(
+  host_id : Int,
+  root : String,
+  message : String,
+  author : String,
+  timestamp_secs : Int,
+) -> @js_async.Promise[Result[String, String]] {
+  js_export_promise(async fn() {
+    js_stash_push(host_id, root, message, author, timestamp_secs)
+  })
+}
+
+///|
 pub fn js_stash_apply(
   host_id : Int,
   root : String,
@@ -934,6 +960,14 @@ pub async fn js_diff_worktree(
 }
 
 ///|
+pub fn js_diff_worktree_promise(
+  host_id : Int,
+  root : String,
+) -> @js_async.Promise[Result[Array[String], String]] {
+  js_export_promise(async fn() { js_diff_worktree(host_id, root) })
+}
+
+///|
 pub async fn js_diff_worktree_stat(
   host_id : Int,
   root : String,
@@ -942,6 +976,14 @@ pub async fn js_diff_worktree_stat(
   js_wrap_error_async(async fn() -> Array[String] raise @bit.GitError {
     diff_stat(diff_worktree(fs, root))
   })
+}
+
+///|
+pub fn js_diff_worktree_stat_promise(
+  host_id : Int,
+  root : String,
+) -> @js_async.Promise[Result[Array[String], String]] {
+  js_export_promise(async fn() { js_diff_worktree_stat(host_id, root) })
 }
 
 ///|
@@ -1117,6 +1159,17 @@ fn js_default_push_refname(
 }
 
 ///|
+fn js_head_refname(
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+) -> String raise @bit.GitError {
+  match read_head_ref(rfs, git_dir) {
+    HeadRef::Branch(name) => "refs/heads/" + name
+    HeadRef::Detached(_) => "HEAD"
+  }
+}
+
+///|
 fn js_find_remote_ref(
   refs : Array[(@bit.ObjectId, String)],
   refname : String,
@@ -1250,6 +1303,196 @@ fn js_select_fetch_target(
 }
 
 ///|
+fn js_branch_name_from_refname(refname : String) -> String? {
+  if refname.has_prefix("refs/heads/") {
+    Some(String::unsafe_substring(refname, start=11, end=refname.length()))
+  } else {
+    None
+  }
+}
+
+///|
+fn js_default_clone_branch(
+  refs : Array[(@bit.ObjectId, String)],
+  symrefs : Map[String, String],
+) -> String {
+  match symrefs.get("HEAD") {
+    Some(target) =>
+      match js_branch_name_from_refname(target) {
+        Some(branch) => return branch
+        None => ()
+      }
+    None => ()
+  }
+  for item in refs {
+    let (_, refname) = item
+    match js_branch_name_from_refname(refname) {
+      Some(branch) => return branch
+      None => ()
+    }
+  }
+  "main"
+}
+
+///|
+fn js_write_clone_remote_config(
+  fs : LibJsHostFs,
+  git_dir : String,
+  remote_url : String,
+) -> Unit raise @bit.GitError {
+  set_config_key(fs, fs, git_dir, "remote", "origin", "url", remote_url)
+  set_config_key(
+    fs, fs, git_dir, "remote", "origin", "fetch", "+refs/heads/*:refs/remotes/origin/*",
+  )
+}
+
+///|
+fn js_set_clone_branch_tracking(
+  fs : LibJsHostFs,
+  git_dir : String,
+  branch : String,
+) -> Unit raise @bit.GitError {
+  set_config_key(fs, fs, git_dir, "branch", branch, "remote", "origin")
+  set_config_key(
+    fs,
+    fs,
+    git_dir,
+    "branch",
+    branch,
+    "merge",
+    "refs/heads/" + branch,
+  )
+}
+
+///|
+fn js_write_clone_remote_tracking_ref(
+  fs : LibJsHostFs,
+  git_dir : String,
+  refname : String,
+  commit_id : @bit.ObjectId,
+) -> Unit raise @bit.GitError {
+  match js_branch_name_from_refname(refname) {
+    Some(branch) => {
+      let remote_ref = "refs/remotes/origin/" + branch
+      let remote_ref_path = join_path(git_dir, remote_ref)
+      fs.mkdir_p(rebase_parent_dir(remote_ref_path))
+      fs.write_string(remote_ref_path, commit_id.to_hex() + "\n")
+      let remote_head_path = join_path(git_dir, "refs/remotes/origin/HEAD")
+      fs.mkdir_p(rebase_parent_dir(remote_head_path))
+      fs.write_string(remote_head_path, "ref: " + remote_ref + "\n")
+      js_set_clone_branch_tracking(fs, git_dir, branch)
+    }
+    None => ()
+  }
+}
+
+///|
+pub async fn js_clone_remote(
+  host_id : Int,
+  root : String,
+  remote_url : String,
+  transport_id : Int,
+  prefer_v2 : Bool,
+) -> Result[JsCloneResult, String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error_async(async fn() -> JsCloneResult raise @bit.GitError {
+    let (refs, _caps, _version, symrefs) = @bitnative.discover_upload_refs_with_http(
+      remote_url,
+      prefer_v2,
+      async fn(
+        url : String,
+        headers : Map[String, String],
+      ) -> (@bit.HttpResponse, Bytes) raise @bit.GitError {
+        js_transport_get(transport_id, url, headers)
+      },
+      async fn(
+        url : String,
+        body : Bytes,
+        headers : Map[String, String],
+      ) -> (@bit.HttpResponse, Bytes) raise @bit.GitError {
+        js_transport_post(transport_id, url, body, headers)
+      },
+    )
+    let wants = @protocol.select_default_wants(refs, symrefs)
+    let default_ref = @protocol.select_default_ref(refs, symrefs)
+    match default_ref {
+      None => {
+        let default_branch = js_default_clone_branch(refs, symrefs)
+        init_repo(fs, root, default_branch~)
+        let git_dir = js_resolve_git_dir(fs, root)
+        js_write_clone_remote_config(fs, git_dir, remote_url)
+        js_set_clone_branch_tracking(fs, git_dir, default_branch)
+      }
+      Some((refname, commit_id)) => {
+        if wants.length() > 0 {
+          let pack = @bitnative.fetch_pack_with_http(
+            remote_url,
+            wants,
+            prefer_v2,
+            0,
+            @protocol.FilterSpec::NoFilter,
+            async fn(
+              url : String,
+              headers : Map[String, String],
+            ) -> (@bit.HttpResponse, Bytes) raise @bit.GitError {
+              js_transport_get(transport_id, url, headers)
+            },
+            async fn(
+              url : String,
+              body : Bytes,
+              headers : Map[String, String],
+            ) -> (@bit.HttpResponse, Bytes) raise @bit.GitError {
+              js_transport_post(transport_id, url, body, headers)
+            },
+          )
+          let objects = @pack.parse_packfile(pack)
+          let git_dir = join_path(root, ".git")
+          fs.mkdir_p(join_path(git_dir, "objects/pack"))
+          @pack.write_packfile_with_index(fs, git_dir, pack, objects)
+          let store = @bit.ObjectStore::from_pack(objects)
+          @bit.materialize_clone_to_fs(
+            store, commit_id, refname, remote_url, fs, root,
+          )
+        } else {
+          init_repo(
+            fs,
+            root,
+            default_branch=js_default_clone_branch(refs, symrefs),
+          )
+        }
+        let git_dir = js_resolve_git_dir(fs, root)
+        js_write_clone_remote_config(fs, git_dir, remote_url)
+        js_write_clone_remote_tracking_ref(fs, git_dir, refname, commit_id)
+      }
+    }
+    let git_dir = js_resolve_git_dir(fs, root)
+    let commit_id = resolve_head_commit(fs, git_dir)
+    {
+      status: if commit_id is Some(_) {
+        "cloned"
+      } else {
+        "empty"
+      },
+      commit_id: js_commit_id_or_empty(commit_id),
+      refname: js_head_refname(fs, git_dir),
+    }
+  })
+}
+
+///|
+pub fn js_clone_remote_promise(
+  host_id : Int,
+  root : String,
+  remote_url : String,
+  transport_id : Int,
+  prefer_v2 : Bool,
+) -> @js_async.Promise[Result[JsCloneResult, String]] {
+  js_export_promise(async fn() {
+    js_clone_remote(host_id, root, remote_url, transport_id, prefer_v2)
+  })
+}
+
+///|
 pub async fn js_fetch_remote(
   host_id : Int,
   root : String,
@@ -1327,6 +1570,20 @@ pub async fn js_fetch_remote(
 }
 
 ///|
+pub fn js_fetch_remote_promise(
+  host_id : Int,
+  root : String,
+  remote_url : String,
+  transport_id : Int,
+  refspec : String,
+  prefer_v2 : Bool,
+) -> @js_async.Promise[Result[JsFetchResult, String]] {
+  js_export_promise(async fn() {
+    js_fetch_remote(host_id, root, remote_url, transport_id, refspec, prefer_v2)
+  })
+}
+
+///|
 pub async fn js_push_remote(
   host_id : Int,
   root : String,
@@ -1383,6 +1640,20 @@ pub async fn js_push_remote(
         js_transport_post(transport_id, url, body, headers)
       },
     )
+  })
+}
+
+///|
+pub fn js_push_remote_promise(
+  host_id : Int,
+  root : String,
+  remote_url : String,
+  transport_id : Int,
+  refname : String,
+  force : Bool,
+) -> @js_async.Promise[Result[String, String]] {
+  js_export_promise(async fn() {
+    js_push_remote(host_id, root, remote_url, transport_id, refname, force)
   })
 }
 

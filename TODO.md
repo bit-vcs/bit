@@ -25,7 +25,7 @@ e2e: **30/30 全パス** (2026-03-29)
 
 - [x] packfile_parse の delta 解決後 OID 計算を algo 対応に (11箇所の hash_object_content → hash_object_content_with_algo)
 - [x] commit-graph trailer を hash_size 対応に (sha1() → hash_prefix())
-- [ ] SHA-256 compat テスト (t1016) — GPG2 依存、GPG 署名実装後に対応
+- [x] SHA-256 compat テスト (t1016)
 
 ## P0: Git compatibility
 
@@ -54,9 +54,7 @@ check-ignore show-index get-tar-commit-id verify-commit annotate
 
 ### スコープ外テスト
 
-- SHA-256 compat (t1016) — GPG2 依存
 - Perl Git.pm (t9700)
-- GPG/SSH 署名 (t7510, t7528)
 - svn/cvs/p4 (t9*)
 - 常時タイムアウト (t0008, t1400, t1901, t3305, t4056, t4124, t5300, t5310, t5326, t5333, t9300)
 
@@ -67,12 +65,12 @@ check-ignore show-index get-tar-commit-id verify-commit annotate
 - [x] Commit-graph 読込・生成
 - [x] SSH トランスポート
 - [x] GPG/SSH 署名 (`commit -S`, `tag -s`)
-- [ ] Interactive add (`add -p` / `add -i`) — エラーで拒否するよう修正済み。実装は未着手
-- [ ] Interactive rebase (`rebase -i`) — 部分実装 (pick/reword/edit/squash/fixup/drop)、スタンドアロンモード不可
+- [x] Interactive add (`add -p` / `add -i`)
+- [x] Interactive rebase (`rebase -i`) native では real git 委譲で対応
 
 ## P1: Relay / P2P collaboration
 
-- [ ] SSH clone の JS target 対応（Issue #18）
+- [x] SSH clone の JS target 対応（Issue #18）
 
 ## P2: パフォーマンス
 
@@ -84,7 +82,7 @@ check-ignore show-index get-tar-commit-id verify-commit annotate
 ## P3: WASM / クロスプラットフォーム
 
 - [ ] WASM target 機能カバレッジ拡大
-- [ ] JS target SSH clone 代替 → Issue #18
+- [x] JS target SSH clone 代替 → Issue #18
 
 ## P4: 将来タスク
 

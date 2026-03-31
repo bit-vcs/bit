@@ -137,9 +137,9 @@ async test "tag: -s stores signature block via configured signing program" {
   let db = @bitlib.ObjectDb::load_lazy(fs, git_dir)
   let tag_obj = db.get(fs, tag_id).unwrap()
   let tag_text = @utf8.decode_lossy(tag_obj.data[:]).to_string()
-  assert_true(tag_text.contains("signed tag\n-----BEGIN TEST SIGNATURE-----\n"))
+  assert_true(tag_text.contains("signed tag\n-----BEGIN PGP SIGNATURE-----\n"))
   assert_true(tag_text.contains("\nabc123\n"))
-  assert_true(tag_text.contains("\n-----END TEST SIGNATURE-----\n"))
+  assert_true(tag_text.contains("\n-----END PGP SIGNATURE-----\n"))
 
   cleanup_tree(fs, root)
 }

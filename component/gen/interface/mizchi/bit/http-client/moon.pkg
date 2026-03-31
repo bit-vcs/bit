@@ -1,0 +1,3 @@
+import {
+  "bit/component/gen/cabi" @cabi,
+}

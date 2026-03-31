@@ -91,7 +91,7 @@ test "show: parse tag info reads metadata and message" {
   assert_eq(info.tagger, "Test User <test@example.com>")
   assert_eq(info.timestamp, 1700000000L)
   assert_eq(info.timezone, "+0900")
-  assert_eq(info.message, "annotated tag\n")
+  assert_eq(info.message, "annotated tag")
 }
 
 ///|
@@ -189,10 +189,43 @@ test "show: pretty format honors body modifiers" {
 }
 
 ///|
+test "show: default commit rendering does not add trailing blank message lines" {
+  let fs = @bitcore.TestFs::new()
+  let git_dir = "/repo/.git"
+  fs.mkdir_p(git_dir)
+  let db = @bitlib.ObjectDb::load(fs, git_dir)
+  let zero = show_wbtest_zero_id()
+  let commit_text = "tree " +
+    zero.to_hex() +
+    "\nauthor Alice <alice@example.com> 1700000000 +0900\ncommitter Alice <alice@example.com> 1700000000 +0900\n\nsubject\n"
+  let rendered = show_render_commit_block(
+    db,
+    fs,
+    zero,
+    str_to_bytes(commit_text),
+    false,
+    None,
+    true,
+    false,
+    [],
+    GrepPatternType::Basic,
+    false,
+  ).unwrap()
+  let expected = "commit 0000000000000000000000000000000000000000\n" +
+    "Author: Alice <alice@example.com>\n" +
+    "Date:   Wed Nov 15 07:13:20 2023 +0900\n" +
+    "\n" +
+    "    subject\n\n"
+  assert_eq(rendered, expected)
+}
+
+///|
 test "show: reference pretty format handled natively" {
   assert_false(show_requires_real_git(["-s", "--pretty=reference", "HEAD"]))
   assert_false(show_requires_real_git(["--format=reference", "HEAD"]))
   assert_false(show_requires_real_git(["-s", "--pretty=%s", "HEAD"]))
+  assert_true(show_requires_real_git(["--show-signature", "HEAD"]))
+  assert_true(show_requires_real_git(["-s", "--pretty=%G?", "HEAD"]))
 }
 
 ///|
@@ -239,6 +272,9 @@ async test "show: command path prints graft deprecation advice and honors config
   )
   assert_eq(suppressed_code, 0)
   assert_eq(suppressed_stderr, "")
+
+  show_wbtest_run_git(repo_dir, ["config", "log.showsignature", "true"])
+  assert_true(show_requires_real_git(["HEAD"], git_dir=repo_dir + "/.git"))
 
   cleanup_tree(fs, root)
 }

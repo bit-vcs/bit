@@ -9,10 +9,44 @@ fn has_interactive_add_flag(args : Array[String]) -> Bool {
 }
 
 ///|
-async fn default_add_interactive_runner(args : Array[String]) -> Int {
-  eprint_line("fatal: interactive add (add -p / add -i) is not yet implemented")
-  ignore(args)
-  1
+fn add_interactive_delegate_argv(args : Array[String]) -> Array[String] {
+  let argv = ["add"]
+  for arg in args {
+    argv.push(arg)
+  }
+  argv
+}
+
+///|
+async fn run_add_interactive_process(
+  program : String,
+  argv : Array[String],
+  process_runner? : (async (String, Array[String]) -> Int noraise)? = None,
+) -> Int {
+  match process_runner {
+    Some(run) => run(program, argv)
+    None =>
+      @process.run(
+        program,
+        argv,
+        inherit_env=true,
+        stdin=@stdio.stdin,
+        stdout=@stdio.stdout,
+        stderr=@stdio.stderr,
+      )
+  }
+}
+
+///|
+async fn default_add_interactive_runner(
+  args : Array[String],
+  process_runner? : (async (String, Array[String]) -> Int noraise)? = None,
+) -> Int {
+  run_add_interactive_process(
+    resolve_real_git_for_dispatch(),
+    add_interactive_delegate_argv(args),
+    process_runner~,
+  )
 }
 
 ///|

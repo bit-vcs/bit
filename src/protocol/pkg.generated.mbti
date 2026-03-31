@@ -19,15 +19,25 @@ pub fn build_ref_update(@object.ObjectId, @object.ObjectId, String, String) -> S
 
 pub fn build_ref_update_simple(@object.ObjectId, @object.ObjectId, String) -> String
 
+pub async fn clone_to_fs_with_http(String, Bool, Int, FilterSpec, &@types.FileSystem, String, async (String, Map[String, String]) -> (@types.HttpResponse, Bytes) raise @object.GitError, async (String, Bytes, Map[String, String]) -> (@types.HttpResponse, Bytes) raise @object.GitError, no_checkout? : Bool) -> Array[(@object.ObjectId, String)] raise @object.GitError
+
+pub async fn clone_with_http(String, Bool, Int, FilterSpec, async (String, Map[String, String]) -> (@types.HttpResponse, Bytes) raise @object.GitError, async (String, Bytes, Map[String, String]) -> (@types.HttpResponse, Bytes) raise @object.GitError) -> (Array[(@object.ObjectId, String)], Array[@object.PackObject]) raise @object.GitError
+
 pub fn detect_protocol_version(Bytes) -> ProtocolVersion raise @object.GitError
 
 pub async fn discover_refs_with_http(Remote, async (String, Map[String, String]) -> (@types.HttpResponse, Bytes) raise @object.GitError) -> (Array[(@object.ObjectId, String)], Array[String]) raise @object.GitError
+
+pub async fn discover_upload_refs_with_http(String, Bool, async (String, Map[String, String]) -> (@types.HttpResponse, Bytes) raise @object.GitError, async (String, Bytes, Map[String, String]) -> (@types.HttpResponse, Bytes) raise @object.GitError) -> (Array[(@object.ObjectId, String)], Array[String], ProtocolVersion, Map[String, String]) raise @object.GitError
 
 pub fn extract_capabilities(Bytes) -> Array[String]
 
 pub fn extract_pack_from_v0_response(Bytes) -> Bytes raise @object.GitError
 
 pub fn extract_pack_from_v2_response(Bytes) -> Bytes raise @object.GitError
+
+pub async fn fetch_objects_with_http(String, Array[@object.ObjectId], Bool, Int, FilterSpec, async (String, Map[String, String]) -> (@types.HttpResponse, Bytes) raise @object.GitError, async (String, Bytes, Map[String, String]) -> (@types.HttpResponse, Bytes) raise @object.GitError) -> Array[@object.PackObject] raise @object.GitError
+
+pub async fn fetch_pack_with_http(String, Array[@object.ObjectId], Bool, Int, FilterSpec, async (String, Map[String, String]) -> (@types.HttpResponse, Bytes) raise @object.GitError, async (String, Bytes, Map[String, String]) -> (@types.HttpResponse, Bytes) raise @object.GitError) -> Bytes raise @object.GitError
 
 pub fn parse_ls_refs_response(Bytes) -> LsRefsResult raise @object.GitError
 
@@ -60,6 +70,10 @@ pub fn select_default_ref(Array[(@object.ObjectId, String)], Map[String, String]
 pub fn select_default_wants(Array[(@object.ObjectId, String)], Map[String, String]) -> Array[@object.ObjectId]
 
 pub fn ssh_remote_to_https(String) -> String?
+
+pub async fn upload_pack_info_refs_with_http(String, Bool, async (String, Map[String, String]) -> (@types.HttpResponse, Bytes) raise @object.GitError) -> Bytes raise @object.GitError
+
+pub async fn upload_pack_request_with_http(String, Bytes, Bool, async (String, Bytes, Map[String, String]) -> (@types.HttpResponse, Bytes) raise @object.GitError) -> Bytes raise @object.GitError
 
 // Errors
 

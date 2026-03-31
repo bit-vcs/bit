@@ -20,9 +20,109 @@ async fn delegate_rebase_to_real_git(
 }
 
 ///|
-fn rebase_requires_real_git(args : Array[String]) -> Bool {
+fn rebase_short_option_cluster_contains(arg : String, flag : UInt16) -> Bool {
+  if arg.length() < 2 || arg.unsafe_get(0) != ('-' : UInt16) {
+    return false
+  }
+  if arg.length() >= 2 && arg.unsafe_get(1) == ('-' : UInt16) {
+    return false
+  }
+  let mut i = 1
+  while i < arg.length() {
+    if arg.unsafe_get(i) == flag {
+      return true
+    }
+    i += 1
+  }
+  false
+}
+
+///|
+fn rebase_has_signing_args(args : Array[String]) -> Bool {
   for arg in args {
-    if arg == "--root" {
+    if arg == "-S" ||
+      rebase_short_option_cluster_contains(arg, ('S' : UInt16)) ||
+      arg == "--gpg-sign" ||
+      arg == "--no-gpg-sign" ||
+      arg.has_prefix("--gpg-sign=") {
+      return true
+    }
+  }
+  false
+}
+
+///|
+fn rebase_has_complex_mode_args(args : Array[String]) -> Bool {
+  for arg in args {
+    if arg == "--interactive" ||
+      rebase_short_option_cluster_contains(arg, ('i' : UInt16)) ||
+      arg == "--exec" ||
+      arg.has_prefix("--exec=") ||
+      arg == "-x" ||
+      rebase_short_option_cluster_contains(arg, ('x' : UInt16)) ||
+      arg == "--autosquash" ||
+      arg == "--rebase-merges" ||
+      arg.has_prefix("--rebase-merges=") ||
+      arg == "--no-rebase-merges" ||
+      arg == "--edit-todo" ||
+      arg == "--show-current-patch" ||
+      arg == "--autostash" ||
+      arg == "--keep-empty" ||
+      arg == "--no-keep-empty" ||
+      arg == "--update-refs" ||
+      arg == "--no-update-refs" ||
+      arg == "--strategy" ||
+      arg.has_prefix("--strategy=") ||
+      arg == "-X" ||
+      arg.has_prefix("-X") ||
+      arg == "--root" {
+      return true
+    }
+  }
+  false
+}
+
+///|
+fn rebase_has_state_action_args(args : Array[String]) -> Bool {
+  for arg in args {
+    if arg == "--continue" || arg == "--abort" || arg == "--skip" {
+      return true
+    }
+  }
+  false
+}
+
+///|
+fn rebase_merge_dir_uses_real_git_interactive_state(
+  rfs : &@bitcore.RepoFileSystem,
+  rebase_merge_dir : String,
+) -> Bool {
+  rfs.is_file(rebase_merge_dir + "/interactive") ||
+  rfs.is_file(rebase_merge_dir + "/git-rebase-todo.backup") ||
+  rfs.is_file(rebase_merge_dir + "/msgnum") ||
+  rfs.is_file(rebase_merge_dir + "/end")
+}
+
+///|
+fn rebase_requires_real_git(
+  args : Array[String],
+  git_dir? : String = "",
+) -> Bool {
+  if rebase_has_complex_mode_args(args) {
+    return true
+  }
+  if git_dir.length() > 0 && signing_commit_config_enabled(git_dir) {
+    return true
+  }
+  if rebase_has_signing_args(args) {
+    return true
+  }
+  if git_dir.length() > 0 && rebase_has_state_action_args(args) {
+    let fs = OsFs::new()
+    let rfs : &@bitcore.RepoFileSystem = fs
+    let rebase_merge_dir = git_dir + "/rebase-merge"
+    if rfs.is_dir(rebase_merge_dir) &&
+      rebase_merge_dir_uses_real_git_interactive_state(rfs, rebase_merge_dir) {
       return true
     }
   }
@@ -32,7 +132,9 @@ fn rebase_requires_real_git(args : Array[String]) -> Bool {
 ///|
 async fn handle_rebase(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
-  if rebase_requires_real_git(args) {
+  let fs = OsFs::new()
+  let git_dir = resolve_git_dir(fs, root)
+  if rebase_requires_real_git(args, git_dir~) {
     delegate_rebase_to_real_git(args, root)
     return
   }
@@ -43,8 +145,6 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
     @sys.exit(1)
   }
   check_and_exit_unsupported_attrs(root)
-  let git_dir = root + "/.git"
-  let fs = OsFs::new()
   let wfs : &@bitcore.FileSystem = fs
   let rfs : &@bitcore.RepoFileSystem = fs
   // Parse arguments

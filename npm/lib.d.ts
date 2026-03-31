@@ -89,6 +89,14 @@ export interface BitFetchResult {
   remoteRef: string | null;
 }
 
+export type BitCloneStatus = "empty" | "cloned";
+
+export interface BitCloneResult {
+  status: BitCloneStatus;
+  commitId: string | null;
+  refname: string | null;
+}
+
 export interface BitRelayPeer {
   sender: string;
   cloneUrl: string;
@@ -170,6 +178,13 @@ export type BitResetMode = "soft" | "mixed" | "hard";
 
 export interface BitFetchOptions {
   refspec?: string;
+  preferV2?: boolean;
+  preferredSender?: string;
+  preferredRepo?: string;
+  authToken?: string;
+}
+
+export interface BitCloneOptions {
   preferV2?: boolean;
   preferredSender?: string;
   preferredRepo?: string;
@@ -463,6 +478,13 @@ export declare function fetch(
   transport: BitTransport | BitFetchImpl,
   options?: BitFetchOptions,
 ): Promise<BitFetchResult>;
+export declare function clone(
+  backend: BitBackend,
+  root: string,
+  remoteUrl: string,
+  transport: BitTransport | BitFetchImpl,
+  options?: BitCloneOptions,
+): Promise<BitCloneResult>;
 export declare function push(
   backend: BitBackend,
   root: string,

@@ -6,8 +6,13 @@ import {
   "moonbitlang/core/encoding/base64" @base64,
   "moonbitlang/core/encoding/utf8" @utf8,
   "moonbitlang/core/json" @json,
+  "moonbitlang/x/crypto" @mbcrypto,
   "moonbitlang/x/sys" @sys,
 }
+
+import {
+  "moonbitlang/async" @async,
+} for "wbtest"
 
 warnings = "-29-67"
 
@@ -17,5 +22,8 @@ options(
     "relay_sign_js.mbt": [ "js" ],
     "relay_sign_native.mbt": [ "native" ],
     "relay_sign_wasm.mbt": [ "wasm-gc", "wasm" ],
+    "relay_sign_wasm_wbtest.mbt": [ "wasm-gc" ],
+    "relay_sign_web_crypto.mbt": [ "js" ],
+    "relay_sign_web_wbtest.mbt": [ "js" ],
   },
 )

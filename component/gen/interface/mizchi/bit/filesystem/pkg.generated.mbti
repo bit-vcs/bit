@@ -1,0 +1,30 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "bit/component/gen/interface/mizchi/bit/filesystem"
+
+// Values
+pub fn is_dir(String) -> Bool
+
+pub fn is_file(String) -> Bool
+
+pub fn mkdir_p(String) -> Result[Unit, String]
+
+pub fn read_file(String) -> Result[Array[Byte], String]
+
+pub fn readdir(String) -> Result[Array[String], String]
+
+pub fn remove_dir(String) -> Result[Unit, String]
+
+pub fn remove_file(String) -> Result[Unit, String]
+
+pub fn write_file(String, Array[Byte]) -> Result[Unit, String]
+
+pub fn write_string(String, String) -> Result[Unit, String]
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits
+

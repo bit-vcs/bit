@@ -1,8 +1,60 @@
 ///|
 
 ///|
-fn show_requires_real_git(_args : Array[String]) -> Bool {
+fn show_format_requests_signature_display(format : String) -> Bool {
+  format.contains("%G")
+}
+
+///|
+fn show_args_request_signature_display(args : Array[String]) -> Bool {
+  let mut i = 0
+  while i < args.length() {
+    let arg = args[i]
+    if arg == "--show-signature" {
+      return true
+    }
+    if (arg == "--pretty" || arg == "--format") && i + 1 < args.length() {
+      if show_format_requests_signature_display(args[i + 1]) {
+        return true
+      }
+      i += 2
+      continue
+    }
+    if arg.has_prefix("--pretty=") {
+      let value = String::unsafe_substring(arg, start=9, end=arg.length())
+      if show_format_requests_signature_display(value) {
+        return true
+      }
+    }
+    if arg.has_prefix("--format=") {
+      let value = String::unsafe_substring(arg, start=9, end=arg.length())
+      if show_format_requests_signature_display(value) {
+        return true
+      }
+    }
+    i += 1
+  }
   false
+}
+
+///|
+fn show_signature_display_config_enabled(git_dir : String) -> Bool {
+  match get_config_override("log.showsignature") {
+    Some(value) => parse_bool_value(value).unwrap_or(false)
+    None =>
+      @bitlib.read_config_bool(
+        OsFs::new(),
+        git_dir + "/config",
+        "log",
+        "showsignature",
+      ).unwrap_or(false)
+  }
+}
+
+///|
+fn show_requires_real_git(args : Array[String], git_dir? : String = "") -> Bool {
+  show_args_request_signature_display(args) ||
+  (git_dir.length() > 0 && show_signature_display_config_enabled(git_dir))
 }
 
 ///|
@@ -46,6 +98,15 @@ priv struct ShowTagInfo {
   timestamp : Int64
   timezone : String
   message : String
+}
+
+///|
+fn show_strip_terminal_message_newline(message : String) -> String {
+  if message.has_suffix("\n") {
+    String::unsafe_substring(message, start=0, end=message.length() - 1)
+  } else {
+    message
+  }
 }
 
 ///|
@@ -115,7 +176,7 @@ fn parse_show_commit(data : Bytes) -> ShowCommitInfo {
       }
     }
   }
-  let message = message_lines.join("\n")
+  let message = show_strip_terminal_message_newline(message_lines.join("\n"))
   { author, timestamp, timezone, message }
 }
 
@@ -255,7 +316,7 @@ fn show_parse_tag_info(data : Bytes) -> ShowTagInfo? {
         tagger,
         timestamp,
         timezone,
-        message: message_lines.join("\n"),
+        message: show_strip_terminal_message_newline(message_lines.join("\n")),
       })
     None => None
   }
@@ -675,12 +736,12 @@ fn show_render_object_block(
 
 ///|
 async fn handle_show(args : Array[String]) -> Unit raise Error {
-  if show_requires_real_git(args) {
-    delegate_show_to_real_git(args)
-  }
   let root = get_work_root()
   let fs = OsFs::new()
   let git_dir = resolve_git_dir(fs, root)
+  if show_requires_real_git(args, git_dir~) {
+    delegate_show_to_real_git(args)
+  }
   check_and_exit_unsupported_attrs(root)
   show_maybe_print_graft_deprecation_advice(fs, git_dir)
   let options = show_parse_args(args)

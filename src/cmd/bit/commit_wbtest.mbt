@@ -43,11 +43,20 @@ async fn signing_wbtest_write_fake_gpg(
   fs.write_string(
     path,
     "#!/bin/sh\n" +
+    "if [ \"${1:-}\" = \"--verify\" ]; then\n" +
+    "  sig=\"${2:-}\"\n" +
+    "  if [ -f \"$sig\" ] && grep -q 'BEGIN PGP SIGNATURE' \"$sig\"; then\n" +
+    "    echo 'gpg: Good signature from \"Test User <test@example.com>\"' >&2\n" +
+    "    exit 0\n" +
+    "  fi\n" +
+    "  echo 'gpg: BAD signature' >&2\n" +
+    "  exit 1\n" +
+    "fi\n" +
     "cat >/dev/null\n" +
     "printf '%s\\n' \\\n" +
-    "  '-----BEGIN TEST SIGNATURE-----' \\\n" +
+    "  '-----BEGIN PGP SIGNATURE-----' \\\n" +
     "  'abc123' \\\n" +
-    "  '-----END TEST SIGNATURE-----'\n",
+    "  '-----END PGP SIGNATURE-----'\n",
   )
   let chmod_code = @process.run("chmod", ["+x", path], inherit_env=true)
   assert_eq(chmod_code, 0)
@@ -415,7 +424,7 @@ async test "commit: -S stores gpgsig header via configured signing program" {
   let commit_text = @utf8.decode_lossy(commit_obj.data[:]).to_string()
   assert_true(
     commit_text.contains(
-      "gpgsig -----BEGIN TEST SIGNATURE-----\n abc123\n -----END TEST SIGNATURE-----\n",
+      "gpgsig -----BEGIN PGP SIGNATURE-----\n abc123\n -----END PGP SIGNATURE-----\n",
     ),
   )
 

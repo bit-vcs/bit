@@ -6,6 +6,7 @@ import {
   branchRename as rawBranchRename,
   buildCommitPayload as rawBuildCommitPayload,
   cherryPick as rawCherryPick,
+  clone as rawClone,
   checkout as rawCheckout,
   checkoutB as rawCheckoutB,
   commit as rawCommit,
@@ -90,7 +91,27 @@ const unwrap = (label, result) => {
   return current;
 };
 
-const unwrapAsync = async (label, resultPromise) => unwrap(label, await resultPromise);
+const callMoonBitAsync = (fn, ...args) => new Promise((resolve, reject) => {
+  let settled = false;
+  const finishResolve = (value) => {
+    if (settled) return;
+    settled = true;
+    resolve(value);
+  };
+  const finishReject = (error) => {
+    if (settled) return;
+    settled = true;
+    reject(error);
+  };
+  const immediate = fn(...args, finishResolve, finishReject);
+  if (immediate !== undefined) {
+    finishResolve(immediate);
+  }
+});
+
+const unwrapAsync = async (label, fn, ...args) => (
+  unwrap(label, await callMoonBitAsync(fn, ...args))
+);
 
 const isBackendObject = (value) => (
   !!value &&
@@ -432,6 +453,12 @@ const toFetchResult = (value) => ({
   remoteRef: toMaybeString(value.remote_ref),
 });
 
+const toCloneResult = (value) => ({
+  status: value.status,
+  commitId: toMaybeString(value.commit_id),
+  refname: toMaybeString(value.refname),
+});
+
 const createMemoryBackendImpl = () => {
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
@@ -588,7 +615,7 @@ export const statusPorcelain = (backend, root) => (
 );
 
 export const statusText = async (backend, root) => (
-  await unwrapAsync("statusText", rawStatusText(toHostId(backend), root))
+  await unwrapAsync("statusText", rawStatusText, toHostId(backend), root)
 );
 
 export const commit = (
@@ -853,7 +880,12 @@ export const stashPush = async (
   toMaybeString(
     await unwrapAsync(
       "stashPush",
-      rawStashPush(toHostId(backend), root, message, author, Math.trunc(timestampSec)),
+      rawStashPush,
+      toHostId(backend),
+      root,
+      message,
+      author,
+      Math.trunc(timestampSec),
     ),
   )
 );
@@ -895,11 +927,20 @@ export const cherryPick = (
 );
 
 export const diffWorktree = async (backend, root) => (
-  Array.from(await unwrapAsync("diffWorktree", rawDiffWorktree(toHostId(backend), root)))
+  Array.from(
+    await unwrapAsync("diffWorktree", rawDiffWorktree, toHostId(backend), root),
+  )
 );
 
 export const diffWorktreeStat = async (backend, root) => (
-  Array.from(await unwrapAsync("diffWorktreeStat", rawDiffWorktreeStat(toHostId(backend), root)))
+  Array.from(
+    await unwrapAsync(
+      "diffWorktreeStat",
+      rawDiffWorktreeStat,
+      toHostId(backend),
+      root,
+    ),
+  )
 );
 
 export const diffIndex = (backend, root) => (
@@ -986,14 +1027,40 @@ export const fetch = async (
   return toFetchResult(
     await unwrapAsync(
       "fetch",
-      rawFetch(
-        toHostId(backend),
-        root,
-        resolvedRemoteUrl,
-        toTransportId(transport),
-        options.refspec ?? "",
-        options.preferV2 !== false,
-      ),
+      rawFetch,
+      toHostId(backend),
+      root,
+      resolvedRemoteUrl,
+      toTransportId(transport),
+      options.refspec ?? "",
+      options.preferV2 !== false,
+    ),
+  );
+};
+
+export const clone = async (
+  backend,
+  root,
+  remoteUrl,
+  transport,
+  options = {},
+) => {
+  const resolvedRemoteUrl = relayUsesSignaling(remoteUrl)
+    ? (await relayResolveRemote(remoteUrl, transport, {
+        preferredSender: options.preferredSender ?? null,
+        preferredRepo: options.preferredRepo ?? null,
+        authToken: options.authToken ?? null,
+      })).url
+    : remoteUrl;
+  return toCloneResult(
+    await unwrapAsync(
+      "clone",
+      rawClone,
+      toHostId(backend),
+      root,
+      resolvedRemoteUrl,
+      toTransportId(transport),
+      options.preferV2 !== false,
     ),
   );
 };
@@ -1014,14 +1081,13 @@ export const push = async (
     : remoteUrl;
   return unwrapAsync(
     "push",
-    rawPush(
-      toHostId(backend),
-      root,
-      resolvedRemoteUrl,
-      toTransportId(transport),
-      options.refname ?? "",
-      Boolean(options.force),
-    ),
+    rawPush,
+    toHostId(backend),
+    root,
+    resolvedRemoteUrl,
+    toTransportId(transport),
+    options.refname ?? "",
+    Boolean(options.force),
   );
 };
 

@@ -61,3 +61,10 @@ pub struct JsFetchResult {
   refname : String
   remote_ref : String
 } derive(Show, Eq)
+
+///|
+pub struct JsCloneResult {
+  status : String
+  commit_id : String
+  refname : String
+} derive(Show, Eq)

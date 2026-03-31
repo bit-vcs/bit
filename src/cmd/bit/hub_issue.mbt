@@ -34,7 +34,9 @@ fn print_hub_issue_usage() -> Unit {
   println("  watch [--stale-hours <n>] [--remote <url>] [--auth-token <token>]")
   println("  search [<query>...] [<options>]")
   println("  note <subcommand> [<args>]")
-  println("  init                                  (prompt before local metadata / sync setup)")
+  println(
+    "  init                                  (prompt before local metadata / sync setup)",
+  )
 }
 
 ///|
@@ -260,9 +262,7 @@ fn parse_hub_work_item_list_options(
 }
 
 ///|
-fn build_issue_child_counts(
-  issues : Array[@hub.Issue],
-) -> Map[String, Int] {
+fn build_issue_child_counts(issues : Array[@hub.Issue]) -> Map[String, Int] {
   let counts : Map[String, Int] = {}
   for issue in issues {
     match issue.parent_id {
@@ -312,11 +312,7 @@ fn append_issue_tree_lines(
 ) -> Unit {
   let child_count = child_counts.get(issue.id()).unwrap_or(0)
   lines.push(
-    format_issue_summary(
-      issue,
-      child_count~,
-      indent=issue_tree_indent(depth),
-    ),
+    format_issue_summary(issue, child_count~, indent=issue_tree_indent(depth)),
   )
   match children_map.get(issue.id()) {
     Some(children) =>
@@ -372,9 +368,7 @@ fn collect_issue_list_lines(
             Some(_) => show_all
             None => false
           }
-          lines.push(
-            format_issue_summary(issue, child_count~, show_parent~),
-          )
+          lines.push(format_issue_summary(issue, child_count~, show_parent~))
         }
     }
   }
@@ -390,14 +384,8 @@ fn select_issue_list_items(
   let issues : Array[@hub.Issue] = []
   for issue in filtered_issues {
     match filter_parent {
-      Some(pid) =>
-        if issue.parent_id == Some(pid) {
-          issues.push(issue)
-        }
-      None =>
-        if show_all || issue.parent_id is None {
-          issues.push(issue)
-        }
+      Some(pid) => if issue.parent_id == Some(pid) { issues.push(issue) }
+      None => if show_all || issue.parent_id is None { issues.push(issue) }
     }
   }
   issues
@@ -499,25 +487,24 @@ async fn handle_hub_issue_list(args : Array[String]) -> Unit raise Error {
     filtered_issues.push(issue)
   }
   let selected_issues = select_issue_list_items(
-    filtered_issues,
-    show_all,
-    filter_parent,
+    filtered_issues, show_all, filter_parent,
   )
   let lines = collect_issue_list_lines(
-    filtered_issues,
-    show_all,
-    show_tree,
-    filter_parent,
+    filtered_issues, show_all, show_tree, filter_parent,
   )
   let raw_limit = options.limit.unwrap_or(
-    if format_json { selected_issues.length() } else { lines.length() },
+    if format_json {
+      selected_issues.length()
+    } else {
+      lines.length()
+    },
   )
-  let total = if format_json { selected_issues.length() } else { lines.length() }
-  let limit = if raw_limit < total {
-    raw_limit
+  let total = if format_json {
+    selected_issues.length()
   } else {
-    total
+    lines.length()
   }
+  let limit = if raw_limit < total { raw_limit } else { total }
   if limit == 0 {
     if format_json {
       print_line("[]")

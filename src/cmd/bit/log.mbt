@@ -172,7 +172,64 @@ async fn delegate_log_to_real_git(args : Array[String], cwd : String) -> Unit {
 }
 
 ///|
-fn log_need_real_git(args : Array[String]) -> Bool {
+fn log_format_requests_signature_display(format : String) -> Bool {
+  format.contains("%G")
+}
+
+///|
+fn log_args_request_signature_display(args : Array[String]) -> Bool {
+  let mut i = 0
+  while i < args.length() {
+    let arg = args[i]
+    if arg == "--show-signature" {
+      return true
+    }
+    if (arg == "--pretty" || arg == "--format") && i + 1 < args.length() {
+      if log_format_requests_signature_display(args[i + 1]) {
+        return true
+      }
+      i += 2
+      continue
+    }
+    if arg.has_prefix("--pretty=") {
+      let value = String::unsafe_substring(arg, start=9, end=arg.length())
+      if log_format_requests_signature_display(value) {
+        return true
+      }
+    }
+    if arg.has_prefix("--format=") {
+      let value = String::unsafe_substring(arg, start=9, end=arg.length())
+      if log_format_requests_signature_display(value) {
+        return true
+      }
+    }
+    i += 1
+  }
+  false
+}
+
+///|
+fn log_signature_display_config_enabled(git_dir : String) -> Bool {
+  match get_config_override("log.showsignature") {
+    Some(value) => log_parse_bool_value(value).unwrap_or(false)
+    None =>
+      @bitlib.read_config_bool(
+        OsFs::new(),
+        git_dir + "/config",
+        "log",
+        "showsignature",
+      ).unwrap_or(false)
+  }
+}
+
+///|
+fn log_need_real_git(args : Array[String], git_dir? : String = "") -> Bool {
+  if log_args_request_signature_display(args) {
+    return true
+  }
+  if git_dir.length() > 0 && log_signature_display_config_enabled(git_dir) {
+    return true
+  }
   let mut saw_double_dash = false
   for arg in args {
     if saw_double_dash {
@@ -3298,13 +3355,13 @@ fn get_head_commit_message(
 async fn handle_log(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let cwd = @env.current_dir().unwrap_or(root)
-  if log_need_real_git(args) {
-    delegate_log_to_real_git(args, cwd)
-    return
-  }
   let fs = OsFs::new()
   let rfs : &@bitcore.RepoFileSystem = fs
   let git_dir = resolve_git_dir(fs, root)
+  if log_need_real_git(args, git_dir~) {
+    delegate_log_to_real_git(args, cwd)
+    return
+  }
   validate_commit_graph_hash_version(fs, git_dir)
   if log_should_use_storage_runtime_in_repo(rfs, git_dir, args) {
     match log_storage_runtime_delegate_args(args) {

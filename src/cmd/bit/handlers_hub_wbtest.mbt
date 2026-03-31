@@ -1084,7 +1084,12 @@ test "hub issue list: collect_issue_list_lines shows top-level counts and tree" 
   assert_eq(tree[2], "    #i-grandchild [open] Grandchild issue")
   assert_eq(tree[3], "#i-sibling [open] Sibling issue")
 
-  let child_only = collect_issue_list_lines(issues, false, true, Some("i-parent"))
+  let child_only = collect_issue_list_lines(
+    issues,
+    false,
+    true,
+    Some("i-parent"),
+  )
   assert_eq(child_only.length(), 2)
   assert_eq(child_only[0], "#i-child [open] Child issue (sub: 1)")
   assert_eq(child_only[1], "  #i-grandchild [open] Grandchild issue")

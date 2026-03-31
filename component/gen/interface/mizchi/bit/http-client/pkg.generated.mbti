@@ -1,0 +1,22 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "bit/component/gen/interface/mizchi/bit/http-client"
+
+// Values
+pub fn http_get(String, Array[(String, String)]) -> Result[(HttpResponse, Array[Byte]), String]
+
+pub fn http_post(String, Array[Byte], Array[(String, String)]) -> Result[(HttpResponse, Array[Byte]), String]
+
+// Errors
+
+// Types and methods
+pub(all) struct HttpResponse {
+  code : Int
+  headers : Array[(String, String)]
+}
+pub impl Eq for HttpResponse
+pub impl Show for HttpResponse
+
+// Type aliases
+
+// Traits
+

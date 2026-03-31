@@ -5,82 +5,145 @@
 ///| with your own HTTP client implementation.
 
 ///|
-fn[T] wasm_http_not_available() -> T raise @bit.GitError {
-  raise @bit.GitError::ProtocolError(
-    "HTTP client not available on wasm target. Use *_with_http functions with your own HTTP implementation.",
-  )
+priv struct WasmHttpClient {
+  get : async (String, Map[String, String]) -> (@bit.HttpResponse, Bytes) raise @bit.GitError
+  post : async (String, Bytes, Map[String, String]) -> (
+    @bit.HttpResponse,
+    Bytes,
+  ) raise @bit.GitError
 }
 
 ///|
-async fn[T] wasm_http_not_available_async() -> T raise @bit.GitError {
-  @async.sleep(0) catch {
-    _ => ()
+let wasm_http_client_ref : Ref[WasmHttpClient?] = Ref::new(None)
+
+///|
+pub fn configure_wasm_http_client(
+  http_get : async (String, Map[String, String]) -> (@bit.HttpResponse, Bytes) raise @bit.GitError,
+  http_post : async (String, Bytes, Map[String, String]) -> (
+    @bit.HttpResponse,
+    Bytes,
+  ) raise @bit.GitError,
+) -> Unit {
+  wasm_http_client_ref.val = Some({ get: http_get, post: http_post })
+}
+
+///|
+pub fn clear_wasm_http_client() -> Unit {
+  wasm_http_client_ref.val = None
+}
+
+///|
+fn wasm_http_client() -> WasmHttpClient raise @bit.GitError {
+  match wasm_http_client_ref.val {
+    Some(client) => client
+    None =>
+      raise @bit.GitError::ProtocolError(
+        "HTTP client not configured for wasm target. Call configure_wasm_http_client(...) before upload-pack operations.",
+      )
   }
-  wasm_http_not_available()
 }
 
 ///|
 pub async fn upload_pack_info_refs(
-  _remote : String,
-  _prefer_v2 : Bool,
+  remote : String,
+  prefer_v2 : Bool,
 ) -> Bytes raise @bit.GitError {
-  wasm_http_not_available_async()
+  let client = wasm_http_client()
+  upload_pack_info_refs_with_http(remote, prefer_v2, client.get)
 }
 
 ///|
 pub async fn upload_pack_request(
-  _remote : String,
-  _body : Bytes,
-  _prefer_v2 : Bool,
+  remote : String,
+  body : Bytes,
+  prefer_v2 : Bool,
 ) -> Bytes raise @bit.GitError {
-  wasm_http_not_available_async()
+  let client = wasm_http_client()
+  upload_pack_request_with_http(remote, body, prefer_v2, client.post)
 }
 
 ///|
 pub async fn discover_upload_refs(
-  _remote : String,
-  _prefer_v2 : Bool,
+  remote : String,
+  prefer_v2 : Bool,
 ) -> (
   Array[(@bit.ObjectId, String)],
   Array[String],
   ProtocolVersion,
   Map[String, String],
 ) raise @bit.GitError {
-  wasm_http_not_available_async()
+  let client = wasm_http_client()
+  discover_upload_refs_with_http(remote, prefer_v2, client.get, client.post)
 }
 
 ///|
 pub async fn fetch_pack(
-  _remote : String,
-  _wants : Array[@bit.ObjectId],
-  _prefer_v2 : Bool,
+  remote : String,
+  wants : Array[@bit.ObjectId],
+  prefer_v2 : Bool,
 ) -> Bytes raise @bit.GitError {
-  wasm_http_not_available_async()
+  let client = wasm_http_client()
+  fetch_pack_with_http(
+    remote,
+    wants,
+    prefer_v2,
+    0,
+    FilterSpec::NoFilter,
+    client.get,
+    client.post,
+  )
 }
 
 ///|
 pub async fn fetch_objects(
-  _remote : String,
-  _wants : Array[@bit.ObjectId],
-  _prefer_v2 : Bool,
+  remote : String,
+  wants : Array[@bit.ObjectId],
+  prefer_v2 : Bool,
 ) -> Array[@bit.PackObject] raise @bit.GitError {
-  wasm_http_not_available_async()
+  let client = wasm_http_client()
+  fetch_objects_with_http(
+    remote,
+    wants,
+    prefer_v2,
+    0,
+    FilterSpec::NoFilter,
+    client.get,
+    client.post,
+  )
 }
 
 ///|
 pub async fn clone_remote(
-  _remote : String,
-  _prefer_v2 : Bool,
+  remote : String,
+  prefer_v2 : Bool,
 ) -> (Array[(@bit.ObjectId, String)], Array[@bit.PackObject]) raise @bit.GitError {
-  wasm_http_not_available_async()
+  let client = wasm_http_client()
+  clone_with_http(
+    remote,
+    prefer_v2,
+    0,
+    FilterSpec::NoFilter,
+    client.get,
+    client.post,
+  )
 }
 
 ///|
 pub async fn clone_remote_to_fs(
-  _remote : String,
-  _prefer_v2 : Bool,
-  _fs : &@bit.FileSystem,
-  _root : String,
+  remote : String,
+  prefer_v2 : Bool,
+  fs : &@bit.FileSystem,
+  root : String,
 ) -> Array[(@bit.ObjectId, String)] raise @bit.GitError {
-  wasm_http_not_available_async()
+  let client = wasm_http_client()
+  clone_to_fs_with_http(
+    remote,
+    prefer_v2,
+    0,
+    FilterSpec::NoFilter,
+    fs,
+    root,
+    client.get,
+    client.post,
+  )
 }

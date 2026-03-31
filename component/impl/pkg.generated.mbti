@@ -1,0 +1,131 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "bit/component/impl"
+
+import {
+  "mizchi/bit/object",
+  "mizchi/bit/types",
+}
+
+// Values
+pub fn add(String, Array[String]) -> Result[Unit, String]
+
+pub fn branch_create(String, String) -> Result[Unit, String]
+
+pub fn branch_delete(String, String) -> Result[Unit, String]
+
+pub fn branch_list(String) -> Result[Array[BranchInfo], String]
+
+pub fn cabi_realloc(Int, Int, Int, Int) -> Int
+
+pub fn checkout(String, String) -> Result[Unit, String]
+
+pub fn checkout_b(String, String) -> Result[Unit, String]
+
+pub fn clone(String, String, String, Int) -> Result[Unit, String]
+
+pub fn commit(String, String, String, Int64) -> Result[String, String]
+
+pub fn fetch(String, String) -> Result[Unit, String]
+
+pub fn git_init(String, String) -> Result[Unit, String]
+
+pub fn log(String, Int) -> Result[Array[LogEntry], String]
+
+pub fn mv(String, String, String) -> Result[Unit, String]
+
+pub fn push(String, String, String) -> Result[String, String]
+
+pub fn rm(String, Array[String], Bool) -> Result[Unit, String]
+
+pub fn status(String) -> Result[StatusResult, String]
+
+pub fn status_porcelain(String) -> Result[Array[String], String]
+
+pub fn wasmExportAdd(Int, Int, Int, Int) -> Int
+
+pub fn wasmExportBranchCreate(Int, Int, Int, Int) -> Int
+
+pub fn wasmExportBranchDelete(Int, Int, Int, Int) -> Int
+
+pub fn wasmExportBranchList(Int, Int) -> Int
+
+pub fn wasmExportCheckout(Int, Int, Int, Int) -> Int
+
+pub fn wasmExportCheckoutB(Int, Int, Int, Int) -> Int
+
+pub fn wasmExportClone(Int, Int, Int, Int, Int, Int, Int) -> Int
+
+pub fn wasmExportCommit(Int, Int, Int, Int, Int, Int, Int64) -> Int
+
+pub fn wasmExportFetch(Int, Int, Int, Int) -> Int
+
+pub fn wasmExportInit(Int, Int, Int, Int) -> Int
+
+pub fn wasmExportLog(Int, Int, Int) -> Int
+
+pub fn wasmExportMv(Int, Int, Int, Int, Int, Int) -> Int
+
+pub fn wasmExportPush(Int, Int, Int, Int, Int, Int) -> Int
+
+pub fn wasmExportRm(Int, Int, Int, Int, Int) -> Int
+
+pub fn wasmExportStatus(Int, Int) -> Int
+
+pub fn wasmExportStatusPorcelain(Int, Int) -> Int
+
+// Errors
+
+// Types and methods
+pub(all) struct BranchInfo {
+  name : String
+  commit_id : String
+  is_current : Bool
+}
+pub impl Eq for BranchInfo
+pub impl Show for BranchInfo
+
+pub(all) struct LogEntry {
+  id : String
+  author : String
+  message : String
+  timestamp : Int64
+}
+pub impl Eq for LogEntry
+pub impl Show for LogEntry
+
+pub(all) struct StatusResult {
+  staged_added : Array[String]
+  staged_modified : Array[String]
+  staged_deleted : Array[String]
+  unstaged_modified : Array[String]
+  unstaged_deleted : Array[String]
+  untracked : Array[String]
+}
+pub impl Eq for StatusResult
+pub impl Show for StatusResult
+
+type StatusStagedChanges
+pub impl Eq for StatusStagedChanges
+pub impl Show for StatusStagedChanges
+
+type StatusWorktreeChanges
+pub impl Eq for StatusWorktreeChanges
+pub impl Show for StatusWorktreeChanges
+
+pub struct WasmFs {
+  // private fields
+}
+pub fn WasmFs::new() -> Self
+pub impl @types.FileSystem for WasmFs
+pub impl @types.RepoFileSystem for WasmFs
+
+pub struct WasmHttpClient {
+  // private fields
+}
+pub fn WasmHttpClient::new() -> Self
+pub impl @types.HttpClient for WasmHttpClient
+
+// Type aliases
+
+// Traits
+

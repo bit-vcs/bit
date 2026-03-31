@@ -17,6 +17,8 @@ options(
   targets: {
     "bench_test.mbt": [ "native" ],
     "remote_test.mbt": [ "native" ],
+    "upload_pack_http_wbtest.mbt": [ "native", "js", "wasm-gc", "wasm" ],
     "upload_pack_remote_wasm.mbt": [ "wasm-gc", "wasm" ],
+    "upload_pack_remote_wasm_wbtest.mbt": [ "wasm-gc", "wasm" ],
   },
 )

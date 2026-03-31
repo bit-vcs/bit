@@ -1,10 +1,55 @@
 ///|
+
+///|
+fn merge_has_signing_args(args : Array[String]) -> Bool {
+  for arg in args {
+    if arg == "-S" ||
+      arg == "--gpg-sign" ||
+      arg == "--no-gpg-sign" ||
+      arg.has_prefix("--gpg-sign=") {
+      return true
+    }
+  }
+  false
+}
+
+///|
+fn merge_requires_real_git(
+  args : Array[String],
+  git_dir? : String = "",
+) -> Bool {
+  merge_has_signing_args(args) ||
+  (git_dir.length() > 0 && signing_commit_config_enabled(git_dir))
+}
+
+///|
+async fn delegate_merge_to_real_git(args : Array[String]) -> Unit {
+  let argv : Array[String] = ["merge"]
+  for arg in args {
+    argv.push(arg)
+  }
+  let code = @process.run(
+    resolve_real_git_for_dispatch(),
+    argv,
+    inherit_env=true,
+    stdin=@stdio.stdin,
+    stdout=@stdio.stdout,
+    stderr=@stdio.stderr,
+  )
+  @sys.exit(code)
+}
+
+///|
 async fn handle_merge(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
+  let git_dir = root + "/.git"
+  if merge_requires_real_git(args, git_dir~) {
+    delegate_merge_to_real_git(args)
+    return
+  }
   let fs = OsFs::new()
   let rfs : &@bitcore.RepoFileSystem = fs
   check_and_exit_unsupported_attrs(root)
-  let git_dir = root + "/.git"
   let wfs : &@bitcore.FileSystem = fs
   let mut message : String? = None
   let mut no_ff = false

@@ -1,7 +1,7 @@
 ///| git-bit main entry point
 
 ///|
-let git_bit_version_tag : String = "0.1.0"
+let git_bit_version_tag : String = "0.2.0"
 
 ///|
 fn git_bit_help_text() -> String {

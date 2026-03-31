@@ -1,0 +1,16 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "bit/component/gen/interface/mizchi/bit/environment"
+
+// Values
+pub fn get_env(String) -> String?
+
+pub fn now() -> Int64
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits
+

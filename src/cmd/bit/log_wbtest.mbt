@@ -119,8 +119,28 @@ test "log: ancestry and simplify options fall back to real git" {
   assert_true(log_need_real_git(["--full-history"]))
   assert_true(log_need_real_git(["--show-pulls"]))
   assert_true(log_need_real_git(["--exclude-first-parent-only"]))
+  assert_true(log_need_real_git(["--show-signature", "HEAD"]))
+  assert_true(log_need_real_git(["--format=%G?%n%GK", "HEAD"]))
+  assert_true(log_need_real_git(["--pretty=format:%GT", "HEAD"]))
   assert_true(log_need_real_git(["--", "file"]))
   assert_false(log_need_real_git(["--oneline", "HEAD"]))
+}
+
+///|
+async test "log: log.showsignature config falls back to real git" {
+  @bitnative.init_native_io()
+  let fs = OsFs::new()
+  let root = "/tmp/bit-test-log-showsignature-" +
+    get_current_timestamp().to_string()
+  cleanup_tree(fs, root)
+  fs.mkdir_p(root)
+
+  commit_wbtest_run_git(root, ["init", "--initial-branch=main", "-q", "."])
+  commit_wbtest_run_git(root, ["config", "log.showsignature", "true"])
+
+  assert_true(log_need_real_git(["HEAD"], git_dir=root + "/.git"))
+
+  cleanup_tree(fs, root)
 }
 
 ///|

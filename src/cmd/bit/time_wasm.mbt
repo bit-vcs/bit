@@ -1,7 +1,6 @@
-///| WASM time stub (not implemented)
+///| WASM time implementation.
 
 ///|
 pub fn get_current_timestamp() -> Int64 {
-  // Return a fixed value for WASM target (not implemented)
-  0L
+  (@env.now() / 1000UL).reinterpret_as_int64()
 }

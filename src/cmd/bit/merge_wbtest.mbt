@@ -11,6 +11,15 @@ test "split_cmdline quote validation" {
 }
 
 ///|
+test "merge: signing args require real git fallback" {
+  assert_true(merge_requires_real_git(["-S", "side"]))
+  assert_true(merge_requires_real_git(["--gpg-sign", "side"]))
+  assert_true(merge_requires_real_git(["--gpg-sign=key", "side"]))
+  assert_true(merge_requires_real_git(["--no-gpg-sign", "side"]))
+  assert_false(merge_requires_real_git(["side"]))
+}
+
+///|
 let merge_wbtest_shim_lock : @async.Semaphore = @async.Semaphore::new(
   1,
   initial_value=1,

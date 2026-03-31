@@ -4,6 +4,15 @@ import { pathToFileURL } from "node:url";
 
 const defaultBitGit = await import(new URL("./bit-git.mjs", import.meta.url));
 
+const decodeHex = (hex) => Uint8Array.from(
+  String(hex ?? "").match(/../g)?.map((pair) => Number.parseInt(pair, 16)) ?? [],
+);
+
+const cloneFixtureAdvV2Hex = "3030306576657273696f6e20320a303031636167656e743d6769742f322e35302e312d44617277696e0a303031336c732d726566733d756e626f726e0a3030323066657463683d7368616c6c6f7720776169742d666f722d646f6e650a303031327365727665722d6f7074696f6e0a303031376f626a6563742d666f726d61743d736861310a30303030";
+const cloneFixtureLsrefsHex = "303035303330633966323038616363373630313737336132396165663339343135376164663936306431303420484541442073796d7265662d7461726765743a726566732f68656164732f6d61696e0a303033643330633966323038616363373630313737336132396165663339343135376164663936306431303420726566732f68656164732f6d61696e0a30303030";
+const cloneFixtureFetchHex = "303030647061636b66696c650a30306435015041434b00000002000000039b09789c95cb310ac3300c40d1dda7f05e28b21ccb319492ab288ad208ea0682baf4f4cd15327d78f0fd508dccdc4874c1a57192512b4aa1194b66505cb58eb9e555e71af8ebdb7ec46e3fd92c3ece0e304cafcef6becbde9f31556a2513258c376800e1d46eee7a690af6310f7f8ae52e13a502789c33343030333151c848cdc9c9d72ba9286138c768a6caccbde2f64ab6ef61d3eae7cd593cc5cd0b00df740dbf36789ccb48cdc9c9e70200084b021f62c7bf336ea966f094470f354a76a0f737e13d30303036017a30303030";
+const cloneFixtureCommit = "30c9f208acc7601773a29aef394157adf960d104";
+
 function createVirtualHost() {
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
@@ -669,6 +678,73 @@ async function runTransportHelperFlow(bitGit) {
   return { calls };
 }
 
+async function runCloneFlow(bitGit) {
+  const backend = bitGit.createMemoryBackend();
+  const decoder = new TextDecoder();
+  const calls = [];
+  const transport = {
+    async get(url, headers) {
+      calls.push({ method: "GET", url, headers });
+      return {
+        status: 200,
+        body: decodeHex(cloneFixtureAdvV2Hex),
+      };
+    },
+    async post(url, body, headers) {
+      const requestText = decoder.decode(body ?? new Uint8Array());
+      calls.push({ method: "POST", url, headers, requestText });
+      if (requestText.includes("command=ls-refs")) {
+        return {
+          status: 200,
+          body: decodeHex(cloneFixtureLsrefsHex),
+        };
+      }
+      if (requestText.includes("command=fetch") || requestText.includes("want ")) {
+        return {
+          status: 200,
+          body: decodeHex(cloneFixtureFetchHex),
+        };
+      }
+      throw new Error(`unexpected clone request: ${requestText}`);
+    },
+  };
+
+  try {
+    const result = await bitGit.clone(
+      backend,
+      "/repo-clone",
+      "git@github.com:user/repo.git",
+      transport,
+    );
+    assert.equal(result.status, "cloned");
+    assert.equal(result.commitId, cloneFixtureCommit);
+    assert.equal(result.refname, "refs/heads/main");
+    assert.equal(bitGit.readString(backend, "/repo-clone/hello.txt"), "hello\n");
+    assert.equal(
+      bitGit.getRemoteUrl(backend, "/repo-clone", "origin"),
+      "git@github.com:user/repo.git",
+    );
+    assert.equal(
+      calls.some((call) => (
+        call.url === "https://github.com/user/repo/info/refs?service=git-upload-pack"
+      )),
+      true,
+    );
+    assert.equal(
+      calls.some((call) => call.url === "https://github.com/user/repo/git-upload-pack"),
+      true,
+    );
+    const requestTexts = calls
+      .filter((call) => call.method === "POST")
+      .map((call) => call.requestText ?? "");
+    assert.ok(requestTexts.some((text) => text.includes("command=ls-refs")));
+    assert.ok(requestTexts.some((text) => text.includes("command=fetch")));
+    return { result, calls };
+  } finally {
+    bitGit.destroyBackend(backend);
+  }
+}
+
 export async function verifyBitGitModule(bitGit = defaultBitGit) {
   const memoryApi = bitGit.createMemoryBackend();
   const customBackend = createVirtualHost();
@@ -760,6 +836,7 @@ export async function verifyBitGitModule(bitGit = defaultBitGit) {
       "Stash Pop <stash-pop@example.com>",
     );
     const transportHelperResult = await runTransportHelperFlow(bitGit);
+    const cloneResult = await runCloneFlow(bitGit);
 
     return {
       memoryResult,
@@ -777,6 +854,7 @@ export async function verifyBitGitModule(bitGit = defaultBitGit) {
       stashDiffCherryPickResult,
       stashPopResult,
       transportHelperResult,
+      cloneResult,
     };
   } finally {
     bitGit.destroyBackend(memoryApi);

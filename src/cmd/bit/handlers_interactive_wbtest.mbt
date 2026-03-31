@@ -20,13 +20,37 @@ async test "interactive: add patch default runner rejects with error" {
 }
 
 ///|
-async test "interactive: add patch default runner fails without custom runner" {
-  // Default runner should fail (exit code 1) since add -p is not implemented
+async test "interactive: add patch default runner delegates to real git argv" {
+  let seen_programs : Array[String] = []
+  let seen_argvs : Array[Array[String]] = []
+  let code = default_add_interactive_runner(
+    ["-p", "README.md"],
+    process_runner=Some(async fn(
+      program : String,
+      argv : Array[String],
+    ) -> Int noraise {
+      seen_programs.push(program)
+      seen_argvs.push(argv)
+      0
+    }),
+  )
+  assert_eq(code, 0)
+  assert_eq(seen_programs.length(), 1)
+  assert_eq(seen_programs[0], resolve_real_git_for_dispatch())
+  assert_eq(seen_argvs.length(), 1)
+  assert_eq(seen_argvs[0], ["add", "-p", "README.md"])
+}
+
+///|
+async test "interactive: add patch runner nonzero exit raises error" {
   try {
-    run_add_interactive(["-p", "README.md"])
-    fail("expected error from unimplemented add -p")
+    run_add_interactive(
+      ["-p", "README.md"],
+      runner=Some(async fn(_args : Array[String]) -> Int noraise { 1 }),
+    )
+    fail("expected add interactive failure")
   } catch {
-    _ => () // Expected: should raise an error
+    _ => ()
   }
 }
 

@@ -7,11 +7,21 @@ pub(all) struct HttpResponse {
   headers : Array[(String, String)]
 } derive(Show, Eq)
 
-///| Low-level FFI import
-fn ffi_http_get(p0_ptr : Int, p0_len : Int, p1_ptr : Int, p1_len : Int, retptr : Int) -> Int = "mizchi:bit/http-client" "http-get"
+///|
+/// Low-level FFI import
+fn ffi_http_get(
+  p0_ptr : Int,
+  p0_len : Int,
+  p1_ptr : Int,
+  p1_len : Int,
+  retptr : Int,
+) -> Int = "mizchi:bit/http-client" "http-get"
 
 ///|
-pub fn http_get(url : String, headers : Array[(String, String)]) -> Result[(HttpResponse, Array[Byte]), String] {
+pub fn http_get(
+  url : String,
+  headers : Array[(String, String)],
+) -> Result[(HttpResponse, Array[Byte]), String] {
   let (p0_ptr, p0_len) = @cabi.cabi_lower_string(url)
   let p1_len = headers.length()
   let p1_ptr = @cabi.cabi_realloc(0, 0, 4, p1_len * 16)
@@ -36,29 +46,58 @@ pub fn http_get(url : String, headers : Array[(String, String)]) -> Result[(Http
       let resp_headers : Array[(String, String)] = Array::new(capacity=hdrs_len)
       for i = 0; i < hdrs_len; i = i + 1 {
         let h_ptr = hdrs_ptr + i * 16
-        let k = @cabi.cabi_lift_string(@cabi.cabi_read_i32(h_ptr), @cabi.cabi_read_i32(h_ptr + 4))
-        let v = @cabi.cabi_lift_string(@cabi.cabi_read_i32(h_ptr + 8), @cabi.cabi_read_i32(h_ptr + 12))
+        let k = @cabi.cabi_lift_string(
+          @cabi.cabi_read_i32(h_ptr),
+          @cabi.cabi_read_i32(h_ptr + 4),
+        )
+        let v = @cabi.cabi_lift_string(
+          @cabi.cabi_read_i32(h_ptr + 8),
+          @cabi.cabi_read_i32(h_ptr + 12),
+        )
         resp_headers.push((k, v))
       }
       let body_ptr = @cabi.cabi_read_i32(resp_ptr + 12)
       let body_len = @cabi.cabi_read_i32(resp_ptr + 16)
       let body : Array[Byte] = Array::new(capacity=body_len)
-      for i = 0; i < body_len; i = i + 1 { body.push(@cabi.cabi_read_u8(body_ptr + i)) }
+      for i = 0; i < body_len; i = i + 1 {
+        body.push(@cabi.cabi_read_u8(body_ptr + i))
+      }
       Ok(({ code: resp_code, headers: resp_headers }, body))
     }
-    _ => Err(@cabi.cabi_lift_string(@cabi.cabi_read_i32(retptr + 4), @cabi.cabi_read_i32(retptr + 4 + 4)))
+    _ =>
+      Err(
+        @cabi.cabi_lift_string(
+          @cabi.cabi_read_i32(retptr + 4),
+          @cabi.cabi_read_i32(retptr + 4 + 4),
+        ),
+      )
   }
 }
 
-///| Low-level FFI import
-fn ffi_http_post(p0_ptr : Int, p0_len : Int, p1_ptr : Int, p1_len : Int, p2_ptr : Int, p2_len : Int, retptr : Int) -> Int = "mizchi:bit/http-client" "http-post"
+///|
+/// Low-level FFI import
+fn ffi_http_post(
+  p0_ptr : Int,
+  p0_len : Int,
+  p1_ptr : Int,
+  p1_len : Int,
+  p2_ptr : Int,
+  p2_len : Int,
+  retptr : Int,
+) -> Int = "mizchi:bit/http-client" "http-post"
 
 ///|
-pub fn http_post(url : String, body : Array[Byte], headers : Array[(String, String)]) -> Result[(HttpResponse, Array[Byte]), String] {
+pub fn http_post(
+  url : String,
+  body : Array[Byte],
+  headers : Array[(String, String)],
+) -> Result[(HttpResponse, Array[Byte]), String] {
   let (p0_ptr, p0_len) = @cabi.cabi_lower_string(url)
   let p1_len = body.length()
   let p1_ptr = @cabi.cabi_realloc(0, 0, 1, p1_len * 1)
-  for i, elem in body { @cabi.cabi_write_u8(p1_ptr + i, elem) }
+  for i, elem in body {
+    @cabi.cabi_write_u8(p1_ptr + i, elem)
+  }
   let p2_len = headers.length()
   let p2_ptr = @cabi.cabi_realloc(0, 0, 4, p2_len * 16)
   for i, elem in headers {
@@ -82,16 +121,30 @@ pub fn http_post(url : String, body : Array[Byte], headers : Array[(String, Stri
       let resp_headers : Array[(String, String)] = Array::new(capacity=hdrs_len)
       for i = 0; i < hdrs_len; i = i + 1 {
         let h_ptr = hdrs_ptr + i * 16
-        let k = @cabi.cabi_lift_string(@cabi.cabi_read_i32(h_ptr), @cabi.cabi_read_i32(h_ptr + 4))
-        let v = @cabi.cabi_lift_string(@cabi.cabi_read_i32(h_ptr + 8), @cabi.cabi_read_i32(h_ptr + 12))
+        let k = @cabi.cabi_lift_string(
+          @cabi.cabi_read_i32(h_ptr),
+          @cabi.cabi_read_i32(h_ptr + 4),
+        )
+        let v = @cabi.cabi_lift_string(
+          @cabi.cabi_read_i32(h_ptr + 8),
+          @cabi.cabi_read_i32(h_ptr + 12),
+        )
         resp_headers.push((k, v))
       }
       let body_ptr = @cabi.cabi_read_i32(resp_ptr + 12)
       let body_len = @cabi.cabi_read_i32(resp_ptr + 16)
       let resp_body : Array[Byte] = Array::new(capacity=body_len)
-      for i = 0; i < body_len; i = i + 1 { resp_body.push(@cabi.cabi_read_u8(body_ptr + i)) }
+      for i = 0; i < body_len; i = i + 1 {
+        resp_body.push(@cabi.cabi_read_u8(body_ptr + i))
+      }
       Ok(({ code: resp_code, headers: resp_headers }, resp_body))
     }
-    _ => Err(@cabi.cabi_lift_string(@cabi.cabi_read_i32(retptr + 4), @cabi.cabi_read_i32(retptr + 4 + 4)))
+    _ =>
+      Err(
+        @cabi.cabi_lift_string(
+          @cabi.cabi_read_i32(retptr + 4),
+          @cabi.cabi_read_i32(retptr + 4 + 4),
+        ),
+      )
   }
 }

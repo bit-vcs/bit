@@ -25,6 +25,121 @@ fn js_exports_parse_loose_header(raw : Bytes) -> (String, Int) {
 }
 
 ///|
+extern "js" fn js_exports_register_clone_fixture_transport(
+  adv_hex : String,
+  lsrefs_hex : String,
+  fetch_hex : String,
+) -> Int =
+  #| (advHex, lsrefsHex, fetchHex) => {
+  #|   const state = globalThis.__bitGitJsTransportState ??= { nextTransportId: 1, transports: new Map() };
+  #|   const decodeHex = (hex) => {
+  #|     const value = String(hex ?? "");
+  #|     const length = Math.floor(value.length / 2);
+  #|     const bytes = new Uint8Array(length);
+  #|     for (let i = 0; i < length; i += 1) {
+  #|       bytes[i] = Number.parseInt(value.slice(i * 2, i * 2 + 2), 16);
+  #|     }
+  #|     return bytes;
+  #|   };
+  #|   const decoder = new TextDecoder();
+  #|   const calls = [];
+  #|   const adv = decodeHex(advHex);
+  #|   const lsrefs = decodeHex(lsrefsHex);
+  #|   const fetch = decodeHex(fetchHex);
+  #|   const transportId = state.nextTransportId++;
+  #|   state.transports.set(transportId, {
+  #|     calls,
+  #|     async get(url) {
+  #|       calls.push(`GET ${url}`);
+  #|       return { status: 200, body: adv };
+  #|     },
+  #|     async post(url, body) {
+  #|       calls.push(`POST ${url}`);
+  #|       const text = decoder.decode(body ?? new Uint8Array());
+  #|       if (text.includes("command=ls-refs")) {
+  #|         return { status: 200, body: lsrefs };
+  #|       }
+  #|       if (text.includes("command=fetch") || text.includes("want ")) {
+  #|         return { status: 200, body: fetch };
+  #|       }
+  #|       throw new Error(`unexpected clone transport payload: ${text}`);
+  #|     },
+  #|   });
+  #|   return transportId;
+  #| }
+
+///|
+extern "js" fn js_exports_transport_calls(transport_id : Int) -> Array[String] =
+  #| (transportId) => {
+  #|   const state = globalThis.__bitGitJsTransportState ??= { nextTransportId: 1, transports: new Map() };
+  #|   const transport = state.transports.get(transportId);
+  #|   return Array.isArray(transport?.calls) ? transport.calls.slice() : [];
+  #| }
+
+///|
+extern "js" fn js_exports_drop_transport(transport_id : Int) -> Unit =
+  #| (transportId) => {
+  #|   const state = globalThis.__bitGitJsTransportState ??= { nextTransportId: 1, transports: new Map() };
+  #|   state.transports.delete(transportId);
+  #| }
+
+///|
+let js_exports_clone_adv_v2_hex : String = "3030306576657273696f6e20320a303031636167656e743d6769742f322e35302e312d44617277696e0a303031336c732d726566733d756e626f726e0a3030323066657463683d7368616c6c6f7720776169742d666f722d646f6e650a303031327365727665722d6f7074696f6e0a303031376f626a6563742d666f726d61743d736861310a30303030"
+
+///|
+let js_exports_clone_lsrefs_hex : String = "303035303330633966323038616363373630313737336132396165663339343135376164663936306431303420484541442073796d7265662d7461726765743a726566732f68656164732f6d61696e0a303033643330633966323038616363373630313737336132396165663339343135376164663936306431303420726566732f68656164732f6d61696e0a30303030"
+
+///|
+let js_exports_clone_fetch_hex : String = "303030647061636b66696c650a30306435015041434b00000002000000039b09789c95cb310ac3300c40d1dda7f05e28b21ccb319492ab288ad208ea0682baf4f4cd15327d78f0fd508dccdc4874c1a57192512b4aa1194b66505cb58eb9e555e71af8ebdb7ec46e3fd92c3ece0e304cafcef6becbde9f31556a2513258c376800e1d46eee7a690af6310f7f8ae52e13a502789c33343030333151c848cdc9c9d72ba9286138c768a6caccbde2f64ab6ef61d3eae7cd593cc5cd0b00df740dbf36789ccb48cdc9c9e70200084b021f62c7bf336ea966f094470f354a76a0f737e13d30303036017a30303030"
+
+///|
+let js_exports_clone_fixture_commit : String = "30c9f208acc7601773a29aef394157adf960d104"
+
+///|
+async test "js exports: clone clones ssh remote via https smart transport" {
+  let transport_id = js_exports_register_clone_fixture_transport(
+    js_exports_clone_adv_v2_hex, js_exports_clone_lsrefs_hex, js_exports_clone_fetch_hex,
+  )
+  let host_id = js_create_memory_host()
+
+  let result = js_exports_unwrap_ok(
+    "clone",
+    js_clone_remote(
+      host_id, "/repo-clone", "git@github.com:user/repo.git", transport_id, true,
+    ),
+  )
+  assert_eq(result.status, "cloned")
+  assert_eq(result.commit_id, js_exports_clone_fixture_commit)
+  assert_eq(result.refname, "refs/heads/main")
+  assert_eq(
+    js_exports_unwrap_ok(
+      "read cloned file",
+      js_host_read_string(host_id, "/repo-clone/hello.txt"),
+    ),
+    "hello\n",
+  )
+  assert_eq(
+    js_exports_unwrap_ok(
+      "origin url",
+      js_get_remote_url(host_id, "/repo-clone", "origin"),
+    ),
+    "git@github.com:user/repo.git",
+  )
+  let calls = js_exports_transport_calls(transport_id)
+  assert_true(
+    calls.contains(
+      "GET https://github.com/user/repo/info/refs?service=git-upload-pack",
+    ),
+  )
+  assert_true(
+    calls.contains("POST https://github.com/user/repo/git-upload-pack"),
+  )
+
+  js_destroy_host(host_id)
+  js_exports_drop_transport(transport_id)
+}
+
+///|
 test "js exports: memory host supports local git flow" {
   let host_id = js_create_memory_host()
 
