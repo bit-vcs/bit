@@ -5,11 +5,9 @@ description: "Manage implementation sessions with bit issue coordination. Use wh
 
 # Session Coordination with bit issue
 
-Coordinate parallel coding sessions using `bit issue`. Each session declares its Target Files via an issue so other sessions can detect and avoid file conflicts.
+Coordinate coding sessions using `bit issue`. Each session declares its Target Files via an issue so other sessions can detect and avoid file conflicts.
 
-This protocol is harness-agnostic — it works with any worktree setup, branch-based workflow, or single-repo workflow. Worktree creation and removal are the caller's responsibility.
-
-`bit issue` works transparently from any worktree.
+This protocol works with any workflow — single-repo, worktrees, or branches.
 
 ## Decide: New Session or Resume
 
@@ -17,8 +15,8 @@ This protocol is harness-agnostic — it works with any worktree setup, branch-b
 bit issue list --open
 ```
 
-- **Open session exists for this branch** → go to [Resume Session](#resume-session)
-- **No existing session** → go to [New Session](#new-session)
+- **Open session exists for this branch** → [Resume Session](#resume-session)
+- **No existing session** → [New Session](#new-session)
 
 ---
 
@@ -26,33 +24,27 @@ bit issue list --open
 
 ### 1. Read the Plan (if available)
 
-If a plan file exists, read it before starting work. Plans may be `.gitignore`d and unavailable from worktrees — read from the main repo path if needed.
+If a plan file exists, read it first. Plans may be `.gitignore`d — read from the main repo path if needed.
 
 ### 2. Declare Scope
 
-Create a bit issue declaring your session and Target Files. Use the current branch name for the session label (e.g., `session:feat/add-auth` or `session:main` if not using feature branches).
+Create a bit issue declaring your session and Target Files. Use the current branch name for the session label.
 
-To assign a sequence number, count **all** issues (not just open) with the session label to avoid reuse after close/reopen cycles:
+To assign a sequence number, count **all** issues (not just open) with the session label:
 
 ```bash
 bit issue list --all --label "session:<branch-name>"
 # → N issues found → next seq = N+1
 ```
 
-Multiple `--label` flags are supported for categorization.
-
 ```bash
 bit issue create \
   --title "[session:<branch-name>#<seq>] <summary>" \
   --label "session:<branch-name>" \
   --body "$(cat <<'BODY'
-## Session Info
-
-- **branch**: <branch-name>
-
 ## Target Files
 
-- path/to/file.ts (modify|create|delete)
+- path/to/file.mbt (modify|create|delete)
 
 ## Plan
 
@@ -65,30 +57,26 @@ BODY
 
 ### 3. Check for Overlap
 
-For each open issue **other than the one you created in step 2**, view it and extract Target Files from the body. Only consider `modify` and `delete` operations for overlap — `create` files are unowned by definition.
+For each open session issue **other than yours**, check Target Files:
 
 ```bash
 bit issue list --open                    # all open sessions
-bit issue view <other-session-id>        # read Target Files section
+bit issue get <other-session-id>         # read Target Files
 ```
 
-Calculate overlap:
+Overlap rules (only `modify` and `delete` count — `create` is conflict-free):
 
-```
-overlapping = my modify/delete files ∩ other modify/delete files
-remaining   = my total targets - overlapping files
+| Situation | Action |
+|-----------|--------|
+| No overlap | Proceed |
+| Some files overlap, others remain | Exclude overlapping files, update issue |
+| All files overlap | Ask user whether to proceed or abort |
 
-- 0 overlapping:              proceed
-- some overlapping, remaining > 0: exclude overlapping files, update issue body + add comment
-- all modify/delete files overlap:  ask user whether to proceed with exclusions or abort
-```
-
-When excluding files, read the current body, remove excluded files, then update:
+When excluding files:
 
 ```bash
-bit issue view <id>                      # read current body
-bit issue update <id> --body "<revised body with excluded files removed>"
-bit issue comment add <id> --body "Excluded path/to/file.ts (owned by session X)"
+bit issue update <id> --body "<revised body>"
+bit issue comment add <id> --body "Excluded path/to/file.mbt (owned by session X)"
 ```
 
 ### 4. Work
@@ -96,12 +84,10 @@ bit issue comment add <id> --body "Excluded path/to/file.ts (owned by session X)
 Record scope changes as they happen:
 
 ```bash
-bit issue comment add <id> --body "Target added: path/to/new.ts (modify) — reason: ..."
+bit issue comment add <id> --body "Target added: path/to/new.mbt (modify) — reason: ..."
 ```
 
 ### 5. Complete
-
-Close the issue when done. Close is idempotent (safe to call on already-closed issues).
 
 ```bash
 bit issue comment add <id> --body "Done: <summary>"
@@ -112,26 +98,15 @@ bit issue close <id>
 
 ## Resume Session
 
-### 1. Find the Session
-
 ```bash
 bit issue list --open --label "session:<branch-name>"
-# or
-bit issue list --open
+bit issue get <id>                       # plan + target files
+bit issue comment list <id>              # scope changes + progress
 ```
 
-### 2. Restore Context
+Continue working. The issue body has the canonical Target Files; comments track changes.
 
-```bash
-bit issue view <id>              # plan + target files
-bit issue comment list <id>      # scope changes + progress
-```
-
-### 3. Continue
-
-The issue body contains the canonical Target Files and plan. Comments track scope changes and progress.
-
-### 4. Clean Up Orphans
+### Clean Up Orphans
 
 If a session is abandoned with no committed work:
 
@@ -140,7 +115,24 @@ bit issue comment add <id> --body "Orphan: session abandoned"
 bit issue close <id>
 ```
 
-Use `bit issue list --all` to find both open and closed sessions.
+---
+
+## Cross-machine Sync (optional)
+
+When coordinating across machines, wrap with relay sync:
+
+```bash
+bit relay sync fetch "$BIT_RELAY_URL"    # pull before declaring scope
+# ... create session issue ...
+bit relay sync push "$BIT_RELAY_URL"     # push so others see it
+```
+
+Or use claims for lightweight coordination:
+
+```bash
+bit issue claim <id>                     # signal you're working on this
+bit issue claims                         # check who's working on what
+```
 
 ---
 
@@ -150,14 +142,14 @@ Use `bit issue list --all` to find both open and closed sessions.
 |-----------|----------|
 | bit command fails | Notify user, continue without coordination |
 | bit not installed | Solo mode — skip coordination |
-| Orphan issue | Verify session is still active, exclude from overlap detection if not |
+| Orphan issue | Verify session is still active, exclude from overlap |
 
 ## Commands Reference
 
 ```bash
 bit issue create --title "..." --label "..." [--label "..."] --body "..."
 bit issue list [--open] [--closed] [--all] [--label <name>] [--parent <id>]
-bit issue view <id>
+bit issue get <id>
 bit issue update <id> [--title "..."] [--body "..."] [--label "..."]
 bit issue close <id>                     # idempotent
 bit issue reopen <id>                    # idempotent

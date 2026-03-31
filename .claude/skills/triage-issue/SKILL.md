@@ -1,19 +1,21 @@
 ---
 name: triage-issue
-description: "Analyze and triage new issues via bit relay. Use when: processing hub.issue relay events, categorizing issues, assessing complexity, or suggesting implementation approaches."
+description: "Analyze and triage issues — categorize, assess complexity, suggest approach. Use when: reviewing new issues, prioritizing backlog, or processing hub.issue relay events."
 ---
 
 # triage-issue
 
-Analyze and triage new issues, triggered by relay hub.issue events.
+Analyze and triage issues.
 
 ## Trigger
 
-Called when a new issue is created and synced via relay, or when relay-agent detects `hub.issue`.
+- User asks to triage issues
+- `bit issue list --open` shows untriaged issues
+- Relay event: `hub.issue` (optional, requires relay)
 
 ## Steps
 
-1. **Read the issue**: Parse title and body
+1. **Read the issue**: `bit issue get <id>`
 2. **Categorize**: Determine type (bug, feature, question, improvement, docs)
 3. **Assess complexity**: Estimate as small/medium/large based on:
    - Number of files likely affected
@@ -45,10 +47,7 @@ Brief description of what needs to be done.
 ## Commands
 
 ```bash
-# Add labels
 bit issue update <id> --label "bug" --label "priority:medium"
-
-# Add comment
 bit issue comment add <id> --body "Triage: ..."
 ```
 

@@ -1,19 +1,21 @@
 ---
 name: auto-review
-description: "Review code changes and provide feedback via bit relay. Use when: processing review.request relay events, reviewing PRs, or analyzing code diffs for bugs, security, and style."
+description: "Review code changes and provide structured feedback. Use when: reviewing PRs, analyzing code diffs for bugs/security/style, or processing review.request relay events."
 ---
 
 # auto-review
 
-Review code changes and provide feedback, triggered by relay review.request events.
+Review code changes and provide structured feedback.
 
 ## Trigger
 
-Called when `bit relay review list` shows a pending review request, or when relay-agent detects `review.request`.
+- User requests a code review
+- `bit pr list` shows PRs awaiting review
+- Relay event: `review.request` (optional, requires relay)
 
 ## Steps
 
-1. **Get PR details**: Read the PR diff using `git diff` or `gh pr diff <id>`
+1. **Get PR details**: `bit pr get <id>` or `git diff <base>...<head>`
 2. **Analyze changes**: Check for:
    - Bugs and logic errors
    - Security vulnerabilities (OWASP top 10)
@@ -21,7 +23,13 @@ Called when `bit relay review list` shows a pending review request, or when rela
    - Test coverage
    - Performance implications
 3. **Write review**: Provide constructive, specific feedback
-4. **Submit verdict**: `bit relay review submit <repo> --pr <id> --verdict approve/reject`
+4. **Submit verdict**:
+   ```bash
+   # Local (bit pr)
+   bit pr review <pr-id> --approve --commit <hex> --body "LGTM"
+   # Via relay (optional)
+   bit relay review submit <repo> --pr <id> --verdict approve
+   ```
 
 ## Review format
 
