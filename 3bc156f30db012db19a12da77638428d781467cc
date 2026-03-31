@@ -1,0 +1,52 @@
+version 1
+key hub/work-item/17631bfe/meta
+kind work-item
+clock test <test@example.com>=1
+timestamp 1774969690
+node test <test@example.com>
+deleted 0
+
+work-item 17631bfe
+title bit issue sync: 双方向の統合コマンドと定期実行
+author test <test@example.com>
+created 1774969690
+updated 1774969690
+state open
+label hub
+parent bec2b506
+
+## 概要
+
+pull + push を統合した sync コマンドと、定期実行の仕組み。
+
+## CLI
+
+```
+bit issue sync [--repo <owner/repo>] [--dry-run] [--conflict <policy>]
+```
+
+`sync` = `pull` → `push` の順に実行。
+
+## 追加機能
+
+### status コマンド
+
+```
+bit issue sync status [--repo <owner/repo>]
+```
+
+- 同期状態の概要: 同期済み/未同期/conflict の件数
+- 最終同期時刻
+- pending な変更のリスト
+
+### import の改善
+
+既存の `bit issue import` を sync 基盤に乗せる:
+- import 時に mapping record を作成する
+- `--sync` フラグで import 後に双方向 sync を有効化
+
+## 完了条件
+
+- `bit issue sync` で pull → push が一括実行される
+- `bit issue sync status` で同期状態が確認できる
+- `bit issue import` が mapping を作成する
