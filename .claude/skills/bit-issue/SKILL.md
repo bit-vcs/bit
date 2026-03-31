@@ -92,6 +92,52 @@ bit issue create --title "Depends on upstream fix" \
   --link "https://github.com/other/repo/issues/42"
 ```
 
+## GitHub Sync
+
+Bidirectional sync between bit issues and GitHub Issues.
+
+### Pull (GitHub → bit)
+
+```bash
+bit issue sync pull --repo owner/repo                   # fetch changes
+bit issue sync pull --repo owner/repo --dry-run         # preview only
+bit issue sync pull --repo owner/repo --since 2026-03-01
+```
+
+### Push (bit → GitHub)
+
+```bash
+bit issue sync push --repo owner/repo                   # push changes
+bit issue sync push --repo owner/repo --dry-run         # preview only
+bit issue sync push --repo owner/repo --label "bug"     # filter by label
+```
+
+Note: `session:*` labeled issues are excluded from push (local-only).
+
+### Bidirectional sync
+
+```bash
+bit issue sync --repo owner/repo                        # pull then push
+bit issue sync status --repo owner/repo                 # show sync state
+```
+
+### Conflict policy
+
+```bash
+bit issue sync --repo owner/repo --conflict github-wins   # default
+bit issue sync --repo owner/repo --conflict bit-wins
+bit issue sync --repo owner/repo --conflict newer-wins
+bit issue sync --repo owner/repo --conflict manual         # skip conflicts
+```
+
+### Import with mapping
+
+```bash
+bit issue import --repo owner/repo                      # creates mapping records
+```
+
+Import automatically creates mapping records (bit id ↔ GitHub number) so subsequent `sync pull/push` can track changes.
+
 ## Claim (optional, requires relay)
 
 Signal to other agents/sessions that you're working on an issue:
@@ -118,6 +164,10 @@ bit issue claims                        # list active claims
 | `bit issue search` | Search issues (`--type`, `--state`, `--author`, `--label`, `--limit`) |
 | `bit issue import` | Import from GitHub (`--repo`, `--state`, `--limit`, `--provider`) |
 | `bit issue link <issue> <pr>` | Associate PR with issue |
+| `bit issue sync pull` | Pull changes from GitHub (`--repo`, `--since`, `--dry-run`) |
+| `bit issue sync push` | Push changes to GitHub (`--repo`, `--label`, `--dry-run`) |
+| `bit issue sync` | Bidirectional sync (`--repo`, `--conflict`, `--dry-run`) |
+| `bit issue sync status` | Show sync state (`--repo`) |
 | `bit issue claim <id>` | Publish claim via relay (optional) |
 | `bit issue unclaim <id>` | Release claim (optional) |
 | `bit issue claims` | List active claims (optional) |
