@@ -1,3 +1,8 @@
+---
+name: relay-respond
+description: "Push results back to a bit relay room after completing a task. Use when: reporting CI status, submitting PR reviews, commenting on issues, or publishing agent responses via relay."
+---
+
 # relay-respond
 
 Push a message back to a relay room. Use after completing a task triggered by a relay event.

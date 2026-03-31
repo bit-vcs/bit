@@ -1,3 +1,8 @@
+---
+name: triage-issue
+description: "Analyze and triage new issues via bit relay. Use when: processing hub.issue relay events, categorizing issues, assessing complexity, or suggesting implementation approaches."
+---
+
 # triage-issue
 
 Analyze and triage new issues, triggered by relay hub.issue events.

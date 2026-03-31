@@ -1,3 +1,8 @@
+---
+name: fix-ci
+description: "Investigate and fix CI failures via bit relay. Use when: processing ci.status relay events, debugging failed GitHub Actions runs, or auto-fixing build/test failures."
+---
+
 # fix-ci
 
 Investigate and fix CI failures, triggered by relay ci.status events.

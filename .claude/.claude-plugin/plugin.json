@@ -1,0 +1,13 @@
+{
+  "name": "bit-skills",
+  "version": "0.1.0",
+  "description": "Agent skills for bit VCS — session coordination, relay-driven CI fixes, PR reviews, and issue triage",
+  "author": {
+    "name": "mizchi",
+    "url": "https://github.com/mizchi"
+  },
+  "homepage": "https://github.com/bit-vcs/bit",
+  "repository": "https://github.com/bit-vcs/bit",
+  "license": "Apache-2.0",
+  "keywords": ["bit", "vcs", "git", "relay", "moonbit"]
+}

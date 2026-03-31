@@ -1,3 +1,8 @@
+---
+name: auto-review
+description: "Review code changes and provide feedback via bit relay. Use when: processing review.request relay events, reviewing PRs, or analyzing code diffs for bugs, security, and style."
+---
+
 # auto-review
 
 Review code changes and provide feedback, triggered by relay review.request events.
