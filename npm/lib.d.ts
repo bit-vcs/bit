@@ -179,6 +179,7 @@ export type BitResetMode = "soft" | "mixed" | "hard";
 export interface BitFetchOptions {
   refspec?: string;
   preferV2?: boolean;
+  depth?: number;
   preferredSender?: string;
   preferredRepo?: string;
   authToken?: string;
@@ -186,6 +187,7 @@ export interface BitFetchOptions {
 
 export interface BitCloneOptions {
   preferV2?: boolean;
+  depth?: number;
   preferredSender?: string;
   preferredRepo?: string;
   authToken?: string;

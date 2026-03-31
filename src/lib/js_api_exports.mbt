@@ -2376,6 +2376,7 @@ pub async fn js_clone_remote(
   remote_url : String,
   transport_id : Int,
   prefer_v2 : Bool,
+  depth : Int,
 ) -> Result[JsCloneResult, String] {
   let fs = js_make_host_fs(host_id)
   js_wrap_error_async(async fn() -> JsCloneResult raise @bit.GitError {
@@ -2412,7 +2413,7 @@ pub async fn js_clone_remote(
             remote_url,
             wants,
             prefer_v2,
-            0,
+            depth,
             @protocol.FilterSpec::NoFilter,
             async fn(
               url : String,
@@ -2469,9 +2470,10 @@ pub fn js_clone_remote_promise(
   remote_url : String,
   transport_id : Int,
   prefer_v2 : Bool,
+  depth : Int,
 ) -> @js_async.Promise[Result[JsCloneResult, String]] {
   js_export_promise(async fn() {
-    js_clone_remote(host_id, root, remote_url, transport_id, prefer_v2)
+    js_clone_remote(host_id, root, remote_url, transport_id, prefer_v2, depth)
   })
 }
 
@@ -2483,6 +2485,7 @@ pub async fn js_fetch_remote(
   transport_id : Int,
   refspec : String,
   prefer_v2 : Bool,
+  depth : Int,
 ) -> Result[JsFetchResult, String] {
   let fs = js_make_host_fs(host_id)
   js_wrap_error_async(async fn() -> JsFetchResult raise @bit.GitError {
@@ -2511,7 +2514,7 @@ pub async fn js_fetch_remote(
           remote_url,
           [commit_id],
           prefer_v2,
-          0,
+          depth,
           @protocol.FilterSpec::NoFilter,
           async fn(
             url : String,
@@ -2560,9 +2563,10 @@ pub fn js_fetch_remote_promise(
   transport_id : Int,
   refspec : String,
   prefer_v2 : Bool,
+  depth : Int,
 ) -> @js_async.Promise[Result[JsFetchResult, String]] {
   js_export_promise(async fn() {
-    js_fetch_remote(host_id, root, remote_url, transport_id, refspec, prefer_v2)
+    js_fetch_remote(host_id, root, remote_url, transport_id, refspec, prefer_v2, depth)
   })
 }
 
