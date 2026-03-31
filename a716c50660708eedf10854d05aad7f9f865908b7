@@ -1,0 +1,49 @@
+version 1
+key hub/work-item/501a2162/meta
+kind work-item
+clock test <test@example.com>=1
+timestamp 1774969670
+node test <test@example.com>
+deleted 0
+
+work-item 501a2162
+title bit issue sync pull: GitHub → bit の差分取得と反映
+author test <test@example.com>
+created 1774969670
+updated 1774969670
+state open
+label hub
+parent bec2b506
+
+## 概要
+
+GitHub Issues の変更を bit issue に反映する pull コマンド。
+
+## CLI
+
+```
+bit issue sync pull [--repo <owner/repo>] [--since <datetime>] [--dry-run]
+```
+
+## 動作
+
+1. mapping record から対応済み issue のリストを取得
+2. `gh api` で GitHub 側の更新を取得 (`updated_at > last_gh_updated_at`)
+3. 新規 GitHub issue → `bit issue create` + mapping 作成
+4. 更新された GitHub issue → conflict policy に従い bit issue を更新
+5. close/reopen → state 同期
+6. コメント → `bit issue comment add` (重複チェック付き)
+
+## Conflict Policy
+
+- **github-wins** (default): GitHub 側が常に勝つ
+- **bit-wins**: bit 側が常に勝つ
+- **newer-wins**: `updated_at` が新しい方が勝つ
+- **manual**: conflict 時にスキップしてレポート
+
+## 完了条件
+
+- `bit issue sync pull` で新規 issue が取り込まれる
+- 既存 issue の title/body/state/labels 更新が反映される
+- comment の増分同期ができる
+- `--dry-run` で変更プレビューが出る
