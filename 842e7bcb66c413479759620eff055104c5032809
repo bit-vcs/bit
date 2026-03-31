@@ -1,0 +1,14 @@
+version 1
+key hub/issue/c10137a3/comment/438bc198
+kind issue.comment
+clock test <test@example.com>=1
+timestamp 1774970022
+node test <test@example.com>
+deleted 0
+
+comment 438bc198
+issue c10137a3
+author test <test@example.com>
+created 1774970022
+
+テスト用コメント: external_id ベースの重複チェックで実装方針を確認した。
