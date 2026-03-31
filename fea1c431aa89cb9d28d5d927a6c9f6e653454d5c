@@ -1,0 +1,17 @@
+version 1
+key hub/work-item/9158949b/meta
+kind work-item
+clock test <test@example.com>=1
+timestamp 1774970277
+node test <test@example.com>
+deleted 0
+
+work-item 9158949b
+title [eval-round3] child-1
+author test <test@example.com>
+created 1774970277
+updated 1774970277
+state open
+label test
+parent e1d8ab74
+
