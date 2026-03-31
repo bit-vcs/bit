@@ -25,14 +25,18 @@ bit issue create --title "Add error handling to parser" \
   --body "Parser panics on malformed input at line 42"
 ```
 
-### List open issues
+### List issues
+
+By default, `list` only shows **top-level** issues (no parent). Use `--all` to include sub-issues.
 
 ```bash
-bit issue list                          # open issues (default)
+bit issue list                          # open top-level issues (default)
 bit issue list --all                    # include sub-issues
-bit issue list --closed                 # closed only
+bit issue list --state closed           # closed top-level only
+bit issue list --state closed --all     # closed including sub-issues
 bit issue list --label "bug"            # filter by label
-bit issue list --format json            # JSON output
+bit issue list --format json            # JSON output (useful for parsing)
+bit issue list --format json --all      # all issues as JSON
 bit issue list --tree                   # show as indented tree
 ```
 
@@ -46,7 +50,7 @@ bit issue comment list <id>             # read comments
 ### Update and close
 
 ```bash
-bit issue update <id> --label "in-progress"
+bit issue update <id> --label "in-progress"       # or: bit issue edit <id>
 bit issue update <id> --body-append "Found root cause: off-by-one in tokenizer"
 bit issue comment add <id> --body "Fixed in commit abc123"
 bit issue close <id>                    # idempotent
@@ -59,18 +63,20 @@ Break complex tasks into smaller items:
 ```bash
 # Create parent
 bit issue create --title "Refactor HTTP client" --label "epic"
-# => iss-abc123
+# => abc12345
 
 # Create sub-issues
-bit issue create --title "Extract connection pool" --parent iss-abc123
-bit issue create --title "Add retry logic" --parent iss-abc123
+bit issue create --title "Extract connection pool" --parent abc12345
+bit issue create --title "Add retry logic" --parent abc12345
 
 # View hierarchy
 bit issue list --tree
-bit issue list --parent iss-abc123
+bit issue list --parent abc12345
 ```
 
 ## Search
+
+Search returns both open and closed issues by default.
 
 ```bash
 bit issue search "parser error"                     # title/body search
@@ -146,6 +152,7 @@ Signal to other agents/sessions that you're working on an issue:
 bit issue claim <id>                    # publish claim via relay
 bit issue unclaim <id>                  # release claim
 bit issue claims                        # list active claims
+bit issue watch                         # stream claim/unclaim events in real-time
 ```
 
 ## Commands Reference
@@ -154,9 +161,9 @@ bit issue claims                        # list active claims
 |---------|-------------|
 | `bit issue init` | Setup hub metadata and refspecs |
 | `bit issue create` | Create issue (`--title`, `--body`, `--label`, `--parent`, `--link`) |
-| `bit issue list` | List issues (`--open`, `--closed`, `--all`, `--tree`, `--parent`, `--label`, `--format json`) |
-| `bit issue get <id>` | View issue detail |
-| `bit issue update <id>` | Update issue (`--title`, `--body`, `--body-append`, `--label`) |
+| `bit issue list` | List top-level issues (`--state`, `--all`, `--tree`, `--parent`, `--label`, `--format json`) |
+| `bit issue get <id>` | View issue detail (alias: `view`) |
+| `bit issue update <id>` | Update issue (`--title`, `--body`, `--body-append`, `--label`; alias: `edit`) |
 | `bit issue close <id>` | Close issue (idempotent) |
 | `bit issue reopen <id>` | Reopen issue (idempotent) |
 | `bit issue comment add <id>` | Add comment (`--body`, `--reply-to`) |
@@ -164,6 +171,7 @@ bit issue claims                        # list active claims
 | `bit issue search` | Search issues (`--type`, `--state`, `--author`, `--label`, `--limit`) |
 | `bit issue import` | Import from GitHub (`--repo`, `--state`, `--limit`, `--provider`) |
 | `bit issue link <issue> <pr>` | Associate PR with issue |
+| `bit issue note` | Low-level notes access (`add`, `get`, `list`, `remove`; `--ns` for namespace) |
 | `bit issue sync pull` | Pull changes from GitHub (`--repo`, `--since`, `--dry-run`) |
 | `bit issue sync push` | Push changes to GitHub (`--repo`, `--label`, `--dry-run`) |
 | `bit issue sync` | Bidirectional sync (`--repo`, `--conflict`, `--dry-run`) |
@@ -171,11 +179,18 @@ bit issue claims                        # list active claims
 | `bit issue claim <id>` | Publish claim via relay (optional) |
 | `bit issue unclaim <id>` | Release claim (optional) |
 | `bit issue claims` | List active claims (optional) |
+| `bit issue watch` | Stream claim events in real-time (optional) |
+
+## Gotchas
+
+- **`list` hides sub-issues by default**: Use `--all` to see them. This applies to both `--state open` and `--state closed`.
+- **`search` returns all states**: Open and closed issues are both returned unless `--state` is specified.
+- **CLI `--help` is incomplete**: Some flags (`--tree`, `--all`, `--body-append`, `--format`) work but are not shown in `--help` output. This skill doc is the authoritative reference.
 
 ## Data Model
 
 - Storage: `refs/notes/bit-hub` (Git notes)
-- ID format: `iss-<hash>`
+- ID format: `<8-char hex hash>` (e.g., `bec2b506`)
 - States: `open`, `closed`
 - Sync: automatic via `git push`/`git fetch` after `bit issue init`
 - Relay: optional, for real-time sync across machines (`bit relay sync push/fetch`)
