@@ -27,25 +27,28 @@ bit issue create --title "Add error handling to parser" \
 
 ### List issues
 
-By default, `list` only shows **top-level** issues (no parent). Use `--all` to include sub-issues.
+By default, `list` shows **top-level** issues (no parent) in **all states** (open + closed). Use `--all` to include sub-issues, `--state` to filter by state.
 
 ```bash
-bit issue list                          # open top-level issues (default)
+bit issue list                          # top-level issues, all states (default)
+bit issue list --state open             # open top-level only
 bit issue list --all                    # include sub-issues
-bit issue list --state closed           # closed top-level only
 bit issue list --state closed --all     # closed including sub-issues
 bit issue list --label "bug"            # filter by label
 bit issue list --format json            # JSON output (useful for parsing)
 bit issue list --format json --all      # all issues as JSON
-bit issue list --tree                   # show as indented tree
+bit issue list --parent <id>            # children of a specific issue (all states)
+bit issue list --parent <id> --state open  # open children only
 ```
 
 ### View an issue
 
 ```bash
 bit issue get <id>                      # or: bit issue view <id>
-bit issue comment list <id>             # read comments
+bit issue comment list <id>             # read comments (not shown in get output)
 ```
+
+Note: `get` shows issue detail and sub-issue list, but does **not** include comments inline. Use `comment list` separately.
 
 ### Update and close
 
@@ -161,7 +164,7 @@ bit issue watch                         # stream claim/unclaim events in real-ti
 |---------|-------------|
 | `bit issue init` | Setup hub metadata and refspecs |
 | `bit issue create` | Create issue (`--title`, `--body`, `--label`, `--parent`, `--link`) |
-| `bit issue list` | List top-level issues (`--state`, `--all`, `--tree`, `--parent`, `--label`, `--format json`) |
+| `bit issue list` | List top-level issues (`--state`, `--all`, `--parent`, `--label`, `--format json`) |
 | `bit issue get <id>` | View issue detail (alias: `view`) |
 | `bit issue update <id>` | Update issue (`--title`, `--body`, `--body-append`, `--label`; alias: `edit`) |
 | `bit issue close <id>` | Close issue (idempotent) |
@@ -183,9 +186,12 @@ bit issue watch                         # stream claim/unclaim events in real-ti
 
 ## Gotchas
 
-- **`list` hides sub-issues by default**: Use `--all` to see them. This applies to both `--state open` and `--state closed`.
+- **`list` shows all states by default**: Use `--state open` or `--state closed` to filter. Without `--state`, both open and closed issues are shown.
+- **`list` hides sub-issues by default**: Use `--all` to include them. `--parent <id>` shows all states of children by default.
+- **`get` does not show comments**: Use `bit issue comment list <id>` separately to read comments.
 - **`search` returns all states**: Open and closed issues are both returned unless `--state` is specified.
-- **CLI `--help` is incomplete**: Some flags (`--tree`, `--all`, `--body-append`, `--format`) work but are not shown in `--help` output. This skill doc is the authoritative reference.
+- **`--tree` is unreliable**: The flag is accepted but currently renders a flat list without indentation. Use `--parent <id>` for reliable sub-issue listing.
+- **CLI `--help` is incomplete**: Some flags (`--all`, `--body-append`, `--format`, `--parent`) work but are not shown in `--help` output. This skill doc is the authoritative reference.
 
 ## Data Model
 
