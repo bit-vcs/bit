@@ -1,0 +1,41 @@
+version 1
+key hub/work-item/4e8ca08b/meta
+kind work-item
+clock test <test@example.com>=1
+timestamp 1774969659
+node test <test@example.com>
+deleted 0
+
+work-item 4e8ca08b
+title mapping record: bit issue id ↔ GitHub issue number の対応を保持する
+author test <test@example.com>
+created 1774969659
+updated 1774969659
+state open
+label hub
+parent bec2b506
+
+## 概要
+
+双方向 sync の基盤として、bit issue id と GitHub issue number/node_id の対応を永続化する。
+
+## 要件
+
+- `refs/notes/bit-hub` 内に mapping record を保存
+- 1 bit issue : 1 GitHub issue の 1:1 対応
+- mapping に必要なフィールド:
+  - `bit_id`: bit issue hash
+  - `gh_repo`: `owner/repo`
+  - `gh_number`: GitHub issue number
+  - `gh_node_id`: GitHub GraphQL node ID (optional, for mutations)
+  - `last_synced_at`: 最終同期時刻
+  - `last_bit_updated_at`: bit 側の最終更新時刻
+  - `last_gh_updated_at`: GitHub 側の最終更新時刻
+- `bit issue import` 時に自動で mapping を作成する
+- mapping の CRUD API を内部モジュールとして実装
+
+## 完了条件
+
+- import 時に mapping record が作成される
+- `bit issue get <id>` で GitHub link が表示される
+- mapping record の読み書きテストがある
