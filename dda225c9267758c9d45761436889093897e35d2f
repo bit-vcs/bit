@@ -1,0 +1,14 @@
+version 1
+key hub/issue/fe160276/comment/818bb3c3
+kind issue.comment
+clock test <test@example.com>=1
+timestamp 1774970283
+node test <test@example.com>
+deleted 0
+
+comment 818bb3c3
+issue fe160276
+author test <test@example.com>
+created 1774970283
+
+Comment from round 1
