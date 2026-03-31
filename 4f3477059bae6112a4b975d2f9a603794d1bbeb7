@@ -1,8 +1,8 @@
 version 1
 key hub/work-item/c10137a3/meta
 kind work-item
-clock test <test@example.com>=4
-timestamp 1774970069
+clock test <test@example.com>=5
+timestamp 1774970072
 node test <test@example.com>
 deleted 0
 
@@ -10,8 +10,8 @@ work-item c10137a3
 title comment sync の重複チェック実装
 author test <test@example.com>
 created 1774970014
-updated 1774970069
-state open
+updated 1774970072
+state closed
 label hub
 parent bec2b506
 
