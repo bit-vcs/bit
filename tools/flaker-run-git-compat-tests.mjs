@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { cpSync, chmodSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { cpSync, chmodSync, existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
@@ -8,6 +8,7 @@ import {
   GIT_COMPAT_TASK_ID,
   normalizeSelectedScripts,
   readAllowlistEntries,
+  resolveShimRefreshAction,
   toGitCompatSuite,
 } from "./flaker-git-compat-lib.mjs";
 
@@ -78,24 +79,31 @@ function ensurePrepared() {
   ensureOk(patch, "apply-git-test-patches");
 
   const shimMoon = join(root, "tools/git-shim/moon");
-  if (existsSync(shimMoon)) {
-    return;
-  }
-
-  const build = run("moon", ["build", "--target", "native", "--release"]);
-  ensureOk(build, "moon build");
-
   const builtBit = join(
     root,
     "_build/native/release/build/cmd/bit/bit.exe",
   );
-  if (!existsSync(builtBit)) {
-    throw new Error(`bit binary not found after build: ${builtBit}`);
+  const action = resolveShimRefreshAction({
+    shimExists: existsSync(shimMoon),
+    builtBitExists: existsSync(builtBit),
+    shimMtimeMs: existsSync(shimMoon) ? statSync(shimMoon).mtimeMs : null,
+    builtBitMtimeMs: existsSync(builtBit) ? statSync(builtBit).mtimeMs : null,
+  });
+
+  if (action === "build") {
+    const build = run("moon", ["build", "--target", "native", "--release"]);
+    ensureOk(build, "moon build");
   }
 
-  mkdirSync(dirname(shimMoon), { recursive: true });
-  cpSync(builtBit, shimMoon);
-  chmodSync(shimMoon, 0o755);
+  if (!existsSync(builtBit)) {
+    throw new Error(`bit binary not found after prepare step: ${builtBit}`);
+  }
+
+  if (action !== "keep") {
+    mkdirSync(dirname(shimMoon), { recursive: true });
+    cpSync(builtBit, shimMoon);
+    chmodSync(shimMoon, 0o755);
+  }
 }
 
 function resolveRealGit() {

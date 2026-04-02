@@ -6,6 +6,7 @@ import {
   parseAllowlistEntries,
   listFlakerGitCompatTests,
   normalizeSelectedScripts,
+  resolveShimRefreshAction,
   toFlakerTest,
 } from "./flaker-git-compat-lib.mjs";
 
@@ -54,4 +55,40 @@ test("normalizeSelectedScripts accepts suite paths and de-duplicates", () => {
   );
 
   assert.deepEqual(selected, ["t1300-config.sh", "t3200-branch.sh"]);
+});
+
+test("resolveShimRefreshAction rebuilds when no built binary exists", () => {
+  assert.equal(
+    resolveShimRefreshAction({
+      shimExists: true,
+      builtBitExists: false,
+      shimMtimeMs: 10,
+      builtBitMtimeMs: null,
+    }),
+    "build",
+  );
+});
+
+test("resolveShimRefreshAction copies when built binary is newer than shim", () => {
+  assert.equal(
+    resolveShimRefreshAction({
+      shimExists: true,
+      builtBitExists: true,
+      shimMtimeMs: 10,
+      builtBitMtimeMs: 20,
+    }),
+    "copy",
+  );
+});
+
+test("resolveShimRefreshAction keeps shim when it is already up to date", () => {
+  assert.equal(
+    resolveShimRefreshAction({
+      shimExists: true,
+      builtBitExists: true,
+      shimMtimeMs: 20,
+      builtBitMtimeMs: 10,
+    }),
+    "keep",
+  );
 });

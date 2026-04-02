@@ -31,6 +31,7 @@ test:
     moon test --target native --no-parallelize -j 1
     just test-git-compat-allowlist
     just test-flaker-affected-rules
+    just test-flaker-cli-wrapper
     just test-flaker-git-compat
     just test-js-build
 
@@ -109,6 +110,10 @@ test-flaker-git-compat:
 # Verify flaker git-compat affected mapping config and examples
 test-flaker-affected-rules:
     node --test tools/flaker-affected-rules.test.mjs
+
+# Verify flaker CLI wrapper guidance for unsupported resolver versions
+test-flaker-cli-wrapper:
+    node --test tools/flaker-cli-wrapper.test.mjs
 
 # Verify JS-exported lib on a pure in-memory host
 test-js-lib: build-js-lib
@@ -387,10 +392,10 @@ flaker-git-compat-sample strategy="weighted" count="25" changed="":
     if [ -n "{{changed}}" ]; then \
       args="$args --changed {{changed}}"; \
     fi; \
-    flaker $args
+    node tools/flaker-cli-wrapper.mjs $args
 
 # Focused local git-compat execution via flaker
-flaker-git-compat-run strategy="weighted" count="25" changed="":
+flaker-git-compat-run strategy="weighted" count="25" changed="": build
     @if ! command -v flaker >/dev/null 2>&1; then \
       echo "flaker CLI is required; install @mizchi/flaker first" >&2; \
       exit 1; \
@@ -403,7 +408,7 @@ flaker-git-compat-run strategy="weighted" count="25" changed="":
     if [ -n "{{changed}}" ]; then \
       args="$args --changed {{changed}}"; \
     fi; \
-    flaker $args
+    node tools/flaker-cli-wrapper.mjs $args
 
 # Inspect which git-compat suites flaker sees as affected
 flaker-git-compat-affected changed:
@@ -411,7 +416,7 @@ flaker-git-compat-affected changed:
       echo "flaker CLI is required; install @mizchi/flaker first" >&2; \
       exit 1; \
     fi
-    flaker affected --changed {{changed}}
+    node tools/flaker-cli-wrapper.mjs affected --changed {{changed}}
 
 # Trigger Git Compat Randomized workflow via workflow_dispatch
 compat-random-dispatch shards="1" ratio="50" target_shard="0" seed="":

@@ -75,3 +75,24 @@ export function normalizeSelectedScripts(tests, allowlistEntries) {
 
   return selected;
 }
+
+export function resolveShimRefreshAction({
+  shimExists,
+  builtBitExists,
+  shimMtimeMs,
+  builtBitMtimeMs,
+}) {
+  if (!builtBitExists) {
+    return "build";
+  }
+
+  if (!shimExists) {
+    return "copy";
+  }
+
+  if ((builtBitMtimeMs ?? 0) > (shimMtimeMs ?? 0)) {
+    return "copy";
+  }
+
+  return "keep";
+}
