@@ -1,6 +1,12 @@
 ///| Git reflog implementation
 
 ///|
+#warnings("-deprecated")
+fn reflog_parse_int64(value : StringView) -> Int64 raise {
+  @strconv.parse_int64(value)
+}
+
+///|
 pub struct ReflogEntry {
   old_id : @bit.ObjectId
   new_id : @bit.ObjectId
@@ -104,7 +110,7 @@ fn parse_reflog_line(line : String) -> ReflogEntry? {
   }
   // Next should be timestamp and timezone
   if i < parts.length() {
-    timestamp = @string.parse_int64(parts[i]) catch { _ => 0L }
+    timestamp = reflog_parse_int64(parts[i]) catch { _ => 0L }
     i += 1
   }
   if i < parts.length() {

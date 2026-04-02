@@ -1,6 +1,12 @@
 ///| Git object database loader (loose + pack + idx)
 
 ///|
+#warnings("-deprecated")
+fn object_db_parse_int(value : StringView) -> Int raise {
+  @strconv.parse_int(value)
+}
+
+///|
 pub struct PackIndex {
   pack_path : String
   ids : Array[String]
@@ -117,7 +123,7 @@ pub struct ObjectDb {
 fn pack_cache_limit_from_env() -> Int {
   match @bitio.env_get("BIT_PACK_CACHE_LIMIT") {
     Some(v) =>
-      try @string.parse_int(v) catch {
+      try object_db_parse_int(v) catch {
         _ => 2
       } noraise {
         n => if n < 0 { 0 } else { n }
