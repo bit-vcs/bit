@@ -15,8 +15,8 @@ list = "node tools/flaker-list-git-compat-tests.mjs"
 execute = "node tools/flaker-run-git-compat-tests.mjs"
 
 [affected]
-resolver = "simple"
-config = ""
+resolver = "glob"
+config = "tools/flaker-affected-rules.toml"
 
 [quarantine]
 auto = true
