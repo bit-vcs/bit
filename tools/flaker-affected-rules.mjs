@@ -90,6 +90,7 @@ export const GIT_COMPAT_AFFECTED_RULES = [
     reason: "command:branch",
     changed: [
       "src/cmd/bit/branch*.mbt",
+      "src/cmd/bit/check_ref_format.mbt",
       "src/cmd/bit/show_branches.mbt",
       "src/cmd/bit/for_each_ref.mbt",
       "src/cmd/bit/show_ref.mbt",
@@ -98,6 +99,7 @@ export const GIT_COMPAT_AFFECTED_RULES = [
     select: [
       "third_party/git/t/t320*.sh",
       "third_party/git/t/t630*.sh",
+      "third_party/git/t/t7419-submodule-set-branch.sh",
     ],
   },
   {
@@ -223,7 +225,6 @@ export const GIT_COMPAT_AFFECTED_RULES = [
       "src/cmd/bit/show*.mbt",
       "src/cmd/bit/rm*.mbt",
       "src/cmd/bit/mv.mbt",
-      "src/cmd/bit/tag*.mbt",
       "src/cmd/bit/stash.mbt",
       "src/cmd/bit/clean.mbt",
       "src/lib/reset.mbt",
@@ -231,7 +232,6 @@ export const GIT_COMPAT_AFFECTED_RULES = [
     select: [
       "third_party/git/t/t7001-mv.sh",
       "third_party/git/t/t7002-mv-sparse-checkout.sh",
-      "third_party/git/t/t7004-tag.sh",
       "third_party/git/t/t7007-show.sh",
       "third_party/git/t/t706*.sh",
       "third_party/git/t/t710*.sh",
@@ -240,6 +240,19 @@ export const GIT_COMPAT_AFFECTED_RULES = [
       "third_party/git/t/t750*.sh",
       "third_party/git/t/t751*.sh",
       "third_party/git/t/t752*.sh",
+    ],
+  },
+  {
+    reason: "command:tag",
+    changed: [
+      "src/cmd/bit/mktag_cmd.mbt",
+      "src/cmd/bit/tag*.mbt",
+      "src/cmd/bit/verify_tag.mbt",
+    ],
+    select: [
+      "third_party/git/t/t7004-tag.sh",
+      "third_party/git/t/t7030-verify-tag.sh",
+      "third_party/git/t/t7031-verify-tag-signed-ssh.sh",
     ],
   },
   {
