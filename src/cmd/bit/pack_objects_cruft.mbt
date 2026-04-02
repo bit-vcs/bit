@@ -263,17 +263,17 @@ async fn collect_cruft_objects(
       if name == "info" || name == "pack" {
         continue
       }
-      if name.length() != 2 || !(is_hex_string(name)) {
+      if name.length() != 2 || !is_hex_string(name) {
         continue
       }
       let subdir = objects_dir + "/" + name
-      if !(fs.is_dir(subdir)) {
+      if !fs.is_dir(subdir) {
         continue
       }
       let files = fs.readdir(subdir) catch { _ => [] }
       for file in files {
         let filename = normalize_dir_entry(file)
-        if filename.length() != 38 || !(is_hex_string(filename)) {
+        if filename.length() != 38 || !is_hex_string(filename) {
           continue
         }
         let hex = name + filename
@@ -367,7 +367,7 @@ fn cruft_rescue_walk(
             .trim()
             .to_string()
           if tree_hex.length() == 40 && candidate_ids.contains(tree_hex) {
-            if !(rescued.contains(tree_hex)) {
+            if !rescued.contains(tree_hex) {
               rescued[tree_hex] = true
               cruft_rescue_walk(
                 db, fs, tree_hex, rescued, candidate_ids, tolerate_missing,
@@ -383,7 +383,7 @@ fn cruft_rescue_walk(
             .trim()
             .to_string()
           if parent_hex.length() == 40 && candidate_ids.contains(parent_hex) {
-            if !(rescued.contains(parent_hex)) {
+            if !rescued.contains(parent_hex) {
               rescued[parent_hex] = true
               cruft_rescue_walk(
                 db, fs, parent_hex, rescued, candidate_ids, tolerate_missing,
@@ -401,7 +401,7 @@ fn cruft_rescue_walk(
       for entry in entries {
         let entry_hex = entry.id.to_hex()
         if candidate_ids.contains(entry_hex) {
-          if !(rescued.contains(entry_hex)) {
+          if !rescued.contains(entry_hex) {
             rescued[entry_hex] = true
             cruft_rescue_walk(
               db, fs, entry_hex, rescued, candidate_ids, tolerate_missing,
@@ -425,7 +425,7 @@ fn cruft_rescue_walk(
             .trim()
             .to_string()
           if target_hex.length() == 40 && candidate_ids.contains(target_hex) {
-            if !(rescued.contains(target_hex)) {
+            if !rescued.contains(target_hex) {
               rescued[target_hex] = true
               cruft_rescue_walk(
                 db, fs, target_hex, rescued, candidate_ids, tolerate_missing,

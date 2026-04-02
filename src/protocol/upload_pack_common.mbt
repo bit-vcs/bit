@@ -77,6 +77,37 @@ pub fn parse_v0_advertised_caps(
 }
 
 ///|
+pub fn parse_symrefs_from_capabilities(
+  caps : Array[String],
+) -> Map[String, String] {
+  let symrefs : Map[String, String] = {}
+  for cap in caps {
+    if cap.has_prefix("symref=") {
+      let raw = String::unsafe_substring(cap, start=7, end=cap.length())
+      match raw.find(":") {
+        None => ()
+        Some(idx) => {
+          let source = String::unsafe_substring(raw, start=0, end=idx)
+          let target = String::unsafe_substring(
+            raw,
+            start=idx + 1,
+            end=raw.length(),
+          )
+          symrefs[source] = target
+        }
+      }
+      continue
+    }
+    if cap.has_prefix("symref-target:") {
+      let target = String::unsafe_substring(cap, start=14, end=cap.length())
+      symrefs["HEAD"] = target
+      continue
+    }
+  }
+  symrefs
+}
+
+///|
 pub fn build_ls_refs_request(agent : String, prefixes : Array[String]) -> Bytes {
   let chunks : Array[Bytes] = []
   chunks.push(pktline_encode("command=ls-refs\n"))
@@ -298,7 +329,7 @@ pub fn extract_pack_from_v2_response(data : Bytes) -> Bytes raise @bit.GitError 
     if line_bytes.length() == 0 {
       continue
     }
-    if !(in_pack) {
+    if !in_pack {
       let line = line_bytes |> bytes_to_string |> trim_newline
       if line == "packfile" {
         in_pack = true

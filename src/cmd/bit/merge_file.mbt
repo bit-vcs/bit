@@ -35,7 +35,7 @@ async fn handle_merge_file(args : Array[String]) -> Unit raise Error {
         } else if arg.has_prefix("-L") {
           labels.push(arg[2:].to_string())
         } else if arg.has_prefix("-") {
-          if !(quiet) {
+          if !quiet {
             eprint_line("fatal: unknown option '\{arg}'")
           }
           @sys.exit(128)

@@ -29,7 +29,7 @@ async fn handle_show_branches(args : Array[String]) -> Unit raise Error {
           _ => 10
         }
       }
-      _ if !(arg.has_prefix("-")) => specific_branches.push(arg)
+      _ if !arg.has_prefix("-") => specific_branches.push(arg)
       _ if arg.has_prefix("-") => warn_unimplemented_arg("show-branch", arg)
       _ => ()
     }

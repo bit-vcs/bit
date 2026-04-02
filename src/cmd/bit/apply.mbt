@@ -30,7 +30,7 @@ async fn handle_apply(args : Array[String]) -> Unit raise Error {
       "-v" | "--verbose" => verbose = true
       "-q" | "--quiet" => quiet = true
       "--recount" => () // no-op, bit always counts from actual lines
-      _ if !(arg.has_prefix("-")) => patch_files.push(arg)
+      _ if !arg.has_prefix("-") => patch_files.push(arg)
       _ => ()
     }
     i += 1
@@ -49,7 +49,7 @@ async fn handle_apply(args : Array[String]) -> Unit raise Error {
   if reverse {
     let reversed = @apply.reverse_patch(patch_content)
     if check_mode {
-      if !(quiet) {
+      if !quiet {
         print_line("Patch would apply cleanly.")
       }
     } else if stat_mode || numstat || summary {
@@ -61,7 +61,7 @@ async fn handle_apply(args : Array[String]) -> Unit raise Error {
       }
     }
   } else if check_mode {
-    if !(quiet) {
+    if !quiet {
       print_line("Patch would apply cleanly.")
     }
   } else if stat_mode || numstat || summary {

@@ -1,6 +1,12 @@
 ///| Git reflog implementation
 
 ///|
+#warnings("-deprecated")
+fn reflog_parse_int64(value : StringView) -> Int64 raise {
+  @strconv.parse_int64(value)
+}
+
+///|
 pub struct ReflogEntry {
   old_id : @bit.ObjectId
   new_id : @bit.ObjectId
@@ -40,7 +46,7 @@ pub fn read_reflog(
   refname : String,
 ) -> Array[ReflogEntry] raise @bit.GitError {
   let reflog_path = get_reflog_path(git_dir, refname)
-  if !(fs.is_file(reflog_path)) {
+  if !fs.is_file(reflog_path) {
     return []
   }
   let content = @utf8.decode_lossy(fs.read_file(reflog_path)[:])
@@ -104,7 +110,7 @@ fn parse_reflog_line(line : String) -> ReflogEntry? {
   }
   // Next should be timestamp and timezone
   if i < parts.length() {
-    timestamp = @string.parse_int64(parts[i]) catch { _ => 0L }
+    timestamp = reflog_parse_int64(parts[i]) catch { _ => 0L }
     i += 1
   }
   if i < parts.length() {
@@ -134,7 +140,7 @@ pub fn append_reflog(
     None => ""
     Some(i) => String::unsafe_substring(reflog_path, start=0, end=i)
   }
-  if parent_dir.length() > 0 && !(rfs.is_dir(parent_dir)) {
+  if parent_dir.length() > 0 && !rfs.is_dir(parent_dir) {
     wfs.mkdir_p(parent_dir)
   }
   // Format: <old-sha> <new-sha> <name> <<email>> <timestamp> <tz>\t<message>\n
@@ -161,10 +167,10 @@ pub fn create_reflog(
     None => ""
     Some(i) => String::unsafe_substring(reflog_path, start=0, end=i)
   }
-  if parent_dir.length() > 0 && !(rfs.is_dir(parent_dir)) {
+  if parent_dir.length() > 0 && !rfs.is_dir(parent_dir) {
     wfs.mkdir_p(parent_dir)
   }
-  if !(rfs.is_file(reflog_path)) {
+  if !rfs.is_file(reflog_path) {
     wfs.write_string(reflog_path, "")
   }
 }
@@ -239,7 +245,7 @@ pub fn should_log_ref(
       (
         refname.has_prefix("refs/heads/") ||
         refname.has_prefix("refs/remotes/") ||
-        (!(is_bare) && refname == "HEAD"),
+        (!is_bare && refname == "HEAD"),
         false,
       )
     Some("false") | Some("0") => (false, false)

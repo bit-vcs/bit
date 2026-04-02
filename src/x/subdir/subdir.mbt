@@ -146,7 +146,7 @@ pub fn extract_subdir_tree(
         }
       }
     }
-    if !(found) {
+    if !found {
       raise SubdirNotFound(subdir_path)
     }
   }

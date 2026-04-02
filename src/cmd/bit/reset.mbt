@@ -70,7 +70,7 @@ async fn handle_reset(args : Array[String]) -> Unit raise Error {
       @bitlib.ResetMode::Mixed => true
       _ => false
     }
-    if !(mixed_mode) {
+    if !mixed_mode {
       eprint_line("fatal: Cannot do hard/soft reset with paths.")
       @sys.exit(1)
     }
@@ -127,7 +127,7 @@ async fn handle_reset(args : Array[String]) -> Unit raise Error {
         git_dir,
         skip_override=Some(skip_before_reset),
       )
-      if !(quiet) && changed.length() > 0 {
+      if !quiet && changed.length() > 0 {
         print_line("Unstaged changes after reset:")
         for path in changed {
           print_line("M\t" + path)
@@ -139,7 +139,7 @@ async fn handle_reset(args : Array[String]) -> Unit raise Error {
     @bitlib.ResetMode::Hard => true
     _ => false
   }
-  if hard_mode && !(quiet) {
+  if hard_mode && !quiet {
     let short_id = String::unsafe_substring(commit_id.to_hex(), start=0, end=7)
     let subject = reset_commit_subject_bytes(rfs, git_dir, commit_id)
     reset_print_hard_reset_message(short_id, subject)
@@ -185,13 +185,13 @@ fn reset_mixed_paths(
   let current_entries = @bitlib.read_index_entries(rfs, git_dir)
   let out_map : Map[String, @bitlib.IndexEntry] = {}
   for entry in current_entries {
-    if !(reset_pathspec_matches_any(normalized_paths, entry.path)) {
+    if !reset_pathspec_matches_any(normalized_paths, entry.path) {
       out_map[entry.path] = entry
     }
   }
   for item in tree_files.to_array() {
     let (path, info) = item
-    if !(reset_pathspec_matches_any(normalized_paths, path)) {
+    if !reset_pathspec_matches_any(normalized_paths, path) {
       continue
     }
     let size = if info.mode == 0o160000 {
@@ -312,7 +312,7 @@ fn reset_apply_intent_to_add(
       continue
     }
     let abs = root + "/" + entry.path
-    if !(rfs.is_file(abs)) {
+    if !rfs.is_file(abs) {
       continue
     }
     merged.push(
@@ -360,7 +360,7 @@ async fn reset_refresh_index_entries(
     let abs = root + "/" + entry.path
     let mut out_entry = entry
     let mut changed = false
-    if !(rfs.is_file(abs)) {
+    if !rfs.is_file(abs) {
       changed = true
     } else {
       let content = rfs.read_file(abs) catch {
@@ -369,7 +369,7 @@ async fn reset_refresh_index_entries(
           Bytes::default()
         }
       }
-      if !(changed) {
+      if !changed {
         let id = @bitcore.hash_blob(content)
         if id == entry.id {
           let mut mtime_sec = entry.mtime_sec
@@ -403,7 +403,7 @@ async fn reset_refresh_index_entries(
         }
       }
     }
-    if changed && !(skip.contains(entry.path)) {
+    if changed && !skip.contains(entry.path) {
       changed_map[entry.path] = true
     }
     updated.push(out_entry)
@@ -439,16 +439,14 @@ fn reset_read_skip_worktree_paths(
     }
   }
   let index_path = git_dir + "/index"
-  if !(fs.is_file(index_path)) {
+  if !fs.is_file(index_path) {
     return out
   }
   let data = fs.read_file(index_path) catch { _ => return out }
   if data.length() < 12 + 20 {
     return out
   }
-  if !(
-      data[0] == b'D' && data[1] == b'I' && data[2] == b'R' && data[3] == b'C',
-    ) {
+  if !(data[0] == b'D' && data[1] == b'I' && data[2] == b'R' && data[3] == b'C') {
     return out
   }
   let count = reset_read_u32_be(data, 8)
@@ -502,16 +500,14 @@ fn reset_index_has_unmerged_entries(
   git_dir : String,
 ) -> Bool {
   let path = git_dir + "/index"
-  if !(fs.is_file(path)) {
+  if !fs.is_file(path) {
     return false
   }
   let data = fs.read_file(path) catch { _ => return false }
   if data.length() < 12 + 20 {
     return false
   }
-  if !(
-      data[0] == b'D' && data[1] == b'I' && data[2] == b'R' && data[3] == b'C',
-    ) {
+  if !(data[0] == b'D' && data[1] == b'I' && data[2] == b'R' && data[3] == b'C') {
     return false
   }
   let count = reset_read_u32_be(data, 8)
@@ -815,7 +811,7 @@ fn reset_resolve_common_git_dir(
   git_dir : String,
 ) -> String {
   let commondir_path = git_dir + "/commondir"
-  if !(fs.is_file(commondir_path)) {
+  if !fs.is_file(commondir_path) {
     return git_dir
   }
   let raw = decode_bytes(

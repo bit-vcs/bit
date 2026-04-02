@@ -112,7 +112,7 @@ fn parse_tree_with_hash_size(
       raise @object.GitError::InvalidObject("Truncated tree entry mode")
     }
     let mode = mode_buf.to_string()
-    if !(parse_tree_mode_is_octal(mode)) {
+    if !parse_tree_mode_is_octal(mode) {
       raise @object.GitError::InvalidObject("Invalid tree entry mode")
     }
     i += 1 // skip space

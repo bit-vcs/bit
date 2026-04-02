@@ -6,6 +6,7 @@ target/
 target
 .mooncakes/
 .moonagent/
+.flaker/
 .repos/
 .jj/tools/git-shim/shim.log
 tools/git-shim/shim.log

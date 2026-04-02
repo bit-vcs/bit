@@ -107,7 +107,7 @@ fn config_is_continuation_context(line : String) -> Bool {
         start=ei + 1,
         end=line.length(),
       )
-      !(config_has_unquoted_comment_before_backslash(after_eq))
+      !config_has_unquoted_comment_before_backslash(after_eq)
     }
   }
 }
@@ -119,10 +119,10 @@ fn config_has_unquoted_comment_before_backslash(value : String) -> Bool {
   for i, c in value {
     if c == '"' {
       let escaped = if i > 0 { value[i - 1] == '\\' } else { false }
-      if !(escaped) {
-        in_quote = !(in_quote)
+      if !escaped {
+        in_quote = !in_quote
       }
-    } else if !(in_quote) && (c == '#' || c == ';') {
+    } else if !in_quote && (c == '#' || c == ';') {
       last_comment_pos = i
       break
     }
@@ -178,7 +178,7 @@ fn config_code_in_string(c : UInt16, s : String) -> Bool {
 pub fn parse_section_header_line(
   line : String,
 ) -> (String, String?, String, Bool)? {
-  if !(line.has_prefix("[")) {
+  if !line.has_prefix("[") {
     return None
   }
   match line.find("]") {
@@ -233,12 +233,10 @@ pub fn is_valid_section_name(name : String) -> Bool {
     return false
   }
   for c in name {
-    if !(
-        (c >= 'a' && c <= 'z') ||
-        (c >= 'A' && c <= 'Z') ||
-        (c >= '0' && c <= '9') ||
-        c == '-',
-      ) {
+    if !((c >= 'a' && c <= 'z') ||
+      (c >= 'A' && c <= 'Z') ||
+      (c >= '0' && c <= '9') ||
+      c == '-') {
       return false
     }
   }
@@ -367,10 +365,8 @@ pub fn find_config_key_line_from_content(
         }
       }
       None => {
-        if !(
-            config_section_header_matches(
-              current_section, current_subsection, sec_l, sub,
-            ),
+        if !config_section_header_matches(
+            current_section, current_subsection, sec_l, sub,
           ) {
           continue
         }
@@ -676,7 +672,7 @@ pub fn parse_config_value(raw : String) -> String {
       trailing_ws = 0
       continue
     }
-    if !(started) && config_is_horizontal_space(c) {
+    if !started && config_is_horizontal_space(c) {
       continue
     }
     if c == '"' {
@@ -696,7 +692,7 @@ pub fn parse_config_value(raw : String) -> String {
       continue
     }
     if c == '#' || c == ';' {
-      if !(started) || trailing_ws > 0 {
+      if !started || trailing_ws > 0 {
         break
       }
     }
@@ -824,7 +820,7 @@ fn config_value_pattern_matches(text : String, pattern : String) -> Bool {
   }
   let result = config_regex_matches(text, actual)
   if negate {
-    !(result)
+    !result
   } else {
     result
   }
@@ -991,7 +987,7 @@ fn config_regex_char_class_matches(
     i += 1
   }
   if negate {
-    !(matched)
+    !matched
   } else {
     matched
   }

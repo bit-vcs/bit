@@ -151,7 +151,7 @@ async fn upload_pack_fail(
 ) -> Unit {
   let _ : Int = protocol_version
   let msg = upload_pack_error_text(err)
-  if !(advertise) {
+  if !advertise {
     let line = upload_pack_first_line(msg)
     let pkt = @protocol.pktline_encode("ERR " + line + "\n")
     @stdio.stdout.write(pkt)

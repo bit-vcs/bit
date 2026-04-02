@@ -45,7 +45,7 @@ async fn handle_fetch_pack(args : Array[String]) -> Unit raise Error {
       _ if arg.has_prefix("--server-option=") => ()
       _ if arg.has_prefix("--negotiation-tip=") => ()
       _ if arg == "--" => ()
-      _ if !(arg.has_prefix("-")) => positional.push(arg)
+      _ if !arg.has_prefix("-") => positional.push(arg)
       _ if arg.has_prefix("-") => warn_unimplemented_arg("fetch-pack", arg)
       _ => ()
     }

@@ -41,7 +41,7 @@ async fn handle_archive(args : Array[String]) -> Unit raise Error {
       break
     } else if arg.has_prefix("-") {
       warn_unimplemented_arg("archive", arg)
-    } else if !(tree_ish_set) {
+    } else if !tree_ish_set {
       tree_ish = arg
       tree_ish_set = true
     } else {

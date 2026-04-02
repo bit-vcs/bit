@@ -55,7 +55,7 @@ pub fn resolve_diff_driver(
     if words.length() < 2 {
       continue
     }
-    if !(gitattr_pattern_matches(normalized, words[0])) {
+    if !gitattr_pattern_matches(normalized, words[0]) {
       continue
     }
     let mut j = 1
@@ -127,7 +127,7 @@ pub fn resolve_eol_attrs(
   path : String,
 ) -> FileEolAttrs {
   let attr_path = join_path(root, ".gitattributes")
-  if !(rfs.is_file(attr_path)) {
+  if !rfs.is_file(attr_path) {
     return {
       text: TextAttr::Unspecified,
       eol: EolAttr::Unspecified,
@@ -156,7 +156,7 @@ pub fn resolve_eol_attrs(
     if words.length() < 2 {
       continue
     }
-    if !(gitattr_pattern_matches(normalized, words[0])) {
+    if !gitattr_pattern_matches(normalized, words[0]) {
       continue
     }
     let mut j = 1
@@ -331,7 +331,7 @@ pub fn check_unsupported_gitattributes(
   root : String,
 ) -> String? {
   let attr_path = join_path(root, ".gitattributes")
-  if !(rfs.is_file(attr_path)) {
+  if !rfs.is_file(attr_path) {
     return None
   }
   let content = @utf8.decode_lossy(
@@ -416,7 +416,7 @@ pub fn has_any_filter_attributes(
   root : String,
 ) -> Bool {
   let attr_path = join_path(root, ".gitattributes")
-  if !(rfs.is_file(attr_path)) {
+  if !rfs.is_file(attr_path) {
     return false
   }
   let content = @utf8.decode_lossy(

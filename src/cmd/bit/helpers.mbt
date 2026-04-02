@@ -438,7 +438,7 @@ fn repository_format_error(
       }
       None => ()
     }
-    if !(in_extensions) {
+    if !in_extensions {
       continue
     }
     match repository_extension_key(trimmed) {
@@ -988,7 +988,7 @@ async fn run_merge_with_sensitive_hooks(
 
 ///|
 fn make_relative_to_cwd(path : String) -> String {
-  if !(path.has_prefix("/")) {
+  if !path.has_prefix("/") {
     return path
   }
   let cwd = match @sys.get_env_var("GIT_SHIM_PWD") {
@@ -1024,7 +1024,7 @@ fn quote_origin_path(path : String) -> String {
       break
     }
   }
-  if !(needs_quote) {
+  if !needs_quote {
     return path
   }
   let buf = StringBuilder::new()

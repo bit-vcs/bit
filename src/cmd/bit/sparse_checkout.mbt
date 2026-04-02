@@ -111,7 +111,7 @@ fn sparse_checkout_path_is_directory_like(
     return Some(false)
   }
   let git_dir = resolve_git_dir(rfs, root)
-  if !(rfs.is_file(git_dir + "/index")) {
+  if !rfs.is_file(git_dir + "/index") {
     return None
   }
   let entries = @bitlib.read_index_entries(rfs, git_dir)
@@ -147,7 +147,7 @@ fn sparse_checkout_validate_literal_patterns(
                 "\{pattern} is not a directory",
               )
             }
-            if !(pattern.has_prefix("/")) {
+            if !pattern.has_prefix("/") {
               return Some(
                 "warning: pass a leading slash before paths such as '\{pattern}' if you want a single file",
               )
@@ -229,11 +229,11 @@ fn sparse_checkout_list_state(
   rfs : &@bitcore.RepoFileSystem,
   git_dir : String,
 ) -> SparseCheckoutListState {
-  if !(@bitlib.is_sparse_checkout_enabled(rfs, git_dir)) {
+  if !@bitlib.is_sparse_checkout_enabled(rfs, git_dir) {
     return Fatal("this worktree is not sparse")
   }
   let sparse_path = git_dir + "/info/sparse-checkout"
-  if !(rfs.is_file(sparse_path)) {
+  if !rfs.is_file(sparse_path) {
     return Warning(
       "this worktree is not sparse (sparse-checkout file may not exist)",
     )
@@ -851,7 +851,7 @@ async fn handle_sparse_checkout_at_root(
       let effective_cone = sparse_checkout_effective_cone_mode(
         fs, git_dir, cone_flag,
       )
-      if !(@bitlib.is_sparse_checkout_enabled(fs, git_dir)) {
+      if !@bitlib.is_sparse_checkout_enabled(fs, git_dir) {
         @bitlib.sparse_checkout_init(fs, fs, root, cone=effective_cone)
       }
       match cone_flag {
@@ -888,7 +888,7 @@ async fn handle_sparse_checkout_at_root(
       let effective_cone = sparse_checkout_effective_cone_mode(
         fs, git_dir, cone_flag,
       )
-      if !(@bitlib.is_sparse_checkout_enabled(fs, git_dir)) {
+      if !@bitlib.is_sparse_checkout_enabled(fs, git_dir) {
         @bitlib.sparse_checkout_init(fs, fs, root, cone=effective_cone)
       }
       match cone_flag {

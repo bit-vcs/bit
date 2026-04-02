@@ -68,7 +68,7 @@ fn fetch_resolve_default_remote(
           }
         }
       }
-      if !(ambiguous) {
+      if !ambiguous {
         match matched_name {
           Some(name) => return (name, Some(url))
           None => ()
@@ -94,7 +94,7 @@ fn fetch_resolve_default_remote(
       }
     }
   }
-  if !(multiple) {
+  if !multiple {
     match single_name {
       Some(name) => return (name, single_url)
       None => ()
@@ -211,7 +211,7 @@ async fn handle_fetch(args : Array[String]) -> Unit raise Error {
         "unknown option '" + option_name_without_prefix(arg) + "'",
       )
     }
-    if !(arg.has_prefix("-")) {
+    if !arg.has_prefix("-") {
       positional_args.push(arg)
       i += 1
       continue
@@ -316,7 +316,7 @@ async fn handle_fetch(args : Array[String]) -> Unit raise Error {
       preferred_sender~,
       preferred_repo~,
     )
-    if !(quiet) {
+    if !quiet {
       print_line("Relay peer selected: \{relay_sender} -> \{relay_fetch_url}")
     }
     resolved_remote_url = relay_fetch_url
@@ -340,7 +340,7 @@ async fn handle_fetch(args : Array[String]) -> Unit raise Error {
   }
   if explicit_no_filter {
     filter = @protocol.FilterSpec::NoFilter
-  } else if !(explicit_filter_flag) && inherited_filter.is_partial() {
+  } else if !explicit_filter_flag && inherited_filter.is_partial() {
     filter = inherited_filter
   }
   let local_root = match @sys.get_env_var("GIT_SHIM_CWD") {
@@ -370,7 +370,7 @@ async fn handle_fetch(args : Array[String]) -> Unit raise Error {
       local_promisor_remote ||
       is_partial_clone
     ) &&
-    !(has_oid_refspec)
+    !has_oid_refspec
   fetch_from_remote(
     fs,
     git_dir,

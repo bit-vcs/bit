@@ -39,7 +39,7 @@ async fn merge_wbtest_collect_shim_git(
   // Build the native binary first so exit codes propagate correctly
   // (moon run swallows non-zero exit codes)
   let bit_exe = repo_root + "/_build/native/release/build/cmd/bit/bit.exe"
-  if !(fs.is_file(bit_exe)) {
+  if !fs.is_file(bit_exe) {
     let build_code = @process.run(
       "moon",
       ["build", "--target", "native", "--release"],

@@ -264,7 +264,7 @@ pub async fn add_paths_async(
                 (existing.mtime_sec != 0 || existing.mtime_nsec != 0) &&
                 ms == existing.mtime_sec &&
                 mn == existing.mtime_nsec &&
-                (!(core_filemode) || info.mode == existing.mode)
+                (!core_filemode || info.mode == existing.mode)
               _ => false
             }
             if stat_matches {
@@ -293,7 +293,7 @@ pub async fn add_paths_async(
             // Collect CRLF conversion warnings
             match warnings {
               Some(warns) =>
-                if !(is_binary_bytes(content)) {
+                if !is_binary_bytes(content) {
                   collect_crlf_warnings(
                     warns, path, content, normalized, attrs, autocrlf,
                   )
@@ -413,7 +413,7 @@ pub fn commit(
   let parent = resolve_head_commit(rfs, actual_git_dir)
   let entries = read_index_entries(rfs, actual_git_dir)
   let tree_id = if entries.length() == 0 {
-    if !(allow_empty) {
+    if !allow_empty {
       raise @bit.GitError::InvalidObject("Empty index")
     }
     match parent {
@@ -840,7 +840,7 @@ fn read_core_filemode_setting(
   git_dir : String,
 ) -> Bool {
   let local_path = join_path(git_dir, "config")
-  if !(fs.is_file(local_path)) {
+  if !fs.is_file(local_path) {
     return true
   }
   match read_core_filemode_from_config(fs, local_path) {
@@ -981,7 +981,7 @@ fn collect_crlf_warnings(
         "warning: in the working copy of '\{path}', CRLF will be replaced by LF",
       )
     }
-  } else if !(has_crlf_in_original) && bytes_contains_lf(original) {
+  } else if !has_crlf_in_original && bytes_contains_lf(original) {
     // File has LF only. Check if smudge would add CRLF
     let would_crlf = match attrs.text {
       Unset => false
@@ -1039,7 +1039,7 @@ pub fn normalize_crlf_to_lf(content : Bytes) -> Bytes {
     out.push(content[i])
     i += 1
   }
-  if !(changed) {
+  if !changed {
     return content
   }
   Bytes::from_array(FixedArray::makei(out.length(), i => out[i]))
@@ -1323,7 +1323,7 @@ fn write_tree_from_entries(
     if worktree_is_zero_object_id(e.id) {
       continue
     }
-    if !(is_gitlink_mode_int(e.mode)) {
+    if !is_gitlink_mode_int(e.mode) {
       match object_db {
         Some(db) =>
           match db.get(rfs, e.id) {
@@ -1479,7 +1479,7 @@ fn resolve_worktree_common_git_dir(
   git_dir : String,
 ) -> String {
   let commondir_path = join_path(git_dir, "commondir")
-  if !(fs.is_file(commondir_path)) {
+  if !fs.is_file(commondir_path) {
     return git_dir
   }
   let raw = @utf8.decode_lossy(
@@ -1766,7 +1766,7 @@ pub fn rm_paths(
     // Remove from index
     map.remove(norm_path)
     // Remove from working tree unless --cached
-    if !(cached) {
+    if !cached {
       let abs = join_path(root, norm_path)
       if rfs.is_file(abs) {
         fs.remove_file(abs)
@@ -1797,7 +1797,7 @@ pub fn rm_paths(
   write_index_entries_with_skip_worktree(
     fs, actual_git_dir, out, remaining_skip_worktree_paths,
   )
-  if !(cached) {
+  if !cached {
     rm_update_gitmodules_after_submodule_removal(
       fs, rfs, root, removed_submodule_paths,
     )
@@ -1815,7 +1815,7 @@ fn rm_update_gitmodules_after_submodule_removal(
     return
   }
   let gitmodules_path = join_path(root, ".gitmodules")
-  if !(rfs.is_file(gitmodules_path)) {
+  if !rfs.is_file(gitmodules_path) {
     return
   }
   let removed_paths : Map[String, Bool] = {}
@@ -1842,7 +1842,7 @@ fn rm_remove_gitmodules_sections_by_path(
   let mut current_path : String? = None
   let mut have_section = false
   let flush_section = fn() {
-    if !(have_section) {
+    if !have_section {
       return
     }
     if in_submodule &&
@@ -1866,7 +1866,7 @@ fn rm_remove_gitmodules_sections_by_path(
       current_path = None
       continue
     }
-    if !(have_section) {
+    if !have_section {
       out.push(line)
       continue
     }
@@ -1894,7 +1894,7 @@ fn rm_prune_empty_parent_dirs(
   }
   while current.length() > 0 {
     let abs = join_path(root, current)
-    if !(rfs.is_dir(abs)) {
+    if !rfs.is_dir(abs) {
       return
     }
     let entries = rfs.readdir(abs) catch { _ => return }
@@ -1970,7 +1970,7 @@ pub fn mv_path(
   let src_abs = join_path(root, src_norm)
   let mut dst_abs = join_path(root, dst_norm)
   // Check source exists
-  if !(rfs.is_file(src_abs)) && !(rfs.is_dir(src_abs)) {
+  if !rfs.is_file(src_abs) && !rfs.is_dir(src_abs) {
     raise @bit.GitError::InvalidObject("source '\{source}' does not exist")
   }
   // If dest is a directory, move source into it (like `mv file dir/`)
@@ -1984,7 +1984,7 @@ pub fn mv_path(
     dst_abs = join_path(root, dst_norm)
   }
   // Check dest doesn't exist (unless force)
-  if (rfs.is_file(dst_abs) || rfs.is_dir(dst_abs)) && !(force) {
+  if (rfs.is_file(dst_abs) || rfs.is_dir(dst_abs)) && !force {
     raise @bit.GitError::InvalidObject("destination '\{dest}' already exists")
   }
   // Read index
@@ -2133,7 +2133,7 @@ fn mv_rewrite_gitfile_after_directory_move(
   let content = trim_worktree_text(
     @string_utils.decode_bytes(rfs.read_file(dst_gitfile)),
   )
-  if !(content.has_prefix("gitdir: ")) {
+  if !content.has_prefix("gitdir: ") {
     return ()
   }
   let rel_gitdir = String::unsafe_substring(
@@ -2163,7 +2163,7 @@ pub fn convert_lf_to_crlf(content : Bytes) -> Bytes {
     }
     i += 1
   }
-  if !(changed) {
+  if !changed {
     return content
   }
   Bytes::from_array(FixedArray::makei(out.length(), fn(i) { out[i] }))

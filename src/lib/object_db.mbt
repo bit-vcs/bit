@@ -1,6 +1,12 @@
 ///| Git object database loader (loose + pack + idx)
 
 ///|
+#warnings("-deprecated")
+fn object_db_parse_int(value : StringView) -> Int raise {
+  @strconv.parse_int(value)
+}
+
+///|
 pub struct PackIndex {
   pack_path : String
   ids : Array[String]
@@ -117,7 +123,7 @@ pub struct ObjectDb {
 fn pack_cache_limit_from_env() -> Int {
   match @bitio.env_get("BIT_PACK_CACHE_LIMIT") {
     Some(v) =>
-      try @string.parse_int(v) catch {
+      try object_db_parse_int(v) catch {
         _ => 2
       } noraise {
         n => if n < 0 { 0 } else { n }
@@ -274,7 +280,7 @@ pub fn ObjectDb::get(
 ) -> @bit.PackObject? raise @bit.GitError {
   let hex = id.to_hex()
   // Fast path: try loose object first without allocating seen set
-  if !(self.prefer_packed) {
+  if !self.prefer_packed {
     match get_loose_by_hex(self, fs, hex) {
       Some(obj) => return Some(obj)
       None => ()
@@ -327,7 +333,7 @@ pub fn ObjectDb::find_delta_base(
   id : @bit.ObjectId,
 ) -> @bit.ObjectId? raise @bit.GitError {
   let hex = id.to_hex()
-  if !(self.prefer_packed) {
+  if !self.prefer_packed {
     if get_loose_by_hex(self, fs, hex) is Some(_) {
       return None
     }
@@ -466,7 +472,7 @@ fn get_loose_by_hex(
         e => raise @bit.GitError::InvalidObject("Zlib error: \{e}")
       }
       let obj = parse_loose_object(raw)
-      if !(db.skip_verify) {
+      if !db.skip_verify {
         let verify_algo : @object.HashAlgorithm = if hex.length() == 64 {
           @object.HashAlgorithm::Sha256
         } else {
@@ -527,7 +533,7 @@ fn get_from_packs(
         try {
           let data = get_pack_bytes(db, fs, pack.pack_path)
           let obj = read_pack_object_at(data, pack, offset, db, fs, seen)
-          if !(db.skip_verify) {
+          if !db.skip_verify {
             let computed = obj.id.to_hex()
             if computed != hex {
               if pack.version == 1 {
@@ -552,7 +558,7 @@ fn get_from_packs(
           let pack = lazy_pack.get(fs) // ensure loaded
           let data = get_pack_bytes(db, fs, pack.pack_path)
           let obj = read_pack_object_at(data, pack, offset, db, fs, seen)
-          if !(db.skip_verify) {
+          if !db.skip_verify {
             let computed = obj.id.to_hex()
             if computed != hex {
               if pack.version == 1 {
@@ -681,7 +687,7 @@ fn get_by_hex(
         e => raise @bit.GitError::InvalidObject("Zlib error: \{e}")
       }
       let obj = parse_loose_object(raw)
-      if !(db.skip_verify) {
+      if !db.skip_verify {
         let verify_algo : @object.HashAlgorithm = if hex.length() == 64 {
           @object.HashAlgorithm::Sha256
         } else {
@@ -772,7 +778,7 @@ fn collect_loose_paths(
       continue
     }
     let dir = join_path(objects_dir, entry)
-    if !(fs.is_dir(dir)) {
+    if !fs.is_dir(dir) {
       continue
     }
     let files = fs.readdir(dir)
@@ -781,7 +787,7 @@ fn collect_loose_paths(
         continue
       }
       let path = join_path(dir, name)
-      if !(fs.is_file(path)) {
+      if !fs.is_file(path) {
         continue
       }
       let hex = entry + name
@@ -818,16 +824,16 @@ fn load_pack_indexes(
   let result : Array[PackIndex] = []
   let entries = fs.readdir(pack_dir)
   for entry in entries {
-    if !(entry.has_suffix(".idx")) {
+    if !entry.has_suffix(".idx") {
       continue
     }
     let idx_path = join_path(pack_dir, entry)
-    if !(fs.is_file(idx_path)) {
+    if !fs.is_file(idx_path) {
       continue
     }
     let base = String::unsafe_substring(entry, start=0, end=entry.length() - 4)
     let pack_path = join_path(pack_dir, base + ".pack")
-    if !(fs.is_file(pack_path)) {
+    if !fs.is_file(pack_path) {
       continue
     }
     let data = fs.read_file(idx_path)
@@ -846,16 +852,16 @@ fn collect_lazy_pack_indexes(
   let result : Array[LazyPackIndex] = []
   let entries = fs.readdir(pack_dir)
   for entry in entries {
-    if !(entry.has_suffix(".idx")) {
+    if !entry.has_suffix(".idx") {
       continue
     }
     let idx_path = join_path(pack_dir, entry)
-    if !(fs.is_file(idx_path)) {
+    if !fs.is_file(idx_path) {
       continue
     }
     let base = String::unsafe_substring(entry, start=0, end=entry.length() - 4)
     let pack_path = join_path(pack_dir, base + ".pack")
-    if !(fs.is_file(pack_path)) {
+    if !fs.is_file(pack_path) {
       continue
     }
     result.push(LazyPackIndex::new(idx_path, pack_path))
@@ -871,11 +877,11 @@ fn load_pack_objects(
   let result : Array[@bit.PackObject] = []
   let entries = fs.readdir(pack_dir)
   for entry in entries {
-    if !(entry.has_suffix(".pack")) {
+    if !entry.has_suffix(".pack") {
       continue
     }
     let path = join_path(pack_dir, entry)
-    if !(fs.is_file(path)) {
+    if !fs.is_file(path) {
       continue
     }
     let data = fs.read_file(path)

@@ -82,7 +82,7 @@ pub fn checkout(
   let head_path = join_path(actual_git_dir, "HEAD")
   let mut target : @bit.ObjectId? = None
   let mut refname : String? = None
-  if !(detach) {
+  if !detach {
     let name = if spec.has_prefix("refs/") {
       spec
     } else {
@@ -94,7 +94,7 @@ pub fn checkout(
         refname = Some(name)
       }
       None =>
-        if !(spec.has_prefix("refs/")) {
+        if !spec.has_prefix("refs/") {
           let remote_ref = "refs/remotes/origin/" + spec
           match resolve_ref(rfs, actual_git_dir, remote_ref) {
             Some(id) => {
@@ -187,7 +187,7 @@ fn resolve_checkout_common_git_dir(
   git_dir : String,
 ) -> String {
   let commondir_path = join_path(git_dir, "commondir")
-  if !(fs.is_file(commondir_path)) {
+  if !fs.is_file(commondir_path) {
     return git_dir
   }
   let raw = @utf8.decode_lossy(

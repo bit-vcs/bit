@@ -138,7 +138,7 @@ fn scalar_render_global_config_with_repos(
       new_blocks.push(block)
     }
   }
-  if !(found) && repos.length() > 0 {
+  if !found && repos.length() > 0 {
     let lines : Array[String] = []
     for repo in repos {
       lines.push("\trepo = \{repo}")
@@ -307,7 +307,7 @@ fn scalar_rewrite_repo_config(fs : OsFs, repo : String) -> Unit {
       None => new_blocks.push(block)
     }
   }
-  if !(has_gui) {
+  if !has_gui {
     new_blocks.push({
       header: Some("[gui]"),
       section: Some("gui"),
@@ -315,7 +315,7 @@ fn scalar_rewrite_repo_config(fs : OsFs, repo : String) -> Unit {
       lines: ["\tGCWarning = false # set by scalar"],
     })
   }
-  if !(has_log) {
+  if !has_log {
     new_blocks.push({
       header: Some("[log]"),
       section: Some("log"),
@@ -323,7 +323,7 @@ fn scalar_rewrite_repo_config(fs : OsFs, repo : String) -> Unit {
       lines: ["\texcludeDecoration = refs/prefetch/* # set by scalar"],
     })
   }
-  if !(has_core) {
+  if !has_core {
     new_blocks.push({
       header: Some("[core]"),
       section: Some("core"),
@@ -371,7 +371,7 @@ async fn scalar_toggle_maintenance(
       scalar_trace_subcommand(fs, [
         "git", "maintenance", "unregister", "--force",
       ])
-      if code != 0 && !(quiet) {
+      if code != 0 && !quiet {
         eprint_line("warning: could not toggle maintenance")
       }
     }
@@ -379,7 +379,7 @@ async fn scalar_toggle_maintenance(
     _ => {
       let code = scalar_run_git_in(repo, ["maintenance", "start"])
       scalar_trace_subcommand(fs, ["git", "maintenance", "start"])
-      if code != 0 && !(quiet) {
+      if code != 0 && !quiet {
         eprint_line("warning: could not toggle maintenance")
       }
     }
@@ -444,7 +444,7 @@ fn scalar_trace_subcommand(fs : OsFs, argv : Array[String]) -> Unit {
 fn scalar_ensure_trace_file(fs : OsFs) -> Unit {
   match @sys.get_env_var("GIT_TRACE2_EVENT") {
     Some(path) =>
-      if !(fs.is_file(path)) {
+      if !fs.is_file(path) {
         fs.write_string(path, "") catch {
           _ => ()
         }
@@ -543,7 +543,7 @@ async fn scalar_handle_register(
   for arg in args {
     if arg == "--no-maintenance" {
       no_maintenance = true
-    } else if !(arg.has_prefix("-")) && target is None {
+    } else if !arg.has_prefix("-") && target is None {
       target = Some(arg)
     }
   }
@@ -555,7 +555,7 @@ async fn scalar_handle_register(
   scalar_add_maintenance_repo(fs, repo)
   scalar_rewrite_repo_config(fs, repo)
   scalar_start_fsmonitor(repo)
-  if !(no_maintenance) {
+  if !no_maintenance {
     scalar_toggle_maintenance(fs, repo, "enable", false)
   }
 }
@@ -629,7 +629,7 @@ async fn scalar_handle_reconfigure(
           maintenance_mode = args[i + 1]
           i += 1
         }
-      _ if !(arg.has_prefix("-")) && target is None => target = Some(arg)
+      _ if !arg.has_prefix("-") && target is None => target = Some(arg)
       _ => ()
     }
     i += 1
@@ -690,10 +690,10 @@ async fn scalar_handle_clone(
     }
   }
   let clone_args : Array[String] = ["clone", "--filter=blob:none"]
-  if !(parsed.tags) {
+  if !parsed.tags {
     clone_args.push("--no-tags")
   }
-  if !(scalar_clone_has_progress_flag(parsed.clone_opts)) {
+  if !scalar_clone_has_progress_flag(parsed.clone_opts) {
     if scalar_stderr_is_tty() {
       clone_args.push("--progress")
     } else {
@@ -710,10 +710,10 @@ async fn scalar_handle_clone(
   if code != 0 {
     @sys.exit(code)
   }
-  if !(parsed.full_clone) {
+  if !parsed.full_clone {
     ignore(scalar_run_git_in(repo, ["sparse-checkout", "init", "--cone"]))
   }
-  if !(parsed.tags) {
+  if !parsed.tags {
     ignore(
       scalar_run_git_in(repo, [
         "fetch", "--quiet", "--no-progress", "origin", "--no-tags",
@@ -743,7 +743,7 @@ async fn scalar_handle_run(
   let cmd = args[0]
   let enlistment_arg = args[1]
   let enlistment = scalar_abs_path(enlistment_arg, cwd)
-  if !(fs.is_dir(enlistment)) {
+  if !fs.is_dir(enlistment) {
     scalar_die(1, "'\{enlistment_arg}' does not exist")
     return
   }
@@ -762,7 +762,7 @@ async fn scalar_handle_run(
 ///|
 fn scalar_read_alternates(fs : OsFs, git_dir : String) -> String {
   let path = git_dir + "/objects/info/alternates"
-  if !(fs.is_file(path)) {
+  if !fs.is_file(path) {
     return ""
   }
   decode_bytes(fs.read_file(path)) catch {

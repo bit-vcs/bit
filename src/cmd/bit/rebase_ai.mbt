@@ -140,7 +140,7 @@ fn parse_rebase_ai_args(
         i += 1
         continue
       }
-      _ if !(arg.has_prefix("-")) => {
+      _ if !arg.has_prefix("-") => {
         upstream = Some(arg)
         i += 1
         continue

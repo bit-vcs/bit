@@ -29,7 +29,7 @@ async fn handle_send_pack(args : Array[String]) -> Unit raise Error {
       }
       _ if arg.has_prefix("--receive-pack=") => ()
       _ if arg.has_prefix("--exec=") => ()
-      _ if !(arg.has_prefix("-")) =>
+      _ if !arg.has_prefix("-") =>
         if remote is None {
           remote = Some(arg)
         } else {

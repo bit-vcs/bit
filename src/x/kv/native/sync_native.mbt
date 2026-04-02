@@ -378,11 +378,11 @@ async fn exchange_http_peer(
   msg : @kv.GossipMessage,
   headers : Map[String, String],
 ) -> Result[@kv.GossipMessage?, String] {
-  if !(is_http_endpoint(peer.endpoint)) {
+  if !is_http_endpoint(peer.endpoint) {
     return Err("peer endpoint is not http(s): \{peer.endpoint}")
   }
   let request_headers = headers.copy()
-  if !(request_headers.contains("Content-Type")) {
+  if !request_headers.contains("Content-Type") {
     request_headers["Content-Type"] = "application/json"
   }
   let payload = encode_gossip_message(msg)
@@ -406,7 +406,7 @@ async fn exchange_websocket_peer(
   msg : @kv.GossipMessage,
   headers : Map[String, String],
 ) -> Result[@kv.GossipMessage?, String] {
-  if !(is_websocket_endpoint(peer.endpoint)) {
+  if !is_websocket_endpoint(peer.endpoint) {
     return Err("peer endpoint is not ws(s): \{peer.endpoint}")
   }
   let conn = @xws.Conn::connect(peer.endpoint, headers~) catch {

@@ -30,20 +30,14 @@ async fn handle_maintenance(args : Array[String]) -> Unit raise Error {
   }
   match task {
     Some("run") | None => run_maintenance_tasks(fs, root, auto, quiet)
-    Some("start") =>
-      if !(quiet) {
-        print_line("Scheduled maintenance started.")
-      }
-    Some("stop") =>
-      if !(quiet) {
-        print_line("Scheduled maintenance stopped.")
-      }
+    Some("start") => if !quiet { print_line("Scheduled maintenance started.") }
+    Some("stop") => if !quiet { print_line("Scheduled maintenance stopped.") }
     Some("register") =>
-      if !(quiet) {
+      if !quiet {
         print_line("Repository registered for maintenance.")
       }
     Some("unregister") =>
-      if !(quiet) {
+      if !quiet {
         print_line("Repository unregistered from maintenance.")
       }
     Some("gc") => handle_gc([])
@@ -52,11 +46,11 @@ async fn handle_maintenance(args : Array[String]) -> Unit raise Error {
       write_commit_graph(fs, git_dir, true) catch {
         _ => ()
       }
-      if !(quiet) {
+      if !quiet {
         print_line("Commit graph updated.")
       }
     }
-    Some("prefetch") => if !(quiet) { print_line("Prefetch completed.") }
+    Some("prefetch") => if !quiet { print_line("Prefetch completed.") }
     Some("loose-objects") => handle_repack(["-d", "-q"])
     Some("incremental-repack") => handle_repack(["-d", "-q"])
     Some("pack-refs") => handle_pack_refs(["--all"])
@@ -72,26 +66,26 @@ async fn run_maintenance_tasks(
   auto : Bool,
   quiet : Bool,
 ) -> Unit raise Error {
-  if !(quiet) {
+  if !quiet {
     print_line("Running maintenance tasks...")
   }
-  if !(quiet) {
+  if !quiet {
     print_line("  pack-refs")
   }
   handle_pack_refs(["--all"])
   if auto {
     // Run GC only if needed
     let result = @bitlib.gc_repo(fs, fs, root)
-    if !(quiet) && result.pack is Some(_) {
+    if !quiet && result.pack is Some(_) {
       print_line("  gc (auto)")
     }
   } else {
-    if !(quiet) {
+    if !quiet {
       print_line("  gc")
     }
     handle_gc([])
   }
-  if !(quiet) {
+  if !quiet {
     print_line("Maintenance completed.")
   }
 }
@@ -102,7 +96,7 @@ fn get_config_value_simple(
   config_path : String,
   key : String,
 ) -> String? {
-  if !(fs.is_file(config_path)) {
+  if !fs.is_file(config_path) {
     return None
   }
   let content = decode_bytes(fs.read_file(config_path)) catch {

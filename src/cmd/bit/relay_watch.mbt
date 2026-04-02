@@ -78,7 +78,7 @@ fn relay_resolve_room_arg(arg : String) -> (String, String) {
 ///|
 /// Watch a relay room for real-time updates (poll-based).
 async fn handle_relay_watch(args : Array[String]) -> Unit raise Error {
-  let mut room_arg = if args.length() > 0 && !(args[0].has_prefix("-")) {
+  let mut room_arg = if args.length() > 0 && !args[0].has_prefix("-") {
     args[0]
   } else {
     "."
@@ -232,7 +232,7 @@ fn relay_watch_summarize_hub_record(payload : Map[String, Json]) -> String {
 ///|
 /// Show who is active in a relay room.
 async fn handle_relay_status(args : Array[String]) -> Unit raise Error {
-  let mut room_arg = if args.length() > 0 && !(args[0].has_prefix("-")) {
+  let mut room_arg = if args.length() > 0 && !args[0].has_prefix("-") {
     args[0]
   } else {
     "."

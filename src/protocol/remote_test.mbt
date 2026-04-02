@@ -146,6 +146,26 @@ test "extract_capabilities" {
 }
 
 ///|
+test "parse_symrefs_from_capabilities parses symref pairs" {
+  let symrefs = parse_symrefs_from_capabilities([
+    "report-status", "symref=HEAD:refs/heads/main", "symref=refs/remotes/origin/HEAD:refs/remotes/origin/main",
+  ])
+  assert_eq(symrefs.get("HEAD"), Some("refs/heads/main"))
+  assert_eq(
+    symrefs.get("refs/remotes/origin/HEAD"),
+    Some("refs/remotes/origin/main"),
+  )
+}
+
+///|
+test "parse_symrefs_from_capabilities accepts symref-target capability" {
+  let symrefs = parse_symrefs_from_capabilities([
+    "ls-refs=unborn", "symref-target:refs/heads/main",
+  ])
+  assert_eq(symrefs.get("HEAD"), Some("refs/heads/main"))
+}
+
+///|
 test "ssh_remote_to_https converts scp-style ssh remote" {
   inspect(
     ssh_remote_to_https("git@github.com:user/repo.git"),

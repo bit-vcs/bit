@@ -23,7 +23,7 @@ fn profile_lap(
   label : String,
   start : @bench.Timestamp?,
 ) -> @bench.Timestamp? {
-  if !(enabled) {
+  if !enabled {
     return start
   }
   match start {

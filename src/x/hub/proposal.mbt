@@ -271,7 +271,7 @@ pub fn Hub::list_pr_proposals(
   let result : Array[PullRequest] = []
   let records = self.store.list_records(objects, pr_proposal_prefix())
   for record in records {
-    if !(record.key.has_suffix("/meta")) || record.kind != "pr-proposal" {
+    if !record.key.has_suffix("/meta") || record.kind != "pr-proposal" {
       continue
     }
     let pr = parse_legacy_pull_request(record.payload) catch { _ => continue }

@@ -24,11 +24,11 @@ async fn handle_prune_packed(args : Array[String]) -> Unit raise Error {
   for entry in entries {
     let name = normalize_dir_entry(entry)
     // Only look at 2-char hex prefix directories
-    if name.length() != 2 || !(is_hex_string(name)) {
+    if name.length() != 2 || !is_hex_string(name) {
       continue
     }
     let dir_path = objects_dir + "/" + name
-    if !(fs.is_dir(dir_path)) {
+    if !fs.is_dir(dir_path) {
       continue
     }
     let files = fs.readdir(dir_path) catch { _ => continue }
@@ -44,14 +44,14 @@ async fn handle_prune_packed(args : Array[String]) -> Unit raise Error {
       if packed_ids.contains(hex) {
         let file_path = dir_path + "/" + file_name
         if dry_run {
-          if !(quiet) {
+          if !quiet {
             print_line(hex)
           }
         } else {
           fs.remove_file(file_path) catch {
             _ => ()
           }
-          if !(quiet) {
+          if !quiet {
             print_line(hex)
           }
         }
@@ -59,7 +59,7 @@ async fn handle_prune_packed(args : Array[String]) -> Unit raise Error {
       }
     }
     // Try to remove empty directory
-    if !(dry_run) && dir_removed == dir_count && dir_count > 0 {
+    if !dry_run && dir_removed == dir_count && dir_count > 0 {
       fs.remove_dir(dir_path) catch {
         _ => ()
       }

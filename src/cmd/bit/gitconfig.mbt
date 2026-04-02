@@ -12,7 +12,7 @@ pub fn load_global_aliases(fs : OsFs) -> Map[String, String] {
   let path = find_global_gitconfig_path()
   match path {
     Some(p) => {
-      if !(fs.is_file(p)) {
+      if !fs.is_file(p) {
         return empty
       }
       let bytes = fs.read_file(p) catch { _ => return empty }
@@ -120,20 +120,20 @@ pub fn split_alias_command(value : String) -> Array[String] {
       escape = false
       continue
     }
-    if c == '\\' && !(in_single) {
+    if c == '\\' && !in_single {
       escape = true
       continue
     }
-    if c == '\'' && !(in_double) {
-      in_single = !(in_single)
+    if c == '\'' && !in_double {
+      in_single = !in_single
       continue
     }
-    if c == '"' && !(in_single) {
-      in_double = !(in_double)
+    if c == '"' && !in_single {
+      in_double = !in_double
       continue
     }
-    if (c == ' ' || c == '\t') && !(in_single) && !(in_double) {
-      if !(sb.is_empty()) {
+    if (c == ' ' || c == '\t') && !in_single && !in_double {
+      if !sb.is_empty() {
         args.push(sb.to_string())
         sb.reset()
       }
@@ -144,7 +144,7 @@ pub fn split_alias_command(value : String) -> Array[String] {
   if escape {
     sb.write_char('\\')
   }
-  if !(sb.is_empty()) {
+  if !sb.is_empty() {
     args.push(sb.to_string())
   }
   args
@@ -168,7 +168,7 @@ fn find_global_gitconfig_path() -> String? {
 
 ///|
 fn parse_section_name(line : String) -> String? {
-  if !(line.has_prefix("[")) || !(line.has_suffix("]")) {
+  if !line.has_prefix("[") || !line.has_suffix("]") {
     return None
   }
   if line.length() < 2 {

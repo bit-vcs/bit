@@ -46,7 +46,7 @@ async fn handle_difftool(args : Array[String]) -> Unit raise Error {
         }
         break
       }
-      _ if !(arg.has_prefix("-")) => positional.push(arg)
+      _ if !arg.has_prefix("-") => positional.push(arg)
       _ if arg.has_prefix("-") => warn_unimplemented_arg("difftool", arg)
       _ => ()
     }

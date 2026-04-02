@@ -98,8 +98,7 @@ fn object_serialize_commit_content_array(commit : Commit) -> Array[Byte] {
   object_append_utf8_string(content, " ")
   object_append_utf8_string(content, commit.committer_tz)
   content.push(b'\n')
-  if commit.encoding.length() > 0 &&
-    !(object_is_utf8_encoding(commit.encoding)) {
+  if commit.encoding.length() > 0 && !object_is_utf8_encoding(commit.encoding) {
     object_append_utf8_string(content, "encoding ")
     object_append_utf8_string(content, commit.encoding)
     content.push(b'\n')
@@ -109,7 +108,7 @@ fn object_serialize_commit_content_array(commit : Commit) -> Array[Byte] {
   content.append(msg_bytes)
   // For verbatim mode (commit-tree), store message exactly as given.
   // Otherwise, ensure trailing newline (git commit behavior).
-  if !(commit.verbatim_message) {
+  if !commit.verbatim_message {
     if msg_bytes.length() == 0 || msg_bytes[msg_bytes.length() - 1] != b'\n' {
       content.push(b'\n')
     }

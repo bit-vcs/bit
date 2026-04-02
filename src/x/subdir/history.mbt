@@ -200,7 +200,7 @@ fn filter_subdir_history(
     prev_tree = subdir_tree
     // 親コミットをキューに追加
     for parent in commit_info.parents {
-      if !(visited.contains(parent.to_hex())) {
+      if !visited.contains(parent.to_hex()) {
         queue.push(parent)
       }
     }

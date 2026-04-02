@@ -8,7 +8,7 @@ fn normalize_repo_path_internal(path : String) -> String {
     } else if part == ".." {
       if parts.length() > 0 && parts[parts.length() - 1] != ".." {
         let _ = parts.pop()
-      } else if !(path.has_prefix("/")) {
+      } else if !path.has_prefix("/") {
         parts.push(part)
       }
     } else {
@@ -84,7 +84,7 @@ pub fn find_tree_entry(
           return Some(entry)
         } else {
           let is_tree = entry.mode == "40000" || entry.mode == "040000"
-          if !(is_tree) {
+          if !is_tree {
             return None
           }
           current = entry.id

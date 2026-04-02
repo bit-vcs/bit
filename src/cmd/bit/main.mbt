@@ -542,7 +542,7 @@ fn help_text_detail_key(cmd : String) -> String {
 
 ///|
 fn load_opt_in_help_text(cmd : String) -> String? {
-  if !(help_text_opt_in_enabled()) {
+  if !help_text_opt_in_enabled() {
     return None
   }
   let dir = match help_text_external_dir() {
@@ -566,7 +566,7 @@ fn load_opt_in_help_text(cmd : String) -> String? {
 async fn show_command_help_from_specs(cmd : String, silent : Bool) -> Bool {
   for spec in show_command_help_specs() {
     if spec.0 == cmd {
-      if !(silent) {
+      if !silent {
         let summary = match load_opt_in_help_text(spec.0) {
           Some(details) => spec.2 + "\n\n" + details
           None => spec.2
@@ -583,115 +583,115 @@ async fn show_command_help_from_specs(cmd : String, silent : Bool) -> Bool {
 async fn show_command_help(cmd : String, silent? : Bool = false) -> Bool {
   match cmd {
     "hq" => {
-      if !(silent) {
+      if !silent {
         print_hq_usage()
       }
       true
     }
     "subdir-clone" => {
-      if !(silent) {
+      if !silent {
         print_subdir_clone_usage()
       }
       true
     }
     "worktree" => {
-      if !(silent) {
+      if !silent {
         show_worktree_help()
       }
       true
     }
     "hub" => {
-      if !(silent) {
+      if !silent {
         print_hub_deprecation_guide()
       }
       true
     }
     "relay" => {
-      if !(silent) {
+      if !silent {
         print_relay_usage()
       }
       true
     }
     "pr" => {
-      if !(silent) {
+      if !silent {
         print_hub_pr_usage()
       }
       true
     }
     "issue" => {
-      if !(silent) {
+      if !silent {
         print_hub_issue_usage()
       }
       true
     }
     "debug" => {
-      if !(silent) {
+      if !silent {
         print_debug_usage()
       }
       true
     }
     "mcp" => {
-      if !(silent) {
+      if !silent {
         print_mcp_usage()
       }
       true
     }
     "workspace" | "ws" => {
-      if !(silent) {
+      if !silent {
         print_workspace_usage()
       }
       true
     }
     "repo" => {
-      if !(silent) {
+      if !silent {
         print_repo_usage()
       }
       true
     }
     "init" => {
-      if !(silent) {
+      if !silent {
         show_init_command_help()
       }
       true
     }
     "status" => {
-      if !(silent) {
+      if !silent {
         show_status_command_help()
       }
       true
     }
     "add" => {
-      if !(silent) {
+      if !silent {
         show_add_command_help()
       }
       true
     }
     "commit" => {
-      if !(silent) {
+      if !silent {
         show_commit_command_help()
       }
       true
     }
     "log" => {
-      if !(silent) {
+      if !silent {
         show_log_command_help()
       }
       true
     }
     "show" => {
-      if !(silent) {
+      if !silent {
         show_show_command_help()
       }
       true
     }
     "x/hooks" => {
-      if !(silent) {
+      if !silent {
         print_x_hooks_usage()
       }
       true
     }
     "rebase-ai" => {
-      if !(silent) {
+      if !silent {
         show_simple_command_help(
           "git rebase-ai [<options>] <upstream>",
           summary="Rebase with AI conflict resolution (OpenRouter moonshotai/kimi-k2, supports --agent-loop).",
@@ -700,7 +700,7 @@ async fn show_command_help(cmd : String, silent? : Bool = false) -> Bool {
       true
     }
     "ai" => {
-      if !(silent) {
+      if !silent {
         show_simple_command_help(
           "bit ai <command> [<args>]",
           summary="AI helpers.\n\nSubcommands:\n  rebase   AI-assisted rebase conflict resolution\n  merge    AI-assisted merge conflict resolution\n  cherry-pick AI-assisted cherry-pick conflict resolution\n  revert   AI-assisted revert conflict resolution\n  commit   AI-assisted commit message workflow",
@@ -751,7 +751,7 @@ async fn run_main_for_args(args : Array[String]) -> Unit {
         show_help()
         return ()
       }
-      _ if !(args[i].has_prefix("-")) => break // Stop at first non-option
+      _ if !args[i].has_prefix("-") => break // Stop at first non-option
       _ => continue
     }
   }
@@ -976,7 +976,7 @@ fn can_handle_global_config_in_shim(opts : GlobalOptions) -> Bool {
       }
       for entry in opts.config_overrides {
         let key = entry.0.to_lower()
-        if !(supported.iter().any(value => value == key)) {
+        if !supported.iter().any(value => value == key) {
           return false
         }
       }
@@ -1010,9 +1010,9 @@ fn should_delegate_to_real_git(
     has_env_pairs ||
     has_env_pairs_without_count
   let shim_handles_config = has_global_config &&
-    !(has_env_parameters) &&
-    !(has_env_pairs) &&
-    !(has_env_pairs_without_count) &&
+    !has_env_parameters &&
+    !has_env_pairs &&
+    !has_env_pairs_without_count &&
     can_handle_global_config_in_shim(opts)
   match opts.subcmd {
     Some(cmd) =>
@@ -1133,7 +1133,7 @@ fn parse_global_options(args : Array[String]) -> GlobalOptions {
     }
     if in_opts && is_unsupported_global_flag(arg) {
       unsupported_global = true
-      if !(arg.contains("=")) && i + 1 < args.length() {
+      if !arg.contains("=") && i + 1 < args.length() {
         i += 2
       } else {
         i += 1
@@ -1177,7 +1177,7 @@ async fn dispatch_command(
   rest : Array[String],
 ) -> Unit raise Error {
   let normalized_cmd = normalize_dispatch_command(cmd)
-  if !(command_handles_builtin_help(normalized_cmd)) {
+  if !command_handles_builtin_help(normalized_cmd) {
     for arg in rest {
       if arg == "-h" || arg == "--help" {
         if !(normalized_cmd |> show_command_help) {

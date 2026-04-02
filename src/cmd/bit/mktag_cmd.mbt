@@ -45,18 +45,18 @@ async fn mktag_validate(content : String) -> Unit {
   }
   // Line 0: object <hex>
   let line0 = lines[0]
-  if !(line0.has_prefix("object ")) {
+  if !line0.has_prefix("object ") {
     eprint_line("error: missingObject: tag missing 'object' line")
     @sys.exit(1)
   }
   let hex = String::unsafe_substring(line0, start=7, end=line0.length())
-  if hex.length() != 40 || !(mktag_is_hex(hex)) {
+  if hex.length() != 40 || !mktag_is_hex(hex) {
     eprint_line("error: badObjectSha1: tag has too-short object SHA-1")
     @sys.exit(1)
   }
   // Line 1: type <type>
   let line1 = lines[1]
-  if !(line1.has_prefix("type ")) {
+  if !line1.has_prefix("type ") {
     eprint_line("error: missingTypeEntry: tag missing 'type' line")
     @sys.exit(1)
   }
@@ -70,7 +70,7 @@ async fn mktag_validate(content : String) -> Unit {
   }
   // Line 2: tag <name>
   let line2 = lines[2]
-  if !(line2.has_prefix("tag ")) {
+  if !line2.has_prefix("tag ") {
     eprint_line("error: missingTagEntry: tag missing 'tag' line")
     @sys.exit(1)
   }
@@ -81,7 +81,7 @@ async fn mktag_validate(content : String) -> Unit {
   }
   // Line 3: tagger <ident>
   let line3 = lines[3]
-  if !(line3.has_prefix("tagger ")) {
+  if !line3.has_prefix("tagger ") {
     eprint_line("error: missingTaggerEntry: tag missing 'tagger' line")
     @sys.exit(1)
   }

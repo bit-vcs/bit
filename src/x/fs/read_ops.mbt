@@ -84,7 +84,7 @@ pub fn Fs::readdir(
   for item in self.working.deleted.to_array() {
     let (del_path, _) = item
     if parent_dir(del_path) == norm ||
-      (norm.length() == 0 && !(del_path.contains("/"))) {
+      (norm.length() == 0 && !del_path.contains("/")) {
       entries.remove(basename(del_path))
     }
   }
@@ -145,7 +145,7 @@ fn Fs::readdir_from_tree(
         }
       }
     }
-    if !(found) {
+    if !found {
       return
     }
   }
@@ -225,7 +225,7 @@ fn Fs::check_dir_in_tree(
         }
       }
     }
-    if !(found) {
+    if !found {
       return false
     }
   }
@@ -342,7 +342,7 @@ fn Fs::find_in_tree(
         }
       }
     }
-    if !(found) {
+    if !found {
       return None
     }
   }
@@ -455,7 +455,7 @@ pub async fn Fs::prefetch(
 ) -> Int raise @bit.GitError {
   let promisor_db = self.get_promisor_db(read_fs)
   guard promisor_db is Some(pdb) else { return 0 }
-  if !(pdb.has_promisor()) {
+  if !pdb.has_promisor() {
     return 0
   }
   // Collect object IDs that need fetching
@@ -475,7 +475,7 @@ pub async fn Fs::prefetch(
         // Check if not already cached
         if self.cache.get_blob(norm) is None {
           // Check if not locally available
-          if !(pdb.has_local(read_fs, id)) {
+          if !pdb.has_local(read_fs, id) {
             ids.push(id)
           }
         }
@@ -512,7 +512,7 @@ pub fn Fs::needs_fetch(
   // Check if object exists locally
   let promisor_db = self.get_promisor_db(read_fs)
   match promisor_db {
-    Some(pdb) => !(pdb.has_local(read_fs, id))
+    Some(pdb) => !pdb.has_local(read_fs, id)
     None => {
       let db = self.get_db(read_fs)
       db.get(read_fs, id) is None

@@ -230,7 +230,7 @@ pub fn tar_emit_parent_dirs(
   let mut di = dirs.length() - 1
   while di >= 0 {
     let dir = dirs[di]
-    if !(emitted.contains(dir)) {
+    if !emitted.contains(dir) {
       emitted[dir] = true
       let hdr = tar_make_header(dir, 0o40755, 0, mtime, b'5', "")
       for b in hdr {

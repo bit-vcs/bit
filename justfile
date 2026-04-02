@@ -30,6 +30,9 @@ test:
     moon test --target wasm -p mizchi/bit/runtime -f storage_runtime_wbtest.mbt
     moon test --target native --no-parallelize -j 1
     just test-git-compat-allowlist
+    just test-flaker-affected-rules
+    just test-flaker-cli-wrapper
+    just test-flaker-git-compat
     just test-js-build
 
 # Update snapshot tests (both js and native)
@@ -99,6 +102,18 @@ test-js-build: sync-npm-lib-raw sync-npm-bit-cjs bundle-js-lib-minimal bundle-js
 # Guard compat-random allowlist against known upstream-oracle failures
 test-git-compat-allowlist:
     node --test tools/git-compat-allowlist.test.mjs
+
+# Verify flaker-focused git-compat inventory helpers
+test-flaker-git-compat:
+    node --test tools/flaker-git-compat.test.mjs
+
+# Verify flaker git-compat affected mapping config and examples
+test-flaker-affected-rules:
+    node --test tools/flaker-affected-rules.test.mjs
+
+# Verify flaker CLI wrapper guidance for unsupported resolver versions
+test-flaker-cli-wrapper:
+    node --test tools/flaker-cli-wrapper.test.mjs
 
 # Verify JS-exported lib on a pure in-memory host
 test-js-lib: build-js-lib
@@ -362,6 +377,46 @@ compat-random-run:
 # Aggregate compatibility random run records (default: compat-random-results)
 compat-random-aggregate results_dir="compat-random-results":
     bash tools/aggregate-git-compat-random.sh {{results_dir}}
+
+# Focused local git-compat sampling via flaker
+flaker-git-compat-sample strategy="weighted" count="25" changed="":
+    @if ! command -v flaker >/dev/null 2>&1; then \
+      echo "flaker CLI is required; install @mizchi/flaker first" >&2; \
+      exit 1; \
+    fi
+    @if { [ "{{strategy}}" = "affected" ] || [ "{{strategy}}" = "hybrid" ]; } && [ -z "{{changed}}" ]; then \
+      echo "changed=... is required when strategy={{strategy}}" >&2; \
+      exit 1; \
+    fi
+    @args="sample --strategy {{strategy}} --count {{count}}"; \
+    if [ -n "{{changed}}" ]; then \
+      args="$args --changed {{changed}}"; \
+    fi; \
+    node tools/flaker-cli-wrapper.mjs $args
+
+# Focused local git-compat execution via flaker
+flaker-git-compat-run strategy="weighted" count="25" changed="": build
+    @if ! command -v flaker >/dev/null 2>&1; then \
+      echo "flaker CLI is required; install @mizchi/flaker first" >&2; \
+      exit 1; \
+    fi
+    @if { [ "{{strategy}}" = "affected" ] || [ "{{strategy}}" = "hybrid" ]; } && [ -z "{{changed}}" ]; then \
+      echo "changed=... is required when strategy={{strategy}}" >&2; \
+      exit 1; \
+    fi
+    @args="run --strategy {{strategy}} --count {{count}}"; \
+    if [ -n "{{changed}}" ]; then \
+      args="$args --changed {{changed}}"; \
+    fi; \
+    node tools/flaker-cli-wrapper.mjs $args
+
+# Inspect which git-compat suites flaker sees as affected
+flaker-git-compat-affected changed:
+    @if ! command -v flaker >/dev/null 2>&1; then \
+      echo "flaker CLI is required; install @mizchi/flaker first" >&2; \
+      exit 1; \
+    fi
+    node tools/flaker-cli-wrapper.mjs affected --changed {{changed}}
 
 # Trigger Git Compat Randomized workflow via workflow_dispatch
 compat-random-dispatch shards="1" ratio="50" target_shard="0" seed="":

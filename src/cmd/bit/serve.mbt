@@ -80,7 +80,7 @@ fn parse_hub_serve_options(args : Array[String]) -> HubServeOptions? {
       i += 1
       continue
     }
-    if !(arg.has_prefix("-")) && relay_url is None {
+    if !arg.has_prefix("-") && relay_url is None {
       relay_url = Some(arg)
       i += 1
       continue
@@ -463,7 +463,7 @@ async fn serve_handle_git_request(
     let service = serve_extract_query_param(path, "service")
     match service {
       Some("git-receive-pack") => {
-        if !(allow_push) {
+        if !allow_push {
           let error_body = @encoding.encode(
             @encoding.Encoding::UTF8,
             "receive-pack not enabled",
@@ -498,7 +498,7 @@ async fn serve_handle_git_request(
       }
     }
   } else if path.has_prefix("/git-receive-pack") {
-    if !(allow_push) {
+    if !allow_push {
       let error_body = @encoding.encode(
         @encoding.Encoding::UTF8,
         "receive-pack not enabled",
@@ -885,7 +885,7 @@ async fn serve_broadcast_push_notification(
   let root = normalize_repo_root(repo_root)
   let git_dir = root + "/.git"
   let incoming_dir = git_dir + "/refs/relay/incoming/heads"
-  if !(fs.is_dir(incoming_dir)) {
+  if !fs.is_dir(incoming_dir) {
     return
   }
   // Build broadcast payload with incoming refs

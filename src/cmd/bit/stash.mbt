@@ -15,8 +15,7 @@ async fn handle_stash(args : Array[String]) -> Unit raise Error {
       first
     }
   }
-  let rest : Array[String] = if args.length() > 0 &&
-    !(args[0].has_prefix("-")) {
+  let rest : Array[String] = if args.length() > 0 && !args[0].has_prefix("-") {
     args.iter().drop(1).collect()
   } else {
     args.iter().collect()

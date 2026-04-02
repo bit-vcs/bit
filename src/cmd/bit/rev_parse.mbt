@@ -185,7 +185,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
         continue
       }
       let a = args[vi]
-      if !(end_of_opts) {
+      if !end_of_opts {
         match a {
           "--verify"
           | "--quiet"
@@ -215,7 +215,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
           _ => ()
         }
       }
-      if !(a.has_prefix("-")) || end_of_opts {
+      if !a.has_prefix("-") || end_of_opts {
         rev_args.push(a)
       }
       vi += 1
@@ -224,7 +224,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
       rev_args.push(d)
     }
     if rev_args.length() != 1 {
-      if !(quiet) {
+      if !quiet {
         eprint_line("fatal: Needed a single revision")
       }
       @sys.exit(128)
@@ -257,7 +257,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
         }
       }
       None => {
-        if !(quiet) {
+        if !quiet {
           eprint_line("fatal: Needed a single revision")
         }
         @sys.exit(128)
@@ -494,7 +494,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
       "--symbolic-full-name" => ()
       "--end-of-options" => {
         // Output --end-of-options itself in non-verify mode
-        if !(verify) && !(revs_only) {
+        if !verify && !revs_only {
           print_line("--end-of-options")
         }
         // All remaining args are revisions/paths, not options
@@ -507,13 +507,13 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
           }
           // "--" still acts as separator in this mode
           if rev_arg == "--" {
-            if !(revs_only) {
+            if !revs_only {
               print_line("--")
             }
             process_index += 1
             // Everything after "--" is a path
             while process_index < args.length() {
-              if !(revs_only) {
+              if !revs_only {
                 let file_arg = args[process_index]
                 match prefix {
                   Some(p) => print_line(p + file_arg)
@@ -566,7 +566,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
                 }
               }
               None =>
-                if !(revs_only) {
+                if !revs_only {
                   raise @bitcore.GitError::InvalidObject(
                     "unknown revision: " + rev_arg,
                   )
@@ -596,7 +596,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
               }
             }
             None =>
-              if !(revs_only) {
+              if !revs_only {
                 raise @bitcore.GitError::InvalidObject(
                   "unknown revision: " + rev_arg,
                 )
@@ -647,13 +647,13 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
         print_line("--min-age=\{timestamp}")
       }
       "--" => {
-        if !(revs_only) {
+        if !revs_only {
           print_line("--")
         }
         process_index += 1
         // Everything after "--" is a file path
         while process_index < args.length() {
-          if !(revs_only) {
+          if !revs_only {
             let file_arg = args[process_index]
             match prefix {
               Some(p) => print_line(p + file_arg)
@@ -892,7 +892,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
             match name {
               Some(value) => print_line("^\{value}")
               None =>
-                if !(revs_only) {
+                if !revs_only {
                   raise @bitcore.GitError::InvalidObject(
                     "unknown revision: " + arg,
                   )
@@ -911,7 +911,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
                 }
               }
               None =>
-                if !(revs_only) {
+                if !revs_only {
                   raise @bitcore.GitError::InvalidObject(
                     "unknown revision: " + arg,
                   )
@@ -926,7 +926,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
           match name {
             Some(value) => print_line(value)
             None =>
-              if !(revs_only) {
+              if !revs_only {
                 raise @bitcore.GitError::InvalidObject(
                   "unknown revision: " + arg,
                 )
@@ -946,7 +946,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
           match name {
             Some(value) => print_line(value)
             None =>
-              if !(revs_only) {
+              if !revs_only {
                 raise @bitcore.GitError::InvalidObject(
                   "unknown revision: " + arg,
                 )
@@ -957,7 +957,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
             resolve_fetch_head_oid(fs, git_dir)
           } else if effective_arg.has_prefix(":") &&
             effective_arg.length() > 1 &&
-            !(effective_arg.has_prefix(":/")) {
+            !effective_arg.has_prefix(":/") {
             resolve_index_path_oid(fs, git_dir, effective_arg)
           } else if effective_arg.find("@{") is Some(_) {
             match resolve_upstream_push_oid(fs, git_dir, effective_arg, quiet) {
@@ -989,7 +989,7 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
               if prefix is Some(p) {
                 // With --prefix, treat unresolved args as file paths
                 print_line(p + arg)
-              } else if !(revs_only) {
+              } else if !revs_only {
                 raise @bitcore.GitError::InvalidObject(
                   "unknown revision: " + arg,
                 )
@@ -1101,7 +1101,7 @@ fn rev_parse_resolve_common_git_dir(
   git_dir : String,
 ) -> String {
   let commondir_path = git_dir + "/commondir"
-  if !(fs.is_file(commondir_path)) {
+  if !fs.is_file(commondir_path) {
     return git_dir
   }
   let raw = decode_bytes(
@@ -1299,7 +1299,7 @@ async fn resolve_reflog_by_date(
       match prev_ooid {
         Some(po) => {
           result_oid = Some(entry.new_id)
-          if po != entry.new_id && !(quiet) {
+          if po != entry.new_id && !quiet {
             eprint_line(
               "warning: log for ref \{refname} has gap after \{cutoff_date}",
             )
@@ -1311,7 +1311,7 @@ async fn resolve_reflog_by_date(
           } else {
             let current = @bitrepo.rev_parse(fs, git_dir, refname)
             result_oid = current
-            if !(quiet) {
+            if !quiet {
               match current {
                 Some(cur_oid) =>
                   if cur_oid != entry.new_id {
@@ -1343,7 +1343,7 @@ async fn resolve_reflog_by_date(
   } else {
     oldest.old_id
   }
-  if !(quiet) {
+  if !quiet {
     eprint_line(
       "warning: log for '\{display_ref}' only goes back to \{oldest_date}",
     )
@@ -1518,7 +1518,7 @@ async fn resolve_upstream_push_symbolic(
         Some(ref_name)
       }
     Some(Err(msg)) => {
-      if !(quiet) {
+      if !quiet {
         eprint_line("fatal: " + msg)
       }
       @sys.exit(128)
@@ -1547,7 +1547,7 @@ async fn resolve_upstream_push_oid(
         @bitrepo.rev_parse(fs, git_dir, ref_name)
       }
     Some(Err(msg)) => {
-      if !(quiet) {
+      if !quiet {
         eprint_line("fatal: " + msg)
       }
       @sys.exit(128)
@@ -1965,7 +1965,7 @@ fn rev_parse_resolve_git_dir_arg(
 
 ///|
 async fn rev_parse_require_repo(in_repo : Bool) -> Unit {
-  if !(in_repo) {
+  if !in_repo {
     eprint_line(
       "fatal: not a git repository (or any of the parent directories): .git",
     )
@@ -2060,7 +2060,7 @@ fn rev_parse_read_bisect_refs(
   let result : Array[(String, String)] = []
   let bisect_dir = git_dir + "/refs/bisect"
   let is_dir = @fs.is_dir(bisect_dir) catch { _ => false }
-  if !(is_dir) {
+  if !is_dir {
     return result
   }
   let entries = @fs.read_dir(bisect_dir) catch { _ => return result }
@@ -2100,7 +2100,7 @@ fn rev_parse_read_bisect_refs(
                 break
               }
             }
-            if !(found) {
+            if !found {
               result.push((refname, oid))
             }
           }
@@ -2129,7 +2129,7 @@ fn rev_parse_apply_prefix_to_colon_path(
     start=colon_idx + 1,
     end=spec.length(),
   )
-  if !(path_part.has_prefix("./")) && !(path_part.has_prefix("../")) {
+  if !path_part.has_prefix("./") && !path_part.has_prefix("../") {
     return spec
   }
   let rev_part = String::unsafe_substring(spec, start=0, end=colon_idx)
@@ -2203,7 +2203,7 @@ async fn handle_parseopt(args : Array[String]) -> Unit raise Error {
     }
     usage_lines.push(lines[i])
   }
-  if !(found_separator) {
+  if !found_separator {
     eprint_line("fatal: premature end of input")
     @sys.exit(128)
   }
@@ -2432,12 +2432,12 @@ fn parseopt_format_help(
   }
   let mut has_visible_opts = false
   for opt in opts {
-    if opt.opt_type == ParseoptOption && (show_all || !(opt.hidden)) {
+    if opt.opt_type == ParseoptOption && (show_all || !opt.hidden) {
       has_visible_opts = true
       break
     }
   }
-  if !(has_visible_opts) {
+  if !has_visible_opts {
     out.write_char('\n')
     return out.to_string()
   }
@@ -2455,7 +2455,7 @@ fn parseopt_format_help(
       }
       ParseoptOption => ()
     }
-    if !(show_all) && opt.hidden {
+    if !show_all && opt.hidden {
       continue
     }
     if need_newline {
@@ -2480,7 +2480,7 @@ fn parseopt_format_help(
         out.write_string("--")
         out.write_string(long_name)
         pos = pos + 2 + long_name.length()
-        if long_name.has_prefix("no-") && !(opt.non_neg) {
+        if long_name.has_prefix("no-") && !opt.non_neg {
           positive_name = Some(
             String::unsafe_substring(long_name, start=3, end=long_name.length()),
           )
@@ -2503,7 +2503,7 @@ fn parseopt_format_help(
               break
             }
           }
-          if !(found) {
+          if !found {
             out.write_string("    --")
             out.write_string(pname)
             let ppos = 4 + 2 + pname.length()
@@ -2525,12 +2525,12 @@ fn parseopt_format_help(
 
 ///|
 fn parseopt_format_argh(opt : ParseoptOpt) -> String {
-  if !(opt.has_arg) && !(opt.opt_arg) {
+  if !opt.has_arg && !opt.opt_arg {
     return ""
   }
   let has_custom_argh = opt.argh.length() > 0
   let argh = if has_custom_argh { opt.argh } else { "..." }
-  let literal = !(has_custom_argh) || parseopt_argh_is_literal(argh)
+  let literal = !has_custom_argh || parseopt_argh_is_literal(argh)
   if opt.opt_arg {
     if opt.long_name.length() > 0 {
       if literal {
@@ -2552,12 +2552,12 @@ fn parseopt_format_argh(opt : ParseoptOpt) -> String {
 
 ///|
 fn parseopt_format_argh_short(opt : ParseoptOpt) -> String {
-  if !(opt.has_arg) && !(opt.opt_arg) {
+  if !opt.has_arg && !opt.opt_arg {
     return ""
   }
   let has_custom_argh = opt.argh.length() > 0
   let argh = if has_custom_argh { opt.argh } else { "..." }
-  let literal = !(has_custom_argh) || parseopt_argh_is_literal(argh)
+  let literal = !has_custom_argh || parseopt_argh_is_literal(argh)
   if opt.opt_arg {
     if literal {
       "[" + argh + "]"
@@ -2756,7 +2756,7 @@ fn parseopt_match_long(
       continue
     }
     let long_name = opt.long_name
-    let allow_unset = !(opt.non_neg)
+    let allow_unset = !opt.non_neg
     let mut opt_unset = false
     let mut check_name = long_name
     if long_name.has_prefix("no-") {
@@ -2769,11 +2769,11 @@ fn parseopt_match_long(
     } else if arg_starts_with_no_no {
       continue
     }
-    let xor_unset = if is_unset { !(opt_unset) } else { opt_unset }
-    if xor_unset && !(allow_unset) {
+    let xor_unset = if is_unset { !opt_unset } else { opt_unset }
+    if xor_unset && !allow_unset {
       continue
     }
-    let effective_unset = if is_unset { !(opt_unset) } else { opt_unset }
+    let effective_unset = if is_unset { !opt_unset } else { opt_unset }
     if no_stripped == check_name {
       exact_match = Some((opt, effective_unset))
       break
@@ -2785,10 +2785,7 @@ fn parseopt_match_long(
       }
       abbrev_match = Some((opt, effective_unset))
     }
-    if allow_unset &&
-      !(is_unset) &&
-      !(arg_starts_with_no_no) &&
-      !(opt_unset) {
+    if allow_unset && !is_unset && !arg_starts_with_no_no && !opt_unset {
       let full_neg = "no-" + long_name
       if full_neg.has_prefix(opt_name) && opt_name.length() < full_neg.length() {
         match abbrev_match {
@@ -2868,7 +2865,7 @@ fn parseopt_format_matched_long(
     } else {
       out.write_string(opt.long_name)
     }
-  } else if opt.short_name != '\u0000' && !(stuck_long) {
+  } else if opt.short_name != '\u0000' && !stuck_long {
     out.write_string(" -")
     out.write_char(opt.short_name)
   } else if opt.long_name.length() > 0 {
@@ -2881,7 +2878,7 @@ fn parseopt_format_matched_long(
   if opt.has_arg || opt.opt_arg {
     match opt_value {
       Some(v) => {
-        if stuck_long && opt.long_name.length() > 0 && !(unset) {
+        if stuck_long && opt.long_name.length() > 0 && !unset {
           let out2 = StringBuilder::new()
           out2.write_string(" --")
           out2.write_string(opt.long_name)
@@ -2889,7 +2886,7 @@ fn parseopt_format_matched_long(
           out2.write_string(shell_single_quote(v))
           return ParseoptMatchOk(out2.to_string(), consumed)
         }
-        if !(stuck_long) {
+        if !stuck_long {
           out.write_char(' ')
         } else if opt.long_name.length() > 0 {
           out.write_char('=')
@@ -2897,7 +2894,7 @@ fn parseopt_format_matched_long(
         out.write_string(shell_single_quote(v))
       }
       None =>
-        if opt.has_arg && !(opt.opt_arg) {
+        if opt.has_arg && !opt.opt_arg {
           if arg_idx + 1 < all_args.length() {
             let next_val = all_args[arg_idx + 1]
             consumed = 2
@@ -2964,14 +2961,14 @@ fn parseopt_match_short(
               out.write_char('=')
               out.write_string(shell_single_quote(rest))
             } else {
-              if !(stuck_long) {
+              if !stuck_long {
                 out.write_char(' ')
               }
               out.write_string(shell_single_quote(rest))
             }
             ci = arg.length()
           } else {
-            if opt.has_arg && !(opt.opt_arg) {
+            if opt.has_arg && !opt.opt_arg {
               if arg_idx + consumed < all_args.length() {
                 let next_val = all_args[arg_idx + consumed]
                 consumed = consumed + 1
@@ -3068,7 +3065,7 @@ fn rev_parse_list_matching_refs(
         }
         // Build full pattern: prefix + pattern (for --glob, prefix is already in pattern)
         let full_pattern = if prefix.length() > 0 { prefix + pat } else { pat }
-        if !(rev_parse_glob_match(refname, full_pattern)) {
+        if !rev_parse_glob_match(refname, full_pattern) {
           continue
         }
         // Also try short name match for simple patterns
@@ -3097,7 +3094,7 @@ fn rev_parse_list_matching_refs(
         break
       }
     }
-    if !(excluded) {
+    if !excluded {
       result.push((refname, oid))
     }
   }
@@ -3143,7 +3140,7 @@ async fn rev_parse_handle_range_op(
       let left_id = @bitrepo.rev_parse(fs, git_dir, left_spec)
       let right_id = @bitrepo.rev_parse(fs, git_dir, right_spec)
       guard left_id is Some(lid) && right_id is Some(rid) else {
-        if !(quiet) && !(revs_only) {
+        if !quiet && !revs_only {
           raise @bitcore.GitError::InvalidObject("unknown revision: " + arg)
         }
         return true
@@ -3151,8 +3148,8 @@ async fn rev_parse_handle_range_op(
       // Verify both are commits (... only works with commits)
       let left_is_commit = rev_parse_is_commit(fs, git_dir, lid)
       let right_is_commit = rev_parse_is_commit(fs, git_dir, rid)
-      if !(left_is_commit) || !(right_is_commit) {
-        if !(quiet) && !(revs_only) {
+      if !left_is_commit || !right_is_commit {
+        if !quiet && !revs_only {
           raise @bitcore.GitError::InvalidObject("unknown revision: " + arg)
         }
         return true
@@ -3232,7 +3229,7 @@ async fn rev_parse_handle_range_op(
       let left_id = @bitrepo.rev_parse(fs, git_dir, left_spec)
       let right_id = @bitrepo.rev_parse(fs, git_dir, right_spec)
       guard left_id is Some(lid) && right_id is Some(rid) else {
-        if !(quiet) && !(revs_only) {
+        if !quiet && !revs_only {
           raise @bitcore.GitError::InvalidObject("unknown revision: " + arg)
         }
         return true
@@ -3410,7 +3407,7 @@ async fn rev_parse_handle_parent_suffix(
   if suffix_type == "@" {
     // ^@ = all parents
     guard base_id is Some(oid) else {
-      if !(quiet) && !(revs_only) {
+      if !quiet && !revs_only {
         eprint_line("fatal: bad revision '\{arg}'")
         @sys.exit(128)
       }
@@ -3419,7 +3416,7 @@ async fn rev_parse_handle_parent_suffix(
     let parents = rev_parse_get_commit_parents(fs, git_dir, oid)
     if parents.length() == 0 {
       // tree object or root commit - error
-      if !(quiet) && !(revs_only) {
+      if !quiet && !revs_only {
         eprint_line("fatal: bad revision '\{arg}'")
         @sys.exit(128)
       }
@@ -3446,7 +3443,7 @@ async fn rev_parse_handle_parent_suffix(
   if suffix_type == "!" {
     // ^! = commit itself, then ^parent1 ^parent2 ...
     guard base_id is Some(oid) else {
-      if !(quiet) && !(revs_only) {
+      if !quiet && !revs_only {
         eprint_line("fatal: bad revision '\{arg}'")
         @sys.exit(128)
       }
@@ -3501,7 +3498,7 @@ async fn rev_parse_handle_parent_suffix(
       return true
     }
     guard base_id is Some(oid) else {
-      if !(quiet) && !(revs_only) {
+      if !quiet && !revs_only {
         eprint_line("fatal: bad revision '\{arg}'")
         @sys.exit(128)
       }

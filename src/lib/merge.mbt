@@ -36,12 +36,12 @@ fn merge_preserve_removed_gitlinks(
   let backup_root = ".bit-merge-preserve"
   let mut backup_index = 0
   for entry in entries {
-    if files.contains(entry.path) || !(is_gitlink_mode_int(entry.mode)) {
+    if files.contains(entry.path) || !is_gitlink_mode_int(entry.mode) {
       continue
     }
     let full_path = join_path(root, entry.path)
     let git_marker = join_path(full_path, ".git")
-    if !(rfs.is_dir(full_path)) {
+    if !rfs.is_dir(full_path) {
       continue
     }
     if !(rfs.is_file(git_marker) || rfs.is_dir(git_marker)) {
@@ -76,7 +76,7 @@ fn merge_restore_preserved_gitlinks(
       continue
     }
     let backup_abs = join_path(root, item.backup_path)
-    if !(rfs.is_dir(backup_abs)) {
+    if !rfs.is_dir(backup_abs) {
       continue
     }
     mv_copy_directory_recursive(fs, rfs, backup_abs, full_path)
@@ -203,7 +203,7 @@ pub fn merge(
     if @diff3.is_binary_content(ours_data) ||
       @diff3.is_binary_content(theirs_data) {
       conflicts.push(candidate.path)
-      if !(all_conflict_types.contains(candidate.path)) {
+      if !all_conflict_types.contains(candidate.path) {
         all_conflict_types[candidate.path] = "content"
       }
       continue
@@ -225,7 +225,7 @@ pub fn merge(
       fs.mkdir_p(dir)
       fs.write_string(full_path, result.content)
       conflicts.push(candidate.path)
-      if !(all_conflict_types.contains(candidate.path)) {
+      if !all_conflict_types.contains(candidate.path) {
         all_conflict_types[candidate.path] = "content"
       }
     } else {
@@ -713,7 +713,7 @@ fn merge_files(
           }
         }
         // Check for rename/add-dest: theirs independently added a file at new_path
-        if !(base.contains(new_path)) {
+        if !base.contains(new_path) {
           match theirs.get(new_path) {
             Some(_) => {
               // Theirs added a file at same path as our rename target
@@ -726,7 +726,7 @@ fn merge_files(
         handled_paths[old_path] = true
         handled_paths[new_path] = true
         // Only mark old_path for removal if it's a clean rename (no conflict, no add-source)
-        if !(is_add_source) && !(conflict_types.contains(new_path)) {
+        if !is_add_source && !conflict_types.contains(new_path) {
           removed_paths.push(old_path)
         }
       }
@@ -782,7 +782,7 @@ fn merge_files(
       }
     }
     // Check for rename/add-dest: ours independently added a file at new_path
-    if !(base.contains(new_path)) {
+    if !base.contains(new_path) {
       match ours.get(new_path) {
         Some(_) => {
           conflicts.push(new_path)
@@ -793,24 +793,24 @@ fn merge_files(
     }
     handled_paths[old_path] = true
     handled_paths[new_path] = true
-    if !(is_add_source) && !(conflict_types.contains(new_path)) {
+    if !is_add_source && !conflict_types.contains(new_path) {
       removed_paths.push(old_path)
     }
   }
   // Step 4: Process remaining paths with standard logic
   let all_paths : Map[String, Bool] = {}
   for path, _ in base {
-    if !(handled_paths.contains(path)) {
+    if !handled_paths.contains(path) {
       all_paths[path] = true
     }
   }
   for path, _ in ours {
-    if !(handled_paths.contains(path)) {
+    if !handled_paths.contains(path) {
       all_paths[path] = true
     }
   }
   for path, _ in theirs {
-    if !(handled_paths.contains(path)) {
+    if !handled_paths.contains(path) {
       all_paths[path] = true
     }
   }
@@ -1011,7 +1011,7 @@ fn merge_conflicted_index_entries_with_renames(
   }
   let merged_entries = tree_files_to_index(db, fs, merged)
   for entry in merged_entries {
-    if !(conflict_set.contains(entry.path)) {
+    if !conflict_set.contains(entry.path) {
       out.push({ entry, stage: 0 })
     }
   }

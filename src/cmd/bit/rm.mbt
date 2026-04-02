@@ -64,7 +64,7 @@ async fn handle_rm(args : Array[String]) -> Unit raise Error {
     }
     @sys.exit(1)
   }
-  if opts.cached && !(opts.force) && head_exists {
+  if opts.cached && !opts.force && head_exists {
     let st = @bitlib.status(fs, root)
     let staged_but_not_head : Map[String, Bool] = {}
     let intent_to_add_paths : Map[String, Bool] = {}
@@ -94,12 +94,12 @@ async fn handle_rm(args : Array[String]) -> Unit raise Error {
       }
     }
   }
-  if !(opts.cached) && !(opts.force) {
+  if !opts.cached && !opts.force {
     let st = @bitlib.status(fs, root)
     let missing_worktree_paths : Map[String, Bool] = {}
     for path in removed_paths {
       let abs_path = root + "/" + path
-      if !(fs.is_file(abs_path)) && !(fs.is_dir(abs_path)) {
+      if !fs.is_file(abs_path) && !fs.is_dir(abs_path) {
         missing_worktree_paths[path] = true
       }
     }
@@ -130,7 +130,7 @@ async fn handle_rm(args : Array[String]) -> Unit raise Error {
     force=opts.force,
     recursive=false,
   )
-  if !(opts.quiet) {
+  if !opts.quiet {
     for path in removed_paths {
       print_line("rm " + rm_quote_path(path))
     }
@@ -179,7 +179,7 @@ fn parse_rm_options(args : Array[String]) -> RmOptions {
       continue
     }
     if parse_options {
-      if arg.has_prefix("-") && !(arg.has_prefix("--")) && arg.length() > 2 {
+      if arg.has_prefix("-") && !arg.has_prefix("--") && arg.length() > 2 {
         let mut recognized_short_cluster = true
         for i = 1; i < arg.length(); i = i + 1 {
           match arg.get_char(i).unwrap() {
@@ -285,7 +285,7 @@ fn rm_partition_target_paths(
       raw_path, entries, recursive, cwd_prefix, root_abs,
     )
     if matched.length() == 0 {
-      if !(ignore_unmatch) {
+      if !ignore_unmatch {
         unmatched_specs.push(raw_path)
       }
       continue
@@ -294,23 +294,23 @@ fn rm_partition_target_paths(
     let sparse_matches : Array[String] = []
     for path in matched {
       if sparse_enabled &&
-        !(@bitlib.matches_sparse_pattern(path, sparse_patterns)) {
+        !@bitlib.matches_sparse_pattern(path, sparse_patterns) {
         sparse_matches.push(path)
       } else {
         dense_matches.push(path)
       }
     }
-    if !(allow_sparse) &&
+    if !allow_sparse &&
       dense_matches.length() == 0 &&
       sparse_matches.length() > 0 {
-      if !(ignore_unmatch) {
+      if !ignore_unmatch {
         sparse_only_specs.push(raw_path)
       }
       continue
     }
     let selected = if allow_sparse { matched } else { dense_matches }
     for path in selected {
-      if !(seen.contains(path)) {
+      if !seen.contains(path) {
         seen[path] = true
         target_paths.push(path)
       }
@@ -655,7 +655,7 @@ fn rm_collect_conflict_paths(
     let has_stage_add = staged_added.contains(path)
     let worktree_missing = missing_worktree_paths.contains(path)
     let has_staged_change = staged_modified.contains(path) ||
-      (has_stage_add && !(worktree_missing))
+      (has_stage_add && !worktree_missing)
     let has_unstaged_change = unstaged_modified.contains(path)
     if has_staged_change && has_unstaged_change {
       both_dirty.push(path)

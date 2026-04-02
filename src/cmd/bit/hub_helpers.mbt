@@ -89,7 +89,7 @@ fn parse_hub_merge_policy_toml(
       in_merge_section = section_name == "merge"
       continue
     }
-    if !(in_merge_section) {
+    if !in_merge_section {
       continue
     }
     let eq_idx = line.find("=")
@@ -168,7 +168,7 @@ fn load_hub_merge_policy(
   git_dir : String,
 ) -> @hub.PrMergePolicy raise @bitcore.GitError {
   let policy_path = hub_merge_policy_path(git_dir)
-  if !(fs.is_file(policy_path)) {
+  if !fs.is_file(policy_path) {
     return default_hub_merge_policy()
   }
   let content = decode_bytes(fs.read_file(policy_path))

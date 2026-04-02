@@ -439,14 +439,12 @@ fn show_parse_args(args : Array[String]) -> ShowArgs {
       grep_pattern_type_override = Some(GrepPatternType::Perl)
     } else if arg == "--basic-regexp" {
       grep_pattern_type_override = Some(GrepPatternType::Basic)
-    } else if arg.has_prefix("^") &&
-      arg.length() > 1 &&
-      !(arg.has_prefix("^{")) {
+    } else if arg.has_prefix("^") && arg.length() > 1 && !arg.has_prefix("^{") {
       range_excludes.push(
         String::unsafe_substring(arg, start=1, end=arg.length()),
       )
       walk_mode = true
-    } else if !(arg.has_prefix("-")) {
+    } else if !arg.has_prefix("-") {
       if log_find_dotdot(arg) >= 0 || log_find_tripledot(arg) >= 0 {
         log_add_revision_input(arg, revs, range_excludes, symmetric_ranges)
         walk_mode = true
@@ -489,11 +487,11 @@ fn show_concat_blocks(blocks : Array[String], compact : Bool) -> String {
   let mut out = blocks[0]
   for i in 1..<blocks.length() {
     if compact {
-      if !(out.has_suffix("\n")) {
+      if !out.has_suffix("\n") {
         out = out + "\n"
       }
     } else {
-      if !(out.has_suffix("\n")) {
+      if !out.has_suffix("\n") {
         out = out + "\n"
       }
       out = out + "\n"
@@ -563,20 +561,18 @@ fn show_render_commit_block(
   grep_ignore_case : Bool,
 ) -> String? raise Error {
   let show_info = parse_show_commit(data)
-  if !(
-      grep_patterns_match_message(
-        show_info.message,
-        grep_patterns,
-        grep_pattern_type,
-        grep_ignore_case,
-      ),
+  if !grep_patterns_match_message(
+      show_info.message,
+      grep_patterns,
+      grep_pattern_type,
+      grep_ignore_case,
     ) {
     return None
   }
   if pretty_raw {
     let text = decode_bytes(data)
     let mut block = "commit \{commit_id.to_hex()}\n" + text
-    if !(text.has_suffix("\n")) {
+    if !text.has_suffix("\n") {
       block = block + "\n"
     }
     return Some(block)
@@ -626,7 +622,7 @@ fn show_render_commit_block(
     lines.push("    \{line_view.to_string()}")
   }
   lines.push("")
-  if !(quiet) && commit_info.parents.length() > 0 {
+  if !quiet && commit_info.parents.length() > 0 {
     let parent_id = commit_info.parents[0]
     let parent_files = @bitlib.collect_tree_files_from_commit(db, fs, parent_id)
     let current_files = @bitlib.collect_tree_files_from_commit(
@@ -644,7 +640,7 @@ fn show_render_commit_block(
     }
     for item in parent_files.to_array() {
       let (path, _) = item
-      if !(current_files.contains(path)) {
+      if !current_files.contains(path) {
         lines.push("diff --git a/\{path} b/\{path}\ndeleted file")
       }
     }

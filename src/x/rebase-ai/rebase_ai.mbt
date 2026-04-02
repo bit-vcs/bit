@@ -226,7 +226,7 @@ fn extract_fenced_code_block(text : String) -> String? {
   let mut in_fence = false
   for line in lines {
     if line.has_prefix("```") {
-      if !(started) {
+      if !started {
         started = true
         in_fence = true
         continue
@@ -355,7 +355,7 @@ fn build_repo_scoped_rw_registry(
         return "error: invalid path (repository scope only)"
       }
       let abs_path = root + "/" + rel_path
-      if !(rfs.is_file(abs_path)) {
+      if !rfs.is_file(abs_path) {
         return "error: file not found"
       }
       let bytes = rfs.read_file(abs_path) catch {
@@ -405,7 +405,7 @@ fn build_repo_scoped_read_tools(
       guard resolve_repo_scoped_path(root, raw_path) is Some(path) else {
         return "error: invalid path"
       }
-      if !(rfs.is_file(root + "/" + path)) {
+      if !rfs.is_file(root + "/" + path) {
         return "error: file not found"
       }
       let abs_path = root + "/" + path
@@ -436,7 +436,7 @@ fn build_repo_scoped_read_tools(
       } else {
         root + "/" + target_path
       }
-      if !(rfs.is_dir(abs_path)) {
+      if !rfs.is_dir(abs_path) {
         return "error: invalid path"
       }
       let entries = rfs.readdir(abs_path) catch {
@@ -502,7 +502,7 @@ fn resolve_conflict_file_with_agent_loop(
   let abs_path = root + "/" + rel_path
   let bytes = rfs.read_file(abs_path) catch { _ => return false }
   let conflicted = decode_bytes(bytes)
-  if !(has_conflict_markers(conflicted)) {
+  if !has_conflict_markers(conflicted) {
     return false
   }
   let (registry, touched_paths) = build_repo_scoped_rw_registry(fs, rfs, root)
@@ -551,7 +551,7 @@ fn resolve_conflict_file_with_provider(
   let abs_path = root + "/" + rel_path
   let bytes = rfs.read_file(abs_path) catch { _ => return false }
   let conflicted = decode_bytes(bytes)
-  if !(has_conflict_markers(conflicted)) {
+  if !has_conflict_markers(conflicted) {
     return false
   }
   let prompt = build_resolve_prompt_with_context(rel_path, conflicted, context)

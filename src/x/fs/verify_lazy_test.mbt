@@ -4,7 +4,7 @@
 test "verify: lazy loading on helix repo" {
   let osfs = @osfs.OsFs::new()
   let git_dir = "/Users/mz/ghq/github.com/helix-editor/helix/.git"
-  if !(osfs.is_dir(git_dir)) {
+  if !osfs.is_dir(git_dir) {
     println("Skipping: helix repo not found")
     return
   }
@@ -85,7 +85,7 @@ test "verify: lazy loading on helix repo" {
 test "verify: lazy loading on this repo" {
   let osfs = @osfs.OsFs::new()
   let git_dir = "/Users/mz/ghq/github.com/mizchi/git/.git"
-  if !(osfs.is_dir(git_dir)) {
+  if !osfs.is_dir(git_dir) {
     println("Skipping: this repo .git not found")
     return
   }

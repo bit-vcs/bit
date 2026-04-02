@@ -1,6 +1,18 @@
 ///| Upload-pack (server-side) implementation
 
 ///|
+#warnings("-deprecated")
+fn upload_pack_parse_int(value : StringView) -> Int raise {
+  @strconv.parse_int(value)
+}
+
+///|
+#warnings("-deprecated")
+fn upload_pack_parse_int64(value : StringView) -> Int64 raise {
+  @strconv.parse_int64(value)
+}
+
+///|
 pub struct UploadPackRequest {
   wants : Array[@bit.ObjectId]
   haves : Array[@bit.ObjectId]
@@ -120,7 +132,7 @@ pub fn parse_upload_pack_request_v2(
     let line = upload_bytes_to_string_range(data, i + 4, i + len)
     let line = upload_trim_line(line)
     i += len
-    if !(in_args) {
+    if !in_args {
       // Command section
       if line.has_prefix("command=") {
         command = String::unsafe_substring(line, start=8, end=line.length())
@@ -347,7 +359,7 @@ pub fn parse_upload_pack_request(
     } else if line.has_prefix("deepen ") {
       let depth_str = String::unsafe_substring(line, start=7, end=line.length())
       let depth_str = upload_trim_line(depth_str)
-      let depth = @string.parse_int(depth_str) catch { _ => -1 }
+      let depth = upload_pack_parse_int(depth_str) catch { _ => -1 }
       if depth >= 0 {
         deepen = Some(depth)
       }
@@ -381,7 +393,7 @@ pub fn upload_pack(
   }
 
   // Stateless clients may terminate after wants; respond with flush only
-  if !(req.done) && req.haves.length() == 0 {
+  if !req.done && req.haves.length() == 0 {
     return @protocol.pktline_flush()
   }
 
@@ -391,7 +403,7 @@ pub fn upload_pack(
 
   // Collect have ACKs (v0 allows duplicates)
   let ack_ids = collect_have_acks_v0(db, fs, req.haves)
-  if !(req.done) {
+  if !req.done {
     return build_upload_pack_ack_response(ack_ids)
   }
 
@@ -416,7 +428,7 @@ pub fn upload_pack(
     let filtered : Array[@bit.PackObject] = []
     for obj in objects {
       let id = @bit.hash_object_content(obj.obj_type, obj.data)
-      if !(have_set.contains(id.to_hex())) {
+      if !have_set.contains(id.to_hex()) {
         filtered.push(obj)
       }
     }
@@ -551,7 +563,7 @@ fn upload_pack_error_message(
     ProtocolError(msg) => msg
     IoError(msg) => msg
   }
-  if include_pack_objects_died && !(base.contains("pack-objects died")) {
+  if include_pack_objects_died && !base.contains("pack-objects died") {
     base + "\npack-objects died"
   } else {
     base
@@ -697,7 +709,7 @@ pub fn upload_pack_v2(
   config : UploadPackConfig,
 ) -> Bytes raise @bit.GitError {
   // Validate request against config
-  if req.filter is Some(_) && !(config.allow_filter) {
+  if req.filter is Some(_) && !config.allow_filter {
     raise @bit.GitError::ProtocolError(
       "unexpected line: 'filter " + req.filter.unwrap() + "'",
     )
@@ -728,7 +740,7 @@ pub fn upload_pack_v2(
   }
   let wanted_refs : Array[(String, @bit.ObjectId)] = []
   if req.want_refs.length() > 0 {
-    if !(config.allow_ref_in_want) {
+    if !config.allow_ref_in_want {
       raise @bit.GitError::ProtocolError("unknown command 'want-ref'")
     }
     for name in req.want_refs {
@@ -745,13 +757,13 @@ pub fn upload_pack_v2(
   let wants : Array[@bit.ObjectId] = []
   for id in all_wants {
     let hex = id.to_hex()
-    if !(seen_wants.contains(hex)) {
+    if !seen_wants.contains(hex) {
       seen_wants[hex] = true
       wants.push(id)
     }
   }
   let ack_ids = collect_have_acks_v2(db, fs, req.haves)
-  if !(req.done) {
+  if !req.done {
     return build_upload_pack_response_v2_ack(ack_ids, wanted_refs)
   }
 
@@ -779,7 +791,7 @@ pub fn upload_pack_v2(
     let filtered : Array[@bit.PackObject] = []
     for obj in objects {
       let id = @bit.hash_object_content(obj.obj_type, obj.data)
-      if !(have_set.contains(id.to_hex())) {
+      if !have_set.contains(id.to_hex()) {
         filtered.push(obj)
       }
     }
@@ -799,11 +811,11 @@ fn parse_filter_spec(spec : String) -> @protocol.FilterSpec {
     @protocol.FilterSpec::BlobNone
   } else if spec.has_prefix("blob:limit=") {
     let limit_str = String::unsafe_substring(spec, start=11, end=spec.length())
-    let limit = @string.parse_int64(limit_str) catch { _ => 0L }
+    let limit = upload_pack_parse_int64(limit_str) catch { _ => 0L }
     @protocol.FilterSpec::BlobLimit(limit)
   } else if spec.has_prefix("tree:") {
     let depth_str = String::unsafe_substring(spec, start=5, end=spec.length())
-    let depth = @string.parse_int(depth_str) catch { _ => 0 }
+    let depth = upload_pack_parse_int(depth_str) catch { _ => 0 }
     @protocol.FilterSpec::TreeDepth(depth)
   } else {
     @protocol.FilterSpec::NoFilter

@@ -13,7 +13,7 @@ fn read_file_text(
   rel_path : String,
 ) -> String? {
   let path = root + "/" + rel_path
-  if !(fs.is_file(path)) {
+  if !fs.is_file(path) {
     return None
   }
   let content = fs.read_file(path) catch { _ => return None }
@@ -65,7 +65,7 @@ fn merge_index_and_worktree_diffs(
     merged[item.path] = item
   }
   for item in index_diffs {
-    if !(merged.contains(item.path)) {
+    if !merged.contains(item.path) {
       merged[item.path] = item
     }
   }
@@ -659,7 +659,7 @@ async fn handle_ai_commit(args : Array[String]) -> Unit raise Error {
     split_commits,
     user_instructions,
   ) = parse_ai_commit_options(args)
-  if !(generate_message) {
+  if !generate_message {
     handle_commit(commit_args)
     return
   }
@@ -688,7 +688,7 @@ async fn handle_ai_commit(args : Array[String]) -> Unit raise Error {
     provider=None,
   )
   let units = split_diff_units(diff_files)
-  if !(split_commits) || units.length() == 1 {
+  if !split_commits || units.length() == 1 {
     let message = @rebase_ai.ai_generate_commit_message(
       rfs,
       root,
@@ -717,7 +717,7 @@ async fn handle_ai_commit(args : Array[String]) -> Unit raise Error {
     let path_map : Map[String, Bool] = {}
     let unit_paths : Array[String] = []
     for file in unit.diffs {
-      if !(path_map.contains(file.path)) {
+      if !path_map.contains(file.path) {
         path_map[file.path] = true
         unit_paths.push(file.path)
       }
@@ -799,8 +799,8 @@ async fn handle_ai_merge(args : Array[String]) -> Unit raise Error {
     }
   }
   handle_merge(merge_args)
-  if !(merge_args_has(merge_args, "--continue")) &&
-    !(merge_args_has(merge_args, "--abort")) {
+  if !merge_args_has(merge_args, "--continue") &&
+    !merge_args_has(merge_args, "--abort") {
     let conflict_paths = @rebase_ai.find_conflict_marker_paths(rfs, root)
     if conflict_paths.length() > 0 {
       let resolved = @rebase_ai.ai_resolve_conflict_paths(
@@ -918,7 +918,7 @@ async fn handle_ai_cherry_pick(args : Array[String]) -> Unit raise Error {
   }
   let mut commit_ref : String? = None
   for arg in cherry_pick_args {
-    if !(arg.has_prefix("-")) {
+    if !arg.has_prefix("-") {
       commit_ref = Some(arg)
       break
     }

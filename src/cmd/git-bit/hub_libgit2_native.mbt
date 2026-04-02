@@ -29,7 +29,7 @@ fn hub_libgit2_available() -> Bool {
 
 ///|
 fn hub_git_repository_path(root : String) -> String? {
-  if !(hub_libgit2_available()) {
+  if !hub_libgit2_available() {
     return None
   }
   hub_libgit2_decode_nonempty(hub_libgit2_repo_path(str_to_bytes(root)))
@@ -37,7 +37,7 @@ fn hub_git_repository_path(root : String) -> String? {
 
 ///|
 fn hub_git_head_ref_name(root : String) -> String? {
-  if !(hub_libgit2_available()) {
+  if !hub_libgit2_available() {
     return None
   }
   hub_libgit2_decode_nonempty(hub_libgit2_head_name(str_to_bytes(root)))

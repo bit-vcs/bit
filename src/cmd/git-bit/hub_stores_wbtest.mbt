@@ -59,7 +59,7 @@ test "hub backend: resolve shared git dir follows commondir file" {
 
 ///|
 async test "hub backend: git backend resolves git dir and current branch" {
-  if !(can_use_hub_git_backend()) {
+  if !can_use_hub_git_backend() {
     return ()
   }
   let fs = OsFs::new()

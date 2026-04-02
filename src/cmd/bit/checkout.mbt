@@ -48,13 +48,13 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
     i += 1
   }
   let targets = if detach_head &&
-    !(saw_separator) &&
+    !saw_separator &&
     pre_separator_targets.length() == 0 {
     ["HEAD"]
   } else {
     pre_separator_targets
   }
-  if !(saw_separator) && targets.length() == 0 {
+  if !saw_separator && targets.length() == 0 {
     raise @bitcore.GitError::InvalidObject("No target specified for checkout")
   }
   ignore(quiet)
@@ -98,7 +98,7 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
         "refs/heads/" + branch_name,
       )
       is Some(_)
-    if branch_exists && !(force_create) {
+    if branch_exists && !force_create {
       raise @bitcore.GitError::InvalidObject(
         "branch '\{branch_name}' already exists",
       )
@@ -369,7 +369,7 @@ fn checkout_parse_tracking_source(
   }
   let remote = parts[0]
   let (remotes, _) = @bitlib.read_repo_config(rfs, git_dir)
-  if !(remotes.contains(remote)) {
+  if !remotes.contains(remote) {
     return None
   }
   let branch = String::unsafe_substring(
@@ -501,7 +501,7 @@ fn checkout_restore_paths_from_spec_mode(
     }
     let merged_entries : Array[@bitlib.IndexEntry] = []
     for entry in current_entries {
-      if !(selected_paths.contains(entry.path)) {
+      if !selected_paths.contains(entry.path) {
         merged_entries.push(entry)
       }
     }
@@ -518,7 +518,7 @@ fn checkout_resolve_common_git_dir(
   git_dir : String,
 ) -> String {
   let commondir_path = git_dir + "/commondir"
-  if !(fs.is_file(commondir_path)) {
+  if !fs.is_file(commondir_path) {
     return git_dir
   }
   let raw = decode_bytes(fs.read_file(commondir_path) catch { _ => b"" })
@@ -594,7 +594,7 @@ async fn checkout_with_promisor_retry(
         )
         if missing_ids.length() > 0 {
           ignore(pdb.fetch_missing(fs, missing_ids))
-          if !(wrote_trace_round) {
+          if !wrote_trace_round {
             append_checkout_fetch_trace(fs)
             wrote_trace_round = true
           }
@@ -627,7 +627,7 @@ async fn checkout_with_promisor_retry(
               Some(db) => db
               None => {
                 let db = @bitlibnative.native_promisor_db(fs, git_dir)
-                if !(db.has_promisor()) {
+                if !db.has_promisor() {
                   raise err
                 }
                 promisor_db = Some(db)
@@ -638,7 +638,7 @@ async fn checkout_with_promisor_retry(
             if fetched.length() == 0 {
               raise err
             }
-            if !(wrote_trace_round) {
+            if !wrote_trace_round {
               append_checkout_fetch_trace(fs)
               wrote_trace_round = true
             }
@@ -738,7 +738,7 @@ fn current_checkout_location(
     Some(target) if target.has_prefix("refs/") => return Some(target)
     _ => ()
   }
-  if !(fs.is_file(head_path)) {
+  if !fs.is_file(head_path) {
     return None
   }
   let head = trim_string(@utf8.decode_lossy(fs.read_file(head_path)[:]))
@@ -765,7 +765,7 @@ fn load_previous_checkout_location(
   git_dir : String,
 ) -> String? raise Error {
   let path = checkout_prev_location_path(git_dir)
-  if !(fs.is_file(path)) {
+  if !fs.is_file(path) {
     return None
   }
   let prev = trim_string(@utf8.decode_lossy(fs.read_file(path)[:]))

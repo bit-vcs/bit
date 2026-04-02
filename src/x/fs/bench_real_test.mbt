@@ -68,7 +68,7 @@ fn bench_git_dir_exists() -> Bool {
 ///|
 /// Simple test to verify real git reading works
 test "real_git: can read HEAD" {
-  if !(bench_git_dir_exists()) {
+  if !bench_git_dir_exists() {
     println("Skipping: bench git dir not found")
     return
   }
@@ -81,7 +81,7 @@ test "real_git: can read HEAD" {
 ///|
 /// Simple test to verify Fs from real git works
 test "real_git: can create Fs from HEAD" {
-  if !(bench_git_dir_exists()) {
+  if !bench_git_dir_exists() {
     println("Skipping: bench git dir not found")
     return
   }
@@ -95,7 +95,7 @@ test "real_git: can create Fs from HEAD" {
 ///|
 /// Test reading files from real git
 test "real_git: can read files" {
-  if !(bench_git_dir_exists()) {
+  if !bench_git_dir_exists() {
     println("Skipping: bench git dir not found")
     return
   }
@@ -116,7 +116,7 @@ let bench_real_git_dir : String = get_bench_git_dir()
 
 ///|
 fn with_real_commit(f : (@bit.ObjectId) -> Unit) -> Unit {
-  if !(bench_git_dir_exists()) {
+  if !bench_git_dir_exists() {
     println("Skipping: bench git dir not found")
     return
   }

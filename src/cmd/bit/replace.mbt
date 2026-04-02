@@ -80,7 +80,7 @@ async fn handle_replace(args : Array[String]) -> Unit raise Error {
         }
         continue
       }
-      _ if arg.has_prefix("-") && !(delete_mode) => {
+      _ if arg.has_prefix("-") && !delete_mode => {
         eprint_line("error: unknown option '\{arg}'")
         @sys.exit(129)
       }
@@ -135,14 +135,14 @@ async fn handle_replace(args : Array[String]) -> Unit raise Error {
     replace_list(rfs, git_dir, pattern, format)
     return
   }
-  if positional.length() == 2 && !(list_mode) {
+  if positional.length() == 2 && !list_mode {
     // Create mode: <object> <replacement>
     let object_ref = positional[0]
     let replacement_ref = positional[1]
     replace_create(rfs, wfs, git_dir, object_ref, replacement_ref, force)
     return
   }
-  if positional.length() == 1 && !(list_mode) {
+  if positional.length() == 1 && !list_mode {
     // With one argument and no subcommand flags, it's list with a pattern
     replace_list(rfs, git_dir, Some(positional[0]), format)
     return
@@ -175,17 +175,17 @@ async fn replace_list(
   format : String,
 ) -> Unit {
   let replace_dir = git_dir + "/refs/replace"
-  if !(fs.is_dir(replace_dir)) {
+  if !fs.is_dir(replace_dir) {
     return
   }
   let entries = fs.readdir(replace_dir) catch { _ => return }
   let oids : Array[String] = []
   for name in entries {
-    if name.length() != 40 || !(is_hex_string(name)) {
+    if name.length() != 40 || !is_hex_string(name) {
       continue
     }
     match pattern {
-      Some(pat) => if !(@ignore.match_glob(pat, name)) { continue }
+      Some(pat) => if !@ignore.match_glob(pat, name) { continue }
       None => ()
     }
     oids.push(name)
@@ -285,7 +285,7 @@ async fn replace_create(
   }
   let replace_dir = git_dir + "/refs/replace"
   let ref_path = replace_dir + "/" + object_id.to_hex()
-  if !(force) && fs.is_file(ref_path) {
+  if !force && fs.is_file(ref_path) {
     eprint_line(
       "error: replace ref 'refs/replace/\{object_id.to_hex()}' already exists",
     )
@@ -305,7 +305,7 @@ async fn replace_delete(
   let oid = replace_resolve_to_oid(fs, git_dir, ref_arg)
   let hex = oid.to_hex()
   let ref_path = git_dir + "/refs/replace/" + hex
-  if !(fs.is_file(ref_path)) {
+  if !fs.is_file(ref_path) {
     eprint_line("error: replace ref 'refs/replace/\{hex}' not found")
     @sys.exit(1)
   }
@@ -361,7 +361,7 @@ async fn replace_graft(
   // Create replace ref
   let replace_dir = git_dir + "/refs/replace"
   let ref_path = replace_dir + "/" + commit_id.to_hex()
-  if !(force) && fs.is_file(ref_path) {
+  if !force && fs.is_file(ref_path) {
     eprint_line(
       "error: replace ref 'refs/replace/\{commit_id.to_hex()}' already exists",
     )
@@ -392,7 +392,7 @@ fn replace_rebuild_commit(
     if in_header {
       if line == "\n" || line == "" {
         // End of header: if we haven't written parents yet, do so now
-        if !(wrote_parents) {
+        if !wrote_parents {
           for parent_id in new_parents {
             append_str("parent " + parent_id.to_hex() + "\n")
           }
@@ -411,7 +411,7 @@ fn replace_rebuild_commit(
       }
       if line.has_prefix("parent ") {
         // Skip original parent lines; we'll write new ones
-        if !(wrote_parents) && past_tree {
+        if !wrote_parents && past_tree {
           for parent_id in new_parents {
             append_str("parent " + parent_id.to_hex() + "\n")
           }
@@ -421,7 +421,7 @@ fn replace_rebuild_commit(
       }
       // Other header lines (author, committer, etc.)
       // If we haven't written parents yet and we're past tree, do it now
-      if !(wrote_parents) && past_tree {
+      if !wrote_parents && past_tree {
         for parent_id in new_parents {
           append_str("parent " + parent_id.to_hex() + "\n")
         }
@@ -464,7 +464,7 @@ async fn replace_convert_graft_file(
   force : Bool,
 ) -> Unit raise Error {
   let graft_path = git_dir + "/info/grafts"
-  if !(fs.is_file(graft_path)) {
+  if !fs.is_file(graft_path) {
     eprint_line("error: could not read graft file '\{graft_path}'")
     @sys.exit(1)
   }

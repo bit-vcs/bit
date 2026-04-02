@@ -50,7 +50,7 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
         i += 1
       }
       "--shared" =>
-        if i + 1 < args.length() && !(args[i + 1].has_prefix("-")) {
+        if i + 1 < args.length() && !args[i + 1].has_prefix("-") {
           shared_mode = Some(args[i + 1])
           i += 1
         } else {
@@ -102,7 +102,7 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
         object_format = Some(value)
         object_format_explicit = true
       }
-      _ if !(arg.has_prefix("-")) => target_dir = Some(arg)
+      _ if !arg.has_prefix("-") => target_dir = Some(arg)
       _ if arg.has_prefix("-") => warn_unimplemented_arg("init", arg)
       _ => ()
     }
@@ -110,7 +110,7 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
   }
   // Resolve ref format from env if not explicitly set via --ref-format
   let mut ref_format_from_env = false
-  if ref_format_env_deferred && !(ref_format_explicit) {
+  if ref_format_env_deferred && !ref_format_explicit {
     let env_ref_format = match @sys.get_env_var("GIT_DEFAULT_REF_FORMAT") {
       Some(value) => Some(value)
       None => @sys.get_env_var("GIT_TEST_DEFAULT_REF_FORMAT")
@@ -250,7 +250,7 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
         init_normalize_path(if d.has_prefix("/") { d } else { root + "/" + d }),
       )
     None =>
-      if use_bit && !(bare) && effective_git_dir is None {
+      if use_bit && !bare && effective_git_dir is None {
         Some(path + "/.bit")
       } else {
         None
@@ -295,7 +295,7 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
   // using --separate-git-dir, resolve and move the symlink target.
   // After this, the symlink becomes dangling and write_string will create
   // the target file through the dangling symlink (POSIX behavior).
-  if resolved_sep_git_dir is Some(sep_dir) && !(bare) {
+  if resolved_sep_git_dir is Some(sep_dir) && !bare {
     let dot_git = path + "/.git"
     let readlink_result = try? @process.collect_output(
       "readlink",
@@ -329,7 +329,7 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
   fn resolve_dot_git_to_common_dir(fs : OsFs, dot_git_path : String) -> String {
     let mut resolved = dot_git_path
     // Follow gitdir: pointer if it's a file
-    if !(fs.is_dir(resolved)) && fs.is_file(resolved) {
+    if !fs.is_dir(resolved) && fs.is_file(resolved) {
       let content = decode_bytes((try? fs.read_file(resolved)).unwrap_or(b""))
       let trimmed = content.trim_end(chars="\r\n").to_string()
       if trimmed.has_prefix("gitdir: ") {
@@ -370,9 +370,7 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
   // This handles the case where we're running from a linked worktree with
   // --separate-git-dir: actual_git_dir was set to sep_dir which doesn't exist,
   // so we need to find the existing git dir from path/.git instead.
-  if resolved_sep_git_dir is Some(sep_dir) &&
-    actual_git_dir == sep_dir &&
-    !(bare) {
+  if resolved_sep_git_dir is Some(sep_dir) && actual_git_dir == sep_dir && !bare {
     let dot_git = path + "/.git"
     let resolved_from_dot_git = resolve_dot_git_to_common_dir(fs, dot_git)
     if resolved_from_dot_git != dot_git {
@@ -498,7 +496,7 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
   }
   // Read init.defaultRefFormat from config, and feature.experimental fallback
   let mut ref_format_from_config = false
-  if !(ref_format_explicit) && ref_format == "files" {
+  if !ref_format_explicit && ref_format == "files" {
     let rfs3 : &@bitcore.RepoFileSystem = fs
     match find_global_gitconfig_path() {
       Some(config_path) => {
@@ -524,8 +522,8 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
           None => ()
         }
         // feature.experimental=true → default to reftable (only if no explicit env, flag, or config)
-        if !(ref_format_from_config) &&
-          !(ref_format_from_env) &&
+        if !ref_format_from_config &&
+          !ref_format_from_env &&
           ref_format == "files" {
           let fe_val = get_config_value(
             rfs3,
@@ -600,7 +598,7 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
   }
   // Determine work_tree for config
   let config_work_tree : String? = match work_tree_env {
-    Some(wt) if bit_dir_env is Some(_) && !(bare) =>
+    Some(wt) if bit_dir_env is Some(_) && !bare =>
       Some(if wt.has_prefix("/") { wt } else { root + "/" + wt })
     _ => None
   }
@@ -624,13 +622,13 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
   // to be moved first. Also create a gitdir file at the old common dir location.
   let mut pre_moved_common_dir = false
   let mut old_common_dir : String? = None
-  if resolved_sep_git_dir is Some(sep_dir) && is_reinit && !(bare) {
+  if resolved_sep_git_dir is Some(sep_dir) && is_reinit && !bare {
     // Check if actual_git_dir is not the default location for this path
     let default_git_dir = path + "/.git"
     // Only pre-move for linked worktrees (where actual_git_dir was resolved via commondir).
     // For simple gitdir redirects (no commondir), the library handles the move itself.
     let dot_git_for_premove = path + "/.git"
-    let has_commondir = if !(fs.is_dir(dot_git_for_premove)) &&
+    let has_commondir = if !fs.is_dir(dot_git_for_premove) &&
       fs.is_file(dot_git_for_premove) {
       // Follow gitdir: pointer to check for commondir
       let gf = decode_bytes(
@@ -738,7 +736,7 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
       }
     None => ()
   }
-  if ref_format == "reftable" && !(is_reinit) {
+  if ref_format == "reftable" && !is_reinit {
     bootstrap_reftable_head_table(fs, actual_git_dir, branch)
   }
   apply_init_shared_permissions(fs, actual_git_dir, shared_mode)
@@ -788,7 +786,7 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
               fs.write_string(wt_dot_git, "gitdir: " + wt_dir + "\n")
               // Also update the gitdir file in worktrees/<name>/
               // to have correct path from new location
-              if !(wt_path.has_prefix("/")) {
+              if !wt_path.has_prefix("/") {
                 // Was relative, recalculate from new location
                 let rel = compute_relative_path(wt_dir, wt_dot_git)
                 fs.write_string(gitdir_file, rel + "\n")
@@ -807,7 +805,7 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
     }
   }
   // Print appropriate message (unless quiet)
-  if !(quiet) {
+  if !quiet {
     let verb = if is_reinit {
       "Reinitialized existing"
     } else {
@@ -923,7 +921,7 @@ async fn bootstrap_reftable_head_table(
   branch : String,
 ) -> Unit {
   let reftable_dir = git_dir + "/reftable"
-  if !(fs.is_dir(reftable_dir)) {
+  if !fs.is_dir(reftable_dir) {
     return
   }
   for entry in fs.readdir(reftable_dir) {
@@ -1011,7 +1009,7 @@ fn init_normalize_path(p : String) -> String {
       ".." =>
         if result.length() > 0 && result[result.length() - 1] != ".." {
           let _ = result.pop()
-        } else if !(is_absolute) {
+        } else if !is_absolute {
           result.push("..")
         }
       _ => result.push(part.to_string())

@@ -175,7 +175,7 @@ fn find_subtree(
         break
       }
     }
-    if !(found) {
+    if !found {
       return None
     }
   }
@@ -310,7 +310,7 @@ fn read_remote_url_from_config(
   git_dir : String,
 ) -> String? {
   let config_path = git_dir + "/config"
-  if !(fs.is_file(config_path)) {
+  if !fs.is_file(config_path) {
     return None
   }
   let config_content = @string_utils.decode_bytes(

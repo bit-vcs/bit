@@ -43,7 +43,7 @@ pub fn bisect_get_candidates(
       continue
     }
     visited[hex] = true
-    if !(skip_set.contains(hex)) && cid != bad {
+    if !skip_set.contains(hex) && cid != bad {
       candidates.push(cid)
     }
     let obj = db.get(rfs, cid)

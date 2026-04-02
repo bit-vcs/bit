@@ -52,7 +52,7 @@ async fn handle_check_attr(args : Array[String]) -> Unit raise Error {
       if a == "--" {
         break
       }
-      if !(a.has_prefix("-")) {
+      if !a.has_prefix("-") {
         attrs.push(a)
       }
       j += 1
@@ -76,7 +76,7 @@ async fn handle_check_attr(args : Array[String]) -> Unit raise Error {
       }
     }
   }
-  if paths.length() == 0 && !(use_stdin) {
+  if paths.length() == 0 && !use_stdin {
     eprint_line(
       "usage: git check-attr [-a | --all | <attr>...] [--] <pathname>...",
     )
@@ -240,7 +240,7 @@ fn check_attr_resolve(
   for rule in rules {
     if check_attr_pattern_matches(normalized, rule.pattern) {
       for attr in rule.attrs {
-        if !(resolved.contains(attr.0)) {
+        if !resolved.contains(attr.0) {
           order.push(attr.0)
         }
         resolved[attr.0] = attr.1

@@ -13,12 +13,12 @@ pub fn stash_list(
   git_dir : String,
 ) -> Array[StashEntry] raise @bit.GitError {
   let stash_ref_path = git_dir + "/refs/stash"
-  if !(fs.is_file(stash_ref_path)) {
+  if !fs.is_file(stash_ref_path) {
     return []
   }
   // Read reflog for stash
   let reflog_path = git_dir + "/logs/refs/stash"
-  if !(fs.is_file(reflog_path)) {
+  if !fs.is_file(reflog_path) {
     // Just return the current stash
     let content = @utf8.decode_lossy(fs.read_file(stash_ref_path)[:])
     let hex = content.trim_end(chars="\n\r ").to_string()
@@ -271,7 +271,7 @@ fn stash_drop_at(
   }
   // Rebuild reflog without the entry
   let reflog_path = git_dir + "/logs/refs/stash"
-  if !(rfs.is_file(reflog_path)) {
+  if !rfs.is_file(reflog_path) {
     // Only one entry, just remove refs/stash
     let stash_ref = git_dir + "/refs/stash"
     fs.remove_file(stash_ref)

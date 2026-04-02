@@ -71,7 +71,7 @@ fn push_unique_search_type(
   types : Array[HubSearchType],
   t : HubSearchType,
 ) -> Unit {
-  if !(hub_search_has_type(types, t)) {
+  if !hub_search_has_type(types, t) {
     types.push(t)
   }
 }
@@ -125,7 +125,7 @@ fn parse_hub_search_types(value : String) -> Array[HubSearchType]? {
     if token.length() == 0 {
       continue
     }
-    if !(append_hub_search_types_by_token(out, token)) {
+    if !append_hub_search_types_by_token(out, token) {
       return None
     }
   }
@@ -172,7 +172,7 @@ fn parse_hub_search_options(
             "Unknown hub search type: \{value}",
           )
         }
-        if !(type_filter_set) {
+        if !type_filter_set {
           types = []
           type_filter_set = true
         }
@@ -194,7 +194,7 @@ fn parse_hub_search_options(
             "Unknown hub search type: \{value}",
           )
         }
-        if !(type_filter_set) {
+        if !type_filter_set {
           types = []
           type_filter_set = true
         }
@@ -350,7 +350,7 @@ fn matches_labels_filter(
     lower_labels.push(label.to_lower())
   }
   for required in required_labels {
-    if !(lower_labels.contains(required.to_lower())) {
+    if !lower_labels.contains(required.to_lower()) {
       return false
     }
   }
@@ -454,10 +454,10 @@ async fn handle_hub_search(args : Array[String]) -> Unit raise Error {
       if search_limit_reached(options.limit, results.length()) {
         break
       }
-      if !(matches_pr_state_filter(options.state, pr.state())) {
+      if !matches_pr_state_filter(options.state, pr.state()) {
         continue
       }
-      if !(matches_labels_filter(options.labels, pr.labels())) {
+      if !matches_labels_filter(options.labels, pr.labels()) {
         continue
       }
       if include_pr &&
@@ -477,7 +477,7 @@ async fn handle_hub_search(args : Array[String]) -> Unit raise Error {
           if search_limit_reached(options.limit, results.length()) {
             break
           }
-          if !(matches_author_filter(options.author, comment.author())) {
+          if !matches_author_filter(options.author, comment.author()) {
             continue
           }
           if matches_query_filter(options.query, [
@@ -498,7 +498,7 @@ async fn handle_hub_search(args : Array[String]) -> Unit raise Error {
           if search_limit_reached(options.limit, results.length()) {
             break
           }
-          if !(matches_author_filter(options.author, review.author())) {
+          if !matches_author_filter(options.author, review.author()) {
             continue
           }
           if matches_query_filter(options.query, [
@@ -523,10 +523,10 @@ async fn handle_hub_search(args : Array[String]) -> Unit raise Error {
       if search_limit_reached(options.limit, results.length()) {
         break
       }
-      if !(matches_issue_state_filter(options.state, issue.state())) {
+      if !matches_issue_state_filter(options.state, issue.state()) {
         continue
       }
-      if !(matches_labels_filter(options.labels, issue.labels())) {
+      if !matches_labels_filter(options.labels, issue.labels()) {
         continue
       }
       if include_issue &&
@@ -550,7 +550,7 @@ async fn handle_hub_search(args : Array[String]) -> Unit raise Error {
           if search_limit_reached(options.limit, results.length()) {
             break
           }
-          if !(matches_author_filter(options.author, comment.author())) {
+          if !matches_author_filter(options.author, comment.author()) {
             continue
           }
           if matches_query_filter(options.query, [
@@ -633,10 +633,10 @@ async fn handle_hub_search_with_defaults(
       if search_limit_reached(options.limit, results.length()) {
         break
       }
-      if !(matches_pr_state_filter(options.state, pr.state())) {
+      if !matches_pr_state_filter(options.state, pr.state()) {
         continue
       }
-      if !(matches_labels_filter(options.labels, pr.labels())) {
+      if !matches_labels_filter(options.labels, pr.labels()) {
         continue
       }
       if include_pr &&
@@ -656,7 +656,7 @@ async fn handle_hub_search_with_defaults(
           if search_limit_reached(options.limit, results.length()) {
             break
           }
-          if !(matches_author_filter(options.author, comment.author())) {
+          if !matches_author_filter(options.author, comment.author()) {
             continue
           }
           if matches_query_filter(options.query, [
@@ -677,7 +677,7 @@ async fn handle_hub_search_with_defaults(
           if search_limit_reached(options.limit, results.length()) {
             break
           }
-          if !(matches_author_filter(options.author, review.author())) {
+          if !matches_author_filter(options.author, review.author()) {
             continue
           }
           if matches_query_filter(options.query, [
@@ -702,10 +702,10 @@ async fn handle_hub_search_with_defaults(
       if search_limit_reached(options.limit, results.length()) {
         break
       }
-      if !(matches_issue_state_filter(options.state, issue.state())) {
+      if !matches_issue_state_filter(options.state, issue.state()) {
         continue
       }
-      if !(matches_labels_filter(options.labels, issue.labels())) {
+      if !matches_labels_filter(options.labels, issue.labels()) {
         continue
       }
       if include_issue &&
@@ -729,7 +729,7 @@ async fn handle_hub_search_with_defaults(
           if search_limit_reached(options.limit, results.length()) {
             break
           }
-          if !(matches_author_filter(options.author, comment.author())) {
+          if !matches_author_filter(options.author, comment.author()) {
             continue
           }
           if matches_query_filter(options.query, [

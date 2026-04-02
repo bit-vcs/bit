@@ -26,7 +26,7 @@ fn bench_log_cleanup_tree(fs : OsFs, path : String) -> Unit {
     }
     return
   }
-  if !(fs.is_dir(path)) {
+  if !fs.is_dir(path) {
     return
   }
   let entries = fs.readdir(path) catch { _ => [] }

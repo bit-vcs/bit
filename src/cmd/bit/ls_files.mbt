@@ -122,7 +122,7 @@ async fn handle_ls_files(args : Array[String]) -> Unit raise Error {
     }
     for item in stage_entries {
       if item.stage == 0 ||
-        !(ls_files_matches_filters(item.entry.path, path_filters)) {
+        !ls_files_matches_filters(item.entry.path, path_filters) {
         continue
       }
       let mode = format_mode(item.entry.mode)
@@ -152,7 +152,7 @@ async fn handle_ls_files(args : Array[String]) -> Unit raise Error {
     let db = @bitlib.ObjectDb::load_lazy(fs, git_dir)
     // Tracked entries (cached or deleted)
     for e in entries {
-      if !(ls_files_matches_filters(e.path, path_filters)) {
+      if !ls_files_matches_filters(e.path, path_filters) {
         continue
       }
       let abs = root + "/" + e.path
@@ -162,9 +162,10 @@ async fn handle_ls_files(args : Array[String]) -> Unit raise Error {
         continue
       }
       // Default (cached): skip deleted unless show_deleted
-      if !(show_deleted) && !(file_exists) && !(show_others) {
-        // still show in default cached mode
+      if !show_deleted && !file_exists && !show_others {
+
       }
+      // still show in default cached mode
       // Detect index EOL from blob content
       let i_eol = match db.get(fs, e.id) {
         Some(obj) if obj.obj_type == @bitcore.ObjectType::Blob =>
@@ -197,7 +198,7 @@ async fn handle_ls_files(args : Array[String]) -> Unit raise Error {
         if tracked.contains(path) {
           continue
         }
-        if !(ls_files_matches_filters(path, path_filters)) {
+        if !ls_files_matches_filters(path, path_filters) {
           continue
         }
         let abs = root + "/" + path
@@ -217,13 +218,13 @@ async fn handle_ls_files(args : Array[String]) -> Unit raise Error {
     }
     return ()
   }
-  if show_ignored && !(show_others) {
+  if show_ignored && !show_others {
     let entry_map : Map[String, @bitlib.IndexEntry] = {}
     for entry in entries {
       entry_map[entry.path] = entry
     }
     for entry in entries {
-      if !(ls_files_matches_filters(entry.path, path_filters)) {
+      if !ls_files_matches_filters(entry.path, path_filters) {
         continue
       }
       if ls_files_cached_entry_is_ignored(
@@ -286,7 +287,7 @@ async fn handle_ls_files(args : Array[String]) -> Unit raise Error {
         filter,
       ) {
         let (_raw, is_exclude, _is_icase) = parse_pathspec_magic(filter)
-        !(is_exclude) &&
+        !is_exclude &&
         ls_files_filter_has_wildcard(filter) &&
         ls_files_filter_prefers_file_output(filter)
       })
@@ -302,8 +303,8 @@ async fn handle_ls_files(args : Array[String]) -> Unit raise Error {
       let explicit_file_filters : Map[String, Bool] = {}
       for filter in path_filters {
         let (_raw, is_exclude, _is_icase) = parse_pathspec_magic(filter)
-        if !(is_exclude) &&
-          !(ls_files_filter_has_wildcard(filter)) &&
+        if !is_exclude &&
+          !ls_files_filter_has_wildcard(filter) &&
           untracked_file_set.contains(filter) {
           explicit_file_filters[filter] = true
         }
@@ -334,13 +335,13 @@ async fn handle_ls_files(args : Array[String]) -> Unit raise Error {
         }
         if should_output {
           if no_empty_directory &&
-            !(ls_files_has_matching_file(dir, all_files, untracked_file_set)) {
+            !ls_files_has_matching_file(dir, all_files, untracked_file_set) {
             continue
           }
           if ls_files_is_within_untracked_dir(dir, compress_dirs) {
             continue
           }
-          if !(output_set.contains(out_path)) {
+          if !output_set.contains(out_path) {
             output_set[out_path] = true
             outputs.push(out_path)
             compress_dirs.push(dir)
@@ -349,14 +350,14 @@ async fn handle_ls_files(args : Array[String]) -> Unit raise Error {
       }
       if path_filters.length() == 0 {
         for file in all_files {
-          if !(untracked_file_set.contains(file)) {
+          if !untracked_file_set.contains(file) {
             continue
           }
-          if !(disable_directory_compression) &&
+          if !disable_directory_compression &&
             ls_files_is_within_untracked_dir(file, compress_dirs) {
             continue
           }
-          if !(output_set.contains(file)) {
+          if !output_set.contains(file) {
             output_set[file] = true
             outputs.push(file)
           }
@@ -364,11 +365,11 @@ async fn handle_ls_files(args : Array[String]) -> Unit raise Error {
       } else if explicit_file_filters.length() > 0 ||
         wildcard_file_filters.length() > 0 {
         for file in all_files {
-          if !(untracked_file_set.contains(file)) {
+          if !untracked_file_set.contains(file) {
             continue
           }
           if explicit_file_filters.contains(file) {
-            if !(output_set.contains(file)) {
+            if !output_set.contains(file) {
               output_set[file] = true
               outputs.push(file)
             }
@@ -376,7 +377,7 @@ async fn handle_ls_files(args : Array[String]) -> Unit raise Error {
           }
           for filter in wildcard_file_filters {
             if ls_files_pathspec_matches(file, filter) {
-              if !(output_set.contains(file)) {
+              if !output_set.contains(file) {
                 output_set[file] = true
                 outputs.push(file)
               }
@@ -428,7 +429,7 @@ async fn handle_ls_files(args : Array[String]) -> Unit raise Error {
       let modified_paths = ls_files_collect_modified_paths(fs, root, entries)
       for path in modified_paths {
         if ls_files_matches_filters(path, path_filters) &&
-          !(output_set.contains(path)) {
+          !output_set.contains(path) {
           output_set[path] = true
           outputs.push(path)
         }
@@ -438,7 +439,7 @@ async fn handle_ls_files(args : Array[String]) -> Unit raise Error {
       let killed_paths = ls_files_collect_killed_paths(fs, root, entries)
       for path in killed_paths {
         if ls_files_matches_filters(path, path_filters) &&
-          !(output_set.contains(path)) {
+          !output_set.contains(path) {
           output_set[path] = true
           outputs.push(path)
         }
@@ -462,7 +463,7 @@ async fn handle_ls_files(args : Array[String]) -> Unit raise Error {
     // Show deleted files (in index but not in worktree)
     for e in entries {
       let abs = root + "/" + e.path
-      if !(fs.is_file(abs)) && ls_files_matches_filters(e.path, path_filters) {
+      if !fs.is_file(abs) && ls_files_matches_filters(e.path, path_filters) {
         print_str(make_display_path(e.path, cwd_prefix) + terminator)
       }
     }
@@ -485,7 +486,7 @@ async fn handle_ls_files(args : Array[String]) -> Unit raise Error {
     // Use stage entries to show actual stage numbers (0, 1, 2, 3)
     let stage_entries = @bitlib.read_index_stage_entries(fs, git_dir)
     for item in stage_entries {
-      if !(ls_files_matches_filters(item.entry.path, path_filters)) {
+      if !ls_files_matches_filters(item.entry.path, path_filters) {
         continue
       }
       let mode = format_mode(item.entry.mode)
@@ -505,7 +506,7 @@ async fn handle_ls_files(args : Array[String]) -> Unit raise Error {
     }
   } else {
     for entry in tracked_entries {
-      if !(ls_files_matches_filters(entry.path, path_filters)) {
+      if !ls_files_matches_filters(entry.path, path_filters) {
         continue
       }
       print_str(make_display_path(entry.path, cwd_prefix) + terminator)
@@ -576,7 +577,7 @@ async fn ls_files_collect_killed_paths(
         None => break
       }
     }
-    if !(obstructs) {
+    if !obstructs {
       let prefix = path + "/"
       for tracked_path in tracked_paths {
         if tracked_path.has_prefix(prefix) {
@@ -585,7 +586,7 @@ async fn ls_files_collect_killed_paths(
         }
       }
     }
-    if obstructs && !(killed_set.contains(path)) {
+    if obstructs && !killed_set.contains(path) {
       killed_set[path] = true
       killed.push(path)
     }
@@ -603,7 +604,7 @@ async fn ls_files_collect_modified_paths(
   let modified_set : Map[String, Bool] = {}
   let diffs = @bitdiff.diff_worktree(fs, root)
   for diff in diffs {
-    if !(modified_set.contains(diff.path)) {
+    if !modified_set.contains(diff.path) {
       modified_set[diff.path] = true
       modified.push(diff.path)
     }
@@ -613,13 +614,13 @@ async fn ls_files_collect_modified_paths(
       continue
     }
     let sub_git_dir = root + "/" + entry.path + "/.git"
-    if !(fs.is_dir(sub_git_dir)) && !(fs.is_file(sub_git_dir)) {
+    if !fs.is_dir(sub_git_dir) && !fs.is_file(sub_git_dir) {
       continue
     }
     let actual_git_dir = @bitlib.resolve_gitdir(fs, sub_git_dir)
     match @bitlib.resolve_head_commit(fs, actual_git_dir) {
       Some(head) =>
-        if head != entry.id && !(modified_set.contains(entry.path)) {
+        if head != entry.id && !modified_set.contains(entry.path) {
           modified_set[entry.path] = true
           modified.push(entry.path)
         }
@@ -767,7 +768,7 @@ fn ls_files_collect_cached_entries(
   } else {
     @bitlib.expand_sparse_index_entries(fs, git_dir, raw_entries)
   }
-  if !(recurse_submodules) {
+  if !recurse_submodules {
     return entries.map(fn(entry) { { path: prefix + entry.path } })
   }
   let submodules = parse_gitmodules(fs, root)
@@ -779,13 +780,13 @@ fn ls_files_collect_cached_entries(
     }
     match ls_files_find_submodule_by_path(submodules, entry.path) {
       Some(submodule) => {
-        if !(ls_files_submodule_is_active(fs, git_dir, submodule.name)) {
+        if !ls_files_submodule_is_active(fs, git_dir, submodule.name) {
           out.push({ path: prefix + entry.path })
           continue
         }
         let sub_root = root + "/" + submodule.path
         let sub_git_marker = sub_root + "/.git"
-        if !(fs.is_dir(sub_git_marker)) && !(fs.is_file(sub_git_marker)) {
+        if !fs.is_dir(sub_git_marker) && !fs.is_file(sub_git_marker) {
           out.push({ path: prefix + entry.path })
           continue
         }
@@ -888,7 +889,7 @@ fn parse_gitmodules(
   root : String,
 ) -> Array[SubmoduleInfo] {
   let gitmodules_path = root + "/.gitmodules"
-  if !(fs.is_file(gitmodules_path)) {
+  if !fs.is_file(gitmodules_path) {
     return []
   }
   let content = decode_bytes(fs.read_file(gitmodules_path)) catch {
@@ -1126,14 +1127,12 @@ fn ls_files_matches_filters(path : String, filters : Array[String]) -> Bool {
     .iter()
     .any(fn(filter) { ls_files_pathspec_matches(normalized, filter) })
   }
-  if !(included) {
+  if !included {
     return false
   }
-  !(
-    exclude_filters
-    .iter()
-    .any(fn(filter) { ls_files_pathspec_matches(normalized, filter) }),
-  )
+  !exclude_filters
+  .iter()
+  .any(fn(filter) { ls_files_pathspec_matches(normalized, filter) })
 }
 
 ///|
@@ -1207,7 +1206,7 @@ fn ls_files_collect_unmatched_raw_filters(
     )
     let include_filters = normalized_filters.filter(fn(filter) {
       let (_raw, is_exclude, _is_icase) = parse_pathspec_magic(filter)
-      !(is_exclude)
+      !is_exclude
     })
     let matched = if include_filters.length() == 0 {
       candidate_paths.length() > 0
@@ -1220,7 +1219,7 @@ fn ls_files_collect_unmatched_raw_filters(
         .any(fn(path) { ls_files_pathspec_matches(path, filter) })
       })
     }
-    if !(matched) {
+    if !matched {
       unmatched.push(raw)
     }
   }
@@ -1344,7 +1343,7 @@ fn ls_files_collect_other_paths(
   }
   match exclude_per_directory {
     Some(name) =>
-      if !(per_directory_files.contains(name)) {
+      if !per_directory_files.contains(name) {
         per_directory_files.push(name)
       }
     None => ()
@@ -1468,7 +1467,7 @@ fn ls_files_cached_entry_is_ignored(
   }
   match exclude_per_directory {
     Some(name) =>
-      if !(per_directory_files.contains(name)) {
+      if !per_directory_files.contains(name) {
         per_directory_files.push(name)
       }
     None => ()
@@ -1560,7 +1559,7 @@ fn ls_files_walk_other_files(
     let is_dir = fs.is_dir(child_path)
     let ignored = matcher.is_ignored(child_rel, is_dir)
     if is_dir {
-      if !(dirs_out.contains(child_rel)) {
+      if !dirs_out.contains(child_rel) {
         dirs_out.push(child_rel)
       }
       if ignored {
@@ -1585,7 +1584,7 @@ fn ls_files_walk_other_files(
       if ignored {
         files_out.push(child_rel)
       }
-    } else if !(ignored) {
+    } else if !ignored {
       files_out.push(child_rel)
     }
   }
@@ -1616,7 +1615,7 @@ fn ls_files_collect_candidate_dirs(
     }
   }
   for dir in explicit_dirs {
-    if !(tracked_dirs.contains(dir)) {
+    if !tracked_dirs.contains(dir) {
       seen[dir] = true
     }
   }

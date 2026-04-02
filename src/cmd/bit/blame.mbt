@@ -45,7 +45,7 @@ fn blame_builtin_supports_args(
   root : String,
   args : Array[String],
 ) -> Bool {
-  if !(fs.is_dir(root + "/.git")) {
+  if !fs.is_dir(root + "/.git") {
     return false
   }
   let mut saw_double_dash = false
@@ -100,7 +100,7 @@ fn blame_extract_target_path(
       }
       "-L" if i + 1 < args.length() => i += 2
       _ if arg.has_prefix("-L") => i += 1
-      _ if !(arg.has_prefix("-")) => {
+      _ if !arg.has_prefix("-") => {
         if file_path is None {
           let test_path = root + "/" + arg
           if fs.is_file(test_path) {
@@ -129,7 +129,7 @@ fn blame_read_path_diff_driver(
     path
   }
   let attr_path = root + "/.gitattributes"
-  if !(fs.is_file(attr_path)) {
+  if !fs.is_file(attr_path) {
     return None
   }
   let text = decode_bytes(
@@ -236,7 +236,7 @@ fn blame_repo_requires_real_git(
   git_dir : String,
   args : Array[String],
 ) -> Bool {
-  if !(blame_builtin_supports_args(fs, root, args)) {
+  if !blame_builtin_supports_args(fs, root, args) {
     return true
   }
   if blame_repo_prefers_real_git(fs, git_dir) {
@@ -319,7 +319,7 @@ async fn handle_blame(args : Array[String]) -> Unit raise Error {
         saw_double_dash = true
         i += 1
       }
-      _ if saw_double_dash || !(arg.has_prefix("-")) => {
+      _ if saw_double_dash || !arg.has_prefix("-") => {
         positionals.push(arg)
         i += 1
       }
@@ -776,7 +776,7 @@ fn normalize_whitespace(s : String) -> String {
   let mut in_space = true // Start true to trim leading spaces
   for c in s {
     if c == ' ' || c == '\t' {
-      if !(in_space) {
+      if !in_space {
         result.write_char(' ')
         in_space = true
       }
@@ -922,7 +922,7 @@ async fn output_blame_incremental(lines : Array[BlameLine]) -> Unit raise Error 
     let sha = line.commit_id.to_hex()
     print_line("\{sha} \{line.line_no} \{line.line_no} 1")
     // Only output full header for first occurrence of each commit
-    if !(seen_commits.get(sha).unwrap_or(false)) {
+    if !seen_commits.get(sha).unwrap_or(false) {
       seen_commits[sha] = true
       print_line("author \{line.author}")
       print_line("author-time \{line.author_time}")

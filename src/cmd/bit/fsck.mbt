@@ -52,11 +52,11 @@ async fn handle_fsck(args : Array[String]) -> Unit raise Error {
   let (head_errors, head_oid) = fsck_check_and_resolve_head(fs, git_dir)
   errors += head_errors
   // Phase 2: Verify loose objects (hash check)
-  if !(connectivity_only) {
+  if !connectivity_only {
     errors += fsck_verify_loose_objects(fs, objects_dir)
   }
   // Phase 3: Verify pack files
-  if !(connectivity_only) {
+  if !connectivity_only {
     errors += fsck_verify_packs(fs, objects_dir)
   }
   // Phase 4: Connectivity check via pure lib function
@@ -69,7 +69,7 @@ async fn handle_fsck(args : Array[String]) -> Unit raise Error {
     Some(id) => ref_tips.push(id)
     None => ()
   }
-  if !(no_reflogs) {
+  if !no_reflogs {
     fsck_collect_reflog_tips(fs, git_dir, ref_tips)
   }
   let need_extra = show_root || show_tags
@@ -89,7 +89,7 @@ async fn handle_fsck(args : Array[String]) -> Unit raise Error {
   if need_all {
     let all_objects = @bitlib.fsck_enumerate_objects(db)
     for hex in all_objects {
-      if !(result.reachable.contains(hex)) {
+      if !result.reachable.contains(hex) {
         let obj_type = @bitlib.fsck_object_type(db, fs, hex)
         if show_unreachable {
           eprint_line("unreachable \{obj_type} \{hex}")
@@ -127,7 +127,7 @@ async fn fsck_check_and_resolve_head(
   git_dir : String,
 ) -> (Int, @bitcore.ObjectId?) {
   let head_path = git_dir + "/HEAD"
-  if !(fs.is_file(head_path)) {
+  if !fs.is_file(head_path) {
     eprint_line("error: HEAD is missing")
     return (1, None)
   }
@@ -148,7 +148,7 @@ async fn fsck_check_and_resolve_head(
       start=5,
       end=trimmed.length(),
     )
-    if !(refname.has_prefix("refs/heads/")) {
+    if !refname.has_prefix("refs/heads/") {
       eprint_line("warning: HEAD points to non-branch '\{refname}'")
     }
     let resolved = fsck_resolve_ref(fs, git_dir, refname)
@@ -187,7 +187,7 @@ fn fsck_resolve_ref(
     return Some(id)
   }
   let packed_path = git_dir + "/packed-refs"
-  if !(fs.is_file(packed_path)) {
+  if !fs.is_file(packed_path) {
     return None
   }
   let packed = @utf8.decode_lossy(fs.read_file(packed_path)[:]) catch {
@@ -219,7 +219,7 @@ fn fsck_resolve_ref(
 ///|
 async fn fsck_verify_loose_objects(fs : OsFs, objects_dir : String) -> Int {
   let mut errors = 0
-  if !(fs.is_dir(objects_dir)) {
+  if !fs.is_dir(objects_dir) {
     return 0
   }
   let entries = fs.readdir(objects_dir) catch { _ => return 0 }
@@ -228,7 +228,7 @@ async fn fsck_verify_loose_objects(fs : OsFs, objects_dir : String) -> Int {
       continue
     }
     let subdir = objects_dir + "/" + entry
-    if !(fs.is_dir(subdir)) {
+    if !fs.is_dir(subdir) {
       continue
     }
     let files = fs.readdir(subdir) catch { _ => continue }
@@ -252,7 +252,7 @@ async fn fsck_verify_loose_objects(fs : OsFs, objects_dir : String) -> Int {
           continue
         }
       }
-      if !(@bitlib.fsck_verify_loose_hash(raw, hex)) {
+      if !@bitlib.fsck_verify_loose_hash(raw, hex) {
         eprint_line("error: hash mismatch for \{hex}")
         errors += 1
       }
@@ -265,17 +265,17 @@ async fn fsck_verify_loose_objects(fs : OsFs, objects_dir : String) -> Int {
 async fn fsck_verify_packs(fs : OsFs, objects_dir : String) -> Int {
   let mut errors = 0
   let pack_dir = objects_dir + "/pack"
-  if !(fs.is_dir(pack_dir)) {
+  if !fs.is_dir(pack_dir) {
     return 0
   }
   let entries = fs.readdir(pack_dir) catch { _ => return 0 }
   for entry in entries {
-    if !(entry.has_suffix(".idx")) {
+    if !entry.has_suffix(".idx") {
       continue
     }
     let stem = String::unsafe_substring(entry, start=0, end=entry.length() - 4)
     let pack_file = pack_dir + "/" + stem + ".pack"
-    if !(fs.is_file(pack_file)) {
+    if !fs.is_file(pack_file) {
       eprint_line("error: pack index \{entry} has no corresponding pack file")
       errors += 1
     }
@@ -290,7 +290,7 @@ fn fsck_collect_reflog_tips(
   tips : Array[@bitcore.ObjectId],
 ) -> Unit {
   let logs_dir = git_dir + "/logs"
-  if !(fs.is_dir(logs_dir)) {
+  if !fs.is_dir(logs_dir) {
     return
   }
   fsck_collect_reflog_tips_dir(fs, git_dir, logs_dir, tips)

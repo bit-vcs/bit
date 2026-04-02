@@ -162,7 +162,7 @@ pub fn Matcher::is_ignored(
   let mut ignored = false
   for rule in self.rules {
     if rule_applies(rule, rel_path, is_dir) {
-      ignored = !(rule.negated)
+      ignored = !rule.negated
     }
   }
   ignored
@@ -203,11 +203,11 @@ pub fn Matcher::could_negate_under(self : Matcher, dir_rel : String) -> Bool {
     return false
   }
   for rule in self.rules {
-    if !(rule.negated) {
+    if !rule.negated {
       continue
     }
     // Non-path-specific rules (no slash, not anchored) could match anywhere
-    if !(rule.has_slash) && !(rule.anchored) {
+    if !rule.has_slash && !rule.anchored {
       return true
     }
     // Path-specific rule: compute target path and check prefix overlap
