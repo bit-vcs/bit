@@ -73,7 +73,7 @@ async fn handle_verify_commit(args : Array[String]) -> Unit raise Error {
                 continue
               }
             }
-            if not(verified) {
+            if !verified {
               had_error = true
             }
           }

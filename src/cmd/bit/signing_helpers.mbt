@@ -213,7 +213,7 @@ fn signing_join_signature_lines(lines : Array[String]) -> String {
     return ""
   }
   let mut out = lines.join("\n")
-  if not(out.has_suffix("\n")) {
+  if !out.has_suffix("\n") {
     out = out + "\n"
   }
   out
