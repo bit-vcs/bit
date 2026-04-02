@@ -83,7 +83,7 @@ pub fn TestFs::remove_dir(
   self : TestFs,
   path : String,
 ) -> Unit raise @types.GitError {
-  if !(self.dirs.contains(path)) {
+  if !self.dirs.contains(path) {
     raise @types.GitError::IoError("Directory not found: \{path}")
   }
   // Check if directory is empty
@@ -99,7 +99,7 @@ pub fn TestFs::readdir(
   self : TestFs,
   path : String,
 ) -> Array[String] raise @types.GitError {
-  if !(self.dirs.contains(path)) {
+  if !self.dirs.contains(path) {
     raise @types.GitError::IoError("Directory not found: \{path}")
   }
   let entries : Map[String, Bool] = {}

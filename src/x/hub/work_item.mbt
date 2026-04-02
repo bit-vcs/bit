@@ -26,7 +26,7 @@ pub fn Hub::get_work_item(
   match record {
     None => None
     Some(r) => {
-      if !(is_work_item_record_kind(r.kind)) {
+      if !is_work_item_record_kind(r.kind) {
         return None
       }
       let result : Result[WorkItem, PrError] = try? parse_work_item(r.payload)
@@ -48,20 +48,20 @@ pub fn Hub::list_work_items(
   let result : Array[WorkItem] = []
   let records = self.store.list_records(objects, work_item_meta_prefix())
   for record in records {
-    if !(record.key.has_suffix("/meta")) {
+    if !record.key.has_suffix("/meta") {
       continue
     }
-    if !(is_work_item_record_kind(record.kind)) {
+    if !is_work_item_record_kind(record.kind) {
       continue
     }
     let parsed : Result[WorkItem, PrError] = try? parse_work_item(
       record.payload,
     )
     guard parsed is Ok(item) else { continue }
-    if !(include_kind(item.kind(), kind)) {
+    if !include_kind(item.kind(), kind) {
       continue
     }
-    if !(include_state(item.state(), state)) {
+    if !include_state(item.state(), state) {
       continue
     }
     result.push(item)

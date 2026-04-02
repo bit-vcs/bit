@@ -98,35 +98,6 @@ pub async fn discover_upload_refs_with_http(
 }
 
 ///|
-fn parse_symrefs_from_capabilities(caps : Array[String]) -> Map[String, String] {
-  let symrefs : Map[String, String] = {}
-  for cap in caps {
-    if cap.has_prefix("symref=") {
-      let raw = String::unsafe_substring(cap, start=7, end=cap.length())
-      match raw.find(":") {
-        None => ()
-        Some(idx) => {
-          let source = String::unsafe_substring(raw, start=0, end=idx)
-          let target = String::unsafe_substring(
-            raw,
-            start=idx + 1,
-            end=raw.length(),
-          )
-          symrefs[source] = target
-        }
-      }
-      continue
-    }
-    if cap.has_prefix("symref-target:") {
-      let target = String::unsafe_substring(cap, start=14, end=cap.length())
-      symrefs["HEAD"] = target
-      continue
-    }
-  }
-  symrefs
-}
-
-///|
 fn normalize_remote_for_http_transport(
   remote : String,
 ) -> String raise @bit.GitError {
@@ -346,7 +317,7 @@ fn write_pack_promisor_marker_http(
   match default_ref {
     Some((_, head_id)) => {
       let head_line = head_id.to_hex() + " HEAD"
-      if not(seen.contains(head_line)) {
+      if !seen.contains(head_line) {
         seen[head_line] = true
         marker_lines.push(head_line)
       }

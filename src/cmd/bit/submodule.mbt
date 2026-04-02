@@ -202,7 +202,7 @@ fn submodule_url_is_local_not_ssh(url : String) -> Bool {
     return false
   }
   match url.find(":") {
-    Some(colon_idx) if !(url.has_prefix("/")) =>
+    Some(colon_idx) if !url.has_prefix("/") =>
       match url.find("/") {
         Some(slash_idx) => colon_idx > slash_idx
         None => false
@@ -238,7 +238,7 @@ fn submodule_resolve_relative_url(
   url : String,
   up_path : String?,
 ) -> String {
-  if !(submodule_relative_local_url(url)) {
+  if !submodule_relative_local_url(url) {
     return url
   }
   let mut remote_url = remote_url
@@ -250,10 +250,9 @@ fn submodule_resolve_relative_url(
     )
   }
   let mut is_relative = false
-  if submodule_url_is_local_not_ssh(remote_url) &&
-    !(remote_url.has_prefix("/")) {
+  if submodule_url_is_local_not_ssh(remote_url) && !remote_url.has_prefix("/") {
     is_relative = true
-    if !(remote_url.has_prefix("./")) && !(remote_url.has_prefix("../")) {
+    if !remote_url.has_prefix("./") && !remote_url.has_prefix("../") {
       remote_url = "./" + remote_url
     }
   }
@@ -322,7 +321,7 @@ fn resolve_submodule_config_url(
 
 ///|
 fn submodule_expand_template_dir(path : String) -> String {
-  if !(path.has_prefix("~/")) {
+  if !path.has_prefix("~/") {
     return path
   }
   match @sys.get_env_var("HOME") {
@@ -377,7 +376,7 @@ async fn submodule_apply_template_exec_bits(
       submodule_apply_template_exec_bits(fs, src_path, dst_path)
       continue
     }
-    if !(fs.is_file(src_path)) || !(fs.is_file(dst_path)) {
+    if !fs.is_file(src_path) || !fs.is_file(dst_path) {
       continue
     }
     match @bitio.lstat_entry_meta(src_path) {
@@ -615,7 +614,7 @@ fn submodule_add_existing_index_error(
       return Some("fatal: '\{path}' already exists in the index")
     }
   }
-  if has_gitlink && !(force) {
+  if has_gitlink && !force {
     return Some("fatal: '\{path}' already exists in the index")
   }
   None
@@ -767,7 +766,7 @@ async fn handle_submodule_add(
     eprint_line("fatal: Unable to create '\{index_lock}': File exists.")
     @sys.exit(128)
   }
-  if !(force) && add_has_explicit_ignored_path(rfs, root, [path]) {
+  if !force && add_has_explicit_ignored_path(rfs, root, [path]) {
     for line in submodule_add_ignored_error_lines(path) {
       eprint_line(line)
     }
@@ -802,12 +801,12 @@ async fn handle_submodule_add(
   }
   match submodule_add_reserved_name_path(rfs, root, git_dir, name) {
     Some(existing_path) =>
-      if !(force) {
+      if !force {
         eprint_line(submodule_add_name_in_use_error(name, existing_path))
         @sys.exit(128)
       }
     None =>
-      if !(force) && reusable_modules_git_dir is Some(_) {
+      if !force && reusable_modules_git_dir is Some(_) {
         eprint_line(submodule_add_name_in_use_error(name, path))
         @sys.exit(128)
       }
@@ -905,8 +904,8 @@ async fn handle_submodule_add(
   }
   let reused_existing_repo = reusable_repo_git_dir is Some(_)
   let absorbed_existing_repo = if existing_embedded_repo &&
-    !(reused_existing_repo) {
-    if !(fs.is_dir(modules_dir)) {
+    !reused_existing_repo {
+    if !fs.is_dir(modules_dir) {
       fs.mkdir_p(modules_dir)
     }
     absorb_git_dir(fs, sub_path, sub_git, modules_dir)
@@ -914,11 +913,8 @@ async fn handle_submodule_add(
   } else {
     false
   }
-  let direct_existing_repo = existing_embedded_repo &&
-    !(absorbed_existing_repo)
-  if !(absorbed_existing_repo) &&
-    !(direct_existing_repo) &&
-    !(fs.is_dir(modules_dir)) {
+  let direct_existing_repo = existing_embedded_repo && !absorbed_existing_repo
+  if !absorbed_existing_repo && !direct_existing_repo && !fs.is_dir(modules_dir) {
     submodule_init_modules_repo(fs, git_dir, modules_dir)
   }
   let active_sub_git_dir = if direct_existing_repo {
@@ -927,7 +923,7 @@ async fn handle_submodule_add(
     modules_dir
   }
   let modules_config = active_sub_git_dir + "/config"
-  if !(direct_existing_repo) {
+  if !direct_existing_repo {
     set_config(
       fs,
       modules_config,
@@ -955,8 +951,8 @@ async fn handle_submodule_add(
     }
   }
   let mut remote_head_branch = @bitlib.read_remote_head_branch(fs, modules_dir)
-  if !(reused_existing_repo) && !(direct_existing_repo) {
-    if progress && !(quiet) {
+  if !reused_existing_repo && !direct_existing_repo {
+    if progress && !quiet {
       eprint_line("Checking connectivity: 100% (1/1), done.")
     }
     fetch_submodule_objects(
@@ -971,13 +967,10 @@ async fn handle_submodule_add(
     )
     remote_head_branch = @bitlib.read_remote_head_branch(fs, modules_dir)
   }
-  let needs_worktree_checkout = !(absorbed_existing_repo) &&
-    (
-      !(fs.is_dir(sub_path)) ||
-      (!(fs.is_file(sub_git)) && !(fs.is_dir(sub_git)))
-    )
+  let needs_worktree_checkout = !absorbed_existing_repo &&
+    (!fs.is_dir(sub_path) || (!fs.is_file(sub_git) && !fs.is_dir(sub_git)))
   if needs_worktree_checkout {
-    if !(fs.is_dir(sub_path)) {
+    if !fs.is_dir(sub_path) {
       fs.mkdir_p(sub_path)
     }
     let rel_path = submodule_relative_path(sub_path, modules_dir)
@@ -1020,7 +1013,7 @@ async fn handle_submodule_add(
         active_sub_git_dir + "/HEAD",
         "ref: refs/heads/" + branch_name + "\n",
       )
-      if !(direct_existing_repo) {
+      if !direct_existing_repo {
         set_config(
           fs,
           modules_config,
@@ -1130,7 +1123,7 @@ fn submodule_missing_url_paths(
   }
   let missing : Array[String] = []
   for path in target_paths {
-    if !(index_paths.contains(path)) {
+    if !index_paths.contains(path) {
       continue
     }
     match submodule_find_by_path(submodules, path) {
@@ -1148,7 +1141,7 @@ fn submodule_unmatched_index_paths(
 ) -> Array[String] {
   let unmatched : Array[String] = []
   for path in requested_paths {
-    if !(index_paths.contains(path)) {
+    if !index_paths.contains(path) {
       unmatched.push(path)
     }
   }
@@ -1162,7 +1155,7 @@ fn submodule_known_paths(
 ) -> Array[String] {
   let known = index_paths.copy()
   for sub in submodules {
-    if !(known.contains(sub.path)) {
+    if !known.contains(sub.path) {
       known.push(sub.path)
     }
   }
@@ -1193,7 +1186,7 @@ fn load_submodule_update_path_blocker(
   if fs.is_file(sub_path) {
     return true
   }
-  if !(fs.is_dir(sub_path)) {
+  if !fs.is_dir(sub_path) {
     return false
   }
   let entries = fs.readdir(sub_path) catch { _ => [] }
@@ -1228,7 +1221,7 @@ fn load_submodule_add_path_blocker(
   if fs.is_file(sub_path) {
     return Some("path")
   }
-  if !(fs.is_dir(sub_path)) {
+  if !fs.is_dir(sub_path) {
     return None
   }
   let entries = fs.readdir(sub_path) catch { _ => [] }
@@ -1321,7 +1314,7 @@ fn parse_submodule_config(
 ) -> Array[SubmoduleInfo] {
   let config_git_dir = resolve_submodule_common_git_dir(fs, git_dir)
   let config_path = config_git_dir + "/config"
-  if !(fs.is_file(config_path)) {
+  if !fs.is_file(config_path) {
     return []
   }
   let content = decode_bytes(fs.read_file(config_path)) catch { _ => return [] }
@@ -1402,7 +1395,7 @@ fn submodule_uninitialized_paths(
 ) -> Array[String] {
   let paths : Array[String] = []
   for sub in submodules {
-    if requested_paths.length() > 0 && !(requested_paths.contains(sub.path)) {
+    if requested_paths.length() > 0 && !requested_paths.contains(sub.path) {
       continue
     }
     if read_submodule_config_value(fs, git_dir, sub.name, "url") is None {
@@ -1427,7 +1420,7 @@ fn submodule_update_notice_paths(
     fs, git_dir, submodules, requested_paths,
   )
   for path in uninitialized {
-    if !(paths.contains(path)) {
+    if !paths.contains(path) {
       paths.push(path)
     }
   }
@@ -1490,7 +1483,7 @@ fn submodule_select_paths_from_filters(
         }
         found
       }
-      if !(matched) {
+      if !matched {
         return ([], Some(filter))
       }
     }
@@ -1510,7 +1503,7 @@ fn submodule_select_paths_from_filters(
       }
       matched
     }
-    if !(include_match) {
+    if !include_match {
       continue
     }
     let mut excluded = false
@@ -1521,7 +1514,7 @@ fn submodule_select_paths_from_filters(
         break
       }
     }
-    if !(excluded) {
+    if !excluded {
       selected.push(path)
     }
   }
@@ -1535,7 +1528,7 @@ fn submodule_active_filters(
   root_abs : String,
 ) -> Array[String] {
   let config_path = git_dir + "/config"
-  if !(fs.is_file(config_path)) {
+  if !fs.is_file(config_path) {
     return []
   }
   let values = get_all_config_values(
@@ -1617,7 +1610,7 @@ fn submodule_resolve_target_paths(
       None => ()
     }
   }
-  if active_filters.length() == 0 && !(has_named_active) {
+  if active_filters.length() == 0 && !has_named_active {
     return ([], false, None)
   }
   let selected_by_filter = if active_filters.length() > 0 {
@@ -1718,7 +1711,7 @@ fn read_submodule_status_head_label(
   head_id : @bitcore.ObjectId,
 ) -> String? {
   let head_path = sub_git_dir + "/HEAD"
-  if !(fs.is_file(head_path)) {
+  if !fs.is_file(head_path) {
     return None
   }
   let content = decode_bytes(
@@ -1817,7 +1810,7 @@ fn gitmodules_has_unmapped_paths(content : String) -> Bool {
   for line_view in content.split("\n") {
     let line = trim_string(line_view.to_string())
     if line.has_prefix("[submodule \"") && line.has_suffix("\"]") {
-      if in_section && has_url && !(has_path) {
+      if in_section && has_url && !has_path {
         return true
       }
       in_section = true
@@ -1825,7 +1818,7 @@ fn gitmodules_has_unmapped_paths(content : String) -> Bool {
       has_url = false
       continue
     }
-    if !(in_section) {
+    if !in_section {
       continue
     }
     if line.has_prefix("path") {
@@ -1834,7 +1827,7 @@ fn gitmodules_has_unmapped_paths(content : String) -> Bool {
       has_url = true
     }
   }
-  in_section && has_url && !(has_path)
+  in_section && has_url && !has_path
 }
 
 ///|
@@ -1899,7 +1892,7 @@ fn submodule_upsert_config_value(
   }
   if section_start < 0 {
     let mut out = content
-    if out.length() > 0 && !(out.has_suffix("\n")) {
+    if out.length() > 0 && !out.has_suffix("\n") {
       out = out + "\n"
     }
     return out + target + "\n\t\{key} = \{value}\n"
@@ -1908,13 +1901,13 @@ fn submodule_upsert_config_value(
   let mut inserted = false
   let mut i = 0
   while i < lines.length() {
-    if i == section_end && !(inserted) {
+    if i == section_end && !inserted {
       out.push("\t\{key} = \{value}")
       inserted = true
     }
     if i > section_start && i < section_end {
       let trimmed = trim_chars(lines[i], " \t")
-      if trimmed.has_prefix(key + " =") && !(inserted) {
+      if trimmed.has_prefix(key + " =") && !inserted {
         out.push("\t\{key} = \{value}")
         inserted = true
         i += 1
@@ -1924,7 +1917,7 @@ fn submodule_upsert_config_value(
     out.push(lines[i])
     i += 1
   }
-  if !(inserted) {
+  if !inserted {
     if out.length() > 0 && out[out.length() - 1].length() == 0 {
       out.insert(out.length() - 1, "\t\{key} = \{value}")
     } else {
@@ -2029,7 +2022,7 @@ async fn handle_submodule_status(
     match arg {
       "--recursive" => recursive = true
       "--cached" => cached = true
-      _ if !(arg.has_prefix("-")) => raw_paths.push(arg)
+      _ if !arg.has_prefix("-") => raw_paths.push(arg)
       _ => ()
     }
   }
@@ -2064,7 +2057,7 @@ async fn handle_submodule_status(
     parse_submodule_config(rfs, git_dir),
   )
   for sub in submodules {
-    if paths.length() > 0 && !(paths.contains(sub.path)) {
+    if paths.length() > 0 && !paths.contains(sub.path) {
       continue
     }
     let sub_path = root + "/" + sub.path
@@ -2072,7 +2065,7 @@ async fn handle_submodule_status(
     let index_id = get_submodule_index_id(rfs, git_dir, sub.path)
     let sub_git = sub_path + "/.git"
     // Check if initialized
-    if !(rfs.is_file(sub_git)) && !(rfs.is_dir(sub_git)) {
+    if !rfs.is_file(sub_git) && !rfs.is_dir(sub_git) {
       print_line(
         submodule_status_output(display_path, index_id, None, cached, None),
       )
@@ -2159,7 +2152,7 @@ async fn handle_submodule_init(
   for arg in args {
     match arg {
       "-q" | "--quiet" => quiet = true
-      _ if !(arg.has_prefix("-")) => raw_paths.push(arg)
+      _ if !arg.has_prefix("-") => raw_paths.push(arg)
       _ => ()
     }
   }
@@ -2211,7 +2204,7 @@ async fn handle_submodule_init(
     ""
   }
   for sub in submodules {
-    if restrict_paths && !(selected_paths.contains(sub.path)) {
+    if restrict_paths && !selected_paths.contains(sub.path) {
       continue
     }
     let config_url = resolve_submodule_config_url(fs, root, git_dir, sub.url)
@@ -2224,7 +2217,7 @@ async fn handle_submodule_init(
       "url",
       config_url,
     )
-    if !(already_active_paths.contains(sub.path)) {
+    if !already_active_paths.contains(sub.path) {
       updated = submodule_upsert_config_value(
         updated,
         sub.name,
@@ -2237,7 +2230,7 @@ async fn handle_submodule_init(
     }
     wfs.write_string(config_path, updated)
     config_content = updated
-    if !(quiet) {
+    if !quiet {
       print_line(
         "Submodule '\{sub.name}' (\{config_url}) registered for path '\{sub.path}'",
       )
@@ -2284,7 +2277,7 @@ async fn handle_submodule_update(
       "--remote" => remote = true
       "--recursive" => recursive = true
       "--quiet" | "-q" => quiet = true
-      _ if !(arg.has_prefix("-")) => raw_paths.push(arg)
+      _ if !arg.has_prefix("-") => raw_paths.push(arg)
       _ => ()
     }
   }
@@ -2356,7 +2349,7 @@ async fn handle_submodule_update(
     }
     handle_submodule_init(fs, root, git_dir, init_paths, quiet~)
   }
-  let auto_init_active = !(init) && paths.length() == 0 && restrict_paths
+  let auto_init_active = !init && paths.length() == 0 && restrict_paths
   let effective_paths = if restrict_paths { selected_paths } else { [] }
   let notice_paths = if init || auto_init_active {
     []
@@ -2368,14 +2361,14 @@ async fn handle_submodule_update(
   for path in notice_paths {
     print_submodule_not_initialized(path)
   }
-  if !(init) && notice_paths.length() > 0 && submodules.length() == 0 {
+  if !init && notice_paths.length() > 0 && submodules.length() == 0 {
     return ()
   }
   for sub in submodules {
     if notice_paths.contains(sub.path) {
       continue
     }
-    if restrict_paths && !(selected_paths.contains(sub.path)) {
+    if restrict_paths && !selected_paths.contains(sub.path) {
       continue
     }
     let sub_path = root + "/" + sub.path
@@ -2413,8 +2406,8 @@ async fn handle_submodule_update(
       exit_submodule_existing_path(sub.path)
     }
     // Clone if needed
-    if !(sub_git_is_dir) && !(has_modules) {
-      if !(quiet) {
+    if !sub_git_is_dir && !has_modules {
+      if !quiet {
         print_line("Cloning into '\{sub.path}'...")
       }
       @bitrepo.init_repo(wfs, modules_dir, bare=true)
@@ -2459,7 +2452,7 @@ async fn handle_submodule_update(
         (None : String?),
         (None : String?),
       )
-      if !(submodule_git_dir_has_object(rfs, modules_dir, target_id)) {
+      if !submodule_git_dir_has_object(rfs, modules_dir, target_id) {
         fetch_submodule_objects(
           fs,
           root,
@@ -2470,8 +2463,8 @@ async fn handle_submodule_update(
         )
       }
     }
-    if !(sub_git_is_dir) && has_modules {
-      if !(rfs.is_dir(sub_path)) {
+    if !sub_git_is_dir && has_modules {
+      if !rfs.is_dir(sub_path) {
         fs.mkdir_p(sub_path)
       }
       // Create or refresh .git file to point to modules dir
@@ -2485,8 +2478,8 @@ async fn handle_submodule_update(
     let sub_git_dir = @bitlib.resolve_gitdir(rfs, sub_git)
     let already_at_target = had_git_marker &&
       @bitlib.resolve_head_commit(rfs, sub_git_dir) == Some(target_id)
-    if !(already_at_target) {
-      if !(quiet) {
+    if !already_at_target {
+      if !quiet {
         print_line(
           "Submodule path '\{sub.path}': checked out '\{target_id.to_hex()}'",
         )
@@ -2559,7 +2552,7 @@ fn submodule_collect_shallow_commit_objects(
   }
   let info = @bitcore.parse_commit(commit_obj.data)
   if depth <= 1 {
-    if !(seen_boundaries.contains(commit_hex)) {
+    if !seen_boundaries.contains(commit_hex) {
       seen_boundaries[commit_hex] = true
       boundary_ids.push(commit_id)
     }
@@ -2611,7 +2604,7 @@ fn submodule_shallow_ref_targets(
           break
         }
       }
-      if !(exists) {
+      if !exists {
         let branch_id = @bitlib.resolve_ref(
           fs,
           src_git_dir,
@@ -2646,7 +2639,7 @@ async fn fetch_submodule_local_repo_shallow(
   } else {
     src_path
   }
-  if !(quiet) {
+  if !quiet {
     eprint_line("From \{display_url}")
   }
   let rfs : &@bitcore.RepoFileSystem = fs
@@ -2843,7 +2836,7 @@ async fn submodule_run_post_checkout_hook(
 ) -> Int {
   let fs = OsFs::new()
   let hook_path = git_dir + "/hooks/post-checkout"
-  if !(fs.is_file(hook_path)) {
+  if !fs.is_file(hook_path) {
     return 0
   }
   let new_hex = commit_id.to_hex()
@@ -2887,7 +2880,7 @@ fn get_rel_path(from : String, to : String) -> String {
     result = result + "../"
   }
   for i in common..<to_parts.length() {
-    if result.length() > 0 && !(result.has_suffix("/")) {
+    if result.length() > 0 && !result.has_suffix("/") {
       result = result + "/"
     }
     result = result + to_parts[i]
@@ -2911,7 +2904,7 @@ async fn handle_submodule_deinit(
       "-f" | "--force" => force = true
       "--all" => all = true
       "-q" | "--quiet" => quiet = true
-      _ if !(arg.has_prefix("-")) => paths.push(arg)
+      _ if !arg.has_prefix("-") => paths.push(arg)
       _ => ()
     }
   }
@@ -2922,7 +2915,7 @@ async fn handle_submodule_deinit(
   let (select_all, requested_paths) = normalize_submodule_deinit_paths(
     paths, cwd_prefix, root_abs, all,
   )
-  if !(select_all) && requested_paths.length() == 0 {
+  if !select_all && requested_paths.length() == 0 {
     @sys.exit(1)
     return
   }
@@ -2943,7 +2936,7 @@ async fn handle_submodule_deinit(
     None => ()
   }
   for sub in submodules {
-    if !(select_all) && !(requested_paths.contains(sub.path)) {
+    if !select_all && !requested_paths.contains(sub.path) {
       continue
     }
     let sub_path = root + "/" + sub.path
@@ -2962,7 +2955,7 @@ async fn handle_submodule_deinit(
     let has_worktree_git = rfs.is_dir(sub_worktree_git) ||
       rfs.is_file(sub_worktree_git)
     // Check for local modifications
-    if !(force) && rfs.is_dir(sub_path) && has_worktree_git {
+    if !force && rfs.is_dir(sub_path) && has_worktree_git {
       match sub_git_dir {
         Some(actual_sub_git_dir) if rfs.is_dir(actual_sub_git_dir) => {
           let status = @bitlib.status(rfs, sub_path) catch {
@@ -3047,10 +3040,10 @@ async fn handle_submodule_deinit(
       }
     }
     remove_submodule_worktree_git(fs, sub_path)
-    if !(rfs.is_dir(sub_path)) && !(rfs.is_file(sub_path)) {
+    if !rfs.is_dir(sub_path) && !rfs.is_file(sub_path) {
       fs.mkdir_p(sub_path)
     }
-    if !(quiet) {
+    if !quiet {
       match registered_url {
         Some(url) =>
           print_line(
@@ -3059,7 +3052,7 @@ async fn handle_submodule_deinit(
         None => ()
       }
     }
-    if cleared_worktree && !(quiet) {
+    if cleared_worktree && !quiet {
       print_line("Cleared directory '\{display_path}'")
     }
   }
@@ -3080,7 +3073,7 @@ fn remove_config_section(
     if trimmed.has_prefix("[") {
       skip = trimmed == target
     }
-    if !(skip) {
+    if !skip {
       lines.push(line)
     }
   }
@@ -3224,7 +3217,7 @@ async fn handle_submodule_sync(
     match arg {
       "--recursive" => recursive = true
       "-q" | "--quiet" => quiet = true
-      _ if !(arg.has_prefix("-")) => paths.push(arg)
+      _ if !arg.has_prefix("-") => paths.push(arg)
       _ => ()
     }
   }
@@ -3244,7 +3237,7 @@ async fn handle_submodule_sync(
     None => ()
   }
   for sub in submodules {
-    if paths.length() > 0 && !(paths.contains(sub.path)) {
+    if paths.length() > 0 && !paths.contains(sub.path) {
       continue
     }
     let sync_config_url = resolve_submodule_config_url(
@@ -3284,7 +3277,7 @@ async fn handle_submodule_sync(
       let updated = update_remote_origin(content, sync_origin_url)
       wfs.write_string(sub_config, updated)
     }
-    if !(quiet) {
+    if !quiet {
       print_line("Synchronizing submodule url for '\{sub.path}'")
     }
     // Handle recursive
@@ -3314,7 +3307,7 @@ fn update_config_value(
     if trimmed.has_prefix("[") {
       in_section = trimmed == target
     }
-    if in_section && trimmed.has_prefix(key + " =") && !(updated) {
+    if in_section && trimmed.has_prefix(key + " =") && !updated {
       lines.push("\t\{key} = \{value}")
       updated = true
     } else {
@@ -3335,7 +3328,7 @@ fn update_remote_origin(content : String, url : String) -> String {
     if trimmed.has_prefix("[") {
       in_origin = trimmed == "[remote \"origin\"]"
     }
-    if in_origin && trimmed.has_prefix("url =") && !(updated) {
+    if in_origin && trimmed.has_prefix("url =") && !updated {
       lines.push("\turl = \{url}")
       updated = true
     } else {
@@ -3367,7 +3360,7 @@ async fn handle_submodule_set_url(
 ) -> Unit raise Error {
   let positional : Array[String] = []
   for arg in args {
-    if !(arg.has_prefix("-")) {
+    if !arg.has_prefix("-") {
       positional.push(arg)
     }
   }
@@ -3431,7 +3424,7 @@ async fn handle_submodule_set_branch(
         branch = Some(args[i])
       }
       "--default" | "-d" => default_branch = true
-      _ if !(arg.has_prefix("-")) => positional.push(arg)
+      _ if !arg.has_prefix("-") => positional.push(arg)
       _ => ()
     }
     i += 1
@@ -3517,7 +3510,7 @@ async fn handle_submodule_foreach(
   for sub in submodules {
     let sub_path = root + "/" + sub.path
     let sub_git = sub_path + "/.git"
-    if !(rfs.is_file(sub_git)) && !(rfs.is_dir(sub_git)) {
+    if !rfs.is_file(sub_git) && !rfs.is_dir(sub_git) {
       continue
     }
     let sub_git_dir = @bitlib.resolve_gitdir(rfs, sub_git)
@@ -3533,7 +3526,7 @@ async fn handle_submodule_foreach(
       Some(id) => id.to_hex()
       None => String::make(40, '0')
     }
-    if !(quiet) {
+    if !quiet {
       print_line("Entering '\{sub.path}'")
     }
     let env : Map[String, String] = {
@@ -3601,14 +3594,14 @@ async fn handle_submodule_absorbgitdirs_with_prefix(
   let wfs : &@bitcore.FileSystem = fs
   let paths : Array[String] = []
   for arg in args {
-    if !(arg.has_prefix("-")) {
+    if !arg.has_prefix("-") {
       paths.push(arg)
     }
   }
   let submodules = parse_gitmodules(rfs, root)
   let index_paths = load_submodule_index_gitlink_paths(rfs, git_dir)
   for path in index_paths {
-    if paths.length() > 0 && !(paths.contains(path)) {
+    if paths.length() > 0 && !paths.contains(path) {
       continue
     }
     if submodule_find_by_path(submodules, path) is Some(_) {
@@ -3622,7 +3615,7 @@ async fn handle_submodule_absorbgitdirs_with_prefix(
     }
   }
   for sub in submodules {
-    if paths.length() > 0 && !(paths.contains(sub.path)) {
+    if paths.length() > 0 && !paths.contains(sub.path) {
       continue
     }
     let sub_path = root + "/" + sub.path
@@ -3636,7 +3629,7 @@ async fn handle_submodule_absorbgitdirs_with_prefix(
       super_prefix + sub.path
     }
     if rfs.is_dir(sub_git) {
-      if !(rfs.is_dir(dest)) {
+      if !rfs.is_dir(dest) {
         wfs.mkdir_p(dest)
       }
       absorb_git_dir(fs, sub_path, sub_git, dest)

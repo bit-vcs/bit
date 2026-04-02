@@ -1028,11 +1028,11 @@ fn collect_pack_ids_from_dir(fs : OsFs, pack_dir : String) -> Map[String, Bool] 
   let entries = fs.readdir(pack_dir) catch { _ => [] }
   for entry in entries {
     let name = normalize_dir_entry(entry)
-    if !(name.has_suffix(".idx")) {
+    if !name.has_suffix(".idx") {
       continue
     }
     let idx_path = pack_dir + "/" + name
-    if !(fs.is_file(idx_path)) {
+    if !fs.is_file(idx_path) {
       continue
     }
     let ids = collect_pack_index_ids(fs, idx_path)
@@ -1056,12 +1056,12 @@ fn collect_pack_ids_from_marker(
   let entries = fs.readdir(pack_dir) catch { _ => [] }
   for entry in entries {
     let name = normalize_dir_entry(entry)
-    if !(name.has_suffix(suffix)) {
+    if !name.has_suffix(suffix) {
       continue
     }
     let base = string_slice_to(name, name.length() - suffix.length())
     let idx_path = pack_dir + "/" + base + ".idx"
-    if !(fs.is_file(idx_path)) {
+    if !fs.is_file(idx_path) {
       continue
     }
     let ids = collect_pack_index_ids(fs, idx_path)
@@ -1089,7 +1089,7 @@ fn collect_pack_ids_from_names(
       name
     }
     let idx_path = pack_dir + "/" + stem + ".idx"
-    if !(fs.is_file(idx_path)) {
+    if !fs.is_file(idx_path) {
       continue
     }
     let ids = collect_pack_index_ids(fs, idx_path)
@@ -1138,7 +1138,7 @@ fn collect_loose_object_ids(
 fn read_alternate_object_dirs(fs : OsFs, git_dir : String) -> Array[String] {
   let out : Array[String] = []
   let alt_path = git_dir + "/objects/info/alternates"
-  if !(fs.is_file(alt_path)) {
+  if !fs.is_file(alt_path) {
     return out
   }
   let data = fs.read_file(alt_path) catch { _ => return out }
@@ -1264,7 +1264,7 @@ fn dedup_objects(
   let out : Array[@bitcore.PackObject] = []
   for obj in objects {
     let hex = object_hex(obj)
-    if !(seen.contains(hex)) {
+    if !seen.contains(hex) {
       seen[hex] = true
       out.push(obj)
     }
@@ -1299,7 +1299,7 @@ fn filter_objects(
   let out : Array[@bitcore.PackObject] = []
   for obj in objects {
     let hex = object_hex(obj)
-    if !(exclude.contains(hex)) {
+    if !exclude.contains(hex) {
       out.push(obj)
     }
   }
@@ -3190,7 +3190,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
             let rev_path = base_name + "-" + hash_hex + ".rev"
             @pack.write_reverse_index(fs, rev_path, pack, idx_objects)
           }
-          if cfg.write_bitmap && !(cfg.stdout) {
+          if cfg.write_bitmap && !cfg.stdout {
             let bitmap_path = base_name + "-" + hash_hex + ".bitmap"
             write_pack_bitmap(fs, git_dir, bitmap_path, pack, idx_objects, db)
           }
@@ -3345,7 +3345,7 @@ async fn loosen_unused_packed_objects(
   }
   for entry in entries {
     let name = normalize_dir_entry(entry)
-    if !(name.has_suffix(".idx")) {
+    if !name.has_suffix(".idx") {
       continue
     }
     // Check if this pack has a .keep file
@@ -3354,7 +3354,7 @@ async fn loosen_unused_packed_objects(
       continue
     }
     let idx_path = pack_dir + "/" + name
-    if !(fs.is_file(idx_path)) {
+    if !fs.is_file(idx_path) {
       continue
     }
     // Get pack file mtime for expiration check

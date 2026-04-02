@@ -199,7 +199,7 @@ async fn handle_hub_pr_status(args : Array[String]) -> Unit raise Error {
   let author = get_author_string()
   let mut mine_count = 0
   for pr in open_prs {
-    if pr.author() == author && !(branch_ids.contains(pr.id())) {
+    if pr.author() == author && !branch_ids.contains(pr.id()) {
       if mine_count == 0 {
         print_line("Open pull requests authored by \{author}:")
       }

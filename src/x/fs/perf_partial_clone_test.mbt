@@ -9,14 +9,14 @@ test "perf: partial clone access pattern verification" {
   let git_dir = "/tmp/partial-clone-test/tree-sitter-nickel/.git"
 
   // Skip if test repo not available
-  if !(osfs.is_dir(git_dir)) {
+  if !osfs.is_dir(git_dir) {
     println("Skipping: partial clone test repo not found")
     println(
       "Run: moongit clone --filter=blob:none https://github.com/nickel-lang/tree-sitter-nickel /tmp/partial-clone-test/tree-sitter-nickel",
     )
     return
   }
-  if !(@lib.is_partial_clone(osfs, git_dir)) {
+  if !@lib.is_partial_clone(osfs, git_dir) {
     println("Skipping: repo is not a partial clone")
     return
   }
@@ -120,11 +120,11 @@ test "perf: partial clone access pattern verification" {
 test "perf: verify lazy vs eager difference" {
   let osfs = @osfs.OsFs::new()
   let git_dir = "/tmp/partial-clone-test/tree-sitter-nickel/.git"
-  if !(osfs.is_dir(git_dir)) {
+  if !osfs.is_dir(git_dir) {
     println("Skipping: partial clone test repo not found")
     return
   }
-  if !(@lib.is_partial_clone(osfs, git_dir)) {
+  if !@lib.is_partial_clone(osfs, git_dir) {
     println("Skipping: repo is not a partial clone")
     return
   }

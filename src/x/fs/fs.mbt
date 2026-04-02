@@ -126,7 +126,7 @@ pub fn Fs::get_promisor_db(
   self : Fs,
   backing_fs : &@bit.RepoFileSystem,
 ) -> @lib.PromisorDb? raise @bit.GitError {
-  if !(self.config.enable_promisor) {
+  if !self.config.enable_promisor {
     return None
   }
   match self.cached_promisor_db {
@@ -147,7 +147,7 @@ pub fn Fs::get_promisor_db(
 ///|
 /// Check if this Fs is backed by a partial clone with promisor remote
 pub fn Fs::has_promisor(self : Fs, backing_fs : &@bit.RepoFileSystem) -> Bool {
-  if !(self.config.enable_promisor) {
+  if !self.config.enable_promisor {
     return false
   }
   @lib.is_partial_clone(backing_fs, self.git_dir)
@@ -159,7 +159,7 @@ pub fn Fs::get_promisor_remote(
   self : Fs,
   backing_fs : &@bit.RepoFileSystem,
 ) -> String? {
-  if !(self.config.enable_promisor) {
+  if !self.config.enable_promisor {
     return None
   }
   @lib.read_promisor_remote(backing_fs, self.git_dir)

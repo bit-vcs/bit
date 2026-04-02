@@ -456,11 +456,11 @@ fn hub_sync_is_valid_room_name(room : String) -> Bool {
   let mut first = true
   for c in room {
     if first {
-      if !(hub_sync_room_leading_char(c)) {
+      if !hub_sync_room_leading_char(c) {
         return false
       }
       first = false
-    } else if !(hub_sync_room_safe_char(c)) {
+    } else if !hub_sync_room_safe_char(c) {
       return false
     }
   }
@@ -483,7 +483,7 @@ fn hub_sync_is_valid_room_token(room_token : String) -> Bool {
     return false
   }
   for c in room_token {
-    if !(hub_sync_room_token_safe_char(c)) {
+    if !hub_sync_room_token_safe_char(c) {
       return false
     }
   }
@@ -526,7 +526,7 @@ fn build_hub_sync_issue_url(
     Some(value) => value
     None => hub_sync_generate_room(relay_base)
   }
-  if !(hub_sync_is_valid_room_name(room)) {
+  if !hub_sync_is_valid_room_name(room) {
     raise @bitcore.GitError::InvalidObject(
       "hub sync issue-url: invalid room name: \{room}",
     )
@@ -535,7 +535,7 @@ fn build_hub_sync_issue_url(
     Some(value) => value
     None => hub_sync_generate_room_token(relay_base, room)
   }
-  if !(hub_sync_is_valid_room_token(room_token)) {
+  if !hub_sync_is_valid_room_token(room_token) {
     raise @bitcore.GitError::InvalidObject(
       "hub sync issue-url: invalid room token",
     )
@@ -734,7 +734,7 @@ async fn run_hub_notify_hook(
   record : @hub.HubRecord,
 ) -> Int {
   let hook_path = git_dir + "/hooks/hub-notify"
-  if !(fs.is_file(hook_path)) {
+  if !fs.is_file(hook_path) {
     return -1
   }
   @process.run(

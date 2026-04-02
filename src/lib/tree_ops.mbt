@@ -36,7 +36,7 @@ fn detect_case_insensitive_collision_skips(
   paths : Array[String],
 ) -> Map[String, Bool] raise @bit.GitError {
   let skip : Map[String, Bool] = {}
-  if !(worktree_is_case_insensitive(fs, rfs, git_dir)) {
+  if !worktree_is_case_insensitive(fs, rfs, git_dir) {
     return skip
   }
   let mut i = 0
@@ -75,7 +75,7 @@ fn remove_worktree_path_recursive(
     fs.remove_file(path)
     return ()
   }
-  if !(rfs.is_dir(path)) {
+  if !rfs.is_dir(path) {
     return ()
   }
   let entries = rfs.readdir(path)
@@ -113,7 +113,7 @@ fn tree_ops_get_rel_path(from : String, to : String) -> String {
     result = result + "../"
   }
   for i in common..<to_parts.length() {
-    if result.length() > 0 && !(result.has_suffix("/")) {
+    if result.length() > 0 && !result.has_suffix("/") {
       result = result + "/"
     }
     result = result + to_parts[i]
@@ -178,7 +178,7 @@ fn tree_ops_find_submodule_name_by_path(
       tree_ops_find_submodule_name_in_content(content, path).unwrap_or(path)
     None => {
       let gitmodules_path = join_path(root, ".gitmodules")
-      if !(rfs.is_file(gitmodules_path)) {
+      if !rfs.is_file(gitmodules_path) {
         return path
       }
       let content = decode_bytes_lossy(
@@ -211,7 +211,7 @@ fn tree_ops_set_core_config_value(
       continue
     }
     if in_core && trimmed.has_prefix("[") {
-      if !(key_set) {
+      if !key_set {
         lines.push("\t\{key} = \{value}")
         key_set = true
       }
@@ -230,7 +230,7 @@ fn tree_ops_set_core_config_value(
     lines.push(line)
   }
   if found_section {
-    if in_core && !(key_set) {
+    if in_core && !key_set {
       lines.push("\t\{key} = \{value}")
     }
   } else {
@@ -288,7 +288,7 @@ fn restore_gitlink_worktree(
   )
   let modules_dir = join_path(join_path(git_dir, "modules"), submodule_name)
   fs.mkdir_p(full_path)
-  if !(rfs.is_dir(modules_dir)) {
+  if !rfs.is_dir(modules_dir) {
     return ()
   }
   let rel_path = tree_ops_get_rel_path(full_path, modules_dir)
@@ -307,7 +307,7 @@ fn restore_gitlink_worktree(
   fs.write_string(config_path, with_bare)
   if rfs.is_file(worktree_git_path) {
     fs.write_string(worktree_git_path, "gitdir: \{rel_path}\n")
-  } else if !(has_existing_worktree) {
+  } else if !has_existing_worktree {
     fs.write_string(worktree_git_path, "gitdir: \{rel_path}\n")
   }
   if has_existing_worktree {
@@ -449,7 +449,7 @@ fn tree_ops_prepare_blob_path(
   full_path : String,
   path : String,
 ) -> Unit raise @bit.GitError {
-  if !(rfs.is_dir(full_path)) {
+  if !rfs.is_dir(full_path) {
     return
   }
   let bit_marker = join_path(full_path, ".git")
@@ -578,7 +578,7 @@ pub fn write_worktree_and_build_index(
     let (path, info) = item
     let skip_write = skip_paths.contains(path)
     if is_gitlink_mode_int(info.mode) {
-      if !(skip_write) {
+      if !skip_write {
         restore_gitlink_worktree(
           fs,
           rfs,
@@ -604,7 +604,7 @@ pub fn write_worktree_and_build_index(
       })
       continue
     }
-    if !(skip_write) {
+    if !skip_write {
       let full_path = join_path(root, path)
       tree_ops_prepare_blob_path(fs, rfs, full_path, path)
     }
@@ -619,7 +619,7 @@ pub fn write_worktree_and_build_index(
           raise @bit.GitError::InvalidObject("Object is not a blob")
         }
         let full_path = join_path(root, path)
-        if !(skip_write) {
+        if !skip_write {
           let dir = parent_dir(full_path)
           fs.mkdir_p(dir)
           let attrs = resolve_eol_attrs(rfs, root, path)

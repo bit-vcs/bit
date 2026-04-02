@@ -158,7 +158,7 @@ async fn handle_fast_import(args : Array[String]) -> Unit raise Error {
       parser.skip_line()
     }
   }
-  if require_done && !(done_seen) {
+  if require_done && !done_seen {
     eprint_line("fatal: stream did not end with 'done' command")
     @sys.exit(1)
   }
@@ -195,7 +195,7 @@ async fn handle_fast_import(args : Array[String]) -> Unit raise Error {
     fs.write_string(abs_path, buf.to_string())
   }
   // Print stats unless quiet
-  if !(quiet) {
+  if !quiet {
     let total = num_blobs + num_commits + num_tags
     eprint_line(
       "fast-import statistics: \{total} objects (\{num_blobs} blobs, \{num_commits} commits, \{num_tags} tags)",

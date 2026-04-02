@@ -14,7 +14,7 @@ async fn handle_rerere(args : Array[String]) -> Unit {
         )
         return
       }
-      _ if !(arg.has_prefix("-")) => positional.push(arg)
+      _ if !arg.has_prefix("-") => positional.push(arg)
       _ if arg.has_prefix("-") => warn_unimplemented_arg("rerere", arg)
       _ => ()
     }
@@ -42,7 +42,7 @@ async fn handle_rerere(args : Array[String]) -> Unit {
         has_path = true
         ignore(positional[j])
       }
-      if !(has_path) {
+      if !has_path {
         eprint_line("usage: git rerere forget <path>...")
         @sys.exit(1)
       }
@@ -114,7 +114,7 @@ async fn rerere_gc(fs : OsFs, rr_cache_dir : String) -> Unit {
     let path = rr_cache_dir + "/" + entry
     if fs.is_dir(path) {
       let postimage = path + "/postimage"
-      if !(fs.is_file(postimage)) {
+      if !fs.is_file(postimage) {
         let sub_entries = fs.readdir(path) catch { _ => continue }
         for sub in sub_entries {
           fs.remove_file(path + "/" + sub) catch {

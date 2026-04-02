@@ -63,7 +63,7 @@ fn patch_id_compute(input : String) -> Array[(String, String)] {
       normalized.push(line)
       continue
     }
-    if !(has_diff) {
+    if !has_diff {
       continue
     }
     // Skip index lines

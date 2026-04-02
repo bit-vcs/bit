@@ -28,7 +28,7 @@ async fn handle_switch(args : Array[String]) -> Unit raise Error {
       "-c" | "--create" => {
         create = true
         force_create = false
-        if i + 1 < args.length() && !(args[i + 1].has_prefix("-")) {
+        if i + 1 < args.length() && !args[i + 1].has_prefix("-") {
           branch = Some(args[i + 1])
           branch_from_option = true
           i += 2
@@ -38,7 +38,7 @@ async fn handle_switch(args : Array[String]) -> Unit raise Error {
       "-C" => {
         create = true
         force_create = true
-        if i + 1 < args.length() && !(args[i + 1].has_prefix("-")) {
+        if i + 1 < args.length() && !args[i + 1].has_prefix("-") {
           branch = Some(args[i + 1])
           branch_from_option = true
           i += 2
@@ -48,7 +48,7 @@ async fn handle_switch(args : Array[String]) -> Unit raise Error {
       "-d" | "--detach" => detach = true
       "--orphan" => {
         orphan = true
-        if i + 1 < args.length() && !(args[i + 1].has_prefix("-")) {
+        if i + 1 < args.length() && !args[i + 1].has_prefix("-") {
           branch = Some(args[i + 1])
           branch_from_option = true
           i += 2
@@ -69,7 +69,7 @@ async fn handle_switch(args : Array[String]) -> Unit raise Error {
           warn_unimplemented_arg("switch", arg)
         }
       }
-      _ if !(arg.has_prefix("-")) => positional.push(arg)
+      _ if !arg.has_prefix("-") => positional.push(arg)
       _ if arg.has_prefix("-") => warn_unimplemented_arg("switch", arg)
       _ => ()
     }
@@ -98,7 +98,7 @@ async fn handle_switch(args : Array[String]) -> Unit raise Error {
       raise @bitcore.GitError::InvalidObject("No branch specified")
     }
     let branch_name = normalize_switch_branch_ref(name)
-    if !(ignore_other_worktrees) {
+    if !ignore_other_worktrees {
       match switch_branch_in_use_path(rfs, root, branch_name) {
         Some(_) => {
           eprint_line(
@@ -113,7 +113,7 @@ async fn handle_switch(args : Array[String]) -> Unit raise Error {
     let previous_location = current_checkout_location(rfs, git_dir)
     switch_write_head_ref(fs, git_dir, branch_name)
     save_previous_checkout_location(fs, git_dir, previous_location)
-    if !(quiet) {
+    if !quiet {
       print_line("Switched to a new branch '\{branch_name}'")
     }
     return
@@ -140,7 +140,7 @@ async fn handle_switch(args : Array[String]) -> Unit raise Error {
       raise @bitcore.GitError::InvalidObject("No branch specified")
     }
     let branch_name = normalize_switch_branch_ref(name)
-    if !(ignore_other_worktrees) {
+    if !ignore_other_worktrees {
       match switch_branch_in_use_path(rfs, root, branch_name) {
         Some(_) => {
           eprint_line(
@@ -152,8 +152,7 @@ async fn handle_switch(args : Array[String]) -> Unit raise Error {
       }
     }
     let refname = branch_name
-    if @bitlib.resolve_ref(rfs, git_dir, refname) is Some(_) &&
-      !(force_create) {
+    if @bitlib.resolve_ref(rfs, git_dir, refname) is Some(_) && !force_create {
       raise @bitcore.GitError::InvalidObject(
         "branch '\{branch_name}' already exists",
       )
@@ -185,7 +184,7 @@ async fn handle_switch(args : Array[String]) -> Unit raise Error {
       }
     }
     save_previous_checkout_location(fs, git_dir, previous_location)
-    if !(quiet) {
+    if !quiet {
       print_line("Switched to a new branch '\{branch_name}'")
     }
     return
@@ -206,7 +205,7 @@ async fn handle_switch(args : Array[String]) -> Unit raise Error {
   let local_branch_exists = @bitlib.resolve_ref(rfs, git_dir, target_ref)
     is Some(_)
   if local_branch_exists {
-    if !(ignore_other_worktrees) {
+    if !ignore_other_worktrees {
       match switch_branch_in_use_path(rfs, root, target_ref) {
         Some(_) => {
           eprint_line(
@@ -220,7 +219,7 @@ async fn handle_switch(args : Array[String]) -> Unit raise Error {
     let previous_location = current_checkout_location(rfs, git_dir)
     ignore(checkout_with_promisor_retry(fs, root, target))
     save_previous_checkout_location(fs, git_dir, previous_location)
-    if !(quiet) {
+    if !quiet {
       print_line("Switched to branch '\{target}'")
     }
     return
@@ -232,7 +231,7 @@ async fn handle_switch(args : Array[String]) -> Unit raise Error {
     let previous_location = current_checkout_location(rfs, git_dir)
     ignore(checkout_with_promisor_retry(fs, root, target))
     save_previous_checkout_location(fs, git_dir, previous_location)
-    if !(quiet) {
+    if !quiet {
       print_line("Switched to branch '\{target}'")
     }
     return

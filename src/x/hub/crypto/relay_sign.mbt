@@ -77,7 +77,7 @@ pub fn relay_extract_sha256_hex(output : String) -> String? {
     if token.length() == 64 {
       let mut ok = true
       for c in token.to_array() {
-        if !(relay_is_hex_char(c)) {
+        if !relay_is_hex_char(c) {
           ok = false
           break
         }

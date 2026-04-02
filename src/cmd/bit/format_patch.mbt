@@ -143,7 +143,7 @@ fn parse_format_patch_options(args : Array[String]) -> FormatPatchOptions {
         )
         i += 1
       }
-      _ if is_format_patch_count_arg(arg) || !(arg.has_prefix("-")) => {
+      _ if is_format_patch_count_arg(arg) || !arg.has_prefix("-") => {
         revisions.push(arg)
         i += 1
       }
@@ -286,9 +286,7 @@ async fn handle_format_patch(args : Array[String]) -> Unit raise Error {
         bit_config_get(git_dir, "format", "outputDirectory").unwrap_or(".")
       }
   }
-  if !(opts.stdout_mode) &&
-    opts.output_file is None &&
-    !(rfs.is_dir(output_dir)) {
+  if !opts.stdout_mode && opts.output_file is None && !rfs.is_dir(output_dir) {
     wfs.mkdir_p(output_dir)
   }
   let total = commits.length()
@@ -657,7 +655,7 @@ fn sanitize_filename(s : String) -> String {
       (c >= '0' && c <= '9') {
       sb.write_char(c)
       last_was_dash = false
-    } else if !(last_was_dash) {
+    } else if !last_was_dash {
       sb.write_char('-')
       last_was_dash = true
     }

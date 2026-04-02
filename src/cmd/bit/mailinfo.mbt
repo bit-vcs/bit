@@ -24,7 +24,7 @@ async fn handle_mailinfo(args : Array[String]) -> Unit raise Error {
         return
       }
       _ if arg.has_prefix("--encoding=") => ()
-      _ if !(arg.has_prefix("-")) => positional.push(arg)
+      _ if !arg.has_prefix("-") => positional.push(arg)
       _ if arg.has_prefix("-") => warn_unimplemented_arg("mailinfo", arg)
       _ => ()
     }
@@ -80,14 +80,14 @@ async fn handle_mailinfo(args : Array[String]) -> Unit raise Error {
       continue
     }
     // Handle scissors
-    if scissors && !(past_scissors) {
+    if scissors && !past_scissors {
       if mailinfo_is_scissors_line(line) {
         past_scissors = true
         continue
       }
     }
     // Detect patch start
-    if !(in_patch) {
+    if !in_patch {
       if line.has_prefix("diff --git ") {
         in_patch = true
       }

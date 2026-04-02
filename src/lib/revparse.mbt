@@ -110,7 +110,7 @@ fn resolve_commit_message_search_all_refs(
   for item in refs {
     let (_, id) = item
     let hex = id.to_hex()
-    if !(seen_start.contains(hex)) {
+    if !seen_start.contains(hex) {
       seen_start[hex] = true
       starts.push(id)
     }
@@ -118,7 +118,7 @@ fn resolve_commit_message_search_all_refs(
   match resolve_head_commit(fs, git_dir) {
     Some(id) => {
       let hex = id.to_hex()
-      if !(seen_start.contains(hex)) {
+      if !seen_start.contains(hex) {
         seen_start[hex] = true
         starts.push(id)
       }
@@ -165,7 +165,7 @@ fn find_reachable_commit_by_message_from_many(
           }
           let info = @bit.parse_commit(obj.data)
           for parent in info.parents {
-            if !(seen.contains(parent.to_hex())) {
+            if !seen.contains(parent.to_hex()) {
               queue.push(parent)
             }
           }
@@ -412,7 +412,7 @@ fn apply_rev_suffix(
         steps = steps * 10 + (chars[i].to_int() - '0'.to_int())
         i += 1
       }
-      if !(has_digits) {
+      if !has_digits {
         steps = 1
       }
       for _ in 0..<steps {
@@ -465,9 +465,7 @@ fn resolve_abbrev_ref_id(
   git_dir : String,
   spec : String,
 ) -> @bit.ObjectId? raise @bit.GitError {
-  if spec.length() < 4 ||
-    spec.length() >= 40 ||
-    !(@bithash.is_hex_string(spec)) {
+  if spec.length() < 4 || spec.length() >= 40 || !@bithash.is_hex_string(spec) {
     return None
   }
   let needle = @bithash.lower_hex_string(spec)
@@ -692,7 +690,7 @@ fn ref_collect_packed(
           start=idx + 1,
           end=line.length(),
         )
-        if !(out.contains(name)) {
+        if !out.contains(name) {
           out[name] = @bit.ObjectId::from_hex(id_hex)
         }
       }
@@ -882,7 +880,7 @@ pub fn rev_parse_normalize_glob_pattern(pattern : String) -> String {
 pub fn rev_parse_glob_match(text : String, pattern : String) -> Bool {
   let has_star = pattern.find("*") is Some(_)
   let has_question = pattern.find("?") is Some(_)
-  if !(has_star) && !(has_question) {
+  if !has_star && !has_question {
     text == pattern ||
     (
       text.has_prefix(pattern) &&
@@ -1092,7 +1090,7 @@ pub fn rev_parse_apply_prefix_to_colon_path(
     start=colon_idx + 1,
     end=spec.length(),
   )
-  if !(path_part.has_prefix("./")) && !(path_part.has_prefix("../")) {
+  if !path_part.has_prefix("./") && !path_part.has_prefix("../") {
     return spec
   }
   let rev_part = String::unsafe_substring(spec, start=0, end=colon_idx)
@@ -1104,7 +1102,7 @@ pub fn rev_parse_apply_prefix_to_colon_path(
 ///|
 /// Parse index pathspec like `:0:path` or `:path`.
 pub fn parse_index_pathspec(spec : String) -> (Int, String?) {
-  if !(spec.has_prefix(":")) || spec.length() <= 1 {
+  if !spec.has_prefix(":") || spec.length() <= 1 {
     return (0, None)
   }
   let rest = String::unsafe_substring(spec, start=1, end=spec.length())

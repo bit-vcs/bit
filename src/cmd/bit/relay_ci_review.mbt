@@ -44,7 +44,7 @@ async fn handle_relay_ci_push(args : Array[String]) -> Unit raise Error {
         i += 2
         continue
       }
-      _ if !(arg.has_prefix("-")) && room_arg.length() == 0 => room_arg = arg
+      _ if !arg.has_prefix("-") && room_arg.length() == 0 => room_arg = arg
       _ => ()
     }
     i += 1
@@ -96,7 +96,7 @@ async fn handle_relay_ci_pull(args : Array[String]) -> Unit raise Error {
         i += 2
         continue
       }
-      _ if !(arg.has_prefix("-")) && room_arg.length() == 0 => room_arg = arg
+      _ if !arg.has_prefix("-") && room_arg.length() == 0 => room_arg = arg
       _ => ()
     }
     i += 1
@@ -218,7 +218,7 @@ async fn handle_relay_review_request(args : Array[String]) -> Unit raise Error {
         i += 2
         continue
       }
-      _ if !(arg.has_prefix("-")) && room_arg.length() == 0 => room_arg = arg
+      _ if !arg.has_prefix("-") && room_arg.length() == 0 => room_arg = arg
       _ => ()
     }
     i += 1
@@ -283,7 +283,7 @@ async fn handle_relay_review_submit(args : Array[String]) -> Unit raise Error {
         i += 2
         continue
       }
-      _ if !(arg.has_prefix("-")) && room_arg.length() == 0 => room_arg = arg
+      _ if !arg.has_prefix("-") && room_arg.length() == 0 => room_arg = arg
       _ => ()
     }
     i += 1
@@ -334,7 +334,7 @@ async fn handle_relay_review_list(args : Array[String]) -> Unit raise Error {
         i += 2
         continue
       }
-      _ if !(arg.has_prefix("-")) && room_arg.length() == 0 => room_arg = arg
+      _ if !arg.has_prefix("-") && room_arg.length() == 0 => room_arg = arg
       _ => ()
     }
     i += 1
@@ -419,7 +419,7 @@ async fn handle_relay_review_list(args : Array[String]) -> Unit raise Error {
       }
     _ => ()
   }
-  if !(found) {
+  if !found {
     print_line("No reviews for PR \{pr_id}")
   }
 }

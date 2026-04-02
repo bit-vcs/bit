@@ -377,7 +377,7 @@ pub fn js_status(host_id : Int, root : String) -> Result[Status, String] {
         continue
       }
       let abs_path = join_path(root, entry.path)
-      if !(fs.is_file(abs_path)) {
+      if !fs.is_file(abs_path) {
         unstaged_deleted.push(entry.path)
       }
     }
@@ -1615,8 +1615,8 @@ pub async fn js_push_remote(
       js_transport_get(transport_id, url, headers)
     })
     let old_id = js_find_remote_ref(refs, target_ref)
-    if !(force) && old_id != @bit.ObjectId::zero() {
-      if !(js_is_ancestor(fs, git_dir, old_id, head_id)) {
+    if !force && old_id != @bit.ObjectId::zero() {
+      if !js_is_ancestor(fs, git_dir, old_id, head_id) {
         raise @bit.GitError::InvalidObject(
           "Updates were rejected because the tip of your current branch is behind its remote counterpart. Use force to override.",
         )

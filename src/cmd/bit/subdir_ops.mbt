@@ -121,7 +121,7 @@ fn compare_trees(
   // Find deleted (in A but not in B)
   for e in entries_a {
     let path = if prefix.length() > 0 { prefix + "/" + e.name } else { e.name }
-    if !(map_b.contains(e.name)) {
+    if !map_b.contains(e.name) {
       if e.mode == "40000" || e.mode == "040000" {
         // Recurse into deleted directory
         let sub = compare_trees_deleted(db, rfs, e.id, path)

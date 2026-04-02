@@ -15,7 +15,7 @@ pub fn receive_pack_info_refs_response(
   token : String,
   agent? : String = "git/moonbit",
 ) -> HttpResponse raise @bit.GitError {
-  if !(check_bearer_token(auth_header, token)) {
+  if !check_bearer_token(auth_header, token) {
     return {
       status: 401,
       headers: { "Content-Type": "text/plain", "WWW-Authenticate": "Bearer" },
@@ -44,7 +44,7 @@ pub fn receive_pack_response(
   token : String,
   body : Bytes,
 ) -> HttpResponse raise @bit.GitError {
-  if !(check_bearer_token(auth_header, token)) {
+  if !check_bearer_token(auth_header, token) {
     return {
       status: 401,
       headers: { "Content-Type": "text/plain", "WWW-Authenticate": "Bearer" },
@@ -84,7 +84,7 @@ fn check_bearer_token(auth_header : String?, token : String) -> Bool {
   match auth_header {
     None => false
     Some(value) => {
-      if !(value.has_prefix("Bearer ")) {
+      if !value.has_prefix("Bearer ") {
         return false
       }
       let received = String::unsafe_substring(

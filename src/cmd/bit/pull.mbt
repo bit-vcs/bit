@@ -278,7 +278,7 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
       preferred_sender~,
       preferred_repo~,
     )
-    if !(quiet) {
+    if !quiet {
       print_line("Relay peer selected: \{relay_sender} -> \{relay_fetch_url}")
     }
     pull_url = relay_fetch_url
@@ -310,8 +310,8 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
     target_ref == current_head_target
   let autostash_enabled = pull_autostash_enabled(fs, git_dir, rebase, autostash)
   if pre_fetch_head is Some(_) &&
-    !(fetch_updates_checked_out_head) &&
-    !(autostash_enabled) &&
+    !fetch_updates_checked_out_head &&
+    !autostash_enabled &&
     pull_has_uncommitted_changes(@bitlib.status(fs, root)) {
     raise @bitcore.GitError::InvalidObject(
       "Cannot pull because you have uncommitted changes.",
@@ -328,12 +328,12 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
     )
   }
   let bare_repo = @bitlib.is_bare_git_dir(git_dir)
-  let initial_unborn_status = if pre_fetch_head is None && !(bare_repo) {
+  let initial_unborn_status = if pre_fetch_head is None && !bare_repo {
     Some(@bitlib.status(fs, root))
   } else {
     None
   }
-  let initial_unborn_entries = if pre_fetch_head is None && !(bare_repo) {
+  let initial_unborn_entries = if pre_fetch_head is None && !bare_repo {
     @bitlib.read_index_entries(fs, git_dir)
   } else {
     []
@@ -345,12 +345,12 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
   }
   let pre_fetch_checked_out_head_status = if pre_fetch_head is Some(_) &&
     fetch_updates_checked_out_head &&
-    !(bare_repo) {
+    !bare_repo {
     Some(@bitlib.status(fs, root))
   } else {
     None
   }
-  if !(quiet) {
+  if !quiet {
     print_line("Fetching from \{pull_url}...")
   }
   fetch_from_remote(
@@ -422,10 +422,10 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
   match (pre_fetch_head, pre_fetch_checked_out_head_status) {
     (Some(old_id), Some(status)) =>
       if old_id != tid {
-        if !(quiet) {
+        if !quiet {
           eprint_line("fetch updated the current branch head")
         }
-        if !(pull_can_fast_forward_checked_out_head(status, target_modes)) {
+        if !pull_can_fast_forward_checked_out_head(status, target_modes) {
           if pull_adhoc_remote {
             @bitlib.remove_remote_refs(fs, fs, git_dir, remote_name)
           }
@@ -466,7 +466,7 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
     }
     let preserved_entries : Array[@bitlib.IndexEntry] = []
     let preserved_files : Map[String, Bytes] = {}
-    if !(bare_repo) {
+    if !bare_repo {
       let current_status = match initial_unborn_status {
         Some(status) => status
         None => @bitlib.status(fs, root)
@@ -491,7 +491,7 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
         preserved_paths.push(entry.path)
       }
       for path in current_status.untracked {
-        if !(target_modes.contains(path)) {
+        if !target_modes.contains(path) {
           preserved_paths.push(path)
         }
       }
@@ -504,7 +504,7 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
     } else {
       write_ref_file(fs, git_dir, head_target, tid)
     }
-    if !(bare_repo) {
+    if !bare_repo {
       if head_target.has_prefix("refs/heads/") {
         let branch = String::unsafe_substring(
           head_target,
@@ -526,7 +526,7 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
         )
       None => ()
     }
-    if !(quiet) {
+    if !quiet {
       print_line("Fast-forward")
     }
     if pull_adhoc_remote {
@@ -555,7 +555,7 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
     }
     if interactive_rebase {
       interactive_rebase_start(fs, fs, root, git_dir, rebase_upstream, tid)
-      if !(rfs.is_dir(git_dir + "/rebase-merge")) {
+      if !rfs.is_dir(git_dir + "/rebase-merge") {
         pull_apply_autostash(fs, fs, git_dir, root, autostash_state, quiet)
       }
     } else {
@@ -574,10 +574,10 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
                     )
                   _ => ()
                 }
-                if !(quiet) {
+                if !quiet {
                   print_line("Fast-forward")
                 }
-              } else if !(quiet) {
+              } else if !quiet {
                 print_line("Updated to \{id.to_hex()}")
               }
               pull_apply_autostash(
@@ -585,7 +585,7 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
               )
             }
             None => {
-              if !(quiet) {
+              if !quiet {
                 print_line("Successfully rebased.")
               }
               pull_apply_autostash(
@@ -594,7 +594,7 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
             }
           }
         @bitlib.RebaseStatus::NothingToRebase => {
-          if !(quiet) {
+          if !quiet {
             print_line("Current branch is up to date.")
           }
           pull_apply_autostash(fs, fs, git_dir, root, autostash_state, quiet)
@@ -620,7 +620,7 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
   )
   match result.status {
     @bitlib.MergeStatus::AlreadyUpToDate =>
-      if !(quiet) {
+      if !quiet {
         print_line("Already up to date.")
       }
     @bitlib.MergeStatus::FastForward =>
@@ -634,7 +634,7 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
             None => ()
           }
           let short = String::unsafe_substring(id.to_hex(), start=0, end=7)
-          if !(quiet) {
+          if !quiet {
             print_line("Fast-forward to \{short}")
           }
         }
@@ -646,7 +646,7 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
               )
             None => ()
           }
-          if !(quiet) {
+          if !quiet {
             print_line("Fast-forward")
           }
         }
@@ -655,11 +655,11 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
       match result.commit_id {
         Some(id) => {
           let short = String::unsafe_substring(id.to_hex(), start=0, end=7)
-          if !(quiet) {
+          if !quiet {
             print_line("Merge made by the 'ort' strategy. [\{short}]")
           }
         }
-        None => if !(quiet) { print_line("Merged") }
+        None => if !quiet { print_line("Merged") }
       }
     @bitlib.MergeStatus::Conflicted => {
       print_line("CONFLICT (content): Merge conflict in the following files:")
@@ -845,7 +845,7 @@ async fn pull_apply_autostash(
           }
         }
       }
-      if !(quiet) {
+      if !quiet {
         print_line("Applied autostash.")
       }
     }
@@ -1143,7 +1143,7 @@ fn pull_collect_initial_preserved_index_entries(
 ) -> Array[@bitlib.IndexEntry] {
   let preserved : Array[@bitlib.IndexEntry] = []
   for entry in entries {
-    if !(target_modes.contains(entry.path)) {
+    if !target_modes.contains(entry.path) {
       preserved.push(entry)
     }
   }
@@ -1216,7 +1216,7 @@ fn pull_pre_fetch_validation_error(
   } else if arg_remote is None &&
     arg_refspec is None &&
     current_branch_remote_cfg is Some(_) &&
-    !(current_branch_has_merge) &&
+    !current_branch_has_merge &&
     has_head {
     Some("There is no tracking information for the current branch.")
   } else if arg_remote is Some(_) && merge_ref is None && has_head {
@@ -1605,7 +1605,7 @@ fn read_config_values(
 ) -> Array[String] {
   let values : Array[String] = []
   let config_path = git_dir + "/config"
-  if !(fs.is_file(config_path)) {
+  if !fs.is_file(config_path) {
     return values
   }
   let content = decode_bytes(
@@ -1681,12 +1681,12 @@ fn resolve_remote_push_refmap_destination(
   remote_push_specs : Array[String],
 ) -> String? {
   let source_candidates = fetch_source_candidates(source_token)
-  if !(source_candidates.contains(source_ref)) {
+  if !source_candidates.contains(source_ref) {
     source_candidates.push(source_ref)
   }
   if source_ref == "HEAD" {
     let current_ref = "refs/heads/" + current_branch
-    if !(source_candidates.contains(current_ref)) {
+    if !source_candidates.contains(current_ref) {
       source_candidates.push(current_ref)
     }
   }
@@ -1790,7 +1790,7 @@ fn normalize_push_ref_token(
     }
   } else if token.has_prefix("refs/") {
     token
-  } else if !(for_destination) &&
+  } else if !for_destination &&
     (token.contains("^") || token.contains("~") || looks_like_object_id(token)) {
     token
   } else {
@@ -1846,7 +1846,7 @@ fn read_url_rewrite_rules(
 ) -> Array[(String, String, Bool)] {
   let config_path = git_dir + "/config"
   let rules : Array[(String, String, Bool)] = []
-  if !(fs.is_file(config_path)) {
+  if !fs.is_file(config_path) {
     return rules
   }
   let content = decode_bytes(
@@ -1886,15 +1886,15 @@ fn rewrite_url_by_rules(
   let mut best_push_only = false
   for i in 0..<rules.length() {
     let (base, prefix, push_only) = rules[i]
-    if push_only && !(for_push) {
+    if push_only && !for_push {
       continue
     }
-    if !(url.has_prefix(prefix)) {
+    if !url.has_prefix(prefix) {
       continue
     }
     let prefix_len = prefix.length()
     if prefix_len > best_prefix_len ||
-      (prefix_len == best_prefix_len && push_only && !(best_push_only)) {
+      (prefix_len == best_prefix_len && push_only && !best_push_only) {
       best_base = Some(base)
       best_prefix_len = prefix_len
       best_push_only = push_only
@@ -1960,7 +1960,7 @@ fn resolve_push_target_plan(
                   "No upstream configured for current branch",
                 )
             }
-          PushDefaultMode::Simple if !(triangular) =>
+          PushDefaultMode::Simple if !triangular =>
             match branch_remote {
               Some(name) => name
               None =>
@@ -1999,7 +1999,7 @@ fn resolve_push_target_plan(
     }
     if looks_like_object_id(raw_src) &&
       raw_dst.length() > 0 &&
-      !(raw_dst.has_prefix("refs/")) {
+      !raw_dst.has_prefix("refs/") {
       raise @bitcore.GitError::InvalidObject(
         "Cannot infer destination ref from source object id",
       )
@@ -2055,7 +2055,7 @@ fn resolve_push_target_plan(
                 "No upstream configured for current branch",
               )
           }
-        PushDefaultMode::Simple if !(triangular) =>
+        PushDefaultMode::Simple if !triangular =>
           match branch_remote {
             Some(name) => name
             None =>
@@ -2323,14 +2323,14 @@ fn is_invalid_push_destination_refname(
   refname : String,
   allow_onelevel : Bool,
 ) -> Bool {
-  if !(refname.has_prefix("refs/")) {
+  if !refname.has_prefix("refs/") {
     return true
   }
   let rest = String::unsafe_substring(refname, start=5, end=refname.length())
   if rest.length() == 0 || rest.has_suffix("/") {
     return true
   }
-  if !(allow_onelevel) && !(rest.contains("/")) {
+  if !allow_onelevel && !rest.contains("/") {
     return true
   }
   false
@@ -2520,13 +2520,13 @@ fn resolve_ref_canonical_name_inner(
     }
   }
   let path = git_dir + "/" + normalized
-  if !(fs.is_file(path)) {
+  if !fs.is_file(path) {
     return normalized
   }
   let line = decode_bytes(fs.read_file(path) catch { _ => return normalized })
     .trim()
     .to_string()
-  if !(line.has_prefix("ref: ")) {
+  if !line.has_prefix("ref: ") {
     return normalized
   }
   let target = String::unsafe_substring(line, start=5, end=line.length())
@@ -2639,7 +2639,7 @@ async fn run_push_hook_with_stdin(
 ) -> Int {
   let hook_git_dir = resolve_push_hook_git_dir(git_dir)
   let hook_path = hook_git_dir + "/hooks/" + hook_name
-  if !(fs.is_file(hook_path)) {
+  if !fs.is_file(hook_path) {
     return 0
   }
   let stdin_path = hook_git_dir +
@@ -2684,7 +2684,7 @@ async fn run_push_hook_with_args(
 ) -> Int {
   let hook_git_dir = resolve_push_hook_git_dir(git_dir)
   let hook_path = hook_git_dir + "/hooks/" + hook_name
-  if !(fs.is_file(hook_path)) {
+  if !fs.is_file(hook_path) {
     return 0
   }
   @process.run(hook_path, args, inherit_env=true, cwd=hook_git_dir) catch {
@@ -2710,7 +2710,7 @@ async fn apply_update_instead_worktree(
   new_id : @bitcore.ObjectId,
 ) -> Unit raise @bitcore.GitError {
   let status = @bitlib.status(fs, worktree_path)
-  if !(is_worktree_status_clean(status)) {
+  if !is_worktree_status_clean(status) {
     raise @bitcore.GitError::InvalidObject("working tree has pending changes")
   }
   let worktree_git_dir = match @bitlib.detect_git_dir(fs, worktree_path) {
@@ -2741,7 +2741,7 @@ async fn run_push_to_checkout_hook(
 ) -> Int {
   let hook_git_dir = resolve_push_hook_git_dir(git_dir)
   let hook_path = hook_git_dir + "/hooks/push-to-checkout"
-  if !(fs.is_file(hook_path)) {
+  if !fs.is_file(hook_path) {
     return -1
   }
   let worktree_git_dir = match @bitlib.detect_git_dir(fs, worktree_path) {

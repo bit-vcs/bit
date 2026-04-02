@@ -253,8 +253,7 @@ fn check_sha1_collisions_with_repo(
     }
     match existing {
       Some(base) =>
-        if base.obj_type != obj.obj_type ||
-          !(Bytes::equal(base.data, obj.data)) {
+        if base.obj_type != obj.obj_type || !Bytes::equal(base.data, obj.data) {
           raise @bitcore.GitError::PackfileError("SHA1 COLLISION FOUND")
         }
       None => ()
@@ -980,7 +979,7 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
             objects.iter(),
           )
           for base_hex in ref_delta_base_ids {
-            if !(pack_ids.contains(base_hex)) {
+            if !pack_ids.contains(base_hex) {
               for base in bases {
                 let id = @bitobject.hash_object_content_with_algo(
                   hash_algo,

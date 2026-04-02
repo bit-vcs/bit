@@ -45,7 +45,7 @@ async fn handle_bundle_create(args : Array[String]) -> Unit raise Error {
       "--all" => all = true
       _ if arg.has_prefix("^") =>
         excludes.push(String::unsafe_substring(arg, start=1, end=arg.length()))
-      _ if !(arg.has_prefix("-")) =>
+      _ if !arg.has_prefix("-") =>
         if bundle_file is None {
           bundle_file = Some(arg)
         } else {
@@ -74,7 +74,7 @@ async fn handle_bundle_create(args : Array[String]) -> Unit raise Error {
   let prereq_hexes : Array[String] = []
   let prereq_seen : Map[String, Bool] = {}
   let add_prereq = fn(hex : String) -> Unit {
-    if !(prereq_seen.contains(hex)) {
+    if !prereq_seen.contains(hex) {
       prereq_seen[hex] = true
       prereq_hexes.push(hex)
     }
@@ -166,13 +166,13 @@ fn collect_bundle_objects(
           @bitcore.ObjectType::Commit => {
             let info = @bitcore.parse_commit(obj.data)
             // Add tree
-            if !(visited.contains(info.tree.to_hex())) {
+            if !visited.contains(info.tree.to_hex()) {
               queue.push(info.tree)
             }
             // Add parents
             for parent in info.parents {
-              if !(visited.contains(parent.to_hex())) &&
-                !(exclude_ids.contains(parent.to_hex())) {
+              if !visited.contains(parent.to_hex()) &&
+                !exclude_ids.contains(parent.to_hex()) {
                 queue.push(parent)
               }
             }
@@ -180,7 +180,7 @@ fn collect_bundle_objects(
           @bitcore.ObjectType::Tree => {
             let entries = @bitcore.parse_tree(obj.data)
             for entry in entries {
-              if !(visited.contains(entry.id.to_hex())) {
+              if !visited.contains(entry.id.to_hex()) {
                 queue.push(entry.id)
               }
             }
@@ -197,7 +197,7 @@ fn collect_bundle_objects(
                   end=line.length(),
                 )
                 let target = @bitcore.ObjectId::from_hex(target_hex)
-                if !(visited.contains(target_hex)) {
+                if !visited.contains(target_hex) {
                   queue.push(target)
                 }
                 break
@@ -222,7 +222,7 @@ async fn handle_bundle_verify(args : Array[String]) -> Unit raise Error {
   for arg in args {
     match arg {
       "-q" | "--quiet" => quiet = true
-      _ if !(arg.has_prefix("-")) => bundle_file = Some(arg)
+      _ if !arg.has_prefix("-") => bundle_file = Some(arg)
       _ if arg.has_prefix("-") => warn_unimplemented_arg("bundle", arg)
       _ => ()
     }
@@ -238,7 +238,7 @@ async fn handle_bundle_verify(args : Array[String]) -> Unit raise Error {
     match @bitrepo.rev_parse(fs, git_dir, prereq) {
       Some(_) => ()
       None => {
-        if !(quiet) {
+        if !quiet {
           eprint_line("error: Repository lacks prerequisite commit: " + prereq)
         }
         ok = false
@@ -246,7 +246,7 @@ async fn handle_bundle_verify(args : Array[String]) -> Unit raise Error {
     }
   }
   if ok {
-    if !(quiet) {
+    if !quiet {
       print_line("The bundle contains \{refs.length()} ref(s)")
       for item in refs {
         let (id, name) = item
@@ -264,7 +264,7 @@ async fn handle_bundle_list_heads(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
   let mut bundle_file : String? = None
   for arg in args {
-    if !(arg.has_prefix("-")) {
+    if !arg.has_prefix("-") {
       bundle_file = Some(arg)
     } else {
       warn_unimplemented_arg("bundle", arg)
@@ -287,7 +287,7 @@ async fn handle_bundle_unbundle(args : Array[String]) -> Unit raise Error {
   let git_dir = find_git_dir(fs)
   let mut bundle_file : String? = None
   for arg in args {
-    if !(arg.has_prefix("-")) {
+    if !arg.has_prefix("-") {
       bundle_file = Some(arg)
     } else {
       warn_unimplemented_arg("bundle", arg)

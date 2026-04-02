@@ -192,7 +192,7 @@ fn resolve_hub_git_dir_with_bit_backend(root : String) -> String {
 
 ///|
 fn resolve_hub_git_dir_with_git_backend(root : String) -> String {
-  if !(can_use_hub_git_backend()) {
+  if !can_use_hub_git_backend() {
     return resolve_hub_git_dir_with_bit_backend(root)
   }
   match hub_git_repository_path(root) {
@@ -219,7 +219,7 @@ impl HubRepoBackend for GitHubRepoBackend with resolve_git_dir(_self, root) {
 
 ///|
 impl HubRepoBackend for GitHubRepoBackend with current_branch_name(_self, root) {
-  if !(can_use_hub_git_backend()) {
+  if !can_use_hub_git_backend() {
     let fallback = BitHubRepoBackend::{  }
     return fallback.current_branch_name(root)
   }

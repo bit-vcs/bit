@@ -92,7 +92,7 @@ async fn handle_interpret_trailers(args : Array[String]) -> Unit raise Error {
       result.write_string(trailer.1)
       result.write_char('\n')
     }
-    if !(no_divider) && existing.length() > 0 {
+    if !no_divider && existing.length() > 0 {
       // With divider, print separator line before trailers
       // but --parse implies --no-divider
     }

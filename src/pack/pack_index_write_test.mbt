@@ -9,7 +9,7 @@ fn read_fixture_bytes(path : String) -> Bytes raise {
 
 ///|
 fn assert_bytes_equal(actual : Bytes, expected : Bytes) -> Unit raise {
-  if !(Bytes::equal(actual, expected)) {
+  if !Bytes::equal(actual, expected) {
     fail(
       "bytes mismatch: actual=\{actual.length()} expected=\{expected.length()}",
     )

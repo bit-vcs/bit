@@ -269,7 +269,7 @@ async fn handle_hq_get(args : Array[String]) -> Unit raise Error {
 ///|
 /// hq list command handler
 async fn handle_hq_list(args : Array[String]) -> Unit {
-  let query : String? = if args.length() > 0 && !(args[0].has_prefix("-")) {
+  let query : String? = if args.length() > 0 && !args[0].has_prefix("-") {
     Some(args[0])
   } else {
     None
@@ -296,7 +296,7 @@ fn list_repos_recursive(
   if fs.is_dir(current + "/.git") {
     // Apply query filter
     match query {
-      Some(q) if !(rel_path.contains(q)) => ()
+      Some(q) if !rel_path.contains(q) => ()
       _ => repos.push(rel_path)
     }
     return repos

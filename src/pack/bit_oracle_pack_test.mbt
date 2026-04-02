@@ -163,7 +163,7 @@ async test "git oracle: index-pack accepts blob packfile" {
     remove_dir_recursive(temp_dir)
     return ()
   }
-  if !(@fs.path_exists(idx_path)) {
+  if !@fs.path_exists(idx_path) {
     println("idx file not created")
     remove_dir_recursive(temp_dir)
     return ()
@@ -268,9 +268,9 @@ async test "git oracle: parse pack-objects output" {
     return ()
   }
   // Check if packfile contains expected objects (skip if not)
-  if !(contains_string(parsed_ids, commit_hex)) ||
-    !(contains_string(parsed_ids, tree_hex)) ||
-    !(contains_string(parsed_ids, blob_hex)) {
+  if !contains_string(parsed_ids, commit_hex) ||
+    !contains_string(parsed_ids, tree_hex) ||
+    !contains_string(parsed_ids, blob_hex) {
     // Pack might not contain all objects in some cases
     remove_dir_recursive(repo_dir)
     return ()
@@ -384,7 +384,7 @@ async test "git oracle: parse delta packfile from git" {
     }
   }
   // Skip if we didn't find both blobs
-  if !(found_base) || !(found_modified) {
+  if !found_base || !found_modified {
     remove_dir_recursive(repo_dir)
     return ()
   }
@@ -554,7 +554,7 @@ async test "git oracle: pack index verified by git" {
     let hello_hash = @bit.hash_blob(blob1).to_hex()
     let world_hash = @bit.hash_blob(blob2).to_hex()
     // These should be in the output, but don't fail test if not
-    if !(out_str.contains(hello_hash)) || !(out_str.contains(world_hash)) {
+    if !out_str.contains(hello_hash) || !out_str.contains(world_hash) {
       println("Warning: blob hashes not found in verify-pack output")
     }
   }
@@ -722,7 +722,7 @@ async test "git oracle: parse tree with subdirectory" {
       found_dir = true
     }
   }
-  if !(found_dir) {
+  if !found_dir {
     remove_dir_recursive(repo_dir)
     return ()
   }
@@ -1142,7 +1142,7 @@ async test "git oracle: executable file mode 100755" {
   let lstree_str = bytes_to_string_lossy(lstree_out)
   // Check if git recorded the file as executable
   // ls-tree output: "100755 blob <hash>\tscript.sh"
-  if !(lstree_str.contains("100755")) {
+  if !lstree_str.contains("100755") {
     // Git might not have recorded it as executable (depends on config)
     remove_dir_recursive(repo_dir)
     return ()
@@ -1245,7 +1245,7 @@ async test "git oracle: symlink mode 120000" {
   }
   // If symlink wasn't found, it's not necessarily an error
   // (some systems don't support symlinks or git didn't track it)
-  if !(found_link) {
+  if !found_link {
     remove_dir_recursive(repo_dir)
     return ()
   }
@@ -1974,7 +1974,7 @@ async test "git oracle: git rm removes file from index" {
   assert_true(status.contains("D"))
   assert_true(status.contains("to_remove.txt"))
   // File should not exist on disk
-  assert_true(!(@fs.path_exists("\{repo_dir}/to_remove.txt")))
+  assert_true(!@fs.path_exists("\{repo_dir}/to_remove.txt"))
   remove_dir_recursive(repo_dir)
 }
 
@@ -2033,7 +2033,7 @@ async test "git oracle: git mv renames file" {
     (status.contains("old_name") && status.contains("new_name")),
   )
   // Old file should not exist, new file should exist
-  assert_true(!(@fs.path_exists("\{repo_dir}/old_name.txt")))
+  assert_true(!@fs.path_exists("\{repo_dir}/old_name.txt"))
   assert_true(@fs.path_exists("\{repo_dir}/new_name.txt"))
   remove_dir_recursive(repo_dir)
 }
@@ -2496,7 +2496,7 @@ async test "git oracle: git clean removes untracked files" {
     return ()
   }
   // Untracked file should be removed
-  assert_true(!(@fs.path_exists("\{repo_dir}/untracked.txt")))
+  assert_true(!@fs.path_exists("\{repo_dir}/untracked.txt"))
   // Tracked file should still exist
   assert_true(@fs.path_exists("\{repo_dir}/tracked.txt"))
   remove_dir_recursive(repo_dir)

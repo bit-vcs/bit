@@ -39,7 +39,7 @@ async fn handle_check_ignore(args : Array[String]) -> Unit raise Error {
     i += 1
   }
   // non-matching requires verbose
-  if non_matching && !(verbose) {
+  if non_matching && !verbose {
     eprint_line("fatal: -n / --non-matching is only valid with -v")
     @sys.exit(128)
     return
@@ -58,7 +58,7 @@ async fn handle_check_ignore(args : Array[String]) -> Unit raise Error {
       }
     }
   }
-  if paths.length() == 0 && !(use_stdin) {
+  if paths.length() == 0 && !use_stdin {
     eprint_line("usage: git check-ignore [<options>] <pathname>...")
     @sys.exit(128)
     return
@@ -117,7 +117,7 @@ async fn handle_check_ignore(args : Array[String]) -> Unit raise Error {
     let ignored = path_matcher.is_ignored(normalized, is_dir)
     if ignored {
       had_match = true
-      if !(quiet) {
+      if !quiet {
         if verbose {
           // Verbose: show which rule matched
           let match_info = check_ignore_find_rule(
@@ -142,7 +142,7 @@ async fn handle_check_ignore(args : Array[String]) -> Unit raise Error {
       print_str("::\t" + path + line_sep)
     }
   }
-  if !(had_match) {
+  if !had_match {
     @sys.exit(1)
   }
 }
@@ -230,7 +230,7 @@ fn check_ignore_scan_file(
   let mut result_source = ""
   let mut result_linenum = 0
   let mut result_pattern = ""
-  if !(fs.is_file(file_path)) {
+  if !fs.is_file(file_path) {
     return (result_source, result_linenum, result_pattern)
   }
   let content = decode_bytes(

@@ -18,7 +18,7 @@ pub fn fast_import_parse_data(
     return { content: Bytes::new(0), next_line: start }
   }
   let line = lines[start]
-  if !(line.has_prefix("data ")) {
+  if !line.has_prefix("data ") {
     return { content: Bytes::new(0), next_line: start + 1 }
   }
   let rest = String::unsafe_substring(line, start=5, end=line.length())

@@ -156,7 +156,7 @@ pub fn Hub::check_merge_policy(
   let (approved_count, has_request_changes) = summarize_latest_review_state(
     reviews,
   )
-  if !(policy.allow_request_changes) && has_request_changes {
+  if !policy.allow_request_changes && has_request_changes {
     raise @bit.GitError::InvalidObject(
       "Merge blocked by policy: request-changes review is present",
     )
@@ -618,7 +618,7 @@ fn create_tree_from_files(
           String::unsafe_substring(path, start=idx + 1, end=path.length()),
         )
     }
-    if !(tree_map.contains(dir)) {
+    if !tree_map.contains(dir) {
       tree_map[dir] = []
     }
     let arr = tree_map.get(dir)

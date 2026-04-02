@@ -124,7 +124,7 @@ fn parse_work_item_state_for_list(
       "Unknown \{unknown_state_label} state: \{value}",
     )
   }
-  if !(allow_merged) && parsed == @hub.WorkItemState::Merged {
+  if !allow_merged && parsed == @hub.WorkItemState::Merged {
     raise @bitcore.GitError::InvalidObject(
       "Unknown \{unknown_state_label} state: \{value}",
     )
@@ -410,7 +410,7 @@ async fn handle_hub_issue_list(args : Array[String]) -> Unit raise Error {
     match args[j] {
       "--all" => show_all = true
       "--tree" => show_tree = true
-      "--relay" if j + 1 < args.length() && !(args[j + 1].has_prefix("-")) => {
+      "--relay" if j + 1 < args.length() && !args[j + 1].has_prefix("-") => {
         relay_url = Some(args[j + 1])
         j += 1
       }
@@ -475,12 +475,12 @@ async fn handle_hub_issue_list(args : Array[String]) -> Unit raise Error {
     if filter_labels.length() > 0 {
       let mut has_all = true
       for label in filter_labels {
-        if !(issue.labels.contains(label)) {
+        if !issue.labels.contains(label) {
           has_all = false
           break
         }
       }
-      if !(has_all) {
+      if !has_all {
         continue
       }
     }

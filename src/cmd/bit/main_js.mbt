@@ -22,7 +22,7 @@ async fn main_js_async() -> Unit {
         show_help_js()
         return
       }
-      _ if !(args[i].has_prefix("-")) => break
+      _ if !args[i].has_prefix("-") => break
       _ => ()
     }
     i += 1

@@ -34,7 +34,7 @@ async fn handle_shortlog(args : Array[String]) -> Unit raise Error {
       "-n" | "--numbered" => numbered = true
       "-s" | "--summary" => summary = true
       "-e" | "--email" => email = true
-      _ if arg.has_prefix("-") && !(arg.has_prefix("--")) => {
+      _ if arg.has_prefix("-") && !arg.has_prefix("--") => {
         // Could be -N for count
         let num_str = String::unsafe_substring(arg, start=1, end=arg.length())
         let n = parse_int(num_str)
@@ -113,7 +113,7 @@ async fn handle_shortlog(args : Array[String]) -> Unit raise Error {
   for entry in authors {
     let (author, commits) = entry
     print_line("\{author} (\{commits.length()}):")
-    if !(summary) {
+    if !summary {
       for commit in commits {
         print_line("      \{commit}")
       }

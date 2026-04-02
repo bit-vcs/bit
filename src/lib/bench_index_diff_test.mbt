@@ -24,7 +24,7 @@ fn bench_index_join_path(root : String, path : String) -> String {
 
 ///|
 fn bench_index_ensure_dir(path : String) -> Unit {
-  if !(@fs.path_exists(path)) {
+  if !@fs.path_exists(path) {
     @fs.create_dir(path) catch {
       _ => ()
     }

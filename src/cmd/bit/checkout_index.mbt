@@ -35,7 +35,7 @@ async fn handle_checkout_index(args : Array[String]) -> Unit raise Error {
       "--" => past_dashdash = true
       _ if arg.has_prefix("--prefix=") =>
         prefix = String::unsafe_substring(arg, start=9, end=arg.length())
-      _ if arg.has_prefix("-") && !(past_dashdash) =>
+      _ if arg.has_prefix("-") && !past_dashdash =>
         warn_unimplemented_arg("checkout-index", arg)
       _ => positional.push(arg)
     }
@@ -75,7 +75,7 @@ async fn handle_checkout_index(args : Array[String]) -> Unit raise Error {
       }
     }
   }
-  if files_to_checkout.length() == 0 && !(all) {
+  if files_to_checkout.length() == 0 && !all {
     // Nothing to do — git checkout-index with no args does nothing
     return
   }
@@ -104,7 +104,7 @@ async fn handle_checkout_index(args : Array[String]) -> Unit raise Error {
           root + "/" + path
         }
         // Check if file already exists (unless --force or --temp)
-        if !(force) && !(temp) && fs.is_file(dest_path) {
+        if !force && !temp && fs.is_file(dest_path) {
           eprint_line("git checkout-index: \{path} already exists, no checkout")
           continue
         }

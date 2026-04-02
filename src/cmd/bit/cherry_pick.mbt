@@ -5,7 +5,7 @@ fn cherry_pick_is_supported_noop_arg(arg : String) -> Bool {
 
 ///|
 fn cherry_pick_is_positional_arg(arg : String) -> Bool {
-  arg == "-" || !(arg.has_prefix("-"))
+  arg == "-" || !arg.has_prefix("-")
 }
 
 ///|
@@ -38,7 +38,7 @@ fn cherry_pick_collect_linear_replay_commits(
       _ => None
     }
   }
-  if !(reached_stop) {
+  if !reached_stop {
     return []
   }
   commits.rev_in_place()
@@ -251,7 +251,7 @@ async fn handle_subdir_cherry_pick(
     Some(pt) => pt.to_hex() != utree.to_hex()
     None => true
   }
-  if !(changed) {
+  if !changed {
     print_line("Commit \{spec} does not change \{subdir_path}, skipping.")
     return
   }

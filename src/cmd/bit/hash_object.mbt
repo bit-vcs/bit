@@ -35,14 +35,14 @@ async fn handle_hash_object(args : Array[String]) -> Unit raise Error {
         let raw_content = read_all_stdin()
         let rfs : &@bitcore.RepoFileSystem = fs
         let content = if resolved_path_hint.length() > 0 &&
-          !(hash_args.no_filters) {
+          !hash_args.no_filters {
           let autocrlf = @bitlib.read_autocrlf_setting(rfs, git_dir)
           let attrs = @bitlib.resolve_eol_attrs(rfs, root, resolved_path_hint)
           @bitlib.clean_for_storage(raw_content, attrs, autocrlf)
         } else {
           raw_content
         }
-        if !(hash_args.literally) {
+        if !hash_args.literally {
           hash_object_validate_content(hash_args.obj_type, content, algo~)
         }
         let id = @bitobject.hash_object_content_with_algo(
@@ -67,8 +67,8 @@ async fn handle_hash_object(args : Array[String]) -> Unit raise Error {
           fs, root, git_dir, algo, hash_args, text,
         )
       }
-      if !(hash_args.stdin_mode) &&
-        !(hash_args.stdin_paths) &&
+      if !hash_args.stdin_mode &&
+        !hash_args.stdin_paths &&
         hash_args.paths.length() == 0 {
         @runtime.run_storage_command(
           fs,
@@ -125,7 +125,7 @@ async fn hash_object_process_file_paths(
       let attrs = @bitlib.resolve_eol_attrs(rfs, root, filter_rel)
       @bitlib.clean_for_storage(content, attrs, autocrlf)
     }
-    if !(hash_args.literally) {
+    if !hash_args.literally {
       hash_object_validate_content(hash_args.obj_type, normalized, algo~)
     }
     let id = @bitobject.hash_object_content_with_algo(
@@ -268,14 +268,14 @@ async fn hash_object_validate_content(
   match obj_type {
     @bitcore.ObjectType::Commit => {
       let text = @utf8.decode_lossy(content[:])
-      if !(text.has_prefix("tree ")) {
+      if !text.has_prefix("tree ") {
         eprint_line("fatal: corrupt commit")
         @sys.exit(128)
       }
     }
     @bitcore.ObjectType::Tag => {
       let text = @utf8.decode_lossy(content[:])
-      if !(text.has_prefix("object ")) {
+      if !text.has_prefix("object ") {
         eprint_line("fatal: corrupt tag")
         @sys.exit(128)
       }

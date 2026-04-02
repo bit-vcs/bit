@@ -326,9 +326,9 @@ fn compare_clock(a : Map[String, Int64], b : Map[String, Int64]) -> Int {
       b_gt = true
     }
   }
-  if a_gt && !(b_gt) {
+  if a_gt && !b_gt {
     1
-  } else if b_gt && !(a_gt) {
+  } else if b_gt && !a_gt {
     -1
   } else {
     0
@@ -528,9 +528,9 @@ fn verify_record_by_policy(store : HubStore, record : HubRecord) -> Bool {
     Some(key) =>
       match record.signature {
         Some(_) => verify_record_signature(record, key)
-        None => !(store.require_signed)
+        None => !store.require_signed
       }
-    None => !(store.require_signed)
+    None => !store.require_signed
   }
 }
 
@@ -563,7 +563,7 @@ pub fn HubStore::get_record(
         Some(blob_obj) => {
           let text = @utf8.decode_lossy(blob_obj.data[:])
           let record = parse_hub_record(text)
-          if !(verify_record_by_policy(self, record)) {
+          if !verify_record_by_policy(self, record) {
             None
           } else if record.deleted {
             None
@@ -682,13 +682,13 @@ pub fn HubStore::list_records(
       Some(blob_obj) => {
         let text = @utf8.decode_lossy(blob_obj.data[:])
         let record = parse_hub_record(text)
-        if !(verify_record_by_policy(self, record)) {
+        if !verify_record_by_policy(self, record) {
           continue
         }
-        if !(record.key.has_prefix(prefix)) {
+        if !record.key.has_prefix(prefix) {
           continue
         }
-        if !(include_deleted_val) && record.deleted {
+        if !include_deleted_val && record.deleted {
           continue
         }
         result.push(record)

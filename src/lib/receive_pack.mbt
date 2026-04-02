@@ -92,7 +92,7 @@ fn normalize_receive_refname(refname : String) -> String raise @bit.GitError {
     _ =>
       raise @bit.GitError::ProtocolError("Invalid receive-pack ref: " + refname)
   }
-  if !(normalized.has_prefix("refs/")) {
+  if !normalized.has_prefix("refs/") {
     raise @bit.GitError::ProtocolError("Invalid receive-pack ref: " + refname)
   }
   normalized
@@ -241,7 +241,7 @@ fn receive_parse_cert_content(
     if in_sig {
       continue
     }
-    if !(in_body) {
+    if !in_body {
       if cert_line.length() == 0 {
         in_body = true
         continue
@@ -318,7 +318,7 @@ pub fn apply_receive_pack(
     pack_objects = @pack.parse_packfile(req.pack)
   }
   // Connectivity check BEFORE writing pack to disk
-  if !(skip_connectivity_check) && pack_objects.length() > 0 {
+  if !skip_connectivity_check && pack_objects.length() > 0 {
     let fail_oid = receive_connectivity_check(rfs, git_dir, pack_objects)
     if fail_oid is Some(oid) {
       return {
@@ -358,14 +358,14 @@ pub fn apply_receive_pack(
         let ff = receive_is_ancestor_commit(db, rfs, current_id, upd.new_id) catch {
           _ => false
         }
-        if !(ff) {
+        if !ff {
           rejected.push((refname, "non-fast-forward"))
           continue
         }
       }
     }
     if upd.new_id == @bit.ObjectId::zero() {
-      if !(receive_delete_ref(fs, rfs, git_dir, refname)) {
+      if !receive_delete_ref(fs, rfs, git_dir, refname) {
         rejected.push((refname, "ref not found"))
         continue
       }
@@ -570,7 +570,7 @@ fn receive_delete_ref(
     return true
   }
   let packed = join_path(git_dir, "packed-refs")
-  if !(rfs.is_file(packed)) {
+  if !rfs.is_file(packed) {
     return false
   }
   let data = rfs.read_file(packed)
@@ -753,16 +753,16 @@ fn receive_connectivity_check(
       // Check parents exist
       for parent in info.parents {
         let p_hex = parent.to_hex()
-        if !(pack_ids.contains(p_hex)) {
-          if !(receive_object_exists(rfs, db, repo_cache, parent)) {
+        if !pack_ids.contains(p_hex) {
+          if !receive_object_exists(rfs, db, repo_cache, parent) {
             return Some(obj.id.to_hex())
           }
         }
       }
       // Check tree exists
       let t_hex = info.tree.to_hex()
-      if !(pack_ids.contains(t_hex)) {
-        if !(receive_object_exists(rfs, db, repo_cache, info.tree)) {
+      if !pack_ids.contains(t_hex) {
+        if !receive_object_exists(rfs, db, repo_cache, info.tree) {
           return Some(obj.id.to_hex())
         }
       }

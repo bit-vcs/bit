@@ -107,8 +107,8 @@ async fn index_guided_status_walk(
   )
   // Post-walk sweep: any unvisited, non-skip-worktree entries are deleted
   for i, entry in index_entries {
-    if !(visited[i]) && !(skip_worktree.contains(entry.path)) {
-      if !(is_gitlink_mode_int(entry.mode)) {
+    if !visited[i] && !skip_worktree.contains(entry.path) {
+      if !is_gitlink_mode_int(entry.mode) {
         unstaged_deleted.push(entry.path)
       }
     }
@@ -156,7 +156,7 @@ async fn walk_dir_guided(
         break
       }
     }
-    if !(has_git) {
+    if !has_git {
       for entry in disk_dirs {
         if entry == ".git" || entry == ".bit" {
           has_git = true
@@ -201,7 +201,7 @@ async fn walk_dir_guided(
         let idx_pos = sorted_idx[ii].0
         let entry = index_entries[idx_pos]
         visited[idx_pos] = true
-        if !(is_gitlink_mode_int(entry.mode)) {
+        if !is_gitlink_mode_int(entry.mode) {
           check_file_against_index(
             fs,
             root,
@@ -224,7 +224,7 @@ async fn walk_dir_guided(
           name != ".jj" &&
           name != ".gitignore" {
           let child_rel = if rel == "" { name } else { rel + "/" + name }
-          if !(matcher.is_ignored(child_rel, false)) {
+          if !matcher.is_ignored(child_rel, false) {
             untracked.push(child_rel)
           }
         }
@@ -239,7 +239,7 @@ async fn walk_dir_guided(
         // Let the post-walk sweep handle it. But we need to avoid double-counting.
         // Actually: mark visited and add to deleted directly here.
         let entry = index_entries[idx_pos]
-        if !(is_gitlink_mode_int(entry.mode)) {
+        if !is_gitlink_mode_int(entry.mode) {
           unstaged_deleted.push(entry.path)
         }
         ii += 1
@@ -252,7 +252,7 @@ async fn walk_dir_guided(
         name != ".jj" &&
         name != ".gitignore" {
         let child_rel = if rel == "" { name } else { rel + "/" + name }
-        if !(matcher.is_ignored(child_rel, false)) {
+        if !matcher.is_ignored(child_rel, false) {
           untracked.push(child_rel)
         }
       }
@@ -262,7 +262,7 @@ async fn walk_dir_guided(
       let idx_pos = sorted_idx[ii].0
       visited[idx_pos] = true
       let entry = index_entries[idx_pos]
-      if !(is_gitlink_mode_int(entry.mode)) {
+      if !is_gitlink_mode_int(entry.mode) {
         unstaged_deleted.push(entry.path)
       }
       ii += 1
@@ -477,7 +477,7 @@ async fn check_file_against_index(
                   match info.mtime_nsec {
                     Some(mn) =>
                       if entry.mtime_sec != 0 || entry.mtime_nsec != 0 {
-                        stat_matches = !(size_mismatch) &&
+                        stat_matches = !size_mismatch &&
                           ms == entry.mtime_sec &&
                           mn == entry.mtime_nsec
                       }
@@ -492,7 +492,7 @@ async fn check_file_against_index(
             unstaged_modified.push(path)
           } else if size_mismatch {
             unstaged_modified.push(path)
-          } else if !(stat_matches) {
+          } else if !stat_matches {
             let content = fs.read_file(abs)
             let attrs = resolve_eol_attrs(fs, root, path)
             let content = match (attrs.filter, run_filter_cmd) {
@@ -547,7 +547,7 @@ async fn check_file_against_index(
           }
           if mode_changed {
             unstaged_modified.push(path)
-          } else if !(stat_matches) {
+          } else if !stat_matches {
             match @bitio.read_symlink_target_path(abs) {
               Some(target) => {
                 let id = target |> @utf8.encode |> @bit.hash_blob

@@ -17,7 +17,7 @@ pub fn CommitGraphFile::load(
   git_dir : String,
 ) -> CommitGraphFile? raise @bit.GitError {
   let graph_path = join_path(git_dir, "objects/info/commit-graph")
-  if !(rfs.is_file(graph_path)) {
+  if !rfs.is_file(graph_path) {
     return None
   }
   let data = rfs.read_file(graph_path)

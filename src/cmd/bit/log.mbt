@@ -141,7 +141,7 @@ fn log_find_tripledot(arg : String) -> Int {
 
 ///|
 fn is_short_count_flag(arg : String) -> Bool {
-  if !(arg.has_prefix("-")) || arg.length() <= 1 {
+  if !arg.has_prefix("-") || arg.length() <= 1 {
     return false
   }
   let raw = String::unsafe_substring(arg, start=1, end=arg.length())
@@ -291,7 +291,7 @@ fn log_storage_runtime_delegate_args(
     }
     i += 1
   }
-  if !(seen_oneline) || !(seen_limit) {
+  if !seen_oneline || !seen_limit {
     return None
   }
   let parsed = storage_runtime_parse_command("log", args) catch {
@@ -326,7 +326,7 @@ fn log_should_use_storage_runtime_in_repo(
   args : Array[String],
 ) -> Bool {
   log_should_use_storage_runtime(args) &&
-  !(log_storage_runtime_blocked_by_repo_config(rfs, git_dir))
+  !log_storage_runtime_blocked_by_repo_config(rfs, git_dir)
 }
 
 ///|
@@ -576,7 +576,7 @@ fn log_resolve_decorate_mode(
         )
         if config_entries.length() > 0 {
           let entry = config_entries[config_entries.length() - 1]
-          if !(entry.has_value) {
+          if !entry.has_value {
             return LogDecorationDisplayMode::Short
           }
           return log_parse_decorate_mode(entry.value).unwrap_or(
@@ -618,7 +618,7 @@ fn log_has_missing_exclude_decoration_value(
   let entries = log_read_config_entries(
     rfs, git_dir, "log", "excludeDecoration",
   )
-  entries.iter().any(fn(entry) { !(entry.has_value) })
+  entries.iter().any(fn(entry) { !entry.has_value })
 }
 
 ///|
@@ -649,15 +649,13 @@ fn log_should_include_decoration_ref(
   exclude_patterns : Array[String],
   include_all_refs : Bool,
 ) -> Bool {
-  if !(include_all_refs) && log_ref_hidden_by_default(refname) {
+  if !include_all_refs && log_ref_hidden_by_default(refname) {
     return false
   }
   if include_patterns.length() > 0 &&
-    !(
-      include_patterns
-      .iter()
-      .any(p => log_decoration_pattern_matches(refname, p)),
-    ) {
+    !include_patterns
+    .iter()
+    .any(p => log_decoration_pattern_matches(refname, p)) {
     return false
   }
   if exclude_patterns
@@ -1276,14 +1274,14 @@ fn log_resolve_pretty_color_directive(
   let mut always = false
   let mut target = lower
   if lower.has_prefix("auto,") {
-    if !(data.pretty_color_enabled) {
+    if !data.pretty_color_enabled {
       return ("", -1)
     }
     target = String::unsafe_substring(lower, start=5, end=lower.length())
   } else if lower.has_prefix("always,") {
     always = true
     target = String::unsafe_substring(lower, start=7, end=lower.length())
-  } else if !(data.pretty_color_enabled) {
+  } else if !data.pretty_color_enabled {
     return ("", -1)
   }
   if target == "reset" || target == "normal" {
@@ -1504,13 +1502,11 @@ fn log_build_ref_names(
   let all_ref_list = @bitrepo.show_ref(rfs, git_dir)
   let db = @bitlib.ObjectDb::load(rfs, log_resolve_common_git_dir(rfs, git_dir))
   for item in all_ref_list {
-    if !(
-        log_should_include_decoration_ref(
-          item.0,
-          options.include_patterns,
-          options.exclude_patterns,
-          options.include_all_refs,
-        ),
+    if !log_should_include_decoration_ref(
+        item.0,
+        options.include_patterns,
+        options.exclude_patterns,
+        options.include_all_refs,
       ) {
       continue
     }
@@ -1646,7 +1642,7 @@ fn log_resolve_common_git_dir(
   git_dir : String,
 ) -> String {
   let commondir_path = git_dir + "/commondir"
-  if !(rfs.is_file(commondir_path)) {
+  if !rfs.is_file(commondir_path) {
     return git_dir
   }
   let raw = @utf8.decode_lossy(
@@ -1683,7 +1679,7 @@ fn log_read_graft_parents(
   commit_id : @bitcore.ObjectId,
 ) -> Array[@bitcore.ObjectId]? {
   let graft_path = log_resolve_common_git_dir(rfs, git_dir) + "/info/grafts"
-  if !(rfs.is_file(graft_path)) {
+  if !rfs.is_file(graft_path) {
     return None
   }
   let content = @utf8.decode_lossy(
@@ -2152,11 +2148,11 @@ fn log_commit_diff_statuses(
   for file in diff_files {
     match file.kind {
       @bitdiff.DiffKind::Added =>
-        if !(renamed_added.contains(file.path)) {
+        if !renamed_added.contains(file.path) {
           statuses["A"] = true
         }
       @bitdiff.DiffKind::Deleted =>
-        if !(renamed_deleted.contains(file.path)) {
+        if !renamed_deleted.contains(file.path) {
           statuses["D"] = true
         }
       @bitdiff.DiffKind::Modified => ()
@@ -2171,12 +2167,12 @@ fn log_commit_matches_diff_filter_with_statuses(
   include_bits : Map[String, Bool],
   exclude : Map[String, Bool],
 ) -> Bool {
-  if !(log_has_diff_filter(include_bits, exclude)) {
+  if !log_has_diff_filter(include_bits, exclude) {
     return true
   }
   if include_bits.length() == 0 {
     for key, _ in statuses {
-      if !(exclude.contains(key)) {
+      if !exclude.contains(key) {
         return true
       }
     }
@@ -2206,7 +2202,7 @@ fn log_commit_matches_diff_filter(
   detect_renames : Bool,
   detect_copies : Bool,
 ) -> Bool raise Error {
-  if !(log_has_diff_filter(include_bits, exclude)) {
+  if !log_has_diff_filter(include_bits, exclude) {
     return true
   }
   let statuses = log_commit_diff_statuses(
@@ -2258,7 +2254,7 @@ fn log_commit_matches_history_filters(
   detect_renames : Bool,
   detect_copies : Bool,
 ) -> Bool raise Error {
-  if !(log_commit_matches_pathspecs(rfs, git_dir, db, commit_id, pathspecs)) {
+  if !log_commit_matches_pathspecs(rfs, git_dir, db, commit_id, pathspecs) {
     return false
   }
   log_commit_matches_diff_filter(
@@ -2337,7 +2333,7 @@ fn log_collect_raw_results(
     }
   }
   for path, entry in old_entries {
-    if !(new_entries.contains(path)) {
+    if !new_entries.contains(path) {
       deleted.push((path, entry))
     }
   }
@@ -2450,16 +2446,14 @@ fn log_grep_patterns_match(
   if patterns.length() == 0 {
     return true
   }
-  if !(all_match) {
+  if !all_match {
     return grep_patterns_match_message(
       message, patterns, pattern_type, ignore_case,
     )
   }
   for pattern in patterns {
-    if !(
-        grep_message_matches_pattern(
-          message, pattern, pattern_type, ignore_case,
-        ),
+    if !grep_message_matches_pattern(
+        message, pattern, pattern_type, ignore_case,
       ) {
       return false
     }
@@ -2490,7 +2484,7 @@ fn log_validate_reflog_grep_options(
   walk_reflogs : Bool,
   grep_reflog_patterns : Array[String],
 ) -> Unit raise Error {
-  if grep_reflog_patterns.length() > 0 && !(walk_reflogs) {
+  if grep_reflog_patterns.length() > 0 && !walk_reflogs {
     raise @bitcore.GitError::InvalidObject(
       "fatal: the option '--grep-reflog' requires '--walk-reflogs'",
     )
@@ -2533,26 +2527,22 @@ fn log_commit_matches_text_filters(
     all_match,
   )
   let effective_message_match = if grep_patterns.length() > 0 && invert_grep {
-    !(message_match)
+    !message_match
   } else {
     message_match
   }
-  if !(effective_message_match) {
+  if !effective_message_match {
     return false
   }
   let author_text = data.author_name + " <" + data.author_email + ">"
-  if !(
-      log_identity_patterns_match(
-        author_text, author_patterns, pattern_type, ignore_case,
-      ),
+  if !log_identity_patterns_match(
+      author_text, author_patterns, pattern_type, ignore_case,
     ) {
     return false
   }
   let committer_text = data.committer_name + " <" + data.committer_email + ">"
-  if !(
-      log_identity_patterns_match(
-        committer_text, committer_patterns, pattern_type, ignore_case,
-      ),
+  if !log_identity_patterns_match(
+      committer_text, committer_patterns, pattern_type, ignore_case,
     ) {
     return false
   }
@@ -2904,7 +2894,7 @@ fn log_sanitize_subject_for_format(s : String) -> String {
       (c >= '0' && c <= '9') {
       sb.write_char(c)
       last_was_dash = false
-    } else if !(last_was_dash) {
+    } else if !last_was_dash {
       sb.write_char('-')
       last_was_dash = true
     }
@@ -3451,7 +3441,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
       "--graph" => graph = true
       "--all" => all_refs = true
       "--" => pathspec_mode = true
-      "--not" => not_mode = !(not_mode)
+      "--not" => not_mode = !not_mode
       "--end-of-options" => end_of_options = true
       "--source" => source = true
       "--left-right" => left_right = true
@@ -3465,7 +3455,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         branch_patterns.push("*")
         saw_revision_input = true
       }
-      "--glob" if i + 1 < args.length() && !(args[i + 1].has_prefix("-")) => {
+      "--glob" if i + 1 < args.length() && !args[i + 1].has_prefix("-") => {
         log_append_glob_targets(rfs, git_dir, args[i + 1], revs)
         saw_revision_input = true
         i += 1
@@ -3734,7 +3724,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         continue
       }
       if line == "--not" {
-        stdin_not_mode = !(stdin_not_mode)
+        stdin_not_mode = !stdin_not_mode
         continue
       }
       if line == "--all" {
@@ -3769,7 +3759,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         saw_revision_input = true
         continue
       }
-      if line.has_prefix("-") && !(line.has_prefix("^")) {
+      if line.has_prefix("-") && !line.has_prefix("^") {
         raise @bitcore.GitError::InvalidObject(
           "invalid option '" + line + "' in --stdin mode",
         )
@@ -3882,31 +3872,27 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
       let mut reflog_index = start_reflog_index
       while reflog_index < entries.length() && emitted < max_count {
         let entry = entries[entries.length() - 1 - reflog_index]
-        if !(
-            log_grep_patterns_match(
-              entry.message,
-              grep_reflog_patterns,
-              grep_pattern_type,
-              grep_ignore_case,
-              all_match,
-            ),
+        if !log_grep_patterns_match(
+            entry.message,
+            grep_reflog_patterns,
+            grep_pattern_type,
+            grep_ignore_case,
+            all_match,
           ) {
           reflog_index += 1
           continue
         }
-        if !(
-            log_commit_matches_text_filters(
-              rfs,
-              reflog_db,
-              entry.new_id,
-              grep_patterns,
-              grep_pattern_type,
-              grep_ignore_case,
-              invert_grep,
-              all_match,
-              author_patterns,
-              committer_patterns,
-            ),
+        if !log_commit_matches_text_filters(
+            rfs,
+            reflog_db,
+            entry.new_id,
+            grep_patterns,
+            grep_pattern_type,
+            grep_ignore_case,
+            invert_grep,
+            all_match,
+            author_patterns,
+            committer_patterns,
           ) {
           reflog_index += 1
           continue
@@ -4052,17 +4038,15 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
       raw_fmt != "raw",
       simplify_by_decoration,
     )
-    let selection_ref_names = if !(
-        log_decoration_mode_is_none(decoration_options.mode),
+    let selection_ref_names = if !log_decoration_mode_is_none(
+        decoration_options.mode,
       ) ||
       simplify_by_decoration {
       log_build_ref_names(rfs, git_dir, decoration_options)
     } else {
       {}
     }
-    let ref_names_map = if !(
-        log_decoration_mode_is_none(decoration_options.mode),
-      ) {
+    let ref_names_map = if !log_decoration_mode_is_none(decoration_options.mode) {
       selection_ref_names
     } else {
       {}
@@ -4087,7 +4071,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         revs,
         branch_patterns,
         all_refs,
-        default_head=!(saw_revision_input),
+        default_head=!saw_revision_input,
         ignore_missing~,
       )
       let targets = if no_walk_unsorted {
@@ -4104,19 +4088,15 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         if seen.contains(hex) {
           continue
         }
-        if !(
-            log_commit_matches_text_filters(
-              rfs, db, id, grep_patterns, grep_pattern_type, grep_ignore_case, invert_grep,
-              all_match, author_patterns, committer_patterns,
-            ),
+        if !log_commit_matches_text_filters(
+            rfs, db, id, grep_patterns, grep_pattern_type, grep_ignore_case, invert_grep,
+            all_match, author_patterns, committer_patterns,
           ) {
           continue
         }
-        if !(
-            log_commit_matches_history_filters(
-              rfs, git_dir, db, id, pathspecs, diff_filter_include, diff_filter_exclude,
-              detect_renames, detect_copies,
-            ),
+        if !log_commit_matches_history_filters(
+            rfs, git_dir, db, id, pathspecs, diff_filter_include, diff_filter_exclude,
+            detect_renames, detect_copies,
           ) {
           continue
         }
@@ -4129,12 +4109,10 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
           continue
         }
         if simplify_by_decoration &&
-          !(
-            log_should_emit_simplified_entry(
-              selection_ref_names,
-              hex,
-              parents.length(),
-            ),
+          !log_should_emit_simplified_entry(
+            selection_ref_names,
+            hex,
+            parents.length(),
           ) {
           continue
         }
@@ -4161,7 +4139,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         revs,
         branch_patterns,
         all_refs,
-        default_head=!(saw_revision_input),
+        default_head=!saw_revision_input,
         ignore_missing~,
       )
       let start_ids : Array[@bitcore.ObjectId] = []
@@ -4227,34 +4205,30 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         if seen.contains(hex) {
           continue
         }
-        if !(
-            log_commit_matches_text_filters(
-              rfs,
-              db,
-              entry.id,
-              grep_patterns,
-              grep_pattern_type,
-              grep_ignore_case,
-              invert_grep,
-              all_match,
-              author_patterns,
-              committer_patterns,
-            ),
+        if !log_commit_matches_text_filters(
+            rfs,
+            db,
+            entry.id,
+            grep_patterns,
+            grep_pattern_type,
+            grep_ignore_case,
+            invert_grep,
+            all_match,
+            author_patterns,
+            committer_patterns,
           ) {
           continue
         }
-        if !(
-            log_commit_matches_history_filters(
-              rfs,
-              git_dir,
-              db,
-              entry.id,
-              pathspecs,
-              diff_filter_include,
-              diff_filter_exclude,
-              detect_renames,
-              detect_copies,
-            ),
+        if !log_commit_matches_history_filters(
+            rfs,
+            git_dir,
+            db,
+            entry.id,
+            pathspecs,
+            diff_filter_include,
+            diff_filter_exclude,
+            detect_renames,
+            detect_copies,
           ) {
           continue
         }
@@ -4267,12 +4241,10 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
           continue
         }
         if simplify_by_decoration &&
-          !(
-            log_should_emit_simplified_entry(
-              selection_ref_names,
-              hex,
-              parents.length(),
-            ),
+          !log_should_emit_simplified_entry(
+            selection_ref_names,
+            hex,
+            parents.length(),
           ) {
           continue
         }
@@ -4302,7 +4274,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
     return
   }
   // Show subdir-clone info if applicable (only in full format)
-  if !(oneline) {
+  if !oneline {
     match get_subdir_info(fs, git_dir) {
       Some((remote, path, base)) => {
         log_emit_output(
@@ -4324,9 +4296,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
     rfs, git_dir, decorate_mode_override, decoration_include_patterns, decoration_exclude_patterns,
     clear_decorations, false, true, simplify_by_decoration,
   )
-  let show_decorations = !(
-    log_decoration_mode_is_none(decoration_options.mode),
-  )
+  let show_decorations = !log_decoration_mode_is_none(decoration_options.mode)
   // Determine whether we need the new walk path
   let need_walk = all_refs ||
     show_decorations ||
@@ -4362,7 +4332,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
       revs,
       branch_patterns,
       all_refs,
-      default_head=!(saw_revision_input),
+      default_head=!saw_revision_input,
       ignore_missing~,
     )
     let targets = if no_walk_unsorted {
@@ -4389,19 +4359,15 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         if seen.contains(hex) {
           continue
         }
-        if !(
-            log_commit_matches_text_filters(
-              rfs, db, id, grep_patterns, grep_pattern_type, grep_ignore_case, invert_grep,
-              all_match, author_patterns, committer_patterns,
-            ),
+        if !log_commit_matches_text_filters(
+            rfs, db, id, grep_patterns, grep_pattern_type, grep_ignore_case, invert_grep,
+            all_match, author_patterns, committer_patterns,
           ) {
           continue
         }
-        if !(
-            log_commit_matches_history_filters(
-              rfs, git_dir, db, id, pathspecs, diff_filter_include, diff_filter_exclude,
-              detect_renames, detect_copies,
-            ),
+        if !log_commit_matches_history_filters(
+            rfs, git_dir, db, id, pathspecs, diff_filter_include, diff_filter_exclude,
+            detect_renames, detect_copies,
           ) {
           continue
         }
@@ -4412,12 +4378,10 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
               continue
             }
             if simplify_by_decoration &&
-              !(
-                log_should_emit_simplified_entry(
-                  selection_ref_names,
-                  hex,
-                  entry.parent_count,
-                ),
+              !log_should_emit_simplified_entry(
+                selection_ref_names,
+                hex,
+                entry.parent_count,
               ) {
               continue
             }
@@ -4443,19 +4407,15 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         if seen.contains(hex) {
           continue
         }
-        if !(
-            log_commit_matches_text_filters(
-              rfs, db, id, grep_patterns, grep_pattern_type, grep_ignore_case, invert_grep,
-              all_match, author_patterns, committer_patterns,
-            ),
+        if !log_commit_matches_text_filters(
+            rfs, db, id, grep_patterns, grep_pattern_type, grep_ignore_case, invert_grep,
+            all_match, author_patterns, committer_patterns,
           ) {
           continue
         }
-        if !(
-            log_commit_matches_history_filters(
-              rfs, git_dir, db, id, pathspecs, diff_filter_include, diff_filter_exclude,
-              detect_renames, detect_copies,
-            ),
+        if !log_commit_matches_history_filters(
+            rfs, git_dir, db, id, pathspecs, diff_filter_include, diff_filter_exclude,
+            detect_renames, detect_copies,
           ) {
           continue
         }
@@ -4473,12 +4433,10 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
               continue
             }
             if simplify_by_decoration &&
-              !(
-                log_should_emit_simplified_entry(
-                  selection_ref_names,
-                  hex,
-                  entry.parent_count,
-                ),
+              !log_should_emit_simplified_entry(
+                selection_ref_names,
+                hex,
+                entry.parent_count,
               ) {
               continue
             }
@@ -4552,7 +4510,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
       revs,
       branch_patterns,
       all_refs,
-      default_head=!(saw_revision_input),
+      default_head=!saw_revision_input,
       ignore_missing~,
     )
     // Build start_ids from explicit targets
@@ -4654,43 +4612,37 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
           continue
         }
         if simplify_by_decoration &&
-          !(
-            log_should_emit_simplified_entry(
-              selection_ref_names,
-              entry.id.to_hex(),
-              entry.parent_count,
-            ),
+          !log_should_emit_simplified_entry(
+            selection_ref_names,
+            entry.id.to_hex(),
+            entry.parent_count,
           ) {
           continue
         }
-        if !(
-            log_commit_matches_text_filters(
-              rfs,
-              walk_db,
-              entry.id,
-              grep_patterns,
-              grep_pattern_type,
-              grep_ignore_case,
-              invert_grep,
-              all_match,
-              author_patterns,
-              committer_patterns,
-            ),
+        if !log_commit_matches_text_filters(
+            rfs,
+            walk_db,
+            entry.id,
+            grep_patterns,
+            grep_pattern_type,
+            grep_ignore_case,
+            invert_grep,
+            all_match,
+            author_patterns,
+            committer_patterns,
           ) {
           continue
         }
-        if !(
-            log_commit_matches_history_filters(
-              rfs,
-              git_dir,
-              walk_db,
-              entry.id,
-              pathspecs,
-              diff_filter_include,
-              diff_filter_exclude,
-              detect_renames,
-              detect_copies,
-            ),
+        if !log_commit_matches_history_filters(
+            rfs,
+            git_dir,
+            walk_db,
+            entry.id,
+            pathspecs,
+            diff_filter_include,
+            diff_filter_exclude,
+            detect_renames,
+            detect_copies,
           ) {
           continue
         }
@@ -4722,43 +4674,37 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
           continue
         }
         if simplify_by_decoration &&
-          !(
-            log_should_emit_simplified_entry(
-              selection_ref_names,
-              entry.id.to_hex(),
-              entry.parent_count,
-            ),
+          !log_should_emit_simplified_entry(
+            selection_ref_names,
+            entry.id.to_hex(),
+            entry.parent_count,
           ) {
           continue
         }
-        if !(
-            log_commit_matches_text_filters(
-              rfs,
-              walk_db,
-              entry.id,
-              grep_patterns,
-              grep_pattern_type,
-              grep_ignore_case,
-              invert_grep,
-              all_match,
-              author_patterns,
-              committer_patterns,
-            ),
+        if !log_commit_matches_text_filters(
+            rfs,
+            walk_db,
+            entry.id,
+            grep_patterns,
+            grep_pattern_type,
+            grep_ignore_case,
+            invert_grep,
+            all_match,
+            author_patterns,
+            committer_patterns,
           ) {
           continue
         }
-        if !(
-            log_commit_matches_history_filters(
-              rfs,
-              git_dir,
-              walk_db,
-              entry.id,
-              pathspecs,
-              diff_filter_include,
-              diff_filter_exclude,
-              detect_renames,
-              detect_copies,
-            ),
+        if !log_commit_matches_history_filters(
+            rfs,
+            git_dir,
+            walk_db,
+            entry.id,
+            pathspecs,
+            diff_filter_include,
+            diff_filter_exclude,
+            detect_renames,
+            detect_copies,
           ) {
           continue
         }
@@ -4926,7 +4872,7 @@ async fn handle_whatchanged(args : Array[String]) -> Unit raise Error {
     )
     return
   }
-  if !(acknowledged) {
+  if !acknowledged {
     @stdio.stderr.write(
       "'git whatchanged' is nominated for removal.\n\nhint: You can replace 'git whatchanged <opts>' with:\nhint:\tgit log <opts> --raw --no-merges\nhint: Or make an alias:\nhint:\tgit config set --global alias.whatchanged 'log --raw --no-merges'\n\nIf you still use this command, here's what you can do:\n\n- read https://git-scm.com/docs/BreakingChanges.html\n- check if anyone has discussed this on the mailing\n  list and if they came up with something that can\n  help you: https://lore.kernel.org/git/?q=git%20whatchanged\n- send an email to <git@vger.kernel.org> to let us\n  know that you still use this command and were unable\n  to determine a suitable replacement\n\nfatal: refusing to run without --i-still-use-this\n",
     )
@@ -4981,7 +4927,7 @@ fn log_walk_commits(
   let queue : Array[(Int64, @bitcore.ObjectId)] = []
   for id in start_ids {
     let hex = id.to_hex()
-    if !(visited.contains(hex)) && !(exclude_ids.contains(hex)) {
+    if !visited.contains(hex) && !exclude_ids.contains(hex) {
       // Get timestamp for sorting
       let ts = log_get_commit_timestamp(db, rfs, id)
       log_queue_insert(queue, (ts, id))
@@ -5019,7 +4965,7 @@ fn log_walk_commits(
     }
     for parent in parents_to_walk {
       let phex = parent.to_hex()
-      if !(visited.contains(phex)) && !(exclude_ids.contains(phex)) {
+      if !visited.contains(phex) && !exclude_ids.contains(phex) {
         visited[phex] = true
         let pts = log_get_commit_timestamp(db, rfs, parent)
         log_queue_insert(queue, (pts, parent))

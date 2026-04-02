@@ -108,7 +108,7 @@ async fn handle_restore(args : Array[String]) -> Unit raise Error {
     eprint_line("fatal: you must specify path(s) to restore")
     @sys.exit(128)
   }
-  if !(staged) && !(worktree) {
+  if !staged && !worktree {
     worktree = true
   }
   let special_name = restore_first_special_mode_name(
@@ -135,16 +135,16 @@ async fn handle_restore(args : Array[String]) -> Unit raise Error {
     )
     return
   }
-  if source is None && worktree && !(staged) {
+  if source is None && worktree && !staged {
     let (matched_unmerged, filtered_paths) = restore_filter_unmerged_paths(
       rfs, git_dir, paths,
     )
     if matched_unmerged.length() > 0 {
-      if !(ignore_unmerged) {
+      if !ignore_unmerged {
         eprint_line("error: path '\{matched_unmerged[0]}' is unmerged")
         @sys.exit(1)
       }
-      if !(quiet) {
+      if !quiet {
         for path in matched_unmerged {
           eprint_line("warning: path '\{path}' is unmerged")
         }
@@ -391,7 +391,7 @@ fn restore_expand_cli_paths(
   for path in raw_paths {
     let matched = restore_expand_single_cli_path(path, tracked_paths)
     for item in matched {
-      if !(seen.contains(item)) {
+      if !seen.contains(item) {
         expanded.push(item)
         seen[item] = true
       }
@@ -408,13 +408,13 @@ fn restore_collect_tracked_paths(
   let tracked : Array[String] = []
   let seen : Map[String, Bool] = {}
   for entry in @bitlib.read_index_entries(rfs, git_dir) {
-    if !(seen.contains(entry.path)) {
+    if !seen.contains(entry.path) {
       tracked.push(entry.path)
       seen[entry.path] = true
     }
   }
   for path, _ in @bitlib.read_unmerged_paths(rfs, git_dir) {
-    if !(seen.contains(path)) {
+    if !seen.contains(path) {
       tracked.push(path)
       seen[path] = true
     }

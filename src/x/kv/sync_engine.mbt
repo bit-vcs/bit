@@ -179,7 +179,7 @@ fn select_random_unique(
   while selected.length() < count && used.length() < peers.length() {
     current_seed = (current_seed * 1103515245L + 12345L) % 2147483648L
     let idx = (current_seed % peers.length().to_int64()).to_int()
-    if !(used.contains(idx)) {
+    if !used.contains(idx) {
       used[idx] = true
       selected.push(peers[idx])
     }

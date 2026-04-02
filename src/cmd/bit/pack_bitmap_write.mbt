@@ -39,7 +39,7 @@ fn bitmap_collect_tips(
     match parsed {
       Some(id) => {
         let hex = id.to_hex()
-        if !(seen.contains(hex)) {
+        if !seen.contains(hex) {
           match pos_by_oid.get(hex) {
             Some(pack_pos) => {
               seen[hex] = true
@@ -57,7 +57,7 @@ fn bitmap_collect_tips(
   match head {
     Some(id) => {
       let hex = id.to_hex()
-      if !(seen.contains(hex)) {
+      if !seen.contains(hex) {
         match pos_by_oid.get(hex) {
           Some(pack_pos) => {
             seen[hex] = true

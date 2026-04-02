@@ -168,7 +168,7 @@ async fn handle_tag(args : Array[String]) -> Unit raise Error {
           String::unsafe_substring(arg, start=12, end=arg.length()),
         )
       "--points-at" => {
-        if i + 1 < args.length() && !(args[i + 1].has_prefix("-")) {
+        if i + 1 < args.length() && !args[i + 1].has_prefix("-") {
           points_at.push(args[i + 1])
           i += 2
           continue
@@ -178,7 +178,7 @@ async fn handle_tag(args : Array[String]) -> Unit raise Error {
       _ if arg.has_prefix("--merged=") =>
         merged = Some(String::unsafe_substring(arg, start=9, end=arg.length()))
       "--merged" => {
-        if i + 1 < args.length() && !(args[i + 1].has_prefix("-")) {
+        if i + 1 < args.length() && !args[i + 1].has_prefix("-") {
           merged = Some(args[i + 1])
           i += 2
           continue
@@ -190,7 +190,7 @@ async fn handle_tag(args : Array[String]) -> Unit raise Error {
           String::unsafe_substring(arg, start=12, end=arg.length()),
         )
       "--no-merged" => {
-        if i + 1 < args.length() && !(args[i + 1].has_prefix("-")) {
+        if i + 1 < args.length() && !args[i + 1].has_prefix("-") {
           no_merged = Some(args[i + 1])
           i += 2
           continue
@@ -202,7 +202,7 @@ async fn handle_tag(args : Array[String]) -> Unit raise Error {
       "--color=auto" => color_mode = "auto"
       "--no-color" | "--color=never" => color_mode = "never"
       "--column" => {
-        if i + 1 < args.length() && !(args[i + 1].has_prefix("-")) {
+        if i + 1 < args.length() && !args[i + 1].has_prefix("-") {
           column_mode = Some(args[i + 1])
           i += 2
           continue
@@ -214,7 +214,7 @@ async fn handle_tag(args : Array[String]) -> Unit raise Error {
         column_mode = Some(
           String::unsafe_substring(arg, start=9, end=arg.length()),
         )
-      _ if !(arg.has_prefix("-")) =>
+      _ if !arg.has_prefix("-") =>
         if delete_mode {
           delete_tags.push(arg)
         } else if explicit_list {
@@ -269,12 +269,12 @@ async fn handle_tag(args : Array[String]) -> Unit raise Error {
     )
   }
   // Determine list mode: if no create/delete args, default to list
-  if !(delete_mode) &&
-    !(annotated) &&
+  if !delete_mode &&
+    !annotated &&
     message is None &&
     message_file is None &&
-    !(force) &&
-    !(verify_mode) {
+    !force &&
+    !verify_mode {
     if tag_name is None {
       list_mode = true
     } else if explicit_list || list_like {
@@ -355,7 +355,7 @@ async fn handle_tag(args : Array[String]) -> Unit raise Error {
             break
           }
         }
-        if !(matched) {
+        if !matched {
           continue
         }
       }
@@ -375,7 +375,7 @@ async fn handle_tag(args : Array[String]) -> Unit raise Error {
             None => ()
           }
         }
-        if !(matches) {
+        if !matches {
           continue
         }
       }
@@ -492,7 +492,7 @@ async fn handle_tag(args : Array[String]) -> Unit raise Error {
     @sys.exit(128)
     return
   }
-  if !(tag_is_valid_name(name)) {
+  if !tag_is_valid_name(name) {
     raise @bitcore.GitError::InvalidObject("invalid tag name: " + name)
   }
   // Resolve target (default to HEAD)
@@ -501,8 +501,7 @@ async fn handle_tag(args : Array[String]) -> Unit raise Error {
   guard resolved_target is Some(id) else {
     raise @bitcore.GitError::InvalidObject("unknown revision: \{target_ref}")
   }
-  if !(force) &&
-    @bitlib.resolve_ref(fs, git_dir, "refs/tags/" + name) is Some(_) {
+  if !force && @bitlib.resolve_ref(fs, git_dir, "refs/tags/" + name) is Some(_) {
     raise @bitcore.GitError::InvalidObject("tag '\{name}' already exists")
   }
   let (tag_message, edit_path) = tag_resolve_message(
@@ -609,7 +608,7 @@ fn tag_expand_short_bundles(args : Array[String]) -> Array[String] {
 
 ///|
 fn tag_expand_short_bundle_arg(arg : String) -> Array[String]? {
-  if arg.length() <= 2 || !(arg.has_prefix("-")) || arg.has_prefix("--") {
+  if arg.length() <= 2 || !arg.has_prefix("-") || arg.has_prefix("--") {
     return None
   }
   let chars = arg.to_array()
@@ -730,7 +729,7 @@ fn tag_apply_column_mode(
         raise @bitcore.GitError::InvalidObject("unsupported option '\{token}'")
     }
   }
-  if saw_layout && !(saw_enable) {
+  if saw_layout && !saw_enable {
     next_enabled_state = "enabled"
   }
   (next_enabled_state, next_layout, next_dense)
@@ -915,7 +914,7 @@ fn tag_format_columns_with_layout(
       } else {
         idx + rows >= items.length()
       }
-      if !(newline) {
+      if !newline {
         let cell_width = widths[x] + padding
         line += " ".repeat(cell_width - lengths[idx])
       }
@@ -966,13 +965,13 @@ fn tag_apply_trailers(message : String, trailers : Array[String]) -> String {
     last_nonblank -= 1
   }
   let need_blank = if last_nonblank >= 0 {
-    !(commit_is_trailer_line(lines[last_nonblank]))
+    !commit_is_trailer_line(lines[last_nonblank])
   } else {
     true
   }
   let result = StringBuilder::new()
   result.write_string(message)
-  if !(message.has_suffix("\n")) {
+  if !message.has_suffix("\n") {
     result.write_char('\n')
   }
   if need_blank {
@@ -1292,7 +1291,7 @@ fn tag_edit_buffer_template(initial_message : String?) -> String {
     Some(message) =>
       if message.length() > 0 {
         sb.write_string(message)
-        if !(message.has_suffix("\n")) {
+        if !message.has_suffix("\n") {
           sb.write_string("\n")
         }
         sb.write_string("\n")
@@ -1362,7 +1361,7 @@ fn tag_cleanup_message(raw : String) -> String {
   for line in lines {
     let blank = line.trim().to_string().length() == 0
     if blank {
-      if !(previous_blank) {
+      if !previous_blank {
         compact.push("")
       }
       previous_blank = true
@@ -1560,9 +1559,7 @@ fn tag_maybe_append_reflog(
   if create_reflog {
     @bitrepo.create_reflog(wfs, rfs, git_dir, refname)
   }
-  if !(create_reflog) &&
-    !(always) &&
-    !(@bitrepo.reflog_exists(rfs, git_dir, refname)) {
+  if !create_reflog && !always && !@bitrepo.reflog_exists(rfs, git_dir, refname) {
     return
   }
   let name_end = tagger.find(" <").unwrap_or(tagger.length())
@@ -1733,7 +1730,7 @@ fn tag_apply_list_filters(
     let commit_id = tag_peel_to_commit(fs, db, ref_id)
     guard commit_id is Some(cid) else { continue }
     match merged_id {
-      Some(mid) => if !(tag_is_ancestor(fs, db, cid, mid)) { continue }
+      Some(mid) => if !tag_is_ancestor(fs, db, cid, mid) { continue }
       None => ()
     }
     match no_merged_id {
@@ -1741,10 +1738,7 @@ fn tag_apply_list_filters(
       None => ()
     }
     match contains_id {
-      Some(ancestor) =>
-        if !(tag_is_ancestor(fs, db, ancestor, cid)) {
-          continue
-        }
+      Some(ancestor) => if !tag_is_ancestor(fs, db, ancestor, cid) { continue }
       None => ()
     }
     match no_contains_id {
@@ -1809,7 +1803,7 @@ fn tag_validate_sort_keys(sort_keys : Array[String]) -> Unit raise Error {
     } else {
       key
     }
-    if !(tag_is_valid_sort_field(sort_field)) {
+    if !tag_is_valid_sort_field(sort_field) {
       raise @bitcore.GitError::InvalidObject(
         "unsupported sort specification: " + sort_field,
       )
@@ -1951,8 +1945,8 @@ fn tag_versionsort_parse_config_text(
       in_versionsort = section.to_lower() == "versionsort"
     } else if in_versionsort &&
       trimmed.length() > 0 &&
-      !(trimmed.has_prefix("#")) &&
-      !(trimmed.has_prefix(";")) {
+      !trimmed.has_prefix("#") &&
+      !trimmed.has_prefix(";") {
       match trimmed.find("=") {
         Some(idx) => {
           let key = trim_string(
@@ -2141,7 +2135,7 @@ fn tag_version_compare_with_suffixes(
     2 => diff
     3 => {
       while tag_version_is_digit(tag_version_char_at(a_chars, i1)) {
-        if !(tag_version_is_digit(tag_version_char_at(b_chars, i2))) {
+        if !tag_version_is_digit(tag_version_char_at(b_chars, i2)) {
           return 1
         }
         i1 += 1

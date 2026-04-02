@@ -71,7 +71,7 @@ test "gc_repo reports unreachable objects" {
     String::unsafe_substring(hex, start=0, end=2) +
     "/" +
     String::unsafe_substring(hex, start=2, end=hex.length())
-  assert_true(!(fs.is_file(orphan_path)))
+  assert_true(!fs.is_file(orphan_path))
   match result.pack {
     None => fail("expected pack")
     Some(r) => assert_true(r.object_count == 3)

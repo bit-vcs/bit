@@ -8,7 +8,7 @@ pub fn read_tables_list(
   git_dir : String,
 ) -> Array[String] raise @object.GitError {
   let path = git_dir + "/reftable/tables.list"
-  if !(fs.is_file(path)) {
+  if !fs.is_file(path) {
     return []
   }
   let data = fs.read_file(path)

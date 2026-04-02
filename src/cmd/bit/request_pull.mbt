@@ -9,7 +9,7 @@ async fn handle_request_pull(args : Array[String]) -> Unit raise Error {
     match arg {
       "-p" => ()
       _ if arg.has_prefix("--signoff=") => ()
-      _ if !(arg.has_prefix("-")) => positional.push(arg)
+      _ if !arg.has_prefix("-") => positional.push(arg)
       _ if arg.has_prefix("-") => warn_unimplemented_arg("request-pull", arg)
       _ => ()
     }
@@ -124,7 +124,7 @@ fn plumb_get_first_line_of_commit(data : Bytes) -> String {
   let mut in_body = false
   for line_view in text.split("\n") {
     let line = line_view.to_string()
-    if !(in_body) {
+    if !in_body {
       if line.length() == 0 {
         in_body = true
       }

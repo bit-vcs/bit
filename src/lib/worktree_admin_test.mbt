@@ -388,7 +388,7 @@ test "worktree admin: create_worktree resolves HEAD to detached commit" {
   )
 
   let linked_head = fs.read_string("/repo/.git/worktrees/head-detached/HEAD")
-  assert_true(!(linked_head.has_prefix("ref: ")))
+  assert_true(!linked_head.has_prefix("ref: "))
   assert_eq(fs.read_string("/repo/head-detached/init.t"), "main\n")
 }
 

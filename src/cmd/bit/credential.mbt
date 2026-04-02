@@ -12,7 +12,7 @@ async fn handle_credential(args : Array[String]) -> Unit raise Error {
         )
         return
       }
-      _ if !(arg.has_prefix("-")) => positional.push(arg)
+      _ if !arg.has_prefix("-") => positional.push(arg)
       _ => ()
     }
   }

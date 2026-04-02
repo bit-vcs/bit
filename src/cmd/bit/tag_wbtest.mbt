@@ -153,10 +153,10 @@ test "tag: sort field aliases normalize to refname variants" {
 ///|
 test "tag: validate tag name rejects invalid forms" {
   assert_true(tag_is_valid_name("release/v1.0"))
-  assert_true(!(tag_is_valid_name(".othertag")))
-  assert_true(!(tag_is_valid_name("other tag")))
-  assert_true(!(tag_is_valid_name("othertag^")))
-  assert_true(!(tag_is_valid_name("other~tag")))
+  assert_true(!tag_is_valid_name(".othertag"))
+  assert_true(!tag_is_valid_name("other tag"))
+  assert_true(!tag_is_valid_name("othertag^"))
+  assert_true(!tag_is_valid_name("other~tag"))
 }
 
 ///|

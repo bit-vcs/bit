@@ -132,7 +132,7 @@ fn parse_hub_init_prompt_override(input : String) -> Bool? {
 async fn read_hub_init_approval() -> Bool {
   let bytes : Array[Byte] = []
   let mut finished = false
-  while !(finished) {
+  while !finished {
     match @stdio.stdin.read_some(max_len=1) {
       None => finished = true
       Some(chunk) =>
@@ -184,10 +184,8 @@ fn compute_hub_origin_sync_plan(content : String) -> HubOriginSyncPlan {
         add_default_push_refspec: false,
       }
     Some(remote) => {
-      let add_fetch_notes = !(
-        remote.fetch.contains(hub_notes_fetch_refspec()),
-      )
-      let add_push_notes = !(remote.push.contains(hub_notes_push_refspec()))
+      let add_fetch_notes = !remote.fetch.contains(hub_notes_fetch_refspec())
+      let add_push_notes = !remote.push.contains(hub_notes_push_refspec())
       {
         has_origin: true,
         add_fetch_notes,
@@ -215,7 +213,7 @@ fn apply_hub_origin_sync_plan(
   git_dir : String,
   plan : HubOriginSyncPlan,
 ) -> Unit raise Error {
-  if !(plan.has_origin) {
+  if !plan.has_origin {
     return ()
   }
   let config_path = hub_sync_config_path(git_dir)
@@ -303,10 +301,10 @@ async fn ensure_hub_initialized(
   let fs = OsFs::new()
   let had_metadata = hub_metadata_is_initialized(fs, git_dir)
   let interactive = hub_should_prompt()
-  if !(had_metadata) {
+  if !had_metadata {
     if interactive {
       print_hub_init_metadata_prompt(command_name, git_dir)
-      if !(read_hub_init_approval()) {
+      if !read_hub_init_approval() {
         eprint_line("fatal: hub metadata initialization was not approved")
         @sys.exit(1)
       }
@@ -316,17 +314,17 @@ async fn ensure_hub_initialized(
     ensure_hub_merge_policy_file(fs, git_dir)
   }
   let plan = load_hub_origin_sync_plan(fs, git_dir)
-  if !(plan.has_origin) {
+  if !plan.has_origin {
     return ()
   }
   let needs_sync_config = plan.add_fetch_notes || plan.add_push_notes
-  if !(needs_sync_config) {
+  if !needs_sync_config {
     return ()
   }
-  if !(explicit || !(had_metadata)) {
+  if !(explicit || !had_metadata) {
     return ()
   }
-  if !(interactive) {
+  if !interactive {
     return ()
   }
   print_hub_init_sync_prompt(command_name, plan)

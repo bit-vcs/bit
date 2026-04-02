@@ -21,17 +21,17 @@ fn ensure_catfile_bench_repo() -> Array[String] {
     return bench_catfile_oids.val
   }
   let marker = bench_catfile_root + "/.bench_ready"
-  if !(@fs.path_exists(bench_catfile_root)) {
+  if !@fs.path_exists(bench_catfile_root) {
     @fs.create_dir(bench_catfile_root) catch {
       _ => ()
     }
   }
-  if !(@fs.path_exists(bench_catfile_repo)) {
+  if !@fs.path_exists(bench_catfile_repo) {
     @fs.create_dir(bench_catfile_repo) catch {
       _ => ()
     }
   }
-  if !(@fs.path_exists(marker)) {
+  if !@fs.path_exists(marker) {
     let fs = OsFs::new()
     ignore(try? @bitrepo.init_repo(fs, bench_catfile_repo))
     for i in 0..<50 {

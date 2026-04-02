@@ -143,7 +143,7 @@ fn setup_filter_config(
   if content.contains(section_header) {
     return ()
   }
-  if content.length() > 0 && !(content.has_suffix("\n")) {
+  if content.length() > 0 && !content.has_suffix("\n") {
     content = content + "\n"
   }
   content = content + section_header + "\n"
@@ -173,7 +173,7 @@ fn setup_gitattributes_filter(
   if content.contains(pattern) {
     return ()
   }
-  if content.length() > 0 && !(content.has_suffix("\n")) {
+  if content.length() > 0 && !content.has_suffix("\n") {
     content = content + "\n"
   }
   content = content + "# moongit subdir: " + subdir_path + "\n"
@@ -208,7 +208,7 @@ fn setup_precommit_hook(
     return ()
   }
   // hook スクリプトを追加
-  if !(content.has_suffix("\n")) {
+  if !content.has_suffix("\n") {
     content = content + "\n"
   }
   content = content + "\n" + marker + "\n"
@@ -241,7 +241,7 @@ fn remove_precommit_hook(
 ) -> Unit raise SubdirError {
   let hooks_dir = git_dir + "/hooks"
   let hook_path = hooks_dir + "/pre-commit"
-  if !(rfs.is_file(hook_path)) {
+  if !rfs.is_file(hook_path) {
     return ()
   }
   let content = bytes_to_string_mod(
@@ -250,7 +250,7 @@ fn remove_precommit_hook(
     },
   )
   let marker = "# moongit-subdir-check: " + subdir_path
-  if !(content.contains(marker)) {
+  if !content.contains(marker) {
     return ()
   }
   // マーカーから fi までを削除
@@ -338,7 +338,7 @@ fn add_filter_to_config(
   }
   // filter セクションを追加
   let filter_section = StringBuilder::new()
-  if config.length() > 0 && !(config.has_suffix("\n")) {
+  if config.length() > 0 && !config.has_suffix("\n") {
     filter_section.write_string("\n")
   }
   filter_section.write_string("[filter \"")
@@ -379,7 +379,7 @@ fn add_filter_to_gitattributes(
     return ()
   }
   // パターンを追加
-  if content.length() > 0 && !(content.has_suffix("\n")) {
+  if content.length() > 0 && !content.has_suffix("\n") {
     content = content + "\n"
   }
   // コメントを追加して分かりやすく
@@ -438,7 +438,7 @@ fn remove_filter_from_config(
   filter_name : String,
 ) -> Unit raise SubdirError {
   let config_path = git_dir + "/config"
-  if !(rfs.is_file(config_path)) {
+  if !rfs.is_file(config_path) {
     return ()
   }
   let content = bytes_to_string_mod(
@@ -447,7 +447,7 @@ fn remove_filter_from_config(
     },
   )
   let section_header = "[filter \"" + filter_name + "\"]"
-  if !(content.contains(section_header)) {
+  if !content.contains(section_header) {
     return ()
   }
   // セクションを削除
@@ -531,7 +531,7 @@ fn remove_filter_from_gitattributes(
   subdir_path : String,
 ) -> Unit raise SubdirError {
   let gitattributes_path = repo_root + "/.gitattributes"
-  if !(rfs.is_file(gitattributes_path)) {
+  if !rfs.is_file(gitattributes_path) {
     return ()
   }
   let content = bytes_to_string_mod(
@@ -541,7 +541,7 @@ fn remove_filter_from_gitattributes(
   )
   let pattern_line = subdir_path + "/** filter=" + filter_name
   let comment_line = "# moongit subdir: " + subdir_path
-  if !(content.contains(pattern_line)) {
+  if !content.contains(pattern_line) {
     return ()
   }
   // パターンとコメントを削除
@@ -615,7 +615,7 @@ fn _add_to_gitmodules(
   }
   // 新しいエントリを追加
   let entry = StringBuilder::new()
-  if content.length() > 0 && !(content.has_suffix("\n")) {
+  if content.length() > 0 && !content.has_suffix("\n") {
     entry.write_string("\n")
   }
   entry.write_string("[submodule \"")
@@ -640,7 +640,7 @@ fn _remove_from_gitmodules(
   subdir_path : String,
 ) -> Unit raise SubdirError {
   let gitmodules_path = repo_root + "/.gitmodules"
-  if !(rfs.is_file(gitmodules_path)) {
+  if !rfs.is_file(gitmodules_path) {
     return ()
   }
   let content = bytes_to_string_mod(
@@ -649,7 +649,7 @@ fn _remove_from_gitmodules(
     },
   )
   let section_header = "[submodule \"" + subdir_path + "\"]"
-  if !(content.contains(section_header)) {
+  if !content.contains(section_header) {
     return ()
   }
   // セクションを削除
@@ -847,7 +847,7 @@ pub fn list_modules(
   git_dir : String,
 ) -> Array[String] {
   let modules_dir = git_dir + "/modules"
-  if !(rfs.is_dir(modules_dir)) {
+  if !rfs.is_dir(modules_dir) {
     return []
   }
   let entries = rfs.readdir(modules_dir) catch { _ => return [] }

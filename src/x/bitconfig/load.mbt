@@ -131,7 +131,7 @@ pub fn load_and_inject() -> Unit {
     Some(p) => p
     None => return
   }
-  if !(@fs.path_exists(path)) {
+  if !@fs.path_exists(path) {
     return
   }
   let content = @fs.read_file_to_string(path) catch { _ => return }

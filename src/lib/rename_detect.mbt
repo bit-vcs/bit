@@ -26,7 +26,7 @@ fn merge_detect_renames(
   let sources : Array[(String, TreeFileEntry)] = []
   let replaced_paths : Map[String, Bool] = {}
   for path, entry in base {
-    if !(side.contains(path)) {
+    if !side.contains(path) {
       sources.push((path, entry))
     } else {
       match side.get(path) {
@@ -42,7 +42,7 @@ fn merge_detect_renames(
   // Added paths: in side but not in base
   let added : Array[(String, TreeFileEntry)] = []
   for path, entry in side {
-    if !(base.contains(path)) {
+    if !base.contains(path) {
       added.push((path, entry))
     }
   }
@@ -69,7 +69,7 @@ fn merge_detect_renames(
     match source_by_oid.get(hex) {
       Some(candidates) =>
         for old_path in candidates {
-          if !(matched_source.contains(old_path)) {
+          if !matched_source.contains(old_path) {
             old_to_new[old_path] = new_path
             matched_source[old_path] = true
             matched_added[new_path] = true
@@ -87,14 +87,14 @@ fn merge_detect_renames(
   let unmatched_sources : Array[(String, TreeFileEntry)] = []
   for item in sources {
     let (path, _) = item
-    if !(matched_source.contains(path)) {
+    if !matched_source.contains(path) {
       unmatched_sources.push(item)
     }
   }
   let unmatched_added : Array[(String, TreeFileEntry)] = []
   for item in added {
     let (path, _) = item
-    if !(matched_added.contains(path)) {
+    if !matched_added.contains(path) {
       unmatched_added.push(item)
     }
   }

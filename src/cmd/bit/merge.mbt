@@ -81,7 +81,7 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
         raise @bitcore.GitError::InvalidObject(
           "option '--message' requires a value",
         )
-      _ if arg.has_prefix("-m") && !(arg.has_prefix("--")) => {
+      _ if arg.has_prefix("-m") && !arg.has_prefix("--") => {
         message = Some(string_slice_from(arg, 2))
         i += 1
         continue
@@ -141,7 +141,7 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
         i += 1
         continue
       }
-      _ if arg.has_prefix("-s") && !(arg.has_prefix("--")) && arg.length() > 2 => {
+      _ if arg.has_prefix("-s") && !arg.has_prefix("--") && arg.length() > 2 => {
         strategy = Some(string_slice_from(arg, 2))
         i += 1
         continue
@@ -157,12 +157,12 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
         continue
       }
       _ if arg.has_prefix("--strategy-option=") ||
-        (arg.has_prefix("-X") && !(arg.has_prefix("--")) && arg.length() > 2) => {
+        (arg.has_prefix("-X") && !arg.has_prefix("--") && arg.length() > 2) => {
         // Strategy options: silently ignored
         i += 1
         continue
       }
-      _ if !(arg.has_prefix("-")) => {
+      _ if !arg.has_prefix("-") => {
         merge_heads.push(arg)
         i += 1
         continue
@@ -222,7 +222,7 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
         err if @async.is_cancellation_error(err) => raise err
         _ => ()
       }
-      if !(quiet) {
+      if !quiet {
         print_line("Merge aborted.")
       }
     } else {
@@ -237,7 +237,7 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
   if continue_merge {
     let merge_head_path = git_dir + "/MERGE_HEAD"
     let merge_msg_path = git_dir + "/MERGE_MSG"
-    if !(rfs.is_file(merge_head_path)) {
+    if !rfs.is_file(merge_head_path) {
       @stdio.stderr.write(
         "fatal: There is no merge in progress (MERGE_HEAD missing).",
       )
@@ -273,7 +273,7 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
       err if @async.is_cancellation_error(err) => raise err
       _ => ()
     }
-    if !(quiet) {
+    if !quiet {
       print_line("[\{short}] \{msg}")
     }
     return
@@ -342,7 +342,7 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
       wfs.write_string(head_path, commit_id.to_hex() + "\n")
     }
     let short = String::unsafe_substring(commit_id.to_hex(), start=0, end=7)
-    if !(quiet) {
+    if !quiet {
       print_line("Merge made by the 'ours' strategy. [\{short}]")
     }
     ignore(allow_unrelated)
@@ -363,7 +363,7 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
     )
     match result.status {
       @bitlib.MergeStatus::AlreadyUpToDate =>
-        if !(quiet) {
+        if !quiet {
           print_line("Already up to date.")
         }
       @bitlib.MergeStatus::FastForward | @bitlib.MergeStatus::Merged => {
@@ -377,7 +377,7 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
             )
           None => ()
         }
-        if !(quiet) {
+        if !quiet {
           print_line("Squash commit -- not updating HEAD")
         }
         // Save merge message for later commit
@@ -387,7 +387,7 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
         )
       }
       @bitlib.MergeStatus::Conflicted => {
-        if !(quiet) {
+        if !quiet {
           for path in result.conflicts {
             let ctype = result.conflict_types.get(path).unwrap_or("content")
             print_line("CONFLICT (\{ctype}): Merge conflict in \{path}")
@@ -406,7 +406,7 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
     None => false
   }
   // Handle --ff-only
-  if ff_only && !(is_ff) {
+  if ff_only && !is_ff {
     @stdio.stderr.write("fatal: Not possible to fast-forward, aborting.")
     @sys.exit(128)
   }
@@ -466,7 +466,7 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
       ),
     )
     let short = String::unsafe_substring(commit_id.to_hex(), start=0, end=7)
-    if !(quiet) {
+    if !quiet {
       print_line("Merge made by the 'ort' strategy (--no-ff). [\{short}]")
     }
     return
@@ -486,31 +486,31 @@ async fn handle_merge(args : Array[String]) -> Unit raise Error {
   )
   match result.status {
     @bitlib.MergeStatus::AlreadyUpToDate =>
-      if !(quiet) {
+      if !quiet {
         print_line("Already up to date.")
       }
     @bitlib.MergeStatus::FastForward =>
       match result.commit_id {
         Some(id) => {
           let short = String::unsafe_substring(id.to_hex(), start=0, end=7)
-          if !(quiet) {
+          if !quiet {
             print_line("Fast-forward to \{short}")
           }
         }
-        None => if !(quiet) { print_line("Fast-forward") }
+        None => if !quiet { print_line("Fast-forward") }
       }
     @bitlib.MergeStatus::Merged =>
       match result.commit_id {
         Some(id) => {
           let short = String::unsafe_substring(id.to_hex(), start=0, end=7)
-          if !(quiet) {
+          if !quiet {
             print_line("Merge made by the 'ort' strategy. [\{short}]")
           }
         }
-        None => if !(quiet) { print_line("Merged") }
+        None => if !quiet { print_line("Merged") }
       }
     @bitlib.MergeStatus::Conflicted => {
-      if !(quiet) {
+      if !quiet {
         for path in result.conflicts {
           let ctype = result.conflict_types.get(path).unwrap_or("content")
           print_line("CONFLICT (\{ctype}): Merge conflict in \{path}")
@@ -610,7 +610,7 @@ async fn handle_octopus_merge(
             @bitlib.ResetMode::Hard,
           ),
         )
-        if !(quiet) {
+        if !quiet {
           for path in result.conflicts {
             let ctype = result.conflict_types.get(path).unwrap_or("content")
             print_line("CONFLICT (\{ctype}): Merge conflict in \{path}")
@@ -638,7 +638,7 @@ async fn handle_octopus_merge(
   // Build parent list. If original HEAD was fast-forwarded to one of the
   // heads, exclude it (git's octopus does the same).
   let all_parents : Array[@bitcore.ObjectId] = []
-  if !(orig_head_ffwd) {
+  if !orig_head_ffwd {
     all_parents.push(orig_hid)
   }
   for id in resolved_ids {
@@ -704,7 +704,7 @@ async fn handle_octopus_merge(
     None => ()
   }
   let short = String::unsafe_substring(commit_id.to_hex(), start=0, end=7)
-  if !(quiet) {
+  if !quiet {
     print_line("Merge made by the 'octopus' strategy. [\{short}]")
   }
 }
@@ -725,7 +725,7 @@ fn truncate_and_append_reflog(
   message : String,
 ) -> Unit {
   let reflog_path = @bitlib.get_reflog_path(git_dir, refname)
-  if !(rfs.is_file(reflog_path)) {
+  if !rfs.is_file(reflog_path) {
     return
   }
   // Read current reflog content
@@ -783,12 +783,12 @@ async fn validate_current_branch_mergeoptions(
   git_dir : String,
 ) -> Unit raise Error {
   let head_path = git_dir + "/HEAD"
-  if !(rfs.is_file(head_path)) {
+  if !rfs.is_file(head_path) {
     return
   }
   let head = decode_bytes(rfs.read_file(head_path) catch { _ => return })
     |> trim_string
-  if !(head.has_prefix("ref: refs/heads/")) {
+  if !head.has_prefix("ref: refs/heads/") {
     return
   }
   let branch_name = String::unsafe_substring(head, start=16, end=head.length())
@@ -813,16 +813,16 @@ fn split_cmdline_has_unclosed_quote(value : String) -> Bool {
       escape = false
       continue
     }
-    if c == '\\' && !(in_single) {
+    if c == '\\' && !in_single {
       escape = true
       continue
     }
-    if c == '\'' && !(in_double) {
-      in_single = !(in_single)
+    if c == '\'' && !in_double {
+      in_single = !in_single
       continue
     }
-    if c == '"' && !(in_single) {
-      in_double = !(in_double)
+    if c == '"' && !in_single {
+      in_double = !in_double
       continue
     }
   }

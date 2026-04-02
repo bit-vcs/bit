@@ -6,14 +6,14 @@ test "partial_clone: mount and list files" {
   let git_dir = "/tmp/partial-clone-test/tree-sitter-nickel/.git"
 
   // Skip if test repo not available
-  if !(osfs.is_dir(git_dir)) {
+  if !osfs.is_dir(git_dir) {
     println("Skipping: partial clone test repo not found")
     println(
       "Run: moongit clone --filter=blob:none https://github.com/nickel-lang/tree-sitter-nickel /tmp/partial-clone-test/tree-sitter-nickel",
     )
     return
   }
-  if !(@lib.is_partial_clone(osfs, git_dir)) {
+  if !@lib.is_partial_clone(osfs, git_dir) {
     println("Skipping: repo is not a partial clone")
     return
   }
@@ -21,7 +21,7 @@ test "partial_clone: mount and list files" {
   // Check if it's a partial clone
   let is_partial = @lib.is_partial_clone(osfs, git_dir)
   println("Is partial clone: \{is_partial}")
-  if !(is_partial) {
+  if !is_partial {
     println("Skipping: repo is not a partial clone")
     return
   }
@@ -81,11 +81,11 @@ test "partial_clone: mount and list files" {
 async test "partial_clone: on-demand fetch" {
   let osfs = @osfs.OsFs::new()
   let git_dir = "/tmp/partial-clone-test/tree-sitter-nickel/.git"
-  if !(osfs.is_dir(git_dir)) {
+  if !osfs.is_dir(git_dir) {
     println("Skipping: partial clone test repo not found")
     return
   }
-  if !(@lib.is_partial_clone(osfs, git_dir)) {
+  if !@lib.is_partial_clone(osfs, git_dir) {
     println("Skipping: repo is not a partial clone")
     return
   }
@@ -147,11 +147,11 @@ test "partial_clone: glob pattern matching" {
   // Test glob_match function via prefetch_glob behavior
   let osfs = @osfs.OsFs::new()
   let git_dir = "/tmp/partial-clone-test/tree-sitter-nickel/.git"
-  if !(osfs.is_dir(git_dir)) {
+  if !osfs.is_dir(git_dir) {
     println("Skipping: partial clone test repo not found")
     return
   }
-  if !(@lib.is_partial_clone(osfs, git_dir)) {
+  if !@lib.is_partial_clone(osfs, git_dir) {
     println("Skipping: repo is not a partial clone")
     return
   }
@@ -210,11 +210,11 @@ test "partial_clone: glob pattern matching" {
 async test "partial_clone: prefetch with glob" {
   let osfs = @osfs.OsFs::new()
   let git_dir = "/tmp/partial-clone-test/tree-sitter-nickel/.git"
-  if !(osfs.is_dir(git_dir)) {
+  if !osfs.is_dir(git_dir) {
     println("Skipping: partial clone test repo not found")
     return
   }
-  if !(@lib.is_partial_clone(osfs, git_dir)) {
+  if !@lib.is_partial_clone(osfs, git_dir) {
     println("Skipping: repo is not a partial clone")
     return
   }
@@ -252,11 +252,11 @@ async test "partial_clone: prefetch with glob" {
 async test "partial_clone: prefetch BFS" {
   let osfs = @osfs.OsFs::new()
   let git_dir = "/tmp/partial-clone-test/tree-sitter-nickel/.git"
-  if !(osfs.is_dir(git_dir)) {
+  if !osfs.is_dir(git_dir) {
     println("Skipping: partial clone test repo not found")
     return
   }
-  if !(@lib.is_partial_clone(osfs, git_dir)) {
+  if !@lib.is_partial_clone(osfs, git_dir) {
     println("Skipping: repo is not a partial clone")
     return
   }
@@ -300,11 +300,11 @@ async test "partial_clone: prefetch BFS" {
 async test "partial_clone: prefetch multiple files" {
   let osfs = @osfs.OsFs::new()
   let git_dir = "/tmp/partial-clone-test/tree-sitter-nickel/.git"
-  if !(osfs.is_dir(git_dir)) {
+  if !osfs.is_dir(git_dir) {
     println("Skipping: partial clone test repo not found")
     return
   }
-  if !(@lib.is_partial_clone(osfs, git_dir)) {
+  if !@lib.is_partial_clone(osfs, git_dir) {
     println("Skipping: repo is not a partial clone")
     return
   }

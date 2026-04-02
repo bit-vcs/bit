@@ -9,7 +9,7 @@ pub fn Fs::snapshot(
   author : String,
   timestamp : Int64,
 ) -> Snapshot raise @bit.GitError {
-  if !(self.working.is_dirty()) {
+  if !self.working.is_dirty() {
     raise @bit.GitError::InvalidObject("No changes to commit")
   }
   let tree_id = build_tree_from_working(

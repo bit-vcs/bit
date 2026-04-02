@@ -99,7 +99,7 @@ fn list_hooks_in_dir(
   dir : String,
   prefix : String?,
 ) -> Array[String] {
-  if !(fs.is_dir(dir)) {
+  if !fs.is_dir(dir) {
     return []
   }
   let names : Array[String] = []
@@ -113,7 +113,7 @@ fn list_hooks_in_dir(
       continue
     }
     match prefix {
-      Some(p) if !(entry.has_prefix(p)) => continue
+      Some(p) if !entry.has_prefix(p) => continue
       _ => ()
     }
     names.push(entry)
@@ -147,12 +147,12 @@ fn list_hooks_with_status(
   let available = list_available_hooks(fs, root, prefix)
   let names = []
   for name in active {
-    if !(names.contains(name)) {
+    if !names.contains(name) {
       names.push(name)
     }
   }
   for name in available {
-    if !(names.contains(name)) {
+    if !names.contains(name) {
       names.push(name)
     }
   }
@@ -222,7 +222,7 @@ fn hooks_file_checksum(
   rfs : &@bitcore.RepoFileSystem,
   path : String,
 ) -> String? {
-  if !(rfs.is_file(path)) {
+  if !rfs.is_file(path) {
     return None
   }
   let content = rfs.read_file(path) catch { _ => return None }
@@ -236,7 +236,7 @@ fn hooks_read_approved_checksum(
   hook_name : String,
 ) -> String? {
   let path = hooks_approved_checksum_path(root, hook_name)
-  if !(rfs.is_file(path)) {
+  if !rfs.is_file(path) {
     return None
   }
   let raw = decode_bytes(rfs.read_file(path) catch { _ => return None })
@@ -256,7 +256,7 @@ fn hooks_write_approved_checksum(
   checksum : String,
 ) -> Unit {
   let dir = join_repo_marker(root, ".bit/hooks/.approved")
-  if !(rfs.is_dir(dir)) {
+  if !rfs.is_dir(dir) {
     wfs.mkdir_p(dir) catch {
       _ => ()
     }
@@ -287,7 +287,7 @@ fn hooks_is_current_checksum_approved(
   if is_always_prompt_hook(hook_name) {
     return false
   }
-  if !(is_sensitive_hook(hook_name)) {
+  if !is_sensitive_hook(hook_name) {
     return true
   }
   match hooks_active_checksum(rfs, root, hook_name) {
@@ -337,7 +337,7 @@ async fn hooks_prompt_approve_checksum(
   )
   let bytes : Array[Byte] = []
   let mut finished = false
-  while !(finished) {
+  while !finished {
     match @stdio.stdin.read_some(max_len=64) {
       None => finished = true
       Some(chunk) =>
@@ -374,10 +374,10 @@ async fn hooks_ensure_sensitive_hook_approval(
   root : String,
   hook_name : String,
 ) -> Unit {
-  if !(is_sensitive_hook(hook_name)) {
+  if !is_sensitive_hook(hook_name) {
     return
   }
-  if !(hooks_is_current_checksum_approved(fs, root, hook_name)) {
+  if !hooks_is_current_checksum_approved(fs, root, hook_name) {
     match hooks_active_checksum(fs, root, hook_name) {
       Some(current) =>
         hooks_prompt_approve_checksum(wfs, fs, root, hook_name, current)
@@ -428,17 +428,17 @@ async fn handle_x_hooks_set(
   }
   let name = args[0]
   let source = args[1]
-  if !(is_valid_hook_name(name)) {
+  if !is_valid_hook_name(name) {
     eprint_line("fatal: invalid hook name '\{name}'")
     @sys.exit(1)
   }
   let source_path = abs_path(source)
-  if !(fs.is_file(source_path)) {
+  if !fs.is_file(source_path) {
     eprint_line("fatal: cannot read hook source '\{source_path}'")
     @sys.exit(1)
   }
   let dir = bit_hooks_dir(root)
-  if !(fs.is_dir(dir)) {
+  if !fs.is_dir(dir) {
     fs.mkdir_p(dir)
   }
   let target = bit_hooks_file_path(root, name)
@@ -465,17 +465,17 @@ async fn handle_x_hooks_approve(
     @sys.exit(1)
   }
   let name = args[0]
-  if !(is_valid_hook_name(name)) {
+  if !is_valid_hook_name(name) {
     eprint_line("fatal: invalid hook name '\{name}'")
     @sys.exit(1)
   }
   let source = bit_hooks_file_path(root, name)
-  if !(fs.is_file(source)) {
+  if !fs.is_file(source) {
     eprint_line("fatal: hook '\{name}' is not available")
     @sys.exit(1)
   }
   let target_dir = hooks_dir(git_dir)
-  if !(fs.is_dir(target_dir)) {
+  if !fs.is_dir(target_dir) {
     fs.mkdir_p(target_dir)
   }
   let target = hooks_file_path(git_dir, name)
@@ -508,7 +508,7 @@ async fn handle_x_hooks_unapprove(
     @sys.exit(1)
   }
   let name = args[0]
-  if !(is_valid_hook_name(name)) {
+  if !is_valid_hook_name(name) {
     eprint_line("fatal: invalid hook name '\{name}'")
     @sys.exit(1)
   }
@@ -540,7 +540,7 @@ async fn handle_x_hooks_remove(
     @sys.exit(1)
   }
   let name = args[0]
-  if !(is_valid_hook_name(name)) {
+  if !is_valid_hook_name(name) {
     eprint_line("fatal: invalid hook name '\{name}'")
     @sys.exit(1)
   }
@@ -563,7 +563,7 @@ async fn handle_x_hooks(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
   let rfs : &@bitcore.RepoFileSystem = fs
   let git_dir = resolve_git_dir(rfs, root)
-  if !(fs.is_dir(git_dir)) {
+  if !fs.is_dir(git_dir) {
     eprint_line("fatal: not a git repository")
     @sys.exit(1)
   }

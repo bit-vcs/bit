@@ -27,7 +27,7 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
       "--continue" => do_continue = true
       "--abort" => do_abort = true
       "--skip" => do_skip = true
-      _ if !(arg.has_prefix("-")) => commits.push(arg)
+      _ if !arg.has_prefix("-") => commits.push(arg)
       _ => ()
     }
     i += 1
@@ -39,7 +39,7 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
   let orig_head_path = git_dir + "/ORIG_HEAD"
   // Handle --abort
   if do_abort {
-    if !(rfs.is_file(revert_head_path)) {
+    if !rfs.is_file(revert_head_path) {
       @stdio.stderr.write("error: no revert in progress")
       @sys.exit(1)
     }
@@ -70,7 +70,7 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
   }
   // Handle --skip
   if do_skip {
-    if !(rfs.is_file(revert_head_path)) {
+    if !rfs.is_file(revert_head_path) {
       @stdio.stderr.write("error: no revert in progress")
       @sys.exit(1)
     }
@@ -90,7 +90,7 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
   }
   // Handle --continue
   if do_continue {
-    if !(rfs.is_file(revert_head_path)) {
+    if !rfs.is_file(revert_head_path) {
       @stdio.stderr.write("error: no revert in progress")
       @sys.exit(1)
     }
@@ -189,7 +189,7 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
     // Files that were added in commit -> delete them
     for item in commit_files.to_array() {
       let (path, _) = item
-      if !(parent_files.contains(path)) {
+      if !parent_files.contains(path) {
         // File was added in commit, remove it
         let abs_path = root + "/" + path
         if rfs.is_file(abs_path) {
@@ -202,7 +202,7 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
     // Files that were deleted in commit -> restore them
     for item in parent_files.to_array() {
       let (path, entry) = item
-      if !(commit_files.contains(path)) {
+      if !commit_files.contains(path) {
         // File was deleted in commit, restore it
         let blob_obj = db.get(rfs, entry.id)
         guard blob_obj is Some(bo) else { continue }
@@ -269,7 +269,7 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
       @sys.exit(1)
     }
     // Create revert commit unless --no-commit
-    if !(no_commit) {
+    if !no_commit {
       let author = get_author_string()
       let timestamp = get_commit_timestamp()
       let new_commit_id = @bitlib.commit(

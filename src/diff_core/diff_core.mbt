@@ -273,8 +273,7 @@ pub fn unified_hunks(
             last_ins_is_eof = false
           }
           out.push("-" + text)
-          last_del_is_eof = !(old_has_trailing_nl) &&
-            oi == old_lines.length() - 1
+          last_del_is_eof = !old_has_trailing_nl && oi == old_lines.length() - 1
         }
         _ => {
           if last_del_is_eof {
@@ -282,8 +281,7 @@ pub fn unified_hunks(
             last_del_is_eof = false
           }
           out.push("+" + text)
-          last_ins_is_eof = !(new_has_trailing_nl) &&
-            ni == new_lines.length() - 1
+          last_ins_is_eof = !new_has_trailing_nl && ni == new_lines.length() - 1
         }
       }
     }

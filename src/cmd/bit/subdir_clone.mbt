@@ -186,7 +186,7 @@ async fn subdir_clone(
   }
   // Load object database and get tree
   let mut db = @bitlib.ObjectDb::load_lazy(fs, temp_git_dir)
-  if !(from_local_repo) && db.get(fs, commit_id) is None {
+  if !from_local_repo && db.get(fs, commit_id) is None {
     let pack = @bitnative.fetch_pack_http(remote_url, [commit_id], true)
     let objects = @pack.parse_packfile(pack)
     @pack.write_packfile_with_index(fs, temp_git_dir, pack, objects)
@@ -203,7 +203,7 @@ async fn subdir_clone(
   )
   guard subdir_tree_id is Some(tree_id) else {
     @bitlib.subdir_remove_dir(fs, fs, temp_clone)
-    if !(target_existed) {
+    if !target_existed {
       @bitlib.subdir_remove_dir(fs, fs, target)
     }
     raise @bitcore.GitError::InvalidObject(

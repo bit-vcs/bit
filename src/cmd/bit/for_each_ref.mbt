@@ -193,7 +193,7 @@ async fn handle_for_each_ref(args : Array[String]) -> Unit raise Error {
           break
         }
       }
-      if !(matched) {
+      if !matched {
         continue
       }
     }
@@ -237,7 +237,7 @@ async fn handle_for_each_ref(args : Array[String]) -> Unit raise Error {
           _ => ()
         }
       }
-      if !(matches_points_at) {
+      if !matches_points_at {
         continue
       }
     }
@@ -281,7 +281,7 @@ async fn handle_for_each_ref(args : Array[String]) -> Unit raise Error {
           // --merged: ref's commit must be ancestor of (or equal to) merged_id
           match merged_id {
             Some(mid) =>
-              if !(for_each_ref_is_ancestor(fs, db_for_filter, cid, mid)) {
+              if !for_each_ref_is_ancestor(fs, db_for_filter, cid, mid) {
                 continue
               }
             None => ()
@@ -297,7 +297,7 @@ async fn handle_for_each_ref(args : Array[String]) -> Unit raise Error {
           // --contains: ref's commit must have contains_id as ancestor
           match contains_id {
             Some(coid) =>
-              if !(for_each_ref_is_ancestor(fs, db_for_filter, coid, cid)) {
+              if !for_each_ref_is_ancestor(fs, db_for_filter, coid, cid) {
                 continue
               }
             None => ()
@@ -488,7 +488,7 @@ async fn for_each_ref_collect_root_refs(
   for entry in entries {
     let name = entry
     // Root ref syntax: all uppercase, hyphens, underscores
-    if !(for_each_ref_is_root_ref_syntax(name)) {
+    if !for_each_ref_is_root_ref_syntax(name) {
       continue
     }
     // Skip pseudo refs (FETCH_HEAD, MERGE_HEAD)
@@ -503,7 +503,7 @@ async fn for_each_ref_collect_root_refs(
       continue
     }
     // Check if it's a root ref (HEAD, *_HEAD, or known irregular root refs)
-    if !(for_each_ref_is_root_ref(name)) {
+    if !for_each_ref_is_root_ref(name) {
       continue
     }
     // Read the ref file
@@ -1023,7 +1023,7 @@ async fn for_each_ref_validate_atom(atom : String) -> Unit {
     } catch {
       _ => ()
     }
-    if !(valid) {
+    if !valid {
       eprint_line("fatal: positive value expected objectname:short=" + val_str)
       @sys.exit(1)
     }
@@ -1039,7 +1039,7 @@ async fn for_each_ref_validate_atom(atom : String) -> Unit {
       start=colon_pos + 1,
       end=atom.length(),
     )
-    if !(for_each_ref_valid_date_format(date_arg)) {
+    if !for_each_ref_valid_date_format(date_arg) {
       eprint_line("fatal: unknown date format " + date_arg)
       @sys.exit(1)
     }
@@ -1062,7 +1062,7 @@ async fn for_each_ref_validate_atom(atom : String) -> Unit {
     }
   }
   // Validate unknown atom names (must be last check)
-  if !(for_each_ref_is_known_atom(atom)) {
+  if !for_each_ref_is_known_atom(atom) {
     eprint_line("fatal: unknown field name '" + atom + "'")
     @sys.exit(1)
   }
@@ -1451,7 +1451,7 @@ fn for_each_ref_match_pattern(refname : String, pattern : String) -> Bool {
         start=star_pos + 1,
         end=pattern.length(),
       )
-      if !(refname.has_prefix(prefix)) {
+      if !refname.has_prefix(prefix) {
         return false
       }
       if suffix.length() == 0 {
@@ -1723,22 +1723,20 @@ fn for_each_ref_format_needs_object(format : String) -> Bool {
           FixedArray::makei(end_pos - start, fn(j) { chars[start + j] }),
         )
         // Atoms that DON'T need object data
-        if !(
-            atom == "refname" ||
-            atom.has_prefix("refname:") ||
-            atom == "objectname" ||
-            atom.has_prefix("objectname:") ||
-            atom == "HEAD" ||
-            atom == "if" ||
-            atom.has_prefix("if:") ||
-            atom == "then" ||
-            atom == "else" ||
-            atom == "end" ||
-            atom.has_prefix("color:") ||
-            atom.has_prefix("align:") ||
-            atom.has_prefix("is-base:") ||
-            atom.has_prefix("ahead-behind:"),
-          ) {
+        if !(atom == "refname" ||
+          atom.has_prefix("refname:") ||
+          atom == "objectname" ||
+          atom.has_prefix("objectname:") ||
+          atom == "HEAD" ||
+          atom == "if" ||
+          atom.has_prefix("if:") ||
+          atom == "then" ||
+          atom == "else" ||
+          atom == "end" ||
+          atom.has_prefix("color:") ||
+          atom.has_prefix("align:") ||
+          atom.has_prefix("is-base:") ||
+          atom.has_prefix("ahead-behind:")) {
           return true
         }
         i = end_pos + 1
@@ -1921,7 +1919,7 @@ async fn for_each_ref_format(
               None => break
             }
           }
-          if !(found_target) {
+          if !found_target {
             break
           }
         }
@@ -2029,9 +2027,9 @@ async fn for_each_ref_format(
           } else {
             // Simple %(if) - true if value is non-empty (git's is_empty: whitespace-only = empty)
             if_result = if if_cond_raw.length() > 0 {
-              !(for_each_ref_is_empty_bytes(if_cond_raw))
+              !for_each_ref_is_empty_bytes(if_cond_raw)
             } else {
-              !(for_each_ref_is_empty_value(if_cond_value))
+              !for_each_ref_is_empty_value(if_cond_value)
             }
           }
           if_state = 2 // then branch
@@ -2153,7 +2151,7 @@ async fn for_each_ref_format(
           continue
         }
         // In then/else branch, only output if condition matches
-        if if_state == 2 && !(if_result) {
+        if if_state == 2 && !if_result {
           i = end_pos + 1
           continue
         }
@@ -2749,7 +2747,7 @@ fn for_each_ref_if_output_active(
     0 => true // normal mode
     1 => false // evaluating condition, don't output
     2 => if_result // then branch: output if condition true
-    3 => !(if_result) // else branch: output if condition false
+    3 => !if_result // else branch: output if condition false
     _ => true
   }
 }
@@ -3046,7 +3044,7 @@ async fn for_each_ref_find_base(
   for item in commit_refs {
     let (refname, cid) = item
     let hex = cid.to_hex()
-    if !(commit_set.contains(hex)) {
+    if !commit_set.contains(hex) {
       commit_set[hex] = refname
     }
   }
@@ -3075,17 +3073,17 @@ async fn for_each_ref_find_base(
               start=7,
               end=line.length(),
             )
-            if !(visited.contains(parent_hex)) {
+            if !visited.contains(parent_hex) {
               visited[parent_hex] = true
               let parent_id = @bitcore.ObjectId::from_hex(parent_hex) catch {
                 _ => continue
               }
               queue.push(parent_id)
             }
-          } else if !(line.has_prefix("tree ")) &&
-            !(line.has_prefix("author ")) &&
-            !(line.has_prefix("committer ")) &&
-            !(line.has_prefix("parent ")) {
+          } else if !line.has_prefix("tree ") &&
+            !line.has_prefix("author ") &&
+            !line.has_prefix("committer ") &&
+            !line.has_prefix("parent ") {
             // Past header lines
             break
           }
@@ -3268,10 +3266,10 @@ fn for_each_ref_short_refname(
     let prefix = rule_prefixes[i]
     let suffix = rule_suffixes[i]
     // Check if refname matches this rule
-    if !(refname.has_prefix(prefix)) {
+    if !refname.has_prefix(prefix) {
       continue
     }
-    if suffix.length() > 0 && !(refname.has_suffix(suffix)) {
+    if suffix.length() > 0 && !refname.has_suffix(suffix) {
       continue
     }
     let short_name = String::unsafe_substring(
@@ -3295,7 +3293,7 @@ fn for_each_ref_short_refname(
         break
       }
     }
-    if !(ambiguous) {
+    if !ambiguous {
       return short_name
     }
   }
@@ -3494,7 +3492,7 @@ fn for_each_ref_upstream_atom(
           _ => None
         })
         is Some(_)
-      if !(upstream_exists) {
+      if !upstream_exists {
         // Upstream is gone
         if atom == "upstream:trackshort" {
           return ""
@@ -3676,7 +3674,7 @@ fn for_each_ref_push_atom(
           _ => None
         })
         is Some(_)
-      if !(push_exists) {
+      if !push_exists {
         if atom == "push:trackshort" {
           return ""
         }
@@ -3836,14 +3834,14 @@ fn for_each_ref_ahead_behind_commits(
   // Count ahead: commits reachable from local but not upstream
   let mut ahead = 0
   for entry in local_ancestors {
-    if !(upstream_ancestors.contains(entry.0)) {
+    if !upstream_ancestors.contains(entry.0) {
       ahead += 1
     }
   }
   // Count behind: commits reachable from upstream but not local
   let mut behind = 0
   for entry in upstream_ancestors {
-    if !(local_ancestors.contains(entry.0)) {
+    if !local_ancestors.contains(entry.0) {
       behind += 1
     }
   }
@@ -3870,7 +3868,7 @@ fn for_each_ref_walk_ancestors(
       Some(o) if o.obj_type == @bitcore.ObjectType::Commit => {
         let info = @bitcore.parse_commit(o.data) catch { _ => continue }
         for parent in info.parents {
-          if !(out.contains(parent.to_hex())) {
+          if !out.contains(parent.to_hex()) {
             queue.push(parent)
           }
         }
@@ -3932,7 +3930,7 @@ async fn for_each_ref_commit_atom(
     } else {
       raw_line
     }
-    if !(past_headers) {
+    if !past_headers {
       if line.length() == 0 {
         past_headers = true
         continue
@@ -4411,7 +4409,7 @@ async fn for_each_ref_format_trailers_atom(
     }
   }
   // Default: if no only= was set and no key filter, show all trailers (including non-trailer lines)
-  if !(only_set) && keys.length() == 0 {
+  if !only_set && keys.length() == 0 {
     only = false
   }
   let trailers = for_each_ref_parse_trailers(message)
@@ -4429,14 +4427,14 @@ async fn for_each_ref_format_trailers_atom(
             break
           }
         }
-        if !(key_matched) {
+        if !key_matched {
           continue
         }
         // Non-trailer lines: only include if only=no
       } else if only {
         continue
       }
-    } else if only && !(is_trailer) {
+    } else if only && !is_trailer {
       continue
     }
     // Format the line

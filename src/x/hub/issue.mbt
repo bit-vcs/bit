@@ -342,7 +342,7 @@ pub fn Hub::link_pr_to_issue(
     raise @bit.GitError::InvalidObject("Issue not found: \{issue_id}")
   }
   let linked = existing.linked_prs
-  if !(linked.contains(pr_id)) {
+  if !linked.contains(pr_id) {
     linked.push(pr_id)
   }
   let updated = Issue::new(

@@ -30,7 +30,7 @@ fn storage_runtime_fail_unsupported_mode(
 
 ///|
 fn storage_runtime_is_short_count_flag(arg : String) -> Bool {
-  if !(arg.has_prefix("-")) || arg.length() <= 1 {
+  if !arg.has_prefix("-") || arg.length() <= 1 {
     return false
   }
   let raw = String::unsafe_substring(arg, start=1, end=arg.length())
@@ -142,19 +142,19 @@ fn storage_runtime_parse_add_args(
   let mut end_of_options = false
   let paths : Array[String] = []
   for arg in args {
-    if !(end_of_options) && arg == "--" {
+    if !end_of_options && arg == "--" {
       end_of_options = true
       continue
     }
     match arg {
-      "-A" | "--all" if !(end_of_options) => add_all = true
-      _ if end_of_options || !(arg.has_prefix("-")) => paths.push(arg)
+      "-A" | "--all" if !end_of_options => add_all = true
+      _ if end_of_options || !arg.has_prefix("-") => paths.push(arg)
       _ if arg.has_prefix("-") =>
         storage_runtime_fail_unsupported_option("add", arg)
       _ => ()
     }
   }
-  if !(add_all) && paths.length() == 0 {
+  if !add_all && paths.length() == 0 {
     raise @bitcore.GitError::InvalidObject("add requires pathspec")
   }
   { add_all, paths }
@@ -353,7 +353,7 @@ fn storage_runtime_parse_hash_object_args(
         }
         break
       }
-      _ if !(arg.has_prefix("-")) => paths.push(arg)
+      _ if !arg.has_prefix("-") => paths.push(arg)
       _ => storage_runtime_fail_unsupported_option("hash-object", arg)
     }
     i += 1
@@ -421,7 +421,7 @@ fn storage_runtime_parse_update_ref_args(
   for arg in args {
     match arg {
       "-d" | "--delete" => delete_mode = true
-      _ if !(arg.has_prefix("-")) => positional.push(arg)
+      _ if !arg.has_prefix("-") => positional.push(arg)
       _ => storage_runtime_fail_unsupported_option("update-ref", arg)
     }
   }

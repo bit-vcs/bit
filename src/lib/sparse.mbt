@@ -41,7 +41,7 @@ fn sparse_upsert_section_value(
       continue
     }
     if in_section && trimmed.has_prefix("[") {
-      if !(key_set) {
+      if !key_set {
         lines.push("\t\{name} = \{value_text}")
         key_set = true
       }
@@ -55,7 +55,7 @@ fn sparse_upsert_section_value(
     lines.push(line)
   }
   if found_section {
-    if in_section && !(key_set) {
+    if in_section && !key_set {
       lines.push("\t\{name} = \{value_text}")
     }
   } else {
@@ -109,7 +109,7 @@ fn sparse_is_section_bool_enabled(
     join_path(git_dir, "config.worktree"),
   ]
   for config_path in config_paths {
-    if !(rfs.is_file(config_path)) {
+    if !rfs.is_file(config_path) {
       continue
     }
     let content = @utf8.decode_lossy(
@@ -290,7 +290,7 @@ fn sparse_canonicalize_cone_patterns(patterns : Array[String]) -> Array[String] 
         for existing in kept {
           canonical.push(existing)
         }
-        if !(covered) {
+        if !covered {
           canonical.push(normalized)
         }
       }
@@ -335,17 +335,17 @@ fn sparse_encode_cone_patterns(patterns : Array[String]) -> Array[String] {
           current + "/" + parts[i]
         }
         let parent = "/" + current + "/"
-        if !(out.contains(parent)) {
+        if !out.contains(parent) {
           out.push(parent)
         }
         let exclude_children = "!/" + current + "/*/"
-        if !(out.contains(exclude_children)) {
+        if !out.contains(exclude_children) {
           out.push(exclude_children)
         }
       }
     }
     let stored = "/" + relative + "/"
-    if !(out.contains(stored)) {
+    if !out.contains(stored) {
       out.push(stored)
     }
   }
@@ -376,7 +376,7 @@ pub fn read_sparse_patterns(
   git_dir : String,
 ) -> Array[String] raise @bit.GitError {
   let sparse_path = join_path(git_dir, "info/sparse-checkout")
-  if !(rfs.is_file(sparse_path)) {
+  if !rfs.is_file(sparse_path) {
     return []
   }
   let content = rfs.read_file(sparse_path)
@@ -384,7 +384,7 @@ pub fn read_sparse_patterns(
   let patterns : Array[String] = []
   for line_view in text.split("\n") {
     let line = sparse_trim(line_view.to_string())
-    if line.length() > 0 && !(line.has_prefix("#")) {
+    if line.length() > 0 && !line.has_prefix("#") {
       patterns.push(line)
     }
   }
@@ -397,7 +397,7 @@ pub fn read_sparse_display_patterns(
   git_dir : String,
 ) -> Array[String] raise @bit.GitError {
   let patterns = read_sparse_patterns(rfs, git_dir)
-  if !(is_sparse_checkout_cone_enabled(rfs, git_dir)) {
+  if !is_sparse_checkout_cone_enabled(rfs, git_dir) {
     return patterns
   }
   let positive : Array[String] = []
@@ -421,7 +421,7 @@ pub fn read_sparse_display_patterns(
       continue
     }
     match sparse_normalize_cone_pattern(pattern) {
-      Some(normalized) if !(positive.contains(normalized)) =>
+      Some(normalized) if !positive.contains(normalized) =>
         positive.push(normalized)
       _ => ()
     }
@@ -437,7 +437,7 @@ pub fn read_sparse_display_patterns(
         }
       }
     }
-    if !(intermediate) {
+    if !intermediate {
       display.push(candidate)
     }
   }
@@ -493,7 +493,7 @@ pub fn sparse_checkout_init(
   fs.write_string(config_path, updated)
   sparse_set_cone_config(fs, rfs, git_dir, cone)
   let sparse_path = join_path(git_dir, "info/sparse-checkout")
-  if !(rfs.is_file(sparse_path)) {
+  if !rfs.is_file(sparse_path) {
     write_sparse_patterns(fs, rfs, git_dir, sparse_default_patterns())
   }
   sparse_update_worktree(fs, rfs, root)
@@ -509,7 +509,7 @@ pub fn sparse_checkout_set(
 ) -> Unit raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   // Ensure sparse checkout is initialized
-  if !(is_sparse_checkout_enabled(rfs, git_dir)) {
+  if !is_sparse_checkout_enabled(rfs, git_dir) {
     sparse_checkout_init(fs, rfs, root)
   }
   sparse_enable_worktree_config(fs, rfs, git_dir)
@@ -533,13 +533,13 @@ pub fn sparse_checkout_add(
 ) -> Unit raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   // Ensure sparse checkout is initialized
-  if !(is_sparse_checkout_enabled(rfs, git_dir)) {
+  if !is_sparse_checkout_enabled(rfs, git_dir) {
     sparse_checkout_init(fs, rfs, root)
   }
   sparse_enable_worktree_config(fs, rfs, git_dir)
   let cone_mode = is_sparse_checkout_cone_enabled(rfs, git_dir)
   let existing = read_sparse_patterns(rfs, git_dir)
-  if cone_mode && !(sparse_patterns_use_cone_mode(existing)) {
+  if cone_mode && !sparse_patterns_use_cone_mode(existing) {
     raise @bit.GitError::InvalidObject(
       "existing sparse-checkout patterns do not use cone mode",
     )
@@ -547,14 +547,14 @@ pub fn sparse_checkout_add(
   let next_patterns = if cone_mode {
     let display = read_sparse_display_patterns(rfs, git_dir)
     for p in new_patterns {
-      if !(display.contains(p)) {
+      if !display.contains(p) {
         display.push(p)
       }
     }
     sparse_encode_cone_patterns(display)
   } else {
     for p in new_patterns {
-      if !(existing.contains(p)) {
+      if !existing.contains(p) {
         existing.push(p)
       }
     }
@@ -621,7 +621,7 @@ pub fn sparse_checkout_reapply(
   root : String,
 ) -> Unit raise @bit.GitError {
   let git_dir = join_path(root, ".git")
-  if !(is_sparse_checkout_enabled(rfs, git_dir)) {
+  if !is_sparse_checkout_enabled(rfs, git_dir) {
     sparse_checkout_init(fs, rfs, root)
   }
   sparse_enable_worktree_config(fs, rfs, git_dir)
@@ -672,7 +672,7 @@ fn sparse_path_matches(path : String, pattern : String) -> Bool {
   // "*.txt" - match files ending in .txt
   if normalized_pattern == "/*" {
     // Match files in root (no slash in path)
-    return !(path.contains("/"))
+    return !path.contains("/")
   }
   if normalized_pattern == "/*/" {
     // Used by the default negation pattern "!/*/" to exclude root directories.
@@ -726,7 +726,7 @@ fn sparse_path_matches(path : String, pattern : String) -> Bool {
         start=dir.length() + 1,
         end=path.length(),
       )
-      return !(rest.contains("/"))
+      return !rest.contains("/")
     }
     return false
   }
@@ -832,7 +832,7 @@ fn sparse_parent_dirs(path : String) -> Array[String] {
       break
     }
     current = String::unsafe_substring(current, start=0, end=slash)
-    if current.length() > 0 && !(out.contains(current)) {
+    if current.length() > 0 && !out.contains(current) {
       out.push(current)
     }
   }
@@ -879,7 +879,7 @@ fn sparse_build_sparse_index_entries(
   let candidate_dirs : Array[String] = []
   for path in skip_paths {
     for dir in sparse_parent_dirs(path) {
-      if !(candidate_dirs.contains(dir)) {
+      if !candidate_dirs.contains(dir) {
         candidate_dirs.push(dir)
       }
     }
@@ -900,16 +900,16 @@ fn sparse_build_sparse_index_entries(
     let mut fully_skipped = true
     for item in all_files.to_array() {
       let (path, _) = item
-      if !(sparse_is_under_dir(path, dir)) {
+      if !sparse_is_under_dir(path, dir) {
         continue
       }
       has_files = true
-      if !(skip_paths.contains(path)) {
+      if !skip_paths.contains(path) {
         fully_skipped = false
         break
       }
     }
-    if !(has_files) || !(fully_skipped) {
+    if !has_files || !fully_skipped {
       continue
     }
     let mut shadowed = false
@@ -919,7 +919,7 @@ fn sparse_build_sparse_index_entries(
         break
       }
     }
-    if !(shadowed) {
+    if !shadowed {
       sparse_dirs.push(dir)
     }
   }
@@ -971,7 +971,7 @@ fn sparse_update_worktree(
   preserve_index? : Bool = false,
 ) -> Unit raise @bit.GitError {
   let git_dir = join_path(root, ".git")
-  if !(rfs.is_file(join_path(git_dir, "index"))) {
+  if !rfs.is_file(join_path(git_dir, "index")) {
     return
   }
   let patterns = read_sparse_patterns(rfs, git_dir)
@@ -993,7 +993,7 @@ fn sparse_update_worktree(
         // Reapply should still prune root-level skipped files back to the
         // current sparse patterns, while preserving dirty paths inside skipped
         // directories that may coexist with user files.
-        if preserve_index && !(entry.path.contains("/")) {
+        if preserve_index && !entry.path.contains("/") {
           continue
         }
         if sparse_worktree_matches_index_entry(
@@ -1030,7 +1030,7 @@ fn sparse_update_worktree(
       // Remove files not in sparse set
       for item in all_files.to_array() {
         let (path, _) = item
-        if !(matches_sparse_pattern(path, patterns)) {
+        if !matches_sparse_pattern(path, patterns) {
           if protected_skip_paths.contains(path) {
             continue
           }
@@ -1111,7 +1111,7 @@ fn sparse_prune_empty_dirs(
   if path != root && path.has_prefix(join_path(root, ".git")) {
     return false
   }
-  if !(rfs.is_dir(path)) {
+  if !rfs.is_dir(path) {
     return false
   }
   let entries = rfs.readdir(path) catch { _ => return false }
@@ -1132,7 +1132,7 @@ fn sparse_prune_empty_dirs(
       break
     }
   }
-  if path != root && !(has_entries) {
+  if path != root && !has_entries {
     fs.remove_dir(path) catch {
       _ => ()
     }

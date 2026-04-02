@@ -11,7 +11,7 @@ async fn handle_cherry(args : Array[String]) -> Unit raise Error {
     let arg = args[i]
     match arg {
       "-v" => verbose = true
-      _ if !(arg.has_prefix("-")) =>
+      _ if !arg.has_prefix("-") =>
         if upstream is None {
           upstream = Some(arg)
         } else if head is None {
@@ -260,7 +260,7 @@ fn cherry_compute_tree_diff(
   }
   for item in parent {
     let (path, _) = item
-    if !(current_map.contains(path)) {
+    if !current_map.contains(path) {
       diff.push((path, "D"))
     }
   }

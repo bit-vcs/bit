@@ -39,7 +39,7 @@ fn scan_repos(
   let entries = list_dir(current_path)
   for entry in entries {
     let (name, is_dir) = entry
-    if is_dir && !(name.has_prefix(".")) {
+    if is_dir && !name.has_prefix(".") {
       let new_rel = if rel_path.is_empty() {
         name
       } else {
