@@ -1,0 +1,28 @@
+[repo]
+owner = "bit-vcs"
+name = "bit"
+
+[storage]
+path = ".flaker/data"
+
+[adapter]
+type = "command"
+
+[runner]
+type = "custom"
+command = "git-compat"
+list = "node tools/flaker-list-git-compat-tests.mjs"
+execute = "node tools/flaker-run-git-compat-tests.mjs"
+
+[affected]
+resolver = "simple"
+config = ""
+
+[quarantine]
+auto = true
+flaky_rate_threshold = 0.3
+min_runs = 5
+
+[flaky]
+window_days = 14
+detection_threshold = 0.1

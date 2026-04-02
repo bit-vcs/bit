@@ -30,6 +30,7 @@ test:
     moon test --target wasm -p mizchi/bit/runtime -f storage_runtime_wbtest.mbt
     moon test --target native --no-parallelize -j 1
     just test-git-compat-allowlist
+    just test-flaker-git-compat
     just test-js-build
 
 # Update snapshot tests (both js and native)
@@ -99,6 +100,10 @@ test-js-build: sync-npm-lib-raw sync-npm-bit-cjs bundle-js-lib-minimal bundle-js
 # Guard compat-random allowlist against known upstream-oracle failures
 test-git-compat-allowlist:
     node --test tools/git-compat-allowlist.test.mjs
+
+# Verify flaker-focused git-compat inventory helpers
+test-flaker-git-compat:
+    node --test tools/flaker-git-compat.test.mjs
 
 # Verify JS-exported lib on a pure in-memory host
 test-js-lib: build-js-lib
@@ -362,6 +367,22 @@ compat-random-run:
 # Aggregate compatibility random run records (default: compat-random-results)
 compat-random-aggregate results_dir="compat-random-results":
     bash tools/aggregate-git-compat-random.sh {{results_dir}}
+
+# Focused local git-compat sampling via flaker
+flaker-git-compat-sample strategy="weighted" count="25":
+    @if ! command -v flaker >/dev/null 2>&1; then \
+      echo "flaker CLI is required; install @mizchi/flaker first" >&2; \
+      exit 1; \
+    fi
+    flaker sample --strategy {{strategy}} --count {{count}}
+
+# Focused local git-compat execution via flaker
+flaker-git-compat-run strategy="weighted" count="25":
+    @if ! command -v flaker >/dev/null 2>&1; then \
+      echo "flaker CLI is required; install @mizchi/flaker first" >&2; \
+      exit 1; \
+    fi
+    flaker run --strategy {{strategy}} --count {{count}}
 
 # Trigger Git Compat Randomized workflow via workflow_dispatch
 compat-random-dispatch shards="1" ratio="50" target_shard="0" seed="":
