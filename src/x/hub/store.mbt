@@ -89,6 +89,24 @@ pub fn is_work_item_record_kind(kind : String) -> Bool {
 }
 
 ///|
+let sync_link_record_kind_value : String = "sync-link"
+
+///|
+pub fn sync_link_record_kind() -> String {
+  sync_link_record_kind_value
+}
+
+///|
+pub fn is_sync_link_record_kind(kind : String) -> Bool {
+  kind == sync_link_record_kind_value
+}
+
+///|
+pub fn sync_link_key(local_id : String, provider : String) -> String {
+  "hub/sync-link/" + local_id + "/" + provider
+}
+
+///|
 pub struct HubRecord {
   version : Int
   key : String
