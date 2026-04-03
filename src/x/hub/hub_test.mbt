@@ -1933,3 +1933,34 @@ test "github_types: parse GhPullRequest open (not merged)" {
   assert_eq(pr.state, "open")
   assert_false(pr.merged)
 }
+
+///|
+test "timestamp: parse ISO 8601 to unix" {
+  let unix = @hub.parse_iso8601_to_unix("2026-01-15T10:30:45Z")
+  assert_eq(unix, 1768473045L)
+}
+
+///|
+test "timestamp: parse ISO 8601 with timezone offset" {
+  let unix = @hub.parse_iso8601_to_unix("2026-01-15T10:30:45+00:00")
+  assert_eq(unix, 1768473045L)
+}
+
+///|
+test "timestamp: unix to ISO 8601" {
+  let iso = @hub.unix_to_iso8601(1768473045L)
+  assert_eq(iso, "2026-01-15T10:30:45Z")
+}
+
+///|
+test "timestamp: roundtrip" {
+  let original = 1774900000L
+  let iso = @hub.unix_to_iso8601(original)
+  let back = @hub.parse_iso8601_to_unix(iso)
+  assert_eq(back, original)
+}
+
+///|
+test "timestamp: empty string returns 0" {
+  assert_eq(@hub.parse_iso8601_to_unix(""), 0L)
+}
