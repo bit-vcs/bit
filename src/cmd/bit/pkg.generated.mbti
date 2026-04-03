@@ -152,8 +152,7 @@ type ParseoptMatchResult
 
 type ParseoptOpt
 
-type ParseoptOptType
-pub impl Eq for ParseoptOptType
+type ParseoptOptType derive(Eq)
 
 type PushDefaultMode
 
@@ -213,9 +212,7 @@ type SubmoduleAddArgs
 
 type SubmoduleDispatch
 
-type SubmoduleInfo
-pub impl Eq for SubmoduleInfo
-pub impl Show for SubmoduleInfo
+type SubmoduleInfo derive(Eq, Show)
 
 type UploadPackTransport
 

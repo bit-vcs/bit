@@ -67,16 +67,12 @@ pub(all) enum GrepExpr {
   And(GrepExpr, GrepExpr)
   Or(GrepExpr, GrepExpr)
   Not(GrepExpr)
-}
-pub impl Eq for GrepExpr
-pub impl Show for GrepExpr
+} derive(Eq, Show)
 
 pub(all) struct GrepExprMatch {
   matched : Bool
   span : GrepMatchSpan?
-}
-pub impl Eq for GrepExprMatch
-pub impl Show for GrepExprMatch
+} derive(Eq, Show)
 
 pub(all) enum GrepExprToken {
   Pattern(String)
@@ -85,40 +81,30 @@ pub(all) enum GrepExprToken {
   Not
   LParen
   RParen
-}
-pub impl Eq for GrepExprToken
-pub impl Show for GrepExprToken
+} derive(Eq, Show)
 
 pub(all) struct GrepFileMatch {
   path : String
   matches : Array[GrepLineMatch]
-}
-pub impl Eq for GrepFileMatch
-pub impl Show for GrepFileMatch
+} derive(Eq, Show)
 
 pub(all) struct GrepLineMatch {
   line_number : Int
   column : Int
   line : String
-}
-pub impl Eq for GrepLineMatch
-pub impl Show for GrepLineMatch
+} derive(Eq, Show)
 
 pub(all) struct GrepMatchSpan {
   start_column : Int
   end_column : Int
-}
-pub impl Eq for GrepMatchSpan
-pub impl Show for GrepMatchSpan
+} derive(Eq, Show)
 
 pub(all) enum GrepPatternType {
   Fixed
   Basic
   Extended
   Perl
-}
-pub impl Eq for GrepPatternType
-pub impl Show for GrepPatternType
+} derive(Eq, Show)
 
 // Type aliases
 

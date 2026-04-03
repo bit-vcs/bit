@@ -719,9 +719,7 @@ pub(all) enum GitHubShorthand {
   Repo(String, String?)
   Subdir(String, String, String?)
   File(String, String)
-}
-pub impl Eq for GitHubShorthand
-pub impl Show for GitHubShorthand
+} derive(Eq, Show)
 
 pub enum HeadRef {
   Branch(String)
@@ -1049,9 +1047,7 @@ pub(all) struct WorktreeInfo {
 pub(all) struct WorktreeRepairResult {
   repaired : Array[String]
   warnings : Array[String]
-}
-pub impl Eq for WorktreeRepairResult
-pub impl Show for WorktreeRepairResult
+} derive(Eq, Show)
 
 // Type aliases
 

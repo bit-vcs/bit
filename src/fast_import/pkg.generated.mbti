@@ -34,9 +34,7 @@ pub(all) enum FastImportFileOp {
   DeleteAll
   Rename(old_path~ : String, new_path~ : String)
   Copy(old_path~ : String, new_path~ : String)
-}
-pub impl Eq for FastImportFileOp
-pub impl Show for FastImportFileOp
+} derive(Eq, Show)
 
 pub(all) struct FastImportIdent {
   ident : String

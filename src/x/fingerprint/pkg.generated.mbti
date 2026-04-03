@@ -22,9 +22,7 @@ pub fn parse_fingerprint_mode(String) -> FingerprintMode?
 pub(all) enum FingerprintMode {
   Fast
   GitCompat
-}
-pub impl Eq for FingerprintMode
-pub impl Show for FingerprintMode
+} derive(Eq, Show)
 
 // Type aliases
 

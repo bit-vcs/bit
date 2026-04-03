@@ -44,31 +44,23 @@ pub(all) struct RefRecord {
   refname : String
   update_index : UInt64
   value : RefValue
-}
-pub impl Eq for RefRecord
-pub impl Show for RefRecord
+} derive(Eq, Show)
 
 pub(all) enum RefValue {
   Deletion
   Val1(@object.ObjectId)
   Val2(@object.ObjectId, @object.ObjectId)
   Symref(String)
-}
-pub impl Eq for RefValue
-pub impl Show for RefValue
+} derive(Eq, Show)
 
-type ReftableFooter
-pub impl Eq for ReftableFooter
-pub impl Show for ReftableFooter
+type ReftableFooter derive(Eq, Show)
 
 pub struct ReftableHeader {
   version : Int
   block_size : Int
   min_update_index : UInt64
   max_update_index : UInt64
-}
-pub impl Eq for ReftableHeader
-pub impl Show for ReftableHeader
+} derive(Eq, Show)
 
 // Type aliases
 

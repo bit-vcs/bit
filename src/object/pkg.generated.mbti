@@ -63,9 +63,7 @@ pub(all) suberror GitError {
   PackfileError(String)
   ProtocolError(String)
   IoError(String)
-}
-pub impl Eq for GitError
-pub impl Show for GitError
+} derive(Eq, Show)
 
 // Types and methods
 pub struct Commit {
@@ -86,13 +84,12 @@ pub fn Commit::new(ObjectId, Array[ObjectId], String, Int64, String, String, Int
 pub(all) enum HashAlgorithm {
   Sha1
   Sha256
-}
+} derive(Eq)
 pub fn HashAlgorithm::from_string(String) -> Self raise GitError
 pub fn HashAlgorithm::hash_size(Self) -> Int
 pub fn HashAlgorithm::hex_size(Self) -> Int
 pub fn HashAlgorithm::name(Self) -> String
 pub fn HashAlgorithm::zero_hex(Self) -> String
-pub impl Eq for HashAlgorithm
 pub impl Show for HashAlgorithm
 
 pub(all) enum HashState {
@@ -129,10 +126,9 @@ pub(all) enum ObjectType {
   Tree
   Commit
   Tag
-}
+} derive(Eq)
 pub fn ObjectType::to_packfile_type(Self) -> Int
 pub fn ObjectType::to_string(Self) -> String
-pub impl Eq for ObjectType
 pub impl Show for ObjectType
 
 pub(all) enum PackCompression {
