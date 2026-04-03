@@ -169,49 +169,79 @@ bit issue create --title "Depends on upstream fix" \
 
 ## GitHub Sync
 
-Bidirectional sync between bit issues and GitHub Issues.
+Bidirectional sync between bit issues/PRs and GitHub. Requires `gh` CLI or `GITHUB_TOKEN` env var.
 
 ### Pull (GitHub → bit)
 
+Pull is read-only — no `--github` flag needed.
+
 ```bash
-bit issue sync pull --repo owner/repo                   # fetch changes
-bit issue sync pull --repo owner/repo --dry-run         # preview only
-bit issue sync pull --repo owner/repo --since 2026-03-01
+bit issue sync pull --repo owner/repo                              # pull issues
+bit issue sync pull --repo owner/repo --include-prs                # include PRs
+bit issue sync pull --repo owner/repo --since 2026-03-01           # incremental
+bit issue sync pull --repo owner/repo --conflict newer-wins        # default
+bit issue sync pull --repo owner/repo --conflict github-wins       # always use GitHub
+bit issue sync pull --repo owner/repo --comments full              # sync comments too
 ```
 
 ### Push (bit → GitHub)
 
-```bash
-bit issue sync push --repo owner/repo                   # push changes
-bit issue sync push --repo owner/repo --dry-run         # preview only
-bit issue sync push --repo owner/repo --label "bug"     # filter by label
-```
+Push requires `--github` flag (safety). Default is **dry-run** (shows plan only).
 
-Note: `session:*` labeled issues are excluded from push (local-only).
+```bash
+bit issue sync push --github --repo owner/repo                     # dry-run
+bit issue sync push --github --repo owner/repo --apply             # execute
+bit issue sync push --github --repo owner/repo --include-prs --apply
+bit issue sync push --github --repo owner/repo --comments full --apply
+```
 
 ### Bidirectional sync
 
-```bash
-bit issue sync --repo owner/repo                        # pull then push
-bit issue sync status --repo owner/repo                 # show sync state
-```
-
-### Conflict policy
+Runs pull then push. Requires `--github`.
 
 ```bash
-bit issue sync --repo owner/repo --conflict github-wins   # default
-bit issue sync --repo owner/repo --conflict bit-wins
-bit issue sync --repo owner/repo --conflict newer-wins
-bit issue sync --repo owner/repo --conflict manual         # skip conflicts
+bit issue sync --github --repo owner/repo                          # pull + push dry-run
+bit issue sync --github --repo owner/repo --apply                  # pull + push execute
 ```
 
-### Import with mapping
+### Sync status
 
 ```bash
-bit issue import --repo owner/repo                      # creates mapping records
+bit issue sync status --repo owner/repo                            # show linked issues/PRs
 ```
 
-Import automatically creates mapping records (bit id ↔ GitHub number) so subsequent `sync pull/push` can track changes.
+### Conflict policies
+
+```bash
+--conflict newer-wins    # default: timestamp comparison
+--conflict github-wins   # always use GitHub version
+--conflict bit-wins      # always keep local version
+--conflict manual        # skip conflicts, report only
+```
+
+### Comment sync modes
+
+```bash
+--comments append-only   # default: new comments only
+--comments full          # add, edit, and delete
+--comments no-delete     # add and edit, no delete
+```
+
+### Auto-sync hook
+
+```bash
+bit issue sync install-hook                                        # add post-push hook
+```
+
+This creates `.git/hooks/post-push` that auto-pushes after `git push`.
+
+### Import (one-way, no SyncLink)
+
+```bash
+bit issue import --repo owner/repo                                 # import without tracking
+```
+
+Note: `import` does NOT create SyncLink mappings. Use `sync pull` for tracked sync.
 
 ## Claim (optional, requires relay)
 
@@ -245,10 +275,11 @@ bit issue watch                         # stream claim/unclaim events in real-ti
 | `bit issue stop <ref>` | Remove issue from working set |
 | `bit issue active` | List active issues across repos |
 | `bit issue note` | Low-level notes access (`add`, `get`, `list`, `remove`; `--ns` for namespace) |
-| `bit issue sync pull` | Pull changes from GitHub (`--repo`, `--since`, `--dry-run`) |
-| `bit issue sync push` | Push changes to GitHub (`--repo`, `--label`, `--dry-run`) |
-| `bit issue sync` | Bidirectional sync (`--repo`, `--conflict`, `--dry-run`) |
+| `bit issue sync pull` | Pull from GitHub (`--repo`, `--since`, `--conflict`, `--comments`, `--include-prs`) |
+| `bit issue sync push` | Push to GitHub (`--github`, `--repo`, `--apply`, `--comments`, `--include-prs`) |
+| `bit issue sync` | Bidirectional (`--github`, `--repo`, `--apply`, `--conflict`, `--comments`) |
 | `bit issue sync status` | Show sync state (`--repo`) |
+| `bit issue sync install-hook` | Add post-push auto-sync hook |
 | `bit issue claim <id>` | Publish claim via relay (optional) |
 | `bit issue unclaim <id>` | Release claim (optional) |
 | `bit issue claims` | List active claims (optional) |
