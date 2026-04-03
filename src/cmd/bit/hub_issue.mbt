@@ -34,6 +34,9 @@ fn print_hub_issue_usage() -> Unit {
   println("  watch [--stale-hours <n>] [--remote <url>] [--auth-token <token>]")
   println("  search [<query>...] [<options>]")
   println("  note <subcommand> [<args>]")
+  println("  remote add <alias> <path>")
+  println("  remote list")
+  println("  remote remove <alias>")
   println(
     "  init                                  (prompt before local metadata / sync setup)",
   )
@@ -74,6 +77,7 @@ async fn handle_hub_issue(args : Array[String]) -> Unit raise Error {
     "claims" => handle_hub_issue_claims(rest)
     "watch" => handle_hub_issue_watch(rest)
     "search" => handle_hub_issue_search(rest)
+    "remote" => handle_hub_issue_remote(rest)
     "note" => handle_hub_note(rest)
     "init" => handle_hub_issue_init(rest)
     "help" | "-h" | "--help" => print_hub_issue_usage()

@@ -176,6 +176,8 @@ options(
     "hub_issue.mbt": [ "native" ],
     "hub_note.mbt": [ "native" ],
     "hub_pr.mbt": [ "native" ],
+    "hub_remote.mbt": [ "native" ],
+    "hub_remote_wbtest.mbt": [ "native" ],
     "hub_search.mbt": [ "native" ],
     "hub_stores.mbt": [ "native" ],
     "hub_sync.mbt": [ "native" ],
