@@ -1140,13 +1140,18 @@ async fn handle_hub_issue_link(args : Array[String]) -> Unit raise Error {
     return ()
   }
   let issue_id = args[0]
-  let pr_id = args[1]
+  let target = args[1]
   let root = get_work_root()
   let git_dir = resolve_hub_git_dir(root)
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
-  hub.link_pr_to_issue(objects, refs, clock, issue_id, pr_id)
-  print_line("Linked PR #\{pr_id} to issue #\{issue_id}")
+  if target.contains("#") || target.contains("/") {
+    hub.link_issue(objects, refs, clock, issue_id, target)
+    print_line("Linked issue \{target} to issue #\{issue_id}")
+  } else {
+    hub.link_pr_to_issue(objects, refs, clock, issue_id, target)
+    print_line("Linked PR #\{target} to issue #\{issue_id}")
+  }
 }
 
 ///|

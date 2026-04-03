@@ -1105,6 +1105,27 @@ test "issue: link PR to issue" {
 }
 
 ///|
+test "issue: link cross-repo issue" {
+  let (_fs, objects, refs, clock) = setup_repo_with_branch()
+  let hub = Hub::init(objects, refs)
+  let issue = hub.create_issue(
+    objects,
+    refs,
+    clock,
+    "Test issue",
+    "body",
+    "alice",
+    labels=[],
+    assignees=[],
+  )
+  hub.link_issue(objects, refs, clock, issue.id(), "bit-vcs/other#deadbeef")
+  let updated = hub.get_issue(objects, issue.id())
+  assert_true(updated is Some(_))
+  let updated = updated.unwrap()
+  assert_eq(updated.linked_issues(), ["bit-vcs/other#deadbeef"])
+}
+
+///|
 test "issue: update issue" {
   let (_fs, objects, refs, clock) = setup_repo_with_branch()
   let hub = Hub::init(objects, refs)

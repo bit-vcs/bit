@@ -328,6 +328,51 @@ pub fn Hub::list_issue_comments(
 }
 
 ///|
+/// Link a cross-repo issue reference to an Issue
+pub fn Hub::link_issue(
+  self : Hub,
+  objects : &@lib.ObjectStore,
+  refs : &@lib.RefStore,
+  clock : &@lib.Clock,
+  issue_id : String,
+  target_ref : String,
+) -> Unit raise @bit.GitError {
+  let issue = self.get_issue(objects, issue_id)
+  guard issue is Some(existing) else {
+    raise @bit.GitError::InvalidObject("Issue not found: \{issue_id}")
+  }
+  let linked = existing.linked_issues
+  if !linked.contains(target_ref) {
+    linked.push(target_ref)
+  }
+  let updated = Issue::new(
+    existing.id,
+    existing.title,
+    existing.body,
+    existing.author,
+    existing.created_at,
+    clock.now(),
+    existing.state,
+    labels=existing.labels,
+    assignees=existing.assignees,
+    linked_prs=existing.linked_prs,
+    linked_issues=linked,
+    parent_id=existing.parent_id,
+  )
+  ignore(
+    self.store.put_record(
+      objects,
+      refs,
+      clock,
+      work_item_meta_key(issue_id),
+      canonical_work_item_record_kind(),
+      updated.to_work_item().serialize(),
+      existing.author,
+    ),
+  )
+}
+
+///|
 /// Link a PR to an Issue
 pub fn Hub::link_pr_to_issue(
   self : Hub,
