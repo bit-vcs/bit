@@ -300,6 +300,60 @@ pub fn Hub::add_issue_comment(
 }
 
 ///|
+/// Update an existing comment on an Issue (replace body, keep id/timestamps)
+pub fn Hub::update_issue_comment(
+  self : Hub,
+  objects : &@lib.ObjectStore,
+  refs : &@lib.RefStore,
+  clock : &@lib.Clock,
+  issue_id : String,
+  comment_id : String,
+  body : String,
+  author : String,
+) -> Unit raise @bit.GitError {
+  let updated_comment = IssueComment::new(
+    comment_id,
+    issue_id,
+    author,
+    body,
+    clock.now(),
+  )
+  ignore(
+    self.store.put_record(
+      objects,
+      refs,
+      clock,
+      issue_comment_key(issue_id, comment_id),
+      "issue.comment",
+      updated_comment.serialize(),
+      author,
+    ),
+  )
+}
+
+///|
+/// Delete a comment from an Issue
+pub fn Hub::delete_issue_comment(
+  self : Hub,
+  objects : &@lib.ObjectStore,
+  refs : &@lib.RefStore,
+  clock : &@lib.Clock,
+  issue_id : String,
+  comment_id : String,
+) -> Unit raise @bit.GitError {
+  ignore(
+    self.store.delete_record(
+      objects,
+      refs,
+      clock,
+      issue_comment_key(issue_id, comment_id),
+      "issue.comment",
+      "github-sync",
+    ),
+  )
+}
+
+///|
 /// List comments for an Issue
 pub fn Hub::list_issue_comments(
   self : Hub,

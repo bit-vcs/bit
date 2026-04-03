@@ -534,3 +534,283 @@ pub async fn github_sync_execute_push_prs(
   }
   { created, updated, errors }
 }
+
+///|
+pub struct CommentSyncResult {
+  created : Int
+  updated : Int
+  deleted : Int
+  errors : Array[String]
+}
+
+///|
+pub fn CommentSyncResult::created(self : CommentSyncResult) -> Int {
+  self.created
+}
+
+///|
+pub fn CommentSyncResult::updated(self : CommentSyncResult) -> Int {
+  self.updated
+}
+
+///|
+pub fn CommentSyncResult::deleted(self : CommentSyncResult) -> Int {
+  self.deleted
+}
+
+///|
+pub fn CommentSyncResult::errors(self : CommentSyncResult) -> Array[String] {
+  self.errors
+}
+
+///|
+/// Find a comment SyncLink by remote comment id (GitHub comment id)
+fn find_comment_sync_link_by_remote_id(
+  links : Array[@hub.SyncLink],
+  remote_comment_id : Int,
+) -> @hub.SyncLink? {
+  for link in links {
+    if link.local_kind() == "comment" &&
+      link.remote_number() == remote_comment_id {
+      return Some(link)
+    }
+  }
+  None
+}
+
+///|
+/// Find a comment SyncLink by local comment id
+fn find_comment_sync_link_by_local_id(
+  links : Array[@hub.SyncLink],
+  local_comment_id : String,
+) -> @hub.SyncLink? {
+  for link in links {
+    if link.local_kind() == "comment" && link.local_id() == local_comment_id {
+      return Some(link)
+    }
+  }
+  None
+}
+
+///|
+/// Pull comments from GitHub to local issue
+pub async fn github_sync_pull_comments(
+  hub : @hub.Hub,
+  objects : &@lib.ObjectStore,
+  refs : &@lib.RefStore,
+  clock : &@lib.Clock,
+  repo : String,
+  issue_local_id : String,
+  issue_remote_number : Int,
+  comments_mode : String,
+) -> CommentSyncResult raise @bit.GitError {
+  let gh_comments = github_list_comments(repo, issue_remote_number)
+  let all_links = hub.list_sync_links(objects, repo~)
+  let now = clock.now()
+  let mut created = 0
+  let mut updated = 0
+  let mut deleted = 0
+  let errors : Array[String] = []
+  // Track which remote comment ids we've seen (for full mode delete)
+  let seen_remote_ids : Map[Int, Bool] = {}
+  for gh_comment in gh_comments {
+    seen_remote_ids[gh_comment.id] = true
+    let existing_link = find_comment_sync_link_by_remote_id(
+      all_links, gh_comment.id,
+    )
+    match existing_link {
+      None => {
+        // New comment -- create locally
+        let local_comment = hub.add_issue_comment(
+          objects,
+          refs,
+          clock,
+          issue_local_id,
+          gh_comment.user,
+          gh_comment.body,
+        ) catch {
+          err => {
+            errors.push("create comment: \{err}")
+            continue
+          }
+        }
+        // Create SyncLink for comment
+        let link = @hub.SyncLink::new(
+          local_comment.id(),
+          "comment",
+          "github",
+          repo,
+          remote_number=gh_comment.id,
+          remote_node_id=gh_comment.node_id,
+          last_pull_at=now,
+          remote_updated_at=@hub.parse_iso8601_to_unix(
+            gh_comment.updated_at,
+          ),
+        )
+        hub.put_sync_link(objects, refs, clock, link)
+        all_links.push(link)
+        created += 1
+      }
+      Some(link) => {
+        // Existing -- update if mode allows and content changed
+        if comments_mode == "append-only" {
+          continue
+        }
+        let gh_updated = @hub.parse_iso8601_to_unix(gh_comment.updated_at)
+        if gh_updated > link.remote_updated_at() {
+          // Update local comment body
+          hub.update_issue_comment(
+            objects,
+            refs,
+            clock,
+            issue_local_id,
+            link.local_id(),
+            gh_comment.body,
+            gh_comment.user,
+          ) catch {
+            err => {
+              errors.push("update comment \{link.local_id()}: \{err}")
+              continue
+            }
+          }
+          // Update SyncLink
+          let updated_link = @hub.SyncLink::new(
+            link.local_id(),
+            "comment",
+            "github",
+            repo,
+            remote_number=gh_comment.id,
+            remote_node_id=gh_comment.node_id,
+            last_pull_at=now,
+            remote_updated_at=gh_updated,
+          )
+          hub.put_sync_link(objects, refs, clock, updated_link)
+          updated += 1
+        }
+      }
+    }
+  }
+  // Full mode: delete local comments not on GitHub
+  if comments_mode == "full" {
+    let local_comments = hub.list_issue_comments(objects, issue_local_id)
+    for local_comment in local_comments {
+      let link = find_comment_sync_link_by_local_id(
+        all_links, local_comment.id(),
+      )
+      match link {
+        Some(l) =>
+          if not(seen_remote_ids.contains(l.remote_number())) {
+            // Remote comment deleted -- delete locally
+            hub.delete_issue_comment(
+              objects, refs, clock, issue_local_id, local_comment.id(),
+            ) catch {
+              err => {
+                errors.push(
+                  "delete comment \{local_comment.id()}: \{err}",
+                )
+                continue
+              }
+            }
+            deleted += 1
+          }
+        None => () // No sync link = locally created, don't delete
+      }
+    }
+  }
+  { created, updated, deleted, errors }
+}
+
+///|
+/// Push comments from local issue to GitHub
+pub async fn github_sync_push_comments(
+  hub : @hub.Hub,
+  objects : &@lib.ObjectStore,
+  refs : &@lib.RefStore,
+  clock : &@lib.Clock,
+  repo : String,
+  issue_local_id : String,
+  issue_remote_number : Int,
+  comments_mode : String,
+  apply : Bool,
+) -> CommentSyncResult raise @bit.GitError {
+  let local_comments = hub.list_issue_comments(objects, issue_local_id)
+  let all_links = hub.list_sync_links(objects, repo~)
+  let now = clock.now()
+  let mut created = 0
+  let mut updated = 0
+  let deleted = 0
+  let errors : Array[String] = []
+  for local_comment in local_comments {
+    let existing_link = find_comment_sync_link_by_local_id(
+      all_links, local_comment.id(),
+    )
+    match existing_link {
+      None => {
+        // New local comment -- push to GitHub
+        if not(apply) {
+          created += 1
+          continue
+        }
+        let gh_comment = github_create_comment(
+          repo, issue_remote_number, local_comment.body(),
+        ) catch {
+          err => {
+            errors.push("create comment on GitHub: \{err}")
+            continue
+          }
+        }
+        // Create SyncLink
+        let link = @hub.SyncLink::new(
+          local_comment.id(),
+          "comment",
+          "github",
+          repo,
+          remote_number=gh_comment.id,
+          remote_node_id=gh_comment.node_id,
+          last_push_at=now,
+          remote_updated_at=@hub.parse_iso8601_to_unix(
+            gh_comment.updated_at,
+          ),
+        )
+        hub.put_sync_link(objects, refs, clock, link)
+        created += 1
+      }
+      Some(link) => {
+        // Existing -- update if mode allows
+        if comments_mode == "append-only" {
+          continue
+        }
+        if not(apply) {
+          updated += 1
+          continue
+        }
+        // Update on GitHub
+        let _ = github_update_comment(
+          repo, link.remote_number(), local_comment.body(),
+        ) catch {
+          err => {
+            errors.push(
+              "update comment #\{link.remote_number()} on GitHub: \{err}",
+            )
+            continue
+          }
+        }
+        // Update SyncLink
+        let updated_link = @hub.SyncLink::new(
+          link.local_id(),
+          "comment",
+          "github",
+          repo,
+          remote_number=link.remote_number(),
+          remote_node_id=link.remote_node_id(),
+          last_push_at=now,
+          last_pull_at=link.last_pull_at(),
+          remote_updated_at=now,
+        )
+        hub.put_sync_link(objects, refs, clock, updated_link)
+        updated += 1
+      }
+    }
+  }
+  { created, updated, deleted, errors }
+}

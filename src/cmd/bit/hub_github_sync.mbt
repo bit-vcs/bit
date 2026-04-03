@@ -5,9 +5,11 @@ fn print_hub_issue_sync_usage() -> Unit {
   println("Usage: bit issue sync <subcommand> [<args>]")
   println("")
   println("Subcommands:")
-  println("  pull --repo <owner/repo> [--include-prs]  (pull from GitHub)")
   println(
-    "  push --github --repo <owner/repo> [--apply] [--include-prs]",
+    "  pull --repo <owner/repo> [--include-prs] [--comments append-only|full|no-delete]",
+  )
+  println(
+    "  push --github --repo <owner/repo> [--apply] [--include-prs] [--comments append-only|full|no-delete]",
   )
   println("  status --repo <owner/repo>")
   println("  install-hook                            (install git hook)")
@@ -43,6 +45,7 @@ async fn handle_hub_issue_sync_pull(
   let mut state = "all"
   let mut conflict = "newer-wins"
   let mut include_prs = false
+  let mut comments_mode = "append-only"
   let mut i = 0
   while i < args.length() {
     let arg = args[i]
@@ -74,6 +77,15 @@ async fn handle_hub_issue_sync_pull(
       )
     } else if arg == "--include-prs" {
       include_prs = true
+    } else if arg == "--comments" && i + 1 < args.length() {
+      i += 1
+      comments_mode = args[i]
+    } else if arg.has_prefix("--comments=") {
+      comments_mode = String::unsafe_substring(
+        arg,
+        start=11,
+        end=arg.length(),
+      )
     } else if arg == "-h" || arg == "--help" {
       print_hub_issue_sync_usage()
       return ()
@@ -99,6 +111,42 @@ async fn handle_hub_issue_sync_pull(
     for c in result.conflicts {
       print_line("    \{c}")
     }
+  }
+  // Pull comments for synced issues
+  let links = hub.list_sync_links(objects, repo=resolved_repo)
+  let mut total_comments_created = 0
+  let mut total_comments_updated = 0
+  let mut total_comments_deleted = 0
+  for link in links {
+    if link.local_kind() == "issue" || link.local_kind() == "pr" {
+      let cr = @hub_native.github_sync_pull_comments(
+        hub,
+        objects,
+        refs,
+        clock,
+        resolved_repo,
+        link.local_id(),
+        link.remote_number(),
+        comments_mode,
+      )
+      total_comments_created += cr.created()
+      total_comments_updated += cr.updated()
+      total_comments_deleted += cr.deleted()
+      if cr.errors().length() > 0 {
+        for err in cr.errors() {
+          print_line("  Comment error: \{err}")
+        }
+      }
+    }
+  }
+  if total_comments_created > 0 ||
+    total_comments_updated > 0 ||
+    total_comments_deleted > 0 {
+    print_line("")
+    print_line("Comments pull complete:")
+    print_line("  Created: \{total_comments_created}")
+    print_line("  Updated: \{total_comments_updated}")
+    print_line("  Deleted: \{total_comments_deleted}")
   }
   if include_prs {
     print_line("")
@@ -127,6 +175,7 @@ async fn handle_hub_issue_sync_push(
   let mut github_flag = false
   let mut apply = false
   let mut include_prs = false
+  let mut comments_mode = "append-only"
   let mut i = 0
   while i < args.length() {
     let arg = args[i]
@@ -143,6 +192,15 @@ async fn handle_hub_issue_sync_push(
       apply = true
     } else if arg == "--include-prs" {
       include_prs = true
+    } else if arg == "--comments" && i + 1 < args.length() {
+      i += 1
+      comments_mode = args[i]
+    } else if arg.has_prefix("--comments=") {
+      comments_mode = String::unsafe_substring(
+        arg,
+        start=11,
+        end=arg.length(),
+      )
     } else if arg == "-h" || arg == "--help" {
       print_hub_issue_sync_usage()
       return ()
@@ -225,6 +283,38 @@ async fn handle_hub_issue_sync_push(
         print_line("    \{err}")
       }
     }
+  }
+  // Push comments for synced issues/PRs
+  let links = hub.list_sync_links(objects, repo=resolved_repo)
+  let mut total_comments_created = 0
+  let mut total_comments_updated = 0
+  for link in links {
+    if link.local_kind() == "issue" || link.local_kind() == "pr" {
+      let cr = @hub_native.github_sync_push_comments(
+        hub,
+        objects,
+        refs,
+        clock,
+        resolved_repo,
+        link.local_id(),
+        link.remote_number(),
+        comments_mode,
+        apply,
+      )
+      total_comments_created += cr.created()
+      total_comments_updated += cr.updated()
+      if cr.errors().length() > 0 {
+        for err in cr.errors() {
+          print_line("  Comment error: \{err}")
+        }
+      }
+    }
+  }
+  if total_comments_created > 0 || total_comments_updated > 0 {
+    print_line("")
+    print_line("Comments push complete:")
+    print_line("  Created: \{total_comments_created}")
+    print_line("  Updated: \{total_comments_updated}")
   }
 }
 

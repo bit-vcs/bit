@@ -292,3 +292,38 @@ pub async fn github_create_comment(
   let obj = parse_json_object_from_api(out)
   @hub.GhComment::from_json(obj)
 }
+
+///|
+/// Update a comment via gh api repos/{owner}/{repo}/issues/comments/{comment_id}
+pub async fn github_update_comment(
+  repo : String,
+  comment_id : Int,
+  body : String,
+) -> @hub.GhComment raise @bit.GitError {
+  let args : Array[String] = [
+    "api",
+    "repos/\{repo}/issues/comments/\{comment_id}",
+    "--method",
+    "PATCH",
+    "-f",
+    "body=\{body}",
+  ]
+  let out = gh_api_collect_output(args)
+  let obj = parse_json_object_from_api(out)
+  @hub.GhComment::from_json(obj)
+}
+
+///|
+/// Delete a comment via gh api repos/{owner}/{repo}/issues/comments/{comment_id}
+pub async fn github_delete_comment(
+  repo : String,
+  comment_id : Int,
+) -> Unit raise @bit.GitError {
+  let args : Array[String] = [
+    "api",
+    "repos/\{repo}/issues/comments/\{comment_id}",
+    "--method",
+    "DELETE",
+  ]
+  ignore(gh_api_collect_output(args))
+}
