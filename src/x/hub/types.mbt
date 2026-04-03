@@ -348,6 +348,7 @@ pub struct WorkItem {
   labels : Array[String]
   assignees : Array[String]
   linked_prs : Array[String]
+  linked_issues : Array[String]
   patch : WorkItemPatch?
   parent_id : String?
 }
@@ -364,6 +365,7 @@ pub fn WorkItem::new(
   labels? : Array[String] = [],
   assignees? : Array[String] = [],
   linked_prs? : Array[String] = [],
+  linked_issues? : Array[String] = [],
   patch? : WorkItemPatch? = None,
   parent_id? : String? = None,
 ) -> WorkItem {
@@ -378,6 +380,7 @@ pub fn WorkItem::new(
     labels,
     assignees,
     linked_prs,
+    linked_issues,
     patch,
     parent_id,
   }
@@ -442,6 +445,11 @@ pub fn WorkItem::linked_prs(self : WorkItem) -> Array[String] {
 }
 
 ///|
+pub fn WorkItem::linked_issues(self : WorkItem) -> Array[String] {
+  self.linked_issues
+}
+
+///|
 pub fn WorkItem::patch(self : WorkItem) -> WorkItemPatch? {
   self.patch
 }
@@ -494,6 +502,7 @@ pub fn WorkItem::to_issue(self : WorkItem) -> Issue? {
               labels=self.labels,
               assignees=self.assignees,
               linked_prs=self.linked_prs,
+              linked_issues=self.linked_issues,
               parent_id=self.parent_id,
             ),
           )
@@ -714,6 +723,7 @@ pub struct Issue {
   labels : Array[String]
   assignees : Array[String]
   linked_prs : Array[String] // Related PRs
+  linked_issues : Array[String] // Cross-repo issue references
   parent_id : String?
 }
 
@@ -729,6 +739,7 @@ pub fn Issue::new(
   labels? : Array[String] = [],
   assignees? : Array[String] = [],
   linked_prs? : Array[String] = [],
+  linked_issues? : Array[String] = [],
   parent_id? : String? = None,
 ) -> Issue {
   {
@@ -742,6 +753,7 @@ pub fn Issue::new(
     labels,
     assignees,
     linked_prs,
+    linked_issues,
     parent_id,
   }
 }
@@ -797,6 +809,11 @@ pub fn Issue::linked_prs(self : Issue) -> Array[String] {
 }
 
 ///|
+pub fn Issue::linked_issues(self : Issue) -> Array[String] {
+  self.linked_issues
+}
+
+///|
 pub fn Issue::to_work_item(self : Issue) -> WorkItem {
   WorkItem::new(
     self.id,
@@ -809,6 +826,7 @@ pub fn Issue::to_work_item(self : Issue) -> WorkItem {
     labels=self.labels,
     assignees=self.assignees,
     linked_prs=self.linked_prs,
+    linked_issues=self.linked_issues,
     parent_id=self.parent_id,
   )
 }

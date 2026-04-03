@@ -1697,6 +1697,29 @@ test "signature: require_signed without key rejects proposal writes" {
 }
 
 ///|
+test "format: serialize and parse WorkItem with linked_issues" {
+  let item = WorkItem::new(
+    "w-linked-1",
+    "Issue with cross-repo links",
+    "Body text",
+    "alice@example.com",
+    1706745600L,
+    1706832000L,
+    WorkItemState::Open,
+    labels=["feature"],
+    linked_issues=["bit-vcs/other-repo#a1b2c3d4", "myteam/lib#deadbeef"],
+  )
+  let serialized = item.serialize()
+  assert_true(serialized.contains("linked-issue bit-vcs/other-repo#a1b2c3d4"))
+  assert_true(serialized.contains("linked-issue myteam/lib#deadbeef"))
+  let parsed = parse_work_item(serialized)
+  assert_eq(
+    parsed.linked_issues(),
+    ["bit-vcs/other-repo#a1b2c3d4", "myteam/lib#deadbeef"],
+  )
+}
+
+///|
 test "format: serialize and parse Note" {
   let note = Note::new(
     @bit.ObjectId::zero(),

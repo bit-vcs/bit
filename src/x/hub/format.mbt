@@ -205,6 +205,11 @@ pub fn WorkItem::serialize(self : WorkItem) -> String {
     sb.write_string(pr_id)
     sb.write_char('\n')
   }
+  for issue_ref in self.linked_issues {
+    sb.write_string("linked-issue ")
+    sb.write_string(issue_ref)
+    sb.write_char('\n')
+  }
   match self.parent_id {
     Some(pid) => {
       sb.write_string("parent ")
@@ -276,6 +281,7 @@ pub fn parse_work_item(text : String) -> WorkItem raise PrError {
   let labels : Array[String] = []
   let assignees : Array[String] = []
   let linked_prs : Array[String] = []
+  let linked_issues : Array[String] = []
   let mut source_branch : String? = None
   let mut source_repo : String? = None
   let mut source_ref : String? = None
@@ -317,6 +323,7 @@ pub fn parse_work_item(text : String) -> WorkItem raise PrError {
           "label" => labels.push(value)
           "assignee" => assignees.push(value)
           "linked-pr" => linked_prs.push(value)
+          "linked-issue" => linked_issues.push(value)
           "parent" => parent_id = Some(value)
           "source" => source_branch = Some(value)
           "source-repo" => source_repo = Some(value)
@@ -375,6 +382,7 @@ pub fn parse_work_item(text : String) -> WorkItem raise PrError {
     labels~,
     assignees~,
     linked_prs~,
+    linked_issues~,
     patch~,
     parent_id~,
   )
@@ -677,6 +685,11 @@ pub fn Issue::serialize(self : Issue) -> String {
     sb.write_string(pr_id)
     sb.write_char('\n')
   }
+  for issue_ref in self.linked_issues {
+    sb.write_string("linked-issue ")
+    sb.write_string(issue_ref)
+    sb.write_char('\n')
+  }
   match self.parent_id {
     Some(pid) => {
       sb.write_string("parent ")
@@ -702,6 +715,7 @@ pub fn parse_legacy_issue(text : String) -> Issue raise PrError {
   let labels : Array[String] = []
   let assignees : Array[String] = []
   let linked_prs : Array[String] = []
+  let linked_issues : Array[String] = []
   let mut parent_id : String? = None
   let body_lines : Array[String] = []
   let mut in_body = false
@@ -735,6 +749,7 @@ pub fn parse_legacy_issue(text : String) -> Issue raise PrError {
           "label" => labels.push(value)
           "assignee" => assignees.push(value)
           "linked-pr" => linked_prs.push(value)
+          "linked-issue" => linked_issues.push(value)
           "parent" => parent_id = Some(value)
           _ => ()
         }
@@ -755,6 +770,7 @@ pub fn parse_legacy_issue(text : String) -> Issue raise PrError {
     labels~,
     assignees~,
     linked_prs~,
+    linked_issues~,
     parent_id~,
   )
 }

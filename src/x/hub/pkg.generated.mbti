@@ -102,17 +102,14 @@ pub(all) suberror PrError {
   InvalidFormat(String)
   InvalidState(String)
   MergeConflict(Array[String])
-}
-pub impl Eq for PrError
-pub impl Show for PrError
+} derive(Eq, Show)
 
 // Types and methods
 pub(all) enum ClaimAction {
   Claim
   Unclaim
-}
+} derive(Eq)
 pub fn ClaimAction::to_string(Self) -> String
-pub impl Eq for ClaimAction
 pub impl Show for ClaimAction
 
 pub struct ClaimMessage {
@@ -120,7 +117,7 @@ pub struct ClaimMessage {
   action : ClaimAction
   claimer : String
   timestamp : Int64
-}
+} derive(Eq, Show)
 pub fn ClaimMessage::action(Self) -> ClaimAction
 pub fn ClaimMessage::claimer(Self) -> String
 pub fn ClaimMessage::is_stale(Self, Int64, threshold_hours? : Int) -> Bool
@@ -128,8 +125,6 @@ pub fn ClaimMessage::issue_id(Self) -> String
 pub fn ClaimMessage::new(String, ClaimAction, String, Int64) -> Self
 pub fn ClaimMessage::timestamp(Self) -> Int64
 pub fn ClaimMessage::to_json(Self) -> Json
-pub impl Eq for ClaimMessage
-pub impl Show for ClaimMessage
 
 pub struct Hub {
   mut store : HubStore
@@ -230,6 +225,7 @@ pub struct Issue {
   labels : Array[String]
   assignees : Array[String]
   linked_prs : Array[String]
+  linked_issues : Array[String]
   parent_id : String?
 }
 pub fn Issue::assignees(Self) -> Array[String]
@@ -238,8 +234,9 @@ pub fn Issue::body(Self) -> String
 pub fn Issue::created_at(Self) -> Int64
 pub fn Issue::id(Self) -> String
 pub fn Issue::labels(Self) -> Array[String]
+pub fn Issue::linked_issues(Self) -> Array[String]
 pub fn Issue::linked_prs(Self) -> Array[String]
-pub fn Issue::new(String, String, String, String, Int64, Int64, IssueState, labels? : Array[String], assignees? : Array[String], linked_prs? : Array[String], parent_id? : String?) -> Self
+pub fn Issue::new(String, String, String, String, Int64, Int64, IssueState, labels? : Array[String], assignees? : Array[String], linked_prs? : Array[String], linked_issues? : Array[String], parent_id? : String?) -> Self
 pub fn Issue::serialize(Self) -> String
 pub fn Issue::state(Self) -> IssueState
 pub fn Issue::title(Self) -> String
@@ -266,10 +263,9 @@ pub fn IssueComment::serialize(Self) -> String
 pub(all) enum IssueState {
   Open
   Closed
-}
+} derive(Eq)
 pub fn IssueState::to_string(Self) -> String
 pub fn IssueState::to_work_item_state(Self) -> WorkItemState
-pub impl Eq for IssueState
 pub impl Show for IssueState
 
 pub struct NodeHeartbeat {
@@ -372,10 +368,9 @@ pub(all) enum PrState {
   Open
   Merged
   Closed
-}
+} derive(Eq)
 pub fn PrState::to_string(Self) -> String
 pub fn PrState::to_work_item_state(Self) -> WorkItemState
-pub impl Eq for PrState
 pub impl Show for PrState
 
 pub struct PrSyncResult {
@@ -416,9 +411,8 @@ pub(all) enum PrWorkflowStatus {
   Running
   Success
   Failed
-}
+} derive(Eq)
 pub fn PrWorkflowStatus::to_string(Self) -> String
-pub impl Eq for PrWorkflowStatus
 pub impl Show for PrWorkflowStatus
 
 pub struct PullRequest {
@@ -467,17 +461,14 @@ pub enum RecordMergePolicy {
 pub(all) enum RecordTriggerClass {
   Full
   NotifyOnly
-}
-pub impl Eq for RecordTriggerClass
-pub impl Show for RecordTriggerClass
+} derive(Eq, Show)
 
 pub(all) enum ReviewVerdict {
   Approved
   RequestChanges
   Comment
-}
+} derive(Eq)
 pub fn ReviewVerdict::to_string(Self) -> String
-pub impl Eq for ReviewVerdict
 pub impl Show for ReviewVerdict
 
 pub struct WorkItem {
@@ -491,6 +482,7 @@ pub struct WorkItem {
   labels : Array[String]
   assignees : Array[String]
   linked_prs : Array[String]
+  linked_issues : Array[String]
   patch : WorkItemPatch?
   parent_id : String?
 }
@@ -501,8 +493,9 @@ pub fn WorkItem::created_at(Self) -> Int64
 pub fn WorkItem::id(Self) -> String
 pub fn WorkItem::kind(Self) -> WorkItemKind
 pub fn WorkItem::labels(Self) -> Array[String]
+pub fn WorkItem::linked_issues(Self) -> Array[String]
 pub fn WorkItem::linked_prs(Self) -> Array[String]
-pub fn WorkItem::new(String, String, String, String, Int64, Int64, WorkItemState, labels? : Array[String], assignees? : Array[String], linked_prs? : Array[String], patch? : WorkItemPatch?, parent_id? : String?) -> Self
+pub fn WorkItem::new(String, String, String, String, Int64, Int64, WorkItemState, labels? : Array[String], assignees? : Array[String], linked_prs? : Array[String], linked_issues? : Array[String], patch? : WorkItemPatch?, parent_id? : String?) -> Self
 pub fn WorkItem::patch(Self) -> WorkItemPatch?
 pub fn WorkItem::serialize(Self) -> String
 pub fn WorkItem::state(Self) -> WorkItemState
@@ -514,9 +507,8 @@ pub fn WorkItem::updated_at(Self) -> Int64
 pub(all) enum WorkItemKind {
   Issue
   PullRequest
-}
+} derive(Eq)
 pub fn WorkItemKind::to_string(Self) -> String
-pub impl Eq for WorkItemKind
 pub impl Show for WorkItemKind
 
 pub struct WorkItemPatch {
@@ -543,11 +535,10 @@ pub(all) enum WorkItemState {
   Open
   Merged
   Closed
-}
+} derive(Eq)
 pub fn WorkItemState::to_issue_state(Self) -> IssueState?
 pub fn WorkItemState::to_pr_state(Self) -> PrState
 pub fn WorkItemState::to_string(Self) -> String
-pub impl Eq for WorkItemState
 pub impl Show for WorkItemState
 
 // Type aliases
