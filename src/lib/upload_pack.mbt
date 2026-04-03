@@ -1,6 +1,18 @@
 ///| Upload-pack (server-side) implementation
 
 ///|
+#warnings("-deprecated")
+fn upload_pack_parse_int(value : StringView) -> Int raise {
+  @strconv.parse_int(value)
+}
+
+///|
+#warnings("-deprecated")
+fn upload_pack_parse_int64(value : StringView) -> Int64 raise {
+  @strconv.parse_int64(value)
+}
+
+///|
 pub struct UploadPackRequest {
   wants : Array[@bit.ObjectId]
   haves : Array[@bit.ObjectId]
@@ -347,7 +359,7 @@ pub fn parse_upload_pack_request(
     } else if line.has_prefix("deepen ") {
       let depth_str = String::unsafe_substring(line, start=7, end=line.length())
       let depth_str = upload_trim_line(depth_str)
-      let depth = @string.parse_int(depth_str) catch { _ => -1 }
+      let depth = upload_pack_parse_int(depth_str) catch { _ => -1 }
       if depth >= 0 {
         deepen = Some(depth)
       }
@@ -799,11 +811,11 @@ fn parse_filter_spec(spec : String) -> @protocol.FilterSpec {
     @protocol.FilterSpec::BlobNone
   } else if spec.has_prefix("blob:limit=") {
     let limit_str = String::unsafe_substring(spec, start=11, end=spec.length())
-    let limit = @string.parse_int64(limit_str) catch { _ => 0L }
+    let limit = upload_pack_parse_int64(limit_str) catch { _ => 0L }
     @protocol.FilterSpec::BlobLimit(limit)
   } else if spec.has_prefix("tree:") {
     let depth_str = String::unsafe_substring(spec, start=5, end=spec.length())
-    let depth = @string.parse_int(depth_str) catch { _ => 0 }
+    let depth = upload_pack_parse_int(depth_str) catch { _ => 0 }
     @protocol.FilterSpec::TreeDepth(depth)
   } else {
     @protocol.FilterSpec::NoFilter
