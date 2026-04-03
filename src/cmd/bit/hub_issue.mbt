@@ -34,6 +34,9 @@ fn print_hub_issue_usage() -> Unit {
   println("  watch [--stale-hours <n>] [--remote <url>] [--auth-token <token>]")
   println("  search [<query>...] [<options>]")
   println("  note <subcommand> [<args>]")
+  println("  start <ref>                           (add to working set)")
+  println("  stop <ref>                            (remove from working set)")
+  println("  active                                (list active issues)")
   println("  remote add <alias> <path>")
   println("  remote list")
   println("  remote remove <alias>")
@@ -77,6 +80,9 @@ async fn handle_hub_issue(args : Array[String]) -> Unit raise Error {
     "claims" => handle_hub_issue_claims(rest)
     "watch" => handle_hub_issue_watch(rest)
     "search" => handle_hub_issue_search(rest)
+    "start" => handle_hub_issue_start(rest)
+    "stop" => handle_hub_issue_stop(rest)
+    "active" => handle_hub_issue_active(rest)
     "remote" => handle_hub_issue_remote(rest)
     "note" => handle_hub_note(rest)
     "init" => handle_hub_issue_init(rest)
@@ -733,11 +739,20 @@ async fn handle_hub_issue_get(args : Array[String]) -> Unit raise Error {
     }
     i += 1
   }
-  guard issue_id is Some(id) else {
+  guard issue_id is Some(id_arg) else {
     raise @bitcore.GitError::InvalidObject("Issue id is required")
   }
+  let (repo_ref, parsed_id) = parse_cross_repo_ref(id_arg)
   let root = get_work_root()
-  let git_dir = resolve_hub_git_dir(root)
+  let (git_dir, id) = if repo_ref.length() > 0 {
+    let local_git_dir = resolve_hub_git_dir(root)
+    let home = @sys.get_env_var("HOME").unwrap_or("/")
+    let aliases = load_aliases(local_git_dir)
+    let remote_path = resolve_repo_ref_to_path(repo_ref, home, aliases~)
+    (resolve_hub_git_dir(remote_path), parsed_id)
+  } else {
+    (resolve_hub_git_dir(root), parsed_id)
+  }
   let (objects, refs, _clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
   let issue = hub.get_issue(objects, id)
