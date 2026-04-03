@@ -27,5 +27,6 @@ options(
     "sync_native.mbt": [ "native" ],
     "sync_native_bench_wbtest.mbt": [ "native" ],
     "sync_native_wbtest.mbt": [ "native" ],
+    "github_api.mbt": [ "native" ],
   },
 )
