@@ -171,6 +171,7 @@ options(
     "http_serve_native.mbt": [ "native" ],
     "hub_compat.mbt": [ "native" ],
     "hub_debug.mbt": [ "native" ],
+    "hub_github_sync.mbt": [ "native" ],
     "hub_helpers.mbt": [ "native" ],
     "hub_import.mbt": [ "native" ],
     "hub_issue.mbt": [ "native" ],

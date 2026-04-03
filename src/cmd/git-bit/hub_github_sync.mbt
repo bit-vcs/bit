@@ -1,0 +1,138 @@
+///| GitHub sync subcommands for `git-bit issue sync`
+
+///|
+fn print_hub_issue_sync_usage() -> Unit {
+  println("Usage: git-bit issue sync <subcommand> [<args>]")
+  println("")
+  println("Subcommands:")
+  println("  pull --repo <owner/repo>                (pull from GitHub)")
+  println(
+    "  push --github --repo <owner/repo> [--apply]",
+  )
+  println("  status --repo <owner/repo>")
+  println("  install-hook                            (install git hook)")
+}
+
+///|
+async fn handle_hub_issue_sync(args : Array[String]) -> Unit raise Error {
+  if args.length() == 0 {
+    print_hub_issue_sync_usage()
+    return ()
+  }
+  let subcmd = args[0]
+  let rest = collect_args(args, 1)
+  match subcmd {
+    "pull" => handle_hub_issue_sync_pull(rest)
+    "push" => handle_hub_issue_sync_push(rest)
+    "status" => handle_hub_issue_sync_status(rest)
+    "install-hook" => handle_hub_issue_sync_install_hook(rest)
+    "help" | "-h" | "--help" => print_hub_issue_sync_usage()
+    _ => {
+      // If no recognized subcommand, treat as bidirectional sync flags
+      handle_hub_issue_sync_bidirectional(args)
+    }
+  }
+}
+
+///|
+async fn handle_hub_issue_sync_pull(
+  _args : Array[String],
+) -> Unit raise Error {
+  eprint_line("git-bit issue sync pull: not yet implemented")
+  @sys.exit(1)
+}
+
+///|
+async fn handle_hub_issue_sync_push(
+  _args : Array[String],
+) -> Unit raise Error {
+  eprint_line("git-bit issue sync push: not yet implemented")
+  @sys.exit(1)
+}
+
+///|
+async fn handle_hub_issue_sync_install_hook(
+  _args : Array[String],
+) -> Unit raise Error {
+  eprint_line("git-bit issue sync install-hook: not yet implemented")
+  @sys.exit(1)
+}
+
+///|
+async fn handle_hub_issue_sync_bidirectional(
+  _args : Array[String],
+) -> Unit raise Error {
+  eprint_line("git-bit issue sync: bidirectional sync not yet implemented")
+  @sys.exit(1)
+}
+
+///|
+async fn handle_hub_issue_sync_status(
+  args : Array[String],
+) -> Unit raise Error {
+  let mut repo : String? = None
+  let mut i = 0
+  while i < args.length() {
+    let arg = args[i]
+    if arg == "--repo" && i + 1 < args.length() {
+      i += 1
+      repo = Some(args[i])
+    } else if arg.has_prefix("--repo=") {
+      repo = Some(
+        String::unsafe_substring(arg, start=7, end=arg.length()),
+      )
+    } else if arg == "-h" || arg == "--help" {
+      print_hub_issue_sync_usage()
+      return ()
+    }
+    i += 1
+  }
+  let root = get_work_root()
+  let git_dir = resolve_hub_git_dir(root)
+  let fs = OsFs::new()
+  let resolved_repo = resolve_github_repo(fs, git_dir, repo)
+  let (objects, refs, _clock) = make_hub_stores(git_dir)
+  let hub = load_hub_store(objects, refs)
+  let links = hub.list_sync_links(objects, repo=resolved_repo)
+  if links.length() == 0 {
+    print_line("No sync links found for \{resolved_repo}")
+    print_line("")
+    print_line(
+      "Run `git-bit issue sync pull --repo \{resolved_repo}` to pull issues from GitHub.",
+    )
+    return ()
+  }
+  print_line("Sync status for \{resolved_repo}")
+  print_line("  Linked items: \{links.length()}")
+  print_line("")
+  // Show recent sync links (up to 20)
+  let limit = if links.length() > 20 { 20 } else { links.length() }
+  for idx = 0; idx < limit; idx = idx + 1 {
+    let link = links[idx]
+    let kind = link.local_kind()
+    let num = link.remote_number()
+    let local_id_short = if link.local_id().length() > 8 {
+      String::unsafe_substring(link.local_id(), start=0, end=8)
+    } else {
+      link.local_id()
+    }
+    let pull_ts = link.last_pull_at()
+    let push_ts = link.last_push_at()
+    let pull_str = if pull_ts > 0L {
+      format_timestamp_iso(pull_ts, "+0000")
+    } else {
+      "never"
+    }
+    let push_str = if push_ts > 0L {
+      format_timestamp_iso(push_ts, "+0000")
+    } else {
+      "never"
+    }
+    print_line(
+      "  \{kind} #\{num} <-> \{local_id_short}  pulled: \{pull_str}  pushed: \{push_str}",
+    )
+  }
+  if links.length() > limit {
+    print_line("  ... and \{links.length() - limit} more")
+  }
+}

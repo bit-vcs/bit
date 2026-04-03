@@ -39,6 +39,9 @@ fn print_hub_issue_usage() -> Unit {
   println("  remote list")
   println("  remote remove <alias>")
   println("  init")
+  println("  sync pull --repo <owner/repo>         (pull from GitHub)")
+  println("  sync push --github --repo <owner/repo> [--apply]")
+  println("  sync status --repo <owner/repo>")
 }
 
 ///|
@@ -82,6 +85,7 @@ async fn handle_hub_issue(args : Array[String]) -> Unit raise Error {
     "remote" => handle_hub_issue_remote(rest)
     "note" => handle_hub_note(rest)
     "init" => handle_hub_issue_init(rest)
+    "sync" => handle_hub_issue_sync(rest)
     "help" | "-h" | "--help" => print_hub_issue_usage()
     _ => {
       eprint_line("git-bit issue: unknown subcommand '\{subcmd}'")
