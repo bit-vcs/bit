@@ -380,10 +380,6 @@ compat-random-aggregate results_dir="compat-random-results":
 
 # Focused local git-compat sampling via flaker
 flaker-git-compat-sample strategy="weighted" count="25" changed="":
-    @if ! command -v flaker >/dev/null 2>&1; then \
-      echo "flaker CLI is required; install @mizchi/flaker first" >&2; \
-      exit 1; \
-    fi
     @if { [ "{{strategy}}" = "affected" ] || [ "{{strategy}}" = "hybrid" ]; } && [ -z "{{changed}}" ]; then \
       echo "changed=... is required when strategy={{strategy}}" >&2; \
       exit 1; \
@@ -396,10 +392,6 @@ flaker-git-compat-sample strategy="weighted" count="25" changed="":
 
 # Focused local git-compat execution via flaker
 flaker-git-compat-run strategy="weighted" count="25" changed="": build
-    @if ! command -v flaker >/dev/null 2>&1; then \
-      echo "flaker CLI is required; install @mizchi/flaker first" >&2; \
-      exit 1; \
-    fi
     @if { [ "{{strategy}}" = "affected" ] || [ "{{strategy}}" = "hybrid" ]; } && [ -z "{{changed}}" ]; then \
       echo "changed=... is required when strategy={{strategy}}" >&2; \
       exit 1; \
@@ -412,10 +404,6 @@ flaker-git-compat-run strategy="weighted" count="25" changed="": build
 
 # Inspect which git-compat suites flaker sees as affected
 flaker-git-compat-affected changed:
-    @if ! command -v flaker >/dev/null 2>&1; then \
-      echo "flaker CLI is required; install @mizchi/flaker first" >&2; \
-      exit 1; \
-    fi
     node tools/flaker-cli-wrapper.mjs affected --changed {{changed}}
 
 # Trigger Git Compat Randomized workflow via workflow_dispatch

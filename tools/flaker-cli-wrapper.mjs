@@ -6,7 +6,20 @@ export function isGlobResolverFailure(stderr) {
   return String(stderr ?? "").includes("Unknown resolver: glob");
 }
 
-export function formatFlakerFailure(stderr, flakerCommand) {
+export function isMissingFlakerCommand(stderr, status) {
+  const text = String(stderr ?? "");
+  return status === 127 || /not found/i.test(text);
+}
+
+export function formatFlakerFailure(stderr, flakerCommand, status) {
+  if (isMissingFlakerCommand(stderr, status)) {
+    return [
+      `flaker CLI is required, but \`${flakerCommand}\` was not found.`,
+      "Install @mizchi/flaker, or point FLAKER_CMD to a local flaker build.",
+      "Example: FLAKER_CMD='node /path/to/flaker/dist/cli.js' just flaker-git-compat-affected changed=src/cmd/bit/merge.mbt",
+    ].join("\n");
+  }
+
   if (!isGlobResolverFailure(stderr)) {
     return String(stderr ?? "").trim();
   }
@@ -42,7 +55,11 @@ function main() {
     return;
   }
 
-  const message = formatFlakerFailure(result.stderr, flakerCommand);
+  const message = formatFlakerFailure(
+    result.stderr,
+    flakerCommand,
+    result.status ?? 1,
+  );
   if (message) {
     process.stderr.write(`${message}\n`);
   }
