@@ -36,10 +36,67 @@ async fn handle_hub_issue_sync(args : Array[String]) -> Unit raise Error {
 
 ///|
 async fn handle_hub_issue_sync_pull(
-  _args : Array[String],
+  args : Array[String],
 ) -> Unit raise Error {
-  eprint_line("bit issue sync pull: not yet implemented")
-  @sys.exit(1)
+  let mut repo : String? = None
+  let mut since = ""
+  let mut state = "all"
+  let mut conflict = "newer-wins"
+  let mut i = 0
+  while i < args.length() {
+    let arg = args[i]
+    if arg == "--repo" && i + 1 < args.length() {
+      i += 1
+      repo = Some(args[i])
+    } else if arg.has_prefix("--repo=") {
+      repo = Some(
+        String::unsafe_substring(arg, start=7, end=arg.length()),
+      )
+    } else if arg == "--since" && i + 1 < args.length() {
+      i += 1
+      since = args[i]
+    } else if arg.has_prefix("--since=") {
+      since = String::unsafe_substring(arg, start=8, end=arg.length())
+    } else if arg == "--state" && i + 1 < args.length() {
+      i += 1
+      state = args[i]
+    } else if arg.has_prefix("--state=") {
+      state = String::unsafe_substring(arg, start=8, end=arg.length())
+    } else if arg == "--conflict" && i + 1 < args.length() {
+      i += 1
+      conflict = args[i]
+    } else if arg.has_prefix("--conflict=") {
+      conflict = String::unsafe_substring(
+        arg,
+        start=11,
+        end=arg.length(),
+      )
+    } else if arg == "-h" || arg == "--help" {
+      print_hub_issue_sync_usage()
+      return ()
+    }
+    i += 1
+  }
+  let root = get_work_root()
+  let git_dir = resolve_hub_git_dir(root)
+  let fs = OsFs::new()
+  let resolved_repo = resolve_github_repo(fs, git_dir, repo)
+  let (objects, refs, clock) = make_hub_stores(git_dir)
+  let hub = load_hub_store(objects, refs)
+  print_line("Pulling issues from GitHub \{resolved_repo}...")
+  let result = @hub_native.github_sync_pull_issues(
+    hub, objects, refs, clock, resolved_repo, since, state, conflict,
+  )
+  print_line("Pull complete:")
+  print_line("  Created: \{result.created}")
+  print_line("  Updated: \{result.updated}")
+  print_line("  Skipped: \{result.skipped}")
+  if result.conflicts.length() > 0 {
+    print_line("  Conflicts (manual review needed):")
+    for c in result.conflicts {
+      print_line("    \{c}")
+    }
+  }
 }
 
 ///|
