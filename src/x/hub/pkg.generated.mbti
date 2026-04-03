@@ -26,6 +26,8 @@ pub fn hub_notes_ns_name() -> String
 
 pub fn hub_notes_ref_name() -> String
 
+pub fn is_sync_link_record_kind(String) -> Bool
+
 pub fn is_work_item_record_kind(String) -> Bool
 
 pub fn issue_comment_key(String, String) -> String
@@ -66,6 +68,8 @@ pub fn parse_pr_workflow_status(String) -> PrWorkflowStatus?
 
 pub fn parse_record_merge_policy(String) -> RecordMergePolicy?
 
+pub fn parse_sync_link(String) -> SyncLink raise PrError
+
 pub fn parse_work_item(String) -> WorkItem raise PrError
 
 pub fn pr_comment_key(String, String) -> String
@@ -89,6 +93,10 @@ pub fn record_notify_topic(HubRecord) -> String?
 pub fn resolve_active_claims(Array[ClaimMessage]) -> Array[ClaimMessage]
 
 pub fn short_ref_name(String) -> String
+
+pub fn sync_link_key(String, String) -> String
+
+pub fn sync_link_record_kind() -> String
 
 pub fn work_item_meta_key(String) -> String
 
@@ -126,6 +134,48 @@ pub fn ClaimMessage::new(String, ClaimAction, String, Int64) -> Self
 pub fn ClaimMessage::timestamp(Self) -> Int64
 pub fn ClaimMessage::to_json(Self) -> Json
 
+pub struct GhComment {
+  id : Int
+  node_id : String
+  body : String
+  user : String
+  created_at : String
+  updated_at : String
+}
+pub fn GhComment::from_json(Map[String, Json]) -> Self
+
+pub struct GhIssue {
+  number : Int
+  node_id : String
+  title : String
+  body : String
+  state : String
+  user : String
+  labels : Array[String]
+  assignees : Array[String]
+  created_at : String
+  updated_at : String
+}
+pub fn GhIssue::from_json(Map[String, Json]) -> Self
+
+pub struct GhPullRequest {
+  number : Int
+  node_id : String
+  title : String
+  body : String
+  state : String
+  user : String
+  head_ref : String
+  head_repo : String
+  base_ref : String
+  labels : Array[String]
+  created_at : String
+  updated_at : String
+  merged : Bool
+  merged_at : String
+}
+pub fn GhPullRequest::from_json(Map[String, Json]) -> Self
+
 pub struct Hub {
   mut store : HubStore
 }
@@ -141,15 +191,18 @@ pub fn Hub::close_pr(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, Strin
 pub fn Hub::create_issue(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, String, labels? : Array[String], assignees? : Array[String], parent_id? : String?) -> Issue raise @object.GitError
 pub fn Hub::create_pr(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, String, String, String, source_repo? : String?, source_ref? : String?) -> PullRequest raise @object.GitError
 pub fn Hub::find_canonical_node(Self, &@lib.ObjectStore) -> String?
+pub fn Hub::find_sync_link_by_remote(Self, &@lib.ObjectStore, String, String, Int) -> SyncLink?
 pub fn Hub::get_issue(Self, &@lib.ObjectStore, String) -> Issue?
 pub fn Hub::get_note(Self, &@lib.ObjectStore, &@lib.RefStore, @object.ObjectId, ns? : String) -> Note? raise @object.GitError
 pub fn Hub::get_pr(Self, &@lib.ObjectStore, String) -> PullRequest?
+pub fn Hub::get_sync_link(Self, &@lib.ObjectStore, String, String) -> SyncLink?
 pub fn Hub::get_work_item(Self, &@lib.ObjectStore, String) -> WorkItem?
 pub fn Hub::import_issues(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, Array[Issue]) -> ImportStats raise @object.GitError
 pub fn Hub::import_pr_proposals(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, Array[PullRequest]) -> ImportStats raise @object.GitError
 pub fn Hub::import_prs(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, Array[PullRequest]) -> ImportStats raise @object.GitError
 pub fn Hub::init(&@lib.ObjectStore, &@lib.RefStore, node_id? : String, signing_key? : String?, require_signed? : Bool) -> Self raise @object.GitError
 pub fn Hub::is_approved(Self, &@lib.ObjectStore, String) -> Bool
+pub fn Hub::link_issue(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String) -> Unit raise @object.GitError
 pub fn Hub::link_pr_to_issue(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String) -> Unit raise @object.GitError
 pub fn Hub::list_comments(Self, &@lib.ObjectStore, String) -> Array[PrComment]
 pub fn Hub::list_feature_broadcasts(Self, &@lib.ObjectStore) -> Array[HubRecord]
@@ -162,11 +215,13 @@ pub fn Hub::list_pr_workflows(Self, &@lib.ObjectStore, String) -> Array[PrWorkfl
 pub fn Hub::list_prs(Self, &@lib.ObjectStore, state? : PrState?) -> Array[PullRequest]
 pub fn Hub::list_reviews(Self, &@lib.ObjectStore, String) -> Array[PrReview]
 pub fn Hub::list_sub_issues(Self, &@lib.ObjectStore, String, state? : IssueState?) -> Array[Issue]
+pub fn Hub::list_sync_links(Self, &@lib.ObjectStore, repo? : String) -> Array[SyncLink]
 pub fn Hub::list_work_items(Self, &@lib.ObjectStore, state? : WorkItemState?, kind? : WorkItemKind?) -> Array[WorkItem]
 pub fn Hub::load(&@lib.ObjectStore, &@lib.RefStore, node_id? : String, signing_key? : String?, require_signed? : Bool) -> Self raise @object.GitError
 pub fn Hub::merge_pr(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, strategy? : PrMergeStrategy) -> PrMergeResult raise @object.GitError
 pub fn Hub::propose_pr(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, String, String, String, source_repo? : String?, source_ref? : String?, closes_issues? : Array[String]) -> PullRequest raise @object.GitError
 pub fn Hub::publish_node_heartbeat(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, commit_count? : Int, main_tip? : String) -> Unit raise @object.GitError
+pub fn Hub::put_sync_link(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, SyncLink) -> Unit raise @object.GitError
 pub fn Hub::record_pr_workflow(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, PrWorkflowStatus, String, String, txn_id? : String?, summary? : String) -> PrWorkflowResult raise @object.GitError
 pub fn Hub::reload_store(Self, &@lib.ObjectStore, &@lib.RefStore) -> Unit raise @object.GitError
 pub fn Hub::remove_note(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, @object.ObjectId, ns? : String) -> Unit raise @object.GitError
@@ -470,6 +525,29 @@ pub(all) enum ReviewVerdict {
 } derive(Eq)
 pub fn ReviewVerdict::to_string(Self) -> String
 pub impl Show for ReviewVerdict
+
+pub struct SyncLink {
+  local_id : String
+  local_kind : String
+  provider : String
+  repo : String
+  remote_number : Int
+  remote_node_id : String
+  last_pull_at : Int64
+  last_push_at : Int64
+  remote_updated_at : Int64
+}
+pub fn SyncLink::last_pull_at(Self) -> Int64
+pub fn SyncLink::last_push_at(Self) -> Int64
+pub fn SyncLink::local_id(Self) -> String
+pub fn SyncLink::local_kind(Self) -> String
+pub fn SyncLink::new(String, String, String, String, remote_number? : Int, remote_node_id? : String, last_pull_at? : Int64, last_push_at? : Int64, remote_updated_at? : Int64) -> Self
+pub fn SyncLink::provider(Self) -> String
+pub fn SyncLink::remote_node_id(Self) -> String
+pub fn SyncLink::remote_number(Self) -> Int
+pub fn SyncLink::remote_updated_at(Self) -> Int64
+pub fn SyncLink::repo(Self) -> String
+pub fn SyncLink::serialize(Self) -> String
 
 pub struct WorkItem {
   id : String

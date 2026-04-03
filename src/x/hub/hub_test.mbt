@@ -1873,3 +1873,63 @@ test "hub: find sync_link by remote number" {
   )
   assert_true(not_found is None)
 }
+
+///|
+test "github_types: parse GhIssue from JSON" {
+  let json_str =
+    #|{"number":42,"node_id":"I_kwDOxxx","title":"Bug report","body":"description","state":"open","user":{"login":"alice"},"labels":[{"name":"bug"}],"assignees":[{"login":"bob"}],"created_at":"2026-01-01T00:00:00Z","updated_at":"2026-01-02T00:00:00Z"}
+  let parsed = @json.parse(json_str)
+  guard parsed is Json::Object(obj) else { abort("not object") }
+  let issue = @hub.GhIssue::from_json(obj)
+  assert_eq(issue.number, 42)
+  assert_eq(issue.node_id, "I_kwDOxxx")
+  assert_eq(issue.title, "Bug report")
+  assert_eq(issue.state, "open")
+  assert_eq(issue.user, "alice")
+  assert_eq(issue.labels, ["bug"])
+  assert_eq(issue.assignees, ["bob"])
+}
+
+///|
+test "github_types: parse GhComment from JSON" {
+  let json_str =
+    #|{"id":12345,"node_id":"IC_kwDOyyy","body":"comment text","user":{"login":"alice"},"created_at":"2026-01-01T00:00:00Z","updated_at":"2026-01-02T00:00:00Z"}
+  let parsed = @json.parse(json_str)
+  guard parsed is Json::Object(obj) else { abort("not object") }
+  let comment = @hub.GhComment::from_json(obj)
+  assert_eq(comment.id, 12345)
+  assert_eq(comment.body, "comment text")
+  assert_eq(comment.user, "alice")
+}
+
+///|
+test "github_types: parse GhPullRequest from JSON" {
+  let json_str =
+    #|{"number":7,"node_id":"PR_kwDOzzz","title":"Add feature","body":"details","state":"closed","user":{"login":"dev"},"head":{"ref":"feature-branch","repo":{"full_name":"dev/repo"}},"base":{"ref":"main"},"labels":[{"name":"enhancement"}],"created_at":"2026-01-01T00:00:00Z","updated_at":"2026-01-03T00:00:00Z","merged":true,"merged_at":"2026-01-03T00:00:00Z"}
+  let parsed = @json.parse(json_str)
+  guard parsed is Json::Object(obj) else { abort("not object") }
+  let pr = @hub.GhPullRequest::from_json(obj)
+  assert_eq(pr.number, 7)
+  assert_eq(pr.node_id, "PR_kwDOzzz")
+  assert_eq(pr.title, "Add feature")
+  assert_eq(pr.state, "merged")
+  assert_eq(pr.user, "dev")
+  assert_eq(pr.head_ref, "feature-branch")
+  assert_eq(pr.head_repo, "dev/repo")
+  assert_eq(pr.base_ref, "main")
+  assert_eq(pr.labels, ["enhancement"])
+  assert_true(pr.merged)
+  assert_eq(pr.merged_at, "2026-01-03T00:00:00Z")
+}
+
+///|
+test "github_types: parse GhPullRequest open (not merged)" {
+  let json_str =
+    #|{"number":8,"node_id":"PR_kwDOaaa","title":"WIP","body":"","state":"open","user":{"login":"dev"},"head":{"ref":"wip","repo":{"full_name":"dev/repo"}},"base":{"ref":"main"},"labels":[],"created_at":"2026-01-01T00:00:00Z","updated_at":"2026-01-01T00:00:00Z","merged":false,"merged_at":null}
+  let parsed = @json.parse(json_str)
+  guard parsed is Json::Object(obj) else { abort("not object") }
+  let pr = @hub.GhPullRequest::from_json(obj)
+  assert_eq(pr.number, 8)
+  assert_eq(pr.state, "open")
+  assert_false(pr.merged)
+}
