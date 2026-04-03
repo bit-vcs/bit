@@ -1755,3 +1755,34 @@ test "format: serialize and parse Note" {
   assert_eq(parsed.author(), "alice@example.com")
   assert_eq(parsed.ns(), "commits")
 }
+
+///|
+test "sync_link: serialize and parse roundtrip" {
+  let link = @hub.SyncLink::new(
+    "abc12345",
+    "issue",
+    "github",
+    "owner/repo",
+    remote_number=42,
+    remote_node_id="I_kwDOxxx",
+    last_pull_at=1774900000L,
+    last_push_at=1774900000L,
+    remote_updated_at=1774899000L,
+  )
+  let serialized = link.serialize()
+  assert_true(serialized.contains("sync-link abc12345"))
+  assert_true(serialized.contains("local-kind issue"))
+  assert_true(serialized.contains("provider github"))
+  assert_true(serialized.contains("repo owner/repo"))
+  assert_true(serialized.contains("remote-number 42"))
+  let parsed = @hub.parse_sync_link(serialized)
+  assert_eq(parsed.local_id(), "abc12345")
+  assert_eq(parsed.local_kind(), "issue")
+  assert_eq(parsed.provider(), "github")
+  assert_eq(parsed.repo(), "owner/repo")
+  assert_eq(parsed.remote_number(), 42)
+  assert_eq(parsed.remote_node_id(), "I_kwDOxxx")
+  assert_eq(parsed.last_pull_at(), 1774900000L)
+  assert_eq(parsed.last_push_at(), 1774900000L)
+  assert_eq(parsed.remote_updated_at(), 1774899000L)
+}
