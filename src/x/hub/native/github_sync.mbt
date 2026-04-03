@@ -262,7 +262,7 @@ pub async fn github_sync_pull_prs(
 }
 
 ///|
-pub async fn github_sync_plan_push(
+pub fn github_sync_plan_push(
   hub : @hub.Hub,
   objects : &@lib.ObjectStore,
   repo : String,
@@ -699,7 +699,7 @@ pub async fn github_sync_pull_comments(
       )
       match link {
         Some(l) =>
-          if not(seen_remote_ids.contains(l.remote_number())) {
+          if !(seen_remote_ids.contains(l.remote_number())) {
             // Remote comment deleted -- delete locally
             hub.delete_issue_comment(
               objects, refs, clock, issue_local_id, local_comment.id(),
@@ -747,7 +747,7 @@ pub async fn github_sync_push_comments(
     match existing_link {
       None => {
         // New local comment -- push to GitHub
-        if not(apply) {
+        if !(apply) {
           created += 1
           continue
         }
@@ -780,7 +780,7 @@ pub async fn github_sync_push_comments(
         if comments_mode == "append-only" {
           continue
         }
-        if not(apply) {
+        if !(apply) {
           updated += 1
           continue
         }

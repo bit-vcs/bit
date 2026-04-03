@@ -26,7 +26,7 @@ async fn handle_hub_issue_sync(args : Array[String]) -> Unit raise Error {
   match subcmd {
     "pull" => handle_hub_issue_sync_pull(rest)
     "push" => {
-      if not(github_sync_write_enabled()) {
+      if !(github_sync_write_enabled()) {
         github_sync_write_disabled_message("push")
         return ()
       }
@@ -34,7 +34,7 @@ async fn handle_hub_issue_sync(args : Array[String]) -> Unit raise Error {
     }
     "status" => handle_hub_issue_sync_status(rest)
     "install-hook" => {
-      if not(github_sync_write_enabled()) {
+      if !(github_sync_write_enabled()) {
         github_sync_write_disabled_message("install-hook")
         return ()
       }
@@ -43,7 +43,7 @@ async fn handle_hub_issue_sync(args : Array[String]) -> Unit raise Error {
     "help" | "-h" | "--help" => print_hub_issue_sync_usage()
     _ => {
       // Bidirectional includes push — check write access
-      if not(github_sync_write_enabled()) {
+      if !(github_sync_write_enabled()) {
         github_sync_write_disabled_message("sync")
         return ()
       }
@@ -223,7 +223,7 @@ async fn handle_hub_issue_sync_push(
     }
     i += 1
   }
-  if not(github_flag) {
+  if !(github_flag) {
     eprint_line("Error: --github flag required for push (safety measure)")
     eprint_line(
       "Usage: bit issue sync push --github --repo <owner/repo> [--apply]",
@@ -238,7 +238,7 @@ async fn handle_hub_issue_sync_push(
   let is_owner = @hub_native.github_check_repo_ownership(resolved_repo) catch {
     _ => false
   }
-  if not(is_owner) {
+  if !(is_owner) {
     eprint_line(
       "Error: push is only allowed to repositories you own",
     )
@@ -280,7 +280,7 @@ async fn handle_hub_issue_sync_push(
     }
     print_line("")
   }
-  if not(apply) {
+  if !(apply) {
     print_line("Run with --apply to execute these changes.")
     return ()
   }
@@ -490,7 +490,7 @@ async fn handle_hub_issue_sync_bidirectional(
     }
     i += 1
   }
-  if not(github_flag) {
+  if !(github_flag) {
     eprint_line("Error: --github flag required for bidirectional sync")
     eprint_line(
       "Usage: bit issue sync --github --repo <owner/repo> [--apply]",
@@ -505,7 +505,7 @@ async fn handle_hub_issue_sync_bidirectional(
   let is_owner = @hub_native.github_check_repo_ownership(resolved_repo) catch {
     _ => false
   }
-  if not(is_owner) {
+  if !(is_owner) {
     eprint_line(
       "Error: bidirectional sync is only allowed for repositories you own",
     )
@@ -614,7 +614,7 @@ async fn handle_hub_issue_sync_bidirectional(
     }
     print_line("")
   }
-  if not(apply) {
+  if !(apply) {
     print_line("Run with --apply to execute push changes.")
     return ()
   }

@@ -22,7 +22,7 @@ pub fn github_has_token() -> Bool {
 
 ///|
 /// Returns "gh", "token", or raises error
-pub fn github_detect_method() -> String raise @bit.GitError {
+pub fn github_detect_method() -> String {
   if github_has_token() {
     return "token"
   }

@@ -19,7 +19,7 @@ import {
   "mizchi/x/websocket" @xws,
 }
 
-warnings = "-29"
+warnings = "-24-29"
 
 options(
   targets: {
