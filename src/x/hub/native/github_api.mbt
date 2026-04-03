@@ -31,6 +31,27 @@ pub fn github_detect_method() -> String raise @bit.GitError {
 }
 
 ///|
+/// Get the authenticated GitHub username
+pub async fn github_get_authenticated_user() -> String raise @bit.GitError {
+  let out = gh_api_collect_output(["api", "user", "--jq", ".login"])
+  out.trim(chars=" \n\r\t").to_string()
+}
+
+///|
+/// Check if the authenticated user owns the given repo (owner/repo format)
+pub async fn github_check_repo_ownership(
+  repo : String,
+) -> Bool raise @bit.GitError {
+  let slash = repo.find("/")
+  let owner = match slash {
+    Some(idx) => String::unsafe_substring(repo, start=0, end=idx)
+    None => return false
+  }
+  let user = github_get_authenticated_user()
+  user.to_lower() == owner.to_lower()
+}
+
+///|
 async fn gh_api_collect_output(
   args : Array[String],
 ) -> String raise @bit.GitError {

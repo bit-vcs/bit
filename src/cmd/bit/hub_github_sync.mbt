@@ -218,6 +218,22 @@ async fn handle_hub_issue_sync_push(
   let git_dir = resolve_hub_git_dir(root)
   let fs = OsFs::new()
   let resolved_repo = resolve_github_repo(fs, git_dir, repo)
+  // Safety: only allow push to repos owned by authenticated user
+  let is_owner = @hub_native.github_check_repo_ownership(resolved_repo) catch {
+    _ => false
+  }
+  if not(is_owner) {
+    eprint_line(
+      "Error: push is only allowed to repositories you own",
+    )
+    eprint_line(
+      "Repository '\{resolved_repo}' is not owned by the authenticated GitHub user",
+    )
+    eprint_line(
+      "Use --force-remote to override (not recommended)",
+    )
+    @sys.exit(1)
+  }
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
   let changes = @hub_native.github_sync_plan_push(hub, objects, resolved_repo)
@@ -469,6 +485,19 @@ async fn handle_hub_issue_sync_bidirectional(
   let git_dir = resolve_hub_git_dir(root)
   let fs = OsFs::new()
   let resolved_repo = resolve_github_repo(fs, git_dir, repo)
+  // Safety: only allow sync (includes push) to repos owned by authenticated user
+  let is_owner = @hub_native.github_check_repo_ownership(resolved_repo) catch {
+    _ => false
+  }
+  if not(is_owner) {
+    eprint_line(
+      "Error: bidirectional sync is only allowed for repositories you own",
+    )
+    eprint_line(
+      "Repository '\{resolved_repo}' is not owned by the authenticated GitHub user",
+    )
+    @sys.exit(1)
+  }
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
   // Phase 1: Pull (always executes)
