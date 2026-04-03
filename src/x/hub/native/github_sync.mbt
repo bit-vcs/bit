@@ -145,6 +145,123 @@ pub async fn github_sync_pull_issues(
 }
 
 ///|
+pub async fn github_sync_pull_prs(
+  hub : @hub.Hub,
+  objects : &@lib.ObjectStore,
+  refs : &@lib.RefStore,
+  clock : &@lib.Clock,
+  repo : String,
+  since : String,
+  state : String,
+  conflict_policy : String,
+) -> SyncPullResult raise @bit.GitError {
+  let gh_prs = github_list_prs(repo, since~, state~)
+  let mut created = 0
+  let mut updated = 0
+  let mut skipped = 0
+  let conflicts : Array[String] = []
+  let now = clock.now()
+  for gh_pr in gh_prs {
+    let existing_link = hub.find_sync_link_by_remote(
+      objects, "github", repo, gh_pr.number,
+    )
+    match existing_link {
+      None => {
+        // New PR -- import it
+        let pr = @hub.gh_pr_to_pull_request(gh_pr)
+        let work_item = pr.to_work_item()
+        ignore(
+          hub.store.put_record(
+            objects,
+            refs,
+            clock,
+            @hub.work_item_meta_key(pr.id()),
+            @hub.canonical_work_item_record_kind(),
+            work_item.serialize(),
+            "github-sync",
+          ),
+        )
+        // Create SyncLink
+        let link = @hub.SyncLink::new(
+          pr.id(),
+          "pr",
+          "github",
+          repo,
+          remote_number=gh_pr.number,
+          remote_node_id=gh_pr.node_id,
+          last_pull_at=now,
+          remote_updated_at=@hub.parse_iso8601_to_unix(gh_pr.updated_at),
+        )
+        hub.put_sync_link(objects, refs, clock, link)
+        created += 1
+      }
+      Some(link) => {
+        // Existing -- check conflict policy
+        let gh_updated = @hub.parse_iso8601_to_unix(gh_pr.updated_at)
+        let local_pr = hub.get_pr(objects, link.local_id())
+        let should_update = match conflict_policy {
+          "github-wins" => true
+          "bit-wins" => false
+          "manual" => {
+            match local_pr {
+              Some(loc) =>
+                if loc.updated_at() > link.last_pull_at() &&
+                  gh_updated > link.remote_updated_at() {
+                  conflicts.push("#\{gh_pr.number} \{gh_pr.title}")
+                  false
+                } else {
+                  gh_updated > link.remote_updated_at()
+                }
+              _ => gh_updated > link.remote_updated_at()
+            }
+          }
+          _ => {
+            // newer-wins (default)
+            match local_pr {
+              Some(loc) => gh_updated > loc.updated_at()
+              None => true
+            }
+          }
+        }
+        if should_update {
+          let pr = @hub.gh_pr_to_pull_request(
+            gh_pr, existing_id=link.local_id(),
+          )
+          let work_item = pr.to_work_item()
+          ignore(
+            hub.store.put_record(
+              objects,
+              refs,
+              clock,
+              @hub.work_item_meta_key(link.local_id()),
+              @hub.canonical_work_item_record_kind(),
+              work_item.serialize(),
+              "github-sync",
+            ),
+          )
+          // Update SyncLink
+          let updated_link = @hub.SyncLink::new(
+            link.local_id(),
+            "pr",
+            "github",
+            repo,
+            remote_number=gh_pr.number,
+            remote_node_id=gh_pr.node_id,
+            last_pull_at=now,
+            remote_updated_at=gh_updated,
+          )
+          hub.put_sync_link(objects, refs, clock, updated_link)
+          updated += 1
+        } else {
+          skipped += 1
+        }
+      }
+    }
+  }
+  { created, updated, skipped, conflicts }
+}
+
+///|
 pub async fn github_sync_plan_push(
   hub : @hub.Hub,
   objects : &@lib.ObjectStore,
@@ -285,6 +402,122 @@ pub async fn github_sync_execute_push(
         let updated_link = @hub.SyncLink::new(
           loc.id(),
           "issue",
+          "github",
+          repo,
+          remote_number=link.remote_number(),
+          remote_node_id=link.remote_node_id(),
+          last_push_at=now,
+          last_pull_at=link.last_pull_at(),
+          remote_updated_at=now,
+        )
+        hub.put_sync_link(objects, refs, clock, updated_link)
+        updated += 1
+      }
+      _ => ()
+    }
+  }
+  { created, updated, errors }
+}
+
+///|
+pub fn github_sync_plan_push_prs(
+  hub : @hub.Hub,
+  objects : &@lib.ObjectStore,
+  repo : String,
+) -> Array[SyncPushChange] {
+  let changes : Array[SyncPushChange] = []
+  let prs = hub.list_prs(objects)
+  let links = hub.list_sync_links(objects, repo=repo)
+  // Build lookup: local_id -> SyncLink
+  let link_map : Map[String, @hub.SyncLink] = {}
+  for link in links {
+    if link.local_kind() == "pr" {
+      link_map.set(link.local_id(), link)
+    }
+  }
+  for pr in prs {
+    match link_map.get(pr.id()) {
+      Some(link) => {
+        // Check if local is newer than last push
+        if pr.updated_at() > link.last_push_at() {
+          let diff = compute_pr_push_diff(pr, link)
+          changes.push(diff)
+        }
+      }
+      None => {
+        // No link -- new PR. Skip creation (PRs should be created via `gh pr create`)
+        ()
+      }
+    }
+  }
+  changes
+}
+
+///|
+fn compute_pr_push_diff(
+  pr : @hub.PullRequest,
+  link : @hub.SyncLink,
+) -> SyncPushChange {
+  let state_str = pr.state().to_string()
+  let labels_str = pr.labels().join(", ")
+  {
+    action: "update",
+    local_id: pr.id(),
+    title: pr.title(),
+    remote_number: link.remote_number(),
+    state_change: state_str,
+    title_change: "",
+    labels_change: if labels_str.length() > 0 {
+      "[\{labels_str}]"
+    } else {
+      ""
+    },
+    is_destructive: true,
+  }
+}
+
+///|
+pub async fn github_sync_execute_push_prs(
+  hub : @hub.Hub,
+  objects : &@lib.ObjectStore,
+  refs : &@lib.RefStore,
+  clock : &@lib.Clock,
+  repo : String,
+  changes : Array[SyncPushChange],
+) -> SyncPushResult raise @bit.GitError {
+  let created = 0
+  let mut updated = 0
+  let errors : Array[String] = []
+  let now = clock.now()
+  for change in changes {
+    let pr = hub.get_pr(objects, change.local_id)
+    guard pr is Some(loc) else { continue }
+    let state_str = match loc.state() {
+      @hub.PrState::Merged => "closed" // GitHub API uses "closed" for merged PRs
+      other => other.to_string()
+    }
+    match change.action {
+      "update" => {
+        let existing_link = hub.get_sync_link(objects, change.local_id, "github")
+        guard existing_link is Some(link) else { continue }
+        // Use issues endpoint for PR metadata updates (title, body, state, labels)
+        let _ = github_update_issue(
+          repo,
+          link.remote_number(),
+          title=loc.title(),
+          body=loc.body(),
+          state=state_str,
+          labels=loc.labels(),
+        ) catch {
+          err => {
+            errors.push("update PR #\{link.remote_number()}: \{err}")
+            continue
+          }
+        }
+        // Update SyncLink
+        let updated_link = @hub.SyncLink::new(
+          loc.id(),
+          "pr",
           "github",
           repo,
           remote_number=link.remote_number(),

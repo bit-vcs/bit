@@ -5,9 +5,9 @@ fn print_hub_issue_sync_usage() -> Unit {
   println("Usage: git-bit issue sync <subcommand> [<args>]")
   println("")
   println("Subcommands:")
-  println("  pull --repo <owner/repo>                (pull from GitHub)")
+  println("  pull --repo <owner/repo> [--include-prs]  (pull from GitHub)")
   println(
-    "  push --github --repo <owner/repo> [--apply]",
+    "  push --github --repo <owner/repo> [--apply] [--include-prs]",
   )
   println("  status --repo <owner/repo>")
   println("  install-hook                            (install git hook)")
@@ -42,6 +42,7 @@ async fn handle_hub_issue_sync_pull(
   let mut since = ""
   let mut state = "all"
   let mut conflict = "newer-wins"
+  let mut include_prs = false
   let mut i = 0
   while i < args.length() {
     let arg = args[i]
@@ -71,6 +72,8 @@ async fn handle_hub_issue_sync_pull(
         start=11,
         end=arg.length(),
       )
+    } else if arg == "--include-prs" {
+      include_prs = true
     } else if arg == "-h" || arg == "--help" {
       print_hub_issue_sync_usage()
       return ()
@@ -87,7 +90,7 @@ async fn handle_hub_issue_sync_pull(
   let result = @hub_native.github_sync_pull_issues(
     hub, objects, refs, clock, resolved_repo, since, state, conflict,
   )
-  print_line("Pull complete:")
+  print_line("Issues pull complete:")
   print_line("  Created: \{result.created}")
   print_line("  Updated: \{result.updated}")
   print_line("  Skipped: \{result.skipped}")
@@ -95,6 +98,23 @@ async fn handle_hub_issue_sync_pull(
     print_line("  Conflicts (manual review needed):")
     for c in result.conflicts {
       print_line("    \{c}")
+    }
+  }
+  if include_prs {
+    print_line("")
+    print_line("Pulling PRs from GitHub \{resolved_repo}...")
+    let pr_result = @hub_native.github_sync_pull_prs(
+      hub, objects, refs, clock, resolved_repo, since, state, conflict,
+    )
+    print_line("PRs pull complete:")
+    print_line("  Created: \{pr_result.created}")
+    print_line("  Updated: \{pr_result.updated}")
+    print_line("  Skipped: \{pr_result.skipped}")
+    if pr_result.conflicts.length() > 0 {
+      print_line("  Conflicts (manual review needed):")
+      for c in pr_result.conflicts {
+        print_line("    \{c}")
+      }
     }
   }
 }
@@ -106,6 +126,7 @@ async fn handle_hub_issue_sync_push(
   let mut repo : String? = None
   let mut github_flag = false
   let mut apply = false
+  let mut include_prs = false
   let mut i = 0
   while i < args.length() {
     let arg = args[i]
@@ -120,6 +141,8 @@ async fn handle_hub_issue_sync_push(
       github_flag = true
     } else if arg == "--apply" {
       apply = true
+    } else if arg == "--include-prs" {
+      include_prs = true
     } else if arg == "-h" || arg == "--help" {
       print_hub_issue_sync_usage()
       return ()
@@ -140,57 +163,99 @@ async fn handle_hub_issue_sync_push(
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
   let changes = @hub_native.github_sync_plan_push(hub, objects, resolved_repo)
-  if changes.length() == 0 {
+  let pr_changes = if include_prs {
+    @hub_native.github_sync_plan_push_prs(hub, objects, resolved_repo)
+  } else {
+    []
+  }
+  if changes.length() == 0 && pr_changes.length() == 0 {
     print_line("Nothing to push to \{resolved_repo}")
     return ()
   }
-  // Display plan
-  print_line("Changes to push to GitHub (\{resolved_repo}):")
-  print_line("")
-  for change in changes {
-    let prefix = if change.is_destructive { "  ! " } else { "  " }
-    match change.action {
-      "create" => {
-        print_line("\{prefix}CREATE issue \"\{change.title}\"")
-        if change.labels_change.length() > 0 {
-          print_line("    labels: \{change.labels_change}")
-        }
-      }
-      "update" => {
-        print_line(
-          "\{prefix}UPDATE issue #\{change.remote_number} \"\{change.title}\"",
-        )
-        if change.state_change.length() > 0 {
-          print_line("    state: \{change.state_change}")
-        }
-        if change.title_change.length() > 0 {
-          print_line("    title: \{change.title_change}")
-        }
-        if change.labels_change.length() > 0 {
-          print_line("    labels: \{change.labels_change}")
-        }
-      }
-      _ => ()
+  // Display issue plan
+  if changes.length() > 0 {
+    print_line("Issue changes to push to GitHub (\{resolved_repo}):")
+    print_line("")
+    for change in changes {
+      print_push_change(change, "issue")
     }
+    print_line("")
   }
-  print_line("")
+  // Display PR plan
+  if pr_changes.length() > 0 {
+    print_line("PR changes to push to GitHub (\{resolved_repo}):")
+    print_line("")
+    for change in pr_changes {
+      print_push_change(change, "PR")
+    }
+    print_line("")
+  }
   if not(apply) {
     print_line("Run with --apply to execute these changes.")
     return ()
   }
-  // Execute
-  print_line("Pushing to GitHub...")
-  let result = @hub_native.github_sync_execute_push(
-    hub, objects, refs, clock, resolved_repo, changes,
-  )
-  print_line("Push complete:")
-  print_line("  Created: \{result.created}")
-  print_line("  Updated: \{result.updated}")
-  if result.errors.length() > 0 {
-    print_line("  Errors:")
-    for err in result.errors {
-      print_line("    \{err}")
+  // Execute issues
+  if changes.length() > 0 {
+    print_line("Pushing issues to GitHub...")
+    let result = @hub_native.github_sync_execute_push(
+      hub, objects, refs, clock, resolved_repo, changes,
+    )
+    print_line("Issue push complete:")
+    print_line("  Created: \{result.created}")
+    print_line("  Updated: \{result.updated}")
+    if result.errors.length() > 0 {
+      print_line("  Errors:")
+      for err in result.errors {
+        print_line("    \{err}")
+      }
     }
+  }
+  // Execute PRs
+  if pr_changes.length() > 0 {
+    print_line("Pushing PR updates to GitHub...")
+    let pr_result = @hub_native.github_sync_execute_push_prs(
+      hub, objects, refs, clock, resolved_repo, pr_changes,
+    )
+    print_line("PR push complete:")
+    print_line("  Created: \{pr_result.created}")
+    print_line("  Updated: \{pr_result.updated}")
+    if pr_result.errors.length() > 0 {
+      print_line("  Errors:")
+      for err in pr_result.errors {
+        print_line("    \{err}")
+      }
+    }
+  }
+}
+
+///|
+async fn print_push_change(
+  change : @hub_native.SyncPushChange,
+  kind : String,
+) -> Unit raise Error {
+  let prefix = if change.is_destructive { "  ! " } else { "  " }
+  match change.action {
+    "create" => {
+      print_line("\{prefix}CREATE \{kind} \"\{change.title}\"")
+      if change.labels_change.length() > 0 {
+        print_line("    labels: \{change.labels_change}")
+      }
+    }
+    "update" => {
+      print_line(
+        "\{prefix}UPDATE \{kind} #\{change.remote_number} \"\{change.title}\"",
+      )
+      if change.state_change.length() > 0 {
+        print_line("    state: \{change.state_change}")
+      }
+      if change.title_change.length() > 0 {
+        print_line("    title: \{change.title_change}")
+      }
+      if change.labels_change.length() > 0 {
+        print_line("    labels: \{change.labels_change}")
+      }
+    }
+    _ => ()
   }
 }
 

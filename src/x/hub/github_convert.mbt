@@ -69,6 +69,79 @@ pub fn issue_diff_for_github(
 }
 
 ///|
+/// Convert a GitHub API pull request to a local PullRequest
+pub fn gh_pr_to_pull_request(
+  gh : GhPullRequest,
+  existing_id? : String = "",
+) -> PullRequest {
+  let created_at = parse_iso8601_to_unix(gh.created_at)
+  let updated_at = parse_iso8601_to_unix(gh.updated_at)
+  let state = match gh.state {
+    "merged" => PrState::Merged
+    "closed" => PrState::Closed
+    _ => PrState::Open
+  }
+  let id = if existing_id != "" {
+    existing_id
+  } else {
+    generate_entity_id("pr", gh.user, created_at, gh.title + "\n" + gh.body)
+  }
+  let source_branch = "refs/heads/" + gh.head_ref
+  let target_branch = "refs/heads/" + gh.base_ref
+  let source_repo : String? = if gh.head_repo.length() > 0 {
+    Some(gh.head_repo)
+  } else {
+    None
+  }
+  PullRequest::new(
+    id,
+    gh.title,
+    gh.body,
+    source_branch,
+    @bit.ObjectId::zero(),
+    target_branch,
+    @bit.ObjectId::zero(),
+    gh.user,
+    created_at,
+    updated_at,
+    state,
+    gh.labels,
+    source_repo=source_repo,
+    source_ref=Some(source_branch),
+  )
+}
+
+///|
+/// Compare a local PullRequest with a GitHub GhPullRequest and return a SyncDiff
+pub fn pr_diff_for_github(
+  current : PullRequest,
+  _link : SyncLink,
+  gh : GhPullRequest,
+) -> SyncDiff {
+  let gh_state : PrState = match gh.state {
+    "merged" => PrState::Merged
+    "closed" => PrState::Closed
+    _ => PrState::Open
+  }
+  let title_changed = current.title != gh.title
+  let body_changed = current.body != gh.body
+  let state_changed = current.state != gh_state
+  let labels_changed = !string_arrays_equal(current.labels, gh.labels)
+  let has_changes = title_changed ||
+    body_changed ||
+    state_changed ||
+    labels_changed
+  {
+    title_changed,
+    body_changed,
+    state_changed,
+    labels_changed,
+    assignees_changed: false,
+    has_changes,
+  }
+}
+
+///|
 fn string_arrays_equal(a : Array[String], b : Array[String]) -> Bool {
   if a.length() != b.length() {
     return false
