@@ -101,10 +101,97 @@ async fn handle_hub_issue_sync_pull(
 
 ///|
 async fn handle_hub_issue_sync_push(
-  _args : Array[String],
+  args : Array[String],
 ) -> Unit raise Error {
-  eprint_line("bit issue sync push: not yet implemented")
-  @sys.exit(1)
+  let mut repo : String? = None
+  let mut github_flag = false
+  let mut apply = false
+  let mut i = 0
+  while i < args.length() {
+    let arg = args[i]
+    if arg == "--repo" && i + 1 < args.length() {
+      i += 1
+      repo = Some(args[i])
+    } else if arg.has_prefix("--repo=") {
+      repo = Some(
+        String::unsafe_substring(arg, start=7, end=arg.length()),
+      )
+    } else if arg == "--github" {
+      github_flag = true
+    } else if arg == "--apply" {
+      apply = true
+    } else if arg == "-h" || arg == "--help" {
+      print_hub_issue_sync_usage()
+      return ()
+    }
+    i += 1
+  }
+  if not(github_flag) {
+    eprint_line("Error: --github flag required for push (safety measure)")
+    eprint_line(
+      "Usage: bit issue sync push --github --repo <owner/repo> [--apply]",
+    )
+    @sys.exit(1)
+  }
+  let root = get_work_root()
+  let git_dir = resolve_hub_git_dir(root)
+  let fs = OsFs::new()
+  let resolved_repo = resolve_github_repo(fs, git_dir, repo)
+  let (objects, refs, clock) = make_hub_stores(git_dir)
+  let hub = load_hub_store(objects, refs)
+  let changes = @hub_native.github_sync_plan_push(hub, objects, resolved_repo)
+  if changes.length() == 0 {
+    print_line("Nothing to push to \{resolved_repo}")
+    return ()
+  }
+  // Display plan
+  print_line("Changes to push to GitHub (\{resolved_repo}):")
+  print_line("")
+  for change in changes {
+    let prefix = if change.is_destructive { "  ! " } else { "  " }
+    match change.action {
+      "create" => {
+        print_line("\{prefix}CREATE issue \"\{change.title}\"")
+        if change.labels_change.length() > 0 {
+          print_line("    labels: \{change.labels_change}")
+        }
+      }
+      "update" => {
+        print_line(
+          "\{prefix}UPDATE issue #\{change.remote_number} \"\{change.title}\"",
+        )
+        if change.state_change.length() > 0 {
+          print_line("    state: \{change.state_change}")
+        }
+        if change.title_change.length() > 0 {
+          print_line("    title: \{change.title_change}")
+        }
+        if change.labels_change.length() > 0 {
+          print_line("    labels: \{change.labels_change}")
+        }
+      }
+      _ => ()
+    }
+  }
+  print_line("")
+  if not(apply) {
+    print_line("Run with --apply to execute these changes.")
+    return ()
+  }
+  // Execute
+  print_line("Pushing to GitHub...")
+  let result = @hub_native.github_sync_execute_push(
+    hub, objects, refs, clock, resolved_repo, changes,
+  )
+  print_line("Push complete:")
+  print_line("  Created: \{result.created}")
+  print_line("  Updated: \{result.updated}")
+  if result.errors.length() > 0 {
+    print_line("  Errors:")
+    for err in result.errors {
+      print_line("    \{err}")
+    }
+  }
 }
 
 ///|

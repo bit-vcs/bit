@@ -1,4 +1,23 @@
-///| GitHub sync pull logic
+///| GitHub sync pull and push logic
+
+///|
+pub struct SyncPushChange {
+  action : String // "create" or "update"
+  local_id : String
+  title : String
+  remote_number : Int // 0 for create
+  state_change : String // "" or "open->closed" etc.
+  title_change : String // "" or "old->new"
+  labels_change : String // "" or "[old]->[new]"
+  is_destructive : Bool // state changes, body overwrites
+}
+
+///|
+pub struct SyncPushResult {
+  created : Int
+  updated : Int
+  errors : Array[String]
+}
 
 ///|
 pub struct SyncPullResult {
@@ -123,4 +142,162 @@ pub async fn github_sync_pull_issues(
     }
   }
   { created, updated, skipped, conflicts }
+}
+
+///|
+pub async fn github_sync_plan_push(
+  hub : @hub.Hub,
+  objects : &@lib.ObjectStore,
+  repo : String,
+) -> Array[SyncPushChange] raise @bit.GitError {
+  let changes : Array[SyncPushChange] = []
+  let issues = hub.list_issues(objects)
+  let links = hub.list_sync_links(objects, repo=repo)
+  // Build lookup: local_id -> SyncLink
+  let link_map : Map[String, @hub.SyncLink] = {}
+  for link in links {
+    if link.local_kind() == "issue" {
+      link_map.set(link.local_id(), link)
+    }
+  }
+  for issue in issues {
+    match link_map.get(issue.id()) {
+      Some(link) => {
+        // Check if local is newer than last push
+        if issue.updated_at() > link.last_push_at() {
+          let diff = compute_push_diff(issue, link)
+          changes.push(diff)
+        }
+      }
+      None => {
+        // No link -- new issue to create on GitHub
+        // Skip sub-issues (have parent_id)
+        if issue.parent_id is Some(_) {
+          continue
+        }
+        let labels_str = issue.labels().join(", ")
+        changes.push(
+          {
+            action: "create",
+            local_id: issue.id(),
+            title: issue.title(),
+            remote_number: 0,
+            state_change: "",
+            title_change: "",
+            labels_change: if labels_str.length() > 0 {
+              "[\{labels_str}]"
+            } else {
+              ""
+            },
+            is_destructive: false,
+          },
+        )
+      }
+    }
+  }
+  changes
+}
+
+///|
+fn compute_push_diff(
+  issue : @hub.Issue,
+  link : @hub.SyncLink,
+) -> SyncPushChange {
+  // For updates, we don't have the remote state cached locally,
+  // so we note that the local has changed since last push.
+  let state_str = issue.state().to_string()
+  let labels_str = issue.labels().join(", ")
+  {
+    action: "update",
+    local_id: issue.id(),
+    title: issue.title(),
+    remote_number: link.remote_number(),
+    state_change: state_str,
+    title_change: "",
+    labels_change: if labels_str.length() > 0 {
+      "[\{labels_str}]"
+    } else {
+      ""
+    },
+    is_destructive: true,
+  }
+}
+
+///|
+pub async fn github_sync_execute_push(
+  hub : @hub.Hub,
+  objects : &@lib.ObjectStore,
+  refs : &@lib.RefStore,
+  clock : &@lib.Clock,
+  repo : String,
+  changes : Array[SyncPushChange],
+) -> SyncPushResult raise @bit.GitError {
+  let mut created = 0
+  let mut updated = 0
+  let errors : Array[String] = []
+  let now = clock.now()
+  for change in changes {
+    let issue = hub.get_issue(objects, change.local_id)
+    guard issue is Some(loc) else { continue }
+    let state_str = loc.state().to_string()
+    match change.action {
+      "create" => {
+        let gh_issue = github_create_issue(
+          repo, loc.title(), loc.body(), loc.labels(), loc.assignees(),
+        ) catch {
+          err => {
+            errors.push("create \{loc.title()}: \{err}")
+            continue
+          }
+        }
+        // Create SyncLink
+        let link = @hub.SyncLink::new(
+          loc.id(),
+          "issue",
+          "github",
+          repo,
+          remote_number=gh_issue.number,
+          remote_node_id=gh_issue.node_id,
+          last_push_at=now,
+          remote_updated_at=@hub.parse_iso8601_to_unix(gh_issue.updated_at),
+        )
+        hub.put_sync_link(objects, refs, clock, link)
+        created += 1
+      }
+      "update" => {
+        let existing_link = hub.get_sync_link(objects, change.local_id, "github")
+        guard existing_link is Some(link) else { continue }
+        let _ = github_update_issue(
+          repo,
+          link.remote_number(),
+          title=loc.title(),
+          body=loc.body(),
+          state=state_str,
+          labels=loc.labels(),
+          assignees=loc.assignees(),
+        ) catch {
+          err => {
+            errors.push("update #\{link.remote_number()}: \{err}")
+            continue
+          }
+        }
+        // Update SyncLink
+        let updated_link = @hub.SyncLink::new(
+          loc.id(),
+          "issue",
+          "github",
+          repo,
+          remote_number=link.remote_number(),
+          remote_node_id=link.remote_node_id(),
+          last_push_at=now,
+          last_pull_at=link.last_pull_at(),
+          remote_updated_at=now,
+        )
+        hub.put_sync_link(objects, refs, clock, updated_link)
+        updated += 1
+      }
+      _ => ()
+    }
+  }
+  { created, updated, errors }
 }
