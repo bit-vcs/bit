@@ -29,6 +29,7 @@ options(
   targets: {
     "git_helpers.mbt": [ "native" ],
     "helpers_shared.mbt": [ "native" ],
+    "hub_active.mbt": [ "native" ],
     "hub_debug.mbt": [ "native" ],
     "hub_github_sync.mbt": [ "native" ],
     "hub_helpers.mbt": [ "native" ],
