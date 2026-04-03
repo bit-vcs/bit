@@ -25,12 +25,28 @@ async fn handle_hub_issue_sync(args : Array[String]) -> Unit raise Error {
   let rest = collect_args(args, 1)
   match subcmd {
     "pull" => handle_hub_issue_sync_pull(rest)
-    "push" => handle_hub_issue_sync_push(rest)
+    "push" => {
+      if not(github_sync_write_enabled()) {
+        github_sync_write_disabled_message("push")
+        return ()
+      }
+      handle_hub_issue_sync_push(rest)
+    }
     "status" => handle_hub_issue_sync_status(rest)
-    "install-hook" => handle_hub_issue_sync_install_hook(rest)
+    "install-hook" => {
+      if not(github_sync_write_enabled()) {
+        github_sync_write_disabled_message("install-hook")
+        return ()
+      }
+      handle_hub_issue_sync_install_hook(rest)
+    }
     "help" | "-h" | "--help" => print_hub_issue_sync_usage()
     _ => {
-      // If no recognized subcommand, treat as bidirectional sync flags
+      // Bidirectional includes push — check write access
+      if not(github_sync_write_enabled()) {
+        github_sync_write_disabled_message("sync")
+        return ()
+      }
       handle_hub_issue_sync_bidirectional(args)
     }
   }
@@ -736,4 +752,28 @@ async fn handle_hub_issue_sync_status(
   if links.length() > limit {
     print_line("  ... and \{links.length() - limit} more")
   }
+}
+
+///|
+fn github_sync_write_enabled() -> Bool {
+  match @sys.get_env_var("BIT_GITHUB_SYNC_WRITE") {
+    Some(v) => v == "1" || v == "true"
+    None => false
+  }
+}
+
+///|
+async fn github_sync_write_disabled_message(
+  command : String,
+) -> Unit raise Error {
+  eprint_line(
+    "Error: 'bit issue sync \{command}' is currently disabled (writes to GitHub)",
+  )
+  eprint_line("")
+  eprint_line("Read-only commands are available:")
+  eprint_line("  bit issue sync pull --repo <owner/repo>   (GitHub → bit)")
+  eprint_line("  bit issue sync status --repo <owner/repo>")
+  eprint_line("")
+  eprint_line("To enable write operations, set: export BIT_GITHUB_SYNC_WRITE=1")
+  @sys.exit(1)
 }
