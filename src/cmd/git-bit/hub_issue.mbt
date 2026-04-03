@@ -694,6 +694,7 @@ async fn handle_hub_issue_create(args : Array[String]) -> Unit raise Error {
   let assignees : Array[String] = []
   let links : Array[String] = []
   let mut parent_id : String? = None
+  let mut repo_ref : String? = None
   let mut i = 0
   while i < args.length() {
     let arg = args[i]
@@ -767,6 +768,18 @@ async fn handle_hub_issue_create(args : Array[String]) -> Unit raise Error {
         i += 1
         continue
       }
+      "--repo" if i + 1 < args.length() => {
+        repo_ref = Some(args[i + 1])
+        i += 2
+        continue
+      }
+      _ if arg.has_prefix("--repo=") => {
+        repo_ref = Some(
+          String::unsafe_substring(arg, start=7, end=arg.length()),
+        )
+        i += 1
+        continue
+      }
       _ if arg.has_prefix("-") => {
         warn_unimplemented_arg("issue create", arg)
         i += 1
@@ -793,7 +806,16 @@ async fn handle_hub_issue_create(args : Array[String]) -> Unit raise Error {
     }
   }
   let root = get_work_root()
-  let git_dir = resolve_hub_git_dir(root)
+  let git_dir = match repo_ref {
+    Some(rref) => {
+      let home = @sys.get_env_var("HOME").unwrap_or("/")
+      let local_git_dir = resolve_hub_git_dir(root)
+      let aliases = load_aliases(local_git_dir)
+      let remote_path = resolve_repo_ref_to_path(rref, home, aliases~)
+      resolve_hub_git_dir(remote_path)
+    }
+    None => resolve_hub_git_dir(root)
+  }
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
   let issue = hub.create_issue(

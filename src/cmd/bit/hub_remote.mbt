@@ -46,13 +46,13 @@ fn hub_remotes_path(git_dir : String) -> String {
 }
 
 ///|
-/// Serialize alias entries to a simple text format: "name path\n" per line.
+/// Serialize alias entries to TSV format: "name\tpath\n" per line.
 fn serialize_alias_entries(entries : Array[(String, String)]) -> String {
   let buf = StringBuilder::new()
   for entry in entries {
     let (name, path) = entry
     buf.write_string(name)
-    buf.write_char(' ')
+    buf.write_char('\t')
     buf.write_string(path)
     buf.write_char('\n')
   }
@@ -71,8 +71,8 @@ fn parse_alias_entries(content : String) -> Array[(String, String)] {
     if trimmed.length() == 0 || trimmed.has_prefix("#") {
       continue
     }
-    // Split on first space
-    match trimmed.find(" ") {
+    // Split on first tab
+    match trimmed.find("\t") {
       Some(idx) => {
         let a = String::unsafe_substring(trimmed, start=0, end=idx)
         let p = String::unsafe_substring(

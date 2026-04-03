@@ -114,6 +114,54 @@ bit issue import --repo owner/repo --state open     # open only
 
 ## Cross-repo References
 
+Link issues across local repositories using `owner/repo#id` format.
+
+### Repository resolution
+
+Resolution order: alias → ghq path (`~/ghq/github.com/owner/repo`) → error.
+
+```bash
+# Register an alias for a local repo
+bit issue remote add myapp ~/ghq/github.com/owner/app
+bit issue remote list
+bit issue remote remove myapp
+```
+
+### Link cross-repo issues
+
+```bash
+# Link a remote issue to a local issue
+bit issue link <local-id> owner/repo#remote-id
+bit issue link <local-id> myapp#remote-id       # using alias
+```
+
+### Read remote issues
+
+```bash
+bit issue get owner/repo#issue-id               # read from another local repo
+bit issue get myapp#issue-id                     # using alias
+```
+
+### Create in remote repo
+
+```bash
+bit issue create --repo owner/repo --title "Fix bug in shared lib"
+bit issue create --repo myapp --title "Fix bug"  # using alias
+```
+
+### Working set (active issues)
+
+Track which issues you're currently working on across repos:
+
+```bash
+bit issue start #local-id                       # add local issue
+bit issue start owner/repo#remote-id            # add cross-repo issue
+bit issue active                                # list all active issues with status
+bit issue stop owner/repo#remote-id             # remove from working set
+```
+
+### External links
+
 ```bash
 bit issue create --title "Depends on upstream fix" \
   --link "https://github.com/other/repo/issues/42"
@@ -191,7 +239,11 @@ bit issue watch                         # stream claim/unclaim events in real-ti
 | `bit issue comment list <id>` | List comments |
 | `bit issue search` | Search issues (`--type`, `--state`, `--author`, `--label`, `--limit`) |
 | `bit issue import` | Import from GitHub (`--repo`, `--state`, `--limit`, `--provider`) |
-| `bit issue link <issue> <pr>` | Associate PR with issue |
+| `bit issue link <issue> <target>` | Link PR or cross-repo issue (`owner/repo#id`) |
+| `bit issue remote add\|list\|remove` | Manage repo aliases for cross-repo refs |
+| `bit issue start <ref>` | Add issue to working set |
+| `bit issue stop <ref>` | Remove issue from working set |
+| `bit issue active` | List active issues across repos |
 | `bit issue note` | Low-level notes access (`add`, `get`, `list`, `remove`; `--ns` for namespace) |
 | `bit issue sync pull` | Pull changes from GitHub (`--repo`, `--since`, `--dry-run`) |
 | `bit issue sync push` | Push changes to GitHub (`--repo`, `--label`, `--dry-run`) |

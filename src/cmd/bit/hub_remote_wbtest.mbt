@@ -45,7 +45,7 @@ test "parse_alias_entries: blank lines and comments ignored" {
   let content =
     #|# comment line
     #|
-    #|myapp /path/to/repo
+    #|myapp	/path/to/repo
     #|
   let parsed = parse_alias_entries(content)
   assert_eq(parsed.length(), 1)
