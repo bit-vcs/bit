@@ -119,3 +119,17 @@ test "autosquash_interactive_todo: multiple fixups for same target" {
   assert_eq(result[2].command, TodoCommand::Fixup)
   assert_eq(result[3].commit_hex, "bbb")
 }
+
+///|
+test "parse_interactive_todo: exec and break commands" {
+  let text = "pick abc first\nexec echo hello\nbreak\npick def second\n"
+  let entries = parse_interactive_todo(text)
+  assert_eq(entries.length(), 4)
+  assert_eq(entries[0].command, TodoCommand::Pick)
+  assert_eq(entries[1].command, TodoCommand::Exec)
+  assert_eq(entries[1].subject, "echo hello")
+  assert_eq(entries[1].commit_hex, "")
+  assert_eq(entries[2].command, TodoCommand::Break)
+  assert_eq(entries[2].commit_hex, "")
+  assert_eq(entries[3].command, TodoCommand::Pick)
+}

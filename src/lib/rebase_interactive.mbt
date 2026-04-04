@@ -62,14 +62,17 @@ pub fn parse_interactive_todo(text : String) -> Array[InteractiveTodoEntry] {
       continue
     }
     let first_space = trimmed.find(" ")
-    guard first_space is Some(sp1) else { continue }
-    let cmd_str = String::unsafe_substring(trimmed, start=0, end=sp1)
-    let after_cmd = String::unsafe_substring(
-      trimmed,
-      start=sp1 + 1,
-      end=trimmed.length(),
-    )
-    let after_trimmed = @string_utils.trim_string(after_cmd)
+    let cmd_str = match first_space {
+      Some(sp1) => String::unsafe_substring(trimmed, start=0, end=sp1)
+      None => trimmed // No space: entire line is the command (e.g., "break")
+    }
+    let after_trimmed = match first_space {
+      Some(sp1) =>
+        @string_utils.trim_string(
+          String::unsafe_substring(trimmed, start=sp1 + 1, end=trimmed.length()),
+        )
+      None => ""
+    }
     let second_space = after_trimmed.find(" ")
     let (commit_hex, subject) = match second_space {
       Some(sp2) =>
@@ -438,6 +441,11 @@ fn interactive_resolve_entries(
 ) -> Array[InteractiveTodoEntry] raise @bit.GitError {
   let result : Array[InteractiveTodoEntry] = []
   for entry in entries {
+    // exec and break don't have commit references
+    if entry.command == TodoCommand::Exec || entry.command == TodoCommand::Break {
+      result.push(entry)
+      continue
+    }
     let hex = entry.commit_hex
     // Try to resolve short hex to full hex via rev_parse
     let resolved = if hex.length() < 40 {
@@ -497,9 +505,9 @@ pub async fn execute_interactive_todo(
     return interactive_rebase_finish(fs, rfs, root, state)
   }
   let entry = state.todo[0]
-  let commit_id = @bit.ObjectId::from_hex(entry.commit_hex)
   match entry.command {
     Pick => {
+      let commit_id = @bit.ObjectId::from_hex(entry.commit_hex)
       let result = interactive_cherry_pick(fs, rfs, root, db, commit_id)
       match result.status {
         IRBConflict => {
@@ -515,6 +523,7 @@ pub async fn execute_interactive_todo(
       }
     }
     Reword => {
+      let commit_id = @bit.ObjectId::from_hex(entry.commit_hex)
       let result = interactive_cherry_pick(fs, rfs, root, db, commit_id)
       match result.status {
         IRBConflict => {
@@ -539,6 +548,7 @@ pub async fn execute_interactive_todo(
       }
     }
     Edit => {
+      let commit_id = @bit.ObjectId::from_hex(entry.commit_hex)
       let result = interactive_cherry_pick(fs, rfs, root, db, commit_id)
       match result.status {
         IRBConflict => {
@@ -574,6 +584,7 @@ pub async fn execute_interactive_todo(
       }
     }
     Squash => {
+      let commit_id = @bit.ObjectId::from_hex(entry.commit_hex)
       let result = interactive_squash_into_head(
         fs,
         rfs,
@@ -601,6 +612,7 @@ pub async fn execute_interactive_todo(
       }
     }
     Fixup => {
+      let commit_id = @bit.ObjectId::from_hex(entry.commit_hex)
       let result = interactive_squash_into_head(
         fs,
         rfs,
