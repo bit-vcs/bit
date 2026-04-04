@@ -138,7 +138,7 @@ pub fn diff_trees(&@types.RepoFileSystem, String, @object.ObjectId?, @object.Obj
 
 pub async fn diff_worktree(&@types.RepoFileSystem, String, run_filter_cmd? : FilterCmd) -> Array[DiffFile] raise @object.GitError
 
-pub async fn execute_interactive_todo(&@types.FileSystem, &@types.RepoFileSystem, String, InteractiveRebaseState, async (String) -> String?) -> InteractiveRebaseResult raise @object.GitError
+pub async fn execute_interactive_todo(&@types.FileSystem, &@types.RepoFileSystem, String, InteractiveRebaseState, async (String) -> String?, exec_runner? : (async (String) -> Int)?) -> InteractiveRebaseResult raise @object.GitError
 
 pub fn expand_sparse_index_entries(&@types.RepoFileSystem, String, Array[IndexEntry]) -> Array[IndexEntry] raise @object.GitError
 
@@ -186,13 +186,15 @@ pub fn init_repo_with_options(&@types.FileSystem, String, InitOptions) -> Unit r
 
 pub fn init_repo_with_options_with_repo_fs(&@types.FileSystem, &@types.RepoFileSystem, String, InitOptions) -> Unit raise @object.GitError
 
+pub fn insert_exec_after_picks(Array[InteractiveTodoEntry], Array[String]) -> Array[InteractiveTodoEntry]
+
 pub fn interactive_rebase_abort_impl(&@types.FileSystem, &@types.RepoFileSystem, String) -> Unit raise @object.GitError
 
-pub async fn interactive_rebase_continue_impl(&@types.FileSystem, &@types.RepoFileSystem, String, async (String) -> String?) -> InteractiveRebaseResult raise @object.GitError
+pub async fn interactive_rebase_continue_impl(&@types.FileSystem, &@types.RepoFileSystem, String, async (String) -> String?, exec_runner? : (async (String) -> Int)?) -> InteractiveRebaseResult raise @object.GitError
 
-pub async fn interactive_rebase_skip_impl(&@types.FileSystem, &@types.RepoFileSystem, String, async (String) -> String?) -> InteractiveRebaseResult raise @object.GitError
+pub async fn interactive_rebase_skip_impl(&@types.FileSystem, &@types.RepoFileSystem, String, async (String) -> String?, exec_runner? : (async (String) -> Int)?) -> InteractiveRebaseResult raise @object.GitError
 
-pub async fn interactive_rebase_start(&@types.FileSystem, &@types.RepoFileSystem, String, @object.ObjectId, @object.ObjectId, async (String) -> String?, async (String) -> String?, autosquash? : Bool) -> InteractiveRebaseResult raise @object.GitError
+pub async fn interactive_rebase_start(&@types.FileSystem, &@types.RepoFileSystem, String, @object.ObjectId, @object.ObjectId, async (String) -> String?, async (String) -> String?, autosquash? : Bool, exec_runner? : (async (String) -> Int)?, exec_cmds? : Array[String]) -> InteractiveRebaseResult raise @object.GitError
 
 pub fn is_ancestor_of(&@types.RepoFileSystem, String, @object.ObjectId, @object.ObjectId) -> Bool
 
@@ -813,6 +815,7 @@ pub struct InteractiveRebaseResult {
   status : InteractiveRebaseStatus
   commit_id : @object.ObjectId?
   message : String
+  exit_code : Int
 }
 
 pub struct InteractiveRebaseState {
@@ -1085,6 +1088,8 @@ pub enum TodoCommand {
   Squash
   Fixup
   Drop
+  Exec
+  Break
 } derive(Eq, Show)
 
 pub struct TreeFileEntry {

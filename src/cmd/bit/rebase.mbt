@@ -237,7 +237,11 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
       let msg_editor = make_message_editor_callback(fs, git_dir)
       let exec_runner = make_exec_runner_callback(root)
       let result = @bitlib.interactive_rebase_continue_impl(
-        wfs, rfs, root, msg_editor, exec_runner=Some(exec_runner),
+        wfs,
+        rfs,
+        root,
+        msg_editor,
+        exec_runner=Some(exec_runner),
       )
       print_interactive_rebase_result(result)
     } else {
@@ -265,7 +269,11 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
       let msg_editor = make_message_editor_callback(fs, git_dir)
       let exec_runner = make_exec_runner_callback(root)
       let result = @bitlib.interactive_rebase_skip_impl(
-        wfs, rfs, root, msg_editor, exec_runner=Some(exec_runner),
+        wfs,
+        rfs,
+        root,
+        msg_editor,
+        exec_runner=Some(exec_runner),
       )
       print_interactive_rebase_result(result)
     } else {
@@ -437,9 +445,17 @@ async fn print_interactive_rebase_result(
     }
     @bitlib.IRBStopped => {
       print_line(result.message)
-      @sys.exit(0)
+      if result.exit_code != 0 {
+        @sys.exit(result.exit_code)
+      }
     }
-    @bitlib.IRBAborted => print_line("Rebase aborted.")
+    @bitlib.IRBAborted =>
+      if result.message.length() > 0 {
+        eprint_line(result.message)
+        @sys.exit(1)
+      } else {
+        print_line("Rebase aborted.")
+      }
   }
 }
 

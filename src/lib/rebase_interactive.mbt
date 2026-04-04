@@ -91,10 +91,18 @@ pub fn parse_interactive_todo(text : String) -> Array[InteractiveTodoEntry] {
     match parse_todo_command(cmd_str) {
       Some(TodoCommand::Exec) =>
         // exec: rest of line is the command, no commit_hex
-        entries.push({ command: TodoCommand::Exec, commit_hex: "", subject: after_trimmed })
+        entries.push({
+          command: TodoCommand::Exec,
+          commit_hex: "",
+          subject: after_trimmed,
+        })
       Some(TodoCommand::Break) =>
         // break: no arguments
-        entries.push({ command: TodoCommand::Break, commit_hex: "", subject: "" })
+        entries.push({
+          command: TodoCommand::Break,
+          commit_hex: "",
+          subject: "",
+        })
       Some(cmd) => entries.push({ command: cmd, commit_hex, subject })
       None => ()
     }
@@ -368,7 +376,11 @@ pub fn insert_exec_after_picks(
     match entry.command {
       Pick | Reword | Edit =>
         for cmd in exec_cmds {
-          result.push({ command: TodoCommand::Exec, commit_hex: "", subject: cmd })
+          result.push({
+            command: TodoCommand::Exec,
+            commit_hex: "",
+            subject: cmd,
+          })
         }
       _ => ()
     }
@@ -424,7 +436,12 @@ pub async fn interactive_rebase_start(
   // Collect commits to rebase
   let commits = rebase_collect_chain(db, rfs, h, upstream)
   if commits.length() == 0 {
-    return { status: IRBComplete, commit_id: Some(h), message: "" }
+    return {
+      status: IRBComplete,
+      commit_id: Some(h),
+      message: "",
+      exit_code: 0,
+    }
   }
   // Save head name before detaching
   let head_name = match read_head_ref(rfs, git_dir) {
@@ -450,7 +467,12 @@ pub async fn interactive_rebase_start(
   // Call sequence editor
   let edited = sequence_editor(todo_for_editor) catch { _ => None }
   guard edited is Some(edited_text) else {
-    return { status: IRBAborted, commit_id: None, message: "rebase aborted" }
+    return {
+      status: IRBAborted,
+      commit_id: None,
+      message: "rebase aborted",
+      exit_code: 1,
+    }
   }
   // Parse edited todo
   let entries = parse_interactive_todo(edited_text)
@@ -458,7 +480,8 @@ pub async fn interactive_rebase_start(
     return {
       status: IRBAborted,
       commit_id: None,
-      message: "nothing to do (empty todo list)",
+      message: "error: nothing to do",
+      exit_code: 1,
     }
   }
   // Resolve short hex to full hex in entries
@@ -530,6 +553,7 @@ pub struct InteractiveRebaseResult {
   status : InteractiveRebaseStatus
   commit_id : @bit.ObjectId?
   message : String
+  exit_code : Int
 }
 
 // ============================================================================
@@ -565,7 +589,14 @@ pub async fn execute_interactive_todo(
         _ => {
           let new_state = interactive_move_to_done(state)
           save_interactive_rebase_state(fs, git_dir, new_state)
-          execute_interactive_todo(fs, rfs, root, new_state, message_editor, exec_runner~)
+          execute_interactive_todo(
+            fs,
+            rfs,
+            root,
+            new_state,
+            message_editor,
+            exec_runner~,
+          )
         }
       }
     }
@@ -590,7 +621,14 @@ pub async fn execute_interactive_todo(
           interactive_amend_head_message(fs, rfs, root, db, msg)
           let new_state = interactive_move_to_done(state)
           save_interactive_rebase_state(fs, git_dir, new_state)
-          execute_interactive_todo(fs, rfs, root, new_state, message_editor, exec_runner~)
+          execute_interactive_todo(
+            fs,
+            rfs,
+            root,
+            new_state,
+            message_editor,
+            exec_runner~,
+          )
         }
       }
     }
@@ -626,6 +664,7 @@ pub async fn execute_interactive_todo(
             ) +
             "... " +
             entry.subject,
+            exit_code: 0,
           }
         }
       }
@@ -654,7 +693,14 @@ pub async fn execute_interactive_todo(
             squash_msg: result.message,
           }
           save_interactive_rebase_state(fs, git_dir, new_state)
-          execute_interactive_todo(fs, rfs, root, new_state, message_editor, exec_runner~)
+          execute_interactive_todo(
+            fs,
+            rfs,
+            root,
+            new_state,
+            message_editor,
+            exec_runner~,
+          )
         }
       }
     }
@@ -682,7 +728,14 @@ pub async fn execute_interactive_todo(
             squash_msg: result.message,
           }
           save_interactive_rebase_state(fs, git_dir, new_state)
-          execute_interactive_todo(fs, rfs, root, new_state, message_editor, exec_runner~)
+          execute_interactive_todo(
+            fs,
+            rfs,
+            root,
+            new_state,
+            message_editor,
+            exec_runner~,
+          )
         }
       }
     }
@@ -690,7 +743,14 @@ pub async fn execute_interactive_todo(
       // Simply skip this commit
       let new_state = interactive_move_to_done(state)
       save_interactive_rebase_state(fs, git_dir, new_state)
-      execute_interactive_todo(fs, rfs, root, new_state, message_editor, exec_runner~)
+      execute_interactive_todo(
+        fs,
+        rfs,
+        root,
+        new_state,
+        message_editor,
+        exec_runner~,
+      )
     }
     Exec => {
       let cmd = entry.subject
@@ -706,9 +766,29 @@ pub async fn execute_interactive_todo(
           status: IRBStopped,
           commit_id: resolve_head_commit(rfs, git_dir),
           message: "Execution failed: \{cmd} (exit code \{code})\nYou can fix the problem, and then run \"git rebase --continue\".",
+          exit_code: code,
         }
       } else {
-        execute_interactive_todo(fs, rfs, root, new_state, message_editor, exec_runner~)
+        // Check if exec left the tree dirty (unstaged or staged changes)
+        let worktree_diffs = diff_worktree(rfs, root)
+        let index_diffs = diff_index(rfs, root)
+        if worktree_diffs.length() > 0 || index_diffs.length() > 0 {
+          {
+            status: IRBStopped,
+            commit_id: resolve_head_commit(rfs, git_dir),
+            message: "You have unstaged changes in your working tree.\nPlease commit or stash them.",
+            exit_code: 1,
+          }
+        } else {
+          execute_interactive_todo(
+            fs,
+            rfs,
+            root,
+            new_state,
+            message_editor,
+            exec_runner~,
+          )
+        }
       }
     }
     Break => {
@@ -718,6 +798,7 @@ pub async fn execute_interactive_todo(
         status: IRBStopped,
         commit_id: resolve_head_commit(rfs, git_dir),
         message: "Stopped at break point.\nYou can run \"git rebase --continue\" to resume.",
+        exit_code: 0,
       }
     }
   }
@@ -779,6 +860,7 @@ fn interactive_cherry_pick(
       status: IRBComplete,
       commit_id: Some(base_id),
       message: "already applied",
+      exit_code: 0,
     }
   }
   // Apply changes with conflict detection
@@ -796,6 +878,7 @@ fn interactive_cherry_pick(
       status: IRBConflict,
       commit_id: Some(commit_id),
       message: "CONFLICT: resolve conflicts then run 'git rebase --continue'",
+      exit_code: 1,
     }
   }
   // Create new commit
@@ -818,7 +901,7 @@ fn interactive_cherry_pick(
   rebase_write_worktree(fs, db, rfs, root, git_dir, base_map)
   let entries = rebase_map_to_index(db, rfs, base_map)
   write_index_entries(fs, git_dir, entries)
-  { status: IRBComplete, commit_id: Some(new_id), message: "" }
+  { status: IRBComplete, commit_id: Some(new_id), message: "", exit_code: 0 }
 }
 
 // ============================================================================
@@ -900,6 +983,7 @@ async fn interactive_squash_into_head(
       status: IRBConflict,
       commit_id: Some(commit_id),
       message: "CONFLICT during squash",
+      exit_code: 1,
     }
   }
   // Build combined message
@@ -943,7 +1027,12 @@ async fn interactive_squash_into_head(
   rebase_write_worktree(fs, db, rfs, root, git_dir, base_map)
   let entries = rebase_map_to_index(db, rfs, base_map)
   write_index_entries(fs, git_dir, entries)
-  { status: IRBComplete, commit_id: Some(new_id), message: final_msg }
+  {
+    status: IRBComplete,
+    commit_id: Some(new_id),
+    message: final_msg,
+    exit_code: 0,
+  }
 }
 
 // ============================================================================
@@ -994,7 +1083,14 @@ pub async fn interactive_rebase_continue_impl(
     // Clear amend flag and continue
     let new_state : InteractiveRebaseState = { ..s, amend: false }
     save_interactive_rebase_state(fs, git_dir, new_state)
-    return execute_interactive_todo(fs, rfs, root, new_state, message_editor, exec_runner~)
+    return execute_interactive_todo(
+      fs,
+      rfs,
+      root,
+      new_state,
+      message_editor,
+      exec_runner~,
+    )
   }
   // Continuing after a conflict: commit the resolved changes
   let db = ObjectDb::load(rfs, git_dir)
@@ -1056,7 +1152,14 @@ pub async fn interactive_rebase_skip_impl(
   // Clear amend flag if set
   let new_state : InteractiveRebaseState = { ..s, amend: false }
   save_interactive_rebase_state(fs, git_dir, new_state)
-  execute_interactive_todo(fs, rfs, root, new_state, message_editor, exec_runner~)
+  execute_interactive_todo(
+    fs,
+    rfs,
+    root,
+    new_state,
+    message_editor,
+    exec_runner~,
+  )
 }
 
 ///|
@@ -1136,6 +1239,7 @@ fn interactive_rebase_finish(
     status: IRBComplete,
     commit_id: Some(final_id),
     message: "Successfully rebased.",
+    exit_code: 0,
   }
 }
 
