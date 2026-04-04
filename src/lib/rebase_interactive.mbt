@@ -97,3 +97,61 @@ pub fn serialize_interactive_todo(
   }
   sb.to_string()
 }
+
+///|
+/// Reorder todo entries for autosquash: move fixup!/squash! commits after their targets.
+pub fn autosquash_interactive_todo(
+  entries : Array[InteractiveTodoEntry],
+) -> Array[InteractiveTodoEntry] {
+  let normal : Array[InteractiveTodoEntry] = []
+  let fixups : Array[(Int, InteractiveTodoEntry)] = []
+  for entry in entries {
+    let (prefix, new_cmd) = if entry.subject.has_prefix("fixup! ") {
+      (
+        String::unsafe_substring(entry.subject, start=7, end=entry.subject.length()),
+        TodoCommand::Fixup,
+      )
+    } else if entry.subject.has_prefix("squash! ") {
+      (
+        String::unsafe_substring(entry.subject, start=8, end=entry.subject.length()),
+        TodoCommand::Squash,
+      )
+    } else {
+      normal.push(entry)
+      continue
+    }
+    let mut target_idx = -1
+    for i, n in normal {
+      if n.subject == prefix || n.subject.has_prefix(prefix) {
+        target_idx = i
+      }
+    }
+    if target_idx >= 0 {
+      fixups.push(
+        (target_idx, { command: new_cmd, commit_hex: entry.commit_hex, subject: entry.subject }),
+      )
+    } else {
+      normal.push(entry)
+    }
+  }
+  let inserts : Map[Int, Array[InteractiveTodoEntry]] = {}
+  for item in fixups {
+    let (idx, entry) = item
+    match inserts.get(idx) {
+      Some(arr) => arr.push(entry)
+      None => inserts[idx] = [entry]
+    }
+  }
+  let result : Array[InteractiveTodoEntry] = []
+  for i, entry in normal {
+    result.push(entry)
+    match inserts.get(i) {
+      Some(fixes) =>
+        for fix in fixes {
+          result.push(fix)
+        }
+      None => ()
+    }
+  }
+  result
+}

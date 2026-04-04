@@ -48,3 +48,62 @@ test "serialize_interactive_todo: roundtrip" {
   assert_eq(parsed[0].commit_hex, "abc123")
   assert_eq(parsed[1].command, TodoCommand::Squash)
 }
+
+///|
+test "autosquash_interactive_todo: fixup! moves after target" {
+  let entries : Array[InteractiveTodoEntry] = [
+    { command: TodoCommand::Pick, commit_hex: "aaa", subject: "base feature" },
+    { command: TodoCommand::Pick, commit_hex: "bbb", subject: "other work" },
+    { command: TodoCommand::Pick, commit_hex: "ccc", subject: "fixup! base feature" },
+  ]
+  let result = autosquash_interactive_todo(entries)
+  assert_eq(result.length(), 3)
+  assert_eq(result[0].commit_hex, "aaa")
+  assert_eq(result[1].commit_hex, "ccc")
+  assert_eq(result[1].command, TodoCommand::Fixup)
+  assert_eq(result[2].commit_hex, "bbb")
+}
+
+///|
+test "autosquash_interactive_todo: squash! moves after target" {
+  let entries : Array[InteractiveTodoEntry] = [
+    { command: TodoCommand::Pick, commit_hex: "aaa", subject: "implement X" },
+    { command: TodoCommand::Pick, commit_hex: "bbb", subject: "squash! implement X" },
+  ]
+  let result = autosquash_interactive_todo(entries)
+  assert_eq(result.length(), 2)
+  assert_eq(result[0].commit_hex, "aaa")
+  assert_eq(result[1].commit_hex, "bbb")
+  assert_eq(result[1].command, TodoCommand::Squash)
+}
+
+///|
+test "autosquash_interactive_todo: no match leaves in place" {
+  let entries : Array[InteractiveTodoEntry] = [
+    { command: TodoCommand::Pick, commit_hex: "aaa", subject: "first" },
+    { command: TodoCommand::Pick, commit_hex: "bbb", subject: "fixup! nonexistent" },
+  ]
+  let result = autosquash_interactive_todo(entries)
+  assert_eq(result.length(), 2)
+  assert_eq(result[0].commit_hex, "aaa")
+  assert_eq(result[1].commit_hex, "bbb")
+  assert_eq(result[1].command, TodoCommand::Pick)
+}
+
+///|
+test "autosquash_interactive_todo: multiple fixups for same target" {
+  let entries : Array[InteractiveTodoEntry] = [
+    { command: TodoCommand::Pick, commit_hex: "aaa", subject: "feature" },
+    { command: TodoCommand::Pick, commit_hex: "bbb", subject: "unrelated" },
+    { command: TodoCommand::Pick, commit_hex: "ccc", subject: "fixup! feature" },
+    { command: TodoCommand::Pick, commit_hex: "ddd", subject: "fixup! feature" },
+  ]
+  let result = autosquash_interactive_todo(entries)
+  assert_eq(result.length(), 4)
+  assert_eq(result[0].commit_hex, "aaa")
+  assert_eq(result[1].commit_hex, "ccc")
+  assert_eq(result[1].command, TodoCommand::Fixup)
+  assert_eq(result[2].commit_hex, "ddd")
+  assert_eq(result[2].command, TodoCommand::Fixup)
+  assert_eq(result[3].commit_hex, "bbb")
+}
