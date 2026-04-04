@@ -59,6 +59,12 @@ pub async fn lfs_prefetch_for_checkout(
       "Cannot resolve LFS server URL. Set lfs.url in git config or configure a remote.",
     )
   }
+  // Security: validate LFS URL scheme
+  if !@bitlib.lfs_is_valid_http_url(lfs_url) {
+    raise @bit.GitError::IoError(
+      "LFS server URL must use http:// or https:// scheme, got: \{lfs_url}",
+    )
+  }
   // 4. Batch download
   let (actions, batch_errors) = lfs_batch_request(lfs_url, needed)
   for err in batch_errors {

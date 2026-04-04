@@ -150,6 +150,7 @@ fn lfs_parent_dir(path : String) -> String {
 
 ///|
 /// Download a single LFS object to the local cache.
+/// Validates: URL scheme (HTTPS/HTTP only), SHA-256 integrity, size.
 pub async fn lfs_download_single_object(
   fs : &@bit.FileSystem,
   rfs : &@bit.RepoFileSystem,
@@ -160,11 +161,21 @@ pub async fn lfs_download_single_object(
   if rfs.is_file(dest) {
     return None
   }
+  // Security: validate download URL scheme (prevent SSRF)
+  if !@bitlib.lfs_is_valid_http_url(action.href) {
+    return Some({
+      oid: action.oid,
+      code: 0,
+      message: "Rejected non-HTTP(S) download URL: \{action.href}",
+    })
+  }
   let dir = lfs_parent_dir(dest)
   fs.mkdir_p(dir)
+  // Security: only forward Authorization header, not arbitrary server headers
   let headers : Map[String, String] = {}
-  for key, value in action.headers {
-    headers[key] = value
+  match action.headers.get("Authorization") {
+    Some(v) => headers["Authorization"] = v
+    None => ()
   }
   let result = try? @bitnative.native_http_get(action.href, headers)
   match result {
@@ -180,6 +191,22 @@ pub async fn lfs_download_single_object(
           oid: action.oid,
           code: response.code,
           message: "HTTP \{response.code}",
+        })
+      }
+      // Security: verify SHA-256 integrity
+      if !@bitlib.lfs_verify_oid(data, action.oid) {
+        return Some({
+          oid: action.oid,
+          code: 0,
+          message: "SHA-256 integrity check failed",
+        })
+      }
+      // Security: verify size matches
+      if action.size > 0L && data.length().to_int64() != action.size {
+        return Some({
+          oid: action.oid,
+          code: 0,
+          message: "Size mismatch: expected \{action.size}, got \{data.length()}",
         })
       }
       fs.write_file(dest, data)

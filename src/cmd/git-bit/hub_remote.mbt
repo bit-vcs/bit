@@ -31,6 +31,12 @@ fn resolve_repo_ref_to_path(
   }
   // 2. Try ghq path (owner/repo format)
   if repo_ref.find("/") is Some(_) {
+    // Security: reject path traversal
+    if repo_ref.contains("..") {
+      raise @bitcore.GitError::InvalidObject(
+        "Invalid repo ref '\{repo_ref}': path traversal not allowed",
+      )
+    }
     let ghq_path = home + "/ghq/github.com/" + repo_ref
     return ghq_path
   }

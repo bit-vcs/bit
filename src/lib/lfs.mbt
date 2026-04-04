@@ -126,6 +126,26 @@ pub fn resolve_lfs_url(
 }
 
 ///|
+/// Verify that downloaded data matches the expected LFS OID (SHA-256).
+pub fn lfs_verify_oid(data : Bytes, expected_oid : String) -> Bool {
+  let raw = @bithash.sha256_raw(data)
+  let digits = "0123456789abcdef"
+  let out = StringBuilder::new()
+  for b in raw {
+    let v = b.to_int()
+    out.write_char(digits[v / 16].to_int().unsafe_to_char())
+    out.write_char(digits[v % 16].to_int().unsafe_to_char())
+  }
+  out.to_string() == expected_oid
+}
+
+///|
+/// Validate that a URL has an http:// or https:// scheme.
+pub fn lfs_is_valid_http_url(url : String) -> Bool {
+  url.has_prefix("https://") || url.has_prefix("http://")
+}
+
+///|
 /// Read an LFS object from the local cache. Returns None if not cached.
 pub fn lfs_get_cached_content(
   rfs : &@bit.RepoFileSystem,

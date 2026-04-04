@@ -116,3 +116,42 @@ test "resolve_lfs_url: lfs.url takes priority" {
   )
   assert_eq(url, "https://priority.example.com")
 }
+
+///|
+test "lfs_verify_oid: correct hash" {
+  // SHA-256 of empty byte sequence
+  let data = b""
+  assert_eq(
+    lfs_verify_oid(data, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
+    true,
+  )
+}
+
+///|
+test "lfs_verify_oid: wrong hash" {
+  let data = b"hello"
+  assert_eq(
+    lfs_verify_oid(data, "0000000000000000000000000000000000000000000000000000000000000000"),
+    false,
+  )
+}
+
+///|
+test "lfs_is_valid_http_url: https" {
+  assert_eq(lfs_is_valid_http_url("https://example.com/lfs"), true)
+}
+
+///|
+test "lfs_is_valid_http_url: http" {
+  assert_eq(lfs_is_valid_http_url("http://example.com/lfs"), true)
+}
+
+///|
+test "lfs_is_valid_http_url: file scheme rejected" {
+  assert_eq(lfs_is_valid_http_url("file:///etc/passwd"), false)
+}
+
+///|
+test "lfs_is_valid_http_url: ssh scheme rejected" {
+  assert_eq(lfs_is_valid_http_url("git@github.com:user/repo.git"), false)
+}
