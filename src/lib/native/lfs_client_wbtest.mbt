@@ -6,14 +6,20 @@ test "lfs_build_batch_request_json: single object" {
   let objects : Array[@bitlib.LfsPointer] = [ptr]
   let json_str = lfs_build_batch_request_json(objects)
   let parsed = @json.parse(json_str)
-  guard parsed is Json::Object(obj) else { assert_true(false); return }
+  guard parsed is Json::Object(obj) else {
+    assert_true(false)
+    return
+  }
   assert_eq(obj.get("operation"), Some(Json::string("download")))
   guard obj.get("objects") is Some(Json::Array(arr)) else {
     assert_true(false)
     return
   }
   assert_eq(arr.length(), 1)
-  guard arr[0] is Json::Object(o) else { assert_true(false); return }
+  guard arr[0] is Json::Object(o) else {
+    assert_true(false)
+    return
+  }
   assert_eq(
     o.get("oid"),
     Some(
@@ -48,7 +54,10 @@ test "lfs_parse_batch_response: success with download action" {
   let (actions, errors) = lfs_parse_batch_response(json_str)
   assert_eq(actions.length(), 1)
   assert_eq(errors.length(), 0)
-  assert_eq(actions[0].oid, "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890")
+  assert_eq(
+    actions[0].oid,
+    "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+  )
   assert_eq(actions[0].size, 5000L)
   assert_eq(actions[0].href, "https://example.com/download/obj1")
   assert_eq(actions[0].headers.get("Authorization"), Some("Bearer token123"))
@@ -72,7 +81,10 @@ test "lfs_parse_batch_response: object with error" {
   let (actions, errors) = lfs_parse_batch_response(json_str)
   assert_eq(actions.length(), 0)
   assert_eq(errors.length(), 1)
-  assert_eq(errors[0].oid, "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890")
+  assert_eq(
+    errors[0].oid,
+    "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+  )
   assert_eq(errors[0].code, 404)
   assert_eq(errors[0].message, "Object not found")
 }
@@ -109,6 +121,8 @@ test "lfs_parse_batch_response: mixed success and error" {
 ///|
 test "lfs_get_cached_object: returns None when not cached" {
   let fs = @osfs.OsFs::new()
-  let result = lfs_get_cached_object(fs, "/tmp/nonexistent-git-dir-lfs-test", "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890")
+  let result = lfs_get_cached_object(
+    fs, "/tmp/nonexistent-git-dir-lfs-test", "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+  )
   assert_eq(result, None)
 }

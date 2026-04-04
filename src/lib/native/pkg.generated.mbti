@@ -12,6 +12,20 @@ pub async fn apply_worktree_modes_from_commit(&@types.FileSystem, &@types.RepoFi
 
 pub async fn clone_http(&@types.FileSystem, &@types.RepoFileSystem, String, String, Bool) -> @object.ObjectId? raise @object.GitError
 
+pub async fn lfs_batch_request(String, Array[@lib.LfsPointer]) -> (Array[LfsDownloadAction], Array[LfsDownloadError]) raise @object.GitError
+
+pub fn lfs_build_batch_request_json(Array[@lib.LfsPointer]) -> String
+
+pub async fn lfs_download_objects(&@types.FileSystem, &@types.RepoFileSystem, String, Array[LfsDownloadAction]) -> Array[LfsDownloadError] raise @object.GitError
+
+pub async fn lfs_download_single_object(&@types.FileSystem, &@types.RepoFileSystem, String, LfsDownloadAction) -> LfsDownloadError? raise @object.GitError
+
+pub fn lfs_get_cached_object(&@types.RepoFileSystem, String, String) -> Bytes?
+
+pub fn lfs_parse_batch_response(String) -> (Array[LfsDownloadAction], Array[LfsDownloadError])
+
+pub async fn lfs_prefetch_for_checkout(@lib.ObjectDb, &@types.FileSystem, &@types.RepoFileSystem, String, String, @object.ObjectId, String) -> Unit raise @object.GitError
+
 pub fn native_promisor_db(&@types.RepoFileSystem, String, lazy_load? : Bool) -> @lib.PromisorDb raise @object.GitError
 
 pub async fn pull_http(&@types.FileSystem, &@types.RepoFileSystem, String, String, Bool, rebase? : Bool) -> @object.ObjectId? raise @object.GitError
@@ -29,6 +43,18 @@ pub async fn run_filter_command(String, String, String, Bytes) -> Bytes raise @o
 // Errors
 
 // Types and methods
+pub struct LfsDownloadAction {
+  oid : String
+  size : Int64
+  href : String
+  headers : Map[String, String]
+} derive(Eq, Show)
+
+pub struct LfsDownloadError {
+  oid : String
+  code : Int
+  message : String
+} derive(Eq, Show)
 
 // Type aliases
 

@@ -2,9 +2,7 @@
 
 ///|
 async fn lfs_prefetch_eprint_line(s : String) -> Unit noraise {
-  try {
-    @stdio.stderr.write(@utf8.encode(s + "\n"))
-  } catch {
+  @stdio.stderr.write(@utf8.encode(s + "\n")) catch {
     _ => ()
   }
 }

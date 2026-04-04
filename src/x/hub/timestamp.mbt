@@ -1,11 +1,13 @@
 ///| ISO 8601 timestamp parser and formatter
 
-///| Check if a year is a leap year
+///|
+/// Check if a year is a leap year
 fn is_leap_year(year : Int) -> Bool {
   (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
 }
 
-///| Days in each month for a given year
+///|
+/// Days in each month for a given year
 fn days_in_month(month : Int, year : Int) -> Int {
   match month {
     1 => 31
@@ -24,7 +26,8 @@ fn days_in_month(month : Int, year : Int) -> Int {
   }
 }
 
-///| Days in a year
+///|
+/// Days in a year
 fn days_in_year(year : Int) -> Int {
   if is_leap_year(year) {
     366
@@ -33,13 +36,15 @@ fn days_in_year(year : Int) -> Int {
   }
 }
 
-///| Parse a substring as an integer
+///|
+/// Parse a substring as an integer
 fn parse_int_sub(s : String, start : Int, end : Int) -> Int {
-  let sub = String::unsafe_substring(s, start=start, end=end)
+  let sub = String::unsafe_substring(s, start~, end~)
   parse_int(sub)
 }
 
-///| Parse ISO 8601 timestamp string to Unix seconds.
+///|
+/// Parse ISO 8601 timestamp string to Unix seconds.
 /// Supports "YYYY-MM-DDThh:mm:ssZ" and "YYYY-MM-DDThh:mm:ss+00:00" formats.
 /// Returns 0 for empty or unparseable strings.
 pub fn parse_iso8601_to_unix(iso_str : String) -> Int64 {
@@ -64,11 +69,14 @@ pub fn parse_iso8601_to_unix(iso_str : String) -> Int64 {
   }
   // Add remaining days (day is 1-based)
   days = days + (day - 1).to_int64()
-  days * 86400L + hour.to_int64() * 3600L + minute.to_int64() * 60L +
+  days * 86400L +
+  hour.to_int64() * 3600L +
+  minute.to_int64() * 60L +
   second.to_int64()
 }
 
-///| Convert Unix seconds to ISO 8601 string in UTC ("YYYY-MM-DDThh:mm:ssZ").
+///|
+/// Convert Unix seconds to ISO 8601 string in UTC ("YYYY-MM-DDThh:mm:ssZ").
 pub fn unix_to_iso8601(unix : Int64) -> String {
   let mut remaining = unix
   let second = (remaining % 60L).to_int()
@@ -115,7 +123,8 @@ pub fn unix_to_iso8601(unix : Int64) -> String {
   buf.to_string()
 }
 
-///| Zero-pad an integer to 2 digits
+///|
+/// Zero-pad an integer to 2 digits
 fn pad2(n : Int) -> String {
   if n < 10 {
     "0" + n.to_string()
@@ -124,7 +133,8 @@ fn pad2(n : Int) -> String {
   }
 }
 
-///| Zero-pad an integer to 4 digits
+///|
+/// Zero-pad an integer to 4 digits
 fn pad4(n : Int) -> String {
   if n < 10 {
     "000" + n.to_string()

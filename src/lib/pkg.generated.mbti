@@ -190,6 +190,8 @@ pub fn is_branch_checked_out(&@types.RepoFileSystem, String, String) -> String? 
 
 pub fn is_ignored_path(&@types.RepoFileSystem, String, String, Bool) -> Bool raise @object.GitError
 
+pub fn is_lfs_pointer(Bytes) -> Bool
+
 pub fn is_mirror_fetch_config(RemoteConfig) -> Bool
 
 pub fn is_partial_clone(&@types.RepoFileSystem, String) -> Bool
@@ -207,6 +209,10 @@ pub fn is_subdir_clone(&@types.RepoFileSystem, String) -> Bool
 pub fn is_valid_remote_name(String) -> Bool
 
 pub fn legacy_remote_exists(&@types.RepoFileSystem, String, String) -> Bool
+
+pub fn lfs_get_cached_content(&@types.RepoFileSystem, String, String) -> Bytes?
+
+pub fn lfs_object_path(String, String) -> String
 
 pub fn list_branches(&@types.RepoFileSystem, String) -> (HeadRef, Array[BranchInfo]) raise @object.GitError
 
@@ -299,6 +305,8 @@ pub fn parse_github_shorthand(String) -> GitHubShorthand?
 pub fn parse_index_pathspec(String) -> (Int, String?)
 
 pub fn parse_iso8601_timestamp(String) -> Int64
+
+pub fn parse_lfs_pointer(Bytes) -> LfsPointer?
 
 pub fn parse_push_refspecs(Array[String]) -> Array[PushRefspec]
 
@@ -446,6 +454,8 @@ pub fn repo_hash_algorithm(&@types.RepoFileSystem, String) -> @object.HashAlgori
 
 pub fn reset(&@types.FileSystem, &@types.RepoFileSystem, String, String, ResetMode, committer? : String, timestamp? : Int64, timezone? : String) -> @object.ObjectId raise @object.GitError
 
+pub fn resolve_checkout_common_git_dir(&@types.RepoFileSystem, String) -> String
+
 pub fn resolve_diff_driver(&@types.RepoFileSystem, String, String) -> String?
 
 pub fn resolve_eol_attrs(&@types.RepoFileSystem, String, String) -> FileEolAttrs
@@ -453,6 +463,10 @@ pub fn resolve_eol_attrs(&@types.RepoFileSystem, String, String) -> FileEolAttrs
 pub fn resolve_gitdir(&@types.RepoFileSystem, String) -> String
 
 pub fn resolve_head_commit(&@types.RepoFileSystem, String) -> @object.ObjectId? raise @object.GitError
+
+pub fn resolve_lfs_url(&@types.RepoFileSystem, String, String) -> String
+
+pub fn resolve_lfs_url_from_config(lfs_url? : String, remote_lfs_url? : String, remote_url? : String) -> String
 
 pub fn resolve_local_repo_path(&@types.RepoFileSystem, String, String) -> String?
 
@@ -776,6 +790,11 @@ pub fn LazyPackIndex::find_offset(Self, &@types.RepoFileSystem, @object.ObjectId
 pub fn LazyPackIndex::find_offset_hex(Self, &@types.RepoFileSystem, String) -> Int64? raise @object.GitError
 pub fn LazyPackIndex::get(Self, &@types.RepoFileSystem) -> PackIndex raise @object.GitError
 pub fn LazyPackIndex::new(String, String) -> Self
+
+pub struct LfsPointer {
+  oid : String
+  size : Int64
+} derive(Eq, Show)
 
 pub struct LogEntry {
   id : @object.ObjectId

@@ -82,9 +82,9 @@ pub fn lfs_object_path(git_dir : String, oid : String) -> String {
 /// Resolve LFS server URL from pre-read config values.
 /// Priority: lfs.url > remote.<name>.lfsurl > derive from remote URL.
 pub fn resolve_lfs_url_from_config(
-  lfs_url~ : String = "",
-  remote_lfs_url~ : String = "",
-  remote_url~ : String = "",
+  lfs_url? : String = "",
+  remote_lfs_url? : String = "",
+  remote_url? : String = "",
 ) -> String {
   if lfs_url.length() > 0 {
     return lfs_url
@@ -113,12 +113,8 @@ pub fn resolve_lfs_url(
     None => ""
   }
   let remote_section = "remote \"\{remote_name}\""
-  let remote_lfs_url = match read_config_value(
-    rfs,
-    config_path,
-    remote_section,
-    "lfsurl",
-  ) {
+  let remote_lfs_url = match
+    read_config_value(rfs, config_path, remote_section, "lfsurl") {
     Some(v) => v
     None => ""
   }

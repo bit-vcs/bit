@@ -72,9 +72,7 @@ async fn gh_api_collect_output(
 }
 
 ///|
-fn parse_json_array_from_api(
-  text : String,
-) -> Array[Json] raise @bit.GitError {
+fn parse_json_array_from_api(text : String) -> Array[Json] raise @bit.GitError {
   let parsed = @json.parse(text) catch {
     err =>
       raise @bit.GitError::InvalidObject(
@@ -113,8 +111,8 @@ fn parse_json_object_from_api(
 /// List issues via gh api repos/{owner}/{repo}/issues
 pub async fn github_list_issues(
   repo : String,
-  since~ : String = "",
-  state~ : String = "open",
+  since? : String = "",
+  state? : String = "open",
 ) -> Array[@hub.GhIssue] raise @bit.GitError {
   let args : Array[String] = [
     "api",
@@ -154,8 +152,8 @@ pub async fn github_list_issues(
 /// List pull requests via gh api repos/{owner}/{repo}/pulls
 pub async fn github_list_prs(
   repo : String,
-  since~ : String = "",
-  state~ : String = "open",
+  since? : String = "",
+  state? : String = "open",
 ) -> Array[@hub.GhPullRequest] raise @bit.GitError {
   let args : Array[String] = [
     "api",
@@ -189,7 +187,7 @@ pub async fn github_list_prs(
 pub async fn github_list_comments(
   repo : String,
   number : Int,
-  since~ : String = "",
+  since? : String = "",
 ) -> Array[@hub.GhComment] raise @bit.GitError {
   let args : Array[String] = [
     "api",
@@ -253,11 +251,11 @@ pub async fn github_create_issue(
 pub async fn github_update_issue(
   repo : String,
   number : Int,
-  title~ : String = "",
-  body~ : String = "",
-  state~ : String = "",
-  labels~ : Array[String] = [],
-  assignees~ : Array[String] = [],
+  title? : String = "",
+  body? : String = "",
+  state? : String = "",
+  labels? : Array[String] = [],
+  assignees? : Array[String] = [],
 ) -> @hub.GhIssue raise @bit.GitError {
   let args : Array[String] = [
     "api",

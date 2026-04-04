@@ -2,12 +2,55 @@
 package "mizchi/bit/x/hub/native"
 
 import {
+  "mizchi/bit/lib",
   "mizchi/bit/object",
   "mizchi/bit/types",
   "mizchi/bit/x/hub",
 }
 
 // Values
+pub async fn github_check_repo_ownership(String) -> Bool raise @object.GitError
+
+pub async fn github_create_comment(String, Int, String) -> @hub.GhComment raise @object.GitError
+
+pub async fn github_create_issue(String, String, String, Array[String], Array[String]) -> @hub.GhIssue raise @object.GitError
+
+pub async fn github_delete_comment(String, Int) -> Unit raise @object.GitError
+
+pub fn github_detect_method() -> String
+
+pub async fn github_get_authenticated_user() -> String raise @object.GitError
+
+pub fn github_has_gh_cli() -> Bool
+
+pub fn github_has_token() -> Bool
+
+pub async fn github_list_comments(String, Int, since? : String) -> Array[@hub.GhComment] raise @object.GitError
+
+pub async fn github_list_issues(String, since? : String, state? : String) -> Array[@hub.GhIssue] raise @object.GitError
+
+pub async fn github_list_prs(String, since? : String, state? : String) -> Array[@hub.GhPullRequest] raise @object.GitError
+
+pub async fn github_sync_execute_push(@hub.Hub, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, Array[SyncPushChange]) -> SyncPushResult raise @object.GitError
+
+pub async fn github_sync_execute_push_prs(@hub.Hub, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, Array[SyncPushChange]) -> SyncPushResult raise @object.GitError
+
+pub fn github_sync_plan_push(@hub.Hub, &@lib.ObjectStore, String) -> Array[SyncPushChange] raise @object.GitError
+
+pub fn github_sync_plan_push_prs(@hub.Hub, &@lib.ObjectStore, String) -> Array[SyncPushChange]
+
+pub async fn github_sync_pull_comments(@hub.Hub, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, Int, String) -> CommentSyncResult raise @object.GitError
+
+pub async fn github_sync_pull_issues(@hub.Hub, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, String, String) -> SyncPullResult raise @object.GitError
+
+pub async fn github_sync_pull_prs(@hub.Hub, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, String, String) -> SyncPullResult raise @object.GitError
+
+pub async fn github_sync_push_comments(@hub.Hub, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, Int, String, Bool) -> CommentSyncResult raise @object.GitError
+
+pub async fn github_update_comment(String, Int, String) -> @hub.GhComment raise @object.GitError
+
+pub async fn github_update_issue(String, Int, title? : String, body? : String, state? : String, labels? : Array[String], assignees? : Array[String]) -> @hub.GhIssue raise @object.GitError
+
 pub async fn hub_fetch(@hub.Hub, &@types.FileSystem, &@types.RepoFileSystem, String, String, signing_key~ : String?, require_signed~ : Bool?, auth_token~ : String?, conflict_policy~ : @hub.RecordMergePolicy?) -> @hub.PrSyncResult raise @object.GitError
 
 pub async fn hub_push(@hub.Hub, &@types.RepoFileSystem, String, String, signing_key~ : String?, require_signed~ : Bool?, auth_token~ : String?, conflict_policy~ : @hub.RecordMergePolicy?) -> @hub.PrSyncResult raise @object.GitError
@@ -29,6 +72,40 @@ pub async fn relay_watch_claims_ws(String, (@hub.ClaimMessage) -> Unit, auth_tok
 // Errors
 
 // Types and methods
+pub struct CommentSyncResult {
+  created : Int
+  updated : Int
+  deleted : Int
+  errors : Array[String]
+}
+pub fn CommentSyncResult::created(Self) -> Int
+pub fn CommentSyncResult::deleted(Self) -> Int
+pub fn CommentSyncResult::errors(Self) -> Array[String]
+pub fn CommentSyncResult::updated(Self) -> Int
+
+pub struct SyncPullResult {
+  created : Int
+  updated : Int
+  skipped : Int
+  conflicts : Array[String]
+}
+
+pub struct SyncPushChange {
+  action : String
+  local_id : String
+  title : String
+  remote_number : Int
+  state_change : String
+  title_change : String
+  labels_change : String
+  is_destructive : Bool
+}
+
+pub struct SyncPushResult {
+  created : Int
+  updated : Int
+  errors : Array[String]
+}
 
 // Type aliases
 

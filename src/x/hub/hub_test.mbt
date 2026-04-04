@@ -1745,10 +1745,9 @@ test "format: serialize and parse WorkItem with linked_issues" {
   assert_true(serialized.contains("linked-issue bit-vcs/other-repo#a1b2c3d4"))
   assert_true(serialized.contains("linked-issue myteam/lib#deadbeef"))
   let parsed = parse_work_item(serialized)
-  assert_eq(
-    parsed.linked_issues(),
-    ["bit-vcs/other-repo#a1b2c3d4", "myteam/lib#deadbeef"],
-  )
+  assert_eq(parsed.linked_issues(), [
+    "bit-vcs/other-repo#a1b2c3d4", "myteam/lib#deadbeef",
+  ])
 }
 
 ///|
@@ -1798,6 +1797,7 @@ test "sync_link: serialize and parse roundtrip" {
   assert_eq(parsed.remote_updated_at(), 1774899000L)
 }
 
+///|
 test "hub: create and get sync_link" {
   let (objects, refs, clock) = make_test_stores()
   let hub = @hub.Hub::init(objects, refs)
@@ -1821,6 +1821,7 @@ test "hub: create and get sync_link" {
   assert_eq(retrieved.repo(), "owner/repo")
 }
 
+///|
 test "hub: list sync_links for repo" {
   let (objects, refs, clock) = make_test_stores()
   let hub = @hub.Hub::init(objects, refs)
@@ -1828,25 +1829,19 @@ test "hub: list sync_links for repo" {
     objects,
     refs,
     clock,
-    @hub.SyncLink::new(
-      "id-1", "issue", "github", "owner/repo", remote_number=1,
-    ),
+    @hub.SyncLink::new("id-1", "issue", "github", "owner/repo", remote_number=1),
   )
   hub.put_sync_link(
     objects,
     refs,
     clock,
-    @hub.SyncLink::new(
-      "id-2", "pr", "github", "owner/repo", remote_number=2,
-    ),
+    @hub.SyncLink::new("id-2", "pr", "github", "owner/repo", remote_number=2),
   )
   hub.put_sync_link(
     objects,
     refs,
     clock,
-    @hub.SyncLink::new(
-      "id-3", "issue", "github", "other/repo", remote_number=3,
-    ),
+    @hub.SyncLink::new("id-3", "issue", "github", "other/repo", remote_number=3),
   )
   let links = hub.list_sync_links(objects, repo="owner/repo")
   assert_eq(links.length(), 2)
@@ -1854,6 +1849,7 @@ test "hub: list sync_links for repo" {
   assert_eq(all_links.length(), 3)
 }
 
+///|
 test "hub: find sync_link by remote number" {
   let (objects, refs, clock) = make_test_stores()
   let hub = @hub.Hub::init(objects, refs)
@@ -1862,7 +1858,11 @@ test "hub: find sync_link by remote number" {
     refs,
     clock,
     @hub.SyncLink::new(
-      "id-1", "issue", "github", "owner/repo", remote_number=42,
+      "id-1",
+      "issue",
+      "github",
+      "owner/repo",
+      remote_number=42,
     ),
   )
   let found = hub.find_sync_link_by_remote(objects, "github", "owner/repo", 42)

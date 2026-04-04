@@ -46,7 +46,10 @@ pub async fn github_sync_pull_issues(
   let now = clock.now()
   for gh_issue in gh_issues {
     let existing_link = hub.find_sync_link_by_remote(
-      objects, "github", repo, gh_issue.number,
+      objects,
+      "github",
+      repo,
+      gh_issue.number,
     )
     match existing_link {
       None => {
@@ -85,7 +88,7 @@ pub async fn github_sync_pull_issues(
         let should_update = match conflict_policy {
           "github-wins" => true
           "bit-wins" => false
-          "manual" => {
+          "manual" =>
             match local_issue {
               Some(loc) =>
                 if loc.updated_at() > link.last_pull_at() &&
@@ -97,18 +100,17 @@ pub async fn github_sync_pull_issues(
                 }
               _ => gh_updated > link.remote_updated_at()
             }
-          }
-          _ => {
+          _ =>
             // newer-wins (default)
             match local_issue {
               Some(loc) => gh_updated > loc.updated_at()
               None => true
             }
-          }
         }
         if should_update {
           let issue = @hub.gh_issue_to_issue(
-            gh_issue, existing_id=link.local_id(),
+            gh_issue,
+            existing_id=link.local_id(),
           )
           let work_item = issue.to_work_item()
           ignore(
@@ -163,7 +165,10 @@ pub async fn github_sync_pull_prs(
   let now = clock.now()
   for gh_pr in gh_prs {
     let existing_link = hub.find_sync_link_by_remote(
-      objects, "github", repo, gh_pr.number,
+      objects,
+      "github",
+      repo,
+      gh_pr.number,
     )
     match existing_link {
       None => {
@@ -202,7 +207,7 @@ pub async fn github_sync_pull_prs(
         let should_update = match conflict_policy {
           "github-wins" => true
           "bit-wins" => false
-          "manual" => {
+          "manual" =>
             match local_pr {
               Some(loc) =>
                 if loc.updated_at() > link.last_pull_at() &&
@@ -214,18 +219,17 @@ pub async fn github_sync_pull_prs(
                 }
               _ => gh_updated > link.remote_updated_at()
             }
-          }
-          _ => {
+          _ =>
             // newer-wins (default)
             match local_pr {
               Some(loc) => gh_updated > loc.updated_at()
               None => true
             }
-          }
         }
         if should_update {
           let pr = @hub.gh_pr_to_pull_request(
-            gh_pr, existing_id=link.local_id(),
+            gh_pr,
+            existing_id=link.local_id(),
           )
           let work_item = pr.to_work_item()
           ignore(
@@ -269,7 +273,7 @@ pub fn github_sync_plan_push(
 ) -> Array[SyncPushChange] raise @bit.GitError {
   let changes : Array[SyncPushChange] = []
   let issues = hub.list_issues(objects)
-  let links = hub.list_sync_links(objects, repo=repo)
+  let links = hub.list_sync_links(objects, repo~)
   // Build lookup: local_id -> SyncLink
   let link_map : Map[String, @hub.SyncLink] = {}
   for link in links {
@@ -279,13 +283,12 @@ pub fn github_sync_plan_push(
   }
   for issue in issues {
     match link_map.get(issue.id()) {
-      Some(link) => {
+      Some(link) =>
         // Check if local is newer than last push
         if issue.updated_at() > link.last_push_at() {
           let diff = compute_push_diff(issue, link)
           changes.push(diff)
         }
-      }
       None => {
         // No link -- new issue to create on GitHub
         // Skip sub-issues (have parent_id)
@@ -293,22 +296,20 @@ pub fn github_sync_plan_push(
           continue
         }
         let labels_str = issue.labels().join(", ")
-        changes.push(
-          {
-            action: "create",
-            local_id: issue.id(),
-            title: issue.title(),
-            remote_number: 0,
-            state_change: "",
-            title_change: "",
-            labels_change: if labels_str.length() > 0 {
-              "[\{labels_str}]"
-            } else {
-              ""
-            },
-            is_destructive: false,
+        changes.push({
+          action: "create",
+          local_id: issue.id(),
+          title: issue.title(),
+          remote_number: 0,
+          state_change: "",
+          title_change: "",
+          labels_change: if labels_str.length() > 0 {
+            "[\{labels_str}]"
+          } else {
+            ""
           },
-        )
+          is_destructive: false,
+        })
       }
     }
   }
@@ -360,7 +361,11 @@ pub async fn github_sync_execute_push(
     match change.action {
       "create" => {
         let gh_issue = github_create_issue(
-          repo, loc.title(), loc.body(), loc.labels(), loc.assignees(),
+          repo,
+          loc.title(),
+          loc.body(),
+          loc.labels(),
+          loc.assignees(),
         ) catch {
           err => {
             errors.push("create \{loc.title()}: \{err}")
@@ -382,7 +387,11 @@ pub async fn github_sync_execute_push(
         created += 1
       }
       "update" => {
-        let existing_link = hub.get_sync_link(objects, change.local_id, "github")
+        let existing_link = hub.get_sync_link(
+          objects,
+          change.local_id,
+          "github",
+        )
         guard existing_link is Some(link) else { continue }
         let _ = github_update_issue(
           repo,
@@ -427,7 +436,7 @@ pub fn github_sync_plan_push_prs(
 ) -> Array[SyncPushChange] {
   let changes : Array[SyncPushChange] = []
   let prs = hub.list_prs(objects)
-  let links = hub.list_sync_links(objects, repo=repo)
+  let links = hub.list_sync_links(objects, repo~)
   // Build lookup: local_id -> SyncLink
   let link_map : Map[String, @hub.SyncLink] = {}
   for link in links {
@@ -437,17 +446,15 @@ pub fn github_sync_plan_push_prs(
   }
   for pr in prs {
     match link_map.get(pr.id()) {
-      Some(link) => {
+      Some(link) =>
         // Check if local is newer than last push
         if pr.updated_at() > link.last_push_at() {
           let diff = compute_pr_push_diff(pr, link)
           changes.push(diff)
         }
-      }
-      None => {
+      None =>
         // No link -- new PR. Skip creation (PRs should be created via `gh pr create`)
         ()
-      }
     }
   }
   changes
@@ -498,7 +505,11 @@ pub async fn github_sync_execute_push_prs(
     }
     match change.action {
       "update" => {
-        let existing_link = hub.get_sync_link(objects, change.local_id, "github")
+        let existing_link = hub.get_sync_link(
+          objects,
+          change.local_id,
+          "github",
+        )
         guard existing_link is Some(link) else { continue }
         // Use issues endpoint for PR metadata updates (title, body, state, labels)
         let _ = github_update_issue(
@@ -616,7 +627,8 @@ pub async fn github_sync_pull_comments(
   for gh_comment in gh_comments {
     seen_remote_ids[gh_comment.id] = true
     let existing_link = find_comment_sync_link_by_remote_id(
-      all_links, gh_comment.id,
+      all_links,
+      gh_comment.id,
     )
     match existing_link {
       None => {
@@ -643,9 +655,7 @@ pub async fn github_sync_pull_comments(
           remote_number=gh_comment.id,
           remote_node_id=gh_comment.node_id,
           last_pull_at=now,
-          remote_updated_at=@hub.parse_iso8601_to_unix(
-            gh_comment.updated_at,
-          ),
+          remote_updated_at=@hub.parse_iso8601_to_unix(gh_comment.updated_at),
         )
         hub.put_sync_link(objects, refs, clock, link)
         all_links.push(link)
@@ -695,19 +705,22 @@ pub async fn github_sync_pull_comments(
     let local_comments = hub.list_issue_comments(objects, issue_local_id)
     for local_comment in local_comments {
       let link = find_comment_sync_link_by_local_id(
-        all_links, local_comment.id(),
+        all_links,
+        local_comment.id(),
       )
       match link {
         Some(l) =>
-          if !(seen_remote_ids.contains(l.remote_number())) {
+          if !seen_remote_ids.contains(l.remote_number()) {
             // Remote comment deleted -- delete locally
             hub.delete_issue_comment(
-              objects, refs, clock, issue_local_id, local_comment.id(),
+              objects,
+              refs,
+              clock,
+              issue_local_id,
+              local_comment.id(),
             ) catch {
               err => {
-                errors.push(
-                  "delete comment \{local_comment.id()}: \{err}",
-                )
+                errors.push("delete comment \{local_comment.id()}: \{err}")
                 continue
               }
             }
@@ -742,17 +755,20 @@ pub async fn github_sync_push_comments(
   let errors : Array[String] = []
   for local_comment in local_comments {
     let existing_link = find_comment_sync_link_by_local_id(
-      all_links, local_comment.id(),
+      all_links,
+      local_comment.id(),
     )
     match existing_link {
       None => {
         // New local comment -- push to GitHub
-        if !(apply) {
+        if !apply {
           created += 1
           continue
         }
         let gh_comment = github_create_comment(
-          repo, issue_remote_number, local_comment.body(),
+          repo,
+          issue_remote_number,
+          local_comment.body(),
         ) catch {
           err => {
             errors.push("create comment on GitHub: \{err}")
@@ -768,9 +784,7 @@ pub async fn github_sync_push_comments(
           remote_number=gh_comment.id,
           remote_node_id=gh_comment.node_id,
           last_push_at=now,
-          remote_updated_at=@hub.parse_iso8601_to_unix(
-            gh_comment.updated_at,
-          ),
+          remote_updated_at=@hub.parse_iso8601_to_unix(gh_comment.updated_at),
         )
         hub.put_sync_link(objects, refs, clock, link)
         created += 1
@@ -780,13 +794,15 @@ pub async fn github_sync_push_comments(
         if comments_mode == "append-only" {
           continue
         }
-        if !(apply) {
+        if !apply {
           updated += 1
           continue
         }
         // Update on GitHub
         let _ = github_update_comment(
-          repo, link.remote_number(), local_comment.body(),
+          repo,
+          link.remote_number(),
+          local_comment.body(),
         ) catch {
           err => {
             errors.push(

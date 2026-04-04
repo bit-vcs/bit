@@ -22,7 +22,7 @@ fn parse_cross_repo_ref(input : String) -> (String, String) {
 fn resolve_repo_ref_to_path(
   repo_ref : String,
   home : String,
-  aliases~ : Map[String, String] = {},
+  aliases? : Map[String, String] = {},
 ) -> String raise Error {
   // 1. Check alias map
   match aliases.get(repo_ref) {
@@ -76,10 +76,12 @@ fn parse_alias_entries(content : String) -> Array[(String, String)] {
       Some(idx) => {
         let a = String::unsafe_substring(trimmed, start=0, end=idx)
         let p = String::unsafe_substring(
-          trimmed,
-          start=idx + 1,
-          end=trimmed.length(),
-        ).trim().to_string()
+            trimmed,
+            start=idx + 1,
+            end=trimmed.length(),
+          )
+          .trim()
+          .to_string()
         if a.length() > 0 && p.length() > 0 {
           result.push((a, p))
         }
@@ -95,7 +97,7 @@ fn parse_alias_entries(content : String) -> Array[(String, String)] {
 fn load_aliases(git_dir : String) -> Map[String, String] {
   let fs = OsFs::new()
   let path = hub_remotes_path(git_dir)
-  if !(fs.is_file(path)) {
+  if !fs.is_file(path) {
     return {}
   }
   let bytes = fs.read_file(path) catch { _ => return {} }

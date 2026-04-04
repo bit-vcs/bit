@@ -614,17 +614,18 @@ async fn checkout_with_promisor_retry(
       }
   }
   match prefetch_target {
-    Some(target_id) => {
+    Some(target_id) =>
       if @bitlib.has_any_filter_attributes(fs, root) {
-        let _prefetch_result : Result[Unit, Error] = try? {
-          let object_git_dir = @bitlib.resolve_checkout_common_git_dir(fs, git_dir)
+        let _prefetch_result : Result[Unit, Error] = try? ({
+          let object_git_dir = @bitlib.resolve_checkout_common_git_dir(
+            fs, git_dir,
+          )
           let db = @bitlib.ObjectDb::load_lazy(fs, object_git_dir)
           @bitlibnative.lfs_prefetch_for_checkout(
             db, fs, fs, root, git_dir, target_id, "origin",
           )
-        }
+        })
       }
-    }
     None => ()
   }
   let mut attempts = 0

@@ -107,11 +107,7 @@ fn gh_json_array_of_nested_strings(
 }
 
 ///|
-fn gh_json_bool(
-  obj : Map[String, Json],
-  key : String,
-  fallback : Bool,
-) -> Bool {
+fn gh_json_bool(obj : Map[String, Json], key : String, fallback : Bool) -> Bool {
   match obj.get(key) {
     Some(Json::True) => true
     Some(Json::False) => false
@@ -138,11 +134,7 @@ pub fn GhIssue::from_json(obj : Map[String, Json]) -> GhIssue {
 ///|
 pub fn GhPullRequest::from_json(obj : Map[String, Json]) -> GhPullRequest {
   let merged = gh_json_bool(obj, "merged", false)
-  let state = if merged {
-    "merged"
-  } else {
-    gh_json_string(obj, "state", "")
-  }
+  let state = if merged { "merged" } else { gh_json_string(obj, "state", "") }
   let head_repo = match obj.get("head") {
     Some(Json::Object(head)) =>
       match head.get("repo") {

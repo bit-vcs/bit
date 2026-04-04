@@ -26,7 +26,7 @@ async fn handle_hub_issue_sync(args : Array[String]) -> Unit raise Error {
   match subcmd {
     "pull" => handle_hub_issue_sync_pull(rest)
     "push" => {
-      if !(github_sync_write_enabled()) {
+      if !github_sync_write_enabled() {
         github_sync_write_disabled_message("push")
         return ()
       }
@@ -34,7 +34,7 @@ async fn handle_hub_issue_sync(args : Array[String]) -> Unit raise Error {
     }
     "status" => handle_hub_issue_sync_status(rest)
     "install-hook" => {
-      if !(github_sync_write_enabled()) {
+      if !github_sync_write_enabled() {
         github_sync_write_disabled_message("install-hook")
         return ()
       }
@@ -43,7 +43,7 @@ async fn handle_hub_issue_sync(args : Array[String]) -> Unit raise Error {
     "help" | "-h" | "--help" => print_hub_issue_sync_usage()
     _ => {
       // Bidirectional includes push — check write access
-      if !(github_sync_write_enabled()) {
+      if !github_sync_write_enabled() {
         github_sync_write_disabled_message("sync")
         return ()
       }
@@ -53,9 +53,7 @@ async fn handle_hub_issue_sync(args : Array[String]) -> Unit raise Error {
 }
 
 ///|
-async fn handle_hub_issue_sync_pull(
-  args : Array[String],
-) -> Unit raise Error {
+async fn handle_hub_issue_sync_pull(args : Array[String]) -> Unit raise Error {
   let mut repo : String? = None
   let mut since = ""
   let mut state = "all"
@@ -69,9 +67,7 @@ async fn handle_hub_issue_sync_pull(
       i += 1
       repo = Some(args[i])
     } else if arg.has_prefix("--repo=") {
-      repo = Some(
-        String::unsafe_substring(arg, start=7, end=arg.length()),
-      )
+      repo = Some(String::unsafe_substring(arg, start=7, end=arg.length()))
     } else if arg == "--since" && i + 1 < args.length() {
       i += 1
       since = args[i]
@@ -86,22 +82,14 @@ async fn handle_hub_issue_sync_pull(
       i += 1
       conflict = args[i]
     } else if arg.has_prefix("--conflict=") {
-      conflict = String::unsafe_substring(
-        arg,
-        start=11,
-        end=arg.length(),
-      )
+      conflict = String::unsafe_substring(arg, start=11, end=arg.length())
     } else if arg == "--include-prs" {
       include_prs = true
     } else if arg == "--comments" && i + 1 < args.length() {
       i += 1
       comments_mode = args[i]
     } else if arg.has_prefix("--comments=") {
-      comments_mode = String::unsafe_substring(
-        arg,
-        start=11,
-        end=arg.length(),
-      )
+      comments_mode = String::unsafe_substring(arg, start=11, end=arg.length())
     } else if arg == "-h" || arg == "--help" {
       print_hub_issue_sync_usage()
       return ()
@@ -184,9 +172,7 @@ async fn handle_hub_issue_sync_pull(
 }
 
 ///|
-async fn handle_hub_issue_sync_push(
-  args : Array[String],
-) -> Unit raise Error {
+async fn handle_hub_issue_sync_push(args : Array[String]) -> Unit raise Error {
   let mut repo : String? = None
   let mut github_flag = false
   let mut apply = false
@@ -199,9 +185,7 @@ async fn handle_hub_issue_sync_push(
       i += 1
       repo = Some(args[i])
     } else if arg.has_prefix("--repo=") {
-      repo = Some(
-        String::unsafe_substring(arg, start=7, end=arg.length()),
-      )
+      repo = Some(String::unsafe_substring(arg, start=7, end=arg.length()))
     } else if arg == "--github" {
       github_flag = true
     } else if arg == "--apply" {
@@ -212,18 +196,14 @@ async fn handle_hub_issue_sync_push(
       i += 1
       comments_mode = args[i]
     } else if arg.has_prefix("--comments=") {
-      comments_mode = String::unsafe_substring(
-        arg,
-        start=11,
-        end=arg.length(),
-      )
+      comments_mode = String::unsafe_substring(arg, start=11, end=arg.length())
     } else if arg == "-h" || arg == "--help" {
       print_hub_issue_sync_usage()
       return ()
     }
     i += 1
   }
-  if !(github_flag) {
+  if !github_flag {
     eprint_line("Error: --github flag required for push (safety measure)")
     eprint_line(
       "Usage: bit issue sync push --github --repo <owner/repo> [--apply]",
@@ -238,16 +218,12 @@ async fn handle_hub_issue_sync_push(
   let is_owner = @hub_native.github_check_repo_ownership(resolved_repo) catch {
     _ => false
   }
-  if !(is_owner) {
-    eprint_line(
-      "Error: push is only allowed to repositories you own",
-    )
+  if !is_owner {
+    eprint_line("Error: push is only allowed to repositories you own")
     eprint_line(
       "Repository '\{resolved_repo}' is not owned by the authenticated GitHub user",
     )
-    eprint_line(
-      "Use --force-remote to override (not recommended)",
-    )
+    eprint_line("Use --force-remote to override (not recommended)")
     @sys.exit(1)
   }
   let (objects, refs, clock) = make_hub_stores(git_dir)
@@ -280,7 +256,7 @@ async fn handle_hub_issue_sync_push(
     }
     print_line("")
   }
-  if !(apply) {
+  if !apply {
     print_line("Run with --apply to execute these changes.")
     return ()
   }
@@ -398,7 +374,9 @@ async fn handle_hub_issue_sync_install_hook(
   // Check if hook already exists
   if fs.is_file(hook_path) {
     let existing = decode_bytes(
-      fs.read_file(hook_path) catch { _ => Bytes::default() },
+      fs.read_file(hook_path) catch {
+        _ => Bytes::default()
+      },
     )
     if existing.contains("bit issue sync") {
       print_line("Hook already installed at \{hook_path}")
@@ -413,7 +391,9 @@ async fn handle_hub_issue_sync_install_hook(
     }
     print_line("Appended sync hook to \{hook_path}")
   } else {
-    fs.mkdir_p(hooks_dir) catch { _ => () }
+    fs.mkdir_p(hooks_dir) catch {
+      _ => ()
+    }
     fs.write_string(hook_path, hook_content) catch {
       err => {
         eprint_line("Error writing hook: \{err}")
@@ -423,9 +403,7 @@ async fn handle_hub_issue_sync_install_hook(
     print_line("Created sync hook at \{hook_path}")
   }
   // Make executable
-  let _ = @process.collect_output(
-    "chmod", ["+x", hook_path], inherit_env=true,
-  )
+  let _ = @process.collect_output("chmod", ["+x", hook_path], inherit_env=true)
 }
 
 ///|
@@ -447,9 +425,7 @@ async fn handle_hub_issue_sync_bidirectional(
       i += 1
       repo = Some(args[i])
     } else if arg.has_prefix("--repo=") {
-      repo = Some(
-        String::unsafe_substring(arg, start=7, end=arg.length()),
-      )
+      repo = Some(String::unsafe_substring(arg, start=7, end=arg.length()))
     } else if arg == "--github" {
       github_flag = true
     } else if arg == "--apply" {
@@ -458,20 +434,12 @@ async fn handle_hub_issue_sync_bidirectional(
       i += 1
       conflict = args[i]
     } else if arg.has_prefix("--conflict=") {
-      conflict = String::unsafe_substring(
-        arg,
-        start=11,
-        end=arg.length(),
-      )
+      conflict = String::unsafe_substring(arg, start=11, end=arg.length())
     } else if arg == "--comments" && i + 1 < args.length() {
       i += 1
       comments_mode = args[i]
     } else if arg.has_prefix("--comments=") {
-      comments_mode = String::unsafe_substring(
-        arg,
-        start=11,
-        end=arg.length(),
-      )
+      comments_mode = String::unsafe_substring(arg, start=11, end=arg.length())
     } else if arg == "--include-prs" {
       include_prs = true
     } else if arg == "--since" && i + 1 < args.length() {
@@ -490,11 +458,9 @@ async fn handle_hub_issue_sync_bidirectional(
     }
     i += 1
   }
-  if !(github_flag) {
+  if !github_flag {
     eprint_line("Error: --github flag required for bidirectional sync")
-    eprint_line(
-      "Usage: bit issue sync --github --repo <owner/repo> [--apply]",
-    )
+    eprint_line("Usage: bit issue sync --github --repo <owner/repo> [--apply]")
     @sys.exit(1)
   }
   let root = get_work_root()
@@ -505,7 +471,7 @@ async fn handle_hub_issue_sync_bidirectional(
   let is_owner = @hub_native.github_check_repo_ownership(resolved_repo) catch {
     _ => false
   }
-  if !(is_owner) {
+  if !is_owner {
     eprint_line(
       "Error: bidirectional sync is only allowed for repositories you own",
     )
@@ -614,7 +580,7 @@ async fn handle_hub_issue_sync_bidirectional(
     }
     print_line("")
   }
-  if !(apply) {
+  if !apply {
     print_line("Run with --apply to execute push changes.")
     return ()
   }
@@ -684,9 +650,7 @@ async fn handle_hub_issue_sync_bidirectional(
 }
 
 ///|
-async fn handle_hub_issue_sync_status(
-  args : Array[String],
-) -> Unit raise Error {
+async fn handle_hub_issue_sync_status(args : Array[String]) -> Unit raise Error {
   let mut repo : String? = None
   let mut i = 0
   while i < args.length() {
@@ -695,9 +659,7 @@ async fn handle_hub_issue_sync_status(
       i += 1
       repo = Some(args[i])
     } else if arg.has_prefix("--repo=") {
-      repo = Some(
-        String::unsafe_substring(arg, start=7, end=arg.length()),
-      )
+      repo = Some(String::unsafe_substring(arg, start=7, end=arg.length()))
     } else if arg == "-h" || arg == "--help" {
       print_hub_issue_sync_usage()
       return ()

@@ -22,6 +22,10 @@ pub fn find_remote_notes_ref(Array[(@object.ObjectId, String)]) -> (@object.Obje
 
 pub fn find_upload_notes_ref(Array[(@object.ObjectId, String)]) -> (@object.ObjectId, String)?
 
+pub fn gh_issue_to_issue(GhIssue, existing_id? : String) -> Issue
+
+pub fn gh_pr_to_pull_request(GhPullRequest, existing_id? : String) -> PullRequest
+
 pub fn hub_notes_ns_name() -> String
 
 pub fn hub_notes_ref_name() -> String
@@ -33,6 +37,8 @@ pub fn is_work_item_record_kind(String) -> Bool
 pub fn issue_comment_key(String, String) -> String
 
 pub fn issue_comment_prefix(String) -> String
+
+pub fn issue_diff_for_github(Issue, SyncLink, GhIssue) -> SyncDiff
 
 pub fn merge_notes_commits(Hub, &@types.FileSystem, String, &@lib.ObjectStore, &@lib.RefStore, @object.ObjectId, @object.ObjectId, conflict_policy? : RecordMergePolicy) -> PrSyncResult raise @object.GitError
 
@@ -47,6 +53,8 @@ pub fn parse_claim_message(Json) -> ClaimMessage?
 pub fn parse_claims_from_envelopes(Array[Json]) -> Array[ClaimMessage]
 
 pub fn parse_hub_record(String) -> HubRecord
+
+pub fn parse_iso8601_to_unix(String) -> Int64
 
 pub fn parse_issue_comment(String) -> IssueComment raise PrError
 
@@ -76,6 +84,8 @@ pub fn pr_comment_key(String, String) -> String
 
 pub fn pr_comment_prefix(String) -> String
 
+pub fn pr_diff_for_github(PullRequest, SyncLink, GhPullRequest) -> SyncDiff
+
 pub fn pr_proposal_meta_key(String) -> String
 
 pub fn pr_proposal_prefix() -> String
@@ -97,6 +107,8 @@ pub fn short_ref_name(String) -> String
 pub fn sync_link_key(String, String) -> String
 
 pub fn sync_link_record_kind() -> String
+
+pub fn unix_to_iso8601(Int64) -> String
 
 pub fn work_item_meta_key(String) -> String
 
@@ -190,6 +202,7 @@ pub fn Hub::close_issue(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, St
 pub fn Hub::close_pr(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String) -> Unit raise @object.GitError
 pub fn Hub::create_issue(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, String, labels? : Array[String], assignees? : Array[String], parent_id? : String?) -> Issue raise @object.GitError
 pub fn Hub::create_pr(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, String, String, String, source_repo? : String?, source_ref? : String?) -> PullRequest raise @object.GitError
+pub fn Hub::delete_issue_comment(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String) -> Unit raise @object.GitError
 pub fn Hub::find_canonical_node(Self, &@lib.ObjectStore) -> String?
 pub fn Hub::find_sync_link_by_remote(Self, &@lib.ObjectStore, String, String, Int) -> SyncLink?
 pub fn Hub::get_issue(Self, &@lib.ObjectStore, String) -> Issue?
@@ -229,6 +242,7 @@ pub fn Hub::reopen_issue(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, S
 pub fn Hub::reopen_pr(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String) -> Unit raise @object.GitError
 pub fn Hub::submit_review(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, ReviewVerdict, String, @object.ObjectId) -> PrReview raise @object.GitError
 pub fn Hub::update_issue(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, title? : String?, body? : String?, labels? : Array[String]?, assignees? : Array[String]?) -> Issue raise @object.GitError
+pub fn Hub::update_issue_comment(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, String, String) -> Unit raise @object.GitError
 pub fn Hub::update_pr(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, title? : String?, body? : String?, labels? : Array[String]?) -> PullRequest raise @object.GitError
 
 pub struct HubRecord {
@@ -525,6 +539,15 @@ pub(all) enum ReviewVerdict {
 } derive(Eq)
 pub fn ReviewVerdict::to_string(Self) -> String
 pub impl Show for ReviewVerdict
+
+pub struct SyncDiff {
+  title_changed : Bool
+  body_changed : Bool
+  state_changed : Bool
+  labels_changed : Bool
+  assignees_changed : Bool
+  has_changes : Bool
+}
 
 pub struct SyncLink {
   local_id : String

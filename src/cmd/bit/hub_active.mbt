@@ -60,7 +60,7 @@ fn remove_active_issue(
 fn load_active_issues(git_dir : String) -> Array[String] {
   let fs = OsFs::new()
   let path = hub_active_issues_path(git_dir)
-  if !(fs.is_file(path)) {
+  if !fs.is_file(path) {
     return []
   }
   let bytes = fs.read_file(path) catch { _ => return [] }
@@ -142,9 +142,7 @@ async fn handle_hub_issue_active(_args : Array[String]) -> Unit raise Error {
       git_dir
     }
     let (objects, refs, _clock) = make_hub_stores(target_git_dir)
-    let hub = try {
-      load_hub_store(objects, refs)
-    } catch {
+    let hub = load_hub_store(objects, refs) catch {
       _ => {
         print_line("\{entry} (hub not initialized)")
         continue

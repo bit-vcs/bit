@@ -13,10 +13,7 @@ pub struct SyncDiff {
 
 ///|
 /// Convert a GitHub API issue to a local Issue
-pub fn gh_issue_to_issue(
-  gh : GhIssue,
-  existing_id? : String = "",
-) -> Issue {
+pub fn gh_issue_to_issue(gh : GhIssue, existing_id? : String = "") -> Issue {
   let created_at = parse_iso8601_to_unix(gh.created_at)
   let updated_at = parse_iso8601_to_unix(gh.updated_at)
   let author = gh.user
@@ -65,7 +62,14 @@ pub fn issue_diff_for_github(
     state_changed ||
     labels_changed ||
     assignees_changed
-  { title_changed, body_changed, state_changed, labels_changed, assignees_changed, has_changes }
+  {
+    title_changed,
+    body_changed,
+    state_changed,
+    labels_changed,
+    assignees_changed,
+    has_changes,
+  }
 }
 
 ///|
@@ -106,7 +110,7 @@ pub fn gh_pr_to_pull_request(
     updated_at,
     state,
     gh.labels,
-    source_repo=source_repo,
+    source_repo~,
     source_ref=Some(source_branch),
   )
 }

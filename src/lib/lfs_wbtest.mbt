@@ -26,7 +26,10 @@ test "parse_lfs_pointer: valid pointer" {
   let ptr = parse_lfs_pointer(content)
   assert_eq(ptr is None, false)
   let p = ptr.unwrap()
-  assert_eq(p.oid, "4d7a214614ab2935c943f9e0ff69d22eadbb8f32b1258daaa5e2ca24d17e2393")
+  assert_eq(
+    p.oid,
+    "4d7a214614ab2935c943f9e0ff69d22eadbb8f32b1258daaa5e2ca24d17e2393",
+  )
   assert_eq(p.size, 12345L)
 }
 
@@ -56,8 +59,12 @@ test "parse_lfs_pointer: non-hex oid" {
 
 ///|
 test "lfs_object_path: correct sharding" {
-  let path = lfs_object_path("/repo/.git", "4d7a214614ab2935c943f9e0ff69d22eadbb8f32b1258daaa5e2ca24d17e2393")
-  assert_eq(path, "/repo/.git/lfs/objects/4d/7a/4d7a214614ab2935c943f9e0ff69d22eadbb8f32b1258daaa5e2ca24d17e2393")
+  let path = lfs_object_path(
+    "/repo/.git", "4d7a214614ab2935c943f9e0ff69d22eadbb8f32b1258daaa5e2ca24d17e2393",
+  )
+  assert_eq(
+    path, "/repo/.git/lfs/objects/4d/7a/4d7a214614ab2935c943f9e0ff69d22eadbb8f32b1258daaa5e2ca24d17e2393",
+  )
 }
 
 ///|
