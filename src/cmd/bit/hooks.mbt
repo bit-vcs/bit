@@ -214,7 +214,35 @@ fn hooks_active_hook_path(
   hook_name : String,
 ) -> String {
   let git_dir = resolve_git_dir(rfs, root)
-  git_dir + "/hooks/" + hook_name
+  let hooks_dir = resolve_hooks_dir(rfs, root, git_dir)
+  hooks_dir + "/" + hook_name
+}
+
+///|
+/// Resolve the hooks directory, respecting core.hooksPath config.
+fn resolve_hooks_dir(
+  rfs : &@bitcore.RepoFileSystem,
+  root : String,
+  git_dir : String,
+) -> String {
+  let config_path = git_dir + "/config"
+  if rfs.is_file(config_path) {
+    match @bitlib.read_config_value(rfs, config_path, "core", "hookspath") {
+      Some(custom) => {
+        let trimmed = custom.trim().to_string()
+        if trimmed.length() > 0 {
+          // Absolute path or relative to root
+          return if trimmed.has_prefix("/") {
+            trimmed
+          } else {
+            root + "/" + trimmed
+          }
+        }
+      }
+      None => ()
+    }
+  }
+  git_dir + "/hooks"
 }
 
 ///|

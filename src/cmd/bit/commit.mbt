@@ -65,9 +65,14 @@ fn commit_storage_runtime_delegate_args(
   if commit_has_merge_state(fs, git_dir) {
     return None
   }
-  if !commit_has_no_verify_flag(args) &&
-    fs.is_file(git_dir + "/hooks/pre-commit") {
-    return None
+  if !commit_has_no_verify_flag(args) {
+    // Check for hooks in default location and core.hooksPath
+    let has_hooks_path_config = @bitlib.read_config_value(
+        fs, git_dir + "/config", "core", "hookspath",
+      ) is Some(_)
+    if has_hooks_path_config || fs.is_file(git_dir + "/hooks/pre-commit") {
+      return None
+    }
   }
   if !parsed.quiet && get_subdir_info(fs, git_dir) is Some(_) {
     return None
@@ -1574,7 +1579,8 @@ fn abs_path(path : String) -> String {
 ///|
 async fn run_pre_commit_hook(fs : OsFs, root : String, git_dir : String) -> Int {
   let hook_git_dir = abs_path(git_dir)
-  let hook_path = hook_git_dir + "/hooks/pre-commit"
+  let hooks_dir = resolve_hooks_dir(fs, abs_path(root), hook_git_dir)
+  let hook_path = hooks_dir + "/pre-commit"
   if !fs.is_file(hook_path) {
     return 0
   }
