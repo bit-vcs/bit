@@ -134,15 +134,15 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let fs = OsFs::new()
   let git_dir = resolve_git_dir(fs, root)
-  if rebase_requires_real_git(args, git_dir~) {
-    delegate_rebase_to_real_git(args, root)
-    return
-  }
   if rebase_args_require_standalone_error(args) {
     eprint_line(
       "fatal: interactive/step rebase mode is not supported in standalone mode",
     )
     @sys.exit(1)
+  }
+  if rebase_requires_real_git(args, git_dir~) {
+    delegate_rebase_to_real_git(args, root)
+    return
   }
   check_and_exit_unsupported_attrs(root)
   let wfs : &@bitcore.FileSystem = fs
