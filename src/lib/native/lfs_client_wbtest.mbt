@@ -105,3 +105,10 @@ test "lfs_parse_batch_response: mixed success and error" {
   assert_eq(actions.length(), 1)
   assert_eq(errors.length(), 1)
 }
+
+///|
+test "lfs_get_cached_object: returns None when not cached" {
+  let fs = @osfs.OsFs::new()
+  let result = lfs_get_cached_object(fs, "/tmp/nonexistent-git-dir-lfs-test", "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890")
+  assert_eq(result, None)
+}
