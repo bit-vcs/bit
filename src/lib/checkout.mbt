@@ -194,7 +194,7 @@ pub fn checkout(
 }
 
 ///|
-fn resolve_checkout_common_git_dir(
+pub fn resolve_checkout_common_git_dir(
   fs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> String {

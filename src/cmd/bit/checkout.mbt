@@ -604,6 +604,29 @@ async fn checkout_with_promisor_retry(
     }
     None => ()
   }
+  // LFS prefetch: download LFS objects before checkout
+  let prefetch_target = match resolved_target {
+    Some(id) => Some(id)
+    None =>
+      match @bitrepo.rev_parse(fs, git_dir, checkout_spec) {
+        Some(id) => Some(id)
+        None => None
+      }
+  }
+  match prefetch_target {
+    Some(target_id) => {
+      if @bitlib.has_any_filter_attributes(fs, root) {
+        let _prefetch_result : Result[Unit, Error] = try? {
+          let object_git_dir = @bitlib.resolve_checkout_common_git_dir(fs, git_dir)
+          let db = @bitlib.ObjectDb::load_lazy(fs, object_git_dir)
+          @bitlibnative.lfs_prefetch_for_checkout(
+            db, fs, fs, root, git_dir, target_id, "origin",
+          )
+        }
+      }
+    }
+    None => ()
+  }
   let mut attempts = 0
   while attempts < 16 {
     let result : Result[@bitcore.ObjectId, Error] = try? run_checkout_with_sensitive_hooks(
