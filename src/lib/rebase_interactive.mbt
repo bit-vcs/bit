@@ -354,6 +354,42 @@ fn interactive_first_line(s : String) -> String {
   }
 }
 
+///|
+/// Insert exec commands after each pick/reword/edit entry in a todo list.
+/// git behavior: `--exec "cmd"` inserts `exec cmd` after every pick line.
+pub fn insert_exec_after_picks(
+  entries : Array[InteractiveTodoEntry],
+  exec_cmds : Array[String],
+) -> Array[InteractiveTodoEntry] {
+  let result : Array[InteractiveTodoEntry] = []
+  for entry in entries {
+    result.push(entry)
+    // Insert exec after pick, reword, edit (not after squash/fixup/drop/exec/break)
+    match entry.command {
+      Pick | Reword | Edit =>
+        for cmd in exec_cmds {
+          result.push({ command: TodoCommand::Exec, commit_hex: "", subject: cmd })
+        }
+      _ => ()
+    }
+  }
+  result
+}
+
+///|
+/// Extract comment lines from todo text (lines starting with #).
+fn extract_todo_comments(text : String) -> String {
+  let sb = StringBuilder::new()
+  for line_view in text.split("\n") {
+    let line = line_view.to_string()
+    if line.has_prefix("#") {
+      sb.write_string(line)
+      sb.write_string("\n")
+    }
+  }
+  sb.to_string()
+}
+
 // ============================================================================
 // Interactive Rebase: start
 // ============================================================================
@@ -372,6 +408,7 @@ pub async fn interactive_rebase_start(
   message_editor : async (String) -> String?,
   autosquash? : Bool = false,
   exec_runner? : (async (String) -> Int)? = None,
+  exec_cmds? : Array[String] = [],
 ) -> InteractiveRebaseResult raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   if is_rebase_in_progress(rfs, git_dir) {
@@ -396,23 +433,33 @@ pub async fn interactive_rebase_start(
   }
   // Generate todo text
   let todo_text = generate_interactive_todo_text(db, rfs, commits)
+  // Pre-process: autosquash and exec insertion before editor
+  let mut pre_entries = parse_interactive_todo(todo_text)
+  if autosquash {
+    pre_entries = autosquash_interactive_todo(pre_entries)
+  }
+  // Insert exec commands after each pick/reword/edit entry
+  let pre_entries_final = if exec_cmds.length() > 0 {
+    insert_exec_after_picks(pre_entries, exec_cmds)
+  } else {
+    pre_entries
+  }
+  // Reconstruct todo text with comments for the editor
+  let todo_for_editor = serialize_interactive_todo(pre_entries_final) +
+    extract_todo_comments(todo_text)
   // Call sequence editor
-  let edited = sequence_editor(todo_text) catch { _ => None }
+  let edited = sequence_editor(todo_for_editor) catch { _ => None }
   guard edited is Some(edited_text) else {
     return { status: IRBAborted, commit_id: None, message: "rebase aborted" }
   }
   // Parse edited todo
-  let mut entries = parse_interactive_todo(edited_text)
+  let entries = parse_interactive_todo(edited_text)
   if entries.length() == 0 {
     return {
       status: IRBAborted,
       commit_id: None,
       message: "nothing to do (empty todo list)",
     }
-  }
-  // Autosquash if requested
-  if autosquash {
-    entries = autosquash_interactive_todo(entries)
   }
   // Resolve short hex to full hex in entries
   let resolved_entries = interactive_resolve_entries(rfs, git_dir, entries)

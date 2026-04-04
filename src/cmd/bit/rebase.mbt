@@ -148,6 +148,7 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
   let mut force_rebase = false
   let mut autosquash = false
   let mut no_autosquash = false
+  let exec_cmds : Array[String] = []
   let mut onto : String? = None
   let mut upstream : String? = None
   let mut i = 0
@@ -188,6 +189,19 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
         force_rebase = false
         i += 1
       }
+      "--exec" | "-x" if i + 1 < args.length() => {
+        exec_cmds.push(args[i + 1])
+        interactive = true // --exec implies -i
+        i += 2
+      }
+      _ if arg.has_prefix("--exec=") => {
+        let cmd = String::unsafe_substring(arg, start=7, end=arg.length())
+        if cmd.length() > 0 {
+          exec_cmds.push(cmd)
+          interactive = true
+        }
+        i += 1
+      }
       "--onto" if i + 1 < args.length() => {
         onto = Some(args[i + 1])
         i += 2
@@ -201,6 +215,13 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
         i += 1
       }
       _ => i += 1
+    }
+  }
+  // Validate exec commands
+  for cmd in exec_cmds {
+    if cmd.trim().to_string().length() == 0 {
+      eprint_line("error: empty exec command")
+      @sys.exit(1)
     }
   }
   // Check if this is a subdir-clone and handle specially
@@ -303,6 +324,7 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
       msg_editor,
       autosquash=effective_autosquash,
       exec_runner=Some(exec_runner),
+      exec_cmds~,
     )
     print_interactive_rebase_result(result)
   } else {
