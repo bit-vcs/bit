@@ -13,6 +13,7 @@ import {
   "moonbitlang/async/process" @process,
   "mizchi/zlib",
   "moonbitlang/core/encoding/utf8" @utf8,
+  "moonbitlang/core/json" @json,
   "moonbitlang/x/fs",
 }
 
@@ -33,6 +34,9 @@ options(
     "bench_worktree_entry_wbtest.mbt": [ "native" ],
     "filter.mbt": [ "native" ],
     "ignore_async_test.mbt": [ "native" ],
+    "lfs_client.mbt": [ "native" ],
+    "lfs_client_wbtest.mbt": [ "native" ],
+    "lfs_prefetch.mbt": [ "native" ],
     "promisor.mbt": [ "native" ],
     "remote_ref.mbt": [ "native" ],
     "sync_http.mbt": [ "native" ],
