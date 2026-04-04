@@ -128,3 +128,22 @@ pub fn resolve_lfs_url(
   }
   resolve_lfs_url_from_config(lfs_url~, remote_lfs_url~, remote_url~)
 }
+
+///|
+/// Read an LFS object from the local cache. Returns None if not cached.
+pub fn lfs_get_cached_content(
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+  oid : String,
+) -> Bytes? {
+  let path = lfs_object_path(git_dir, oid)
+  if rfs.is_file(path) {
+    try rfs.read_file(path) catch {
+      _ => None
+    } noraise {
+      data => Some(data)
+    }
+  } else {
+    None
+  }
+}
