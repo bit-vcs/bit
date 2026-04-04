@@ -12,6 +12,8 @@ pub enum TodoCommand {
   Squash
   Fixup
   Drop
+  Exec
+  Break
 } derive(Show, Eq)
 
 ///|
@@ -30,6 +32,8 @@ fn parse_todo_command(s : String) -> TodoCommand? {
     "squash" | "s" => Some(TodoCommand::Squash)
     "fixup" | "f" => Some(TodoCommand::Fixup)
     "drop" | "d" => Some(TodoCommand::Drop)
+    "exec" | "x" => Some(TodoCommand::Exec)
+    "break" | "b" => Some(TodoCommand::Break)
     _ => None
   }
 }
@@ -43,6 +47,8 @@ fn todo_command_to_string(cmd : TodoCommand) -> String {
     Squash => "squash"
     Fixup => "fixup"
     Drop => "drop"
+    Exec => "exec"
+    Break => "break"
   }
 }
 
@@ -80,6 +86,12 @@ pub fn parse_interactive_todo(text : String) -> Array[InteractiveTodoEntry] {
       None => (after_trimmed, "")
     }
     match parse_todo_command(cmd_str) {
+      Some(TodoCommand::Exec) =>
+        // exec: rest of line is the command, no commit_hex
+        entries.push({ command: TodoCommand::Exec, commit_hex: "", subject: after_trimmed })
+      Some(TodoCommand::Break) =>
+        // break: no arguments
+        entries.push({ command: TodoCommand::Break, commit_hex: "", subject: "" })
       Some(cmd) => entries.push({ command: cmd, commit_hex, subject })
       None => ()
     }
@@ -356,6 +368,7 @@ pub async fn interactive_rebase_start(
   sequence_editor : async (String) -> String?,
   message_editor : async (String) -> String?,
   autosquash? : Bool = false,
+  exec_runner? : (async (String) -> Int)? = None,
 ) -> InteractiveRebaseResult raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   if is_rebase_in_progress(rfs, git_dir) {
@@ -414,7 +427,7 @@ pub async fn interactive_rebase_start(
   }
   save_interactive_rebase_state(fs, git_dir, state)
   // Execute the todo
-  execute_interactive_todo(fs, rfs, root, state, message_editor)
+  execute_interactive_todo(fs, rfs, root, state, message_editor, exec_runner~)
 }
 
 ///|
@@ -475,6 +488,7 @@ pub async fn execute_interactive_todo(
   root : String,
   state : InteractiveRebaseState,
   message_editor : async (String) -> String?,
+  exec_runner? : (async (String) -> Int)? = None,
 ) -> InteractiveRebaseResult raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   let db = ObjectDb::load(rfs, git_dir)
@@ -496,7 +510,7 @@ pub async fn execute_interactive_todo(
         _ => {
           let new_state = interactive_move_to_done(state)
           save_interactive_rebase_state(fs, git_dir, new_state)
-          execute_interactive_todo(fs, rfs, root, new_state, message_editor)
+          execute_interactive_todo(fs, rfs, root, new_state, message_editor, exec_runner~)
         }
       }
     }
@@ -520,7 +534,7 @@ pub async fn execute_interactive_todo(
           interactive_amend_head_message(fs, rfs, root, db, msg)
           let new_state = interactive_move_to_done(state)
           save_interactive_rebase_state(fs, git_dir, new_state)
-          execute_interactive_todo(fs, rfs, root, new_state, message_editor)
+          execute_interactive_todo(fs, rfs, root, new_state, message_editor, exec_runner~)
         }
       }
     }
@@ -582,7 +596,7 @@ pub async fn execute_interactive_todo(
             squash_msg: result.message,
           }
           save_interactive_rebase_state(fs, git_dir, new_state)
-          execute_interactive_todo(fs, rfs, root, new_state, message_editor)
+          execute_interactive_todo(fs, rfs, root, new_state, message_editor, exec_runner~)
         }
       }
     }
@@ -609,7 +623,7 @@ pub async fn execute_interactive_todo(
             squash_msg: result.message,
           }
           save_interactive_rebase_state(fs, git_dir, new_state)
-          execute_interactive_todo(fs, rfs, root, new_state, message_editor)
+          execute_interactive_todo(fs, rfs, root, new_state, message_editor, exec_runner~)
         }
       }
     }
@@ -617,7 +631,35 @@ pub async fn execute_interactive_todo(
       // Simply skip this commit
       let new_state = interactive_move_to_done(state)
       save_interactive_rebase_state(fs, git_dir, new_state)
-      execute_interactive_todo(fs, rfs, root, new_state, message_editor)
+      execute_interactive_todo(fs, rfs, root, new_state, message_editor, exec_runner~)
+    }
+    Exec => {
+      let cmd = entry.subject
+      let new_state = interactive_move_to_done(state)
+      save_interactive_rebase_state(fs, git_dir, new_state)
+      let code = match exec_runner {
+        Some(runner) => runner(cmd) catch { _ => 1 }
+        None => 0 // No runner: skip exec commands silently
+      }
+      if code != 0 {
+        // exec failed — stop and let user fix
+        {
+          status: IRBStopped,
+          commit_id: resolve_head_commit(rfs, git_dir),
+          message: "Execution failed: \{cmd} (exit code \{code})\nYou can fix the problem, and then run \"git rebase --continue\".",
+        }
+      } else {
+        execute_interactive_todo(fs, rfs, root, new_state, message_editor, exec_runner~)
+      }
+    }
+    Break => {
+      let new_state = interactive_move_to_done(state)
+      save_interactive_rebase_state(fs, git_dir, new_state)
+      {
+        status: IRBStopped,
+        commit_id: resolve_head_commit(rfs, git_dir),
+        message: "Stopped at break point.\nYou can run \"git rebase --continue\" to resume.",
+      }
     }
   }
 }
@@ -855,6 +897,7 @@ pub async fn interactive_rebase_continue_impl(
   rfs : &@bit.RepoFileSystem,
   root : String,
   message_editor : async (String) -> String?,
+  exec_runner? : (async (String) -> Int)? = None,
 ) -> InteractiveRebaseResult raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   let state = load_interactive_rebase_state(rfs, git_dir)
@@ -892,7 +935,7 @@ pub async fn interactive_rebase_continue_impl(
     // Clear amend flag and continue
     let new_state : InteractiveRebaseState = { ..s, amend: false }
     save_interactive_rebase_state(fs, git_dir, new_state)
-    return execute_interactive_todo(fs, rfs, root, new_state, message_editor)
+    return execute_interactive_todo(fs, rfs, root, new_state, message_editor, exec_runner~)
   }
   // Continuing after a conflict: commit the resolved changes
   let db = ObjectDb::load(rfs, git_dir)
@@ -925,7 +968,7 @@ pub async fn interactive_rebase_continue_impl(
   }
   // Continue with remaining todo
   save_interactive_rebase_state(fs, git_dir, s)
-  execute_interactive_todo(fs, rfs, root, s, message_editor)
+  execute_interactive_todo(fs, rfs, root, s, message_editor, exec_runner~)
 }
 
 ///|
@@ -934,6 +977,7 @@ pub async fn interactive_rebase_skip_impl(
   rfs : &@bit.RepoFileSystem,
   root : String,
   message_editor : async (String) -> String?,
+  exec_runner? : (async (String) -> Int)? = None,
 ) -> InteractiveRebaseResult raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   let state = load_interactive_rebase_state(rfs, git_dir)
@@ -953,7 +997,7 @@ pub async fn interactive_rebase_skip_impl(
   // Clear amend flag if set
   let new_state : InteractiveRebaseState = { ..s, amend: false }
   save_interactive_rebase_state(fs, git_dir, new_state)
-  execute_interactive_todo(fs, rfs, root, new_state, message_editor)
+  execute_interactive_todo(fs, rfs, root, new_state, message_editor, exec_runner~)
 }
 
 ///|

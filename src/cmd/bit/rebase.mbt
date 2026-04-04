@@ -54,11 +54,7 @@ fn rebase_has_signing_args(args : Array[String]) -> Bool {
 ///|
 fn rebase_has_complex_mode_args(args : Array[String]) -> Bool {
   for arg in args {
-    if arg == "--exec" ||
-      arg.has_prefix("--exec=") ||
-      arg == "-x" ||
-      rebase_short_option_cluster_contains(arg, ('x' : UInt16)) ||
-      arg == "--rebase-merges" ||
+    if arg == "--rebase-merges" ||
       arg.has_prefix("--rebase-merges=") ||
       arg == "--no-rebase-merges" ||
       arg == "--edit-todo" ||
@@ -218,8 +214,9 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
   if do_continue {
     if @bitlib.is_interactive_rebase_in_progress(rfs, git_dir) {
       let msg_editor = make_message_editor_callback(fs, git_dir)
+      let exec_runner = make_exec_runner_callback(root)
       let result = @bitlib.interactive_rebase_continue_impl(
-        wfs, rfs, root, msg_editor,
+        wfs, rfs, root, msg_editor, exec_runner=Some(exec_runner),
       )
       print_interactive_rebase_result(result)
     } else {
@@ -245,8 +242,9 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
   if do_skip {
     if @bitlib.is_interactive_rebase_in_progress(rfs, git_dir) {
       let msg_editor = make_message_editor_callback(fs, git_dir)
+      let exec_runner = make_exec_runner_callback(root)
       let result = @bitlib.interactive_rebase_skip_impl(
-        wfs, rfs, root, msg_editor,
+        wfs, rfs, root, msg_editor, exec_runner=Some(exec_runner),
       )
       print_interactive_rebase_result(result)
     } else {
@@ -294,6 +292,7 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
     // Build editor callbacks
     let seq_editor = make_sequence_editor_callback(fs, git_dir)
     let msg_editor = make_message_editor_callback(fs, git_dir)
+    let exec_runner = make_exec_runner_callback(root)
     let result = @bitlib.interactive_rebase_start(
       wfs,
       rfs,
@@ -303,6 +302,7 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
       seq_editor,
       msg_editor,
       autosquash=effective_autosquash,
+      exec_runner=Some(exec_runner),
     )
     print_interactive_rebase_result(result)
   } else {
@@ -382,6 +382,22 @@ async fn make_message_editor_callback(
         normalize_commit_edit_buffer(edited)
       }
     }
+  }
+}
+
+///|
+/// Create an exec runner callback that runs shell commands in the repo root.
+async fn make_exec_runner_callback(root : String) -> async (String) -> Int {
+  async fn(cmd : String) -> Int {
+    @process.run(
+      "/bin/sh",
+      ["-c", cmd],
+      inherit_env=true,
+      stdin=@stdio.stdin,
+      stdout=@stdio.stdout,
+      stderr=@stdio.stderr,
+      cwd=root,
+    )
   }
 }
 
