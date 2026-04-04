@@ -77,3 +77,54 @@ pub fn lfs_object_path(git_dir : String, oid : String) -> String {
   let d2 = String::unsafe_substring(oid, start=2, end=4)
   "\{git_dir}/lfs/objects/\{d1}/\{d2}/\{oid}"
 }
+
+///|
+/// Resolve LFS server URL from pre-read config values.
+/// Priority: lfs.url > remote.<name>.lfsurl > derive from remote URL.
+pub fn resolve_lfs_url_from_config(
+  lfs_url~ : String = "",
+  remote_lfs_url~ : String = "",
+  remote_url~ : String = "",
+) -> String {
+  if lfs_url.length() > 0 {
+    return lfs_url
+  }
+  if remote_lfs_url.length() > 0 {
+    return remote_lfs_url
+  }
+  let base = if remote_url.has_suffix(".git") {
+    remote_url
+  } else {
+    remote_url + ".git"
+  }
+  base + "/info/lfs"
+}
+
+///|
+/// Read LFS URL from git config and remote config.
+pub fn resolve_lfs_url(
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+  remote_name : String,
+) -> String {
+  let config_path = git_dir + "/config"
+  let lfs_url = match read_config_value(rfs, config_path, "lfs", "url") {
+    Some(v) => v
+    None => ""
+  }
+  let remote_section = "remote \"\{remote_name}\""
+  let remote_lfs_url = match read_config_value(
+    rfs,
+    config_path,
+    remote_section,
+    "lfsurl",
+  ) {
+    Some(v) => v
+    None => ""
+  }
+  let remote_url = match get_remote_url(rfs, git_dir, remote_name) {
+    Some(v) => v
+    None => ""
+  }
+  resolve_lfs_url_from_config(lfs_url~, remote_lfs_url~, remote_url~)
+}
