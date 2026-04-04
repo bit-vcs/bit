@@ -43,6 +43,18 @@ test "parse_lfs_pointer: missing size" {
 }
 
 ///|
+test "parse_lfs_pointer: wrong version" {
+  let content = b"version https://example.com/v1\noid sha256:4d7a214614ab2935c943f9e0ff69d22eadbb8f32b1258daaa5e2ca24d17e2393\nsize 100\n"
+  assert_true(parse_lfs_pointer(content) is None)
+}
+
+///|
+test "parse_lfs_pointer: non-hex oid" {
+  let content = b"version https://git-lfs.github.com/spec/v1\noid sha256:ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ\nsize 100\n"
+  assert_true(parse_lfs_pointer(content) is None)
+}
+
+///|
 test "lfs_object_path: correct sharding" {
   let path = lfs_object_path("/repo/.git", "4d7a214614ab2935c943f9e0ff69d22eadbb8f32b1258daaa5e2ca24d17e2393")
   assert_eq(path, "/repo/.git/lfs/objects/4d/7a/4d7a214614ab2935c943f9e0ff69d22eadbb8f32b1258daaa5e2ca24d17e2393")

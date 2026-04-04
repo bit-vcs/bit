@@ -62,7 +62,7 @@ pub fn parse_lfs_pointer(content : Bytes) -> LfsPointer? {
   }
   match (oid, size) {
     (Some(o), Some(s)) =>
-      if o.length() == 64 {
+      if o.length() == 64 && @bithash.is_hex_string(o) {
         Some({ oid: o, size: s })
       } else {
         None
