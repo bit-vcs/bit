@@ -11,8 +11,29 @@ import {
   "mizchi/bit/lib" @lib,
 } for "test"
 
-warnings = "-29"
+warnings = "-24-29"
 
 options(
-  targets: { "sync_wbtest.mbt": [ "native" ] },
+  link: {
+    "js": {
+      "exports": [
+        "js_hub_issue_init:hubIssueInit",
+        "js_hub_issue_list:hubIssueList",
+        "js_hub_issue_get:hubIssueGet",
+        "js_hub_issue_create:hubIssueCreate",
+        "js_hub_issue_update:hubIssueUpdate",
+        "js_hub_issue_close:hubIssueClose",
+        "js_hub_issue_reopen:hubIssueReopen",
+        "js_hub_issue_comment_list:hubIssueCommentList",
+        "js_hub_issue_comment_add:hubIssueCommentAdd",
+        "js_hub_issue_search:hubIssueSearch",
+      ],
+      "format": "esm",
+    },
+  },
+  targets: {
+    "js_hub_exports.mbt": [ "js" ],
+    "js_hub_host_bridge.mbt": [ "js" ],
+    "sync_wbtest.mbt": [ "native" ],
+  },
 )

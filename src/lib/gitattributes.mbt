@@ -347,9 +347,7 @@ pub fn check_unsupported_gitattributes(
       if token.length() == 0 {
         continue
       }
-      if token == "filter=lfs" || token.has_prefix("filter=lfs ") {
-        return Some("fatal: filter 'lfs' is not supported in standalone mode")
-      }
+      // filter=lfs is handled natively by bit (LFS pointer resolution)
       if token.has_prefix("working-tree-encoding=") {
         return Some(
           "fatal: working-tree-encoding is not supported in standalone mode",

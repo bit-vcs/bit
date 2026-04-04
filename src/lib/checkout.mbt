@@ -45,7 +45,19 @@ pub fn restore_paths(
               fs.mkdir_p(dir)
             }
             let attrs = resolve_eol_attrs(rfs, root, safe_path)
-            let output = smudge_for_checkout(o.data, attrs, autocrlf, core_eol~)
+            let data = if attrs.filter == Some("lfs") && is_lfs_pointer(o.data) {
+              match parse_lfs_pointer(o.data) {
+                Some(ptr) =>
+                  match lfs_get_cached_content(rfs, actual_git_dir, ptr.oid) {
+                    Some(cached) => cached
+                    None => o.data
+                  }
+                None => o.data
+              }
+            } else {
+              o.data
+            }
+            let output = smudge_for_checkout(data, attrs, autocrlf, core_eol~)
             fs.write_file(abs_path, output)
           }
         }
@@ -182,7 +194,7 @@ pub fn checkout(
 }
 
 ///|
-fn resolve_checkout_common_git_dir(
+pub fn resolve_checkout_common_git_dir(
   fs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> String {

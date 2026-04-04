@@ -530,7 +530,19 @@ pub fn write_worktree_from_files(
         let dir = parent_dir(full_path)
         fs.mkdir_p(dir)
         let attrs = resolve_eol_attrs(rfs, root, path)
-        let output = smudge_for_checkout(o.data, attrs, autocrlf, core_eol~)
+        let data = if attrs.filter == Some("lfs") && is_lfs_pointer(o.data) {
+          match parse_lfs_pointer(o.data) {
+            Some(ptr) =>
+              match lfs_get_cached_content(rfs, git_dir, ptr.oid) {
+                Some(cached) => cached
+                None => o.data
+              }
+            None => o.data
+          }
+        } else {
+          o.data
+        }
+        let output = smudge_for_checkout(data, attrs, autocrlf, core_eol~)
         fs.write_file(full_path, output)
       }
     }
@@ -623,7 +635,19 @@ pub fn write_worktree_and_build_index(
           let dir = parent_dir(full_path)
           fs.mkdir_p(dir)
           let attrs = resolve_eol_attrs(rfs, root, path)
-          let output = smudge_for_checkout(o.data, attrs, autocrlf, core_eol~)
+          let data = if attrs.filter == Some("lfs") && is_lfs_pointer(o.data) {
+            match parse_lfs_pointer(o.data) {
+              Some(ptr) =>
+                match lfs_get_cached_content(rfs, git_dir, ptr.oid) {
+                  Some(cached) => cached
+                  None => o.data
+                }
+              None => o.data
+            }
+          } else {
+            o.data
+          }
+          let output = smudge_for_checkout(data, attrs, autocrlf, core_eol~)
           fs.write_file(full_path, output)
         }
         // Get actual mtime from the file we just wrote
