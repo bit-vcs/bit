@@ -241,9 +241,7 @@ fn log_need_real_git(args : Array[String], git_dir? : String = "") -> Bool {
     }
     if arg == "--name-only" ||
       arg == "--name-status" ||
-      arg == "--stat" ||
       arg == "--stdin" ||
-      arg == "--graph" ||
       arg == "--boundary" ||
       arg == "--parents" ||
       arg == "--full-history" ||
