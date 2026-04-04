@@ -754,7 +754,16 @@ fn rebase_write_object(
     "/" +
     String::unsafe_substring(hex, start=2, end=hex.length()),
   )
-  fs.write_file(path, compressed)
+  fs.write_file(path, compressed) catch {
+    // Loose objects may already exist as read-only files.
+    @bit.GitError::IoError(msg) if msg.contains("Permission denied") => {
+      fs.remove_file(path) catch {
+        _ => raise @bit.GitError::IoError(msg)
+      }
+      fs.write_file(path, compressed)
+    }
+    err => raise err
+  }
 }
 
 ///|

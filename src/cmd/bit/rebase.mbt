@@ -331,7 +331,9 @@ async fn make_sequence_editor_callback(
   let editor_cmd = resolve_sequence_editor()
   async fn(content : String) -> String? {
     let path = git_dir + "/rebase-merge/git-rebase-todo"
-    (fs as &@bitcore.FileSystem).write_string(path, content) catch {
+    let wfs : &@bitcore.FileSystem = fs
+    wfs.mkdir_p(git_dir + "/rebase-merge")
+    wfs.write_string(path, content) catch {
       _ => return None
     }
     match editor_cmd {

@@ -17,11 +17,14 @@ test "rebase: signing flags require real git fallback" {
 
 ///|
 test "rebase: interactive and complex modes require real git fallback" {
-  assert_true(rebase_requires_real_git(["-i", "HEAD~1"]))
-  assert_true(rebase_requires_real_git(["--interactive", "HEAD~1"]))
+  // -i and --interactive are now handled natively
+  assert_false(rebase_requires_real_git(["-i", "HEAD~1"]))
+  assert_false(rebase_requires_real_git(["--interactive", "HEAD~1"]))
+  // -ix contains exec flag which requires real git
   assert_true(rebase_requires_real_git(["-ix", "echo hi", "HEAD~1"]))
   assert_true(rebase_requires_real_git(["--exec", "echo hi", "HEAD~1"]))
-  assert_true(rebase_requires_real_git(["--autosquash", "HEAD~1"]))
+  // --autosquash is now handled natively
+  assert_false(rebase_requires_real_git(["--autosquash", "HEAD~1"]))
   assert_true(rebase_requires_real_git(["--rebase-merges", "HEAD~1"]))
   assert_true(rebase_requires_real_git(["--edit-todo"]))
   assert_true(rebase_requires_real_git(["--show-current-patch"]))
