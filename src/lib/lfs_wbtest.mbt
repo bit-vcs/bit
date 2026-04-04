@@ -122,7 +122,9 @@ test "lfs_verify_oid: correct hash" {
   // SHA-256 of empty byte sequence
   let data = b""
   assert_eq(
-    lfs_verify_oid(data, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
+    lfs_verify_oid(
+      data, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    ),
     true,
   )
 }
@@ -131,7 +133,9 @@ test "lfs_verify_oid: correct hash" {
 test "lfs_verify_oid: wrong hash" {
   let data = b"hello"
   assert_eq(
-    lfs_verify_oid(data, "0000000000000000000000000000000000000000000000000000000000000000"),
+    lfs_verify_oid(
+      data, "0000000000000000000000000000000000000000000000000000000000000000",
+    ),
     false,
   )
 }

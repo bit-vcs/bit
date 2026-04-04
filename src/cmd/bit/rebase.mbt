@@ -54,13 +54,10 @@ fn rebase_has_signing_args(args : Array[String]) -> Bool {
 ///|
 fn rebase_has_complex_mode_args(args : Array[String]) -> Bool {
   for arg in args {
-    if arg == "--interactive" ||
-      rebase_short_option_cluster_contains(arg, ('i' : UInt16)) ||
-      arg == "--exec" ||
+    if arg == "--exec" ||
       arg.has_prefix("--exec=") ||
       arg == "-x" ||
       rebase_short_option_cluster_contains(arg, ('x' : UInt16)) ||
-      arg == "--autosquash" ||
       arg == "--rebase-merges" ||
       arg.has_prefix("--rebase-merges=") ||
       arg == "--no-rebase-merges" ||
@@ -153,6 +150,8 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
   let mut do_skip = false
   let mut interactive = false
   let mut force_rebase = false
+  let mut autosquash = false
+  let mut no_autosquash = false
   let mut onto : String? = None
   let mut upstream : String? = None
   let mut i = 0
@@ -173,6 +172,16 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
       }
       "-i" | "--interactive" => {
         interactive = true
+        i += 1
+      }
+      "--autosquash" => {
+        autosquash = true
+        no_autosquash = false
+        i += 1
+      }
+      "--no-autosquash" => {
+        no_autosquash = true
+        autosquash = false
         i += 1
       }
       "--force-rebase" | "--no-ff" | "-f" => {
@@ -207,11 +216,12 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
   }
   // Handle --continue (works for both regular and interactive)
   if do_continue {
-    // Check if interactive rebase is in progress
-    let rebase_merge_dir = git_dir + "/rebase-merge"
-    if rfs.is_dir(rebase_merge_dir) &&
-      !rebase_merge_dir_uses_builtin_state(rfs, rebase_merge_dir) {
-      interactive_rebase_continue(wfs, rfs, root, git_dir)
+    if @bitlib.is_interactive_rebase_in_progress(rfs, git_dir) {
+      let msg_editor = make_message_editor_callback(fs, git_dir)
+      let result = @bitlib.interactive_rebase_continue_impl(
+        wfs, rfs, root, msg_editor,
+      )
+      print_interactive_rebase_result(result)
     } else {
       let result = @bitlib.rebase_continue(fs, fs, root)
       print_rebase_result(result)
@@ -220,24 +230,25 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
   }
   // Handle --abort
   if do_abort {
-    let rebase_merge_dir = git_dir + "/rebase-merge"
-    if rfs.is_dir(rebase_merge_dir) &&
-      !rebase_merge_dir_uses_builtin_state(rfs, rebase_merge_dir) {
-      interactive_rebase_abort(wfs, rfs, root, git_dir)
+    if @bitlib.is_interactive_rebase_in_progress(rfs, git_dir) {
+      @bitlib.interactive_rebase_abort_impl(wfs, rfs, root)
+      print_line("Rebase aborted")
     } else {
       @bitlib.rebase_abort(fs, fs, root) catch {
         _ => @bitlib.clear_rebase_state(fs, fs, git_dir)
       }
+      print_line("Rebase aborted")
     }
-    print_line("Rebase aborted")
     return ()
   }
   // Handle --skip
   if do_skip {
-    let rebase_merge_dir = git_dir + "/rebase-merge"
-    if rfs.is_dir(rebase_merge_dir) &&
-      !rebase_merge_dir_uses_builtin_state(rfs, rebase_merge_dir) {
-      interactive_rebase_skip(wfs, rfs, root, git_dir)
+    if @bitlib.is_interactive_rebase_in_progress(rfs, git_dir) {
+      let msg_editor = make_message_editor_callback(fs, git_dir)
+      let result = @bitlib.interactive_rebase_skip_impl(
+        wfs, rfs, root, msg_editor,
+      )
+      print_interactive_rebase_result(result)
     } else {
       let result = @bitlib.rebase_skip(fs, fs, root)
       print_rebase_result(result)
@@ -264,7 +275,36 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
       }
       None => id
     }
-    interactive_rebase_start(wfs, rfs, root, git_dir, id, onto_id)
+    // Read autosquash config
+    let auto_squash_config = match
+      @bitlib.read_config_value(
+        rfs,
+        git_dir + "/config",
+        "rebase",
+        "autosquash",
+      ) {
+      Some(v) => v.to_lower() == "true"
+      None => false
+    }
+    let effective_autosquash = if no_autosquash {
+      false
+    } else {
+      autosquash || auto_squash_config
+    }
+    // Build editor callbacks
+    let seq_editor = make_sequence_editor_callback(fs, git_dir)
+    let msg_editor = make_message_editor_callback(fs, git_dir)
+    let result = @bitlib.interactive_rebase_start(
+      wfs,
+      rfs,
+      root,
+      id,
+      onto_id,
+      seq_editor,
+      msg_editor,
+      autosquash=effective_autosquash,
+    )
+    print_interactive_rebase_result(result)
   } else {
     let result = match onto {
       Some(o) => {
@@ -282,35 +322,89 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
 }
 
 ///|
-fn rebase_args_require_standalone_error(args : Array[String]) -> Bool {
-  for arg in args {
-    if arg == "-i" || arg == "--interactive" {
-      return true
+/// Create a sequence editor callback using GIT_SEQUENCE_EDITOR or EDITOR.
+/// Writes content to the todo file, invokes editor, reads back result.
+async fn make_sequence_editor_callback(
+  fs : OsFs,
+  git_dir : String,
+) -> async (String) -> String? {
+  let editor_cmd = resolve_sequence_editor()
+  async fn(content : String) -> String? {
+    let path = git_dir + "/rebase-merge/git-rebase-todo"
+    (fs as &@bitcore.FileSystem).write_string(path, content) catch {
+      _ => return None
+    }
+    match editor_cmd {
+      None => Some(content)
+      Some(cmd) => {
+        let code = run_editor_on_path(cmd, path)
+        if code != 0 {
+          return None
+        }
+        let edited = decode_bytes(
+          (fs as &@bitcore.RepoFileSystem).read_file(path) catch {
+            _ => return None
+          },
+        )
+        Some(edited)
+      }
     }
   }
-  false
 }
 
 ///|
-fn rebase_merge_dir_uses_builtin_state(
-  rfs : &@bitcore.RepoFileSystem,
-  rebase_merge_dir : String,
-) -> Bool {
-  if rfs.is_file(rebase_merge_dir + "/stopped-sha") {
-    return true
-  }
-  if rfs.is_file(rebase_merge_dir + "/head-name") {
-    let head_name = trim_string(
-      decode_bytes(
-        rfs.read_file(rebase_merge_dir + "/head-name") catch {
-          _ => Bytes::default()
-        },
-      ),
-    )
-    if head_name.has_prefix("refs/") {
-      return true
+/// Create a commit message editor callback.
+async fn make_message_editor_callback(
+  fs : OsFs,
+  git_dir : String,
+) -> async (String) -> String? {
+  let editor_cmd = resolve_commit_editor()
+  async fn(content : String) -> String? {
+    let path = git_dir + "/COMMIT_EDITMSG"
+    let template = commit_edit_buffer_template(Some(content))
+    (fs as &@bitcore.FileSystem).write_string(path, template) catch {
+      _ => return None
+    }
+    match editor_cmd {
+      None => Some(content)
+      Some(cmd) => {
+        let code = run_editor_on_path(cmd, path)
+        if code != 0 {
+          return None
+        }
+        let edited = decode_bytes(
+          (fs as &@bitcore.RepoFileSystem).read_file(path) catch {
+            _ => return None
+          },
+        )
+        normalize_commit_edit_buffer(edited)
+      }
     }
   }
+}
+
+///|
+async fn print_interactive_rebase_result(
+  result : @bitlib.InteractiveRebaseResult,
+) -> Unit {
+  match result.status {
+    @bitlib.IRBComplete =>
+      print_line("Successfully rebased and updated refs/heads.")
+    @bitlib.IRBConflict => {
+      print_line(result.message)
+      print_line("Resolve conflicts, then run \"git rebase --continue\".")
+      @sys.exit(1)
+    }
+    @bitlib.IRBStopped => {
+      print_line(result.message)
+      @sys.exit(0)
+    }
+    @bitlib.IRBAborted => print_line("Rebase aborted.")
+  }
+}
+
+///|
+fn rebase_args_require_standalone_error(_args : Array[String]) -> Bool {
   false
 }
 
@@ -875,59 +969,6 @@ async fn squash_commit(
   } else {
     print_line("[\{short}] squash")
   }
-}
-
-///|
-async fn interactive_rebase_abort(
-  wfs : &@bitcore.FileSystem,
-  rfs : &@bitcore.RepoFileSystem,
-  root : String,
-  git_dir : String,
-) -> Unit raise Error {
-  let rebase_dir = git_dir + "/rebase-merge"
-  let orig_head_path = rebase_dir + "/orig-head"
-  let head_name_path = rebase_dir + "/head-name"
-  // Restore original HEAD
-  if rfs.is_file(orig_head_path) {
-    let orig_hex = rfs.read_file(orig_head_path) |> decode_bytes |> trim_string
-    ignore(
-      run_checkout_with_sensitive_hooks(wfs, rfs, root, orig_hex, detach=true),
-    )
-    // Restore branch if was on one
-    if rfs.is_file(head_name_path) {
-      let branch = rfs.read_file(head_name_path) |> decode_bytes |> trim_string
-      if branch != "HEAD" {
-        wfs.write_string(git_dir + "/refs/heads/" + branch, orig_hex + "\n")
-        wfs.write_string(git_dir + "/HEAD", "ref: refs/heads/" + branch + "\n")
-      }
-    }
-  }
-  // Clean up rebase directory
-  cleanup_rebase_dir(wfs, rfs, rebase_dir)
-}
-
-///|
-async fn interactive_rebase_skip(
-  wfs : &@bitcore.FileSystem,
-  rfs : &@bitcore.RepoFileSystem,
-  root : String,
-  git_dir : String,
-) -> Unit raise Error {
-  let rebase_dir = git_dir + "/rebase-merge"
-  let todo_path = rebase_dir + "/git-rebase-todo"
-  // Read and skip first entry
-  let todo_content = if rfs.is_file(todo_path) {
-    decode_bytes(rfs.read_file(todo_path))
-  } else {
-    ""
-  }
-  let entries = parse_rebase_todo(todo_content)
-  if entries.length() > 0 {
-    move_todo_to_done(wfs, rfs, rebase_dir, entries[0])
-    print_line("Skipping \{entries[0].commit_ref}")
-  }
-  // Continue
-  interactive_rebase_continue(wfs, rfs, root, git_dir)
 }
 
 ///|

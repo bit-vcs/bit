@@ -20,6 +20,8 @@ pub fn apply_receive_pack(&@types.FileSystem, &@types.RepoFileSystem, String, Re
 
 pub fn apply_template(&@types.FileSystem, &@types.RepoFileSystem, String, String) -> Unit raise @object.GitError
 
+pub fn autosquash_interactive_todo(Array[InteractiveTodoEntry]) -> Array[InteractiveTodoEntry]
+
 pub fn bisect_get_candidates(ObjectDb, &@types.RepoFileSystem, @object.ObjectId, Array[@object.ObjectId], Array[@object.ObjectId]) -> Array[@object.ObjectId] raise
 
 pub fn bisect_mark_ancestors(ObjectDb, &@types.RepoFileSystem, @object.ObjectId, Map[String, Bool]) -> Unit
@@ -136,6 +138,8 @@ pub fn diff_trees(&@types.RepoFileSystem, String, @object.ObjectId?, @object.Obj
 
 pub async fn diff_worktree(&@types.RepoFileSystem, String, run_filter_cmd? : FilterCmd) -> Array[DiffFile] raise @object.GitError
 
+pub async fn execute_interactive_todo(&@types.FileSystem, &@types.RepoFileSystem, String, InteractiveRebaseState, async (String) -> String?) -> InteractiveRebaseResult raise @object.GitError
+
 pub fn expand_sparse_index_entries(&@types.RepoFileSystem, String, Array[IndexEntry]) -> Array[IndexEntry] raise @object.GitError
 
 pub fn expand_sparse_skip_worktree_paths(&@types.RepoFileSystem, String, Array[IndexEntry], Map[String, Bool]) -> Map[String, Bool] raise @object.GitError
@@ -155,6 +159,8 @@ pub fn fsck_object_type(ObjectDb, &@types.RepoFileSystem, String) -> String
 pub fn fsck_verify_loose_hash(Bytes, String) -> Bool
 
 pub fn gc_repo(&@types.FileSystem, &@types.RepoFileSystem, String) -> GcResult raise @object.GitError
+
+pub fn generate_interactive_todo_text(ObjectDb, &@types.RepoFileSystem, Array[@object.ObjectId]) -> String raise @object.GitError
 
 pub fn get_effective_remote_url(&@types.RepoFileSystem, String) -> String?
 
@@ -180,6 +186,14 @@ pub fn init_repo_with_options(&@types.FileSystem, String, InitOptions) -> Unit r
 
 pub fn init_repo_with_options_with_repo_fs(&@types.FileSystem, &@types.RepoFileSystem, String, InitOptions) -> Unit raise @object.GitError
 
+pub fn interactive_rebase_abort_impl(&@types.FileSystem, &@types.RepoFileSystem, String) -> Unit raise @object.GitError
+
+pub async fn interactive_rebase_continue_impl(&@types.FileSystem, &@types.RepoFileSystem, String, async (String) -> String?) -> InteractiveRebaseResult raise @object.GitError
+
+pub async fn interactive_rebase_skip_impl(&@types.FileSystem, &@types.RepoFileSystem, String, async (String) -> String?) -> InteractiveRebaseResult raise @object.GitError
+
+pub async fn interactive_rebase_start(&@types.FileSystem, &@types.RepoFileSystem, String, @object.ObjectId, @object.ObjectId, async (String) -> String?, async (String) -> String?, autosquash? : Bool) -> InteractiveRebaseResult raise @object.GitError
+
 pub fn is_ancestor_of(&@types.RepoFileSystem, String, @object.ObjectId, @object.ObjectId) -> Bool
 
 pub fn is_bare_git_dir(String) -> Bool
@@ -189,6 +203,8 @@ pub fn is_binary_bytes(Bytes) -> Bool
 pub fn is_branch_checked_out(&@types.RepoFileSystem, String, String) -> String? raise @object.GitError
 
 pub fn is_ignored_path(&@types.RepoFileSystem, String, String, Bool) -> Bool raise @object.GitError
+
+pub fn is_interactive_rebase_in_progress(&@types.RepoFileSystem, String) -> Bool
 
 pub fn is_lfs_pointer(Bytes) -> Bool
 
@@ -212,7 +228,11 @@ pub fn legacy_remote_exists(&@types.RepoFileSystem, String, String) -> Bool
 
 pub fn lfs_get_cached_content(&@types.RepoFileSystem, String, String) -> Bytes?
 
+pub fn lfs_is_valid_http_url(String) -> Bool
+
 pub fn lfs_object_path(String, String) -> String
+
+pub fn lfs_verify_oid(Bytes, String) -> Bool
 
 pub fn list_branches(&@types.RepoFileSystem, String) -> (HeadRef, Array[BranchInfo]) raise @object.GitError
 
@@ -241,6 +261,8 @@ pub fn list_worktrees(&@types.RepoFileSystem, String) -> Array[WorktreeInfo] rai
 pub fn load_all_objects_from_fs(&@types.RepoFileSystem, String) -> Array[@object.PackObject] raise @object.GitError
 
 pub fn load_all_objects_from_object_dir(&@types.RepoFileSystem, String) -> Array[@object.PackObject] raise @object.GitError
+
+pub fn load_interactive_rebase_state(&@types.RepoFileSystem, String) -> InteractiveRebaseState? raise @object.GitError
 
 pub fn load_object_store_from_fs(&@types.RepoFileSystem, String) -> @repo.ObjectStore raise @object.GitError
 
@@ -303,6 +325,8 @@ pub fn parse_fetch_refspecs(Array[String]) -> Array[FetchRefspec]
 pub fn parse_github_shorthand(String) -> GitHubShorthand?
 
 pub fn parse_index_pathspec(String) -> (Int, String?)
+
+pub fn parse_interactive_todo(String) -> Array[InteractiveTodoEntry]
 
 pub fn parse_iso8601_timestamp(String) -> Int64
 
@@ -511,6 +535,10 @@ pub fn rev_parse_parse_parent_suffix(String) -> (String, String)?
 pub fn rewrite_packed_refs(&@types.FileSystem, &@types.RepoFileSystem, String, (String) -> String?) -> Unit raise @object.GitError
 
 pub fn rm_paths(&@types.FileSystem, &@types.RepoFileSystem, String, Array[String], cached? : Bool, force? : Bool, recursive? : Bool) -> Unit raise @object.GitError
+
+pub fn save_interactive_rebase_state(&@types.FileSystem, String, InteractiveRebaseState) -> Unit raise @object.GitError
+
+pub fn serialize_interactive_todo(Array[InteractiveTodoEntry]) -> String
 
 pub fn set_config_key(&@types.FileSystem, &@types.RepoFileSystem, String, String, String, String, String) -> Unit raise @object.GitError
 
@@ -781,6 +809,35 @@ pub(all) struct InitOptions {
 }
 pub fn InitOptions::new() -> Self
 
+pub struct InteractiveRebaseResult {
+  status : InteractiveRebaseStatus
+  commit_id : @object.ObjectId?
+  message : String
+}
+
+pub struct InteractiveRebaseState {
+  onto : @object.ObjectId
+  orig_head : @object.ObjectId
+  head_name : String
+  todo : Array[InteractiveTodoEntry]
+  done : Array[InteractiveTodoEntry]
+  amend : Bool
+  squash_msg : String
+}
+
+pub enum InteractiveRebaseStatus {
+  IRBComplete
+  IRBConflict
+  IRBStopped
+  IRBAborted
+}
+
+pub struct InteractiveTodoEntry {
+  command : TodoCommand
+  commit_hex : String
+  subject : String
+} derive(Eq, Show)
+
 pub struct LazyPackIndex {
   idx_path : String
   pack_path : String
@@ -1020,6 +1077,15 @@ pub enum TextAttr {
   Unset
   Unspecified
 }
+
+pub enum TodoCommand {
+  Pick
+  Reword
+  Edit
+  Squash
+  Fixup
+  Drop
+} derive(Eq, Show)
 
 pub struct TreeFileEntry {
   id : @object.ObjectId

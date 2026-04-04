@@ -66,16 +66,17 @@ pub fn parse_interactive_todo(text : String) -> Array[InteractiveTodoEntry] {
     let after_trimmed = @string_utils.trim_string(after_cmd)
     let second_space = after_trimmed.find(" ")
     let (commit_hex, subject) = match second_space {
-      Some(sp2) => (
-        String::unsafe_substring(after_trimmed, start=0, end=sp2),
-        @string_utils.trim_string(
-          String::unsafe_substring(
-            after_trimmed,
-            start=sp2 + 1,
-            end=after_trimmed.length(),
+      Some(sp2) =>
+        (
+          String::unsafe_substring(after_trimmed, start=0, end=sp2),
+          @string_utils.trim_string(
+            String::unsafe_substring(
+              after_trimmed,
+              start=sp2 + 1,
+              end=after_trimmed.length(),
+            ),
           ),
-        ),
-      )
+        )
       None => (after_trimmed, "")
     }
     match parse_todo_command(cmd_str) {
@@ -88,7 +89,7 @@ pub fn parse_interactive_todo(text : String) -> Array[InteractiveTodoEntry] {
 
 ///|
 pub fn serialize_interactive_todo(
-  entries : Array[InteractiveTodoEntry]
+  entries : Array[InteractiveTodoEntry],
 ) -> String {
   let sb = StringBuilder::new()
   for entry in entries {
@@ -112,12 +113,20 @@ pub fn autosquash_interactive_todo(
   for entry in entries {
     let (prefix, new_cmd) = if entry.subject.has_prefix("fixup! ") {
       (
-        String::unsafe_substring(entry.subject, start=7, end=entry.subject.length()),
+        String::unsafe_substring(
+          entry.subject,
+          start=7,
+          end=entry.subject.length(),
+        ),
         TodoCommand::Fixup,
       )
     } else if entry.subject.has_prefix("squash! ") {
       (
-        String::unsafe_substring(entry.subject, start=8, end=entry.subject.length()),
+        String::unsafe_substring(
+          entry.subject,
+          start=8,
+          end=entry.subject.length(),
+        ),
         TodoCommand::Squash,
       )
     } else {
@@ -132,7 +141,14 @@ pub fn autosquash_interactive_todo(
     }
     if target_idx >= 0 {
       fixups.push(
-        (target_idx, { command: new_cmd, commit_hex: entry.commit_hex, subject: entry.subject }),
+        (
+          target_idx,
+          {
+            command: new_cmd,
+            commit_hex: entry.commit_hex,
+            subject: entry.subject,
+          },
+        ),
       )
     } else {
       normal.push(entry)
@@ -229,10 +245,7 @@ pub fn load_interactive_rebase_state(
     return None
   }
   let onto_hex = read_file_trimmed(rfs, join_path(rebase_dir, "onto"))
-  let orig_head_hex = read_file_trimmed(
-    rfs,
-    join_path(rebase_dir, "orig-head"),
-  )
+  let orig_head_hex = read_file_trimmed(rfs, join_path(rebase_dir, "orig-head"))
   let head_name = read_file_trimmed(rfs, join_path(rebase_dir, "head-name"))
   let todo_text = interactive_read_file_or_empty(
     rfs,
@@ -303,9 +316,7 @@ pub fn generate_interactive_todo_text(
   sb.write_string(
     "# r, reword <commit> = use commit, but edit the commit message\n",
   )
-  sb.write_string(
-    "# e, edit   <commit> = use commit, but stop for amending\n",
-  )
+  sb.write_string("# e, edit   <commit> = use commit, but stop for amending\n")
   sb.write_string(
     "# s, squash <commit> = use commit, but meld into previous commit\n",
   )
@@ -314,9 +325,7 @@ pub fn generate_interactive_todo_text(
   )
   sb.write_string("# d, drop   <commit> = remove commit\n")
   sb.write_string("#\n")
-  sb.write_string(
-    "# If you remove a line here THAT COMMIT WILL BE LOST.\n",
-  )
+  sb.write_string("# If you remove a line here THAT COMMIT WILL BE LOST.\n")
   sb.write_string("#\n")
   sb.to_string()
 }
@@ -325,9 +334,7 @@ pub fn generate_interactive_todo_text(
 fn interactive_first_line(s : String) -> String {
   match s.find("\n") {
     Some(idx) =>
-      @string_utils.trim_string(
-        String::unsafe_substring(s, start=0, end=idx),
-      )
+      @string_utils.trim_string(String::unsafe_substring(s, start=0, end=idx))
     None => @string_utils.trim_string(s)
   }
 }
@@ -340,14 +347,14 @@ fn interactive_first_line(s : String) -> String {
 /// Start an interactive rebase. The sequence_editor callback is invoked with
 /// the generated todo text and should return `Some(edited_text)` to proceed
 /// or `None` to abort.
-pub fn interactive_rebase_start(
+pub async fn interactive_rebase_start(
   fs : &@bit.FileSystem,
   rfs : &@bit.RepoFileSystem,
   root : String,
   upstream : @bit.ObjectId,
   onto : @bit.ObjectId,
-  sequence_editor : (String) -> String?,
-  message_editor : (String) -> String?,
+  sequence_editor : async (String) -> String?,
+  message_editor : async (String) -> String?,
   autosquash? : Bool = false,
 ) -> InteractiveRebaseResult raise @bit.GitError {
   let git_dir = join_path(root, ".git")
@@ -374,7 +381,7 @@ pub fn interactive_rebase_start(
   // Generate todo text
   let todo_text = generate_interactive_todo_text(db, rfs, commits)
   // Call sequence editor
-  let edited = sequence_editor(todo_text)
+  let edited = sequence_editor(todo_text) catch { _ => None }
   guard edited is Some(edited_text) else {
     return { status: IRBAborted, commit_id: None, message: "rebase aborted" }
   }
@@ -423,17 +430,17 @@ fn interactive_resolve_entries(
     let resolved = if hex.length() < 40 {
       let id = rev_parse(rfs, git_dir, hex)
       guard id is Some(resolved_id) else {
-        raise @bit.GitError::InvalidObject(
-          "Cannot resolve commit: " + hex,
-        )
+        raise @bit.GitError::InvalidObject("Cannot resolve commit: " + hex)
       }
       resolved_id.to_hex()
     } else {
       hex
     }
-    result.push(
-      { command: entry.command, commit_hex: resolved, subject: entry.subject },
-    )
+    result.push({
+      command: entry.command,
+      commit_hex: resolved,
+      subject: entry.subject,
+    })
   }
   result
 }
@@ -462,12 +469,12 @@ pub struct InteractiveRebaseResult {
 // ============================================================================
 
 ///|
-pub fn execute_interactive_todo(
+pub async fn execute_interactive_todo(
   fs : &@bit.FileSystem,
   rfs : &@bit.RepoFileSystem,
   root : String,
   state : InteractiveRebaseState,
-  message_editor : (String) -> String?,
+  message_editor : async (String) -> String?,
 ) -> InteractiveRebaseResult raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   let db = ObjectDb::load(rfs, git_dir)
@@ -504,7 +511,7 @@ pub fn execute_interactive_todo(
         _ => {
           // Get original message and let editor modify it
           let info = rebase_parse_commit_full(db, rfs, commit_id)
-          let edited_msg = message_editor(info.message)
+          let edited_msg = message_editor(info.message) catch { _ => None }
           let msg = match edited_msg {
             Some(m) => m
             None => info.message
@@ -537,24 +544,31 @@ pub fn execute_interactive_todo(
             status: IRBStopped,
             commit_id: head,
             message: "Stopped at " +
-              String::unsafe_substring(
-                entry.commit_hex,
-                start=0,
-                end=if entry.commit_hex.length() > 7 {
-                  7
-                } else {
-                  entry.commit_hex.length()
-                },
-              ) +
-              "... " +
-              entry.subject,
+            String::unsafe_substring(
+              entry.commit_hex,
+              start=0,
+              end=if entry.commit_hex.length() > 7 {
+                7
+              } else {
+                entry.commit_hex.length()
+              },
+            ) +
+            "... " +
+            entry.subject,
           }
         }
       }
     }
     Squash => {
       let result = interactive_squash_into_head(
-        fs, rfs, root, db, commit_id, state.squash_msg, false, message_editor,
+        fs,
+        rfs,
+        root,
+        db,
+        commit_id,
+        state.squash_msg,
+        false,
+        message_editor,
       )
       match result.status {
         IRBConflict => {
@@ -574,7 +588,14 @@ pub fn execute_interactive_todo(
     }
     Fixup => {
       let result = interactive_squash_into_head(
-        fs, rfs, root, db, commit_id, state.squash_msg, true, message_editor,
+        fs,
+        rfs,
+        root,
+        db,
+        commit_id,
+        state.squash_msg,
+        true,
+        message_editor,
       )
       match result.status {
         IRBConflict => {
@@ -738,7 +759,7 @@ fn interactive_amend_head_message(
 // ============================================================================
 
 ///|
-fn interactive_squash_into_head(
+async fn interactive_squash_into_head(
   fs : &@bit.FileSystem,
   rfs : &@bit.RepoFileSystem,
   root : String,
@@ -746,7 +767,7 @@ fn interactive_squash_into_head(
   commit_id : @bit.ObjectId,
   prev_squash_msg : String,
   fixup : Bool,
-  message_editor : (String) -> String?,
+  message_editor : async (String) -> String?,
 ) -> InteractiveRebaseResult raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   let info = rebase_parse_commit_full(db, rfs, commit_id)
@@ -795,7 +816,8 @@ fn interactive_squash_into_head(
   let final_msg = if fixup {
     combined_msg
   } else {
-    match message_editor(combined_msg) {
+    let edited_squash_msg = message_editor(combined_msg) catch { _ => None }
+    match edited_squash_msg {
       Some(edited) => edited
       None => combined_msg
     }
@@ -828,11 +850,11 @@ fn interactive_squash_into_head(
 // ============================================================================
 
 ///|
-pub fn interactive_rebase_continue_impl(
+pub async fn interactive_rebase_continue_impl(
   fs : &@bit.FileSystem,
   rfs : &@bit.RepoFileSystem,
   root : String,
-  message_editor : (String) -> String?,
+  message_editor : async (String) -> String?,
 ) -> InteractiveRebaseResult raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   let state = load_interactive_rebase_state(rfs, git_dir)
@@ -907,11 +929,11 @@ pub fn interactive_rebase_continue_impl(
 }
 
 ///|
-pub fn interactive_rebase_skip_impl(
+pub async fn interactive_rebase_skip_impl(
   fs : &@bit.FileSystem,
   rfs : &@bit.RepoFileSystem,
   root : String,
-  message_editor : (String) -> String?,
+  message_editor : async (String) -> String?,
 ) -> InteractiveRebaseResult raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   let state = load_interactive_rebase_state(rfs, git_dir)
@@ -1021,6 +1043,5 @@ pub fn is_interactive_rebase_in_progress(
   git_dir : String,
 ) -> Bool {
   let rebase_dir = join_path(git_dir, "rebase-merge")
-  rfs.is_dir(rebase_dir) &&
-  rfs.is_file(join_path(rebase_dir, "interactive"))
+  rfs.is_dir(rebase_dir) && rfs.is_file(join_path(rebase_dir, "interactive"))
 }

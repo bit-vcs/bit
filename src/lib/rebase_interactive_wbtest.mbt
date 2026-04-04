@@ -54,7 +54,11 @@ test "autosquash_interactive_todo: fixup! moves after target" {
   let entries : Array[InteractiveTodoEntry] = [
     { command: TodoCommand::Pick, commit_hex: "aaa", subject: "base feature" },
     { command: TodoCommand::Pick, commit_hex: "bbb", subject: "other work" },
-    { command: TodoCommand::Pick, commit_hex: "ccc", subject: "fixup! base feature" },
+    {
+      command: TodoCommand::Pick,
+      commit_hex: "ccc",
+      subject: "fixup! base feature",
+    },
   ]
   let result = autosquash_interactive_todo(entries)
   assert_eq(result.length(), 3)
@@ -68,7 +72,11 @@ test "autosquash_interactive_todo: fixup! moves after target" {
 test "autosquash_interactive_todo: squash! moves after target" {
   let entries : Array[InteractiveTodoEntry] = [
     { command: TodoCommand::Pick, commit_hex: "aaa", subject: "implement X" },
-    { command: TodoCommand::Pick, commit_hex: "bbb", subject: "squash! implement X" },
+    {
+      command: TodoCommand::Pick,
+      commit_hex: "bbb",
+      subject: "squash! implement X",
+    },
   ]
   let result = autosquash_interactive_todo(entries)
   assert_eq(result.length(), 2)
@@ -81,7 +89,11 @@ test "autosquash_interactive_todo: squash! moves after target" {
 test "autosquash_interactive_todo: no match leaves in place" {
   let entries : Array[InteractiveTodoEntry] = [
     { command: TodoCommand::Pick, commit_hex: "aaa", subject: "first" },
-    { command: TodoCommand::Pick, commit_hex: "bbb", subject: "fixup! nonexistent" },
+    {
+      command: TodoCommand::Pick,
+      commit_hex: "bbb",
+      subject: "fixup! nonexistent",
+    },
   ]
   let result = autosquash_interactive_todo(entries)
   assert_eq(result.length(), 2)
