@@ -44,7 +44,7 @@ t3404 (rebase -i): **129/132 (97.7%)**
 - [x] `--autostash` — rebase 前に自動 stash、完了後に pop (v0.40.3)
 - [x] `--keep-empty` / `--no-keep-empty` — 空コミットの保持制御 (v0.40.3)
 - [x] `--edit-todo` — 進行中 rebase の todo を再編集 (v0.40.3)
-- [ ] `--show-current-patch` — 現在のパッチ表示
+- [x] `--show-current-patch` — 現在のパッチ表示 (v0.40.4)
 - [ ] `--update-refs` — ref の自動追跡
 - [ ] `--strategy` / `-X` — マージストラテジーオプション
 - [ ] `--root` — root コミットからの rebase
