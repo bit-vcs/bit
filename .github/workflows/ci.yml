@@ -68,6 +68,18 @@ jobs:
           moon test --target native -p mizchi/bit/x/hub/native
           moon test --target native -p mizchi/bit/x/kv
 
+  nix-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-nix
+      - name: Build
+        run: nix build
+      - name: Smoke test
+        run: test -x ./result/bin/bit
+
   git-compat:
     runs-on: ubuntu-latest
     strategy:
