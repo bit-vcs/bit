@@ -13,25 +13,75 @@ t3404 (rebase -i): **129/132 (97.7%)**
 - LFS Read-Only: pointer 解決 + batch download + SHA-256 検証 + SSRF 防止
 - Interactive Rebase: pick/reword/edit/squash/fixup/drop/exec/break + autosquash + --exec
 - core.hooksPath: git config からフックパス解決
-- log --graph / --stat: native 実行に移行
+- log --graph / --stat / --name-only / --name-status / --topo-order: native 実行に移行
 - Cross-repo issue references + GitHub sync (read-only)
 - セキュリティ修正: LFS SHA-256 検証、URL scheme 検証、パス走査防止
 
-## P0: Git compatibility — delegate → native 移行
+## P0: Delegate → Native 移行 (コマンド別)
 
-### 高優先度・低コスト
+### log
 
-- [x] `log --name-only` / `--name-status` — diff ファイル名/ステータス表示 (v0.40.3)
-- [x] `log --topo-order` / `--date-order` / `--author-date-order` — コミットソート順 (v0.40.3)
+- [x] `--graph` — ブランチグラフ描画 (v0.40.3)
+- [x] `--stat` — diffstat 表示 (v0.40.3)
+- [x] `--name-only` / `--name-status` — ファイル名/ステータス表示 (v0.40.3)
+- [x] `--topo-order` / `--date-order` / `--author-date-order` — ソート順 (v0.40.3)
+- [ ] `log -- <path>` — pathspec フィルタ。`git log -- src/lib/` のようなパス限定表示
+- [ ] `--parents` — 各コミットの親 OID を表示
+- [ ] `--boundary` — boundary コミットのマーク
+- [ ] `--full-history` / `--simplify-merges` — マージ簡略化制御
+- [ ] `--ancestry-path` — 2点間の ancestry パス
+- [ ] `--show-pulls` — pull マージの表示
+- [ ] `--show-signature` — GPG 署名表示
+- [ ] `--stdin` — stdin からリビジョン読み取り
 
-### 高優先度・中コスト
+### rebase
 
-- [ ] `rebase --rebase-merges` — マージコミット保持 rebase (label/reset/merge コマンド)
+- [x] `-i` / `--interactive` — interactive rebase (v0.40.2)
+- [x] `--autosquash` — fixup!/squash! 並べ替え (v0.40.2)
+- [x] `--exec` / `-x` — exec コマンド挿入 (v0.40.3)
+- [x] `exec` / `break` — todo コマンド (v0.40.3)
+- [ ] `--rebase-merges` — マージ保持 rebase (label/reset/merge コマンド)
+- [ ] `--autostash` — rebase 前に自動 stash、完了後に pop
+- [ ] `--keep-empty` / `--no-keep-empty` — 空コミットの保持制御
+- [ ] `--edit-todo` — 進行中 rebase の todo を再編集
+- [ ] `--show-current-patch` — 現在のパッチ表示
+- [ ] `--update-refs` — ref の自動追跡
+- [ ] `--strategy` / `-X` — マージストラテジーオプション
+- [ ] `--root` — root コミットからの rebase
+- [ ] GPG 署名 (`-S` / `--gpg-sign`) on rebase
 
-### 中優先度
+### merge
+
+- [ ] GPG 署名 (`-S` / `--gpg-sign`) on merge — `commit.gpgSign` config 対応
+
+### show
+
+- [ ] GPG 署名表示 — `log.showSignature` config 対応
+
+### blame
+
+- [ ] textconv ドライバー対応
+- [ ] 未サポートフラグ群の native 実装
+
+### clone
+
+- [ ] `file://` URL + `--depth` / `--filter` — shallow clone のローカルプロトコル
+
+### fetch
+
+- [ ] `--depth` / `--deepen` / `--unshallow` — shallow fetch/unshallow
+
+### config
+
+- [ ] `--fixed-value` with `--rename-section` / `--remove-section`
+
+### rev-list
+
+- [ ] `--cherry-pick` / `--cherry-mark` / `--cherry` — cherry-pick 等価判定
+
+### stash
 
 - [ ] `stash push -p` — interactive hunk 選択
-- [ ] t3404 残り 3 件 — FAKE_LINES テストインフラ互換性
 
 ## P0.5: 未実装機能
 
@@ -44,7 +94,7 @@ t3404 (rebase -i): **129/132 (97.7%)**
 - [x] Interactive rebase (`rebase -i`) — native 実装 (v0.40.2)
 - [x] LFS Read-Only (v0.40.0)
 - [x] core.hooksPath (v0.40.3)
-- [x] log --graph / --stat (v0.40.3)
+- [x] log --graph / --stat / --name-only / --name-status / --topo-order (v0.40.3)
 
 ## P1: LFS
 
@@ -84,6 +134,10 @@ t3404 (rebase -i): **129/132 (97.7%)**
 - [ ] t1400 (update-ref) — FIFO デッドロック問題
 - [ ] t4056 (diff order) — `-O orderfile` 未実装
 
+## P2.5: t3404 (rebase -i) 残り 3 件
+
+- [ ] test 4, 5, 6 — FAKE_LINES テストインフラ (git 独自の fake editor) 互換性
+
 ## P3: WASM / クロスプラットフォーム
 
 - [ ] WASM target 機能カバレッジ拡大
@@ -92,7 +146,6 @@ t3404 (rebase -i): **129/132 (97.7%)**
 
 - [ ] Moonix integration
 - [ ] bit mcp 拡充
-- [ ] GPG 署名 on merge/rebase
 
 ## 実装済みコマンド (108 SHIM_CMDS)
 
