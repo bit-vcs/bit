@@ -59,7 +59,6 @@ fn rebase_has_complex_mode_args(args : Array[String]) -> Bool {
       arg == "--no-rebase-merges" ||
       arg == "--edit-todo" ||
       arg == "--show-current-patch" ||
-      arg == "--autostash" ||
       arg == "--keep-empty" ||
       arg == "--no-keep-empty" ||
       arg == "--update-refs" ||
@@ -148,6 +147,7 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
   let mut force_rebase = false
   let mut autosquash = false
   let mut no_autosquash = false
+  let mut autostash = false
   let exec_cmds : Array[String] = []
   let mut onto : String? = None
   let mut upstream : String? = None
@@ -179,6 +179,14 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
       "--no-autosquash" => {
         no_autosquash = true
         autosquash = false
+        i += 1
+      }
+      "--autostash" => {
+        autostash = true
+        i += 1
+      }
+      "--no-autostash" => {
+        autostash = false
         i += 1
       }
       "--force-rebase" | "--no-ff" | "-f" => {
@@ -282,6 +290,29 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
     }
     return ()
   }
+  // Also check rebase.autoStash config
+  if !autostash {
+    match @bitlib.read_config_value(rfs, git_dir + "/config", "rebase", "autostash") {
+      Some(v) => if v.to_lower() == "true" { autostash = true }
+      None => ()
+    }
+  }
+  // Autostash: save dirty state before rebase
+  let mut autostash_oid : @bitcore.ObjectId? = None
+  if autostash {
+    let author = get_author_string()
+    let timestamp = get_commit_timestamp()
+    let stash_id = @bitlib.stash_push(
+      wfs, rfs, root, author, "autostash", timestamp,
+    ) catch { _ => None }
+    match stash_id {
+      Some(id) => {
+        autostash_oid = Some(id)
+        eprint_line("Created autostash: \{String::unsafe_substring(id.to_hex(), start=0, end=7)}")
+      }
+      None => () // nothing to stash
+    }
+  }
   // Start new rebase
   guard upstream is Some(ref_name) else {
     raise @bitcore.GitError::InvalidObject("usage: git rebase [-i] <upstream>")
@@ -335,6 +366,10 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
       exec_cmds~,
     )
     print_interactive_rebase_result(result)
+    // Autostash pop on success
+    if autostash_oid is Some(_) && result.status is @bitlib.IRBComplete {
+      rebase_autostash_pop(wfs, rfs, root)
+    }
   } else {
     let result = match onto {
       Some(o) => {
@@ -348,7 +383,26 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
         @bitlib.rebase_start_with_onto(fs, fs, root, id, id, force_rebase~)
     }
     print_rebase_result(result)
+    // Autostash pop on success
+    if autostash_oid is Some(_) && result.status is @bitlib.RebaseStatus::Complete {
+      rebase_autostash_pop(wfs, rfs, root)
+    }
   }
+}
+
+///|
+async fn rebase_autostash_pop(
+  fs : &@bitcore.FileSystem,
+  rfs : &@bitcore.RepoFileSystem,
+  root : String,
+) -> Unit {
+  @bitlib.stash_apply(fs, rfs, root, 0, true) catch {
+    _ => {
+      eprint_line("warning: could not apply autostash")
+      return
+    }
+  }
+  eprint_line("Applied autostash.")
 }
 
 ///|
