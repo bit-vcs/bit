@@ -107,9 +107,7 @@ test "log: revision input handles caret and not-mode excludes" {
 
 ///|
 test "log: ancestry and simplify options fall back to real git" {
-  assert_true(log_need_real_git(["--stat"]))
   assert_true(log_need_real_git(["--stdin"]))
-  assert_true(log_need_real_git(["--graph"]))
   assert_true(log_need_real_git(["--boundary"]))
   assert_true(log_need_real_git(["--ancestry-path"]))
   assert_true(log_need_real_git(["--ancestry-path=topic"]))
@@ -124,6 +122,14 @@ test "log: ancestry and simplify options fall back to real git" {
   assert_true(log_need_real_git(["--pretty=format:%GT", "HEAD"]))
   assert_true(log_need_real_git(["--", "file"]))
   assert_false(log_need_real_git(["--oneline", "HEAD"]))
+  // These flags are now handled natively
+  assert_false(log_need_real_git(["--stat"]))
+  assert_false(log_need_real_git(["--graph"]))
+  assert_false(log_need_real_git(["--name-only"]))
+  assert_false(log_need_real_git(["--name-status"]))
+  assert_false(log_need_real_git(["--topo-order"]))
+  assert_false(log_need_real_git(["--date-order"]))
+  assert_false(log_need_real_git(["--author-date-order"]))
 }
 
 ///|

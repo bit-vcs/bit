@@ -239,15 +239,10 @@ fn log_need_real_git(args : Array[String], git_dir? : String = "") -> Bool {
       saw_double_dash = true
       continue
     }
-    if arg == "--name-only" ||
-      arg == "--name-status" ||
-      arg == "--stdin" ||
+    if arg == "--stdin" ||
       arg == "--boundary" ||
       arg == "--parents" ||
       arg == "--full-history" ||
-      arg == "--topo-order" ||
-      arg == "--date-order" ||
-      arg == "--author-date-order" ||
       arg == "--ancestry-path" ||
       arg == "--simplify-by-decoration" ||
       arg == "--simplify-merges" ||
@@ -3222,6 +3217,8 @@ async fn log_emit_default_commit_entry(
   reflog_selector? : String? = None,
   reflog_identity? : String? = None,
   reflog_message? : String? = None,
+  name_only? : Bool = false,
+  name_status? : Bool = false,
 ) -> Unit raise Error {
   let deco = format_decoration(ref_names, entry.id.to_hex())
   let header_hex = if abbrev_commit {
@@ -3289,6 +3286,32 @@ async fn log_emit_default_commit_entry(
         true,
         line_prefix,
       )
+    }
+    log_emit_output("", true, line_prefix)
+  }
+  if name_only || name_status {
+    let diff_files = @bitdiff.diff_trees(
+      rfs,
+      git_dir,
+      entry.parent_tree,
+      entry.tree,
+      db~,
+    )
+    for file in diff_files {
+      if name_only {
+        let path = match file.kind {
+          @bitdiff.DiffKind::Deleted => file.path
+          _ => file.path
+        }
+        log_emit_output(path, true, line_prefix)
+      } else {
+        let status = match file.kind {
+          @bitdiff.DiffKind::Added => "A"
+          @bitdiff.DiffKind::Modified => "M"
+          @bitdiff.DiffKind::Deleted => "D"
+        }
+        log_emit_output(status + "\t" + file.path, true, line_prefix)
+      }
     }
     log_emit_output("", true, line_prefix)
   }
@@ -3371,6 +3394,9 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
   let mut decorate_mode_override : LogDecorationDisplayMode? = None
   let mut show_stat = false
   let mut show_patch = false
+  let mut name_only = false
+  let mut name_status = false
+  let mut topo_order = false
   let mut max_count = 2147483647
   let mut since_ts = 0L
   let mut until_ts = 9223372036854775807L
@@ -3496,6 +3522,10 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
       "--raw" => show_raw = true
       "--stat" => show_stat = true
       "-p" | "--patch" => show_patch = true
+      "--name-only" => name_only = true
+      "--name-status" => name_status = true
+      "--topo-order" => topo_order = true
+      "--date-order" | "--author-date-order" => () // accepted but date-order is default
       "--no-merges" => no_merges = true
       "--abbrev-commit" => abbrev_commit_override = Some(true)
       "--no-abbrev-commit" => abbrev_commit_override = Some(false)
@@ -4194,6 +4224,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         until_ts,
         false,
         first_parent~,
+        topo_order~,
       )
       if reverse {
         entries.rev_in_place()
@@ -4424,7 +4455,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
             rfs,
             git_dir,
             id,
-            show_stat || show_patch || show_raw,
+            show_stat || show_patch || show_raw || name_only || name_status,
           ) {
           Some(entry) => {
             if no_merges && entry.parent_count > 1 {
@@ -4493,6 +4524,28 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
                   true,
                   line_prefix,
                 )
+              }
+              log_emit_output("", true, line_prefix)
+            }
+            if name_only || name_status {
+              let diff_files = @bitdiff.diff_trees(
+                rfs,
+                git_dir,
+                entry.parent_tree,
+                entry.tree,
+                db~,
+              )
+              for file in diff_files {
+                if name_only {
+                  log_emit_output(file.path, true, line_prefix)
+                } else {
+                  let status = match file.kind {
+                    @bitdiff.DiffKind::Added => "A"
+                    @bitdiff.DiffKind::Modified => "M"
+                    @bitdiff.DiffKind::Deleted => "D"
+                  }
+                  log_emit_output(status + "\t" + file.path, true, line_prefix)
+                }
               }
               log_emit_output("", true, line_prefix)
             }
@@ -4594,8 +4647,9 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
       },
       since_ts,
       until_ts,
-      show_stat || show_patch || show_raw,
+      show_stat || show_patch || show_raw || name_only || name_status,
       first_parent~,
+      topo_order~,
     )
     if reverse {
       entries.rev_in_place()
@@ -4772,6 +4826,28 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
           }
           log_emit_output("", true, line_prefix)
         }
+        if name_only || name_status {
+          let diff_files = @bitdiff.diff_trees(
+            rfs,
+            git_dir,
+            entry.parent_tree,
+            entry.tree,
+            db=walk_db,
+          )
+          for file in diff_files {
+            if name_only {
+              log_emit_output(file.path, true, line_prefix)
+            } else {
+              let status = match file.kind {
+                @bitdiff.DiffKind::Added => "A"
+                @bitdiff.DiffKind::Modified => "M"
+                @bitdiff.DiffKind::Deleted => "D"
+              }
+              log_emit_output(status + "\t" + file.path, true, line_prefix)
+            }
+          }
+          log_emit_output("", true, line_prefix)
+        }
         emitted += 1
       }
     }
@@ -4800,12 +4876,12 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
       max_count~,
       since=since_ts,
       until=until_ts,
-      include_parent_tree=show_stat || show_patch,
+      include_parent_tree=show_stat || show_patch || name_only || name_status,
     )
     if reverse {
       entries.rev_in_place()
     }
-    let log_db = if show_stat || show_patch {
+    let log_db = if show_stat || show_patch || name_only || name_status {
       Some(
         @bitlib.ObjectDb::load(rfs, log_resolve_common_git_dir(rfs, git_dir)),
       )
@@ -4846,6 +4922,28 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
           }
           log_emit_output("", true, line_prefix)
         }
+      }
+      if name_only || name_status {
+        let diff_files = @bitdiff.diff_trees(
+          rfs,
+          git_dir,
+          entry.parent_tree,
+          entry.tree,
+          db=log_db.unwrap(),
+        )
+        for file in diff_files {
+          if name_only {
+            log_emit_output(file.path, true, line_prefix)
+          } else {
+            let status = match file.kind {
+              @bitdiff.DiffKind::Added => "A"
+              @bitdiff.DiffKind::Modified => "M"
+              @bitdiff.DiffKind::Deleted => "D"
+            }
+            log_emit_output(status + "\t" + file.path, true, line_prefix)
+          }
+        }
+        log_emit_output("", true, line_prefix)
       }
     }
   }
@@ -4905,7 +5003,7 @@ fn format_decoration(
 
 ///|
 /// BFS walk from start_ids, excluding exclude_ids, with timestamp filtering.
-/// Returns entries sorted by timestamp descending.
+/// Returns entries sorted by timestamp descending (or topologically if topo_order).
 fn log_walk_commits(
   rfs : &@bitcore.RepoFileSystem,
   git_dir : String,
@@ -4916,6 +5014,7 @@ fn log_walk_commits(
   until_ts : Int64,
   include_parent_tree : Bool,
   first_parent? : Bool = false,
+  topo_order? : Bool = false,
 ) -> Array[LogWalkEntry] raise Error {
   let db = @bitlib.ObjectDb::load(rfs, log_resolve_common_git_dir(rfs, git_dir))
   let result : Array[LogWalkEntry] = []
@@ -4923,6 +5022,8 @@ fn log_walk_commits(
   // Priority queue: (timestamp, id) sorted desc by timestamp
   // Use insertion-sorted array
   let queue : Array[(Int64, @bitcore.ObjectId)] = []
+  // For topo_order: DFS stack follows first-parent chains
+  let topo_stack : Array[@bitcore.ObjectId] = []
   for id in start_ids {
     let hex = id.to_hex()
     if !visited.contains(hex) && !exclude_ids.contains(hex) {
@@ -4933,18 +5034,26 @@ fn log_walk_commits(
     }
   }
   let mut emitted = 0
-  while queue.length() > 0 && emitted < max_count {
-    let (_, id) = queue[0]
-    // Remove front
-    let new_q : Array[(Int64, @bitcore.ObjectId)] = []
-    for i in 1..<queue.length() {
-      new_q.push(queue[i])
-    }
-    while queue.length() > 0 {
-      ignore(queue.unsafe_pop())
-    }
-    for item in new_q {
-      queue.push(item)
+  while (queue.length() > 0 || topo_stack.length() > 0) && emitted < max_count {
+    // Pick next commit: in topo_order, prefer the DFS stack
+    let id = if topo_order && topo_stack.length() > 0 {
+      topo_stack.unsafe_pop()
+    } else if queue.length() > 0 {
+      let (_, qid) = queue[0]
+      // Remove front
+      let new_q : Array[(Int64, @bitcore.ObjectId)] = []
+      for i in 1..<queue.length() {
+        new_q.push(queue[i])
+      }
+      while queue.length() > 0 {
+        ignore(queue.unsafe_pop())
+      }
+      for item in new_q {
+        queue.push(item)
+      }
+      qid
+    } else {
+      break
     }
     let hex = id.to_hex()
     if exclude_ids.contains(hex) {
@@ -4955,18 +5064,34 @@ fn log_walk_commits(
     guard obj is Some(o) else { continue }
     let info = @bitcore.parse_commit(o.data)
     let parents = log_resolve_parents(rfs, git_dir, id, info.parents)
-    // Add parents to queue (limited to first parent if --first-parent)
+    // Add parents to queue/stack (limited to first parent if --first-parent)
     let parents_to_walk = if first_parent && parents.length() > 0 {
       [parents[0]]
     } else {
       parents
     }
-    for parent in parents_to_walk {
-      let phex = parent.to_hex()
-      if !visited.contains(phex) && !exclude_ids.contains(phex) {
-        visited[phex] = true
-        let pts = log_get_commit_timestamp(db, rfs, parent)
-        log_queue_insert(queue, (pts, parent))
+    if topo_order {
+      // In topo-order: push first parent onto DFS stack, rest into timestamp queue
+      for idx, parent in parents_to_walk {
+        let phex = parent.to_hex()
+        if !visited.contains(phex) && !exclude_ids.contains(phex) {
+          visited[phex] = true
+          if idx == 0 {
+            topo_stack.push(parent)
+          } else {
+            let pts = log_get_commit_timestamp(db, rfs, parent)
+            log_queue_insert(queue, (pts, parent))
+          }
+        }
+      }
+    } else {
+      for parent in parents_to_walk {
+        let phex = parent.to_hex()
+        if !visited.contains(phex) && !exclude_ids.contains(phex) {
+          visited[phex] = true
+          let pts = log_get_commit_timestamp(db, rfs, parent)
+          log_queue_insert(queue, (pts, parent))
+        }
       }
     }
     // Build LogWalkEntry

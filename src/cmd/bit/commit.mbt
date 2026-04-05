@@ -68,8 +68,12 @@ fn commit_storage_runtime_delegate_args(
   if !commit_has_no_verify_flag(args) {
     // Check for hooks in default location and core.hooksPath
     let has_hooks_path_config = @bitlib.read_config_value(
-        fs, git_dir + "/config", "core", "hookspath",
-      ) is Some(_)
+        fs,
+        git_dir + "/config",
+        "core",
+        "hookspath",
+      )
+      is Some(_)
     if has_hooks_path_config || fs.is_file(git_dir + "/hooks/pre-commit") {
       return None
     }
