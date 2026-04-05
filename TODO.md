@@ -40,7 +40,7 @@ t3404 (rebase -i): **129/132 (97.7%)**
 - [x] `--autosquash` — fixup!/squash! 並べ替え (v0.40.2)
 - [x] `--exec` / `-x` — exec コマンド挿入 (v0.40.3)
 - [x] `exec` / `break` — todo コマンド (v0.40.3)
-- [~] `--rebase-merges` — label/reset/merge コマンド実装済み、DAG todo 生成にバグあり (v0.40.4)
+- [x] `--rebase-merges` — label/reset/merge コマンド + DAG todo 生成 (v0.40.4)
 - [x] `--autostash` — rebase 前に自動 stash、完了後に pop (v0.40.3)
 - [x] `--keep-empty` / `--no-keep-empty` — 空コミットの保持制御 (v0.40.3)
 - [x] `--edit-todo` — 進行中 rebase の todo を再編集 (v0.40.3)
