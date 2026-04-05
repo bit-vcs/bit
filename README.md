@@ -211,9 +211,35 @@ run_storage_command(fs, fs, root, "commit", ["-m", "agent snapshot"])
 
 ## Compatibility
 
-- Git config: reads global aliases from `~/.gitconfig` (or `GIT_CONFIG_GLOBAL`) only.
-- Generic `filter=` attributes (clean/smudge) are handled natively.
-- Detailed standalone scope, unsupported paths, fallback points, and git/t coverage are documented in [`docs/git-compatibility.md`](docs/git-compatibility.md).
+bit implements 108 git commands natively with 973 git test suite tests passing. Key compatibility features:
+
+- Git config: reads global aliases from `~/.gitconfig` (or `GIT_CONFIG_GLOBAL`).
+- `core.hooksPath`: custom hook directory support.
+- Generic `filter=` attributes (clean/smudge) handled natively.
+- LFS pointer files resolved natively (read-only).
+- `log --graph`, `--stat`, `--name-only`, `--name-status`, `--topo-order` run natively.
+- `rebase -i` with all standard commands runs natively.
+- Detailed standalone scope, unsupported paths, fallback points, and git/t coverage documented in [`docs/git-compatibility.md`](docs/git-compatibility.md).
+
+### Git LFS Support
+
+bit natively resolves LFS pointer files during clone and checkout. No `git-lfs` binary required.
+
+- LFS pointer detection and batch download via LFS Batch API
+- SHA-256 integrity verification on downloaded objects
+- Local cache at `.git/lfs/objects/` (compatible with git-lfs layout)
+- URL resolution: `lfs.url`, `remote.<name>.lfsurl`, or derived from remote URL
+
+**Note:** Write support (clean filter, push) is not yet implemented. LFS repositories are read-only.
+
+### Interactive Rebase
+
+bit handles `rebase -i` natively with an injectable editor architecture:
+
+- **Commands:** pick, reword, edit, squash, fixup, drop, exec, break, label, reset, merge
+- **Flags:** `--autosquash`, `--exec`, `--autostash`, `--keep-empty`, `--edit-todo`, `--show-current-patch`, `--update-refs`, `--root`, `--strategy`/`-X`, `--rebase-merges`
+- **Editor injection:** `GIT_SEQUENCE_EDITOR` for todo editing, `GIT_EDITOR` for commit messages
+- **Programmatic API:** library layer accepts `(String) -> String?` callbacks (for CI, AI agents, MCP tools)
 
 ### Explicitly Unsupported Features
 
@@ -225,23 +251,16 @@ The following features are **not supported** and will produce a fatal error:
 - Incremental multi-pack-index chains
 
 **Gitattributes**
-- `filter=lfs` (Git LFS)
 - `working-tree-encoding=`
 
-**Commit & rebase**
-- Signed commits (`-S`, `--gpg-sign`)
-- Interactive rebase (`-i`, `--interactive`)
+**Other**
+- GPG signing on merge/rebase (`-S`, `--gpg-sign`)
 - Grafts (`.git/info/grafts`) and replace refs (`refs/replace/`)
-
-**Clone**
 - Recursive clone (`--recursive`, submodule auto-init)
-
-**Network**
-- SSH URLs (`git@...`) in `bit cat` / `bit tree` commands
-- JS target: SSH transport (`ssh://`, `git@...`) in `clone` / `fetch` / `pull` / `push` (use HTTP(S) or relay URLs)
-
-**Shell**
 - Shell aliases (prefixed with `!`)
+
+**JS target only**
+- SSH transport (`ssh://`, `git@...`) in `clone` / `fetch` / `pull` / `push` (use HTTP(S) or relay URLs)
 
 ## Environment Variables
 
