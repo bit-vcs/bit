@@ -204,9 +204,7 @@ pub fn serialize_interactive_todo(
         sb.write_string(entry.subject)
         sb.write_string("\n")
       }
-      Break => {
-        sb.write_string("break\n")
-      }
+      Break => sb.write_string("break\n")
       Exec => {
         sb.write_string("exec ")
         sb.write_string(entry.subject)
@@ -718,7 +716,7 @@ fn generate_rebase_merges_todo_text(
   let mut label_counter = 0
   for c in commits {
     let hex = c.to_hex()
-    if !(is_merge.get(hex).unwrap_or(false)) {
+    if !is_merge.get(hex).unwrap_or(false) {
       continue
     }
     let ps = parents_map.get(hex).unwrap_or([])
@@ -743,6 +741,16 @@ fn generate_rebase_merges_todo_text(
   // a labeled commit or at the base.
   let sb = StringBuilder::new()
   sb.write_string("label onto\n\n")
+  // Emit label commands for external parents (outside the rebase range).
+  // These are merge parents not in commit_set that need labels so that
+  // merge commands can reference them.
+  for item in needs_label.to_array() {
+    let (ch, label) = item
+    if !commit_set.contains(ch) {
+      sb.write_string("reset \{ch}\n")
+      sb.write_string("label \{label}\n\n")
+    }
+  }
   // Group commits into branches by tracing first-parent chains backward
   // from each commit that needs a label (these are side branch tips)
   // Strategy: process commits in topological order (parents first).
@@ -861,11 +869,7 @@ fn generate_rebase_merges_todo_text(
           }
           None => "???"
         }
-        entries.push({
-          command: TodoCommand::Pick,
-          commit_hex: short,
-          subject,
-        })
+        entries.push({ command: TodoCommand::Pick, commit_hex: short, subject })
       }
     }
     // Add label at end if this branch is labeled
@@ -903,12 +907,8 @@ fn generate_rebase_merges_todo_text(
   }
   sb.write_string("# Rebase commands:\n")
   sb.write_string("# p, pick   <commit> = use commit\n")
-  sb.write_string(
-    "# l, label  <name>  = label current HEAD with a name\n",
-  )
-  sb.write_string(
-    "# t, reset  <name>  = reset HEAD to a label\n",
-  )
+  sb.write_string("# l, label  <name>  = label current HEAD with a name\n")
+  sb.write_string("# t, reset  <name>  = reset HEAD to a label\n")
   sb.write_string(
     "# m, merge  [-C <commit>] <label> = create a merge using the original merge commit's message\n",
   )
@@ -1475,14 +1475,25 @@ pub async fn execute_interactive_todo(
       )
     }
     Reset => {
-      // Reset HEAD to a labeled commit
+      // Reset HEAD to a labeled commit or a commit hash
       let label_name = entry.subject
       let hex = match state.labels.get(label_name) {
         Some(h) => h
         None =>
-          raise @bit.GitError::InvalidObject(
-            "Unknown label: \{label_name}",
-          )
+          // If the label is a full hex commit id, use it directly
+          if label_name.length() == 40 || label_name.length() == 64 {
+            label_name
+          } else {
+            // Try resolving as a rev-parse reference
+            let resolved = rev_parse(rfs, git_dir, label_name)
+            match resolved {
+              Some(id) => id.to_hex()
+              None =>
+                raise @bit.GitError::InvalidObject(
+                  "Unknown label: \{label_name}",
+                )
+            }
+          }
       }
       ignore(checkout(fs, rfs, root, hex, detach=true))
       let new_state = interactive_move_to_done(state)
@@ -1527,7 +1538,9 @@ pub async fn execute_interactive_todo(
       }
       let ours_files = collect_tree_files_from_commit(db, rfs, head_id)
       let theirs_files = collect_tree_files_from_commit(db, rfs, label_id)
-      let file_result = merge_files(base_files, ours_files, theirs_files, db, rfs)
+      let file_result = merge_files(
+        base_files, ours_files, theirs_files, db, rfs,
+      )
       let merged = file_result.merged
       let conflicts = file_result.conflicts
       // Handle content merges
@@ -1647,12 +1660,7 @@ pub async fn execute_interactive_todo(
       let (new_id, compressed) = @bit.create_commit(new_commit)
       write_object_bytes(fs, git_dir, new_id, compressed)
       rebase_update_head(fs, rfs, git_dir, new_id)
-      interactive_record_commit_mapping(
-        state,
-        rfs,
-        git_dir,
-        entry.commit_hex,
-      )
+      interactive_record_commit_mapping(state, rfs, git_dir, entry.commit_hex)
       let new_state = interactive_move_to_done(state)
       save_interactive_rebase_state(fs, git_dir, new_state)
       execute_interactive_todo(

@@ -489,24 +489,10 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
         guard onto_id is Some(oid) else {
           raise @bitcore.GitError::InvalidObject("unknown revision: \{o}")
         }
-        @bitlib.rebase_start_with_onto(
-          fs,
-          fs,
-          root,
-          oid,
-          id,
-          force_rebase~,
-        )
+        @bitlib.rebase_start_with_onto(fs, fs, root, oid, id, force_rebase~)
       }
       None =>
-        @bitlib.rebase_start_with_onto(
-          fs,
-          fs,
-          root,
-          id,
-          id,
-          force_rebase~,
-        )
+        @bitlib.rebase_start_with_onto(fs, fs, root, id, id, force_rebase~)
     }
     print_rebase_result(result)
     // Autostash pop on success
