@@ -14,6 +14,9 @@ pub enum TodoCommand {
   Drop
   Exec
   Break
+  Label
+  Reset
+  Merge
 } derive(Show, Eq)
 
 ///|
@@ -34,6 +37,9 @@ fn parse_todo_command(s : String) -> TodoCommand? {
     "drop" | "d" => Some(TodoCommand::Drop)
     "exec" | "x" => Some(TodoCommand::Exec)
     "break" | "b" => Some(TodoCommand::Break)
+    "label" | "l" => Some(TodoCommand::Label)
+    "reset" | "t" => Some(TodoCommand::Reset)
+    "merge" | "m" => Some(TodoCommand::Merge)
     _ => None
   }
 }
@@ -49,6 +55,51 @@ fn todo_command_to_string(cmd : TodoCommand) -> String {
     Drop => "drop"
     Exec => "exec"
     Break => "break"
+    Label => "label"
+    Reset => "reset"
+    Merge => "merge"
+  }
+}
+
+///|
+/// Parse "merge" entry arguments: `-C <oid> <label> [# comment]` or `<label> [# comment]`
+fn parse_merge_todo_entry(after : String) -> InteractiveTodoEntry {
+  if after.has_prefix("-C ") || after.has_prefix("-c ") {
+    // merge -C <oid> <label> [# comment]
+    let rest = @string_utils.trim_string(
+      String::unsafe_substring(after, start=3, end=after.length()),
+    )
+    let sp = rest.find(" ")
+    match sp {
+      Some(idx) => {
+        let oid = String::unsafe_substring(rest, start=0, end=idx)
+        let label_and_comment = @string_utils.trim_string(
+          String::unsafe_substring(rest, start=idx + 1, end=rest.length()),
+        )
+        // Strip # comment from label
+        let label = match label_and_comment.find(" #") {
+          Some(ci) =>
+            @string_utils.trim_string(
+              String::unsafe_substring(label_and_comment, start=0, end=ci),
+            )
+          None => label_and_comment
+        }
+        { command: TodoCommand::Merge, commit_hex: oid, subject: label }
+      }
+      None =>
+        // Just "merge -C <oid>" with no label — shouldn't happen but handle it
+        { command: TodoCommand::Merge, commit_hex: rest, subject: "" }
+    }
+  } else {
+    // merge <label> [# comment] — no -C flag, no original commit
+    let label = match after.find(" #") {
+      Some(ci) =>
+        @string_utils.trim_string(
+          String::unsafe_substring(after, start=0, end=ci),
+        )
+      None => after
+    }
+    { command: TodoCommand::Merge, commit_hex: "", subject: label }
   }
 }
 
@@ -96,6 +147,24 @@ pub fn parse_interactive_todo(text : String) -> Array[InteractiveTodoEntry] {
           commit_hex: "",
           subject: after_trimmed,
         })
+      Some(TodoCommand::Label) =>
+        // label <name>: no commit_hex, subject is the label name
+        entries.push({
+          command: TodoCommand::Label,
+          commit_hex: "",
+          subject: after_trimmed,
+        })
+      Some(TodoCommand::Reset) =>
+        // reset <name>: no commit_hex, subject is the label name
+        entries.push({
+          command: TodoCommand::Reset,
+          commit_hex: "",
+          subject: after_trimmed,
+        })
+      Some(TodoCommand::Merge) =>
+        // merge -C <oid> <label> [# comment]
+        // or merge <label> [# comment] (without -C)
+        entries.push(parse_merge_todo_entry(after_trimmed))
       Some(TodoCommand::Break) =>
         // break: no arguments
         entries.push({
@@ -116,12 +185,42 @@ pub fn serialize_interactive_todo(
 ) -> String {
   let sb = StringBuilder::new()
   for entry in entries {
-    sb.write_string(todo_command_to_string(entry.command))
-    sb.write_string(" ")
-    sb.write_string(entry.commit_hex)
-    sb.write_string(" ")
-    sb.write_string(entry.subject)
-    sb.write_string("\n")
+    match entry.command {
+      Label | Reset => {
+        // label <name> / reset <name>
+        sb.write_string(todo_command_to_string(entry.command))
+        sb.write_string(" ")
+        sb.write_string(entry.subject)
+        sb.write_string("\n")
+      }
+      Merge => {
+        // merge [-C <oid>] <label>
+        sb.write_string("merge")
+        if entry.commit_hex.length() > 0 {
+          sb.write_string(" -C ")
+          sb.write_string(entry.commit_hex)
+        }
+        sb.write_string(" ")
+        sb.write_string(entry.subject)
+        sb.write_string("\n")
+      }
+      Break => {
+        sb.write_string("break\n")
+      }
+      Exec => {
+        sb.write_string("exec ")
+        sb.write_string(entry.subject)
+        sb.write_string("\n")
+      }
+      _ => {
+        sb.write_string(todo_command_to_string(entry.command))
+        sb.write_string(" ")
+        sb.write_string(entry.commit_hex)
+        sb.write_string(" ")
+        sb.write_string(entry.subject)
+        sb.write_string("\n")
+      }
+    }
   }
   sb.to_string()
 }
@@ -212,6 +311,9 @@ pub struct InteractiveRebaseState {
   done : Array[InteractiveTodoEntry]
   amend : Bool // true when stopped for edit (next continue should amend)
   squash_msg : String // accumulated squash message
+  update_refs : Map[String, String] // ref_path → old_commit_hex (refs to update)
+  commit_map : Map[String, String] // old_commit_hex → new_commit_hex (rebase mapping)
+  labels : Map[String, String] // label_name → commit_hex (for --rebase-merges)
 }
 
 ///|
@@ -252,6 +354,44 @@ pub fn save_interactive_rebase_state(
       _ => ()
     }
   }
+  // Write labels state (for --rebase-merges)
+  if state.labels.length() > 0 {
+    let sb = StringBuilder::new()
+    for item in state.labels.to_array() {
+      let (name, hex) = item
+      sb.write_string(name)
+      sb.write_string(" ")
+      sb.write_string(hex)
+      sb.write_string("\n")
+    }
+    fs.write_string(join_path(rebase_dir, "labels"), sb.to_string())
+  } else {
+    fs.remove_file(join_path(rebase_dir, "labels")) catch {
+      _ => ()
+    }
+  }
+  // Write update-refs state
+  if state.update_refs.length() > 0 {
+    let sb = StringBuilder::new()
+    for item in state.update_refs.to_array() {
+      let (ref_path, old_hex) = item
+      let new_hex = match state.commit_map.get(old_hex) {
+        Some(h) => h
+        None => ""
+      }
+      sb.write_string(old_hex)
+      sb.write_string(" ")
+      sb.write_string(new_hex)
+      sb.write_string(" ")
+      sb.write_string(ref_path)
+      sb.write_string("\n")
+    }
+    fs.write_string(join_path(rebase_dir, "update-refs"), sb.to_string())
+  } else {
+    fs.remove_file(join_path(rebase_dir, "update-refs")) catch {
+      _ => ()
+    }
+  }
 }
 
 ///|
@@ -283,6 +423,61 @@ pub fn load_interactive_rebase_state(
     rfs,
     join_path(rebase_dir, "message-squash"),
   )
+  // Load labels state (for --rebase-merges)
+  let labels : Map[String, String] = {}
+  let labels_text = interactive_read_file_or_empty(
+    rfs,
+    join_path(rebase_dir, "labels"),
+  )
+  if labels_text.length() > 0 {
+    for line_view in labels_text.split("\n") {
+      let line = @string_utils.trim_string(line_view.to_string())
+      if line.length() == 0 {
+        continue
+      }
+      let sp = line.find(" ")
+      guard sp is Some(idx) else { continue }
+      let name = String::unsafe_substring(line, start=0, end=idx)
+      let hex = String::unsafe_substring(line, start=idx + 1, end=line.length())
+      labels[name] = hex
+    }
+  }
+  // Load update-refs state
+  let update_refs : Map[String, String] = {}
+  let commit_map : Map[String, String] = {}
+  let update_refs_text = interactive_read_file_or_empty(
+    rfs,
+    join_path(rebase_dir, "update-refs"),
+  )
+  if update_refs_text.length() > 0 {
+    for line_view in update_refs_text.split("\n") {
+      let line = @string_utils.trim_string(line_view.to_string())
+      if line.length() == 0 {
+        continue
+      }
+      // Format: old_hex new_hex ref_path
+      let first_sp = line.find(" ")
+      guard first_sp is Some(sp1) else { continue }
+      let old_hex = String::unsafe_substring(line, start=0, end=sp1)
+      let rest = String::unsafe_substring(
+        line,
+        start=sp1 + 1,
+        end=line.length(),
+      )
+      let second_sp = rest.find(" ")
+      guard second_sp is Some(sp2) else { continue }
+      let new_hex = String::unsafe_substring(rest, start=0, end=sp2)
+      let ref_path = String::unsafe_substring(
+        rest,
+        start=sp2 + 1,
+        end=rest.length(),
+      )
+      update_refs[ref_path] = old_hex
+      if new_hex.length() > 0 {
+        commit_map[old_hex] = new_hex
+      }
+    }
+  }
   Some({
     onto: @bit.ObjectId::from_hex(onto_hex),
     orig_head: @bit.ObjectId::from_hex(orig_head_hex),
@@ -291,6 +486,9 @@ pub fn load_interactive_rebase_state(
     done: parse_interactive_todo(done_text),
     amend,
     squash_msg,
+    update_refs,
+    commit_map,
+    labels,
   })
 }
 
@@ -403,6 +601,360 @@ fn extract_todo_comments(text : String) -> String {
 }
 
 // ============================================================================
+// Interactive Rebase: DAG collection for --rebase-merges
+// ============================================================================
+
+///|
+/// Collect all commits between upstream and head, including merge commits.
+/// Returns commits in topological order (parents before children).
+fn rebase_collect_dag(
+  db : ObjectDb,
+  fs : &@bit.RepoFileSystem,
+  head : @bit.ObjectId,
+  upstream : @bit.ObjectId,
+) -> Array[@bit.ObjectId] raise @bit.GitError {
+  // Find the merge base
+  let merge_base = find_merge_base(db, fs, head, upstream)
+  guard merge_base is Some(base) else {
+    raise @bit.GitError::InvalidObject("No common ancestor found")
+  }
+  // BFS to collect all ancestors of base (stop set)
+  let base_ancestors : Map[String, Bool] = {}
+  base_ancestors[base.to_hex()] = true
+  let bfs_queue : Array[@bit.ObjectId] = [base]
+  let mut qi = 0
+  while qi < bfs_queue.length() {
+    let cur = bfs_queue[qi]
+    qi += 1
+    let obj = db.get(fs, cur)
+    match obj {
+      Some(o) => {
+        let info = @bit.parse_commit(o.data)
+        for p in info.parents {
+          if !base_ancestors.contains(p.to_hex()) {
+            base_ancestors[p.to_hex()] = true
+            bfs_queue.push(p)
+          }
+        }
+      }
+      None => ()
+    }
+  }
+  // BFS from head, collecting commits not in base_ancestors
+  let visited : Map[String, Bool] = {}
+  let result : Array[@bit.ObjectId] = []
+  let queue : Array[@bit.ObjectId] = [head]
+  visited[head.to_hex()] = true
+  let mut idx = 0
+  while idx < queue.length() {
+    let cur = queue[idx]
+    idx += 1
+    let hex = cur.to_hex()
+    if base_ancestors.contains(hex) {
+      continue
+    }
+    result.push(cur)
+    let obj = db.get(fs, cur)
+    match obj {
+      Some(o) => {
+        let info = @bit.parse_commit(o.data)
+        for p in info.parents {
+          let ph = p.to_hex()
+          if !visited.contains(ph) {
+            visited[ph] = true
+            queue.push(p)
+          }
+        }
+      }
+      None => ()
+    }
+  }
+  // Reverse to get topological order (parents first)
+  result.rev()
+}
+
+///|
+/// Generate todo text for --rebase-merges mode.
+/// Produces label/reset/merge commands to preserve merge topology.
+fn generate_rebase_merges_todo_text(
+  db : ObjectDb,
+  rfs : &@bit.RepoFileSystem,
+  commits : Array[@bit.ObjectId],
+  upstream : @bit.ObjectId,
+) -> String raise @bit.GitError {
+  let merge_base = find_merge_base(
+    db,
+    rfs,
+    commits[commits.length() - 1],
+    upstream,
+  )
+  let base_hex = match merge_base {
+    Some(b) => b.to_hex()
+    None => upstream.to_hex()
+  }
+  // Build set for quick lookup
+  let commit_set : Map[String, Bool] = {}
+  for c in commits {
+    commit_set[c.to_hex()] = true
+  }
+  // Build children map and parent info
+  let parents_map : Map[String, Array[@bit.ObjectId]] = {}
+  let is_merge : Map[String, Bool] = {}
+  for c in commits {
+    let obj = db.get(rfs, c)
+    match obj {
+      Some(o) => {
+        let info = @bit.parse_commit(o.data)
+        parents_map[c.to_hex()] = info.parents
+        if info.parents.length() > 1 {
+          is_merge[c.to_hex()] = true
+        }
+      }
+      None => ()
+    }
+  }
+  // Find which commits are referenced as second+ parent of merges (need labels)
+  let needs_label : Map[String, String] = {} // commit_hex → label_name
+  let mut label_counter = 0
+  for c in commits {
+    let hex = c.to_hex()
+    if !(is_merge.get(hex).unwrap_or(false)) {
+      continue
+    }
+    let ps = parents_map.get(hex).unwrap_or([])
+    // Second and subsequent parents need labels
+    for i = 1; i < ps.length(); i = i + 1 {
+      let ph = ps[i].to_hex()
+      if commit_set.contains(ph) && !needs_label.contains(ph) {
+        // Try to derive a label name from commit subject
+        let label = "branch-\{label_counter}"
+        label_counter += 1
+        needs_label[ph] = label
+      } else if !commit_set.contains(ph) && !needs_label.contains(ph) {
+        // Parent is outside the rebase range — label it as external
+        let label = "branch-\{label_counter}"
+        label_counter += 1
+        needs_label[ph] = label
+      }
+    }
+  }
+  // Walk first-parent chains and build branches
+  // A "branch" is a sequence of commits along first-parent that ends at
+  // a labeled commit or at the base.
+  let sb = StringBuilder::new()
+  sb.write_string("label onto\n\n")
+  // Group commits into branches by tracing first-parent chains backward
+  // from each commit that needs a label (these are side branch tips)
+  // Strategy: process commits in topological order (parents first).
+  // Track which "branch" each commit belongs to.
+  // First, identify branch tips: commits that are second+ parents of merges
+  // and the final commit (HEAD)
+  let head_hex = commits[commits.length() - 1].to_hex()
+  // For each labeled commit, trace its first-parent chain until we hit
+  // a commit that's already assigned or is outside the range
+  // Process labeled commits + HEAD
+  let branch_tips : Array[(String, String)] = [] // (commit_hex, label_name)
+  for item in needs_label.to_array() {
+    let (ch, label) = item
+    if commit_set.contains(ch) {
+      branch_tips.push((ch, label))
+    }
+  }
+  // HEAD is always the main branch
+  branch_tips.push((head_hex, ""))
+  // Sort so that earlier commits in the topo order come first
+  let commit_order : Map[String, Int] = {}
+  for i, c in commits {
+    commit_order[c.to_hex()] = i
+  }
+  // Process each branch: trace first-parent chain, collect picks
+  let branch_entries : Array[(String, Array[InteractiveTodoEntry])] = []
+  let processed : Map[String, Bool] = {}
+  // Process branches in reverse topological order of their tips
+  // so that dependencies (labels) are defined before they're needed
+  let sorted_tips = branch_tips.copy()
+  sorted_tips.sort_by(fn(a, b) {
+    let oa = commit_order.get(a.0).unwrap_or(0)
+    let ob = commit_order.get(b.0).unwrap_or(0)
+    oa - ob
+  })
+  for tip in sorted_tips {
+    let (tip_hex, label) = tip
+    if processed.contains(tip_hex) {
+      continue
+    }
+    // Trace first-parent chain from tip backward
+    let chain : Array[@bit.ObjectId] = []
+    let mut cur_hex = tip_hex
+    while true {
+      if !commit_set.contains(cur_hex) || processed.contains(cur_hex) {
+        break
+      }
+      chain.push(@bit.ObjectId::from_hex(cur_hex))
+      processed[cur_hex] = true
+      let ps = parents_map.get(cur_hex).unwrap_or([])
+      if ps.length() == 0 {
+        break
+      }
+      cur_hex = ps[0].to_hex()
+    }
+    chain.rev_in_place()
+    // Determine what to reset to
+    let reset_target = if chain.length() > 0 {
+      let first = chain[0]
+      let ps = parents_map.get(first.to_hex()).unwrap_or([])
+      if ps.length() > 0 {
+        let p0hex = ps[0].to_hex()
+        if p0hex == base_hex || !commit_set.contains(p0hex) {
+          "onto"
+        } else {
+          // Find which label this parent has
+          match needs_label.get(p0hex) {
+            Some(l) => l
+            None => "onto"
+          }
+        }
+      } else {
+        "onto"
+      }
+    } else {
+      "onto"
+    }
+    // Build entries for this branch
+    let entries : Array[InteractiveTodoEntry] = []
+    entries.push({
+      command: TodoCommand::Reset,
+      commit_hex: "",
+      subject: reset_target,
+    })
+    for c in chain {
+      let ch = c.to_hex()
+      if is_merge.get(ch).unwrap_or(false) {
+        // This is a merge commit
+        let ps = parents_map.get(ch).unwrap_or([])
+        // The second parent should have a label
+        if ps.length() > 1 {
+          let p2hex = ps[1].to_hex()
+          let merge_label = needs_label.get(p2hex).unwrap_or("unknown")
+          let short = String::unsafe_substring(ch, start=0, end=7)
+          let subject = match db.get(rfs, c) {
+            Some(o) => {
+              let info = rebase_parse_commit_content(o.data)
+              interactive_first_line(info.message)
+            }
+            None => "???"
+          }
+          ignore(subject)
+          entries.push({
+            command: TodoCommand::Merge,
+            commit_hex: ch,
+            subject: merge_label,
+          })
+          ignore(short)
+        }
+      } else {
+        let short = String::unsafe_substring(ch, start=0, end=7)
+        let subject = match db.get(rfs, c) {
+          Some(o) => {
+            let info = rebase_parse_commit_content(o.data)
+            interactive_first_line(info.message)
+          }
+          None => "???"
+        }
+        entries.push({
+          command: TodoCommand::Pick,
+          commit_hex: short,
+          subject,
+        })
+      }
+    }
+    // Add label at end if this branch is labeled
+    if label.length() > 0 {
+      entries.push({
+        command: TodoCommand::Label,
+        commit_hex: "",
+        subject: label,
+      })
+    }
+    branch_entries.push((label, entries))
+  }
+  // Output branches: side branches first, then main branch (empty label)
+  for item in branch_entries {
+    let (label, entries) = item
+    if label.length() == 0 {
+      continue
+    }
+    sb.write_string("# Branch \{label}\n")
+    for entry in entries {
+      sb.write_string(serialize_single_todo_entry(entry))
+    }
+    sb.write_string("\n")
+  }
+  // Main branch last
+  for item in branch_entries {
+    let (label, entries) = item
+    if label.length() > 0 {
+      continue
+    }
+    for entry in entries {
+      sb.write_string(serialize_single_todo_entry(entry))
+    }
+    sb.write_string("\n")
+  }
+  sb.write_string("# Rebase commands:\n")
+  sb.write_string("# p, pick   <commit> = use commit\n")
+  sb.write_string(
+    "# l, label  <name>  = label current HEAD with a name\n",
+  )
+  sb.write_string(
+    "# t, reset  <name>  = reset HEAD to a label\n",
+  )
+  sb.write_string(
+    "# m, merge  [-C <commit>] <label> = create a merge using the original merge commit's message\n",
+  )
+  sb.write_string("#\n")
+  sb.to_string()
+}
+
+///|
+fn serialize_single_todo_entry(entry : InteractiveTodoEntry) -> String {
+  let sb = StringBuilder::new()
+  match entry.command {
+    Label | Reset => {
+      sb.write_string(todo_command_to_string(entry.command))
+      sb.write_string(" ")
+      sb.write_string(entry.subject)
+      sb.write_string("\n")
+    }
+    Merge => {
+      sb.write_string("merge")
+      if entry.commit_hex.length() > 0 {
+        sb.write_string(" -C ")
+        sb.write_string(entry.commit_hex)
+      }
+      sb.write_string(" ")
+      sb.write_string(entry.subject)
+      sb.write_string("\n")
+    }
+    Break => sb.write_string("break\n")
+    Exec => {
+      sb.write_string("exec ")
+      sb.write_string(entry.subject)
+      sb.write_string("\n")
+    }
+    _ => {
+      sb.write_string(todo_command_to_string(entry.command))
+      sb.write_string(" ")
+      sb.write_string(entry.commit_hex)
+      sb.write_string(" ")
+      sb.write_string(entry.subject)
+      sb.write_string("\n")
+    }
+  }
+  sb.to_string()
+}
+
+// ============================================================================
 // Interactive Rebase: start
 // ============================================================================
 
@@ -421,6 +973,9 @@ pub async fn interactive_rebase_start(
   autosquash? : Bool = false,
   exec_runner? : (async (String) -> Int)? = None,
   exec_cmds? : Array[String] = [],
+  update_refs? : Bool = false,
+  root_mode? : Bool = false,
+  rebase_merges? : Bool = false,
 ) -> InteractiveRebaseResult raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   if is_rebase_in_progress(rfs, git_dir) {
@@ -434,7 +989,13 @@ pub async fn interactive_rebase_start(
   }
   let db = ObjectDb::load(rfs, git_dir)
   // Collect commits to rebase
-  let commits = rebase_collect_chain(db, rfs, h, upstream)
+  let commits = if root_mode {
+    rebase_collect_chain_to_root(db, rfs, h)
+  } else if rebase_merges {
+    rebase_collect_dag(db, rfs, h, upstream)
+  } else {
+    rebase_collect_chain(db, rfs, h, upstream)
+  }
   if commits.length() == 0 {
     return {
       status: IRBComplete,
@@ -449,7 +1010,11 @@ pub async fn interactive_rebase_start(
     HeadRef::Detached(_) => ""
   }
   // Generate todo text
-  let todo_text = generate_interactive_todo_text(db, rfs, commits)
+  let todo_text = if rebase_merges {
+    generate_rebase_merges_todo_text(db, rfs, commits, upstream)
+  } else {
+    generate_interactive_todo_text(db, rfs, commits)
+  }
   // Pre-process: autosquash and exec insertion before editor
   let mut pre_entries = parse_interactive_todo(todo_text)
   if autosquash {
@@ -486,8 +1051,41 @@ pub async fn interactive_rebase_start(
   }
   // Resolve short hex to full hex in entries
   let resolved_entries = interactive_resolve_entries(rfs, git_dir, entries)
-  // Detach HEAD at onto
-  ignore(checkout(fs, rfs, root, onto.to_hex(), detach=true))
+  // Collect refs to update if --update-refs is enabled
+  let update_refs_map : Map[String, String] = {}
+  if update_refs {
+    let commit_set : Map[String, Bool] = {}
+    for entry in resolved_entries {
+      if entry.commit_hex.length() > 0 {
+        commit_set[entry.commit_hex] = true
+      }
+    }
+    let all_refs = list_refs_with_ids(rfs, git_dir, Some("refs/heads/"))
+    for item in all_refs.to_array() {
+      let (ref_path, ref_id) = item
+      let hex = ref_id.to_hex()
+      // Skip the branch being rebased (it's handled by head_name restoration)
+      if ref_path == head_name {
+        continue
+      }
+      if commit_set.contains(hex) {
+        update_refs_map[ref_path] = hex
+      }
+    }
+  }
+  // Detach HEAD at onto (for --root mode, point HEAD to unborn branch)
+  if root_mode {
+    // Point HEAD to a non-existent branch to simulate orphan state.
+    // resolve_head_commit will return None, which interactive_cherry_pick handles.
+    let head_path = join_path(git_dir, "HEAD")
+    fs.write_string(head_path, "ref: refs/heads/_bit_rebase_orphan_\n")
+    // Ensure the ref does not exist
+    fs.remove_file(join_path(git_dir, "refs/heads/_bit_rebase_orphan_")) catch {
+      _ => ()
+    }
+  } else {
+    ignore(checkout(fs, rfs, root, onto.to_hex(), detach=true))
+  }
   // Save state
   let state : InteractiveRebaseState = {
     onto,
@@ -497,6 +1095,9 @@ pub async fn interactive_rebase_start(
     done: [],
     amend: false,
     squash_msg: "",
+    update_refs: update_refs_map,
+    commit_map: {},
+    labels: {},
   }
   save_interactive_rebase_state(fs, git_dir, state)
   // Execute the todo
@@ -511,8 +1112,16 @@ fn interactive_resolve_entries(
 ) -> Array[InteractiveTodoEntry] raise @bit.GitError {
   let result : Array[InteractiveTodoEntry] = []
   for entry in entries {
-    // exec and break don't have commit references
-    if entry.command == TodoCommand::Exec || entry.command == TodoCommand::Break {
+    // exec, break, label, reset don't have commit references to resolve
+    if entry.command == TodoCommand::Exec ||
+      entry.command == TodoCommand::Break ||
+      entry.command == TodoCommand::Label ||
+      entry.command == TodoCommand::Reset {
+      result.push(entry)
+      continue
+    }
+    // merge without -C (empty commit_hex) doesn't need resolution
+    if entry.command == TodoCommand::Merge && entry.commit_hex.length() == 0 {
       result.push(entry)
       continue
     }
@@ -556,6 +1165,22 @@ pub struct InteractiveRebaseResult {
   exit_code : Int
 }
 
+///|
+/// Record old→new commit mapping for update-refs tracking.
+fn interactive_record_commit_mapping(
+  state : InteractiveRebaseState,
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+  old_hex : String,
+) -> Unit {
+  if state.update_refs.length() == 0 {
+    return
+  }
+  let head = resolve_head_commit(rfs, git_dir) catch { _ => return () }
+  guard head is Some(new_id) else { return }
+  state.commit_map[old_hex] = new_id.to_hex()
+}
+
 // ============================================================================
 // Interactive Rebase: execute todo loop
 // ============================================================================
@@ -587,6 +1212,12 @@ pub async fn execute_interactive_todo(
           return result
         }
         _ => {
+          interactive_record_commit_mapping(
+            state,
+            rfs,
+            git_dir,
+            entry.commit_hex,
+          )
           let new_state = interactive_move_to_done(state)
           save_interactive_rebase_state(fs, git_dir, new_state)
           execute_interactive_todo(
@@ -619,6 +1250,12 @@ pub async fn execute_interactive_todo(
           }
           // Amend HEAD commit with new message
           interactive_amend_head_message(fs, rfs, root, db, msg)
+          interactive_record_commit_mapping(
+            state,
+            rfs,
+            git_dir,
+            entry.commit_hex,
+          )
           let new_state = interactive_move_to_done(state)
           save_interactive_rebase_state(fs, git_dir, new_state)
           execute_interactive_todo(
@@ -642,6 +1279,12 @@ pub async fn execute_interactive_todo(
           return result
         }
         _ => {
+          interactive_record_commit_mapping(
+            state,
+            rfs,
+            git_dir,
+            entry.commit_hex,
+          )
           // Stop for user editing
           let new_state : InteractiveRebaseState = {
             ..interactive_move_to_done(state),
@@ -688,6 +1331,12 @@ pub async fn execute_interactive_todo(
           return result
         }
         _ => {
+          interactive_record_commit_mapping(
+            state,
+            rfs,
+            git_dir,
+            entry.commit_hex,
+          )
           let new_state : InteractiveRebaseState = {
             ..interactive_move_to_done(state),
             squash_msg: result.message,
@@ -723,6 +1372,12 @@ pub async fn execute_interactive_todo(
           return result
         }
         _ => {
+          interactive_record_commit_mapping(
+            state,
+            rfs,
+            git_dir,
+            entry.commit_hex,
+          )
           let new_state : InteractiveRebaseState = {
             ..interactive_move_to_done(state),
             squash_msg: result.message,
@@ -801,6 +1456,214 @@ pub async fn execute_interactive_todo(
         exit_code: 0,
       }
     }
+    Label => {
+      // Record current HEAD as a label
+      let head = resolve_head_commit(rfs, git_dir)
+      guard head is Some(head_id) else {
+        raise @bit.GitError::InvalidObject("No HEAD for label command")
+      }
+      state.labels[entry.subject] = head_id.to_hex()
+      let new_state = interactive_move_to_done(state)
+      save_interactive_rebase_state(fs, git_dir, new_state)
+      execute_interactive_todo(
+        fs,
+        rfs,
+        root,
+        new_state,
+        message_editor,
+        exec_runner~,
+      )
+    }
+    Reset => {
+      // Reset HEAD to a labeled commit
+      let label_name = entry.subject
+      let hex = match state.labels.get(label_name) {
+        Some(h) => h
+        None =>
+          raise @bit.GitError::InvalidObject(
+            "Unknown label: \{label_name}",
+          )
+      }
+      ignore(checkout(fs, rfs, root, hex, detach=true))
+      let new_state = interactive_move_to_done(state)
+      save_interactive_rebase_state(fs, git_dir, new_state)
+      execute_interactive_todo(
+        fs,
+        rfs,
+        root,
+        new_state,
+        message_editor,
+        exec_runner~,
+      )
+    }
+    Merge => {
+      // Create a merge commit combining current HEAD with the labeled commit
+      let label_name = entry.subject
+      let label_hex = match state.labels.get(label_name) {
+        Some(h) => h
+        None =>
+          raise @bit.GitError::InvalidObject(
+            "Unknown label for merge: \{label_name}",
+          )
+      }
+      let label_id = @bit.ObjectId::from_hex(label_hex)
+      // Get the merge message from the original commit (if -C was used)
+      let merge_message = if entry.commit_hex.length() > 0 {
+        let orig_id = @bit.ObjectId::from_hex(entry.commit_hex)
+        let info = rebase_parse_commit_full(db, rfs, orig_id)
+        info.message
+      } else {
+        "Merge branch '\{label_name}'"
+      }
+      let head = resolve_head_commit(rfs, git_dir)
+      guard head is Some(head_id) else {
+        raise @bit.GitError::InvalidObject("No HEAD for merge command")
+      }
+      // Perform three-way merge: find merge base between HEAD and label
+      let base = find_merge_base(db, rfs, head_id, label_id)
+      let base_files : Map[String, TreeFileEntry] = match base {
+        Some(bid) => collect_tree_files_from_commit(db, rfs, bid)
+        None => {}
+      }
+      let ours_files = collect_tree_files_from_commit(db, rfs, head_id)
+      let theirs_files = collect_tree_files_from_commit(db, rfs, label_id)
+      let file_result = merge_files(base_files, ours_files, theirs_files, db, rfs)
+      let merged = file_result.merged
+      let conflicts = file_result.conflicts
+      // Handle content merges
+      for candidate in file_result.needs_content_merge {
+        let base_content = match candidate.base_id {
+          Some(id) => merge_get_blob_text(db, rfs, id)
+          None => ""
+        }
+        let ours_content = merge_get_blob_text(db, rfs, candidate.ours_id)
+        let theirs_content = merge_get_blob_text(db, rfs, candidate.theirs_id)
+        let ours_data = merge_get_blob_data(db, rfs, candidate.ours_id)
+        let theirs_data = merge_get_blob_data(db, rfs, candidate.theirs_id)
+        if @diff3.is_binary_content(ours_data) ||
+          @diff3.is_binary_content(theirs_data) {
+          conflicts.push(candidate.path)
+          continue
+        }
+        let result = @diff3.content_merge(
+          base_content,
+          ours_content,
+          theirs_content,
+          @diff3.ContentMergeOptions::default().with_labels(
+            ours="HEAD",
+            base="",
+            theirs=label_name,
+          ),
+        )
+        if result.has_conflicts {
+          let full_path = join_path(root, candidate.path)
+          let dir = rebase_parent_dir(full_path)
+          fs.mkdir_p(dir)
+          fs.write_string(full_path, result.content)
+          conflicts.push(candidate.path)
+        } else {
+          let content_bytes = @utf8.encode(result.content)
+          let (blob_id, compressed) = @bit.create_blob(content_bytes)
+          write_object_bytes(fs, git_dir, blob_id, compressed)
+          merged[candidate.path] = { id: blob_id, mode: candidate.mode }
+        }
+      }
+      if conflicts.length() > 0 {
+        // Write partial worktree, save stopped-sha for the merge commit
+        write_worktree_from_files(
+          db,
+          fs,
+          rfs,
+          root,
+          git_dir,
+          merged,
+          remove_missing=true,
+        )
+        let entries = tree_files_to_index(db, rfs, merged)
+        write_index_entries(fs, git_dir, entries)
+        // Save the merge state so continue can finish it
+        fs.write_string(
+          join_path(git_dir, "rebase-merge/stopped-sha"),
+          entry.commit_hex,
+        )
+        let new_state = interactive_move_to_done(state)
+        save_interactive_rebase_state(fs, git_dir, new_state)
+        return {
+          status: IRBConflict,
+          commit_id: Some(label_id),
+          message: "CONFLICT during merge: resolve conflicts then run 'git rebase --continue'",
+          exit_code: 1,
+        }
+      }
+      // No conflicts — create merge commit
+      write_worktree_from_files(
+        db,
+        fs,
+        rfs,
+        root,
+        git_dir,
+        merged,
+        remove_missing=true,
+      )
+      let entries = tree_files_to_index(db, rfs, merged)
+      write_index_entries(fs, git_dir, entries)
+      let tree_id = write_tree_from_index(fs, rfs, git_dir, entries)
+      // Get author/committer info from original merge commit if available
+      let (author, author_time, author_tz, committer, commit_time, committer_tz) = if entry.commit_hex.length() >
+        0 {
+        let orig_id = @bit.ObjectId::from_hex(entry.commit_hex)
+        let info = rebase_parse_commit_full(db, rfs, orig_id)
+        (
+          info.author,
+          info.author_time,
+          info.author_tz,
+          info.committer,
+          info.commit_time,
+          info.committer_tz,
+        )
+      } else {
+        // Fallback: use HEAD commit's committer info
+        let head_info = rebase_parse_commit_full(db, rfs, head_id)
+        (
+          head_info.author,
+          head_info.author_time,
+          head_info.author_tz,
+          head_info.committer,
+          head_info.commit_time,
+          head_info.committer_tz,
+        )
+      }
+      let new_commit = @bit.Commit::new(
+        tree_id,
+        [head_id, label_id],
+        author,
+        author_time,
+        author_tz,
+        committer,
+        commit_time,
+        committer_tz,
+        merge_message,
+      )
+      let (new_id, compressed) = @bit.create_commit(new_commit)
+      write_object_bytes(fs, git_dir, new_id, compressed)
+      rebase_update_head(fs, rfs, git_dir, new_id)
+      interactive_record_commit_mapping(
+        state,
+        rfs,
+        git_dir,
+        entry.commit_hex,
+      )
+      let new_state = interactive_move_to_done(state)
+      save_interactive_rebase_state(fs, git_dir, new_state)
+      execute_interactive_todo(
+        fs,
+        rfs,
+        root,
+        new_state,
+        message_editor,
+        exec_runner~,
+      )
+    }
   }
 }
 
@@ -824,6 +1687,9 @@ fn interactive_move_to_done(
     done: new_done,
     amend: false,
     squash_msg: state.squash_msg,
+    update_refs: state.update_refs,
+    commit_map: state.commit_map,
+    labels: state.labels,
   }
 }
 
@@ -841,17 +1707,50 @@ fn interactive_cherry_pick(
 ) -> InteractiveRebaseResult raise @bit.GitError {
   let git_dir = join_path(root, ".git")
   let info = rebase_parse_commit_full(db, rfs, commit_id)
-  let parent_id = if info.parents.length() > 0 {
-    info.parents[0]
+  let is_root_commit = info.parents.length() == 0
+  let parent_id : @bit.ObjectId? = if info.parents.length() > 0 {
+    Some(info.parents[0])
   } else {
-    raise @bit.GitError::InvalidObject("Cannot cherry-pick root commit")
+    None
   }
   let head = resolve_head_commit(rfs, git_dir)
   guard head is Some(base_id) else {
+    // For root commits during --root rebase, HEAD may not exist yet.
+    // In that case, just create the commit with empty tree as parent.
+    if is_root_commit {
+      // Write the root commit's tree directly as the new commit
+      let new_commit = @bit.Commit::new(
+        info.tree,
+        [],
+        info.author,
+        info.author_time,
+        info.author_tz,
+        info.committer,
+        info.commit_time,
+        info.committer_tz,
+        info.message,
+      )
+      let (new_id, compressed) = @bit.create_commit(new_commit)
+      rebase_write_object(fs, git_dir, new_id, compressed)
+      rebase_update_head(fs, rfs, git_dir, new_id)
+      let tree_map = rebase_tree_map_from_tree(db, rfs, info.tree)
+      rebase_write_worktree(fs, db, rfs, root, git_dir, tree_map)
+      let entries = rebase_map_to_index(db, rfs, tree_map)
+      write_index_entries(fs, git_dir, entries)
+      return {
+        status: IRBComplete,
+        commit_id: Some(new_id),
+        message: "",
+        exit_code: 0,
+      }
+    }
     raise @bit.GitError::InvalidObject("No HEAD commit")
   }
   let base_map = rebase_tree_map(db, rfs, base_id)
-  let parent_map = rebase_tree_map(db, rfs, parent_id)
+  let parent_map : Map[String, TreeEntryInfo] = match parent_id {
+    Some(pid) => rebase_tree_map(db, rfs, pid)
+    None => {} // Empty map for root commit (empty tree parent)
+  }
   let commit_map = rebase_tree_map_from_tree(db, rfs, info.tree)
   let changes = rebase_diff_maps(parent_map, commit_map)
   // Check if already applied
@@ -1080,6 +1979,13 @@ pub async fn interactive_rebase_continue_impl(
       rebase_write_object(fs, git_dir, new_id, compressed)
       rebase_update_head(fs, rfs, git_dir, new_id)
     }
+    // Record commit mapping for update-refs after amend
+    // The last done entry is the edit commit whose mapping was recorded before stop
+    // After amend, HEAD may have changed, so update the mapping
+    if s.update_refs.length() > 0 && s.done.length() > 0 {
+      let last_done = s.done[s.done.length() - 1]
+      interactive_record_commit_mapping(s, rfs, git_dir, last_done.commit_hex)
+    }
     // Clear amend flag and continue
     let new_state : InteractiveRebaseState = { ..s, amend: false }
     save_interactive_rebase_state(fs, git_dir, new_state)
@@ -1120,6 +2026,10 @@ pub async fn interactive_rebase_continue_impl(
     let (new_id, compressed) = @bit.create_commit(new_commit)
     rebase_write_object(fs, git_dir, new_id, compressed)
     rebase_update_head(fs, rfs, git_dir, new_id)
+    // Record commit mapping for update-refs
+    if s.update_refs.length() > 0 {
+      s.commit_map[last_done.commit_hex] = new_id.to_hex()
+    }
   }
   // Continue with remaining todo
   save_interactive_rebase_state(fs, git_dir, s)
@@ -1222,6 +2132,23 @@ fn interactive_rebase_finish(
   rebase_write_worktree(fs, db, rfs, root, git_dir, final_map)
   let entries = rebase_map_to_index(db, rfs, final_map)
   write_index_entries(fs, git_dir, entries)
+  // Update refs that pointed to commits in the rebase chain
+  if state.update_refs.length() > 0 {
+    for item in state.update_refs.to_array() {
+      let (ref_path, old_hex) = item
+      match state.commit_map.get(old_hex) {
+        Some(new_hex) if new_hex.length() > 0 => {
+          let full_ref_path = join_path(git_dir, ref_path)
+          let dir = parent_dir(full_ref_path)
+          if dir.length() > 0 {
+            fs.mkdir_p(dir)
+          }
+          fs.write_string(full_ref_path, new_hex + "\n")
+        }
+        _ => ()
+      }
+    }
+  }
   // Restore branch ref if applicable
   if state.head_name.length() > 0 {
     let head_path = join_path(git_dir, "HEAD")

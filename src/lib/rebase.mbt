@@ -174,6 +174,36 @@ fn rebase_collect_chain(
 }
 
 ///|
+/// Collect all commits from head to the root (initial commit with no parents).
+/// Returns commits in chronological order (oldest first).
+fn rebase_collect_chain_to_root(
+  db : ObjectDb,
+  fs : &@bit.RepoFileSystem,
+  head : @bit.ObjectId,
+) -> Array[@bit.ObjectId] raise @bit.GitError {
+  let list : Array[@bit.ObjectId] = []
+  let mut current = head
+  while true {
+    list.push(current)
+    let obj = db.get(fs, current)
+    match obj {
+      None => raise @bit.GitError::InvalidObject("Missing commit object")
+      Some(o) => {
+        if o.obj_type != @bit.ObjectType::Commit {
+          raise @bit.GitError::InvalidObject("Object is not a commit")
+        }
+        let info = @bit.parse_commit(o.data)
+        if info.parents.length() == 0 {
+          break // Reached the root commit
+        }
+        current = info.parents[0]
+      }
+    }
+  }
+  list.rev()
+}
+
+///|
 /// Find the merge base (common ancestor) of two commits.
 fn find_merge_base(
   db : ObjectDb,

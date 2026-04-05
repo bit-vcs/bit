@@ -54,10 +54,8 @@ fn rebase_has_signing_args(args : Array[String]) -> Bool {
 ///|
 fn rebase_has_complex_mode_args(args : Array[String]) -> Bool {
   for arg in args {
-    if arg == "--rebase-merges" ||
-      arg.has_prefix("--rebase-merges=") ||
-      arg == "--no-rebase-merges" ||
-      arg == "--update-refs" ||
+    // --rebase-merges is now natively supported, so not listed here
+    if arg == "--update-refs" ||
       arg == "--no-update-refs" ||
       arg == "--strategy" ||
       arg.has_prefix("--strategy=") ||
@@ -144,7 +142,12 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
   let mut autosquash = false
   let mut no_autosquash = false
   let mut autostash = false
+  let mut update_refs : Bool? = None
   let exec_cmds : Array[String] = []
+  let mut root_mode = false
+  let mut rebase_merges = false
+  let mut strategy : String? = None
+  let strategy_options : Array[String] = []
   let mut onto : String? = None
   let mut upstream : String? = None
   let mut i = 0
@@ -185,17 +188,14 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
         autostash = false
         i += 1
       }
-      "--keep-empty" | "--no-keep-empty" => {
+      "--keep-empty" | "--no-keep-empty" =>
         // Accepted but not specially handled (bit keeps empty commits by default)
         i += 1
-      }
       "--show-current-patch" => {
         // Show the patch being applied during a stopped rebase
         let stopped_path = git_dir + "/rebase-merge/stopped-sha"
         if rfs.is_file(stopped_path) {
-          let hex = trim_string(
-            decode_bytes(rfs.read_file(stopped_path)),
-          )
+          let hex = trim_string(decode_bytes(rfs.read_file(stopped_path)))
           handle_show([hex])
         } else {
           eprint_line("fatal: No rebase in progress?")
@@ -240,6 +240,51 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
           exec_cmds.push(cmd)
           interactive = true
         }
+        i += 1
+      }
+      "--update-refs" => {
+        update_refs = Some(true)
+        i += 1
+      }
+      "--no-update-refs" => {
+        update_refs = Some(false)
+        i += 1
+      }
+      "--root" => {
+        root_mode = true
+        i += 1
+      }
+      "--rebase-merges" => {
+        rebase_merges = true
+        interactive = true // --rebase-merges implies -i
+        i += 1
+      }
+      _ if arg.has_prefix("--rebase-merges=") => {
+        // --rebase-merges=rebase-cousins or --rebase-merges=no-rebase-cousins
+        rebase_merges = true
+        interactive = true
+        i += 1
+      }
+      "--no-rebase-merges" => {
+        rebase_merges = false
+        i += 1
+      }
+      "--strategy" if i + 1 < args.length() => {
+        strategy = Some(args[i + 1])
+        i += 2
+      }
+      _ if arg.has_prefix("--strategy=") => {
+        let val = String::unsafe_substring(arg, start=11, end=arg.length())
+        strategy = Some(val)
+        i += 1
+      }
+      "-X" if i + 1 < args.length() => {
+        strategy_options.push(args[i + 1])
+        i += 2
+      }
+      _ if arg.has_prefix("-X") && arg.length() > 2 => {
+        let val = String::unsafe_substring(arg, start=2, end=arg.length())
+        strategy_options.push(val)
         i += 1
       }
       "--onto" if i + 1 < args.length() => {
@@ -324,10 +369,26 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
   }
   // Also check rebase.autoStash config
   if !autostash {
-    match @bitlib.read_config_value(rfs, git_dir + "/config", "rebase", "autostash") {
+    match
+      @bitlib.read_config_value(rfs, git_dir + "/config", "rebase", "autostash") {
       Some(v) => if v.to_lower() == "true" { autostash = true }
       None => ()
     }
+  }
+  // Check rebase.updateRefs config if not set by flag
+  let effective_update_refs = match update_refs {
+    Some(v) => v
+    None =>
+      match
+        @bitlib.read_config_value(
+          rfs,
+          git_dir + "/config",
+          "rebase",
+          "updateRefs",
+        ) {
+        Some(v) => v.to_lower() == "true"
+        None => false
+      }
   }
   // Autostash: save dirty state before rebase
   let mut autostash_oid : @bitcore.ObjectId? = None
@@ -336,23 +397,39 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
     let timestamp = get_commit_timestamp()
     let stash_id = @bitlib.stash_push(
       wfs, rfs, root, author, "autostash", timestamp,
-    ) catch { _ => None }
+    ) catch {
+      _ => None
+    }
     match stash_id {
       Some(id) => {
         autostash_oid = Some(id)
-        eprint_line("Created autostash: \{String::unsafe_substring(id.to_hex(), start=0, end=7)}")
+        eprint_line(
+          "Created autostash: \{String::unsafe_substring(id.to_hex(), start=0, end=7)}",
+        )
       }
       None => () // nothing to stash
     }
   }
   // Start new rebase
-  guard upstream is Some(ref_name) else {
-    raise @bitcore.GitError::InvalidObject("usage: git rebase [-i] <upstream>")
+  // Resolve upstream: --root mode doesn't need an upstream argument
+  let id : @bitcore.ObjectId = if root_mode {
+    // Use empty tree OID as a sentinel; actual root handling is in the lib layer
+    @bitcore.ObjectId::from_hex("4b825dc642cb6eb9a060e54bf899d15363647a20")
+  } else {
+    guard upstream is Some(ref_name) else {
+      raise @bitcore.GitError::InvalidObject(
+        "usage: git rebase [-i] <upstream>",
+      )
+    }
+    let upstream_id = @bitrepo.rev_parse(fs, git_dir, ref_name)
+    guard upstream_id is Some(uid) else {
+      raise @bitcore.GitError::InvalidObject("unknown revision: \{ref_name}")
+    }
+    uid
   }
-  let upstream_id = @bitrepo.rev_parse(fs, git_dir, ref_name)
-  guard upstream_id is Some(id) else {
-    raise @bitcore.GitError::InvalidObject("unknown revision: \{ref_name}")
-  }
+  // Suppress unused warnings for strategy/strategy_options (accepted but not yet wired)
+  ignore(strategy)
+  ignore(strategy_options)
   if interactive {
     // Interactive rebase
     let onto_id = match onto {
@@ -396,6 +473,9 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
       autosquash=effective_autosquash,
       exec_runner=Some(exec_runner),
       exec_cmds~,
+      update_refs=effective_update_refs,
+      root_mode~,
+      rebase_merges~,
     )
     print_interactive_rebase_result(result)
     // Autostash pop on success
@@ -409,14 +489,29 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
         guard onto_id is Some(oid) else {
           raise @bitcore.GitError::InvalidObject("unknown revision: \{o}")
         }
-        @bitlib.rebase_start_with_onto(fs, fs, root, oid, id, force_rebase~)
+        @bitlib.rebase_start_with_onto(
+          fs,
+          fs,
+          root,
+          oid,
+          id,
+          force_rebase~,
+        )
       }
       None =>
-        @bitlib.rebase_start_with_onto(fs, fs, root, id, id, force_rebase~)
+        @bitlib.rebase_start_with_onto(
+          fs,
+          fs,
+          root,
+          id,
+          id,
+          force_rebase~,
+        )
     }
     print_rebase_result(result)
     // Autostash pop on success
-    if autostash_oid is Some(_) && result.status is @bitlib.RebaseStatus::Complete {
+    if autostash_oid is Some(_) &&
+      result.status is @bitlib.RebaseStatus::Complete {
       rebase_autostash_pop(wfs, rfs, root)
     }
   }

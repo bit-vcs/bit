@@ -194,7 +194,7 @@ pub async fn interactive_rebase_continue_impl(&@types.FileSystem, &@types.RepoFi
 
 pub async fn interactive_rebase_skip_impl(&@types.FileSystem, &@types.RepoFileSystem, String, async (String) -> String?, exec_runner? : (async (String) -> Int)?) -> InteractiveRebaseResult raise @object.GitError
 
-pub async fn interactive_rebase_start(&@types.FileSystem, &@types.RepoFileSystem, String, @object.ObjectId, @object.ObjectId, async (String) -> String?, async (String) -> String?, autosquash? : Bool, exec_runner? : (async (String) -> Int)?, exec_cmds? : Array[String]) -> InteractiveRebaseResult raise @object.GitError
+pub async fn interactive_rebase_start(&@types.FileSystem, &@types.RepoFileSystem, String, @object.ObjectId, @object.ObjectId, async (String) -> String?, async (String) -> String?, autosquash? : Bool, exec_runner? : (async (String) -> Int)?, exec_cmds? : Array[String], update_refs? : Bool, root_mode? : Bool) -> InteractiveRebaseResult raise @object.GitError
 
 pub fn is_ancestor_of(&@types.RepoFileSystem, String, @object.ObjectId, @object.ObjectId) -> Bool
 
@@ -428,7 +428,7 @@ pub fn rebase_skip(&@types.FileSystem, &@types.RepoFileSystem, String) -> Rebase
 
 pub fn rebase_start(&@types.FileSystem, &@types.RepoFileSystem, String, @object.ObjectId) -> RebaseResult raise @object.GitError
 
-pub fn rebase_start_with_onto(&@types.FileSystem, &@types.RepoFileSystem, String, @object.ObjectId, @object.ObjectId, force_rebase? : Bool) -> RebaseResult raise @object.GitError
+pub fn rebase_start_with_onto(&@types.FileSystem, &@types.RepoFileSystem, String, @object.ObjectId, @object.ObjectId, force_rebase? : Bool, update_refs? : Bool, root_mode? : Bool) -> RebaseResult raise @object.GitError
 
 pub fn receive_build_status_response(ReceivePackResult) -> Bytes
 
@@ -826,6 +826,8 @@ pub struct InteractiveRebaseState {
   done : Array[InteractiveTodoEntry]
   amend : Bool
   squash_msg : String
+  update_refs : Map[String, String]
+  commit_map : Map[String, String]
 }
 
 pub enum InteractiveRebaseStatus {

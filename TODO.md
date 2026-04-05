@@ -40,14 +40,14 @@ t3404 (rebase -i): **129/132 (97.7%)**
 - [x] `--autosquash` — fixup!/squash! 並べ替え (v0.40.2)
 - [x] `--exec` / `-x` — exec コマンド挿入 (v0.40.3)
 - [x] `exec` / `break` — todo コマンド (v0.40.3)
-- [ ] `--rebase-merges` — マージ保持 rebase (label/reset/merge コマンド)
+- [~] `--rebase-merges` — label/reset/merge コマンド実装済み、DAG todo 生成にバグあり (v0.40.4)
 - [x] `--autostash` — rebase 前に自動 stash、完了後に pop (v0.40.3)
 - [x] `--keep-empty` / `--no-keep-empty` — 空コミットの保持制御 (v0.40.3)
 - [x] `--edit-todo` — 進行中 rebase の todo を再編集 (v0.40.3)
 - [x] `--show-current-patch` — 現在のパッチ表示 (v0.40.4)
 - [x] `--update-refs` — ref の自動追跡 (v0.40.4)
-- [ ] `--strategy` / `-X` — マージストラテジーオプション
-- [ ] `--root` — root コミットからの rebase
+- [x] `--strategy` / `-X` — マージストラテジーオプション受理 (v0.40.4)
+- [x] `--root` — root コミットからの rebase (v0.40.4)
 - [ ] GPG 署名 (`-S` / `--gpg-sign`) on rebase
 
 ### merge

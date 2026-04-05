@@ -25,7 +25,8 @@ test "rebase: interactive and complex modes require real git fallback" {
   assert_true(rebase_requires_real_git(["--exec", "echo hi", "HEAD~1"]))
   // --autosquash is now handled natively
   assert_false(rebase_requires_real_git(["--autosquash", "HEAD~1"]))
-  assert_true(rebase_requires_real_git(["--rebase-merges", "HEAD~1"]))
+  // --rebase-merges is now handled natively
+  assert_false(rebase_requires_real_git(["--rebase-merges", "HEAD~1"]))
   assert_true(rebase_requires_real_git(["--edit-todo"]))
   assert_true(rebase_requires_real_git(["--show-current-patch"]))
   assert_true(
