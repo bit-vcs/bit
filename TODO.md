@@ -21,8 +21,8 @@ t3404 (rebase -i): **129/132 (97.7%)**
 
 ### 高優先度・低コスト
 
-- [ ] `log --name-only` / `--name-status` — diff ファイル名/ステータス表示
-- [ ] `log --topo-order` / `--date-order` / `--author-date-order` — コミットソート順
+- [x] `log --name-only` / `--name-status` — diff ファイル名/ステータス表示 (v0.40.3)
+- [x] `log --topo-order` / `--date-order` / `--author-date-order` — コミットソート順 (v0.40.3)
 
 ### 高優先度・中コスト
 
