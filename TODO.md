@@ -45,7 +45,7 @@ t3404 (rebase -i): **129/132 (97.7%)**
 - [x] `--keep-empty` / `--no-keep-empty` — 空コミットの保持制御 (v0.40.3)
 - [x] `--edit-todo` — 進行中 rebase の todo を再編集 (v0.40.3)
 - [x] `--show-current-patch` — 現在のパッチ表示 (v0.40.4)
-- [ ] `--update-refs` — ref の自動追跡
+- [x] `--update-refs` — ref の自動追跡 (v0.40.4)
 - [ ] `--strategy` / `-X` — マージストラテジーオプション
 - [ ] `--root` — root コミットからの rebase
 - [ ] GPG 署名 (`-S` / `--gpg-sign`) on rebase
