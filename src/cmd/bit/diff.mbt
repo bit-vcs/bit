@@ -2416,7 +2416,16 @@ fn diff_path_matches_filters(path : String, filters : Array[String]) -> Bool {
   if filters.length() == 0 {
     return true
   }
-  filters.iter().any(p => path == p || path.has_prefix(p + "/"))
+  filters.iter().any(
+    fn(p) {
+      let norm = if p.has_suffix("/") {
+        String::unsafe_substring(p, start=0, end=p.length() - 1)
+      } else {
+        p
+      }
+      path == norm || path.has_prefix(norm + "/")
+    },
+  )
 }
 
 ///|

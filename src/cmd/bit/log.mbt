@@ -230,15 +230,7 @@ fn log_need_real_git(args : Array[String], git_dir? : String = "") -> Bool {
   if git_dir.length() > 0 && log_signature_display_config_enabled(git_dir) {
     return true
   }
-  let mut saw_double_dash = false
   for arg in args {
-    if saw_double_dash {
-      return true
-    }
-    if arg == "--" {
-      saw_double_dash = true
-      continue
-    }
     if arg == "--stdin" ||
       arg == "--boundary" ||
       arg == "--parents" ||
