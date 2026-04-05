@@ -25,7 +25,7 @@ t3404 (rebase -i): **129/132 (97.7%)**
 - [x] `--stat` — diffstat 表示 (v0.40.3)
 - [x] `--name-only` / `--name-status` — ファイル名/ステータス表示 (v0.40.3)
 - [x] `--topo-order` / `--date-order` / `--author-date-order` — ソート順 (v0.40.3)
-- [ ] `log -- <path>` — pathspec フィルタ。`git log -- src/lib/` のようなパス限定表示
+- [x] `log -- <path>` — pathspec フィルタ (v0.40.3)
 - [ ] `--parents` — 各コミットの親 OID を表示
 - [ ] `--boundary` — boundary コミットのマーク
 - [ ] `--full-history` / `--simplify-merges` — マージ簡略化制御
@@ -41,9 +41,9 @@ t3404 (rebase -i): **129/132 (97.7%)**
 - [x] `--exec` / `-x` — exec コマンド挿入 (v0.40.3)
 - [x] `exec` / `break` — todo コマンド (v0.40.3)
 - [ ] `--rebase-merges` — マージ保持 rebase (label/reset/merge コマンド)
-- [ ] `--autostash` — rebase 前に自動 stash、完了後に pop
-- [ ] `--keep-empty` / `--no-keep-empty` — 空コミットの保持制御
-- [ ] `--edit-todo` — 進行中 rebase の todo を再編集
+- [x] `--autostash` — rebase 前に自動 stash、完了後に pop (v0.40.3)
+- [x] `--keep-empty` / `--no-keep-empty` — 空コミットの保持制御 (v0.40.3)
+- [x] `--edit-todo` — 進行中 rebase の todo を再編集 (v0.40.3)
 - [ ] `--show-current-patch` — 現在のパッチ表示
 - [ ] `--update-refs` — ref の自動追跡
 - [ ] `--strategy` / `-X` — マージストラテジーオプション
