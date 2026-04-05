@@ -57,10 +57,7 @@ fn rebase_has_complex_mode_args(args : Array[String]) -> Bool {
     if arg == "--rebase-merges" ||
       arg.has_prefix("--rebase-merges=") ||
       arg == "--no-rebase-merges" ||
-      arg == "--edit-todo" ||
       arg == "--show-current-patch" ||
-      arg == "--keep-empty" ||
-      arg == "--no-keep-empty" ||
       arg == "--update-refs" ||
       arg == "--no-update-refs" ||
       arg == "--strategy" ||
@@ -188,6 +185,28 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
       "--no-autostash" => {
         autostash = false
         i += 1
+      }
+      "--keep-empty" | "--no-keep-empty" => {
+        // Accepted but not specially handled (bit keeps empty commits by default)
+        i += 1
+      }
+      "--edit-todo" => {
+        // Edit the todo list of an in-progress interactive rebase
+        let seq_editor = make_sequence_editor_callback(fs, git_dir)
+        let todo_path = git_dir + "/rebase-merge/git-rebase-todo"
+        if !(rfs as &@bitcore.RepoFileSystem).is_file(todo_path) {
+          eprint_line("fatal: No rebase in progress?")
+          @sys.exit(1)
+        }
+        let content = decode_bytes(
+          (rfs as &@bitcore.RepoFileSystem).read_file(todo_path),
+        )
+        match seq_editor(content) {
+          Some(edited) =>
+            (fs as &@bitcore.FileSystem).write_string(todo_path, edited)
+          None => ()
+        }
+        return
       }
       "--force-rebase" | "--no-ff" | "-f" => {
         force_rebase = true
