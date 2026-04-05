@@ -57,7 +57,6 @@ fn rebase_has_complex_mode_args(args : Array[String]) -> Bool {
     if arg == "--rebase-merges" ||
       arg.has_prefix("--rebase-merges=") ||
       arg == "--no-rebase-merges" ||
-      arg == "--show-current-patch" ||
       arg == "--update-refs" ||
       arg == "--no-update-refs" ||
       arg == "--strategy" ||
@@ -189,6 +188,20 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
       "--keep-empty" | "--no-keep-empty" => {
         // Accepted but not specially handled (bit keeps empty commits by default)
         i += 1
+      }
+      "--show-current-patch" => {
+        // Show the patch being applied during a stopped rebase
+        let stopped_path = git_dir + "/rebase-merge/stopped-sha"
+        if rfs.is_file(stopped_path) {
+          let hex = trim_string(
+            decode_bytes(rfs.read_file(stopped_path)),
+          )
+          handle_show([hex])
+        } else {
+          eprint_line("fatal: No rebase in progress?")
+          @sys.exit(1)
+        }
+        return
       }
       "--edit-todo" => {
         // Edit the todo list of an in-progress interactive rebase
