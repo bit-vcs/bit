@@ -23,7 +23,6 @@ import {
   "mizchi/bit/x/hub" @hub,
   "mizchi/bit/x/hub/native" @hub_native,
   "mizchi/bit/x/rebase-ai" @rebase_ai,
-  "mizchi/llm/ffi" @llm_ffi,
   "mizchi/bit/x/fs" @bitfs,
   "mizchi/bit/x/doc" @xdoc,
   "mizchi/bit/x/hq" @hq,
