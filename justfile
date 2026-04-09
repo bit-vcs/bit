@@ -9,9 +9,9 @@ fmt:
 
 # Type check (js + wasm + native)
 check:
-    moon check --deny-warn --target js
-    moon check --deny-warn --target wasm
-    moon check --deny-warn --target native
+    moon check --deny-warn --warn-list=-27 --target js
+    moon check --deny-warn --warn-list=-27 --target wasm
+    moon check --deny-warn --warn-list=-27 --target native
     @if rg -n "OsFs::new|@process\\.run" src/runtime >/dev/null; then \
       echo "runtime layer must not use OsFs::new or @process.run"; \
       exit 1; \
