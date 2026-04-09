@@ -76,6 +76,15 @@ export declare function commitSigned(
   signature: string,
   timestampSec?: number,
 ): string;
+export declare function commitSignedChecked(
+  backend: BitBackend,
+  root: string,
+  message: string,
+  author: string,
+  expectedPayload: string,
+  signature: string,
+  timestampSec?: number,
+): string;
 export declare function commitWithSigner(
   backend: BitBackend,
   root: string,
@@ -84,6 +93,25 @@ export declare function commitWithSigner(
   signer: BitCommitSigner,
   timestampSec?: number,
 ): Promise<string>;
+export declare function resolveSshEd25519PublicKey(
+  privateKeyPem: string,
+  comment?: string,
+): Promise<string>;
+export declare function signGitPayloadSshEd25519(
+  privateKeyPem: string,
+  payload: string,
+): Promise<string>;
+export declare function verifyGitPayloadSshEd25519(
+  publicKey: string,
+  payload: string,
+  signature: string,
+): Promise<boolean>;
+export declare function verifyCommitSshEd25519(
+  backend: BitBackend,
+  root: string,
+  spec: string,
+  publicKey: string,
+): Promise<boolean>;
 export declare function log(
   backend: BitBackend,
   root: string,

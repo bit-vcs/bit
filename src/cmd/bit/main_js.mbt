@@ -1,8 +1,8 @@
 ///| JS target main entry point
 
 ///|
-/// bit version tag (update this and moon.mod.json together when releasing)
-let bit_version_tag : String = "2.47.0 (bit v0.35.0)"
+/// bit version tag (update this and the npm package version together when releasing)
+let bit_version_tag : String = "2.47.0 (bit v0.41.0)"
 
 ///|
 async fn main_js_async() -> Unit {
