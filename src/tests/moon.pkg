@@ -2,7 +2,7 @@ import {
   "mizchi/bit" @bit,
   "mizchi/bit/pack" @pack,
   "mizchi/bit/protocol" @protocol,
-  "mizchi/zlib",
+  "mizchi/zlib" @zlib,
   "moonbitlang/core/encoding/utf8",
 } for "test"
 

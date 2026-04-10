@@ -13,7 +13,7 @@ import {
   "mizchi/bit/string_utils" @string_utils,
   "mizchi/bit/date_parse" @date_parse,
   "mizchi/bit/diff3" @diff3,
-  "mizchi/zlib",
+  "mizchi/zlib" @zlib,
   "moonbitlang/async/js_async" @js_async,
   "moonbitlang/core/bench" @bench,
   "moonbitlang/core/encoding/utf8",
