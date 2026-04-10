@@ -12,6 +12,7 @@ import {
   commit as rawCommit,
   commitAmend as rawCommitAmend,
   commitSigned as rawCommitSigned,
+  commitSignedChecked as rawCommitSignedChecked,
   diffIndex as rawDiffIndex,
   diffIndexStat as rawDiffIndexStat,
   diffWorktree as rawDiffWorktree,
@@ -33,10 +34,12 @@ import {
   rebaseSkip as rawRebaseSkip,
   rebaseStart as rawRebaseStart,
   rebaseStartWithOnto as rawRebaseStartWithOnto,
+  resolveSshEd25519PublicKey as rawResolveSshEd25519PublicKey,
   reset as rawReset,
   restore as rawRestore,
   revParse as rawRevParse,
   rm as rawRm,
+  signGitPayloadSshEd25519 as rawSignGitPayloadSshEd25519,
   showRef as rawShowRef,
   stashApply as rawStashApply,
   stashDrop as rawStashDrop,
@@ -59,6 +62,8 @@ import {
   tagCreateLightweight as rawTagCreateLightweight,
   tagDelete as rawTagDelete,
   tagList as rawTagList,
+  verifyCommitSshEd25519 as rawVerifyCommitSshEd25519,
+  verifyGitPayloadSshEd25519 as rawVerifyGitPayloadSshEd25519,
 } from "./lib.raw.js";
 
 const ensureState = () => (
@@ -688,6 +693,29 @@ export const commitSigned = (
   )
 );
 
+export const commitSignedChecked = (
+  backend,
+  root,
+  message,
+  author,
+  expectedPayload,
+  signature,
+  timestampSec = Math.floor(Date.now() / 1000),
+) => (
+  unwrap(
+    "commitSignedChecked",
+    rawCommitSignedChecked(
+      toHostId(backend),
+      root,
+      message,
+      author,
+      Math.trunc(timestampSec),
+      expectedPayload,
+      signature,
+    ),
+  )
+);
+
 export const commitWithSigner = async (
   backend,
   root,
@@ -701,8 +729,70 @@ export const commitWithSigner = async (
   if (typeof signature !== "string" || signature.length === 0) {
     throw new TypeError("signer must return a non-empty signature string");
   }
-  return commitSigned(backend, root, message, author, signature, timestampSec);
+  return commitSignedChecked(
+    backend,
+    root,
+    message,
+    author,
+    payload,
+    signature,
+    timestampSec,
+  );
 };
+
+export const resolveSshEd25519PublicKey = async (
+  privateKeyPem,
+  comment = "",
+) => (
+  await unwrapAsync(
+    "resolveSshEd25519PublicKey",
+    rawResolveSshEd25519PublicKey,
+    privateKeyPem,
+    comment,
+  )
+);
+
+export const signGitPayloadSshEd25519 = async (
+  privateKeyPem,
+  payload,
+) => (
+  await unwrapAsync(
+    "signGitPayloadSshEd25519",
+    rawSignGitPayloadSshEd25519,
+    privateKeyPem,
+    payload,
+  )
+);
+
+export const verifyGitPayloadSshEd25519 = async (
+  publicKey,
+  payload,
+  signature,
+) => (
+  await unwrapAsync(
+    "verifyGitPayloadSshEd25519",
+    rawVerifyGitPayloadSshEd25519,
+    publicKey,
+    payload,
+    signature,
+  )
+);
+
+export const verifyCommitSshEd25519 = async (
+  backend,
+  root,
+  spec,
+  publicKey,
+) => (
+  await unwrapAsync(
+    "verifyCommitSshEd25519",
+    rawVerifyCommitSshEd25519,
+    toHostId(backend),
+    root,
+    spec,
+    publicKey,
+  )
+);
 
 export const log = (backend, root, maxCount = 32) => (
   Array.from(unwrap("log", rawLog(toHostId(backend), root, Math.trunc(maxCount)))).map(toLogEntry)

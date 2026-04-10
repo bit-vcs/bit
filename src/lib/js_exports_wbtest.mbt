@@ -9,6 +9,21 @@ fn[T] js_exports_unwrap_ok(label : String, result : Result[T, String]) -> T {
 }
 
 ///|
+fn js_exports_expect_err_contains(
+  label : String,
+  result : Result[String, String],
+  expected : String,
+) -> Unit {
+  match result {
+    Ok(value) => abort("\{label}: expected error, got success \{value}")
+    Err(error) =>
+      if !error.contains(expected) {
+        abort("\{label}: expected '\{expected}' in '\{error}'")
+      }
+  }
+}
+
+///|
 fn js_exports_parse_loose_header(raw : Bytes) -> (String, Int) {
   let type_buf = StringBuilder::new()
   let mut i = 0
@@ -22,6 +37,163 @@ fn js_exports_parse_loose_header(raw : Bytes) -> (String, Int) {
   }
   i += 1
   (type_buf.to_string(), i)
+}
+
+///|
+let js_exports_test_private_key =
+  #|-----BEGIN PRIVATE KEY-----
+  #|MC4CAQAwBQYDK2VwBCIEIEYOzKBrnjy/eCL5x9n4fAniBKTxut5of1q69fXuIjc6
+  #|-----END PRIVATE KEY-----
+
+///|
+let js_exports_test_principal = "signer@example.com"
+
+///|
+extern "js" fn js_exports_verify_ssh_signature_impl(
+  public_key : String,
+  principal : String,
+  payload : String,
+  signature : String,
+) -> @js_async.Promise[String] =
+  #| async (publicKey, principal, payload, signature) => {
+  #|   const fs = await import('node:fs/promises');
+  #|   const os = await import('node:os');
+  #|   const path = await import('node:path');
+  #|   const { spawnSync } = await import('node:child_process');
+  #|   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'bit-js-sshsig-'));
+  #|   const allowedSigners = path.join(tempDir, 'allowed_signers');
+  #|   const sigPath = path.join(tempDir, 'payload.sig');
+  #|   try {
+  #|     await fs.writeFile(allowedSigners, `${principal} ${publicKey}\n`, 'utf8');
+  #|     await fs.writeFile(sigPath, String(signature ?? ''), 'utf8');
+  #|     const result = spawnSync(
+  #|       'ssh-keygen',
+  #|       ['-Y', 'verify', '-f', allowedSigners, '-I', String(principal ?? ''), '-n', 'git', '-s', sigPath],
+  #|       { input: String(payload ?? ''), encoding: 'utf8' },
+  #|     );
+  #|     if (result.status !== 0) {
+  #|       const stderr = String(result.stderr ?? '').trim();
+  #|       const stdout = String(result.stdout ?? '').trim();
+  #|       throw new Error(stderr || stdout || `ssh-keygen failed with status ${result.status}`);
+  #|     }
+  #|     return 'ok';
+  #|   } finally {
+  #|     await fs.rm(tempDir, { recursive: true, force: true });
+  #|   }
+  #| }
+
+///|
+async fn js_exports_verify_ssh_signature(
+  public_key : String,
+  principal : String,
+  payload : String,
+  signature : String,
+) -> Unit raise @bit.GitError {
+  ignore(
+    js_exports_verify_ssh_signature_impl(
+      public_key, principal, payload, signature,
+    ).wait() catch {
+      err =>
+        raise @bit.GitError::InvalidObject(
+          "ssh-keygen verify failed for js-generated signature: \{err}",
+        )
+    },
+  )
+}
+
+///|
+extern "js" fn js_exports_verify_git_commit_impl(
+  host_id : Int,
+  repo_root : String,
+  commit_id : String,
+  principal : String,
+  public_key : String,
+) -> @js_async.Promise[String] =
+  #| async (hostId, repoRoot, commitId, principal, publicKey) => {
+  #|   const fs = await import('node:fs/promises');
+  #|   const os = await import('node:os');
+  #|   const path = await import('node:path');
+  #|   const { spawnSync } = await import('node:child_process');
+  #|   const state = globalThis.__bitGitJsState ??= { nextHostId: 1, hosts: new Map() };
+  #|   const host = state.hosts.get(hostId);
+  #|   if (!host) {
+  #|     throw new Error(`bit-git js host ${hostId} not found`);
+  #|   }
+  #|   const normalizePath = (value) => {
+  #|     if (value == null || value === '') return '/';
+  #|     let normalized = String(value).replace(/\/+/g, '/');
+  #|     if (!normalized.startsWith('/')) normalized = `/${normalized}`;
+  #|     if (normalized.length > 1 && normalized.endsWith('/')) {
+  #|       normalized = normalized.slice(0, -1);
+  #|     }
+  #|     return normalized;
+  #|   };
+  #|   const joinHostPath = (base, entry) => {
+  #|     const normalizedBase = normalizePath(base);
+  #|     if (normalizedBase === '/') return normalizePath(`/${entry}`);
+  #|     return normalizePath(`${normalizedBase}/${entry}`);
+  #|   };
+  #|   const copyTree = async (hostPath, diskPath) => {
+  #|     await fs.mkdir(diskPath, { recursive: true });
+  #|     for (const entry of host.readdir(hostPath)) {
+  #|       const childHostPath = joinHostPath(hostPath, entry);
+  #|       const childDiskPath = path.join(diskPath, entry);
+  #|       if (host.isDir(childHostPath)) {
+  #|         await copyTree(childHostPath, childDiskPath);
+  #|         continue;
+  #|       }
+  #|       const content = host.readFile(childHostPath);
+  #|       await fs.mkdir(path.dirname(childDiskPath), { recursive: true });
+  #|       await fs.writeFile(childDiskPath, content);
+  #|     }
+  #|   };
+  #|   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'bit-js-git-verify-'));
+  #|   const repoPath = path.join(tempDir, 'repo');
+  #|   const allowedSigners = path.join(tempDir, 'allowed_signers');
+  #|   try {
+  #|     await copyTree(normalizePath(repoRoot), repoPath);
+  #|     await fs.writeFile(allowedSigners, `${principal} ${publicKey}\n`, 'utf8');
+  #|     const result = spawnSync(
+  #|       'git',
+  #|       [
+  #|         '-c',
+  #|         'gpg.format=ssh',
+  #|         '-c',
+  #|         `gpg.ssh.allowedSignersFile=${allowedSigners}`,
+  #|         'verify-commit',
+  #|         String(commitId ?? ''),
+  #|       ],
+  #|       { cwd: repoPath, encoding: 'utf8' },
+  #|     );
+  #|     if (result.status !== 0) {
+  #|       const stderr = String(result.stderr ?? '').trim();
+  #|       const stdout = String(result.stdout ?? '').trim();
+  #|       throw new Error(stderr || stdout || `git verify-commit failed with status ${result.status}`);
+  #|     }
+  #|     return String(result.stdout ?? result.stderr ?? 'ok').trim() || 'ok';
+  #|   } finally {
+  #|     await fs.rm(tempDir, { recursive: true, force: true });
+  #|   }
+  #| }
+
+///|
+async fn js_exports_verify_git_commit(
+  host_id : Int,
+  repo_root : String,
+  commit_id : String,
+  principal : String,
+  public_key : String,
+) -> Unit raise @bit.GitError {
+  ignore(
+    js_exports_verify_git_commit_impl(
+      host_id, repo_root, commit_id, principal, public_key,
+    ).wait() catch {
+      err =>
+        raise @bit.GitError::InvalidObject(
+          "git verify-commit failed for js-generated signature: \{err}",
+        )
+    },
+  )
 }
 
 ///|
@@ -262,6 +434,336 @@ test "js exports: signed commit stores gpgsig header" {
     ),
   )
   assert_true(text.contains("\n\nsigned commit\n"))
+
+  js_destroy_host(host_id)
+}
+
+///|
+test "js exports: checked signed commit stores gpgsig header" {
+  let host_id = js_create_memory_host()
+
+  js_exports_unwrap_ok("init", js_git_init(host_id, "/repo", "main"))
+  js_exports_unwrap_ok(
+    "hostWriteString",
+    js_host_write_string(host_id, "/repo/hello.txt", "hello\n"),
+  )
+  js_exports_unwrap_ok("add", js_add_paths(host_id, "/repo", ["hello.txt"]))
+
+  let payload = js_exports_unwrap_ok(
+    "buildCommitPayload",
+    js_build_commit_payload(
+      host_id, "/repo", "signed commit", "Signer <signer@example.com>", 1700000000,
+    ),
+  )
+  let commit_id = js_exports_unwrap_ok(
+    "commitSignedChecked",
+    js_commit_signed_checked(
+      host_id, "/repo", "signed commit", "Signer <signer@example.com>", 1700000000,
+      payload, "-----BEGIN TEST SIGNATURE-----\nabc123\n-----END TEST SIGNATURE-----\n",
+    ),
+  )
+
+  let fs = js_make_host_fs(host_id)
+  let object_dir = String::unsafe_substring(commit_id, start=0, end=2)
+  let object_file = String::unsafe_substring(
+    commit_id,
+    start=2,
+    end=commit_id.length(),
+  )
+  let object_path = join_path(
+    join_path("/repo/.git/objects", object_dir),
+    object_file,
+  )
+  let compressed = fs.read_file(object_path)
+  let raw = @zlib.zlib_decompress(compressed)
+  let (obj_type, content_start) = js_exports_parse_loose_header(raw)
+  assert_eq(obj_type, "commit")
+  let content = Bytes::from_array(
+    FixedArray::makei(raw.length() - content_start, fn(i) {
+      raw[content_start + i]
+    }),
+  )
+  let text = @utf8.decode_lossy(content[:])
+  assert_true(
+    text.contains(
+      "gpgsig -----BEGIN TEST SIGNATURE-----\n abc123\n -----END TEST SIGNATURE-----\n",
+    ),
+  )
+
+  js_destroy_host(host_id)
+}
+
+///|
+test "js exports: checked signed commit rejects stale payload" {
+  let host_id = js_create_memory_host()
+
+  js_exports_unwrap_ok("init", js_git_init(host_id, "/repo", "main"))
+  js_exports_unwrap_ok(
+    "write initial",
+    js_host_write_string(host_id, "/repo/hello.txt", "hello\n"),
+  )
+  js_exports_unwrap_ok(
+    "add initial",
+    js_add_paths(host_id, "/repo", ["hello.txt"]),
+  )
+
+  let payload = js_exports_unwrap_ok(
+    "buildCommitPayload",
+    js_build_commit_payload(
+      host_id, "/repo", "signed commit", "Signer <signer@example.com>", 1700000000,
+    ),
+  )
+
+  js_exports_unwrap_ok(
+    "write updated",
+    js_host_write_string(host_id, "/repo/hello.txt", "hello updated\n"),
+  )
+  js_exports_unwrap_ok(
+    "add updated",
+    js_add_paths(host_id, "/repo", ["hello.txt"]),
+  )
+
+  js_exports_expect_err_contains(
+    "commitSignedChecked stale payload",
+    js_commit_signed_checked(
+      host_id, "/repo", "signed commit", "Signer <signer@example.com>", 1700000000,
+      payload, "-----BEGIN TEST SIGNATURE-----\nabc123\n-----END TEST SIGNATURE-----\n",
+    ),
+    "commit payload changed while signing",
+  )
+
+  js_destroy_host(host_id)
+}
+
+///|
+test "js exports: checked signed commit rejects sha256 repo" {
+  let host_id = js_create_memory_host()
+
+  js_exports_unwrap_ok("init", js_git_init(host_id, "/repo", "main"))
+  js_exports_unwrap_ok(
+    "write config",
+    js_host_write_string(
+      host_id, "/repo/.git/config", "[core]\n\trepositoryformatversion = 1\n\tfilemode = true\n\tbare = false\n\tlogallrefupdates = true\n[extensions]\n\tobjectFormat = sha256\n\tcompatObjectFormat = sha1\n",
+    ),
+  )
+  js_exports_unwrap_ok(
+    "write file",
+    js_host_write_string(host_id, "/repo/hello.txt", "hello\n"),
+  )
+  js_exports_unwrap_ok("add", js_add_paths(host_id, "/repo", ["hello.txt"]))
+
+  let payload = js_exports_unwrap_ok(
+    "buildCommitPayload",
+    js_build_commit_payload(
+      host_id, "/repo", "signed commit", "Signer <signer@example.com>", 1700000000,
+    ),
+  )
+
+  js_exports_expect_err_contains(
+    "commitSignedChecked sha256 repo",
+    js_commit_signed_checked(
+      host_id, "/repo", "signed commit", "Signer <signer@example.com>", 1700000000,
+      payload, "-----BEGIN TEST SIGNATURE-----\nabc123\n-----END TEST SIGNATURE-----\n",
+    ),
+    "js commit signing only supports sha1 repositories",
+  )
+
+  js_destroy_host(host_id)
+}
+
+///|
+async test "js exports: ssh ed25519 payload signature verifies with ssh-keygen" {
+  let host_id = js_create_memory_host()
+
+  js_exports_unwrap_ok("init", js_git_init(host_id, "/repo", "main"))
+  js_exports_unwrap_ok(
+    "write file",
+    js_host_write_string(host_id, "/repo/hello.txt", "hello\n"),
+  )
+  js_exports_unwrap_ok("add", js_add_paths(host_id, "/repo", ["hello.txt"]))
+
+  let payload = js_exports_unwrap_ok(
+    "buildCommitPayload",
+    js_build_commit_payload(
+      host_id, "/repo", "signed commit", "Signer <signer@example.com>", 1700000000,
+    ),
+  )
+  let public_key = js_exports_unwrap_ok(
+    "resolveSshEd25519PublicKey",
+    js_resolve_ssh_ed25519_public_key(js_exports_test_private_key, ""),
+  )
+  assert_true(public_key.has_prefix("ssh-ed25519 "))
+  let signature = js_exports_unwrap_ok(
+    "signGitPayloadSshEd25519",
+    js_sign_git_payload_ssh_ed25519(js_exports_test_private_key, payload),
+  )
+  assert_true(signature.contains("-----BEGIN SSH SIGNATURE-----"))
+  js_exports_verify_ssh_signature(
+    public_key, js_exports_test_principal, payload, signature,
+  )
+
+  js_destroy_host(host_id)
+}
+
+///|
+async test "js exports: ssh ed25519 signing composes with checked commit" {
+  let host_id = js_create_memory_host()
+
+  js_exports_unwrap_ok("init", js_git_init(host_id, "/repo", "main"))
+  js_exports_unwrap_ok(
+    "write file",
+    js_host_write_string(host_id, "/repo/hello.txt", "hello\n"),
+  )
+  js_exports_unwrap_ok("add", js_add_paths(host_id, "/repo", ["hello.txt"]))
+
+  let payload = js_exports_unwrap_ok(
+    "buildCommitPayload",
+    js_build_commit_payload(
+      host_id, "/repo", "signed commit", "Signer <signer@example.com>", 1700000000,
+    ),
+  )
+  let public_key = js_exports_unwrap_ok(
+    "resolveSshEd25519PublicKey",
+    js_resolve_ssh_ed25519_public_key(js_exports_test_private_key, ""),
+  )
+  let signature = js_exports_unwrap_ok(
+    "signGitPayloadSshEd25519",
+    js_sign_git_payload_ssh_ed25519(js_exports_test_private_key, payload),
+  )
+  let commit_id = js_exports_unwrap_ok(
+    "commitSignedChecked",
+    js_commit_signed_checked(
+      host_id, "/repo", "signed commit", "Signer <signer@example.com>", 1700000000,
+      payload, signature,
+    ),
+  )
+
+  let fs = js_make_host_fs(host_id)
+  let object_dir = String::unsafe_substring(commit_id, start=0, end=2)
+  let object_file = String::unsafe_substring(
+    commit_id,
+    start=2,
+    end=commit_id.length(),
+  )
+  let object_path = join_path(
+    join_path("/repo/.git/objects", object_dir),
+    object_file,
+  )
+  let compressed = fs.read_file(object_path)
+  let raw = @zlib.zlib_decompress(compressed)
+  let (obj_type, content_start) = js_exports_parse_loose_header(raw)
+  assert_eq(obj_type, "commit")
+  let content = Bytes::from_array(
+    FixedArray::makei(raw.length() - content_start, fn(i) {
+      raw[content_start + i]
+    }),
+  )
+  let text = @utf8.decode_lossy(content[:])
+  assert_true(text.contains("gpgsig -----BEGIN SSH SIGNATURE-----\n"))
+  js_exports_verify_ssh_signature(
+    public_key, js_exports_test_principal, payload, signature,
+  )
+  js_exports_verify_git_commit(
+    host_id, "/repo", commit_id, js_exports_test_principal, public_key,
+  )
+
+  js_destroy_host(host_id)
+}
+
+///|
+async test "js exports: verify ssh ed25519 payload accepts matching signature" {
+  let host_id = js_create_memory_host()
+
+  js_exports_unwrap_ok("init", js_git_init(host_id, "/repo", "main"))
+  js_exports_unwrap_ok(
+    "write file",
+    js_host_write_string(host_id, "/repo/hello.txt", "hello\n"),
+  )
+  js_exports_unwrap_ok("add", js_add_paths(host_id, "/repo", ["hello.txt"]))
+
+  let payload = js_exports_unwrap_ok(
+    "buildCommitPayload",
+    js_build_commit_payload(
+      host_id, "/repo", "signed commit", "Signer <signer@example.com>", 1700000000,
+    ),
+  )
+  let public_key = js_exports_unwrap_ok(
+    "resolveSshEd25519PublicKey",
+    js_resolve_ssh_ed25519_public_key(js_exports_test_private_key, ""),
+  )
+  let signature = js_exports_unwrap_ok(
+    "signGitPayloadSshEd25519",
+    js_sign_git_payload_ssh_ed25519(js_exports_test_private_key, payload),
+  )
+  assert_true(
+    js_exports_unwrap_ok(
+      "verifyGitPayloadSshEd25519",
+      js_verify_git_payload_ssh_ed25519(public_key, payload, signature),
+    ),
+  )
+  assert_false(
+    js_exports_unwrap_ok(
+      "verifyGitPayloadSshEd25519 wrong payload",
+      js_verify_git_payload_ssh_ed25519(
+        public_key,
+        payload + "tampered",
+        signature,
+      ),
+    ),
+  )
+
+  js_destroy_host(host_id)
+}
+
+///|
+async test "js exports: verify ssh ed25519 commit accepts signed commit" {
+  let host_id = js_create_memory_host()
+
+  js_exports_unwrap_ok("init", js_git_init(host_id, "/repo", "main"))
+  js_exports_unwrap_ok(
+    "write file",
+    js_host_write_string(host_id, "/repo/hello.txt", "hello\n"),
+  )
+  js_exports_unwrap_ok("add", js_add_paths(host_id, "/repo", ["hello.txt"]))
+
+  let payload = js_exports_unwrap_ok(
+    "buildCommitPayload",
+    js_build_commit_payload(
+      host_id, "/repo", "signed commit", "Signer <signer@example.com>", 1700000000,
+    ),
+  )
+  let public_key = js_exports_unwrap_ok(
+    "resolveSshEd25519PublicKey",
+    js_resolve_ssh_ed25519_public_key(js_exports_test_private_key, ""),
+  )
+  let signature = js_exports_unwrap_ok(
+    "signGitPayloadSshEd25519",
+    js_sign_git_payload_ssh_ed25519(js_exports_test_private_key, payload),
+  )
+  ignore(
+    js_exports_unwrap_ok(
+      "commitSignedChecked",
+      js_commit_signed_checked(
+        host_id, "/repo", "signed commit", "Signer <signer@example.com>", 1700000000,
+        payload, signature,
+      ),
+    ),
+  )
+
+  assert_true(
+    js_exports_unwrap_ok(
+      "verifyCommitSshEd25519",
+      js_verify_commit_ssh_ed25519(host_id, "/repo", "HEAD", public_key),
+    ),
+  )
+  assert_false(
+    js_exports_unwrap_ok(
+      "verifyCommitSshEd25519 wrong key",
+      js_verify_commit_ssh_ed25519(
+        host_id, "/repo", "HEAD", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKrq4Q6Q5lM6R5i2uY1v3f6hM1dYkN0zPpLxjW0l8M4W wrong@example.com",
+      ),
+    ),
+  )
 
   js_destroy_host(host_id)
 }

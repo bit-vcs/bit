@@ -32,6 +32,648 @@ fn[T] js_export_promise(f : async () -> T) -> @js_async.Promise[T] {
 }
 
 ///|
+extern "js" fn js_webcrypto_resolve_ssh_ed25519_public_key_impl(
+  private_key_pem : String,
+  comment : String,
+) -> @js_async.Promise[String] =
+  #| async (privateKeyPem, comment) => {
+  #|   const helpers = globalThis.__bitGitJsSshSigHelpers ??= (() => {
+  #|     const encoder = new TextEncoder();
+  #|     const ensureSubtle = () => {
+  #|       if (!globalThis.crypto?.subtle) {
+  #|         throw new Error('Web Crypto SubtleCrypto is not available');
+  #|       }
+  #|       return globalThis.crypto.subtle;
+  #|     };
+  #|     const decodeBase64 = (value) => {
+  #|       if (typeof atob === 'function') {
+  #|         return Uint8Array.from(atob(value), (c) => c.charCodeAt(0));
+  #|       }
+  #|       if (typeof Buffer !== 'undefined') {
+  #|         return new Uint8Array(Buffer.from(value, 'base64'));
+  #|       }
+  #|       throw new Error('base64 decode is not available in this runtime');
+  #|     };
+  #|     const encodeBase64 = (bytes) => {
+  #|       if (typeof btoa === 'function') {
+  #|         let text = '';
+  #|         for (let i = 0; i < bytes.length; i += 1) {
+  #|           text += String.fromCharCode(bytes[i]);
+  #|         }
+  #|         return btoa(text);
+  #|       }
+  #|       if (typeof Buffer !== 'undefined') {
+  #|         return Buffer.from(bytes).toString('base64');
+  #|       }
+  #|       throw new Error('base64 encode is not available in this runtime');
+  #|     };
+  #|     const base64UrlToBytes = (value) => {
+  #|       const normalized = String(value ?? '').replace(/-/g, '+').replace(/_/g, '/');
+  #|       const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+  #|       return decodeBase64(padded);
+  #|     };
+  #|     const decodePem = (pem) => {
+  #|       const body = String(pem ?? '')
+  #|         .replace(/-----BEGIN[^-]*-----/, '')
+  #|         .replace(/-----END[^-]*-----/, '')
+  #|         .replace(/\s+/g, '');
+  #|       if (!body) {
+  #|         throw new Error('private key PEM is empty');
+  #|       }
+  #|       return decodeBase64(body);
+  #|     };
+  #|     const importPrivateKey = async (pem) => {
+  #|       return ensureSubtle().importKey(
+  #|         'pkcs8',
+  #|         decodePem(pem),
+  #|         { name: 'Ed25519' },
+  #|         true,
+  #|         ['sign'],
+  #|       );
+  #|     };
+  #|     const exportPublicKeyRaw = async (pem) => {
+  #|       const privateKey = await importPrivateKey(pem);
+  #|       const jwk = await ensureSubtle().exportKey('jwk', privateKey);
+  #|       if (typeof jwk?.x !== 'string' || jwk.x.length === 0) {
+  #|         throw new Error('missing Ed25519 public key component');
+  #|       }
+  #|       return base64UrlToBytes(jwk.x);
+  #|     };
+  #|     const concatBytes = (...parts) => {
+  #|       let total = 0;
+  #|       for (const part of parts) total += part.length;
+  #|       const out = new Uint8Array(total);
+  #|       let offset = 0;
+  #|       for (const part of parts) {
+  #|         out.set(part, offset);
+  #|         offset += part.length;
+  #|       }
+  #|       return out;
+  #|     };
+  #|     const uint32be = (value) => new Uint8Array([
+  #|       (value >>> 24) & 0xff,
+  #|       (value >>> 16) & 0xff,
+  #|       (value >>> 8) & 0xff,
+  #|       value & 0xff,
+  #|     ]);
+  #|     const sshString = (value) => {
+  #|       const bytes = typeof value === 'string' ? encoder.encode(value) : value;
+  #|       return concatBytes(uint32be(bytes.length), bytes);
+  #|     };
+  #|     const wrapBase64 = (value, width = 70) => {
+  #|       const parts = [];
+  #|       for (let i = 0; i < value.length; i += width) {
+  #|         parts.push(value.slice(i, i + width));
+  #|       }
+  #|       return parts.join('\n');
+  #|     };
+  #|     const resolveSshEd25519PublicKey = async (pem, keyComment) => {
+  #|       const publicKeyRaw = await exportPublicKeyRaw(pem);
+  #|       const publicKeyWire = concatBytes(
+  #|         sshString('ssh-ed25519'),
+  #|         sshString(publicKeyRaw),
+  #|       );
+  #|       const suffix = String(keyComment ?? '').length > 0 ? ` ${String(keyComment)}` : '';
+  #|       return `ssh-ed25519 ${encodeBase64(publicKeyWire)}${suffix}`;
+  #|     };
+  #|     const signGitPayloadSshEd25519 = async (pem, messageText) => {
+  #|       const subtle = ensureSubtle();
+  #|       const privateKey = await importPrivateKey(pem);
+  #|       const publicKeyRaw = await exportPublicKeyRaw(pem);
+  #|       const payloadBytes = encoder.encode(String(messageText ?? ''));
+  #|       const payloadHash = new Uint8Array(
+  #|         await subtle.digest('SHA-512', payloadBytes),
+  #|       );
+  #|       const signedData = concatBytes(
+  #|         encoder.encode('SSHSIG'),
+  #|         sshString('git'),
+  #|         sshString(new Uint8Array()),
+  #|         sshString('sha512'),
+  #|         sshString(payloadHash),
+  #|       );
+  #|       const rawSignature = new Uint8Array(
+  #|         await subtle.sign('Ed25519', privateKey, signedData),
+  #|       );
+  #|       const publicKeyBlob = concatBytes(
+  #|         sshString('ssh-ed25519'),
+  #|         sshString(publicKeyRaw),
+  #|       );
+  #|       const signatureBlob = concatBytes(
+  #|         sshString('ssh-ed25519'),
+  #|         sshString(rawSignature),
+  #|       );
+  #|       const sshSigBlob = concatBytes(
+  #|         encoder.encode('SSHSIG'),
+  #|         uint32be(1),
+  #|         sshString(publicKeyBlob),
+  #|         sshString('git'),
+  #|         sshString(new Uint8Array()),
+  #|         sshString('sha512'),
+  #|         sshString(signatureBlob),
+  #|       );
+  #|       return (
+  #|         '-----BEGIN SSH SIGNATURE-----\n' +
+  #|         wrapBase64(encodeBase64(sshSigBlob)) +
+  #|         '\n-----END SSH SIGNATURE-----\n'
+  #|       );
+  #|     };
+  #|     return { resolveSshEd25519PublicKey, signGitPayloadSshEd25519 };
+  #|   })();
+  #|   return helpers.resolveSshEd25519PublicKey(privateKeyPem, comment);
+  #| }
+
+///|
+extern "js" fn js_webcrypto_sign_git_payload_ssh_ed25519_impl(
+  private_key_pem : String,
+  payload : String,
+) -> @js_async.Promise[String] =
+  #| async (privateKeyPem, payload) => {
+  #|   const helpers = globalThis.__bitGitJsSshSigHelpers ??= (() => {
+  #|     const encoder = new TextEncoder();
+  #|     const ensureSubtle = () => {
+  #|       if (!globalThis.crypto?.subtle) {
+  #|         throw new Error('Web Crypto SubtleCrypto is not available');
+  #|       }
+  #|       return globalThis.crypto.subtle;
+  #|     };
+  #|     const decodeBase64 = (value) => {
+  #|       if (typeof atob === 'function') {
+  #|         return Uint8Array.from(atob(value), (c) => c.charCodeAt(0));
+  #|       }
+  #|       if (typeof Buffer !== 'undefined') {
+  #|         return new Uint8Array(Buffer.from(value, 'base64'));
+  #|       }
+  #|       throw new Error('base64 decode is not available in this runtime');
+  #|     };
+  #|     const encodeBase64 = (bytes) => {
+  #|       if (typeof btoa === 'function') {
+  #|         let text = '';
+  #|         for (let i = 0; i < bytes.length; i += 1) {
+  #|           text += String.fromCharCode(bytes[i]);
+  #|         }
+  #|         return btoa(text);
+  #|       }
+  #|       if (typeof Buffer !== 'undefined') {
+  #|         return Buffer.from(bytes).toString('base64');
+  #|       }
+  #|       throw new Error('base64 encode is not available in this runtime');
+  #|     };
+  #|     const base64UrlToBytes = (value) => {
+  #|       const normalized = String(value ?? '').replace(/-/g, '+').replace(/_/g, '/');
+  #|       const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+  #|       return decodeBase64(padded);
+  #|     };
+  #|     const decodePem = (pem) => {
+  #|       const body = String(pem ?? '')
+  #|         .replace(/-----BEGIN[^-]*-----/, '')
+  #|         .replace(/-----END[^-]*-----/, '')
+  #|         .replace(/\s+/g, '');
+  #|       if (!body) {
+  #|         throw new Error('private key PEM is empty');
+  #|       }
+  #|       return decodeBase64(body);
+  #|     };
+  #|     const importPrivateKey = async (pem) => {
+  #|       return ensureSubtle().importKey(
+  #|         'pkcs8',
+  #|         decodePem(pem),
+  #|         { name: 'Ed25519' },
+  #|         true,
+  #|         ['sign'],
+  #|       );
+  #|     };
+  #|     const exportPublicKeyRaw = async (pem) => {
+  #|       const privateKey = await importPrivateKey(pem);
+  #|       const jwk = await ensureSubtle().exportKey('jwk', privateKey);
+  #|       if (typeof jwk?.x !== 'string' || jwk.x.length === 0) {
+  #|         throw new Error('missing Ed25519 public key component');
+  #|       }
+  #|       return base64UrlToBytes(jwk.x);
+  #|     };
+  #|     const concatBytes = (...parts) => {
+  #|       let total = 0;
+  #|       for (const part of parts) total += part.length;
+  #|       const out = new Uint8Array(total);
+  #|       let offset = 0;
+  #|       for (const part of parts) {
+  #|         out.set(part, offset);
+  #|         offset += part.length;
+  #|       }
+  #|       return out;
+  #|     };
+  #|     const uint32be = (value) => new Uint8Array([
+  #|       (value >>> 24) & 0xff,
+  #|       (value >>> 16) & 0xff,
+  #|       (value >>> 8) & 0xff,
+  #|       value & 0xff,
+  #|     ]);
+  #|     const sshString = (value) => {
+  #|       const bytes = typeof value === 'string' ? encoder.encode(value) : value;
+  #|       return concatBytes(uint32be(bytes.length), bytes);
+  #|     };
+  #|     const wrapBase64 = (value, width = 70) => {
+  #|       const parts = [];
+  #|       for (let i = 0; i < value.length; i += width) {
+  #|         parts.push(value.slice(i, i + width));
+  #|       }
+  #|       return parts.join('\n');
+  #|     };
+  #|     const resolveSshEd25519PublicKey = async (pem, keyComment) => {
+  #|       const publicKeyRaw = await exportPublicKeyRaw(pem);
+  #|       const publicKeyWire = concatBytes(
+  #|         sshString('ssh-ed25519'),
+  #|         sshString(publicKeyRaw),
+  #|       );
+  #|       const suffix = String(keyComment ?? '').length > 0 ? ` ${String(keyComment)}` : '';
+  #|       return `ssh-ed25519 ${encodeBase64(publicKeyWire)}${suffix}`;
+  #|     };
+  #|     const signGitPayloadSshEd25519 = async (pem, messageText) => {
+  #|       const subtle = ensureSubtle();
+  #|       const privateKey = await importPrivateKey(pem);
+  #|       const publicKeyRaw = await exportPublicKeyRaw(pem);
+  #|       const payloadBytes = encoder.encode(String(messageText ?? ''));
+  #|       const payloadHash = new Uint8Array(
+  #|         await subtle.digest('SHA-512', payloadBytes),
+  #|       );
+  #|       const signedData = concatBytes(
+  #|         encoder.encode('SSHSIG'),
+  #|         sshString('git'),
+  #|         sshString(new Uint8Array()),
+  #|         sshString('sha512'),
+  #|         sshString(payloadHash),
+  #|       );
+  #|       const rawSignature = new Uint8Array(
+  #|         await subtle.sign('Ed25519', privateKey, signedData),
+  #|       );
+  #|       const publicKeyBlob = concatBytes(
+  #|         sshString('ssh-ed25519'),
+  #|         sshString(publicKeyRaw),
+  #|       );
+  #|       const signatureBlob = concatBytes(
+  #|         sshString('ssh-ed25519'),
+  #|         sshString(rawSignature),
+  #|       );
+  #|       const sshSigBlob = concatBytes(
+  #|         encoder.encode('SSHSIG'),
+  #|         uint32be(1),
+  #|         sshString(publicKeyBlob),
+  #|         sshString('git'),
+  #|         sshString(new Uint8Array()),
+  #|         sshString('sha512'),
+  #|         sshString(signatureBlob),
+  #|       );
+  #|       return (
+  #|         '-----BEGIN SSH SIGNATURE-----\n' +
+  #|         wrapBase64(encodeBase64(sshSigBlob)) +
+  #|         '\n-----END SSH SIGNATURE-----\n'
+  #|       );
+  #|     };
+  #|     return { resolveSshEd25519PublicKey, signGitPayloadSshEd25519 };
+  #|   })();
+  #|   return helpers.signGitPayloadSshEd25519(privateKeyPem, payload);
+  #| }
+
+///|
+extern "js" fn js_webcrypto_ensure_ssh_ed25519_verify_helpers() -> Unit =
+  #| () => {
+  #|   const existing = globalThis.__bitGitJsSshSigHelpers;
+  #|   if (
+  #|     existing &&
+  #|     typeof existing.resolveSshEd25519PublicKey === 'function' &&
+  #|     typeof existing.signGitPayloadSshEd25519 === 'function' &&
+  #|     typeof existing.verifyGitPayloadSshEd25519 === 'function'
+  #|   ) {
+  #|     return;
+  #|   }
+  #|   globalThis.__bitGitJsSshSigHelpers = (() => {
+  #|     const encoder = new TextEncoder();
+  #|     const decoder = new TextDecoder();
+  #|     const ensureSubtle = () => {
+  #|       if (!globalThis.crypto?.subtle) {
+  #|         throw new Error('Web Crypto SubtleCrypto is not available');
+  #|       }
+  #|       return globalThis.crypto.subtle;
+  #|     };
+  #|     const decodeBase64 = (value) => {
+  #|       if (typeof atob === 'function') {
+  #|         return Uint8Array.from(atob(value), (c) => c.charCodeAt(0));
+  #|       }
+  #|       if (typeof Buffer !== 'undefined') {
+  #|         return new Uint8Array(Buffer.from(value, 'base64'));
+  #|       }
+  #|       throw new Error('base64 decode is not available in this runtime');
+  #|     };
+  #|     const encodeBase64 = (bytes) => {
+  #|       if (typeof btoa === 'function') {
+  #|         let text = '';
+  #|         for (let i = 0; i < bytes.length; i += 1) {
+  #|           text += String.fromCharCode(bytes[i]);
+  #|         }
+  #|         return btoa(text);
+  #|       }
+  #|       if (typeof Buffer !== 'undefined') {
+  #|         return Buffer.from(bytes).toString('base64');
+  #|       }
+  #|       throw new Error('base64 encode is not available in this runtime');
+  #|     };
+  #|     const base64UrlToBytes = (value) => {
+  #|       const normalized = String(value ?? '').replace(/-/g, '+').replace(/_/g, '/');
+  #|       const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+  #|       return decodeBase64(padded);
+  #|     };
+  #|     const decodePem = (pem) => {
+  #|       const body = String(pem ?? '')
+  #|         .replace(/-----BEGIN[^-]*-----/, '')
+  #|         .replace(/-----END[^-]*-----/, '')
+  #|         .replace(/\s+/g, '');
+  #|       if (!body) {
+  #|         throw new Error('private key PEM is empty');
+  #|       }
+  #|       return decodeBase64(body);
+  #|     };
+  #|     const importPrivateKey = async (pem) => {
+  #|       return ensureSubtle().importKey(
+  #|         'pkcs8',
+  #|         decodePem(pem),
+  #|         { name: 'Ed25519' },
+  #|         true,
+  #|         ['sign'],
+  #|       );
+  #|     };
+  #|     const importPublicKeyRaw = async (publicKeyRaw) => {
+  #|       return ensureSubtle().importKey(
+  #|         'raw',
+  #|         publicKeyRaw,
+  #|         { name: 'Ed25519' },
+  #|         true,
+  #|         ['verify'],
+  #|       );
+  #|     };
+  #|     const exportPublicKeyRaw = async (pem) => {
+  #|       const privateKey = await importPrivateKey(pem);
+  #|       const jwk = await ensureSubtle().exportKey('jwk', privateKey);
+  #|       if (typeof jwk?.x !== 'string' || jwk.x.length === 0) {
+  #|         throw new Error('missing Ed25519 public key component');
+  #|       }
+  #|       return base64UrlToBytes(jwk.x);
+  #|     };
+  #|     const concatBytes = (...parts) => {
+  #|       let total = 0;
+  #|       for (const part of parts) total += part.length;
+  #|       const out = new Uint8Array(total);
+  #|       let offset = 0;
+  #|       for (const part of parts) {
+  #|         out.set(part, offset);
+  #|         offset += part.length;
+  #|       }
+  #|       return out;
+  #|     };
+  #|     const uint32be = (value) => new Uint8Array([
+  #|       (value >>> 24) & 0xff,
+  #|       (value >>> 16) & 0xff,
+  #|       (value >>> 8) & 0xff,
+  #|       value & 0xff,
+  #|     ]);
+  #|     const readUint32be = (bytes, offset) => {
+  #|       if (offset + 4 > bytes.length) {
+  #|         throw new Error('truncated sshsig data');
+  #|       }
+  #|       return (
+  #|         ((bytes[offset] << 24) >>> 0) |
+  #|         (bytes[offset + 1] << 16) |
+  #|         (bytes[offset + 2] << 8) |
+  #|         bytes[offset + 3]
+  #|       ) >>> 0;
+  #|     };
+  #|     const sshString = (value) => {
+  #|       const bytes = typeof value === 'string' ? encoder.encode(value) : value;
+  #|       return concatBytes(uint32be(bytes.length), bytes);
+  #|     };
+  #|     const readSshString = (bytes, offset) => {
+  #|       const length = readUint32be(bytes, offset);
+  #|       const start = offset + 4;
+  #|       const end = start + length;
+  #|       if (end > bytes.length) {
+  #|         throw new Error('truncated ssh string');
+  #|       }
+  #|       return [bytes.slice(start, end), end];
+  #|     };
+  #|     const wrapBase64 = (value, width = 70) => {
+  #|       const parts = [];
+  #|       for (let i = 0; i < value.length; i += width) {
+  #|         parts.push(value.slice(i, i + width));
+  #|       }
+  #|       return parts.join('\n');
+  #|     };
+  #|     const decodeUtf8 = (bytes) => decoder.decode(bytes);
+  #|     const bytesEqual = (left, right) => {
+  #|       if (left.length !== right.length) {
+  #|         return false;
+  #|       }
+  #|       for (let i = 0; i < left.length; i += 1) {
+  #|         if (left[i] !== right[i]) {
+  #|           return false;
+  #|         }
+  #|       }
+  #|       return true;
+  #|     };
+  #|     const normalizeNewlines = (value) =>
+  #|       String(value ?? '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  #|     const resolveSshEd25519PublicKey = async (pem, keyComment) => {
+  #|       const publicKeyRaw = await exportPublicKeyRaw(pem);
+  #|       const publicKeyWire = concatBytes(
+  #|         sshString('ssh-ed25519'),
+  #|         sshString(publicKeyRaw),
+  #|       );
+  #|       const suffix = String(keyComment ?? '').length > 0 ? ` ${String(keyComment)}` : '';
+  #|       return `ssh-ed25519 ${encodeBase64(publicKeyWire)}${suffix}`;
+  #|     };
+  #|     const parsePublicKeyText = (publicKeyText) => {
+  #|       const parts = String(publicKeyText ?? '').trim().split(/\s+/);
+  #|       if (parts.length < 2 || parts[0] !== 'ssh-ed25519') {
+  #|         throw new Error('expected ssh-ed25519 public key text');
+  #|       }
+  #|       const publicKeyBlob = decodeBase64(parts[1]);
+  #|       let offset = 0;
+  #|       const [keyTypeBytes, nextOffset] = readSshString(publicKeyBlob, offset);
+  #|       offset = nextOffset;
+  #|       const keyType = decodeUtf8(keyTypeBytes);
+  #|       if (keyType !== 'ssh-ed25519') {
+  #|         throw new Error(`unsupported ssh public key type: ${keyType}`);
+  #|       }
+  #|       const [publicKeyRaw, endOffset] = readSshString(publicKeyBlob, offset);
+  #|       if (endOffset !== publicKeyBlob.length) {
+  #|         throw new Error('unexpected trailing data in ssh public key');
+  #|       }
+  #|       return publicKeyRaw;
+  #|     };
+  #|     const parseSshSignatureArmor = (signatureText) => {
+  #|       const begin = '-----BEGIN SSH SIGNATURE-----';
+  #|       const end = '-----END SSH SIGNATURE-----';
+  #|       const normalized = normalizeNewlines(signatureText).trim();
+  #|       if (!normalized.startsWith(begin) || !normalized.endsWith(end)) {
+  #|         throw new Error('expected SSH SIGNATURE armor');
+  #|       }
+  #|       const body = normalized
+  #|         .slice(begin.length, normalized.length - end.length)
+  #|         .replace(/\s+/g, '');
+  #|       if (body.length === 0) {
+  #|         throw new Error('empty SSH SIGNATURE body');
+  #|       }
+  #|       const bytes = decodeBase64(body);
+  #|       if (decodeUtf8(bytes.slice(0, 6)) !== 'SSHSIG') {
+  #|         throw new Error('invalid SSHSIG magic');
+  #|       }
+  #|       let offset = 6;
+  #|       const version = readUint32be(bytes, offset);
+  #|       offset += 4;
+  #|       if (version !== 1) {
+  #|         throw new Error(`unsupported SSHSIG version: ${version}`);
+  #|       }
+  #|       const [publicKeyBlob, publicKeyOffset] = readSshString(bytes, offset);
+  #|       offset = publicKeyOffset;
+  #|       const [namespaceBytes, namespaceOffset] = readSshString(bytes, offset);
+  #|       offset = namespaceOffset;
+  #|       const [reservedBytes, reservedOffset] = readSshString(bytes, offset);
+  #|       offset = reservedOffset;
+  #|       const [hashAlgorithmBytes, hashAlgorithmOffset] = readSshString(bytes, offset);
+  #|       offset = hashAlgorithmOffset;
+  #|       const [signatureBlob, endOffset] = readSshString(bytes, offset);
+  #|       offset = endOffset;
+  #|       if (offset !== bytes.length) {
+  #|         throw new Error('unexpected trailing data in SSH SIGNATURE');
+  #|       }
+  #|       let keyOffset = 0;
+  #|       const [publicKeyTypeBytes, publicKeyTypeOffset] = readSshString(publicKeyBlob, keyOffset);
+  #|       keyOffset = publicKeyTypeOffset;
+  #|       const [publicKeyRaw, publicKeyEndOffset] = readSshString(publicKeyBlob, keyOffset);
+  #|       if (publicKeyEndOffset !== publicKeyBlob.length) {
+  #|         throw new Error('unexpected trailing data in SSH signature public key');
+  #|       }
+  #|       let sigOffset = 0;
+  #|       const [signatureTypeBytes, signatureTypeOffset] = readSshString(signatureBlob, sigOffset);
+  #|       sigOffset = signatureTypeOffset;
+  #|       const [rawSignature, signatureEndOffset] = readSshString(signatureBlob, sigOffset);
+  #|       if (signatureEndOffset !== signatureBlob.length) {
+  #|         throw new Error('unexpected trailing data in SSH signature blob');
+  #|       }
+  #|       return {
+  #|         namespace: decodeUtf8(namespaceBytes),
+  #|         reserved: reservedBytes,
+  #|         hashAlgorithm: decodeUtf8(hashAlgorithmBytes).toLowerCase(),
+  #|         publicKeyType: decodeUtf8(publicKeyTypeBytes),
+  #|         publicKeyRaw,
+  #|         signatureType: decodeUtf8(signatureTypeBytes),
+  #|         rawSignature,
+  #|       };
+  #|     };
+  #|     const signGitPayloadSshEd25519 = async (pem, messageText) => {
+  #|       const subtle = ensureSubtle();
+  #|       const privateKey = await importPrivateKey(pem);
+  #|       const publicKeyRaw = await exportPublicKeyRaw(pem);
+  #|       const payloadBytes = encoder.encode(String(messageText ?? ''));
+  #|       const payloadHash = new Uint8Array(
+  #|         await subtle.digest('SHA-512', payloadBytes),
+  #|       );
+  #|       const signedData = concatBytes(
+  #|         encoder.encode('SSHSIG'),
+  #|         sshString('git'),
+  #|         sshString(new Uint8Array()),
+  #|         sshString('sha512'),
+  #|         sshString(payloadHash),
+  #|       );
+  #|       const rawSignature = new Uint8Array(
+  #|         await subtle.sign('Ed25519', privateKey, signedData),
+  #|       );
+  #|       const publicKeyBlob = concatBytes(
+  #|         sshString('ssh-ed25519'),
+  #|         sshString(publicKeyRaw),
+  #|       );
+  #|       const signatureBlob = concatBytes(
+  #|         sshString('ssh-ed25519'),
+  #|         sshString(rawSignature),
+  #|       );
+  #|       const sshSigBlob = concatBytes(
+  #|         encoder.encode('SSHSIG'),
+  #|         uint32be(1),
+  #|         sshString(publicKeyBlob),
+  #|         sshString('git'),
+  #|         sshString(new Uint8Array()),
+  #|         sshString('sha512'),
+  #|         sshString(signatureBlob),
+  #|       );
+  #|       return (
+  #|         '-----BEGIN SSH SIGNATURE-----\n' +
+  #|         wrapBase64(encodeBase64(sshSigBlob)) +
+  #|         '\n-----END SSH SIGNATURE-----\n'
+  #|       );
+  #|     };
+  #|     const verifyGitPayloadSshEd25519 = async (publicKeyText, messageText, signatureText) => {
+  #|       const subtle = ensureSubtle();
+  #|       const parsedSignature = parseSshSignatureArmor(signatureText);
+  #|       if (parsedSignature.namespace !== 'git') {
+  #|         return false;
+  #|       }
+  #|       if (
+  #|         parsedSignature.publicKeyType !== 'ssh-ed25519' ||
+  #|         parsedSignature.signatureType !== 'ssh-ed25519'
+  #|       ) {
+  #|         return false;
+  #|       }
+  #|       const expectedPublicKeyRaw = parsePublicKeyText(publicKeyText);
+  #|       if (!bytesEqual(expectedPublicKeyRaw, parsedSignature.publicKeyRaw)) {
+  #|         return false;
+  #|       }
+  #|       const hashAlgorithm = parsedSignature.hashAlgorithm;
+  #|       const digestName =
+  #|         hashAlgorithm === 'sha512'
+  #|           ? 'SHA-512'
+  #|           : hashAlgorithm === 'sha256'
+  #|             ? 'SHA-256'
+  #|             : '';
+  #|       if (!digestName) {
+  #|         return false;
+  #|       }
+  #|       const payloadBytes = encoder.encode(String(messageText ?? ''));
+  #|       const payloadHash = new Uint8Array(await subtle.digest(digestName, payloadBytes));
+  #|       const signedData = concatBytes(
+  #|         encoder.encode('SSHSIG'),
+  #|         sshString(parsedSignature.namespace),
+  #|         sshString(parsedSignature.reserved),
+  #|         sshString(hashAlgorithm),
+  #|         sshString(payloadHash),
+  #|       );
+  #|       const publicKey = await importPublicKeyRaw(expectedPublicKeyRaw);
+  #|       return subtle.verify(
+  #|         'Ed25519',
+  #|         publicKey,
+  #|         parsedSignature.rawSignature,
+  #|         signedData,
+  #|       );
+  #|     };
+  #|     return {
+  #|       resolveSshEd25519PublicKey,
+  #|       signGitPayloadSshEd25519,
+  #|       verifyGitPayloadSshEd25519,
+  #|     };
+  #|   })();
+  #| }
+
+///|
+extern "js" fn js_webcrypto_verify_git_payload_ssh_ed25519_impl(
+  public_key : String,
+  payload : String,
+  signature : String,
+) -> @js_async.Promise[Bool] =
+  #| (publicKey, payload, signature) => {
+  #|   return globalThis.__bitGitJsSshSigHelpers.verifyGitPayloadSshEd25519(
+  #|     publicKey,
+  #|     payload,
+  #|     signature,
+  #|   );
+  #| }
+
+///|
 fn js_resolve_git_dir(
   fs : LibJsHostFs,
   root : String,
@@ -41,6 +683,34 @@ fn js_resolve_git_dir(
     resolve_gitdir(fs, git_path)
   } else {
     resolve_worktree_git_dir(fs, root)
+  }
+}
+
+///|
+fn js_repo_object_format(fs : LibJsHostFs, git_dir : String) -> String {
+  match
+    read_config_value(fs, git_dir + "/config", "extensions", "objectformat") {
+    Some(raw) => {
+      let normalized = config_strip_quotes(raw).to_lower()
+      if normalized == "sha256" {
+        "sha256"
+      } else {
+        "sha1"
+      }
+    }
+    None => "sha1"
+  }
+}
+
+///|
+fn js_require_sha1_signing_repo(
+  fs : LibJsHostFs,
+  git_dir : String,
+) -> Unit raise @bit.GitError {
+  if js_repo_object_format(fs, git_dir) != "sha1" {
+    raise @bit.GitError::InvalidObject(
+      "js commit signing only supports sha1 repositories",
+    )
   }
 }
 
@@ -92,6 +762,66 @@ fn js_prepare_commit(
     timezone,
     message,
     payload: @bit.serialize_commit_content(commit),
+  }
+}
+
+///|
+fn js_commit_payload_text(payload : Bytes) -> String {
+  @utf8.decode_lossy(payload[:])
+}
+
+///|
+async fn js_resolve_ssh_ed25519_public_key_text(
+  private_key_pem : String,
+  comment : String,
+) -> String raise @bit.GitError {
+  js_webcrypto_resolve_ssh_ed25519_public_key_impl(private_key_pem, comment).wait() catch {
+    err =>
+      raise @bit.GitError::InvalidObject(
+        "failed to resolve ssh public key from private key: \{err}",
+      )
+  }
+}
+
+///|
+async fn js_sign_git_payload_ssh_ed25519_text(
+  private_key_pem : String,
+  payload : String,
+) -> String raise @bit.GitError {
+  js_webcrypto_sign_git_payload_ssh_ed25519_impl(private_key_pem, payload).wait() catch {
+    err =>
+      raise @bit.GitError::InvalidObject(
+        "failed to sign git payload with ssh ed25519: \{err}",
+      )
+  }
+}
+
+///|
+async fn js_verify_git_payload_ssh_ed25519_text(
+  public_key : String,
+  payload : String,
+  signature : String,
+) -> Bool raise @bit.GitError {
+  js_webcrypto_ensure_ssh_ed25519_verify_helpers()
+  js_webcrypto_verify_git_payload_ssh_ed25519_impl(
+    public_key, payload, signature,
+  ).wait() catch {
+    err =>
+      raise @bit.GitError::InvalidObject(
+        "failed to verify git payload with ssh ed25519: \{err}",
+      )
+  }
+}
+
+///|
+fn js_require_matching_commit_payload(
+  expected_payload : String,
+  actual_payload : Bytes,
+) -> Unit raise @bit.GitError {
+  if expected_payload != js_commit_payload_text(actual_payload) {
+    raise @bit.GitError::InvalidObject(
+      "commit payload changed while signing; rebuild payload and retry",
+    )
   }
 }
 
@@ -160,6 +890,134 @@ fn js_find_commit_header_end(payload : Bytes) -> Int raise @bit.GitError {
     i += 1
   }
   raise @bit.GitError::InvalidObject("Malformed commit payload")
+}
+
+///|
+fn js_bytes_starts_with(
+  data : Bytes,
+  start : Int,
+  end_ : Int,
+  prefix : String,
+) -> Bool {
+  let prefix_bytes = @utf8.encode(prefix)
+  if end_ - start < prefix_bytes.length() {
+    return false
+  }
+  for i in 0..<prefix_bytes.length() {
+    if data[start + i] != prefix_bytes[i] {
+      return false
+    }
+  }
+  true
+}
+
+///|
+fn js_collect_line_ranges(data : Bytes) -> Array[(Int, Int, Bool)] {
+  let lines : Array[(Int, Int, Bool)] = []
+  if data.length() == 0 {
+    return lines
+  }
+  let mut i = 0
+  while i < data.length() {
+    let start = i
+    while i < data.length() && data[i] != b'\n' {
+      i += 1
+    }
+    let end_ = i
+    let has_newline = i < data.length() && data[i] == b'\n'
+    if has_newline {
+      i += 1
+    }
+    lines.push((start, end_, has_newline))
+  }
+  lines
+}
+
+///|
+fn js_copy_line_range(
+  data : Bytes,
+  out : Array[Byte],
+  line : (Int, Int, Bool),
+) -> Unit {
+  for b in data[line.0:line.1] {
+    out.push(b)
+  }
+  if line.2 {
+    out.push(b'\n')
+  }
+}
+
+///|
+fn js_join_signature_lines(lines : Array[String]) -> String {
+  if lines.length() == 0 {
+    return ""
+  }
+  let mut out = lines.join("\n")
+  if !out.has_suffix("\n") {
+    out = out + "\n"
+  }
+  out
+}
+
+///|
+fn js_extract_commit_signature(data : Bytes) -> (Bytes, String)? {
+  let lines = js_collect_line_ranges(data)
+  let mut header_end = lines.length()
+  let mut sig_start = -1
+  let mut sig_end = -1
+  let mut prefix_len = 0
+  for i in 0..<lines.length() {
+    let line = lines[i]
+    if line.1 == line.0 {
+      header_end = i
+      break
+    }
+    if js_bytes_starts_with(data, line.0, line.1, "gpgsig ") {
+      sig_start = i
+      prefix_len = 7
+      break
+    }
+    if js_bytes_starts_with(data, line.0, line.1, "gpgsig-sha256 ") {
+      sig_start = i
+      prefix_len = 14
+      break
+    }
+  }
+  if sig_start < 0 {
+    return None
+  }
+  sig_end = sig_start + 1
+  while sig_end < header_end {
+    let line = lines[sig_end]
+    if line.1 > line.0 && data[line.0] == b' ' {
+      sig_end += 1
+    } else {
+      break
+    }
+  }
+  let signature_lines : Array[String] = []
+  let first_line = lines[sig_start]
+  signature_lines.push(
+    @utf8.decode_lossy(
+      Bytes::from_array(data[first_line.0 + prefix_len:first_line.1].to_array())[:],
+    ),
+  )
+  for i in (sig_start + 1)..<sig_end {
+    let line = lines[i]
+    signature_lines.push(
+      @utf8.decode_lossy(
+        Bytes::from_array(data[line.0 + 1:line.1].to_array())[:],
+      ),
+    )
+  }
+  let out : Array[Byte] = []
+  for i in 0..<lines.length() {
+    if i >= sig_start && i < sig_end {
+      continue
+    }
+    js_copy_line_range(data, out, lines[i])
+  }
+  Some((Bytes::from_iter(out.iter()), js_join_signature_lines(signature_lines)))
 }
 
 ///|
@@ -502,7 +1360,7 @@ pub fn js_build_commit_payload(
   let fs = js_make_host_fs(host_id)
   js_wrap_error(() => {
     let prepared = js_prepare_commit(fs, root, message, author, timestamp_secs)
-    @utf8.decode_lossy(prepared.payload[:])
+    js_commit_payload_text(prepared.payload)
   })
 }
 
@@ -518,8 +1376,137 @@ pub fn js_commit_signed(
   let fs = js_make_host_fs(host_id)
   js_wrap_error(() => {
     let prepared = js_prepare_commit(fs, root, message, author, timestamp_secs)
+    js_require_sha1_signing_repo(fs, prepared.git_dir)
     let signed_payload = js_inject_commit_signature(prepared.payload, signature)
     js_finalize_commit(fs, prepared, signed_payload).to_hex()
+  })
+}
+
+///|
+pub fn js_commit_signed_checked(
+  host_id : Int,
+  root : String,
+  message : String,
+  author : String,
+  timestamp_secs : Int,
+  expected_payload : String,
+  signature : String,
+) -> Result[String, String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error(() => {
+    let prepared = js_prepare_commit(fs, root, message, author, timestamp_secs)
+    js_require_sha1_signing_repo(fs, prepared.git_dir)
+    js_require_matching_commit_payload(expected_payload, prepared.payload)
+    let signed_payload = js_inject_commit_signature(prepared.payload, signature)
+    js_finalize_commit(fs, prepared, signed_payload).to_hex()
+  })
+}
+
+///|
+pub async fn js_resolve_ssh_ed25519_public_key(
+  private_key_pem : String,
+  comment : String,
+) -> Result[String, String] {
+  js_wrap_error_async(async fn() -> String raise @bit.GitError {
+    js_resolve_ssh_ed25519_public_key_text(private_key_pem, comment)
+  })
+}
+
+///|
+pub fn js_resolve_ssh_ed25519_public_key_promise(
+  private_key_pem : String,
+  comment : String,
+) -> @js_async.Promise[Result[String, String]] {
+  js_export_promise(async fn() {
+    js_resolve_ssh_ed25519_public_key(private_key_pem, comment)
+  })
+}
+
+///|
+pub async fn js_sign_git_payload_ssh_ed25519(
+  private_key_pem : String,
+  payload : String,
+) -> Result[String, String] {
+  js_wrap_error_async(async fn() -> String raise @bit.GitError {
+    js_sign_git_payload_ssh_ed25519_text(private_key_pem, payload)
+  })
+}
+
+///|
+pub fn js_sign_git_payload_ssh_ed25519_promise(
+  private_key_pem : String,
+  payload : String,
+) -> @js_async.Promise[Result[String, String]] {
+  js_export_promise(async fn() {
+    js_sign_git_payload_ssh_ed25519(private_key_pem, payload)
+  })
+}
+
+///|
+pub async fn js_verify_git_payload_ssh_ed25519(
+  public_key : String,
+  payload : String,
+  signature : String,
+) -> Result[Bool, String] {
+  js_wrap_error_async(async fn() -> Bool raise @bit.GitError {
+    js_verify_git_payload_ssh_ed25519_text(public_key, payload, signature)
+  })
+}
+
+///|
+pub fn js_verify_git_payload_ssh_ed25519_promise(
+  public_key : String,
+  payload : String,
+  signature : String,
+) -> @js_async.Promise[Result[Bool, String]] {
+  js_export_promise(async fn() {
+    js_verify_git_payload_ssh_ed25519(public_key, payload, signature)
+  })
+}
+
+///|
+pub async fn js_verify_commit_ssh_ed25519(
+  host_id : Int,
+  root : String,
+  spec : String,
+  public_key : String,
+) -> Result[Bool, String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error_async(async fn() -> Bool raise @bit.GitError {
+    let git_dir = js_resolve_git_dir(fs, root)
+    let commit_id = js_resolve_revision(fs, root, spec)
+    let db = ObjectDb::load(fs, git_dir)
+    let obj = match db.get(fs, commit_id) {
+      Some(value) => value
+      None => raise @bit.GitError::InvalidObject("Unknown revision: " + spec)
+    }
+    if obj.obj_type != @bit.ObjectType::Commit {
+      raise @bit.GitError::InvalidObject("Revision is not a commit: " + spec)
+    }
+    let (payload, signature) = match js_extract_commit_signature(obj.data) {
+      Some(value) => value
+      None =>
+        raise @bit.GitError::InvalidObject(
+          "Commit has no gpgsig header: " + spec,
+        )
+    }
+    js_verify_git_payload_ssh_ed25519_text(
+      public_key,
+      js_commit_payload_text(payload),
+      signature,
+    )
+  })
+}
+
+///|
+pub fn js_verify_commit_ssh_ed25519_promise(
+  host_id : Int,
+  root : String,
+  spec : String,
+  public_key : String,
+) -> @js_async.Promise[Result[Bool, String]] {
+  js_export_promise(async fn() {
+    js_verify_commit_ssh_ed25519(host_id, root, spec, public_key)
   })
 }
 

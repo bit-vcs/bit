@@ -44,6 +44,7 @@ import {
   buildCommitPayload,
   commit,
   commitAmend,
+  commitSignedChecked,
   commitWithSigner,
   createFetchTransport,
   fetch,
@@ -55,9 +56,13 @@ import {
   relayResolveRemote,
   push,
   rebaseStart,
+  resolveSshEd25519PublicKey,
+  signGitPayloadSshEd25519,
   status,
   statusText,
   switchBranch,
+  verifyCommitSshEd25519,
+  verifyGitPayloadSshEd25519,
   writeString,
 } from "@mizchi/bit";
 
@@ -110,22 +115,38 @@ const payload = buildCommitPayload(
   "Example <example@example.com>",
   1700000001,
 );
+const privateKeyPem = [
+  "-----BEGIN PRIVATE KEY-----",
+  "...",
+  "-----END PRIVATE KEY-----",
+].join("\n");
+const publicKey = await resolveSshEd25519PublicKey(privateKeyPem);
+const signature = await signGitPayloadSshEd25519(privateKeyPem, payload);
 
-const signedCommitId = await commitWithSigner(
+const signedCommitId = commitSignedChecked(
   backend,
   "/repo",
   "signed commit",
   "Example <example@example.com>",
-  async (payloadToSign) => {
-    const bytes = new TextEncoder().encode(payloadToSign);
-    const signature = await crypto.subtle.sign("Ed25519", privateKey, bytes);
-    return encodeArmoredSignature(signature);
-  },
+  payload,
+  signature,
+  1700000001,
+);
+
+const signedCommitIdFromSigner = await commitWithSigner(
+  backend,
+  "/repo",
+  "signed commit",
+  "Example <example@example.com>",
+  (payloadToSign) => signGitPayloadSshEd25519(privateKeyPem, payloadToSign),
   1700000001,
 );
 
 console.log(payload);
 console.log(signedCommitId);
+console.log(signedCommitIdFromSigner);
+console.log(await verifyGitPayloadSshEd25519(publicKey, payload, signature));
+console.log(await verifyCommitSshEd25519(backend, "/repo", "HEAD", publicKey));
 
 const transport = createFetchTransport(fetch);
 const fetched = await fetch(
@@ -272,7 +293,14 @@ Required backend methods:
 - There is no `createHost()` wrapper API. Pass the backend object itself through your call sites.
 - `buildCommitPayload()` returns the unsigned commit payload text you should hand to your signer.
 - `commitSigned()` writes a signed commit from an armored signature string.
-- `commitWithSigner()` is the ergonomic async wrapper for browser `crypto.subtle` style signers.
+- `commitSignedChecked()` writes a signed commit only if the supplied payload still matches the current index/tree state.
+- `commitWithSigner()` is the ergonomic async wrapper that signs `buildCommitPayload()` output and finalizes through `commitSignedChecked()`.
+- `resolveSshEd25519PublicKey()` derives an OpenSSH public key line from a PKCS#8 Ed25519 private key PEM.
+- `signGitPayloadSshEd25519()` signs commit payload text and returns Git-compatible `-----BEGIN SSH SIGNATURE-----` armor.
+- `verifyGitPayloadSshEd25519()` verifies a payload/signature pair against an OpenSSH `ssh-ed25519 ...` public key line.
+- `verifyCommitSshEd25519()` extracts `gpgsig` from a commit and verifies it against an OpenSSH `ssh-ed25519 ...` public key line.
+- JS signed-commit support currently targets `SSH + Ed25519 + commit + SHA-1 repo` only.
+- JS verification is cryptographic verification against the supplied public key only. Git trust policy such as `allowedSignersFile`, principals, and revocation is not applied.
 - `commitAmend()` exposes `git commit --amend` style history replacement.
 - `revParse()` and `showRef()` expose ref resolution helpers.
 - `merge()` resolves a revision string such as `feature`, `origin/main`, or `HEAD^`.

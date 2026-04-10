@@ -12,6 +12,12 @@ const cloneFixtureAdvV2Hex = "3030306576657273696f6e20320a303031636167656e743d67
 const cloneFixtureLsrefsHex = "303035303330633966323038616363373630313737336132396165663339343135376164663936306431303420484541442073796d7265662d7461726765743a726566732f68656164732f6d61696e0a303033643330633966323038616363373630313737336132396165663339343135376164663936306431303420726566732f68656164732f6d61696e0a30303030";
 const cloneFixtureFetchHex = "303030647061636b66696c650a30306435015041434b00000002000000039b09789c95cb310ac3300c40d1dda7f05e28b21ccb319492ab288ad208ea0682baf4f4cd15327d78f0fd508dccdc4874c1a57192512b4aa1194b66505cb58eb9e555e71af8ebdb7ec46e3fd92c3ece0e304cafcef6becbde9f31556a2513258c376800e1d46eee7a690af6310f7f8ae52e13a502789c33343030333151c848cdc9c9d72ba9286138c768a6caccbde2f64ab6ef61d3eae7cd593cc5cd0b00df740dbf36789ccb48cdc9c9e70200084b021f62c7bf336ea966f094470f354a76a0f737e13d30303036017a30303030";
 const cloneFixtureCommit = "30c9f208acc7601773a29aef394157adf960d104";
+const sshTestPrivateKey = [
+  "-----BEGIN PRIVATE KEY-----",
+  "MC4CAQAwBQYDK2VwBCIEIEYOzKBrnjy/eCL5x9n4fAniBKTxut5of1q69fXuIjc6",
+  "-----END PRIVATE KEY-----",
+].join("\n");
+const sshWrongPublicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKrq4Q6Q5lM6R5i2uY1v3f6hM1dYkN0zPpLxjW0l8M4W wrong@example.com";
 
 function createVirtualHost() {
   const encoder = new TextEncoder();
@@ -223,6 +229,60 @@ async function runSignedCommitFlow(bitGit, api, root, author) {
   assert.equal(logEntries[0].message, "signed commit");
 
   return { commitId, payload, commitText };
+}
+
+async function runSshSignatureFlow(bitGit, api, root, author) {
+  bitGit.init(api, root, "main");
+  bitGit.writeString(api, `${root}/signed.txt`, "signed\n");
+  bitGit.add(api, root, ["signed.txt"]);
+
+  const payload = bitGit.buildCommitPayload(
+    api,
+    root,
+    "signed ssh commit",
+    author,
+    1700000002,
+  );
+  const publicKey = await bitGit.resolveSshEd25519PublicKey(sshTestPrivateKey);
+  assert.match(publicKey, /^ssh-ed25519 /);
+
+  const signature = await bitGit.signGitPayloadSshEd25519(
+    sshTestPrivateKey,
+    payload,
+  );
+  assert.match(signature, /BEGIN SSH SIGNATURE/);
+
+  assert.equal(
+    await bitGit.verifyGitPayloadSshEd25519(publicKey, payload, signature),
+    true,
+  );
+  assert.equal(
+    await bitGit.verifyGitPayloadSshEd25519(publicKey, `${payload}tampered`, signature),
+    false,
+  );
+
+  const commitId = bitGit.commitSignedChecked(
+    api,
+    root,
+    "signed ssh commit",
+    author,
+    payload,
+    signature,
+    1700000002,
+  );
+  const commitText = readLooseCommitText(api, root, commitId);
+  assert.ok(commitText.includes("gpgsig -----BEGIN SSH SIGNATURE-----\n"));
+
+  assert.equal(
+    await bitGit.verifyCommitSshEd25519(api, root, "HEAD", publicKey),
+    true,
+  );
+  assert.equal(
+    await bitGit.verifyCommitSshEd25519(api, root, "HEAD", sshWrongPublicKey),
+    false,
+  );
+
+  return { commitId, payload, publicKey, signature };
 }
 
 function runMergeFlow(bitGit, api, root, author) {
@@ -769,6 +829,12 @@ export async function verifyBitGitModule(bitGit = defaultBitGit) {
       "/repo-signed",
       "Signer <signer@example.com>",
     );
+    const sshSignatureResult = await runSshSignatureFlow(
+      bitGit,
+      memoryApi,
+      "/repo-signed-ssh",
+      "SSH Signer <signer@example.com>",
+    );
     const directSignedResult = runDirectSignedCommitFlow(
       bitGit,
       memoryApi,
@@ -842,6 +908,7 @@ export async function verifyBitGitModule(bitGit = defaultBitGit) {
       memoryResult,
       customResult,
       signedResult,
+      sshSignatureResult,
       directSignedResult,
       mergeResult,
       rebaseResult,

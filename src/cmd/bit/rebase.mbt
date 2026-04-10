@@ -57,6 +57,7 @@ fn rebase_has_complex_mode_args(args : Array[String]) -> Bool {
     // --rebase-merges is now natively supported, so not listed here
     if arg == "--update-refs" ||
       arg == "--no-update-refs" ||
+      (rebase_short_option_cluster_contains(arg, ('x' : UInt16)) && arg != "-x") ||
       arg == "--strategy" ||
       arg.has_prefix("--strategy=") ||
       arg == "-X" ||

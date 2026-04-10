@@ -120,9 +120,9 @@ test "log: ancestry and simplify options fall back to real git" {
   assert_true(log_need_real_git(["--show-signature", "HEAD"]))
   assert_true(log_need_real_git(["--format=%G?%n%GK", "HEAD"]))
   assert_true(log_need_real_git(["--pretty=format:%GT", "HEAD"]))
-  assert_true(log_need_real_git(["--", "file"]))
   assert_false(log_need_real_git(["--oneline", "HEAD"]))
   // These flags are now handled natively
+  assert_false(log_need_real_git(["--", "file"]))
   assert_false(log_need_real_git(["--stat"]))
   assert_false(log_need_real_git(["--graph"]))
   assert_false(log_need_real_git(["--name-only"]))

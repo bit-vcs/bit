@@ -261,6 +261,7 @@ The following features are **not supported** and will produce a fatal error:
 
 **JS target only**
 - SSH transport (`ssh://`, `git@...`) in `clone` / `fetch` / `pull` / `push` (use HTTP(S) or relay URLs)
+- The JS library exposes signed-commit helpers for `SSH + Ed25519` on SHA-1 repositories only
 
 ## Environment Variables
 
