@@ -431,7 +431,7 @@ pub fn crc32_range(
 
 ///|
 fn bytes_from_array(arr : Array[Byte]) -> Bytes {
-  Bytes::from_array(FixedArray::makei(arr.length(), i => arr[i]))
+  Bytes::from_array(arr)
 }
 
 ///|

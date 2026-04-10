@@ -1,9 +1,11 @@
 ///| Git packfile generation
 
 ///|
-/// Helper to convert Array[Byte] to Bytes
+/// Helper to convert Array[Byte] to Bytes.
+/// `Bytes::from_array` accepts `ArrayView[Byte]`, so an `Array[Byte]` can be
+/// passed directly without an intermediate `FixedArray` copy.
 fn pack_array_to_bytes(arr : Array[Byte]) -> Bytes {
-  Bytes::from_array(FixedArray::makei(arr.length(), i => arr[i]))
+  Bytes::from_array(arr)
 }
 
 ///|
@@ -17,13 +19,13 @@ fn compress_pack_data(
     @bit.PackCompression::Default => {
       // Use fixed Huffman (fast) for pack data, matching git's default level 1
       let deflated = @zlib.deflate_compress_fixed(data)
-      let total_len = 2 + deflated.length() + 4
+      let deflated_len = deflated.length()
+      let total_len = 2 + deflated_len + 4
       let result : FixedArray[Byte] = FixedArray::make(total_len, b'\x00')
       result[0] = b'\x78'
       result[1] = b'\x01'
-      for i in 0..<deflated.length() {
-        result[2 + i] = deflated[i]
-      }
+      // Bulk copy the deflate stream — avoids byte-by-byte iteration
+      result.blit_from_bytes(2, deflated, 0, deflated_len)
       let checksum = @zlib.adler32(data)
       result[total_len - 4] = ((checksum >> 24) & 0xFF).to_byte()
       result[total_len - 3] = ((checksum >> 16) & 0xFF).to_byte()
@@ -313,12 +315,7 @@ fn find_best_match(
 
 ///|
 fn out_to_bytes(out : Array[Byte]) -> Bytes {
-  let len = out.length()
-  let arr = FixedArray::make(len, b'\x00')
-  for i in 0..<len {
-    arr[i] = out[i]
-  }
-  Bytes::from_array(arr)
+  Bytes::from_array(out)
 }
 
 ///|
