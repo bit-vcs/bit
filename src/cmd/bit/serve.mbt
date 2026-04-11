@@ -511,9 +511,14 @@ async fn serve_handle_git_request(
     }
     let fs = OsFs::new()
     let root = normalize_repo_root(repo_root)
-    // Rewrite ref names in the raw protocol data to refs/relay/incoming/ namespace
+    let git_dir = root + "/.git"
+    // Rewrite ref names in the raw protocol data to refs/relay/incoming/
+    // namespace, and resynthesize old_id from the incoming namespace so
+    // receive_pack accepts the transition as fast-forward or creation.
     let (rewritten_bytes, original_refnames) = serve_rewrite_receive_pack_refs(
       input_bytes,
+      fs,
+      git_dir,
     )
     let out = @bitlib.receive_pack(fs, fs, root, rewritten_bytes)
     // Rewrite status response: translate rewritten refs back to original names
@@ -555,11 +560,33 @@ async fn serve_handle_git_request(
 
 ///|
 /// Rewrite ref names in raw receive-pack protocol data.
+///
+/// The client advertisement shows `refs/heads/*`, so the client sends
+/// `<old_id> <new_id> refs/heads/X` where `old_id` is the current value
+/// of `refs/heads/X`. But we write incoming updates into
+/// `refs/relay/incoming/heads/X`, so `receive_pack` compares `old_id`
+/// against the incoming namespace instead. To keep the two sides in sync
+/// we replace `old_id` with the current value of the rewritten ref
+/// (or `0000...` if the rewritten ref does not exist yet), so
+/// `receive_pack` accepts the update as a fast-forward or creation in
+/// the incoming namespace.
+///
 /// Returns (rewritten_bytes, mapping from rewritten -> original ref names)
 fn serve_rewrite_receive_pack_refs(
   data : Bytes,
-) -> (Bytes, Map[String, String]) {
+  fs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+) -> (Bytes, Map[String, String]) raise @bitcore.GitError {
   let rewrite_map : Map[String, String] = {}
+  // Build a lookup of the current ref state so we can resynthesize old_id
+  // for each rewritten ref. Missing refs resolve to the zero id.
+  let current_ref_ids : Map[String, String] = {}
+  let existing_refs = @bitrepo.show_ref(fs, git_dir)
+  for item in existing_refs {
+    let (refname, id) = item
+    current_ref_ids[refname] = id.to_hex()
+  }
+  let zero_id = @bitcore.ObjectId::zero().to_hex()
   // Parse pkt-lines up to the flush, rewrite ref names, then append remaining pack data
   let out : Array[Byte] = []
   let mut i = 0
@@ -611,7 +638,14 @@ fn serve_rewrite_receive_pack_refs(
       let original_ref = parts[2]
       let rewritten_ref = serve_rewrite_ref_incoming(original_ref)
       rewrite_map[rewritten_ref] = original_ref
-      parts[0] + " " + parts[1] + " " + rewritten_ref + caps_part + "\n"
+      // Replace old_id with the current value of the rewritten ref so
+      // receive_pack sees a consistent old->new transition in the
+      // incoming namespace (zeroes create the ref on first push).
+      let rewritten_old_id = match current_ref_ids.get(rewritten_ref) {
+        Some(hex) => hex
+        None => zero_id
+      }
+      rewritten_old_id + " " + parts[1] + " " + rewritten_ref + caps_part + "\n"
     } else {
       line
     }
