@@ -1124,6 +1124,7 @@ export const fetch = async (
       toTransportId(transport),
       options.refspec ?? "",
       options.preferV2 !== false,
+      options.depth ?? 0,
     ),
   );
 };
@@ -1151,6 +1152,7 @@ export const clone = async (
       resolvedRemoteUrl,
       toTransportId(transport),
       options.preferV2 !== false,
+      options.depth ?? 0,
     ),
   );
 };
