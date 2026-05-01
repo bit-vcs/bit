@@ -218,6 +218,7 @@ options(
     "name_rev.mbt": [ "native" ],
     "notes.mbt": [ "native" ],
     "osfs.mbt": [ "native", "js" ],
+    "pack_bitmap_read.mbt": [ "native" ],
     "pack_bitmap_write.mbt": [ "native" ],
     "pack_bitmap_write_wbtest.mbt": [ "native" ],
     "pack_helpers.mbt": [ "native" ],

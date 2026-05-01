@@ -1644,10 +1644,20 @@ fn count_single_pack_reused_objects(
     Some(name) => name
     None => return (0, 0)
   }
+  let stem = string_slice_to(pack_name, pack_name.length() - 5)
+  let bitmap_path = pack_dir + "/" + stem + ".bitmap"
+  let bitmap_data = fs.read_file(bitmap_path) catch { _ => return (0, 0) }
+  let bitmap = match pack_bitmap_parse(bitmap_data) {
+    Some(value) => value
+    None => return (0, 0)
+  }
   let idx_path = pack_idx_path(pack_dir + "/" + pack_name)
   // Read OIDs from the pack index
   let entries = midx_read_pack_index(fs, idx_path, 0, 0)
   if entries.length() == 0 {
+    return (0, 0)
+  }
+  if bitmap.object_count != entries.length() {
     return (0, 0)
   }
   let pack_oids : Map[String, Bool] = {}
@@ -1672,7 +1682,10 @@ fn has_midx_bitmap(fs : OsFs, pack_dir : String) -> Bool {
   for entry in entries {
     let name = normalize_dir_entry(entry)
     if name.has_prefix("multi-pack-index") && name.has_suffix(".bitmap") {
-      return true
+      let data = fs.read_file(pack_dir + "/" + name) catch { _ => continue }
+      if pack_bitmap_parse(data) is Some(_) {
+        return true
+      }
     }
   }
   false

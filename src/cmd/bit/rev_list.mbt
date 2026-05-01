@@ -1535,94 +1535,43 @@ async fn rev_list_test_bitmap(fs : OsFs, git_dir : String) -> Unit raise Error {
   ignore(midx_data)
   // Emit GIT_TRACE2_EVENT for load_midx_revindex
   emit_revindex_trace(fs, "midx")
-  // Parse bitmap header
-  if bmp_bytes.length() < 32 {
-    eprint_line("error: bitmap file too short")
-    @sys.exit(1)
-    return
-  }
-  if bmp_bytes[0] != b'B' ||
-    bmp_bytes[1] != b'I' ||
-    bmp_bytes[2] != b'T' ||
-    bmp_bytes[3] != b'M' {
-    eprint_line("error: invalid bitmap signature")
-    @sys.exit(1)
-    return
-  }
-  // Verify bitmap trailer checksum
-  let bmp_body_len = bmp_bytes.length() - 20
-  if bmp_body_len < 32 {
-    eprint_line("error: bitmap too short for checksum")
-    @sys.exit(1)
-    return
-  }
-  let bmp_body = Bytes::from_array(
-    FixedArray::makei(bmp_body_len, i => bmp_bytes[i]),
-  )
-  let bmp_computed = @bitcore.sha1(bmp_body)
-  let mut bmp_checksum_ok = true
-  for i in 0..<20 {
-    if bmp_computed.bytes[i] != bmp_bytes[bmp_body_len + i] {
-      bmp_checksum_ok = false
-    }
-  }
-  if !bmp_checksum_ok {
-    eprint_line("error: bitmap checksum mismatch")
-    @sys.exit(1)
-    return
-  }
-  let entry_count = midx_read_u32(bmp_bytes, 8)
-  if entry_count <= 0 {
-    eprint_line("error: bitmap has no entries")
-    @sys.exit(1)
-    return
-  }
-  // Validate bitmap structure: parse type bitmaps and per-commit entries
-  let mut bmp_pos = 32
-  let mut valid = true
-  // Skip 4 type bitmaps
-  for _ in 0..<4 {
-    if bmp_pos + 8 > bmp_body_len {
-      valid = false
-      break
-    }
-    let word_count = midx_read_u32(bmp_bytes, bmp_pos + 4)
-    if word_count < 0 {
-      valid = false
-      break
-    }
-    bmp_pos = bmp_pos + 4 + 4 + word_count * 8 + 4
-  }
-  if !valid {
+  guard pack_bitmap_parse(bmp_bytes) is Some(bitmap) else {
     eprint_line("error: bitmap structure invalid")
     @sys.exit(1)
     return
   }
-  // Parse per-commit bitmap entries
-  for _ in 0..<entry_count {
-    if bmp_pos + 6 > bmp_body_len {
-      valid = false
-      break
-    }
-    bmp_pos += 6
-    if bmp_pos + 8 > bmp_body_len {
-      valid = false
-      break
-    }
-    let word_count = midx_read_u32(bmp_bytes, bmp_pos + 4)
-    if word_count < 0 {
-      valid = false
-      break
-    }
-    bmp_pos = bmp_pos + 4 + 4 + word_count * 8 + 4
+  if bitmap.entry_count <= 0 || bitmap.entries.length() == 0 {
+    eprint_line("error: bitmap has no entries")
+    @sys.exit(1)
+    return
   }
-  if valid {
-    eprint_line("OK!")
-  } else {
+  let type_count = bitmap.commit_positions.length() +
+    bitmap.tree_positions.length() +
+    bitmap.blob_positions.length() +
+    bitmap.tag_positions.length()
+  let mut reachable_count = 0
+  let mut valid = bitmap.version == 1 &&
+    bitmap.pack_checksum.length() == 20 &&
+    bitmap.entries.length() == bitmap.entry_count &&
+    type_count <= bitmap.object_count &&
+    (
+      (bitmap.options & 4) == 0 ||
+      bitmap.name_hashes.length() == bitmap.object_count
+    )
+  for entry in bitmap.entries {
+    reachable_count += entry.positions.length()
+    if entry.flags == 0 ||
+      entry.object_pos < 0 ||
+      entry.object_pos >= bitmap.object_count {
+      valid = false
+    }
+  }
+  if !valid || reachable_count == 0 {
     eprint_line("mismatch in bitmap results")
     @sys.exit(1)
     return
   }
+  eprint_line("OK!")
 }
 
 ///|
