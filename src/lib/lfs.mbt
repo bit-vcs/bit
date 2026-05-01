@@ -4,7 +4,7 @@
 pub struct LfsPointer {
   oid : String
   size : Int64
-} derive(Show, Eq)
+} derive(Debug, Eq)
 
 ///|
 let lfs_version_prefix : String = "version https://git-lfs.github.com/spec/v1\n"
@@ -17,6 +17,19 @@ let lfs_size_prefix : String = "size "
 
 ///|
 let lfs_max_pointer_size : Int = 1024
+
+///|
+fn lfs_sha256_hex(data : Bytes) -> String {
+  let raw = @bithash.sha256_raw(data)
+  let digits = "0123456789abcdef"
+  let out = StringBuilder::new()
+  for b in raw {
+    let v = b.to_int()
+    out.write_char(digits[v / 16].to_int().unsafe_to_char())
+    out.write_char(digits[v % 16].to_int().unsafe_to_char())
+  }
+  out.to_string()
+}
 
 ///|
 pub fn is_lfs_pointer(content : Bytes) -> Bool {
@@ -79,6 +92,77 @@ pub fn lfs_object_path(git_dir : String, oid : String) -> String {
 }
 
 ///|
+fn lfs_is_session_id_char(c : Char) -> Bool {
+  (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')
+}
+
+///|
+fn lfs_is_relay_git_session_url(remote_url : String) -> Bool {
+  if !(remote_url.has_prefix("http://") || remote_url.has_prefix("https://")) {
+    return false
+  }
+  guard remote_url.rev_find("/git/") is Some(idx) else { return false }
+  let session = String::unsafe_substring(
+    remote_url,
+    start=idx + 5,
+    end=remote_url.length(),
+  )
+  if session.length() < 6 || session.length() > 16 {
+    return false
+  }
+  for c in session {
+    if !lfs_is_session_id_char(c) {
+      return false
+    }
+  }
+  true
+}
+
+///|
+fn lfs_parent_dir(path : String) -> String {
+  match path.rev_find("/") {
+    None => "/"
+    Some(0) => "/"
+    Some(i) => String::unsafe_substring(path, start=0, end=i)
+  }
+}
+
+///|
+fn lfs_pointer_content(oid : String, size : Int64) -> Bytes {
+  @utf8.encode(
+    "\{lfs_version_prefix}\{lfs_oid_prefix}\{oid}\n\{lfs_size_prefix}\{size}\n",
+  )
+}
+
+///|
+fn lfs_pointer_for_content(content : Bytes) -> Bytes {
+  if is_lfs_pointer(content) {
+    content
+  } else {
+    lfs_pointer_content(lfs_sha256_hex(content), content.length().to_int64())
+  }
+}
+
+///|
+fn lfs_clean_content(
+  fs : &@bit.FileSystem,
+  rfs : &@bit.RepoFileSystem,
+  git_dir : String,
+  content : Bytes,
+) -> Bytes raise @bit.GitError {
+  if is_lfs_pointer(content) {
+    return content
+  }
+  let oid = lfs_sha256_hex(content)
+  let path = lfs_object_path(git_dir, oid)
+  if !rfs.is_file(path) {
+    fs.mkdir_p(lfs_parent_dir(path))
+    fs.write_file(path, content)
+  }
+  lfs_pointer_for_content(content)
+}
+
+///|
 /// Resolve LFS server URL from pre-read config values.
 /// Priority: lfs.url > remote.<name>.lfsurl > derive from remote URL.
 pub fn resolve_lfs_url_from_config(
@@ -93,6 +177,8 @@ pub fn resolve_lfs_url_from_config(
     return remote_lfs_url
   }
   let base = if remote_url.has_suffix(".git") {
+    remote_url
+  } else if lfs_is_relay_git_session_url(remote_url) {
     remote_url
   } else {
     remote_url + ".git"
@@ -128,15 +214,7 @@ pub fn resolve_lfs_url(
 ///|
 /// Verify that downloaded data matches the expected LFS OID (SHA-256).
 pub fn lfs_verify_oid(data : Bytes, expected_oid : String) -> Bool {
-  let raw = @bithash.sha256_raw(data)
-  let digits = "0123456789abcdef"
-  let out = StringBuilder::new()
-  for b in raw {
-    let v = b.to_int()
-    out.write_char(digits[v / 16].to_int().unsafe_to_char())
-    out.write_char(digits[v % 16].to_int().unsafe_to_char())
-  }
-  out.to_string() == expected_oid
+  lfs_sha256_hex(data) == expected_oid
 }
 
 ///|

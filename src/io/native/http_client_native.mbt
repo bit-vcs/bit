@@ -288,3 +288,41 @@ pub async fn native_http_post(
   )
   (@bit.HttpResponse::new(response.code), data)
 }
+
+///|
+pub async fn native_http_put(
+  url : String,
+  body : Bytes,
+  headers : Map[String, String],
+) -> (@bit.HttpResponse, Bytes) raise @bit.GitError {
+  let auth_headers = apply_auth_header(url, headers)
+  let client = @http.put_stream(url, headers=auth_headers) catch {
+    e => raise @bit.GitError::IoError("HTTP PUT failed: \{e}")
+  }
+  client.write(body) catch {
+    e => raise @bit.GitError::IoError("HTTP PUT write failed: \{e}")
+  }
+  let response = client.end_request() catch {
+    e => raise @bit.GitError::IoError("HTTP PUT end_request failed: \{e}")
+  }
+  let chunks : Array[Byte] = []
+  while true {
+    let chunk = client.read_some() catch {
+      err if @async.is_cancellation_error(err) =>
+        raise @bit.GitError::IoError(err.to_string())
+      _ => break
+    }
+    match chunk {
+      Some(b) =>
+        for byte in b {
+          chunks.push(byte)
+        }
+      None => break
+    }
+  }
+  client.close()
+  let data = Bytes::from_array(
+    FixedArray::makei(chunks.length(), i => chunks[i]),
+  )
+  (@bit.HttpResponse::new(response.code), data)
+}

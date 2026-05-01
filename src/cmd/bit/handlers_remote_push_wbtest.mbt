@@ -780,3 +780,166 @@ test "push-lease: remote tracking refname follows pushed remote" {
   )
   assert_eq(push_remote_tracking_refname("origin", "refs/tags/v1"), None)
 }
+
+///|
+fn serve_lfs_wbtest_sha256_hex(data : Bytes) -> String {
+  let raw = @bithash.sha256_raw(data)
+  let digits = "0123456789abcdef"
+  let out = StringBuilder::new()
+  for b in raw {
+    let v = b.to_int()
+    out.write_char(digits[v / 16].to_int().unsafe_to_char())
+    out.write_char(digits[v % 16].to_int().unsafe_to_char())
+  }
+  out.to_string()
+}
+
+///|
+fn serve_lfs_wbtest_request(
+  req_method_value : String,
+  path : String,
+  body? : Bytes = b"",
+) -> ServePollRequest {
+  {
+    request_id: "lfs-wbtest",
+    req_method: req_method_value,
+    path,
+    _headers: {
+      "x-forwarded-proto": "https",
+      "x-forwarded-host": "relay.example.com",
+      "x-forwarded-prefix": "/git/abc123",
+    },
+    body_base64: Some(serve_base64_encode(body)),
+  }
+}
+
+///|
+fn serve_lfs_wbtest_parse_body(body : Bytes) -> Map[String, Json] raise Error {
+  let text = decode_bytes(body)
+  let parsed = @json.parse(text) catch {
+    _ => fail("expected JSON response: " + text)
+  }
+  guard parsed is Json::Object(obj) else {
+    fail("expected JSON object response: " + text)
+  }
+  obj
+}
+
+///|
+async test "serve lfs: upload batch advertises relay object URL" {
+  @bitnative.init_native_io()
+  let fs = OsFs::new()
+  let root = "/tmp/bit-test-serve-lfs-batch-" +
+    get_current_timestamp().to_string()
+  cleanup_tree(fs, root)
+  ignore(try? @bitlib.init_repo(fs, root))
+  let data = @utf8.encode("large blob\n")
+  let oid = serve_lfs_wbtest_sha256_hex(data)
+  let batch = @utf8.encode(
+    "{\"operation\":\"upload\",\"objects\":[{\"oid\":\"\{oid}\",\"size\":\{data.length()}}]}",
+  )
+
+  let (status, headers, body, incoming_refs) = serve_handle_git_request(
+    root,
+    serve_lfs_wbtest_request("POST", "/info/lfs/objects/batch", body=batch),
+    allow_push=true,
+  )
+
+  assert_eq(status, 200)
+  assert_eq(headers.get("Content-Type"), Some("application/vnd.git-lfs+json"))
+  assert_eq(incoming_refs.length(), 0)
+  let obj = serve_lfs_wbtest_parse_body(body)
+  guard obj.get("objects") is Some(Json::Array(objects)) else {
+    fail("missing objects")
+  }
+  assert_eq(objects.length(), 1)
+  guard objects[0] is Json::Object(item) else { fail("missing object item") }
+  guard item.get("actions") is Some(Json::Object(actions)) else {
+    fail("missing actions")
+  }
+  guard actions.get("upload") is Some(Json::Object(upload)) else {
+    fail("missing upload action")
+  }
+  assert_eq(
+    upload.get("href"),
+    Some(
+      Json::string(
+        "https://relay.example.com/git/abc123/info/lfs/objects/\{oid}",
+      ),
+    ),
+  )
+  cleanup_tree(fs, root)
+}
+
+///|
+async test "serve lfs: put caches object and get downloads it" {
+  @bitnative.init_native_io()
+  let fs = OsFs::new()
+  let root = "/tmp/bit-test-serve-lfs-put-get-" +
+    get_current_timestamp().to_string()
+  cleanup_tree(fs, root)
+  ignore(try? @bitlib.init_repo(fs, root))
+  let data = @utf8.encode("large blob\n")
+  let oid = serve_lfs_wbtest_sha256_hex(data)
+  let object_path = @bitlib.lfs_object_path(root + "/.git", oid)
+
+  let (put_status, _, put_body, _) = serve_handle_git_request(
+    root,
+    serve_lfs_wbtest_request("PUT", "/info/lfs/objects/\{oid}", body=data),
+    allow_push=true,
+  )
+  assert_eq(put_status, 200)
+  assert_true(fs.is_file(object_path))
+  assert_true(Bytes::equal(fs.read_file(object_path), data))
+  assert_true(decode_bytes(put_body).contains("ok"))
+
+  let (get_status, get_headers, get_body, _) = serve_handle_git_request(
+    root,
+    serve_lfs_wbtest_request("GET", "/info/lfs/objects/\{oid}"),
+    allow_push=false,
+  )
+  assert_eq(get_status, 200)
+  assert_eq(get_headers.get("Content-Type"), Some("application/octet-stream"))
+  assert_true(Bytes::equal(get_body, data))
+  cleanup_tree(fs, root)
+}
+
+///|
+async test "serve lfs: download batch reports cached and missing objects" {
+  @bitnative.init_native_io()
+  let fs = OsFs::new()
+  let root = "/tmp/bit-test-serve-lfs-download-" +
+    get_current_timestamp().to_string()
+  cleanup_tree(fs, root)
+  ignore(try? @bitlib.init_repo(fs, root))
+  let data = @utf8.encode("large blob\n")
+  let oid = serve_lfs_wbtest_sha256_hex(data)
+  ignore(
+    try? serve_handle_git_request(
+      root,
+      serve_lfs_wbtest_request("PUT", "/info/lfs/objects/\{oid}", body=data),
+      allow_push=true,
+    ),
+  )
+  let missing = "0000000000000000000000000000000000000000000000000000000000000000"
+  let batch = @utf8.encode(
+    "{\"operation\":\"download\",\"objects\":[{\"oid\":\"\{oid}\",\"size\":\{data.length()}},{\"oid\":\"\{missing}\",\"size\":1}]}",
+  )
+
+  let (status, _, body, _) = serve_handle_git_request(
+    root,
+    serve_lfs_wbtest_request("POST", "/info/lfs/objects/batch", body=batch),
+  )
+
+  assert_eq(status, 200)
+  let text = decode_bytes(body)
+  assert_true(text.contains("\"download\""))
+  assert_true(
+    text.contains(
+      "https://relay.example.com/git/abc123/info/lfs/objects/\{oid}",
+    ),
+  )
+  assert_true(text.contains("\"code\":404"))
+  assert_true(text.contains(missing))
+  cleanup_tree(fs, root)
+}

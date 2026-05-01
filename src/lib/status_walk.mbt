@@ -495,15 +495,20 @@ async fn check_file_against_index(
           } else if !stat_matches {
             let content = fs.read_file(abs)
             let attrs = resolve_eol_attrs(fs, root, path)
-            let content = match (attrs.filter, run_filter_cmd) {
-              (Some(name), Some(run_cmd)) => {
-                let (clean_cmd, _) = read_filter_commands(fs, git_dir, name)
-                match clean_cmd {
-                  Some(cmd) => (run_cmd.run)(root, git_dir, cmd, content)
+            let content = match attrs.filter {
+              Some("lfs") => lfs_pointer_for_content(content)
+              Some(name) =>
+                match run_filter_cmd {
+                  Some(run_cmd) => {
+                    let (clean_cmd, _) = read_filter_commands(fs, git_dir, name)
+                    match clean_cmd {
+                      Some(cmd) => (run_cmd.run)(root, git_dir, cmd, content)
+                      None => content
+                    }
+                  }
                   None => content
                 }
-              }
-              _ => content
+              None => content
             }
             let normalized = clean_for_storage(content, attrs, autocrlf)
             let id = @bit.hash_blob(normalized)
@@ -513,15 +518,20 @@ async fn check_file_against_index(
           } else if racy_git {
             let content = fs.read_file(abs)
             let attrs = resolve_eol_attrs(fs, root, path)
-            let content = match (attrs.filter, run_filter_cmd) {
-              (Some(name), Some(run_cmd)) => {
-                let (clean_cmd, _) = read_filter_commands(fs, git_dir, name)
-                match clean_cmd {
-                  Some(cmd) => (run_cmd.run)(root, git_dir, cmd, content)
+            let content = match attrs.filter {
+              Some("lfs") => lfs_pointer_for_content(content)
+              Some(name) =>
+                match run_filter_cmd {
+                  Some(run_cmd) => {
+                    let (clean_cmd, _) = read_filter_commands(fs, git_dir, name)
+                    match clean_cmd {
+                      Some(cmd) => (run_cmd.run)(root, git_dir, cmd, content)
+                      None => content
+                    }
+                  }
                   None => content
                 }
-              }
-              _ => content
+              None => content
             }
             let normalized = clean_for_storage(content, attrs, autocrlf)
             let id = @bit.hash_blob(normalized)

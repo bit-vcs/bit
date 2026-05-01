@@ -106,6 +106,7 @@ pub async fn push_http(
   root : String,
   remote_url : String,
   refname : String,
+  remote_name? : String = "",
   force? : Bool = false,
 ) -> String raise @bit.GitError {
   let git_dir = sync_join_path(root, ".git")
@@ -121,6 +122,15 @@ pub async fn push_http(
       let db = @bitlib.ObjectDb::load(rfs, actual_git_dir)
       let objects = @bitlib.collect_reachable_objects(db, rfs, head_id)
       let pack = @pack.create_packfile(objects)
+      sync_raise_lfs_upload_errors(
+        lfs_upload_pack_objects(
+          rfs,
+          actual_git_dir,
+          remote_url,
+          objects,
+          remote_name~,
+        ),
+      )
       let remote = @protocol.Remote::new(remote_url)
       let refs = @bitnative.discover_receive_refs_http(remote)
       let old_id = sync_find_ref(refs, refname)
@@ -148,9 +158,17 @@ pub async fn push_http_from_commit(
   refname : String,
 ) -> String raise @bit.GitError {
   let git_dir = sync_join_path(root, ".git")
-  let db = @bitlib.ObjectDb::load(rfs, git_dir)
+  let actual_git_dir = if rfs.is_file(git_dir) {
+    @bitlib.resolve_gitdir(rfs, git_dir)
+  } else {
+    git_dir
+  }
+  let db = @bitlib.ObjectDb::load(rfs, actual_git_dir)
   let objects = @bitlib.collect_reachable_objects(db, rfs, commit_id)
   let pack = @pack.create_packfile(objects)
+  sync_raise_lfs_upload_errors(
+    lfs_upload_pack_objects(rfs, actual_git_dir, remote_url, objects),
+  )
   let remote = @protocol.Remote::new(remote_url)
   let refs = @bitnative.discover_receive_refs_http(remote)
   let old_id = sync_find_ref(refs, refname)
@@ -171,13 +189,34 @@ pub async fn push_http_tree_only(
   refname : String,
 ) -> String raise @bit.GitError {
   let git_dir = sync_join_path(root, ".git")
-  let db = @bitlib.ObjectDb::load(rfs, git_dir)
+  let actual_git_dir = if rfs.is_file(git_dir) {
+    @bitlib.resolve_gitdir(rfs, git_dir)
+  } else {
+    git_dir
+  }
+  let db = @bitlib.ObjectDb::load(rfs, actual_git_dir)
   // Collect only the diff objects (new/modified since base)
   let objects = @bitlib.collect_diff_objects(db, rfs, old_commit_id, commit_id)
   let pack = @pack.create_packfile(objects)
+  sync_raise_lfs_upload_errors(
+    lfs_upload_pack_objects(rfs, actual_git_dir, remote_url, objects),
+  )
   let remote = @protocol.Remote::new(remote_url)
   let req = @protocol.PushRequest::new(old_commit_id, commit_id, refname, pack)
   @bitnative.push(remote, req)
+}
+
+///|
+fn sync_raise_lfs_upload_errors(
+  errors : Array[LfsUploadError],
+) -> Unit raise @bit.GitError {
+  if errors.length() == 0 {
+    return
+  }
+  let err = errors[0]
+  raise @bit.GitError::InvalidObject(
+    "LFS upload failed for \{err.oid}: \{err.message}",
+  )
 }
 
 ///|

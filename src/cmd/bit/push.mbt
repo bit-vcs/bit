@@ -1973,6 +1973,7 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
             root,
             url,
             first_refname,
+            remote_name~,
             force~,
           )
           if !(porcelain || quiet) {

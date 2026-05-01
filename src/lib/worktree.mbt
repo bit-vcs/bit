@@ -179,7 +179,11 @@ pub fn add_paths(
     if rfs.is_file(abs) {
       let content = rfs.read_file(abs)
       let attrs = resolve_eol_attrs(rfs, root, path)
-      let normalized = clean_for_storage(content, attrs, autocrlf)
+      let storage_content = match attrs.filter {
+        Some("lfs") => lfs_clean_content(fs, rfs, actual_git_dir, content)
+        _ => content
+      }
+      let normalized = clean_for_storage(storage_content, attrs, autocrlf)
       let id = write_loose_object(
         fs,
         actual_git_dir,
@@ -277,25 +281,35 @@ pub async fn add_paths_async(
           @bitio.WorktreeKindMeta::Regular => {
             let content = rfs.read_file(abs)
             let attrs = resolve_eol_attrs(rfs, root, path)
-            let content = match (attrs.filter, run_filter_cmd) {
-              (Some(name), Some(run_cmd)) => {
-                let (clean_cmd, _) = read_filter_commands(
-                  rfs, actual_git_dir, name,
-                )
-                match clean_cmd {
-                  Some(cmd) => (run_cmd.run)(root, actual_git_dir, cmd, content)
+            let storage_content = match attrs.filter {
+              Some("lfs") => lfs_clean_content(fs, rfs, actual_git_dir, content)
+              Some(name) =>
+                match run_filter_cmd {
+                  Some(run_cmd) => {
+                    let (clean_cmd, _) = read_filter_commands(
+                      rfs, actual_git_dir, name,
+                    )
+                    match clean_cmd {
+                      Some(cmd) =>
+                        (run_cmd.run)(root, actual_git_dir, cmd, content)
+                      None => content
+                    }
+                  }
                   None => content
                 }
-              }
-              _ => content
+              None => content
             }
-            let normalized = clean_for_storage(content, attrs, autocrlf)
+            let normalized = clean_for_storage(storage_content, attrs, autocrlf)
+            let entry_size = match attrs.filter {
+              Some("lfs") => content.length()
+              _ => storage_content.length()
+            }
             // Collect CRLF conversion warnings
             match warnings {
               Some(warns) =>
-                if !is_binary_bytes(content) {
+                if !is_binary_bytes(storage_content) {
                   collect_crlf_warnings(
-                    warns, path, content, normalized, attrs, autocrlf,
+                    warns, path, storage_content, normalized, attrs, autocrlf,
                   )
                 }
               None => ()
@@ -308,7 +322,7 @@ pub async fn add_paths_async(
               algo=effective_algo,
             )
             compat_record_blob_mapping(fs, rfs, actual_git_dir, id, normalized)
-            let size = content.length()
+            let size = entry_size
             let (mtime_sec, mtime_nsec) = info.mtime()
             let dev = info.dev.unwrap_or(0)
             let ino = info.ino.unwrap_or(0)

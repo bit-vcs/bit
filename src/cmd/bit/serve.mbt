@@ -289,6 +289,18 @@ struct ServePollRequest {
 }
 
 ///|
+struct ServeLfsObject {
+  oid : String
+  size : Int64
+}
+
+///|
+struct ServeLfsBatchRequest {
+  operation : String
+  objects : Array[ServeLfsObject]
+}
+
+///|
 fn serve_parse_poll_response(body : Bytes) -> Array[ServePollRequest]? {
   let text = serve_decode_bytes(body)
   let parsed = @json.parse(text) catch { _ => return None }
@@ -438,6 +450,342 @@ fn serve_extract_query_param(path : String, param : String) -> String? {
 }
 
 ///|
+fn serve_header_get(headers : Map[String, String], name : String) -> String? {
+  match headers.get(name) {
+    Some(value) => return Some(value)
+    None => ()
+  }
+  let wanted = name.to_lower()
+  for entry in headers.to_array() {
+    let (key, value) = entry
+    if key.to_lower() == wanted {
+      return Some(value)
+    }
+  }
+  None
+}
+
+///|
+fn serve_lfs_prefix_from_original_path(path : String) -> String? {
+  guard path.find("/info/lfs") is Some(idx) else { return None }
+  if idx == 0 {
+    None
+  } else {
+    Some(String::unsafe_substring(path, start=0, end=idx))
+  }
+}
+
+///|
+fn serve_lfs_external_base(req : ServePollRequest) -> String {
+  match serve_header_get(req._headers, "x-relay-base-url") {
+    Some(value) => return serve_trim_trailing_slash(value)
+    None => ()
+  }
+  let proto = match serve_header_get(req._headers, "x-forwarded-proto") {
+    Some(value) if value.length() > 0 => value
+    _ => "http"
+  }
+  let host = match serve_header_get(req._headers, "x-forwarded-host") {
+    Some(value) if value.length() > 0 => value
+    _ =>
+      match serve_header_get(req._headers, "host") {
+        Some(value) if value.length() > 0 => value
+        _ => "localhost"
+      }
+  }
+  let prefix = match serve_header_get(req._headers, "x-forwarded-prefix") {
+    Some(value) if value.length() > 0 => value
+    _ =>
+      match serve_header_get(req._headers, "x-original-uri") {
+        Some(value) =>
+          match serve_lfs_prefix_from_original_path(value) {
+            Some(prefix) => prefix
+            None => ""
+          }
+        None =>
+          match serve_header_get(req._headers, "x-forwarded-uri") {
+            Some(value) =>
+              match serve_lfs_prefix_from_original_path(value) {
+                Some(prefix) => prefix
+                None => ""
+              }
+            None => ""
+          }
+      }
+  }
+  serve_trim_trailing_slash("\{proto}://\{host}\{prefix}")
+}
+
+///|
+fn serve_lfs_json_body(message : String) -> Bytes {
+  let obj : Map[String, Json] = {}
+  obj["message"] = Json::string(message)
+  @utf8.encode(Json::object(obj).stringify())
+}
+
+///|
+fn serve_lfs_json_headers() -> Map[String, String] {
+  { "Content-Type": "application/vnd.git-lfs+json" }
+}
+
+///|
+fn serve_lfs_is_valid_oid(oid : String) -> Bool {
+  oid.length() == 64 && @bithash.is_hex_string(oid)
+}
+
+///|
+fn serve_lfs_extract_object_oid(path : String) -> String? {
+  let prefix = "/info/lfs/objects/"
+  if !path.has_prefix(prefix) {
+    return None
+  }
+  let raw = String::unsafe_substring(
+    path,
+    start=prefix.length(),
+    end=path.length(),
+  )
+  let oid = match raw.find("?") {
+    Some(idx) => String::unsafe_substring(raw, start=0, end=idx)
+    None => raw
+  }
+  if serve_lfs_is_valid_oid(oid) {
+    Some(oid)
+  } else {
+    None
+  }
+}
+
+///|
+fn serve_lfs_parse_batch_request(body : Bytes) -> ServeLfsBatchRequest? {
+  let text = @utf8.decode_lossy(body[:])
+  let parsed = @json.parse(text) catch { _ => return None }
+  guard parsed is Json::Object(root) else { return None }
+  let operation = match root.get("operation") {
+    Some(Json::String(value)) => value
+    _ => return None
+  }
+  let objects : Array[ServeLfsObject] = []
+  guard root.get("objects") is Some(Json::Array(items)) else { return None }
+  for item in items {
+    guard item is Json::Object(obj) else { return None }
+    let oid = match obj.get("oid") {
+      Some(Json::String(value)) => value
+      _ => return None
+    }
+    let size = match obj.get("size") {
+      Some(Json::Number(n, ..)) => n.to_int64()
+      _ => return None
+    }
+    if size < 0L {
+      return None
+    }
+    objects.push({ oid, size })
+  }
+  Some({ operation, objects })
+}
+
+///|
+fn serve_lfs_object_href(req : ServePollRequest, oid : String) -> String {
+  serve_lfs_external_base(req) + "/info/lfs/objects/" + oid
+}
+
+///|
+fn serve_lfs_object_error(
+  oid : String,
+  size : Int64,
+  code : Int,
+  message : String,
+) -> Json {
+  let item : Map[String, Json] = {}
+  item["oid"] = Json::string(oid)
+  item["size"] = Json::number(size.to_double())
+  let err : Map[String, Json] = {}
+  err["code"] = Json::number(code.to_double())
+  err["message"] = Json::string(message)
+  item["error"] = Json::object(err)
+  Json::object(item)
+}
+
+///|
+fn serve_lfs_object_action(
+  req : ServePollRequest,
+  obj : ServeLfsObject,
+  action_name : String,
+) -> Json {
+  let item : Map[String, Json] = {}
+  item["oid"] = Json::string(obj.oid)
+  item["size"] = Json::number(obj.size.to_double())
+  let action : Map[String, Json] = {}
+  action["href"] = Json::string(serve_lfs_object_href(req, obj.oid))
+  action["header"] = Json::object({})
+  let actions : Map[String, Json] = {}
+  actions[action_name] = Json::object(action)
+  item["actions"] = Json::object(actions)
+  Json::object(item)
+}
+
+///|
+fn serve_lfs_batch_response(
+  repo_root : String,
+  req : ServePollRequest,
+  allow_push : Bool,
+) -> (Int, Map[String, String], Bytes, Array[String]) {
+  let body = match req.body_base64 {
+    Some(b64) => serve_base64_decode(b64)
+    None => Bytes::new(0)
+  }
+  guard serve_lfs_parse_batch_request(body) is Some(batch) else {
+    return (
+      400,
+      serve_lfs_json_headers(),
+      serve_lfs_json_body("invalid LFS batch request"),
+      [],
+    )
+  }
+  if batch.operation == "upload" && !allow_push {
+    return (
+      403,
+      serve_lfs_json_headers(),
+      serve_lfs_json_body("LFS upload not enabled"),
+      [],
+    )
+  }
+  if batch.operation != "upload" && batch.operation != "download" {
+    return (
+      400,
+      serve_lfs_json_headers(),
+      serve_lfs_json_body("unsupported LFS operation"),
+      [],
+    )
+  }
+  let fs = OsFs::new()
+  let git_dir = normalize_repo_root(repo_root) + "/.git"
+  let items : Array[Json] = []
+  for obj in batch.objects {
+    if !serve_lfs_is_valid_oid(obj.oid) {
+      items.push(serve_lfs_object_error(obj.oid, obj.size, 422, "invalid oid"))
+      continue
+    }
+    let cached = fs.is_file(@bitlib.lfs_object_path(git_dir, obj.oid))
+    if batch.operation == "download" {
+      if cached {
+        items.push(serve_lfs_object_action(req, obj, "download"))
+      } else {
+        items.push(
+          serve_lfs_object_error(obj.oid, obj.size, 404, "object not found"),
+        )
+      }
+    } else if cached {
+      let item : Map[String, Json] = {}
+      item["oid"] = Json::string(obj.oid)
+      item["size"] = Json::number(obj.size.to_double())
+      items.push(Json::object(item))
+    } else {
+      items.push(serve_lfs_object_action(req, obj, "upload"))
+    }
+  }
+  let root : Map[String, Json] = {}
+  root["objects"] = Json::array(items)
+  (
+    200,
+    serve_lfs_json_headers(),
+    @utf8.encode(Json::object(root).stringify()),
+    [],
+  )
+}
+
+///|
+fn serve_lfs_put_object(
+  repo_root : String,
+  req : ServePollRequest,
+  oid : String,
+  allow_push : Bool,
+) -> (Int, Map[String, String], Bytes, Array[String]) raise Error {
+  if !allow_push {
+    return (
+      403,
+      serve_lfs_json_headers(),
+      serve_lfs_json_body("LFS upload not enabled"),
+      [],
+    )
+  }
+  let body = match req.body_base64 {
+    Some(b64) => serve_base64_decode(b64)
+    None => Bytes::new(0)
+  }
+  if !@bitlib.lfs_verify_oid(body, oid) {
+    return (
+      422,
+      serve_lfs_json_headers(),
+      serve_lfs_json_body("SHA-256 integrity check failed"),
+      [],
+    )
+  }
+  let fs = OsFs::new()
+  let git_dir = normalize_repo_root(repo_root) + "/.git"
+  let path = @bitlib.lfs_object_path(git_dir, oid)
+  fs.mkdir_p(parent_dir(path))
+  fs.write_file(path, body)
+  (200, serve_lfs_json_headers(), @utf8.encode("{\"ok\":true}"), [])
+}
+
+///|
+fn serve_lfs_get_object(
+  repo_root : String,
+  oid : String,
+) -> (Int, Map[String, String], Bytes, Array[String]) raise Error {
+  let fs = OsFs::new()
+  let git_dir = normalize_repo_root(repo_root) + "/.git"
+  let path = @bitlib.lfs_object_path(git_dir, oid)
+  if !fs.is_file(path) {
+    return (
+      404,
+      serve_lfs_json_headers(),
+      serve_lfs_json_body("object not found"),
+      [],
+    )
+  }
+  (200, { "Content-Type": "application/octet-stream" }, fs.read_file(path), [])
+}
+
+///|
+fn serve_handle_lfs_request(
+  repo_root : String,
+  req : ServePollRequest,
+  allow_push : Bool,
+) -> (Int, Map[String, String], Bytes, Array[String]) raise Error {
+  let req_method_lower = req.req_method.to_lower()
+  if req.path.has_prefix("/info/lfs/objects/batch") {
+    if req_method_lower != "post" {
+      return (
+        405,
+        serve_lfs_json_headers(),
+        serve_lfs_json_body("method not allowed"),
+        [],
+      )
+    }
+    return serve_lfs_batch_response(repo_root, req, allow_push)
+  }
+  match serve_lfs_extract_object_oid(req.path) {
+    Some(oid) =>
+      if req_method_lower == "put" {
+        serve_lfs_put_object(repo_root, req, oid, allow_push)
+      } else if req_method_lower == "get" {
+        serve_lfs_get_object(repo_root, oid)
+      } else {
+        (
+          405,
+          serve_lfs_json_headers(),
+          serve_lfs_json_body("method not allowed"),
+          [],
+        )
+      }
+    None =>
+      (404, serve_lfs_json_headers(), serve_lfs_json_body("not found"), [])
+  }
+}
+
+///|
 /// Rewrite ref names for incoming push: refs/heads/X -> refs/relay/incoming/heads/X
 fn serve_rewrite_ref_incoming(refname : String) -> String {
   if refname.has_prefix("refs/") {
@@ -459,7 +807,9 @@ async fn serve_handle_git_request(
   allow_push? : Bool = false,
 ) -> (Int, Map[String, String], Bytes, Array[String]) raise Error {
   let path = req.path
-  if path.has_prefix("/info/refs") {
+  if path.has_prefix("/info/lfs/") {
+    serve_handle_lfs_request(repo_root, req, allow_push)
+  } else if path.has_prefix("/info/refs") {
     let service = serve_extract_query_param(path, "service")
     match service {
       Some("git-receive-pack") => {

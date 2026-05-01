@@ -12,6 +12,7 @@ import {
   "mizchi/bit/reftable" @reftable,
   "mizchi/bit/string_utils" @string_utils,
   "mizchi/bit/date_parse" @date_parse,
+  "mizchi/bit/diff_core" @diff_core,
   "mizchi/bit/diff3" @diff3,
   "mizchi/zlib" @zlib,
   "moonbitlang/async/js_async" @js_async,
