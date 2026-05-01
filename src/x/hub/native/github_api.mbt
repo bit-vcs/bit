@@ -52,6 +52,36 @@ pub async fn github_check_repo_ownership(
 }
 
 ///|
+fn github_json_bool(obj : Map[String, Json], key : String) -> Bool {
+  match obj.get(key) {
+    Some(Json::True) => true
+    _ => false
+  }
+}
+
+///|
+fn github_repo_permissions_allow_push(obj : Map[String, Json]) -> Bool {
+  match obj.get("permissions") {
+    Some(Json::Object(permissions)) =>
+      github_json_bool(permissions, "push") ||
+      github_json_bool(permissions, "maintain") ||
+      github_json_bool(permissions, "admin")
+    _ => false
+  }
+}
+
+///|
+/// Check if the authenticated user can push/write to the repo.
+/// Uses GitHub's repository permissions so organization repositories work.
+pub async fn github_check_repo_push_permission(
+  repo : String,
+) -> Bool raise @bit.GitError {
+  let out = gh_api_collect_output(["api", "repos/\{repo}", "--method", "GET"])
+  let obj = parse_json_object_from_api(out)
+  github_repo_permissions_allow_push(obj)
+}
+
+///|
 async fn gh_api_collect_output(
   args : Array[String],
 ) -> String raise @bit.GitError {

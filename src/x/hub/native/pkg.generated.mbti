@@ -11,6 +11,8 @@ import {
 // Values
 pub async fn github_check_repo_ownership(String) -> Bool raise @object.GitError
 
+pub async fn github_check_repo_push_permission(String) -> Bool raise @object.GitError
+
 pub async fn github_create_comment(String, Int, String) -> @hub.GhComment raise @object.GitError
 
 pub async fn github_create_issue(String, String, String, Array[String], Array[String]) -> @hub.GhIssue raise @object.GitError

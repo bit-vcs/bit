@@ -792,6 +792,37 @@ test "hub sync parser: --sign-key alias parses inline value" {
 }
 
 ///|
+test "hub issue sync push parser: parses force remote" {
+  let options = parse_hub_issue_sync_push_options([
+    "--github", "--repo", "org/repo", "--apply", "--include-prs", "--comments", "full",
+    "--force-remote",
+  ])
+  assert_eq(options.repo, Some("org/repo"))
+  assert_true(options.github_flag)
+  assert_true(options.apply)
+  assert_true(options.include_prs)
+  assert_eq(options.comments_mode, "full")
+  assert_true(options.force_remote)
+}
+
+///|
+test "hub issue sync bidirectional parser: parses force remote" {
+  let options = parse_hub_issue_sync_bidirectional_options([
+    "--github", "--repo=org/repo", "--apply", "--conflict", "tombstone-wins", "--comments=full",
+    "--include-prs", "--since", "2026-01-01T00:00:00Z", "--state", "all", "--force-remote",
+  ])
+  assert_eq(options.repo, Some("org/repo"))
+  assert_true(options.github_flag)
+  assert_true(options.apply)
+  assert_eq(options.conflict, "tombstone-wins")
+  assert_eq(options.comments_mode, "full")
+  assert_true(options.include_prs)
+  assert_eq(options.since, "2026-01-01T00:00:00Z")
+  assert_eq(options.state, "all")
+  assert_true(options.force_remote)
+}
+
+///|
 test "hub sync parser: rejects unknown option" {
   ignore(
     parse_hub_sync_runtime_options(["--unknown"]) catch {

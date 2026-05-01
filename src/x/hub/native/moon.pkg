@@ -25,6 +25,7 @@ options(
   targets: {
     "claim_native.mbt": [ "native" ],
     "github_api.mbt": [ "native" ],
+    "github_api_wbtest.mbt": [ "native" ],
     "github_sync.mbt": [ "native" ],
     "sync_native.mbt": [ "native" ],
     "sync_native_bench_wbtest.mbt": [ "native" ],

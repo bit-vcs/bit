@@ -44,8 +44,8 @@ t3404 (rebase -i): **129/132 (97.7%)**
 
 - [x] Cross-repo issue references (owner/repo#id)
 - [x] GitHub sync pull (issues, PRs, comments)
-- [ ] GitHub sync push — org リポジトリ対応
-- [ ] `--force-remote` フラグ
+- [x] GitHub sync push — org リポジトリ対応
+- [x] `--force-remote` フラグ
 
 ## P2: パフォーマンス
 

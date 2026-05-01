@@ -9,10 +9,144 @@ fn print_hub_issue_sync_usage() -> Unit {
     "  pull --repo <owner/repo> [--include-prs] [--comments append-only|full|no-delete]",
   )
   println(
-    "  push --github --repo <owner/repo> [--apply] [--include-prs] [--comments append-only|full|no-delete]",
+    "  push --github --repo <owner/repo> [--apply] [--force-remote] [--include-prs] [--comments append-only|full|no-delete]",
   )
   println("  status --repo <owner/repo>")
   println("  install-hook                            (install git hook)")
+}
+
+///|
+priv struct HubIssueSyncPushOptions {
+  repo : String?
+  github_flag : Bool
+  apply : Bool
+  include_prs : Bool
+  comments_mode : String
+  force_remote : Bool
+  help : Bool
+}
+
+///|
+fn parse_hub_issue_sync_push_options(
+  args : Array[String],
+) -> HubIssueSyncPushOptions {
+  let mut repo : String? = None
+  let mut github_flag = false
+  let mut apply = false
+  let mut include_prs = false
+  let mut comments_mode = "append-only"
+  let mut force_remote = false
+  let mut help = false
+  let mut i = 0
+  while i < args.length() {
+    let arg = args[i]
+    if arg == "--repo" && i + 1 < args.length() {
+      i += 1
+      repo = Some(args[i])
+    } else if arg.has_prefix("--repo=") {
+      repo = Some(String::unsafe_substring(arg, start=7, end=arg.length()))
+    } else if arg == "--github" {
+      github_flag = true
+    } else if arg == "--apply" {
+      apply = true
+    } else if arg == "--include-prs" {
+      include_prs = true
+    } else if arg == "--comments" && i + 1 < args.length() {
+      i += 1
+      comments_mode = args[i]
+    } else if arg.has_prefix("--comments=") {
+      comments_mode = String::unsafe_substring(arg, start=11, end=arg.length())
+    } else if arg == "--force-remote" {
+      force_remote = true
+    } else if arg == "-h" || arg == "--help" {
+      help = true
+    }
+    i += 1
+  }
+  { repo, github_flag, apply, include_prs, comments_mode, force_remote, help }
+}
+
+///|
+priv struct HubIssueSyncBidirectionalOptions {
+  repo : String?
+  github_flag : Bool
+  apply : Bool
+  conflict : String
+  comments_mode : String
+  include_prs : Bool
+  since : String
+  state : String
+  force_remote : Bool
+  help : Bool
+}
+
+///|
+fn parse_hub_issue_sync_bidirectional_options(
+  args : Array[String],
+) -> HubIssueSyncBidirectionalOptions {
+  let mut repo : String? = None
+  let mut github_flag = false
+  let mut apply = false
+  let mut conflict = "newer-wins"
+  let mut comments_mode = "append-only"
+  let mut include_prs = false
+  let mut since = ""
+  let mut state = "all"
+  let mut force_remote = false
+  let mut help = false
+  let mut i = 0
+  while i < args.length() {
+    let arg = args[i]
+    if arg == "--repo" && i + 1 < args.length() {
+      i += 1
+      repo = Some(args[i])
+    } else if arg.has_prefix("--repo=") {
+      repo = Some(String::unsafe_substring(arg, start=7, end=arg.length()))
+    } else if arg == "--github" {
+      github_flag = true
+    } else if arg == "--apply" {
+      apply = true
+    } else if arg == "--conflict" && i + 1 < args.length() {
+      i += 1
+      conflict = args[i]
+    } else if arg.has_prefix("--conflict=") {
+      conflict = String::unsafe_substring(arg, start=11, end=arg.length())
+    } else if arg == "--comments" && i + 1 < args.length() {
+      i += 1
+      comments_mode = args[i]
+    } else if arg.has_prefix("--comments=") {
+      comments_mode = String::unsafe_substring(arg, start=11, end=arg.length())
+    } else if arg == "--include-prs" {
+      include_prs = true
+    } else if arg == "--since" && i + 1 < args.length() {
+      i += 1
+      since = args[i]
+    } else if arg.has_prefix("--since=") {
+      since = String::unsafe_substring(arg, start=8, end=arg.length())
+    } else if arg == "--state" && i + 1 < args.length() {
+      i += 1
+      state = args[i]
+    } else if arg.has_prefix("--state=") {
+      state = String::unsafe_substring(arg, start=8, end=arg.length())
+    } else if arg == "--force-remote" {
+      force_remote = true
+    } else if arg == "-h" || arg == "--help" {
+      help = true
+    }
+    i += 1
+  }
+  {
+    repo,
+    github_flag,
+    apply,
+    conflict,
+    comments_mode,
+    include_prs,
+    since,
+    state,
+    force_remote,
+    help,
+  }
 }
 
 ///|
@@ -173,37 +307,12 @@ async fn handle_hub_issue_sync_pull(args : Array[String]) -> Unit raise Error {
 
 ///|
 async fn handle_hub_issue_sync_push(args : Array[String]) -> Unit raise Error {
-  let mut repo : String? = None
-  let mut github_flag = false
-  let mut apply = false
-  let mut include_prs = false
-  let mut comments_mode = "append-only"
-  let mut i = 0
-  while i < args.length() {
-    let arg = args[i]
-    if arg == "--repo" && i + 1 < args.length() {
-      i += 1
-      repo = Some(args[i])
-    } else if arg.has_prefix("--repo=") {
-      repo = Some(String::unsafe_substring(arg, start=7, end=arg.length()))
-    } else if arg == "--github" {
-      github_flag = true
-    } else if arg == "--apply" {
-      apply = true
-    } else if arg == "--include-prs" {
-      include_prs = true
-    } else if arg == "--comments" && i + 1 < args.length() {
-      i += 1
-      comments_mode = args[i]
-    } else if arg.has_prefix("--comments=") {
-      comments_mode = String::unsafe_substring(arg, start=11, end=arg.length())
-    } else if arg == "-h" || arg == "--help" {
-      print_hub_issue_sync_usage()
-      return ()
-    }
-    i += 1
+  let options = parse_hub_issue_sync_push_options(args)
+  if options.help {
+    print_hub_issue_sync_usage()
+    return ()
   }
-  if !github_flag {
+  if !options.github_flag {
     eprint_line("Error: --github flag required for push (safety measure)")
     eprint_line(
       "Usage: git-bit issue sync push --github --repo <owner/repo> [--apply]",
@@ -213,23 +322,26 @@ async fn handle_hub_issue_sync_push(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let git_dir = resolve_hub_git_dir(root)
   let fs = OsFs::new()
-  let resolved_repo = resolve_github_repo(fs, git_dir, repo)
-  // Safety: only allow push to repos owned by authenticated user
-  let is_owner = @hub_native.github_check_repo_ownership(resolved_repo) catch {
-    _ => false
-  }
-  if !is_owner {
-    eprint_line("Error: push is only allowed to repositories you own")
-    eprint_line(
-      "Repository '\{resolved_repo}' is not owned by the authenticated GitHub user",
-    )
-    eprint_line("Use --force-remote to override (not recommended)")
-    @sys.exit(1)
+  let resolved_repo = resolve_github_repo(fs, git_dir, options.repo)
+  if !options.force_remote {
+    let can_push = @hub_native.github_check_repo_push_permission(resolved_repo) catch {
+      _ => false
+    }
+    if !can_push {
+      eprint_line(
+        "Error: push requires GitHub write access to the remote repository",
+      )
+      eprint_line(
+        "Repository '\{resolved_repo}' is not writable by the authenticated GitHub user",
+      )
+      eprint_line("Use --force-remote to override (not recommended)")
+      @sys.exit(1)
+    }
   }
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
   let changes = @hub_native.github_sync_plan_push(hub, objects, resolved_repo)
-  let pr_changes = if include_prs {
+  let pr_changes = if options.include_prs {
     @hub_native.github_sync_plan_push_prs(hub, objects, resolved_repo)
   } else {
     []
@@ -256,7 +368,7 @@ async fn handle_hub_issue_sync_push(args : Array[String]) -> Unit raise Error {
     }
     print_line("")
   }
-  if !apply {
+  if !options.apply {
     print_line("Run with --apply to execute these changes.")
     return ()
   }
@@ -306,8 +418,8 @@ async fn handle_hub_issue_sync_push(args : Array[String]) -> Unit raise Error {
         resolved_repo,
         link.local_id(),
         link.remote_number(),
-        comments_mode,
-        apply,
+        options.comments_mode,
+        options.apply,
       )
       total_comments_created += cr.created()
       total_comments_updated += cr.updated()
@@ -410,55 +522,12 @@ async fn handle_hub_issue_sync_install_hook(
 async fn handle_hub_issue_sync_bidirectional(
   args : Array[String],
 ) -> Unit raise Error {
-  let mut repo : String? = None
-  let mut github_flag = false
-  let mut apply = false
-  let mut conflict = "newer-wins"
-  let mut comments_mode = "append-only"
-  let mut include_prs = false
-  let mut since = ""
-  let mut state = "all"
-  let mut i = 0
-  while i < args.length() {
-    let arg = args[i]
-    if arg == "--repo" && i + 1 < args.length() {
-      i += 1
-      repo = Some(args[i])
-    } else if arg.has_prefix("--repo=") {
-      repo = Some(String::unsafe_substring(arg, start=7, end=arg.length()))
-    } else if arg == "--github" {
-      github_flag = true
-    } else if arg == "--apply" {
-      apply = true
-    } else if arg == "--conflict" && i + 1 < args.length() {
-      i += 1
-      conflict = args[i]
-    } else if arg.has_prefix("--conflict=") {
-      conflict = String::unsafe_substring(arg, start=11, end=arg.length())
-    } else if arg == "--comments" && i + 1 < args.length() {
-      i += 1
-      comments_mode = args[i]
-    } else if arg.has_prefix("--comments=") {
-      comments_mode = String::unsafe_substring(arg, start=11, end=arg.length())
-    } else if arg == "--include-prs" {
-      include_prs = true
-    } else if arg == "--since" && i + 1 < args.length() {
-      i += 1
-      since = args[i]
-    } else if arg.has_prefix("--since=") {
-      since = String::unsafe_substring(arg, start=8, end=arg.length())
-    } else if arg == "--state" && i + 1 < args.length() {
-      i += 1
-      state = args[i]
-    } else if arg.has_prefix("--state=") {
-      state = String::unsafe_substring(arg, start=8, end=arg.length())
-    } else if arg == "-h" || arg == "--help" {
-      print_hub_issue_sync_usage()
-      return ()
-    }
-    i += 1
+  let options = parse_hub_issue_sync_bidirectional_options(args)
+  if options.help {
+    print_hub_issue_sync_usage()
+    return ()
   }
-  if !github_flag {
+  if !options.github_flag {
     eprint_line("Error: --github flag required for bidirectional sync")
     eprint_line(
       "Usage: git-bit issue sync --github --repo <owner/repo> [--apply]",
@@ -468,19 +537,21 @@ async fn handle_hub_issue_sync_bidirectional(
   let root = get_work_root()
   let git_dir = resolve_hub_git_dir(root)
   let fs = OsFs::new()
-  let resolved_repo = resolve_github_repo(fs, git_dir, repo)
-  // Safety: only allow sync (includes push) to repos owned by authenticated user
-  let is_owner = @hub_native.github_check_repo_ownership(resolved_repo) catch {
-    _ => false
-  }
-  if !is_owner {
-    eprint_line(
-      "Error: bidirectional sync is only allowed for repositories you own",
-    )
-    eprint_line(
-      "Repository '\{resolved_repo}' is not owned by the authenticated GitHub user",
-    )
-    @sys.exit(1)
+  let resolved_repo = resolve_github_repo(fs, git_dir, options.repo)
+  if !options.force_remote {
+    let can_push = @hub_native.github_check_repo_push_permission(resolved_repo) catch {
+      _ => false
+    }
+    if !can_push {
+      eprint_line(
+        "Error: bidirectional sync requires GitHub write access to the remote repository",
+      )
+      eprint_line(
+        "Repository '\{resolved_repo}' is not writable by the authenticated GitHub user",
+      )
+      eprint_line("Use --force-remote to override (not recommended)")
+      @sys.exit(1)
+    }
   }
   let (objects, refs, clock) = make_hub_stores(git_dir)
   let hub = load_hub_store(objects, refs)
@@ -488,7 +559,14 @@ async fn handle_hub_issue_sync_bidirectional(
   print_line("=== Pull (GitHub → bit) ===")
   print_line("Pulling issues from GitHub \{resolved_repo}...")
   let pull_result = @hub_native.github_sync_pull_issues(
-    hub, objects, refs, clock, resolved_repo, since, state, conflict,
+    hub,
+    objects,
+    refs,
+    clock,
+    resolved_repo,
+    options.since,
+    options.state,
+    options.conflict,
   )
   print_line("Issues pull complete:")
   print_line("  Created: \{pull_result.created}")
@@ -515,7 +593,7 @@ async fn handle_hub_issue_sync_bidirectional(
         resolved_repo,
         link.local_id(),
         link.remote_number(),
-        comments_mode,
+        options.comments_mode,
       )
       total_pull_comments_created += cr.created()
       total_pull_comments_updated += cr.updated()
@@ -536,11 +614,18 @@ async fn handle_hub_issue_sync_bidirectional(
     print_line("  Updated: \{total_pull_comments_updated}")
     print_line("  Deleted: \{total_pull_comments_deleted}")
   }
-  if include_prs {
+  if options.include_prs {
     print_line("")
     print_line("Pulling PRs from GitHub \{resolved_repo}...")
     let pr_result = @hub_native.github_sync_pull_prs(
-      hub, objects, refs, clock, resolved_repo, since, state, conflict,
+      hub,
+      objects,
+      refs,
+      clock,
+      resolved_repo,
+      options.since,
+      options.state,
+      options.conflict,
     )
     print_line("PRs pull complete:")
     print_line("  Created: \{pr_result.created}")
@@ -557,7 +642,7 @@ async fn handle_hub_issue_sync_bidirectional(
   print_line("")
   print_line("=== Push (bit → GitHub) ===")
   let changes = @hub_native.github_sync_plan_push(hub, objects, resolved_repo)
-  let pr_changes = if include_prs {
+  let pr_changes = if options.include_prs {
     @hub_native.github_sync_plan_push_prs(hub, objects, resolved_repo)
   } else {
     []
@@ -582,7 +667,7 @@ async fn handle_hub_issue_sync_bidirectional(
     }
     print_line("")
   }
-  if !apply {
+  if !options.apply {
     print_line("Run with --apply to execute push changes.")
     return ()
   }
@@ -631,8 +716,8 @@ async fn handle_hub_issue_sync_bidirectional(
         resolved_repo,
         link.local_id(),
         link.remote_number(),
-        comments_mode,
-        apply,
+        options.comments_mode,
+        options.apply,
       )
       total_push_comments_created += cr.created()
       total_push_comments_updated += cr.updated()
