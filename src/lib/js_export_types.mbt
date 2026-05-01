@@ -5,7 +5,7 @@ pub struct JsBranchInfo {
   name : String
   commit_id : String
   is_current : Bool
-} derive(Show, Eq)
+} derive(Debug, Eq)
 
 ///|
 pub struct JsLogEntry {
@@ -13,46 +13,46 @@ pub struct JsLogEntry {
   author : String
   message : String
   timestamp : Int
-} derive(Show, Eq)
+} derive(Debug, Eq)
 
 ///|
 pub struct JsRefInfo {
   name : String
   id : String
-} derive(Show, Eq)
+} derive(Debug, Eq)
 
 ///|
 pub struct JsStashEntry {
   id : String
   message : String
-} derive(Show, Eq)
+} derive(Debug, Eq)
 
 ///|
 pub struct JsRemoteVerboseEntry {
   name : String
   value : String
-} derive(Show, Eq)
+} derive(Debug, Eq)
 
 ///|
 pub struct JsMergeResult {
   status : String
   commit_id : String
   conflicts : Array[String]
-} derive(Show, Eq)
+} derive(Debug, Eq)
 
 ///|
 pub struct JsRebaseResult {
   status : String
   commit_id : String
   conflicts : Array[String]
-} derive(Show, Eq)
+} derive(Debug, Eq)
 
 ///|
 pub struct JsCherryPickResult {
   status : String
   commit_id : String
   conflicts : Array[String]
-} derive(Show, Eq)
+} derive(Debug, Eq)
 
 ///|
 pub struct JsFetchResult {
@@ -60,11 +60,11 @@ pub struct JsFetchResult {
   commit_id : String
   refname : String
   remote_ref : String
-} derive(Show, Eq)
+} derive(Debug, Eq)
 
 ///|
 pub struct JsCloneResult {
   status : String
   commit_id : String
   refname : String
-} derive(Show, Eq)
+} derive(Debug, Eq)

@@ -194,7 +194,58 @@ pub(all) suberror GitError {
   PackfileError(String)
   ProtocolError(String)
   IoError(String)
-} derive(Show, Eq)
+} derive(Debug, Eq)
+
+///|
+fn git_error_show_string(value : String) -> String {
+  let buf = StringBuilder::new()
+  buf.write_char('"')
+  for c in value {
+    if c == '"' {
+      buf.write_string("\\\"")
+    } else if c == '\\' {
+      buf.write_string("\\\\")
+    } else if c == '\n' {
+      buf.write_string("\\n")
+    } else if c == '\r' {
+      buf.write_string("\\r")
+    } else if c == '\t' {
+      buf.write_string("\\t")
+    } else {
+      buf.write_char(c)
+    }
+  }
+  buf.write_char('"')
+  buf.to_string()
+}
+
+///|
+pub impl Show for GitError with output(self, logger) {
+  match self {
+    InvalidObject(message) =>
+      logger.write_string(
+        "InvalidObject(" + git_error_show_string(message) + ")",
+      )
+    HashMismatch(expected, actual) =>
+      logger.write_string(
+        "HashMismatch(" +
+        git_error_show_string(expected) +
+        ", " +
+        git_error_show_string(actual) +
+        ")",
+      )
+    PackfileError(message) =>
+      logger.write_string(
+        "PackfileError(" + git_error_show_string(message) + ")",
+      )
+    ProtocolError(message) =>
+      logger.write_string(
+        "ProtocolError(" + git_error_show_string(message) + ")",
+      )
+    IoError(message) =>
+      logger.write_string("IoError(" + git_error_show_string(message) + ")")
+  }
+}
 
 ///|
 /// Tree entry in a Git tree object

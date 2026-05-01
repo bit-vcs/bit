@@ -691,7 +691,7 @@ fn copy_dir_recursive_wt(
 pub(all) struct WorktreeRepairResult {
   repaired : Array[String]
   warnings : Array[String]
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 fn worktree_repair_resolve_requested_path(

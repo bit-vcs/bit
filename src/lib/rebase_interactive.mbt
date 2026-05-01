@@ -17,14 +17,31 @@ pub enum TodoCommand {
   Label
   Reset
   Merge
-} derive(Show, Eq)
+} derive(Debug, Eq)
+
+///|
+pub impl Show for TodoCommand with output(self, logger) {
+  match self {
+    Pick => logger.write_string("Pick")
+    Reword => logger.write_string("Reword")
+    Edit => logger.write_string("Edit")
+    Squash => logger.write_string("Squash")
+    Fixup => logger.write_string("Fixup")
+    Drop => logger.write_string("Drop")
+    Exec => logger.write_string("Exec")
+    Break => logger.write_string("Break")
+    Label => logger.write_string("Label")
+    Reset => logger.write_string("Reset")
+    Merge => logger.write_string("Merge")
+  }
+}
 
 ///|
 pub struct InteractiveTodoEntry {
   command : TodoCommand
   commit_hex : String
   subject : String
-} derive(Show, Eq)
+} derive(Debug, Eq)
 
 ///|
 fn parse_todo_command(s : String) -> TodoCommand? {

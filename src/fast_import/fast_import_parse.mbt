@@ -153,7 +153,65 @@ pub(all) enum FastImportFileOp {
   DeleteAll
   Rename(old_path~ : String, new_path~ : String)
   Copy(old_path~ : String, new_path~ : String)
-} derive(Eq, Show)
+} derive(Eq, Debug)
+
+///|
+fn fast_import_show_string(value : String) -> String {
+  let buf = StringBuilder::new()
+  buf.write_char('"')
+  for c in value {
+    if c == '"' {
+      buf.write_string("\\\"")
+    } else if c == '\\' {
+      buf.write_string("\\\\")
+    } else if c == '\n' {
+      buf.write_string("\\n")
+    } else if c == '\r' {
+      buf.write_string("\\r")
+    } else if c == '\t' {
+      buf.write_string("\\t")
+    } else {
+      buf.write_char(c)
+    }
+  }
+  buf.write_char('"')
+  buf.to_string()
+}
+
+///|
+pub impl Show for FastImportFileOp with output(self, logger) {
+  match self {
+    Modify(mode~, dataref~, path~) =>
+      logger.write_string(
+        "Modify(mode=" +
+        fast_import_show_string(mode) +
+        ", dataref=" +
+        fast_import_show_string(dataref) +
+        ", path=" +
+        fast_import_show_string(path) +
+        ")",
+      )
+    Delete(path~) =>
+      logger.write_string("Delete(path=" + fast_import_show_string(path) + ")")
+    DeleteAll => logger.write_string("DeleteAll")
+    Rename(old_path~, new_path~) =>
+      logger.write_string(
+        "Rename(old_path=" +
+        fast_import_show_string(old_path) +
+        ", new_path=" +
+        fast_import_show_string(new_path) +
+        ")",
+      )
+    Copy(old_path~, new_path~) =>
+      logger.write_string(
+        "Copy(old_path=" +
+        fast_import_show_string(old_path) +
+        ", new_path=" +
+        fast_import_show_string(new_path) +
+        ")",
+      )
+  }
+}
 
 ///|
 /// Parse a single file operation line from a fast-import stream.

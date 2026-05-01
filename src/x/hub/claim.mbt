@@ -4,7 +4,7 @@
 pub(all) enum ClaimAction {
   Claim
   Unclaim
-} derive(Eq)
+} derive(Eq, Debug)
 
 ///|
 pub fn ClaimAction::to_string(self : ClaimAction) -> String {
@@ -34,7 +34,45 @@ pub struct ClaimMessage {
   action : ClaimAction
   claimer : String
   timestamp : Int64
-} derive(Eq, Show)
+} derive(Eq, Debug)
+
+///|
+fn claim_show_string(value : String) -> String {
+  let buf = StringBuilder::new()
+  buf.write_char('"')
+  for c in value {
+    if c == '"' {
+      buf.write_string("\\\"")
+    } else if c == '\\' {
+      buf.write_string("\\\\")
+    } else if c == '\n' {
+      buf.write_string("\\n")
+    } else if c == '\r' {
+      buf.write_string("\\r")
+    } else if c == '\t' {
+      buf.write_string("\\t")
+    } else {
+      buf.write_char(c)
+    }
+  }
+  buf.write_char('"')
+  buf.to_string()
+}
+
+///|
+pub impl Show for ClaimMessage with output(self, logger) {
+  logger.write_string(
+    "{issue_id: " +
+    claim_show_string(self.issue_id) +
+    ", action: " +
+    self.action.to_string() +
+    ", claimer: " +
+    claim_show_string(self.claimer) +
+    ", timestamp: " +
+    self.timestamp.to_string() +
+    "}",
+  )
+}
 
 ///|
 pub fn ClaimMessage::new(

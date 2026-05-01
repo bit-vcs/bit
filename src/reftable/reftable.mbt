@@ -38,14 +38,62 @@ pub(all) enum RefValue {
   Val1(@object.ObjectId)
   Val2(@object.ObjectId, @object.ObjectId)
   Symref(String)
-} derive(Eq, Show)
+} derive(Eq)
 
 ///|
 pub(all) struct RefRecord {
   refname : String
   update_index : UInt64
   value : RefValue
-} derive(Eq, Show)
+} derive(Eq)
+
+///|
+fn reftable_show_string(value : String) -> String {
+  let buf = StringBuilder::new()
+  buf.write_char('"')
+  for c in value {
+    if c == '"' {
+      buf.write_string("\\\"")
+    } else if c == '\\' {
+      buf.write_string("\\\\")
+    } else if c == '\n' {
+      buf.write_string("\\n")
+    } else if c == '\r' {
+      buf.write_string("\\r")
+    } else if c == '\t' {
+      buf.write_string("\\t")
+    } else {
+      buf.write_char(c)
+    }
+  }
+  buf.write_char('"')
+  buf.to_string()
+}
+
+///|
+pub impl Show for RefValue with output(self, logger) {
+  match self {
+    Deletion => logger.write_string("Deletion")
+    Val1(id) => logger.write_string("Val1(" + id.to_hex() + ")")
+    Val2(id1, id2) =>
+      logger.write_string("Val2(" + id1.to_hex() + ", " + id2.to_hex() + ")")
+    Symref(target) =>
+      logger.write_string("Symref(" + reftable_show_string(target) + ")")
+  }
+}
+
+///|
+pub impl Show for RefRecord with output(self, logger) {
+  logger.write_string(
+    "{refname: " +
+    reftable_show_string(self.refname) +
+    ", update_index: " +
+    self.update_index.to_string() +
+    ", value: " +
+    self.value.to_string() +
+    "}",
+  )
+}
 
 ///|
 pub struct ReftableHeader {
@@ -53,7 +101,7 @@ pub struct ReftableHeader {
   block_size : Int
   min_update_index : UInt64
   max_update_index : UInt64
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 struct ReftableFooter {
@@ -64,7 +112,7 @@ struct ReftableFooter {
   log_offset : UInt64
   log_index_offset : UInt64
   crc32 : UInt
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// Encode a varint (LEB128 variant with zero optimization used by reftable).

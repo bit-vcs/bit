@@ -9,7 +9,53 @@ pub struct RepoPath {
   repo : String
   /// Subdirectory for sparse checkout (optional)
   subdir : String?
-} derive(Show, Eq)
+} derive(Debug, Eq)
+
+///|
+fn hq_show_string(value : String) -> String {
+  let buf = StringBuilder::new()
+  buf.write_char('"')
+  for c in value {
+    if c == '"' {
+      buf.write_string("\\\"")
+    } else if c == '\\' {
+      buf.write_string("\\\\")
+    } else if c == '\n' {
+      buf.write_string("\\n")
+    } else if c == '\r' {
+      buf.write_string("\\r")
+    } else if c == '\t' {
+      buf.write_string("\\t")
+    } else {
+      buf.write_char(c)
+    }
+  }
+  buf.write_char('"')
+  buf.to_string()
+}
+
+///|
+fn hq_show_string_option(value : String?) -> String {
+  match value {
+    Some(s) => "Some(" + hq_show_string(s) + ")"
+    None => "None"
+  }
+}
+
+///|
+pub impl Show for RepoPath with output(self, logger) {
+  logger.write_string(
+    "{host: " +
+    hq_show_string_option(self.host) +
+    ", user: " +
+    hq_show_string(self.user) +
+    ", repo: " +
+    hq_show_string(self.repo) +
+    ", subdir: " +
+    hq_show_string_option(self.subdir) +
+    "}",
+  )
+}
 
 ///|
 pub fn RepoPath::new(
@@ -120,4 +166,17 @@ pub(all) enum HqGetResult {
   Updated(String) // Successfully updated existing repo
   Skipped(String) // Already exists, no update requested
   Error(String) // Error message
-} derive(Show, Eq)
+} derive(Debug, Eq)
+
+///|
+pub impl Show for HqGetResult with output(self, logger) {
+  match self {
+    Cloned(path) => logger.write_string("Cloned(" + hq_show_string(path) + ")")
+    Updated(path) =>
+      logger.write_string("Updated(" + hq_show_string(path) + ")")
+    Skipped(path) =>
+      logger.write_string("Skipped(" + hq_show_string(path) + ")")
+    Error(message) =>
+      logger.write_string("Error(" + hq_show_string(message) + ")")
+  }
+}

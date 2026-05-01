@@ -7,7 +7,70 @@ pub(all) enum GitHubShorthand {
   Subdir(String, String, String?) // github_url, subdir_path, ref?
   /// Single file fetch: raw URL, filename
   File(String, String) // raw_url, filename
-} derive(Eq, Show)
+} derive(Eq, Debug)
+
+///|
+fn remote_shorthand_show_string(value : String) -> String {
+  let buf = StringBuilder::new()
+  buf.write_char('"')
+  for c in value {
+    if c == '"' {
+      buf.write_string("\\\"")
+    } else if c == '\\' {
+      buf.write_string("\\\\")
+    } else if c == '\n' {
+      buf.write_string("\\n")
+    } else if c == '\r' {
+      buf.write_string("\\r")
+    } else if c == '\t' {
+      buf.write_string("\\t")
+    } else {
+      buf.write_char(c)
+    }
+  }
+  buf.write_char('"')
+  buf.to_string()
+}
+
+///|
+fn remote_shorthand_show_string_option(value : String?) -> String {
+  match value {
+    Some(s) => "Some(" + remote_shorthand_show_string(s) + ")"
+    None => "None"
+  }
+}
+
+///|
+pub impl Show for GitHubShorthand with output(self, logger) {
+  match self {
+    Repo(url, ref_spec) =>
+      logger.write_string(
+        "Repo(" +
+        remote_shorthand_show_string(url) +
+        ", " +
+        remote_shorthand_show_string_option(ref_spec) +
+        ")",
+      )
+    Subdir(url, path, ref_spec) =>
+      logger.write_string(
+        "Subdir(" +
+        remote_shorthand_show_string(url) +
+        ", " +
+        remote_shorthand_show_string(path) +
+        ", " +
+        remote_shorthand_show_string_option(ref_spec) +
+        ")",
+      )
+    File(url, name) =>
+      logger.write_string(
+        "File(" +
+        remote_shorthand_show_string(url) +
+        ", " +
+        remote_shorthand_show_string(name) +
+        ")",
+      )
+  }
+}
 
 ///|
 /// Parse clone shorthand or GitHub browser URL.

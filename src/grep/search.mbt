@@ -3,13 +3,60 @@ pub(all) struct GrepLineMatch {
   line_number : Int
   column : Int
   line : String
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub(all) struct GrepFileMatch {
   path : String
   matches : Array[GrepLineMatch]
-} derive(Eq, Show)
+} derive(Eq, Debug)
+
+///|
+fn grep_search_show_string(value : String) -> String {
+  let buf = StringBuilder::new()
+  buf.write_char('"')
+  for c in value {
+    if c == '"' {
+      buf.write_string("\\\"")
+    } else if c == '\\' {
+      buf.write_string("\\\\")
+    } else if c == '\n' {
+      buf.write_string("\\n")
+    } else if c == '\r' {
+      buf.write_string("\\r")
+    } else if c == '\t' {
+      buf.write_string("\\t")
+    } else {
+      buf.write_char(c)
+    }
+  }
+  buf.write_char('"')
+  buf.to_string()
+}
+
+///|
+pub impl Show for GrepLineMatch with output(self, logger) {
+  logger.write_string(
+    "{line_number: " +
+    self.line_number.to_string() +
+    ", column: " +
+    self.column.to_string() +
+    ", line: " +
+    grep_search_show_string(self.line) +
+    "}",
+  )
+}
+
+///|
+pub impl Show for GrepFileMatch with output(self, logger) {
+  logger.write_string(
+    "{path: " +
+    grep_search_show_string(self.path) +
+    ", matches: " +
+    self.matches.to_string() +
+    "}",
+  )
+}
 
 ///|
 priv struct GrepBlobSource {

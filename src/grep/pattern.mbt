@@ -4,13 +4,13 @@ pub(all) enum GrepPatternType {
   Basic
   Extended
   Perl
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub(all) struct GrepMatchSpan {
   start_column : Int
   end_column : Int
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub(all) enum GrepExprToken {
@@ -20,7 +20,7 @@ pub(all) enum GrepExprToken {
   Not
   LParen
   RParen
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub(all) enum GrepExpr {
@@ -28,13 +28,98 @@ pub(all) enum GrepExpr {
   And(GrepExpr, GrepExpr)
   Or(GrepExpr, GrepExpr)
   Not(GrepExpr)
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 pub(all) struct GrepExprMatch {
   matched : Bool
   span : GrepMatchSpan?
-} derive(Eq, Show)
+} derive(Eq, Debug)
+
+///|
+fn grep_pattern_show_string(value : String) -> String {
+  let buf = StringBuilder::new()
+  buf.write_char('"')
+  for c in value {
+    if c == '"' {
+      buf.write_string("\\\"")
+    } else if c == '\\' {
+      buf.write_string("\\\\")
+    } else if c == '\n' {
+      buf.write_string("\\n")
+    } else if c == '\r' {
+      buf.write_string("\\r")
+    } else if c == '\t' {
+      buf.write_string("\\t")
+    } else {
+      buf.write_char(c)
+    }
+  }
+  buf.write_char('"')
+  buf.to_string()
+}
+
+///|
+pub impl Show for GrepPatternType with output(self, logger) {
+  match self {
+    Fixed => logger.write_string("Fixed")
+    Basic => logger.write_string("Basic")
+    Extended => logger.write_string("Extended")
+    Perl => logger.write_string("Perl")
+  }
+}
+
+///|
+pub impl Show for GrepMatchSpan with output(self, logger) {
+  logger.write_string(
+    "{start_column: " +
+    self.start_column.to_string() +
+    ", end_column: " +
+    self.end_column.to_string() +
+    "}",
+  )
+}
+
+///|
+pub impl Show for GrepExprToken with output(self, logger) {
+  match self {
+    Pattern(pattern) =>
+      logger.write_string("Pattern(" + grep_pattern_show_string(pattern) + ")")
+    And => logger.write_string("And")
+    Or => logger.write_string("Or")
+    Not => logger.write_string("Not")
+    LParen => logger.write_string("LParen")
+    RParen => logger.write_string("RParen")
+  }
+}
+
+///|
+pub impl Show for GrepExpr with output(self, logger) {
+  match self {
+    Pattern(pattern) =>
+      logger.write_string("Pattern(" + grep_pattern_show_string(pattern) + ")")
+    And(lhs, rhs) =>
+      logger.write_string(
+        "And(" + lhs.to_string() + ", " + rhs.to_string() + ")",
+      )
+    Or(lhs, rhs) =>
+      logger.write_string(
+        "Or(" + lhs.to_string() + ", " + rhs.to_string() + ")",
+      )
+    Not(inner) => logger.write_string("Not(" + inner.to_string() + ")")
+  }
+}
+
+///|
+pub impl Show for GrepExprMatch with output(self, logger) {
+  logger.write_string(
+    "{matched: " +
+    self.matched.to_string() +
+    ", span: " +
+    self.span.to_string() +
+    "}",
+  )
+}
 
 ///|
 priv enum GrepRegexAtom {

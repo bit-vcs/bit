@@ -708,7 +708,7 @@ pub(all) suberror PrError {
   InvalidFormat(String)
   InvalidState(String)
   MergeConflict(Array[String])
-} derive(Show, Eq)
+} derive(Debug, Eq)
 
 ///|
 /// Issue data

@@ -123,7 +123,15 @@ pub struct HubRecord {
 pub(all) enum RecordTriggerClass {
   Full
   NotifyOnly
-} derive(Eq, Show)
+} derive(Eq, Debug)
+
+///|
+pub impl Show for RecordTriggerClass with output(self, logger) {
+  match self {
+    Full => logger.write_string("Full")
+    NotifyOnly => logger.write_string("NotifyOnly")
+  }
+}
 
 ///|
 pub fn classify_record_trigger(record : HubRecord) -> RecordTriggerClass {

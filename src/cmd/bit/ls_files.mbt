@@ -739,11 +739,47 @@ fn ls_files_relativize_absolute_filter(
 }
 
 ///|
-struct SubmoduleInfo {
+pub(all) struct SubmoduleInfo {
   name : String
   path : String
   url : String
-} derive(Eq, Show)
+} derive(Eq, Debug)
+
+///|
+fn submodule_info_show_string(value : String) -> String {
+  let buf = StringBuilder::new()
+  buf.write_char('"')
+  for c in value {
+    if c == '"' {
+      buf.write_string("\\\"")
+    } else if c == '\\' {
+      buf.write_string("\\\\")
+    } else if c == '\n' {
+      buf.write_string("\\n")
+    } else if c == '\r' {
+      buf.write_string("\\r")
+    } else if c == '\t' {
+      buf.write_string("\\t")
+    } else {
+      buf.write_char(c)
+    }
+  }
+  buf.write_char('"')
+  buf.to_string()
+}
+
+///|
+pub impl Show for SubmoduleInfo with output(self, logger) {
+  logger.write_string(
+    "{name: " +
+    submodule_info_show_string(self.name) +
+    ", path: " +
+    submodule_info_show_string(self.path) +
+    ", url: " +
+    submodule_info_show_string(self.url) +
+    "}",
+  )
+}
 
 ///|
 struct LsFilesTrackedEntry {
