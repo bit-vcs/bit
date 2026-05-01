@@ -93,6 +93,7 @@ options(
     "cat_file_wbtest.mbt": [ "native" ],
     "check_attr.mbt": [ "native" ],
     "check_ignore.mbt": [ "native" ],
+    "check_ignore_wbtest.mbt": [ "native" ],
     "check_mailmap.mbt": [ "native" ],
     "check_ref_format.mbt": [ "native" ],
     "checkout.mbt": [ "native" ],
