@@ -216,21 +216,22 @@ bit implements 108 git commands natively with 973 git test suite tests passing. 
 - Git config: reads global aliases from `~/.gitconfig` (or `GIT_CONFIG_GLOBAL`).
 - `core.hooksPath`: custom hook directory support.
 - Generic `filter=` attributes (clean/smudge) handled natively.
-- LFS pointer files resolved natively (read-only).
+- LFS pointer files resolved natively, including clean/add and HTTP push upload.
 - `log --graph`, `--stat`, `--name-only`, `--name-status`, `--topo-order` run natively.
 - `rebase -i` with all standard commands runs natively.
 - Detailed standalone scope, unsupported paths, fallback points, and git/t coverage documented in [`docs/git-compatibility.md`](docs/git-compatibility.md).
 
 ### Git LFS Support
 
-bit natively resolves LFS pointer files during clone and checkout. No `git-lfs` binary required.
+bit natively handles LFS pointer files during clone, checkout, add, and HTTP push. No `git-lfs` binary required.
 
 - LFS pointer detection and batch download via LFS Batch API
 - SHA-256 integrity verification on downloaded objects
 - Local cache at `.git/lfs/objects/` (compatible with git-lfs layout)
+- Clean filter support: `git add` stores pointer blobs and caches original content
+- HTTP push upload support via LFS Batch API upload actions
+- Relay/serve LFS transfer support for Batch API upload/download and object PUT/GET
 - URL resolution: `lfs.url`, `remote.<name>.lfsurl`, or derived from remote URL
-
-**Note:** Write support (clean filter, push) is not yet implemented. LFS repositories are read-only.
 
 ### Interactive Rebase
 

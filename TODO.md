@@ -11,34 +11,34 @@ t3404 (rebase -i): **129/132 (97.7%)**
 
 ### log (特殊フラグ)
 
-- [ ] `--parents` — 各コミットの親 OID を表示
-- [ ] `--boundary` — boundary コミットのマーク
-- [ ] `--full-history` / `--simplify-merges` — マージ簡略化制御
-- [ ] `--ancestry-path` — 2点間の ancestry パス
-- [ ] `--show-signature` — GPG 署名表示
-- [ ] `--stdin` — stdin からリビジョン読み取り
+- [x] `--parents` — 各コミットの親 OID を表示
+- [x] `--boundary` — boundary コミットのマーク
+- [x] `--full-history` / `--simplify-merges` — マージ簡略化制御
+- [x] `--ancestry-path` — 2点間の ancestry パス
+- [x] `--show-signature` — GPG 署名表示
+- [x] `--stdin` — stdin からリビジョン読み取り
 
 ### GPG 署名
 
-- [ ] `rebase -S` / `--gpg-sign` — rebase 中のコミット署名
-- [ ] `merge -S` / `--gpg-sign` — merge コミット署名
-- [ ] `show --show-signature` — 署名表示
+- [x] `rebase -S` / `--gpg-sign` — rebase 中のコミット署名
+- [x] `merge -S` / `--gpg-sign` — merge コミット署名
+- [x] `show --show-signature` — 署名表示
 
 ### その他
 
-- [ ] `blame` textconv ドライバー対応
-- [ ] `clone` file:// + --depth/--filter (shallow)
-- [ ] `fetch --depth` / `--unshallow` (shallow fetch)
-- [ ] `stash push -p` — interactive hunk 選択
-- [ ] `rev-list --cherry-pick` / `--cherry-mark`
+- [x] `blame` textconv ドライバー対応
+- [x] `clone` file:// + --depth/--filter (shallow)
+- [x] `fetch --depth` / `--unshallow` (shallow fetch)
+- [x] `stash push -p` — interactive hunk 選択
+- [x] `rev-list --cherry-pick` / `--cherry-mark`
 
 ## P1: LFS
 
 - [x] Phase 1: Read-Only — pointer 解決、batch download (v0.40.0)
 - [x] Phase 1 セキュリティ — SHA-256 検証、SSRF 防止 (v0.40.1)
-- [ ] Phase 2: Clean filter — `git add` で pointer 化
-- [ ] Phase 3: Push — upload to LFS server
-- [ ] Phase 4: bit-relay LFS 転送
+- [x] Phase 2: Clean filter — `git add` で pointer 化
+- [x] Phase 3: Push — upload to LFS server
+- [x] Phase 4: bit-relay LFS 転送
 
 ## P1.5: Hub / GitHub sync
 

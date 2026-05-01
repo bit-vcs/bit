@@ -6,6 +6,7 @@ import {
   "mizchi/bit/object",
   "mizchi/bit/runtime",
   "mizchi/bit/types",
+  "moonbitlang/core/debug",
 }
 
 // Values
@@ -192,6 +193,10 @@ type ScalarCloneOptions
 
 type ServeFeatureBroadcast
 
+type ServeLfsBatchRequest
+
+type ServeLfsObject
+
 type ServePollRequest
 
 type ServeSession
@@ -212,7 +217,12 @@ type SubmoduleAddArgs
 
 type SubmoduleDispatch
 
-type SubmoduleInfo derive(Eq, Show)
+pub(all) struct SubmoduleInfo {
+  name : String
+  path : String
+  url : String
+} derive(Eq, @debug.Debug)
+pub impl Show for SubmoduleInfo
 
 type UploadPackTransport
 

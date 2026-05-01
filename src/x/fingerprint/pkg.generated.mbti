@@ -3,6 +3,7 @@ package "mizchi/bit/x/fingerprint"
 
 import {
   "mizchi/bit/types",
+  "moonbitlang/core/debug",
 }
 
 // Values
@@ -22,7 +23,8 @@ pub fn parse_fingerprint_mode(String) -> FingerprintMode?
 pub(all) enum FingerprintMode {
   Fast
   GitCompat
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub impl Show for FingerprintMode
 
 // Type aliases
 

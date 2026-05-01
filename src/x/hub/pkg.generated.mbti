@@ -5,6 +5,7 @@ import {
   "mizchi/bit/lib",
   "mizchi/bit/object",
   "mizchi/bit/types",
+  "moonbitlang/core/debug",
 }
 
 // Values
@@ -122,13 +123,13 @@ pub(all) suberror PrError {
   InvalidFormat(String)
   InvalidState(String)
   MergeConflict(Array[String])
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
 
 // Types and methods
 pub(all) enum ClaimAction {
   Claim
   Unclaim
-} derive(Eq)
+} derive(Eq, @debug.Debug)
 pub fn ClaimAction::to_string(Self) -> String
 pub impl Show for ClaimAction
 
@@ -137,7 +138,7 @@ pub struct ClaimMessage {
   action : ClaimAction
   claimer : String
   timestamp : Int64
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
 pub fn ClaimMessage::action(Self) -> ClaimAction
 pub fn ClaimMessage::claimer(Self) -> String
 pub fn ClaimMessage::is_stale(Self, Int64, threshold_hours? : Int) -> Bool
@@ -145,6 +146,7 @@ pub fn ClaimMessage::issue_id(Self) -> String
 pub fn ClaimMessage::new(String, ClaimAction, String, Int64) -> Self
 pub fn ClaimMessage::timestamp(Self) -> Int64
 pub fn ClaimMessage::to_json(Self) -> Json
+pub impl Show for ClaimMessage
 
 pub struct GhComment {
   id : Int
@@ -530,7 +532,8 @@ pub enum RecordMergePolicy {
 pub(all) enum RecordTriggerClass {
   Full
   NotifyOnly
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub impl Show for RecordTriggerClass
 
 pub(all) enum ReviewVerdict {
   Approved

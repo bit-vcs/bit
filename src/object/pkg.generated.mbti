@@ -3,6 +3,7 @@ package "mizchi/bit/object"
 
 import {
   "mizchi/bit/hash",
+  "moonbitlang/core/debug",
 }
 
 // Values
@@ -63,7 +64,8 @@ pub(all) suberror GitError {
   PackfileError(String)
   ProtocolError(String)
   IoError(String)
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub impl Show for GitError
 
 // Types and methods
 pub struct Commit {

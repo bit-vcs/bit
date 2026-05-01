@@ -4,6 +4,7 @@ package "mizchi/bit/grep"
 import {
   "mizchi/bit/object",
   "mizchi/bit/types",
+  "moonbitlang/core/debug",
 }
 
 // Values
@@ -67,12 +68,14 @@ pub(all) enum GrepExpr {
   And(GrepExpr, GrepExpr)
   Or(GrepExpr, GrepExpr)
   Not(GrepExpr)
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub impl Show for GrepExpr
 
 pub(all) struct GrepExprMatch {
   matched : Bool
   span : GrepMatchSpan?
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub impl Show for GrepExprMatch
 
 pub(all) enum GrepExprToken {
   Pattern(String)
@@ -81,30 +84,35 @@ pub(all) enum GrepExprToken {
   Not
   LParen
   RParen
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub impl Show for GrepExprToken
 
 pub(all) struct GrepFileMatch {
   path : String
   matches : Array[GrepLineMatch]
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub impl Show for GrepFileMatch
 
 pub(all) struct GrepLineMatch {
   line_number : Int
   column : Int
   line : String
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub impl Show for GrepLineMatch
 
 pub(all) struct GrepMatchSpan {
   start_column : Int
   end_column : Int
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub impl Show for GrepMatchSpan
 
 pub(all) enum GrepPatternType {
   Fixed
   Basic
   Extended
   Perl
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub impl Show for GrepPatternType
 
 // Type aliases
 

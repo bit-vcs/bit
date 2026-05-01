@@ -4,6 +4,7 @@ package "mizchi/bit/reftable"
 import {
   "mizchi/bit/object",
   "mizchi/bit/types",
+  "moonbitlang/core/debug",
 }
 
 // Values
@@ -44,23 +45,25 @@ pub(all) struct RefRecord {
   refname : String
   update_index : UInt64
   value : RefValue
-} derive(Eq, Show)
+} derive(Eq)
+pub impl Show for RefRecord
 
 pub(all) enum RefValue {
   Deletion
   Val1(@object.ObjectId)
   Val2(@object.ObjectId, @object.ObjectId)
   Symref(String)
-} derive(Eq, Show)
+} derive(Eq)
+pub impl Show for RefValue
 
-type ReftableFooter derive(Eq, Show)
+type ReftableFooter derive(Eq, @debug.Debug)
 
 pub struct ReftableHeader {
   version : Int
   block_size : Int
   min_update_index : UInt64
   max_update_index : UInt64
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
 
 // Type aliases
 

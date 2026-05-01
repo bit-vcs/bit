@@ -5,6 +5,7 @@ import {
   "mizchi/bit/object",
   "mizchi/bit/repo",
   "mizchi/bit/types",
+  "moonbitlang/core/debug",
 }
 
 // Values
@@ -594,6 +595,8 @@ pub fn stash_mode_str(Int) -> String
 
 pub async fn stash_push(&@types.FileSystem, &@types.RepoFileSystem, String, String, String, Int64) -> @object.ObjectId? raise @object.GitError
 
+pub async fn stash_push_patch(&@types.FileSystem, &@types.RepoFileSystem, String, String, String, Int64, async (StashPatchHunk, Int, Int) -> Bool) -> @object.ObjectId? raise @object.GitError
+
 pub async fn status(&@types.RepoFileSystem, String, run_filter_cmd? : FilterCmd) -> Status raise @object.GitError
 
 pub async fn status_porcelain(&@types.RepoFileSystem, String) -> Array[String] raise @object.GitError
@@ -763,7 +766,8 @@ pub(all) enum GitHubShorthand {
   Repo(String, String?)
   Subdir(String, String, String?)
   File(String, String)
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub impl Show for GitHubShorthand
 
 pub enum HeadRef {
   Branch(String)
@@ -842,7 +846,7 @@ pub struct InteractiveTodoEntry {
   command : TodoCommand
   commit_hex : String
   subject : String
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
 
 pub struct LazyPackIndex {
   idx_path : String
@@ -857,7 +861,7 @@ pub fn LazyPackIndex::new(String, String) -> Self
 pub struct LfsPointer {
   oid : String
   size : Int64
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
 
 pub struct LogEntry {
   id : @object.ObjectId
@@ -1068,6 +1072,11 @@ pub struct StashEntry {
   message : String
 }
 
+pub(all) struct StashPatchHunk {
+  path : String
+  display_lines : Array[String]
+}
+
 pub struct Status {
   staged_added : Array[String]
   staged_modified : Array[String]
@@ -1096,7 +1105,8 @@ pub enum TodoCommand {
   Label
   Reset
   Merge
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub impl Show for TodoCommand
 
 pub struct TreeFileEntry {
   id : @object.ObjectId
@@ -1143,7 +1153,7 @@ pub(all) struct WorktreeInfo {
 pub(all) struct WorktreeRepairResult {
   repaired : Array[String]
   warnings : Array[String]
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
 
 // Type aliases
 

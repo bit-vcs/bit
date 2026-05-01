@@ -3,6 +3,7 @@ package "mizchi/bit/remote"
 
 import {
   "mizchi/bit/types",
+  "moonbitlang/core/debug",
 }
 
 // Values
@@ -25,7 +26,8 @@ pub(all) enum GitHubShorthand {
   Repo(String, String?)
   Subdir(String, String, String?)
   File(String, String)
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub impl Show for GitHubShorthand
 
 // Type aliases
 

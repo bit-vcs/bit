@@ -1,6 +1,10 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "mizchi/bit/fast_import"
 
+import {
+  "moonbitlang/core/debug",
+}
+
 // Values
 pub fn fast_import_parse_data(Array[String], Int) -> FastImportDataResult
 
@@ -34,7 +38,8 @@ pub(all) enum FastImportFileOp {
   DeleteAll
   Rename(old_path~ : String, new_path~ : String)
   Copy(old_path~ : String, new_path~ : String)
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
+pub impl Show for FastImportFileOp
 
 pub(all) struct FastImportIdent {
   ident : String
