@@ -12,6 +12,13 @@ pub struct CommitGraphFile {
 }
 
 ///|
+pub(all) struct CommitGraphCommitInfo {
+  tree : @bit.ObjectId
+  parents : Array[@bit.ObjectId]
+  committer_timestamp : Int64
+}
+
+///|
 pub fn CommitGraphFile::load(
   rfs : &@bit.RepoFileSystem,
   git_dir : String,
@@ -175,6 +182,15 @@ pub fn CommitGraphFile::read_commit(
     parents.push(self.get_oid(parent2_raw))
   }
   (tree_oid, parents, timestamp)
+}
+
+///|
+pub fn CommitGraphFile::read_commit_info(
+  self : CommitGraphFile,
+  pos : Int,
+) -> CommitGraphCommitInfo {
+  let (tree, parents, committer_timestamp) = self.read_commit(pos)
+  { tree, parents, committer_timestamp }
 }
 
 ///|

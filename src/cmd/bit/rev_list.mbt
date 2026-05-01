@@ -636,9 +636,8 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
     visited[hex] = true
     result.push(id)
     // Get commit and add parents
-    match db.get(fs, id) {
-      Some(obj) if obj.obj_type == @bitcore.ObjectType::Commit => {
-        let info = @bitcore.parse_commit(obj.data)
+    match rev_list_load_commit_info(db, fs, id) {
+      Some(info) =>
         if first_parent && info.parents.length() > 0 {
           if !visited.contains(info.parents[0].to_hex()) {
             queue.push(info.parents[0])
@@ -650,7 +649,6 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
             }
           }
         }
-      }
       _ => ()
     }
   }
@@ -667,13 +665,7 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
   if min_parents is Some(_) || max_parents is Some(_) {
     let filtered : Array[@bitcore.ObjectId] = []
     for id in result {
-      let parent_count = match db.get(fs, id) {
-        Some(obj) if obj.obj_type == @bitcore.ObjectType::Commit => {
-          let info = @bitcore.parse_commit(obj.data)
-          info.parents.length()
-        }
-        _ => 0
-      }
+      let parent_count = rev_list_commit_parent_count(db, fs, id)
       let min_ok = match min_parents {
         Some(min) => parent_count >= min
         None => true
@@ -761,23 +753,16 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
     }
     for id in sliced_result {
       object_ids.push((id, ""))
-      match db.get(fs, id) {
-        Some(obj) if obj.obj_type == @bitcore.ObjectType::Commit => {
-          let info = @bitcore.parse_commit(obj.data)
+      match rev_list_commit_tree(db, fs, id) {
+        Some(tree) =>
           if indexed_objects_negated {
             collect_tree_objects_excluding_index(
-              db,
-              fs,
-              info.tree,
-              object_ids,
-              object_seen,
-              indexed_path_ids,
+              db, fs, tree, object_ids, object_seen, indexed_path_ids,
             )
           } else {
-            collect_tree_objects(db, fs, info.tree, object_ids, object_seen)
+            collect_tree_objects(db, fs, tree, object_ids, object_seen)
           }
-        }
-        _ => ()
+        None => ()
       }
     }
     if indexed_objects && !indexed_objects_negated {
@@ -876,15 +861,13 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
         )
         buf.write_string(hex)
         if parents {
-          match db.get(fs, id) {
-            Some(obj) if obj.obj_type == @bitcore.ObjectType::Commit => {
-              let info = @bitcore.parse_commit(obj.data)
-              for p in info.parents {
+          match rev_list_commit_parents(db, fs, id) {
+            Some(parent_ids) =>
+              for p in parent_ids {
                 buf.write_string(" ")
                 buf.write_string(p.to_hex())
               }
-            }
-            _ => ()
+            None => ()
           }
         }
         if header {
@@ -953,6 +936,92 @@ fn rev_list_peel_to_commit(
     }
   }
   None
+}
+
+///|
+fn rev_list_load_commit_info(
+  db : @bitlib.ObjectDb,
+  fs : &@bitcore.RepoFileSystem,
+  id : @bitcore.ObjectId,
+) -> @bitlib.CommitGraphCommitInfo? {
+  match db.get_commit_graph_commit(id) {
+    Some(info) => return Some(info)
+    None => ()
+  }
+  let obj = db.get(fs, id) catch { _ => return None }
+  match obj {
+    Some(o) if o.obj_type == @bitcore.ObjectType::Commit => {
+      let info = @bitcore.parse_commit(o.data) catch { _ => return None }
+      Some({
+        tree: info.tree,
+        parents: info.parents,
+        committer_timestamp: @tar.tar_parse_committer_timestamp(o.data),
+      })
+    }
+    _ => None
+  }
+}
+
+///|
+fn rev_list_commit_parents(
+  db : @bitlib.ObjectDb,
+  fs : &@bitcore.RepoFileSystem,
+  id : @bitcore.ObjectId,
+) -> Array[@bitcore.ObjectId]? {
+  match rev_list_load_commit_info(db, fs, id) {
+    Some(info) => Some(info.parents)
+    None => None
+  }
+}
+
+///|
+fn rev_list_commit_tree(
+  db : @bitlib.ObjectDb,
+  fs : &@bitcore.RepoFileSystem,
+  id : @bitcore.ObjectId,
+) -> @bitcore.ObjectId? {
+  match rev_list_load_commit_info(db, fs, id) {
+    Some(info) => Some(info.tree)
+    None => None
+  }
+}
+
+///|
+fn rev_list_commit_parent_count(
+  db : @bitlib.ObjectDb,
+  fs : &@bitcore.RepoFileSystem,
+  id : @bitcore.ObjectId,
+) -> Int {
+  match rev_list_load_commit_info(db, fs, id) {
+    Some(info) => info.parents.length()
+    None => 0
+  }
+}
+
+///|
+fn rev_list_commit_committer_timestamp(
+  db : @bitlib.ObjectDb,
+  fs : &@bitcore.RepoFileSystem,
+  id : @bitcore.ObjectId,
+) -> Int64 {
+  match rev_list_load_commit_info(db, fs, id) {
+    Some(info) => info.committer_timestamp
+    None => 0L
+  }
+}
+
+///|
+fn rev_list_commit_author_timestamp(
+  db : @bitlib.ObjectDb,
+  fs : &@bitcore.RepoFileSystem,
+  id : @bitcore.ObjectId,
+) -> Int64 {
+  let obj = db.get(fs, id) catch { _ => return 0L }
+  match obj {
+    Some(o) if o.obj_type == @bitcore.ObjectType::Commit =>
+      rev_list_extract_author_timestamp(o.data)
+    _ => 0L
+  }
 }
 
 ///|
@@ -1210,17 +1279,15 @@ fn walk_commits_to_map(
       continue
     }
     out[hex] = true
-    let obj = db.get(fs, id) catch { _ => continue }
-    match obj {
-      Some(o) if o.obj_type == @bitcore.ObjectType::Commit => {
-        let info = @bitcore.parse_commit(o.data) catch { _ => continue }
-        for parent in info.parents {
-          if !out.contains(parent.to_hex()) {
+    match rev_list_commit_parents(db, fs, id) {
+      Some(parents) =>
+        for parent in parents {
+          let phex = parent.to_hex()
+          if !out.contains(phex) {
             queue.push(parent)
           }
         }
-      }
-      _ => ()
+      None => ()
     }
   }
 }
@@ -1358,28 +1425,18 @@ fn rev_list_collect_index_objects(
   }
   let head_id = @bitrepo.rev_parse(fs, git_dir, "HEAD") catch { _ => None }
   match head_id {
-    Some(id) => {
-      let obj = db.get(fs, id)
-      match obj {
-        Some(commit_obj) if commit_obj.obj_type == @bitcore.ObjectType::Commit => {
-          let info = @bitcore.parse_commit(commit_obj.data)
+    Some(id) =>
+      match rev_list_commit_tree(db, fs, id) {
+        Some(tree) => {
           let matched_paths : Map[String, Bool] = {}
           ignore(
             rev_list_collect_matching_index_trees(
-              db,
-              fs,
-              info.tree,
-              index_by_path,
-              matched_paths,
-              visible,
-              unique_ids,
-              path_ids,
+              db, fs, tree, index_by_path, matched_paths, visible, unique_ids, path_ids,
             ),
           )
         }
-        _ => ()
+        None => ()
       }
-    }
     None => ()
   }
   (visible, path_ids)
@@ -1615,7 +1672,7 @@ fn rev_list_topo_sort(
   db : @bitlib.ObjectDb,
   rfs : &@bitcore.RepoFileSystem,
   commits : Array[@bitcore.ObjectId],
-) -> Unit raise Error {
+) -> Unit {
   rev_list_topo_sort_impl(db, rfs, commits, false)
 }
 
@@ -1633,7 +1690,7 @@ fn rev_list_topo_sort_impl(
   rfs : &@bitcore.RepoFileSystem,
   commits : Array[@bitcore.ObjectId],
   use_author_date : Bool,
-) -> Unit raise Error {
+) -> Unit {
   if commits.length() <= 1 {
     return
   }
@@ -1648,9 +1705,8 @@ fn rev_list_topo_sort_impl(
   for id in commits {
     let hex = id.to_hex()
     parents_map[hex] = []
-    match db.get(rfs, id) {
-      Some(obj) if obj.obj_type == @bitcore.ObjectType::Commit => {
-        let info = @bitcore.parse_commit(obj.data) catch { _ => continue }
+    match rev_list_load_commit_info(db, rfs, id) {
+      Some(info) => {
         let ps : Array[String] = []
         for p in info.parents {
           let phex = p.to_hex()
@@ -1660,9 +1716,9 @@ fn rev_list_topo_sort_impl(
         }
         parents_map[hex] = ps
         timestamps[hex] = if use_author_date {
-          rev_list_extract_author_timestamp(obj.data)
+          rev_list_commit_author_timestamp(db, rfs, id)
         } else {
-          @tar.tar_parse_committer_timestamp(obj.data)
+          info.committer_timestamp
         }
       }
       _ => timestamps[hex] = 0L
@@ -1779,7 +1835,7 @@ fn rev_list_topo_sort_author_date(
   db : @bitlib.ObjectDb,
   rfs : &@bitcore.RepoFileSystem,
   commits : Array[@bitcore.ObjectId],
-) -> Unit raise Error {
+) -> Unit {
   rev_list_topo_sort_impl(db, rfs, commits, true)
 }
 
@@ -1821,17 +1877,13 @@ fn rev_list_date_sort(
   db : @bitlib.ObjectDb,
   rfs : &@bitcore.RepoFileSystem,
   commits : Array[@bitcore.ObjectId],
-) -> Unit raise Error {
+) -> Unit {
   if commits.length() <= 1 {
     return
   }
   let timestamps : Map[String, Int64] = {}
   for id in commits {
-    match db.get(rfs, id) {
-      Some(obj) if obj.obj_type == @bitcore.ObjectType::Commit =>
-        timestamps[id.to_hex()] = @tar.tar_parse_committer_timestamp(obj.data)
-      _ => timestamps[id.to_hex()] = 0L
-    }
+    timestamps[id.to_hex()] = rev_list_commit_committer_timestamp(db, rfs, id)
   }
   // Simple insertion sort (stable, preserves order for equal timestamps)
   for i in 1..<commits.length() {

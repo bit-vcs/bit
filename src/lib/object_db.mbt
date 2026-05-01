@@ -310,6 +310,24 @@ pub fn ObjectDb::get(
 }
 
 ///|
+pub fn ObjectDb::get_commit_graph_commit(
+  self : ObjectDb,
+  id : @bit.ObjectId,
+) -> CommitGraphCommitInfo? {
+  match self.commit_graph {
+    Some(graph) => {
+      let pos = graph.find_commit(id)
+      if pos >= 0 {
+        Some(graph.read_commit_info(pos))
+      } else {
+        None
+      }
+    }
+    None => None
+  }
+}
+
+///|
 fn get_from_commit_graph(db : ObjectDb, id : @bit.ObjectId) -> @bit.PackObject? {
   match db.commit_graph {
     Some(graph) => {

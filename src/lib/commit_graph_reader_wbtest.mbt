@@ -87,6 +87,29 @@ test "synthesize_commit_object produces parseable commit" {
   assert_true(text.contains("1700000000"))
 }
 
+///|
+test "ObjectDb exposes commit-graph metadata without reading commit object" {
+  let oid_a = @bit.ObjectId::from_hex(
+    "1111111111111111111111111111111111111111",
+  )
+  let oid_b = @bit.ObjectId::from_hex(
+    "2222222222222222222222222222222222222222",
+  )
+  let tree = @bit.ObjectId::from_hex("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+  let graph = build_test_commit_graph([
+    TestCommitEntry::new(oid_a, tree, [], 100L),
+    TestCommitEntry::new(oid_b, tree, [oid_a], 200L),
+  ])
+  let fs = @bit.TestFs::new()
+  fs.mkdir_p("/repo/.git/objects/info")
+  fs.write_file("/repo/.git/objects/info/commit-graph", graph)
+  let db = ObjectDb::load(fs, "/repo/.git")
+  let meta = db.get_commit_graph_commit(oid_b).unwrap()
+  assert_eq(meta.tree, tree)
+  assert_eq(meta.parents, [oid_a])
+  assert_eq(meta.committer_timestamp, 200L)
+}
+
 // -- Test helpers --
 
 ///|

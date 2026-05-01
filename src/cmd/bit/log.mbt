@@ -2512,10 +2512,7 @@ fn log_commit_diff_statuses(
   guard obj is Some(o) else { return statuses }
   let info = @bitcore.parse_commit(o.data)
   let old_tree : @bitcore.ObjectId? = if info.parents.length() > 0 {
-    match db.get(rfs, info.parents[0]) {
-      Some(parent_obj) => Some(@bitcore.parse_commit(parent_obj.data).tree)
-      None => None
-    }
+    log_get_commit_tree(db, rfs, info.parents[0])
   } else {
     None
   }
@@ -2748,19 +2745,17 @@ fn log_commit_matches_simplify_merges(
     return true
   }
   for parent in parents {
-    match db.get(rfs, parent) {
-      Some(parent_obj) if parent_obj.obj_type == @bitcore.ObjectType::Commit => {
-        let parent_info = @bitcore.parse_commit(parent_obj.data)
+    match log_get_commit_tree(db, rfs, parent) {
+      Some(parent_tree) =>
         if log_trees_same_for_pathspecs(
             rfs,
             db,
-            parent_info.tree,
+            parent_tree,
             info.tree,
             pathspecs,
           ) {
           return false
         }
-      }
       _ => ()
     }
   }
@@ -5866,13 +5861,7 @@ fn log_walk_commits(
     }
     let parent_tree : @bitcore.ObjectId? = if include_parent_tree &&
       parents.length() > 0 {
-      match db.get(rfs, parents[0]) {
-        Some(po) => {
-          let pi = @bitcore.parse_commit(po.data)
-          Some(pi.tree)
-        }
-        None => None
-      }
+      log_get_commit_tree(db, rfs, parents[0])
     } else {
       None
     }
@@ -5897,13 +5886,7 @@ fn log_walk_commits(
       )
       let parent_tree : @bitcore.ObjectId? = if include_parent_tree &&
         parents.length() > 0 {
-        match db.get(rfs, parents[0]) {
-          Some(po) => {
-            let pi = @bitcore.parse_commit(po.data)
-            Some(pi.tree)
-          }
-          None => None
-        }
+        log_get_commit_tree(db, rfs, parents[0])
       } else {
         None
       }
@@ -5947,6 +5930,26 @@ fn log_get_commit_timestamp(
   let obj = db.get(rfs, id) catch { _ => return 0L }
   guard obj is Some(o) else { return 0L }
   log_extract_author_timestamp(o.data)
+}
+
+///|
+fn log_get_commit_tree(
+  db : @bitlib.ObjectDb,
+  rfs : &@bitcore.RepoFileSystem,
+  id : @bitcore.ObjectId,
+) -> @bitcore.ObjectId? {
+  match db.get_commit_graph_commit(id) {
+    Some(info) => return Some(info.tree)
+    None => ()
+  }
+  let obj = db.get(rfs, id) catch { _ => return None }
+  match obj {
+    Some(o) if o.obj_type == @bitcore.ObjectType::Commit => {
+      let info = @bitcore.parse_commit(o.data) catch { _ => return None }
+      Some(info.tree)
+    }
+    _ => None
+  }
 }
 
 ///|
@@ -6055,13 +6058,7 @@ fn log_load_entry(
   let entry = log_parse_entry_from_obj(id, o.data, info.tree, parents)
   let parent_tree : @bitcore.ObjectId? = if include_parent_tree &&
     parents.length() > 0 {
-    match db.get(rfs, parents[0]) {
-      Some(parent_obj) => {
-        let parent_info = @bitcore.parse_commit(parent_obj.data)
-        Some(parent_info.tree)
-      }
-      None => None
-    }
+    log_get_commit_tree(db, rfs, parents[0])
   } else {
     None
   }

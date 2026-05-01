@@ -50,7 +50,7 @@ t3404 (rebase -i): **129/132 (97.7%)**
 ## P2: パフォーマンス
 
 - [x] Pack bitmap 読み込み (t5310/t5326/t5333)
-- [ ] Commit-graph 活用 — log/rev-list 高速化
+- [x] Commit-graph 活用 — log/rev-list 高速化
 
 ## P2.5: Allowlist 拡大
 
