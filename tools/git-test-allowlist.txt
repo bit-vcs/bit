@@ -7,6 +7,7 @@
 # basic / init / help
 t0000-basic.sh
 t0001-init.sh
+t0008-ignores.sh
 t0012-help.sh
 t0450-txt-doc-vs-help.sh
 
