@@ -300,6 +300,7 @@ t5150-request-pull.sh
 t5200-update-server-info.sh
 
 # pack / idx (strict mode compatible)
+t5300-pack-object.sh
 t5301-sliding-window.sh
 t5302-pack-index.sh
 t5303-pack-corruption-resilience.sh
@@ -309,6 +310,7 @@ t5306-pack-nobase.sh
 t5307-pack-missing-commit.sh
 t5308-pack-detect-duplicates.sh
 t5309-pack-delta-cycles.sh
+t5310-pack-bitmaps.sh
 t5311-pack-bitmaps-shallow.sh
 t5312-prune-corruption.sh
 t5313-pack-bounds-checks.sh
@@ -324,12 +326,14 @@ t5322-pack-objects-sparse.sh
 t5323-pack-redundant.sh
 t5324-split-commit-graph.sh
 t5325-reverse-index.sh
+t5326-multi-pack-bitmaps.sh
 t5327-multi-pack-bitmaps-rev.sh
 t5328-commit-graph-64bit-time.sh
 t5329-pack-objects-cruft.sh
 t5330-no-lazy-fetch-with-commit-graph.sh
 t5331-pack-objects-stdin.sh
 t5332-multi-pack-reuse.sh
+t5333-pseudo-merge-bitmaps.sh
 t5334-incremental-multi-pack-index.sh
 t5351-unpack-large-objects.sh
 
@@ -642,6 +646,7 @@ t1700-split-index.sh
 t1701-racy-split-index.sh
 t1800-hook.sh
 t1900-repo.sh
+t1901-repo-structure.sh
 
 # t2*
 t2000-conflict-when-checking-files-out.sh
@@ -719,6 +724,7 @@ t3301-notes.sh
 t3302-notes-index-expensive.sh
 t3303-notes-subtrees.sh
 t3304-notes-mixed.sh
+t3305-notes-fanout.sh
 t3306-notes-prune.sh
 t3307-notes-man.sh
 t3308-notes-merge.sh
@@ -889,6 +895,7 @@ t4120-apply-popt.sh
 t4121-apply-diffs.sh
 t4122-apply-symlink-inside.sh
 t4123-apply-shrink.sh
+t4124-apply-ws-rule.sh
 t4125-apply-ws-fuzz.sh
 t4126-apply-empty.sh
 t4127-apply-same-fn.sh
