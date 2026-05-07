@@ -261,7 +261,7 @@ export const GIT_COMPAT_AFFECTED_RULES = [
       "src/cmd/bit/submodule*.mbt",
       "src/cmd/bit/worktree*.mbt",
       "src/cmd/bit/sparse_checkout*.mbt",
-      "src/x/subdir/**",
+      "src/x-subdir/**",
     ],
     select: [
       "third_party/git/t/t6437-submodule-merge.sh",

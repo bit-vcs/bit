@@ -3,7 +3,7 @@
 ## Status
 
 This document is a design note for a proposed integration path.
-It references `mizchi/bit/x/agent/llm/`, which does not exist in the current checkout.
+It references `mizchi/bit/x-agent/llm/`, which does not exist in the current checkout.
 
 Treat the architecture below as a proposal, not as implemented repository structure.
 
@@ -15,7 +15,7 @@ migrating the agent execution environment to one with sandbox + snapshot/rollbac
 ## Architecture
 
 ```
-mizchi/bit/x/agent/llm/
+mizchi/bit/x-agent/llm/
   tool_env.mbt          # ToolEnvironment trait (already exists)
   tools.mbt             # Tool registry (already exists)
   runner.mbt            # Agent runner (already exists)

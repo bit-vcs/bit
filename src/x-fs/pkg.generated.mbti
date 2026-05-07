@@ -1,0 +1,146 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/bit/x-fs"
+
+import {
+  "mizchi/bit/lib",
+  "mizchi/bit/object",
+  "mizchi/bit/types",
+}
+
+// Values
+pub fn build_tree_from_working(&@types.FileSystem, &@types.RepoFileSystem, String, @object.ObjectId, WorkingLayer) -> @object.ObjectId raise @object.GitError
+
+pub fn join_path(String, String) -> String
+
+// Errors
+
+// Types and methods
+pub struct Fs {
+  git_dir : String
+  mut base_tree : @object.ObjectId
+  mut base_commit : @object.ObjectId?
+  working : WorkingLayer
+  layers : Array[Layer]
+  cache : ObjectCache
+  config : FsConfig
+  mut cached_db : @lib.ObjectDb?
+  mut cached_promisor_db : @lib.PromisorDb?
+  lazy_mode : Bool
+}
+pub fn Fs::add_layer(Self, &@types.RepoFileSystem, @object.ObjectId, String, commit_id? : @object.ObjectId?) -> Unit raise @object.GitError
+pub fn Fs::add_layer_from_commit(Self, &@types.RepoFileSystem, @object.ObjectId, String) -> Unit raise @object.GitError
+pub fn Fs::base_commit(Self) -> @object.ObjectId?
+pub fn Fs::base_tree(Self) -> @object.ObjectId
+pub fn Fs::checkout_snapshot(Self, &@types.RepoFileSystem, @object.ObjectId) -> Unit raise @object.GitError
+pub fn Fs::clear_layers(Self) -> Unit
+pub fn Fs::collect_files_bfs(Self, &@types.RepoFileSystem, Int) -> Array[String] raise @object.GitError
+pub fn Fs::discard_changes(Self) -> Unit
+pub fn Fs::empty(String, config? : FsConfig) -> Self
+pub fn Fs::exists_in_base(Self, &@types.RepoFileSystem, String) -> Bool
+pub fn Fs::flatten_layers(Self, &@types.FileSystem, &@types.RepoFileSystem) -> @object.ObjectId raise @object.GitError
+pub fn Fs::from_branch(&@types.RepoFileSystem, String, String, config? : FsConfig) -> Self raise @object.GitError
+pub fn Fs::from_commit(&@types.RepoFileSystem, String, @object.ObjectId, config? : FsConfig) -> Self raise @object.GitError
+pub fn Fs::from_tree(String, @object.ObjectId, config? : FsConfig) -> Self
+pub fn Fs::get_db(Self, &@types.RepoFileSystem) -> @lib.ObjectDb raise @object.GitError
+pub fn Fs::get_deleted_files(Self) -> Array[String]
+pub fn Fs::get_pending_fetches(Self, &@types.RepoFileSystem, Int) -> Array[String] raise @object.GitError
+pub fn Fs::get_promisor_db(Self, &@types.RepoFileSystem) -> @lib.PromisorDb? raise @object.GitError
+pub fn Fs::get_promisor_remote(Self, &@types.RepoFileSystem) -> String?
+pub fn Fs::get_working_files(Self) -> Array[String]
+pub fn Fs::git_dir(Self) -> String
+pub fn Fs::has_layer(Self, String) -> Bool
+pub fn Fs::has_promisor(Self, &@types.RepoFileSystem) -> Bool
+pub fn Fs::is_dir(Self, &@types.RepoFileSystem, String) -> Bool
+pub fn Fs::is_dirty(Self) -> Bool
+pub fn Fs::is_file(Self, &@types.RepoFileSystem, String) -> Bool
+pub fn Fs::is_lazy(Self) -> Bool
+pub fn Fs::is_promisor_enabled(Self) -> Bool
+pub fn Fs::list_layers(Self) -> Array[Layer]
+pub fn Fs::list_snapshots(Self, &@types.RepoFileSystem, max_count? : Int) -> Array[Snapshot] raise @object.GitError
+pub fn Fs::mkdir_p(Self, String) -> Unit
+pub fn Fs::needs_fetch(Self, &@types.RepoFileSystem, String) -> Bool raise @object.GitError
+pub async fn Fs::prefetch(Self, &@types.RepoFileSystem, &@types.FileSystem, Array[String]) -> Int raise @object.GitError
+pub async fn Fs::prefetch_bfs(Self, &@types.RepoFileSystem, &@types.FileSystem, Int) -> Int raise @object.GitError
+pub async fn Fs::prefetch_glob(Self, &@types.RepoFileSystem, &@types.FileSystem, String) -> Int raise @object.GitError
+pub fn Fs::read_file(Self, &@types.RepoFileSystem, String) -> Bytes raise @object.GitError
+pub async fn Fs::read_file_async(Self, &@types.RepoFileSystem, &@types.FileSystem, String) -> Bytes raise @object.GitError
+pub fn Fs::readdir(Self, &@types.RepoFileSystem, String) -> Array[String] raise @object.GitError
+pub fn Fs::remove_dir(Self, String) -> Unit
+pub fn Fs::remove_file(Self, String) -> Unit
+pub fn Fs::remove_layer(Self, String) -> Bool
+pub fn Fs::rollback(Self) -> Unit
+pub fn Fs::snapshot(Self, &@types.FileSystem, &@types.RepoFileSystem, String, String, Int64) -> Snapshot raise @object.GitError
+pub fn Fs::write_file(Self, String, Bytes) -> Unit
+pub fn Fs::write_string(Self, String, String) -> Unit
+
+pub struct FsConfig {
+  max_cache_bytes : Int
+  max_cache_entries : Int
+  lazy_load : Bool
+  enable_promisor : Bool
+}
+pub fn FsConfig::default() -> Self
+pub fn FsConfig::eager() -> Self
+pub fn FsConfig::local_only() -> Self
+
+pub(all) struct Layer {
+  tree_id : @object.ObjectId
+  commit_id : @object.ObjectId?
+  name : String
+}
+
+pub struct LruCache[V] {
+  mut hot : Map[String, V]
+  mut cold : Map[String, V]
+  mut hot_bytes : Int
+  mut cold_bytes : Int
+  max_bytes : Int
+  size_fn : (V) -> Int
+}
+pub fn[V] LruCache::clear(Self[V]) -> Unit
+pub fn[V] LruCache::contains(Self[V], String) -> Bool
+pub fn[V] LruCache::get(Self[V], String) -> V?
+pub fn[V] LruCache::length(Self[V]) -> Int
+pub fn[V] LruCache::new(Int, (V) -> Int) -> Self[V]
+pub fn[V] LruCache::remove(Self[V], String) -> Unit
+pub fn[V] LruCache::set(Self[V], String, V) -> Unit
+pub fn[V] LruCache::total_bytes(Self[V]) -> Int
+
+pub(all) struct ObjectCache {
+  blob_cache : LruCache[Bytes]
+  trees : Map[@object.ObjectId, Array[@object.TreeEntry]]
+  path_cache : Map[String, @object.ObjectId?]
+}
+pub fn ObjectCache::clear(Self) -> Unit
+pub fn ObjectCache::get_blob(Self, String) -> Bytes?
+pub fn ObjectCache::get_path(Self, String) -> @object.ObjectId??
+pub fn ObjectCache::get_tree(Self, @object.ObjectId) -> Array[@object.TreeEntry]?
+pub fn ObjectCache::invalidate_path(Self, String) -> Unit
+pub fn ObjectCache::new(Int) -> Self
+pub fn ObjectCache::set_blob(Self, String, Bytes) -> Unit
+pub fn ObjectCache::set_path(Self, String, @object.ObjectId?) -> Unit
+pub fn ObjectCache::set_tree(Self, @object.ObjectId, Array[@object.TreeEntry]) -> Unit
+
+pub(all) struct Snapshot {
+  commit_id : @object.ObjectId
+  tree_id : @object.ObjectId
+  message : String
+  author : String
+  timestamp : Int64
+}
+pub fn Snapshot::new(@object.ObjectId, @object.ObjectId, String, String, Int64) -> Self
+
+pub(all) struct WorkingLayer {
+  files : Map[String, Bytes]
+  deleted : Map[String, Bool]
+  dirs : Map[String, Bool]
+  mut dirty : Bool
+}
+pub fn WorkingLayer::clear(Self) -> Unit
+pub fn WorkingLayer::is_dirty(Self) -> Bool
+pub fn WorkingLayer::new() -> Self
+
+// Type aliases
+
+// Traits
+

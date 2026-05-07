@@ -192,7 +192,7 @@ mizchi/bit-agent (NEW)        # agent system
     mizchi/moonix            # execution environment (AgentRuntime, GitBackedFs)
     mizchi/llm               # LLM provider
     mizchi/bit               # (optional) native git adapter
-    mizchi/bit/x/hub      # (optional) PR/review integration
+    mizchi/bit/x-hub      # (optional) PR/review integration
 ```
 
 ### Tool Definition Changes

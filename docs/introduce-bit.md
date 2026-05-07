@@ -38,8 +38,8 @@ Git cannot extract `foo` as a new root. (hg/svn could.)
 So this is implemented as `bit clone` shorthand:
 
 ```bash
-# extract only src/x/fs from mizchi/bit-vcs
-$ bit clone mizchi/bit-vcs:src/x/fs
+# extract only src/x-fs from mizchi/bit-vcs
+$ bit clone mizchi/bit-vcs:src/x-fs
 $ cd fs
 $ ls
 fs.mbt  types.mbt  ...
@@ -49,10 +49,10 @@ You can pin a branch/commit with `@<ref>` (short-hash allowed).
 
 ```bash
 # branch
-$ bit clone mizchi/bit-vcs@main:src/x/fs
+$ bit clone mizchi/bit-vcs@main:src/x-fs
 
 # commit (short-hash OK)
-$ bit clone mizchi/bit-vcs@<commit>:src/x/fs
+$ bit clone mizchi/bit-vcs@<commit>:src/x-fs
 ```
 
 You can also paste a GitHub URL directly.

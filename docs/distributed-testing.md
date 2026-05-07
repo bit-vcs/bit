@@ -9,17 +9,17 @@ Older agent/orchestrator notes still exist in `docs/`, but this guide is scoped 
 
 1. Pure logic (fast)
 - Purpose: Detect regressions in pure coordination and serialization logic
-- Target: `src/x/hub/*_test.mbt`, `src/x/kv/*_test.mbt`, `src/x/rebase-ai/*_wbtest.mbt`
+- Target: `src/x-hub/*_test.mbt`, `src/x-kv/*_test.mbt`, `src/x-rebase-ai/*_wbtest.mbt`
 - Examples: Hub record round-trips, issue/PR state transitions, KV merge behavior, rebase-ai parser logic
 
 2. Coordination/State (medium)
 - Purpose: Verify read/write consistency across relay, native sync, and repo-backed state
-- Target: `src/x/hub/native/*_wbtest.mbt`, `src/x/kv/native/*_wbtest.mbt`, `src/x/mcp/*_wbtest.mbt`
+- Target: `src/x-hub/native/*_wbtest.mbt`, `src/x-kv/native/*_wbtest.mbt`, `src/x-mcp/*_wbtest.mbt`
 - Examples: relay fetch/push behavior, sync conflict handling, MCP server I/O behavior
 
 3. Hub/Sync contract (medium)
 - Purpose: Verify PR/Issue/Review representation and sync contracts
-- Target: `src/x/hub/*_test.mbt`, `src/x/hub/*_wbtest.mbt`, `src/x/hub/native/*_wbtest.mbt`
+- Target: `src/x-hub/*_test.mbt`, `src/x-hub/*_wbtest.mbt`, `src/x-hub/native/*_wbtest.mbt`
 
 4. End-to-end simulation (heavy)
 - Purpose: End-to-end connectivity of repository collaboration and relay-oriented flows
@@ -46,11 +46,11 @@ just check
 
 Current `just test-distributed` runs:
 
-- `mizchi/bit/x/mcp`
-- `mizchi/bit/x/rebase-ai`
-- `mizchi/bit/x/hub`
-- `mizchi/bit/x/hub/native`
-- `mizchi/bit/x/kv`
+- `mizchi/bit/x-mcp`
+- `mizchi/bit/x-rebase-ai`
+- `mizchi/bit/x-hub`
+- `mizchi/bit/x-hub/native`
+- `mizchi/bit/x-kv`
 
 ## 4. Minimal Fault Injection Set
 

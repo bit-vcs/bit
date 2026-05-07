@@ -59,6 +59,6 @@ select = ["third_party/git/t/t7004-tag.sh", "third_party/git/t/t7030-verify-tag.
 reason = "command:tag"
 
 [[rules]]
-changed = ["src/cmd/bit/submodule*.mbt", "src/cmd/bit/worktree*.mbt", "src/cmd/bit/sparse_checkout*.mbt", "src/x/subdir/**"]
+changed = ["src/cmd/bit/submodule*.mbt", "src/cmd/bit/worktree*.mbt", "src/cmd/bit/sparse_checkout*.mbt", "src/x-subdir/**"]
 select = ["third_party/git/t/t6437-submodule-merge.sh", "third_party/git/t/t6438-submodule-directory-file-conflicts.sh", "third_party/git/t/t740*.sh", "third_party/git/t/t741*.sh", "third_party/git/t/t742*.sh", "third_party/git/t/t7450-bad-git-dotfiles.sh"]
 reason = "command:submodule"
