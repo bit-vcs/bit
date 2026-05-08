@@ -12,6 +12,7 @@ check:
     moon check --deny-warn --warn-list=-27 --target js
     moon check --deny-warn --warn-list=-27 --target wasm
     moon check --deny-warn --warn-list=-27 --target native
+    node tools/check-layers.mjs
     @if rg -n "OsFs::new|@process\\.run" src/runtime >/dev/null; then \
       echo "runtime layer must not use OsFs::new or @process.run"; \
       exit 1; \
