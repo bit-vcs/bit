@@ -235,11 +235,11 @@ test-subdir:
 
 # Distributed agent/orchestration focused checks (excluding upstream git/t)
 test-distributed:
-    moon test --target native -p mizchi/bit/x/mcp
-    moon test --target native -p mizchi/bit/x/rebase-ai
-    moon test --target native -p mizchi/bit/x/hub
-    moon test --target native -p mizchi/bit/x/hub/native
-    moon test --target native -p mizchi/bit/x/kv
+    moon test --target native -p mizchi/bit/x-mcp
+    moon test --target native -p mizchi/bit/x-rebase-ai
+    moon test --target native -p mizchi/bit/x-hub
+    moon test --target native -p mizchi/bit/x-hub/native
+    moon test --target native -p mizchi/bit/x-kv
 
 # Prepare an intentional rebase conflict to debug rebase-ai locally
 test-ai:
@@ -576,13 +576,13 @@ bench:
 
 # Run benchmarks by package
 bench-fs:
-    moon bench --target native -p mizchi/bit/x/fs -f bench_test.mbt
+    moon bench --target native -p mizchi/bit/vfs -f bench_test.mbt
 
 bench-fs-real:
-    moon bench --target native -p mizchi/bit/x/fs -f bench_real_test.mbt
+    moon bench --target native -p mizchi/bit/vfs -f bench_real_test.mbt
 
 bench-kv:
-    moon bench --target native -p mizchi/bit/x/kv
+    moon bench --target native -p mizchi/bit/x-kv
 
 bench-lib:
     moon bench --target native -p mizchi/bit/lib

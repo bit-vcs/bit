@@ -16,7 +16,7 @@ The Git smart-http specification itself (`/info/refs`, pack protocol) is out of 
 - `Room`: A logical channel within the relay. Default is `main`.
 - `Envelope`: A single message relayed by the relay.
 - `Cursor`: A 0-based integer representing a position in the room's envelope array.
-- `HubRecord`: A record held by `bit x/hub` (text-serialized).
+- `HubRecord`: A record held by `bit x-hub` (text-serialized).
 
 ## 3. URL and Transport Selection
 

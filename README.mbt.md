@@ -225,7 +225,7 @@ Not passing:
 
 ## Environment Variables
 
-- `BIT_BENCH_GIT_DIR`: override .git path for bench_real (x/fs benchmarks).
+- `BIT_BENCH_GIT_DIR`: override .git path for bench_real (vfs benchmarks).
 - `BIT_PACK_CACHE_LIMIT`: max number of pack files to keep in memory (default: 2; 0 disables cache).
 - `BIT_RACY_GIT`: when set, rehash even if stat matches to avoid racy-git false negatives.
 
