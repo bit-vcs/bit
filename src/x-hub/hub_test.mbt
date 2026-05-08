@@ -1457,7 +1457,7 @@ test "notes: custom ns" {
 
 ///|
 test "hub_record version round-trip" {
-  let record = @hub.HubRecord::new(
+  let record = HubRecord::new(
     "hub/pr/1/meta",
     "pr",
     "some payload",
@@ -1466,7 +1466,7 @@ test "hub_record version round-trip" {
     version=1,
   )
   let serialized = record.serialize()
-  let parsed = @hub.parse_hub_record(serialized)
+  let parsed = parse_hub_record(serialized)
   assert_eq(parsed.version, 1)
   assert_eq(parsed.key, "hub/pr/1/meta")
   assert_eq(parsed.kind, "pr")
@@ -1475,7 +1475,7 @@ test "hub_record version round-trip" {
 
 ///|
 test "hub_record signature round-trip" {
-  let record = @hub.HubRecord::new(
+  let record = HubRecord::new(
     "hub/pr/1/meta",
     "pr",
     "some payload",
@@ -1484,7 +1484,7 @@ test "hub_record signature round-trip" {
     signature=Some("deadbeef"),
   )
   let serialized = record.serialize()
-  let parsed = @hub.parse_hub_record(serialized)
+  let parsed = parse_hub_record(serialized)
   assert_eq(parsed.signature, Some("deadbeef"))
 }
 
@@ -1500,7 +1500,7 @@ test "hub_record version=0 backward compat" {
     #|deleted 0
     #|
     #|payload data
-  let parsed = @hub.parse_hub_record(text)
+  let parsed = parse_hub_record(text)
   assert_eq(parsed.version, 0)
   assert_eq(parsed.key, "hub/pr/1/meta")
 }
@@ -1768,7 +1768,7 @@ test "format: serialize and parse Note" {
 
 ///|
 test "sync_link: serialize and parse roundtrip" {
-  let link = @hub.SyncLink::new(
+  let link = SyncLink::new(
     "abc12345",
     "issue",
     "github",
@@ -1785,7 +1785,7 @@ test "sync_link: serialize and parse roundtrip" {
   assert_true(serialized.contains("provider github"))
   assert_true(serialized.contains("repo owner/repo"))
   assert_true(serialized.contains("remote-number 42"))
-  let parsed = @hub.parse_sync_link(serialized)
+  let parsed = parse_sync_link(serialized)
   assert_eq(parsed.local_id(), "abc12345")
   assert_eq(parsed.local_kind(), "issue")
   assert_eq(parsed.provider(), "github")
@@ -1800,8 +1800,8 @@ test "sync_link: serialize and parse roundtrip" {
 ///|
 test "hub: create and get sync_link" {
   let (objects, refs, clock) = make_test_stores()
-  let hub = @hub.Hub::init(objects, refs)
-  let link = @hub.SyncLink::new(
+  let hub = Hub::init(objects, refs)
+  let link = SyncLink::new(
     "issue-abc",
     "issue",
     "github",
@@ -1824,24 +1824,24 @@ test "hub: create and get sync_link" {
 ///|
 test "hub: list sync_links for repo" {
   let (objects, refs, clock) = make_test_stores()
-  let hub = @hub.Hub::init(objects, refs)
+  let hub = Hub::init(objects, refs)
   hub.put_sync_link(
     objects,
     refs,
     clock,
-    @hub.SyncLink::new("id-1", "issue", "github", "owner/repo", remote_number=1),
+    SyncLink::new("id-1", "issue", "github", "owner/repo", remote_number=1),
   )
   hub.put_sync_link(
     objects,
     refs,
     clock,
-    @hub.SyncLink::new("id-2", "pr", "github", "owner/repo", remote_number=2),
+    SyncLink::new("id-2", "pr", "github", "owner/repo", remote_number=2),
   )
   hub.put_sync_link(
     objects,
     refs,
     clock,
-    @hub.SyncLink::new("id-3", "issue", "github", "other/repo", remote_number=3),
+    SyncLink::new("id-3", "issue", "github", "other/repo", remote_number=3),
   )
   let links = hub.list_sync_links(objects, repo="owner/repo")
   assert_eq(links.length(), 2)
@@ -1852,12 +1852,12 @@ test "hub: list sync_links for repo" {
 ///|
 test "hub: find sync_link by remote number" {
   let (objects, refs, clock) = make_test_stores()
-  let hub = @hub.Hub::init(objects, refs)
+  let hub = Hub::init(objects, refs)
   hub.put_sync_link(
     objects,
     refs,
     clock,
-    @hub.SyncLink::new(
+    SyncLink::new(
       "id-1",
       "issue",
       "github",
@@ -1880,7 +1880,7 @@ test "github_types: parse GhIssue from JSON" {
     #|{"number":42,"node_id":"I_kwDOxxx","title":"Bug report","body":"description","state":"open","user":{"login":"alice"},"labels":[{"name":"bug"}],"assignees":[{"login":"bob"}],"created_at":"2026-01-01T00:00:00Z","updated_at":"2026-01-02T00:00:00Z"}
   let parsed = @json.parse(json_str)
   guard parsed is Json::Object(obj) else { abort("not object") }
-  let issue = @hub.GhIssue::from_json(obj)
+  let issue = GhIssue::from_json(obj)
   assert_eq(issue.number, 42)
   assert_eq(issue.node_id, "I_kwDOxxx")
   assert_eq(issue.title, "Bug report")
@@ -1896,7 +1896,7 @@ test "github_types: parse GhComment from JSON" {
     #|{"id":12345,"node_id":"IC_kwDOyyy","body":"comment text","user":{"login":"alice"},"created_at":"2026-01-01T00:00:00Z","updated_at":"2026-01-02T00:00:00Z"}
   let parsed = @json.parse(json_str)
   guard parsed is Json::Object(obj) else { abort("not object") }
-  let comment = @hub.GhComment::from_json(obj)
+  let comment = GhComment::from_json(obj)
   assert_eq(comment.id, 12345)
   assert_eq(comment.body, "comment text")
   assert_eq(comment.user, "alice")
@@ -1908,7 +1908,7 @@ test "github_types: parse GhPullRequest from JSON" {
     #|{"number":7,"node_id":"PR_kwDOzzz","title":"Add feature","body":"details","state":"closed","user":{"login":"dev"},"head":{"ref":"feature-branch","repo":{"full_name":"dev/repo"}},"base":{"ref":"main"},"labels":[{"name":"enhancement"}],"created_at":"2026-01-01T00:00:00Z","updated_at":"2026-01-03T00:00:00Z","merged":true,"merged_at":"2026-01-03T00:00:00Z"}
   let parsed = @json.parse(json_str)
   guard parsed is Json::Object(obj) else { abort("not object") }
-  let pr = @hub.GhPullRequest::from_json(obj)
+  let pr = GhPullRequest::from_json(obj)
   assert_eq(pr.number, 7)
   assert_eq(pr.node_id, "PR_kwDOzzz")
   assert_eq(pr.title, "Add feature")
@@ -1928,7 +1928,7 @@ test "github_types: parse GhPullRequest open (not merged)" {
     #|{"number":8,"node_id":"PR_kwDOaaa","title":"WIP","body":"","state":"open","user":{"login":"dev"},"head":{"ref":"wip","repo":{"full_name":"dev/repo"}},"base":{"ref":"main"},"labels":[],"created_at":"2026-01-01T00:00:00Z","updated_at":"2026-01-01T00:00:00Z","merged":false,"merged_at":null}
   let parsed = @json.parse(json_str)
   guard parsed is Json::Object(obj) else { abort("not object") }
-  let pr = @hub.GhPullRequest::from_json(obj)
+  let pr = GhPullRequest::from_json(obj)
   assert_eq(pr.number, 8)
   assert_eq(pr.state, "open")
   assert_false(pr.merged)
@@ -1936,31 +1936,31 @@ test "github_types: parse GhPullRequest open (not merged)" {
 
 ///|
 test "timestamp: parse ISO 8601 to unix" {
-  let unix = @hub.parse_iso8601_to_unix("2026-01-15T10:30:45Z")
+  let unix = parse_iso8601_to_unix("2026-01-15T10:30:45Z")
   assert_eq(unix, 1768473045L)
 }
 
 ///|
 test "timestamp: parse ISO 8601 with timezone offset" {
-  let unix = @hub.parse_iso8601_to_unix("2026-01-15T10:30:45+00:00")
+  let unix = parse_iso8601_to_unix("2026-01-15T10:30:45+00:00")
   assert_eq(unix, 1768473045L)
 }
 
 ///|
 test "timestamp: unix to ISO 8601" {
-  let iso = @hub.unix_to_iso8601(1768473045L)
+  let iso = unix_to_iso8601(1768473045L)
   assert_eq(iso, "2026-01-15T10:30:45Z")
 }
 
 ///|
 test "timestamp: roundtrip" {
   let original = 1774900000L
-  let iso = @hub.unix_to_iso8601(original)
-  let back = @hub.parse_iso8601_to_unix(iso)
+  let iso = unix_to_iso8601(original)
+  let back = parse_iso8601_to_unix(iso)
   assert_eq(back, original)
 }
 
 ///|
 test "timestamp: empty string returns 0" {
-  assert_eq(@hub.parse_iso8601_to_unix(""), 0L)
+  assert_eq(parse_iso8601_to_unix(""), 0L)
 }
