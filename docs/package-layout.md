@@ -62,18 +62,19 @@ Operations layered on top of `core/*`. May depend on `core/*` only.
 
 ### high (gitoxide `gix` porcelain 相当)
 
-Single facade package. May depend on `core/*` and `mid/*`. Used by `cmd/*` and
+Porcelain layer. May depend on `core/*` and `mid/*`. Used by `cmd/*` and
 `x-*` as a convenience surface.
 
-| Package           | Path       | Notes                                          |
-|-------------------|------------|------------------------------------------------|
-| `mizchi/bit/lib`  | `src/lib`  | High-level / backward-compatible facade        |
+| Package                       | Path               | Notes                                              |
+|-------------------------------|--------------------|----------------------------------------------------|
+| `mizchi/bit/lib`              | `src/lib`          | High-level / backward-compatible facade            |
+| `mizchi/bit/vfs`              | `src/vfs`          | Virtual FS over commits (used by `lib`, `x-kv`, `x-subdir`) |
+| `mizchi/bit/fingerprint`      | `src/fingerprint`  | Workspace fingerprint (used by `x-workspace`)      |
 
 ### x-* (extensions, gitoxide にはない bit 独自機能)
 
 Optional features. Each `x-*` package is independent and must not depend on
-other `x-*` packages, with two exceptions documented under "Shared
-infrastructure" below. May depend on `core/*`, `mid/*`, and `lib`.
+other `x-*` packages. May depend on `core/*`, `mid/*`, and `high/*`.
 
 | Package                          | Path                      | Description                  |
 |----------------------------------|---------------------------|------------------------------|
@@ -82,13 +83,11 @@ infrastructure" below. May depend on `core/*`, `mid/*`, and `lib`.
 | `mizchi/bit/x-hub/native`        | `src/x-hub/native`        | Hub native bindings          |
 | `mizchi/bit/x-kv`                | `src/x-kv`                | Git-backed KV store          |
 | `mizchi/bit/x-kv/native`         | `src/x-kv/native`         | KV native sync               |
-| `mizchi/bit/x-fs`                | `src/x-fs`                | Virtual FS over commits      |
 | `mizchi/bit/x-mcp`               | `src/x-mcp`               | MCP server                   |
 | `mizchi/bit/x-mcp/cmd`           | `src/x-mcp/cmd`           | Standalone MCP entry point   |
 | `mizchi/bit/x-hq`                | `src/x-hq`                | `ghq`-compatible repo mgr    |
 | `mizchi/bit/x-rebase-ai`         | `src/x-rebase-ai`         | AI rebase helpers            |
 | `mizchi/bit/x-subdir`            | `src/x-subdir`            | Subdirectory clone           |
-| `mizchi/bit/x-fingerprint`       | `src/x-fingerprint`       | Workspace fingerprint        |
 | `mizchi/bit/x-workspace`         | `src/x-workspace`         | Workspace flow               |
 | `mizchi/bit/x-bitconfig`         | `src/x-bitconfig`         | bit-specific config          |
 | `mizchi/bit/x-doc`               | `src/x-doc`               | Doc rendering                |
@@ -114,23 +113,8 @@ Each layer may import from itself and lower layers only:
 | x-*     | ✓    | ✓   | ✓          | (1)  |      |
 | cmd     | ✓    | ✓   | ✓          | ✓    | ✓    |
 
-(1) An `x-*` package must not import another `x-*` package, with the exception
-of the shared-infrastructure packages listed below.
-
-## Shared infrastructure (`EXT_SHARED`)
-
-Two `x-*` packages currently sit between `mid` and `ext`. Other `x-*` packages
-and `lib` are permitted to depend on them. They are tracked here so the lint
-allowlist matches the docs:
-
-| Package                     | Used by                                            |
-|-----------------------------|----------------------------------------------------|
-| `mizchi/bit/x-fs`           | `lib`, `x-kv`, `x-kv/native`, `x-subdir`           |
-| `mizchi/bit/x-fingerprint`  | `x-workspace`                                      |
-
-Future work: promote these into the `mid` (or `core`) layer so the `ext`
-boundary becomes strictly leaf-only. The corresponding allowlist lives in
-`tools/check-layers.mjs` (`EXT_SHARED`).
+(1) An `x-*` package must not import another `x-*` package. Shared logic
+should be lifted into `high`, `mid`, or `core`.
 
 ## Lint
 

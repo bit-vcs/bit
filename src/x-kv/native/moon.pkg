@@ -2,7 +2,7 @@ import {
   "moonbitlang/async" @async,
   "mizchi/bit" @bit,
   "mizchi/bit/lib" @lib,
-  "mizchi/bit/x-fs" @fs,
+  "mizchi/bit/vfs" @fs,
   "mizchi/bit/x-kv" @kv,
   "mizchi/x/http" @xhttp,
   "mizchi/x/websocket" @xws,

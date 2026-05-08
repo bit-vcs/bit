@@ -5,7 +5,7 @@ import {
   "mizchi/bit/lib",
   "mizchi/bit/object",
   "mizchi/bit/types",
-  "mizchi/bit/x-fs",
+  "mizchi/bit/vfs",
 }
 
 // Values

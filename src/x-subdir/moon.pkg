@@ -1,7 +1,7 @@
 import {
   "mizchi/bit" @bit,
   "mizchi/bit/lib",
-  "mizchi/bit/x-fs" @fs,
+  "mizchi/bit/vfs" @fs,
   "mizchi/zlib" @zlib,
 }
 

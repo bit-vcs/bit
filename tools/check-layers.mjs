@@ -61,14 +61,8 @@ const HIGH = new Set([
   "pack_ops",
   "repo_ops",
   "worktree",
-]);
-
-// Foundational ext-* packages that other ext-* packages and `lib` are allowed
-// to depend on. These are essentially infrastructure; long-term they should be
-// promoted out of `ext`. See docs/package-layout.md.
-const EXT_SHARED = new Set([
-  "x-fs",
-  "x-fingerprint",
+  "vfs",
+  "fingerprint",
 ]);
 
 function isOurModule(pkgPath) {
@@ -175,12 +169,8 @@ for (const file of walkPkgFiles(SRC)) {
     }
     const toTop = topSegment(dep);
     const fromTop = topSegment(fromPath);
-    const toIsExtShared = toLayer === "ext" && EXT_SHARED.has(toTop);
 
-    // Allow `high` (lib) and `ext` to import shared-infrastructure ext packages.
-    if (toIsExtShared && (fromLayer === "high" || fromLayer === "ext" || fromLayer === "cmd")) {
-      // OK
-    } else if (LAYER_ORDER[fromLayer] < LAYER_ORDER[toLayer]) {
+    if (LAYER_ORDER[fromLayer] < LAYER_ORDER[toLayer]) {
       violations.push({
         kind: "upward",
         file,
@@ -192,18 +182,15 @@ for (const file of walkPkgFiles(SRC)) {
       });
     }
 
-    // ext-to-ext rule: ext packages cannot depend on other ext-* families,
-    // unless the target is in the EXT_SHARED allowlist.
-    if (fromLayer === "ext" && toLayer === "ext" && !toIsExtShared) {
-      if (fromTop !== toTop) {
-        violations.push({
-          kind: "ext-to-ext",
-          file,
-          from: fromPath,
-          to: dep,
-          msg: `ext package ${fromPath} imports a different ext package ${dep}`,
-        });
-      }
+    // ext-to-ext rule: ext packages cannot depend on other ext-* families.
+    if (fromLayer === "ext" && toLayer === "ext" && fromTop !== toTop) {
+      violations.push({
+        kind: "ext-to-ext",
+        file,
+        from: fromPath,
+        to: dep,
+        msg: `ext package ${fromPath} imports a different ext package ${dep}`,
+      });
     }
   }
 }

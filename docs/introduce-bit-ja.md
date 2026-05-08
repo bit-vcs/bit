@@ -38,8 +38,8 @@ git だとこの `foo` だけをルートディレクトリとして取り出す
 というわけで、まずこれを実装しました。
 
 ```bash
-# mizchi/bit-vcs の src/x-fs だけを取り出す
-$ bit clone mizchi/bit-vcs:src/x-fs
+# mizchi/bit-vcs の src/vfs だけを取り出す
+$ bit clone mizchi/bit-vcs:src/vfs
 $ cd fs
 $ ls
 fs.mbt  types.mbt  ...
@@ -49,10 +49,10 @@ fs.mbt  types.mbt  ...
 
 ```bash
 # ブランチ指定
-$ bit clone mizchi/bit-vcs@main:src/x-fs
+$ bit clone mizchi/bit-vcs@main:src/vfs
 
 # コミット指定 (short-hash OK)
-$ bit clone mizchi/bit-vcs@<commit>:src/x-fs
+$ bit clone mizchi/bit-vcs@<commit>:src/vfs
 ```
 
 GitHub の URL をそのまま貼り付けることもできます。

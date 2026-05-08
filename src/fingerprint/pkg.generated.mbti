@@ -1,5 +1,5 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "mizchi/bit/x-fingerprint"
+package "mizchi/bit/fingerprint"
 
 import {
   "mizchi/bit/types",
