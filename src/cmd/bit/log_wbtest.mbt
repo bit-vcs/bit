@@ -65,7 +65,7 @@ test "log: raw rotate uses first path after target when absent" {
     Some("sample3.t"),
     None,
   )
-  assert_eq(rotated.map(item => item.new_path), [
+  @test.assert_eq(rotated.map(item => item.new_path), [
     "sample4.t", "sample1.t", "sample2.t",
   ])
   let skipped = log_apply_rotate_skip_raw_results(
@@ -73,7 +73,7 @@ test "log: raw rotate uses first path after target when absent" {
     None,
     Some("sample3.t"),
   )
-  assert_eq(skipped.map(item => item.new_path), ["sample4.t"])
+  @test.assert_eq(skipped.map(item => item.new_path), ["sample4.t"])
 }
 
 ///|
@@ -114,34 +114,34 @@ test "log: config reader handles inline section key" {
   fs.write_string("/repo/.git/config", base_config + "\n[log] decorate\n")
 
   let entries = log_read_config_entries(fs, "/repo/.git", "log", "decorate")
-  assert_eq(entries.length(), 1)
+  @test.assert_eq(entries.length(), 1)
   assert_false(entries[0].has_value)
 }
 
 ///|
 test "log: log_find_dotdot parses A..B ranges" {
   // Normal range
-  assert_eq(log_find_dotdot("main..develop"), 4)
+  @test.assert_eq(log_find_dotdot("main..develop"), 4)
   // Range with no left side
-  assert_eq(log_find_dotdot("..develop"), 0)
+  @test.assert_eq(log_find_dotdot("..develop"), 0)
   // Range with no right side
-  assert_eq(log_find_dotdot("main.."), 4)
+  @test.assert_eq(log_find_dotdot("main.."), 4)
   // Triple dot is NOT a range
-  assert_eq(log_find_dotdot("main...develop"), -1)
+  @test.assert_eq(log_find_dotdot("main...develop"), -1)
   // No dots
-  assert_eq(log_find_dotdot("HEAD"), -1)
-  assert_eq(log_find_dotdot("HEAD~3"), -1)
+  @test.assert_eq(log_find_dotdot("HEAD"), -1)
+  @test.assert_eq(log_find_dotdot("HEAD~3"), -1)
   // Single dot
-  assert_eq(log_find_dotdot("a.b"), -1)
+  @test.assert_eq(log_find_dotdot("a.b"), -1)
 }
 
 ///|
 test "log: log_find_tripledot parses A...B ranges" {
-  assert_eq(log_find_tripledot("main...topic"), 4)
-  assert_eq(log_find_tripledot("...topic"), 0)
-  assert_eq(log_find_tripledot("main..."), 4)
-  assert_eq(log_find_tripledot("main..topic"), -1)
-  assert_eq(log_find_tripledot("HEAD"), -1)
+  @test.assert_eq(log_find_tripledot("main...topic"), 4)
+  @test.assert_eq(log_find_tripledot("...topic"), 0)
+  @test.assert_eq(log_find_tripledot("main..."), 4)
+  @test.assert_eq(log_find_tripledot("main..topic"), -1)
+  @test.assert_eq(log_find_tripledot("HEAD"), -1)
 }
 
 ///|
@@ -152,8 +152,8 @@ test "log: revision input handles caret and not-mode excludes" {
   log_push_revision_input("^topic", revs, excludes, symmetric, false)
   log_push_revision_input("main", revs, excludes, symmetric, true)
 
-  assert_eq(revs.length(), 0)
-  assert_eq(excludes, ["topic", "main"])
+  @test.assert_eq(revs.length(), 0)
+  @test.assert_eq(excludes, ["topic", "main"])
 }
 
 ///|
@@ -173,11 +173,11 @@ test "log: stdin parser reads revisions, excludes, and pathspecs" {
 
   assert_true(saw_revision_input)
   assert_false(all_refs)
-  assert_eq(revs, ["HEAD"])
-  assert_eq(excludes, ["HEAD~1"])
-  assert_eq(symmetric.length(), 0)
-  assert_eq(pathspecs, ["file-2"])
-  assert_eq(branch_patterns.length(), 0)
+  @test.assert_eq(revs, ["HEAD"])
+  @test.assert_eq(excludes, ["HEAD~1"])
+  @test.assert_eq(symmetric.length(), 0)
+  @test.assert_eq(pathspecs, ["file-2"])
+  @test.assert_eq(branch_patterns.length(), 0)
 }
 
 ///|
@@ -241,7 +241,7 @@ async test "log: simplify-merges drops path merge that is TREESAME to a parent" 
   grep_test_run_git(repo_dir, ["checkout", "-q", "main"])
   grep_test_run_git(repo_dir, ["merge", "--no-ff", "-m", "merge", "side"])
 
-  assert_eq(
+  @test.assert_eq(
     trim_string(
       grep_test_git_stdout(repo_dir, [
         "log", "--full-history", "--format=%s", "--", "target",
@@ -249,7 +249,7 @@ async test "log: simplify-merges drops path merge that is TREESAME to a parent" 
     ),
     "merge\nside\nbase",
   )
-  assert_eq(
+  @test.assert_eq(
     trim_string(
       grep_test_git_stdout(repo_dir, [
         "log", "--simplify-merges", "--format=%s", "--", "target",
@@ -330,7 +330,7 @@ async test "log: simplify-merges drops path merge that is TREESAME to a parent" 
 
 ///|
 test "log: signature output drops status protocol lines" {
-  assert_eq(
+  @test.assert_eq(
     log_signature_output_lines(
       "[GNUPG:] GOODSIG 0000000000000000 Test User <test@example.com>\n", "gpg: Good signature from \"Test User <test@example.com>\"\n",
     ),
@@ -425,7 +425,7 @@ test "log: ancestry path keeps commits descended from bottom commits" {
     9223372036854775807L,
     false,
   )
-  assert_eq(entries.length(), 2)
+  @test.assert_eq(entries.length(), 2)
   assert_true(log_commit_has_ancestor(fs, git_dir, merge, [bottom]))
   assert_false(log_commit_has_ancestor(fs, git_dir, side, [bottom]))
 
@@ -435,8 +435,8 @@ test "log: ancestry path keeps commits descended from bottom commits" {
       ancestry_entries.push(entry)
     }
   }
-  assert_eq(ancestry_entries.length(), 1)
-  assert_eq(ancestry_entries[0].id.to_hex(), merge.to_hex())
+  @test.assert_eq(ancestry_entries.length(), 1)
+  @test.assert_eq(ancestry_entries[0].id.to_hex(), merge.to_hex())
 }
 
 ///|
@@ -477,12 +477,12 @@ test "log: boundary walk appends excluded parent with marker flag" {
     show_boundary=true,
   )
 
-  assert_eq(entries.length(), 2)
-  assert_eq(entries[0].id.to_hex(), third.to_hex())
+  @test.assert_eq(entries.length(), 2)
+  @test.assert_eq(entries[0].id.to_hex(), third.to_hex())
   assert_false(entries[0].boundary)
-  assert_eq(entries[1].id.to_hex(), second.to_hex())
+  @test.assert_eq(entries[1].id.to_hex(), second.to_hex())
   assert_true(entries[1].boundary)
-  assert_eq(entries[1].message, "second")
+  @test.assert_eq(entries[1].message, "second")
 }
 
 ///|
@@ -497,19 +497,19 @@ test "log: parents format extends commit identity" {
     "cccccccccccccccccccccccccccccccccccccccc",
   )
 
-  assert_eq(
+  @test.assert_eq(
     log_format_commit_identity(id, [p1, p2], 7, false, true),
     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb cccccccccccccccccccccccccccccccccccccccc",
   )
-  assert_eq(
+  @test.assert_eq(
     log_format_commit_identity(id, [p1, p2], 7, true, true),
     "aaaaaaa bbbbbbb ccccccc",
   )
-  assert_eq(
+  @test.assert_eq(
     log_format_commit_identity(id, [p1], 12, true, true),
     "aaaaaaaaaaaa bbbbbbbbbbbb",
   )
-  assert_eq(
+  @test.assert_eq(
     log_format_commit_identity(id, [p1], 7, false, false),
     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   )
@@ -535,8 +535,8 @@ async test "log: log.showsignature config enables native signature display" {
 
 ///|
 test "log: ref glob normalization expands bare namespaces" {
-  assert_eq(log_normalize_ref_glob_pattern("refs/heads"), "refs/heads/*")
-  assert_eq(
+  @test.assert_eq(log_normalize_ref_glob_pattern("refs/heads"), "refs/heads/*")
+  @test.assert_eq(
     log_normalize_ref_glob_pattern("heads/topic/*"),
     "refs/heads/topic/*",
   )
@@ -578,7 +578,7 @@ async test "log: command path supports excludes and pathspec separator" {
   let stdout = grep_test_git_stdout(repo_dir, [
     "log", "--format=%s", "HEAD", "^HEAD~1", "--", "file-2",
   ])
-  assert_eq(trim_string(stdout), "touch-2")
+  @test.assert_eq(trim_string(stdout), "touch-2")
 
   cleanup_tree(fs, root)
 }
@@ -608,7 +608,7 @@ async test "log: command path supports --all with --not" {
   let stdout = grep_test_git_stdout(repo_dir, [
     "log", "--format=%s", "--all", "--not", "main",
   ])
-  assert_eq(trim_string(stdout), "side")
+  @test.assert_eq(trim_string(stdout), "side")
 
   cleanup_tree(fs, root)
 }
@@ -630,19 +630,19 @@ test "log: reflog target selection prefers branch patterns over HEAD" {
   )
 
   let targets = log_collect_reflog_targets(fs, "/repo/.git", [], ["root*"])
-  assert_eq(targets, ["root1/branch1", "root1/branch2", "root2/branch1"])
-  assert_eq(log_collect_reflog_targets(fs, "/repo/.git", [], []), ["HEAD"])
+  @test.assert_eq(targets, ["root1/branch1", "root1/branch2", "root2/branch1"])
+  @test.assert_eq(log_collect_reflog_targets(fs, "/repo/.git", [], []), ["HEAD"])
 }
 
 ///|
 test "log: reflog selector helpers split and format explicit selectors" {
-  assert_eq(log_split_reflog_target("HEAD@{0}"), ("HEAD", Some("0")))
-  assert_eq(log_split_reflog_target("HEAD@{now}"), ("HEAD", Some("now")))
-  assert_eq(
+  @test.assert_eq(log_split_reflog_target("HEAD@{0}"), ("HEAD", Some("0")))
+  @test.assert_eq(log_split_reflog_target("HEAD@{now}"), ("HEAD", Some("now")))
+  @test.assert_eq(
     log_format_reflog_selector("HEAD", 0, 1112911993L, "-0700", None, "raw"),
     "HEAD@{1112911993 -0700}",
   )
-  assert_eq(
+  @test.assert_eq(
     log_format_reflog_selector(
       "HEAD",
       0,
@@ -657,7 +657,7 @@ test "log: reflog selector helpers split and format explicit selectors" {
 
 ///|
 test "log: format_reflog_entry keeps %gD selector without message" {
-  assert_eq(
+  @test.assert_eq(
     format_reflog_entry(
       Some("%gD"),
       "root1/branch1@{0}",
@@ -665,7 +665,7 @@ test "log: format_reflog_entry keeps %gD selector without message" {
     ),
     "root1/branch1@{0}",
   )
-  assert_eq(
+  @test.assert_eq(
     format_reflog_entry(
       Some("%gD %gs"),
       "root1/branch1@{0}",
@@ -719,11 +719,11 @@ fn log_test_format_data(
 test "log: format_commit_string honors reflog placeholders" {
   let data = log_test_format_data("sixth")
 
-  assert_eq(
+  @test.assert_eq(
     format_commit_string("%gD %gs %H", data),
     "HEAD@{0} commit: sixth aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   )
-  assert_eq(
+  @test.assert_eq(
     format_commit_string("%gn:%ge", data),
     "C O Mitter:committer@example.com",
   )
@@ -766,7 +766,7 @@ test "log: format_commit_string honors left-right marker" {
     pretty_auto_color: "\u001b[33m",
   }
 
-  assert_eq(format_commit_string("%m %s", data), "> sixth")
+  @test.assert_eq(format_commit_string("%m %s", data), "> sixth")
 }
 
 ///|
@@ -778,14 +778,14 @@ test "log: format_commit_string honors line and space modifiers" {
     message="subject\n\nbody line",
   )
 
-  assert_eq(format_commit_string("x%n%-b", without_body), "x")
-  assert_eq(format_commit_string("x%+b", without_body), "x")
-  assert_eq(format_commit_string("x% b", without_body), "x")
-  assert_eq(format_commit_string("x%n%-b", with_body), "x\nbody line")
-  assert_eq(format_commit_string("x%+b", with_body), "x\nbody line")
-  assert_eq(format_commit_string("x% b", with_body), "x body line")
-  assert_eq(format_commit_string("x% s", without_body), "x subject")
-  assert_eq(
+  @test.assert_eq(format_commit_string("x%n%-b", without_body), "x")
+  @test.assert_eq(format_commit_string("x%+b", without_body), "x")
+  @test.assert_eq(format_commit_string("x% b", without_body), "x")
+  @test.assert_eq(format_commit_string("x%n%-b", with_body), "x\nbody line")
+  @test.assert_eq(format_commit_string("x%+b", with_body), "x\nbody line")
+  @test.assert_eq(format_commit_string("x% b", with_body), "x body line")
+  @test.assert_eq(format_commit_string("x% s", without_body), "x subject")
+  @test.assert_eq(
     format_commit_string(
       "%e",
       log_test_format_data("subject", encoding="ISO-8859-1"),
@@ -799,19 +799,19 @@ test "log: format_commit_string honors truncation and width padding" {
   let long_subject = log_test_format_data("abcdefghijklmnopqrstuvwxyz")
   let short_subject = log_test_format_data("short")
 
-  assert_eq(
+  @test.assert_eq(
     format_commit_string("%<(20,trunc)%s", long_subject),
     "abcdefghijklmnopqr..",
   )
-  assert_eq(
+  @test.assert_eq(
     format_commit_string("%<(20,mtrunc)%s", long_subject),
     "abcdefghi..rstuvwxyz",
   )
-  assert_eq(
+  @test.assert_eq(
     format_commit_string("%<(20,ltrunc)%s", long_subject),
     "..ijklmnopqrstuvwxyz",
   )
-  assert_eq(
+  @test.assert_eq(
     format_commit_string("%<(20,trunc)%s", short_subject),
     "short               ",
   )
@@ -821,19 +821,19 @@ test "log: format_commit_string honors truncation and width padding" {
 test "log: format_commit_string honors pretty color directives" {
   let data = log_test_format_data("subject", pretty_color_enabled=true)
 
-  assert_eq(
+  @test.assert_eq(
     format_commit_string("%C(always,red)foo%C(always,reset)", data),
     "\u001b[31mfoo\u001b[m",
   )
-  assert_eq(
+  @test.assert_eq(
     format_commit_string("%Credfoo%Creset", data),
     "\u001b[31mfoo\u001b[m",
   )
-  assert_eq(
+  @test.assert_eq(
     format_commit_string("%C(auto)%H", data),
     "\u001b[33maaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\u001b[m",
   )
-  assert_eq(
+  @test.assert_eq(
     format_commit_string("%Credfoo%Creset", log_test_format_data("subject")),
     "foo",
   )
@@ -931,13 +931,13 @@ test "log: grep reflog requires walk_reflogs" {
 test "log: format_decoration" {
   let ref_names : Map[String, Array[String]] = {}
   // No decoration
-  assert_eq(format_decoration(ref_names, "abc1234"), "")
+  @test.assert_eq(format_decoration(ref_names, "abc1234"), "")
   // Single decoration
   ref_names["abc1234"] = ["HEAD -> main"]
-  assert_eq(format_decoration(ref_names, "abc1234"), " (HEAD -> main)")
+  @test.assert_eq(format_decoration(ref_names, "abc1234"), " (HEAD -> main)")
   // Multiple decorations
   ref_names["def5678"] = ["HEAD -> main", "origin/main"]
-  assert_eq(
+  @test.assert_eq(
     format_decoration(ref_names, "def5678"),
     " (HEAD -> main, origin/main)",
   )
@@ -980,7 +980,7 @@ test "log: log_extract_author_timestamp" {
   let commit_data = "tree 0000000000000000000000000000000000000000\nauthor Test User <test@example.com> 1700000000 +0000\ncommitter Test User <test@example.com> 1700000000 +0000\n\nTest commit message\n"
   let data = @utf8.encode(commit_data[:])
   let ts = log_extract_author_timestamp(data)
-  assert_eq(ts, 1700000000L)
+  @test.assert_eq(ts, 1700000000L)
 }
 
 ///|
@@ -994,10 +994,10 @@ test "log: log_parse_entry_from_obj" {
     "0000000000000000000000000000000000000000",
   )
   let entry = log_parse_entry_from_obj(id, data, tree, [])
-  assert_eq(entry.message, "Test commit message")
-  assert_eq(entry.author, "Test User <test@example.com>")
-  assert_eq(entry.timestamp, 1700000000L)
-  assert_eq(entry.parent_count, 0)
+  @test.assert_eq(entry.message, "Test commit message")
+  @test.assert_eq(entry.author, "Test User <test@example.com>")
+  @test.assert_eq(entry.timestamp, 1700000000L)
+  @test.assert_eq(entry.parent_count, 0)
 }
 
 ///|
@@ -1024,9 +1024,9 @@ test "log: log_queue_insert maintains descending order" {
   log_queue_insert(queue, (100L, id1))
   log_queue_insert(queue, (300L, id3))
   log_queue_insert(queue, (200L, id2))
-  assert_eq(queue[0].0, 300L)
-  assert_eq(queue[1].0, 200L)
-  assert_eq(queue[2].0, 100L)
+  @test.assert_eq(queue[0].0, 300L)
+  @test.assert_eq(queue[1].0, 200L)
+  @test.assert_eq(queue[2].0, 100L)
 }
 
 ///|
@@ -1097,7 +1097,7 @@ test "log: build ref names peels nested annotated tags" {
   }
   match ref_names.get(head.to_hex()) {
     Some(names) =>
-      assert_eq(names, [
+      @test.assert_eq(names, [
         "HEAD -> main", "tag: lightweight", "tag: double-1", "tag: double-0", "tag: annotated",
         "reach",
       ])
@@ -1114,7 +1114,7 @@ test "log: build ref names peels nested annotated tags" {
   }
   match full_ref_names.get(head.to_hex()) {
     Some(names) =>
-      assert_eq(names, [
+      @test.assert_eq(names, [
         "HEAD -> refs/heads/main", "tag: refs/tags/lightweight", "tag: refs/tags/double-1",
         "tag: refs/tags/double-0", "tag: refs/tags/annotated", "refs/heads/reach",
       ])
@@ -1147,9 +1147,9 @@ test "log: resolve targets preserves tag revision names" {
   ) catch {
     err => fail("unexpected resolve error: \{err}")
   }
-  assert_eq(targets.length(), 2)
-  assert_eq(targets[0].0, "source-tag")
-  assert_eq(targets[1].0, "source-a")
+  @test.assert_eq(targets.length(), 2)
+  @test.assert_eq(targets[0].0, "source-tag")
+  @test.assert_eq(targets[1].0, "source-a")
 }
 
 ///|
@@ -1175,7 +1175,7 @@ test "log: grafts affect fast-path history in main and linked worktrees" {
   let main_lines = @bitlib.log_head_oneline(fs, "/repo/.git", max_count=2) catch {
     err => fail("unexpected log error: \{err}")
   }
-  assert_eq(main_lines.length(), 2)
+  @test.assert_eq(main_lines.length(), 2)
   assert_true(main_lines[0].has_suffix(" xyz"))
   assert_true(main_lines[1].has_suffix(" abc"))
 
@@ -1197,7 +1197,7 @@ test "log: grafts affect fast-path history in main and linked worktrees" {
   ) catch {
     err => fail("unexpected linked log error: \{err}")
   }
-  assert_eq(linked_lines.length(), 2)
+  @test.assert_eq(linked_lines.length(), 2)
   assert_true(linked_lines[0].has_suffix(" xyz"))
   assert_true(linked_lines[1].has_suffix(" abc"))
 }
@@ -1209,7 +1209,7 @@ test "log: apply wrap spec indents and wraps subject text" {
     indent1: 1,
     indent2: 2,
   })
-  assert_eq(wrapped, " This is\n  the sixth\n  commit.")
+  @test.assert_eq(wrapped, " This is\n  the sixth\n  commit.")
 }
 
 ///|
@@ -1249,12 +1249,12 @@ test "log: format_commit_string honors %w prefix" {
     pretty_auto_color: "\u001b[33m",
   }
   let wrapped = format_commit_string("%w(11,1,2)This is the %s commit.", data)
-  assert_eq(wrapped, " This is\n  the sixth\n  commit.")
+  @test.assert_eq(wrapped, " This is\n  the sixth\n  commit.")
 
   let explicit_breaks = format_commit_string(
     "%w(,1,2)This is%nthe %s%ncommit.", data,
   )
-  assert_eq(explicit_breaks, " This is\n  the sixth\n  commit.")
+  @test.assert_eq(explicit_breaks, " This is\n  the sixth\n  commit.")
 
   let sanitized_data : CommitFormatData = {
     id,
@@ -1285,17 +1285,17 @@ test "log: format_commit_string honors %w prefix" {
     pretty_auto_color: "\u001b[33m",
   }
   let sanitized = format_commit_string("%f", sanitized_data)
-  assert_eq(sanitized, "Merge-tag-reach")
+  @test.assert_eq(sanitized, "Merge-tag-reach")
 }
 
 ///|
 test "log: abbrev helpers respect bool and numeric config" {
-  assert_eq(log_parse_abbrev_length_value("false"), Some(40))
-  assert_eq(log_parse_abbrev_length_value("9000"), Some(40))
-  assert_eq(log_parse_abbrev_length_value("3"), Some(4))
-  assert_eq(log_parse_abbrev_length_value("12"), Some(12))
-  assert_eq(log_abbrev_hex("0123456789abcdef", 7), "0123456")
-  assert_eq(log_abbrev_hex("012345", 40), "012345")
+  @test.assert_eq(log_parse_abbrev_length_value("false"), Some(40))
+  @test.assert_eq(log_parse_abbrev_length_value("9000"), Some(40))
+  @test.assert_eq(log_parse_abbrev_length_value("3"), Some(4))
+  @test.assert_eq(log_parse_abbrev_length_value("12"), Some(12))
+  @test.assert_eq(log_abbrev_hex("0123456789abcdef", 7), "0123456")
+  @test.assert_eq(log_abbrev_hex("012345", 40), "012345")
 }
 
 ///|

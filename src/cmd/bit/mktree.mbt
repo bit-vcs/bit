@@ -20,7 +20,7 @@ async fn handle_mktree(args : Array[String]) -> Unit raise Error {
     // Batch mode: empty line separates trees
     let current_entries : Array[@bitcore.TreeEntry] = []
     for line_view in input.split(sep) {
-      let line = trim_string(line_view.to_string())
+      let line = trim_string(line_view.to_owned())
       if line.length() == 0 {
         // Output tree for current entries
         if current_entries.length() > 0 {
@@ -41,7 +41,7 @@ async fn handle_mktree(args : Array[String]) -> Unit raise Error {
     // Single tree mode
     let entries : Array[@bitcore.TreeEntry] = []
     for line_view in input.split(sep) {
-      let line = trim_string(line_view.to_string())
+      let line = trim_string(line_view.to_owned())
       if line.length() == 0 {
         continue
       }
@@ -70,7 +70,7 @@ fn parse_and_add_tree_entry(
       )
       let parts : Array[String] = []
       for part_view in meta.split(" ") {
-        let p = part_view.to_string()
+        let p = part_view.to_owned()
         if p.length() > 0 {
           parts.push(p)
         }

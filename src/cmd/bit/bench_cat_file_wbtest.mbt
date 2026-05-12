@@ -61,7 +61,7 @@ fn ensure_catfile_bench_repo() -> Array[String] {
   ) catch {
     _ => ""
   }
-  let commit_oid = head_content.trim().to_string()
+  let commit_oid = head_content.trim().to_owned()
   // Use rev-parse via run_main to get tree OID
   // For simplicity, just use the commit OID for benchmarks
   bench_catfile_oids.val = [commit_oid]

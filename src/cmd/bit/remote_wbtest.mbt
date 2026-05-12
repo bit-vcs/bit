@@ -29,9 +29,9 @@ test "remote: update resolves repeated group entries" {
     blocks,
     ["all"],
   )
-  assert_eq(names, ["one", "two"])
+  @test.assert_eq(names, ["one", "two"])
   assert_false(default_update)
-  assert_eq(missing, None)
+  @test.assert_eq(missing, None)
 }
 
 ///|
@@ -43,7 +43,7 @@ test "remote: update reports missing group or remote" {
     blocks,
     ["nonexistent"],
   )
-  assert_eq(names, [])
+  @test.assert_eq(names, [])
   assert_false(default_update)
-  assert_eq(missing, Some("nonexistent"))
+  @test.assert_eq(missing, Some("nonexistent"))
 }

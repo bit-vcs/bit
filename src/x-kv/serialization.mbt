@@ -365,7 +365,7 @@ pub fn SerializedSnapshot::from_bytes(data : Bytes) -> SerializedSnapshot {
   let (node_id, new_pos) = read_string(data, pos)
   pos = new_pos
   // Head - use slice instead of loop copy
-  let head = data[pos:pos + 20].to_bytes()
+  let head = data[pos:pos + 20].to_owned()
   pos += 20
   // Clock entries
   let clock_count = read_u32_le(data, pos)
@@ -384,14 +384,14 @@ pub fn SerializedSnapshot::from_bytes(data : Bytes) -> SerializedSnapshot {
   let objects : Array[SerializedObject] = []
   for _ in 0..<object_count {
     // Use slice for id bytes
-    let id = data[pos:pos + 20].to_bytes()
+    let id = data[pos:pos + 20].to_owned()
     pos += 20
     let obj_type = data[pos].to_int()
     pos += 1
     let data_len = read_u32_le(data, pos)
     pos += 4
     // Use slice for object data
-    let obj_data = data[pos:pos + data_len].to_bytes()
+    let obj_data = data[pos:pos + data_len].to_owned()
     pos += data_len
     objects.push({ id, obj_type, data: obj_data })
   }

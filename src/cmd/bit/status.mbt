@@ -98,7 +98,7 @@ async fn handle_status(args : Array[String]) -> Unit raise Error {
     match get_subdir_info(fs, git_dir) {
       Some((remote, path, base)) => {
         print_line("# subdir-clone: \{path} from \{remote}")
-        print_line("# base: \{base[:7].to_string()}")
+        print_line("# base: \{base[:7].to_owned()}")
         print_line("")
       }
       None => ()
@@ -113,7 +113,7 @@ async fn handle_status(args : Array[String]) -> Unit raise Error {
       match head {
         @bitlib.HeadRef::Branch(name) => print_line("## \{name}")
         @bitlib.HeadRef::Detached(id) =>
-          print_line("## HEAD (detached at \{id.to_hex()[:7].to_string()})")
+          print_line("## HEAD (detached at \{id.to_hex()[:7].to_owned()})")
       }
     }
     let lines = @bitlib.status_porcelain(fs, root)

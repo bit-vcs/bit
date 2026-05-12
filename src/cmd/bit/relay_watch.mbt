@@ -213,7 +213,7 @@ fn relay_watch_summarize_hub_record(payload : Map[String, Json]) -> String {
       // Extract title from work-item record
       let mut title = ""
       for line_view in record_str.split("\n") {
-        let line = line_view.to_string()
+        let line = line_view.to_owned()
         if line.has_prefix("title: ") {
           title = String::unsafe_substring(line, start=7, end=line.length())
           break

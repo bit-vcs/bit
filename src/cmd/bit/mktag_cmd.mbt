@@ -37,7 +37,7 @@ async fn mktag_validate(content : String) -> Unit {
   // Must have "object <hex>\n"
   let lines : Array[String] = []
   for line_view in content.split("\n") {
-    lines.push(line_view.to_string())
+    lines.push(line_view.to_owned())
   }
   if lines.length() < 4 {
     eprint_line("error: missingObject: tag missing 'object' line")

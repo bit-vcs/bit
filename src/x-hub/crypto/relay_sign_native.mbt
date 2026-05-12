@@ -12,7 +12,7 @@ pub fn relay_unix_timestamp_sec() -> Int64 {
 fn relay_sign_private_key_file() -> String? {
   match @sys.get_env_var("BIT_RELAY_SIGN_PRIVATE_KEY_FILE") {
     Some(value) => {
-      let normalized = value.trim(chars=" \n\r\t").to_string()
+      let normalized = value.trim(chars=" \n\r\t").to_owned()
       if normalized.length() > 0 {
         Some(normalized)
       } else {
@@ -27,7 +27,7 @@ fn relay_sign_private_key_file() -> String? {
 fn relay_sign_public_key() -> String? {
   match @sys.get_env_var("BIT_RELAY_SIGN_PUBLIC_KEY") {
     Some(value) => {
-      let normalized = value.trim(chars=" \n\r\t").to_string()
+      let normalized = value.trim(chars=" \n\r\t").to_owned()
       if normalized.length() > 0 {
         Some(normalized)
       } else {
@@ -71,7 +71,7 @@ pub async fn relay_sha256_hex(text : String) -> String raise @bit.GitError {
   }
   if code != 0 {
     let err_text = stderr.text() catch { _ => "" }
-    let normalized = err_text.trim(chars=" \n\r\t").to_string()
+    let normalized = err_text.trim(chars=" \n\r\t").to_owned()
     raise @bit.GitError::IoError(
       "relay sign: openssl dgst error: \{normalized}",
     )
@@ -131,13 +131,13 @@ pub async fn relay_sign_ed25519(
   }
   if code != 0 {
     let err_text = stderr.text() catch { _ => "" }
-    let normalized = err_text.trim(chars=" \n\r\t").to_string()
+    let normalized = err_text.trim(chars=" \n\r\t").to_owned()
     raise @bit.GitError::IoError(
       "relay sign: openssl pkeyutl error: \{normalized}",
     )
   }
   let base64_sig = stdout.text() catch { _ => "" }
-  let normalized = base64_sig.trim(chars=" \n\r\t").to_string()
+  let normalized = base64_sig.trim(chars=" \n\r\t").to_owned()
   if normalized.length() == 0 {
     raise @bit.GitError::IoError("relay sign: openssl produced empty signature")
   }
@@ -166,13 +166,13 @@ pub async fn relay_resolve_public_key(
       }
       if code != 0 {
         let err_text = stderr.text() catch { _ => "" }
-        let normalized = err_text.trim(chars=" \n\r\t").to_string()
+        let normalized = err_text.trim(chars=" \n\r\t").to_owned()
         raise @bit.GitError::IoError(
           "relay sign: openssl pkey error: \{normalized}",
         )
       }
       let der_base64 = stdout.text() catch { _ => "" }
-      let normalized = der_base64.trim(chars=" \n\r\t").to_string()
+      let normalized = der_base64.trim(chars=" \n\r\t").to_owned()
       if normalized.length() == 0 {
         raise @bit.GitError::IoError(
           "relay sign: openssl returned empty public key",

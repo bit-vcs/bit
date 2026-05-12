@@ -211,7 +211,7 @@ fn parse_show_commit(data : Bytes) -> ShowCommitInfo {
   let mut in_message = false
   let message_lines : Array[String] = []
   for line_view in text.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     if in_message {
       message_lines.push(line)
       continue
@@ -361,7 +361,7 @@ fn show_parse_tag_info(data : Bytes) -> ShowTagInfo? {
   let mut in_message = false
   let message_lines : Array[String] = []
   for line_view in text.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     if in_message {
       message_lines.push(line)
       continue
@@ -759,7 +759,7 @@ fn show_render_commit_block(
   )
   lines.push("")
   for line_view in show_info.message.split("\n") {
-    lines.push("    \{line_view.to_string()}")
+    lines.push("    \{line_view.to_owned()}")
   }
   lines.push("")
   if !quiet && commit_info.parents.length() > 0 {
@@ -870,7 +870,7 @@ async fn show_render_object_block(
       }
       if info.message.length() > 0 {
         for line_view in info.message.split("\n") {
-          lines.push("    \{line_view.to_string()}")
+          lines.push("    \{line_view.to_owned()}")
         }
         lines.push("")
       }

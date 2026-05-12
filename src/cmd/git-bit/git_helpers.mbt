@@ -194,7 +194,7 @@ fn get_commit_timestamp() -> Int64 {
 fn parse_git_env_timestamp(raw : String) -> Int64? {
   let mut token : String? = None
   for part_view in raw.split(" ") {
-    let part = part_view.to_string()
+    let part = part_view.to_owned()
     if part.length() > 0 {
       token = Some(part)
       break
@@ -220,7 +220,7 @@ fn parse_git_env_timestamp(raw : String) -> Int64? {
 
 ///|
 fn parse_iso_date_timestamp(raw : String) -> Int64? {
-  let s = raw.trim().to_string()
+  let s = raw.trim().to_owned()
   if s.length() < 16 {
     return None
   }
@@ -285,7 +285,7 @@ fn parse_iso_date_timestamp(raw : String) -> Int64? {
 
 ///|
 fn parse_iso_tz_offset_seconds(s : String) -> Int64 {
-  let t = s.trim().to_string()
+  let t = s.trim().to_owned()
   if t.length() < 5 {
     return 0L
   }

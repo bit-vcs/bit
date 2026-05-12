@@ -162,7 +162,7 @@ async test "storage runtime cmd wrapper: delegates successful flow" {
       fs.read_file(root_runtime + "/.git/refs/heads/main"),
     ),
   )
-  assert_eq(cmd_head, runtime_head)
+  @test.assert_eq(cmd_head, runtime_head)
 
   cmd_storage_restore_test_env(
     prev_author_name, prev_author_email, prev_committer_name, prev_committer_email,
@@ -178,7 +178,7 @@ async test "storage runtime cmd wrapper: delegates error path" {
     err => cmd_error = "\{err}"
   }
   assert_true(cmd_error.length() > 0)
-  assert_eq(cmd_error, "InvalidObject(\"unsupported storage command: clone\")")
+  @test.assert_eq(cmd_error, "InvalidObject(\"unsupported storage command: clone\")")
 }
 
 ///|
@@ -219,9 +219,9 @@ test "storage runtime parser: init normal and invalid ref-format" {
   match parsed {
     @runtime.StorageCommand::Init(args) => {
       assert_true(args.quiet)
-      assert_eq(args.default_branch, "dev")
-      assert_eq(args.ref_format, "files")
-      assert_eq(args.object_format, "sha1")
+      @test.assert_eq(args.default_branch, "dev")
+      @test.assert_eq(args.ref_format, "files")
+      @test.assert_eq(args.object_format, "sha1")
     }
     _ => fail("expected init command")
   }
@@ -239,7 +239,7 @@ test "storage runtime parser: add normal and no pathspec" {
   match parsed {
     @runtime.StorageCommand::Add(args) => {
       assert_false(args.add_all)
-      assert_eq(args.paths, ["-file"])
+      @test.assert_eq(args.paths, ["-file"])
     }
     _ => fail("expected add command")
   }
@@ -264,7 +264,7 @@ test "storage runtime parser: commit normal and missing message" {
   }
   match parsed {
     @runtime.StorageCommand::Commit(args) => {
-      assert_eq(args.message, "msg")
+      @test.assert_eq(args.message, "msg")
       assert_true(args.all_modified)
       assert_true(args.allow_empty)
       assert_true(args.quiet)
@@ -310,7 +310,7 @@ test "storage runtime parser: log normal and revision invalid" {
   match parsed {
     @runtime.StorageCommand::Log(args) => {
       assert_true(args.oneline)
-      assert_eq(args.max_count, 3)
+      @test.assert_eq(args.max_count, 3)
     }
     _ => fail("expected log command")
   }
@@ -341,8 +341,8 @@ test "storage runtime parser: hash-object normal and invalid type" {
     @runtime.StorageCommand::HashObject(args) => {
       assert_true(args.write_object)
       assert_false(args.stdin_mode)
-      assert_eq(args.obj_type, @bitcore.ObjectType::Tree)
-      assert_eq(args.paths, ["x.txt"])
+      @test.assert_eq(args.obj_type, @bitcore.ObjectType::Tree)
+      @test.assert_eq(args.paths, ["x.txt"])
     }
     _ => fail("expected hash-object command")
   }
@@ -359,7 +359,7 @@ test "storage runtime parser: write-tree normal and invalid option" {
   }
   match parsed {
     @runtime.StorageCommand::WriteTree(args) =>
-      assert_eq(args.prefix, Some("sub/"))
+      @test.assert_eq(args.prefix, Some("sub/"))
     _ => fail("expected write-tree command")
   }
   let parsed_missing = storage_runtime_parse_command("write-tree", [
@@ -395,9 +395,9 @@ test "storage runtime parser: update-ref normal and missing value" {
   match parsed {
     @runtime.StorageCommand::UpdateRef(args) => {
       assert_false(args.delete_mode)
-      assert_eq(args.refname, "refs/heads/dev")
-      assert_eq(args.new_value, Some("@"))
-      assert_eq(args.old_value, None)
+      @test.assert_eq(args.refname, "refs/heads/dev")
+      @test.assert_eq(args.new_value, Some("@"))
+      @test.assert_eq(args.old_value, None)
     }
     _ => fail("expected update-ref command")
   }
@@ -417,9 +417,9 @@ test "storage runtime parser: update-ref normal and missing value" {
   match parsed_delete {
     @runtime.StorageCommand::UpdateRef(args) => {
       assert_true(args.delete_mode)
-      assert_eq(args.refname, "refs/heads/dev")
-      assert_eq(args.new_value, None)
-      assert_eq(args.old_value, Some("oldhash"))
+      @test.assert_eq(args.refname, "refs/heads/dev")
+      @test.assert_eq(args.new_value, None)
+      @test.assert_eq(args.old_value, Some("oldhash"))
     }
     _ => fail("expected update-ref command")
   }

@@ -66,7 +66,7 @@ async fn test_exec_text(
       return None
     }
   }
-  Some(text.trim_end().to_string())
+  Some(text.trim_end().to_owned())
 }
 
 ///|
@@ -77,18 +77,18 @@ test "rebase-ai: normalize_model_output extracts fenced content" {
     #|line-2
     #|```
   let normalized = normalize_model_output(raw)
-  assert_eq(normalized, "line-1\nline-2")
+  @test.assert_eq(normalized, "line-1\nline-2")
 }
 
 ///|
 test "rebase-ai: normalize_repo_relative_path rejects escape path" {
-  assert_eq(
+  @test.assert_eq(
     normalize_repo_relative_path("conflicted.txt"),
     Some("conflicted.txt"),
   )
-  assert_eq(normalize_repo_relative_path("./nested/../x.txt"), None)
-  assert_eq(normalize_repo_relative_path("../outside.txt"), None)
-  assert_eq(normalize_repo_relative_path(".git/config"), None)
+  @test.assert_eq(normalize_repo_relative_path("./nested/../x.txt"), None)
+  @test.assert_eq(normalize_repo_relative_path("../outside.txt"), None)
+  @test.assert_eq(normalize_repo_relative_path(".git/config"), None)
 }
 
 ///|
@@ -108,8 +108,8 @@ async test "rebase-ai: find_conflict_marker_paths finds files with markers" {
   fs.write_string(root + "/plain.txt", "ok")
   fs.write_string(root + "/.git/HEAD", conflicted)
   let paths = find_conflict_marker_paths(fs, root)
-  assert_eq(paths.length(), 1)
-  assert_eq(paths[0], "nested/conflict.txt")
+  @test.assert_eq(paths.length(), 1)
+  @test.assert_eq(paths[0], "nested/conflict.txt")
   test_cleanup(root)
 }
 
@@ -154,11 +154,11 @@ async test "rebase-ai: resolve_conflict_paths applies model output and stages fi
     provider_ref,
     "",
   )
-  assert_eq(resolved.failed.length(), 0)
-  assert_eq(resolved.resolved.length(), 1)
+  @test.assert_eq(resolved.failed.length(), 0)
+  @test.assert_eq(resolved.resolved.length(), 1)
   let data = fs.read_file(root + "/conflicted.txt")
   let text = decode_bytes(data)
-  assert_eq(has_conflict_markers(text), false)
+  @test.assert_eq(has_conflict_markers(text), false)
   assert_true(text.contains("merged-line"))
   guard test_exec_text("git", ["diff", "--cached", "--name-only"], root)
     is Some(staged_names) else {
@@ -233,11 +233,11 @@ async test "rebase-ai: agent-loop mode resolves conflict with repo-scoped read/w
     provider_ref,
     "",
   )
-  assert_eq(resolved.failed.length(), 0)
-  assert_eq(resolved.resolved.length(), 1)
+  @test.assert_eq(resolved.failed.length(), 0)
+  @test.assert_eq(resolved.resolved.length(), 1)
   let data = fs.read_file(root + "/conflicted.txt")
   let text = decode_bytes(data)
-  assert_eq(has_conflict_markers(text), false)
+  @test.assert_eq(has_conflict_markers(text), false)
   assert_true(text.contains("merged-line"))
   guard test_exec_text("git", ["diff", "--cached", "--name-only"], root)
     is Some(staged_names) else {

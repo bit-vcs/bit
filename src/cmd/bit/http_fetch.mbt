@@ -59,9 +59,9 @@ async fn handle_http_fetch(args : Array[String]) -> Unit raise Error {
   let packs_text = decode_bytes(packs_data)
   // Parse pack list and download packs
   for line_view in packs_text.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     if line.has_prefix("P ") {
-      let pack_name = line[2:].to_string()
+      let pack_name = line[2:].to_owned()
       if pack_name.length() > 0 {
         let pack_url = url + "/objects/pack/" + pack_name
         if verbose {
@@ -83,7 +83,7 @@ async fn handle_http_fetch(args : Array[String]) -> Unit raise Error {
         }
         // Fetch corresponding .idx if pack
         if pack_name.has_suffix(".pack") {
-          let idx_name = pack_name[:pack_name.length() - 5].to_string() + ".idx"
+          let idx_name = pack_name[:pack_name.length() - 5].to_owned() + ".idx"
           let idx_url = url + "/objects/pack/" + idx_name
           if verbose {
             eprint_line("Getting \{idx_url}")
@@ -115,8 +115,8 @@ async fn http_fetch_loose_object(
   if oid_hex.length() < 4 {
     return
   }
-  let prefix = oid_hex[:2].to_string()
-  let suffix = oid_hex[2:].to_string()
+  let prefix = oid_hex[:2].to_owned()
+  let suffix = oid_hex[2:].to_owned()
   let obj_url = url + "/objects/" + prefix + "/" + suffix
   if verbose {
     eprint_line("Getting \{obj_url}")

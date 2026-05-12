@@ -1,26 +1,26 @@
 ///|
 test "check-ignore: validation errors match git precedence" {
-  assert_eq(
+  @test.assert_eq(
     check_ignore_validation_error(true, true, false, false, false, 1),
     Some("cannot have both --quiet and --verbose"),
   )
-  assert_eq(
+  @test.assert_eq(
     check_ignore_validation_error(false, false, true, false, false, 1),
     Some("cannot specify pathnames with --stdin"),
   )
-  assert_eq(
+  @test.assert_eq(
     check_ignore_validation_error(false, false, false, true, false, 1),
     Some("-z only makes sense with --stdin"),
   )
-  assert_eq(
+  @test.assert_eq(
     check_ignore_validation_error(false, false, false, false, false, 0),
     Some("no path specified"),
   )
-  assert_eq(
+  @test.assert_eq(
     check_ignore_validation_error(true, false, false, false, false, 2),
     Some("--quiet is only valid with a single pathname"),
   )
-  assert_eq(
+  @test.assert_eq(
     check_ignore_validation_error(false, false, false, false, true, 1),
     Some("--non-matching is only valid with --verbose"),
   )
@@ -28,11 +28,11 @@ test "check-ignore: validation errors match git precedence" {
 
 ///|
 test "check-ignore: repo path resolves cwd-relative input" {
-  assert_eq(check_ignore_repo_relative_path("file", ""), "file")
-  assert_eq(check_ignore_repo_relative_path("./file", ""), "file")
-  assert_eq(check_ignore_repo_relative_path("file", "a/b"), "a/b/file")
-  assert_eq(check_ignore_repo_relative_path("../file", "a/b"), "../file")
-  assert_eq(check_ignore_repo_relative_path("/tmp/file", "a/b"), "/tmp/file")
+  @test.assert_eq(check_ignore_repo_relative_path("file", ""), "file")
+  @test.assert_eq(check_ignore_repo_relative_path("./file", ""), "file")
+  @test.assert_eq(check_ignore_repo_relative_path("file", "a/b"), "a/b/file")
+  @test.assert_eq(check_ignore_repo_relative_path("../file", "a/b"), "../file")
+  @test.assert_eq(check_ignore_repo_relative_path("/tmp/file", "a/b"), "/tmp/file")
 }
 
 ///|
@@ -63,9 +63,9 @@ test "check-ignore: standard rules include configured global excludes" {
   assert_true(matcher.is_ignored("global", false))
 
   let info = check_ignore_find_rule(fs, "/repo", "/repo/.git", "global", false)
-  assert_eq(info.0, "global-excludes")
-  assert_eq(info.1, 1)
-  assert_eq(info.2, "global")
+  @test.assert_eq(info.0, "global-excludes")
+  @test.assert_eq(info.1, 1)
+  @test.assert_eq(info.2, "global")
 }
 
 ///|
@@ -79,7 +79,7 @@ test "check-ignore: verbose rule lookup reports negation matches" {
   assert_false(matcher.is_ignored("one", false))
 
   let info = check_ignore_find_rule(fs, "/repo", "/repo/.git", "one", false)
-  assert_eq(info.0, ".gitignore")
-  assert_eq(info.1, 2)
-  assert_eq(info.2, "!on*")
+  @test.assert_eq(info.0, ".gitignore")
+  @test.assert_eq(info.1, 2)
+  @test.assert_eq(info.2, "!on*")
 }

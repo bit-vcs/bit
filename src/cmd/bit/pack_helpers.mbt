@@ -146,7 +146,7 @@ fn parse_bool_value(value : String) -> Bool? {
   match @config_parse.parse_bool_keyword_value(value) {
     Some(v) => Some(v)
     None => {
-      let trimmed = value.trim().to_string()
+      let trimmed = value.trim().to_owned()
       let parsed = @string.parse_int(trimmed) catch { _ => return None }
       Some(parsed != 0)
     }
@@ -155,7 +155,7 @@ fn parse_bool_value(value : String) -> Bool? {
 
 ///|
 fn parse_pack_allow_reuse(value : String) -> Bool? {
-  let trimmed = value.trim().to_string().to_lower()
+  let trimmed = value.trim().to_owned().to_lower()
   if trimmed.length() == 0 {
     return None
   }

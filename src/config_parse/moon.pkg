@@ -3,3 +3,7 @@ import {
   "moonbitlang/core/string" @string,
   "moonbitlang/core/strconv",
 }
+
+import {
+  "moonbitlang/core/test" @test,
+} for "test"

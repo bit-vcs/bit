@@ -674,9 +674,9 @@ fn tag_parse_annotation_lines(value : String) -> Int? {
 fn tag_parse_column_tokens(value : String) -> Array[String] {
   let tokens : Array[String] = []
   for comma_part in value.split(",") {
-    let chunk = comma_part.to_string()
+    let chunk = comma_part.to_owned()
     for space_part in chunk.split(" ") {
-      let token = space_part.to_string().trim().to_string()
+      let token = space_part.to_owned().trim().to_owned()
       if token.length() > 0 {
         tokens.push(token)
       }
@@ -958,7 +958,7 @@ fn tag_apply_trailers(message : String, trailers : Array[String]) -> String {
   }
   let lines : Array[String] = []
   for line_view in message.split("\n") {
-    lines.push(line_view.to_string())
+    lines.push(line_view.to_owned())
   }
   let mut last_nonblank = lines.length() - 1
   while last_nonblank >= 0 && trim_string(lines[last_nonblank]).length() == 0 {
@@ -1134,7 +1134,7 @@ fn tag_extract_message_lines(text : String, max_lines : Int) -> Array[String] {
     if out.length() >= max_lines {
       break
     }
-    out.push(line_view.to_string())
+    out.push(line_view.to_owned())
   }
   while out.length() > 1 && out.last().unwrap_or("").length() == 0 {
     ignore(out.pop())
@@ -1186,7 +1186,7 @@ fn tag_is_valid_name(name : String) -> Bool {
   }
   let components = normalized.split("/")
   for component_view in components {
-    let component = component_view.to_string()
+    let component = component_view.to_owned()
     if component.length() == 0 ||
       component.has_prefix(".") ||
       component.has_suffix(".lock") {
@@ -1350,16 +1350,16 @@ fn tag_extract_message_body(text : String) -> String {
 fn tag_cleanup_message(raw : String) -> String {
   let lines : Array[String] = []
   for line_view in raw.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     if line.has_prefix("#") {
       continue
     }
-    lines.push(line.trim_end(chars=" \t\r").to_string())
+    lines.push(line.trim_end(chars=" \t\r").to_owned())
   }
   let compact : Array[String] = []
   let mut previous_blank = false
   for line in lines {
-    let blank = line.trim().to_string().length() == 0
+    let blank = line.trim().to_owned().length() == 0
     if blank {
       if !previous_blank {
         compact.push("")
@@ -1484,7 +1484,7 @@ fn tag_extract_commit_subject(data : Bytes) -> String {
         end=text.length(),
       )
       for line_view in body.split("\n") {
-        let line = line_view.to_string()
+        let line = line_view.to_owned()
         if line.length() > 0 {
           return line
         }
@@ -1499,7 +1499,7 @@ fn tag_extract_commit_subject(data : Bytes) -> String {
 fn tag_extract_commit_committer_time(data : Bytes) -> (Int64, String) {
   let text = decode_bytes(data)
   for line_view in text.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     if line.length() == 0 {
       break
     }
@@ -1611,7 +1611,7 @@ fn tag_points_at_object(
           let text = decode_bytes(o.data)
           let mut next_hex = ""
           for line_view in text.split("\n") {
-            let line = line_view.to_string()
+            let line = line_view.to_owned()
             if line.has_prefix("object ") {
               next_hex = String::unsafe_substring(
                 line,
@@ -1656,7 +1656,7 @@ fn tag_peel_to_commit(
             let text = decode_bytes(o.data)
             let mut next_hex = ""
             for line_view in text.split("\n") {
-              let line = line_view.to_string()
+              let line = line_view.to_owned()
               if line.has_prefix("object ") {
                 next_hex = String::unsafe_substring(
                   line,
@@ -1935,7 +1935,7 @@ fn tag_versionsort_parse_config_text(
   let mut missing_prerelease = false
   let mut in_versionsort = false
   for line_view in text.split("\n") {
-    let trimmed = trim_string(line_view.to_string())
+    let trimmed = trim_string(line_view.to_owned())
     if trimmed.has_prefix("[") && trimmed.has_suffix("]") {
       let section = String::unsafe_substring(
         trimmed,

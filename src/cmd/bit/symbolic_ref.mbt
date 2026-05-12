@@ -33,7 +33,7 @@ async fn handle_symbolic_ref(args : Array[String]) -> Unit raise Error {
       raise @bitcore.GitError::InvalidObject("ref \{name} not found")
     }
     let content = decode_bytes(fs.read_file(ref_path))
-    let trimmed = content.trim_end(chars="\n\r ").to_string()
+    let trimmed = content.trim_end(chars="\n\r ").to_owned()
     if trimmed.has_prefix("ref: ") {
       let target = String::unsafe_substring(
         trimmed,

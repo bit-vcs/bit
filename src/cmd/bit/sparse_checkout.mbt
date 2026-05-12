@@ -68,7 +68,7 @@ fn sparse_checkout_pattern_has_glob_magic(pattern : String) -> Bool {
 
 ///|
 fn sparse_checkout_normalize_literal_pattern(pattern : String) -> String? {
-  let trimmed = pattern.trim().to_string()
+  let trimmed = pattern.trim().to_owned()
   if trimmed.length() == 0 || trimmed == "/*" || trimmed == "!/*/" {
     return None
   }
@@ -192,7 +192,7 @@ async fn sparse_checkout_parse_pattern_args(
   if read_from_stdin {
     let input = decode_bytes(read_all_stdin())
     for line_view in input.split("\n") {
-      let line = sparse_checkout_trim_cr(line_view.to_string())
+      let line = sparse_checkout_trim_cr(line_view.to_owned())
       if line.length() > 0 {
         patterns.push(line)
       }
@@ -316,7 +316,7 @@ fn sparse_checkout_compile_cone_patterns(
     }
     let parts : Array[String] = []
     for part_view in relative.split("/") {
-      let part = part_view.to_string()
+      let part = part_view.to_owned()
       if part.length() > 0 {
         parts.push(part)
       }
@@ -373,7 +373,7 @@ fn sparse_checkout_split_check_rules_input(
     return entries
   }
   for line_view in input.split("\n") {
-    let raw = sparse_checkout_trim_cr(line_view.to_string())
+    let raw = sparse_checkout_trim_cr(line_view.to_owned())
     if raw.length() == 0 {
       continue
     }
@@ -427,7 +427,7 @@ fn sparse_checkout_read_check_rules_patterns(
         rules_file = Some(args[i])
       }
       _ if arg.has_prefix("--rules-file=") =>
-        rules_file = Some(arg["--rules-file=".length():].to_string())
+        rules_file = Some(arg["--rules-file=".length():].to_owned())
       _ =>
         raise @bitcore.GitError::InvalidObject(
           "unknown option for sparse-checkout check-rules: \{arg}",
@@ -441,7 +441,7 @@ fn sparse_checkout_read_check_rules_patterns(
       let raw_rules = decode_bytes(fs.read_file(resolved))
       let decoded_rules : Array[String] = []
       for line_view in raw_rules.split("\n") {
-        let line = sparse_checkout_trim_cr(line_view.to_string())
+        let line = sparse_checkout_trim_cr(line_view.to_owned())
         if line.length() > 0 {
           decoded_rules.push(sparse_checkout_unquote_c_style(line))
         }
@@ -506,7 +506,7 @@ fn sparse_checkout_clean_managed_root(
 ) -> String? {
   let parts : Array[String] = []
   for part_view in path.split("/") {
-    let part = part_view.to_string()
+    let part = part_view.to_owned()
     if part.length() > 0 {
       parts.push(part)
     }
@@ -543,7 +543,7 @@ async fn sparse_checkout_warn_reapply_preserved_paths(
     }
     let raw_path = item.entry.path
     let path = if raw_path.has_suffix("/") {
-      raw_path[:raw_path.length() - 1].to_string()
+      raw_path[:raw_path.length() - 1].to_owned()
     } else {
       raw_path
     }
@@ -714,7 +714,7 @@ async fn sparse_checkout_run_clean(
     }
     let raw_path = item.entry.path
     let path = if raw_path.has_suffix("/") {
-      raw_path[:raw_path.length() - 1].to_string()
+      raw_path[:raw_path.length() - 1].to_owned()
     } else {
       raw_path
     }

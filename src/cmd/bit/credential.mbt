@@ -43,7 +43,7 @@ async fn credential_fill() -> Unit raise Error {
   let mut username = ""
   let mut password = ""
   for line_view in input.split("\n") {
-    let line = trim_string(line_view.to_string())
+    let line = trim_string(line_view.to_owned())
     if line.length() == 0 {
       continue
     }

@@ -41,7 +41,7 @@ pub fn read_subdir_attributes(
   let mut path = ""
   let mut base = ""
   for line in text.split("\n") {
-    let l = line.to_string()
+    let l = line.to_owned()
     if l.has_prefix("* subdir-remote=") {
       remote = String::unsafe_substring(l, start=16, end=l.length())
     } else if l.has_prefix("* subdir-path=") {
@@ -138,7 +138,7 @@ pub fn resolve_ref_for_subdir(
       // Try as remote ref (e.g., origin/main -> refs/remotes/origin/main)
       let remote_path = git_dir + "/refs/remotes/" + refspec
       let bytes = fs.read_file(remote_path) catch { _ => return None }
-      let hex = bytes_to_string(bytes).trim(chars=" \n\t").to_string()
+      let hex = bytes_to_string(bytes).trim(chars=" \n\t").to_owned()
       let id = @bit.ObjectId::from_hex(hex) catch { _ => return None }
       Some(id)
     }
@@ -154,7 +154,7 @@ fn find_subtree(
 ) -> @bit.ObjectId? raise @bit.GitError {
   let parts : Array[String] = []
   for p in path.split("/") {
-    let s = p.to_string()
+    let s = p.to_owned()
     if s.length() > 0 {
       parts.push(s)
     }
@@ -320,7 +320,7 @@ fn read_remote_url_from_config(
   )
   let mut in_remote_section = false
   for line_view in config_content.split("\n") {
-    let line = @string_utils.trim_string(line_view.to_string())
+    let line = @string_utils.trim_string(line_view.to_owned())
     if line.has_prefix("[remote ") {
       in_remote_section = true
       continue

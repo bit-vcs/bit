@@ -26,7 +26,7 @@ test "upload-pack process: info-refs over ssh uses native protocol (no stateless
   assert_false(remote_cmd.contains("--advertise-refs"))
   assert_true(remote_cmd.contains("bit-vcs.git"))
   match spec.extra_env {
-    Some(extra) => assert_eq(extra.get("GIT_PROTOCOL"), Some("version=2"))
+    Some(extra) => @test.assert_eq(extra.get("GIT_PROTOCOL"), Some("version=2"))
     None => fail("expected GIT_PROTOCOL for prefer_v2")
   }
   restore_env_var_for_upload_pack_process_wbtest(
@@ -51,7 +51,7 @@ test "upload-pack process: request over ssh uses native protocol (no stateless-r
   assert_false(remote_cmd.contains("--stateless-rpc"))
   assert_true(remote_cmd.contains("bit-vcs.git"))
   match spec.extra_env {
-    Some(extra) => assert_eq(extra.get("GIT_PROTOCOL"), Some("version=2"))
+    Some(extra) => @test.assert_eq(extra.get("GIT_PROTOCOL"), Some("version=2"))
     None => fail("expected GIT_PROTOCOL for prefer_v2")
   }
   restore_env_var_for_upload_pack_process_wbtest(

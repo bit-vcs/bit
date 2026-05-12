@@ -31,7 +31,7 @@ async fn handle_cherry(args : Array[String]) -> Unit raise Error {
       // Try to get upstream from current branch
       let head_content = decode_bytes(fs.read_file(git_dir + "/HEAD"))
       if head_content.has_prefix("ref: refs/heads/") {
-        let branch = trim_string(head_content[16:].to_string())
+        let branch = trim_string(head_content[16:].to_owned())
         // Check for remote tracking
         let remote_ref = "origin/" + branch
         if @bitrepo.rev_parse(fs, git_dir, remote_ref) is Some(_) {

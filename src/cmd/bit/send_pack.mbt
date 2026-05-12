@@ -44,7 +44,7 @@ async fn handle_send_pack(args : Array[String]) -> Unit raise Error {
   if stdin {
     let input = decode_bytes(read_all_stdin())
     for line_view in input.split("\n") {
-      let line = trim_string(line_view.to_string())
+      let line = trim_string(line_view.to_owned())
       if line.length() > 0 {
         refspecs.push(line)
       }
@@ -69,7 +69,7 @@ async fn handle_send_pack(args : Array[String]) -> Unit raise Error {
     // Default to current branch
     let head = decode_bytes(fs.read_file(git_dir + "/HEAD"))
     if head.has_prefix("ref: ") {
-      let ref_name = trim_string(head[5:].to_string())
+      let ref_name = trim_string(head[5:].to_owned())
       refspecs.push(ref_name + ":" + ref_name)
     }
   }
@@ -77,11 +77,11 @@ async fn handle_send_pack(args : Array[String]) -> Unit raise Error {
   let refs_to_push : Array[(String, @bitcore.ObjectId, String)] = []
   for spec in refspecs {
     let (src, dst) = match spec.find(":") {
-      Some(idx) => (spec[:idx].to_string(), spec[idx + 1:].to_string())
+      Some(idx) => (spec[:idx].to_owned(), spec[idx + 1:].to_owned())
       None => (spec, spec)
     }
     // Handle force push
-    let actual_src = if src.has_prefix("+") { src[1:].to_string() } else { src }
+    let actual_src = if src.has_prefix("+") { src[1:].to_owned() } else { src }
     // Resolve source ref
     match @bitrepo.rev_parse(fs, git_dir, actual_src) {
       Some(id) => refs_to_push.push((actual_src, id, dst))
@@ -97,7 +97,7 @@ async fn handle_send_pack(args : Array[String]) -> Unit raise Error {
     for item in refs_to_push {
       let (src, id, dst) = item
       print_line(
-        "push " + src + " -> " + dst + " (" + id.to_hex()[:7].to_string() + ")",
+        "push " + src + " -> " + dst + " (" + id.to_hex()[:7].to_owned() + ")",
       )
     }
   }
@@ -111,7 +111,7 @@ async fn handle_send_pack(args : Array[String]) -> Unit raise Error {
   for item in refs_to_push {
     let (_, id, dst) = item
     print_line(
-      " * [new reference]  " + id.to_hex()[:7].to_string() + " -> " + dst,
+      " * [new reference]  " + id.to_hex()[:7].to_owned() + " -> " + dst,
     )
   }
   ignore(force)

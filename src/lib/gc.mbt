@@ -250,7 +250,7 @@ fn collect_packed_refs(
   let prefixes : Array[String] = ["refs/heads/", "refs/tags/", "refs/remotes/"]
   let text = @utf8.decode_lossy(fs.read_file(packed_path)[:])
   for line_view in text.split("\n") {
-    let line = trim_line_gc(line_view.to_string())
+    let line = trim_line_gc(line_view.to_owned())
     if line.length() == 0 {
       continue
     }
@@ -291,7 +291,7 @@ fn read_ref_line_gc(
 ) -> String raise @bit.GitError {
   let text = @utf8.decode_lossy(fs.read_file(path)[:])
   for line_view in text.split("\n") {
-    let line = trim_line_gc(line_view.to_string())
+    let line = trim_line_gc(line_view.to_owned())
     if line.length() > 0 {
       return line
     }
@@ -377,7 +377,7 @@ fn collect_reflog_ids_recursive(
         (fs.read_file(path) catch { _ => continue })[:],
       ).to_string()
       for line_view in content.split("\n") {
-        let line = line_view.to_string()
+        let line = line_view.to_owned()
         if line.length() < 82 {
           continue
         }
@@ -487,7 +487,7 @@ fn parse_tag_target(
   let mut object_hex : String? = None
   let mut object_type : String? = None
   for line_view in text.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     if line.length() == 0 {
       break
     }

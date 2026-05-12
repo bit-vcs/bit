@@ -55,12 +55,12 @@ async fn handle_upload_archive(args : Array[String]) -> Unit raise Error {
     // Convert to string and strip trailing newline
     let line = decode_bytes(data)
     let trimmed = if line.length() > 0 && line[line.length() - 1] == '\n' {
-      line[:line.length() - 1].to_string()
+      line[:line.length() - 1].to_owned()
     } else {
       line
     }
     if trimmed.has_prefix(arg_prefix) {
-      archive_args.push(trimmed[arg_prefix.length():].to_string())
+      archive_args.push(trimmed[arg_prefix.length():].to_owned())
     } else {
       upload_archive_send_nack("'argument' token or flush expected")
       @sys.exit(1)
@@ -80,9 +80,9 @@ async fn handle_upload_archive(args : Array[String]) -> Unit raise Error {
   while i < archive_args.length() {
     let arg = archive_args[i]
     if arg.has_prefix("--format=") {
-      format = arg[9:].to_string()
+      format = arg[9:].to_owned()
     } else if arg.has_prefix("--prefix=") {
-      prefix = arg[9:].to_string()
+      prefix = arg[9:].to_owned()
     } else if arg == "--" {
       i += 1
       while i < archive_args.length() {

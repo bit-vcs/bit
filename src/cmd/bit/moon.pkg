@@ -325,3 +325,10 @@ options(
     "write_tree_wbtest.mbt": [ "native" ],
   },
 )
+import {
+  "moonbitlang/core/test" @test,
+} for "test"
+
+import {
+  "moonbitlang/core/test" @test,
+} for "wbtest"

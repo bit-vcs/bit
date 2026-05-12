@@ -34,7 +34,7 @@ pub fn github_detect_method() -> String {
 /// Get the authenticated GitHub username
 pub async fn github_get_authenticated_user() -> String raise @bit.GitError {
   let out = gh_api_collect_output(["api", "user", "--jq", ".login"])
-  out.trim(chars=" \n\r\t").to_string()
+  out.trim(chars=" \n\r\t").to_owned()
 }
 
 ///|
@@ -95,7 +95,7 @@ async fn gh_api_collect_output(
   let out = stdout.text() catch { _ => "" }
   if code != 0 {
     let err_text = stderr.text() catch { _ => "" }
-    let normalized = err_text.trim(chars=" \n\r\t").to_string()
+    let normalized = err_text.trim(chars=" \n\r\t").to_owned()
     raise @bit.GitError::IoError("gh api failed (\{code}): \{normalized}")
   }
   out

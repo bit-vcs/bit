@@ -192,7 +192,7 @@ fn rebase_clear_signing_state(
 fn rebase_commit_header_value(data : Bytes, prefix : String) -> String? {
   let text = decode_bytes(data)
   for line_view in text.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     if line.length() == 0 {
       break
     }
@@ -214,7 +214,7 @@ fn rebase_commit_identity(
     Some(value) => value
     None =>
       raise @bitcore.GitError::InvalidObject(
-        "Missing \{prefix.trim().to_string()} header",
+        "Missing \{prefix.trim().to_owned()} header",
       )
   }
   let (name, email, timestamp, timezone) = parse_ident_parts(raw)
@@ -646,7 +646,7 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
   let commit_algo = signing_repo_hash_algorithm(fs, git_dir)
   // Validate exec commands
   for cmd in exec_cmds {
-    if cmd.trim().to_string().length() == 0 {
+    if cmd.trim().to_owned().length() == 0 {
       eprint_line("error: empty exec command")
       @sys.exit(1)
     }
@@ -1390,7 +1390,7 @@ struct RebaseTodoEntry {
 fn parse_rebase_todo(content : String) -> Array[RebaseTodoEntry] {
   let result : Array[RebaseTodoEntry] = []
   for line_view in content.split("\n") {
-    let line = trim_string(line_view.to_string())
+    let line = trim_string(line_view.to_owned())
     // Skip comments and empty lines
     if line.length() == 0 || line.has_prefix("#") {
       continue
@@ -1512,7 +1512,7 @@ fn remove_first_non_comment_line(content : String) -> String {
   let lines : Array[String] = []
   let mut skipped_first = false
   for line_view in content.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     if !skipped_first {
       let trimmed = trim_string(line)
       if trimmed.length() > 0 && !trimmed.has_prefix("#") {
@@ -1773,7 +1773,7 @@ async fn handle_subdir_rebase(
   }
   let upstream_hex = subdir_bytes_to_string(upstream_bytes)
     .trim(chars=" \n\t")
-    .to_string()
+    .to_owned()
   print_line("  Upstream: \{upstream_hex}")
   // Step 3: Find commits affecting subdirectory
   print_line("  Finding changes to \{subdir_path}...")
@@ -1912,7 +1912,7 @@ fn find_tree_subtree(
 ) -> @bitcore.ObjectId? raise @bitcore.GitError {
   let parts : Array[String] = []
   for p in path.split("/") {
-    let s = p.to_string()
+    let s = p.to_owned()
     if s.length() > 0 {
       parts.push(s)
     }
@@ -1944,7 +1944,7 @@ fn parse_commit_author_message(content : Bytes) -> (String, String) {
   let mut in_message = false
   let message = StringBuilder::new()
   for line_view in text.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     if in_message {
       message.write_string(line)
       message.write_char('\n')
@@ -1958,7 +1958,7 @@ fn parse_commit_author_message(content : Bytes) -> (String, String) {
       author = String::unsafe_substring(line, start=7, end=line.length())
     }
   }
-  (author, message.to_string().trim(chars=" \n\t").to_string())
+  (author, message.to_string().trim(chars=" \n\t").to_owned())
 }
 
 ///|
@@ -1997,7 +1997,7 @@ fn apply_subdir_change(
   }
   let head_text = subdir_bytes_to_string(head_bytes)
     .trim(chars=" \n\t")
-    .to_string()
+    .to_owned()
   let parent_id = if head_text.has_prefix("ref: ") {
     let ref_name = String::unsafe_substring(
       head_text,
@@ -2009,7 +2009,7 @@ fn apply_subdir_change(
     }
     let ref_hex = subdir_bytes_to_string(ref_bytes)
       .trim(chars=" \n\t")
-      .to_string()
+      .to_owned()
     @bitcore.ObjectId::from_hex(ref_hex) catch {
       _ => raise @bitcore.GitError::InvalidObject("Invalid ref")
     }

@@ -2,25 +2,25 @@
 /// Fs blackbox tests
 test "bitfs: empty filesystem" {
   let bitfs = Fs::empty("/repo/.git")
-  assert_eq(bitfs.is_dirty(), false)
-  assert_eq(bitfs.base_tree(), @bit.ObjectId::zero())
-  assert_eq(bitfs.base_commit(), None)
+  @test.assert_eq(bitfs.is_dirty(), false)
+  @test.assert_eq(bitfs.base_tree(), @bit.ObjectId::zero())
+  @test.assert_eq(bitfs.base_commit(), None)
 }
 
 ///|
 test "bitfs: write and read file in working layer" {
   let bitfs = Fs::empty("/repo/.git")
   bitfs.write_string("/file.txt", "hello\n")
-  assert_eq(bitfs.is_dirty(), true)
+  @test.assert_eq(bitfs.is_dirty(), true)
   let files = bitfs.get_working_files()
-  assert_eq(files, ["file.txt"])
+  @test.assert_eq(files, ["file.txt"])
 }
 
 ///|
 test "bitfs: mkdir_p creates directory hierarchy" {
   let bitfs = Fs::empty("/repo/.git")
   bitfs.mkdir_p("a/b/c")
-  assert_eq(bitfs.is_dirty(), true)
+  @test.assert_eq(bitfs.is_dirty(), true)
 }
 
 ///|
@@ -29,26 +29,26 @@ test "bitfs: remove_file marks file as deleted" {
   bitfs.write_string("file.txt", "content")
   bitfs.remove_file("file.txt")
   let files = bitfs.get_working_files()
-  assert_eq(files, [])
+  @test.assert_eq(files, [])
   let deleted = bitfs.get_deleted_files()
-  assert_eq(deleted, ["file.txt"])
+  @test.assert_eq(deleted, ["file.txt"])
 }
 
 ///|
 test "bitfs: rollback clears working layer" {
   let bitfs = Fs::empty("/repo/.git")
   bitfs.write_string("file.txt", "content")
-  assert_eq(bitfs.is_dirty(), true)
+  @test.assert_eq(bitfs.is_dirty(), true)
   bitfs.rollback()
-  assert_eq(bitfs.is_dirty(), false)
-  assert_eq(bitfs.get_working_files(), [])
+  @test.assert_eq(bitfs.is_dirty(), false)
+  @test.assert_eq(bitfs.get_working_files(), [])
 }
 
 ///|
 test "bitfs: config defaults" {
   let config = FsConfig::default()
-  assert_eq(config.max_cache_bytes, 64 * 1024 * 1024)
-  assert_eq(config.max_cache_entries, 1000)
+  @test.assert_eq(config.max_cache_bytes, 64 * 1024 * 1024)
+  @test.assert_eq(config.max_cache_entries, 1000)
 }
 
 ///|
@@ -62,18 +62,18 @@ test "bitfs: full workflow with backing fs" {
   )
   let bitfs = Fs::from_commit(fs, "/repo/.git", commit1)
   let content = bitfs.read_file(fs, "file.txt")
-  assert_eq(@utf8.decode_lossy(content[:]), "initial\n")
+  @test.assert_eq(@utf8.decode_lossy(content[:]), "initial\n")
   bitfs.write_string("file.txt", "modified\n")
-  assert_eq(bitfs.is_dirty(), true)
+  @test.assert_eq(bitfs.is_dirty(), true)
   let snap = bitfs.snapshot(
     fs, fs, "Snapshot 1", "Author <a@b.com>", 1700001000L,
   )
-  assert_eq(bitfs.is_dirty(), false)
+  @test.assert_eq(bitfs.is_dirty(), false)
   assert_true(snap.commit_id != commit1)
   bitfs.write_string("file.txt", "changed again\n")
   bitfs.rollback()
   let content2 = bitfs.read_file(fs, "file.txt")
-  assert_eq(@utf8.decode_lossy(content2[:]), "modified\n")
+  @test.assert_eq(@utf8.decode_lossy(content2[:]), "modified\n")
 }
 
 ///|

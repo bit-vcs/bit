@@ -32,7 +32,7 @@ fn sparse_upsert_section_value(
   let mut found_section = false
   let mut key_set = false
   for line_view in config.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     let trimmed = sparse_trim(line)
     if trimmed == header {
       in_section = true
@@ -117,7 +117,7 @@ fn sparse_is_section_bool_enabled(
     )
     let mut in_section = false
     for line_view in content.split("\n") {
-      let trimmed = sparse_trim(line_view.to_string())
+      let trimmed = sparse_trim(line_view.to_owned())
       if trimmed == header {
         in_section = true
         continue
@@ -321,7 +321,7 @@ fn sparse_encode_cone_patterns(patterns : Array[String]) -> Array[String] {
   for relative in sparse_canonicalize_cone_patterns(patterns) {
     let parts : Array[String] = []
     for part_view in relative.split("/") {
-      let part = part_view.to_string()
+      let part = part_view.to_owned()
       if part.length() > 0 {
         parts.push(part)
       }
@@ -383,7 +383,7 @@ pub fn read_sparse_patterns(
   let text = @utf8.decode_lossy(content[:])
   let patterns : Array[String] = []
   for line_view in text.split("\n") {
-    let line = sparse_trim(line_view.to_string())
+    let line = sparse_trim(line_view.to_owned())
     if line.length() > 0 && !line.has_prefix("#") {
       patterns.push(line)
     }
@@ -753,7 +753,7 @@ fn sparse_path_matches(path : String, pattern : String) -> Bool {
     let parts = normalized_pattern.split("**")
     let parts_arr : Array[String] = []
     for p in parts {
-      parts_arr.push(p.to_string())
+      parts_arr.push(p.to_owned())
     }
     if parts_arr.length() == 2 {
       let prefix = parts_arr[0]

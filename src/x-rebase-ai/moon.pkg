@@ -24,3 +24,7 @@ options(
     "rebase_ai_wbtest.mbt": [ "native" ],
   },
 )
+
+import {
+  "moonbitlang/core/test" @test,
+} for "wbtest"

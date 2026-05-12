@@ -20,7 +20,7 @@ async fn submodule_wbtest_run_git(
     inherit_env=true,
     cwd~,
   )
-  assert_eq(code, 0)
+  @test.assert_eq(code, 0)
 }
 
 ///|
@@ -34,7 +34,7 @@ async fn submodule_wbtest_git_stdout(
     inherit_env=true,
     cwd~,
   )
-  assert_eq(code, 0)
+  @test.assert_eq(code, 0)
   stdout.text() catch {
     _ => ""
   }
@@ -97,8 +97,8 @@ async fn submodule_wbtest_run_shim_git(
   args : Array[String],
 ) -> Unit raise Error {
   let (code, stderr) = submodule_wbtest_collect_shim_git_stderr(cwd, args)
-  assert_eq(code, 0)
-  assert_eq(stderr, "")
+  @test.assert_eq(code, 0)
+  @test.assert_eq(stderr, "")
 }
 
 ///|
@@ -161,8 +161,8 @@ async test "submodule absorbgitdirs: gitlink without gitmodules entry is fatal" 
   let (code, stderr) = submodule_wbtest_collect_shim_git_stderr(root, [
     "submodule", "absorbgitdirs",
   ])
-  assert_eq(code, 128)
-  assert_eq(stderr, "fatal: could not lookup name for submodule 'sub2'\n")
+  @test.assert_eq(code, 128)
+  @test.assert_eq(stderr, "fatal: could not lookup name for submodule 'sub2'\n")
 }
 
 ///|
@@ -192,8 +192,8 @@ async test "submodule absorbgitdirs: embedded repo migrates and update reuses mo
   let (add_code, add_stderr) = submodule_wbtest_collect_shim_git_stderr(root, [
     "submodule", "add", "./sub1",
   ])
-  assert_eq(add_code, 0)
-  assert_eq(add_stderr, "")
+  @test.assert_eq(add_code, 0)
+  @test.assert_eq(add_stderr, "")
   assert_true(fs.is_dir(root + "/sub1/.git"))
   assert_false(fs.is_dir(root + "/.git/modules/sub1"))
   submodule_wbtest_run_git(root, ["commit", "-q", "-am", "superproject"])
@@ -202,8 +202,8 @@ async test "submodule absorbgitdirs: embedded repo migrates and update reuses mo
     root,
     ["submodule", "absorbgitdirs"],
   )
-  assert_eq(absorb_code, 0)
-  assert_eq(
+  @test.assert_eq(absorb_code, 0)
+  @test.assert_eq(
     absorb_stderr,
     "Migrating git directory of 'sub1' from\n" +
     "'\{root}/sub1/.git' to\n" +
@@ -252,7 +252,7 @@ async test "submodule add: relative local url works from absorbed submodule root
     root,
     ["submodule", "absorbgitdirs"],
   )
-  assert_eq(absorb_code, 0)
+  @test.assert_eq(absorb_code, 0)
 
   submodule_wbtest_run_git(root + "/sub1", [
     "init", "--initial-branch=main", "-q", "nested",
@@ -273,8 +273,8 @@ async test "submodule add: relative local url works from absorbed submodule root
     root + "/sub1",
     ["submodule", "add", "./nested"],
   )
-  assert_eq(code, 0)
-  assert_eq(stderr, "")
+  @test.assert_eq(code, 0)
+  @test.assert_eq(stderr, "")
   assert_true(fs.is_dir(root + "/sub1/nested/.git"))
   assert_true(fs.is_file(root + "/sub1/.gitmodules"))
   submodule_wbtest_restore_env("GIT_ALLOW_PROTOCOL", prev_allow_protocol)
@@ -296,7 +296,7 @@ async test "submodule deinit: failure on untracked file keeps config" {
     "submodule", "deinit", "init",
   ])
 
-  assert_eq(code, 1)
+  @test.assert_eq(code, 1)
   assert_true(stderr.contains("local modifications"))
   let config_content = decode_bytes(fs.read_file(super_dir + "/.git/config"))
   assert_true(config_content.contains("[submodule \"init\"]"))
@@ -320,7 +320,7 @@ async test "submodule deinit: failure on head mismatch keeps config" {
     "submodule", "deinit", "init",
   ])
 
-  assert_eq(code, 1)
+  @test.assert_eq(code, 1)
   assert_true(stderr.contains("local modifications"))
   let config_content = decode_bytes(fs.read_file(super_dir + "/.git/config"))
   assert_true(config_content.contains("[submodule \"init\"]"))
@@ -354,8 +354,8 @@ async test "submodule update --init: active filters keep named active unset for 
   let sub0_active = read_submodule_config_value(rfs, git_dir, "sub0", "active")
   let sub1_active = read_submodule_config_value(rfs, git_dir, "sub1", "active")
   let sub1_url = read_submodule_config_value(rfs, git_dir, "sub1", "url")
-  assert_eq(sub0_active, None)
-  assert_eq(sub1_active, None)
+  @test.assert_eq(sub0_active, None)
+  @test.assert_eq(sub1_active, None)
   assert_true(sub1_url is Some(_))
   cleanup_tree(fs, root)
 }
@@ -438,7 +438,7 @@ async test "submodule add: writes explicit active when global pathspec does not 
     "mod",
     "active",
   )
-  assert_eq(active, Some("true"))
+  @test.assert_eq(active, Some("true"))
   cleanup_tree(fs, root)
 }
 
@@ -488,7 +488,7 @@ async test "submodule add: skips explicit active when global pathspec matches" {
     "sub1",
     "active",
   )
-  assert_eq(active, None)
+  @test.assert_eq(active, None)
   cleanup_tree(fs, root)
 }
 
@@ -523,7 +523,7 @@ async test "submodule update: missing gitmodules path prints not initialized" {
     "submodule", "update", "sub",
   ])
 
-  assert_eq(code, 0)
+  @test.assert_eq(code, 0)
   assert_true(stderr.contains("Submodule path 'sub' not initialized"))
   cleanup_tree(fs, root)
 }
@@ -569,7 +569,7 @@ async test "submodule update --remote: moved source fails until set-url" {
   submodule_wbtest_run_git(source_dir, ["add", "file"])
   submodule_wbtest_run_git(source_dir, ["commit", "-q", "-m", "b"])
   let move_code = @process.run("mv", [source_dir, moved_source_dir])
-  assert_eq(move_code, 0)
+  @test.assert_eq(move_code, 0)
 
   let (update_code, _update_stderr) = submodule_wbtest_collect_shim_git_stderr(
     super_dir,
@@ -584,7 +584,7 @@ async test "submodule update --remote: moved source fails until set-url" {
     super_dir,
     ["submodule", "update", "--remote"],
   )
-  assert_eq(update_after_set_url_code, 0)
+  @test.assert_eq(update_after_set_url_code, 0)
   submodule_wbtest_restore_env("GIT_ALLOW_PROTOCOL", prev_allow_protocol)
 
   let actual_head = submodule_wbtest_git_stdout(super_dir + "/source", [
@@ -595,7 +595,7 @@ async test "submodule update --remote: moved source fails until set-url" {
       "rev-parse", "HEAD",
     ])
     |> add_test_trim_trailing_newline
-  assert_eq(actual_head, expected_head)
+  @test.assert_eq(actual_head, expected_head)
   cleanup_tree(fs, root)
 }
 
@@ -617,7 +617,7 @@ async test "submodule add: template dir is read from global config" {
   let actual = submodule_add_template_dir(fs)
   submodule_wbtest_restore_env("HOME", prev_home)
   submodule_wbtest_restore_env("GIT_CONFIG_GLOBAL", prev_global)
-  assert_eq(actual, Some(root + "/home/templates"))
+  @test.assert_eq(actual, Some(root + "/home/templates"))
   cleanup_tree(fs, root)
 }
 
@@ -638,13 +638,13 @@ async test "submodule add: post-checkout hook runs in submodule worktree" {
     "#!/bin/sh\n" + "echo hook >hook.run\n" + "exit 1\n",
   )
   let chmod_code = @process.run("chmod", ["+x", hook_path], inherit_env=true)
-  assert_eq(chmod_code, 0)
+  @test.assert_eq(chmod_code, 0)
   let code = submodule_run_post_checkout_hook(
     work_tree,
     git_dir,
     submodule_wbtest_id(1),
   )
-  assert_eq(code, 1)
+  @test.assert_eq(code, 1)
   assert_true(fs.is_file(work_tree + "/hook.run"))
   cleanup_tree(fs, root)
 }
@@ -665,7 +665,7 @@ async test "submodule add: template hook keeps executable bit" {
   fs.mkdir_p(template_dir + "/hooks")
   fs.write_string(hook_path, "#!/bin/sh\nexit 0\n")
   let chmod_code = @process.run("chmod", ["+x", hook_path], inherit_env=true)
-  assert_eq(chmod_code, 0)
+  @test.assert_eq(chmod_code, 0)
   let prev_template_dir = @sys.get_env_var("GIT_TEMPLATE_DIR")
   @sys.set_env_var("GIT_TEMPLATE_DIR", template_dir)
   @bitlib.init_repo(fs, super_git_dir, bare=true)
@@ -674,7 +674,7 @@ async test "submodule add: template hook keeps executable bit" {
   let mode = @bitio.lstat_entry_meta(modules_dir + "/hooks/post-checkout").map(meta => {
     meta.mode
   })
-  assert_eq(mode, Some(0o100755))
+  @test.assert_eq(mode, Some(0o100755))
   cleanup_tree(fs, root)
 }
 
@@ -683,7 +683,7 @@ test "submodule gitmodules: incomplete section is completed in place" {
   let content = "[submodule \"one\"]\n\tignore = all\n"
   let mut updated = submodule_upsert_config_value(content, "one", "path", "one")
   updated = submodule_upsert_config_value(updated, "one", "url", "./one")
-  assert_eq(
+  @test.assert_eq(
     updated, "[submodule \"one\"]\n\tignore = all\n\tpath = one\n\turl = ./one\n",
   )
 }
@@ -691,16 +691,16 @@ test "submodule gitmodules: incomplete section is completed in place" {
 ///|
 test "submodule dispatch: quiet implies status" {
   let dispatch = parse_submodule_dispatch(["--quiet"])
-  assert_eq(dispatch.subcmd, "status")
-  assert_eq(dispatch.args, ["--quiet"])
+  @test.assert_eq(dispatch.subcmd, "status")
+  @test.assert_eq(dispatch.args, ["--quiet"])
   assert_false(dispatch.usage_error)
 }
 
 ///|
 test "submodule dispatch: leading status flag keeps explicit status" {
   let dispatch = parse_submodule_dispatch(["--cached", "status", "path"])
-  assert_eq(dispatch.subcmd, "status")
-  assert_eq(dispatch.args, ["--cached", "path"])
+  @test.assert_eq(dispatch.subcmd, "status")
+  @test.assert_eq(dispatch.args, ["--cached", "path"])
   assert_false(dispatch.usage_error)
 }
 
@@ -714,7 +714,7 @@ test "submodule dispatch: recursive without command is usage error" {
 test "submodule gitmodules: existing key is replaced before next section" {
   let content = "[submodule \"one\"]\n\tpath = wrong\n[submodule \"two\"]\n\tpath = two\n"
   let updated = submodule_upsert_config_value(content, "one", "path", "one")
-  assert_eq(
+  @test.assert_eq(
     updated, "[submodule \"one\"]\n\tpath = one\n[submodule \"two\"]\n\tpath = two\n",
   )
 }
@@ -725,13 +725,13 @@ test "submodule index: gitlink path extraction ignores non-gitlinks" {
     submodule_wbtest_entry("plain.txt", 0o100644),
     submodule_wbtest_entry("sub", 0o160000),
   ])
-  assert_eq(paths, ["sub"])
+  @test.assert_eq(paths, ["sub"])
 }
 
 ///|
 test "submodule missing url: index gitlink without config entry is reported" {
   let missing = submodule_missing_url_paths([], ["sub"], [])
-  assert_eq(missing, ["sub"])
+  @test.assert_eq(missing, ["sub"])
 }
 
 ///|
@@ -741,13 +741,13 @@ test "submodule missing url: empty url is treated as missing" {
     ["sub"],
     [],
   )
-  assert_eq(missing, ["sub"])
+  @test.assert_eq(missing, ["sub"])
 }
 
 ///|
 test "submodule missing url: non-index path is ignored" {
   let missing = submodule_missing_url_paths([], [], ["inner"])
-  assert_eq(missing, [])
+  @test.assert_eq(missing, [])
 }
 
 ///|
@@ -758,7 +758,7 @@ test "submodule update: missing config url marks path uninitialized" {
   cleanup_tree(fs, root)
   fs.mkdir_p(root + "/.git")
   let submodules = [{ name: "example", path: "init", url: "./init" }]
-  assert_eq(
+  @test.assert_eq(
     submodule_uninitialized_paths(fs, root + "/.git", submodules, ["init"]),
     ["init"],
   )
@@ -766,7 +766,7 @@ test "submodule update: missing config url marks path uninitialized" {
     root + "/.git/config",
     "[submodule \"example\"]\n\turl = ./init\n",
   )
-  assert_eq(
+  @test.assert_eq(
     submodule_uninitialized_paths(fs, root + "/.git", submodules, ["init"]),
     [],
   )
@@ -780,7 +780,7 @@ test "submodule update: missing gitmodules entry still prints not initialized pa
     get_current_timestamp().to_string()
   cleanup_tree(fs, root)
   fs.mkdir_p(root + "/.git")
-  assert_eq(
+  @test.assert_eq(
     submodule_update_notice_paths(fs, root + "/.git", [], ["sub"], ["sub"]),
     ["sub"],
   )
@@ -788,7 +788,7 @@ test "submodule update: missing gitmodules entry still prints not initialized pa
     root + "/.git/config",
     "[submodule \"example\"]\n\turl = ./init\n",
   )
-  assert_eq(
+  @test.assert_eq(
     submodule_update_notice_paths(
       fs,
       root + "/.git",
@@ -808,13 +808,13 @@ test "submodule add: existing index conflict requires force for gitlinks only" {
     "dir-tracked",
     false,
   )
-  assert_eq(plain, Some("fatal: 'dir-tracked' already exists in the index"))
+  @test.assert_eq(plain, Some("fatal: 'dir-tracked' already exists in the index"))
   let existing_gitlink = submodule_add_existing_index_error(
     [submodule_wbtest_entry("submod", 0o160000)],
     "submod",
     false,
   )
-  assert_eq(
+  @test.assert_eq(
     existing_gitlink,
     Some("fatal: 'submod' already exists in the index"),
   )
@@ -823,12 +823,12 @@ test "submodule add: existing index conflict requires force for gitlinks only" {
     "submod",
     true,
   )
-  assert_eq(forced, None)
+  @test.assert_eq(forced, None)
 }
 
 ///|
 test "submodule add: ignored path message includes path and hints" {
-  assert_eq(submodule_add_ignored_error_lines("submod"), [
+  @test.assert_eq(submodule_add_ignored_error_lines("submod"), [
     "The following paths are ignored by one of your .gitignore files:", "submod",
     "hint: Use -f if you really want to add them.", "hint: Disable this message with \"git config set advice.addIgnoredFile false\"",
   ])
@@ -837,7 +837,7 @@ test "submodule add: ignored path message includes path and hints" {
 ///|
 test "submodule status: explicit non-gitlink path is unmatched" {
   let unmatched = submodule_unmatched_index_paths(["sub"], ["inner", "sub"])
-  assert_eq(unmatched, ["inner"])
+  @test.assert_eq(unmatched, ["inner"])
 }
 
 ///|
@@ -846,7 +846,7 @@ test "submodule known paths: merges gitmodules and index paths" {
     [{ name: "s", path: "sub", url: "./sub" }],
     ["indexed"],
   )
-  assert_eq(known, ["indexed", "sub"])
+  @test.assert_eq(known, ["indexed", "sub"])
 }
 
 ///|
@@ -871,12 +871,12 @@ test "submodule update blocker: git entry is allowed" {
 
 ///|
 test "submodule add blocker: file path rejects" {
-  assert_eq(submodule_add_path_blocker_kind(true, [], false), Some("path"))
+  @test.assert_eq(submodule_add_path_blocker_kind(true, [], false), Some("path"))
 }
 
 ///|
 test "submodule add blocker: empty dir rejects as invalid repo" {
-  assert_eq(
+  @test.assert_eq(
     submodule_add_path_blocker_kind(false, [], false),
     Some("empty_dir"),
   )
@@ -884,23 +884,23 @@ test "submodule add blocker: empty dir rejects as invalid repo" {
 
 ///|
 test "submodule add blocker: existing repo is allowed" {
-  assert_eq(submodule_add_path_blocker_kind(false, ["a"], true), None)
+  @test.assert_eq(submodule_add_path_blocker_kind(false, ["a"], true), None)
 }
 
 ///|
 test "submodule add blocker: occupied dir rejects" {
-  assert_eq(submodule_add_path_blocker_kind(false, ["a"], false), Some("path"))
+  @test.assert_eq(submodule_add_path_blocker_kind(false, ["a"], false), Some("path"))
 }
 
 ///|
 test "submodule status: display path is relative to cwd prefix" {
-  assert_eq(make_display_path("init", "sub"), "../init")
+  @test.assert_eq(make_display_path("init", "sub"), "../init")
 }
 
 ///|
 test "submodule status: missing worktree shows index sha with dash prefix" {
   let id = submodule_wbtest_id(b'\x11')
-  assert_eq(
+  @test.assert_eq(
     submodule_status_output("init", Some(id), None, false, None),
     "-\{id.to_hex()} init",
   )
@@ -910,7 +910,7 @@ test "submodule status: missing worktree shows index sha with dash prefix" {
 test "submodule status: cached shows index sha for modified submodule" {
   let index_id = submodule_wbtest_id(b'\x11')
   let head_id = submodule_wbtest_id(b'\x22')
-  assert_eq(
+  @test.assert_eq(
     submodule_status_output("init", Some(index_id), Some(head_id), true, None),
     "+\{index_id.to_hex()} init",
   )
@@ -918,12 +918,12 @@ test "submodule status: cached shows index sha for modified submodule" {
 
 ///|
 test "submodule status: attached head shows branch suffix" {
-  assert_eq(
+  @test.assert_eq(
     submodule_status_head_label("ref: refs/heads/main\n"),
     Some("heads/main"),
   )
   let id = submodule_wbtest_id(b'\x33')
-  assert_eq(
+  @test.assert_eq(
     submodule_status_output(
       "repo",
       Some(id),
@@ -945,7 +945,7 @@ test "submodule status: detached head shows exact tag suffix" {
   let id = submodule_wbtest_id(b'\x44')
   fs.write_string(root + "/.git/HEAD", id.to_hex() + "\n")
   fs.write_string(root + "/.git/refs/tags/test2", id.to_hex() + "\n")
-  assert_eq(
+  @test.assert_eq(
     read_submodule_status_head_label(fs, root + "/.git", id),
     Some("test2"),
   )
@@ -955,7 +955,7 @@ test "submodule status: detached head shows exact tag suffix" {
 ///|
 test "submodule status: path arguments are normalized from cwd prefix" {
   let paths = normalize_submodule_status_paths(["../init"], "sub", "/repo")
-  assert_eq(paths, ["init"])
+  @test.assert_eq(paths, ["init"])
 }
 
 ///|
@@ -974,8 +974,8 @@ test "submodule target paths: exclude-only pathspec applies to all known paths" 
     "/repo",
   )
   assert_true(restrict)
-  assert_eq(unmatched, None)
-  assert_eq(paths, ["sub1", "sub2", "sub3"])
+  @test.assert_eq(unmatched, None)
+  @test.assert_eq(paths, ["sub1", "sub2", "sub3"])
 }
 
 ///|
@@ -998,8 +998,8 @@ test "submodule target paths: dot active filter selects all known paths" {
     root,
   )
   assert_true(restrict)
-  assert_eq(unmatched, None)
-  assert_eq(paths, ["sub0", "sub1"])
+  @test.assert_eq(unmatched, None)
+  @test.assert_eq(paths, ["sub0", "sub1"])
   cleanup_tree(fs, root)
 }
 
@@ -1028,8 +1028,8 @@ test "submodule target paths: global active filters restrict default update set"
     root,
   )
   assert_true(restrict)
-  assert_eq(unmatched, None)
-  assert_eq(paths, ["sub1", "sub2", "sub3"])
+  @test.assert_eq(unmatched, None)
+  @test.assert_eq(paths, ["sub1", "sub2", "sub3"])
   cleanup_tree(fs, root)
 }
 
@@ -1060,30 +1060,30 @@ test "submodule target paths: per-submodule active overrides global filters" {
     root,
   )
   assert_true(restrict)
-  assert_eq(unmatched, None)
-  assert_eq(paths, ["sub0", "sub2", "sub3"])
+  @test.assert_eq(unmatched, None)
+  @test.assert_eq(paths, ["sub0", "sub2", "sub3"])
   cleanup_tree(fs, root)
 }
 
 ///|
 test "submodule relative url resolver matches git semantics" {
-  assert_eq(
+  @test.assert_eq(
     submodule_resolve_relative_url("ssh://hostname/repo", "../subrepo", None),
     "ssh://hostname/subrepo",
   )
-  assert_eq(
+  @test.assert_eq(
     submodule_resolve_relative_url("ssh://hostname:22/repo", "../subrepo", None),
     "ssh://hostname:22/subrepo",
   )
-  assert_eq(
+  @test.assert_eq(
     submodule_resolve_relative_url("//somewhere else/repo", "../subrepo", None),
     "//somewhere else/subrepo",
   )
-  assert_eq(
+  @test.assert_eq(
     submodule_resolve_relative_url("file:///tmp/repo", "../subrepo", None),
     "file:///tmp/subrepo",
   )
-  assert_eq(
+  @test.assert_eq(
     submodule_resolve_relative_url(
       "helper:://hostname/repo",
       "../subrepo",
@@ -1091,39 +1091,39 @@ test "submodule relative url resolver matches git semantics" {
     ),
     "helper:://hostname/subrepo",
   )
-  assert_eq(
+  @test.assert_eq(
     submodule_resolve_relative_url("user@host:repo", "../subrepo", None),
     "user@host:subrepo",
   )
-  assert_eq(
+  @test.assert_eq(
     submodule_resolve_relative_url("user@host:path/to/repo", "../subrepo", None),
     "user@host:path/to/subrepo",
   )
-  assert_eq(
+  @test.assert_eq(
     submodule_resolve_relative_url("foo", "../subrepo", None),
     "subrepo",
   )
-  assert_eq(
+  @test.assert_eq(
     submodule_resolve_relative_url("foo/bar", "../subrepo", None),
     "foo/subrepo",
   )
-  assert_eq(
+  @test.assert_eq(
     submodule_resolve_relative_url("./foo", "../subrepo", None),
     "subrepo",
   )
-  assert_eq(
+  @test.assert_eq(
     submodule_resolve_relative_url("./foo/bar", "../subrepo", None),
     "foo/subrepo",
   )
-  assert_eq(
+  @test.assert_eq(
     submodule_resolve_relative_url("../foo", "../subrepo", None),
     "../subrepo",
   )
-  assert_eq(
+  @test.assert_eq(
     submodule_resolve_relative_url("../foo/bar", "../subrepo", None),
     "../foo/subrepo",
   )
-  assert_eq(
+  @test.assert_eq(
     submodule_resolve_relative_url("../parent.git", "../repo", Some("../")),
     "../../repo",
   )
@@ -1138,24 +1138,24 @@ test "submodule add args: parses quiet progress force branch and depth" {
   assert_true(args.quiet)
   assert_true(args.progress)
   assert_true(args.force)
-  assert_eq(args.branch, Some("topic"))
-  assert_eq(args.depth, Some(2))
-  assert_eq(args.name, Some("mod"))
-  assert_eq(args.url, "repo")
-  assert_eq(args.path, "path")
+  @test.assert_eq(args.branch, Some("topic"))
+  @test.assert_eq(args.depth, Some(2))
+  @test.assert_eq(args.name, Some("mod"))
+  @test.assert_eq(args.url, "repo")
+  @test.assert_eq(args.path, "path")
 }
 
 ///|
 test "submodule add path: normalizes cwd relative and absolute destinations" {
-  assert_eq(
+  @test.assert_eq(
     normalize_submodule_add_path("../realsubmod3", "sub", "/repo"),
     "realsubmod3",
   )
-  assert_eq(
+  @test.assert_eq(
     normalize_submodule_add_path("././dotsubmod/./frotz/./", "", "/repo"),
     "dotsubmod/frotz",
   )
-  assert_eq(
+  @test.assert_eq(
     normalize_submodule_add_path("/repo/add-abs", "", "/repo"),
     "add-abs",
   )
@@ -1163,7 +1163,7 @@ test "submodule add path: normalizes cwd relative and absolute destinations" {
 
 ///|
 test "submodule add: no-commit message uses destination path" {
-  assert_eq(
+  @test.assert_eq(
     submodule_add_no_commit_message("./repo-no-commits"),
     "fatal: 'repo-no-commits' does not have a commit checked out",
   )
@@ -1178,7 +1178,7 @@ test "submodule deinit paths: dot selects all and normalizes relative paths" {
     false,
   )
   assert_true(select_all)
-  assert_eq(normalized, ["init"])
+  @test.assert_eq(normalized, ["init"])
 }
 
 ///|
@@ -1201,7 +1201,7 @@ test "submodule config: parser reads path and url entries" {
     root + "/.git/config",
     "[submodule \"example\"]\n\tpath = init\n\turl = ./init\n",
   )
-  assert_eq(parse_submodule_config(fs, root + "/.git"), [
+  @test.assert_eq(parse_submodule_config(fs, root + "/.git"), [
     { name: "example", path: "init", url: "./init" },
   ])
   cleanup_tree(fs, root)
@@ -1216,7 +1216,7 @@ test "submodule status infos: ignores config-only path" {
       { name: "example2", path: "example2", url: "./init2" },
     ],
   )
-  assert_eq(merged, [{ name: "example", path: "init", url: "./override" }])
+  @test.assert_eq(merged, [{ name: "example", path: "init", url: "./override" }])
 }
 
 ///|
@@ -1267,12 +1267,12 @@ async test "submodule status: ignores config-only entries" {
   let status = submodule_wbtest_git_stdout(super_dir, ["submodule", "status"])
   let lines : Array[String] = []
   for line_view in status.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     if line.length() > 0 {
       lines.push(line)
     }
   }
-  assert_eq(lines.length(), 1)
+  @test.assert_eq(lines.length(), 1)
   assert_true(lines[0].contains(" init"))
 
   cleanup_tree(fs, root)
@@ -1407,7 +1407,7 @@ async test "submodule deinit: unregisters config and removes worktree gitfile" {
   assert_false(module_config.contains("worktree ="))
   assert_false(fs.is_file(super_dir + "/init/.git"))
   assert_true(fs.is_dir(super_dir + "/init"))
-  assert_eq(fs.readdir(super_dir + "/init").length(), 0)
+  @test.assert_eq(fs.readdir(super_dir + "/init").length(), 0)
 
   cleanup_tree(fs, root)
 }
@@ -1457,7 +1457,7 @@ async test "submodule deinit: missing worktree path is recreated as empty direct
   let config_content = decode_bytes(fs.read_file(super_dir + "/.git/config"))
   assert_false(config_content.contains("[submodule \"init\"]"))
   assert_true(fs.is_dir(super_dir + "/init"))
-  assert_eq(fs.readdir(super_dir + "/init").length(), 0)
+  @test.assert_eq(fs.readdir(super_dir + "/init").length(), 0)
   assert_false(fs.is_file(super_dir + "/init/.git"))
 
   cleanup_tree(fs, root)
@@ -1574,7 +1574,7 @@ async test "submodule update: recreates missing worktree before writing gitfile"
       "rev-parse", "HEAD",
     ])
     |> add_test_trim_trailing_newline
-  assert_eq(head, rev1)
+  @test.assert_eq(head, rev1)
 
   cleanup_tree(fs, root)
 }
@@ -1684,7 +1684,7 @@ async test "submodule update: restores deinitialized worktree when another submo
       "rev-parse", "HEAD",
     ])
     |> add_test_trim_trailing_newline
-  assert_eq(restored_init, init_head)
+  @test.assert_eq(restored_init, init_head)
 
   assert_true(fs.is_dir(super_dir + "/other"))
   assert_true(fs.is_file(super_dir + "/other/.git"))
@@ -1692,7 +1692,7 @@ async test "submodule update: restores deinitialized worktree when another submo
       "rev-parse", "HEAD",
     ])
     |> add_test_trim_trailing_newline
-  assert_eq(restored_other, other_head)
+  @test.assert_eq(restored_other, other_head)
 
   cleanup_tree(fs, root)
 }
@@ -1740,7 +1740,7 @@ async test "submodule init: relative url resolves against origin remote" {
       "config", "--get", "submodule.sub.url",
     ])
     |> add_test_trim_trailing_newline
-  assert_eq(config_url, "ssh://hostname/subrepo")
+  @test.assert_eq(config_url, "ssh://hostname/subrepo")
 
   cleanup_tree(fs, root)
 }
@@ -1785,7 +1785,7 @@ async test "submodule add: relative repo with normalized path keeps resolved con
       "config", "--get", "submodule.a/b/c.url",
     ])
     |> add_test_trim_trailing_newline
-  assert_eq(config_url, "../foo/bar/a/b/c")
+  @test.assert_eq(config_url, "../foo/bar/a/b/c")
 
   cleanup_tree(fs, root)
 }
@@ -1828,8 +1828,8 @@ async test "submodule add: quiet suppresses fetch stderr and writes expected git
       "config", "--get", "core.worktree",
     ])
     |> add_test_trim_trailing_newline
-  assert_eq(dotgit, "gitdir: ../.git/modules/submod\n")
-  assert_eq(core_worktree, "../../../submod")
+  @test.assert_eq(dotgit, "gitdir: ../.git/modules/submod\n")
+  @test.assert_eq(core_worktree, "../../../submod")
 
   cleanup_tree(fs, root)
 }
@@ -1885,8 +1885,8 @@ async test "submodule add: depth=1 keeps shallow history for local file url" {
   let shallow = decode_bytes(
     fs.read_file(super_dir + "/.git/modules/submodule/shallow"),
   )
-  assert_eq(count, "1")
-  assert_eq(shallow, head_id + "\n")
+  @test.assert_eq(count, "1")
+  @test.assert_eq(shallow, head_id + "\n")
 
   cleanup_tree(fs, root)
 }
@@ -1938,7 +1938,7 @@ async test "submodule add: detached local source still copies target history" {
     ])
     |> add_test_trim_trailing_newline
   submodule_wbtest_run_git(super_dir + "/submodule", ["checkout", "-q", "HEAD^"])
-  assert_eq(count, "2")
+  @test.assert_eq(count, "2")
 
   cleanup_tree(fs, root)
 }
@@ -1981,7 +1981,7 @@ async test "submodule add: cloned gitlink repo stays clean for diff-files" {
     [init_dir, root + "/.subrepo"],
     inherit_env=true,
   )
-  assert_eq(mv_code, 0)
+  @test.assert_eq(mv_code, 0)
 
   submodule_wbtest_run_git(root, [
     "init", "--initial-branch=main", "-q", "addtest",
@@ -2003,7 +2003,7 @@ async test "submodule add: cloned gitlink repo stays clean for diff-files" {
   ])
 
   let stale = collect_diff_index_stale_entries(fs, addtest_dir + "/submod", [])
-  assert_eq(stale.map(entry => entry.path), [])
+  @test.assert_eq(stale.map(entry => entry.path), [])
 
   cleanup_tree(fs, root)
 }
@@ -2037,7 +2037,7 @@ async test "submodule add: target id follows requested branch" {
     normalize_path(root),
     Some("initial"),
   )
-  assert_eq(resolved.to_hex(), initial_id)
+  @test.assert_eq(resolved.to_hex(), initial_id)
 
   cleanup_tree(fs, root)
 }
@@ -2090,8 +2090,8 @@ async test "submodule add: force reconfigure existing submodule does not refetch
       "config", "--get", "submodule.submod.url",
     ])
     |> add_test_trim_trailing_newline
-  assert_eq(gitmodules_url, bogus_url)
-  assert_eq(config_url, bogus_url)
+  @test.assert_eq(gitmodules_url, bogus_url)
+  @test.assert_eq(config_url, bogus_url)
   cleanup_tree(fs, root)
 }
 
@@ -2137,13 +2137,13 @@ async test "submodule add: reused name requires force after git rm" {
   let (fail_code, _fail_stderr) = submodule_wbtest_git_stderr(addtest_dir, [
     "submodule", "add", "-q", "--name", "repo_new", bogus_url, "repo",
   ])
-  assert_eq(fail_code, 128)
+  @test.assert_eq(fail_code, 128)
   assert_false(fs.is_dir(addtest_dir + "/repo"))
   let preserved_url = submodule_wbtest_git_stdout(addtest_dir, [
       "config", "--get", "submodule.repo_new.url",
     ])
     |> add_test_trim_trailing_newline
-  assert_eq(preserved_url, source_url)
+  @test.assert_eq(preserved_url, source_url)
 
   handle_submodule_add(fs, addtest_dir, addtest_git_dir, [
     "-f", "-q", "--name", "repo_new", bogus_url, "repo",
@@ -2157,9 +2157,9 @@ async test "submodule add: reused name requires force after git rm" {
       "config", "--get", "submodule.repo_new.url",
     ])
     |> add_test_trim_trailing_newline
-  assert_eq(gitmodules_url, bogus_url)
-  assert_eq(config_url, bogus_url)
-  assert_eq(
+  @test.assert_eq(gitmodules_url, bogus_url)
+  @test.assert_eq(config_url, bogus_url)
+  @test.assert_eq(
     decode_bytes(fs.read_file(addtest_dir + "/repo/.git")),
     "gitdir: ../.git/modules/repo_new\n",
   )
@@ -2211,7 +2211,7 @@ async test "submodule add: --name keeps separate module name and path" {
   assert_true(config_content.contains("[submodule \"repo_new\"]"))
   assert_true(config_content.contains("path = repo"))
   assert_true(fs.is_dir(addtest_dir + "/.git/modules/repo_new"))
-  assert_eq(
+  @test.assert_eq(
     decode_bytes(fs.read_file(addtest_dir + "/repo/.git")),
     "gitdir: ../.git/modules/repo_new\n",
   )
@@ -2280,7 +2280,7 @@ async test "submodule add: moved submodule name stays reserved" {
     super_dir + "/.git",
     "child",
   )
-  assert_eq(reserved_path, Some("child_old"))
+  @test.assert_eq(reserved_path, Some("child_old"))
   assert_true(
     submodule_add_name_in_use_error("child", "child_old").contains(
       "already used for",
@@ -2342,8 +2342,8 @@ async test "submodule add: branch keeps default branch head alongside requested 
       ["for-each-ref", "--format=%(refname)", "refs/heads/*"],
     )
     |> add_test_trim_trailing_newline
-  assert_eq(head_ref, "refs/heads/initial")
-  assert_eq(branch_heads, "refs/heads/initial\nrefs/heads/main")
+  @test.assert_eq(head_ref, "refs/heads/initial")
+  @test.assert_eq(branch_heads, "refs/heads/initial\nrefs/heads/main")
   cleanup_tree(fs, root)
 }
 
@@ -2397,8 +2397,8 @@ async test "submodule sync: relative url resolves against superproject root when
     ])
     |> add_test_trim_trailing_newline
   let expected = normalize_path(root + "/repo")
-  assert_eq(config_url, expected)
-  assert_eq(sub_origin, expected)
+  @test.assert_eq(config_url, expected)
+  @test.assert_eq(sub_origin, expected)
 
   cleanup_tree(fs, root)
 }
@@ -2456,8 +2456,8 @@ async test "submodule sync: relative url stays relative in config when origin ex
       "config", "--get", "remote.origin.url",
     ])
     |> add_test_trim_trailing_newline
-  assert_eq(config_url, "../repo")
-  assert_eq(sub_origin, "../../repo")
+  @test.assert_eq(config_url, "../repo")
+  @test.assert_eq(sub_origin, "../../repo")
 
   cleanup_tree(fs, root)
 }

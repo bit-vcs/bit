@@ -124,7 +124,7 @@ fn parse_merge_todo_entry(after : String) -> InteractiveTodoEntry {
 pub fn parse_interactive_todo(text : String) -> Array[InteractiveTodoEntry] {
   let entries : Array[InteractiveTodoEntry] = []
   for line_view in text.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     let trimmed = @string_utils.trim_string(line)
     if trimmed.length() == 0 || trimmed.has_prefix("#") {
       continue
@@ -446,7 +446,7 @@ pub fn load_interactive_rebase_state(
   )
   if labels_text.length() > 0 {
     for line_view in labels_text.split("\n") {
-      let line = @string_utils.trim_string(line_view.to_string())
+      let line = @string_utils.trim_string(line_view.to_owned())
       if line.length() == 0 {
         continue
       }
@@ -466,7 +466,7 @@ pub fn load_interactive_rebase_state(
   )
   if update_refs_text.length() > 0 {
     for line_view in update_refs_text.split("\n") {
-      let line = @string_utils.trim_string(line_view.to_string())
+      let line = @string_utils.trim_string(line_view.to_owned())
       if line.length() == 0 {
         continue
       }
@@ -606,7 +606,7 @@ pub fn insert_exec_after_picks(
 fn extract_todo_comments(text : String) -> String {
   let sb = StringBuilder::new()
   for line_view in text.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     if line.has_prefix("#") {
       sb.write_string(line)
       sb.write_string("\n")

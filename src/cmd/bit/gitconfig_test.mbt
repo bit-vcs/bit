@@ -12,11 +12,11 @@ test "parse alias section from gitconfig" {
     #|  shell = "!echo hello"
     #|
   let aliases = parse_gitconfig_aliases(content)
-  assert_eq(aliases["co"], "checkout")
-  assert_eq(aliases["st"], "status -sb")
-  assert_eq(aliases["lg"], "log --oneline")
-  assert_eq(aliases["shell"], "!echo hello")
-  assert_eq(aliases.get("editor"), None)
+  @test.assert_eq(aliases["co"], "checkout")
+  @test.assert_eq(aliases["st"], "status -sb")
+  @test.assert_eq(aliases["lg"], "log --oneline")
+  @test.assert_eq(aliases["shell"], "!echo hello")
+  @test.assert_eq(aliases.get("editor"), None)
 }
 
 ///|
@@ -25,10 +25,10 @@ test "resolve alias expands args" {
   aliases.set("st", "status -sb")
   match resolve_alias(aliases, "st", ["-u"]) {
     Resolved(cmd, rest) => {
-      assert_eq(cmd, "status")
-      assert_eq(rest.length(), 2)
-      assert_eq(rest[0], "-sb")
-      assert_eq(rest[1], "-u")
+      @test.assert_eq(cmd, "status")
+      @test.assert_eq(rest.length(), 2)
+      @test.assert_eq(rest[0], "-sb")
+      @test.assert_eq(rest[1], "-u")
     }
     Shell(_) => fail("unexpected shell alias")
   }
@@ -40,9 +40,9 @@ test "resolve alias keeps quoted args together" {
   aliases.set("pretty", "log --pretty=\"%h %s\"")
   match resolve_alias(aliases, "pretty", []) {
     Resolved(cmd, rest) => {
-      assert_eq(cmd, "log")
-      assert_eq(rest.length(), 1)
-      assert_eq(rest[0], "--pretty=%h %s")
+      @test.assert_eq(cmd, "log")
+      @test.assert_eq(rest.length(), 1)
+      @test.assert_eq(rest[0], "--pretty=%h %s")
     }
     Shell(_) => fail("unexpected shell alias")
   }

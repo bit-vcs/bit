@@ -68,7 +68,7 @@ async fn handle_checkout_index(args : Array[String]) -> Unit raise Error {
     let stdin_text = decode_bytes(stdin_data)
     let sep = if nul_sep { "\u0000" } else { "\n" }
     for part_view in stdin_text.split(sep) {
-      let part = part_view.to_string()
+      let part = part_view.to_owned()
       let trimmed = trim_string(part)
       if trimmed.length() > 0 {
         files_to_checkout.push(trimmed)
@@ -242,7 +242,7 @@ fn checkout_index_load_dbs(
   }
   let alt_text = decode_bytes(alt_data)
   for line_view in alt_text.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     if line.length() == 0 || line.has_prefix("#") {
       continue
     }

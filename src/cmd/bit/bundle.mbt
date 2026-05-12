@@ -189,7 +189,7 @@ fn collect_bundle_objects(
             // Parse tag target
             let text = decode_bytes(obj.data)
             for line_view in text.split("\n") {
-              let line = line_view.to_string()
+              let line = line_view.to_owned()
               if line.has_prefix("object ") {
                 let target_hex = String::unsafe_substring(
                   line,
@@ -339,7 +339,7 @@ fn parse_bundle_file(
   let prereqs : Array[String] = []
   let refs : Array[(String, String)] = []
   for line_view in header.split("\n") {
-    let line = trim_string(line_view.to_string())
+    let line = trim_string(line_view.to_owned())
     if line.length() == 0 || line.has_prefix("#") {
       continue
     }

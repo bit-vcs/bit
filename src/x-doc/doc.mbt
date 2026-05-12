@@ -36,7 +36,7 @@ fn is_valid_page_name(page_name : String) -> Bool {
     }
   }
   for view in page.split("/") {
-    let seg = view.to_string()
+    let seg = view.to_owned()
     if seg.length() == 0 || seg == "." || seg == ".." {
       return false
     }

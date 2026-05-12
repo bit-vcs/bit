@@ -18,13 +18,13 @@ test "tag: cleanup file message strips comments and surrounding blanks" {
     #|Repeated blank lines
     #|
     #|Trailing spaces
-  assert_eq(tag_cleanup_message(input), expected)
+  @test.assert_eq(tag_cleanup_message(input), expected)
 }
 
 ///|
 test "tag: cleanup treats comment-only inline messages as empty" {
-  assert_eq(tag_cleanup_message("#comment"), "")
-  assert_eq(tag_cleanup_message("     "), "")
+  @test.assert_eq(tag_cleanup_message("#comment"), "")
+  @test.assert_eq(tag_cleanup_message("     "), "")
 }
 
 ///|
@@ -42,7 +42,7 @@ test "tag: default sort is lexical" {
 ///|
 test "tag: annotation output aligns first line without extra separator" {
   let lines = tag_format_annotation_lines("tag-one-line", ["A msg"])
-  assert_eq(lines.join("\n"), "tag-one-line    A msg")
+  @test.assert_eq(lines.join("\n"), "tag-one-line    A msg")
 }
 
 ///|
@@ -50,22 +50,22 @@ test "tag: annotation output indents continuation lines" {
   let lines = tag_format_annotation_lines("tag-lines", [
     "tag line one", "tag line two",
   ])
-  assert_eq(lines.join("\n"), "tag-lines       tag line one\n    tag line two")
+  @test.assert_eq(lines.join("\n"), "tag-lines       tag line one\n    tag line two")
 }
 
 ///|
 test "tag: editor template starts with blank line when message is absent" {
   let template = tag_edit_buffer_template(None)
-  assert_eq(string_slice_to(template, 1), "\n")
+  @test.assert_eq(string_slice_to(template, 1), "\n")
 }
 
 ///|
 test "tag: short option bundles expand annotate and message" {
-  assert_eq(tag_expand_short_bundles(["-am", "msg", "v1"]), [
+  @test.assert_eq(tag_expand_short_bundles(["-am", "msg", "v1"]), [
     "-a", "-m", "msg", "v1",
   ])
-  assert_eq(tag_expand_short_bundles(["-ammsg", "v1"]), ["-a", "-mmsg", "v1"])
-  assert_eq(tag_expand_short_bundles(["-n2", "v1"]), ["-n2", "v1"])
+  @test.assert_eq(tag_expand_short_bundles(["-ammsg", "v1"]), ["-a", "-mmsg", "v1"])
+  @test.assert_eq(tag_expand_short_bundles(["-n2", "v1"]), ["-n2", "v1"])
 }
 
 ///|
@@ -146,8 +146,8 @@ async test "tag: -s stores signature block via configured signing program" {
 
 ///|
 test "tag: sort field aliases normalize to refname variants" {
-  assert_eq(tag_normalize_sort_field("tag"), "refname")
-  assert_eq(tag_normalize_sort_field("version:tag"), "version:refname")
+  @test.assert_eq(tag_normalize_sort_field("tag"), "refname")
+  @test.assert_eq(tag_normalize_sort_field("version:tag"), "version:refname")
 }
 
 ///|
@@ -161,7 +161,7 @@ test "tag: validate tag name rejects invalid forms" {
 
 ///|
 test "tag: reflog message formatting matches git" {
-  assert_eq(
+  @test.assert_eq(
     tag_reflog_message("1234567", "Foo", "2026-03-09"),
     "tag: tagging 1234567 (Foo, 2026-03-09)",
   )
@@ -169,19 +169,19 @@ test "tag: reflog message formatting matches git" {
 
 ///|
 test "tag: contains aliases normalize to canonical filter keys" {
-  assert_eq(
+  @test.assert_eq(
     tag_parse_contains_style_option("--with", None),
     Some(("contains", "HEAD", 0)),
   )
-  assert_eq(
+  @test.assert_eq(
     tag_parse_contains_style_option("--without", None),
     Some(("no_contains", "HEAD", 0)),
   )
-  assert_eq(
+  @test.assert_eq(
     tag_parse_contains_style_option("--with=main", None),
     Some(("contains", "main", 0)),
   )
-  assert_eq(
+  @test.assert_eq(
     tag_parse_contains_style_option("--without=main", None),
     Some(("no_contains", "main", 0)),
   )
@@ -189,15 +189,15 @@ test "tag: contains aliases normalize to canonical filter keys" {
 
 ///|
 test "tag: contains-style options consume explicit revs and reject following options" {
-  assert_eq(
+  @test.assert_eq(
     tag_parse_contains_style_option("--contains", Some("topic")),
     Some(("contains", "topic", 1)),
   )
-  assert_eq(
+  @test.assert_eq(
     tag_parse_contains_style_option("--no-contains", Some("topic")),
     Some(("no_contains", "topic", 1)),
   )
-  assert_eq(
+  @test.assert_eq(
     tag_parse_contains_style_option("--contains", Some("--no-contains")),
     Some(("invalid", "--contains", 0)),
   )
@@ -212,13 +212,13 @@ test "tag: nested advice text matches git" {
     #|hint:
     #|hint: 	git tag -f nested annotated-v4.0^{}
     #|hint: Disable this message with "git config set advice.nestedTag false"
-  assert_eq(lines.join("\n"), expected)
+  @test.assert_eq(lines.join("\n"), expected)
 }
 
 ///|
 test "tag: trailer args normalize to key-value lines" {
-  assert_eq(tag_normalize_trailer_arg("my-trailer=here"), "my-trailer: here")
-  assert_eq(
+  @test.assert_eq(tag_normalize_trailer_arg("my-trailer=here"), "my-trailer: here")
+  @test.assert_eq(
     tag_normalize_trailer_arg("alt-trailer=there"),
     "alt-trailer: there",
   )
@@ -234,7 +234,7 @@ test "tag: trailers append after a blank separator" {
     #|
     #|my-trailer: here
     #|alt-trailer: there
-  assert_eq(message, expected)
+  @test.assert_eq(message, expected)
 }
 
 ///|
@@ -246,7 +246,7 @@ test "tag: trailer-only edit buffer keeps a leading blank line" {
     #|
     #|my-trailer: here
     #|alt-trailer: there
-  assert_eq(message, expected)
+  @test.assert_eq(message, expected)
 }
 
 ///|
@@ -259,8 +259,8 @@ test "tag: extract message lines keeps commit subject for lightweight tags" {
     #|Foo
     #|Bar
     #|
-  assert_eq(tag_extract_message_lines(commit_text, 1).join("\n"), "Foo")
-  assert_eq(tag_extract_message_lines(commit_text, 2).join("\n"), "Foo\nBar")
+  @test.assert_eq(tag_extract_message_lines(commit_text, 1).join("\n"), "Foo")
+  @test.assert_eq(tag_extract_message_lines(commit_text, 2).join("\n"), "Foo\nBar")
 }
 
 ///|
@@ -272,8 +272,8 @@ test "tag: versionsort parse detects missing values" {
   let (suffix_values, prerelease_values, missing_suffix, missing_prerelease) = tag_versionsort_parse_config_text(
     text,
   )
-  assert_eq(suffix_values.length(), 0)
-  assert_eq(prerelease_values.length(), 0)
+  @test.assert_eq(suffix_values.length(), 0)
+  @test.assert_eq(prerelease_values.length(), 0)
   assert_true(missing_suffix)
   assert_true(missing_prerelease)
 }
@@ -315,7 +315,7 @@ test "tag: column row layout uses global max width by default" {
   let expected =
     #|a1      aa1     cba     t210    t211
     #|v0.2.1  v1.0    v1.0.1  v1.1.3
-  assert_eq(lines.join("\n"), expected)
+  @test.assert_eq(lines.join("\n"), expected)
 }
 
 ///|
@@ -328,5 +328,5 @@ test "tag: column dense layout uses per-column widths" {
   let expected =
     #|a1      aa1   cba     t210    t211
     #|v0.2.1  v1.0  v1.0.1  v1.1.3
-  assert_eq(lines.join("\n"), expected)
+  @test.assert_eq(lines.join("\n"), expected)
 }

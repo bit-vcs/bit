@@ -363,7 +363,7 @@ fn read_ssh_variant_override() -> String? {
         None => None
         Some(overrides) => {
           for line_view in overrides.split("\n") {
-            let line = line_view.to_string()
+            let line = line_view.to_owned()
             if line.length() == 0 {
               continue
             }

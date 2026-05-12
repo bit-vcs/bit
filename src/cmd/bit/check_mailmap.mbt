@@ -25,7 +25,7 @@ async fn handle_check_mailmap(args : Array[String]) -> Unit raise Error {
   if use_stdin {
     let input = decode_bytes(read_all_stdin())
     for line_view in input.split("\n") {
-      let line = line_view.to_string()
+      let line = line_view.to_owned()
       if line.length() > 0 {
         print_line(check_mailmap_map_contact(line, mailmap))
       }
@@ -76,7 +76,7 @@ fn check_mailmap_get_config_mailmap_file(
   // Simple parse: look for mailmap.file = <value>
   let mut in_mailmap = false
   for line_view in text.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     let trimmed = check_mailmap_trim(line)
     if trimmed.has_prefix("[mailmap") {
       in_mailmap = true
@@ -121,7 +121,7 @@ fn check_mailmap_parse_file(
   let data = fs.read_file(path) catch { _ => return }
   let text = decode_bytes(data)
   for line_view in text.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     if line.length() == 0 || line.has_prefix("#") {
       continue
     }

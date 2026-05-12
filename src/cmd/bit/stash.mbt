@@ -347,8 +347,8 @@ async fn stash_show_patch(
         continue
       }
       print_line("diff --git a/\{path} b/\{path}")
-      let p_short = p.id.to_hex()[:7].to_string()
-      let s_short = s.id.to_hex()[:7].to_string()
+      let p_short = p.id.to_hex()[:7].to_owned()
+      let s_short = s.id.to_hex()[:7].to_owned()
       print_line("index \{p_short}..\{s_short} \{stash_mode_str(s.mode)}")
       print_line("--- a/\{path}")
       print_line("+++ b/\{path}")
@@ -392,7 +392,7 @@ fn stash_read_blob(
       let text = @utf8.decode_lossy(o.data[:])
       let lines : Array[String] = []
       for line_view in text.split("\n") {
-        lines.push(line_view.to_string())
+        lines.push(line_view.to_owned())
       }
       if lines.length() > 0 && lines[lines.length() - 1] == "" {
         ignore(lines.pop())

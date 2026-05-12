@@ -11,7 +11,7 @@ pub fn read_promisor_remote(
     return None
   }
   let content = fs.read_file(promisor_path) catch { _ => return None }
-  let remote = @utf8.decode_lossy(content[:]).trim().to_string()
+  let remote = @utf8.decode_lossy(content[:]).trim().to_owned()
   if remote.length() > 0 {
     Some(remote)
   } else {

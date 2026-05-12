@@ -49,3 +49,7 @@ options(
     "time_native.mbt": [ "native" ],
   },
 )
+
+import {
+  "moonbitlang/core/test" @test,
+} for "wbtest"

@@ -24,11 +24,11 @@ async fn switch_wbtest_run_shim_git(
       ["build", "--target", "native", "--release"],
       inherit_env=true,
     )
-    assert_eq(build_code, 0)
+    @test.assert_eq(build_code, 0)
   }
   fs.write_string(shim_moon, "#!/bin/sh\nset -eu\nexec '\{bit_exe}' \"$@\"\n")
   let chmod_code = @process.run("chmod", ["+x", shim_moon], inherit_env=true)
-  assert_eq(chmod_code, 0)
+  @test.assert_eq(chmod_code, 0)
   let env : Map[String, String] = {
     "SHIM_REAL_GIT": wbtest_resolve_real_git(repo_root),
     "SHIM_EXEC_PATH": repo_root + "/third_party/git",
@@ -46,9 +46,9 @@ async fn switch_wbtest_run_shim_git(
     extra_env=env,
     inherit_env=true,
   )
-  assert_eq(code, 0)
+  @test.assert_eq(code, 0)
   let stderr_text = stderr.text() catch { _ => "" }
-  assert_eq(stderr_text, "")
+  @test.assert_eq(stderr_text, "")
 }
 
 ///|
@@ -92,15 +92,15 @@ async fn switch_wbtest_case_tracking_config_uses_short_branch_names() -> Unit ra
   let (_, branches) = @bitlib.read_repo_config(fs, git_dir)
   match branches.get("foo2") {
     Some(cfg) => {
-      assert_eq(cfg.remote, Some("origin"))
-      assert_eq(cfg.merges, ["refs/heads/foo"])
+      @test.assert_eq(cfg.remote, Some("origin"))
+      @test.assert_eq(cfg.merges, ["refs/heads/foo"])
     }
     None => fail("expected inherited tracking config for foo2")
   }
   match branches.get("foo4") {
     Some(cfg) => {
-      assert_eq(cfg.remote, Some("."))
-      assert_eq(cfg.merges, ["refs/heads/foo"])
+      @test.assert_eq(cfg.remote, Some("."))
+      @test.assert_eq(cfg.merges, ["refs/heads/foo"])
     }
     None => fail("expected direct tracking config for foo4")
   }
@@ -137,7 +137,7 @@ async fn switch_wbtest_case_branch_in_use_path_accepts_full_ref() -> Unit raise 
     ])
     |> add_test_trim_trailing_newline
 
-  assert_eq(
+  @test.assert_eq(
     switch_branch_in_use_path(fs, linked_dir, "refs/heads/shared"),
     Some(expected_repo),
   )
@@ -190,7 +190,7 @@ async fn switch_wbtest_case_orphan_allows_cached_rm() -> Unit raise Error {
   switch_wbtest_run_shim_git(repo_dir, ["switch", "-q", "--orphan", "unborn"])
   switch_wbtest_run_shim_git(repo_dir, ["rm", "-q", "--cached", "-r", "."])
 
-  assert_eq(add_test_git_stdout(repo_dir, ["ls-files"]), "")
+  @test.assert_eq(add_test_git_stdout(repo_dir, ["ls-files"]), "")
   assert_true(fs.is_file(repo_dir + "/init.t"))
   cleanup_tree(fs, root)
 }
@@ -212,7 +212,7 @@ async fn switch_wbtest_case_create_branch_in_unborn_repo_keeps_ref_unborn() -> U
 
   switch_wbtest_run_shim_git(repo_dir, ["switch", "-q", "-c", "topic"])
 
-  assert_eq(
+  @test.assert_eq(
     decode_bytes(fs.read_file(git_dir + "/HEAD")),
     "ref: refs/heads/topic\n",
   )
@@ -222,7 +222,7 @@ async fn switch_wbtest_case_create_branch_in_unborn_repo_keeps_ref_unborn() -> U
   add_test_run_git(repo_dir, ["add", "topic.t"])
   add_test_run_git(repo_dir, ["commit", "-q", "-m", "topic"])
 
-  assert_eq(
+  @test.assert_eq(
     add_test_git_stdout(repo_dir, ["rev-parse", "--abbrev-ref", "HEAD"])
     |> add_test_trim_trailing_newline,
     "topic",

@@ -77,7 +77,7 @@ fn parse_hub_merge_policy_toml(
   let mut required_workflows : Array[String] = []
   let mut in_merge_section = false
   for line_view in content.split("\n") {
-    let raw_line = line_view.to_string()
+    let raw_line = line_view.to_owned()
     let line = trim_string(raw_line)
     if line.length() == 0 || line.has_prefix("#") || line.has_prefix(";") {
       continue
@@ -407,9 +407,9 @@ fn format_issue_detail(issue : @hub.Issue) -> String {
   let raw = issue.serialize()
   let sb = StringBuilder::new()
   for line_view in raw.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     if line.has_prefix("created ") {
-      let ts = line[8:].to_string()
+      let ts = line[8:].to_owned()
       sb.write_string("created ")
       sb.write_string(ts)
       sb.write_string(" (")
@@ -417,7 +417,7 @@ fn format_issue_detail(issue : @hub.Issue) -> String {
       sb.write_string(")")
       sb.write_char('\n')
     } else if line.has_prefix("updated ") {
-      let ts = line[8:].to_string()
+      let ts = line[8:].to_owned()
       sb.write_string("updated ")
       sb.write_string(ts)
       sb.write_string(" (")

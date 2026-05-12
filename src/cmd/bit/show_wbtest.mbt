@@ -14,7 +14,7 @@ async fn show_wbtest_run_git(
     inherit_env=true,
     cwd=root,
   )
-  assert_eq(code, 0)
+  @test.assert_eq(code, 0)
 }
 
 ///|
@@ -28,7 +28,7 @@ async fn show_wbtest_git_stdout(
     inherit_env=true,
     cwd=root,
   )
-  assert_eq(code, 0)
+  @test.assert_eq(code, 0)
   stdout.text() catch {
     _ => ""
   }
@@ -75,7 +75,7 @@ test "show: render tree lines adds trailing slash for directories" {
     #|
     #|a/
     #|main1.t
-  assert_eq(lines.join("\n"), expected)
+  @test.assert_eq(lines.join("\n"), expected)
 }
 
 ///|
@@ -86,29 +86,29 @@ test "show: parse tag info reads metadata and message" {
     "\ntype commit\ntag annotated\ntagger Test User <test@example.com> 1700000000 +0900\n\nannotated tag\n"
   let data = str_to_bytes(text)
   let info = show_parse_tag_info(data).unwrap()
-  assert_eq(info.target, zero)
-  assert_eq(info.name, "annotated")
-  assert_eq(info.tagger, "Test User <test@example.com>")
-  assert_eq(info.timestamp, 1700000000L)
-  assert_eq(info.timezone, "+0900")
-  assert_eq(info.message, "annotated tag")
+  @test.assert_eq(info.target, zero)
+  @test.assert_eq(info.name, "annotated")
+  @test.assert_eq(info.tagger, "Test User <test@example.com>")
+  @test.assert_eq(info.timestamp, 1700000000L)
+  @test.assert_eq(info.timezone, "+0900")
+  @test.assert_eq(info.message, "annotated tag")
 }
 
 ///|
 test "show: parse args detects walk mode and graph flag" {
   let count_opts = show_parse_args(["-2", "main3"])
   assert_true(count_opts.walk_mode)
-  assert_eq(count_opts.max_count, 2)
-  assert_eq(count_opts.revs, ["main3"])
+  @test.assert_eq(count_opts.max_count, 2)
+  @test.assert_eq(count_opts.revs, ["main3"])
 
   let range_opts = show_parse_args(["^side3", "main3"])
   assert_true(range_opts.walk_mode)
-  assert_eq(range_opts.range_excludes, ["side3"])
-  assert_eq(range_opts.revs, ["main3"])
+  @test.assert_eq(range_opts.range_excludes, ["side3"])
+  @test.assert_eq(range_opts.revs, ["main3"])
 
   let tree_opts = show_parse_args(["main1^{tree}"])
   assert_false(tree_opts.walk_mode)
-  assert_eq(tree_opts.revs, ["main1^{tree}"])
+  @test.assert_eq(tree_opts.revs, ["main1^{tree}"])
 
   let graph_opts = show_parse_args(["--graph", "HEAD"])
   assert_true(graph_opts.graph_requested)
@@ -123,15 +123,15 @@ test "show: resolves :path against index entries" {
   @bitlib.write_index_entries(fs, git_dir, [
     @bitlib.IndexEntry::new("staged-file", zero, 0o100644, 12),
   ])
-  assert_eq(
+  @test.assert_eq(
     show_resolve_index_object_id(fs, git_dir, ":staged-file"),
     Some(zero),
   )
-  assert_eq(
+  @test.assert_eq(
     show_resolve_index_object_id(fs, git_dir, ":./staged-file"),
     Some(zero),
   )
-  assert_eq(show_resolve_index_object_id(fs, git_dir, ":missing"), None)
+  @test.assert_eq(show_resolve_index_object_id(fs, git_dir, ":missing"), None)
 }
 
 ///|
@@ -160,7 +160,7 @@ test "show: pretty format uses generic commit formatter" {
     false,
   ).unwrap()
   let expected = "Alice,alice@example.com,\{date}\n"
-  assert_eq(rendered, expected)
+  @test.assert_eq(rendered, expected)
 }
 
 ///|
@@ -187,7 +187,7 @@ test "show: pretty format honors body modifiers" {
     GrepPatternType::Basic,
     false,
   ).unwrap()
-  assert_eq(rendered, "subject\nbody line\nThanks\n")
+  @test.assert_eq(rendered, "subject\nbody line\nThanks\n")
 }
 
 ///|
@@ -219,7 +219,7 @@ test "show: default commit rendering does not add trailing blank message lines" 
     "Date:   Wed Nov 15 07:13:20 2023 +0900\n" +
     "\n" +
     "    subject\n\n"
-  assert_eq(rendered, expected)
+  @test.assert_eq(rendered, expected)
 }
 
 ///|
@@ -252,7 +252,7 @@ test "show: default commit rendering inserts signature after commit line" {
     "Date:   Wed Nov 15 07:13:20 2023 +0900\n" +
     "\n" +
     "    subject\n\n"
-  assert_eq(rendered, expected)
+  @test.assert_eq(rendered, expected)
 }
 
 ///|
@@ -279,7 +279,7 @@ test "show: pretty format prefixes signature output" {
     GrepPatternType::Basic,
     false,
   ).unwrap()
-  assert_eq(
+  @test.assert_eq(
     rendered, "gpg: Good signature from \"Test User <test@example.com>\"\nsubject\n",
   )
 }
@@ -321,18 +321,18 @@ async test "show: command path prints graft deprecation advice and honors config
 
   let head = show_wbtest_git_stdout(repo_dir, ["rev-parse", "HEAD"])
     .trim()
-    .to_string()
+    .to_owned()
   let parent = show_wbtest_git_stdout(repo_dir, ["rev-parse", "HEAD^"])
     .trim()
-    .to_string()
+    .to_owned()
   fs.mkdir_p(repo_dir + "/.git/info")
   fs.write_string(repo_dir + "/.git/info/grafts", head + " " + parent + "\n")
 
   let (code, stderr) = show_wbtest_collect_shim_git_stderr(repo_dir, [
     "show", "HEAD",
   ])
-  assert_eq(code, 0)
-  assert_eq(stderr, show_graft_deprecation_advice_lines().join("\n") + "\n")
+  @test.assert_eq(code, 0)
+  @test.assert_eq(stderr, show_graft_deprecation_advice_lines().join("\n") + "\n")
 
   fs.write_string(
     repo_dir + "/.git/config",
@@ -343,8 +343,8 @@ async test "show: command path prints graft deprecation advice and honors config
     repo_dir,
     ["show", "HEAD"],
   )
-  assert_eq(suppressed_code, 0)
-  assert_eq(suppressed_stderr, "")
+  @test.assert_eq(suppressed_code, 0)
+  @test.assert_eq(suppressed_stderr, "")
 
   show_wbtest_run_git(repo_dir, ["config", "log.showsignature", "true"])
   assert_false(show_requires_real_git(["HEAD"], git_dir=repo_dir + "/.git"))

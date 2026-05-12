@@ -78,7 +78,7 @@ async fn handle_diff_tree(args : Array[String]) -> Unit raise Error {
     let text = decode_bytes(input)
     let db = @bitlib.ObjectDb::load(rfs, git_dir)
     for line_view in text.split("\n") {
-      let line = trim_string(line_view.to_string())
+      let line = trim_string(line_view.to_owned())
       if line.length() == 0 {
         continue
       }

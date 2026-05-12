@@ -4,7 +4,7 @@ fn collect_global_config_overrides_for_delegate() -> Array[String] {
   match @sys.get_env_var("GIT_CONFIG_OVERRIDES") {
     Some(encoded) =>
       for line_view in encoded.split("\n") {
-        let line = line_view.to_string()
+        let line = line_view.to_owned()
         if line.length() == 0 {
           continue
         }
@@ -428,7 +428,7 @@ fn fetch_remote_uses_relay_signaling(remote_url : String) -> Bool {
 fn fetch_normalize_optional_value(value : String?) -> String? {
   match value {
     Some(raw) => {
-      let normalized = raw.trim(chars=" \n\r\t").to_string()
+      let normalized = raw.trim(chars=" \n\r\t").to_owned()
       if normalized.length() == 0 {
         None
       } else {

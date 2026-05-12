@@ -301,7 +301,7 @@ fn submodule_resolve_relative_url(
 fn submodule_up_path(path : String) -> String {
   let up : Array[String] = []
   for part_view in path.split("/") {
-    if part_view.to_string().length() > 0 {
+    if part_view.to_owned().length() > 0 {
       up.push("../")
     }
   }
@@ -1064,7 +1064,7 @@ async fn handle_submodule_add(
 fn derive_submodule_path(url : String) -> String {
   let mut name = url
   for part_view in url.split("/") {
-    let part = part_view.to_string()
+    let part = part_view.to_owned()
     if part.length() > 0 {
       name = part
     }
@@ -1323,7 +1323,7 @@ fn parse_submodule_config(
   let mut current_path = ""
   let mut current_url = ""
   for line_view in content.split("\n") {
-    let line = trim_string(line_view.to_string())
+    let line = trim_string(line_view.to_owned())
     if line.has_prefix("[submodule \"") && line.has_suffix("\"]") {
       if current_name.length() > 0 && current_path.length() > 0 {
         result.push({ name: current_name, path: current_path, url: current_url })
@@ -1808,7 +1808,7 @@ fn gitmodules_has_unmapped_paths(content : String) -> Bool {
   let mut has_path = false
   let mut has_url = false
   for line_view in content.split("\n") {
-    let line = trim_string(line_view.to_string())
+    let line = trim_string(line_view.to_owned())
     if line.has_prefix("[submodule \"") && line.has_suffix("\"]") {
       if in_section && has_url && !has_path {
         return true
@@ -1874,7 +1874,7 @@ fn submodule_upsert_config_value(
   let target = "[submodule \"\{name}\"]"
   let lines : Array[String] = []
   for line_view in content.split("\n") {
-    lines.push(line_view.to_string())
+    lines.push(line_view.to_owned())
   }
   let mut section_start = -1
   let mut section_end = lines.length()
@@ -2857,13 +2857,13 @@ async fn submodule_run_post_checkout_hook(
 fn get_rel_path(from : String, to : String) -> String {
   let from_parts : Array[String] = from
     .split("/")
-    .filter(s => s.to_string().length() > 0)
-    .map(s => s.to_string())
+    .filter(s => s.to_owned().length() > 0)
+    .map(s => s.to_owned())
     .collect()
   let to_parts : Array[String] = to
     .split("/")
-    .filter(s => s.to_string().length() > 0)
-    .map(s => s.to_string())
+    .filter(s => s.to_owned().length() > 0)
+    .map(s => s.to_owned())
     .collect()
   // Find common prefix
   let mut common = 0
@@ -3068,7 +3068,7 @@ fn remove_config_section(
   let mut skip = false
   let target = "[\{section_type} \"\{name}\"]"
   for line_view in content.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     let trimmed = trim_chars(line, " \t")
     if trimmed.has_prefix("[") {
       skip = trimmed == target
@@ -3089,7 +3089,7 @@ fn remove_config_key(
   let lines : Array[String] = []
   let mut in_target = false
   for line_view in content.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     let trimmed = trim_chars(line, " \t")
     if trimmed.has_prefix("[") {
       in_target = trimmed == section_header
@@ -3302,7 +3302,7 @@ fn update_config_value(
   let mut updated = false
   let target = "[submodule \"\{name}\"]"
   for line_view in content.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     let trimmed = trim_chars(line, " \t")
     if trimmed.has_prefix("[") {
       in_section = trimmed == target
@@ -3323,7 +3323,7 @@ fn update_remote_origin(content : String, url : String) -> String {
   let mut in_origin = false
   let mut updated = false
   for line_view in content.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     let trimmed = trim_chars(line, " \t")
     if trimmed.has_prefix("[") {
       in_origin = trimmed == "[remote \"origin\"]"

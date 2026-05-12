@@ -14,3 +14,7 @@ warnings = "-29"
 options(
   targets: { "fingerprint_wbtest.mbt": [ "native" ] },
 )
+
+import {
+  "moonbitlang/core/test" @test,
+} for "wbtest"

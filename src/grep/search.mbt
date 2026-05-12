@@ -893,7 +893,7 @@ fn collect_line_matches(
   let matches : Array[GrepLineMatch] = []
   let lines : Array[String] = []
   for line_view in content.split("\n") {
-    lines.push(line_view.to_string())
+    lines.push(line_view.to_owned())
   }
   let last = lines.length() - 1
   for i in 0..<lines.length() {

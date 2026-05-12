@@ -92,13 +92,13 @@ fn remove_worktree_path_recursive(
 fn tree_ops_get_rel_path(from : String, to : String) -> String {
   let from_parts : Array[String] = from
     .split("/")
-    .filter(s => s.to_string().length() > 0)
-    .map(s => s.to_string())
+    .filter(s => s.to_owned().length() > 0)
+    .map(s => s.to_owned())
     .collect()
   let to_parts : Array[String] = to
     .split("/")
-    .filter(s => s.to_string().length() > 0)
-    .map(s => s.to_string())
+    .filter(s => s.to_owned().length() > 0)
+    .map(s => s.to_owned())
     .collect()
   let mut common = 0
   while common < from_parts.length() && common < to_parts.length() {
@@ -129,8 +129,8 @@ fn tree_ops_find_submodule_name_in_content(
   let mut current_name : String? = None
   let mut current_path : String? = None
   for line_view in content.split("\n") {
-    let line = line_view.to_string()
-    let trimmed = line.trim(chars=" \t").to_string()
+    let line = line_view.to_owned()
+    let trimmed = line.trim(chars=" \t").to_owned()
     if trimmed.has_prefix("[submodule \"") && trimmed.has_suffix("\"]") {
       match (current_name, current_path) {
         (Some(name), Some(current)) if current == path => return Some(name)
@@ -202,8 +202,8 @@ fn tree_ops_set_core_config_value(
   let mut found_section = false
   let mut key_set = false
   for line_view in content.split("\n") {
-    let line = line_view.to_string()
-    let trimmed = line.trim(chars=" \t").to_string()
+    let line = line_view.to_owned()
+    let trimmed = line.trim(chars=" \t").to_owned()
     if trimmed == "[core]" {
       in_core = true
       found_section = true

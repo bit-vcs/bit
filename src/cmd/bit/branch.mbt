@@ -432,7 +432,7 @@ fn branch_get_commit_subject(
       let text = @utf8.decode_lossy(o.data[:])
       let mut in_header = true
       for line_view in text.split("\n") {
-        let line = line_view.to_string()
+        let line = line_view.to_owned()
         if in_header {
           if line.length() == 0 {
             in_header = false
@@ -476,9 +476,9 @@ fn branch_last_config_value(
 fn branch_parse_column_tokens(value : String) -> Array[String] {
   let tokens : Array[String] = []
   for comma_part in value.split(",") {
-    let chunk = comma_part.to_string()
+    let chunk = comma_part.to_owned()
     for space_part in chunk.split(" ") {
-      let token = space_part.to_string().trim().to_string()
+      let token = space_part.to_owned().trim().to_owned()
       if token.length() > 0 {
         tokens.push(token)
       }

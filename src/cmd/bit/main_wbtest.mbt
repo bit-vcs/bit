@@ -1,7 +1,7 @@
 ///|
 test "main: parse_global_options keeps raw -C path for diagnostics" {
   let opts = parse_global_options(["bit", "-C", "missing/repo", "init"])
-  assert_eq(opts.cwd_raw, Some("missing/repo"))
+  @test.assert_eq(opts.cwd_raw, Some("missing/repo"))
   assert_true(opts.cwd is Some(_))
 }
 
@@ -9,11 +9,11 @@ test "main: parse_global_options keeps raw -C path for diagnostics" {
 test "main: missing_global_cwd_error uses raw -C path" {
   let fs = @bitcore.TestFs::new()
   fs.mkdir_p("/repo/existing")
-  assert_eq(
+  @test.assert_eq(
     missing_global_cwd_error(fs, Some("/repo/existing"), Some("existing")),
     None,
   )
-  assert_eq(
+  @test.assert_eq(
     missing_global_cwd_error(fs, Some("/repo/missing"), Some("missing")),
     Some("fatal: cannot change to 'missing': No such file or directory"),
   )
@@ -69,7 +69,7 @@ test "main: config overrides use last matching value" {
   @sys.set_env_var(
     "GIT_CONFIG_OVERRIDES", "grep.patternType=extended\ngrep.patternType=default\ngrep.patternType=fixed",
   )
-  assert_eq(get_config_override("grep.patternType"), Some("fixed"))
+  @test.assert_eq(get_config_override("grep.patternType"), Some("fixed"))
   match prev {
     Some(value) => @sys.set_env_var("GIT_CONFIG_OVERRIDES", value)
     None => @sys.unset_env_var("GIT_CONFIG_OVERRIDES")

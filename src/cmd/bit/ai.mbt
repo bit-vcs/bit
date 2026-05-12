@@ -135,7 +135,7 @@ fn extract_commit_message_for_ai(data : Bytes) -> String {
   let mut in_message = false
   let message_lines : Array[String] = []
   for line_view in content.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     if in_message {
       message_lines.push(line)
       continue

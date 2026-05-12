@@ -63,7 +63,7 @@ pub fn parse_commit(content : Bytes) -> CommitInfo raise @object.GitError {
   let mut tree_id : @object.ObjectId? = None
   let parents : Array[@object.ObjectId] = []
   for line_view in text.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     if line.length() == 0 {
       break
     }

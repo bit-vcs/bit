@@ -45,62 +45,62 @@ async fn relay_test_http_post_ok(
 
 ///|
 test "relay: parse_relay_base_url handles explicit prefixes" {
-  assert_eq(
+  @test.assert_eq(
     parse_relay_base_url("relay+http://127.0.0.1:8787"),
     Some("http://127.0.0.1:8787"),
   )
-  assert_eq(
+  @test.assert_eq(
     parse_relay_base_url("relay+https://relay.example.com"),
     Some("https://relay.example.com"),
   )
-  assert_eq(
+  @test.assert_eq(
     parse_relay_base_url("relay://127.0.0.1:8787"),
     Some("http://127.0.0.1:8787"),
   )
   // Plain HTTP URLs without /git/<session> pattern are NOT relay URLs
-  assert_eq(parse_relay_base_url("http://127.0.0.1:8787"), None)
-  assert_eq(parse_relay_base_url("https://github.com/user/repo.git"), None)
+  @test.assert_eq(parse_relay_base_url("http://127.0.0.1:8787"), None)
+  @test.assert_eq(parse_relay_base_url("https://github.com/user/repo.git"), None)
 }
 
 ///|
 test "relay: parse_relay_base_url detects proxied relay git session URLs" {
   // Proxied URL stored by `bit clone relay+https://host/<session>`
-  assert_eq(
+  @test.assert_eq(
     parse_relay_base_url("https://relay.example.com/git/AbCdEfGh"),
     Some("https://relay.example.com"),
   )
-  assert_eq(
+  @test.assert_eq(
     parse_relay_base_url("http://localhost:8788/git/jfIGqUeq"),
     Some("http://localhost:8788"),
   )
   // With trailing slash
-  assert_eq(
+  @test.assert_eq(
     parse_relay_base_url("https://relay.example.com/git/AbCdEfGh/"),
     Some("https://relay.example.com"),
   )
   // With query parameters
-  assert_eq(
+  @test.assert_eq(
     parse_relay_base_url("https://relay.example.com/git/AbCdEfGh?room=main"),
     Some("https://relay.example.com"),
   )
   // Too short session ID (< 6 chars) - not a relay URL
-  assert_eq(parse_relay_base_url("https://relay.example.com/git/Ab12"), None)
+  @test.assert_eq(parse_relay_base_url("https://relay.example.com/git/Ab12"), None)
   // Too long session ID (> 16 chars) - not a relay URL
-  assert_eq(
+  @test.assert_eq(
     parse_relay_base_url("https://relay.example.com/git/AbCdEfGhIjKlMnOpQr"),
     None,
   )
   // Named session (owner/repo) - not a random session, contains slash
-  assert_eq(
+  @test.assert_eq(
     parse_relay_base_url("https://relay.example.com/git/owner/repo"),
     None,
   )
   // Non-alphanumeric chars in session - not a relay URL
-  assert_eq(parse_relay_base_url("https://relay.example.com/git/abc-def"), None)
+  @test.assert_eq(parse_relay_base_url("https://relay.example.com/git/abc-def"), None)
   // .git suffix contains dot - not a relay URL
-  assert_eq(parse_relay_base_url("https://github.com/git/foobar123.git"), None)
+  @test.assert_eq(parse_relay_base_url("https://github.com/git/foobar123.git"), None)
   // SSH URL - not a relay URL
-  assert_eq(parse_relay_base_url("git@github.com:user/repo.git"), None)
+  @test.assert_eq(parse_relay_base_url("git@github.com:user/repo.git"), None)
 }
 
 ///|
@@ -108,9 +108,9 @@ test "relay: relay_resolve_control_endpoint parses room and token query" {
   let endpoint = relay_resolve_control_endpoint(
     "relay+https://relay.example.com/base/?room=team-a&room_token=token-1",
   )
-  assert_eq(endpoint.base_url, "https://relay.example.com/base")
-  assert_eq(endpoint.room, "team-a")
-  assert_eq(endpoint.room_token, Some("token-1"))
+  @test.assert_eq(endpoint.base_url, "https://relay.example.com/base")
+  @test.assert_eq(endpoint.room, "team-a")
+  @test.assert_eq(endpoint.room_token, Some("token-1"))
 }
 
 ///|
@@ -185,10 +185,10 @@ test "relay: should_fallback_to_relay only for http 404 smart-http errors" {
 test "relay: parse_relay_poll_body extracts hub records and cursor" {
   let body = "{\"ok\":true,\"room\":\"main\",\"next_cursor\":1,\"envelopes\":[{\"room\":\"main\",\"id\":\"msg-1\",\"sender\":\"node-a\",\"topic\":\"notify\",\"payload\":{\"kind\":\"hub.record\",\"record\":\"version 1\\nkey hub/pr/1/meta\\nkind hub.pr\\nclock node-a=1\\ntimestamp 1\\nnode node-a\\ndeleted 0\\n\\npayload\"},\"signature\":null}]}"
   let (cursor, records) = parse_relay_poll_body(body)
-  assert_eq(cursor, 1)
-  assert_eq(records.length(), 1)
-  assert_eq(records[0].key, "hub/pr/1/meta")
-  assert_eq(records[0].payload, "payload")
+  @test.assert_eq(cursor, 1)
+  @test.assert_eq(records.length(), 1)
+  @test.assert_eq(records[0].key, "hub/pr/1/meta")
+  @test.assert_eq(records[0].payload, "payload")
 }
 
 ///|
@@ -224,7 +224,7 @@ test "relay: apply_relay_records stores imported record into notes" {
   let loaded = reloaded.get_record(objects, "hub/pr/1/meta")
   assert_true(loaded is Some(_))
   guard loaded is Some(record) else { panic() }
-  assert_eq(record.payload, "payload")
+  @test.assert_eq(record.payload, "payload")
 }
 
 ///|
@@ -336,8 +336,8 @@ async test "relay: relay push forwards auth token header" {
     auth_token=Some("token-1"),
   )
   assert_true(result.success())
-  assert_eq(seen_auth.length(), 1)
-  assert_eq(seen_auth[0], "Bearer token-1")
+  @test.assert_eq(seen_auth.length(), 1)
+  @test.assert_eq(seen_auth[0], "Bearer token-1")
 }
 
 ///|
@@ -432,20 +432,20 @@ async test "relay: relay push adds relay signature headers when key env is set" 
   )
 
   assert_true(result.success())
-  assert_eq(seen_public_keys.length(), 1)
-  assert_eq(seen_public_keys[0], "test-public-key")
-  assert_eq(seen_signatures.length(), 1)
+  @test.assert_eq(seen_public_keys.length(), 1)
+  @test.assert_eq(seen_public_keys[0], "test-public-key")
+  @test.assert_eq(seen_signatures.length(), 1)
   assert_true(seen_signatures[0].length() > 0)
   assert_false(seen_signatures[0].contains("+"))
   assert_false(seen_signatures[0].contains("/"))
   assert_false(seen_signatures[0].contains("="))
-  assert_eq(seen_timestamps.length(), 1)
+  @test.assert_eq(seen_timestamps.length(), 1)
   assert_true(seen_timestamps[0].length() > 0)
   let timestamp_sec = @string.parse_int64(seen_timestamps[0]) catch {
     _ => fail("expected x-relay-timestamp to be int64")
   }
   assert_true(timestamp_sec >= 1_000_000_000L)
-  assert_eq(seen_nonces.length(), 1)
+  @test.assert_eq(seen_nonces.length(), 1)
   assert_true(seen_nonces[0].length() > 0)
 }
 
@@ -496,7 +496,7 @@ async test "relay: relay push uses BIT_RELAY_SENDER for publish sender query" {
   )
   @sys.unset_env_var("BIT_RELAY_SENDER")
   assert_true(result.success())
-  assert_eq(seen_urls.length(), 1)
+  @test.assert_eq(seen_urls.length(), 1)
   assert_true(seen_urls[0].contains("sender=node-a"))
   assert_true(seen_urls[0].contains("room=team-a"))
   assert_true(seen_urls[0].contains("room_token=token-1"))
@@ -544,9 +544,9 @@ async test "relay: relay fetch forwards auth token header" {
     auth_token=Some("token-2"),
   )
   assert_true(result.success())
-  assert_eq(seen_auth.length(), 1)
-  assert_eq(seen_auth[0], "Bearer token-2")
-  assert_eq(seen_urls.length(), 1)
+  @test.assert_eq(seen_auth.length(), 1)
+  @test.assert_eq(seen_auth[0], "Bearer token-2")
+  @test.assert_eq(seen_urls.length(), 1)
   assert_true(seen_urls[0].contains("room=team-a"))
   assert_true(seen_urls[0].contains("room_token=token-2"))
 }
@@ -601,12 +601,12 @@ test "relay: parse_relay_poll_clone_peers extracts latest announce per sender" {
     include_self=false,
     self_sender="node-self",
   )
-  assert_eq(cursor, 4)
-  assert_eq(peers.length(), 1)
+  @test.assert_eq(cursor, 4)
+  @test.assert_eq(peers.length(), 1)
   let (sender, clone_url, repo) = peers[0]
-  assert_eq(sender, "node-a")
-  assert_eq(clone_url, "http://node-a-new:9418/repo.git")
-  assert_eq(repo, Some("repo-a"))
+  @test.assert_eq(sender, "node-a")
+  @test.assert_eq(clone_url, "http://node-a-new:9418/repo.git")
+  @test.assert_eq(repo, Some("repo-a"))
 }
 
 ///|
@@ -646,14 +646,14 @@ async test "relay: relay_publish_clone_announce_with_http publishes notify paylo
   )
   @sys.unset_env_var("BIT_RELAY_SENDER")
   assert_true(accepted)
-  assert_eq(seen_urls.length(), 1)
+  @test.assert_eq(seen_urls.length(), 1)
   assert_true(seen_urls[0].contains("sender=node-self"))
   assert_true(seen_urls[0].contains("topic=notify"))
   assert_true(seen_urls[0].contains("room=team-a"))
   assert_true(seen_urls[0].contains("room_token=token-3"))
-  assert_eq(seen_auth.length(), 1)
-  assert_eq(seen_auth[0], "Bearer token-3")
-  assert_eq(seen_bodies.length(), 1)
+  @test.assert_eq(seen_auth.length(), 1)
+  @test.assert_eq(seen_auth[0], "Bearer token-3")
+  @test.assert_eq(seen_bodies.length(), 1)
   assert_true(seen_bodies[0].contains("\"kind\":\"bit.clone.announce.v1\""))
   assert_true(
     seen_bodies[0].contains("\"clone_url\":\"http://node-self:9418/repo.git\""),
@@ -694,18 +694,18 @@ async test "relay: relay_list_clone_peers_with_http filters self sender by defau
     auth_token=Some("token-4"),
     include_self=true,
   )
-  assert_eq(seen_auth.length(), 2)
-  assert_eq(seen_urls.length(), 2)
+  @test.assert_eq(seen_auth.length(), 2)
+  @test.assert_eq(seen_urls.length(), 2)
   assert_true(seen_urls[0].contains("room=team-a"))
   assert_true(seen_urls[0].contains("room_token=token-4"))
   assert_true(seen_urls[1].contains("room=team-a"))
   assert_true(seen_urls[1].contains("room_token=token-4"))
-  assert_eq(seen_auth[0], "Bearer token-4")
-  assert_eq(seen_auth[1], "Bearer token-4")
-  assert_eq(peers.length(), 1)
+  @test.assert_eq(seen_auth[0], "Bearer token-4")
+  @test.assert_eq(seen_auth[1], "Bearer token-4")
+  @test.assert_eq(peers.length(), 1)
   let (sender, clone_url, repo) = peers[0]
-  assert_eq(sender, "node-peer")
-  assert_eq(clone_url, "http://peer:9418/repo.git")
-  assert_eq(repo, Some("repo-peer"))
-  assert_eq(peers_including_self.length(), 2)
+  @test.assert_eq(sender, "node-peer")
+  @test.assert_eq(clone_url, "http://peer:9418/repo.git")
+  @test.assert_eq(repo, Some("repo-peer"))
+  @test.assert_eq(peers_including_self.length(), 2)
 }
