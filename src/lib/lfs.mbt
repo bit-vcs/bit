@@ -52,7 +52,7 @@ pub fn parse_lfs_pointer(content : Bytes) -> LfsPointer? {
   let mut oid : String? = None
   let mut size : Int64? = None
   for line_view in text.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if line.has_prefix(lfs_oid_prefix) {
       oid = Some(
         String::unsafe_substring(

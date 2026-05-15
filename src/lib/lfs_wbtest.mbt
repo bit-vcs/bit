@@ -1,48 +1,48 @@
 ///|
 test "is_lfs_pointer: valid pointer" {
   let content = b"version https://git-lfs.github.com/spec/v1\noid sha256:4d7a214614ab2935c943f9e0ff69d22eadbb8f32b1258daaa5e2ca24d17e2393\nsize 12345\n"
-  @test.assert_eq(is_lfs_pointer(content), true)
+  assert_eq(is_lfs_pointer(content), true)
 }
 
 ///|
 test "is_lfs_pointer: empty content" {
-  @test.assert_eq(is_lfs_pointer(b""), false)
+  assert_eq(is_lfs_pointer(b""), false)
 }
 
 ///|
 test "is_lfs_pointer: regular file content" {
-  @test.assert_eq(is_lfs_pointer(b"hello world\n"), false)
+  assert_eq(is_lfs_pointer(b"hello world\n"), false)
 }
 
 ///|
 test "is_lfs_pointer: wrong version" {
   let content = b"version https://example.com/v1\noid sha256:abcd\nsize 100\n"
-  @test.assert_eq(is_lfs_pointer(content), false)
+  assert_eq(is_lfs_pointer(content), false)
 }
 
 ///|
 test "parse_lfs_pointer: valid pointer" {
   let content = b"version https://git-lfs.github.com/spec/v1\noid sha256:4d7a214614ab2935c943f9e0ff69d22eadbb8f32b1258daaa5e2ca24d17e2393\nsize 12345\n"
   let ptr = parse_lfs_pointer(content)
-  @test.assert_eq(ptr is None, false)
+  assert_eq(ptr is None, false)
   let p = ptr.unwrap()
-  @test.assert_eq(
+  assert_eq(
     p.oid,
     "4d7a214614ab2935c943f9e0ff69d22eadbb8f32b1258daaa5e2ca24d17e2393",
   )
-  @test.assert_eq(p.size, 12345L)
+  assert_eq(p.size, 12345L)
 }
 
 ///|
 test "parse_lfs_pointer: missing oid" {
   let content = b"version https://git-lfs.github.com/spec/v1\nsize 100\n"
-  @test.assert_eq(parse_lfs_pointer(content) is None, true)
+  assert_eq(parse_lfs_pointer(content) is None, true)
 }
 
 ///|
 test "parse_lfs_pointer: missing size" {
   let content = b"version https://git-lfs.github.com/spec/v1\noid sha256:4d7a214614ab2935c943f9e0ff69d22eadbb8f32b1258daaa5e2ca24d17e2393\n"
-  @test.assert_eq(parse_lfs_pointer(content) is None, true)
+  assert_eq(parse_lfs_pointer(content) is None, true)
 }
 
 ///|
@@ -62,7 +62,7 @@ test "lfs_object_path: correct sharding" {
   let path = lfs_object_path(
     "/repo/.git", "4d7a214614ab2935c943f9e0ff69d22eadbb8f32b1258daaa5e2ca24d17e2393",
   )
-  @test.assert_eq(
+  assert_eq(
     path, "/repo/.git/lfs/objects/4d/7a/4d7a214614ab2935c943f9e0ff69d22eadbb8f32b1258daaa5e2ca24d17e2393",
   )
 }
@@ -74,7 +74,7 @@ test "resolve_lfs_url: from lfs.url config" {
     remote_lfs_url="",
     remote_url="https://github.com/user/repo.git",
   )
-  @test.assert_eq(url, "https://custom-lfs.example.com")
+  assert_eq(url, "https://custom-lfs.example.com")
 }
 
 ///|
@@ -84,7 +84,7 @@ test "resolve_lfs_url: from remote lfsurl" {
     remote_lfs_url="https://remote-lfs.example.com",
     remote_url="https://github.com/user/repo.git",
   )
-  @test.assert_eq(url, "https://remote-lfs.example.com")
+  assert_eq(url, "https://remote-lfs.example.com")
 }
 
 ///|
@@ -94,7 +94,7 @@ test "resolve_lfs_url: derived from remote url with .git suffix" {
     remote_lfs_url="",
     remote_url="https://github.com/user/repo.git",
   )
-  @test.assert_eq(url, "https://github.com/user/repo.git/info/lfs")
+  assert_eq(url, "https://github.com/user/repo.git/info/lfs")
 }
 
 ///|
@@ -104,7 +104,7 @@ test "resolve_lfs_url: derived from remote url without .git suffix" {
     remote_lfs_url="",
     remote_url="https://github.com/user/repo",
   )
-  @test.assert_eq(url, "https://github.com/user/repo.git/info/lfs")
+  assert_eq(url, "https://github.com/user/repo.git/info/lfs")
 }
 
 ///|
@@ -114,7 +114,7 @@ test "resolve_lfs_url: relay session url does not add .git suffix" {
     remote_lfs_url="",
     remote_url="https://relay.example.com/git/abc123",
   )
-  @test.assert_eq(url, "https://relay.example.com/git/abc123/info/lfs")
+  assert_eq(url, "https://relay.example.com/git/abc123/info/lfs")
 }
 
 ///|
@@ -124,14 +124,14 @@ test "resolve_lfs_url: lfs.url takes priority" {
     remote_lfs_url="https://remote-lfs.example.com",
     remote_url="https://github.com/user/repo.git",
   )
-  @test.assert_eq(url, "https://priority.example.com")
+  assert_eq(url, "https://priority.example.com")
 }
 
 ///|
 test "lfs_verify_oid: correct hash" {
   // SHA-256 of empty byte sequence
   let data = b""
-  @test.assert_eq(
+  assert_eq(
     lfs_verify_oid(
       data, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     ),
@@ -142,7 +142,7 @@ test "lfs_verify_oid: correct hash" {
 ///|
 test "lfs_verify_oid: wrong hash" {
   let data = b"hello"
-  @test.assert_eq(
+  assert_eq(
     lfs_verify_oid(
       data, "0000000000000000000000000000000000000000000000000000000000000000",
     ),
@@ -152,22 +152,22 @@ test "lfs_verify_oid: wrong hash" {
 
 ///|
 test "lfs_is_valid_http_url: https" {
-  @test.assert_eq(lfs_is_valid_http_url("https://example.com/lfs"), true)
+  assert_eq(lfs_is_valid_http_url("https://example.com/lfs"), true)
 }
 
 ///|
 test "lfs_is_valid_http_url: http" {
-  @test.assert_eq(lfs_is_valid_http_url("http://example.com/lfs"), true)
+  assert_eq(lfs_is_valid_http_url("http://example.com/lfs"), true)
 }
 
 ///|
 test "lfs_is_valid_http_url: file scheme rejected" {
-  @test.assert_eq(lfs_is_valid_http_url("file:///etc/passwd"), false)
+  assert_eq(lfs_is_valid_http_url("file:///etc/passwd"), false)
 }
 
 ///|
 test "lfs_is_valid_http_url: ssh scheme rejected" {
-  @test.assert_eq(lfs_is_valid_http_url("git@github.com:user/repo.git"), false)
+  assert_eq(lfs_is_valid_http_url("git@github.com:user/repo.git"), false)
 }
 
 ///|
@@ -203,10 +203,10 @@ test "lfs clean: add_paths stores pointer blob and caches content" {
   let blob = lfs_test_index_blob(fs, "asset.bin")
   assert_true(is_lfs_pointer(blob))
   let ptr = parse_lfs_pointer(blob).unwrap()
-  @test.assert_eq(ptr.size, content.length().to_int64())
+  assert_eq(ptr.size, content.length().to_int64())
   assert_true(lfs_verify_oid(content, ptr.oid))
-  @test.assert_eq(lfs_get_cached_content(fs, "/repo/.git", ptr.oid), Some(content))
-  @test.assert_eq(fs.read_file("/repo/asset.bin"), content)
+  assert_eq(lfs_get_cached_content(fs, "/repo/.git", ptr.oid), Some(content))
+  assert_eq(fs.read_file("/repo/asset.bin"), content)
 }
 
 ///|
@@ -221,10 +221,10 @@ async test "lfs clean: add_paths_async stores pointer blob and caches content" {
   let blob = lfs_test_index_blob(fs, "asset.bin")
   assert_true(is_lfs_pointer(blob))
   let ptr = parse_lfs_pointer(blob).unwrap()
-  @test.assert_eq(ptr.size, content.length().to_int64())
+  assert_eq(ptr.size, content.length().to_int64())
   assert_true(lfs_verify_oid(content, ptr.oid))
-  @test.assert_eq(lfs_get_cached_content(fs, "/repo/.git", ptr.oid), Some(content))
-  @test.assert_eq(fs.read_file("/repo/asset.bin"), content)
+  assert_eq(lfs_get_cached_content(fs, "/repo/.git", ptr.oid), Some(content))
+  assert_eq(fs.read_file("/repo/asset.bin"), content)
 }
 
 ///|
@@ -251,7 +251,7 @@ test "lfs clean: add_paths does not re-clean existing pointer" {
   add_paths(fs, fs, "/repo", ["asset.bin"])
 
   let blob = lfs_test_index_blob(fs, "asset.bin")
-  @test.assert_eq(blob, pointer)
+  assert_eq(blob, pointer)
   let ptr = parse_lfs_pointer(blob).unwrap()
-  @test.assert_eq(lfs_get_cached_content(fs, "/repo/.git", ptr.oid), None)
+  assert_eq(lfs_get_cached_content(fs, "/repo/.git", ptr.oid), None)
 }

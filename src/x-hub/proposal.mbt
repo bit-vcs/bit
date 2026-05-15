@@ -201,7 +201,7 @@ pub fn Hub::list_node_heartbeats(
     let mut main_tip = ""
     let mut timestamp : Int64 = 0
     for line_view in record.payload.split("\n") {
-      let line = line_view.to_owned()
+      let line = line_view.to_string()
       match line.find(" ") {
         None => continue
         Some(idx) => {

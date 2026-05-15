@@ -246,7 +246,7 @@ async fn merge_base_fork_point(
   // Parse reflog entries to get new OIDs
   let reflog_oids : Array[@bitcore.ObjectId] = []
   for line_view in data.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if line.length() < 82 {
       continue
     }

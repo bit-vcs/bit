@@ -689,7 +689,7 @@ fn rebase_parse_commit_content(
   let mut commit_time = 0L
   let mut committer_tz = "+0000"
   for line_view in header.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if line.has_prefix("tree ") {
       let hex = String::unsafe_substring(line, start=5, end=line.length())
       tree_id = hex |> @bit.ObjectId::from_hex |> Some
@@ -972,12 +972,12 @@ fn parse_todo_file(
     (fs.read_file(path) catch { _ => Bytes::default() })[:],
   )
   for line_view in content.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if line.length() == 0 || line.has_prefix("#") {
       continue
     }
     // Format: "pick <sha>" or just "<sha>"
-    let parts = line.split(" ").map(v => v.to_owned()).collect()
+    let parts = line.split(" ").map(v => v.to_string()).collect()
     if parts.length() >= 2 && parts[0] == "pick" {
       let id = @bit.ObjectId::from_hex(parts[1]) catch { _ => continue }
       result.push(id)

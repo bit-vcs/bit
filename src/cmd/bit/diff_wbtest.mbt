@@ -1,9 +1,9 @@
 ///|
 test "diff: apply relative path strips literal prefix" {
-  @test.assert_eq(diff_apply_relative_path("subdir/file2", "subdir/"), Some("file2"))
-  @test.assert_eq(diff_apply_relative_path("subdir/file2", "subdir"), Some("file2"))
-  @test.assert_eq(diff_apply_relative_path("subdir/file2", "sub"), Some("dir/file2"))
-  @test.assert_eq(diff_apply_relative_path("file1", "subdir"), None)
+  assert_eq(diff_apply_relative_path("subdir/file2", "subdir/"), Some("file2"))
+  assert_eq(diff_apply_relative_path("subdir/file2", "subdir"), Some("file2"))
+  assert_eq(diff_apply_relative_path("subdir/file2", "sub"), Some("dir/file2"))
+  assert_eq(diff_apply_relative_path("file1", "subdir"), None)
 }
 
 ///|
@@ -27,8 +27,8 @@ test "diff: apply relative files filters outside prefix" {
     },
   ]
   let display = diff_apply_relative_files(files, Some("subdir"))
-  @test.assert_eq(display.length(), 1)
-  @test.assert_eq(display[0].path, "file2")
+  assert_eq(display.length(), 1)
+  assert_eq(display[0].path, "file2")
 }
 
 ///|
@@ -70,9 +70,9 @@ test "diff: orderfile patterns keep unmatched paths in normal order" {
   let patterns = diff_parse_orderfile_patterns(
     "# comment\n*Makefile\n*.txt\n*.h\n\n",
   )
-  @test.assert_eq(patterns, ["*Makefile", "*.txt", "*.h"])
+  assert_eq(patterns, ["*Makefile", "*.txt", "*.h"])
   let ordered = diff_apply_orderfile_patterns(files, patterns)
-  @test.assert_eq(ordered.map(file => file.path), [
+  assert_eq(ordered.map(file => file.path), [
     "c/Makefile", "d.txt", "a.h", "b.c",
   ])
 }
@@ -80,7 +80,7 @@ test "diff: orderfile patterns keep unmatched paths in normal order" {
 ///|
 test "diff: path compare sorts directories before later root files" {
   assert_true(diff_compare_path("c/Makefile", "d.txt") < 0)
-  @test.assert_eq(
+  assert_eq(
     diff_sort_files_by_path([
       {
         path: "d.txt",
@@ -138,7 +138,7 @@ test "diff: rotate strict and skip non-strict use git diffcore semantics" {
     strict=true,
   )
   assert_true(rotated is Some(_))
-  @test.assert_eq(rotated.unwrap().map(file => file.path), [
+  assert_eq(rotated.unwrap().map(file => file.path), [
     "sample2.t", "sample4.t", "sample1.t",
   ])
   let skipped = diff_apply_rotate_skip_files(
@@ -148,7 +148,7 @@ test "diff: rotate strict and skip non-strict use git diffcore semantics" {
     strict=false,
   )
   assert_true(skipped is Some(_))
-  @test.assert_eq(skipped.unwrap().map(file => file.path), ["sample4.t"])
+  assert_eq(skipped.unwrap().map(file => file.path), ["sample4.t"])
   assert_true(
     diff_apply_rotate_skip_files(files, Some("sample3.t"), None, strict=true)
     is None,
@@ -171,7 +171,7 @@ async test "diff: resolve relative prefix from cwd and config" {
     None,
     false,
   )
-  @test.assert_eq(from_config, Some("subdir"))
+  assert_eq(from_config, Some("subdir"))
   let explicit = diff_resolve_relative_prefix(
     fs,
     "/repo/.git",
@@ -179,7 +179,7 @@ async test "diff: resolve relative prefix from cwd and config" {
     Some("sub"),
     false,
   )
-  @test.assert_eq(explicit, Some("sub"))
+  assert_eq(explicit, Some("sub"))
   let disabled = diff_resolve_relative_prefix(
     fs,
     "/repo/.git",
@@ -187,7 +187,7 @@ async test "diff: resolve relative prefix from cwd and config" {
     Some("sub"),
     true,
   )
-  @test.assert_eq(disabled, None)
+  assert_eq(disabled, None)
   @sys.unset_env_var("GIT_SHIM_CWD")
   @sys.unset_env_var("GIT_SHIM_PWD")
 }
@@ -204,8 +204,8 @@ test "diff: format numstat and stat" {
       new_mode: Some(0o100644),
     },
   ]
-  @test.assert_eq(diff_format_numstat(files), ["1\t0\tfile2"])
-  @test.assert_eq(diff_format_stat(files), [
+  assert_eq(diff_format_numstat(files), ["1\t0\tfile2"])
+  assert_eq(diff_format_stat(files), [
     " file2 | 1 +", " 1 file changed, 1 insertion(+)",
   ])
 }
@@ -241,15 +241,15 @@ test "diff: format shortstat summary dirstat and compact summary" {
       new_mode: Some(0o100644),
     },
   ]
-  @test.assert_eq(diff_format_shortstat(files), [
+  assert_eq(diff_format_shortstat(files), [
     " 3 files changed, 2 insertions(+), 4 deletions(-)",
   ])
-  @test.assert_eq(diff_format_summary(files), [
+  assert_eq(diff_format_summary(files), [
     " mode change 100644 => 100755 path0", " delete mode 100755 path1",
   ])
-  @test.assert_eq(diff_format_dirstat(files), ["  45.3% path2/"])
-  @test.assert_eq(diff_format_dirstat(files, by_file=true), ["  33.3% path2/"])
-  @test.assert_eq(diff_format_stat(files, compact_summary=true), [
+  assert_eq(diff_format_dirstat(files), ["  45.3% path2/"])
+  assert_eq(diff_format_dirstat(files, by_file=true), ["  33.3% path2/"])
+  assert_eq(diff_format_stat(files, compact_summary=true), [
     " path0 (mode +x) | 2 +-", " path1 (gone)    | 3 ---", " path2/path3     | 1 +",
     " 3 files changed, 2 insertions(+), 4 deletions(-)",
   ])
@@ -284,7 +284,7 @@ test "diff: ignore-all-space drops whitespace-only modifications" {
     },
   ]
   let filtered = diff_filter_ignore_all_space(files)
-  @test.assert_eq(filtered.map(f => f.path), ["mode.txt", "real.txt"])
+  assert_eq(filtered.map(f => f.path), ["mode.txt", "real.txt"])
 }
 
 ///|
@@ -300,7 +300,7 @@ test "diff: check helper finds trailing whitespace and conflict markers" {
     old_mode: Some(0o100644),
     new_mode: Some(0o100644),
   })
-  @test.assert_eq(issues_a.map(issue => "\{issue.line}:\{issue.message}"), [
+  assert_eq(issues_a.map(issue => "\{issue.line}:\{issue.message}"), [
     "2:trailing whitespace.",
   ])
   let issues_b = diff_collect_check_issues_for_file(fs, "/repo", {
@@ -311,7 +311,7 @@ test "diff: check helper finds trailing whitespace and conflict markers" {
     old_mode: Some(0o100644),
     new_mode: Some(0o100644),
   })
-  @test.assert_eq(issues_b.map(issue => "\{issue.line}:\{issue.message}"), [
+  assert_eq(issues_b.map(issue => "\{issue.line}:\{issue.message}"), [
     "2:leftover conflict marker", "3:leftover conflict marker",
   ])
 }
@@ -331,11 +331,11 @@ test "diff: raw formatter uses blob object ids" {
     @bitcore.ObjectType::Blob,
     content,
   )
-  @test.assert_eq(
+  assert_eq(
     format_diff_index_line_from_diff_file(file),
     ":000000 100644 0000000000000000000000000000000000000000 \{expected_oid.to_hex()} A\tfile2",
   )
-  @test.assert_eq(
+  assert_eq(
     format_diff_index_line_from_diff_file(file, worktree_compare=true),
     ":000000 100644 0000000000000000000000000000000000000000 0000000000000000000000000000000000000000 A\tfile2",
   )
@@ -365,11 +365,11 @@ test "diff: raw worktree change tracks delete typechange and add" {
     Some(old_id),
     missing,
   ).unwrap()
-  @test.assert_eq(gone.path, "gone")
-  @test.assert_eq(gone.status, "D")
-  @test.assert_eq(gone.old_mode, Some(0o100644))
-  @test.assert_eq(gone.old_id.map(id => id.to_hex()), Some(old_id.to_hex()))
-  @test.assert_eq(gone.new_mode, None)
+  assert_eq(gone.path, "gone")
+  assert_eq(gone.status, "D")
+  assert_eq(gone.old_mode, Some(0o100644))
+  assert_eq(gone.old_id.map(id => id.to_hex()), Some(old_id.to_hex()))
+  assert_eq(gone.new_mode, None)
 
   let typed = diff_raw_worktree_change(
     "submodule",
@@ -377,18 +377,18 @@ test "diff: raw worktree change tracks delete typechange and add" {
     Some(old_id),
     submodule,
   ).unwrap()
-  @test.assert_eq(typed.path, "submodule")
-  @test.assert_eq(typed.status, "T")
-  @test.assert_eq(typed.old_mode, Some(0o100644))
-  @test.assert_eq(typed.old_id.map(id => id.to_hex()), Some(old_id.to_hex()))
-  @test.assert_eq(typed.new_mode, Some(0o160000))
+  assert_eq(typed.path, "submodule")
+  assert_eq(typed.status, "T")
+  assert_eq(typed.old_mode, Some(0o100644))
+  assert_eq(typed.old_id.map(id => id.to_hex()), Some(old_id.to_hex()))
+  assert_eq(typed.new_mode, Some(0o160000))
 
   let added = diff_raw_worktree_change("added", None, None, submodule).unwrap()
-  @test.assert_eq(added.path, "added")
-  @test.assert_eq(added.status, "A")
-  @test.assert_eq(added.old_mode, None)
-  @test.assert_eq(added.old_id, None)
-  @test.assert_eq(added.new_mode, Some(0o160000))
+  assert_eq(added.path, "added")
+  assert_eq(added.status, "A")
+  assert_eq(added.old_mode, None)
+  assert_eq(added.old_id, None)
+  assert_eq(added.new_mode, Some(0o160000))
 
   assert_true(
     diff_raw_worktree_change("same", Some(0o100644), Some(old_id), same_file)
@@ -420,9 +420,9 @@ test "diff: ignore-submodules filter removes gitlink raw changes" {
     },
   ]
   let filtered = diff_filter_raw_submodule_changes(changes, true)
-  @test.assert_eq(filtered.length(), 1)
-  @test.assert_eq(filtered[0].path, "plain")
-  @test.assert_eq(diff_filter_raw_submodule_changes(changes, false).length(), 2)
+  assert_eq(filtered.length(), 1)
+  assert_eq(filtered[0].path, "plain")
+  assert_eq(diff_filter_raw_submodule_changes(changes, false).length(), 2)
 }
 
 ///|
@@ -444,7 +444,7 @@ test "diff: extra unmerged names duplicate displayed relative paths" {
     [],
     Some("subdir"),
   )
-  @test.assert_eq(extra, ["file0"])
+  assert_eq(extra, ["file0"])
 }
 
 ///|
@@ -488,7 +488,7 @@ async test "diff: real fs diff_worktree sees gitlink head change" {
     inherit_env=true,
     cwd=root,
   )
-  @test.assert_eq(code_init, 0)
+  assert_eq(code_init, 0)
   submodule_wbtest_run_git(init_dir, ["config", "user.name", "Test User"])
   submodule_wbtest_run_git(init_dir, [
     "config", "user.email", "test@example.com",
@@ -505,7 +505,7 @@ async test "diff: real fs diff_worktree sees gitlink head change" {
     inherit_env=true,
     cwd=root,
   )
-  @test.assert_eq(code_super, 0)
+  assert_eq(code_super, 0)
   submodule_wbtest_run_git(super_dir, ["config", "user.name", "Test User"])
   submodule_wbtest_run_git(super_dir, [
     "config", "user.email", "test@example.com",
@@ -519,14 +519,14 @@ async test "diff: real fs diff_worktree sees gitlink head change" {
     inherit_env=true,
     cwd=root,
   )
-  @test.assert_eq(code_add, 0)
+  assert_eq(code_add, 0)
   let (code_commit, _, _) = @process.collect_output(
     "git",
     ["-C", super_dir, "commit", "-qam", "initial"],
     inherit_env=true,
     cwd=root,
   )
-  @test.assert_eq(code_commit, 0)
+  assert_eq(code_commit, 0)
   submodule_wbtest_restore_env("GIT_ALLOW_PROTOCOL", prev_allow_protocol)
 
   submodule_wbtest_run_git(super_dir + "/init", [
@@ -542,14 +542,14 @@ async test "diff: real fs diff_worktree sees gitlink head change" {
     inherit_env=true,
     cwd=root,
   )
-  @test.assert_eq(code_sub_add, 0)
+  assert_eq(code_sub_add, 0)
   let (code_sub_commit, _, _) = @process.collect_output(
     "git",
     ["-C", super_dir + "/init", "commit", "-q", "-m", "second"],
     inherit_env=true,
     cwd=root,
   )
-  @test.assert_eq(code_sub_commit, 0)
+  assert_eq(code_sub_commit, 0)
   let rev2 = submodule_wbtest_git_stdout(super_dir + "/init", [
       "rev-parse", "HEAD",
     ])
@@ -564,14 +564,14 @@ async test "diff: real fs diff_worktree sees gitlink head change" {
     }
   }
   let gitlink = gitlink.unwrap()
-  @test.assert_eq(gitlink.mode, 0o160000)
-  @test.assert_eq(gitlink.id.to_hex(), rev1)
+  assert_eq(gitlink.mode, 0o160000)
+  assert_eq(gitlink.id.to_hex(), rev1)
   let sub_git_dir = @bitlib.resolve_gitdir(fs, super_dir + "/init/.git")
   let head = @bitlib.resolve_head_commit(fs, sub_git_dir).unwrap()
-  @test.assert_eq(head.to_hex(), rev2)
+  assert_eq(head.to_hex(), rev2)
 
   let files = @bitdiff.diff_worktree(fs, super_dir)
-  @test.assert_eq(files.length(), 1)
+  assert_eq(files.length(), 1)
   let text = @bitdiff.diff_text(files)
   assert_true(text.contains("-Subproject commit " + rev1))
   assert_true(text.contains("+Subproject commit " + rev2))

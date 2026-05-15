@@ -118,7 +118,7 @@ pub fn parse_receive_pack_response(
       } else if channel == 3 {
         let msg = remote_bytes_to_string(content)
           .trim(chars=" \n\r\t")
-          .to_owned()
+          .to_string()
         if msg.length() > 0 {
           error_msg = msg
         }

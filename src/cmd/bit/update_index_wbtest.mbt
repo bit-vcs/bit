@@ -35,10 +35,10 @@ test "update-index: parse_update_index_info_line rejects bad paths" {
 
 ///|
 test "update-index: parse_update_index_version accepts supported values" {
-  @test.assert_eq(parse_update_index_version("2"), Some(2))
-  @test.assert_eq(parse_update_index_version("3"), Some(3))
-  @test.assert_eq(parse_update_index_version("4"), Some(4))
-  @test.assert_eq(parse_update_index_version("1"), None)
+  assert_eq(parse_update_index_version("2"), Some(2))
+  assert_eq(parse_update_index_version("3"), Some(3))
+  assert_eq(parse_update_index_version("4"), Some(4))
+  assert_eq(parse_update_index_version("1"), None)
 }
 
 ///|
@@ -63,8 +63,8 @@ test "update-index: preserve symlink mode when restaging existing entry" {
   let before = [@bitlib.IndexEntry::new("symlink", blob_id, 0o120000, 6)]
   let after = [@bitlib.IndexEntry::new("symlink", blob_id, 0o100644, 6)]
   let preserved = update_index_preserve_existing_symlink_modes(before, after)
-  @test.assert_eq(preserved.length(), 1)
-  @test.assert_eq(preserved[0].mode, 0o120000)
+  assert_eq(preserved.length(), 1)
+  assert_eq(preserved[0].mode, 0o120000)
 }
 
 ///|
@@ -78,7 +78,7 @@ async fn update_index_wbtest_run_git(
     inherit_env=true,
     cwd~,
   )
-  @test.assert_eq(code, 0)
+  assert_eq(code, 0)
 }
 
 ///|
@@ -101,11 +101,11 @@ async fn update_index_wbtest_run_sparse_checkout_shim(
       ["build", "--target", "native", "--release"],
       inherit_env=true,
     )
-    @test.assert_eq(build_code, 0)
+    assert_eq(build_code, 0)
   }
   fs.write_string(shim_moon, "#!/bin/sh\nset -eu\nexec '\{bit_exe}' \"$@\"\n")
   let chmod_code = @process.run("chmod", ["+x", shim_moon], inherit_env=true)
-  @test.assert_eq(chmod_code, 0)
+  assert_eq(chmod_code, 0)
   let env : Map[String, String] = {
     "SHIM_REAL_GIT": wbtest_resolve_real_git(repo_root),
     "SHIM_EXEC_PATH": repo_root + "/third_party/git",
@@ -123,9 +123,9 @@ async fn update_index_wbtest_run_sparse_checkout_shim(
     extra_env=env,
     inherit_env=true,
   )
-  @test.assert_eq(code, 0)
+  assert_eq(code, 0)
   let stderr_text = stderr.text() catch { _ => "" }
-  @test.assert_eq(stderr_text, "")
+  assert_eq(stderr_text, "")
 }
 
 ///|

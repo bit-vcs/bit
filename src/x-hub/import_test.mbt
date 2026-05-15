@@ -23,11 +23,11 @@ test "import pr: creates" {
     ["imported"],
   )
   let stats = hub.import_prs(objects, refs, clock, [pr])
-  @test.assert_eq(stats.created(), 1)
-  @test.assert_eq(stats.updated(), 0)
+  assert_eq(stats.created(), 1)
+  assert_eq(stats.updated(), 0)
   let stored = hub.get_pr(objects, "10")
   guard stored is Some(val) else { panic() }
-  @test.assert_eq(val.title(), "Imported PR")
+  assert_eq(val.title(), "Imported PR")
 }
 
 ///|
@@ -58,12 +58,12 @@ test "import pr: updates existing" {
     ["sync"],
   )
   let stats = hub.import_prs(objects, refs, clock, [pr])
-  @test.assert_eq(stats.created(), 0)
-  @test.assert_eq(stats.updated(), 1)
+  assert_eq(stats.created(), 0)
+  assert_eq(stats.updated(), 1)
   let stored = hub.get_pr(objects, pr_id)
   guard stored is Some(val) else { panic() }
-  @test.assert_eq(val.title(), "Updated Title")
-  @test.assert_eq(val.state(), PrState::Closed)
+  assert_eq(val.title(), "Updated Title")
+  assert_eq(val.state(), PrState::Closed)
 }
 
 ///|
@@ -89,17 +89,17 @@ test "import pr proposal: stores notify-only proposal records" {
     [],
   )
   let stats = hub.import_pr_proposals(objects, refs, clock, [proposal])
-  @test.assert_eq(stats.created(), 1)
-  @test.assert_eq(stats.updated(), 0)
-  @test.assert_eq(hub.list_prs(objects).length(), 0)
+  assert_eq(stats.created(), 1)
+  assert_eq(stats.updated(), 0)
+  assert_eq(hub.list_prs(objects).length(), 0)
   let proposals = hub.list_pr_proposals(objects)
-  @test.assert_eq(proposals.length(), 1)
-  @test.assert_eq(proposals[0].id(), "p1")
+  assert_eq(proposals.length(), 1)
+  assert_eq(proposals[0].id(), "p1")
   let key = pr_proposal_meta_key("p1")
   let record = hub.store.get_record(objects, key)
   guard record is Some(r) else { panic() }
-  @test.assert_eq(classify_record_trigger(r), RecordTriggerClass::NotifyOnly)
-  @test.assert_eq(record_notify_topic(r), Some("hub.pr.proposal"))
+  assert_eq(classify_record_trigger(r), RecordTriggerClass::NotifyOnly)
+  assert_eq(record_notify_topic(r), Some("hub.pr.proposal"))
 }
 
 ///|
@@ -131,9 +131,9 @@ test "import pr proposal: strict reader hides unsigned imported records" {
     [],
   )
   let stats = writer.import_pr_proposals(objects, refs, clock, [proposal])
-  @test.assert_eq(stats.created(), 1)
+  assert_eq(stats.created(), 1)
   reader.reload_store(objects, refs)
-  @test.assert_eq(reader.list_pr_proposals(objects).length(), 0)
+  assert_eq(reader.list_pr_proposals(objects).length(), 0)
 }
 
 ///|
@@ -170,9 +170,9 @@ test "import pr proposal: wrong key hides signed imported records" {
     [],
   )
   let stats = writer.import_pr_proposals(objects, refs, clock, [proposal])
-  @test.assert_eq(stats.created(), 1)
+  assert_eq(stats.created(), 1)
   reader.reload_store(objects, refs)
-  @test.assert_eq(reader.list_pr_proposals(objects).length(), 0)
+  assert_eq(reader.list_pr_proposals(objects).length(), 0)
 }
 
 ///|
@@ -225,8 +225,8 @@ test "import issue: creates" {
     assignees=["alice"],
   )
   let stats = hub.import_issues(objects, refs, clock, [issue])
-  @test.assert_eq(stats.created(), 1)
-  @test.assert_eq(stats.updated(), 0)
+  assert_eq(stats.created(), 1)
+  assert_eq(stats.updated(), 0)
   let created = hub.create_issue(
     objects, refs, clock, "Next", "Body", "alice@example.com",
   )

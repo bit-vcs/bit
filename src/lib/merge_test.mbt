@@ -38,7 +38,7 @@ test "merge: content-level merge non-overlapping changes" {
     }
   }
   let content = fs.read_string("/repo/file.txt")
-  @test.assert_eq(content, "line1\nchanged2\nline3\nchanged4\nline5\n")
+  assert_eq(content, "line1\nchanged2\nline3\nchanged4\nline5\n")
 }
 
 ///|
@@ -76,11 +76,11 @@ test "merge: content-level merge with conflict" {
   assert_true(content.contains("<<<<<<< HEAD"))
   assert_true(content.contains(">>>>>>> incoming"))
   let staged = read_index_stage_entries(fs, "/repo/.git")
-  @test.assert_eq(staged.length(), 3)
-  @test.assert_eq(staged[0].entry.path, "file.txt")
-  @test.assert_eq(staged[0].stage, 1)
-  @test.assert_eq(staged[1].stage, 2)
-  @test.assert_eq(staged[2].stage, 3)
+  assert_eq(staged.length(), 3)
+  assert_eq(staged[0].entry.path, "file.txt")
+  assert_eq(staged[0].stage, 1)
+  assert_eq(staged[1].stage, 2)
+  assert_eq(staged[2].stage, 3)
   assert_true(
     fs.read_string("/repo/.git/MERGE_HEAD").contains(feature_commit.to_hex()),
   )
@@ -173,10 +173,10 @@ test "merge: unborn branch fast-forwards to target" {
     FastForward => ()
     _ => fail("expected fast-forward merge")
   }
-  @test.assert_eq(result.commit_id, Some(target))
+  assert_eq(result.commit_id, Some(target))
   let head_ref = fs.read_string("/repo/.git/refs/heads/main")
   assert_true(head_ref.contains(target.to_hex()))
-  @test.assert_eq(fs.read_string("/repo/file.txt"), "base\n")
+  assert_eq(fs.read_string("/repo/file.txt"), "base\n")
 }
 
 ///|
@@ -242,7 +242,7 @@ test "merge: fast-forward preserves initialized submodule on removal" {
   }
   assert_true(fs.is_dir("/repo/vendor/sub"))
   assert_true(fs.is_file("/repo/vendor/sub/.git"))
-  @test.assert_eq(fs.read_string("/repo/vendor/sub/a"), "sub\n")
+  assert_eq(fs.read_string("/repo/vendor/sub/a"), "sub\n")
 }
 
 ///|
@@ -294,8 +294,8 @@ test "merge: rename on one side, no conflict" {
     }
   }
   // b.txt should exist, a.txt should be gone
-  @test.assert_eq(fs.read_string("/repo/b.txt"), "content\n")
-  @test.assert_eq(fs.read_string("/repo/c.txt"), "other\n")
+  assert_eq(fs.read_string("/repo/b.txt"), "content\n")
+  assert_eq(fs.read_string("/repo/c.txt"), "other\n")
 }
 
 ///|
@@ -351,7 +351,7 @@ test "merge: rename on one side, modify on other (rename/modify)" {
     _ => fail("expected merged")
   }
   // File should be at b.txt with modified content
-  @test.assert_eq(fs.read_string("/repo/b.txt"), "line1\nmodified\nline3\n")
+  assert_eq(fs.read_string("/repo/b.txt"), "line1\nmodified\nline3\n")
 }
 
 ///|
@@ -419,7 +419,7 @@ test "merge: rename on both sides to same target" {
     AlreadyUpToDate => () // Also acceptable since trees are identical
     _ => fail("expected merged or up-to-date")
   }
-  @test.assert_eq(fs.read_string("/repo/b.txt"), "content\n")
+  assert_eq(fs.read_string("/repo/b.txt"), "content\n")
 }
 
 ///|
@@ -480,7 +480,7 @@ test "merge: rename/add-source - rename a->b with new file at a" {
     }
   }
   // b.txt should have original content, a.txt should have new content
-  @test.assert_eq(fs.read_string("/repo/b.txt"), "line1\nline2\nline3\n")
-  @test.assert_eq(fs.read_string("/repo/a.txt"), "something completely different\n")
-  @test.assert_eq(fs.read_string("/repo/c.txt"), "other\n")
+  assert_eq(fs.read_string("/repo/b.txt"), "line1\nline2\nline3\n")
+  assert_eq(fs.read_string("/repo/a.txt"), "something completely different\n")
+  assert_eq(fs.read_string("/repo/c.txt"), "other\n")
 }

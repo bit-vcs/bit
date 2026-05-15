@@ -263,7 +263,7 @@ fn parse_hub_sync_clone_announce_options(
       "hub sync clone-announce: --url is required",
     )
   }
-  let normalized_clone_url = raw_clone_url.trim(chars=" \n\r\t").to_owned()
+  let normalized_clone_url = raw_clone_url.trim(chars=" \n\r\t").to_string()
   if normalized_clone_url.length() == 0 {
     raise @bitcore.GitError::InvalidObject(
       "hub sync clone-announce: --url must not be empty",
@@ -271,7 +271,7 @@ fn parse_hub_sync_clone_announce_options(
   }
   let normalized_repo = match repo {
     Some(raw_repo) => {
-      let value = raw_repo.trim(chars=" \n\r\t").to_owned()
+      let value = raw_repo.trim(chars=" \n\r\t").to_string()
       if value.length() == 0 {
         None
       } else {
@@ -372,7 +372,7 @@ fn parse_hub_sync_issue_url_options(
   }
   let normalized_room = match room {
     Some(raw) => {
-      let value = raw.trim(chars=" \n\r\t").to_owned()
+      let value = raw.trim(chars=" \n\r\t").to_string()
       if value.length() == 0 {
         None
       } else {
@@ -383,7 +383,7 @@ fn parse_hub_sync_issue_url_options(
   }
   let normalized_room_token = match room_token {
     Some(raw) => {
-      let value = raw.trim(chars=" \n\r\t").to_owned()
+      let value = raw.trim(chars=" \n\r\t").to_string()
       if value.length() == 0 {
         None
       } else {

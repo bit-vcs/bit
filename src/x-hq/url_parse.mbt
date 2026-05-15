@@ -12,7 +12,7 @@
 /// - https://github.com/user/repo/tree/main/path/to/subdir
 /// - git@github.com:user/repo.git
 pub fn parse_repo_url(input : String) -> RepoPath? {
-  let input = input.trim().to_owned()
+  let input = input.trim().to_string()
   if input.is_empty() {
     return None
   }
@@ -47,8 +47,8 @@ fn parse_ssh_url(input : String) -> RepoPath? {
   if parts.length() < 2 {
     return None
   }
-  let user = parts[0].to_owned()
-  let repo = parts[1].to_owned()
+  let user = parts[0].to_string()
+  let repo = parts[1].to_string()
   let subdir : String? = if parts.length() > 2 {
     Some(join_parts(parts, 2, parts.length()))
   } else {
@@ -77,16 +77,16 @@ fn parse_https_url(input : String) -> RepoPath? {
   if parts.length() < 3 {
     return None
   }
-  let host = parts[0].to_owned()
-  let user = parts[1].to_owned()
-  let mut repo = parts[2].to_owned()
+  let host = parts[0].to_string()
+  let user = parts[1].to_string()
+  let mut repo = parts[2].to_string()
   // Remove .git suffix
   if repo.has_suffix(".git") {
     repo = slice_to(repo, repo.length() - 4)
   }
   // Check for /tree/branch/path or /blob/branch/path pattern
   let subdir : String? = if parts.length() > 4 &&
-    (parts[3].to_owned() == "tree" || parts[3].to_owned() == "blob") {
+    (parts[3].to_string() == "tree" || parts[3].to_string() == "blob") {
     // parts[4] is branch, parts[5:] is path
     if parts.length() > 5 {
       Some(join_parts(parts, 5, parts.length()))
@@ -130,15 +130,15 @@ fn parse_shorthand(input : String) -> RepoPath? {
     return None
   }
   // Check if first part looks like a host (contains a dot)
-  let first = parts[0].to_owned()
+  let first = parts[0].to_string()
   if first.contains(".") {
     // host/user/repo format
     if parts.length() < 3 {
       return None
     }
     let host = first
-    let user = parts[1].to_owned()
-    let repo = parts[2].to_owned()
+    let user = parts[1].to_string()
+    let repo = parts[2].to_string()
     let subdir = match explicit_subdir {
       Some(sd) => Some(sd)
       None =>
@@ -157,8 +157,8 @@ fn parse_shorthand(input : String) -> RepoPath? {
     Some(RepoPath::new(user, repo, host=normalized_host, subdir~))
   } else {
     // user/repo format (github.com implicit)
-    let user = parts[0].to_owned()
-    let repo = parts[1].to_owned()
+    let user = parts[0].to_string()
+    let repo = parts[1].to_string()
     let subdir = match explicit_subdir {
       Some(sd) => Some(sd)
       None =>
@@ -192,7 +192,7 @@ fn join_parts(parts : Array[StringView], start : Int, end : Int) -> String {
     if i > start {
       buf.write_char('/')
     }
-    buf.write_string(parts[i].to_owned())
+    buf.write_string(parts[i].to_string())
   }
   buf.to_string()
 }

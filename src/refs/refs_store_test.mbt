@@ -10,8 +10,8 @@ test "refs/store: list refs merges loose and packed" {
     "# pack-refs with: peeled fully-peeled\n\{id2.to_hex()} refs/tags/v1\n",
   )
   let refs = list_refs_with_ids(fs, "/repo/.git", None)
-  @test.assert_eq(refs.get("refs/heads/main"), Some(id))
-  @test.assert_eq(refs.get("refs/tags/v1"), Some(id2))
+  assert_eq(refs.get("refs/heads/main"), Some(id))
+  assert_eq(refs.get("refs/tags/v1"), Some(id2))
 }
 
 ///|

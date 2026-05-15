@@ -936,7 +936,7 @@ fn parse_gitmodules(
   let mut current_path = ""
   let mut current_url = ""
   for line_view in content.split("\n") {
-    let line = trim_string(line_view.to_owned())
+    let line = trim_string(line_view.to_string())
     if line.has_prefix("[submodule \"") && line.has_suffix("\"]") {
       // Save previous submodule if any
       if current_name.length() > 0 && current_path.length() > 0 {
@@ -1103,14 +1103,14 @@ fn make_display_path(path : String, cwd_prefix : String) -> String {
   }
   let path_parts : Array[String] = []
   for part_view in normalized_path.split("/") {
-    let part = part_view.to_owned()
+    let part = part_view.to_string()
     if part.length() > 0 {
       path_parts.push(part)
     }
   }
   let cwd_parts : Array[String] = []
   for part_view in cwd_prefix.split("/") {
-    let part = part_view.to_owned()
+    let part = part_view.to_string()
     if part.length() > 0 {
       cwd_parts.push(part)
     }
@@ -1514,7 +1514,7 @@ fn ls_files_cached_entry_is_ignored(
   let mut current = ""
   let segments : Array[String] = []
   for segment_view in path.split("/") {
-    let segment = segment_view.to_owned()
+    let segment = segment_view.to_string()
     if segment.length() > 0 {
       segments.push(segment)
     }

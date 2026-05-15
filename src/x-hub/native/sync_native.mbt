@@ -217,7 +217,7 @@ fn relay_is_valid_room_name(room : String) -> Bool {
 
 ///|
 fn normalize_relay_sender(raw : String) -> String {
-  let trimmed = raw.trim(chars=" \n\r\t").to_owned()
+  let trimmed = raw.trim(chars=" \n\r\t").to_string()
   let out = StringBuilder::new()
   for c in trimmed {
     if relay_sender_safe_char(c) {
@@ -365,7 +365,7 @@ fn relay_query_get(raw_query : String?, key : String) -> String? {
     None => None
     Some(query) => {
       for part_view in query.split("&") {
-        let part = part_view.to_owned()
+        let part = part_view.to_string()
         if part.length() == 0 {
           continue
         }
@@ -423,7 +423,7 @@ fn relay_resolve_control_endpoint(
   let base_url = trim_trailing_slash(raw_base_url)
   let room = match relay_query_get(raw_query, "room") {
     Some(value) => {
-      let normalized = value.trim(chars=" \n\r\t").to_owned()
+      let normalized = value.trim(chars=" \n\r\t").to_string()
       if normalized.length() == 0 {
         "main"
       } else {
@@ -560,7 +560,7 @@ fn parse_relay_poll_clone_peers(
         guard item is Json::Object(envelope_obj) else { continue }
         let sender = json_get_string(envelope_obj, "sender", "")
           .trim(chars=" \n\r\t")
-          .to_owned()
+          .to_string()
         if sender.length() == 0 {
           continue
         }
@@ -576,13 +576,13 @@ fn parse_relay_poll_clone_peers(
         }
         let clone_url = json_get_string(payload_obj, "clone_url", "")
           .trim(chars=" \n\r\t")
-          .to_owned()
+          .to_string()
         if clone_url.length() == 0 {
           continue
         }
         let repo = match payload_obj.get("repo") {
           Some(Json::String(raw_repo)) => {
-            let normalized = raw_repo.trim(chars=" \n\r\t").to_owned()
+            let normalized = raw_repo.trim(chars=" \n\r\t").to_string()
             if normalized.length() == 0 {
               None
             } else {
@@ -818,7 +818,7 @@ fn read_relay_cursor(
   let content = rfs.read_file(path) catch { _ => return 0 }
   let text = @utf8.decode_lossy(content[:])
   let first = match text.split("\n").iter().next() {
-    Some(line) => line.to_owned()
+    Some(line) => line.to_string()
     None => ""
   }
   @string.parse_int(first) catch {
@@ -875,7 +875,7 @@ fn relay_poll_url(
 fn relay_normalize_optional_text(value : String?) -> String? {
   match value {
     Some(raw) => {
-      let normalized = raw.trim(chars=" \n\r\t").to_owned()
+      let normalized = raw.trim(chars=" \n\r\t").to_string()
       if normalized.length() == 0 {
         None
       } else {
@@ -928,7 +928,7 @@ async fn relay_publish_clone_announce_with_http(
   auth_token~ : String?,
 ) -> Bool raise @bit.GitError {
   let endpoint = relay_resolve_control_endpoint(remote_url)
-  let normalized_clone_url = clone_url.trim(chars=" \n\r\t").to_owned()
+  let normalized_clone_url = clone_url.trim(chars=" \n\r\t").to_string()
   if normalized_clone_url.length() == 0 {
     raise @bit.GitError::InvalidObject(
       "hub sync clone-announce: --url must not be empty",

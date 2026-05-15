@@ -8,7 +8,7 @@ test "helpers: resolve_git_dir falls back to bare repo when GIT_DIR points missi
   let prev_git_dir = @sys.get_env_var("GIT_DIR")
   @sys.set_env_var("GIT_DIR", root + "/.git")
   let resolved = resolve_git_dir(fs, root)
-  @test.assert_eq(resolved, root)
+  assert_eq(resolved, root)
   match prev_git_dir {
     Some(value) => @sys.set_env_var("GIT_DIR", value)
     None => @sys.unset_env_var("GIT_DIR")
@@ -71,7 +71,7 @@ test "helpers: resolve_git_dir prefers .git when .git is present" {
   let prev_git_dir = @sys.get_env_var("GIT_DIR")
   @sys.unset_env_var("GIT_DIR")
   let resolved = resolve_git_dir(fs, root)
-  @test.assert_eq(resolved, root + "/.git")
+  assert_eq(resolved, root + "/.git")
   match prev_git_dir {
     Some(value) => @sys.set_env_var("GIT_DIR", value)
     None => @sys.unset_env_var("GIT_DIR")
@@ -96,7 +96,7 @@ test "helpers: resolve_git_dir falls back to .bit when .git is absent" {
   let prev_git_dir = @sys.get_env_var("GIT_DIR")
   @sys.unset_env_var("GIT_DIR")
   let resolved = resolve_git_dir(fs, root)
-  @test.assert_eq(resolved, root + "/.bit")
+  assert_eq(resolved, root + "/.bit")
   match prev_git_dir {
     Some(value) => @sys.set_env_var("GIT_DIR", value)
     None => @sys.unset_env_var("GIT_DIR")
@@ -119,7 +119,7 @@ test "helpers: resolve_git_dir keeps explicit GIT_DIR even if .bit exists" {
   let prev_git_dir = @sys.get_env_var("GIT_DIR")
   @sys.set_env_var("GIT_DIR", root + "/custom-meta")
   let resolved = resolve_git_dir(fs, root)
-  @test.assert_eq(resolved, root + "/custom-meta")
+  assert_eq(resolved, root + "/custom-meta")
   match prev_git_dir {
     Some(value) => @sys.set_env_var("GIT_DIR", value)
     None => @sys.unset_env_var("GIT_DIR")
@@ -140,8 +140,8 @@ test "helpers: parse_run_git_invocation maps --version to internal version comma
   let parsed = parse_run_git_invocation(["--version"], None)
   match parsed {
     Some(invocation) => {
-      @test.assert_eq(invocation.cmd, "version")
-      @test.assert_eq(invocation.rest.length(), 0)
+      assert_eq(invocation.cmd, "version")
+      assert_eq(invocation.rest.length(), 0)
     }
     None => fail("expected parsed invocation")
   }
@@ -152,8 +152,8 @@ test "helpers: parse_run_git_invocation keeps unknown command token for dispatch
   let parsed = parse_run_git_invocation(["unknown-bit-dispatch"], None)
   match parsed {
     Some(invocation) => {
-      @test.assert_eq(invocation.cmd, "unknown-bit-dispatch")
-      @test.assert_eq(invocation.rest.length(), 0)
+      assert_eq(invocation.cmd, "unknown-bit-dispatch")
+      assert_eq(invocation.rest.length(), 0)
     }
     None => fail("expected parsed invocation")
   }
@@ -161,21 +161,21 @@ test "helpers: parse_run_git_invocation keeps unknown command token for dispatch
 
 ///|
 test "helpers: parse_git_env_timestamp supports timezone suffix" {
-  @test.assert_eq(parse_git_env_timestamp("1234567890 -0700"), Some(1234567890L))
-  @test.assert_eq(parse_git_env_timestamp("@1234567890 +0900"), Some(1234567890L))
+  assert_eq(parse_git_env_timestamp("1234567890 -0700"), Some(1234567890L))
+  assert_eq(parse_git_env_timestamp("@1234567890 +0900"), Some(1234567890L))
 }
 
 ///|
 test "helpers: parse_git_env_timezone extracts timezone token" {
-  @test.assert_eq(parse_git_env_timezone("1234567890 -0700"), Some("-0700"))
-  @test.assert_eq(parse_git_env_timezone("@1234567890 +0900"), Some("+0900"))
+  assert_eq(parse_git_env_timezone("1234567890 -0700"), Some("-0700"))
+  assert_eq(parse_git_env_timezone("@1234567890 +0900"), Some("+0900"))
 }
 
 ///|
 test "helpers: get_commit_timestamp parses git-style committer date" {
   let prev = @sys.get_env_var("GIT_COMMITTER_DATE")
   @sys.set_env_var("GIT_COMMITTER_DATE", "1234567890 -0700")
-  @test.assert_eq(get_commit_timestamp(), 1234567890L)
+  assert_eq(get_commit_timestamp(), 1234567890L)
   match prev {
     Some(value) => @sys.set_env_var("GIT_COMMITTER_DATE", value)
     None => @sys.unset_env_var("GIT_COMMITTER_DATE")
@@ -188,7 +188,7 @@ test "helpers: get_author_timestamp prefers author date" {
   let prev_committer = @sys.get_env_var("GIT_COMMITTER_DATE")
   @sys.set_env_var("GIT_AUTHOR_DATE", "1234567891 -0600")
   @sys.set_env_var("GIT_COMMITTER_DATE", "1234567890 -0700")
-  @test.assert_eq(get_author_timestamp(), 1234567891L)
+  assert_eq(get_author_timestamp(), 1234567891L)
   match prev_author {
     Some(value) => @sys.set_env_var("GIT_AUTHOR_DATE", value)
     None => @sys.unset_env_var("GIT_AUTHOR_DATE")
@@ -203,7 +203,7 @@ test "helpers: get_author_timestamp prefers author date" {
 test "helpers: get_commit_timezone parses git-style committer date" {
   let prev = @sys.get_env_var("GIT_COMMITTER_DATE")
   @sys.set_env_var("GIT_COMMITTER_DATE", "1234567890 -0700")
-  @test.assert_eq(get_commit_timezone(), "-0700")
+  assert_eq(get_commit_timezone(), "-0700")
   match prev {
     Some(value) => @sys.set_env_var("GIT_COMMITTER_DATE", value)
     None => @sys.unset_env_var("GIT_COMMITTER_DATE")
@@ -216,7 +216,7 @@ test "helpers: get_author_timezone prefers author date" {
   let prev_committer = @sys.get_env_var("GIT_COMMITTER_DATE")
   @sys.set_env_var("GIT_AUTHOR_DATE", "1234567891 -0600")
   @sys.set_env_var("GIT_COMMITTER_DATE", "1234567890 -0700")
-  @test.assert_eq(get_author_timezone(), "-0600")
+  assert_eq(get_author_timezone(), "-0600")
   match prev_author {
     Some(value) => @sys.set_env_var("GIT_AUTHOR_DATE", value)
     None => @sys.unset_env_var("GIT_AUTHOR_DATE")
@@ -237,7 +237,7 @@ test "helpers: get_committer_string prefers GIT_COMMITTER identity" {
   @sys.set_env_var("GIT_COMMITTER_EMAIL", "committer@example.com")
   @sys.set_env_var("GIT_AUTHOR_NAME", "Author")
   @sys.set_env_var("GIT_AUTHOR_EMAIL", "author@example.com")
-  @test.assert_eq(get_committer_string(), "Committer <committer@example.com>")
+  assert_eq(get_committer_string(), "Committer <committer@example.com>")
   match prev_committer_name {
     Some(value) => @sys.set_env_var("GIT_COMMITTER_NAME", value)
     None => @sys.unset_env_var("GIT_COMMITTER_NAME")
@@ -266,7 +266,7 @@ test "helpers: get_committer_string falls back to author identity" {
   @sys.unset_env_var("GIT_COMMITTER_EMAIL")
   @sys.set_env_var("GIT_AUTHOR_NAME", "Author")
   @sys.set_env_var("GIT_AUTHOR_EMAIL", "author@example.com")
-  @test.assert_eq(get_committer_string(), "Author <author@example.com>")
+  assert_eq(get_committer_string(), "Author <author@example.com>")
   match prev_committer_name {
     Some(value) => @sys.set_env_var("GIT_COMMITTER_NAME", value)
     None => @sys.unset_env_var("GIT_COMMITTER_NAME")
@@ -290,7 +290,7 @@ test "main: resolve_global_path uses GIT_SHIM_PWD when available" {
   let prev = @sys.get_env_var("GIT_SHIM_PWD")
   @sys.set_env_var("GIT_SHIM_PWD", "/tmp/bit-main-wbtest")
   let resolved = resolve_global_path("dest", None)
-  @test.assert_eq(resolved, "/tmp/bit-main-wbtest/dest")
+  assert_eq(resolved, "/tmp/bit-main-wbtest/dest")
   match prev {
     Some(value) => @sys.set_env_var("GIT_SHIM_PWD", value)
     None => @sys.unset_env_var("GIT_SHIM_PWD")
@@ -315,7 +315,7 @@ test "main: parse_global_options resolves -C relative path without GIT_SHIM_PWD"
   let prev = @sys.get_env_var("GIT_SHIM_PWD")
   @sys.unset_env_var("GIT_SHIM_PWD")
   let opts = parse_global_options(["bit", "-C", "dest", "status"])
-  @test.assert_eq(opts.subcmd, Some("status"))
+  assert_eq(opts.subcmd, Some("status"))
   match opts.cwd {
     Some(path) => {
       assert_true(path.has_prefix("/"))
@@ -332,8 +332,8 @@ test "main: parse_global_options resolves -C relative path without GIT_SHIM_PWD"
 ///|
 test "main: parse_global_options keeps ls-files pathspec" {
   let opts = parse_global_options(["bit", "ls-files", "a*"])
-  @test.assert_eq(opts.subcmd, Some("ls-files"))
-  @test.assert_eq(opts.rest, ["a*"])
+  assert_eq(opts.subcmd, Some("ls-files"))
+  assert_eq(opts.rest, ["a*"])
 }
 
 ///|
@@ -353,7 +353,7 @@ test "helpers: get_work_root finds repo root from PWD when shim pwd is absent" {
   @sys.set_env_var("PWD", subdir)
   @sys.unset_env_var("GIT_DIR")
   @sys.unset_env_var("GIT_WORK_TREE")
-  @test.assert_eq(get_work_root(), root)
+  assert_eq(get_work_root(), root)
   match prev_shim_pwd {
     Some(value) => @sys.set_env_var("GIT_SHIM_PWD", value)
     None => @sys.unset_env_var("GIT_SHIM_PWD")
@@ -416,15 +416,15 @@ test "ai: parse_ai_commit_options strips ai flags and keeps commit args" {
     "--model", "gpt-4", "--agent-loop", "-m", "msg", "--max-ai-rounds=5", "--agent-max-steps",
     "10", "--all",
   ])
-  @test.assert_eq(options.model, "gpt-4")
+  assert_eq(options.model, "gpt-4")
   assert_true(options.use_agent_loop)
-  @test.assert_eq(options.max_auto_rounds, 5)
-  @test.assert_eq(options.agent_max_steps, 10)
-  @test.assert_eq(commit_args, ["-m", "msg", "--all"])
+  assert_eq(options.max_auto_rounds, 5)
+  assert_eq(options.agent_max_steps, 10)
+  assert_eq(commit_args, ["-m", "msg", "--all"])
   assert_false(generate_message)
   assert_true(all_modified)
   assert_false(split_commits)
-  @test.assert_eq(user_instructions, [])
+  assert_eq(user_instructions, [])
 }
 
 ///|
@@ -432,10 +432,10 @@ test "ai: parse_ai_merge_options keeps merge args and user instructions" {
   let (options, merge_args, user_instructions) = parse_ai_merge_options([
     "origin/main", "--model", "gpt-4", "--agent-loop", "--", "Prefer ours", "Keep changes grouped by file",
   ])
-  @test.assert_eq(options.model, "gpt-4")
+  assert_eq(options.model, "gpt-4")
   assert_true(options.use_agent_loop)
-  @test.assert_eq(merge_args, ["origin/main"])
-  @test.assert_eq(user_instructions, ["Prefer ours", "Keep changes grouped by file"])
+  assert_eq(merge_args, ["origin/main"])
+  assert_eq(user_instructions, ["Prefer ours", "Keep changes grouped by file"])
 }
 
 ///|
@@ -462,7 +462,7 @@ test "main: opt-in help text is disabled by default" {
   @sys.unset_env_var("BIT_HELP_FULL")
   @sys.unset_env_var("BIT_HELP_TEXT_DIR")
   assert_false(help_text_opt_in_enabled())
-  @test.assert_eq(load_opt_in_help_text("status"), None)
+  assert_eq(load_opt_in_help_text("status"), None)
   match prev_full {
     Some(value) => @sys.set_env_var("BIT_HELP_FULL", value)
     None => @sys.unset_env_var("BIT_HELP_FULL")
@@ -485,7 +485,7 @@ test "main: opt-in help text is loaded from external files" {
   @sys.set_env_var("BIT_HELP_FULL", "1")
   @sys.set_env_var("BIT_HELP_TEXT_DIR", dir)
   assert_true(help_text_opt_in_enabled())
-  @test.assert_eq(
+  assert_eq(
     load_opt_in_help_text("show-branches"),
     Some("Detailed show-branch help"),
   )
@@ -533,7 +533,7 @@ test "completion: all_subcommands has no missing summary" {
 
 ///|
 test "main: normalize_dispatch_command maps ws to workspace" {
-  @test.assert_eq(normalize_dispatch_command("ws"), "workspace")
+  assert_eq(normalize_dispatch_command("ws"), "workspace")
 }
 
 ///|
@@ -577,7 +577,7 @@ test "helpers: repo_object_format defaults to sha1" {
   let root = "/tmp/bit-test-object-format-default-" +
     get_current_timestamp().to_string()
   fs.mkdir_p(root)
-  @test.assert_eq(repo_object_format(fs, root), "sha1")
+  assert_eq(repo_object_format(fs, root), "sha1")
   fs.remove_dir(root) catch {
     _ => ()
   }
@@ -590,7 +590,7 @@ test "helpers: repo_object_format reads extensions.objectFormat" {
     get_current_timestamp().to_string()
   fs.mkdir_p(root)
   fs.write_string(root + "/config", "[extensions]\n\tobjectFormat = sha256\n")
-  @test.assert_eq(repo_object_format(fs, root), "sha256")
+  assert_eq(repo_object_format(fs, root), "sha256")
   fs.remove_file(root + "/config") catch {
     _ => ()
   }
@@ -632,10 +632,10 @@ test "helpers: repository format v1 allows preciousObjects" {
   fs.write_string(
     "/repo/.git/config", "[core]\n\trepositoryformatversion = 1\n[extensions]\n\tpreciousObjects = 1\n",
   )
-  @test.assert_eq(repository_format_error(fs, "/repo/.git"), None)
+  assert_eq(repository_format_error(fs, "/repo/.git"), None)
 }
 
 ///|
 test "helpers: str_to_bytes preserves utf8 output" {
-  @test.assert_eq(str_to_bytes("å äö\n"), @utf8.encode("å äö\n"))
+  assert_eq(str_to_bytes("å äö\n"), @utf8.encode("å äö\n"))
 }

@@ -993,7 +993,7 @@ pub fn read_skip_worktree_paths(
       (fs.read_file(sidecar_path) catch { _ => Bytes::default() })[:],
     )
     for line_view in text.split("\n") {
-      let line = line_view.to_owned()
+      let line = line_view.to_string()
       if line.length() > 0 {
         out[line] = true
       }

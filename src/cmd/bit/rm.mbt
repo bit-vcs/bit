@@ -253,9 +253,9 @@ async fn rm_read_pathspecs(
   let paths : Array[String] = []
   for part_view in content.split(separator) {
     let part = if use_nul {
-      part_view.to_owned()
+      part_view.to_string()
     } else {
-      trim_string(part_view.to_owned())
+      trim_string(part_view.to_string())
     }
     if part.length() > 0 {
       paths.push(part)
@@ -360,7 +360,7 @@ fn rm_has_symlink_leading_path(
   }
   let parts : Array[String] = []
   for part_view in normalized_pattern.split("/") {
-    parts.push(part_view.to_owned())
+    parts.push(part_view.to_string())
   }
   if parts.length() < 2 {
     return false

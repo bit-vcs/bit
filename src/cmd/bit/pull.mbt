@@ -1004,7 +1004,7 @@ fn pull_can_fast_forward_checked_out_head(
 fn pull_normalize_optional_value(value : String?) -> String? {
   match value {
     Some(raw) => {
-      let normalized = raw.trim(chars=" \n\r\t").to_owned()
+      let normalized = raw.trim(chars=" \n\r\t").to_string()
       if normalized.length() == 0 {
         None
       } else {
@@ -2525,7 +2525,7 @@ fn resolve_ref_canonical_name_inner(
   }
   let line = decode_bytes(fs.read_file(path) catch { _ => return normalized })
     .trim()
-    .to_owned()
+    .to_string()
   if !line.has_prefix("ref: ") {
     return normalized
   }

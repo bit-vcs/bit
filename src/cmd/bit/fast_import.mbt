@@ -56,7 +56,7 @@ async fn handle_fast_import(args : Array[String]) -> Unit raise Error {
     )
     if content.length() > 0 {
       for line_view in content.split("\n") {
-        let line = line_view.to_owned()
+        let line = line_view.to_string()
         if line.length() == 0 {
           continue
         }
@@ -231,7 +231,7 @@ struct FastImportParser {
 fn FastImportParser::new(text : String) -> FastImportParser {
   let lines : Array[String] = []
   for lv in text.split("\n") {
-    lines.push(lv.to_owned())
+    lines.push(lv.to_string())
   }
   { lines, line_idx: 0 }
 }

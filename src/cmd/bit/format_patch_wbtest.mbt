@@ -4,7 +4,7 @@ async fn format_patch_wbtest_run_git(
   args : Array[String],
 ) -> Unit raise Error {
   let (code, _, _) = @process.collect_output("git", args[:], cwd~)
-  @test.assert_eq(code, 0)
+  assert_eq(code, 0)
 }
 
 ///|
@@ -12,12 +12,12 @@ test "format_patch: parse options keeps count revision and output file" {
   let opts = parse_format_patch_options([
     "--output=outfile", "--signature=my sig", "--no-signature", "-3", "HEAD",
   ])
-  @test.assert_eq(opts.output_file, Some("outfile"))
-  @test.assert_eq(opts.signature, Some("my sig"))
+  assert_eq(opts.output_file, Some("outfile"))
+  assert_eq(opts.signature, Some("my sig"))
   assert_true(opts.no_signature)
-  @test.assert_eq(opts.revisions.length(), 2)
-  @test.assert_eq(opts.revisions[0], "-3")
-  @test.assert_eq(opts.revisions[1], "HEAD")
+  assert_eq(opts.revisions.length(), 2)
+  assert_eq(opts.revisions[0], "-3")
+  assert_eq(opts.revisions[1], "HEAD")
 }
 
 ///|
@@ -48,9 +48,9 @@ test "format_patch: parse revisions accepts count with explicit end ref" {
   let (_, commits) = parse_format_patch_revisions(fs, "/repo/.git", [
     "-2", "HEAD",
   ])
-  @test.assert_eq(commits.length(), 2)
-  @test.assert_eq(commits[0].to_hex(), second.to_hex())
-  @test.assert_eq(commits[1].to_hex(), third.to_hex())
+  assert_eq(commits.length(), 2)
+  assert_eq(commits[0].to_hex(), second.to_hex())
+  assert_eq(commits[1].to_hex(), third.to_hex())
 }
 
 ///|
@@ -62,7 +62,7 @@ test "format_patch: range excludes commits reachable from base branch" {
     .read_string("/repo/.git/HEAD")
     .trim()
     .replace(old="ref: ", new="")
-  let head_ref = head_ref_view.to_owned()
+  let head_ref = head_ref_view.to_string()
   fs.write_string("/repo/file", "one\n")
   @bitlib.add_paths(fs, fs, "/repo", ["file"])
   let initial = @bitlib.commit(
@@ -91,9 +91,9 @@ test "format_patch: range excludes commits reachable from base branch" {
   )
 
   let commits = collect_commits_in_range(fs, "/repo/.git", main_two, side_two)
-  @test.assert_eq(commits.length(), 2)
-  @test.assert_eq(commits[0].to_hex(), side_one.to_hex())
-  @test.assert_eq(commits[1].to_hex(), side_two.to_hex())
+  assert_eq(commits.length(), 2)
+  assert_eq(commits[0].to_hex(), side_one.to_hex())
+  assert_eq(commits[1].to_hex(), side_two.to_hex())
 }
 
 ///|
@@ -140,19 +140,19 @@ async test "format_patch: range excludes main history on OsFs" {
   let main_two = @bitrepo.rev_parse(fs, git_dir, "HEAD").unwrap()
 
   let commits = collect_commits_in_range(fs, git_dir, main_two, side_three)
-  @test.assert_eq(commits.length(), 3)
-  @test.assert_eq(commits[0].to_hex(), side_one.to_hex())
-  @test.assert_eq(commits[1].to_hex(), side_two.to_hex())
-  @test.assert_eq(commits[2].to_hex(), side_three.to_hex())
+  assert_eq(commits.length(), 3)
+  assert_eq(commits[0].to_hex(), side_one.to_hex())
+  assert_eq(commits[1].to_hex(), side_two.to_hex())
+  assert_eq(commits[2].to_hex(), side_three.to_hex())
 
   cleanup_tree(fs, root)
 }
 
 ///|
 test "format_patch: signature suffix handles text file and none" {
-  @test.assert_eq(format_patch_signature_suffix(None), "")
-  @test.assert_eq(format_patch_signature_suffix(Some("my sig")), "-- \nmy sig\n\n")
-  @test.assert_eq(
+  assert_eq(format_patch_signature_suffix(None), "")
+  assert_eq(format_patch_signature_suffix(Some("my sig")), "-- \nmy sig\n\n")
+  assert_eq(
     format_patch_signature_suffix(Some("\nline1\nline2\n")),
     "-- \n\nline1\nline2\n\n",
   )

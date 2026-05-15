@@ -79,7 +79,7 @@ fn unpack_file_load_dbs(fs : OsFs, git_dir : String) -> Array[@bitlib.ObjectDb] 
   }
   let alt_text = decode_bytes(alt_data)
   for line_view in alt_text.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if line.length() == 0 || line.has_prefix("#") {
       continue
     }

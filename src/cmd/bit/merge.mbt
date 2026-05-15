@@ -863,7 +863,7 @@ fn truncate_and_append_reflog(
   // Split into lines and keep only entries before the intermediate merges
   let lines : Array[String] = []
   for line_view in content.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if line.length() > 0 {
       lines.push(line)
     }
@@ -888,14 +888,14 @@ fn truncate_and_append_reflog(
 ///|
 /// Parse an author string like "Name <email> timestamp +tz" into (name, email).
 fn parse_reflog_author(author : String) -> (String, String) {
-  let trimmed = author.trim().to_owned()
+  let trimmed = author.trim().to_string()
   match trimmed.find("<") {
     Some(start) =>
       match trimmed.find(">") {
         Some(end) if end > start => {
           let name = String::unsafe_substring(trimmed, start=0, end=start)
             .trim()
-            .to_owned()
+            .to_string()
           let email = String::unsafe_substring(trimmed, start=start + 1, end~)
           (if name.length() == 0 { "unknown" } else { name }, email)
         }

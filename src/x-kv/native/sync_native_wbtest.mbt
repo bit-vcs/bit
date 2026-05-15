@@ -141,8 +141,8 @@ test "kv native: encode/decode announce message roundtrip" {
   guard decoded is Ok(Some(@kv.GossipMessage::Announce(decoded_state))) else {
     fail("failed to decode announce")
   }
-  @test.assert_eq(decoded_state.node_id.id, "node-a")
-  @test.assert_eq(decoded_state.timestamp, 1234L)
+  assert_eq(decoded_state.node_id.id, "node-a")
+  assert_eq(decoded_state.timestamp, 1234L)
 }
 
 ///|
@@ -152,10 +152,10 @@ async test "kv native: sync_round_with_exchange updates cursor on success" {
   let result = sync_round_with_exchange(kv, 1, 11L, 1000L, fn(_peer, _msg) {
     Ok(None)
   })
-  @test.assert_eq(result.selected, 1)
-  @test.assert_eq(result.succeeded, 1)
-  @test.assert_eq(result.failed, 0)
-  @test.assert_eq(kv.get_peer_cursor(@kv.NodeId::new("peer1")), Some(1L))
+  assert_eq(result.selected, 1)
+  assert_eq(result.succeeded, 1)
+  assert_eq(result.failed, 0)
+  assert_eq(kv.get_peer_cursor(@kv.NodeId::new("peer1")), Some(1L))
 }
 
 ///|
@@ -165,10 +165,10 @@ async test "kv native: sync_round_with_exchange applies retry on failure" {
   let result = sync_round_with_exchange(kv, 1, 22L, 1000L, fn(_peer, _msg) {
     Err("boom")
   })
-  @test.assert_eq(result.succeeded, 0)
-  @test.assert_eq(result.failed, 1)
+  assert_eq(result.succeeded, 0)
+  assert_eq(result.failed, 1)
   let early = kv.select_gossip_peers(1, 22L, timestamp=1500L)
-  @test.assert_eq(early.length(), 0)
+  assert_eq(early.length(), 0)
   let late = kv.select_gossip_peers(1, 22L, timestamp=2500L)
-  @test.assert_eq(late.length(), 1)
+  assert_eq(late.length(), 1)
 }

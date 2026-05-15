@@ -10,17 +10,17 @@ test "lfs_build_batch_request_json: single object" {
     assert_true(false)
     return
   }
-  @test.assert_eq(obj.get("operation"), Some(Json::string("download")))
+  assert_eq(obj.get("operation"), Some(Json::string("download")))
   guard obj.get("objects") is Some(Json::Array(arr)) else {
     assert_true(false)
     return
   }
-  @test.assert_eq(arr.length(), 1)
+  assert_eq(arr.length(), 1)
   guard arr[0] is Json::Object(o) else {
     assert_true(false)
     return
   }
-  @test.assert_eq(
+  assert_eq(
     o.get("oid"),
     Some(
       Json::string(
@@ -28,7 +28,7 @@ test "lfs_build_batch_request_json: single object" {
       ),
     ),
   )
-  @test.assert_eq(o.get("size"), Some(Json::number(9876.0)))
+  assert_eq(o.get("size"), Some(Json::number(9876.0)))
 }
 
 ///|
@@ -43,12 +43,12 @@ test "lfs_build_batch_upload_request_json: single object" {
     assert_true(false)
     return
   }
-  @test.assert_eq(obj.get("operation"), Some(Json::string("upload")))
+  assert_eq(obj.get("operation"), Some(Json::string("upload")))
   guard obj.get("objects") is Some(Json::Array(arr)) else {
     assert_true(false)
     return
   }
-  @test.assert_eq(arr.length(), 1)
+  assert_eq(arr.length(), 1)
 }
 
 ///|
@@ -72,15 +72,15 @@ test "lfs_parse_batch_response: success with download action" {
     #|  ]
     #|}
   let (actions, errors) = lfs_parse_batch_response(json_str)
-  @test.assert_eq(actions.length(), 1)
-  @test.assert_eq(errors.length(), 0)
-  @test.assert_eq(
+  assert_eq(actions.length(), 1)
+  assert_eq(errors.length(), 0)
+  assert_eq(
     actions[0].oid,
     "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
   )
-  @test.assert_eq(actions[0].size, 5000L)
-  @test.assert_eq(actions[0].href, "https://example.com/download/obj1")
-  @test.assert_eq(actions[0].headers.get("Authorization"), Some("Bearer token123"))
+  assert_eq(actions[0].size, 5000L)
+  assert_eq(actions[0].href, "https://example.com/download/obj1")
+  assert_eq(actions[0].headers.get("Authorization"), Some("Bearer token123"))
 }
 
 ///|
@@ -99,14 +99,14 @@ test "lfs_parse_batch_response: object with error" {
     #|  ]
     #|}
   let (actions, errors) = lfs_parse_batch_response(json_str)
-  @test.assert_eq(actions.length(), 0)
-  @test.assert_eq(errors.length(), 1)
-  @test.assert_eq(
+  assert_eq(actions.length(), 0)
+  assert_eq(errors.length(), 1)
+  assert_eq(
     errors[0].oid,
     "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
   )
-  @test.assert_eq(errors[0].code, 404)
-  @test.assert_eq(errors[0].message, "Object not found")
+  assert_eq(errors[0].code, 404)
+  assert_eq(errors[0].message, "Object not found")
 }
 
 ///|
@@ -134,8 +134,8 @@ test "lfs_parse_batch_response: mixed success and error" {
     #|  ]
     #|}
   let (actions, errors) = lfs_parse_batch_response(json_str)
-  @test.assert_eq(actions.length(), 1)
-  @test.assert_eq(errors.length(), 1)
+  assert_eq(actions.length(), 1)
+  assert_eq(errors.length(), 1)
 }
 
 ///|
@@ -144,7 +144,7 @@ test "lfs_get_cached_object: returns None when not cached" {
   let result = lfs_get_cached_object(
     fs, "/tmp/nonexistent-git-dir-lfs-test", "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
   )
-  @test.assert_eq(result, None)
+  assert_eq(result, None)
 }
 
 ///|
@@ -155,7 +155,7 @@ test "lfs_upload_url_for_remote: remote lfsurl is used before derived url" {
     "/repo/.git/config", "[remote \"origin\"]\n\turl = https://example.com/repo.git\n\tlfsurl = https://lfs.example/custom\n",
   )
 
-  @test.assert_eq(
+  assert_eq(
     lfs_upload_url_for_remote(
       fs,
       "/repo/.git",
@@ -238,11 +238,11 @@ async test "lfs_upload_pack_objects_with_http: uploads cached pointer content" {
     fs, git_dir, "https://example.com/repo.git/info/lfs", objects, http_post, http_put,
   )
 
-  @test.assert_eq(errors.length(), 0)
-  @test.assert_eq(post_urls[0], "https://example.com/repo.git/info/lfs/objects/batch")
-  @test.assert_eq(post_content_types[0], "application/vnd.git-lfs+json")
+  assert_eq(errors.length(), 0)
+  assert_eq(post_urls[0], "https://example.com/repo.git/info/lfs/objects/batch")
+  assert_eq(post_content_types[0], "application/vnd.git-lfs+json")
   assert_true(post_bodies[0].contains("\"operation\":\"upload\""))
-  @test.assert_eq(put_urls[0], "https://lfs.example/upload/\{oid}")
-  @test.assert_eq(put_bodies[0], content)
-  @test.assert_eq(put_auth_headers[0], "Bearer token")
+  assert_eq(put_urls[0], "https://lfs.example/upload/\{oid}")
+  assert_eq(put_bodies[0], content)
+  assert_eq(put_auth_headers[0], "Bearer token")
 }

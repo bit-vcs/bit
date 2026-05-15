@@ -3,7 +3,3 @@ import {
   "moonbitlang/x/sys" @sys,
   "moonbitlang/x/fs" @fs,
 }
-
-import {
-  "moonbitlang/core/test" @test,
-} for "wbtest"

@@ -58,12 +58,12 @@ async fn handle_update_index(args : Array[String]) -> Unit raise Error {
         let val = args[i + 1]
         match val.find(",") {
           Some(idx1) => {
-            let mode = val[:idx1].to_owned()
-            let rest = val[idx1 + 1:].to_owned()
+            let mode = val[:idx1].to_string()
+            let rest = val[idx1 + 1:].to_string()
             match rest.find(",") {
               Some(idx2) => {
-                let sha = rest[:idx2].to_owned()
-                let path = rest[idx2 + 1:].to_owned()
+                let sha = rest[:idx2].to_string()
+                let path = rest[idx2 + 1:].to_string()
                 cacheinfo.push((mode, sha, path))
                 i += 2
                 continue
@@ -99,7 +99,7 @@ async fn handle_update_index(args : Array[String]) -> Unit raise Error {
       }
       "--index-version" => update_index_usage()
       _ if arg.has_prefix("--index-version=") =>
-        match parse_update_index_version(arg[16:].to_owned()) {
+        match parse_update_index_version(arg[16:].to_string()) {
           Some(version) => set_index_version = Some(version)
           None => {
             eprint_line("fatal: bad --index-version value")
@@ -107,15 +107,15 @@ async fn handle_update_index(args : Array[String]) -> Unit raise Error {
           }
         }
       _ if arg.has_prefix("--cacheinfo=") => {
-        let val = arg[12:].to_owned()
+        let val = arg[12:].to_string()
         match val.find(",") {
           Some(idx1) => {
-            let mode = val[:idx1].to_owned()
-            let rest = val[idx1 + 1:].to_owned()
+            let mode = val[:idx1].to_string()
+            let rest = val[idx1 + 1:].to_string()
             match rest.find(",") {
               Some(idx2) => {
-                let sha = rest[:idx2].to_owned()
-                let path = rest[idx2 + 1:].to_owned()
+                let sha = rest[:idx2].to_string()
+                let path = rest[idx2 + 1:].to_string()
                 cacheinfo.push((mode, sha, path))
               }
               None => update_index_usage()
@@ -153,7 +153,7 @@ async fn handle_update_index(args : Array[String]) -> Unit raise Error {
     let input = decode_bytes(read_all_stdin())
     let sep = if nul_term { "\u0000" } else { "\n" }
     for part_view in input.split(sep) {
-      let part = trim_string(part_view.to_owned())
+      let part = trim_string(part_view.to_string())
       if part.length() == 0 {
         continue
       }
@@ -228,9 +228,9 @@ async fn handle_update_index(args : Array[String]) -> Unit raise Error {
       let mut prefix = ""
       for k = 0; k < parts.length() - 1; k = k + 1 {
         if prefix.length() > 0 {
-          prefix = prefix + "/" + parts[k].to_owned()
+          prefix = prefix + "/" + parts[k].to_string()
         } else {
-          prefix = parts[k].to_owned()
+          prefix = parts[k].to_string()
         }
         if existing_paths.contains(prefix) {
           eprint_line(
@@ -510,7 +510,7 @@ fn parse_octal_mode(s : String) -> Int? {
 fn split_update_index_fields(s : String) -> Array[String] {
   let out : Array[String] = []
   for item in s.split(" ") {
-    let part = trim_string(item.to_owned())
+    let part = trim_string(item.to_string())
     if part.length() > 0 {
       out.push(part)
     }
@@ -637,7 +637,7 @@ fn update_skip_worktree_state(
   if fs.is_file(state_path) {
     let text = decode_bytes(fs.read_file(state_path))
     for line_view in text.split("\n") {
-      let line = trim_string(line_view.to_owned())
+      let line = trim_string(line_view.to_string())
       if line.length() > 0 {
         state[line] = true
       }

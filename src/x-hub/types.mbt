@@ -6,14 +6,14 @@ pub(all) enum PrState {
   Open
   Merged
   Closed
-} derive(Eq, Debug)
+} derive(Eq)
 
 ///|
 /// State of an Issue
 pub(all) enum IssueState {
   Open
   Closed
-} derive(Eq, Debug)
+} derive(Eq)
 
 ///|
 /// Unified state of an Issue/PullRequest work item
@@ -21,14 +21,14 @@ pub(all) enum WorkItemState {
   Open
   Merged
   Closed
-} derive(Eq, Debug)
+} derive(Eq)
 
 ///|
 /// Work item kind
 pub(all) enum WorkItemKind {
   Issue
   PullRequest
-} derive(Eq, Debug)
+} derive(Eq)
 
 ///|
 pub fn IssueState::to_string(self : IssueState) -> String {
@@ -625,7 +625,7 @@ pub(all) enum ReviewVerdict {
   Approved
   RequestChanges
   Comment
-} derive(Eq, Debug)
+} derive(Eq)
 
 ///|
 pub fn ReviewVerdict::to_string(self : ReviewVerdict) -> String {

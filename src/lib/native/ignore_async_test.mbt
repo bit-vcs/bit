@@ -16,7 +16,7 @@ async test "ignore async: symlink dir is not traversed" {
     return ()
   }
   let root = stdout.text() catch { _ => return () }
-  let root = root.trim_end().to_owned()
+  let root = root.trim_end().to_string()
   fs.mkdir_p(root + "/real")
   fs.write_string(root + "/real/file.txt", "ok")
   let ln = @process.collect_output(

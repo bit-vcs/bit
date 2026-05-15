@@ -102,7 +102,7 @@ fn parse_log_entry(
   let mut in_message = false
   let message_lines : Array[String] = []
   for line_view in lines {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if in_message {
       message_lines.push(line)
       continue
@@ -192,13 +192,13 @@ fn log_read_graft_parents(
   )
   let commit_hex = commit_id.to_hex()
   for line_view in content.split("\n") {
-    let line = @string_utils.trim_string(line_view.to_owned())
+    let line = @string_utils.trim_string(line_view.to_string())
     if line.length() == 0 || line.has_prefix("#") {
       continue
     }
     let tokens : Array[String] = []
     for token_view in line.split(" ") {
-      let token = @string_utils.trim_string(token_view.to_owned())
+      let token = @string_utils.trim_string(token_view.to_string())
       if token.length() > 0 {
         tokens.push(token)
       }

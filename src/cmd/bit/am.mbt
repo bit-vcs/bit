@@ -170,11 +170,11 @@ fn parse_mbox(input : String, keep_cr : Bool) -> Array[MboxPatch] {
   let patches : Array[MboxPatch] = []
   let lines : Array[String] = []
   for v in input.split("\n") {
-    let s = v.to_owned()
+    let s = v.to_string()
     if keep_cr {
       lines.push(s)
     } else {
-      lines.push(s.trim_end(chars="\r").to_owned())
+      lines.push(s.trim_end(chars="\r").to_string())
     }
   }
   let mut in_header = false
@@ -223,7 +223,7 @@ fn parse_mbox(input : String, keep_cr : Bool) -> Array[MboxPatch] {
                   end=subject.length(),
                 )
                 .trim()
-                .to_owned()
+                .to_string()
             None => ()
           }
         }
@@ -306,7 +306,7 @@ async fn apply_remaining_patches(
     if fs.is_file(info_file) {
       let info = decode_bytes(fs.read_file(info_file))
       for line_view in info.split("\n") {
-        let line = line_view.to_owned()
+        let line = line_view.to_string()
         if line.has_prefix("Author: ") {
           author = String::unsafe_substring(line, start=8, end=line.length())
         } else if line.has_prefix("Date: ") {
@@ -365,8 +365,8 @@ async fn apply_remaining_patches(
 fn extract_name_str(author : String) -> String {
   match author.find("<") {
     Some(idx) =>
-      String::unsafe_substring(author, start=0, end=idx).trim().to_owned()
-    None => author.trim().to_owned()
+      String::unsafe_substring(author, start=0, end=idx).trim().to_string()
+    None => author.trim().to_string()
   }
 }
 
@@ -398,7 +398,7 @@ fn apply_patch_to_worktree(
   let mut hunk_lines : Array[String] = []
   let mut in_hunk = false
   for line_view in patch.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if line.has_prefix("diff --git ") {
       if current_file.length() > 0 && hunks.length() > 0 {
         apply_hunks_to_file(fs, root, current_file, hunks, old_file, new_file)
@@ -410,7 +410,7 @@ fn apply_patch_to_worktree(
           end=line.length(),
         )
         .split(" ")
-        .map(v => v.to_owned())
+        .map(v => v.to_string())
         .collect()
       if parts.length() >= 2 {
         old_file = parts[0]
@@ -486,7 +486,7 @@ fn parse_hunk_header(line : String) -> (Int, Int, Int, Int)? {
       let range_part = String::unsafe_substring(content, start=0, end~)
       let parts : Array[String] = range_part
         .split(" ")
-        .map(v => v.to_owned())
+        .map(v => v.to_string())
         .collect()
       if parts.length() < 2 {
         return None
@@ -534,7 +534,7 @@ fn apply_hunks_to_file(
   let original_lines : Array[String] = if fs.is_file(path) {
     decode_bytes(fs.read_file(path))
     .split("\n")
-    .map(v => v.to_owned())
+    .map(v => v.to_string())
     .collect()
   } else {
     match file.rev_find("/") {

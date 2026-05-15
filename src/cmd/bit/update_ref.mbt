@@ -125,7 +125,7 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
     let mut stdin_no_deref = no_deref
     let mut stdin_create_reflog = create_reflog
     for line_view in input.split("\n") {
-      let line = trim_chars(line_view.to_owned(), " \t\r\n")
+      let line = trim_chars(line_view.to_string(), " \t\r\n")
       if line.length() == 0 {
         continue
       }
@@ -527,7 +527,7 @@ fn delete_packed_ref_entry(
   let mut removed = false
   let mut skip_peeled = false
   for line_view in content.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if skip_peeled && line.has_prefix("^") {
       skip_peeled = false
       removed = true
@@ -657,7 +657,7 @@ fn get_author_info(
       }
       let mut in_user = false
       for line_view in content.split("\n") {
-        let line = trim_chars(line_view.to_owned(), " \t\r")
+        let line = trim_chars(line_view.to_string(), " \t\r")
         if line.has_prefix("[user]") {
           in_user = true
           continue
@@ -700,7 +700,7 @@ fn get_author_info(
 fn update_ref_split_stdin_tokens(line : String) -> Array[String] {
   let tokens : Array[String] = []
   for token_view in line.split(" ") {
-    let token = trim_string(token_view.to_owned())
+    let token = trim_string(token_view.to_string())
     if token.length() > 0 {
       tokens.push(token)
     }

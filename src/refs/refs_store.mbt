@@ -85,7 +85,7 @@ pub fn collect_packed_ref_ids(
   let packed = fs.read_file(packed_path) catch { _ => Bytes::default() }
   let text = @utf8.decode_lossy(packed[:])
   for line_view in text.split("\n") {
-    let line = trim_string_refs(line_view.to_owned())
+    let line = trim_string_refs(line_view.to_string())
     if line.length() == 0 {
       continue
     }
@@ -163,7 +163,7 @@ pub fn rewrite_packed_refs(
   let lines : Array[String] = []
   let mut skip_peeled = false
   for line_view in text.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if line.length() == 0 {
       continue
     }

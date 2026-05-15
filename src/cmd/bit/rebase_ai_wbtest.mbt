@@ -4,7 +4,7 @@ test "rebase-ai parser: basic flags and upstream" {
   assert_true(parsed.do_continue)
   assert_true(parsed.do_skip)
   assert_false(parsed.do_abort)
-  @test.assert_eq(parsed.upstream, Some("origin/main"))
+  assert_eq(parsed.upstream, Some("origin/main"))
 }
 
 ///|
@@ -12,8 +12,8 @@ test "rebase-ai parser: model and round options" {
   let parsed = parse_rebase_ai_args([
     "--model=moonshotai/kimi-k2", "--max-ai-rounds", "5",
   ])
-  @test.assert_eq(parsed.model, "moonshotai/kimi-k2")
-  @test.assert_eq(parsed.max_auto_rounds, 5)
+  assert_eq(parsed.model, "moonshotai/kimi-k2")
+  assert_eq(parsed.max_auto_rounds, 5)
 }
 
 ///|
@@ -36,8 +36,8 @@ test "rebase-ai parser: agent-loop options" {
     "--agent-loop", "--agent-max-steps", "9", "origin/main",
   ])
   assert_true(parsed.use_agent_loop)
-  @test.assert_eq(parsed.agent_max_steps, 9)
-  @test.assert_eq(parsed.upstream, Some("origin/main"))
+  assert_eq(parsed.agent_max_steps, 9)
+  assert_eq(parsed.upstream, Some("origin/main"))
 }
 
 ///|

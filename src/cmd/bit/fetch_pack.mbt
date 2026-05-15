@@ -37,10 +37,10 @@ async fn handle_fetch_pack(args : Array[String]) -> Unit raise Error {
         return
       }
       _ if arg.has_prefix("--depth=") =>
-        depth = Some(@string.parse_int(arg[8:].to_owned()) catch { _ => 0 })
+        depth = Some(@string.parse_int(arg[8:].to_string()) catch { _ => 0 })
       _ if arg.has_prefix("--upload-pack=") =>
-        upload_pack = Some(arg[14:].to_owned())
-      _ if arg.has_prefix("--exec=") => upload_pack = Some(arg[7:].to_owned())
+        upload_pack = Some(arg[14:].to_string())
+      _ if arg.has_prefix("--exec=") => upload_pack = Some(arg[7:].to_string())
       _ if arg.has_prefix("--filter=") => ()
       _ if arg.has_prefix("--server-option=") => ()
       _ if arg.has_prefix("--negotiation-tip=") => ()
@@ -55,7 +55,7 @@ async fn handle_fetch_pack(args : Array[String]) -> Unit raise Error {
   if stdin {
     let input = decode_bytes(read_all_stdin())
     for line_view in input.split("\n") {
-      let line = trim_string(line_view.to_owned())
+      let line = trim_string(line_view.to_string())
       if line.length() > 0 {
         positional.push(line)
       }

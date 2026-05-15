@@ -64,7 +64,7 @@ async fn handle_check_ignore(args : Array[String]) -> Unit raise Error {
     let text = decode_bytes(data)
     let sep = if nul_terminated { "\u0000" } else { "\n" }
     for part_view in text.split(sep) {
-      let part = part_view.to_owned()
+      let part = part_view.to_string()
       if part.length() > 0 {
         paths.push(part)
       }
@@ -274,7 +274,7 @@ fn check_ignore_add_rules_file(
 fn check_ignore_split_path(path : String) -> Array[String] {
   let out : Array[String] = []
   for part_view in path.split("/") {
-    let part = part_view.to_owned()
+    let part = part_view.to_string()
     if part.length() > 0 {
       out.push(part)
     }
@@ -378,11 +378,11 @@ fn check_ignore_scan_file(
   let mut linenum = 0
   for line_view in content.split("\n") {
     linenum += 1
-    let mut line = line_view.to_owned()
+    let mut line = line_view.to_string()
     if line.has_suffix("\r") {
       line = String::unsafe_substring(line, start=0, end=line.length() - 1)
     }
-    let trimmed = line.trim().to_owned()
+    let trimmed = line.trim().to_string()
     if trimmed.length() == 0 || trimmed.has_prefix("#") {
       continue
     }

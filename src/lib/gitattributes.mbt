@@ -41,13 +41,13 @@ pub fn resolve_diff_driver(
   let normalized = gitattr_normalize_path(path)
   let mut diff_driver : String? = None
   for line_view in content.split("\n") {
-    let line = line_view.to_owned().trim().to_owned()
+    let line = line_view.to_string().trim().to_string()
     if line.length() == 0 || line.has_prefix("#") {
       continue
     }
     let words : Array[String] = []
     for token_view in line.split(" ") {
-      let token = token_view.to_owned().trim().to_owned()
+      let token = token_view.to_string().trim().to_string()
       if token.length() > 0 {
         words.push(token)
       }
@@ -142,13 +142,13 @@ pub fn resolve_eol_attrs(
   let mut eol : EolAttr = EolAttr::Unspecified
   let mut filter : String? = None
   for line_view in content.split("\n") {
-    let line = line_view.to_owned().trim().to_owned()
+    let line = line_view.to_string().trim().to_string()
     if line.length() == 0 || line.has_prefix("#") {
       continue
     }
     let words : Array[String] = []
     for token_view in line.split(" ") {
-      let token = token_view.to_owned().trim().to_owned()
+      let token = token_view.to_string().trim().to_string()
       if token.length() > 0 {
         words.push(token)
       }
@@ -338,12 +338,12 @@ pub fn check_unsupported_gitattributes(
     (rfs.read_file(attr_path) catch { _ => Bytes::default() })[:],
   )
   for line_view in content.split("\n") {
-    let line = line_view.to_owned().trim().to_owned()
+    let line = line_view.to_string().trim().to_string()
     if line.length() == 0 || line.has_prefix("#") {
       continue
     }
     for token_view in line.split(" ") {
-      let token = token_view.to_owned().trim().to_owned()
+      let token = token_view.to_string().trim().to_string()
       if token.length() == 0 {
         continue
       }
@@ -421,12 +421,12 @@ pub fn has_any_filter_attributes(
     (rfs.read_file(attr_path) catch { _ => Bytes::default() })[:],
   )
   for line_view in content.split("\n") {
-    let line = line_view.to_owned().trim().to_owned()
+    let line = line_view.to_string().trim().to_string()
     if line.length() == 0 || line.has_prefix("#") {
       continue
     }
     for token_view in line.split(" ") {
-      let token = token_view.to_owned().trim().to_owned()
+      let token = token_view.to_string().trim().to_string()
       if token.length() == 0 {
         continue
       }

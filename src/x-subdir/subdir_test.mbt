@@ -50,8 +50,8 @@ test "subdir: SubdirRepo::from_commit creates repo" {
     _ => return ()
   }
   // 基本プロパティを確認
-  @test.assert_eq(subdir.path(), "src/lib")
-  @test.assert_eq(subdir.base_commit(), Some(commit_id))
+  assert_eq(subdir.path(), "src/lib")
+  assert_eq(subdir.base_commit(), Some(commit_id))
   assert_true(subdir.tree_id() is Some(_))
 }
 
@@ -77,7 +77,7 @@ test "subdir: read file through Fs" {
   // サブディレクトリ内のファイルをルートからのパスで読む
   let bitfs = subdir.fs()
   let content = bitfs.read_file(fs, "/foo.mbt") catch { _ => return () }
-  @test.assert_eq(content, b"content of foo")
+  assert_eq(content, b"content of foo")
 }
 
 ///|
@@ -108,7 +108,7 @@ test "subdir: write file to working layer" {
   assert_true(subdir.is_dirty())
   // 変更が読める
   let content = bitfs.read_file(fs, "/foo.mbt") catch { _ => return () }
-  @test.assert_eq(content, b"modified")
+  assert_eq(content, b"modified")
 }
 
 ///|
@@ -176,7 +176,7 @@ test "subdir: log returns commits that changed subdir" {
   let history = subdir.log(fs) catch { _ => return () }
   // サブディレクトリを変更したコミットは2つ（1番目と2番目）
   // 3番目のコミットは README.md だけなので含まれない
-  @test.assert_eq(history.length(), 2)
+  assert_eq(history.length(), 2)
 }
 
 ///|
@@ -197,13 +197,13 @@ test "subdir: diff shows working changes" {
   }
   // 変更前は空
   let diff_before = subdir.diff()
-  @test.assert_eq(diff_before.length(), 0)
+  assert_eq(diff_before.length(), 0)
   // ファイルを変更
   subdir.fs().write_file("/bar.mbt", b"new file")
   // 変更が表示される
   let diff_after = subdir.diff()
-  @test.assert_eq(diff_after.length(), 1)
-  @test.assert_eq(diff_after[0].path(), "/bar.mbt")
+  assert_eq(diff_after.length(), 1)
+  assert_eq(diff_after[0].path(), "/bar.mbt")
 }
 
 ///|
@@ -280,9 +280,9 @@ test "subdir: normalize path" {
     _ => return ()
   }
   // すべて同じパスに正規化される
-  @test.assert_eq(subdir1.path(), "src/lib")
-  @test.assert_eq(subdir2.path(), "src/lib")
-  @test.assert_eq(subdir3.path(), "src/lib")
+  assert_eq(subdir1.path(), "src/lib")
+  assert_eq(subdir2.path(), "src/lib")
+  assert_eq(subdir3.path(), "src/lib")
 }
 
 ///|
@@ -299,7 +299,7 @@ test "subdir: init creates config and marker files" {
     _ => return ()
   }
   // 結果を確認
-  @test.assert_eq(info.path, "src/lib")
+  assert_eq(info.path, "src/lib")
   assert_true(info.initialized)
   // 設定ファイルが作成されている
   assert_true(fs.is_file("/repo/.git/subdir/src_lib/config"))
@@ -348,13 +348,13 @@ test "subdir: deinit removes config and marker files" {
 ///|
 test "subdir: generate_shell_env returns correct variables" {
   let env = generate_shell_env("/repo/.git", "/repo", "src/lib")
-  @test.assert_eq(env.length(), 4)
+  assert_eq(env.length(), 4)
   // MOONGIT_SUBDIR
-  @test.assert_eq(env[0].0, "MOONGIT_SUBDIR")
-  @test.assert_eq(env[0].1, "src/lib")
+  assert_eq(env[0].0, "MOONGIT_SUBDIR")
+  assert_eq(env[0].1, "src/lib")
   // GIT_PREFIX
-  @test.assert_eq(env[3].0, "GIT_PREFIX")
-  @test.assert_eq(env[3].1, "src/lib/")
+  assert_eq(env[3].0, "GIT_PREFIX")
+  assert_eq(env[3].1, "src/lib/")
 }
 
 ///|
@@ -454,8 +454,8 @@ test "subdir: get_subdir_info returns info for initialized subdir" {
   let info_after = get_subdir_info(fs, "/repo/.git", "/repo", "src/lib")
   match info_after {
     Some(info) => {
-      @test.assert_eq(info.path, "src/lib")
-      @test.assert_eq(info.git_dir, "/repo/.git")
+      assert_eq(info.path, "src/lib")
+      assert_eq(info.git_dir, "/repo/.git")
       assert_true(info.initialized)
     }
     None => assert_true(false)
@@ -512,7 +512,7 @@ test "subdir: nested path initialization" {
     _ => return ()
   }
   // パスが正規化されている
-  @test.assert_eq(info.path, "src/packages/core/lib")
+  assert_eq(info.path, "src/packages/core/lib")
   // 設定ディレクトリ名が正しい（/ が _ に変換）
   assert_true(fs.is_file("/repo/.git/subdir/src_packages_core_lib/config"))
 }
@@ -557,19 +557,19 @@ test "subdir: env vars have correct values" {
   for pair in env {
     match pair.0 {
       "MOONGIT_SUBDIR" => {
-        @test.assert_eq(pair.1, "packages/core")
+        assert_eq(pair.1, "packages/core")
         found_subdir = true
       }
       "MOONGIT_GIT_DIR" => {
-        @test.assert_eq(pair.1, "/home/user/repo/.git")
+        assert_eq(pair.1, "/home/user/repo/.git")
         found_git_dir = true
       }
       "MOONGIT_REPO_ROOT" => {
-        @test.assert_eq(pair.1, "/home/user/repo")
+        assert_eq(pair.1, "/home/user/repo")
         found_root = true
       }
       "GIT_PREFIX" => {
-        @test.assert_eq(pair.1, "packages/core/")
+        assert_eq(pair.1, "packages/core/")
         found_prefix = true
       }
       _ => ()
@@ -607,7 +607,7 @@ test "subdir: init with SubdirRepo integration" {
   }
   // ファイルが読める
   let content = subdir.fs().read_file(fs, "/foo.mbt") catch { _ => return () }
-  @test.assert_eq(content, b"original content")
+  assert_eq(content, b"original content")
 }
 
 ///|
@@ -747,19 +747,19 @@ test "module: list_modules returns initialized modules" {
   fs.mkdir_p("/repo/src/cli")
   // 初期状態では空
   let modules_before = list_modules(fs, "/repo/.git")
-  @test.assert_eq(modules_before.length(), 0)
+  assert_eq(modules_before.length(), 0)
   // lib を初期化
   init_module(fs, fs, "/repo/.git", "/repo", "src/lib") catch {
     _ => return ()
   }
   let modules_one = list_modules(fs, "/repo/.git")
-  @test.assert_eq(modules_one.length(), 1)
+  assert_eq(modules_one.length(), 1)
   // cli も初期化
   init_module(fs, fs, "/repo/.git", "/repo", "src/cli") catch {
     _ => return ()
   }
   let modules_two = list_modules(fs, "/repo/.git")
-  @test.assert_eq(modules_two.length(), 2)
+  assert_eq(modules_two.length(), 2)
 }
 
 ///|
@@ -823,11 +823,11 @@ test "subdir: commit creates new commit in parent repo" {
     _ => return ()
   }
   let content = subdir2.fs().read_file(fs, "/foo.mbt") catch { _ => return () }
-  @test.assert_eq(content, b"modified")
+  assert_eq(content, b"modified")
   let new_content = subdir2.fs().read_file(fs, "/bar.mbt") catch {
       _ => return ()
     }
-  @test.assert_eq(new_content, b"new file")
+  assert_eq(new_content, b"new file")
 }
 
 ///|
@@ -856,13 +856,13 @@ test "subdir: checkout retrieves files from specific commit" {
     _ => return ()
   }
   let content1 = subdir1.fs().read_file(fs, "/foo.mbt") catch { _ => return () }
-  @test.assert_eq(content1, b"version 1")
+  assert_eq(content1, b"version 1")
   // commit2 のサブディレクトリを取得
   let subdir2 = SubdirRepo::from_commit(fs, "/repo/.git", commit2, "src/lib") catch {
     _ => return ()
   }
   let content2 = subdir2.fs().read_file(fs, "/foo.mbt") catch { _ => return () }
-  @test.assert_eq(content2, b"version 2")
+  assert_eq(content2, b"version 2")
 }
 
 ///|
@@ -1001,7 +1001,7 @@ test "edge: empty subdirectory" {
     _ => return ()
   }
   // 空でも正常に作成される
-  @test.assert_eq(subdir.path(), "src/lib")
+  assert_eq(subdir.path(), "src/lib")
 }
 
 ///|
@@ -1022,9 +1022,9 @@ test "edge: very deep nesting (5 levels)" {
   let subdir = SubdirRepo::from_commit(fs, "/repo/.git", commit_id, deep_path) catch {
     _ => return ()
   }
-  @test.assert_eq(subdir.path(), deep_path)
+  assert_eq(subdir.path(), deep_path)
   let content = subdir.fs().read_file(fs, "/file.txt") catch { _ => return () }
-  @test.assert_eq(content, b"deep content")
+  assert_eq(content, b"deep content")
 }
 
 ///|
@@ -1069,7 +1069,7 @@ test "edge: path normalization variants" {
     let subdir = SubdirRepo::from_commit(fs, "/repo/.git", commit_id, path) catch {
       _ => continue
     }
-    @test.assert_eq(subdir.path(), "src/lib")
+    assert_eq(subdir.path(), "src/lib")
   }
 }
 
@@ -1090,8 +1090,8 @@ test "edge: single file in subdirectory" {
     _ => return ()
   }
   let files = subdir.fs().readdir(fs, "/") catch { _ => return () }
-  @test.assert_eq(files.length(), 1)
-  @test.assert_eq(files[0], "single.mbt")
+  assert_eq(files.length(), 1)
+  assert_eq(files[0], "single.mbt")
 }
 
 // ============================================================================
@@ -1139,7 +1139,7 @@ test "workflow: init -> commit -> checkout -> deinit" {
   let old_content = subdir_old.fs().read_file(fs, "/foo.mbt") catch {
       _ => return ()
     }
-  @test.assert_eq(old_content, b"v1")
+  assert_eq(old_content, b"v1")
   // 5. 新しいコミットを確認
   let subdir_new = SubdirRepo::from_commit(fs, "/repo/.git", commit2, "src/lib") catch {
     _ => return ()
@@ -1147,7 +1147,7 @@ test "workflow: init -> commit -> checkout -> deinit" {
   let new_content = subdir_new.fs().read_file(fs, "/foo.mbt") catch {
       _ => return ()
     }
-  @test.assert_eq(new_content, b"v2")
+  assert_eq(new_content, b"v2")
   // 6. モジュール削除
   deinit_module(fs, fs, "/repo/.git", "/repo", "src/lib")
   assert_false(is_module_initialized(fs, "/repo/.git", "src/lib"))
@@ -1195,7 +1195,7 @@ test "workflow: multiple commits in sequence" {
   let content = final_subdir.fs().read_file(fs, "/foo.mbt") catch {
       _ => return ()
     }
-  @test.assert_eq(content, b"v5")
+  assert_eq(content, b"v5")
 }
 
 // ============================================================================
@@ -1232,7 +1232,7 @@ test "parallel: multiple modules independent operations" {
   }
   // 全て初期化されている
   let modules = list_modules(fs, "/repo/.git")
-  @test.assert_eq(modules.length(), 3)
+  assert_eq(modules.length(), 3)
   // 各モジュールで独立してSubdirRepoを作成
   let core = SubdirRepo::from_commit(
     fs, "/repo/.git", commit_id, "packages/core",
@@ -1251,8 +1251,8 @@ test "parallel: multiple modules independent operations" {
   let utils_content = utils.fs().read_file(fs, "/index.mbt") catch {
       _ => return ()
     }
-  @test.assert_eq(core_content, b"core")
-  @test.assert_eq(utils_content, b"utils")
+  assert_eq(core_content, b"core")
+  assert_eq(utils_content, b"utils")
 }
 
 ///|
@@ -1291,7 +1291,7 @@ test "parallel: commit to one module preserves others" {
   let b_content = subdir_b.fs().read_file(fs, "/file.mbt") catch {
       _ => return ()
     }
-  @test.assert_eq(b_content, b"b original")
+  assert_eq(b_content, b"b original")
   // pkg/a は変更されている
   let subdir_a2 = SubdirRepo::from_commit(fs, "/repo/.git", commit2, "pkg/a") catch {
     _ => return ()
@@ -1299,7 +1299,7 @@ test "parallel: commit to one module preserves others" {
   let a_content = subdir_a2.fs().read_file(fs, "/file.mbt") catch {
       _ => return ()
     }
-  @test.assert_eq(a_content, b"a modified")
+  assert_eq(a_content, b"a modified")
 }
 
 // ============================================================================
@@ -1370,7 +1370,7 @@ test "misc: log filters commits correctly" {
   let history = subdir.log(fs) catch { _ => return () }
   // lib を変更したコミットは2つ（Both と Lib only）
   // Readme only は含まれない
-  @test.assert_eq(history.length(), 2)
+  assert_eq(history.length(), 2)
 }
 
 ///|
@@ -1393,7 +1393,7 @@ test "misc: diff shows only subdirectory changes" {
   subdir.fs().write_file("/foo.mbt", b"modified")
   subdir.fs().write_file("/bar.mbt", b"new file")
   let diff = subdir.diff()
-  @test.assert_eq(diff.length(), 2)
+  assert_eq(diff.length(), 2)
 }
 
 ///|
@@ -1418,7 +1418,7 @@ test "misc: multiple files in subdirectory" {
     _ => return ()
   }
   let files = subdir.fs().readdir(fs, "/") catch { _ => return () }
-  @test.assert_eq(files.length(), 10)
+  assert_eq(files.length(), 10)
 }
 
 ///|
@@ -1480,8 +1480,8 @@ test "misc: commit with delete file" {
     _ => return ()
   }
   let files = subdir2.fs().readdir(fs, "/") catch { _ => return () }
-  @test.assert_eq(files.length(), 1)
-  @test.assert_eq(files[0], "keep.mbt")
+  assert_eq(files.length(), 1)
+  assert_eq(files[0], "keep.mbt")
 }
 
 ///|
@@ -1576,10 +1576,10 @@ test "sparse: write and read patterns" {
   }
   // パターンを読み取り
   let read_patterns = read_module_sparse_patterns(fs, "/repo/.git", "src/lib")
-  @test.assert_eq(read_patterns.length(), 3)
-  @test.assert_eq(read_patterns[0], "*.mbt")
-  @test.assert_eq(read_patterns[1], "*.mbti")
-  @test.assert_eq(read_patterns[2], "!*_test.mbt")
+  assert_eq(read_patterns.length(), 3)
+  assert_eq(read_patterns[0], "*.mbt")
+  assert_eq(read_patterns[1], "*.mbti")
+  assert_eq(read_patterns[2], "!*_test.mbt")
 }
 
 ///|
@@ -1608,9 +1608,9 @@ test "sparse: set_module_sparse_patterns replaces existing" {
   }
   // 読み取り
   let patterns = read_module_sparse_patterns(fs, "/repo/.git", "src/lib")
-  @test.assert_eq(patterns.length(), 2)
-  @test.assert_eq(patterns[0], "*.txt")
-  @test.assert_eq(patterns[1], "*.md")
+  assert_eq(patterns.length(), 2)
+  assert_eq(patterns[0], "*.txt")
+  assert_eq(patterns[1], "*.md")
 }
 
 ///|
@@ -1641,9 +1641,9 @@ test "sparse: add_module_sparse_patterns appends without duplicates" {
   }
   // 読み取り
   let patterns = read_module_sparse_patterns(fs, "/repo/.git", "src/lib")
-  @test.assert_eq(patterns.length(), 2) // *.mbt は重複しない
-  @test.assert_eq(patterns[0], "*.mbt")
-  @test.assert_eq(patterns[1], "*.mbti")
+  assert_eq(patterns.length(), 2) // *.mbt は重複しない
+  assert_eq(patterns[0], "*.mbt")
+  assert_eq(patterns[1], "*.mbti")
 }
 
 ///|
@@ -1747,7 +1747,7 @@ test "sparse: read patterns from non-existent module returns empty" {
   }
   // 存在しないモジュールのパターンを読み取り
   let patterns = read_module_sparse_patterns(fs, "/repo/.git", "nonexistent")
-  @test.assert_eq(patterns.length(), 0)
+  assert_eq(patterns.length(), 0)
 }
 
 ///|

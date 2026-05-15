@@ -176,7 +176,7 @@ async fn bit_credential_fill(
   let mut user : String? = None
   let mut pass : String? = None
   for line_view in text.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     match line.find("=") {
       Some(eq) => {
         let key = String::unsafe_substring(line, start=0, end=eq)

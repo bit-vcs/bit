@@ -352,7 +352,7 @@ fn resolve_hub_git_dir(root : String) -> String {
     let raw = @utf8.decode_lossy(
       (fs.read_file(commondir_path) catch { _ => Bytes::default() })[:],
     )
-    let rel = raw.trim(chars=" \t\r\n").to_owned()
+    let rel = raw.trim(chars=" \t\r\n").to_string()
     if rel.length() > 0 {
       if rel.has_prefix("/") {
         return normalize_path(rel)

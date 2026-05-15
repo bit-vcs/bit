@@ -73,7 +73,7 @@ fn parse_alias_entries(content : String) -> Array[(String, String)] {
     return result
   }
   for line_view in content.split("\n") {
-    let trimmed = line_view.to_owned().trim().to_owned()
+    let trimmed = line_view.to_string().trim().to_string()
     if trimmed.length() == 0 || trimmed.has_prefix("#") {
       continue
     }
@@ -87,7 +87,7 @@ fn parse_alias_entries(content : String) -> Array[(String, String)] {
             end=trimmed.length(),
           )
           .trim()
-          .to_owned()
+          .to_string()
         if a.length() > 0 && p.length() > 0 {
           result.push((a, p))
         }

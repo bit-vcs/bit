@@ -94,7 +94,7 @@ pub fn parse_legacy_pull_request(text : String) -> PullRequest raise PrError {
   let body_lines : Array[String] = []
   let mut in_body = false
   for line_view in text.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if in_body {
       body_lines.push(line)
       continue
@@ -294,7 +294,7 @@ pub fn parse_work_item(text : String) -> WorkItem raise PrError {
   let body_lines : Array[String] = []
   let mut in_body = false
   for line_view in text.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if in_body {
       body_lines.push(line)
       continue
@@ -455,7 +455,7 @@ pub fn parse_pr_comment(text : String) -> PrComment raise PrError {
   let body_lines : Array[String] = []
   let mut in_body = false
   for line_view in text.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if in_body {
       body_lines.push(line)
       continue
@@ -548,7 +548,7 @@ pub fn parse_pr_review(text : String) -> PrReview raise PrError {
   let body_lines : Array[String] = []
   let mut in_body = false
   for line_view in text.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if in_body {
       body_lines.push(line)
       continue
@@ -720,7 +720,7 @@ pub fn parse_legacy_issue(text : String) -> Issue raise PrError {
   let body_lines : Array[String] = []
   let mut in_body = false
   for line_view in text.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if in_body {
       body_lines.push(line)
       continue
@@ -815,7 +815,7 @@ pub fn parse_issue_comment(text : String) -> IssueComment raise PrError {
   let body_lines : Array[String] = []
   let mut in_body = false
   for line_view in text.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if in_body {
       body_lines.push(line)
       continue
@@ -905,7 +905,7 @@ pub fn parse_note(text : String) -> Note {
   let body_lines : Array[String] = []
   let mut in_body = false
   for line_view in text.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if in_body {
       body_lines.push(line)
       continue

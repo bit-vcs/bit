@@ -47,7 +47,7 @@ async fn handle_stripspace(args : Array[String]) -> Unit raise Error {
 fn stripspace_split_lines(input : String) -> Array[String] {
   let lines : Array[String] = []
   for line_view in input.split("\n") {
-    lines.push(line_view.to_owned())
+    lines.push(line_view.to_string())
   }
   // Remove the trailing empty string from final newline
   if lines.length() > 0 && lines[lines.length() - 1].length() == 0 {
@@ -60,7 +60,7 @@ fn stripspace_split_lines(input : String) -> Array[String] {
 fn stripspace_clean(input : String, strip_comments : Bool) -> String {
   let lines : Array[String] = []
   for line_view in input.split("\n") {
-    lines.push(line_view.to_owned())
+    lines.push(line_view.to_string())
   }
   // Process lines
   let processed : Array[String] = []

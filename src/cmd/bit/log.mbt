@@ -333,7 +333,7 @@ fn log_append_signature_output_text(
     .replace_all(old="\r\n", new="\n")
     .replace_all(old="\r", new="\n")
   for line_view in normalized.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if line.length() == 0 || line.has_prefix("[GNUPG:]") {
       continue
     }
@@ -554,7 +554,7 @@ fn log_parse_stdin_input(
   let mut stdin_pathspec_mode = false
   let mut stdin_not_mode = false
   for line_view in input.split("\n") {
-    let line = trim_string(line_view.to_owned())
+    let line = trim_string(line_view.to_string())
     if line.length() == 0 || line.has_prefix("#") {
       continue
     }
@@ -763,7 +763,7 @@ fn log_read_config_entries(
   let section_lower = section.to_lower()
   let key_lower = key.to_lower()
   for raw_line_view in content.split("\n") {
-    let raw_line = raw_line_view.to_owned()
+    let raw_line = raw_line_view.to_string()
     let line = trim_string(raw_line)
     if line.length() == 0 || line.has_prefix("#") || line.has_prefix(";") {
       continue
@@ -825,7 +825,7 @@ fn log_read_config_entries(
   match @sys.get_env_var("GIT_CONFIG_OVERRIDES") {
     Some(data) =>
       for line_view in data.split("\n") {
-        let line = line_view.to_owned()
+        let line = line_view.to_string()
         if line.length() == 0 {
           continue
         }
@@ -1518,7 +1518,7 @@ fn parse_commit_format_data(
   let mut committer_tz = "+0000"
   let message_lines : Array[String] = []
   for line_view in text.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if line.has_prefix("author ") {
       let rest = String::unsafe_substring(line, start=7, end=line.length())
       let (name, email, ts, tz) = parse_ident_parts(rest)
@@ -1536,7 +1536,7 @@ fn parse_commit_format_data(
     }
   }
   for line_view in message_text.split("\n") {
-    message_lines.push(line_view.to_owned())
+    message_lines.push(line_view.to_string())
   }
   // Remove trailing empty lines from message
   while message_lines.length() > 0 &&
@@ -1765,7 +1765,7 @@ fn parse_ident_parts(ident : String) -> (String, String, Int64, String) {
   let mut tz = "+0000"
   match ident.find("<") {
     Some(lt) => {
-      name = String::unsafe_substring(ident, start=0, end=lt).trim().to_owned()
+      name = String::unsafe_substring(ident, start=0, end=lt).trim().to_string()
       match ident.find(">") {
         Some(gt) => {
           email = String::unsafe_substring(ident, start=lt + 1, end=gt)
@@ -1775,11 +1775,11 @@ fn parse_ident_parts(ident : String) -> (String, String, Int64, String) {
               end=ident.length(),
             )
             .trim()
-            .to_owned()
+            .to_string()
           // rest = "timestamp timezone"
           let parts : Array[String] = []
           for p in rest.split(" ") {
-            let s = p.to_owned().trim().to_owned()
+            let s = p.to_string().trim().to_string()
             if s.length() > 0 {
               parts.push(s)
             }
@@ -1810,7 +1810,7 @@ struct LogWrapSpec {
 fn log_parse_wrap_spec(text : String) -> LogWrapSpec {
   let parts : Array[String] = []
   for part in text.split(",") {
-    parts.push(part.to_owned())
+    parts.push(part.to_string())
   }
   let width = if parts.length() > 0 && parts[0].length() > 0 {
     @string.parse_int(parts[0]) catch {
@@ -1850,7 +1850,7 @@ fn log_apply_wrap(text : String, spec : LogWrapSpec) -> String {
   let lines : Array[String] = []
   let mut first_output_line = true
   for raw_line_view in text.split("\n") {
-    let raw_line = raw_line_view.to_owned()
+    let raw_line = raw_line_view.to_string()
     let indent = if first_output_line { spec.indent1 } else { spec.indent2 }
     if spec.width <= 0 {
       lines.push(log_indent_string(indent) + raw_line)
@@ -1859,7 +1859,7 @@ fn log_apply_wrap(text : String, spec : LogWrapSpec) -> String {
     }
     let words : Array[String] = []
     for word_view in raw_line.split(" ") {
-      let word = word_view.to_owned()
+      let word = word_view.to_string()
       if word.length() > 0 {
         words.push(word)
       }
@@ -1919,7 +1919,7 @@ async fn log_emit_output(
   }
   let lines : Array[String] = []
   for line_view in text.split("\n") {
-    lines.push(line_view.to_owned())
+    lines.push(line_view.to_string())
   }
   for i in 0..<lines.length() {
     let prefixed = line_prefix + lines[i]
@@ -2126,13 +2126,13 @@ fn log_read_graft_parents(
   )
   let commit_hex = commit_id.to_hex()
   for line_view in content.split("\n") {
-    let line = trim_string(line_view.to_owned())
+    let line = trim_string(line_view.to_string())
     if line.length() == 0 || line.has_prefix("#") {
       continue
     }
     let tokens : Array[String] = []
     for token_view in line.split(" ") {
-      let token = trim_string(token_view.to_owned())
+      let token = trim_string(token_view.to_string())
       if token.length() > 0 {
         tokens.push(token)
       }
@@ -3941,7 +3941,7 @@ fn get_head_commit_message(
   let mut in_message = false
   let msg_lines : Array[String] = []
   for line_view in text.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if in_message {
       msg_lines.push(line)
       continue
@@ -4975,7 +4975,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
           true,
           line_prefix,
         )
-        log_emit_output("# base: \{base[:7].to_owned()}", true, line_prefix)
+        log_emit_output("# base: \{base[:7].to_string()}", true, line_prefix)
         log_emit_output("", true, line_prefix)
       }
       None => ()
@@ -6049,7 +6049,7 @@ fn log_get_commit_tree(
 fn log_extract_author_timestamp(data : Bytes) -> Int64 {
   let text = decode_bytes(data)
   for line_view in text.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if line.length() == 0 {
       break
     }
@@ -6106,7 +6106,7 @@ fn log_parse_entry_from_obj(
   let mut in_message = false
   let message_lines : Array[String] = []
   for line_view in text.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if in_message {
       message_lines.push(line)
       continue
@@ -6455,7 +6455,7 @@ fn get_commit_subject(
 fn extract_author_line_from_bytes(data : Bytes) -> String {
   let text = decode_bytes(data)
   for line_view in text.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if line.has_prefix("author ") {
       return String::unsafe_substring(line, start=7, end=line.length())
     }

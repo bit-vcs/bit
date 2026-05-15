@@ -15,7 +15,7 @@ async fn sparse_checkout_wbtest_run_git(
     inherit_env=true,
     cwd~,
   )
-  @test.assert_eq(code, 0)
+  assert_eq(code, 0)
 }
 
 ///|
@@ -29,7 +29,7 @@ async fn sparse_checkout_wbtest_git_stdout(
     inherit_env=true,
     cwd~,
   )
-  @test.assert_eq(code, 0)
+  assert_eq(code, 0)
   stdout.text() catch {
     _ => ""
   }
@@ -46,7 +46,7 @@ async fn sparse_checkout_wbtest_shell_stdout(
     inherit_env=true,
     cwd~,
   )
-  @test.assert_eq(code, 0)
+  assert_eq(code, 0)
   stdout.text() catch {
     _ => ""
   }
@@ -67,14 +67,14 @@ async fn sparse_checkout_wbtest_shim_moon_path(
       ["build", "--target", "native", "--release"],
       inherit_env=true,
     )
-    @test.assert_eq(build_code, 0)
+    assert_eq(build_code, 0)
   }
   fs.write_string(
     wrapper_path,
     "#!/bin/sh\nset -eu\nexec '\{bit_exe}' \"$@\"\n",
   )
   let chmod_code = @process.run("chmod", ["+x", wrapper_path], inherit_env=true)
-  @test.assert_eq(chmod_code, 0)
+  assert_eq(chmod_code, 0)
   wrapper_path
 }
 
@@ -83,7 +83,7 @@ fn sparse_checkout_wbtest_strip_moon_warnings(text : String) -> String {
   let lines : Array[String] = []
   let mut skipping_warning = false
   for line_view in text.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if line.has_prefix("Warning: [") {
       skipping_warning = true
       continue
@@ -166,8 +166,8 @@ async fn sparse_checkout_wbtest_run_shim_git(
   let (code, _stdout, stderr) = sparse_checkout_wbtest_collect_shim_git_output(
     cwd, git_args,
   )
-  @test.assert_eq(code, 0)
-  @test.assert_eq(stderr, "")
+  assert_eq(code, 0)
+  assert_eq(stderr, "")
 }
 
 ///|
@@ -242,7 +242,7 @@ async test "sparse-checkout: parse pattern args accepts --skip-checks" {
   ]) catch {
     err => fail("unexpected error: \{err}")
   }
-  @test.assert_eq(patterns, ["a", "deep"])
+  assert_eq(patterns, ["a", "deep"])
 }
 
 ///|
@@ -259,7 +259,7 @@ test "sparse-checkout: literal file path errors in cone mode without --skip-chec
       false,
     ) catch {
       @bitcore.GitError::InvalidObject(message) => {
-        @test.assert_eq(message, ".gitignore is not a directory")
+        assert_eq(message, ".gitignore is not a directory")
         return ()
       }
       err => fail("unexpected error: \{err}")
@@ -306,7 +306,7 @@ async test "sparse-checkout: set defaults to cone mode for fresh repo with --ski
   let patterns = decode_bytes(
     fs.read_file(repo_dir + "/.git/info/sparse-checkout"),
   )
-  @test.assert_eq(patterns, "/*\n!/*/\n/a/\n/deep/\n")
+  assert_eq(patterns, "/*\n!/*/\n/a/\n/deep/\n")
   cleanup_tree(fs, root)
 }
 
@@ -331,7 +331,7 @@ async test "sparse-checkout: init re-enables sparse mode after disable and branc
     fs,
     repo_dir + "/.git",
   )
-  @test.assert_eq(skip_paths_after_disable.length(), 0)
+  assert_eq(skip_paths_after_disable.length(), 0)
   assert_true(fs.is_file(repo_dir + "/b"))
   assert_true(fs.is_dir(repo_dir + "/folder1"))
   assert_true(fs.is_dir(repo_dir + "/folder2"))
@@ -392,7 +392,7 @@ async test "sparse-checkout: set without patterns initializes defaults and confi
   sparse_checkout_wbtest_run_shim_git(repo_dir, ["set"])
 
   let patterns = @bitlib.read_sparse_patterns(fs, repo_dir + "/.git")
-  @test.assert_eq(patterns, @bitlib.sparse_default_patterns())
+  assert_eq(patterns, @bitlib.sparse_default_patterns())
   let config = @utf8.decode_lossy(fs.read_file(repo_dir + "/.git/config")[:])
   assert_true(config.contains("repositoryformatversion = 1"))
   assert_true(config.contains("worktreeConfig = true"))
@@ -798,7 +798,7 @@ async test "sparse-checkout: add keeps skipped paths out of porcelain status" {
   @bitlib.add_paths_async(fs, fs, repo_dir, ["README.md"])
 
   let lines = @bitlib.status_porcelain(fs, repo_dir)
-  @test.assert_eq(lines, ["A  README.md"])
+  assert_eq(lines, ["A  README.md"])
 
   cleanup_tree(fs, root)
 }
@@ -818,7 +818,7 @@ async test "sparse-checkout: list warns when sparse-checkout file is missing" {
 
   match sparse_checkout_list_state(fs, repo_dir + "/.git") {
     Warning(msg) =>
-      @test.assert_eq(
+      assert_eq(
         msg, "this worktree is not sparse (sparse-checkout file may not exist)",
       )
     _ => fail("expected sparse list warning when sparse file is missing")
@@ -841,16 +841,16 @@ async test "sparse-checkout: set --stdin in cone mode updates list and worktree"
     repo_dir,
     ["sparse-checkout", "init", "--cone"],
   )
-  @test.assert_eq(init_code, 0)
-  @test.assert_eq(init_stdout, "Sparse checkout initialized\n")
-  @test.assert_eq(init_stderr, "")
+  assert_eq(init_code, 0)
+  assert_eq(init_stdout, "Sparse checkout initialized\n")
+  assert_eq(init_stderr, "")
 
   let (code, stdout, stderr) = sparse_checkout_wbtest_collect_shim_git_shell_output(
     repo_dir, "printf 'folder1\\nfolder2\\n' | \"$SHIM_GIT\" -C . sparse-checkout set --stdin >/dev/null && \"$SHIM_GIT\" -C . sparse-checkout list",
   )
-  @test.assert_eq(code, 0)
-  @test.assert_eq(stdout, "folder1\nfolder2\n")
-  @test.assert_eq(stderr, "")
+  assert_eq(code, 0)
+  assert_eq(stdout, "folder1\nfolder2\n")
+  assert_eq(stderr, "")
   assert_true(fs.is_dir(repo_dir + "/folder1"))
   assert_true(fs.is_dir(repo_dir + "/folder2"))
   assert_true(fs.is_file(repo_dir + "/folder1/c"))
@@ -873,7 +873,7 @@ async test "sparse-checkout: reapply restores worktree from current patterns" {
   sparse_checkout_wbtest_run_shim_git(repo_dir, ["set", "/*", "!b", "!/*/"])
 
   let initial_patterns = @bitlib.read_sparse_patterns(fs, repo_dir + "/.git")
-  @test.assert_eq(initial_patterns, ["/*", "!b", "!/*/"])
+  assert_eq(initial_patterns, ["/*", "!b", "!/*/"])
   let initial_skip_paths = @bitlib.read_skip_worktree_paths(
     fs,
     repo_dir + "/.git",
@@ -888,7 +888,7 @@ async test "sparse-checkout: reapply restores worktree from current patterns" {
   assert_false(fs.is_dir(repo_dir + "/folder1"))
   assert_false(fs.is_dir(repo_dir + "/folder2"))
   let patterns = @bitlib.read_sparse_patterns(fs, repo_dir + "/.git")
-  @test.assert_eq(patterns, ["/*", "!b", "!/*/"])
+  assert_eq(patterns, ["/*", "!b", "!/*/"])
 
   cleanup_tree(fs, root)
 }
@@ -921,12 +921,12 @@ async test "sparse-checkout: cone set collapses nested explicit paths to parent"
   ])
 
   let file_patterns = @bitlib.read_sparse_patterns(fs, repo_dir + "/.git")
-  @test.assert_eq(file_patterns, ["/*", "!/*/", "/deep/"])
+  assert_eq(file_patterns, ["/*", "!/*/", "/deep/"])
   let display_patterns = @bitlib.read_sparse_display_patterns(
     fs,
     repo_dir + "/.git",
   )
-  @test.assert_eq(display_patterns, ["deep"])
+  assert_eq(display_patterns, ["deep"])
 
   cleanup_tree(fs, root)
 }
@@ -974,8 +974,8 @@ async test "sparse-checkout: init warns when dirty tracked path is preserved" {
     repo_dir,
     ["sparse-checkout", "init", "--no-cone"],
   )
-  @test.assert_eq(code, 0)
-  @test.assert_eq(stdout, "Sparse checkout initialized\n")
+  assert_eq(code, 0)
+  assert_eq(stdout, "Sparse checkout initialized\n")
   assert_true(
     stderr.contains("warning: The following paths are not up to date"),
   )
@@ -1053,7 +1053,7 @@ async test "sparse-checkout: no-checkout clone keeps worktree empty until switch
   sparse_checkout_wbtest_run_shim_git(clone_dir, ["set", "folder1"])
 
   let patterns = @bitlib.read_sparse_display_patterns(fs, clone_dir + "/.git")
-  @test.assert_eq(patterns, ["folder1"])
+  assert_eq(patterns, ["folder1"])
   assert_false(fs.is_file(clone_dir + "/a"))
   assert_false(fs.is_dir(clone_dir + "/folder1"))
   assert_false(fs.is_file(clone_dir + "/.git/index"))
@@ -1073,7 +1073,7 @@ test "sparse-checkout: check-rules helper preserves quoted and nul-delimited mat
   let quoted = sparse_checkout_filter_check_rules_input(
     "\"folder\\\" a/file\"\n\"folder\\\" b/file\"\n", patterns, false,
   )
-  @test.assert_eq(quoted, "\"folder\\\" a/file\"\n")
+  assert_eq(quoted, "\"folder\\\" a/file\"\n")
 
   let nul_input = StringBuilder::new()
   nul_input.write_string("folder\" a/a")
@@ -1088,7 +1088,7 @@ test "sparse-checkout: check-rules helper preserves quoted and nul-delimited mat
   let expect = StringBuilder::new()
   expect.write_string("folder\" a/a")
   expect.write_char('\u{0}')
-  @test.assert_eq(nul_output, expect.to_string())
+  assert_eq(nul_output, expect.to_string())
 }
 
 ///|
@@ -1111,7 +1111,7 @@ async test "sparse-checkout: check-rules defaults to cone mode for rules files" 
     repo_root,
     "SHIM_REAL_GIT=\{repo_root}/third_party/git/git SHIM_EXEC_PATH=\{repo_root}/third_party/git SHIM_MOON=\{shim_moon} SHIM_CMDS='sparse-checkout' SHIM_STRICT=1 \{repo_root}/tools/git-shim/bin/git -C \{repo_dir} sparse-checkout check-rules --rules-file \{rules_path} < \{input_path}",
   )
-  @test.assert_eq(actual, "a\nfolder1/c\n")
+  assert_eq(actual, "a\nfolder1/c\n")
 
   cleanup_tree(fs, root)
 }
@@ -1134,7 +1134,7 @@ async test "sparse-checkout: clean refuses without force by default" {
     repo_dir,
     ["sparse-checkout", "clean"],
   )
-  @test.assert_eq(code, 1)
+  assert_eq(code, 1)
   assert_true(stderr.contains("refusing to clean"))
   assert_true(fs.is_file(repo_dir + "/folder2/extra/file"))
 
@@ -1159,18 +1159,18 @@ async test "sparse-checkout: clean dry-run collapses outside sparse paths" {
     repo_dir,
     ["sparse-checkout", "clean", "--dry-run"],
   )
-  @test.assert_eq(dry_code, 0)
-  @test.assert_eq(dry_stdout, "Would remove folder2/\n")
-  @test.assert_eq(dry_stderr, "")
+  assert_eq(dry_code, 0)
+  assert_eq(dry_stdout, "Would remove folder2/\n")
+  assert_eq(dry_stderr, "")
   assert_true(fs.is_file(repo_dir + "/folder2/extra/file"))
 
   let (verbose_code, verbose_stdout, verbose_stderr) = sparse_checkout_wbtest_collect_shim_git_output(
     repo_dir,
     ["sparse-checkout", "clean", "--dry-run", "--verbose"],
   )
-  @test.assert_eq(verbose_code, 0)
-  @test.assert_eq(verbose_stdout, "Would remove folder2/extra/file\n")
-  @test.assert_eq(verbose_stderr, "")
+  assert_eq(verbose_code, 0)
+  assert_eq(verbose_stdout, "Would remove folder2/extra/file\n")
+  assert_eq(verbose_stderr, "")
   assert_true(fs.is_file(repo_dir + "/folder2/extra/file"))
 
   cleanup_tree(fs, root)
@@ -1209,11 +1209,11 @@ async test "sparse-checkout: clean skips roots with tracked paths still present"
     }
   }
   assert_true(skipped_paths.contains("folder2/d"))
-  @test.assert_eq(
+  assert_eq(
     sparse_checkout_clean_managed_root("folder2/d", skipped_paths, kept_paths),
     Some("folder2"),
   )
-  @test.assert_eq(
+  assert_eq(
     sparse_checkout_clean_managed_root(
       "folder2/file", skipped_paths, kept_paths,
     ),
@@ -1224,9 +1224,9 @@ async test "sparse-checkout: clean skips roots with tracked paths still present"
     repo_dir,
     ["sparse-checkout", "clean", "-f"],
   )
-  @test.assert_eq(code, 0)
-  @test.assert_eq(stdout, "")
-  @test.assert_eq(stderr, "")
+  assert_eq(code, 0)
+  assert_eq(stdout, "")
+  assert_eq(stderr, "")
   assert_true(fs.is_file(repo_dir + "/folder2/d"))
   assert_true(fs.is_file(repo_dir + "/folder2/file"))
 
@@ -1259,9 +1259,9 @@ async test "sparse-checkout: clean defers all managed roots while tracked sparse
     repo_dir,
     ["sparse-checkout", "clean", "-f"],
   )
-  @test.assert_eq(code, 0)
-  @test.assert_eq(stdout, "")
-  @test.assert_eq(stderr, "")
+  assert_eq(code, 0)
+  assert_eq(stdout, "")
+  assert_eq(stderr, "")
   assert_true(fs.is_file(repo_dir + "/folder2/d"))
   assert_true(fs.is_file(repo_dir + "/folder2/file"))
   assert_true(fs.is_file(repo_dir + "/folder3/extra/file"))
@@ -1288,8 +1288,8 @@ async test "sparse-checkout: reapply warns about tracked sparse paths left in pl
     repo_dir,
     ["sparse-checkout", "reapply"],
   )
-  @test.assert_eq(code, 0)
-  @test.assert_eq(stdout, "")
+  assert_eq(code, 0)
+  assert_eq(stdout, "")
   assert_true(stderr.contains("warning"))
   assert_true(stderr.contains("not up to date"))
   assert_true(stderr.contains("folder2"))

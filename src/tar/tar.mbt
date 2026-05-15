@@ -68,12 +68,12 @@ pub fn tar_split_path(path : String) -> (String, String) {
     }
   }
   if best_slash >= 0 {
-    let prefix_part = path[:best_slash].to_owned()
-    let name_part = path[best_slash + 1:].to_owned()
+    let prefix_part = path[:best_slash].to_string()
+    let name_part = path[best_slash + 1:].to_string()
     (name_part, prefix_part)
   } else {
     // Can't split; truncate name
-    (path[:100].to_owned(), "")
+    (path[:100].to_string(), "")
   }
 }
 
@@ -164,13 +164,13 @@ pub fn tar_make_header(
 pub fn tar_parse_committer_timestamp(data : Bytes) -> Int64 {
   let text = @utf8.decode_lossy(data[:])
   for line_view in text.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if line.length() == 0 {
       break
     }
     if line.has_prefix("committer ") {
       // Format: "committer Name <email> timestamp tz"
-      let rest = line[10:].to_owned()
+      let rest = line[10:].to_string()
       // Find '>' to locate end of email
       let mut gt_pos = -1
       for ci in 0..<rest.length() {
@@ -179,12 +179,12 @@ pub fn tar_parse_committer_timestamp(data : Bytes) -> Int64 {
         }
       }
       if gt_pos >= 0 && gt_pos + 2 < rest.length() {
-        let after_email = rest[gt_pos + 2:].to_owned()
+        let after_email = rest[gt_pos + 2:].to_string()
         // "timestamp tz"
         let parts = after_email.split(" ")
         let parts_arr : Array[String] = []
         for p in parts {
-          parts_arr.push(p.to_owned())
+          parts_arr.push(p.to_string())
         }
         if parts_arr.length() >= 1 {
           let ts_str = parts_arr[0]
@@ -219,12 +219,12 @@ pub fn tar_emit_parent_dirs(
     if slash_pos <= 0 {
       break
     }
-    let dir = p[:slash_pos + 1].to_owned() // include trailing /
+    let dir = p[:slash_pos + 1].to_string() // include trailing /
     if emitted.contains(dir) {
       break
     }
     dirs.push(dir)
-    p = p[:slash_pos].to_owned()
+    p = p[:slash_pos].to_string()
   }
   // Emit in order from shallowest to deepest
   let mut di = dirs.length() - 1

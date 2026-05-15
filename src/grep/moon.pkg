@@ -15,7 +15,3 @@ options(
     "search_wbtest.mbt": [ "native" ],
   },
 )
-
-import {
-  "moonbitlang/core/test" @test,
-} for "wbtest"

@@ -1,29 +1,29 @@
 ///|
 test "init: normalize path preserves leading parent segments in relative paths" {
-  @test.assert_eq(init_normalize_path("./../realgit"), "../realgit")
-  @test.assert_eq(init_normalize_path("../../repo/.git"), "../../repo/.git")
+  assert_eq(init_normalize_path("./../realgit"), "../realgit")
+  assert_eq(init_normalize_path("../../repo/.git"), "../../repo/.git")
 }
 
 ///|
 test "init: normalize path keeps absolute parent traversal rooted" {
-  @test.assert_eq(init_normalize_path("/tmp/work/../realgit"), "/tmp/realgit")
-  @test.assert_eq(init_normalize_path("/tmp/../../realgit"), "/realgit")
+  assert_eq(init_normalize_path("/tmp/work/../realgit"), "/tmp/realgit")
+  assert_eq(init_normalize_path("/tmp/../../realgit"), "/realgit")
 }
 
 ///|
 test "init: shared mode parsing supports symbolic and octal values" {
-  @test.assert_eq(init_shared_file_mode(Some("group")), Some(0o660))
-  @test.assert_eq(init_shared_file_mode(Some("all")), Some(0o664))
-  @test.assert_eq(init_shared_file_mode(Some("0660")), Some(0o660))
-  @test.assert_eq(init_shared_file_mode(Some("umask")), None)
-  @test.assert_eq(init_shared_file_mode(Some("bogus")), None)
+  assert_eq(init_shared_file_mode(Some("group")), Some(0o660))
+  assert_eq(init_shared_file_mode(Some("all")), Some(0o664))
+  assert_eq(init_shared_file_mode(Some("0660")), Some(0o660))
+  assert_eq(init_shared_file_mode(Some("umask")), None)
+  assert_eq(init_shared_file_mode(Some("bogus")), None)
 }
 
 ///|
 test "init: shared directory mode derives traversal bits and setgid" {
-  @test.assert_eq(init_shared_dir_mode(0o660), 0o2770)
-  @test.assert_eq(init_shared_dir_mode(0o664), 0o2775)
-  @test.assert_eq(init_shared_dir_mode(0o640), 0o2750)
+  assert_eq(init_shared_dir_mode(0o660), 0o2770)
+  assert_eq(init_shared_dir_mode(0o664), 0o2775)
+  assert_eq(init_shared_dir_mode(0o640), 0o2750)
 }
 
 ///|
@@ -59,8 +59,8 @@ async test "init: --object-format sha256 creates SHA-256 repo with valid config"
     @bitcore.ObjectType::Blob,
     content,
   )
-  @test.assert_eq(id.to_hex().length(), 64)
-  @test.assert_eq(id.hash_size(), 32)
+  assert_eq(id.to_hex().length(), 64)
+  assert_eq(id.hash_size(), 32)
 
   // Verify SHA-1 produces 40-char hex OIDs (baseline)
   let id_sha1 = @bitobject.hash_object_content_with_algo(
@@ -68,16 +68,16 @@ async test "init: --object-format sha256 creates SHA-256 repo with valid config"
     @bitcore.ObjectType::Blob,
     content,
   )
-  @test.assert_eq(id_sha1.to_hex().length(), 40)
-  @test.assert_eq(id_sha1.hash_size(), 20)
+  assert_eq(id_sha1.to_hex().length(), 40)
+  assert_eq(id_sha1.hash_size(), 20)
 
   // Verify SHA-256 and SHA-1 produce different hashes
   assert_true(id.to_hex() != id_sha1.to_hex())
 
   // Verify round-trip: hex -> ObjectId -> hex
   let recovered = @bitcore.ObjectId::from_hex(id.to_hex())
-  @test.assert_eq(recovered.to_hex(), id.to_hex())
-  @test.assert_eq(recovered.hash_size(), 32)
+  assert_eq(recovered.to_hex(), id.to_hex())
+  assert_eq(recovered.hash_size(), 32)
 
   // Write object to SHA-256 repo and read it back
   let git_dir = root + "/.git"
@@ -86,7 +86,7 @@ async test "init: --object-format sha256 creates SHA-256 repo with valid config"
     @bitcore.ObjectType::Blob,
     content,
   )
-  @test.assert_eq(write_id.to_hex().length(), 64)
+  assert_eq(write_id.to_hex().length(), 64)
   @bitlib.write_object_bytes(fs, git_dir, write_id, compressed)
 
   // Verify the loose object file exists at correct path
@@ -105,7 +105,7 @@ async test "init: --object-format sha256 creates SHA-256 repo with valid config"
   let header_bytes = Bytes::from_array(@utf8.encode(expected_header).to_array())
   // Verify decompressed data starts with correct header
   for i in 0..<header_bytes.length() {
-    @test.assert_eq(decompressed[i], header_bytes[i])
+    assert_eq(decompressed[i], header_bytes[i])
   }
 
   add_test_restore_env("GIT_SHIM_CWD", prev_shim_cwd)
@@ -140,7 +140,7 @@ async test "init: respects GIT_TEST_DEFAULT_INITIAL_BRANCH_NAME" {
 
   handle_init(["-q", "repo"])
 
-  @test.assert_eq(
+  assert_eq(
     decode_bytes(fs.read_file(root + "/repo/.git/HEAD")),
     "ref: refs/heads/main\n",
   )

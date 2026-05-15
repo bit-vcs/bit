@@ -77,7 +77,7 @@ fn parent_dir(path : String) -> String {
 fn normalize_path(path : String) -> String {
   let parts : Array[String] = []
   for part_view in path.split("/") {
-    let part = part_view.to_owned()
+    let part = part_view.to_string()
     if part == "" || part == "." {
       continue
     } else if part == ".." {
@@ -585,7 +585,7 @@ fn parse_toml_string_array(raw : String) -> Array[String] {
   let inner = String::unsafe_substring(text, start=1, end=text.length() - 1)
   let result : Array[String] = []
   for part_view in inner.split(",") {
-    let part = trim_string(part_view.to_owned())
+    let part = trim_string(part_view.to_string())
     if part.length() == 0 {
       continue
     }
@@ -603,7 +603,7 @@ fn parse_workspace_manifest(text : String) -> WorkspaceManifest {
   let nodes : Array[WorkspaceNode] = []
   let mut current : WorkspaceNode? = None
   for raw_line_view in text.split("\n") {
-    let raw_line = raw_line_view.to_owned()
+    let raw_line = raw_line_view.to_string()
     let line = trim_string(strip_workspace_comment(raw_line))
     if line.length() == 0 {
       continue

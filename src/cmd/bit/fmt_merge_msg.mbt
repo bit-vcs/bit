@@ -55,7 +55,7 @@ fn fmt_merge_msg_format(
 ) -> String {
   let merge_lines : Array[String] = []
   for line_view in input.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if line.length() == 0 {
       continue
     }

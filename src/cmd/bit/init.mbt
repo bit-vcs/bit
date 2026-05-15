@@ -304,7 +304,7 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
     )
     match readlink_result {
       Ok((0, stdout, _)) => {
-        let target = (stdout.text() catch { _ => "" }).trim().to_owned()
+        let target = (stdout.text() catch { _ => "" }).trim().to_string()
         if target != "" {
           let abs_target = if target.has_prefix("/") {
             target
@@ -331,7 +331,7 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
     // Follow gitdir: pointer if it's a file
     if !fs.is_dir(resolved) && fs.is_file(resolved) {
       let content = decode_bytes((try? fs.read_file(resolved)).unwrap_or(b""))
-      let trimmed = content.trim_end(chars="\r\n").to_owned()
+      let trimmed = content.trim_end(chars="\r\n").to_string()
       if trimmed.has_prefix("gitdir: ") {
         let linked = string_slice_from(trimmed, 8)
         resolved = if linked.has_prefix("/") {
@@ -352,7 +352,7 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
             (try? fs.read_file(commondir_file)).unwrap_or(b""),
           )
           .trim_end(chars="\r\n")
-          .to_owned()
+          .to_string()
         if cd_val != "" {
           resolved = if cd_val.has_prefix("/") {
             cd_val
@@ -399,7 +399,7 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
     } else if fs.is_file(dot_git) {
       let gf_content = decode_bytes(fs.read_file(dot_git))
         .trim_end(chars="\r\n")
-        .to_owned()
+        .to_string()
       if gf_content.has_prefix("gitdir: ") {
         let linked = string_slice_from(gf_content, 8)
         let resolved = if linked.has_prefix("/") {
@@ -418,7 +418,7 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
         if fs.is_file(commondir_path) {
           let cd_content = decode_bytes(fs.read_file(commondir_path))
             .trim_end(chars="\r\n")
-            .to_owned()
+            .to_string()
           if cd_content != "" {
             check_bare_dir = if cd_content.has_prefix("/") {
               cd_content
@@ -635,7 +635,7 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
           (try? fs.read_file(dot_git_for_premove)).unwrap_or(b""),
         )
         .trim_end(chars="\r\n")
-        .to_owned()
+        .to_string()
       if gf.has_prefix("gitdir: ") {
         let linked = string_slice_from(gf, 8)
         let abs_linked = if linked.has_prefix("/") {
@@ -708,7 +708,7 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
     if fs.is_file(dot_git) {
       let content = decode_bytes(fs.read_file(dot_git))
         .trim_end(chars="\r\n")
-        .to_owned()
+        .to_string()
       if content.has_prefix("gitdir: ") {
         let old_wt_dir = string_slice_from(content, 8)
         // Extract worktree name from old path (e.g., .../worktrees/linkwt → linkwt)
@@ -757,7 +757,7 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
           // Read the linked worktree's working directory path
           let wt_path = decode_bytes(fs.read_file(gitdir_file))
             .trim_end(chars="\r\n")
-            .to_owned()
+            .to_string()
           if wt_path != "" {
             // Resolve to absolute path. For relative paths, resolve against the
             // OLD worktree dir location (before move), since the gitdir file
@@ -963,11 +963,11 @@ fn init_read_default_branch(fs : OsFs) -> String? {
 fn compute_relative_path(from_dir : String, to_path : String) -> String {
   let from_parts = init_normalize_path(from_dir)
     .split("/")
-    .map(fn(v) { v.to_owned() })
+    .map(fn(v) { v.to_string() })
     .to_array()
   let to_parts = init_normalize_path(to_path)
     .split("/")
-    .map(fn(v) { v.to_owned() })
+    .map(fn(v) { v.to_string() })
     .to_array()
   // Find common prefix length
   let mut common = 0
@@ -1012,7 +1012,7 @@ fn init_normalize_path(p : String) -> String {
         } else if !is_absolute {
           result.push("..")
         }
-      _ => result.push(part.to_owned())
+      _ => result.push(part.to_string())
     }
   }
   if result.length() == 0 {

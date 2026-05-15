@@ -167,7 +167,7 @@ fn extract_commit_subject(data : Bytes) -> String {
   let text = @utf8.decode_lossy(data[:])
   let mut in_header = true
   for line_view in text.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if in_header {
       if line.length() == 0 {
         in_header = false
@@ -662,7 +662,7 @@ fn validate_branch_rename_target_path(
 ) -> Unit raise @bit.GitError {
   let parts : Array[String] = []
   for part_view in new_ref.split("/") {
-    parts.push(part_view.to_owned())
+    parts.push(part_view.to_string())
   }
   let mut current = git_dir
   for i in 0..<(parts.length() - 1) {
@@ -688,7 +688,7 @@ fn remove_from_packed_refs(
   let lines : Array[String] = []
   let mut found = false
   for line_view in text.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if line.length() == 0 {
       continue
     }
@@ -857,7 +857,7 @@ fn collect_packed_heads(
 ) -> Unit raise @bit.GitError {
   let text = @utf8.decode_lossy(fs.read_file(packed_path)[:])
   for line_view in text.split("\n") {
-    let line = trim_line(line_view.to_owned())
+    let line = trim_line(line_view.to_string())
     if line.length() == 0 {
       continue
     }
@@ -928,7 +928,7 @@ fn resolve_packed_ref(
 ) -> @bit.ObjectId? raise @bit.GitError {
   let text = @utf8.decode_lossy(fs.read_file(packed_path)[:])
   for line_view in text.split("\n") {
-    let line = trim_line(line_view.to_owned())
+    let line = trim_line(line_view.to_string())
     if line.length() == 0 {
       continue
     }
@@ -972,7 +972,7 @@ fn read_ref_line(
 ) -> String raise @bit.GitError {
   let text = @utf8.decode_lossy(fs.read_file(path)[:])
   for line_view in text.split("\n") {
-    let line = trim_line(line_view.to_owned())
+    let line = trim_line(line_view.to_string())
     if line.length() > 0 {
       return line
     }
@@ -1037,7 +1037,7 @@ fn collect_packed_tags(
     (fs.read_file(packed_path) catch { _ => return () })[:],
   )
   for line_view in text.split("\n") {
-    let line = trim_line(line_view.to_owned())
+    let line = trim_line(line_view.to_string())
     if line.length() == 0 || line.has_prefix("#") || line.has_prefix("^") {
       continue
     }
@@ -1167,7 +1167,7 @@ fn validate_tag_ref_path(
 ) -> Unit raise @bit.GitError {
   let parts : Array[String] = []
   for part_view in refname.split("/") {
-    parts.push(part_view.to_owned())
+    parts.push(part_view.to_string())
   }
   let mut current = git_dir
   for i in 0..<(parts.length() - 1) {
@@ -1206,7 +1206,7 @@ fn has_packed_ref_path_conflict(
   }
   let refname_prefix = refname + "/"
   for line_view in text.split("\n") {
-    let line = trim_line(line_view.to_owned())
+    let line = trim_line(line_view.to_string())
     if line.length() == 0 || line.has_prefix("#") || line.has_prefix("^") {
       continue
     }

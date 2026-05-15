@@ -579,7 +579,7 @@ fn receive_delete_ref(
   let mut removed = false
   let mut skip_peeled = false
   for line_view in text.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if line.length() == 0 {
       continue
     }

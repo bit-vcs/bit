@@ -212,7 +212,7 @@ async fn check_corrupt_hunk_headers(patch : String) -> Unit {
   let mut line_num = 0
   for line_view in patch.split("\n") {
     line_num += 1
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if line.has_prefix("@@ -") {
       // Parse @@ -N,N +N,N @@ and check for overflow
       let rest = String::unsafe_substring(line, start=4, end=line.length())

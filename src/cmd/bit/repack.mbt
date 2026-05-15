@@ -260,7 +260,7 @@ async fn handle_repack(args : Array[String]) -> Unit raise Error {
   let stdout_text = stdout_data.text() catch { _ => "" }
   let new_packs : Array[String] = []
   for line_view in stdout_text.split("\n") {
-    let line = trim_string(line_view.to_owned())
+    let line = trim_string(line_view.to_string())
     if line.length() > 0 {
       new_packs.push("pack-" + line + ".pack")
     }

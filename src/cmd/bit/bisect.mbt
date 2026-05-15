@@ -464,7 +464,7 @@ async fn bisect_replay(
   // Read and process log file
   let content = decode_bytes(fs.read_file(filename))
   for line_view in content.split("\n") {
-    let line = trim_string(line_view.to_owned())
+    let line = trim_string(line_view.to_string())
     if line.length() == 0 || line.has_prefix("#") {
       continue
     }
@@ -479,7 +479,7 @@ async fn bisect_replay(
     // Split into subcmd and args
     let parts : Array[String] = []
     for part in rest.split(" ") {
-      let s = part.to_owned()
+      let s = part.to_string()
       if s.length() > 0 {
         parts.push(s)
       }
@@ -549,7 +549,7 @@ async fn bisect_terms(
   let content = decode_bytes(rfs.read_file(bisect_terms_path))
   let lines : Array[String] = []
   for line in content.split("\n") {
-    let s = trim_string(line.to_owned())
+    let s = trim_string(line.to_string())
     if s.length() > 0 {
       lines.push(s)
     }

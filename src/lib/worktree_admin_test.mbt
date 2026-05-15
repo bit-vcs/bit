@@ -54,9 +54,9 @@ fn remove_test_dir(fs : @bit.TestFs, path : String) -> Unit {
 test "worktree admin: list main worktree only" {
   let fs = setup_worktree_admin_fs()
   let worktrees = list_worktrees(fs, "/repo")
-  @test.assert_eq(worktrees.length(), 1)
-  @test.assert_eq(worktrees[0].path, "/repo")
-  @test.assert_eq(worktrees[0].branch, Some("main"))
+  assert_eq(worktrees.length(), 1)
+  assert_eq(worktrees[0].path, "/repo")
+  assert_eq(worktrees[0].branch, Some("main"))
   assert_true(worktrees[0].is_main)
   assert_false(worktrees[0].is_bare)
   assert_false(worktrees[0].locked)
@@ -74,13 +74,13 @@ test "worktree admin: list with linked worktree" {
     "/repo/.git/refs/heads/feature", "2222222222222222222222222222222222222222\n",
   )
   let worktrees = list_worktrees(fs, "/repo")
-  @test.assert_eq(worktrees.length(), 2)
+  assert_eq(worktrees.length(), 2)
   // Main worktree
-  @test.assert_eq(worktrees[0].path, "/repo")
-  @test.assert_eq(worktrees[0].branch, Some("main"))
+  assert_eq(worktrees[0].path, "/repo")
+  assert_eq(worktrees[0].branch, Some("main"))
   // Linked worktree
-  @test.assert_eq(worktrees[1].path, "/worktree1")
-  @test.assert_eq(worktrees[1].branch, Some("feature"))
+  assert_eq(worktrees[1].path, "/worktree1")
+  assert_eq(worktrees[1].branch, Some("feature"))
   assert_false(worktrees[1].is_main)
   assert_false(worktrees[1].is_bare)
 }
@@ -97,9 +97,9 @@ test "worktree admin: list detached head worktree" {
   )
   fs.write_string("/repo/.git/worktrees/wt-detached/commondir", "../..\n")
   let worktrees = list_worktrees(fs, "/repo")
-  @test.assert_eq(worktrees.length(), 2)
-  @test.assert_eq(worktrees[1].path, "/detached-wt")
-  @test.assert_eq(worktrees[1].branch, None)
+  assert_eq(worktrees.length(), 2)
+  assert_eq(worktrees[1].path, "/detached-wt")
+  assert_eq(worktrees[1].branch, None)
 }
 
 ///|
@@ -115,7 +115,7 @@ test "worktree admin: list locked worktree" {
   fs.write_string("/repo/.git/worktrees/locked-wt/commondir", "../..\n")
   fs.write_string("/repo/.git/worktrees/locked-wt/locked", "")
   let worktrees = list_worktrees(fs, "/repo")
-  @test.assert_eq(worktrees.length(), 2)
+  assert_eq(worktrees.length(), 2)
   assert_true(worktrees[1].locked)
 }
 
@@ -123,14 +123,14 @@ test "worktree admin: list locked worktree" {
 test "worktree admin: is_branch_checked_out main" {
   let fs = setup_worktree_admin_fs()
   let result = is_branch_checked_out(fs, "/repo", "main")
-  @test.assert_eq(result, Some("/repo"))
+  assert_eq(result, Some("/repo"))
 }
 
 ///|
 test "worktree admin: is_branch_checked_out untracked" {
   let fs = setup_worktree_admin_fs()
   let result = is_branch_checked_out(fs, "/repo", "nonexistent")
-  @test.assert_eq(result, None)
+  assert_eq(result, None)
 }
 
 ///|
@@ -144,7 +144,7 @@ test "worktree admin: is_branch_checked_out in linked worktree" {
     "/repo/.git/refs/heads/feature", "2222222222222222222222222222222222222222\n",
   )
   let result = is_branch_checked_out(fs, "/repo", "feature")
-  @test.assert_eq(result, Some("/worktree1"))
+  assert_eq(result, Some("/worktree1"))
 }
 
 ///|
@@ -159,8 +159,8 @@ test "worktree admin: prune missing worktree" {
   fs.write_string("/repo/.git/worktrees/missing/commondir", "../..\n")
   // Prune should remove it
   let pruned = prune_worktrees(fs, fs, "/repo")
-  @test.assert_eq(pruned.length(), 1)
-  @test.assert_eq(pruned[0], "missing")
+  assert_eq(pruned.length(), 1)
+  assert_eq(pruned[0], "missing")
   // Admin dir should be removed
   assert_false(fs.is_dir("/repo/.git/worktrees/missing"))
 }
@@ -172,9 +172,9 @@ test "worktree admin: prune invalid file entry reports reason" {
   fs.write_string("/repo/.git/worktrees/abc", "")
 
   let pruned = prune_worktrees_detailed(fs, fs, "/repo")
-  @test.assert_eq(pruned.length(), 1)
-  @test.assert_eq(pruned[0].name, "abc")
-  @test.assert_eq(pruned[0].reason, "not a valid directory")
+  assert_eq(pruned.length(), 1)
+  assert_eq(pruned[0].name, "abc")
+  assert_eq(pruned[0].reason, "not a valid directory")
   assert_false(fs.is_file("/repo/.git/worktrees/abc"))
 }
 
@@ -188,9 +188,9 @@ test "worktree admin: prune duplicate linked worktree keeps lexical first entry"
   fs.write_string("/repo/w1/.git", "gitdir: /repo/.git/worktrees/w1\n")
 
   let pruned = prune_worktrees_detailed(fs, fs, "/repo", dry_run=true)
-  @test.assert_eq(pruned.length(), 1)
-  @test.assert_eq(pruned[0].name, "w2")
-  @test.assert_eq(pruned[0].reason, "duplicate entry")
+  assert_eq(pruned.length(), 1)
+  assert_eq(pruned[0].name, "w2")
+  assert_eq(pruned[0].reason, "duplicate entry")
 }
 
 ///|
@@ -200,9 +200,9 @@ test "worktree admin: prune linked entry duplicated by main git dir" {
   fs.write_string("/repo/.git/worktrees/wt/gitdir", "/repo/.git\n")
 
   let pruned = prune_worktrees_detailed(fs, fs, "/repo", dry_run=true)
-  @test.assert_eq(pruned.length(), 1)
-  @test.assert_eq(pruned[0].name, "wt")
-  @test.assert_eq(pruned[0].reason, "duplicate entry")
+  assert_eq(pruned.length(), 1)
+  assert_eq(pruned[0].name, "wt")
+  assert_eq(pruned[0].reason, "duplicate entry")
 }
 
 ///|
@@ -216,7 +216,7 @@ test "worktree admin: prune dry run" {
   fs.write_string("/repo/.git/worktrees/missing/commondir", "../..\n")
   // Dry run should not remove
   let pruned = prune_worktrees(fs, fs, "/repo", dry_run=true)
-  @test.assert_eq(pruned.length(), 1)
+  assert_eq(pruned.length(), 1)
   // Admin dir should still exist
   assert_true(fs.is_dir("/repo/.git/worktrees/missing"))
 }
@@ -235,7 +235,7 @@ test "worktree admin: prune locked worktree not pruned" {
   fs.write_string("/repo/.git/worktrees/locked-missing/locked", "")
   // Locked worktrees should not be pruned even if missing
   let pruned = prune_worktrees(fs, fs, "/repo")
-  @test.assert_eq(pruned.length(), 0)
+  assert_eq(pruned.length(), 0)
   assert_true(fs.is_dir("/repo/.git/worktrees/locked-missing"))
 }
 
@@ -256,20 +256,20 @@ test "worktree admin: bare repo includes pseudo main worktree" {
     "/bare/refs/heads/wt", "2222222222222222222222222222222222222222\n",
   )
   let worktrees = list_worktrees(fs, "/bare")
-  @test.assert_eq(worktrees.length(), 2)
-  @test.assert_eq(worktrees[0].path, "/bare")
+  assert_eq(worktrees.length(), 2)
+  assert_eq(worktrees[0].path, "/bare")
   assert_true(worktrees[0].is_main)
   assert_true(worktrees[0].is_bare)
-  @test.assert_eq(worktrees[1].path, "/bare/wt")
-  @test.assert_eq(worktrees[1].branch, Some("wt"))
+  assert_eq(worktrees[1].path, "/bare/wt")
+  assert_eq(worktrees[1].branch, Some("wt"))
 }
 
 ///|
 test "worktree admin: list from .git directory reports main worktree" {
   let fs = setup_worktree_admin_fs()
   let worktrees = list_worktrees(fs, "/repo/.git")
-  @test.assert_eq(worktrees.length(), 1)
-  @test.assert_eq(worktrees[0].path, "/repo")
+  assert_eq(worktrees.length(), 1)
+  assert_eq(worktrees[0].path, "/repo")
   assert_false(worktrees[0].is_bare)
 }
 
@@ -293,10 +293,10 @@ test "worktree admin: linked worktree with bare main shows bare root first" {
   )
 
   let worktrees = list_worktrees(fs, "/there")
-  @test.assert_eq(worktrees.length(), 2)
-  @test.assert_eq(worktrees[0].path, "/bare")
+  assert_eq(worktrees.length(), 2)
+  assert_eq(worktrees[0].path, "/bare")
   assert_true(worktrees[0].is_bare)
-  @test.assert_eq(worktrees[1].path, "/there")
+  assert_eq(worktrees[1].path, "/there")
 }
 
 ///|
@@ -326,8 +326,8 @@ test "worktree admin: linked worktrees are sorted lexically by path" {
   )
 
   let worktrees = list_worktrees(fs, "/repo")
-  @test.assert_eq(worktrees[1].path, "/repo/locked_crlf")
-  @test.assert_eq(worktrees[2].path, "/repo/locked_lf")
+  assert_eq(worktrees[1].path, "/repo/locked_crlf")
+  assert_eq(worktrees[2].path, "/repo/locked_lf")
 }
 
 ///|
@@ -349,11 +349,11 @@ test "worktree admin: create_worktree resolves dash to previous checkout branch"
 
   create_worktree(fs, fs, "/repo", "short-hand", Some("-"), new_branch=None)
 
-  @test.assert_eq(
+  assert_eq(
     fs.read_string("/repo/.git/worktrees/short-hand/HEAD"),
     "ref: refs/heads/newbranch\n",
   )
-  @test.assert_eq(fs.read_string("/repo/short-hand/init.t"), "newbranch\n")
+  assert_eq(fs.read_string("/repo/short-hand/init.t"), "newbranch\n")
 }
 
 ///|
@@ -363,11 +363,11 @@ test "worktree admin: create_worktree with new branch writes branch and HEAD ref
   create_worktree(fs, fs, "/repo", "wt", Some("main"), new_branch=Some("wt"))
 
   let branch_entries = read_reflog(fs, "/repo/.git", "refs/heads/wt")
-  @test.assert_eq(branch_entries.length(), 1)
-  @test.assert_eq(branch_entries[0].message, "branch: Created from main")
+  assert_eq(branch_entries.length(), 1)
+  assert_eq(branch_entries[0].message, "branch: Created from main")
 
   let head_entries = read_reflog(fs, "/repo/.git/worktrees/wt", "HEAD")
-  @test.assert_eq(head_entries.length(), 1)
+  assert_eq(head_entries.length(), 1)
 }
 
 ///|
@@ -389,7 +389,7 @@ test "worktree admin: create_worktree resolves HEAD to detached commit" {
 
   let linked_head = fs.read_string("/repo/.git/worktrees/head-detached/HEAD")
   assert_true(!linked_head.has_prefix("ref: "))
-  @test.assert_eq(fs.read_string("/repo/head-detached/init.t"), "main\n")
+  assert_eq(fs.read_string("/repo/head-detached/init.t"), "main\n")
 }
 
 ///|
@@ -442,7 +442,7 @@ test "worktree admin: create_worktree disambiguates duplicate basename" {
 
   assert_true(fs.is_dir("/repo/.git/worktrees/here"))
   assert_true(fs.is_dir("/repo/.git/worktrees/here1"))
-  @test.assert_eq(
+  assert_eq(
     fs.read_string("/repo/.git/worktrees/here1/gitdir"),
     "/repo/sub/here/.git\n",
   )
@@ -466,11 +466,11 @@ test "worktree admin: move_worktree nests destination under existing directory" 
 
   assert_false(fs.is_dir("/repo/source"))
   assert_true(fs.is_dir("/repo/some-dir/source"))
-  @test.assert_eq(
+  assert_eq(
     fs.read_string("/repo/.git/worktrees/source/gitdir"),
     "/repo/some-dir/source/.git\n",
   )
-  @test.assert_eq(
+  assert_eq(
     fs.read_string("/repo/some-dir/source/.git"),
     "gitdir: /repo/.git/worktrees/source\n",
   )
@@ -662,8 +662,8 @@ test "worktree admin: relative gitdir entries resolve linked worktree paths" {
   )
 
   let worktrees = list_worktrees(fs, "/repo")
-  @test.assert_eq(worktrees.length(), 2)
-  @test.assert_eq(worktrees[1].path, "/repo/relative")
+  assert_eq(worktrees.length(), 2)
+  assert_eq(worktrees[1].path, "/repo/relative")
   remove_worktree(fs, fs, "/repo", "relative")
   assert_false(fs.is_dir("/repo/relative"))
   assert_false(fs.is_dir("/repo/.git/worktrees/source"))
@@ -688,11 +688,11 @@ test "worktree admin: create_worktree honors worktree.useRelativePaths" {
     new_branch=None,
   )
 
-  @test.assert_eq(
+  assert_eq(
     fs.read_string("/repo/relative/.git"),
     "gitdir: ../.git/worktrees/relative\n",
   )
-  @test.assert_eq(
+  assert_eq(
     fs.read_string("/repo/.git/worktrees/relative/gitdir"),
     "../../../relative/.git\n",
   )
@@ -872,7 +872,7 @@ test "worktree admin: repair recreates missing gitfile with warning" {
 
   assert_true(result.warnings.contains(".git file broken: /repo/corrupt"))
   assert_true(result.repaired.contains(".git: /repo/corrupt"))
-  @test.assert_eq(
+  assert_eq(
     fs.read_string("/repo/corrupt/.git"),
     "gitdir: /repo/.git/worktrees/corrupt\n",
   )
@@ -903,11 +903,11 @@ test "worktree admin: repair explicit moved path updates stale gitdir" {
       "gitdir incorrect: /repo/.git/worktrees/orig/gitdir",
     ),
   )
-  @test.assert_eq(
+  assert_eq(
     fs.read_string("/repo/.git/worktrees/orig/gitdir"),
     "/repo/moved/.git\n",
   )
-  @test.assert_eq(
+  assert_eq(
     fs.read_string("/repo/moved/.git"),
     "gitdir: /repo/.git/worktrees/orig\n",
   )
@@ -935,7 +935,7 @@ test "worktree admin: repair respects configured relative paths for missing gitf
   let result = repair_worktree_detailed(fs, fs, "/repo")
 
   assert_true(result.warnings.contains(".git file broken: /repo/wt"))
-  @test.assert_eq(fs.read_string("/repo/wt/.git"), "gitdir: ../.git/worktrees/wt\n")
+  assert_eq(fs.read_string("/repo/wt/.git"), "gitdir: ../.git/worktrees/wt\n")
 }
 
 ///|
@@ -964,11 +964,11 @@ test "worktree admin: repair defaults relative repository to absolute paths" {
       "gitdir incorrect: /repo/.git/worktrees/side/gitdir",
     ),
   )
-  @test.assert_eq(
+  assert_eq(
     fs.read_string("/repo/.git/worktrees/side/gitdir"),
     "/repo/sidemoved/.git\n",
   )
-  @test.assert_eq(
+  assert_eq(
     fs.read_string("/repo/sidemoved/.git"),
     "gitdir: /repo/.git/worktrees/side\n",
   )

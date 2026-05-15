@@ -152,14 +152,14 @@ fn merge_detect_renames(
 fn rename_similarity_score(a : String, b : String) -> Int {
   let a_lines : Array[String] = []
   for line in a.split("\n") {
-    let s = line.to_owned()
+    let s = line.to_string()
     if s.length() > 0 {
       a_lines.push(s)
     }
   }
   let b_lines : Array[String] = []
   for line in b.split("\n") {
-    let s = line.to_owned()
+    let s = line.to_string()
     if s.length() > 0 {
       b_lines.push(s)
     }

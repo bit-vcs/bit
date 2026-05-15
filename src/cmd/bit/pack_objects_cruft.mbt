@@ -29,7 +29,7 @@ fn parse_cruft_stdin_lines(input : Bytes) -> (Array[String], Array[String]) {
 /// Supports: "never", "now", "N.seconds.ago", "N.minutes.ago",
 /// "N.hours.ago", "N.days.ago", "N.weeks.ago"
 fn parse_approxidate(s : String) -> Int64 {
-  let trimmed = s.trim().to_owned().to_lower()
+  let trimmed = s.trim().to_string().to_lower()
   if trimmed == "never" {
     return 0L
   }
@@ -357,7 +357,7 @@ fn cruft_rescue_walk(
       let data_str = bytes_to_string_lossy(obj.data)
       let parts = data_str.split("\n")
       for line_iter in parts {
-        let line = line_iter.to_owned()
+        let line = line_iter.to_string()
         if line.has_prefix("tree ") {
           let tree_hex = String::unsafe_substring(
               line,
@@ -365,7 +365,7 @@ fn cruft_rescue_walk(
               end=line.length(),
             )
             .trim()
-            .to_owned()
+            .to_string()
           if tree_hex.length() == 40 && candidate_ids.contains(tree_hex) {
             if !rescued.contains(tree_hex) {
               rescued[tree_hex] = true
@@ -381,7 +381,7 @@ fn cruft_rescue_walk(
               end=line.length(),
             )
             .trim()
-            .to_owned()
+            .to_string()
           if parent_hex.length() == 40 && candidate_ids.contains(parent_hex) {
             if !rescued.contains(parent_hex) {
               rescued[parent_hex] = true
@@ -415,7 +415,7 @@ fn cruft_rescue_walk(
       let data_str = bytes_to_string_lossy(obj.data)
       let parts = data_str.split("\n")
       for line_iter in parts {
-        let line = line_iter.to_owned()
+        let line = line_iter.to_string()
         if line.has_prefix("object ") {
           let target_hex = String::unsafe_substring(
               line,
@@ -423,7 +423,7 @@ fn cruft_rescue_walk(
               end=line.length(),
             )
             .trim()
-            .to_owned()
+            .to_string()
           if target_hex.length() == 40 && candidate_ids.contains(target_hex) {
             if !rescued.contains(target_hex) {
               rescued[target_hex] = true

@@ -57,7 +57,7 @@ async fn bit_write_tree_after_add_all(root : String) -> String? {
       return None
     }
   }
-  Some(text.trim_end().to_owned())
+  Some(text.trim_end().to_string())
 }
 
 ///|
@@ -86,7 +86,7 @@ async fn bit_cached_name_status(root : String) -> String? {
       return None
     }
   }
-  Some(text.trim_end().to_owned())
+  Some(text.trim_end().to_string())
 }
 
 ///|
@@ -128,31 +128,31 @@ async fn assert_git_add_all_equivalent(fs : @osfs.OsFs, root : String) -> Unit {
   let cached_before = bit_cached_name_status(root).unwrap_or("")
   let ours = directory_fingerprint(fs, root, FingerprintMode::GitCompat)
   let cached_after = bit_cached_name_status(root).unwrap_or("")
-  @test.assert_eq(cached_before, cached_after)
+  assert_eq(cached_before, cached_after)
   guard bit_write_tree_after_add_all(root) is Some(expected) else {
-    @test.assert_eq(1, 0)
+    assert_eq(1, 0)
     return
   }
-  @test.assert_eq(ours, expected)
+  assert_eq(ours, expected)
 }
 
 ///|
 async test "fingerprint: parse mode aliases" {
-  @test.assert_eq(parse_fingerprint_mode("fast"), Some(FingerprintMode::Fast))
-  @test.assert_eq(parse_fingerprint_mode("git"), Some(FingerprintMode::GitCompat))
-  @test.assert_eq(
+  assert_eq(parse_fingerprint_mode("fast"), Some(FingerprintMode::Fast))
+  assert_eq(parse_fingerprint_mode("git"), Some(FingerprintMode::GitCompat))
+  assert_eq(
     parse_fingerprint_mode("git-compat"),
     Some(FingerprintMode::GitCompat),
   )
-  @test.assert_eq(
+  assert_eq(
     parse_fingerprint_mode("bit_compat"),
     Some(FingerprintMode::GitCompat),
   )
-  @test.assert_eq(
+  assert_eq(
     parse_fingerprint_mode("bit_compat"),
     Some(FingerprintMode::GitCompat),
   )
-  @test.assert_eq(parse_fingerprint_mode("unknown"), None)
+  assert_eq(parse_fingerprint_mode("unknown"), None)
 }
 
 ///|
@@ -165,7 +165,7 @@ async test "fingerprint: fast mode changes when file content changes" {
   let hash1 = directory_fingerprint(fs, root, FingerprintMode::Fast)
   fs.write_string(root + "/nested/file.txt", "hello world\n")
   let hash2 = directory_fingerprint(fs, root, FingerprintMode::Fast)
-  @test.assert_eq(hash1 == hash2, false)
+  assert_eq(hash1 == hash2, false)
   cleanup_tmp_dir(root)
 }
 
@@ -182,7 +182,7 @@ async test "fingerprint: fast mode ignores .git and .bit metadata dirs" {
   fs.write_string(root + "/.git/HEAD", "ref: refs/heads/main\n")
   fs.write_string(root + "/.bit/WORKSPACE", "metadata\n")
   let hash2 = directory_fingerprint(fs, root, FingerprintMode::Fast)
-  @test.assert_eq(hash1, hash2)
+  assert_eq(hash1, hash2)
   cleanup_tmp_dir(root)
 }
 
@@ -215,10 +215,10 @@ async test "fingerprint: git compat mode matches git write-tree for simple files
   let ours = directory_fingerprint(fs, root, FingerprintMode::GitCompat)
   guard bit_write_tree_after_add_all(root) is Some(expected) else {
     cleanup_tmp_dir(root)
-    @test.assert_eq(1, 0)
+    assert_eq(1, 0)
     return
   }
-  @test.assert_eq(ours, expected)
+  assert_eq(ours, expected)
   cleanup_tmp_dir(root)
 }
 
@@ -271,8 +271,8 @@ async test "fingerprint: git compat matches git add -A write-tree with staged an
       -1
     }
   }
-  @test.assert_eq(cfg_email, 0)
-  @test.assert_eq(cfg_name, 0)
+  assert_eq(cfg_email, 0)
+  assert_eq(cfg_name, 0)
   fs.mkdir_p(root + "/dir")
   fs.write_string(root + "/tracked.txt", "base\n")
   fs.write_string(root + "/dir/a.txt", "a\n")
@@ -297,8 +297,8 @@ async test "fingerprint: git compat matches git add -A write-tree with staged an
       -1
     }
   }
-  @test.assert_eq(add_base, 0)
-  @test.assert_eq(commit_base, 0)
+  assert_eq(add_base, 0)
+  assert_eq(commit_base, 0)
 
   // staged + unstaged on tracked file
   fs.write_string(root + "/tracked.txt", "stage-1\n")
@@ -315,7 +315,7 @@ async test "fingerprint: git compat matches git add -A write-tree with staged an
       -1
     }
   }
-  @test.assert_eq(stage_code, 0)
+  assert_eq(stage_code, 0)
   fs.write_string(root + "/tracked.txt", "worktree-2\n")
   // untracked file under new directory
   fs.mkdir_p(root + "/newdir/sub")
@@ -326,13 +326,13 @@ async test "fingerprint: git compat matches git add -A write-tree with staged an
   let before_cached = bit_cached_name_status(root).unwrap_or("")
   let ours = directory_fingerprint(fs, root, FingerprintMode::GitCompat)
   let after_cached = bit_cached_name_status(root).unwrap_or("")
-  @test.assert_eq(before_cached, after_cached)
+  assert_eq(before_cached, after_cached)
   guard bit_write_tree_after_add_all(root) is Some(expected) else {
     cleanup_tmp_dir(root)
-    @test.assert_eq(1, 0)
+    assert_eq(1, 0)
     return
   }
-  @test.assert_eq(ours, expected)
+  assert_eq(ours, expected)
   cleanup_tmp_dir(root)
 }
 
@@ -347,7 +347,7 @@ async test "fingerprint: git compat mode ignores empty directories" {
   fs.mkdir_p(root + "/pkg/empty")
   fs.mkdir_p(root + "/only-empty-dir")
   let hash2 = directory_fingerprint(fs, root, FingerprintMode::GitCompat)
-  @test.assert_eq(hash1, hash2)
+  assert_eq(hash1, hash2)
   cleanup_tmp_dir(root)
 }
 
@@ -362,7 +362,7 @@ async test "fingerprint: git compat mode changes when file is renamed" {
   fs.remove_file(root + "/pkg/a.txt")
   fs.write_string(root + "/pkg/b.txt", "same-content\n")
   let hash2 = directory_fingerprint(fs, root, FingerprintMode::GitCompat)
-  @test.assert_eq(hash1 == hash2, false)
+  assert_eq(hash1 == hash2, false)
   cleanup_tmp_dir(root)
 }
 
@@ -375,7 +375,7 @@ async test "fingerprint: fast and git compat produce different fingerprints" {
   fs.write_string(root + "/pkg/file.txt", "payload\n")
   let fast = directory_fingerprint(fs, root, FingerprintMode::Fast)
   let git = directory_fingerprint(fs, root, FingerprintMode::GitCompat)
-  @test.assert_eq(fast == git, false)
+  assert_eq(fast == git, false)
   cleanup_tmp_dir(root)
 }
 
@@ -456,8 +456,8 @@ async test "fingerprint: git compat add-all matrix matches git write-tree" {
       -1
     }
   }
-  @test.assert_eq(add_base, 0)
-  @test.assert_eq(commit_base, 0)
+  assert_eq(add_base, 0)
+  assert_eq(commit_base, 0)
 
   // case: untracked file
   assert_true(bit_reset_clean(root))

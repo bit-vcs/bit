@@ -62,7 +62,7 @@ fn ensure_dir(path : String) -> Unit raise @bitcore.GitError {
 fn normalize_path(path : String) -> String {
   let parts : Array[String] = []
   for part_view in path.split("/") {
-    let part = part_view.to_owned()
+    let part = part_view.to_string()
     if part == "" || part == "." {
       continue
     } else if part == ".." {
@@ -130,7 +130,7 @@ fn find_repo_root(start : String) -> String? {
   match @sys.get_env_var("GIT_CEILING_DIRECTORIES") {
     Some(raw) =>
       for view in raw.split(":") {
-        let dir = view.to_owned()
+        let dir = view.to_string()
         if dir.length() == 0 {
           continue
         }

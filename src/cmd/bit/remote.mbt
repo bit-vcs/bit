@@ -162,7 +162,7 @@ fn ref_namespace_root(refname : String) -> String {
   } else {
     let mut i = 0
     for part_view in refname.split("/") {
-      let part = part_view.to_owned()
+      let part = part_view.to_string()
       if i == 1 {
         if part.length() > 0 {
           return "refs/" + part
@@ -1030,7 +1030,7 @@ async fn remote_rename(
     let fetches : Array[String] = []
     let pushes : Array[String] = []
     for line_view in text.split("\n") {
-      let trimmed = trim_string(line_view.to_owned())
+      let trimmed = trim_string(line_view.to_string())
       if trimmed.has_prefix("URL:") {
         url = Some(
           trim_string(
@@ -1083,7 +1083,7 @@ async fn remote_rename(
     }
   }
   if !found_remote && fs.is_file(legacy_branches) {
-    let text = decode_bytes(fs.read_file(legacy_branches)).trim().to_owned()
+    let text = decode_bytes(fs.read_file(legacy_branches)).trim().to_string()
     if text.length() > 0 {
       let (url, branch) = match text.find("#") {
         Some(idx) => {
@@ -1657,7 +1657,7 @@ fn upsert_packed_refs(
   if fs.is_file(packed_path) {
     let content = decode_bytes(fs.read_file(packed_path))
     for line_view in content.split("\n") {
-      let line = line_view.trim().to_owned()
+      let line = line_view.trim().to_string()
       if line.length() == 0 || line.has_prefix("#") || line.has_prefix("^") {
         continue
       }
@@ -1775,7 +1775,7 @@ fn parse_legacy_branches_entry(
   let path = git_dir + "/branches/" + name
   guard fs.is_file(path) else { return None }
   let raw = fs.read_file(path) catch { _ => return None }
-  let text = decode_bytes(raw).trim().to_owned()
+  let text = decode_bytes(raw).trim().to_string()
   if text.length() == 0 {
     return None
   }
@@ -1813,7 +1813,7 @@ fn collect_clone_alternates(
   if fs.is_file(source_alternates) {
     let text = decode_bytes(fs.read_file(source_alternates)) catch { _ => "" }
     for line_view in text.split("\n") {
-      let line = trim_string(line_view.to_owned())
+      let line = trim_string(line_view.to_string())
       if line.length() == 0 {
         continue
       }
@@ -2344,7 +2344,7 @@ fn read_clone_source_head_fallback(
   )
   let mut latest_id : @bitcore.ObjectId? = None
   for line_view in reflog_content.split("\n") {
-    let line = trim_string(line_view.to_owned())
+    let line = trim_string(line_view.to_string())
     if line.length() == 0 {
       continue
     }
@@ -3304,7 +3304,7 @@ fn is_ancestor_commit(
 fn parse_tag_target(data : Bytes) -> @bitcore.ObjectId? {
   let text = @utf8.decode_lossy(data[:])
   for line_view in text.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if line.length() == 0 {
       break
     }
@@ -3360,7 +3360,7 @@ fn push_objects_dir_has_object(
   }
   let text = decode_bytes(alternate_bytes)
   for line_view in text.split("\n") {
-    let line = trim_string(line_view.to_owned())
+    let line = trim_string(line_view.to_string())
     if line.length() == 0 {
       continue
     }

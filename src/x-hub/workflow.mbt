@@ -6,7 +6,7 @@ pub(all) enum PrWorkflowStatus {
   Running
   Success
   Failed
-} derive(Eq, Debug)
+} derive(Eq)
 
 ///|
 pub fn PrWorkflowStatus::to_string(self : PrWorkflowStatus) -> String {

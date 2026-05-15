@@ -163,7 +163,7 @@ async fn handle_for_each_ref(args : Array[String]) -> Unit raise Error {
     }
     let stdin_text = decode_bytes(read_all_stdin())
     for line_view in stdin_text.split("\n") {
-      let line = line_view.to_owned()
+      let line = line_view.to_string()
       if line.length() > 0 {
         patterns.push(line)
       }
@@ -509,7 +509,7 @@ async fn for_each_ref_collect_root_refs(
     // Read the ref file
     let path = git_dir + "/" + name
     let content = fs.read_file(path) catch { _ => continue }
-    let text = decode_bytes(content).trim(chars=" \t\n\r").to_owned()
+    let text = decode_bytes(content).trim(chars=" \t\n\r").to_string()
     if text.has_prefix("ref: ") {
       // Symbolic ref — resolve the target
       let target = String::unsafe_substring(text, start=5, end=text.length())
@@ -583,7 +583,7 @@ async fn for_each_ref_collect_refs_safe(
     if data.length() > 0 {
       let text = decode_bytes(data)
       for line_view in text.split("\n") {
-        let line = line_view.to_owned()
+        let line = line_view.to_string()
         if line.length() == 0 || line[0] == '#' || line[0] == '^' {
           continue
         }
@@ -1334,7 +1334,7 @@ fn for_each_ref_get_sort_value(
     }
     for h in headers {
       for line_view in text.split("\n") {
-        let line = line_view.to_owned()
+        let line = line_view.to_string()
         if line.length() == 0 {
           break
         }
@@ -1363,7 +1363,7 @@ fn for_each_ref_get_sort_value(
     let headers = ["tagger ", "committer ", "author "]
     for h in headers {
       for line_view in text.split("\n") {
-        let line = line_view.to_owned()
+        let line = line_view.to_string()
         if line.length() == 0 {
           break
         }
@@ -1402,7 +1402,7 @@ fn for_each_ref_get_sort_value(
     return ""
   }
   for line_view in text.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if line.length() == 0 {
       break
     }
@@ -1430,7 +1430,7 @@ fn for_each_ref_get_sort_value(
           Some(es) if es > 0 =>
             return String::unsafe_substring(ident, start=0, end=es)
               .trim_end(chars=" ")
-              .to_owned()
+              .to_string()
           _ => ()
         }
       }
@@ -1495,7 +1495,7 @@ async fn for_each_ref_peel_to_commit(
             let tag_text = decode_bytes(o.data)
             let mut target_hex = ""
             for line_view in tag_text.split("\n") {
-              let line = line_view.to_owned()
+              let line = line_view.to_string()
               if line.has_prefix("object ") {
                 target_hex = String::unsafe_substring(
                   line,
@@ -1545,7 +1545,7 @@ fn for_each_ref_peel_terminal_object(
           let tag_text = decode_bytes(o.data)
           let mut target_hex = ""
           for line_view in tag_text.split("\n") {
-            let line = line_view.to_owned()
+            let line = line_view.to_string()
             if line.has_prefix("object ") {
               target_hex = String::unsafe_substring(
                 line,
@@ -1636,7 +1636,7 @@ fn for_each_ref_get_timestamp(
     let headers = ["tagger ", "committer ", "author "]
     for h in headers {
       for line_view in text.split("\n") {
-        let line = line_view.to_owned()
+        let line = line_view.to_string()
         if line.length() == 0 {
           break
         }
@@ -1661,7 +1661,7 @@ fn for_each_ref_get_timestamp(
     "tagger "
   }
   for line_view in text.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if line.length() == 0 {
       break
     }
@@ -1777,7 +1777,7 @@ fn for_each_ref_parse_align_args(args : String) -> (Int, Int) {
   let mut width = 0
   let mut position = 0 // left by default
   for part_view in args.split(",") {
-    let part_str = part_view.to_owned().trim(chars=" \t").to_owned()
+    let part_str = part_view.to_string().trim(chars=" \t").to_string()
     if part_str == "left" {
       position = 0
     } else if part_str == "middle" {
@@ -1871,7 +1871,7 @@ async fn for_each_ref_format(
           let mut declared_type = ""
           let mut target_hex_str = ""
           for line_view in tag_text.split("\n") {
-            let line = line_view.to_owned()
+            let line = line_view.to_string()
             if line.has_prefix("object ") {
               target_hex_str = String::unsafe_substring(
                 line,
@@ -2415,7 +2415,7 @@ async fn for_each_ref_atom(
       if is_tag {
         let text = decode_bytes(tag_data)
         for line_view in text.split("\n") {
-          let line = line_view.to_owned()
+          let line = line_view.to_string()
           if line.has_prefix("object ") {
             return String::unsafe_substring(line, start=7, end=line.length())
           }
@@ -2428,7 +2428,7 @@ async fn for_each_ref_atom(
       if is_tag {
         let text = decode_bytes(tag_data)
         for line_view in text.split("\n") {
-          let line = line_view.to_owned()
+          let line = line_view.to_string()
           if line.has_prefix("type ") {
             return String::unsafe_substring(line, start=5, end=line.length())
           }
@@ -2441,7 +2441,7 @@ async fn for_each_ref_atom(
       if is_tag {
         let text = decode_bytes(tag_data)
         for line_view in text.split("\n") {
-          let line = line_view.to_owned()
+          let line = line_view.to_string()
           if line.has_prefix("tag ") {
             return String::unsafe_substring(line, start=4, end=line.length())
           }
@@ -2456,7 +2456,7 @@ async fn for_each_ref_atom(
       } else {
         let text = decode_bytes(commit_data)
         for line_view in text.split("\n") {
-          let line = line_view.to_owned()
+          let line = line_view.to_string()
           if line.has_prefix("tree ") {
             let hash = String::unsafe_substring(
               line,
@@ -2479,7 +2479,7 @@ async fn for_each_ref_atom(
         let n = @string.parse_int(n_str) catch { _ => 7 }
         let text = decode_bytes(commit_data)
         for line_view in text.split("\n") {
-          let line = line_view.to_owned()
+          let line = line_view.to_string()
           if line.has_prefix("tree ") {
             let hash = String::unsafe_substring(
               line,
@@ -2499,7 +2499,7 @@ async fn for_each_ref_atom(
       } else {
         let text = decode_bytes(commit_data)
         for line_view in text.split("\n") {
-          let line = line_view.to_owned()
+          let line = line_view.to_string()
           if line.has_prefix("parent ") {
             return String::unsafe_substring(line, start=7, end=line.length())
           }
@@ -2516,7 +2516,7 @@ async fn for_each_ref_atom(
         let text = decode_bytes(commit_data)
         let mut count = 0
         for line_view in text.split("\n") {
-          let line = line_view.to_owned()
+          let line = line_view.to_string()
           if line.has_prefix("parent ") {
             count += 1
           }
@@ -2692,7 +2692,7 @@ async fn for_each_ref_atom(
       if is_tag {
         let text = decode_bytes(tag_data)
         for line_view in text.split("\n") {
-          let line = line_view.to_owned()
+          let line = line_view.to_string()
           if line.has_prefix("object ") {
             let target_hex = String::unsafe_substring(
               line,
@@ -2901,7 +2901,7 @@ async fn for_each_ref_resolve_to_commit(
             let mut target_hex = ""
             let mut declared_type = ""
             for line_view in tag_text.split("\n") {
-              let line = line_view.to_owned()
+              let line = line_view.to_string()
               if line.has_prefix("object ") {
                 target_hex = String::unsafe_substring(
                   line,
@@ -3066,7 +3066,7 @@ async fn for_each_ref_find_base(
       Some(o) if o.obj_type == @bitcore.ObjectType::Commit => {
         let text = decode_bytes(o.data)
         for line_view in text.split("\n") {
-          let line = line_view.to_owned()
+          let line = line_view.to_string()
           if line.has_prefix("parent ") {
             let parent_hex = String::unsafe_substring(
               line,
@@ -3326,7 +3326,7 @@ fn for_each_ref_packed_ref_exists(
     (fs.read_file(packed_refs_path) catch { _ => return false })[:],
   )
   for line_view in content.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if line.length() == 0 || line[0] == '#' || line[0] == '^' {
       continue
     }
@@ -3363,7 +3363,7 @@ fn for_each_ref_lstrip_negative(refname : String, keep : Int) -> String {
   // lstrip=-N keeps rightmost N components
   let parts : Array[String] = []
   for sv in refname.split("/") {
-    parts.push(sv.to_owned())
+    parts.push(sv.to_string())
   }
   if keep >= parts.length() {
     return refname
@@ -3380,7 +3380,7 @@ fn for_each_ref_lstrip_negative(refname : String, keep : Int) -> String {
 fn for_each_ref_rstrip_n(refname : String, n : Int) -> String {
   let parts : Array[String] = []
   for sv in refname.split("/") {
-    parts.push(sv.to_owned())
+    parts.push(sv.to_string())
   }
   if n >= 0 {
     // rstrip=N removes last N components
@@ -3923,7 +3923,7 @@ async fn for_each_ref_commit_atom(
   let mut past_headers = false
   let message_lines : Array[String] = []
   for line_view in text.split("\n") {
-    let raw_line = line_view.to_owned()
+    let raw_line = line_view.to_string()
     // Strip trailing \r for header/subject parsing (CRLF support)
     let line = if raw_line.has_suffix("\r") {
       String::unsafe_substring(raw_line, start=0, end=raw_line.length() - 1)
@@ -4229,7 +4229,7 @@ async fn for_each_ref_commit_atom(
           if lines.length() >= n {
             break
           }
-          lines.push(line_view.to_owned())
+          lines.push(line_view.to_string())
         }
         // Trim trailing empty lines
         while lines.length() > 0 && lines[lines.length() - 1] == "" {
@@ -4287,7 +4287,7 @@ fn for_each_ref_parse_trailers(
   // Non-trailer lines in the block are kept with is_trailer=false
   let lines : Array[String] = []
   for line_view in message.split("\n") {
-    lines.push(line_view.to_owned())
+    lines.push(line_view.to_string())
   }
   // Remove trailing empty lines
   while lines.length() > 0 &&
@@ -4916,7 +4916,7 @@ fn for_each_ref_read_mailmap(
   let data = fs.read_file(worktree + "/.mailmap") catch { _ => return entries }
   let text = decode_bytes(data)
   for line_view in text.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if line.length() == 0 || line.has_prefix("#") {
       continue
     }

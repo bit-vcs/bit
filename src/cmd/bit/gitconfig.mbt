@@ -44,7 +44,7 @@ pub fn parse_gitconfig_aliases(content : String) -> Map[String, String] {
   let aliases : Map[String, String] = {}
   let mut in_alias_section = false
   for line_view in content.split("\n") {
-    let line = trim_string(line_view.to_owned())
+    let line = trim_string(line_view.to_string())
     if line.length() == 0 || line.has_prefix("#") || line.has_prefix(";") {
       continue
     }

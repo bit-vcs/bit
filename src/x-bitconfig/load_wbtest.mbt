@@ -4,9 +4,9 @@ test "get_string extracts string value" {
     "name": @toml.TomlValue::TomlString("alice"),
     "count": @toml.TomlValue::TomlInteger(42L),
   }
-  @test.assert_eq(get_string(table, "name"), Some("alice"))
-  @test.assert_eq(get_string(table, "count"), None)
-  @test.assert_eq(get_string(table, "missing"), None)
+  assert_eq(get_string(table, "name"), Some("alice"))
+  assert_eq(get_string(table, "count"), None)
+  assert_eq(get_string(table, "missing"), None)
 }
 
 ///|
@@ -16,10 +16,10 @@ test "get_bool_string extracts boolean as string" {
     "disabled": @toml.TomlValue::TomlBoolean(false),
     "name": @toml.TomlValue::TomlString("test"),
   }
-  @test.assert_eq(get_bool_string(table, "enabled"), Some("true"))
-  @test.assert_eq(get_bool_string(table, "disabled"), Some("false"))
-  @test.assert_eq(get_bool_string(table, "name"), None)
-  @test.assert_eq(get_bool_string(table, "missing"), None)
+  assert_eq(get_bool_string(table, "enabled"), Some("true"))
+  assert_eq(get_bool_string(table, "disabled"), Some("false"))
+  assert_eq(get_bool_string(table, "name"), None)
+  assert_eq(get_bool_string(table, "missing"), None)
 }
 
 ///|
@@ -32,19 +32,19 @@ test "get_table extracts sub-table" {
     "name": @toml.TomlValue::TomlString("test"),
   }
   assert_true(get_table(table, "section") is Some(_))
-  assert_true(get_table(table, "name") is None)
-  assert_true(get_table(table, "missing") is None)
+  assert_eq(get_table(table, "name"), None)
+  assert_eq(get_table(table, "missing"), None)
 }
 
 ///|
 test "expand_home expands tilde prefix" {
-  @test.assert_eq(
+  assert_eq(
     expand_home("~/keys/ed25519.pem", "/home/user"),
     "/home/user/keys/ed25519.pem",
   )
-  @test.assert_eq(expand_home("/absolute/path", "/home/user"), "/absolute/path")
-  @test.assert_eq(expand_home("relative/path", "/home/user"), "relative/path")
-  @test.assert_eq(expand_home("~nope", "/home/user"), "~nope")
+  assert_eq(expand_home("/absolute/path", "/home/user"), "/absolute/path")
+  assert_eq(expand_home("relative/path", "/home/user"), "relative/path")
+  assert_eq(expand_home("~nope", "/home/user"), "~nope")
 }
 
 ///|
@@ -52,7 +52,7 @@ test "inject_if_unset sets when unset" {
   let key = "BIT_TEST_INJECT_UNSET_1"
   @sys.unset_env_var(key)
   inject_if_unset(key, "hello")
-  @test.assert_eq(@sys.get_env_var(key), Some("hello"))
+  assert_eq(@sys.get_env_var(key), Some("hello"))
   @sys.unset_env_var(key)
 }
 
@@ -61,7 +61,7 @@ test "inject_if_unset preserves existing value" {
   let key = "BIT_TEST_INJECT_UNSET_2"
   @sys.set_env_var(key, "original")
   inject_if_unset(key, "new")
-  @test.assert_eq(@sys.get_env_var(key), Some("original"))
+  assert_eq(@sys.get_env_var(key), Some("original"))
   @sys.unset_env_var(key)
 }
 
@@ -70,7 +70,7 @@ test "inject_if_unset overwrites empty string" {
   let key = "BIT_TEST_INJECT_UNSET_3"
   @sys.set_env_var(key, "")
   inject_if_unset(key, "filled")
-  @test.assert_eq(@sys.get_env_var(key), Some("filled"))
+  assert_eq(@sys.get_env_var(key), Some("filled"))
   @sys.unset_env_var(key)
 }
 
@@ -112,28 +112,28 @@ test "inject_from_bit_table injects all sections" {
   guard root is @toml.TomlValue::TomlTable(top) else { fail("expected table") }
   guard get_table(top, "bit") is Some(bit) else { fail("expected [bit] table") }
   inject_from_bit_table(bit, "/home/test")
-  @test.assert_eq(@sys.get_env_var("BIT_RELAY_SENDER"), Some("mizchi"))
-  @test.assert_eq(@sys.get_env_var("BIT_GITHUB_USERNAME"), Some("mizchi"))
-  @test.assert_eq(
+  assert_eq(@sys.get_env_var("BIT_RELAY_SENDER"), Some("mizchi"))
+  assert_eq(@sys.get_env_var("BIT_GITHUB_USERNAME"), Some("mizchi"))
+  assert_eq(
     @sys.get_env_var("BIT_RELAY_URL"),
     Some("relay+https://relay.sprites.dev"),
   )
-  @test.assert_eq(@sys.get_env_var("BIT_RELAY_AUTH_TOKEN"), Some("secret-token"))
-  @test.assert_eq(
+  assert_eq(@sys.get_env_var("BIT_RELAY_AUTH_TOKEN"), Some("secret-token"))
+  assert_eq(
     @sys.get_env_var("BIT_RELAY_SIGN_PRIVATE_KEY_FILE"),
     Some("/home/test/.config/bit/keys/ed25519.pem"),
   )
-  @test.assert_eq(
+  assert_eq(
     @sys.get_env_var("BIT_RELAY_SIGN_PUBLIC_KEY"),
     Some("base64url_encoded_public_key"),
   )
-  @test.assert_eq(@sys.get_env_var("BIT_SERVE_ALLOW_PUSH"), Some("false"))
-  @test.assert_eq(@sys.get_env_var("BIT_SERVE_BROADCAST"), Some("true"))
-  @test.assert_eq(@sys.get_env_var("BIT_SERVE_AUTO_FETCH"), Some("false"))
-  @test.assert_eq(@sys.get_env_var("BIT_SERVE_ROOM"), Some("my-room"))
-  @test.assert_eq(@sys.get_env_var("BIT_HUB_CONFLICT_POLICY"), Some("ours"))
-  @test.assert_eq(@sys.get_env_var("BIT_COLLAB_SIGN_KEY"), Some("key-value"))
-  @test.assert_eq(@sys.get_env_var("BIT_COLLAB_REQUIRE_SIGNED"), Some("true"))
+  assert_eq(@sys.get_env_var("BIT_SERVE_ALLOW_PUSH"), Some("false"))
+  assert_eq(@sys.get_env_var("BIT_SERVE_BROADCAST"), Some("true"))
+  assert_eq(@sys.get_env_var("BIT_SERVE_AUTO_FETCH"), Some("false"))
+  assert_eq(@sys.get_env_var("BIT_SERVE_ROOM"), Some("my-room"))
+  assert_eq(@sys.get_env_var("BIT_HUB_CONFLICT_POLICY"), Some("ours"))
+  assert_eq(@sys.get_env_var("BIT_COLLAB_SIGN_KEY"), Some("key-value"))
+  assert_eq(@sys.get_env_var("BIT_COLLAB_REQUIRE_SIGNED"), Some("true"))
   for key in keys {
     @sys.unset_env_var(key)
   }
@@ -150,7 +150,7 @@ test "inject_from_bit_table respects existing env vars" {
   guard root is @toml.TomlValue::TomlTable(top) else { fail("expected table") }
   guard get_table(top, "bit") is Some(bit) else { fail("expected [bit] table") }
   inject_from_bit_table(bit, "/home/test")
-  @test.assert_eq(@sys.get_env_var(key), Some("existing-sender"))
+  assert_eq(@sys.get_env_var(key), Some("existing-sender"))
   @sys.unset_env_var(key)
 }
 
@@ -165,8 +165,8 @@ test "inject_from_bit_table handles partial config" {
   guard root is @toml.TomlValue::TomlTable(top) else { fail("expected table") }
   guard get_table(top, "bit") is Some(bit) else { fail("expected [bit] table") }
   inject_from_bit_table(bit, "/home/test")
-  @test.assert_eq(@sys.get_env_var("BIT_RELAY_SENDER"), Some("mizchi"))
-  @test.assert_eq(@sys.get_env_var("BIT_RELAY_URL"), None)
+  assert_eq(@sys.get_env_var("BIT_RELAY_SENDER"), Some("mizchi"))
+  assert_eq(@sys.get_env_var("BIT_RELAY_URL"), None)
   @sys.unset_env_var("BIT_RELAY_SENDER")
 }
 
@@ -181,7 +181,7 @@ test "no bit section does not crash" {
   guard root is @toml.TomlValue::TomlTable(top) else { fail("expected table") }
   // no [bit] section — should be a no-op
   assert_true(get_table(top, "bit") is None)
-  @test.assert_eq(@sys.get_env_var("BIT_RELAY_SENDER"), None)
+  assert_eq(@sys.get_env_var("BIT_RELAY_SENDER"), None)
 }
 
 ///|

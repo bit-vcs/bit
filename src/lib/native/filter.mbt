@@ -41,7 +41,7 @@ pub async fn run_filter_command(
 /// Build shell command for filter execution.
 /// Supports: "cmd %f" → "cmd "$1"", "cmd" → "cmd < "$1""
 fn build_filter_shell_command(command : String) -> String {
-  let trimmed = command.trim().to_owned()
+  let trimmed = command.trim().to_string()
   if trimmed.contains("%f") {
     return trimmed.replace_all(old="%f", new="\"$1\"")
   }

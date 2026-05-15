@@ -69,7 +69,7 @@ fn reflog_expire_mode_for_ref(
 /// Parse an expire value into seconds-from-epoch cutoff timestamp.
 /// Returns None for "never"/"false", Some(cutoff_ts) for "now" or time-based values.
 fn reflog_parse_expire_value(value : String, now : Int64) -> Int64? {
-  let normalized = value.trim().to_owned().to_lower()
+  let normalized = value.trim().to_string().to_lower()
   if normalized == "never" || normalized == "false" {
     return None
   }
@@ -78,7 +78,7 @@ fn reflog_parse_expire_value(value : String, now : Int64) -> Int64? {
     return Some(now + 999999999L)
   }
   // Try parsing as approxidate
-  match @date_parse.parse_approxidate(value.trim().to_owned(), now) {
+  match @date_parse.parse_approxidate(value.trim().to_string(), now) {
     Some(ts) => Some(ts)
     None => None
   }
@@ -493,7 +493,7 @@ async fn reflog_expire_single_ref(
   let content = @utf8.decode_lossy(rfs.read_file(reflog_path)[:])
   let lines : Array[String] = []
   for line_view in content.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if line.length() > 0 {
       lines.push(line)
     }
@@ -825,7 +825,7 @@ async fn reflog_delete_entry(
   let content = @utf8.decode_lossy(rfs.read_file(reflog_path)[:])
   let lines : Array[String] = []
   for line_view in content.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if line.length() > 0 {
       lines.push(line)
     }

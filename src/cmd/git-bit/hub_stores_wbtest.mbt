@@ -53,7 +53,7 @@ test "hub backend: resolve shared git dir follows commondir file" {
   cleanup_tree(fs, root)
   fs.mkdir_p(worktree_git)
   fs.write_string(worktree_git + "/commondir", "../..\n")
-  @test.assert_eq(resolve_hub_common_git_dir(worktree_git), root + "/repo/.git")
+  assert_eq(resolve_hub_common_git_dir(worktree_git), root + "/repo/.git")
   cleanup_tree(fs, root)
 }
 
@@ -85,8 +85,8 @@ async test "hub backend: git backend resolves git dir and current branch" {
 
   @bitrepo.init_repo(fs, root, default_branch="main")
 
-  @test.assert_eq(resolve_hub_git_dir(root), root + "/.git")
-  @test.assert_eq(detect_hub_current_branch_name(root), Some("main"))
+  assert_eq(resolve_hub_git_dir(root), root + "/.git")
+  assert_eq(detect_hub_current_branch_name(root), Some("main"))
 
   add_test_restore_env("BIT_HUB_BACKEND", prev_backend)
   add_test_restore_env(

@@ -147,7 +147,7 @@ fn resolve_git_dir(fs : &@bit.RepoFileSystem, root : String) -> String {
     let bytes = fs.read_file(bit_path) catch { _ => return bit_path }
     let text = decode_bytes(bytes)
     for line_view in text.split("\n") {
-      let line = trim_string(line_view.to_owned())
+      let line = trim_string(line_view.to_string())
       if !line.has_prefix("gitdir:") {
         continue
       }

@@ -19,7 +19,7 @@ pub(all) struct PatchInfo {
 pub fn reverse_patch(patch : String) -> String {
   let lines : Array[String] = []
   for line_view in patch.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if line.has_prefix("+") && !line.has_prefix("+++") {
       lines.push(
         "-" + String::unsafe_substring(line, start=1, end=line.length()),
@@ -49,7 +49,7 @@ pub fn parse_patches(patch : String) -> Array[PatchInfo] {
   let lines_iter = patch.split("\n")
   let all_lines : Array[String] = []
   for lv in lines_iter {
-    all_lines.push(lv.to_owned())
+    all_lines.push(lv.to_string())
   }
   let mut i = 0
   while i < all_lines.length() {

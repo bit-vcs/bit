@@ -28,11 +28,11 @@ async fn worktree_wbtest_collect_shim_git(
       ["build", "--target", "native", "--release"],
       inherit_env=true,
     )
-    @test.assert_eq(build_code, 0)
+    assert_eq(build_code, 0)
   }
   fs.write_string(shim_moon, "#!/bin/sh\nset -eu\nexec '\{bit_exe}' \"$@\"\n")
   let chmod_code = @process.run("chmod", ["+x", shim_moon], inherit_env=true)
-  @test.assert_eq(chmod_code, 0)
+  assert_eq(chmod_code, 0)
   let env : Map[String, String] = {
     "SHIM_REAL_GIT": wbtest_resolve_real_git(repo_root),
     "SHIM_EXEC_PATH": repo_root + "/third_party/git",
@@ -64,23 +64,23 @@ async fn worktree_wbtest_collect_shim_git(
 ///|
 async fn worktree_wbtest_run_shim_git(args : Array[String]) -> Unit raise Error {
   let (code, _stdout, _stderr) = worktree_wbtest_collect_shim_git(args)
-  @test.assert_eq(code, 0)
+  assert_eq(code, 0)
 }
 
 ///|
 
 ///|
 test "worktree: quote path uses utf8 octal escapes" {
-  @test.assert_eq(worktree_quote_path("/repo/á"), "\"/repo/\\303\\241\"")
+  assert_eq(worktree_quote_path("/repo/á"), "\"/repo/\\303\\241\"")
 }
 
 ///|
 test "worktree: locked porcelain reason only quotes escaped values" {
-  @test.assert_eq(
+  assert_eq(
     worktree_format_locked_porcelain(Some("with reason")),
     Some("locked with reason"),
   )
-  @test.assert_eq(
+  assert_eq(
     worktree_format_locked_porcelain(Some("line1\nline2")),
     Some("locked \"line1\\nline2\""),
   )
@@ -88,14 +88,14 @@ test "worktree: locked porcelain reason only quotes escaped values" {
 
 ///|
 test "worktree: verbose lock suffix is omitted when reason exists" {
-  @test.assert_eq(worktree_verbose_locked_suffix(None), " locked")
-  @test.assert_eq(worktree_verbose_locked_suffix(Some("")), " locked")
-  @test.assert_eq(worktree_verbose_locked_suffix(Some("with reason")), "")
+  assert_eq(worktree_verbose_locked_suffix(None), " locked")
+  assert_eq(worktree_verbose_locked_suffix(Some("")), " locked")
+  assert_eq(worktree_verbose_locked_suffix(Some("with reason")), "")
 }
 
 ///|
 test "worktree: branch display distinguishes bare and broken" {
-  @test.assert_eq(
+  assert_eq(
     worktree_default_branch_display({
       path: "/bare",
       head_id: None,
@@ -106,7 +106,7 @@ test "worktree: branch display distinguishes bare and broken" {
     }),
     "(bare)",
   )
-  @test.assert_eq(
+  assert_eq(
     worktree_default_branch_display({
       path: "/repo",
       head_id: None,
@@ -122,9 +122,9 @@ test "worktree: branch display distinguishes bare and broken" {
 ///|
 test "worktree: parse expire days ago" {
   let now = get_current_timestamp()
-  @test.assert_eq(worktree_parse_expire_before_sec("2.days.ago"), Some(now - 172800L))
-  @test.assert_eq(worktree_parse_expire_before_sec("days.ago"), None)
-  @test.assert_eq(worktree_parse_expire_before_sec("2.hours.ago"), None)
+  assert_eq(worktree_parse_expire_before_sec("2.days.ago"), Some(now - 172800L))
+  assert_eq(worktree_parse_expire_before_sec("days.ago"), None)
+  assert_eq(worktree_parse_expire_before_sec("2.hours.ago"), None)
 }
 
 ///|
@@ -164,7 +164,7 @@ async fn worktree_wbtest_case_dash_shorthand() -> Unit raise Error {
 
   worktree_wbtest_run_shim_git(["worktree", "add", "short-hand", "-"])
 
-  @test.assert_eq(
+  assert_eq(
     add_test_git_stdout(root + "/repo/short-hand", [
       "rev-parse", "--symbolic-full-name", "HEAD",
     ]),
@@ -257,7 +257,7 @@ async fn worktree_wbtest_case_lock_reason() -> Unit raise Error {
     "main",
   ])
 
-  @test.assert_eq(
+  assert_eq(
     decode_bytes(
       fs.read_file(repo_dir + "/.git/worktrees/here-with-lock/locked"),
     ),
@@ -304,7 +304,7 @@ async fn worktree_wbtest_case_detach_defaults_to_head() -> Unit raise Error {
   let expected_head = add_test_git_stdout(repo_dir, ["rev-parse", "HEAD"])
   worktree_wbtest_run_shim_git(["worktree", "add", "--detach", "detached-here"])
 
-  @test.assert_eq(
+  assert_eq(
     add_test_git_stdout(repo_dir + "/detached-here", ["rev-parse", "HEAD"]),
     expected_head,
   )
@@ -349,7 +349,7 @@ async fn worktree_wbtest_case_explicit_head_creates_detached_worktree() -> Unit 
   let expected_head = add_test_git_stdout(repo_dir, ["rev-parse", "HEAD"])
   worktree_wbtest_run_shim_git(["worktree", "add", "head-explicit", "HEAD"])
 
-  @test.assert_eq(
+  assert_eq(
     add_test_git_stdout(repo_dir + "/head-explicit", ["rev-parse", "HEAD"]),
     expected_head,
   )
@@ -447,7 +447,7 @@ async fn worktree_wbtest_case_existing_branch_dwim() -> Unit raise Error {
   let expected_head = add_test_git_stdout(repo_dir, ["rev-parse", "dwim"])
   worktree_wbtest_run_shim_git(["worktree", "add", "dwim"])
 
-  @test.assert_eq(
+  assert_eq(
     add_test_git_stdout(repo_dir + "/dwim", ["rev-parse", "HEAD"]),
     expected_head,
   )
@@ -492,7 +492,7 @@ async fn worktree_wbtest_case_force_allows_current_branch_dwim() -> Unit raise E
 
   worktree_wbtest_run_shim_git(["worktree", "add", "--force", "test-branch"])
 
-  @test.assert_eq(
+  assert_eq(
     add_test_git_stdout(repo_dir + "/test-branch", ["symbolic-ref", "HEAD"]),
     "refs/heads/test-branch\n",
   )
@@ -611,11 +611,11 @@ async fn worktree_wbtest_case_relative_paths_option() -> Unit raise Error {
     "worktree", "add", "--detach", "--relative-paths", "relative", "main",
   ])
 
-  @test.assert_eq(
+  assert_eq(
     decode_bytes(fs.read_file(repo_dir + "/relative/.git")),
     "gitdir: ../.git/worktrees/relative\n",
   )
-  @test.assert_eq(
+  assert_eq(
     decode_bytes(fs.read_file(repo_dir + "/.git/worktrees/relative/gitdir")),
     "../../../relative/.git\n",
   )
@@ -668,21 +668,21 @@ async fn worktree_wbtest_case_config_relative_paths_default_and_override() -> Un
     "worktree", "add", "--detach", "--no-relative-paths", "absolute", "main",
   ])
 
-  @test.assert_eq(
+  assert_eq(
     decode_bytes(fs.read_file(repo_dir + "/config-relative/.git")),
     "gitdir: ../.git/worktrees/config-relative\n",
   )
-  @test.assert_eq(
+  assert_eq(
     decode_bytes(
       fs.read_file(repo_dir + "/.git/worktrees/config-relative/gitdir"),
     ),
     "../../../config-relative/.git\n",
   )
-  @test.assert_eq(
+  assert_eq(
     decode_bytes(fs.read_file(repo_dir + "/absolute/.git")),
     "gitdir: " + repo_dir + "/.git/worktrees/absolute\n",
   )
-  @test.assert_eq(
+  assert_eq(
     decode_bytes(fs.read_file(repo_dir + "/.git/worktrees/absolute/gitdir")),
     repo_dir + "/absolute/.git\n",
   )
@@ -722,7 +722,7 @@ async fn worktree_wbtest_case_infers_orphan_without_guess_remote() -> Unit raise
   worktree_wbtest_run_shim_git(["worktree", "add", "--no-guess-remote", "foo"])
 
   assert_true(fs.is_dir(repo_dir + "/foo"))
-  @test.assert_eq(
+  assert_eq(
     decode_bytes(fs.read_file(repo_dir + "/.git/worktrees/foo/HEAD")),
     "ref: refs/heads/foo\n",
   )
@@ -757,8 +757,8 @@ async fn worktree_wbtest_case_bad_head_with_local_refs_warns() -> Unit raise Err
   let git_dir = repo_dir + "/.git"
   match worktree_local_refs_status(fs, git_dir, git_dir) {
     WorktreeLocalRefsStatus::InvalidHead(path, contents) => {
-      @test.assert_eq(path, git_dir + "/HEAD")
-      @test.assert_eq(contents, "ref: refs/heads/badbranch")
+      assert_eq(path, git_dir + "/HEAD")
+      assert_eq(contents, "ref: refs/heads/badbranch")
     }
     _ => fail("expected invalid head with local refs")
   }
@@ -804,7 +804,7 @@ async fn worktree_wbtest_case_guess_remote_uses_configured_remote_name() -> Unit
   worktree_wbtest_run_shim_git(["worktree", "add", "--guess-remote", "foo"])
 
   assert_true(fs.is_dir(repo_dir + "/foo"))
-  @test.assert_eq(
+  assert_eq(
     decode_bytes(fs.read_file(repo_dir + "/.git/refs/remotes/upstream/foo")),
     decode_bytes(fs.read_file(repo_dir + "/.git/refs/heads/foo")),
   )
@@ -812,8 +812,8 @@ async fn worktree_wbtest_case_guess_remote_uses_configured_remote_name() -> Unit
   let (_, branches) = @bitlib.read_repo_config(fs, repo_dir + "/.git")
   match branches.get("foo") {
     Some(branch_config) => {
-      @test.assert_eq(branch_config.remote, Some("upstream"))
-      @test.assert_eq(branch_config.merges, ["refs/heads/foo"])
+      assert_eq(branch_config.remote, Some("upstream"))
+      assert_eq(branch_config.merges, ["refs/heads/foo"])
     }
     None => fail("expected branch.foo config")
   }
@@ -992,7 +992,7 @@ async fn worktree_wbtest_case_list_shows_main_and_linked() -> Unit raise Error {
   let (code, stdout, _stderr) = worktree_wbtest_collect_shim_git([
     "worktree", "list",
   ])
-  @test.assert_eq(code, 0)
+  assert_eq(code, 0)
   // Default list should contain both main worktree and linked worktree
   assert_true(stdout.contains(repo_dir))
   assert_true(stdout.contains("linked1"))
@@ -1002,7 +1002,7 @@ async fn worktree_wbtest_case_list_shows_main_and_linked() -> Unit raise Error {
   let (pcode, pstdout, _pstderr) = worktree_wbtest_collect_shim_git([
     "worktree", "list", "--porcelain",
   ])
-  @test.assert_eq(pcode, 0)
+  assert_eq(pcode, 0)
   assert_true(pstdout.contains("worktree " + repo_dir))
   assert_true(pstdout.contains("worktree " + repo_dir + "/linked1"))
   assert_true(pstdout.contains("branch refs/heads/main"))
@@ -1230,7 +1230,7 @@ async fn worktree_wbtest_case_lock_and_unlock() -> Unit raise Error {
   worktree_wbtest_run_shim_git([
     "worktree", "lock", "--reason", "doing maintenance", "locktest",
   ])
-  @test.assert_eq(
+  assert_eq(
     decode_bytes(fs.read_file(repo_dir + "/.git/worktrees/locktest/locked")),
     "doing maintenance\n",
   )
@@ -1295,10 +1295,10 @@ async fn worktree_wbtest_case_add_list_remove_e2e() -> Unit raise Error {
     "worktree", "list", "--porcelain",
   ])
   let worktree_count = list_out.split("worktree ").collect().length() - 1
-  @test.assert_eq(worktree_count, 3)
+  assert_eq(worktree_count, 3)
 
   // Verify feat1 is on correct branch
-  @test.assert_eq(
+  assert_eq(
     add_test_git_stdout(repo_dir + "/wt-feat1", [
       "rev-parse", "--symbolic-full-name", "HEAD",
     ]),
@@ -1313,7 +1313,7 @@ async fn worktree_wbtest_case_add_list_remove_e2e() -> Unit raise Error {
     "worktree", "list", "--porcelain",
   ])
   let worktree_count2 = list_out2.split("worktree ").collect().length() - 1
-  @test.assert_eq(worktree_count2, 2)
+  assert_eq(worktree_count2, 2)
   assert_false(list_out2.contains("wt-detached"))
 
   // Remove the other
@@ -1322,7 +1322,7 @@ async fn worktree_wbtest_case_add_list_remove_e2e() -> Unit raise Error {
     "worktree", "list", "--porcelain",
   ])
   let worktree_count3 = list_out3.split("worktree ").collect().length() - 1
-  @test.assert_eq(worktree_count3, 1)
+  assert_eq(worktree_count3, 1)
 
   add_test_restore_env("GIT_SHIM_CWD", prev_shim_cwd)
   add_test_restore_env("GIT_SHIM_PWD", prev_shim_pwd)

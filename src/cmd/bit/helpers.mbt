@@ -526,7 +526,7 @@ fn repository_extension_value(line : String) -> String {
     Some(idx) =>
       String::unsafe_substring(line, start=idx + 1, end=line.length())
       .trim()
-      .to_owned()
+      .to_string()
     None => ""
   }
 }
@@ -695,7 +695,7 @@ fn get_author_timestamp() -> Int64 {
 fn parse_git_env_timestamp(raw : String) -> Int64? {
   let mut token : String? = None
   for part_view in raw.split(" ") {
-    let part = part_view.to_owned()
+    let part = part_view.to_string()
     if part.length() > 0 {
       token = Some(part)
       break
@@ -724,7 +724,7 @@ fn parse_git_env_timestamp(raw : String) -> Int64? {
 fn parse_iso_date_timestamp(raw : String) -> Int64? {
   // Extract date and time parts from ISO format
   // Formats: "2005-05-26 23:00", "2005-05-26T23:00", "2005-05-26 23:00:30"
-  let s = raw.trim().to_owned()
+  let s = raw.trim().to_string()
   // Need at least "YYYY-MM-DD HH:MM" = 16 chars
   if s.length() < 16 {
     return None
@@ -796,7 +796,7 @@ fn parse_iso_date_timestamp(raw : String) -> Int64? {
 ///|
 fn parse_iso_tz_offset_seconds(s : String) -> Int64 {
   // Parse timezone offset like "+0200", "-0500", "+02:00", " +0200"
-  let t = s.trim().to_owned()
+  let t = s.trim().to_string()
   if t.length() < 5 {
     return 0L
   }
@@ -881,7 +881,7 @@ fn get_author_timezone() -> String {
 fn parse_git_env_timezone(raw : String) -> String? {
   let fields : Array[String] = []
   for part_view in raw.split(" ") {
-    let part = part_view.to_owned()
+    let part = part_view.to_string()
     if part.length() > 0 {
       fields.push(part)
     }
@@ -893,7 +893,7 @@ fn parse_git_env_timezone(raw : String) -> String? {
     }
   }
   // Try extracting embedded timezone from ISO8601 format (e.g. "2005-04-01T15:14:15+0200")
-  let s = raw.trim().to_owned()
+  let s = raw.trim().to_string()
   if s.length() >= 5 {
     // Check for +HHMM or -HHMM at end of string
     let tail = String::unsafe_substring(s, start=s.length() - 5, end=s.length())

@@ -294,7 +294,7 @@ pub fn fast_import_parse_dataref(ref_str : String) -> (Int, String) {
 pub fn fast_import_parse_marks(content : String) -> Array[(Int, String)] {
   let result : Array[(Int, String)] = []
   for line_view in content.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if line.length() == 0 {
       continue
     }

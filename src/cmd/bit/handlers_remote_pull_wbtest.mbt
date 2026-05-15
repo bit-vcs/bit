@@ -7,7 +7,7 @@ test "pull: detect submodule replaced by file" {
   let replaced = find_submodule_replaced_with_non_submodule(
     from_modes, to_modes,
   )
-  @test.assert_eq(replaced, Some("sub1"))
+  assert_eq(replaced, Some("sub1"))
 }
 
 ///|
@@ -18,28 +18,28 @@ test "pull: do not flag submodule removal" {
   let replaced = find_submodule_replaced_with_non_submodule(
     from_modes, to_modes,
   )
-  @test.assert_eq(replaced, None)
+  assert_eq(replaced, None)
 }
 
 ///|
 test "pull: initial head target uses current branch ref" {
   let target = resolve_initial_pull_head_target(Some("main"))
-  @test.assert_eq(target, "refs/heads/main")
+  assert_eq(target, "refs/heads/main")
 }
 
 ///|
 test "pull: initial head target uses detached HEAD" {
   let target = resolve_initial_pull_head_target(None)
-  @test.assert_eq(target, "HEAD")
+  assert_eq(target, "HEAD")
 }
 
 ///|
 test "pull: explicit refspec keeps fetch and merge target aligned" {
   let parsed = pull_parse_explicit_refspec(Some("main:main"))
-  @test.assert_eq(parsed.fetch_refspecs, ["main:main"])
-  @test.assert_eq(parsed.merge_ref, Some("refs/heads/main"))
-  @test.assert_eq(parsed.target_ref, Some("refs/heads/main"))
-  @test.assert_eq(parsed.upstream_ref, Some("refs/heads/main"))
+  assert_eq(parsed.fetch_refspecs, ["main:main"])
+  assert_eq(parsed.merge_ref, Some("refs/heads/main"))
+  assert_eq(parsed.target_ref, Some("refs/heads/main"))
+  assert_eq(parsed.upstream_ref, Some("refs/heads/main"))
 }
 
 ///|
@@ -53,7 +53,7 @@ test "pull: validation rejects detached HEAD without refspec" {
     None,
     true,
   )
-  @test.assert_eq(message, Some("You are not currently on a branch."))
+  assert_eq(message, Some("You are not currently on a branch."))
 }
 
 ///|
@@ -67,7 +67,7 @@ test "pull: validation rejects remote without branch when HEAD exists" {
     None,
     true,
   )
-  @test.assert_eq(message, Some("Please specify a branch on the command line."))
+  assert_eq(message, Some("Please specify a branch on the command line."))
 }
 
 ///|
@@ -81,7 +81,7 @@ test "pull: validation allows unborn branch without explicit merge ref" {
     None,
     false,
   )
-  @test.assert_eq(message, None)
+  assert_eq(message, None)
 }
 
 ///|
@@ -95,7 +95,7 @@ test "pull: validation reports missing tracking information" {
     None,
     true,
   )
-  @test.assert_eq(
+  assert_eq(
     message,
     Some("There is no tracking information for the current branch."),
   )
@@ -130,7 +130,7 @@ test "pull: merge ref becomes implicit fetch refspec" {
     Some("refs/heads/not-in-refspec"),
     None,
   )
-  @test.assert_eq(
+  assert_eq(
     pull_fetch_refspecs([], Some("refs/heads/not-in-refspec"), target_ref),
     ["refs/heads/not-in-refspec:refs/remotes/origin/not-in-refspec"],
   )
@@ -138,15 +138,15 @@ test "pull: merge ref becomes implicit fetch refspec" {
 
 ///|
 test "pull: in-progress merge error prefers unmerged files" {
-  @test.assert_eq(
+  assert_eq(
     pull_in_progress_error(true, true),
     Some("Pulling is not possible because you have unmerged files."),
   )
-  @test.assert_eq(
+  assert_eq(
     pull_in_progress_error(false, true),
     Some("You have not concluded your merge (MERGE_HEAD exists)."),
   )
-  @test.assert_eq(pull_in_progress_error(false, false), None)
+  assert_eq(pull_in_progress_error(false, false), None)
 }
 
 ///|
@@ -185,11 +185,11 @@ test "pull: rebase mode prefers branch config over pull.rebase" {
       #|
     ),
   )
-  @test.assert_eq(
+  assert_eq(
     pull_resolve_rebase_behavior(fs, git_dir, Some(false), None),
     (false, false),
   )
-  @test.assert_eq(
+  assert_eq(
     pull_resolve_rebase_behavior(fs, git_dir, Some(true), None),
     (true, false),
   )
@@ -208,8 +208,8 @@ test "pull: rebase mode parses interactive and rejects invalid config" {
       #|
     ),
   )
-  @test.assert_eq(pull_resolve_rebase_behavior(fs, git_dir, None, None), (true, true))
-  @test.assert_eq(pull_parse_rebase_behavior_value("i", "--rebase"), (true, true))
+  assert_eq(pull_resolve_rebase_behavior(fs, git_dir, None, None), (true, true))
+  assert_eq(pull_parse_rebase_behavior_value("i", "--rebase"), (true, true))
   fs.write_string(
     git_dir + "/config",
     (
@@ -268,11 +268,11 @@ async fn handlers_remote_pull_wbtest_collect_shim_git(
       ["build", "--target", "native", "--release"],
       inherit_env=true,
     )
-    @test.assert_eq(build_code, 0)
+    assert_eq(build_code, 0)
   }
   fs.write_string(shim_moon, "#!/bin/sh\nset -eu\nexec '\{bit_exe}' \"$@\"\n")
   let chmod_code = @process.run("chmod", ["+x", shim_moon], inherit_env=true)
-  @test.assert_eq(chmod_code, 0)
+  assert_eq(chmod_code, 0)
   let env : Map[String, String] = {
     "SHIM_REAL_GIT": wbtest_resolve_real_git(repo_root),
     "SHIM_REAL_GIT_FALLBACK": "",
@@ -306,9 +306,9 @@ async fn handlers_remote_pull_wbtest_run_shim_git(
   let (code, stdout, stderr) = handlers_remote_pull_wbtest_collect_shim_git(
     cwd, args,
   )
-  @test.assert_eq(code, 0)
-  @test.assert_eq(stdout, "")
-  @test.assert_eq(stderr, "")
+  assert_eq(code, 0)
+  assert_eq(stdout, "")
+  assert_eq(stderr, "")
 }
 
 ///|
@@ -445,7 +445,7 @@ async test "pull: branch remote dot pulls from current repo config" {
 
   handlers_remote_pull_wbtest_run_shim_git(root, ["pull", "-q"])
 
-  @test.assert_eq(
+  assert_eq(
     decode_bytes(fs.read_file(root + "/file") catch { _ => Bytes::default() }),
     "updated\n",
   )
@@ -484,7 +484,7 @@ async test "pull: command path pulls into unborn branch from parent repo" {
     "pull", "-q", "..", "main:main",
   ])
 
-  @test.assert_eq(
+  assert_eq(
     decode_bytes(
       fs.read_file(dst_dir + "/file") catch {
         _ => Bytes::default()
@@ -521,7 +521,7 @@ async test "pull: command path keeps staged new file on unborn branch" {
 
   handlers_remote_pull_wbtest_run_shim_git(dst_dir, ["pull", "-q", "..", "main"])
 
-  @test.assert_eq(
+  assert_eq(
     decode_bytes(
       fs.read_file(dst_dir + "/newfile") catch {
         _ => Bytes::default()
@@ -613,7 +613,7 @@ async test "pull: rebase rejects staged changes on unborn branch" {
     }
   }
   assert_true(found_staged_file)
-  @test.assert_eq(
+  assert_eq(
     decode_bytes(
       fs.read_file(dst_dir + "/staged-file") catch {
         _ => Bytes::default()
@@ -665,15 +665,15 @@ async test "pull: rebase uses previous target as fork point for rebased upstream
     "pull", "--rebase", "-q", "me", "copy",
   ])
 
-  @test.assert_eq(
+  assert_eq(
     decode_bytes(fs.read_file(root + "/file") catch { _ => Bytes::default() }),
     "conflicting modification\n",
   )
-  @test.assert_eq(
+  assert_eq(
     decode_bytes(fs.read_file(root + "/file2") catch { _ => Bytes::default() }),
     "new\n",
   )
-  @test.assert_eq(@bitlib.read_unmerged_paths(fs, root + "/.git").length(), 0)
+  assert_eq(@bitlib.read_unmerged_paths(fs, root + "/.git").length(), 0)
   cleanup_tree(fs, root)
 }
 
@@ -707,11 +707,11 @@ async test "pull: updates checked-out branch worktree when fetch advances it" {
     "pull", "-q", ".", "second:third",
   ])
 
-  @test.assert_eq(
+  assert_eq(
     decode_bytes(fs.read_file(root + "/file") catch { _ => Bytes::default() }),
     "modified\n",
   )
-  @test.assert_eq(
+  assert_eq(
     @bitlib.resolve_ref(fs, root + "/.git", "refs/heads/third"),
     second_id,
   )
@@ -758,11 +758,11 @@ async test "pull: refuses dirty worktree when fetch advances current branch" {
 
   assert_true(code != 0)
   assert_true(stderr.contains("Cannot fast-forward your working tree"))
-  @test.assert_eq(
+  assert_eq(
     decode_bytes(fs.read_file(root + "/file") catch { _ => Bytes::default() }),
     "conflict\n",
   )
-  @test.assert_eq(
+  assert_eq(
     @bitlib.resolve_ref(fs, root + "/.git", "refs/heads/third"),
     second_id,
   )
@@ -829,7 +829,7 @@ async test "pull: rebase autostash preserves staged file on fast-forward" {
     "pull", "--rebase", "-q", ".", "main",
   ])
 
-  @test.assert_eq(
+  assert_eq(
     decode_bytes(
       fs.read_file(root + "/new_file") catch {
         _ => Bytes::default()
@@ -837,11 +837,11 @@ async test "pull: rebase autostash preserves staged file on fast-forward" {
     ),
     "dirty\n",
   )
-  @test.assert_eq(
+  assert_eq(
     decode_bytes(fs.read_file(root + "/file") catch { _ => Bytes::default() }),
     "modified again\n",
   )
-  @test.assert_eq(@bitlib.stash_list(fs, root + "/.git").length(), 0)
+  assert_eq(@bitlib.stash_list(fs, root + "/.git").length(), 0)
   cleanup_tree(fs, root)
 }
 
@@ -867,7 +867,7 @@ async test "pull: unborn conflict detection only keeps colliding paths" {
   target_modes["file"] = 0o100644
   target_modes["extra"] = 0o100644
   let conflicts = pull_collect_initial_conflicting_paths(status, target_modes)
-  @test.assert_eq(conflicts.length(), 2)
+  assert_eq(conflicts.length(), 2)
   assert_true(conflicts.contains("file"))
   assert_true(conflicts.contains("extra"))
 }
@@ -889,8 +889,8 @@ test "pull: unborn preserve index entries outside target tree" {
   let preserved = pull_collect_initial_preserved_index_entries(
     entries, target_modes,
   )
-  @test.assert_eq(preserved.length(), 1)
-  @test.assert_eq(preserved[0].path, "keep")
+  assert_eq(preserved.length(), 1)
+  assert_eq(preserved[0].path, "keep")
 }
 
 ///|
@@ -951,12 +951,12 @@ test "pull relay: preferred sender/repo env is trimmed and optional" {
   let prev_repo = @sys.get_env_var("BIT_RELAY_PULL_REPO")
   @sys.set_env_var("BIT_RELAY_PULL_SENDER", " node-a ")
   @sys.set_env_var("BIT_RELAY_PULL_REPO", " repo-b ")
-  @test.assert_eq(pull_relay_preferred_sender(), Some("node-a"))
-  @test.assert_eq(pull_relay_preferred_repo(), Some("repo-b"))
+  assert_eq(pull_relay_preferred_sender(), Some("node-a"))
+  assert_eq(pull_relay_preferred_repo(), Some("repo-b"))
   @sys.set_env_var("BIT_RELAY_PULL_SENDER", "   ")
   @sys.set_env_var("BIT_RELAY_PULL_REPO", "   ")
-  @test.assert_eq(pull_relay_preferred_sender(), None)
-  @test.assert_eq(pull_relay_preferred_repo(), None)
+  assert_eq(pull_relay_preferred_sender(), None)
+  assert_eq(pull_relay_preferred_repo(), None)
   restore_env_var_for_fetch_wbtest("BIT_RELAY_PULL_SENDER", prev_sender)
   restore_env_var_for_fetch_wbtest("BIT_RELAY_PULL_REPO", prev_repo)
 }
@@ -972,7 +972,7 @@ test "pull relay: sender filter is preferred over repo filter" {
     preferred_sender=Some("node-a"),
     preferred_repo=Some("repo-b"),
   )
-  @test.assert_eq(selected, Some(("node-a", "http://node-a:9418/repo-a.git")))
+  assert_eq(selected, Some(("node-a", "http://node-a:9418/repo-a.git")))
 }
 
 ///|
@@ -986,11 +986,11 @@ test "pull relay: falls back to repo and then first peer" {
     preferred_sender=Some("node-z"),
     preferred_repo=Some("repo-b"),
   )
-  @test.assert_eq(by_repo, Some(("node-b", "http://node-b:9418/repo-b.git")))
+  assert_eq(by_repo, Some(("node-b", "http://node-b:9418/repo-b.git")))
   let first = pull_select_relay_peer(
     peers,
     preferred_sender=None,
     preferred_repo=Some("repo-z"),
   )
-  @test.assert_eq(first, Some(("node-a", "http://node-a:9418/repo-a.git")))
+  assert_eq(first, Some(("node-a", "http://node-a:9418/repo-a.git")))
 }

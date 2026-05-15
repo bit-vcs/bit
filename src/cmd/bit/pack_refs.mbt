@@ -19,11 +19,11 @@ fn handle_pack_refs(args : Array[String]) -> Unit raise Error {
   if fs.is_file(packed_refs_path) {
     let content = decode_bytes(fs.read_file(packed_refs_path))
     for line_view in content.split("\n") {
-      let line = line_view.to_owned()
+      let line = line_view.to_string()
       if line.length() > 0 && !line.has_prefix("#") && !line.has_prefix("^") {
         let parts : Array[String] = line
           .split(" ")
-          .map(v => v.to_owned())
+          .map(v => v.to_string())
           .collect()
         if parts.length() >= 2 {
           let sha = parts[0]
@@ -98,7 +98,7 @@ fn cleanup_empty_dirs(
 ) -> Unit raise Error {
   let parts : Array[String] = ref_path
     .split("/")
-    .map(v => v.to_owned())
+    .map(v => v.to_string())
     .collect()
   let mut current = git_dir
   let dirs : Array[String] = []

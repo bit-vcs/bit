@@ -124,11 +124,6 @@ pub impl Show for ObjectId with output(self, logger) {
 }
 
 ///|
-pub impl @debug.Debug for ObjectId with to_repr(self) {
-  @debug.Repr::string(self.to_hex())
-}
-
-///|
 pub impl Eq for ObjectId with equal(self, other) {
   if self.bytes.length() != other.bytes.length() {
     return false
@@ -164,7 +159,7 @@ pub(all) enum ObjectType {
   Tree
   Commit
   Tag
-} derive(Eq, Debug)
+} derive(Eq)
 
 ///|
 pub fn ObjectType::to_string(self : ObjectType) -> String {

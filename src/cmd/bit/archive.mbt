@@ -18,9 +18,9 @@ async fn handle_archive(args : Array[String]) -> Unit raise Error {
     if arg == "-l" || arg == "--list" {
       list_formats = true
     } else if arg.has_prefix("--format=") {
-      format = arg[9:].to_owned()
+      format = arg[9:].to_string()
     } else if arg.has_prefix("--prefix=") {
-      prefix = arg[9:].to_owned()
+      prefix = arg[9:].to_string()
     } else if arg == "--output" || arg == "-o" {
       i += 1
       if i < args.length() {
@@ -30,7 +30,7 @@ async fn handle_archive(args : Array[String]) -> Unit raise Error {
         @sys.exit(1)
       }
     } else if arg.has_prefix("--output=") {
-      output_file = Some(arg[9:].to_owned())
+      output_file = Some(arg[9:].to_string())
     } else if arg == "--" {
       // remaining args are path filters
       i += 1

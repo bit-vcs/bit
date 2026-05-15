@@ -24,7 +24,7 @@ test "perf: partial clone access pattern verification" {
 
   // Get commit ID
   let head_ref = osfs.read_file(git_dir + "/HEAD")
-  let head_str = @utf8.decode_lossy(head_ref[:]).trim().to_owned()
+  let head_str = @utf8.decode_lossy(head_ref[:]).trim().to_string()
   let commit_id = if head_str.has_prefix("ref: ") {
     let ref_name = String::unsafe_substring(
       head_str,
@@ -34,7 +34,7 @@ test "perf: partial clone access pattern verification" {
     let ref_path = git_dir + "/" + ref_name
     let ref_content = osfs.read_file(ref_path)
     @bit.ObjectId::from_hex(
-      @utf8.decode_lossy(ref_content[:]).trim().to_owned(),
+      @utf8.decode_lossy(ref_content[:]).trim().to_string(),
     )
   } else {
     @bit.ObjectId::from_hex(head_str)
@@ -130,7 +130,7 @@ test "perf: verify lazy vs eager difference" {
   }
   println("\n=== Lazy vs Eager Mode Comparison ===\n")
   let head_ref = osfs.read_file(git_dir + "/HEAD")
-  let head_str = @utf8.decode_lossy(head_ref[:]).trim().to_owned()
+  let head_str = @utf8.decode_lossy(head_ref[:]).trim().to_string()
   let commit_id = if head_str.has_prefix("ref: ") {
     let ref_name = String::unsafe_substring(
       head_str,
@@ -140,7 +140,7 @@ test "perf: verify lazy vs eager difference" {
     let ref_path = git_dir + "/" + ref_name
     let ref_content = osfs.read_file(ref_path)
     @bit.ObjectId::from_hex(
-      @utf8.decode_lossy(ref_content[:]).trim().to_owned(),
+      @utf8.decode_lossy(ref_content[:]).trim().to_string(),
     )
   } else {
     @bit.ObjectId::from_hex(head_str)

@@ -109,7 +109,7 @@ fn storage_decode_bytes(data : Bytes) -> String {
 fn storage_normalize_path(path : String) -> String {
   let parts : Array[String] = []
   for part_view in path.split("/") {
-    let part = part_view.to_owned()
+    let part = part_view.to_string()
     if part == "" || part == "." {
       continue
     } else if part == ".." {
@@ -190,7 +190,7 @@ fn storage_resolve_git_dir(rfs : &@bit.RepoFileSystem, root : String) -> String 
 fn storage_parse_git_env_timestamp(raw : String) -> Int64? {
   let mut token : String? = None
   for part_view in raw.split(" ") {
-    let part = part_view.to_owned()
+    let part = part_view.to_string()
     if part.length() > 0 {
       token = Some(part)
       break
@@ -304,7 +304,7 @@ fn storage_is_valid_timezone_token(token : String) -> Bool {
 fn storage_parse_git_env_timezone(raw : String) -> String? {
   let fields : Array[String] = []
   for part_view in raw.split(" ") {
-    let part = part_view.to_owned()
+    let part = part_view.to_string()
     if part.length() > 0 {
       fields.push(part)
     }
@@ -1056,7 +1056,7 @@ fn storage_handle_hash_object(
     let text = @string_utils.decode_bytes(stdin_content)
     let autocrlf = @bitlib.read_autocrlf_setting(rfs, git_dir)
     for line_view in text.split("\n") {
-      let line = line_view.to_owned()
+      let line = line_view.to_string()
       if line.length() == 0 {
         continue
       }
@@ -1068,7 +1068,7 @@ fn storage_handle_hash_object(
       let content = rfs.read_file(abs)
       let prefix_len = root.length() + 1
       let rel_path = if abs.has_prefix(root + "/") {
-        abs[prefix_len:].to_owned()
+        abs[prefix_len:].to_string()
       } else {
         abs
       }
@@ -1109,7 +1109,7 @@ fn storage_handle_hash_object(
     let content = rfs.read_file(abs)
     let prefix_len = root.length() + 1
     let rel_path = if abs.has_prefix(root + "/") {
-      abs[prefix_len:].to_owned()
+      abs[prefix_len:].to_string()
     } else {
       abs
     }

@@ -107,7 +107,7 @@ fn trailers_normalize(trailer : String) -> String {
 pub fn parse_trailers(message : String) -> Array[(String, String)] {
   let lines : Array[String] = []
   for line_view in message.split("\n") {
-    lines.push(line_view.to_owned())
+    lines.push(line_view.to_string())
   }
   // Remove trailing empty lines
   while lines.length() > 0 &&
@@ -163,7 +163,7 @@ pub fn parse_trailers(message : String) -> Array[(String, String)] {
 fn trailers_split(input : String) -> (String, Array[String]) {
   let lines : Array[String] = []
   for line_view in input.split("\n") {
-    lines.push(line_view.to_owned())
+    lines.push(line_view.to_string())
   }
   // Remove trailing empty line from split
   if lines.length() > 0 && lines[lines.length() - 1].length() == 0 {

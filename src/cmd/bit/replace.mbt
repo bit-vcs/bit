@@ -478,14 +478,14 @@ async fn replace_convert_graft_file(
   let text = decode_bytes(content)
   let mut count = 0
   for line_view in text.split("\n") {
-    let line = trim_chars(line_view.to_owned(), " \t\r")
+    let line = trim_chars(line_view.to_string(), " \t\r")
     if line.length() == 0 || line.has_prefix("#") {
       continue
     }
     // Parse: <commit> [<parent1> <parent2> ...]
     let parts : Array[String] = []
     for part_view in line.split(" ") {
-      let part = trim_chars(part_view.to_owned(), " \t")
+      let part = trim_chars(part_view.to_string(), " \t")
       if part.length() > 0 {
         parts.push(part)
       }

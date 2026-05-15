@@ -52,7 +52,7 @@ async fn handle_mailinfo(args : Array[String]) -> Unit raise Error {
   let mut in_patch = false
   let mut past_scissors = false
   for line_view in input.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if in_headers {
       if line.length() == 0 {
         in_headers = false

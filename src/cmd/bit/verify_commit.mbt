@@ -102,7 +102,7 @@ async fn handle_verify_commit(args : Array[String]) -> Unit raise Error {
 fn verify_commit_extract_field(text : String, field : String) -> String {
   let prefix = field + " "
   for line_view in text.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if line.has_prefix(prefix) {
       return String::unsafe_substring(
         line,

@@ -79,7 +79,7 @@ fn strip_remote_helper_path(url : String) -> String? {
 fn normalize_local_path(path : String) -> String {
   let parts : Array[String] = []
   for part_view in path.split("/") {
-    let part = part_view.to_owned()
+    let part = part_view.to_string()
     if part == "" || part == "." {
       continue
     } else if part == ".." {

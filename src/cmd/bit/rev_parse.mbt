@@ -1630,7 +1630,7 @@ fn resolve_fetch_head_oid(
   )
   let mut result : @bitcore.ObjectId? = None
   for line_view in content.split("\n") {
-    let line = line_view.to_owned().trim().to_owned()
+    let line = line_view.to_string().trim().to_string()
     if line.length() == 0 {
       continue
     }
@@ -1743,13 +1743,13 @@ fn rev_parse_lookup_loose_object_idx(
   }
   let text = decode_bytes(fs.read_file(idx_path) catch { _ => return None })
   for line_view in text.split("\n") {
-    let line = trim_string(line_view.to_owned())
+    let line = trim_string(line_view.to_string())
     if line.length() == 0 || line.has_prefix("#") {
       continue
     }
     let cols : Array[String] = []
     for col_view in line.split(" ") {
-      let col = trim_string(col_view.to_owned())
+      let col = trim_string(col_view.to_string())
       if col.length() > 0 {
         cols.push(col)
       }
@@ -2079,7 +2079,7 @@ fn rev_parse_read_bisect_refs(
   if packed_exists {
     let content = decode_bytes(fs.read_file(packed_path) catch { e => raise e })
     for line_view in content.split("\n") {
-      let line = trim_string(line_view.to_owned())
+      let line = trim_string(line_view.to_string())
       if line.length() == 0 || line.has_prefix("#") || line.has_prefix("^") {
         continue
       }
@@ -3579,7 +3579,7 @@ fn rev_parse_find_superproject_working_tree(
   let rfs : &@bitcore.RepoFileSystem = fs
   let content_bytes = rfs.read_file(dot_git) catch { _ => return None }
   let content = @string_utils.decode_bytes(content_bytes)
-  let trimmed = content.trim().to_owned()
+  let trimmed = content.trim().to_string()
   guard trimmed.has_prefix("gitdir: ") else { return None }
   let gitdir_raw = String::unsafe_substring(
     trimmed,

@@ -207,12 +207,12 @@ test "VectorClock: increment and merge" {
   let clock1 = VectorClock::new().increment(node1).increment(node1)
   let clock2 = VectorClock::new().increment(node2)
   // clock1 has node1=2, clock2 has node2=1
-  @test.assert_eq(clock1.clocks.get("node1"), Some(2L))
-  @test.assert_eq(clock2.clocks.get("node2"), Some(1L))
+  assert_eq(clock1.clocks.get("node1"), Some(2L))
+  assert_eq(clock2.clocks.get("node2"), Some(1L))
   // Merge
   let merged = clock1.merge(clock2)
-  @test.assert_eq(merged.clocks.get("node1"), Some(2L))
-  @test.assert_eq(merged.clocks.get("node2"), Some(1L))
+  assert_eq(merged.clocks.get("node1"), Some(2L))
+  assert_eq(merged.clocks.get("node2"), Some(1L))
 }
 
 ///|
@@ -224,11 +224,11 @@ test "VectorClock: compare" {
   // clock2: {node1: 1}
   let clock2 = VectorClock::new().increment(node1)
   // clock1 is after clock2
-  @test.assert_eq(clock1.compare(clock2), 1)
-  @test.assert_eq(clock2.compare(clock1), -1)
+  assert_eq(clock1.compare(clock2), 1)
+  assert_eq(clock2.compare(clock1), -1)
   // Concurrent clocks
   let clock3 = VectorClock::new().increment(node2)
-  @test.assert_eq(clock1.compare(clock3), 0) // Concurrent
+  assert_eq(clock1.compare(clock3), 0) // Concurrent
 }
 
 ///|
@@ -249,16 +249,16 @@ test "Kv: basic KV operations" {
   db.set("key1", b"value1")
   db.set("nested/path/key2", b"value2")
   let v1 = db.get("key1")
-  @test.assert_eq(v1, Some(b"value1"))
+  assert_eq(v1, Some(b"value1"))
   let v2 = db.get("nested/path/key2")
-  @test.assert_eq(v2, Some(b"value2"))
+  assert_eq(v2, Some(b"value2"))
   // Non-existent key
   let v3 = db.get("nonexistent")
-  @test.assert_eq(v3, None)
+  assert_eq(v3, None)
   // Delete
   db.delete("key1")
   let v4 = db.get("key1")
-  @test.assert_eq(v4, None)
+  assert_eq(v4, None)
 }
 
 ///|
@@ -282,9 +282,9 @@ test "Kv: list keys" {
 test "Kv: gossip state" {
   let db = make_test_kv_simple("node1")
   let state = db.get_gossip_state(1000L)
-  @test.assert_eq(state.node_id.id, "node1")
-  @test.assert_eq(state.head, @bit.ObjectId::zero())
-  @test.assert_eq(state.timestamp, 1000L)
+  assert_eq(state.node_id.id, "node1")
+  assert_eq(state.head, @bit.ObjectId::zero())
+  assert_eq(state.timestamp, 1000L)
 }
 
 ///|
@@ -306,12 +306,12 @@ test "Kv: peer management" {
   db.add_peer(peer1)
   db.add_peer(peer2)
   let peers = db.get_peers()
-  @test.assert_eq(peers.length(), 2)
+  assert_eq(peers.length(), 2)
   // Remove peer
   let removed = db.remove_peer(NodeId::new("peer1"))
   assert_true(removed)
   let peers2 = db.get_peers()
-  @test.assert_eq(peers2.length(), 1)
+  assert_eq(peers2.length(), 1)
 }
 
 ///|
@@ -329,7 +329,7 @@ test "Kv: select gossip peers" {
   }
   // Select 3 random peers
   let selected = db.select_gossip_peers(3, 12345L)
-  @test.assert_eq(selected.length(), 3)
+  assert_eq(selected.length(), 3)
   // Select with different seed should give different result
   let selected2 = db.select_gossip_peers(3, 67890L)
   // At least one should be different (probabilistically)
@@ -368,9 +368,9 @@ test "Kv: sync cursor roundtrip" {
     endpoint: "wss://peer1.example.com",
   }
   db.add_peer(peer)
-  @test.assert_eq(db.get_peer_cursor(NodeId::new("peer1")), None)
+  assert_eq(db.get_peer_cursor(NodeId::new("peer1")), None)
   db.set_peer_cursor(NodeId::new("peer1"), 42L)
-  @test.assert_eq(db.get_peer_cursor(NodeId::new("peer1")), Some(42L))
+  assert_eq(db.get_peer_cursor(NodeId::new("peer1")), Some(42L))
 }
 
 ///|
@@ -416,13 +416,13 @@ test "Kv: sync_round success increments peer cursor" {
     Ok(None)
   })
   assert_true(saw_announce)
-  @test.assert_eq(result.selected, 1)
-  @test.assert_eq(result.attempted, 1)
-  @test.assert_eq(result.succeeded, 1)
-  @test.assert_eq(result.failed, 0)
-  @test.assert_eq(result.messages_sent, 1)
-  @test.assert_eq(result.messages_received, 0)
-  @test.assert_eq(db.get_peer_cursor(NodeId::new("peer1")), Some(1L))
+  assert_eq(result.selected, 1)
+  assert_eq(result.attempted, 1)
+  assert_eq(result.succeeded, 1)
+  assert_eq(result.failed, 0)
+  assert_eq(result.messages_sent, 1)
+  assert_eq(result.messages_received, 0)
+  assert_eq(db.get_peer_cursor(NodeId::new("peer1")), Some(1L))
 }
 
 ///|
@@ -455,11 +455,11 @@ test "Kv: sync_round processes response and follow-up message" {
       Ok(None)
     }
   })
-  @test.assert_eq(call_count, 2)
-  @test.assert_eq(result.succeeded, 1)
-  @test.assert_eq(result.failed, 0)
-  @test.assert_eq(result.messages_sent, 2)
-  @test.assert_eq(result.messages_received, 1)
+  assert_eq(call_count, 2)
+  assert_eq(result.succeeded, 1)
+  assert_eq(result.failed, 0)
+  assert_eq(result.messages_sent, 2)
+  assert_eq(result.messages_received, 1)
 }
 
 ///|
@@ -475,9 +475,9 @@ test "Kv: sync_round failure applies retry backoff" {
   let result = db.sync_round(1, 77L, 1000L, fn(_peer, _msg) {
     Err("network error")
   })
-  @test.assert_eq(result.succeeded, 0)
-  @test.assert_eq(result.failed, 1)
-  @test.assert_eq(db.get_peer_cursor(NodeId::new("peer1")), None)
+  assert_eq(result.succeeded, 0)
+  assert_eq(result.failed, 1)
+  assert_eq(db.get_peer_cursor(NodeId::new("peer1")), None)
   let early = db.select_gossip_peers(1, 77L, timestamp=1500L)
   assert_false(peers_contains(early, "peer1"))
   let late = db.select_gossip_peers(1, 77L, timestamp=2500L)
@@ -503,10 +503,10 @@ test "Kv: commit and rollback" {
   assert_false(db.is_dirty())
   // key3 should not exist
   let v3 = db.get("key3")
-  @test.assert_eq(v3, None)
+  assert_eq(v3, None)
   // key1 and key2 should still exist (from commit)
   let v1 = db.get("key1")
-  @test.assert_eq(v1, Some(b"value1"))
+  assert_eq(v1, Some(b"value1"))
 }
 
 ///|
@@ -520,7 +520,7 @@ test "Kv: serialize snapshot cache avoids repeated object reads when clean" {
   let _ = db.serialize_snapshot(mode=TreeAndBlobOnly)
   let second = read_counter(fs, counter_path)
   assert_true(first > 0)
-  @test.assert_eq(second, first)
+  assert_eq(second, first)
   db.set("b.txt", b"b")
   let _ = db.commit("c2", 1001L)
   let _ = db.serialize_snapshot(mode=TreeAndBlobOnly)
@@ -539,7 +539,7 @@ test "Kv: serialize_snapshot_bytes cache avoids repeated object reads when clean
   let _ = db.serialize_snapshot_bytes(mode=TreeAndBlobOnly)
   let second = read_counter(fs, counter_path)
   assert_true(first > 0)
-  @test.assert_eq(second, first)
+  assert_eq(second, first)
   db.set("b.txt", b"b")
   let _ = db.commit("c2", 1001L)
   let _ = db.serialize_snapshot_bytes(mode=TreeAndBlobOnly)

@@ -105,36 +105,36 @@ impl @bit.FileSystem for CountingFs with remove_dir(self, path) {
 
 ///|
 test "path: normalize_path removes leading and trailing slashes" {
-  @test.assert_eq(normalize_path("/foo/bar/"), "foo/bar")
-  @test.assert_eq(normalize_path("./foo"), "foo")
-  @test.assert_eq(normalize_path("foo"), "foo")
-  @test.assert_eq(normalize_path("/"), "")
+  assert_eq(normalize_path("/foo/bar/"), "foo/bar")
+  assert_eq(normalize_path("./foo"), "foo")
+  assert_eq(normalize_path("foo"), "foo")
+  assert_eq(normalize_path("/"), "")
 }
 
 ///|
 test "path: split_path splits into components" {
-  @test.assert_eq(split_path("a/b/c"), ["a", "b", "c"])
-  @test.assert_eq(split_path("/a/b/"), ["a", "b"])
-  @test.assert_eq(split_path(""), [])
+  assert_eq(split_path("a/b/c"), ["a", "b", "c"])
+  assert_eq(split_path("/a/b/"), ["a", "b"])
+  assert_eq(split_path(""), [])
 }
 
 ///|
 test "path: parent_dir returns parent directory" {
-  @test.assert_eq(parent_dir("/a/b/c"), "/a/b")
-  @test.assert_eq(parent_dir("/a"), "/")
-  @test.assert_eq(parent_dir("a"), "")
+  assert_eq(parent_dir("/a/b/c"), "/a/b")
+  assert_eq(parent_dir("/a"), "/")
+  assert_eq(parent_dir("a"), "")
 }
 
 ///|
 test "path: basename returns file name" {
-  @test.assert_eq(basename("/a/b/c"), "c")
-  @test.assert_eq(basename("foo"), "foo")
+  assert_eq(basename("/a/b/c"), "c")
+  assert_eq(basename("foo"), "foo")
 }
 
 ///|
 test "path: split_first splits at first slash" {
-  @test.assert_eq(split_first("a/b/c"), ("a", Some("b/c")))
-  @test.assert_eq(split_first("foo"), ("foo", None))
+  assert_eq(split_first("a/b/c"), ("a", Some("b/c")))
+  assert_eq(split_first("foo"), ("foo", None))
 }
 
 ///|
@@ -144,9 +144,9 @@ test "cache: blob cache with LRU eviction" {
   let data2 = Bytes::from_array([b'd', b'e', b'f'])
   cache.set_blob("file1", data1)
   cache.set_blob("file2", data2)
-  @test.assert_eq(cache.get_blob("file1").unwrap(), data1)
-  @test.assert_eq(cache.get_blob("file2").unwrap(), data2)
-  @test.assert_eq(cache.blob_cache.total_bytes(), 6)
+  assert_eq(cache.get_blob("file1").unwrap(), data1)
+  assert_eq(cache.get_blob("file2").unwrap(), data2)
+  assert_eq(cache.blob_cache.total_bytes(), 6)
 }
 
 ///|
@@ -157,13 +157,13 @@ test "cache: blob eviction when over limit" {
   let data3 = Bytes::from_array([b'x', b'y', b'z'])
   cache.set_blob("file1", data1)
   cache.set_blob("file2", data2)
-  @test.assert_eq(cache.blob_cache.total_bytes(), 10)
+  assert_eq(cache.blob_cache.total_bytes(), 10)
   cache.set_blob("file3", data3)
   // Two-generation LRU evicts entire cold generation at once
   // file1 and file2 were moved to cold, then evicted
   assert_true(cache.get_blob("file1") is None)
   assert_true(cache.get_blob("file2") is None)
-  @test.assert_eq(cache.get_blob("file3").unwrap(), data3)
+  assert_eq(cache.get_blob("file3").unwrap(), data3)
 }
 
 ///|
@@ -197,10 +197,10 @@ test "working_layer: clear resets state" {
   layer.dirs["dir"] = true
   layer.dirty = true
   layer.clear()
-  @test.assert_eq(layer.files.length(), 0)
-  @test.assert_eq(layer.deleted.length(), 0)
-  @test.assert_eq(layer.dirs.length(), 0)
-  @test.assert_eq(layer.dirty, false)
+  assert_eq(layer.files.length(), 0)
+  assert_eq(layer.deleted.length(), 0)
+  assert_eq(layer.dirs.length(), 0)
+  assert_eq(layer.dirty, false)
 }
 
 ///|
@@ -222,7 +222,7 @@ test "read_ops: sibling path cache is warmed on first lookup" {
   bitfs.write_file("b.txt", b"b")
   let snap = bitfs.snapshot(fs, fs, "seed", "Bench <bench@example.com>", 1000L)
   bitfs.checkout_snapshot(fs, snap.commit_id)
-  @test.assert_eq(bitfs.cache.path_cache.length(), 0)
+  assert_eq(bitfs.cache.path_cache.length(), 0)
   let _ = bitfs.read_file(fs, "a.txt")
   assert_true(bitfs.cache.get_path("a.txt") is Some(Some(_)))
   assert_true(bitfs.cache.get_path("b.txt") is Some(Some(_)))
@@ -257,6 +257,6 @@ test "snapshot: untouched subtree objects are not loaded or rewritten" {
   bitfs.write_file("hot/a.txt", b"v2")
   let _ = bitfs.snapshot(cfs, cfs, "edit", "Bench <bench@example.com>", 1001L)
 
-  @test.assert_eq(cfs.read_count(cold_tree_path), 0)
-  @test.assert_eq(cfs.write_count(cold_tree_path), 0)
+  assert_eq(cfs.read_count(cold_tree_path), 0)
+  assert_eq(cfs.write_count(cold_tree_path), 0)
 }

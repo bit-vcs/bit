@@ -647,11 +647,11 @@ pub fn read_autocrlf_setting(
   match @bitio.env_get("GIT_CONFIG_OVERRIDES") {
     Some(env_value) =>
       for line_view in env_value.split("\n") {
-        let line = line_view.to_owned().trim().to_owned()
+        let line = line_view.to_string().trim().to_string()
         if line.to_lower().has_prefix("core.autocrlf=") {
           let v = String::unsafe_substring(line, start=14, end=line.length())
             .trim()
-            .to_owned()
+            .to_string()
             .to_lower()
           value = Some(parse_autocrlf_value(v))
         }
@@ -679,7 +679,7 @@ fn parse_autocrlf_from_content(content : String) -> AutoCrlf? {
   let mut section = ""
   let mut value : AutoCrlf? = None
   for line_view in content.split("\n") {
-    let line = line_view.trim().to_owned()
+    let line = line_view.trim().to_string()
     if line.length() == 0 {
       continue
     }
@@ -688,7 +688,7 @@ fn parse_autocrlf_from_content(content : String) -> AutoCrlf? {
     }
     if line.has_prefix("[") && line.has_suffix("]") {
       let inner = String::unsafe_substring(line, start=1, end=line.length() - 1)
-      let inner_trim = inner.trim().to_owned()
+      let inner_trim = inner.trim().to_string()
       let section_name = match inner_trim.find(" ") {
         Some(i) => String::unsafe_substring(inner_trim, start=0, end=i)
         None => inner_trim
@@ -704,7 +704,7 @@ fn parse_autocrlf_from_content(content : String) -> AutoCrlf? {
       Some(idx) => {
         let key = String::unsafe_substring(line, start=0, end=idx)
           .trim()
-          .to_owned()
+          .to_string()
           .to_lower()
         if key != "autocrlf" {
           continue
@@ -715,7 +715,7 @@ fn parse_autocrlf_from_content(content : String) -> AutoCrlf? {
             end=line.length(),
           )
           .trim()
-          .to_owned()
+          .to_string()
           .to_lower()
         value = raw_value |> parse_autocrlf_value |> Some
       }
@@ -760,11 +760,11 @@ pub fn read_core_eol_setting(
   match @bitio.env_get("GIT_CONFIG_OVERRIDES") {
     Some(env_value) =>
       for line_view in env_value.split("\n") {
-        let line = line_view.to_owned().trim().to_owned()
+        let line = line_view.to_string().trim().to_string()
         if line.to_lower().has_prefix("core.eol=") {
           let v = String::unsafe_substring(line, start=9, end=line.length())
             .trim()
-            .to_owned()
+            .to_string()
             .to_lower()
           value = parse_eol_value(v)
         }
@@ -784,7 +784,7 @@ fn read_core_eol_from_config(
   let mut section = ""
   let mut value : EolAttr? = None
   for line_view in content.split("\n") {
-    let line = line_view.trim().to_owned()
+    let line = line_view.trim().to_string()
     if line.length() == 0 {
       continue
     }
@@ -793,7 +793,7 @@ fn read_core_eol_from_config(
     }
     if line.has_prefix("[") && line.has_suffix("]") {
       let inner = String::unsafe_substring(line, start=1, end=line.length() - 1)
-      let inner_trim = inner.trim().to_owned()
+      let inner_trim = inner.trim().to_string()
       let section_name = match inner_trim.find(" ") {
         Some(i) => String::unsafe_substring(inner_trim, start=0, end=i)
         None => inner_trim
@@ -809,7 +809,7 @@ fn read_core_eol_from_config(
       Some(idx) => {
         let key = String::unsafe_substring(line, start=0, end=idx)
           .trim()
-          .to_owned()
+          .to_string()
           .to_lower()
         if key != "eol" {
           continue
@@ -820,7 +820,7 @@ fn read_core_eol_from_config(
             end=line.length(),
           )
           .trim()
-          .to_owned()
+          .to_string()
           .to_lower()
         value = Some(parse_eol_value(raw_value))
       }
@@ -873,7 +873,7 @@ fn read_core_filemode_from_config(
   let mut section = ""
   let mut value : Bool? = None
   for line_view in content.split("\n") {
-    let line = line_view.trim().to_owned()
+    let line = line_view.trim().to_string()
     if line.length() == 0 {
       continue
     }
@@ -882,7 +882,7 @@ fn read_core_filemode_from_config(
     }
     if line.has_prefix("[") && line.has_suffix("]") {
       let inner = String::unsafe_substring(line, start=1, end=line.length() - 1)
-      let inner_trim = inner.trim().to_owned()
+      let inner_trim = inner.trim().to_string()
       let section_name = match inner_trim.find(" ") {
         Some(i) => String::unsafe_substring(inner_trim, start=0, end=i)
         None => inner_trim
@@ -897,7 +897,7 @@ fn read_core_filemode_from_config(
       Some(idx) => {
         let key = String::unsafe_substring(line, start=0, end=idx)
           .trim()
-          .to_owned()
+          .to_string()
           .to_lower()
         if key != "filemode" {
           continue
@@ -908,7 +908,7 @@ fn read_core_filemode_from_config(
             end=line.length(),
           )
           .trim()
-          .to_owned()
+          .to_string()
           .to_lower()
         if raw_value == "true" ||
           raw_value == "yes" ||
@@ -1716,14 +1716,14 @@ fn worktree_commit_subject(message : String) -> String {
 
 ///|
 fn reflog_parse_identity(identity : String) -> (String, String) {
-  let trimmed = identity.trim().to_owned()
+  let trimmed = identity.trim().to_string()
   match trimmed.find("<") {
     Some(start) =>
       match trimmed.find(">") {
         Some(end) if end > start => {
           let name = String::unsafe_substring(trimmed, start=0, end=start)
             .trim()
-            .to_owned()
+            .to_string()
           let email = String::unsafe_substring(trimmed, start=start + 1, end~)
           (if name.length() == 0 { "unknown" } else { name }, email)
         }
@@ -1869,8 +1869,8 @@ fn rm_remove_gitmodules_sections_by_path(
     }
   }
   for line_view in content.split("\n") {
-    let line = line_view.to_owned()
-    let trimmed = line.trim(chars=" \t").to_owned()
+    let line = line_view.to_string()
+    let trimmed = line.trim(chars=" \t").to_string()
     if trimmed.has_prefix("[") && trimmed.has_suffix("]") {
       flush_section()
       section_lines = [line]
@@ -2101,7 +2101,7 @@ fn mv_update_submodule_path_in_config(
   let out : Array[String] = []
   let mut in_submodule = false
   for line_view in content.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     let trimmed = line.trim()
     if trimmed.has_prefix("[") && trimmed.has_suffix("]") {
       in_submodule = trimmed.has_prefix("[submodule \"")

@@ -36,7 +36,7 @@ fn get_head_commit(
 ) -> @bit.ObjectId raise @bit.GitError {
   let head_path = git_dir + "/HEAD"
   let head_content = fs.read_file(head_path)
-  let head_str = @utf8.decode_lossy(head_content[:]).trim().to_owned()
+  let head_str = @utf8.decode_lossy(head_content[:]).trim().to_string()
   if head_str.has_prefix("ref: ") {
     let ref_name = String::unsafe_substring(
       head_str,
@@ -45,7 +45,7 @@ fn get_head_commit(
     )
     let ref_path = git_dir + "/" + ref_name
     let ref_content = fs.read_file(ref_path)
-    let ref_str = @utf8.decode_lossy(ref_content[:]).trim().to_owned()
+    let ref_str = @utf8.decode_lossy(ref_content[:]).trim().to_string()
     @bit.ObjectId::from_hex(ref_str)
   } else {
     @bit.ObjectId::from_hex(head_str)

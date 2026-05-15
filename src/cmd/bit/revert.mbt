@@ -298,7 +298,7 @@ fn extract_commit_message(data : Bytes) -> String {
   let mut in_message = false
   let msg_lines : Array[String] = []
   for line_view in text.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if in_message {
       msg_lines.push(line)
       continue

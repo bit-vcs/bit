@@ -50,19 +50,19 @@ test "rebase: start with onto rebases commits onto new base" {
     fail("expected head commit object")
   }
   let head_info = @bit.parse_commit(head_commit.data)
-  @test.assert_eq(head_info.parents.length(), 1)
+  assert_eq(head_info.parents.length(), 1)
 
   let parent_obj = db.get(fs, head_info.parents[0])
   guard parent_obj is Some(parent_commit) else {
     fail("expected parent commit object")
   }
   let parent_info = @bit.parse_commit(parent_commit.data)
-  @test.assert_eq(parent_info.parents.length(), 1)
-  @test.assert_eq(parent_info.parents[0], commit_c)
-  @test.assert_eq(fs.read_string("/repo/b.txt"), "B\n")
-  @test.assert_eq(fs.read_string("/repo/c.txt"), "C\n")
-  @test.assert_eq(fs.read_string("/repo/d.txt"), "D\n")
-  @test.assert_eq(fs.read_string("/repo/e.txt"), "E\n")
+  assert_eq(parent_info.parents.length(), 1)
+  assert_eq(parent_info.parents[0], commit_c)
+  assert_eq(fs.read_string("/repo/b.txt"), "B\n")
+  assert_eq(fs.read_string("/repo/c.txt"), "C\n")
+  assert_eq(fs.read_string("/repo/d.txt"), "D\n")
+  assert_eq(fs.read_string("/repo/e.txt"), "E\n")
 }
 
 ///|
@@ -87,10 +87,10 @@ test "rebase: start fast-forwards when HEAD is behind upstream" {
     RebaseStatus::Complete => ()
     _ => fail("expected complete rebase")
   }
-  @test.assert_eq(result.commit_id, Some(commit_b))
-  @test.assert_eq(resolve_head_commit(fs, "/repo/.git"), Some(commit_b))
-  @test.assert_eq(fs.read_string("/repo/a.txt"), "A\n")
-  @test.assert_eq(fs.read_string("/repo/b.txt"), "B\n")
+  assert_eq(result.commit_id, Some(commit_b))
+  assert_eq(resolve_head_commit(fs, "/repo/.git"), Some(commit_b))
+  assert_eq(fs.read_string("/repo/a.txt"), "A\n")
+  assert_eq(fs.read_string("/repo/b.txt"), "B\n")
 }
 
 ///|
@@ -133,6 +133,6 @@ test "rebase: start skips commit whose patch already exists upstream" {
     _ => fail("expected rebase to skip already-upstreamed patch")
   }
 
-  @test.assert_eq(resolve_head_commit(fs, "/repo/.git"), Some(upstream_head))
-  @test.assert_eq(fs.read_string("/repo/stuff"), upstream_twice)
+  assert_eq(resolve_head_commit(fs, "/repo/.git"), Some(upstream_head))
+  assert_eq(fs.read_string("/repo/stuff"), upstream_twice)
 }

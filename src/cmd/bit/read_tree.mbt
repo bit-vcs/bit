@@ -137,9 +137,9 @@ fn plumb_resolve_to_tree(
           // Parse tag and follow to target
           let text = decode_bytes(obj.data)
           for line_view in text.split("\n") {
-            let line = line_view.to_owned()
+            let line = line_view.to_string()
             if line.has_prefix("object ") {
-              let target_hex = line[7:].to_owned()
+              let target_hex = line[7:].to_string()
               let target = @bitcore.ObjectId::from_hex(target_hex)
               return plumb_resolve_to_tree(fs, git_dir, target)
             }

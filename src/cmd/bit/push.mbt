@@ -2073,7 +2073,7 @@ fn push_detect_relay_session(remote_url : String) -> (String, String)? {
 fn push_normalize_optional_value(value : String?) -> String? {
   match value {
     Some(raw) => {
-      let normalized = raw.trim(chars=" \n\r\t").to_owned()
+      let normalized = raw.trim(chars=" \n\r\t").to_string()
       if normalized.length() == 0 {
         None
       } else {
@@ -2342,7 +2342,7 @@ fn replace_tree_at_path(
   let path_parts : Array[String] = path
     .split("/")
     .filter(s => s.length() > 0)
-    .map(s => s.to_owned())
+    .map(s => s.to_string())
     .collect()
   if path_parts.length() == 0 {
     return new_subtree

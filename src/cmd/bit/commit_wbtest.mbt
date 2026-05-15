@@ -13,7 +13,7 @@ async fn commit_wbtest_run_git(
     inherit_env=true,
     cwd~,
   )
-  @test.assert_eq(code, 0)
+  assert_eq(code, 0)
 }
 
 ///|
@@ -59,7 +59,7 @@ async fn signing_wbtest_write_fake_gpg(
     "  '-----END PGP SIGNATURE-----'\n",
   )
   let chmod_code = @process.run("chmod", ["+x", path], inherit_env=true)
-  @test.assert_eq(chmod_code, 0)
+  assert_eq(chmod_code, 0)
 }
 
 ///|
@@ -80,7 +80,7 @@ async fn signing_wbtest_write_fake_ssh_keygen(
     "  '-----END SSH SIGNATURE-----' > \"${last}.sig\"\n",
   )
   let chmod_code = @process.run("chmod", ["+x", path], inherit_env=true)
-  @test.assert_eq(chmod_code, 0)
+  assert_eq(chmod_code, 0)
 }
 
 ///|
@@ -117,7 +117,7 @@ test "commit: no-edit prefers SQUASH_MSG and appends MERGE_MSG comments" {
   fs.write_string("/repo/.git/SQUASH_MSG", "squash body\n")
   fs.write_string("/repo/.git/MERGE_MSG", "\n# Conflicts:\n#\tfile\n")
   let msg = resolve_no_edit_commit_message(fs, "/repo", "/repo/.git", false)
-  @test.assert_eq(msg, Some("squash body\n\n# Conflicts:\n#\tfile\n"))
+  assert_eq(msg, Some("squash body\n\n# Conflicts:\n#\tfile\n"))
 }
 
 ///|
@@ -130,7 +130,7 @@ test "commit: no-edit prefers MERGE_MSG when MERGE_HEAD exists" {
   fs.write_string("/repo/.git/SQUASH_MSG", "squash body\n")
   fs.write_string("/repo/.git/MERGE_MSG", "merge body\n")
   let msg = resolve_no_edit_commit_message(fs, "/repo", "/repo/.git", false)
-  @test.assert_eq(msg, Some("merge body\n"))
+  assert_eq(msg, Some("merge body\n"))
 }
 
 ///|
@@ -141,9 +141,9 @@ test "commit: read MERGE_HEAD supports multiple parents" {
     "/repo/.git/MERGE_HEAD", "1111111111111111111111111111111111111111\n2222222222222222222222222222222222222222\n",
   )
   let merge_heads = read_merge_head_ids(fs, "/repo/.git")
-  @test.assert_eq(merge_heads.length(), 2)
-  @test.assert_eq(merge_heads[0].to_hex(), "1111111111111111111111111111111111111111")
-  @test.assert_eq(merge_heads[1].to_hex(), "2222222222222222222222222222222222222222")
+  assert_eq(merge_heads.length(), 2)
+  assert_eq(merge_heads[0].to_hex(), "1111111111111111111111111111111111111111")
+  assert_eq(merge_heads[1].to_hex(), "2222222222222222222222222222222222222222")
 }
 
 ///|
@@ -158,10 +158,10 @@ test "commit: storage runtime routing handles normal and -a mode" {
 
 ///|
 test "commit: cleanup mode validation honors verbatim" {
-  @test.assert_eq(commit_normalize_cleanup_mode("verbatim"), Some("verbatim"))
-  @test.assert_eq(commit_normalize_cleanup_mode("non-existent"), None)
-  @test.assert_eq(commit_prepare_message_for_validation("\n", "verbatim"), "\n")
-  @test.assert_eq(commit_prepare_message_for_validation("\n", "default"), "")
+  assert_eq(commit_normalize_cleanup_mode("verbatim"), Some("verbatim"))
+  assert_eq(commit_normalize_cleanup_mode("non-existent"), None)
+  assert_eq(commit_prepare_message_for_validation("\n", "verbatim"), "\n")
+  assert_eq(commit_prepare_message_for_validation("\n", "default"), "")
 }
 
 ///|
@@ -229,7 +229,7 @@ async test "commit: pathspec staging updates submodule gitlink entry" {
 
   let after_entries = @bitlib.read_index_entries(fs, super_dir + "/.git")
   let after_submodule = commit_wbtest_find_entry(after_entries, "submodule")
-  @test.assert_eq(after_submodule.id, sub_head)
+  assert_eq(after_submodule.id, sub_head)
 
   cleanup_tree(fs, root)
 }
@@ -370,8 +370,8 @@ async test "commit: merge state commit records MERGE_HEAD as second parent" {
   let db = @bitlib.ObjectDb::load_lazy(fs, git_dir)
   let commit_obj = db.get(fs, head).unwrap()
   let info = @bitcore.parse_commit(commit_obj.data)
-  @test.assert_eq(info.parents.length(), 2)
-  @test.assert_eq(info.parents[1].to_hex(), merge_head)
+  assert_eq(info.parents.length(), 2)
+  assert_eq(info.parents[1].to_hex(), merge_head)
   assert_false(fs.is_file(root + "/.git/MERGE_HEAD"))
 
   cleanup_tree(fs, root)

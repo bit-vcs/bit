@@ -5,7 +5,7 @@ test "remote-path: resolve helper URL with absolute local path" {
   let resolved = resolve_local_repo_path(
     fs, "/work/client", "testgit::/work/server",
   )
-  @test.assert_eq(resolved, Some("/work/server"))
+  assert_eq(resolved, Some("/work/server"))
 }
 
 ///|
@@ -15,7 +15,7 @@ test "remote-path: resolve helper URL with relative local path" {
   let resolved = resolve_local_repo_path(
     fs, "/work/client", "testgit::../server",
   )
-  @test.assert_eq(resolved, Some("/work/server"))
+  assert_eq(resolved, Some("/work/server"))
 }
 
 ///|
@@ -24,7 +24,7 @@ test "remote-path: ignore non-local scheme URL" {
   let resolved = resolve_local_repo_path(
     fs, "/work/client", "broken://example.com/repo.git",
   )
-  @test.assert_eq(resolved, None)
+  assert_eq(resolved, None)
 }
 
 ///|
@@ -32,5 +32,5 @@ test "remote-path: prefer root-relative resolution for dot-dot path" {
   let fs = @bit.TestFs::new()
   fs.mkdir_p("/work/repo/.git/objects")
   let resolved = resolve_local_repo_path(fs, "/work/repo/testrepo", "..")
-  @test.assert_eq(resolved, Some("/work/repo"))
+  assert_eq(resolved, Some("/work/repo"))
 }

@@ -25,7 +25,7 @@ fn ensure_dir(path : String) -> Unit raise @bit.GitError {
   let parts = path.split("/").collect()
   let mut current = ""
   for part_view in parts {
-    let part = part_view.to_owned()
+    let part = part_view.to_string()
     if part.length() == 0 {
       current = "/"
       continue

@@ -1,66 +1,66 @@
 ///|
 test "hub parser: parse_pr_state handles known and unknown values" {
-  @test.assert_eq(parse_pr_state("open"), Some(@hub.PrState::Open))
-  @test.assert_eq(parse_pr_state("closed"), Some(@hub.PrState::Closed))
-  @test.assert_eq(parse_pr_state("merged"), Some(@hub.PrState::Merged))
-  @test.assert_eq(parse_pr_state("draft"), None)
+  assert_eq(parse_pr_state("open"), Some(@hub.PrState::Open))
+  assert_eq(parse_pr_state("closed"), Some(@hub.PrState::Closed))
+  assert_eq(parse_pr_state("merged"), Some(@hub.PrState::Merged))
+  assert_eq(parse_pr_state("draft"), None)
 }
 
 ///|
 test "hub parser: parse_issue_state handles known and unknown values" {
-  @test.assert_eq(parse_issue_state("open"), Some(@hub.IssueState::Open))
-  @test.assert_eq(parse_issue_state("closed"), Some(@hub.IssueState::Closed))
-  @test.assert_eq(parse_issue_state("draft"), None)
+  assert_eq(parse_issue_state("open"), Some(@hub.IssueState::Open))
+  assert_eq(parse_issue_state("closed"), Some(@hub.IssueState::Closed))
+  assert_eq(parse_issue_state("draft"), None)
 }
 
 ///|
 test "hub parser: parse_work_item_state handles known and unknown values" {
-  @test.assert_eq(parse_work_item_state("open"), Some(@hub.WorkItemState::Open))
-  @test.assert_eq(parse_work_item_state("closed"), Some(@hub.WorkItemState::Closed))
-  @test.assert_eq(parse_work_item_state("merged"), Some(@hub.WorkItemState::Merged))
-  @test.assert_eq(parse_work_item_state("draft"), None)
+  assert_eq(parse_work_item_state("open"), Some(@hub.WorkItemState::Open))
+  assert_eq(parse_work_item_state("closed"), Some(@hub.WorkItemState::Closed))
+  assert_eq(parse_work_item_state("merged"), Some(@hub.WorkItemState::Merged))
+  assert_eq(parse_work_item_state("draft"), None)
 }
 
 ///|
 test "hub parser: parse_work_item_kind handles known and unknown values" {
-  @test.assert_eq(parse_work_item_kind("issue"), Some(@hub.WorkItemKind::Issue))
-  @test.assert_eq(parse_work_item_kind("pr"), Some(@hub.WorkItemKind::PullRequest))
-  @test.assert_eq(
+  assert_eq(parse_work_item_kind("issue"), Some(@hub.WorkItemKind::Issue))
+  assert_eq(parse_work_item_kind("pr"), Some(@hub.WorkItemKind::PullRequest))
+  assert_eq(
     parse_work_item_kind("pull-request"),
     Some(@hub.WorkItemKind::PullRequest),
   )
-  @test.assert_eq(parse_work_item_kind("comment"), None)
+  assert_eq(parse_work_item_kind("comment"), None)
 }
 
 ///|
 test "hub parser: parse_review_verdict handles known and unknown values" {
-  @test.assert_eq(
+  assert_eq(
     parse_review_verdict("approved"),
     Some(@hub.ReviewVerdict::Approved),
   )
-  @test.assert_eq(parse_review_verdict("comment"), Some(@hub.ReviewVerdict::Comment))
-  @test.assert_eq(
+  assert_eq(parse_review_verdict("comment"), Some(@hub.ReviewVerdict::Comment))
+  assert_eq(
     parse_review_verdict("request-changes"),
     Some(@hub.ReviewVerdict::RequestChanges),
   )
-  @test.assert_eq(parse_review_verdict("reject"), None)
+  assert_eq(parse_review_verdict("reject"), None)
 }
 
 ///|
 test "hub parser: parse_review_verdict_flag handles gh-style flags" {
-  @test.assert_eq(
+  assert_eq(
     parse_review_verdict_flag("--approve"),
     Some(@hub.ReviewVerdict::Approved),
   )
-  @test.assert_eq(
+  assert_eq(
     parse_review_verdict_flag("--comment"),
     Some(@hub.ReviewVerdict::Comment),
   )
-  @test.assert_eq(
+  assert_eq(
     parse_review_verdict_flag("--request-changes"),
     Some(@hub.ReviewVerdict::RequestChanges),
   )
-  @test.assert_eq(parse_review_verdict_flag("--unknown"), None)
+  assert_eq(parse_review_verdict_flag("--unknown"), None)
 }
 
 ///|
@@ -105,92 +105,92 @@ test "hub parser: parse_merge_strategy_flag handles gh-style flags" {
 
 ///|
 test "hub parser: normalize pr subcommand handles gh aliases" {
-  @test.assert_eq(normalize_hub_pr_subcommand("view"), "get")
-  @test.assert_eq(normalize_hub_pr_subcommand("edit"), "update")
-  @test.assert_eq(normalize_hub_pr_subcommand("proposal"), "proposals")
-  @test.assert_eq(normalize_hub_pr_subcommand("list"), "list")
+  assert_eq(normalize_hub_pr_subcommand("view"), "get")
+  assert_eq(normalize_hub_pr_subcommand("edit"), "update")
+  assert_eq(normalize_hub_pr_subcommand("proposal"), "proposals")
+  assert_eq(normalize_hub_pr_subcommand("list"), "list")
 }
 
 ///|
 test "hub parser: normalize issue subcommand handles gh aliases" {
-  @test.assert_eq(normalize_hub_issue_subcommand("view"), "get")
-  @test.assert_eq(normalize_hub_issue_subcommand("edit"), "update")
-  @test.assert_eq(normalize_hub_issue_subcommand("list"), "list")
+  assert_eq(normalize_hub_issue_subcommand("view"), "get")
+  assert_eq(normalize_hub_issue_subcommand("edit"), "update")
+  assert_eq(normalize_hub_issue_subcommand("list"), "list")
 }
 
 ///|
 test "hub parser: normalize work-item subcommand handles aliases" {
-  @test.assert_eq(normalize_hub_work_item_subcommand("view"), "get")
-  @test.assert_eq(normalize_hub_work_item_subcommand("list"), "list")
+  assert_eq(normalize_hub_work_item_subcommand("view"), "get")
+  assert_eq(normalize_hub_work_item_subcommand("list"), "list")
 }
 
 ///|
 test "hub parser: resolve comment subcommand defaults to add" {
-  @test.assert_eq(resolve_hub_comment_subcommand("add"), "add")
-  @test.assert_eq(resolve_hub_comment_subcommand("list"), "list")
-  @test.assert_eq(resolve_hub_comment_subcommand("123"), "add")
+  assert_eq(resolve_hub_comment_subcommand("add"), "add")
+  assert_eq(resolve_hub_comment_subcommand("list"), "list")
+  assert_eq(resolve_hub_comment_subcommand("123"), "add")
 }
 
 ///|
 test "hub parser: resolve review subcommand defaults to submit" {
-  @test.assert_eq(resolve_hub_review_subcommand("submit"), "submit")
-  @test.assert_eq(resolve_hub_review_subcommand("list"), "list")
-  @test.assert_eq(resolve_hub_review_subcommand("123"), "submit")
+  assert_eq(resolve_hub_review_subcommand("submit"), "submit")
+  assert_eq(resolve_hub_review_subcommand("list"), "list")
+  assert_eq(resolve_hub_review_subcommand("123"), "submit")
 }
 
 ///|
 test "hub parser: parse_pr_state_flag handles gh-style flags" {
-  @test.assert_eq(parse_pr_state_flag("--open"), Some(@hub.PrState::Open))
-  @test.assert_eq(parse_pr_state_flag("--closed"), Some(@hub.PrState::Closed))
-  @test.assert_eq(parse_pr_state_flag("--merged"), Some(@hub.PrState::Merged))
-  @test.assert_eq(parse_pr_state_flag("--all"), None)
+  assert_eq(parse_pr_state_flag("--open"), Some(@hub.PrState::Open))
+  assert_eq(parse_pr_state_flag("--closed"), Some(@hub.PrState::Closed))
+  assert_eq(parse_pr_state_flag("--merged"), Some(@hub.PrState::Merged))
+  assert_eq(parse_pr_state_flag("--all"), None)
 }
 
 ///|
 test "hub parser: parse_issue_state_flag handles gh-style flags" {
-  @test.assert_eq(parse_issue_state_flag("--open"), Some(@hub.IssueState::Open))
-  @test.assert_eq(parse_issue_state_flag("--closed"), Some(@hub.IssueState::Closed))
-  @test.assert_eq(parse_issue_state_flag("--all"), None)
+  assert_eq(parse_issue_state_flag("--open"), Some(@hub.IssueState::Open))
+  assert_eq(parse_issue_state_flag("--closed"), Some(@hub.IssueState::Closed))
+  assert_eq(parse_issue_state_flag("--all"), None)
 }
 
 ///|
 test "hub parser: parse_work_item_state_flag handles flags" {
-  @test.assert_eq(
+  assert_eq(
     parse_work_item_state_flag("--open"),
     Some(@hub.WorkItemState::Open),
   )
-  @test.assert_eq(
+  assert_eq(
     parse_work_item_state_flag("--closed"),
     Some(@hub.WorkItemState::Closed),
   )
-  @test.assert_eq(
+  assert_eq(
     parse_work_item_state_flag("--merged"),
     Some(@hub.WorkItemState::Merged),
   )
-  @test.assert_eq(parse_work_item_state_flag("--all"), None)
+  assert_eq(parse_work_item_state_flag("--all"), None)
 }
 
 ///|
 test "hub parser: parse_work_item_kind_flag handles flags" {
-  @test.assert_eq(
+  assert_eq(
     parse_work_item_kind_flag("--issue"),
     Some(@hub.WorkItemKind::Issue),
   )
-  @test.assert_eq(
+  assert_eq(
     parse_work_item_kind_flag("--pr"),
     Some(@hub.WorkItemKind::PullRequest),
   )
-  @test.assert_eq(parse_work_item_kind_flag("--all"), None)
+  assert_eq(parse_work_item_kind_flag("--all"), None)
 }
 
 ///|
 test "hub parser: parse_head_branch_name handles symbolic and detached head" {
-  @test.assert_eq(parse_head_branch_name("ref: refs/heads/main\n"), Some("main"))
-  @test.assert_eq(
+  assert_eq(parse_head_branch_name("ref: refs/heads/main\n"), Some("main"))
+  assert_eq(
     parse_head_branch_name("ref: refs/heads/feature/topic\n"),
     Some("feature/topic"),
   )
-  @test.assert_eq(
+  assert_eq(
     parse_head_branch_name("9fceb02f5f7a6f5a5be74e5f7d2d9d31b2f9f0f5\n"),
     None,
   )
@@ -199,13 +199,13 @@ test "hub parser: parse_head_branch_name handles symbolic and detached head" {
 ///|
 test "hub parser: parse_hub_pr_list_options handles gh-style flags and limit" {
   let opts = parse_hub_pr_list_options(["--closed", "--limit", "5"])
-  @test.assert_eq(opts.limit, Some(5))
+  assert_eq(opts.limit, Some(5))
   match opts.state {
     Some(@hub.WorkItemState::Closed) => ()
     _ => fail("expected closed state")
   }
   let opts2 = parse_hub_pr_list_options(["-L", "3", "--open"])
-  @test.assert_eq(opts2.limit, Some(3))
+  assert_eq(opts2.limit, Some(3))
   match opts2.state {
     Some(@hub.WorkItemState::Open) => ()
     _ => fail("expected open state")
@@ -215,13 +215,13 @@ test "hub parser: parse_hub_pr_list_options handles gh-style flags and limit" {
 ///|
 test "hub parser: parse_hub_issue_list_options handles gh-style flags and limit" {
   let opts = parse_hub_issue_list_options(["--closed", "--limit", "7"])
-  @test.assert_eq(opts.limit, Some(7))
+  assert_eq(opts.limit, Some(7))
   match opts.state {
     Some(@hub.WorkItemState::Closed) => ()
     _ => fail("expected closed state")
   }
   let opts2 = parse_hub_issue_list_options(["-L", "2", "--open"])
-  @test.assert_eq(opts2.limit, Some(2))
+  assert_eq(opts2.limit, Some(2))
   match opts2.state {
     Some(@hub.WorkItemState::Open) => ()
     _ => fail("expected open state")
@@ -233,7 +233,7 @@ test "hub parser: parse_hub_work_item_list_options handles filters and limit" {
   let opts = parse_hub_work_item_list_options([
     "--closed", "--kind", "issue", "--limit", "4",
   ])
-  @test.assert_eq(opts.limit, Some(4))
+  assert_eq(opts.limit, Some(4))
   match opts.state {
     Some(@hub.WorkItemState::Closed) => ()
     _ => fail("expected closed state")
@@ -243,7 +243,7 @@ test "hub parser: parse_hub_work_item_list_options handles filters and limit" {
     _ => fail("expected issue kind")
   }
   let opts2 = parse_hub_work_item_list_options(["-L", "2", "--pr", "--open"])
-  @test.assert_eq(opts2.limit, Some(2))
+  assert_eq(opts2.limit, Some(2))
   match opts2.kind {
     Some(@hub.WorkItemKind::PullRequest) => ()
     _ => fail("expected pull request kind")
@@ -302,12 +302,12 @@ async test "hub parser: parse_hub_pr_create_options accepts positional source/ta
     ["--title", "Add feature", "feature", "main"],
     "hub pr create",
   )
-  @test.assert_eq(options.title, "Add feature")
-  @test.assert_eq(options.body, "")
-  @test.assert_eq(options.source_branch, "feature")
-  @test.assert_eq(options.target_branch, "main")
-  @test.assert_eq(options.source_repo, None)
-  @test.assert_eq(options.source_ref, None)
+  assert_eq(options.title, "Add feature")
+  assert_eq(options.body, "")
+  assert_eq(options.source_branch, "feature")
+  assert_eq(options.target_branch, "main")
+  assert_eq(options.source_repo, None)
+  assert_eq(options.source_ref, None)
 }
 
 ///|
@@ -363,7 +363,7 @@ async test "hub pr review submit: --commit requires a value" {
 ///|
 test "hub dump parser: defaults" {
   let opts = parse_hub_dump_options([])
-  @test.assert_eq(opts.prefix, "hub/")
+  assert_eq(opts.prefix, "hub/")
   assert_false(opts.raw)
   assert_false(opts.include_deleted)
 }
@@ -373,11 +373,11 @@ test "hub dump parser: options and positional prefix" {
   let opts1 = parse_hub_dump_options([
     "--prefix", "hub/pr/", "--raw", "--include-deleted",
   ])
-  @test.assert_eq(opts1.prefix, "hub/pr/")
+  assert_eq(opts1.prefix, "hub/pr/")
   assert_true(opts1.raw)
   assert_true(opts1.include_deleted)
   let opts2 = parse_hub_dump_options(["hub/issue/"])
-  @test.assert_eq(opts2.prefix, "hub/issue/")
+  assert_eq(opts2.prefix, "hub/issue/")
   assert_false(opts2.raw)
   assert_false(opts2.include_deleted)
 }
@@ -431,7 +431,7 @@ test "hub search parser: defaults" {
   assert_true(hub_search_has_type(opts.types, HubSearchType::IssueComment))
   assert_true(opts.state is None)
   assert_true(opts.author is None)
-  @test.assert_eq(opts.labels.length(), 0)
+  assert_eq(opts.labels.length(), 0)
   assert_true(opts.limit is None)
 }
 
@@ -442,18 +442,18 @@ test "hub search parser: parse query and filters" {
     "--limit", "3", "hello", "world",
   ])
   guard opts.query is Some(q) else { fail("expected query") }
-  @test.assert_eq(q, "hello world")
-  @test.assert_eq(opts.types.length(), 2)
+  assert_eq(q, "hello world")
+  assert_eq(opts.types.length(), 2)
   assert_true(hub_search_has_type(opts.types, HubSearchType::Pr))
   assert_true(hub_search_has_type(opts.types, HubSearchType::Issue))
   guard opts.state is Some(state) else { fail("expected state") }
-  @test.assert_eq(state, "open")
+  assert_eq(state, "open")
   guard opts.author is Some(author) else { fail("expected author") }
-  @test.assert_eq(author, "alice")
-  @test.assert_eq(opts.labels.length(), 1)
-  @test.assert_eq(opts.labels[0], "bug")
+  assert_eq(author, "alice")
+  assert_eq(opts.labels.length(), 1)
+  assert_eq(opts.labels[0], "bug")
   guard opts.limit is Some(limit) else { fail("expected limit") }
-  @test.assert_eq(limit, 3)
+  assert_eq(limit, 3)
 }
 
 ///|
@@ -646,14 +646,14 @@ test "hub parser: parse_gh_prs captures source repo/ref" {
     #|  "labels": []
     #|}]
   let prs = parse_gh_prs(payload)
-  @test.assert_eq(prs.length(), 1)
+  assert_eq(prs.length(), 1)
   let pr = prs[0]
   guard pr.source_repo() is Some(source_repo) else {
     fail("missing source_repo")
   }
-  @test.assert_eq(source_repo, "contrib/bit")
+  assert_eq(source_repo, "contrib/bit")
   guard pr.source_ref() is Some(source_ref) else { fail("missing source_ref") }
-  @test.assert_eq(source_ref, "refs/heads/feature")
+  assert_eq(source_ref, "refs/heads/feature")
 }
 
 ///|
@@ -673,7 +673,7 @@ test "hub parser: parse_gh_issues rejects non-array JSON" {
 ///|
 test "hub merge policy parser: defaults without explicit values" {
   let policy = parse_hub_merge_policy_toml("")
-  @test.assert_eq(policy.required_approvals(), 0)
+  assert_eq(policy.required_approvals(), 0)
   assert_true(policy.allow_request_changes())
   assert_false(policy.require_signed_records())
 }
@@ -687,12 +687,12 @@ test "hub merge policy parser: parse merge section values" {
     #|require_signed_records = true
     #|required_workflows = ["test", "lint"]
   let policy = parse_hub_merge_policy_toml(policy_text)
-  @test.assert_eq(policy.required_approvals(), 2)
+  assert_eq(policy.required_approvals(), 2)
   assert_false(policy.allow_request_changes())
   assert_true(policy.require_signed_records())
-  @test.assert_eq(policy.required_workflows().length(), 2)
-  @test.assert_eq(policy.required_workflows()[0], "test")
-  @test.assert_eq(policy.required_workflows()[1], "lint")
+  assert_eq(policy.required_workflows().length(), 2)
+  assert_eq(policy.required_workflows()[0], "test")
+  assert_eq(policy.required_workflows()[1], "lint")
 }
 
 ///|
@@ -737,10 +737,10 @@ test "hub sync parser: parse remote and auth/signing overrides" {
     ],
     default_remote_url=Some("https://origin.example/repo.git"),
   )
-  @test.assert_eq(options.remote_url, Some("relay+http://127.0.0.1:8787"))
-  @test.assert_eq(options.auth_token, Some("token-1"))
-  @test.assert_eq(options.signing_key, Some("k1"))
-  @test.assert_eq(options.require_signed, Some(true))
+  assert_eq(options.remote_url, Some("relay+http://127.0.0.1:8787"))
+  assert_eq(options.auth_token, Some("token-1"))
+  assert_eq(options.signing_key, Some("k1"))
+  assert_eq(options.require_signed, Some(true))
 }
 
 ///|
@@ -749,10 +749,10 @@ test "hub sync parser: defaults to configured remote and allows unsigned overrid
     ["--allow-unsigned"],
     default_remote_url=Some("https://origin.example/repo.git"),
   )
-  @test.assert_eq(options.remote_url, Some("https://origin.example/repo.git"))
-  @test.assert_eq(options.require_signed, Some(false))
-  @test.assert_eq(options.auth_token, None)
-  @test.assert_eq(options.signing_key, None)
+  assert_eq(options.remote_url, Some("https://origin.example/repo.git"))
+  assert_eq(options.require_signed, Some(false))
+  assert_eq(options.auth_token, None)
+  assert_eq(options.signing_key, None)
 }
 
 ///|
@@ -761,7 +761,7 @@ test "hub sync parser: parses conflict policy option" {
     ["--conflict-policy", "tombstone-wins"],
     default_remote_url=Some("https://origin.example/repo.git"),
   )
-  @test.assert_eq(options.remote_url, Some("https://origin.example/repo.git"))
+  assert_eq(options.remote_url, Some("https://origin.example/repo.git"))
   match options.conflict_policy {
     Some(@hub.RecordMergePolicy::TombstoneWins) => ()
     _ => fail("expected tombstone-wins policy")
@@ -787,8 +787,8 @@ test "hub sync parser: --sign-key alias parses inline value" {
   let options = parse_hub_sync_runtime_options([
     "--sign-key=key-1", "relay+http://127.0.0.1:8787",
   ])
-  @test.assert_eq(options.signing_key, Some("key-1"))
-  @test.assert_eq(options.remote_url, Some("relay+http://127.0.0.1:8787"))
+  assert_eq(options.signing_key, Some("key-1"))
+  assert_eq(options.remote_url, Some("relay+http://127.0.0.1:8787"))
 }
 
 ///|
@@ -797,11 +797,11 @@ test "hub issue sync push parser: parses force remote" {
     "--github", "--repo", "org/repo", "--apply", "--include-prs", "--comments", "full",
     "--force-remote",
   ])
-  @test.assert_eq(options.repo, Some("org/repo"))
+  assert_eq(options.repo, Some("org/repo"))
   assert_true(options.github_flag)
   assert_true(options.apply)
   assert_true(options.include_prs)
-  @test.assert_eq(options.comments_mode, "full")
+  assert_eq(options.comments_mode, "full")
   assert_true(options.force_remote)
 }
 
@@ -811,14 +811,14 @@ test "hub issue sync bidirectional parser: parses force remote" {
     "--github", "--repo=org/repo", "--apply", "--conflict", "tombstone-wins", "--comments=full",
     "--include-prs", "--since", "2026-01-01T00:00:00Z", "--state", "all", "--force-remote",
   ])
-  @test.assert_eq(options.repo, Some("org/repo"))
+  assert_eq(options.repo, Some("org/repo"))
   assert_true(options.github_flag)
   assert_true(options.apply)
-  @test.assert_eq(options.conflict, "tombstone-wins")
-  @test.assert_eq(options.comments_mode, "full")
+  assert_eq(options.conflict, "tombstone-wins")
+  assert_eq(options.comments_mode, "full")
   assert_true(options.include_prs)
-  @test.assert_eq(options.since, "2026-01-01T00:00:00Z")
-  @test.assert_eq(options.state, "all")
+  assert_eq(options.since, "2026-01-01T00:00:00Z")
+  assert_eq(options.state, "all")
   assert_true(options.force_remote)
 }
 
@@ -845,10 +845,10 @@ test "hub sync clone announce parser: parse clone url and runtime options" {
     ],
     default_remote_url=Some("https://origin.example/repo.git"),
   )
-  @test.assert_eq(options.clone_url, "http://127.0.0.1:9418/repo.git")
-  @test.assert_eq(options.repo, Some("repo-a"))
-  @test.assert_eq(options.runtime.remote_url, Some("relay+http://127.0.0.1:8787"))
-  @test.assert_eq(options.runtime.auth_token, Some("token-1"))
+  assert_eq(options.clone_url, "http://127.0.0.1:9418/repo.git")
+  assert_eq(options.repo, Some("repo-a"))
+  assert_eq(options.runtime.remote_url, Some("relay+http://127.0.0.1:8787"))
+  assert_eq(options.runtime.auth_token, Some("token-1"))
 }
 
 ///|
@@ -877,8 +877,8 @@ test "hub sync clone peers parser: include-self and runtime options" {
     default_remote_url=Some("https://origin.example/repo.git"),
   )
   assert_true(options.include_self)
-  @test.assert_eq(options.runtime.remote_url, Some("relay+https://relay.example.com"))
-  @test.assert_eq(options.runtime.auth_token, Some("token-2"))
+  assert_eq(options.runtime.remote_url, Some("relay+https://relay.example.com"))
+  assert_eq(options.runtime.auth_token, Some("token-2"))
 }
 
 ///|
@@ -889,9 +889,9 @@ test "hub sync issue-url parser: parse room/token and remote" {
     ],
     default_remote_url=Some("relay+https://origin.example"),
   )
-  @test.assert_eq(options.remote_url, Some("relay+https://relay.example.com"))
-  @test.assert_eq(options.room, Some("team-a"))
-  @test.assert_eq(options.room_token, Some("token-1"))
+  assert_eq(options.remote_url, Some("relay+https://relay.example.com"))
+  assert_eq(options.room, Some("team-a"))
+  assert_eq(options.room_token, Some("token-1"))
 }
 
 ///|
@@ -935,7 +935,7 @@ test "hub sync issue-url builder: adds slash before query at root remote" {
     room: Some("team-a"),
     room_token: Some("token-1"),
   })
-  @test.assert_eq(
+  assert_eq(
     url, "relay+https://relay.example.com/?room=team-a&room_token=token-1",
   )
 }
@@ -949,7 +949,7 @@ test "hub notify: select_notify_records filters notify-only records" {
     "hub/proposal/pr/p1/meta", "pr-proposal", "proposal", "node-b", 2L,
   )
   let selected = select_notify_records([canonical, proposal])
-  @test.assert_eq(selected.length(), 1)
+  assert_eq(selected.length(), 1)
   assert_true(selected.contains("hub/proposal/pr/p1/meta"))
 }
 
@@ -967,9 +967,9 @@ test "hub notify: collect_changed_notify_records detects new and updated" {
     "hub/proposal/pr/p2/meta", "pr-proposal", "created", "node-b", 3L,
   )
   let changed = collect_changed_notify_records(before, after)
-  @test.assert_eq(changed.length(), 2)
-  @test.assert_eq(changed[0].key, "hub/proposal/pr/p1/meta")
-  @test.assert_eq(changed[1].key, "hub/proposal/pr/p2/meta")
+  assert_eq(changed.length(), 2)
+  assert_eq(changed[0].key, "hub/proposal/pr/p1/meta")
+  assert_eq(changed[1].key, "hub/proposal/pr/p2/meta")
 }
 
 ///|
@@ -999,7 +999,7 @@ test "hub notify: format_hub_notify_message handles hub.pr.proposal" {
   assert_true(message.contains("hub.pr.proposal"))
   assert_true(message.contains("#p-1"))
   assert_true(message.contains("External Proposal"))
-  @test.assert_eq(
+  assert_eq(
     format_hub_notify_message("hub.other", record),
     "[hub.notify] hub.other key=hub/proposal/pr/p-1/meta",
   )
@@ -1097,23 +1097,23 @@ test "hub issue list: collect_issue_list_lines shows top-level counts and tree" 
   let issues = [parent, child, grandchild, sibling]
 
   let top_level = collect_issue_list_lines(issues, false, false, None)
-  @test.assert_eq(top_level.length(), 2)
+  assert_eq(top_level.length(), 2)
   assert_true(top_level[0].contains("#i-parent"))
   assert_true(top_level[0].contains("(sub: 1)"))
   assert_true(top_level[1].contains("#i-sibling"))
 
   let flat = collect_issue_list_lines(issues, true, false, None)
-  @test.assert_eq(flat.length(), 4)
+  assert_eq(flat.length(), 4)
   assert_true(flat[1].contains("parent: i-parent"))
   assert_true(flat[1].contains("sub: 1"))
   assert_true(flat[2].contains("parent: i-child"))
 
   let tree = collect_issue_list_lines(issues, false, true, None)
-  @test.assert_eq(tree.length(), 4)
-  @test.assert_eq(tree[0], "#i-parent [open] Parent issue (sub: 1)")
-  @test.assert_eq(tree[1], "  #i-child [open] Child issue (sub: 1)")
-  @test.assert_eq(tree[2], "    #i-grandchild [open] Grandchild issue")
-  @test.assert_eq(tree[3], "#i-sibling [open] Sibling issue")
+  assert_eq(tree.length(), 4)
+  assert_eq(tree[0], "#i-parent [open] Parent issue (sub: 1)")
+  assert_eq(tree[1], "  #i-child [open] Child issue (sub: 1)")
+  assert_eq(tree[2], "    #i-grandchild [open] Grandchild issue")
+  assert_eq(tree[3], "#i-sibling [open] Sibling issue")
 
   let child_only = collect_issue_list_lines(
     issues,
@@ -1121,9 +1121,9 @@ test "hub issue list: collect_issue_list_lines shows top-level counts and tree" 
     true,
     Some("i-parent"),
   )
-  @test.assert_eq(child_only.length(), 2)
-  @test.assert_eq(child_only[0], "#i-child [open] Child issue (sub: 1)")
-  @test.assert_eq(child_only[1], "  #i-grandchild [open] Grandchild issue")
+  assert_eq(child_only.length(), 2)
+  assert_eq(child_only[0], "#i-child [open] Child issue (sub: 1)")
+  assert_eq(child_only[1], "  #i-grandchild [open] Grandchild issue")
 }
 
 ///|
@@ -1137,11 +1137,11 @@ test "hub init: parse approval accepts only yes-like answers" {
 
 ///|
 test "hub init: parse prompt override handles force on off and invalid" {
-  @test.assert_eq(parse_hub_init_prompt_override("1"), Some(true))
-  @test.assert_eq(parse_hub_init_prompt_override("yes"), Some(true))
-  @test.assert_eq(parse_hub_init_prompt_override("0"), Some(false))
-  @test.assert_eq(parse_hub_init_prompt_override("No"), Some(false))
-  @test.assert_eq(parse_hub_init_prompt_override("maybe"), None)
+  assert_eq(parse_hub_init_prompt_override("1"), Some(true))
+  assert_eq(parse_hub_init_prompt_override("yes"), Some(true))
+  assert_eq(parse_hub_init_prompt_override("0"), Some(false))
+  assert_eq(parse_hub_init_prompt_override("No"), Some(false))
+  assert_eq(parse_hub_init_prompt_override("maybe"), None)
 }
 
 ///|

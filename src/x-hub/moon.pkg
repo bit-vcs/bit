@@ -9,7 +9,6 @@ import {
 
 import {
   "mizchi/bit/lib" @lib,
-  "moonbitlang/core/test" @test,
 } for "test"
 
 warnings = "-24-29"
@@ -38,7 +37,3 @@ options(
     "sync_wbtest.mbt": [ "native" ],
   },
 )
-
-import {
-  "moonbitlang/core/test" @test,
-} for "wbtest"

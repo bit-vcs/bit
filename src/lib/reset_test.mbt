@@ -27,8 +27,8 @@ test "reset: hard to previous commit" {
   let ref_text = fs.read_string("/repo/.git/refs/heads/main")
   assert_true(ref_text.contains(first.to_hex()))
   let reflog = read_reflog(fs, "/repo/.git", "refs/heads/main")
-  @test.assert_eq(reflog.length(), 3)
-  @test.assert_eq(reflog[2].message, "reset: moving to " + first.to_hex())
+  assert_eq(reflog.length(), 3)
+  assert_eq(reflog[2].message, "reset: moving to " + first.to_hex())
 }
 
 ///|
@@ -114,11 +114,11 @@ test "reset: hard preserves initialized submodule worktree state" {
 
   ignore(reset(fs, fs, "/repo", with_submodule.to_hex(), ResetMode::Hard))
 
-  @test.assert_eq(
+  assert_eq(
     fs.read_string("/repo/.git/modules/example/HEAD"),
     head_before_reset,
   )
-  @test.assert_eq(
+  assert_eq(
     resolve_head_commit(fs, "/repo/.git/modules/example"),
     Some(submodule_second),
   )
@@ -148,5 +148,5 @@ test "reset: hard replaces directory path with file from target commit" {
   let target = reset(fs, fs, "/repo", file_commit.to_hex(), ResetMode::Hard)
   assert_true(target == file_commit)
   assert_true(fs.is_file("/repo/folder1/0/0"))
-  @test.assert_eq(fs.read_string("/repo/folder1/0/0"), "file\n")
+  assert_eq(fs.read_string("/repo/folder1/0/0"), "file\n")
 }

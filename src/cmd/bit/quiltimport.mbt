@@ -23,14 +23,14 @@ async fn handle_quiltimport(args : Array[String]) -> Unit raise Error {
           author = args[i]
         }
       }
-      _ if arg.has_prefix("--author=") => author = arg[9:].to_owned()
+      _ if arg.has_prefix("--author=") => author = arg[9:].to_string()
       "--patches" => {
         i += 1
         if i < args.length() {
           patches_dir = args[i]
         }
       }
-      _ if arg.has_prefix("--patches=") => patches_dir = arg[10:].to_owned()
+      _ if arg.has_prefix("--patches=") => patches_dir = arg[10:].to_string()
       _ if arg.has_prefix("-") => warn_unimplemented_arg("quiltimport", arg)
       _ => ()
     }
@@ -49,7 +49,7 @@ async fn handle_quiltimport(args : Array[String]) -> Unit raise Error {
   // Parse series: one patch file per line, skip comments and blanks
   let patch_files : Array[String] = []
   for line_view in series_text.split("\n") {
-    let line = quiltimport_trim(line_view.to_owned())
+    let line = quiltimport_trim(line_view.to_string())
     if line.length() == 0 {
       continue
     }
@@ -59,7 +59,7 @@ async fn handle_quiltimport(args : Array[String]) -> Unit raise Error {
     // Take just the patch filename (ignore options after spaces)
     let parts : Array[String] = []
     for part_view in line.split(" ") {
-      parts.push(part_view.to_owned())
+      parts.push(part_view.to_string())
     }
     if parts.length() > 0 && parts[0].length() > 0 {
       patch_files.push(parts[0])
@@ -158,6 +158,6 @@ fn quiltimport_trim(s : String) -> String {
   if start == 0 && end == chars.length() {
     s
   } else {
-    s[start:end].to_owned()
+    s[start:end].to_string()
   }
 }

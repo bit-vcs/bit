@@ -150,7 +150,7 @@ fn native_bench_repo_root(file_count : Int, file_size : Int) -> String {
 ///|
 fn read_marker_head(marker : String) -> @bit.ObjectId? {
   let raw = @nfs.read_file_to_string(marker) catch { _ => return None }
-  let line = raw.trim().to_owned()
+  let line = raw.trim().to_string()
   if line.length() == 0 {
     return None
   }

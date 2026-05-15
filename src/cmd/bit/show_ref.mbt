@@ -27,7 +27,7 @@ async fn handle_show_ref(args : Array[String]) -> Unit raise Error {
       "--exclude-existing" => exclude_existing = true
       _ if arg.has_prefix("--exclude-existing=") => {
         exclude_existing = true
-        _exclude_existing_prefix = arg[19:].to_owned()
+        _exclude_existing_prefix = arg[19:].to_string()
       }
       "--" => ()
       _ if arg.has_prefix("-") => warn_unimplemented_arg("show-ref", arg)
@@ -186,12 +186,12 @@ async fn show_ref_deref(
     let text = decode_bytes(o.data)
     let mut target_hex = ""
     for line_view in text.split("\n") {
-      let line = line_view.to_owned()
+      let line = line_view.to_string()
       if line.length() == 0 {
         break
       }
       if line.has_prefix("object ") {
-        target_hex = line[7:].to_owned()
+        target_hex = line[7:].to_string()
         break
       }
     }
@@ -246,7 +246,7 @@ fn show_ref_exists_without_resolution(
     },
   )
   for line_view in content.split("\n") {
-    let line = trim_string(line_view.to_owned())
+    let line = trim_string(line_view.to_string())
     if line.length() == 0 || line.has_prefix("#") || line.has_prefix("^") {
       continue
     }

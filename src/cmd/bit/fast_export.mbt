@@ -31,15 +31,15 @@ async fn handle_fast_export(args : Array[String]) -> Unit raise Error {
       "--full-tree" => full_tree = true
       "--no-data" => no_data = true
       _ if arg.has_prefix("--signed-tags=") =>
-        signed_tags = arg[14:].to_owned()
+        signed_tags = arg[14:].to_string()
       _ if arg.has_prefix("--tag-of-filtered-object=") =>
-        tag_of_filtered_object = arg[25:].to_owned()
+        tag_of_filtered_object = arg[25:].to_string()
       _ if arg.has_prefix("--import-marks=") =>
-        import_marks_file = Some(arg[15:].to_owned())
+        import_marks_file = Some(arg[15:].to_string())
       _ if arg.has_prefix("--export-marks=") =>
-        export_marks_file = Some(arg[15:].to_owned())
+        export_marks_file = Some(arg[15:].to_string())
       _ if arg.has_prefix("--refspec=") =>
-        refspec_filters.push(arg[10:].to_owned())
+        refspec_filters.push(arg[10:].to_string())
       "--" => ()
       _ if arg.has_prefix("-") => warn_unimplemented_arg("fast-export", arg)
       _ => positional.push(arg)
@@ -126,9 +126,9 @@ async fn handle_fast_export(args : Array[String]) -> Unit raise Error {
     let content = fs.read_file(path) catch { _ => b"" }
     let text = @utf8.decode_lossy(content[:])
     for line_view in text.split("\n") {
-      let line = line_view.to_owned()
+      let line = line_view.to_string()
       if line.length() > 0 && line[0] == ':' {
-        let parts = fast_export_split_first_space(line[1:].to_owned())
+        let parts = fast_export_split_first_space(line[1:].to_string())
         if parts.0.length() > 0 && parts.1.length() > 0 {
           let mark_num = @string.parse_int(parts.0) catch { _ => 0 }
           if mark_num > 0 {
@@ -350,7 +350,7 @@ async fn handle_fast_export(args : Array[String]) -> Unit raise Error {
   for item in tag_refs {
     let (refname, tag_id) = item
     let tag_name = if refname.has_prefix("refs/tags/") {
-      refname[10:].to_owned()
+      refname[10:].to_string()
     } else {
       refname
     }
@@ -468,7 +468,7 @@ fn fast_export_split_first_space(s : String) -> (String, String) {
 fn fast_export_extract_header(text : String, header : String) -> String {
   let prefix = header + " "
   for line_view in text.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if line.length() == 0 {
       break
     }

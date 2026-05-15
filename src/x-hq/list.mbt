@@ -68,9 +68,9 @@ pub fn hq_list_full_paths(
 pub fn parse_repo_path(rel_path : String) -> RepoPath? {
   let parts = rel_path.split("/").collect()
   // Check if first part looks like a host
-  if parts.length() >= 3 && parts[0].to_owned().contains(".") {
+  if parts.length() >= 3 && parts[0].to_string().contains(".") {
     // host/user/repo
-    let host = parts[0].to_owned()
+    let host = parts[0].to_string()
     let normalized_host : String? = if host == "github.com" {
       None
     } else {
@@ -78,14 +78,14 @@ pub fn parse_repo_path(rel_path : String) -> RepoPath? {
     }
     Some(
       RepoPath::new(
-        parts[1].to_owned(),
-        parts[2].to_owned(),
+        parts[1].to_string(),
+        parts[2].to_string(),
         host=normalized_host,
       ),
     )
   } else if parts.length() >= 2 {
     // user/repo (github.com implicit)
-    Some(RepoPath::new(parts[0].to_owned(), parts[1].to_owned()))
+    Some(RepoPath::new(parts[0].to_string(), parts[1].to_string()))
   } else {
     None
   }

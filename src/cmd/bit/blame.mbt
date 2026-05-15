@@ -101,14 +101,14 @@ fn blame_read_path_diff_driver(
   )
   let mut diff_driver : String? = None
   for line_view in text.split("\n") {
-    let line = trim_string(line_view.to_owned())
+    let line = trim_string(line_view.to_string())
     if line.length() == 0 || line.has_prefix("#") {
       continue
     }
     let tokens = line.split(" ")
     let words : Array[String] = []
     for token_view in tokens {
-      let token = trim_string(token_view.to_owned())
+      let token = trim_string(token_view.to_string())
       if token.length() > 0 {
         words.push(token)
       }
@@ -656,7 +656,7 @@ fn join_path(parts : Array[String], start_idx : Int) -> String {
 fn split_lines(content : String) -> Array[String] {
   let result : Array[String] = []
   for line_view in content.split("\n") {
-    result.push(line_view.to_owned())
+    result.push(line_view.to_string())
   }
   // Remove trailing empty line if content ends with newline
   if result.length() > 0 && result[result.length() - 1] == "" {
@@ -847,7 +847,7 @@ fn get_blob_content(
 ///|
 fn extract_author_line(commit_text : String) -> String {
   for line_view in commit_text.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if line.has_prefix("author ") {
       return String::unsafe_substring(line, start=7, end=line.length())
     }

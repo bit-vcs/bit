@@ -36,8 +36,8 @@ async fn handle_range_diff(args : Array[String]) -> Unit raise Error {
     // Symmetric difference: A...B means A..B compared to B..A
     match ranges[0].find("...") {
       Some(idx) => {
-        let a = ranges[0][:idx].to_owned()
-        let b = ranges[0][idx + 3:].to_owned()
+        let a = ranges[0][:idx].to_string()
+        let b = ranges[0][idx + 3:].to_string()
         (a, b, b, a)
       }
       None => {
@@ -89,7 +89,7 @@ async fn handle_range_diff(args : Array[String]) -> Unit raise Error {
         print_line(
           idx1.to_string() +
           ":  " +
-          c1.to_hex()[:7].to_owned() +
+          c1.to_hex()[:7].to_string() +
           " = " +
           m_idx.to_string() +
           ":  " +
@@ -100,7 +100,7 @@ async fn handle_range_diff(args : Array[String]) -> Unit raise Error {
         print_line(
           idx1.to_string() +
           ":  " +
-          c1.to_hex()[:7].to_owned() +
+          c1.to_hex()[:7].to_string() +
           " < -:  ------- " +
           msg1,
         )
@@ -122,7 +122,7 @@ async fn handle_range_diff(args : Array[String]) -> Unit raise Error {
         "-:  ------- > " +
         idx2.to_string() +
         ":  " +
-        c2.to_hex()[:7].to_owned() +
+        c2.to_hex()[:7].to_string() +
         " " +
         msg2,
       )

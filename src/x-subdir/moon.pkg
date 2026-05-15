@@ -6,7 +6,3 @@ import {
 }
 
 warnings = "-unused_constructor-29"
-
-import {
-  "moonbitlang/core/test" @test,
-} for "test"

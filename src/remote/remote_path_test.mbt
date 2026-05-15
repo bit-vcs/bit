@@ -5,7 +5,7 @@ test "remote/path: resolve helper URL with relative local path" {
   let resolved = resolve_local_repo_path(
     fs, "/work/client", "testgit::../server",
   )
-  @test.assert_eq(resolved, Some("/work/server"))
+  assert_eq(resolved, Some("/work/server"))
 }
 
 ///|

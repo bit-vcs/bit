@@ -96,7 +96,7 @@ fn bytes_to_string_lossy(data : Bytes) -> String {
 fn first_word(text : String) -> String {
   match String::split(text, " ").head() {
     None => ""
-    Some(word) => word.to_owned()
+    Some(word) => word.to_string()
   }
 }
 
@@ -126,13 +126,13 @@ async fn remove_dir_recursive(path : String) -> Unit {
 ///|
 async fn bit_stdout_trim(args : Array[String], cwd : String?) -> (Int, String) {
   let (code, out, _) = run_git(args, None, cwd)
-  (code, String::trim(bytes_to_string_lossy(out)).to_owned())
+  (code, String::trim(bytes_to_string_lossy(out)).to_string())
 }
 
 ///|
 fn find_blob_hash_in_verify_output(output : String) -> String? {
   for line in output.split("\n") {
-    let line_str = line.to_owned()
+    let line_str = line.to_string()
     if line_str.contains("blob") {
       return Some(first_word(line_str))
     }
@@ -1318,7 +1318,7 @@ async test "git oracle: MoonBit blob hash matches git hash-object" {
     remove_dir_recursive(temp_dir)
     return ()
   }
-  let bit_hash = bytes_to_string_lossy(bit_out).trim().to_owned()
+  let bit_hash = bytes_to_string_lossy(bit_out).trim().to_string()
 
   // Verify they match
   assert_true(moonbit_hash == bit_hash)
@@ -1357,7 +1357,7 @@ async test "git oracle: MoonBit tree format matches git write-tree" {
     remove_dir_recursive(repo_dir)
     return ()
   }
-  let bit_tree_hash = bytes_to_string_lossy(bit_tree_hex).trim().to_owned()
+  let bit_tree_hash = bytes_to_string_lossy(bit_tree_hex).trim().to_string()
   if bit_tree_hash.length() != 40 {
     // git write-tree failed to produce valid hash
     remove_dir_recursive(repo_dir)
@@ -1483,7 +1483,7 @@ async test "git oracle: MoonBit commit format matches git commit-tree" {
     remove_dir_recursive(repo_dir)
     return ()
   }
-  let tree_hex = bytes_to_string_lossy(tree_out).trim().to_owned()
+  let tree_hex = bytes_to_string_lossy(tree_out).trim().to_string()
   if tree_hex.length() != 40 {
     // git write-tree failed
     remove_dir_recursive(repo_dir)
@@ -1507,7 +1507,7 @@ async test "git oracle: MoonBit commit format matches git commit-tree" {
     remove_dir_recursive(repo_dir)
     return ()
   }
-  let bit_commit_hex = bytes_to_string_lossy(ct_out).trim().to_owned()
+  let bit_commit_hex = bytes_to_string_lossy(ct_out).trim().to_string()
 
   // Get the raw commit from git
   let (cat_code, cat_out, _) = run_git(
@@ -1526,14 +1526,14 @@ async test "git oracle: MoonBit commit format matches git commit-tree" {
   let mut bit_author_time = 0L
   let mut bit_author_tz = "+0000"
   for line in bit_commit_text.split("\n") {
-    let line_str = line.to_owned()
+    let line_str = line.to_string()
     if line_str.has_prefix("author ") {
       // Format: "author Name <email> timestamp tz"
       // Extract timestamp and tz from the end
       let parts = line_str.split(" ")
       let parts_arr : Array[String] = []
       for p in parts {
-        parts_arr.push(p.to_owned())
+        parts_arr.push(p.to_string())
       }
       if parts_arr.length() >= 2 {
         let tz_idx = parts_arr.length() - 1
@@ -1751,7 +1751,7 @@ async test "git oracle: MoonBit tree accepted by git fsck" {
     remove_dir_recursive(repo_dir)
     return ()
   }
-  let blob_hex = bytes_to_string_lossy(blob_out).trim().to_owned()
+  let blob_hex = bytes_to_string_lossy(blob_out).trim().to_string()
   if blob_hex.length() != 40 {
     remove_dir_recursive(repo_dir)
     return ()
@@ -1767,7 +1767,7 @@ async test "git oracle: MoonBit tree accepted by git fsck" {
     remove_dir_recursive(repo_dir)
     return ()
   }
-  let tree_hex_str = bytes_to_string_lossy(tree_hex).trim().to_owned()
+  let tree_hex_str = bytes_to_string_lossy(tree_hex).trim().to_string()
   if tree_hex_str.length() == 0 {
     remove_dir_recursive(repo_dir)
     return ()
@@ -1848,8 +1848,8 @@ async test "git oracle: lightweight tag creation" {
     remove_dir_recursive(repo_dir)
     return ()
   }
-  let tag_commit = bytes_to_string_lossy(show_out).trim().to_owned()
-  let head_commit = bytes_to_string_lossy(head_out).trim().to_owned()
+  let tag_commit = bytes_to_string_lossy(show_out).trim().to_string()
+  let head_commit = bytes_to_string_lossy(head_out).trim().to_string()
   assert_true(tag_commit == head_commit)
   remove_dir_recursive(repo_dir)
 }
@@ -1915,7 +1915,7 @@ async test "git oracle: annotated tag with message" {
     remove_dir_recursive(repo_dir)
     return ()
   }
-  let obj_type = bytes_to_string_lossy(type_out).trim().to_owned()
+  let obj_type = bytes_to_string_lossy(type_out).trim().to_string()
   assert_true(obj_type == "tag")
   remove_dir_recursive(repo_dir)
 }
@@ -2158,7 +2158,7 @@ async test "git oracle: git log --oneline format" {
   let log = bytes_to_string_lossy(log_out)
   let lines : Array[String] = []
   for line in log.split("\n") {
-    let s = line.to_owned().trim().to_owned()
+    let s = line.to_string().trim().to_string()
     if s.length() > 0 {
       lines.push(s)
     }
@@ -2219,7 +2219,7 @@ async test "git oracle: git stash push and pop" {
       return ()
     }
   }
-  assert_true(content_after_stash.trim().to_owned() == "original")
+  assert_true(content_after_stash.trim().to_string() == "original")
   // List stash
   let (list_code, list_out, _) = run_git(
     ["stash", "list"],
@@ -2245,7 +2245,7 @@ async test "git oracle: git stash push and pop" {
       return ()
     }
   }
-  assert_true(content_after_pop.trim().to_owned() == "modified")
+  assert_true(content_after_pop.trim().to_string() == "modified")
   remove_dir_recursive(repo_dir)
 }
 
@@ -2315,7 +2315,7 @@ async test "git oracle: git revert creates reverting commit" {
       return ()
     }
   }
-  assert_true(content.trim().to_owned() == "initial")
+  assert_true(content.trim().to_string() == "initial")
   // Check commit count (should be 3)
   let (log_code, log_out, _) = run_git(
     ["log", "--oneline"],
@@ -2329,7 +2329,7 @@ async test "git oracle: git revert creates reverting commit" {
   let log = bytes_to_string_lossy(log_out)
   let mut commit_count = 0
   for line in log.split("\n") {
-    if line.to_owned().trim().to_owned().length() > 0 {
+    if line.to_string().trim().to_string().length() > 0 {
       commit_count = commit_count + 1
     }
   }
@@ -2407,7 +2407,7 @@ async test "git oracle: git cherry-pick applies commit" {
     remove_dir_recursive(repo_dir)
     return ()
   }
-  let feature_commit = bytes_to_string_lossy(rev_out).trim().to_owned()
+  let feature_commit = bytes_to_string_lossy(rev_out).trim().to_string()
   // Switch back to main
   let (checkout_code, _, _) = run_git(
     ["checkout", "master"],
@@ -2540,8 +2540,8 @@ async test "git oracle: git blame shows line attribution" {
     remove_dir_recursive(repo_dir)
     return ()
   }
-  let commit_hash = bytes_to_string_lossy(rev_out).trim().to_owned()
-  let short_hash = commit_hash[:7].to_owned()
+  let commit_hash = bytes_to_string_lossy(rev_out).trim().to_string()
+  let short_hash = commit_hash[:7].to_string()
   // Run blame
   let (blame_code, blame_out, _) = run_git(
     ["blame", "file.txt"],
@@ -2560,7 +2560,7 @@ async test "git oracle: git blame shows line attribution" {
   // Should have 2 lines of blame output
   let mut line_count = 0
   for line in blame.split("\n") {
-    if line.to_owned().trim().to_owned().length() > 0 {
+    if line.to_string().trim().to_string().length() > 0 {
       line_count = line_count + 1
     }
   }

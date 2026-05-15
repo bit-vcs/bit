@@ -110,7 +110,7 @@ fn fsck_walk_tag(
 ) -> Unit {
   let text = @utf8.decode_lossy(data[:])
   for line_view in text.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if line.length() == 0 {
       break
     }

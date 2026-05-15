@@ -1127,7 +1127,7 @@ fn clone_detect_relay_session(remote_url : String) -> (String, String)? {
 fn clone_normalize_optional_value(value : String?) -> String? {
   match value {
     Some(raw) => {
-      let normalized = raw.trim(chars=" \n\r\t").to_owned()
+      let normalized = raw.trim(chars=" \n\r\t").to_string()
       if normalized.length() == 0 {
         None
       } else {
@@ -1417,7 +1417,7 @@ fn parse_bundle_uri_response_loose_for_clone(data : Bytes) -> Array[String] {
   let kv_lines : Array[String] = []
   let raw = decode_bytes(data)
   for view in raw.split("\n") {
-    let line = view.to_owned()
+    let line = view.to_string()
     match line.find("bundle.") {
       Some(idx) =>
         kv_lines.push(

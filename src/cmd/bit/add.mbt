@@ -759,7 +759,7 @@ fn add_parse_refresh_pathspec(raw : String) -> (String, Bool) {
         )
         let mut icase = false
         for token_view in magic.split(",") {
-          let token = trim_string(token_view.to_owned())
+          let token = trim_string(token_view.to_string())
           if token == "icase" {
             icase = true
           }

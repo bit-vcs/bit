@@ -33,7 +33,7 @@ test "partial_clone: mount and list files" {
 
   // Get HEAD commit
   let head_ref = osfs.read_file(git_dir + "/HEAD")
-  let head_str = @utf8.decode_lossy(head_ref[:]).trim().to_owned()
+  let head_str = @utf8.decode_lossy(head_ref[:]).trim().to_string()
   println("HEAD: \{head_str}")
 
   // Get commit ID
@@ -46,7 +46,7 @@ test "partial_clone: mount and list files" {
     let ref_path = git_dir + "/" + ref_name
     let ref_content = osfs.read_file(ref_path)
     @bit.ObjectId::from_hex(
-      @utf8.decode_lossy(ref_content[:]).trim().to_owned(),
+      @utf8.decode_lossy(ref_content[:]).trim().to_string(),
     )
   } else {
     @bit.ObjectId::from_hex(head_str)
@@ -92,7 +92,7 @@ async test "partial_clone: on-demand fetch" {
 
   // Get commit
   let head_ref = osfs.read_file(git_dir + "/HEAD")
-  let head_str = @utf8.decode_lossy(head_ref[:]).trim().to_owned()
+  let head_str = @utf8.decode_lossy(head_ref[:]).trim().to_string()
   let commit_id = if head_str.has_prefix("ref: ") {
     let ref_name = String::unsafe_substring(
       head_str,
@@ -102,7 +102,7 @@ async test "partial_clone: on-demand fetch" {
     let ref_path = git_dir + "/" + ref_name
     let ref_content = osfs.read_file(ref_path)
     @bit.ObjectId::from_hex(
-      @utf8.decode_lossy(ref_content[:]).trim().to_owned(),
+      @utf8.decode_lossy(ref_content[:]).trim().to_string(),
     )
   } else {
     @bit.ObjectId::from_hex(head_str)
@@ -126,7 +126,7 @@ async test "partial_clone: on-demand fetch" {
   let text = @utf8.decode_lossy(content[:])
   let lines : Array[String] = text
     .split("\n")
-    .map(fn(sv) { sv.to_owned() })
+    .map(fn(sv) { sv.to_string() })
     .collect()
   let preview_lines = if lines.length() > 5 { 5 } else { lines.length() }
   println("Content preview:")
@@ -156,7 +156,7 @@ test "partial_clone: glob pattern matching" {
     return
   }
   let head_ref = osfs.read_file(git_dir + "/HEAD")
-  let head_str = @utf8.decode_lossy(head_ref[:]).trim().to_owned()
+  let head_str = @utf8.decode_lossy(head_ref[:]).trim().to_string()
   let commit_id = if head_str.has_prefix("ref: ") {
     let ref_name = String::unsafe_substring(
       head_str,
@@ -166,7 +166,7 @@ test "partial_clone: glob pattern matching" {
     let ref_path = git_dir + "/" + ref_name
     let ref_content = osfs.read_file(ref_path)
     @bit.ObjectId::from_hex(
-      @utf8.decode_lossy(ref_content[:]).trim().to_owned(),
+      @utf8.decode_lossy(ref_content[:]).trim().to_string(),
     )
   } else {
     @bit.ObjectId::from_hex(head_str)
@@ -219,7 +219,7 @@ async test "partial_clone: prefetch with glob" {
     return
   }
   let head_ref = osfs.read_file(git_dir + "/HEAD")
-  let head_str = @utf8.decode_lossy(head_ref[:]).trim().to_owned()
+  let head_str = @utf8.decode_lossy(head_ref[:]).trim().to_string()
   let commit_id = if head_str.has_prefix("ref: ") {
     let ref_name = String::unsafe_substring(
       head_str,
@@ -229,7 +229,7 @@ async test "partial_clone: prefetch with glob" {
     let ref_path = git_dir + "/" + ref_name
     let ref_content = osfs.read_file(ref_path)
     @bit.ObjectId::from_hex(
-      @utf8.decode_lossy(ref_content[:]).trim().to_owned(),
+      @utf8.decode_lossy(ref_content[:]).trim().to_string(),
     )
   } else {
     @bit.ObjectId::from_hex(head_str)
@@ -261,7 +261,7 @@ async test "partial_clone: prefetch BFS" {
     return
   }
   let head_ref = osfs.read_file(git_dir + "/HEAD")
-  let head_str = @utf8.decode_lossy(head_ref[:]).trim().to_owned()
+  let head_str = @utf8.decode_lossy(head_ref[:]).trim().to_string()
   let commit_id = if head_str.has_prefix("ref: ") {
     let ref_name = String::unsafe_substring(
       head_str,
@@ -271,7 +271,7 @@ async test "partial_clone: prefetch BFS" {
     let ref_path = git_dir + "/" + ref_name
     let ref_content = osfs.read_file(ref_path)
     @bit.ObjectId::from_hex(
-      @utf8.decode_lossy(ref_content[:]).trim().to_owned(),
+      @utf8.decode_lossy(ref_content[:]).trim().to_string(),
     )
   } else {
     @bit.ObjectId::from_hex(head_str)
@@ -309,7 +309,7 @@ async test "partial_clone: prefetch multiple files" {
     return
   }
   let head_ref = osfs.read_file(git_dir + "/HEAD")
-  let head_str = @utf8.decode_lossy(head_ref[:]).trim().to_owned()
+  let head_str = @utf8.decode_lossy(head_ref[:]).trim().to_string()
   let commit_id = if head_str.has_prefix("ref: ") {
     let ref_name = String::unsafe_substring(
       head_str,
@@ -319,7 +319,7 @@ async test "partial_clone: prefetch multiple files" {
     let ref_path = git_dir + "/" + ref_name
     let ref_content = osfs.read_file(ref_path)
     @bit.ObjectId::from_hex(
-      @utf8.decode_lossy(ref_content[:]).trim().to_owned(),
+      @utf8.decode_lossy(ref_content[:]).trim().to_string(),
     )
   } else {
     @bit.ObjectId::from_hex(head_str)

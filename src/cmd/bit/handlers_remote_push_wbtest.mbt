@@ -59,9 +59,9 @@ test "push-default: upstream uses configured tracking" {
     None,
     false,
   )
-  @test.assert_eq(plan.remote_name, "parent1")
-  @test.assert_eq(plan.source_ref, "refs/heads/main")
-  @test.assert_eq(plan.dest_ref, "refs/heads/foo")
+  assert_eq(plan.remote_name, "parent1")
+  assert_eq(plan.source_ref, "refs/heads/main")
+  assert_eq(plan.dest_ref, "refs/heads/foo")
   assert_false(plan.auto_set_upstream)
 }
 
@@ -96,8 +96,8 @@ test "push-default: current chooses origin when multiple remotes" {
     None,
     false,
   )
-  @test.assert_eq(plan.remote_name, "origin")
-  @test.assert_eq(plan.dest_ref, "refs/heads/main")
+  assert_eq(plan.remote_name, "origin")
+  assert_eq(plan.dest_ref, "refs/heads/main")
 }
 
 ///|
@@ -113,8 +113,8 @@ test "push-default: current chooses sole remote" {
     None,
     false,
   )
-  @test.assert_eq(plan.remote_name, "parent2")
-  @test.assert_eq(plan.dest_ref, "refs/heads/main")
+  assert_eq(plan.remote_name, "parent2")
+  assert_eq(plan.dest_ref, "refs/heads/main")
 }
 
 ///|
@@ -148,8 +148,8 @@ test "push-default: simple triangular falls back to current" {
     Some("parent2"),
     false,
   )
-  @test.assert_eq(plan.remote_name, "parent2")
-  @test.assert_eq(plan.dest_ref, "refs/heads/main")
+  assert_eq(plan.remote_name, "parent2")
+  assert_eq(plan.dest_ref, "refs/heads/main")
 }
 
 ///|
@@ -165,8 +165,8 @@ test "push-default: autosetup enables new branch push" {
     None,
     true,
   )
-  @test.assert_eq(plan.remote_name, "parent1")
-  @test.assert_eq(plan.dest_ref, "refs/heads/new-branch")
+  assert_eq(plan.remote_name, "parent1")
+  assert_eq(plan.dest_ref, "refs/heads/new-branch")
   assert_true(plan.auto_set_upstream)
 }
 
@@ -219,9 +219,9 @@ test "push-default: colon refspec is treated as matching" {
     None,
     false,
   )
-  @test.assert_eq(plan.remote_name, "origin")
-  @test.assert_eq(plan.source_ref, "refs/heads/main")
-  @test.assert_eq(plan.dest_ref, "refs/heads/main")
+  assert_eq(plan.remote_name, "origin")
+  assert_eq(plan.source_ref, "refs/heads/main")
+  assert_eq(plan.dest_ref, "refs/heads/main")
 }
 
 ///|
@@ -290,13 +290,13 @@ test "push matching-refspec: allows at least one candidate" {
 ///|
 test "push-mirror: explicit option uses wildcard refspec" {
   let specs = push_resolve_mirror_refspecs(true, false, 0, false, false, false)
-  @test.assert_eq(specs, Some(["+refs/*:refs/*"]))
+  assert_eq(specs, Some(["+refs/*:refs/*"]))
 }
 
 ///|
 test "push-mirror: remote config enables wildcard refspec" {
   let specs = push_resolve_mirror_refspecs(false, true, 0, false, false, false)
-  @test.assert_eq(specs, Some(["+refs/*:refs/*"]))
+  assert_eq(specs, Some(["+refs/*:refs/*"]))
 }
 
 ///|
@@ -312,8 +312,8 @@ test "push-parse: two positional args treat first as remote" {
   let (remote, refspec) = resolve_push_positionals(["", "main"], fn(_name) {
     false
   })
-  @test.assert_eq(remote, Some(""))
-  @test.assert_eq(refspec, Some("main"))
+  assert_eq(remote, Some(""))
+  assert_eq(refspec, Some("main"))
 }
 
 ///|
@@ -322,10 +322,10 @@ test "push-parse: multi positionals keep all refspecs after remote" {
     ["origin", "main", "topic:topic"],
     fn(_name) { false },
   )
-  @test.assert_eq(remote, Some("origin"))
-  @test.assert_eq(refspecs.length(), 2)
-  @test.assert_eq(refspecs[0], "main")
-  @test.assert_eq(refspecs[1], "topic:topic")
+  assert_eq(remote, Some("origin"))
+  assert_eq(refspecs.length(), 2)
+  assert_eq(refspecs[0], "main")
+  assert_eq(refspecs[1], "topic:topic")
 }
 
 ///|
@@ -333,15 +333,15 @@ test "push-parse: single positional known remote" {
   let (remote, refspec) = resolve_push_positionals(["origin"], fn(name) {
     name == "origin"
   })
-  @test.assert_eq(remote, Some("origin"))
-  @test.assert_eq(refspec, None)
+  assert_eq(remote, Some("origin"))
+  assert_eq(refspec, None)
 }
 
 ///|
 test "push-parse: single positional unknown is refspec" {
   let (remote, refspec) = resolve_push_positionals(["main"], fn(_name) { false })
-  @test.assert_eq(remote, None)
-  @test.assert_eq(refspec, Some("main"))
+  assert_eq(remote, None)
+  assert_eq(refspec, Some("main"))
 }
 
 ///|
@@ -357,8 +357,8 @@ test "push-refspec: ignore head and rev-expression tokens" {
 
 ///|
 test "push/fetch options: strip long option prefix for error messages" {
-  @test.assert_eq(option_name_without_prefix("--no-ipv4"), "no-ipv4")
-  @test.assert_eq(option_name_without_prefix("--no-ipv6"), "no-ipv6")
+  assert_eq(option_name_without_prefix("--no-ipv4"), "no-ipv4")
+  assert_eq(option_name_without_prefix("--no-ipv6"), "no-ipv6")
 }
 
 ///|
@@ -382,12 +382,12 @@ test "push relay: preferred sender/repo env is trimmed and optional" {
   let prev_repo = @sys.get_env_var("BIT_RELAY_PUSH_REPO")
   @sys.set_env_var("BIT_RELAY_PUSH_SENDER", " node-a ")
   @sys.set_env_var("BIT_RELAY_PUSH_REPO", " repo-b ")
-  @test.assert_eq(push_relay_preferred_sender(), Some("node-a"))
-  @test.assert_eq(push_relay_preferred_repo(), Some("repo-b"))
+  assert_eq(push_relay_preferred_sender(), Some("node-a"))
+  assert_eq(push_relay_preferred_repo(), Some("repo-b"))
   @sys.set_env_var("BIT_RELAY_PUSH_SENDER", "   ")
   @sys.set_env_var("BIT_RELAY_PUSH_REPO", "   ")
-  @test.assert_eq(push_relay_preferred_sender(), None)
-  @test.assert_eq(push_relay_preferred_repo(), None)
+  assert_eq(push_relay_preferred_sender(), None)
+  assert_eq(push_relay_preferred_repo(), None)
   restore_env_var_for_push_wbtest("BIT_RELAY_PUSH_SENDER", prev_sender)
   restore_env_var_for_push_wbtest("BIT_RELAY_PUSH_REPO", prev_repo)
 }
@@ -403,7 +403,7 @@ test "push relay: sender filter is preferred over repo filter" {
     preferred_sender=Some("node-a"),
     preferred_repo=Some("repo-b"),
   )
-  @test.assert_eq(selected, Some(("node-a", "http://node-a:9418/repo-a.git")))
+  assert_eq(selected, Some(("node-a", "http://node-a:9418/repo-a.git")))
 }
 
 ///|
@@ -417,23 +417,23 @@ test "push relay: falls back to repo and then first peer" {
     preferred_sender=Some("node-z"),
     preferred_repo=Some("repo-b"),
   )
-  @test.assert_eq(by_repo, Some(("node-b", "http://node-b:9418/repo-b.git")))
+  assert_eq(by_repo, Some(("node-b", "http://node-b:9418/repo-b.git")))
   let first = push_select_relay_peer(
     peers,
     preferred_sender=None,
     preferred_repo=Some("repo-z"),
   )
-  @test.assert_eq(first, Some(("node-a", "http://node-a:9418/repo-a.git")))
+  assert_eq(first, Some(("node-a", "http://node-a:9418/repo-a.git")))
 }
 
 ///|
 test "url rewrite: insteadOf is applied for fetch/push" {
   let rules : Array[(String, String, Bool)] = [("/tmp/trash/", "trash/", false)]
-  @test.assert_eq(
+  assert_eq(
     rewrite_url_by_rules("trash/testrepo", rules, false),
     "/tmp/trash/testrepo",
   )
-  @test.assert_eq(
+  assert_eq(
     rewrite_url_by_rules("trash/testrepo", rules, true),
     "/tmp/trash/testrepo",
   )
@@ -442,11 +442,11 @@ test "url rewrite: insteadOf is applied for fetch/push" {
 ///|
 test "url rewrite: pushInsteadOf is push-only" {
   let rules : Array[(String, String, Bool)] = [("/tmp/trash/", "trash/", true)]
-  @test.assert_eq(
+  assert_eq(
     rewrite_url_by_rules("trash/testrepo", rules, false),
     "trash/testrepo",
   )
-  @test.assert_eq(
+  assert_eq(
     rewrite_url_by_rules("trash/testrepo", rules, true),
     "/tmp/trash/testrepo",
   )
@@ -454,13 +454,13 @@ test "url rewrite: pushInsteadOf is push-only" {
 
 ///|
 test "push normalize: source '@' maps to HEAD" {
-  @test.assert_eq(normalize_push_ref_token("@", "main", false), "HEAD")
+  assert_eq(normalize_push_ref_token("@", "main", false), "HEAD")
 }
 
 ///|
 test "push normalize: source object id stays as-is" {
   let oid = "0123456789abcdef0123456789abcdef01234567"
-  @test.assert_eq(normalize_push_ref_token(oid, "main", false), oid)
+  assert_eq(normalize_push_ref_token(oid, "main", false), oid)
 }
 
 ///|
@@ -486,7 +486,7 @@ test "push porcelain: line format matches git style" {
   let line = format_push_porcelain_line(
     "*", "refs/heads/main", "refs/remotes/origin/main", "[new reference]",
   )
-  @test.assert_eq(
+  assert_eq(
     line, "*\trefs/heads/main:refs/remotes/origin/main\t[new reference]",
   )
 }
@@ -502,8 +502,8 @@ test "push porcelain: classify new reference" {
     false,
     false,
   )
-  @test.assert_eq(flag, "*")
-  @test.assert_eq(status, "[new reference]")
+  assert_eq(flag, "*")
+  assert_eq(status, "[new reference]")
 }
 
 ///|
@@ -517,14 +517,14 @@ test "push porcelain: classify non-fast-forward update marker" {
   let (flag, status) = classify_push_porcelain_success(
     old_id, new_id, false, false,
   )
-  @test.assert_eq(flag, " ")
-  @test.assert_eq(status, "[updated]")
+  assert_eq(flag, " ")
+  assert_eq(status, "[updated]")
 }
 
 ///|
 test "push reject: non-fast-forward takes precedence over deny-current-branch" {
   let status = select_push_rejection_status(true, false, true, false)
-  @test.assert_eq(status, Some("[rejected] (non-fast-forward)"))
+  assert_eq(status, Some("[rejected] (non-fast-forward)"))
 }
 
 ///|
@@ -538,16 +538,16 @@ test "push prune: destination wildcard maps back to source wildcard" {
   let src = prune_source_ref_for_destination(
     "refs/heads/*", "refs/tmp/*", "refs/tmp/topic",
   )
-  @test.assert_eq(src, Some("refs/heads/topic"))
+  assert_eq(src, Some("refs/heads/topic"))
 }
 
 ///|
 test "fetch refspec: short source expands to branch and tag namespaces" {
   let candidates = fetch_source_candidates("main")
-  @test.assert_eq(candidates.length(), 3)
-  @test.assert_eq(candidates[0], "main")
-  @test.assert_eq(candidates[1], "refs/heads/main")
-  @test.assert_eq(candidates[2], "refs/tags/main")
+  assert_eq(candidates.length(), 3)
+  assert_eq(candidates[0], "main")
+  assert_eq(candidates[1], "refs/heads/main")
+  assert_eq(candidates[2], "refs/tags/main")
 }
 
 ///|
@@ -555,7 +555,7 @@ test "push refspec parse: keeps explicit destination presence" {
   let specs = parse_push_refspecs_with_presence([
     "main", "topic:refs/heads/topic", "+dev",
   ])
-  @test.assert_eq(specs.length(), 3)
+  assert_eq(specs.length(), 3)
   assert_false(specs[0].has_explicit_destination)
   assert_true(specs[1].has_explicit_destination)
   assert_false(specs[2].has_explicit_destination)
@@ -572,7 +572,7 @@ test "push refmap: colon-less source uses remote.push refmap first" {
     Some("refs/heads/main"),
     ["+refs/heads/*:refs/remotes/src/*"],
   )
-  @test.assert_eq(dst, "refs/remotes/src/main")
+  assert_eq(dst, "refs/remotes/src/main")
 }
 
 ///|
@@ -586,7 +586,7 @@ test "push refmap: without remote.push, upstream mapping is used" {
     Some("refs/heads/trunk"),
     [],
   )
-  @test.assert_eq(dst, "refs/heads/trunk")
+  assert_eq(dst, "refs/heads/trunk")
 }
 
 ///|
@@ -598,7 +598,7 @@ test "push deny-current: updateInstead returns checked-out worktree path" {
   )
   match decision {
     DenyCurrentBranchDecision::UpdateInstead(path) =>
-      @test.assert_eq(path, "/repo/wt")
+      assert_eq(path, "/repo/wt")
     _ => fail("expected updateInstead decision")
   }
 }
@@ -726,9 +726,9 @@ test "push-upstream: explicit source branch updates that branch config" {
   push_append_upstream_config_update(
     updates, "refs/heads/topic_2", "refs/heads/other2", "main", false,
   )
-  @test.assert_eq(updates.length(), 1)
-  @test.assert_eq(updates[0].branch_name, "topic_2")
-  @test.assert_eq(updates[0].merge_ref, "refs/heads/other2")
+  assert_eq(updates.length(), 1)
+  assert_eq(updates[0].branch_name, "topic_2")
+  assert_eq(updates[0].merge_ref, "refs/heads/other2")
 }
 
 ///|
@@ -737,9 +737,9 @@ test "push-upstream: HEAD maps to current branch" {
   push_append_upstream_config_update(
     updates, "HEAD", "refs/heads/headbranch", "headbranch", false,
   )
-  @test.assert_eq(updates.length(), 1)
-  @test.assert_eq(updates[0].branch_name, "headbranch")
-  @test.assert_eq(updates[0].merge_ref, "refs/heads/headbranch")
+  assert_eq(updates.length(), 1)
+  assert_eq(updates[0].branch_name, "headbranch")
+  assert_eq(updates[0].merge_ref, "refs/heads/headbranch")
 }
 
 ///|
@@ -748,7 +748,7 @@ test "push-upstream: delete refs do not update tracking config" {
   push_append_upstream_config_update(
     updates, "refs/heads/topic_2", "refs/heads/topic_2", "main", true,
   )
-  @test.assert_eq(updates.length(), 0)
+  assert_eq(updates.length(), 0)
 }
 
 ///|
@@ -765,7 +765,7 @@ test "push-lease: parse empty explicit expectation" {
   let (refname, expectation) = push_parse_force_with_lease_value(
     fs, "/repo/.git", "branch:",
   )
-  @test.assert_eq(refname, "refs/heads/branch")
+  assert_eq(refname, "refs/heads/branch")
   match expectation {
     PushLeaseExpectation::Explicit(None) => ()
     _ => fail("expected explicit empty lease expectation")
@@ -774,11 +774,11 @@ test "push-lease: parse empty explicit expectation" {
 
 ///|
 test "push-lease: remote tracking refname follows pushed remote" {
-  @test.assert_eq(
+  assert_eq(
     push_remote_tracking_refname("origin-push", "refs/heads/main"),
     Some("refs/remotes/origin-push/main"),
   )
-  @test.assert_eq(push_remote_tracking_refname("origin", "refs/tags/v1"), None)
+  assert_eq(push_remote_tracking_refname("origin", "refs/tags/v1"), None)
 }
 
 ///|
@@ -845,14 +845,14 @@ async test "serve lfs: upload batch advertises relay object URL" {
     allow_push=true,
   )
 
-  @test.assert_eq(status, 200)
-  @test.assert_eq(headers.get("Content-Type"), Some("application/vnd.git-lfs+json"))
-  @test.assert_eq(incoming_refs.length(), 0)
+  assert_eq(status, 200)
+  assert_eq(headers.get("Content-Type"), Some("application/vnd.git-lfs+json"))
+  assert_eq(incoming_refs.length(), 0)
   let obj = serve_lfs_wbtest_parse_body(body)
   guard obj.get("objects") is Some(Json::Array(objects)) else {
     fail("missing objects")
   }
-  @test.assert_eq(objects.length(), 1)
+  assert_eq(objects.length(), 1)
   guard objects[0] is Json::Object(item) else { fail("missing object item") }
   guard item.get("actions") is Some(Json::Object(actions)) else {
     fail("missing actions")
@@ -860,7 +860,7 @@ async test "serve lfs: upload batch advertises relay object URL" {
   guard actions.get("upload") is Some(Json::Object(upload)) else {
     fail("missing upload action")
   }
-  @test.assert_eq(
+  assert_eq(
     upload.get("href"),
     Some(
       Json::string(
@@ -888,7 +888,7 @@ async test "serve lfs: put caches object and get downloads it" {
     serve_lfs_wbtest_request("PUT", "/info/lfs/objects/\{oid}", body=data),
     allow_push=true,
   )
-  @test.assert_eq(put_status, 200)
+  assert_eq(put_status, 200)
   assert_true(fs.is_file(object_path))
   assert_true(Bytes::equal(fs.read_file(object_path), data))
   assert_true(decode_bytes(put_body).contains("ok"))
@@ -898,8 +898,8 @@ async test "serve lfs: put caches object and get downloads it" {
     serve_lfs_wbtest_request("GET", "/info/lfs/objects/\{oid}"),
     allow_push=false,
   )
-  @test.assert_eq(get_status, 200)
-  @test.assert_eq(get_headers.get("Content-Type"), Some("application/octet-stream"))
+  assert_eq(get_status, 200)
+  assert_eq(get_headers.get("Content-Type"), Some("application/octet-stream"))
   assert_true(Bytes::equal(get_body, data))
   cleanup_tree(fs, root)
 }
@@ -931,7 +931,7 @@ async test "serve lfs: download batch reports cached and missing objects" {
     serve_lfs_wbtest_request("POST", "/info/lfs/objects/batch", body=batch),
   )
 
-  @test.assert_eq(status, 200)
+  assert_eq(status, 200)
   let text = decode_bytes(body)
   assert_true(text.contains("\"download\""))
   assert_true(

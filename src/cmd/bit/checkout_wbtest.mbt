@@ -24,11 +24,11 @@ async fn checkout_wbtest_collect_shim_git_output(
       ["build", "--target", "native", "--release"],
       inherit_env=true,
     )
-    @test.assert_eq(build_code, 0)
+    assert_eq(build_code, 0)
   }
   fs.write_string(shim_moon, "#!/bin/sh\nset -eu\nexec '\{bit_exe}' \"$@\"\n")
   let chmod_code = @process.run("chmod", ["+x", shim_moon], inherit_env=true)
-  @test.assert_eq(chmod_code, 0)
+  assert_eq(chmod_code, 0)
   let env : Map[String, String] = {
     "SHIM_REAL_GIT": wbtest_resolve_real_git(repo_root),
     "SHIM_EXEC_PATH": repo_root + "/third_party/git",
@@ -59,9 +59,9 @@ async fn checkout_wbtest_run_shim_git(
   let (code, stdout, stderr) = checkout_wbtest_collect_shim_git_output(
     cwd, args,
   )
-  @test.assert_eq(code, 0)
-  @test.assert_eq(stdout, "")
-  @test.assert_eq(stderr, "")
+  assert_eq(code, 0)
+  assert_eq(stdout, "")
+  assert_eq(stderr, "")
 }
 
 ///|
@@ -123,8 +123,8 @@ async fn checkout_wbtest_case_treeish_restore() -> Unit raise Error {
     "checkout", "-q", "newmain", "--", "init.t",
   ])
 
-  @test.assert_eq(decode_bytes(fs.read_file(repo_dir + "/init.t")), "newmain\n")
-  @test.assert_eq(
+  assert_eq(decode_bytes(fs.read_file(repo_dir + "/init.t")), "newmain\n")
+  assert_eq(
     add_test_git_stdout(repo_dir, ["symbolic-ref", "--short", "HEAD"]),
     "main\n",
   )
@@ -170,7 +170,7 @@ async fn checkout_wbtest_case_switch_back_to_main() -> Unit raise Error {
 
   checkout_wbtest_run_shim_git(repo_dir, ["checkout", "-q", "main"])
 
-  @test.assert_eq(
+  assert_eq(
     add_test_git_stdout(repo_dir, ["symbolic-ref", "--short", "HEAD"]),
     "main\n",
   )
@@ -227,7 +227,7 @@ async fn checkout_wbtest_case_switch_back_with_detached_worktree() -> Unit raise
 
   checkout_wbtest_run_shim_git(repo_dir, ["checkout", "-q", "main"])
 
-  @test.assert_eq(
+  assert_eq(
     add_test_git_stdout(repo_dir, ["symbolic-ref", "--short", "HEAD"]),
     "main\n",
   )
@@ -273,7 +273,7 @@ async fn checkout_wbtest_case_switch_back_after_shim_commit() -> Unit raise Erro
 
   checkout_wbtest_run_shim_git(repo_dir, ["checkout", "-q", "main"])
 
-  @test.assert_eq(
+  assert_eq(
     add_test_git_stdout(repo_dir, ["symbolic-ref", "--short", "HEAD"]),
     "main\n",
   )
@@ -325,9 +325,9 @@ async fn checkout_wbtest_case_branch_in_use() -> Unit raise Error {
   let (_, stdout, stderr) = checkout_wbtest_collect_shim_git_output(repo_dir, [
     "checkout", "-q", "newmain",
   ])
-  @test.assert_eq(stdout, "")
+  assert_eq(stdout, "")
   assert_true(stderr.contains("already used by worktree at"))
-  @test.assert_eq(
+  assert_eq(
     add_test_git_stdout(repo_dir, ["symbolic-ref", "--short", "HEAD"]),
     "main\n",
   )
@@ -377,7 +377,7 @@ async fn checkout_wbtest_case_force_branch_in_use() -> Unit raise Error {
   @sys.unset_env_var("GIT_DIR")
   @sys.unset_env_var("GIT_WORK_TREE")
 
-  @test.assert_eq(
+  assert_eq(
     checkout_branch_in_use_path(fs, repo_dir, "newmain"),
     Some(linked_dir),
   )
@@ -390,15 +390,15 @@ async fn checkout_wbtest_case_force_branch_in_use() -> Unit raise Error {
   let (_, stdout, stderr) = checkout_wbtest_collect_shim_git_output(repo_dir, [
     "checkout", "-q", "-B", "newmain",
   ])
-  @test.assert_eq(stdout, "")
+  assert_eq(stdout, "")
   assert_true(stderr.contains("already used by worktree at"))
-  @test.assert_eq(
+  assert_eq(
     add_test_git_stdout(repo_dir, [
       "rev-parse", "--verify", "refs/heads/newmain",
     ]),
     before_branch,
   )
-  @test.assert_eq(
+  assert_eq(
     add_test_git_stdout(repo_dir, ["rev-parse", "--verify", "HEAD"]),
     before_head,
   )
@@ -449,21 +449,21 @@ async fn checkout_wbtest_case_symlinked_branch_in_use() -> Unit raise Error {
     inherit_env=true,
     cwd=root,
   )
-  @test.assert_eq(link_code, 0)
+  assert_eq(link_code, 0)
 
   @sys.set_env_var("GIT_SHIM_CWD", repo_dir)
   @sys.set_env_var("GIT_SHIM_PWD", repo_dir)
   @sys.unset_env_var("GIT_DIR")
   @sys.unset_env_var("GIT_WORK_TREE")
 
-  @test.assert_eq(
+  assert_eq(
     checkout_branch_in_use_path(fs, repo_dir, "newmain"),
     Some(linked_dir),
   )
   let (_, stdout, stderr) = checkout_wbtest_collect_shim_git_output(repo_dir, [
     "checkout", "-q", "newmain",
   ])
-  @test.assert_eq(stdout, "")
+  assert_eq(stdout, "")
   assert_true(stderr.contains("already used by worktree at"))
 
   add_test_restore_env("GIT_SHIM_CWD", prev_shim_cwd)
@@ -512,7 +512,7 @@ async fn checkout_wbtest_case_recheckout_current_branch_with_symlink_head() -> U
     inherit_env=true,
     cwd=root,
   )
-  @test.assert_eq(link_code, 0)
+  assert_eq(link_code, 0)
 
   @sys.set_env_var("GIT_SHIM_CWD", linked_dir)
   @sys.set_env_var("GIT_SHIM_PWD", linked_dir)
@@ -521,7 +521,7 @@ async fn checkout_wbtest_case_recheckout_current_branch_with_symlink_head() -> U
 
   checkout_wbtest_run_shim_git(linked_dir, ["checkout", "-q", "newmain"])
 
-  @test.assert_eq(
+  assert_eq(
     add_test_git_stdout(linked_dir, ["symbolic-ref", "HEAD"]),
     "refs/heads/newmain\n",
   )
@@ -565,7 +565,7 @@ async fn checkout_wbtest_case_bare_repo_checkout_fails() -> Unit raise Error {
   let (_, stdout, stderr) = checkout_wbtest_collect_shim_git_output(bare_dir, [
     "checkout", "-q", "main",
   ])
-  @test.assert_eq(stdout, "")
+  assert_eq(stdout, "")
   assert_true(stderr.length() > 0)
 
   add_test_restore_env("GIT_SHIM_CWD", prev_shim_cwd)
@@ -606,14 +606,14 @@ async fn checkout_wbtest_case_orphan_branch() -> Unit raise Error {
     "checkout", "-q", "--orphan", "orphan1",
   ])
 
-  @test.assert_eq(
+  assert_eq(
     add_test_git_stdout(repo_dir, ["symbolic-ref", "--short", "HEAD"]),
     "orphan1\n",
   )
   assert_false(fs.is_file(repo_dir + "/.git/refs/heads/orphan1"))
-  @test.assert_eq(@bitlib.read_index_entries(fs, repo_dir + "/.git").length(), 1)
-  @test.assert_eq(add_test_git_stdout(repo_dir, ["ls-files"]), "init.t\n")
-  @test.assert_eq(@fs.read_file_to_string(repo_dir + "/init.t"), "main\n")
+  assert_eq(@bitlib.read_index_entries(fs, repo_dir + "/.git").length(), 1)
+  assert_eq(add_test_git_stdout(repo_dir, ["ls-files"]), "init.t\n")
+  assert_eq(@fs.read_file_to_string(repo_dir + "/init.t"), "main\n")
 
   add_test_restore_env("GIT_SHIM_CWD", prev_shim_cwd)
   add_test_restore_env("GIT_SHIM_PWD", prev_shim_pwd)
@@ -653,7 +653,7 @@ async fn checkout_wbtest_case_checkout_updates_head_reflog() -> Unit raise Error
   @sys.unset_env_var("GIT_WORK_TREE")
 
   let before = @bitrepo.read_reflog(fs, repo_dir + "/.git", "HEAD")
-  @test.assert_eq(before.length(), 2)
+  assert_eq(before.length(), 2)
 
   checkout_wbtest_run_shim_git(repo_dir, ["checkout", "-q", "side"])
 
@@ -661,8 +661,8 @@ async fn checkout_wbtest_case_checkout_updates_head_reflog() -> Unit raise Error
     trim_string(add_test_git_stdout(repo_dir, ["rev-parse", "side"])),
   )
   let after_branch = @bitrepo.read_reflog(fs, repo_dir + "/.git", "HEAD")
-  @test.assert_eq(after_branch.length(), 3)
-  @test.assert_eq(after_branch[after_branch.length() - 1].new_id, side_id)
+  assert_eq(after_branch.length(), 3)
+  assert_eq(after_branch[after_branch.length() - 1].new_id, side_id)
 
   checkout_wbtest_run_shim_git(repo_dir, ["checkout", "-q", "main^0"])
 
@@ -670,8 +670,8 @@ async fn checkout_wbtest_case_checkout_updates_head_reflog() -> Unit raise Error
     trim_string(add_test_git_stdout(repo_dir, ["rev-parse", "main"])),
   )
   let after_detach = @bitrepo.read_reflog(fs, repo_dir + "/.git", "HEAD")
-  @test.assert_eq(after_detach.length(), 4)
-  @test.assert_eq(after_detach[after_detach.length() - 1].new_id, main_id)
+  assert_eq(after_detach.length(), 4)
+  assert_eq(after_detach[after_detach.length() - 1].new_id, main_id)
 
   add_test_restore_env("GIT_SHIM_CWD", prev_shim_cwd)
   add_test_restore_env("GIT_SHIM_PWD", prev_shim_pwd)
@@ -720,7 +720,7 @@ async fn checkout_wbtest_case_force_checkout_clears_merge_state() -> Unit raise 
 
   assert_false(fs.is_file(repo_dir + "/.git/MERGE_HEAD"))
   assert_false(fs.is_file(repo_dir + "/.git/MERGE_MSG"))
-  @test.assert_eq(
+  assert_eq(
     decode_bytes(
       fs.read_file(repo_dir + "/file") catch {
         _ => Bytes::default()
@@ -768,8 +768,8 @@ async fn checkout_wbtest_case_treeish_restore_updates_index() -> Unit raise Erro
     "checkout", "-q", "HEAD", "--", "file",
   ])
 
-  @test.assert_eq(decode_bytes(fs.read_file(repo_dir + "/file")), "base\n")
-  @test.assert_eq(
+  assert_eq(decode_bytes(fs.read_file(repo_dir + "/file")), "base\n")
+  assert_eq(
     add_test_git_stdout(repo_dir, ["diff", "--cached", "--name-only"]),
     "",
   )
@@ -814,8 +814,8 @@ async fn checkout_wbtest_case_treeish_restore_without_separator() -> Unit raise 
   @sys.unset_env_var("GIT_WORK_TREE")
   checkout_wbtest_run_shim_git(repo_dir, ["checkout", "-q", "side", "file"])
 
-  @test.assert_eq(decode_bytes(fs.read_file(repo_dir + "/file")), "side\n")
-  @test.assert_eq(
+  assert_eq(decode_bytes(fs.read_file(repo_dir + "/file")), "side\n")
+  assert_eq(
     add_test_git_stdout(repo_dir, ["symbolic-ref", "--short", "HEAD"]),
     "main\n",
   )
@@ -859,11 +859,11 @@ async fn checkout_wbtest_case_track_sets_branch_config() -> Unit raise Error {
     "checkout", "-q", "--track", "-b", "topic", "me/main",
   ])
 
-  @test.assert_eq(
+  assert_eq(
     add_test_git_stdout(repo_dir, ["config", "--get", "branch.topic.remote"]),
     "me\n",
   )
-  @test.assert_eq(
+  assert_eq(
     add_test_git_stdout(repo_dir, ["config", "--get", "branch.topic.merge"]),
     "refs/heads/main\n",
   )
@@ -906,7 +906,7 @@ async fn checkout_wbtest_case_detach_head_without_target() -> Unit raise Error {
   @sys.unset_env_var("GIT_WORK_TREE")
   checkout_wbtest_run_shim_git(repo_dir, ["checkout", "-q", "--detach"])
 
-  @test.assert_eq(
+  assert_eq(
     trim_string(decode_bytes(fs.read_file(repo_dir + "/.git/HEAD"))),
     head_before,
   )
@@ -949,7 +949,7 @@ async fn checkout_wbtest_case_previous_checkout_syntax() -> Unit raise Error {
   checkout_wbtest_run_shim_git(repo_dir, ["checkout", "-q", "main"])
   checkout_wbtest_run_shim_git(repo_dir, ["checkout", "-q", "@{-1}"])
 
-  @test.assert_eq(
+  assert_eq(
     add_test_git_stdout(repo_dir, ["symbolic-ref", "--short", "HEAD"]),
     "topic\n",
   )

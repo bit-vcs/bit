@@ -133,7 +133,7 @@ pub fn parse_github_shorthand(url : String) -> GitHubShorthand? {
   let parts : Array[String] = repo_base
     .split("/")
     .filter(s => s.length() > 0)
-    .map(s => s.to_owned())
+    .map(s => s.to_string())
     .collect()
   // Determine host and user/repo.
   let (host, owner, repo) = if parts.length() == 2 {
@@ -196,7 +196,7 @@ pub fn check_shorthand_ambiguity(
   let parts : Array[String] = repo_base
     .split("/")
     .filter(s => s.length() > 0)
-    .map(s => s.to_owned())
+    .map(s => s.to_string())
     .collect()
   if parts.length() >= 2 {
     let two_parts = parts[0] + "/" + parts[1]
@@ -217,7 +217,7 @@ fn parse_github_browser_url(url : String) -> GitHubShorthand? {
   let parts : Array[String] = path
     .split("/")
     .filter(s => s.length() > 0)
-    .map(s => s.to_owned())
+    .map(s => s.to_string())
     .collect()
   // Need at least: user/repo/tree|blob/branch/path.
   // parts[0] = user, parts[1] = repo, parts[2] = tree|blob, parts[3] = branch, parts[4+] = path

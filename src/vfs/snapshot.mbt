@@ -111,7 +111,7 @@ fn parse_commit_details(content : Bytes) -> (String, Int64, String) {
   let mut in_message = false
   let message_buf = StringBuilder::new()
   for line_view in text.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if in_message {
       if message_buf.to_string().length() > 0 {
         message_buf.write_char('\n')
@@ -143,7 +143,7 @@ fn parse_commit_details(content : Bytes) -> (String, Int64, String) {
   } nobreak {
     ()
   }
-  (author, timestamp, message_buf.to_string().trim().to_owned())
+  (author, timestamp, message_buf.to_string().trim().to_string())
 }
 
 ///|

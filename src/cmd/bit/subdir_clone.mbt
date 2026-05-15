@@ -158,7 +158,7 @@ async fn subdir_clone(
       }
       let head_text = @utf8.decode_lossy(head_ref[:])
         .trim(chars=" \n\r\t")
-        .to_owned()
+        .to_string()
       if head_text.has_prefix("ref: ") {
         let ref_name = String::unsafe_substring(
           head_text,
@@ -172,7 +172,7 @@ async fn subdir_clone(
         }
         let ref_text = @utf8.decode_lossy(ref_content[:])
           .trim(chars=" \n\r\t")
-          .to_owned()
+          .to_string()
         @bitcore.ObjectId::from_hex(ref_text) catch {
           _ =>
             raise @bitcore.GitError::InvalidObject("Invalid commit ID in ref")

@@ -434,7 +434,7 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
     let mut stdin_not_mode = false
     let mut stdin_end_of_options = false
     for line_view in input.split("\n") {
-      let line = trim_string(line_view.to_owned())
+      let line = trim_string(line_view.to_string())
       if line.length() == 0 || line.has_prefix("#") {
         continue
       }
@@ -1534,7 +1534,7 @@ async fn rev_list_test_bitmap(fs : OsFs, git_dir : String) -> Unit raise Error {
     let text = midx_bytes_to_string(chain_data, 0, chain_data.length())
     let mut last_hash = ""
     for raw_line in text.split("\n") {
-      let line = raw_line.to_owned().trim().to_owned()
+      let line = raw_line.to_string().trim().to_string()
       if line.length() > 0 {
         last_hash = line
       }
@@ -1635,7 +1635,7 @@ async fn rev_list_test_bitmap(fs : OsFs, git_dir : String) -> Unit raise Error {
 fn emit_revindex_trace(fs : OsFs, kind : String) -> Unit {
   match @sys.get_env_var("GIT_TRACE2_EVENT") {
     Some(path) => {
-      let target = path.trim().to_owned()
+      let target = path.trim().to_string()
       if target.length() == 0 || target == "1" || target == "2" {
         return
       }
@@ -1844,7 +1844,7 @@ fn rev_list_topo_sort_author_date(
 fn rev_list_extract_author_timestamp(data : Bytes) -> Int64 {
   let text = @utf8.decode_lossy(data[:])
   for line_view in text.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if line.length() == 0 {
       break
     }

@@ -22,7 +22,7 @@ async fn handle_verify_tag(args : Array[String]) -> Unit raise Error {
         )
         return
       }
-      _ if arg.has_prefix("--format=") => format = Some(arg[9:].to_owned())
+      _ if arg.has_prefix("--format=") => format = Some(arg[9:].to_string())
       _ if arg.has_prefix("-") => warn_unimplemented_arg("verify-tag", arg)
       _ => positional.push(arg)
     }

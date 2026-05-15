@@ -20,7 +20,7 @@ fn signing_commit_config_enabled(git_dir : String) -> Bool {
 
 ///|
 fn signing_normalize_config_value(value : String) -> String {
-  @bitlib.config_strip_quotes(value).trim().to_owned()
+  @bitlib.config_strip_quotes(value).trim().to_string()
 }
 
 ///|
@@ -108,8 +108,8 @@ fn signing_split_program(command : String) -> (String, Array[String]) {
 ///|
 fn signing_key(git_dir : String, key_override : String?) -> String? {
   match key_override {
-    Some(value) if value.trim().to_owned().length() > 0 =>
-      Some(value.trim().to_owned())
+    Some(value) if value.trim().to_string().length() > 0 =>
+      Some(value.trim().to_string())
     _ =>
       bit_config_get(git_dir, "user", "signingkey").map(
         signing_normalize_config_value,
@@ -124,7 +124,7 @@ fn signing_lines(signature : String) -> Array[String] raise @bitcore.GitError {
     .replace_all(old="\r\n", new="\n")
     .replace_all(old="\r", new="\n")
   for line_view in normalized.split("\n") {
-    lines.push(line_view.to_owned())
+    lines.push(line_view.to_string())
   }
   while lines.length() > 0 && lines[lines.length() - 1] == "" {
     ignore(lines.pop())
@@ -256,7 +256,7 @@ fn signing_parse_identity_timestamp_and_timezone(
 fn signing_payload_verify_time_arg(payload : Bytes) -> String? {
   let text = decode_bytes(payload)
   for line_view in text.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if line.length() == 0 {
       break
     }
@@ -552,7 +552,7 @@ async fn signing_emit_stderr_text(text : String) -> Unit raise Error {
     .replace_all(old="\r\n", new="\n")
     .replace_all(old="\r", new="\n")
   for line_view in normalized.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if line.length() == 0 {
       continue
     }
@@ -660,7 +660,7 @@ async fn signing_run_ssh_verifier(
   let principals : Array[String] = []
   if find_code == 0 {
     for line_view in find_stdout.split("\n") {
-      let line = trim_string(line_view.to_owned())
+      let line = trim_string(line_view.to_string())
       if line.length() > 0 {
         principals.push(line)
       }
@@ -801,7 +801,7 @@ async fn signing_run_stdout_signer(
       )
   }
   if code != 0 {
-    let stderr = (stderr_data.text() catch { _ => "" }).trim().to_owned()
+    let stderr = (stderr_data.text() catch { _ => "" }).trim().to_string()
     if stderr.length() > 0 {
       raise @bitcore.GitError::InvalidObject(stderr)
     }
@@ -861,7 +861,7 @@ async fn signing_run_ssh_signer(
   }
   let (code, _stdout_data, stderr_data) = result
   if code != 0 {
-    let stderr = (stderr_data.text() catch { _ => "" }).trim().to_owned()
+    let stderr = (stderr_data.text() catch { _ => "" }).trim().to_string()
     signing_try_remove_file(fs, temp_path)
     signing_try_remove_file(fs, sig_path)
     if stderr.length() > 0 {

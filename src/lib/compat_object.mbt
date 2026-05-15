@@ -71,13 +71,13 @@ pub fn compat_lookup_loose_object_idx(
     },
   )
   for line_view in text.split("\n") {
-    let line = line_view.to_owned().trim().to_owned()
+    let line = line_view.to_string().trim().to_string()
     if line.length() == 0 || line.has_prefix("#") {
       continue
     }
     let cols : Array[String] = []
     for col_view in line.split(" ") {
-      let col = col_view.to_owned().trim().to_owned()
+      let col = col_view.to_string().trim().to_string()
       if col.length() > 0 {
         cols.push(col)
       }

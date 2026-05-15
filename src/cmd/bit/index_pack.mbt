@@ -266,7 +266,7 @@ fn tag_missing_tagger(content : Bytes) -> Bool {
   let text = @utf8.decode_lossy(content[:])
   let mut found_tagger = false
   for line_view in text.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if line.length() == 0 {
       break
     }
@@ -281,7 +281,7 @@ fn tag_missing_tagger(content : Bytes) -> Bool {
 fn commit_has_missing_email(content : Bytes) -> Bool {
   let text = @utf8.decode_lossy(content[:])
   for line_view in text.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if line.length() == 0 {
       break
     }
@@ -304,7 +304,7 @@ fn parse_tag_object_id(
   let text = @utf8.decode_lossy(data[:])
   let mut object_hex : String? = None
   for line_view in text.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if line.length() == 0 {
       break
     }

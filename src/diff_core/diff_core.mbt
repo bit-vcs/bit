@@ -97,7 +97,7 @@ pub fn split_lines(data : Bytes) -> Array[String] {
   let text = @utf8.decode_lossy(data[:])
   let lines : Array[String] = []
   for line_view in text.split("\n") {
-    lines.push(line_view.to_owned())
+    lines.push(line_view.to_string())
   }
   if text.has_suffix("\n") &&
     lines.length() > 0 &&

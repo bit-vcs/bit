@@ -362,7 +362,7 @@ fn checkout_parse_tracking_source(
   }
   let parts : Array[String] = []
   for part in normalized.split("/") {
-    parts.push(part.to_owned())
+    parts.push(part.to_string())
   }
   if parts.length() < 2 {
     return None

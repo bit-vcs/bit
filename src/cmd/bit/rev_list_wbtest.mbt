@@ -97,7 +97,7 @@ async fn rev_list_test_bit_stdout(
 fn rev_list_sorted_nonempty_lines(s : String) -> String {
   let lines : Array[String] = []
   for line_view in s.split("\n") {
-    let line = line_view.to_owned()
+    let line = line_view.to_string()
     if line.length() > 0 {
       lines.push(line)
     }
@@ -331,7 +331,7 @@ async test "rev-list: indexed-objects tracks head tree ids even with extra stage
   guard commit_obj is Some(obj) else { fail("expected commit object") }
   let info = @bitcore.parse_commit(obj.data)
   match result.1.get("") {
-    Some(root_tree_hex) => @test.assert_eq(root_tree_hex, info.tree.to_hex())
+    Some(root_tree_hex) => assert_eq(root_tree_hex, info.tree.to_hex())
     None => fail("expected root tree entry")
   }
   assert_true(
@@ -371,7 +371,7 @@ async test "rev-list: indexed-objects keeps cached subtree after empty head comm
 
   assert_true(result.1.contains("two"))
   match result.1.get("two") {
-    Some(hex) => @test.assert_eq(hex, two_tree)
+    Some(hex) => assert_eq(hex, two_tree)
     None => fail("expected subtree cache-tree id")
   }
   assert_true(
@@ -415,7 +415,7 @@ async test "rev-list: shim setup keeps cached subtree after empty head commit" {
 
   assert_true(result.1.contains("two"))
   match result.1.get("two") {
-    Some(hex) => @test.assert_eq(hex, two_tree)
+    Some(hex) => assert_eq(hex, two_tree)
     None => fail("expected subtree cache-tree id")
   }
   assert_true(

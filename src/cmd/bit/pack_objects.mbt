@@ -654,7 +654,7 @@ fn apply_sparse_oid_filter(
   let patterns : Array[String] = []
   let lines = pattern_str.split("\n")
   lines.each(fn(line) {
-    let s = line.to_owned().trim().to_owned()
+    let s = line.to_string().trim().to_string()
     if s.length() > 0 && !s.has_prefix("#") {
       patterns.push(s)
     }
@@ -1357,7 +1357,7 @@ fn get_pack_reuse_mode(git_dir : String) -> PackReuseMode {
   // Check config override first
   match get_config_override("pack.allowPackReuse") {
     Some(value) => {
-      let v = value.trim().to_owned().to_lower()
+      let v = value.trim().to_string().to_lower()
       if v == "multi" {
         return PackReuseMode::Multi
       }
@@ -1374,7 +1374,7 @@ fn get_pack_reuse_mode(git_dir : String) -> PackReuseMode {
   // Check git config
   match bit_config_get(git_dir, "pack", "allowPackReuse") {
     Some(value) => {
-      let v = value.trim().to_owned().to_lower()
+      let v = value.trim().to_string().to_lower()
       if v == "multi" {
         return PackReuseMode::Multi
       }
