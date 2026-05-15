@@ -439,7 +439,7 @@ fn serve_extract_query_param(path : String, param : String) -> String? {
   let query = String::unsafe_substring(path, start=idx + 1, end=path.length())
   let prefix = param + "="
   for part_view in query.split("&") {
-    let part = part_view.to_string()
+    let part = part_view.to_owned()
     if part.has_prefix(prefix) {
       return Some(
         String::unsafe_substring(part, start=prefix.length(), end=part.length()),

@@ -26,6 +26,7 @@ import {
 import {
   "moonbitlang/core/bench" @bench,
   "mizchi/bit/osfs" @osfs,
+  "moonbitlang/core/test" @test,
 } for "wbtest"
 
 warnings = "-29"

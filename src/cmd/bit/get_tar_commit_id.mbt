@@ -97,7 +97,7 @@ fn tar_find_pax_comment(data : Bytes, start : Int, end : Int) -> String? {
   }
   let text = decode_bytes(bytes_from_array(arr))
   for line_view in text.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     if line.length() == 0 {
       continue
     }

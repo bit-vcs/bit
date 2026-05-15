@@ -767,7 +767,7 @@ fn parse_autocrlf_from_content(content : String) -> AutoCrlf? {
   let mut section = ""
   let mut value : AutoCrlf? = None
   for line_view in content.split("\n") {
-    let line = line_view.trim().to_string()
+    let line = line_view.trim().to_owned()
     if line.length() == 0 {
       continue
     }
@@ -776,7 +776,7 @@ fn parse_autocrlf_from_content(content : String) -> AutoCrlf? {
     }
     if line.has_prefix("[") && line.has_suffix("]") {
       let inner = String::unsafe_substring(line, start=1, end=line.length() - 1)
-      let inner_trim = inner.trim().to_string()
+      let inner_trim = inner.trim().to_owned()
       let section_name = match inner_trim.find(" ") {
         Some(i) => String::unsafe_substring(inner_trim, start=0, end=i)
         None => inner_trim
@@ -792,7 +792,7 @@ fn parse_autocrlf_from_content(content : String) -> AutoCrlf? {
       Some(idx) => {
         let key = String::unsafe_substring(line, start=0, end=idx)
           .trim()
-          .to_string()
+          .to_owned()
           .to_lower()
         if key != "autocrlf" {
           continue
@@ -803,7 +803,7 @@ fn parse_autocrlf_from_content(content : String) -> AutoCrlf? {
             end=line.length(),
           )
           .trim()
-          .to_string()
+          .to_owned()
           .to_lower()
         value = raw_value |> parse_autocrlf_value |> Some
       }

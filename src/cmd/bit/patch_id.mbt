@@ -29,7 +29,7 @@ fn patch_id_compute(input : String) -> Array[(String, String)] {
   let results : Array[(String, String)] = []
   let lines : Array[String] = []
   for line_view in input.split("\n") {
-    lines.push(line_view.to_string())
+    lines.push(line_view.to_owned())
   }
   // Process the diff to find individual patches (separated by "commit " or "diff --git")
   let normalized : Array[String] = []

@@ -131,7 +131,7 @@ pub fn parse_sync_link(text : String) -> SyncLink raise PrError {
   let mut last_push_at : Int64 = 0
   let mut remote_updated_at : Int64 = 0
   for line_view in text.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     if line.length() == 0 {
       continue
     }

@@ -2,3 +2,7 @@ import {
 }
 
 warnings = "-29"
+
+import {
+  "moonbitlang/core/test" @test,
+} for "test"

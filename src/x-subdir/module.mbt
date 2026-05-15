@@ -273,7 +273,7 @@ fn remove_hook_section(content : String, marker : String) -> String {
   let result = StringBuilder::new()
   let mut in_section = false
   for line_view in content.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     if line == marker {
       in_section = true
       continue
@@ -468,7 +468,7 @@ fn remove_config_section(content : String, section_name : String) -> String {
   let mut in_section = false
   let mut prev_was_empty = false
   for line_view in content.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     if line == section_header {
       in_section = true
       continue
@@ -547,7 +547,7 @@ fn remove_filter_from_gitattributes(
   // パターンとコメントを削除
   let result = StringBuilder::new()
   for line_view in content.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     if line == pattern_line || line == comment_line {
       continue
     }
@@ -673,7 +673,7 @@ fn remove_gitmodules_section(content : String, subdir_path : String) -> String {
   let section_header = "[submodule \"" + subdir_path + "\"]"
   let mut in_section = false
   for line_view in content.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     if line == section_header {
       in_section = true
       continue

@@ -194,7 +194,7 @@ fn fsck_resolve_ref(
     _ => return None
   }
   for line_view in packed.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     if line.has_prefix("#") || line.has_prefix("^") || line.length() == 0 {
       continue
     }

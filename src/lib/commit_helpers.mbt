@@ -33,7 +33,7 @@ fn commit_trim_string(s : String) -> String {
 pub fn commit_strip_message(msg : String) -> String {
   let lines : Array[String] = []
   for line_view in msg.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     let trimmed = commit_trim_string(line)
     // Skip comment lines (lines starting with #)
     if trimmed.has_prefix("#") {
@@ -91,7 +91,7 @@ pub fn commit_apply_signoff(msg : String, committer~ : String) -> String {
   // Check if signoff already present at the end
   let lines : Array[String] = []
   for line_view in msg.split("\n") {
-    lines.push(line_view.to_string())
+    lines.push(line_view.to_owned())
   }
   // Strip trailing newlines for checking
   let mut last_nonblank = lines.length() - 1
@@ -163,7 +163,7 @@ fn normalize_commit_encoding_name(value : String) -> String {
 /// Returns the ObjectId of the tagged object (from the "object <sha>" line).
 pub fn parse_tag_object(data : String) -> @bit.ObjectId? raise Error {
   for line_view in data.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     if line.has_prefix("object ") {
       let hex = String::unsafe_substring(line, start=7, end=line.length())
       return hex |> commit_trim_string |> @bit.ObjectId::from_hex |> Some

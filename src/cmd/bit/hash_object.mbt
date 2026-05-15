@@ -158,7 +158,7 @@ async fn hash_object_process_stdin_paths(
   let autocrlf = @bitlib.read_autocrlf_setting(rfs, git_dir)
   let cwd = get_cwd_for_hash_object()
   for line_view in text.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     if line.length() == 0 {
       continue
     }

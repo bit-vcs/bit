@@ -773,7 +773,7 @@ async fn grep_append_patterns_from_file(
     @utf8.decode_lossy(fs.read_file(path)[:])
   }
   for line_view in content.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     if line == "" {
       continue
     }
@@ -836,7 +836,7 @@ fn grep_append_pattern(
   if pattern.contains("\n") {
     let mut appended = false
     for line_view in pattern.split("\n") {
-      let line = line_view.to_string()
+      let line = line_view.to_owned()
       if line == "" {
         continue
       }
@@ -1045,7 +1045,7 @@ fn grep_parse_color_value(value : String) -> String? {
   }
   let tokens : Array[String] = []
   for token_view in trimmed.split(" ") {
-    let token = token_view.to_string()
+    let token = token_view.to_owned()
     if token != "" {
       tokens.push(token)
     }
@@ -2217,7 +2217,7 @@ fn grep_relative_repo_path(base : String, path : String) -> String {
 fn grep_split_path_segments(path : String) -> Array[String] {
   let out : Array[String] = []
   for segment_view in path.split("/") {
-    let segment = segment_view.to_string()
+    let segment = segment_view.to_owned()
     if segment == "" {
       continue
     }
@@ -2242,7 +2242,7 @@ fn grep_join_path_segments(parts : Array[String]) -> String {
 fn grep_split_content_lines(content : String) -> Array[String] {
   let lines : Array[String] = []
   for line_view in content.split("\n") {
-    lines.push(line_view.to_string())
+    lines.push(line_view.to_owned())
   }
   if content.has_suffix("\n") &&
     lines.length() > 0 &&

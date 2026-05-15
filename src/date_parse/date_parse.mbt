@@ -151,7 +151,7 @@ pub fn parse_approxidate_iso_date(s : String) -> Int64? {
 pub fn parse_approxidate_human(s : String) -> Int64? {
   let parts : Array[String] = []
   for p in s.split(" ") {
-    let ps = p.to_string()
+    let ps = p.to_owned()
     if ps.length() > 0 {
       parts.push(ps)
     }
@@ -172,7 +172,7 @@ pub fn parse_approxidate_human(s : String) -> Int64? {
       if parts.length() >= 4 {
         let time_parts : Array[String] = []
         for tp in parts[3].split(":") {
-          time_parts.push(tp.to_string())
+          time_parts.push(tp.to_owned())
         }
         if time_parts.length() >= 1 {
           hour = parse_int_from_string(time_parts[0])
@@ -211,7 +211,7 @@ pub fn parse_approxidate_relative(s : String, now : Int64) -> Int64? {
   let normalized = lower.replace_all(old=".", new=" ")
   let parts : Array[String] = []
   for p in normalized.split(" ") {
-    let ps = p.to_string()
+    let ps = p.to_owned()
     if ps.length() > 0 {
       parts.push(ps)
     }

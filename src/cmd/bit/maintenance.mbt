@@ -104,7 +104,7 @@ fn get_config_value_simple(
   }
   let parts : Array[String] = []
   for p in key.split(".") {
-    parts.push(p.to_string())
+    parts.push(p.to_owned())
   }
   if parts.length() < 2 {
     return None
@@ -113,7 +113,7 @@ fn get_config_value_simple(
   let name = parts[parts.length() - 1]
   let mut in_section = false
   for line_view in content.split("\n") {
-    let line = trim_string(line_view.to_string())
+    let line = trim_string(line_view.to_owned())
     if line.has_prefix("[") && line.has_suffix("]") {
       let sec_content = String::unsafe_substring(
         line,

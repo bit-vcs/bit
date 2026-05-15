@@ -63,7 +63,7 @@ async fn handle_name_rev(args : Array[String]) -> Unit raise Error {
   if read_stdin {
     let input = decode_bytes(read_all_stdin())
     for line_view in input.split("\n") {
-      let line = line_view.to_string()
+      let line = line_view.to_owned()
       if line.length() == 0 {
         continue
       }
@@ -219,7 +219,7 @@ fn name_rev_deref_tag(
   let data = decode_bytes(o.data)
   // Parse "object <hex>" from tag
   for line_view in data.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     if line.has_prefix("object ") {
       let hex = trim_string(
         String::unsafe_substring(line, start=7, end=line.length()),

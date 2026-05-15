@@ -1170,7 +1170,7 @@ fn filter_worktree_config_content(content : String) -> String {
   let lines : Array[String] = []
   let mut current_section = ""
   for line_view in content.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     let trimmed = worktree_trim_whitespace(line)
     if trimmed.has_prefix("[") && trimmed.has_suffix("]") {
       let header = String::unsafe_substring(
@@ -1382,7 +1382,7 @@ fn worktree_strip_lock_suffixes(name : String) -> String {
   let mut done = false
   while !done {
     match current.strip_suffix(".lock") {
-      Some(stripped) => current = stripped.to_string()
+      Some(stripped) => current = stripped.to_owned()
       None => done = true
     }
   }
@@ -1419,7 +1419,7 @@ fn worktree_sanitize_admin_component(name : String) -> String {
   }
   let sanitized = worktree_strip_lock_suffixes(String::from_array(out[:]))
   match sanitized.strip_suffix(".") {
-    Some(stripped) => stripped.to_string()
+    Some(stripped) => stripped.to_owned()
     None => sanitized
   }
 }
@@ -1665,11 +1665,11 @@ fn worktree_compute_relative_path(
 ) -> String {
   let from_parts = normalize_path(from_dir)
     .split("/")
-    .map(fn(v) { v.to_string() })
+    .map(fn(v) { v.to_owned() })
     .to_array()
   let to_parts = normalize_path(to_path)
     .split("/")
-    .map(fn(v) { v.to_string() })
+    .map(fn(v) { v.to_owned() })
     .to_array()
   let mut common = 0
   let min_len = if from_parts.length() < to_parts.length() {
@@ -1993,7 +1993,7 @@ fn basename(path : String) -> String {
 fn normalize_path(path : String) -> String {
   let parts : Array[String] = []
   for part_view in path.split("/") {
-    let part = part_view.to_string()
+    let part = part_view.to_owned()
     if part == "" || part == "." {
       continue
     } else if part == ".." {

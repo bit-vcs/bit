@@ -78,7 +78,7 @@ test "blame: textconv diff driver on target path stays native" {
     assert_true(false)
     return
   }
-  assert_eq(cmd, "./helper")
+  @test.assert_eq(cmd, "./helper")
   assert_true(
     blame_effective_textconv_command(
       fs,
@@ -108,7 +108,7 @@ async test "blame: textconv transforms target blob content" {
     root + "/textconv.sh",
     "#!/bin/sh\nsed 's/raw/text/g' \"$1\"\n",
   )
-  assert_eq(
+  @test.assert_eq(
     @process.run("chmod", ["+x", root + "/textconv.sh"], inherit_env=true),
     0,
   )
@@ -141,7 +141,7 @@ async test "blame: textconv transforms target blob content" {
     "file.bin",
     Some(command),
   )
-  assert_eq(content, Some("text one\n"))
+  @test.assert_eq(content, Some("text one\n"))
   let raw_content = blame_get_file_at_commit_for_display(
     fs,
     db,
@@ -152,7 +152,7 @@ async test "blame: textconv transforms target blob content" {
     "file.bin",
     None,
   )
-  assert_eq(raw_content, Some("raw one\n"))
+  @test.assert_eq(raw_content, Some("raw one\n"))
   cleanup_tree(fs, root)
 }
 

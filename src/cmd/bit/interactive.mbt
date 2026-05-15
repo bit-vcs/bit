@@ -68,16 +68,16 @@ async fn run_add_interactive(
 ///|
 fn resolve_sequence_editor() -> String? {
   match @sys.get_env_var("GIT_SEQUENCE_EDITOR") {
-    Some(cmd) if cmd.trim().to_string().length() > 0 => Some(cmd)
+    Some(cmd) if cmd.trim().to_owned().length() > 0 => Some(cmd)
     _ =>
       match @sys.get_env_var("GIT_EDITOR") {
-        Some(cmd) if cmd.trim().to_string().length() > 0 => Some(cmd)
+        Some(cmd) if cmd.trim().to_owned().length() > 0 => Some(cmd)
         _ =>
           match @sys.get_env_var("VISUAL") {
-            Some(cmd) if cmd.trim().to_string().length() > 0 => Some(cmd)
+            Some(cmd) if cmd.trim().to_owned().length() > 0 => Some(cmd)
             _ =>
               match @sys.get_env_var("EDITOR") {
-                Some(cmd) if cmd.trim().to_string().length() > 0 => Some(cmd)
+                Some(cmd) if cmd.trim().to_owned().length() > 0 => Some(cmd)
                 _ => None
               }
           }
@@ -88,13 +88,13 @@ fn resolve_sequence_editor() -> String? {
 ///|
 fn resolve_commit_editor() -> String? {
   match @sys.get_env_var("GIT_EDITOR") {
-    Some(cmd) if cmd.trim().to_string().length() > 0 => Some(cmd)
+    Some(cmd) if cmd.trim().to_owned().length() > 0 => Some(cmd)
     _ =>
       match @sys.get_env_var("VISUAL") {
-        Some(cmd) if cmd.trim().to_string().length() > 0 => Some(cmd)
+        Some(cmd) if cmd.trim().to_owned().length() > 0 => Some(cmd)
         _ =>
           match @sys.get_env_var("EDITOR") {
-            Some(cmd) if cmd.trim().to_string().length() > 0 => Some(cmd)
+            Some(cmd) if cmd.trim().to_owned().length() > 0 => Some(cmd)
             _ => None
           }
       }
@@ -103,7 +103,7 @@ fn resolve_commit_editor() -> String? {
 
 ///|
 async fn run_editor_on_path(editor_cmd : String, path : String) -> Int {
-  let command = editor_cmd.trim().to_string()
+  let command = editor_cmd.trim().to_owned()
   if command.length() == 0 {
     return 1
   }
@@ -149,21 +149,21 @@ fn normalize_commit_edit_buffer(content : String) -> String? {
   let lines = content.split("\n")
   let kept : Array[String] = []
   for line_view in lines {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     if line.has_prefix("#") {
       continue
     }
     kept.push(line)
   }
   let mut start = 0
-  while start < kept.length() && kept[start].trim().to_string().length() == 0 {
+  while start < kept.length() && kept[start].trim().to_owned().length() == 0 {
     start += 1
   }
   if start >= kept.length() {
     return None
   }
   let mut end = kept.length() - 1
-  while end >= start && kept[end].trim().to_string().length() == 0 {
+  while end >= start && kept[end].trim().to_owned().length() == 0 {
     end -= 1
   }
   let sb = StringBuilder::new()
@@ -174,7 +174,7 @@ fn normalize_commit_edit_buffer(content : String) -> String? {
     sb.write_string(kept[i])
   }
   let msg = sb.to_string()
-  if msg.trim().to_string().length() == 0 {
+  if msg.trim().to_owned().length() == 0 {
     None
   } else {
     Some(msg)

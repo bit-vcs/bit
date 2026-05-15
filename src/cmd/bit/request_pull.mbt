@@ -76,9 +76,9 @@ async fn handle_request_pull(args : Array[String]) -> Unit raise Error {
   // Get current branch name
   let head_content = decode_bytes(fs.read_file(git_dir + "/HEAD"))
   let branch = if head_content.has_prefix("ref: refs/heads/") {
-    trim_string(head_content[16:].to_string())
+    trim_string(head_content[16:].to_owned())
   } else {
-    end_id.to_hex()[:7].to_string()
+    end_id.to_hex()[:7].to_owned()
   }
   // Print request-pull output
   print_line("The following changes since commit " + start_id.to_hex() + ":")
@@ -88,7 +88,7 @@ async fn handle_request_pull(args : Array[String]) -> Unit raise Error {
     Some(obj) if obj.obj_type == @bitcore.ObjectType::Commit => {
       let first_line = plumb_get_first_line_of_commit(obj.data)
       print_line(
-        "  " + first_line + " (" + start_id.to_hex()[:10].to_string() + ")",
+        "  " + first_line + " (" + start_id.to_hex()[:10].to_owned() + ")",
       )
     }
     _ => ()
@@ -105,7 +105,7 @@ async fn handle_request_pull(args : Array[String]) -> Unit raise Error {
     Some(obj) if obj.obj_type == @bitcore.ObjectType::Commit => {
       let first_line = plumb_get_first_line_of_commit(obj.data)
       print_line(
-        "  " + first_line + " (" + end_id.to_hex()[:10].to_string() + ")",
+        "  " + first_line + " (" + end_id.to_hex()[:10].to_owned() + ")",
       )
     }
     _ => ()
@@ -123,7 +123,7 @@ fn plumb_get_first_line_of_commit(data : Bytes) -> String {
   // Skip header lines until empty line
   let mut in_body = false
   for line_view in text.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     if !in_body {
       if line.length() == 0 {
         in_body = true

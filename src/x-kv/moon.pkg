@@ -10,6 +10,7 @@ import {
   "mizchi/bit/vfs" @fs,
   "mizchi/bit/osfs" @osfs,
   "moonbitlang/x/fs" @nfs,
+  "moonbitlang/core/test" @test,
 } for "test"
 
 warnings = "-29"

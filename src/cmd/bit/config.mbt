@@ -2014,7 +2014,7 @@ fn format_config_output_value(
       val
     }
   } else if get_expiry_date {
-    let trimmed = val.trim().to_string().to_lower()
+    let trimmed = val.trim().to_owned().to_lower()
     if trimmed == "never" || trimmed == "false" {
       "0"
     } else {
@@ -2095,7 +2095,7 @@ fn format_config_source_name(source_name : String) -> String {
 
 ///|
 fn parse_config_color(value : String) -> String? {
-  let trimmed = value.trim().to_string().to_lower()
+  let trimmed = value.trim().to_owned().to_lower()
   let code = match trimmed {
     "black" => "30"
     "red" => "31"
@@ -3351,7 +3351,7 @@ fn remove_config_section_file(
   }
   let parts : Array[String] = []
   for p in section_key.split(".") {
-    parts.push(p.to_string())
+    parts.push(p.to_owned())
   }
   if parts.length() == 0 {
     return
@@ -3420,7 +3420,7 @@ fn rename_config_section(
   // Validate section part of new_name (before first dot)
   let new_sec_parts : Array[String] = []
   for p in new_name.split(".") {
-    new_sec_parts.push(p.to_string())
+    new_sec_parts.push(p.to_owned())
   }
   let new_sec_name = new_sec_parts[0]
   if !is_valid_section_name(new_sec_name) {
@@ -3431,7 +3431,7 @@ fn rename_config_section(
   // Parse old section key
   let old_parts : Array[String] = []
   for p in old_name.split(".") {
-    old_parts.push(p.to_string())
+    old_parts.push(p.to_owned())
   }
   if old_parts.length() == 0 {
     return
@@ -3448,7 +3448,7 @@ fn rename_config_section(
   // Parse new section key
   let new_parts : Array[String] = []
   for p in new_name.split(".") {
-    new_parts.push(p.to_string())
+    new_parts.push(p.to_owned())
   }
   if new_parts.length() == 0 {
     return

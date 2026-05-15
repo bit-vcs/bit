@@ -18,7 +18,7 @@ async fn handle_mailsplit(args : Array[String]) -> Unit raise Error {
         return
       }
       _ if arg.has_prefix("-o") => {
-        let dir = arg[2:].to_string()
+        let dir = arg[2:].to_owned()
         if dir.length() > 0 {
           output_dir = dir
         } else {
@@ -109,7 +109,7 @@ async fn handle_mailsplit(args : Array[String]) -> Unit raise Error {
 fn mailsplit_split_lines(input : String) -> Array[String] {
   let lines : Array[String] = []
   for line_view in input.split("\n") {
-    lines.push(line_view.to_string())
+    lines.push(line_view.to_owned())
   }
   // Remove trailing empty string from final newline
   if lines.length() > 0 && lines[lines.length() - 1].length() == 0 {

@@ -54,7 +54,7 @@ fn trim_string_internal(s : String) -> String {
 
 ///|
 pub fn config_strip_quotes(s : String) -> String {
-  let t = s.trim().to_string()
+  let t = s.trim().to_owned()
   if t.length() >= 2 && t.has_prefix("\"") && t.has_suffix("\"") {
     String::unsafe_substring(t, start=1, end=t.length() - 1)
   } else {
@@ -113,7 +113,7 @@ pub fn parse_config_blocks(content : String) -> Array[ConfigBlock] {
     lines: [],
   }
   for line_view in content.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     let trimmed = trim_string_internal(line)
     if trimmed.has_prefix("[") && trimmed.has_suffix("]") {
       if current.header is Some(_) || current.lines.length() > 0 {
@@ -192,7 +192,7 @@ pub fn parse_remote_config(
   let mut current_section : String? = None
   let mut current_name : String? = None
   for line_view in content.split("\n") {
-    let line = trim_string_internal(line_view.to_string())
+    let line = trim_string_internal(line_view.to_owned())
     if line.length() == 0 || line.has_prefix("#") || line.has_prefix(";") {
       continue
     }
@@ -267,7 +267,7 @@ pub fn parse_remote_config(
               "merge" => {
                 let parts = value.split(" ").collect()
                 for p_view in parts {
-                  let p = p_view.to_string().trim().to_string()
+                  let p = p_view.to_owned().trim().to_owned()
                   if p.length() > 0 {
                     bc.merges.push(p)
                   }
@@ -541,7 +541,7 @@ pub fn get_remote_url(
   let target_section = "[remote \"\{name}\"]"
   let mut in_section = false
   for line_view in content.split("\n") {
-    let line = trim_string_internal(line_view.to_string())
+    let line = trim_string_internal(line_view.to_owned())
     if line == target_section {
       in_section = true
       continue
@@ -838,7 +838,7 @@ pub fn set_config_key(
   let mut found_section = false
   let mut key_set = false
   for line_view in content.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     let trimmed = trim_string_internal(line)
     if trimmed == target_section {
       in_section = true

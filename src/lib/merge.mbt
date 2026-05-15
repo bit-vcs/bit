@@ -908,11 +908,11 @@ fn merge_entry_eq(a : TreeFileEntry?, b : TreeFileEntry?) -> Bool {
 fn merge_common_line_prefix(a : String, b : String) -> String {
   let a_arr : Array[String] = []
   for part in a.split("\n") {
-    a_arr.push(part.to_string())
+    a_arr.push(part.to_owned())
   }
   let b_arr : Array[String] = []
   for part in b.split("\n") {
-    b_arr.push(part.to_string())
+    b_arr.push(part.to_owned())
   }
   let result = StringBuilder::new()
   let limit = if a_arr.length() < b_arr.length() {

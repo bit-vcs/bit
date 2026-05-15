@@ -146,7 +146,7 @@ fn get_commit_tree_ident(
       )
       let mut in_user = false
       for line_view in content.split("\n") {
-        let line = trim_chars(line_view.to_string(), " \t\r")
+        let line = trim_chars(line_view.to_owned(), " \t\r")
         if line.has_prefix("[user]") {
           in_user = true
           continue

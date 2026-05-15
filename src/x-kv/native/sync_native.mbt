@@ -329,7 +329,7 @@ pub fn encode_gossip_message(msg : @kv.GossipMessage) -> String {
 pub fn decode_gossip_message(
   text : String,
 ) -> Result[@kv.GossipMessage?, String] {
-  let trimmed = text.trim().to_string()
+  let trimmed = text.trim().to_owned()
   if trimmed.length() == 0 || trimmed == "null" {
     return Ok(None)
   }

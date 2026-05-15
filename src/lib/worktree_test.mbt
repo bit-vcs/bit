@@ -117,10 +117,10 @@ async test "worktree: commit writes HEAD and branch reflogs" {
   )
   let head_log = read_reflog(fs, "/repo/.git", "HEAD")
   let branch_log = read_reflog(fs, "/repo/.git", "refs/heads/main")
-  assert_eq(head_log.length(), 1)
-  assert_eq(branch_log.length(), 1)
-  assert_eq(head_log[0].message, "commit (initial): msg")
-  assert_eq(branch_log[0].message, "commit (initial): msg")
+  @test.assert_eq(head_log.length(), 1)
+  @test.assert_eq(branch_log.length(), 1)
+  @test.assert_eq(head_log[0].message, "commit (initial): msg")
+  @test.assert_eq(branch_log[0].message, "commit (initial): msg")
 }
 
 ///|
@@ -156,7 +156,7 @@ async test "worktree: sha256 compat repo records loose-object-idx mappings" {
     [@bit.TreeEntry::new("100644", "hello", blob_compat)],
   )
   assert_true(fs.is_file(worktree_test_object_path(git_dir, blob_storage)))
-  assert_eq(
+  @test.assert_eq(
     compat_lookup_loose_object_idx(fs, git_dir, blob_storage.to_hex()),
     Some(blob_compat.to_hex()),
   )
@@ -164,10 +164,10 @@ async test "worktree: sha256 compat repo records loose-object-idx mappings" {
   let tree_id = @bit.parse_commit(commit_obj.data).tree
   let tree_obj = ObjectDb::load(fs, git_dir).get(fs, tree_id).unwrap()
   let tree_entries = @bit.parse_tree(tree_obj.data)
-  assert_eq(tree_entries.length(), 1)
-  assert_eq(tree_entries[0].name, "hello")
-  assert_eq(tree_entries[0].mode, "100644")
-  assert_eq(tree_entries[0].id.to_hex(), blob_storage.to_hex())
+  @test.assert_eq(tree_entries.length(), 1)
+  @test.assert_eq(tree_entries[0].name, "hello")
+  @test.assert_eq(tree_entries[0].mode, "100644")
+  @test.assert_eq(tree_entries[0].id.to_hex(), blob_storage.to_hex())
   let tree_compat = compat_lookup_loose_object_idx(
     fs,
     git_dir,
@@ -180,7 +180,7 @@ async test "worktree: sha256 compat repo records loose-object-idx mappings" {
   )
   assert_true(tree_compat is Some(_))
   assert_true(commit_compat is Some(_))
-  assert_eq(tree_compat.unwrap(), expected_tree_compat.to_hex())
+  @test.assert_eq(tree_compat.unwrap(), expected_tree_compat.to_hex())
   let (expected_commit_compat, _) = @object.create_commit_with_algo(
     @object.HashAlgorithm::Sha1,
     @bit.Commit::new(
@@ -195,7 +195,7 @@ async test "worktree: sha256 compat repo records loose-object-idx mappings" {
       "Initial commit\n",
     ),
   )
-  assert_eq(commit_compat.unwrap(), expected_commit_compat.to_hex())
+  @test.assert_eq(commit_compat.unwrap(), expected_commit_compat.to_hex())
 }
 
 ///|
@@ -319,10 +319,10 @@ async test "worktree: amend preserves gitlink entries without local object" {
   let commit_info = @bit.parse_commit(commit_obj.data)
   let tree_obj = db.get(fs, commit_info.tree).unwrap()
   let tree_entries = @bit.parse_tree(tree_obj.data)
-  assert_eq(tree_entries.length(), 2)
-  assert_eq(tree_entries[1].mode, "160000")
-  assert_eq(tree_entries[1].name, "submodule")
-  assert_eq(
+  @test.assert_eq(tree_entries.length(), 2)
+  @test.assert_eq(tree_entries[1].mode, "160000")
+  @test.assert_eq(tree_entries[1].name, "submodule")
+  @test.assert_eq(
     tree_entries[1].id.to_hex(),
     "e598ccc29ff366687aa04587483454a7925521ae",
   )
@@ -343,11 +343,11 @@ async test "worktree: mv_path moves gitlink directory" {
   mv_path(fs, fs, "/repo", "child", "child_old")
 
   let entries = read_index_entries(fs, "/repo/.git")
-  assert_eq(entries.length(), 1)
-  assert_eq(entries[0].path, "child_old")
+  @test.assert_eq(entries.length(), 1)
+  @test.assert_eq(entries[0].path, "child_old")
   assert_false(fs.is_dir("/repo/child"))
   assert_true(fs.is_dir("/repo/child_old"))
-  assert_eq(
+  @test.assert_eq(
     fs.read_string("/repo/child_old/.git"),
     "gitdir: ../.git/modules/child\n",
   )
@@ -371,7 +371,7 @@ async test "worktree: mv_path updates gitmodules path for gitlink rename" {
 
   mv_path(fs, fs, "/repo", "a", "b")
 
-  assert_eq(
+  @test.assert_eq(
     fs.read_string("/repo/.gitmodules"),
     "[submodule \"a\"]\n\tpath = b\n\turl = ../submodule\n",
   )
@@ -388,7 +388,7 @@ async test "worktree: mv_path updates gitmodules path for gitlink rename" {
   }
   let db = ObjectDb::load_lazy(fs, "/repo/.git")
   let gitmodules_obj = db.get(fs, entry.id).unwrap()
-  assert_eq(
+  @test.assert_eq(
     @utf8.decode_lossy(gitmodules_obj.data),
     "[submodule \"a\"]\n\tpath = b\n\turl = ../submodule\n",
   )

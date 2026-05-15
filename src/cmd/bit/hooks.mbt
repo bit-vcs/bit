@@ -229,7 +229,7 @@ fn resolve_hooks_dir(
   if rfs.is_file(config_path) {
     match @bitlib.read_config_value(rfs, config_path, "core", "hookspath") {
       Some(custom) => {
-        let trimmed = custom.trim().to_string()
+        let trimmed = custom.trim().to_owned()
         if trimmed.length() > 0 {
           // Absolute path or relative to root
           return if trimmed.has_prefix("/") {

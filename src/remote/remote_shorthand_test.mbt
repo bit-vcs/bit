@@ -10,5 +10,5 @@ test "remote/shorthand: parse repo ref shorthand" {
 ///|
 test "remote/shorthand: ambiguity detects first path segment" {
   let result = check_shorthand_ambiguity("user/repo:src", p => p == "user")
-  assert_eq(result, Some("user"))
+  @test.assert_eq(result, Some("user"))
 }

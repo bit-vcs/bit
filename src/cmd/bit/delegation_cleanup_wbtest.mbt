@@ -10,7 +10,7 @@ test "pack-objects parser tracks repack flags" {
       assert_true(cfg.reflog)
       assert_true(cfg.indexed_objects)
       assert_true(cfg.unpack_unreachable)
-      assert_eq(cfg.unpack_unreachable_expiration, 0L)
+      @test.assert_eq(cfg.unpack_unreachable_expiration, 0L)
     }
     _ => fail("expected pack-objects parse ok")
   }
@@ -30,7 +30,7 @@ test "index-pack parser handles options natively" {
   match parse_index_pack_args(["--stdin", "--rev-index"]) {
     IndexPackParse::Ok(cfg) => {
       assert_true(cfg.stdin)
-      assert_eq(cfg.write_rev_index, Some(true))
+      @test.assert_eq(cfg.write_rev_index, Some(true))
     }
     _ => fail("expected index-pack parse ok")
   }

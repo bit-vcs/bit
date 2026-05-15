@@ -55,7 +55,7 @@ fn split_path(path : String) -> Array[String] {
     return out
   }
   for part_view in norm.split("/") {
-    let part = part_view.to_string()
+    let part = part_view.to_owned()
     if part.length() > 0 {
       out.push(part)
     }

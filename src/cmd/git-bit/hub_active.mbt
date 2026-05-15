@@ -11,7 +11,7 @@ fn parse_active_issues(content : String) -> Array[String] {
     return result
   }
   for line_view in content.split("\n") {
-    let trimmed = line_view.to_string().trim().to_string()
+    let trimmed = line_view.to_owned().trim().to_owned()
     if trimmed.length() > 0 {
       result.push(trimmed)
     }

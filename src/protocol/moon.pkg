@@ -9,6 +9,7 @@ import {
   "mizchi/bit" @bit,
   "mizchi/bit/pack" @pack,
   "moonbitlang/core/bench" @bench,
+  "moonbitlang/core/test" @test,
 } for "test"
 
 warnings = "-29"

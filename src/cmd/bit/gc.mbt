@@ -27,7 +27,7 @@ async fn handle_gc(args : Array[String]) -> Unit raise Error {
     match result.pack {
       Some(pack) =>
         print_line(
-          "Repacked \{pack.object_count} objects into pack-\{pack.pack_id.to_hex()[:8].to_string()}",
+          "Repacked \{pack.object_count} objects into pack-\{pack.pack_id.to_hex()[:8].to_owned()}",
         )
       None => ()
     }

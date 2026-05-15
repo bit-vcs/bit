@@ -278,8 +278,8 @@ test "hq_get: clone new repository with explicit depth" {
 
   let result = hq_get(repo, config, options, exec, path_exists)
   inspect(result, content="Cloned(\"/tmp/bhq/mizchi/git\")")
-  assert_eq(commands.length(), 1)
-  assert_eq(
+  @test.assert_eq(commands.length(), 1)
+  @test.assert_eq(
     commands[0],
     "git clone --depth=2 https://github.com/mizchi/git.git /tmp/bhq/mizchi/git",
   )
@@ -319,9 +319,9 @@ test "hq_get: unshallow existing repository before update" {
 
   let result = hq_get(repo, config, options, exec, path_exists)
   inspect(result, content="Updated(\"/tmp/bhq/mizchi/git\")")
-  assert_eq(commands.length(), 2)
-  assert_eq(commands[0], "cd /tmp/bhq/mizchi/git && git fetch --unshallow")
-  assert_eq(commands[1], "cd /tmp/bhq/mizchi/git && git pull --ff-only")
+  @test.assert_eq(commands.length(), 2)
+  @test.assert_eq(commands[0], "cd /tmp/bhq/mizchi/git && git fetch --unshallow")
+  @test.assert_eq(commands[1], "cd /tmp/bhq/mizchi/git && git pull --ff-only")
 }
 
 ///|

@@ -35,7 +35,7 @@ test "clone local source file resolver: existing relative bundle path" {
   let resolved = resolve_local_clone_source_file(
     fs, "/work/repo", "repo.bundle",
   )
-  assert_eq(resolved, Some("/work/repo/repo.bundle"))
+  @test.assert_eq(resolved, Some("/work/repo/repo.bundle"))
 }
 
 ///|
@@ -45,7 +45,7 @@ test "clone local source file resolver: file URL path" {
   let resolved = resolve_local_clone_source_file(
     fs, "/work/repo", "file:///tmp/repo.bundle",
   )
-  assert_eq(resolved, Some("/tmp/repo.bundle"))
+  @test.assert_eq(resolved, Some("/tmp/repo.bundle"))
 }
 
 ///|
@@ -54,7 +54,7 @@ test "clone local source file resolver: remote URL is ignored" {
   let resolved = resolve_local_clone_source_file(
     fs, "/work/repo", "https://example.com/repo.bundle",
   )
-  assert_eq(resolved, None)
+  @test.assert_eq(resolved, None)
 }
 
 ///|
@@ -87,7 +87,7 @@ test "clone relay: select preferred sender when available" {
     preferred_sender=Some("node-b"),
     preferred_repo=None,
   )
-  assert_eq(selected, Some(("node-b", "http://node-b:9418/repo.git")))
+  @test.assert_eq(selected, Some(("node-b", "http://node-b:9418/repo.git")))
 }
 
 ///|
@@ -101,7 +101,7 @@ test "clone relay: fallback to first sender when preferred missing" {
     preferred_sender=Some("node-z"),
     preferred_repo=None,
   )
-  assert_eq(selected, Some(("node-a", "http://node-a:9418/repo.git")))
+  @test.assert_eq(selected, Some(("node-a", "http://node-a:9418/repo.git")))
 }
 
 ///|
@@ -112,27 +112,27 @@ test "clone relay: no peers returns none" {
     preferred_sender=None,
     preferred_repo=None,
   )
-  assert_eq(selected, None)
+  @test.assert_eq(selected, None)
 }
 
 ///|
 test "clone relay: preferred sender env is trimmed and optional" {
   @sys.set_env_var("BIT_RELAY_CLONE_SENDER", " node-preferred ")
-  assert_eq(clone_relay_preferred_sender(), Some("node-preferred"))
+  @test.assert_eq(clone_relay_preferred_sender(), Some("node-preferred"))
   @sys.set_env_var("BIT_RELAY_CLONE_SENDER", "   ")
-  assert_eq(clone_relay_preferred_sender(), None)
+  @test.assert_eq(clone_relay_preferred_sender(), None)
   @sys.unset_env_var("BIT_RELAY_CLONE_SENDER")
-  assert_eq(clone_relay_preferred_sender(), None)
+  @test.assert_eq(clone_relay_preferred_sender(), None)
 }
 
 ///|
 test "clone relay: preferred repo env is trimmed and optional" {
   @sys.set_env_var("BIT_RELAY_CLONE_REPO", " repo-b ")
-  assert_eq(clone_relay_preferred_repo(), Some("repo-b"))
+  @test.assert_eq(clone_relay_preferred_repo(), Some("repo-b"))
   @sys.set_env_var("BIT_RELAY_CLONE_REPO", "   ")
-  assert_eq(clone_relay_preferred_repo(), None)
+  @test.assert_eq(clone_relay_preferred_repo(), None)
   @sys.unset_env_var("BIT_RELAY_CLONE_REPO")
-  assert_eq(clone_relay_preferred_repo(), None)
+  @test.assert_eq(clone_relay_preferred_repo(), None)
 }
 
 ///|
@@ -146,7 +146,7 @@ test "clone relay: preferred repo selects matching peer" {
     preferred_sender=None,
     preferred_repo=Some("repo-b"),
   )
-  assert_eq(selected, Some(("node-b", "http://node-b:9418/repo-b.git")))
+  @test.assert_eq(selected, Some(("node-b", "http://node-b:9418/repo-b.git")))
 }
 
 ///|
@@ -160,7 +160,7 @@ test "clone relay: sender filter is applied before repo filter" {
     preferred_sender=Some("node-a"),
     preferred_repo=Some("repo-b"),
   )
-  assert_eq(selected, Some(("node-a", "http://node-a:9418/repo-a.git")))
+  @test.assert_eq(selected, Some(("node-a", "http://node-a:9418/repo-a.git")))
 }
 
 ///|
@@ -221,16 +221,16 @@ test "clone: command root prefers shim pwd when cwd is absent" {
   let resolved = clone_command_root("/tmp/bit-clone-fallback")
   restore_clone_env("GIT_SHIM_CWD", prev_cwd)
   restore_clone_env("GIT_SHIM_PWD", prev_pwd)
-  assert_eq(resolved, "/tmp/bit-clone-command-root")
+  @test.assert_eq(resolved, "/tmp/bit-clone-command-root")
 }
 
 ///|
 test "clone: recurse-submodules option keeps exact filter value" {
-  assert_eq(
+  @test.assert_eq(
     clone_parse_recurse_submodules_filter("--recurse-submodules=sub0"),
     "sub0",
   )
-  assert_eq(
+  @test.assert_eq(
     clone_parse_recurse_submodules_filter("--recurse-submodules=:(exclude)sub0"),
     ":(exclude)sub0",
   )
@@ -238,11 +238,11 @@ test "clone: recurse-submodules option keeps exact filter value" {
 
 ///|
 test "clone: recurse submodule filters are forwarded to update args" {
-  assert_eq(
+  @test.assert_eq(
     clone_build_recurse_submodules_args([".", ":(exclude)sub0"], false),
     ["update", "--init", "--recursive", ".", ":(exclude)sub0"],
   )
-  assert_eq(clone_build_recurse_submodules_args(["sub0"], true), [
+  @test.assert_eq(clone_build_recurse_submodules_args(["sub0"], true), [
     "update", "--init", "--recursive", "-q", "sub0",
   ])
 }
@@ -263,7 +263,7 @@ test "clone: recurse submodule filters are written as config multivar" {
     (None : String?),
     false,
   )
-  assert_eq(values, [".", ":(exclude)sub0"])
+  @test.assert_eq(values, [".", ":(exclude)sub0"])
   cleanup_clone_wbtest_tree(fs, root)
 }
 
@@ -315,7 +315,7 @@ test "clone: sparse flag initializes cone sparse-checkout metadata" {
   clone_maybe_enable_sparse_checkout(fs, root, true, false) catch {
     err => fail("unexpected error: \{err}")
   }
-  assert_eq(
+  @test.assert_eq(
     decode_bytes(fs.read_file(git_dir + "/info/sparse-checkout")),
     "/*\n!/*/\n",
   )
@@ -408,7 +408,7 @@ test "clone transport tracking: writes origin head and branch config for checked
   finalize_transport_clone_tracking(fs, git_dir, "origin", false) catch {
     err => fail("unexpected error: \{err}")
   }
-  assert_eq(
+  @test.assert_eq(
     @bitlib.resolve_ref(fs, git_dir, "refs/remotes/origin/main").map(fn(id) {
       id.to_hex()
     }),
@@ -417,7 +417,7 @@ test "clone transport tracking: writes origin head and branch config for checked
   let remote_head = decode_bytes(
     fs.read_file(git_dir + "/refs/remotes/origin/HEAD"),
   )
-  assert_eq(remote_head, "ref: refs/remotes/origin/main\n")
+  @test.assert_eq(remote_head, "ref: refs/remotes/origin/main\n")
   let config = decode_bytes(fs.read_file(git_dir + "/config"))
   assert_true(config.contains("[branch \"main\"]"))
   assert_true(config.contains("remote = origin"))
@@ -443,7 +443,7 @@ test "clone empty transport: initializes empty repo metadata" {
   }
   assert_true(initialized)
   let git_dir = root + "/.git"
-  assert_eq(
+  @test.assert_eq(
     decode_bytes(fs.read_file(git_dir + "/HEAD")),
     "ref: refs/heads/main\n",
   )

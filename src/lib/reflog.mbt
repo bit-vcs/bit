@@ -52,7 +52,7 @@ pub fn read_reflog(
   let content = @utf8.decode_lossy(fs.read_file(reflog_path)[:])
   let entries : Array[ReflogEntry] = []
   for line_view in content.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     if line.length() == 0 {
       continue
     }
@@ -75,7 +75,7 @@ fn parse_reflog_line(line : String) -> ReflogEntry? {
   // Parse prefix: old_sha new_sha author_name <author_email> timestamp tz
   let parts : Array[String] = []
   for p in prefix.split(" ") {
-    parts.push(p.to_string())
+    parts.push(p.to_owned())
   }
   if parts.length() < 5 {
     return None
@@ -212,7 +212,7 @@ pub fn should_log_ref(
     let content = @utf8.decode_lossy(fs.read_file(config_path)[:])
     let mut in_core = false
     for line_view in content.split("\n") {
-      let line = trim_whitespace(line_view.to_string())
+      let line = trim_whitespace(line_view.to_owned())
       if line.has_prefix("[core]") {
         in_core = true
         continue

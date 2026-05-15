@@ -150,8 +150,8 @@ test "parse_symrefs_from_capabilities parses symref pairs" {
   let symrefs = parse_symrefs_from_capabilities([
     "report-status", "symref=HEAD:refs/heads/main", "symref=refs/remotes/origin/HEAD:refs/remotes/origin/main",
   ])
-  assert_eq(symrefs.get("HEAD"), Some("refs/heads/main"))
-  assert_eq(
+  @test.assert_eq(symrefs.get("HEAD"), Some("refs/heads/main"))
+  @test.assert_eq(
     symrefs.get("refs/remotes/origin/HEAD"),
     Some("refs/remotes/origin/main"),
   )
@@ -162,7 +162,7 @@ test "parse_symrefs_from_capabilities accepts symref-target capability" {
   let symrefs = parse_symrefs_from_capabilities([
     "ls-refs=unborn", "symref-target:refs/heads/main",
   ])
-  assert_eq(symrefs.get("HEAD"), Some("refs/heads/main"))
+  @test.assert_eq(symrefs.get("HEAD"), Some("refs/heads/main"))
 }
 
 ///|
@@ -207,7 +207,7 @@ test "select_default_wants ignores zero oid refs in empty repo" {
   ]
   let symrefs : Map[String, String] = { "HEAD": "refs/heads/main" }
   let wants = select_default_wants(refs, symrefs)
-  assert_eq(wants.length(), 0)
+  @test.assert_eq(wants.length(), 0)
 }
 
 ///|
@@ -218,7 +218,7 @@ test "select_default_ref ignores zero oid refs in empty repo" {
     (zero, "refs/heads/main"),
   ]
   let symrefs : Map[String, String] = { "HEAD": "refs/heads/main" }
-  assert_eq(select_default_ref(refs, symrefs), None)
+  @test.assert_eq(select_default_ref(refs, symrefs), None)
 }
 
 ///|
@@ -232,11 +232,11 @@ test "select_default_ref keeps non-zero symref target" {
     (main_id, "refs/heads/main"),
   ]
   let symrefs : Map[String, String] = { "HEAD": "refs/heads/main" }
-  assert_eq(
+  @test.assert_eq(
     select_default_ref(refs, symrefs),
     Some(("refs/heads/main", main_id)),
   )
   let wants = select_default_wants(refs, symrefs)
-  assert_eq(wants.length(), 1)
-  assert_eq(wants[0].to_hex(), main_id.to_hex())
+  @test.assert_eq(wants.length(), 1)
+  @test.assert_eq(wants[0].to_hex(), main_id.to_hex())
 }

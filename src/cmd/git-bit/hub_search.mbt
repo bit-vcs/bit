@@ -121,7 +121,7 @@ fn append_hub_search_types_by_token(
 fn parse_hub_search_types(value : String) -> Array[HubSearchType]? {
   let out : Array[HubSearchType] = []
   for part_view in value.split(",") {
-    let token = trim_string(part_view.to_string()).to_lower()
+    let token = trim_string(part_view.to_owned()).to_lower()
     if token.length() == 0 {
       continue
     }

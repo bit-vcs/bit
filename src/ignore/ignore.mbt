@@ -276,7 +276,7 @@ pub fn parse(content : String, base : String) -> Array[Rule] {
   let rules : Array[Rule] = []
   let base_len = base.length()
   for line_view in content.split("\n") {
-    let mut line = line_view.to_string()
+    let mut line = line_view.to_owned()
     // Handle CRLF
     if line.has_suffix("\r") {
       line = String::unsafe_substring(line, start=0, end=line.length() - 1)

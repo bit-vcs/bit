@@ -1336,7 +1336,7 @@ fn cat_file_read_alternate_object_dirs(
   let seen : Map[String, Bool] = {}
   let text = decode_bytes(data)
   for line_view in text.split("\n") {
-    let line = trim_string(line_view.to_string())
+    let line = trim_string(line_view.to_owned())
     if line.length() == 0 || line.has_prefix("#") {
       continue
     }
@@ -1879,13 +1879,13 @@ fn cat_file_lookup_loose_object_idx(
   }
   let text = decode_bytes(fs.read_file(idx_path) catch { _ => return None })
   for line_view in text.split("\n") {
-    let line = trim_string(line_view.to_string())
+    let line = trim_string(line_view.to_owned())
     if line.length() == 0 || line.has_prefix("#") {
       continue
     }
     let cols : Array[String] = []
     for col_view in line.split(" ") {
-      let col = trim_string(col_view.to_string())
+      let col = trim_string(col_view.to_owned())
       if col.length() > 0 {
         cols.push(col)
       }
@@ -2363,7 +2363,7 @@ fn cat_file_is_tree_mode(mode : String) -> Bool {
 fn cat_file_split_repo_path_parts(path : String) -> Array[String] {
   let parts : Array[String] = []
   for part_view in path.split("/") {
-    let part = part_view.to_string()
+    let part = part_view.to_owned()
     if part.length() == 0 || part == "." {
       continue
     }
@@ -2444,7 +2444,7 @@ fn cat_file_expand_symlink_follow_path(
     expanded.push(part)
   }
   for token_view in target.split("/") {
-    let token = token_view.to_string()
+    let token = token_view.to_owned()
     if token.length() == 0 || token == "." {
       continue
     }
@@ -2777,14 +2777,14 @@ fn cat_file_read_path_attrs(
       },
     )
     for line_view in text.split("\n") {
-      let line = trim_string(line_view.to_string())
+      let line = trim_string(line_view.to_owned())
       if line.length() == 0 || line.has_prefix("#") {
         continue
       }
       let tokens = line.split(" ")
       let words : Array[String] = []
       for token_view in tokens {
-        let token = trim_string(token_view.to_string())
+        let token = trim_string(token_view.to_owned())
         if token.length() > 0 {
           words.push(token)
         }

@@ -33,7 +33,7 @@ async fn handle_multi_pack_index(args : Array[String]) -> Unit raise Error {
         continue
       }
       _ if arg.has_prefix("--object-dir=") =>
-        object_dir = Some(resolve_in_cwd(arg[13:].to_string()))
+        object_dir = Some(resolve_in_cwd(arg[13:].to_owned()))
       "--progress" => progress = true
       "--no-progress" => progress = false
       "--batch-size" if i + 1 < args.length() => {
@@ -45,7 +45,7 @@ async fn handle_multi_pack_index(args : Array[String]) -> Unit raise Error {
         continue
       }
       _ if arg.has_prefix("--batch-size=") =>
-        batch_size = @string.parse_int(arg[13:].to_string()) catch {
+        batch_size = @string.parse_int(arg[13:].to_owned()) catch {
           err if @async.is_cancellation_error(err) => raise err
           _ => 0
         }
@@ -55,7 +55,7 @@ async fn handle_multi_pack_index(args : Array[String]) -> Unit raise Error {
         continue
       }
       _ if arg.has_prefix("--preferred-pack=") =>
-        preferred_pack = Some(arg[17:].to_string())
+        preferred_pack = Some(arg[17:].to_owned())
       "--stdin-packs" => stdin_packs = true
       "--bitmap" => {
         bitmap = true
@@ -72,7 +72,7 @@ async fn handle_multi_pack_index(args : Array[String]) -> Unit raise Error {
         continue
       }
       _ if arg.has_prefix("--refs-snapshot=") =>
-        refs_snapshot = Some(resolve_in_cwd(arg[16:].to_string()))
+        refs_snapshot = Some(resolve_in_cwd(arg[16:].to_owned()))
       "write" | "verify" | "expire" | "repack" => subcommand = Some(arg)
       _ if arg.has_prefix("-") => {
         warn_unimplemented_arg("multi-pack-index", arg)
@@ -1135,7 +1135,7 @@ fn midx_bytes_equal(a : Bytes, b : Bytes) -> Bool {
 
 ///|
 fn midx_normalize_stdin_pack_name(name : String) -> String? {
-  let trimmed = name.trim().to_string()
+  let trimmed = name.trim().to_owned()
   if trimmed.length() == 0 {
     return None
   }
@@ -1625,7 +1625,7 @@ fn midx_parse_config_bool(value : String) -> Bool? {
 fn midx_emit_lookup_table_trace(fs : OsFs) -> Unit {
   match @sys.get_env_var("GIT_TRACE2_EVENT") {
     Some(path) => {
-      let target = path.trim().to_string()
+      let target = path.trim().to_owned()
       if target.length() == 0 || target == "1" || target == "2" {
         return
       }
@@ -1837,7 +1837,7 @@ fn midx_split_bitmap_tip_prefixes(raw : String) -> Array[String] {
   let out : Array[String] = []
   let normalized = raw.replace(old=",", new=" ")
   for token in normalized.split(" ") {
-    let prefix = token.to_string().trim().to_string()
+    let prefix = token.to_owned().trim().to_owned()
     if prefix.length() > 0 {
       out.push(prefix)
     }
@@ -1867,7 +1867,7 @@ fn midx_collect_snapshot_specs(
   let data = fs.read_file(path) catch { _ => return out }
   let text = midx_bytes_to_string(data, 0, data.length())
   for raw_line in text.split("\n") {
-    let line = raw_line.to_string().trim().to_string()
+    let line = raw_line.to_owned().trim().to_owned()
     if line.length() == 0 {
       continue
     }
@@ -1876,7 +1876,7 @@ fn midx_collect_snapshot_specs(
     if spec.has_prefix("+") {
       preferred = true
       spec = String::unsafe_substring(spec, start=1, end=spec.length())
-      spec = spec.trim().to_string()
+      spec = spec.trim().to_owned()
     }
     if spec.length() == 0 {
       continue
@@ -1891,7 +1891,7 @@ fn midx_collect_snapshot_specs(
     }
     let token = String::unsafe_substring(spec, start=0, end=token_end)
       .trim()
-      .to_string()
+      .to_owned()
     if token.length() > 0 {
       out.push((token, preferred))
     }
@@ -2550,7 +2550,7 @@ fn midx_read_chain_hashes(fs : OsFs, pack_dir : String) -> Array[String] {
   let text = midx_bytes_to_string(data, 0, data.length())
   let out : Array[String] = []
   for raw_line in text.split("\n") {
-    let line = raw_line.to_string().trim().to_string()
+    let line = raw_line.to_owned().trim().to_owned()
     if line.length() > 0 {
       out.push(line)
     }
@@ -2692,7 +2692,7 @@ fn midx_write_rev_file(
 fn midx_should_write_rev() -> Bool {
   match @sys.get_env_var("GIT_TEST_MIDX_WRITE_REV") {
     Some(value) => {
-      let v = value.trim().to_string()
+      let v = value.trim().to_owned()
       v == "1" || v.to_lower() == "true"
     }
     None => false

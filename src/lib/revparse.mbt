@@ -190,7 +190,7 @@ fn commit_message_contains(data : Bytes, needle : String) -> Bool {
 fn parse_commit_committer_timestamp(data : Bytes) -> Int64 {
   let text = @utf8.decode_lossy(data[:])
   for line_view in text.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     if line.length() == 0 {
       break
     }
@@ -321,7 +321,7 @@ fn peel_object_to_tag(
 fn parse_tag_object_target(data : Bytes) -> @bit.ObjectId? {
   let text = @utf8.decode_lossy(data[:])
   for line_view in text.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     if line.length() == 0 {
       break
     }
@@ -670,7 +670,7 @@ fn ref_collect_packed(
 ) -> Unit raise @bit.GitError {
   let text = @utf8.decode_lossy(fs.read_file(packed_path)[:])
   for line_view in text.split("\n") {
-    let line = ref_trim_line(line_view.to_string())
+    let line = ref_trim_line(line_view.to_owned())
     if line.length() == 0 {
       continue
     }
@@ -705,7 +705,7 @@ fn ref_read_line(
 ) -> String raise @bit.GitError {
   let text = @utf8.decode_lossy(fs.read_file(path)[:])
   for line_view in text.split("\n") {
-    let line = ref_trim_line(line_view.to_string())
+    let line = ref_trim_line(line_view.to_owned())
     if line.length() > 0 {
       return line
     }
@@ -1063,7 +1063,7 @@ pub fn rev_parse_normalize_path(path : String) -> String {
   let parts = path.split("/")
   let result : Array[String] = []
   for part in parts {
-    let s = part.to_string()
+    let s = part.to_owned()
     if s == "." {
       continue
     } else if s == ".." {
@@ -1136,7 +1136,7 @@ pub fn normalize_index_pathspec_path(path : String) -> String {
 /// Extract the `object` header hex from tag text.
 pub fn rev_parse_extract_tag_target_name(tag_text : String) -> String? {
   for line_view in tag_text.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     if line.has_prefix("object ") {
       return Some(
         rev_parse_trim_string(

@@ -2,7 +2,7 @@
 fn normalize_repo_path_internal(path : String) -> String {
   let parts : Array[String] = []
   for part_view in path.split("/") {
-    let part = part_view.to_string()
+    let part = part_view.to_owned()
     if part == "" || part == "." {
       continue
     } else if part == ".." {
@@ -50,7 +50,7 @@ pub fn normalize_repo_path(path : String) -> String raise @bit.GitError {
 
 ///|
 fn split_path_parts(path : String) -> Array[String] {
-  path.split("/").filter(s => s.length() > 0).map(s => s.to_string()).collect()
+  path.split("/").filter(s => s.length() > 0).map(s => s.to_owned()).collect()
 }
 
 ///|

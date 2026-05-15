@@ -202,7 +202,7 @@ test "pr: init creates notes ref on first write" {
 
 ///|
 test "work item: meta key uses canonical namespace" {
-  assert_eq(work_item_meta_key("abc"), "hub/work-item/abc/meta")
+  @test.assert_eq(work_item_meta_key("abc"), "hub/work-item/abc/meta")
 }
 
 ///|
@@ -215,18 +215,18 @@ test "pr: create and get PR" {
   )
   let pr_id = pr.id()
   assert_true(pr_id.length() > 0)
-  assert_eq(pr.title(), "Fix authentication bug")
-  assert_eq(pr.state(), PrState::Open)
+  @test.assert_eq(pr.title(), "Fix authentication bug")
+  @test.assert_eq(pr.state(), PrState::Open)
   // Retrieve PR
   let retrieved = prs.get_pr(objects, pr_id)
   assert_true(retrieved is Some(_))
   guard retrieved is Some(r) else { panic() }
-  assert_eq(r.title(), "Fix authentication bug")
-  assert_eq(r.source_branch(), "refs/heads/feature")
-  assert_eq(r.target_branch(), "refs/heads/main")
+  @test.assert_eq(r.title(), "Fix authentication bug")
+  @test.assert_eq(r.source_branch(), "refs/heads/feature")
+  @test.assert_eq(r.target_branch(), "refs/heads/main")
   let record = prs.store.get_record(objects, work_item_meta_key(pr_id))
   guard record is Some(stored) else { panic() }
-  assert_eq(stored.kind, "work-item")
+  @test.assert_eq(stored.kind, "work-item")
   assert_true(stored.payload.has_prefix("work-item "))
 }
 
@@ -266,8 +266,8 @@ test "pr: get/list supports canonical work-item record" {
   let found = hub.get_pr(objects, imported.id())
   assert_true(found is Some(_))
   let prs = hub.list_prs(objects)
-  assert_eq(prs.length(), 1)
-  assert_eq(prs[0].id(), imported.id())
+  @test.assert_eq(prs.length(), 1)
+  @test.assert_eq(prs[0].id(), imported.id())
 }
 
 ///|
@@ -306,7 +306,7 @@ test "pr: list ignores legacy namespace records" {
   let found = hub.get_pr(objects, legacy_pr.id())
   assert_true(found is None)
   let prs = hub.list_prs(objects)
-  assert_eq(prs.length(), 0)
+  @test.assert_eq(prs.length(), 0)
 }
 
 ///|
@@ -322,9 +322,9 @@ test "pr: list PRs" {
     "bob@example.com",
   )
   let all = prs.list_prs(objects)
-  assert_eq(all.length(), 2)
+  @test.assert_eq(all.length(), 2)
   let open_hub = prs.list_prs(objects, state=Some(PrState::Open))
-  assert_eq(open_hub.length(), 2)
+  @test.assert_eq(open_hub.length(), 2)
 }
 
 ///|
@@ -336,11 +336,11 @@ test "pr proposal: propose and list without mutating canonical PR list" {
     "refs/heads/main", "carol@example.com",
   )
   let proposals = hub.list_pr_proposals(objects)
-  assert_eq(proposals.length(), 1)
-  assert_eq(proposals[0].id(), proposed.id())
-  assert_eq(proposals[0].title(), "Proposal PR")
+  @test.assert_eq(proposals.length(), 1)
+  @test.assert_eq(proposals[0].id(), proposed.id())
+  @test.assert_eq(proposals[0].title(), "Proposal PR")
   let canonical = hub.list_prs(objects)
-  assert_eq(canonical.length(), 0)
+  @test.assert_eq(canonical.length(), 0)
 }
 
 ///|
@@ -354,8 +354,8 @@ test "pr proposal: classify as notify-only trigger" {
   let proposal_key = pr_proposal_meta_key(proposed.id())
   let proposal_record = hub.store.get_record(objects, proposal_key)
   guard proposal_record is Some(record) else { panic() }
-  assert_eq(classify_record_trigger(record), RecordTriggerClass::NotifyOnly)
-  assert_eq(record_notify_topic(record), Some("hub.pr.proposal"))
+  @test.assert_eq(classify_record_trigger(record), RecordTriggerClass::NotifyOnly)
+  @test.assert_eq(record_notify_topic(record), Some("hub.pr.proposal"))
 }
 
 ///|
@@ -369,8 +369,8 @@ test "pr: classify canonical records as full triggers" {
   let key = work_item_meta_key(pr.id())
   let record = hub.store.get_record(objects, key)
   guard record is Some(r) else { panic() }
-  assert_eq(classify_record_trigger(r), RecordTriggerClass::Full)
-  assert_eq(record_notify_topic(r), None)
+  @test.assert_eq(classify_record_trigger(r), RecordTriggerClass::Full)
+  @test.assert_eq(record_notify_topic(r), None)
 }
 
 ///|
@@ -385,7 +385,7 @@ test "pr: close PR" {
   prs.close_pr(objects, refs, clock, pr_id)
   let closed = prs.get_pr(objects, pr_id)
   guard closed is Some(pr) else { panic() }
-  assert_eq(pr.state(), PrState::Closed)
+  @test.assert_eq(pr.state(), PrState::Closed)
 }
 
 ///|
@@ -401,7 +401,7 @@ test "pr: reopen PR" {
   prs.reopen_pr(objects, refs, clock, pr_id)
   let reopened = prs.get_pr(objects, pr_id)
   guard reopened is Some(pr2) else { panic() }
-  assert_eq(pr2.state(), PrState::Open)
+  @test.assert_eq(pr2.state(), PrState::Open)
 }
 
 ///|
@@ -442,12 +442,12 @@ test "pr: update PR" {
     title=Some("Updated Title"),
     body=Some("Updated body with more details"),
   )
-  assert_eq(updated.title(), "Updated Title")
-  assert_eq(updated.body(), "Updated body with more details")
+  @test.assert_eq(updated.title(), "Updated Title")
+  @test.assert_eq(updated.body(), "Updated body with more details")
   // Verify persisted
   let retrieved = hub.get_pr(objects, pr_id)
   guard retrieved is Some(pr) else { panic() }
-  assert_eq(pr.title(), "Updated Title")
+  @test.assert_eq(pr.title(), "Updated Title")
 }
 
 ///|
@@ -467,7 +467,7 @@ test "pr: update PR labels" {
     pr_id,
     labels=Some(["bug", "urgent"]),
   )
-  assert_eq(updated.labels().length(), 2)
+  @test.assert_eq(updated.labels().length(), 2)
   assert_true(updated.labels().contains("bug"))
 }
 
@@ -496,8 +496,8 @@ test "pr: add and list comments" {
   assert_true(c1.id().length() > 0)
   assert_true(c2.file_path() is Some(_))
   let comments = prs.list_comments(objects, pr_id)
-  assert_eq(comments.length(), 2)
-  assert_eq(comments[0].body(), "LGTM!")
+  @test.assert_eq(comments.length(), 2)
+  @test.assert_eq(comments[0].body(), "LGTM!")
 }
 
 ///|
@@ -521,9 +521,9 @@ test "pr: submit and list reviews" {
     "Looks good!",
     fid,
   )
-  assert_eq(r1.verdict(), ReviewVerdict::Approved)
+  @test.assert_eq(r1.verdict(), ReviewVerdict::Approved)
   let reviews = prs.list_reviews(objects, pr_id)
-  assert_eq(reviews.length(), 1)
+  @test.assert_eq(reviews.length(), 1)
   assert_true(prs.is_approved(objects, pr_id))
 }
 
@@ -699,10 +699,10 @@ test "pr workflow: record and list latest workflow result" {
     summary="passed",
   )
   let workflows = hub.list_pr_workflows(objects, pr.id())
-  assert_eq(workflows.length(), 1)
-  assert_eq(workflows[0].task(), "test")
-  assert_eq(workflows[0].status(), PrWorkflowStatus::Success)
-  assert_eq(workflows[0].workspace_fingerprint(), "fp-2")
+  @test.assert_eq(workflows.length(), 1)
+  @test.assert_eq(workflows[0].task(), "test")
+  @test.assert_eq(workflows[0].status(), PrWorkflowStatus::Success)
+  @test.assert_eq(workflows[0].workspace_fingerprint(), "fp-2")
 }
 
 ///|
@@ -780,11 +780,11 @@ test "pr: merge fast-forward" {
   )
   assert_true(result.success())
   assert_true(result.commit_id() is Some(_))
-  assert_eq(result.message(), "Fast-forward merge completed")
+  @test.assert_eq(result.message(), "Fast-forward merge completed")
   // Verify PR is marked as merged
   let merged = prs.get_pr(objects, pr_id)
   guard merged is Some(pr) else { panic() }
-  assert_eq(pr.state(), PrState::Merged)
+  @test.assert_eq(pr.state(), PrState::Merged)
 }
 
 ///|
@@ -805,10 +805,10 @@ test "pr: merge squash" {
     strategy=PrMergeStrategy::Squash,
   )
   assert_true(result.success())
-  assert_eq(result.message(), "Squash merge completed")
+  @test.assert_eq(result.message(), "Squash merge completed")
   let merged = hub.get_pr(objects, pr_id)
   guard merged is Some(pr) else { panic() }
-  assert_eq(pr.state(), PrState::Merged)
+  @test.assert_eq(pr.state(), PrState::Merged)
 }
 
 ///|
@@ -829,10 +829,10 @@ test "pr: merge commit" {
     strategy=PrMergeStrategy::Merge,
   )
   assert_true(result.success())
-  assert_eq(result.message(), "Merge commit created")
+  @test.assert_eq(result.message(), "Merge commit created")
   let merged = hub.get_pr(objects, pr_id)
   guard merged is Some(pr) else { panic() }
-  assert_eq(pr.state(), PrState::Merged)
+  @test.assert_eq(pr.state(), PrState::Merged)
 }
 
 ///|
@@ -853,9 +853,9 @@ test "format: serialize and parse PullRequest" {
   )
   let serialized = pr.serialize()
   let parsed = parse_legacy_pull_request(serialized)
-  assert_eq(parsed.id(), "42")
-  assert_eq(parsed.title(), "Test PR")
-  assert_eq(parsed.labels().length(), 2)
+  @test.assert_eq(parsed.id(), "42")
+  @test.assert_eq(parsed.title(), "Test PR")
+  @test.assert_eq(parsed.labels().length(), 2)
   assert_true(parsed.labels().contains("bug"))
 }
 
@@ -880,9 +880,9 @@ test "format: serialize and parse PullRequest with source metadata" {
   let serialized = pr.serialize()
   let parsed = parse_legacy_pull_request(serialized)
   guard parsed.source_repo() is Some(repo) else { panic() }
-  assert_eq(repo, "contrib/bit")
+  @test.assert_eq(repo, "contrib/bit")
   guard parsed.source_ref() is Some(source_ref) else { panic() }
-  assert_eq(source_ref, "refs/heads/feature")
+  @test.assert_eq(source_ref, "refs/heads/feature")
 }
 
 ///|
@@ -898,11 +898,11 @@ test "format: serialize and parse PrComment" {
   )
   let serialized = comment.serialize()
   let parsed = parse_pr_comment(serialized)
-  assert_eq(parsed.id(), "abc123")
-  assert_eq(parsed.pr_id(), "1")
+  @test.assert_eq(parsed.id(), "abc123")
+  @test.assert_eq(parsed.pr_id(), "1")
   assert_true(parsed.file_path() is Some(_))
   guard parsed.file_path() is Some(fp) else { panic() }
-  assert_eq(fp, "src/lib.mbt")
+  @test.assert_eq(fp, "src/lib.mbt")
 }
 
 ///|
@@ -918,8 +918,8 @@ test "format: serialize and parse PrReview" {
   )
   let serialized = review.serialize()
   let parsed = parse_pr_review(serialized)
-  assert_eq(parsed.id(), "rev123")
-  assert_eq(parsed.verdict(), ReviewVerdict::Approved)
+  @test.assert_eq(parsed.id(), "rev123")
+  @test.assert_eq(parsed.verdict(), ReviewVerdict::Approved)
 }
 
 ///|
@@ -937,16 +937,16 @@ test "issue: create and get issue" {
   )
   let issue_id = issue.id()
   assert_true(issue_id.length() > 0)
-  assert_eq(issue.title(), "Bug report")
-  assert_eq(issue.state(), IssueState::Open)
+  @test.assert_eq(issue.title(), "Bug report")
+  @test.assert_eq(issue.state(), IssueState::Open)
   let retrieved = prs.get_issue(objects, issue_id)
   assert_true(retrieved is Some(_))
   guard retrieved is Some(i) else { panic() }
-  assert_eq(i.title(), "Bug report")
-  assert_eq(i.labels().length(), 1)
+  @test.assert_eq(i.title(), "Bug report")
+  @test.assert_eq(i.labels().length(), 1)
   let record = prs.store.get_record(objects, work_item_meta_key(issue_id))
   guard record is Some(stored) else { panic() }
-  assert_eq(stored.kind, "work-item")
+  @test.assert_eq(stored.kind, "work-item")
   assert_true(stored.payload.has_prefix("work-item "))
 }
 
@@ -977,8 +977,8 @@ test "issue: get/list supports canonical work-item record" {
   let found = hub.get_issue(objects, imported.id())
   assert_true(found is Some(_))
   let issues = hub.list_issues(objects)
-  assert_eq(issues.length(), 1)
-  assert_eq(issues[0].id(), imported.id())
+  @test.assert_eq(issues.length(), 1)
+  @test.assert_eq(issues[0].id(), imported.id())
 }
 
 ///|
@@ -1008,7 +1008,7 @@ test "issue: list ignores legacy namespace records" {
   let found = hub.get_issue(objects, legacy_issue.id())
   assert_true(found is None)
   let issues = hub.list_issues(objects)
-  assert_eq(issues.length(), 0)
+  @test.assert_eq(issues.length(), 0)
 }
 
 ///|
@@ -1022,9 +1022,9 @@ test "issue: list issues" {
     objects, refs, clock, "Issue 2", "Second", "bob@example.com",
   )
   let all = prs.list_issues(objects)
-  assert_eq(all.length(), 2)
+  @test.assert_eq(all.length(), 2)
   let open_issues = prs.list_issues(objects, state=Some(IssueState::Open))
-  assert_eq(open_issues.length(), 2)
+  @test.assert_eq(open_issues.length(), 2)
 }
 
 ///|
@@ -1038,7 +1038,7 @@ test "issue: close issue" {
   prs.close_issue(objects, refs, clock, issue_id)
   let closed = prs.get_issue(objects, issue_id)
   guard closed is Some(issue) else { panic() }
-  assert_eq(issue.state(), IssueState::Closed)
+  @test.assert_eq(issue.state(), IssueState::Closed)
 }
 
 ///|
@@ -1053,7 +1053,7 @@ test "issue: reopen issue" {
   prs.reopen_issue(objects, refs, clock, issue_id)
   let reopened = prs.get_issue(objects, issue_id)
   guard reopened is Some(issue2) else { panic() }
-  assert_eq(issue2.state(), IssueState::Open)
+  @test.assert_eq(issue2.state(), IssueState::Open)
 }
 
 ///|
@@ -1092,7 +1092,7 @@ test "issue: add and list comments" {
   assert_true(c1.id().length() > 0)
   assert_true(c2.id().length() > 0)
   let comments = prs.list_issue_comments(objects, issue_id)
-  assert_eq(comments.length(), 2)
+  @test.assert_eq(comments.length(), 2)
 }
 
 ///|
@@ -1111,7 +1111,7 @@ test "issue: link PR to issue" {
   prs.link_pr_to_issue(objects, refs, clock, issue_id, pr_id)
   let updated = prs.get_issue(objects, issue_id)
   guard updated is Some(i) else { panic() }
-  assert_eq(i.linked_prs().length(), 1)
+  @test.assert_eq(i.linked_prs().length(), 1)
   assert_true(i.linked_prs().contains(pr_id))
 }
 
@@ -1133,7 +1133,7 @@ test "issue: link cross-repo issue" {
   let updated = hub.get_issue(objects, issue.id())
   assert_true(updated is Some(_))
   let updated = updated.unwrap()
-  assert_eq(updated.linked_issues(), ["bit-vcs/other#deadbeef"])
+  @test.assert_eq(updated.linked_issues(), ["bit-vcs/other#deadbeef"])
 }
 
 ///|
@@ -1152,11 +1152,11 @@ test "issue: update issue" {
     title=Some("Updated Title"),
     body=Some("Updated body"),
   )
-  assert_eq(updated.title(), "Updated Title")
-  assert_eq(updated.body(), "Updated body")
+  @test.assert_eq(updated.title(), "Updated Title")
+  @test.assert_eq(updated.body(), "Updated body")
   let retrieved = hub.get_issue(objects, issue_id)
   guard retrieved is Some(issue) else { panic() }
-  assert_eq(issue.title(), "Updated Title")
+  @test.assert_eq(issue.title(), "Updated Title")
 }
 
 ///|
@@ -1175,8 +1175,8 @@ test "issue: update issue labels and assignees" {
     labels=Some(["bug", "critical"]),
     assignees=Some(["bob@example.com"]),
   )
-  assert_eq(updated.labels().length(), 2)
-  assert_eq(updated.assignees().length(), 1)
+  @test.assert_eq(updated.labels().length(), 2)
+  @test.assert_eq(updated.assignees().length(), 1)
   assert_true(updated.assignees().contains("bob@example.com"))
 }
 
@@ -1200,19 +1200,19 @@ test "work item: get returns unified issue/pr view" {
   )
   let issue_item = hub.get_work_item(objects, issue.id())
   guard issue_item is Some(found_issue_item) else { panic() }
-  assert_eq(found_issue_item.kind(), WorkItemKind::Issue)
-  assert_eq(found_issue_item.state(), WorkItemState::Open)
-  assert_eq(found_issue_item.assignees().length(), 1)
+  @test.assert_eq(found_issue_item.kind(), WorkItemKind::Issue)
+  @test.assert_eq(found_issue_item.state(), WorkItemState::Open)
+  @test.assert_eq(found_issue_item.assignees().length(), 1)
   assert_true(found_issue_item.patch() is None)
 
   let pr_item = hub.get_work_item(objects, pr.id())
   guard pr_item is Some(found_pr_item) else { panic() }
-  assert_eq(found_pr_item.kind(), WorkItemKind::PullRequest)
-  assert_eq(found_pr_item.state(), WorkItemState::Open)
-  assert_eq(found_pr_item.assignees().length(), 0)
+  @test.assert_eq(found_pr_item.kind(), WorkItemKind::PullRequest)
+  @test.assert_eq(found_pr_item.state(), WorkItemState::Open)
+  @test.assert_eq(found_pr_item.assignees().length(), 0)
   guard found_pr_item.patch() is Some(pr_patch) else { panic() }
-  assert_eq(pr_patch.source_branch(), "refs/heads/feature")
-  assert_eq(pr_patch.target_branch(), "refs/heads/main")
+  @test.assert_eq(pr_patch.source_branch(), "refs/heads/feature")
+  @test.assert_eq(pr_patch.target_branch(), "refs/heads/main")
 }
 
 ///|
@@ -1230,29 +1230,29 @@ test "work item: list supports kind/state filters" {
   hub.close_pr(objects, refs, clock, pr.id())
 
   let all = hub.list_work_items(objects)
-  assert_eq(all.length(), 2)
+  @test.assert_eq(all.length(), 2)
 
   let closed = hub.list_work_items(objects, state=Some(WorkItemState::Closed))
-  assert_eq(closed.length(), 2)
+  @test.assert_eq(closed.length(), 2)
 
   let issue_only = hub.list_work_items(
     objects,
     state=Some(WorkItemState::Closed),
     kind=Some(WorkItemKind::Issue),
   )
-  assert_eq(issue_only.length(), 1)
-  assert_eq(issue_only[0].kind(), WorkItemKind::Issue)
+  @test.assert_eq(issue_only.length(), 1)
+  @test.assert_eq(issue_only[0].kind(), WorkItemKind::Issue)
 
   let pr_only = hub.list_work_items(
     objects,
     state=Some(WorkItemState::Closed),
     kind=Some(WorkItemKind::PullRequest),
   )
-  assert_eq(pr_only.length(), 1)
-  assert_eq(pr_only[0].kind(), WorkItemKind::PullRequest)
+  @test.assert_eq(pr_only.length(), 1)
+  @test.assert_eq(pr_only[0].kind(), WorkItemKind::PullRequest)
 
   let merged = hub.list_work_items(objects, state=Some(WorkItemState::Merged))
-  assert_eq(merged.length(), 0)
+  @test.assert_eq(merged.length(), 0)
 }
 
 ///|
@@ -1266,7 +1266,7 @@ test "work item: kind is derived from patch capability" {
     2L,
     WorkItemState::Open,
   )
-  assert_eq(issue_like.kind(), WorkItemKind::Issue)
+  @test.assert_eq(issue_like.kind(), WorkItemKind::Issue)
 
   let patch = WorkItemPatch::new(
     "refs/heads/feature",
@@ -1284,7 +1284,7 @@ test "work item: kind is derived from patch capability" {
     WorkItemState::Open,
     patch=Some(patch),
   )
-  assert_eq(pr_like.kind(), WorkItemKind::PullRequest)
+  @test.assert_eq(pr_like.kind(), WorkItemKind::PullRequest)
 }
 
 ///|
@@ -1303,11 +1303,11 @@ test "format: serialize and parse WorkItem issue" {
   )
   let serialized = item.serialize()
   let parsed = parse_work_item(serialized)
-  assert_eq(parsed.id(), "w-issue-1")
-  assert_eq(parsed.kind(), WorkItemKind::Issue)
+  @test.assert_eq(parsed.id(), "w-issue-1")
+  @test.assert_eq(parsed.kind(), WorkItemKind::Issue)
   guard parsed.to_issue() is Some(issue) else { panic() }
-  assert_eq(issue.title(), "Issue title")
-  assert_eq(issue.assignees().length(), 1)
+  @test.assert_eq(issue.title(), "Issue title")
+  @test.assert_eq(issue.assignees().length(), 1)
 }
 
 ///|
@@ -1340,13 +1340,13 @@ test "format: serialize and parse WorkItem pull request" {
   )
   let serialized = item.serialize()
   let parsed = parse_work_item(serialized)
-  assert_eq(parsed.id(), "w-pr-1")
-  assert_eq(parsed.kind(), WorkItemKind::PullRequest)
+  @test.assert_eq(parsed.id(), "w-pr-1")
+  @test.assert_eq(parsed.kind(), WorkItemKind::PullRequest)
   guard parsed.to_pull_request() is Some(pr) else { panic() }
-  assert_eq(pr.state(), PrState::Merged)
-  assert_eq(pr.closes_issues().length(), 1)
+  @test.assert_eq(pr.state(), PrState::Merged)
+  @test.assert_eq(pr.closes_issues().length(), 1)
   guard pr.merge_commit() is Some(parsed_merge_id) else { panic() }
-  assert_eq(parsed_merge_id, merge_id)
+  @test.assert_eq(parsed_merge_id, merge_id)
 }
 
 ///|
@@ -1364,10 +1364,10 @@ test "format: serialize and parse Issue" {
   )
   let serialized = issue.serialize()
   let parsed = parse_legacy_issue(serialized)
-  assert_eq(parsed.id(), "42")
-  assert_eq(parsed.title(), "Bug report")
-  assert_eq(parsed.labels().length(), 2)
-  assert_eq(parsed.assignees().length(), 1)
+  @test.assert_eq(parsed.id(), "42")
+  @test.assert_eq(parsed.title(), "Bug report")
+  @test.assert_eq(parsed.labels().length(), 2)
+  @test.assert_eq(parsed.assignees().length(), 1)
 }
 
 ///|
@@ -1377,8 +1377,8 @@ test "format: serialize and parse IssueComment" {
   )
   let serialized = comment.serialize()
   let parsed = parse_issue_comment(serialized)
-  assert_eq(parsed.id(), "abc123")
-  assert_eq(parsed.issue_id(), "1")
+  @test.assert_eq(parsed.id(), "abc123")
+  @test.assert_eq(parsed.issue_id(), "1")
 }
 
 ///|
@@ -1391,12 +1391,12 @@ test "notes: add and get note" {
     objects, refs, clock, cid, "This commit introduces the initial README.", "alice@example.com",
     1706745600L,
   )
-  assert_eq(note.body(), "This commit introduces the initial README.")
-  assert_eq(note.author(), "alice@example.com")
+  @test.assert_eq(note.body(), "This commit introduces the initial README.")
+  @test.assert_eq(note.author(), "alice@example.com")
   let retrieved = hub.get_note(objects, refs, cid)
   assert_true(retrieved is Some(_))
   guard retrieved is Some(n) else { panic() }
-  assert_eq(n.body(), "This commit introduces the initial README.")
+  @test.assert_eq(n.body(), "This commit introduces the initial README.")
 }
 
 ///|
@@ -1414,7 +1414,7 @@ test "notes: list notes" {
     objects, refs, clock, feature_id, "Note on feature", "bob@example.com", 1706832000L,
   )
   let notes = hub.list_notes(objects, refs)
-  assert_eq(notes.length(), 2)
+  @test.assert_eq(notes.length(), 2)
 }
 
 ///|
@@ -1467,10 +1467,10 @@ test "hub_record version round-trip" {
   )
   let serialized = record.serialize()
   let parsed = parse_hub_record(serialized)
-  assert_eq(parsed.version, 1)
-  assert_eq(parsed.key, "hub/pr/1/meta")
-  assert_eq(parsed.kind, "pr")
-  assert_eq(parsed.node, "node-a")
+  @test.assert_eq(parsed.version, 1)
+  @test.assert_eq(parsed.key, "hub/pr/1/meta")
+  @test.assert_eq(parsed.kind, "pr")
+  @test.assert_eq(parsed.node, "node-a")
 }
 
 ///|
@@ -1485,7 +1485,7 @@ test "hub_record signature round-trip" {
   )
   let serialized = record.serialize()
   let parsed = parse_hub_record(serialized)
-  assert_eq(parsed.signature, Some("deadbeef"))
+  @test.assert_eq(parsed.signature, Some("deadbeef"))
 }
 
 ///|
@@ -1501,8 +1501,8 @@ test "hub_record version=0 backward compat" {
     #|
     #|payload data
   let parsed = parse_hub_record(text)
-  assert_eq(parsed.version, 0)
-  assert_eq(parsed.key, "hub/pr/1/meta")
+  @test.assert_eq(parsed.version, 0)
+  @test.assert_eq(parsed.key, "hub/pr/1/meta")
 }
 
 ///|
@@ -1531,7 +1531,7 @@ test "pr merge_commit round-trip" {
   let parsed = parse_legacy_pull_request(serialized) catch { _ => panic() }
   assert_true(parsed.merge_commit() is Some(_))
   guard parsed.merge_commit() is Some(mc) else { panic() }
-  assert_eq(mc.to_hex(), "abcdef0123456789abcdef0123456789abcdef01")
+  @test.assert_eq(mc.to_hex(), "abcdef0123456789abcdef0123456789abcdef01")
 }
 
 ///|
@@ -1675,14 +1675,14 @@ test "signature: require_signed hides unsigned proposal records" {
   )
   strict_hub.reload_store(objects, refs)
   let strict_view = strict_hub.list_pr_proposals(objects)
-  assert_eq(strict_view.length(), 0)
+  @test.assert_eq(strict_view.length(), 0)
   let signed = strict_hub.propose_pr(
     objects, refs, clock, "Signed proposal", "Body", "refs/heads/feature", "refs/heads/main",
     "alice@example.com",
   )
   let strict_signed = strict_hub.list_pr_proposals(objects)
-  assert_eq(strict_signed.length(), 1)
-  assert_eq(strict_signed[0].id(), signed.id())
+  @test.assert_eq(strict_signed.length(), 1)
+  @test.assert_eq(strict_signed[0].id(), signed.id())
 }
 
 ///|
@@ -1706,7 +1706,7 @@ test "signature: wrong key hides signed proposal records" {
   )
   reader.reload_store(objects, refs)
   let seen = reader.list_pr_proposals(objects)
-  assert_eq(seen.length(), 0)
+  @test.assert_eq(seen.length(), 0)
 }
 
 ///|
@@ -1745,7 +1745,7 @@ test "format: serialize and parse WorkItem with linked_issues" {
   assert_true(serialized.contains("linked-issue bit-vcs/other-repo#a1b2c3d4"))
   assert_true(serialized.contains("linked-issue myteam/lib#deadbeef"))
   let parsed = parse_work_item(serialized)
-  assert_eq(parsed.linked_issues(), [
+  @test.assert_eq(parsed.linked_issues(), [
     "bit-vcs/other-repo#a1b2c3d4", "myteam/lib#deadbeef",
   ])
 }
@@ -1761,9 +1761,9 @@ test "format: serialize and parse Note" {
   )
   let serialized = note.serialize()
   let parsed = parse_note(serialized)
-  assert_eq(parsed.body(), "This is a helpful note.")
-  assert_eq(parsed.author(), "alice@example.com")
-  assert_eq(parsed.ns(), "commits")
+  @test.assert_eq(parsed.body(), "This is a helpful note.")
+  @test.assert_eq(parsed.author(), "alice@example.com")
+  @test.assert_eq(parsed.ns(), "commits")
 }
 
 ///|
@@ -1786,15 +1786,15 @@ test "sync_link: serialize and parse roundtrip" {
   assert_true(serialized.contains("repo owner/repo"))
   assert_true(serialized.contains("remote-number 42"))
   let parsed = parse_sync_link(serialized)
-  assert_eq(parsed.local_id(), "abc12345")
-  assert_eq(parsed.local_kind(), "issue")
-  assert_eq(parsed.provider(), "github")
-  assert_eq(parsed.repo(), "owner/repo")
-  assert_eq(parsed.remote_number(), 42)
-  assert_eq(parsed.remote_node_id(), "I_kwDOxxx")
-  assert_eq(parsed.last_pull_at(), 1774900000L)
-  assert_eq(parsed.last_push_at(), 1774900000L)
-  assert_eq(parsed.remote_updated_at(), 1774899000L)
+  @test.assert_eq(parsed.local_id(), "abc12345")
+  @test.assert_eq(parsed.local_kind(), "issue")
+  @test.assert_eq(parsed.provider(), "github")
+  @test.assert_eq(parsed.repo(), "owner/repo")
+  @test.assert_eq(parsed.remote_number(), 42)
+  @test.assert_eq(parsed.remote_node_id(), "I_kwDOxxx")
+  @test.assert_eq(parsed.last_pull_at(), 1774900000L)
+  @test.assert_eq(parsed.last_push_at(), 1774900000L)
+  @test.assert_eq(parsed.remote_updated_at(), 1774899000L)
 }
 
 ///|
@@ -1816,9 +1816,9 @@ test "hub: create and get sync_link" {
   let retrieved = hub.get_sync_link(objects, "issue-abc", "github")
   assert_true(retrieved is Some(_))
   let retrieved = retrieved.unwrap()
-  assert_eq(retrieved.local_id(), "issue-abc")
-  assert_eq(retrieved.remote_number(), 42)
-  assert_eq(retrieved.repo(), "owner/repo")
+  @test.assert_eq(retrieved.local_id(), "issue-abc")
+  @test.assert_eq(retrieved.remote_number(), 42)
+  @test.assert_eq(retrieved.repo(), "owner/repo")
 }
 
 ///|
@@ -1844,9 +1844,9 @@ test "hub: list sync_links for repo" {
     SyncLink::new("id-3", "issue", "github", "other/repo", remote_number=3),
   )
   let links = hub.list_sync_links(objects, repo="owner/repo")
-  assert_eq(links.length(), 2)
+  @test.assert_eq(links.length(), 2)
   let all_links = hub.list_sync_links(objects)
-  assert_eq(all_links.length(), 3)
+  @test.assert_eq(all_links.length(), 3)
 }
 
 ///|
@@ -1867,7 +1867,7 @@ test "hub: find sync_link by remote number" {
   )
   let found = hub.find_sync_link_by_remote(objects, "github", "owner/repo", 42)
   assert_true(found is Some(_))
-  assert_eq(found.unwrap().local_id(), "id-1")
+  @test.assert_eq(found.unwrap().local_id(), "id-1")
   let not_found = hub.find_sync_link_by_remote(
     objects, "github", "owner/repo", 99,
   )
@@ -1881,13 +1881,13 @@ test "github_types: parse GhIssue from JSON" {
   let parsed = @json.parse(json_str)
   guard parsed is Json::Object(obj) else { abort("not object") }
   let issue = GhIssue::from_json(obj)
-  assert_eq(issue.number, 42)
-  assert_eq(issue.node_id, "I_kwDOxxx")
-  assert_eq(issue.title, "Bug report")
-  assert_eq(issue.state, "open")
-  assert_eq(issue.user, "alice")
-  assert_eq(issue.labels, ["bug"])
-  assert_eq(issue.assignees, ["bob"])
+  @test.assert_eq(issue.number, 42)
+  @test.assert_eq(issue.node_id, "I_kwDOxxx")
+  @test.assert_eq(issue.title, "Bug report")
+  @test.assert_eq(issue.state, "open")
+  @test.assert_eq(issue.user, "alice")
+  @test.assert_eq(issue.labels, ["bug"])
+  @test.assert_eq(issue.assignees, ["bob"])
 }
 
 ///|
@@ -1897,9 +1897,9 @@ test "github_types: parse GhComment from JSON" {
   let parsed = @json.parse(json_str)
   guard parsed is Json::Object(obj) else { abort("not object") }
   let comment = GhComment::from_json(obj)
-  assert_eq(comment.id, 12345)
-  assert_eq(comment.body, "comment text")
-  assert_eq(comment.user, "alice")
+  @test.assert_eq(comment.id, 12345)
+  @test.assert_eq(comment.body, "comment text")
+  @test.assert_eq(comment.user, "alice")
 }
 
 ///|
@@ -1909,17 +1909,17 @@ test "github_types: parse GhPullRequest from JSON" {
   let parsed = @json.parse(json_str)
   guard parsed is Json::Object(obj) else { abort("not object") }
   let pr = GhPullRequest::from_json(obj)
-  assert_eq(pr.number, 7)
-  assert_eq(pr.node_id, "PR_kwDOzzz")
-  assert_eq(pr.title, "Add feature")
-  assert_eq(pr.state, "merged")
-  assert_eq(pr.user, "dev")
-  assert_eq(pr.head_ref, "feature-branch")
-  assert_eq(pr.head_repo, "dev/repo")
-  assert_eq(pr.base_ref, "main")
-  assert_eq(pr.labels, ["enhancement"])
+  @test.assert_eq(pr.number, 7)
+  @test.assert_eq(pr.node_id, "PR_kwDOzzz")
+  @test.assert_eq(pr.title, "Add feature")
+  @test.assert_eq(pr.state, "merged")
+  @test.assert_eq(pr.user, "dev")
+  @test.assert_eq(pr.head_ref, "feature-branch")
+  @test.assert_eq(pr.head_repo, "dev/repo")
+  @test.assert_eq(pr.base_ref, "main")
+  @test.assert_eq(pr.labels, ["enhancement"])
   assert_true(pr.merged)
-  assert_eq(pr.merged_at, "2026-01-03T00:00:00Z")
+  @test.assert_eq(pr.merged_at, "2026-01-03T00:00:00Z")
 }
 
 ///|
@@ -1929,27 +1929,27 @@ test "github_types: parse GhPullRequest open (not merged)" {
   let parsed = @json.parse(json_str)
   guard parsed is Json::Object(obj) else { abort("not object") }
   let pr = GhPullRequest::from_json(obj)
-  assert_eq(pr.number, 8)
-  assert_eq(pr.state, "open")
+  @test.assert_eq(pr.number, 8)
+  @test.assert_eq(pr.state, "open")
   assert_false(pr.merged)
 }
 
 ///|
 test "timestamp: parse ISO 8601 to unix" {
   let unix = parse_iso8601_to_unix("2026-01-15T10:30:45Z")
-  assert_eq(unix, 1768473045L)
+  @test.assert_eq(unix, 1768473045L)
 }
 
 ///|
 test "timestamp: parse ISO 8601 with timezone offset" {
   let unix = parse_iso8601_to_unix("2026-01-15T10:30:45+00:00")
-  assert_eq(unix, 1768473045L)
+  @test.assert_eq(unix, 1768473045L)
 }
 
 ///|
 test "timestamp: unix to ISO 8601" {
   let iso = unix_to_iso8601(1768473045L)
-  assert_eq(iso, "2026-01-15T10:30:45Z")
+  @test.assert_eq(iso, "2026-01-15T10:30:45Z")
 }
 
 ///|
@@ -1957,10 +1957,10 @@ test "timestamp: roundtrip" {
   let original = 1774900000L
   let iso = unix_to_iso8601(original)
   let back = parse_iso8601_to_unix(iso)
-  assert_eq(back, original)
+  @test.assert_eq(back, original)
 }
 
 ///|
 test "timestamp: empty string returns 0" {
-  assert_eq(parse_iso8601_to_unix(""), 0L)
+  @test.assert_eq(parse_iso8601_to_unix(""), 0L)
 }

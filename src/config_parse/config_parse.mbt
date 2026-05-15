@@ -297,7 +297,7 @@ pub fn parse_config_key(key : String) -> (String, String?, String)? {
   }
   let parts : Array[String] = []
   for p in key.split(".") {
-    parts.push(p.to_string())
+    parts.push(p.to_owned())
   }
   if parts.length() < 2 {
     return None
@@ -749,7 +749,7 @@ pub fn encode_config_value(value : String) -> String {
 ///|
 /// Parse boolean keyword values: true/false/yes/no/on/off.
 pub fn parse_bool_keyword_value(value : String) -> Bool? {
-  let trimmed = value.trim().to_string().to_lower()
+  let trimmed = value.trim().to_owned().to_lower()
   match trimmed {
     "true" | "yes" | "on" | "1" => Some(true)
     "false" | "no" | "off" | "0" | "" => Some(false)
@@ -763,7 +763,7 @@ pub fn parse_config_int_value(val : String) -> (Int64?, String?) {
   match config_parse_size_value(val) {
     Some(n) => (Some(n), (None : String?))
     None => {
-      let trimmed = val.trim().to_string().to_lower()
+      let trimmed = val.trim().to_owned().to_lower()
       if trimmed.length() == 0 {
         return ((None : Int64?), (None : String?))
       }
@@ -784,7 +784,7 @@ pub fn parse_config_int_value(val : String) -> (Int64?, String?) {
 ///|
 /// Parse a size value with optional k/m/g suffix.
 pub fn config_parse_size_value(value : String) -> Int64? {
-  let trimmed = value.trim().to_string().to_lower()
+  let trimmed = value.trim().to_owned().to_lower()
   if trimmed.length() == 0 {
     return None
   }

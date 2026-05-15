@@ -70,7 +70,7 @@ async fn handle_check_attr(args : Array[String]) -> Unit raise Error {
     let text = decode_bytes(data)
     let sep = if nul_terminated { "\u0000" } else { "\n" }
     for part_view in text.split(sep) {
-      let part = part_view.to_string()
+      let part = part_view.to_owned()
       if part.length() > 0 {
         paths.push(part)
       }
@@ -148,12 +148,12 @@ fn check_attr_parse_rules(
   rules : Array[CheckAttrRule],
 ) -> Unit {
   for line_view in content.split("\n") {
-    let mut line = line_view.to_string()
+    let mut line = line_view.to_owned()
     // Handle CRLF
     if line.has_suffix("\r") {
       line = String::unsafe_substring(line, start=0, end=line.length() - 1)
     }
-    let trimmed = line.trim().to_string()
+    let trimmed = line.trim().to_owned()
     if trimmed.length() == 0 || trimmed.has_prefix("#") {
       continue
     }

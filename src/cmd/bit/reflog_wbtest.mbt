@@ -1,42 +1,42 @@
 ///|
 test "reflog: short max-count option is parsed" {
   let parsed = parse_reflog_show_args(["-1"])
-  assert_eq(parsed.max_count, Some(1))
-  assert_eq(parsed.refname, "HEAD")
+  @test.assert_eq(parsed.max_count, Some(1))
+  @test.assert_eq(parsed.refname, "HEAD")
 }
 
 ///|
 test "reflog: short max-count can be combined with refname" {
   let parsed = parse_reflog_show_args(["-20", "refs/heads/main"])
-  assert_eq(parsed.max_count, Some(20))
-  assert_eq(parsed.refname, "refs/heads/main")
+  @test.assert_eq(parsed.max_count, Some(20))
+  @test.assert_eq(parsed.refname, "refs/heads/main")
 }
 
 ///|
 test "reflog: non-numeric short options do not set max-count" {
   let parsed = parse_reflog_show_args(["-i", "--grep=merge"])
-  assert_eq(parsed.max_count, None)
+  @test.assert_eq(parsed.max_count, None)
   assert_true(parsed.grep_ignore_case)
-  assert_eq(parsed.grep_patterns, ["merge"])
+  @test.assert_eq(parsed.grep_patterns, ["merge"])
 }
 
 ///|
 test "reflog: oneline flag is parsed" {
   let parsed = parse_reflog_show_args(["--oneline"])
   assert_true(parsed.oneline)
-  assert_eq(parsed.refname, "HEAD")
+  @test.assert_eq(parsed.refname, "HEAD")
 }
 
 ///|
 test "reflog: format flag is parsed" {
   let parsed = parse_reflog_show_args(["--format=short"])
-  assert_eq(parsed.format, "short")
+  @test.assert_eq(parsed.format, "short")
 }
 
 ///|
 test "reflog: date flag is parsed" {
   let parsed = parse_reflog_show_args(["--date=relative"])
-  assert_eq(parsed.date_format, "relative")
+  @test.assert_eq(parsed.date_format, "relative")
 }
 
 ///|
@@ -120,13 +120,13 @@ async test "reflog: expire honors per-ref gc patterns for plain refs" {
     false,
   )
 
-  assert_eq(
+  @test.assert_eq(
     @utf8.decode_lossy(
       fs.read_file("/repo/.git/logs/refs/heads/root1/branch1")[:],
     ).to_string(),
     entry,
   )
-  assert_eq(
+  @test.assert_eq(
     @utf8.decode_lossy(
       fs.read_file("/repo/.git/logs/refs/heads/root2/branch1")[:],
     ).to_string(),
@@ -175,7 +175,7 @@ test "reflog: list finds all refs in logs directory" {
   fs.write_string("/repo/.git/logs/refs/remotes/origin/main", "")
 
   let refs = reflog_list_all_refs(fs, "/repo/.git")
-  assert_eq(refs, [
+  @test.assert_eq(refs, [
     "HEAD", "refs/heads/feature", "refs/heads/main", "refs/remotes/origin/main",
   ])
 }
@@ -191,8 +191,8 @@ test "reflog: expire with explicit --expire=now clears all entries" {
   fs.write_string("/repo/.git/logs/refs/heads/main", entry)
 
   let parsed = parse_reflog_expire_args(["--expire=now", "refs/heads/main"])
-  assert_eq(parsed.expire, Some("now"))
-  assert_eq(parsed.refs, ["refs/heads/main"])
+  @test.assert_eq(parsed.expire, Some("now"))
+  @test.assert_eq(parsed.refs, ["refs/heads/main"])
 }
 
 ///|
@@ -200,5 +200,5 @@ test "reflog: expire args parsing with --all and --dry-run" {
   let parsed = parse_reflog_expire_args(["--all", "--dry-run", "--expire=now"])
   assert_true(parsed.all)
   assert_true(parsed.dry_run)
-  assert_eq(parsed.expire, Some("now"))
+  @test.assert_eq(parsed.expire, Some("now"))
 }

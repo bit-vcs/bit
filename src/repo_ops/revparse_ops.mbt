@@ -334,7 +334,7 @@ fn regex_like_match_at(
 fn parse_commit_committer_timestamp(data : Bytes) -> Int64 {
   let text = @utf8.decode_lossy(data[:])
   for line_view in text.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     if line.length() == 0 {
       break
     }
@@ -464,7 +464,7 @@ fn peel_object_to_tree(
 fn parse_tag_object_target(data : Bytes) -> @object.ObjectId? {
   let text = @utf8.decode_lossy(data[:])
   for line_view in text.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     if line.length() == 0 {
       break
     }
@@ -1280,7 +1280,7 @@ fn ref_collect_packed(
 ) -> Unit raise @object.GitError {
   let text = @utf8.decode_lossy(fs.read_file(packed_path)[:])
   for line_view in text.split("\n") {
-    let line = ref_trim_line(line_view.to_string())
+    let line = ref_trim_line(line_view.to_owned())
     if line.length() == 0 {
       continue
     }
@@ -1315,7 +1315,7 @@ fn ref_read_line(
 ) -> String raise @object.GitError {
   let text = @utf8.decode_lossy(fs.read_file(path)[:])
   for line_view in text.split("\n") {
-    let line = ref_trim_line(line_view.to_string())
+    let line = ref_trim_line(line_view.to_owned())
     if line.length() > 0 {
       return line
     }

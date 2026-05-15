@@ -50,14 +50,14 @@ pub fn stash_list(
   if !fs.is_file(reflog_path) {
     // Just return the current stash
     let content = @utf8.decode_lossy(fs.read_file(stash_ref_path)[:])
-    let hex = content.trim_end(chars="\n\r ").to_string()
+    let hex = content.trim_end(chars="\n\r ").to_owned()
     let id = @bit.ObjectId::from_hex(hex)
     return [{ id, message: "WIP on HEAD" }]
   }
   let log_content = @utf8.decode_lossy(fs.read_file(reflog_path)[:])
   let entries : Array[StashEntry] = []
   for line_view in log_content.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     if line.length() == 0 {
       continue
     }
@@ -72,7 +72,7 @@ pub fn stash_list(
           start=idx + 1,
           end=line.length(),
         )
-        let parts = prefix.split(" ").map(v => v.to_string()).collect()
+        let parts = prefix.split(" ").map(v => v.to_owned()).collect()
         if parts.length() >= 2 {
           let new_sha = parts[1]
           let id = @bit.ObjectId::from_hex(new_sha) catch { _ => continue }
@@ -269,7 +269,7 @@ fn stash_store_entry(
   let stash_ref_path = git_dir + "/refs/stash"
   let old_id = if rfs.is_file(stash_ref_path) {
     let content = @utf8.decode_lossy(rfs.read_file(stash_ref_path)[:])
-    let hex = content.trim_end(chars="\n\r ").to_string()
+    let hex = content.trim_end(chars="\n\r ").to_owned()
     let parsed : Result[@bit.ObjectId, Error] = try? @bit.ObjectId::from_hex(
       hex,
     )
@@ -540,7 +540,7 @@ fn stash_parse_hunk_header(line : String) -> (Int, Int, Int, Int)? {
       let range_part = String::unsafe_substring(content, start=0, end~)
       let parts : Array[String] = range_part
         .split(" ")
-        .map(v => v.to_string())
+        .map(v => v.to_owned())
         .collect()
       if parts.length() < 2 {
         return None
@@ -875,7 +875,7 @@ fn stash_drop_at(
   let log_content = @utf8.decode_lossy(rfs.read_file(reflog_path)[:])
   let lines : Array[String] = []
   for line_view in log_content.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     if line.length() > 0 {
       lines.push(line)
     }
@@ -898,7 +898,7 @@ fn stash_drop_at(
     fs.write_string(reflog_path, new_content)
     // Update refs/stash to newest entry (last line has newest)
     let newest = lines[lines.length() - 1]
-    let parts = newest.split(" ").map(v => v.to_string()).collect()
+    let parts = newest.split(" ").map(v => v.to_owned()).collect()
     if parts.length() >= 2 {
       let new_id = parts[1]
       fs.write_string(git_dir + "/refs/stash", new_id + "\n")

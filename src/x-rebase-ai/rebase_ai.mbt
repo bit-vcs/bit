@@ -48,7 +48,7 @@ pub fn AiRebaseOptions::new(
 
 ///|
 fn trim_text(s : String) -> String {
-  s.trim(chars=" \n\r\t").to_string()
+  s.trim(chars=" \n\r\t").to_owned()
 }
 
 ///|
@@ -70,7 +70,7 @@ fn env_truthy(name : String) -> Bool {
   if raw.length() == 0 {
     return false
   }
-  match raw.to_string_view().to_lower().to_string() {
+  match raw.to_string_view().to_lower().to_owned() {
     "1" | "true" | "yes" | "on" => true
     _ => false
   }
@@ -219,7 +219,7 @@ fn collect_text_with_provider(
 fn extract_fenced_code_block(text : String) -> String? {
   let lines : Array[String] = []
   for line_view in text.split("\n") {
-    lines.push(line_view.to_string())
+    lines.push(line_view.to_owned())
   }
   let captured : Array[String] = []
   let mut started = false
@@ -273,7 +273,7 @@ fn normalize_repo_relative_path(path : String) -> String? {
   }
   let normalized_parts : Array[String] = []
   for part_view in trimmed.split("/") {
-    let part = part_view.to_string()
+    let part = part_view.to_owned()
     if part == "" || part == "." {
       continue
     }

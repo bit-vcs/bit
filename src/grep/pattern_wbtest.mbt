@@ -31,11 +31,11 @@ test "grep pattern: basic treats escaped dot literally" {
 
 ///|
 test "grep pattern: basic treats dollar as end anchor" {
-  assert_eq(
+  @test.assert_eq(
     grep_first_match_span("foo mmap", "mmap$", GrepPatternType::Basic, false),
     Some({ start_column: 5, end_column: 8 }),
   )
-  assert_eq(
+  @test.assert_eq(
     grep_first_match_span(
       "foo mmap baz",
       "mmap$",
@@ -94,7 +94,7 @@ test "grep pattern: resolve prefers cli then override then repo config" {
   @bitlib.init_repo(fs, "/repo")
   fs.write_string("/repo/.git/config", "[grep]\n\tpatternType = perl\n")
 
-  assert_eq(
+  @test.assert_eq(
     resolve_grep_pattern_type(
       fs,
       "/repo/.git",
@@ -103,11 +103,11 @@ test "grep pattern: resolve prefers cli then override then repo config" {
     ),
     GrepPatternType::Extended,
   )
-  assert_eq(
+  @test.assert_eq(
     resolve_grep_pattern_type(fs, "/repo/.git", None, Some("fixed")),
     GrepPatternType::Fixed,
   )
-  assert_eq(
+  @test.assert_eq(
     resolve_grep_pattern_type(fs, "/repo/.git", None, None),
     GrepPatternType::Perl,
   )
@@ -118,7 +118,7 @@ test "grep pattern: extract_commit_message_from_raw returns message body" {
   let raw = @utf8.encode(
     "tree 123456\nparent 789abc\nauthor T <t@example.com> 0 +0000\n\nsubject\nbody\n",
   )
-  assert_eq(extract_commit_message_from_raw(raw), "subject\nbody\n")
+  @test.assert_eq(extract_commit_message_from_raw(raw), "subject\nbody\n")
 }
 
 ///|
@@ -152,7 +152,7 @@ test "grep pattern: first span returns earliest matching column across patterns"
 
 ///|
 test "grep pattern: word regexp excludes embedded underscore matches" {
-  assert_eq(
+  @test.assert_eq(
     grep_first_match_span(
       "foo_mmap bar mmap",
       "mmap",
@@ -228,11 +228,11 @@ test "grep pattern: boolean expression keeps earliest positive span" {
     GrepExprToken::Not,
     GrepExprToken::Pattern("ll"),
   ])
-  assert_eq(
+  @test.assert_eq(
     grep_eval_expr("Hello_world", expr, GrepPatternType::Fixed, false),
     { matched: false, span: Some({ start_column: 3, end_column: 4 }) },
   )
-  assert_eq(
+  @test.assert_eq(
     grep_eval_expr("HeLLo_world", expr, GrepPatternType::Fixed, false),
     { matched: false, span: Some({ start_column: 6, end_column: 6 }) },
   )

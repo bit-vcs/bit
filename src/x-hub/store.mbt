@@ -232,7 +232,7 @@ pub fn parse_hub_record(text : String) -> HubRecord {
   let payload_lines : Array[String] = []
   let mut in_body = false
   for line_view in text.split("\n") {
-    let line = line_view.to_string()
+    let line = line_view.to_owned()
     if in_body {
       payload_lines.push(line)
       continue
@@ -281,7 +281,7 @@ fn parse_clock(s : String) -> Map[String, Int64] {
     return result
   }
   for part_view in s.split(",") {
-    let part = part_view.to_string()
+    let part = part_view.to_owned()
     if part.length() == 0 {
       continue
     }

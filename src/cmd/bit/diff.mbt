@@ -52,7 +52,7 @@ fn get_config_override(key : String) -> String? {
     Some(data) => {
       let mut found : String? = None
       for line_view in data.split("\n") {
-        let line = line_view.to_string()
+        let line = line_view.to_owned()
         match line.find("=") {
           Some(eq_idx) => {
             let k = String::unsafe_substring(line, start=0, end=eq_idx)
@@ -120,7 +120,7 @@ fn diff_last_config_value(
 
 ///|
 fn diff_parse_bool_config(value : String) -> Bool? {
-  match value.trim().to_string().to_lower() {
+  match value.trim().to_owned().to_lower() {
     "true" | "yes" | "on" | "1" => Some(true)
     "false" | "no" | "off" | "0" => Some(false)
     _ => None
@@ -159,17 +159,17 @@ fn diff_get_external_command(
 ) -> String? {
   match @sys.get_env_var("GIT_EXTERNAL_DIFF") {
     Some(value) if value.trim().length() > 0 =>
-      return Some(value.trim().to_string())
+      return Some(value.trim().to_owned())
     _ => ()
   }
   match get_config_override("diff.external") {
     Some(value) if value.trim().length() > 0 =>
-      return Some(value.trim().to_string())
+      return Some(value.trim().to_owned())
     _ => ()
   }
   let config_path = git_dir + "/config"
   match diff_last_config_value(fs, config_path, "diff", "external") {
-    Some(value) if value.trim().length() > 0 => Some(value.trim().to_string())
+    Some(value) if value.trim().length() > 0 => Some(value.trim().to_owned())
     _ => None
   }
 }
@@ -270,7 +270,7 @@ async fn diff_run_external(
 
 ///|
 fn diff_trim_relative_value(value : String) -> String {
-  let mut out = value.trim().to_string()
+  let mut out = value.trim().to_owned()
   if out.has_prefix("./") {
     out = String::unsafe_substring(out, start=2, end=out.length())
   }
@@ -422,7 +422,7 @@ fn diff_apply_relative_files(
 fn diff_parse_orderfile_patterns(content : String) -> Array[String] {
   let patterns : Array[String] = []
   for line_view in content.split("\n") {
-    let mut line = line_view.to_string()
+    let mut line = line_view.to_owned()
     if line.has_suffix("\r") {
       line = String::unsafe_substring(line, start=0, end=line.length() - 1)
     }
@@ -596,13 +596,13 @@ fn diff_orderfile_from_config(
   git_dir : String,
 ) -> String? {
   match get_config_override("diff.orderfile") {
-    Some(value) if value.trim().length() > 0 => Some(value.trim().to_string())
+    Some(value) if value.trim().length() > 0 => Some(value.trim().to_owned())
     Some(_) => None
     None => {
       let config_path = git_dir + "/config"
       match diff_last_config_value(fs, config_path, "diff", "orderfile") {
         Some(value) if value.trim().length() > 0 =>
-          Some(value.trim().to_string())
+          Some(value.trim().to_owned())
         _ => None
       }
     }
@@ -870,13 +870,13 @@ fn diff_conflict_marker_size(
   )
   let mut size = 7
   for line_view in content.split("\n") {
-    let line = line_view.to_string().trim().to_string()
+    let line = line_view.to_owned().trim().to_owned()
     if line.length() == 0 || line.has_prefix("#") {
       continue
     }
     let words : Array[String] = []
     for token_view in line.split(" ") {
-      let token = token_view.to_string().trim().to_string()
+      let token = token_view.to_owned().trim().to_owned()
       if token.length() > 0 {
         words.push(token)
       }
@@ -993,7 +993,7 @@ fn diff_split_lines_preserve_newline(data : Bytes) -> Array[String] {
   let text = @utf8.decode_lossy(data[:])
   let parts : Array[String] = []
   for part_view in text.split("\n") {
-    parts.push(part_view.to_string())
+    parts.push(part_view.to_owned())
   }
   let lines : Array[String] = []
   let last = parts.length() - 1
@@ -1280,7 +1280,7 @@ fn diff_format_summary(files : Array[@bitdiff.DiffFile]) -> Array[String] {
 fn diff_dirstat_dirs(path : String, cumulative : Bool) -> Array[String] {
   let parts : Array[String] = []
   for part_view in path.split("/") {
-    parts.push(part_view.to_string())
+    parts.push(part_view.to_owned())
   }
   if parts.length() <= 1 {
     return []

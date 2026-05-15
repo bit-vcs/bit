@@ -10,10 +10,10 @@ test "ClaimMessage::to_json serializes correctly" {
   )
   let json = msg.to_json()
   guard json is Json::Object(obj) else { fail("expected object") }
-  assert_eq(obj.get("type"), Some(Json::string("work-item.claim")))
-  assert_eq(obj.get("issue_id"), Some(Json::string("issue-0001")))
-  assert_eq(obj.get("action"), Some(Json::string("claim")))
-  assert_eq(obj.get("claimer"), Some(Json::string("mizchi")))
+  @test.assert_eq(obj.get("type"), Some(Json::string("work-item.claim")))
+  @test.assert_eq(obj.get("issue_id"), Some(Json::string("issue-0001")))
+  @test.assert_eq(obj.get("action"), Some(Json::string("claim")))
+  @test.assert_eq(obj.get("claimer"), Some(Json::string("mizchi")))
 }
 
 ///|
@@ -26,7 +26,7 @@ test "ClaimMessage::to_json unclaim action" {
   )
   let json = msg.to_json()
   guard json is Json::Object(obj) else { fail("expected object") }
-  assert_eq(obj.get("action"), Some(Json::string("unclaim")))
+  @test.assert_eq(obj.get("action"), Some(Json::string("unclaim")))
 }
 
 ///|
@@ -40,16 +40,16 @@ test "parse_claim_message roundtrip" {
   let json = msg.to_json()
   let parsed = parse_claim_message(json)
   guard parsed is Some(result) else { fail("expected Some") }
-  assert_eq(result.issue_id(), "issue-0001")
-  assert_eq(result.action(), ClaimAction::Claim)
-  assert_eq(result.claimer(), "mizchi")
-  assert_eq(result.timestamp(), 1708700000L)
+  @test.assert_eq(result.issue_id(), "issue-0001")
+  @test.assert_eq(result.action(), ClaimAction::Claim)
+  @test.assert_eq(result.claimer(), "mizchi")
+  @test.assert_eq(result.timestamp(), 1708700000L)
 }
 
 ///|
 test "parse_claim_message returns None for invalid JSON" {
   let json = Json::string("not an object")
-  assert_eq(parse_claim_message(json), None)
+  @test.assert_eq(parse_claim_message(json), None)
 }
 
 ///|
@@ -60,7 +60,7 @@ test "parse_claim_message returns None for wrong type" {
   obj["action"] = Json::string("claim")
   obj["claimer"] = Json::string("mizchi")
   obj["timestamp"] = Json::number(1708700000.0)
-  assert_eq(parse_claim_message(Json::object(obj)), None)
+  @test.assert_eq(parse_claim_message(Json::object(obj)), None)
 }
 
 ///|
@@ -69,7 +69,7 @@ test "parse_claim_message returns None for missing fields" {
   obj["type"] = Json::string("work-item.claim")
   obj["issue_id"] = Json::string("issue-0001")
   // missing action, claimer, timestamp
-  assert_eq(parse_claim_message(Json::object(obj)), None)
+  @test.assert_eq(parse_claim_message(Json::object(obj)), None)
 }
 
 ///|
@@ -80,7 +80,7 @@ test "parse_claim_message returns None for invalid action" {
   obj["action"] = Json::string("invalid")
   obj["claimer"] = Json::string("mizchi")
   obj["timestamp"] = Json::number(1708700000.0)
-  assert_eq(parse_claim_message(Json::object(obj)), None)
+  @test.assert_eq(parse_claim_message(Json::object(obj)), None)
 }
 
 ///|
@@ -102,9 +102,9 @@ test "parse_claims_from_envelopes extracts claims" {
     make_test_envelope(claim2.to_json()),
   ]
   let claims = parse_claims_from_envelopes(envelopes)
-  assert_eq(claims.length(), 2)
-  assert_eq(claims[0].issue_id(), "issue-0001")
-  assert_eq(claims[1].issue_id(), "issue-0002")
+  @test.assert_eq(claims.length(), 2)
+  @test.assert_eq(claims[0].issue_id(), "issue-0001")
+  @test.assert_eq(claims[1].issue_id(), "issue-0002")
 }
 
 ///|
@@ -123,7 +123,7 @@ test "parse_claims_from_envelopes skips non-claim envelopes" {
     Json::string("invalid"),
   ]
   let claims = parse_claims_from_envelopes(envelopes)
-  assert_eq(claims.length(), 1)
+  @test.assert_eq(claims.length(), 1)
 }
 
 ///|
@@ -134,10 +134,10 @@ test "resolve_active_claims keeps latest claim per issue" {
     ClaimMessage::new("issue-0002", ClaimAction::Claim, "bob", 1708700050L),
   ]
   let active = resolve_active_claims(claims)
-  assert_eq(active.length(), 2)
+  @test.assert_eq(active.length(), 2)
   let issue1 = active.iter().find_first(fn(c) { c.issue_id() == "issue-0001" })
   guard issue1 is Some(c1) else { fail("expected issue-0001") }
-  assert_eq(c1.claimer(), "alice")
+  @test.assert_eq(c1.claimer(), "alice")
 }
 
 ///|
@@ -147,7 +147,7 @@ test "resolve_active_claims removes unclaimed issues" {
     ClaimMessage::new("issue-0001", ClaimAction::Unclaim, "mizchi", 1708700100L),
   ]
   let active = resolve_active_claims(claims)
-  assert_eq(active.length(), 0)
+  @test.assert_eq(active.length(), 0)
 }
 
 ///|
@@ -158,8 +158,8 @@ test "resolve_active_claims reclaim after unclaim" {
     ClaimMessage::new("issue-0001", ClaimAction::Claim, "alice", 1708700200L),
   ]
   let active = resolve_active_claims(claims)
-  assert_eq(active.length(), 1)
-  assert_eq(active[0].claimer(), "alice")
+  @test.assert_eq(active.length(), 1)
+  @test.assert_eq(active[0].claimer(), "alice")
 }
 
 ///|
@@ -206,15 +206,15 @@ test "is_stale custom threshold" {
 
 ///|
 test "ClaimAction::to_string" {
-  assert_eq(ClaimAction::Claim.to_string(), "claim")
-  assert_eq(ClaimAction::Unclaim.to_string(), "unclaim")
+  @test.assert_eq(ClaimAction::Claim.to_string(), "claim")
+  @test.assert_eq(ClaimAction::Unclaim.to_string(), "unclaim")
 }
 
 ///|
 test "parse_claim_action" {
-  assert_eq(parse_claim_action("claim"), Some(ClaimAction::Claim))
-  assert_eq(parse_claim_action("unclaim"), Some(ClaimAction::Unclaim))
-  assert_eq(parse_claim_action("invalid"), None)
+  @test.assert_eq(parse_claim_action("claim"), Some(ClaimAction::Claim))
+  @test.assert_eq(parse_claim_action("unclaim"), Some(ClaimAction::Unclaim))
+  @test.assert_eq(parse_claim_action("invalid"), None)
 }
 
 ///|

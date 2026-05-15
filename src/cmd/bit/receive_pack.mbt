@@ -258,7 +258,7 @@ async fn receive_collect_alternate_haves(
     fs, config_path, "core", "alternateRefsPrefixes",
   )
   for line_view in text.split("\n") {
-    let mut line = line_view.to_string()
+    let mut line = line_view.to_owned()
     // Strip trailing CR and slashes
     while line.has_suffix("\r") || line.has_suffix("/") {
       line = String::unsafe_substring(line, start=0, end=line.length() - 1)
@@ -298,7 +298,7 @@ async fn receive_collect_alternate_haves(
         let output_bytes = stdout.binary()
         let output = @utf8.decode_lossy(output_bytes[:])
         for oid_line in output.split("\n") {
-          let oid_str = oid_line.to_string()
+          let oid_str = oid_line.to_owned()
           if oid_str.length() >= 40 {
             let hex = String::unsafe_substring(oid_str, start=0, end=40)
             let oid = @bitcore.ObjectId::from_hex(hex) catch { _ => continue }
@@ -313,7 +313,7 @@ async fn receive_collect_alternate_haves(
           Some(prefixes) => {
             let prefix_list : Array[String] = []
             for p in prefixes.split(" ") {
-              let ps = p.to_string()
+              let ps = p.to_owned()
               if ps.length() > 0 {
                 prefix_list.push(ps)
               }

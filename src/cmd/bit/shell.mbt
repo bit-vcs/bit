@@ -56,7 +56,7 @@ fn shell_parse_interactive_command(line : String) -> (String, Array[String]) {
   let mut name : String? = None
   let args : Array[String] = []
   for token_view in line.split(" ") {
-    let token = trim_string(token_view.to_string())
+    let token = trim_string(token_view.to_owned())
     if token.length() == 0 {
       continue
     }

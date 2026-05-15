@@ -13,7 +13,7 @@ fn get_helix_head() -> @bit.ObjectId raise @bit.GitError {
   let git_dir = get_helix_git_dir()
   let head_path = git_dir + "/HEAD"
   let head_content = osfs.read_file(head_path)
-  let head_str = @utf8.decode_lossy(head_content[:]).trim().to_string()
+  let head_str = @utf8.decode_lossy(head_content[:]).trim().to_owned()
   if head_str.has_prefix("ref: ") {
     let ref_name = String::unsafe_substring(
       head_str,
@@ -22,7 +22,7 @@ fn get_helix_head() -> @bit.ObjectId raise @bit.GitError {
     )
     let ref_path = git_dir + "/" + ref_name
     let ref_content = osfs.read_file(ref_path)
-    let ref_str = @utf8.decode_lossy(ref_content[:]).trim().to_string()
+    let ref_str = @utf8.decode_lossy(ref_content[:]).trim().to_owned()
     @bit.ObjectId::from_hex(ref_str)
   } else {
     @bit.ObjectId::from_hex(head_str)

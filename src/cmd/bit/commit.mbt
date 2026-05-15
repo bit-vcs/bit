@@ -699,7 +699,7 @@ fn read_merge_head_ids(
   let ids : Array[@bitcore.ObjectId] = []
   let content = decode_bytes(fs.read_file(path))
   for line_view in content.split("\n") {
-    let line = trim_string(line_view.to_string())
+    let line = trim_string(line_view.to_owned())
     if line.length() == 0 {
       continue
     }
@@ -721,12 +721,12 @@ fn commit_subject_line(message : String) -> String {
 
 ///|
 fn commit_reflog_identity(identity : String) -> (String, String) {
-  let trimmed = identity.trim().to_string()
+  let trimmed = identity.trim().to_owned()
   match trimmed.find("<") {
     Some(start) =>
       match trimmed.find(">") {
         Some(end) if end > start => {
-          let name = string_slice_to(trimmed, start).trim().to_string()
+          let name = string_slice_to(trimmed, start).trim().to_owned()
           let email = String::unsafe_substring(trimmed, start=start + 1, end~)
           (if name.length() == 0 { "unknown" } else { name }, email)
         }

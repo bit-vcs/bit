@@ -57,7 +57,7 @@ fn relay_is_hex_char(c : Char) -> Bool {
 ///|
 pub fn relay_extract_sha256_hex(output : String) -> String? {
   for line_view in output.split("\n") {
-    let line = line_view.trim(chars=" \n\r\t").to_string()
+    let line = line_view.trim(chars=" \n\r\t").to_owned()
     if line.length() == 0 {
       continue
     }
@@ -68,7 +68,7 @@ pub fn relay_extract_sha256_hex(output : String) -> String? {
     }
     let candidate_trimmed = candidate_with_label
       .trim(chars=" \n\r\t")
-      .to_string()
+      .to_owned()
     let token = match candidate_trimmed.find(" ") {
       Some(space_idx) =>
         String::unsafe_substring(candidate_trimmed, start=0, end=space_idx)

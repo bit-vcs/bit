@@ -28,9 +28,9 @@ async fn handle_ls_tree(args : Array[String]) -> Unit raise Error {
       "--full-name" => _full_name = true
       "--full-tree" => _full_tree = true
       "--recurse-submodules" => recurse_submodules = true
-      _ if arg.has_prefix("--format=") => format_str = Some(arg[9:].to_string())
+      _ if arg.has_prefix("--format=") => format_str = Some(arg[9:].to_owned())
       _ if arg.has_prefix("--abbrev=") => {
-        let v = arg[9:].to_string()
+        let v = arg[9:].to_owned()
         _abbrev = Some(@string.parse_int(v)) catch { _ => Some(7) }
       }
       "--abbrev" => _abbrev = Some(7)

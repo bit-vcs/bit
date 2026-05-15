@@ -22,7 +22,7 @@ pub fn is_module_sparse_enabled(
   let text = bytes_to_string_sparse(content)
   let mut in_core = false
   for line_view in text.split("\n") {
-    let line = sparse_trim(line_view.to_string())
+    let line = sparse_trim(line_view.to_owned())
     if line == "[core]" {
       in_core = true
       continue
@@ -58,7 +58,7 @@ pub fn read_module_sparse_patterns(
   let text = bytes_to_string_sparse(content)
   let patterns : Array[String] = []
   for line_view in text.split("\n") {
-    let line = sparse_trim(line_view.to_string())
+    let line = sparse_trim(line_view.to_owned())
     if line.length() > 0 && !line.has_prefix("#") {
       patterns.push(line)
     }
@@ -325,7 +325,7 @@ fn match_double_star(path : String, pattern : String) -> Bool {
   let parts = pattern.split("**")
   let parts_arr : Array[String] = []
   for p in parts {
-    parts_arr.push(p.to_string())
+    parts_arr.push(p.to_owned())
   }
   if parts_arr.length() != 2 {
     return false
