@@ -18,7 +18,7 @@ jobs:
       - name: Install pkfire + pkspec
         uses: mizchi/pkfire@v0
       - name: Install pkspec
-        uses: mizchi/pkspec@v0
+        uses: mizchi/pkspec@v0.2.1
         with:
           pkl-version: none
       - name: Install MoonBit CLI
