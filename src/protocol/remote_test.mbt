@@ -169,7 +169,7 @@ test "parse_symrefs_from_capabilities accepts symref-target capability" {
 test "ssh_remote_to_https converts scp-style ssh remote" {
   inspect(
     ssh_remote_to_https("git@github.com:user/repo.git"),
-    content="Some(\"https://github.com/user/repo.git\")",
+    content="Some(https://github.com/user/repo.git)",
   )
 }
 
@@ -177,7 +177,7 @@ test "ssh_remote_to_https converts scp-style ssh remote" {
 test "ssh_remote_to_https converts ssh:// remote" {
   inspect(
     ssh_remote_to_https("ssh://git@github.com/user/repo.git"),
-    content="Some(\"https://github.com/user/repo.git\")",
+    content="Some(https://github.com/user/repo.git)",
   )
 }
 
@@ -185,7 +185,7 @@ test "ssh_remote_to_https converts ssh:// remote" {
 test "ssh_remote_to_https drops explicit ssh port" {
   inspect(
     ssh_remote_to_https("ssh://git@github.com:2222/user/repo.git"),
-    content="Some(\"https://github.com/user/repo.git\")",
+    content="Some(https://github.com/user/repo.git)",
   )
 }
 

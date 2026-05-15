@@ -247,6 +247,8 @@ async test "verify: verify-tag validates ssh signatures via native ssh-keygen" {
   grep_test_run_git(root, ["init", "-q", "repo"])
   grep_test_run_git(repo_dir, ["config", "user.name", "Test User"])
   grep_test_run_git(repo_dir, ["config", "user.email", "test@example.com"])
+  grep_test_run_git(repo_dir, ["config", "commit.gpgsign", "false"])
+  grep_test_run_git(repo_dir, ["config", "tag.gpgsign", "false"])
   let (signing_key, allowed_signers) = verify_wbtest_generate_ssh_key(
     fs, root, "test@example.com",
   )
@@ -301,6 +303,8 @@ async test "verify: ssh verifier uses tagger timestamp for key validity" {
   grep_test_run_git(root, ["init", "-q", "repo"])
   grep_test_run_git(repo_dir, ["config", "user.name", "Test User"])
   grep_test_run_git(repo_dir, ["config", "user.email", "test@example.com"])
+  grep_test_run_git(repo_dir, ["config", "commit.gpgsign", "false"])
+  grep_test_run_git(repo_dir, ["config", "tag.gpgsign", "false"])
   let (valid_key, invalid_key, allowed_signers) = verify_wbtest_generate_timeboxed_ssh_keys(
     fs, root,
   )
@@ -443,6 +447,8 @@ async test "verify: verify-tag uses external openpgp verifier" {
   grep_test_run_git(root, ["init", "-q", "repo"])
   grep_test_run_git(repo_dir, ["config", "user.name", "Test User"])
   grep_test_run_git(repo_dir, ["config", "user.email", "test@example.com"])
+  grep_test_run_git(repo_dir, ["config", "commit.gpgsign", "false"])
+  grep_test_run_git(repo_dir, ["config", "tag.gpgsign", "false"])
   let signer = root + "/fake-gpg.sh"
   signing_wbtest_write_fake_gpg(fs, signer)
   grep_test_run_git(repo_dir, ["config", "gpg.program", signer])

@@ -14,5 +14,5 @@ test "remote/path: detect bare git dir" {
   fs.mkdir_p("/bare/objects")
   fs.write_string("/bare/HEAD", "ref: refs/heads/main\n")
   let detected = detect_git_dir(fs, "/bare")
-  inspect(detected, content="Some((\"/bare\", true))")
+  inspect(detected, content="Some((/bare, true))")
 }

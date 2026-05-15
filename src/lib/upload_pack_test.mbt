@@ -175,7 +175,7 @@ test "parse_upload_pack_request_v2: with packfile-uris" {
   ])
   let req = parse_upload_pack_request_v2(req_bytes)
   inspect(req.command, content="fetch")
-  inspect(req.packfile_uris, content="Some(\"https\")")
+  inspect(req.packfile_uris, content="Some(https)")
 }
 
 ///|
@@ -189,7 +189,7 @@ test "parse_upload_pack_request_v2: with filter" {
     @protocol.pktline_flush(),
   ])
   let req = parse_upload_pack_request_v2(req_bytes)
-  inspect(req.filter, content="Some(\"blob:none\")")
+  inspect(req.filter, content="Some(blob:none)")
 }
 
 ///|
