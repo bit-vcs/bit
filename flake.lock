@@ -21,11 +21,11 @@
     "moon-registry": {
       "flake": false,
       "locked": {
-        "lastModified": 1775390818,
-        "narHash": "sha256-nZadhyf35zxdHFtrGOs8uMoiUU6u7pZWlzcRX4ljRAQ=",
+        "lastModified": 1778843524,
+        "narHash": "sha256-zgSCJMzj65vgZUz4YMjBr4LREDHjZ409N89pjSAGonc=",
         "ref": "refs/heads/main",
-        "rev": "53c5f5c14ff9b18eead9258aa66e9bcfeaaf44ab",
-        "revCount": 7833,
+        "rev": "d7497bd805fbc0c16aa90d4f51ae46988975aabb",
+        "revCount": 8744,
         "type": "git",
         "url": "https://mooncakes.io/git/index"
       },
