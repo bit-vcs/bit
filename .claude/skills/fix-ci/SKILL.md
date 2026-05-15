@@ -19,7 +19,7 @@ Investigate and fix CI failures.
 2. **Read logs**: `gh run view <id> --log-failed` to get failure details
 3. **Identify cause**: Parse the log output to find the root cause
 4. **Fix**: Make the necessary code changes
-5. **Test locally**: Run `just release-check` or relevant tests
+5. **Test locally**: Run `pkf run release-check` or relevant tests
 6. **Report**:
    ```bash
    # Commit the fix

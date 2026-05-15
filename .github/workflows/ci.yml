@@ -15,16 +15,20 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: true
-      - name: Install just
-        uses: extractions/setup-just@v2
+      - name: Install pkfire + pkspec
+        uses: mizchi/pkfire@v0
+      - name: Install pkspec
+        uses: mizchi/pkspec@v0
+        with:
+          pkl-version: none
       - name: Install MoonBit CLI
         run: |
           curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
           echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
       - name: Moon update
         run: moon update
-      - name: just check
-        run: just check
+      - name: pkf run check
+        run: pkf run check
       - name: Build native binary for wbtests
         run: |
           moon build --target native --release

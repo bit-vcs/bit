@@ -18,19 +18,26 @@ This repo can run Git upstream tests (`third_party/git/t`) in two modes:
 Run allowlist with shim (pass-through to system Git):
 
 ```
-just git-t-allowlist-shim
+pkf run git-t-allowlist-shim
 ```
 
 Run allowlist with shim in **strict** mode (fails selected subcommands):
 
 ```
-just git-t-allowlist-shim-strict
+pkf run git-t-allowlist-shim-strict
 ```
 
 Run allowlist with **random routing** (per command invocation, probabilistic bit vs real git):
 
 ```
-SHIM_RANDOM_RATIO=50 just git-t-allowlist-shim-random
+SHIM_RANDOM_RATIO=50 pkf run git-t-allowlist-shim-random
+```
+
+Run a single upstream test in strict shim mode (parameterized — call the
+script directly rather than via pkfire):
+
+```
+tools/git-t-one.sh t3200-branch.sh
 ```
 
 ## Environment Variables (git-shim)
@@ -58,8 +65,8 @@ running via `make test`:
 - Shim mode is scaffolding: it doesn't test this repo's implementation until
   `SHIM_MOON` points to a real CLI that calls MoonBit code.
 - On Apple Git, `git version --build-options` does not emit `default-hash`,
-  so `GIT_DEFAULT_HASH` becomes empty and `git init` fails. The `just` shim
-  targets set `GIT_TEST_DEFAULT_HASH=sha1` to avoid this.
+  so `GIT_DEFAULT_HASH` becomes empty and `git init` fails. The `tools/git-t-*.sh`
+  shim wrappers set `GIT_TEST_DEFAULT_HASH=sha1` to avoid this.
 - `tools/git-shim/moon` is a MoonBit entrypoint used by the shim. It currently
   handles `receive-pack` via MoonBit and forwards other subcommands to the
   system Git.

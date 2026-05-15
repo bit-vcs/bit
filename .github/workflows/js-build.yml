@@ -22,8 +22,12 @@ jobs:
         with:
           node-version: 24
 
-      - name: Install just
-        uses: extractions/setup-just@v2
+      - name: Install pkfire
+        uses: mizchi/pkfire@v0
+      - name: Install pkspec
+        uses: mizchi/pkspec@v0
+        with:
+          pkl-version: none
 
       - name: Install Bun
         uses: oven-sh/setup-bun@v2
@@ -39,7 +43,7 @@ jobs:
         run: moon update
 
       - name: Guard compat allowlist
-        run: just test-git-compat-allowlist
+        run: pkspec exec -f Test.pkl --only git-compat-allowlist
 
       - name: Run JS build tests
-        run: just test-js-build
+        run: pkf run test-js-build

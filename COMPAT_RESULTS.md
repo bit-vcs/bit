@@ -7,7 +7,7 @@ Commit: 5469b4d978e3bd388fad34dc12d1a142a0ac9c0d
 
 ## Allowlist (tools/git-test-allowlist.txt)
 
-Run: `just git-t-allowlist-shim-strict`
+Run: `pkf run git-t-allowlist-shim-strict`
 
 Result:
 - success: 4650
@@ -165,12 +165,12 @@ Notes:
 
 Allowlist (shim strict):
 ```bash
-just git-t-allowlist-shim-strict
+pkf run git-t-allowlist-shim-strict
 ```
 
 Single test:
 ```bash
-just git-t-one t5302-pack-index.sh
+tools/git-t-one.sh t5302-pack-index.sh
 ```
 
 Batch example (t9 selected):
@@ -196,6 +196,6 @@ for t in \
   t9902-completion.sh \
   t9903-bash-prompt.sh
 do
-  just git-t-one "$t"
+  tools/git-t-one.sh "$t"
 done
 ```

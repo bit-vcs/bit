@@ -9,6 +9,13 @@
       url = "git+https://mooncakes.io/git/index";
       flake = false;
     };
+
+    # Typed task runner + language-agnostic test runner used in place of the
+    # old justfile. See Taskfile.pkl and Test.pkl at the repo root.
+    pkfire.url = "github:mizchi/pkfire";
+    pkfire.inputs.nixpkgs.follows = "nixpkgs";
+    pkspec.url = "github:mizchi/pkspec";
+    pkspec.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs =
@@ -48,6 +55,9 @@
               registryIndexSrc = inputs.moon-registry;
             };
           };
+
+          pkfire = inputs.pkfire.packages.${system}.default;
+          pkspec = inputs.pkspec.packages.${system}.default;
         in
         {
           packages = {
@@ -70,9 +80,10 @@
             packages = [
               moonHome
               pkgs.git
-              pkgs.just
               pkgs.pnpm
               pkgs.nodejs
+              pkfire
+              pkspec
             ];
             env.MOON_HOME = "${moonHome}";
           };

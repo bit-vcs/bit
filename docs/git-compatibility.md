@@ -119,7 +119,7 @@ The following are intentionally rejected with explicit standalone-mode errors (c
 
 706 test files from the official Git test suite are in the allowlist.
 
-Allowlist run (`just git-t-allowlist-shim-strict`) on macOS:
+Allowlist run (`pkf run git-t-allowlist-shim-strict`) on macOS:
 
 | | Count |
 |---|---|
@@ -147,7 +147,7 @@ Allowlist run (`just git-t-allowlist-shim-strict`) on macOS:
 - `t5332` (multi-pack reuse)
 - `t5400` (send-pack)
 
-Full upstream run (`just git-t`) summary on macOS (2026-02-07):
+Full upstream run (`pkf run git-t`) summary on macOS (2026-02-07):
 
 | | Count |
 |---|---|
@@ -158,11 +158,11 @@ Full upstream run (`just git-t`) summary on macOS (2026-02-07):
 
 ## Local Test Snapshot (2026-02-12)
 
-- `just check`: pass
-- `just test`: pass (`js/lib 215 pass`, `native 811 pass`)
-- `just e2e` (`t/run-tests.sh t00`): pass
-- `just test-subdir` (`t/run-tests.sh t900`): pass
-- `just git-t-allowlist`: pass (`success 24,279 / failed 0 / broken 177`)
+- `pkf run check`: pass
+- `pkf run test`: pass (`js/lib 215 pass`, `native 811 pass`)
+- `pkf run e2e` (`t/run-tests.sh t00`): pass
+- `pkf run test-subdir` (`t/run-tests.sh t900`): pass
+- `pkf run git-t-allowlist`: pass (`success 24,279 / failed 0 / broken 177`)
 
 ## Performance Snapshot (2026-02-12)
 
@@ -177,5 +177,5 @@ Full upstream run (`just git-t`) summary on macOS (2026-02-07):
 
 ## Related Distributed/Agent Tests
 
-- `just test-distributed`: focused checks for `x-mcp`, `x-rebase-ai`, `x-hub`, `x-hub/native`, `x-kv`
+- `pkf run test-distributed`: focused checks for `x-mcp`, `x-rebase-ai`, `x-hub`, `x-hub/native`, `x-kv`
 - strategy and invariants: `docs/distributed-testing.md`

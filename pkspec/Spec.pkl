@@ -1,0 +1,541 @@
+/// pkspec Spec — BDD-style high-level DSL on top of Test.pkl.
+///
+/// Author scenarios as Given / When / Then triplets, paired with a
+/// concrete `Step` implementation (the same `Step` class Test.pkl
+/// already understands). Spec.pkl renders each scenario into a
+/// single sequential Test whose step names carry the natural-language
+/// description, so reports read like:
+///
+///     [pkspec] user signup: failed
+///           step "Given a clean database": passed
+///           step "When I post a new user": passed
+///           step "Then the user is retrievable": failed
+///             expected exit code 0, got 1
+///
+/// The runner is unchanged — Spec.pkl `amends Test.pkl`, so the
+/// rendered output shape is identical.
+@ModuleInfo { minPklVersion = "0.31.0" }
+module pkspec.Spec extends "Test.pkl"
+
+import "Test.pkl" as base
+
+/// One step inside a Given/When/Then list.
+///
+/// `description` is the natural-language phrase that appears in
+/// reports; `impl` is the concrete shell invocation, captures, and
+/// expectations. The two are deliberately separate: a glossary of
+/// reusable `impl` values can drive many scenarios without
+/// duplicating the prose.
+class SpecStep {
+  description: String(length > 0)
+  impl: base.Step
+}
+
+/// One implementation pointer on a Scenario. The same Scenario can
+/// carry multiple `Implementation` entries — typical when one spec
+/// is enforced by a test + a code guard, or by code + a prose doc.
+///
+/// `kind = "test"` declares that a `Test.specRef = { id }` link in
+/// any Test.pkl module is sufficient; `at` is unused for this kind
+/// and pkspec lint flags it if set.
+///
+/// `kind = "code"` and `kind = "doc"` require `at` to point at the
+/// implementing artefact ("path:Symbol" / "path#anchor").
+/// `pkspec check --strict` verifies that the file portion exists
+/// on disk.
+class Implementation {
+  kind: ("test" | "code" | "doc")
+  at: String? = null
+}
+
+/// A user-facing Goal — a piece of value the system should
+/// deliver, independent of any specific implementation. Goals have
+/// no test of their own; Scenarios reference them via
+/// `Scenario.contributes`. `pkspec goals` lists Goals with
+/// each Goal's contributing-scenario coverage; `pkspec next`
+/// ranks unimplemented scenarios by their Goal's priority to
+/// suggest where to invest next.
+class Goal {
+  /// Stable identifier. Same regex as `Scenario.id`; convention is
+  /// to use a `GOAL-` prefix so the two namespaces don't collide.
+  id: String(matches(Regex(#"^[a-zA-Z0-9][a-zA-Z0-9_.\-/]*$"#)))
+
+  /// Short label used in headings.
+  name: String(length > 0)
+
+  /// User-value description: who benefits, what they can do.
+  description: String? = null
+
+  /// Higher = more important. No fixed scale — the runner only
+  /// uses it for relative ordering. Convention: 0-100 range with
+  /// 50 = default importance.
+  priority: Int = 50
+
+  /// Authoring lifecycle. Same semantics as `Scenario.reviewStatus`.
+  reviewStatus: ("draft" | "review" | "approved") = "draft"
+
+  /// Marks the Goal as retired. `pkspec goals` excludes
+  /// deprecated Goals from the active list (they remain visible
+  /// for design archaeology).
+  deprecated: Boolean = false
+
+  /// Free-form explanation of why this Goal matters — the
+  /// business / user-experience justification.
+  rationale: String? = null
+
+  /// Calculation used by `pkspec goals` and Milestone rollups.
+  /// `scenario-count` (default) is implemented scenarios divided
+  /// by all contributing scenarios. `severity-weighted` gives
+  /// critical / major / minor scenarios weights of 5 / 3 / 1 so
+  /// higher-impact scenarios dominate the percentage.
+  progressMethod: ("scenario-count" | "severity-weighted") = "scenario-count"
+}
+
+/// A Milestone groups Goals into a release / planning checkpoint.
+/// Progress is derived from the referenced Goals; Milestones do not
+/// duplicate Scenario links themselves.
+class Milestone {
+  /// Stable identifier. Convention: use an `ms.` or `MILESTONE-`
+  /// namespace to keep ids distinct from Goal and Scenario ids.
+  id: String(matches(Regex(#"^[a-zA-Z0-9][a-zA-Z0-9_.\-/]*$"#)))
+
+  /// Short label used in headings.
+  name: String(length > 0)
+
+  /// Human-facing scope description.
+  description: String? = null
+
+  /// Optional target date in `YYYY-MM-DD` form.
+  targetDate: String(matches(Regex(#"^\d{4}-\d{2}-\d{2}$"#)))? = null
+
+  /// Authoring lifecycle. Same semantics as `Goal.reviewStatus`.
+  reviewStatus: ("draft" | "review" | "approved") = "draft"
+
+  /// Marks the Milestone as retired. `pkspec milestones` excludes
+  /// deprecated Milestones from the active list.
+  deprecated: Boolean = false
+
+  /// Goal ids included in this Milestone.
+  goals: Listing<String(matches(Regex(#"^[a-zA-Z0-9][a-zA-Z0-9_.\-/]*$"#)))> = new {}
+
+  /// Rollup strategy for the Milestone percentage.
+  /// `goal-average` averages each referenced Goal's percentage.
+  /// `scenario-count` / `severity-weighted` flatten all contributing
+  /// scenarios across referenced Goals before computing the ratio.
+  progressMethod: ("goal-average" | "scenario-count" | "severity-weighted") = "goal-average"
+}
+
+/// One entry in a scenario's decision log. Append-only by convention
+/// — don't rewrite past entries when a spec changes; add a new
+/// Decision pointing back at what it supersedes.
+///
+/// `pkspec decisions` renders these chronologically across the
+/// whole project so reviewers can read the design trail.
+class Decision {
+  /// ISO-8601 date the decision was made. Regex enforces
+  /// `YYYY-MM-DD` so date sorts work without parsing.
+  date: String(matches(Regex(#"^\d{4}-\d{2}-\d{2}$"#)))
+
+  /// Optional author of the decision. Free-form string —
+  /// usernames, real names, or "PM/EngLead/QA" group labels.
+  author: String? = null
+
+  /// One-line summary of what changed. Appears in the SPEC.md
+  /// table-of-decisions. Keep it under ~80 chars.
+  summary: String(length > 0)
+
+  /// Optional multi-paragraph rationale. Rendered as a quoted
+  /// block under the summary in `pkspec decisions`.
+  rationale: String? = null
+}
+
+/// A BDD scenario.
+///
+/// All four step lists default to empty — a scenario can be just
+/// `then` if it's a smoke check, or `given` + `when` if there's
+/// nothing to assert beyond exit code.
+class Scenario {
+  name: String(matches(Regex(#"^[a-zA-Z0-9_][a-zA-Z0-9_:.\-/ ]*$"#)))
+  description: String? = null
+
+  /// Stable identifier for this scenario across the project — the
+  /// anchor that `Test.specRef` points at and that `pkspec spec` uses
+  /// as the section heading. Convention: short domain prefix +
+  /// number, e.g. "LOGIN-001", "BILLING-042". When set, the
+  /// rendered Test inherits `specRef = { id }` so the scenario
+  /// counts as its own implementation marker until a sibling test
+  /// in `Test.pkl` overrides it.
+  ///
+  /// Element regex `^[a-zA-Z0-9][a-zA-Z0-9_.\-/]*$` — same as
+  /// `Test.specRef` elements.
+  id: String(matches(Regex(#"^[a-zA-Z0-9][a-zA-Z0-9_.\-/]*$"#)))? = null
+
+  /// Free-form classification tags propagated to the rendered Test.
+  /// Same semantics as `Test.tags` — see `docs/notes/spec.md`. A
+  /// Scenario tagged "spec" with all four step lists empty becomes
+  /// an auto-pending Test (the description / step descriptions stay
+  /// as the written-down intent).
+  tags: Listing<String> = new {}
+
+  /// Human audience names this scenario should appear under when
+  /// generating reader-specific docs. Conventional values:
+  /// "end-user", "pm", "non-engineer", "developer", "api",
+  /// and "operator". The `audience:<name>` tag form is also
+  /// recognized by the Go renderer for backwards compatibility with
+  /// tag-only projects.
+  audience: Listing<String> = new {}
+
+  /// Reader-specific prose used by `pkspec docs --audience NAME`.
+  /// Keyed by audience name; the docs renderer looks up
+  /// `audienceNotes[NAME]` and falls back to `description` when no
+  /// entry is present.
+  ///
+  /// Conventional keys: "end-user" / "pm" / "operator" / "api"
+  /// (replacing the v0.1.x `userDescription` / `pmNotes` /
+  /// `operatorNotes` / `apiNotes` fields). Custom audience names
+  /// (e.g. "security", "sre") are accepted; they only need to
+  /// match the `--audience NAME` arg.
+  audienceNotes: Mapping<String, String> = new {}
+
+  given: Listing<SpecStep> = new {}
+  // `when` is a Pkl keyword (used by `when (cond) { ... }` constraint
+  // blocks), so the field name must be backtick-quoted both in this
+  // schema and in user modules: `new Scenario { \`when\` { ... } }`.
+  `when`: Listing<SpecStep> = new {}
+  then: Listing<SpecStep> = new {}
+
+  /// Cleanup steps run with `always = true` — they fire even if a
+  /// preceding step failed. Use them for db rollbacks, file removal,
+  /// process kills that should not depend on the test passing.
+  cleanup: Listing<SpecStep> = new {}
+
+  // The same Test-level knobs every scenario can need.
+  shell: String = "bash"
+  env: Mapping<String, String> = new {}
+  workdir: String? = null
+  timeoutSec: Int(this > 0) = 60
+  retries: Int(this >= 0) = 0
+  flakyAcceptable: Boolean = false
+  background: Listing<base.Background> = new {}
+
+  /// Mark the scenario as not-yet-implemented. Useful for "I will
+  /// write this tomorrow" placeholders that still document intent.
+  pending: Boolean = false
+
+  // ── Knowledge graph edges ────────────────────────────────────
+
+  /// Other `Scenario.id` values this spec depends on / assumes.
+  /// `pkspec graph` renders these as graphviz edges so impact
+  /// analysis ("if LOGIN-001 breaks, what else fails?") is mechanical.
+  ///
+  /// `dependsOn` is one of three free-form fields on Scenario; see
+  /// the `Vocabulary Note` table in
+  /// `docs/advanced/recipes/open-questions-policy.md` for how it
+  /// differs from `openQuestions` (unresolved ambiguities) and
+  /// `decisions` (append-only resolutions).
+  dependsOn: Listing<String(matches(Regex(#"^[a-zA-Z0-9][a-zA-Z0-9_.\-/]*$"#)))> = new {}
+
+  /// Other `Scenario.id` values that this spec replaces. The
+  /// superseded specs should themselves be `deprecated = true`
+  /// with `replacedBy` pointing back at this one — `pkspec spec`
+  /// cross-checks both directions.
+  supersedes: Listing<String(matches(Regex(#"^[a-zA-Z0-9][a-zA-Z0-9_.\-/]*$"#)))> = new {}
+
+  /// Parent Scenario's id when this scenario is a *sub-spec* — a
+  /// more specific case of a broader spec. Example: AUTH-001
+  /// (parent: "user can log in") refined into AUTH-001a (sub:
+  /// "happy path") and AUTH-001b (sub: "rejects empty
+  /// password"). Distinct from `dependsOn` (preconditions) and
+  /// from `supersedes` (lifecycle replacement) — this is purely
+  /// a refinement / containment edge.
+  parent: String(matches(Regex(#"^[a-zA-Z0-9][a-zA-Z0-9_.\-/]*$"#)))? = null
+
+  /// `Goal.id` values this scenario contributes toward. A single
+  /// scenario can advance multiple goals (e.g. "login works" goal
+  /// AND "audit log captures auth events" goal). `pkspec next`
+  /// uses these edges to rank unimplemented specs by the priority
+  /// of the goals they would unblock.
+  contributes: Listing<String(matches(Regex(#"^[a-zA-Z0-9][a-zA-Z0-9_.\-/]*$"#)))> = new {}
+
+  // ── Lifecycle ────────────────────────────────────────────────
+
+  /// Authoring lifecycle. "draft" = sketched, not yet reviewed —
+  /// `pkspec check` ignores draft specs (no failure even when
+  /// unimplemented). "review" = under stakeholder review.
+  /// "approved" = signed off, must be implemented before merging.
+  reviewStatus: ("draft" | "review" | "approved") = "draft"
+
+  /// Marks the spec as retired. `pkspec check` skips deprecated
+  /// specs, but they remain in `pkspec decisions` / `pkspec graph`
+  /// so the design history is preserved.
+  deprecated: Boolean = false
+
+  /// Free-form explanation of why the spec was retired. Appears in
+  /// the decision log alongside the `deprecated = true` flip.
+  deprecatedReason: String? = null
+
+  /// Successor spec's `Scenario.id`. When `deprecated = true`,
+  /// `replacedBy` is the forwarding pointer readers should follow.
+  replacedBy: String? = null
+
+  /// Severity for failure-impact classification. Affects how
+  /// `pkspec check` weighs unimplemented specs — `critical`
+  /// triggers failure, `major` warns, `minor` is silent. Default
+  /// `major` so most specs land in the middle bucket.
+  severity: ("critical" | "major" | "minor") = "major"
+
+  /// Implementation pointers (kind + path) declared for this
+  /// scenario. One Scenario can carry multiple entries (e.g. code
+  /// + doc + test). Empty list means "verified only by Test.specRef
+  /// links from Test.pkl modules" — the runner uses Test.specRef
+  /// matches to satisfy `pkspec check` when this list is empty.
+  ///
+  /// See `class Implementation` above for the kind/at contract.
+  implementations: Listing<Implementation> = new {}
+
+  /// Outstanding ambiguities or open questions about this spec.
+  /// `pkspec spec` renders these as a TODO list at the end of the
+  /// SPEC.md so reviewers can answer them in one pass instead of
+  /// hunting through descriptions.
+  ///
+  /// `openQuestions` is one of three free-form fields on Scenario;
+  /// each answers a different reviewer question. The
+  /// `Vocabulary Note` table in
+  /// `docs/advanced/recipes/open-questions-policy.md` is the
+  /// canonical guide for picking between `openQuestions`,
+  /// `decisions`, and `dependsOn`.
+  openQuestions: Listing<String> = new {}
+
+  /// Append-only decision log. Each entry records what changed,
+  /// when, and (optionally) why. Don't edit past entries — add new
+  /// ones. `pkspec decisions` renders these across the project
+  /// for design-history review.
+  ///
+  /// `decisions` is one of three free-form fields on Scenario;
+  /// see the `Vocabulary Note` table in
+  /// `docs/advanced/recipes/open-questions-policy.md` for how it
+  /// differs from `openQuestions` and `dependsOn`.
+  decisions: Listing<Decision> = new {}
+}
+
+/// Optional human-readable feature name; not currently surfaced in
+/// reporting but available to anyone consuming the rendered Pkl.
+feature: String? = null
+
+/// Authored scenarios. Same authoring convention as Test.pkl:
+/// declare each scenario as `local x = new Scenario { ... }`, then
+/// list them here.
+scenarios: Listing<Scenario> = new {}
+
+/// User-facing Goals. Each Goal is a piece of value the system
+/// should deliver; Scenarios contribute toward them via
+/// `Scenario.contributes`. `pkspec goals` lists them; `pkspec next`
+/// ranks unimplemented scenarios by Goal priority.
+goals: Listing<Goal> = new {}
+
+/// Planning checkpoints built from Goal ids. `pkspec milestones`
+/// renders their progress and linked Goals.
+milestones: Listing<Milestone> = new {}
+
+/// Shared setup steps prepended to every scenario's Given list —
+/// Cucumber's `Background:` block. Use this for invariants every
+/// scenario in this module relies on (logged-in user, seeded
+/// database, mocked clock). Avoids copy/pasting the same Given
+/// into each scenario.
+///
+/// Named `prelude` rather than `background` because `Scenario.background`
+/// already exists for long-running auxiliary processes.
+prelude: Listing<SpecStep> = new {}
+
+/// Optional allow-list of Scenario.id domain prefixes used in this
+/// module / project. When non-empty, `pkspec lint` reports any
+/// Scenario.id whose first dot-segment is not in this list as
+/// `lint.unknown-domain-prefix` at info level (advisory).
+///
+/// Leave empty to opt out — projects with their own naming
+/// convention (e.g. examples/ style `AUTH-001`) get no new lint
+/// output unless they declare their own allow-list.
+///
+/// Convention for pkspec's own SPEC.pkl: the 14 prefixes documented
+/// in `docs/notes/concepts.md` §2. Other projects pick their own.
+domains: Listing<String> = new {}
+
+local function tagStep(prefix: String, s: SpecStep, runAlways: Boolean): base.Step = new {
+  name = "\(prefix) \(s.description)"
+  // body slots — every kind the runner knows about
+  cmd = s.impl.cmd
+  http = s.impl.http
+  playwright = s.impl.playwright
+  playwrightTest = s.impl.playwrightTest
+  sql = s.impl.sql
+  // shell-specific
+  shell = s.impl.shell
+  stdin = s.impl.stdin
+  expectExitCode = s.impl.expectExitCode
+  expectStdout = s.impl.expectStdout
+  expectStderr = s.impl.expectStderr
+  expectStdoutContains = s.impl.expectStdoutContains
+  expectStderrContains = s.impl.expectStderrContains
+  expectStdoutMatches = s.impl.expectStdoutMatches
+  expectStderrMatches = s.impl.expectStderrMatches
+  expectStdoutJsonPath = s.impl.expectStdoutJsonPath
+  expectStderrJsonPath = s.impl.expectStderrJsonPath
+  inlineStdout = s.impl.inlineStdout
+  captureStdout = s.impl.captureStdout
+  captureExitCode = s.impl.captureExitCode
+  // http-specific
+  expectStatus = s.impl.expectStatus
+  expectStatusBetween = s.impl.expectStatusBetween
+  expectBodyEquals = s.impl.expectBodyEquals
+  expectBodyContains = s.impl.expectBodyContains
+  expectHeaderEquals = s.impl.expectHeaderEquals
+  expectBodyJsonPath = s.impl.expectBodyJsonPath
+  captureBody = s.impl.captureBody
+  captureStatus = s.impl.captureStatus
+  captureBodyJsonPath = s.impl.captureBodyJsonPath
+  cassette = s.impl.cassette
+  // common
+  env = s.impl.env
+  workdir = s.impl.workdir
+  timeoutSec = s.impl.timeoutSec
+  eventually = s.impl.eventually
+  expectAi = s.impl.expectAi
+  always = runAlways
+  repeat = s.impl.repeat
+}
+
+local function tagSteps(prefix: String, items: Listing<SpecStep>, runAlways: Boolean): Listing<base.Step> =
+  new {
+    for (s in items) { tagStep(prefix, s, runAlways) }
+  }
+
+local function scenarioToTest(s: Scenario): base.Test = new {
+  name = s.name
+  description = s.description
+  tags = s.tags
+  specRef = new Listing<String> {
+    when (s.id != null) { s.id }
+  }
+  shell = s.shell
+  env = s.env
+  workdir = s.workdir
+  timeoutSec = s.timeoutSec
+  retries = s.retries
+  flakyAcceptable = s.flakyAcceptable
+  background = s.background
+  // Auto-pending when the scenario's own steps are empty. A
+  // module-level `prelude` does NOT count toward "has a body" —
+  // shared setup steps are always supporting cast for some
+  // scenario-specific Given/When/Then.
+  pending = s.pending || (
+    s.given.isEmpty
+    && s.`when`.isEmpty
+    && s.then.isEmpty
+    && s.cleanup.isEmpty
+  )
+  // Order matters: Prelude (Background:) → Given → When → Then →
+  // Cleanup. Prelude steps are tagged "Background" in the runner's
+  // report so the spec-side shared-setup is visible.
+  steps = new Listing<base.Step> {
+    ...tagSteps("Background", prelude, false)
+    ...tagSteps("Given", s.given, false)
+    ...tagSteps("When", s.`when`, false)
+    ...tagSteps("Then", s.then, false)
+    ...tagSteps("Cleanup", s.cleanup, true)
+  }
+}
+
+local function renderDecision(d: Decision): base.RenderedDecision = new {
+  date = d.date
+  author = d.author
+  summary = d.summary
+  rationale = d.rationale
+}
+
+local function renderImplementation(i: Implementation): base.RenderedImplementation = new {
+  kind = i.kind
+  at = i.at
+}
+
+local function renderScenarioMeta(s: Scenario): base.RenderedScenario = new {
+  name = s.name
+  id = s.id
+  description = s.description
+  tags = s.tags
+  audience = s.audience
+  audienceNotes = s.audienceNotes
+  dependsOn = s.dependsOn
+  supersedes = s.supersedes
+  parent = s.parent
+  contributes = s.contributes
+  reviewStatus = s.reviewStatus
+  deprecated = s.deprecated
+  deprecatedReason = s.deprecatedReason
+  replacedBy = s.replacedBy
+  severity = s.severity
+  implementations = new Listing<base.RenderedImplementation> {
+    for (i in s.implementations) { renderImplementation(i) }
+  }
+  openQuestions = s.openQuestions
+  decisions = new Listing<base.RenderedDecision> {
+    for (d in s.decisions) { renderDecision(d) }
+  }
+}
+
+local function renderGoal(g: Goal): base.RenderedGoal = new {
+  id = g.id
+  name = g.name
+  description = g.description
+  priority = g.priority
+  reviewStatus = g.reviewStatus
+  deprecated = g.deprecated
+  rationale = g.rationale
+  progressMethod = g.progressMethod
+}
+
+local function renderMilestone(m: Milestone): base.RenderedMilestone = new {
+  id = m.id
+  name = m.name
+  description = m.description
+  targetDate = m.targetDate
+  reviewStatus = m.reviewStatus
+  deprecated = m.deprecated
+  goals = m.goals
+  progressMethod = m.progressMethod
+}
+
+// Append the rendered scenarios to whatever `tests` the user (or
+// further `amends`) might have declared. Test.pkl's rendering picks
+// it up from here unchanged.
+tests: Listing<base.Test> = new {
+  for (s in scenarios) { scenarioToTest(s) }
+}
+
+/// Inject scenario-side metadata into the rendered Plan so
+/// `pkspec check / coverage / graph / decisions` can
+/// read it via the Go side. Keyed by Scenario.name since names
+/// are unique within a module; the id (if any) lives inside.
+renderedScenarios: Mapping<String, base.RenderedScenario> = new {
+  for (s in scenarios) {
+    [s.name] = renderScenarioMeta(s)
+  }
+}
+
+/// Inject Goal definitions, keyed by Goal.id. Reachable from the
+/// Go side via `Plan.Goals`.
+renderedGoals: Mapping<String, base.RenderedGoal> = new {
+  for (g in goals) {
+    [g.id] = renderGoal(g)
+  }
+}
+
+/// Inject Milestone definitions, keyed by Milestone.id.
+renderedMilestones: Mapping<String, base.RenderedMilestone> = new {
+  for (m in milestones) {
+    [m.id] = renderMilestone(m)
+  }
+}
+
+/// Forward the module-level `domains` allow-list to the rendered
+/// Plan so `pkspec lint` can apply the unknown-prefix rule.
+renderedDomains: Listing<String> = domains

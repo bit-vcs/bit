@@ -16,7 +16,7 @@ export function formatFlakerFailure(stderr, flakerCommand, status) {
     return [
       `flaker CLI is required, but \`${flakerCommand}\` was not found.`,
       "Install @mizchi/flaker, or point FLAKER_CMD to a local flaker build.",
-      "Example: FLAKER_CMD='node /path/to/flaker/dist/cli.js' just flaker-git-compat-affected changed=src/cmd/bit/merge.mbt",
+      "Example: FLAKER_CMD='node /path/to/flaker/dist/cli.js' tools/flaker-git-compat-affected.sh src/cmd/bit/merge.mbt",
     ].join("\n");
   }
 

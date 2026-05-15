@@ -12,7 +12,9 @@ on:
       - "package.json"
       - "pnpm-lock.yaml"
       - "vite.playground.config.mjs"
-      - "justfile"
+      - "Taskfile.pkl"
+      - "Test.pkl"
+      - "pkspec/**"
       - "moon.mod.json"
       - "src/lib/**"
       - "tools/bit-git.mjs"
@@ -45,8 +47,8 @@ jobs:
           node-version: 24
           cache: pnpm
 
-      - name: Install just
-        uses: extractions/setup-just@v2
+      - name: Install pkfire
+        uses: mizchi/pkfire@v0
 
       - name: Install Bun
         uses: oven-sh/setup-bun@v2
@@ -68,6 +70,6 @@ jobs:
         run: |
           # The checked-in docs bundles are not byte-stable across host platforms,
           # so CI only verifies that the Pages artifact can be rebuilt.
-          just build-pages-demo
+          pkf run build-pages-demo
           test -s target/pages/app.js
           test -s target/pages/playground/app.js

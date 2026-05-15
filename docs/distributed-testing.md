@@ -37,14 +37,14 @@ Older agent/orchestrator notes still exist in `docs/`, but this guide is scoped 
 
 ```bash
 # Run distributed-system-focused verification
-just test-distributed
+pkf run test-distributed
 
 # Additionally, run full regression
-just test
-just check
+pkf run test
+pkf run check
 ```
 
-Current `just test-distributed` runs:
+Current `pkf run test-distributed` runs:
 
 - `mizchi/bit/x-mcp`
 - `mizchi/bit/x-rebase-ai`

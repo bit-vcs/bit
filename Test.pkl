@@ -1,0 +1,46 @@
+// Unified test suite for `bit`. Run with:
+//   pkspec exec -f Test.pkl
+// Or via the pkfire wrapper:
+//   pkf run test
+//
+// Build prerequisites (JS bundle sync, etc.) are handled by `pkf run test`,
+// which depends on the relevant build/bundle tasks before invoking pkspec.
+
+// Schemas under pkspec/ are vendored via `pkspec init` (pkspec v0.2.1).
+// Regenerate with `pkspec init --force` if upgrading.
+amends "pkspec/Test.pkl"
+
+tests {
+  new {
+    name = "moon-test-js"
+    cmd = "moon test --target js -p mizchi/bit -p mizchi/bit/lib"
+  }
+  new {
+    name = "moon-test-wasm-storage-runtime"
+    cmd = "moon test --target wasm -p mizchi/bit/runtime -f storage_runtime_wbtest.mbt"
+  }
+  new {
+    name = "moon-test-native"
+    cmd = "moon test --target native --no-parallelize -j 1"
+  }
+  new {
+    name = "git-compat-allowlist"
+    cmd = "node --test tools/git-compat-allowlist.test.mjs"
+  }
+  new {
+    name = "flaker-affected-rules"
+    cmd = "node --test tools/flaker-affected-rules.test.mjs"
+  }
+  new {
+    name = "flaker-cli-wrapper"
+    cmd = "node --test tools/flaker-cli-wrapper.test.mjs"
+  }
+  new {
+    name = "flaker-git-compat"
+    cmd = "node --test tools/flaker-git-compat.test.mjs"
+  }
+  new {
+    name = "js-build"
+    cmd = "node --test tools/js-build.test.mjs tools/npm-lib.test.mjs tools/npm-cli.test.mjs tools/demo-relay.test.mjs tools/demo-editor-link.test.mjs tools/playground-commands.test.mjs tools/playground-view.test.mjs"
+  }
+}

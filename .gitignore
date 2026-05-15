@@ -52,3 +52,7 @@ npm/bit.cjs
 npm/lib.raw.js
 /result
 apps/
+
+# pkfire / pkspec runtime artifacts
+.pkfire/
+.pkspec/

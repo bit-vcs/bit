@@ -7,7 +7,7 @@ DIR=".bench-results"
 
 if [ ! -d "$DIR" ]; then
     echo "No benchmark results found in $DIR/"
-    echo "Run: just bench-save <name>"
+    echo "Run: tools/bench-save.sh <name>"
     exit 1
 fi
 
@@ -20,7 +20,7 @@ else
     if [ ${#FILES[@]} -lt 2 ]; then
         echo "Need at least 2 benchmark results to compare."
         echo "Found: ${FILES[*]}"
-        echo "Run: just bench-save <name>"
+        echo "Run: tools/bench-save.sh <name>"
         exit 1
     fi
     CURRENT="${FILES[0]}"

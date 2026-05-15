@@ -1,0 +1,686 @@
+// MoonBit project tasks for `bit`. Run with `pkf run <task>`.
+// Migrated from the previous `justfile`. Parameterized recipes that used
+// to take positional args (e.g. `git-t-one t3200-branch.sh`) are now invoked
+// directly as `tools/<script>.sh` — see docs/git-test-harness.md.
+
+amends "package://pkg.pkl-lang.org/github.com/mizchi/pkfire/pkfire@0.10.0#/Taskfile.pkl"
+
+local moonbitSources: Listing<String> = new {
+  "src/**/*.mbt"
+  "src/**/moon.pkg.json"
+  "moon.mod.json"
+}
+
+// -- formatting -----------------------------------------------------------
+
+local fmt: Task = new {
+  name = "fmt"
+  description = "Format MoonBit sources"
+  cmd = "moon fmt"
+}
+
+// -- type-check + static guards ------------------------------------------
+
+local checkJs: Task = new {
+  name = "check:js"
+  description = "moon check --target js"
+  cmd = "moon check --deny-warn --warn-list=-27-20 --target js"
+  inputs = moonbitSources
+}
+
+local checkWasm: Task = new {
+  name = "check:wasm"
+  description = "moon check --target wasm"
+  cmd = "moon check --deny-warn --warn-list=-27-20 --target wasm"
+  inputs = moonbitSources
+}
+
+local checkNative: Task = new {
+  name = "check:native"
+  description = "moon check --target native"
+  cmd = "moon check --deny-warn --warn-list=-27-20 --target native"
+  inputs = moonbitSources
+}
+
+local checkLayers: Task = new {
+  name = "check:layers"
+  description = "Validate the package layering graph"
+  cmd = "node tools/check-layers.mjs"
+  inputs {
+    "tools/check-layers.mjs"
+    "src/**/moon.pkg.json"
+  }
+}
+
+local checkGuards: Task = new {
+  name = "check:guards"
+  description = "Layer-boundary guards (runtime/storage_runtime)"
+  cmd = "tools/check-layer-guards.sh"
+  inputs {
+    "src/**/*.mbt"
+    "tools/check-layer-guards.sh"
+  }
+}
+
+local check: Task = new {
+  name = "check"
+  description = "Type-check across js/wasm/native + static guards"
+  deps { checkJs; checkWasm; checkNative; checkLayers; checkGuards }
+}
+
+// -- build artifacts -----------------------------------------------------
+
+local build: Task = new {
+  name = "build"
+  description = "Native release build; stages bit binary for the git-shim harness"
+  cmd = "tools/build-bit-native.sh"
+  inputs = moonbitSources
+  outputs {
+    "_build/native/release/build/cmd/bit/bit.exe"
+    "tools/git-shim/moon"
+  }
+}
+
+local buildJsLib: Task = new {
+  name = "build-js-lib"
+  description = "JS release build of src/lib"
+  cmd = "moon build --target js --release src/lib"
+  inputs = moonbitSources
+  outputs { "_build/js/release/build/lib/lib.js" }
+}
+
+local buildJsCli: Task = new {
+  name = "build-js-cli"
+  description = "JS release build of src/cmd/bit"
+  cmd = "moon build --target js --release src/cmd/bit"
+  inputs = moonbitSources
+  outputs { "_build/js/release/build/cmd/bit/bit.js" }
+}
+
+local syncNpmLibRaw: Task = new {
+  name = "sync-npm-lib-raw"
+  description = "Copy the JS lib payload into the checked-in npm wrapper"
+  cmd = "cp _build/js/release/build/lib/lib.js npm/lib.raw.js"
+  deps { buildJsLib }
+  inputs { "_build/js/release/build/lib/lib.js" }
+  outputs { "npm/lib.raw.js" }
+}
+
+local syncNpmBitCjs: Task = new {
+  name = "sync-npm-bit-cjs"
+  description = "Copy the JS CLI payload into the checked-in npm wrapper"
+  cmd = "cp _build/js/release/build/cmd/bit/bit.js npm/bit.cjs"
+  deps { buildJsCli }
+  inputs { "_build/js/release/build/cmd/bit/bit.js" }
+  outputs { "npm/bit.cjs" }
+}
+
+local bundleJsLibMinimal: Task = new {
+  name = "bundle-js-lib-minimal"
+  description = "Tree-shake the minimal lib consumer (bun build)"
+  cmd = #"""
+    mkdir -p target
+    bun build --target browser --format esm --production \
+      --outfile target/lib-js-minimal.bundle.mjs \
+      tools/lib-js-minimal.mjs
+    """#
+  deps { buildJsLib }
+  inputs {
+    "_build/js/release/build/lib/lib.js"
+    "tools/lib-js-minimal.mjs"
+  }
+  outputs { "target/lib-js-minimal.bundle.mjs" }
+}
+
+local bundleJsLibGitOps: Task = new {
+  name = "bundle-js-lib-git-ops"
+  description = "Tree-shake the git-ops lib consumer (bun build)"
+  cmd = #"""
+    mkdir -p target
+    bun build --target browser --format esm --production \
+      --outfile target/lib-js-git-ops.bundle.mjs \
+      tools/lib-js-git-ops.mjs
+    """#
+  deps { buildJsLib }
+  inputs {
+    "_build/js/release/build/lib/lib.js"
+    "tools/lib-js-git-ops.mjs"
+  }
+  outputs { "target/lib-js-git-ops.bundle.mjs" }
+}
+
+// -- JS lib smoke / verification -----------------------------------------
+
+local testJsLib: Task = new {
+  name = "test-js-lib"
+  description = "Run lib consumer against an in-memory libgit2-style host"
+  cmd = "node tools/verify-libgit2-js.mjs"
+  deps { buildJsLib }
+}
+
+local testJsLibRelay: Task = new {
+  name = "test-js-lib-relay"
+  description = "Run lib consumer through the relay transport"
+  cmd = "node tools/verify-libgit2-relay.mjs"
+  deps { buildJsLib }
+}
+
+local testJsLibMinimal: Task = new {
+  name = "test-js-lib-minimal"
+  description = "Run the minimal lib consumer script"
+  cmd = "node tools/lib-js-minimal.mjs"
+  deps { buildJsLib }
+}
+
+local testJsLibGitOps: Task = new {
+  name = "test-js-lib-git-ops"
+  description = "Run the representative git-ops lib consumer script"
+  cmd = "node tools/lib-js-git-ops.mjs"
+  deps { buildJsLib }
+}
+
+local testJsLibMinimalBundle: Task = new {
+  name = "test-js-lib-minimal-bundle"
+  description = "Run the bundled minimal lib consumer"
+  cmd = "node target/lib-js-minimal.bundle.mjs"
+  deps { bundleJsLibMinimal }
+}
+
+local testJsLibGitOpsBundle: Task = new {
+  name = "test-js-lib-git-ops-bundle"
+  description = "Run the bundled git-ops lib consumer"
+  cmd = "node target/lib-js-git-ops.bundle.mjs"
+  deps { bundleJsLibGitOps }
+}
+
+local verifyJsLibTreeshake: Task = new {
+  name = "verify-js-lib-treeshake"
+  description = "Confirm minimal bundle stays materially smaller than git-ops"
+  cmd = "node tools/verify-lib-js-treeshake.mjs"
+  deps { bundleJsLibMinimal; bundleJsLibGitOps }
+}
+
+local sizeJsLib: Task = new {
+  name = "size-js-lib"
+  description = "Report raw + gzip size of the JS lib"
+  cmd = "tools/size-bytes.sh _build/js/release/build/lib/lib.js"
+  deps { buildJsLib }
+}
+
+local sizeJsLibMinimalBundle: Task = new {
+  name = "size-js-lib-minimal-bundle"
+  description = "Report raw + gzip size of the minimal bundle"
+  cmd = "tools/size-bytes.sh target/lib-js-minimal.bundle.mjs"
+  deps { bundleJsLibMinimal }
+}
+
+local sizeJsLibGitOpsBundle: Task = new {
+  name = "size-js-lib-git-ops-bundle"
+  description = "Report raw + gzip size of the git-ops bundle"
+  cmd = "tools/size-bytes.sh target/lib-js-git-ops.bundle.mjs"
+  deps { bundleJsLibGitOps }
+}
+
+// -- docs / pages demo ---------------------------------------------------
+
+local buildDocsDemo: Task = new {
+  name = "build-docs-demo"
+  description = "Build the in-tree browser demo bundle"
+  cmd = #"""
+    bun build --target browser --format esm --production \
+      --outfile docs/demo/app.js \
+      docs/demo/main.js
+    """#
+  deps { buildJsLib }
+  inputs {
+    "_build/js/release/build/lib/lib.js"
+    "docs/demo/main.js"
+    "docs/demo/**/*.js"
+  }
+  outputs { "docs/demo/app.js" }
+}
+
+local buildDocsPlayground: Task = new {
+  name = "build-docs-playground"
+  description = "Build the in-tree browser playground bundle"
+  cmd = #"""
+    if [ ! -d node_modules ]; then pnpm install; fi
+    pnpm run playground:build
+    """#
+  deps { buildJsLib }
+}
+
+local buildPagesDemo: Task = new {
+  name = "build-pages-demo"
+  description = "Stage the GitHub Pages demo artifact under target/pages/"
+  cmd = "tools/build-pages-demo.sh"
+  deps { buildDocsDemo; buildDocsPlayground }
+}
+
+local sizePagesDemo: Task = new {
+  name = "size-pages-demo"
+  description = "Report raw + gzip size of the GitHub Pages demo bundle"
+  cmd = "tools/size-bytes.sh target/pages/app.js"
+  deps { buildPagesDemo }
+}
+
+// -- unified test runner via pkspec --------------------------------------
+
+local test: Task = new {
+  name = "test"
+  description = "Run the full test matrix through pkspec (Test.pkl)"
+  cmd = "pkspec exec -f Test.pkl"
+  deps {
+    syncNpmLibRaw
+    syncNpmBitCjs
+    bundleJsLibMinimal
+    bundleJsLibGitOps
+  }
+}
+
+local testUpdate: Task = new {
+  name = "test-update"
+  description = "Refresh snapshot expectations for the moon test suites"
+  cmd = #"""
+    moon test --update --target js -p mizchi/bit -p mizchi/bit/lib
+    moon test --update --target native --no-parallelize -j 1
+    """#
+}
+
+local testJsBuild: Task = new {
+  name = "test-js-build"
+  description = "Node-side smoke tests for the published JS lib + npm wrapper"
+  cmd = "node --test tools/js-build.test.mjs tools/npm-lib.test.mjs tools/npm-cli.test.mjs tools/demo-relay.test.mjs tools/demo-editor-link.test.mjs tools/playground-commands.test.mjs tools/playground-view.test.mjs"
+  deps {
+    syncNpmLibRaw
+    syncNpmBitCjs
+    bundleJsLibMinimal
+    bundleJsLibGitOps
+  }
+}
+
+// -- distributed/integration test entry points ---------------------------
+
+local e2e: Task = new {
+  name = "e2e"
+  description = "Legacy t00xx integration tests"
+  cmd = "bash e2e/run-tests.sh"
+}
+
+local testSubdir: Task = new {
+  name = "test-subdir"
+  description = "subdir-clone/push integration tests (t/ directory)"
+  cmd = "bash t/run-tests.sh t900"
+}
+
+local testDistributed: Task = new {
+  name = "test-distributed"
+  description = "Agent/orchestration focused native checks"
+  cmd = #"""
+    moon test --target native -p mizchi/bit/x-mcp
+    moon test --target native -p mizchi/bit/x-rebase-ai
+    moon test --target native -p mizchi/bit/x-hub
+    moon test --target native -p mizchi/bit/x-hub/native
+    moon test --target native -p mizchi/bit/x-kv
+    """#
+}
+
+local testAi: Task = new {
+  name = "test-ai"
+  description = "Prepare an intentional rebase conflict to debug rebase-ai locally"
+  cmd = "bash tools/test-ai.sh"
+}
+
+// -- compatibility helpers ------------------------------------------------
+
+local compatTable: Task = new {
+  name = "compat-table"
+  description = "Generate the compatibility table from the allowlist"
+  cmd = "bash tools/generate-compat-table.sh"
+}
+
+local compatRandomRun: Task = new {
+  name = "compat-random-run"
+  description = "Run a randomized git-compat shard (env-configured)"
+  cmd = "bash tools/run-git-compat-random.sh"
+}
+
+// Parameterized helpers (call the script directly):
+//
+//   tools/compat-random-aggregate.sh [results_dir]
+//   tools/compat-random-dispatch.sh  [shards] [ratio] [target_shard] [seed]
+//   tools/compat-random-notify.sh    [summary] [matrix]
+//   tools/flaker-cli-wrapper.mjs ...
+//   tools/update-git-test-runtime-seconds.py ...
+//   tools/git-t-one.sh <test_file>
+//   tools/git-t-one-no-real-git.sh <test_file>
+//   tools/git-t-one-remote.sh <test_file>
+//   tools/git-t-one-random.sh <test_file>
+//   tools/git-t-full.sh <test_file>
+//   tools/compare-real-git.sh [REPO_URL=...]
+//   tools/bench-save.sh <name>
+//   tools/bench-compare.sh <args>
+
+// -- upstream Git test suite ---------------------------------------------
+
+local gitT: Task = new {
+  name = "git-t"
+  description = "Run Git's upstream test suite (submodule at third_party/git)"
+  cmd = #"""
+    tools/apply-git-test-patches.sh
+    tools/run-git-test.sh
+    """#
+  deps { build }
+}
+
+local gitTPack: Task = new {
+  name = "git-t-pack"
+  description = "Run pack-related upstream tests"
+  cmd = #"""
+    tools/apply-git-test-patches.sh
+    tools/run-git-test.sh T='t5300-pack-object.sh t5302-pack-index.sh t5303-pack-corruption-resilience.sh t5315-pack-objects-compression.sh t5316-pack-delta-depth.sh t5351-unpack-large-objects.sh'
+    """#
+  deps { build }
+}
+
+local gitTPackMore: Task = new {
+  name = "git-t-pack-more"
+  description = "Run a broader pack/idx/bitmap test set"
+  cmd = #"""
+    tools/apply-git-test-patches.sh
+    tools/run-git-test.sh T='t5300-pack-object.sh t5302-pack-index.sh t5303-pack-corruption-resilience.sh t5306-pack-nobase.sh t5307-pack-missing-commit.sh t5308-pack-detect-duplicates.sh t5309-pack-delta-cycles.sh t5310-pack-bitmaps.sh t5311-pack-bitmaps-shallow.sh t5313-pack-bounds-checks.sh t5314-pack-cycle-detection.sh t5315-pack-objects-compression.sh t5316-pack-delta-depth.sh t5319-multi-pack-index.sh t5321-pack-large-objects.sh t5326-multi-pack-bitmaps.sh t5327-multi-pack-bitmaps-rev.sh t5329-pack-objects-cruft.sh t5331-pack-objects-stdin.sh t5332-multi-pack-reuse.sh t5334-incremental-multi-pack-index.sh t5351-unpack-large-objects.sh'
+    """#
+  deps { build }
+}
+
+local gitTHard: Task = new {
+  name = "git-t-hard"
+  description = "Run protocol/fetch/push logic-heavy tests"
+  cmd = #"""
+    tools/apply-git-test-patches.sh
+    tools/run-git-test.sh T='t5500-fetch-pack.sh t5504-fetch-receive-strict.sh t5512-ls-remote.sh t5515-fetch-merge-logic.sh t5516-fetch-push.sh t5528-push-default.sh t5529-push-errors.sh t5533-push-cas.sh t5535-fetch-push-symref.sh t5537-fetch-shallow.sh t5538-push-shallow.sh t5700-protocol-v1.sh t5702-protocol-v2.sh t5703-upload-pack-ref-in-want.sh t5704-protocol-violations.sh t5705-session-id-in-capabilities.sh'
+    """#
+  deps { build }
+}
+
+local gitTHardMore: Task = new {
+  name = "git-t-hard-more"
+  description = "Run additional fetch/push edge cases"
+  cmd = #"""
+    tools/apply-git-test-patches.sh
+    tools/run-git-test.sh T='t5510-fetch.sh t5511-refspec.sh t5513-fetch-track.sh t5514-fetch-multiple.sh t5518-fetch-exit-status.sh t5525-fetch-tagopt.sh t5527-fetch-odd-refs.sh t5530-upload-pack-error.sh t5536-fetch-conflicts.sh t5539-fetch-http-shallow.sh'
+    """#
+  deps { build }
+}
+
+local gitTProtoMore: Task = new {
+  name = "git-t-proto-more"
+  description = "Run remaining protocol v2 bundle-uri and serve tests"
+  cmd = #"""
+    tools/apply-git-test-patches.sh
+    tools/run-git-test.sh T='t5701-git-serve.sh t5710-promisor-remote-capability.sh t5730-protocol-v2-bundle-uri-file.sh t5731-protocol-v2-bundle-uri-git.sh t5732-protocol-v2-bundle-uri-http.sh t5750-bundle-uri-parse.sh'
+    """#
+  deps { build }
+}
+
+local gitTAllowlist: Task = new {
+  name = "git-t-allowlist"
+  description = "Run tests from tools/git-test-allowlist.txt (no shim)"
+  cmd = "tools/git-t-allowlist.sh"
+  deps { build }
+}
+
+local gitTAllowlistShim: Task = new {
+  name = "git-t-allowlist-shim"
+  description = "Allowlist run via git-shim (system git fallback for unintercepted commands)"
+  cmd = "tools/git-t-allowlist-shim.sh"
+  deps { build }
+}
+
+local gitTAllowlistShimStrict: Task = new {
+  name = "git-t-allowlist-shim-strict"
+  description = "Allowlist run with strict shim — every listed subcommand goes through bit"
+  cmd = "tools/git-t-allowlist-shim-strict.sh"
+  deps { build }
+}
+
+local gitTAllowlistShimRandom: Task = new {
+  name = "git-t-allowlist-shim-random"
+  description = "Allowlist run with random bit/real-git routing (env: SHIM_RANDOM_RATIO)"
+  cmd = "tools/git-t-allowlist-shim-random.sh"
+  deps { build }
+}
+
+local compareRealGit: Task = new {
+  name = "compare-real-git"
+  description = "Compare bit vs real git performance"
+  cmd = "bash tools/compare-real-git.sh"
+}
+
+// -- benchmarks ----------------------------------------------------------
+
+local bench: Task = new {
+  name = "bench"
+  description = "Run all native benchmarks"
+  cmd = "moon bench --target native"
+}
+
+local benchFs: Task = new {
+  name = "bench-fs"
+  cmd = "moon bench --target native -p mizchi/bit/vfs -f bench_test.mbt"
+}
+
+local benchFsReal: Task = new {
+  name = "bench-fs-real"
+  cmd = "moon bench --target native -p mizchi/bit/vfs -f bench_real_test.mbt"
+}
+
+local benchKv: Task = new {
+  name = "bench-kv"
+  cmd = "moon bench --target native -p mizchi/bit/x-kv"
+}
+
+local benchLib: Task = new {
+  name = "bench-lib"
+  cmd = "moon bench --target native -p mizchi/bit/lib"
+}
+
+local benchInit: Task = new {
+  name = "bench-init"
+  cmd = "moon bench --target native -p mizchi/bit/cmd/bit -f bench_init_wbtest.mbt"
+}
+
+local benchMidxClone: Task = new {
+  name = "bench-midx-clone"
+  cmd = "moon bench --target native -p mizchi/bit/cmd/bit -f bench_midx_clone_wbtest.mbt"
+}
+
+local benchE2eCloneFetch: Task = new {
+  name = "bench-e2e-clone-fetch"
+  cmd = "moon bench --target native -p mizchi/bit/cmd/bit -f bench_e2e_clone_fetch_wbtest.mbt"
+}
+
+local benchStatus: Task = new {
+  name = "bench-status"
+  cmd = "moon bench --target native -p mizchi/bit/lib -f bench_status_test.mbt"
+}
+
+local benchPack: Task = new {
+  name = "bench-pack"
+  cmd = "moon bench --target native -p mizchi/bit/pack -f bench_test.mbt"
+}
+
+local benchProtocol: Task = new {
+  name = "bench-protocol"
+  cmd = "moon bench --target native -p mizchi/bit/protocol -f bench_test.mbt"
+}
+
+local benchDiff: Task = new {
+  name = "bench-diff"
+  cmd = "moon bench --target native -p mizchi/bit/diff -f bench_test.mbt"
+}
+
+local benchOps: Task = new {
+  name = "bench-ops"
+  cmd = "moon bench --target native -p mizchi/bit/lib -f bench_ops_test.mbt"
+}
+
+local benchLog: Task = new {
+  name = "bench-log"
+  cmd = "moon bench --target native -p mizchi/bit/cmd/bit -f bench_log_wbtest.mbt"
+}
+
+local benchGrep: Task = new {
+  name = "bench-grep"
+  cmd = "moon bench --target native -p mizchi/bit/cmd/bit -f bench_grep_wbtest.mbt"
+}
+
+// -- housekeeping -------------------------------------------------------
+
+local run: Task = new {
+  name = "run"
+  description = "Run src/main (native)"
+  cmd = "moon run src/main --target native"
+}
+
+local info: Task = new {
+  name = "info"
+  description = "Generate type definition files"
+  cmd = "moon info"
+}
+
+local clean: Task = new {
+  name = "clean"
+  description = "Clean build artifacts"
+  cmd = #"""
+    moon clean
+    bash tools/clean-git-test-artifacts.sh
+    """#
+}
+
+local install: Task = new {
+  name = "install"
+  description = "Install bit to ~/.moon/bin"
+  cmd = "tools/install-bit.sh"
+}
+
+local uninstall: Task = new {
+  name = "uninstall"
+  description = "Remove ~/.moon/bin/bit"
+  cmd = #"""
+    rm -f ~/.moon/bin/bit
+    echo "Removed ~/.moon/bin/bit"
+    """#
+}
+
+local playgroundInstall: Task = new {
+  name = "playground-install"
+  description = "Install local frontend tooling for the Vite playground"
+  cmd = "pnpm install"
+}
+
+local playgroundDev: Task = new {
+  name = "playground-dev"
+  description = "Build the JS lib and boot the Vite playground"
+  cmd = "tools/playground-dev.sh"
+}
+
+local releaseCheck: Task = new {
+  name = "release-check"
+  description = "Pre-release gate: fmt + info + check + test + treeshake + e2e"
+  deps { fmt; info; check; test; verifyJsLibTreeshake; e2e }
+}
+
+// -- default ------------------------------------------------------------
+
+local default: Task = new {
+  name = "default"
+  description = "Default gate: check + test"
+  deps { check; test }
+}
+
+tasks {
+  default
+
+  fmt
+  check
+  checkJs
+  checkWasm
+  checkNative
+  checkLayers
+  checkGuards
+
+  build
+  buildJsLib
+  buildJsCli
+  syncNpmLibRaw
+  syncNpmBitCjs
+  bundleJsLibMinimal
+  bundleJsLibGitOps
+
+  test
+  testUpdate
+  testJsBuild
+  testJsLib
+  testJsLibRelay
+  testJsLibMinimal
+  testJsLibGitOps
+  testJsLibMinimalBundle
+  testJsLibGitOpsBundle
+  verifyJsLibTreeshake
+
+  sizeJsLib
+  sizeJsLibMinimalBundle
+  sizeJsLibGitOpsBundle
+  sizePagesDemo
+
+  buildDocsDemo
+  buildDocsPlayground
+  buildPagesDemo
+
+  e2e
+  testSubdir
+  testDistributed
+  testAi
+
+  compatTable
+  compatRandomRun
+
+  gitT
+  gitTPack
+  gitTPackMore
+  gitTHard
+  gitTHardMore
+  gitTProtoMore
+  gitTAllowlist
+  gitTAllowlistShim
+  gitTAllowlistShimStrict
+  gitTAllowlistShimRandom
+  compareRealGit
+
+  bench
+  benchFs
+  benchFsReal
+  benchKv
+  benchLib
+  benchInit
+  benchMidxClone
+  benchE2eCloneFetch
+  benchStatus
+  benchPack
+  benchProtocol
+  benchDiff
+  benchOps
+  benchLog
+  benchGrep
+
+  run
+  info
+  clean
+  install
+  uninstall
+  playgroundInstall
+  playgroundDev
+
+  releaseCheck
+}
