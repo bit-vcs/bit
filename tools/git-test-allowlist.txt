@@ -15,6 +15,7 @@ t0450-txt-doc-vs-help.sh
 t1006-cat-file.sh
 t1007-hash-object.sh
 t1300-config.sh
+t1400-update-ref.sh
 t1401-symbolic-ref.sh
 t1403-show-ref.sh
 t1500-rev-parse.sh
