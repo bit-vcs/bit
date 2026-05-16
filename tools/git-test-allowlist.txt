@@ -894,6 +894,7 @@ t4120-apply-popt.sh
 t4121-apply-diffs.sh
 t4122-apply-symlink-inside.sh
 t4123-apply-shrink.sh
+t4124-apply-ws-rule.sh
 t4125-apply-ws-fuzz.sh
 t4126-apply-empty.sh
 t4127-apply-same-fn.sh
