@@ -68,6 +68,8 @@ t3404 (rebase -i): **129/132 (97.7%)**
 ## P3: 将来タスク
 
 - [ ] WASM target カバレッジ拡大
+  - [x] diff3 wbtest (23/23 pass) / repo materialize wbtest (2/2 pass) — wasm CI 入り
+  - [ ] fingerprint / x-workspace の wbtest は `async/process` 依存で wasm 不可能、native のみ維持
 - [ ] Moonix integration
 - [ ] bit mcp 拡充
 
