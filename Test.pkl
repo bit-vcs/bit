@@ -20,6 +20,14 @@ tests {
     cmd = "moon test --target wasm -p mizchi/bit/runtime -f storage_runtime_wbtest.mbt"
   }
   new {
+    name = "moon-test-wasm-diff3"
+    cmd = "moon test --target wasm -p mizchi/bit/diff3"
+  }
+  new {
+    name = "moon-test-wasm-repo"
+    cmd = "moon test --target wasm -p mizchi/bit/repo"
+  }
+  new {
     name = "moon-test-native"
     cmd = "moon test --target native --no-parallelize -j 1"
   }
