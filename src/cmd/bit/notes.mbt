@@ -338,12 +338,10 @@ async fn notes_list(
   let obj = db.get(rfs, commit_id)
   guard obj is Some(o) else { return }
   let commit_info = @bitcore.parse_commit(o.data)
-  // Read tree
-  let tree_obj = db.get(rfs, commit_info.tree)
-  guard tree_obj is Some(to) else { return }
-  let entries = @bitcore.parse_tree(to.data)
-  for entry in entries {
-    print_line("\{entry.id.to_hex()} \{entry.name}")
+  let collected = notes_collect_all(rfs, db, commit_info.tree)
+  for pair in collected {
+    let (hex, id) = pair
+    print_line("\{id.to_hex()} \{hex}")
   }
 }
 
@@ -375,17 +373,10 @@ async fn notes_show(
     @sys.exit(1)
   }
   let commit_info = @bitcore.parse_commit(o.data)
-  // Read tree
-  let tree_obj = db.get(rfs, commit_info.tree)
-  guard tree_obj is Some(to) else {
-    @stdio.stderr.write("error: notes tree corrupt")
-    @sys.exit(1)
-  }
-  let entries = @bitcore.parse_tree(to.data)
-  // Find entry matching target commit
-  for entry in entries {
-    if entry.name == target_hex {
-      let note_obj = db.get(rfs, entry.id)
+  // Find entry matching target commit (supports any fanout depth).
+  match notes_lookup_blob(rfs, db, commit_info.tree, target_hex) {
+    Some(blob_id) => {
+      let note_obj = db.get(rfs, blob_id)
       guard note_obj is Some(no) else {
         @stdio.stderr.write("error: note blob corrupt")
         @sys.exit(1)
@@ -393,9 +384,128 @@ async fn notes_show(
       no.data |> decode_bytes |> print_line
       return
     }
+    None => ()
   }
   @stdio.stderr.write("error: no note found for \{target_hex}")
   @sys.exit(1)
+}
+
+///|
+/// Lookup a note blob ID for `commit_hex` in the given notes tree, supporting
+/// any fanout depth. Returns None if the note isn't present.
+fn notes_lookup_blob(
+  rfs : &@bitcore.RepoFileSystem,
+  db : @bitlib.ObjectDb,
+  tree_id : @bitcore.ObjectId,
+  commit_hex : String,
+) -> @bitcore.ObjectId? raise Error {
+  let obj = db.get(rfs, tree_id)
+  guard obj is Some(o) else { return None }
+  let entries = @bitcore.parse_tree(o.data)
+  for e in entries {
+    if e.name == commit_hex {
+      return Some(e.id)
+    }
+    if (e.mode == "40000" || e.mode == "040000") &&
+      commit_hex.length() > e.name.length() &&
+      string_slice_to(commit_hex, e.name.length()) == e.name {
+      let rest = string_slice_from(commit_hex, e.name.length())
+      return notes_lookup_blob(rfs, db, e.id, rest)
+    }
+  }
+  None
+}
+
+///|
+/// Recursively collect all (full_commit_hex, blob_id) pairs from a notes tree.
+fn notes_collect_all(
+  rfs : &@bitcore.RepoFileSystem,
+  db : @bitlib.ObjectDb,
+  tree_id : @bitcore.ObjectId,
+) -> Array[(String, @bitcore.ObjectId)] raise Error {
+  let result : Array[(String, @bitcore.ObjectId)] = []
+  notes_walk_tree(rfs, db, tree_id, "", result)
+  result
+}
+
+///|
+fn notes_walk_tree(
+  rfs : &@bitcore.RepoFileSystem,
+  db : @bitlib.ObjectDb,
+  tree_id : @bitcore.ObjectId,
+  prefix : String,
+  out : Array[(String, @bitcore.ObjectId)],
+) -> Unit raise Error {
+  let obj = db.get(rfs, tree_id)
+  guard obj is Some(o) else { return }
+  let entries = @bitcore.parse_tree(o.data)
+  for e in entries {
+    if e.mode == "40000" || e.mode == "040000" {
+      notes_walk_tree(rfs, db, e.id, prefix + e.name, out)
+    } else {
+      out.push((prefix + e.name, e.id))
+    }
+  }
+}
+
+///|
+/// Threshold above which the notes tree is rebalanced into 1-level fanout
+/// (subdirs named with the first 2 hex chars of the commit OID). Matches
+/// the conventional 256-entry boundary used by upstream git.
+let notes_fanout_threshold : Int = 256
+
+///|
+/// Build and write a notes tree for the given (commit_hex, blob_id) entries.
+/// Picks fanout 0 when entries.length() <= notes_fanout_threshold, otherwise
+/// fanout 1. Returns the root tree id.
+fn notes_write_tree(
+  wfs : &@bitcore.FileSystem,
+  git_dir : String,
+  notes : Array[(String, @bitcore.ObjectId)],
+) -> @bitcore.ObjectId raise Error {
+  if notes.length() <= notes_fanout_threshold {
+    let entries : Array[@bitcore.TreeEntry] = []
+    for pair in notes {
+      let (hex, id) = pair
+      entries.push(@bitcore.TreeEntry::new("100644", hex, id))
+    }
+    entries.sort_by((a, b) => a.name.compare(b.name))
+    let (tree_id, tree_data) = @bitcore.create_tree(entries)
+    @bitlib.write_object_bytes(wfs, git_dir, tree_id, tree_data)
+    return tree_id
+  }
+  // Fanout 1: group by first 2 hex chars.
+  let groups : Map[String, Array[@bitcore.TreeEntry]] = Map::new()
+  for pair in notes {
+    let (hex, id) = pair
+    let prefix = string_slice_to(hex, 2)
+    let suffix = string_slice_from(hex, 2)
+    let existing = groups.get(prefix)
+    match existing {
+      Some(g) => g.push(@bitcore.TreeEntry::new("100644", suffix, id))
+      None => {
+        let g : Array[@bitcore.TreeEntry] = []
+        g.push(@bitcore.TreeEntry::new("100644", suffix, id))
+        groups[prefix] = g
+      }
+    }
+  }
+  let prefixes : Array[String] = []
+  for prefix, _ in groups {
+    prefixes.push(prefix)
+  }
+  prefixes.sort()
+  let top_entries : Array[@bitcore.TreeEntry] = []
+  for prefix in prefixes {
+    let group = groups.get(prefix).unwrap()
+    group.sort_by((a, b) => a.name.compare(b.name))
+    let (sub_id, sub_data) = @bitcore.create_tree(group)
+    @bitlib.write_object_bytes(wfs, git_dir, sub_id, sub_data)
+    top_entries.push(@bitcore.TreeEntry::new("40000", prefix, sub_id))
+  }
+  let (tree_id, tree_data) = @bitcore.create_tree(top_entries)
+  @bitlib.write_object_bytes(wfs, git_dir, tree_id, tree_data)
+  tree_id
 }
 
 ///|
@@ -422,8 +532,8 @@ async fn notes_add(
     @bitcore.ObjectType::Blob,
     note_content,
   )
-  // Get existing tree entries if notes ref exists
-  let entries : Array[@bitcore.TreeEntry] = []
+  // Collect all existing notes (recursively across any fanout depth).
+  let notes : Array[(String, @bitcore.ObjectId)] = []
   let mut parent_commit : @bitcore.ObjectId? = None
   if rfs.is_file(notes_ref_path) {
     let ref_content = decode_bytes(rfs.read_file(notes_ref_path))
@@ -435,38 +545,27 @@ async fn notes_add(
     match obj {
       Some(o) => {
         let commit_info = @bitcore.parse_commit(o.data)
-        let tree_obj = db.get(rfs, commit_info.tree)
-        match tree_obj {
-          Some(to) => {
-            let existing = @bitcore.parse_tree(to.data)
-            for e in existing {
-              if e.name == target_hex {
-                if !force {
-                  @stdio.stderr.write(
-                    "error: note already exists for \{target_hex}",
-                  )
-                  @stdio.stderr.write("Use -f to overwrite existing note")
-                  @sys.exit(1)
-                }
-                // Skip existing note (will be replaced)
-              } else {
-                entries.push(e)
-              }
+        let collected = notes_collect_all(rfs, db, commit_info.tree)
+        for pair in collected {
+          let (hex, id) = pair
+          if hex == target_hex {
+            if !force {
+              @stdio.stderr.write("error: note already exists for \{target_hex}")
+              @stdio.stderr.write("Use -f to overwrite existing note")
+              @sys.exit(1)
             }
+            // Skip existing note (will be replaced)
+          } else {
+            notes.push((hex, id))
           }
-          None => ()
         }
       }
       None => ()
     }
   }
-  // Add new note entry
-  entries.push(@bitcore.TreeEntry::new("100644", target_hex, note_id))
-  // Sort entries by name (git requires sorted trees)
-  entries.sort_by((a, b) => a.name.compare(b.name))
-  // Create tree
-  let (tree_id, tree_data) = @bitcore.create_tree(entries)
-  @bitlib.write_object_bytes(wfs, git_dir, tree_id, tree_data)
+  // Add new note entry, then write tree at the appropriate fanout level.
+  notes.push((target_hex, note_id))
+  let tree_id = notes_write_tree(wfs, git_dir, notes)
   // Create commit
   let author = get_author_string()
   let timestamp = @sys.get_env_var("GIT_COMMITTER_DATE")
@@ -502,8 +601,8 @@ async fn notes_append(
     raise @bitcore.GitError::InvalidObject("unknown revision: \{commit_ref}")
   }
   let target_hex = tid.to_hex()
-  // Get existing tree entries and note content if present
-  let entries : Array[@bitcore.TreeEntry] = []
+  // Collect existing notes (across any fanout), capture current text if any.
+  let notes : Array[(String, @bitcore.ObjectId)] = []
   let mut parent_commit : @bitcore.ObjectId? = None
   let mut existing_text : String? = None
   if rfs.is_file(notes_ref_path) {
@@ -518,22 +617,18 @@ async fn notes_append(
       @sys.exit(1)
     }
     let commit_info = @bitcore.parse_commit(o.data)
-    let tree_obj = db.get(rfs, commit_info.tree)
-    guard tree_obj is Some(to) else {
-      @stdio.stderr.write("error: notes tree corrupt")
-      @sys.exit(1)
-    }
-    let existing = @bitcore.parse_tree(to.data)
-    for e in existing {
-      if e.name == target_hex {
-        let note_obj = db.get(rfs, e.id)
+    let collected = notes_collect_all(rfs, db, commit_info.tree)
+    for pair in collected {
+      let (hex, id) = pair
+      if hex == target_hex {
+        let note_obj = db.get(rfs, id)
         guard note_obj is Some(no) else {
           @stdio.stderr.write("error: note blob corrupt")
           @sys.exit(1)
         }
         existing_text = no.data |> decode_bytes |> Some
       } else {
-        entries.push(e)
+        notes.push((hex, id))
       }
     }
   }
@@ -552,13 +647,9 @@ async fn notes_append(
     @bitcore.ObjectType::Blob,
     note_content,
   )
-  // Add new note entry
-  entries.push(@bitcore.TreeEntry::new("100644", target_hex, note_id))
-  // Sort entries by name (git requires sorted trees)
-  entries.sort_by((a, b) => a.name.compare(b.name))
-  // Create tree
-  let (tree_id, tree_data) = @bitcore.create_tree(entries)
-  @bitlib.write_object_bytes(wfs, git_dir, tree_id, tree_data)
+  // Add new note entry, write tree at appropriate fanout.
+  notes.push((target_hex, note_id))
+  let tree_id = notes_write_tree(wfs, git_dir, notes)
   // Create commit
   let author = get_author_string()
   let timestamp = get_current_timestamp()
@@ -617,31 +708,27 @@ async fn notes_copy(
     @sys.exit(1)
   }
   let commit_info = @bitcore.parse_commit(o.data)
-  let tree_obj = db.get(rfs, commit_info.tree)
-  guard tree_obj is Some(to) else {
-    @stdio.stderr.write("error: notes tree corrupt")
-    @sys.exit(1)
-  }
-  let existing = @bitcore.parse_tree(to.data)
-  let entries : Array[@bitcore.TreeEntry] = []
-  let mut source_entry : @bitcore.TreeEntry? = None
+  let collected = notes_collect_all(rfs, db, commit_info.tree)
+  let notes : Array[(String, @bitcore.ObjectId)] = []
+  let mut source_blob : @bitcore.ObjectId? = None
   let mut dest_exists = false
-  for e in existing {
-    if e.name == from_hex {
-      source_entry = Some(e)
-      entries.push(e)
-    } else if e.name == to_hex {
+  for pair in collected {
+    let (hex, id) = pair
+    if hex == from_hex {
+      source_blob = Some(id)
+      notes.push((hex, id))
+    } else if hex == to_hex {
       dest_exists = true
       if force {
-        // skip existing destination
+        // skip existing destination (will be replaced below)
       } else {
-        entries.push(e)
+        notes.push((hex, id))
       }
     } else {
-      entries.push(e)
+      notes.push((hex, id))
     }
   }
-  guard source_entry is Some(src) else {
+  guard source_blob is Some(src_id) else {
     @stdio.stderr.write("error: no note found for \{from_hex}")
     @sys.exit(1)
   }
@@ -649,12 +736,12 @@ async fn notes_copy(
     @stdio.stderr.write("error: note already exists for \{to_hex}")
     @sys.exit(1)
   }
-  entries.push(@bitcore.TreeEntry::new("100644", to_hex, src.id))
-  entries.sort_by((a, b) => a.name.compare(b.name))
-  let (tree_id, tree_data) = @bitcore.create_tree(entries)
-  @bitlib.write_object_bytes(wfs, git_dir, tree_id, tree_data)
+  notes.push((to_hex, src_id))
+  let tree_id = notes_write_tree(wfs, git_dir, notes)
   let author = get_author_string()
-  let timestamp = get_current_timestamp()
+  let timestamp = @sys.get_env_var("GIT_COMMITTER_DATE")
+    .map(parse_commit_date)
+    .unwrap_or(get_current_timestamp())
   let commit = @bitcore.Commit::new(
     tree_id,
     [commit_id],
@@ -701,32 +788,28 @@ async fn notes_remove(
     @sys.exit(1)
   }
   let commit_info = @bitcore.parse_commit(o.data)
-  let tree_obj = db.get(rfs, commit_info.tree)
-  guard tree_obj is Some(to) else {
-    @stdio.stderr.write("error: notes tree corrupt")
-    @sys.exit(1)
-  }
-  let existing = @bitcore.parse_tree(to.data)
+  let collected = notes_collect_all(rfs, db, commit_info.tree)
   // Filter out target entry
   let mut found = false
-  let entries : Array[@bitcore.TreeEntry] = []
-  for e in existing {
-    if e.name == target_hex {
+  let notes : Array[(String, @bitcore.ObjectId)] = []
+  for pair in collected {
+    let (hex, id) = pair
+    if hex == target_hex {
       found = true
     } else {
-      entries.push(e)
+      notes.push((hex, id))
     }
   }
   if !found {
     @stdio.stderr.write("error: no note found for \{target_hex}")
     @sys.exit(1)
   }
-  // Create new tree
-  let (tree_id, tree_data) = @bitcore.create_tree(entries)
-  @bitlib.write_object_bytes(wfs, git_dir, tree_id, tree_data)
+  let tree_id = notes_write_tree(wfs, git_dir, notes)
   // Create commit
   let author = get_author_string()
-  let timestamp = get_current_timestamp()
+  let timestamp = @sys.get_env_var("GIT_COMMITTER_DATE")
+    .map(parse_commit_date)
+    .unwrap_or(get_current_timestamp())
   let commit = @bitcore.Commit::new(
     tree_id,
     [commit_id],
@@ -763,32 +846,31 @@ async fn notes_prune(
   let obj = db.get(rfs, commit_id)
   guard obj is Some(o) else { return }
   let commit_info = @bitcore.parse_commit(o.data)
-  let tree_obj = db.get(rfs, commit_info.tree)
-  guard tree_obj is Some(to) else { return }
-  let existing = @bitcore.parse_tree(to.data)
+  let collected = notes_collect_all(rfs, db, commit_info.tree)
   // Filter entries where the referenced commit still exists
-  let entries : Array[@bitcore.TreeEntry] = []
+  let notes : Array[(String, @bitcore.ObjectId)] = []
   let mut pruned = 0
-  for e in existing {
-    let ref_id = @bitcore.ObjectId::from_hex(e.name)
+  for pair in collected {
+    let (hex, id) = pair
+    let ref_id = @bitcore.ObjectId::from_hex(hex)
     let ref_obj = db.get(rfs, ref_id) catch {
       err if @async.is_cancellation_error(err) => raise err
       _ => None
     }
     match ref_obj {
-      Some(_) => entries.push(e)
+      Some(_) => notes.push((hex, id))
       None => pruned += 1
     }
   }
   if pruned == 0 {
     return
   }
-  // Create new tree
-  let (tree_id, tree_data) = @bitcore.create_tree(entries)
-  @bitlib.write_object_bytes(wfs, git_dir, tree_id, tree_data)
+  let tree_id = notes_write_tree(wfs, git_dir, notes)
   // Create commit
   let author = get_author_string()
-  let timestamp = get_current_timestamp()
+  let timestamp = @sys.get_env_var("GIT_COMMITTER_DATE")
+    .map(parse_commit_date)
+    .unwrap_or(get_current_timestamp())
   let commit = @bitcore.Commit::new(
     tree_id,
     [commit_id],

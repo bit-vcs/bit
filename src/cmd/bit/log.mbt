@@ -1932,6 +1932,45 @@ async fn log_emit_output(
 }
 
 ///|
+/// Emit the note for `commit_id` (from refs/notes/commits) in the same shape
+/// upstream git uses for the medium format: a "Notes:" header, the indented
+/// note body, and a trailing blank line. Emits nothing when no note exists.
+async fn log_emit_notes_for_commit(
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  db : @bitlib.ObjectDb,
+  commit_id : @bitcore.ObjectId,
+  line_prefix : String,
+) -> Unit raise Error {
+  let notes_ref_path = git_dir + "/refs/notes/commits"
+  if !rfs.is_file(notes_ref_path) {
+    return
+  }
+  let ref_content = decode_bytes(rfs.read_file(notes_ref_path))
+  let commit_hex = trim_string(ref_content)
+  let notes_commit_id = @bitcore.ObjectId::from_hex(commit_hex)
+  let obj = db.get(rfs, notes_commit_id)
+  guard obj is Some(o) else { return }
+  let commit_info = @bitcore.parse_commit(o.data)
+  let target_hex = commit_id.to_hex()
+  let blob_id = notes_lookup_blob(rfs, db, commit_info.tree, target_hex)
+  guard blob_id is Some(bid) else { return }
+  let blob_obj = db.get(rfs, bid)
+  guard blob_obj is Some(bo) else { return }
+  let note_text = decode_bytes(bo.data)
+  let trimmed = if note_text.has_suffix("\n") {
+    string_slice_to(note_text, note_text.length() - 1)
+  } else {
+    note_text
+  }
+  log_emit_output("Notes:", true, line_prefix)
+  for line_view in trimmed.split("\n") {
+    log_emit_output("    " + line_view.to_owned(), true, line_prefix)
+  }
+  log_emit_output("", true, line_prefix)
+}
+
+///|
 fn log_build_ref_names(
   rfs : &@bitcore.RepoFileSystem,
   git_dir : String,
@@ -3841,6 +3880,7 @@ async fn log_emit_default_commit_entry(
   log_emit_output("", true, line_prefix)
   log_emit_output("    " + entry.message, true, line_prefix)
   log_emit_output("", true, line_prefix)
+  log_emit_notes_for_commit(rfs, git_dir, db, entry.id, line_prefix)
   if show_stat || show_patch {
     let diff_files = diff_apply_rotate_skip_files(
       @bitdiff.diff_trees(rfs, git_dir, entry.parent_tree, entry.tree, db~),
@@ -5204,6 +5244,9 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
             log_emit_output("", true, line_prefix)
             log_emit_output("    " + entry.message, true, line_prefix)
             log_emit_output("", true, line_prefix)
+            log_emit_notes_for_commit(
+              rfs, git_dir, db, entry.id, line_prefix,
+            )
             if show_stat || show_patch {
               let diff_files = diff_apply_rotate_skip_files(
                 @bitdiff.diff_trees(
@@ -5564,6 +5607,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         log_emit_output("", true, line_prefix)
         log_emit_output("    " + entry.message, true, line_prefix)
         log_emit_output("", true, line_prefix)
+        log_emit_notes_for_commit(rfs, git_dir, walk_db, entry.id, line_prefix)
         if show_stat || show_patch {
           let diff_files = diff_apply_rotate_skip_files(
             @bitdiff.diff_trees(
@@ -5683,6 +5727,9 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
     } else {
       None
     }
+    let notes_db = @bitlib.ObjectDb::load(
+      rfs, log_resolve_common_git_dir(rfs, git_dir),
+    )
     for entry in entries {
       log_emit_output("commit " + entry.id.to_hex(), true, line_prefix)
       log_emit_output("Author: " + entry.author, true, line_prefix)
@@ -5695,6 +5742,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
       log_emit_output("", true, line_prefix)
       log_emit_output("    " + entry.message, true, line_prefix)
       log_emit_output("", true, line_prefix)
+      log_emit_notes_for_commit(rfs, git_dir, notes_db, entry.id, line_prefix)
       if show_stat || show_patch {
         let diff_files = diff_apply_rotate_skip_files(
           @bitdiff.diff_trees(
