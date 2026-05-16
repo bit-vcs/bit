@@ -966,6 +966,7 @@ t8020-last-modified.sh
 # t9*
 t9002-column.sh
 t9003-help-autocorrect.sh
+t9300-fast-import.sh
 t9301-fast-import-notes.sh
 t9302-fast-import-unpack-limit.sh
 t9303-fast-import-compression.sh
