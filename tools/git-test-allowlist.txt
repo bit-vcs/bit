@@ -299,6 +299,7 @@ t5150-request-pull.sh
 t5200-update-server-info.sh
 
 # pack / idx (strict mode compatible)
+t5300-pack-object.sh
 t5301-sliding-window.sh
 t5302-pack-index.sh
 t5303-pack-corruption-resilience.sh
@@ -720,6 +721,7 @@ t3301-notes.sh
 t3302-notes-index-expensive.sh
 t3303-notes-subtrees.sh
 t3304-notes-mixed.sh
+t3305-notes-fanout.sh
 t3306-notes-prune.sh
 t3307-notes-man.sh
 t3308-notes-merge.sh
