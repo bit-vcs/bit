@@ -329,6 +329,7 @@ t5329-pack-objects-cruft.sh
 t5330-no-lazy-fetch-with-commit-graph.sh
 t5331-pack-objects-stdin.sh
 t5332-multi-pack-reuse.sh
+t5333-pseudo-merge-bitmaps.sh
 t5334-incremental-multi-pack-index.sh
 t5351-unpack-large-objects.sh
 
@@ -641,6 +642,7 @@ t1700-split-index.sh
 t1701-racy-split-index.sh
 t1800-hook.sh
 t1900-repo.sh
+t1901-repo-structure.sh
 
 # t2*
 t2000-conflict-when-checking-files-out.sh

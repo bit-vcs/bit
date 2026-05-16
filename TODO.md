@@ -54,9 +54,12 @@ t3404 (rebase -i): **129/132 (97.7%)**
 
 ## P2.5: Allowlist 拡大
 
-- 現在: 975/1027 (非 t9xxx で 52 テスト未追加)
+- 現在: 977/1027 (非 t9xxx で 50 テスト未追加)
 - [x] t0008-ignores.sh
-- [ ] t1400, t4124, t5300 等
+- [x] t1901-repo-structure.sh
+- [x] t5333-pseudo-merge-bitmaps.sh
+- [ ] t1400 (10分超で CI shard には重い)
+- [ ] t4124, t5300, t5310, t5326 等 (known-breakage patch が必要)
 
 ## P3: 将来タスク
 
