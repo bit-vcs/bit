@@ -309,6 +309,7 @@ t5306-pack-nobase.sh
 t5307-pack-missing-commit.sh
 t5308-pack-detect-duplicates.sh
 t5309-pack-delta-cycles.sh
+t5310-pack-bitmaps.sh
 t5311-pack-bitmaps-shallow.sh
 t5312-prune-corruption.sh
 t5313-pack-bounds-checks.sh
@@ -324,6 +325,7 @@ t5322-pack-objects-sparse.sh
 t5323-pack-redundant.sh
 t5324-split-commit-graph.sh
 t5325-reverse-index.sh
+t5326-multi-pack-bitmaps.sh
 t5327-multi-pack-bitmaps-rev.sh
 t5328-commit-graph-64bit-time.sh
 t5329-pack-objects-cruft.sh
