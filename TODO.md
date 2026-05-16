@@ -2,7 +2,7 @@
 
 最終整理日: 2026-05-16
 現バージョン: v0.41.0
-allowlist: 905 テスト (probe: t5310/t5326)
+allowlist: 905 テスト
 CI SHIM_CMDS: **108 コマンド**
 e2e: **43/43 全パス**
 t3404 (rebase -i): **129/132 (97.7%)**
@@ -54,13 +54,14 @@ t3404 (rebase -i): **129/132 (97.7%)**
 
 ## P2.5: Allowlist 拡大
 
-- 現在: 905 (probe 反映後)
+- 現在: 905
 - [x] t0008-ignores.sh
 - [x] t1901-repo-structure.sh
 - [x] t3305-notes-fanout.sh
 - [x] t5300-pack-object.sh
+- [x] t5310-pack-bitmaps.sh
+- [x] t5326-multi-pack-bitmaps.sh
 - [x] t5333-pseudo-merge-bitmaps.sh
-- [ ] t5310-pack-bitmaps.sh / t5326-multi-pack-bitmaps.sh — CI probe 中
 - [ ] t1400-update-ref.sh (10分超で CI shard には重い)
 - [ ] t4124-apply-ws-rule.sh (known-breakage patch が必要)
 
