@@ -159,7 +159,14 @@ jobs:
             # Strip third_party/git/t/ prefix if present
             t_base="${t#third_party/git/t/}"
             t_start=$SECONDS
-            if timeout 120 bash "./$t_base" > "$test_output" 2>&1; then
+            # Per-test timeout: 3× the recorded median runtime weight,
+            # floored at 120s. Recorded weights cap at the previous 120s
+            # timeout, so tests whose true runtime exceeds it (e.g.
+            # t1400-update-ref) get enough headroom to finish.
+            t_weight=$(awk -F'\t' -v t="$t_base" '$1==t {print $2}' "$GITHUB_WORKSPACE/tools/git-test-runtime-seconds.tsv")
+            t_timeout=$(( ${t_weight:-40} * 3 ))
+            if [ "$t_timeout" -lt 120 ]; then t_timeout=120; fi
+            if timeout "$t_timeout" bash "./$t_base" > "$test_output" 2>&1; then
               tail -5 "$test_output"
               passed=$((passed + 1))
             else
@@ -169,7 +176,7 @@ jobs:
               tail -5 "$test_output"
               echo "::endgroup::"
               if [ "$exit_code" -eq 124 ]; then
-                echo "TIMEOUT: $t_base exceeded 120s"
+                echo "TIMEOUT: $t_base exceeded ${t_timeout}s"
               fi
               failed=$((failed + 1))
               failed_tests="$failed_tests $t_base"
