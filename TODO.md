@@ -2,7 +2,7 @@
 
 最終整理日: 2026-05-16
 現バージョン: v0.41.0
-allowlist: 905 テスト
+allowlist: 907 テスト
 CI SHIM_CMDS: **108 コマンド**
 e2e: **43/43 全パス**
 t3404 (rebase -i): **129/132 (97.7%)**
@@ -52,18 +52,18 @@ t3404 (rebase -i): **129/132 (97.7%)**
 - [x] Pack bitmap 読み込み (t5310/t5326/t5333)
 - [x] Commit-graph 活用 — log/rev-list 高速化
 
-## P2.5: Allowlist 拡大
+## P2.5: Allowlist 拡大 — 完了
 
-- 現在: 905
+- 現在: 907
 - [x] t0008-ignores.sh
+- [x] t1400-update-ref.sh — per-test timeout を `max(weight×3, 120s)` に変更して enroll
 - [x] t1901-repo-structure.sh
 - [x] t3305-notes-fanout.sh
+- [x] t4124-apply-ws-rule.sh — known-breakage patch 不要
 - [x] t5300-pack-object.sh
 - [x] t5310-pack-bitmaps.sh
 - [x] t5326-multi-pack-bitmaps.sh
 - [x] t5333-pseudo-merge-bitmaps.sh
-- [ ] t1400-update-ref.sh (10分超で CI shard には重い)
-- [ ] t4124-apply-ws-rule.sh (known-breakage patch が必要)
 
 ## P3: 将来タスク
 
