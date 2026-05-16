@@ -44,6 +44,7 @@ jobs:
           moon test --target wasm -p mizchi/bit/runtime -f storage_runtime_wbtest.mbt
           moon test --target wasm -p mizchi/bit/diff3
           moon test --target wasm -p mizchi/bit/repo
+          moon test --target wasm -p mizchi/bit/grep
           # Kill any orphan moon processes and remove stale lock before native tests
           pkill -f "moon" || true
           rm -f _build/.moon-lock

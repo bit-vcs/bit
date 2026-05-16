@@ -11,8 +11,8 @@ warnings = "-29"
 
 options(
   targets: {
-    "pattern_wbtest.mbt": [ "native" ],
-    "search_wbtest.mbt": [ "native" ],
+    "pattern_wbtest.mbt": [ "native", "wasm" ],
+    "search_wbtest.mbt": [ "native", "wasm" ],
   },
 )
 

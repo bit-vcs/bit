@@ -28,6 +28,10 @@ tests {
     cmd = "moon test --target wasm -p mizchi/bit/repo"
   }
   new {
+    name = "moon-test-wasm-grep"
+    cmd = "moon test --target wasm -p mizchi/bit/grep"
+  }
+  new {
     name = "moon-test-native"
     cmd = "moon test --target native --no-parallelize -j 1"
   }
