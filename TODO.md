@@ -1,8 +1,9 @@
 # TODO (Active Only)
 
-最終整理日: 2026-05-16
+最終整理日: 2026-05-17
 現バージョン: v0.41.0
-allowlist: 907 テスト
+allowlist: 908 テスト
+known-breakage パッチ: 14 (uniform relaxation 系は削除済)
 CI SHIM_CMDS: **108 コマンド**
 e2e: **43/43 全パス**
 t3404 (rebase -i): **129/132 (97.7%)**
@@ -52,9 +53,9 @@ t3404 (rebase -i): **129/132 (97.7%)**
 - [x] Pack bitmap 読み込み (t5310/t5326/t5333)
 - [x] Commit-graph 活用 — log/rev-list 高速化
 
-## P2.5: Allowlist 拡大 — 完了
+## P2.5: Allowlist 拡大
 
-- 現在: 907
+- 現在: 908
 - [x] t0008-ignores.sh
 - [x] t1400-update-ref.sh — per-test timeout を `max(weight×3, 120s)` に変更して enroll
 - [x] t1901-repo-structure.sh
@@ -64,6 +65,19 @@ t3404 (rebase -i): **129/132 (97.7%)**
 - [x] t5310-pack-bitmaps.sh
 - [x] t5326-multi-pack-bitmaps.sh
 - [x] t5333-pseudo-merge-bitmaps.sh
+- [x] t9300-fast-import.sh — known-breakage patch 不要 (t9301-9306 と同列)
+- 残候補 in-scope: なし (未収録 120 件は svn/cvs/p4/perl/scalar 系 = スコープ外)
+
+## P2.6: Known-breakage パッチ精査
+
+- 削除済: 18 → 14
+  - [x] t5610-clone-detached / t9350-fast-export / t5505-remote / t5801-remote-helpers
+    — 純 relaxation (BIT prereq なし) → upstream `test_expect_failure` で支障なし
+- 残 14 パッチの内訳と次手:
+  - **BIT prereq 付き (10)**: t0411 / t1410 / t2405 / t3600 / t5572 / t5616 / t7502 / t7527 / t7600 / t7703
+    → 各 prereq を外して probe、bit 側の修正で不要化したものを削除
+  - **test 書き換え / skip 系 (4)**: t1006-cat-file (rest+whitespace) / t5300-pack-object (8 件 success→failure) / t5540-http-push-webdav (skip 追加) / t9902-completion (contrib/completion 修正含む)
+    → 機能修正を伴う。個別評価。
 
 ## P3: 将来タスク
 
