@@ -3,7 +3,7 @@
 最終整理日: 2026-05-17
 現バージョン: v0.41.0
 allowlist: 908 テスト
-known-breakage パッチ: 8 (実機能 gap / scope 除外 / contrib 修正のみ残)
+known-breakage パッチ: 4 (scope 除外 / contrib backport / 本物の機能 gap のみ残)
 CI SHIM_CMDS: **108 コマンド**
 e2e: **43/43 全パス**
 t3404 (rebase -i): **129/132 (97.7%)**
@@ -70,20 +70,20 @@ t3404 (rebase -i): **129/132 (97.7%)**
 
 ## P2.6: Known-breakage パッチ精査 — audit pass 完了
 
-- 削除済: 18 → 8
+- 削除済: 18 → 4
   - [x] **case 1a (#54)**: t5610-clone-detached / t9350-fast-export / t5505-remote / t5801-remote-helpers
     — 純 relaxation (BIT prereq なし) → upstream `test_expect_failure` で支障なし
   - [x] **case 1b (#56)**: t1410-reflog / t2405-worktree-submodule / t3600-rm
     — BIT prereq 付きだが upstream は `test_expect_failure`、bit 側 skip を外しても TODO 扱い
   - [x] **case 1c (#58)**: t5572-pull-submodule — 再分類で case 1 判明
-  - [x] **virtual gap (#60)**: t7502-commit-porcelain / t7600-merge — `BIT_SIGTERM_LOCKS` の "bit does not clean up lock files on SIGTERM" は実体無し。bit の index 書込パスが `.git/index.lock` を作らないため `! -f .git/index.lock` は trivially true、SIGTERM handler 実装は不要
-- 残 8 パッチ = 実機能 gap / 個別評価:
-  - **case 2 — bit 機能 gap (4)**:
-    - t0411 / t5616 / t7703 — pack-objects の promisor remote 対応 (lazy-fetch / REF_DELTA / geometric repack)
-    - t7527 — builtin fsmonitor--daemon の submodule 統合
-    → patch 削除には機能実装が先
-  - **case 3 — test 書き換え / scope 除外 (4)**: t1006-cat-file (rest+whitespace) / t5300-pack-object (8 件 success→failure) / t5540-http-push-webdav (WebDAV 意図的非対応宣言 — 削除不可) / t9902-completion (contrib/completion 修正含む)
-    → 個別評価
+  - [x] **virtual gap SIGTERM (#60)**: t7502-commit-porcelain / t7600-merge — bit の index 書込が `.git/index.lock` を作らないため `! -f .git/index.lock` trivially true
+  - [x] **virtual gap promisor (#63)**: t0411-clone-from-partial / t5616-partial-clone / t7703-repack-geometric — promisor 関連の masked subtest は実は bit 側で問題なく通る (推測されていた pack-objects gap は実体無し)
+  - [x] **virtual gap cat-file (#64)**: t1006-cat-file `%(rest)` — upstream の動的 `test_rest` 分岐で whitespace ケースは元々 `test_expect_failure`、bit のサイドステップ不要
+- 残 4 パッチ:
+  - **t5300-pack-object** — 8 件 `test_expect_success` → `test_expect_failure` (unconditional)。 unpack-objects / verify-pack 検証 / index-pack --strict / prefetch の bit gap を encode。 probe 候補 (本当に落ちるか確認)
+  - **t5540-http-push-webdav** — WebDAV 意図的非対応の `skip_all` 宣言、 削除不可
+  - **t7527-builtin-fsmonitor** — fsmonitor--daemon 未実装。 daemon 実装が特大 (4000-6000 LOC)
+  - **t9902-completion** — contrib/completion バグ修正 + relaxation。 contrib backport 部分は削除不可。 probe 候補 (test 部分だけ削除して通るか)
 
 ## P3: 将来タスク
 
