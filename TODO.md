@@ -3,7 +3,7 @@
 最終整理日: 2026-05-17
 現バージョン: v0.41.0
 allowlist: 908 テスト
-known-breakage パッチ: 14 (uniform relaxation 系は削除済)
+known-breakage パッチ: 11 (case 1 relaxation 削除済、case 2 / rewrite 系のみ残)
 CI SHIM_CMDS: **108 コマンド**
 e2e: **43/43 全パス**
 t3404 (rebase -i): **129/132 (97.7%)**
@@ -70,13 +70,15 @@ t3404 (rebase -i): **129/132 (97.7%)**
 
 ## P2.6: Known-breakage パッチ精査
 
-- 削除済: 18 → 14
-  - [x] t5610-clone-detached / t9350-fast-export / t5505-remote / t5801-remote-helpers
+- 削除済: 18 → 11
+  - [x] **case 1a (#54)**: t5610-clone-detached / t9350-fast-export / t5505-remote / t5801-remote-helpers
     — 純 relaxation (BIT prereq なし) → upstream `test_expect_failure` で支障なし
-- 残 14 パッチの内訳と次手:
-  - **BIT prereq 付き (10)**: t0411 / t1410 / t2405 / t3600 / t5572 / t5616 / t7502 / t7527 / t7600 / t7703
-    → 各 prereq を外して probe、bit 側の修正で不要化したものを削除
-  - **test 書き換え / skip 系 (4)**: t1006-cat-file (rest+whitespace) / t5300-pack-object (8 件 success→failure) / t5540-http-push-webdav (skip 追加) / t9902-completion (contrib/completion 修正含む)
+  - [x] **case 1b (#56)**: t1410-reflog / t2405-worktree-submodule / t3600-rm
+    — BIT prereq 付きだが upstream は `test_expect_failure`、bit 側 skip を外しても TODO 扱い
+- 残 11 パッチの内訳と次手:
+  - **case 2 — BIT prereq で upstream success を skip (7)**: t0411 / t5572 / t5616 / t7502 / t7527 / t7600 / t7703
+    → 外すと bit gap が露呈し suite 落ちる可能性大。各機能 (例: pack-objects REF_DELTA, builtin-fsmonitor 等) を確認してから削除
+  - **case 3 — test 書き換え / skip 系 (4)**: t1006-cat-file (rest+whitespace) / t5300-pack-object (8 件 success→failure) / t5540-http-push-webdav (skip 追加) / t9902-completion (contrib/completion 修正含む)
     → 機能修正を伴う。個別評価。
 
 ## P3: 将来タスク
