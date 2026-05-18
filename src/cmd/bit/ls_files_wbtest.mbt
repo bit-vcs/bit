@@ -22,7 +22,8 @@ test "submodule: validate_submodule_entry rejects hostile names" {
   assert_true(!validate_submodule_entry("..", "x", "https://x/r"))
   // Embedded NUL — built up from chars to avoid a literal NUL in the
   // source file (some toolchains refuse NULs in `.mbt` source).
-  let nul_name = "a" + 0.unsafe_to_char().to_string() + "b"
+  let nul_char : Int = 0
+  let nul_name = "a" + nul_char.unsafe_to_char().to_string() + "b"
   assert_true(!validate_submodule_entry(nul_name, "x", "https://x/r"))
   // embedded newline
   assert_true(!validate_submodule_entry("a\nb", "x", "https://x/r"))
