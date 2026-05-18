@@ -187,8 +187,7 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
     // Apply reverse changes
     let mut has_conflicts = false
     // Files that were added in commit -> delete them
-    for item in commit_files.to_array() {
-      let (path, _) = item
+    for path in commit_files.keys() {
       if !parent_files.contains(path) {
         // File was added in commit, remove it
         let abs_path = root + "/" + path
@@ -200,8 +199,7 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
       }
     }
     // Files that were deleted in commit -> restore them
-    for item in parent_files.to_array() {
-      let (path, entry) = item
+    for path, entry in parent_files {
       if !commit_files.contains(path) {
         // File was deleted in commit, restore it
         let blob_obj = db.get(rfs, entry.id)
@@ -221,8 +219,7 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
       }
     }
     // Files that were modified in commit -> restore parent version
-    for item in commit_files.to_array() {
-      let (path, commit_entry) = item
+    for path, commit_entry in commit_files {
       match parent_files.get(path) {
         Some(parent_entry) =>
           if commit_entry.id.to_hex() != parent_entry.id.to_hex() {

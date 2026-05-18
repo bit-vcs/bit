@@ -603,8 +603,7 @@ async fn sparse_checkout_warn_reapply_preserved_paths(
       None => ()
     }
   }
-  for item in @bitlib.read_unmerged_paths(fs, git_dir).to_array() {
-    let (path, _) = item
+  for path in @bitlib.read_unmerged_paths(fs, git_dir).keys() {
     match sparse_checkout_clean_managed_root(path, skipped_paths, kept_paths) {
       Some(clean_root) =>
         sparse_checkout_unique_push(unmerged_roots, clean_root)

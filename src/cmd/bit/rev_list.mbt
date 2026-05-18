@@ -744,8 +744,8 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
       let result = rev_list_collect_index_objects(
         db, fs, git_dir, index_entries,
       )
-      for item in result.1.to_array() {
-        indexed_path_ids[item.0] = item.1
+      for path, id in result.1 {
+        indexed_path_ids[path] = id
       }
       result.0
     } else {
@@ -1067,8 +1067,7 @@ fn rev_list_build_left_right_markers(
         for base in bases {
           walk_commits_to_map(fs, git_dir, base, merge_base_seen)
         }
-        for item in left_seen.to_array() {
-          let hex = item.0
+        for hex in left_seen.keys() {
           if merge_base_seen.contains(hex) {
             continue
           }
@@ -1082,8 +1081,7 @@ fn rev_list_build_left_right_markers(
             },
           )
         }
-        for item in right_seen.to_array() {
-          let hex = item.0
+        for hex in right_seen.keys() {
           if merge_base_seen.contains(hex) {
             continue
           }
@@ -1185,9 +1183,7 @@ fn rev_list_build_cherry_equal(
     }
   }
   let equal : Map[String, Bool] = {}
-  for item in left_patches.to_array() {
-    let pid = item.0
-    let left_ids = item.1
+  for pid, left_ids in left_patches {
     match right_patches.get(pid) {
       Some(right_ids) => {
         for hex in left_ids {

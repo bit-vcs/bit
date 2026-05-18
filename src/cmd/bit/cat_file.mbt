@@ -1179,8 +1179,7 @@ fn cat_file_collect_batch_all_objects(
     let db = @bitlib.ObjectDb::load_from_objects_dir(fs, scan_object_dir) catch {
       _ => continue
     }
-    for item in db.loose_paths.to_array() {
-      let (hex, _) = item
+    for hex in db.loose_paths.keys() {
       seen_ids[hex] = true
     }
     for pack in db.packs {
@@ -1195,11 +1194,7 @@ fn cat_file_collect_batch_all_objects(
       }
     }
   }
-  let ids : Array[String] = []
-  for item in seen_ids.to_array() {
-    let (hex, _) = item
-    ids.push(hex)
-  }
+  let ids = seen_ids.keys().to_array()
   if !unordered {
     ids.sort()
   }
@@ -1222,8 +1217,7 @@ fn cat_file_collect_batch_all_object_disk_records(
     let db = @bitlib.ObjectDb::load_from_objects_dir(fs, scan_object_dir) catch {
       _ => continue
     }
-    for item in db.loose_paths.to_array() {
-      let (hex, path) = item
+    for hex, path in db.loose_paths {
       let id = @bitcore.ObjectId::from_hex(hex) catch { _ => continue }
       let size = fs.read_file(path).length() catch { _ => continue }
       out.push(CatFileBatchAllObjectDiskRecord::{ id, disk_size: size })

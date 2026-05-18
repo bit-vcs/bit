@@ -147,8 +147,7 @@ fn merge_tree_convert_files(
   files : Map[String, @bitlib.TreeFileEntry],
 ) -> Map[String, MergeTreeEntry] {
   let out : Map[String, MergeTreeEntry] = {}
-  for item in files.to_array() {
-    let (path, entry) = item
+  for path, entry in files {
     out[path] = { id: entry.id, mode: entry.mode }
   }
   out
@@ -259,17 +258,16 @@ fn merge_tree_merge_files(
   let conflicts : Array[String] = []
   let needs_content_merge : Array[MergeTreeContentCandidate] = []
   let all_paths : Map[String, Bool] = {}
-  for item in base.to_array() {
-    all_paths[item.0] = true
+  for path in base.keys() {
+    all_paths[path] = true
   }
-  for item in ours.to_array() {
-    all_paths[item.0] = true
+  for path in ours.keys() {
+    all_paths[path] = true
   }
-  for item in theirs.to_array() {
-    all_paths[item.0] = true
+  for path in theirs.keys() {
+    all_paths[path] = true
   }
-  for item in all_paths.to_array() {
-    let path = item.0
+  for path in all_paths.keys() {
     let b = base.get(path)
     let o = ours.get(path)
     let t = theirs.get(path)
@@ -399,8 +397,7 @@ fn merge_tree_write_tree(
     }
   }
   // Recursively write subtrees
-  for item in dir_map.to_array() {
-    let (dir_name, sub_files) = item
+  for dir_name, sub_files in dir_map {
     let sub_tree_id = merge_tree_write_tree(fs, git_dir, sub_files)
     file_entries.push(@bitcore.TreeEntry::new("40000", dir_name, sub_tree_id))
   }

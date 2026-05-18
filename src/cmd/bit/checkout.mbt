@@ -690,8 +690,7 @@ fn collect_missing_checkout_blob_ids(
   }
   let missing : Array[@bitcore.ObjectId] = []
   let seen : Map[String, Bool] = {}
-  for item in files.to_array() {
-    let (_, entry) = item
+  for entry in files.values() {
     if entry.mode == 0o160000 {
       continue
     }

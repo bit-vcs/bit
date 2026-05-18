@@ -189,8 +189,7 @@ fn reset_mixed_paths(
       out_map[entry.path] = entry
     }
   }
-  for item in tree_files.to_array() {
-    let (path, info) = item
+  for path, info in tree_files {
     if !reset_pathspec_matches_any(normalized_paths, path) {
       continue
     }
@@ -207,11 +206,7 @@ fn reset_mixed_paths(
     }
     out_map[path] = @bitlib.IndexEntry::new(path, info.id, info.mode, size)
   }
-  let out : Array[@bitlib.IndexEntry] = []
-  for item in out_map.to_array() {
-    let (_, entry) = item
-    out.push(entry)
-  }
+  let out = out_map.values().to_array()
   @bitlib.write_index_entries(fs, git_dir, out)
   ignore(root)
 }
@@ -346,8 +341,7 @@ async fn reset_refresh_index_entries(
   let skip = reset_read_skip_worktree_paths(rfs, git_dir)
   match skip_override {
     Some(extra) =>
-      for item in extra.to_array() {
-        let (path, enabled) = item
+      for path, enabled in extra {
         if enabled {
           skip[path] = true
         }
@@ -409,11 +403,7 @@ async fn reset_refresh_index_entries(
     updated.push(out_entry)
   }
   @bitlib.write_index_entries(fs, git_dir, updated)
-  let changed : Array[String] = []
-  for item in changed_map.to_array() {
-    let (path, _) = item
-    changed.push(path)
-  }
+  let changed = changed_map.keys().to_array()
   changed.sort_by((a, b) => String::compare(a, b))
   changed
 }

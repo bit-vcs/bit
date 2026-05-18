@@ -1655,11 +1655,7 @@ fn ls_files_collect_candidate_dirs(
       seen[dir] = true
     }
   }
-  let out : Array[String] = []
-  for item in seen.to_array() {
-    let (dir, _) = item
-    out.push(dir)
-  }
+  let out = seen.keys().to_array()
   out.sort_by(fn(a, b) { ls_files_compare_paths(a, b) })
   out
 }

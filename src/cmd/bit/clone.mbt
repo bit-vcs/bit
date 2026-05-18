@@ -1880,11 +1880,7 @@ fn collect_case_collision_paths(paths : Array[String]) -> Array[String] {
     }
     i += 1
   }
-  let out : Array[String] = []
-  for item in collided.to_array() {
-    let (path, _) = item
-    out.push(path)
-  }
+  let out = collided.keys().to_array()
   out.sort_by((a, b) => String::compare(a, b))
   out
 }
@@ -1902,11 +1898,7 @@ async fn warn_case_insensitive_collisions_from_commit(
   let files = @bitlib.collect_tree_files_from_commit(db, fs, commit_id) catch {
     _ => return
   }
-  let paths : Array[String] = []
-  for item in files.to_array() {
-    let (path, _) = item
-    paths.push(path)
-  }
+  let paths = files.keys().to_array()
   let collided_paths = collect_case_collision_paths(paths)
   if collided_paths.length() > 0 {
     @stdio.stderr.write("warning: the following paths have collided:\n")

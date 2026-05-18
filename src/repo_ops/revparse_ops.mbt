@@ -1200,9 +1200,10 @@ pub fn show_ref(
   if fs.is_file(packed) {
     ref_collect_packed(fs, packed, out)
   }
-  let result : Array[(String, @object.ObjectId)] = []
-  for item in out.to_array() {
-    let (name, id) = item
+  let result : Array[(String, @object.ObjectId)] = Array::new(
+    capacity=out.length(),
+  )
+  for name, id in out {
     result.push((name, id))
   }
   result.sort_by(fn(a, b) {

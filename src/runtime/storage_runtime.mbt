@@ -811,8 +811,7 @@ fn storage_collect_status_snapshot(
     rfs, git_dir, staged_index_map, staged_modified, staged_deleted,
   )
   let staged_added : Array[String] = []
-  for item in staged_index_map.to_array() {
-    let (path, _) = item
+  for path in staged_index_map.keys() {
     staged_added.push(path)
   }
   staged_added.sort()
@@ -892,11 +891,7 @@ fn storage_status_porcelain_lines(
     paths[p] = true
   }
   let lines : Array[String] = []
-  let merged_paths : Array[String] = []
-  for item in paths.to_array() {
-    let (path, _) = item
-    merged_paths.push(path)
-  }
+  let merged_paths = paths.keys().to_array()
   merged_paths.sort()
   for path in merged_paths {
     let x = xmap.get(path).unwrap_or(' ')

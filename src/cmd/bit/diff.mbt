@@ -3064,8 +3064,7 @@ async fn try_handle_submodule_range_diff(
   let old_entries = @bitlib.collect_tree_files_from_commit(db, rfs, old_commit)
   let new_entries = @bitlib.collect_tree_files_from_commit(db, rfs, new_commit)
   let changes : Array[(String, @bitcore.ObjectId, @bitcore.ObjectId)] = []
-  for item in new_entries.to_array() {
-    let (path, new_entry) = item
+  for path, new_entry in new_entries {
     if !is_gitlink_mode_for_diff(new_entry.mode) {
       continue
     }
