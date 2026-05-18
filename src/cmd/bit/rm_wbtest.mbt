@@ -29,11 +29,11 @@ test "rm collect target paths: dot expands to all index entries" {
     "",
     "/",
   )
-  assert_eq(removed.length(), 2)
+  @test.assert_eq(removed.length(), 2)
   assert_true(removed.contains("a.txt"))
   assert_true(removed.contains("dir/b.txt"))
-  assert_eq(sparse_only_specs, [])
-  assert_eq(unmatched_specs, [])
+  @test.assert_eq(sparse_only_specs, [])
+  @test.assert_eq(unmatched_specs, [])
 }
 
 ///|
@@ -42,7 +42,7 @@ test "rm options: short flags can be clustered" {
   assert_true(opts.recursive)
   assert_true(opts.force)
   assert_true(opts.quiet)
-  assert_eq(opts.paths, ["."])
+  @test.assert_eq(opts.paths, ["."])
 }
 
 ///|
@@ -63,9 +63,9 @@ test "rm pathspec: wildcard matches tracked entries" {
     "",
     "/",
   )
-  assert_eq(removed, ["a.txt", "b.txt"])
-  assert_eq(sparse_only_specs, [])
-  assert_eq(unmatched_specs, [])
+  @test.assert_eq(removed, ["a.txt", "b.txt"])
+  @test.assert_eq(sparse_only_specs, [])
+  @test.assert_eq(unmatched_specs, [])
 }
 
 ///|
@@ -90,9 +90,9 @@ test "rm sparse: dense matches win over sparse matches" {
     "",
     "/repo",
   )
-  assert_eq(target_paths, ["a"])
-  assert_eq(sparse_only_specs, [])
-  assert_eq(unmatched_specs, [])
+  @test.assert_eq(target_paths, ["a"])
+  @test.assert_eq(sparse_only_specs, [])
+  @test.assert_eq(unmatched_specs, [])
 }
 
 ///|
@@ -109,9 +109,9 @@ test "rm sparse: sparse-only pathspec is reported when --sparse is absent" {
     "",
     "/repo",
   )
-  assert_eq(target_paths, [])
-  assert_eq(sparse_only_specs, ["b"])
-  assert_eq(unmatched_specs, [])
+  @test.assert_eq(target_paths, [])
+  @test.assert_eq(sparse_only_specs, ["b"])
+  @test.assert_eq(unmatched_specs, [])
 }
 
 ///|
@@ -128,9 +128,9 @@ test "rm sparse: --sparse allows sparse-only pathspecs" {
     "",
     "/repo",
   )
-  assert_eq(target_paths, ["b"])
-  assert_eq(sparse_only_specs, [])
-  assert_eq(unmatched_specs, [])
+  @test.assert_eq(target_paths, ["b"])
+  @test.assert_eq(sparse_only_specs, [])
+  @test.assert_eq(unmatched_specs, [])
 }
 
 ///|
@@ -147,15 +147,15 @@ test "rm sparse: recursive pathspec removes dense entries only by default" {
     "",
     "/repo",
   )
-  assert_eq(target_paths, ["sub/dir/e"])
-  assert_eq(sparse_only_specs, [])
-  assert_eq(unmatched_specs, [])
+  @test.assert_eq(target_paths, ["sub/dir/e"])
+  @test.assert_eq(sparse_only_specs, [])
+  @test.assert_eq(unmatched_specs, [])
 }
 
 ///|
 test "rm conflict: mixed categories are sorted and keep hints" {
   let lines = rm_conflict_error_lines(["foo1.txt"], ["bar1.txt"], [], true)
-  assert_eq(lines, [
+  @test.assert_eq(lines, [
     "error: the following file has staged content different from both the", "file and the HEAD:",
     "    foo1.txt", "(use -f to force removal)", "error: the following file has changes staged in the index:",
     "    bar1.txt", "(use --cached to keep the file, or -f to force removal)",
@@ -165,7 +165,7 @@ test "rm conflict: mixed categories are sorted and keep hints" {
 ///|
 test "rm conflict: advice.rmhints=false omits hint lines" {
   let lines = rm_conflict_error_lines([], [], ["bar.txt"], false)
-  assert_eq(lines, [
+  @test.assert_eq(lines, [
     "error: the following file has local modifications:", "    bar.txt",
   ])
 }
@@ -268,7 +268,7 @@ async test "rm: orphan checkout keeps tracked files removable" {
   ])
   handle_rm(["-q", "-rf", "."])
 
-  assert_eq(add_test_git_stdout(repo_dir, ["ls-files"]), "")
+  @test.assert_eq(add_test_git_stdout(repo_dir, ["ls-files"]), "")
   assert_false(fs.is_file(repo_dir + "/init.t"))
 
   add_test_restore_env("GIT_SHIM_CWD", prev_shim_cwd)
@@ -410,7 +410,7 @@ async test "rm: cached submodule removal preserves gitmodules entry" {
 
   let after_gitmodules = decode_bytes(fs.read_file(super_dir + "/.gitmodules"))
   let tracked = submodule_wbtest_git_stdout(super_dir, ["ls-files"])
-  assert_eq(after_gitmodules, before_gitmodules)
+  @test.assert_eq(after_gitmodules, before_gitmodules)
   assert_true(after_gitmodules.contains("[submodule \"repo_new\"]"))
   assert_true(after_gitmodules.contains("path = repo"))
   assert_true(fs.is_dir(super_dir + "/repo"))

@@ -22,9 +22,9 @@ test "hooks: list_hooks sorts and filters installed hooks" {
   fs.write_string(git_dir + "/hooks/post-add", "#!/bin/sh\n")
   fs.write_string(git_dir + "/hooks/pre-commit", "#!/bin/sh\n")
   let all = list_hooks(fs, git_dir, None)
-  assert_eq(all, ["pre-add", "post-add", "pre-commit"])
+  @test.assert_eq(all, ["pre-add", "post-add", "pre-commit"])
   let filtered = list_hooks(fs, git_dir, Some("pre"))
-  assert_eq(filtered, ["pre-add", "pre-commit"])
+  @test.assert_eq(filtered, ["pre-add", "pre-commit"])
 
   fs.remove_file(git_dir + "/hooks/pre-add") catch {
     _ => ()
@@ -58,11 +58,11 @@ test "hooks: list_hooks_with_status merges .git/hooks and .bit/hooks" {
   fs.write_string(git_dir + "/hooks/post-applypatch", "#!/bin/sh\n")
   fs.write_string(git_dir + "/hooks/pre-add", "#!/bin/sh\n")
   let status = list_hooks_with_status(fs, root, git_dir, None)
-  assert_eq(status, [
+  @test.assert_eq(status, [
     "pre-add (available, enabled)", "post-applypatch (enabled)",
   ])
   let filtered = list_hooks_with_status(fs, root, git_dir, Some("pre"))
-  assert_eq(filtered, ["pre-add (available, enabled)"])
+  @test.assert_eq(filtered, ["pre-add (available, enabled)"])
 
   fs.remove_file(root + "/.bit/hooks/pre-add") catch {
     _ => ()
@@ -172,7 +172,7 @@ async test "hooks: approving sensitive hook writes approved checksum metadata" {
   )
   let rfs : &@bitcore.RepoFileSystem = fs
   let active = hooks_active_checksum(rfs, root, "post-merge").unwrap_or("")
-  assert_eq(approved, active)
+  @test.assert_eq(approved, active)
   assert_true(hooks_is_current_checksum_approved(rfs, root, "post-merge"))
 
   fs.write_string(git_dir + "/hooks/post-merge", "#!/bin/sh\necho modified\n")

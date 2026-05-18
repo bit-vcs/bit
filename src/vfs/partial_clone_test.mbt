@@ -28,7 +28,7 @@ test "partial_clone: mount and list files" {
 
   // Get promisor remote
   let remote = @lib.read_promisor_remote(osfs, git_dir)
-  println("Promisor remote: \{remote}")
+  println("Promisor remote: \{to_repr(remote)}")
   assert_true(remote is Some(_))
 
   // Get HEAD commit
@@ -343,7 +343,7 @@ async test "partial_clone: prefetch multiple files" {
     } else {
       files_to_fetch
     }
-    println("Prefetching: \{to_prefetch}")
+    println("Prefetching: \{to_repr(to_prefetch)}")
     let fetched = bitfs.prefetch(osfs, osfs, to_prefetch)
     println("Fetched \{fetched} objects")
 

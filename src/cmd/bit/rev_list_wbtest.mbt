@@ -8,17 +8,17 @@ test "rev-list: short max-count helpers detect numeric forms" {
 
 ///|
 test "rev-list: window honors skip and max-count" {
-  assert_eq(rev_list_window(5, 0, None), (0, 5))
-  assert_eq(rev_list_window(5, 3, None), (3, 5))
-  assert_eq(rev_list_window(5, 3, Some(0)), (3, 3))
-  assert_eq(rev_list_window(5, 3, Some(2)), (3, 5))
-  assert_eq(rev_list_window(5, 10, Some(2)), (5, 5))
+  @test.assert_eq(rev_list_window(5, 0, None), (0, 5))
+  @test.assert_eq(rev_list_window(5, 3, None), (3, 5))
+  @test.assert_eq(rev_list_window(5, 3, Some(0)), (3, 3))
+  @test.assert_eq(rev_list_window(5, 3, Some(2)), (3, 5))
+  @test.assert_eq(rev_list_window(5, 10, Some(2)), (5, 5))
 }
 
 ///|
 test "rev-list: negative max-count is treated as unlimited" {
-  assert_eq(@bitlib.rev_list_normalize_max_count(Some(-1)), None)
-  assert_eq(rev_list_window(5, 0, Some(-1)), (0, 5))
+  @test.assert_eq(@bitlib.rev_list_normalize_max_count(Some(-1)), None)
+  @test.assert_eq(rev_list_window(5, 0, Some(-1)), (0, 5))
 }
 
 ///|
@@ -50,7 +50,7 @@ async fn rev_list_test_run_git(
     inherit_env=true,
     cwd=root,
   )
-  assert_eq(code, 0)
+  @test.assert_eq(code, 0)
 }
 
 ///|
@@ -64,7 +64,7 @@ async fn rev_list_test_git_stdout(
     inherit_env=true,
     cwd=root,
   )
-  assert_eq(code, 0)
+  @test.assert_eq(code, 0)
   stdout.text() catch {
     _ => ""
   }
@@ -87,7 +87,7 @@ async fn rev_list_test_bit_stdout(
     inherit_env=true,
     cwd=repo_root,
   )
-  assert_eq(code, 0)
+  @test.assert_eq(code, 0)
   stdout.text() catch {
     _ => ""
   }
@@ -132,8 +132,8 @@ async fn rev_list_test_run_shim_git(
     inherit_env=true,
   )
   let text = stderr.text() catch { _ => "" }
-  assert_eq(code, 0)
-  assert_eq(text, "")
+  @test.assert_eq(code, 0)
+  @test.assert_eq(text, "")
 }
 
 ///|
@@ -161,7 +161,7 @@ async fn rev_list_test_shim_git_stdout(
     extra_env=env,
     inherit_env=true,
   )
-  assert_eq(code, 0)
+  @test.assert_eq(code, 0)
   stdout.text() catch {
     _ => ""
   }
@@ -219,7 +219,7 @@ async test "rev-list: cherry pick and mark match real git on symmetric ranges" {
     let actual = rev_list_sorted_nonempty_lines(
       rev_list_test_bit_stdout(repo_dir, args),
     )
-    assert_eq(actual, expected)
+    @test.assert_eq(actual, expected)
   }
 
   cleanup_tree(fs, root)
@@ -259,7 +259,7 @@ async test "rev-list: indexed-objects includes staged blobs and cached subtree" 
     " only-in-index\n" +
     rev_list_trim_trailing_newline(two_tree) +
     " two"
-  assert_eq(rev_list_trim_trailing_newline(actual), expected)
+  @test.assert_eq(rev_list_trim_trailing_newline(actual), expected)
 
   cleanup_tree(fs, root)
 }
@@ -291,7 +291,7 @@ async test "rev-list: not indexed-objects suppresses tree and blob output" {
   let actual = rev_list_test_git_stdout(repo_dir, [
     "rev-list", "-1", "--objects", "HEAD", "--not", "--indexed-objects",
   ])
-  assert_eq(
+  @test.assert_eq(
     rev_list_trim_trailing_newline(actual),
     rev_list_trim_trailing_newline(head) + "\n" + root_tree + " ",
   )
@@ -469,7 +469,7 @@ async test "rev-list: shim setup preserves cached subtree for indexed output" {
     " only-in-index\n" +
     two_tree +
     " two"
-  assert_eq(actual, expected)
+  @test.assert_eq(actual, expected)
 
   cleanup_tree(fs, root)
 }
@@ -525,7 +525,7 @@ async test "rev-list: shim allow-empty commit preserves indexed tree objects" {
     ]),
   )
   let expected = one_blob + " one\n" + root_tree + " \n" + two_tree + " two"
-  assert_eq(actual, expected)
+  @test.assert_eq(actual, expected)
 
   cleanup_tree(fs, root)
 }
@@ -584,7 +584,7 @@ async test "rev-list: shim setup negates cached tree objects for real rev-list" 
       "rev-list", "-1", "--objects", "HEAD", "--not", "--indexed-objects",
     ]),
   )
-  assert_eq(actual, head)
+  @test.assert_eq(actual, head)
 
   cleanup_tree(fs, root)
 }
@@ -631,7 +631,7 @@ async test "rev-list: negated indexed-objects suppresses clean head tree" {
   )
   assert_true(copied_path_ids.contains(""))
   assert_true(copied_path_ids.contains("two"))
-  assert_eq(out.length(), 0)
+  @test.assert_eq(out.length(), 0)
 
   cleanup_tree(fs, root)
 }
@@ -682,7 +682,7 @@ async test "rev-list: negated indexed-objects suppresses clean trees after empty
 
   assert_true(copied_path_ids.contains(""))
   assert_true(copied_path_ids.contains("two"))
-  assert_eq(out.length(), 0)
+  @test.assert_eq(out.length(), 0)
 
   cleanup_tree(fs, root)
 }
@@ -712,7 +712,7 @@ async test "rev-list: command path suppresses clean head tree for negated indexe
       "rev-list", "-1", "--objects", "HEAD", "--not", "--indexed-objects",
     ]),
   )
-  assert_eq(actual, head)
+  @test.assert_eq(actual, head)
 
   cleanup_tree(fs, root)
 }

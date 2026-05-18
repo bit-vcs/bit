@@ -131,7 +131,7 @@ test "detect_protocol_version: v1 format (want line)" {
     @protocol.pktline_flush(),
   ])
   let version = detect_protocol_version(req_bytes)
-  inspect(version, content="1")
+  debug_inspect(version, content="1")
 }
 
 ///|
@@ -144,7 +144,7 @@ test "detect_protocol_version: v2 format (command=fetch)" {
     @protocol.pktline_flush(),
   ])
   let version = detect_protocol_version(req_bytes)
-  inspect(version, content="2")
+  debug_inspect(version, content="2")
 }
 
 ///|
@@ -158,9 +158,11 @@ test "parse_upload_pack_request_v2: simple fetch" {
     @protocol.pktline_flush(),
   ])
   let req = parse_upload_pack_request_v2(req_bytes)
-  inspect(req.command, content="fetch")
-  inspect(req.wants.length(), content="1")
-  inspect(req.done, content="true")
+  debug_inspect(req.command, content=(
+    #|"fetch"
+  ))
+  debug_inspect(req.wants.length(), content="1")
+  debug_inspect(req.done, content="true")
 }
 
 ///|
@@ -174,8 +176,12 @@ test "parse_upload_pack_request_v2: with packfile-uris" {
     @protocol.pktline_flush(),
   ])
   let req = parse_upload_pack_request_v2(req_bytes)
-  inspect(req.command, content="fetch")
-  inspect(req.packfile_uris, content="Some(https)")
+  debug_inspect(req.command, content=(
+    #|"fetch"
+  ))
+  debug_inspect(req.packfile_uris, content=(
+    #|Some("https")
+  ))
 }
 
 ///|
@@ -189,7 +195,9 @@ test "parse_upload_pack_request_v2: with filter" {
     @protocol.pktline_flush(),
   ])
   let req = parse_upload_pack_request_v2(req_bytes)
-  inspect(req.filter, content="Some(blob:none)")
+  debug_inspect(req.filter, content=(
+    #|Some("blob:none")
+  ))
 }
 
 ///|
@@ -203,8 +211,10 @@ test "parse_upload_pack_request_v2: want-ref" {
     @protocol.pktline_flush(),
   ])
   let req = parse_upload_pack_request_v2(req_bytes)
-  inspect(req.want_refs.length(), content="1")
-  inspect(req.want_refs[0], content="refs/heads/main")
+  debug_inspect(req.want_refs.length(), content="1")
+  debug_inspect(req.want_refs[0], content=(
+    #|"refs/heads/main"
+  ))
 }
 
 ///|
@@ -221,7 +231,7 @@ test "parse_upload_pack_request_v2: extra delimiter" {
   match res {
     Ok(_) => fail("expected protocol error")
     Err(err) =>
-      inspect(
+      debug_inspect(
         err.to_string().contains("expected flush after fetch arguments"),
         content="true",
       )

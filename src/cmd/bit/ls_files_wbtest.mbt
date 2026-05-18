@@ -83,26 +83,26 @@ test "ls-files: wildcard prefix filter" {
 
 ///|
 test "ls-files: normalize keeps wildcard filter as-is" {
-  assert_eq(normalize_ls_tree_filters(["a*"], ""), ["a*"])
+  @test.assert_eq(normalize_ls_tree_filters(["a*"], ""), ["a*"])
 }
 
 ///|
 test "ls-files: absolute filter inside repo becomes repo-relative" {
-  assert_eq(normalize_ls_files_filters(["/repo/subs/link"], "subs", "/repo"), [
+  @test.assert_eq(normalize_ls_files_filters(["/repo/subs/link"], "subs", "/repo"), [
     "subs/link",
   ])
 }
 
 ///|
 test "ls-files: absolute filter outside repo stays absolute" {
-  assert_eq(normalize_ls_files_filters(["/outside/link"], "subs", "/repo"), [
+  @test.assert_eq(normalize_ls_files_filters(["/outside/link"], "subs", "/repo"), [
     "/outside/link",
   ])
 }
 
 ///|
 test "ls-files: normalize preserves pathspec magic" {
-  assert_eq(
+  @test.assert_eq(
     normalize_ls_files_filters([":(exclude)../submodule"], "b", "/repo"),
     [":(exclude)submodule"],
   )
@@ -146,12 +146,12 @@ test "ls-files: compare directory and file suffix order" {
 
 ///|
 test "ls-files: display path relativizes sibling and parent paths" {
-  assert_eq(make_display_path("top/x", "top/sub"), "../x")
-  assert_eq(
+  @test.assert_eq(make_display_path("top/x", "top/sub"), "../x")
+  @test.assert_eq(
     make_display_path("never-mind-me", "top/sub"),
     "../../never-mind-me",
   )
-  assert_eq(make_display_path("top/dir/", "top/sub"), "../dir/")
+  @test.assert_eq(make_display_path("top/dir/", "top/sub"), "../dir/")
 }
 
 ///|
@@ -160,7 +160,7 @@ test "ls-files: cwd prefix falls back to PWD when shim pwd is absent" {
   let prev_pwd = @sys.get_env_var("PWD")
   @sys.unset_env_var("GIT_SHIM_PWD")
   @sys.set_env_var("PWD", "/repo/sub")
-  assert_eq(compute_cwd_prefix("/repo"), "sub")
+  @test.assert_eq(compute_cwd_prefix("/repo"), "sub")
   match prev_shim_pwd {
     Some(value) => @sys.set_env_var("GIT_SHIM_PWD", value)
     None => @sys.unset_env_var("GIT_SHIM_PWD")

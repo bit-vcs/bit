@@ -1,7 +1,7 @@
 ///|
 test "remote/shorthand: parse repo ref shorthand" {
   let parsed = parse_github_shorthand("user/repo@main")
-  inspect(
+  debug_inspect(
     parsed,
     content="Some(Repo(\"https://github.com/user/repo\", Some(\"main\")))",
   )

@@ -13,11 +13,11 @@ test "github_convert: gh_issue_to_issue basic" {
     #|{"number":42,"node_id":"I_kwDOxxx","title":"Bug report","body":"description","state":"open","user":{"login":"alice"},"labels":[{"name":"bug"}],"assignees":[{"login":"bob"}],"created_at":"2026-01-15T10:30:45Z","updated_at":"2026-01-16T10:30:45Z"}
   let gh = make_gh_issue_json(json)
   let issue = gh_issue_to_issue(gh)
-  assert_eq(issue.title, "Bug report")
-  assert_eq(issue.body, "description")
-  assert_eq(issue.author, "alice")
-  assert_eq(issue.labels, ["bug"])
-  assert_eq(issue.assignees, ["bob"])
+  @test.assert_eq(issue.title, "Bug report")
+  @test.assert_eq(issue.body, "description")
+  @test.assert_eq(issue.author, "alice")
+  @test.assert_eq(issue.labels, ["bug"])
+  @test.assert_eq(issue.assignees, ["bob"])
   assert_true(issue.state == IssueState::Open)
 }
 
@@ -36,7 +36,7 @@ test "github_convert: gh_issue_to_issue with existing_id" {
     #|{"number":42,"node_id":"I_kwDOxxx","title":"Bug","body":"desc","state":"open","user":{"login":"alice"},"labels":[],"assignees":[],"created_at":"2026-01-15T10:30:45Z","updated_at":"2026-01-16T10:30:45Z"}
   let gh = make_gh_issue_json(json)
   let issue = gh_issue_to_issue(gh, existing_id="my-custom-id")
-  assert_eq(issue.id, "my-custom-id")
+  @test.assert_eq(issue.id, "my-custom-id")
 }
 
 ///|

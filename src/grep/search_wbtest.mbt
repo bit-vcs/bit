@@ -17,10 +17,16 @@ test "grep search: searches tracked worktree files only" {
     invert_match=false,
   )
 
-  inspect(
+  debug_inspect(
     matches,
     content=(
-      #|[{path: "a.txt", matches: [{line_number: 1, column: 1, line: "hello"}]}]
+      #|[
+      #|  {
+      #|    path: "a.txt",
+      #|    matches: [{ line_number: 1, column: 1, line: "hello" }],
+      #|  },
+      #|]
+
     ),
   )
 }
@@ -43,10 +49,16 @@ test "grep search: path filter and ignore-case both apply" {
     invert_match=false,
   )
 
-  inspect(
+  debug_inspect(
     matches,
     content=(
-      #|[{path: "dir/b.txt", matches: [{line_number: 1, column: 1, line: "HELLO"}]}]
+      #|[
+      #|  {
+      #|    path: "dir/b.txt",
+      #|    matches: [{ line_number: 1, column: 1, line: "HELLO" }],
+      #|  },
+      #|]
+
     ),
   )
 }
@@ -66,10 +78,16 @@ test "grep search: matches any pattern in the list" {
     [],
   )
 
-  inspect(
+  debug_inspect(
     matches,
     content=(
-      #|[{path: "a.txt", matches: [{line_number: 1, column: 1, line: "world"}]}]
+      #|[
+      #|  {
+      #|    path: "a.txt",
+      #|    matches: [{ line_number: 1, column: 1, line: "world" }],
+      #|  },
+      #|]
+
     ),
   )
 }
@@ -84,10 +102,16 @@ test "grep search: cached reads index blob instead of worktree file" {
 
   let matches = search_index(fs, "/repo/.git", ["cached"], [])
 
-  inspect(
+  debug_inspect(
     matches,
     content=(
-      #|[{path: "a.txt", matches: [{line_number: 1, column: 1, line: "cached"}]}]
+      #|[
+      #|  {
+      #|    path: "a.txt",
+      #|    matches: [{ line_number: 1, column: 1, line: "cached" }],
+      #|  },
+      #|]
+
     ),
   )
 }
@@ -103,10 +127,16 @@ test "grep search: treeish reads committed tree instead of worktree file" {
 
   let matches = search_treeish(fs, "/repo/.git", "HEAD", ["head"], [])
 
-  inspect(
+  debug_inspect(
     matches,
     content=(
-      #|[{path: "HEAD:a.txt", matches: [{line_number: 1, column: 1, line: "head"}]}]
+      #|[
+      #|  {
+      #|    path: "HEAD:a.txt",
+      #|    matches: [{ line_number: 1, column: 1, line: "head" }],
+      #|  },
+      #|]
+
     ),
   )
 }
@@ -130,10 +160,16 @@ test "grep search: max depth limits treeish path traversal" {
     max_depth=0,
   )
 
-  inspect(
+  debug_inspect(
     matches,
     content=(
-      #|[{path: "HEAD:t/v", matches: [{line_number: 1, column: 1, line: "vvv"}]}]
+      #|[
+      #|  {
+      #|    path: "HEAD:t/v",
+      #|    matches: [{ line_number: 1, column: 1, line: "vvv" }],
+      #|  },
+      #|]
+
     ),
   )
 }
@@ -157,10 +193,24 @@ test "grep search: wildcard pathspec keeps recursive treeish matches" {
     max_depth=0,
   )
 
-  inspect(
+  debug_inspect(
     matches,
     content=(
-      #|[{path: "HEAD:t/a/v", matches: [{line_number: 1, column: 1, line: "vvv"}]}, {path: "HEAD:t/v", matches: [{line_number: 1, column: 1, line: "vvv"}]}, {path: "HEAD:v", matches: [{line_number: 1, column: 1, line: "vvv"}]}]
+      #|[
+      #|  {
+      #|    path: "HEAD:t/a/v",
+      #|    matches: [{ line_number: 1, column: 1, line: "vvv" }],
+      #|  },
+      #|  {
+      #|    path: "HEAD:t/v",
+      #|    matches: [{ line_number: 1, column: 1, line: "vvv" }],
+      #|  },
+      #|  {
+      #|    path: "HEAD:v",
+      #|    matches: [{ line_number: 1, column: 1, line: "vvv" }],
+      #|  },
+      #|]
+
     ),
   )
 }
@@ -184,10 +234,20 @@ test "grep search: word regexp keeps whole-word matches and reports first column
     word_regexp=true,
   )
 
-  inspect(
+  debug_inspect(
     matches,
     content=(
-      #|[{path: "HEAD:file", matches: [{line_number: 1, column: 5, line: "foo mmap bar"}, {line_number: 3, column: 14, line: "foo_mmap bar mmap"}, {line_number: 4, column: 5, line: "foo mmap bar_mmap"}]}]
+      #|[
+      #|  {
+      #|    path: "HEAD:file",
+      #|    matches: [
+      #|      { line_number: 1, column: 5, line: "foo mmap bar" },
+      #|      { line_number: 3, column: 14, line: "foo_mmap bar mmap" },
+      #|      { line_number: 4, column: 5, line: "foo mmap bar_mmap" },
+      #|    ],
+      #|  },
+      #|]
+
     ),
   )
 }
@@ -206,10 +266,20 @@ test "grep search: plain worktree search includes ignored files unless excluded"
     GrepExpr::Pattern("hello"),
     [],
   )
-  inspect(
+  debug_inspect(
     all_matches,
     content=(
-      #|[{path: "drop.skip", matches: [{line_number: 1, column: 1, line: "hello"}]}, {path: "keep.txt", matches: [{line_number: 1, column: 1, line: "hello"}]}]
+      #|[
+      #|  {
+      #|    path: "drop.skip",
+      #|    matches: [{ line_number: 1, column: 1, line: "hello" }],
+      #|  },
+      #|  {
+      #|    path: "keep.txt",
+      #|    matches: [{ line_number: 1, column: 1, line: "hello" }],
+      #|  },
+      #|]
+
     ),
   )
 
@@ -220,10 +290,16 @@ test "grep search: plain worktree search includes ignored files unless excluded"
     [],
     exclude_standard=true,
   )
-  inspect(
+  debug_inspect(
     visible_matches,
     content=(
-      #|[{path: "keep.txt", matches: [{line_number: 1, column: 1, line: "hello"}]}]
+      #|[
+      #|  {
+      #|    path: "keep.txt",
+      #|    matches: [{ line_number: 1, column: 1, line: "hello" }],
+      #|  },
+      #|]
+
     ),
   )
 }
@@ -243,10 +319,20 @@ test "grep search: plain worktree descends into nested repos but skips .git" {
     GrepExpr::Pattern("magic"),
     [],
   )
-  inspect(
+  debug_inspect(
     matches,
     content=(
-      #|[{path: "nested/file", matches: [{line_number: 1, column: 1, line: "magic"}]}, {path: "top.txt", matches: [{line_number: 1, column: 1, line: "magic"}]}]
+      #|[
+      #|  {
+      #|    path: "nested/file",
+      #|    matches: [{ line_number: 1, column: 1, line: "magic" }],
+      #|  },
+      #|  {
+      #|    path: "top.txt",
+      #|    matches: [{ line_number: 1, column: 1, line: "magic" }],
+      #|  },
+      #|]
+
     ),
   )
 }
@@ -267,10 +353,20 @@ test "grep search: untracked search respects ignore rules" {
     GrepExpr::Pattern("o"),
     [],
   )
-  inspect(
+  debug_inspect(
     matches,
     content=(
-      #|[{path: "file1", matches: [{line_number: 1, column: 5, line: "hello"}]}, {path: "sub/file2", matches: [{line_number: 1, column: 2, line: "world"}]}]
+      #|[
+      #|  {
+      #|    path: "file1",
+      #|    matches: [{ line_number: 1, column: 5, line: "hello" }],
+      #|  },
+      #|  {
+      #|    path: "sub/file2",
+      #|    matches: [{ line_number: 1, column: 2, line: "world" }],
+      #|  },
+      #|]
+
     ),
   )
 }
