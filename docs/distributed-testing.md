@@ -14,8 +14,8 @@ Older agent/orchestrator notes still exist in `docs/`, but this guide is scoped 
 
 2. Coordination/State (medium)
 - Purpose: Verify read/write consistency across relay, native sync, and repo-backed state
-- Target: `src/x-hub/native/*_wbtest.mbt`, `src/x-kv/native/*_wbtest.mbt`, `src/x-mcp/*_wbtest.mbt`
-- Examples: relay fetch/push behavior, sync conflict handling, MCP server I/O behavior
+- Target: `src/x-hub/native/*_wbtest.mbt`, `src/x-kv/native/*_wbtest.mbt`
+- Examples: relay fetch/push behavior, sync conflict handling
 
 3. Hub/Sync contract (medium)
 - Purpose: Verify PR/Issue/Review representation and sync contracts
@@ -46,7 +46,6 @@ pkf run check
 
 Current `pkf run test-distributed` runs:
 
-- `mizchi/bit/x-mcp`
 - `mizchi/bit/x-rebase-ai`
 - `mizchi/bit/x-hub`
 - `mizchi/bit/x-hub/native`

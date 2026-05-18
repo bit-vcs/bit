@@ -157,22 +157,6 @@ bit ai commit -m "message..."
 bit ai commit
 ```
 
-### bit mcp
-
-Start the MCP server via `bit mcp` (native target).
-
-```bash
-# Start MCP server (stdio)
-bit mcp
-
-# Help
-bit mcp --help
-bit help mcp
-
-# Standalone MoonBit entrypoint (equivalent server implementation)
-moon run src/x-mcp/cmd --target native
-```
-
 ### bit hq
 
 `ghq`-compatible repository manager (default root: `~/bhq`).

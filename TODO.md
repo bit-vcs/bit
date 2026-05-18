@@ -91,7 +91,6 @@ t3404 (rebase -i): **129/132 (97.7%)**
   - [x] grep pattern + search wbtest (28/28 pass) — wasm CI 入り
   - [ ] fingerprint / x-workspace の wbtest は `async/process` 依存で wasm 不可能、native のみ維持
 - [ ] Moonix integration
-- [ ] bit mcp 拡充
 
 ---
 
@@ -154,3 +153,4 @@ check-ignore show-index get-tar-commit-id verify-commit annotate
 
 - `filter-branch` — 非推奨 (git-filter-repo 推奨)
 - Perl Git.pm (t9700), svn/cvs/p4 (t9*)
+- `bit mcp` — 削除済 (v0.42.x)。必要になれば再実装

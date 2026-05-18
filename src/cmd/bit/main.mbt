@@ -65,7 +65,6 @@ async fn show_help() -> Unit {
     #|
     #|experimental
     #|   hub          (deprecated) Use 'bit pr' / 'bit issue' / 'bit debug' instead
-    #|   mcp          Run bit MCP server (stdio)
     #|   workspace    Manage hierarchical bit workspace projects
     #|   ws           Shortcut for 'workspace'
     #|   repo         Run regular bit command without workspace translation
@@ -627,12 +626,6 @@ async fn show_command_help(cmd : String, silent? : Bool = false) -> Bool {
     "debug" => {
       if !silent {
         print_debug_usage()
-      }
-      true
-    }
-    "mcp" => {
-      if !silent {
-        print_mcp_usage()
       }
       true
     }
@@ -1299,7 +1292,6 @@ async fn dispatch_known_command(
     "pr" => handle_hub_pr(rest)
     "issue" => handle_hub_issue(rest)
     "debug" => handle_debug(rest)
-    "mcp" => handle_mcp(rest)
     "workspace" => handle_workspace(rest)
     "repo" => handle_repo(rest)
     "hq" => handle_hq(rest)

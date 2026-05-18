@@ -83,8 +83,6 @@ other `x-*` packages. May depend on `core/*`, `mid/*`, and `high/*`.
 | `mizchi/bit/x-hub/native`        | `src/x-hub/native`        | Hub native bindings          |
 | `mizchi/bit/x-kv`                | `src/x-kv`                | Git-backed KV store          |
 | `mizchi/bit/x-kv/native`         | `src/x-kv/native`         | KV native sync               |
-| `mizchi/bit/x-mcp`               | `src/x-mcp`               | MCP server                   |
-| `mizchi/bit/x-mcp/cmd`           | `src/x-mcp/cmd`           | Standalone MCP entry point   |
 | `mizchi/bit/x-hq`                | `src/x-hq`                | `ghq`-compatible repo mgr    |
 | `mizchi/bit/x-rebase-ai`         | `src/x-rebase-ai`         | AI rebase helpers            |
 | `mizchi/bit/x-subdir`            | `src/x-subdir`            | Subdirectory clone           |
