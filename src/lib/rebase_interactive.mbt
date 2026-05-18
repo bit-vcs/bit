@@ -372,8 +372,7 @@ pub fn save_interactive_rebase_state(
   // Write labels state (for --rebase-merges)
   if state.labels.length() > 0 {
     let sb = StringBuilder::new()
-    for item in state.labels.to_array() {
-      let (name, hex) = item
+    for name, hex in state.labels {
       sb.write_string(name)
       sb.write_string(" ")
       sb.write_string(hex)
@@ -388,8 +387,7 @@ pub fn save_interactive_rebase_state(
   // Write update-refs state
   if state.update_refs.length() > 0 {
     let sb = StringBuilder::new()
-    for item in state.update_refs.to_array() {
-      let (ref_path, old_hex) = item
+    for ref_path, old_hex in state.update_refs {
       let new_hex = match state.commit_map.get(old_hex) {
         Some(h) => h
         None => ""
@@ -761,8 +759,7 @@ fn generate_rebase_merges_todo_text(
   // Emit label commands for external parents (outside the rebase range).
   // These are merge parents not in commit_set that need labels so that
   // merge commands can reference them.
-  for item in needs_label.to_array() {
-    let (ch, label) = item
+  for ch, label in needs_label {
     if !commit_set.contains(ch) {
       sb.write_string("reset \{ch}\n")
       sb.write_string("label \{label}\n\n")
@@ -779,8 +776,7 @@ fn generate_rebase_merges_todo_text(
   // a commit that's already assigned or is outside the range
   // Process labeled commits + HEAD
   let branch_tips : Array[(String, String)] = [] // (commit_hex, label_name)
-  for item in needs_label.to_array() {
-    let (ch, label) = item
+  for ch, label in needs_label {
     if commit_set.contains(ch) {
       branch_tips.push((ch, label))
     }
@@ -1078,8 +1074,7 @@ pub async fn interactive_rebase_start(
       }
     }
     let all_refs = list_refs_with_ids(rfs, git_dir, Some("refs/heads/"))
-    for item in all_refs.to_array() {
-      let (ref_path, ref_id) = item
+    for ref_path, ref_id in all_refs {
       let hex = ref_id.to_hex()
       // Skip the branch being rebased (it's handled by head_name restoration)
       if ref_path == head_name {
@@ -2159,8 +2154,7 @@ fn interactive_rebase_finish(
   write_index_entries(fs, git_dir, entries)
   // Update refs that pointed to commits in the rebase chain
   if state.update_refs.length() > 0 {
-    for item in state.update_refs.to_array() {
-      let (ref_path, old_hex) = item
+    for ref_path, old_hex in state.update_refs {
       match state.commit_map.get(old_hex) {
         Some(new_hex) if new_hex.length() > 0 => {
           let full_ref_path = join_path(git_dir, ref_path)

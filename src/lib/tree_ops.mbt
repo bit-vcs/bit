@@ -366,8 +366,7 @@ pub fn tree_files_to_index(
   files : Map[String, TreeFileEntry],
 ) -> Array[IndexEntry] raise @bit.GitError {
   let entries : Array[IndexEntry] = []
-  for item in files.to_array() {
-    let (path, info) = item
+  for path, info in files {
     if is_gitlink_mode_int(info.mode) {
       entries.push({
         path,

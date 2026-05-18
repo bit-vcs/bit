@@ -97,8 +97,7 @@ fn gc_git_dir(
   }
   let store = load_object_store_from_fs(rfs, git_dir)
   let unreachable_hex : Array[String] = []
-  for item in store.objects.to_array() {
-    let (hex, _) = item
+  for hex in store.objects.keys() {
     if !reachable_hex.contains(hex) {
       unreachable_hex.push(hex)
     }
@@ -213,12 +212,7 @@ fn collect_ref_ids(
     Detached(id) => refs["HEAD"] = id
     Branch(_) => ()
   }
-  let out : Array[@bit.ObjectId] = []
-  for item in refs.to_array() {
-    let (_, id) = item
-    out.push(id)
-  }
-  out
+  refs.values().to_array()
 }
 
 ///|

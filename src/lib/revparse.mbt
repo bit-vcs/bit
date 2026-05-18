@@ -608,9 +608,10 @@ pub fn show_ref(
   if fs.is_file(packed) {
     ref_collect_packed(fs, packed, out)
   }
-  let result : Array[(String, @bit.ObjectId)] = []
-  for item in out.to_array() {
-    let (name, id) = item
+  let result : Array[(String, @bit.ObjectId)] = Array::new(
+    capacity=out.length(),
+  )
+  for name, id in out {
     result.push((name, id))
   }
   result.sort_by((a, b) => String::compare(a.0, b.0))

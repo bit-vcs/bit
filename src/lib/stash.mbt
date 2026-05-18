@@ -337,18 +337,13 @@ fn stash_collect_patch_files(
   index_entries : Array[IndexEntry],
 ) -> Array[StashPatchFile] raise @bit.GitError {
   let path_set : Map[String, Bool] = {}
-  for item in head_files.to_array() {
-    let (path, _) = item
+  for path in head_files.keys() {
     path_set[path] = true
   }
   for entry in index_entries {
     path_set[entry.path] = true
   }
-  let paths : Array[String] = []
-  for item in path_set.to_array() {
-    let (path, _) = item
-    paths.push(path)
-  }
+  let paths = path_set.keys().to_array()
   paths.sort()
   let files : Array[StashPatchFile] = []
   for path in paths {
@@ -699,19 +694,13 @@ fn stash_build_patch_tree_entries(
   overrides : Map[String, StashPatchContent],
 ) -> Array[IndexEntry] raise @bit.GitError {
   let path_set : Map[String, Bool] = {}
-  for item in head_files.to_array() {
-    let (path, _) = item
+  for path in head_files.keys() {
     path_set[path] = true
   }
-  for item in overrides.to_array() {
-    let (path, _) = item
+  for path in overrides.keys() {
     path_set[path] = true
   }
-  let paths : Array[String] = []
-  for item in path_set.to_array() {
-    let (path, _) = item
-    paths.push(path)
-  }
+  let paths = path_set.keys().to_array()
   paths.sort()
   let entries : Array[IndexEntry] = []
   for path in paths {
@@ -767,8 +756,7 @@ fn stash_write_patch_remaining_worktree(
   root : String,
   overrides : Map[String, StashPatchContent],
 ) -> Unit raise @bit.GitError {
-  for item in overrides.to_array() {
-    let (path, content) = item
+  for path, content in overrides {
     let abs = join_path(root, path)
     match content.content {
       Some(bytes) => {

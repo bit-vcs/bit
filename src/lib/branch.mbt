@@ -81,8 +81,7 @@ pub fn list_branches(
     collect_packed_heads(fs, packed_path, map)
   }
   let branches : Array[BranchInfo] = []
-  for item in map.to_array() {
-    let (name, id) = item
+  for name, id in map {
     let current = match head {
       Branch(n) => n == name
       Detached(_) => false

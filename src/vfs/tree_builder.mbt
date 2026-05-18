@@ -62,12 +62,10 @@ pub fn build_tree_from_working(
       Some(@lib.ObjectDb::load_lazy(rfs, git_dir)),
     )
   }
-  for item in working.deleted.to_array() {
-    let (path, _) = item
+  for path in working.deleted.keys() {
     delete_from_tree(db, rfs, root, path)
   }
-  for item in working.files.to_array() {
-    let (path, content) = item
+  for path, content in working.files {
     let blob_id = @lib.write_loose_object(
       backing_fs,
       git_dir,
@@ -270,8 +268,7 @@ fn write_tree_recursive(
     }
   }
   let entries : Array[@bit.TreeEntry] = []
-  for item in node.children.to_array() {
-    let (name, child) = item
+  for name, child in node.children {
     let (id, mode_str) = match child.blob_id {
       Some(blob_id) => (blob_id, mode_to_string(child.mode))
       None => {

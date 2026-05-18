@@ -822,8 +822,7 @@ fn load_loose_objects(
 ) -> Array[@bit.PackObject] raise @bit.GitError {
   let result : Array[@bit.PackObject] = []
   let paths = collect_loose_paths(fs, objects_dir)
-  for item in paths.to_array() {
-    let (_, path) = item
+  for path in paths.values() {
     let compressed = fs.read_file(path)
     let raw = @zlib.zlib_decompress(compressed) catch {
       e => raise @bit.GitError::InvalidObject("Zlib error: \{e}")

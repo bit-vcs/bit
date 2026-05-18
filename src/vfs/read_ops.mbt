@@ -45,56 +45,45 @@ pub fn Fs::readdir(
 ) -> Array[String] raise @bit.GitError {
   let norm = normalize_path(path)
   let entries : Map[String, Bool] = {}
-  for item in self.working.files.to_array() {
-    let (file_path, _) = item
-    let rel = if norm.length() == 0 {
-      file_path
-    } else if file_path.has_prefix(norm + "/") {
-      String::unsafe_substring(
-        file_path,
-        start=norm.length() + 1,
-        end=file_path.length(),
-      )
-    } else {
-      continue
-    }
-    match split_first(rel) {
-      (name, _) => entries[name] = true
+  // Collect entries from working files/dirs under `norm`.
+  for path in self.working.files.keys() {
+    match readdir_relative_name(path, norm) {
+      Some(name) => entries[name] = true
+      None => ()
     }
   }
-  for item in self.working.dirs.to_array() {
-    let (dir_path, _) = item
-    let rel = if norm.length() == 0 {
-      dir_path
-    } else if dir_path.has_prefix(norm + "/") {
-      String::unsafe_substring(
-        dir_path,
-        start=norm.length() + 1,
-        end=dir_path.length(),
-      )
-    } else {
-      continue
-    }
-    match split_first(rel) {
-      (name, _) => entries[name] = true
+  for path in self.working.dirs.keys() {
+    match readdir_relative_name(path, norm) {
+      Some(name) => entries[name] = true
+      None => ()
     }
   }
   self.readdir_from_layers(backing_fs, norm, entries)
   self.readdir_from_tree(backing_fs, norm, self.base_tree, entries)
-  for item in self.working.deleted.to_array() {
-    let (del_path, _) = item
+  for del_path in self.working.deleted.keys() {
     if parent_dir(del_path) == norm ||
       (norm.length() == 0 && !del_path.contains("/")) {
       entries.remove(basename(del_path))
     }
   }
-  let out : Array[String] = []
-  for item in entries.to_array() {
-    let (name, _) = item
-    out.push(name)
-  }
+  let out = entries.keys().to_array()
   out.sort()
   out
+}
+
+///|
+/// If `path` is `norm/X/...`, returns the first segment `X`; otherwise None.
+/// At the root (norm=""), the first segment of `path` itself is returned.
+fn readdir_relative_name(path : String, norm : String) -> String? {
+  let rel = if norm.length() == 0 {
+    path
+  } else if path.has_prefix(norm + "/") {
+    String::unsafe_substring(path, start=norm.length() + 1, end=path.length())
+  } else {
+    return None
+  }
+  let (name, _) = split_first(rel)
+  Some(name)
 }
 
 ///|
@@ -170,8 +159,7 @@ pub fn Fs::is_dir(
   if self.working.dirs.contains(norm) {
     return true
   }
-  for item in self.working.files.to_array() {
-    let (file_path, _) = item
+  for file_path in self.working.files.keys() {
     if file_path.has_prefix(norm + "/") {
       return true
     }

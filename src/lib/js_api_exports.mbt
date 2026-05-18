@@ -1249,11 +1249,7 @@ pub fn js_status(host_id : Int, root : String) -> Result[Status, String] {
     collect_staged_changes_from_head(
       fs, git_dir, staged_index_map, skip_worktree_paths, staged_modified, staged_deleted,
     )
-    let staged_added : Array[String] = []
-    for item in staged_index_map.to_array() {
-      let (path, _) = item
-      staged_added.push(path)
-    }
+    let staged_added = staged_index_map.keys().to_array()
     staged_added.sort()
     staged_modified.sort()
     staged_deleted.sort()
