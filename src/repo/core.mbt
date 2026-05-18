@@ -216,6 +216,7 @@ fn walk_tree(
       }
       let entries = parse_tree(obj.data)
       for entry in entries {
+        verify_tree_entry_name(entry.name)
         let path = if prefix.length() == 0 {
           entry.name
         } else {
@@ -259,6 +260,7 @@ fn walk_tree_to_fs(
       }
       let entries = parse_tree(obj.data)
       for entry in entries {
+        verify_tree_entry_name(entry.name)
         let path = if prefix.length() == 0 {
           entry.name
         } else {
@@ -320,5 +322,59 @@ pub fn parent_dir(path : String) -> String {
     None => "/"
     Some(0) => "/"
     Some(i) => String::unsafe_substring(path, start=0, end=i)
+  }
+}
+
+///|
+/// Verify a single tree-entry name is safe to materialize into a
+/// worktree path.
+///
+/// Rejects: empty string, `.`, `..`, any name containing `/` or NUL,
+/// and `.git` case-insensitively (the canonical foothold for hooks,
+/// config, refs). Mirrors the subset of git's `verify_path()` that
+/// matters for path-traversal during checkout / clone / fetch.
+///
+/// Called at the bytes→worktree boundary (`walk_tree_to_fs`,
+/// `lib.collect_tree_files_inner`). Reading the bytes via
+/// `@object.parse_tree` is unaffected: a repo might still contain
+/// legacy commits with names we now reject, but bit refuses to
+/// materialize them. Use `git fsck --strict` upstream to catch the
+/// commit; bit will not silently write into `.git/` or above the
+/// worktree.
+pub fn verify_tree_entry_name(name : String) -> Unit raise @object.GitError {
+  if name.length() == 0 {
+    raise @object.GitError::InvalidObject("tree entry: empty name")
+  }
+  if name == "." || name == ".." {
+    raise @object.GitError::InvalidObject("tree entry: name is '\{name}'")
+  }
+  for i in 0..<name.length() {
+    let c = name.unsafe_get(i)
+    if c == '/' || c == 0 {
+      raise @object.GitError::InvalidObject(
+        "tree entry: name contains separator or NUL: '\{name}'",
+      )
+    }
+  }
+  // Case-insensitive `.git` check. We compare ASCII letters only;
+  // bit currently does not implement git's HFS/NTFS-specific
+  // expansions (e.g. `git~1`, `.gi‌t`). Those would be the next
+  // layer of hardening.
+  if name.length() == 4 {
+    let c0 = name.unsafe_get(0).to_int()
+    let c1 = name.unsafe_get(1).to_int()
+    let c2 = name.unsafe_get(2).to_int()
+    let c3 = name.unsafe_get(3).to_int()
+    let lower = fn(c : Int) -> Int {
+      if c >= 0x41 && c <= 0x5A { c + 32 } else { c }
+    }
+    if c0 == 0x2E && // '.'
+      lower(c1) == 0x67 && // 'g'
+      lower(c2) == 0x69 && // 'i'
+      lower(c3) == 0x74 { // 't'
+      raise @object.GitError::InvalidObject(
+        "tree entry: name aliases '.git'",
+      )
+    }
   }
 }

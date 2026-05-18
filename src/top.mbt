@@ -32,6 +32,7 @@ pub using @repo {
   join_path,
   materialize_clone_to_fs,
   write_git_metadata,
+  verify_tree_entry_name,
 }
 
 ///|

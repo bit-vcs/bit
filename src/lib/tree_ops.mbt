@@ -694,6 +694,10 @@ fn collect_tree_files_inner(
       }
       let entries = @bit.parse_tree(obj.data)
       for entry in entries {
+        // Reject names that would let a malicious tree write outside
+        // the worktree or into .git. Done here (the bytes→path
+        // boundary) so parsing legacy bytes still succeeds.
+        @bit.verify_tree_entry_name(entry.name)
         let path = if prefix.length() == 0 {
           entry.name
         } else {

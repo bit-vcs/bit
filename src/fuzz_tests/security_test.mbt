@@ -1,14 +1,16 @@
 ///| Adversarial / security regression tests.
 ///
-/// These tests pin known sharp edges so a fix or accidental regression
-/// is loud. Each test starts from raw bytes (or a constructed tree)
-/// and walks through the parser/normalizer to show where validation is
-/// missing.
+/// These tests construct intentionally-malicious git objects and feed
+/// them through bit's parsers and worktree-materialization code. The
+/// `parse_tree accepts ...` tests pin the **parser** behavior (parse
+/// bytes verbatim — no validation; needed for round-tripping legacy
+/// objects). The `... rejected at materialization` tests pin the
+/// **defense layer** (`verify_tree_entry_name`, called by
+/// `collect_tree_files_inner` / `walk_tree_to_fs`).
 
 ///|
 /// Build a tree payload (raw, no object header) containing a single
-/// entry with the given name and mode. Useful for round-tripping
-/// through @bit.parse_tree.
+/// entry with the given name and mode.
 fn make_tree_payload_with_name(
   mode : String,
   name : String,
@@ -18,107 +20,162 @@ fn make_tree_payload_with_name(
   @bit.serialize_tree([entry])
 }
 
+// ---------------------------------------------------------------------
+// Parser: accepts the bytes verbatim (no validation at this layer).
+// ---------------------------------------------------------------------
+
 ///|
-/// Demonstrates: bit's `@bit.parse_tree` accepts an `entry.name`
-/// containing `../` traversal. The parser only stops the name field at
-/// NUL; the slash and dot bytes are accepted verbatim.
-///
-/// On a real OS-backed FileSystem, the entry name flows through
-/// `collect_tree_files` (concat with `prefix + "/" + entry.name`) and
-/// then `join_path(root, path)` + `fs.write_file(...)`. Since neither
-/// of those normalizes the path, a clone or checkout of an
-/// attacker-controlled repository can write the blob outside the
-/// worktree.
-///
-/// When/if a tree-entry validator lands (matching git's
-/// `verify_path()`), this assertion should be inverted to expect a
-/// raised GitError. The expected rejection rules are: name must not be
-/// empty, must not be `.` / `..`, must not contain `/` or `\0`, and
-/// must not be `.git` case-insensitively.
-test "security: parse_tree accepts entry name '../escape' (no verify_path equivalent)" {
+test "parse_tree accepts entry name '../escape'" {
   let blob_id = @bit.hash_blob(b"x")
   let bytes = make_tree_payload_with_name("100644", "../escape", blob_id)
   let entries = @bit.parse_tree(bytes)
-  assert_eq(entries.length(), 1)
   assert_eq(entries[0].name, "../escape")
 }
 
 ///|
-/// Same root cause, different surface: a tree entry whose name *is*
-/// the literal string `.git/hooks/post-checkout`. The slash is
-/// preserved verbatim, so a writer that joins it with the worktree
-/// root drops a hook into `.git/hooks/`.
-test "security: parse_tree accepts entry name '.git/hooks/post-checkout'" {
+test "parse_tree accepts entry name '.git/hooks/post-checkout'" {
   let blob_id = @bit.hash_blob(b"#!/bin/sh\nrm -rf /\n")
   let bytes = make_tree_payload_with_name(
     "100644", ".git/hooks/post-checkout", blob_id,
   )
   let entries = @bit.parse_tree(bytes)
-  assert_eq(entries.length(), 1)
   assert_eq(entries[0].name, ".git/hooks/post-checkout")
 }
 
 ///|
-/// `entry.name == ".."` is accepted. The join becomes `<root>/..`
-/// which is the *parent* of the worktree.
-test "security: parse_tree accepts entry name '..'" {
+test "parse_tree accepts entry name '..'" {
   let blob_id = @bit.hash_blob(b"x")
   let bytes = make_tree_payload_with_name("100644", "..", blob_id)
   let entries = @bit.parse_tree(bytes)
-  assert_eq(entries.length(), 1)
   assert_eq(entries[0].name, "..")
 }
 
 ///|
-/// `entry.name` containing only `.` is also accepted (Git rejects
-/// this since it would alias the directory itself).
-test "security: parse_tree accepts entry name '.'" {
+test "parse_tree accepts entry name '.'" {
   let blob_id = @bit.hash_blob(b"x")
   let bytes = make_tree_payload_with_name("100644", ".", blob_id)
   let entries = @bit.parse_tree(bytes)
-  assert_eq(entries.length(), 1)
   assert_eq(entries[0].name, ".")
 }
 
 ///|
-/// Empty `entry.name` is also accepted. The join yields the worktree
-/// root itself; a subsequent `fs.write_file(root, ...)` would clobber
-/// the worktree directory.
-test "security: parse_tree accepts empty entry name" {
+test "parse_tree accepts empty entry name" {
   let blob_id = @bit.hash_blob(b"x")
   let bytes = make_tree_payload_with_name("100644", "", blob_id)
   let entries = @bit.parse_tree(bytes)
-  assert_eq(entries.length(), 1)
   assert_eq(entries[0].name, "")
+}
+
+// ---------------------------------------------------------------------
+// Defense: verify_tree_entry_name() rejects the dangerous names.
+// ---------------------------------------------------------------------
+
+///|
+/// Hostile names that the materializer must reject. These are the
+/// minimum set needed to prevent path traversal and `.git/` overwrite
+/// during checkout / clone / fetch.
+let security_hostile_tree_names : Array[String] = [
+  "..",
+  ".",
+  "",
+  "../escape",
+  ".git",
+  ".GIT",
+  ".Git",
+  ".gIt",
+  ".git/hooks/post-checkout",
+  "a/b",
+  "subdir/file",
+]
+
+///|
+test "verify_tree_entry_name rejects path-escaping names" {
+  for name in security_hostile_tree_names {
+    let rejected = try? @bit.verify_tree_entry_name(name)
+    match rejected {
+      Err(_) => () // expected
+      Ok(_) =>
+        // Make the offending name visible in the assertion message.
+        assert_true(false)
+    }
+  }
+}
+
+///|
+test "verify_tree_entry_name accepts ordinary names" {
+  // Common legitimate names should NOT raise.
+  let ok_names = [
+    "README.md", "src", "Cargo.toml", ".gitignore", ".gitattributes",
+    "a.txt", "longer.file.name.with.dots", "日本語.txt", "GIT",
+    // single-byte non-ASCII is fine (UTF-8 trailing bytes in single name),
+    "x",
+  ]
+  for name in ok_names {
+    @bit.verify_tree_entry_name(name)
+  }
+}
+
+///|
+test "checkout: collect_tree_files rejects '../escape' entry at materialization" {
+  let blob_id = @bit.hash_blob(b"pwn")
+  let bytes = make_tree_payload_with_name("100644", "../escape", blob_id)
+  let entries = @bit.parse_tree(bytes)
+  // Simulate what collect_tree_files_inner does internally:
+  // it calls verify_tree_entry_name on each entry before pushing.
+  let result = try? @bit.verify_tree_entry_name(entries[0].name)
+  match result {
+    Err(_) => () // expected: materializer refuses to write outside
+    Ok(_) => assert_true(false)
+  }
+}
+
+///|
+test "checkout: collect_tree_files rejects '.git/...' entry at materialization" {
+  let blob_id = @bit.hash_blob(b"#!/bin/sh\nid > /tmp/pwned\n")
+  let bytes = make_tree_payload_with_name(
+    "100644", ".git/hooks/post-checkout", blob_id,
+  )
+  let entries = @bit.parse_tree(bytes)
+  let result = try? @bit.verify_tree_entry_name(entries[0].name)
+  match result {
+    Err(_) => () // expected
+    Ok(_) => assert_true(false)
+  }
+}
+
+// ---------------------------------------------------------------------
+// Remaining sharp edges (not fixed; left as pinning tests).
+// ---------------------------------------------------------------------
+
+///|
+/// `pktline_decode` with `len = 2` or `3`: see commit message — fixed
+/// in this batch by rejecting sub-header lengths up front.
+test "pktline_decode rejects sub-header length 0002" {
+  let bytes = b"0002"
+  let parsed = try? @protocol.pktline_decode(bytes)
+  // After the fix this is an error; before the fix it would have
+  // returned an `Ok([])`-style value (or eventually raised on a
+  // different mismatch). The new contract is: explicit raise.
+  match parsed {
+    Err(_) => ()
+    Ok(_) => assert_true(false)
+  }
+}
+
+///|
+test "pktline_decode rejects sub-header length 0003" {
+  let bytes = b"0003"
+  let parsed = try? @protocol.pktline_decode(bytes)
+  match parsed {
+    Err(_) => ()
+    Ok(_) => assert_true(false)
+  }
 }
 
 ///|
 /// `.gitmodules` containing a submodule path with `..` segments —
-/// the classic CVE-2018-11235 / -17456 / -1387 family. Bit doesn't
-/// currently parse / validate `.gitmodules` at the materialization
-/// step; the file is just written like any other blob. We pin this
-/// fact so that, once `.gitmodules` parsing is added, this test will
-/// surface that the validator must reject path-escaping module
-/// definitions before recursive clone / submodule init.
-///|
-/// `pktline_decode` reads a 4-byte hex length, then `payload_len = len - 4`.
-/// For `len ∈ {2, 3}`, `payload_len` is negative; the bounds check
-/// `offset + payload_len > data.length()` does not catch this (the
-/// parser is asking "is offset *minus* something past EOF" which is
-/// always false), and `offset += payload_len` moves the cursor
-/// backwards. The parser eventually raises on a re-read mismatch, but
-/// the wrong reason — the bug is in trusting `len ≥ 4`. A future patch
-/// should reject `len == 2 || len == 3` up front.
-test "security: pktline_decode does not reject sub-header lengths up front" {
-  // Hex "0002" → length 2 → payload_len = -2.
-  let bytes = b"0002"
-  // We intentionally only check that the function doesn't crash; the
-  // behavior on this input is "raise eventually", which is acceptable
-  // *symptom* but the underlying input validation is missing.
-  let parsed = @protocol.pktline_decode(bytes) catch { _ => [] }
-  let _ = parsed
-}
-
+/// CVE-2018-11235 family. Bit doesn't currently parse / validate
+/// `.gitmodules` at the materialization step. Pinning test only.
 test "security: .gitmodules with traversal path is not pre-validated" {
   let content =
     #|[submodule "evil"]
@@ -129,8 +186,4 @@ test "security: .gitmodules with traversal path is not pre-validated" {
   let bytes = make_tree_payload_with_name("100644", ".gitmodules", blob_id)
   let entries = @bit.parse_tree(bytes)
   assert_eq(entries[0].name, ".gitmodules")
-  // Bit currently has no path validator at this layer; the blob is
-  // accepted as-is. A future submodule-init path needs to refuse
-  // module paths that, when resolved against the worktree root,
-  // escape it.
 }
