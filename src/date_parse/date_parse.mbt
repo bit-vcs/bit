@@ -91,7 +91,9 @@ pub fn month_name_to_number(name : String) -> Int? {
 
 ///|
 /// Parse an ISO 8601 date/time string (e.g. "2024-01-15T10:30:00").
-/// Returns 0 if the string is too short.
+/// Returns 0 if the string is too short or if the resulting calendar
+/// fields are out of range (would index `month_days[]` out of bounds
+/// inside `days_since_epoch`).
 pub fn parse_approxidate_iso8601(s : String) -> Int64 {
   let chars = s.to_array()
   if chars.length() < 10 {
@@ -100,6 +102,9 @@ pub fn parse_approxidate_iso8601(s : String) -> Int64 {
   let year = parse_date_digits(chars, 0, 4)
   let month = parse_date_digits(chars, 5, 7)
   let day = parse_date_digits(chars, 8, 10)
+  if year < 1970 || month < 1 || month > 12 || day < 1 || day > 31 {
+    return 0L
+  }
   let mut hour = 0
   let mut minute = 0
   let mut second = 0
