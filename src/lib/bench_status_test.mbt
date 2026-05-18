@@ -75,6 +75,25 @@ test "bench status clean large" (b : @bench.T) {
 }
 
 ///|
+// Pre-computed Status snapshots: the bench only measures the formatter so we
+// hoist the (slow) async status() call to package init.
+let bench_status_dirty_small_snapshot : Status = {
+  let mut snapshot = None
+  @async.run_async_main(async fn() {
+    snapshot = Some(status(bench_status_dirty_small, bench_root))
+  })
+  snapshot.unwrap()
+}
+
+///|
+test "bench status_porcelain_from dirty small" (b : @bench.T) {
+  b.bench(fn() {
+    let lines = status_porcelain_from(bench_status_dirty_small_snapshot)
+    b.keep(lines.length())
+  })
+}
+
+///|
 async test "racy_git: unchanged file is not reported" {
   let fs = @bit.TestFs::new()
   ignore(try? init_repo(fs, "/repo"))

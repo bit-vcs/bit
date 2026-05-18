@@ -56,8 +56,7 @@ pub async fn status(
     fs, actual_git_dir, index_map, skip_worktree_paths, staged_modified, staged_deleted,
   )
   t0 = profile_lap(profile, "status read_head_entries", t0)
-  for item in index_map.to_array() {
-    let (path, _) = item
+  for path in index_map.keys() {
     staged_added.push(path)
   }
   staged_added.sort()
@@ -89,16 +88,16 @@ pub async fn status_porcelain(
 
 ///|
 pub fn status_porcelain_from(s : Status) -> Array[String] {
-  if s.staged_added.length() == 0 &&
-    s.staged_modified.length() == 0 &&
-    s.staged_deleted.length() == 0 &&
-    s.unstaged_modified.length() == 0 &&
-    s.unstaged_deleted.length() == 0 &&
-    s.untracked.length() == 0 {
+  let tracked_count = s.staged_added.length() +
+    s.staged_modified.length() +
+    s.staged_deleted.length() +
+    s.unstaged_modified.length() +
+    s.unstaged_deleted.length()
+  if tracked_count == 0 && s.untracked.length() == 0 {
     return []
   }
-  let xmap : Map[String, Char] = {}
-  let ymap : Map[String, Char] = {}
+  let xmap : Map[String, Char] = Map([], capacity=tracked_count)
+  let ymap : Map[String, Char] = Map([], capacity=tracked_count)
   for p in s.staged_added {
     xmap[p] = 'A'
   }
@@ -114,29 +113,18 @@ pub fn status_porcelain_from(s : Status) -> Array[String] {
   for p in s.unstaged_deleted {
     ymap[p] = 'D'
   }
-  let paths : Map[String, Bool] = {}
-  for p in s.staged_added {
-    paths[p] = true
-  }
-  for p in s.staged_modified {
-    paths[p] = true
-  }
-  for p in s.staged_deleted {
-    paths[p] = true
-  }
-  for p in s.unstaged_modified {
-    paths[p] = true
-  }
-  for p in s.unstaged_deleted {
-    paths[p] = true
-  }
-  let out : Array[String] = []
-  let list : Array[String] = []
-  for item in paths.to_array() {
-    let (p, _) = item
+  // xmap.keys() ∪ ymap.keys() — paths touched by either side.
+  let list : Array[String] = Array::new(capacity=tracked_count)
+  for p in xmap.keys() {
     list.push(p)
   }
+  for p in ymap.keys() {
+    if !xmap.contains(p) {
+      list.push(p)
+    }
+  }
   list.sort()
+  let out : Array[String] = Array::new(capacity=list.length() + s.untracked.length())
   for p in list {
     let x = xmap.get(p).unwrap_or(' ')
     let y = ymap.get(p).unwrap_or(' ')
@@ -193,15 +181,20 @@ pub fn add_paths(
       )
       compat_record_blob_mapping(fs, rfs, actual_git_dir, id, normalized)
       let size = content.length()
-      let meta = @bitio.worktree_entry_meta_sync(rfs, abs)
-      let mtime_sec = meta.map(info => info.mtime_sec.unwrap_or(0)).unwrap_or(0)
-      let mtime_nsec = meta
-        .map(info => info.mtime_nsec.unwrap_or(0))
-        .unwrap_or(0)
-      let dev = meta.map(info => info.dev.unwrap_or(0)).unwrap_or(0)
-      let ino = meta.map(info => info.ino.unwrap_or(0)).unwrap_or(0)
-      let uid = meta.map(info => info.uid.unwrap_or(0)).unwrap_or(0)
-      let gid = meta.map(info => info.gid.unwrap_or(0)).unwrap_or(0)
+      let (mtime_sec, mtime_nsec, dev, ino, uid, gid) = match @bitio.worktree_entry_meta_sync(
+          rfs, abs,
+        ) {
+        Some(info) =>
+          (
+            info.mtime_sec.unwrap_or(0),
+            info.mtime_nsec.unwrap_or(0),
+            info.dev.unwrap_or(0),
+            info.ino.unwrap_or(0),
+            info.uid.unwrap_or(0),
+            info.gid.unwrap_or(0),
+          )
+        None => (0, 0, 0, 0, 0, 0)
+      }
       map[path] = {
         path,
         id,
@@ -219,11 +212,7 @@ pub fn add_paths(
       map.remove(path)
     }
   }
-  let out : Array[IndexEntry] = []
-  for item in map.to_array() {
-    let (_, entry) = item
-    out.push(entry)
-  }
+  let out = map.values().to_array()
   write_index_entries_preserving_cache_tree(fs, rfs, actual_git_dir, out)
 }
 
@@ -388,11 +377,7 @@ pub async fn add_paths_async(
       }
     }
   }
-  let out : Array[IndexEntry] = []
-  for item in map.to_array() {
-    let (_, entry) = item
-    out.push(entry)
-  }
+  let out = map.values().to_array()
   write_index_entries_preserving_cache_tree(fs, rfs, actual_git_dir, out)
 }
 
@@ -1390,8 +1375,7 @@ fn write_tree_from_entries(
         }
     }
   }
-  for item in dir_map.to_array() {
-    let (dir_name, list) = item
+  for dir_name, list in dir_map {
     let sub_id = write_tree_from_entries(
       fs,
       rfs,
@@ -1793,19 +1777,15 @@ pub fn rm_paths(
       }
     }
   }
-  let out : Array[IndexEntry] = []
+  let out : Array[IndexEntry] = Array::new(capacity=map.length())
   let remaining_skip_worktree_paths : Map[String, Bool] = {}
-  for item in map.to_array() {
-    let (path, entry) = item
+  let remaining_skip_paths : Array[String] = []
+  for path, entry in map {
     out.push(entry)
     if skip_worktree_paths.contains(path) {
       remaining_skip_worktree_paths[path] = true
+      remaining_skip_paths.push(path)
     }
-  }
-  let remaining_skip_paths : Array[String] = []
-  for item in remaining_skip_worktree_paths.to_array() {
-    let (path, _) = item
-    remaining_skip_paths.push(path)
   }
   write_skip_worktree_paths(fs, actual_git_dir, remaining_skip_paths)
   write_index_entries_with_skip_worktree(
@@ -1936,8 +1916,7 @@ fn expand_rm_paths(
   for p in paths {
     let norm_path = normalize_rel_path(p)
     if norm_path == "." || norm_path == "" {
-      for item in index_map.to_array() {
-        let (entry_path, _) = item
+      for entry_path in index_map.keys() {
         result.push(entry_path)
       }
       continue
@@ -1950,8 +1929,7 @@ fn expand_rm_paths(
       } else {
         norm_path + "/"
       }
-      for item in index_map.to_array() {
-        let (entry_path, _) = item
+      for entry_path in index_map.keys() {
         if entry_path.has_prefix(prefix) || entry_path == norm_path {
           result.push(entry_path)
         }
@@ -2047,11 +2025,7 @@ pub fn mv_path(
     fs.remove_file(src_abs)
   }
   // Write index
-  let out : Array[IndexEntry] = []
-  for item in map.to_array() {
-    let (_, entry) = item
-    out.push(entry)
-  }
+  let out = map.values().to_array()
   write_index_entries(fs, actual_git_dir, out)
   if is_gitlink_mode_int(src_entry.mode) {
     mv_update_submodule_paths_after_move(

@@ -898,8 +898,7 @@ fn sparse_build_sparse_index_entries(
   for dir in candidate_dirs {
     let mut has_files = false
     let mut fully_skipped = true
-    for item in all_files.to_array() {
-      let (path, _) = item
+    for path in all_files.keys() {
       if !sparse_is_under_dir(path, dir) {
         continue
       }
@@ -931,8 +930,7 @@ fn sparse_build_sparse_index_entries(
 
   let kept_files : Map[String, TreeFileEntry] = {}
   let skip_set : Map[String, Bool] = {}
-  for item in all_files.to_array() {
-    let (path, entry) = item
+  for path, entry in all_files {
     let mut collapsed = false
     for dir in sparse_dirs {
       if sparse_is_under_dir(path, dir) {
@@ -1019,8 +1017,7 @@ fn sparse_update_worktree(
       // Filter files based on sparse patterns
       let sparse_files : Map[String, TreeFileEntry] = {}
       let skip_paths : Array[String] = []
-      for item in all_files.to_array() {
-        let (path, entry) = item
+      for path, entry in all_files {
         if matches_sparse_pattern(path, patterns) {
           sparse_files[path] = entry
         } else {
@@ -1028,16 +1025,13 @@ fn sparse_update_worktree(
         }
       }
       // Remove files not in sparse set
-      for item in all_files.to_array() {
-        let (path, _) = item
-        if !matches_sparse_pattern(path, patterns) {
-          if protected_skip_paths.contains(path) {
-            continue
-          }
-          let file_path = join_path(root, path)
-          if rfs.is_file(file_path) {
-            fs.remove_file(file_path)
-          }
+      for path in skip_paths {
+        if protected_skip_paths.contains(path) {
+          continue
+        }
+        let file_path = join_path(root, path)
+        if rfs.is_file(file_path) {
+          fs.remove_file(file_path)
         }
       }
       // Write sparse files

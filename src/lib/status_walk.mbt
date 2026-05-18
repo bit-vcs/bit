@@ -437,13 +437,75 @@ fn mark_subtree_visited(
   }
   // Mark files in subdirectories (need to scan all dirs with matching prefix)
   let prefix = rel + "/"
-  for item in dir_index.dir_files.to_array() {
-    let (dir, files) = item
+  for dir, files in dir_index.dir_files {
     if dir.has_prefix(prefix) {
       for f in files {
         visited[f.0] = true
       }
     }
+  }
+}
+
+///|
+/// Hash the regular-file at `abs` after running configured filters / EOL
+/// normalization. Used by status comparison when stat info alone can't decide.
+async fn hash_regular_for_compare(
+  fs : &@bit.RepoFileSystem,
+  root : String,
+  git_dir : String,
+  abs : String,
+  path : String,
+  autocrlf : AutoCrlf,
+  run_filter_cmd? : FilterCmd,
+) -> @bit.ObjectId raise @bit.GitError {
+  let content = fs.read_file(abs)
+  let attrs = resolve_eol_attrs(fs, root, path)
+  let filtered = match attrs.filter {
+    Some("lfs") => lfs_pointer_for_content(content)
+    Some(name) =>
+      match run_filter_cmd {
+        Some(run_cmd) => {
+          let (clean_cmd, _) = read_filter_commands(fs, git_dir, name)
+          match clean_cmd {
+            Some(cmd) => (run_cmd.run)(root, git_dir, cmd, content)
+            None => content
+          }
+        }
+        None => content
+      }
+    None => content
+  }
+  let normalized = clean_for_storage(filtered, attrs, autocrlf)
+  @bit.hash_blob(normalized)
+}
+
+///|
+/// Returns true when the stat triple (size, mtime_sec, mtime_nsec) matches
+/// the recorded entry. A zero mtime in the entry counts as no-info: never a
+/// match.
+fn stat_matches_entry(
+  info : @bitio.WorktreeEntryMeta,
+  entry : IndexEntry,
+  check_size~ : Bool,
+) -> Bool {
+  if entry.mtime_sec == 0 && entry.mtime_nsec == 0 {
+    return false
+  }
+  match (info.mtime_sec, info.mtime_nsec) {
+    (Some(ms), Some(mn)) => {
+      if ms != entry.mtime_sec || mn != entry.mtime_nsec {
+        return false
+      }
+      if check_size {
+        match info.size {
+          Some(sz) => sz == entry.size
+          None => false
+        }
+      } else {
+        true
+      }
+    }
+    _ => false
   }
 }
 
@@ -467,107 +529,35 @@ async fn check_file_against_index(
     Some(info) =>
       match info.kind {
         @bitio.WorktreeKindMeta::Regular => {
-          let mut stat_matches = false
-          let mut size_mismatch = false
-          match info.size {
-            Some(sz) => {
-              size_mismatch = sz != entry.size
-              match info.mtime_sec {
-                Some(ms) =>
-                  match info.mtime_nsec {
-                    Some(mn) =>
-                      if entry.mtime_sec != 0 || entry.mtime_nsec != 0 {
-                        stat_matches = !size_mismatch &&
-                          ms == entry.mtime_sec &&
-                          mn == entry.mtime_nsec
-                      }
-                    None => ()
-                  }
-                None => ()
-              }
-            }
-            None => ()
-          }
           if info.mode != entry.mode {
             unstaged_modified.push(path)
-          } else if size_mismatch {
+            return
+          }
+          let size_mismatch = match info.size {
+            Some(sz) => sz != entry.size
+            None => false
+          }
+          if size_mismatch {
             unstaged_modified.push(path)
-          } else if !stat_matches {
-            let content = fs.read_file(abs)
-            let attrs = resolve_eol_attrs(fs, root, path)
-            let content = match attrs.filter {
-              Some("lfs") => lfs_pointer_for_content(content)
-              Some(name) =>
-                match run_filter_cmd {
-                  Some(run_cmd) => {
-                    let (clean_cmd, _) = read_filter_commands(fs, git_dir, name)
-                    match clean_cmd {
-                      Some(cmd) => (run_cmd.run)(root, git_dir, cmd, content)
-                      None => content
-                    }
-                  }
-                  None => content
-                }
-              None => content
-            }
-            let normalized = clean_for_storage(content, attrs, autocrlf)
-            let id = @bit.hash_blob(normalized)
-            if id != entry.id {
-              unstaged_modified.push(path)
-            }
-          } else if racy_git {
-            let content = fs.read_file(abs)
-            let attrs = resolve_eol_attrs(fs, root, path)
-            let content = match attrs.filter {
-              Some("lfs") => lfs_pointer_for_content(content)
-              Some(name) =>
-                match run_filter_cmd {
-                  Some(run_cmd) => {
-                    let (clean_cmd, _) = read_filter_commands(fs, git_dir, name)
-                    match clean_cmd {
-                      Some(cmd) => (run_cmd.run)(root, git_dir, cmd, content)
-                      None => content
-                    }
-                  }
-                  None => content
-                }
-              None => content
-            }
-            let normalized = clean_for_storage(content, attrs, autocrlf)
-            let id = @bit.hash_blob(normalized)
+            return
+          }
+          let stat_matches = stat_matches_entry(info, entry, check_size=true)
+          if !stat_matches || racy_git {
+            let id = hash_regular_for_compare(
+              fs, root, git_dir, abs, path, autocrlf, run_filter_cmd?,
+            )
             if id != entry.id {
               unstaged_modified.push(path)
             }
           }
         }
         @bitio.WorktreeKindMeta::Symlink => {
-          let mode_changed = info.mode != entry.mode
-          let mut stat_matches = false
-          match info.mtime_sec {
-            Some(ms) =>
-              match info.mtime_nsec {
-                Some(mn) =>
-                  if entry.mtime_sec != 0 || entry.mtime_nsec != 0 {
-                    stat_matches = ms == entry.mtime_sec &&
-                      mn == entry.mtime_nsec
-                  }
-                None => ()
-              }
-            None => ()
-          }
-          if mode_changed {
+          if info.mode != entry.mode {
             unstaged_modified.push(path)
-          } else if !stat_matches {
-            match @bitio.read_symlink_target_path(abs) {
-              Some(target) => {
-                let id = target |> @utf8.encode |> @bit.hash_blob
-                if id != entry.id {
-                  unstaged_modified.push(path)
-                }
-              }
-              None => ()
-            }
-          } else if racy_git {
+            return
+          }
+          let stat_matches = stat_matches_entry(info, entry, check_size=false)
+          if !stat_matches || racy_git {
             match @bitio.read_symlink_target_path(abs) {
               Some(target) => {
                 let id = target |> @utf8.encode |> @bit.hash_blob
