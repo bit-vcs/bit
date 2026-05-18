@@ -201,8 +201,6 @@ options(
     "main_wasm.mbt": [ "wasm-gc", "wasm" ],
     "main_wbtest.mbt": [ "native" ],
     "maintenance.mbt": [ "native" ],
-    "mcp.mbt": [ "native" ],
-    "mcp_wbtest.mbt": [ "native" ],
     "merge.mbt": [ "native" ],
     "merge_base.mbt": [ "native" ],
     "merge_file.mbt": [ "native" ],

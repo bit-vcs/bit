@@ -929,7 +929,6 @@ fn completion_custom_summary(cmd : String) -> String? {
     "hq" => Some("ghq-compatible repository management")
     "init" => Some("Create an empty Git repository")
     "log" => Some("Show commit logs")
-    "mcp" => Some("Run bit MCP server (stdio)")
     "repo" => Some("Run regular bit command without workspace translation")
     "show" => Some("Show various types of objects")
     "status" => Some("Show the working tree status")
@@ -960,7 +959,7 @@ fn all_subcommands() -> Array[(String, String)] {
     "checkout", "cherry", "cherry-pick", "clean", "clone", "commit", "completion",
     "x/hooks", "x/doc", "config", "debug", "describe", "diff", "diff-files", "fetch",
     "format-patch", "fsck", "gc", "grep", "hash-object", "help", "hq", "hub", "index-pack",
-    "init", "issue", "log", "ls-files", "ls-tree", "maintenance", "mcp", "merge",
+    "init", "issue", "log", "ls-files", "ls-tree", "maintenance", "merge",
     "merge-base", "mktree", "multi-pack-index", "mv", "notes", "pack-objects", "pack-refs",
     "pr", "prune", "prune-packed", "pull", "push", "range-diff", "read-tree", "repo",
     "rebase", "receive-pack", "reflog", "relay", "remote", "repack", "request-pull",
