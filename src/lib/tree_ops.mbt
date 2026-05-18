@@ -461,6 +461,43 @@ fn tree_ops_prepare_blob_path(
 }
 
 ///|
+/// Refuse to write a blob if any of its parent components on disk is
+/// a symlink. Defense against the "leave a symlink behind on one
+/// checkout, then write through it on the next" attack — bit creates
+/// symlinks in `apply_worktree_modes`, and a follow-up checkout of a
+/// different tree could otherwise write through the lingering link.
+///
+/// Uses `@bitio.lstat_entry_meta` so it doesn't follow symlinks. On
+/// JS / non-native targets (where lstat is unavailable) the check is
+/// a no-op — which is acceptable because there are no symlinks in
+/// the in-memory `TestFs` either: `fs.write_file(linkpath, target)`
+/// writes a regular file.
+fn verify_no_symlink_in_parents(
+  root : String,
+  rel_path : String,
+) -> Unit raise @bit.GitError {
+  // Walk every ancestor of `rel_path` (excluding the leaf and root
+  // itself) and lstat each. Worktree root is trusted.
+  let n = rel_path.length()
+  for i in 0..<n {
+    if rel_path.unsafe_get(i) != '/' {
+      continue
+    }
+    let component = String::unsafe_substring(rel_path, start=0, end=i)
+    let abs = join_path(root, component)
+    match @bitio.lstat_entry_meta(abs) {
+      Some(info) =>
+        if info.kind is @bitio.WorktreeKindMeta::Symlink {
+          raise @bit.GitError::InvalidObject(
+            "Refusing to write through symlink in path: \{component}",
+          )
+        }
+      None => () // No native lstat or path doesn't exist yet — OK.
+    }
+  }
+}
+
+///|
 pub fn write_worktree_from_files(
   db : ObjectDb,
   fs : &@bit.FileSystem,
@@ -513,6 +550,7 @@ pub fn write_worktree_from_files(
       )
       continue
     }
+    verify_no_symlink_in_parents(root, path)
     let full_path = join_path(root, path)
     tree_ops_prepare_blob_path(fs, rfs, full_path, path)
     let obj = db.get(rfs, info.id)
@@ -616,6 +654,7 @@ pub fn write_worktree_and_build_index(
       continue
     }
     if !skip_write {
+      verify_no_symlink_in_parents(root, path)
       let full_path = join_path(root, path)
       tree_ops_prepare_blob_path(fs, rfs, full_path, path)
     }

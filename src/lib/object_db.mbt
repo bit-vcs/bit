@@ -133,6 +133,23 @@ fn pack_cache_limit_from_env() -> Int {
 }
 
 ///|
+/// Hard cap on the inflated size of a single loose object. Mirrors
+/// `pack.MAX_PACK_OBJECT_SIZE`. Unlike pack entries, loose objects
+/// expose their size only *inside* the deflate stream, so the check
+/// runs after `zlib_decompress` — this still bounds the downstream
+/// damage even if the initial allocation completed.
+const MAX_LOOSE_OBJECT_SIZE : Int = 0x7fff_ffff
+
+///|
+fn check_loose_object_size(bytes : Bytes) -> Unit raise @bit.GitError {
+  if bytes.length() > MAX_LOOSE_OBJECT_SIZE {
+    raise @bit.GitError::InvalidObject(
+      "Loose object too large: \{bytes.length()} (max \{MAX_LOOSE_OBJECT_SIZE})",
+    )
+  }
+}
+
+///|
 fn touch_pack_cache(db : ObjectDb, pack_path : String) -> Unit {
   if db.pack_cache_order.search(pack_path) is Some(idx) {
     ignore(db.pack_cache_order.remove(idx))
@@ -489,6 +506,7 @@ fn get_loose_by_hex(
       let raw = @zlib.zlib_decompress(compressed) catch {
         e => raise @bit.GitError::InvalidObject("Zlib error: \{e}")
       }
+      check_loose_object_size(raw)
       let obj = parse_loose_object(raw)
       if !db.skip_verify {
         let verify_algo : @object.HashAlgorithm = if hex.length() == 64 {
@@ -704,6 +722,7 @@ fn get_by_hex(
       let raw = @zlib.zlib_decompress(compressed) catch {
         e => raise @bit.GitError::InvalidObject("Zlib error: \{e}")
       }
+      check_loose_object_size(raw)
       let obj = parse_loose_object(raw)
       if !db.skip_verify {
         let verify_algo : @object.HashAlgorithm = if hex.length() == 64 {

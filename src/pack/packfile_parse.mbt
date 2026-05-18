@@ -1,6 +1,51 @@
 ///| Packfile parsing (deflate + delta)
 
 ///|
+/// Hard cap on the inflated size of a single pack-encoded object, in
+/// bytes. The per-object size header is taken from untrusted pack
+/// bytes, so we refuse to call `zlib_decompress_at` if the claimed
+/// size is unreasonable — otherwise an attacker can hand us a small
+/// pack whose entries claim multi-gigabyte inflated sizes, OOMing
+/// the process before any other check fires.
+///
+/// 2 GiB matches `git`'s effective ceiling on 32-bit size fields.
+/// If/when we expose this as `BIT_MAX_OBJECT_SIZE`, the const becomes
+/// the default.
+const MAX_PACK_OBJECT_SIZE : Int = 0x7fff_ffff
+
+///|
+fn check_pack_object_size(size : Int) -> Unit raise @bit.GitError {
+  if size < 0 || size > MAX_PACK_OBJECT_SIZE {
+    raise @bit.GitError::PackfileError(
+      "Pack object size out of range: \{size} (max \{MAX_PACK_OBJECT_SIZE})",
+    )
+  }
+}
+
+///|
+/// Hard cap on the delta chain length for a single pack-encoded
+/// object. Matches git's runtime ceiling (50). Resolving a delta
+/// chain is iterative here, so depth doesn't blow the stack; the
+/// concern is the per-step `apply_delta` cost — at depth 1000+ a
+/// hostile pack can drag parsing into the seconds-per-object range.
+///
+/// OFS_DELTA cycles are impossible by construction (base_offset is
+/// strictly less than the current offset, enforced earlier).
+/// REF_DELTA cycles are caught by the iterative `progress` flag and
+/// leave entries unresolved — but the resolved-chain depth is the
+/// remaining bound.
+const MAX_DELTA_DEPTH : Int = 50
+
+///|
+fn check_delta_depth(depth : Int) -> Unit raise @bit.GitError {
+  if depth > MAX_DELTA_DEPTH {
+    raise @bit.GitError::PackfileError(
+      "Delta chain too deep: \{depth} (max \{MAX_DELTA_DEPTH})",
+    )
+  }
+}
+
+///|
 fn hash_algo_from_size(hash_size : Int) -> @bit.HashAlgorithm {
   if hash_size == 32 {
     @bit.HashAlgorithm::Sha256
@@ -50,6 +95,7 @@ pub fn max_delta_chain_length(
   for _ in 0..<count {
     let obj_offset = offset
     let (type_id, size, next_offset) = decode_type_and_size_at(data, offset)
+    check_pack_object_size(size)
     offset = next_offset
     let (obj_type, content, after) = match type_id {
       1 | 2 | 3 | 4 => {
@@ -113,6 +159,7 @@ pub fn max_delta_chain_length(
               objects[idx] = obj
               resolved[idx] = true
               let depth = depths[base_index] + 1
+              check_delta_depth(depth)
               depths[idx] = depth
               if depth > max_depth {
                 max_depth = depth
@@ -179,6 +226,7 @@ pub fn max_delta_chain_length(
             resolved[idx] = true
             let base_depth = by_id_depth.get(base_oid).unwrap_or(0)
             let depth = base_depth + 1
+            check_delta_depth(depth)
             depths[idx] = depth
             if depth > max_depth {
               max_depth = depth
@@ -248,6 +296,7 @@ pub fn max_delta_chain_length(
             objects[p.index] = obj
             resolved[p.index] = true
             let depth = depths[base_index] + 1
+            check_delta_depth(depth)
             depths[p.index] = depth
             if depth > max_depth {
               max_depth = depth
@@ -279,6 +328,7 @@ pub fn max_delta_chain_length(
               resolved[p.index] = true
               let base_depth = by_id_depth.get(base_oid).unwrap_or(0)
               let depth = base_depth + 1
+              check_delta_depth(depth)
               depths[p.index] = depth
               if depth > max_depth {
                 max_depth = depth
@@ -449,6 +499,7 @@ fn parse_packfile_internal(
   for _ in 0..<count {
     let obj_offset = offset
     let (type_id, size, next_offset) = decode_type_and_size_at(data, offset)
+    check_pack_object_size(size)
     offset = next_offset
     let (obj_type, content, after) = match type_id {
       1 | 2 | 3 | 4 => {
@@ -710,6 +761,7 @@ fn parse_packfile_stream_internal(
   for _ in 0..<count {
     let obj_offset = offset
     let (type_id, size, next_offset) = decode_type_and_size_at(data, offset)
+    check_pack_object_size(size)
     offset = next_offset
     match type_id {
       1 | 2 | 3 | 4 => {
