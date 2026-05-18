@@ -26,7 +26,6 @@ import {
   "mizchi/bit/vfs" @bitfs,
   "mizchi/bit/x-doc" @xdoc,
   "mizchi/bit/x-hq" @hq,
-  "mizchi/bit/x-mcp" @mcp,
   "mizchi/bit/x-subdir" @subdir,
   "mizchi/bit/x-bitconfig" @bitconfig,
   "mizchi/bit/x-workspace" @workspace,
