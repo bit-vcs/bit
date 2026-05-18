@@ -5,6 +5,54 @@ test "ls-files: no wildcard filter matches exact path" {
 }
 
 ///|
+test "submodule: validate_submodule_entry accepts ordinary entries" {
+  assert_true(validate_submodule_entry("sub", "sub", "https://example.com/r"))
+  assert_true(
+    validate_submodule_entry("plugin", "plugins/a", "git@example.com:x/y"),
+  )
+  // `/` in the name is rejected — git treats it as a single
+  // component, and a `/` inside the name lets attackers smuggle
+  // path-like values past trivial path validators.
+  assert_true(!validate_submodule_entry("a/b", "x", "https://x/r"))
+}
+
+///|
+test "submodule: validate_submodule_entry rejects hostile names" {
+  assert_true(!validate_submodule_entry("", "x", "https://x/r"))
+  assert_true(!validate_submodule_entry("..", "x", "https://x/r"))
+  // Embedded NUL — built up from chars to avoid a literal NUL in the
+  // source file (some toolchains refuse NULs in `.mbt` source).
+  let nul_name = "a" + 0.unsafe_to_char().to_string() + "b"
+  assert_true(!validate_submodule_entry(nul_name, "x", "https://x/r"))
+  // embedded newline
+  assert_true(!validate_submodule_entry("a\nb", "x", "https://x/r"))
+}
+
+///|
+test "submodule: validate_submodule_entry rejects hostile paths" {
+  // path traversal
+  assert_true(!validate_submodule_entry("e", "../escape", "https://x/r"))
+  assert_true(!validate_submodule_entry("e", "a/../b", "https://x/r"))
+  // absolute path
+  assert_true(!validate_submodule_entry("e", "/etc/passwd", "https://x/r"))
+  // .git segment (case-insensitive)
+  assert_true(!validate_submodule_entry("e", ".git/hooks/x", "https://x/r"))
+  assert_true(!validate_submodule_entry("e", "a/.GIT/b", "https://x/r"))
+  assert_true(!validate_submodule_entry("e", "a/.GiT/b", "https://x/r"))
+  // empty
+  assert_true(!validate_submodule_entry("e", "", "https://x/r"))
+}
+
+///|
+test "submodule: validate_submodule_entry rejects hostile urls" {
+  // arg injection
+  assert_true(!validate_submodule_entry("e", "p", "--upload-pack=evil"))
+  assert_true(!validate_submodule_entry("e", "p", "-oProxyCommand=x"))
+  // git-remote-ext RCE surface
+  assert_true(!validate_submodule_entry("e", "p", "ext::x"))
+}
+
+///|
 test "ls-files: directory prefix filter works" {
   assert_true(ls_files_matches_filters("dir/a.txt", ["dir"]))
   assert_true(!ls_files_matches_filters("other.txt", ["dir"]))

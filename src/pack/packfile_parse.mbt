@@ -758,6 +758,11 @@ fn parse_packfile_stream_internal(
   let mut offset = 12
   let algo = hash_algo_from_size(hash_size)
   let pending : Array[PendingDeltaStream] = []
+  // depth tracking — see MAX_DELTA_DEPTH (parse_packfile_with_bases
+  // does the same). Stream variant emits objects as they resolve, so
+  // we keep depth side-tables keyed by offset and id.
+  let depth_by_offset : Map[Int, Int] = {}
+  let depth_by_id : Map[@bit.ObjectId, Int] = {}
   for _ in 0..<count {
     let obj_offset = offset
     let (type_id, size, next_offset) = decode_type_and_size_at(data, offset)
@@ -780,6 +785,8 @@ fn parse_packfile_stream_internal(
         )
         by_offset[obj_offset] = obj
         insert_pack_object_by_id(by_id, obj)
+        depth_by_offset[obj_offset] = 0
+        depth_by_id[obj_id] = 0
         emit(obj)
         offset = after
       }
@@ -814,6 +821,10 @@ fn parse_packfile_stream_internal(
             )
             by_offset[obj_offset] = obj
             insert_pack_object_by_id(by_id, obj)
+            let depth = depth_by_offset.get(base_offset).unwrap_or(0) + 1
+            check_delta_depth(depth)
+            depth_by_offset[obj_offset] = depth
+            depth_by_id[obj_id] = depth
             emit(obj)
           }
           None =>
@@ -856,6 +867,10 @@ fn parse_packfile_stream_internal(
             )
             by_offset[obj_offset] = obj
             insert_pack_object_by_id(by_id, obj)
+            let depth = depth_by_id.get(base_oid).unwrap_or(0) + 1
+            check_delta_depth(depth)
+            depth_by_offset[obj_offset] = depth
+            depth_by_id[obj_id] = depth
             emit(obj)
           }
           None =>
@@ -897,6 +912,10 @@ fn parse_packfile_stream_internal(
               )
               by_offset[p.offset] = obj
               insert_pack_object_by_id(by_id, obj)
+              let depth = depth_by_offset.get(base_offset).unwrap_or(0) + 1
+              check_delta_depth(depth)
+              depth_by_offset[p.offset] = depth
+              depth_by_id[obj_id] = depth
               emit(obj)
               progress = true
             }
@@ -920,6 +939,10 @@ fn parse_packfile_stream_internal(
               )
               by_offset[p.offset] = obj
               insert_pack_object_by_id(by_id, obj)
+              let depth = depth_by_id.get(base_oid).unwrap_or(0) + 1
+              check_delta_depth(depth)
+              depth_by_offset[p.offset] = depth
+              depth_by_id[obj_id] = depth
               emit(obj)
               progress = true
             }

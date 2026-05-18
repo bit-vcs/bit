@@ -432,8 +432,7 @@ async fn lfs_upload_single_object_with_http(
     })
   }
   let headers : Map[String, String] = {}
-  for item in action.headers.to_array() {
-    let (key, value) = item
+  for key, value in action.headers {
     headers[key] = value
   }
   if !headers.contains("Content-Type") {

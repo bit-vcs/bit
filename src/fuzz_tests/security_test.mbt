@@ -220,10 +220,16 @@ test "pktline_decode rejects sub-header length 0003" {
 }
 
 ///|
-/// `.gitmodules` containing a submodule path with `..` segments —
-/// CVE-2018-11235 family. Bit doesn't currently parse / validate
-/// `.gitmodules` at the materialization step. Pinning test only.
-test "security: .gitmodules with traversal path is not pre-validated" {
+/// Issue #75: `.gitmodules` entries are now validated before `bit
+/// submodule init/update` consumes them. The blob itself is still
+/// stored verbatim in the tree (that's a property of `parse_tree`),
+/// but `parse_gitmodules` filters out malicious rows.
+///
+/// We can't cheaply reach `parse_gitmodules` from `fuzz_tests` (it's
+/// in `cmd/bit/`), so this test just pins the tree-level fact that
+/// the .gitmodules blob is opaque to the parser layer — defense is
+/// applied one layer up.
+test "security: .gitmodules blob is opaque at tree layer (defense is in parse_gitmodules)" {
   let content =
     #|[submodule "evil"]
     #|	path = ../../escape
