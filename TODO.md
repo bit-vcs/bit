@@ -2,8 +2,8 @@
 
 最終整理日: 2026-05-17
 現バージョン: v0.41.0
-allowlist: 908 テスト
-known-breakage パッチ: 4 (scope 除外 / contrib backport / 本物の機能 gap のみ残)
+allowlist: 910 テスト
+known-breakage パッチ: 2 (scope 除外 1 + 大型未実装 1 のみ残)
 CI SHIM_CMDS: **108 コマンド**
 e2e: **43/43 全パス**
 t3404 (rebase -i): **129/132 (97.7%)**
@@ -55,7 +55,7 @@ t3404 (rebase -i): **129/132 (97.7%)**
 
 ## P2.5: Allowlist 拡大
 
-- 現在: 908
+- 現在: 910
 - [x] t0008-ignores.sh
 - [x] t1400-update-ref.sh — per-test timeout を `max(weight×3, 120s)` に変更して enroll
 - [x] t1901-repo-structure.sh
@@ -65,25 +65,24 @@ t3404 (rebase -i): **129/132 (97.7%)**
 - [x] t5310-pack-bitmaps.sh
 - [x] t5326-multi-pack-bitmaps.sh
 - [x] t5333-pseudo-merge-bitmaps.sh
+- [x] t9210-scalar.sh / t9211-scalar-clone.sh — bit scalar 実装あり、無パッチで pass
 - [x] t9300-fast-import.sh — known-breakage patch 不要 (t9301-9306 と同列)
-- 残候補 in-scope: なし (未収録 120 件は svn/cvs/p4/perl/scalar 系 = スコープ外)
+- 残候補 in-scope: なし (未収録 117 件は svn/cvs/p4/perl/send-email/svk 系 = スコープ外)
 
 ## P2.6: Known-breakage パッチ精査 — audit pass 完了
 
-- 削除済: 18 → 4
+- 削除済: 18 → 2
   - [x] **case 1a (#54)**: t5610-clone-detached / t9350-fast-export / t5505-remote / t5801-remote-helpers
-    — 純 relaxation (BIT prereq なし) → upstream `test_expect_failure` で支障なし
   - [x] **case 1b (#56)**: t1410-reflog / t2405-worktree-submodule / t3600-rm
-    — BIT prereq 付きだが upstream は `test_expect_failure`、bit 側 skip を外しても TODO 扱い
-  - [x] **case 1c (#58)**: t5572-pull-submodule — 再分類で case 1 判明
-  - [x] **virtual gap SIGTERM (#60)**: t7502-commit-porcelain / t7600-merge — bit の index 書込が `.git/index.lock` を作らないため `! -f .git/index.lock` trivially true
-  - [x] **virtual gap promisor (#63)**: t0411-clone-from-partial / t5616-partial-clone / t7703-repack-geometric — promisor 関連の masked subtest は実は bit 側で問題なく通る (推測されていた pack-objects gap は実体無し)
-  - [x] **virtual gap cat-file (#64)**: t1006-cat-file `%(rest)` — upstream の動的 `test_rest` 分岐で whitespace ケースは元々 `test_expect_failure`、bit のサイドステップ不要
-- 残 4 パッチ:
-  - **t5300-pack-object** — 8 件 `test_expect_success` → `test_expect_failure` (unconditional)。 unpack-objects / verify-pack 検証 / index-pack --strict / prefetch の bit gap を encode。 probe 候補 (本当に落ちるか確認)
-  - **t5540-http-push-webdav** — WebDAV 意図的非対応の `skip_all` 宣言、 削除不可
+  - [x] **case 1c (#58)**: t5572-pull-submodule
+  - [x] **virtual gap SIGTERM (#60)**: t7502-commit-porcelain / t7600-merge — bit の index 書込は `.git/index.lock` を作らない
+  - [x] **virtual gap promisor (#63)**: t0411-clone-from-partial / t5616-partial-clone / t7703-repack-geometric — pack-objects gap は実体無し
+  - [x] **virtual gap cat-file (#64)**: t1006-cat-file `%(rest)` — upstream の動的 `test_rest` 分岐に任せて OK
+  - [x] **virtual gap pack-object (#66)**: t5300-pack-object — unpack/verify/strict/prefetch の 8 件、 削除しても全部 pass
+  - [x] **virtual gap completion (#67)**: t9902-completion — contrib/completion 修正は削除しても他に影響なし、テストは upstream `test_expect_failure` で吸収
+- 残 2 パッチ (どちらも audit で削除不可):
+  - **t5540-http-push-webdav** — WebDAV 意図的非対応の `skip_all` 宣言、 機能追加無しでは削除不可
   - **t7527-builtin-fsmonitor** — fsmonitor--daemon 未実装。 daemon 実装が特大 (4000-6000 LOC)
-  - **t9902-completion** — contrib/completion バグ修正 + relaxation。 contrib backport 部分は削除不可。 probe 候補 (test 部分だけ削除して通るか)
 
 ## P3: 将来タスク
 
