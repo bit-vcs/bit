@@ -1083,6 +1083,15 @@ pub fn apply_delta(base : Bytes, delta : Bytes) -> Bytes raise @bit.GitError {
   }
   let (result_size, off2) = read_delta_size(delta, offset)
   offset = off2
+  // Same cap as pack object size: prevents `FixedArray::make` from
+  // attempting a multi-GB allocation when the delta header claims an
+  // outsized result (or the varint wraps to a value the caller can't
+  // service).
+  if result_size < 0 || result_size > MAX_PACK_OBJECT_SIZE {
+    raise @bit.GitError::PackfileError(
+      "Delta result size out of range: \{result_size}",
+    )
+  }
   let out : FixedArray[Byte] = FixedArray::make(result_size, b'\x00')
   let mut out_pos = 0
   while offset < delta.length() {
@@ -1092,38 +1101,73 @@ pub fn apply_delta(base : Bytes, delta : Bytes) -> Bytes raise @bit.GitError {
       let mut cp_off = 0
       let mut cp_size = 0
       if (opcode & 0x01) != 0 {
+        if offset >= delta.length() {
+          raise @bit.GitError::PackfileError("Delta copy header truncated")
+        }
         cp_off = cp_off | delta[offset].to_int()
         offset += 1
       }
       if (opcode & 0x02) != 0 {
+        if offset >= delta.length() {
+          raise @bit.GitError::PackfileError("Delta copy header truncated")
+        }
         cp_off = cp_off | (delta[offset].to_int() << 8)
         offset += 1
       }
       if (opcode & 0x04) != 0 {
+        if offset >= delta.length() {
+          raise @bit.GitError::PackfileError("Delta copy header truncated")
+        }
         cp_off = cp_off | (delta[offset].to_int() << 16)
         offset += 1
       }
       if (opcode & 0x08) != 0 {
+        if offset >= delta.length() {
+          raise @bit.GitError::PackfileError("Delta copy header truncated")
+        }
         cp_off = cp_off | (delta[offset].to_int() << 24)
         offset += 1
       }
       if (opcode & 0x10) != 0 {
+        if offset >= delta.length() {
+          raise @bit.GitError::PackfileError("Delta copy header truncated")
+        }
         cp_size = cp_size | delta[offset].to_int()
         offset += 1
       }
       if (opcode & 0x20) != 0 {
+        if offset >= delta.length() {
+          raise @bit.GitError::PackfileError("Delta copy header truncated")
+        }
         cp_size = cp_size | (delta[offset].to_int() << 8)
         offset += 1
       }
       if (opcode & 0x40) != 0 {
+        if offset >= delta.length() {
+          raise @bit.GitError::PackfileError("Delta copy header truncated")
+        }
         cp_size = cp_size | (delta[offset].to_int() << 16)
         offset += 1
       }
       if cp_size == 0 {
         cp_size = 0x10000
       }
-      if cp_off < 0 || cp_off + cp_size > base.length() {
+      // Bounds check guarding against integer overflow on Int32:
+      // a `cp_off` near 2^31 plus a 7-bit-shifted `cp_size` can wrap
+      // into a small negative value, slipping past
+      // `cp_off + cp_size > base.length()`.
+      let base_len = base.length()
+      if cp_off < 0 ||
+        cp_size < 0 ||
+        cp_off > base_len ||
+        cp_size > base_len - cp_off {
         raise @bit.GitError::PackfileError("Delta copy out of range")
+      }
+      // Same defense for the *output* cursor — a malicious delta that
+      // sums its op sizes past `result_size` would otherwise index
+      // out of the `out` FixedArray and panic.
+      if out_pos < 0 || cp_size > result_size - out_pos {
+        raise @bit.GitError::PackfileError("Delta copy past result size")
       }
       for i in 0..<cp_size {
         out[out_pos] = base[cp_off + i]
@@ -1134,8 +1178,11 @@ pub fn apply_delta(base : Bytes, delta : Bytes) -> Bytes raise @bit.GitError {
       if literal_len == 0 {
         raise @bit.GitError::PackfileError("Invalid delta opcode")
       }
-      if offset + literal_len > delta.length() {
+      if literal_len > delta.length() - offset {
         raise @bit.GitError::PackfileError("Delta literal out of range")
+      }
+      if literal_len > result_size - out_pos {
+        raise @bit.GitError::PackfileError("Delta literal past result size")
       }
       for i in 0..<literal_len {
         out[out_pos] = delta[offset + i]
@@ -1159,9 +1206,21 @@ fn read_delta_size(data : Bytes, start : Int) -> (Int, Int) raise @bit.GitError 
     if offset >= data.length() {
       raise @bit.GitError::PackfileError("Unexpected end of delta data")
     }
+    // Cap the shift before it can wrap MoonBit's 32-bit Int. A hostile
+    // delta that keeps the continuation bit set indefinitely would
+    // otherwise either truncate to a small `size` (silent corruption)
+    // or shift into the sign bit (negative size accepted by the
+    // caller, then handed to `FixedArray::make` — undefined for
+    // negative len).
+    if shift >= 32 {
+      raise @bit.GitError::PackfileError("Delta size varint too large")
+    }
     let b = data[offset].to_int()
     offset += 1
     size = size | ((b & 0x7f) << shift)
+    if size < 0 {
+      raise @bit.GitError::PackfileError("Delta size overflow")
+    }
     if (b & 0x80) == 0 {
       break
     }

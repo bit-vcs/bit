@@ -195,6 +195,52 @@ test "pack: delta depth constant is enforced" {
 }
 
 ///|
+/// `apply_delta` reads two varint sizes from the delta header. Without
+/// a shift cap, a hostile delta can keep the continuation bit set
+/// indefinitely until the 32-bit `size` wraps into the sign bit
+/// (negative size) or a small positive. The negative size then flows
+/// into `FixedArray::make(size, b'\0')` — undefined for negative len.
+test "pack: apply_delta rejects oversized varint header" {
+  // 10 bytes of 0xFF: a continuation chain that asks for more bits
+  // than 32. Real git rejects this; we now do too.
+  let oversize_varint = b"\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff"
+  // base_size byte 0 (so base_len 0 matches), then result_size = the
+  // overlong varint, then no body.
+  let delta = b"\x00\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff"
+  let parsed = try? @pack.apply_delta(b"", delta)
+  match parsed {
+    Err(_) => () // expected: shift cap fires
+    Ok(_) => assert_true(false)
+  }
+  // Silence the unused binding lint — the comment above describes
+  // what shape we're avoiding.
+  let _ = oversize_varint
+}
+
+///|
+/// Same path, but a delta copy op whose `cp_off + cp_size` overflows
+/// MoonBit's Int32 and slips past the bounds check. Pre-fix, the
+/// next iteration would index `base[cp_off + i]` out of bounds and
+/// panic; post-fix the check uses subtraction to avoid the overflow.
+test "pack: apply_delta rejects copy-op with overflowing bounds" {
+  // base of 16 bytes
+  let base = b"0123456789abcdef"
+  // Delta layout:
+  //   varint base_size (16, single byte 0x10)
+  //   varint result_size (16, single byte 0x10)
+  //   copy opcode 0xFF (all 7 cp-bits set: 4 off + 3 size)
+  //   cp_off = 0xFFFFFFFF
+  //   cp_size = 0x10
+  // Pre-fix: cp_off + cp_size wraps to negative; bounds check passes.
+  let delta = b"\x10\x10\xff\xff\xff\xff\xff\x10\x00\x00"
+  let parsed = try? @pack.apply_delta(base, delta)
+  match parsed {
+    Err(_) => () // expected
+    Ok(_) => assert_true(false)
+  }
+}
+
+///|
 /// `pktline_decode` with `len = 2` or `3`: see commit message — fixed
 /// in this batch by rejecting sub-header lengths up front.
 test "pktline_decode rejects sub-header length 0002" {

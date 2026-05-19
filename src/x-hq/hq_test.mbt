@@ -1,7 +1,7 @@
 ///|
 test "RepoPath::parse: user/repo shorthand" {
   let result = parse_repo_url("mizchi/git")
-  let expected =
+  let _expected =
     #|Some({host: None, user: "mizchi", repo: "git", subdir: None})
   debug_inspect(result, content=(
     #|Some({ host: None, user: "mizchi", repo: "git", subdir: None })
@@ -11,7 +11,7 @@ test "RepoPath::parse: user/repo shorthand" {
 ///|
 test "RepoPath::parse: user/repo:subdir shorthand" {
   let result = parse_repo_url("mizchi/monorepo:packages/core")
-  let expected =
+  let _expected =
     #|Some({host: None, user: "mizchi", repo: "monorepo", subdir: Some("packages/core")})
   debug_inspect(result, content=(
     #|Some(
@@ -28,7 +28,7 @@ test "RepoPath::parse: user/repo:subdir shorthand" {
 ///|
 test "RepoPath::parse: user/repo/path subdir" {
   let result = parse_repo_url("mizchi/monorepo/packages/core")
-  let expected =
+  let _expected =
     #|Some({host: None, user: "mizchi", repo: "monorepo", subdir: Some("packages/core")})
   debug_inspect(result, content=(
     #|Some(
@@ -45,7 +45,7 @@ test "RepoPath::parse: user/repo/path subdir" {
 ///|
 test "RepoPath::parse: github.com/user/repo/path subdir" {
   let result = parse_repo_url("github.com/mizchi/monorepo/packages/core")
-  let expected =
+  let _expected =
     #|Some({host: None, user: "mizchi", repo: "monorepo", subdir: Some("packages/core")})
   debug_inspect(result, content=(
     #|Some(
@@ -62,7 +62,7 @@ test "RepoPath::parse: github.com/user/repo/path subdir" {
 ///|
 test "RepoPath::parse: gitlab.com/user/repo/path subdir" {
   let result = parse_repo_url("gitlab.com/user/monorepo/packages/core")
-  let expected =
+  let _expected =
     #|Some({host: Some("gitlab.com"), user: "user", repo: "monorepo", subdir: Some("packages/core")})
   debug_inspect(result, content=(
     #|Some(
@@ -79,7 +79,7 @@ test "RepoPath::parse: gitlab.com/user/repo/path subdir" {
 ///|
 test "RepoPath::parse: github.com/user/repo (normalized)" {
   let result = parse_repo_url("github.com/mizchi/git")
-  let expected =
+  let _expected =
     #|Some({host: None, user: "mizchi", repo: "git", subdir: None})
   debug_inspect(result, content=(
     #|Some({ host: None, user: "mizchi", repo: "git", subdir: None })
@@ -89,7 +89,7 @@ test "RepoPath::parse: github.com/user/repo (normalized)" {
 ///|
 test "RepoPath::parse: gitlab.com/user/repo (other host)" {
   let result = parse_repo_url("gitlab.com/user/project")
-  let expected =
+  let _expected =
     #|Some({host: Some("gitlab.com"), user: "user", repo: "project", subdir: None})
   debug_inspect(result, content=(
     #|Some(
@@ -106,7 +106,7 @@ test "RepoPath::parse: gitlab.com/user/repo (other host)" {
 ///|
 test "RepoPath::parse: https URL" {
   let result = parse_repo_url("https://github.com/mizchi/git")
-  let expected =
+  let _expected =
     #|Some({host: None, user: "mizchi", repo: "git", subdir: None})
   debug_inspect(result, content=(
     #|Some({ host: None, user: "mizchi", repo: "git", subdir: None })
@@ -116,7 +116,7 @@ test "RepoPath::parse: https URL" {
 ///|
 test "RepoPath::parse: https URL with .git" {
   let result = parse_repo_url("https://github.com/mizchi/git.git")
-  let expected =
+  let _expected =
     #|Some({host: None, user: "mizchi", repo: "git", subdir: None})
   debug_inspect(result, content=(
     #|Some({ host: None, user: "mizchi", repo: "git", subdir: None })
@@ -128,7 +128,7 @@ test "RepoPath::parse: https URL with tree path" {
   let result = parse_repo_url(
     "https://github.com/mizchi/monorepo/tree/main/packages/core",
   )
-  let expected =
+  let _expected =
     #|Some({host: None, user: "mizchi", repo: "monorepo", subdir: Some("packages/core")})
   debug_inspect(result, content=(
     #|Some(
@@ -145,7 +145,7 @@ test "RepoPath::parse: https URL with tree path" {
 ///|
 test "RepoPath::parse: SSH URL" {
   let result = parse_repo_url("git@github.com:mizchi/git.git")
-  let expected =
+  let _expected =
     #|Some({host: None, user: "mizchi", repo: "git", subdir: None})
   debug_inspect(result, content=(
     #|Some({ host: None, user: "mizchi", repo: "git", subdir: None })
@@ -155,7 +155,7 @@ test "RepoPath::parse: SSH URL" {
 ///|
 test "RepoPath::parse: SSH URL gitlab" {
   let result = parse_repo_url("git@gitlab.com:user/project.git")
-  let expected =
+  let _expected =
     #|Some({host: Some("gitlab.com"), user: "user", repo: "project", subdir: None})
   debug_inspect(result, content=(
     #|Some(
@@ -218,7 +218,7 @@ test "RepoPath::local_path: explicit github.com also normalized" {
 ///|
 test "RepoPath::local_path: other host includes host" {
   let repo = RepoPath::new("user", "project", host=Some("gitlab.com"))
-  let expected = "/home/user/bhq/gitlab.com/user/project"
+  let _expected = "/home/user/bhq/gitlab.com/user/project"
   debug_inspect(repo.local_path("/home/user/bhq"), content=(
     #|"/home/user/bhq/gitlab.com/user/project"
   ))
@@ -299,7 +299,7 @@ test "build_clone_command: simple" {
   let repo = RepoPath::new("mizchi", "git")
   let options = HqGetOptions::default()
   let cmd = build_clone_command(repo, "/home/user/bhq/mizchi/git", options)
-  let expected = "git clone https://github.com/mizchi/git.git /home/user/bhq/mizchi/git"
+  let _expected = "git clone https://github.com/mizchi/git.git /home/user/bhq/mizchi/git"
   debug_inspect(cmd, content=(
     #|"git clone https://github.com/mizchi/git.git /home/user/bhq/mizchi/git"
   ))
@@ -310,7 +310,7 @@ test "build_clone_command: shallow" {
   let repo = RepoPath::new("mizchi", "git")
   let options = HqGetOptions::new(shallow=true)
   let cmd = build_clone_command(repo, "/home/user/bhq/mizchi/git", options)
-  let expected = "git clone --depth=1 https://github.com/mizchi/git.git /home/user/bhq/mizchi/git"
+  let _expected = "git clone --depth=1 https://github.com/mizchi/git.git /home/user/bhq/mizchi/git"
   debug_inspect(cmd, content=(
     #|"git clone --depth=1 https://github.com/mizchi/git.git /home/user/bhq/mizchi/git"
   ))
@@ -321,7 +321,7 @@ test "build_clone_command: explicit depth" {
   let repo = RepoPath::new("mizchi", "git")
   let options = HqGetOptions::new(depth=3)
   let cmd = build_clone_command(repo, "/home/user/bhq/mizchi/git", options)
-  let expected = "git clone --depth=3 https://github.com/mizchi/git.git /home/user/bhq/mizchi/git"
+  let _expected = "git clone --depth=3 https://github.com/mizchi/git.git /home/user/bhq/mizchi/git"
   debug_inspect(cmd, content=(
     #|"git clone --depth=3 https://github.com/mizchi/git.git /home/user/bhq/mizchi/git"
   ))
@@ -332,7 +332,7 @@ test "build_clone_command: sparse checkout" {
   let repo = RepoPath::new("mizchi", "monorepo", subdir=Some("packages/core"))
   let options = HqGetOptions::default()
   let cmd = build_clone_command(repo, "/home/user/bhq/mizchi/monorepo", options)
-  let expected = "git clone --no-checkout https://github.com/mizchi/monorepo.git /home/user/bhq/mizchi/monorepo && cd /home/user/bhq/mizchi/monorepo && git sparse-checkout init --cone && git sparse-checkout set /packages/core/"
+  let _expected = "git clone --no-checkout https://github.com/mizchi/monorepo.git /home/user/bhq/mizchi/monorepo && cd /home/user/bhq/mizchi/monorepo && git sparse-checkout init --cone && git sparse-checkout set /packages/core/"
   debug_inspect(cmd, content=(
     #|"git clone --no-checkout https://github.com/mizchi/monorepo.git /home/user/bhq/mizchi/monorepo && cd /home/user/bhq/mizchi/monorepo && git sparse-checkout init --cone && git sparse-checkout set /packages/core/"
   ))
@@ -343,7 +343,7 @@ test "build_clone_command: sparse checkout with depth" {
   let repo = RepoPath::new("mizchi", "monorepo", subdir=Some("packages/core"))
   let options = HqGetOptions::new(depth=2)
   let cmd = build_clone_command(repo, "/home/user/bhq/mizchi/monorepo", options)
-  let expected = "git clone --no-checkout --depth=2 https://github.com/mizchi/monorepo.git /home/user/bhq/mizchi/monorepo && cd /home/user/bhq/mizchi/monorepo && git sparse-checkout init --cone && git sparse-checkout set /packages/core/"
+  let _expected = "git clone --no-checkout --depth=2 https://github.com/mizchi/monorepo.git /home/user/bhq/mizchi/monorepo && cd /home/user/bhq/mizchi/monorepo && git sparse-checkout init --cone && git sparse-checkout set /packages/core/"
   debug_inspect(cmd, content=(
     #|"git clone --no-checkout --depth=2 https://github.com/mizchi/monorepo.git /home/user/bhq/mizchi/monorepo && cd /home/user/bhq/mizchi/monorepo && git sparse-checkout init --cone && git sparse-checkout set /packages/core/"
   ))
@@ -449,7 +449,7 @@ test "hq_get: update existing with -u" {
 ///|
 test "parse_repo_path: user/repo" {
   let result = parse_repo_path("mizchi/git")
-  let expected =
+  let _expected =
     #|Some({host: None, user: "mizchi", repo: "git", subdir: None})
   debug_inspect(result, content=(
     #|Some({ host: None, user: "mizchi", repo: "git", subdir: None })
@@ -459,7 +459,7 @@ test "parse_repo_path: user/repo" {
 ///|
 test "parse_repo_path: host/user/repo" {
   let result = parse_repo_path("gitlab.com/user/project")
-  let expected =
+  let _expected =
     #|Some({host: Some("gitlab.com"), user: "user", repo: "project", subdir: None})
   debug_inspect(result, content=(
     #|Some(
