@@ -241,6 +241,47 @@ test "pack: apply_delta rejects copy-op with overflowing bounds" {
 }
 
 ///|
+/// Sideband payload from a hostile remote can contain ANSI escape
+/// sequences that clear the screen, hide output, or fake prompts when
+/// printed to the user's terminal. Git 2.55 ships
+/// `sideband.allowControlCharacters=color` as the default policy:
+/// color (CSI ... m) passes through, every other control byte and
+/// CSI sequence is replaced.
+///
+/// Bit's `sanitize_sideband_text` enforces the same rule on band 3
+/// (error) payloads before they reach `eprint_line`.
+test "sideband: ANSI color is preserved" {
+  let red = b"\x1b[31mERR\x1b[0m"
+  let cleaned = @protocol.sanitize_sideband_text(red)
+  assert_eq(cleaned, red)
+}
+
+///|
+test "sideband: cursor / erase CSI sequences are stripped" {
+  // ESC[2J = clear screen, ESC[H = move cursor home, ESC[K = erase line
+  let evil = b"\x1b[2J\x1b[H\x1b[Kpwned"
+  let cleaned = @protocol.sanitize_sideband_text(evil)
+  // The CSI sequences collapse to single `?`s; the literal text
+  // survives.
+  assert_eq(cleaned, b"???pwned")
+}
+
+///|
+test "sideband: lone control bytes are replaced" {
+  // BEL (0x07), backspace (0x08), and DEL (0x7f) all dropped.
+  let evil = b"a\x07b\x08c\x7fd"
+  let cleaned = @protocol.sanitize_sideband_text(evil)
+  assert_eq(cleaned, b"a?b?c?d")
+}
+
+///|
+test "sideband: tab/LF/CR pass through" {
+  let safe = b"line1\nline2\tcol\rfoo"
+  let cleaned = @protocol.sanitize_sideband_text(safe)
+  assert_eq(cleaned, safe)
+}
+
+///|
 /// `pktline_decode` with `len = 2` or `3`: see commit message — fixed
 /// in this batch by rejecting sub-header lengths up front.
 test "pktline_decode rejects sub-header length 0002" {
