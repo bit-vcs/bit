@@ -3,14 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Learning Guide — bit</title>
-<meta name="description" content="A guided path through bit, from install to running your own distributed node.">
+<title>Learning Guide</title>
 <link rel="icon" href="../assets/img/logo.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../assets/tokens.css">
 <link rel="stylesheet" href="../assets/site.css">
 </head>
 <body>
-
 <header class="topbar">
   <div class="topbar__brand">
     <a href="../" class="plain"><img src="../assets/img/wordmark.svg" alt="bit"></a>
@@ -18,7 +16,7 @@
   </div>
   <button class="topbar__menu" aria-label="menu"><span></span><span></span><span></span></button>
   <nav>
-    <a href="./" class="active">Learn</a>
+    <a href="../learn/" class="active">Learn</a>
     <a href="../reference/">Reference</a>
     <a href="https://github.com/mizchi/bit" target="_blank" rel="noopener">GitHub ↗</a>
   </nav>
@@ -27,17 +25,24 @@
 <section class="hero">
   <div class="hero__tag">
     <span><strong>bit / learn</strong></span>
-    <span>est. 35 min — five chapters</span>
+    <span>est. 35 min — six chapters</span>
   </div>
 
   <p class="kicker">// guide</p>
-  <h1 class="hero__head" style="font-size: clamp(48px, 9vw, 96px);">Learning<br>Guide.</h1>
-  <p class="hero__sub" style="margin-top: var(--space-5);">A guided path through bit. By the end you will have installed bit, made commits against a real repository, replicated history to a second peer, and opened a local pull request — all without leaving your terminal.</p>
+  <h1 class="hero__head" style="font-size: clamp(48px, 9vw, 96px);">Learning Guide.</h1>
+  <p class="hero__sub" style="margin-top: var(--space-5);">A guided path through bit. By the end you will understand the model, install the binary, make commits against a real repository, replicate history to a second peer, and open a local pull request — all without leaving your terminal.</p>
 </section>
 
 <section class="section" style="padding-top: 0;">
   <nav class="chapters" aria-label="chapters">
-
+    <a class="chapter" href="concept.html">
+      <div class="chapter__num">// 00</div>
+      <div>
+        <h3 class="chapter__h">Concept</h3>
+        <p class="chapter__p">What bit is, what is interesting about it, and the five-concept mental model that makes everything else fall into place.</p>
+      </div>
+      <div class="chapter__meta">~7 min</div>
+    </a>
     <a class="chapter" href="install.html">
       <div class="chapter__num">// 01</div>
       <div>
@@ -46,7 +51,6 @@
       </div>
       <div class="chapter__meta">~5 min</div>
     </a>
-
     <a class="chapter" href="first-commit.html">
       <div class="chapter__num">// 02</div>
       <div>
@@ -55,7 +59,6 @@
       </div>
       <div class="chapter__meta">~5 min</div>
     </a>
-
     <a class="chapter" href="distributed.html">
       <div class="chapter__num">// 03</div>
       <div>
@@ -64,31 +67,14 @@
       </div>
       <div class="chapter__meta">~10 min</div>
     </a>
-
-    <a class="chapter" href="hub.html">
-      <div class="chapter__num">// 04</div>
-      <div>
-        <h3 class="chapter__h">PRs &amp; issues without a server</h3>
-        <p class="chapter__p"><code>bit pr</code> and <code>bit issue</code> live as Git objects. Open a PR, review it, merge it — offline.</p>
-      </div>
-      <div class="chapter__meta">~10 min</div>
-    </a>
-
-    <a class="chapter" href="moonbit.html">
-      <div class="chapter__num">// 05</div>
-      <div>
-        <h3 class="chapter__h">Driving bit from MoonBit</h3>
-        <p class="chapter__p">Use the library API directly. Mount an in-memory <code>TestFs</code>, build a repository programmatically, run commands without a shell.</p>
-      </div>
-      <div class="chapter__meta">~5 min</div>
-    </a>
-
   </nav>
 </section>
 
+
+
 <footer class="site">
   <span>bit · learn</span>
-  <span><a href="../">Home</a> · <a href="../reference/">Reference</a></span>
+  <span><a href="../">Home</a> · <a href="../learn/">Learn</a> · <a href="../reference/">Reference</a></span>
 </footer>
 
 <script src="../assets/syntax.js"></script>

@@ -3,13 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Library API — Reference</title>
+<title>Library API</title>
 <link rel="icon" href="../assets/img/logo.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../assets/tokens.css">
 <link rel="stylesheet" href="../assets/site.css">
 </head>
 <body>
-
 <header class="topbar">
   <div class="topbar__brand">
     <a href="../" class="plain"><img src="../assets/img/wordmark.svg" alt="bit"></a>
@@ -18,7 +17,7 @@
   <button class="topbar__menu" aria-label="menu"><span></span><span></span><span></span></button>
   <nav>
     <a href="../learn/">Learn</a>
-    <a href="./" class="active">Reference</a>
+    <a href="../reference/" class="active">Reference</a>
     <a href="https://github.com/mizchi/bit" target="_blank" rel="noopener">GitHub ↗</a>
   </nav>
 </header>
@@ -28,18 +27,14 @@
   <aside class="side">
     <h4>// Reference</h4>
     <ul>
-      <li><a href="cli.html">R1 CLI commands</a></li>
-      <li><a href="library.html" class="active">R2 Library API</a></li>
-      <li><a href="env.html">R3 Environment</a></li>
+      <li><a href="cli.html">01 CLI commands</a></li>
+      <li><a href="library.html" class="active">02 Library API</a></li>
+      <li><a href="env.html">03 Environment</a></li>
     </ul>
-    <h4>// Library</h4>
+    <h4>// More</h4>
     <ul>
-      <li><a href="#packages">Packages</a></li>
-      <li><a href="#storage">Storage runtime</a></li>
-      <li><a href="#fs">Fs — virtual FS</a></li>
-      <li><a href="#kv">Kv — distributed KV</a></li>
-      <li><a href="#hub-lib">Hub — PR / Issue</a></li>
-      <li><a href="#node">Node — peers</a></li>
+      <li><a href="../learn/">Learning Guide</a></li>
+      <li><a href="../">Home</a></li>
     </ul>
   </aside>
 
@@ -50,199 +45,269 @@
       <p class="lead">bit is a MoonBit library first, a CLI second. Every CLI command is a thin shell around a public function. Embed bit directly in your agent, editor plugin, or CI runner — no subprocess required.</p>
     </header>
 
-    <h2 id="packages" data-num="// 001 — packages">Package layout</h2>
-    <p>Source is organized in five layers, dependencies flow downward only.</p>
-    <table>
-      <thead><tr><th>Layer</th><th>Path</th><th>What lives here</th></tr></thead>
-      <tbody>
-        <tr><td>core</td><td><code>src/core/</code></td><td>Object types, SHA, ref store primitives.</td></tr>
-        <tr><td>mid</td><td><code>src/mid/</code></td><td>Index, pack, merge, diff algorithms.</td></tr>
-        <tr><td>high</td><td><code>src/high/</code></td><td>Porcelain operations (commit, rebase, …).</td></tr>
-        <tr><td>ext</td><td><code>src/ext/</code></td><td>Hub, relay, LFS, AI, workspace.</td></tr>
-        <tr><td>cmd</td><td><code>src/cmd/</code></td><td>CLI entry points.</td></tr>
-      </tbody>
-    </table>
-
-    <h2 id="storage" data-num="// 002 — storage">Storage runtime</h2>
-    <p>The entry point for embedding. Any storage that implements <code>FileSystem</code> + <code>RepoFileSystem</code> can host a repository.</p>
-
-    <h3>Traits</h3>
-    <div class="codeblock">
-      <div class="codeblock__bar"><span class="lang">// moonbit</span><button class="codeblock__copy">copy</button></div>
-      <pre><code data-lang="moonbit">pub trait FileSystem {
-  write_string(Self, String, String) -> Unit
-  write_bytes(Self, String, Bytes) -> Unit
-  mkdir_p(Self, String) -> Unit
-  remove(Self, String) -> Unit
-  rename(Self, String, String) -> Unit
+<h2 id="package-layout" data-num="// 001">Package layout</h2>
+<p>Source is organized in five layers, dependencies flow downward only.</p>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Path</th>
+<th>What lives here</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>core</td>
+<td><code>src/core/</code></td>
+<td>Object types, SHA, ref store primitives.</td>
+</tr>
+<tr>
+<td>mid</td>
+<td><code>src/mid/</code></td>
+<td>Index, pack, merge, diff algorithms.</td>
+</tr>
+<tr>
+<td>high</td>
+<td><code>src/high/</code></td>
+<td>Porcelain operations (commit, rebase, …).</td>
+</tr>
+<tr>
+<td>ext</td>
+<td><code>src/ext/</code></td>
+<td>Hub, relay, LFS, AI, workspace.</td>
+</tr>
+<tr>
+<td>cmd</td>
+<td><code>src/cmd/</code></td>
+<td>CLI entry points.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="storage-runtime" data-num="// 002">Storage runtime</h2>
+<p>The entry point for embedding. Any storage that implements <code>FileSystem</code> and <code>RepoFileSystem</code> can host a repository.</p>
+<h3>Traits</h3>
+<div class="codeblock"><div class="codeblock__bar"><span class="lang">// moonbit</span><button class="codeblock__copy">copy</button></div><pre><code data-lang="moonbit">pub trait FileSystem {
+  write_string(Self, String, String) -&gt; Unit
+  write_bytes(Self, String, Bytes) -&gt; Unit
+  mkdir_p(Self, String) -&gt; Unit
+  remove(Self, String) -&gt; Unit
+  rename(Self, String, String) -&gt; Unit
 }
 
 pub trait RepoFileSystem {
-  read_string(Self, String) -> String?
-  read_bytes(Self, String) -> Bytes?
-  exists(Self, String) -> Bool
-  readdir(Self, String) -> Array[String]
-  stat(Self, String) -> FileStat?
-}</code></pre>
-    </div>
-
-    <h3>Entry function</h3>
-    <div class="codeblock">
-      <div class="codeblock__bar"><span class="lang">// moonbit</span><button class="codeblock__copy">copy</button></div>
-      <pre><code data-lang="moonbit">pub fn run_storage_command[F : FileSystem + RepoFileSystem](
+  read_string(Self, String) -&gt; String?
+  read_bytes(Self, String) -&gt; Bytes?
+  exists(Self, String) -&gt; Bool
+  readdir(Self, String) -&gt; Array[String]
+  stat(Self, String) -&gt; FileStat?
+}
+</code></pre></div>
+<h3>Entry function</h3>
+<div class="codeblock"><div class="codeblock__bar"><span class="lang">// moonbit</span><button class="codeblock__copy">copy</button></div><pre><code data-lang="moonbit">pub fn run_storage_command[F : FileSystem + RepoFileSystem](
   fs   : F,
   rfs  : F,
   root : String,
   cmd  : String,
   args : Array[String]
-) -> String</code></pre>
-    </div>
+) -&gt; String
+</code></pre></div>
+<h3>In-memory backend</h3>
+<p><code>TestFs</code> is the reference implementation. Use it for agents, tests, and ephemeral repos.</p>
+<div class="codeblock"><div class="codeblock__bar"><span class="lang">// moonbit</span><button class="codeblock__copy">copy</button></div><pre><code data-lang="moonbit">let fs = @bit.TestFs::new()
+let root = &quot;/agent-repo&quot;
 
-    <h3>In-memory backend</h3>
-    <p><code>TestFs</code> is the reference implementation. Use it for agents, tests, and ephemeral repos.</p>
-    <div class="codeblock">
-      <div class="codeblock__bar"><span class="lang">// moonbit</span><button class="codeblock__copy">copy</button></div>
-      <pre><code data-lang="moonbit">let fs = @bit.TestFs::new()
-let root = "/agent-repo"
+run_storage_command(fs, fs, root, &quot;init&quot;, [&quot;-q&quot;])
+fs.write_string(root + &quot;/note.txt&quot;, &quot;hello, peer&quot;)
+run_storage_command(fs, fs, root, &quot;add&quot;, [&quot;note.txt&quot;])
+run_storage_command(fs, fs, root, &quot;commit&quot;, [&quot;-m&quot;, &quot;agent snapshot&quot;])
 
-run_storage_command(fs, fs, root, "init", ["-q"])
-fs.write_string(root + "/note.txt", "hello, peer")
-run_storage_command(fs, fs, root, "add", ["note.txt"])
-run_storage_command(fs, fs, root, "commit", ["-m", "agent snapshot"])
-
-let head = run_storage_command(fs, fs, root, "rev-parse", ["HEAD"])
-println("head: \{head}")</code></pre>
-    </div>
-
-    <h2 id="fs" data-num="// 003 — fs">Fs — virtual filesystem</h2>
-    <p>Mount any commit as a read-only filesystem with lazy blob loading.</p>
-    <div class="codeblock">
-      <div class="codeblock__bar"><span class="lang">// moonbit</span><button class="codeblock__copy">copy</button></div>
-      <pre><code data-lang="moonbit">let mounted = @bit.Fs::from_commit(fs, ".git", commit_id)
-let entries = mounted.readdir(fs, "src")
-let content = mounted.read_file(fs, "src/main.mbt")?
+let head = run_storage_command(fs, fs, root, &quot;rev-parse&quot;, [&quot;HEAD&quot;])
+println(&quot;head: \{head}&quot;)
+</code></pre></div>
+<h2 id="fs-virtual-filesystem" data-num="// 003">Fs — virtual filesystem</h2>
+<p>Mount any commit as a read-only filesystem with lazy blob loading.</p>
+<div class="codeblock"><div class="codeblock__bar"><span class="lang">// moonbit</span><button class="codeblock__copy">copy</button></div><pre><code data-lang="moonbit">let mounted = @bit.Fs::from_commit(fs, &quot;.git&quot;, commit_id)
+let entries = mounted.readdir(fs, &quot;src&quot;)
+let content = mounted.read_file(fs, &quot;src/main.mbt&quot;)?
 
 for name in entries {
-  println("- \{name}")
-}</code></pre>
-    </div>
+  println(&quot;- \{name}&quot;)
+}
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Fs::from_commit(fs, gitdir, sha)</code></td>
+<td>Open a virtual FS rooted at a commit's tree.</td>
+</tr>
+<tr>
+<td><code>Fs::from_tree(fs, gitdir, sha)</code></td>
+<td>Open from a tree object directly.</td>
+</tr>
+<tr>
+<td><code>readdir(self, fs, path)</code></td>
+<td>List entries in a directory.</td>
+</tr>
+<tr>
+<td><code>read_file(self, fs, path)</code></td>
+<td>Read a blob lazily.</td>
+</tr>
+<tr>
+<td><code>stat(self, fs, path)</code></td>
+<td>Get entry metadata (mode, size).</td>
+</tr>
+</tbody>
+</table>
+<h2 id="kv-distributed-kv-store" data-num="// 004">Kv — distributed KV store</h2>
+<p>Git-backed key/value store with gossip sync. Useful when you want a small, replicated config alongside the repository.</p>
+<div class="codeblock"><div class="codeblock__bar"><span class="lang">// moonbit</span><button class="codeblock__copy">copy</button></div><pre><code data-lang="moonbit">let db = @bit.Kv::init(fs, fs, git_dir, node_id=&quot;aurora.local&quot;)
 
-    <table>
-      <thead><tr><th>Method</th><th>Description</th></tr></thead>
-      <tbody>
-        <tr><td><code>Fs::from_commit(fs, gitdir, sha)</code></td><td>Open a virtual FS rooted at a commit's tree.</td></tr>
-        <tr><td><code>Fs::from_tree(fs, gitdir, sha)</code></td><td>Open from a tree object directly.</td></tr>
-        <tr><td><code>readdir(self, fs, path)</code></td><td>List entries in a directory.</td></tr>
-        <tr><td><code>read_file(self, fs, path)</code></td><td>Read a blob lazily.</td></tr>
-        <tr><td><code>stat(self, fs, path)</code></td><td>Get entry metadata (mode, size).</td></tr>
-      </tbody>
-    </table>
+db.set(fs, fs, &quot;users/alice/profile&quot;, profile_bytes, ts=now())
+let value = db.get(fs, fs, &quot;users/alice/profile&quot;)?
 
-    <h2 id="kv" data-num="// 004 — kv">Kv — distributed KV store</h2>
-    <p>Git-backed key/value store with gossip sync. Useful when you want a small, replicated config alongside the repository.</p>
-    <div class="codeblock">
-      <div class="codeblock__bar"><span class="lang">// moonbit</span><button class="codeblock__copy">copy</button></div>
-      <pre><code data-lang="moonbit">let db = @bit.Kv::init(fs, fs, git_dir, node_id="aurora.local")
-
-db.set(fs, fs, "users/alice/profile", profile_bytes, ts=now())
-let value = db.get(fs, fs, "users/alice/profile")?
-
-db.sync_with_peer(fs, fs, "relay://bit.example.com/u/me/kv")</code></pre>
-    </div>
-
-    <h2 id="hub-lib" data-num="// 005 — hub">Hub — PR / Issue API</h2>
-    <p>Same data the <code>bit pr</code> / <code>bit issue</code> CLI commands operate on. Drive PRs from an agent, write a custom triage UI, or wire it into your editor.</p>
-    <div class="codeblock">
-      <div class="codeblock__bar"><span class="lang">// moonbit</span><button class="codeblock__copy">copy</button></div>
-      <pre><code data-lang="moonbit">let hub = @bit.Hub::init(fs, fs, git_dir)
+db.sync_with_peer(fs, fs, &quot;relay://bit.example.com/u/me/kv&quot;)
+</code></pre></div>
+<h2 id="hub-pr-issue-api" data-num="// 005">Hub — PR / Issue API</h2>
+<p>Same data the <code>bit pr</code> and <code>bit issue</code> CLI commands operate on. Drive PRs from an agent, write a custom triage UI, or wire it into your editor.</p>
+<div class="codeblock"><div class="codeblock__bar"><span class="lang">// moonbit</span><button class="codeblock__copy">copy</button></div><pre><code data-lang="moonbit">let hub = @bit.Hub::init(fs, fs, git_dir)
 
 let pr = hub.create_pr(
   fs, fs,
-  title          = "Replace gossip backoff with token bucket",
-  body           = "fixes thrashing under high churn",
-  source_branch  = "feature/token-bucket",
-  target_branch  = "main",
-  author         = "ubugeeei",
+  title          = &quot;Replace gossip backoff with token bucket&quot;,
+  body           = &quot;fixes thrashing under high churn&quot;,
+  source_branch  = &quot;feature/token-bucket&quot;,
+  target_branch  = &quot;main&quot;,
+  author         = &quot;ubugeeei&quot;,
   ts             = now()
 )
 
 hub.review(fs, fs, pr.id, status=Approve, commit=Some(pr.head))?
-hub.merge(fs, fs, pr.id)?</code></pre>
-    </div>
-
-    <table>
-      <thead><tr><th>Function</th><th>Returns</th></tr></thead>
-      <tbody>
-        <tr><td><code>Hub::init(fs, rfs, gitdir)</code></td><td><code>Hub</code></td></tr>
-        <tr><td><code>hub.create_pr(...)</code></td><td><code>Pr</code></td></tr>
-        <tr><td><code>hub.list_prs(state)</code></td><td><code>Array[Pr]</code></td></tr>
-        <tr><td><code>hub.review(id, status, commit?)</code></td><td><code>Result[Review, Error]</code></td></tr>
-        <tr><td><code>hub.merge(id)</code></td><td><code>Result[Sha, Error]</code></td></tr>
-        <tr><td><code>hub.create_issue(...)</code></td><td><code>Issue</code></td></tr>
-        <tr><td><code>hub.link(issue_id, pr_id)</code></td><td><code>Unit</code></td></tr>
-      </tbody>
-    </table>
-
-    <h2 id="node" data-num="// 006 — node">Node — peer protocol</h2>
-    <p>Open sessions with other peers, exchange refs, fetch object graphs.</p>
-    <div class="codeblock">
-      <div class="codeblock__bar"><span class="lang">// moonbit</span><button class="codeblock__copy">copy</button></div>
-      <pre><code data-lang="moonbit">let peer = @bit.Node::from_uri("bit://aurora.local:9418/repo")
+hub.merge(fs, fs, pr.id)?
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>Returns</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Hub::init(fs, rfs, gitdir)</code></td>
+<td><code>Hub</code></td>
+</tr>
+<tr>
+<td><code>hub.create_pr(...)</code></td>
+<td><code>Pr</code></td>
+</tr>
+<tr>
+<td><code>hub.list_prs(state)</code></td>
+<td><code>Array[Pr]</code></td>
+</tr>
+<tr>
+<td><code>hub.review(id, status, commit?)</code></td>
+<td><code>Result[Review, Error]</code></td>
+</tr>
+<tr>
+<td><code>hub.merge(id)</code></td>
+<td><code>Result[Sha, Error]</code></td>
+</tr>
+<tr>
+<td><code>hub.create_issue(...)</code></td>
+<td><code>Issue</code></td>
+</tr>
+<tr>
+<td><code>hub.link(issue_id, pr_id)</code></td>
+<td><code>Unit</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="node-peer-protocol" data-num="// 006">Node — peer protocol</h2>
+<p>Open sessions with other peers, exchange refs, fetch object graphs.</p>
+<div class="codeblock"><div class="codeblock__bar"><span class="lang">// moonbit</span><button class="codeblock__copy">copy</button></div><pre><code data-lang="moonbit">let peer = @bit.Node::from_uri(&quot;bit://aurora.local:9418/repo&quot;)
 peer.handshake(timeout=2.s)?
 
-let local_refs = @bit.refs(fs, ".git")
+let local_refs = @bit.refs(fs, &quot;.git&quot;)
 let wants      = local_refs.diff(peer.refs())
 peer.fetch(wants)?
 
-println("now at: \{peer.refs().get(\"refs/heads/main\")}")</code></pre>
-    </div>
+println(&quot;now at: \{peer.refs().get(\&quot;refs/heads/main\&quot;)}&quot;)
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Node::from_uri(uri)</code></td>
+<td>Create a peer session (lazy connect).</td>
+</tr>
+<tr>
+<td><code>peer.handshake(timeout?)</code></td>
+<td>Open the session, exchange capabilities.</td>
+</tr>
+<tr>
+<td><code>peer.refs()</code></td>
+<td>Snapshot of remote refs.</td>
+</tr>
+<tr>
+<td><code>peer.fetch(wants)</code></td>
+<td>Download objects reachable from <code>wants</code>.</td>
+</tr>
+<tr>
+<td><code>peer.send(bit)</code></td>
+<td>Push a single object or pack.</td>
+</tr>
+<tr>
+<td><code>peer.close()</code></td>
+<td>Drop the session.</td>
+</tr>
+</tbody>
+</table>
+<div class="callout">
+<p class="kicker">// see also</p>
+<p>The <a href="cli.html">CLI Reference</a> documents the same surface, packaged as commands. The mapping is one-to-one: <code>bit pr create</code> ↔ <code>Hub::create_pr</code>, <code>bit fetch</code> ↔ <code>Node::fetch</code>, and so on.</p>
+</div>
 
-    <table>
-      <thead><tr><th>Function</th><th>Description</th></tr></thead>
-      <tbody>
-        <tr><td><code>Node::from_uri(uri)</code></td><td>Create a peer session (lazy connect).</td></tr>
-        <tr><td><code>peer.handshake(timeout?)</code></td><td>Open the session, exchange capabilities.</td></tr>
-        <tr><td><code>peer.refs()</code></td><td>Snapshot of remote refs.</td></tr>
-        <tr><td><code>peer.fetch(wants)</code></td><td>Download objects reachable from <code>wants</code>.</td></tr>
-        <tr><td><code>peer.send(bit)</code></td><td>Push a single object or pack.</td></tr>
-        <tr><td><code>peer.close()</code></td><td>Drop the session.</td></tr>
-      </tbody>
-    </table>
 
-    <div class="callout">
-      <p class="kicker">// see also</p>
-      <p>The <a href="cli.html">CLI Reference</a> documents the same surface, packaged as commands. The mapping is one-to-one: <code>bit pr create</code> ↔ <code>Hub::create_pr</code>, <code>bit fetch</code> ↔ <code>Node::fetch</code>, etc.</p>
-    </div>
-
-    <nav class="pager">
-      <a href="cli.html">
-        <span class="pager__k">← prev · R1</span>
-        <span class="pager__t">CLI commands</span>
-      </a>
-      <a class="next" href="env.html">
-        <span class="pager__k">next · R3 →</span>
-        <span class="pager__t">Environment</span>
-      </a>
-    </nav>
+<nav class="pager">
+  <a href="cli.html">
+    <span class="pager__k">← prev · R1</span>
+    <span class="pager__t">CLI commands</span>
+  </a>
+  <a class="next" href="env.html">
+    <span class="pager__k">next · R3 →</span>
+    <span class="pager__t">Environment</span>
+  </a>
+</nav>
   </article>
 
   <aside class="toc">
     <h4>// on this page</h4>
     <ul>
-      <li><a href="#packages"><span class="num">001</span> Packages</a></li>
-      <li><a href="#storage"><span class="num">002</span> Storage</a></li>
-      <li><a href="#fs"><span class="num">003</span> Fs</a></li>
-      <li><a href="#kv"><span class="num">004</span> Kv</a></li>
-      <li><a href="#hub-lib"><span class="num">005</span> Hub</a></li>
-      <li><a href="#node"><span class="num">006</span> Node</a></li>
+      <li><a href="#package-layout"><span class="num">001</span> Package layout</a></li>
+      <li><a href="#storage-runtime"><span class="num">002</span> Storage runtime</a></li>
+      <li><a href="#fs-virtual-filesystem"><span class="num">003</span> Fs — virtual filesystem</a></li>
+      <li><a href="#kv-distributed-kv-store"><span class="num">004</span> Kv — distributed KV store</a></li>
+      <li><a href="#hub-pr-issue-api"><span class="num">005</span> Hub — PR / Issue API</a></li>
+      <li><a href="#node-peer-protocol"><span class="num">006</span> Node — peer protocol</a></li>
     </ul>
   </aside>
 
 </div>
 
 <footer class="site">
-  <span>bit · reference · R2</span>
-  <span><a href="../">Home</a> · <a href="../learn/">Learn</a></span>
+  <span>bit · reference · library</span>
+  <span><a href="../">Home</a> · <a href="../learn/">Learn</a> · <a href="../reference/">Reference</a></span>
 </footer>
 
 <script src="../assets/syntax.js"></script>
