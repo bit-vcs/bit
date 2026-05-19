@@ -503,7 +503,7 @@ fn get_loose_by_hex(
   match loose_path {
     Some(path) => {
       let compressed = fs.read_file(path)
-      let raw = @zlib.zlib_decompress(compressed) catch {
+      let raw = @zlib.zlib_decompress(compressed, max_size=MAX_LOOSE_OBJECT_SIZE) catch {
         e => raise @bit.GitError::InvalidObject("Zlib error: \{e}")
       }
       check_loose_object_size(raw)
@@ -719,7 +719,7 @@ fn get_by_hex(
   match loose_path {
     Some(path) => {
       let compressed = fs.read_file(path)
-      let raw = @zlib.zlib_decompress(compressed) catch {
+      let raw = @zlib.zlib_decompress(compressed, max_size=MAX_LOOSE_OBJECT_SIZE) catch {
         e => raise @bit.GitError::InvalidObject("Zlib error: \{e}")
       }
       check_loose_object_size(raw)
@@ -843,7 +843,7 @@ fn load_loose_objects(
   let paths = collect_loose_paths(fs, objects_dir)
   for path in paths.values() {
     let compressed = fs.read_file(path)
-    let raw = @zlib.zlib_decompress(compressed) catch {
+    let raw = @zlib.zlib_decompress(compressed, max_size=MAX_LOOSE_OBJECT_SIZE) catch {
       e => raise @bit.GitError::InvalidObject("Zlib error: \{e}")
     }
     let obj = parse_loose_object(raw)
@@ -1063,10 +1063,19 @@ fn read_pack_object_at(
   let (type_id, size, next_offset) = @pack.decode_type_and_size_at(
     data, offset_i,
   )
+  if size < 0 || size > MAX_LOOSE_OBJECT_SIZE {
+    raise @bit.GitError::PackfileError(
+      "Pack object size out of range: \{size}",
+    )
+  }
   match type_id {
     1 | 2 | 3 | 4 => {
       let obj_type = @pack.packfile_type_to_object_type(type_id)
-      let (content, _after) = @zlib.zlib_decompress_at(data, next_offset) catch {
+      let (content, _after) = @zlib.zlib_decompress_at(
+        data,
+        next_offset,
+        max_size=size,
+      ) catch {
         e => raise @bit.GitError::PackfileError("Zlib error: \{e}")
       }
       if content.length() != size {
@@ -1085,7 +1094,11 @@ fn read_pack_object_at(
       if base_offset < 0 {
         raise @bit.GitError::PackfileError("Invalid OFS_DELTA base offset")
       }
-      let (delta, _after) = @zlib.zlib_decompress_at(data, after_ref) catch {
+      let (delta, _after) = @zlib.zlib_decompress_at(
+        data,
+        after_ref,
+        max_size=size,
+      ) catch {
         e => raise @bit.GitError::PackfileError("Zlib error: \{e}")
       }
       if delta.length() != size {
@@ -1117,7 +1130,11 @@ fn read_pack_object_at(
     }
     7 => {
       let (base_hex, after_ref) = @pack.read_ref_delta_id(data, next_offset)
-      let (delta, _after) = @zlib.zlib_decompress_at(data, after_ref) catch {
+      let (delta, _after) = @zlib.zlib_decompress_at(
+        data,
+        after_ref,
+        max_size=size,
+      ) catch {
         e => raise @bit.GitError::PackfileError("Zlib error: \{e}")
       }
       if delta.length() != size {

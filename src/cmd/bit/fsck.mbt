@@ -245,7 +245,10 @@ async fn fsck_verify_loose_objects(fs : OsFs, objects_dir : String) -> Int {
           continue
         }
       }
-      let raw = @zlib.zlib_decompress(data) catch {
+      let raw = @zlib.zlib_decompress(
+          data,
+          max_size=@zlib.default_max_decompressed_size,
+        ) catch {
         _ => {
           eprint_line("error: \{hex}: object corrupt or missing: \{path}")
           errors += 1

@@ -148,12 +148,12 @@ test "checkout: collect_tree_files rejects '.git/...' entry at materialization" 
 // ---------------------------------------------------------------------
 
 ///|
-/// Issue #71: pack entries declare their inflated size in the
-/// type-and-size varint header. Without an up-front cap, an attacker
-/// can hand bit a small pack whose entries claim multi-GB sizes,
-/// driving `@zlib.zlib_decompress_at` into a runaway allocation.
-/// `check_pack_object_size` now rejects sizes > 2 GiB before any
-/// decompression runs.
+/// Issue #71 (revised in mizchi/zlib 0.4.5): pack and loose objects
+/// declare their inflated size up front; the in-flight zlib reader
+/// now also enforces a `max_size` per call (passed through from
+/// `decode_type_and_size_at` for pack, or
+/// `MAX_LOOSE_OBJECT_SIZE` for loose). The bit-level size cap
+/// `check_pack_object_size` remains as defense-in-depth.
 ///
 /// We can't easily construct a real malicious pack here (the size
 /// header is varint-encoded and bound to the rest of the stream),
