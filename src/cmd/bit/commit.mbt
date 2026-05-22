@@ -1583,15 +1583,8 @@ fn abs_path(path : String) -> String {
 ///|
 async fn run_pre_commit_hook(fs : OsFs, root : String, git_dir : String) -> Int {
   let hook_git_dir = abs_path(git_dir)
-  let hooks_dir = resolve_hooks_dir(fs, abs_path(root), hook_git_dir)
-  let hook_path = hooks_dir + "/pre-commit"
-  if !fs.is_file(hook_path) {
-    return 0
-  }
   let work_root = abs_path(root)
-  @process.run(hook_path, [], inherit_env=true, cwd=work_root) catch {
-    _ => 1
-  }
+  run_hook(fs, work_root, hook_git_dir, "pre-commit", work_root)
 }
 
 ///|

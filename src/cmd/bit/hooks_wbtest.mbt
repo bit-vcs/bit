@@ -300,3 +300,121 @@ test "hooks: postinstall never becomes auto-approved by checksum" {
     _ => ()
   }
 }
+
+///|
+test "hooks: read_hook_config returns empty for missing section" {
+  let fs = OsFs::new()
+  let root = "/tmp/bit-test-hook-config-empty-" +
+    get_current_timestamp().to_string()
+  let git_dir = root + "/.git"
+  fs.mkdir_p(git_dir)
+  fs.write_string(
+    git_dir + "/config",
+    "[core]\n\trepositoryformatversion = 0\n",
+  )
+  let cfg = read_hook_config(fs, git_dir, "pre-commit")
+  assert_eq(cfg.commands.length(), 0)
+  assert_false(cfg.parallel)
+  fs.remove_file(git_dir + "/config") catch {
+    _ => ()
+  }
+  fs.remove_dir(git_dir) catch {
+    _ => ()
+  }
+  fs.remove_dir(root) catch {
+    _ => ()
+  }
+}
+
+///|
+test "hooks: read_hook_config parses multi-command + parallel flag" {
+  let fs = OsFs::new()
+  let root = "/tmp/bit-test-hook-config-multi-" +
+    get_current_timestamp().to_string()
+  let git_dir = root + "/.git"
+  fs.mkdir_p(git_dir)
+  // Match upstream's section name format: `[hook "<name>"]` with the
+  // hook name quoted. `command` is multivalued.
+  fs.write_string(
+    git_dir + "/config",
+    "[hook \"pre-commit\"]\n\tcommand = /usr/bin/formatter\n\tcommand = /usr/bin/linter\n\tparallel = true\n",
+  )
+  let cfg = read_hook_config(fs, git_dir, "pre-commit")
+  assert_eq(cfg.commands.length(), 2)
+  assert_eq(cfg.commands[0], "/usr/bin/formatter")
+  assert_eq(cfg.commands[1], "/usr/bin/linter")
+  assert_true(cfg.parallel)
+  fs.remove_file(git_dir + "/config") catch {
+    _ => ()
+  }
+  fs.remove_dir(git_dir) catch {
+    _ => ()
+  }
+  fs.remove_dir(root) catch {
+    _ => ()
+  }
+}
+
+///|
+test "hooks: read_hook_config treats parallel=false as default" {
+  let fs = OsFs::new()
+  let root = "/tmp/bit-test-hook-config-seq-" +
+    get_current_timestamp().to_string()
+  let git_dir = root + "/.git"
+  fs.mkdir_p(git_dir)
+  fs.write_string(
+    git_dir + "/config",
+    "[hook \"pre-add\"]\n\tcommand = /usr/bin/single\n",
+  )
+  let cfg = read_hook_config(fs, git_dir, "pre-add")
+  assert_eq(cfg.commands.length(), 1)
+  assert_false(cfg.parallel)
+  fs.remove_file(git_dir + "/config") catch {
+    _ => ()
+  }
+  fs.remove_dir(git_dir) catch {
+    _ => ()
+  }
+  fs.remove_dir(root) catch {
+    _ => ()
+  }
+}
+
+///|
+test "hooks: is_truthy_config_value matches git's accepted forms" {
+  assert_true(is_truthy_config_value("true"))
+  assert_true(is_truthy_config_value("True"))
+  assert_true(is_truthy_config_value("yes"))
+  assert_true(is_truthy_config_value("on"))
+  assert_true(is_truthy_config_value("1"))
+  assert_false(is_truthy_config_value("false"))
+  assert_false(is_truthy_config_value(""))
+  assert_false(is_truthy_config_value("nope"))
+  assert_false(is_truthy_config_value("0"))
+}
+
+///|
+/// Filter for non-pre-commit hook section is ignored by name match.
+test "hooks: read_hook_config skips other hook sections" {
+  let fs = OsFs::new()
+  let root = "/tmp/bit-test-hook-config-other-" +
+    get_current_timestamp().to_string()
+  let git_dir = root + "/.git"
+  fs.mkdir_p(git_dir)
+  fs.write_string(
+    git_dir + "/config",
+    "[hook \"post-commit\"]\n\tcommand = /one\n[hook \"pre-commit\"]\n\tcommand = /two\n",
+  )
+  let cfg = read_hook_config(fs, git_dir, "pre-commit")
+  assert_eq(cfg.commands.length(), 1)
+  assert_eq(cfg.commands[0], "/two")
+  fs.remove_file(git_dir + "/config") catch {
+    _ => ()
+  }
+  fs.remove_dir(git_dir) catch {
+    _ => ()
+  }
+  fs.remove_dir(root) catch {
+    _ => ()
+  }
+}

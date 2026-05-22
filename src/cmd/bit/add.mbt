@@ -28,13 +28,8 @@ async fn run_add_hook(
   hook_name : String,
 ) -> Int {
   let hook_git_dir = add_abs_path(git_dir)
-  let hook_path = hook_git_dir + "/hooks/" + hook_name
-  if !fs.is_file(hook_path) {
-    return 0
-  }
-  @process.run(hook_path, [], inherit_env=true, cwd=add_abs_path(root)) catch {
-    _ => 1
-  }
+  let work_root = add_abs_path(root)
+  run_hook(fs, work_root, hook_git_dir, hook_name, work_root)
 }
 
 ///|

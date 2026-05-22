@@ -1549,13 +1549,7 @@ async fn run_postclone_hook(
     return ()
   }
   hooks_ensure_sensitive_hook_approval(wfs, rfs, root, "postclone")
-  let hook_path = git_dir + "/hooks/postclone"
-  if !rfs.is_file(hook_path) {
-    return ()
-  }
-  let code = @process.run(hook_path, [], inherit_env=true, cwd=root) catch {
-    _ => 1
-  }
+  let code = run_hook(rfs, root, git_dir, "postclone", root)
   if code != 0 {
     raise @bitcore.GitError::InvalidObject("postclone hook failed")
   }
