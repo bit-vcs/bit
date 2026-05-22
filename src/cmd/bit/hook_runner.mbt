@@ -58,12 +58,34 @@ fn is_truthy_config_value(value : String) -> Bool {
 }
 
 ///|
-/// Execute one hook command. The command is taken as a literal
-/// program path (no shell interpretation; this matches upstream's
-/// behavior when `hook.<name>.command` is a path rather than a shell
-/// snippet — bit currently doesn't support shell-form commands).
-async fn run_hook_command(command : String, cwd : String) -> Int {
-  @process.run(command, [], inherit_env=true, cwd~) catch { _ => 1 }
+/// Live-streaming execution: stdout/stderr go straight to the
+/// caller's terminal. Used for sequential hook execution and the
+/// single legacy-file path.
+async fn run_hook_command_streaming(
+  command : String,
+  args : Array[String],
+  cwd : String,
+) -> Int {
+  @process.run(command, args, inherit_env=true, cwd~) catch { _ => 1 }
+}
+
+///|
+/// Buffered execution: stdout and stderr are merged and captured.
+/// Used for parallel hook execution so concurrent children don't
+/// interleave their output on the terminal — the captured bytes
+/// are replayed in command-list order after the batch completes.
+async fn run_hook_command_buffered(
+  command : String,
+  args : Array[String],
+  cwd : String,
+) -> (Int, Bytes) {
+  let result = try? @process.collect_output_merged(
+    command, args, inherit_env=true, cwd~,
+  )
+  match result {
+    Ok((code, data)) => (code, data.binary())
+    Err(_) => (1, b"")
+  }
 }
 
 ///|
@@ -73,8 +95,16 @@ async fn run_hook_command(command : String, cwd : String) -> Int {
 ///
 /// Sequential execution when `parallel = false`. When `true`, every
 /// command is spawned concurrently via `@async.with_task_group`; the
-/// caller blocks until they all return. Output ordering of mixed
-/// commands isn't defined in parallel mode — same as upstream.
+/// caller blocks until they all return. In parallel mode each child's
+/// stdout+stderr is captured to a buffer (via
+/// `@process.collect_output_merged`) and replayed in command-list
+/// order after the batch — preventing interleaved output on the
+/// terminal. Mirrors upstream git 2.55's buffered parallel hook
+/// behavior.
+///
+/// `args` is passed verbatim to every command, matching upstream:
+/// e.g. `pre-push` hooks receive `<remote-name> <remote-url>`
+/// positionally and all configured commands see the same args.
 ///
 /// If `hook.<name>.command` is set, the legacy file at
 /// `<hooks_dir>/<name>` is NOT additionally run (upstream prefers the
@@ -86,6 +116,7 @@ async fn run_hook(
   git_dir : String,
   hook_name : String,
   cwd : String,
+  args~ : Array[String] = [],
 ) -> Int {
   let cfg = read_hook_config(rfs, git_dir, hook_name)
   if cfg.commands.length() == 0 {
@@ -94,28 +125,36 @@ async fn run_hook(
     if !rfs.is_file(hook_path) {
       return 0
     }
-    return run_hook_command(hook_path, cwd)
+    return run_hook_command_streaming(hook_path, args, cwd)
   }
   if !cfg.parallel {
     for command in cfg.commands {
-      let code = run_hook_command(command, cwd)
+      let code = run_hook_command_streaming(command, args, cwd)
       if code != 0 {
         return code
       }
     }
     return 0
   }
-  // Parallel: spawn every command in a task group and aggregate the
-  // worst exit code. `with_task_group` blocks until all spawned
-  // tasks finish.
+  // Parallel: spawn every command in a task group with captured
+  // output, then replay each child's bytes in declaration order so
+  // the user still sees a deterministic stream.
   let codes : Array[Int] = Array::make(cfg.commands.length(), 0)
+  let outputs : Array[Bytes] = Array::make(cfg.commands.length(), b"")
   @async.with_task_group(group => {
     for i, command in cfg.commands {
       let _ = group.spawn(() => {
-        codes[i] = run_hook_command(command, cwd)
+        let (code, out) = run_hook_command_buffered(command, args, cwd)
+        codes[i] = code
+        outputs[i] = out
       })
     }
   })
+  for out in outputs {
+    if out.length() > 0 {
+      @stdio.stdout.write(out)
+    }
+  }
   for code in codes {
     if code != 0 {
       return code
