@@ -78,6 +78,21 @@ test "bench list_refs_with_ids loose 200 branches + 200 remotes" (b : @bench.T) 
 }
 
 ///|
+test "bench list_refs_with_ids loose 200+200 filtered refs/heads/" (b : @bench.T) {
+  // Filter that excludes refs/remotes — exercises the new
+  // subtree-pruning early exit.
+  let git_dir = bench_refs_root + "/.git"
+  b.bench(fn() {
+    let refs = list_refs_with_ids(
+      bench_loose_large,
+      git_dir,
+      Some("refs/heads/"),
+    )
+    b.keep(refs.length())
+  })
+}
+
+///|
 test "bench list_refs_with_ids packed 50 refs" (b : @bench.T) {
   let git_dir = bench_refs_root + "/.git"
   b.bench(fn() {

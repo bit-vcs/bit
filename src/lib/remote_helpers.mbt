@@ -328,6 +328,56 @@ pub fn read_config_content(
 }
 
 ///|
+/// Read a key from already-decoded config content. Lets the caller
+/// share a single read across multiple key lookups when several
+/// `read_config_value` calls happen in a row against the same file
+/// (see `rev_parse`'s object-format cluster).
+pub fn read_config_value_from_content(
+  content_str : String,
+  section : String,
+  name : String,
+) -> String? {
+  if content_str.length() == 0 {
+    return None
+  }
+  let section_lower = section.to_lower()
+  let name_lower = name.to_lower()
+  let mut in_section = false
+  let lines = split_by_newline(content_str)
+  for line in lines {
+    let trimmed = remote_trim_string(line)
+    if trimmed.has_prefix("[") && trimmed.has_suffix("]") {
+      let sec = String::unsafe_substring(
+        trimmed,
+        start=1,
+        end=trimmed.length() - 1,
+      )
+      in_section = sec.to_lower() == section_lower
+    } else if in_section {
+      match trimmed.find("=") {
+        Some(idx) => {
+          let k = remote_trim_string(
+            String::unsafe_substring(trimmed, start=0, end=idx),
+          )
+          let v = remote_trim_string(
+            String::unsafe_substring(
+              trimmed,
+              start=idx + 1,
+              end=trimmed.length(),
+            ),
+          )
+          if k.to_lower() == name_lower {
+            return Some(v)
+          }
+        }
+        None => ()
+      }
+    }
+  }
+  None
+}
+
+///|
 pub fn legacy_remote_exists(
   rfs : &@bit.RepoFileSystem,
   git_dir : String,

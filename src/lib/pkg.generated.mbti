@@ -383,6 +383,8 @@ pub fn read_config_content(&@types.RepoFileSystem, String) -> String
 
 pub fn read_config_value(&@types.RepoFileSystem, String, String, String) -> String?
 
+pub fn read_config_value_from_content(String, String, String) -> String?
+
 pub fn read_config_values(&@types.RepoFileSystem, String, String, String) -> Array[String]
 
 pub fn read_core_eol_setting(&@types.RepoFileSystem, String) -> EolAttr

@@ -354,6 +354,51 @@ fn is_reftable_repo(fs : &@bitcore.RepoFileSystem, git_dir : String) -> Bool {
 }
 
 ///|
+/// Bundled lookup for the three "what flavor of repo is this"
+/// fields. Reading them through this helper keeps the config file
+/// open only once instead of three times — the rev-parse output
+/// path used to re-read `<git_dir>/config` per field.
+fn repo_format_info(
+  fs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+) -> (Bool, String, String?) {
+  // (is_reftable, object_format, compat_object_format)
+  let reftable_dir = fs.is_dir(git_dir + "/reftable")
+  let content = @bitlib.read_config_content(fs, git_dir)
+  let is_reftable = reftable_dir ||
+    (
+      @bitlib.read_config_value_from_content(content, "extensions", "refstorage") is
+        Some(v) && v.to_lower() == "reftable"
+    )
+  let object_format = match
+    @bitlib.read_config_value_from_content(
+      content,
+      "extensions",
+      "objectformat",
+    ) {
+    Some(value) => if value.to_lower() == "sha256" { "sha256" } else { "sha1" }
+    None => "sha1"
+  }
+  let compat_object_format = match
+    @bitlib.read_config_value_from_content(
+      content,
+      "extensions",
+      "compatobjectformat",
+    ) {
+    Some(value) => {
+      let normalized = @bitlib.config_strip_quotes(value).to_lower()
+      if normalized == "sha1" || normalized == "sha256" {
+        Some(normalized)
+      } else {
+        None
+      }
+    }
+    None => None
+  }
+  (is_reftable, object_format, compat_object_format)
+}
+
+///|
 fn repo_object_format(
   fs : &@bitcore.RepoFileSystem,
   git_dir : String,

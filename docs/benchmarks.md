@@ -181,3 +181,46 @@ moon bench -p mizchi/bit/diff --target native --release
 moon bench -p mizchi/bit/vfs --target native -f bench_test.mbt --release
 moon bench -p mizchi/bit/pack --target native -f bench_test.mbt --release
 ```
+
+## Targeted fixes after profiling
+
+### `refs.list_refs_with_ids` loose subtree pruning
+
+`collect_loose_ref_ids` used to recurse into every subdir under
+`<git_dir>/refs/` and filter at the file level. Now it skips a
+whole subtree if its name can't intersect `filter_prefix`. The new
+`refs_subtree_intersects_filter` helper checks whether
+`dir + "/"` is a prefix of the filter or vice versa.
+
+| Benchmark                                                  | Before | After  | Δ                      |
+| ---------------------------------------------------------- | ------ | ------ | ---------------------- |
+| list_refs_with_ids loose 200+200 (no filter)               | 731 µs | 817 µs | within noise           |
+| list_refs_with_ids loose 200+200 filtered `refs/heads/`    | —      | 409 µs | **−50% vs unfiltered** |
+
+The filtered case now does ~half the I/O — the `refs/remotes/`
+subtree is skipped entirely.
+
+### `read_config_value_from_content` for shared parses
+
+`is_reftable_repo`, `repo_object_format`, `repo_compat_object_format`
+used to each open and parse `<git_dir>/config` independently. The
+rev-parse output-format path called the last two back-to-back so
+the file was read twice.
+
+New `@bitlib.read_config_value_from_content(content, section, name)`
+lets the caller share a single content read across multiple key
+lookups. `cmd/bit/helpers.mbt::repo_format_info` bundles all three
+fields into one read, used by `rev_parse_resolve_output_oid_hex`
+and `rev_parse_output_object_format_supported`.
+
+| Benchmark                                                                   | Result  |
+| --------------------------------------------------------------------------- | ------- |
+| read_config_value 4 keys on 100-remote config (4 reads + 4 parses)          | 234 µs  |
+| read_config_value_from_content 4 keys on 100-remote (1 read + 4 parses)     | 216 µs  |
+
+TestFs `read_file` is cheap so the saving on benchmarks is modest
+(~8%). The win is bigger on osfs where each re-read is a syscall.
+An earlier attempt at a process-singleton cache landed but was
+reverted because invalidation through the `FileSystem` trait
+can't be made safe (`TestFs::write_string` would have to
+participate, and `io` can't depend on `lib`).

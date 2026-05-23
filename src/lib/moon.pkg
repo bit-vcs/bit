@@ -115,6 +115,7 @@ options(
     },
   },
   targets: {
+    "bench_config_test.mbt": [ "native" ],
     "bench_index_diff_test.mbt": [ "native" ],
     "bench_ops_test.mbt": [ "native" ],
     "bench_status_test.mbt": [ "native" ],

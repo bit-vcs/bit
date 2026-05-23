@@ -59,6 +59,8 @@ pub fn sha256_array_prefix(Array[Byte], Int) -> @object.ObjectId
 
 pub fn sha256_prefix(Bytes, Int) -> @object.ObjectId
 
+pub fn verify_tree_entry_name(String) -> Unit raise @object.GitError
+
 pub fn write_git_metadata(@repo.ObjectStore, @object.ObjectId, String, String, &@types.FileSystem, String) -> Unit raise @object.GitError
 
 // Errors

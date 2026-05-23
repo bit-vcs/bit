@@ -104,7 +104,7 @@ pub struct SubdirRepo {
   subdir_path : String
   current_commit : @object.ObjectId?
   subdir_tree : @object.ObjectId?
-  bitfs : @fs.Fs
+  bitfs : @vfs.Fs
   config : SubdirConfig
 }
 pub fn SubdirRepo::base_commit(Self) -> @object.ObjectId?
@@ -113,7 +113,7 @@ pub fn SubdirRepo::diff(Self) -> Array[DiffEntry]
 pub fn SubdirRepo::from_branch(&@types.RepoFileSystem, String, String, String, config? : SubdirConfig) -> Self raise SubdirError
 pub fn SubdirRepo::from_commit(&@types.RepoFileSystem, String, @object.ObjectId, String, config? : SubdirConfig) -> Self raise SubdirError
 pub fn SubdirRepo::from_head(&@types.RepoFileSystem, String, String, config? : SubdirConfig) -> Self raise SubdirError
-pub fn SubdirRepo::fs(Self) -> @fs.Fs
+pub fn SubdirRepo::fs(Self) -> @vfs.Fs
 pub fn SubdirRepo::is_dirty(Self) -> Bool
 pub fn SubdirRepo::load_workdir(Self, &@types.RepoFileSystem, String) -> Unit
 pub fn SubdirRepo::log(Self, &@types.RepoFileSystem, max_count? : Int) -> Array[SubdirCommit] raise SubdirError
