@@ -1,3 +1,13 @@
 import {
   "moonbitlang/core/encoding/utf8",
 }
+
+import {
+  "moonbitlang/core/bench" @bench,
+} for "test"
+
+options(
+  targets: {
+    "bench_test.mbt": [ "native" ],
+  },
+)

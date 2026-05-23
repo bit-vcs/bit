@@ -62,6 +62,91 @@ refactor + zlib 0.4.5 + security batch.
 | encode_type_and_size            |   9.83 µs  |
 | decode_type_and_size_at         |    10 µs   |
 
+## Core package coverage (newly added)
+
+The packages below previously had no benchmarks. Numbers are
+baselines captured at the same time as the comparison above —
+nothing to compare to yet.
+
+### `hash/bench_test.mbt`
+
+| Benchmark             | Final      | Throughput   |
+| --------------------- | ---------- | ------------ |
+| sha1_raw 64 bytes     |   667 ns   |              |
+| sha1_raw 1 KiB        |  5.14 µs   |  ~200 MB/s   |
+| sha1_raw 8 KiB        |  38.5 µs   |  ~213 MB/s   |
+| sha1_raw 64 KiB       |   312 µs   |  ~210 MB/s   |
+| sha256_raw 1 KiB      |  7.66 µs   |  ~134 MB/s   |
+| sha256_raw 8 KiB      |  56.6 µs   |  ~145 MB/s   |
+
+SHA-1 sustains ~210 MB/s once past the small-input overhead;
+SHA-256 is ~30% slower per byte.
+
+### `object/bench_test.mbt`
+
+| Benchmark                      | Final      |
+| ------------------------------ | ---------- |
+| hash_blob 1 KiB                |  5.32 µs   |
+| hash_blob 64 KiB               |   302 µs   |
+| create_blob 1 KiB              |   319 µs   |
+| create_blob 64 KiB             |  2.56 ms   |
+| serialize_tree 10 entries      |  6.56 µs   |
+| serialize_tree 100 entries     |  64.6 µs   |
+| serialize_tree 1000 entries    |   644 µs   |
+| create_tree 100 entries        |   325 µs   |
+| create_tree 1000 entries       |  2.95 ms   |
+
+Notable: `create_blob 1 KiB` (319 µs) is ~60× slower than
+`hash_blob 1 KiB` (5.32 µs) — zlib compression dominates the
+write path. `serialize_tree` is linear (~644 ns / entry).
+
+### `config_parse/bench_test.mbt`
+
+| Benchmark                                      | Final      |
+| ---------------------------------------------- | ---------- |
+| config_lines_from_content small                |  5.30 µs   |
+| config_lines_from_content 100 remotes          |   182 µs   |
+| get_config_value_from_content small            |  9.08 µs   |
+| get_config_value_from_content miss (100 r)     |   249 µs   |
+| get_all_config_values_from_content remote.*    |   256 µs   |
+| parse_section_header_line subsection           |   283 ns   |
+| parse_config_key dotted                        |   378 ns   |
+| parse_bool_keyword_value                       |   172 ns   |
+| config_parse_size_value "1m"                   |   254 ns   |
+
+A miss on a 100-remote config scans the whole file (249 µs); this
+is the worst-case path for first-time key lookup.
+
+### `refs/bench_test.mbt`
+
+| Benchmark                                                  | Final      |
+| ---------------------------------------------------------- | ---------- |
+| list_refs_with_ids loose 20 branches + 20 remotes          |  74.5 µs   |
+| list_refs_with_ids loose 200 branches + 200 remotes        |   731 µs   |
+| list_refs_with_ids packed 50 refs                          |  53.6 µs   |
+| list_refs_with_ids packed 2000 refs                        |  2.24 ms   |
+| list_refs_with_ids packed 2000 filtered by prefix          |  2.41 ms   |
+
+Packed refs are ~2× faster per ref than loose. The prefix-filtered
+variant is *slower* than unfiltered — the filter doesn't
+short-circuit early, just discards non-matching entries after
+parsing. Worth revisiting.
+
+### `diff_core/bench_test.mbt`
+
+| Benchmark                           | Final      |
+| ----------------------------------- | ---------- |
+| split_lines 100 KiB                 |   366 µs   |
+| count_lines 100 KiB                 |  74.0 µs   |
+| myers_diff identical 100 lines      |  2.82 µs   |
+| myers_diff 10pct changed 100 lines  |  10.2 µs   |
+| myers_diff identical 1000 lines     |  24.3 µs   |
+| myers_diff 10pct changed 1000 lines |   750 µs   |
+
+`myers_diff` is O(N) for identical input but climbs to O(ND) when
+edits exist — at 1000 lines × 10% changed, the wall jumps 31× over
+the all-equal case.
+
 ## Drivers of the improvement
 
 Improvements span every package; no single change dominates. Best
