@@ -940,16 +940,23 @@ fn validate_submodule_entry(
   path : String,
   url : String,
 ) -> Bool {
-  // name
+  // name: reject empty, traversal patterns, and dangerous chars.
+  // Slash IS allowed (git permits names like "nested/sub" to match
+  // the path) — we only reject names that begin with "." (matches
+  // git's prohibition on .git, .., and dot-prefixed names) and
+  // names with "/." or "/../" / trailing "/.."  traversal sequences.
   if name.length() == 0 {
     return false
   }
-  if name == ".." || name.contains("/") {
+  if name == ".." || name.has_prefix(".") {
+    return false
+  }
+  if name.contains("/.") || name.has_suffix("/..") {
     return false
   }
   for i in 0..<name.length() {
     let c = name.unsafe_get(i).to_int()
-    if c == 0 || c == 0x0A || c == 0x0D {
+    if c == 0 || c == 0x0A || c == 0x0D || c == 0x5C { // \0 \n \r \\
       return false
     }
   }

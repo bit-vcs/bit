@@ -10,10 +10,12 @@ test "submodule: validate_submodule_entry accepts ordinary entries" {
   assert_true(
     validate_submodule_entry("plugin", "plugins/a", "git@example.com:x/y"),
   )
-  // `/` in the name is rejected — git treats it as a single
-  // component, and a `/` inside the name lets attackers smuggle
-  // path-like values past trivial path validators.
-  assert_true(!validate_submodule_entry("a/b", "x", "https://x/r"))
+  // Slash IS allowed in the name (matches the path), as git does.
+  assert_true(validate_submodule_entry("a/b/c", "a/b/c", "https://x/r"))
+  // But traversal patterns inside the name are still rejected.
+  assert_true(!validate_submodule_entry("a/./b", "x", "https://x/r"))
+  assert_true(!validate_submodule_entry("a/../b", "x", "https://x/r"))
+  assert_true(!validate_submodule_entry("a/..", "x", "https://x/r"))
 }
 
 ///|
