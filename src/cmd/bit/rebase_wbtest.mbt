@@ -113,8 +113,18 @@ async test "rebase: -S stores gpgsig header on rewritten commit" {
   @sys.unset_env_var("GIT_WORK_TREE")
   @sys.set_env_var("GIT_SHIM_PWD", repo_dir)
 
-  handle_rebase(["-S", "main"]) catch {
-    err => fail("handle_rebase failed: \{err}")
+  // handle_rebase writes "Successfully rebased and updated refs. [...]"
+  // to stdout via print_line. In `moon test` that bleeds into the
+  // runner's JSON summary stream and breaks the parser, so redirect
+  // fd 1 to /dev/null for the duration of the call.
+  bench_stdout_suppress()
+  let rebase_result : Result[Unit, Error] = try? handle_rebase([
+    "-S", "main",
+  ])
+  bench_stdout_restore()
+  match rebase_result {
+    Ok(_) => ()
+    Err(err) => fail("handle_rebase failed: \{err}")
   }
 
   let git_dir = repo_dir + "/.git"
