@@ -55,10 +55,18 @@ jobs:
           moon test --target native --no-parallelize -j 1 2>&1 | tee /tmp/native_test.log
           rc=${PIPESTATUS[0]}
           if [ "$rc" -ne 0 ]; then
-            echo "::group::Native test failures"
-            grep -E "^\[mizchi/bit\] test .* failed:" /tmp/native_test.log | head -40
-            echo "::endgroup::"
-            grep -E "^Total tests:" /tmp/native_test.log | tail -5
+            {
+              echo "## Native test failures"
+              echo ""
+              echo '```'
+              grep -E "^\[mizchi/bit\] test .* failed:" /tmp/native_test.log | head -40
+              grep -E "^Total tests:" /tmp/native_test.log | tail -5
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::native tests failed (see step summary at the top of the run page)"
+            grep -E "^\[mizchi/bit\] test .* failed:" /tmp/native_test.log | head -40 | while IFS= read -r line; do
+              echo "::error::$line"
+            done
           fi
           exit $rc
 
