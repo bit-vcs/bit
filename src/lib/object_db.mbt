@@ -133,6 +133,23 @@ fn pack_cache_limit_from_env() -> Int {
 }
 
 ///|
+/// Hard cap on the inflated size of a single loose object. Mirrors
+/// `pack.MAX_PACK_OBJECT_SIZE`. Unlike pack entries, loose objects
+/// expose their size only *inside* the deflate stream, so the check
+/// runs after `zlib_decompress` — this still bounds the downstream
+/// damage even if the initial allocation completed.
+const MAX_LOOSE_OBJECT_SIZE : Int = 0x7fff_ffff
+
+///|
+fn check_loose_object_size(bytes : Bytes) -> Unit raise @bit.GitError {
+  if bytes.length() > MAX_LOOSE_OBJECT_SIZE {
+    raise @bit.GitError::InvalidObject(
+      "Loose object too large: \{bytes.length()} (max \{MAX_LOOSE_OBJECT_SIZE})",
+    )
+  }
+}
+
+///|
 fn touch_pack_cache(db : ObjectDb, pack_path : String) -> Unit {
   if db.pack_cache_order.search(pack_path) is Some(idx) {
     ignore(db.pack_cache_order.remove(idx))
@@ -486,9 +503,10 @@ fn get_loose_by_hex(
   match loose_path {
     Some(path) => {
       let compressed = fs.read_file(path)
-      let raw = @zlib.zlib_decompress(compressed) catch {
+      let raw = @zlib.zlib_decompress(compressed, max_size=MAX_LOOSE_OBJECT_SIZE) catch {
         e => raise @bit.GitError::InvalidObject("Zlib error: \{e}")
       }
+      check_loose_object_size(raw)
       let obj = parse_loose_object(raw)
       if !db.skip_verify {
         let verify_algo : @object.HashAlgorithm = if hex.length() == 64 {
@@ -701,9 +719,10 @@ fn get_by_hex(
   match loose_path {
     Some(path) => {
       let compressed = fs.read_file(path)
-      let raw = @zlib.zlib_decompress(compressed) catch {
+      let raw = @zlib.zlib_decompress(compressed, max_size=MAX_LOOSE_OBJECT_SIZE) catch {
         e => raise @bit.GitError::InvalidObject("Zlib error: \{e}")
       }
+      check_loose_object_size(raw)
       let obj = parse_loose_object(raw)
       if !db.skip_verify {
         let verify_algo : @object.HashAlgorithm = if hex.length() == 64 {
@@ -822,10 +841,9 @@ fn load_loose_objects(
 ) -> Array[@bit.PackObject] raise @bit.GitError {
   let result : Array[@bit.PackObject] = []
   let paths = collect_loose_paths(fs, objects_dir)
-  for item in paths.to_array() {
-    let (_, path) = item
+  for path in paths.values() {
     let compressed = fs.read_file(path)
-    let raw = @zlib.zlib_decompress(compressed) catch {
+    let raw = @zlib.zlib_decompress(compressed, max_size=MAX_LOOSE_OBJECT_SIZE) catch {
       e => raise @bit.GitError::InvalidObject("Zlib error: \{e}")
     }
     let obj = parse_loose_object(raw)
@@ -1045,10 +1063,19 @@ fn read_pack_object_at(
   let (type_id, size, next_offset) = @pack.decode_type_and_size_at(
     data, offset_i,
   )
+  if size < 0 || size > MAX_LOOSE_OBJECT_SIZE {
+    raise @bit.GitError::PackfileError(
+      "Pack object size out of range: \{size}",
+    )
+  }
   match type_id {
     1 | 2 | 3 | 4 => {
       let obj_type = @pack.packfile_type_to_object_type(type_id)
-      let (content, _after) = @zlib.zlib_decompress_at(data, next_offset) catch {
+      let (content, _after) = @zlib.zlib_decompress_at(
+        data,
+        next_offset,
+        max_size=size,
+      ) catch {
         e => raise @bit.GitError::PackfileError("Zlib error: \{e}")
       }
       if content.length() != size {
@@ -1067,7 +1094,11 @@ fn read_pack_object_at(
       if base_offset < 0 {
         raise @bit.GitError::PackfileError("Invalid OFS_DELTA base offset")
       }
-      let (delta, _after) = @zlib.zlib_decompress_at(data, after_ref) catch {
+      let (delta, _after) = @zlib.zlib_decompress_at(
+        data,
+        after_ref,
+        max_size=size,
+      ) catch {
         e => raise @bit.GitError::PackfileError("Zlib error: \{e}")
       }
       if delta.length() != size {
@@ -1099,7 +1130,11 @@ fn read_pack_object_at(
     }
     7 => {
       let (base_hex, after_ref) = @pack.read_ref_delta_id(data, next_offset)
-      let (delta, _after) = @zlib.zlib_decompress_at(data, after_ref) catch {
+      let (delta, _after) = @zlib.zlib_decompress_at(
+        data,
+        after_ref,
+        max_size=size,
+      ) catch {
         e => raise @bit.GitError::PackfileError("Zlib error: \{e}")
       }
       if delta.length() != size {

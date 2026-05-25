@@ -553,20 +553,16 @@ fn three_way_merge(
   let merged : Map[String, FileEntry] = {}
   let conflicts : Array[String] = []
   let all_paths : Map[String, Bool] = {}
-  for item in base.to_array() {
-    let (path, _) = item
+  for path in base.keys() {
     all_paths[path] = true
   }
-  for item in ours.to_array() {
-    let (path, _) = item
+  for path in ours.keys() {
     all_paths[path] = true
   }
-  for item in theirs.to_array() {
-    let (path, _) = item
+  for path in theirs.keys() {
     all_paths[path] = true
   }
-  for item in all_paths.to_array() {
-    let (path, _) = item
+  for path in all_paths.keys() {
     let b = base.get(path)
     let o = ours.get(path)
     let t = theirs.get(path)
@@ -607,8 +603,7 @@ fn create_tree_from_files(
   files : Map[String, FileEntry],
 ) -> @bit.ObjectId raise @bit.GitError {
   let tree_map : Map[String, Array[(String, FileEntry)]] = {}
-  for item in files.to_array() {
-    let (path, entry) = item
+  for path, entry in files {
     let slash = path.rev_find("/")
     let (dir, name) = match slash {
       None => ("", path)
@@ -638,12 +633,11 @@ fn create_tree_from_files(
     let entries_arr = tree_map.get(dir)
     guard entries_arr is Some(file_entries) else { continue }
     let tree_entries : Array[@bit.TreeEntry] = []
-    for item in file_entries {
-      let (name, entry) = item
+    for pair in file_entries {
+      let (name, entry) = pair
       tree_entries.push(@bit.TreeEntry::new(entry.mode, name, entry.id))
     }
-    for item in tree_ids.to_array() {
-      let (subdir, id) = item
+    for subdir, id in tree_ids {
       let parent_dir = get_parent_dir(subdir)
       if parent_dir == dir {
         let name = get_base_name(subdir)

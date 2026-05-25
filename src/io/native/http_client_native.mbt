@@ -26,8 +26,7 @@ async fn apply_auth_header(
     None => headers
     Some(value) => {
       let out : Map[String, String] = {}
-      for item in headers.to_array() {
-        let (k, v) = item
+      for k, v in headers {
         out[k] = v
       }
       out["Authorization"] = value

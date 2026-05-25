@@ -289,8 +289,7 @@ pub fn diff_index(
   let head_entries = diff_read_head_entries(fs, git_dir)
   let db = @bitlib.ObjectDb::load_lazy(fs, git_dir)
   let out : Array[DiffFile] = []
-  for item in index_map.to_array() {
-    let (path, entry) = item
+  for path, entry in index_map {
     match head_entries.get(path) {
       None => {
         let new = diff_content_for_entry(db, fs, entry.id, entry.mode)
@@ -330,8 +329,7 @@ pub fn diff_index(
         }
     }
   }
-  for item in head_entries.to_array() {
-    let (path, h) = item
+  for path, h in head_entries {
     if !index_map.contains(path) {
       let old = diff_content_for_entry(db, fs, h.id, h.mode)
       // Skip if blob not found (e.g., submodule)

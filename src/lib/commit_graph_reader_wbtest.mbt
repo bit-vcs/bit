@@ -17,9 +17,9 @@ test "CommitGraphFile::find_commit returns -1 for empty graph" {
   let cg = CommitGraphFile::load(fs, "/repo/.git")
   assert_true(cg is Some(_))
   let g = cg.unwrap()
-  assert_eq(g.num_commits, 0)
+  @test.assert_eq(g.num_commits, 0)
   let id = @bit.ObjectId::from_hex("da39a3ee5e6b4b0d3255bfef95601890afd80709")
-  assert_eq(g.find_commit(id), -1)
+  @test.assert_eq(g.find_commit(id), -1)
 }
 
 ///|
@@ -33,13 +33,13 @@ test "CommitGraphFile with one commit can find and read it" {
   fs.mkdir_p("/repo/.git/objects/info")
   fs.write_file("/repo/.git/objects/info/commit-graph", graph)
   let g = CommitGraphFile::load(fs, "/repo/.git").unwrap()
-  assert_eq(g.num_commits, 1)
+  @test.assert_eq(g.num_commits, 1)
   let pos = g.find_commit(oid)
   assert_true(pos >= 0)
   let (read_tree, parents, timestamp) = g.read_commit(pos)
-  assert_eq(read_tree, tree)
-  assert_eq(parents.length(), 0)
-  assert_eq(timestamp, 1700000000L)
+  @test.assert_eq(read_tree, tree)
+  @test.assert_eq(parents.length(), 0)
+  @test.assert_eq(timestamp, 1700000000L)
 }
 
 ///|
@@ -59,13 +59,13 @@ test "CommitGraphFile with parent chain" {
   fs.mkdir_p("/repo/.git/objects/info")
   fs.write_file("/repo/.git/objects/info/commit-graph", graph)
   let g = CommitGraphFile::load(fs, "/repo/.git").unwrap()
-  assert_eq(g.num_commits, 2)
+  @test.assert_eq(g.num_commits, 2)
   let pos_b = g.find_commit(oid_b)
   assert_true(pos_b >= 0)
   let (_, parents, ts) = g.read_commit(pos_b)
-  assert_eq(parents.length(), 1)
-  assert_eq(parents[0], oid_a)
-  assert_eq(ts, 200L)
+  @test.assert_eq(parents.length(), 1)
+  @test.assert_eq(parents[0], oid_a)
+  @test.assert_eq(ts, 200L)
 }
 
 ///|
@@ -81,7 +81,7 @@ test "synthesize_commit_object produces parseable commit" {
   let g = CommitGraphFile::load(fs, "/repo/.git").unwrap()
   let pos = g.find_commit(oid)
   let obj = g.synthesize_commit_object(pos, oid)
-  assert_eq(obj.obj_type, @bit.ObjectType::Commit)
+  @test.assert_eq(obj.obj_type, @bit.ObjectType::Commit)
   let text = @utf8.decode_lossy(obj.data[:])
   assert_true(text.contains("tree bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"))
   assert_true(text.contains("1700000000"))
@@ -105,9 +105,9 @@ test "ObjectDb exposes commit-graph metadata without reading commit object" {
   fs.write_file("/repo/.git/objects/info/commit-graph", graph)
   let db = ObjectDb::load(fs, "/repo/.git")
   let meta = db.get_commit_graph_commit(oid_b).unwrap()
-  assert_eq(meta.tree, tree)
-  assert_eq(meta.parents, [oid_a])
-  assert_eq(meta.committer_timestamp, 200L)
+  @test.assert_eq(meta.tree, tree)
+  @test.assert_eq(meta.parents, [oid_a])
+  @test.assert_eq(meta.committer_timestamp, 200L)
 }
 
 // -- Test helpers --

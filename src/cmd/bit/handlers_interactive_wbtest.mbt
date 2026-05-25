@@ -16,7 +16,7 @@ async test "interactive: add patch default runner rejects with error" {
   })
   // With custom runner, it should pass through
   run_add_interactive(["-p", "README.md"], runner~)
-  assert_eq(runner_called.length(), 1)
+  @test.assert_eq(runner_called.length(), 1)
 }
 
 ///|
@@ -34,11 +34,11 @@ async test "interactive: add patch default runner delegates to real git argv" {
       0
     }),
   )
-  assert_eq(code, 0)
-  assert_eq(seen_programs.length(), 1)
-  assert_eq(seen_programs[0], resolve_real_git_for_dispatch())
-  assert_eq(seen_argvs.length(), 1)
-  assert_eq(seen_argvs[0], ["add", "-p", "README.md"])
+  @test.assert_eq(code, 0)
+  @test.assert_eq(seen_programs.length(), 1)
+  @test.assert_eq(seen_programs[0], resolve_real_git_for_dispatch())
+  @test.assert_eq(seen_argvs.length(), 1)
+  @test.assert_eq(seen_argvs[0], ["add", "-p", "README.md"])
 }
 
 ///|
@@ -63,8 +63,8 @@ async test "interactive: rebase todo editor callback is invoked" {
   })
   let edited = edit_rebase_todo("/tmp/git-rebase-todo", editor~)
   assert_true(edited)
-  assert_eq(edited_paths.length(), 1)
-  assert_eq(edited_paths[0], "/tmp/git-rebase-todo")
+  @test.assert_eq(edited_paths.length(), 1)
+  @test.assert_eq(edited_paths[0], "/tmp/git-rebase-todo")
 }
 
 ///|
@@ -74,7 +74,7 @@ test "interactive: resolve commit editor precedence" {
   @sys.set_env_var("GIT_EDITOR", "hx")
   let selected = resolve_commit_editor()
   match selected {
-    Some(cmd) => assert_eq(cmd, "hx")
+    Some(cmd) => @test.assert_eq(cmd, "hx")
     None => fail("expected editor")
   }
   @sys.unset_env_var("GIT_EDITOR")
@@ -93,7 +93,7 @@ test "interactive: normalize commit edit buffer removes comments" {
     #|# end
   let msg = normalize_commit_edit_buffer(raw)
   match msg {
-    Some(text) => assert_eq(text, "feat: add x\n\nbody line")
+    Some(text) => @test.assert_eq(text, "feat: add x\n\nbody line")
     None => fail("expected commit message")
   }
 }
@@ -112,11 +112,11 @@ async test "interactive: commit message editor callback is invoked" {
   })
   let message = read_commit_message_from_editor(fs, root, editor~)
   match message {
-    Some(text) => assert_eq(text, "feat: from editor\n\nbody")
+    Some(text) => @test.assert_eq(text, "feat: from editor\n\nbody")
     None => fail("expected commit message")
   }
-  assert_eq(edited_paths.length(), 1)
-  assert_eq(edited_paths[0], root + "/.git/COMMIT_EDITMSG")
+  @test.assert_eq(edited_paths.length(), 1)
+  @test.assert_eq(edited_paths[0], root + "/.git/COMMIT_EDITMSG")
   fs.remove_file(root + "/.git/COMMIT_EDITMSG") catch {
     _ => ()
   }
@@ -145,7 +145,7 @@ async test "interactive: allow-empty-message keeps blank editor result" {
     editor~,
   )
   match message {
-    Some(text) => assert_eq(text, "")
+    Some(text) => @test.assert_eq(text, "")
     None => fail("expected empty commit message")
   }
   fs.remove_file(root + "/.git/COMMIT_EDITMSG") catch {

@@ -6,6 +6,7 @@ import {
 
 import {
   "mizchi/bit/osfs" @osfs,
+  "moonbitlang/core/test" @test,
 } for "test"
 
 warnings = "-29"

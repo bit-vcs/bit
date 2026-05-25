@@ -1168,11 +1168,13 @@ fn rev_parse_resolve_output_oid_hex(
     return oid_hex
   }
   let requested_format = @bitlib.config_strip_quotes(raw_requested_format).to_lower()
-  let storage_format = repo_object_format(fs, git_dir)
+  // One config read instead of two — `storage` and `compat` come from
+  // the same file.
+  let (_, storage_format, compat_object_format) = repo_format_info(fs, git_dir)
   if requested_format == storage_format {
     return oid_hex
   }
-  match repo_compat_object_format(fs, git_dir) {
+  match compat_object_format {
     Some(compat_format) if compat_format == requested_format =>
       match rev_parse_lookup_loose_object_idx(fs, git_dir, oid_hex) {
         Some(mapped) => mapped
@@ -1191,11 +1193,11 @@ fn rev_parse_output_object_format_supported(
   if requested_format.length() == 0 {
     return false
   }
-  let storage_format = repo_object_format(fs, git_dir)
+  let (_, storage_format, compat_object_format) = repo_format_info(fs, git_dir)
   if requested_format == storage_format {
     return true
   }
-  match repo_compat_object_format(fs, git_dir) {
+  match compat_object_format {
     Some(compat_format) => compat_format == requested_format
     None => false
   }

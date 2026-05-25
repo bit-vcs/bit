@@ -202,17 +202,14 @@ fn merge_notes_trees_store(
     remote_map[entry.name] = entry.id
   }
   let keys : Map[String, Bool] = {}
-  for item in local_map.to_array() {
-    let (key, _) = item
+  for key in local_map.keys() {
     keys[key] = true
   }
-  for item in remote_map.to_array() {
-    let (key, _) = item
+  for key in remote_map.keys() {
     keys[key] = true
   }
   let merged_entries : Array[@bit.TreeEntry] = []
-  for item in keys.to_array() {
-    let (key, _) = item
+  for key in keys.keys() {
     match (local_map.get(key), remote_map.get(key)) {
       (Some(lid), Some(rid)) =>
         if lid == rid {

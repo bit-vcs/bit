@@ -349,19 +349,13 @@ fn rebase_diff_maps(
 ) -> Array[Change] {
   let changes : Array[Change] = []
   let paths : Map[String, Bool] = {}
-  for item in parent_map.to_array() {
-    let (p, _) = item
+  for p in parent_map.keys() {
     paths[p] = true
   }
-  for item in commit_map.to_array() {
-    let (p, _) = item
+  for p in commit_map.keys() {
     paths[p] = true
   }
-  let list : Array[String] = []
-  for item in paths.to_array() {
-    let (p, _) = item
-    list.push(p)
-  }
+  let list = paths.keys().to_array()
   list.sort()
   for path in list {
     match (parent_map.get(path), commit_map.get(path)) {
@@ -429,8 +423,7 @@ fn rebase_write_tree_from_map(
   map : Map[String, TreeEntryInfo],
 ) -> @bit.ObjectId raise @bit.GitError {
   let entries : Array[IndexEntry] = []
-  for item in map.to_array() {
-    let (path, e) = item
+  for path, e in map {
     entries.push({
       path,
       id: e.id,
@@ -499,8 +492,7 @@ fn rebase_write_tree_recursive(
         }
     }
   }
-  for item in dir_map.to_array() {
-    let (dir_name, list) = item
+  for dir_name, list in dir_map {
     let sub_id = rebase_write_tree_recursive(fs, git_dir, list)
     file_entries.push(@bit.TreeEntry::new("040000", dir_name, sub_id))
   }
@@ -539,8 +531,7 @@ fn rebase_write_worktree_except(
   for path in except {
     except_set[path] = true
   }
-  for item in map.to_array() {
-    let (path, info) = item
+  for path, info in map {
     if except_set.contains(path) {
       continue // Skip conflicting files
     }
@@ -581,8 +572,7 @@ fn rebase_map_to_index(
   map : Map[String, TreeEntryInfo],
 ) -> Array[IndexEntry] raise @bit.GitError {
   let entries : Array[IndexEntry] = []
-  for item in map.to_array() {
-    let (path, e) = item
+  for path, e in map {
     if is_gitlink_mode_int(e.mode) {
       entries.push({
         path,

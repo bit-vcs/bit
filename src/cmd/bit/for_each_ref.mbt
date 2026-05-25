@@ -600,9 +600,10 @@ async fn for_each_ref_collect_refs_safe(
       }
     }
   }
-  let result : Array[(String, @bitcore.ObjectId)] = []
-  for item in out.to_array() {
-    let (name, id) = item
+  let result : Array[(String, @bitcore.ObjectId)] = Array::new(
+    capacity=out.length(),
+  )
+  for name, id in out {
     result.push((name, id))
   }
   result.sort_by(fn(a, b) { String::compare(a.0, b.0) })

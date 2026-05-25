@@ -68,10 +68,10 @@ async test "upload-pack http: info-refs accepts scp-style ssh remote" {
       (@bit.HttpResponse::new(200), @utf8.encode("ok"))
     },
   )
-  assert_eq(
+  @test.assert_eq(
     observed_url, "https://github.com/mizchi/bit-vcs/info/refs?service=git-upload-pack",
   )
-  assert_eq(result, @utf8.encode("ok"))
+  @test.assert_eq(result, @utf8.encode("ok"))
 }
 
 ///|
@@ -127,10 +127,10 @@ async test "upload-pack http: fetch-pack works with injected transport" {
   assert_true(
     store.contains(@bit.ObjectId::from_hex(upload_pack_http_fixture_commit)),
   )
-  assert_eq(get_calls, [
+  @test.assert_eq(get_calls, [
     "https://github.com/user/repo/info/refs?service=git-upload-pack",
   ])
-  assert_eq(post_calls, [
+  @test.assert_eq(post_calls, [
     "https://github.com/user/repo/git-upload-pack", "https://github.com/user/repo/git-upload-pack",
   ])
 }
@@ -182,9 +182,9 @@ async test "upload-pack http: clone-to-fs materializes repo with injected transp
     },
   )
   assert_true(refs.length() > 0)
-  assert_eq(fs.read_string("/repo/hello.txt"), "hello\n")
-  assert_eq(fs.read_string("/repo/.git/HEAD"), "ref: refs/heads/main\n")
-  assert_eq(
+  @test.assert_eq(fs.read_string("/repo/hello.txt"), "hello\n")
+  @test.assert_eq(fs.read_string("/repo/.git/HEAD"), "ref: refs/heads/main\n")
+  @test.assert_eq(
     fs.read_string("/repo/.git/refs/heads/main"),
     upload_pack_http_fixture_commit + "\n",
   )

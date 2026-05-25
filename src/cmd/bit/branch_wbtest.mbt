@@ -8,7 +8,7 @@ test "branch: format columns row-major" {
   let expected = [
     "  a/b/c   bam     foo     l     * main    n       o/p     r", "  abc     bar     j/k     m/m     mb      o/o     q       topic",
   ]
-  assert_eq(lines, expected)
+  @test.assert_eq(lines, expected)
 }
 
 ///|
@@ -19,10 +19,10 @@ test "branch: format columns falls back for long branch names" {
     "  mb", "  n", "  o/o", "  o/p", "  q", "  r", "  topic", long,
   ]
   let lines = branch_format_columns(items, 80)
-  assert_eq(lines.length(), items.length())
-  assert_eq(lines[0], "  a/b/c")
-  assert_eq(lines[8], "* main")
-  assert_eq(lines.last().unwrap_or(""), long)
+  @test.assert_eq(lines.length(), items.length())
+  @test.assert_eq(lines[0], "  a/b/c")
+  @test.assert_eq(lines[8], "* main")
+  @test.assert_eq(lines.last().unwrap_or(""), long)
 }
 
 ///|

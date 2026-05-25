@@ -276,8 +276,7 @@ fn tree_id_from_entries(entries : Array[@bitlib.IndexEntry]) -> @bit.ObjectId {
         }
     }
   }
-  for item in dir_map.to_array() {
-    let (dir_name, list) = item
+  for dir_name, list in dir_map {
     let sub_id = tree_id_from_entries(list)
     file_entries.push(@bit.TreeEntry::new("40000", dir_name, sub_id))
   }

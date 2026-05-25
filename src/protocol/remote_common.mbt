@@ -116,7 +116,7 @@ pub fn parse_receive_pack_response(
           band1_bytes.push(b)
         }
       } else if channel == 3 {
-        let msg = remote_bytes_to_string(content)
+        let msg = remote_bytes_to_string(sanitize_sideband_text(content))
           .trim(chars=" \n\r\t")
           .to_owned()
         if msg.length() > 0 {
@@ -183,6 +183,59 @@ pub fn parse_sideband(data : Bytes) -> (Int, Bytes) {
     content.push(data[i])
   }
   (channel, remote_array_to_bytes(content))
+}
+
+///|
+/// Strip terminal control sequences from sideband payload before it
+/// reaches the user's terminal. Mirrors git 2.55's
+/// `sideband.allowControlCharacters=color` default: line feeds, tabs
+/// and ANSI color (CSI ... m) pass through; every other C0/C1 byte
+/// and every non-color CSI sequence is replaced with `?`.
+///
+/// A hostile remote can otherwise push CSI sequences via band 2
+/// (progress) or band 3 (error). Bit's band 3 handling turns the
+/// payload into a `GitError` message that flows to stderr, so an
+/// attacker could clear the screen, hide their output, or fake a
+/// password prompt.
+pub fn sanitize_sideband_text(data : Bytes) -> Bytes {
+  let out : Array[Byte] = []
+  let mut i = 0
+  while i < data.length() {
+    let b = data[i].to_int()
+    if b == 0x1B && i + 1 < data.length() && data[i + 1].to_int() == 0x5B {
+      // CSI: ESC '[' params final.
+      let mut j = i + 2
+      while j < data.length() {
+        let c = data[j].to_int()
+        // Parameter / intermediate bytes: 0x20–0x3F.
+        if c >= 0x20 && c < 0x40 {
+          j = j + 1
+          continue
+        }
+        break
+      }
+      if j < data.length() && data[j].to_int() == 0x6D {
+        // CSI ... m — SGR (color/style). Keep verbatim.
+        while i <= j {
+          out.push(data[i])
+          i = i + 1
+        }
+        continue
+      }
+      // Non-color CSI: drop the whole sequence (replace with one ?).
+      out.push(b'?')
+      i = if j < data.length() { j + 1 } else { data.length() }
+      continue
+    }
+    if b == 0x09 || b == 0x0A || b == 0x0D || (b >= 0x20 && b < 0x7F) || b >= 0x80 {
+      out.push(data[i])
+    } else {
+      // C0 (other than tab/LF/CR), DEL, lone ESC.
+      out.push(b'?')
+    }
+    i = i + 1
+  }
+  remote_array_to_bytes(out)
 }
 
 ///|

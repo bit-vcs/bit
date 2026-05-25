@@ -1565,8 +1565,7 @@ fn checkout_to_worktree(
   let db = ObjectDb::load(rfs, git_dir)
   let files = collect_tree_files_from_commit(db, rfs, commit_id)
   // Write files to worktree
-  for item in files.to_array() {
-    let (path, entry) = item
+  for path, entry in files {
     let abs_path = join_path(worktree_path, path)
     if is_gitlink_mode_int(entry.mode) {
       fs.mkdir_p(abs_path)

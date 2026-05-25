@@ -13,7 +13,7 @@ test "write_index_v2 writes Git lexical path order" {
   let paths = parse_index_paths_wbtest(index_bytes)
   let expected = paths.copy()
   expected.sort_by((a, b) => String::lexical_compare(a, b))
-  assert_eq(paths, expected)
+  @test.assert_eq(paths, expected)
 }
 
 ///|
@@ -27,7 +27,7 @@ test "write_index_v2 keeps lexical order for prefix-like paths" {
     err => fail("failed to read index: \{err}")
   }
   let paths = parse_index_paths_wbtest(index_bytes)
-  assert_eq(paths, ["a-y", "a.b", "a.y", "a/z", "a0"])
+  @test.assert_eq(paths, ["a-y", "a.b", "a.y", "a/z", "a0"])
 }
 
 ///|

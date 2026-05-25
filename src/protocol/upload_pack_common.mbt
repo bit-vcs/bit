@@ -343,7 +343,18 @@ pub fn extract_pack_from_v2_response(data : Bytes) -> Bytes raise @bit.GitError 
         chunks.push(line_bytes[i])
       }
     } else if channel == 3 {
-      let msg = bytes_to_string_from(line_bytes, 1)
+      // Strip control sequences before they hit the terminal — see
+      // `sanitize_sideband_text` for the policy.
+      let payload : Array[Byte] = []
+      for i in 1..<line_bytes.length() {
+        payload.push(line_bytes[i])
+      }
+      let safe = sanitize_sideband_text(
+        Bytes::from_array(
+          FixedArray::makei(payload.length(), i => payload[i]),
+        ),
+      )
+      let msg = bytes_to_string_from(safe, 0)
       raise @bit.GitError::ProtocolError("upload-pack error: \{msg}")
     }
   }
@@ -365,7 +376,18 @@ pub fn extract_pack_from_v0_response(data : Bytes) -> Bytes raise @bit.GitError 
         chunks.push(line_bytes[i])
       }
     } else if channel == 3 {
-      let msg = bytes_to_string_from(line_bytes, 1)
+      // Strip control sequences before they hit the terminal — see
+      // `sanitize_sideband_text` for the policy.
+      let payload : Array[Byte] = []
+      for i in 1..<line_bytes.length() {
+        payload.push(line_bytes[i])
+      }
+      let safe = sanitize_sideband_text(
+        Bytes::from_array(
+          FixedArray::makei(payload.length(), i => payload[i]),
+        ),
+      )
+      let msg = bytes_to_string_from(safe, 0)
       raise @bit.GitError::ProtocolError("upload-pack error: \{msg}")
     }
   }

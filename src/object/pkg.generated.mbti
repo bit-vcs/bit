@@ -122,13 +122,14 @@ pub fn ObjectId::zero(algo? : HashAlgorithm) -> Self
 pub impl Eq for ObjectId
 pub impl Hash for ObjectId
 pub impl Show for ObjectId
+pub impl @debug.Debug for ObjectId
 
 pub(all) enum ObjectType {
   Blob
   Tree
   Commit
   Tag
-} derive(Eq)
+} derive(Eq, @debug.Debug)
 pub fn ObjectType::to_packfile_type(Self) -> Int
 pub fn ObjectType::to_string(Self) -> String
 pub impl Show for ObjectType

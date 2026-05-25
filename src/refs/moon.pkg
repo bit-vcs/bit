@@ -8,4 +8,11 @@ warnings = "-29"
 
 import {
   "moonbitlang/core/test" @test,
+  "moonbitlang/core/bench" @bench,
 } for "test"
+
+options(
+  targets: {
+    "bench_test.mbt": [ "native" ],
+  },
+)

@@ -5,11 +5,11 @@ test "doc: put_page validates nested names and rejects traversal" {
   cleanup_doc_test_root(fs, root)
 
   match put_page(fs, root, "wiki/setup", "ok") {
-    Ok(page) => assert_eq(page, "wiki/setup")
+    Ok(page) => @test.assert_eq(page, "wiki/setup")
     Err(_) => fail("expected nested page name to be valid")
   }
   match read_page(fs, root, "wiki/setup") {
-    Ok(body) => assert_eq(body, "ok\n")
+    Ok(body) => @test.assert_eq(body, "ok\n")
     Err(_) => fail("expected valid page to be readable")
   }
   for
@@ -18,7 +18,7 @@ test "doc: put_page validates nested names and rejects traversal" {
     ] {
     match put_page(fs, root, invalid, "x") {
       Ok(_) => fail("expected invalid page name to be rejected")
-      Err(InvalidPageName(name)) => assert_eq(name, invalid)
+      Err(InvalidPageName(name)) => @test.assert_eq(name, invalid)
       Err(_) => fail("expected InvalidPageName")
     }
   }
@@ -39,10 +39,10 @@ test "doc: list_pages reads recursive markdown pages with prefix filter" {
   fs.write_string(root + "/.bit/docs/ignore.txt", "ignore\n")
 
   let pages = list_pages(fs, root, None)
-  assert_eq(pages, ["daily/2026-02-19", "home", "wiki/setup"])
+  @test.assert_eq(pages, ["daily/2026-02-19", "home", "wiki/setup"])
 
   let filtered = list_pages(fs, root, Some("wiki"))
-  assert_eq(filtered, ["wiki/setup"])
+  @test.assert_eq(filtered, ["wiki/setup"])
 
   fs.remove_file(root + "/.bit/docs/home.md") catch {
     _ => ()
@@ -80,17 +80,17 @@ test "doc: put append remove updates docs storage" {
   cleanup_doc_test_root(fs, root)
   let page_path = root + "/.bit/docs/home.md"
   match put_page(fs, root, "home", "initial memo") {
-    Ok(page) => assert_eq(page, "home")
+    Ok(page) => @test.assert_eq(page, "home")
     Err(_) => fail("expected put_page to succeed")
   }
   let initial = read_page(fs, root, "home")
   match initial {
-    Ok(body) => assert_eq(body, "initial memo\n")
+    Ok(body) => @test.assert_eq(body, "initial memo\n")
     Err(_) => fail("expected read_page to succeed")
   }
 
   match append_page(fs, fs, root, "home", "next line", 12345) {
-    Ok(page) => assert_eq(page, "home")
+    Ok(page) => @test.assert_eq(page, "home")
     Err(_) => fail("expected append_page to succeed")
   }
   let appended = read_page(fs, root, "home")
@@ -103,7 +103,7 @@ test "doc: put append remove updates docs storage" {
   }
 
   match remove_page(fs, fs, root, "home") {
-    Ok(page) => assert_eq(page, "home")
+    Ok(page) => @test.assert_eq(page, "home")
     Err(_) => fail("expected remove_page to succeed")
   }
   assert_false(fs.is_file(page_path))

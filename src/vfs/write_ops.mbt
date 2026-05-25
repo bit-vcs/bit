@@ -47,8 +47,7 @@ pub fn Fs::remove_dir(self : Fs, path : String) -> Unit {
   self.working.dirs.remove(norm)
   let prefix = norm + "/"
   let files_to_remove : Array[String] = []
-  for item in self.working.files.to_array() {
-    let (file_path, _) = item
+  for file_path in self.working.files.keys() {
     if file_path.has_prefix(prefix) {
       files_to_remove.push(file_path)
     }
@@ -58,8 +57,7 @@ pub fn Fs::remove_dir(self : Fs, path : String) -> Unit {
     self.working.deleted[file_path] = true
   }
   let dirs_to_remove : Array[String] = []
-  for item in self.working.dirs.to_array() {
-    let (dir_path, _) = item
+  for dir_path in self.working.dirs.keys() {
     if dir_path.has_prefix(prefix) || dir_path == norm {
       dirs_to_remove.push(dir_path)
     }

@@ -2,27 +2,33 @@
 /// Tests for Git HTTP push protocol
 test "Remote info_refs_url" {
   let remote = Remote::new("https://github.com/user/repo.git")
-  inspect(
+  debug_inspect(
     remote.info_refs_url(),
-    content="https://github.com/user/repo/info/refs?service=git-receive-pack",
+    content=(
+      #|"https://github.com/user/repo/info/refs?service=git-receive-pack"
+    ),
   )
 }
 
 ///|
 test "Remote info_refs_url without .git" {
   let remote = Remote::new("https://github.com/user/repo")
-  inspect(
+  debug_inspect(
     remote.info_refs_url(),
-    content="https://github.com/user/repo/info/refs?service=git-receive-pack",
+    content=(
+      #|"https://github.com/user/repo/info/refs?service=git-receive-pack"
+    ),
   )
 }
 
 ///|
 test "Remote receive_pack_url" {
   let remote = Remote::new("https://github.com/user/repo.git")
-  inspect(
+  debug_inspect(
     remote.receive_pack_url(),
-    content="https://github.com/user/repo/git-receive-pack",
+    content=(
+      #|"https://github.com/user/repo/git-receive-pack"
+    ),
   )
 }
 
@@ -41,10 +47,18 @@ test "build_receive_pack_body" {
 
   // Should contain PACK at the end
   let pack_start = body.length() - 4
-  inspect(body[pack_start], content="b'\\x50'") // 'P'
-  inspect(body[pack_start + 1], content="b'\\x41'") // 'A'
-  inspect(body[pack_start + 2], content="b'\\x43'") // 'C'
-  inspect(body[pack_start + 3], content="b'\\x4B'") // 'K'
+  debug_inspect(body[pack_start], content=(
+    #|0x50
+  )) // 'P'
+  debug_inspect(body[pack_start + 1], content=(
+    #|0x41
+  )) // 'A'
+  debug_inspect(body[pack_start + 2], content=(
+    #|0x43
+  )) // 'C'
+  debug_inspect(body[pack_start + 3], content=(
+    #|0x4b
+  )) // 'K'
 }
 
 ///|
@@ -74,7 +88,9 @@ test "parse_receive_pack_response success" {
   )
   let result = parse_receive_pack_response(data)
   match result {
-    Ok(msg) => inspect(msg, content="Push successful")
+    Ok(msg) => debug_inspect(msg, content=(
+      #|"Push successful"
+    ))
     Err(e) => {
       let _ = e
       assert_true(false)
@@ -112,16 +128,16 @@ test "parse_sideband" {
   // Channel 1 with data
   let data = Bytes::from_array([b'\x01', b'h', b'e', b'l', b'l', b'o'])
   let (channel, content) = parse_sideband(data)
-  inspect(channel, content="1")
-  inspect(content.length(), content="5")
+  debug_inspect(channel, content="1")
+  debug_inspect(content.length(), content="5")
 }
 
 ///|
 test "parse_sideband empty" {
   let data = Bytes::from_array([])
   let (channel, content) = parse_sideband(data)
-  inspect(channel, content="0")
-  inspect(content.length(), content="0")
+  debug_inspect(channel, content="0")
+  debug_inspect(content.length(), content="0")
 }
 
 ///|
@@ -167,35 +183,41 @@ test "parse_symrefs_from_capabilities accepts symref-target capability" {
 
 ///|
 test "ssh_remote_to_https converts scp-style ssh remote" {
-  inspect(
+  debug_inspect(
     ssh_remote_to_https("git@github.com:user/repo.git"),
-    content="Some(https://github.com/user/repo.git)",
+    content=(
+      #|Some("https://github.com/user/repo.git")
+    ),
   )
 }
 
 ///|
 test "ssh_remote_to_https converts ssh:// remote" {
-  inspect(
+  debug_inspect(
     ssh_remote_to_https("ssh://git@github.com/user/repo.git"),
-    content="Some(https://github.com/user/repo.git)",
+    content=(
+      #|Some("https://github.com/user/repo.git")
+    ),
   )
 }
 
 ///|
 test "ssh_remote_to_https drops explicit ssh port" {
-  inspect(
+  debug_inspect(
     ssh_remote_to_https("ssh://git@github.com:2222/user/repo.git"),
-    content="Some(https://github.com/user/repo.git)",
+    content=(
+      #|Some("https://github.com/user/repo.git")
+    ),
   )
 }
 
 ///|
 test "ssh_remote_to_https returns none for non-ssh remotes" {
-  inspect(
+  debug_inspect(
     ssh_remote_to_https("https://github.com/user/repo.git"),
     content="None",
   )
-  inspect(ssh_remote_to_https("file:///tmp/repo.git"), content="None")
+  debug_inspect(ssh_remote_to_https("file:///tmp/repo.git"), content="None")
 }
 
 ///|

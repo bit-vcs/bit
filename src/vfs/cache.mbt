@@ -53,8 +53,7 @@ pub fn ObjectCache::invalidate_path(self : ObjectCache, path : String) -> Unit {
   self.path_cache.remove(path)
   let prefix = path + "/"
   let to_remove : Array[String] = []
-  for item in self.path_cache.to_array() {
-    let (k, _) = item
+  for k in self.path_cache.keys() {
     if k.has_prefix(prefix) {
       to_remove.push(k)
     }

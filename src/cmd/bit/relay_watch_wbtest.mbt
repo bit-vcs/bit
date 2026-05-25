@@ -44,7 +44,8 @@ test "relay_safe_sender: from env" {
 
 ///|
 test "relay_watch_print_envelope: formats hub record" {
-  // Just verify no crash — output goes to stdout
+  // Just verify no crash — suppress fd 1 so the formatted line
+  // doesn't bleed into the moon test JSON summary stream.
   let envelope : Json = {
     "sender": "alice",
     "topic": "hub.issue",
@@ -54,7 +55,9 @@ test "relay_watch_print_envelope: formats hub record" {
       "record": "version: 1\ntitle: Test Issue\nstate: open",
     },
   }
+  bench_stdout_suppress()
   relay_watch_print_envelope(envelope)
+  bench_stdout_restore()
 }
 
 ///|
@@ -65,7 +68,9 @@ test "relay_watch_print_envelope: formats ci status" {
     "id": "ci-main-pass",
     "payload": { "kind": "ci.status", "ref": "main", "status": "pass" },
   }
+  bench_stdout_suppress()
   relay_watch_print_envelope(envelope)
+  bench_stdout_restore()
 }
 
 ///|

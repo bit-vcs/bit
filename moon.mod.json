@@ -10,7 +10,7 @@
     "mizchi/x": "0.2.0",
     "bobzhang/toml": "0.1.7",
     "mizchi/libgit2": "0.1.0",
-    "mizchi/zlib": "0.4.4"
+    "mizchi/zlib": "0.4.5"
   },
   "readme": "README.mbt.md",
   "repository": "https://github.com/mizchi/bit-vcs",

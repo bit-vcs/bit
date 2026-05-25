@@ -78,12 +78,10 @@ pub fn Fs::flatten_layers(
     merge_tree_into(db, rfs, layer.tree_id, root)
     i -= 1
   }
-  for item in self.working.deleted.to_array() {
-    let (path, _) = item
+  for path in self.working.deleted.keys() {
     delete_from_tree(Some(db), rfs, root, path)
   }
-  for item in self.working.files.to_array() {
-    let (path, content) = item
+  for path, content in self.working.files {
     let blob_id = @lib.write_loose_object(
       backing_fs,
       self.git_dir,

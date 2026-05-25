@@ -13,7 +13,7 @@ let bench_catfile_repo : String = bench_catfile_root + "/repo"
 let bench_catfile_repeat : Int = 10
 
 ///|
-let bench_catfile_oids : Ref[Array[String]] = Ref::new([])
+let bench_catfile_oids : Ref[Array[String]] = { val: [] }
 
 ///|
 fn ensure_catfile_bench_repo() -> Array[String] {

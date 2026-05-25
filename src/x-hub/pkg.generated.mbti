@@ -334,7 +334,7 @@ pub fn IssueComment::serialize(Self) -> String
 pub(all) enum IssueState {
   Open
   Closed
-} derive(Eq)
+} derive(Eq, @debug.Debug)
 pub fn IssueState::to_string(Self) -> String
 pub fn IssueState::to_work_item_state(Self) -> WorkItemState
 pub impl Show for IssueState
@@ -439,7 +439,7 @@ pub(all) enum PrState {
   Open
   Merged
   Closed
-} derive(Eq)
+} derive(Eq, @debug.Debug)
 pub fn PrState::to_string(Self) -> String
 pub fn PrState::to_work_item_state(Self) -> WorkItemState
 pub impl Show for PrState
@@ -482,7 +482,7 @@ pub(all) enum PrWorkflowStatus {
   Running
   Success
   Failed
-} derive(Eq)
+} derive(Eq, @debug.Debug)
 pub fn PrWorkflowStatus::to_string(Self) -> String
 pub impl Show for PrWorkflowStatus
 
@@ -539,7 +539,7 @@ pub(all) enum ReviewVerdict {
   Approved
   RequestChanges
   Comment
-} derive(Eq)
+} derive(Eq, @debug.Debug)
 pub fn ReviewVerdict::to_string(Self) -> String
 pub impl Show for ReviewVerdict
 
@@ -611,7 +611,7 @@ pub fn WorkItem::updated_at(Self) -> Int64
 pub(all) enum WorkItemKind {
   Issue
   PullRequest
-} derive(Eq)
+} derive(Eq, @debug.Debug)
 pub fn WorkItemKind::to_string(Self) -> String
 pub impl Show for WorkItemKind
 
@@ -639,7 +639,7 @@ pub(all) enum WorkItemState {
   Open
   Merged
   Closed
-} derive(Eq)
+} derive(Eq, @debug.Debug)
 pub fn WorkItemState::to_issue_state(Self) -> IssueState?
 pub fn WorkItemState::to_pr_state(Self) -> PrState
 pub fn WorkItemState::to_string(Self) -> String

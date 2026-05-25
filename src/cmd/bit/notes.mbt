@@ -475,7 +475,7 @@ fn notes_write_tree(
     return tree_id
   }
   // Fanout 1: group by first 2 hex chars.
-  let groups : Map[String, Array[@bitcore.TreeEntry]] = Map::new()
+  let groups : Map[String, Array[@bitcore.TreeEntry]] = Map([])
   for pair in notes {
     let (hex, id) = pair
     let prefix = string_slice_to(hex, 2)
@@ -1038,7 +1038,7 @@ async fn notes_merge(
     }
     Some((current_commit_id, current_entries)) => {
       let db = @bitlib.ObjectDb::load(rfs, git_dir)
-      let entries : Map[String, @bitcore.TreeEntry] = Map::new()
+      let entries : Map[String, @bitcore.TreeEntry] = Map([])
       for e in current_entries {
         entries.set(e.name, e)
       }
@@ -1143,7 +1143,7 @@ async fn notes_rewrite(
   }
   let current = load_notes_tree(rfs, git_dir, notes_ref_path)
   guard current is Some((current_commit_id, current_entries)) else { return }
-  let entries : Map[String, @bitcore.TreeEntry] = Map::new()
+  let entries : Map[String, @bitcore.TreeEntry] = Map([])
   let mut source : @bitcore.TreeEntry? = None
   let mut dest_exists = false
   for e in current_entries {

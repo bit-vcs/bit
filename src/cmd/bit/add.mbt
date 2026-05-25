@@ -28,13 +28,8 @@ async fn run_add_hook(
   hook_name : String,
 ) -> Int {
   let hook_git_dir = add_abs_path(git_dir)
-  let hook_path = hook_git_dir + "/hooks/" + hook_name
-  if !fs.is_file(hook_path) {
-    return 0
-  }
-  @process.run(hook_path, [], inherit_env=true, cwd=add_abs_path(root)) catch {
-    _ => 1
-  }
+  let work_root = add_abs_path(root)
+  run_hook(fs, work_root, hook_git_dir, hook_name, work_root)
 }
 
 ///|
@@ -427,11 +422,7 @@ fn add_apply_intent_to_add(
   if staged.length() == 0 {
     return staged
   }
-  let updated : Array[@bitlib.IndexEntry] = []
-  for item in map.to_array() {
-    let (_, entry) = item
-    updated.push(entry)
-  }
+  let updated = map.values().to_array()
   @bitlib.write_index_entries_preserving_cache_tree(fs, rfs, git_dir, updated)
   staged
 }
@@ -472,12 +463,7 @@ async fn add_collect_update_requested_paths(
       @sys.exit(1)
     }
   }
-  let out : Array[String] = []
-  for item in selected.to_array() {
-    let (path, _) = item
-    out.push(path)
-  }
-  out
+  selected.keys().to_array()
 }
 
 ///|

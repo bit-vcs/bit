@@ -548,8 +548,7 @@ fn apply_update_index_entries(
       None => out.push(entry)
     }
   }
-  for item in update_map.to_array() {
-    let (_, entry) = item
+  for entry in update_map.values() {
     out.push(entry)
   }
   update_index_write_entries(fs, git_dir, dedupe_index_entries_by_path(out))
@@ -651,8 +650,7 @@ fn update_skip_worktree_state(
     }
   }
   let out : Array[String] = []
-  for item in state.to_array() {
-    let (path, marked) = item
+  for path, marked in state {
     if marked {
       out.push(path)
     }
@@ -1109,8 +1107,7 @@ async fn update_index_stage_paths(
       None => merged_entries.push(entry)
     }
   }
-  for item in gitlink_paths.to_array() {
-    let (_, entry) = item
+  for entry in gitlink_paths.values() {
     merged_entries.push(entry)
   }
   let normalized_entries = dedupe_index_entries_by_path(merged_entries)
@@ -1254,8 +1251,7 @@ async fn handle_update_index_refresh(
     }
     if selected_unmerged_paths.length() > 0 {
       if !quiet {
-        for item in selected_unmerged_paths.to_array() {
-          let (path, _) = item
+        for path in selected_unmerged_paths.keys() {
           print_line(path)
         }
       }

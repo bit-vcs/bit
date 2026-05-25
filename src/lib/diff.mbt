@@ -219,8 +219,7 @@ pub fn diff_index(
     None => ObjectDb::load_lazy(fs, git_dir)
   }
   let out : Array[DiffFile] = []
-  for item in index_map.to_array() {
-    let (path, entry) = item
+  for path, entry in index_map {
     match head_entries.get(path) {
       None => {
         let new = diff_read_blob(db, fs, entry.id)
@@ -260,8 +259,7 @@ pub fn diff_index(
         }
     }
   }
-  for item in head_entries.to_array() {
-    let (path, h) = item
+  for path, h in head_entries {
     if !index_map.contains(path) {
       let old = diff_read_blob(db, fs, h.id)
       // Skip if blob not found (e.g., submodule)

@@ -342,7 +342,7 @@ fn build_repo_scoped_rw_registry(
   root : String,
 ) -> (@llmlib.ToolRegistry, Ref[Array[String]]) {
   let registry = @llmlib.ToolRegistry::new()
-  let touched_paths : Ref[Array[String]] = Ref::new([])
+  let touched_paths : Ref[Array[String]] = { val: [] }
   registry.register(
     "read_file",
     "Read file contents from repository scope. Path must stay inside repository.",

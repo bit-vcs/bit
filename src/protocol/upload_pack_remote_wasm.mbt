@@ -14,7 +14,7 @@ priv struct WasmHttpClient {
 }
 
 ///|
-let wasm_http_client_ref : Ref[WasmHttpClient?] = Ref::new(None)
+let wasm_http_client_ref : Ref[WasmHttpClient?] = { val: None }
 
 ///|
 pub fn configure_wasm_http_client(

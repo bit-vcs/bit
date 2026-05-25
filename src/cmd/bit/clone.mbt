@@ -1549,13 +1549,7 @@ async fn run_postclone_hook(
     return ()
   }
   hooks_ensure_sensitive_hook_approval(wfs, rfs, root, "postclone")
-  let hook_path = git_dir + "/hooks/postclone"
-  if !rfs.is_file(hook_path) {
-    return ()
-  }
-  let code = @process.run(hook_path, [], inherit_env=true, cwd=root) catch {
-    _ => 1
-  }
+  let code = run_hook(rfs, root, git_dir, "postclone", root)
   if code != 0 {
     raise @bitcore.GitError::InvalidObject("postclone hook failed")
   }
@@ -1880,11 +1874,7 @@ fn collect_case_collision_paths(paths : Array[String]) -> Array[String] {
     }
     i += 1
   }
-  let out : Array[String] = []
-  for item in collided.to_array() {
-    let (path, _) = item
-    out.push(path)
-  }
+  let out = collided.keys().to_array()
   out.sort_by((a, b) => String::compare(a, b))
   out
 }
@@ -1902,11 +1892,7 @@ async fn warn_case_insensitive_collisions_from_commit(
   let files = @bitlib.collect_tree_files_from_commit(db, fs, commit_id) catch {
     _ => return
   }
-  let paths : Array[String] = []
-  for item in files.to_array() {
-    let (path, _) = item
-    paths.push(path)
-  }
+  let paths = files.keys().to_array()
   let collided_paths = collect_case_collision_paths(paths)
   if collided_paths.length() > 0 {
     @stdio.stderr.write("warning: the following paths have collided:\n")

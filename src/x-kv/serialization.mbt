@@ -114,7 +114,7 @@ fn Kv::serialize_snapshot_uncached(
           store,
           self.head,
           objects,
-          Set::new(),
+          Set([]),
           true,
         )
       HeadState =>
@@ -122,7 +122,7 @@ fn Kv::serialize_snapshot_uncached(
           store,
           self.head,
           objects,
-          Set::new(),
+          Set([]),
           false,
         )
       TreeAndBlobOnly =>
@@ -252,9 +252,9 @@ fn collect_tree_and_blob_objects_from_head(
   match obj.obj_type {
     Commit => {
       let commit = @bit.parse_commit(obj.data) catch { _ => return }
-      collect_tree_and_blob_objects(store, commit.tree, objects, Set::new())
+      collect_tree_and_blob_objects(store, commit.tree, objects, Set([]))
     }
-    Tree => collect_tree_and_blob_objects(store, head, objects, Set::new())
+    Tree => collect_tree_and_blob_objects(store, head, objects, Set([]))
     Blob =>
       objects.push({
         id: object_id_to_bytes(head),

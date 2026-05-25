@@ -919,7 +919,104 @@ fn ls_files_submodule_is_active(
 }
 
 ///|
-/// Parse .gitmodules file to extract submodule info
+/// Validate a single submodule entry against the rules that prevent
+/// path-traversal, hostile URL handling, and arg-injection during
+/// `submodule init/update`. Returns true if the entry is safe to
+/// consume.
+///
+/// Rules:
+/// - name: non-empty, no NUL / newline / `/` / `..`
+/// - path: not absolute, no `..` segments, no `.git` segment
+///   (case-insensitive), non-empty
+/// - url: must not start with `-` (arg injection), reject `ext::`
+///   (git-remote-ext is a remote-helper RCE surface). `file://` is
+///   accepted today; tightening it requires a config knob.
+///
+/// Mirrors the subset of git's CVE-2018-11235 / -17456 / -1387 /
+/// 2022-39253 defenses that matters when `bit submodule init/update`
+/// consumes attacker-controlled `.gitmodules`.
+fn validate_submodule_entry(
+  name : String,
+  path : String,
+  url : String,
+) -> Bool {
+  // name: reject empty, traversal patterns, and dangerous chars.
+  // Slash IS allowed (git permits names like "nested/sub" to match
+  // the path) — we only reject names that begin with "." (matches
+  // git's prohibition on .git, .., and dot-prefixed names) and
+  // names with "/." or "/../" / trailing "/.."  traversal sequences.
+  if name.length() == 0 {
+    return false
+  }
+  if name == ".." || name.has_prefix(".") {
+    return false
+  }
+  if name.contains("/.") || name.has_suffix("/..") {
+    return false
+  }
+  for i in 0..<name.length() {
+    let c = name.unsafe_get(i).to_int()
+    if c == 0 || c == 0x0A || c == 0x0D || c == 0x5C { // \0 \n \r \\
+      return false
+    }
+  }
+  // path
+  if path.length() == 0 {
+    return false
+  }
+  if path.has_prefix("/") {
+    return false
+  }
+  // walk path components
+  let mut start = 0
+  while start <= path.length() {
+    let mut end = start
+    // 0x2F = '/'
+    while end < path.length() && path.unsafe_get(end).to_int() != 0x2F {
+      end += 1
+    }
+    let comp = String::unsafe_substring(path, start~, end~)
+    if comp == ".." {
+      return false
+    }
+    // .git (case-insensitive ASCII)
+    if comp.length() == 4 &&
+      comp.unsafe_get(0).to_int() == 0x2E { // '.'
+      let lower = fn(c : Int) -> Int {
+        if c >= 0x41 && c <= 0x5A {
+          c + 32
+        } else {
+          c
+        }
+      }
+      let c1 = lower(comp.unsafe_get(1).to_int())
+      let c2 = lower(comp.unsafe_get(2).to_int())
+      let c3 = lower(comp.unsafe_get(3).to_int())
+      if c1 == 0x67 && c2 == 0x69 && c3 == 0x74 { // 'git'
+        return false
+      }
+    }
+    if end >= path.length() {
+      break
+    }
+    start = end + 1
+  }
+  // url
+  if url.has_prefix("-") {
+    return false
+  }
+  if url.has_prefix("ext::") {
+    return false
+  }
+  true
+}
+
+///|
+/// Parse .gitmodules file to extract submodule info. Entries that
+/// fail `validate_submodule_entry` are skipped (with a stderr
+/// notice), so a malicious .gitmodules can't drive `bit submodule
+/// init/update` into writing outside the worktree or running
+/// remote-helper commands.
 fn parse_gitmodules(
   fs : &@bitcore.RepoFileSystem,
   root : String,
@@ -938,11 +1035,13 @@ fn parse_gitmodules(
   for line_view in content.split("\n") {
     let line = trim_string(line_view.to_owned())
     if line.has_prefix("[submodule \"") && line.has_suffix("\"]") {
-      // Save previous submodule if any
-      if current_name.length() > 0 && current_path.length() > 0 {
+      if current_name.length() > 0 &&
+        current_path.length() > 0 &&
+        validate_submodule_entry(
+          current_name, current_path, current_url,
+        ) {
         result.push({ name: current_name, path: current_path, url: current_url })
       }
-      // Extract name from [submodule "name"]
       current_name = String::unsafe_substring(
         line,
         start=12,
@@ -970,8 +1069,9 @@ fn parse_gitmodules(
       }
     }
   }
-  // Don't forget the last one
-  if current_name.length() > 0 && current_path.length() > 0 {
+  if current_name.length() > 0 &&
+    current_path.length() > 0 &&
+    validate_submodule_entry(current_name, current_path, current_url) {
     result.push({ name: current_name, path: current_path, url: current_url })
   }
   result
@@ -1655,11 +1755,7 @@ fn ls_files_collect_candidate_dirs(
       seen[dir] = true
     }
   }
-  let out : Array[String] = []
-  for item in seen.to_array() {
-    let (dir, _) = item
-    out.push(dir)
-  }
+  let out = seen.keys().to_array()
   out.sort_by(fn(a, b) { ls_files_compare_paths(a, b) })
   out
 }

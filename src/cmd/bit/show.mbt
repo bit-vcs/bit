@@ -768,8 +768,7 @@ fn show_render_commit_block(
     let current_files = @bitlib.collect_tree_files_from_commit(
       db, fs, commit_id,
     )
-    for item in current_files.to_array() {
-      let (path, entry) = item
+    for path, entry in current_files {
       match parent_files.get(path) {
         None => lines.push("diff --git a/\{path} b/\{path}\nnew file")
         Some(parent_entry) =>
@@ -778,8 +777,7 @@ fn show_render_commit_block(
           }
       }
     }
-    for item in parent_files.to_array() {
-      let (path, _) = item
+    for path in parent_files.keys() {
       if !current_files.contains(path) {
         lines.push("diff --git a/\{path} b/\{path}\ndeleted file")
       }

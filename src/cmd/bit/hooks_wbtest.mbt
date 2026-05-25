@@ -22,9 +22,9 @@ test "hooks: list_hooks sorts and filters installed hooks" {
   fs.write_string(git_dir + "/hooks/post-add", "#!/bin/sh\n")
   fs.write_string(git_dir + "/hooks/pre-commit", "#!/bin/sh\n")
   let all = list_hooks(fs, git_dir, None)
-  assert_eq(all, ["pre-add", "post-add", "pre-commit"])
+  @test.assert_eq(all, ["pre-add", "post-add", "pre-commit"])
   let filtered = list_hooks(fs, git_dir, Some("pre"))
-  assert_eq(filtered, ["pre-add", "pre-commit"])
+  @test.assert_eq(filtered, ["pre-add", "pre-commit"])
 
   fs.remove_file(git_dir + "/hooks/pre-add") catch {
     _ => ()
@@ -58,11 +58,11 @@ test "hooks: list_hooks_with_status merges .git/hooks and .bit/hooks" {
   fs.write_string(git_dir + "/hooks/post-applypatch", "#!/bin/sh\n")
   fs.write_string(git_dir + "/hooks/pre-add", "#!/bin/sh\n")
   let status = list_hooks_with_status(fs, root, git_dir, None)
-  assert_eq(status, [
+  @test.assert_eq(status, [
     "pre-add (available, enabled)", "post-applypatch (enabled)",
   ])
   let filtered = list_hooks_with_status(fs, root, git_dir, Some("pre"))
-  assert_eq(filtered, ["pre-add (available, enabled)"])
+  @test.assert_eq(filtered, ["pre-add (available, enabled)"])
 
   fs.remove_file(root + "/.bit/hooks/pre-add") catch {
     _ => ()
@@ -172,7 +172,7 @@ async test "hooks: approving sensitive hook writes approved checksum metadata" {
   )
   let rfs : &@bitcore.RepoFileSystem = fs
   let active = hooks_active_checksum(rfs, root, "post-merge").unwrap_or("")
-  assert_eq(approved, active)
+  @test.assert_eq(approved, active)
   assert_true(hooks_is_current_checksum_approved(rfs, root, "post-merge"))
 
   fs.write_string(git_dir + "/hooks/post-merge", "#!/bin/sh\necho modified\n")
@@ -294,6 +294,124 @@ test "hooks: postinstall never becomes auto-approved by checksum" {
     _ => ()
   }
   fs.remove_dir(root + "/.bit") catch {
+    _ => ()
+  }
+  fs.remove_dir(root) catch {
+    _ => ()
+  }
+}
+
+///|
+test "hooks: read_hook_config returns empty for missing section" {
+  let fs = OsFs::new()
+  let root = "/tmp/bit-test-hook-config-empty-" +
+    get_current_timestamp().to_string()
+  let git_dir = root + "/.git"
+  fs.mkdir_p(git_dir)
+  fs.write_string(
+    git_dir + "/config",
+    "[core]\n\trepositoryformatversion = 0\n",
+  )
+  let cfg = read_hook_config(fs, git_dir, "pre-commit")
+  assert_eq(cfg.commands.length(), 0)
+  assert_false(cfg.parallel)
+  fs.remove_file(git_dir + "/config") catch {
+    _ => ()
+  }
+  fs.remove_dir(git_dir) catch {
+    _ => ()
+  }
+  fs.remove_dir(root) catch {
+    _ => ()
+  }
+}
+
+///|
+test "hooks: read_hook_config parses multi-command + parallel flag" {
+  let fs = OsFs::new()
+  let root = "/tmp/bit-test-hook-config-multi-" +
+    get_current_timestamp().to_string()
+  let git_dir = root + "/.git"
+  fs.mkdir_p(git_dir)
+  // Match upstream's section name format: `[hook "<name>"]` with the
+  // hook name quoted. `command` is multivalued.
+  fs.write_string(
+    git_dir + "/config",
+    "[hook \"pre-commit\"]\n\tcommand = /usr/bin/formatter\n\tcommand = /usr/bin/linter\n\tparallel = true\n",
+  )
+  let cfg = read_hook_config(fs, git_dir, "pre-commit")
+  assert_eq(cfg.commands.length(), 2)
+  assert_eq(cfg.commands[0], "/usr/bin/formatter")
+  assert_eq(cfg.commands[1], "/usr/bin/linter")
+  assert_true(cfg.parallel)
+  fs.remove_file(git_dir + "/config") catch {
+    _ => ()
+  }
+  fs.remove_dir(git_dir) catch {
+    _ => ()
+  }
+  fs.remove_dir(root) catch {
+    _ => ()
+  }
+}
+
+///|
+test "hooks: read_hook_config treats parallel=false as default" {
+  let fs = OsFs::new()
+  let root = "/tmp/bit-test-hook-config-seq-" +
+    get_current_timestamp().to_string()
+  let git_dir = root + "/.git"
+  fs.mkdir_p(git_dir)
+  fs.write_string(
+    git_dir + "/config",
+    "[hook \"pre-add\"]\n\tcommand = /usr/bin/single\n",
+  )
+  let cfg = read_hook_config(fs, git_dir, "pre-add")
+  assert_eq(cfg.commands.length(), 1)
+  assert_false(cfg.parallel)
+  fs.remove_file(git_dir + "/config") catch {
+    _ => ()
+  }
+  fs.remove_dir(git_dir) catch {
+    _ => ()
+  }
+  fs.remove_dir(root) catch {
+    _ => ()
+  }
+}
+
+///|
+test "hooks: is_truthy_config_value matches git's accepted forms" {
+  assert_true(is_truthy_config_value("true"))
+  assert_true(is_truthy_config_value("True"))
+  assert_true(is_truthy_config_value("yes"))
+  assert_true(is_truthy_config_value("on"))
+  assert_true(is_truthy_config_value("1"))
+  assert_false(is_truthy_config_value("false"))
+  assert_false(is_truthy_config_value(""))
+  assert_false(is_truthy_config_value("nope"))
+  assert_false(is_truthy_config_value("0"))
+}
+
+///|
+/// Filter for non-pre-commit hook section is ignored by name match.
+test "hooks: read_hook_config skips other hook sections" {
+  let fs = OsFs::new()
+  let root = "/tmp/bit-test-hook-config-other-" +
+    get_current_timestamp().to_string()
+  let git_dir = root + "/.git"
+  fs.mkdir_p(git_dir)
+  fs.write_string(
+    git_dir + "/config",
+    "[hook \"post-commit\"]\n\tcommand = /one\n[hook \"pre-commit\"]\n\tcommand = /two\n",
+  )
+  let cfg = read_hook_config(fs, git_dir, "pre-commit")
+  assert_eq(cfg.commands.length(), 1)
+  assert_eq(cfg.commands[0], "/two")
+  fs.remove_file(git_dir + "/config") catch {
+    _ => ()
+  }
+  fs.remove_dir(git_dir) catch {
     _ => ()
   }
   fs.remove_dir(root) catch {

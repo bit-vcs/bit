@@ -5,6 +5,57 @@ test "ls-files: no wildcard filter matches exact path" {
 }
 
 ///|
+test "submodule: validate_submodule_entry accepts ordinary entries" {
+  assert_true(validate_submodule_entry("sub", "sub", "https://example.com/r"))
+  assert_true(
+    validate_submodule_entry("plugin", "plugins/a", "git@example.com:x/y"),
+  )
+  // Slash IS allowed in the name (matches the path), as git does.
+  assert_true(validate_submodule_entry("a/b/c", "a/b/c", "https://x/r"))
+  // But traversal patterns inside the name are still rejected.
+  assert_true(!validate_submodule_entry("a/./b", "x", "https://x/r"))
+  assert_true(!validate_submodule_entry("a/../b", "x", "https://x/r"))
+  assert_true(!validate_submodule_entry("a/..", "x", "https://x/r"))
+}
+
+///|
+test "submodule: validate_submodule_entry rejects hostile names" {
+  assert_true(!validate_submodule_entry("", "x", "https://x/r"))
+  assert_true(!validate_submodule_entry("..", "x", "https://x/r"))
+  // Embedded NUL — built up from chars to avoid a literal NUL in the
+  // source file (some toolchains refuse NULs in `.mbt` source).
+  let nul_char : Int = 0
+  let nul_name = "a" + nul_char.unsafe_to_char().to_string() + "b"
+  assert_true(!validate_submodule_entry(nul_name, "x", "https://x/r"))
+  // embedded newline
+  assert_true(!validate_submodule_entry("a\nb", "x", "https://x/r"))
+}
+
+///|
+test "submodule: validate_submodule_entry rejects hostile paths" {
+  // path traversal
+  assert_true(!validate_submodule_entry("e", "../escape", "https://x/r"))
+  assert_true(!validate_submodule_entry("e", "a/../b", "https://x/r"))
+  // absolute path
+  assert_true(!validate_submodule_entry("e", "/etc/passwd", "https://x/r"))
+  // .git segment (case-insensitive)
+  assert_true(!validate_submodule_entry("e", ".git/hooks/x", "https://x/r"))
+  assert_true(!validate_submodule_entry("e", "a/.GIT/b", "https://x/r"))
+  assert_true(!validate_submodule_entry("e", "a/.GiT/b", "https://x/r"))
+  // empty
+  assert_true(!validate_submodule_entry("e", "", "https://x/r"))
+}
+
+///|
+test "submodule: validate_submodule_entry rejects hostile urls" {
+  // arg injection
+  assert_true(!validate_submodule_entry("e", "p", "--upload-pack=evil"))
+  assert_true(!validate_submodule_entry("e", "p", "-oProxyCommand=x"))
+  // git-remote-ext RCE surface
+  assert_true(!validate_submodule_entry("e", "p", "ext::x"))
+}
+
+///|
 test "ls-files: directory prefix filter works" {
   assert_true(ls_files_matches_filters("dir/a.txt", ["dir"]))
   assert_true(!ls_files_matches_filters("other.txt", ["dir"]))
@@ -34,26 +85,26 @@ test "ls-files: wildcard prefix filter" {
 
 ///|
 test "ls-files: normalize keeps wildcard filter as-is" {
-  assert_eq(normalize_ls_tree_filters(["a*"], ""), ["a*"])
+  @test.assert_eq(normalize_ls_tree_filters(["a*"], ""), ["a*"])
 }
 
 ///|
 test "ls-files: absolute filter inside repo becomes repo-relative" {
-  assert_eq(normalize_ls_files_filters(["/repo/subs/link"], "subs", "/repo"), [
+  @test.assert_eq(normalize_ls_files_filters(["/repo/subs/link"], "subs", "/repo"), [
     "subs/link",
   ])
 }
 
 ///|
 test "ls-files: absolute filter outside repo stays absolute" {
-  assert_eq(normalize_ls_files_filters(["/outside/link"], "subs", "/repo"), [
+  @test.assert_eq(normalize_ls_files_filters(["/outside/link"], "subs", "/repo"), [
     "/outside/link",
   ])
 }
 
 ///|
 test "ls-files: normalize preserves pathspec magic" {
-  assert_eq(
+  @test.assert_eq(
     normalize_ls_files_filters([":(exclude)../submodule"], "b", "/repo"),
     [":(exclude)submodule"],
   )
@@ -97,12 +148,12 @@ test "ls-files: compare directory and file suffix order" {
 
 ///|
 test "ls-files: display path relativizes sibling and parent paths" {
-  assert_eq(make_display_path("top/x", "top/sub"), "../x")
-  assert_eq(
+  @test.assert_eq(make_display_path("top/x", "top/sub"), "../x")
+  @test.assert_eq(
     make_display_path("never-mind-me", "top/sub"),
     "../../never-mind-me",
   )
-  assert_eq(make_display_path("top/dir/", "top/sub"), "../dir/")
+  @test.assert_eq(make_display_path("top/dir/", "top/sub"), "../dir/")
 }
 
 ///|
@@ -111,7 +162,7 @@ test "ls-files: cwd prefix falls back to PWD when shim pwd is absent" {
   let prev_pwd = @sys.get_env_var("PWD")
   @sys.unset_env_var("GIT_SHIM_PWD")
   @sys.set_env_var("PWD", "/repo/sub")
-  assert_eq(compute_cwd_prefix("/repo"), "sub")
+  @test.assert_eq(compute_cwd_prefix("/repo"), "sub")
   match prev_shim_pwd {
     Some(value) => @sys.set_env_var("GIT_SHIM_PWD", value)
     None => @sys.unset_env_var("GIT_SHIM_PWD")

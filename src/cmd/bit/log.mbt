@@ -2740,20 +2740,17 @@ fn log_trees_same_for_pathspecs(
   let left_files = @bitlib.collect_tree_files(db, rfs, left_tree)
   let right_files = @bitlib.collect_tree_files(db, rfs, right_tree)
   let paths : Map[String, Bool] = {}
-  for item in left_files.to_array() {
-    let path = item.0
+  for path in left_files.keys() {
     if diff_path_matches_filters(path, pathspecs) {
       paths[path] = true
     }
   }
-  for item in right_files.to_array() {
-    let path = item.0
+  for path in right_files.keys() {
     if diff_path_matches_filters(path, pathspecs) {
       paths[path] = true
     }
   }
-  for item in paths.to_array() {
-    let path = item.0
+  for path in paths.keys() {
     if !log_tree_file_entries_same(left_files.get(path), right_files.get(path)) {
       return false
     }

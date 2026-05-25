@@ -1,6 +1,6 @@
 ///|
 test "sparse: cone encoding adds ancestor file patterns for deep paths" {
-  assert_eq(sparse_encode_cone_patterns(["folder2/2/3"]), [
+  @test.assert_eq(sparse_encode_cone_patterns(["folder2/2/3"]), [
     "/*", "!/*/", "/folder2/", "!/folder2/*/", "/folder2/2/", "!/folder2/2/*/", "/folder2/2/3/",
   ])
 }

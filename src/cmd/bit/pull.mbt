@@ -2683,13 +2683,7 @@ async fn run_push_hook_with_args(
   args : Array[String],
 ) -> Int {
   let hook_git_dir = resolve_push_hook_git_dir(git_dir)
-  let hook_path = hook_git_dir + "/hooks/" + hook_name
-  if !fs.is_file(hook_path) {
-    return 0
-  }
-  @process.run(hook_path, args, inherit_env=true, cwd=hook_git_dir) catch {
-    _ => 1
-  }
+  run_hook(fs, hook_git_dir, hook_git_dir, hook_name, hook_git_dir, args~)
 }
 
 ///|

@@ -130,7 +130,7 @@ test "grep pattern: validate rejects unmatched group syntax" {
   match result {
     Ok(_) => fail("expected invalid regex error")
     Err(err) =>
-      inspect(
+      debug_inspect(
         err.to_string().contains("invalid regular expression"),
         content="true",
       )
@@ -139,14 +139,16 @@ test "grep pattern: validate rejects unmatched group syntax" {
 
 ///|
 test "grep pattern: first span returns earliest matching column across patterns" {
-  inspect(
+  debug_inspect(
     grep_patterns_first_match_span(
       "foo mmap bar",
       ["bar", "mmap"],
       GrepPatternType::Fixed,
       false,
     ),
-    content="Some({start_column: 5, end_column: 8})",
+    content=(
+      #|Some({ start_column: 5, end_column: 8 })
+    ),
   )
 }
 
@@ -166,7 +168,7 @@ test "grep pattern: word regexp excludes embedded underscore matches" {
 
 ///|
 test "grep pattern: collect match spans returns repeated fixed matches" {
-  inspect(
+  debug_inspect(
     grep_collect_expr_match_spans(
       "foo mmap bar mmap",
       GrepExpr::Pattern("mmap"),
@@ -174,14 +176,18 @@ test "grep pattern: collect match spans returns repeated fixed matches" {
       false,
     ),
     content=(
-      #|[{start_column: 5, end_column: 8}, {start_column: 14, end_column: 17}]
+      #|[
+      #|  { start_column: 5, end_column: 8 },
+      #|  { start_column: 14, end_column: 17 },
+      #|]
+
     ),
   )
 }
 
 ///|
 test "grep pattern: collect match spans stays non-overlapping" {
-  inspect(
+  debug_inspect(
     grep_collect_expr_match_spans(
       "aaaa",
       GrepExpr::Pattern("aa"),
@@ -189,7 +195,11 @@ test "grep pattern: collect match spans stays non-overlapping" {
       false,
     ),
     content=(
-      #|[{start_column: 1, end_column: 2}, {start_column: 3, end_column: 4}]
+      #|[
+      #|  { start_column: 1, end_column: 2 },
+      #|  { start_column: 3, end_column: 4 },
+      #|]
+
     ),
   )
 }

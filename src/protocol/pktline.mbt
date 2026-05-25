@@ -96,6 +96,18 @@ pub fn pktline_decode(data : Bytes) -> Array[(Bytes, Bool)] raise @bit.GitError 
       result.push((Bytes::from_array([]), false))
       continue
     }
+    // Lengths 2 and 3 are illegal per RFC: a non-control pkt-line
+    // header is 4 bytes, so the smallest valid `len` carrying a
+    // payload is 4 (zero-byte payload). Without this guard the
+    // subtraction below underflows and `offset += payload_len` moves
+    // the cursor backwards into bytes already consumed, which lets a
+    // hostile sender either drive the parser into an infinite re-read
+    // loop or surface a confusing "incomplete" error one round later.
+    if len < 4 {
+      raise @bit.GitError::ProtocolError(
+        "Invalid pkt-line length \{len} (must be 0, 1, or >= 4)",
+      )
+    }
     let payload_len = len - 4
     if offset + payload_len > data.length() {
       raise @bit.GitError::ProtocolError("Incomplete pkt-line payload")

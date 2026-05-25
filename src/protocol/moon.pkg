@@ -6,6 +6,10 @@ import {
 }
 
 import {
+  "moonbitlang/core/test" @test,
+} for "wbtest"
+
+import {
   "mizchi/bit" @bit,
   "mizchi/bit/pack" @pack,
   "moonbitlang/core/bench" @bench,

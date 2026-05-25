@@ -222,6 +222,7 @@ fn collect_tree_entries(
       }
       let entries = parse_tree(obj.data)
       for entry in entries {
+        verify_tree_entry_name(entry.name)
         let path = if prefix.length() == 0 {
           entry.name
         } else {

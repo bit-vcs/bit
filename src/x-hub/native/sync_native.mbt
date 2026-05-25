@@ -692,9 +692,10 @@ fn commit_relay_notes(
   message : String,
   timestamp : Int64,
 ) -> @bit.ObjectId raise @bit.GitError {
-  let tree_entries : Array[@bit.TreeEntry] = []
-  for item in store.entries.to_array() {
-    let (name, blob_id) = item
+  let tree_entries : Array[@bit.TreeEntry] = Array::new(
+    capacity=store.entries.length(),
+  )
+  for name, blob_id in store.entries {
     tree_entries.push(@bit.TreeEntry::new("100644", name, blob_id))
   }
   tree_entries.sort_by((a, b) => String::compare(a.name, b.name))

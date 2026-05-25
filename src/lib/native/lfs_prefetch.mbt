@@ -23,8 +23,7 @@ pub async fn lfs_prefetch_for_checkout(
   let files = @bitlib.collect_tree_files_from_commit(db, rfs, commit_id)
   // 2. Find LFS pointers that need downloading
   let needed : Array[@bitlib.LfsPointer] = []
-  for item in files.to_array() {
-    let (path, info) = item
+  for path, info in files {
     if info.mode == 0o160000 {
       continue
     }

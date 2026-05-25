@@ -331,25 +331,26 @@ pub fn compare_vector_clocks(
 
 ///|
 fn compare_clock(a : Map[String, Int64], b : Map[String, Int64]) -> Int {
-  let keys : Map[String, Bool] = {}
-  for item in a.to_array() {
-    let (key, _) = item
-    keys[key] = true
-  }
-  for item in b.to_array() {
-    let (key, _) = item
-    keys[key] = true
-  }
   let mut a_gt = false
   let mut b_gt = false
-  for item in keys.to_array() {
-    let (key, _) = item
-    let va = a.get(key).unwrap_or(0)
+  // Walk a's entries; b-only entries are handled by the second pass.
+  for key, va in a {
     let vb = b.get(key).unwrap_or(0)
     if va > vb {
       a_gt = true
     } else if vb > va {
       b_gt = true
+    }
+  }
+  // b-only keys: a's missing value is treated as 0.
+  for key, vb in b {
+    if a.contains(key) {
+      continue
+    }
+    if vb > 0 {
+      b_gt = true
+    } else if vb < 0 {
+      a_gt = true
     }
   }
   if a_gt && !b_gt {
@@ -700,8 +701,7 @@ pub fn HubStore::list_records(
 ) -> Array[HubRecord] {
   let result : Array[HubRecord] = []
   let include_deleted_val = include_deleted
-  for item in self.entries.to_array() {
-    let (_, blob_id) = item
+  for blob_id in self.entries.values() {
     let obj = objects.get(blob_id) catch { _ => None }
     match obj {
       None => ()
@@ -750,9 +750,10 @@ fn commit_notes(
   timestamp : Int64,
 ) -> @bit.ObjectId raise @bit.GitError {
   // Build tree from entries
-  let tree_entries : Array[@bit.TreeEntry] = []
-  for item in store.entries.to_array() {
-    let (name, blob_id) = item
+  let tree_entries : Array[@bit.TreeEntry] = Array::new(
+    capacity=store.entries.length(),
+  )
+  for name, blob_id in store.entries {
     tree_entries.push(@bit.TreeEntry::new("100644", name, blob_id))
   }
   tree_entries.sort_by((a, b) => String::compare(a.name, b.name))

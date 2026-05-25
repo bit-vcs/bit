@@ -43,6 +43,16 @@ pub fn collect_loose_ref_ids(
   if !fs.is_dir(dir) {
     return ()
   }
+  // Early-exit: when a refname-prefix filter is set, skip whole
+  // subtrees whose refname can never intersect with the filter
+  // (e.g. don't walk `refs/tags/` when the caller asked for
+  // `refs/heads/`). Before this guard the recursion stepped into
+  // every `.git/refs/*` directory and filtered at the file level.
+  if filter_prefix is Some(pfx) &&
+    prefix.length() > 0 &&
+    !refs_subtree_intersects_filter(prefix, pfx) {
+    return ()
+  }
   let entries = fs.readdir(dir) catch { _ => [] }
   for entry in entries {
     if entry == "." || entry == ".." {
@@ -69,6 +79,25 @@ pub fn collect_loose_ref_ids(
       out[name] = id
     }
   }
+}
+
+///|
+/// Whether refnames under directory `dir_refname` can intersect the
+/// caller-supplied `filter_prefix`. Used to prune the loose-ref
+/// recursion without reading every directory entry. Both inputs are
+/// refname-style paths (no leading `/`).
+///
+/// A refname under `dir_refname/` matches `filter_prefix` iff one of
+/// the two strings is a prefix of the other (after appending `/` to
+/// the directory):
+///   * filter narrower than dir: filter starts with `dir + "/"`
+///   * dir inside filter range:  `dir + "/"` starts with filter
+fn refs_subtree_intersects_filter(
+  dir_refname : String,
+  filter_prefix : String,
+) -> Bool {
+  let with_slash = dir_refname + "/"
+  filter_prefix.has_prefix(with_slash) || with_slash.has_prefix(filter_prefix)
 }
 
 ///|

@@ -733,18 +733,23 @@ async fn run_hub_notify_hook(
   topic : String,
   record : @hub.HubRecord,
 ) -> Int {
-  let hook_path = git_dir + "/hooks/hub-notify"
-  if !fs.is_file(hook_path) {
+  let root = os_parent_path(git_dir)
+  // Distinguish "hook absent" from "hook errored" — callers treat -1
+  // as the absence sentinel. We pre-check the legacy file path and
+  // any config override here so the contract stays the same.
+  let cfg = read_hook_config(fs, git_dir, "hub-notify")
+  let legacy_path = resolve_hooks_dir(fs, root, git_dir) + "/hub-notify"
+  if cfg.commands.length() == 0 && !fs.is_file(legacy_path) {
     return -1
   }
-  @process.run(
-    hook_path,
-    [topic, record.kind, record.key, record.node],
-    inherit_env=true,
-    cwd=os_parent_path(git_dir),
-  ) catch {
-    _ => 1
-  }
+  run_hook(
+    fs,
+    root,
+    git_dir,
+    "hub-notify",
+    root,
+    args=[topic, record.kind, record.key, record.node],
+  )
 }
 
 ///|

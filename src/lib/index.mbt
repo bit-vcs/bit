@@ -141,11 +141,9 @@ pub fn read_index_entries(
         None => selected[entry.path] = (prio, entry)
       }
     }
-    let deduped : Array[IndexEntry] = []
-    for item in selected.to_array() {
-      let (_, value) = item
-      let (_, entry) = value
-      deduped.push(entry)
+    let deduped : Array[IndexEntry] = Array::new(capacity=selected.length())
+    for _, value in selected {
+      deduped.push(value.1)
     }
     deduped.sort_by((a, b) => index_path_compare_git_order(a.path, b.path))
     deduped
@@ -262,8 +260,7 @@ pub fn expand_sparse_skip_worktree_paths(
   }
   let db = ObjectDb::load(fs, git_dir)
   let expanded : Map[String, Bool] = {}
-  for item in skip_worktree_paths.to_array() {
-    let (path, _) = item
+  for path in skip_worktree_paths.keys() {
     expanded[path] = true
   }
   for entry in entries {
@@ -790,8 +787,7 @@ fn index_collect_changed_paths(
   }
   let changed : Array[String] = []
   let seen : Map[String, Bool] = {}
-  for item in old_by_path.to_array() {
-    let (path, old_sig) = item
+  for path, old_sig in old_by_path {
     match new_by_path.get(path) {
       Some(new_sig) if new_sig == old_sig => ()
       _ =>
@@ -801,8 +797,7 @@ fn index_collect_changed_paths(
         }
     }
   }
-  for item in new_by_path.to_array() {
-    let (path, _) = item
+  for path in new_by_path.keys() {
     if !old_by_path.contains(path) && !seen.contains(path) {
       seen[path] = true
       changed.push(path)
@@ -904,8 +899,7 @@ fn index_build_cache_tree_from_entries(
         }
     }
   }
-  for item in dir_map.to_array() {
-    let (dir_name, list) = item
+  for dir_name, list in dir_map {
     let subtree = index_build_cache_tree_from_entries(list, name=dir_name)
     file_entries.push(
       @bit.TreeEntry::new("40000", dir_name, subtree.oid.unwrap()),
@@ -1134,11 +1128,7 @@ pub fn write_skip_worktree_paths(
       by_path[path] = true
     }
   }
-  let sorted : Array[String] = []
-  for item in by_path.to_array() {
-    let (path, _) = item
-    sorted.push(path)
-  }
+  let sorted = by_path.keys().to_array()
   sorted.sort_by((a, b) => String::compare(a, b))
   if sorted.length() == 0 {
     fs.remove_file(state_path) catch {

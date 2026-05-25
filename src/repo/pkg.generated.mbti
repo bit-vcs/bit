@@ -25,6 +25,8 @@ pub fn parse_commit(Bytes) -> CommitInfo raise @object.GitError
 
 pub fn parse_tree(Bytes) -> Array[@object.TreeEntry] raise @object.GitError
 
+pub fn verify_tree_entry_name(String) -> Unit raise @object.GitError
+
 pub fn write_git_metadata(ObjectStore, @object.ObjectId, String, String, &@types.FileSystem, String) -> Unit raise @object.GitError
 
 // Errors
