@@ -237,3 +237,71 @@ test "fuzz: date_parse approxidate_relative" {
   }
 }
 
+///|
+/// `parse_rev_parse_short_length` accepts decimal digits and rejects
+/// anything else. Random ASCII (whitespace, sign chars, huge numbers)
+/// must not crash via integer overflow.
+test "fuzz: parse_rev_parse_short_length with random ascii" {
+  let rng = Lcg::new(0x5407)
+  for _ in 0..<128 {
+    let s = random_ascii_string(rng, rng.next_int() % 24)
+    ignore(@bitlib.parse_rev_parse_short_length(s))
+  }
+}
+
+///|
+/// `parse_reflog_selector` decodes `<ref>@{N}` forms. Mutate the
+/// boundary cases: empty ref, missing `@{`, missing `}`, non-digit
+/// number, overflow-length number.
+test "fuzz: parse_reflog_selector with random spec" {
+  let rng = Lcg::new(0xEF10)
+  for _ in 0..<128 {
+    let s = random_ascii_string(rng, rng.next_int() % 32)
+    ignore(@bitlib.parse_reflog_selector(s))
+  }
+  // Structured: `<refname>@{<digits>}`
+  for _ in 0..<128 {
+    let sb = StringBuilder::new()
+    sb.write_string(random_ascii_string(rng, rng.next_int() % 12))
+    sb.write_string("@{")
+    let digit_count = rng.next_int() % 20
+    for _ in 0..<digit_count {
+      let code = rng.next_int() % 10 + 48
+      sb.write_char(code.unsafe_to_char())
+    }
+    sb.write_string("}")
+    ignore(@bitlib.parse_reflog_selector(sb.to_string()))
+  }
+}
+
+///|
+/// `parse_reflog_date_selector` decodes `<ref>@{<date>}` forms.
+test "fuzz: parse_reflog_date_selector with random spec" {
+  let rng = Lcg::new(0xDA7E)
+  for _ in 0..<128 {
+    let s = random_ascii_string(rng, rng.next_int() % 32)
+    ignore(@bitlib.parse_reflog_date_selector(s))
+  }
+}
+
+///|
+/// `parse_index_pathspec` decodes `:<stage>:<path>` index pathspecs.
+/// Stage byte ('0'..'3') vs arbitrary bytes is the interesting axis.
+test "fuzz: parse_index_pathspec with random spec" {
+  let rng = Lcg::new(0x9A7)
+  for _ in 0..<128 {
+    let s = random_ascii_string(rng, rng.next_int() % 32)
+    ignore(@bitlib.parse_index_pathspec(s))
+  }
+  // Bias toward the `:N:` prefix form.
+  for _ in 0..<128 {
+    let sb = StringBuilder::new()
+    sb.write_char(':')
+    let stage_code = rng.next_int() % 60 + 48 // 0..<60 + '0'
+    sb.write_char(stage_code.unsafe_to_char())
+    sb.write_char(':')
+    sb.write_string(random_ascii_string(rng, rng.next_int() % 20))
+    ignore(@bitlib.parse_index_pathspec(sb.to_string()))
+  }
+}
+

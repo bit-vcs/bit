@@ -6,6 +6,8 @@ import {
   "moonbitlang/core/encoding/utf8" @utf8,
   "mizchi/bit/config_parse" @config_parse,
   "mizchi/bit/date_parse" @date_parse,
+  "mizchi/bit/repo" @repo,
+  "mizchi/bit/lib" @bitlib,
 }
 
 warnings = "-29"
