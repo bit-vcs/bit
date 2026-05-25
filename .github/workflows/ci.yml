@@ -50,7 +50,17 @@ jobs:
           rm -f _build/.moon-lock
       - name: Run native tests
         timeout-minutes: 30
-        run: moon test --target native --no-parallelize -j 1
+        run: |
+          set -o pipefail
+          moon test --target native --no-parallelize -j 1 2>&1 | tee /tmp/native_test.log
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -ne 0 ]; then
+            echo "::group::Native test failures"
+            grep -E "^\[mizchi/bit\] test .* failed:" /tmp/native_test.log | head -40
+            echo "::endgroup::"
+            grep -E "^Total tests:" /tmp/native_test.log | tail -5
+          fi
+          exit $rc
 
   distributed-test:
     runs-on: ubuntu-latest
