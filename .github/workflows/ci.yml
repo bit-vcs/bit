@@ -56,17 +56,29 @@ jobs:
           rc=${PIPESTATUS[0]}
           if [ "$rc" -ne 0 ]; then
             {
-              echo "## Native test failures"
+              echo "## Native test step (exit $rc)"
               echo ""
+              echo '### Last 200 lines'
               echo '```'
-              grep -E "^\[mizchi/bit\] test .* failed:" /tmp/native_test.log | head -40
-              grep -E "^Total tests:" /tmp/native_test.log | tail -5
+              tail -200 /tmp/native_test.log
+              echo '```'
+              echo ''
+              echo '### Failure lines'
+              echo '```'
+              grep -E "^\[mizchi/bit\] test .* failed:" /tmp/native_test.log | head -60
+              echo '```'
+              echo ''
+              echo '### Totals'
+              echo '```'
+              grep -E "^Total tests:" /tmp/native_test.log
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
-            echo "::error::native tests failed (see step summary at the top of the run page)"
-            grep -E "^\[mizchi/bit\] test .* failed:" /tmp/native_test.log | head -40 | while IFS= read -r line; do
+            # Surface up to 10 failure annotations (action caps annotations per step).
+            grep -E "^\[mizchi/bit\] test .* failed:" /tmp/native_test.log | head -10 | while IFS= read -r line; do
               echo "::error::$line"
             done
+            # Always emit a sentinel error so the check page shows we attempted diag.
+            echo "::error::Native tests failed with exit $rc (see step summary)"
           fi
           exit $rc
 
