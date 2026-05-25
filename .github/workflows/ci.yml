@@ -82,6 +82,13 @@ jobs:
           fi
           exit $rc
 
+      - name: Upload native test log (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-test-log
+          path: /tmp/native_test.log
+
   distributed-test:
     runs-on: ubuntu-latest
     steps:
