@@ -89,6 +89,27 @@ jobs:
           name: native-test-log
           path: /tmp/native_test.log
 
+      - name: Post log tail as PR comment on failure
+        if: failure() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            let log = '';
+            try { log = fs.readFileSync('/tmp/native_test.log', 'utf8'); }
+            catch (e) { log = '(log read failed: ' + e.message + ')'; }
+            const tail = log.split('\n').slice(-300).join('\n');
+            const body = '### Native test diag (sha ' + context.sha.slice(0, 7) + ')\n\n' +
+              'Log size: ' + log.length + ' bytes\n\n' +
+              '<details><summary>last 300 lines</summary>\n\n```\n' + tail + '\n```\n</details>\n';
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body,
+            });
+
   distributed-test:
     runs-on: ubuntu-latest
     steps:
