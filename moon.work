@@ -2,5 +2,12 @@
 // See docs/package-layout.md for the module split rationale.
 members = [
   ".",
+  "modules/bitx_bitconfig",
+  "modules/bitx_doc",
+  "modules/bitx_hq",
+  "modules/bitx_hub",
   "modules/bitx_kv",
+  "modules/bitx_rebase_ai",
+  "modules/bitx_subdir",
+  "modules/bitx_workspace",
 ]

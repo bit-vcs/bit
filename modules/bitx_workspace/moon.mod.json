@@ -1,0 +1,16 @@
+{
+  "name": "mizchi/bitx_workspace",
+  "version": "0.42.2",
+  "deps": {
+    "mizchi/bit": "0.42.2",
+    "mizchi/bitflow": "0.4.0",
+    "moonbitlang/async": "0.16.6",
+    "moonbitlang/x": "0.4.40"
+  },
+  "repository": "https://github.com/mizchi/bit-vcs",
+  "license": "Apache-2.0",
+  "keywords": ["git", "workspace"],
+  "description": "Workspace flow (extension module for mizchi/bit)",
+  "source": "src",
+  "preferred-target": "native"
+}

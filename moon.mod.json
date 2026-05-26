@@ -10,7 +10,14 @@
     "mizchi/x": "0.2.0",
     "bobzhang/toml": "0.1.7",
     "mizchi/libgit2": "0.1.0",
-    "mizchi/zlib": "0.4.5"
+    "mizchi/zlib": "0.4.5",
+    "mizchi/bitx_bitconfig": "0.42.2",
+    "mizchi/bitx_doc": "0.42.2",
+    "mizchi/bitx_hq": "0.42.2",
+    "mizchi/bitx_hub": "0.42.2",
+    "mizchi/bitx_rebase_ai": "0.42.2",
+    "mizchi/bitx_subdir": "0.42.2",
+    "mizchi/bitx_workspace": "0.42.2"
   },
   "readme": "README.mbt.md",
   "repository": "https://github.com/mizchi/bit-vcs",

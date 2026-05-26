@@ -1,0 +1,14 @@
+{
+  "name": "mizchi/bitx_subdir",
+  "version": "0.42.2",
+  "deps": {
+    "mizchi/bit": "0.42.2",
+    "mizchi/zlib": "0.4.5"
+  },
+  "repository": "https://github.com/mizchi/bit-vcs",
+  "license": "Apache-2.0",
+  "keywords": ["git", "subdir"],
+  "description": "Subdirectory clone (extension module for mizchi/bit)",
+  "source": "src",
+  "preferred-target": "native"
+}

@@ -71,27 +71,27 @@ Porcelain layer. May depend on `core/*` and `mid/*`. Used by `cmd/*` and
 | `mizchi/bit/vfs`              | `src/vfs`          | Virtual FS over commits (used by `lib`, `x-kv`, `x-subdir`) |
 | `mizchi/bit/fingerprint`      | `src/fingerprint`  | Workspace fingerprint (used by `x-workspace`)      |
 
-### x-* (extensions, gitoxide にはない bit 独自機能)
+### bitx_* (extensions, gitoxide にはない bit 独自機能)
 
-Optional features. Each `x-*` package is independent and must not depend on
-other `x-*` packages. May depend on `core/*`, `mid/*`, and `high/*`.
+Optional features. Each extension is its own MoonBit module under
+`modules/`, so consumers can pull in only the features they need. An
+extension may depend on `mizchi/bit` (core / mid / high) but must not
+depend on another extension module — shared logic should be promoted into
+`mid` or `core` of the main module.
 
-| Package                          | Path                      | Description                  |
-|----------------------------------|---------------------------|------------------------------|
-| `mizchi/bit/x-hub`               | `src/x-hub`               | Local PR / Issue metadata    |
-| `mizchi/bit/x-hub/crypto`        | `src/x-hub/crypto`        | Hub signing primitives       |
-| `mizchi/bit/x-hub/native`        | `src/x-hub/native`        | Hub native bindings          |
-| `mizchi/bitx_kv` †               | `modules/bitx_kv/src`     | Git-backed KV store          |
-| `mizchi/bitx_kv/native` †        | `modules/bitx_kv/src/native` | KV native sync            |
-| `mizchi/bit/x-hq`                | `src/x-hq`                | `ghq`-compatible repo mgr    |
-| `mizchi/bit/x-rebase-ai`         | `src/x-rebase-ai`         | AI rebase helpers            |
-| `mizchi/bit/x-subdir`            | `src/x-subdir`            | Subdirectory clone           |
-| `mizchi/bit/x-workspace`         | `src/x-workspace`         | Workspace flow               |
-| `mizchi/bit/x-bitconfig`         | `src/x-bitconfig`         | bit-specific config          |
-| `mizchi/bit/x-doc`               | `src/x-doc`               | Doc rendering                |
-
-† Lives in a separate MoonBit module under `modules/`. See [Multi-module
-workspace](#multi-module-workspace) below.
+| Module                       | Path                            | Description                     |
+|------------------------------|---------------------------------|---------------------------------|
+| `mizchi/bitx_bitconfig`      | `modules/bitx_bitconfig/src`    | bit-specific config             |
+| `mizchi/bitx_doc`            | `modules/bitx_doc/src`          | Repo-stored markdown docs       |
+| `mizchi/bitx_hq`             | `modules/bitx_hq/src`           | `ghq`-compatible repo manager   |
+| `mizchi/bitx_hub`            | `modules/bitx_hub/src`          | Local PR / Issue metadata       |
+| `mizchi/bitx_hub/crypto`     | `modules/bitx_hub/src/crypto`   | Hub signing primitives          |
+| `mizchi/bitx_hub/native`     | `modules/bitx_hub/src/native`   | Hub native bindings + GitHub    |
+| `mizchi/bitx_kv`             | `modules/bitx_kv/src`           | Git-backed KV store             |
+| `mizchi/bitx_kv/native`      | `modules/bitx_kv/src/native`    | KV native sync                  |
+| `mizchi/bitx_rebase_ai`      | `modules/bitx_rebase_ai/src`    | AI-assisted rebase helpers      |
+| `mizchi/bitx_subdir`         | `modules/bitx_subdir/src`       | Subdirectory clone              |
+| `mizchi/bitx_workspace`      | `modules/bitx_workspace/src`    | Workspace flow                  |
 
 ### cmd (binaries)
 
@@ -106,16 +106,17 @@ CLI entry points. May depend on any layer.
 
 Each layer may import from itself and lower layers only:
 
-| From    | core | mid | high (lib) | x-*  | cmd  |
-|---------|:----:|:---:|:----------:|:----:|:----:|
-| core    | ✓    |     |            |      |      |
-| mid     | ✓    | ✓   |            |      |      |
-| high    | ✓    | ✓   | ✓          |      |      |
-| x-*     | ✓    | ✓   | ✓          | (1)  |      |
-| cmd     | ✓    | ✓   | ✓          | ✓    | ✓    |
+| From    | core | mid | high (lib) | bitx_* | cmd  |
+|---------|:----:|:---:|:----------:|:------:|:----:|
+| core    | ✓    |     |            |        |      |
+| mid     | ✓    | ✓   |            |        |      |
+| high    | ✓    | ✓   | ✓          |        |      |
+| bitx_*  | ✓    | ✓   | ✓          | (1)    |      |
+| cmd     | ✓    | ✓   | ✓          | ✓      | ✓    |
 
-(1) An `x-*` package must not import another `x-*` package. Shared logic
-should be lifted into `high`, `mid`, or `core`.
+(1) A `bitx_*` module must not import another `bitx_*` module. Shared logic
+should be lifted into `high`, `mid`, or `core` of the main `mizchi/bit`
+module.
 
 ## Lint
 
@@ -128,36 +129,43 @@ rules above. CI runs the same script.
 - `lib` (high) is a thin facade. Do not put new logic into `lib`; instead, add
   it to a focused `core/*` or `mid/*` package and re-export through `lib` if
   callers need the convenience.
-- `x-*` packages are independent. If two `x-*` packages need to share code,
-  promote the shared piece into `mid` or `core`.
+- `bitx_*` modules are independent. If two of them need to share code,
+  promote the shared piece into `mid` or `core` of the main `mizchi/bit`
+  module.
 
 ## Multi-module workspace
 
-To keep the main `mizchi/bit` module focused on Git plumbing/porcelain, some
-low-frequency extensions live in their own MoonBit modules under `modules/`.
-The repo root has a `moon.work` file declaring the workspace members; when
-`moon build` resolves dependencies it picks them up locally instead of from
-`mooncakes.io`. This mirrors gitoxide's split between `gix-*` plumbing crates
-and feature-specific crates.
+The main `mizchi/bit` module is kept focused on Git plumbing/porcelain. All
+non-Git extensions are extracted into their own MoonBit modules under
+`modules/`, so a consumer can pull in only the features they need. This
+mirrors gitoxide's split between `gix-*` plumbing crates and feature-specific
+crates.
 
-Extracted extensions follow the `bitx_*` naming convention (one underscore-
-separated word for a single feature). Currently extracted:
+The repo root has a `moon.work` file listing every workspace member. When
+`moon build` resolves dependencies it picks the listed members up locally
+instead of from `mooncakes.io`. The naming convention is `bitx_<feature>`
+(underscore-separated, single underscore-prefixed segment per feature).
 
-| Module                 | Path                  | Origin (before extraction) |
-|------------------------|-----------------------|----------------------------|
-| `mizchi/bitx_kv`       | `modules/bitx_kv`     | `src/x-kv`                 |
+### Cross-module dependencies
+
+`mizchi/bit` declares each `bitx_*` it consumes (via `cmd/*`) in its
+`moon.mod.json` `deps`. Each `bitx_*` module declares `mizchi/bit` in its
+own `deps` when it needs core types. MoonBit's workspace resolver allows
+this module-level cycle because the in-package dependency graph remains
+acyclic.
 
 ### How to add a new extracted module
 
-1. Create `modules/<name>/moon.mod.json` (name should be `mizchi/bitx_<thing>`).
-2. Move the package directory into `modules/<name>/src/`.
-3. Replace any self-import of the old path inside the moved package's
-   `moon.pkg` files (e.g. `"mizchi/bit/x-kv"` → `"mizchi/bitx_kv"`).
-4. Add the new path to `moon.work`'s `members`.
-5. If anything in `mizchi/bit` (typically `cmd/*`) consumes the extracted
-   module, add it to the consumer's `moon.pkg` import and to
-   `moon.mod.json`'s `deps`. Note: this creates a module-level dependency
-   from `mizchi/bit` onto the extension, so do not extract a feature that
-   would back-depend on `mizchi/bit` while also being imported by it
-   (cycle). When in doubt, extract `cmd/*` first.
-6. Update `docs/package-layout.md` and any references in `Taskfile.pkl`.
+1. Create `modules/bitx_<name>/moon.mod.json` with `"name":
+   "mizchi/bitx_<name>"` and the minimum `deps` set.
+2. Move the package directory under `modules/bitx_<name>/src/` with
+   `git mv`.
+3. Replace any self-import inside the moved package's `moon.pkg` files
+   (e.g. `"mizchi/bit/x-foo"` → `"mizchi/bitx_foo"`).
+4. Add the new directory to `moon.work`'s `members`.
+5. For every consumer in `mizchi/bit` (typically `cmd/*`), update the
+   `moon.pkg` import path and add the new module to the root
+   `moon.mod.json`'s `deps`.
+6. Update this document and any references in `Taskfile.pkl`.
+7. Run `moon check` and `moon test --target native -p mizchi/bitx_<name>`
+   to confirm the move is clean.
