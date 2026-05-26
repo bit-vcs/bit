@@ -3,8 +3,8 @@ import {
   "mizchi/bit/types" @types,
   "mizchi/bit/lib" @bitlib,
   "mizchi/bit_hash" @bithash,
-  "mizchi/bit/object" @object,
-  "mizchi/bit/string_utils" @string_utils,
+  "mizchi/bit_object" @object,
+  "mizchi/bit_utils" @string_utils,
   "moonbitlang/core/encoding/utf8" @utf8,
 }
 

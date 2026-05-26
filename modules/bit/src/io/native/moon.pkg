@@ -1,7 +1,8 @@
 import {
   "mizchi/bit" @bit,
+  "mizchi/bit_object" @object,
   "mizchi/bit/io" @bitio,
-  "mizchi/bit/pack" @pack,
+  "mizchi/bit_pack" @pack,
   "mizchi/bit/protocol" @protocol,
   "moonbitlang/async" @async,
   "moonbitlang/async/fs" @afs,

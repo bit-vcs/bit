@@ -33,10 +33,10 @@ fn make_similar_blob_objects(count : Int) -> Array[@bit.PackObject] {
 }
 
 ///|
-let bench_pack_small : Bytes = @pack.create_packfile(make_blob_objects(3))
+let bench_pack_small : Bytes = @bit_pack.create_packfile(make_blob_objects(3))
 
 ///|
-let bench_pack_100 : Bytes = @pack.create_packfile(make_blob_objects(100))
+let bench_pack_100 : Bytes = @bit_pack.create_packfile(make_blob_objects(100))
 
 ///|
 let bench_objects_10 : Array[@bit.PackObject] = make_blob_objects(10)
@@ -50,7 +50,7 @@ let bench_similar_100 : Array[@bit.PackObject] = make_similar_blob_objects(100)
 ///|
 test "bench parse_packfile small" (b : @bench.T) {
   b.bench(fn() {
-    let objs = try! @pack.parse_packfile(bench_pack_small)
+    let objs = try! @bit_pack.parse_packfile(bench_pack_small)
     b.keep(objs.length())
   })
 }
@@ -58,7 +58,7 @@ test "bench parse_packfile small" (b : @bench.T) {
 ///|
 test "bench parse_packfile 100 objects" (b : @bench.T) {
   b.bench(fn() {
-    let objs = try! @pack.parse_packfile(bench_pack_100)
+    let objs = try! @bit_pack.parse_packfile(bench_pack_100)
     b.keep(objs.length())
   })
 }
@@ -66,7 +66,7 @@ test "bench parse_packfile 100 objects" (b : @bench.T) {
 ///|
 test "bench create_packfile 10 objects" (b : @bench.T) {
   b.bench(fn() {
-    let pack = @pack.create_packfile(bench_objects_10)
+    let pack = @bit_pack.create_packfile(bench_objects_10)
     b.keep(pack.length())
   })
 }
@@ -74,7 +74,7 @@ test "bench create_packfile 10 objects" (b : @bench.T) {
 ///|
 test "bench create_packfile 100 objects" (b : @bench.T) {
   b.bench(fn() {
-    let pack = @pack.create_packfile(bench_objects_100)
+    let pack = @bit_pack.create_packfile(bench_objects_100)
     b.keep(pack.length())
   })
 }
@@ -82,7 +82,7 @@ test "bench create_packfile 100 objects" (b : @bench.T) {
 ///|
 test "bench create_packfile_with_delta 100" (b : @bench.T) {
   b.bench(fn() {
-    let pack = @pack.create_packfile_with_delta(
+    let pack = @bit_pack.create_packfile_with_delta(
       bench_similar_100,
       @bit.PackDeltaMode::OfsDelta,
     )
@@ -93,7 +93,7 @@ test "bench create_packfile_with_delta 100" (b : @bench.T) {
 ///|
 test "bench build_pack_index" (b : @bench.T) {
   b.bench(fn() {
-    let idx = try! @pack.build_pack_index(bench_pack_100)
+    let idx = try! @bit_pack.build_pack_index(bench_pack_100)
     b.keep(idx.length())
   })
 }
@@ -104,7 +104,7 @@ test "bench encode_type_and_size" (b : @bench.T) {
     let buf : Array[Byte] = []
     for i in 0..<1000 {
       buf.clear()
-      @pack.encode_type_and_size(3, i * 100, buf)
+      @bit_pack.encode_type_and_size(3, i * 100, buf)
     }
     b.keep(buf.length())
   })
@@ -113,7 +113,7 @@ test "bench encode_type_and_size" (b : @bench.T) {
 ///|
 fn make_encoded_header() -> Bytes {
   let buf : Array[Byte] = []
-  @pack.encode_type_and_size(3, 65536, buf)
+  @bit_pack.encode_type_and_size(3, 65536, buf)
   Bytes::from_array(buf)
 }
 
@@ -125,7 +125,7 @@ test "bench decode_type_and_size_at" (b : @bench.T) {
   b.bench(fn() {
     let mut sum = 0
     for _ in 0..<1000 {
-      let (type_id, size, _) = try! @pack.decode_type_and_size_at(
+      let (type_id, size, _) = try! @bit_pack.decode_type_and_size_at(
         bench_encoded_header, 0,
       )
       sum = sum + type_id + size

@@ -1,5 +1,6 @@
 import {
   "mizchi/bit" @bit,
+  "mizchi/bit_object" @object,
   "mizchi/zlib" @zlib,
   "moonbitlang/core/encoding/utf8" @utf8,
   "moonbitlang/core/string" @string,
@@ -7,6 +8,7 @@ import {
 
 import {
   "mizchi/bit" @bit,
+  "mizchi/bit_object" @object,
   "mizchi/bit/protocol" @protocol,
   "moonbitlang/async" @async,
   "moonbitlang/async/process" @process,

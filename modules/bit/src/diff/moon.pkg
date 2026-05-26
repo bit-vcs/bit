@@ -1,5 +1,6 @@
 import {
   "mizchi/bit" @bit,
+  "mizchi/bit_object" @object,
   "mizchi/bit_diff_core" @diff_core,
   "mizchi/bit/io" @bitio,
   "mizchi/bit/lib" @bitlib,

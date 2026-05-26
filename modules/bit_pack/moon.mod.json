@@ -1,19 +1,18 @@
 {
-  "name": "mizchi/bitx_workspace",
+  "name": "mizchi/bit_pack",
   "version": "0.42.2",
   "deps": {
     "mizchi/bit": "0.42.2",
     "mizchi/bit_object": "0.42.2",
-    "mizchi/bit_osfs": "0.42.2",
-    "mizchi/bit_utils": "0.42.2",
-    "mizchi/bitflow": "0.4.0",
+    "mizchi/tempfile": "0.1.0",
+    "mizchi/zlib": "0.4.5",
     "moonbitlang/async": "0.16.6",
     "moonbitlang/x": "0.4.40"
   },
   "repository": "https://github.com/mizchi/bit-vcs",
   "license": "Apache-2.0",
-  "keywords": ["git", "workspace"],
-  "description": "Workspace flow (extension module for mizchi/bit)",
+  "keywords": ["git", "pack", "packfile", "index"],
+  "description": "Git packfile encoder/decoder + index (gix-pack equivalent)",
   "source": "src",
   "preferred-target": "native"
 }

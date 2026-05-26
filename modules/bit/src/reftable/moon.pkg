@@ -1,6 +1,6 @@
 import {
   "mizchi/bit" @bit,
-  "mizchi/bit/object" @object,
+  "mizchi/bit_object" @object,
 }
 
 warnings = "-29"

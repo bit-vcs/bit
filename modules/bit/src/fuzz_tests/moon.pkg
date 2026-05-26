@@ -1,10 +1,11 @@
 import {
   "mizchi/bit" @bit,
-  "mizchi/bit/pack" @pack,
+  "mizchi/bit_object" @object,
+  "mizchi/bit_pack" @pack,
   "mizchi/bit/protocol" @protocol,
   "mizchi/bit_ignore" @ignore,
   "moonbitlang/core/encoding/utf8" @utf8,
-  "mizchi/bit/config_parse" @config_parse,
+  "mizchi/bit_config" @config_parse,
   "mizchi/bit_date" @date_parse,
   "mizchi/bit/repo" @repo,
   "mizchi/bit/lib" @bitlib,

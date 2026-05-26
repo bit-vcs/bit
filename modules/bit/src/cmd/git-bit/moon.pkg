@@ -1,6 +1,7 @@
 import {
   "mizchi/bit" @bitcore,
-  "mizchi/bit/config_parse" @config_parse,
+  "mizchi/bit_object" @object,
+  "mizchi/bit_config" @config_parse,
   "mizchi/bit_hash" @bithash,
   "mizchi/bit/lib" @bitlib,
   "mizchi/bit/repo_ops" @bitrepo,

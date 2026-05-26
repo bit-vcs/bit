@@ -1,5 +1,6 @@
 import {
   "mizchi/bit" @bit,
+  "mizchi/bit_object" @object,
   "moonbitlang/x/encoding" @encoding,
   "moonbitlang/x/path" @path,
 }

@@ -60,7 +60,7 @@ test "bench profile: delta compute 500 blobs" (b : @bench.T) {
     for obj in profile_500 {
       match prev {
         Some(p) => {
-          let delta = @pack.build_delta_pub(p.data, obj.data)
+          let delta = @bit_pack.build_delta_pub(p.data, obj.data)
           total += delta.length()
         }
         None => ()
@@ -106,7 +106,7 @@ test "bench profile: Array[Byte] collect 500x200B" (b : @bench.T) {
 ///|
 test "bench profile: full packfile 500 blobs" (b : @bench.T) {
   b.bench(fn() {
-    let pack = @pack.create_packfile(profile_500)
+    let pack = @bit_pack.create_packfile(profile_500)
     b.keep(pack.length())
   })
 }
@@ -114,7 +114,7 @@ test "bench profile: full packfile 500 blobs" (b : @bench.T) {
 ///|
 test "bench profile: packfile with delta 500 blobs" (b : @bench.T) {
   b.bench(fn() {
-    let pack = @pack.create_packfile_with_delta(
+    let pack = @bit_pack.create_packfile_with_delta(
       profile_500,
       @bit.PackDeltaMode::OfsDelta,
     )

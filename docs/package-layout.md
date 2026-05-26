@@ -24,13 +24,16 @@ modules/
   bit_apply/               ← standalone core modules (gix-* equivalents)
   bit_archive/
   bit_bootstrap/
+  bit_config/
   bit_date/
   bit_diff3/
   bit_diff_core/
   bit_fast_import/
   bit_hash/
   bit_ignore/
+  bit_object/
   bit_osfs/
+  bit_pack/
   bit_trailers/
   bit_utils/
   bitx_bitconfig/          ← extension modules (non-Git features)
@@ -80,12 +83,12 @@ is to keep extracting until every core package is its own module.
 | `mizchi/bit_fast_import`      | `modules/bit_fast_import/src`     | (fast-import stream)               |
 | `mizchi/bit_osfs`             | `modules/bit_osfs/src`            | `gix-fs` (OS-backed impl)          |
 | `mizchi/bit_bootstrap`        | `modules/bit_bootstrap/src`       | (bootstrap helpers)                |
-| `mizchi/bit/types`            | `modules/bit/src/types`           | (shared types)                     |
-| `mizchi/bit/config_parse`     | `modules/bit/src/config_parse`    | `gix-config`                       |
-| `mizchi/bit/object`           | `modules/bit/src/object`          | `gix-object`                       |
+| `mizchi/bit_config`           | `modules/bit_config/src`          | `gix-config`                       |
+| `mizchi/bit_object`           | `modules/bit_object/src`          | `gix-object`                       |
+| `mizchi/bit_pack`             | `modules/bit_pack/src`            | `gix-pack`                         |
+| `mizchi/bit/types`            | `modules/bit/src/types`           | (shared types, re-exports object)  |
 | `mizchi/bit/io`               | `modules/bit/src/io`              | `gix-fs` (abstract)                |
 | `mizchi/bit/io/native`        | `modules/bit/src/io/native`       | `gix-fs` (native bindings)         |
-| `mizchi/bit/pack`             | `modules/bit/src/pack`            | `gix-pack`                         |
 | `mizchi/bit/refs`             | `modules/bit/src/refs`            | `gix-ref`                          |
 | `mizchi/bit/reftable`         | `modules/bit/src/reftable`        | (reftable backend)                 |
 | `mizchi/bit/protocol`         | `modules/bit/src/protocol`        | `gix-protocol`/`gix-transport`     |
