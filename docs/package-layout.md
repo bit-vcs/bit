@@ -26,6 +26,7 @@ modules/
   bit_bootstrap/
   bit_config/
   bit_date/
+  bit_diff/
   bit_diff3/
   bit_diff_core/
   bit_fast_import/
@@ -35,14 +36,17 @@ modules/
   bit_object/
   bit_osfs/
   bit_pack/
+  bit_pack_ops/
   bit_protocol/
   bit_refs/
   bit_reftable/
   bit_remote/
   bit_repo/
+  bit_repo_ops/
   bit_trailers/
   bit_types/
   bit_utils/
+  bit_worktree/
   bitx_bitconfig/          ← extension modules (non-Git features)
   bitx_doc/
   bitx_hq/
@@ -110,12 +114,17 @@ is to keep extracting until every core package is its own module.
 
 Operations layered on top of `core/*`. May depend on `core/*` only.
 
-| Package                  | Path             | Notes                                |
-|--------------------------|------------------|--------------------------------------|
-| `mizchi/bit/repo_ops`    | `modules/bit/src/repo_ops`   | Repository-level operations          |
-| `mizchi/bit/pack_ops`    | `modules/bit/src/pack_ops`   | `collect_reachable_objects`, etc.    |
-| `mizchi/bit/worktree`    | `modules/bit/src/worktree`   | status / add / commit / rm / mv      |
-| `mizchi/bit/diff`        | `modules/bit/src/diff`       | High-level diff / show               |
+| Module / Package         | Path                              | Notes                                |
+|--------------------------|-----------------------------------|--------------------------------------|
+| `mizchi/bit_repo_ops`    | `modules/bit_repo_ops/src`        | Repository-level operations          |
+| `mizchi/bit_pack_ops`    | `modules/bit_pack_ops/src`        | `collect_reachable_objects`, etc.    |
+| `mizchi/bit_worktree`    | `modules/bit_worktree/src`        | status / add / commit / rm / mv      |
+| `mizchi/bit_diff`        | `modules/bit_diff/src`            | High-level diff / show               |
+
+(These currently still import `mizchi/bit/lib`, so they are tracked as
+**high** by `tools/check-layers.mjs` even though gitoxide-style they
+belong to mid. Promoting them once their `lib` dep is broken is on the
+roadmap.)
 
 ### high (gitoxide `gix` porcelain 相当)
 

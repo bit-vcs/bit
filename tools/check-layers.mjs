@@ -42,6 +42,16 @@ const CORE_MODULES = new Set([
   "mizchi/bit_utils",
 ]);
 
+// Standalone "high"-layer modules (carved out of mizchi/bit, still depend
+// on mizchi/bit/lib). Long-term direction: break their lib dependency
+// and promote to MID, eventually shrinking lib to a thin facade.
+const HIGH_MODULES = new Set([
+  "mizchi/bit_diff",
+  "mizchi/bit_pack_ops",
+  "mizchi/bit_repo_ops",
+  "mizchi/bit_worktree",
+]);
+
 // Layer order (low to high). A package may import from its own layer or any
 // lower layer.
 const LAYERS = ["core", "mid", "high", "ext", "cmd"];
@@ -103,10 +113,16 @@ function isCoreModule(pkgPath) {
   return CORE_MODULES.has(head);
 }
 
+function isHighModule(pkgPath) {
+  const head = pkgPath.split("/").slice(0, 2).join("/");
+  return HIGH_MODULES.has(head);
+}
+
 function isOurModule(pkgPath) {
   if (pkgPath === MODULE_PREFIX || pkgPath.startsWith(MODULE_PREFIX + "/")) return true;
   if (isExtModule(pkgPath)) return true;
   if (isCoreModule(pkgPath)) return true;
+  if (isHighModule(pkgPath)) return true;
   return false;
 }
 
@@ -116,6 +132,7 @@ function classify(pkgPath) {
   if (!isOurModule(pkgPath)) return null; // external
   if (isExtModule(pkgPath)) return "ext";
   if (isCoreModule(pkgPath)) return "core";
+  if (isHighModule(pkgPath)) return "high";
   const rel = pkgPath === MODULE_PREFIX ? "" : pkgPath.slice(MODULE_PREFIX.length + 1);
   const top = rel.split("/")[0];
   if (rel === "") return "core";
@@ -128,7 +145,7 @@ function classify(pkgPath) {
 
 function topSegment(pkgPath) {
   if (!isOurModule(pkgPath)) return null;
-  if (isCoreModule(pkgPath)) {
+  if (isCoreModule(pkgPath) || isHighModule(pkgPath)) {
     return pkgPath.split("/").slice(0, 2).join("/");
   }
   if (isExtModule(pkgPath)) {

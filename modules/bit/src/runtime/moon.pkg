@@ -5,7 +5,7 @@ import {
   "mizchi/bit_repo" @repo,
   "mizchi/bit_io" @io,
   "mizchi/bit/lib" @bitlib,
-  "mizchi/bit/repo_ops" @bitrepo,
+  "mizchi/bit_repo_ops" @bitrepo,
   "mizchi/bit_utils" @string_utils,
   "moonbitlang/core/encoding/utf8" @utf8,
   "moonbitlang/core/env" @env,
