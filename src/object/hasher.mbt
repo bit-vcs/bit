@@ -125,21 +125,7 @@ pub fn create_tree_with_algo(
   algo : HashAlgorithm,
   entries : Array[TreeEntry],
 ) -> (ObjectId, Bytes) {
-  let content : Array[Byte] = []
-  for entry in entries {
-    for c in entry.mode {
-      content.push(c.to_int().to_byte())
-    }
-    content.push(b' ')
-    for b in @utf8.encode(entry.name) {
-      content.push(b)
-    }
-    content.push(b'\x00')
-    for b in entry.id.bytes {
-      content.push(b)
-    }
-  }
-  create_object_with_algo(algo, ObjectType::Tree, array_to_bytes(content))
+  create_object_with_algo(algo, ObjectType::Tree, serialize_tree(entries))
 }
 
 ///|

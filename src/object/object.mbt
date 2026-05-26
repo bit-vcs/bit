@@ -1,34 +1,6 @@
 ///| Git object creation and hashing
 
 ///|
-/// Helper to convert Array[Byte] to Bytes
-pub fn array_to_bytes(arr : Array[Byte]) -> Bytes {
-  Bytes::from_iter(arr.iter())
-}
-
-///|
-/// Helper to convert String to byte array (ASCII encoding)
-fn string_to_byte_array(s : String) -> Array[Byte] {
-  let arr : Array[Byte] = []
-  for c in s {
-    arr.push(c.to_int().to_byte())
-  }
-  arr
-}
-
-///|
-fn object_append_bytes(out : Array[Byte], data : Bytes) -> Unit {
-  for b in data {
-    out.push(b)
-  }
-}
-
-///|
-fn object_append_utf8_string(out : Array[Byte], s : String) -> Unit {
-  object_append_bytes(out, @utf8.encode(s))
-}
-
-///|
 fn object_normalize_encoding_name(value : String) -> String {
   let out = StringBuilder::new()
   for c in value.trim().to_lower() {
@@ -53,67 +25,64 @@ fn object_is_iso_8859_1_encoding(encoding : String) -> Bool {
 }
 
 ///|
-fn object_commit_message_bytes(
-  message : String,
-  encoding : String,
-) -> Array[Byte] {
+fn object_commit_message_bytes(message : String, encoding : String) -> Bytes {
+  let buf = @buffer.new()
   if object_is_iso_8859_1_encoding(encoding) {
-    let out : Array[Byte] = []
     for c in message {
       let code = c.to_int()
       if code <= 0xff {
-        out.push(code.to_byte())
+        buf.write_byte(code.to_byte())
       } else {
-        object_append_bytes(out, @utf8.encode(c.to_string()))
+        buf.write_bytes(@utf8.encode(c.to_string()))
       }
     }
-    out
   } else {
-    @utf8.encode(message).to_array()
+    buf.write_bytes(@utf8.encode(message))
   }
+  buf.to_bytes()
 }
 
 ///|
-fn object_serialize_commit_content_array(commit : Commit) -> Array[Byte] {
-  let content : Array[Byte] = []
-  object_append_utf8_string(content, "tree ")
-  object_append_utf8_string(content, commit.tree.to_hex())
-  content.push(b'\n')
+fn object_serialize_commit_content_bytes(commit : Commit) -> Bytes {
+  let buf = @buffer.new()
+  buf.write_bytes(@utf8.encode("tree "))
+  buf.write_bytes(@utf8.encode(commit.tree.to_hex()))
+  buf.write_byte(b'\n')
   for parent in commit.parents {
-    object_append_utf8_string(content, "parent ")
-    object_append_utf8_string(content, parent.to_hex())
-    content.push(b'\n')
+    buf.write_bytes(@utf8.encode("parent "))
+    buf.write_bytes(@utf8.encode(parent.to_hex()))
+    buf.write_byte(b'\n')
   }
-  object_append_utf8_string(content, "author ")
-  object_append_utf8_string(content, commit.author)
-  object_append_utf8_string(content, " ")
-  object_append_utf8_string(content, commit.author_time.to_string())
-  object_append_utf8_string(content, " ")
-  object_append_utf8_string(content, commit.author_tz)
-  content.push(b'\n')
-  object_append_utf8_string(content, "committer ")
-  object_append_utf8_string(content, commit.committer)
-  object_append_utf8_string(content, " ")
-  object_append_utf8_string(content, commit.commit_time.to_string())
-  object_append_utf8_string(content, " ")
-  object_append_utf8_string(content, commit.committer_tz)
-  content.push(b'\n')
+  buf.write_bytes(@utf8.encode("author "))
+  buf.write_bytes(@utf8.encode(commit.author))
+  buf.write_byte(b' ')
+  buf.write_bytes(@utf8.encode(commit.author_time.to_string()))
+  buf.write_byte(b' ')
+  buf.write_bytes(@utf8.encode(commit.author_tz))
+  buf.write_byte(b'\n')
+  buf.write_bytes(@utf8.encode("committer "))
+  buf.write_bytes(@utf8.encode(commit.committer))
+  buf.write_byte(b' ')
+  buf.write_bytes(@utf8.encode(commit.commit_time.to_string()))
+  buf.write_byte(b' ')
+  buf.write_bytes(@utf8.encode(commit.committer_tz))
+  buf.write_byte(b'\n')
   if commit.encoding.length() > 0 && !object_is_utf8_encoding(commit.encoding) {
-    object_append_utf8_string(content, "encoding ")
-    object_append_utf8_string(content, commit.encoding)
-    content.push(b'\n')
+    buf.write_bytes(@utf8.encode("encoding "))
+    buf.write_bytes(@utf8.encode(commit.encoding))
+    buf.write_byte(b'\n')
   }
-  content.push(b'\n')
+  buf.write_byte(b'\n')
   let msg_bytes = object_commit_message_bytes(commit.message, commit.encoding)
-  content.append(msg_bytes)
+  buf.write_bytes(msg_bytes)
   // For verbatim mode (commit-tree), store message exactly as given.
   // Otherwise, ensure trailing newline (git commit behavior).
   if !commit.verbatim_message {
     if msg_bytes.length() == 0 || msg_bytes[msg_bytes.length() - 1] != b'\n' {
-      content.push(b'\n')
+      buf.write_byte(b'\n')
     }
   }
-  content
+  buf.to_bytes()
 }
 
 ///|
@@ -143,14 +112,11 @@ pub fn hash_object_content(obj_type : ObjectType, content : Bytes) -> ObjectId {
 /// Format a Git object (without compression)
 fn format_object(obj_type : ObjectType, content : Bytes) -> Bytes {
   let header = "\{obj_type.to_string()} \{content.length()}\u0000"
-  let result : Array[Byte] = []
-  for c in header {
-    result.push(c.to_int().to_byte())
-  }
-  for b in content {
-    result.push(b)
-  }
-  array_to_bytes(result)
+  let header_bytes = @utf8.encode(header)
+  let buf = @buffer.new(size_hint=header_bytes.length() + content.length())
+  buf.write_bytes(header_bytes)
+  buf.write_bytes(content)
+  buf.to_bytes()
 }
 
 ///|
@@ -162,31 +128,18 @@ pub fn create_blob(content : Bytes) -> (ObjectId, Bytes) {
 ///|
 /// Create a blob from string content
 pub fn create_blob_string(content : String) -> (ObjectId, Bytes) {
-  content |> string_to_byte_array |> array_to_bytes |> create_blob
+  let buf = @buffer.new(size_hint=content.length())
+  for c in content {
+    buf.write_byte(c.to_int().to_byte())
+  }
+  create_blob(buf.to_bytes())
 }
 
 ///|
 /// Create a tree object from entries
 /// Entries must be sorted by name
 pub fn create_tree(entries : Array[TreeEntry]) -> (ObjectId, Bytes) {
-  let content : Array[Byte] = []
-  for entry in entries {
-    // mode (as ASCII)
-    for c in entry.mode {
-      content.push(c.to_int().to_byte())
-    }
-    // space
-    content.push(b' ')
-    // name (as UTF-8 bytes)
-    object_append_utf8_string(content, entry.name)
-    // null byte
-    content.push(b'\x00')
-    // 20-byte SHA
-    for b in entry.id.bytes {
-      content.push(b)
-    }
-  }
-  create_object(ObjectType::Tree, array_to_bytes(content))
+  create_object(ObjectType::Tree, serialize_tree(entries))
 }
 
 ///|
@@ -204,25 +157,30 @@ pub fn hash_blob(content : Bytes) -> ObjectId {
 ///|
 /// Serialize tree entries to raw content bytes (without git object header)
 pub fn serialize_tree(entries : Array[TreeEntry]) -> Bytes {
-  let content : Array[Byte] = []
+  let buf = @buffer.new()
   for entry in entries {
+    // mode (as ASCII)
     for c in entry.mode {
-      content.push(c.to_int().to_byte())
+      buf.write_byte(c.to_int().to_byte())
     }
-    content.push(b' ')
-    object_append_utf8_string(content, entry.name)
-    content.push(b'\x00')
+    // space
+    buf.write_byte(b' ')
+    // name (as UTF-8 bytes)
+    buf.write_bytes(@utf8.encode(entry.name))
+    // null byte
+    buf.write_byte(b'\x00')
+    // 20-byte SHA
     for b in entry.id.bytes {
-      content.push(b)
+      buf.write_byte(b)
     }
   }
-  array_to_bytes(content)
+  buf.to_bytes()
 }
 
 ///|
 /// Serialize commit to raw content bytes (without git object header)
 pub fn serialize_commit_content(commit : Commit) -> Bytes {
-  array_to_bytes(object_serialize_commit_content_array(commit))
+  object_serialize_commit_content_bytes(commit)
 }
 
 ///|

@@ -7,8 +7,6 @@ import {
 }
 
 // Values
-pub fn array_to_bytes(Array[Byte]) -> Bytes
-
 pub fn create_blob(Bytes) -> (ObjectId, Bytes)
 
 pub fn create_blob_string(String) -> (ObjectId, Bytes)
