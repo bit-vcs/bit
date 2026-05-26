@@ -2,6 +2,7 @@ import {
   "moonbitlang/async" @async,
   "mizchi/bit" @bit,
   "mizchi/bit_object" @object,
+  "mizchi/bit_types" @types,
   "mizchi/bit/lib" @lib,
   "mizchi/bit/vfs" @fs,
   "mizchi/bitx_kv" @kv,

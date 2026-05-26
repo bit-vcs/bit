@@ -1,6 +1,7 @@
 import {
   "mizchi/bit" @bit,
   "mizchi/bit_object" @object,
+  "mizchi/bit_types" @types,
   "moonbitlang/async/process" @process,
   "moonbitlang/async/js_async" @js_async,
   "moonbitlang/core/env" @env,

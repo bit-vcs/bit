@@ -34,7 +34,10 @@ modules/
   bit_object/
   bit_osfs/
   bit_pack/
+  bit_protocol/
+  bit_reftable/
   bit_trailers/
+  bit_types/
   bit_utils/
   bitx_bitconfig/          ← extension modules (non-Git features)
   bitx_doc/
@@ -86,7 +89,9 @@ is to keep extracting until every core package is its own module.
 | `mizchi/bit_config`           | `modules/bit_config/src`          | `gix-config`                       |
 | `mizchi/bit_object`           | `modules/bit_object/src`          | `gix-object`                       |
 | `mizchi/bit_pack`             | `modules/bit_pack/src`            | `gix-pack`                         |
-| `mizchi/bit/types`            | `modules/bit/src/types`           | (shared types, re-exports object)  |
+| `mizchi/bit_protocol`         | `modules/bit_protocol/src`        | `gix-protocol` + `gix-transport`   |
+| `mizchi/bit_reftable`         | `modules/bit_reftable/src`        | (reftable backend)                 |
+| `mizchi/bit_types`            | `modules/bit_types/src`           | (shared types, re-exports object)  |
 | `mizchi/bit/io`               | `modules/bit/src/io`              | `gix-fs` (abstract)                |
 | `mizchi/bit/io/native`        | `modules/bit/src/io/native`       | `gix-fs` (native bindings)         |
 | `mizchi/bit/refs`             | `modules/bit/src/refs`            | `gix-ref`                          |

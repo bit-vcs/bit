@@ -1,7 +1,8 @@
 import {
   "mizchi/bit" @bit,
   "mizchi/bit_object" @object,
-  "mizchi/bit/reftable" @reftable,
+  "mizchi/bit_types" @types,
+  "mizchi/bit_reftable" @reftable,
   "moonbitlang/core/encoding/utf8" @utf8,
 }
 

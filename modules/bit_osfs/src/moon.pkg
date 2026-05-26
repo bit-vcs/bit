@@ -1,6 +1,7 @@
 import {
   "mizchi/bit" @bit,
   "mizchi/bit_object" @object,
+  "mizchi/bit_types" @types,
   "moonbitlang/x/fs",
 }
 

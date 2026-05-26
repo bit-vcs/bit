@@ -4,6 +4,7 @@
   "deps": {
     "mizchi/bit": "0.42.2",
     "mizchi/bit_object": "0.42.2",
+    "mizchi/bit_types": "0.42.2",
     "mizchi/zlib": "0.4.5"
   },
   "repository": "https://github.com/mizchi/bit-vcs",

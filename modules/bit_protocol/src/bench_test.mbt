@@ -24,12 +24,12 @@ fn make_encoded_packets(count : Int) -> Bytes {
   let parts : Array[Byte] = []
   for i in 0..<count {
     let line = "00000000000000000000000000000000000000\{i % 10} refs/heads/branch-\{i}\n"
-    let encoded = @protocol.pktline_encode(line)
+    let encoded = @bit_protocol.pktline_encode(line)
     for j in 0..<encoded.length() {
       parts.push(encoded[j])
     }
   }
-  let flush = @protocol.pktline_flush()
+  let flush = @bit_protocol.pktline_flush()
   for j in 0..<flush.length() {
     parts.push(flush[j])
   }
@@ -50,12 +50,12 @@ fn make_refs_advertisement(count : Int) -> Bytes {
     } else {
       hex + " refs/heads/branch-\{i}\n"
     }
-    let encoded = @protocol.pktline_encode(line)
+    let encoded = @bit_protocol.pktline_encode(line)
     for j in 0..<encoded.length() {
       parts.push(encoded[j])
     }
   }
-  let flush = @protocol.pktline_flush()
+  let flush = @bit_protocol.pktline_flush()
   for j in 0..<flush.length() {
     parts.push(flush[j])
   }
@@ -85,7 +85,7 @@ let bench_caps : Array[String] = [
 ]
 
 ///|
-fn make_push_request() -> @protocol.PushRequest {
+fn make_push_request() -> @bit_protocol.PushRequest {
   let old_id = @bit.ObjectId::zero()
   let new_id = try! @bit.ObjectId::from_hex(
     "ce013625030ba8dba906f756967f9e9ca394464a",
@@ -93,16 +93,16 @@ fn make_push_request() -> @protocol.PushRequest {
   let packfile = Bytes::from_array([
     b'P', b'A', b'C', b'K', 0, 0, 0, 2, 0, 0, 0, 0,
   ])
-  @protocol.PushRequest::new(old_id, new_id, "refs/heads/main", packfile)
+  @bit_protocol.PushRequest::new(old_id, new_id, "refs/heads/main", packfile)
 }
 
 ///|
-let bench_push_req : @protocol.PushRequest = make_push_request()
+let bench_push_req : @bit_protocol.PushRequest = make_push_request()
 
 ///|
 test "bench pktline_encode" (b : @bench.T) {
   b.bench(fn() {
-    let encoded = @protocol.pktline_encode(bench_pktline_str)
+    let encoded = @bit_protocol.pktline_encode(bench_pktline_str)
     b.keep(encoded.length())
   })
 }
@@ -110,7 +110,7 @@ test "bench pktline_encode" (b : @bench.T) {
 ///|
 test "bench pktline_encode_bytes 1KB" (b : @bench.T) {
   b.bench(fn() {
-    let encoded = @protocol.pktline_encode_bytes(bench_1kb_bytes)
+    let encoded = @bit_protocol.pktline_encode_bytes(bench_1kb_bytes)
     b.keep(encoded.length())
   })
 }
@@ -118,7 +118,7 @@ test "bench pktline_encode_bytes 1KB" (b : @bench.T) {
 ///|
 test "bench pktline_decode 100 packets" (b : @bench.T) {
   b.bench(fn() {
-    let packets = try! @protocol.pktline_decode(bench_encoded_100)
+    let packets = try! @bit_protocol.pktline_decode(bench_encoded_100)
     b.keep(packets.length())
   })
 }
@@ -126,7 +126,7 @@ test "bench pktline_decode 100 packets" (b : @bench.T) {
 ///|
 test "bench parse_refs 50 refs" (b : @bench.T) {
   b.bench(fn() {
-    let refs = try! @protocol.parse_refs(bench_refs_50)
+    let refs = try! @bit_protocol.parse_refs(bench_refs_50)
     b.keep(refs.length())
   })
 }
@@ -134,7 +134,7 @@ test "bench parse_refs 50 refs" (b : @bench.T) {
 ///|
 test "bench build_fetch_request_v2" (b : @bench.T) {
   b.bench(fn() {
-    let req = @protocol.build_fetch_request_v2("git/moonbit", bench_want_ids, 0)
+    let req = @bit_protocol.build_fetch_request_v2("git/moonbit", bench_want_ids, 0)
     b.keep(req.length())
   })
 }
@@ -142,7 +142,7 @@ test "bench build_fetch_request_v2" (b : @bench.T) {
 ///|
 test "bench build_fetch_request_v0" (b : @bench.T) {
   b.bench(fn() {
-    let req = @protocol.build_fetch_request_v0(
+    let req = @bit_protocol.build_fetch_request_v0(
       "git/moonbit", bench_want_ids, bench_caps,
     )
     b.keep(req.length())
@@ -152,7 +152,7 @@ test "bench build_fetch_request_v0" (b : @bench.T) {
 ///|
 test "bench parse_remote http" (b : @bench.T) {
   b.bench(fn() {
-    let spec = @protocol.parse_remote("https://github.com/user/repo.git")
+    let spec = @bit_protocol.parse_remote("https://github.com/user/repo.git")
     b.keep(spec.path.length())
   })
 }
@@ -160,7 +160,7 @@ test "bench parse_remote http" (b : @bench.T) {
 ///|
 test "bench parse_remote ssh" (b : @bench.T) {
   b.bench(fn() {
-    let spec = @protocol.parse_remote("git@github.com:user/repo.git")
+    let spec = @bit_protocol.parse_remote("git@github.com:user/repo.git")
     b.keep(spec.path.length())
   })
 }
@@ -168,7 +168,7 @@ test "bench parse_remote ssh" (b : @bench.T) {
 ///|
 test "bench build_receive_pack_body" (b : @bench.T) {
   b.bench(fn() {
-    let body = @protocol.build_receive_pack_body(bench_push_req)
+    let body = @bit_protocol.build_receive_pack_body(bench_push_req)
     b.keep(body.length())
   })
 }

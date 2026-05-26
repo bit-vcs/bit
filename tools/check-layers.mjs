@@ -31,7 +31,10 @@ const CORE_MODULES = new Set([
   "mizchi/bit_object",
   "mizchi/bit_osfs",
   "mizchi/bit_pack",
+  "mizchi/bit_protocol",
+  "mizchi/bit_reftable",
   "mizchi/bit_trailers",
+  "mizchi/bit_types",
   "mizchi/bit_utils",
 ]);
 
