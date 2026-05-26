@@ -321,7 +321,7 @@ local testDistributed: Task = new {
     moon test --target native -p mizchi/bit/x-rebase-ai
     moon test --target native -p mizchi/bit/x-hub
     moon test --target native -p mizchi/bit/x-hub/native
-    moon test --target native -p mizchi/bit/x-kv
+    moon test --target native -p mizchi/bitx_kv
     """#
 }
 
@@ -477,7 +477,7 @@ local benchFsReal: Task = new {
 
 local benchKv: Task = new {
   name = "bench-kv"
-  cmd = "moon bench --target native -p mizchi/bit/x-kv"
+  cmd = "moon bench --target native -p mizchi/bitx_kv"
 }
 
 local benchLib: Task = new {

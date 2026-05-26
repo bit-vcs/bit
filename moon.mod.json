@@ -30,6 +30,7 @@
     "docs",
     "t",
     "octorus",
+    "modules",
     "third_party/git",
     "file.txt",
     "install.sh",

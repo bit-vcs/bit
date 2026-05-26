@@ -1,0 +1,6 @@
+// Workspace file. Members are resolved locally instead of from mooncakes.io.
+// See docs/package-layout.md for the module split rationale.
+members = [
+  ".",
+  "modules/bitx_kv",
+]

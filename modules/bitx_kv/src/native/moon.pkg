@@ -3,7 +3,7 @@ import {
   "mizchi/bit" @bit,
   "mizchi/bit/lib" @lib,
   "mizchi/bit/vfs" @fs,
-  "mizchi/bit/x-kv" @kv,
+  "mizchi/bitx_kv" @kv,
   "mizchi/x/http" @xhttp,
   "mizchi/x/websocket" @xws,
   "moonbitlang/core/encoding/base64" @base64,
