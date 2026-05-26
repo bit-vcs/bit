@@ -1,16 +1,41 @@
 # Package Layout
 
-`mizchi/bit` is a single MoonBit module (`moon.mod.json`), but its packages are
-organized into a layered structure inspired by [gitoxide]'s `gix-*` plumbing /
-`gix` porcelain / `gitoxide` CLI split.
+The repository is a MoonBit workspace (`moon.work`). Every module lives under
+`modules/<name>/`. The main module `mizchi/bit` (under `modules/bit/`) contains
+Git plumbing / porcelain organized in a layered structure inspired by
+[gitoxide]'s `gix-*` plumbing / `gix` porcelain / `gitoxide` CLI split.
+Non-Git extensions live in their own `mizchi/bitx_*` modules so consumers can
+pick only the features they need.
 
 [gitoxide]: https://github.com/Byron/gitoxide
+
+## Repository layout
+
+```
+moon.work                  ← workspace manifest
+modules/
+  bit/                     ← main module: core / mid / high / cmd
+    moon.mod.json
+    src/
+      types/  hash/  object/  ...  (core)
+      repo/  worktree/  diff/ ...   (mid)
+      lib/  vfs/  fingerprint/      (high)
+      cmd/bit/  cmd/git-bit/        (cmd)
+  bitx_bitconfig/          ← extension modules
+  bitx_doc/
+  bitx_hq/
+  bitx_hub/
+  bitx_kv/
+  bitx_rebase_ai/
+  bitx_subdir/
+  bitx_workspace/
+```
 
 ## Layers
 
 ```
-cmd ─→ x-* ─→ lib (high) ─→ mid ─→ core
-              x-* ─→ mid ─→ core           (x-* may bypass `lib`)
+cmd ─→ bitx_* ─→ lib (high) ─→ mid ─→ core
+                bitx_* ─→ mid ─→ core      (bitx_* may bypass `lib`)
 ```
 
 Dependencies must flow only in one direction. A package in a lower layer must
@@ -23,29 +48,29 @@ primitive and may only depend on other `core/*` packages it strictly needs.
 
 | Package                       | Path                  | gitoxide analogue                  |
 |-------------------------------|-----------------------|------------------------------------|
-| `mizchi/bit/types`            | `src/types`           | (shared types)                     |
-| `mizchi/bit/hash`             | `src/hash`            | `gix-hash`                         |
-| `mizchi/bit/date_parse`       | `src/date_parse`      | `gix-date`                         |
-| `mizchi/bit/string_utils`     | `src/string_utils`    | `gix-utils`, `gix-quote`           |
-| `mizchi/bit/config_parse`     | `src/config_parse`    | `gix-config`                       |
-| `mizchi/bit/object`           | `src/object`          | `gix-object`                       |
-| `mizchi/bit/trailers`         | `src/trailers`        | `gix-trailers`                     |
-| `mizchi/bit/ignore`           | `src/ignore`          | `gix-ignore` + `gix-glob`          |
-| `mizchi/bit/tar`              | `src/tar`             | `gix-archive`                      |
-| `mizchi/bit/diff_core`        | `src/diff_core`       | `gix-diff` (low-level)             |
-| `mizchi/bit/diff3`            | `src/diff3`           | `gix-merge` (low-level)            |
-| `mizchi/bit/apply`            | `src/apply`           | (patch application)                |
-| `mizchi/bit/fast_import`      | `src/fast_import`     | (fast-import stream)               |
-| `mizchi/bit/grep`             | `src/grep`            | (grep engine)                      |
-| `mizchi/bit/io`               | `src/io`              | `gix-fs` (abstract)                |
-| `mizchi/bit/io/native`        | `src/io/native`       | `gix-fs` (native bindings)         |
-| `mizchi/bit/osfs`             | `src/osfs`            | `gix-fs` (OS-backed impl)          |
-| `mizchi/bit/pack`             | `src/pack`            | `gix-pack`                         |
-| `mizchi/bit/refs`             | `src/refs`            | `gix-ref`                          |
-| `mizchi/bit/reftable`         | `src/reftable`        | (reftable backend)                 |
-| `mizchi/bit/protocol`         | `src/protocol`        | `gix-protocol`/`gix-transport`     |
-| `mizchi/bit/runtime`          | `src/runtime`         | (runtime helpers)                  |
-| `mizchi/bit/bootstrap`        | `src/bootstrap`       | (bootstrap helpers)                |
+| `mizchi/bit/types`            | `modules/bit/src/types`           | (shared types)                     |
+| `mizchi/bit/hash`             | `modules/bit/src/hash`            | `gix-hash`                         |
+| `mizchi/bit/date_parse`       | `modules/bit/src/date_parse`      | `gix-date`                         |
+| `mizchi/bit/string_utils`     | `modules/bit/src/string_utils`    | `gix-utils`, `gix-quote`           |
+| `mizchi/bit/config_parse`     | `modules/bit/src/config_parse`    | `gix-config`                       |
+| `mizchi/bit/object`           | `modules/bit/src/object`          | `gix-object`                       |
+| `mizchi/bit/trailers`         | `modules/bit/src/trailers`        | `gix-trailers`                     |
+| `mizchi/bit/ignore`           | `modules/bit/src/ignore`          | `gix-ignore` + `gix-glob`          |
+| `mizchi/bit/tar`              | `modules/bit/src/tar`             | `gix-archive`                      |
+| `mizchi/bit/diff_core`        | `modules/bit/src/diff_core`       | `gix-diff` (low-level)             |
+| `mizchi/bit/diff3`            | `modules/bit/src/diff3`           | `gix-merge` (low-level)            |
+| `mizchi/bit/apply`            | `modules/bit/src/apply`           | (patch application)                |
+| `mizchi/bit/fast_import`      | `modules/bit/src/fast_import`     | (fast-import stream)               |
+| `mizchi/bit/grep`             | `modules/bit/src/grep`            | (grep engine)                      |
+| `mizchi/bit/io`               | `modules/bit/src/io`              | `gix-fs` (abstract)                |
+| `mizchi/bit/io/native`        | `modules/bit/src/io/native`       | `gix-fs` (native bindings)         |
+| `mizchi/bit/osfs`             | `modules/bit/src/osfs`            | `gix-fs` (OS-backed impl)          |
+| `mizchi/bit/pack`             | `modules/bit/src/pack`            | `gix-pack`                         |
+| `mizchi/bit/refs`             | `modules/bit/src/refs`            | `gix-ref`                          |
+| `mizchi/bit/reftable`         | `modules/bit/src/reftable`        | (reftable backend)                 |
+| `mizchi/bit/protocol`         | `modules/bit/src/protocol`        | `gix-protocol`/`gix-transport`     |
+| `mizchi/bit/runtime`          | `modules/bit/src/runtime`         | (runtime helpers)                  |
+| `mizchi/bit/bootstrap`        | `modules/bit/src/bootstrap`       | (bootstrap helpers)                |
 
 ### mid (gitoxide `gitoxide-core` 相当)
 
@@ -53,12 +78,12 @@ Operations layered on top of `core/*`. May depend on `core/*` only.
 
 | Package                  | Path             | Notes                                |
 |--------------------------|------------------|--------------------------------------|
-| `mizchi/bit/repo`        | `src/repo`       | Repository handle / materialization  |
-| `mizchi/bit/repo_ops`    | `src/repo_ops`   | Repository-level operations          |
-| `mizchi/bit/pack_ops`    | `src/pack_ops`   | `collect_reachable_objects`, etc.    |
-| `mizchi/bit/remote`      | `src/remote`     | URL / shorthand / `.git` discovery   |
-| `mizchi/bit/worktree`    | `src/worktree`   | status / add / commit / rm / mv      |
-| `mizchi/bit/diff`        | `src/diff`       | High-level diff / show               |
+| `mizchi/bit/repo`        | `modules/bit/src/repo`       | Repository handle / materialization  |
+| `mizchi/bit/repo_ops`    | `modules/bit/src/repo_ops`   | Repository-level operations          |
+| `mizchi/bit/pack_ops`    | `modules/bit/src/pack_ops`   | `collect_reachable_objects`, etc.    |
+| `mizchi/bit/remote`      | `modules/bit/src/remote`     | URL / shorthand / `.git` discovery   |
+| `mizchi/bit/worktree`    | `modules/bit/src/worktree`   | status / add / commit / rm / mv      |
+| `mizchi/bit/diff`        | `modules/bit/src/diff`       | High-level diff / show               |
 
 ### high (gitoxide `gix` porcelain 相当)
 
@@ -67,9 +92,9 @@ Porcelain layer. May depend on `core/*` and `mid/*`. Used by `cmd/*` and
 
 | Package                       | Path               | Notes                                              |
 |-------------------------------|--------------------|----------------------------------------------------|
-| `mizchi/bit/lib`              | `src/lib`          | High-level / backward-compatible facade            |
-| `mizchi/bit/vfs`              | `src/vfs`          | Virtual FS over commits (used by `lib`, `x-kv`, `x-subdir`) |
-| `mizchi/bit/fingerprint`      | `src/fingerprint`  | Workspace fingerprint (used by `x-workspace`)      |
+| `mizchi/bit/lib`              | `modules/bit/src/lib`          | High-level / backward-compatible facade            |
+| `mizchi/bit/vfs`              | `modules/bit/src/vfs`          | Virtual FS over commits (used by `lib`, `x-kv`, `x-subdir`) |
+| `mizchi/bit/fingerprint`      | `modules/bit/src/fingerprint`  | Workspace fingerprint (used by `x-workspace`)      |
 
 ### bitx_* (extensions, gitoxide にはない bit 独自機能)
 
@@ -99,8 +124,8 @@ CLI entry points. May depend on any layer.
 
 | Package                  | Path             | Notes                                  |
 |--------------------------|------------------|----------------------------------------|
-| `mizchi/bit/cmd/bit`     | `src/cmd/bit`    | Main `bit` CLI                         |
-| `mizchi/bit/cmd/git-bit` | `src/cmd/git-bit`| `git-bit` shim CLI                     |
+| `mizchi/bit/cmd/bit`     | `modules/bit/src/cmd/bit`    | Main `bit` CLI                         |
+| `mizchi/bit/cmd/git-bit` | `modules/bit/src/cmd/git-bit`| `git-bit` shim CLI                     |
 
 ## Allowed dependency directions
 

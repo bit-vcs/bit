@@ -11,7 +11,6 @@ import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const REPO_ROOT = join(fileURLToPath(import.meta.url), "..", "..");
-const SRC = join(REPO_ROOT, "src");
 const MODULES_DIR = join(REPO_ROOT, "modules");
 const MODULE_PREFIX = "mizchi/bit";
 const EXT_PREFIX = "mizchi/bitx_";
@@ -120,7 +119,7 @@ function* walkPkgFiles(dir) {
 // Roots to walk. Each root maps a moon.pkg file to a package path:
 //   { dir, prefix }  →  package path = prefix + ("" or "/<rel>")
 function discoverRoots() {
-  const roots = [{ dir: SRC, prefix: MODULE_PREFIX }];
+  const roots = [];
   if (existsSync(MODULES_DIR)) {
     for (const name of readdirSync(MODULES_DIR)) {
       const modSrc = join(MODULES_DIR, name, "src");

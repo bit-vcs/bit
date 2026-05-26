@@ -15,8 +15,9 @@ on:
       - "Taskfile.pkl"
       - "Test.pkl"
       - "pkspec/**"
-      - "moon.mod.json"
-      - "src/lib/**"
+      - "moon.work"
+      - "modules/bit/moon.mod.json"
+      - "modules/bit/src/lib/**"
       - "tools/bit-git.mjs"
   workflow_dispatch:
 

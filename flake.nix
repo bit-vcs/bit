@@ -51,7 +51,7 @@
 
           moonHome = pkgs.moonPlatform.bundleWithRegistry {
             cachedRegistry = pkgs.moonPlatform.buildCachedRegistry {
-              moonModJson = ./moon.mod.json;
+              moonModJson = ./modules/bit/moon.mod.json;
               registryIndexSrc = inputs.moon-registry;
             };
           };

@@ -29,25 +29,5 @@
   ],
   "description": "Pure MoonBit Git implementation",
   "source": "src",
-  "exclude": [
-    "component",
-    "tools",
-    "e2e",
-    "fixtures",
-    "docs",
-    "t",
-    "octorus",
-    "modules",
-    "third_party/git",
-    "file.txt",
-    "install.sh",
-    "Taskfile.pkl",
-    "Test.pkl",
-    "pkspec",
-    "AGENTS.md",
-    "CLAUDE.md",
-    "COMPAT_RESULTS.md",
-    "TODO.md"
-  ],
   "preferred-target": "native"
 }

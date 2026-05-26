@@ -15,7 +15,7 @@ test("renderAffectedRulesToml stays in sync with committed config", () => {
 
 test("merge-related changes select merge-focused git compat suites", () => {
   const selected = selectSuitesForChanges(
-    ["src/cmd/bit/merge.mbt"],
+    ["modules/bit/src/cmd/bit/merge.mbt"],
     [
       "third_party/git/t/t6400-merge-df.sh",
       "third_party/git/t/t7600-merge.sh",
@@ -32,7 +32,7 @@ test("merge-related changes select merge-focused git compat suites", () => {
 
 test("fetch and protocol changes include transport suites", () => {
   const selected = selectSuitesForChanges(
-    ["src/cmd/bit/fetch.mbt", "src/protocol/transport.mbt"],
+    ["modules/bit/src/cmd/bit/fetch.mbt", "modules/bit/src/protocol/transport.mbt"],
     [
       "third_party/git/t/t5500-fetch-pack.sh",
       "third_party/git/t/t5700-protocol-v1.sh",
@@ -49,7 +49,7 @@ test("fetch and protocol changes include transport suites", () => {
 
 test("refname validation changes include branch-oriented suites", () => {
   const selected = selectSuitesForChanges(
-    ["src/cmd/bit/check_ref_format.mbt"],
+    ["modules/bit/src/cmd/bit/check_ref_format.mbt"],
     [
       "third_party/git/t/t3204-branch-name-interpretation.sh",
       "third_party/git/t/t7419-submodule-set-branch.sh",
@@ -66,7 +66,7 @@ test("refname validation changes include branch-oriented suites", () => {
 
 test("tag verification changes include tag suites", () => {
   const selected = selectSuitesForChanges(
-    ["src/cmd/bit/verify_tag.mbt", "src/cmd/bit/mktag_cmd.mbt"],
+    ["modules/bit/src/cmd/bit/verify_tag.mbt", "modules/bit/src/cmd/bit/mktag_cmd.mbt"],
     [
       "third_party/git/t/t7004-tag.sh",
       "third_party/git/t/t7030-verify-tag.sh",

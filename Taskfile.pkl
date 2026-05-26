@@ -6,9 +6,11 @@
 amends "package://pkg.pkl-lang.org/github.com/mizchi/pkfire/pkfire@0.10.0#/Taskfile.pkl"
 
 local moonbitSources: Listing<String> = new {
-  "src/**/*.mbt"
-  "src/**/moon.pkg.json"
-  "moon.mod.json"
+  "modules/**/*.mbt"
+  "modules/**/moon.pkg"
+  "modules/**/moon.pkg.json"
+  "modules/**/moon.mod.json"
+  "moon.work"
 }
 
 // -- formatting -----------------------------------------------------------
@@ -48,7 +50,8 @@ local checkLayers: Task = new {
   cmd = "node tools/check-layers.mjs"
   inputs {
     "tools/check-layers.mjs"
-    "src/**/moon.pkg.json"
+    "modules/**/moon.pkg"
+    "modules/**/moon.pkg.json"
   }
 }
 
@@ -57,7 +60,7 @@ local checkGuards: Task = new {
   description = "Layer-boundary guards (runtime/storage_runtime)"
   cmd = "tools/check-layer-guards.sh"
   inputs {
-    "src/**/*.mbt"
+    "modules/**/*.mbt"
     "tools/check-layer-guards.sh"
   }
 }
@@ -83,16 +86,16 @@ local build: Task = new {
 
 local buildJsLib: Task = new {
   name = "build-js-lib"
-  description = "JS release build of src/lib"
-  cmd = "moon build --target js --release src/lib"
+  description = "JS release build of mizchi/bit/lib"
+  cmd = "moon build --target js --release modules/bit/src/lib"
   inputs = moonbitSources
   outputs { "_build/js/release/build/lib/lib.js" }
 }
 
 local buildJsCli: Task = new {
   name = "build-js-cli"
-  description = "JS release build of src/cmd/bit"
-  cmd = "moon build --target js --release src/cmd/bit"
+  description = "JS release build of mizchi/bit/cmd/bit"
+  cmd = "moon build --target js --release modules/bit/src/cmd/bit"
   inputs = moonbitSources
   outputs { "_build/js/release/build/cmd/bit/bit.js" }
 }
