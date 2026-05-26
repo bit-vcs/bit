@@ -38,6 +38,8 @@ modules/
   bit_protocol/
   bit_refs/
   bit_reftable/
+  bit_remote/
+  bit_repo/
   bit_trailers/
   bit_types/
   bit_utils/
@@ -97,6 +99,8 @@ is to keep extracting until every core package is its own module.
 | `mizchi/bit_io`               | `modules/bit_io/src`              | `gix-fs` (abstract + native)       |
 | `mizchi/bit_io/native`        | `modules/bit_io/src/native`       | `gix-fs` (native bindings)         |
 | `mizchi/bit_refs`             | `modules/bit_refs/src`            | `gix-ref`                          |
+| `mizchi/bit_remote`           | `modules/bit_remote/src`          | `gix-url` + `gix-discover`         |
+| `mizchi/bit_repo`             | `modules/bit_repo/src`            | (repo handle)                      |
 | `mizchi/bit/reftable`         | `modules/bit/src/reftable`        | (reftable backend)                 |
 | `mizchi/bit/protocol`         | `modules/bit/src/protocol`        | `gix-protocol`/`gix-transport`     |
 | `mizchi/bit/remote`           | `modules/bit/src/remote`          | `gix-url` / discover               |

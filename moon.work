@@ -19,6 +19,8 @@ members = [
   "modules/bit_protocol",
   "modules/bit_refs",
   "modules/bit_reftable",
+  "modules/bit_remote",
+  "modules/bit_repo",
   "modules/bit_trailers",
   "modules/bit_types",
   "modules/bit_utils",

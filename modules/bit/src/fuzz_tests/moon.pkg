@@ -8,7 +8,7 @@ import {
   "moonbitlang/core/encoding/utf8" @utf8,
   "mizchi/bit_config" @config_parse,
   "mizchi/bit_date" @date_parse,
-  "mizchi/bit/repo" @repo,
+  "mizchi/bit_repo" @repo,
   "mizchi/bit/lib" @bitlib,
 }
 
