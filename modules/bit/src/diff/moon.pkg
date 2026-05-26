@@ -3,7 +3,7 @@ import {
   "mizchi/bit_object" @object,
   "mizchi/bit_types" @types,
   "mizchi/bit_diff_core" @diff_core,
-  "mizchi/bit/io" @bitio,
+  "mizchi/bit_io" @bitio,
   "mizchi/bit/lib" @bitlib,
   "mizchi/bit_utils" @string_utils,
   "moonbitlang/core/bench" @bench,

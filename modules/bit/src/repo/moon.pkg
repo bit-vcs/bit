@@ -1,12 +1,12 @@
 import {
   "mizchi/bit_types" @types,
   "mizchi/bit_object" @object,
-  "mizchi/bit/io" @io,
+  "mizchi/bit_io" @io,
   "moonbitlang/core/encoding/utf8" @utf8,
 }
 
 import {
-  "mizchi/bit/io" @io,
+  "mizchi/bit_io" @io,
   "moonbitlang/core/test" @test,
 } for "wbtest"
 
