@@ -266,23 +266,286 @@ async fn hash_object_validate_content(
   algo? : @bitobject.HashAlgorithm = @bitobject.HashAlgorithm::Sha1,
 ) -> Unit raise Error {
   match obj_type {
-    @bitcore.ObjectType::Commit => {
-      let text = @utf8.decode_lossy(content[:])
-      if !text.has_prefix("tree ") {
-        eprint_line("fatal: corrupt commit")
-        @sys.exit(128)
-      }
-    }
-    @bitcore.ObjectType::Tag => {
-      let text = @utf8.decode_lossy(content[:])
-      if !text.has_prefix("object ") {
-        eprint_line("fatal: corrupt tag")
-        @sys.exit(128)
-      }
-    }
+    @bitcore.ObjectType::Commit => hash_object_validate_commit(content, algo)
+    @bitcore.ObjectType::Tag => hash_object_validate_tag(content, algo)
     @bitcore.ObjectType::Tree => hash_object_validate_tree(content, algo)
     _ => ()
   }
+}
+
+///| Walk a hash-id line ("tree <hex>\n", "parent <hex>\n", ...) and
+/// emit a fsck-compatible error token on each well-defined failure
+/// mode. Returns the byte index after the consumed line (one past
+/// the trailing newline) on success. Test contract: `t1451`.
+async fn hash_object_check_id_line(
+  content : Bytes,
+  start : Int,
+  prefix : String,
+  missing_token : String,
+  bad_sha_token : String,
+  algo : @bitobject.HashAlgorithm,
+) -> Int {
+  let len = content.length()
+  // Does the buffer have enough room for "prefix"?
+  for i in 0..<prefix.length() {
+    let p = start + i
+    if p >= len || content[p].to_int() != prefix.unsafe_get(i).to_int() {
+      eprint_line("error: \{missing_token}: ...")
+      @sys.exit(128)
+    }
+  }
+  let after_prefix = start + prefix.length()
+  // Need at least 2*hash_size hex chars + newline.
+  let hex_len = algo.hash_size() * 2
+  if after_prefix + hex_len > len {
+    eprint_line("error: \{bad_sha_token}: invalid hash")
+    @sys.exit(128)
+  }
+  for i in 0..<hex_len {
+    let b = content[after_prefix + i]
+    let c = b.to_int()
+    let is_hex = (c >= 0x30 && c <= 0x39) || // 0-9
+      (c >= 0x61 && c <= 0x66) || // a-f
+      (c >= 0x41 && c <= 0x46) // A-F
+    if !is_hex {
+      eprint_line("error: \{bad_sha_token}: invalid hash")
+      @sys.exit(128)
+    }
+  }
+  let after_hex = after_prefix + hex_len
+  // Optional trailing newline.
+  if after_hex < len && content[after_hex] == b'\n' {
+    after_hex + 1
+  } else {
+    after_hex
+  }
+}
+
+///| ident line shape: "<name> <<email>> <ts> <tz>\n".  Mirrors
+/// git's fsck token set: missingEmail / badEmail /
+/// missingSpaceBeforeDate / badDate / badTimezone.
+async fn hash_object_check_ident_line(
+  content : Bytes,
+  start : Int,
+  prefix : String, // "author " or "committer " or "tagger "
+) -> Int {
+  let len = content.length()
+  if start + prefix.length() > len {
+    eprint_line("error: missingEmail: ident missing")
+    @sys.exit(128)
+  }
+  // After the prefix, scan for '<'. If we hit newline or EOF first
+  // → missingEmail.
+  let mut pos = start + prefix.length()
+  while pos < len && content[pos] != b'<' && content[pos] != b'\n' {
+    pos += 1
+  }
+  if pos >= len || content[pos] == b'\n' {
+    eprint_line("error: missingEmail: missing email in ident")
+    @sys.exit(128)
+  }
+  // pos sits on '<'. Find matching '>'.
+  pos += 1
+  let email_start = pos
+  while pos < len && content[pos] != b'>' && content[pos] != b'\n' {
+    pos += 1
+  }
+  if pos >= len || content[pos] == b'\n' {
+    eprint_line("error: badEmail: unterminated email")
+    @sys.exit(128)
+  }
+  let _ = email_start
+  // pos sits on '>'. Need space-then-date.
+  pos += 1
+  if pos >= len || content[pos] == b'\n' {
+    eprint_line("error: missingSpaceBeforeDate: ident has no date")
+    @sys.exit(128)
+  }
+  if content[pos] != b' ' {
+    eprint_line("error: missingSpaceBeforeDate: ident has no space before date")
+    @sys.exit(128)
+  }
+  pos += 1
+  // Date: one-or-more digits. Then space. Then tz.
+  let date_start = pos
+  while pos < len && content[pos] != b' ' && content[pos] != b'\n' {
+    let b = content[pos]
+    if b < b'0' || b > b'9' {
+      eprint_line("error: badDate: invalid date")
+      @sys.exit(128)
+    }
+    pos += 1
+  }
+  if pos == date_start {
+    eprint_line("error: badDate: empty date")
+    @sys.exit(128)
+  }
+  if pos >= len || content[pos] == b'\n' {
+    eprint_line("error: badDate: no space before timezone")
+    @sys.exit(128)
+  }
+  pos += 1 // consume the space
+  // Timezone: optional sign then 4 digits.
+  if pos >= len || content[pos] == b'\n' {
+    eprint_line("error: badTimezone: missing timezone")
+    @sys.exit(128)
+  }
+  if content[pos] == b'+' || content[pos] == b'-' {
+    pos += 1
+  }
+  let tz_digits_start = pos
+  while pos < len && content[pos] != b'\n' {
+    let b = content[pos]
+    if b < b'0' || b > b'9' {
+      eprint_line("error: badTimezone: invalid timezone digit")
+      @sys.exit(128)
+    }
+    pos += 1
+  }
+  if pos - tz_digits_start < 4 {
+    eprint_line("error: badTimezone: short timezone")
+    @sys.exit(128)
+  }
+  // Skip trailing newline if present.
+  if pos < len && content[pos] == b'\n' {
+    pos + 1
+  } else {
+    pos
+  }
+}
+
+///| Commit object validator. Walks the header fields in order:
+///   tree <hex>\n
+///   (parent <hex>\n)*
+///   author <ident>\n
+///   committer <ident>\n
+///   ...body...
+async fn hash_object_validate_commit(
+  content : Bytes,
+  algo : @bitobject.HashAlgorithm,
+) -> Unit {
+  let len = content.length()
+  // Tree
+  if len < 5 || !hash_object_bytes_have_prefix(content, 0, "tree ") {
+    eprint_line("error: missingTree: invalid commit object")
+    @sys.exit(128)
+  }
+  let mut pos = hash_object_check_id_line(
+    content, 0, "tree ", "missingTree", "badTreeSha1", algo,
+  )
+  // Parents (zero or more)
+  while pos < len && hash_object_bytes_have_prefix(content, pos, "parent ") {
+    pos = hash_object_check_id_line(
+      content, pos, "parent ", "missingAuthor", "badParentSha1", algo,
+    )
+  }
+  // Author: required
+  if !hash_object_bytes_have_prefix(content, pos, "author ") {
+    eprint_line("error: missingAuthor: commit is missing author")
+    @sys.exit(128)
+  }
+  pos = hash_object_check_ident_line(content, pos, "author ")
+  // Committer: required
+  if !hash_object_bytes_have_prefix(content, pos, "committer ") {
+    eprint_line("error: missingCommitter: commit is missing committer")
+    @sys.exit(128)
+  }
+  pos = hash_object_check_ident_line(content, pos, "committer ")
+  let _ = pos
+  // Anything after committer is the (optional) header tail and
+  // commit message.  Git's fsck does not require any further
+  // structure here.
+}
+
+///| Tag object validator. Same approach as commit but the header
+/// set differs.
+async fn hash_object_validate_tag(
+  content : Bytes,
+  algo : @bitobject.HashAlgorithm,
+) -> Unit {
+  let len = content.length()
+  if !hash_object_bytes_have_prefix(content, 0, "object ") {
+    eprint_line("error: missingObject: tag is missing object")
+    @sys.exit(128)
+  }
+  let mut pos = hash_object_check_id_line(
+    content, 0, "object ", "missingObject", "badObjectSha1", algo,
+  )
+  // type <name>\n
+  if !hash_object_bytes_have_prefix(content, pos, "type ") {
+    eprint_line("error: missingType: tag is missing type")
+    @sys.exit(128)
+  }
+  pos += 5
+  let type_start = pos
+  while pos < len && content[pos] != b'\n' {
+    pos += 1
+  }
+  let type_len = pos - type_start
+  if type_len == 0 {
+    eprint_line("error: badType: empty type")
+    @sys.exit(128)
+  }
+  let type_buf = StringBuilder::new()
+  for i in type_start..<(type_start + type_len) {
+    type_buf.write_char(content[i].to_int().unsafe_to_char())
+  }
+  let type_str = type_buf.to_string()
+  if type_str != "commit" &&
+    type_str != "tree" &&
+    type_str != "blob" &&
+    type_str != "tag" {
+    eprint_line("error: badType: invalid type '\{type_str}'")
+    @sys.exit(128)
+  }
+  if pos >= len {
+    eprint_line("error: missingTagEntry: tag is missing tag entry")
+    @sys.exit(128)
+  }
+  pos += 1 // skip newline
+  // tag <name>\n
+  if !hash_object_bytes_have_prefix(content, pos, "tag ") {
+    eprint_line("error: missingTagEntry: tag is missing tag entry")
+    @sys.exit(128)
+  }
+  pos += 4
+  let name_start = pos
+  while pos < len && content[pos] != b'\n' {
+    pos += 1
+  }
+  if pos == name_start {
+    eprint_line("error: badTagName: empty tag name")
+    @sys.exit(128)
+  }
+  if pos < len {
+    pos += 1
+  }
+  // tagger <ident>\n
+  if !hash_object_bytes_have_prefix(content, pos, "tagger ") {
+    eprint_line("error: missingTagger: tag is missing tagger")
+    @sys.exit(128)
+  }
+  pos = hash_object_check_ident_line(content, pos, "tagger ")
+  let _ = pos
+}
+
+///| Byte-level prefix match — `String::has_prefix` only works on
+/// `String`, and lossy-decoding short / truncated input first
+/// risks losing information needed by the validator.
+fn hash_object_bytes_have_prefix(
+  content : Bytes,
+  start : Int,
+  prefix : String,
+) -> Bool {
+  if start + prefix.length() > content.length() {
+    return false
+  }
+  for i in 0..<prefix.length() {
+    if content[start + i].to_int() != prefix.unsafe_get(i).to_int() {
+      return false
+    }
+  }
+  true
 }
 
 ///|
@@ -296,7 +559,7 @@ async fn hash_object_validate_tree(
     return
   }
   if len < oid_size + 4 {
-    eprint_line("error: too-short tree object")
+    eprint_line("error: badTree: too-short tree object")
     @sys.exit(128)
   }
   let mut pos = 0
@@ -307,20 +570,20 @@ async fn hash_object_validate_tree(
     while pos < len && content[pos] != b' ' {
       let b = content[pos]
       if b < b'0' || b > b'7' {
-        eprint_line("error: malformed mode in tree entry")
+        eprint_line("error: badTree: malformed mode in tree entry")
         @sys.exit(128)
       }
       pos += 1
     }
     if pos >= len || pos == mode_start {
-      eprint_line("error: too-short tree object")
+      eprint_line("error: badTree: tree object truncated")
       @sys.exit(128)
     }
     // Check for leading zero in mode (e.g., "0100644" — git rejects modes
     // that start with an extra leading zero like "00644")
     let mode_len = pos - mode_start
     if mode_len > 1 && content[mode_start] == b'0' {
-      eprint_line("error: malformed mode in tree entry")
+      eprint_line("error: badTree: malformed mode in tree entry")
       @sys.exit(128)
     }
     pos += 1 // skip space
@@ -330,12 +593,14 @@ async fn hash_object_validate_tree(
       pos += 1
     }
     if pos >= len {
-      eprint_line("error: too-short tree object")
+      // Walked off the end without finding NUL — classic "missing nul"
+      // truncation. Test t1451 grep's for badTree here.
+      eprint_line("error: badTree: missing nul in tree entry")
       @sys.exit(128)
     }
     let name_len = pos - name_start
     if name_len == 0 {
-      eprint_line("error: empty filename in tree entry")
+      eprint_line("error: badTree: empty filename in tree entry")
       @sys.exit(128)
     }
     let name_buf = StringBuilder::new()
@@ -349,11 +614,11 @@ async fn hash_object_validate_tree(
     }
     seen_names[name] = true
     pos += 1 // skip NUL
-    // Skip OID
-    pos += oid_size
-    if pos > len {
-      eprint_line("error: too-short tree object")
+    // Need oid_size bytes of OID.
+    if pos + oid_size > len {
+      eprint_line("error: badTree: tree entry has short hash")
       @sys.exit(128)
     }
+    pos += oid_size
   }
 }
