@@ -6,7 +6,7 @@ import {
 
 import {
   "mizchi/bit/lib" @lib,
-  "mizchi/bit/osfs" @osfs,
+  "mizchi/bit_osfs" @osfs,
   "mizchi/zlib",
   "moonbitlang/core/bench" @bench,
   "moonbitlang/async",

@@ -3,7 +3,7 @@ import {
   "mizchi/bit/object" @object,
   "mizchi/bit/lib" @bitlib,
   "mizchi/bit/repo_ops" @bitrepo,
-  "mizchi/bit/string_utils" @string_utils,
+  "mizchi/bit_utils" @string_utils,
   "moonbitlang/core/encoding/utf8" @utf8,
   "moonbitlang/core/env" @env,
   "moonbitlang/core/string" @string,

@@ -1,7 +1,7 @@
 ///|
 /// Tests for gitignore pattern matching
 test "parse simple patterns" {
-  let rules = @ignore.parse("*.txt\nnode_modules/\n", "")
+  let rules = @bit_ignore.parse("*.txt\nnode_modules/\n", "")
   assert_eq(rules.length(), 2)
   assert_eq(rules[0].pattern, "*.txt")
   assert_eq(rules[0].dir_only, false)
@@ -11,7 +11,7 @@ test "parse simple patterns" {
 
 ///|
 test "parse negation" {
-  let rules = @ignore.parse("*.log\n!important.log\n", "")
+  let rules = @bit_ignore.parse("*.log\n!important.log\n", "")
   assert_eq(rules.length(), 2)
   assert_eq(rules[0].negated, false)
   assert_eq(rules[1].negated, true)
@@ -20,7 +20,7 @@ test "parse negation" {
 
 ///|
 test "parse anchored patterns" {
-  let rules = @ignore.parse("/build\n*.o\n", "")
+  let rules = @bit_ignore.parse("/build\n*.o\n", "")
   assert_eq(rules.length(), 2)
   assert_eq(rules[0].anchored, true)
   assert_eq(rules[0].pattern, "build")
@@ -29,14 +29,14 @@ test "parse anchored patterns" {
 
 ///|
 test "parse comments and empty lines" {
-  let rules = @ignore.parse("# comment\n\n*.txt\n  \n", "")
+  let rules = @bit_ignore.parse("# comment\n\n*.txt\n  \n", "")
   assert_eq(rules.length(), 1)
   assert_eq(rules[0].pattern, "*.txt")
 }
 
 ///|
 test "parse escaped characters" {
-  let rules = @ignore.parse("\\!important\n\\#hash\n", "")
+  let rules = @bit_ignore.parse("\\!important\n\\#hash\n", "")
   assert_eq(rules.length(), 2)
   assert_eq(rules[0].pattern, "!important")
   assert_eq(rules[0].negated, false)
@@ -45,30 +45,30 @@ test "parse escaped characters" {
 
 ///|
 test "match_glob simple" {
-  assert_true(@ignore.match_glob("*.txt", "file.txt"))
-  assert_true(@ignore.match_glob("*.txt", "a.txt"))
-  assert_false(@ignore.match_glob("*.txt", "file.log"))
-  assert_false(@ignore.match_glob("*.txt", "txt"))
+  assert_true(@bit_ignore.match_glob("*.txt", "file.txt"))
+  assert_true(@bit_ignore.match_glob("*.txt", "a.txt"))
+  assert_false(@bit_ignore.match_glob("*.txt", "file.log"))
+  assert_false(@bit_ignore.match_glob("*.txt", "txt"))
 }
 
 ///|
 test "match_glob question mark" {
-  assert_true(@ignore.match_glob("file?.txt", "file1.txt"))
-  assert_true(@ignore.match_glob("file?.txt", "fileA.txt"))
-  assert_false(@ignore.match_glob("file?.txt", "file10.txt"))
-  assert_false(@ignore.match_glob("file?.txt", "file.txt"))
+  assert_true(@bit_ignore.match_glob("file?.txt", "file1.txt"))
+  assert_true(@bit_ignore.match_glob("file?.txt", "fileA.txt"))
+  assert_false(@bit_ignore.match_glob("file?.txt", "file10.txt"))
+  assert_false(@bit_ignore.match_glob("file?.txt", "file.txt"))
 }
 
 ///|
 test "match_glob multiple wildcards" {
-  assert_true(@ignore.match_glob("*.min.*", "app.min.js"))
-  assert_true(@ignore.match_glob("*.min.*", "lib.min.css"))
-  assert_false(@ignore.match_glob("*.min.*", "app.js"))
+  assert_true(@bit_ignore.match_glob("*.min.*", "app.min.js"))
+  assert_true(@bit_ignore.match_glob("*.min.*", "lib.min.css"))
+  assert_false(@bit_ignore.match_glob("*.min.*", "app.js"))
 }
 
 ///|
 test "matcher basic" {
-  let m = @ignore.Matcher::new()
+  let m = @bit_ignore.Matcher::new()
   m.add_rules("", "*.log\nnode_modules/\n")
   assert_true(m.is_ignored("debug.log", false))
   assert_true(m.is_ignored("logs/error.log", false))
@@ -79,7 +79,7 @@ test "matcher basic" {
 
 ///|
 test "matcher negation" {
-  let m = @ignore.Matcher::new()
+  let m = @bit_ignore.Matcher::new()
   m.add_rules("", "*.log\n!important.log\n")
   assert_true(m.is_ignored("debug.log", false))
   assert_false(m.is_ignored("important.log", false))
@@ -87,7 +87,7 @@ test "matcher negation" {
 
 ///|
 test "matcher anchored pattern" {
-  let m = @ignore.Matcher::new()
+  let m = @bit_ignore.Matcher::new()
   m.add_rules("", "/build\n")
   assert_true(m.is_ignored("build", true))
   assert_false(m.is_ignored("src/build", true))
@@ -95,7 +95,7 @@ test "matcher anchored pattern" {
 
 ///|
 test "matcher with base" {
-  let m = @ignore.Matcher::new()
+  let m = @bit_ignore.Matcher::new()
   m.add_rules("src", "*.bak\n")
   assert_true(m.is_ignored("src/file.bak", false))
   assert_false(m.is_ignored("file.bak", false))
@@ -104,7 +104,7 @@ test "matcher with base" {
 
 ///|
 test "matcher double star" {
-  let m = @ignore.Matcher::new()
+  let m = @bit_ignore.Matcher::new()
   m.add_rules("", "**/test\n")
   assert_true(m.is_ignored("test", true))
   assert_true(m.is_ignored("src/test", true))
@@ -113,7 +113,7 @@ test "matcher double star" {
 
 ///|
 test "matcher truncate" {
-  let m = @ignore.Matcher::new()
+  let m = @bit_ignore.Matcher::new()
   m.add_rules("", "*.txt\n")
   let len = m.len()
   m.add_rules("src", "*.bak\n")
@@ -125,7 +125,7 @@ test "matcher truncate" {
 
 ///|
 test "git-aware glob filter" {
-  let m = @ignore.Matcher::new()
+  let m = @bit_ignore.Matcher::new()
   m.add_rules("", "*.log\n/dist/\nbuild/\n")
   m.add_rules("src", "*.generated.*\n!keep.generated.ts\n")
   let files : Array[String] = [
@@ -140,7 +140,7 @@ test "git-aware glob filter" {
 
 ///|
 test "directory traversal backtracking" {
-  let m = @ignore.Matcher::new()
+  let m = @bit_ignore.Matcher::new()
   m.add_rules("", "*.tmp\n")
   let saved = m.len()
   m.add_rules("src", "*.bak\n")

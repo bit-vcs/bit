@@ -5,7 +5,7 @@ import {
 }
 
 import {
-  "mizchi/bit/osfs" @osfs,
+  "mizchi/bit_osfs" @osfs,
   "moonbitlang/core/test" @test,
 } for "test"
 

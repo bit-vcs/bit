@@ -3,7 +3,7 @@ import {
   "mizchi/bit/pack" @pack,
   "mizchi/bit/protocol" @protocol,
   "mizchi/bit/lib" @bitlib,
-  "mizchi/bit/ignore" @ignore,
+  "mizchi/bit_ignore" @ignore,
   "mizchi/bit/io" @bitio,
   "mizchi/bit/io/native" @bitnative,
   "moonbitlang/async" @async,
@@ -20,12 +20,12 @@ import {
 
 import {
   "moonbitlang/core/bench" @bench,
-  "mizchi/bit/osfs" @osfs,
+  "mizchi/bit_osfs" @osfs,
 } for "test"
 
 import {
   "moonbitlang/core/bench" @bench,
-  "mizchi/bit/osfs" @osfs,
+  "mizchi/bit_osfs" @osfs,
   "moonbitlang/core/test" @test,
 } for "wbtest"
 

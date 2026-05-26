@@ -1,5 +1,5 @@
 import {
-  "mizchi/bit/string_utils" @string_utils,
+  "mizchi/bit_utils" @string_utils,
   "moonbitlang/core/string" @string,
   "moonbitlang/core/strconv",
 }

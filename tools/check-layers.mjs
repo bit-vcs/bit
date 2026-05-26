@@ -14,6 +14,23 @@ const REPO_ROOT = join(fileURLToPath(import.meta.url), "..", "..");
 const MODULES_DIR = join(REPO_ROOT, "modules");
 const MODULE_PREFIX = "mizchi/bit";
 const EXT_PREFIX = "mizchi/bitx_";
+// Standalone core modules extracted out of mizchi/bit. Each one is a
+// gix-* plumbing equivalent that lives in its own MoonBit module under
+// modules/bit_<name>/. They are still classified as the "core" layer.
+const CORE_MODULES = new Set([
+  "mizchi/bit_apply",
+  "mizchi/bit_archive",
+  "mizchi/bit_bootstrap",
+  "mizchi/bit_date",
+  "mizchi/bit_diff3",
+  "mizchi/bit_diff_core",
+  "mizchi/bit_fast_import",
+  "mizchi/bit_hash",
+  "mizchi/bit_ignore",
+  "mizchi/bit_osfs",
+  "mizchi/bit_trailers",
+  "mizchi/bit_utils",
+]);
 
 // Layer order (low to high). A package may import from its own layer or any
 // lower layer.
@@ -71,9 +88,15 @@ function isExtModule(pkgPath) {
          pkgPath.startsWith(EXT_PREFIX);
 }
 
+function isCoreModule(pkgPath) {
+  const head = pkgPath.split("/").slice(0, 2).join("/");
+  return CORE_MODULES.has(head);
+}
+
 function isOurModule(pkgPath) {
   if (pkgPath === MODULE_PREFIX || pkgPath.startsWith(MODULE_PREFIX + "/")) return true;
   if (isExtModule(pkgPath)) return true;
+  if (isCoreModule(pkgPath)) return true;
   return false;
 }
 
@@ -82,6 +105,7 @@ function isOurModule(pkgPath) {
 function classify(pkgPath) {
   if (!isOurModule(pkgPath)) return null; // external
   if (isExtModule(pkgPath)) return "ext";
+  if (isCoreModule(pkgPath)) return "core";
   const rel = pkgPath === MODULE_PREFIX ? "" : pkgPath.slice(MODULE_PREFIX.length + 1);
   const top = rel.split("/")[0];
   if (rel === "") return "core";
@@ -94,6 +118,9 @@ function classify(pkgPath) {
 
 function topSegment(pkgPath) {
   if (!isOurModule(pkgPath)) return null;
+  if (isCoreModule(pkgPath)) {
+    return pkgPath.split("/").slice(0, 2).join("/");
+  }
   if (isExtModule(pkgPath)) {
     // For ext modules, the "family" is the module name itself
     // (e.g. "mizchi/bitx_hub" is one family — its sub-packages /native,

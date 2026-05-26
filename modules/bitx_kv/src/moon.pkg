@@ -8,7 +8,7 @@ import {
 import {
   "moonbitlang/core/bench" @bench,
   "mizchi/bit/vfs" @fs,
-  "mizchi/bit/osfs" @osfs,
+  "mizchi/bit_osfs" @osfs,
   "moonbitlang/x/fs" @nfs,
   "moonbitlang/core/test" @test,
 } for "test"

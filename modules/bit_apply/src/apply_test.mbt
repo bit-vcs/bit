@@ -1,7 +1,7 @@
 ///|
 test "reverse_patch swaps add/delete lines" {
   let patch = "--- a/file.txt\n+++ b/file.txt\n@@ -1,3 +1,3 @@\n context\n-old line\n+new line\n context\n"
-  let reversed = @apply.reverse_patch(patch)
+  let reversed = @bit_apply.reverse_patch(patch)
   assert_true(reversed.contains("+++ b/file.txt"))
   assert_true(reversed.contains("--- a/file.txt"))
   assert_true(reversed.contains("+old line"))
@@ -11,7 +11,7 @@ test "reverse_patch swaps add/delete lines" {
 
 ///|
 test "reverse_patch empty input" {
-  let result = @apply.reverse_patch("")
+  let result = @bit_apply.reverse_patch("")
   assert_eq(result, "")
 }
 
@@ -26,7 +26,7 @@ test "parse_patches simple diff" {
     #|-world
     #|+world!
     #|+extra
-  let patches = @apply.parse_patches(patch)
+  let patches = @bit_apply.parse_patches(patch)
   assert_eq(patches.length(), 1)
   assert_eq(patches[0].display_name, "foo.txt")
   assert_eq(patches[0].additions, 2)
@@ -44,7 +44,7 @@ test "parse_patches new file" {
     #|+++ b/new.txt
     #|@@ -0,0 +1 @@
     #|+hello
-  let patches = @apply.parse_patches(patch)
+  let patches = @bit_apply.parse_patches(patch)
   assert_eq(patches.length(), 1)
   assert_true(patches[0].is_new)
   assert_eq(patches[0].new_mode, "100644")
@@ -58,7 +58,7 @@ test "parse_patches rename" {
     #|similarity index 95%
     #|rename from old.txt
     #|rename to new.txt
-  let patches = @apply.parse_patches(patch)
+  let patches = @bit_apply.parse_patches(patch)
   assert_eq(patches.length(), 1)
   assert_true(patches[0].is_rename)
   assert_eq(patches[0].old_name, "old.txt")
@@ -68,7 +68,7 @@ test "parse_patches rename" {
 
 ///|
 test "parse_diff_git_header" {
-  let (old_name, new_name) = @apply.parse_diff_git_header(
+  let (old_name, new_name) = @bit_apply.parse_diff_git_header(
     "a/src/main.mbt b/src/main.mbt",
   )
   assert_eq(old_name, "src/main.mbt")
@@ -77,7 +77,7 @@ test "parse_diff_git_header" {
 
 ///|
 test "parse_pct" {
-  assert_eq(@apply.parse_pct("95%"), 95)
-  assert_eq(@apply.parse_pct("100%"), 100)
-  assert_eq(@apply.parse_pct("0%"), 0)
+  assert_eq(@bit_apply.parse_pct("95%"), 95)
+  assert_eq(@bit_apply.parse_pct("100%"), 100)
+  assert_eq(@bit_apply.parse_pct("0%"), 0)
 }

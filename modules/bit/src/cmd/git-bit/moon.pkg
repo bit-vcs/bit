@@ -1,10 +1,10 @@
 import {
   "mizchi/bit" @bitcore,
   "mizchi/bit/config_parse" @config_parse,
-  "mizchi/bit/hash" @bithash,
+  "mizchi/bit_hash" @bithash,
   "mizchi/bit/lib" @bitlib,
   "mizchi/bit/repo_ops" @bitrepo,
-  "mizchi/bit/string_utils" @string_utils,
+  "mizchi/bit_utils" @string_utils,
   "mizchi/bitx_hq" @hq,
   "mizchi/bitx_hub" @hub,
   "mizchi/bitx_hub/native" @hub_native,
