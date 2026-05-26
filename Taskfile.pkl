@@ -79,7 +79,7 @@ local build: Task = new {
   cmd = "tools/build-bit-native.sh"
   inputs = moonbitSources
   outputs {
-    "_build/native/release/build/cmd/bit/bit.exe"
+    "_build/native/release/build/mizchi/bit/cmd/bit/bit.exe"
     "tools/git-shim/moon"
   }
 }
@@ -89,7 +89,7 @@ local buildJsLib: Task = new {
   description = "JS release build of mizchi/bit/lib"
   cmd = "moon build --target js --release modules/bit/src/lib"
   inputs = moonbitSources
-  outputs { "_build/js/release/build/lib/lib.js" }
+  outputs { "_build/js/release/build/mizchi/bit/lib/lib.js" }
 }
 
 local buildJsCli: Task = new {
@@ -97,24 +97,24 @@ local buildJsCli: Task = new {
   description = "JS release build of mizchi/bit/cmd/bit"
   cmd = "moon build --target js --release modules/bit/src/cmd/bit"
   inputs = moonbitSources
-  outputs { "_build/js/release/build/cmd/bit/bit.js" }
+  outputs { "_build/js/release/build/mizchi/bit/cmd/bit/bit.js" }
 }
 
 local syncNpmLibRaw: Task = new {
   name = "sync-npm-lib-raw"
   description = "Copy the JS lib payload into the checked-in npm wrapper"
-  cmd = "cp _build/js/release/build/lib/lib.js npm/lib.raw.js"
+  cmd = "cp _build/js/release/build/mizchi/bit/lib/lib.js npm/lib.raw.js"
   deps { buildJsLib }
-  inputs { "_build/js/release/build/lib/lib.js" }
+  inputs { "_build/js/release/build/mizchi/bit/lib/lib.js" }
   outputs { "npm/lib.raw.js" }
 }
 
 local syncNpmBitCjs: Task = new {
   name = "sync-npm-bit-cjs"
   description = "Copy the JS CLI payload into the checked-in npm wrapper"
-  cmd = "cp _build/js/release/build/cmd/bit/bit.js npm/bit.cjs"
+  cmd = "cp _build/js/release/build/mizchi/bit/cmd/bit/bit.js npm/bit.cjs"
   deps { buildJsCli }
-  inputs { "_build/js/release/build/cmd/bit/bit.js" }
+  inputs { "_build/js/release/build/mizchi/bit/cmd/bit/bit.js" }
   outputs { "npm/bit.cjs" }
 }
 
@@ -129,7 +129,7 @@ local bundleJsLibMinimal: Task = new {
     """#
   deps { buildJsLib }
   inputs {
-    "_build/js/release/build/lib/lib.js"
+    "_build/js/release/build/mizchi/bit/lib/lib.js"
     "tools/lib-js-minimal.mjs"
   }
   outputs { "target/lib-js-minimal.bundle.mjs" }
@@ -146,7 +146,7 @@ local bundleJsLibGitOps: Task = new {
     """#
   deps { buildJsLib }
   inputs {
-    "_build/js/release/build/lib/lib.js"
+    "_build/js/release/build/mizchi/bit/lib/lib.js"
     "tools/lib-js-git-ops.mjs"
   }
   outputs { "target/lib-js-git-ops.bundle.mjs" }
@@ -206,7 +206,7 @@ local verifyJsLibTreeshake: Task = new {
 local sizeJsLib: Task = new {
   name = "size-js-lib"
   description = "Report raw + gzip size of the JS lib"
-  cmd = "tools/size-bytes.sh _build/js/release/build/lib/lib.js"
+  cmd = "tools/size-bytes.sh _build/js/release/build/mizchi/bit/lib/lib.js"
   deps { buildJsLib }
 }
 
@@ -236,7 +236,7 @@ local buildDocsDemo: Task = new {
     """#
   deps { buildJsLib }
   inputs {
-    "_build/js/release/build/lib/lib.js"
+    "_build/js/release/build/mizchi/bit/lib/lib.js"
     "docs/demo/main.js"
     "docs/demo/**/*.js"
   }

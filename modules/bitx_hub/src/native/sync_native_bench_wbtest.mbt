@@ -2,7 +2,7 @@
 
 ///|
 /// Run with:
-/// - moon bench -p mizchi/bit/x-hub/native --target native -f sync_native_bench_wbtest.mbt
+/// - moon bench -p mizchi/bitx_hub/native --target native -f sync_native_bench_wbtest.mbt
 
 ///|
 priv struct BenchClock {
