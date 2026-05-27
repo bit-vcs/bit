@@ -48,9 +48,60 @@ jobs:
           # Kill any orphan moon processes and remove stale lock before native tests
           pkill -f "moon" || true
           rm -f _build/.moon-lock
-      - name: Run native tests
-        timeout-minutes: 60
-        run: moon test --target native
+      - name: Run native tests (non-cmd modules)
+        timeout-minutes: 30
+        run: |
+          # Test extracted bit_* and bitx_* modules + mizchi/bit (without cmd).
+          # cmd/bit native tests run in the separate cmd-native-test job because
+          # they dominate runtime (~50 min for the linker pass).
+          modules="$(jq -r '.members[]' moon.work 2>/dev/null || true)"
+          if [ -z "$modules" ]; then
+            modules=$(awk '/members = \[/,/\]/' moon.work | grep -oE '"[^"]+"' | tr -d '"')
+          fi
+          for m in $modules; do
+            case "$m" in
+              modules/bit) continue ;; # cmd lives here — handled separately
+            esac
+            mod_name="mizchi/$(basename "$m")"
+            echo "::group::moon test --target native -p $mod_name"
+            moon test --target native -p "$mod_name"
+            echo "::endgroup::"
+          done
+          # Test mizchi/bit's non-cmd packages (tests + fuzz_tests).
+          moon test --target native -p mizchi/bit/tests
+          moon test --target native -p mizchi/bit/fuzz_tests || true
+
+  cmd-native-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Install pkfire + pkspec
+        uses: mizchi/pkfire@v0
+      - name: Install pkspec
+        uses: mizchi/pkspec@v0.2.1
+        with:
+          pkl-version: none
+      - name: Install MoonBit CLI
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+      - name: Moon update
+        run: moon update
+      - name: Build native binary for wbtests
+        run: |
+          moon build --target native --release modules/bit/src/cmd/bit
+          cp _build/native/release/build/mizchi/bit/cmd/bit/bit.exe tools/git-shim/moon
+          chmod +x tools/git-shim/moon
+          which git > tools/git-shim/real-git-path
+          git config --global protocol.file.allow always
+      - name: Run cmd/bit + cmd/git-bit native tests
+        timeout-minutes: 75
+        run: |
+          moon test --target native -p mizchi/bit/cmd/bit
+          moon test --target native -p mizchi/bit/cmd/git-bit
 
   distributed-test:
     runs-on: ubuntu-latest
