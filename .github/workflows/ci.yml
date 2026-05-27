@@ -124,8 +124,8 @@ jobs:
       - name: Build bit
         run: |
           set -euo pipefail
-          moon build --target native --release
-          bin_path="_build/native/release/build/cmd/bit/bit.exe"
+          moon build --target native --release modules/bit/src/cmd/bit
+          bin_path="_build/native/release/build/mizchi/bit/cmd/bit/bit.exe"
           if [ ! -f "$bin_path" ]; then
             echo "bit binary not found at $bin_path"
             find _build/native -maxdepth 8 -type f -name 'bit.exe' || true
