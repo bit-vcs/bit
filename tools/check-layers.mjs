@@ -49,6 +49,7 @@ const HIGH_MODULES = new Set([
   "mizchi/bit_diff",
   "mizchi/bit_fingerprint",
   "mizchi/bit_grep",
+  "mizchi/bit_lib",
   "mizchi/bit_pack_ops",
   "mizchi/bit_repo_ops",
   "mizchi/bit_runtime",

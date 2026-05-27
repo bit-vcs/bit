@@ -4,7 +4,7 @@ import {
   "mizchi/bit_repo" @repo,
   "mizchi/bit_types" @types,
   "mizchi/bit_io" @io,
-  "mizchi/bit/lib",
+  "mizchi/bit_lib" @lib,
   "mizchi/bit_vfs" @fs,
   "mizchi/zlib" @zlib,
 }

@@ -4,7 +4,7 @@ import {
   "mizchi/bit_types" @types,
   "mizchi/bit_repo" @repo,
   "mizchi/bit_io" @io,
-  "mizchi/bit/lib" @lib,
+  "mizchi/bit_lib" @lib,
   "moonbitlang/core/json" @json,
   "moonbitlang/core/encoding/utf8" @utf8,
   "moonbitlang/core/string" @string,
@@ -12,7 +12,7 @@ import {
 }
 
 import {
-  "mizchi/bit/lib" @lib,
+  "mizchi/bit_lib" @lib,
   "moonbitlang/core/test" @test,
 } for "test"
 

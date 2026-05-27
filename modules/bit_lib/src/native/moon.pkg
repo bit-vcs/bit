@@ -5,7 +5,7 @@ import {
   "mizchi/bit_repo" @repo,
   "mizchi/bit_pack" @pack,
   "mizchi/bit_protocol" @protocol,
-  "mizchi/bit/lib" @bitlib,
+  "mizchi/bit_lib" @bitlib,
   "mizchi/bit_ignore" @ignore,
   "mizchi/bit_io" @bitio,
   "mizchi/bit_io/native" @bitnative,

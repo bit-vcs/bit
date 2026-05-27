@@ -9,7 +9,7 @@ import {
   "mizchi/bit_config" @config_parse,
   "mizchi/bit_date" @date_parse,
   "mizchi/bit_repo" @repo,
-  "mizchi/bit/lib" @bitlib,
+  "mizchi/bit_lib" @bitlib,
 }
 
 warnings = "-29"

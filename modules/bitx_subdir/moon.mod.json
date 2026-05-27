@@ -6,6 +6,7 @@
     "mizchi/bit_object": "0.42.2",
     "mizchi/bit_repo": "0.42.2",
     "mizchi/bit_io": "0.42.2",
+    "mizchi/bit_lib": "0.42.2",
     "mizchi/bit_types": "0.42.2",
     "mizchi/bit_vfs": "0.42.2",
     "mizchi/zlib": "0.4.5"

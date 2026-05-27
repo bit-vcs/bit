@@ -6,7 +6,7 @@ import {
   "mizchi/bit_protocol" @protocol,
   "mizchi/bit_io/native" @bitnative,
   "mizchi/bit_io" @io,
-  "mizchi/bit/lib" @lib,
+  "mizchi/bit_lib" @lib,
   "mizchi/bitx_hub" @hub,
   "mizchi/bitx_hub/crypto" @crypto,
   "moonbitlang/async" @async,

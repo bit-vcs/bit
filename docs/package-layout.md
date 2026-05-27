@@ -14,13 +14,12 @@ pick only the features they need.
 ```
 moon.work                  ← workspace manifest
 modules/
-  bit/                     ← main module: remaining core / mid / high / cmd
+  bit/                     ← residual main: just the CLI + integration tests
     moon.mod.json
     src/
-      types/ object/ pack/ refs/ protocol/ ...   (core, not yet extracted)
-      repo_ops/ worktree/ diff/ ...              (mid)
-      lib/ vfs/ fingerprint/ grep/ runtime/      (high)
-      cmd/bit/ cmd/git-bit/                      (cmd)
+      top.mbt + moon.pkg              (thin facade re-exports)
+      cmd/bit/ cmd/git-bit/           (CLI binaries)
+      tests/ fuzz_tests/              (integration + fuzz suites)
   bit_apply/               ← standalone core modules (gix-* equivalents)
   bit_archive/
   bit_bootstrap/
@@ -35,6 +34,7 @@ modules/
   bit_hash/
   bit_ignore/
   bit_io/
+  bit_lib/
   bit_object/
   bit_osfs/
   bit_pack/
@@ -137,7 +137,8 @@ Porcelain layer. May depend on `core/*` and `mid/*`. Used by `cmd/*` and
 
 | Package                       | Path               | Notes                                              |
 |-------------------------------|--------------------|----------------------------------------------------|
-| `mizchi/bit/lib`              | `modules/bit/src/lib`          | High-level / backward-compatible facade            |
+| `mizchi/bit_lib`              | `modules/bit_lib/src`          | High-level porcelain facade (gix-equivalent)       |
+| `mizchi/bit_lib/native`       | `modules/bit_lib/src/native`   | Native-only porcelain helpers                      |
 | `mizchi/bit_vfs`              | `modules/bit_vfs/src`          | Virtual FS over commits (used by `lib`, `bitx_kv`, `bitx_subdir`) |
 | `mizchi/bit_fingerprint`      | `modules/bit_fingerprint/src`  | Workspace fingerprint (used by `bitx_workspace`)   |
 | `mizchi/bit_grep`             | `modules/bit_grep/src`         | Grep engine over the working tree                  |

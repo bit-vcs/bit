@@ -4,12 +4,12 @@ import {
   "mizchi/bit_types" @types,
   "mizchi/bit_repo" @repo,
   "mizchi/bit_io" @io,
-  "mizchi/bit/lib" @lib,
+  "mizchi/bit_lib" @lib,
   "moonbitlang/core/encoding/utf8" @utf8,
 }
 
 import {
-  "mizchi/bit/lib" @lib,
+  "mizchi/bit_lib" @lib,
   "mizchi/bit_osfs" @osfs,
   "mizchi/zlib",
   "moonbitlang/core/bench" @bench,

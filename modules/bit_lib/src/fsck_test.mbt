@@ -6,8 +6,8 @@ test "fsck_connectivity_check on empty repo" {
   let git_dir = "/repo/.git"
   fs.mkdir_p(git_dir + "/objects")
   fs.mkdir_p(git_dir + "/objects/pack")
-  let db = @lib.ObjectDb::load(fs, git_dir)
-  let result = @lib.fsck_connectivity_check(db, fs, [])
+  let db = @bit_lib.ObjectDb::load(fs, git_dir)
+  let result = @bit_lib.fsck_connectivity_check(db, fs, [])
   assert_eq(result.errors, 0)
   assert_eq(result.reachable.to_array().length(), 0)
   assert_eq(result.missing.to_array().length(), 0)
@@ -22,12 +22,12 @@ test "fsck_connectivity_check finds reachable objects" {
   fs.mkdir_p(git_dir + "/refs")
   // Create a blob
   let (blob_id, blob_bytes) = @bit.create_blob_string("hello\n")
-  @lib.write_object_bytes(fs, git_dir, blob_id, blob_bytes)
+  @bit_lib.write_object_bytes(fs, git_dir, blob_id, blob_bytes)
   // Create a tree with the blob
   let (tree_id, tree_bytes) = @bit.create_tree([
     @bit.TreeEntry::new("100644", "hello.txt", blob_id),
   ])
-  @lib.write_object_bytes(fs, git_dir, tree_id, tree_bytes)
+  @bit_lib.write_object_bytes(fs, git_dir, tree_id, tree_bytes)
   // Create a root commit
   let commit = @bit.Commit::new(
     tree_id,
@@ -41,9 +41,9 @@ test "fsck_connectivity_check finds reachable objects" {
     "test\n",
   )
   let (commit_id, commit_bytes) = @bit.create_commit(commit)
-  @lib.write_object_bytes(fs, git_dir, commit_id, commit_bytes)
-  let db = @lib.ObjectDb::load(fs, git_dir)
-  let result = @lib.fsck_connectivity_check(
+  @bit_lib.write_object_bytes(fs, git_dir, commit_id, commit_bytes)
+  let db = @bit_lib.ObjectDb::load(fs, git_dir)
+  let result = @bit_lib.fsck_connectivity_check(
     db,
     fs,
     [commit_id],
@@ -78,9 +78,9 @@ test "fsck_connectivity_check detects missing objects" {
     "test\n",
   )
   let (commit_id, commit_bytes) = @bit.create_commit(commit)
-  @lib.write_object_bytes(fs, git_dir, commit_id, commit_bytes)
-  let db = @lib.ObjectDb::load(fs, git_dir)
-  let result = @lib.fsck_connectivity_check(db, fs, [commit_id])
+  @bit_lib.write_object_bytes(fs, git_dir, commit_id, commit_bytes)
+  let db = @bit_lib.ObjectDb::load(fs, git_dir)
+  let result = @bit_lib.fsck_connectivity_check(db, fs, [commit_id])
   assert_true(result.errors > 0)
   assert_true(result.missing.contains(fake_tree_hex))
 }
@@ -93,10 +93,10 @@ test "fsck_enumerate_objects lists all" {
   fs.mkdir_p(git_dir + "/objects")
   for i in 0..<3 {
     let (id, data) = @bit.create_blob_string("content \{i}\n")
-    @lib.write_object_bytes(fs, git_dir, id, data)
+    @bit_lib.write_object_bytes(fs, git_dir, id, data)
   }
-  let db = @lib.ObjectDb::load(fs, git_dir)
-  let all = @lib.fsck_enumerate_objects(db)
+  let db = @bit_lib.ObjectDb::load(fs, git_dir)
+  let all = @bit_lib.fsck_enumerate_objects(db)
   assert_eq(all.length(), 3)
 }
 
@@ -120,9 +120,9 @@ test "fsck_verify_loose_hash valid" {
     }),
   )
   let expected = @bit.sha1(raw)
-  assert_true(@lib.fsck_verify_loose_hash(raw, expected.to_hex()))
+  assert_true(@bit_lib.fsck_verify_loose_hash(raw, expected.to_hex()))
   assert_true(
-    !@lib.fsck_verify_loose_hash(
+    !@bit_lib.fsck_verify_loose_hash(
       raw, "0000000000000000000000000000000000000000",
     ),
   )
