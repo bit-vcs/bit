@@ -73,6 +73,13 @@ jobs:
 
   cmd-native-test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: cmd-bit,     pkg: mizchi/bit/cmd/bit,     timeout: 120 }
+          - { name: cmd-git-bit, pkg: mizchi/bit/cmd/git-bit, timeout: 30  }
+    name: cmd-native-test (${{ matrix.name }})
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -97,11 +104,9 @@ jobs:
           chmod +x tools/git-shim/moon
           which git > tools/git-shim/real-git-path
           git config --global protocol.file.allow always
-      - name: Run cmd/bit + cmd/git-bit native tests
-        timeout-minutes: 75
-        run: |
-          moon test --target native -p mizchi/bit/cmd/bit
-          moon test --target native -p mizchi/bit/cmd/git-bit
+      - name: Run ${{ matrix.pkg }} native tests
+        timeout-minutes: ${{ matrix.timeout }}
+        run: moon test --target native -p ${{ matrix.pkg }}
 
   distributed-test:
     runs-on: ubuntu-latest
