@@ -2,7 +2,7 @@
 # Boot the Vite-powered playground after building the JS lib.
 set -euo pipefail
 
-moon build --target js --release modules/bit/src/lib
+moon build --target js --release modules/bit_lib/src
 if [ ! -d node_modules ]; then
   pnpm install
 fi

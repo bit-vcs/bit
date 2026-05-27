@@ -31,8 +31,8 @@ jobs:
         run: pkf run check
       - name: Build native binary for wbtests
         run: |
-          moon build --target native --release
-          cp _build/native/release/build/cmd/bit/bit.exe tools/git-shim/moon
+          moon build --target native --release modules/bit/src/cmd/bit
+          cp _build/native/release/build/mizchi/bit/cmd/bit/bit.exe tools/git-shim/moon
           chmod +x tools/git-shim/moon
           # Set system git as fallback for wbtests (third_party/git/git is not built in test job)
           which git > tools/git-shim/real-git-path
@@ -40,11 +40,11 @@ jobs:
           git config --global protocol.file.allow always
       - name: Run JS and WASM tests
         run: |
-          moon test --target js -p mizchi/bit -p mizchi/bit/lib
-          moon test --target wasm -p mizchi/bit/runtime -f storage_runtime_wbtest.mbt
-          moon test --target wasm -p mizchi/bit/diff3
-          moon test --target wasm -p mizchi/bit/repo
-          moon test --target wasm -p mizchi/bit/grep
+          moon test --target js -p mizchi/bit -p mizchi/bit_lib
+          moon test --target wasm -p mizchi/bit_runtime -f storage_runtime_wbtest.mbt
+          moon test --target wasm -p mizchi/bit_diff3
+          moon test --target wasm -p mizchi/bit_repo
+          moon test --target wasm -p mizchi/bit_grep
           # Kill any orphan moon processes and remove stale lock before native tests
           pkill -f "moon" || true
           rm -f _build/.moon-lock
@@ -71,9 +71,9 @@ jobs:
           moon test --target native -p mizchi/bit/x/agent/llm
           moon test --target native -p mizchi/bit/x/agent/mcp
           moon test --target native -p mizchi/bit/x/agent/native
-          moon test --target native -p mizchi/bit/x-hub
-          moon test --target native -p mizchi/bit/x-hub/native
-          moon test --target native -p mizchi/bit/x-kv
+          moon test --target native -p mizchi/bitx_hub
+          moon test --target native -p mizchi/bitx_hub/native
+          moon test --target native -p mizchi/bitx_kv
 
   nix-build:
     runs-on: ubuntu-latest

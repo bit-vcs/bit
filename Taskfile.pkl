@@ -87,9 +87,9 @@ local build: Task = new {
 local buildJsLib: Task = new {
   name = "build-js-lib"
   description = "JS release build of mizchi/bit/lib"
-  cmd = "moon build --target js --release modules/bit/src/lib"
+  cmd = "moon build --target js --release modules/bit_lib/src"
   inputs = moonbitSources
-  outputs { "_build/js/release/build/mizchi/bit/lib/lib.js" }
+  outputs { "_build/js/release/build/mizchi/bit_lib/bit_lib.js" }
 }
 
 local buildJsCli: Task = new {
@@ -103,9 +103,9 @@ local buildJsCli: Task = new {
 local syncNpmLibRaw: Task = new {
   name = "sync-npm-lib-raw"
   description = "Copy the JS lib payload into the checked-in npm wrapper"
-  cmd = "cp _build/js/release/build/mizchi/bit/lib/lib.js npm/lib.raw.js"
+  cmd = "cp _build/js/release/build/mizchi/bit_lib/bit_lib.js npm/lib.raw.js"
   deps { buildJsLib }
-  inputs { "_build/js/release/build/mizchi/bit/lib/lib.js" }
+  inputs { "_build/js/release/build/mizchi/bit_lib/bit_lib.js" }
   outputs { "npm/lib.raw.js" }
 }
 
@@ -129,7 +129,7 @@ local bundleJsLibMinimal: Task = new {
     """#
   deps { buildJsLib }
   inputs {
-    "_build/js/release/build/mizchi/bit/lib/lib.js"
+    "_build/js/release/build/mizchi/bit_lib/bit_lib.js"
     "tools/lib-js-minimal.mjs"
   }
   outputs { "target/lib-js-minimal.bundle.mjs" }
@@ -146,7 +146,7 @@ local bundleJsLibGitOps: Task = new {
     """#
   deps { buildJsLib }
   inputs {
-    "_build/js/release/build/mizchi/bit/lib/lib.js"
+    "_build/js/release/build/mizchi/bit_lib/bit_lib.js"
     "tools/lib-js-git-ops.mjs"
   }
   outputs { "target/lib-js-git-ops.bundle.mjs" }
@@ -206,7 +206,7 @@ local verifyJsLibTreeshake: Task = new {
 local sizeJsLib: Task = new {
   name = "size-js-lib"
   description = "Report raw + gzip size of the JS lib"
-  cmd = "tools/size-bytes.sh _build/js/release/build/mizchi/bit/lib/lib.js"
+  cmd = "tools/size-bytes.sh _build/js/release/build/mizchi/bit_lib/bit_lib.js"
   deps { buildJsLib }
 }
 
@@ -236,7 +236,7 @@ local buildDocsDemo: Task = new {
     """#
   deps { buildJsLib }
   inputs {
-    "_build/js/release/build/mizchi/bit/lib/lib.js"
+    "_build/js/release/build/mizchi/bit_lib/bit_lib.js"
     "docs/demo/main.js"
     "docs/demo/**/*.js"
   }

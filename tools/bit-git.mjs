@@ -64,7 +64,7 @@ import {
   tagList as rawTagList,
   verifyCommitSshEd25519 as rawVerifyCommitSshEd25519,
   verifyGitPayloadSshEd25519 as rawVerifyGitPayloadSshEd25519,
-} from "../_build/js/release/build/lib/lib.js";
+} from "../_build/js/release/build/mizchi/bit_lib/bit_lib.js";
 
 const ensureState = () => (
   globalThis.__bitGitJsState ??= { nextHostId: 1, hosts: new Map() }
