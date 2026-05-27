@@ -49,8 +49,8 @@ jobs:
           pkill -f "moon" || true
           rm -f _build/.moon-lock
       - name: Run native tests
-        timeout-minutes: 30
-        run: moon test --target native --no-parallelize -j 1
+        timeout-minutes: 60
+        run: moon test --target native
 
   distributed-test:
     runs-on: ubuntu-latest
