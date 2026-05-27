@@ -47,8 +47,12 @@ const CORE_MODULES = new Set([
 // and promote to MID, eventually shrinking lib to a thin facade.
 const HIGH_MODULES = new Set([
   "mizchi/bit_diff",
+  "mizchi/bit_fingerprint",
+  "mizchi/bit_grep",
   "mizchi/bit_pack_ops",
   "mizchi/bit_repo_ops",
+  "mizchi/bit_runtime",
+  "mizchi/bit_vfs",
   "mizchi/bit_worktree",
 ]);
 

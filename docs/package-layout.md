@@ -30,6 +30,8 @@ modules/
   bit_diff3/
   bit_diff_core/
   bit_fast_import/
+  bit_fingerprint/
+  bit_grep/
   bit_hash/
   bit_ignore/
   bit_io/
@@ -43,9 +45,11 @@ modules/
   bit_remote/
   bit_repo/
   bit_repo_ops/
+  bit_runtime/
   bit_trailers/
   bit_types/
   bit_utils/
+  bit_vfs/
   bit_worktree/
   bitx_bitconfig/          ← extension modules (non-Git features)
   bitx_doc/
@@ -134,8 +138,10 @@ Porcelain layer. May depend on `core/*` and `mid/*`. Used by `cmd/*` and
 | Package                       | Path               | Notes                                              |
 |-------------------------------|--------------------|----------------------------------------------------|
 | `mizchi/bit/lib`              | `modules/bit/src/lib`          | High-level / backward-compatible facade            |
-| `mizchi/bit/vfs`              | `modules/bit/src/vfs`          | Virtual FS over commits (used by `lib`, `x-kv`, `x-subdir`) |
-| `mizchi/bit/fingerprint`      | `modules/bit/src/fingerprint`  | Workspace fingerprint (used by `x-workspace`)      |
+| `mizchi/bit_vfs`              | `modules/bit_vfs/src`          | Virtual FS over commits (used by `lib`, `bitx_kv`, `bitx_subdir`) |
+| `mizchi/bit_fingerprint`      | `modules/bit_fingerprint/src`  | Workspace fingerprint (used by `bitx_workspace`)   |
+| `mizchi/bit_grep`             | `modules/bit_grep/src`         | Grep engine over the working tree                  |
+| `mizchi/bit_runtime`          | `modules/bit_runtime/src`      | Runtime helpers (storage_runtime, etc.)            |
 
 ### bitx_* (extensions, gitoxide にはない bit 独自機能)
 

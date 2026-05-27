@@ -5,7 +5,7 @@ import {
   "mizchi/bit_types" @types,
   "mizchi/bit/lib" @bitlib,
   "mizchi/bit_utils" @string_utils,
-  "mizchi/bit/runtime" @runtime,
+  "mizchi/bit_runtime" @runtime,
   "mizchi/bit_osfs" @osfs,
   "mizchi/llm" @llmlib,
   "mizchi/llm/openai" @openai,

@@ -36,7 +36,7 @@ import {
   "moonbitlang/async" @async,
   "moonbitlang/core/bench" @bench,
   "mizchi/bit_osfs" @osfs,
-  "mizchi/bit/vfs" @bitfs,
+  "mizchi/bit_vfs" @bitfs,
   "moonbitlang/core/test" @test,
 } for "wbtest"
 

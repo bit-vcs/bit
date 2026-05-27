@@ -5,6 +5,7 @@
     "mizchi/bit": "0.42.2",
     "mizchi/bit_object": "0.42.2",
     "mizchi/bit_types": "0.42.2",
+    "mizchi/bit_fingerprint": "0.42.2",
     "mizchi/bit_osfs": "0.42.2",
     "mizchi/bit_utils": "0.42.2",
     "mizchi/bitflow": "0.4.0",

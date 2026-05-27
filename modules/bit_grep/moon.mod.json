@@ -1,0 +1,18 @@
+{
+  "name": "mizchi/bit_grep",
+  "version": "0.42.2",
+  "deps": {
+    "mizchi/bit": "0.42.2",
+    "mizchi/bit_ignore": "0.42.2",
+    "mizchi/bit_io": "0.42.2",
+    "mizchi/bit_object": "0.42.2",
+    "mizchi/bit_repo_ops": "0.42.2",
+    "mizchi/bit_types": "0.42.2"
+  },
+  "repository": "https://github.com/mizchi/bit-vcs",
+  "license": "Apache-2.0",
+  "keywords": ["git", "grep"],
+  "description": "Grep engine over the working tree",
+  "source": "src",
+  "preferred-target": "native"
+}
