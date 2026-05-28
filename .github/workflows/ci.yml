@@ -104,6 +104,10 @@ jobs:
           chmod +x tools/git-shim/moon
           which git > tools/git-shim/real-git-path
           git config --global protocol.file.allow always
+      - name: Clear stale moon lock
+        run: |
+          pkill -f "moon" || true
+          rm -f _build/.moon-lock
       - name: Run ${{ matrix.pkg }} native tests
         timeout-minutes: ${{ matrix.timeout }}
         run: moon test --target native -p ${{ matrix.pkg }}
