@@ -277,7 +277,7 @@ async test "js exports: clone clones ssh remote via https smart transport" {
   let result = js_exports_unwrap_ok(
     "clone",
     js_clone_remote(
-      host_id, "/repo-clone", "git@github.com:user/repo.git", transport_id, true,
+      host_id, "/repo-clone", "git@github.com:user/repo.git", transport_id, true, 0,
     ),
   )
   assert_eq(result.status, "cloned")
