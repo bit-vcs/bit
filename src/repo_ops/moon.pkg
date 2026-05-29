@@ -4,6 +4,7 @@ import {
   "mizchi/bit/lib" @bitlib,
   "mizchi/bit/hash" @bithash,
   "mizchi/bit/object" @object,
+  "mizchi/bit/string_utils" @string_utils,
   "moonbitlang/core/encoding/utf8" @utf8,
 }
 

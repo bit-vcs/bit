@@ -398,7 +398,7 @@ fn apply_rev_suffix(
       } else {
         parent_index = 1
       }
-      let next = commit_nth_parent(db, fs, current, parent_index)
+      let next = commit_nth_parent(db, fs, git_dir, current, parent_index)
       guard next is Some(parent_id) else { return None }
       current = parent_id
       continue
@@ -416,7 +416,7 @@ fn apply_rev_suffix(
         steps = 1
       }
       for _ in 0..<steps {
-        let next = commit_nth_parent(db, fs, current, 1)
+        let next = commit_nth_parent(db, fs, git_dir, current, 1)
         guard next is Some(parent_id) else { return None }
         current = parent_id
       }
@@ -431,6 +431,7 @@ fn apply_rev_suffix(
 fn commit_nth_parent(
   db : ObjectDb,
   fs : &@bit.RepoFileSystem,
+  git_dir : String,
   commit_id : @bit.ObjectId,
   nth_parent : Int,
 ) -> @bit.ObjectId? raise @bit.GitError {
@@ -443,10 +444,62 @@ fn commit_nth_parent(
     return None
   }
   let info = @bit.parse_commit(o.data)
-  if nth_parent > info.parents.length() {
+  let parents = match revparse_read_graft_parents(fs, git_dir, commit_id) {
+    Some(grafted) => grafted
+    None => info.parents
+  }
+  if nth_parent > parents.length() {
     return None
   }
-  Some(info.parents[nth_parent - 1])
+  Some(parents[nth_parent - 1])
+}
+
+///|
+/// Read `.git/info/grafts` and return the grafted parent list for `commit_id`
+/// if a graft entry exists for it. Each line is `<commit-id> <parent>...`.
+/// Returns None when there is no graft entry (or the file is missing).
+fn revparse_read_graft_parents(
+  fs : &@bit.RepoFileSystem,
+  git_dir : String,
+  commit_id : @bit.ObjectId,
+) -> Array[@bit.ObjectId]? {
+  let graft_path = join_path(git_dir, "info/grafts")
+  if !fs.is_file(graft_path) {
+    return None
+  }
+  let raw = fs.read_file(graft_path) catch {
+    _ => return None
+  }
+  let content = @utf8.decode_lossy(raw[:])
+  let commit_hex = commit_id.to_hex()
+  for line_view in content.split("\n") {
+    let line = @string_utils.trim_string(line_view.to_owned())
+    if line.length() == 0 || line.has_prefix("#") {
+      continue
+    }
+    let tokens : Array[String] = []
+    for token_view in line.split(" ") {
+      let token = @string_utils.trim_string(token_view.to_owned())
+      if token.length() > 0 {
+        tokens.push(token)
+      }
+    }
+    if tokens.length() == 0 || tokens[0] != commit_hex {
+      continue
+    }
+    let parents : Array[@bit.ObjectId] = []
+    for i in 1..<tokens.length() {
+      let parent_hex = tokens[i]
+      if parent_hex.length() == 40 || parent_hex.length() == 64 {
+        let parent_id = @bit.ObjectId::from_hex(parent_hex) catch {
+          _ => continue
+        }
+        parents.push(parent_id)
+      }
+    }
+    return Some(parents)
+  }
+  None
 }
 
 ///|
