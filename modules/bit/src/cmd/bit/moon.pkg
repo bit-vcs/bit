@@ -57,11 +57,6 @@ warnings = "-12-29-67"
 
 options(
   is_main: true,
-  link: {
-    "native": {
-      "cc": "clang",
-    },
-  },
   "native-stub": [
     "bench_suppress_stub.c",
     "hub_tty_stub.c",
