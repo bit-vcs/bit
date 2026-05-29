@@ -247,7 +247,7 @@ async fn handlers_remote_pull_wbtest_collect_shim_git(
     Some(d) => d
     None => {
       let exe = @sys.get_cli_args()[0]
-      // exe is like /path/to/bit/_build/native/release/build/cmd/bit/bit.exe
+      // exe is like /path/to/bit/_build/native/release/build/mizchi/bit/cmd/bit/bit.exe
       // or the test binary — fallback to current_dir
       let idx = exe.find("/_build/")
       match idx {
@@ -261,7 +261,7 @@ async fn handlers_remote_pull_wbtest_collect_shim_git(
   let fs = OsFs::new()
   // Build the native binary first so exit codes propagate correctly
   // (moon run swallows non-zero exit codes)
-  let bit_exe = repo_root + "/_build/native/release/build/cmd/bit/bit.exe"
+  let bit_exe = repo_root + "/_build/native/release/build/mizchi/bit/cmd/bit/bit.exe"
   if !fs.is_file(bit_exe) {
     let build_code = @process.run(
       "moon",
