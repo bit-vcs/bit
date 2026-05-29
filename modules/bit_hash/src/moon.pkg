@@ -10,7 +10,10 @@ import {
 warnings = "-29"
 
 options(
+  "native-stub": [ "sha1_ni.c", "sha256_ni.c" ],
+  "cc-flags": [ "-msha", "-msse4.1" ],
   targets: {
+    "sha1_ni_ffi.mbt": [ "native" ],
     "bench_test.mbt": [ "native" ],
   },
 )

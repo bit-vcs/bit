@@ -52,7 +52,9 @@ pub fn Sha256State::finish_raw(self : Sha256State) -> FixedArray[Byte] {
 
 ///|
 pub fn sha256_raw(data : Bytes) -> FixedArray[Byte] {
-  sha256_prefix_raw(data, data.length())
+  let out : FixedArray[Byte] = FixedArray::make(32, b'\x00')
+  sha256_compute_ffi(data, data.length(), out)
+  out
 }
 
 ///|
