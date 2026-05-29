@@ -1,6 +1,7 @@
 {
   lib,
   git,
+  clang,
   autoPatchelfHook,
   stdenv,
   writeText,
@@ -33,7 +34,7 @@ stdenv.mkDerivation {
 
   src = lib.cleanSource ./.;
 
-  nativeBuildInputs = [ moonHome ] ++ lib.optionals stdenv.isLinux [ autoPatchelfHook ];
+  nativeBuildInputs = [ moonHome clang ] ++ lib.optionals stdenv.isLinux [ autoPatchelfHook ];
   propagatedBuildInputs = [ git ];
 
   configurePhase = ''
