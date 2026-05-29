@@ -99,14 +99,25 @@ jobs:
         run: moon update
       - name: Build native binary for wbtests
         run: |
+          set -euo pipefail
+          moon --version
           moon build --target native --release modules/bit/src/cmd/bit
-          cp _build/native/release/build/mizchi/bit/cmd/bit/bit.exe tools/git-shim/moon
+          bin_path=$(find _build/native -maxdepth 8 -type f -name 'bit.exe' | head -1)
+          if [ -z "$bin_path" ]; then
+            echo "bit.exe not found after moon build"
+            find _build/native -maxdepth 8 -type f | head -20 || true
+            exit 1
+          fi
+          echo "bit.exe found at: $bin_path"
+          cp "$bin_path" tools/git-shim/moon
           chmod +x tools/git-shim/moon
           which git > tools/git-shim/real-git-path
           git config --global protocol.file.allow always
-      - name: Clear stale moon lock
+      - name: Clear stale processes and moon lock
         run: |
           pkill -f "moon" || true
+          pkill -f "clang" || true
+          sleep 1
           rm -f _build/.moon-lock
       - name: Run ${{ matrix.pkg }} native tests
         timeout-minutes: ${{ matrix.timeout }}
@@ -184,14 +195,15 @@ jobs:
       - name: Build bit
         run: |
           set -euo pipefail
+          moon --version
           moon build --target native --release modules/bit/src/cmd/bit
-          bin_path="_build/native/release/build/mizchi/bit/cmd/bit/bit.exe"
-          if [ ! -f "$bin_path" ]; then
-            echo "bit binary not found at $bin_path"
-            find _build/native -maxdepth 8 -type f -name 'bit.exe' || true
+          bin_path=$(find _build/native -maxdepth 8 -type f -name 'bit.exe' | head -1)
+          if [ -z "$bin_path" ]; then
+            echo "bit.exe not found after moon build"
+            find _build/native -maxdepth 8 -type f | head -20 || true
             exit 1
           fi
-          echo "Using bit binary: $bin_path"
+          echo "bit.exe found at: $bin_path"
           cp "$bin_path" tools/git-shim/moon
           chmod +x tools/git-shim/moon
 
