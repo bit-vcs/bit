@@ -1,0 +1,406 @@
+///|
+test "merge help is handled by merge command path" {
+  assert_true(command_handles_builtin_help("merge"))
+}
+
+///|
+test "split_cmdline quote validation" {
+  assert_true(split_cmdline_has_unclosed_quote("echo \""))
+  assert_false(split_cmdline_has_unclosed_quote("echo \\\""))
+  assert_false(split_cmdline_has_unclosed_quote("--no-ff -m \"ok\""))
+}
+
+///|
+test "merge: signing args handled natively" {
+  assert_false(merge_requires_real_git(["-S", "side"]))
+  assert_false(merge_requires_real_git(["--gpg-sign", "side"]))
+  assert_false(merge_requires_real_git(["--gpg-sign=key", "side"]))
+  assert_false(merge_requires_real_git(["--no-gpg-sign", "side"]))
+  assert_false(merge_requires_real_git(["side"]))
+}
+
+///|
+async test "merge: -S stores gpgsig header on merge commit" {
+  @bitnative.init_native_io()
+  cmd_bit_wbtest_env_lock.acquire()
+  defer cmd_bit_wbtest_env_lock.release()
+  let fs = OsFs::new()
+  let root = "/tmp/bit-test-merge-gpg-sign-" +
+    get_current_timestamp().to_string()
+  cleanup_tree(fs, root)
+  fs.mkdir_p(root)
+  let repo_dir = root + "/repo"
+
+  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
+  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @sys.get_env_var("GIT_DIR")
+  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
+  defer add_test_restore_env("GIT_SHIM_CWD", prev_shim_cwd)
+  defer add_test_restore_env("GIT_SHIM_PWD", prev_shim_pwd)
+  defer add_test_restore_env("GIT_DIR", prev_git_dir)
+  defer add_test_restore_env("GIT_WORK_TREE", prev_work_tree)
+
+  grep_test_run_git(root, ["init", "--initial-branch=main", "-q", "repo"])
+  grep_test_run_git(repo_dir, ["config", "user.name", "Test User"])
+  grep_test_run_git(repo_dir, ["config", "user.email", "test@example.com"])
+  let signer = root + "/fake-gpg.sh"
+  signing_wbtest_write_fake_gpg(fs, signer)
+  grep_test_run_git(repo_dir, ["config", "gpg.program", signer])
+  grep_test_run_git(repo_dir, ["config", "gpg.format", "openpgp"])
+
+  fs.write_string(repo_dir + "/base.txt", "base\n")
+  grep_test_run_git(repo_dir, ["add", "base.txt"])
+  grep_test_run_git(repo_dir, ["commit", "-q", "-m", "base"])
+
+  grep_test_run_git(repo_dir, ["switch", "-q", "-c", "side"])
+  fs.write_string(repo_dir + "/side.txt", "side\n")
+  grep_test_run_git(repo_dir, ["add", "side.txt"])
+  grep_test_run_git(repo_dir, ["commit", "-q", "-m", "side"])
+
+  grep_test_run_git(repo_dir, ["switch", "-q", "main"])
+  fs.write_string(repo_dir + "/main.txt", "main\n")
+  grep_test_run_git(repo_dir, ["add", "main.txt"])
+  grep_test_run_git(repo_dir, ["commit", "-q", "-m", "main"])
+
+  @sys.unset_env_var("GIT_SHIM_CWD")
+  @sys.unset_env_var("GIT_DIR")
+  @sys.unset_env_var("GIT_WORK_TREE")
+  @sys.set_env_var("GIT_SHIM_PWD", repo_dir)
+
+  handle_merge(["-q", "-S", "-m", "signed merge", "side"]) catch {
+    err => fail("handle_merge failed: \{err}")
+  }
+
+  let git_dir = repo_dir + "/.git"
+  let head = @bitlib.resolve_head_commit(fs, git_dir).unwrap()
+  let db = @bitlib.ObjectDb::load_lazy(fs, git_dir)
+  let commit_obj = db.get(fs, head).unwrap()
+  let commit_text = @utf8.decode_lossy(commit_obj.data[:]).to_string()
+  let info = @bitcore.parse_commit(commit_obj.data)
+  assert_eq(info.parents.length(), 2)
+  assert_true(
+    commit_text.contains(
+      "gpgsig -----BEGIN PGP SIGNATURE-----\n abc123\n -----END PGP SIGNATURE-----\n",
+    ),
+  )
+
+  cleanup_tree(fs, root)
+}
+
+///|
+let merge_wbtest_shim_lock : @async.Semaphore = @async.Semaphore::new(
+  1,
+  initial_value=1,
+)
+
+///|
+async fn merge_wbtest_collect_shim_git(
+  cwd : String,
+  args : Array[String],
+) -> (Int, String, String) raise Error {
+  merge_wbtest_shim_lock.acquire()
+  defer merge_wbtest_shim_lock.release()
+  let repo_root = @env.current_dir().unwrap_or(".")
+  let shim_git = repo_root + "/tools/git-shim/bin/git"
+  let shim_moon = "/tmp/bit-merge-shim-moon.sh"
+  let fs = OsFs::new()
+  // Build the native binary first so exit codes propagate correctly
+  // (moon run swallows non-zero exit codes)
+  let bit_exe = repo_root + "/_build/native/release/build/mizchi/bit/cmd/bit/bit.exe"
+  if !fs.is_file(bit_exe) {
+    let build_code = @process.run(
+      "moon",
+      ["build", "--target", "native", "--release"],
+      inherit_env=true,
+    )
+    assert_eq(build_code, 0)
+  }
+  fs.write_string(shim_moon, "#!/bin/sh\nset -eu\nexec '\{bit_exe}' \"$@\"\n")
+  let chmod_code = @process.run("chmod", ["+x", shim_moon], inherit_env=true)
+  assert_eq(chmod_code, 0)
+  let env : Map[String, String] = {
+    "SHIM_REAL_GIT": wbtest_resolve_real_git(repo_root),
+    "SHIM_EXEC_PATH": repo_root + "/third_party/git",
+    "SHIM_MOON": shim_moon,
+    "SHIM_CMDS": "merge",
+    "SHIM_STRICT": "1",
+  }
+  let git_args : Array[String] = ["-C", cwd]
+  for arg in args {
+    git_args.push(arg)
+  }
+  let (code, stdout, stderr) = @process.collect_output(
+    shim_git,
+    git_args[:],
+    extra_env=env,
+    inherit_env=true,
+  )
+  let stdout_text = stdout.text() catch { _ => "" }
+  let stderr_text = stderr.text() catch { _ => "" }
+  (code, stdout_text, stderr_text)
+}
+
+///|
+async test "merge: command path supports strategy ours via fallback" {
+  @bitnative.init_native_io()
+  let fs = OsFs::new()
+  let root = "/tmp/bit-test-merge-strategy-ours-" +
+    get_current_timestamp().to_string()
+  cleanup_tree(fs, root)
+  fs.mkdir_p(root)
+  let repo_dir = root + "/repo"
+
+  grep_test_run_git(root, ["init", "--initial-branch=main", "-q", "repo"])
+  grep_test_run_git(repo_dir, ["config", "user.name", "Test User"])
+  grep_test_run_git(repo_dir, ["config", "user.email", "test@example.com"])
+
+  fs.write_string(repo_dir + "/file", "base\n")
+  grep_test_run_git(repo_dir, ["add", "file"])
+  grep_test_run_git(repo_dir, ["commit", "-q", "-m", "base"])
+
+  grep_test_run_git(repo_dir, ["checkout", "-q", "-b", "side"])
+  fs.write_string(repo_dir + "/file", "side\n")
+  grep_test_run_git(repo_dir, ["commit", "-q", "-am", "side"])
+
+  grep_test_run_git(repo_dir, ["checkout", "-q", "main"])
+  fs.write_string(repo_dir + "/file", "main\n")
+  grep_test_run_git(repo_dir, ["commit", "-q", "-am", "main"])
+
+  grep_test_run_git(repo_dir, [
+    "merge", "-q", "-s", "ours", "-m", "ours", "side",
+  ])
+
+  assert_eq(
+    trim_string(grep_test_git_stdout(repo_dir, ["log", "-1", "--format=%s"])),
+    "ours",
+  )
+  assert_eq(decode_bytes(fs.read_file(repo_dir + "/file")), "main\n")
+
+  cleanup_tree(fs, root)
+}
+
+///|
+async test "merge: --no-commit with strategy ours keeps merge state" {
+  @bitnative.init_native_io()
+  cmd_bit_wbtest_env_lock.acquire()
+  defer cmd_bit_wbtest_env_lock.release()
+  let fs = OsFs::new()
+  let root = "/tmp/bit-test-merge-no-commit-ours-" +
+    get_current_timestamp().to_string()
+  cleanup_tree(fs, root)
+  fs.mkdir_p(root)
+  let repo_dir = root + "/repo"
+
+  let prev_shim_cwd = @sys.get_env_var("GIT_SHIM_CWD")
+  let prev_shim_pwd = @sys.get_env_var("GIT_SHIM_PWD")
+  let prev_git_dir = @sys.get_env_var("GIT_DIR")
+  let prev_work_tree = @sys.get_env_var("GIT_WORK_TREE")
+  defer add_test_restore_env("GIT_SHIM_CWD", prev_shim_cwd)
+  defer add_test_restore_env("GIT_SHIM_PWD", prev_shim_pwd)
+  defer add_test_restore_env("GIT_DIR", prev_git_dir)
+  defer add_test_restore_env("GIT_WORK_TREE", prev_work_tree)
+
+  grep_test_run_git(root, ["init", "--initial-branch=main", "-q", "repo"])
+  grep_test_run_git(repo_dir, ["config", "user.name", "Test User"])
+  grep_test_run_git(repo_dir, ["config", "user.email", "test@example.com"])
+
+  fs.write_string(repo_dir + "/file", "base\n")
+  grep_test_run_git(repo_dir, ["add", "file"])
+  grep_test_run_git(repo_dir, ["commit", "-q", "-m", "base"])
+
+  grep_test_run_git(repo_dir, ["checkout", "-q", "-b", "side"])
+  fs.write_string(repo_dir + "/file", "side\n")
+  grep_test_run_git(repo_dir, ["commit", "-q", "-am", "side"])
+  let side_id = trim_string(
+    grep_test_git_stdout(repo_dir, ["rev-parse", "side"]),
+  )
+
+  grep_test_run_git(repo_dir, ["checkout", "-q", "main"])
+  fs.write_string(repo_dir + "/file", "main\n")
+  grep_test_run_git(repo_dir, ["commit", "-q", "-am", "main"])
+  let main_id = trim_string(
+    grep_test_git_stdout(repo_dir, ["rev-parse", "HEAD"]),
+  )
+
+  @sys.unset_env_var("GIT_SHIM_CWD")
+  @sys.unset_env_var("GIT_DIR")
+  @sys.unset_env_var("GIT_WORK_TREE")
+  @sys.set_env_var("GIT_SHIM_PWD", repo_dir)
+
+  handle_merge(["-q", "--no-commit", "-s", "ours", "side"]) catch {
+    err => fail("handle_merge failed: \{err}")
+  }
+
+  assert_eq(
+    trim_string(grep_test_git_stdout(repo_dir, ["rev-parse", "HEAD"])),
+    main_id,
+  )
+  assert_eq(decode_bytes(fs.read_file(repo_dir + "/file")), "main\n")
+  assert_eq(
+    trim_string(decode_bytes(fs.read_file(repo_dir + "/.git/MERGE_HEAD"))),
+    side_id,
+  )
+  assert_eq(
+    trim_string(decode_bytes(fs.read_file(repo_dir + "/.git/ORIG_HEAD"))),
+    main_id,
+  )
+  assert_true(fs.is_file(repo_dir + "/.git/MERGE_MSG"))
+
+  cleanup_tree(fs, root)
+}
+
+///|
+async test "merge: handles merge commit target natively" {
+  @bitnative.init_native_io()
+  let fs = OsFs::new()
+  let root = "/tmp/bit-test-merge-merge-target-" +
+    get_current_timestamp().to_string()
+  cleanup_tree(fs, root)
+  fs.mkdir_p(root)
+  let repo_dir = root + "/repo"
+
+  grep_test_run_git(root, ["init", "--initial-branch=main", "-q", "repo"])
+  grep_test_run_git(repo_dir, ["config", "user.name", "Test User"])
+  grep_test_run_git(repo_dir, ["config", "user.email", "test@example.com"])
+
+  // Create base commit
+  fs.write_string(repo_dir + "/file", "base\n")
+  grep_test_run_git(repo_dir, ["add", "file"])
+  grep_test_run_git(repo_dir, ["commit", "-q", "-m", "I"])
+
+  // Create branch with a merge commit (non-conflicting)
+  grep_test_run_git(repo_dir, ["switch", "-q", "-c", "branchA"])
+  fs.write_string(repo_dir + "/a.txt", "A\n")
+  grep_test_run_git(repo_dir, ["add", "a.txt"])
+  grep_test_run_git(repo_dir, ["commit", "-q", "-m", "A"])
+
+  grep_test_run_git(repo_dir, ["switch", "-q", "-c", "branchB", "main"])
+  fs.write_string(repo_dir + "/b.txt", "B\n")
+  grep_test_run_git(repo_dir, ["add", "b.txt"])
+  grep_test_run_git(repo_dir, ["commit", "-q", "-m", "B"])
+
+  grep_test_run_git(repo_dir, ["switch", "-q", "branchA"])
+  grep_test_run_git(repo_dir, ["merge", "-q", "-m", "M", "branchB"])
+
+  // Now merge the merge commit into main using bit
+  grep_test_run_git(repo_dir, ["switch", "-q", "main"])
+  fs.write_string(repo_dir + "/c.txt", "C\n")
+  grep_test_run_git(repo_dir, ["add", "c.txt"])
+  grep_test_run_git(repo_dir, ["commit", "-q", "-m", "C"])
+
+  let (merge_code, _, _) = merge_wbtest_collect_shim_git(repo_dir, [
+    "merge", "-q", "-m", "N", "branchA",
+  ])
+  assert_eq(merge_code, 0)
+  assert_eq(
+    trim_string(grep_test_git_stdout(repo_dir, ["log", "-1", "--format=%s"])),
+    "N",
+  )
+  cleanup_tree(fs, root)
+}
+
+///|
+async test "merge: --continue records MERGE_HEAD as second parent" {
+  @bitnative.init_native_io()
+  let fs = OsFs::new()
+  let root = "/tmp/bit-test-merge-continue-parents-" +
+    get_current_timestamp().to_string()
+  cleanup_tree(fs, root)
+  fs.mkdir_p(root)
+  let repo_dir = root + "/repo"
+
+  grep_test_run_git(root, ["init", "--initial-branch=main", "-q", "repo"])
+  grep_test_run_git(repo_dir, ["config", "user.name", "Test User"])
+  grep_test_run_git(repo_dir, ["config", "user.email", "test@example.com"])
+
+  fs.write_string(repo_dir + "/file", "base\n")
+  grep_test_run_git(repo_dir, ["add", "file"])
+  grep_test_run_git(repo_dir, ["commit", "-q", "-m", "I"])
+
+  grep_test_run_git(repo_dir, ["switch", "-q", "-c", "side"])
+  fs.write_string(repo_dir + "/file", "side\n")
+  grep_test_run_git(repo_dir, ["commit", "-q", "-am", "side"])
+
+  grep_test_run_git(repo_dir, ["switch", "-q", "main"])
+  fs.write_string(repo_dir + "/file", "main\n")
+  grep_test_run_git(repo_dir, ["commit", "-q", "-am", "main"])
+
+  @sys.set_env_var("GIT_SHIM_PWD", repo_dir)
+  let (conflict_code, _) = grep_test_git_stderr(repo_dir, [
+    "merge", "-m", "merge", "side",
+  ])
+  assert_true(conflict_code != 0)
+
+  let merge_head = decode_bytes(fs.read_file(repo_dir + "/.git/MERGE_HEAD"))
+    |> trim_string
+  fs.write_string(repo_dir + "/file", "main\nside\n")
+  grep_test_run_git(repo_dir, ["add", "file"])
+
+  let (continue_code, continue_stdout, continue_stderr) = merge_wbtest_collect_shim_git(
+    repo_dir,
+    ["merge", "-q", "--continue"],
+  )
+  assert_eq(continue_code, 0)
+  assert_eq(continue_stdout, "")
+  assert_eq(continue_stderr, "")
+
+  let git_dir = repo_dir + "/.git"
+  let head = @bitlib.resolve_head_commit(fs, git_dir).unwrap()
+  let db = @bitlib.ObjectDb::load_lazy(fs, git_dir)
+  let commit_obj = db.get(fs, head).unwrap()
+  let info = @bitcore.parse_commit(commit_obj.data)
+  assert_eq(info.parents.length(), 2)
+  assert_eq(info.parents[1].to_hex(), merge_head)
+  assert_false(fs.is_file(repo_dir + "/.git/MERGE_HEAD"))
+  cleanup_tree(fs, root)
+}
+
+///|
+async test "merge: command path supports octopus merge via fallback" {
+  @bitnative.init_native_io()
+  let fs = OsFs::new()
+  let root = "/tmp/bit-test-merge-octopus-" +
+    get_current_timestamp().to_string()
+  cleanup_tree(fs, root)
+  fs.mkdir_p(root)
+  let repo_dir = root + "/repo"
+
+  grep_test_run_git(root, ["init", "--initial-branch=main", "-q", "repo"])
+  grep_test_run_git(repo_dir, ["config", "user.name", "Test User"])
+  grep_test_run_git(repo_dir, ["config", "user.email", "test@example.com"])
+
+  fs.write_string(repo_dir + "/base.txt", "base\n")
+  grep_test_run_git(repo_dir, ["add", "base.txt"])
+  grep_test_run_git(repo_dir, ["commit", "-q", "-m", "base"])
+
+  grep_test_run_git(repo_dir, ["checkout", "-q", "-b", "side"])
+  fs.write_string(repo_dir + "/side.txt", "side\n")
+  grep_test_run_git(repo_dir, ["add", "side.txt"])
+  grep_test_run_git(repo_dir, ["commit", "-q", "-m", "side"])
+
+  grep_test_run_git(repo_dir, ["checkout", "-q", "-b", "another", "main"])
+  fs.write_string(repo_dir + "/another.txt", "another\n")
+  grep_test_run_git(repo_dir, ["add", "another.txt"])
+  grep_test_run_git(repo_dir, ["commit", "-q", "-m", "another"])
+
+  grep_test_run_git(repo_dir, ["checkout", "-q", "main"])
+  fs.write_string(repo_dir + "/main.txt", "main\n")
+  grep_test_run_git(repo_dir, ["add", "main.txt"])
+  grep_test_run_git(repo_dir, ["commit", "-q", "-m", "main"])
+  grep_test_run_git(repo_dir, [
+    "merge", "-q", "-m", "octopus", "side", "another",
+  ])
+
+  let git_dir = repo_dir + "/.git"
+  let head = @bitlib.resolve_head_commit(fs, git_dir).unwrap()
+  let db = @bitlib.ObjectDb::load_lazy(fs, git_dir)
+  let commit_obj = db.get(fs, head).unwrap()
+  let info = @bitcore.parse_commit(commit_obj.data)
+  assert_eq(info.parents.length(), 3)
+  assert_eq(
+    trim_string(grep_test_git_stdout(repo_dir, ["log", "-1", "--format=%s"])),
+    "octopus",
+  )
+
+  cleanup_tree(fs, root)
+}

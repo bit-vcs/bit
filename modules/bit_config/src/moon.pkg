@@ -1,0 +1,18 @@
+import {
+  "mizchi/bit_utils" @string_utils,
+  "moonbitlang/core/string" @string,
+  "moonbitlang/core/strconv",
+}
+
+import {
+  "moonbitlang/core/test" @test,
+  "moonbitlang/core/bench" @bench,
+} for "test"
+
+warnings = "-29"
+
+options(
+  targets: {
+    "bench_test.mbt": [ "native" ],
+  },
+)

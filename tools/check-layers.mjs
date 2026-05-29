@@ -6,13 +6,56 @@
 //
 // Exit codes: 0 = clean, 1 = violations found.
 
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const REPO_ROOT = join(fileURLToPath(import.meta.url), "..", "..");
-const SRC = join(REPO_ROOT, "src");
+const MODULES_DIR = join(REPO_ROOT, "modules");
 const MODULE_PREFIX = "mizchi/bit";
+const EXT_PREFIX = "mizchi/bitx_";
+// Standalone core modules extracted out of mizchi/bit. Each one is a
+// gix-* plumbing equivalent that lives in its own MoonBit module under
+// modules/bit_<name>/. They are still classified as the "core" layer.
+const CORE_MODULES = new Set([
+  "mizchi/bit_apply",
+  "mizchi/bit_archive",
+  "mizchi/bit_bootstrap",
+  "mizchi/bit_config",
+  "mizchi/bit_date",
+  "mizchi/bit_diff3",
+  "mizchi/bit_diff_core",
+  "mizchi/bit_fast_import",
+  "mizchi/bit_hash",
+  "mizchi/bit_ignore",
+  "mizchi/bit_io",
+  "mizchi/bit_object",
+  "mizchi/bit_osfs",
+  "mizchi/bit_pack",
+  "mizchi/bit_protocol",
+  "mizchi/bit_refs",
+  "mizchi/bit_reftable",
+  "mizchi/bit_remote",
+  "mizchi/bit_repo",
+  "mizchi/bit_trailers",
+  "mizchi/bit_types",
+  "mizchi/bit_utils",
+]);
+
+// Standalone "high"-layer modules (carved out of mizchi/bit, still depend
+// on mizchi/bit/lib). Long-term direction: break their lib dependency
+// and promote to MID, eventually shrinking lib to a thin facade.
+const HIGH_MODULES = new Set([
+  "mizchi/bit_diff",
+  "mizchi/bit_fingerprint",
+  "mizchi/bit_grep",
+  "mizchi/bit_lib",
+  "mizchi/bit_pack_ops",
+  "mizchi/bit_repo_ops",
+  "mizchi/bit_runtime",
+  "mizchi/bit_vfs",
+  "mizchi/bit_worktree",
+]);
 
 // Layer order (low to high). A package may import from its own layer or any
 // lower layer.
@@ -65,18 +108,40 @@ const HIGH = new Set([
   "fingerprint",
 ]);
 
-function isOurModule(pkgPath) {
-  return pkgPath === MODULE_PREFIX || pkgPath.startsWith(MODULE_PREFIX + "/");
+function isExtModule(pkgPath) {
+  return pkgPath === EXT_PREFIX.slice(0, -1) /* never matches */ ||
+         pkgPath.startsWith(EXT_PREFIX);
 }
 
-// Map a package path (e.g. "mizchi/bit/hash") to its layer.
+function isCoreModule(pkgPath) {
+  const head = pkgPath.split("/").slice(0, 2).join("/");
+  return CORE_MODULES.has(head);
+}
+
+function isHighModule(pkgPath) {
+  const head = pkgPath.split("/").slice(0, 2).join("/");
+  return HIGH_MODULES.has(head);
+}
+
+function isOurModule(pkgPath) {
+  if (pkgPath === MODULE_PREFIX || pkgPath.startsWith(MODULE_PREFIX + "/")) return true;
+  if (isExtModule(pkgPath)) return true;
+  if (isCoreModule(pkgPath)) return true;
+  if (isHighModule(pkgPath)) return true;
+  return false;
+}
+
+// Map a package path (e.g. "mizchi/bit/hash" or "mizchi/bitx_hub/native")
+// to its layer.
 function classify(pkgPath) {
   if (!isOurModule(pkgPath)) return null; // external
+  if (isExtModule(pkgPath)) return "ext";
+  if (isCoreModule(pkgPath)) return "core";
+  if (isHighModule(pkgPath)) return "high";
   const rel = pkgPath === MODULE_PREFIX ? "" : pkgPath.slice(MODULE_PREFIX.length + 1);
   const top = rel.split("/")[0];
   if (rel === "") return "core";
   if (top === "cmd" || top === "tests" || top === "fuzz_tests") return "cmd";
-  if (top.startsWith("x-")) return "ext";
   if (CORE.has(top)) return "core";
   if (MID.has(top)) return "mid";
   if (HIGH.has(top)) return "high";
@@ -85,6 +150,15 @@ function classify(pkgPath) {
 
 function topSegment(pkgPath) {
   if (!isOurModule(pkgPath)) return null;
+  if (isCoreModule(pkgPath) || isHighModule(pkgPath)) {
+    return pkgPath.split("/").slice(0, 2).join("/");
+  }
+  if (isExtModule(pkgPath)) {
+    // For ext modules, the "family" is the module name itself
+    // (e.g. "mizchi/bitx_hub" is one family — its sub-packages /native,
+    // /crypto are the same family).
+    return pkgPath.split("/").slice(0, 2).join("/");
+  }
   if (pkgPath === MODULE_PREFIX) return "";
   return pkgPath.slice(MODULE_PREFIX.length + 1).split("/")[0];
 }
@@ -101,12 +175,27 @@ function* walkPkgFiles(dir) {
   }
 }
 
-// Derive the package path "mizchi/bit/<rel-of-src>" from a moon.pkg location.
-function pkgPathOf(moonPkgFile) {
+// Roots to walk. Each root maps a moon.pkg file to a package path:
+//   { dir, prefix }  →  package path = prefix + ("" or "/<rel>")
+function discoverRoots() {
+  const roots = [];
+  if (existsSync(MODULES_DIR)) {
+    for (const name of readdirSync(MODULES_DIR)) {
+      const modSrc = join(MODULES_DIR, name, "src");
+      if (existsSync(modSrc)) {
+        roots.push({ dir: modSrc, prefix: `mizchi/${name}` });
+      }
+    }
+  }
+  return roots;
+}
+
+// Derive the package path from a moon.pkg location for a given root.
+function pkgPathOf(moonPkgFile, root) {
   const dir = moonPkgFile.replace(/\/(moon\.pkg|moon\.pkg\.json)$/, "");
-  const rel = relative(SRC, dir);
-  if (rel === "" || rel === ".") return MODULE_PREFIX;
-  return MODULE_PREFIX + "/" + rel.split("\\").join("/");
+  const rel = relative(root.dir, dir);
+  if (rel === "" || rel === ".") return root.prefix;
+  return root.prefix + "/" + rel.split("\\").join("/");
 }
 
 // Extract imported package paths from a moon.pkg / moon.pkg.json file.
@@ -140,8 +229,16 @@ function extractImports(file) {
 
 const violations = [];
 
-for (const file of walkPkgFiles(SRC)) {
-  const fromPath = pkgPathOf(file);
+const roots = discoverRoots();
+const files = [];
+for (const root of roots) {
+  for (const file of walkPkgFiles(root.dir)) {
+    files.push({ file, root });
+  }
+}
+
+for (const { file, root } of files) {
+  const fromPath = pkgPathOf(file, root);
   const fromLayer = classify(fromPath);
   if (fromLayer === null || fromLayer === "unknown") {
     violations.push({

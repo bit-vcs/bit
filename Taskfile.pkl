@@ -6,9 +6,11 @@
 amends "package://pkg.pkl-lang.org/github.com/mizchi/pkfire/pkfire@0.10.0#/Taskfile.pkl"
 
 local moonbitSources: Listing<String> = new {
-  "src/**/*.mbt"
-  "src/**/moon.pkg.json"
-  "moon.mod.json"
+  "modules/**/*.mbt"
+  "modules/**/moon.pkg"
+  "modules/**/moon.pkg.json"
+  "modules/**/moon.mod.json"
+  "moon.work"
 }
 
 // -- formatting -----------------------------------------------------------
@@ -48,7 +50,8 @@ local checkLayers: Task = new {
   cmd = "node tools/check-layers.mjs"
   inputs {
     "tools/check-layers.mjs"
-    "src/**/moon.pkg.json"
+    "modules/**/moon.pkg"
+    "modules/**/moon.pkg.json"
   }
 }
 
@@ -57,7 +60,7 @@ local checkGuards: Task = new {
   description = "Layer-boundary guards (runtime/storage_runtime)"
   cmd = "tools/check-layer-guards.sh"
   inputs {
-    "src/**/*.mbt"
+    "modules/**/*.mbt"
     "tools/check-layer-guards.sh"
   }
 }
@@ -76,42 +79,42 @@ local build: Task = new {
   cmd = "tools/build-bit-native.sh"
   inputs = moonbitSources
   outputs {
-    "_build/native/release/build/cmd/bit/bit.exe"
+    "_build/native/release/build/mizchi/bit/cmd/bit/bit.exe"
     "tools/git-shim/moon"
   }
 }
 
 local buildJsLib: Task = new {
   name = "build-js-lib"
-  description = "JS release build of src/lib"
-  cmd = "moon build --target js --release src/lib"
+  description = "JS release build of mizchi/bit/lib"
+  cmd = "moon build --target js --release modules/bit_lib/src"
   inputs = moonbitSources
-  outputs { "_build/js/release/build/lib/lib.js" }
+  outputs { "_build/js/release/build/mizchi/bit_lib/bit_lib.js" }
 }
 
 local buildJsCli: Task = new {
   name = "build-js-cli"
-  description = "JS release build of src/cmd/bit"
-  cmd = "moon build --target js --release src/cmd/bit"
+  description = "JS release build of mizchi/bit/cmd/bit"
+  cmd = "moon build --target js --release modules/bit/src/cmd/bit"
   inputs = moonbitSources
-  outputs { "_build/js/release/build/cmd/bit/bit.js" }
+  outputs { "_build/js/release/build/mizchi/bit/cmd/bit/bit.js" }
 }
 
 local syncNpmLibRaw: Task = new {
   name = "sync-npm-lib-raw"
   description = "Copy the JS lib payload into the checked-in npm wrapper"
-  cmd = "cp _build/js/release/build/lib/lib.js npm/lib.raw.js"
+  cmd = "cp _build/js/release/build/mizchi/bit_lib/bit_lib.js npm/lib.raw.js"
   deps { buildJsLib }
-  inputs { "_build/js/release/build/lib/lib.js" }
+  inputs { "_build/js/release/build/mizchi/bit_lib/bit_lib.js" }
   outputs { "npm/lib.raw.js" }
 }
 
 local syncNpmBitCjs: Task = new {
   name = "sync-npm-bit-cjs"
   description = "Copy the JS CLI payload into the checked-in npm wrapper"
-  cmd = "cp _build/js/release/build/cmd/bit/bit.js npm/bit.cjs"
+  cmd = "cp _build/js/release/build/mizchi/bit/cmd/bit/bit.js npm/bit.cjs"
   deps { buildJsCli }
-  inputs { "_build/js/release/build/cmd/bit/bit.js" }
+  inputs { "_build/js/release/build/mizchi/bit/cmd/bit/bit.js" }
   outputs { "npm/bit.cjs" }
 }
 
@@ -126,7 +129,7 @@ local bundleJsLibMinimal: Task = new {
     """#
   deps { buildJsLib }
   inputs {
-    "_build/js/release/build/lib/lib.js"
+    "_build/js/release/build/mizchi/bit_lib/bit_lib.js"
     "tools/lib-js-minimal.mjs"
   }
   outputs { "target/lib-js-minimal.bundle.mjs" }
@@ -143,7 +146,7 @@ local bundleJsLibGitOps: Task = new {
     """#
   deps { buildJsLib }
   inputs {
-    "_build/js/release/build/lib/lib.js"
+    "_build/js/release/build/mizchi/bit_lib/bit_lib.js"
     "tools/lib-js-git-ops.mjs"
   }
   outputs { "target/lib-js-git-ops.bundle.mjs" }
@@ -203,7 +206,7 @@ local verifyJsLibTreeshake: Task = new {
 local sizeJsLib: Task = new {
   name = "size-js-lib"
   description = "Report raw + gzip size of the JS lib"
-  cmd = "tools/size-bytes.sh _build/js/release/build/lib/lib.js"
+  cmd = "tools/size-bytes.sh _build/js/release/build/mizchi/bit_lib/bit_lib.js"
   deps { buildJsLib }
 }
 
@@ -233,7 +236,7 @@ local buildDocsDemo: Task = new {
     """#
   deps { buildJsLib }
   inputs {
-    "_build/js/release/build/lib/lib.js"
+    "_build/js/release/build/mizchi/bit_lib/bit_lib.js"
     "docs/demo/main.js"
     "docs/demo/**/*.js"
   }
@@ -318,10 +321,10 @@ local testDistributed: Task = new {
   description = "Agent/orchestration focused native checks"
   cmd = #"""
     moon test --target native -p mizchi/bit/x-mcp
-    moon test --target native -p mizchi/bit/x-rebase-ai
-    moon test --target native -p mizchi/bit/x-hub
-    moon test --target native -p mizchi/bit/x-hub/native
-    moon test --target native -p mizchi/bit/x-kv
+    moon test --target native -p mizchi/bitx_rebase_ai
+    moon test --target native -p mizchi/bitx_hub
+    moon test --target native -p mizchi/bitx_hub/native
+    moon test --target native -p mizchi/bitx_kv
     """#
 }
 
@@ -477,7 +480,7 @@ local benchFsReal: Task = new {
 
 local benchKv: Task = new {
   name = "bench-kv"
-  cmd = "moon bench --target native -p mizchi/bit/x-kv"
+  cmd = "moon bench --target native -p mizchi/bitx_kv"
 }
 
 local benchLib: Task = new {

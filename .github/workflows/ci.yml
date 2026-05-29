@@ -31,8 +31,8 @@ jobs:
         run: pkf run check
       - name: Build native binary for wbtests
         run: |
-          moon build --target native --release
-          cp _build/native/release/build/cmd/bit/bit.exe tools/git-shim/moon
+          moon build --target native --release modules/bit/src/cmd/bit
+          cp _build/native/release/build/mizchi/bit/cmd/bit/bit.exe tools/git-shim/moon
           chmod +x tools/git-shim/moon
           # Set system git as fallback for wbtests (third_party/git/git is not built in test job)
           which git > tools/git-shim/real-git-path
@@ -40,17 +40,85 @@ jobs:
           git config --global protocol.file.allow always
       - name: Run JS and WASM tests
         run: |
-          moon test --target js -p mizchi/bit -p mizchi/bit/lib
-          moon test --target wasm -p mizchi/bit/runtime -f storage_runtime_wbtest.mbt
-          moon test --target wasm -p mizchi/bit/diff3
-          moon test --target wasm -p mizchi/bit/repo
-          moon test --target wasm -p mizchi/bit/grep
+          moon test --target js -p mizchi/bit -p mizchi/bit_lib
+          moon test --target wasm -p mizchi/bit_runtime -f storage_runtime_wbtest.mbt
+          moon test --target wasm -p mizchi/bit_diff3
+          moon test --target wasm -p mizchi/bit_repo
+          moon test --target wasm -p mizchi/bit_grep
           # Kill any orphan moon processes and remove stale lock before native tests
           pkill -f "moon" || true
           rm -f _build/.moon-lock
-      - name: Run native tests
+      - name: Run native tests (non-cmd modules)
         timeout-minutes: 30
-        run: moon test --target native --no-parallelize -j 1
+        run: |
+          # Test extracted bit_* and bitx_* modules + mizchi/bit (without cmd).
+          # cmd/bit native tests run in the separate cmd-native-test job because
+          # they dominate runtime (~50 min for the linker pass).
+          modules=$(awk '/members = \[/,/\]/' moon.work | grep -oE '"[^"]+"' | tr -d '"' | sed 's|^\./||')
+          for m in $modules; do
+            case "$m" in
+              modules/bit) continue ;; # cmd lives here — handled separately
+            esac
+            mod_name="mizchi/$(basename "$m")"
+            echo "::group::moon test --target native -p $mod_name"
+            moon test --target native -p "$mod_name"
+            echo "::endgroup::"
+          done
+          # Test mizchi/bit's non-cmd packages (tests + fuzz_tests).
+          moon test --target native -p mizchi/bit/tests
+          moon test --target native -p mizchi/bit/fuzz_tests || true
+
+  cmd-native-test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: cmd-bit,     pkg: mizchi/bit/cmd/bit,     timeout: 120 }
+          - { name: cmd-git-bit, pkg: mizchi/bit/cmd/git-bit, timeout: 30  }
+    name: cmd-native-test (${{ matrix.name }})
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Install pkfire + pkspec
+        uses: mizchi/pkfire@v0
+      - name: Install pkspec
+        uses: mizchi/pkspec@v0.2.1
+        with:
+          pkl-version: none
+      - name: Install MoonBit CLI
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+      - name: Moon update
+        run: moon update
+      - name: Build native binary for wbtests
+        run: |
+          set -euo pipefail
+          moon --version
+          moon build --target native --release modules/bit/src/cmd/bit
+          bin_path=$(find _build/native -maxdepth 8 -type f -name 'bit.exe' | head -1)
+          if [ -z "$bin_path" ]; then
+            echo "bit.exe not found after moon build"
+            find _build/native -maxdepth 8 -type f | head -20 || true
+            exit 1
+          fi
+          echo "bit.exe found at: $bin_path"
+          cp "$bin_path" tools/git-shim/moon
+          chmod +x tools/git-shim/moon
+          which git > tools/git-shim/real-git-path
+          git config --global protocol.file.allow always
+      - name: Clear stale processes and moon lock
+        run: |
+          pkill -f "moon" || true
+          pkill -f "clang" || true
+          sleep 1
+          rm -f _build/.moon-lock
+      - name: Run ${{ matrix.pkg }} native tests
+        timeout-minutes: ${{ matrix.timeout }}
+        run: moon test --target native -p ${{ matrix.pkg }}
 
   distributed-test:
     runs-on: ubuntu-latest
@@ -67,13 +135,9 @@ jobs:
         run: moon update
       - name: Distributed tests
         run: |
-          moon test --target native -p mizchi/bit/x/agent
-          moon test --target native -p mizchi/bit/x/agent/llm
-          moon test --target native -p mizchi/bit/x/agent/mcp
-          moon test --target native -p mizchi/bit/x/agent/native
-          moon test --target native -p mizchi/bit/x-hub
-          moon test --target native -p mizchi/bit/x-hub/native
-          moon test --target native -p mizchi/bit/x-kv
+          moon test --target native -p mizchi/bitx_hub
+          moon test --target native -p mizchi/bitx_hub/native
+          moon test --target native -p mizchi/bitx_kv
 
   nix-build:
     runs-on: ubuntu-latest
@@ -124,14 +188,15 @@ jobs:
       - name: Build bit
         run: |
           set -euo pipefail
-          moon build --target native --release
-          bin_path="_build/native/release/build/cmd/bit/bit.exe"
-          if [ ! -f "$bin_path" ]; then
-            echo "bit binary not found at $bin_path"
-            find _build/native -maxdepth 8 -type f -name 'bit.exe' || true
+          moon --version
+          moon build --target native --release modules/bit/src/cmd/bit
+          bin_path=$(find _build/native -maxdepth 8 -type f -name 'bit.exe' | head -1)
+          if [ -z "$bin_path" ]; then
+            echo "bit.exe not found after moon build"
+            find _build/native -maxdepth 8 -type f | head -20 || true
             exit 1
           fi
-          echo "Using bit binary: $bin_path"
+          echo "bit.exe found at: $bin_path"
           cp "$bin_path" tools/git-shim/moon
           chmod +x tools/git-shim/moon
 

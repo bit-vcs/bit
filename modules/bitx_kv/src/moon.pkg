@@ -1,0 +1,28 @@
+import {
+  "mizchi/bit" @bit,
+  "mizchi/bit_object" @object,
+  "mizchi/bit_types" @types,
+  "mizchi/bit_repo" @repo,
+  "mizchi/bit_io" @io,
+  "mizchi/bit_lib" @lib,
+  "moonbitlang/core/buffer" @buffer,
+  "moonbitlang/core/encoding/utf8" @utf8,
+}
+
+import {
+  "moonbitlang/core/bench" @bench,
+  "mizchi/bit_vfs" @fs,
+  "mizchi/bit_osfs" @osfs,
+  "moonbitlang/x/fs" @nfs,
+  "moonbitlang/core/test" @test,
+} for "test"
+
+warnings = "-29"
+
+options(
+  targets: {
+    "bench_test.mbt": [ "native" ],
+    "kv_test.mbt": [ "native" ],
+    "sync_test.mbt": [ "native" ],
+  },
+)

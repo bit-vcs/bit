@@ -1,0 +1,16 @@
+import {
+  "mizchi/bit" @bit,
+  "mizchi/bit_object" @object,
+  "mizchi/bit_repo" @repo,
+  "mizchi/bit_types" @types,
+  "mizchi/bit_io" @io,
+  "mizchi/bit_lib" @lib,
+  "mizchi/bit_vfs" @fs,
+  "mizchi/zlib" @zlib,
+}
+
+warnings = "-unused_constructor-29"
+
+import {
+  "moonbitlang/core/test" @test,
+} for "test"

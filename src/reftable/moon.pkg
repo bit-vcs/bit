@@ -1,6 +1,0 @@
-import {
-  "mizchi/bit" @bit,
-  "mizchi/bit/object" @object,
-}
-
-warnings = "-29"

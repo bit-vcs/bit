@@ -1,0 +1,41 @@
+import {
+  "mizchi/bit" @bit,
+  "mizchi/bit_object" @object,
+  "mizchi/bit_types" @types,
+  "mizchi/bit_pack" @pack,
+  "mizchi/bit_protocol" @protocol,
+  "mizchi/bit_io/native" @bitnative,
+  "mizchi/bit_io" @io,
+  "mizchi/bit_lib" @lib,
+  "mizchi/bitx_hub" @hub,
+  "mizchi/bitx_hub/crypto" @crypto,
+  "moonbitlang/async" @async,
+  "moonbitlang/async/process" @process,
+  "moonbitlang/core/bench" @bench,
+  "moonbitlang/core/env" @env,
+  "moonbitlang/core/encoding/base64" @base64,
+  "moonbitlang/core/encoding/utf8" @utf8,
+  "moonbitlang/core/json" @json,
+  "moonbitlang/core/string" @string,
+  "moonbitlang/x/sys" @sys,
+  "moonbitlang/core/strconv" @strconv,
+  "mizchi/x/websocket" @xws,
+}
+
+warnings = "-24-29"
+
+options(
+  targets: {
+    "claim_native.mbt": [ "native" ],
+    "github_api.mbt": [ "native" ],
+    "github_api_wbtest.mbt": [ "native" ],
+    "github_sync.mbt": [ "native" ],
+    "sync_native.mbt": [ "native" ],
+    "sync_native_bench_wbtest.mbt": [ "native" ],
+    "sync_native_wbtest.mbt": [ "native" ],
+  },
+)
+
+import {
+  "moonbitlang/core/test" @test,
+} for "wbtest"

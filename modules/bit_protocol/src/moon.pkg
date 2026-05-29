@@ -1,0 +1,33 @@
+import {
+  "mizchi/bit" @bit,
+  "mizchi/bit_object" @object,
+  "mizchi/bit_types" @types,
+  "mizchi/bit_repo" @repo,
+  "mizchi/bit_io" @io,
+  "mizchi/bit_pack" @pack,
+  "moonbitlang/async" @async,
+  "moonbitlang/core/encoding/utf8" @utf8,
+}
+
+import {
+  "moonbitlang/core/test" @test,
+} for "wbtest"
+
+import {
+  "mizchi/bit" @bit,
+  "mizchi/bit_pack" @pack,
+  "moonbitlang/core/bench" @bench,
+  "moonbitlang/core/test" @test,
+} for "test"
+
+warnings = "-29"
+
+options(
+  targets: {
+    "bench_test.mbt": [ "native" ],
+    "remote_test.mbt": [ "native" ],
+    "upload_pack_http_wbtest.mbt": [ "native", "js", "wasm-gc", "wasm" ],
+    "upload_pack_remote_wasm.mbt": [ "wasm-gc", "wasm" ],
+    "upload_pack_remote_wasm_wbtest.mbt": [ "wasm-gc", "wasm" ],
+  },
+)

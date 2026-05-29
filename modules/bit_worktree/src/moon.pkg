@@ -1,0 +1,13 @@
+import {
+  "mizchi/bit" @bit,
+  "mizchi/bit_object" @object,
+  "mizchi/bit_types" @types,
+  "mizchi/bit_io" @io,
+  "mizchi/bit_lib" @bitlib,
+}
+
+import {
+  "moonbitlang/async" @async,
+} for "test"
+
+warnings = "-29"

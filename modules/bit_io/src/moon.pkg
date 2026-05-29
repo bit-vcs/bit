@@ -1,0 +1,7 @@
+import {
+  "mizchi/bit_types" @types,
+  "mizchi/bit_object" @object,
+  "moonbitlang/core/encoding/utf8" @utf8,
+}
+
+warnings = "-29"

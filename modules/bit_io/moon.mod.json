@@ -1,0 +1,20 @@
+{
+  "name": "mizchi/bit_io",
+  "version": "0.42.2",
+  "deps": {
+    "mizchi/bit": "0.42.2",
+    "mizchi/bit_object": "0.42.2",
+    "mizchi/bit_repo": "0.42.2",
+    "mizchi/bit_pack": "0.42.2",
+    "mizchi/bit_protocol": "0.42.2",
+    "mizchi/bit_types": "0.42.2",
+    "moonbitlang/async": "0.16.6",
+    "moonbitlang/x": "0.4.40"
+  },
+  "repository": "https://github.com/mizchi/bit-vcs",
+  "license": "Apache-2.0",
+  "keywords": ["git", "fs", "io"],
+  "description": "Abstract FileSystem traits + native HTTP/FS bindings (gix-fs abstract)",
+  "source": "src",
+  "preferred-target": "native"
+}

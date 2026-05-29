@@ -1,0 +1,21 @@
+import {
+  "mizchi/bit" @bit,
+  "mizchi/bit_object" @object,
+  "mizchi/bit_types" @types,
+  "mizchi/bit_io" @io,
+  "mizchi/bit_reftable" @reftable,
+  "moonbitlang/core/encoding/utf8" @utf8,
+}
+
+warnings = "-29"
+
+import {
+  "moonbitlang/core/test" @test,
+  "moonbitlang/core/bench" @bench,
+} for "test"
+
+options(
+  targets: {
+    "bench_test.mbt": [ "native" ],
+  },
+)

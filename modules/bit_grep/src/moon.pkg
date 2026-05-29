@@ -1,0 +1,23 @@
+import {
+  "mizchi/bit" @bit,
+  "mizchi/bit_object" @object,
+  "mizchi/bit_types" @types,
+  "mizchi/bit_lib" @bitlib,
+  "mizchi/bit_repo_ops" @bitrepo,
+  "mizchi/bit_ignore" @ignore,
+  "mizchi/bit_io" @bitio,
+  "moonbitlang/core/encoding/utf8" @utf8,
+}
+
+warnings = "-29"
+
+options(
+  targets: {
+    "pattern_wbtest.mbt": [ "native", "wasm" ],
+    "search_wbtest.mbt": [ "native", "wasm" ],
+  },
+)
+
+import {
+  "moonbitlang/core/test" @test,
+} for "wbtest"

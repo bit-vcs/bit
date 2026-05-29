@@ -1,0 +1,50 @@
+import {
+  "mizchi/bit" @bit,
+  "mizchi/bit_object" @object,
+  "mizchi/bit_types" @types,
+  "mizchi/bit_repo" @repo,
+  "mizchi/bit_pack" @pack,
+  "mizchi/bit_protocol" @protocol,
+  "mizchi/bit_lib" @bitlib,
+  "mizchi/bit_ignore" @ignore,
+  "mizchi/bit_io" @bitio,
+  "mizchi/bit_io/native" @bitnative,
+  "moonbitlang/async" @async,
+  "moonbitlang/async/fs" @afs,
+  "moonbitlang/async/http" @http,
+  "moonbitlang/async/io" @aio,
+  "moonbitlang/async/stdio" @stdio,
+  "moonbitlang/async/process" @process,
+  "mizchi/zlib",
+  "moonbitlang/core/encoding/utf8" @utf8,
+  "moonbitlang/core/json" @json,
+  "moonbitlang/x/fs",
+}
+
+import {
+  "moonbitlang/core/bench" @bench,
+  "mizchi/bit_osfs" @osfs,
+} for "test"
+
+import {
+  "moonbitlang/core/bench" @bench,
+  "mizchi/bit_osfs" @osfs,
+  "moonbitlang/core/test" @test,
+} for "wbtest"
+
+warnings = "-29"
+
+options(
+  targets: {
+    "bench_worktree_entry_wbtest.mbt": [ "native" ],
+    "filter.mbt": [ "native" ],
+    "ignore_async_test.mbt": [ "native" ],
+    "lfs_client.mbt": [ "native" ],
+    "lfs_client_wbtest.mbt": [ "native" ],
+    "lfs_prefetch.mbt": [ "native" ],
+    "promisor.mbt": [ "native" ],
+    "remote_ref.mbt": [ "native" ],
+    "sync_http.mbt": [ "native" ],
+    "worktree_modes.mbt": [ "native" ],
+  },
+)

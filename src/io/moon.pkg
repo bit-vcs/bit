@@ -1,6 +1,0 @@
-import {
-  "mizchi/bit/types" @types,
-  "moonbitlang/core/encoding/utf8" @utf8,
-}
-
-warnings = "-29"

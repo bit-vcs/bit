@@ -1,0 +1,39 @@
+import {
+  "mizchi/bit" @bit,
+  "mizchi/bit_object" @object,
+  "mizchi/bit_types" @types,
+  "mizchi/bit_repo" @repo,
+  "mizchi/bit_io" @io,
+  "mizchi/bit_lib" @lib,
+  "moonbitlang/core/encoding/utf8" @utf8,
+}
+
+import {
+  "mizchi/bit_lib" @lib,
+  "mizchi/bit_osfs" @osfs,
+  "mizchi/zlib",
+  "moonbitlang/core/bench" @bench,
+  "moonbitlang/async",
+  "moonbitlang/x/sys" @sys,
+  "moonbitlang/core/test" @test,
+} for "test"
+
+warnings = "-unused_value-29"
+
+options(
+  targets: {
+    "bench_real_test.mbt": [ "native" ],
+    "bench_test.mbt": [ "native" ],
+    "fs_test.mbt": [ "native" ],
+    "fs_wbtest.mbt": [ "native" ],
+    "integration_test.mbt": [ "native" ],
+    "lru_test.mbt": [ "native" ],
+    "partial_clone_test.mbt": [ "native" ],
+    "perf_partial_clone_test.mbt": [ "native" ],
+    "verify_lazy_test.mbt": [ "native" ],
+  },
+)
+
+import {
+  "moonbitlang/core/test" @test,
+} for "wbtest"

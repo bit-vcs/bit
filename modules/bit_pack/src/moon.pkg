@@ -1,0 +1,39 @@
+import {
+  "mizchi/bit" @bit,
+  "mizchi/bit_object" @object,
+  "mizchi/bit_types" @types,
+  "mizchi/bit_repo" @repo,
+  "mizchi/zlib" @zlib,
+  "moonbitlang/core/encoding/utf8" @utf8,
+  "moonbitlang/core/string" @string,
+}
+
+import {
+  "mizchi/bit" @bit,
+  "mizchi/bit_object" @object,
+  "mizchi/bit_types" @types,
+  "mizchi/bit_repo" @repo,
+  "mizchi/bit_protocol" @protocol,
+  "moonbitlang/async" @async,
+  "moonbitlang/async/process" @process,
+  "moonbitlang/x/fs",
+  "mizchi/tempfile",
+  "moonbitlang/core/bench" @bench,
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/strconv" @strconv,
+} for "test"
+
+import {
+  "moonbitlang/core/encoding/utf8",
+} for "wbtest"
+
+warnings = "-29"
+
+options(
+  targets: {
+    "bench_profile_test.mbt": [ "native" ],
+    "bench_test.mbt": [ "native" ],
+    "bit_oracle_pack_test.mbt": [ "native" ],
+    "pack_index_write_test.mbt": [ "native" ],
+  },
+)

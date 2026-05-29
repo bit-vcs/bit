@@ -1,0 +1,17 @@
+import {
+  "mizchi/bit" @bit,
+  "mizchi/bit_object" @object,
+  "mizchi/bit_types" @types,
+  "mizchi/bit_io" @io,
+  "mizchi/bit_repo" @repo,
+  "mizchi/bit_pack" @pack,
+  "mizchi/bit_protocol" @protocol,
+  "mizchi/zlib" @zlib,
+  "moonbitlang/core/encoding/utf8",
+} for "test"
+
+warnings = "-29"
+
+options(
+  targets: { "integration_test.mbt": [ "wasm-gc", "wasm" ] },
+)
