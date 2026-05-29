@@ -54,10 +54,7 @@ jobs:
           # Test extracted bit_* and bitx_* modules + mizchi/bit (without cmd).
           # cmd/bit native tests run in the separate cmd-native-test job because
           # they dominate runtime (~50 min for the linker pass).
-          modules="$(jq -r '.members[]' moon.work 2>/dev/null || true)"
-          if [ -z "$modules" ]; then
-            modules=$(awk '/members = \[/,/\]/' moon.work | grep -oE '"[^"]+"' | tr -d '"')
-          fi
+          modules=$(awk '/members = \[/,/\]/' moon.work | grep -oE '"[^"]+"' | tr -d '"' | sed 's|^\./||')
           for m in $modules; do
             case "$m" in
               modules/bit) continue ;; # cmd lives here — handled separately
