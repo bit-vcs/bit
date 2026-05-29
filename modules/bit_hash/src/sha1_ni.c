@@ -25,11 +25,17 @@
 #  define SHA_NI_TARGET
 #endif
 
-/* ── runtime capability query ─────────────────────────────────────────── */
+/* ── CPUID runtime detection ──────────────────────────────────────────── */
 
-int32_t sha1_ni_available(void) {
-  return USE_SHA_NI ? 1 : 0;
+#if USE_SHA_NI
+static int sha1_hw_ok = -1;
+static int sha1_ni_ok(void) {
+  if (sha1_hw_ok < 0)
+    sha1_hw_ok = (__builtin_cpu_supports("sha") != 0) &
+                 (__builtin_cpu_supports("sse4.1") != 0);
+  return sha1_hw_ok;
 }
+#endif
 
 /* ── portable big-endian helpers ──────────────────────────────────────── */
 
@@ -298,12 +304,15 @@ void sha1_compute(const uint8_t* data, int32_t len, uint8_t* out) {
   int32_t full_blocks = len / 64;
   int32_t remainder   = len % 64;
 
-  if (full_blocks > 0) {
 #if USE_SHA_NI
-    sha1_ni_blocks(state, data, (size_t)full_blocks);
+#  define SHA1_DISPATCH(st, d, n) \
+     (sha1_ni_ok() ? sha1_ni_blocks((st),(d),(n)) : sha1_scalar_blocks((st),(d),(n)))
 #else
-    sha1_scalar_blocks(state, data, (size_t)full_blocks);
+#  define SHA1_DISPATCH(st, d, n) sha1_scalar_blocks((st),(d),(n))
 #endif
+
+  if (full_blocks > 0) {
+    SHA1_DISPATCH(state, data, (size_t)full_blocks);
   }
 
   /* Build the padding block(s) in a local buffer. */
@@ -333,11 +342,7 @@ void sha1_compute(const uint8_t* data, int32_t len, uint8_t* out) {
   pad[pad_len - 2] = (uint8_t)(bit_len >>  8);
   pad[pad_len - 1] = (uint8_t)(bit_len      );
 
-#if USE_SHA_NI
-  sha1_ni_blocks(state, pad, (size_t)(pad_len / 64));
-#else
-  sha1_scalar_blocks(state, pad, (size_t)(pad_len / 64));
-#endif
+  SHA1_DISPATCH(state, pad, (size_t)(pad_len / 64));
 
   /* Write digest in big-endian. */
   for (int i = 0; i < 5; i++) {
@@ -364,11 +369,7 @@ void sha1_process_blocks(int32_t* h, const uint8_t* data,
   state[2] = (uint32_t)h[2]; state[3] = (uint32_t)h[3];
   state[4] = (uint32_t)h[4];
 
-#if USE_SHA_NI
-  sha1_ni_blocks(state, data + offset, (size_t)num_blocks);
-#else
-  sha1_scalar_blocks(state, data + offset, (size_t)num_blocks);
-#endif
+  SHA1_DISPATCH(state, data + offset, (size_t)num_blocks);
 
   h[0] = (int32_t)state[0]; h[1] = (int32_t)state[1];
   h[2] = (int32_t)state[2]; h[3] = (int32_t)state[3];

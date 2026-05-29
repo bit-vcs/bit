@@ -21,6 +21,17 @@
 #  define SHA256_TARGET
 #endif
 
+#if USE_SHA256_NI
+static int sha256_hw_ok = -1;
+static int sha256_ni_ok(void) {
+  if (sha256_hw_ok < 0)
+    sha256_hw_ok = (__builtin_cpu_supports("sha") != 0) &
+                   (__builtin_cpu_supports("sse4.1") != 0) &
+                   (__builtin_cpu_supports("ssse3") != 0);
+  return sha256_hw_ok;
+}
+#endif
+
 /* ── SHA-256 K constants ──────────────────────────────────────────────── */
 
 static const uint32_t K256[64] = {
@@ -217,12 +228,15 @@ void sha256_compute(const uint8_t* data, int32_t len, uint8_t* out) {
   int32_t full_blocks = len / 64;
   int32_t remainder   = len % 64;
 
-  if (full_blocks > 0) {
 #if USE_SHA256_NI
-    sha256_ni_blocks(state, data, (size_t)full_blocks);
+#  define SHA256_DISPATCH(st, d, n) \
+     (sha256_ni_ok() ? sha256_ni_blocks((st),(d),(n)) : sha256_scalar_blocks((st),(d),(n)))
 #else
-    sha256_scalar_blocks(state, data, (size_t)full_blocks);
+#  define SHA256_DISPATCH(st, d, n) sha256_scalar_blocks((st),(d),(n))
 #endif
+
+  if (full_blocks > 0) {
+    SHA256_DISPATCH(state, data, (size_t)full_blocks);
   }
 
   uint8_t pad[128];
@@ -248,11 +262,7 @@ void sha256_compute(const uint8_t* data, int32_t len, uint8_t* out) {
   pad[pad_len - 2] = (uint8_t)(bit_len >>  8);
   pad[pad_len - 1] = (uint8_t)(bit_len      );
 
-#if USE_SHA256_NI
-  sha256_ni_blocks(state, pad, (size_t)(pad_len / 64));
-#else
-  sha256_scalar_blocks(state, pad, (size_t)(pad_len / 64));
-#endif
+  SHA256_DISPATCH(state, pad, (size_t)(pad_len / 64));
 
   for (int i = 0; i < 8; i++) {
     out[i*4    ] = (uint8_t)(state[i] >> 24);

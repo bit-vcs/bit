@@ -46,10 +46,6 @@ pub fn Sha1State::reset(self : Sha1State) -> Unit {
   self.total_len = 0L
 }
 
-///|
-fn Sha1State::process_block(self : Sha1State) -> Unit {
-  sha1_process_blocks_ffi(self.h, self.block, 0, 1)
-}
 
 ///|
 pub fn Sha1State::update(self : Sha1State, data : Bytes) -> Unit {
@@ -147,12 +143,6 @@ pub fn sha1_prefix_raw(data : Bytes, len : Int) -> FixedArray[Byte] {
   state.finish_raw()
 }
 
-///|
-pub fn sha1_raw(data : Bytes) -> FixedArray[Byte] {
-  let out : FixedArray[Byte] = FixedArray::make(20, b'\x00')
-  sha1_compute_ffi(data, data.length(), out)
-  out
-}
 
 ///|
 pub fn sha1_array_prefix_raw(data : Array[Byte], len : Int) -> FixedArray[Byte] {
