@@ -1,3 +1,5 @@
+// SHA-1 fallback for non-native targets (pure MoonBit + @simdhash).
+
 ///|
 fn Sha1State::process_block(self : Sha1State) -> Unit {
   let h = self.h
@@ -48,6 +50,11 @@ fn Sha1State::process_block(self : Sha1State) -> Unit {
 fn sha1_rotl32(x : Int, n : Int) -> Int {
   ((x << n) | (x.reinterpret_as_uint() >> (32 - n)).reinterpret_as_int()) &
   0xffffffff
+}
+
+///|
+pub fn sha1_bytes(data : Bytes) -> Bytes {
+  @simdhash.sha1(data)
 }
 
 ///|

@@ -58,6 +58,14 @@ test "bench sha1_raw 64 KiB" (b : @bench.T) {
 }
 
 ///|
+test "bench sha256_raw 64 bytes" (b : @bench.T) {
+  b.bench(fn() {
+    let h = sha256_raw(bench_input_64)
+    b.keep(h.length())
+  })
+}
+
+///|
 test "bench sha256_raw 1 KiB" (b : @bench.T) {
   b.bench(fn() {
     let h = sha256_raw(bench_input_1k)

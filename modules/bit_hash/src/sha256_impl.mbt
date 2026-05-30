@@ -1,3 +1,10 @@
+// SHA-256 fallback for non-native targets (@simdhash).
+
+///|
+pub fn sha256_bytes(data : Bytes) -> Bytes {
+  @simdhash.sha256(data)
+}
+
 ///|
 pub fn sha256_raw(data : Bytes) -> FixedArray[Byte] {
   let b = @simdhash.sha256(data)
