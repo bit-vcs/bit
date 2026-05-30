@@ -2,7 +2,6 @@
   "name": "mizchi/bit_hash",
   "version": "0.42.2",
   "deps": {
-    "moonbitlang/x": "0.4.40",
     "mizchi/simd": "0.4.1"
   },
   "repository": "https://github.com/mizchi/bit-vcs",

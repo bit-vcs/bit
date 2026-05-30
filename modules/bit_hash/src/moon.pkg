@@ -1,6 +1,4 @@
 import {
-  "moonbitlang/core/encoding/utf8" @utf8,
-  "moonbitlang/x/crypto" @crypto,
   "mizchi/simd/src/simdhash" @simdhash,
 }
 

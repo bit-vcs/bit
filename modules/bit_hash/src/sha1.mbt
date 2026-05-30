@@ -90,7 +90,7 @@ pub fn Sha1State::update_byte(self : Sha1State, b : Byte) -> Unit {
 
 ///|
 pub fn Sha1State::update_string(self : Sha1State, s : String) -> Unit {
-  self.update(@utf8.encode(s))
+  self.update(utf8_encode(s))
 }
 
 ///|
