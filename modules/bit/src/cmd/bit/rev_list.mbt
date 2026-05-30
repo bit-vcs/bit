@@ -116,6 +116,7 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
   let mut min_parents : Int? = None
   let mut graph = false
   let mut no_walk = false
+  let mut maximal_only = false
   let refs : Array[String] = []
   let excludes : Array[String] = []
   let symmetric_ranges : Array[(String, String)] = []
@@ -155,6 +156,7 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
       }
       "--no-walk" | "--no-walk=sorted" | "--no-walk=unsorted" => no_walk = true
       "--do-walk" => no_walk = false
+      "--maximal-only" => maximal_only = true
       "--merges" => min_parents = Some(2)
       "--no-merges" => max_parents = Some(1)
       "--min-parents" if i + 1 < args.length() => {
@@ -707,6 +709,31 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
       let cherry_ok = !(cherry_pick && cherry_equal.contains(hex))
       if side_ok && cherry_ok {
         filtered.push(id)
+      }
+    }
+    result.clear()
+    for id in filtered {
+      result.push(id)
+    }
+  }
+  // --maximal-only: keep only commits not reachable from any other in result
+  if maximal_only {
+    let result_ids = result.copy()
+    let filtered : Array[@bitcore.ObjectId] = []
+    for i2 in 0..<result_ids.length() {
+      let candidate = result_ids[i2]
+      let mut dominated = false
+      for j in 0..<result_ids.length() {
+        if i2 == j {
+          continue
+        }
+        if @bitlib.merge_base_is_ancestor(db, fs, candidate, result_ids[j]) {
+          dominated = true
+          break
+        }
+      }
+      if !dominated {
+        filtered.push(candidate)
       }
     }
     result.clear()
