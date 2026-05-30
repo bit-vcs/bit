@@ -146,6 +146,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - uses: ./.github/actions/setup-nix
+      - name: Update moon registry pin
+        run: nix flake update moon-registry
       - name: Build
         run: nix build
       - name: Smoke test
