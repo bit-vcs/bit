@@ -146,10 +146,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - uses: ./.github/actions/setup-nix
-      - name: Update moon registry pin
-        run: nix flake update moon-registry
       - name: Build
-        run: nix build
+        run: nix build --override-input moon-registry git+https://mooncakes.io/git/index
       - name: Smoke test
         run: test -x ./result/bin/bit
 
