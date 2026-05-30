@@ -1,0 +1,7 @@
+import {
+  "mizchi/simd/src/simdhash" @simdhash,
+}
+
+options(
+  "is-main": true,
+)
