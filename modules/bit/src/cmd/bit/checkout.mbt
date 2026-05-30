@@ -14,6 +14,7 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
   let mut track_branch = false
   let mut detach_head = false
   let mut quiet = false
+  let mut autostash = false
   let pre_separator_targets : Array[String] = []
   let post_separator_targets : Array[String] = []
   let mut i = 0
@@ -31,6 +32,7 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
       "-f" | "--force" => force_checkout = true
       "--detach" => detach_head = true
       "--orphan" => orphan_branch = true
+      "-m" | "--merge" => autostash = true
       "-" =>
         if saw_separator {
           post_separator_targets.push(arg)
@@ -58,6 +60,7 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
     raise @bitcore.GitError::InvalidObject("No target specified for checkout")
   }
   ignore(quiet)
+  ignore(autostash) // resolved below at branch-switch site
   if is_bare_repo_dir(root) {
     raise @bitcore.GitError::InvalidObject(
       "this operation must be run in a work tree",
@@ -204,6 +207,14 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
     let mut switched_head = false
     let mut switched_head_id : @bitcore.ObjectId? = None
     let mut switched_target : String? = None
+    // -m/--merge: stash uncommitted changes, restore after switch
+    let mut did_autostash = false
+    if autostash {
+      let author = get_author_string()
+      let timestamp = get_commit_timestamp()
+      let stash_id = @bitlib.stash_push(fs, fs, root, "", author, timestamp)
+      did_autostash = stash_id is Some(_)
+    }
     if is_path && is_branch {
       // Ambiguous - default to branch (like git)
       match checkout_branch_in_use_path(rfs, root, target) {
@@ -244,6 +255,9 @@ async fn handle_checkout(args : Array[String]) -> Unit raise Error {
         _ => ()
       }
       save_previous_checkout_location(fs, git_dir, previous_location)
+      if did_autostash {
+        @bitlib.stash_apply(fs, fs, root, 0, true)
+      }
     }
   } else {
     let first = resolve_checkout_target(rfs, git_dir, targets[0])

@@ -783,7 +783,7 @@ test "push-lease: remote tracking refname follows pushed remote" {
 
 ///|
 fn serve_lfs_wbtest_sha256_hex(data : Bytes) -> String {
-  let raw = @bithash.sha256_raw(data)
+  let raw = @bithash.sha256_bytes(data)
   let digits = "0123456789abcdef"
   let out = StringBuilder::new()
   for b in raw {

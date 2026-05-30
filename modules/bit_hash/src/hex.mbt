@@ -1,6 +1,30 @@
 ///| Common hash/hex helpers.
 
 ///|
+fn utf8_encode(s : String) -> Bytes {
+  let buf : Array[Byte] = []
+  for c in s {
+    let cp = c.to_int()
+    if cp < 0x80 {
+      buf.push(cp.to_byte())
+    } else if cp < 0x800 {
+      buf.push((0xc0 | (cp >> 6)).to_byte())
+      buf.push((0x80 | (cp & 0x3f)).to_byte())
+    } else if cp < 0x10000 {
+      buf.push((0xe0 | (cp >> 12)).to_byte())
+      buf.push((0x80 | ((cp >> 6) & 0x3f)).to_byte())
+      buf.push((0x80 | (cp & 0x3f)).to_byte())
+    } else {
+      buf.push((0xf0 | (cp >> 18)).to_byte())
+      buf.push((0x80 | ((cp >> 12) & 0x3f)).to_byte())
+      buf.push((0x80 | ((cp >> 6) & 0x3f)).to_byte())
+      buf.push((0x80 | (cp & 0x3f)).to_byte())
+    }
+  }
+  Bytes::from_array(buf)
+}
+
+///|
 pub fn short_hex(hex : String, n : Int) -> String {
   if hex.length() <= n {
     hex

@@ -16,24 +16,6 @@ let sha1_h3 : Int = 0x10325476
 let sha1_h4 : Int = 0xc3d2e1f0
 
 ///|
-let sha1_k0 : Int = 0x5a827999
-
-///|
-let sha1_k1 : Int = 0x6ed9eba1
-
-///|
-let sha1_k2 : Int = 0x8f1bbcdc
-
-///|
-let sha1_k3 : Int = 0xca62c1d6
-
-///|
-fn rotl32(x : Int, n : Int) -> Int {
-  ((x << n) | (x.reinterpret_as_uint() >> (32 - n)).reinterpret_as_int()) &
-  0xffffffff
-}
-
-///|
 pub struct Sha1State {
   h : FixedArray[Int]
   block : FixedArray[Byte]
@@ -64,67 +46,6 @@ pub fn Sha1State::reset(self : Sha1State) -> Unit {
   self.total_len = 0L
 }
 
-///|
-fn Sha1State::process_block(self : Sha1State) -> Unit {
-  let h = self.h
-  let w = self.w
-  let block = self.block
-  for i = 0; i < 16; i = i + 1 {
-    w[i] = (block[i * 4].to_int() << 24) |
-      (block[i * 4 + 1].to_int() << 16) |
-      (block[i * 4 + 2].to_int() << 8) |
-      block[i * 4 + 3].to_int()
-  }
-  for i in 16..<80 {
-    w[i] = rotl32(w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16], 1)
-  }
-  let mut a = h[0]
-  let mut b = h[1]
-  let mut c = h[2]
-  let mut d = h[3]
-  let mut e = h[4]
-  for i = 0; i < 20; i = i + 1 {
-    let f = (b & c) | (b.lnot() & d)
-    let temp = (rotl32(a, 5) + f + e + sha1_k0 + w[i]) & 0xffffffff
-    e = d
-    d = c
-    c = rotl32(b, 30)
-    b = a
-    a = temp
-  }
-  for i = 20; i < 40; i = i + 1 {
-    let f = b ^ c ^ d
-    let temp = (rotl32(a, 5) + f + e + sha1_k1 + w[i]) & 0xffffffff
-    e = d
-    d = c
-    c = rotl32(b, 30)
-    b = a
-    a = temp
-  }
-  for i = 40; i < 60; i = i + 1 {
-    let f = (b & c) | (b & d) | (c & d)
-    let temp = (rotl32(a, 5) + f + e + sha1_k2 + w[i]) & 0xffffffff
-    e = d
-    d = c
-    c = rotl32(b, 30)
-    b = a
-    a = temp
-  }
-  for i = 60; i < 80; i = i + 1 {
-    let f = b ^ c ^ d
-    let temp = (rotl32(a, 5) + f + e + sha1_k3 + w[i]) & 0xffffffff
-    e = d
-    d = c
-    c = rotl32(b, 30)
-    b = a
-    a = temp
-  }
-  h[0] = (h[0] + a) & 0xffffffff
-  h[1] = (h[1] + b) & 0xffffffff
-  h[2] = (h[2] + c) & 0xffffffff
-  h[3] = (h[3] + d) & 0xffffffff
-  h[4] = (h[4] + e) & 0xffffffff
-}
 
 ///|
 pub fn Sha1State::update(self : Sha1State, data : Bytes) -> Unit {
@@ -169,7 +90,7 @@ pub fn Sha1State::update_byte(self : Sha1State, b : Byte) -> Unit {
 
 ///|
 pub fn Sha1State::update_string(self : Sha1State, s : String) -> Unit {
-  self.update(@utf8.encode(s))
+  self.update(utf8_encode(s))
 }
 
 ///|
@@ -222,10 +143,6 @@ pub fn sha1_prefix_raw(data : Bytes, len : Int) -> FixedArray[Byte] {
   state.finish_raw()
 }
 
-///|
-pub fn sha1_raw(data : Bytes) -> FixedArray[Byte] {
-  sha1_prefix_raw(data, data.length())
-}
 
 ///|
 pub fn sha1_array_prefix_raw(data : Array[Byte], len : Int) -> FixedArray[Byte] {

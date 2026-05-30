@@ -4,6 +4,7 @@
   "deps": {
     "moonbitlang/async": "0.16.6",
     "moonbitlang/x": "0.4.40",
+    "mizchi/simd": "0.4.1",
     "mizchi/tempfile": "0.1.0",
     "mizchi/llm": "0.2.2",
     "mizchi/bitflow": "0.4.0",
