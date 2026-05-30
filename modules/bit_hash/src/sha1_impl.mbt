@@ -1,9 +1,7 @@
-// SHA-1 fallback for non-native targets (pure MoonBit).
-
 ///|
 fn Sha1State::process_block(self : Sha1State) -> Unit {
   let h = self.h
-  let w = self.w
+  let w : FixedArray[Int] = self.w
   let block = self.block
   for i = 0; i < 16; i = i + 1 {
     w[i] = (block[i * 4].to_int() << 24) |
@@ -54,5 +52,10 @@ fn sha1_rotl32(x : Int, n : Int) -> Int {
 
 ///|
 pub fn sha1_raw(data : Bytes) -> FixedArray[Byte] {
-  sha1_prefix_raw(data, data.length())
+  let b = @simdhash.sha1(data)
+  let result : FixedArray[Byte] = FixedArray::make(20, b'\x00')
+  for i in 0..<20 {
+    result[i] = b[i]
+  }
+  result
 }
