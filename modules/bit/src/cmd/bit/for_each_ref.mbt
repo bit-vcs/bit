@@ -2283,41 +2283,11 @@ async fn for_each_ref_format(
         i += 1
       }
     } else if chars[i] == '%' &&
-      i + 1 < len &&
-      chars[i + 1] == '0' &&
-      i + 2 < len {
-      // %0a = newline, %00 = NUL, etc. (hex escape)
-      let hex_ch = chars[i + 2]
-      let val = match hex_ch {
-        'a' | 'A' => Some('\n')
-        'd' | 'D' => Some('\r')
-        '0' => {
-          let nul : Char = Int::unsafe_to_char(0)
-          Some(nul)
-        }
-        _ => None
-      }
-      match val {
-        Some(c) => {
-          if for_each_ref_if_output_active(if_state, if_result, if_depth) {
-            byte_buf_push_char(out, c)
-          }
-          i += 3
-        }
-        None => {
-          if for_each_ref_if_output_active(if_state, if_result, if_depth) {
-            byte_buf_push_char(out, chars[i])
-          }
-          i += 1
-        }
-      }
-    } else if chars[i] == '%' &&
-      i + 1 < len &&
-      chars[i + 1] == 'x' &&
-      i + 3 < len {
-      // %xNN hex escape
+      i + 2 < len &&
+      (chars[i + 1] == 'x' || chars[i + 1] == 'X') {
+      // %xNN / %XNN hex escape (e.g. %x09 = tab)
       let hi = for_each_ref_hex_digit(chars[i + 2])
-      let lo = for_each_ref_hex_digit(chars[i + 3])
+      let lo = if i + 3 < len { for_each_ref_hex_digit(chars[i + 3]) } else { -1 }
       if hi >= 0 && lo >= 0 {
         if for_each_ref_if_output_active(if_state, if_result, if_depth) {
           out.push(((hi * 16 + lo) & 0xFF).to_byte())
@@ -2329,6 +2299,17 @@ async fn for_each_ref_format(
         }
         i += 1
       }
+    } else if chars[i] == '%' &&
+      i + 2 < len &&
+      for_each_ref_hex_digit(chars[i + 1]) >= 0 &&
+      for_each_ref_hex_digit(chars[i + 2]) >= 0 {
+      // %NN two-digit hex escape (e.g. %09 = tab, %0a = newline)
+      let hi = for_each_ref_hex_digit(chars[i + 1])
+      let lo = for_each_ref_hex_digit(chars[i + 2])
+      if for_each_ref_if_output_active(if_state, if_result, if_depth) {
+        out.push(((hi * 16 + lo) & 0xFF).to_byte())
+      }
+      i += 3
     } else if chars[i] == '%' && i + 1 < len && chars[i + 1] == '%' {
       if for_each_ref_if_output_active(if_state, if_result, if_depth) {
         out.push(b'%')
