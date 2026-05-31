@@ -5,7 +5,7 @@ test "component impl: network remote helpers normalize ssh remotes" {
     content="https://github.com/mizchi/bit-vcs.git",
   )
 
-  let remote = net_http_remote("git@github.com:user/repo.git")
+  let remote = net_http_remote(component_impl_fixture_remote_url)
   inspect(
     remote.info_refs_url(),
     content="https://github.com/user/repo/info/refs?service=git-receive-pack",

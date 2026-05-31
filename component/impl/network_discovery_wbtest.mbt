@@ -4,7 +4,7 @@ test "component impl: discover refs accepts scp-style ssh remote" {
   let get_calls : Array[String] = []
   let post_calls : Array[String] = []
   let (refs, _caps, version, symrefs) = discover_refs_sync(
-    "git@github.com:user/repo.git",
+    component_impl_fixture_remote_url,
     true,
     fn(
       url : String,

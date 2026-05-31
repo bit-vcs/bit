@@ -882,6 +882,8 @@ fn save_rebase_state(
   match state.current {
     Some(id) => {
       fs.write_string(join_path(state_dir, "stopped-sha"), id.to_hex() + "\n")
+      // REBASE_HEAD points to the commit being applied (used by hooks/tools)
+      fs.write_string(join_path(git_dir, "REBASE_HEAD"), id.to_hex() + "\n")
       fs.write_string(join_path(state_dir, "message"), state.message)
       fs.write_string(
         join_path(state_dir, "author-script"),
@@ -1008,6 +1010,13 @@ pub fn clear_rebase_state(
   // Remove the directory
   fs.remove_dir(state_dir) catch {
     _ => ()
+  }
+  // Remove REBASE_HEAD from git_dir root (written on conflict)
+  let rebase_head = join_path(git_dir, "REBASE_HEAD")
+  if rfs.is_file(rebase_head) {
+    fs.remove_file(rebase_head) catch {
+      _ => ()
+    }
   }
 }
 

@@ -35,10 +35,20 @@ async fn handle_gc(args : Array[String]) -> Unit raise Error {
       print_line("Found \{result.dangling.length()} dangling objects")
     }
   }
-  // Update commit-graph after gc
+  // Update commit-graph after gc if gc.writeCommitGraph is enabled (default: true)
   let git_dir = resolve_git_dir(fs, root)
-  write_commit_graph(fs, git_dir, true) catch {
-    _ => ()
+  let rfs : &@bitcore.RepoFileSystem = fs
+  let write_cgraph = match
+    @bitlib.read_config_value(
+      rfs, git_dir + "/config", "gc", "writeCommitGraph",
+    ) {
+    Some(v) => v.to_lower() != "false"
+    None => true
+  }
+  if write_cgraph {
+    write_commit_graph(fs, git_dir, true) catch {
+      _ => ()
+    }
   }
 }
 

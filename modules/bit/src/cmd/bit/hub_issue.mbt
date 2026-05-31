@@ -26,6 +26,9 @@ fn print_hub_issue_usage() -> Unit {
   )
   println("  comment list <issue-id>")
   println("  link <issue-id> <pr-id>")
+  println("  dep add <issue-id> <blocked-by-id>    (add blocked-by dependency)")
+  println("  dep remove <issue-id> <blocked-by-id> (remove dependency)")
+  println("  dep list <issue-id>                   (list dependencies)")
   println("  claim <issue-id> [--remote <url>] [--auth-token <token>]")
   println("  unclaim <issue-id> [--remote <url>] [--auth-token <token>]")
   println(
@@ -78,6 +81,7 @@ async fn handle_hub_issue(args : Array[String]) -> Unit raise Error {
     "reopen" => handle_hub_issue_reopen(rest)
     "comment" => handle_hub_issue_comment(rest)
     "link" => handle_hub_issue_link(rest)
+    "dep" => handle_hub_issue_dep(rest)
     "claim" => handle_hub_issue_claim(rest)
     "unclaim" => handle_hub_issue_unclaim(rest)
     "claims" => handle_hub_issue_claims(rest)
@@ -1332,6 +1336,85 @@ async fn handle_hub_issue_link(args : Array[String]) -> Unit raise Error {
   } else {
     hub.link_pr_to_issue(objects, refs, clock, issue_id, target)
     print_line("Linked PR #\{target} to issue #\{issue_id}")
+  }
+}
+
+///|
+async fn handle_hub_issue_dep(args : Array[String]) -> Unit raise Error {
+  if args.length() == 0 {
+    eprint_line("usage: bit issue dep <add|remove|list> ...")
+    @sys.exit(1)
+  }
+  let subcmd = args[0]
+  let rest = collect_args(args, 1)
+  match subcmd {
+    "add" => {
+      if rest.length() < 2 {
+        eprint_line("usage: bit issue dep add <issue-id> <blocked-by-id>")
+        @sys.exit(1)
+      }
+      let source_id = rest[0]
+      let target_id = rest[1]
+      let root = get_work_root()
+      let git_dir = resolve_hub_git_dir(root)
+      ensure_hub_initialized(git_dir, command_name="issue dep add")
+      let (objects, refs, clock) = make_hub_stores(git_dir)
+      let hub = load_hub_store(objects, refs)
+      hub.add_dep(objects, refs, clock, source_id, target_id)
+      print_line("Issue #\{source_id} is now blocked by #\{target_id}")
+    }
+    "remove" | "rm" => {
+      if rest.length() < 2 {
+        eprint_line("usage: bit issue dep remove <issue-id> <blocked-by-id>")
+        @sys.exit(1)
+      }
+      let source_id = rest[0]
+      let target_id = rest[1]
+      let root = get_work_root()
+      let git_dir = resolve_hub_git_dir(root)
+      ensure_hub_initialized(git_dir, command_name="issue dep remove")
+      let (objects, refs, clock) = make_hub_stores(git_dir)
+      let hub = load_hub_store(objects, refs)
+      hub.remove_dep(objects, refs, clock, source_id, target_id)
+      print_line("Removed dependency: #\{source_id} is no longer blocked by #\{target_id}")
+    }
+    "list" | "ls" => {
+      if rest.length() < 1 {
+        eprint_line("usage: bit issue dep list <issue-id>")
+        @sys.exit(1)
+      }
+      let issue_id = rest[0]
+      let root = get_work_root()
+      let git_dir = resolve_hub_git_dir(root)
+      ensure_hub_initialized(git_dir, command_name="issue dep list")
+      let (objects, refs, _clock) = make_hub_stores(git_dir)
+      let hub = load_hub_store(objects, refs)
+      let issue = hub.get_issue(objects, issue_id)
+      guard issue is Some(iss) else {
+        eprint_line("error: issue not found: \{issue_id}")
+        @sys.exit(1)
+      }
+      if iss.blocked_by.length() > 0 {
+        print_line("Blocked by:")
+        for id in iss.blocked_by {
+          print_line("  #\{id}")
+        }
+      }
+      if iss.blocking.length() > 0 {
+        print_line("Blocking:")
+        for id in iss.blocking {
+          print_line("  #\{id}")
+        }
+      }
+      if iss.blocked_by.length() == 0 && iss.blocking.length() == 0 {
+        print_line("No dependencies")
+      }
+    }
+    _ => {
+      eprint_line("bit issue dep: unknown subcommand '\{subcmd}'")
+      eprint_line("usage: bit issue dep <add|remove|list> ...")
+      @sys.exit(1)
+    }
   }
 }
 

@@ -10,7 +10,7 @@ test "component impl: push_with_transport accepts scp-style ssh remote" {
   let result = push_with_transport(
     fs,
     "/repo",
-    "git@github.com:user/repo.git",
+    component_impl_fixture_remote_url,
     "",
     fn(
       url : String,

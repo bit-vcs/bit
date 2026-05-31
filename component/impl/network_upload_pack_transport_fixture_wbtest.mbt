@@ -33,10 +33,10 @@ test "component impl: upload-pack transport fixture helpers assert request expec
   )
 
   let (upload_info_url, upload_info_headers) = upload_pack_info_refs_request(
-    "git@github.com:user/repo.git", true,
+    component_impl_fixture_remote_url, true,
   )
   let (upload_post_url, upload_post_headers) = upload_pack_service_request(
-    "git@github.com:user/repo.git", true,
+    component_impl_fixture_remote_url, true,
   )
   component_impl_assert_upload_pack_request(
     upload_info_url, upload_info_headers, upload_post_url, upload_post_headers, "https://github.com/user/repo",

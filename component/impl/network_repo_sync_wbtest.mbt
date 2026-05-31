@@ -8,7 +8,7 @@ test "component impl: repo sync helpers fetch remote target and apply fetched st
     fs,
     fs,
     "/repo",
-    "git@github.com:user/repo.git",
+    component_impl_fixture_remote_url,
     0,
     "No refs found on remote",
     fn(

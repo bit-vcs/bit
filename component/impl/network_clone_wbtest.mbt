@@ -5,7 +5,7 @@ test "component impl: clone_with_transport materializes repo with injected trans
   clone_with_transport(
     fs,
     fs,
-    "git@github.com:user/repo.git",
+    component_impl_fixture_remote_url,
     "/repo",
     "",
     0,

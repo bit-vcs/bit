@@ -10,7 +10,7 @@ test "component impl: push sync helpers prepare state and execute request" {
   let result = net_sync_push_target(
     fs,
     "/repo",
-    "git@github.com:user/repo.git",
+    component_impl_fixture_remote_url,
     "",
     fn(
       url : String,

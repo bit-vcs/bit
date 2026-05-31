@@ -1,3 +1,146 @@
+///| Commit-graph command handler and utilities
+
+///|
+async fn handle_commit_graph(args : Array[String]) -> Unit raise Error {
+  let fs = OsFs::new()
+  let git_dir = find_git_dir(fs)
+  let mut subcommand : String? = None
+  let mut object_dir : String? = None
+  let mut reachable = false
+  let mut stdin_packs = false
+  let mut stdin_commits = false
+  let mut append = false
+  let mut verify_shallow = false
+  let mut progress = false
+  let mut i = 0
+  while i < args.length() {
+    let arg = args[i]
+    match arg {
+      "write" | "verify" => subcommand = Some(arg)
+      "--reachable" => reachable = true
+      "--stdin-packs" => stdin_packs = true
+      "--stdin-commits" => stdin_commits = true
+      "--append" => append = true
+      "--shallow" => verify_shallow = true
+      "--progress" => progress = true
+      "--no-progress" => progress = false
+      "--object-dir" if i + 1 < args.length() => {
+        object_dir = Some(args[i + 1])
+        i += 2
+        continue
+      }
+      _ if arg.has_prefix("--object-dir=") =>
+        object_dir = Some(arg[13:].to_owned())
+      // Accepted but ignored options
+      "--changed-paths" | "--no-changed-paths" => ()
+      _ if arg.has_prefix("--max-new-filters") => ()
+      _ if arg.has_prefix("--split") => ()
+      _ if arg.has_prefix("--expire-time") => ()
+      _ if arg.has_prefix("--no-expire-time") => ()
+      _ if arg.has_prefix("-") => warn_unimplemented_arg("commit-graph", arg)
+      _ => ()
+    }
+    i += 1
+  }
+  ignore(append)
+  ignore(progress)
+  ignore(verify_shallow)
+  // --object-dir points to the objects directory; git_dir is one level up.
+  // If not specified, use the detected git_dir.
+  let effective_git_dir = match object_dir {
+    Some(d) => {
+      let resolved = resolve_in_cwd(d)
+      // Strip trailing "/objects" suffix if present to get git_dir
+      if resolved.has_suffix("/objects") {
+        String::unsafe_substring(
+          resolved,
+          start=0,
+          end=resolved.length() - 8,
+        )
+      } else {
+        // Assume it IS the git_dir (e.g. bare repo)
+        resolved
+      }
+    }
+    None => git_dir
+  }
+  match subcommand {
+    None | Some("write") => {
+      if stdin_commits {
+        write_commit_graph_from_stdin_commits(fs, effective_git_dir)
+      } else if stdin_packs {
+        write_commit_graph(fs, effective_git_dir, false)
+      } else if reachable {
+        write_commit_graph(fs, effective_git_dir, true)
+      } else {
+        write_commit_graph(fs, effective_git_dir, false)
+      }
+    }
+    Some("verify") => cgraph_verify(fs, effective_git_dir)
+    Some(other) => {
+      eprint_line("error: unknown subcommand: " + other)
+      @sys.exit(1)
+    }
+  }
+}
+
+///|
+async fn write_commit_graph_from_stdin_commits(
+  fs : OsFs,
+  git_dir : String,
+) -> Unit raise Error {
+  // --stdin-commits: fall back to full reachable walk (stdin parsing not yet implemented)
+  write_commit_graph(fs, git_dir, true)
+}
+
+///|
+async fn cgraph_verify(fs : OsFs, git_dir : String) -> Unit raise Error {
+  let rfs : &@bitcore.RepoFileSystem = fs
+  let graph_path = git_dir + "/objects/info/commit-graph"
+  if !rfs.is_file(graph_path) {
+    eprint_line("error: commit-graph file not found")
+    @sys.exit(1)
+  }
+  let data = rfs.read_file(graph_path)
+  if data.length() < 8 {
+    eprint_line("error: commit-graph file too small")
+    @sys.exit(1)
+  }
+  let sig = (data[0].to_int() << 24) |
+    (data[1].to_int() << 16) |
+    (data[2].to_int() << 8) |
+    data[3].to_int()
+  if sig != 0x43475048 {
+    eprint_line("error: commit-graph signature mismatch")
+    @sys.exit(1)
+  }
+  let hash_version = data[5].to_int()
+  let hash_size = if hash_version == 2 { 32 } else { 20 }
+  let expected_hash_version = commit_graph_repo_hash_version(rfs, git_dir)
+  if hash_version != expected_hash_version {
+    eprint_line(
+      "error: commit-graph hash version \{hash_version} does not match repository hash version \{expected_hash_version}",
+    )
+    @sys.exit(1)
+  }
+  // Verify checksum trailer
+  if data.length() < hash_size {
+    eprint_line("error: commit-graph file too small for checksum")
+    @sys.exit(1)
+  }
+  let body_len = data.length() - hash_size
+  let stored_trailer = @bitcore.ObjectId::from_bytes_at(
+    data, body_len, hash_size~,
+  )
+  let expected_trailer = @bitcore.hash_prefix(data, body_len, hash_size~)
+  if stored_trailer != expected_trailer {
+    eprint_line("error: commit-graph checksum mismatch")
+    @sys.exit(1)
+  }
+  // Verify all commits exist
+  check_commit_graph_paranoia(fs, git_dir)
+}
+
 ///| Commit-graph file reader (minimal: header validation + hash version check)
 
 ///|

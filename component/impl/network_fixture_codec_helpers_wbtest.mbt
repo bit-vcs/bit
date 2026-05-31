@@ -56,3 +56,9 @@ let component_impl_fetch_hex : String = "303030647061636b66696c650a3030643501504
 
 ///|
 let component_impl_fixture_commit : String = "30c9f208acc7601773a29aef394157adf960d104"
+
+///|
+let component_impl_fixture_remote_url : String = "git@github.com:user/repo.git"
+
+///|
+let component_impl_fixture_default_branch : String = "refs/heads/main"

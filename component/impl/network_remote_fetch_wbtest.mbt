@@ -3,7 +3,7 @@ test "component impl: remote fetch helpers choose default target and fetch pack"
   let (adv, lsrefs, fetch) = component_impl_fixture_upload_pack_responses()
 
   let (refname, commit_id, pack) = net_fetch_remote_target(
-    "git@github.com:user/repo.git",
+    component_impl_fixture_remote_url,
     0,
     "No default branch found",
     fn(
@@ -29,7 +29,5 @@ test "component impl: remote fetch helpers choose default target and fetch pack"
     },
   )
 
-  assert_eq(refname, "refs/heads/main")
-  inspect(commit_id.to_hex(), content=component_impl_fixture_commit)
-  assert_true(pack.length() > 0)
+  component_impl_assert_remote_fetch_target(refname, commit_id, pack)
 }

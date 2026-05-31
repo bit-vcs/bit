@@ -58,12 +58,31 @@ async fn handle_for_each_ref(args : Array[String]) -> Unit raise Error {
         points_at.push(
           String::unsafe_substring(arg, start=12, end=arg.length()),
         )
+      "--points-at" =>
+        if i + 1 < args.length() {
+          i += 1
+          points_at.push(args[i])
+        }
       _ if arg.has_prefix("--merged=") =>
         merged = Some(String::unsafe_substring(arg, start=9, end=arg.length()))
+      "--merged" =>
+        if i + 1 < args.length() && !args[i + 1].has_prefix("-") {
+          i += 1
+          merged = Some(args[i])
+        } else {
+          merged = Some("HEAD")
+        }
       _ if arg.has_prefix("--no-merged=") =>
         no_merged = Some(
           String::unsafe_substring(arg, start=12, end=arg.length()),
         )
+      "--no-merged" =>
+        if i + 1 < args.length() && !args[i + 1].has_prefix("-") {
+          i += 1
+          no_merged = Some(args[i])
+        } else {
+          no_merged = Some("HEAD")
+        }
       "--shell" | "-s" => {
         if quote_style != "" {
           eprint_line("error: more than one quoting style")
@@ -745,11 +764,11 @@ async fn for_each_ref_validate_if_then_else(format : String) -> Unit {
     } else if atom == "then" {
       if stack.length() == 0 || stack[stack.length() - 1] != "if" {
         if stack.length() > 0 && stack[stack.length() - 1] == "if-then" {
-          eprint_line("fatal: format: %%(then) atom used more than once")
+          eprint_line("fatal: format: %(then) atom used more than once")
         } else if stack.length() > 0 && stack[stack.length() - 1] == "if-else" {
-          eprint_line("fatal: format: %%(then) atom used after %%(else)")
+          eprint_line("fatal: format: %(then) atom used after %(else)")
         } else {
-          eprint_line("fatal: format: %%(then) atom used without a %%(if) atom")
+          eprint_line("fatal: format: %(then) atom used without a %(if) atom")
         }
         @sys.exit(1)
       }
@@ -757,9 +776,9 @@ async fn for_each_ref_validate_if_then_else(format : String) -> Unit {
     } else if atom == "else" {
       if stack.length() == 0 || stack[stack.length() - 1] != "if-then" {
         if stack.length() > 0 && stack[stack.length() - 1] == "if-else" {
-          eprint_line("fatal: format: %%(else) atom used more than once")
+          eprint_line("fatal: format: %(else) atom used more than once")
         } else {
-          eprint_line("fatal: format: %%(else) atom used without a %%(if) atom")
+          eprint_line("fatal: format: %(else) atom used without a %(if) atom")
         }
         @sys.exit(1)
       }
@@ -767,14 +786,14 @@ async fn for_each_ref_validate_if_then_else(format : String) -> Unit {
     } else if atom == "end" {
       if stack.length() == 0 {
         eprint_line(
-          "fatal: format: %%(end) atom used without corresponding %%(if)/%(align) atom",
+          "fatal: format: %(end) atom used without corresponding atom",
         )
         @sys.exit(1)
       }
       let top = stack[stack.length() - 1]
       if top == "if" {
         // %(if) without %(then) before %(end)
-        eprint_line("fatal: format: %%(if) atom used without a %%(then) atom")
+        eprint_line("fatal: format: %(if) atom used without a %(then) atom")
         @sys.exit(1)
       }
       ignore(stack.pop())
@@ -783,13 +802,13 @@ async fn for_each_ref_validate_if_then_else(format : String) -> Unit {
   if stack.length() > 0 {
     let top = stack[stack.length() - 1]
     if top == "if" {
-      eprint_line("fatal: format: %%(if) atom used without a %%(then) atom")
+      eprint_line("fatal: format: %(if) atom used without a %(then) atom")
     } else if top == "if-then" || top == "if-else" {
       eprint_line(
-        "fatal: format: expected %%(end) atom after %%(then) or %%(else)",
+        "fatal: format: expected %(end) atom after %(then) or %(else)",
       )
     } else {
-      eprint_line("fatal: format: expected %%(end) atom")
+      eprint_line("fatal: format: expected %(end) atom")
     }
     @sys.exit(1)
   }
@@ -875,8 +894,19 @@ async fn for_each_ref_validate_atom(atom : String) -> Unit {
         opt == "only=true" ||
         opt == "only=no" ||
         opt == "only=false" ||
+        opt.has_prefix("only=") ||
         opt == "unfold" ||
+        opt == "unfold=yes" ||
+        opt == "unfold=true" ||
+        opt == "unfold=no" ||
+        opt == "unfold=false" ||
+        opt.has_prefix("unfold=") ||
         opt == "valueonly" ||
+        opt == "valueonly=yes" ||
+        opt == "valueonly=true" ||
+        opt == "valueonly=no" ||
+        opt == "valueonly=false" ||
+        opt.has_prefix("valueonly=") ||
         opt.has_prefix("key=") ||
         opt.has_prefix("separator=") ||
         opt.has_prefix("key_value_separator=") {
@@ -961,6 +991,58 @@ async fn for_each_ref_validate_atom(atom : String) -> Unit {
   if atom.has_prefix("HEAD:") {
     eprint_line("fatal: %(HEAD) does not take arguments")
     @sys.exit(1)
+  }
+  // Validate atoms that do not take arguments
+  if atom.has_prefix("objecttype:") {
+    eprint_line("fatal: %(objecttype) does not take arguments")
+    @sys.exit(1)
+  }
+  if atom.has_prefix("deltabase:") {
+    eprint_line("fatal: %(deltabase) does not take arguments")
+    @sys.exit(1)
+  }
+  // Validate objectsize arguments
+  if atom.has_prefix("objectsize:") {
+    let arg = String::unsafe_substring(atom, start=11, end=atom.length())
+    if arg != "disk" {
+      eprint_line("fatal: unrecognized %(objectsize) argument: " + arg)
+      @sys.exit(1)
+    }
+  }
+  // Validate upstream/push arguments
+  if atom.has_prefix("upstream:") {
+    let arg = String::unsafe_substring(atom, start=9, end=atom.length())
+    match arg {
+      "short" | "track" | "trackshort" | "remotename" | "remoteref" => ()
+      _ => {
+        eprint_line("fatal: unrecognized %(upstream) argument: " + arg)
+        @sys.exit(1)
+      }
+    }
+  }
+  if atom.has_prefix("push:") {
+    let arg = String::unsafe_substring(atom, start=5, end=atom.length())
+    match arg {
+      "short" | "track" | "trackshort" | "remotename" | "remoteref" => ()
+      _ => {
+        eprint_line("fatal: unrecognized %(push) argument: " + arg)
+        @sys.exit(1)
+      }
+    }
+  }
+  // Validate symref arguments
+  if atom.has_prefix("symref:") {
+    let arg = String::unsafe_substring(atom, start=7, end=atom.length())
+    match arg {
+      "short" => ()
+      _ if arg.has_prefix("lstrip=") ||
+        arg.has_prefix("strip=") ||
+        arg.has_prefix("rstrip=") => ()
+      _ => {
+        eprint_line("fatal: unrecognized %(symref) argument: " + arg)
+        @sys.exit(1)
+      }
+    }
   }
   // Validate subject
   if atom.has_prefix("subject:") && atom != "subject:sanitize" {
@@ -1064,7 +1146,7 @@ async fn for_each_ref_validate_atom(atom : String) -> Unit {
   }
   // Validate unknown atom names (must be last check)
   if !for_each_ref_is_known_atom(atom) {
-    eprint_line("fatal: unknown field name '" + atom + "'")
+    eprint_line("fatal: unknown field name: " + atom)
     @sys.exit(1)
   }
 }
@@ -1155,6 +1237,8 @@ fn for_each_ref_is_known_atom(atom : String) -> Bool {
     | "is-base"
     | "ahead-behind"
     | "worktreepath"
+    | "version"
+    | "v"
     | "*objectname"
     | "*objecttype"
     | "*objectsize"
@@ -1964,7 +2048,13 @@ async fn for_each_ref_format(
             end=atom.length(),
           )
           let parsed = for_each_ref_parse_align_args(align_args)
-          align_stack.push((out.length(), parsed.0, parsed.1))
+          // Only record position in output buffer if we're actually outputting.
+          // In a suppressed if-branch we still push "align" to scope_stack so
+          // the matching %(end) is consumed correctly, but we must not push to
+          // align_stack or the %(end) handler will emit spurious padding.
+          if for_each_ref_if_output_active(if_state, if_result, if_depth) {
+            align_stack.push((out.length(), parsed.0, parsed.1))
+          }
           scope_stack.push("align")
           i = end_pos + 1
           continue
@@ -2212,41 +2302,11 @@ async fn for_each_ref_format(
         i += 1
       }
     } else if chars[i] == '%' &&
-      i + 1 < len &&
-      chars[i + 1] == '0' &&
-      i + 2 < len {
-      // %0a = newline, %00 = NUL, etc. (hex escape)
-      let hex_ch = chars[i + 2]
-      let val = match hex_ch {
-        'a' | 'A' => Some('\n')
-        'd' | 'D' => Some('\r')
-        '0' => {
-          let nul : Char = Int::unsafe_to_char(0)
-          Some(nul)
-        }
-        _ => None
-      }
-      match val {
-        Some(c) => {
-          if for_each_ref_if_output_active(if_state, if_result, if_depth) {
-            byte_buf_push_char(out, c)
-          }
-          i += 3
-        }
-        None => {
-          if for_each_ref_if_output_active(if_state, if_result, if_depth) {
-            byte_buf_push_char(out, chars[i])
-          }
-          i += 1
-        }
-      }
-    } else if chars[i] == '%' &&
-      i + 1 < len &&
-      chars[i + 1] == 'x' &&
-      i + 3 < len {
-      // %xNN hex escape
+      i + 2 < len &&
+      (chars[i + 1] == 'x' || chars[i + 1] == 'X') {
+      // %xNN / %XNN hex escape (e.g. %x09 = tab)
       let hi = for_each_ref_hex_digit(chars[i + 2])
-      let lo = for_each_ref_hex_digit(chars[i + 3])
+      let lo = if i + 3 < len { for_each_ref_hex_digit(chars[i + 3]) } else { -1 }
       if hi >= 0 && lo >= 0 {
         if for_each_ref_if_output_active(if_state, if_result, if_depth) {
           out.push(((hi * 16 + lo) & 0xFF).to_byte())
@@ -2258,6 +2318,17 @@ async fn for_each_ref_format(
         }
         i += 1
       }
+    } else if chars[i] == '%' &&
+      i + 2 < len &&
+      for_each_ref_hex_digit(chars[i + 1]) >= 0 &&
+      for_each_ref_hex_digit(chars[i + 2]) >= 0 {
+      // %NN two-digit hex escape (e.g. %09 = tab, %0a = newline)
+      let hi = for_each_ref_hex_digit(chars[i + 1])
+      let lo = for_each_ref_hex_digit(chars[i + 2])
+      if for_each_ref_if_output_active(if_state, if_result, if_depth) {
+        out.push(((hi * 16 + lo) & 0xFF).to_byte())
+      }
+      i += 3
     } else if chars[i] == '%' && i + 1 < len && chars[i + 1] == '%' {
       if for_each_ref_if_output_active(if_state, if_result, if_depth) {
         out.push(b'%')
@@ -2371,6 +2442,8 @@ async fn for_each_ref_atom(
   match atom {
     "refname" | "refname:" => refname
     "refname:short" => for_each_ref_short_refname(fs, git_dir, refname)
+    // %(version:refname) and %(v:refname) are sort-only aliases; output the refname as-is
+    "version:refname" | "v:refname" => refname
     _ if atom.has_prefix("refname:lstrip=") || atom.has_prefix("refname:strip=") => {
       let eq_pos = atom.find("=").unwrap()
       let n_str = String::unsafe_substring(
@@ -4175,15 +4248,31 @@ async fn for_each_ref_commit_atom(
     }
     "subject" => subject
     "subject:sanitize" => {
+      // Replace runs of non-filename-safe chars with a single '-', like git does
       let sb = StringBuilder::new()
+      let mut last_was_dash = false
       for c in subject {
-        if c == ' ' {
-          sb.write_char('-')
-        } else {
+        let code = c.to_int()
+        // Safe chars: alphanumerics and a few punctuation chars
+        let safe = (code >= 'a'.to_int() && code <= 'z'.to_int()) ||
+          (code >= 'A'.to_int() && code <= 'Z'.to_int()) ||
+          (code >= '0'.to_int() && code <= '9'.to_int()) ||
+          c == '.' || c == '_'
+        if safe {
           sb.write_char(c)
+          last_was_dash = false
+        } else if !last_was_dash {
+          sb.write_char('-')
+          last_was_dash = true
         }
       }
-      sb.to_string()
+      // Strip trailing dash
+      let s = sb.to_string()
+      if s.has_suffix("-") {
+        String::unsafe_substring(s, start=0, end=s.length() - 1)
+      } else {
+        s
+      }
     }
     _ if atom.has_prefix("subject:") => {
       let arg = String::unsafe_substring(atom, start=8, end=atom.length())
@@ -4374,16 +4463,22 @@ async fn for_each_ref_format_trailers_atom(
     let mut remaining = options_str
     while remaining.length() > 0 {
       let (opt, rest) = for_each_ref_split_trailer_opt(remaining)
-      if opt == "only" || opt == "only=yes" || opt == "only=true" {
-        only = true
+      if opt == "only" ||
+        opt == "only=yes" ||
+        opt == "only=true" ||
+        opt.has_prefix("only=") {
+        only = opt != "only=no" && opt != "only=false"
         only_set = true
-      } else if opt == "only=no" || opt == "only=false" {
-        only = false
-        only_set = true
-      } else if opt == "unfold" {
-        unfold = true
-      } else if opt == "valueonly" {
-        valueonly = true
+      } else if opt == "unfold" ||
+        opt == "unfold=yes" ||
+        opt == "unfold=true" ||
+        opt.has_prefix("unfold=") {
+        unfold = opt != "unfold=no" && opt != "unfold=false"
+      } else if opt == "valueonly" ||
+        opt == "valueonly=yes" ||
+        opt == "valueonly=true" ||
+        opt.has_prefix("valueonly=") {
+        valueonly = opt != "valueonly=no" && opt != "valueonly=false"
       } else if opt.has_prefix("key=") {
         let key_val = String::unsafe_substring(opt, start=4, end=opt.length())
         // Strip trailing colon if present
