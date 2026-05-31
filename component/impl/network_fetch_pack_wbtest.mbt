@@ -3,7 +3,7 @@ test "component impl: fetch_pack_sync returns pack payload through injected tran
   let (adv, lsrefs, fetch) = component_impl_fixture_upload_pack_responses()
 
   let pack = fetch_pack_sync(
-    "git@github.com:user/repo.git",
+    component_impl_fixture_remote_url,
     [@bit.ObjectId::from_hex(component_impl_fixture_commit)],
     true,
     0,

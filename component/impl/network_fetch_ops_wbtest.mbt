@@ -8,7 +8,7 @@ test "component impl: fetch_with_transport materializes fetched state" {
     fs,
     fs,
     "/repo",
-    "git@github.com:user/repo.git",
+    component_impl_fixture_remote_url,
     fn(
       _url : String,
       _headers : Map[String, String],

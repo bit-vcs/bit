@@ -4,7 +4,7 @@ test "component impl: push exchange helpers execute receive-pack flow" {
   let get_calls : Array[String] = []
   let post_calls : Array[String] = []
   let result = net_execute_push_request(
-    "git@github.com:user/repo.git",
+    component_impl_fixture_remote_url,
     "refs/heads/main",
     @bit.ObjectId::from_hex(component_impl_fixture_commit),
     Bytes::from_array([1, 2, 3, 4]),

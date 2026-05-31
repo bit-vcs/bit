@@ -4229,15 +4229,31 @@ async fn for_each_ref_commit_atom(
     }
     "subject" => subject
     "subject:sanitize" => {
+      // Replace runs of non-filename-safe chars with a single '-', like git does
       let sb = StringBuilder::new()
+      let mut last_was_dash = false
       for c in subject {
-        if c == ' ' {
-          sb.write_char('-')
-        } else {
+        let code = c.to_int()
+        // Safe chars: alphanumerics and a few punctuation chars
+        let safe = (code >= 'a'.to_int() && code <= 'z'.to_int()) ||
+          (code >= 'A'.to_int() && code <= 'Z'.to_int()) ||
+          (code >= '0'.to_int() && code <= '9'.to_int()) ||
+          c == '.' || c == '_'
+        if safe {
           sb.write_char(c)
+          last_was_dash = false
+        } else if !last_was_dash {
+          sb.write_char('-')
+          last_was_dash = true
         }
       }
-      sb.to_string()
+      // Strip trailing dash
+      let s = sb.to_string()
+      if s.has_suffix("-") {
+        String::unsafe_substring(s, start=0, end=s.length() - 1)
+      } else {
+        s
+      }
     }
     _ if atom.has_prefix("subject:") => {
       let arg = String::unsafe_substring(atom, start=8, end=atom.length())

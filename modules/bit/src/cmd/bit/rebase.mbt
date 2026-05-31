@@ -559,6 +559,10 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
         force_rebase = false
         i += 1
       }
+      // Backend selection flags: bit has a single backend so these are accepted
+      // and ignored for git compatibility (e.g. GIT_TEST_REBASE_USE_BUILTIN_BACKEND)
+      "--apply" | "--merge" => i += 1
+      _ if arg.has_prefix("--backend=") => i += 1
       "--exec" | "-x" if i + 1 < args.length() => {
         exec_cmds.push(args[i + 1])
         interactive = true // --exec implies -i
@@ -799,6 +803,10 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
     }
     return ()
   }
+  // rebase.backend config (apply/ort): bit has a unified backend, accept and ignore
+  ignore(
+    @bitlib.read_config_value(rfs, git_dir + "/config", "rebase", "backend"),
+  )
   // Also check rebase.autoStash config
   if !autostash {
     match

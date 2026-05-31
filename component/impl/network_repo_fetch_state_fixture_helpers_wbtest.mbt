@@ -16,3 +16,14 @@ fn component_impl_assert_fetch_only_state(
   )
   assert_eq(fs.read_string(root + "/hello.txt"), "hello\n")
 }
+
+///|
+fn component_impl_assert_remote_fetch_target(
+  refname : String,
+  commit_id : @bit.ObjectId,
+  pack : Bytes,
+) -> Unit {
+  assert_eq(refname, component_impl_fixture_default_branch)
+  inspect(commit_id.to_hex(), content=component_impl_fixture_commit)
+  assert_true(pack.length() > 0)
+}
