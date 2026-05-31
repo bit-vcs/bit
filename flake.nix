@@ -72,7 +72,7 @@
         {
           packages = {
             default = bit;
-            inherit bit;
+            inherit bit pkfire pkspec;
           };
 
           apps = {
@@ -83,6 +83,14 @@
             bit = {
               type = "app";
               program = "${bit}/bin/bit";
+            };
+            pkfire = {
+              type = "app";
+              program = "${pkfire}/bin/pkf";
+            };
+            pkspec = {
+              type = "app";
+              program = "${pkspec}/bin/pkspec";
             };
           };
 
