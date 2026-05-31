@@ -559,6 +559,9 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
         force_rebase = false
         i += 1
       }
+      // --stat/--no-stat/--diffstat/--no-diffstat: show diffstat after rebase
+      // bit does not yet show diffstats, accept for compatibility
+      "--stat" | "--diffstat" | "--no-stat" | "--no-diffstat" => i += 1
       // Backend selection flags: bit has a single backend so these are accepted
       // and ignored for git compatibility (e.g. GIT_TEST_REBASE_USE_BUILTIN_BACKEND)
       "--apply" | "--merge" => i += 1
@@ -625,6 +628,13 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
         onto = Some(args[i + 1])
         i += 2
       }
+      // Silently accepted compat flags
+      "--reschedule-failed-exec" | "--no-reschedule-failed-exec" => i += 1
+      "--reset-author-date" | "--ignore-date" | "--committer-date-is-author-date" => i += 1
+      "--signoff" | "--no-signoff" => i += 1
+      "--ignore-whitespace" => i += 1
+      _ if arg.has_prefix("--whitespace=") => i += 1
+      _ if arg.has_prefix("--empty=") => i += 1
       _ if !arg.has_prefix("-") => {
         upstream = Some(arg)
         i += 1
@@ -806,6 +816,10 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
   // rebase.backend config (apply/ort): bit has a unified backend, accept and ignore
   ignore(
     @bitlib.read_config_value(rfs, git_dir + "/config", "rebase", "backend"),
+  )
+  // rebase.stat: bit does not yet show diffstats, accept config for compat
+  ignore(
+    @bitlib.read_config_value(rfs, git_dir + "/config", "rebase", "stat"),
   )
   // Also check rebase.autoStash config
   if !autostash {

@@ -150,8 +150,8 @@ pub fn CommitGraphFile::read_commit(
   let parent2_raw = cgraph_read_u32(self.data, entry + self.hash_size + 4)
   let gen_and_date = cgraph_read_u32(self.data, entry + self.hash_size + 8)
   let date_low = cgraph_read_u32(self.data, entry + self.hash_size + 12)
-  // Timestamp: upper 2 bits from gen_and_date[31:30], lower 32 from date_low
-  let date_hi = (gen_and_date >> 30) & 0x3
+  // Format: bits 31-2 = generation number, bits 1-0 = upper 2 bits of timestamp
+  let date_hi = gen_and_date & 0x3
   let timestamp = (date_hi.to_int64() << 32) |
     date_low.to_int64().land(0xffffffffL)
   // Parents

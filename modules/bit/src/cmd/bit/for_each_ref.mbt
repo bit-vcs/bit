@@ -58,12 +58,31 @@ async fn handle_for_each_ref(args : Array[String]) -> Unit raise Error {
         points_at.push(
           String::unsafe_substring(arg, start=12, end=arg.length()),
         )
+      "--points-at" =>
+        if i + 1 < args.length() {
+          i += 1
+          points_at.push(args[i])
+        }
       _ if arg.has_prefix("--merged=") =>
         merged = Some(String::unsafe_substring(arg, start=9, end=arg.length()))
+      "--merged" =>
+        if i + 1 < args.length() && !args[i + 1].has_prefix("-") {
+          i += 1
+          merged = Some(args[i])
+        } else {
+          merged = Some("HEAD")
+        }
       _ if arg.has_prefix("--no-merged=") =>
         no_merged = Some(
           String::unsafe_substring(arg, start=12, end=arg.length()),
         )
+      "--no-merged" =>
+        if i + 1 < args.length() && !args[i + 1].has_prefix("-") {
+          i += 1
+          no_merged = Some(args[i])
+        } else {
+          no_merged = Some("HEAD")
+        }
       "--shell" | "-s" => {
         if quote_style != "" {
           eprint_line("error: more than one quoting style")
