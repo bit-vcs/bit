@@ -351,6 +351,8 @@ pub struct WorkItem {
   linked_issues : Array[String]
   patch : WorkItemPatch?
   parent_id : String?
+  blocked_by : Array[String]
+  blocking : Array[String]
 }
 
 ///|
@@ -368,6 +370,8 @@ pub fn WorkItem::new(
   linked_issues? : Array[String] = [],
   patch? : WorkItemPatch? = None,
   parent_id? : String? = None,
+  blocked_by? : Array[String] = [],
+  blocking? : Array[String] = [],
 ) -> WorkItem {
   {
     id,
@@ -383,6 +387,8 @@ pub fn WorkItem::new(
     linked_issues,
     patch,
     parent_id,
+    blocked_by,
+    blocking,
   }
 }
 
@@ -450,6 +456,16 @@ pub fn WorkItem::linked_issues(self : WorkItem) -> Array[String] {
 }
 
 ///|
+pub fn WorkItem::blocked_by(self : WorkItem) -> Array[String] {
+  self.blocked_by
+}
+
+///|
+pub fn WorkItem::blocking(self : WorkItem) -> Array[String] {
+  self.blocking
+}
+
+///|
 pub fn WorkItem::patch(self : WorkItem) -> WorkItemPatch? {
   self.patch
 }
@@ -504,6 +520,8 @@ pub fn WorkItem::to_issue(self : WorkItem) -> Issue? {
               linked_prs=self.linked_prs,
               linked_issues=self.linked_issues,
               parent_id=self.parent_id,
+              blocked_by=self.blocked_by,
+              blocking=self.blocking,
             ),
           )
       }
@@ -725,6 +743,8 @@ pub struct Issue {
   linked_prs : Array[String] // Related PRs
   linked_issues : Array[String] // Cross-repo issue references
   parent_id : String?
+  blocked_by : Array[String] // Issues that block this one
+  blocking : Array[String] // Issues this one blocks
 }
 
 ///|
@@ -741,6 +761,8 @@ pub fn Issue::new(
   linked_prs? : Array[String] = [],
   linked_issues? : Array[String] = [],
   parent_id? : String? = None,
+  blocked_by? : Array[String] = [],
+  blocking? : Array[String] = [],
 ) -> Issue {
   {
     id,
@@ -755,6 +777,8 @@ pub fn Issue::new(
     linked_prs,
     linked_issues,
     parent_id,
+    blocked_by,
+    blocking,
   }
 }
 
@@ -814,6 +838,16 @@ pub fn Issue::linked_issues(self : Issue) -> Array[String] {
 }
 
 ///|
+pub fn Issue::blocked_by(self : Issue) -> Array[String] {
+  self.blocked_by
+}
+
+///|
+pub fn Issue::blocking(self : Issue) -> Array[String] {
+  self.blocking
+}
+
+///|
 pub fn Issue::to_work_item(self : Issue) -> WorkItem {
   WorkItem::new(
     self.id,
@@ -828,6 +862,8 @@ pub fn Issue::to_work_item(self : Issue) -> WorkItem {
     linked_prs=self.linked_prs,
     linked_issues=self.linked_issues,
     parent_id=self.parent_id,
+    blocked_by=self.blocked_by,
+    blocking=self.blocking,
   )
 }
 

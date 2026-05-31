@@ -131,7 +131,10 @@ pub fn Hub::update_issue(
     labels=new_labels,
     assignees=new_assignees,
     linked_prs=existing.linked_prs,
+    linked_issues=existing.linked_issues,
     parent_id=existing.parent_id,
+    blocked_by=existing.blocked_by,
+    blocking=existing.blocking,
   )
   ignore(
     self.store.put_record(
@@ -412,6 +415,8 @@ pub fn Hub::link_issue(
     linked_prs=existing.linked_prs,
     linked_issues=linked,
     parent_id=existing.parent_id,
+    blocked_by=existing.blocked_by,
+    blocking=existing.blocking,
   )
   ignore(
     self.store.put_record(
@@ -470,3 +475,98 @@ pub fn Hub::link_pr_to_issue(
 }
 
 ///|
+/// Add a dependency relationship between two issues.
+/// `source_id` is blocked by `target_id`.
+/// Both issues are updated in separate put_record calls.
+pub fn Hub::add_dep(
+  self : Hub,
+  objects : &@lib.ObjectStore,
+  refs : &@lib.RefStore,
+  clock : &@lib.Clock,
+  source_id : String,
+  target_id : String,
+) -> Unit raise @bit.GitError {
+  let source = self.get_issue(objects, source_id)
+  guard source is Some(src) else {
+    raise @bit.GitError::InvalidObject("Issue not found: \{source_id}")
+  }
+  let target = self.get_issue(objects, target_id)
+  guard target is Some(tgt) else {
+    raise @bit.GitError::InvalidObject("Issue not found: \{target_id}")
+  }
+  if !src.blocked_by.contains(target_id) {
+    let new_blocked_by = src.blocked_by.copy()
+    new_blocked_by.push(target_id)
+    let updated_src = Issue::new(
+      src.id, src.title, src.body, src.author,
+      src.created_at, clock.now(), src.state,
+      labels=src.labels, assignees=src.assignees,
+      linked_prs=src.linked_prs, linked_issues=src.linked_issues,
+      parent_id=src.parent_id,
+      blocked_by=new_blocked_by, blocking=src.blocking,
+    )
+    ignore(self.store.put_record(objects, refs, clock,
+      work_item_meta_key(source_id), canonical_work_item_record_kind(),
+      updated_src.to_work_item().serialize(), src.author))
+  }
+  if !tgt.blocking.contains(source_id) {
+    let new_blocking = tgt.blocking.copy()
+    new_blocking.push(source_id)
+    let updated_tgt = Issue::new(
+      tgt.id, tgt.title, tgt.body, tgt.author,
+      tgt.created_at, clock.now(), tgt.state,
+      labels=tgt.labels, assignees=tgt.assignees,
+      linked_prs=tgt.linked_prs, linked_issues=tgt.linked_issues,
+      parent_id=tgt.parent_id,
+      blocked_by=tgt.blocked_by, blocking=new_blocking,
+    )
+    ignore(self.store.put_record(objects, refs, clock,
+      work_item_meta_key(target_id), canonical_work_item_record_kind(),
+      updated_tgt.to_work_item().serialize(), tgt.author))
+  }
+}
+
+///|
+/// Remove a dependency relationship between two issues.
+/// `source_id` is no longer blocked by `target_id`.
+pub fn Hub::remove_dep(
+  self : Hub,
+  objects : &@lib.ObjectStore,
+  refs : &@lib.RefStore,
+  clock : &@lib.Clock,
+  source_id : String,
+  target_id : String,
+) -> Unit raise @bit.GitError {
+  let source = self.get_issue(objects, source_id)
+  guard source is Some(src) else {
+    raise @bit.GitError::InvalidObject("Issue not found: \{source_id}")
+  }
+  let target = self.get_issue(objects, target_id)
+  guard target is Some(tgt) else {
+    raise @bit.GitError::InvalidObject("Issue not found: \{target_id}")
+  }
+  let new_blocked_by = src.blocked_by.filter(fn(id) { id != target_id })
+  let updated_src = Issue::new(
+    src.id, src.title, src.body, src.author,
+    src.created_at, clock.now(), src.state,
+    labels=src.labels, assignees=src.assignees,
+    linked_prs=src.linked_prs, linked_issues=src.linked_issues,
+    parent_id=src.parent_id,
+    blocked_by=new_blocked_by, blocking=src.blocking,
+  )
+  ignore(self.store.put_record(objects, refs, clock,
+    work_item_meta_key(source_id), canonical_work_item_record_kind(),
+    updated_src.to_work_item().serialize(), src.author))
+  let new_blocking = tgt.blocking.filter(fn(id) { id != source_id })
+  let updated_tgt = Issue::new(
+    tgt.id, tgt.title, tgt.body, tgt.author,
+    tgt.created_at, clock.now(), tgt.state,
+    labels=tgt.labels, assignees=tgt.assignees,
+    linked_prs=tgt.linked_prs, linked_issues=tgt.linked_issues,
+    parent_id=tgt.parent_id,
+    blocked_by=tgt.blocked_by, blocking=new_blocking,
+  )
+  ignore(self.store.put_record(objects, refs, clock,
+    work_item_meta_key(target_id), canonical_work_item_record_kind(),
+    updated_tgt.to_work_item().serialize(), tgt.author))
+}

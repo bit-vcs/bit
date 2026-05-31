@@ -63,7 +63,7 @@ fn rebase_signing_override(args : Array[String]) -> Bool? {
 ///|
 fn rebase_uses_rebase_merges_mode(args : Array[String]) -> Bool {
   for arg in args {
-    if arg == "--rebase-merges" || arg.has_prefix("--rebase-merges=") {
+    if arg == "--rebase-merges" || arg == "--preserve-merges" || arg.has_prefix("--rebase-merges=") {
       return true
     }
   }
@@ -584,7 +584,7 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
         root_mode = true
         i += 1
       }
-      "--rebase-merges" => {
+      "--rebase-merges" | "--preserve-merges" => {
         rebase_merges = true
         interactive = true // --rebase-merges implies -i
         i += 1

@@ -218,6 +218,16 @@ pub fn WorkItem::serialize(self : WorkItem) -> String {
     }
     None => ()
   }
+  for id in self.blocked_by {
+    sb.write_string("blocked-by ")
+    sb.write_string(id)
+    sb.write_char('\n')
+  }
+  for id in self.blocking {
+    sb.write_string("blocking ")
+    sb.write_string(id)
+    sb.write_char('\n')
+  }
   match self.patch {
     None => ()
     Some(patch) => {
@@ -291,6 +301,8 @@ pub fn parse_work_item(text : String) -> WorkItem raise PrError {
   let closes_issues : Array[String] = []
   let mut merge_commit : @bit.ObjectId? = None
   let mut parent_id : String? = None
+  let blocked_by : Array[String] = []
+  let blocking : Array[String] = []
   let body_lines : Array[String] = []
   let mut in_body = false
   for line_view in text.split("\n") {
@@ -325,6 +337,8 @@ pub fn parse_work_item(text : String) -> WorkItem raise PrError {
           "linked-pr" => linked_prs.push(value)
           "linked-issue" => linked_issues.push(value)
           "parent" => parent_id = Some(value)
+          "blocked-by" => blocked_by.push(value)
+          "blocking" => blocking.push(value)
           "source" => source_branch = Some(value)
           "source-repo" => source_repo = Some(value)
           "source-ref" => source_ref = Some(value)
@@ -385,6 +399,8 @@ pub fn parse_work_item(text : String) -> WorkItem raise PrError {
     linked_issues~,
     patch~,
     parent_id~,
+    blocked_by~,
+    blocking~,
   )
 }
 
@@ -698,6 +714,16 @@ pub fn Issue::serialize(self : Issue) -> String {
     }
     None => ()
   }
+  for id in self.blocked_by {
+    sb.write_string("blocked-by ")
+    sb.write_string(id)
+    sb.write_char('\n')
+  }
+  for id in self.blocking {
+    sb.write_string("blocking ")
+    sb.write_string(id)
+    sb.write_char('\n')
+  }
   sb.write_char('\n')
   sb.write_string(self.body)
   sb.to_string()
@@ -717,6 +743,8 @@ pub fn parse_legacy_issue(text : String) -> Issue raise PrError {
   let linked_prs : Array[String] = []
   let linked_issues : Array[String] = []
   let mut parent_id : String? = None
+  let blocked_by : Array[String] = []
+  let blocking : Array[String] = []
   let body_lines : Array[String] = []
   let mut in_body = false
   for line_view in text.split("\n") {
@@ -751,6 +779,8 @@ pub fn parse_legacy_issue(text : String) -> Issue raise PrError {
           "linked-pr" => linked_prs.push(value)
           "linked-issue" => linked_issues.push(value)
           "parent" => parent_id = Some(value)
+          "blocked-by" => blocked_by.push(value)
+          "blocking" => blocking.push(value)
           _ => ()
         }
       }
@@ -772,6 +802,8 @@ pub fn parse_legacy_issue(text : String) -> Issue raise PrError {
     linked_prs~,
     linked_issues~,
     parent_id~,
+    blocked_by~,
+    blocking~,
   )
 }
 
