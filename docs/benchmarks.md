@@ -184,6 +184,61 @@ moon bench -p mizchi/bit/pack --target native -f bench_test.mbt --release
 
 ## Targeted fixes after profiling
 
+### `sha1_compute` padding off-by-one (native one-shot path)
+
+A regression introduced by commit `c25986d` routed `sha1_raw` through
+`Sha1State` (one C FFI call per 64-byte block) instead of the one-shot
+`sha1_compute` C entry, because the latter was suspected of giving
+wrong results for `Bytes::from_iter` inputs. The real cause was a
+padding off-by-one in `sha1_compute`: the condition `if (remainder <
+55)` rejected the boundary case `remainder == 55`, where `0x80` plus
+the 8-byte big-endian length still fit in one 64-byte block. The
+mis-padded second block produced a different digest than `Sha1State`'s
+correct one-block path, so HubStore writes and reads computed
+inconsistent hashes. Fixed by changing the condition to `< 56` and
+restoring `sha1_raw` to the one-shot FFI; added a sweep test that
+walks both padding cliffs.
+
+`moon bench -p mizchi/bit_hash --target native --release` on a non-
+SHA-NI CPU (scalar fallback):
+
+| Benchmark         | Sha1State (regressed) | One-shot (fixed) | Δ      |
+| ----------------- | --------------------- | ---------------- | ------ |
+| sha1_raw 64 bytes |   1.18 µs             |   842 ns         | −29%   |
+| sha1_raw 1 KiB    |   9.46 µs             |  6.72 µs         | −29%   |
+| sha1_raw 8 KiB    |  69.51 µs             | 50.65 µs         | −27%   |
+| sha1_raw 64 KiB   | 546.63 µs             | 403.00 µs        | −26%   |
+
+(The pre-`c25986d` numbers in the table at the top of this document
+were taken on a SHA-NI-capable host and remain the ceiling; on this
+non-SHA-NI VM we cap out at the C scalar throughput. The win above
+comes from collapsing 16-1024 FFI hops into one, not from SHA-NI.)
+
+### Profiling target: `mizchi/simd::simdhash` rotates (wasm-gc)
+
+The existing `modules/bit_hash/bench/cmd/sha_hash/main.mbt` was wired
+for `moon-pprof`. Built with `-g` for source-mapped symbols and
+profiled via `moon-pprof profile … --out` + `summary`:
+
+```
+Top user functions by self time (mem-mgmt frames hidden)
+    1825.83 ms   29.7%  mizchi::simd::src::simdhash::rotr
+    1440.03 ms   23.4%  mizchi::simd::src::simdhash::sha256__compress
+    1012.83 ms   16.5%  mizchi::simd::src::simdhash::sha1__scalar
+     963.74 ms   15.7%  mizchi::simd::src::simdhash::rotl
+     565.27 ms    9.2%  mizchi::simd::src::simdhash::pad__message
+```
+
+`rotr` + `rotl` together account for 45.4% of self time on the
+wasm-gc target. They're defined as plain expressions (`(x >> n) | (x
+<< (32 - n))`) without `#inline`, so each round-constant invocation
+inside the SHA loops eats a real call. Marking them `#inline` in
+`mizchi/simd` would benefit every wasm-gc / js consumer of
+`@simdhash.sha1` / `sha256`; filed upstream-side, not patched here
+because `mizchi/simd` is an external dependency.
+
+
+
 ### `refs.list_refs_with_ids` loose subtree pruning
 
 `collect_loose_ref_ids` used to recurse into every subdir under
