@@ -875,8 +875,19 @@ async fn for_each_ref_validate_atom(atom : String) -> Unit {
         opt == "only=true" ||
         opt == "only=no" ||
         opt == "only=false" ||
+        opt.has_prefix("only=") ||
         opt == "unfold" ||
+        opt == "unfold=yes" ||
+        opt == "unfold=true" ||
+        opt == "unfold=no" ||
+        opt == "unfold=false" ||
+        opt.has_prefix("unfold=") ||
         opt == "valueonly" ||
+        opt == "valueonly=yes" ||
+        opt == "valueonly=true" ||
+        opt == "valueonly=no" ||
+        opt == "valueonly=false" ||
+        opt.has_prefix("valueonly=") ||
         opt.has_prefix("key=") ||
         opt.has_prefix("separator=") ||
         opt.has_prefix("key_value_separator=") {
@@ -1155,6 +1166,8 @@ fn for_each_ref_is_known_atom(atom : String) -> Bool {
     | "is-base"
     | "ahead-behind"
     | "worktreepath"
+    | "version"
+    | "v"
     | "*objectname"
     | "*objecttype"
     | "*objectsize"
@@ -2371,6 +2384,8 @@ async fn for_each_ref_atom(
   match atom {
     "refname" | "refname:" => refname
     "refname:short" => for_each_ref_short_refname(fs, git_dir, refname)
+    // %(version:refname) and %(v:refname) are sort-only aliases; output the refname as-is
+    "version:refname" | "v:refname" => refname
     _ if atom.has_prefix("refname:lstrip=") || atom.has_prefix("refname:strip=") => {
       let eq_pos = atom.find("=").unwrap()
       let n_str = String::unsafe_substring(
@@ -4374,16 +4389,22 @@ async fn for_each_ref_format_trailers_atom(
     let mut remaining = options_str
     while remaining.length() > 0 {
       let (opt, rest) = for_each_ref_split_trailer_opt(remaining)
-      if opt == "only" || opt == "only=yes" || opt == "only=true" {
-        only = true
+      if opt == "only" ||
+        opt == "only=yes" ||
+        opt == "only=true" ||
+        opt.has_prefix("only=") {
+        only = opt != "only=no" && opt != "only=false"
         only_set = true
-      } else if opt == "only=no" || opt == "only=false" {
-        only = false
-        only_set = true
-      } else if opt == "unfold" {
-        unfold = true
-      } else if opt == "valueonly" {
-        valueonly = true
+      } else if opt == "unfold" ||
+        opt == "unfold=yes" ||
+        opt == "unfold=true" ||
+        opt.has_prefix("unfold=") {
+        unfold = opt != "unfold=no" && opt != "unfold=false"
+      } else if opt == "valueonly" ||
+        opt == "valueonly=yes" ||
+        opt == "valueonly=true" ||
+        opt.has_prefix("valueonly=") {
+        valueonly = opt != "valueonly=no" && opt != "valueonly=false"
       } else if opt.has_prefix("key=") {
         let key_val = String::unsafe_substring(opt, start=4, end=opt.length())
         // Strip trailing colon if present
