@@ -385,6 +385,9 @@ fn show_command_help_specs() -> Array[(String, String, String)] {
       "multi-pack-index", "git multi-pack-index [<options>] <subcommand>", "Write and verify multi-pack-indexes.",
     ),
     (
+      "commit-graph", "git commit-graph [write | verify] [<options>]", "Write and verify Git commit-graph files.",
+    ),
+    (
       "cherry", "git cherry [<options>] <upstream> [<head>]", "Find commits yet to be applied to upstream.",
     ),
     (
@@ -1349,6 +1352,7 @@ async fn dispatch_known_command(
     "send-pack" => handle_send_pack(rest)
     "range-diff" => handle_range_diff(rest)
     "multi-pack-index" => handle_multi_pack_index(rest)
+    "commit-graph" => handle_commit_graph(rest)
     "cherry" => handle_cherry(rest)
     "completion" => handle_completion(rest)
     "x/hooks" => handle_x_hooks(rest)
