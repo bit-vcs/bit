@@ -321,12 +321,12 @@ void sha1_compute(const uint8_t* data, int32_t len, uint8_t* out) {
   pad[remainder] = 0x80;
 
   int32_t pad_len;
-  if (remainder < 55) {
-    /* One padding block. */
+  if (remainder < 56) {
+    /* One padding block: 0x80 at pad[remainder], length at pad[56..63]. */
     memset(pad + remainder + 1, 0, (size_t)(55 - remainder));
     pad_len = 64;
   } else {
-    /* Two padding blocks. */
+    /* Two padding blocks: 0x80 collides with length in this block. */
     memset(pad + remainder + 1, 0, (size_t)(119 - remainder));
     pad_len = 128;
   }

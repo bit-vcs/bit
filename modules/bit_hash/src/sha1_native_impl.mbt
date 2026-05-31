@@ -7,13 +7,14 @@ fn Sha1State::process_block(self : Sha1State) -> Unit {
 
 ///|
 pub fn sha1_bytes(data : Bytes) -> Bytes {
-  let raw = sha1_raw(data)
-  Bytes::makei(20, fn(i) { raw[i] })
+  let out : FixedArray[Byte] = FixedArray::make(20, b'\x00')
+  sha1_compute_ffi(data, data.length(), out)
+  Bytes::makei(20, fn(i) { out[i] })
 }
 
 ///|
 pub fn sha1_raw(data : Bytes) -> FixedArray[Byte] {
-  let state = Sha1State::new()
-  state.update(data)
-  state.finish_raw()
+  let out : FixedArray[Byte] = FixedArray::make(20, b'\x00')
+  sha1_compute_ffi(data, data.length(), out)
+  out
 }

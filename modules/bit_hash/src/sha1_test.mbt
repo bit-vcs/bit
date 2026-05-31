@@ -43,6 +43,30 @@ test "Sha1State: large input matches sha1_raw" {
 }
 
 ///|
+test "sha1_raw: one-shot matches Sha1State across padding boundaries" {
+  // Regression guard for a padding off-by-one in `sha1_compute` that
+  // disagreed with `Sha1State` exactly at `remainder == 55` — the
+  // tight case where 0x80 plus the 8-byte length still fit in one
+  // 64-byte block. Sweep both the 56-byte and 120-byte padding
+  // cliffs.
+  for len in [
+    0, 1, 31, 32, 33, 54, 55, 56, 57, 63, 64, 65, 100, 118, 119, 120, 121, 127,
+    128, 129, 200, 256, 511, 512, 513, 1024, 4096,
+  ] {
+    let data : Array[Byte] = []
+    for i in 0..<len {
+      data.push(((i * 31 + 7) % 251).to_byte())
+    }
+    let input = Bytes::from_array(data)
+    let one_shot = sha1_raw(input) |> raw_to_hex
+    let state = Sha1State::new()
+    state.update(input)
+    let incremental = state.finish_raw() |> raw_to_hex
+    inspect(one_shot == incremental, content="true")
+  }
+}
+
+///|
 test "sha1_raw: 35-byte input" {
   // printf "blob 29 hub/proposal/pr/abc12345/meta" | sha1sum
   let key = "hub/proposal/pr/abc12345/meta"
