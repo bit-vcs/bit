@@ -118,6 +118,12 @@ local syncNpmBitCjs: Task = new {
   outputs { "npm/bit.cjs" }
 }
 
+local buildNpm: Task = new {
+  name = "build-npm"
+  description = "Build the JS lib + CLI and stage them into npm/ for publish"
+  deps { syncNpmLibRaw; syncNpmBitCjs }
+}
+
 local bundleJsLibMinimal: Task = new {
   name = "bundle-js-lib-minimal"
   description = "Tree-shake the minimal lib consumer (bun build)"
@@ -594,6 +600,24 @@ local releaseCheck: Task = new {
   deps { fmt; info; check; test; verifyJsLibTreeshake; e2e }
 }
 
+local releaseNpm: Task = new {
+  name = "release-npm"
+  description = "Build, validate, and `npm publish` the @mizchi/bit JS package"
+  cmd = #"""
+    cd npm && npm publish
+    """#
+  deps { buildNpm; testJsBuild }
+}
+
+local releaseNpmDryRun: Task = new {
+  name = "release-npm-dry-run"
+  description = "Same as release-npm but invokes `npm publish --dry-run`"
+  cmd = #"""
+    cd npm && npm publish --dry-run
+    """#
+  deps { buildNpm; testJsBuild }
+}
+
 // -- default ------------------------------------------------------------
 
 local default: Task = new {
@@ -618,6 +642,7 @@ tasks {
   buildJsCli
   syncNpmLibRaw
   syncNpmBitCjs
+  buildNpm
   bundleJsLibMinimal
   bundleJsLibGitOps
 
@@ -686,4 +711,6 @@ tasks {
   playgroundDev
 
   releaseCheck
+  releaseNpm
+  releaseNpmDryRun
 }

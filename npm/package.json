@@ -7,7 +7,7 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/bit-vcs/bit"
+    "url": "git+https://github.com/bit-vcs/bit.git"
   },
   "exports": {
     ".": {
@@ -17,6 +17,9 @@
     "./bit.js": "./bit.js",
     "./bit.cjs": "./bit.cjs",
     "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "bin": {
     "bit": "bin/bit.mjs"
