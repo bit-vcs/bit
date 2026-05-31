@@ -745,11 +745,11 @@ async fn for_each_ref_validate_if_then_else(format : String) -> Unit {
     } else if atom == "then" {
       if stack.length() == 0 || stack[stack.length() - 1] != "if" {
         if stack.length() > 0 && stack[stack.length() - 1] == "if-then" {
-          eprint_line("fatal: format: %%(then) atom used more than once")
+          eprint_line("fatal: format: %(then) atom used more than once")
         } else if stack.length() > 0 && stack[stack.length() - 1] == "if-else" {
-          eprint_line("fatal: format: %%(then) atom used after %%(else)")
+          eprint_line("fatal: format: %(then) atom used after %(else)")
         } else {
-          eprint_line("fatal: format: %%(then) atom used without a %%(if) atom")
+          eprint_line("fatal: format: %(then) atom used without a %(if) atom")
         }
         @sys.exit(1)
       }
@@ -757,9 +757,9 @@ async fn for_each_ref_validate_if_then_else(format : String) -> Unit {
     } else if atom == "else" {
       if stack.length() == 0 || stack[stack.length() - 1] != "if-then" {
         if stack.length() > 0 && stack[stack.length() - 1] == "if-else" {
-          eprint_line("fatal: format: %%(else) atom used more than once")
+          eprint_line("fatal: format: %(else) atom used more than once")
         } else {
-          eprint_line("fatal: format: %%(else) atom used without a %%(if) atom")
+          eprint_line("fatal: format: %(else) atom used without a %(if) atom")
         }
         @sys.exit(1)
       }
@@ -767,14 +767,14 @@ async fn for_each_ref_validate_if_then_else(format : String) -> Unit {
     } else if atom == "end" {
       if stack.length() == 0 {
         eprint_line(
-          "fatal: format: %%(end) atom used without corresponding %%(if)/%(align) atom",
+          "fatal: format: %(end) atom used without corresponding atom",
         )
         @sys.exit(1)
       }
       let top = stack[stack.length() - 1]
       if top == "if" {
         // %(if) without %(then) before %(end)
-        eprint_line("fatal: format: %%(if) atom used without a %%(then) atom")
+        eprint_line("fatal: format: %(if) atom used without a %(then) atom")
         @sys.exit(1)
       }
       ignore(stack.pop())
@@ -783,13 +783,13 @@ async fn for_each_ref_validate_if_then_else(format : String) -> Unit {
   if stack.length() > 0 {
     let top = stack[stack.length() - 1]
     if top == "if" {
-      eprint_line("fatal: format: %%(if) atom used without a %%(then) atom")
+      eprint_line("fatal: format: %(if) atom used without a %(then) atom")
     } else if top == "if-then" || top == "if-else" {
       eprint_line(
-        "fatal: format: expected %%(end) atom after %%(then) or %%(else)",
+        "fatal: format: expected %(end) atom after %(then) or %(else)",
       )
     } else {
-      eprint_line("fatal: format: expected %%(end) atom")
+      eprint_line("fatal: format: expected %(end) atom")
     }
     @sys.exit(1)
   }
@@ -973,6 +973,58 @@ async fn for_each_ref_validate_atom(atom : String) -> Unit {
     eprint_line("fatal: %(HEAD) does not take arguments")
     @sys.exit(1)
   }
+  // Validate atoms that do not take arguments
+  if atom.has_prefix("objecttype:") {
+    eprint_line("fatal: %(objecttype) does not take arguments")
+    @sys.exit(1)
+  }
+  if atom.has_prefix("deltabase:") {
+    eprint_line("fatal: %(deltabase) does not take arguments")
+    @sys.exit(1)
+  }
+  // Validate objectsize arguments
+  if atom.has_prefix("objectsize:") {
+    let arg = String::unsafe_substring(atom, start=11, end=atom.length())
+    if arg != "disk" {
+      eprint_line("fatal: unrecognized %(objectsize) argument: " + arg)
+      @sys.exit(1)
+    }
+  }
+  // Validate upstream/push arguments
+  if atom.has_prefix("upstream:") {
+    let arg = String::unsafe_substring(atom, start=9, end=atom.length())
+    match arg {
+      "short" | "track" | "trackshort" | "remotename" | "remoteref" => ()
+      _ => {
+        eprint_line("fatal: unrecognized %(upstream) argument: " + arg)
+        @sys.exit(1)
+      }
+    }
+  }
+  if atom.has_prefix("push:") {
+    let arg = String::unsafe_substring(atom, start=5, end=atom.length())
+    match arg {
+      "short" | "track" | "trackshort" | "remotename" | "remoteref" => ()
+      _ => {
+        eprint_line("fatal: unrecognized %(push) argument: " + arg)
+        @sys.exit(1)
+      }
+    }
+  }
+  // Validate symref arguments
+  if atom.has_prefix("symref:") {
+    let arg = String::unsafe_substring(atom, start=7, end=atom.length())
+    match arg {
+      "short" => ()
+      _ if arg.has_prefix("lstrip=") ||
+        arg.has_prefix("strip=") ||
+        arg.has_prefix("rstrip=") => ()
+      _ => {
+        eprint_line("fatal: unrecognized %(symref) argument: " + arg)
+        @sys.exit(1)
+      }
+    }
+  }
   // Validate subject
   if atom.has_prefix("subject:") && atom != "subject:sanitize" {
     let arg = String::unsafe_substring(atom, start=8, end=atom.length())
@@ -1075,7 +1127,7 @@ async fn for_each_ref_validate_atom(atom : String) -> Unit {
   }
   // Validate unknown atom names (must be last check)
   if !for_each_ref_is_known_atom(atom) {
-    eprint_line("fatal: unknown field name '" + atom + "'")
+    eprint_line("fatal: unknown field name: " + atom)
     @sys.exit(1)
   }
 }
@@ -1977,7 +2029,13 @@ async fn for_each_ref_format(
             end=atom.length(),
           )
           let parsed = for_each_ref_parse_align_args(align_args)
-          align_stack.push((out.length(), parsed.0, parsed.1))
+          // Only record position in output buffer if we're actually outputting.
+          // In a suppressed if-branch we still push "align" to scope_stack so
+          // the matching %(end) is consumed correctly, but we must not push to
+          // align_stack or the %(end) handler will emit spurious padding.
+          if for_each_ref_if_output_active(if_state, if_result, if_depth) {
+            align_stack.push((out.length(), parsed.0, parsed.1))
+          }
           scope_stack.push("align")
           i = end_pos + 1
           continue
