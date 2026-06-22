@@ -1122,6 +1122,10 @@ async fn commit_with_merge_heads(
     head_parent,
     if head_parent is None {
       "commit (initial): " + commit_subject_line(message)
+    } else if merge_heads.length() > 0 {
+      // A commit recording MERGE_HEAD parents is a merge; git tags its reflog
+      // entry with the "(merge)" qualifier.
+      "commit (merge): " + commit_subject_line(message)
     } else {
       "commit: " + commit_subject_line(message)
     },

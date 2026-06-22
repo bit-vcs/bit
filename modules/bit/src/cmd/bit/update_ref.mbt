@@ -380,7 +380,7 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
     let should_head_log = should_update_head_reflog(
       input_refname, refname, no_deref, head_target,
     )
-    let msg = message.unwrap_or("update-ref: delete")
+    let msg = message.unwrap_or("")
     if should_log || @bitrepo.reflog_exists(rfs, actual_git_dir, refname) {
       @bitrepo.append_reflog(
         wfs,
@@ -502,7 +502,7 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
     should_head_log ||
     @bitrepo.reflog_exists(rfs, actual_git_dir, refname) {
     let old_id = current_id.unwrap_or(@bitcore.ObjectId::zero())
-    let msg = message.unwrap_or("update-ref: updating")
+    let msg = message.unwrap_or("")
     if should_log ||
       always ||
       create_reflog ||
@@ -844,7 +844,9 @@ async fn update_ref_unquote_arg(token : String) -> String {
       result = result + decoded
       i = i + 2
     } else {
-      result = result + c.to_string()
+      // `token[i]` is a UInt16 code unit; render it as the character it
+      // represents rather than its numeric value.
+      result = result + Int::unsafe_to_char(c.to_int()).to_string()
       i = i + 1
     }
   }

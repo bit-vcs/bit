@@ -1727,7 +1727,64 @@ fn cat_file_rev_parse_with_compat(
   if reflog_zero is Some(_) {
     return reflog_zero
   }
+  // Resolve reflog date selectors such as `main@{2005-05-26 23:30}` so that
+  // `cat-file <rev>:<path>` accepts them (git resolves the rev part the same
+  // way `rev-parse` does).
+  let reflog_date = cat_file_rev_parse_reflog_date(fs, git_dir, spec)
+  if reflog_date is Some(_) {
+    return reflog_date
+  }
   cat_file_rev_parse_commit_message_search_with_compat(fs, git_dir, spec)
+}
+
+///|
+/// Resolve a reflog date selector (`<ref>@{<date>}`) to an object id without
+/// emitting the diagnostic warnings that the interactive `rev-parse` path does
+/// (cat-file only needs the resolved value).
+fn cat_file_rev_parse_reflog_date(
+  fs : OsFs,
+  git_dir : String,
+  spec : String,
+) -> @bitcore.ObjectId? raise Error {
+  guard @bitlib.parse_reflog_date_selector(spec) is Some((raw_ref, date_str)) else {
+    return None
+  }
+  let mut refname = raw_ref
+  if refname.length() == 0 {
+    match @bitlib.read_head_ref(fs, git_dir) {
+      @bitlib.HeadRef::Branch(name) => refname = "refs/heads/" + name
+      @bitlib.HeadRef::Detached(_) => refname = "HEAD"
+    }
+  }
+  guard parse_reflog_date(date_str) is Some(at_time) else { return None }
+  let entries = @bitrepo.read_reflog(fs, git_dir, refname)
+  let len = entries.length()
+  if len == 0 {
+    return None
+  }
+  let mut prev_ooid : @bitcore.ObjectId? = None
+  for i = len - 1; i >= 0; i = i - 1 {
+    let entry = entries[i]
+    if entry.timestamp <= at_time {
+      match prev_ooid {
+        Some(_) => return Some(entry.new_id)
+        None =>
+          if entry.timestamp == at_time {
+            return Some(entry.new_id)
+          } else {
+            return @bitrepo.rev_parse(fs, git_dir, refname)
+          }
+      }
+    }
+    prev_ooid = Some(entry.old_id)
+  }
+  // Requested time precedes the whole log: report the oldest known state.
+  let oldest = entries[0]
+  if oldest.old_id == @bitcore.ObjectId::zero() {
+    Some(oldest.new_id)
+  } else {
+    Some(oldest.old_id)
+  }
 }
 
 ///|
