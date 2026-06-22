@@ -1009,24 +1009,40 @@ async fn for_each_ref_validate_atom(atom : String) -> Unit {
       @sys.exit(1)
     }
   }
-  // Validate upstream/push arguments
+  // Validate upstream/push arguments. The argument may be a comma-separated
+  // list of tokens (e.g. "track,nobracket"); each token is a simple option or
+  // a ref-stripping modifier (lstrip=/strip=/rstrip=), mirroring git.
   if atom.has_prefix("upstream:") {
     let arg = String::unsafe_substring(atom, start=9, end=atom.length())
-    match arg {
-      "short" | "track" | "trackshort" | "remotename" | "remoteref" => ()
-      _ => {
-        eprint_line("fatal: unrecognized %(upstream) argument: " + arg)
-        @sys.exit(1)
+    for tok_view in arg.split(",") {
+      let tok = tok_view.to_owned()
+      match tok {
+        "short" | "track" | "trackshort" | "nobracket" | "remotename"
+        | "remoteref" => ()
+        _ if tok.has_prefix("lstrip=") ||
+          tok.has_prefix("strip=") ||
+          tok.has_prefix("rstrip=") => ()
+        _ => {
+          eprint_line("fatal: unrecognized %(upstream) argument: " + arg)
+          @sys.exit(1)
+        }
       }
     }
   }
   if atom.has_prefix("push:") {
     let arg = String::unsafe_substring(atom, start=5, end=atom.length())
-    match arg {
-      "short" | "track" | "trackshort" | "remotename" | "remoteref" => ()
-      _ => {
-        eprint_line("fatal: unrecognized %(push) argument: " + arg)
-        @sys.exit(1)
+    for tok_view in arg.split(",") {
+      let tok = tok_view.to_owned()
+      match tok {
+        "short" | "track" | "trackshort" | "nobracket" | "remotename"
+        | "remoteref" => ()
+        _ if tok.has_prefix("lstrip=") ||
+          tok.has_prefix("strip=") ||
+          tok.has_prefix("rstrip=") => ()
+        _ => {
+          eprint_line("fatal: unrecognized %(push) argument: " + arg)
+          @sys.exit(1)
+        }
       }
     }
   }
@@ -4081,6 +4097,17 @@ async fn for_each_ref_commit_atom(
   } else {
     ""
   }
+  // Message with the signature block removed (lines before sig_start). Trailer
+  // parsing must ignore the signature, matching git which strips it first.
+  let no_sig_parts : Array[String] = []
+  for i = 0; i < sig_start; i = i + 1 {
+    no_sig_parts.push(message_lines[i])
+  }
+  let message_no_sig = if no_sig_parts.length() > 0 {
+    no_sig_parts.join("\n")
+  } else {
+    ""
+  }
   // Determine which ident to use for creator* atoms
   let creator = if tagger.length() > 0 {
     tagger
@@ -4328,17 +4355,17 @@ async fn for_each_ref_commit_atom(
         lines.join("\n")
       }
     }
-    "trailers" => for_each_ref_format_trailers_atom(atom, raw_message)
+    "trailers" => for_each_ref_format_trailers_atom(atom, message_no_sig)
     _ if atom.has_prefix("trailers:") =>
-      for_each_ref_format_trailers_atom(atom, raw_message)
+      for_each_ref_format_trailers_atom(atom, message_no_sig)
     "contents:trailers" => {
       let trailer_atom = "trailers"
-      for_each_ref_format_trailers_atom(trailer_atom, raw_message)
+      for_each_ref_format_trailers_atom(trailer_atom, message_no_sig)
     }
     _ if atom.has_prefix("contents:trailers:") => {
       let trailer_atom = "trailers" +
         String::unsafe_substring(atom, start=17, end=atom.length())
-      for_each_ref_format_trailers_atom(trailer_atom, raw_message)
+      for_each_ref_format_trailers_atom(trailer_atom, message_no_sig)
     }
     _ if atom.has_prefix("contents:") => {
       let arg = String::unsafe_substring(atom, start=9, end=atom.length())
