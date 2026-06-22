@@ -9,7 +9,7 @@
     "mizchi/bit_protocol": "0.42.2",
     "mizchi/tempfile": "0.1.0",
     "mizchi/zlib": "0.4.5",
-    "moonbitlang/async": "0.16.6",
+    "moonbitlang/async": "0.19.4",
     "moonbitlang/x": "0.4.40"
   },
   "repository": "https://github.com/mizchi/bit-vcs",

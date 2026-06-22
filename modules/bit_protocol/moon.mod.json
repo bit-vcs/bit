@@ -8,7 +8,7 @@
     "mizchi/bit_repo": "0.42.2",
     "mizchi/bit_types": "0.42.2",
     "mizchi/bit_pack": "0.42.2",
-    "moonbitlang/async": "0.16.6"
+    "moonbitlang/async": "0.19.4"
   },
   "repository": "https://github.com/mizchi/bit-vcs",
   "license": "Apache-2.0",
