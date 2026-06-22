@@ -438,7 +438,11 @@ fn normalize_update_ref_name(
   let normalized = @bitlib.normalize_repo_path(refname) catch {
     _ => raise @bitcore.GitError::InvalidObject("invalid refname: " + refname)
   }
-  if normalized == "HEAD" || normalized.has_prefix("refs/") {
+  // Accept HEAD, refs/..., and one-component root/pseudo refs such as
+  // ORIG_HEAD or CHERRY_PICK_HEAD (git allows updating these directly).
+  if normalized == "HEAD" ||
+    normalized.has_prefix("refs/") ||
+    for_each_ref_is_root_ref_syntax(normalized) {
     normalized
   } else {
     raise @bitcore.GitError::InvalidObject("invalid refname: " + refname)

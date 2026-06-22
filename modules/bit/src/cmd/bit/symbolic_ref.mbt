@@ -80,7 +80,11 @@ fn symbolic_ref_normalize_refname(
   let normalized = @bitlib.normalize_repo_path(name) catch {
     _ => raise @bitcore.GitError::InvalidObject("invalid refname: " + name)
   }
-  if normalized == "HEAD" || normalized.has_prefix("refs/") {
+  // Accept HEAD, refs/..., and one-component root refs such as DANGLING_HEAD
+  // (git allows symbolic-ref on these).
+  if normalized == "HEAD" ||
+    normalized.has_prefix("refs/") ||
+    for_each_ref_is_root_ref_syntax(normalized) {
     normalized
   } else {
     raise @bitcore.GitError::InvalidObject("invalid refname: " + name)
