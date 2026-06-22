@@ -94,6 +94,7 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
   let mut create_reflog = false
   let mut no_deref = false
   let mut stdin_mode = false
+  let mut z_mode = false
   let mut message : String? = None
   let positional : Array[String] = []
   let mut i = 0
@@ -104,6 +105,7 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
       "--create-reflog" => create_reflog = true
       "--no-deref" => no_deref = true
       "--stdin" => stdin_mode = true
+      "-z" => z_mode = true
       "-m" if i + 1 < args.length() => {
         message = Some(args[i + 1])
         i += 1
@@ -113,6 +115,11 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
       _ => ()
     }
     i += 1
+  }
+  // -z only makes sense together with --stdin.
+  if z_mode && !stdin_mode {
+    eprint_line("usage: git update-ref [<options>]    <refname> <new-oid> [<old-oid>]")
+    @sys.exit(129)
   }
   let actual_git_dir = git_dir
   let head_target = resolve_symbolic_ref_target(fs, actual_git_dir, "HEAD")
@@ -124,108 +131,183 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
     let input = decode_bytes(read_all_stdin())
     let mut stdin_no_deref = no_deref
     let mut stdin_create_reflog = create_reflog
-    for line_view in input.split("\n") {
-      let line = trim_chars(line_view.to_owned(), " \t\r\n")
+    let seen_refs : Map[String, Bool] = {}
+    // Build command lines. A trailing newline terminates the final command (it
+    // does not introduce an empty command); truly empty input means no commands.
+    let lines : Array[String] = []
+    if input.length() > 0 {
+      for lv in input.split("\n") {
+        lines.push(lv.to_owned())
+      }
+      if input.has_suffix("\n") && lines.length() > 0 {
+        ignore(lines.pop())
+      }
+    }
+    // git applies a --stdin batch as one transaction: validate every command
+    // (syntax, duplicate refs) before applying any, so a later error leaves the
+    // repo untouched. Pass 1 validates and records actions; pass 2 applies.
+    // Each action is ("call", <handle_update_ref args>) or ("verify", [ref, old?]).
+    let actions : Array[(String, Array[String])] = []
+    for raw in lines {
+      let line = if raw.has_suffix("\r") {
+        String::unsafe_substring(raw, start=0, end=raw.length() - 1)
+      } else {
+        raw
+      }
       if line.length() == 0 {
-        continue
+        eprint_line("fatal: empty command in input")
+        @sys.exit(128)
       }
-      let tokens = update_ref_split_stdin_tokens(line)
-      if tokens.length() == 0 {
-        continue
+      let first = line[0]
+      if first == ' ' || first == '\t' {
+        eprint_line("fatal: whitespace before command: " + line)
+        @sys.exit(128)
       }
-      let cmd = tokens[0]
+      let fields : Array[String] = []
+      for fv in line.split(" ") {
+        fields.push(fv.to_owned())
+      }
+      let cmd = fields[0]
+      let ref_tok = if fields.length() >= 2 { fields[1] } else { "" }
       match cmd {
         "option" => {
-          if tokens.length() != 2 {
-            eprint_line("fatal: update-ref: option requires one argument")
-            @sys.exit(128)
-          }
-          match tokens[1] {
+          let name = ref_tok
+          match name {
             "no-deref" => stdin_no_deref = true
             "create-reflog" => stdin_create_reflog = true
             _ => {
-              eprint_line("fatal: update-ref: unknown option: " + tokens[1])
+              eprint_line("fatal: option unknown: " + name)
               @sys.exit(128)
             }
           }
         }
         "start" | "prepare" | "commit" | "abort" => ()
         "create" => {
-          if tokens.length() != 3 {
-            eprint_line("fatal: update-ref: create requires <ref> <newvalue>")
+          if ref_tok.length() == 0 {
+            eprint_line("fatal: create: missing <ref>")
             @sys.exit(128)
           }
-          let cmd_args = update_ref_stdin_base_args(
-            stdin_no_deref, stdin_create_reflog, message,
-          )
-          cmd_args.push(tokens[1])
-          cmd_args.push(tokens[2])
-          cmd_args.push(@bitcore.ObjectId::zero().to_hex())
-          handle_update_ref(cmd_args)
-        }
-        "update" => {
-          if tokens.length() != 3 && tokens.length() != 4 {
+          let val_tok = if fields.length() >= 3 { fields[2] } else { "" }
+          if val_tok.length() == 0 {
+            eprint_line("fatal: create \{ref_tok}: missing <new-oid>")
+            @sys.exit(128)
+          }
+          if fields.length() > 3 {
             eprint_line(
-              "fatal: update-ref: update requires <ref> <newvalue> [<oldvalue>]",
+              "fatal: create \{ref_tok}: extra input: " +
+              update_ref_extra_input(fields, 3),
             )
             @sys.exit(128)
           }
+          update_ref_stdin_check_dup(seen_refs, ref_tok)
           let cmd_args = update_ref_stdin_base_args(
             stdin_no_deref, stdin_create_reflog, message,
           )
-          cmd_args.push(tokens[1])
-          cmd_args.push(tokens[2])
-          if tokens.length() == 4 {
-            cmd_args.push(tokens[3])
-          }
-          handle_update_ref(cmd_args)
+          cmd_args.push(ref_tok)
+          cmd_args.push(val_tok)
+          cmd_args.push(@bitcore.ObjectId::zero().to_hex())
+          actions.push(("call", cmd_args))
         }
-        "delete" => {
-          if tokens.length() != 2 && tokens.length() != 3 {
-            eprint_line("fatal: update-ref: delete requires <ref> [<oldvalue>]")
+        "update" => {
+          if ref_tok.length() == 0 {
+            eprint_line("fatal: update: missing <ref>")
             @sys.exit(128)
           }
+          let val_tok = if fields.length() >= 3 { fields[2] } else { "" }
+          if val_tok.length() == 0 {
+            eprint_line("fatal: update \{ref_tok}: missing <new-oid>")
+            @sys.exit(128)
+          }
+          if fields.length() > 4 {
+            eprint_line(
+              "fatal: update \{ref_tok}: extra input: " +
+              update_ref_extra_input(fields, 4),
+            )
+            @sys.exit(128)
+          }
+          update_ref_stdin_check_dup(seen_refs, ref_tok)
+          let cmd_args = update_ref_stdin_base_args(
+            stdin_no_deref, stdin_create_reflog, message,
+          )
+          cmd_args.push(ref_tok)
+          cmd_args.push(val_tok)
+          if fields.length() == 4 {
+            cmd_args.push(fields[3])
+          }
+          actions.push(("call", cmd_args))
+        }
+        "delete" => {
+          if ref_tok.length() == 0 {
+            eprint_line("fatal: delete: missing <ref>")
+            @sys.exit(128)
+          }
+          if fields.length() > 3 {
+            eprint_line(
+              "fatal: delete \{ref_tok}: extra input: " +
+              update_ref_extra_input(fields, 3),
+            )
+            @sys.exit(128)
+          }
+          update_ref_stdin_check_dup(seen_refs, ref_tok)
           let cmd_args = update_ref_stdin_base_args(
             stdin_no_deref, stdin_create_reflog, message,
           )
           cmd_args.push("-d")
-          cmd_args.push(tokens[1])
-          if tokens.length() == 3 {
-            cmd_args.push(tokens[2])
+          cmd_args.push(ref_tok)
+          if fields.length() == 3 {
+            cmd_args.push(fields[2])
           }
-          handle_update_ref(cmd_args)
+          actions.push(("call", cmd_args))
         }
         "verify" => {
-          if tokens.length() != 2 && tokens.length() != 3 {
-            eprint_line("fatal: update-ref: verify requires <ref> [<oldvalue>]")
+          if ref_tok.length() == 0 {
+            eprint_line("fatal: verify: missing <ref>")
             @sys.exit(128)
           }
-          let refname = normalize_update_ref_name(tokens[1])
-          let refname = resolve_update_target_ref(
-            fs, actual_git_dir, refname, stdin_no_deref,
-          )
-          let current_id = read_ref_value(fs, actual_git_dir, refname)
-          let ok = match tokens.length() {
-            2 => current_id is Some(_)
-            _ => {
-              let expected_id = @bitcore.ObjectId::from_hex(tokens[2]) catch {
-                _ => @bitcore.ObjectId::zero()
-              }
-              match current_id {
-                Some(cur_id) => cur_id.to_hex() == expected_id.to_hex()
-                None =>
-                  expected_id.to_hex() == @bitcore.ObjectId::zero().to_hex()
-              }
-            }
+          if fields.length() > 3 {
+            eprint_line(
+              "fatal: verify \{ref_tok}: extra input: " +
+              update_ref_extra_input(fields, 3),
+            )
+            @sys.exit(128)
           }
-          if !ok {
-            eprint_line("fatal: update-ref: verify failed for " + tokens[1])
-            @sys.exit(1)
+          let verify_args : Array[String] = [ref_tok]
+          if fields.length() >= 3 {
+            verify_args.push(fields[2])
           }
+          actions.push(("verify", verify_args))
         }
         _ => {
-          eprint_line("fatal: update-ref: unknown command: " + cmd)
+          eprint_line("fatal: unknown command: " + line)
           @sys.exit(128)
+        }
+      }
+    }
+    // Pass 2: apply the validated actions in order.
+    for action in actions {
+      if action.0 == "call" {
+        handle_update_ref(action.1)
+      } else {
+        let v_ref = action.1[0]
+        let refname = normalize_update_ref_name(v_ref)
+        let refname = resolve_update_target_ref(
+          fs, actual_git_dir, refname, stdin_no_deref,
+        )
+        let current_id = read_ref_value(fs, actual_git_dir, refname)
+        let ok = if action.1.length() < 2 {
+          current_id is Some(_)
+        } else {
+          let expected_id = @bitcore.ObjectId::from_hex(action.1[1]) catch {
+            _ => @bitcore.ObjectId::zero()
+          }
+          match current_id {
+            Some(cur_id) => cur_id.to_hex() == expected_id.to_hex()
+            None => expected_id.to_hex() == @bitcore.ObjectId::zero().to_hex()
+          }
+        }
+        if !ok {
+          eprint_line("fatal: update-ref: verify failed for " + v_ref)
+          @sys.exit(1)
         }
       }
     }
@@ -701,15 +783,30 @@ fn get_author_info(
 }
 
 ///|
-fn update_ref_split_stdin_tokens(line : String) -> Array[String] {
-  let tokens : Array[String] = []
-  for token_view in line.split(" ") {
-    let token = trim_string(token_view.to_owned())
-    if token.length() > 0 {
-      tokens.push(token)
-    }
+/// Reconstruct git's "extra input" tail: the unconsumed fields, each preceded
+/// by the single separating space (so the result has a leading space, matching
+/// git which reports the remaining input pointer including its separator).
+fn update_ref_extra_input(fields : Array[String], consumed : Int) -> String {
+  let mut s = ""
+  for i = consumed; i < fields.length(); i = i + 1 {
+    s = s + " " + fields[i]
   }
-  tokens
+  s
+}
+
+///|
+/// git's stdin transaction rejects multiple updates to the same ref.
+async fn update_ref_stdin_check_dup(
+  seen : Map[String, Bool],
+  ref_tok : String,
+) -> Unit {
+  if seen.get(ref_tok).unwrap_or(false) {
+    eprint_line(
+      "fatal: multiple updates for ref '" + ref_tok + "' not allowed",
+    )
+    @sys.exit(128)
+  }
+  seen[ref_tok] = true
 }
 
 ///|
