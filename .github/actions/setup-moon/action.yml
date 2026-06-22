@@ -1,0 +1,33 @@
+name: Setup MoonBit (pinned)
+description: >
+  Install the MoonBit toolchain, pinned via an actions/cache key. MoonBit's
+  installer can only fetch `latest`/`nightly` (it has no version-pinning), so a
+  bleeding-edge release can break CI at any time (see #83: async [3002] and the
+  $|/#| syntax_lint [0063]). Caching ~/.moon freezes the toolchain to whatever
+  was current when `pin` was last bumped; bump `pin` to intentionally upgrade.
+inputs:
+  pin:
+    description: Toolchain pin marker. Bump this string to pull a newer toolchain.
+    required: false
+    default: "2026-06-22"
+runs:
+  using: composite
+  steps:
+    - name: Restore MoonBit toolchain cache
+      id: moon-cache
+      uses: actions/cache@v4
+      with:
+        # Cache the toolchain only (binaries + bundled core), not the registry
+        # index — `moon update` still refreshes ~/.moon/registry every run.
+        path: |
+          ~/.moon/bin
+          ~/.moon/lib
+          ~/.moon/include
+        key: moon-toolchain-${{ runner.os }}-${{ inputs.pin }}
+    - name: Install MoonBit CLI
+      if: steps.moon-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+    - name: Add MoonBit to PATH
+      shell: bash
+      run: echo "$HOME/.moon/bin" >> "$GITHUB_PATH"

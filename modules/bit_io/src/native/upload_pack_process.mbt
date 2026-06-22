@@ -1325,19 +1325,19 @@ fn write_partial_clone_metadata(
   let filter_value = filter.to_string()
   let config_path = @bit.join_path(git_dir, "config")
   let config =
-    #|[core]
-    #|	repositoryformatversion = 1
-    #|	filemode = true
-    #|	bare = false
-    #|	logallrefupdates = true
-    #|[extensions]
-    #|	partialclone = origin
+    $|[core]
+    $|	repositoryformatversion = 1
+    $|	filemode = true
+    $|	bare = false
+    $|	logallrefupdates = true
+    $|[extensions]
+    $|	partialclone = origin
     $|[remote "origin"]
     $|	url = \{remote}
-    #|	fetch = +refs/heads/*:refs/remotes/origin/*
-    #|	promisor = true
+    $|	fetch = +refs/heads/*:refs/remotes/origin/*
+    $|	promisor = true
     $|	partialclonefilter = \{filter_value}
-    #|
+    $|
   fs.write_string(config_path, config)
   let packed_refs_path = @bit.join_path(git_dir, "packed-refs")
   fs.write_string(packed_refs_path, "# pack-refs with: peeled fully-peeled\n")

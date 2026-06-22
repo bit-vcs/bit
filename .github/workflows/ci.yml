@@ -21,10 +21,8 @@ jobs:
         uses: mizchi/pkspec@v0.2.1
         with:
           pkl-version: none
-      - name: Install MoonBit CLI
-        run: |
-          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
-          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+      - name: Setup MoonBit (pinned toolchain)
+        uses: ./.github/actions/setup-moon
       - name: Moon update
         run: moon update
       - name: pkf run check
@@ -88,10 +86,8 @@ jobs:
         uses: mizchi/pkspec@v0.2.1
         with:
           pkl-version: none
-      - name: Install MoonBit CLI
-        run: |
-          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
-          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+      - name: Setup MoonBit (pinned toolchain)
+        uses: ./.github/actions/setup-moon
       - name: Moon update
         run: moon update
       - name: Build native binary for wbtests
@@ -127,10 +123,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: true
-      - name: Install MoonBit CLI
-        run: |
-          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
-          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+      - name: Setup MoonBit (pinned toolchain)
+        uses: ./.github/actions/setup-moon
       - name: Moon update
         run: moon update
       - name: Distributed tests
@@ -180,10 +174,8 @@ jobs:
           cd third_party/git
           make -j$(nproc)
 
-      - name: Install MoonBit CLI
-        run: |
-          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
-          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+      - name: Setup MoonBit (pinned toolchain)
+        uses: ./.github/actions/setup-moon
 
       - name: Moon update
         run: moon update
