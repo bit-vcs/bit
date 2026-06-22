@@ -167,6 +167,13 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
       for fv in line.split(" ") {
         fields.push(fv.to_owned())
       }
+      // Unquote C-style quoted arguments, reporting git's exact errors on
+      // malformed quoting (before any command is applied).
+      for fi = 0; fi < fields.length(); fi = fi + 1 {
+        if fields[fi].has_prefix("\"") {
+          fields[fi] = update_ref_unquote_arg(fields[fi])
+        }
+      }
       let cmd = fields[0]
       let ref_tok = if fields.length() >= 2 { fields[1] } else { "" }
       match cmd {
@@ -792,6 +799,58 @@ fn update_ref_extra_input(fields : Array[String], consumed : Int) -> String {
     s = s + " " + fields[i]
   }
   s
+}
+
+///|
+/// Unquote a C-style quoted --stdin argument (token starts with `"`), matching
+/// git's parser. Exits with git's exact diagnostics on malformed quoting:
+/// unterminated/invalid-escape -> "badly quoted argument: <tok>", trailing
+/// junk after the closing quote -> "unexpected character after quoted argument:
+/// <tok>".
+async fn update_ref_unquote_arg(token : String) -> String {
+  let n = token.length()
+  let mut result = ""
+  let mut i = 1 // skip opening quote
+  while i < n {
+    let c = token[i]
+    if c == '"' {
+      // Closing quote must be the final character of the token.
+      if i != n - 1 {
+        eprint_line(
+          "fatal: unexpected character after quoted argument: " + token,
+        )
+        @sys.exit(128)
+      }
+      return result
+    }
+    if c == '\\' {
+      if i + 1 >= n {
+        eprint_line("fatal: badly quoted argument: " + token)
+        @sys.exit(128)
+      }
+      let decoded = match token[i + 1] {
+        '"' => "\""
+        '\\' => "\\"
+        'n' => "\n"
+        't' => "\t"
+        'r' => "\r"
+        _ => {
+          eprint_line("fatal: badly quoted argument: " + token)
+          @sys.exit(128)
+          ""
+        }
+      }
+      result = result + decoded
+      i = i + 2
+    } else {
+      result = result + c.to_string()
+      i = i + 1
+    }
+  }
+  // Reached end of token without a closing quote.
+  eprint_line("fatal: badly quoted argument: " + token)
+  @sys.exit(128)
+  ""
 }
 
 ///|
