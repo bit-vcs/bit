@@ -147,8 +147,8 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
     // git applies a --stdin batch as one transaction: validate every command
     // (syntax, duplicate refs) before applying any, so a later error leaves the
     // repo untouched. Pass 1 validates and records actions; pass 2 applies.
-    // Each action is ("call", <handle_update_ref args>) or ("verify", [ref, old?]).
-    let actions : Array[(String, Array[String])] = []
+    // Pass 1: parse + syntax-check every command into a structured op list.
+    let ops : Array[UpdateRefStdinOp] = []
     for raw in lines {
       let line = if raw.has_suffix("\r") {
         String::unsafe_substring(raw, start=0, end=raw.length() - 1)
@@ -164,10 +164,7 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
         eprint_line("fatal: whitespace before command: " + line)
         @sys.exit(128)
       }
-      let fields : Array[String] = []
-      for fv in line.split(" ") {
-        fields.push(fv.to_owned())
-      }
+      let fields = update_ref_stdin_split_fields(line)
       // Unquote C-style quoted arguments, reporting git's exact errors on
       // malformed quoting (before any command is applied).
       for fi = 0; fi < fields.length(); fi = fi + 1 {
@@ -195,8 +192,7 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
             eprint_line("fatal: create: missing <ref>")
             @sys.exit(128)
           }
-          let val_tok = if fields.length() >= 3 { fields[2] } else { "" }
-          if val_tok.length() == 0 {
+          if fields.length() < 3 {
             eprint_line("fatal: create \{ref_tok}: missing <new-oid>")
             @sys.exit(128)
           }
@@ -208,21 +204,21 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
             @sys.exit(128)
           }
           update_ref_stdin_check_dup(seen_refs, ref_tok)
-          let cmd_args = update_ref_stdin_base_args(
-            stdin_no_deref, stdin_create_reflog, message,
-          )
-          cmd_args.push(ref_tok)
-          cmd_args.push(val_tok)
-          cmd_args.push(@bitcore.ObjectId::zero().to_hex())
-          actions.push(("call", cmd_args))
+          ops.push({
+            kind: "create",
+            refname: ref_tok,
+            new_tok: Some(fields[2]),
+            old_tok: None,
+            no_deref: stdin_no_deref,
+            create_reflog: stdin_create_reflog,
+          })
         }
         "update" => {
           if ref_tok.length() == 0 {
             eprint_line("fatal: update: missing <ref>")
             @sys.exit(128)
           }
-          let val_tok = if fields.length() >= 3 { fields[2] } else { "" }
-          if val_tok.length() == 0 {
+          if fields.length() < 3 {
             eprint_line("fatal: update \{ref_tok}: missing <new-oid>")
             @sys.exit(128)
           }
@@ -234,15 +230,14 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
             @sys.exit(128)
           }
           update_ref_stdin_check_dup(seen_refs, ref_tok)
-          let cmd_args = update_ref_stdin_base_args(
-            stdin_no_deref, stdin_create_reflog, message,
-          )
-          cmd_args.push(ref_tok)
-          cmd_args.push(val_tok)
-          if fields.length() == 4 {
-            cmd_args.push(fields[3])
-          }
-          actions.push(("call", cmd_args))
+          ops.push({
+            kind: "update",
+            refname: ref_tok,
+            new_tok: Some(fields[2]),
+            old_tok: if fields.length() >= 4 { Some(fields[3]) } else { None },
+            no_deref: stdin_no_deref,
+            create_reflog: stdin_create_reflog,
+          })
         }
         "delete" => {
           if ref_tok.length() == 0 {
@@ -257,15 +252,14 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
             @sys.exit(128)
           }
           update_ref_stdin_check_dup(seen_refs, ref_tok)
-          let cmd_args = update_ref_stdin_base_args(
-            stdin_no_deref, stdin_create_reflog, message,
-          )
-          cmd_args.push("-d")
-          cmd_args.push(ref_tok)
-          if fields.length() == 3 {
-            cmd_args.push(fields[2])
-          }
-          actions.push(("call", cmd_args))
+          ops.push({
+            kind: "delete",
+            refname: ref_tok,
+            new_tok: None,
+            old_tok: if fields.length() >= 3 { Some(fields[2]) } else { None },
+            no_deref: stdin_no_deref,
+            create_reflog: stdin_create_reflog,
+          })
         }
         "verify" => {
           if ref_tok.length() == 0 {
@@ -279,11 +273,14 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
             )
             @sys.exit(128)
           }
-          let verify_args : Array[String] = [ref_tok]
-          if fields.length() >= 3 {
-            verify_args.push(fields[2])
-          }
-          actions.push(("verify", verify_args))
+          ops.push({
+            kind: "verify",
+            refname: ref_tok,
+            new_tok: None,
+            old_tok: if fields.length() >= 3 { Some(fields[2]) } else { None },
+            no_deref: stdin_no_deref,
+            create_reflog: stdin_create_reflog,
+          })
         }
         _ => {
           eprint_line("fatal: unknown command: " + line)
@@ -291,33 +288,74 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
         }
       }
     }
-    // Pass 2: apply the validated actions in order.
-    for action in actions {
-      if action.0 == "call" {
-        handle_update_ref(action.1)
-      } else {
-        let v_ref = action.1[0]
-        let refname = normalize_update_ref_name(v_ref)
-        let refname = resolve_update_target_ref(
-          fs, actual_git_dir, refname, stdin_no_deref,
-        )
-        let current_id = read_ref_value(fs, actual_git_dir, refname)
-        let ok = if action.1.length() < 2 {
-          current_id is Some(_)
-        } else {
-          let expected_id = @bitcore.ObjectId::from_hex(action.1[1]) catch {
-            _ => @bitcore.ObjectId::zero()
+    // Pass 2: validate the whole batch against the current repo state before
+    // touching anything, so a later failure leaves the repo untouched.
+    for op in ops {
+      update_ref_stdin_validate_op(fs, actual_git_dir, op)
+    }
+    // Pass 3: apply. Verify commands have no effect; the rest reuse the regular
+    // update-ref machinery (reflogs, symref deref) now that they are validated.
+    let zero_hex = @bitcore.ObjectId::zero().to_hex()
+    for op in ops {
+      if op.kind == "verify" {
+        continue
+      }
+      let cmd_args = update_ref_stdin_base_args(
+        op.no_deref, op.create_reflog, message,
+      )
+      // Resolve the old value to a concrete oid hex; the regular handler's
+      // old-value check expects a hex string, not a ref name or revision.
+      let old_hex = match op.old_tok {
+        Some(t) =>
+          if t.length() == 0 {
+            Some(zero_hex)
+          } else {
+            match update_ref_resolve_oid(fs, actual_git_dir, t) {
+              Some(oid) => Some(oid.to_hex())
+              None => Some(t)
+            }
           }
-          match current_id {
-            Some(cur_id) => cur_id.to_hex() == expected_id.to_hex()
-            None => expected_id.to_hex() == @bitcore.ObjectId::zero().to_hex()
+        None => None
+      }
+      // Resolve the new value; an `update` to the zero oid means "delete".
+      let new_hex = match op.new_tok {
+        Some(t) =>
+          if t.length() == 0 {
+            zero_hex
+          } else {
+            match update_ref_resolve_oid(fs, actual_git_dir, t) {
+              Some(oid) => oid.to_hex()
+              None => t
+            }
           }
+        None => zero_hex
+      }
+      let deletes = op.kind == "delete" ||
+        (op.kind == "update" && new_hex == zero_hex)
+      if deletes {
+        // Ensuring a ref is absent when it is already gone is a no-op.
+        if @bitrepo.rev_parse(fs, actual_git_dir, op.refname) is None {
+          continue
         }
-        if !ok {
-          eprint_line("fatal: update-ref: verify failed for " + v_ref)
-          @sys.exit(1)
+        cmd_args.push("-d")
+        cmd_args.push(op.refname)
+        match old_hex {
+          Some(h) => cmd_args.push(h)
+          None => ()
+        }
+      } else {
+        cmd_args.push(op.refname)
+        cmd_args.push(new_hex)
+        if op.kind == "create" {
+          cmd_args.push(zero_hex)
+        } else {
+          match old_hex {
+            Some(h) => cmd_args.push(h)
+            None => ()
+          }
         }
       }
+      handle_update_ref(cmd_args)
     }
     return ()
   }
@@ -808,6 +846,169 @@ fn update_ref_extra_input(fields : Array[String], consumed : Int) -> String {
 /// unterminated/invalid-escape -> "badly quoted argument: <tok>", trailing
 /// junk after the closing quote -> "unexpected character after quoted argument:
 /// <tok>".
+/// One parsed `--stdin` operation, captured during the syntax pass so that the
+/// whole batch can be validated atomically before anything is written.
+struct UpdateRefStdinOp {
+  kind : String // "create" | "update" | "delete" | "verify"
+  refname : String
+  new_tok : String? // None when the command takes no new value (delete/verify)
+  old_tok : String? // None when no old value was supplied
+  no_deref : Bool
+  create_reflog : Bool
+}
+
+///|
+/// Resolve a `--stdin` value token (hex oid, ref name, or revision) to an
+/// object id, or None when it cannot be resolved.
+fn update_ref_resolve_oid(
+  fs : OsFs,
+  git_dir : String,
+  tok : String,
+) -> @bitcore.ObjectId? raise Error {
+  let direct = @bitcore.ObjectId::from_hex(tok) catch {
+    _ => return @bitrepo.rev_parse(fs, git_dir, tok)
+  }
+  Some(direct)
+}
+
+///|
+/// Validate one parsed stdin op against the current repository state, emitting
+/// git's exact `fatal:` diagnostics and exiting without applying anything when
+/// the operation cannot proceed.
+async fn update_ref_stdin_validate_op(
+  fs : OsFs,
+  git_dir : String,
+  op : UpdateRefStdinOp,
+) -> Unit raise Error {
+  let zero = @bitcore.ObjectId::zero()
+  // Resolve and sanity-check the new value (create/update only).
+  match op.new_tok {
+    Some(tok) => {
+      // An empty new value (e.g. `create R ` with a trailing space) is the zero
+      // oid, which git rejects for create as "zero <new-oid>".
+      let new_id = if tok.length() == 0 {
+        Some(zero)
+      } else {
+        update_ref_resolve_oid(fs, git_dir, tok)
+      }
+      guard new_id is Some(nid) else {
+        eprint_line("fatal: \{op.kind} \{op.refname}: invalid <new-oid>: \{tok}")
+        @sys.exit(128)
+      }
+      if op.kind == "create" && nid.to_hex() == zero.to_hex() {
+        eprint_line("fatal: create \{op.refname}: zero <new-oid>")
+        @sys.exit(128)
+      }
+    }
+    None => ()
+  }
+  // Determine the expected previous value: Some(id) means "must currently
+  // equal id" (zero means "must not exist"); None means "no check".
+  let expected : @bitcore.ObjectId? = if op.kind == "create" {
+    Some(zero)
+  } else {
+    match op.old_tok {
+      Some(tok) => {
+        let resolved = if tok.length() == 0 {
+          Some(zero)
+        } else {
+          update_ref_resolve_oid(fs, git_dir, tok)
+        }
+        guard resolved is Some(oid) else {
+          eprint_line(
+            "fatal: \{op.kind} \{op.refname}: invalid <old-oid>: \{tok}",
+          )
+          @sys.exit(128)
+          return
+        }
+        // A zero <old-oid> is meaningless for delete.
+        if op.kind == "delete" && oid.to_hex() == zero.to_hex() {
+          eprint_line("fatal: delete \{op.refname}: zero <old-oid>")
+          @sys.exit(128)
+        }
+        Some(oid)
+      }
+      // verify with no value defaults to "must not exist"; update/delete with
+      // no old value skip the check entirely.
+      None => if op.kind == "verify" { Some(zero) } else { None }
+    }
+  }
+  match expected {
+    Some(eid) => {
+      let current = @bitrepo.rev_parse(fs, git_dir, op.refname)
+      match current {
+        Some(cur) =>
+          if cur.to_hex() != eid.to_hex() {
+            if eid.to_hex() == zero.to_hex() {
+              eprint_line(
+                "fatal: cannot lock ref '\{op.refname}': reference already exists",
+              )
+            } else {
+              eprint_line(
+                "fatal: cannot lock ref '\{op.refname}': is at \{cur.to_hex()} but expected \{eid.to_hex()}",
+              )
+            }
+            @sys.exit(128)
+          }
+        None =>
+          if eid.to_hex() != zero.to_hex() {
+            eprint_line(
+              "fatal: cannot lock ref '\{op.refname}': unable to resolve reference '\{op.refname}'",
+            )
+            @sys.exit(128)
+          }
+      }
+    }
+    None => ()
+  }
+}
+
+///|
+/// Split a `--stdin` command line into space-separated fields, keeping a
+/// C-quoted field (one that starts with `"`) intact even when it contains
+/// spaces — e.g. `create R "refs/heads/main:path with space"` yields three
+/// fields, not five. Any trailing junk after a closing quote stays attached to
+/// the field so the unquoter can report it.
+fn update_ref_stdin_split_fields(line : String) -> Array[String] {
+  let fields : Array[String] = []
+  let n = line.length()
+  let mut i = 0
+  for ;; {
+    let start = i
+    if i < n && line[i] == '"' {
+      i = i + 1
+      let mut closed = false
+      while i < n {
+        if !closed && line[i] == '\\' && i + 1 < n {
+          i = i + 2
+        } else if !closed && line[i] == '"' {
+          closed = true
+          i = i + 1
+        } else if closed && line[i] == ' ' {
+          break
+        } else {
+          i = i + 1
+        }
+      }
+    } else {
+      while i < n && line[i] != ' ' {
+        i = i + 1
+      }
+    }
+    fields.push(String::unsafe_substring(line, start=start, end=i))
+    // A single space separates fields; consuming it and continuing means a
+    // trailing space yields a trailing empty field (git treats `create R ` as
+    // an empty <new-oid>, distinct from `create R`).
+    if i < n && line[i] == ' ' {
+      i = i + 1
+    } else {
+      break
+    }
+  }
+  fields
+}
+
+///|
 async fn update_ref_unquote_arg(token : String) -> String {
   let n = token.length()
   let mut result = ""
