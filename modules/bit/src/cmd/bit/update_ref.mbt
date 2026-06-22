@@ -123,9 +123,10 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
   }
   let actual_git_dir = git_dir
   let head_target = resolve_symbolic_ref_target(fs, actual_git_dir, "HEAD")
-  // Get current timestamp for reflog
-  let timestamp = get_current_timestamp()
-  let timezone = "+0000"
+  // Reflog timestamp honors GIT_COMMITTER_DATE (falling back to now), matching
+  // git — reflog entries created by update-ref must record the committer date.
+  let timestamp = get_commit_tree_timestamp("GIT_COMMITTER_DATE")
+  let timezone = get_commit_tree_timezone("GIT_COMMITTER_DATE")
   let (author, email) = get_author_info(fs, actual_git_dir)
   if stdin_mode {
     let input = decode_bytes(read_all_stdin())
