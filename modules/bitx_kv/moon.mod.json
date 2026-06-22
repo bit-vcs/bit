@@ -10,7 +10,7 @@
     "mizchi/bit_types": "0.42.2",
     "mizchi/bit_vfs": "0.42.2",
     "mizchi/bit_osfs": "0.42.2",
-    "moonbitlang/async": "0.16.6",
+    "moonbitlang/async": "0.19.4",
     "moonbitlang/x": "0.4.40",
     "mizchi/x": "0.2.0"
   },
