@@ -1,33 +1,31 @@
-name: Setup MoonBit (pinned)
+name: Setup MoonBit (pinned via nix overlay)
 description: >
-  Install the MoonBit toolchain, pinned via an actions/cache key. MoonBit's
-  installer can only fetch `latest`/`nightly` (it has no version-pinning), so a
-  bleeding-edge release can break CI at any time (see #83: async [3002] and the
-  $|/#| syntax_lint [0063]). Caching ~/.moon freezes the toolchain to whatever
-  was current when `pin` was last bumped; bump `pin` to intentionally upgrade.
+  Provide the MoonBit toolchain from moonbit-overlay, pinned to a specific
+  revision. MoonBit's curl installer only fetches `latest`/`nightly` (no
+  version pinning, see cli.moonbitlang.com returning 403 for version strings),
+  and bleeding-edge releases repeatedly broke CI: async [3002], the $|/#|
+  syntax_lint [0063], and the `moon test` working-directory change in
+  0.1.20260618 that broke bit_pack's repo-root-relative fixtures. Pinning the
+  overlay rev freezes the toolchain to a known-good build; bump `overlay-rev`
+  (and re-validate) to upgrade intentionally.
 inputs:
-  pin:
-    description: Toolchain pin marker. Bump this string to pull a newer toolchain.
+  overlay-rev:
+    description: >
+      moonbit-overlay git revision whose `#default` toolchain is installed.
+      Default provides moon 0.1.20260608 (the last build before the
+      0.1.20260618 moon-test CWD regression), verified to build the workspace
+      and pass `moon test`.
     required: false
-    default: "2026-06-22"
+    default: "96727d9f3962fffe8342713f94bd714f81a00c6b"
 runs:
   using: composite
   steps:
-    - name: Restore MoonBit toolchain cache
-      id: moon-cache
-      uses: actions/cache@v4
-      with:
-        # Cache the toolchain only (binaries + bundled core), not the registry
-        # index — `moon update` still refreshes ~/.moon/registry every run.
-        path: |
-          ~/.moon/bin
-          ~/.moon/lib
-          ~/.moon/include
-        key: moon-toolchain-${{ runner.os }}-${{ inputs.pin }}
-    - name: Install MoonBit CLI
-      if: steps.moon-cache.outputs.cache-hit != 'true'
+    - name: Install Nix (with store cache)
+      uses: ./.github/actions/setup-nix
+    - name: Install pinned MoonBit toolchain
       shell: bash
-      run: curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
-    - name: Add MoonBit to PATH
-      shell: bash
-      run: echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+      run: |
+        nix profile install \
+          --extra-experimental-features 'nix-command flakes' \
+          "github:moonbit-community/moonbit-overlay/${{ inputs.overlay-rev }}#default"
+        echo "$HOME/.nix-profile/bin" >> "$GITHUB_PATH"
