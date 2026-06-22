@@ -27,9 +27,11 @@ jobs:
         with:
           submodules: true
 
-      - name: Setup MoonBit (pinned toolchain, Unix)
+      - name: Install MoonBit CLI (Unix)
         if: runner.os != 'Windows'
-        uses: ./.github/actions/setup-moon
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
 
       - name: Install MoonBit CLI (Windows)
         if: runner.os == 'Windows'

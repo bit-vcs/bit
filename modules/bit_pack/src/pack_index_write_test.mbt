@@ -1,8 +1,28 @@
 ///| Pack index fixture tests (git index-pack output)
 
 ///|
+/// Resolve a repo-root-relative fixture path independent of the test's working
+/// directory. `moon test` does not guarantee the native test binary runs from
+/// the repo root (this changed in moon 0.1.20260618, which broke the plain
+/// "fixtures/..." reads), so walk up parent directories until the path exists.
+fn resolve_fixture(path : String) -> String {
+  let mut prefix = ""
+  let mut i = 0
+  while i < 32 {
+    let candidate = prefix + path
+    if @fs.path_exists(candidate) {
+      return candidate
+    }
+    prefix = prefix + "../"
+    i = i + 1
+  }
+  path
+}
+
+///|
 fn read_fixture_bytes(path : String) -> Bytes raise {
-  @fs.read_file_to_bytes(path) catch {
+  let resolved = resolve_fixture(path)
+  @fs.read_file_to_bytes(resolved) catch {
     e => fail("failed to read fixture: \{path} (\{e})")
   }
 }

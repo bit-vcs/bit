@@ -56,8 +56,10 @@ jobs:
         with:
           bun-version: 1.3.5
 
-      - name: Setup MoonBit (pinned toolchain)
-        uses: ./.github/actions/setup-moon
+      - name: Install MoonBit CLI
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
 
       - name: Moon update
         run: moon update
