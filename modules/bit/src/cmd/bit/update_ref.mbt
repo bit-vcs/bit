@@ -133,38 +133,42 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
     let mut stdin_no_deref = no_deref
     let mut stdin_create_reflog = create_reflog
     let seen_refs : Map[String, Bool] = {}
-    // Build command lines. A trailing newline terminates the final command (it
-    // does not introduce an empty command); truly empty input means no commands.
-    let lines : Array[String] = []
-    if input.length() > 0 {
-      for lv in input.split("\n") {
-        lines.push(lv.to_owned())
-      }
-      if input.has_suffix("\n") && lines.length() > 0 {
-        ignore(lines.pop())
-      }
-    }
-    // git applies a --stdin batch as one transaction: validate every command
-    // (syntax, duplicate refs) before applying any, so a later error leaves the
-    // repo untouched. Pass 1 validates and records actions; pass 2 applies.
-    // Pass 1: parse + syntax-check every command into a structured op list.
+    // git applies a --stdin batch as one transaction: every command is parsed
+    // into a structured op, the whole batch is validated against the current
+    // repo state, and only then is anything written.
     let ops : Array[UpdateRefStdinOp] = []
-    for raw in lines {
-      let line = if raw.has_suffix("\r") {
-        String::unsafe_substring(raw, start=0, end=raw.length() - 1)
-      } else {
-        raw
+    if z_mode {
+      update_ref_parse_stdin_z(
+        input, ops, seen_refs, stdin_no_deref, stdin_create_reflog,
+      )
+    } else {
+      // A trailing newline terminates the final command (it does not introduce
+      // an empty command); truly empty input means no commands.
+      let lines : Array[String] = []
+      if input.length() > 0 {
+        for lv in input.split("\n") {
+          lines.push(lv.to_owned())
+        }
+        if input.has_suffix("\n") && lines.length() > 0 {
+          ignore(lines.pop())
+        }
       }
-      if line.length() == 0 {
-        eprint_line("fatal: empty command in input")
-        @sys.exit(128)
-      }
-      let first = line[0]
-      if first == ' ' || first == '\t' {
-        eprint_line("fatal: whitespace before command: " + line)
-        @sys.exit(128)
-      }
-      let fields = update_ref_stdin_split_fields(line)
+      for raw in lines {
+        let line = if raw.has_suffix("\r") {
+          String::unsafe_substring(raw, start=0, end=raw.length() - 1)
+        } else {
+          raw
+        }
+        if line.length() == 0 {
+          eprint_line("fatal: empty command in input")
+          @sys.exit(128)
+        }
+        let first = line[0]
+        if first == ' ' || first == '\t' {
+          eprint_line("fatal: whitespace before command: " + line)
+          @sys.exit(128)
+        }
+        let fields = update_ref_stdin_split_fields(line)
       // Unquote C-style quoted arguments, reporting git's exact errors on
       // malformed quoting (before any command is applied).
       for fi = 0; fi < fields.length(); fi = fi + 1 {
@@ -286,6 +290,7 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
           eprint_line("fatal: unknown command: " + line)
           @sys.exit(128)
         }
+      }
       }
     }
     // Pass 2: validate the whole batch against the current repo state before
@@ -960,6 +965,188 @@ async fn update_ref_stdin_validate_op(
       }
     }
     None => ()
+  }
+}
+
+///|
+/// Parse `--stdin -z` input (NUL-separated records) into the shared op list.
+/// In this format each command record is `<cmd> SP <ref>` and the values are
+/// separate NUL records; create/verify/delete take exactly one value, update
+/// takes two. An empty new value is the zero oid (a delete, with git's warning);
+/// an empty old value means "do not check".
+async fn update_ref_parse_stdin_z(
+  input : String,
+  ops : Array[UpdateRefStdinOp],
+  seen_refs : Map[String, Bool],
+  no_deref_init : Bool,
+  create_reflog_init : Bool,
+) -> Unit raise Error {
+  let mut no_deref = no_deref_init
+  let mut create_reflog = create_reflog_init
+  // Split into NUL-terminated records; the trailing NUL closes the last field.
+  let records : Array[String] = []
+  let cur = StringBuilder::new()
+  let mut pending = false
+  for ch in input {
+    if ch == '\u{0}' {
+      records.push(cur.to_string())
+      cur.reset()
+      pending = false
+    } else {
+      cur.write_char(ch)
+      pending = true
+    }
+  }
+  if pending {
+    records.push(cur.to_string())
+  }
+  let mut ri = 0
+  while ri < records.length() {
+    let rec = records[ri]
+    ri = ri + 1
+    if rec.length() == 0 {
+      eprint_line("fatal: empty command in input")
+      @sys.exit(128)
+    }
+    let fc = rec[0]
+    if fc == ' ' || fc == '\t' || fc == '\n' || fc == '\r' {
+      eprint_line("fatal: whitespace before command: " + rec)
+      @sys.exit(128)
+    }
+    let (cmd, ref_tok) = match rec.find(" ") {
+      Some(si) =>
+        (
+          String::unsafe_substring(rec, start=0, end=si),
+          String::unsafe_substring(rec, start=si + 1, end=rec.length()),
+        )
+      None => (rec, "")
+    }
+    match cmd {
+      "option" =>
+        match ref_tok {
+          "no-deref" => no_deref = true
+          "create-reflog" => create_reflog = true
+          _ => {
+            eprint_line("fatal: option unknown: " + ref_tok)
+            @sys.exit(128)
+          }
+        }
+      "start" | "prepare" | "commit" | "abort" => ()
+      "create" => {
+        if ref_tok.length() == 0 {
+          eprint_line("fatal: create: missing <ref>")
+          @sys.exit(128)
+        }
+        if ri >= records.length() {
+          eprint_line(
+            "fatal: create \{ref_tok}: unexpected end of input when reading <new-oid>",
+          )
+          @sys.exit(128)
+        }
+        let new_val = records[ri]
+        ri = ri + 1
+        // Unlike line mode (where an empty field is a zero oid), -z reports an
+        // empty <new-oid> for create as missing.
+        if new_val.length() == 0 {
+          eprint_line("fatal: create \{ref_tok}: missing <new-oid>")
+          @sys.exit(128)
+        }
+        update_ref_stdin_check_dup(seen_refs, ref_tok)
+        ops.push({
+          kind: "create",
+          refname: ref_tok,
+          new_tok: Some(new_val),
+          old_tok: None,
+          no_deref,
+          create_reflog,
+        })
+      }
+      "update" => {
+        if ref_tok.length() == 0 {
+          eprint_line("fatal: update: missing <ref>")
+          @sys.exit(128)
+        }
+        if ri >= records.length() {
+          eprint_line(
+            "fatal: update \{ref_tok}: unexpected end of input when reading <new-oid>",
+          )
+          @sys.exit(128)
+        }
+        let new_val = records[ri]
+        ri = ri + 1
+        if ri >= records.length() {
+          eprint_line(
+            "fatal: update \{ref_tok}: unexpected end of input when reading <old-oid>",
+          )
+          @sys.exit(128)
+        }
+        let old_val = records[ri]
+        ri = ri + 1
+        if new_val.length() == 0 {
+          eprint_line(
+            "warning: update \{ref_tok}: missing <new-oid>, treating as zero",
+          )
+        }
+        update_ref_stdin_check_dup(seen_refs, ref_tok)
+        ops.push({
+          kind: "update",
+          refname: ref_tok,
+          new_tok: Some(new_val),
+          old_tok: if old_val.length() == 0 { None } else { Some(old_val) },
+          no_deref,
+          create_reflog,
+        })
+      }
+      "delete" => {
+        if ref_tok.length() == 0 {
+          eprint_line("fatal: delete: missing <ref>")
+          @sys.exit(128)
+        }
+        if ri >= records.length() {
+          eprint_line(
+            "fatal: delete \{ref_tok}: unexpected end of input when reading <old-oid>",
+          )
+          @sys.exit(128)
+        }
+        let old_val = records[ri]
+        ri = ri + 1
+        update_ref_stdin_check_dup(seen_refs, ref_tok)
+        ops.push({
+          kind: "delete",
+          refname: ref_tok,
+          new_tok: None,
+          old_tok: if old_val.length() == 0 { None } else { Some(old_val) },
+          no_deref,
+          create_reflog,
+        })
+      }
+      "verify" => {
+        if ref_tok.length() == 0 {
+          eprint_line("fatal: verify: missing <ref>")
+          @sys.exit(128)
+        }
+        if ri >= records.length() {
+          eprint_line(
+            "fatal: verify \{ref_tok}: unexpected end of input when reading <old-oid>",
+          )
+          @sys.exit(128)
+        }
+        let old_val = records[ri]
+        ri = ri + 1
+        ops.push({
+          kind: "verify",
+          refname: ref_tok,
+          new_tok: None,
+          old_tok: if old_val.length() == 0 { None } else { Some(old_val) },
+          no_deref,
+          create_reflog,
+        })
+      }
+      _ => {
+        eprint_line("fatal: unknown command: " + rec)
+        @sys.exit(128)
+      }
+    }
   }
 }
 
