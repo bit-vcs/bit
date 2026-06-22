@@ -11,29 +11,61 @@ async fn handle_describe(args : Array[String]) -> Unit raise Error {
   let mut abbrev = 7 // --abbrev=N: abbreviation length
   let mut commit_ref = "HEAD"
   let mut dirty_mark = ""
-  for arg in args {
-    match arg {
-      "--tags" => use_tags = true
-      "--always" => always = true
-      "--long" => long_format = true
-      "--dirty" => dirty_mark = "-dirty"
-      _ if arg.has_prefix("--abbrev=") =>
-        abbrev = parse_int(
-          String::unsafe_substring(arg, start=9, end=arg.length()),
-        )
-      _ if arg.has_prefix("--dirty=") =>
-        dirty_mark = String::unsafe_substring(arg, start=8, end=arg.length())
-      _ if !arg.has_prefix("-") => commit_ref = arg
-      _ => ()
+  // --match/--exclude: glob patterns restricting which tags are considered.
+  // Both the two-arg (`--match <pat>`) and `--match=<pat>` forms are accepted,
+  // and each may be given multiple times (matching git).
+  let match_patterns : Array[String] = []
+  let exclude_patterns : Array[String] = []
+  let mut i = 0
+  while i < args.length() {
+    let arg = args[i]
+    if arg == "--tags" {
+      use_tags = true
+    } else if arg == "--always" {
+      always = true
+    } else if arg == "--long" {
+      long_format = true
+    } else if arg == "--dirty" {
+      dirty_mark = "-dirty"
+    } else if arg.has_prefix("--abbrev=") {
+      abbrev = parse_int(String::unsafe_substring(arg, start=9, end=arg.length()))
+    } else if arg.has_prefix("--dirty=") {
+      dirty_mark = String::unsafe_substring(arg, start=8, end=arg.length())
+    } else if arg == "--match" {
+      i = i + 1
+      if i < args.length() {
+        match_patterns.push(args[i])
+      }
+    } else if arg.has_prefix("--match=") {
+      match_patterns.push(String::unsafe_substring(arg, start=8, end=arg.length()))
+    } else if arg == "--exclude" {
+      i = i + 1
+      if i < args.length() {
+        exclude_patterns.push(args[i])
+      }
+    } else if arg.has_prefix("--exclude=") {
+      exclude_patterns.push(
+        String::unsafe_substring(arg, start=10, end=arg.length()),
+      )
+    } else if !arg.has_prefix("-") {
+      commit_ref = arg
     }
+    i = i + 1
   }
   // Resolve target commit
   let target_id = @bitrepo.rev_parse(rfs, git_dir, commit_ref)
-  guard target_id is Some(tid) else {
+  guard target_id is Some(tid0) else {
     raise @bitcore.GitError::InvalidObject("unknown revision: \{commit_ref}")
   }
-  // Get all tags
-  let tags = get_all_tags(rfs, git_dir, use_tags)
+  // Peel annotated tag objects down to the commit they point at, matching
+  // `git describe` (e.g. `git describe <tag-object-sha>` describes the commit).
+  let tid = describe_peel_to_commit(rfs, git_dir, tid0)
+  // Get all tags, then apply --match/--exclude filtering on the tag name.
+  let tags = filter_tags(
+    get_all_tags(rfs, git_dir, use_tags),
+    match_patterns,
+    exclude_patterns,
+  )
   if tags.length() == 0 && !always {
     @stdio.stderr.write("fatal: No names found, cannot describe anything.")
     @sys.exit(128)
@@ -117,6 +149,67 @@ fn get_all_tags(
 ///|
 fn parse_tag_object(data : String) -> @bitcore.ObjectId? raise Error {
   @bitlib.parse_tag_object(data)
+}
+
+///|
+/// Follow a chain of annotated tag objects to the commit they ultimately point
+/// at. Non-tag objects (and unresolvable ids) are returned unchanged.
+fn describe_peel_to_commit(
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  id : @bitcore.ObjectId,
+) -> @bitcore.ObjectId raise Error {
+  let db = @bitlib.ObjectDb::load(rfs, git_dir)
+  let mut cur = id
+  for _depth in 0..<10 {
+    match db.get(rfs, cur) {
+      Some(o) =>
+        if o.obj_type == @bitcore.ObjectType::Tag {
+          match parse_tag_object(decode_bytes(o.data)) {
+            Some(t) => cur = t
+            None => break
+          }
+        } else {
+          break
+        }
+      None => break
+    }
+  }
+  cur
+}
+
+///|
+/// Whether `name` matches any of the glob `patterns`.
+fn matches_any(patterns : Array[String], name : String) -> Bool {
+  for pat in patterns {
+    if @ignore.match_glob(pat, name) {
+      return true
+    }
+  }
+  false
+}
+
+///|
+/// Restrict candidate tags by `--match`/`--exclude` glob patterns (matched
+/// against the tag name). A tag is kept when it matches at least one match
+/// pattern (or none were given) and matches no exclude pattern.
+fn filter_tags(
+  tags : Map[String, @bitcore.ObjectId],
+  match_patterns : Array[String],
+  exclude_patterns : Array[String],
+) -> Map[String, @bitcore.ObjectId] {
+  if match_patterns.length() == 0 && exclude_patterns.length() == 0 {
+    return tags
+  }
+  let filtered : Map[String, @bitcore.ObjectId] = {}
+  for name, cid in tags {
+    let included = match_patterns.length() == 0 ||
+      matches_any(match_patterns, name)
+    if included && !matches_any(exclude_patterns, name) {
+      filtered[name] = cid
+    }
+  }
+  filtered
 }
 
 ///|
