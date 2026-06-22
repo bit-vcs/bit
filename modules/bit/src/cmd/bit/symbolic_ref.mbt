@@ -5,17 +5,25 @@ async fn handle_symbolic_ref(args : Array[String]) -> Unit raise Error {
   let mut delete_mode = false
   let mut short_mode = false
   let mut recurse = true
+  let mut message : String? = None
   let positional : Array[String] = []
-  for arg in args {
+  let mut ai = 0
+  while ai < args.length() {
+    let arg = args[ai]
     match arg {
       "-d" | "--delete" => delete_mode = true
       "--short" => short_mode = true
       "--recurse" => recurse = true
       "--no-recurse" => recurse = false
+      "-m" if ai + 1 < args.length() => {
+        message = Some(args[ai + 1])
+        ai = ai + 1
+      }
       _ if !arg.has_prefix("-") => positional.push(arg)
       _ if arg.has_prefix("-") => warn_unimplemented_arg("symbolic-ref", arg)
       _ => ()
     }
+    ai = ai + 1
   }
   if positional.length() == 0 {
     raise @bitcore.GitError::InvalidObject(
@@ -96,7 +104,31 @@ async fn handle_symbolic_ref(args : Array[String]) -> Unit raise Error {
   } else {
     // Write mode
     let target = symbolic_ref_normalize_refname(positional[1])
+    let git_dir = resolve_git_dir(fs, root)
+    // Capture the pre-update resolved value for the reflog (zero if unborn).
+    let old_id = match @bitrepo.rev_parse(fs, git_dir, name) {
+      Some(id) => id
+      None => @bitcore.ObjectId::zero()
+    }
     fs.write_string(ref_path, "ref: \{target}\n")
+    // git records a reflog entry for the updated ref when given a reason (-m).
+    match message {
+      Some(msg) => {
+        let rfs : &@bitcore.RepoFileSystem = fs
+        let wfs : &@bitcore.FileSystem = fs
+        let new_id = match @bitrepo.rev_parse(fs, git_dir, target) {
+          Some(id) => id
+          None => @bitcore.ObjectId::zero()
+        }
+        let timestamp = get_current_timestamp()
+        let (author, email) = get_author_info(fs, git_dir)
+        @bitrepo.append_reflog(
+          wfs, rfs, git_dir, name, old_id, new_id, author, email, timestamp,
+          "+0000", msg,
+        )
+      }
+      None => ()
+    }
   }
 }
 
