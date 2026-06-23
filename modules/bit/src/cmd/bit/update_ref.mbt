@@ -133,6 +133,9 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
     let mut stdin_no_deref = no_deref
     let mut stdin_create_reflog = create_reflog
     let seen_refs : Map[String, Bool] = {}
+    // Maps a --no-deref symref's referent to the symref name, so a later update
+    // of that referent is detected as a duplicate.
+    let noderef_referents : Map[String, String] = {}
     // git applies a --stdin batch as one transaction: every command is parsed
     // into a structured op, the whole batch is validated against the current
     // repo state, and only then is anything written.
@@ -146,7 +149,8 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
     let mut txn_started = false
     if z_mode {
       update_ref_parse_stdin_z(
-        input, ops, seen_refs, stdin_no_deref, stdin_create_reflog,
+        fs, actual_git_dir, input, ops, seen_refs, noderef_referents,
+        stdin_no_deref, stdin_create_reflog,
       )
     } else {
       // A trailing newline terminates the final command (it does not introduce
@@ -197,6 +201,7 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
         txn_state = 0
         txn_started = false
         seen_refs.clear()
+        noderef_referents.clear()
       }
       match cmd {
         "option" => {
@@ -222,6 +227,7 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
             // A fresh start (initial open or after a prior commit/abort).
             ops.clear()
             seen_refs.clear()
+            noderef_referents.clear()
             txn_state = 0
             txn_started = true
             print_line("start: ok")
@@ -245,6 +251,7 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
             update_ref_stdin_flush(fs, actual_git_dir, ops, message)
             ops.clear()
             seen_refs.clear()
+            noderef_referents.clear()
             print_line("commit: ok")
             txn_state = 2
           }
@@ -255,6 +262,7 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
           } else {
             ops.clear()
             seen_refs.clear()
+            noderef_referents.clear()
             print_line("abort: ok")
             txn_state = 2
           }
@@ -274,7 +282,10 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
             )
             @sys.exit(128)
           }
-          update_ref_stdin_check_dup(seen_refs, ref_tok)
+          update_ref_stdin_check_dup(
+            fs, actual_git_dir, ref_tok, stdin_no_deref, seen_refs,
+            noderef_referents,
+          )
           ops.push({
             kind: "create",
             refname: ref_tok,
@@ -300,7 +311,10 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
             )
             @sys.exit(128)
           }
-          update_ref_stdin_check_dup(seen_refs, ref_tok)
+          update_ref_stdin_check_dup(
+            fs, actual_git_dir, ref_tok, stdin_no_deref, seen_refs,
+            noderef_referents,
+          )
           ops.push({
             kind: "update",
             refname: ref_tok,
@@ -322,7 +336,10 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
             )
             @sys.exit(128)
           }
-          update_ref_stdin_check_dup(seen_refs, ref_tok)
+          update_ref_stdin_check_dup(
+            fs, actual_git_dir, ref_tok, stdin_no_deref, seen_refs,
+            noderef_referents,
+          )
           ops.push({
             kind: "delete",
             refname: ref_tok,
@@ -1064,9 +1081,12 @@ async fn update_ref_stdin_flush(
 /// takes two. An empty new value is the zero oid (a delete, with git's warning);
 /// an empty old value means "do not check".
 async fn update_ref_parse_stdin_z(
+  fs : OsFs,
+  git_dir : String,
   input : String,
   ops : Array[UpdateRefStdinOp],
   seen_refs : Map[String, Bool],
+  noderef_referents : Map[String, String],
   no_deref_init : Bool,
   create_reflog_init : Bool,
 ) -> Unit raise Error {
@@ -1140,7 +1160,10 @@ async fn update_ref_parse_stdin_z(
           eprint_line("fatal: create \{ref_tok}: missing <new-oid>")
           @sys.exit(128)
         }
-        update_ref_stdin_check_dup(seen_refs, ref_tok)
+        update_ref_stdin_check_dup(
+            fs, git_dir, ref_tok, no_deref, seen_refs,
+            noderef_referents,
+          )
         ops.push({
           kind: "create",
           refname: ref_tok,
@@ -1176,7 +1199,10 @@ async fn update_ref_parse_stdin_z(
             "warning: update \{ref_tok}: missing <new-oid>, treating as zero",
           )
         }
-        update_ref_stdin_check_dup(seen_refs, ref_tok)
+        update_ref_stdin_check_dup(
+            fs, git_dir, ref_tok, no_deref, seen_refs,
+            noderef_referents,
+          )
         ops.push({
           kind: "update",
           refname: ref_tok,
@@ -1199,7 +1225,10 @@ async fn update_ref_parse_stdin_z(
         }
         let old_val = records[ri]
         ri = ri + 1
-        update_ref_stdin_check_dup(seen_refs, ref_tok)
+        update_ref_stdin_check_dup(
+            fs, git_dir, ref_tok, no_deref, seen_refs,
+            noderef_referents,
+          )
         ops.push({
           kind: "delete",
           refname: ref_tok,
@@ -1335,17 +1364,89 @@ async fn update_ref_unquote_arg(token : String) -> String {
 
 ///|
 /// git's stdin transaction rejects multiple updates to the same ref.
-async fn update_ref_stdin_check_dup(
-  seen : Map[String, Bool],
-  ref_tok : String,
-) -> Unit {
-  if seen.get(ref_tok).unwrap_or(false) {
-    eprint_line(
-      "fatal: multiple updates for ref '" + ref_tok + "' not allowed",
-    )
-    @sys.exit(128)
+/// Read the immediate (one-level) symref target of `refname`, or None if it is
+/// not a symbolic ref.
+fn update_ref_symref_target_one(
+  fs : OsFs,
+  git_dir : String,
+  refname : String,
+) -> String? {
+  let ref_path = git_dir + "/" + refname
+  if !fs.is_file(ref_path) {
+    return None
   }
-  seen[ref_tok] = true
+  let content = decode_bytes(fs.read_file(ref_path)) catch { _ => return None }
+  let line = trim_chars(content, " \t\r\n")
+  if line.has_prefix("ref: ") {
+    Some(String::unsafe_substring(line, start=5, end=line.length()))
+  } else {
+    None
+  }
+}
+
+///|
+/// git's stdin transaction rejects two updates that touch the same underlying
+/// ref. A dereferencing symref update collides on its (resolved) target; a
+/// `--no-deref` symref update collides with a separate update of its referent.
+async fn update_ref_stdin_check_dup(
+  fs : OsFs,
+  git_dir : String,
+  ref_tok : String,
+  no_deref : Bool,
+  seen : Map[String, Bool],
+  noderef_referents : Map[String, String],
+) -> Unit raise Error {
+  match update_ref_symref_target_one(fs, git_dir, ref_tok) {
+    Some(referent) =>
+      if no_deref {
+        // The symref itself is updated; conflicts if its referent is too.
+        if seen.get(referent).unwrap_or(false) {
+          eprint_line(
+            "fatal: multiple updates for '\{ref_tok}' (including one via its referent '\{referent}') are not allowed",
+          )
+          @sys.exit(128)
+        }
+        if seen.get(ref_tok).unwrap_or(false) {
+          eprint_line(
+            "fatal: multiple updates for ref '\{ref_tok}' not allowed",
+          )
+          @sys.exit(128)
+        }
+        seen[ref_tok] = true
+        noderef_referents[referent] = ref_tok
+      } else {
+        // Dereferencing: the update lands on the fully resolved target.
+        let target = resolve_symbolic_ref_target(fs, git_dir, ref_tok).unwrap_or(
+          ref_tok,
+        )
+        if seen.get(target).unwrap_or(false) {
+          eprint_line(
+            "fatal: multiple updates for '\{target}' (including one via symref '\{ref_tok}') are not allowed",
+          )
+          @sys.exit(128)
+        }
+        seen[target] = true
+      }
+    None => {
+      if seen.get(ref_tok).unwrap_or(false) {
+        eprint_line(
+          "fatal: multiple updates for ref '\{ref_tok}' not allowed",
+        )
+        @sys.exit(128)
+      }
+      // A prior --no-deref symref update may have claimed this ref as referent.
+      match noderef_referents.get(ref_tok) {
+        Some(symref) => {
+          eprint_line(
+            "fatal: multiple updates for '\{symref}' (including one via its referent '\{ref_tok}') are not allowed",
+          )
+          @sys.exit(128)
+        }
+        None => ()
+      }
+      seen[ref_tok] = true
+    }
+  }
 }
 
 ///|
