@@ -477,9 +477,17 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
       match current_id {
         Some(cur_id) =>
           if cur_id.to_hex() != expected_id.to_hex() {
-            @stdio.stderr.write(
-              "error: cannot lock ref '\{refname}': is at \{cur_id.to_hex()} but expected \{expected_id.to_hex()}",
-            )
+            // A zero expected value means "must not exist"; git reports an
+            // existing ref as "already exists" rather than a value mismatch.
+            if expected_id.to_hex() == @bitcore.ObjectId::zero().to_hex() {
+              @stdio.stderr.write(
+                "error: cannot lock ref '\{refname}': reference already exists",
+              )
+            } else {
+              @stdio.stderr.write(
+                "error: cannot lock ref '\{refname}': is at \{cur_id.to_hex()} but expected \{expected_id.to_hex()}",
+              )
+            }
             @sys.exit(1)
           }
         None =>

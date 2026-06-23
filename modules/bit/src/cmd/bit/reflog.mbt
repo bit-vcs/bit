@@ -217,10 +217,12 @@ fn parse_reflog_expire_args(args : Array[String]) -> ReflogExpireArgs {
 ///|
 async fn handle_reflog(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
-  let git_dir = root + "/.git"
   let fs = OsFs::new()
   let rfs : &@bitcore.RepoFileSystem = fs
   let wfs : &@bitcore.FileSystem = fs
+  // Resolve the real git dir so bare repositories (where the git dir is the
+  // work root, with no .git subdirectory) are handled correctly.
+  let git_dir = resolve_git_dir(rfs, root)
   let empty_grep_patterns : Array[String] = []
   if args.length() == 0 {
     // Default to show HEAD
