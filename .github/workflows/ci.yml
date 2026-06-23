@@ -70,12 +70,18 @@ jobs:
 
   cmd-native-test:
     runs-on: ubuntu-latest
+    # The bundled `tcc` backend hangs compiling cmd/bit's large test binary, so
+    # override the native C compiler with gcc (MOON_CC). gcc at -O0 (the debug
+    # default) compiles it quickly and never hangs, unlike tcc; using gcc -O
+    # (--release) also works but is far slower.
+    env:
+      MOON_CC: gcc
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { name: cmd-bit,     pkg: mizchi/bit/cmd/bit,     timeout: 120 }
-          - { name: cmd-git-bit, pkg: mizchi/bit/cmd/git-bit, timeout: 30  }
+          - { name: cmd-bit,     pkg: mizchi/bit/cmd/bit,     timeout: 150, mode: "" }
+          - { name: cmd-git-bit, pkg: mizchi/bit/cmd/git-bit, timeout: 30,  mode: "" }
     name: cmd-native-test (${{ matrix.name }})
     steps:
       - name: Checkout
@@ -98,7 +104,7 @@ jobs:
         run: |
           set -euo pipefail
           moon --version
-          moon build --target native --release modules/bit/src/cmd/bit
+          moon build --target native modules/bit/src/cmd/bit
           bin_path=$(find _build/native -maxdepth 8 -type f -name 'bit.exe' | head -1)
           if [ -z "$bin_path" ]; then
             echo "bit.exe not found after moon build"
@@ -118,7 +124,7 @@ jobs:
           rm -f _build/.moon-lock
       - name: Run ${{ matrix.pkg }} native tests
         timeout-minutes: ${{ matrix.timeout }}
-        run: moon test --target native -p ${{ matrix.pkg }}
+        run: moon test --target native ${{ matrix.mode }} -p ${{ matrix.pkg }}
 
   distributed-test:
     runs-on: ubuntu-latest
