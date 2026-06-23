@@ -137,6 +137,9 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
     // into a structured op, the whole batch is validated against the current
     // repo state, and only then is anything written.
     let ops : Array[UpdateRefStdinOp] = []
+    // Transaction state for the explicit start/prepare/commit/abort commands:
+    // 0 = open, 1 = prepared, 2 = closed.
+    let mut txn_state = 0
     if z_mode {
       update_ref_parse_stdin_z(
         input, ops, seen_refs, stdin_no_deref, stdin_create_reflog,
@@ -190,7 +193,46 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
             }
           }
         }
-        "start" | "prepare" | "commit" | "abort" => ()
+        "start" =>
+          if txn_state == 2 {
+            eprint_line("fatal: transaction is closed")
+            @sys.exit(128)
+          } else if txn_state == 1 {
+            eprint_line("fatal: prepared transactions can only be closed")
+            @sys.exit(128)
+          } else {
+            print_line("start: ok")
+          }
+        "prepare" =>
+          if txn_state == 2 {
+            eprint_line("fatal: transaction is closed")
+            @sys.exit(128)
+          } else {
+            for op in ops {
+              update_ref_stdin_validate_op(fs, actual_git_dir, op)
+            }
+            print_line("prepare: ok")
+            txn_state = 1
+          }
+        "commit" =>
+          if txn_state == 2 {
+            eprint_line("fatal: transaction is closed")
+            @sys.exit(128)
+          } else {
+            update_ref_stdin_flush(fs, actual_git_dir, ops, message)
+            ops.clear()
+            print_line("commit: ok")
+            txn_state = 2
+          }
+        "abort" =>
+          if txn_state == 2 {
+            eprint_line("fatal: transaction is closed")
+            @sys.exit(128)
+          } else {
+            ops.clear()
+            print_line("abort: ok")
+            txn_state = 2
+          }
         "create" => {
           if ref_tok.length() == 0 {
             eprint_line("fatal: create: missing <ref>")
@@ -293,74 +335,10 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
       }
       }
     }
-    // Pass 2: validate the whole batch against the current repo state before
-    // touching anything, so a later failure leaves the repo untouched.
-    for op in ops {
-      update_ref_stdin_validate_op(fs, actual_git_dir, op)
-    }
-    // Pass 3: apply. Verify commands have no effect; the rest reuse the regular
-    // update-ref machinery (reflogs, symref deref) now that they are validated.
-    let zero_hex = @bitcore.ObjectId::zero().to_hex()
-    for op in ops {
-      if op.kind == "verify" {
-        continue
-      }
-      let cmd_args = update_ref_stdin_base_args(
-        op.no_deref, op.create_reflog, message,
-      )
-      // Resolve the old value to a concrete oid hex; the regular handler's
-      // old-value check expects a hex string, not a ref name or revision.
-      let old_hex = match op.old_tok {
-        Some(t) =>
-          if t.length() == 0 {
-            Some(zero_hex)
-          } else {
-            match update_ref_resolve_oid(fs, actual_git_dir, t) {
-              Some(oid) => Some(oid.to_hex())
-              None => Some(t)
-            }
-          }
-        None => None
-      }
-      // Resolve the new value; an `update` to the zero oid means "delete".
-      let new_hex = match op.new_tok {
-        Some(t) =>
-          if t.length() == 0 {
-            zero_hex
-          } else {
-            match update_ref_resolve_oid(fs, actual_git_dir, t) {
-              Some(oid) => oid.to_hex()
-              None => t
-            }
-          }
-        None => zero_hex
-      }
-      let deletes = op.kind == "delete" ||
-        (op.kind == "update" && new_hex == zero_hex)
-      if deletes {
-        // Ensuring a ref is absent when it is already gone is a no-op.
-        if @bitrepo.rev_parse(fs, actual_git_dir, op.refname) is None {
-          continue
-        }
-        cmd_args.push("-d")
-        cmd_args.push(op.refname)
-        match old_hex {
-          Some(h) => cmd_args.push(h)
-          None => ()
-        }
-      } else {
-        cmd_args.push(op.refname)
-        cmd_args.push(new_hex)
-        if op.kind == "create" {
-          cmd_args.push(zero_hex)
-        } else {
-          match old_hex {
-            Some(h) => cmd_args.push(h)
-            None => ()
-          }
-        }
-      }
-      handle_update_ref(cmd_args)
+    // At end of input an open (or prepared-but-not-closed) transaction is
+    // committed implicitly; an explicit commit/abort already flushed/discarded.
+    if txn_state != 2 {
+      update_ref_stdin_flush(fs, actual_git_dir, ops, message)
     }
     return ()
   }
@@ -965,6 +943,83 @@ async fn update_ref_stdin_validate_op(
       }
     }
     None => ()
+  }
+}
+
+///|
+/// Validate then apply a batch of parsed stdin ops as a single transaction:
+/// the whole batch is checked against the current repo state first, so a later
+/// failure leaves the repo untouched, and only then is each op written.
+async fn update_ref_stdin_flush(
+  fs : OsFs,
+  git_dir : String,
+  ops : Array[UpdateRefStdinOp],
+  message : String?,
+) -> Unit raise Error {
+  for op in ops {
+    update_ref_stdin_validate_op(fs, git_dir, op)
+  }
+  let zero_hex = @bitcore.ObjectId::zero().to_hex()
+  for op in ops {
+    if op.kind == "verify" {
+      continue
+    }
+    let cmd_args = update_ref_stdin_base_args(
+      op.no_deref, op.create_reflog, message,
+    )
+    // Resolve the old value to a concrete oid hex; the regular handler's
+    // old-value check expects a hex string, not a ref name or revision.
+    let old_hex = match op.old_tok {
+      Some(t) =>
+        if t.length() == 0 {
+          Some(zero_hex)
+        } else {
+          match update_ref_resolve_oid(fs, git_dir, t) {
+            Some(oid) => Some(oid.to_hex())
+            None => Some(t)
+          }
+        }
+      None => None
+    }
+    // Resolve the new value; an `update` to the zero oid means "delete".
+    let new_hex = match op.new_tok {
+      Some(t) =>
+        if t.length() == 0 {
+          zero_hex
+        } else {
+          match update_ref_resolve_oid(fs, git_dir, t) {
+            Some(oid) => oid.to_hex()
+            None => t
+          }
+        }
+      None => zero_hex
+    }
+    let deletes = op.kind == "delete" ||
+      (op.kind == "update" && new_hex == zero_hex)
+    if deletes {
+      // Ensuring a ref is absent when it is already gone is a no-op.
+      if @bitrepo.rev_parse(fs, git_dir, op.refname) is None {
+        continue
+      }
+      cmd_args.push("-d")
+      cmd_args.push(op.refname)
+      match old_hex {
+        Some(h) => cmd_args.push(h)
+        None => ()
+      }
+    } else {
+      cmd_args.push(op.refname)
+      cmd_args.push(new_hex)
+      if op.kind == "create" {
+        cmd_args.push(zero_hex)
+      } else {
+        match old_hex {
+          Some(h) => cmd_args.push(h)
+          None => ()
+        }
+      }
+    }
+    handle_update_ref(cmd_args)
   }
 }
 
