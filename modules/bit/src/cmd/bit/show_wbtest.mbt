@@ -45,7 +45,7 @@ async fn show_wbtest_collect_shim_git_stderr(
     "SHIM_REAL_GIT": wbtest_resolve_real_git(repo_root),
     "SHIM_REAL_GIT_FALLBACK": "",
     "SHIM_EXEC_PATH": repo_root + "/third_party/git",
-    "SHIM_MOON": repo_root + "/_build/native/release/build/mizchi/bit/cmd/bit/bit.exe",
+    "SHIM_MOON": wbtest_resolve_bit_exe(repo_root),
     "SHIM_CMDS": "show",
     "SHIM_STRICT": "1",
   }
