@@ -138,8 +138,12 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
     // repo state, and only then is anything written.
     let ops : Array[UpdateRefStdinOp] = []
     // Transaction state for the explicit start/prepare/commit/abort commands:
-    // 0 = open, 1 = prepared, 2 = closed.
+    // phase 0 = open, 1 = prepared, 2 = closed. `txn_started` records whether
+    // the active transaction was opened with an explicit `start` (which aborts
+    // by default at end of input, unlike the implicit transaction which
+    // commits).
     let mut txn_state = 0
+    let mut txn_started = false
     if z_mode {
       update_ref_parse_stdin_z(
         input, ops, seen_refs, stdin_no_deref, stdin_create_reflog,
@@ -181,6 +185,19 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
       }
       let cmd = fields[0]
       let ref_tok = if fields.length() >= 2 { fields[1] } else { "" }
+      // A ref command issued after a closed transaction implicitly begins a
+      // new (un-started) transaction.
+      if txn_state == 2 &&
+        (
+          cmd == "create" ||
+          cmd == "update" ||
+          cmd == "delete" ||
+          cmd == "verify"
+        ) {
+        txn_state = 0
+        txn_started = false
+        seen_refs.clear()
+      }
       match cmd {
         "option" => {
           let name = ref_tok
@@ -194,13 +211,19 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
           }
         }
         "start" =>
-          if txn_state == 2 {
-            eprint_line("fatal: transaction is closed")
-            @sys.exit(128)
-          } else if txn_state == 1 {
+          if txn_state == 1 {
             eprint_line("fatal: prepared transactions can only be closed")
             @sys.exit(128)
+          } else if txn_state == 0 && txn_started {
+            // A transaction is already open and explicitly started.
+            eprint_line("fatal: transaction already in progress")
+            @sys.exit(128)
           } else {
+            // A fresh start (initial open or after a prior commit/abort).
+            ops.clear()
+            seen_refs.clear()
+            txn_state = 0
+            txn_started = true
             print_line("start: ok")
           }
         "prepare" =>
@@ -221,6 +244,7 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
           } else {
             update_ref_stdin_flush(fs, actual_git_dir, ops, message)
             ops.clear()
+            seen_refs.clear()
             print_line("commit: ok")
             txn_state = 2
           }
@@ -230,6 +254,7 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
             @sys.exit(128)
           } else {
             ops.clear()
+            seen_refs.clear()
             print_line("abort: ok")
             txn_state = 2
           }
@@ -335,9 +360,10 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
       }
       }
     }
-    // At end of input an open (or prepared-but-not-closed) transaction is
-    // committed implicitly; an explicit commit/abort already flushed/discarded.
-    if txn_state != 2 {
+    // At end of input the implicit transaction commits, but an explicitly
+    // started transaction that was never committed aborts by default; an
+    // explicit commit/abort has already flushed/discarded.
+    if txn_state != 2 && !txn_started {
       update_ref_stdin_flush(fs, actual_git_dir, ops, message)
     }
     return ()
