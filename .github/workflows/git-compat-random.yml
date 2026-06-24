@@ -72,7 +72,7 @@ jobs:
 
       - name: Install pkfire
         if: ${{ steps.shard_guard.outputs.should_run == 'true' }}
-        uses: mizchi/pkfire@v0
+        uses: mizchi/pkfire@v0.12.0
 
       - name: Install MoonBit CLI
         if: ${{ steps.shard_guard.outputs.should_run == 'true' }}

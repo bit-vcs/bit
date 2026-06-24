@@ -16,7 +16,7 @@ jobs:
         with:
           submodules: true
       - name: Install pkfire + pkspec
-        uses: mizchi/pkfire@v0
+        uses: mizchi/pkfire@v0.12.0
       - name: Install pkspec
         uses: mizchi/pkspec@v0.2.1
         with:
@@ -99,7 +99,7 @@ jobs:
         with:
           submodules: true
       - name: Install pkfire + pkspec
-        uses: mizchi/pkfire@v0
+        uses: mizchi/pkfire@v0.12.0
       - name: Install pkspec
         uses: mizchi/pkspec@v0.2.1
         with:
