@@ -108,10 +108,12 @@ pub fn parse_approxidate_iso8601(s : String) -> Int64 {
   let mut hour = 0
   let mut minute = 0
   let mut second = 0
-  if chars.length() >= 19 {
+  if chars.length() >= 16 {
     hour = parse_date_digits(chars, 11, 13)
     minute = parse_date_digits(chars, 14, 16)
-    second = parse_date_digits(chars, 17, 19)
+    if chars.length() >= 19 && chars[16] == ':' {
+      second = parse_date_digits(chars, 17, 19)
+    }
   }
   let days = days_since_epoch(year, month, day)
   days.to_int64() * 86400L +
@@ -137,10 +139,14 @@ pub fn parse_approxidate_iso_date(s : String) -> Int64? {
   let mut hour = 0
   let mut minute = 0
   let mut second = 0
-  if chars.length() >= 19 && (chars[10] == ' ' || chars[10] == 'T') {
+  // Accept both "HH:MM" (length >= 16) and "HH:MM:SS" (length >= 19); git
+  // permits a reflog date without an explicit seconds field.
+  if chars.length() >= 16 && (chars[10] == ' ' || chars[10] == 'T') {
     hour = parse_date_digits(chars, 11, 13)
     minute = parse_date_digits(chars, 14, 16)
-    second = parse_date_digits(chars, 17, 19)
+    if chars.length() >= 19 && chars[16] == ':' {
+      second = parse_date_digits(chars, 17, 19)
+    }
   }
   let days = days_since_epoch(year, month, day)
   Some(

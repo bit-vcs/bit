@@ -68,12 +68,12 @@ async fn submodule_wbtest_collect_shim_git_stderr(
   cwd : String,
   args : Array[String],
 ) -> (Int, String) raise Error {
-  let repo_root = @env.current_dir().unwrap_or(".")
+  let repo_root = wbtest_resolve_repo_root()
   let shim_git = repo_root + "/tools/git-shim/bin/git"
   let env : Map[String, String] = {
     "SHIM_REAL_GIT": wbtest_resolve_real_git(repo_root),
     "SHIM_EXEC_PATH": repo_root + "/third_party/git",
-    "SHIM_MOON": repo_root + "/_build/native/release/build/mizchi/bit/cmd/bit/bit.exe",
+    "SHIM_MOON": wbtest_resolve_bit_exe(repo_root),
     "SHIM_CMDS": "submodule submodule--helper",
     "SHIM_STRICT": "1",
   }

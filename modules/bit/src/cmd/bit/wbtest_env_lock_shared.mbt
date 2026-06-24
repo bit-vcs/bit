@@ -8,6 +8,22 @@ let cmd_bit_wbtest_env_lock : @async.Semaphore = @async.Semaphore::new(
 fn init {
   ignore(cmd_bit_wbtest_env_lock)
   ignore(wbtest_resolve_real_git)
+  ignore(wbtest_resolve_bit_exe)
+  ignore(wbtest_resolve_repo_root)
+}
+
+///|
+/// Resolve the git repo root for wbtests independently of the current working
+/// directory. `moon test` sets CWD to the module dir (`modules/bit`), so
+/// `@env.current_dir()` cannot locate repo-root-relative assets such as the
+/// git shim (`tools/git-shim/bin/git`). Derive the root from the running test
+/// executable's `/_build/` path instead, falling back to CWD when that fails.
+fn wbtest_resolve_repo_root() -> String {
+  let exe = @sys.get_cli_args()[0]
+  match exe.find("/_build/") {
+    Some(i) => String::unsafe_substring(exe, start=0, end=i)
+    None => @env.current_dir().unwrap_or(".")
+  }
 }
 
 ///|
@@ -21,4 +37,37 @@ fn wbtest_resolve_real_git(repo_root : String) -> String {
   } else {
     "git"
   }
+}
+
+///|
+/// Resolve the freshly built `bit.exe` for wbtests. The native binary lives
+/// under a debug or release build directory depending on how it was compiled,
+/// so prefer whichever exists (debug first, since that is the default build).
+fn wbtest_resolve_bit_exe(repo_root : String) -> String {
+  let fs : &@bitcore.RepoFileSystem = OsFs::new()
+  let debug_rel = "/_build/native/debug/build/mizchi/bit/cmd/bit/bit.exe"
+  let release_rel = "/_build/native/release/build/mizchi/bit/cmd/bit/bit.exe"
+  // Candidate repo roots, most reliable first: a root derived from the running
+  // test executable path (independent of CWD, which `moon test` may set to the
+  // module dir), then the caller-supplied repo_root.
+  let roots : Array[String] = []
+  let exe = @sys.get_cli_args()[0]
+  match exe.find("/_build/") {
+    Some(i) => roots.push(String::unsafe_substring(exe, start=0, end=i))
+    None => ()
+  }
+  roots.push(repo_root)
+  for root in roots {
+    let debug_path = root + debug_rel
+    if fs.is_file(debug_path) {
+      return debug_path
+    }
+    let release_path = root + release_rel
+    if fs.is_file(release_path) {
+      return release_path
+    }
+  }
+  // Not found anywhere: return the primary debug candidate so the caller's
+  // existence check fails with a clear, actionable path.
+  roots[0] + debug_rel
 }

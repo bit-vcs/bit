@@ -60,14 +60,11 @@ async fn sparse_checkout_wbtest_shim_moon_path(
   let wrapper_path = "/tmp/bit-sparse-shim-moon.sh"
   // Build the native binary first so exit codes propagate correctly
   // (moon run swallows non-zero exit codes)
-  let bit_exe = repo_root + "/_build/native/release/build/mizchi/bit/cmd/bit/bit.exe"
+  let bit_exe = wbtest_resolve_bit_exe(repo_root)
   if !fs.is_file(bit_exe) {
-    let build_code = @process.run(
-      "moon",
-      ["build", "--target", "native", "--release"],
-      inherit_env=true,
+    fail(
+      "bit.exe not found at \{bit_exe}; build it with `moon build --target native modules/bit/src/cmd/bit` first",
     )
-    @test.assert_eq(build_code, 0)
   }
   fs.write_string(
     wrapper_path,
@@ -119,7 +116,7 @@ async fn sparse_checkout_wbtest_collect_shim_git_output(
 ) -> (Int, String, String) raise Error {
   sparse_checkout_wbtest_shim_lock.acquire()
   defer sparse_checkout_wbtest_shim_lock.release()
-  let repo_root = @env.current_dir().unwrap_or(".")
+  let repo_root = wbtest_resolve_repo_root()
   let shim_git = repo_root + "/tools/git-shim/bin/git"
   let shim_moon = sparse_checkout_wbtest_shim_moon_path(repo_root)
   let env : Map[String, String] = {
@@ -177,7 +174,7 @@ async fn sparse_checkout_wbtest_collect_shim_git_shell_output(
 ) -> (Int, String, String) raise Error {
   sparse_checkout_wbtest_shim_lock.acquire()
   defer sparse_checkout_wbtest_shim_lock.release()
-  let repo_root = @env.current_dir().unwrap_or(".")
+  let repo_root = wbtest_resolve_repo_root()
   let shim_git = repo_root + "/tools/git-shim/bin/git"
   let shim_moon = sparse_checkout_wbtest_shim_moon_path(repo_root)
   let env : Map[String, String] = {
@@ -1095,7 +1092,7 @@ test "sparse-checkout: check-rules helper preserves quoted and nul-delimited mat
 async test "sparse-checkout: check-rules defaults to cone mode for rules files" {
   @bitnative.init_native_io()
   let fs = OsFs::new()
-  let repo_root = @env.current_dir().unwrap_or(".")
+  let repo_root = wbtest_resolve_repo_root()
   let shim_moon = sparse_checkout_wbtest_shim_moon_path(repo_root)
   let root = "/tmp/bit-test-sparse-check-rules-" +
     get_current_timestamp().to_string()

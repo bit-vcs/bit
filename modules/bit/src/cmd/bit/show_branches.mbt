@@ -51,7 +51,7 @@ async fn handle_show_branches(args : Array[String]) -> Unit raise Error {
   let branch_chars = "!*+-o=#@%&"
   for idx, branch in branches_to_show {
     let marker = if idx < branch_chars.length() {
-      branch_chars[idx].to_string()
+      Int::unsafe_to_char(branch_chars[idx].to_int()).to_string()
     } else {
       "!"
     }
@@ -78,7 +78,7 @@ async fn handle_show_branches(args : Array[String]) -> Unit raise Error {
       for i = 0; i < branches_to_show.length(); i = i + 1 {
         if i == branch_idx {
           let ch = if i < branch_chars.length() {
-            branch_chars[i].to_string()
+            Int::unsafe_to_char(branch_chars[i].to_int()).to_string()
           } else {
             "+"
           }
@@ -94,7 +94,7 @@ async fn handle_show_branches(args : Array[String]) -> Unit raise Error {
           )
           if reachable {
             let ch = if i < branch_chars.length() {
-              branch_chars[i].to_string()
+              Int::unsafe_to_char(branch_chars[i].to_int()).to_string()
             } else {
               "+"
             }

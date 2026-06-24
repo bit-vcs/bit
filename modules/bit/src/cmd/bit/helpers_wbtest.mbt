@@ -166,6 +166,12 @@ test "helpers: parse_git_env_timestamp supports timezone suffix" {
 }
 
 ///|
+test "helpers: parse_git_env_timestamp parses human ISO date" {
+  @test.assert_eq(parse_iso_date_timestamp("2005-05-26 23:30"), Some(1117150200L))
+  @test.assert_eq(parse_git_env_timestamp("2005-05-26 23:30"), Some(1117150200L))
+}
+
+///|
 test "helpers: parse_git_env_timezone extracts timezone token" {
   @test.assert_eq(parse_git_env_timezone("1234567890 -0700"), Some("-0700"))
   @test.assert_eq(parse_git_env_timezone("@1234567890 +0900"), Some("+0900"))

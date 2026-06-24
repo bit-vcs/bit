@@ -203,11 +203,131 @@ fn storage_parse_git_env_timestamp(raw : String) -> Int64? {
         let parsed = @string.parse_int64(numeric) catch { _ => return None }
         Some(parsed)
       } else {
-        let parsed = @string.parse_int64(part) catch { _ => return None }
-        Some(parsed)
+        // Plain integer epoch first; otherwise fall back to a human-readable
+        // ISO date such as "2005-05-26 23:30" (git accepts these in
+        // GIT_AUTHOR_DATE / GIT_COMMITTER_DATE).
+        let parsed = @string.parse_int64(part) catch { _ => -1L }
+        if parsed >= 0L {
+          return Some(parsed)
+        }
+        storage_parse_iso_date_timestamp(raw)
       }
     None => None
   }
+}
+
+///|
+/// Parse a human-readable ISO date into a Unix timestamp (seconds).
+/// Formats: "2005-05-26 23:30", "2005-05-26T23:00", "2005-05-26 23:00:30",
+/// optionally followed by a timezone offset such as " -0500".
+fn storage_parse_iso_date_timestamp(raw : String) -> Int64? {
+  let s = raw.trim().to_owned()
+  if s.length() < 16 {
+    return None
+  }
+  if s[4] != '-' || s[7] != '-' {
+    return None
+  }
+  let sep = s[10]
+  if sep != ' ' && sep != 'T' {
+    return None
+  }
+  let year = @string.parse_int64(String::unsafe_substring(s, start=0, end=4)) catch {
+    _ => return None
+  }
+  let month = @string.parse_int64(String::unsafe_substring(s, start=5, end=7)) catch {
+    _ => return None
+  }
+  let day = @string.parse_int64(String::unsafe_substring(s, start=8, end=10)) catch {
+    _ => return None
+  }
+  let time_str = String::unsafe_substring(s, start=11, end=s.length())
+  let mut time_end = time_str.length()
+  for i = 0; i < time_str.length(); i = i + 1 {
+    let c = time_str[i]
+    if c == ' ' || c == '+' || c == '-' {
+      time_end = i
+      break
+    }
+  }
+  let time_part = String::unsafe_substring(time_str, start=0, end=time_end)
+  if time_part.length() < 5 || time_part[2] != ':' {
+    return None
+  }
+  let hour = @string.parse_int64(
+    String::unsafe_substring(time_part, start=0, end=2),
+  ) catch {
+    _ => return None
+  }
+  let minute = @string.parse_int64(
+    String::unsafe_substring(time_part, start=3, end=5),
+  ) catch {
+    _ => return None
+  }
+  let second = if time_part.length() >= 8 && time_part[5] == ':' {
+    @string.parse_int64(String::unsafe_substring(time_part, start=6, end=8)) catch {
+      _ => 0L
+    }
+  } else {
+    0L
+  }
+  let days = storage_days_from_epoch(year, month, day)
+  let mut ts = days * 86400L + hour * 3600L + minute * 60L + second
+  let after_time = String::unsafe_substring(s, start=11 + time_end, end=s.length())
+  ts = ts - storage_parse_iso_tz_offset_seconds(after_time)
+  Some(ts)
+}
+
+///|
+fn storage_parse_iso_tz_offset_seconds(s : String) -> Int64 {
+  let t = s.trim().to_owned()
+  if t.length() < 5 {
+    return 0L
+  }
+  let sign : Int64 = if t[0] == '-' {
+    -1L
+  } else if t[0] == '+' {
+    1L
+  } else {
+    return 0L
+  }
+  let (hh_str, mm_str) = if t.length() >= 6 && t[3] == ':' {
+    (
+      String::unsafe_substring(t, start=1, end=3),
+      String::unsafe_substring(t, start=4, end=6),
+    )
+  } else {
+    (
+      String::unsafe_substring(t, start=1, end=3),
+      String::unsafe_substring(t, start=3, end=5),
+    )
+  }
+  let hh = @string.parse_int64(hh_str) catch { _ => return 0L }
+  let mm = @string.parse_int64(mm_str) catch { _ => return 0L }
+  sign * (hh * 3600L + mm * 60L)
+}
+
+///|
+fn storage_days_from_epoch(year : Int64, month : Int64, day : Int64) -> Int64 {
+  let month_days : Array[Int64] = [
+    0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334,
+  ]
+  let y = year
+  let m = month
+  let mut days = 365L * (y - 1970L)
+  if y > 1970L {
+    days = days + (y - 1969L) / 4L - (y - 1901L) / 100L + (y - 1601L) / 400L
+  } else {
+    days = days - (1970L - y) / 4L + (1970L - y) / 100L - (1970L - y) / 400L
+  }
+  days = days + month_days[(m - 1L).to_int()]
+  if m > 2L {
+    let is_leap = (y % 4L == 0L && y % 100L != 0L) || y % 400L == 0L
+    if is_leap {
+      days = days + 1L
+    }
+  }
+  days + day - 1L
 }
 
 ///|

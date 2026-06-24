@@ -94,6 +94,7 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
   let mut create_reflog = false
   let mut no_deref = false
   let mut stdin_mode = false
+  let mut z_mode = false
   let mut message : String? = None
   let positional : Array[String] = []
   let mut i = 0
@@ -104,6 +105,7 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
       "--create-reflog" => create_reflog = true
       "--no-deref" => no_deref = true
       "--stdin" => stdin_mode = true
+      "-z" => z_mode = true
       "-m" if i + 1 < args.length() => {
         message = Some(args[i + 1])
         i += 1
@@ -114,120 +116,272 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
     }
     i += 1
   }
+  // -z only makes sense together with --stdin.
+  if z_mode && !stdin_mode {
+    eprint_line("usage: git update-ref [<options>]    <refname> <new-oid> [<old-oid>]")
+    @sys.exit(129)
+  }
   let actual_git_dir = git_dir
   let head_target = resolve_symbolic_ref_target(fs, actual_git_dir, "HEAD")
-  // Get current timestamp for reflog
-  let timestamp = get_current_timestamp()
-  let timezone = "+0000"
+  // Reflog timestamp honors GIT_COMMITTER_DATE (falling back to now), matching
+  // git — reflog entries created by update-ref must record the committer date.
+  let timestamp = get_commit_tree_timestamp("GIT_COMMITTER_DATE")
+  let timezone = get_commit_tree_timezone("GIT_COMMITTER_DATE")
   let (author, email) = get_author_info(fs, actual_git_dir)
   if stdin_mode {
     let input = decode_bytes(read_all_stdin())
     let mut stdin_no_deref = no_deref
     let mut stdin_create_reflog = create_reflog
-    for line_view in input.split("\n") {
-      let line = trim_chars(line_view.to_owned(), " \t\r\n")
-      if line.length() == 0 {
-        continue
+    let seen_refs : Map[String, Bool] = {}
+    // Maps a --no-deref symref's referent to the symref name, so a later update
+    // of that referent is detected as a duplicate.
+    let noderef_referents : Map[String, String] = {}
+    // git applies a --stdin batch as one transaction: every command is parsed
+    // into a structured op, the whole batch is validated against the current
+    // repo state, and only then is anything written.
+    let ops : Array[UpdateRefStdinOp] = []
+    // Transaction state for the explicit start/prepare/commit/abort commands:
+    // phase 0 = open, 1 = prepared, 2 = closed. `txn_started` records whether
+    // the active transaction was opened with an explicit `start` (which aborts
+    // by default at end of input, unlike the implicit transaction which
+    // commits).
+    let mut txn_state = 0
+    let mut txn_started = false
+    if z_mode {
+      update_ref_parse_stdin_z(
+        fs, actual_git_dir, input, ops, seen_refs, noderef_referents,
+        stdin_no_deref, stdin_create_reflog,
+      )
+    } else {
+      // A trailing newline terminates the final command (it does not introduce
+      // an empty command); truly empty input means no commands.
+      let lines : Array[String] = []
+      if input.length() > 0 {
+        for lv in input.split("\n") {
+          lines.push(lv.to_owned())
+        }
+        if input.has_suffix("\n") && lines.length() > 0 {
+          ignore(lines.pop())
+        }
       }
-      let tokens = update_ref_split_stdin_tokens(line)
-      if tokens.length() == 0 {
-        continue
+      for raw in lines {
+        let line = if raw.has_suffix("\r") {
+          String::unsafe_substring(raw, start=0, end=raw.length() - 1)
+        } else {
+          raw
+        }
+        if line.length() == 0 {
+          eprint_line("fatal: empty command in input")
+          @sys.exit(128)
+        }
+        let first = line[0]
+        if first == ' ' || first == '\t' {
+          eprint_line("fatal: whitespace before command: " + line)
+          @sys.exit(128)
+        }
+        let fields = update_ref_stdin_split_fields(line)
+      // Unquote C-style quoted arguments, reporting git's exact errors on
+      // malformed quoting (before any command is applied).
+      for fi = 0; fi < fields.length(); fi = fi + 1 {
+        if fields[fi].has_prefix("\"") {
+          fields[fi] = update_ref_unquote_arg(fields[fi])
+        }
       }
-      let cmd = tokens[0]
+      let cmd = fields[0]
+      let ref_tok = if fields.length() >= 2 { fields[1] } else { "" }
+      // A ref command issued after a closed transaction implicitly begins a
+      // new (un-started) transaction.
+      if txn_state == 2 &&
+        (
+          cmd == "create" ||
+          cmd == "update" ||
+          cmd == "delete" ||
+          cmd == "verify"
+        ) {
+        txn_state = 0
+        txn_started = false
+        seen_refs.clear()
+        noderef_referents.clear()
+      }
       match cmd {
         "option" => {
-          if tokens.length() != 2 {
-            eprint_line("fatal: update-ref: option requires one argument")
-            @sys.exit(128)
-          }
-          match tokens[1] {
+          let name = ref_tok
+          match name {
             "no-deref" => stdin_no_deref = true
             "create-reflog" => stdin_create_reflog = true
             _ => {
-              eprint_line("fatal: update-ref: unknown option: " + tokens[1])
+              eprint_line("fatal: option unknown: " + name)
               @sys.exit(128)
             }
           }
         }
-        "start" | "prepare" | "commit" | "abort" => ()
+        "start" =>
+          if txn_state == 1 {
+            eprint_line("fatal: prepared transactions can only be closed")
+            @sys.exit(128)
+          } else if txn_state == 0 && txn_started {
+            // A transaction is already open and explicitly started.
+            eprint_line("fatal: transaction already in progress")
+            @sys.exit(128)
+          } else {
+            // A fresh start (initial open or after a prior commit/abort).
+            ops.clear()
+            seen_refs.clear()
+            noderef_referents.clear()
+            txn_state = 0
+            txn_started = true
+            print_line("start: ok")
+          }
+        "prepare" =>
+          if txn_state == 2 {
+            eprint_line("fatal: transaction is closed")
+            @sys.exit(128)
+          } else {
+            for op in ops {
+              update_ref_stdin_validate_op(fs, actual_git_dir, op)
+            }
+            print_line("prepare: ok")
+            txn_state = 1
+          }
+        "commit" =>
+          if txn_state == 2 {
+            eprint_line("fatal: transaction is closed")
+            @sys.exit(128)
+          } else {
+            update_ref_stdin_flush(fs, actual_git_dir, ops, message)
+            ops.clear()
+            seen_refs.clear()
+            noderef_referents.clear()
+            print_line("commit: ok")
+            txn_state = 2
+          }
+        "abort" =>
+          if txn_state == 2 {
+            eprint_line("fatal: transaction is closed")
+            @sys.exit(128)
+          } else {
+            ops.clear()
+            seen_refs.clear()
+            noderef_referents.clear()
+            print_line("abort: ok")
+            txn_state = 2
+          }
         "create" => {
-          if tokens.length() != 3 {
-            eprint_line("fatal: update-ref: create requires <ref> <newvalue>")
+          if ref_tok.length() == 0 {
+            eprint_line("fatal: create: missing <ref>")
             @sys.exit(128)
           }
-          let cmd_args = update_ref_stdin_base_args(
-            stdin_no_deref, stdin_create_reflog, message,
-          )
-          cmd_args.push(tokens[1])
-          cmd_args.push(tokens[2])
-          cmd_args.push(@bitcore.ObjectId::zero().to_hex())
-          handle_update_ref(cmd_args)
-        }
-        "update" => {
-          if tokens.length() != 3 && tokens.length() != 4 {
+          if fields.length() < 3 {
+            eprint_line("fatal: create \{ref_tok}: missing <new-oid>")
+            @sys.exit(128)
+          }
+          if fields.length() > 3 {
             eprint_line(
-              "fatal: update-ref: update requires <ref> <newvalue> [<oldvalue>]",
+              "fatal: create \{ref_tok}: extra input: " +
+              update_ref_extra_input(fields, 3),
             )
             @sys.exit(128)
           }
-          let cmd_args = update_ref_stdin_base_args(
-            stdin_no_deref, stdin_create_reflog, message,
+          update_ref_stdin_check_dup(
+            fs, actual_git_dir, ref_tok, stdin_no_deref, seen_refs,
+            noderef_referents,
           )
-          cmd_args.push(tokens[1])
-          cmd_args.push(tokens[2])
-          if tokens.length() == 4 {
-            cmd_args.push(tokens[3])
+          ops.push({
+            kind: "create",
+            refname: ref_tok,
+            new_tok: Some(fields[2]),
+            old_tok: None,
+            no_deref: stdin_no_deref,
+            create_reflog: stdin_create_reflog,
+          })
+        }
+        "update" => {
+          if ref_tok.length() == 0 {
+            eprint_line("fatal: update: missing <ref>")
+            @sys.exit(128)
           }
-          handle_update_ref(cmd_args)
+          if fields.length() < 3 {
+            eprint_line("fatal: update \{ref_tok}: missing <new-oid>")
+            @sys.exit(128)
+          }
+          if fields.length() > 4 {
+            eprint_line(
+              "fatal: update \{ref_tok}: extra input: " +
+              update_ref_extra_input(fields, 4),
+            )
+            @sys.exit(128)
+          }
+          update_ref_stdin_check_dup(
+            fs, actual_git_dir, ref_tok, stdin_no_deref, seen_refs,
+            noderef_referents,
+          )
+          ops.push({
+            kind: "update",
+            refname: ref_tok,
+            new_tok: Some(fields[2]),
+            old_tok: if fields.length() >= 4 { Some(fields[3]) } else { None },
+            no_deref: stdin_no_deref,
+            create_reflog: stdin_create_reflog,
+          })
         }
         "delete" => {
-          if tokens.length() != 2 && tokens.length() != 3 {
-            eprint_line("fatal: update-ref: delete requires <ref> [<oldvalue>]")
+          if ref_tok.length() == 0 {
+            eprint_line("fatal: delete: missing <ref>")
             @sys.exit(128)
           }
-          let cmd_args = update_ref_stdin_base_args(
-            stdin_no_deref, stdin_create_reflog, message,
-          )
-          cmd_args.push("-d")
-          cmd_args.push(tokens[1])
-          if tokens.length() == 3 {
-            cmd_args.push(tokens[2])
+          if fields.length() > 3 {
+            eprint_line(
+              "fatal: delete \{ref_tok}: extra input: " +
+              update_ref_extra_input(fields, 3),
+            )
+            @sys.exit(128)
           }
-          handle_update_ref(cmd_args)
+          update_ref_stdin_check_dup(
+            fs, actual_git_dir, ref_tok, stdin_no_deref, seen_refs,
+            noderef_referents,
+          )
+          ops.push({
+            kind: "delete",
+            refname: ref_tok,
+            new_tok: None,
+            old_tok: if fields.length() >= 3 { Some(fields[2]) } else { None },
+            no_deref: stdin_no_deref,
+            create_reflog: stdin_create_reflog,
+          })
         }
         "verify" => {
-          if tokens.length() != 2 && tokens.length() != 3 {
-            eprint_line("fatal: update-ref: verify requires <ref> [<oldvalue>]")
+          if ref_tok.length() == 0 {
+            eprint_line("fatal: verify: missing <ref>")
             @sys.exit(128)
           }
-          let refname = normalize_update_ref_name(tokens[1])
-          let refname = resolve_update_target_ref(
-            fs, actual_git_dir, refname, stdin_no_deref,
-          )
-          let current_id = read_ref_value(fs, actual_git_dir, refname)
-          let ok = match tokens.length() {
-            2 => current_id is Some(_)
-            _ => {
-              let expected_id = @bitcore.ObjectId::from_hex(tokens[2]) catch {
-                _ => @bitcore.ObjectId::zero()
-              }
-              match current_id {
-                Some(cur_id) => cur_id.to_hex() == expected_id.to_hex()
-                None =>
-                  expected_id.to_hex() == @bitcore.ObjectId::zero().to_hex()
-              }
-            }
+          if fields.length() > 3 {
+            eprint_line(
+              "fatal: verify \{ref_tok}: extra input: " +
+              update_ref_extra_input(fields, 3),
+            )
+            @sys.exit(128)
           }
-          if !ok {
-            eprint_line("fatal: update-ref: verify failed for " + tokens[1])
-            @sys.exit(1)
-          }
+          ops.push({
+            kind: "verify",
+            refname: ref_tok,
+            new_tok: None,
+            old_tok: if fields.length() >= 3 { Some(fields[2]) } else { None },
+            no_deref: stdin_no_deref,
+            create_reflog: stdin_create_reflog,
+          })
         }
         _ => {
-          eprint_line("fatal: update-ref: unknown command: " + cmd)
+          eprint_line("fatal: unknown command: " + line)
           @sys.exit(128)
         }
       }
+      }
+    }
+    // At end of input the implicit transaction commits, but an explicitly
+    // started transaction that was never committed aborts by default; an
+    // explicit commit/abort has already flushed/discarded.
+    if txn_state != 2 && !txn_started {
+      update_ref_stdin_flush(fs, actual_git_dir, ops, message)
     }
     return ()
   }
@@ -290,7 +444,7 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
     let should_head_log = should_update_head_reflog(
       input_refname, refname, no_deref, head_target,
     )
-    let msg = message.unwrap_or("update-ref: delete")
+    let msg = message.unwrap_or("")
     if should_log || @bitrepo.reflog_exists(rfs, actual_git_dir, refname) {
       @bitrepo.append_reflog(
         wfs,
@@ -366,9 +520,17 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
       match current_id {
         Some(cur_id) =>
           if cur_id.to_hex() != expected_id.to_hex() {
-            @stdio.stderr.write(
-              "error: cannot lock ref '\{refname}': is at \{cur_id.to_hex()} but expected \{expected_id.to_hex()}",
-            )
+            // A zero expected value means "must not exist"; git reports an
+            // existing ref as "already exists" rather than a value mismatch.
+            if expected_id.to_hex() == @bitcore.ObjectId::zero().to_hex() {
+              @stdio.stderr.write(
+                "error: cannot lock ref '\{refname}': reference already exists",
+              )
+            } else {
+              @stdio.stderr.write(
+                "error: cannot lock ref '\{refname}': is at \{cur_id.to_hex()} but expected \{expected_id.to_hex()}",
+              )
+            }
             @sys.exit(1)
           }
         None =>
@@ -412,7 +574,7 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
     should_head_log ||
     @bitrepo.reflog_exists(rfs, actual_git_dir, refname) {
     let old_id = current_id.unwrap_or(@bitcore.ObjectId::zero())
-    let msg = message.unwrap_or("update-ref: updating")
+    let msg = message.unwrap_or("")
     if should_log ||
       always ||
       create_reflog ||
@@ -438,7 +600,11 @@ fn normalize_update_ref_name(
   let normalized = @bitlib.normalize_repo_path(refname) catch {
     _ => raise @bitcore.GitError::InvalidObject("invalid refname: " + refname)
   }
-  if normalized == "HEAD" || normalized.has_prefix("refs/") {
+  // Accept HEAD, refs/..., and one-component root/pseudo refs such as
+  // ORIG_HEAD or CHERRY_PICK_HEAD (git allows updating these directly).
+  if normalized == "HEAD" ||
+    normalized.has_prefix("refs/") ||
+    for_each_ref_is_root_ref_syntax(normalized) {
     normalized
   } else {
     raise @bitcore.GitError::InvalidObject("invalid refname: " + refname)
@@ -697,15 +863,590 @@ fn get_author_info(
 }
 
 ///|
-fn update_ref_split_stdin_tokens(line : String) -> Array[String] {
-  let tokens : Array[String] = []
-  for token_view in line.split(" ") {
-    let token = trim_string(token_view.to_owned())
-    if token.length() > 0 {
-      tokens.push(token)
+/// Reconstruct git's "extra input" tail: the unconsumed fields, each preceded
+/// by the single separating space (so the result has a leading space, matching
+/// git which reports the remaining input pointer including its separator).
+fn update_ref_extra_input(fields : Array[String], consumed : Int) -> String {
+  let mut s = ""
+  for i = consumed; i < fields.length(); i = i + 1 {
+    s = s + " " + fields[i]
+  }
+  s
+}
+
+///|
+/// Unquote a C-style quoted --stdin argument (token starts with `"`), matching
+/// git's parser. Exits with git's exact diagnostics on malformed quoting:
+/// unterminated/invalid-escape -> "badly quoted argument: <tok>", trailing
+/// junk after the closing quote -> "unexpected character after quoted argument:
+/// <tok>".
+/// One parsed `--stdin` operation, captured during the syntax pass so that the
+/// whole batch can be validated atomically before anything is written.
+struct UpdateRefStdinOp {
+  kind : String // "create" | "update" | "delete" | "verify"
+  refname : String
+  new_tok : String? // None when the command takes no new value (delete/verify)
+  old_tok : String? // None when no old value was supplied
+  no_deref : Bool
+  create_reflog : Bool
+}
+
+///|
+/// Resolve a `--stdin` value token (hex oid, ref name, or revision) to an
+/// object id, or None when it cannot be resolved.
+fn update_ref_resolve_oid(
+  fs : OsFs,
+  git_dir : String,
+  tok : String,
+) -> @bitcore.ObjectId? raise Error {
+  let direct = @bitcore.ObjectId::from_hex(tok) catch {
+    _ => return @bitrepo.rev_parse(fs, git_dir, tok)
+  }
+  Some(direct)
+}
+
+///|
+/// Validate one parsed stdin op against the current repository state, emitting
+/// git's exact `fatal:` diagnostics and exiting without applying anything when
+/// the operation cannot proceed.
+async fn update_ref_stdin_validate_op(
+  fs : OsFs,
+  git_dir : String,
+  op : UpdateRefStdinOp,
+) -> Unit raise Error {
+  let zero = @bitcore.ObjectId::zero()
+  // Resolve and sanity-check the new value (create/update only).
+  match op.new_tok {
+    Some(tok) => {
+      // An empty new value (e.g. `create R ` with a trailing space) is the zero
+      // oid, which git rejects for create as "zero <new-oid>".
+      let new_id = if tok.length() == 0 {
+        Some(zero)
+      } else {
+        update_ref_resolve_oid(fs, git_dir, tok)
+      }
+      guard new_id is Some(nid) else {
+        eprint_line("fatal: \{op.kind} \{op.refname}: invalid <new-oid>: \{tok}")
+        @sys.exit(128)
+      }
+      if op.kind == "create" && nid.to_hex() == zero.to_hex() {
+        eprint_line("fatal: create \{op.refname}: zero <new-oid>")
+        @sys.exit(128)
+      }
+    }
+    None => ()
+  }
+  // Determine the expected previous value: Some(id) means "must currently
+  // equal id" (zero means "must not exist"); None means "no check".
+  let expected : @bitcore.ObjectId? = if op.kind == "create" {
+    Some(zero)
+  } else {
+    match op.old_tok {
+      Some(tok) => {
+        let resolved = if tok.length() == 0 {
+          Some(zero)
+        } else {
+          update_ref_resolve_oid(fs, git_dir, tok)
+        }
+        guard resolved is Some(oid) else {
+          eprint_line(
+            "fatal: \{op.kind} \{op.refname}: invalid <old-oid>: \{tok}",
+          )
+          @sys.exit(128)
+          return
+        }
+        // A zero <old-oid> is meaningless for delete.
+        if op.kind == "delete" && oid.to_hex() == zero.to_hex() {
+          eprint_line("fatal: delete \{op.refname}: zero <old-oid>")
+          @sys.exit(128)
+        }
+        Some(oid)
+      }
+      // verify with no value defaults to "must not exist"; update/delete with
+      // no old value skip the check entirely.
+      None => if op.kind == "verify" { Some(zero) } else { None }
     }
   }
-  tokens
+  match expected {
+    Some(eid) => {
+      let current = @bitrepo.rev_parse(fs, git_dir, op.refname)
+      match current {
+        Some(cur) =>
+          if cur.to_hex() != eid.to_hex() {
+            if eid.to_hex() == zero.to_hex() {
+              eprint_line(
+                "fatal: cannot lock ref '\{op.refname}': reference already exists",
+              )
+            } else {
+              eprint_line(
+                "fatal: cannot lock ref '\{op.refname}': is at \{cur.to_hex()} but expected \{eid.to_hex()}",
+              )
+            }
+            @sys.exit(128)
+          }
+        None =>
+          if eid.to_hex() != zero.to_hex() {
+            eprint_line(
+              "fatal: cannot lock ref '\{op.refname}': unable to resolve reference '\{op.refname}'",
+            )
+            @sys.exit(128)
+          }
+      }
+    }
+    None => ()
+  }
+}
+
+///|
+/// Validate then apply a batch of parsed stdin ops as a single transaction:
+/// the whole batch is checked against the current repo state first, so a later
+/// failure leaves the repo untouched, and only then is each op written.
+async fn update_ref_stdin_flush(
+  fs : OsFs,
+  git_dir : String,
+  ops : Array[UpdateRefStdinOp],
+  message : String?,
+) -> Unit raise Error {
+  for op in ops {
+    update_ref_stdin_validate_op(fs, git_dir, op)
+  }
+  let zero_hex = @bitcore.ObjectId::zero().to_hex()
+  for op in ops {
+    if op.kind == "verify" {
+      continue
+    }
+    let cmd_args = update_ref_stdin_base_args(
+      op.no_deref, op.create_reflog, message,
+    )
+    // Resolve the old value to a concrete oid hex; the regular handler's
+    // old-value check expects a hex string, not a ref name or revision.
+    let old_hex = match op.old_tok {
+      Some(t) =>
+        if t.length() == 0 {
+          Some(zero_hex)
+        } else {
+          match update_ref_resolve_oid(fs, git_dir, t) {
+            Some(oid) => Some(oid.to_hex())
+            None => Some(t)
+          }
+        }
+      None => None
+    }
+    // Resolve the new value; an `update` to the zero oid means "delete".
+    let new_hex = match op.new_tok {
+      Some(t) =>
+        if t.length() == 0 {
+          zero_hex
+        } else {
+          match update_ref_resolve_oid(fs, git_dir, t) {
+            Some(oid) => oid.to_hex()
+            None => t
+          }
+        }
+      None => zero_hex
+    }
+    let deletes = op.kind == "delete" ||
+      (op.kind == "update" && new_hex == zero_hex)
+    if deletes {
+      // Ensuring a ref is absent when it is already gone is a no-op.
+      if @bitrepo.rev_parse(fs, git_dir, op.refname) is None {
+        continue
+      }
+      cmd_args.push("-d")
+      cmd_args.push(op.refname)
+      match old_hex {
+        Some(h) => cmd_args.push(h)
+        None => ()
+      }
+    } else {
+      cmd_args.push(op.refname)
+      cmd_args.push(new_hex)
+      if op.kind == "create" {
+        cmd_args.push(zero_hex)
+      } else {
+        match old_hex {
+          Some(h) => cmd_args.push(h)
+          None => ()
+        }
+      }
+    }
+    handle_update_ref(cmd_args)
+  }
+}
+
+///|
+/// Parse `--stdin -z` input (NUL-separated records) into the shared op list.
+/// In this format each command record is `<cmd> SP <ref>` and the values are
+/// separate NUL records; create/verify/delete take exactly one value, update
+/// takes two. An empty new value is the zero oid (a delete, with git's warning);
+/// an empty old value means "do not check".
+async fn update_ref_parse_stdin_z(
+  fs : OsFs,
+  git_dir : String,
+  input : String,
+  ops : Array[UpdateRefStdinOp],
+  seen_refs : Map[String, Bool],
+  noderef_referents : Map[String, String],
+  no_deref_init : Bool,
+  create_reflog_init : Bool,
+) -> Unit raise Error {
+  let mut no_deref = no_deref_init
+  let mut create_reflog = create_reflog_init
+  // Split into NUL-terminated records; the trailing NUL closes the last field.
+  let records : Array[String] = []
+  let cur = StringBuilder::new()
+  let mut pending = false
+  for ch in input {
+    if ch == '\u{0}' {
+      records.push(cur.to_string())
+      cur.reset()
+      pending = false
+    } else {
+      cur.write_char(ch)
+      pending = true
+    }
+  }
+  if pending {
+    records.push(cur.to_string())
+  }
+  let mut ri = 0
+  while ri < records.length() {
+    let rec = records[ri]
+    ri = ri + 1
+    if rec.length() == 0 {
+      eprint_line("fatal: empty command in input")
+      @sys.exit(128)
+    }
+    let fc = rec[0]
+    if fc == ' ' || fc == '\t' || fc == '\n' || fc == '\r' {
+      eprint_line("fatal: whitespace before command: " + rec)
+      @sys.exit(128)
+    }
+    let (cmd, ref_tok) = match rec.find(" ") {
+      Some(si) =>
+        (
+          String::unsafe_substring(rec, start=0, end=si),
+          String::unsafe_substring(rec, start=si + 1, end=rec.length()),
+        )
+      None => (rec, "")
+    }
+    match cmd {
+      "option" =>
+        match ref_tok {
+          "no-deref" => no_deref = true
+          "create-reflog" => create_reflog = true
+          _ => {
+            eprint_line("fatal: option unknown: " + ref_tok)
+            @sys.exit(128)
+          }
+        }
+      "start" | "prepare" | "commit" | "abort" => ()
+      "create" => {
+        if ref_tok.length() == 0 {
+          eprint_line("fatal: create: missing <ref>")
+          @sys.exit(128)
+        }
+        if ri >= records.length() {
+          eprint_line(
+            "fatal: create \{ref_tok}: unexpected end of input when reading <new-oid>",
+          )
+          @sys.exit(128)
+        }
+        let new_val = records[ri]
+        ri = ri + 1
+        // Unlike line mode (where an empty field is a zero oid), -z reports an
+        // empty <new-oid> for create as missing.
+        if new_val.length() == 0 {
+          eprint_line("fatal: create \{ref_tok}: missing <new-oid>")
+          @sys.exit(128)
+        }
+        update_ref_stdin_check_dup(
+            fs, git_dir, ref_tok, no_deref, seen_refs,
+            noderef_referents,
+          )
+        ops.push({
+          kind: "create",
+          refname: ref_tok,
+          new_tok: Some(new_val),
+          old_tok: None,
+          no_deref,
+          create_reflog,
+        })
+      }
+      "update" => {
+        if ref_tok.length() == 0 {
+          eprint_line("fatal: update: missing <ref>")
+          @sys.exit(128)
+        }
+        if ri >= records.length() {
+          eprint_line(
+            "fatal: update \{ref_tok}: unexpected end of input when reading <new-oid>",
+          )
+          @sys.exit(128)
+        }
+        let new_val = records[ri]
+        ri = ri + 1
+        if ri >= records.length() {
+          eprint_line(
+            "fatal: update \{ref_tok}: unexpected end of input when reading <old-oid>",
+          )
+          @sys.exit(128)
+        }
+        let old_val = records[ri]
+        ri = ri + 1
+        if new_val.length() == 0 {
+          eprint_line(
+            "warning: update \{ref_tok}: missing <new-oid>, treating as zero",
+          )
+        }
+        update_ref_stdin_check_dup(
+            fs, git_dir, ref_tok, no_deref, seen_refs,
+            noderef_referents,
+          )
+        ops.push({
+          kind: "update",
+          refname: ref_tok,
+          new_tok: Some(new_val),
+          old_tok: if old_val.length() == 0 { None } else { Some(old_val) },
+          no_deref,
+          create_reflog,
+        })
+      }
+      "delete" => {
+        if ref_tok.length() == 0 {
+          eprint_line("fatal: delete: missing <ref>")
+          @sys.exit(128)
+        }
+        if ri >= records.length() {
+          eprint_line(
+            "fatal: delete \{ref_tok}: unexpected end of input when reading <old-oid>",
+          )
+          @sys.exit(128)
+        }
+        let old_val = records[ri]
+        ri = ri + 1
+        update_ref_stdin_check_dup(
+            fs, git_dir, ref_tok, no_deref, seen_refs,
+            noderef_referents,
+          )
+        ops.push({
+          kind: "delete",
+          refname: ref_tok,
+          new_tok: None,
+          old_tok: if old_val.length() == 0 { None } else { Some(old_val) },
+          no_deref,
+          create_reflog,
+        })
+      }
+      "verify" => {
+        if ref_tok.length() == 0 {
+          eprint_line("fatal: verify: missing <ref>")
+          @sys.exit(128)
+        }
+        if ri >= records.length() {
+          eprint_line(
+            "fatal: verify \{ref_tok}: unexpected end of input when reading <old-oid>",
+          )
+          @sys.exit(128)
+        }
+        let old_val = records[ri]
+        ri = ri + 1
+        ops.push({
+          kind: "verify",
+          refname: ref_tok,
+          new_tok: None,
+          old_tok: if old_val.length() == 0 { None } else { Some(old_val) },
+          no_deref,
+          create_reflog,
+        })
+      }
+      _ => {
+        eprint_line("fatal: unknown command: " + rec)
+        @sys.exit(128)
+      }
+    }
+  }
+}
+
+///|
+/// Split a `--stdin` command line into space-separated fields, keeping a
+/// C-quoted field (one that starts with `"`) intact even when it contains
+/// spaces — e.g. `create R "refs/heads/main:path with space"` yields three
+/// fields, not five. Any trailing junk after a closing quote stays attached to
+/// the field so the unquoter can report it.
+fn update_ref_stdin_split_fields(line : String) -> Array[String] {
+  let fields : Array[String] = []
+  let n = line.length()
+  let mut i = 0
+  for ;; {
+    let start = i
+    if i < n && line[i] == '"' {
+      i = i + 1
+      let mut closed = false
+      while i < n {
+        if !closed && line[i] == '\\' && i + 1 < n {
+          i = i + 2
+        } else if !closed && line[i] == '"' {
+          closed = true
+          i = i + 1
+        } else if closed && line[i] == ' ' {
+          break
+        } else {
+          i = i + 1
+        }
+      }
+    } else {
+      while i < n && line[i] != ' ' {
+        i = i + 1
+      }
+    }
+    fields.push(String::unsafe_substring(line, start=start, end=i))
+    // A single space separates fields; consuming it and continuing means a
+    // trailing space yields a trailing empty field (git treats `create R ` as
+    // an empty <new-oid>, distinct from `create R`).
+    if i < n && line[i] == ' ' {
+      i = i + 1
+    } else {
+      break
+    }
+  }
+  fields
+}
+
+///|
+async fn update_ref_unquote_arg(token : String) -> String {
+  let n = token.length()
+  let mut result = ""
+  let mut i = 1 // skip opening quote
+  while i < n {
+    let c = token[i]
+    if c == '"' {
+      // Closing quote must be the final character of the token.
+      if i != n - 1 {
+        eprint_line(
+          "fatal: unexpected character after quoted argument: " + token,
+        )
+        @sys.exit(128)
+      }
+      return result
+    }
+    if c == '\\' {
+      if i + 1 >= n {
+        eprint_line("fatal: badly quoted argument: " + token)
+        @sys.exit(128)
+      }
+      let decoded = match token[i + 1] {
+        '"' => "\""
+        '\\' => "\\"
+        'n' => "\n"
+        't' => "\t"
+        'r' => "\r"
+        _ => {
+          eprint_line("fatal: badly quoted argument: " + token)
+          @sys.exit(128)
+          ""
+        }
+      }
+      result = result + decoded
+      i = i + 2
+    } else {
+      // `token[i]` is a UInt16 code unit; render it as the character it
+      // represents rather than its numeric value.
+      result = result + Int::unsafe_to_char(c.to_int()).to_string()
+      i = i + 1
+    }
+  }
+  // Reached end of token without a closing quote.
+  eprint_line("fatal: badly quoted argument: " + token)
+  @sys.exit(128)
+  ""
+}
+
+///|
+/// git's stdin transaction rejects multiple updates to the same ref.
+/// Read the immediate (one-level) symref target of `refname`, or None if it is
+/// not a symbolic ref.
+fn update_ref_symref_target_one(
+  fs : OsFs,
+  git_dir : String,
+  refname : String,
+) -> String? {
+  let ref_path = git_dir + "/" + refname
+  if !fs.is_file(ref_path) {
+    return None
+  }
+  let content = decode_bytes(fs.read_file(ref_path)) catch { _ => return None }
+  let line = trim_chars(content, " \t\r\n")
+  if line.has_prefix("ref: ") {
+    Some(String::unsafe_substring(line, start=5, end=line.length()))
+  } else {
+    None
+  }
+}
+
+///|
+/// git's stdin transaction rejects two updates that touch the same underlying
+/// ref. A dereferencing symref update collides on its (resolved) target; a
+/// `--no-deref` symref update collides with a separate update of its referent.
+async fn update_ref_stdin_check_dup(
+  fs : OsFs,
+  git_dir : String,
+  ref_tok : String,
+  no_deref : Bool,
+  seen : Map[String, Bool],
+  noderef_referents : Map[String, String],
+) -> Unit raise Error {
+  match update_ref_symref_target_one(fs, git_dir, ref_tok) {
+    Some(referent) =>
+      if no_deref {
+        // The symref itself is updated; conflicts if its referent is too.
+        if seen.get(referent).unwrap_or(false) {
+          eprint_line(
+            "fatal: multiple updates for '\{ref_tok}' (including one via its referent '\{referent}') are not allowed",
+          )
+          @sys.exit(128)
+        }
+        if seen.get(ref_tok).unwrap_or(false) {
+          eprint_line(
+            "fatal: multiple updates for ref '\{ref_tok}' not allowed",
+          )
+          @sys.exit(128)
+        }
+        seen[ref_tok] = true
+        noderef_referents[referent] = ref_tok
+      } else {
+        // Dereferencing: the update lands on the fully resolved target.
+        let target = resolve_symbolic_ref_target(fs, git_dir, ref_tok).unwrap_or(
+          ref_tok,
+        )
+        if seen.get(target).unwrap_or(false) {
+          eprint_line(
+            "fatal: multiple updates for '\{target}' (including one via symref '\{ref_tok}') are not allowed",
+          )
+          @sys.exit(128)
+        }
+        seen[target] = true
+      }
+    None => {
+      if seen.get(ref_tok).unwrap_or(false) {
+        eprint_line(
+          "fatal: multiple updates for ref '\{ref_tok}' not allowed",
+        )
+        @sys.exit(128)
+      }
+      // A prior --no-deref symref update may have claimed this ref as referent.
+      match noderef_referents.get(ref_tok) {
+        Some(symref) => {
+          eprint_line(
+            "fatal: multiple updates for '\{symref}' (including one via its referent '\{ref_tok}') are not allowed",
+          )
+          @sys.exit(128)
+        }
+        None => ()
+      }
+      seen[ref_tok] = true
+    }
+  }
 }
 
 ///|

@@ -68,10 +68,16 @@ pub fn read_reflog(
 /// Parse a single reflog line.
 fn parse_reflog_line(line : String) -> ReflogEntry? {
   // Format: <old-sha> <new-sha> <name> <<email>> <timestamp> <tz>\t<message>
-  let tab_idx = line.find("\t")
-  guard tab_idx is Some(idx) else { return None }
-  let prefix = String::unsafe_substring(line, start=0, end=idx)
-  let message = String::unsafe_substring(line, start=idx + 1, end=line.length())
+  // git omits the tab + message entirely for messageless updates, so a line
+  // without a tab is valid and carries an empty message.
+  let (prefix, message) = match line.find("\t") {
+    Some(idx) =>
+      (
+        String::unsafe_substring(line, start=0, end=idx),
+        String::unsafe_substring(line, start=idx + 1, end=line.length()),
+      )
+    None => (line, "")
+  }
   // Parse prefix: old_sha new_sha author_name <author_email> timestamp tz
   let parts : Array[String] = []
   for p in prefix.split(" ") {
@@ -144,7 +150,15 @@ pub fn append_reflog(
     wfs.mkdir_p(parent_dir)
   }
   // Format: <old-sha> <new-sha> <name> <<email>> <timestamp> <tz>\t<message>\n
-  let entry = "\{old_id.to_hex()} \{new_id.to_hex()} \{author} <\{email}> \{timestamp} \{timezone}\t\{message}\n"
+  // git only emits the tab + message when the message is non-empty; an empty
+  // reason produces a line ending right after the timezone (matching
+  // log_ref_write_fd's `if (msg && *msg)` guard).
+  let prefix = "\{old_id.to_hex()} \{new_id.to_hex()} \{author} <\{email}> \{timestamp} \{timezone}"
+  let entry = if message.length() > 0 {
+    "\{prefix}\t\{message}\n"
+  } else {
+    "\{prefix}\n"
+  }
   // Append to file
   if rfs.is_file(reflog_path) {
     let existing = @utf8.decode_lossy(rfs.read_file(reflog_path)[:])

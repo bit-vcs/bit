@@ -11,20 +11,17 @@ async fn switch_wbtest_run_shim_git(
 ) -> Unit raise Error {
   switch_wbtest_shim_lock.acquire()
   defer switch_wbtest_shim_lock.release()
-  let repo_root = @env.current_dir().unwrap_or(".")
+  let repo_root = wbtest_resolve_repo_root()
   let shim_git = repo_root + "/tools/git-shim/bin/git"
   let shim_moon = "/tmp/bit-switch-shim-moon.sh"
   let fs = OsFs::new()
   // Build the native binary first so exit codes propagate correctly
   // (moon run swallows non-zero exit codes)
-  let bit_exe = repo_root + "/_build/native/release/build/mizchi/bit/cmd/bit/bit.exe"
+  let bit_exe = wbtest_resolve_bit_exe(repo_root)
   if !fs.is_file(bit_exe) {
-    let build_code = @process.run(
-      "moon",
-      ["build", "--target", "native", "--release"],
-      inherit_env=true,
+    fail(
+      "bit.exe not found at \{bit_exe}; build it with `moon build --target native modules/bit/src/cmd/bit` first",
     )
-    @test.assert_eq(build_code, 0)
   }
   fs.write_string(shim_moon, "#!/bin/sh\nset -eu\nexec '\{bit_exe}' \"$@\"\n")
   let chmod_code = @process.run("chmod", ["+x", shim_moon], inherit_env=true)

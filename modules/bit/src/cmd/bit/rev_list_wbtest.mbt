@@ -75,8 +75,8 @@ async fn rev_list_test_bit_stdout(
   root : String,
   args : Array[String],
 ) -> String raise Error {
-  let repo_root = @env.current_dir().unwrap_or(".")
-  let bit_exe = repo_root + "/_build/native/release/build/mizchi/bit/cmd/bit/bit.exe"
+  let repo_root = wbtest_resolve_repo_root()
+  let bit_exe = wbtest_resolve_bit_exe(repo_root)
   let bit_args : Array[String] = ["-C", root]
   for arg in args {
     bit_args.push(arg)
@@ -111,13 +111,13 @@ async fn rev_list_test_run_shim_git(
   cwd : String,
   args : Array[String],
 ) -> Unit raise Error {
-  let repo_root = @env.current_dir().unwrap_or(".")
+  let repo_root = wbtest_resolve_repo_root()
   let shim_git = repo_root + "/tools/git-shim/bin/git"
   let env : Map[String, String] = {
     "SHIM_REAL_GIT": wbtest_resolve_real_git(repo_root),
     "SHIM_REAL_GIT_FALLBACK": "",
     "SHIM_EXEC_PATH": repo_root + "/third_party/git",
-    "SHIM_MOON": repo_root + "/_build/native/release/build/mizchi/bit/cmd/bit/bit.exe",
+    "SHIM_MOON": wbtest_resolve_bit_exe(repo_root),
     "SHIM_CMDS": "init status add commit log show branch checkout switch reset rebase stash cherry-pick diff diff-files diff-index merge tag rm mv config sparse-checkout restore rev-parse cat-file ls-files hash-object ls-tree write-tree show-ref update-ref update-index symbolic-ref reflog worktree gc clean grep submodule revert notes bisect describe blame format-patch shortlog remote clone fetch pull push receive-pack upload-pack pack-objects index-pack shell",
     "SHIM_STRICT": "1",
   }
@@ -141,13 +141,13 @@ async fn rev_list_test_shim_git_stdout(
   cwd : String,
   args : Array[String],
 ) -> String raise Error {
-  let repo_root = @env.current_dir().unwrap_or(".")
+  let repo_root = wbtest_resolve_repo_root()
   let shim_git = repo_root + "/tools/git-shim/bin/git"
   let env : Map[String, String] = {
     "SHIM_REAL_GIT": wbtest_resolve_real_git(repo_root),
     "SHIM_REAL_GIT_FALLBACK": "",
     "SHIM_EXEC_PATH": repo_root + "/third_party/git",
-    "SHIM_MOON": repo_root + "/_build/native/release/build/mizchi/bit/cmd/bit/bit.exe",
+    "SHIM_MOON": wbtest_resolve_bit_exe(repo_root),
     "SHIM_CMDS": "init status add commit log show branch checkout switch reset rebase stash cherry-pick diff diff-files diff-index merge tag rm mv config sparse-checkout restore rev-parse cat-file ls-files hash-object ls-tree write-tree show-ref update-ref update-index symbolic-ref reflog worktree gc clean grep submodule revert notes bisect describe blame format-patch shortlog remote clone fetch pull push receive-pack upload-pack pack-objects index-pack shell",
     "SHIM_STRICT": "1",
   }

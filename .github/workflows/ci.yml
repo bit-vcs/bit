@@ -70,12 +70,28 @@ jobs:
 
   cmd-native-test:
     runs-on: ubuntu-latest
+    # The bundled `tcc` backend hangs compiling cmd/bit's large test binary, so
+    # override the native C compiler with gcc (MOON_CC). gcc at -O0 (the debug
+    # default) compiles it quickly and never hangs, unlike tcc; using gcc -O
+    # (--release) also works but is far slower.
+    env:
+      MOON_CC: gcc
     strategy:
       fail-fast: false
       matrix:
+        # cmd/bit's whitebox tests are split into 6 file-based shards: a single
+        # `moon test <files>` only compiles a test driver for the selected files
+        # and runs their tests, so each shard's compile and run is ~1/6 of the
+        # whole. This keeps every job well under the timeout (the unsharded run
+        # exceeded 150 min even with gcc). cmd/git-bit is small, run whole.
         include:
-          - { name: cmd-bit,     pkg: mizchi/bit/cmd/bit,     timeout: 120 }
-          - { name: cmd-git-bit, pkg: mizchi/bit/cmd/git-bit, timeout: 30  }
+          - { name: cmd-git-bit, kind: pkg,   sel: mizchi/bit/cmd/git-bit, timeout: 30 }
+          - { name: cmd-bit-0,   kind: shard, sel: "0",                     timeout: 60 }
+          - { name: cmd-bit-1,   kind: shard, sel: "1",                     timeout: 60 }
+          - { name: cmd-bit-2,   kind: shard, sel: "2",                     timeout: 60 }
+          - { name: cmd-bit-3,   kind: shard, sel: "3",                     timeout: 60 }
+          - { name: cmd-bit-4,   kind: shard, sel: "4",                     timeout: 60 }
+          - { name: cmd-bit-5,   kind: shard, sel: "5",                     timeout: 60 }
     name: cmd-native-test (${{ matrix.name }})
     steps:
       - name: Checkout
@@ -98,7 +114,7 @@ jobs:
         run: |
           set -euo pipefail
           moon --version
-          moon build --target native --release modules/bit/src/cmd/bit
+          moon build --target native modules/bit/src/cmd/bit
           bin_path=$(find _build/native -maxdepth 8 -type f -name 'bit.exe' | head -1)
           if [ -z "$bin_path" ]; then
             echo "bit.exe not found after moon build"
@@ -116,9 +132,19 @@ jobs:
           pkill -f "clang" || true
           sleep 1
           rm -f _build/.moon-lock
-      - name: Run ${{ matrix.pkg }} native tests
+      - name: Run ${{ matrix.name }} native tests
         timeout-minutes: ${{ matrix.timeout }}
-        run: moon test --target native -p ${{ matrix.pkg }}
+        run: |
+          set -euo pipefail
+          if [ "${{ matrix.kind }}" = "pkg" ]; then
+            moon test --target native -p ${{ matrix.sel }}
+          else
+            files=$(ls modules/bit/src/cmd/bit/*.mbt | sort | awk "(NR-1) % 6 == ${{ matrix.sel }}")
+            echo "cmd-bit shard ${{ matrix.sel }}/6 — files:"
+            echo "$files"
+            # shellcheck disable=SC2086
+            moon test --target native $files
+          fi
 
   distributed-test:
     runs-on: ubuntu-latest
