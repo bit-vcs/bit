@@ -39,7 +39,7 @@ async fn show_wbtest_collect_shim_git_stderr(
   cwd : String,
   args : Array[String],
 ) -> (Int, String) raise Error {
-  let repo_root = @env.current_dir().unwrap_or(".")
+  let repo_root = wbtest_resolve_repo_root()
   let shim_git = repo_root + "/tools/git-shim/bin/git"
   let env : Map[String, String] = {
     "SHIM_REAL_GIT": wbtest_resolve_real_git(repo_root),

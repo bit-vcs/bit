@@ -75,7 +75,7 @@ async fn rev_list_test_bit_stdout(
   root : String,
   args : Array[String],
 ) -> String raise Error {
-  let repo_root = @env.current_dir().unwrap_or(".")
+  let repo_root = wbtest_resolve_repo_root()
   let bit_exe = wbtest_resolve_bit_exe(repo_root)
   let bit_args : Array[String] = ["-C", root]
   for arg in args {
@@ -111,7 +111,7 @@ async fn rev_list_test_run_shim_git(
   cwd : String,
   args : Array[String],
 ) -> Unit raise Error {
-  let repo_root = @env.current_dir().unwrap_or(".")
+  let repo_root = wbtest_resolve_repo_root()
   let shim_git = repo_root + "/tools/git-shim/bin/git"
   let env : Map[String, String] = {
     "SHIM_REAL_GIT": wbtest_resolve_real_git(repo_root),
@@ -141,7 +141,7 @@ async fn rev_list_test_shim_git_stdout(
   cwd : String,
   args : Array[String],
 ) -> String raise Error {
-  let repo_root = @env.current_dir().unwrap_or(".")
+  let repo_root = wbtest_resolve_repo_root()
   let shim_git = repo_root + "/tools/git-shim/bin/git"
   let env : Map[String, String] = {
     "SHIM_REAL_GIT": wbtest_resolve_real_git(repo_root),

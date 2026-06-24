@@ -100,7 +100,7 @@ async fn merge_wbtest_collect_shim_git(
 ) -> (Int, String, String) raise Error {
   merge_wbtest_shim_lock.acquire()
   defer merge_wbtest_shim_lock.release()
-  let repo_root = @env.current_dir().unwrap_or(".")
+  let repo_root = wbtest_resolve_repo_root()
   let shim_git = repo_root + "/tools/git-shim/bin/git"
   let shim_moon = "/tmp/bit-merge-shim-moon.sh"
   let fs = OsFs::new()

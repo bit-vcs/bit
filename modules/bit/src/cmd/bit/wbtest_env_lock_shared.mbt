@@ -9,6 +9,21 @@ fn init {
   ignore(cmd_bit_wbtest_env_lock)
   ignore(wbtest_resolve_real_git)
   ignore(wbtest_resolve_bit_exe)
+  ignore(wbtest_resolve_repo_root)
+}
+
+///|
+/// Resolve the git repo root for wbtests independently of the current working
+/// directory. `moon test` sets CWD to the module dir (`modules/bit`), so
+/// `@env.current_dir()` cannot locate repo-root-relative assets such as the
+/// git shim (`tools/git-shim/bin/git`). Derive the root from the running test
+/// executable's `/_build/` path instead, falling back to CWD when that fails.
+fn wbtest_resolve_repo_root() -> String {
+  let exe = @sys.get_cli_args()[0]
+  match exe.find("/_build/") {
+    Some(i) => String::unsafe_substring(exe, start=0, end=i)
+    None => @env.current_dir().unwrap_or(".")
+  }
 }
 
 ///|

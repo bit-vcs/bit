@@ -88,7 +88,7 @@ async fn update_index_wbtest_run_sparse_checkout_shim(
 ) -> Unit raise Error {
   update_index_wbtest_shim_lock.acquire()
   defer update_index_wbtest_shim_lock.release()
-  let repo_root = @env.current_dir().unwrap_or(".")
+  let repo_root = wbtest_resolve_repo_root()
   let shim_git = repo_root + "/tools/git-shim/bin/git"
   let shim_moon = "/tmp/bit-update-index-sparse-shim-moon.sh"
   let fs = OsFs::new()

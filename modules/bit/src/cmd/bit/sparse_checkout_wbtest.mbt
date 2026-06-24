@@ -116,7 +116,7 @@ async fn sparse_checkout_wbtest_collect_shim_git_output(
 ) -> (Int, String, String) raise Error {
   sparse_checkout_wbtest_shim_lock.acquire()
   defer sparse_checkout_wbtest_shim_lock.release()
-  let repo_root = @env.current_dir().unwrap_or(".")
+  let repo_root = wbtest_resolve_repo_root()
   let shim_git = repo_root + "/tools/git-shim/bin/git"
   let shim_moon = sparse_checkout_wbtest_shim_moon_path(repo_root)
   let env : Map[String, String] = {
@@ -174,7 +174,7 @@ async fn sparse_checkout_wbtest_collect_shim_git_shell_output(
 ) -> (Int, String, String) raise Error {
   sparse_checkout_wbtest_shim_lock.acquire()
   defer sparse_checkout_wbtest_shim_lock.release()
-  let repo_root = @env.current_dir().unwrap_or(".")
+  let repo_root = wbtest_resolve_repo_root()
   let shim_git = repo_root + "/tools/git-shim/bin/git"
   let shim_moon = sparse_checkout_wbtest_shim_moon_path(repo_root)
   let env : Map[String, String] = {
@@ -1092,7 +1092,7 @@ test "sparse-checkout: check-rules helper preserves quoted and nul-delimited mat
 async test "sparse-checkout: check-rules defaults to cone mode for rules files" {
   @bitnative.init_native_io()
   let fs = OsFs::new()
-  let repo_root = @env.current_dir().unwrap_or(".")
+  let repo_root = wbtest_resolve_repo_root()
   let shim_moon = sparse_checkout_wbtest_shim_moon_path(repo_root)
   let root = "/tmp/bit-test-sparse-check-rules-" +
     get_current_timestamp().to_string()
