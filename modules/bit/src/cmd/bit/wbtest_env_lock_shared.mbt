@@ -30,13 +30,29 @@ fn wbtest_resolve_real_git(repo_root : String) -> String {
 /// so prefer whichever exists (debug first, since that is the default build).
 fn wbtest_resolve_bit_exe(repo_root : String) -> String {
   let fs : &@bitcore.RepoFileSystem = OsFs::new()
-  let debug_path = repo_root +
-    "/_build/native/debug/build/mizchi/bit/cmd/bit/bit.exe"
-  let release_path = repo_root +
-    "/_build/native/release/build/mizchi/bit/cmd/bit/bit.exe"
-  if fs.is_file(debug_path) {
-    debug_path
-  } else {
-    release_path
+  let debug_rel = "/_build/native/debug/build/mizchi/bit/cmd/bit/bit.exe"
+  let release_rel = "/_build/native/release/build/mizchi/bit/cmd/bit/bit.exe"
+  // Candidate repo roots, most reliable first: a root derived from the running
+  // test executable path (independent of CWD, which `moon test` may set to the
+  // module dir), then the caller-supplied repo_root.
+  let roots : Array[String] = []
+  let exe = @sys.get_cli_args()[0]
+  match exe.find("/_build/") {
+    Some(i) => roots.push(String::unsafe_substring(exe, start=0, end=i))
+    None => ()
   }
+  roots.push(repo_root)
+  for root in roots {
+    let debug_path = root + debug_rel
+    if fs.is_file(debug_path) {
+      return debug_path
+    }
+    let release_path = root + release_rel
+    if fs.is_file(release_path) {
+      return release_path
+    }
+  }
+  // Not found anywhere: return the primary debug candidate so the caller's
+  // existence check fails with a clear, actionable path.
+  roots[0] + debug_rel
 }

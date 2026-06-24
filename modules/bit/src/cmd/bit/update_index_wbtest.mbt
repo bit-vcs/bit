@@ -96,12 +96,9 @@ async fn update_index_wbtest_run_sparse_checkout_shim(
   // (moon run swallows non-zero exit codes)
   let bit_exe = wbtest_resolve_bit_exe(repo_root)
   if !fs.is_file(bit_exe) {
-    let build_code = @process.run(
-      "moon",
-      ["build", "--target", "native", "--release"],
-      inherit_env=true,
+    fail(
+      "bit.exe not found at \{bit_exe}; build it with `moon build --target native modules/bit/src/cmd/bit` first",
     )
-    @test.assert_eq(build_code, 0)
   }
   fs.write_string(shim_moon, "#!/bin/sh\nset -eu\nexec '\{bit_exe}' \"$@\"\n")
   let chmod_code = @process.run("chmod", ["+x", shim_moon], inherit_env=true)
