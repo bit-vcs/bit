@@ -25,6 +25,7 @@ import {
   "mizchi/bit_io/native" @bitnative,
   "mizchi/bitx_hub" @hub,
   "mizchi/bitx_hub/native" @hub_native,
+  "mizchi/bitx_openpgp" @openpgp,
   "mizchi/bitx_rebase_ai" @rebase_ai,
   "mizchi/bit_vfs" @bitfs,
   "mizchi/bitx_doc" @xdoc,
