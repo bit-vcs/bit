@@ -751,6 +751,122 @@ async fn signing_run_ssh_verifier(
 }
 
 ///|
+/// Read the native OpenPGP verification keyring, if one is configured. The
+/// source is the `gpg.openpgpKeyringFile` config key (a file of one or more
+/// ASCII-armored public keys), overridable via the `BIT_OPENPGP_KEYRING`
+/// environment variable. A flat key name (no inner dot) is used deliberately
+/// so that `git config gpg.openpgpKeyringFile <path>` stores it under `[gpg]`
+/// where bit's config reader can find it, rather than as a `[gpg "openpgp"]`
+/// subsection. Returns the parsed armored key blocks when configured, or
+/// `None` when no native keyring is set — in which case callers fall back to
+/// the external gpg program. Raises when a configured file cannot be read.
+fn signing_openpgp_native_keyring(
+  fs : OsFs,
+  root : String,
+  git_dir : String,
+) -> Array[String]? raise @bitcore.GitError {
+  let configured = match @sys.get_env_var("BIT_OPENPGP_KEYRING") {
+    Some(value) if value.trim().to_owned().length() > 0 => Some(value)
+    _ => bit_config_get(git_dir, "gpg", "openpgpKeyringFile")
+  }
+  guard configured is Some(raw) else { return None }
+  let value = signing_normalize_config_value(raw)
+  if value.length() == 0 {
+    return None
+  }
+  let path = signing_resolve_config_path(root, value)
+  let data = fs.read_file(path) catch {
+    err =>
+      raise @bitcore.GitError::InvalidObject(
+        "failed to read gpg.openpgpKeyringFile '\{path}': \{err}",
+      )
+  }
+  Some(@openpgp.split_armored_public_keys(decode_bytes(data)))
+}
+
+///|
+/// Verify a detached OpenPGP signature natively (pure MoonBit, no external
+/// gpg) and produce the verification result plus a concise gpg-style status
+/// line for stderr. Pure and target-independent; the caller is responsible for
+/// emitting the message.
+fn signing_openpgp_native_result(
+  payload : Bytes,
+  signature : String,
+  keys : Array[String],
+) -> (Bool, String) {
+  let result = @openpgp.verify_detached_armored(payload, signature, keys)
+  let message = if result.verified {
+    "bit: Good OpenPGP signature (native verification)"
+  } else {
+    match result.error {
+      Some(detail) => "bit: OpenPGP signature not verified: " + detail
+      None => "bit: BAD OpenPGP signature (no configured key validates it)"
+    }
+  }
+  (result.verified, message)
+}
+
+///|
+/// Whether native (pure-MoonBit) signature verification is opted into, via the
+/// `BIT_NATIVE_VERIFY` environment variable or the `gpg.nativeVerify` config
+/// key. This routes SSH verification away from the external `ssh-keygen`.
+/// (OpenPGP self-activates whenever a native keyring is configured, so it does
+/// not require this flag.)
+fn signing_native_verify_enabled(git_dir : String) -> Bool {
+  match @sys.get_env_var("BIT_NATIVE_VERIFY") {
+    Some(value) => {
+      let normalized = value.trim().to_owned().to_lower()
+      if normalized != "" && normalized != "0" && normalized != "false" {
+        return true
+      }
+    }
+    None => ()
+  }
+  match bit_config_get(git_dir, "gpg", "nativeVerify") {
+    Some(value) => parse_bool_value(value).unwrap_or(false)
+    None => false
+  }
+}
+
+///|
+/// Read the OpenSSH allowed-signers file (`gpg.ssh.allowedSignersFile`) for
+/// native SSH verification. Returns its contents, or `None` when the file is
+/// not configured or cannot be read (callers then fall back to `ssh-keygen`).
+fn signing_ssh_native_allowed_signers(
+  fs : OsFs,
+  root : String,
+  git_dir : String,
+) -> String? {
+  guard signing_allowed_signers_file(root, git_dir) is Some(path) else {
+    return None
+  }
+  let data = fs.read_file(path) catch { _ => return None }
+  Some(decode_bytes(data))
+}
+
+///|
+/// Verify a detached SSHSIG signature natively (pure MoonBit, no `ssh-keygen`)
+/// and produce the result plus a concise status line for stderr.
+fn signing_ssh_native_result(
+  payload : Bytes,
+  signature : String,
+  allowed_signers_text : String,
+) -> (Bool, String) {
+  let result = @openpgp.verify_ssh_detached(
+    payload, signature, allowed_signers_text,
+  )
+  let message = if result.verified {
+    "bit: Good SSH signature (native verification)"
+  } else {
+    match result.error {
+      Some(detail) => "bit: SSH signature not verified: " + detail
+      None => "bit: BAD SSH signature (no allowed signer validates it)"
+    }
+  }
+  (result.verified, message)
+}
+
+///|
 async fn signing_verify_payload(
   fs : OsFs,
   root : String,
@@ -759,6 +875,34 @@ async fn signing_verify_payload(
   signature : String,
 ) -> Bool raise @bitcore.GitError {
   let format = signing_detect_signature_format(git_dir, signature)
+  // For OpenPGP signatures, prefer native verification when the caller has
+  // configured a public-key source; otherwise fall back to the gpg program.
+  if format == "openpgp" {
+    match signing_openpgp_native_keyring(fs, root, git_dir) {
+      Some(keys) => {
+        let (verified, message) = signing_openpgp_native_result(
+          payload, signature, keys,
+        )
+        signing_emit_stderr_text(message) catch { _ => () }
+        return verified
+      }
+      None => ()
+    }
+  }
+  // For SSH signatures, use native verification when opted in (and an
+  // allowed-signers file is available); otherwise fall back to `ssh-keygen`.
+  if format == "ssh" && signing_native_verify_enabled(git_dir) {
+    match signing_ssh_native_allowed_signers(fs, root, git_dir) {
+      Some(allowed_text) => {
+        let (verified, message) = signing_ssh_native_result(
+          payload, signature, allowed_text,
+        )
+        signing_emit_stderr_text(message) catch { _ => () }
+        return verified
+      }
+      None => ()
+    }
+  }
   match format {
     "ssh" => signing_run_ssh_verifier(fs, root, git_dir, payload, signature)
     "x509" | _ =>
