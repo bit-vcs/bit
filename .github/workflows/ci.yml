@@ -182,7 +182,7 @@ jobs:
         run: >
           nix build
           --override-input moon-registry git+https://mooncakes.io/git/index
-          --override-input moonbit-overlay git+https://github.com/moonbit-community/moonbit-overlay
+          --override-input moonbit-overlay github:moonbit-community/moonbit-overlay
       - name: Smoke test
         run: test -x ./result/bin/bit
 
