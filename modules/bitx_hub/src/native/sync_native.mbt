@@ -1349,7 +1349,7 @@ pub async fn hub_push(
         rfs,
         git_dir,
         remote_url,
-        @bitnative.native_http_post,
+        relay_http_post_timed,
         signing_key=effective_signing_key,
         require_signed=effective_require_signed,
         auth_token=effective_auth_token,
@@ -1365,7 +1365,7 @@ pub async fn hub_push(
               rfs,
               git_dir,
               remote_url,
-              @bitnative.native_http_post,
+              relay_http_post_timed,
               signing_key=effective_signing_key,
               require_signed=effective_require_signed,
               auth_token=effective_auth_token,
@@ -1392,7 +1392,7 @@ pub async fn relay_publish_clone_announce(
   relay_publish_clone_announce_with_http(
     remote_url,
     clone_url,
-    @bitnative.native_http_post,
+    relay_http_post_timed,
     repo~,
     auth_token=effective_auth_token,
   )
@@ -1410,7 +1410,7 @@ pub async fn relay_list_clone_peers(
   }
   relay_list_clone_peers_with_http(
     remote_url,
-    @bitnative.native_http_get,
+    relay_http_get_timed,
     auth_token=effective_auth_token,
     include_self~,
   )
@@ -1453,7 +1453,7 @@ pub async fn hub_fetch(
         rfs,
         git_dir,
         remote_url,
-        @bitnative.native_http_get,
+        relay_http_get_timed,
         signing_key=effective_signing_key,
         require_signed=effective_require_signed,
         auth_token=effective_auth_token,
@@ -1479,7 +1479,7 @@ pub async fn hub_fetch(
               rfs,
               git_dir,
               remote_url,
-              @bitnative.native_http_get,
+              relay_http_get_timed,
               signing_key=effective_signing_key,
               require_signed=effective_require_signed,
               auth_token=effective_auth_token,

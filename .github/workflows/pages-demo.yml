@@ -49,7 +49,9 @@ jobs:
           cache: pnpm
 
       - name: Install pkfire
-        uses: mizchi/pkfire@v0
+        uses: mizchi/pkfire@v0.12.1
+        with:
+          version: 0.12.1
 
       - name: Install Bun
         uses: oven-sh/setup-bun@v2

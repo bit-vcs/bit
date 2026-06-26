@@ -16,10 +16,13 @@ jobs:
         with:
           submodules: true
       - name: Install pkfire + pkspec
-        uses: mizchi/pkfire@v0
-      - name: Install pkspec
-        uses: mizchi/pkspec@v0.2.1
+        uses: mizchi/pkfire@v0.12.1
         with:
+          version: 0.12.1
+      - name: Install pkspec
+        uses: mizchi/pkspec@v0.4.1
+        with:
+          version: 0.4.1
           pkl-version: none
       - name: Install MoonBit CLI
         run: |
@@ -99,10 +102,13 @@ jobs:
         with:
           submodules: true
       - name: Install pkfire + pkspec
-        uses: mizchi/pkfire@v0
-      - name: Install pkspec
-        uses: mizchi/pkspec@v0.2.1
+        uses: mizchi/pkfire@v0.12.1
         with:
+          version: 0.12.1
+      - name: Install pkspec
+        uses: mizchi/pkspec@v0.4.1
+        with:
+          version: 0.4.1
           pkl-version: none
       - name: Install MoonBit CLI
         run: |
@@ -176,7 +182,7 @@ jobs:
         run: >
           nix build
           --override-input moon-registry git+https://mooncakes.io/git/index
-          --override-input moonbit-overlay git+https://github.com/moonbit-community/moonbit-overlay
+          --override-input moonbit-overlay github:moonbit-community/moonbit-overlay
       - name: Smoke test
         run: test -x ./result/bin/bit
 

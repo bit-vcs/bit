@@ -131,6 +131,103 @@ async fn relay_poll_claims_with_http(
 }
 
 ///|
+/// Default timeout (in milliseconds) for relay HTTP requests. Relay
+/// request/response payloads are small, so a stalled or unreachable relay
+/// should fail fast instead of hanging the CLI indefinitely (e.g. `bit issue
+/// claims`, `bit issue claim`, `bit issue list --relay`, `bit issue sync`).
+/// Unlike clone/fetch/push, which may legitimately stream large payloads, the
+/// relay endpoints are bounded, so a fixed timeout is safe here.
+let default_relay_http_timeout_ms : Int = 30000
+
+///|
+/// Resolve the relay HTTP timeout in milliseconds. Overridable via the
+/// `BIT_RELAY_TIMEOUT_MS` environment variable; set it to `0` (or less) to
+/// disable the timeout entirely.
+fn relay_http_timeout_ms() -> Int {
+  match @sys.get_env_var("BIT_RELAY_TIMEOUT_MS") {
+    Some(value) =>
+      @string.parse_int(value) catch { _ => default_relay_http_timeout_ms }
+    None => default_relay_http_timeout_ms
+  }
+}
+
+///|
+/// Re-cast a generic `Error` back to a `@bit.GitError`. `@async.with_timeout_opt`
+/// is typed to raise the generic `Error` (via its internal task-group
+/// machinery), but the only errors that cross this boundary originate from the
+/// wrapped HTTP call, which already raises `@bit.GitError`. The explicit match
+/// restores the concrete type required by the relay helper signatures.
+fn relay_coerce_git_error(e : Error) -> @bit.GitError {
+  match e {
+    @bit.GitError::IoError(m) => @bit.GitError::IoError(m)
+    @bit.GitError::ProtocolError(m) => @bit.GitError::ProtocolError(m)
+    @bit.GitError::InvalidObject(m) => @bit.GitError::InvalidObject(m)
+    @bit.GitError::PackfileError(m) => @bit.GitError::PackfileError(m)
+    @bit.GitError::HashMismatch(a, b) => @bit.GitError::HashMismatch(a, b)
+    _ => @bit.GitError::IoError(e.to_string())
+  }
+}
+
+///|
+/// `@bitnative.native_http_get` wrapped with the relay timeout. Shares the
+/// exact signature of the underlying function, so it is a drop-in replacement
+/// wherever an http_get function value is passed to a relay helper.
+///
+/// `with_timeout_opt` returns None on timeout (and cancels the in-flight
+/// request) instead of hanging indefinitely.
+async fn relay_http_get_timed(
+  url : String,
+  headers : Map[String, String],
+) -> (@bit.HttpResponse, Bytes) raise @bit.GitError {
+  let ms = relay_http_timeout_ms()
+  if ms <= 0 {
+    return @bitnative.native_http_get(url, headers)
+  }
+  let outcome = @async.with_timeout_opt(ms, () => @bitnative.native_http_get(
+      url,
+      headers,
+    ))
+    catch {
+      e => raise relay_coerce_git_error(e)
+    }
+  match outcome {
+    Some(result) => result
+    None =>
+      raise @bit.GitError::IoError(
+        "relay HTTP request timed out after \{ms}ms (\{url})",
+      )
+  }
+}
+
+///|
+/// `@bitnative.native_http_post` wrapped with the relay timeout.
+async fn relay_http_post_timed(
+  url : String,
+  body : Bytes,
+  headers : Map[String, String],
+) -> (@bit.HttpResponse, Bytes) raise @bit.GitError {
+  let ms = relay_http_timeout_ms()
+  if ms <= 0 {
+    return @bitnative.native_http_post(url, body, headers)
+  }
+  let outcome = @async.with_timeout_opt(ms, () => @bitnative.native_http_post(
+      url,
+      body,
+      headers,
+    ))
+    catch {
+      e => raise relay_coerce_git_error(e)
+    }
+  match outcome {
+    Some(result) => result
+    None =>
+      raise @bit.GitError::IoError(
+        "relay HTTP request timed out after \{ms}ms (\{url})",
+      )
+  }
+}
+
+///|
 pub async fn relay_publish_claim(
   remote_url : String,
   claim : @hub.ClaimMessage,
@@ -143,7 +240,7 @@ pub async fn relay_publish_claim(
   relay_publish_claim_with_http(
     remote_url,
     claim,
-    @bitnative.native_http_post,
+    relay_http_post_timed,
     auth_token=effective_auth_token,
   )
 }
@@ -159,7 +256,7 @@ pub async fn relay_poll_claims(
   }
   relay_poll_claims_with_http(
     remote_url,
-    @bitnative.native_http_get,
+    relay_http_get_timed,
     auth_token=effective_auth_token,
   )
 }
@@ -226,7 +323,7 @@ pub async fn relay_poll_claims_after(
     remote_url,
     cursor,
     limit,
-    @bitnative.native_http_get,
+    relay_http_get_timed,
     auth_token=effective_auth_token,
   )
 }
@@ -308,12 +405,25 @@ pub async fn relay_watch_claims_ws(
     Some(token) => headers["Authorization"] = "Bearer \{token}"
     None => ()
   }
-  let conn = @xws.Conn::connect(ws_url, headers~) catch {
-    err =>
-      raise @bit.GitError::ProtocolError(
-        "WebSocket connect failed: \{err.to_string()}",
-      )
-  }
+  let connect_timeout_ms = relay_http_timeout_ms()
+  let conn = (
+      if connect_timeout_ms <= 0 {
+        @xws.Conn::connect(ws_url, headers~)
+      } else {
+        @async.with_timeout(connect_timeout_ms, () => @xws.Conn::connect(
+          ws_url,
+          headers~,
+        ), error=@bit.GitError::ProtocolError(
+          "WebSocket connect timed out after \{connect_timeout_ms}ms",
+        ))
+      }
+    )
+    catch {
+      err =>
+        raise @bit.GitError::ProtocolError(
+          "WebSocket connect failed: \{err.to_string()}",
+        )
+    }
   // Read ready message
   let _ = conn.recv() catch {
     err =>
