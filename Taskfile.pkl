@@ -3,7 +3,7 @@
 // to take positional args (e.g. `git-t-one t3200-branch.sh`) are now invoked
 // directly as `tools/<script>.sh` — see docs/git-test-harness.md.
 
-amends "package://pkg.pkl-lang.org/github.com/mizchi/pkfire/pkfire@0.12.0#/Taskfile.pkl"
+amends "package://pkg.pkl-lang.org/github.com/mizchi/pkfire/pkfire@0.12.1#/Taskfile.pkl"
 
 local moonbitSources: Listing<String> = new {
   "modules/**/*.mbt"

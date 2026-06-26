@@ -23,12 +23,13 @@ jobs:
           node-version: 24
 
       - name: Install pkfire
-        uses: mizchi/pkfire@v0.12.0
+        uses: mizchi/pkfire@v0.12.1
         with:
-          version: 0.12.0
+          version: 0.12.1
       - name: Install pkspec
-        uses: mizchi/pkspec@v0.2.1
+        uses: mizchi/pkspec@v0.4.1
         with:
+          version: 0.4.1
           pkl-version: none
 
       - name: Install Bun
