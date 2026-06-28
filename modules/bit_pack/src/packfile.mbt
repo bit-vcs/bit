@@ -218,31 +218,66 @@ fn rolling_hash_next(
   h1 * base + byte_to_uint(in_b)
 }
 
+///| Flat chained hash index over the base buffer's blocks.
+///
+/// Replaces the previous `Map[UInt, Array[Int]]` (one heap `Array[Int]`
+/// per bucket plus generic map churn — the dominant cost in delta
+/// compression) with three `FixedArray`s forming an open-bucket,
+/// closed-chain hash table:
+///   - `head[b]`   : first position whose hash lands in bucket `b` (-1 = empty)
+///   - `nxt[i]`    : next position sharing `i`'s bucket (-1 = end of chain)
+///   - `hashes[i]` : the exact rolling hash at position `i`
+/// Chains are built so each is in ascending position order, matching the
+/// insertion order of the old per-bucket arrays, so `find_best_match`
+/// visits identical candidates in the same order and the emitted delta is
+/// byte-for-byte unchanged.
+priv struct BlockIndex {
+  head : FixedArray[Int]
+  nxt : FixedArray[Int]
+  hashes : FixedArray[UInt]
+  mask : UInt
+  base_pow : UInt
+}
+
 ///|
-fn build_block_index(
-  base : Bytes,
-  block_size : Int,
-) -> (Map[UInt, Array[Int]], UInt) {
+fn build_block_index(base : Bytes, block_size : Int) -> BlockIndex {
   let base_pow = rolling_hash_base_pow(block_size)
-  let index : Map[UInt, Array[Int]] = {}
   if base.length() < block_size {
-    return (index, base_pow)
-  }
-  let mut h = rolling_hash_init(base, 0, block_size)
-  let last = base.length() - block_size
-  for i = 0; i <= last; i = i + 1 {
-    match index.get(h) {
-      Some(arr) => arr.push(i)
-      None => {
-        let arr : Array[Int] = [i]
-        index[h] = arr
-      }
+    return {
+      head: FixedArray::make(1, -1),
+      nxt: FixedArray::make(0, -1),
+      hashes: FixedArray::make(0, 0U),
+      mask: 0U,
+      base_pow,
     }
+  }
+  let last = base.length() - block_size
+  let n = last + 1
+  // Forward pass: materialise the rolling hash for every position.
+  let hashes = FixedArray::make(n, 0U)
+  let mut h = rolling_hash_init(base, 0, block_size)
+  for i = 0; i <= last; i = i + 1 {
+    hashes[i] = h
     if i < last {
       h = rolling_hash_next(h, base_pow, base[i], base[i + block_size])
     }
   }
-  (index, base_pow)
+  // Power-of-two table sized for ~0.5 load factor.
+  // Power-of-two table at ~0.5 load factor keeps bucket chains short.
+  let mut size = 1
+  while size < n * 2 {
+    size = size * 2
+  }
+  let mask = uint_from_int(size - 1)
+  let head = FixedArray::make(size, -1)
+  let nxt = FixedArray::make(n, -1)
+  // Build chains back-to-front so each bucket lists positions ascending.
+  for i = last; i >= 0; i = i - 1 {
+    let b = (hashes[i] & mask).reinterpret_as_int()
+    nxt[i] = head[b]
+    head[b] = i
+  }
+  { head, nxt, hashes, mask, base_pow }
 }
 
 ///|
@@ -251,7 +286,8 @@ fn find_best_match(
   target : Bytes,
   target_pos : Int,
   block_size : Int,
-  candidates : Array[Int],
+  index : BlockIndex,
+  th : UInt,
 ) -> (Int, Int)? {
   let mut best_len = 0
   let mut best_off = 0
@@ -263,7 +299,17 @@ fn find_best_match(
   let t1 = target[target_pos + 1]
   let t2 = target[target_pos + 2]
   let t3 = target[target_pos + 3]
-  for off in candidates {
+  // Walk the bucket chain (ascending position order). Only positions whose
+  // exact hash equals `th` are real candidates — others merely collide in
+  // the table bucket and are skipped without counting against the limit.
+  let mut j = index.head[(th & index.mask).reinterpret_as_int()]
+  while j != -1 {
+    if index.hashes[j] != th {
+      j = index.nxt[j]
+      continue
+    }
+    let off = j
+    j = index.nxt[j]
     if off + block_size > base_len {
       continue
     }
@@ -322,9 +368,9 @@ fn out_to_bytes(out : Array[Byte]) -> Bytes {
 fn build_delta_with_index(
   base : Bytes,
   target : Bytes,
-  index : Map[UInt, Array[Int]],
-  base_pow : UInt,
+  index : BlockIndex,
 ) -> Bytes {
+  let base_pow = index.base_pow
   let base_len = base.length()
   let target_len = target.length()
   // Pre-allocate output buffer: delta is typically smaller than target
@@ -344,10 +390,7 @@ fn build_delta_with_index(
   let last = target_len - delta_block_size
   let mut th = rolling_hash_init(target, 0, delta_block_size)
   while t <= last {
-    let matched = match index.get(th) {
-      None => None
-      Some(cands) => find_best_match(base, target, t, delta_block_size, cands)
-    }
+    let matched = find_best_match(base, target, t, delta_block_size, index, th)
     match matched {
       Some((base_off, match_len)) => {
         if literal_len > 0 {
@@ -399,8 +442,8 @@ fn build_delta_with_index(
 
 ///|
 fn build_delta(base : Bytes, target : Bytes) -> Bytes {
-  let (index, base_pow) = build_block_index(base, delta_block_size)
-  build_delta_with_index(base, target, index, base_pow)
+  let index = build_block_index(base, delta_block_size)
+  build_delta_with_index(base, target, index)
 }
 
 ///|
@@ -413,7 +456,7 @@ priv struct DeltaWindowEntry {
   offset : Int
   obj : @bit.PackObject
   depth : Int
-  mut block_index : (Map[UInt, Array[Int]], UInt)?
+  mut block_index : BlockIndex?
 }
 
 ///|
@@ -656,7 +699,7 @@ pub fn create_packfile_with_delta_stats_compression(
           continue
         }
         // Build block index (cached per window entry)
-        let (idx, bpow) = match entry.block_index {
+        let idx = match entry.block_index {
           Some(cached) => cached
           None => {
             let built = build_block_index(entry.obj.data, delta_block_size)
@@ -664,7 +707,7 @@ pub fn create_packfile_with_delta_stats_compression(
             built
           }
         }
-        let delta = build_delta_with_index(entry.obj.data, obj.data, idx, bpow)
+        let delta = build_delta_with_index(entry.obj.data, obj.data, idx)
         if delta.length() < best_delta_size {
           best_delta_size = delta.length()
           best_base = Some((entry.offset, entry.obj))
@@ -813,7 +856,7 @@ pub fn create_packfiles_with_size_limit(
         if reuse_only && (obj.offset < 0 || e.obj.offset < 0) {
           continue
         }
-        let (idx, pow) = match e.block_index {
+        let idx = match e.block_index {
           Some(cached) => cached
           None => {
             let r = build_block_index(e.obj.data, delta_block_size)
@@ -821,7 +864,7 @@ pub fn create_packfiles_with_size_limit(
             r
           }
         }
-        let delta = build_delta_with_index(e.obj.data, obj.data, idx, pow)
+        let delta = build_delta_with_index(e.obj.data, obj.data, idx)
         if delta.length() < best_size {
           best_size = delta.length()
           best = Some((e.offset, e.obj, delta, e.depth))
@@ -983,7 +1026,7 @@ pub fn create_packfile_with_delta_stats_compression_reuse(
         if reuse_only && (obj.offset < 0 || e.obj.offset < 0) {
           continue
         }
-        let (idx, pow) = match e.block_index {
+        let idx = match e.block_index {
           Some(cached) => cached
           None => {
             let r = build_block_index(e.obj.data, delta_block_size)
@@ -991,7 +1034,7 @@ pub fn create_packfile_with_delta_stats_compression_reuse(
             r
           }
         }
-        let delta = build_delta_with_index(e.obj.data, obj.data, idx, pow)
+        let delta = build_delta_with_index(e.obj.data, obj.data, idx)
         if delta.length() < best_size {
           best_size = delta.length()
           best = Some((e.offset, e.obj, delta, e.depth))
