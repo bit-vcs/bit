@@ -65,21 +65,23 @@ fn ofs_delta_len(back_offset : Int) -> Int {
 
 ///|
 fn encode_ofs_delta_offset(back_offset : Int, result : Array[Byte]) -> Unit {
-  let parts : Array[Int] = []
-  let mut val = back_offset
-  parts.push(val & 0x7f)
-  while val > 0x7f {
-    val = (val >> 7) - 1
-    parts.push(val & 0x7f)
+  // Emit the base-128 groups most-significant first with a continuation
+  // bit on every byte except the final (least-significant) one. Recursion
+  // emits in the right order without a per-call digit buffer.
+  emit_ofs_delta_byte(back_offset, true, result)
+}
+
+///|
+fn emit_ofs_delta_byte(
+  val : Int,
+  is_last : Bool,
+  result : Array[Byte],
+) -> Unit {
+  if val > 0x7f {
+    emit_ofs_delta_byte((val >> 7) - 1, false, result)
   }
-  for i in 0..<parts.length() {
-    let idx = parts.length() - 1 - i
-    let mut b = parts[idx]
-    if i < parts.length() - 1 {
-      b = b | 0x80
-    }
-    result.push(b.to_byte())
-  }
+  let lo = val & 0x7f
+  result.push((if is_last { lo } else { lo | 0x80 }).to_byte())
 }
 
 ///|
@@ -123,39 +125,58 @@ fn encode_delta_copy_single(
   size : Int,
   out : Array[Byte],
 ) -> Unit {
+  // Compute the flag byte first so the offset/size bytes can be written
+  // straight into `out` — avoids a per-call temporary buffer allocation.
+  let b0 = offset & 0xff
+  let b1 = (offset >> 8) & 0xff
+  let b2 = (offset >> 16) & 0xff
+  let b3 = (offset >> 24) & 0xff
+  let s0 = size & 0xff
+  let s1 = (size >> 8) & 0xff
+  let s2 = (size >> 16) & 0xff
   let mut op = 0x80
-  let buf : Array[Byte] = []
-  if (offset & 0xff) != 0 {
+  if b0 != 0 {
     op = op | 0x01
-    buf.push((offset & 0xff).to_byte())
   }
-  if ((offset >> 8) & 0xff) != 0 {
+  if b1 != 0 {
     op = op | 0x02
-    buf.push(((offset >> 8) & 0xff).to_byte())
   }
-  if ((offset >> 16) & 0xff) != 0 {
+  if b2 != 0 {
     op = op | 0x04
-    buf.push(((offset >> 16) & 0xff).to_byte())
   }
-  if ((offset >> 24) & 0xff) != 0 {
+  if b3 != 0 {
     op = op | 0x08
-    buf.push(((offset >> 24) & 0xff).to_byte())
   }
-  if (size & 0xff) != 0 {
+  if s0 != 0 {
     op = op | 0x10
-    buf.push((size & 0xff).to_byte())
   }
-  if ((size >> 8) & 0xff) != 0 {
+  if s1 != 0 {
     op = op | 0x20
-    buf.push(((size >> 8) & 0xff).to_byte())
   }
-  if ((size >> 16) & 0xff) != 0 {
+  if s2 != 0 {
     op = op | 0x40
-    buf.push(((size >> 16) & 0xff).to_byte())
   }
   out.push(op.to_byte())
-  for b in buf {
-    out.push(b)
+  if b0 != 0 {
+    out.push(b0.to_byte())
+  }
+  if b1 != 0 {
+    out.push(b1.to_byte())
+  }
+  if b2 != 0 {
+    out.push(b2.to_byte())
+  }
+  if b3 != 0 {
+    out.push(b3.to_byte())
+  }
+  if s0 != 0 {
+    out.push(s0.to_byte())
+  }
+  if s1 != 0 {
+    out.push(s1.to_byte())
+  }
+  if s2 != 0 {
+    out.push(s2.to_byte())
   }
 }
 
