@@ -303,12 +303,21 @@ fn log_need_real_git(args : Array[String], git_dir? : String = "") -> Bool {
   // --ancestry-path (with/without =<rev>, including the --graph combination) and
   // --simplify-by-decoration are implemented natively by the walker. The
   // remaining flags below are not yet supported and still fall back.
-  // --show-pulls needs git's full parent-rewriting simplification to decide
-  // which "pull" merges to re-include, which the native walker does not do yet.
+  // --show-pulls is implemented natively (simplified-parent visible set), but
+  // only for the non-graph render paths; combined with --graph it still falls
+  // back since the graph renderer does not consult that set.
+  let mut has_show_pulls = false
+  let mut has_graph = false
   for arg in args {
     if arg == "--show-pulls" {
-      return true
+      has_show_pulls = true
     }
+    if arg == "--graph" {
+      has_graph = true
+    }
+  }
+  if has_show_pulls && has_graph {
+    return true
   }
   false
 }
@@ -2829,6 +2838,102 @@ fn log_merge_pathspec_visibility(
   Some(true)
 }
 
+///| Whether a tree contains any path matching the pathspec. Used to decide if a
+/// root commit introduces the path under --show-pulls.
+fn log_tree_has_pathspec(
+  rfs : &@bitcore.RepoFileSystem,
+  db : @bitlib.ObjectDb,
+  tree : @bitcore.ObjectId,
+  pathspecs : Array[String],
+) -> Bool raise Error {
+  let files = @bitlib.collect_tree_files(db, rfs, tree)
+  for path in files.keys() {
+    if diff_path_matches_filters(path, pathspecs) {
+      return true
+    }
+  }
+  false
+}
+
+///| Classify a commit for the --show-pulls simplified walk. Returns whether the
+/// commit is shown and the simplified parent set to continue from. Mirrors git's
+/// try_to_simplify_commit: TREESAME to the first parent => follow it (hidden);
+/// otherwise the first later parent it is TREESAME to is a "pull" merge that we
+/// divert to (dropping the other parents) and show; TREESAME to no parent => a
+/// genuine change/merge, shown, follow all parents.
+fn log_show_pulls_classify(
+  rfs : &@bitcore.RepoFileSystem,
+  db : @bitlib.ObjectDb,
+  tree : @bitcore.ObjectId,
+  parents : Array[@bitcore.ObjectId],
+  pathspecs : Array[String],
+) -> (Bool, Array[@bitcore.ObjectId]) raise Error {
+  if parents.length() == 0 {
+    return (log_tree_has_pathspec(rfs, db, tree, pathspecs), [])
+  }
+  match log_get_commit_tree(db, rfs, parents[0]) {
+    Some(p0_tree) =>
+      if log_trees_same_for_pathspecs(rfs, db, p0_tree, tree, pathspecs) {
+        return (false, [parents[0]])
+      }
+    None => ()
+  }
+  for i in 1..<parents.length() {
+    match log_get_commit_tree(db, rfs, parents[i]) {
+      Some(pt) =>
+        if log_trees_same_for_pathspecs(rfs, db, pt, tree, pathspecs) {
+          return (true, [parents[i]])
+        }
+      None => ()
+    }
+  }
+  (true, parents)
+}
+
+///| Compute the set of commits visible under --show-pulls for a path-limited log,
+/// by walking the simplified-parent graph from the start commits.
+fn log_compute_show_pulls_visible(
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  db : @bitlib.ObjectDb,
+  start_ids : Array[@bitcore.ObjectId],
+  pathspecs : Array[String],
+) -> Map[String, Bool] raise Error {
+  let visible : Map[String, Bool] = {}
+  let visited : Map[String, Bool] = {}
+  let stack : Array[@bitcore.ObjectId] = []
+  for id in start_ids {
+    stack.push(id)
+  }
+  while stack.length() > 0 {
+    let id = stack.unsafe_pop()
+    let hex = id.to_hex()
+    if visited.contains(hex) {
+      continue
+    }
+    visited[hex] = true
+    let obj = db.get(rfs, id)
+    guard obj is Some(o) else { continue }
+    if o.obj_type != @bitcore.ObjectType::Commit {
+      continue
+    }
+    let info = @bitcore.parse_commit(o.data)
+    let parents = log_resolve_parents(rfs, git_dir, id, info.parents)
+    let (shown, next_parents) = log_show_pulls_classify(
+      rfs, db, info.tree, parents, pathspecs,
+    )
+    if shown {
+      visible[hex] = true
+    }
+    for parent in next_parents {
+      if !visited.contains(parent.to_hex()) {
+        stack.push(parent)
+      }
+    }
+  }
+  visible
+}
+
 ///|
 fn log_commit_matches_history_filters(
   rfs : &@bitcore.RepoFileSystem,
@@ -2842,11 +2947,28 @@ fn log_commit_matches_history_filters(
   detect_copies : Bool,
   simplify_merges : Bool,
   full_history~ : Bool = false,
+  show_pulls_visible? : Map[String, Bool]? = None,
 ) -> Bool raise Error {
   if !log_commit_matches_simplify_merges(
       rfs, git_dir, db, commit_id, pathspecs, simplify_merges,
     ) {
     return false
+  }
+  // --show-pulls: membership in the precomputed simplified-parent visible set
+  // replaces the default merge/pathspec visibility test (diff filters still
+  // apply below).
+  match show_pulls_visible {
+    Some(visible_set) =>
+      if pathspecs.length() > 0 && !full_history {
+        if !visible_set.contains(commit_id.to_hex()) {
+          return false
+        }
+        return log_commit_matches_diff_filter(
+          rfs, git_dir, db, commit_id, include_bits, exclude, detect_renames,
+          detect_copies,
+        )
+      }
+    None => ()
   }
   // Default path-limited history simplification hides merges that are TREESAME
   // to a parent on the pathspec; --full-history disables it. For non-merges this
@@ -4178,6 +4300,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
   let mut exclude_first_parent_only = false
   let mut full_history = false
   let mut full_diff = false
+  let mut show_pulls = false
   let mut simplify_merges = false
   let diff_filter_include : Map[String, Bool] = {}
   let diff_filter_exclude : Map[String, Bool] = {}
@@ -4410,6 +4533,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
       }
       "--full-history" => full_history = true
       "--full-diff" => full_diff = true
+      "--show-pulls" => show_pulls = true
       "--simplify-merges" => simplify_merges = true
       _ if arg.has_prefix("-n") && arg.length() > 2 => {
         let num_str = string_slice_from(arg, 2)
@@ -5016,6 +5140,15 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
       if reverse {
         entries.rev_in_place()
       }
+      let show_pulls_visible : Map[String, Bool]? = if show_pulls &&
+        pathspecs.length() > 0 &&
+        !full_history {
+        Some(
+          log_compute_show_pulls_visible(rfs, git_dir, db, start_ids, pathspecs),
+        )
+      } else {
+        None
+      }
       let mut emitted = 0
       for entry in entries {
         if !entry.boundary && emitted >= max_count {
@@ -5061,6 +5194,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
             detect_copies,
             simplify_merges,
             full_history~,
+            show_pulls_visible=show_pulls_visible,
           ) {
           continue
         }
@@ -5583,6 +5717,17 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
     if reverse {
       entries.rev_in_place()
     }
+    let show_pulls_visible : Map[String, Bool]? = if show_pulls &&
+      pathspecs.length() > 0 &&
+      !full_history {
+      Some(
+        log_compute_show_pulls_visible(
+          rfs, git_dir, walk_db, start_ids, pathspecs,
+        ),
+      )
+    } else {
+      None
+    }
     if oneline {
       let mut emitted = 0
       for entry in entries {
@@ -5636,6 +5781,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
             detect_copies,
             simplify_merges,
             full_history~,
+            show_pulls_visible=show_pulls_visible,
           ) {
           continue
         }
@@ -5721,6 +5867,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
             detect_copies,
             simplify_merges,
             full_history~,
+            show_pulls_visible=show_pulls_visible,
           ) {
           continue
         }
