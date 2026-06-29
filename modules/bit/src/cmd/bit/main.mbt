@@ -1042,9 +1042,10 @@ fn should_delegate_to_real_git(
     can_handle_global_config_in_shim(opts)
   match opts.subcmd {
     Some(cmd) =>
-      if cmd == "config" || cmd == "status" {
-        true
-      } else if cmd == "worktree" ||
+      // config/status are handled natively by default; like every other
+      // command they only fall back when global config injection (-c /
+      // GIT_CONFIG_*) is present and the shim cannot apply it itself.
+      if cmd == "worktree" ||
         cmd == "submodule" ||
         cmd == "submodule--helper" {
         false

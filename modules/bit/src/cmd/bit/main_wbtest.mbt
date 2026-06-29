@@ -85,6 +85,28 @@ test "main: unsupported -c overrides still delegate" {
 }
 
 ///|
+test "main: config and status stay native without config injection" {
+  for cmd in ["config", "status"] {
+    let opts = parse_global_options(["bit", cmd])
+    assert_false(should_delegate_to_real_git(["bit", cmd], opts))
+  }
+}
+
+///|
+test "main: config and status still delegate under config injection" {
+  let prev = @sys.get_env_var("GIT_CONFIG_PARAMETERS")
+  @sys.set_env_var("GIT_CONFIG_PARAMETERS", "'core.editor'='vim'")
+  for cmd in ["config", "status"] {
+    let opts = parse_global_options(["bit", cmd])
+    assert_true(should_delegate_to_real_git(["bit", cmd], opts))
+  }
+  match prev {
+    Some(value) => @sys.set_env_var("GIT_CONFIG_PARAMETERS", value)
+    None => @sys.unset_env_var("GIT_CONFIG_PARAMETERS")
+  }
+}
+
+///|
 test "main: worktree stays in shim without config overrides" {
   let opts = parse_global_options(["bit", "worktree", "add", "wt", "-"])
   assert_false(
