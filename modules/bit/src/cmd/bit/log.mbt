@@ -155,6 +155,9 @@ fn is_short_count_flag(arg : String) -> Bool {
 
 ///|
 async fn delegate_log_to_real_git(args : Array[String], cwd : String) -> Unit {
+  if git_fallback_disabled() {
+    exit_no_git_fallback("git log")
+  }
   let argv : Array[String] = ["log"]
   for arg in args {
     argv.push(arg)
@@ -297,27 +300,13 @@ fn log_need_real_git(args : Array[String], git_dir? : String = "") -> Bool {
       return true
     }
   }
-  let mut has_graph = false
-  let mut has_ancestry_path = false
+  // --ancestry-path (with/without =<rev>, including the --graph combination) and
+  // --simplify-by-decoration are implemented natively by the walker. The
+  // remaining flags below are not yet supported and still fall back.
+  // --show-pulls needs git's full parent-rewriting simplification to decide
+  // which "pull" merges to re-include, which the native walker does not do yet.
   for arg in args {
-    if arg.has_prefix("--ancestry-path=") {
-      return true
-    }
-    if arg == "--graph" {
-      has_graph = true
-    }
-    if arg == "--ancestry-path" {
-      has_ancestry_path = true
-    }
-  }
-  if has_graph && has_ancestry_path {
-    return true
-  }
-  for arg in args {
-    if arg == "--simplify-by-decoration" ||
-      arg == "--show-pulls" ||
-      arg == "--exclude-first-parent-only" ||
-      arg == "--full-diff" {
+    if arg == "--show-pulls" || arg == "--full-diff" {
       return true
     }
   }
@@ -2799,6 +2788,48 @@ fn log_commit_matches_simplify_merges(
 }
 
 ///|
+/// Decide whether a merge is visible under default path-limited history
+/// simplification. Returns None for non-merge commits (caller falls back to the
+/// regular first-parent pathspec test). For a merge, git hides it when it is
+/// TREESAME to any parent on the pathspec (history follows that parent instead).
+fn log_merge_pathspec_visibility(
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  db : @bitlib.ObjectDb,
+  commit_id : @bitcore.ObjectId,
+  pathspecs : Array[String],
+) -> Bool? raise Error {
+  let obj = db.get(rfs, commit_id)
+  guard obj is Some(o) else { return None }
+  if o.obj_type != @bitcore.ObjectType::Commit {
+    return None
+  }
+  let info = @bitcore.parse_commit(o.data)
+  let parents = log_resolve_parents(rfs, git_dir, commit_id, info.parents)
+  if parents.length() < 2 {
+    return None
+  }
+  for parent in parents {
+    match log_get_commit_tree(db, rfs, parent) {
+      Some(parent_tree) =>
+        if log_trees_same_for_pathspecs(
+            rfs,
+            db,
+            parent_tree,
+            info.tree,
+            pathspecs,
+          ) {
+          // TREESAME to this parent on the pathspec: history follows it and the
+          // merge itself is simplified away.
+          return Some(false)
+        }
+      None => ()
+    }
+  }
+  Some(true)
+}
+
+///|
 fn log_commit_matches_history_filters(
   rfs : &@bitcore.RepoFileSystem,
   git_dir : String,
@@ -2810,11 +2841,30 @@ fn log_commit_matches_history_filters(
   detect_renames : Bool,
   detect_copies : Bool,
   simplify_merges : Bool,
+  full_history~ : Bool = false,
 ) -> Bool raise Error {
   if !log_commit_matches_simplify_merges(
       rfs, git_dir, db, commit_id, pathspecs, simplify_merges,
     ) {
     return false
+  }
+  // Default path-limited history simplification hides merges that are TREESAME
+  // to a parent on the pathspec; --full-history disables it. For non-merges this
+  // returns None and we fall back to the regular first-parent pathspec test.
+  if pathspecs.length() > 0 && !full_history {
+    match
+      log_merge_pathspec_visibility(rfs, git_dir, db, commit_id, pathspecs) {
+      Some(visible) => {
+        if !visible {
+          return false
+        }
+        return log_commit_matches_diff_filter(
+          rfs, git_dir, db, commit_id, include_bits, exclude, detect_renames,
+          detect_copies,
+        )
+      }
+      None => ()
+    }
   }
   if !log_commit_matches_pathspecs(rfs, git_dir, db, commit_id, pathspecs) {
     return false
@@ -4071,6 +4121,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
   let decoration_exclude_patterns : Array[String] = []
   let mut clear_decorations = false
   let mut simplify_by_decoration = false
+  let mut exclude_first_parent_only = false
   let mut full_history = false
   let mut simplify_merges = false
   let diff_filter_include : Map[String, Bool] = {}
@@ -4164,6 +4215,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         clear_decorations = true
       }
       "--simplify-by-decoration" => simplify_by_decoration = true
+      "--exclude-first-parent-only" => exclude_first_parent_only = true
       "--raw" => show_raw = true
       "--stat" => show_stat = true
       "-p" | "--patch" => show_patch = true
@@ -4772,6 +4824,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         if !log_commit_matches_history_filters(
             rfs, git_dir, db, id, pathspecs, diff_filter_include, diff_filter_exclude,
             detect_renames, detect_copies, simplify_merges,
+            full_history~,
           ) {
           continue
         }
@@ -4845,7 +4898,14 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
       let exclude_ids : Map[String, Bool] = {}
       for spec in range_excludes {
         match @bitrepo.rev_parse(rfs, git_dir, spec) {
-          Some(id) => walk_commits_to_map(fs, git_dir, id, exclude_ids)
+          Some(id) =>
+            walk_commits_to_map(
+              fs,
+              git_dir,
+              id,
+              exclude_ids,
+              first_parent=exclude_first_parent_only,
+            )
           None if ignore_missing => ()
           None =>
             raise @bitcore.GitError::InvalidObject("Unknown revision: " + spec)
@@ -4862,7 +4922,13 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
           (Some(left_id), Some(right_id)) =>
             match log_find_merge_base(rfs, git_dir, left_id, right_id) {
               Some(base_id) =>
-                walk_commits_to_map(fs, git_dir, base_id, exclude_ids)
+                walk_commits_to_map(
+                  fs,
+                  git_dir,
+                  base_id,
+                  exclude_ids,
+                  first_parent=exclude_first_parent_only,
+                )
               None => ()
             }
           _ if ignore_missing => ()
@@ -4936,6 +5002,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
             detect_renames,
             detect_copies,
             simplify_merges,
+            full_history~,
           ) {
           continue
         }
@@ -5120,6 +5187,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         if !log_commit_matches_history_filters(
             rfs, git_dir, db, id, pathspecs, diff_filter_include, diff_filter_exclude,
             detect_renames, detect_copies, simplify_merges,
+            full_history~,
           ) {
           continue
         }
@@ -5184,6 +5252,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         if !log_commit_matches_history_filters(
             rfs, git_dir, db, id, pathspecs, diff_filter_include, diff_filter_exclude,
             detect_renames, detect_copies, simplify_merges,
+            full_history~,
           ) {
           continue
         }
@@ -5345,7 +5414,14 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
     let exclude_ids : Map[String, Bool] = {}
     for spec in range_excludes {
       match @bitrepo.rev_parse(rfs, git_dir, spec) {
-        Some(id) => walk_commits_to_map(fs, git_dir, id, exclude_ids)
+        Some(id) =>
+          walk_commits_to_map(
+            fs,
+            git_dir,
+            id,
+            exclude_ids,
+            first_parent=exclude_first_parent_only,
+          )
         None if ignore_missing => ()
         None =>
           raise @bitcore.GitError::InvalidObject("Unknown revision: " + spec)
@@ -5362,7 +5438,13 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         (Some(left_id), Some(right_id)) =>
           match log_find_merge_base(rfs, git_dir, left_id, right_id) {
             Some(base_id) =>
-              walk_commits_to_map(fs, git_dir, base_id, exclude_ids)
+              walk_commits_to_map(
+                fs,
+                git_dir,
+                base_id,
+                exclude_ids,
+                first_parent=exclude_first_parent_only,
+              )
             None => ()
           }
         _ if ignore_missing => ()
@@ -5483,6 +5565,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
             detect_renames,
             detect_copies,
             simplify_merges,
+            full_history~,
           ) {
           continue
         }
@@ -5567,6 +5650,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
             detect_renames,
             detect_copies,
             simplify_merges,
+            full_history~,
           ) {
           continue
         }

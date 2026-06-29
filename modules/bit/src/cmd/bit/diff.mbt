@@ -77,37 +77,6 @@ fn get_config_override(key : String) -> String? {
 }
 
 ///|
-fn resolve_real_git_for_diff() -> String {
-  match @sys.get_env_var("SHIM_REAL_GIT") {
-    Some(path) =>
-      if path.length() > 0 {
-        path
-      } else {
-        @sys.get_env_var("GIT_SHIM_REAL_GIT").unwrap_or("/usr/bin/git")
-      }
-    None => @sys.get_env_var("GIT_SHIM_REAL_GIT").unwrap_or("/usr/bin/git")
-  }
-}
-
-///|
-async fn delegate_diff_to_real_git(args : Array[String]) -> Unit {
-  let real_git = resolve_real_git_for_diff()
-  let argv : Array[String] = ["diff"]
-  for arg in args {
-    argv.push(arg)
-  }
-  let code = @process.run(
-    real_git,
-    argv,
-    inherit_env=true,
-    stdin=@stdio.stdin,
-    stdout=@stdio.stdout,
-    stderr=@stdio.stderr,
-  )
-  @sys.exit(code)
-}
-
-///|
 fn diff_last_config_value(
   fs : &@bitcore.RepoFileSystem,
   config_path : String,
@@ -142,14 +111,6 @@ fn diff_noprefix_enabled_from_config(
       }
     }
   }
-}
-
-///|
-fn diff_need_real_git(
-  _fs : &@bitcore.RepoFileSystem,
-  _git_dir : String,
-) -> Bool {
-  false
 }
 
 ///|
@@ -1624,10 +1585,6 @@ async fn handle_diff(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
   let rfs : &@bitcore.RepoFileSystem = fs
   let git_dir = resolve_git_dir(rfs, root)
-  if diff_need_real_git(rfs, git_dir) {
-    delegate_diff_to_real_git(args)
-    return
-  }
   let repo_git_dir = resolve_submodule_common_git_dir(rfs, git_dir)
   let mut submodule_mode = false
   let mut range_spec : String? = None

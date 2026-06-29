@@ -3,6 +3,9 @@ async fn delegate_rebase_to_real_git(
   args : Array[String],
   cwd : String,
 ) -> Unit {
+  if git_fallback_disabled() {
+    exit_no_git_fallback("git rebase")
+  }
   let argv : Array[String] = ["rebase"]
   for arg in args {
     argv.push(arg)

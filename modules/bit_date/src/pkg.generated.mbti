@@ -10,6 +10,8 @@ pub fn month_name_to_number(String) -> Int?
 
 pub fn parse_approxidate(String, Int64) -> Int64?
 
+pub fn parse_approxidate_epoch(String) -> Int64?
+
 pub fn parse_approxidate_human(String) -> Int64?
 
 pub fn parse_approxidate_iso8601(String) -> Int64

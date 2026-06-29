@@ -1,33 +1,6 @@
 ///| Pack handlers: rev-list, verify-pack, unpack-objects, bundle
 
 ///|
-async fn delegate_rev_list_to_real_git(
-  args : Array[String],
-  cwd : String,
-) -> Unit {
-  let argv : Array[String] = ["rev-list"]
-  for arg in args {
-    argv.push(arg)
-  }
-  let code = @process.run(
-    resolve_real_git_for_dispatch(),
-    argv,
-    inherit_env=true,
-    cwd~,
-    stdin=@stdio.stdin,
-    stdout=@stdio.stdout,
-    stderr=@stdio.stderr,
-  )
-  @sys.exit(code)
-}
-
-///|
-fn rev_list_requires_real_git(args : Array[String]) -> Bool {
-  ignore(args)
-  false
-}
-
-///|
 fn rev_list_config_get(
   git_dir : String,
   dotted_key : String,
@@ -76,11 +49,6 @@ async fn rev_list_write_text(
 
 ///|
 async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
-  let cwd = @env.current_dir().unwrap_or(".")
-  if rev_list_requires_real_git(args) {
-    delegate_rev_list_to_real_git(args, cwd)
-    return
-  }
   let fs = OsFs::new()
   let git_dir = find_git_dir(fs)
   check_commit_graph_paranoia(fs, git_dir)
@@ -1292,6 +1260,7 @@ fn walk_commits_to_map(
   git_dir : String,
   start : @bitcore.ObjectId,
   out : Map[String, Bool],
+  first_parent? : Bool = false,
 ) -> Unit {
   let db = @bitlib.ObjectDb::load(fs, git_dir) catch { _ => return () }
   let queue : Array[@bitcore.ObjectId] = [start]
@@ -1303,13 +1272,21 @@ fn walk_commits_to_map(
     }
     out[hex] = true
     match rev_list_commit_parents(db, fs, id) {
-      Some(parents) =>
-        for parent in parents {
+      Some(parents) => {
+        // For --exclude-first-parent-only the exclusion walk follows only the
+        // first parent when crossing a merge.
+        let parents_to_walk = if first_parent && parents.length() > 0 {
+          [parents[0]]
+        } else {
+          parents
+        }
+        for parent in parents_to_walk {
           let phex = parent.to_hex()
           if !out.contains(phex) {
             queue.push(parent)
           }
         }
+      }
       None => ()
     }
   }

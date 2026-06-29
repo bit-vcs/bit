@@ -2,6 +2,9 @@
 
 ///|
 async fn handle_filter_branch(args : Array[String]) -> Unit raise Error {
+  if git_fallback_disabled() {
+    exit_no_git_fallback("git filter-branch")
+  }
   eprint_line(
     "WARNING: git filter-branch is deprecated. Use git-filter-repo instead.",
   )

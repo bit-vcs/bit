@@ -595,4 +595,125 @@ test_expect_success 'write-tree on non-sha1 repo is explicitly unsupported if SH
     )
 '
 
+test_expect_success 'filter-branch is explicitly unsupported with --no-git-fallback' '
+    git_cmd init repo &&
+    (
+        cd repo &&
+        echo hello >a.txt &&
+        git_cmd add a.txt &&
+        git_cmd commit -m "first commit" &&
+        test_must_fail git_cmd filter-branch --tree-filter true HEAD >out 2>err &&
+        grep -Eiq "standalone|not supported|no-git-fallback" err
+    )
+'
+
+test_expect_success 'config --type=expiry-date is handled natively with --no-git-fallback' '
+    git_cmd init repo &&
+    (
+        cd repo &&
+        git_cmd config gc.x never &&
+        test "$(git_cmd config --type=expiry-date --get gc.x)" = "0" &&
+        git_cmd config gc.y now &&
+        test "$(git_cmd config --type=expiry-date --get gc.y)" = "18446744073709551615" &&
+        git_cmd config gc.z "@1234567890 +0000" &&
+        test "$(git_cmd config --type=expiry-date --get gc.z)" = "1234567890"
+    )
+'
+
+test_expect_success 'config --get-urlmatch is explicitly unsupported with --no-git-fallback' '
+    git_cmd init repo &&
+    (
+        cd repo &&
+        test_must_fail git_cmd config --get-urlmatch http https://example.com >out 2>err &&
+        grep -Eiq "standalone|not supported|no-git-fallback" err
+    )
+'
+
+test_expect_success 'log --simplify-by-decoration and --ancestry-path are handled natively with --no-git-fallback' '
+    git_cmd init repo &&
+    (
+        cd repo &&
+        echo a >f && git_cmd add f && git_cmd commit -q -m a &&
+        echo b >f && git_cmd add f && git_cmd commit -q -m b && git_cmd tag t-b &&
+        echo c >f && git_cmd add f && git_cmd commit -q -m c &&
+        echo d >f && git_cmd add f && git_cmd commit -q -m d &&
+        git_cmd log --pretty=%s --simplify-by-decoration >dec.out &&
+        printf "d\nb\na\n" >dec.expect &&
+        test_cmp dec.expect dec.out &&
+        git_cmd log --pretty=%s --ancestry-path t-b..HEAD >anc.out &&
+        printf "d\nc\n" >anc.expect &&
+        test_cmp anc.expect anc.out
+    )
+'
+
+test_expect_success 'log --exclude-first-parent-only is handled natively with --no-git-fallback' '
+    git_cmd init repo &&
+    (
+        cd repo &&
+        echo base >base && git_cmd add base && git_cmd commit -q -m base &&
+        main="$(git_cmd rev-parse --abbrev-ref HEAD)" &&
+        git_cmd checkout -q -b topic &&
+        echo t1 >t1 && git_cmd add t1 && git_cmd commit -q -m t1 &&
+        git_cmd checkout -q "$main" &&
+        echo m1 >m1 && git_cmd add m1 && git_cmd commit -q -m m1 &&
+        git_cmd merge -q --no-ff topic -m M1 &&
+        git_cmd tag mark &&
+        git_cmd checkout -q topic &&
+        echo t2 >t2 && git_cmd add t2 && git_cmd commit -q -m t2 &&
+        git_cmd checkout -q "$main" &&
+        echo m2 >m2 && git_cmd add m2 && git_cmd commit -q -m m2 &&
+        git_cmd merge -q --no-ff topic -m M2 &&
+        # Plain exclusion drops t1 (in mark ancestry); first-parent-only keeps it.
+        git_cmd log --pretty=%s mark..HEAD >plain.out &&
+        ! grep -qx t1 plain.out &&
+        git_cmd log --pretty=%s --exclude-first-parent-only mark..HEAD >efp.out &&
+        grep -qx t1 efp.out
+    )
+'
+
+test_expect_success 'log --full-diff stays explicitly unsupported with --no-git-fallback' '
+    git_cmd init repo &&
+    (
+        cd repo &&
+        echo hello >a.txt &&
+        git_cmd add a.txt &&
+        git_cmd commit -m "first commit" &&
+        test_must_fail git_cmd log --full-diff -- a.txt >out 2>err &&
+        grep -Eiq "standalone|not supported|no-git-fallback" err
+    )
+'
+
+test_expect_success 'log -- <path> simplifies away a pull merge (default history simplification)' '
+    git_cmd init repo &&
+    (
+        cd repo &&
+        echo 0 >base && git_cmd add base && git_cmd commit -q -m c0 &&
+        main="$(git_cmd rev-parse --abbrev-ref HEAD)" &&
+        git_cmd checkout -q -b topic &&
+        echo a >foo && git_cmd add foo && git_cmd commit -q -m t_foo &&
+        git_cmd checkout -q "$main" &&
+        echo 1 >base && git_cmd add base && git_cmd commit -q -m m_base &&
+        git_cmd merge -q --no-ff topic -m merge_pulls_foo &&
+        echo 2 >base && git_cmd add base && git_cmd commit -q -m m_base2 &&
+        git_cmd log --pretty=%s -- foo >foo.out &&
+        printf "t_foo\n" >foo.expect &&
+        test_cmp foo.expect foo.out &&
+        # --full-history keeps the pull merge visible.
+        git_cmd log --pretty=%s --full-history -- foo >full.out &&
+        grep -qx merge_pulls_foo full.out
+    )
+'
+
+test_expect_success 'log --show-pulls stays explicitly unsupported with --no-git-fallback' '
+    git_cmd init repo &&
+    (
+        cd repo &&
+        echo hello >a.txt &&
+        git_cmd add a.txt &&
+        git_cmd commit -m "first commit" &&
+        test_must_fail git_cmd log --show-pulls -- a.txt >out 2>err &&
+        grep -Eiq "standalone|not supported|no-git-fallback" err
+    )
+'
+
 test_done

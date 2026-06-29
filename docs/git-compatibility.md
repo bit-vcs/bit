@@ -110,8 +110,22 @@ The following are intentionally rejected with explicit standalone-mode errors (c
 
 ## Where Git Fallback Exists
 
-- Main `bit` command dispatch in `src/cmd/bit/main.mbt` does not auto-delegate unknown commands to system git.
-- Git fallback/delegation is implemented in the shim layer `tools/git-shim/bin/git`.
+The product binary is being moved off git fallback entirely; the shim layer is
+the only place fallback is expected to remain (for compatibility testing).
+
+- Main `bit` command dispatch in `src/cmd/bit/main.mbt` does not auto-delegate
+  unknown commands to system git. `config` and `status` are handled natively by
+  default; `should_delegate_to_real_git` only falls back when global config
+  injection (`-c` / `GIT_CONFIG_*`) is present and the shim cannot apply it.
+- `--no-git-fallback` is authoritative: it forbids every per-command delegation
+  (`blame`, `config`, `fetch`, `log`, `rebase`, `show`, `filter-branch`,
+  `add -i/-p`), which abort with an explicit standalone-mode error instead.
+- A few per-command paths still delegate when fallback is allowed: `config`
+  `--get-urlmatch` / `--blob` / `--includes`, `log`/`show` signature display and
+  SSH-format signatures, `rebase` complex/interactive-state modes, `blame`
+  unsupported args, `fetch` relative `--deepen`, and deprecated `filter-branch`.
+- Git fallback/delegation is otherwise implemented in the shim layer
+  `tools/git-shim/bin/git`.
   - The shim delegates to `SHIM_REAL_GIT` by default.
   - CI `git-compat` (`.github/workflows/ci.yml`) runs upstream `git/t` via this shim (`SHIM_REAL_GIT`, `SHIM_MOON`, `SHIM_CMDS`).
 

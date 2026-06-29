@@ -22,14 +22,6 @@ test "rev-list: negative max-count is treated as unlimited" {
 }
 
 ///|
-test "rev-list: cherry options stay on native implementation" {
-  assert_false(rev_list_requires_real_git(["--cherry-pick", "A...B"]))
-  assert_false(rev_list_requires_real_git(["--cherry-mark", "A...B"]))
-  assert_false(rev_list_requires_real_git(["--cherry", "A...B"]))
-  assert_false(rev_list_requires_real_git(["--left-right", "A...B"]))
-}
-
-///|
 async fn rev_list_test_init_repo(
   root : String,
   repo_dir : String,

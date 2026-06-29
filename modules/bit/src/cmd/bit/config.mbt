@@ -218,10 +218,6 @@ async fn handle_config(args : Array[String]) -> Unit raise Error {
     Some("color") => get_color = true
     _ => ()
   }
-  if get_expiry_date {
-    delegate_config_to_real_git(args)
-    return
-  }
   if saw_get_mode && saw_get_all_mode {
     eprint_line(
       "error: options '--get-all' and '--get' cannot be used together",
@@ -2014,17 +2010,27 @@ fn format_config_output_value(
       val
     }
   } else if get_expiry_date {
-    let trimmed = val.trim().to_owned().to_lower()
-    if trimmed == "never" || trimmed == "false" {
+    let trimmed = val.trim().to_owned()
+    let normalized = trimmed.to_lower()
+    if normalized == "never" || normalized == "false" {
       "0"
+    } else if normalized == "now" || normalized == "all" {
+      // git maps "now"/"all" to TIME_MAX so that everything is treated as
+      // expired; mirror its decimal representation of UINT64_MAX.
+      "18446744073709551615"
     } else {
-      let key_for_error = match key {
-        Some(k) => k
-        None => ""
+      match @date_parse.parse_approxidate(trimmed, get_current_timestamp()) {
+        Some(ts) => ts.to_string()
+        None => {
+          let key_for_error = match key {
+            Some(k) => k
+            None => ""
+          }
+          raise @bitcore.GitError::InvalidObject(
+            "'\{val}' for '\{key_for_error}' is not a valid timestamp",
+          )
+        }
       }
-      raise @bitcore.GitError::InvalidObject(
-        "'\{val}' for '\{key_for_error}' is not a valid timestamp",
-      )
     }
   } else if get_color {
     match parse_config_color(val) {
@@ -2126,6 +2132,9 @@ fn resolve_real_git_for_config() -> String {
 
 ///|
 async fn delegate_config_to_real_git(args : Array[String]) -> Unit {
+  if git_fallback_disabled() {
+    exit_no_git_fallback("git config")
+  }
   let real_git = resolve_real_git_for_config()
   let argv : Array[String] = ["config"]
   for arg in args {

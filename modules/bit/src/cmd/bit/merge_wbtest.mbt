@@ -11,15 +11,6 @@ test "split_cmdline quote validation" {
 }
 
 ///|
-test "merge: signing args handled natively" {
-  assert_false(merge_requires_real_git(["-S", "side"]))
-  assert_false(merge_requires_real_git(["--gpg-sign", "side"]))
-  assert_false(merge_requires_real_git(["--gpg-sign=key", "side"]))
-  assert_false(merge_requires_real_git(["--no-gpg-sign", "side"]))
-  assert_false(merge_requires_real_git(["side"]))
-}
-
-///|
 async test "merge: -S stores gpgsig header on merge commit" {
   @bitnative.init_native_io()
   cmd_bit_wbtest_env_lock.acquire()

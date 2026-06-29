@@ -185,13 +185,13 @@ test "log: ancestry and remaining simplify options fallback boundaries" {
   assert_false(log_need_real_git(["--stdin"]))
   assert_false(log_need_real_git(["--boundary"]))
   assert_false(log_need_real_git(["--ancestry-path", "A..B"]))
-  assert_true(log_need_real_git(["--ancestry-path=topic", "B"]))
-  assert_true(log_need_real_git(["--graph", "--ancestry-path", "A..B"]))
-  assert_true(log_need_real_git(["--simplify-by-decoration"]))
+  assert_false(log_need_real_git(["--ancestry-path=topic", "B"]))
+  assert_false(log_need_real_git(["--graph", "--ancestry-path", "A..B"]))
+  assert_false(log_need_real_git(["--simplify-by-decoration"]))
   assert_false(log_need_real_git(["--simplify-merges"]))
   assert_false(log_need_real_git(["--full-history"]))
   assert_true(log_need_real_git(["--show-pulls"]))
-  assert_true(log_need_real_git(["--exclude-first-parent-only"]))
+  assert_false(log_need_real_git(["--exclude-first-parent-only"]))
   assert_false(log_need_real_git(["--show-signature", "HEAD"]))
   assert_true(log_need_real_git(["--show-signature", "--oneline", "HEAD"]))
   assert_true(log_need_real_git(["--show-signature", "--graph", "HEAD"]))
@@ -268,7 +268,11 @@ async test "log: simplify-merges drops path merge that is TREESAME to a parent" 
   guard base_id is Some(base_commit) else { fail("expected base commit") }
   let include_bits : Map[String, Bool] = {}
   let exclude_bits : Map[String, Bool] = {}
-  assert_true(
+  // Default path-limited history simplification also drops the merge: it is
+  // TREESAME to its second parent (side) on `target`, so history follows that
+  // parent. (--full-history would keep it; that is covered by the git oracle
+  // assertions above.)
+  assert_false(
     log_commit_matches_history_filters(
       fs,
       git_dir,
@@ -282,6 +286,7 @@ async test "log: simplify-merges drops path merge that is TREESAME to a parent" 
       false,
     ),
   )
+  // --simplify-merges drops it as well.
   assert_false(
     log_commit_matches_history_filters(
       fs,

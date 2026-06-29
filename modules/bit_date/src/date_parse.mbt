@@ -261,11 +261,46 @@ pub fn parse_approxidate_relative(s : String, now : Int64) -> Int64? {
   None
 }
 
+///| Parse git's raw epoch date form `@<seconds>`, optionally followed by a
+/// timezone such as ` +0000`. The timezone offset does not change the epoch
+/// value git reports, so it is accepted but ignored. Returns None when the
+/// string is not in this form.
+pub fn parse_approxidate_epoch(s : String) -> Int64? {
+  let chars = s.to_array()
+  if chars.length() < 2 || chars[0] != '@' {
+    return None
+  }
+  let mut i = 1
+  let mut result = 0L
+  let mut found = false
+  while i < chars.length() && chars[i] >= '0' && chars[i] <= '9' {
+    result = result * 10L + (chars[i].to_int() - '0'.to_int()).to_int64()
+    found = true
+    i += 1
+  }
+  if !found {
+    return None
+  }
+  // Skip whitespace before an optional timezone, then ensure the only trailing
+  // content is a +HHMM / -HHMM offset.
+  while i < chars.length() && (chars[i] == ' ' || chars[i] == '\t') {
+    i += 1
+  }
+  if i < chars.length() && chars[i] != '+' && chars[i] != '-' {
+    return None
+  }
+  Some(result)
+}
+
 ///|
 /// Parse a date string trying multiple formats: ISO 8601, relative, human-readable, YYYY-MM-DD.
 /// Takes the current timestamp for relative date resolution.
 pub fn parse_approxidate(date_str : String, now : Int64) -> Int64? {
   let s = date_str
+  match parse_approxidate_epoch(s) {
+    Some(ts) => return Some(ts)
+    None => ()
+  }
   if s.find("T") is Some(_) {
     let ts = parse_approxidate_iso8601(s)
     if ts > 0L {

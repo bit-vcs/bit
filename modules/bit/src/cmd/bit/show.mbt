@@ -135,6 +135,9 @@ fn show_requires_real_git(args : Array[String], git_dir? : String = "") -> Bool 
 
 ///|
 async fn delegate_show_to_real_git(args : Array[String]) -> Unit {
+  if git_fallback_disabled() {
+    exit_no_git_fallback("git show")
+  }
   let argv = ["show"]
   for arg in args {
     argv.push(arg)
