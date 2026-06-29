@@ -300,25 +300,11 @@ fn log_need_real_git(args : Array[String], git_dir? : String = "") -> Bool {
       return true
     }
   }
-  let mut has_graph = false
-  let mut has_ancestry_path = false
+  // --ancestry-path (with/without =<rev>, including the --graph combination) and
+  // --simplify-by-decoration are implemented natively by the walker. The
+  // remaining flags below are not yet supported and still fall back.
   for arg in args {
-    if arg.has_prefix("--ancestry-path=") {
-      return true
-    }
-    if arg == "--graph" {
-      has_graph = true
-    }
-    if arg == "--ancestry-path" {
-      has_ancestry_path = true
-    }
-  }
-  if has_graph && has_ancestry_path {
-    return true
-  }
-  for arg in args {
-    if arg == "--simplify-by-decoration" ||
-      arg == "--show-pulls" ||
+    if arg == "--show-pulls" ||
       arg == "--exclude-first-parent-only" ||
       arg == "--full-diff" {
       return true

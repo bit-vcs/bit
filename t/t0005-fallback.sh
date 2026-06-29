@@ -629,14 +629,31 @@ test_expect_success 'config --get-urlmatch is explicitly unsupported with --no-g
     )
 '
 
-test_expect_success 'log --simplify-by-decoration is explicitly unsupported with --no-git-fallback' '
+test_expect_success 'log --simplify-by-decoration and --ancestry-path are handled natively with --no-git-fallback' '
+    git_cmd init repo &&
+    (
+        cd repo &&
+        echo a >f && git_cmd add f && git_cmd commit -q -m a &&
+        echo b >f && git_cmd add f && git_cmd commit -q -m b && git_cmd tag t-b &&
+        echo c >f && git_cmd add f && git_cmd commit -q -m c &&
+        echo d >f && git_cmd add f && git_cmd commit -q -m d &&
+        git_cmd log --pretty=%s --simplify-by-decoration >dec.out &&
+        printf "d\nb\na\n" >dec.expect &&
+        test_cmp dec.expect dec.out &&
+        git_cmd log --pretty=%s --ancestry-path t-b..HEAD >anc.out &&
+        printf "d\nc\n" >anc.expect &&
+        test_cmp anc.expect anc.out
+    )
+'
+
+test_expect_success 'log --full-diff stays explicitly unsupported with --no-git-fallback' '
     git_cmd init repo &&
     (
         cd repo &&
         echo hello >a.txt &&
         git_cmd add a.txt &&
         git_cmd commit -m "first commit" &&
-        test_must_fail git_cmd log --simplify-by-decoration >out 2>err &&
+        test_must_fail git_cmd log --full-diff -- a.txt >out 2>err &&
         grep -Eiq "standalone|not supported|no-git-fallback" err
     )
 '
