@@ -742,4 +742,24 @@ test_expect_success 'log --graph --show-pulls still falls back (explicit error u
     )
 '
 
+test_expect_success 'log --full-history -- <path> keeps a merge that changes the path vs a later parent' '
+    git_cmd init repo &&
+    (
+        cd repo &&
+        echo 0 >base && git_cmd add base && git_cmd commit -q -m c0 &&
+        main="$(git_cmd rev-parse --abbrev-ref HEAD)" &&
+        git_cmd checkout -q -b side &&
+        echo s >bar && git_cmd add bar && git_cmd commit -q -m side_bar &&
+        git_cmd checkout -q "$main" &&
+        echo m >foo && git_cmd add foo && git_cmd commit -q -m main_foo &&
+        git_cmd merge -q --no-ff side -m themerge &&
+        # The merge is TREESAME to its first parent on foo but differs from the
+        # side parent: default simplification hides it, --full-history keeps it.
+        git_cmd log --pretty=%s -- foo >plain.out &&
+        ! grep -qx themerge plain.out &&
+        git_cmd log --pretty=%s --full-history -- foo >full.out &&
+        grep -qx themerge full.out
+    )
+'
+
 test_done
