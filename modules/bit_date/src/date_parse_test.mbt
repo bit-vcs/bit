@@ -55,3 +55,22 @@ test "parse_approxidate human readable" {
   let expected = @bit_date.days_since_epoch(2000, 1, 1).to_int64() * 86400L
   @test.assert_eq(result.unwrap(), expected)
 }
+
+///|
+test "parse_approxidate_epoch" {
+  @test.assert_eq(@bit_date.parse_approxidate_epoch("@1234567890"), Some(1234567890L))
+  @test.assert_eq(
+    @bit_date.parse_approxidate_epoch("@1234567890 +0000"),
+    Some(1234567890L),
+  )
+  @test.assert_eq(
+    @bit_date.parse_approxidate_epoch("@1117150200 -0500"),
+    Some(1117150200L),
+  )
+  // Not the epoch form.
+  @test.assert_eq(@bit_date.parse_approxidate_epoch("1234567890"), None)
+  @test.assert_eq(@bit_date.parse_approxidate_epoch("@"), None)
+  @test.assert_eq(@bit_date.parse_approxidate_epoch("@12abc"), None)
+  // parse_approxidate dispatches to the epoch form.
+  @test.assert_eq(@bit_date.parse_approxidate("@1234567890", 0L), Some(1234567890L))
+}

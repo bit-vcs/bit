@@ -607,6 +607,19 @@ test_expect_success 'filter-branch is explicitly unsupported with --no-git-fallb
     )
 '
 
+test_expect_success 'config --type=expiry-date is handled natively with --no-git-fallback' '
+    git_cmd init repo &&
+    (
+        cd repo &&
+        git_cmd config gc.x never &&
+        test "$(git_cmd config --type=expiry-date --get gc.x)" = "0" &&
+        git_cmd config gc.y now &&
+        test "$(git_cmd config --type=expiry-date --get gc.y)" = "18446744073709551615" &&
+        git_cmd config gc.z "@1234567890 +0000" &&
+        test "$(git_cmd config --type=expiry-date --get gc.z)" = "1234567890"
+    )
+'
+
 test_expect_success 'config --get-urlmatch is explicitly unsupported with --no-git-fallback' '
     git_cmd init repo &&
     (
