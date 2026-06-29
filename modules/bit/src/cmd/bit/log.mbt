@@ -2838,6 +2838,44 @@ fn log_merge_pathspec_visibility(
   Some(true)
 }
 
+///| Whether a merge is visible under --full-history for a path-limited log.
+/// Returns None for non-merge commits. git keeps a merge whenever it differs
+/// from any parent on the pathspec (not only its first parent).
+fn log_full_history_merge_visible(
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  db : @bitlib.ObjectDb,
+  commit_id : @bitcore.ObjectId,
+  pathspecs : Array[String],
+) -> Bool? raise Error {
+  let obj = db.get(rfs, commit_id)
+  guard obj is Some(o) else { return None }
+  if o.obj_type != @bitcore.ObjectType::Commit {
+    return None
+  }
+  let info = @bitcore.parse_commit(o.data)
+  let parents = log_resolve_parents(rfs, git_dir, commit_id, info.parents)
+  if parents.length() < 2 {
+    return None
+  }
+  for parent in parents {
+    match log_get_commit_tree(db, rfs, parent) {
+      Some(parent_tree) =>
+        if !log_trees_same_for_pathspecs(
+            rfs,
+            db,
+            parent_tree,
+            info.tree,
+            pathspecs,
+          ) {
+          return Some(true)
+        }
+      None => ()
+    }
+  }
+  Some(false)
+}
+
 ///| Whether a tree contains any path matching the pathspec. Used to decide if a
 /// root commit introduces the path under --show-pulls.
 fn log_tree_has_pathspec(
@@ -2976,6 +3014,24 @@ fn log_commit_matches_history_filters(
   if pathspecs.length() > 0 && !full_history {
     match
       log_merge_pathspec_visibility(rfs, git_dir, db, commit_id, pathspecs) {
+      Some(visible) => {
+        if !visible {
+          return false
+        }
+        return log_commit_matches_diff_filter(
+          rfs, git_dir, db, commit_id, include_bits, exclude, detect_renames,
+          detect_copies,
+        )
+      }
+      None => ()
+    }
+  }
+  // --full-history: keep a merge if it differs from any parent on the pathspec
+  // (the regular first-parent test below would miss merges that only change the
+  // path relative to a later parent).
+  if pathspecs.length() > 0 && full_history {
+    match
+      log_full_history_merge_visible(rfs, git_dir, db, commit_id, pathspecs) {
       Some(visible) => {
         if !visible {
           return false
