@@ -646,6 +646,31 @@ test_expect_success 'log --simplify-by-decoration and --ancestry-path are handle
     )
 '
 
+test_expect_success 'log --exclude-first-parent-only is handled natively with --no-git-fallback' '
+    git_cmd init repo &&
+    (
+        cd repo &&
+        echo base >base && git_cmd add base && git_cmd commit -q -m base &&
+        main="$(git_cmd rev-parse --abbrev-ref HEAD)" &&
+        git_cmd checkout -q -b topic &&
+        echo t1 >t1 && git_cmd add t1 && git_cmd commit -q -m t1 &&
+        git_cmd checkout -q "$main" &&
+        echo m1 >m1 && git_cmd add m1 && git_cmd commit -q -m m1 &&
+        git_cmd merge -q --no-ff topic -m M1 &&
+        git_cmd tag mark &&
+        git_cmd checkout -q topic &&
+        echo t2 >t2 && git_cmd add t2 && git_cmd commit -q -m t2 &&
+        git_cmd checkout -q "$main" &&
+        echo m2 >m2 && git_cmd add m2 && git_cmd commit -q -m m2 &&
+        git_cmd merge -q --no-ff topic -m M2 &&
+        # Plain exclusion drops t1 (in mark ancestry); first-parent-only keeps it.
+        git_cmd log --pretty=%s mark..HEAD >plain.out &&
+        ! grep -qx t1 plain.out &&
+        git_cmd log --pretty=%s --exclude-first-parent-only mark..HEAD >efp.out &&
+        grep -qx t1 efp.out
+    )
+'
+
 test_expect_success 'log --full-diff stays explicitly unsupported with --no-git-fallback' '
     git_cmd init repo &&
     (

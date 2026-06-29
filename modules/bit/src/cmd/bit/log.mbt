@@ -304,9 +304,7 @@ fn log_need_real_git(args : Array[String], git_dir? : String = "") -> Bool {
   // --simplify-by-decoration are implemented natively by the walker. The
   // remaining flags below are not yet supported and still fall back.
   for arg in args {
-    if arg == "--show-pulls" ||
-      arg == "--exclude-first-parent-only" ||
-      arg == "--full-diff" {
+    if arg == "--show-pulls" || arg == "--full-diff" {
       return true
     }
   }
@@ -4060,6 +4058,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
   let decoration_exclude_patterns : Array[String] = []
   let mut clear_decorations = false
   let mut simplify_by_decoration = false
+  let mut exclude_first_parent_only = false
   let mut full_history = false
   let mut simplify_merges = false
   let diff_filter_include : Map[String, Bool] = {}
@@ -4153,6 +4152,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         clear_decorations = true
       }
       "--simplify-by-decoration" => simplify_by_decoration = true
+      "--exclude-first-parent-only" => exclude_first_parent_only = true
       "--raw" => show_raw = true
       "--stat" => show_stat = true
       "-p" | "--patch" => show_patch = true
@@ -4834,7 +4834,14 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
       let exclude_ids : Map[String, Bool] = {}
       for spec in range_excludes {
         match @bitrepo.rev_parse(rfs, git_dir, spec) {
-          Some(id) => walk_commits_to_map(fs, git_dir, id, exclude_ids)
+          Some(id) =>
+            walk_commits_to_map(
+              fs,
+              git_dir,
+              id,
+              exclude_ids,
+              first_parent=exclude_first_parent_only,
+            )
           None if ignore_missing => ()
           None =>
             raise @bitcore.GitError::InvalidObject("Unknown revision: " + spec)
@@ -4851,7 +4858,13 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
           (Some(left_id), Some(right_id)) =>
             match log_find_merge_base(rfs, git_dir, left_id, right_id) {
               Some(base_id) =>
-                walk_commits_to_map(fs, git_dir, base_id, exclude_ids)
+                walk_commits_to_map(
+                  fs,
+                  git_dir,
+                  base_id,
+                  exclude_ids,
+                  first_parent=exclude_first_parent_only,
+                )
               None => ()
             }
           _ if ignore_missing => ()
@@ -5334,7 +5347,14 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
     let exclude_ids : Map[String, Bool] = {}
     for spec in range_excludes {
       match @bitrepo.rev_parse(rfs, git_dir, spec) {
-        Some(id) => walk_commits_to_map(fs, git_dir, id, exclude_ids)
+        Some(id) =>
+          walk_commits_to_map(
+            fs,
+            git_dir,
+            id,
+            exclude_ids,
+            first_parent=exclude_first_parent_only,
+          )
         None if ignore_missing => ()
         None =>
           raise @bitcore.GitError::InvalidObject("Unknown revision: " + spec)
@@ -5351,7 +5371,13 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         (Some(left_id), Some(right_id)) =>
           match log_find_merge_base(rfs, git_dir, left_id, right_id) {
             Some(base_id) =>
-              walk_commits_to_map(fs, git_dir, base_id, exclude_ids)
+              walk_commits_to_map(
+                fs,
+                git_dir,
+                base_id,
+                exclude_ids,
+                first_parent=exclude_first_parent_only,
+              )
             None => ()
           }
         _ if ignore_missing => ()

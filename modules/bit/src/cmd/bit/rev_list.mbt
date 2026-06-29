@@ -1260,6 +1260,7 @@ fn walk_commits_to_map(
   git_dir : String,
   start : @bitcore.ObjectId,
   out : Map[String, Bool],
+  first_parent? : Bool = false,
 ) -> Unit {
   let db = @bitlib.ObjectDb::load(fs, git_dir) catch { _ => return () }
   let queue : Array[@bitcore.ObjectId] = [start]
@@ -1271,13 +1272,21 @@ fn walk_commits_to_map(
     }
     out[hex] = true
     match rev_list_commit_parents(db, fs, id) {
-      Some(parents) =>
-        for parent in parents {
+      Some(parents) => {
+        // For --exclude-first-parent-only the exclusion walk follows only the
+        // first parent when crossing a merge.
+        let parents_to_walk = if first_parent && parents.length() > 0 {
+          [parents[0]]
+        } else {
+          parents
+        }
+        for parent in parents_to_walk {
           let phex = parent.to_hex()
           if !out.contains(phex) {
             queue.push(parent)
           }
         }
+      }
       None => ()
     }
   }
