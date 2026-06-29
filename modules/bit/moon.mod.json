@@ -11,7 +11,7 @@
     "mizchi/x": "0.2.0",
     "bobzhang/toml": "0.1.7",
     "mizchi/libgit2": "0.1.0",
-    "mizchi/zlib": "0.4.5",
+    "mizchi/zlib": "0.4.8",
     "mizchi/experimental_crypto": "0.0.2",
     "mizchi/bitx_openpgp": "0.42.2",
     "mizchi/bit_apply": "0.42.2",
