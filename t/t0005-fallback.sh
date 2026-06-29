@@ -671,15 +671,20 @@ test_expect_success 'log --exclude-first-parent-only is handled natively with --
     )
 '
 
-test_expect_success 'log --full-diff stays explicitly unsupported with --no-git-fallback' '
+test_expect_success 'log -p -- <path> restricts the diff; --full-diff shows all paths (native)' '
     git_cmd init repo &&
     (
         cd repo &&
-        echo hello >a.txt &&
-        git_cmd add a.txt &&
-        git_cmd commit -m "first commit" &&
-        test_must_fail git_cmd log --full-diff -- a.txt >out 2>err &&
-        grep -Eiq "standalone|not supported|no-git-fallback" err
+        echo a >foo && echo b >bar && git_cmd add foo bar && git_cmd commit -q -m c1 &&
+        echo a2 >foo && echo b2 >bar && git_cmd add foo bar && git_cmd commit -q -m c2 &&
+        # Path-limited diff only mentions foo, not bar.
+        git_cmd log -p -- foo >restricted.out &&
+        grep -q "b/foo" restricted.out &&
+        ! grep -q "b/bar" restricted.out &&
+        # --full-diff shows bar as well, while still selecting by foo.
+        git_cmd log -p --full-diff -- foo >full.out &&
+        grep -q "b/foo" full.out &&
+        grep -q "b/bar" full.out
     )
 '
 

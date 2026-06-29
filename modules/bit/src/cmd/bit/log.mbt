@@ -306,7 +306,7 @@ fn log_need_real_git(args : Array[String], git_dir? : String = "") -> Bool {
   // --show-pulls needs git's full parent-rewriting simplification to decide
   // which "pull" merges to re-include, which the native walker does not do yet.
   for arg in args {
-    if arg == "--show-pulls" || arg == "--full-diff" {
+    if arg == "--show-pulls" {
       return true
     }
   }
@@ -3872,6 +3872,46 @@ fn log_format_commit_identity(
   out.to_string()
 }
 
+///| Restrict per-commit diff files to the pathspec for path-limited log output.
+/// git shows only the diff of the matched paths unless --full-diff is given (or
+/// there is no pathspec).
+fn log_restrict_diff_files(
+  files : Array[@bitdiff.DiffFile],
+  pathspecs : Array[String],
+  full_diff : Bool,
+) -> Array[@bitdiff.DiffFile] {
+  if full_diff || pathspecs.length() == 0 {
+    return files
+  }
+  let out : Array[@bitdiff.DiffFile] = []
+  for file in files {
+    if diff_path_matches_filters(file.path, pathspecs) {
+      out.push(file)
+    }
+  }
+  out
+}
+
+///| Same as log_restrict_diff_files but for `--raw` rows (keyed on the new/old
+/// path so renames matching on either side are kept).
+fn log_restrict_raw_results(
+  results : Array[LogRawResult],
+  pathspecs : Array[String],
+  full_diff : Bool,
+) -> Array[LogRawResult] {
+  if full_diff || pathspecs.length() == 0 {
+    return results
+  }
+  let out : Array[LogRawResult] = []
+  for r in results {
+    if diff_path_matches_filters(r.new_path, pathspecs) ||
+      diff_path_matches_filters(r.old_path, pathspecs) {
+      out.push(r)
+    }
+  }
+  out
+}
+
 ///|
 async fn log_emit_default_commit_entry(
   entry : LogWalkEntry,
@@ -3896,6 +3936,8 @@ async fn log_emit_default_commit_entry(
   show_parents? : Bool = false,
   rotate_to? : String? = None,
   skip_to? : String? = None,
+  pathspecs? : Array[String] = [],
+  full_diff? : Bool = false,
 ) -> Unit raise Error {
   let deco = format_decoration(ref_names, entry.id.to_hex())
   let header_identity = log_format_commit_identity(
@@ -3929,12 +3971,16 @@ async fn log_emit_default_commit_entry(
   log_emit_output("", true, line_prefix)
   log_emit_notes_for_commit(rfs, git_dir, db, entry.id, line_prefix)
   if show_stat || show_patch {
-    let diff_files = diff_apply_rotate_skip_files(
-      @bitdiff.diff_trees(rfs, git_dir, entry.parent_tree, entry.tree, db~),
-      rotate_to,
-      skip_to,
-      strict=false,
-    ).unwrap()
+    let diff_files = log_restrict_diff_files(
+      diff_apply_rotate_skip_files(
+        @bitdiff.diff_trees(rfs, git_dir, entry.parent_tree, entry.tree, db~),
+        rotate_to,
+        skip_to,
+        strict=false,
+      ).unwrap(),
+      pathspecs,
+      full_diff,
+    )
     if show_stat {
       let stat_lines = @bitdiff.diff_stat(diff_files)
       for line in stat_lines {
@@ -3951,17 +3997,21 @@ async fn log_emit_default_commit_entry(
     }
   }
   if show_raw {
-    let raw_results = log_apply_rotate_skip_raw_results(
-      log_collect_raw_results(
-        rfs,
-        db,
-        entry.parent_tree,
-        entry.tree,
-        raw_detect_renames,
-        detect_copies,
+    let raw_results = log_restrict_raw_results(
+      log_apply_rotate_skip_raw_results(
+        log_collect_raw_results(
+          rfs,
+          db,
+          entry.parent_tree,
+          entry.tree,
+          raw_detect_renames,
+          detect_copies,
+        ),
+        rotate_to,
+        skip_to,
       ),
-      rotate_to,
-      skip_to,
+      pathspecs,
+      full_diff,
     )
     for raw_result in raw_results {
       log_emit_output(
@@ -3973,12 +4023,16 @@ async fn log_emit_default_commit_entry(
     log_emit_output("", true, line_prefix)
   }
   if name_only || name_status {
-    let diff_files = diff_apply_rotate_skip_files(
-      @bitdiff.diff_trees(rfs, git_dir, entry.parent_tree, entry.tree, db~),
-      rotate_to,
-      skip_to,
-      strict=false,
-    ).unwrap()
+    let diff_files = log_restrict_diff_files(
+      diff_apply_rotate_skip_files(
+        @bitdiff.diff_trees(rfs, git_dir, entry.parent_tree, entry.tree, db~),
+        rotate_to,
+        skip_to,
+        strict=false,
+      ).unwrap(),
+      pathspecs,
+      full_diff,
+    )
     for file in diff_files {
       if name_only {
         let path = match file.kind {
@@ -4123,6 +4177,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
   let mut simplify_by_decoration = false
   let mut exclude_first_parent_only = false
   let mut full_history = false
+  let mut full_diff = false
   let mut simplify_merges = false
   let diff_filter_include : Map[String, Bool] = {}
   let diff_filter_exclude : Map[String, Bool] = {}
@@ -4354,6 +4409,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         ancestry_path_specs.push(string_slice_from(arg, 16))
       }
       "--full-history" => full_history = true
+      "--full-diff" => full_diff = true
       "--simplify-merges" => simplify_merges = true
       _ if arg.has_prefix("-n") && arg.length() > 2 => {
         let num_str = string_slice_from(arg, 2)
@@ -4656,6 +4712,8 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
                 show_parents~,
                 rotate_to~,
                 skip_to~,
+                pathspecs~,
+                full_diff~,
               )
               if (show_stat || show_patch || show_raw) &&
                 reflog_index + 1 < entries.length() &&
@@ -5314,18 +5372,22 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
               rfs, git_dir, db, entry.id, line_prefix,
             )
             if show_stat || show_patch {
-              let diff_files = diff_apply_rotate_skip_files(
-                @bitdiff.diff_trees(
-                  rfs,
-                  git_dir,
-                  entry.parent_tree,
-                  entry.tree,
-                  db~,
-                ),
-                rotate_to,
-                skip_to,
-                strict=false,
-              ).unwrap()
+              let diff_files = log_restrict_diff_files(
+                diff_apply_rotate_skip_files(
+                  @bitdiff.diff_trees(
+                    rfs,
+                    git_dir,
+                    entry.parent_tree,
+                    entry.tree,
+                    db~,
+                  ),
+                  rotate_to,
+                  skip_to,
+                  strict=false,
+                ).unwrap(),
+                pathspecs,
+                full_diff,
+              )
               if show_stat {
                 let stat_lines = @bitdiff.diff_stat(diff_files)
                 for line in stat_lines {
@@ -5342,17 +5404,21 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
               }
             }
             if show_raw {
-              let raw_results = log_apply_rotate_skip_raw_results(
-                log_collect_raw_results(
-                  rfs,
-                  db,
-                  entry.parent_tree,
-                  entry.tree,
-                  raw_detect_renames,
-                  detect_copies,
+              let raw_results = log_restrict_raw_results(
+                log_apply_rotate_skip_raw_results(
+                  log_collect_raw_results(
+                    rfs,
+                    db,
+                    entry.parent_tree,
+                    entry.tree,
+                    raw_detect_renames,
+                    detect_copies,
+                  ),
+                  rotate_to,
+                  skip_to,
                 ),
-                rotate_to,
-                skip_to,
+                pathspecs,
+                full_diff,
               )
               for raw_result in raw_results {
                 log_emit_output(
@@ -5364,18 +5430,22 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
               log_emit_output("", true, line_prefix)
             }
             if name_only || name_status {
-              let diff_files = diff_apply_rotate_skip_files(
-                @bitdiff.diff_trees(
-                  rfs,
-                  git_dir,
-                  entry.parent_tree,
-                  entry.tree,
-                  db~,
-                ),
-                rotate_to,
-                skip_to,
-                strict=false,
-              ).unwrap()
+              let diff_files = log_restrict_diff_files(
+                diff_apply_rotate_skip_files(
+                  @bitdiff.diff_trees(
+                    rfs,
+                    git_dir,
+                    entry.parent_tree,
+                    entry.tree,
+                    db~,
+                  ),
+                  rotate_to,
+                  skip_to,
+                  strict=false,
+                ).unwrap(),
+                pathspecs,
+                full_diff,
+              )
               for file in diff_files {
                 if name_only {
                   log_emit_output(file.path, true, line_prefix)
@@ -5690,18 +5760,22 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         log_emit_output("", true, line_prefix)
         log_emit_notes_for_commit(rfs, git_dir, walk_db, entry.id, line_prefix)
         if show_stat || show_patch {
-          let diff_files = diff_apply_rotate_skip_files(
-            @bitdiff.diff_trees(
-              rfs,
-              git_dir,
-              entry.parent_tree,
-              entry.tree,
-              db=walk_db,
-            ),
-            rotate_to,
-            skip_to,
-            strict=false,
-          ).unwrap()
+          let diff_files = log_restrict_diff_files(
+            diff_apply_rotate_skip_files(
+              @bitdiff.diff_trees(
+                rfs,
+                git_dir,
+                entry.parent_tree,
+                entry.tree,
+                db=walk_db,
+              ),
+              rotate_to,
+              skip_to,
+              strict=false,
+            ).unwrap(),
+            pathspecs,
+            full_diff,
+          )
           if show_stat {
             let stat_lines = @bitdiff.diff_stat(diff_files)
             for line in stat_lines {
@@ -5718,17 +5792,21 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
           }
         }
         if show_raw {
-          let raw_results = log_apply_rotate_skip_raw_results(
-            log_collect_raw_results(
-              rfs,
-              walk_db,
-              entry.parent_tree,
-              entry.tree,
-              raw_detect_renames,
-              detect_copies,
+          let raw_results = log_restrict_raw_results(
+            log_apply_rotate_skip_raw_results(
+              log_collect_raw_results(
+                rfs,
+                walk_db,
+                entry.parent_tree,
+                entry.tree,
+                raw_detect_renames,
+                detect_copies,
+              ),
+              rotate_to,
+              skip_to,
             ),
-            rotate_to,
-            skip_to,
+            pathspecs,
+            full_diff,
           )
           for raw_result in raw_results {
             log_emit_output(
@@ -5740,18 +5818,22 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
           log_emit_output("", true, line_prefix)
         }
         if name_only || name_status {
-          let diff_files = diff_apply_rotate_skip_files(
-            @bitdiff.diff_trees(
-              rfs,
-              git_dir,
-              entry.parent_tree,
-              entry.tree,
-              db=walk_db,
-            ),
-            rotate_to,
-            skip_to,
-            strict=false,
-          ).unwrap()
+          let diff_files = log_restrict_diff_files(
+            diff_apply_rotate_skip_files(
+              @bitdiff.diff_trees(
+                rfs,
+                git_dir,
+                entry.parent_tree,
+                entry.tree,
+                db=walk_db,
+              ),
+              rotate_to,
+              skip_to,
+              strict=false,
+            ).unwrap(),
+            pathspecs,
+            full_diff,
+          )
           for file in diff_files {
             if name_only {
               log_emit_output(file.path, true, line_prefix)
@@ -5825,18 +5907,22 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
       log_emit_output("", true, line_prefix)
       log_emit_notes_for_commit(rfs, git_dir, notes_db, entry.id, line_prefix)
       if show_stat || show_patch {
-        let diff_files = diff_apply_rotate_skip_files(
-          @bitdiff.diff_trees(
-            rfs,
-            git_dir,
-            entry.parent_tree,
-            entry.tree,
-            db=log_db.unwrap(),
-          ),
-          rotate_to,
-          skip_to,
-          strict=false,
-        ).unwrap()
+        let diff_files = log_restrict_diff_files(
+          diff_apply_rotate_skip_files(
+            @bitdiff.diff_trees(
+              rfs,
+              git_dir,
+              entry.parent_tree,
+              entry.tree,
+              db=log_db.unwrap(),
+            ),
+            rotate_to,
+            skip_to,
+            strict=false,
+          ).unwrap(),
+          pathspecs,
+          full_diff,
+        )
         if show_stat {
           let stat_lines = @bitdiff.diff_stat(diff_files)
           for line in stat_lines {
@@ -5853,18 +5939,22 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         }
       }
       if name_only || name_status {
-        let diff_files = diff_apply_rotate_skip_files(
-          @bitdiff.diff_trees(
-            rfs,
-            git_dir,
-            entry.parent_tree,
-            entry.tree,
-            db=log_db.unwrap(),
-          ),
-          rotate_to,
-          skip_to,
-          strict=false,
-        ).unwrap()
+        let diff_files = log_restrict_diff_files(
+          diff_apply_rotate_skip_files(
+            @bitdiff.diff_trees(
+              rfs,
+              git_dir,
+              entry.parent_tree,
+              entry.tree,
+              db=log_db.unwrap(),
+            ),
+            rotate_to,
+            skip_to,
+            strict=false,
+          ).unwrap(),
+          pathspecs,
+          full_diff,
+        )
         for file in diff_files {
           if name_only {
             log_emit_output(file.path, true, line_prefix)
