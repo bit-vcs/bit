@@ -303,6 +303,8 @@ fn log_need_real_git(args : Array[String], git_dir? : String = "") -> Bool {
   // --ancestry-path (with/without =<rev>, including the --graph combination) and
   // --simplify-by-decoration are implemented natively by the walker. The
   // remaining flags below are not yet supported and still fall back.
+  // --show-pulls needs git's full parent-rewriting simplification to decide
+  // which "pull" merges to re-include, which the native walker does not do yet.
   for arg in args {
     if arg == "--show-pulls" || arg == "--full-diff" {
       return true
@@ -2786,6 +2788,48 @@ fn log_commit_matches_simplify_merges(
 }
 
 ///|
+/// Decide whether a merge is visible under default path-limited history
+/// simplification. Returns None for non-merge commits (caller falls back to the
+/// regular first-parent pathspec test). For a merge, git hides it when it is
+/// TREESAME to any parent on the pathspec (history follows that parent instead).
+fn log_merge_pathspec_visibility(
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  db : @bitlib.ObjectDb,
+  commit_id : @bitcore.ObjectId,
+  pathspecs : Array[String],
+) -> Bool? raise Error {
+  let obj = db.get(rfs, commit_id)
+  guard obj is Some(o) else { return None }
+  if o.obj_type != @bitcore.ObjectType::Commit {
+    return None
+  }
+  let info = @bitcore.parse_commit(o.data)
+  let parents = log_resolve_parents(rfs, git_dir, commit_id, info.parents)
+  if parents.length() < 2 {
+    return None
+  }
+  for parent in parents {
+    match log_get_commit_tree(db, rfs, parent) {
+      Some(parent_tree) =>
+        if log_trees_same_for_pathspecs(
+            rfs,
+            db,
+            parent_tree,
+            info.tree,
+            pathspecs,
+          ) {
+          // TREESAME to this parent on the pathspec: history follows it and the
+          // merge itself is simplified away.
+          return Some(false)
+        }
+      None => ()
+    }
+  }
+  Some(true)
+}
+
+///|
 fn log_commit_matches_history_filters(
   rfs : &@bitcore.RepoFileSystem,
   git_dir : String,
@@ -2797,11 +2841,30 @@ fn log_commit_matches_history_filters(
   detect_renames : Bool,
   detect_copies : Bool,
   simplify_merges : Bool,
+  full_history~ : Bool = false,
 ) -> Bool raise Error {
   if !log_commit_matches_simplify_merges(
       rfs, git_dir, db, commit_id, pathspecs, simplify_merges,
     ) {
     return false
+  }
+  // Default path-limited history simplification hides merges that are TREESAME
+  // to a parent on the pathspec; --full-history disables it. For non-merges this
+  // returns None and we fall back to the regular first-parent pathspec test.
+  if pathspecs.length() > 0 && !full_history {
+    match
+      log_merge_pathspec_visibility(rfs, git_dir, db, commit_id, pathspecs) {
+      Some(visible) => {
+        if !visible {
+          return false
+        }
+        return log_commit_matches_diff_filter(
+          rfs, git_dir, db, commit_id, include_bits, exclude, detect_renames,
+          detect_copies,
+        )
+      }
+      None => ()
+    }
   }
   if !log_commit_matches_pathspecs(rfs, git_dir, db, commit_id, pathspecs) {
     return false
@@ -4761,6 +4824,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         if !log_commit_matches_history_filters(
             rfs, git_dir, db, id, pathspecs, diff_filter_include, diff_filter_exclude,
             detect_renames, detect_copies, simplify_merges,
+            full_history~,
           ) {
           continue
         }
@@ -4938,6 +5002,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
             detect_renames,
             detect_copies,
             simplify_merges,
+            full_history~,
           ) {
           continue
         }
@@ -5122,6 +5187,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         if !log_commit_matches_history_filters(
             rfs, git_dir, db, id, pathspecs, diff_filter_include, diff_filter_exclude,
             detect_renames, detect_copies, simplify_merges,
+            full_history~,
           ) {
           continue
         }
@@ -5186,6 +5252,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         if !log_commit_matches_history_filters(
             rfs, git_dir, db, id, pathspecs, diff_filter_include, diff_filter_exclude,
             detect_renames, detect_copies, simplify_merges,
+            full_history~,
           ) {
           continue
         }
@@ -5498,6 +5565,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
             detect_renames,
             detect_copies,
             simplify_merges,
+            full_history~,
           ) {
           continue
         }
@@ -5582,6 +5650,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
             detect_renames,
             detect_copies,
             simplify_merges,
+            full_history~,
           ) {
           continue
         }

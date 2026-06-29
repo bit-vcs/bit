@@ -683,4 +683,37 @@ test_expect_success 'log --full-diff stays explicitly unsupported with --no-git-
     )
 '
 
+test_expect_success 'log -- <path> simplifies away a pull merge (default history simplification)' '
+    git_cmd init repo &&
+    (
+        cd repo &&
+        echo 0 >base && git_cmd add base && git_cmd commit -q -m c0 &&
+        main="$(git_cmd rev-parse --abbrev-ref HEAD)" &&
+        git_cmd checkout -q -b topic &&
+        echo a >foo && git_cmd add foo && git_cmd commit -q -m t_foo &&
+        git_cmd checkout -q "$main" &&
+        echo 1 >base && git_cmd add base && git_cmd commit -q -m m_base &&
+        git_cmd merge -q --no-ff topic -m merge_pulls_foo &&
+        echo 2 >base && git_cmd add base && git_cmd commit -q -m m_base2 &&
+        git_cmd log --pretty=%s -- foo >foo.out &&
+        printf "t_foo\n" >foo.expect &&
+        test_cmp foo.expect foo.out &&
+        # --full-history keeps the pull merge visible.
+        git_cmd log --pretty=%s --full-history -- foo >full.out &&
+        grep -qx merge_pulls_foo full.out
+    )
+'
+
+test_expect_success 'log --show-pulls stays explicitly unsupported with --no-git-fallback' '
+    git_cmd init repo &&
+    (
+        cd repo &&
+        echo hello >a.txt &&
+        git_cmd add a.txt &&
+        git_cmd commit -m "first commit" &&
+        test_must_fail git_cmd log --show-pulls -- a.txt >out 2>err &&
+        grep -Eiq "standalone|not supported|no-git-fallback" err
+    )
+'
+
 test_done
