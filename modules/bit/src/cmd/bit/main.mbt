@@ -751,6 +751,14 @@ async fn run_main_for_args(args : Array[String]) -> Unit {
       _ => continue
     }
   }
+  // Record `--no-git-fallback` so per-command handlers can refuse to delegate
+  // to a real git binary instead of silently falling back.
+  for arg in args {
+    if arg == "--no-git-fallback" {
+      @sys.set_env_var("BIT_NO_GIT_FALLBACK", "1")
+      break
+    }
+  }
   let opts = parse_global_options(args)
   if should_delegate_to_real_git(args, opts) {
     delegate_to_real_git_original_args(args)
@@ -876,6 +884,27 @@ fn missing_global_cwd_error(
   }
 }
 
+///| Returns true when the user passed `--no-git-fallback`, forbidding any
+/// delegation to a real `git` binary. The flag is recorded as an environment
+/// variable by `run_main_for_args` so per-command handlers can consult it
+/// without threading global options through every dispatch path.
+fn git_fallback_disabled() -> Bool {
+  match @sys.get_env_var("BIT_NO_GIT_FALLBACK") {
+    Some(value) => value == "1"
+    None => false
+  }
+}
+
+///| Abort with an explicit standalone-mode error instead of delegating to a
+/// real `git` binary. Called from per-command delegation paths when
+/// `--no-git-fallback` forbids fallback.
+async fn exit_no_git_fallback(what : String) -> Unit {
+  eprint_line(
+    "fatal: '\{what}' requires falling back to real git, which is disabled by --no-git-fallback (not supported in standalone mode)",
+  )
+  @sys.exit(128)
+}
+
 ///|
 fn resolve_real_git_for_dispatch() -> String {
   match @sys.get_env_var("SHIM_REAL_GIT") {
@@ -891,6 +920,9 @@ fn resolve_real_git_for_dispatch() -> String {
 
 ///|
 async fn delegate_to_real_git_original_args(args : Array[String]) -> Unit {
+  if git_fallback_disabled() {
+    exit_no_git_fallback("git")
+  }
   if args.length() <= 1 {
     return
   }
@@ -987,10 +1019,8 @@ fn should_delegate_to_real_git(
   args : Array[String],
   opts : GlobalOptions,
 ) -> Bool {
-  for arg in args {
-    if arg == "--no-git-fallback" {
-      return false
-    }
+  if git_fallback_disabled() {
+    return false
   }
   let has_global_config = has_global_config_injection(args)
   let has_env_parameters = match @sys.get_env_var("GIT_CONFIG_PARAMETERS") {

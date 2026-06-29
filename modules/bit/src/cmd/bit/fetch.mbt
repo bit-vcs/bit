@@ -543,6 +543,9 @@ fn collect_commit_tree_modes(
 
 ///|
 async fn delegate_fetch_to_real_git(args : Array[String]) -> Unit raise Error {
+  if git_fallback_disabled() {
+    exit_no_git_fallback("git fetch")
+  }
   let argv : Array[String] = ["fetch"]
   for arg in args {
     argv.push(arg)

@@ -13,6 +13,9 @@ fn resolve_real_git_for_blame() -> String {
 
 ///|
 async fn delegate_blame_to_real_git(args : Array[String], cwd : String) -> Unit {
+  if git_fallback_disabled() {
+    exit_no_git_fallback("git blame")
+  }
   let argv : Array[String] = ["blame"]
   for arg in args {
     argv.push(arg)

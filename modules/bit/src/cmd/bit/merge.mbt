@@ -1,14 +1,4 @@
 ///|
-fn merge_requires_real_git(
-  args : Array[String],
-  git_dir? : String = "",
-) -> Bool {
-  ignore(args)
-  ignore(git_dir)
-  false
-}
-
-///|
 async fn merge_write_commit_object(
   fs : OsFs,
   root : String,
@@ -73,23 +63,6 @@ async fn merge_rewrite_signed_commit(
 }
 
 ///|
-async fn delegate_merge_to_real_git(args : Array[String]) -> Unit {
-  let argv : Array[String] = ["merge"]
-  for arg in args {
-    argv.push(arg)
-  }
-  let code = @process.run(
-    resolve_real_git_for_dispatch(),
-    argv,
-    inherit_env=true,
-    stdin=@stdio.stdin,
-    stdout=@stdio.stdout,
-    stderr=@stdio.stderr,
-  )
-  @sys.exit(code)
-}
-
-///|
 fn merge_write_pending_state(
   fs : &@bitcore.FileSystem,
   git_dir : String,
@@ -106,10 +79,6 @@ fn merge_write_pending_state(
 async fn handle_merge(args : Array[String]) -> Unit raise Error {
   let root = get_work_root()
   let git_dir = root + "/.git"
-  if merge_requires_real_git(args, git_dir~) {
-    delegate_merge_to_real_git(args)
-    return
-  }
   let fs = OsFs::new()
   let rfs : &@bitcore.RepoFileSystem = fs
   check_and_exit_unsupported_attrs(root)

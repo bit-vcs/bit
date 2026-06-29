@@ -155,6 +155,9 @@ fn is_short_count_flag(arg : String) -> Bool {
 
 ///|
 async fn delegate_log_to_real_git(args : Array[String], cwd : String) -> Unit {
+  if git_fallback_disabled() {
+    exit_no_git_fallback("git log")
+  }
   let argv : Array[String] = ["log"]
   for arg in args {
     argv.push(arg)

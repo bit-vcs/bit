@@ -54,6 +54,9 @@ async fn run_add_interactive(
   args : Array[String],
   runner? : (async (Array[String]) -> Int noraise)? = None,
 ) -> Unit raise Error {
+  if runner is None && git_fallback_disabled() {
+    exit_no_git_fallback("git add --interactive")
+  }
   let code = match runner {
     Some(run) => run(args)
     None => default_add_interactive_runner(args)

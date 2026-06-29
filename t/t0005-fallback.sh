@@ -595,4 +595,37 @@ test_expect_success 'write-tree on non-sha1 repo is explicitly unsupported if SH
     )
 '
 
+test_expect_success 'filter-branch is explicitly unsupported with --no-git-fallback' '
+    git_cmd init repo &&
+    (
+        cd repo &&
+        echo hello >a.txt &&
+        git_cmd add a.txt &&
+        git_cmd commit -m "first commit" &&
+        test_must_fail git_cmd filter-branch --tree-filter true HEAD >out 2>err &&
+        grep -Eiq "standalone|not supported|no-git-fallback" err
+    )
+'
+
+test_expect_success 'config --get-urlmatch is explicitly unsupported with --no-git-fallback' '
+    git_cmd init repo &&
+    (
+        cd repo &&
+        test_must_fail git_cmd config --get-urlmatch http https://example.com >out 2>err &&
+        grep -Eiq "standalone|not supported|no-git-fallback" err
+    )
+'
+
+test_expect_success 'log --simplify-by-decoration is explicitly unsupported with --no-git-fallback' '
+    git_cmd init repo &&
+    (
+        cd repo &&
+        echo hello >a.txt &&
+        git_cmd add a.txt &&
+        git_cmd commit -m "first commit" &&
+        test_must_fail git_cmd log --simplify-by-decoration >out 2>err &&
+        grep -Eiq "standalone|not supported|no-git-fallback" err
+    )
+'
+
 test_done

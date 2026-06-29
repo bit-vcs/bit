@@ -2126,6 +2126,9 @@ fn resolve_real_git_for_config() -> String {
 
 ///|
 async fn delegate_config_to_real_git(args : Array[String]) -> Unit {
+  if git_fallback_disabled() {
+    exit_no_git_fallback("git config")
+  }
   let real_git = resolve_real_git_for_config()
   let argv : Array[String] = ["config"]
   for arg in args {
