@@ -6610,15 +6610,35 @@ async fn log_with_graph(
         err if @async.is_cancellation_error(err) => raise err
         _ => []
       }
-      for branch in branches {
+      // git iterates refs in sorted order; match it so the graph-order tips
+      // (and thus the output order) line up byte-for-byte.
+      // git iterates refs in lexicographic (byte) order, so the graph-order
+      // tips match git only if we do the same. Sort explicitly by byte order to
+      // avoid depending on String::compare's collation.
+      let sorted_branches : Array[String] = []
+      for b in branches {
+        let mut pos = sorted_branches.length()
+        for i in 0..<sorted_branches.length() {
+          if log_string_lex_less(b, sorted_branches[i]) {
+            pos = i
+            break
+          }
+        }
+        sorted_branches.insert(pos, b)
+      }
+      for branch in sorted_branches {
         let ref_path = heads_dir + "/" + branch
         if rfs.is_file(ref_path) {
           let hex = rfs.read_file(ref_path) |> decode_bytes |> trim_string
           let id = @bitcore.ObjectId::from_hex(hex)
           starts.push(id)
-          match ref_names.get(hex) {
-            Some(arr) => arr.push(branch)
-            None => ref_names[hex] = [branch]
+          // Only decorate when explicitly requested; like git, a piped
+          // `--all` without `--decorate` shows no ref names.
+          if decorate {
+            match ref_names.get(hex) {
+              Some(arr) => arr.push(branch)
+              None => ref_names[hex] = [branch]
+            }
           }
         }
       }
@@ -6674,191 +6694,796 @@ async fn log_with_graph(
         raise @bitcore.GitError::InvalidObject("Unknown revision: " + spec)
     }
   }
-  // BFS to collect commits with graph structure
-  let commits : Array[(@bitcore.ObjectId, Array[@bitcore.ObjectId], Int, Bool)] = [] // (id, parents, column, boundary)
-  let visited : Map[String, Bool] = {}
-  let boundary_seen : Map[String, Bool] = {}
-  let boundary_items : Array[(@bitcore.ObjectId, Int)] = []
-  let active_columns : Array[@bitcore.ObjectId?] = [] // Track which columns are active
-  let queue : Array[(@bitcore.ObjectId, Int)] = [] // (commit, column)
-  // Initialize queue
-  for i, start in starts {
-    queue.push((start, i))
-    while active_columns.length() <= i {
-      active_columns.push(None)
-    }
-    active_columns[i] = Some(start)
+  // Collect commits in date order (git's traversal order), then reorder them
+  // with git's REV_SORT_IN_GRAPH_ORDER topological sort. `--graph` always
+  // implies this ordering. The state machine owns all lane/column bookkeeping,
+  // so the walk only needs to produce the (id, parents, boundary) tuples.
+  //
+  // git applies `-n`/`--max-count` AFTER the topological sort, so the walk
+  // gathers the full reachable history and we truncate the sorted result. (A
+  // walk-then-truncate would topo-sort the wrong subset near the cutoff.)
+  let walked = log_walk_commits(
+    rfs,
+    git_dir,
+    starts,
+    exclude_ids,
+    2147483647,
+    since_ts,
+    until_ts,
+    false,
+    first_parent~,
+    show_boundary~,
+  )
+  let sorted = log_graph_order_sort(walked)
+  let entries : Array[LogWalkEntry] = []
+  let limit = if max_count < sorted.length() { max_count } else {
+    sorted.length()
   }
-  let mut count = 0
-  while queue.length() > 0 && count < max_count {
-    // Sort queue by column to process in order
-    queue.sort_by((a, b) => a.1.compare(b.1))
-    let (current, col) = queue[0]
-    // Remove first element
-    let new_queue : Array[(@bitcore.ObjectId, Int)] = []
-    for i in 1..<queue.length() {
-      new_queue.push(queue[i])
-    }
-    while queue.length() > 0 {
-      ignore(queue.pop())
-    }
-    for item in new_queue {
-      queue.push(item)
-    }
-    let hex = current.to_hex()
-    if visited.get(hex).unwrap_or(false) {
-      continue
-    }
-    visited[hex] = true
-    if exclude_ids.contains(hex) {
-      continue
-    }
-    let obj = db.get(rfs, current)
-    match obj {
-      Some(o) => {
-        let info = @bitcore.parse_commit(o.data)
-        let parents = log_resolve_parents(rfs, git_dir, current, info.parents)
-        // Add parents to queue (limited to first parent if --first-parent)
-        let parents_to_walk : Array[@bitcore.ObjectId] = if first_parent &&
-          parents.length() > 0 {
-          [parents[0]]
-        } else {
-          parents
-        }
-        for i, parent in parents_to_walk {
-          let parent_col = if i == 0 {
-            col
-          } else {
-            find_free_column(active_columns, col)
-          }
-          let parent_hex = parent.to_hex()
-          if exclude_ids.contains(parent_hex) {
-            if show_boundary && !boundary_seen.contains(parent_hex) {
-              boundary_seen[parent_hex] = true
-              boundary_items.push((parent, parent_col))
-            }
-            continue
-          }
-          queue.push((parent, parent_col))
-          if parent_col < active_columns.length() {
-            active_columns[parent_col] = Some(parent)
-          }
-        }
-        // Clear this column if no more commits
-        if parents_to_walk.length() == 0 && col < active_columns.length() {
-          active_columns[col] = None
-        }
-        // Apply since/until filters
-        let ts = log_extract_author_timestamp(o.data)
-        if ts <= until_ts && ts >= since_ts {
-          commits.push((current, parents, col, false))
-          count += 1
-        }
-      }
-      None => ()
+  for i in 0..<limit {
+    entries.push(sorted[i])
+  }
+  log_emit_commit_graph(
+    entries, db, rfs, oneline, abbrev_len, abbrev_commit, show_parents,
+    first_parent, exclude_ids, ref_names,
+  )
+}
+
+///| Byte-lexicographic "less than" for ref names, matching git's refname
+/// ordering (shorter is smaller only when it is a prefix of the longer).
+fn log_string_lex_less(a : String, b : String) -> Bool {
+  let ca = a.to_array()
+  let cb = b.to_array()
+  let n = if ca.length() < cb.length() { ca.length() } else { cb.length() }
+  for i in 0..<n {
+    if ca[i] != cb[i] {
+      return ca[i] < cb[i]
     }
   }
-  if show_boundary {
-    for item in boundary_items {
-      let (boundary_id, col) = item
-      let obj = db.get(rfs, boundary_id)
-      match obj {
-        Some(o) if o.obj_type == @bitcore.ObjectType::Commit => {
-          let info = @bitcore.parse_commit(o.data)
-          let parents = log_resolve_parents(
-            rfs,
-            git_dir,
-            boundary_id,
-            info.parents,
-          )
-          commits.push((boundary_id, parents, col, true))
-        }
-        _ => ()
+  ca.length() < cb.length()
+}
+
+///| Reorder a date-ordered commit list into git's `--graph` order, which is
+/// `REV_SORT_IN_GRAPH_ORDER` from commit.c: an in-degree topological sort where
+/// the initial tips are kept in traversal order and the work queue behaves as a
+/// LIFO stack (git collects tips, reverses them, then pops with a NULL-compare
+/// prio_queue). This guarantees no commit appears before any of its children and
+/// reproduces git's exact tie-breaking when commit dates are equal.
+fn log_graph_order_sort(entries : Array[LogWalkEntry]) -> Array[LogWalkEntry] {
+  let n = entries.length()
+  if n == 0 {
+    return entries
+  }
+  let idx : Map[String, Int] = {}
+  for i in 0..<n {
+    idx[entries[i].id.to_hex()] = i
+  }
+  // in-degree: 1 for every listed commit, +1 for each time it is a parent of
+  // another listed commit (children counting).
+  let indeg = Array::make(n, 1)
+  for i in 0..<n {
+    for p in entries[i].parents {
+      match idx.get(p.to_hex()) {
+        Some(pi) => indeg[pi] += 1
+        None => ()
       }
     }
   }
-  // Output with graph
-  let max_col = get_max_column(commits)
-  for entry in commits {
-    let (commit_id, parents, col, is_boundary) = entry
-    let hex = commit_id.to_hex()
-    // Build graph line
-    let graph_line = build_graph_line(col, max_col, parents.length() > 1)
-    let node = if is_boundary { "o " } else { "* " }
-    // Get decorations
-    let decorations = match ref_names.get(hex) {
-      Some(names) => " (" + names.join(", ") + ")"
-      None => ""
+  // Tips are the commits no listed commit points at (in-degree 1), kept in
+  // traversal order; the stack is that list reversed so popping the end yields
+  // tips in traversal order while parents enqueued later are emitted LIFO.
+  let stack : Array[Int] = []
+  for k in 0..<n {
+    let i = n - 1 - k
+    if indeg[i] == 1 {
+      stack.push(i)
     }
-    if oneline {
-      let identity = log_format_commit_identity(
-        commit_id, parents, abbrev_len, true, show_parents,
-      )
-      print_line(
-        graph_line +
-        node +
-        identity +
-        decorations +
-        " " +
-        get_commit_subject(db, rfs, commit_id),
-      )
-    } else {
-      let identity = log_format_commit_identity(
-        commit_id, parents, abbrev_len, abbrev_commit, show_parents,
-      )
-      print_line(graph_line + node + "commit " + identity + decorations)
-      let obj = db.get(rfs, commit_id)
-      match obj {
-        Some(o) => {
-          let author_line = extract_author_line_from_bytes(o.data)
-          print_line(graph_line + "| Author: " + author_line)
-          print_line(graph_line + "|")
-          let msg = get_commit_subject(db, rfs, commit_id)
-          print_line(graph_line + "|     " + msg)
-          print_line(graph_line + "|")
+  }
+  let out : Array[LogWalkEntry] = []
+  while stack.length() > 0 {
+    let i = stack.unsafe_pop()
+    out.push(entries[i])
+    for p in entries[i].parents {
+      match idx.get(p.to_hex()) {
+        Some(pi) => {
+          indeg[pi] -= 1
+          if indeg[pi] == 1 {
+            stack.push(pi)
+          }
         }
         None => ()
       }
     }
   }
+  out
+}
+
+// Graph renderer state constants — a faithful port of git's `enum graph_state`
+// (graph.c). The algorithm below mirrors graph.c so that `bit log --graph`
+// output is byte-for-byte identical to git's for arbitrary topologies.
+let graph_state_padding = 0
+
+///|
+let graph_state_skip = 1
+
+///|
+let graph_state_pre_commit = 2
+
+///|
+let graph_state_commit = 3
+
+///|
+let graph_state_post_merge = 4
+
+///|
+let graph_state_collapsing = 5
+
+///| merge_chars[] from graph.c: index 0 = '/', 1 = '|', 2 = '\\'.
+let graph_merge_chars : Array[Char] = ['/', '|', '\\']
+
+///| Port of git's `struct git_graph` (graph.c). Columns hold commit hexes (""
+/// means an unused slot); colors are omitted since `bit log` never colorizes
+/// the graph. See third_party/git/graph.c for the field documentation.
+struct GitGraph {
+  mut commit : String
+  mut commit_is_boundary : Bool
+  mut num_parents : Int
+  mut width : Int
+  mut expansion_row : Int
+  mut state : Int
+  mut prev_state : Int
+  mut commit_index : Int
+  mut prev_commit_index : Int
+  mut merge_layout : Int
+  mut edges_added : Int
+  mut prev_edges_added : Int
+  mut num_columns : Int
+  mut num_new_columns : Int
+  mut mapping_size : Int
+  mut columns : Array[String]
+  mut new_columns : Array[String]
+  mut mapping : Array[Int]
+  mut old_mapping : Array[Int]
+  mut cur_parents : Array[String]
+  shown : Map[String, Bool]
+  exclude : Map[String, Bool]
+  first_parent_only : Bool
 }
 
 ///|
-fn find_free_column(columns : Array[@bitcore.ObjectId?], start : Int) -> Int {
-  for i in (start + 1)..<columns.length() {
-    if columns[i] is None {
+fn GitGraph::new(
+  shown : Map[String, Bool],
+  exclude : Map[String, Bool],
+  first_parent_only : Bool,
+) -> GitGraph {
+  {
+    commit: "",
+    commit_is_boundary: false,
+    num_parents: 0,
+    width: 0,
+    expansion_row: 0,
+    state: graph_state_padding,
+    prev_state: graph_state_padding,
+    commit_index: 0,
+    prev_commit_index: 0,
+    merge_layout: 0,
+    edges_added: 0,
+    prev_edges_added: 0,
+    num_columns: 0,
+    num_new_columns: 0,
+    mapping_size: 0,
+    columns: [],
+    new_columns: [],
+    mapping: [],
+    old_mapping: [],
+    cur_parents: [],
+    shown,
+    exclude,
+    first_parent_only,
+  }
+}
+
+///| A parent is "interesting" (gets a graph lane drawn to it) if it is not an
+/// excluded/uninteresting commit — matching git's graph_is_interesting(), which
+/// keys off commit flags rather than the `-n` output limit. Truncating output
+/// with `-n` must NOT drop a merge parent that lies just past the window, or the
+/// merge would lose a lane. Boundary commits are excluded yet still shown, so
+/// they count as interesting when present in the displayed set.
+/// With `--first-parent`, only the first parent is ever interesting.
+fn graph_interesting_parents(
+  g : GitGraph,
+  parents : Array[String],
+) -> Array[String] {
+  if parents.length() == 0 {
+    return []
+  }
+  if g.first_parent_only {
+    if graph_parent_is_interesting(g, parents[0]) {
+      return [parents[0]]
+    }
+    return []
+  }
+  let res : Array[String] = []
+  for p in parents {
+    if graph_parent_is_interesting(g, p) {
+      res.push(p)
+    }
+  }
+  res
+}
+
+///|
+fn graph_parent_is_interesting(g : GitGraph, p : String) -> Bool {
+  !g.exclude.get(p).unwrap_or(false) || g.shown.get(p).unwrap_or(false)
+}
+
+///|
+fn graph_update_state(g : GitGraph, s : Int) -> Unit {
+  g.prev_state = g.state
+  g.state = s
+}
+
+///|
+fn graph_ensure_capacity(g : GitGraph, n : Int) -> Unit {
+  while g.columns.length() < n {
+    g.columns.push("")
+  }
+  while g.new_columns.length() < n {
+    g.new_columns.push("")
+  }
+  let m = 2 * n + 2
+  while g.mapping.length() < m {
+    g.mapping.push(-1)
+  }
+  while g.old_mapping.length() < m {
+    g.old_mapping.push(-1)
+  }
+}
+
+///|
+fn graph_find_new_column_by_commit(g : GitGraph, commit : String) -> Int {
+  for i in 0..<g.num_new_columns {
+    if g.new_columns[i] == commit {
       return i
     }
   }
-  columns.length()
+  -1
 }
 
 ///|
-fn get_max_column(
-  commits : Array[(@bitcore.ObjectId, Array[@bitcore.ObjectId], Int, Bool)],
-) -> Int {
-  let mut max = 0
-  for entry in commits {
-    if entry.2 > max {
-      max = entry.2
+fn graph_num_dashed_parents(g : GitGraph) -> Int {
+  g.num_parents + g.merge_layout - 3
+}
+
+///|
+fn graph_num_expansion_rows(g : GitGraph) -> Int {
+  graph_num_dashed_parents(g) * 2
+}
+
+///|
+fn graph_needs_pre_commit_line(g : GitGraph) -> Bool {
+  g.num_parents >= 3 &&
+  g.commit_index < g.num_columns - 1 &&
+  g.expansion_row < graph_num_expansion_rows(g)
+}
+
+///|
+fn graph_is_mapping_correct(g : GitGraph) -> Bool {
+  for i in 0..<g.mapping_size {
+    let target = g.mapping[i]
+    if target < 0 {
+      continue
     }
+    if target == i / 2 {
+      continue
+    }
+    return false
   }
-  max
+  true
+}
+
+///| Port of git's graph_insert_into_new_columns().
+fn graph_insert_into_new_columns(
+  g : GitGraph,
+  commit : String,
+  idx : Int,
+) -> Unit {
+  let mut i = graph_find_new_column_by_commit(g, commit)
+  let mut mapping_idx = 0
+  if i < 0 {
+    i = g.num_new_columns
+    g.new_columns[i] = commit
+    g.num_new_columns += 1
+  }
+  if g.num_parents > 1 && idx > -1 && g.merge_layout == -1 {
+    let dist = idx - i
+    let shift = if dist > 1 { 2 * dist - 3 } else { 1 }
+    g.merge_layout = if dist > 0 { 0 } else { 1 }
+    g.edges_added = g.num_parents + g.merge_layout - 2
+    mapping_idx = g.width + (g.merge_layout - 1) * shift
+    g.width += 2 * g.merge_layout
+  } else if g.edges_added > 0 &&
+    g.width >= 2 &&
+    i == g.mapping[g.width - 2] {
+    mapping_idx = g.width - 2
+    g.edges_added = -1
+  } else {
+    mapping_idx = g.width
+    g.width += 2
+  }
+  g.mapping[mapping_idx] = i
+}
+
+///| Port of git's graph_update_columns().
+fn graph_update_columns(g : GitGraph) -> Unit {
+  let tmp = g.columns
+  g.columns = g.new_columns
+  g.new_columns = tmp
+  g.num_columns = g.num_new_columns
+  g.num_new_columns = 0
+  let max_new_columns = g.num_columns + g.num_parents
+  graph_ensure_capacity(g, max_new_columns)
+  g.mapping_size = 2 * max_new_columns
+  for i in 0..<g.mapping_size {
+    g.mapping[i] = -1
+  }
+  g.width = 0
+  g.prev_edges_added = g.edges_added
+  g.edges_added = 0
+  let mut seen_this = false
+  let mut i = 0
+  while i <= g.num_columns {
+    let col_commit = if i == g.num_columns {
+      if seen_this {
+        break
+      }
+      g.commit
+    } else {
+      g.columns[i]
+    }
+    if col_commit == g.commit {
+      seen_this = true
+      g.commit_index = i
+      g.merge_layout = -1
+      for p in g.cur_parents {
+        graph_insert_into_new_columns(g, p, i)
+      }
+      if g.num_parents == 0 {
+        g.width += 2
+      }
+    } else {
+      graph_insert_into_new_columns(g, col_commit, -1)
+    }
+    i += 1
+  }
+  while g.mapping_size > 1 && g.mapping[g.mapping_size - 1] < 0 {
+    g.mapping_size -= 1
+  }
+}
+
+///| Port of git's graph_update(): advance the graph to the next commit.
+fn graph_update(
+  g : GitGraph,
+  commit_hex : String,
+  is_boundary : Bool,
+  parents : Array[String],
+) -> Unit {
+  g.commit = commit_hex
+  g.commit_is_boundary = is_boundary
+  g.cur_parents = graph_interesting_parents(g, parents)
+  g.num_parents = g.cur_parents.length()
+  g.prev_commit_index = g.commit_index
+  graph_update_columns(g)
+  g.expansion_row = 0
+  if g.state != graph_state_padding {
+    g.state = graph_state_skip
+  } else if graph_needs_pre_commit_line(g) {
+    g.state = graph_state_pre_commit
+  } else {
+    g.state = graph_state_commit
+  }
 }
 
 ///|
-fn build_graph_line(col : Int, max_col : Int, is_merge : Bool) -> String {
+fn graph_pad_horizontally(g : GitGraph, line : Array[Char]) -> Unit {
+  while line.length() < g.width {
+    line.push(' ')
+  }
+}
+
+///|
+fn graph_chars_to_string(line : Array[Char]) -> String {
   let sb = StringBuilder::new()
-  for _ in 0..<col {
-    sb.write_string("| ")
-  }
-  if is_merge {
-    sb.write_string("|\\ ")
-  }
-  for _ in (col + 1)..<(max_col + 1) {
-    sb.write_string("| ")
+  for c in line {
+    sb.write_char(c)
   }
   sb.to_string()
+}
+
+///|
+fn graph_output_padding_line(g : GitGraph, line : Array[Char]) -> Unit {
+  for _ in 0..<g.num_new_columns {
+    line.push('|')
+    line.push(' ')
+  }
+}
+
+///|
+fn graph_output_skip_line(g : GitGraph, line : Array[Char]) -> Unit {
+  line.push('.')
+  line.push('.')
+  line.push('.')
+  if graph_needs_pre_commit_line(g) {
+    graph_update_state(g, graph_state_pre_commit)
+  } else {
+    graph_update_state(g, graph_state_commit)
+  }
+}
+
+///|
+fn graph_output_pre_commit_line(g : GitGraph, line : Array[Char]) -> Unit {
+  let mut seen_this = false
+  for i in 0..<g.num_columns {
+    if g.columns[i] == g.commit {
+      seen_this = true
+      line.push('|')
+      for _ in 0..<g.expansion_row {
+        line.push(' ')
+      }
+    } else if seen_this && g.expansion_row == 0 {
+      if g.prev_state == graph_state_post_merge && g.prev_commit_index < i {
+        line.push('\\')
+      } else {
+        line.push('|')
+      }
+    } else if seen_this && g.expansion_row > 0 {
+      line.push('\\')
+    } else {
+      line.push('|')
+    }
+    line.push(' ')
+  }
+  g.expansion_row += 1
+  if !graph_needs_pre_commit_line(g) {
+    graph_update_state(g, graph_state_commit)
+  }
+}
+
+///|
+fn graph_output_commit_char(g : GitGraph, line : Array[Char]) -> Unit {
+  if g.commit_is_boundary {
+    line.push('o')
+  } else {
+    line.push('*')
+  }
+}
+
+///| Port of git's graph_draw_octopus_merge().
+fn graph_draw_octopus_merge(g : GitGraph, line : Array[Char]) -> Unit {
+  let dashed = graph_num_dashed_parents(g)
+  for i in 0..<dashed {
+    line.push('-')
+    line.push(if i == dashed - 1 { '.' } else { '-' })
+  }
+}
+
+///| Port of git's graph_output_commit_line().
+fn graph_output_commit_line(g : GitGraph, line : Array[Char]) -> Unit {
+  let mut seen_this = false
+  let mut i = 0
+  while i <= g.num_columns {
+    let col_commit = if i == g.num_columns {
+      if seen_this {
+        break
+      }
+      g.commit
+    } else {
+      g.columns[i]
+    }
+    if col_commit == g.commit {
+      seen_this = true
+      graph_output_commit_char(g, line)
+      if g.num_parents > 2 {
+        graph_draw_octopus_merge(g, line)
+      }
+    } else if seen_this && g.edges_added > 1 {
+      line.push('\\')
+    } else if seen_this && g.edges_added == 1 {
+      if g.prev_state == graph_state_post_merge &&
+        g.prev_edges_added > 0 &&
+        g.prev_commit_index < i {
+        line.push('\\')
+      } else {
+        line.push('|')
+      }
+    } else if g.prev_state == graph_state_collapsing &&
+      g.old_mapping[2 * i + 1] == i &&
+      g.mapping[2 * i] < i {
+      line.push('/')
+    } else {
+      line.push('|')
+    }
+    line.push(' ')
+    i += 1
+  }
+  if g.num_parents > 1 {
+    graph_update_state(g, graph_state_post_merge)
+  } else if graph_is_mapping_correct(g) {
+    graph_update_state(g, graph_state_padding)
+  } else {
+    graph_update_state(g, graph_state_collapsing)
+  }
+}
+
+///| Port of git's graph_output_post_merge_line().
+fn graph_output_post_merge_line(g : GitGraph, line : Array[Char]) -> Unit {
+  let mut seen_this = false
+  let first_parent_hex = g.cur_parents[0]
+  let mut parent_col_set = false
+  let mut i = 0
+  while i <= g.num_columns {
+    let col_commit = if i == g.num_columns {
+      if seen_this {
+        break
+      }
+      g.commit
+    } else {
+      g.columns[i]
+    }
+    if col_commit == g.commit {
+      seen_this = true
+      let mut idx = g.merge_layout
+      let mut j = 0
+      while j < g.num_parents {
+        let par_hex = g.cur_parents[j]
+        let _par_column = graph_find_new_column_by_commit(g, par_hex)
+        line.push(graph_merge_chars[idx])
+        if idx == 2 {
+          if g.edges_added > 0 || j < g.num_parents - 1 {
+            line.push(' ')
+          }
+        } else {
+          idx += 1
+        }
+        j += 1
+      }
+      if g.edges_added == 0 {
+        line.push(' ')
+      }
+    } else if seen_this {
+      if g.edges_added > 0 {
+        line.push('\\')
+      } else {
+        line.push('|')
+      }
+      line.push(' ')
+    } else {
+      line.push('|')
+      if g.merge_layout != 0 || i != g.commit_index - 1 {
+        if parent_col_set {
+          line.push('_')
+        } else {
+          line.push(' ')
+        }
+      }
+    }
+    if col_commit == first_parent_hex {
+      parent_col_set = true
+    }
+    i += 1
+  }
+  if graph_is_mapping_correct(g) {
+    graph_update_state(g, graph_state_padding)
+  } else {
+    graph_update_state(g, graph_state_collapsing)
+  }
+}
+
+///| Port of git's graph_output_collapsing_line().
+fn graph_output_collapsing_line(g : GitGraph, line : Array[Char]) -> Unit {
+  let mut used_horizontal = false
+  let mut horizontal_edge = -1
+  let mut horizontal_edge_target = -1
+  let tmp = g.mapping
+  g.mapping = g.old_mapping
+  g.old_mapping = tmp
+  for i in 0..<g.mapping_size {
+    g.mapping[i] = -1
+  }
+  for i in 0..<g.mapping_size {
+    let target = g.old_mapping[i]
+    if target < 0 {
+      continue
+    }
+    if target * 2 == i {
+      g.mapping[i] = target
+    } else if g.mapping[i - 1] < 0 {
+      g.mapping[i - 1] = target
+      if horizontal_edge == -1 {
+        horizontal_edge = i
+        horizontal_edge_target = target
+        let mut j = target * 2 + 3
+        while j < i - 2 {
+          g.mapping[j] = target
+          j += 2
+        }
+      }
+    } else if g.mapping[i - 1] == target {
+      // Already merged into the branch line to our left.
+      ()
+    } else {
+      g.mapping[i - 2] = target
+      if horizontal_edge == -1 {
+        horizontal_edge_target = target
+        horizontal_edge = i - 1
+        let mut j = target * 2 + 3
+        while j < i - 2 {
+          g.mapping[j] = target
+          j += 2
+        }
+      }
+    }
+  }
+  for i in 0..<g.mapping_size {
+    g.old_mapping[i] = g.mapping[i]
+  }
+  if g.mapping[g.mapping_size - 1] < 0 {
+    g.mapping_size -= 1
+  }
+  for i in 0..<g.mapping_size {
+    let target = g.mapping[i]
+    if target < 0 {
+      line.push(' ')
+    } else if target * 2 == i {
+      line.push('|')
+    } else if target == horizontal_edge_target && i != horizontal_edge - 1 {
+      if i != target * 2 + 3 {
+        g.mapping[i] = -1
+      }
+      used_horizontal = true
+      line.push('_')
+    } else {
+      if used_horizontal && i < horizontal_edge {
+        g.mapping[i] = -1
+      }
+      line.push('/')
+    }
+  }
+  if graph_is_mapping_correct(g) {
+    graph_update_state(g, graph_state_padding)
+  }
+}
+
+///| Port of git's graph_next_line(): emit one graph line for the current state.
+/// Returns the padded line and whether it was the commit (`*`) line.
+fn graph_next_line(g : GitGraph) -> (String, Bool) {
+  let line : Array[Char] = []
+  let mut shown = false
+  if g.state == graph_state_padding {
+    graph_output_padding_line(g, line)
+  } else if g.state == graph_state_skip {
+    graph_output_skip_line(g, line)
+  } else if g.state == graph_state_pre_commit {
+    graph_output_pre_commit_line(g, line)
+  } else if g.state == graph_state_commit {
+    graph_output_commit_line(g, line)
+    shown = true
+  } else if g.state == graph_state_post_merge {
+    graph_output_post_merge_line(g, line)
+  } else {
+    graph_output_collapsing_line(g, line)
+  }
+  graph_pad_horizontally(g, line)
+  (graph_chars_to_string(line), shown)
+}
+
+///| Port of git's graph_padding_line(): the inter-entry separator row. When the
+/// current state is GRAPH_COMMIT this draws the special padding that keeps merge
+/// columns aligned; otherwise it falls through to graph_next_line().
+fn graph_padding_line(g : GitGraph) -> String {
+  if g.state != graph_state_commit {
+    return graph_next_line(g).0
+  }
+  let line : Array[Char] = []
+  for i in 0..<g.num_columns {
+    line.push('|')
+    if g.columns[i] == g.commit && g.num_parents > 2 {
+      let len = (g.num_parents - 2) * 2
+      for _ in 0..<len {
+        line.push(' ')
+      }
+    } else {
+      line.push(' ')
+    }
+  }
+  graph_pad_horizontally(g, line)
+  g.prev_state = graph_state_padding
+  graph_chars_to_string(line)
+}
+
+///| git-compatible `--graph` renderer. Drives the ported graph.c state machine
+/// over the (already topo-ordered) commit list, interleaving graph art with the
+/// commit content exactly as git's show_log() does.
+async fn log_emit_commit_graph(
+  entries : Array[LogWalkEntry],
+  db : @bitlib.ObjectDb,
+  rfs : &@bitcore.RepoFileSystem,
+  oneline : Bool,
+  abbrev_len : Int,
+  abbrev_commit : Bool,
+  show_parents : Bool,
+  first_parent : Bool,
+  exclude_ids : Map[String, Bool],
+  ref_names : Map[String, Array[String]],
+) -> Unit raise Error {
+  let shown : Map[String, Bool] = {}
+  for e in entries {
+    shown[e.id.to_hex()] = true
+  }
+  let g = GitGraph::new(shown, exclude_ids, first_parent)
+  let mut shown_one = false
+  for e in entries {
+    let id = e.id
+    let hex = id.to_hex()
+    let parents_hex : Array[String] = []
+    for p in e.parents {
+      parents_hex.push(p.to_hex())
+    }
+    graph_update(g, hex, e.boundary, parents_hex)
+    // Inter-entry separator: for the multi-line format git prints a padding row
+    // before every entry but the first (the oneline format has no padding).
+    if shown_one && !oneline {
+      print_line(graph_padding_line(g))
+    }
+    shown_one = true
+    let deco = match ref_names.get(hex) {
+      Some(names) => " (" + names.join(", ") + ")"
+      None => ""
+    }
+    // Emit graph-only rows up to and including the commit ('*') row prefix.
+    let mut commit_prefix = ""
+    let mut got_commit = false
+    while !got_commit {
+      let (s, is_commit) = graph_next_line(g)
+      if is_commit {
+        commit_prefix = s
+        got_commit = true
+      } else {
+        print_line(s)
+      }
+    }
+    if oneline {
+      let identity = log_format_commit_identity(
+        id, e.parents, abbrev_len, true, show_parents,
+      )
+      let subject = get_commit_subject(db, rfs, id)
+      print_line(commit_prefix + identity + deco + " " + subject)
+    } else {
+      let identity = log_format_commit_identity(
+        id, e.parents, abbrev_len, abbrev_commit, show_parents,
+      )
+      let subject = get_commit_subject(db, rfs, id)
+      let date_str = format_date_by_mode(
+        e.timestamp, log_extract_author_tz(e.author), "",
+      )
+      let content = [
+        "commit " + identity + deco,
+        "Author: " + e.author,
+        "Date:   " + date_str,
+        "",
+        "    " + subject,
+      ]
+      print_line(commit_prefix + content[0])
+      for k in 1..<content.length() {
+        let (s, _) = graph_next_line(g)
+        print_line(s + content[k])
+      }
+    }
+    // Emit any remaining graph rows for this commit (merge fan-out / collapse).
+    while g.state != graph_state_padding {
+      let (s, _) = graph_next_line(g)
+      print_line(s)
+    }
+  }
 }
 
 ///|

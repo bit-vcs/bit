@@ -762,4 +762,51 @@ test_expect_success 'log --full-history -- <path> keeps a merge that changes the
     )
 '
 
+test_expect_success 'log --graph --oneline renders a merge natively (git-compatible art)' '
+    git_cmd init repo &&
+    (
+        cd repo &&
+        echo 0 >f && git_cmd add f && git_cmd commit -q -m c0 &&
+        main="$(git_cmd rev-parse --abbrev-ref HEAD)" &&
+        git_cmd checkout -q -b topic &&
+        echo t >t && git_cmd add t && git_cmd commit -q -m topic &&
+        git_cmd checkout -q "$main" &&
+        echo m >m && git_cmd add m && git_cmd commit -q -m main &&
+        git_cmd merge -q --no-ff topic -m MERGE &&
+        echo z >z && git_cmd add z && git_cmd commit -q -m after &&
+        git_cmd log --graph --oneline | sed -E "s/ [0-9a-f]{7,40} / /; s/[[:space:]]*$//" >graph.out &&
+        cat >graph.expect <<-\EOF &&
+	* after
+	*   MERGE
+	|\
+	| * topic
+	* | main
+	|/
+	* c0
+	EOF
+        test_cmp graph.expect graph.out
+    )
+'
+
+test_expect_success 'log --graph --oneline --all keeps divergent branches in separate lanes' '
+    git_cmd init repo &&
+    (
+        cd repo &&
+        echo 0 >f && git_cmd add f && git_cmd commit -q -m c0 &&
+        main="$(git_cmd rev-parse --abbrev-ref HEAD)" &&
+        git_cmd checkout -q -b topic &&
+        echo t >t && git_cmd add t && git_cmd commit -q -m topic &&
+        git_cmd checkout -q "$main" &&
+        echo m >m && git_cmd add m && git_cmd commit -q -m main &&
+        git_cmd log --graph --oneline --all | sed -E "s/ [0-9a-f]{7,40} / /; s/[[:space:]]*$//" >graph.out &&
+        cat >graph.expect <<-\EOF &&
+	* main
+	| * topic
+	|/
+	* c0
+	EOF
+        test_cmp graph.expect graph.out
+    )
+'
+
 test_done
