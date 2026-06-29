@@ -709,14 +709,35 @@ test_expect_success 'log -- <path> simplifies away a pull merge (default history
     )
 '
 
-test_expect_success 'log --show-pulls stays explicitly unsupported with --no-git-fallback' '
+test_expect_success 'log --show-pulls surfaces the pull merge natively' '
+    git_cmd init repo &&
+    (
+        cd repo &&
+        echo 0 >base && git_cmd add base && git_cmd commit -q -m c0 &&
+        main="$(git_cmd rev-parse --abbrev-ref HEAD)" &&
+        git_cmd checkout -q -b topic &&
+        echo a >foo && git_cmd add foo && git_cmd commit -q -m t_foo &&
+        git_cmd checkout -q "$main" &&
+        echo 1 >base && git_cmd add base && git_cmd commit -q -m m_base &&
+        git_cmd merge -q --no-ff topic -m mergepull &&
+        echo 2 >base && git_cmd add base && git_cmd commit -q -m m_base2 &&
+        # Default simplification hides the merge; --show-pulls brings it back.
+        git_cmd log --pretty=%s -- foo >plain.out &&
+        ! grep -qx mergepull plain.out &&
+        git_cmd log --pretty=%s --show-pulls -- foo >pulls.out &&
+        grep -qx mergepull pulls.out &&
+        grep -qx t_foo pulls.out
+    )
+'
+
+test_expect_success 'log --graph --show-pulls still falls back (explicit error under --no-git-fallback)' '
     git_cmd init repo &&
     (
         cd repo &&
         echo hello >a.txt &&
         git_cmd add a.txt &&
         git_cmd commit -m "first commit" &&
-        test_must_fail git_cmd log --show-pulls -- a.txt >out 2>err &&
+        test_must_fail git_cmd log --graph --show-pulls -- a.txt >out 2>err &&
         grep -Eiq "standalone|not supported|no-git-fallback" err
     )
 '
