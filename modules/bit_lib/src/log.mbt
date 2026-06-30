@@ -4,8 +4,13 @@
 pub struct LogEntry {
   id : @bit.ObjectId
   message : String
+  // Full commit message body (every line, trailing blank lines stripped); the
+  // multi-line default log format prints these, while `message` is the subject.
+  body_lines : Array[String]
   author : String
   timestamp : Int64
+  // Author timezone offset (e.g. "+0900"), needed to render the "Date:" line.
+  date_tz : String
   tree : @bit.ObjectId
   parent_tree : @bit.ObjectId?
 }
@@ -99,6 +104,7 @@ fn parse_log_entry(
   let lines = text.split("\n")
   let mut author = ""
   let mut timestamp = 0L
+  let mut date_tz = "+0000"
   let mut in_message = false
   let message_lines : Array[String] = []
   for line_view in lines {
@@ -113,27 +119,44 @@ fn parse_log_entry(
     }
     if line.has_prefix("author ") {
       let rest = String::unsafe_substring(line, start=7, end=line.length())
-      let (name, time) = parse_author_line(rest)
+      let (name, time, tz) = parse_author_line(rest)
       author = name
       timestamp = time
+      date_tz = tz
     }
   }
   let message = if message_lines.length() > 0 { message_lines[0] } else { "" }
-  { id, message, author, timestamp, tree, parent_tree: None }
+  // Drop trailing blank lines (git strips them before printing the body).
+  let mut body_end = message_lines.length()
+  while body_end > 0 && message_lines[body_end - 1] == "" {
+    body_end -= 1
+  }
+  let body_lines : Array[String] = []
+  for i in 0..<body_end {
+    body_lines.push(message_lines[i])
+  }
+  { id, message, body_lines, author, timestamp, date_tz, tree, parent_tree: None }
 }
 
 ///|
-fn parse_author_line(line : String) -> (String, Int64) {
+fn parse_author_line(line : String) -> (String, Int64, String) {
   // format: Name <email> 1700000000 +0000
   let mut last_space = line.rev_find(" ")
   if last_space is None {
-    return (line, 0L)
+    return (line, 0L, "+0000")
   }
   let tz_idx = last_space.unwrap()
+  let tz_str = String::unsafe_substring(line, start=tz_idx + 1, end=line.length())
+  let tz = if tz_str.length() >= 4 &&
+    (tz_str.has_prefix("+") || tz_str.has_prefix("-")) {
+    tz_str
+  } else {
+    "+0000"
+  }
   let before_tz = String::unsafe_substring(line, start=0, end=tz_idx)
   last_space = before_tz.rev_find(" ")
   if last_space is None {
-    return (before_tz, 0L)
+    return (before_tz, 0L, tz)
   }
   let time_idx = last_space.unwrap()
   let name = String::unsafe_substring(before_tz, start=0, end=time_idx)
@@ -143,7 +166,7 @@ fn parse_author_line(line : String) -> (String, Int64) {
     end=before_tz.length(),
   )
   let ts = parse_int64(time_str)
-  (name, ts)
+  (name, ts, tz)
 }
 
 ///|

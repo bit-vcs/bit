@@ -1734,27 +1734,6 @@ fn log_resolve_pretty_color_directive(
 }
 
 ///|
-fn log_extract_author_tz(author : String) -> String {
-  // author is "Name <email> timestamp tz" or just "Name <email>"
-  // Extract tz (last token after last space)
-  match author.rev_find(" ") {
-    Some(idx) => {
-      let last = String::unsafe_substring(
-        author,
-        start=idx + 1,
-        end=author.length(),
-      )
-      if last.length() >= 4 && (last.has_prefix("+") || last.has_prefix("-")) {
-        last
-      } else {
-        "+0000"
-      }
-    }
-    None => "+0000"
-  }
-}
-
-///|
 fn parse_ident_parts(ident : String) -> (String, String, Int64, String) {
   // Format: "Name <email> timestamp timezone"
   let mut name = ""
@@ -4140,12 +4119,14 @@ async fn log_emit_default_commit_entry(
   log_emit_output("Author: " + entry.author, true, line_prefix)
   let date_str = format_date_by_mode(
     entry.timestamp,
-    log_extract_author_tz(entry.author),
+    entry.date_tz,
     date_format,
   )
   log_emit_output("Date:   " + date_str, true, line_prefix)
   log_emit_output("", true, line_prefix)
-  log_emit_output("    " + entry.message, true, line_prefix)
+  for body_line in log_indent_body_lines(entry.body_lines) {
+    log_emit_output(body_line, true, line_prefix)
+  }
   log_emit_output("", true, line_prefix)
   log_emit_notes_for_commit(rfs, git_dir, db, entry.id, line_prefix)
   if show_stat || show_patch {
@@ -5551,12 +5532,14 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
             log_emit_output("Author: " + entry.author, true, line_prefix)
             let date_str = format_date_by_mode(
               entry.timestamp,
-              log_extract_author_tz(entry.author),
+              entry.date_tz,
               date_format,
             )
             log_emit_output("Date:   " + date_str, true, line_prefix)
             log_emit_output("", true, line_prefix)
-            log_emit_output("    " + entry.message, true, line_prefix)
+            for body_line in log_indent_body_lines(entry.body_lines) {
+              log_emit_output(body_line, true, line_prefix)
+            }
             log_emit_output("", true, line_prefix)
             log_emit_notes_for_commit(
               rfs, git_dir, db, entry.id, line_prefix,
@@ -5954,12 +5937,14 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         log_emit_output("Author: " + entry.author, true, line_prefix)
         let date_str = format_date_by_mode(
           entry.timestamp,
-          log_extract_author_tz(entry.author),
+          entry.date_tz,
           date_format,
         )
         log_emit_output("Date:   " + date_str, true, line_prefix)
         log_emit_output("", true, line_prefix)
-        log_emit_output("    " + entry.message, true, line_prefix)
+        for body_line in log_indent_body_lines(entry.body_lines) {
+          log_emit_output(body_line, true, line_prefix)
+        }
         log_emit_output("", true, line_prefix)
         log_emit_notes_for_commit(rfs, git_dir, walk_db, entry.id, line_prefix)
         if show_stat || show_patch {
@@ -6096,18 +6081,29 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
     let notes_db = @bitlib.ObjectDb::load(
       rfs, log_resolve_common_git_dir(rfs, git_dir),
     )
-    for entry in entries {
+    for entry_idx, entry in entries {
       log_emit_output("commit " + entry.id.to_hex(), true, line_prefix)
       log_emit_output("Author: " + entry.author, true, line_prefix)
       let date_str = format_date_by_mode(
         entry.timestamp,
-        log_extract_author_tz(entry.author),
+        entry.date_tz,
         date_format,
       )
       log_emit_output("Date:   " + date_str, true, line_prefix)
       log_emit_output("", true, line_prefix)
-      log_emit_output("    " + entry.message, true, line_prefix)
-      log_emit_output("", true, line_prefix)
+      for body_line in log_indent_body_lines(entry.body_lines) {
+        log_emit_output(body_line, true, line_prefix)
+      }
+      // git separates entries with a blank line but prints none after the last;
+      // a trailing diff/stat/raw/name block still needs its leading blank.
+      if entry_idx < entries.length() - 1 ||
+        show_stat ||
+        show_patch ||
+        show_raw ||
+        name_only ||
+        name_status {
+        log_emit_output("", true, line_prefix)
+      }
       log_emit_notes_for_commit(rfs, git_dir, notes_db, entry.id, line_prefix)
       if show_stat || show_patch {
         let diff_files = log_restrict_diff_files(
@@ -6210,8 +6206,14 @@ async fn handle_whatchanged(args : Array[String]) -> Unit raise Error {
 struct LogWalkEntry {
   id : @bitcore.ObjectId
   message : String
+  // Full commit message body (every line, trailing blank lines stripped) used
+  // by the multi-line default format; `message` keeps only the subject line.
+  body_lines : Array[String]
   author : String
   timestamp : Int64
+  // Author timezone offset (e.g. "+0900"); the "Author: " line drops it but the
+  // "Date:" line needs it to render the local time git shows.
+  date_tz : String
   tree : @bitcore.ObjectId
   parent_tree : @bitcore.ObjectId?
   parents : Array[@bitcore.ObjectId]
@@ -6477,7 +6479,7 @@ fn log_extract_author_timestamp(data : Bytes) -> Int64 {
     }
     if line.has_prefix("author ") {
       let rest = String::unsafe_substring(line, start=7, end=line.length())
-      let (_, ts) = log_parse_author_parts(rest)
+      let (_, ts, _) = log_parse_author_parts(rest)
       return ts
     }
   }
@@ -6485,8 +6487,8 @@ fn log_extract_author_timestamp(data : Bytes) -> Int64 {
 }
 
 ///|
-/// Parse author line "Name <email> TIMESTAMP +TZ" into (name, timestamp).
-fn log_parse_author_parts(rest : String) -> (String, Int64) {
+/// Parse author line "Name <email> TIMESTAMP +TZ" into (name, timestamp, tz).
+fn log_parse_author_parts(rest : String) -> (String, Int64, String) {
   let chars : Array[Char] = []
   for c in rest {
     chars.push(c)
@@ -6508,10 +6510,28 @@ fn log_parse_author_parts(rest : String) -> (String, Int64) {
       end=last_sp,
     )
     let ts = @string.parse_int64(ts_str) catch { _ => 0L }
-    (name, ts)
+    let tz_str = String::unsafe_substring(rest, start=last_sp + 1, end=len)
+    let tz = if tz_str.length() >= 4 &&
+      (tz_str.has_prefix("+") || tz_str.has_prefix("-")) {
+      tz_str
+    } else {
+      "+0000"
+    }
+    (name, ts, tz)
   } else {
-    (rest, 0L)
+    (rest, 0L, "+0000")
   }
+}
+
+///|
+///| Indent a commit message body the way git's default format does: prefix
+/// every line with four spaces (so a blank line becomes exactly four spaces).
+fn log_indent_body_lines(body_lines : Array[String]) -> Array[String] {
+  let out : Array[String] = []
+  for l in body_lines {
+    out.push("    " + l)
+  }
+  out
 }
 
 ///|
@@ -6525,6 +6545,7 @@ fn log_parse_entry_from_obj(
   let text = decode_bytes(data)
   let mut author = ""
   let mut timestamp = 0L
+  let mut date_tz = "+0000"
   let mut in_message = false
   let message_lines : Array[String] = []
   for line_view in text.split("\n") {
@@ -6539,17 +6560,29 @@ fn log_parse_entry_from_obj(
     }
     if line.has_prefix("author ") {
       let rest = String::unsafe_substring(line, start=7, end=line.length())
-      let (name, ts) = log_parse_author_parts(rest)
+      let (name, ts, tz) = log_parse_author_parts(rest)
       author = name
       timestamp = ts
+      date_tz = tz
     }
   }
   let message = if message_lines.length() > 0 { message_lines[0] } else { "" }
+  // Drop trailing blank lines (git strips them before printing the body).
+  let mut body_end = message_lines.length()
+  while body_end > 0 && message_lines[body_end - 1] == "" {
+    body_end -= 1
+  }
+  let body_lines : Array[String] = []
+  for i in 0..<body_end {
+    body_lines.push(message_lines[i])
+  }
   {
     id,
     message,
+    body_lines,
     author,
     timestamp,
+    date_tz,
     tree,
     parent_tree: None,
     parents,
@@ -7454,9 +7487,8 @@ async fn log_emit_commit_graph(
       let identity = log_format_commit_identity(
         id, e.parents, abbrev_len, abbrev_commit, show_parents,
       )
-      let subject = get_commit_subject(db, rfs, id)
       let date_str = format_date_by_mode(
-        e.timestamp, log_extract_author_tz(e.author), "",
+        e.timestamp, e.date_tz, "",
       )
       let content = [
         "commit " + identity + deco,
@@ -7475,7 +7507,9 @@ async fn log_emit_commit_graph(
       content.push("Author: " + e.author)
       content.push("Date:   " + date_str)
       content.push("")
-      content.push("    " + subject)
+      for body_line in log_indent_body_lines(e.body_lines) {
+        content.push(body_line)
+      }
       print_line(commit_prefix + content[0])
       for k in 1..<content.length() {
         let (s, _) = graph_next_line(g)
