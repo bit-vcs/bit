@@ -875,8 +875,10 @@ pub struct LfsPointer {
 pub struct LogEntry {
   id : @object.ObjectId
   message : String
+  body_lines : Array[String]
   author : String
   timestamp : Int64
+  date_tz : String
   tree : @object.ObjectId
   parent_tree : @object.ObjectId?
 }
