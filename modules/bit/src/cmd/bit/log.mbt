@@ -6603,43 +6603,40 @@ async fn log_with_graph(
   let starts : Array[@bitcore.ObjectId] = []
   let ref_names : Map[String, Array[String]] = {} // commit hex -> ref names
   if all_refs {
-    // Add all branches
-    let heads_dir = git_dir + "/refs/heads"
-    if rfs.is_dir(heads_dir) {
-      let branches = rfs.readdir(heads_dir) catch {
-        err if @async.is_cancellation_error(err) => raise err
-        _ => []
-      }
-      // git iterates refs in sorted order; match it so the graph-order tips
-      // (and thus the output order) line up byte-for-byte.
-      // git iterates refs in lexicographic (byte) order, so the graph-order
-      // tips match git only if we do the same. Sort explicitly by byte order to
-      // avoid depending on String::compare's collation.
-      let sorted_branches : Array[String] = []
-      for b in branches {
-        let mut pos = sorted_branches.length()
-        for i in 0..<sorted_branches.length() {
-          if log_string_lex_less(b, sorted_branches[i]) {
-            pos = i
-            break
-          }
+    // git's `--all` walks every ref under refs/ (heads, remotes, tags, ...),
+    // each peeled to a commit, in lexicographic refname order so the
+    // graph-order tips line up byte-for-byte. (Ref collation must not depend on
+    // String::compare's locale.)
+    let refs = @bitlib.list_refs_with_ids(rfs, git_dir, None)
+    let sorted_names : Array[String] = []
+    for name, _ in refs {
+      let mut pos = sorted_names.length()
+      for i in 0..<sorted_names.length() {
+        if log_string_lex_less(name, sorted_names[i]) {
+          pos = i
+          break
         }
-        sorted_branches.insert(pos, b)
       }
-      for branch in sorted_branches {
-        let ref_path = heads_dir + "/" + branch
-        if rfs.is_file(ref_path) {
-          let hex = rfs.read_file(ref_path) |> decode_bytes |> trim_string
-          let id = @bitcore.ObjectId::from_hex(hex)
-          starts.push(id)
-          // Only decorate when explicitly requested; like git, a piped
-          // `--all` without `--decorate` shows no ref names.
-          if decorate {
-            match ref_names.get(hex) {
-              Some(arr) => arr.push(branch)
-              None => ref_names[hex] = [branch]
-            }
-          }
+      sorted_names.insert(pos, name)
+    }
+    for name in sorted_names {
+      // Peel tags (and anything else) down to a commit; refs that don't
+      // resolve to a commit are skipped, exactly as git does.
+      let commit_id = match
+        (@bitrepo.rev_parse(rfs, git_dir, name + "^{commit}") catch { _ => None }) {
+        Some(c) => c
+        None => continue
+      }
+      starts.push(commit_id)
+      // Only decorate when explicitly requested; like git, a piped `--all`
+      // without `--decorate` shows no ref names. Decoration for non-branch refs
+      // is handled elsewhere; mirror the prior behaviour for branch names.
+      if decorate && name.has_prefix("refs/heads/") {
+        let branch = String::unsafe_substring(name, start=11, end=name.length())
+        let hex = commit_id.to_hex()
+        match ref_names.get(hex) {
+          Some(arr) => arr.push(branch)
+          None => ref_names[hex] = [branch]
         }
       }
     }
@@ -6715,6 +6712,14 @@ async fn log_with_graph(
     show_boundary~,
   )
   let sorted = log_graph_order_sort(walked)
+  // A parent is lane-worthy if it was part of the full walk, so build the
+  // membership set from every walked commit — not just the truncated output —
+  // otherwise `-n` would drop merge lanes that cross the cutoff and unwalked
+  // (missing/grafted) parents would sprout phantom lanes.
+  let shown : Map[String, Bool] = {}
+  for e in sorted {
+    shown[e.id.to_hex()] = true
+  }
   let entries : Array[LogWalkEntry] = []
   let limit = if max_count < sorted.length() { max_count } else {
     sorted.length()
@@ -6723,8 +6728,8 @@ async fn log_with_graph(
     entries.push(sorted[i])
   }
   log_emit_commit_graph(
-    entries, db, rfs, oneline, abbrev_len, abbrev_commit, show_parents,
-    first_parent, exclude_ids, ref_names,
+    entries, shown, db, rfs, oneline, abbrev_len, abbrev_commit, show_parents,
+    first_parent, ref_names,
   )
 }
 
@@ -6845,14 +6850,12 @@ struct GitGraph {
   mut old_mapping : Array[Int]
   mut cur_parents : Array[String]
   shown : Map[String, Bool]
-  exclude : Map[String, Bool]
   first_parent_only : Bool
 }
 
 ///|
 fn GitGraph::new(
   shown : Map[String, Bool],
-  exclude : Map[String, Bool],
   first_parent_only : Bool,
 ) -> GitGraph {
   {
@@ -6877,18 +6880,17 @@ fn GitGraph::new(
     old_mapping: [],
     cur_parents: [],
     shown,
-    exclude,
     first_parent_only,
   }
 }
 
-///| A parent is "interesting" (gets a graph lane drawn to it) if it is not an
-/// excluded/uninteresting commit — matching git's graph_is_interesting(), which
-/// keys off commit flags rather than the `-n` output limit. Truncating output
-/// with `-n` must NOT drop a merge parent that lies just past the window, or the
-/// merge would lose a lane. Boundary commits are excluded yet still shown, so
-/// they count as interesting when present in the displayed set.
-/// With `--first-parent`, only the first parent is ever interesting.
+///| A parent is "interesting" (gets a graph lane drawn to it) if it is part of
+/// the walk — i.e. present in the full reachable `shown` set. This mirrors git's
+/// graph_is_interesting(), which keys off the revision walk rather than the `-n`
+/// output limit: the walk gathers the whole history, so a merge parent just past
+/// an `-n` cutoff is still interesting (its lane is kept), while a parent that
+/// was never walked (missing/grafted/excluded) is not, so no phantom lane is
+/// drawn. With `--first-parent`, only the first parent is ever interesting.
 fn graph_interesting_parents(
   g : GitGraph,
   parents : Array[String],
@@ -6897,23 +6899,18 @@ fn graph_interesting_parents(
     return []
   }
   if g.first_parent_only {
-    if graph_parent_is_interesting(g, parents[0]) {
+    if g.shown.get(parents[0]).unwrap_or(false) {
       return [parents[0]]
     }
     return []
   }
   let res : Array[String] = []
   for p in parents {
-    if graph_parent_is_interesting(g, p) {
+    if g.shown.get(p).unwrap_or(false) {
       res.push(p)
     }
   }
   res
-}
-
-///|
-fn graph_parent_is_interesting(g : GitGraph, p : String) -> Bool {
-  !g.exclude.get(p).unwrap_or(false) || g.shown.get(p).unwrap_or(false)
 }
 
 ///|
@@ -7405,6 +7402,7 @@ fn graph_padding_line(g : GitGraph) -> String {
 /// commit content exactly as git's show_log() does.
 async fn log_emit_commit_graph(
   entries : Array[LogWalkEntry],
+  shown : Map[String, Bool],
   db : @bitlib.ObjectDb,
   rfs : &@bitcore.RepoFileSystem,
   oneline : Bool,
@@ -7412,14 +7410,9 @@ async fn log_emit_commit_graph(
   abbrev_commit : Bool,
   show_parents : Bool,
   first_parent : Bool,
-  exclude_ids : Map[String, Bool],
   ref_names : Map[String, Array[String]],
 ) -> Unit raise Error {
-  let shown : Map[String, Bool] = {}
-  for e in entries {
-    shown[e.id.to_hex()] = true
-  }
-  let g = GitGraph::new(shown, exclude_ids, first_parent)
+  let g = GitGraph::new(shown, first_parent)
   let mut shown_one = false
   for e in entries {
     let id = e.id
@@ -7467,11 +7460,22 @@ async fn log_emit_commit_graph(
       )
       let content = [
         "commit " + identity + deco,
-        "Author: " + e.author,
-        "Date:   " + date_str,
-        "",
-        "    " + subject,
       ]
+      // Merge commits carry a "Merge: <p1> <p2> ..." line (abbreviated parents,
+      // always at abbrev_len even when the commit id is shown in full).
+      if e.parents.length() > 1 {
+        let mline = StringBuilder::new()
+        mline.write_string("Merge:")
+        for p in e.parents {
+          mline.write_string(" ")
+          mline.write_string(log_abbrev_hex(p.to_hex(), abbrev_len))
+        }
+        content.push(mline.to_string())
+      }
+      content.push("Author: " + e.author)
+      content.push("Date:   " + date_str)
+      content.push("")
+      content.push("    " + subject)
       print_line(commit_prefix + content[0])
       for k in 1..<content.length() {
         let (s, _) = graph_next_line(g)

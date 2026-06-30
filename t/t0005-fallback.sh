@@ -809,4 +809,23 @@ test_expect_success 'log --graph --oneline --all keeps divergent branches in sep
     )
 '
 
+test_expect_success 'log --graph (multi-line) renders the Merge: line on the fan-out row' '
+    git_cmd init repo &&
+    (
+        cd repo &&
+        echo 0 >f && git_cmd add f && git_cmd commit -q -m c0 &&
+        main="$(git_cmd rev-parse --abbrev-ref HEAD)" &&
+        git_cmd checkout -q -b topic &&
+        echo t >t && git_cmd add t && git_cmd commit -q -m topic &&
+        git_cmd checkout -q "$main" &&
+        echo m >m && git_cmd add m && git_cmd commit -q -m main &&
+        git_cmd merge -q --no-ff topic -m MERGE &&
+        git_cmd log --graph >graph.out &&
+        # The merge commit row is "*   commit <hash>" and the fan-out row that
+        # follows carries the abbreviated parents as "|\\  Merge: <p1> <p2>".
+        grep -Eq "^\\*   commit [0-9a-f]{40}\$" graph.out &&
+        grep -Eq "^\\|\\\\  Merge: [0-9a-f]+ [0-9a-f]+\$" graph.out
+    )
+'
+
 test_done
