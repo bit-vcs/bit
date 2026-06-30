@@ -6355,22 +6355,6 @@ fn log_get_commit_tree(
   }
 }
 
-///|
-fn log_extract_author_timestamp(data : Bytes) -> Int64 {
-  let text = decode_bytes(data)
-  for line_view in text.split("\n") {
-    let line = line_view.to_owned()
-    if line.length() == 0 {
-      break
-    }
-    if line.has_prefix("author ") {
-      let rest = String::unsafe_substring(line, start=7, end=line.length())
-      let (_, ts, _) = log_parse_author_parts(rest)
-      return ts
-    }
-  }
-  0L
-}
 
 ///|
 /// Parse author line "Name <email> TIMESTAMP +TZ" into (name, timestamp, tz).
