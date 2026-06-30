@@ -981,11 +981,11 @@ test "log: decoration ref visibility respects defaults and clear mode" {
 }
 
 ///|
-test "log: log_extract_author_timestamp" {
+test "log: log_extract_committer_timestamp" {
   // Simulate a commit object data
-  let commit_data = "tree 0000000000000000000000000000000000000000\nauthor Test User <test@example.com> 1700000000 +0000\ncommitter Test User <test@example.com> 1700000000 +0000\n\nTest commit message\n"
+  let commit_data = "tree 0000000000000000000000000000000000000000\nauthor Test User <test@example.com> 1699999999 +0000\ncommitter Test User <test@example.com> 1700000000 +0000\n\nTest commit message\n"
   let data = @utf8.encode(commit_data[:])
-  let ts = log_extract_author_timestamp(data)
+  let ts = log_extract_committer_timestamp(data)
   @test.assert_eq(ts, 1700000000L)
 }
 

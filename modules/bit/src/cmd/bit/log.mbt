@@ -5324,35 +5324,6 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
   )
   let show_decorations = !log_decoration_mode_is_none(decoration_options.mode)
   // Determine whether we need the new walk path
-  let need_walk = all_refs ||
-    show_decorations ||
-    decoration_include_patterns.length() > 0 ||
-    decoration_exclude_patterns.length() > 0 ||
-    clear_decorations ||
-    simplify_by_decoration ||
-    full_history ||
-    simplify_merges ||
-    pathspecs.length() > 0 ||
-    show_raw ||
-    no_merges ||
-    show_parents ||
-    abbrev_commit ||
-    abbrev_len != 7 ||
-    log_has_diff_filter(diff_filter_include, diff_filter_exclude) ||
-    grep_patterns.length() > 0 ||
-    grep_reflog_patterns.length() > 0 ||
-    author_patterns.length() > 0 ||
-    committer_patterns.length() > 0 ||
-    saw_revision_input ||
-    source ||
-    show_boundary ||
-    show_signature ||
-    ancestry_path ||
-    ancestry_path_specs.length() > 0 ||
-    revs.length() > 0 ||
-    range_excludes.length() > 0 ||
-    branch_patterns.length() > 0 ||
-    symmetric_ranges.length() > 0
   if graph {
     log_with_graph(
       rfs, git_dir, max_count, oneline, all_refs, show_decorations, since_ts, until_ts,
@@ -5638,7 +5609,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         }
       }
     }
-  } else if need_walk {
+  } else {
     let start_targets = log_resolve_targets(
       rfs,
       git_dir,
@@ -5855,6 +5826,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
       }
     } else {
       let mut emitted = 0
+      let mut shown_any = false
       for entry in entries {
         if !entry.boundary && emitted >= max_count {
           break
@@ -5910,6 +5882,12 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
           ) {
           continue
         }
+        // git separates entries with a single blank line and prints none after
+        // the last; emit the separator before every shown entry but the first.
+        if shown_any {
+          log_emit_output("", true, line_prefix)
+        }
+        shown_any = true
         let deco = format_decoration(ref_names, entry.id.to_hex())
         let header_identity = log_format_commit_identity(
           entry.id,
@@ -5924,6 +5902,15 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
           true,
           line_prefix,
         )
+        if entry.parents.length() > 1 {
+          let mline = StringBuilder::new()
+          mline.write_string("Merge:")
+          for p in entry.parents {
+            mline.write_string(" ")
+            mline.write_string(log_abbrev_hex(p.to_hex(), abbrev_len))
+          }
+          log_emit_output(mline.to_string(), true, line_prefix)
+        }
         if show_signature {
           log_emit_commit_signature_output_lines(
             fs,
@@ -5945,7 +5932,15 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         for body_line in log_indent_body_lines(entry.body_lines) {
           log_emit_output(body_line, true, line_prefix)
         }
-        log_emit_output("", true, line_prefix)
+        // A trailing diff/stat/raw/name block (or notes) still needs its leading
+        // blank; the inter-entry separator is handled before the next commit.
+        if show_stat ||
+          show_patch ||
+          show_raw ||
+          name_only ||
+          name_status {
+          log_emit_output("", true, line_prefix)
+        }
         log_emit_notes_for_commit(rfs, git_dir, walk_db, entry.id, line_prefix)
         if show_stat || show_patch {
           let diff_files = log_restrict_diff_files(
@@ -6039,134 +6034,6 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         if !entry.boundary {
           emitted += 1
         }
-      }
-    }
-  } else if oneline {
-    // Fast path: simple HEAD walk
-    ignore(log_resolve_default_head(rfs, git_dir))
-    let lines = @bitlib.log_head_oneline(
-      fs,
-      git_dir,
-      max_count~,
-      since=since_ts,
-      until=until_ts,
-    )
-    if reverse {
-      lines.rev_in_place()
-    }
-    for line in lines {
-      log_emit_output(line, true, line_prefix)
-    }
-  } else {
-    // Fast path: simple HEAD walk (full format)
-    ignore(log_resolve_default_head(rfs, git_dir))
-    let entries = @bitlib.log_head(
-      fs,
-      git_dir,
-      max_count~,
-      since=since_ts,
-      until=until_ts,
-      include_parent_tree=show_stat || show_patch || name_only || name_status,
-    )
-    if reverse {
-      entries.rev_in_place()
-    }
-    let log_db = if show_stat || show_patch || name_only || name_status {
-      Some(
-        @bitlib.ObjectDb::load(rfs, log_resolve_common_git_dir(rfs, git_dir)),
-      )
-    } else {
-      None
-    }
-    let notes_db = @bitlib.ObjectDb::load(
-      rfs, log_resolve_common_git_dir(rfs, git_dir),
-    )
-    for entry_idx, entry in entries {
-      log_emit_output("commit " + entry.id.to_hex(), true, line_prefix)
-      log_emit_output("Author: " + entry.author, true, line_prefix)
-      let date_str = format_date_by_mode(
-        entry.timestamp,
-        entry.date_tz,
-        date_format,
-      )
-      log_emit_output("Date:   " + date_str, true, line_prefix)
-      log_emit_output("", true, line_prefix)
-      for body_line in log_indent_body_lines(entry.body_lines) {
-        log_emit_output(body_line, true, line_prefix)
-      }
-      // git separates entries with a blank line but prints none after the last;
-      // a trailing diff/stat/raw/name block still needs its leading blank.
-      if entry_idx < entries.length() - 1 ||
-        show_stat ||
-        show_patch ||
-        show_raw ||
-        name_only ||
-        name_status {
-        log_emit_output("", true, line_prefix)
-      }
-      log_emit_notes_for_commit(rfs, git_dir, notes_db, entry.id, line_prefix)
-      if show_stat || show_patch {
-        let diff_files = log_restrict_diff_files(
-          diff_apply_rotate_skip_files(
-            @bitdiff.diff_trees(
-              rfs,
-              git_dir,
-              entry.parent_tree,
-              entry.tree,
-              db=log_db.unwrap(),
-            ),
-            rotate_to,
-            skip_to,
-            strict=false,
-          ).unwrap(),
-          pathspecs,
-          full_diff,
-        )
-        if show_stat {
-          let stat_lines = @bitdiff.diff_stat(diff_files)
-          for line in stat_lines {
-            log_emit_output(line, true, line_prefix)
-          }
-          log_emit_output("", true, line_prefix)
-        }
-        if show_patch {
-          let patch_lines = @bitdiff.diff_text(diff_files)
-          for line in patch_lines {
-            log_emit_output(line, true, line_prefix)
-          }
-          log_emit_output("", true, line_prefix)
-        }
-      }
-      if name_only || name_status {
-        let diff_files = log_restrict_diff_files(
-          diff_apply_rotate_skip_files(
-            @bitdiff.diff_trees(
-              rfs,
-              git_dir,
-              entry.parent_tree,
-              entry.tree,
-              db=log_db.unwrap(),
-            ),
-            rotate_to,
-            skip_to,
-            strict=false,
-          ).unwrap(),
-          pathspecs,
-          full_diff,
-        )
-        for file in diff_files {
-          if name_only {
-            log_emit_output(file.path, true, line_prefix)
-          } else {
-            let status = match file.kind {
-              @bitdiff.DiffKind::Added => "A"
-              @bitdiff.DiffKind::Modified => "M"
-              @bitdiff.DiffKind::Deleted => "D"
-            }
-            log_emit_output(status + "\t" + file.path, true, line_prefix)
-          }
-        }
-        log_emit_output("", true, line_prefix)
       }
     }
   }
@@ -6446,7 +6313,26 @@ fn log_get_commit_timestamp(
 ) -> Int64 {
   let obj = db.get(rfs, id) catch { _ => return 0L }
   guard obj is Some(o) else { return 0L }
-  log_extract_author_timestamp(o.data)
+  // git's default rev walk orders by COMMITTER date (reverse chronological),
+  // not author date, so commit ordering matches `git log`.
+  log_extract_committer_timestamp(o.data)
+}
+
+///|
+fn log_extract_committer_timestamp(data : Bytes) -> Int64 {
+  let text = decode_bytes(data)
+  for line_view in text.split("\n") {
+    let line = line_view.to_owned()
+    if line.length() == 0 {
+      break
+    }
+    if line.has_prefix("committer ") {
+      let rest = String::unsafe_substring(line, start=10, end=line.length())
+      let (_, ts, _) = log_parse_author_parts(rest)
+      return ts
+    }
+  }
+  0L
 }
 
 ///|
@@ -6469,22 +6355,6 @@ fn log_get_commit_tree(
   }
 }
 
-///|
-fn log_extract_author_timestamp(data : Bytes) -> Int64 {
-  let text = decode_bytes(data)
-  for line_view in text.split("\n") {
-    let line = line_view.to_owned()
-    if line.length() == 0 {
-      break
-    }
-    if line.has_prefix("author ") {
-      let rest = String::unsafe_substring(line, start=7, end=line.length())
-      let (_, ts, _) = log_parse_author_parts(rest)
-      return ts
-    }
-  }
-  0L
-}
 
 ///|
 /// Parse author line "Name <email> TIMESTAMP +TZ" into (name, timestamp, tz).
