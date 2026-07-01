@@ -470,72 +470,6 @@ async fn log_emit_commit_signature_output_lines(
 }
 
 ///|
-fn log_storage_runtime_delegate_args(
-  args : Array[String],
-) -> @runtime.StorageLogArgs? {
-  if log_need_real_git(args) {
-    return None
-  }
-  let mut seen_oneline = false
-  let mut seen_limit = false
-  let mut i = 0
-  while i < args.length() {
-    let arg = args[i]
-    match arg {
-      "--oneline" => seen_oneline = true
-      "-n" | "--max-count" => {
-        seen_limit = true
-        if i + 1 < args.length() {
-          i += 1
-        } else {
-          return None
-        }
-      }
-      _ if arg.has_prefix("--max-count=") => seen_limit = true
-      _ if is_short_count_flag(arg) => seen_limit = true
-      _ => return None
-    }
-    i += 1
-  }
-  if !seen_oneline || !seen_limit {
-    return None
-  }
-  let parsed = storage_runtime_parse_command("log", args) catch {
-    _ => return None
-  }
-  match parsed {
-    @runtime.StorageCommand::Log(log_args) if log_args.oneline => Some(log_args)
-    _ => None
-  }
-}
-
-///|
-fn log_should_use_storage_runtime(args : Array[String]) -> Bool {
-  log_storage_runtime_delegate_args(args) is Some(_)
-}
-
-///|
-fn log_storage_runtime_blocked_by_repo_config(
-  rfs : &@bitcore.RepoFileSystem,
-  git_dir : String,
-) -> Bool {
-  log_read_config_entries(rfs, git_dir, "log", "decorate").length() > 0 ||
-  log_read_config_entries(rfs, git_dir, "log", "excludeDecoration").length() > 0 ||
-  log_read_config_entries(rfs, git_dir, "log", "abbrevCommit").length() > 0 ||
-  log_read_config_entries(rfs, git_dir, "core", "abbrev").length() > 0
-}
-
-///|
-fn log_should_use_storage_runtime_in_repo(
-  rfs : &@bitcore.RepoFileSystem,
-  git_dir : String,
-  args : Array[String],
-) -> Bool {
-  log_should_use_storage_runtime(args) &&
-  !log_storage_runtime_blocked_by_repo_config(rfs, git_dir)
-}
-
-///|
 fn log_parse_stdin_input(
   rfs : &@bitcore.RepoFileSystem,
   git_dir : String,
@@ -4269,20 +4203,6 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
     return
   }
   validate_commit_graph_hash_version(fs, git_dir)
-  if log_should_use_storage_runtime_in_repo(rfs, git_dir, args) {
-    match log_storage_runtime_delegate_args(args) {
-      Some(log_args) => {
-        @runtime.run_storage_command(
-          fs,
-          rfs,
-          root,
-          @runtime.StorageCommand::Log(log_args),
-        )
-        return
-      }
-      None => ()
-    }
-  }
   let mut oneline = false
   let mut graph = false
   let mut all_refs = false
