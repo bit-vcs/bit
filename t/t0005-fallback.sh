@@ -730,15 +730,30 @@ test_expect_success 'log --show-pulls surfaces the pull merge natively' '
     )
 '
 
-test_expect_success 'log --graph --show-pulls still falls back (explicit error under --no-git-fallback)' '
+test_expect_success 'log --graph --show-pulls surfaces the pull merge natively (path-simplified graph)' '
     git_cmd init repo &&
     (
         cd repo &&
-        echo hello >a.txt &&
-        git_cmd add a.txt &&
-        git_cmd commit -m "first commit" &&
-        test_must_fail git_cmd log --graph --show-pulls -- a.txt >out 2>err &&
-        grep -Eiq "standalone|not supported|no-git-fallback" err
+        echo 0 >base && git_cmd add base && git_cmd commit -q -m c0 &&
+        main="$(git_cmd rev-parse --abbrev-ref HEAD)" &&
+        git_cmd checkout -q -b topic &&
+        echo a >foo && git_cmd add foo && git_cmd commit -q -m t_foo &&
+        git_cmd checkout -q "$main" &&
+        echo 1 >base && git_cmd add base && git_cmd commit -q -m m_base &&
+        git_cmd merge -q --no-ff topic -m mergepull &&
+        echo 2 >base && git_cmd add base && git_cmd commit -q -m m_base2 &&
+        # Default path simplification collapses to just the commit that adds foo.
+        git_cmd log --graph --oneline -- foo | sed -E "s/ [0-9a-f]{7,40} / /; s/[[:space:]]*\$//" >plain.out &&
+        printf "* t_foo\n" >plain.expect &&
+        test_cmp plain.expect plain.out &&
+        # --show-pulls additionally surfaces the pull merge, rewritten to a single
+        # lane above t_foo (no fallback error).
+        git_cmd log --graph --oneline --show-pulls -- foo | sed -E "s/ [0-9a-f]{7,40} / /; s/[[:space:]]*\$//" >pulls.out &&
+        cat >pulls.expect <<-\EOF &&
+	* mergepull
+	* t_foo
+	EOF
+        test_cmp pulls.expect pulls.out
     )
 '
 
