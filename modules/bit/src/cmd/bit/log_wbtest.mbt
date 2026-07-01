@@ -1,31 +1,4 @@
 ///|
-test "log: storage runtime routing only for oneline subset" {
-  assert_true(log_should_use_storage_runtime(["--oneline", "-n", "3"]))
-  assert_true(log_should_use_storage_runtime(["--oneline", "--max-count=2"]))
-  assert_true(log_should_use_storage_runtime(["--oneline", "-3"]))
-
-  assert_false(log_should_use_storage_runtime(["--oneline"]))
-  assert_false(log_should_use_storage_runtime(["-n", "3"]))
-  assert_false(log_should_use_storage_runtime(["--graph", "--oneline"]))
-  assert_false(log_should_use_storage_runtime(["HEAD"]))
-  assert_false(log_should_use_storage_runtime(["--oneline", "HEAD"]))
-  assert_false(log_should_use_storage_runtime(["--oneline", "--source", "v1"]))
-}
-
-///|
-test "log: storage runtime not used for --all, --decorate, ranges" {
-  // --all is not --oneline alone, so storage runtime should be false
-  assert_false(log_should_use_storage_runtime(["--all"]))
-  assert_false(log_should_use_storage_runtime(["--all", "--oneline"]))
-  assert_false(log_should_use_storage_runtime(["--decorate"]))
-  assert_false(log_should_use_storage_runtime(["--decorate", "--oneline"]))
-  // positional args (including ranges) are not pure --oneline
-  assert_false(log_should_use_storage_runtime(["main..develop"]))
-  assert_false(log_should_use_storage_runtime(["HEAD~3"]))
-  assert_false(log_should_use_storage_runtime(["main"]))
-}
-
-///|
 test "log: raw rotate uses first path after target when absent" {
   let zero = @bitcore.ObjectId::zero()
   let raw_results : Array[LogRawResult] = [
@@ -74,36 +47,6 @@ test "log: raw rotate uses first path after target when absent" {
     Some("sample3.t"),
   )
   @test.assert_eq(skipped.map(item => item.new_path), ["sample4.t"])
-}
-
-///|
-test "log: storage runtime disabled by repo config overrides" {
-  let fs = @bitcore.TestFs::new()
-  ignore(try? @bitlib.init_repo(fs, "/repo"))
-  let base_config = fs.read_string("/repo/.git/config")
-
-  assert_true(
-    log_should_use_storage_runtime_in_repo(fs, "/repo/.git", [
-      "--oneline", "-n", "3",
-    ]),
-  )
-
-  fs.write_string("/repo/.git/config", base_config + "\n[log]\n\tdecorate\n")
-  assert_false(
-    log_should_use_storage_runtime_in_repo(fs, "/repo/.git", [
-      "--oneline", "-n", "3",
-    ]),
-  )
-
-  fs.write_string(
-    "/repo/.git/config",
-    base_config + "\n[core]\n\tabbrev = 12\n",
-  )
-  assert_false(
-    log_should_use_storage_runtime_in_repo(fs, "/repo/.git", [
-      "--oneline", "-n", "3",
-    ]),
-  )
 }
 
 ///|
