@@ -300,25 +300,9 @@ fn log_need_real_git(args : Array[String], git_dir? : String = "") -> Bool {
       return true
     }
   }
-  // --ancestry-path (with/without =<rev>, including the --graph combination) and
-  // --simplify-by-decoration are implemented natively by the walker. The
-  // remaining flags below are not yet supported and still fall back.
-  // --show-pulls is implemented natively (simplified-parent visible set), but
-  // only for the non-graph render paths; combined with --graph it still falls
-  // back since the graph renderer does not consult that set.
-  let mut has_show_pulls = false
-  let mut has_graph = false
-  for arg in args {
-    if arg == "--show-pulls" {
-      has_show_pulls = true
-    }
-    if arg == "--graph" {
-      has_graph = true
-    }
-  }
-  if has_show_pulls && has_graph {
-    return true
-  }
+  // --ancestry-path, --simplify-by-decoration, --show-pulls, and path-limited
+  // history simplification (including the --graph combinations) are all handled
+  // natively by the walker / graph renderer, so nothing below falls back.
   false
 }
 
@@ -5248,7 +5232,8 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
     log_with_graph(
       rfs, git_dir, max_count, oneline, all_refs, show_decorations, since_ts, until_ts,
       revs, range_excludes, first_parent, show_parents, abbrev_len, abbrev_commit,
-      show_boundary,
+      show_boundary, pathspecs, simplify_merges, full_history, show_pulls,
+      detect_renames, detect_copies, diff_filter_include, diff_filter_exclude,
     )
   } else if no_walk {
     let resolved_targets = log_resolve_targets(
@@ -6420,6 +6405,14 @@ async fn log_with_graph(
   abbrev_len : Int,
   abbrev_commit : Bool,
   show_boundary : Bool,
+  pathspecs : Array[String],
+  simplify_merges : Bool,
+  full_history : Bool,
+  show_pulls : Bool,
+  detect_renames : Bool,
+  detect_copies : Bool,
+  diff_filter_include : Map[String, Bool],
+  diff_filter_exclude : Map[String, Bool],
 ) -> Unit raise Error {
   let db = @bitlib.ObjectDb::load(rfs, git_dir)
   // Collect starting points
@@ -6534,11 +6527,48 @@ async fn log_with_graph(
     first_parent~,
     show_boundary~,
   )
-  let sorted = log_graph_order_sort(walked)
-  // A parent is lane-worthy if it was part of the full walk, so build the
-  // membership set from every walked commit — not just the truncated output —
-  // otherwise `-n` would drop merge lanes that cross the cutoff and unwalked
-  // (missing/grafted) parents would sprout phantom lanes.
+  // With a pathspec, git simplifies history: hide commits that don't touch the
+  // path, then rewrite each surviving commit's parents to their nearest visible
+  // ancestors so the graph draws the simplified DAG. --show-pulls / --full-history
+  // adjust which merges survive. Apply this before graph-ordering so the lane
+  // layout matches git's simplified topology.
+  let walk_source = if pathspecs.length() > 0 {
+    let show_pulls_visible : Map[String, Bool]? = if show_pulls && !full_history {
+      Some(log_compute_show_pulls_visible(rfs, git_dir, db, starts, pathspecs))
+    } else {
+      None
+    }
+    let visible : Map[String, Bool] = {}
+    for e in walked {
+      if log_commit_matches_history_filters(
+          rfs, git_dir, db, e.id, pathspecs, diff_filter_include,
+          diff_filter_exclude, detect_renames, detect_copies, simplify_merges,
+          full_history~, show_pulls_visible=show_pulls_visible,
+        ) {
+        visible[e.id.to_hex()] = true
+      }
+    }
+    // Rewrite parents of every surviving commit to their nearest visible
+    // ancestors, memoised across the walk.
+    let memo : Map[String, Array[@bitcore.ObjectId]] = {}
+    let simplified : Array[LogWalkEntry] = []
+    for e in walked {
+      if visible.contains(e.id.to_hex()) {
+        let rp = log_graph_simplified_parents(
+          rfs, git_dir, db, e.tree, e.parents, visible, memo, pathspecs,
+        )
+        simplified.push({ ..e, parents: rp, parent_count: rp.length() })
+      }
+    }
+    simplified
+  } else {
+    walked
+  }
+  let sorted = log_graph_order_sort(walk_source)
+  // A parent is lane-worthy if it was part of the (possibly simplified) walk, so
+  // build the membership set from every surviving commit — not just the truncated
+  // output — otherwise `-n` would drop merge lanes that cross the cutoff and
+  // unwalked (missing/grafted) parents would sprout phantom lanes.
   let shown : Map[String, Bool] = {}
   for e in sorted {
     shown[e.id.to_hex()] = true
@@ -6554,6 +6584,93 @@ async fn log_with_graph(
     entries, shown, db, rfs, oneline, abbrev_len, abbrev_commit, show_parents,
     first_parent, ref_names,
   )
+}
+
+///| Nearest visible ancestors of `commit` (itself if visible), memoised. For a
+/// hidden commit we follow its *simplified* parents (git's try_to_simplify:
+/// TREESAME to a parent => follow only that parent), so a hidden merge collapses
+/// to a single lane instead of fanning out into every ancestor branch.
+fn log_graph_nearest_visible(
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  db : @bitlib.ObjectDb,
+  commit : @bitcore.ObjectId,
+  visible : Map[String, Bool],
+  memo : Map[String, Array[@bitcore.ObjectId]],
+  pathspecs : Array[String],
+) -> Array[@bitcore.ObjectId] raise Error {
+  let hex = commit.to_hex()
+  match memo.get(hex) {
+    Some(r) => return r
+    None => ()
+  }
+  if visible.contains(hex) {
+    let r = [commit]
+    memo[hex] = r
+    return r
+  }
+  let obj = db.get(rfs, commit) catch {
+    _ => {
+      memo[hex] = []
+      return []
+    }
+  }
+  guard obj is Some(o) && o.obj_type == @bitcore.ObjectType::Commit else {
+    memo[hex] = []
+    return []
+  }
+  let info = @bitcore.parse_commit(o.data)
+  let parents = log_resolve_parents(rfs, git_dir, commit, info.parents)
+  let (_, next_parents) = log_show_pulls_classify(
+    rfs, db, info.tree, parents, pathspecs,
+  )
+  let result : Array[@bitcore.ObjectId] = []
+  let seen : Map[String, Bool] = {}
+  for p in next_parents {
+    for anc in log_graph_nearest_visible(
+        rfs, git_dir, db, p, visible, memo, pathspecs,
+      ) {
+      let h = anc.to_hex()
+      if !seen.contains(h) {
+        seen[h] = true
+        result.push(anc)
+      }
+    }
+  }
+  memo[hex] = result
+  result
+}
+
+///| Rewrite a shown commit's parents for the path-simplified graph: reduce to the
+/// simplified parent set (git's try_to_simplify_commit), then map each to its
+/// nearest visible ancestors, deduplicated and order-preserving.
+fn log_graph_simplified_parents(
+  rfs : &@bitcore.RepoFileSystem,
+  git_dir : String,
+  db : @bitlib.ObjectDb,
+  tree : @bitcore.ObjectId,
+  parents : Array[@bitcore.ObjectId],
+  visible : Map[String, Bool],
+  memo : Map[String, Array[@bitcore.ObjectId]],
+  pathspecs : Array[String],
+) -> Array[@bitcore.ObjectId] raise Error {
+  let (_, next_parents) = log_show_pulls_classify(
+    rfs, db, tree, parents, pathspecs,
+  )
+  let result : Array[@bitcore.ObjectId] = []
+  let seen : Map[String, Bool] = {}
+  for p in next_parents {
+    for anc in log_graph_nearest_visible(
+        rfs, git_dir, db, p, visible, memo, pathspecs,
+      ) {
+      let h = anc.to_hex()
+      if !seen.contains(h) {
+        seen[h] = true
+        result.push(anc)
+      }
+    }
+  }
+  result
 }
 
 ///| Byte-lexicographic "less than" for ref names, matching git's refname
