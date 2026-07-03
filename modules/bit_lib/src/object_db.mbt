@@ -9,9 +9,15 @@ fn object_db_parse_int(value : StringView) -> Int raise {
 ///|
 pub struct PackIndex {
   pack_path : String
-  ids : Array[String]
+  // Raw, sorted object ids: exactly `id_count * hash_size` bytes, copied
+  // verbatim from the pack `.idx`. Kept raw (not hex) so lookups binary-search
+  // on bytes and parsing never hex-encodes every entry. Hex is materialized
+  // lazily via `hex_ids`/`id_hex_at` only for the object-enumeration paths.
+  id_bytes : Bytes
+  hash_size : Int
   offsets : Array[Int64]
   version : Int
+  mut hex_ids_cache : Array[String]?
 }
 
 ///|
@@ -67,18 +73,76 @@ pub fn LazyPackIndex::find_offset_hex(
 }
 
 ///|
-pub fn PackIndex::find_offset(self : PackIndex, id : @bit.ObjectId) -> Int64? {
-  let target = id.to_hex()
-  PackIndex::find_offset_hex(self, target)
+/// Number of objects indexed.
+pub fn PackIndex::id_count(self : PackIndex) -> Int {
+  self.offsets.length()
 }
 
 ///|
-pub fn PackIndex::find_offset_hex(self : PackIndex, hex : String) -> Int64? {
+/// Object id at position `i` (raw bytes → ObjectId, no hex roundtrip).
+pub fn PackIndex::id_at(self : PackIndex, i : Int) -> @bit.ObjectId {
+  @bit.ObjectId::from_bytes_at(
+    self.id_bytes,
+    i * self.hash_size,
+    hash_size=self.hash_size,
+  )
+}
+
+///|
+/// Hex of the object id at position `i`.
+pub fn PackIndex::id_hex_at(self : PackIndex, i : Int) -> String {
+  self.id_at(i).to_hex()
+}
+
+///|
+/// All object ids as hex, materialized lazily and cached. Only the object
+/// enumeration paths (fsck, cat-file --batch-all-objects, pack-redundant,
+/// commit-graph) need this; normal lookups binary-search on raw bytes and
+/// never allocate hex.
+pub fn PackIndex::hex_ids(self : PackIndex) -> Array[String] {
+  match self.hex_ids_cache {
+    Some(ids) => ids
+    None => {
+      let ids : Array[String] = []
+      for i in 0..<self.id_count() {
+        ids.push(self.id_hex_at(i))
+      }
+      self.hex_ids_cache = Some(ids)
+      ids
+    }
+  }
+}
+
+///|
+/// Compare the id at position `mid` against `target` (exactly `hash_size`
+/// bytes), unsigned byte order — identical ordering to hex lexicographic
+/// comparison, since hex is a monotonic per-byte encoding.
+fn PackIndex::compare_id_at(
+  self : PackIndex,
+  mid : Int,
+  target : Bytes,
+) -> Int {
+  let base = mid * self.hash_size
+  for j in 0..<self.hash_size {
+    let a = self.id_bytes[base + j].to_int()
+    let b = target[j].to_int()
+    if a != b {
+      return a - b
+    }
+  }
+  0
+}
+
+///|
+fn PackIndex::find_offset_bytes(self : PackIndex, target : Bytes) -> Int64? {
+  if target.length() != self.hash_size {
+    return None
+  }
   let mut lo = 0
-  let mut hi = self.ids.length()
+  let mut hi = self.id_count()
   while lo < hi {
     let mid = (lo + hi) / 2
-    let cmp = String::compare(self.ids[mid], hex)
+    let cmp = self.compare_id_at(mid, target)
     if cmp == 0 {
       return Some(self.offsets[mid])
     } else if cmp < 0 {
@@ -91,14 +155,30 @@ pub fn PackIndex::find_offset_hex(self : PackIndex, hex : String) -> Int64? {
 }
 
 ///|
-/// Find object id by offset (linear scan).
+pub fn PackIndex::find_offset(self : PackIndex, id : @bit.ObjectId) -> Int64? {
+  self.find_offset_bytes(id.to_bytes())
+}
+
+///|
+pub fn PackIndex::find_offset_hex(self : PackIndex, hex : String) -> Int64? {
+  if hex.length() != self.hash_size * 2 {
+    return None
+  }
+  let id = @bit.ObjectId::from_hex(hex) catch {
+    _ => return None
+  }
+  self.find_offset_bytes(id.to_bytes())
+}
+
+///|
+/// Find object id (hex) by offset (linear scan).
 pub fn PackIndex::find_id_by_offset(
   self : PackIndex,
   offset : Int64,
 ) -> String? {
   for i in 0..<self.offsets.length() {
     if self.offsets[i] == offset {
-      return Some(self.ids[i])
+      return Some(self.id_hex_at(i))
     }
   }
   None
@@ -958,19 +1038,26 @@ fn parse_pack_index_v1(
   if data.length() < expected_len {
     raise @bit.GitError::InvalidObject("Index file truncated (v1)")
   }
-  let ids : Array[String] = []
   let offsets : Array[Int64] = []
+  // Gather the interleaved (offset, id) entries: raw ids into one contiguous
+  // buffer, no per-entry hex encoding.
+  let id_arr : FixedArray[Byte] = FixedArray::make(count * hash_size, b'\x00')
   for i in 0..<count {
     let base = entries_start + i * entry_size
-    let off = read_u32_be_at64(data, base)
-    offsets.push(off)
-    let bytes : FixedArray[Byte] = FixedArray::make(hash_size, b'\x00')
+    offsets.push(read_u32_be_at64(data, base))
+    let id_base = i * hash_size
     for j in 0..<hash_size {
-      bytes[j] = data[base + 4 + j]
+      id_arr[id_base + j] = data[base + 4 + j]
     }
-    ids.push(@bit.ObjectId::new(bytes).to_hex())
   }
-  { pack_path, ids, offsets, version: 1 }
+  {
+    pack_path,
+    id_bytes: Bytes::from_array(id_arr),
+    hash_size,
+    offsets,
+    version: 1,
+    hex_ids_cache: None,
+  }
 }
 
 ///|
@@ -1003,18 +1090,17 @@ fn parse_pack_index(
     raise @bit.GitError::InvalidObject("Too many objects in index")
   }
   let count = count64.to_int()
-  let ids : Array[String] = []
-  for _ in 0..<count {
-    if offset + hash_size > data.length() {
-      raise @bit.GitError::InvalidObject("Index file truncated (ids)")
-    }
-    let bytes : FixedArray[Byte] = FixedArray::make(hash_size, b'\x00')
-    for i in 0..<hash_size {
-      bytes[i] = data[offset + i]
-    }
-    offset += hash_size
-    ids.push(@bit.ObjectId::new(bytes).to_hex())
+  // The v2 id table is `count * hash_size` contiguous bytes; copy it whole
+  // instead of hex-encoding each entry.
+  let id_byte_len = count * hash_size
+  if offset + id_byte_len > data.length() {
+    raise @bit.GitError::InvalidObject("Index file truncated (ids)")
   }
+  let ids_start = offset
+  let id_bytes = Bytes::from_array(
+    FixedArray::makei(id_byte_len, j => data[ids_start + j]),
+  )
+  offset += id_byte_len
   // Skip CRC32 table
   offset += count * 4
   if offset + count * 4 > data.length() {
@@ -1047,7 +1133,7 @@ fn parse_pack_index(
       large_idx += 1
     }
   }
-  { pack_path, ids, offsets, version: 2 }
+  { pack_path, id_bytes, hash_size, offsets, version: 2, hex_ids_cache: None }
 }
 
 ///|

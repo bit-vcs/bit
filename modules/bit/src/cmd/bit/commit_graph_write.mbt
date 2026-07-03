@@ -71,8 +71,8 @@ async fn write_commit_graph(
   } else {
     // Enumerate all commits from pack indexes + loose
     for pack in db.packs {
-      for hex in pack.ids {
-        let oid = @bitcore.ObjectId::from_hex(hex)
+      for i in 0..<pack.id_count() {
+        let oid = pack.id_at(i)
         let obj = db.get(rfs, oid) catch { _ => None }
         match obj {
           Some(o) =>
