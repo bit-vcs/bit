@@ -193,6 +193,7 @@ options(
     "init_wbtest.mbt": [ "native" ],
     "interactive.mbt": [ "native" ],
     "interpret_trailers.mbt": [ "native" ],
+    "graph_lane_limit_wbtest.mbt": [ "native" ],
     "log.mbt": [ "native" ],
     "log_wbtest.mbt": [ "native" ],
     "ls_files.mbt": [ "native" ],

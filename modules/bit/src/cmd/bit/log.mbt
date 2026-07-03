@@ -4189,6 +4189,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
   validate_commit_graph_hash_version(fs, git_dir)
   let mut oneline = false
   let mut graph = false
+  let mut graph_lane_limit = 0
   let mut all_refs = false
   let mut decorate_mode_override : LogDecorationDisplayMode? = None
   let mut show_stat = false
@@ -4274,6 +4275,10 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
     match arg {
       "--oneline" => oneline = true
       "--graph" => graph = true
+      "--graph-lane-limit" if i + 1 < args.length() => {
+        graph_lane_limit = @string.parse_int(args[i + 1])
+        i += 1
+      }
       "--all" => all_refs = true
       "--" => pathspec_mode = true
       "--not" => not_mode = !not_mode
@@ -4513,6 +4518,11 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
       _ if arg.has_prefix("--branches=") => {
         branch_patterns.push(string_slice_from(arg, 11))
         saw_revision_input = true
+      }
+      _ if arg.has_prefix("--graph-lane-limit=") => {
+        graph_lane_limit = @string.parse_int(
+          String::unsafe_substring(arg, start=19, end=arg.length()),
+        )
       }
       _ if arg.has_prefix("--glob=") => {
         log_append_glob_targets(
@@ -5234,6 +5244,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
       revs, range_excludes, first_parent, show_parents, abbrev_len, abbrev_commit,
       show_boundary, pathspecs, simplify_merges, full_history, show_pulls,
       detect_renames, detect_copies, diff_filter_include, diff_filter_exclude,
+      graph_lane_limit,
     )
   } else if no_walk {
     let resolved_targets = log_resolve_targets(
@@ -6413,6 +6424,7 @@ async fn log_with_graph(
   detect_copies : Bool,
   diff_filter_include : Map[String, Bool],
   diff_filter_exclude : Map[String, Bool],
+  graph_max_lanes : Int,
 ) -> Unit raise Error {
   let db = @bitlib.ObjectDb::load(rfs, git_dir)
   // Collect starting points
@@ -6582,7 +6594,7 @@ async fn log_with_graph(
   }
   log_emit_commit_graph(
     entries, shown, db, rfs, oneline, abbrev_len, abbrev_commit, show_parents,
-    first_parent, ref_names,
+    first_parent, ref_names, graph_max_lanes,
   )
 }
 
@@ -6791,12 +6803,23 @@ struct GitGraph {
   mut cur_parents : Array[String]
   shown : Map[String, Bool]
   first_parent_only : Bool
+  // --graph-lane-limit=<n>: cap the number of visible lanes; lanes at or
+  // beyond this index are replaced with a "~" truncation mark. 0 (or any
+  // value <= 0) means no limit. Mirrors git's revs->graph_max_lanes.
+  graph_max_lanes : Int
+}
+
+///| Port of git's graph_needs_truncation(): true when `lane` is at or beyond
+/// the configured lane limit. Values <= 0 mean no limit.
+fn graph_needs_truncation(g : GitGraph, lane : Int) -> Bool {
+  g.graph_max_lanes > 0 && lane >= g.graph_max_lanes
 }
 
 ///|
 fn GitGraph::new(
   shown : Map[String, Bool],
   first_parent_only : Bool,
+  graph_max_lanes : Int,
 ) -> GitGraph {
   {
     commit: "",
@@ -6821,6 +6844,7 @@ fn GitGraph::new(
     cur_parents: [],
     shown,
     first_parent_only,
+    graph_max_lanes,
   }
 }
 
@@ -6992,6 +7016,14 @@ fn graph_update_columns(g : GitGraph) -> Unit {
     }
     i += 1
   }
+  // If graph_max_lanes is set, cap the width: "| " per lane plus the "~ "
+  // truncation mark. Allow commits from merges to align to the merged lane.
+  if g.graph_max_lanes > 0 {
+    let max_width = g.graph_max_lanes * 2 + 2
+    if g.width > max_width {
+      g.width = max_width
+    }
+  }
   while g.mapping_size > 1 && g.mapping[g.mapping_size - 1] < 0 {
     g.mapping_size -= 1
   }
@@ -7038,9 +7070,16 @@ fn graph_chars_to_string(line : Array[Char]) -> String {
 
 ///|
 fn graph_output_padding_line(g : GitGraph, line : Array[Char]) -> Unit {
-  for _ in 0..<g.num_new_columns {
+  let mut i = 0
+  while i < g.num_new_columns {
+    if graph_needs_truncation(g, i) {
+      line.push('~')
+      line.push(' ')
+      break
+    }
     line.push('|')
     line.push(' ')
+    i += 1
   }
 }
 
@@ -7059,13 +7098,18 @@ fn graph_output_skip_line(g : GitGraph, line : Array[Char]) -> Unit {
 ///|
 fn graph_output_pre_commit_line(g : GitGraph, line : Array[Char]) -> Unit {
   let mut seen_this = false
-  for i in 0..<g.num_columns {
+  let mut i = 0
+  while i < g.num_columns {
     if g.columns[i] == g.commit {
       seen_this = true
       line.push('|')
       for _ in 0..<g.expansion_row {
         line.push(' ')
       }
+    } else if seen_this && graph_needs_truncation(g, i) {
+      line.push('~')
+      line.push(' ')
+      break
     } else if seen_this && g.expansion_row == 0 {
       if g.prev_state == graph_state_post_merge && g.prev_commit_index < i {
         line.push('\\')
@@ -7078,6 +7122,7 @@ fn graph_output_pre_commit_line(g : GitGraph, line : Array[Char]) -> Unit {
       line.push('|')
     }
     line.push(' ')
+    i += 1
   }
   g.expansion_row += 1
   if !graph_needs_pre_commit_line(g) {
@@ -7097,9 +7142,17 @@ fn graph_output_commit_char(g : GitGraph, line : Array[Char]) -> Unit {
 ///| Port of git's graph_draw_octopus_merge().
 fn graph_draw_octopus_merge(g : GitGraph, line : Array[Char]) -> Unit {
   let dashed = graph_num_dashed_parents(g)
-  for i in 0..<dashed {
+  let mut i = 0
+  while i < dashed {
     line.push('-')
+    // Commit is at commit_index; each iteration moves one lane to the right.
+    if graph_needs_truncation(g, g.commit_index + 1 + i) {
+      line.push('~')
+      line.push(' ')
+      break
+    }
     line.push(if i == dashed - 1 { '.' } else { '-' })
+    i += 1
   }
 }
 
@@ -7119,9 +7172,18 @@ fn graph_output_commit_line(g : GitGraph, line : Array[Char]) -> Unit {
     if col_commit == g.commit {
       seen_this = true
       graph_output_commit_char(g, line)
+      if graph_needs_truncation(g, i) {
+        line.push(' ')
+        break
+      }
       if g.num_parents > 2 {
         graph_draw_octopus_merge(g, line)
       }
+    } else if graph_needs_truncation(g, i) {
+      line.push('~')
+      line.push(' ')
+      seen_this = true
+      break
     } else if seen_this && g.edges_added > 1 {
       line.push('\\')
     } else if seen_this && g.edges_added == 1 {
@@ -7143,7 +7205,21 @@ fn graph_output_commit_line(g : GitGraph, line : Array[Char]) -> Unit {
     i += 1
   }
   if g.num_parents > 1 {
-    graph_update_state(g, graph_state_post_merge)
+    // If the commit is over the truncation limit but its first parent is on a
+    // visible lane, we still draw the (truncated) merge lane. If both commit
+    // and first parent are truncated, no merge lane is needed.
+    if !graph_needs_truncation(g, g.commit_index) {
+      graph_update_state(g, graph_state_post_merge)
+    } else {
+      let lane = graph_find_new_column_by_commit(g, g.cur_parents[0])
+      if !graph_needs_truncation(g, lane) {
+        graph_update_state(g, graph_state_post_merge)
+      } else if graph_is_mapping_correct(g) {
+        graph_update_state(g, graph_state_padding)
+      } else {
+        graph_update_state(g, graph_state_collapsing)
+      }
+    }
   } else if graph_is_mapping_correct(g) {
     graph_update_state(g, graph_state_padding)
   } else {
@@ -7169,13 +7245,32 @@ fn graph_output_post_merge_line(g : GitGraph, line : Array[Char]) -> Unit {
     if col_commit == g.commit {
       seen_this = true
       let mut idx = g.merge_layout
+      let mut truncated = false
       let mut j = 0
       while j < g.num_parents {
         let par_hex = g.cur_parents[j]
         let _par_column = graph_find_new_column_by_commit(g, par_hex)
         line.push(graph_merge_chars[idx])
+        // j counts parents; halve it to compare with the column index i.
+        // Don't truncate if there are no more lanes to print (end of lane).
+        if graph_needs_truncation(g, j / 2 + i) && j / 2 + i <= g.num_columns {
+          if (j + i * 2) % 2 != 0 {
+            line.push(' ')
+          }
+          line.push('~')
+          line.push(' ')
+          truncated = true
+          break
+        }
         if idx == 2 {
-          if g.edges_added > 0 || j < g.num_parents - 1 {
+          // Check if the next lane needs truncation to avoid doubled padding.
+          if graph_needs_truncation(g, (j + 1) / 2 + i) &&
+            j < g.num_parents - 1 {
+            line.push('~')
+            line.push(' ')
+            truncated = true
+            break
+          } else if g.edges_added > 0 || j < g.num_parents - 1 {
             line.push(' ')
           }
         } else {
@@ -7183,16 +7278,26 @@ fn graph_output_post_merge_line(g : GitGraph, line : Array[Char]) -> Unit {
         }
         j += 1
       }
+      if truncated {
+        break
+      }
       if g.edges_added == 0 {
         line.push(' ')
       }
+    } else if graph_needs_truncation(g, i) {
+      line.push('~')
+      line.push(' ')
+      break
     } else if seen_this {
       if g.edges_added > 0 {
         line.push('\\')
       } else {
         line.push('|')
       }
-      line.push(' ')
+      // If it's between two lanes and the next would be truncated, don't pad.
+      if !graph_needs_truncation(g, i + 1) {
+        line.push(' ')
+      }
     } else {
       line.push('|')
       if g.merge_layout != 0 || i != g.commit_index - 1 {
@@ -7266,23 +7371,37 @@ fn graph_output_collapsing_line(g : GitGraph, line : Array[Char]) -> Unit {
   if g.mapping[g.mapping_size - 1] < 0 {
     g.mapping_size -= 1
   }
+  let mut truncated = false
   for i in 0..<g.mapping_size {
     let target = g.mapping[i]
-    if target < 0 {
+    if !truncated && graph_needs_truncation(g, i / 2) {
+      line.push('~')
       line.push(' ')
+      truncated = true
+    }
+    if target < 0 {
+      if !truncated {
+        line.push(' ')
+      }
     } else if target * 2 == i {
-      line.push('|')
+      if !truncated {
+        line.push('|')
+      }
     } else if target == horizontal_edge_target && i != horizontal_edge - 1 {
       if i != target * 2 + 3 {
         g.mapping[i] = -1
       }
       used_horizontal = true
-      line.push('_')
+      if !truncated {
+        line.push('_')
+      }
     } else {
       if used_horizontal && i < horizontal_edge {
         g.mapping[i] = -1
       }
-      line.push('/')
+      if !truncated {
+        line.push('/')
+      }
     }
   }
   if graph_is_mapping_correct(g) {
@@ -7321,7 +7440,13 @@ fn graph_padding_line(g : GitGraph) -> String {
     return graph_next_line(g).0
   }
   let line : Array[Char] = []
-  for i in 0..<g.num_columns {
+  let mut i = 0
+  while i < g.num_columns {
+    if graph_needs_truncation(g, i) {
+      line.push('~')
+      line.push(' ')
+      break
+    }
     line.push('|')
     if g.columns[i] == g.commit && g.num_parents > 2 {
       let len = (g.num_parents - 2) * 2
@@ -7331,6 +7456,7 @@ fn graph_padding_line(g : GitGraph) -> String {
     } else {
       line.push(' ')
     }
+    i += 1
   }
   graph_pad_horizontally(g, line)
   g.prev_state = graph_state_padding
@@ -7351,8 +7477,9 @@ async fn log_emit_commit_graph(
   show_parents : Bool,
   first_parent : Bool,
   ref_names : Map[String, Array[String]],
+  graph_max_lanes : Int,
 ) -> Unit raise Error {
-  let g = GitGraph::new(shown, first_parent)
+  let g = GitGraph::new(shown, first_parent, graph_max_lanes)
   let mut shown_one = false
   for e in entries {
     let id = e.id
