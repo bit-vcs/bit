@@ -1,12 +1,37 @@
 ///|
 struct OsObjectStore {
   git_dir : String
+  // Cached lazily-loaded ObjectDb. Reused across get/has calls so pack
+  // indexes are parsed at most once per store instance.
+  mut cached_db : @bitlib.ObjectDb?
+}
+
+///|
+/// Return a cached ObjectDb, building it lazily on first use.
+///
+/// Rebuilding the ObjectDb on every `get`/`has` re-parsed each pack `.idx`
+/// from scratch, and parsing an index hex-encodes every object id it
+/// contains. Once `bit issue` blobs were packed by gc, every object read
+/// re-hashed the entire pack index, making hub operations extremely slow.
+/// Caching the db lets `LazyPackIndex` keep its parsed index between reads.
+fn OsObjectStore::object_db(
+  self : OsObjectStore,
+  fs : OsFs,
+) -> @bitlib.ObjectDb raise @bitcore.GitError {
+  match self.cached_db {
+    Some(db) => db
+    None => {
+      let db = @bitlib.ObjectDb::load_lazy(fs, self.git_dir)
+      self.cached_db = Some(db)
+      db
+    }
+  }
 }
 
 ///|
 impl @bitlib.ObjectStore for OsObjectStore with get(self, id) {
   let fs = OsFs::new()
-  let db = @bitlib.ObjectDb::load_lazy(fs, self.git_dir)
+  let db = self.object_db(fs)
   db.get(fs, id)
 }
 
@@ -27,7 +52,7 @@ impl @bitlib.ObjectStore for OsObjectStore with put(self, obj_type, content) {
 ///|
 impl @bitlib.ObjectStore for OsObjectStore with has(self, id) {
   let fs = OsFs::new()
-  let db = @bitlib.ObjectDb::load_lazy(fs, self.git_dir)
+  let db = self.object_db(fs)
   let obj = db.get(fs, id)
   obj is Some(_)
 }
@@ -267,7 +292,7 @@ fn detect_hub_current_branch_name(root : String) -> String? {
 fn make_hub_stores(
   git_dir : String,
 ) -> (&@bitlib.ObjectStore, &@bitlib.RefStore, &@bitlib.Clock) {
-  let objects : OsObjectStore = { git_dir, }
+  let objects : OsObjectStore = { git_dir, cached_db: None }
   let refs : OsRefStore = { git_dir, }
   let clock : OsClock = { time: get_commit_timestamp() }
   (objects, refs, clock)
