@@ -53,6 +53,7 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
   let git_dir = find_git_dir(fs)
   check_commit_graph_paranoia(fs, git_dir)
   let mut max_count : Int? = None
+  let mut max_count_oldest : Int? = None
   let mut skip_count = 0
   let mut count_only = false
   let mut objects = false
@@ -96,6 +97,11 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
     match arg {
       "-n" | "--max-count" if i + 1 < args.length() => {
         max_count = Some(rev_list_parse_int_or_die(args[i + 1]))
+        i += 2
+        continue
+      }
+      "--max-count-oldest" if i + 1 < args.length() => {
+        max_count_oldest = Some(rev_list_parse_int_or_die(args[i + 1]))
         i += 2
         continue
       }
@@ -295,6 +301,10 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
       _ if arg.has_prefix("--max-count=") => {
         let val = String::unsafe_substring(arg, start=12, end=arg.length())
         max_count = Some(rev_list_parse_int_or_die(val))
+      }
+      _ if arg.has_prefix("--max-count-oldest=") => {
+        let val = String::unsafe_substring(arg, start=19, end=arg.length())
+        max_count_oldest = Some(rev_list_parse_int_or_die(val))
       }
       _ if arg.has_prefix("--skip=") => {
         let val = String::unsafe_substring(arg, start=7, end=arg.length())
@@ -717,6 +727,27 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
   } else {
     // Default: date order (same as git's default chronological ordering)
     rev_list_date_sort(db, fs, result)
+  }
+  // --max-count-oldest=<n>: keep only the N oldest commits. `result` is
+  // newest-first here, so the oldest N are its tail; preserve their
+  // newest-first relative order, matching git's output order before
+  // --reverse is applied.
+  match max_count_oldest {
+    Some(n) => {
+      let keep = if n < 0 { 0 } else { n }
+      if result.length() > keep {
+        let start = result.length() - keep
+        let tail : Array[@bitcore.ObjectId] = []
+        for idx in start..<result.length() {
+          tail.push(result[idx])
+        }
+        result.clear()
+        for id in tail {
+          result.push(id)
+        }
+      }
+    }
+    None => ()
   }
   if reverse {
     result.rev_in_place()
