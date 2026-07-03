@@ -17,6 +17,7 @@ async fn handle_switch(args : Array[String]) -> Unit raise Error {
   let mut orphan = false
   let mut discard_changes = false
   let mut ignore_other_worktrees = false
+  let mut merge = false
   let mut quiet = false
   let mut track_mode : String? = None
   let mut guess_mode : Bool? = None
@@ -57,6 +58,7 @@ async fn handle_switch(args : Array[String]) -> Unit raise Error {
       }
       "--discard-changes" => discard_changes = true
       "--ignore-other-worktrees" => ignore_other_worktrees = true
+      "-m" | "--merge" => merge = true
       "-q" | "--quiet" => quiet = true
       "--track" => track_mode = Some("direct")
       "--guess" => guess_mode = Some(true)
@@ -216,9 +218,7 @@ async fn handle_switch(args : Array[String]) -> Unit raise Error {
         None => ()
       }
     }
-    let previous_location = current_checkout_location(rfs, git_dir)
-    ignore(checkout_with_promisor_retry(fs, root, target))
-    save_previous_checkout_location(fs, git_dir, previous_location)
+    switch_do_branch_switch(fs, rfs, root, git_dir, target, merge)
     if !quiet {
       print_line("Switched to branch '\{target}'")
     }
@@ -228,9 +228,7 @@ async fn handle_switch(args : Array[String]) -> Unit raise Error {
   if guess &&
     @bitlib.resolve_ref(rfs, git_dir, "refs/remotes/origin/" + target)
     is Some(_) {
-    let previous_location = current_checkout_location(rfs, git_dir)
-    ignore(checkout_with_promisor_retry(fs, root, target))
-    save_previous_checkout_location(fs, git_dir, previous_location)
+    switch_do_branch_switch(fs, rfs, root, git_dir, target, merge)
     if !quiet {
       print_line("Switched to branch '\{target}'")
     }
@@ -244,6 +242,34 @@ async fn handle_switch(args : Array[String]) -> Unit raise Error {
     @sys.exit(1)
   }
   raise @bitcore.GitError::InvalidObject("Invalid ref: \{target}")
+}
+
+///|
+/// Switch to `target`, optionally autostashing local changes across the
+/// switch (`-m`/`--merge`). Mirrors `checkout -m`: uncommitted changes are
+/// stashed before the worktree is rewritten and re-applied afterwards, so
+/// they survive the branch switch instead of being overwritten.
+fn switch_do_branch_switch(
+  fs : OsFs,
+  rfs : &@bitcore.RepoFileSystem,
+  root : String,
+  git_dir : String,
+  target : String,
+  merge : Bool,
+) -> Unit raise Error {
+  let previous_location = current_checkout_location(rfs, git_dir)
+  let mut did_autostash = false
+  if merge {
+    let author = get_author_string()
+    let timestamp = get_commit_timestamp()
+    let stash_id = @bitlib.stash_push(fs, fs, root, "", author, timestamp)
+    did_autostash = stash_id is Some(_)
+  }
+  ignore(checkout_with_promisor_retry(fs, root, target))
+  save_previous_checkout_location(fs, git_dir, previous_location)
+  if did_autostash {
+    @bitlib.stash_apply(fs, fs, root, 0, true)
+  }
 }
 
 ///|
