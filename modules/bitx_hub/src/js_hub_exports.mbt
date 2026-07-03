@@ -16,11 +16,34 @@ fn[T] hub_wrap_error(f : () -> T raise @bit.GitError) -> Result[T, String] {
 priv struct HubJsObjectStore {
   fs : HubJsHostFs
   git_dir : String
+  // Cached lazily-loaded ObjectDb. Reused across get/has calls so pack
+  // indexes are parsed at most once per store instance.
+  mut cached_db : @lib.ObjectDb?
+}
+
+///|
+/// Return a cached ObjectDb, building it lazily on first use.
+///
+/// Rebuilding it on every `get`/`has` re-parsed each pack `.idx` from
+/// scratch (hex-encoding every object id it contains), so once `bit issue`
+/// blobs were packed by gc, every read re-hashed the whole pack index.
+/// Caching lets `LazyPackIndex` keep its parsed index between reads.
+fn HubJsObjectStore::object_db(
+  self : HubJsObjectStore,
+) -> @lib.ObjectDb raise @bit.GitError {
+  match self.cached_db {
+    Some(db) => db
+    None => {
+      let db = @lib.ObjectDb::load_lazy(self.fs, self.git_dir)
+      self.cached_db = Some(db)
+      db
+    }
+  }
 }
 
 ///|
 impl @lib.ObjectStore for HubJsObjectStore with get(self, id) {
-  let db = @lib.ObjectDb::load_lazy(self.fs, self.git_dir)
+  let db = self.object_db()
   db.get(self.fs, id)
 }
 
@@ -39,7 +62,7 @@ impl @lib.ObjectStore for HubJsObjectStore with put(self, obj_type, content) {
 
 ///|
 impl @lib.ObjectStore for HubJsObjectStore with has(self, id) {
-  let db = @lib.ObjectDb::load_lazy(self.fs, self.git_dir)
+  let db = self.object_db()
   let obj = db.get(self.fs, id)
   obj is Some(_)
 }
@@ -142,7 +165,7 @@ fn hub_make_stores(
 ) -> (HubJsObjectStore, HubJsRefStore, HubJsClock) raise @bit.GitError {
   let fs = hub_make_host_fs(host_id)
   let git_dir = hub_resolve_git_dir(fs, root)
-  let objects = HubJsObjectStore::{ fs, git_dir }
+  let objects = HubJsObjectStore::{ fs, git_dir, cached_db: None }
   let refs = HubJsRefStore::{ fs, git_dir }
   let now = hub_js_date_now().to_int64() / 1000L
   let clock = HubJsClock::{ timestamp: now }
