@@ -141,7 +141,7 @@ pub fn fsck_enumerate_objects(db : ObjectDb) -> Array[String] {
     }
   }
   for pack in db.packs {
-    for id in pack.ids {
+    for id in pack.hex_ids() {
       if !seen.contains(id) {
         seen[id] = true
         all.push(id)

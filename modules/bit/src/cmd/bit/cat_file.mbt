@@ -1183,13 +1183,13 @@ fn cat_file_collect_batch_all_objects(
       seen_ids[hex] = true
     }
     for pack in db.packs {
-      for hex in pack.ids {
+      for hex in pack.hex_ids() {
         seen_ids[hex] = true
       }
     }
     for lazy_pack in db.lazy_packs {
       let pack = lazy_pack.get(fs) catch { _ => continue }
-      for hex in pack.ids {
+      for hex in pack.hex_ids() {
         seen_ids[hex] = true
       }
     }
@@ -1252,7 +1252,7 @@ fn cat_file_append_pack_disk_records(
     return
   }
   let pack_end = (pack_data.length() - 20).to_int64()
-  for i in 0..<pack.ids.length() {
+  for i in 0..<pack.id_count() {
     let offset = pack.offsets[i]
     let size = cat_file_compute_pack_entry_disk_size(
       pack.offsets,
@@ -1260,7 +1260,7 @@ fn cat_file_append_pack_disk_records(
       pack_end,
     )
     guard size is Some(entry_size) else { continue }
-    let id = @bitcore.ObjectId::from_hex(pack.ids[i]) catch { _ => continue }
+    let id = pack.id_at(i)
     out.push(CatFileBatchAllObjectDiskRecord::{ id, disk_size: entry_size })
   }
 }

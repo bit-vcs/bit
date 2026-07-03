@@ -925,13 +925,19 @@ pub fn ObjectDb::set_skip_verify(Self, Bool) -> Unit
 
 pub struct PackIndex {
   pack_path : String
-  ids : Array[String]
+  id_bytes : Bytes
+  hash_size : Int
   offsets : Array[Int64]
   version : Int
+  mut hex_ids_cache : Array[String]?
 }
 pub fn PackIndex::find_id_by_offset(Self, Int64) -> String?
 pub fn PackIndex::find_offset(Self, @object.ObjectId) -> Int64?
 pub fn PackIndex::find_offset_hex(Self, String) -> Int64?
+pub fn PackIndex::hex_ids(Self) -> Array[String]
+pub fn PackIndex::id_at(Self, Int) -> @object.ObjectId
+pub fn PackIndex::id_count(Self) -> Int
+pub fn PackIndex::id_hex_at(Self, Int) -> String
 
 pub struct PromisorDb {
   db : ObjectDb
