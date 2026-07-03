@@ -249,7 +249,7 @@ async fn handle_switch(args : Array[String]) -> Unit raise Error {
 /// switch (`-m`/`--merge`). Mirrors `checkout -m`: uncommitted changes are
 /// stashed before the worktree is rewritten and re-applied afterwards, so
 /// they survive the branch switch instead of being overwritten.
-fn switch_do_branch_switch(
+async fn switch_do_branch_switch(
   fs : OsFs,
   rfs : &@bitcore.RepoFileSystem,
   root : String,
