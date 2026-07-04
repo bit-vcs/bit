@@ -2750,6 +2750,166 @@ fn midx_relink_monolithic_to_chain(fs : OsFs, pack_dir : String) -> String {
 }
 
 ///|
+/// repack.midxSplitFactor (Git 2.55): a multi-pack-index chain layer must be at
+/// least this many times larger than the layer above it; otherwise incremental
+/// writes compact the two together. Default 2, minimum 2.
+fn midx_repack_split_factor(pack_dir : String) -> Int {
+  let git_dir = parent_dir(parent_dir(pack_dir))
+  match bit_config_get(git_dir, "repack", "midxsplitfactor") {
+    Some(v) => {
+      let n = @string.parse_int(v.trim()) catch {
+        _ => 2
+      }
+      if n < 2 {
+        2
+      } else {
+        n
+      }
+    }
+    None => 2
+  }
+}
+
+///|
+/// repack.midxNewLayerThreshold (Git 2.55): an incremental multi-pack-index
+/// write whose new layer holds fewer than this many objects is folded into the
+/// chain's tip instead of forming its own layer. Default 8, minimum 1.
+fn midx_repack_new_layer_threshold(pack_dir : String) -> Int {
+  let git_dir = parent_dir(parent_dir(pack_dir))
+  match bit_config_get(git_dir, "repack", "midxnewlayerthreshold") {
+    Some(v) => {
+      let n = @string.parse_int(v.trim()) catch {
+        _ => 8
+      }
+      if n < 1 {
+        1
+      } else {
+        n
+      }
+    }
+    None => 8
+  }
+}
+
+///|
+/// Enforce the incremental multi-pack-index layer invariants
+/// (repack.midxSplitFactor / repack.midxNewLayerThreshold). Repeatedly merge the
+/// two top-most chain layers whenever the tip holds fewer than
+/// `new_layer_threshold` objects, or is not at least `split_factor` times
+/// smaller than the layer below it. This keeps the layer count logarithmic
+/// instead of growing by one on every incremental write.
+///
+/// Operates on bit's chain format (each layer an independent MIDX, deduped
+/// against the layers below it); it does not touch bitmap sidecars, so callers
+/// skip it when writing bitmaps.
+async fn midx_compact_chain(
+  fs : OsFs,
+  pack_dir : String,
+  split_factor : Int,
+  new_layer_threshold : Int,
+  oid_version : Int,
+) -> Unit raise Error {
+  let inc_dir = pack_dir + "/multi-pack-index.d"
+  let mut rounds = 0
+  while rounds < 4096 {
+    rounds += 1
+    let hashes = midx_read_chain_hashes(fs, pack_dir)
+    if hashes.length() < 2 {
+      return
+    }
+    // Per-layer object counts and pack lists.
+    let sizes : Array[Int] = []
+    let layer_packs : Array[Array[String]] = []
+    for h in hashes {
+      let p = inc_dir + "/multi-pack-index-" + h + ".midx"
+      let d = fs.read_file(p) catch { _ => Bytes::new(0) }
+      sizes.push(midx_read_oids_from_midx_data(d).size())
+      layer_packs.push(midx_read_packs_from_midx_data(d))
+    }
+    let k = hashes.length() - 1
+    let need_merge = sizes[k] < new_layer_threshold ||
+      sizes[k] * split_factor > sizes[k - 1]
+    if !need_merge {
+      return
+    }
+    // Merge layers[k-1] and layers[k]; base layers are [0, k-1).
+    let base_oids : Map[String, Bool] = {}
+    for i in 0..<(k - 1) {
+      let p = inc_dir + "/multi-pack-index-" + hashes[i] + ".midx"
+      let d = fs.read_file(p) catch { _ => Bytes::new(0) }
+      for oid, _ in midx_read_oids_from_midx_data(d) {
+        base_oids[oid] = true
+      }
+    }
+    let merged_packs : Array[String] = []
+    for pk in layer_packs[k - 1] {
+      if !midx_array_has_string(merged_packs, pk) {
+        merged_packs.push(pk)
+      }
+    }
+    for pk in layer_packs[k] {
+      if !midx_array_has_string(merged_packs, pk) {
+        merged_packs.push(pk)
+      }
+    }
+    midx_sort_strings_lex_in_place(merged_packs)
+    let all_entries : Array[MidxEntry] = []
+    for pack_idx, pack_name in merged_packs {
+      let idx_path = pack_dir +
+        "/" +
+        String::unsafe_substring(pack_name, start=0, end=pack_name.length() - 5) +
+        ".idx"
+      if !fs.is_file(idx_path) {
+        continue
+      }
+      for entry in midx_read_pack_index(fs, idx_path, pack_idx, 0) {
+        all_entries.push(entry)
+      }
+    }
+    all_entries.sort_by(fn(a, b) {
+      let cmp = midx_compare_oid(a.id, b.id)
+      if cmp != 0 {
+        return cmp
+      }
+      a.pack_idx - b.pack_idx
+    })
+    let unique : Array[MidxEntry] = []
+    let mut last : @bitcore.ObjectId? = None
+    for entry in all_entries {
+      match last {
+        Some(lid) if lid == entry.id => continue
+        _ =>
+          if !base_oids.contains(entry.id.to_hex()) {
+            unique.push(entry)
+            last = Some(entry.id)
+          } else {
+            last = Some(entry.id)
+          }
+      }
+    }
+    let merged_bytes = midx_build(merged_packs, unique, false, oid_version, None)
+    let merged_hash = midx_checksum_hex(merged_bytes)
+    // Remove the two merged layers (and any sidecars), write the merged layer.
+    for h in [hashes[k - 1], hashes[k]] {
+      for ext in [".midx", ".bitmap", ".rev"] {
+        fs.remove_file(inc_dir + "/multi-pack-index-" + h + ext) catch {
+          _ => ()
+        }
+      }
+    }
+    fs.write_file(
+      inc_dir + "/multi-pack-index-" + merged_hash + ".midx", merged_bytes,
+    )
+    let new_hashes : Array[String] = []
+    for i in 0..<(k - 1) {
+      new_hashes.push(hashes[i])
+    }
+    new_hashes.push(merged_hash)
+    midx_write_chain_file(fs, pack_dir, new_hashes)
+  }
+}
+
+///|
 async fn midx_write_incremental(
   fs : OsFs,
   pack_dir : String,
@@ -3007,6 +3167,18 @@ async fn midx_write_incremental(
   // Update chain file
   hashes.push(new_hash)
   midx_write_chain_file(fs, pack_dir, hashes)
+  // Compact the chain to keep the layer count bounded (Git 2.55's
+  // repack.midxSplitFactor / repack.midxNewLayerThreshold). Skipped when
+  // writing bitmaps, whose sidecars are keyed to specific layer hashes.
+  if !bitmap {
+    midx_compact_chain(
+      fs,
+      pack_dir,
+      midx_repack_split_factor(pack_dir),
+      midx_repack_new_layer_threshold(pack_dir),
+      oid_version,
+    )
+  }
   // Remove monolithic midx if it still exists
   let monolithic = pack_dir + "/multi-pack-index"
   if fs.is_file(monolithic) {
