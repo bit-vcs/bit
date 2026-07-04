@@ -254,6 +254,7 @@ options(
     "remote.mbt": [ "native" ],
     "remote_wbtest.mbt": [ "native" ],
     "repack.mbt": [ "native" ],
+    "repack_midx_incremental_wbtest.mbt": [ "native" ],
     "replace.mbt": [ "native" ],
     "request_pull.mbt": [ "native" ],
     "rerere.mbt": [ "native" ],

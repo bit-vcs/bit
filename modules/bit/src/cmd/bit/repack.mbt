@@ -15,6 +15,7 @@ async fn handle_repack(args : Array[String]) -> Unit raise Error {
   let mut pack_kept_objects = false
   let mut cruft = false
   let mut write_midx = false
+  let mut write_midx_incremental = false
   let keep_packs : Array[String] = []
   let filter_specs : Array[String] = []
   let mut geometric_factor : String = ""
@@ -44,6 +45,11 @@ async fn handle_repack(args : Array[String]) -> Unit raise Error {
       cruft = true
     } else if arg == "--write-midx" {
       write_midx = true
+    } else if arg == "--write-midx=incremental" {
+      // Git 2.55: write the multi-pack-index as an append-only chain of layers
+      // (objects/pack/multi-pack-index.d/) instead of a single monolithic file.
+      write_midx = true
+      write_midx_incremental = true
     } else if arg == "-k" || arg == "--keep-unreachable" {
       keep_unreachable = true
     } else if arg.has_prefix("--keep-pack=") {
@@ -302,16 +308,27 @@ async fn handle_repack(args : Array[String]) -> Unit raise Error {
   }
   // Write multi-pack-index if requested
   if write_midx {
-    midx_write(
-      fs,
-      pack_dir,
-      !quiet,
-      None,
-      false,
-      write_bitmap,
-      no_write_bitmap,
-      None,
-    )
+    if write_midx_incremental {
+      midx_write_incremental(
+        fs,
+        pack_dir,
+        !quiet,
+        None,
+        write_bitmap && !no_write_bitmap,
+        None,
+      )
+    } else {
+      midx_write(
+        fs,
+        pack_dir,
+        !quiet,
+        None,
+        false,
+        write_bitmap,
+        no_write_bitmap,
+        None,
+      )
+    }
   }
 }
 
