@@ -48,6 +48,12 @@ async fn handle_fsck(args : Array[String]) -> Unit raise Error {
   let mut errors = 0
   let objects_dir = git_dir + "/objects"
   let db = @bitlib.ObjectDb::load(fs, git_dir)
+  // The connectivity walk (Phase 4) and the dangling/lost-found enumeration
+  // (Phase 5) read every reachable object through this db. Loose object
+  // integrity is already checked by Phase 2 (`fsck_verify_loose_objects`),
+  // and `--connectivity-only` intentionally skips content hashing (matching
+  // git), so re-hashing each object on read here is pure duplicated work.
+  db.set_skip_verify(true)
   // Phase 1: Check HEAD and get resolved OID
   let (head_errors, head_oid) = fsck_check_and_resolve_head(fs, git_dir)
   errors += head_errors
