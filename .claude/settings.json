@@ -1,0 +1,6 @@
+{
+  "env": {
+    "MOON_CC": "cc",
+    "MOONBIT_NEW_NATIVE": "1"
+  }
+}
