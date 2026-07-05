@@ -11,12 +11,16 @@ Run `node tools/check-layers.mjs` to validate the dependency graph.
 ## Native builds
 
 `moon test --target native` runs its test drivers through the bundled
-`tcc -run`, which can crash in some environments. Set `MOON_CC=cc` (or any
-real `cc`/`clang` driver) to compile and run native tests with the system C
-compiler instead — slower to compile, but stable. `MOONBIT_NEW_NATIVE=1`
-selects moonc's newer native backend, which likewise requires a real
-C compiler/linker driver.
+`tcc -run`, which can crash in some environments. `MOONBIT_NEW_NATIVE=1`
+selects moonc's newer native backend, which routes native builds through the
+system `cc`/`clang` driver instead — slower to compile, but stable. That flag
+only takes effect from toolchain `0.1.20260629` onward (it is inert on older
+releases such as `0.1.20260608`).
 
-Both are set in [`.claude/settings.json`](.claude/settings.json) so Claude
-Code sessions pick them up automatically. `moon build --target native
---release` (the `bit.exe` binary) already uses `cc`, so it is unaffected.
+`MOONBIT_NEW_NATIVE=1` is set in
+[`.claude/settings.json`](.claude/settings.json), and the SessionStart hook
+[`.claude/hooks/session-start.sh`](.claude/hooks/session-start.sh) upgrades the
+toolchain to the latest release when it is older than that, so Claude Code web
+sessions get a working native backend automatically. `moon build --target
+native --release` (the `bit.exe` binary) already uses `cc`, so it is
+unaffected.
