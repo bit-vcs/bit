@@ -930,6 +930,8 @@ pub struct PackIndex {
   offsets : Array[Int64]
   version : Int
   mut hex_ids_cache : Array[String]?
+  mut offset_index_cache : Map[Int64, Int]?
+  mut sorted_offsets_cache : Array[Int64]?
 }
 pub fn PackIndex::find_id_by_offset(Self, Int64) -> String?
 pub fn PackIndex::find_offset(Self, @object.ObjectId) -> Int64?

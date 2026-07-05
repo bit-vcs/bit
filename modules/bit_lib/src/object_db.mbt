@@ -18,6 +18,13 @@ pub struct PackIndex {
   offsets : Array[Int64]
   version : Int
   mut hex_ids_cache : Array[String]?
+  // Lazily-built offset -> entry-index map, so `find_id_by_offset` is O(1)
+  // instead of scanning every offset on each delta-base resolution.
+  mut offset_index_cache : Map[Int64, Int]?
+  // Lazily-built ascending copy of `offsets`, so locating the next-higher
+  // offset (an object's on-disk end) is a binary search instead of a full
+  // linear scan of every entry.
+  mut sorted_offsets_cache : Array[Int64]?
 }
 
 ///|
@@ -171,17 +178,69 @@ pub fn PackIndex::find_offset_hex(self : PackIndex, hex : String) -> Int64? {
 }
 
 ///|
-/// Find object id (hex) by offset (linear scan).
+/// Return (building lazily on first use) a map from pack offset to the
+/// entry index at that offset. Pack offsets are unique, so the map is exact.
+fn PackIndex::offset_index(self : PackIndex) -> Map[Int64, Int] {
+  match self.offset_index_cache {
+    Some(m) => m
+    None => {
+      let m : Map[Int64, Int] = {}
+      for i in 0..<self.offsets.length() {
+        m[self.offsets[i]] = i
+      }
+      self.offset_index_cache = Some(m)
+      m
+    }
+  }
+}
+
+///|
+/// Return (building lazily on first use) an ascending copy of the pack
+/// offsets, for binary-searching the next-higher offset.
+fn PackIndex::sorted_offsets(self : PackIndex) -> Array[Int64] {
+  match self.sorted_offsets_cache {
+    Some(a) => a
+    None => {
+      let a = self.offsets.copy()
+      a.sort()
+      self.sorted_offsets_cache = Some(a)
+      a
+    }
+  }
+}
+
+///|
+/// Smallest offset strictly greater than `offset`, or None if `offset` is
+/// the last object in the pack. Binary search over the sorted offsets.
+fn PackIndex::next_offset_after(self : PackIndex, offset : Int64) -> Int64? {
+  let sorted = self.sorted_offsets()
+  let mut lo = 0
+  let mut hi = sorted.length()
+  while lo < hi {
+    let mid = lo + (hi - lo) / 2
+    if sorted[mid] <= offset {
+      lo = mid + 1
+    } else {
+      hi = mid
+    }
+  }
+  if lo < sorted.length() {
+    Some(sorted[lo])
+  } else {
+    None
+  }
+}
+
+///|
+/// Find object id (hex) by offset, via the lazily-built offset->index map.
 pub fn PackIndex::find_id_by_offset(
   self : PackIndex,
   offset : Int64,
 ) -> String? {
-  for i in 0..<self.offsets.length() {
-    if self.offsets[i] == offset {
-      return Some(self.id_hex_at(i))
-    }
+  match self.offset_index().get(offset) {
+    Some(i) => Some(self.id_hex_at(i))
+    None => None
   }
-  None
 }
 
 ///|
@@ -530,18 +589,7 @@ fn pack_object_disk_size_at(
   if data.length() <= 32 {
     return None
   }
-  let mut next_offset : Int64? = None
-  for candidate in pack.offsets {
-    if candidate > offset {
-      match next_offset {
-        Some(current) =>
-          if candidate < current {
-            next_offset = Some(candidate)
-          }
-        None => next_offset = Some(candidate)
-      }
-    }
-  }
+  let next_offset = pack.next_offset_after(offset)
   let end_offset = match next_offset {
     Some(found) => found
     None => (data.length() - 20).to_int64() // TODO: use hash_size for SHA-256 packs
@@ -1057,6 +1105,8 @@ fn parse_pack_index_v1(
     offsets,
     version: 1,
     hex_ids_cache: None,
+    offset_index_cache: None,
+    sorted_offsets_cache: None,
   }
 }
 
@@ -1133,7 +1183,16 @@ fn parse_pack_index(
       large_idx += 1
     }
   }
-  { pack_path, id_bytes, hash_size, offsets, version: 2, hex_ids_cache: None }
+  {
+    pack_path,
+    id_bytes,
+    hash_size,
+    offsets,
+    version: 2,
+    hex_ids_cache: None,
+    offset_index_cache: None,
+    sorted_offsets_cache: None,
+  }
 }
 
 ///|
