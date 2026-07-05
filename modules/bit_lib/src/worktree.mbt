@@ -1509,6 +1509,10 @@ fn collect_staged_changes_from_head(
     Some(commit_id) => {
       let common_git_dir = resolve_worktree_common_git_dir(fs, git_dir)
       let db = ObjectDb::load_lazy(fs, common_git_dir)
+      // `git status` does not re-hash HEAD tree/commit objects on read (git
+      // trusts the object store); skip the per-object SHA verification that
+      // otherwise runs for every loose object walked here.
+      db.set_skip_verify(true)
       let commit_obj = db.get(fs, commit_id)
       match commit_obj {
         None => return
