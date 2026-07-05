@@ -7,7 +7,7 @@
     "mizchi/bit_repo": "0.42.2",
     "mizchi/bit_types": "0.42.2",
     "mizchi/bit_protocol": "0.42.2",
-    "mizchi/tempfile": "0.1.0",
+    "mizchi/tempfile": "0.1.2",
     "mizchi/zlib": "0.4.8",
     "moonbitlang/async": "0.19.4",
     "moonbitlang/x": "0.4.40"
