@@ -195,6 +195,8 @@ options(
     "interpret_trailers.mbt": [ "native" ],
     "graph_lane_limit_wbtest.mbt": [ "native" ],
     "log.mbt": [ "native" ],
+    "log_datefmt.mbt": [ "native" ],
+    "log_graph.mbt": [ "native" ],
     "log_wbtest.mbt": [ "native" ],
     "ls_files.mbt": [ "native" ],
     "ls_files_wbtest.mbt": [ "native" ],
