@@ -13,7 +13,7 @@ Git implementation in [MoonBit](https://docs.moonbitlang.com) with practical com
 curl -fsSL https://raw.githubusercontent.com/mizchi/bit-vcs/main/install.sh | bash
 
 # Or install via MoonBit toolchain
-moon install mizchi/bit/cmd/bit
+moon install mizchi/bit
 ```
 
 ## Shell Completion

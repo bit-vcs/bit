@@ -175,8 +175,9 @@ CLI entry points. May depend on any layer.
 
 | Package                  | Path             | Notes                                  |
 |--------------------------|------------------|----------------------------------------|
-| `mizchi/bit/cmd/bit`     | `modules/bit/src/cmd/bit`    | Main `bit` CLI                         |
-| `mizchi/bit/cmd/git-bit` | `modules/bit/src/cmd/git-bit`| `git-bit` shim CLI                     |
+| `mizchi/bit`             | `modules/bit`                 | Installable `bit` CLI entry point      |
+| `mizchi/bit/cmd/bit`     | `modules/bit/cmd/bit`         | Reusable `bit` CLI implementation      |
+| `mizchi/bit/cmd/git-bit` | `modules/bit/cmd/git-bit`     | `git-bit` shim CLI                     |
 
 ## Allowed dependency directions
 

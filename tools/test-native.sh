@@ -36,7 +36,7 @@ moon test --target native -p mizchi/bit/cmd/git-bit
 
 for shard in 0 1 2 3 4 5; do
   # shellcheck disable=SC2012
-  files=$(ls modules/bit/src/cmd/bit/*.mbt | sort | awk "(NR-1) % 6 == $shard")
+  files=$(ls modules/bit/cmd/bit/*.mbt | sort | awk "(NR-1) % 6 == $shard")
   echo "[native] cmd/bit shard $shard/6"
   # Moon expects the selected files as separate positional arguments.
   # shellcheck disable=SC2086

@@ -45,14 +45,14 @@ stdenv.mkDerivation {
 
   buildPhase = ''
     runHook preBuild
-    moon build --target native --release modules/bit/src/cmd/bit
+    moon build --target native --release modules/bit
     runHook postBuild
   '';
 
   installPhase = ''
     runHook preInstall
     install -Dm755 \
-      _build/native/release/build/mizchi/bit/cmd/bit/bit.exe \
+      _build/native/release/build/mizchi/bit/bit.exe \
       $out/bin/bit
     runHook postInstall
   '';

@@ -1445,6 +1445,6 @@ fn format_error_message(err : Error) -> String {
 }
 
 ///|
-fn main {
+pub fn run_cli() -> Unit {
   @async.run_async_main(main_async)
 }

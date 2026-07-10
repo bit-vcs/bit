@@ -353,11 +353,11 @@ fn repack_find_bit_exe(git_dir : String) -> String {
   // Try relative to git_dir (standard build location), debug or release.
   let fs = OsFs::new()
   let base = git_dir + "/../_build/native"
-  let debug_path = base + "/debug/build/mizchi/bit/cmd/bit/bit.exe"
+  let debug_path = base + "/debug/build/mizchi/bit/bit.exe"
   if fs.is_file(debug_path) {
     return debug_path
   }
-  let build_path = base + "/release/build/mizchi/bit/cmd/bit/bit.exe"
+  let build_path = base + "/release/build/mizchi/bit/bit.exe"
   if fs.is_file(build_path) {
     return build_path
   }

@@ -36,6 +36,8 @@ pub fn resolve_alias(Map[String, String], String, Array[String]) -> AliasResolut
 
 pub fn resolve_ref_for_subdir(OsFs, String, String) -> @bit_object.ObjectId? raise
 
+pub fn run_cli() -> Unit
+
 pub async fn run_storage_command(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, @bit_runtime.StorageCommand) -> Unit
 
 pub async fn run_storage_command_by_name(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, Array[String]) -> Unit
