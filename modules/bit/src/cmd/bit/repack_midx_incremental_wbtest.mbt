@@ -52,7 +52,7 @@ test "repack --write-midx=incremental writes a midx chain" {
 
 ///| Commit a new file, pack the new loose objects into their own packfile
 /// (keeping existing packs), then add them to the incremental multi-pack-index.
-fn midx_inc_commit_and_pack(root : String, tag : String) -> Unit raise Error {
+fn midx_inc_commit_and_pack(root : String, tag : String) -> Unit {
   let fs = OsFs::new()
   @fs.write_string_to_file(root + "/file_\{tag}.txt", "data \{tag}\n") catch {
     _ => ()

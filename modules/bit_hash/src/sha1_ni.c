@@ -16,7 +16,9 @@
  * even without -msha on the command line.
  * TCC doesn't support __attribute__((target(...))), so we fall back there.
  */
-#if !defined(__TINYC__) && (defined(__clang__) || defined(__GNUC__))
+#if !defined(__TINYC__) && \
+    (defined(__x86_64__) || defined(__i386__)) && \
+    (defined(__clang__) || defined(__GNUC__))
 #  include <immintrin.h>
 #  define USE_SHA_NI 1
 #  define SHA_NI_TARGET __attribute__((target("sha,sse4.1")))

@@ -7,12 +7,15 @@ set -e
 # Configuration
 TEST_DIR="${TEST_DIR:-$(cd "$(dirname "$0")" && pwd)}"
 PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$TEST_DIR/.." && pwd)}"
-MOONGIT="${MOONGIT:-$PROJECT_ROOT/target/native/release/build/cmd/bit/bit.exe}"
+MOONGIT="${MOONGIT:-$PROJECT_ROOT/_build/native/release/build/mizchi/bit/cmd/bit/bit.exe}"
+if [ ! -f "$MOONGIT" ] && [ -f "$PROJECT_ROOT/tools/git-shim/moon" ]; then
+    MOONGIT="$PROJECT_ROOT/tools/git-shim/moon"
+fi
 if [ ! -f "$MOONGIT" ] && [ -f "$PROJECT_ROOT/_build/native/release/build/cmd/bit/bit.exe" ]; then
     MOONGIT="$PROJECT_ROOT/_build/native/release/build/cmd/bit/bit.exe"
 fi
-if [ ! -f "$MOONGIT" ] && [ -f "$PROJECT_ROOT/tools/git-shim/moon" ]; then
-    MOONGIT="$PROJECT_ROOT/tools/git-shim/moon"
+if [ ! -f "$MOONGIT" ] && [ -f "$PROJECT_ROOT/target/native/release/build/cmd/bit/bit.exe" ]; then
+    MOONGIT="$PROJECT_ROOT/target/native/release/build/cmd/bit/bit.exe"
 fi
 
 # Build moongit if not exists

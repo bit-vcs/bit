@@ -33,7 +33,8 @@ tests {
   }
   new {
     name = "moon-test-native"
-    cmd = "moon test --target native --no-parallelize -j 1"
+    cmd = "bash tools/test-native.sh"
+    timeoutSec = 3600
   }
   new {
     name = "git-compat-allowlist"
