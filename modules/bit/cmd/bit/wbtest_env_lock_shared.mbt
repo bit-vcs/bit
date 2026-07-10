@@ -45,8 +45,8 @@ fn wbtest_resolve_real_git(repo_root : String) -> String {
 /// so prefer whichever exists (debug first, since that is the default build).
 fn wbtest_resolve_bit_exe(repo_root : String) -> String {
   let fs : &@bitcore.RepoFileSystem = OsFs::new()
-  let debug_rel = "/_build/native/debug/build/mizchi/bit/cmd/bit/bit.exe"
-  let release_rel = "/_build/native/release/build/mizchi/bit/cmd/bit/bit.exe"
+  let debug_rel = "/_build/native/debug/build/mizchi/bit/bit.exe"
+  let release_rel = "/_build/native/release/build/mizchi/bit/bit.exe"
   // Candidate repo roots, most reliable first: a root derived from the running
   // test executable path (independent of CWD, which `moon test` may set to the
   // module dir), then the caller-supplied repo_root.

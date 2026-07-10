@@ -11,7 +11,7 @@ It is written in MoonBit and distributed as binaries for macOS/Linux.
 ```bash
 curl -fsSL https://raw.githubusercontent.com/mizchi/bit-vcs/main/install.sh | bash
 # or
-moon install mizchi/bit/cmd/bit
+moon install mizchi/bit
 ```
 
 > **Warning**: Experimental. Do not use in production. Data loss is possible in the worst case.

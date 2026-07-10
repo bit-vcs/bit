@@ -247,7 +247,7 @@ async fn handlers_remote_pull_wbtest_collect_shim_git(
     Some(d) => d
     None => {
       let exe = @sys.get_cli_args()[0]
-      // exe is like /path/to/bit/_build/native/release/build/mizchi/bit/cmd/bit/bit.exe
+      // exe is like /path/to/bit/_build/native/release/build/mizchi/bit/bit.exe
       // or the test binary — fallback to current_dir
       let idx = exe.find("/_build/")
       match idx {
@@ -264,7 +264,7 @@ async fn handlers_remote_pull_wbtest_collect_shim_git(
   let bit_exe = wbtest_resolve_bit_exe(repo_root)
   if !fs.is_file(bit_exe) {
     fail(
-      "bit.exe not found at \{bit_exe}; build it with `moon build --target native modules/bit/src/cmd/bit` first",
+      "bit.exe not found at \{bit_exe}; build it with `moon build --target native modules/bit/cmd/bit` first",
     )
   }
   fs.write_string(shim_moon, "#!/bin/sh\nset -eu\nexec '\{bit_exe}' \"$@\"\n")

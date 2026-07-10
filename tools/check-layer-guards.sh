@@ -8,9 +8,9 @@ if rg -n "OsFs::new|@process\\.run" modules/bit/src/runtime >/dev/null; then
 fi
 
 if rg -n "run_storage_command_by_name\\(" modules \
-  -g '!modules/bit/src/cmd/bit/storage_runtime.mbt' \
-  -g '!modules/bit/src/cmd/bit/storage_runtime_wbtest.mbt' \
-  -g '!modules/bit/src/cmd/bit/pkg.generated.mbti' >/dev/null; then
+  -g '!modules/bit/cmd/bit/storage_runtime.mbt' \
+  -g '!modules/bit/cmd/bit/storage_runtime_wbtest.mbt' \
+  -g '!modules/bit/cmd/bit/pkg.generated.mbti' >/dev/null; then
   echo "run_storage_command_by_name is only allowed in cmd storage_runtime boundary/wbtests"
   exit 1
 fi

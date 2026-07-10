@@ -59,7 +59,7 @@ async fn main_js_async() -> Unit {
 }
 
 ///|
-fn main {
+pub fn run_cli() -> Unit {
   @async.run_async_main(main_js_async)
 }
 

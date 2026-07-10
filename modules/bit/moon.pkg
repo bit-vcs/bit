@@ -1,4 +1,5 @@
 import {
+  "mizchi/bit/cmd/bit" @bitcmd,
   "mizchi/bit_io" @io,
   "mizchi/bit_object" @object,
   "mizchi/bit_repo" @repo,
@@ -6,3 +7,5 @@ import {
 }
 
 warnings = "-29"
+
+options(is_main: true)

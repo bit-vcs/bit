@@ -34,8 +34,8 @@ jobs:
         run: pkf run check
       - name: Build native binary for wbtests
         run: |
-          moon build --target native --release modules/bit/src/cmd/bit
-          cp _build/native/release/build/mizchi/bit/cmd/bit/bit.exe tools/git-shim/moon
+          moon build --target native --release modules/bit
+          cp _build/native/release/build/mizchi/bit/bit.exe tools/git-shim/moon
           chmod +x tools/git-shim/moon
           # Set system git as fallback for wbtests (third_party/git/git is not built in test job)
           which git > tools/git-shim/real-git-path
@@ -120,7 +120,7 @@ jobs:
         run: |
           set -euo pipefail
           moon --version
-          moon build --target native modules/bit/src/cmd/bit
+          moon build --target native modules/bit
           bin_path=$(find _build/native -maxdepth 8 -type f -name 'bit.exe' | head -1)
           if [ -z "$bin_path" ]; then
             echo "bit.exe not found after moon build"
@@ -145,7 +145,7 @@ jobs:
           if [ "${{ matrix.kind }}" = "pkg" ]; then
             moon test --target native -p ${{ matrix.sel }}
           else
-            files=$(ls modules/bit/src/cmd/bit/*.mbt | sort | awk "(NR-1) % 6 == ${{ matrix.sel }}")
+            files=$(ls modules/bit/cmd/bit/*.mbt | sort | awk "(NR-1) % 6 == ${{ matrix.sel }}")
             echo "cmd-bit shard ${{ matrix.sel }}/6 — files:"
             echo "$files"
             # shellcheck disable=SC2086
@@ -224,7 +224,7 @@ jobs:
         run: |
           set -euo pipefail
           moon --version
-          moon build --target native --release modules/bit/src/cmd/bit
+          moon build --target native --release modules/bit
           bin_path=$(find _build/native -maxdepth 8 -type f -name 'bit.exe' | head -1)
           if [ -z "$bin_path" ]; then
             echo "bit.exe not found after moon build"

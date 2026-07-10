@@ -1,6 +1,6 @@
 import {
   "mizchi/bit_bootstrap" @bootstrap,
-  "mizchi/bit" @bitcore,
+  "mizchi/bit_core" @bitcore,
   "mizchi/bit_object" @object,
   "mizchi/bit_types" @types,
   "mizchi/bit_object" @bitobject,
@@ -54,10 +54,9 @@ import {
   "moonbitlang/x/sys" @sys,
 }
 
-warnings = "-12-29-67"
+warnings = "-4-12-29-67"
 
 options(
-  is_main: true,
   "native-stub": [
     "bench_suppress_stub.c",
     "hub_tty_stub.c",

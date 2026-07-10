@@ -97,7 +97,7 @@ async fn update_index_wbtest_run_sparse_checkout_shim(
   let bit_exe = wbtest_resolve_bit_exe(repo_root)
   if !fs.is_file(bit_exe) {
     fail(
-      "bit.exe not found at \{bit_exe}; build it with `moon build --target native modules/bit/src/cmd/bit` first",
+      "bit.exe not found at \{bit_exe}; build it with `moon build --target native modules/bit/cmd/bit` first",
     )
   }
   fs.write_string(shim_moon, "#!/bin/sh\nset -eu\nexec '\{bit_exe}' \"$@\"\n")

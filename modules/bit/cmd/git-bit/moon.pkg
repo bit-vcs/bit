@@ -1,5 +1,5 @@
 import {
-  "mizchi/bit" @bitcore,
+  "mizchi/bit_core" @bitcore,
   "mizchi/bit_object" @object,
   "mizchi/bit_repo" @repo,
   "mizchi/bit_types" @types,

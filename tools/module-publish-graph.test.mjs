@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
 import test from "node:test";
 
 import {
@@ -6,20 +8,17 @@ import {
   topologicalPublishOrder,
 } from "./module-publish-graph.mjs";
 
-test("workspace modules form a version-aligned publish DAG", () => {
+test("workspace modules form a publish DAG with resolvable internal versions", () => {
   const modules = loadWorkspaceModules();
-  const names = new Set(modules.map((module) => module.name));
-  const versions = new Set(modules.map((module) => module.version));
+  const byName = new Map(modules.map((module) => [module.name, module]));
 
-  assert.equal(versions.size, 1, "workspace module versions must be aligned");
-  const [workspaceVersion] = versions;
   for (const module of modules) {
     for (const [dependency, version] of Object.entries(module.deps ?? {})) {
-      if (names.has(dependency)) {
+      if (byName.has(dependency)) {
         assert.equal(
           version,
-          workspaceVersion,
-          `${module.name} must use the workspace version for ${dependency}`,
+          byName.get(dependency).version,
+          `${module.name} must use ${dependency}'s workspace version`,
         );
       }
     }
@@ -28,4 +27,14 @@ test("workspace modules form a version-aligned publish DAG", () => {
   const ordered = topologicalPublishOrder(modules);
   assert.equal(ordered.length, modules.length);
   assert.equal(ordered.at(-1).name, "mizchi/bit");
+});
+
+test("mizchi/bit module root is the installable main package", () => {
+  const [bit] = loadWorkspaceModules().filter((module) => module.name === "mizchi/bit");
+  assert.equal(bit.source, ".");
+  assert.equal(existsSync(path.join(bit.directory, "moon.pkg")), true);
+  assert.match(
+    readFileSync(path.join(bit.directory, "moon.pkg"), "utf8"),
+    /options\(is_main: true\)/,
+  );
 });
