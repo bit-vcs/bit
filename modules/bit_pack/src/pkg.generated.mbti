@@ -1,77 +1,77 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "mizchi/bit/pack"
+package "mizchi/bit_pack"
 
 import {
-  "mizchi/bit/object",
-  "mizchi/bit/types",
+  "mizchi/bit_object",
+  "mizchi/bit_types",
 }
 
 // Values
-pub fn apply_delta(Bytes, Bytes) -> Bytes raise @object.GitError
+pub fn apply_delta(Bytes, Bytes) -> Bytes raise @bit_object.GitError
 
 pub fn build_delta_pub(Bytes, Bytes) -> Bytes
 
-pub fn build_pack_index(Bytes, hash_size? : Int) -> Bytes raise @object.GitError
+pub fn build_pack_index(Bytes, hash_size? : Int) -> Bytes raise @bit_object.GitError
 
-pub fn build_pack_index_from_objects(Bytes, Array[@object.PackObject], hash_size? : Int) -> Bytes raise @object.GitError
+pub fn build_pack_index_from_objects(Bytes, Array[@bit_object.PackObject], hash_size? : Int) -> Bytes raise @bit_object.GitError
 
-pub fn build_reverse_index(Bytes, Array[@object.PackObject]) -> Bytes raise @object.GitError
+pub fn build_reverse_index(Bytes, Array[@bit_object.PackObject]) -> Bytes raise @bit_object.GitError
 
-pub fn crc32_range(Bytes, Int, Int) -> UInt raise @object.GitError
+pub fn crc32_range(Bytes, Int, Int) -> UInt raise @bit_object.GitError
 
 pub fn create_blob_packfile(Bytes, hash_size? : Int) -> Bytes
 
-pub fn create_commit_packfile(Bytes, String, @object.Commit) -> (@object.ObjectId, Bytes)
+pub fn create_commit_packfile(Bytes, String, @bit_object.Commit) -> (@bit_object.ObjectId, Bytes)
 
-pub fn create_packfile(Array[@object.PackObject], hash_size? : Int) -> Bytes
+pub fn create_packfile(Array[@bit_object.PackObject], hash_size? : Int) -> Bytes
 
-pub fn create_packfile_with_delta(Array[@object.PackObject], @object.PackDeltaMode, hash_size? : Int) -> Bytes
+pub fn create_packfile_with_delta(Array[@bit_object.PackObject], @bit_object.PackDeltaMode, hash_size? : Int) -> Bytes
 
-pub fn create_packfile_with_delta_stats(Array[@object.PackObject], @object.PackDeltaMode, hash_size? : Int) -> (Bytes, Int)
+pub fn create_packfile_with_delta_stats(Array[@bit_object.PackObject], @bit_object.PackDeltaMode, hash_size? : Int) -> (Bytes, Int)
 
-pub fn create_packfile_with_delta_stats_compression(Array[@object.PackObject], @object.PackDeltaMode, @object.PackCompression, hash_size? : Int) -> (Bytes, Int)
+pub fn create_packfile_with_delta_stats_compression(Array[@bit_object.PackObject], @bit_object.PackDeltaMode, @bit_object.PackCompression, hash_size? : Int) -> (Bytes, Int)
 
-pub fn create_packfile_with_delta_stats_compression_reuse(Array[@object.PackObject], @object.PackDeltaMode, @object.PackCompression, Bool, Int, Int, hash_size? : Int) -> (Bytes, Int)
+pub fn create_packfile_with_delta_stats_compression_reuse(Array[@bit_object.PackObject], @bit_object.PackDeltaMode, @bit_object.PackCompression, Bool, Int, Int, hash_size? : Int) -> (Bytes, Int)
 
-pub fn create_packfiles_with_size_limit(Array[@object.PackObject], @object.PackDeltaMode, @object.PackCompression, Bool, Int, Int64, Int, hash_size? : Int) -> (Array[Bytes], Int)
+pub fn create_packfiles_with_size_limit(Array[@bit_object.PackObject], @bit_object.PackDeltaMode, @bit_object.PackCompression, Bool, Int, Int64, Int, hash_size? : Int) -> (Array[Bytes], Int)
 
-pub fn decode_type_and_size_at(Bytes, Int) -> (Int, Int, Int) raise @object.GitError
+pub fn decode_type_and_size_at(Bytes, Int) -> (Int, Int, Int) raise @bit_object.GitError
 
 pub fn encode_type_and_size(Int, Int, Array[Byte]) -> Unit
 
-pub fn generate_commit_packfile() -> (@object.ObjectId, Bytes)
+pub fn generate_commit_packfile() -> (@bit_object.ObjectId, Bytes)
 
 pub fn generate_test_packfile() -> Bytes
 
 pub fn hex_dump(Bytes) -> String
 
-pub fn max_delta_chain_length(Bytes, hash_size? : Int) -> Int raise @object.GitError
+pub fn max_delta_chain_length(Bytes, hash_size? : Int) -> Int raise @bit_object.GitError
 
-pub fn packfile_type_to_object_type(Int) -> @object.ObjectType raise @object.GitError
+pub fn packfile_type_to_object_type(Int) -> @bit_object.ObjectType raise @bit_object.GitError
 
-pub fn parse_packfile(Bytes, verify_checksum? : Bool, hash_size? : Int) -> Array[@object.PackObject] raise @object.GitError
+pub fn parse_packfile(Bytes, verify_checksum? : Bool, hash_size? : Int) -> Array[@bit_object.PackObject] raise @bit_object.GitError
 
-pub fn parse_packfile_stream(Bytes, (@object.PackObject) -> Unit, verify_checksum? : Bool, hash_size? : Int) -> Unit raise @object.GitError
+pub fn parse_packfile_stream(Bytes, (@bit_object.PackObject) -> Unit, verify_checksum? : Bool, hash_size? : Int) -> Unit raise @bit_object.GitError
 
-pub fn parse_packfile_stream_with_bases(Bytes, Array[@object.PackObject], (@object.PackObject) -> Unit, verify_checksum? : Bool, hash_size? : Int) -> Unit raise @object.GitError
+pub fn parse_packfile_stream_with_bases(Bytes, Array[@bit_object.PackObject], (@bit_object.PackObject) -> Unit, verify_checksum? : Bool, hash_size? : Int) -> Unit raise @bit_object.GitError
 
-pub fn parse_packfile_with_bases(Bytes, Array[@object.PackObject], verify_checksum? : Bool, hash_size? : Int) -> Array[@object.PackObject] raise @object.GitError
+pub fn parse_packfile_with_bases(Bytes, Array[@bit_object.PackObject], verify_checksum? : Bool, hash_size? : Int) -> Array[@bit_object.PackObject] raise @bit_object.GitError
 
-pub fn read_ofs_delta_offset(Bytes, Int) -> (Int, Int) raise @object.GitError
+pub fn read_ofs_delta_offset(Bytes, Int) -> (Int, Int) raise @bit_object.GitError
 
-pub fn read_ref_delta_id(Bytes, Int, hash_size? : Int) -> (String, Int) raise @object.GitError
+pub fn read_ref_delta_id(Bytes, Int, hash_size? : Int) -> (String, Int) raise @bit_object.GitError
 
-pub fn write_pack_and_index(&@types.FileSystem, String, Bytes, verify_checksum? : Bool) -> Unit raise @object.GitError
+pub fn write_pack_and_index(&@bit_types.FileSystem, String, Bytes, verify_checksum? : Bool) -> Unit raise @bit_object.GitError
 
-pub fn write_pack_index(&@types.FileSystem, String, Bytes) -> Unit raise @object.GitError
+pub fn write_pack_index(&@bit_types.FileSystem, String, Bytes) -> Unit raise @bit_object.GitError
 
-pub fn write_pack_index_from_objects(&@types.FileSystem, String, Bytes, Array[@object.PackObject]) -> Unit raise @object.GitError
+pub fn write_pack_index_from_objects(&@bit_types.FileSystem, String, Bytes, Array[@bit_object.PackObject]) -> Unit raise @bit_object.GitError
 
-pub fn write_pack_index_from_objects_versioned(&@types.FileSystem, String, Bytes, Array[@object.PackObject], Int, Int64?) -> Unit raise @object.GitError
+pub fn write_pack_index_from_objects_versioned(&@bit_types.FileSystem, String, Bytes, Array[@bit_object.PackObject], Int, Int64?) -> Unit raise @bit_object.GitError
 
-pub fn write_packfile_with_index(&@types.FileSystem, String, Bytes, Array[@object.PackObject]) -> Unit raise @object.GitError
+pub fn write_packfile_with_index(&@bit_types.FileSystem, String, Bytes, Array[@bit_object.PackObject]) -> Unit raise @bit_object.GitError
 
-pub fn write_reverse_index(&@types.FileSystem, String, Bytes, Array[@object.PackObject]) -> Unit raise @object.GitError
+pub fn write_reverse_index(&@bit_types.FileSystem, String, Bytes, Array[@bit_object.PackObject]) -> Unit raise @bit_object.GitError
 
 // Errors
 

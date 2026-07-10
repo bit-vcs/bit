@@ -1,0 +1,99 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/bit_io_native"
+
+import {
+  "mizchi/bit_object",
+  "mizchi/bit_protocol",
+  "mizchi/bit_types",
+}
+
+// Values
+pub async fn clone_http(String, Bool, depth? : Int, filter? : @bit_protocol.FilterSpec) -> (Array[(@bit_object.ObjectId, String)], Array[@bit_object.PackObject]) raise @bit_object.GitError
+
+pub async fn clone_http_to_fs(String, Bool, &@bit_types.FileSystem, String, depth? : Int, filter? : @bit_protocol.FilterSpec, no_checkout? : Bool) -> Array[(@bit_object.ObjectId, String)] raise @bit_object.GitError
+
+pub async fn clone_process(String, Bool, depth? : Int, filter? : @bit_protocol.FilterSpec) -> (Array[(@bit_object.ObjectId, String)], Array[@bit_object.PackObject]) raise @bit_object.GitError
+
+pub async fn clone_process_to_fs(String, Bool, &@bit_types.FileSystem, String, depth? : Int, filter? : @bit_protocol.FilterSpec, no_checkout? : Bool) -> Array[(@bit_object.ObjectId, String)] raise @bit_object.GitError
+
+pub async fn clone_remote(String, Bool) -> (Array[(@bit_object.ObjectId, String)], Array[@bit_object.PackObject]) raise @bit_object.GitError
+
+pub async fn clone_remote_to_fs(String, Bool, &@bit_types.FileSystem, String) -> Array[(@bit_object.ObjectId, String)] raise @bit_object.GitError
+
+pub async fn clone_to_fs_with_http(String, Bool, Int, @bit_protocol.FilterSpec, &@bit_types.FileSystem, String, async (String, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError, async (String, Bytes, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError, no_checkout? : Bool) -> Array[(@bit_object.ObjectId, String)] raise @bit_object.GitError
+
+pub async fn clone_with_http(String, Bool, Int, @bit_protocol.FilterSpec, async (String, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError, async (String, Bytes, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError) -> (Array[(@bit_object.ObjectId, String)], Array[@bit_object.PackObject]) raise @bit_object.GitError
+
+pub async fn discover_receive_refs_http(@bit_protocol.Remote) -> Array[(@bit_object.ObjectId, String)] raise @bit_object.GitError
+
+pub async fn discover_refs(@bit_protocol.Remote) -> (Array[(@bit_object.ObjectId, String)], Array[String]) raise @bit_object.GitError
+
+pub async fn discover_upload_refs(String, Bool) -> (Array[(@bit_object.ObjectId, String)], Array[String], @bit_protocol.ProtocolVersion, Map[String, String]) raise @bit_object.GitError
+
+pub async fn discover_upload_refs_http(String, Bool) -> (Array[(@bit_object.ObjectId, String)], Array[String], @bit_protocol.ProtocolVersion, Map[String, String]) raise @bit_object.GitError
+
+pub async fn discover_upload_refs_process(String, Bool) -> (Array[(@bit_object.ObjectId, String)], Array[String], @bit_protocol.ProtocolVersion, Map[String, String]) raise @bit_object.GitError
+
+pub async fn discover_upload_refs_with_http(String, Bool, async (String, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError, async (String, Bytes, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError) -> (Array[(@bit_object.ObjectId, String)], Array[String], @bit_protocol.ProtocolVersion, Map[String, String]) raise @bit_object.GitError
+
+pub async fn fetch_objects(String, Array[@bit_object.ObjectId], Bool) -> Array[@bit_object.PackObject] raise @bit_object.GitError
+
+pub async fn fetch_objects_http(String, Array[@bit_object.ObjectId], Bool, depth? : Int, filter? : @bit_protocol.FilterSpec) -> Array[@bit_object.PackObject] raise @bit_object.GitError
+
+pub async fn fetch_objects_process(String, Array[@bit_object.ObjectId], Bool, depth? : Int, filter? : @bit_protocol.FilterSpec) -> Array[@bit_object.PackObject] raise @bit_object.GitError
+
+pub async fn fetch_objects_with_http(String, Array[@bit_object.ObjectId], Bool, Int, @bit_protocol.FilterSpec, async (String, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError, async (String, Bytes, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError) -> Array[@bit_object.PackObject] raise @bit_object.GitError
+
+pub async fn fetch_pack(String, Array[@bit_object.ObjectId], Bool) -> Bytes raise @bit_object.GitError
+
+pub async fn fetch_pack_http(String, Array[@bit_object.ObjectId], Bool, depth? : Int, filter? : @bit_protocol.FilterSpec) -> Bytes raise @bit_object.GitError
+
+pub async fn fetch_pack_process(String, Array[@bit_object.ObjectId], Bool, depth? : Int, filter? : @bit_protocol.FilterSpec) -> Bytes raise @bit_object.GitError
+
+pub async fn fetch_pack_with_http(String, Array[@bit_object.ObjectId], Bool, Int, @bit_protocol.FilterSpec, async (String, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError, async (String, Bytes, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError) -> Bytes raise @bit_object.GitError
+
+pub fn init_env_provider() -> Unit
+
+pub fn init_native_io() -> Unit
+
+pub fn init_worktree_probe() -> Unit
+
+pub async fn native_http_get(String, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError
+
+pub async fn native_http_post(String, Bytes, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError
+
+pub async fn native_http_put(String, Bytes, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError
+
+pub fn native_readdir_typed(String) -> Array[(String, Int)]?
+
+pub async fn push(@bit_protocol.Remote, @bit_protocol.PushRequest) -> String raise @bit_object.GitError
+
+pub async fn push_file(@bit_protocol.Remote, Bytes, String, String, String, Int64, @bit_object.ObjectId?) -> @bit_object.ObjectId raise @bit_object.GitError
+
+pub async fn upload_pack_info_refs(String, Bool) -> Bytes raise @bit_object.GitError
+
+pub async fn upload_pack_info_refs_http(String, Bool) -> Bytes raise @bit_object.GitError
+
+pub async fn upload_pack_info_refs_process(String, Bool) -> Bytes raise @bit_object.GitError
+
+pub async fn upload_pack_info_refs_with_http(String, Bool, async (String, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError) -> Bytes raise @bit_object.GitError
+
+pub async fn upload_pack_request(String, Bytes, Bool) -> Bytes raise @bit_object.GitError
+
+pub async fn upload_pack_request_http(String, Bytes, Bool) -> Bytes raise @bit_object.GitError
+
+pub async fn upload_pack_request_process(String, Bytes, Bool) -> Bytes raise @bit_object.GitError
+
+pub async fn upload_pack_request_with_http(String, Bytes, Bool, async (String, Bytes, Map[String, String]) -> (@bit_types.HttpResponse, Bytes) raise @bit_object.GitError) -> Bytes raise @bit_object.GitError
+
+// Errors
+
+// Types and methods
+pub struct NativeHttpClient {
+  dummy : Int
+}
+pub fn NativeHttpClient::new() -> Self
+
+// Type aliases
+
+// Traits

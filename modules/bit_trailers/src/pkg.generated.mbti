@@ -1,5 +1,5 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "mizchi/bit/trailers"
+package "mizchi/bit_trailers"
 
 // Values
 pub fn add_trailer(String, String, String) -> String

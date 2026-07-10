@@ -1,5 +1,5 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "mizchi/bit/bootstrap"
+package "mizchi/bit_bootstrap"
 
 // Values
 pub fn init_stdin_guard() -> Unit

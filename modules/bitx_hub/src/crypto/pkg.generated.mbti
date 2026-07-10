@@ -1,8 +1,8 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "mizchi/bit/x-hub/crypto"
+package "mizchi/bitx_hub/crypto"
 
 import {
-  "mizchi/bit/object",
+  "mizchi/bit_object",
 }
 
 // Values
@@ -18,17 +18,17 @@ pub fn relay_extract_sha256_hex(String) -> String?
 
 pub fn relay_headers_with_publish_signature(Map[String, String], RelayPublishHttpSignature?) -> Map[String, String]
 
-pub async fn relay_http_signing_config() -> RelayHttpSigningConfig? raise @object.GitError
+pub async fn relay_http_signing_config() -> RelayHttpSigningConfig? raise @bit_object.GitError
 
 pub fn relay_load_signing_key() -> String?
 
-pub async fn relay_resolve_public_key(String) -> String raise @object.GitError
+pub async fn relay_resolve_public_key(String) -> String raise @bit_object.GitError
 
-pub async fn relay_sha256_hex(String) -> String raise @object.GitError
+pub async fn relay_sha256_hex(String) -> String raise @bit_object.GitError
 
-pub async fn relay_sign_ed25519(String, String) -> String raise @object.GitError
+pub async fn relay_sign_ed25519(String, String) -> String raise @bit_object.GitError
 
-pub async fn relay_sign_publish_payload(RelayHttpSigningConfig?, String, String, String, String, Json) -> RelayPublishHttpSignature? raise @object.GitError
+pub async fn relay_sign_publish_payload(RelayHttpSigningConfig?, String, String, String, String, Json) -> RelayPublishHttpSignature? raise @bit_object.GitError
 
 pub fn relay_unix_timestamp_sec() -> Int64
 

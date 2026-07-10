@@ -1,5 +1,5 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "mizchi/bit/string_utils"
+package "mizchi/bit_utils"
 
 // Values
 pub fn decode_bytes(Bytes) -> String

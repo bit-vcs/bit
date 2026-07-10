@@ -1,82 +1,82 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "mizchi/bit/x-subdir"
+package "mizchi/bitx_subdir"
 
 import {
-  "mizchi/bit/lib",
-  "mizchi/bit/object",
-  "mizchi/bit/types",
-  "mizchi/bit/vfs",
+  "mizchi/bit_lib",
+  "mizchi/bit_object",
+  "mizchi/bit_types",
+  "mizchi/bit_vfs",
 }
 
 // Values
-pub fn add_module_sparse_patterns(&@types.FileSystem, &@types.RepoFileSystem, String, String, Array[String]) -> Unit raise SubdirError
+pub fn add_module_sparse_patterns(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, Array[String]) -> Unit raise SubdirError
 
-pub fn create_commit_in_repo(&@types.FileSystem, String, @object.ObjectId, @object.ObjectId, String, String, Int64) -> @object.ObjectId raise SubdirError
+pub fn create_commit_in_repo(&@bit_types.FileSystem, String, @bit_object.ObjectId, @bit_object.ObjectId, String, String, Int64) -> @bit_object.ObjectId raise SubdirError
 
-pub fn deinit_module(&@types.FileSystem, &@types.RepoFileSystem, String, String, String) -> Unit
+pub fn deinit_module(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, String) -> Unit
 
-pub fn deinit_subdir(&@types.FileSystem, &@types.RepoFileSystem, String, String, String) -> Unit
+pub fn deinit_subdir(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, String) -> Unit
 
-pub fn disable_module_sparse(&@types.FileSystem, &@types.RepoFileSystem, String, String) -> Unit raise SubdirError
+pub fn disable_module_sparse(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String) -> Unit raise SubdirError
 
-pub fn extract_subdir_tree(@lib.ObjectDb, &@types.RepoFileSystem, @object.ObjectId, String) -> @object.ObjectId raise SubdirError
+pub fn extract_subdir_tree(@bit_lib.ObjectDb, &@bit_types.RepoFileSystem, @bit_object.ObjectId, String) -> @bit_object.ObjectId raise SubdirError
 
 pub fn generate_shell_env(String, String, String) -> Array[(String, String)]
 
 pub fn generate_shell_rc(String) -> String
 
-pub fn get_subdir_info(&@types.RepoFileSystem, String, String, String) -> SubdirInfo?
+pub fn get_subdir_info(&@bit_types.RepoFileSystem, String, String, String) -> SubdirInfo?
 
-pub fn init_module(&@types.FileSystem, &@types.RepoFileSystem, String, String, String) -> Unit raise SubdirError
+pub fn init_module(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, String) -> Unit raise SubdirError
 
-pub fn init_module_sparse(&@types.FileSystem, &@types.RepoFileSystem, String, String, cone? : Bool) -> Unit raise SubdirError
+pub fn init_module_sparse(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, cone? : Bool) -> Unit raise SubdirError
 
-pub fn init_subdir(&@types.FileSystem, String, String, String, SubdirInitConfig) -> SubdirInfo raise SubdirError
+pub fn init_subdir(&@bit_types.FileSystem, String, String, String, SubdirInitConfig) -> SubdirInfo raise SubdirError
 
-pub fn is_module_initialized(&@types.RepoFileSystem, String, String) -> Bool
+pub fn is_module_initialized(&@bit_types.RepoFileSystem, String, String) -> Bool
 
-pub fn is_module_sparse_enabled(&@types.RepoFileSystem, String, String) -> Bool
+pub fn is_module_sparse_enabled(&@bit_types.RepoFileSystem, String, String) -> Bool
 
-pub fn is_subdir_initialized(&@types.RepoFileSystem, String, String) -> Bool
+pub fn is_subdir_initialized(&@bit_types.RepoFileSystem, String, String) -> Bool
 
-pub fn list_modules(&@types.RepoFileSystem, String) -> Array[String]
+pub fn list_modules(&@bit_types.RepoFileSystem, String) -> Array[String]
 
 pub fn matches_module_sparse(String, Array[String]) -> Bool
 
-pub fn read_module_sparse_patterns(&@types.RepoFileSystem, String, String) -> Array[String]
+pub fn read_module_sparse_patterns(&@bit_types.RepoFileSystem, String, String) -> Array[String]
 
-pub fn set_module_sparse_patterns(&@types.FileSystem, &@types.RepoFileSystem, String, String, Array[String]) -> Unit raise SubdirError
+pub fn set_module_sparse_patterns(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, Array[String]) -> Unit raise SubdirError
 
-pub fn sync_module(&@types.FileSystem, &@types.RepoFileSystem, String, String) -> Unit raise SubdirError
+pub fn sync_module(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String) -> Unit raise SubdirError
 
-pub fn write_module_sparse_patterns(&@types.FileSystem, String, String, Array[String]) -> Unit raise SubdirError
+pub fn write_module_sparse_patterns(&@bit_types.FileSystem, String, String, Array[String]) -> Unit raise SubdirError
 
 // Errors
 pub suberror SubdirError {
   SubdirNotFound(String)
   InvalidPath(String)
-  CommitNotFound(@object.ObjectId)
-  TreeNotFound(@object.ObjectId)
+  CommitNotFound(@bit_object.ObjectId)
+  TreeNotFound(@bit_object.ObjectId)
   IoError(String)
 }
 pub fn SubdirError::to_string(Self) -> String
 
 // Types and methods
 pub enum DiffEntry {
-  Added(String, @object.ObjectId)
-  Modified(String, @object.ObjectId, @object.ObjectId)
-  Deleted(String, @object.ObjectId)
+  Added(String, @bit_object.ObjectId)
+  Modified(String, @bit_object.ObjectId, @bit_object.ObjectId)
+  Deleted(String, @bit_object.ObjectId)
 }
 pub fn DiffEntry::path(Self) -> String
 pub fn DiffEntry::to_string(Self) -> String
 
 pub struct SubdirCommit {
-  id : @object.ObjectId
-  subdir_tree : @object.ObjectId
+  id : @bit_object.ObjectId
+  subdir_tree : @bit_object.ObjectId
   message : String
   author : String
   timestamp : Int64
-  prev_commit : @object.ObjectId?
+  prev_commit : @bit_object.ObjectId?
 }
 
 pub struct SubdirConfig {
@@ -102,23 +102,23 @@ pub fn SubdirInitConfig::new(create_wrapper? : Bool, verbose_marker? : Bool) -> 
 pub struct SubdirRepo {
   git_dir : String
   subdir_path : String
-  current_commit : @object.ObjectId?
-  subdir_tree : @object.ObjectId?
-  bitfs : @vfs.Fs
+  current_commit : @bit_object.ObjectId?
+  subdir_tree : @bit_object.ObjectId?
+  bitfs : @bit_vfs.Fs
   config : SubdirConfig
 }
-pub fn SubdirRepo::base_commit(Self) -> @object.ObjectId?
-pub fn SubdirRepo::commit(Self, &@types.FileSystem, &@types.RepoFileSystem, String, author? : String, timestamp? : Int64) -> @object.ObjectId raise SubdirError
+pub fn SubdirRepo::base_commit(Self) -> @bit_object.ObjectId?
+pub fn SubdirRepo::commit(Self, &@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, author? : String, timestamp? : Int64) -> @bit_object.ObjectId raise SubdirError
 pub fn SubdirRepo::diff(Self) -> Array[DiffEntry]
-pub fn SubdirRepo::from_branch(&@types.RepoFileSystem, String, String, String, config? : SubdirConfig) -> Self raise SubdirError
-pub fn SubdirRepo::from_commit(&@types.RepoFileSystem, String, @object.ObjectId, String, config? : SubdirConfig) -> Self raise SubdirError
-pub fn SubdirRepo::from_head(&@types.RepoFileSystem, String, String, config? : SubdirConfig) -> Self raise SubdirError
-pub fn SubdirRepo::fs(Self) -> @vfs.Fs
+pub fn SubdirRepo::from_branch(&@bit_types.RepoFileSystem, String, String, String, config? : SubdirConfig) -> Self raise SubdirError
+pub fn SubdirRepo::from_commit(&@bit_types.RepoFileSystem, String, @bit_object.ObjectId, String, config? : SubdirConfig) -> Self raise SubdirError
+pub fn SubdirRepo::from_head(&@bit_types.RepoFileSystem, String, String, config? : SubdirConfig) -> Self raise SubdirError
+pub fn SubdirRepo::fs(Self) -> @bit_vfs.Fs
 pub fn SubdirRepo::is_dirty(Self) -> Bool
-pub fn SubdirRepo::load_workdir(Self, &@types.RepoFileSystem, String) -> Unit
-pub fn SubdirRepo::log(Self, &@types.RepoFileSystem, max_count? : Int) -> Array[SubdirCommit] raise SubdirError
+pub fn SubdirRepo::load_workdir(Self, &@bit_types.RepoFileSystem, String) -> Unit
+pub fn SubdirRepo::log(Self, &@bit_types.RepoFileSystem, max_count? : Int) -> Array[SubdirCommit] raise SubdirError
 pub fn SubdirRepo::path(Self) -> String
-pub fn SubdirRepo::tree_id(Self) -> @object.ObjectId?
+pub fn SubdirRepo::tree_id(Self) -> @bit_object.ObjectId?
 
 // Type aliases
 

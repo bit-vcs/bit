@@ -1,23 +1,23 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "mizchi/bit/remote"
+package "mizchi/bit_remote"
 
 import {
-  "mizchi/bit/types",
+  "mizchi/bit_types",
   "moonbitlang/core/debug",
 }
 
 // Values
 pub fn check_shorthand_ambiguity(String, (String) -> Bool) -> String?
 
-pub fn detect_git_dir(&@types.RepoFileSystem, String) -> (String, Bool)?
+pub fn detect_git_dir(&@bit_types.RepoFileSystem, String) -> (String, Bool)?
 
 pub fn is_bare_git_dir(String) -> Bool
 
 pub fn parse_github_shorthand(String) -> GitHubShorthand?
 
-pub fn resolve_gitdir(&@types.RepoFileSystem, String) -> String
+pub fn resolve_gitdir(&@bit_types.RepoFileSystem, String) -> String
 
-pub fn resolve_local_repo_path(&@types.RepoFileSystem, String, String) -> String?
+pub fn resolve_local_repo_path(&@bit_types.RepoFileSystem, String, String) -> String?
 
 // Errors
 

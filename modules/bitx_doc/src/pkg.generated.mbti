@@ -1,21 +1,21 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "mizchi/bit/x-doc"
+package "mizchi/bitx_doc"
 
 import {
-  "mizchi/bit/object",
-  "mizchi/bit/types",
+  "mizchi/bit_object",
+  "mizchi/bit_types",
 }
 
 // Values
-pub fn append_page(&@types.FileSystem, &@types.RepoFileSystem, String, String, String, Int64) -> Result[String, DocError] raise @object.GitError
+pub fn append_page(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, String, Int64) -> Result[String, DocError] raise @bit_object.GitError
 
-pub fn list_pages(&@types.RepoFileSystem, String, String?) -> Array[String]
+pub fn list_pages(&@bit_types.RepoFileSystem, String, String?) -> Array[String]
 
-pub fn put_page(&@types.FileSystem, String, String, String) -> Result[String, DocError] raise @object.GitError
+pub fn put_page(&@bit_types.FileSystem, String, String, String) -> Result[String, DocError] raise @bit_object.GitError
 
-pub fn read_page(&@types.RepoFileSystem, String, String) -> Result[String, DocError] raise @object.GitError
+pub fn read_page(&@bit_types.RepoFileSystem, String, String) -> Result[String, DocError] raise @bit_object.GitError
 
-pub fn remove_page(&@types.FileSystem, &@types.RepoFileSystem, String, String) -> Result[String, DocError] raise @object.GitError
+pub fn remove_page(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String) -> Result[String, DocError] raise @bit_object.GitError
 
 // Errors
 

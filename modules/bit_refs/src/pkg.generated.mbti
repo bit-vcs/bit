@@ -1,29 +1,29 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "mizchi/bit/refs"
+package "mizchi/bit_refs"
 
 import {
-  "mizchi/bit/object",
-  "mizchi/bit/types",
+  "mizchi/bit_object",
+  "mizchi/bit_types",
 }
 
 // Values
-pub fn collect_loose_ref_ids(&@types.RepoFileSystem, String, String, Map[String, @object.ObjectId], String?) -> Unit
+pub fn collect_loose_ref_ids(&@bit_types.RepoFileSystem, String, String, Map[String, @bit_object.ObjectId], String?) -> Unit
 
-pub fn collect_packed_ref_ids(&@types.RepoFileSystem, String, Map[String, @object.ObjectId], String?) -> Unit
+pub fn collect_packed_ref_ids(&@bit_types.RepoFileSystem, String, Map[String, @bit_object.ObjectId], String?) -> Unit
 
-pub fn list_refs_with_ids(&@types.RepoFileSystem, String, String?) -> Map[String, @object.ObjectId]
+pub fn list_refs_with_ids(&@bit_types.RepoFileSystem, String, String?) -> Map[String, @bit_object.ObjectId]
 
-pub fn list_remote_tracking_refs(&@types.RepoFileSystem, String, String) -> Map[String, @object.ObjectId]
+pub fn list_remote_tracking_refs(&@bit_types.RepoFileSystem, String, String) -> Map[String, @bit_object.ObjectId]
 
-pub fn remove_packed_ref(&@types.FileSystem, &@types.RepoFileSystem, String, String) -> Unit raise @object.GitError
+pub fn remove_packed_ref(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String) -> Unit raise @bit_object.GitError
 
-pub fn remove_packed_refs_with_prefix(&@types.FileSystem, &@types.RepoFileSystem, String, String, String) -> Unit raise @object.GitError
+pub fn remove_packed_refs_with_prefix(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, String) -> Unit raise @bit_object.GitError
 
-pub fn remove_remote_refs(&@types.FileSystem, &@types.RepoFileSystem, String, String) -> Unit
+pub fn remove_remote_refs(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String) -> Unit
 
-pub fn rename_packed_refs_prefix(&@types.FileSystem, &@types.RepoFileSystem, String, String, String, String, String) -> Unit raise @object.GitError
+pub fn rename_packed_refs_prefix(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, String, String, String) -> Unit raise @bit_object.GitError
 
-pub fn rewrite_packed_refs(&@types.FileSystem, &@types.RepoFileSystem, String, (String) -> String?) -> Unit raise @object.GitError
+pub fn rewrite_packed_refs(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, (String) -> String?) -> Unit raise @bit_object.GitError
 
 // Errors
 

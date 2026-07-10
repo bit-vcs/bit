@@ -1,5 +1,5 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "mizchi/bit/fast_import"
+package "mizchi/bit_fast_import"
 
 import {
   "moonbitlang/core/debug",

@@ -2,10 +2,10 @@
 package "mizchi/bit/cmd/bit"
 
 import {
-  "mizchi/bit/lib",
-  "mizchi/bit/object",
-  "mizchi/bit/runtime",
-  "mizchi/bit/types",
+  "mizchi/bit_lib",
+  "mizchi/bit_object",
+  "mizchi/bit_runtime",
+  "mizchi/bit_types",
   "moonbitlang/core/debug",
 }
 
@@ -20,7 +20,7 @@ pub fn get_effective_remote_url(OsFs, String) -> String?
 
 pub fn get_subdir_info(OsFs, String) -> (String, String, String)?
 
-pub fn get_subdir_tree_from_commit(@lib.ObjectDb, OsFs, @object.ObjectId, String) -> @object.ObjectId? raise @object.GitError
+pub fn get_subdir_tree_from_commit(@bit_lib.ObjectDb, OsFs, @bit_object.ObjectId, String) -> @bit_object.ObjectId? raise @bit_object.GitError
 
 pub fn is_subdir_clone(OsFs, String) -> Bool
 
@@ -28,17 +28,17 @@ pub fn load_global_aliases(OsFs) -> Map[String, String]
 
 pub fn parse_gitconfig_aliases(String) -> Map[String, String]
 
-pub fn parse_github_shorthand(String) -> @lib.GitHubShorthand?
+pub fn parse_github_shorthand(String) -> @bit_lib.GitHubShorthand?
 
 pub fn read_subdir_attributes(OsFs, String) -> (String, String, String)?
 
 pub fn resolve_alias(Map[String, String], String, Array[String]) -> AliasResolution
 
-pub fn resolve_ref_for_subdir(OsFs, String, String) -> @object.ObjectId? raise
+pub fn resolve_ref_for_subdir(OsFs, String, String) -> @bit_object.ObjectId? raise
 
-pub async fn run_storage_command(&@types.FileSystem, &@types.RepoFileSystem, String, @runtime.StorageCommand) -> Unit
+pub async fn run_storage_command(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, @bit_runtime.StorageCommand) -> Unit
 
-pub async fn run_storage_command_by_name(&@types.FileSystem, &@types.RepoFileSystem, String, String, Array[String]) -> Unit
+pub async fn run_storage_command_by_name(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, Array[String]) -> Unit
 
 pub fn split_alias_command(String) -> Array[String]
 
@@ -96,6 +96,8 @@ type FetchHeadEntry
 
 type FormatPatchOptions
 
+type GitGraph
+
 type GitHubImportProvider
 
 type GlobalOptions
@@ -142,8 +144,8 @@ pub struct OsFs {
   dummy : Int
 }
 pub fn OsFs::new() -> Self
-pub impl @types.FileSystem for OsFs
-pub impl @types.RepoFileSystem for OsFs
+pub impl @bit_types.FileSystem for OsFs
+pub impl @bit_types.RepoFileSystem for OsFs
 
 type OsObjectStore
 
@@ -223,6 +225,8 @@ pub(all) struct SubmoduleInfo {
   url : String
 } derive(Eq, @debug.Debug)
 pub impl Show for SubmoduleInfo
+
+type UpdateRefStdinOp
 
 type UploadPackTransport
 

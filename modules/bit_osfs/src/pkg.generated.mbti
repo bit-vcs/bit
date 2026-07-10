@@ -1,9 +1,9 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "mizchi/bit/osfs"
+package "mizchi/bit_osfs"
 
 import {
-  "mizchi/bit/object",
-  "mizchi/bit/types",
+  "mizchi/bit_object",
+  "mizchi/bit_types",
 }
 
 // Values
@@ -15,8 +15,8 @@ pub struct OsFs {
   // private fields
 }
 pub fn OsFs::new() -> Self
-pub impl @types.FileSystem for OsFs
-pub impl @types.RepoFileSystem for OsFs
+pub impl @bit_types.FileSystem for OsFs
+pub impl @bit_types.RepoFileSystem for OsFs
 
 // Type aliases
 

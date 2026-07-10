@@ -1,0 +1,111 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/bit_core"
+
+import {
+  "mizchi/bit_io",
+  "mizchi/bit_object",
+  "mizchi/bit_repo",
+  "mizchi/bit_types",
+}
+
+// Values
+pub fn checkout_commit(@bit_repo.ObjectStore, @bit_object.ObjectId) -> Map[String, Bytes] raise @bit_object.GitError
+
+pub fn checkout_commit_to_fs(@bit_repo.ObjectStore, @bit_object.ObjectId, &@bit_types.FileSystem, String) -> Unit raise @bit_object.GitError
+
+pub fn create_blob(Bytes) -> (@bit_object.ObjectId, Bytes)
+
+pub fn create_blob_string(String) -> (@bit_object.ObjectId, Bytes)
+
+pub fn create_commit(@bit_object.Commit) -> (@bit_object.ObjectId, Bytes)
+
+pub fn create_object(@bit_object.ObjectType, Bytes) -> (@bit_object.ObjectId, Bytes)
+
+pub fn create_tree(Array[@bit_object.TreeEntry]) -> (@bit_object.ObjectId, Bytes)
+
+pub fn hash_array_prefix(Array[Byte], Int, hash_size? : Int) -> @bit_object.ObjectId
+
+pub fn hash_blob(Bytes) -> @bit_object.ObjectId
+
+pub fn hash_blob_string(String) -> @bit_object.ObjectId
+
+pub fn hash_object_content(@bit_object.ObjectType, Bytes) -> @bit_object.ObjectId
+
+pub fn hash_object_content_with_algo(@bit_object.HashAlgorithm, @bit_object.ObjectType, Bytes) -> @bit_object.ObjectId
+
+pub fn hash_prefix(Bytes, Int, hash_size? : Int) -> @bit_object.ObjectId
+
+pub fn join_path(String, String) -> String
+
+pub fn materialize_clone_to_fs(@bit_repo.ObjectStore, @bit_object.ObjectId, String, String, &@bit_types.FileSystem, String) -> Unit raise @bit_object.GitError
+
+pub fn parse_commit(Bytes) -> @bit_repo.CommitInfo raise @bit_object.GitError
+
+pub fn parse_tree(Bytes) -> Array[@bit_object.TreeEntry] raise @bit_object.GitError
+
+pub fn serialize_commit_content(@bit_object.Commit) -> Bytes
+
+pub fn serialize_tree(Array[@bit_object.TreeEntry]) -> Bytes
+
+pub fn sha1(Bytes) -> @bit_object.ObjectId
+
+pub fn sha1_array(Array[Byte]) -> @bit_object.ObjectId
+
+pub fn sha1_array_prefix(Array[Byte], Int) -> @bit_object.ObjectId
+
+pub fn sha1_prefix(Bytes, Int) -> @bit_object.ObjectId
+
+pub fn sha256_array_prefix(Array[Byte], Int) -> @bit_object.ObjectId
+
+pub fn sha256_prefix(Bytes, Int) -> @bit_object.ObjectId
+
+pub fn verify_tree_entry_name(String) -> Unit raise @bit_object.GitError
+
+pub fn write_git_metadata(@bit_repo.ObjectStore, @bit_object.ObjectId, String, String, &@bit_types.FileSystem, String) -> Unit raise @bit_object.GitError
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+pub using @bit_object {type Commit}
+
+pub using @bit_repo {type CommitInfo}
+
+pub using @bit_object {type GitError}
+
+pub using @bit_object {type HashAlgorithm}
+
+pub using @bit_object {type HashState}
+
+pub using @bit_types {type HttpResponse}
+
+pub using @bit_types {type MockHttpClient}
+
+pub using @bit_object {type ObjectId}
+
+pub using @bit_repo {type ObjectStore}
+
+pub using @bit_object {type ObjectType}
+
+pub using @bit_object {type PackCompression}
+
+pub using @bit_object {type PackDeltaMode}
+
+pub using @bit_object {type PackObject}
+
+pub using @bit_object {type Sha1State}
+
+pub using @bit_object {type Sha256State}
+
+pub using @bit_io {type TestFs}
+
+pub using @bit_object {type TreeEntry}
+
+pub using @bit_types {trait FileSystem}
+
+pub using @bit_types {trait HttpClient}
+
+pub using @bit_types {trait RepoFileSystem}
+
+// Traits

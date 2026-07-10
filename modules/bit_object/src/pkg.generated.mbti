@@ -1,8 +1,8 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "mizchi/bit/object"
+package "mizchi/bit_object"
 
 import {
-  "mizchi/bit/hash",
+  "mizchi/bit_hash",
   "moonbitlang/core/debug",
 }
 
@@ -156,7 +156,7 @@ pub fn PackObject::new(ObjectType, Bytes) -> Self
 pub fn PackObject::with_metadata(ObjectType, Bytes, ObjectId, Int, UInt) -> Self
 
 pub struct Sha1State {
-  inner : @hash.Sha1State
+  inner : @bit_hash.Sha1State
 }
 pub fn Sha1State::finish(Self) -> ObjectId
 pub fn Sha1State::new() -> Self
@@ -167,7 +167,7 @@ pub fn Sha1State::update_slice(Self, Bytes, Int, Int) -> Unit
 pub fn Sha1State::update_string(Self, String) -> Unit
 
 pub struct Sha256State {
-  inner : @hash.Sha256State
+  inner : @bit_hash.Sha256State
 }
 pub fn Sha256State::finish(Self) -> ObjectId
 pub fn Sha256State::new() -> Self

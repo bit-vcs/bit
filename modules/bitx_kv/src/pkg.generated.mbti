@@ -1,9 +1,9 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "mizchi/bit/x-kv"
+package "mizchi/bitx_kv"
 
 import {
-  "mizchi/bit/lib",
-  "mizchi/bit/object",
+  "mizchi/bit_lib",
+  "mizchi/bit_object",
 }
 
 // Values
@@ -12,41 +12,41 @@ import {
 
 // Types and methods
 pub(all) struct GitObject {
-  id : @object.ObjectId
-  obj_type : @object.ObjectType
+  id : @bit_object.ObjectId
+  obj_type : @bit_object.ObjectType
   data : Bytes
 }
 
 pub(all) enum GossipMessage {
   Announce(GossipState)
-  WantObjects(Array[@object.ObjectId])
+  WantObjects(Array[@bit_object.ObjectId])
   HaveObjects(Array[GitObject])
-  SyncRequest(NodeId, @object.ObjectId)
-  SyncResponse(Array[GitObject], @object.ObjectId)
+  SyncRequest(NodeId, @bit_object.ObjectId)
+  SyncResponse(Array[GitObject], @bit_object.ObjectId)
 }
 
 pub(all) struct GossipState {
   node_id : NodeId
-  head : @object.ObjectId
+  head : @bit_object.ObjectId
   clock : VectorClock
   timestamp : Int64
 }
 
 pub struct Kv {
   node_id : NodeId
-  tree : &@lib.WorkingTree
-  store : &@lib.ObjectStore
+  tree : &@bit_lib.WorkingTree
+  store : &@bit_lib.ObjectStore
   mut clock : VectorClock
-  mut head : @object.ObjectId
+  mut head : @bit_object.ObjectId
   sync_engine : SyncEngine
   pending_objects : Map[String, GitObject]
   snapshot_cache : Map[Int, SerializedSnapshot]
   snapshot_bytes_cache : Map[Int, Bytes]
 }
 pub fn Kv::add_peer(Self, PeerInfo) -> Unit
-pub fn Kv::apply_pending_objects(Self) -> Int raise @object.GitError
+pub fn Kv::apply_pending_objects(Self) -> Int raise @bit_object.GitError
 pub fn Kv::clock(Self) -> VectorClock
-pub fn Kv::commit(Self, String, Int64) -> @object.ObjectId raise @object.GitError
+pub fn Kv::commit(Self, String, Int64) -> @bit_object.ObjectId raise @bit_object.GitError
 pub fn Kv::delete(Self, String) -> Unit
 pub fn Kv::get(Self, String) -> Bytes?
 pub fn Kv::get_gossip_state(Self, Int64) -> GossipState
@@ -55,12 +55,12 @@ pub fn Kv::get_peers(Self) -> Array[PeerInfo]
 pub fn Kv::handle_gossip(Self, GossipMessage, Int64) -> GossipMessage?
 pub fn Kv::has(Self, String) -> Bool
 pub fn Kv::has_pending_objects(Self) -> Bool
-pub fn Kv::head(Self) -> @object.ObjectId
+pub fn Kv::head(Self) -> @bit_object.ObjectId
 pub fn Kv::is_dirty(Self) -> Bool
 pub fn Kv::list(Self, String) -> Array[String]
 pub fn Kv::list_recursive(Self, String) -> Array[String]
-pub fn Kv::merge(Self, @object.ObjectId, VectorClock, MergeStrategy, Int64) -> MergeResult raise @object.GitError
-pub fn Kv::new(NodeId, &@lib.WorkingTree, &@lib.ObjectStore, @object.ObjectId) -> Self
+pub fn Kv::merge(Self, @bit_object.ObjectId, VectorClock, MergeStrategy, Int64) -> MergeResult raise @bit_object.GitError
+pub fn Kv::new(NodeId, &@bit_lib.WorkingTree, &@bit_lib.ObjectStore, @bit_object.ObjectId) -> Self
 pub fn Kv::node_id(Self) -> NodeId
 pub fn Kv::pending_object_count(Self) -> Int
 pub fn Kv::record_peer_sync_result(Self, NodeId, Bool, Int64) -> Unit
@@ -84,8 +84,8 @@ pub fn KvConfig::default(NodeId) -> Self
 
 pub(all) enum MergeResult {
   NoOp
-  FastForward(@object.ObjectId)
-  Merged(@object.ObjectId, Array[String])
+  FastForward(@bit_object.ObjectId)
+  Merged(@bit_object.ObjectId, Array[String])
   Conflict(Array[String])
 }
 
@@ -106,7 +106,7 @@ pub impl Show for NodeId
 pub(all) struct PeerInfo {
   node_id : NodeId
   last_seen : Int64
-  head : @object.ObjectId
+  head : @bit_object.ObjectId
   endpoint : String
 }
 
@@ -176,7 +176,7 @@ pub(all) struct SyncResult {
   objects_sent : Int
   objects_received : Int
   conflicts : Array[String]
-  new_head : @object.ObjectId
+  new_head : @bit_object.ObjectId
 }
 
 pub(all) struct SyncRoundResult {

@@ -1,17 +1,17 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "mizchi/bit/fingerprint"
+package "mizchi/bit_fingerprint"
 
 import {
-  "mizchi/bit/types",
+  "mizchi/bit_types",
   "moonbitlang/core/debug",
 }
 
 // Values
-pub fn bit_compat_directory_fingerprint(&@types.RepoFileSystem, String, ignore_entries? : Array[String]) -> String
+pub fn bit_compat_directory_fingerprint(&@bit_types.RepoFileSystem, String, ignore_entries? : Array[String]) -> String
 
-pub fn directory_fingerprint(&@types.RepoFileSystem, String, FingerprintMode, ignore_entries? : Array[String]) -> String
+pub fn directory_fingerprint(&@bit_types.RepoFileSystem, String, FingerprintMode, ignore_entries? : Array[String]) -> String
 
-pub fn fast_directory_fingerprint(&@types.RepoFileSystem, String, ignore_entries? : Array[String]) -> String
+pub fn fast_directory_fingerprint(&@bit_types.RepoFileSystem, String, ignore_entries? : Array[String]) -> String
 
 pub fn fingerprint_mode_name(FingerprintMode) -> String
 

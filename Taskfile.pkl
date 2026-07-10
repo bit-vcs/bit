@@ -621,6 +621,14 @@ local releaseNpmDryRun: Task = new {
   deps { buildNpm; testJsBuild }
 }
 
+local publishMoon: Task = new {
+  name = "publish-moon"
+  description = "Publish all Moon modules in dependency order"
+  cmd = "node tools/publish-moon.mjs"
+  cache = false
+  deps { releaseCheck }
+}
+
 // -- default ------------------------------------------------------------
 
 local default: Task = new {
@@ -714,6 +722,7 @@ tasks {
   playgroundDev
 
   releaseCheck
+  publishMoon
   releaseNpm
   releaseNpmDryRun
 }

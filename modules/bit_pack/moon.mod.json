@@ -1,12 +1,11 @@
 {
   "name": "mizchi/bit_pack",
-  "version": "0.43.0",
+  "version": "0.43.1",
   "deps": {
-    "mizchi/bit": "0.43.0",
-    "mizchi/bit_object": "0.43.0",
-    "mizchi/bit_repo": "0.43.0",
-    "mizchi/bit_types": "0.43.0",
-    "mizchi/bit_protocol": "0.43.0",
+    "mizchi/bit_core": "0.43.1",
+    "mizchi/bit_object": "0.43.1",
+    "mizchi/bit_repo": "0.43.1",
+    "mizchi/bit_types": "0.43.1",
     "mizchi/tempfile": "0.1.2",
     "mizchi/zlib": "0.4.8",
     "moonbitlang/async": "0.19.4",

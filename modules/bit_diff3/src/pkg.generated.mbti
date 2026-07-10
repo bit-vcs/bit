@@ -1,5 +1,5 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "mizchi/bit/diff3"
+package "mizchi/bit_diff3"
 
 // Values
 pub fn content_merge(String, String, String, ContentMergeOptions) -> ContentMergeResult

@@ -1,10 +1,10 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "mizchi/bit/x-hub"
+package "mizchi/bitx_hub"
 
 import {
-  "mizchi/bit/lib",
-  "mizchi/bit/object",
-  "mizchi/bit/types",
+  "mizchi/bit_lib",
+  "mizchi/bit_object",
+  "mizchi/bit_types",
   "moonbitlang/core/debug",
 }
 
@@ -19,9 +19,9 @@ pub fn compare_vector_clocks(Map[String, Int64], Map[String, Int64]) -> Int
 
 pub fn default_record_merge_policy() -> RecordMergePolicy
 
-pub fn find_remote_notes_ref(Array[(@object.ObjectId, String)]) -> (@object.ObjectId, String)
+pub fn find_remote_notes_ref(Array[(@bit_object.ObjectId, String)]) -> (@bit_object.ObjectId, String)
 
-pub fn find_upload_notes_ref(Array[(@object.ObjectId, String)]) -> (@object.ObjectId, String)?
+pub fn find_upload_notes_ref(Array[(@bit_object.ObjectId, String)]) -> (@bit_object.ObjectId, String)?
 
 pub fn gh_issue_to_issue(GhIssue, existing_id? : String) -> Issue
 
@@ -41,7 +41,7 @@ pub fn issue_comment_prefix(String) -> String
 
 pub fn issue_diff_for_github(Issue, SyncLink, GhIssue) -> SyncDiff
 
-pub fn merge_notes_commits(Hub, &@types.FileSystem, String, &@lib.ObjectStore, &@lib.RefStore, @object.ObjectId, @object.ObjectId, conflict_policy? : RecordMergePolicy) -> PrSyncResult raise @object.GitError
+pub fn merge_notes_commits(Hub, &@bit_types.FileSystem, String, &@bit_lib.ObjectStore, &@bit_lib.RefStore, @bit_object.ObjectId, @bit_object.ObjectId, conflict_policy? : RecordMergePolicy) -> PrSyncResult raise @bit_object.GitError
 
 pub fn merge_record_bytes(Bytes, Bytes) -> Bytes
 
@@ -65,7 +65,7 @@ pub fn parse_legacy_pull_request(String) -> PullRequest raise PrError
 
 pub fn parse_note(String) -> Note
 
-pub fn parse_note_plain(@object.ObjectId, String) -> Note
+pub fn parse_note_plain(@bit_object.ObjectId, String) -> Note
 
 pub fn parse_pr_comment(String) -> PrComment raise PrError
 
@@ -115,7 +115,7 @@ pub fn work_item_meta_key(String) -> String
 
 pub fn work_item_meta_prefix() -> String
 
-pub fn write_object_bytes(&@types.FileSystem, String, @object.ObjectId, Bytes) -> Unit raise @object.GitError
+pub fn write_object_bytes(&@bit_types.FileSystem, String, @bit_object.ObjectId, Bytes) -> Unit raise @bit_object.GitError
 
 // Errors
 pub(all) suberror PrError {
@@ -193,59 +193,61 @@ pub fn GhPullRequest::from_json(Map[String, Json]) -> Self
 pub struct Hub {
   mut store : HubStore
 }
-pub fn Hub::add_comment(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, String, reply_to? : String?, file_path? : String?, line_number? : Int?, commit_id? : @object.ObjectId?) -> PrComment raise @object.GitError
-pub fn Hub::add_issue_comment(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, String, reply_to? : String?) -> IssueComment raise @object.GitError
-pub fn Hub::add_note(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, @object.ObjectId, String, String, Int64, ns? : String) -> Note raise @object.GitError
-pub fn Hub::add_note_plain(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, @object.ObjectId, String, ns? : String) -> Unit raise @object.GitError
-pub fn Hub::broadcast_feature(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, String, summary? : String, closes_issues? : Array[String], session_url? : String?) -> Unit raise @object.GitError
-pub fn Hub::can_merge(Self, &@lib.ObjectStore, &@lib.RefStore, String) -> Bool raise @object.GitError
-pub fn Hub::check_merge_policy(Self, &@lib.ObjectStore, &@lib.RefStore, String, PrMergePolicy, signing_key? : String?) -> Unit raise @object.GitError
-pub fn Hub::close_issue(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String) -> Unit raise @object.GitError
-pub fn Hub::close_pr(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String) -> Unit raise @object.GitError
-pub fn Hub::create_issue(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, String, labels? : Array[String], assignees? : Array[String], parent_id? : String?) -> Issue raise @object.GitError
-pub fn Hub::create_pr(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, String, String, String, source_repo? : String?, source_ref? : String?) -> PullRequest raise @object.GitError
-pub fn Hub::delete_issue_comment(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String) -> Unit raise @object.GitError
-pub fn Hub::find_canonical_node(Self, &@lib.ObjectStore) -> String?
-pub fn Hub::find_sync_link_by_remote(Self, &@lib.ObjectStore, String, String, Int) -> SyncLink?
-pub fn Hub::get_issue(Self, &@lib.ObjectStore, String) -> Issue?
-pub fn Hub::get_note(Self, &@lib.ObjectStore, &@lib.RefStore, @object.ObjectId, ns? : String) -> Note? raise @object.GitError
-pub fn Hub::get_pr(Self, &@lib.ObjectStore, String) -> PullRequest?
-pub fn Hub::get_sync_link(Self, &@lib.ObjectStore, String, String) -> SyncLink?
-pub fn Hub::get_work_item(Self, &@lib.ObjectStore, String) -> WorkItem?
-pub fn Hub::import_issues(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, Array[Issue]) -> ImportStats raise @object.GitError
-pub fn Hub::import_pr_proposals(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, Array[PullRequest]) -> ImportStats raise @object.GitError
-pub fn Hub::import_prs(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, Array[PullRequest]) -> ImportStats raise @object.GitError
-pub fn Hub::init(&@lib.ObjectStore, &@lib.RefStore, node_id? : String, signing_key? : String?, require_signed? : Bool) -> Self raise @object.GitError
-pub fn Hub::is_approved(Self, &@lib.ObjectStore, String) -> Bool
-pub fn Hub::link_issue(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String) -> Unit raise @object.GitError
-pub fn Hub::link_pr_to_issue(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String) -> Unit raise @object.GitError
-pub fn Hub::list_comments(Self, &@lib.ObjectStore, String) -> Array[PrComment]
-pub fn Hub::list_feature_broadcasts(Self, &@lib.ObjectStore) -> Array[HubRecord]
-pub fn Hub::list_issue_comments(Self, &@lib.ObjectStore, String) -> Array[IssueComment]
-pub fn Hub::list_issues(Self, &@lib.ObjectStore, state? : IssueState?) -> Array[Issue]
-pub fn Hub::list_node_heartbeats(Self, &@lib.ObjectStore) -> Array[NodeHeartbeat]
-pub fn Hub::list_notes(Self, &@lib.ObjectStore, &@lib.RefStore, ns? : String) -> Array[Note] raise @object.GitError
-pub fn Hub::list_pr_proposals(Self, &@lib.ObjectStore) -> Array[PullRequest]
-pub fn Hub::list_pr_workflows(Self, &@lib.ObjectStore, String) -> Array[PrWorkflowResult]
-pub fn Hub::list_prs(Self, &@lib.ObjectStore, state? : PrState?) -> Array[PullRequest]
-pub fn Hub::list_reviews(Self, &@lib.ObjectStore, String) -> Array[PrReview]
-pub fn Hub::list_sub_issues(Self, &@lib.ObjectStore, String, state? : IssueState?) -> Array[Issue]
-pub fn Hub::list_sync_links(Self, &@lib.ObjectStore, repo? : String) -> Array[SyncLink]
-pub fn Hub::list_work_items(Self, &@lib.ObjectStore, state? : WorkItemState?, kind? : WorkItemKind?) -> Array[WorkItem]
-pub fn Hub::load(&@lib.ObjectStore, &@lib.RefStore, node_id? : String, signing_key? : String?, require_signed? : Bool) -> Self raise @object.GitError
-pub fn Hub::merge_pr(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, strategy? : PrMergeStrategy) -> PrMergeResult raise @object.GitError
-pub fn Hub::propose_pr(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, String, String, String, source_repo? : String?, source_ref? : String?, closes_issues? : Array[String]) -> PullRequest raise @object.GitError
-pub fn Hub::publish_node_heartbeat(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, commit_count? : Int, main_tip? : String) -> Unit raise @object.GitError
-pub fn Hub::put_sync_link(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, SyncLink) -> Unit raise @object.GitError
-pub fn Hub::record_pr_workflow(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, PrWorkflowStatus, String, String, txn_id? : String?, summary? : String) -> PrWorkflowResult raise @object.GitError
-pub fn Hub::reload_store(Self, &@lib.ObjectStore, &@lib.RefStore) -> Unit raise @object.GitError
-pub fn Hub::remove_note(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, @object.ObjectId, ns? : String) -> Unit raise @object.GitError
-pub fn Hub::reopen_issue(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String) -> Unit raise @object.GitError
-pub fn Hub::reopen_pr(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String) -> Unit raise @object.GitError
-pub fn Hub::submit_review(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, ReviewVerdict, String, @object.ObjectId) -> PrReview raise @object.GitError
-pub fn Hub::update_issue(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, title? : String?, body? : String?, labels? : Array[String]?, assignees? : Array[String]?) -> Issue raise @object.GitError
-pub fn Hub::update_issue_comment(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, String, String) -> Unit raise @object.GitError
-pub fn Hub::update_pr(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, title? : String?, body? : String?, labels? : Array[String]?) -> PullRequest raise @object.GitError
+pub fn Hub::add_comment(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, String, String, String, reply_to? : String?, file_path? : String?, line_number? : Int?, commit_id? : @bit_object.ObjectId?) -> PrComment raise @bit_object.GitError
+pub fn Hub::add_dep(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, String, String) -> Unit raise @bit_object.GitError
+pub fn Hub::add_issue_comment(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, String, String, String, reply_to? : String?) -> IssueComment raise @bit_object.GitError
+pub fn Hub::add_note(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, @bit_object.ObjectId, String, String, Int64, ns? : String) -> Note raise @bit_object.GitError
+pub fn Hub::add_note_plain(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, @bit_object.ObjectId, String, ns? : String) -> Unit raise @bit_object.GitError
+pub fn Hub::broadcast_feature(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, String, String, String, summary? : String, closes_issues? : Array[String], session_url? : String?) -> Unit raise @bit_object.GitError
+pub fn Hub::can_merge(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, String) -> Bool raise @bit_object.GitError
+pub fn Hub::check_merge_policy(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, String, PrMergePolicy, signing_key? : String?) -> Unit raise @bit_object.GitError
+pub fn Hub::close_issue(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, String) -> Unit raise @bit_object.GitError
+pub fn Hub::close_pr(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, String) -> Unit raise @bit_object.GitError
+pub fn Hub::create_issue(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, String, String, String, labels? : Array[String], assignees? : Array[String], parent_id? : String?) -> Issue raise @bit_object.GitError
+pub fn Hub::create_pr(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, String, String, String, String, String, source_repo? : String?, source_ref? : String?) -> PullRequest raise @bit_object.GitError
+pub fn Hub::delete_issue_comment(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, String, String) -> Unit raise @bit_object.GitError
+pub fn Hub::find_canonical_node(Self, &@bit_lib.ObjectStore) -> String?
+pub fn Hub::find_sync_link_by_remote(Self, &@bit_lib.ObjectStore, String, String, Int) -> SyncLink?
+pub fn Hub::get_issue(Self, &@bit_lib.ObjectStore, String) -> Issue?
+pub fn Hub::get_note(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, @bit_object.ObjectId, ns? : String) -> Note? raise @bit_object.GitError
+pub fn Hub::get_pr(Self, &@bit_lib.ObjectStore, String) -> PullRequest?
+pub fn Hub::get_sync_link(Self, &@bit_lib.ObjectStore, String, String) -> SyncLink?
+pub fn Hub::get_work_item(Self, &@bit_lib.ObjectStore, String) -> WorkItem?
+pub fn Hub::import_issues(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, Array[Issue]) -> ImportStats raise @bit_object.GitError
+pub fn Hub::import_pr_proposals(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, Array[PullRequest]) -> ImportStats raise @bit_object.GitError
+pub fn Hub::import_prs(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, Array[PullRequest]) -> ImportStats raise @bit_object.GitError
+pub fn Hub::init(&@bit_lib.ObjectStore, &@bit_lib.RefStore, node_id? : String, signing_key? : String?, require_signed? : Bool) -> Self raise @bit_object.GitError
+pub fn Hub::is_approved(Self, &@bit_lib.ObjectStore, String) -> Bool
+pub fn Hub::link_issue(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, String, String) -> Unit raise @bit_object.GitError
+pub fn Hub::link_pr_to_issue(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, String, String) -> Unit raise @bit_object.GitError
+pub fn Hub::list_comments(Self, &@bit_lib.ObjectStore, String) -> Array[PrComment]
+pub fn Hub::list_feature_broadcasts(Self, &@bit_lib.ObjectStore) -> Array[HubRecord]
+pub fn Hub::list_issue_comments(Self, &@bit_lib.ObjectStore, String) -> Array[IssueComment]
+pub fn Hub::list_issues(Self, &@bit_lib.ObjectStore, state? : IssueState?) -> Array[Issue]
+pub fn Hub::list_node_heartbeats(Self, &@bit_lib.ObjectStore) -> Array[NodeHeartbeat]
+pub fn Hub::list_notes(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, ns? : String) -> Array[Note] raise @bit_object.GitError
+pub fn Hub::list_pr_proposals(Self, &@bit_lib.ObjectStore) -> Array[PullRequest]
+pub fn Hub::list_pr_workflows(Self, &@bit_lib.ObjectStore, String) -> Array[PrWorkflowResult]
+pub fn Hub::list_prs(Self, &@bit_lib.ObjectStore, state? : PrState?) -> Array[PullRequest]
+pub fn Hub::list_reviews(Self, &@bit_lib.ObjectStore, String) -> Array[PrReview]
+pub fn Hub::list_sub_issues(Self, &@bit_lib.ObjectStore, String, state? : IssueState?) -> Array[Issue]
+pub fn Hub::list_sync_links(Self, &@bit_lib.ObjectStore, repo? : String) -> Array[SyncLink]
+pub fn Hub::list_work_items(Self, &@bit_lib.ObjectStore, state? : WorkItemState?, kind? : WorkItemKind?) -> Array[WorkItem]
+pub fn Hub::load(&@bit_lib.ObjectStore, &@bit_lib.RefStore, node_id? : String, signing_key? : String?, require_signed? : Bool) -> Self raise @bit_object.GitError
+pub fn Hub::merge_pr(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, String, String, strategy? : PrMergeStrategy) -> PrMergeResult raise @bit_object.GitError
+pub fn Hub::propose_pr(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, String, String, String, String, String, source_repo? : String?, source_ref? : String?, closes_issues? : Array[String]) -> PullRequest raise @bit_object.GitError
+pub fn Hub::publish_node_heartbeat(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, String, commit_count? : Int, main_tip? : String) -> Unit raise @bit_object.GitError
+pub fn Hub::put_sync_link(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, SyncLink) -> Unit raise @bit_object.GitError
+pub fn Hub::record_pr_workflow(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, String, String, PrWorkflowStatus, String, String, txn_id? : String?, summary? : String) -> PrWorkflowResult raise @bit_object.GitError
+pub fn Hub::reload_store(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore) -> Unit raise @bit_object.GitError
+pub fn Hub::remove_dep(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, String, String) -> Unit raise @bit_object.GitError
+pub fn Hub::remove_note(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, @bit_object.ObjectId, ns? : String) -> Unit raise @bit_object.GitError
+pub fn Hub::reopen_issue(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, String) -> Unit raise @bit_object.GitError
+pub fn Hub::reopen_pr(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, String) -> Unit raise @bit_object.GitError
+pub fn Hub::submit_review(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, String, String, ReviewVerdict, String, @bit_object.ObjectId) -> PrReview raise @bit_object.GitError
+pub fn Hub::update_issue(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, String, title? : String?, body? : String?, labels? : Array[String]?, assignees? : Array[String]?) -> Issue raise @bit_object.GitError
+pub fn Hub::update_issue_comment(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, String, String, String, String) -> Unit raise @bit_object.GitError
+pub fn Hub::update_pr(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, String, title? : String?, body? : String?, labels? : Array[String]?) -> PullRequest raise @bit_object.GitError
 
 pub struct HubRecord {
   version : Int
@@ -265,15 +267,15 @@ pub struct HubStore {
   node_id : String
   signing_key : String?
   require_signed : Bool
-  entries : Map[String, @object.ObjectId]
-  mut head : @object.ObjectId?
+  entries : Map[String, @bit_object.ObjectId]
+  mut head : @bit_object.ObjectId?
 }
-pub fn HubStore::delete_record(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, String) -> HubRecord raise @object.GitError
-pub fn HubStore::get_record(Self, &@lib.ObjectStore, String) -> HubRecord?
-pub fn HubStore::list_records(Self, &@lib.ObjectStore, String, include_deleted? : Bool) -> Array[HubRecord]
-pub fn HubStore::load(&@lib.ObjectStore, &@lib.RefStore, node_id? : String, signing_key? : String?, require_signed? : Bool) -> Self raise @object.GitError
+pub fn HubStore::delete_record(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, String, String, String) -> HubRecord raise @bit_object.GitError
+pub fn HubStore::get_record(Self, &@bit_lib.ObjectStore, String) -> HubRecord?
+pub fn HubStore::list_records(Self, &@bit_lib.ObjectStore, String, include_deleted? : Bool) -> Array[HubRecord]
+pub fn HubStore::load(&@bit_lib.ObjectStore, &@bit_lib.RefStore, node_id? : String, signing_key? : String?, require_signed? : Bool) -> Self raise @bit_object.GitError
 pub fn HubStore::node_id(Self) -> String
-pub fn HubStore::put_record(Self, &@lib.ObjectStore, &@lib.RefStore, &@lib.Clock, String, String, String, String) -> HubRecord raise @object.GitError
+pub fn HubStore::put_record(Self, &@bit_lib.ObjectStore, &@bit_lib.RefStore, &@bit_lib.Clock, String, String, String, String) -> HubRecord raise @bit_object.GitError
 pub fn HubStore::require_signed(Self) -> Bool
 pub fn HubStore::signing_key(Self) -> String?
 
@@ -298,16 +300,20 @@ pub struct Issue {
   linked_prs : Array[String]
   linked_issues : Array[String]
   parent_id : String?
+  blocked_by : Array[String]
+  blocking : Array[String]
 }
 pub fn Issue::assignees(Self) -> Array[String]
 pub fn Issue::author(Self) -> String
+pub fn Issue::blocked_by(Self) -> Array[String]
+pub fn Issue::blocking(Self) -> Array[String]
 pub fn Issue::body(Self) -> String
 pub fn Issue::created_at(Self) -> Int64
 pub fn Issue::id(Self) -> String
 pub fn Issue::labels(Self) -> Array[String]
 pub fn Issue::linked_issues(Self) -> Array[String]
 pub fn Issue::linked_prs(Self) -> Array[String]
-pub fn Issue::new(String, String, String, String, Int64, Int64, IssueState, labels? : Array[String], assignees? : Array[String], linked_prs? : Array[String], linked_issues? : Array[String], parent_id? : String?) -> Self
+pub fn Issue::new(String, String, String, String, Int64, Int64, IssueState, labels? : Array[String], assignees? : Array[String], linked_prs? : Array[String], linked_issues? : Array[String], parent_id? : String?, blocked_by? : Array[String], blocking? : Array[String]) -> Self
 pub fn Issue::serialize(Self) -> String
 pub fn Issue::state(Self) -> IssueState
 pub fn Issue::title(Self) -> String
@@ -348,7 +354,7 @@ pub struct NodeHeartbeat {
 }
 
 pub struct Note {
-  commit_id : @object.ObjectId
+  commit_id : @bit_object.ObjectId
   body : String
   author : String
   created_at : Int64
@@ -356,9 +362,9 @@ pub struct Note {
 }
 pub fn Note::author(Self) -> String
 pub fn Note::body(Self) -> String
-pub fn Note::commit_id(Self) -> @object.ObjectId
+pub fn Note::commit_id(Self) -> @bit_object.ObjectId
 pub fn Note::created_at(Self) -> Int64
-pub fn Note::new(@object.ObjectId, String, String, Int64, ns? : String) -> Self
+pub fn Note::new(@bit_object.ObjectId, String, String, Int64, ns? : String) -> Self
 pub fn Note::ns(Self) -> String
 pub fn Note::serialize(Self) -> String
 pub fn Note::serialize_plain(Self) -> String
@@ -372,16 +378,16 @@ pub struct PrComment {
   reply_to : String?
   file_path : String?
   line_number : Int?
-  commit_id : @object.ObjectId?
+  commit_id : @bit_object.ObjectId?
 }
 pub fn PrComment::author(Self) -> String
 pub fn PrComment::body(Self) -> String
-pub fn PrComment::commit_id(Self) -> @object.ObjectId?
+pub fn PrComment::commit_id(Self) -> @bit_object.ObjectId?
 pub fn PrComment::created_at(Self) -> Int64
 pub fn PrComment::file_path(Self) -> String?
 pub fn PrComment::id(Self) -> String
 pub fn PrComment::line_number(Self) -> Int?
-pub fn PrComment::new(String, String, String, String, Int64, reply_to? : String?, file_path? : String?, line_number? : Int?, commit_id? : @object.ObjectId?) -> Self
+pub fn PrComment::new(String, String, String, String, Int64, reply_to? : String?, file_path? : String?, line_number? : Int?, commit_id? : @bit_object.ObjectId?) -> Self
 pub fn PrComment::pr_id(Self) -> String
 pub fn PrComment::reply_to(Self) -> String?
 pub fn PrComment::serialize(Self) -> String
@@ -401,11 +407,11 @@ pub fn PrMergePolicy::required_workflows(Self) -> Array[String]
 
 pub struct PrMergeResult {
   success : Bool
-  commit_id : @object.ObjectId?
+  commit_id : @bit_object.ObjectId?
   conflicts : Array[String]
   message : String
 }
-pub fn PrMergeResult::commit_id(Self) -> @object.ObjectId?
+pub fn PrMergeResult::commit_id(Self) -> @bit_object.ObjectId?
 pub fn PrMergeResult::conflicts(Self) -> Array[String]
 pub fn PrMergeResult::message(Self) -> String
 pub fn PrMergeResult::success(Self) -> Bool
@@ -423,14 +429,14 @@ pub struct PrReview {
   verdict : ReviewVerdict
   body : String
   created_at : Int64
-  commit_id : @object.ObjectId
+  commit_id : @bit_object.ObjectId
 }
 pub fn PrReview::author(Self) -> String
 pub fn PrReview::body(Self) -> String
-pub fn PrReview::commit_id(Self) -> @object.ObjectId
+pub fn PrReview::commit_id(Self) -> @bit_object.ObjectId
 pub fn PrReview::created_at(Self) -> Int64
 pub fn PrReview::id(Self) -> String
-pub fn PrReview::new(String, String, String, ReviewVerdict, String, Int64, @object.ObjectId) -> Self
+pub fn PrReview::new(String, String, String, ReviewVerdict, String, Int64, @bit_object.ObjectId) -> Self
 pub fn PrReview::pr_id(Self) -> String
 pub fn PrReview::serialize(Self) -> String
 pub fn PrReview::verdict(Self) -> ReviewVerdict
@@ -447,13 +453,13 @@ pub impl Show for PrState
 pub struct PrSyncResult {
   success : Bool
   message : String
-  local_commit : @object.ObjectId?
-  remote_commit : @object.ObjectId?
+  local_commit : @bit_object.ObjectId?
+  remote_commit : @bit_object.ObjectId?
 }
-pub fn PrSyncResult::local_commit(Self) -> @object.ObjectId?
+pub fn PrSyncResult::local_commit(Self) -> @bit_object.ObjectId?
 pub fn PrSyncResult::message(Self) -> String
-pub fn PrSyncResult::new(Bool, String, @object.ObjectId?, @object.ObjectId?) -> Self
-pub fn PrSyncResult::remote_commit(Self) -> @object.ObjectId?
+pub fn PrSyncResult::new(Bool, String, @bit_object.ObjectId?, @bit_object.ObjectId?) -> Self
+pub fn PrSyncResult::remote_commit(Self) -> @bit_object.ObjectId?
 pub fn PrSyncResult::success(Self) -> Bool
 
 pub struct PrWorkflowResult {
@@ -493,16 +499,16 @@ pub struct PullRequest {
   source_branch : String
   source_repo : String?
   source_ref : String?
-  source_commit : @object.ObjectId
+  source_commit : @bit_object.ObjectId
   target_branch : String
-  target_commit : @object.ObjectId
+  target_commit : @bit_object.ObjectId
   author : String
   created_at : Int64
   updated_at : Int64
   state : PrState
   labels : Array[String]
   closes_issues : Array[String]
-  merge_commit : @object.ObjectId?
+  merge_commit : @bit_object.ObjectId?
 }
 pub fn PullRequest::author(Self) -> String
 pub fn PullRequest::body(Self) -> String
@@ -510,16 +516,16 @@ pub fn PullRequest::closes_issues(Self) -> Array[String]
 pub fn PullRequest::created_at(Self) -> Int64
 pub fn PullRequest::id(Self) -> String
 pub fn PullRequest::labels(Self) -> Array[String]
-pub fn PullRequest::merge_commit(Self) -> @object.ObjectId?
-pub fn PullRequest::new(String, String, String, String, @object.ObjectId, String, @object.ObjectId, String, Int64, Int64, PrState, Array[String], closes_issues? : Array[String], merge_commit? : @object.ObjectId?, source_repo? : String?, source_ref? : String?) -> Self
+pub fn PullRequest::merge_commit(Self) -> @bit_object.ObjectId?
+pub fn PullRequest::new(String, String, String, String, @bit_object.ObjectId, String, @bit_object.ObjectId, String, Int64, Int64, PrState, Array[String], closes_issues? : Array[String], merge_commit? : @bit_object.ObjectId?, source_repo? : String?, source_ref? : String?) -> Self
 pub fn PullRequest::serialize(Self) -> String
 pub fn PullRequest::source_branch(Self) -> String
-pub fn PullRequest::source_commit(Self) -> @object.ObjectId
+pub fn PullRequest::source_commit(Self) -> @bit_object.ObjectId
 pub fn PullRequest::source_ref(Self) -> String?
 pub fn PullRequest::source_repo(Self) -> String?
 pub fn PullRequest::state(Self) -> PrState
 pub fn PullRequest::target_branch(Self) -> String
-pub fn PullRequest::target_commit(Self) -> @object.ObjectId
+pub fn PullRequest::target_commit(Self) -> @bit_object.ObjectId
 pub fn PullRequest::title(Self) -> String
 pub fn PullRequest::to_work_item(Self) -> WorkItem
 pub fn PullRequest::updated_at(Self) -> Int64
@@ -589,9 +595,13 @@ pub struct WorkItem {
   linked_issues : Array[String]
   patch : WorkItemPatch?
   parent_id : String?
+  blocked_by : Array[String]
+  blocking : Array[String]
 }
 pub fn WorkItem::assignees(Self) -> Array[String]
 pub fn WorkItem::author(Self) -> String
+pub fn WorkItem::blocked_by(Self) -> Array[String]
+pub fn WorkItem::blocking(Self) -> Array[String]
 pub fn WorkItem::body(Self) -> String
 pub fn WorkItem::created_at(Self) -> Int64
 pub fn WorkItem::id(Self) -> String
@@ -599,7 +609,7 @@ pub fn WorkItem::kind(Self) -> WorkItemKind
 pub fn WorkItem::labels(Self) -> Array[String]
 pub fn WorkItem::linked_issues(Self) -> Array[String]
 pub fn WorkItem::linked_prs(Self) -> Array[String]
-pub fn WorkItem::new(String, String, String, String, Int64, Int64, WorkItemState, labels? : Array[String], assignees? : Array[String], linked_prs? : Array[String], linked_issues? : Array[String], patch? : WorkItemPatch?, parent_id? : String?) -> Self
+pub fn WorkItem::new(String, String, String, String, Int64, Int64, WorkItemState, labels? : Array[String], assignees? : Array[String], linked_prs? : Array[String], linked_issues? : Array[String], patch? : WorkItemPatch?, parent_id? : String?, blocked_by? : Array[String], blocking? : Array[String]) -> Self
 pub fn WorkItem::patch(Self) -> WorkItemPatch?
 pub fn WorkItem::serialize(Self) -> String
 pub fn WorkItem::state(Self) -> WorkItemState
@@ -619,21 +629,21 @@ pub struct WorkItemPatch {
   source_branch : String
   source_repo : String?
   source_ref : String?
-  source_commit : @object.ObjectId
+  source_commit : @bit_object.ObjectId
   target_branch : String
-  target_commit : @object.ObjectId
+  target_commit : @bit_object.ObjectId
   closes_issues : Array[String]
-  merge_commit : @object.ObjectId?
+  merge_commit : @bit_object.ObjectId?
 }
 pub fn WorkItemPatch::closes_issues(Self) -> Array[String]
-pub fn WorkItemPatch::merge_commit(Self) -> @object.ObjectId?
-pub fn WorkItemPatch::new(String, @object.ObjectId, String, @object.ObjectId, closes_issues? : Array[String], merge_commit? : @object.ObjectId?, source_repo? : String?, source_ref? : String?) -> Self
+pub fn WorkItemPatch::merge_commit(Self) -> @bit_object.ObjectId?
+pub fn WorkItemPatch::new(String, @bit_object.ObjectId, String, @bit_object.ObjectId, closes_issues? : Array[String], merge_commit? : @bit_object.ObjectId?, source_repo? : String?, source_ref? : String?) -> Self
 pub fn WorkItemPatch::source_branch(Self) -> String
-pub fn WorkItemPatch::source_commit(Self) -> @object.ObjectId
+pub fn WorkItemPatch::source_commit(Self) -> @bit_object.ObjectId
 pub fn WorkItemPatch::source_ref(Self) -> String?
 pub fn WorkItemPatch::source_repo(Self) -> String?
 pub fn WorkItemPatch::target_branch(Self) -> String
-pub fn WorkItemPatch::target_commit(Self) -> @object.ObjectId
+pub fn WorkItemPatch::target_commit(Self) -> @bit_object.ObjectId
 
 pub(all) enum WorkItemState {
   Open

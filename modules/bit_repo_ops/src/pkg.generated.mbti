@@ -1,44 +1,44 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "mizchi/bit/repo_ops"
+package "mizchi/bit_repo_ops"
 
 import {
-  "mizchi/bit/lib",
-  "mizchi/bit/object",
-  "mizchi/bit/types",
+  "mizchi/bit_lib",
+  "mizchi/bit_object",
+  "mizchi/bit_types",
 }
 
 // Values
-pub fn append_reflog(&@types.FileSystem, &@types.RepoFileSystem, String, String, @object.ObjectId, @object.ObjectId, String, String, Int64, String, String) -> Unit raise @object.GitError
+pub fn append_reflog(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, @bit_object.ObjectId, @bit_object.ObjectId, String, String, Int64, String, String) -> Unit raise @bit_object.GitError
 
-pub fn apply_template(&@types.FileSystem, &@types.RepoFileSystem, String, String) -> Unit raise @object.GitError
+pub fn apply_template(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String) -> Unit raise @bit_object.GitError
 
-pub fn create_reflog(&@types.FileSystem, &@types.RepoFileSystem, String, String) -> Unit raise @object.GitError
+pub fn create_reflog(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String) -> Unit raise @bit_object.GitError
 
-pub fn delete_reflog(&@types.FileSystem, &@types.RepoFileSystem, String, String) -> Unit raise @object.GitError
+pub fn delete_reflog(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String) -> Unit raise @bit_object.GitError
 
-pub fn init_repo(&@types.FileSystem, String, default_branch? : String, bare? : Bool) -> Unit raise @object.GitError
+pub fn init_repo(&@bit_types.FileSystem, String, default_branch? : String, bare? : Bool) -> Unit raise @bit_object.GitError
 
-pub fn init_repo_with_options(&@types.FileSystem, &@types.RepoFileSystem, String, @lib.InitOptions) -> Unit raise @object.GitError
+pub fn init_repo_with_options(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, @bit_lib.InitOptions) -> Unit raise @bit_object.GitError
 
-pub fn init_repo_with_options_with_repo_fs(&@types.FileSystem, &@types.RepoFileSystem, String, @lib.InitOptions) -> Unit raise @object.GitError
+pub fn init_repo_with_options_with_repo_fs(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, @bit_lib.InitOptions) -> Unit raise @bit_object.GitError
 
 pub fn parse_upstream_push_spec(String) -> (String, String, String)?
 
-pub fn read_reflog(&@types.RepoFileSystem, String, String) -> Array[@lib.ReflogEntry] raise @object.GitError
+pub fn read_reflog(&@bit_types.RepoFileSystem, String, String) -> Array[@bit_lib.ReflogEntry] raise @bit_object.GitError
 
-pub fn reflog_exists(&@types.RepoFileSystem, String, String) -> Bool
+pub fn reflog_exists(&@bit_types.RepoFileSystem, String, String) -> Bool
 
-pub fn resolve_push_ref(&@types.RepoFileSystem, String, String) -> String raise @object.GitError
+pub fn resolve_push_ref(&@bit_types.RepoFileSystem, String, String) -> String raise @bit_object.GitError
 
-pub fn resolve_upstream_ref(&@types.RepoFileSystem, String, String) -> String raise @object.GitError
+pub fn resolve_upstream_ref(&@bit_types.RepoFileSystem, String, String) -> String raise @bit_object.GitError
 
-pub fn rev_parse(&@types.RepoFileSystem, String, String) -> @object.ObjectId? raise @object.GitError
+pub fn rev_parse(&@bit_types.RepoFileSystem, String, String) -> @bit_object.ObjectId? raise @bit_object.GitError
 
-pub fn should_log_ref(&@types.RepoFileSystem, String, String, Bool) -> (Bool, Bool) raise @object.GitError
+pub fn should_log_ref(&@bit_types.RepoFileSystem, String, String, Bool) -> (Bool, Bool) raise @bit_object.GitError
 
-pub fn show_ref(&@types.RepoFileSystem, String) -> Array[(String, @object.ObjectId)] raise @object.GitError
+pub fn show_ref(&@bit_types.RepoFileSystem, String) -> Array[(String, @bit_object.ObjectId)] raise @bit_object.GitError
 
-pub fn show_ref_text(&@types.RepoFileSystem, String) -> Array[String] raise @object.GitError
+pub fn show_ref_text(&@bit_types.RepoFileSystem, String) -> Array[String] raise @bit_object.GitError
 
 // Errors
 

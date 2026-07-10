@@ -1,22 +1,22 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "mizchi/bit/diff"
+package "mizchi/bit_diff"
 
 import {
-  "mizchi/bit/lib",
-  "mizchi/bit/object",
-  "mizchi/bit/types",
+  "mizchi/bit_lib",
+  "mizchi/bit_object",
+  "mizchi/bit_types",
 }
 
 // Values
-pub fn diff_index(&@types.RepoFileSystem, String) -> Array[DiffFile] raise @object.GitError
+pub fn diff_index(&@bit_types.RepoFileSystem, String) -> Array[DiffFile] raise @bit_object.GitError
 
 pub fn diff_stat(Array[DiffFile]) -> Array[String]
 
 pub fn diff_text(Array[DiffFile], context_lines? : Int) -> Array[String]
 
-pub fn diff_trees(&@types.RepoFileSystem, String, @object.ObjectId?, @object.ObjectId, db? : @lib.ObjectDb) -> Array[DiffFile] raise @object.GitError
+pub fn diff_trees(&@bit_types.RepoFileSystem, String, @bit_object.ObjectId?, @bit_object.ObjectId, db? : @bit_lib.ObjectDb) -> Array[DiffFile] raise @bit_object.GitError
 
-pub async fn diff_worktree(&@types.RepoFileSystem, String) -> Array[DiffFile] raise @object.GitError
+pub async fn diff_worktree(&@bit_types.RepoFileSystem, String) -> Array[DiffFile] raise @bit_object.GitError
 
 // Errors
 

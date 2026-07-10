@@ -1,5 +1,5 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "mizchi/bit/diff_core"
+package "mizchi/bit_diff_core"
 
 // Values
 pub fn count_lines(Bytes) -> Int

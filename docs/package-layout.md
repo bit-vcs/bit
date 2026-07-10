@@ -24,6 +24,7 @@ modules/
   bit_archive/
   bit_bootstrap/
   bit_config/
+  bit_core/                ← internal facade used to keep module publishing acyclic
   bit_date/
   bit_diff/
   bit_diff3/
@@ -34,6 +35,7 @@ modules/
   bit_hash/
   bit_ignore/
   bit_io/
+  bit_io_native/
   bit_lib/
   bit_object/
   bit_osfs/
@@ -99,13 +101,14 @@ is to keep extracting until every core package is its own module.
 | `mizchi/bit_osfs`             | `modules/bit_osfs/src`            | `gix-fs` (OS-backed impl)          |
 | `mizchi/bit_bootstrap`        | `modules/bit_bootstrap/src`       | (bootstrap helpers)                |
 | `mizchi/bit_config`           | `modules/bit_config/src`          | `gix-config`                       |
+| `mizchi/bit_core`             | `modules/bit_core/src`            | Stable internal facade             |
 | `mizchi/bit_object`           | `modules/bit_object/src`          | `gix-object`                       |
 | `mizchi/bit_pack`             | `modules/bit_pack/src`            | `gix-pack`                         |
 | `mizchi/bit_protocol`         | `modules/bit_protocol/src`        | `gix-protocol` + `gix-transport`   |
 | `mizchi/bit_reftable`         | `modules/bit_reftable/src`        | (reftable backend)                 |
 | `mizchi/bit_types`            | `modules/bit_types/src`           | (shared types, re-exports object)  |
 | `mizchi/bit_io`               | `modules/bit_io/src`              | `gix-fs` (abstract + native)       |
-| `mizchi/bit_io/native`        | `modules/bit_io/src/native`       | `gix-fs` (native bindings)         |
+| `mizchi/bit_io_native`        | `modules/bit_io_native/src`       | `gix-fs` (native bindings)         |
 | `mizchi/bit_refs`             | `modules/bit_refs/src`            | `gix-ref`                          |
 | `mizchi/bit_remote`           | `modules/bit_remote/src`          | `gix-url` + `gix-discover`         |
 | `mizchi/bit_repo`             | `modules/bit_repo/src`            | (repo handle)                      |

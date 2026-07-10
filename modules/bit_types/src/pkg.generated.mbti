@@ -1,8 +1,8 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "mizchi/bit/types"
+package "mizchi/bit_types"
 
 import {
-  "mizchi/bit/object",
+  "mizchi/bit_object",
 }
 
 // Values
@@ -25,48 +25,48 @@ pub fn MockHttpClient::new() -> Self
 pub impl HttpClient for MockHttpClient
 
 // Type aliases
-pub using @object {type Commit}
+pub using @bit_object {type Commit}
 
-pub using @object {type GitError}
+pub using @bit_object {type GitError}
 
-pub using @object {type HashAlgorithm}
+pub using @bit_object {type HashAlgorithm}
 
-pub using @object {type HashState}
+pub using @bit_object {type HashState}
 
-pub using @object {type ObjectId}
+pub using @bit_object {type ObjectId}
 
-pub using @object {type ObjectType}
+pub using @bit_object {type ObjectType}
 
-pub using @object {type PackCompression}
+pub using @bit_object {type PackCompression}
 
-pub using @object {type PackDeltaMode}
+pub using @bit_object {type PackDeltaMode}
 
-pub using @object {type PackObject}
+pub using @bit_object {type PackObject}
 
-pub using @object {type Sha1State}
+pub using @bit_object {type Sha1State}
 
-pub using @object {type Sha256State}
+pub using @bit_object {type Sha256State}
 
-pub using @object {type TreeEntry}
+pub using @bit_object {type TreeEntry}
 
 // Traits
 pub(open) trait FileSystem {
-  mkdir_p(Self, String) -> Unit raise @object.GitError
-  write_file(Self, String, Bytes) -> Unit raise @object.GitError
-  write_string(Self, String, String) -> Unit raise @object.GitError
-  remove_file(Self, String) -> Unit raise @object.GitError
-  remove_dir(Self, String) -> Unit raise @object.GitError
+  fn mkdir_p(Self, String) -> Unit raise @bit_object.GitError
+  fn write_file(Self, String, Bytes) -> Unit raise @bit_object.GitError
+  fn write_string(Self, String, String) -> Unit raise @bit_object.GitError
+  fn remove_file(Self, String) -> Unit raise @bit_object.GitError
+  fn remove_dir(Self, String) -> Unit raise @bit_object.GitError
 }
 
 pub(open) trait HttpClient {
-  get(Self, String, Map[String, String]) -> (HttpResponse, Bytes) raise @object.GitError
-  post(Self, String, Bytes, Map[String, String]) -> (HttpResponse, Bytes) raise @object.GitError
+  fn get(Self, String, Map[String, String]) -> (HttpResponse, Bytes) raise @bit_object.GitError
+  fn post(Self, String, Bytes, Map[String, String]) -> (HttpResponse, Bytes) raise @bit_object.GitError
 }
 
 pub(open) trait RepoFileSystem {
-  read_file(Self, String) -> Bytes raise @object.GitError
-  readdir(Self, String) -> Array[String] raise @object.GitError
-  is_dir(Self, String) -> Bool
-  is_file(Self, String) -> Bool
+  fn read_file(Self, String) -> Bytes raise @bit_object.GitError
+  fn readdir(Self, String) -> Array[String] raise @bit_object.GitError
+  fn is_dir(Self, String) -> Bool
+  fn is_file(Self, String) -> Bool
 }
 

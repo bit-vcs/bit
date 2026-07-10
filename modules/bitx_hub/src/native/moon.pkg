@@ -1,10 +1,10 @@
 import {
-  "mizchi/bit" @bit,
+  "mizchi/bit_core" @bit,
   "mizchi/bit_object" @object,
   "mizchi/bit_types" @types,
   "mizchi/bit_pack" @pack,
   "mizchi/bit_protocol" @protocol,
-  "mizchi/bit_io/native" @bitnative,
+  "mizchi/bit_io_native" @bitnative,
   "mizchi/bit_io" @io,
   "mizchi/bit_lib" @lib,
   "mizchi/bitx_hub" @hub,

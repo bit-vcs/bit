@@ -2,8 +2,8 @@
 package "mizchi/bit/cmd/git-bit"
 
 import {
-  "mizchi/bit/object",
-  "mizchi/bit/types",
+  "mizchi/bit_object",
+  "mizchi/bit_types",
 }
 
 // Values
@@ -29,8 +29,8 @@ pub struct OsFs {
   dummy : Int
 }
 pub fn OsFs::new() -> Self
-pub impl @types.FileSystem for OsFs
-pub impl @types.RepoFileSystem for OsFs
+pub impl @bit_types.FileSystem for OsFs
+pub impl @bit_types.RepoFileSystem for OsFs
 
 type OsObjectStore
 

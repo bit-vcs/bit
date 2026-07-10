@@ -1,5 +1,5 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "mizchi/bit/tar"
+package "mizchi/bit_archive"
 
 // Values
 pub fn tar_emit_parent_dirs(Array[Byte], String, Int64, Map[String, Bool]) -> Unit

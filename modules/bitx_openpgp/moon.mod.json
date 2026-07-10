@@ -1,6 +1,6 @@
 {
   "name": "mizchi/bitx_openpgp",
-  "version": "0.43.0",
+  "version": "0.43.1",
   "deps": {
     "mizchi/experimental_crypto": "0.0.2"
   },

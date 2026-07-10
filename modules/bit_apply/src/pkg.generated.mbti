@@ -1,5 +1,5 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "mizchi/bit/apply"
+package "mizchi/bit_apply"
 
 // Values
 pub fn make_rename_display(String, String) -> String

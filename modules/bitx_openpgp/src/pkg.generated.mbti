@@ -1,0 +1,21 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mizchi/bitx_openpgp"
+
+// Values
+pub fn split_armored_public_keys(String) -> Array[String]
+
+pub fn verify_detached_armored(Bytes, String, Array[String]) -> VerifyResult
+
+pub fn verify_ssh_detached(Bytes, String, String) -> VerifyResult
+
+// Errors
+
+// Types and methods
+pub struct VerifyResult {
+  verified : Bool
+  error : String?
+}
+
+// Type aliases
+
+// Traits

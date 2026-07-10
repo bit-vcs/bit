@@ -1253,45 +1253,6 @@ async test "git oracle: symlink mode 120000" {
 }
 
 // =============================================================================
-// refs parsing Oracle Tests
-// =============================================================================
-
-///|
-async test "git oracle: parse refs from pkt-line format" {
-  // parse_refs expects pkt-line encoded data (git protocol format)
-  // Format: {4-byte length}{sha} {refname}\n
-  let line1 = "ce013625030ba8dba906f756967f9e9ca394464a refs/heads/main\n"
-  let line2 = "cc628ccd10742baea8241c5924df992b5c019f71 refs/heads/feature\n"
-  // Build pkt-line encoded bytes
-  let out : Array[Byte] = []
-  for b in @protocol.pktline_encode(line1) {
-    out.push(b)
-  }
-  for b in @protocol.pktline_encode(line2) {
-    out.push(b)
-  }
-  for b in @protocol.pktline_flush() {
-    out.push(b)
-  }
-  let refs_bytes = Bytes::from_array(
-    FixedArray::makei(out.length(), fn(i) { out[i] }),
-  )
-  let refs = @protocol.parse_refs(refs_bytes) catch {
-    _ => {
-      assert_true(false)
-      []
-    }
-  }
-  assert_true(refs.length() == 2)
-  let (id1, name1) = refs[0]
-  let (id2, name2) = refs[1]
-  assert_true(name1 == "refs/heads/main")
-  assert_true(id1.to_hex() == "ce013625030ba8dba906f756967f9e9ca394464a")
-  assert_true(name2 == "refs/heads/feature")
-  assert_true(id2.to_hex() == "cc628ccd10742baea8241c5924df992b5c019f71")
-}
-
-// =============================================================================
 // MoonBit-generated objects verified by git
 // =============================================================================
 

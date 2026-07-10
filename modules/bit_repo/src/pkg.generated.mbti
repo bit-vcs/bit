@@ -1,15 +1,15 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "mizchi/bit/repo"
+package "mizchi/bit_repo"
 
 import {
-  "mizchi/bit/object",
-  "mizchi/bit/types",
+  "mizchi/bit_object",
+  "mizchi/bit_types",
 }
 
 // Values
-pub fn checkout_commit(ObjectStore, @object.ObjectId) -> Map[String, Bytes] raise @object.GitError
+pub fn checkout_commit(ObjectStore, @bit_object.ObjectId) -> Map[String, Bytes] raise @bit_object.GitError
 
-pub fn checkout_commit_to_fs(ObjectStore, @object.ObjectId, &@types.FileSystem, String) -> Unit raise @object.GitError
+pub fn checkout_commit_to_fs(ObjectStore, @bit_object.ObjectId, &@bit_types.FileSystem, String) -> Unit raise @bit_object.GitError
 
 pub fn is_gitlink_mode(String) -> Bool
 
@@ -17,33 +17,33 @@ pub fn is_tree_mode(String) -> Bool
 
 pub fn join_path(String, String) -> String
 
-pub fn materialize_clone_to_fs(ObjectStore, @object.ObjectId, String, String, &@types.FileSystem, String) -> Unit raise @object.GitError
+pub fn materialize_clone_to_fs(ObjectStore, @bit_object.ObjectId, String, String, &@bit_types.FileSystem, String) -> Unit raise @bit_object.GitError
 
 pub fn parent_dir(String) -> String
 
-pub fn parse_commit(Bytes) -> CommitInfo raise @object.GitError
+pub fn parse_commit(Bytes) -> CommitInfo raise @bit_object.GitError
 
-pub fn parse_tree(Bytes) -> Array[@object.TreeEntry] raise @object.GitError
+pub fn parse_tree(Bytes) -> Array[@bit_object.TreeEntry] raise @bit_object.GitError
 
-pub fn verify_tree_entry_name(String) -> Unit raise @object.GitError
+pub fn verify_tree_entry_name(String) -> Unit raise @bit_object.GitError
 
-pub fn write_git_metadata(ObjectStore, @object.ObjectId, String, String, &@types.FileSystem, String) -> Unit raise @object.GitError
+pub fn write_git_metadata(ObjectStore, @bit_object.ObjectId, String, String, &@bit_types.FileSystem, String) -> Unit raise @bit_object.GitError
 
 // Errors
 
 // Types and methods
 pub struct CommitInfo {
-  tree : @object.ObjectId
-  parents : Array[@object.ObjectId]
+  tree : @bit_object.ObjectId
+  parents : Array[@bit_object.ObjectId]
 }
 
 pub struct ObjectStore {
-  objects : Map[String, @object.PackObject]
+  objects : Map[String, @bit_object.PackObject]
 }
-pub fn ObjectStore::add_objects(Self, Array[@object.PackObject]) -> Unit
-pub fn ObjectStore::contains(Self, @object.ObjectId) -> Bool
-pub fn ObjectStore::from_pack(Array[@object.PackObject]) -> Self
-pub fn ObjectStore::get(Self, @object.ObjectId) -> @object.PackObject?
+pub fn ObjectStore::add_objects(Self, Array[@bit_object.PackObject]) -> Unit
+pub fn ObjectStore::contains(Self, @bit_object.ObjectId) -> Bool
+pub fn ObjectStore::from_pack(Array[@bit_object.PackObject]) -> Self
+pub fn ObjectStore::get(Self, @bit_object.ObjectId) -> @bit_object.PackObject?
 pub fn ObjectStore::new() -> Self
 
 // Type aliases

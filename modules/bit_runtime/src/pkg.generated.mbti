@@ -1,13 +1,13 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "mizchi/bit/runtime"
+package "mizchi/bit_runtime"
 
 import {
-  "mizchi/bit/object",
-  "mizchi/bit/types",
+  "mizchi/bit_object",
+  "mizchi/bit_types",
 }
 
 // Values
-pub fn run_storage_command(&@types.FileSystem, &@types.RepoFileSystem, String, StorageCommand) -> Unit raise
+pub fn run_storage_command(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, StorageCommand) -> Unit raise
 
 // Errors
 
@@ -42,7 +42,7 @@ pub(all) struct StorageHashObjectArgs {
   stdin_paths : Bool
   no_filters : Bool
   literally : Bool
-  obj_type : @object.ObjectType
+  obj_type : @bit_object.ObjectType
   paths : Array[String]
   object_format : String
   path_hint : String

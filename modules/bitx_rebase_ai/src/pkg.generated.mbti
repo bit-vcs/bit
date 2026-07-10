@@ -1,31 +1,31 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "mizchi/bit/x-rebase-ai"
+package "mizchi/bitx_rebase_ai"
 
 import {
-  "mizchi/bit/lib",
-  "mizchi/bit/object",
-  "mizchi/bit/types",
+  "mizchi/bit_lib",
+  "mizchi/bit_object",
+  "mizchi/bit_types",
   "mizchi/llm",
 }
 
 // Values
-pub fn ai_generate_commit_message(&@types.RepoFileSystem, String, String, String, options? : AiRebaseOptions) -> String raise @object.GitError
+pub fn ai_generate_commit_message(&@bit_types.RepoFileSystem, String, String, String, options? : AiRebaseOptions) -> String raise @bit_object.GitError
 
-pub fn ai_rebase_abort(&@types.FileSystem, &@types.RepoFileSystem, String) -> Unit raise @object.GitError
+pub fn ai_rebase_abort(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String) -> Unit raise @bit_object.GitError
 
-pub fn ai_rebase_continue(&@types.FileSystem, &@types.RepoFileSystem, String, options? : AiRebaseOptions) -> @lib.RebaseResult raise @object.GitError
+pub fn ai_rebase_continue(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, options? : AiRebaseOptions) -> @bit_lib.RebaseResult raise @bit_object.GitError
 
-pub fn ai_rebase_skip(&@types.FileSystem, &@types.RepoFileSystem, String, options? : AiRebaseOptions) -> @lib.RebaseResult raise @object.GitError
+pub fn ai_rebase_skip(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, options? : AiRebaseOptions) -> @bit_lib.RebaseResult raise @bit_object.GitError
 
-pub fn ai_rebase_start(&@types.FileSystem, &@types.RepoFileSystem, String, @object.ObjectId, options? : AiRebaseOptions) -> @lib.RebaseResult raise @object.GitError
+pub fn ai_rebase_start(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, @bit_object.ObjectId, options? : AiRebaseOptions) -> @bit_lib.RebaseResult raise @bit_object.GitError
 
-pub fn ai_resolve_conflict_paths(&@types.FileSystem, &@types.RepoFileSystem, String, Array[String], AiRebaseOptions, String) -> AiConflictResolution raise @object.GitError
+pub fn ai_resolve_conflict_paths(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, Array[String], AiRebaseOptions, String) -> AiConflictResolution raise @bit_object.GitError
 
 pub let default_model : String
 
 pub let default_provider : String
 
-pub fn find_conflict_marker_paths(&@types.RepoFileSystem, String) -> Array[String]
+pub fn find_conflict_marker_paths(&@bit_types.RepoFileSystem, String) -> Array[String]
 
 // Errors
 

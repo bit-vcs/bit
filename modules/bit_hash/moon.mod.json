@@ -1,6 +1,6 @@
 {
   "name": "mizchi/bit_hash",
-  "version": "0.43.0",
+  "version": "0.43.1",
   "deps": {
     "mizchi/simd": "0.4.1"
   },

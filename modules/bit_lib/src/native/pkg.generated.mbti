@@ -1,51 +1,51 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "mizchi/bit/lib/native"
+package "mizchi/bit_lib/native"
 
 import {
-  "mizchi/bit/lib",
-  "mizchi/bit/object",
-  "mizchi/bit/types",
+  "mizchi/bit_lib",
+  "mizchi/bit_object",
+  "mizchi/bit_types",
   "moonbitlang/core/debug",
 }
 
 // Values
-pub async fn apply_worktree_modes_from_commit(&@types.FileSystem, &@types.RepoFileSystem, String, String, @object.ObjectId) -> Unit raise @object.GitError
+pub async fn apply_worktree_modes_from_commit(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, @bit_object.ObjectId) -> Unit raise @bit_object.GitError
 
-pub async fn clone_http(&@types.FileSystem, &@types.RepoFileSystem, String, String, Bool) -> @object.ObjectId? raise @object.GitError
+pub async fn clone_http(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, Bool) -> @bit_object.ObjectId? raise @bit_object.GitError
 
-pub async fn lfs_batch_request(String, Array[@lib.LfsPointer]) -> (Array[LfsDownloadAction], Array[LfsDownloadError]) raise @object.GitError
+pub async fn lfs_batch_request(String, Array[@bit_lib.LfsPointer]) -> (Array[LfsDownloadAction], Array[LfsDownloadError]) raise @bit_object.GitError
 
-pub fn lfs_build_batch_request_json(Array[@lib.LfsPointer]) -> String
+pub fn lfs_build_batch_request_json(Array[@bit_lib.LfsPointer]) -> String
 
-pub fn lfs_build_batch_upload_request_json(Array[@lib.LfsPointer]) -> String
+pub fn lfs_build_batch_upload_request_json(Array[@bit_lib.LfsPointer]) -> String
 
-pub async fn lfs_download_objects(&@types.FileSystem, &@types.RepoFileSystem, String, Array[LfsDownloadAction]) -> Array[LfsDownloadError] raise @object.GitError
+pub async fn lfs_download_objects(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, Array[LfsDownloadAction]) -> Array[LfsDownloadError] raise @bit_object.GitError
 
-pub async fn lfs_download_single_object(&@types.FileSystem, &@types.RepoFileSystem, String, LfsDownloadAction) -> LfsDownloadError? raise @object.GitError
+pub async fn lfs_download_single_object(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, LfsDownloadAction) -> LfsDownloadError? raise @bit_object.GitError
 
-pub fn lfs_get_cached_object(&@types.RepoFileSystem, String, String) -> Bytes?
+pub fn lfs_get_cached_object(&@bit_types.RepoFileSystem, String, String) -> Bytes?
 
 pub fn lfs_parse_batch_response(String) -> (Array[LfsDownloadAction], Array[LfsDownloadError])
 
 pub fn lfs_parse_upload_batch_response(String) -> (Array[LfsUploadAction], Array[LfsUploadError])
 
-pub async fn lfs_prefetch_for_checkout(@lib.ObjectDb, &@types.FileSystem, &@types.RepoFileSystem, String, String, @object.ObjectId, String) -> Unit raise @object.GitError
+pub async fn lfs_prefetch_for_checkout(@bit_lib.ObjectDb, &@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, @bit_object.ObjectId, String) -> Unit raise @bit_object.GitError
 
-pub async fn lfs_upload_pack_objects(&@types.RepoFileSystem, String, String, Array[@object.PackObject], remote_name? : String) -> Array[LfsUploadError] raise @object.GitError
+pub async fn lfs_upload_pack_objects(&@bit_types.RepoFileSystem, String, String, Array[@bit_object.PackObject], remote_name? : String) -> Array[LfsUploadError] raise @bit_object.GitError
 
-pub fn native_promisor_db(&@types.RepoFileSystem, String, lazy_load? : Bool) -> @lib.PromisorDb raise @object.GitError
+pub fn native_promisor_db(&@bit_types.RepoFileSystem, String, lazy_load? : Bool) -> @bit_lib.PromisorDb raise @bit_object.GitError
 
-pub async fn pull_http(&@types.FileSystem, &@types.RepoFileSystem, String, String, Bool, rebase? : Bool) -> @object.ObjectId? raise @object.GitError
+pub async fn pull_http(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, Bool, rebase? : Bool) -> @bit_object.ObjectId? raise @bit_object.GitError
 
-pub async fn push_http(&@types.RepoFileSystem, String, String, String, remote_name? : String, force? : Bool) -> String raise @object.GitError
+pub async fn push_http(&@bit_types.RepoFileSystem, String, String, String, remote_name? : String, force? : Bool) -> String raise @bit_object.GitError
 
-pub async fn push_http_from_commit(&@types.RepoFileSystem, String, String, @object.ObjectId, String) -> String raise @object.GitError
+pub async fn push_http_from_commit(&@bit_types.RepoFileSystem, String, String, @bit_object.ObjectId, String) -> String raise @bit_object.GitError
 
-pub async fn push_http_tree_only(&@types.RepoFileSystem, String, String, @object.ObjectId, @object.ObjectId, String) -> String raise @object.GitError
+pub async fn push_http_tree_only(&@bit_types.RepoFileSystem, String, String, @bit_object.ObjectId, @bit_object.ObjectId, String) -> String raise @bit_object.GitError
 
-pub async fn resolve_remote_ref_id(String, String) -> (@object.ObjectId, String?)? raise @object.GitError
+pub async fn resolve_remote_ref_id(String, String) -> (@bit_object.ObjectId, String?)? raise @bit_object.GitError
 
-pub async fn run_filter_command(String, String, String, Bytes) -> Bytes raise @object.GitError
+pub async fn run_filter_command(String, String, String, Bytes) -> Bytes raise @bit_object.GitError
 
 // Errors
 
