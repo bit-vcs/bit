@@ -206,6 +206,7 @@ options(
     "mailsplit.mbt": [ "native" ],
     "main.mbt": [ "native" ],
     "main_js.mbt": [ "js" ],
+    "version.mbt": [ "native", "js" ],
     "main_wasm.mbt": [ "wasm-gc", "wasm" ],
     "main_wbtest.mbt": [ "native" ],
     "maintenance.mbt": [ "native" ],

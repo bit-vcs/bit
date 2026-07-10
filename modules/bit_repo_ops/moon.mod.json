@@ -1,14 +1,14 @@
 {
   "name": "mizchi/bit_repo_ops",
-  "version": "0.42.2",
+  "version": "0.43.0",
   "deps": {
-    "mizchi/bit": "0.42.2",
-    "mizchi/bit_hash": "0.42.2",
-    "mizchi/bit_object": "0.42.2",
-    "mizchi/bit_lib": "0.42.2",
-    "mizchi/bit_repo": "0.42.2",
-    "mizchi/bit_types": "0.42.2",
-    "mizchi/bit_utils": "0.42.2"
+    "mizchi/bit": "0.43.0",
+    "mizchi/bit_hash": "0.43.0",
+    "mizchi/bit_object": "0.43.0",
+    "mizchi/bit_lib": "0.43.0",
+    "mizchi/bit_repo": "0.43.0",
+    "mizchi/bit_types": "0.43.0",
+    "mizchi/bit_utils": "0.43.0"
   },
   "repository": "https://github.com/mizchi/bit-vcs",
   "license": "Apache-2.0",
