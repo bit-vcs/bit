@@ -19,7 +19,6 @@
     "playground:preview": "vite preview --config vite.playground.config.mjs"
   },
   "devDependencies": {
-    "vite": "^8.0.1",
-    "vite-plugin-moonbit": "^0.1.5"
+    "vite": "^8.0.1"
   }
 }

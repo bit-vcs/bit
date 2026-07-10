@@ -2,23 +2,23 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { defineConfig } from "vite";
-import moonbit from "vite-plugin-moonbit";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const playgroundRoot = path.resolve(__dirname, "playground");
 const playgroundDocsRoot = path.resolve(__dirname, "docs/playground");
+const bitLibEntry = path.resolve(
+  __dirname,
+  "_build/js/release/build/mizchi/bit_lib/bit_lib.js",
+);
 
 export default defineConfig({
   root: playgroundRoot,
   base: "./",
-  plugins: [
-    moonbit({
-      target: "js",
-      mode: "release",
-      watch: false,
-      showLogs: true,
-    }),
-  ],
+  resolve: {
+    alias: {
+      "mbt:mizchi/bit_lib": bitLibEntry,
+    },
+  },
   server: {
     host: "127.0.0.1",
     port: 4175,

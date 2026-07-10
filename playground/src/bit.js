@@ -9,7 +9,7 @@ import {
   init as rawInit,
   log as rawLog,
   status as rawStatus,
-} from "mbt:mizchi/bit/lib";
+} from "mbt:mizchi/bit_lib";
 
 const ensureState = () => (
   globalThis.__bitPlaygroundMbtState ??= { nextHostId: 1, hosts: new Map() }
