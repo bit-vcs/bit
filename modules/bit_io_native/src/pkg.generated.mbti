@@ -97,3 +97,4 @@ pub fn NativeHttpClient::new() -> Self
 // Type aliases
 
 // Traits
+
