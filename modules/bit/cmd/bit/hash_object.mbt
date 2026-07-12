@@ -273,7 +273,8 @@ async fn hash_object_validate_content(
   }
 }
 
-///| Walk a hash-id line ("tree <hex>\n", "parent <hex>\n", ...) and
+///|
+/// Walk a hash-id line ("tree <hex>\n", "parent <hex>\n", ...) and
 /// emit a fsck-compatible error token on each well-defined failure
 /// mode. Returns the byte index after the consumed line (one past
 /// the trailing newline) on success. Test contract: `t1451`.
@@ -321,7 +322,8 @@ async fn hash_object_check_id_line(
   }
 }
 
-///| ident line shape: "<name> <<email>> <ts> <tz>\n".  Mirrors
+///|
+/// ident line shape: "<name> <<email>> <ts> <tz>\n".  Mirrors
 /// git's fsck token set: missingEmail / badEmail /
 /// missingSpaceBeforeDate / badDate / badTimezone.
 async fn hash_object_check_ident_line(
@@ -414,7 +416,8 @@ async fn hash_object_check_ident_line(
   }
 }
 
-///| Commit object validator. Walks the header fields in order:
+///|
+/// Commit object validator. Walks the header fields in order:
 ///   tree <hex>\n
 ///   (parent <hex>\n)*
 ///   author <ident>\n
@@ -457,7 +460,8 @@ async fn hash_object_validate_commit(
   // structure here.
 }
 
-///| Tag object validator. Same approach as commit but the header
+///|
+/// Tag object validator. Same approach as commit but the header
 /// set differs.
 async fn hash_object_validate_tag(
   content : Bytes,
@@ -529,7 +533,8 @@ async fn hash_object_validate_tag(
   let _ = pos
 }
 
-///| Byte-level prefix match — `String::has_prefix` only works on
+///|
+/// Byte-level prefix match — `String::has_prefix` only works on
 /// `String`, and lossy-decoding short / truncated input first
 /// risks losing information needed by the validator.
 fn hash_object_bytes_have_prefix(

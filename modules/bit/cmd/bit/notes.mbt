@@ -550,7 +550,9 @@ async fn notes_add(
           let (hex, id) = pair
           if hex == target_hex {
             if !force {
-              @stdio.stderr.write("error: note already exists for \{target_hex}")
+              @stdio.stderr.write(
+                "error: note already exists for \{target_hex}",
+              )
               @stdio.stderr.write("Use -f to overwrite existing note")
               @sys.exit(1)
             }

@@ -90,16 +90,18 @@ test "ls-files: normalize keeps wildcard filter as-is" {
 
 ///|
 test "ls-files: absolute filter inside repo becomes repo-relative" {
-  @test.assert_eq(normalize_ls_files_filters(["/repo/subs/link"], "subs", "/repo"), [
-    "subs/link",
-  ])
+  @test.assert_eq(
+    normalize_ls_files_filters(["/repo/subs/link"], "subs", "/repo"),
+    ["subs/link"],
+  )
 }
 
 ///|
 test "ls-files: absolute filter outside repo stays absolute" {
-  @test.assert_eq(normalize_ls_files_filters(["/outside/link"], "subs", "/repo"), [
-    "/outside/link",
-  ])
+  @test.assert_eq(
+    normalize_ls_files_filters(["/outside/link"], "subs", "/repo"),
+    ["/outside/link"],
+  )
 }
 
 ///|

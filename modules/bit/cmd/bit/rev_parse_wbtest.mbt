@@ -132,7 +132,10 @@ test "rev-parse: --is-bare-repository lets config.worktree override shared core.
 
 ///|
 test "rev-parse: --git-dir uses relative path at repository root" {
-  @test.assert_eq(rev_parse_display_git_dir("/repo", "/repo", "/repo/.git"), ".git")
+  @test.assert_eq(
+    rev_parse_display_git_dir("/repo", "/repo", "/repo/.git"),
+    ".git",
+  )
 }
 
 ///|
@@ -169,7 +172,10 @@ test "rev-parse: prefix not applied to absolute colon path" {
 
 ///|
 test "rev-parse: apply empty prefix to colon path" {
-  @test.assert_eq(rev_parse_apply_prefix_to_colon_path("HEAD:./top", ""), "HEAD:top")
+  @test.assert_eq(
+    rev_parse_apply_prefix_to_colon_path("HEAD:./top", ""),
+    "HEAD:top",
+  )
 }
 
 ///|

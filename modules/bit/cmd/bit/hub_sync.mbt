@@ -742,14 +742,12 @@ async fn run_hub_notify_hook(
   if cfg.commands.length() == 0 && !fs.is_file(legacy_path) {
     return -1
   }
-  run_hook(
-    fs,
-    root,
-    git_dir,
-    "hub-notify",
-    root,
-    args=[topic, record.kind, record.key, record.node],
-  )
+  run_hook(fs, root, git_dir, "hub-notify", root, args=[
+    topic,
+    record.kind,
+    record.key,
+    record.node,
+  ])
 }
 
 ///|

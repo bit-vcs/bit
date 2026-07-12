@@ -123,10 +123,10 @@ fn skip_zlib_data(data : Bytes, offset : Int) -> Int {
   // We need to find the end of the compressed stream.
   // Use zlib decompression to find the consumed length.
   let (_, after) = @zlib.zlib_decompress_at(
-      data,
-      offset,
-      max_size=@zlib.default_max_decompressed_size,
-    ) catch {
+    data,
+    offset,
+    max_size=@zlib.default_max_decompressed_size,
+  ) catch {
     _ => return data.length() - 20 // Skip to trailer on error
   }
   after

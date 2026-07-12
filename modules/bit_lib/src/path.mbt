@@ -23,4 +23,3 @@ fn parent_dir(path : String) -> String {
     Some(i) => String::unsafe_substring(path, start=0, end=i)
   }
 }
-

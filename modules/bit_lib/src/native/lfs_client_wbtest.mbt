@@ -80,7 +80,10 @@ test "lfs_parse_batch_response: success with download action" {
   )
   @test.assert_eq(actions[0].size, 5000L)
   @test.assert_eq(actions[0].href, "https://example.com/download/obj1")
-  @test.assert_eq(actions[0].headers.get("Authorization"), Some("Bearer token123"))
+  @test.assert_eq(
+    actions[0].headers.get("Authorization"),
+    Some("Bearer token123"),
+  )
 }
 
 ///|
@@ -239,7 +242,10 @@ async test "lfs_upload_pack_objects_with_http: uploads cached pointer content" {
   )
 
   @test.assert_eq(errors.length(), 0)
-  @test.assert_eq(post_urls[0], "https://example.com/repo.git/info/lfs/objects/batch")
+  @test.assert_eq(
+    post_urls[0],
+    "https://example.com/repo.git/info/lfs/objects/batch",
+  )
   @test.assert_eq(post_content_types[0], "application/vnd.git-lfs+json")
   assert_true(post_bodies[0].contains("\"operation\":\"upload\""))
   @test.assert_eq(put_urls[0], "https://lfs.example/upload/\{oid}")

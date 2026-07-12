@@ -20,7 +20,7 @@ pub enum TodoCommand {
 } derive(Debug, Eq)
 
 ///|
-pub impl Show for TodoCommand with output(self, logger) {
+pub impl Show for TodoCommand with fn output(self, logger) {
   match self {
     Pick => logger.write_string("Pick")
     Reword => logger.write_string("Reword")

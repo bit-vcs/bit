@@ -22,22 +22,38 @@ fn Sha1State::process_block(self : Sha1State) -> Unit {
   for i = 0; i < 20; i = i + 1 {
     let f = (b & c) | (b.lnot() & d)
     let temp = (sha1_rotl32(a, 5) + f + e + 0x5a827999 + w[i]) & 0xffffffff
-    e = d; d = c; c = sha1_rotl32(b, 30); b = a; a = temp
+    e = d
+    d = c
+    c = sha1_rotl32(b, 30)
+    b = a
+    a = temp
   }
   for i = 20; i < 40; i = i + 1 {
     let f = b ^ c ^ d
     let temp = (sha1_rotl32(a, 5) + f + e + 0x6ed9eba1 + w[i]) & 0xffffffff
-    e = d; d = c; c = sha1_rotl32(b, 30); b = a; a = temp
+    e = d
+    d = c
+    c = sha1_rotl32(b, 30)
+    b = a
+    a = temp
   }
   for i = 40; i < 60; i = i + 1 {
     let f = (b & c) | (b & d) | (c & d)
     let temp = (sha1_rotl32(a, 5) + f + e + 0x8f1bbcdc + w[i]) & 0xffffffff
-    e = d; d = c; c = sha1_rotl32(b, 30); b = a; a = temp
+    e = d
+    d = c
+    c = sha1_rotl32(b, 30)
+    b = a
+    a = temp
   }
   for i = 60; i < 80; i = i + 1 {
     let f = b ^ c ^ d
     let temp = (sha1_rotl32(a, 5) + f + e + 0xca62c1d6 + w[i]) & 0xffffffff
-    e = d; d = c; c = sha1_rotl32(b, 30); b = a; a = temp
+    e = d
+    d = c
+    c = sha1_rotl32(b, 30)
+    b = a
+    a = temp
   }
   h[0] = (h[0] + a) & 0xffffffff
   h[1] = (h[1] + b) & 0xffffffff

@@ -72,11 +72,7 @@ fn encode_ofs_delta_offset(back_offset : Int, result : Array[Byte]) -> Unit {
 }
 
 ///|
-fn emit_ofs_delta_byte(
-  val : Int,
-  is_last : Bool,
-  result : Array[Byte],
-) -> Unit {
+fn emit_ofs_delta_byte(val : Int, is_last : Bool, result : Array[Byte]) -> Unit {
   if val > 0x7f {
     emit_ofs_delta_byte((val >> 7) - 1, false, result)
   }
@@ -239,7 +235,8 @@ fn rolling_hash_next(
   h1 * base + byte_to_uint(in_b)
 }
 
-///| Flat chained hash index over the base buffer's blocks.
+///|
+/// Flat chained hash index over the base buffer's blocks.
 ///
 /// Replaces the previous `Map[UInt, Array[Int]]` (one heap `Array[Int]`
 /// per bucket plus generic map churn — the dominant cost in delta

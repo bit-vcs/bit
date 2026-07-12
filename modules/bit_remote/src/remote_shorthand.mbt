@@ -41,7 +41,7 @@ fn remote_shorthand_show_string_option(value : String?) -> String {
 }
 
 ///|
-pub impl Show for GitHubShorthand with output(self, logger) {
+pub impl Show for GitHubShorthand with fn output(self, logger) {
   match self {
     Repo(url, ref_spec) =>
       logger.write_string(

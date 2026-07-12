@@ -124,7 +124,9 @@ pub fn status_porcelain_from(s : Status) -> Array[String] {
     }
   }
   list.sort()
-  let out : Array[String] = Array::new(capacity=list.length() + s.untracked.length())
+  let out : Array[String] = Array::new(
+    capacity=list.length() + s.untracked.length(),
+  )
   for p in list {
     let x = xmap.get(p).unwrap_or(' ')
     let y = ymap.get(p).unwrap_or(' ')
@@ -181,9 +183,8 @@ pub fn add_paths(
       )
       compat_record_blob_mapping(fs, rfs, actual_git_dir, id, normalized)
       let size = content.length()
-      let (mtime_sec, mtime_nsec, dev, ino, uid, gid) = match @bitio.worktree_entry_meta_sync(
-          rfs, abs,
-        ) {
+      let (mtime_sec, mtime_nsec, dev, ino, uid, gid) = match
+        @bitio.worktree_entry_meta_sync(rfs, abs) {
         Some(info) =>
           (
             info.mtime_sec.unwrap_or(0),

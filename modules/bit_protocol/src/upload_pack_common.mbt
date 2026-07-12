@@ -350,9 +350,7 @@ pub fn extract_pack_from_v2_response(data : Bytes) -> Bytes raise @bit.GitError 
         payload.push(line_bytes[i])
       }
       let safe = sanitize_sideband_text(
-        Bytes::from_array(
-          FixedArray::makei(payload.length(), i => payload[i]),
-        ),
+        Bytes::from_array(FixedArray::makei(payload.length(), i => payload[i])),
       )
       let msg = bytes_to_string_from(safe, 0)
       raise @bit.GitError::ProtocolError("upload-pack error: \{msg}")
@@ -383,9 +381,7 @@ pub fn extract_pack_from_v0_response(data : Bytes) -> Bytes raise @bit.GitError 
         payload.push(line_bytes[i])
       }
       let safe = sanitize_sideband_text(
-        Bytes::from_array(
-          FixedArray::makei(payload.length(), i => payload[i]),
-        ),
+        Bytes::from_array(FixedArray::makei(payload.length(), i => payload[i])),
       )
       let msg = bytes_to_string_from(safe, 0)
       raise @bit.GitError::ProtocolError("upload-pack error: \{msg}")

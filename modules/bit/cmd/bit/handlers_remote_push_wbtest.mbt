@@ -846,7 +846,10 @@ async test "serve lfs: upload batch advertises relay object URL" {
   )
 
   @test.assert_eq(status, 200)
-  @test.assert_eq(headers.get("Content-Type"), Some("application/vnd.git-lfs+json"))
+  @test.assert_eq(
+    headers.get("Content-Type"),
+    Some("application/vnd.git-lfs+json"),
+  )
   @test.assert_eq(incoming_refs.length(), 0)
   let obj = serve_lfs_wbtest_parse_body(body)
   guard obj.get("objects") is Some(Json::Array(objects)) else {
@@ -899,7 +902,10 @@ async test "serve lfs: put caches object and get downloads it" {
     allow_push=false,
   )
   @test.assert_eq(get_status, 200)
-  @test.assert_eq(get_headers.get("Content-Type"), Some("application/octet-stream"))
+  @test.assert_eq(
+    get_headers.get("Content-Type"),
+    Some("application/octet-stream"),
+  )
   assert_true(Bytes::equal(get_body, data))
   cleanup_tree(fs, root)
 }

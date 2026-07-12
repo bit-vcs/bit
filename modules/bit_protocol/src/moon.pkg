@@ -5,19 +5,19 @@ import {
   "mizchi/bit_repo" @repo,
   "mizchi/bit_io" @io,
   "mizchi/bit_pack" @pack,
-  "moonbitlang/async" @async,
-  "moonbitlang/core/encoding/utf8" @utf8,
+  "moonbitlang/async",
+  "moonbitlang/core/encoding/utf8",
 }
 
 import {
-  "moonbitlang/core/test" @test,
+  "moonbitlang/core/test",
 } for "wbtest"
 
 import {
   "mizchi/bit_core" @bit,
   "mizchi/bit_pack" @pack,
-  "moonbitlang/core/bench" @bench,
-  "moonbitlang/core/test" @test,
+  "moonbitlang/core/bench",
+  "moonbitlang/core/test",
 } for "test"
 
 warnings = "-29"

@@ -104,17 +104,21 @@ fn create_cached_bench_db(
 }
 
 ///|
-impl @lib.ObjectStore for CachedTestObjectStore with get(self, id) {
+impl @lib.ObjectStore for CachedTestObjectStore with fn get(self, id) {
   self.db.get(self.backing_fs, id)
 }
 
 ///|
-impl @lib.ObjectStore for CachedTestObjectStore with put(self, obj_type, data) {
+impl @lib.ObjectStore for CachedTestObjectStore with fn put(
+  self,
+  obj_type,
+  data,
+) {
   @lib.write_loose_object(self.write_fs, self.git_dir, obj_type, data)
 }
 
 ///|
-impl @lib.ObjectStore for CachedTestObjectStore with has(self, id) {
+impl @lib.ObjectStore for CachedTestObjectStore with fn has(self, id) {
   let obj = self.db.get(self.backing_fs, id) catch { _ => return false }
   obj is Some(_)
 }

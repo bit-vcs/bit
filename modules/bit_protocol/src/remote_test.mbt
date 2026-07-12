@@ -47,18 +47,30 @@ test "build_receive_pack_body" {
 
   // Should contain PACK at the end
   let pack_start = body.length() - 4
-  debug_inspect(body[pack_start], content=(
-    #|0x50
-  )) // 'P'
-  debug_inspect(body[pack_start + 1], content=(
-    #|0x41
-  )) // 'A'
-  debug_inspect(body[pack_start + 2], content=(
-    #|0x43
-  )) // 'C'
-  debug_inspect(body[pack_start + 3], content=(
-    #|0x4b
-  )) // 'K'
+  debug_inspect(
+    body[pack_start],
+    content=(
+      #|0x50
+    ),
+  ) // 'P'
+  debug_inspect(
+    body[pack_start + 1],
+    content=(
+      #|0x41
+    ),
+  ) // 'A'
+  debug_inspect(
+    body[pack_start + 2],
+    content=(
+      #|0x43
+    ),
+  ) // 'C'
+  debug_inspect(
+    body[pack_start + 3],
+    content=(
+      #|0x4b
+    ),
+  ) // 'K'
 }
 
 ///|
@@ -88,9 +100,13 @@ test "parse_receive_pack_response success" {
   )
   let result = parse_receive_pack_response(data)
   match result {
-    Ok(msg) => debug_inspect(msg, content=(
-      #|"Push successful"
-    ))
+    Ok(msg) =>
+      debug_inspect(
+        msg,
+        content=(
+          #|"Push successful"
+        ),
+      )
     Err(e) => {
       let _ = e
       assert_true(false)

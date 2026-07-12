@@ -50,7 +50,10 @@ test "tag: annotation output indents continuation lines" {
   let lines = tag_format_annotation_lines("tag-lines", [
     "tag line one", "tag line two",
   ])
-  @test.assert_eq(lines.join("\n"), "tag-lines       tag line one\n    tag line two")
+  @test.assert_eq(
+    lines.join("\n"),
+    "tag-lines       tag line one\n    tag line two",
+  )
 }
 
 ///|
@@ -64,7 +67,9 @@ test "tag: short option bundles expand annotate and message" {
   @test.assert_eq(tag_expand_short_bundles(["-am", "msg", "v1"]), [
     "-a", "-m", "msg", "v1",
   ])
-  @test.assert_eq(tag_expand_short_bundles(["-ammsg", "v1"]), ["-a", "-mmsg", "v1"])
+  @test.assert_eq(tag_expand_short_bundles(["-ammsg", "v1"]), [
+    "-a", "-mmsg", "v1",
+  ])
   @test.assert_eq(tag_expand_short_bundles(["-n2", "v1"]), ["-n2", "v1"])
 }
 
@@ -217,7 +222,10 @@ test "tag: nested advice text matches git" {
 
 ///|
 test "tag: trailer args normalize to key-value lines" {
-  @test.assert_eq(tag_normalize_trailer_arg("my-trailer=here"), "my-trailer: here")
+  @test.assert_eq(
+    tag_normalize_trailer_arg("my-trailer=here"),
+    "my-trailer: here",
+  )
   @test.assert_eq(
     tag_normalize_trailer_arg("alt-trailer=there"),
     "alt-trailer: there",
@@ -260,7 +268,10 @@ test "tag: extract message lines keeps commit subject for lightweight tags" {
     #|Bar
     #|
   @test.assert_eq(tag_extract_message_lines(commit_text, 1).join("\n"), "Foo")
-  @test.assert_eq(tag_extract_message_lines(commit_text, 2).join("\n"), "Foo\nBar")
+  @test.assert_eq(
+    tag_extract_message_lines(commit_text, 2).join("\n"),
+    "Foo\nBar",
+  )
 }
 
 ///|

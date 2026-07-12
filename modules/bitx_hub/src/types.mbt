@@ -39,7 +39,7 @@ pub fn IssueState::to_string(self : IssueState) -> String {
 }
 
 ///|
-pub impl Show for IssueState with output(self, logger) {
+pub impl Show for IssueState with fn output(self, logger) {
   logger.write_string(self.to_string())
 }
 
@@ -53,7 +53,7 @@ pub fn PrState::to_string(self : PrState) -> String {
 }
 
 ///|
-pub impl Show for PrState with output(self, logger) {
+pub impl Show for PrState with fn output(self, logger) {
   logger.write_string(self.to_string())
 }
 
@@ -67,7 +67,7 @@ pub fn WorkItemState::to_string(self : WorkItemState) -> String {
 }
 
 ///|
-pub impl Show for WorkItemState with output(self, logger) {
+pub impl Show for WorkItemState with fn output(self, logger) {
   logger.write_string(self.to_string())
 }
 
@@ -80,7 +80,7 @@ pub fn WorkItemKind::to_string(self : WorkItemKind) -> String {
 }
 
 ///|
-pub impl Show for WorkItemKind with output(self, logger) {
+pub impl Show for WorkItemKind with fn output(self, logger) {
   logger.write_string(self.to_string())
 }
 
@@ -655,7 +655,7 @@ pub fn ReviewVerdict::to_string(self : ReviewVerdict) -> String {
 }
 
 ///|
-pub impl Show for ReviewVerdict with output(self, logger) {
+pub impl Show for ReviewVerdict with fn output(self, logger) {
   logger.write_string(self.to_string())
 }
 

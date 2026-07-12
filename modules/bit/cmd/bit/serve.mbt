@@ -866,9 +866,7 @@ async fn serve_handle_git_request(
     // namespace, and resynthesize old_id from the incoming namespace so
     // receive_pack accepts the transition as fast-forward or creation.
     let (rewritten_bytes, original_refnames) = serve_rewrite_receive_pack_refs(
-      input_bytes,
-      fs,
-      git_dir,
+      input_bytes, fs, git_dir,
     )
     let out = @bitlib.receive_pack(fs, fs, root, rewritten_bytes)
     // Rewrite status response: translate rewritten refs back to original names

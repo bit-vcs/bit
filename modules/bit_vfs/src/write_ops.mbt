@@ -80,26 +80,26 @@ fn string_to_bytes(s : String) -> Bytes {
 }
 
 ///|
-impl @bit.FileSystem for Fs with mkdir_p(self, path) {
+impl @bit.FileSystem for Fs with fn mkdir_p(self, path) {
   Fs::mkdir_p(self, path)
 }
 
 ///|
-impl @bit.FileSystem for Fs with write_file(self, path, content) {
+impl @bit.FileSystem for Fs with fn write_file(self, path, content) {
   Fs::write_file(self, path, content)
 }
 
 ///|
-impl @bit.FileSystem for Fs with write_string(self, path, content) {
+impl @bit.FileSystem for Fs with fn write_string(self, path, content) {
   Fs::write_string(self, path, content)
 }
 
 ///|
-impl @bit.FileSystem for Fs with remove_file(self, path) {
+impl @bit.FileSystem for Fs with fn remove_file(self, path) {
   Fs::remove_file(self, path)
 }
 
 ///|
-impl @bit.FileSystem for Fs with remove_dir(self, path) {
+impl @bit.FileSystem for Fs with fn remove_dir(self, path) {
   Fs::remove_dir(self, path)
 }

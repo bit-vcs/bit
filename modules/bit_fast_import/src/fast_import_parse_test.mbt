@@ -203,7 +203,10 @@ test "fast_import_parse_file_op: unrecognized" {
 ///|
 test "fast_import_parse_file_op: quoted path" {
   let result = fast_import_parse_file_op("D \"path with spaces.txt\"")
-  @test.assert_eq(result, Some(FastImportFileOp::Delete(path="path with spaces.txt")))
+  @test.assert_eq(
+    result,
+    Some(FastImportFileOp::Delete(path="path with spaces.txt")),
+  )
 }
 
 ///|

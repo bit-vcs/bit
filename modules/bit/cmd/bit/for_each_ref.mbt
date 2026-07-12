@@ -1017,7 +1017,11 @@ async fn for_each_ref_validate_atom(atom : String) -> Unit {
     for tok_view in arg.split(",") {
       let tok = tok_view.to_owned()
       match tok {
-        "short" | "track" | "trackshort" | "nobracket" | "remotename"
+        "short"
+        | "track"
+        | "trackshort"
+        | "nobracket"
+        | "remotename"
         | "remoteref" => ()
         _ if tok.has_prefix("lstrip=") ||
           tok.has_prefix("strip=") ||
@@ -1034,7 +1038,11 @@ async fn for_each_ref_validate_atom(atom : String) -> Unit {
     for tok_view in arg.split(",") {
       let tok = tok_view.to_owned()
       match tok {
-        "short" | "track" | "trackshort" | "nobracket" | "remotename"
+        "short"
+        | "track"
+        | "trackshort"
+        | "nobracket"
+        | "remotename"
         | "remoteref" => ()
         _ if tok.has_prefix("lstrip=") ||
           tok.has_prefix("strip=") ||
@@ -2322,7 +2330,11 @@ async fn for_each_ref_format(
       (chars[i + 1] == 'x' || chars[i + 1] == 'X') {
       // %xNN / %XNN hex escape (e.g. %x09 = tab)
       let hi = for_each_ref_hex_digit(chars[i + 2])
-      let lo = if i + 3 < len { for_each_ref_hex_digit(chars[i + 3]) } else { -1 }
+      let lo = if i + 3 < len {
+        for_each_ref_hex_digit(chars[i + 3])
+      } else {
+        -1
+      }
       if hi >= 0 && lo >= 0 {
         if for_each_ref_if_output_active(if_state, if_result, if_depth) {
           out.push(((hi * 16 + lo) & 0xFF).to_byte())
@@ -4284,7 +4296,8 @@ async fn for_each_ref_commit_atom(
         let safe = (code >= 'a'.to_int() && code <= 'z'.to_int()) ||
           (code >= 'A'.to_int() && code <= 'Z'.to_int()) ||
           (code >= '0'.to_int() && code <= '9'.to_int()) ||
-          c == '.' || c == '_'
+          c == '.' ||
+          c == '_'
         if safe {
           sb.write_char(c)
           last_was_dash = false

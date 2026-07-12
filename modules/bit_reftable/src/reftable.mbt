@@ -71,7 +71,7 @@ fn reftable_show_string(value : String) -> String {
 }
 
 ///|
-pub impl Show for RefValue with output(self, logger) {
+pub impl Show for RefValue with fn output(self, logger) {
   match self {
     Deletion => logger.write_string("Deletion")
     Val1(id) => logger.write_string("Val1(" + id.to_hex() + ")")
@@ -83,7 +83,7 @@ pub impl Show for RefValue with output(self, logger) {
 }
 
 ///|
-pub impl Show for RefRecord with output(self, logger) {
+pub impl Show for RefRecord with fn output(self, logger) {
   logger.write_string(
     "{refname: " +
     reftable_show_string(self.refname) +

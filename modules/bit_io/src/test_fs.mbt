@@ -135,47 +135,47 @@ pub fn TestFs::is_file(self : TestFs, path : String) -> Bool {
 }
 
 ///|
-pub impl FileSystem for TestFs with mkdir_p(self, path) {
+pub impl FileSystem for TestFs with fn mkdir_p(self, path) {
   TestFs::mkdir_p(self, path)
 }
 
 ///|
-pub impl FileSystem for TestFs with write_file(self, path, content) {
+pub impl FileSystem for TestFs with fn write_file(self, path, content) {
   TestFs::write_file(self, path, content)
 }
 
 ///|
-pub impl FileSystem for TestFs with write_string(self, path, content) {
+pub impl FileSystem for TestFs with fn write_string(self, path, content) {
   TestFs::write_string(self, path, content)
 }
 
 ///|
-pub impl FileSystem for TestFs with remove_file(self, path) {
+pub impl FileSystem for TestFs with fn remove_file(self, path) {
   TestFs::remove_file(self, path)
 }
 
 ///|
-pub impl FileSystem for TestFs with remove_dir(self, path) {
+pub impl FileSystem for TestFs with fn remove_dir(self, path) {
   TestFs::remove_dir(self, path)
 }
 
 ///|
-pub impl RepoFileSystem for TestFs with read_file(self, path) {
+pub impl RepoFileSystem for TestFs with fn read_file(self, path) {
   TestFs::read_file(self, path)
 }
 
 ///|
-pub impl RepoFileSystem for TestFs with readdir(self, path) {
+pub impl RepoFileSystem for TestFs with fn readdir(self, path) {
   TestFs::readdir(self, path)
 }
 
 ///|
-pub impl RepoFileSystem for TestFs with is_dir(self, path) {
+pub impl RepoFileSystem for TestFs with fn is_dir(self, path) {
   TestFs::is_dir(self, path)
 }
 
 ///|
-pub impl RepoFileSystem for TestFs with is_file(self, path) {
+pub impl RepoFileSystem for TestFs with fn is_file(self, path) {
   TestFs::is_file(self, path)
 }
 

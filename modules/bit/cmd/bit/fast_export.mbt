@@ -30,8 +30,7 @@ async fn handle_fast_export(args : Array[String]) -> Unit raise Error {
       "--show-original-ids" => show_original_ids = true
       "--full-tree" => full_tree = true
       "--no-data" => no_data = true
-      _ if arg.has_prefix("--signed-tags=") =>
-        signed_tags = arg[14:].to_owned()
+      _ if arg.has_prefix("--signed-tags=") => signed_tags = arg[14:].to_owned()
       _ if arg.has_prefix("--tag-of-filtered-object=") =>
         tag_of_filtered_object = arg[25:].to_owned()
       _ if arg.has_prefix("--import-marks=") =>

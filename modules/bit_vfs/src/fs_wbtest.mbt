@@ -44,7 +44,7 @@ fn loose_object_path(git_dir : String, id : @bit.ObjectId) -> String {
 }
 
 ///|
-impl @bit.RepoFileSystem for CountingFs with read_file(self, path) {
+impl @bit.RepoFileSystem for CountingFs with fn read_file(self, path) {
   let count = match self.read_counts.get(path) {
     Some(n) => n
     None => 0
@@ -54,27 +54,27 @@ impl @bit.RepoFileSystem for CountingFs with read_file(self, path) {
 }
 
 ///|
-impl @bit.RepoFileSystem for CountingFs with readdir(self, path) {
+impl @bit.RepoFileSystem for CountingFs with fn readdir(self, path) {
   self.fs.readdir(path)
 }
 
 ///|
-impl @bit.RepoFileSystem for CountingFs with is_dir(self, path) {
+impl @bit.RepoFileSystem for CountingFs with fn is_dir(self, path) {
   self.fs.is_dir(path)
 }
 
 ///|
-impl @bit.RepoFileSystem for CountingFs with is_file(self, path) {
+impl @bit.RepoFileSystem for CountingFs with fn is_file(self, path) {
   self.fs.is_file(path)
 }
 
 ///|
-impl @bit.FileSystem for CountingFs with mkdir_p(self, path) {
+impl @bit.FileSystem for CountingFs with fn mkdir_p(self, path) {
   self.fs.mkdir_p(path)
 }
 
 ///|
-impl @bit.FileSystem for CountingFs with write_file(self, path, data) {
+impl @bit.FileSystem for CountingFs with fn write_file(self, path, data) {
   let count = match self.write_counts.get(path) {
     Some(n) => n
     None => 0
@@ -84,7 +84,7 @@ impl @bit.FileSystem for CountingFs with write_file(self, path, data) {
 }
 
 ///|
-impl @bit.FileSystem for CountingFs with write_string(self, path, s) {
+impl @bit.FileSystem for CountingFs with fn write_string(self, path, s) {
   let count = match self.write_counts.get(path) {
     Some(n) => n
     None => 0
@@ -94,12 +94,12 @@ impl @bit.FileSystem for CountingFs with write_string(self, path, s) {
 }
 
 ///|
-impl @bit.FileSystem for CountingFs with remove_file(self, path) {
+impl @bit.FileSystem for CountingFs with fn remove_file(self, path) {
   self.fs.remove_file(path)
 }
 
 ///|
-impl @bit.FileSystem for CountingFs with remove_dir(self, path) {
+impl @bit.FileSystem for CountingFs with fn remove_dir(self, path) {
   self.fs.remove_dir(path)
 }
 

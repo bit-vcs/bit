@@ -8,4 +8,6 @@ import {
 
 warnings = "-29"
 
-options(is_main: true)
+options(
+  is_main: true,
+)

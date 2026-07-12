@@ -46,7 +46,6 @@ pub fn Sha1State::reset(self : Sha1State) -> Unit {
   self.total_len = 0L
 }
 
-
 ///|
 pub fn Sha1State::update(self : Sha1State, data : Bytes) -> Unit {
   self.update_slice(data, 0, data.length())
@@ -142,7 +141,6 @@ pub fn sha1_prefix_raw(data : Bytes, len : Int) -> FixedArray[Byte] {
   state.update_slice(data, 0, msg_len)
   state.finish_raw()
 }
-
 
 ///|
 pub fn sha1_array_prefix_raw(data : Array[Byte], len : Int) -> FixedArray[Byte] {

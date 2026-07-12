@@ -7,10 +7,7 @@ test "update-ref stdin extra-input reconstructs the unconsumed tail" {
     3,
   )
   assert_eq(extra, " cafef00d")
-  assert_eq(
-    update_ref_extra_input(["delete", "refs/tags/v1"], 2),
-    "",
-  )
+  assert_eq(update_ref_extra_input(["delete", "refs/tags/v1"], 2), "")
 }
 
 ///|

@@ -10,7 +10,7 @@ priv struct BenchClock {
 }
 
 ///|
-impl @lib.Clock for BenchClock with now(self) {
+impl @lib.Clock for BenchClock with fn now(self) {
   self.now_ts
 }
 

@@ -9,19 +9,23 @@ priv struct TestHubObjectStore {
 }
 
 ///|
-impl @lib.ObjectStore for TestHubObjectStore with get(self, id) {
+impl @lib.ObjectStore for TestHubObjectStore with fn get(self, id) {
   self.db.get(self.rfs, id)
 }
 
 ///|
-impl @lib.ObjectStore for TestHubObjectStore with put(self, obj_type, content) {
+impl @lib.ObjectStore for TestHubObjectStore with fn put(
+  self,
+  obj_type,
+  content,
+) {
   let (id, compressed) = @bit.create_object(obj_type, content)
   write_object_bytes(self.fs, self.git_dir, id, compressed)
   id
 }
 
 ///|
-impl @lib.ObjectStore for TestHubObjectStore with has(self, id) {
+impl @lib.ObjectStore for TestHubObjectStore with fn has(self, id) {
   let obj = self.db.get(self.rfs, id)
   obj is Some(_)
 }

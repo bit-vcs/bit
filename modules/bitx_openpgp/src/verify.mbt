@@ -29,17 +29,13 @@ pub fn verify_detached_armored(
 ) -> VerifyResult {
   let mut last_error : String? = None
   for key_armor in public_keys_armor {
-    let packet = try {
-      @pgp.parse_pubkey_armor(key_armor)
-    } catch {
+    let packet = @pgp.parse_pubkey_armor(key_armor) catch {
       _ => {
         last_error = Some("failed to parse OpenPGP public key")
         continue
       }
     }
-    let ok = try {
-      @pgp.verify_armor(signature_armor, payload, packet.key)
-    } catch {
+    let ok = @pgp.verify_armor(signature_armor, payload, packet.key) catch {
       _ => {
         last_error = Some("unsupported or malformed OpenPGP signature")
         continue
@@ -64,24 +60,20 @@ pub fn verify_ssh_detached(
   signature_armor : String,
   allowed_signers_text : String,
 ) -> VerifyResult {
-  let signers = try {
-    @ssh.parse_allowed_signers(allowed_signers_text)
-  } catch {
+  let signers = @ssh.parse_allowed_signers(allowed_signers_text) catch {
     _ =>
       return { verified: false, error: Some("failed to parse allowed signers") }
   }
   let mut last_error : String? = None
   for signer in signers {
     for principal in signer.principals {
-      let ok = try {
-        @ssh.verify_with_allowed_signers(
-          allowed_signers_text,
-          principal,
-          signature_armor,
-          payload,
-          sig_namespace="git",
-        )
-      } catch {
+      let ok = @ssh.verify_with_allowed_signers(
+        allowed_signers_text,
+        principal,
+        signature_armor,
+        payload,
+        sig_namespace="git",
+      ) catch {
         _ => {
           last_error = Some("unsupported or malformed SSH signature")
           continue
@@ -111,7 +103,7 @@ pub fn split_armored_public_keys(text : String) -> Array[String] {
     }
     let from_begin = String::unsafe_substring(
       remaining,
-      start=start,
+      start~,
       end=remaining.length(),
     )
     let end_off = match from_begin.find(end) {

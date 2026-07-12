@@ -179,7 +179,7 @@ fn fast_import_show_string(value : String) -> String {
 }
 
 ///|
-pub impl Show for FastImportFileOp with output(self, logger) {
+pub impl Show for FastImportFileOp with fn output(self, logger) {
   match self {
     Modify(mode~, dataref~, path~) =>
       logger.write_string(

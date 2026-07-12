@@ -6,7 +6,7 @@ priv struct FixedClock {
 }
 
 ///|
-impl @lib.Clock for FixedClock with now(self) {
+impl @lib.Clock for FixedClock with fn now(self) {
   self.now_ts
 }
 
@@ -59,7 +59,10 @@ test "relay: parse_relay_base_url handles explicit prefixes" {
   )
   // Plain HTTP URLs without /git/<session> pattern are NOT relay URLs
   @test.assert_eq(parse_relay_base_url("http://127.0.0.1:8787"), None)
-  @test.assert_eq(parse_relay_base_url("https://github.com/user/repo.git"), None)
+  @test.assert_eq(
+    parse_relay_base_url("https://github.com/user/repo.git"),
+    None,
+  )
 }
 
 ///|
@@ -84,7 +87,10 @@ test "relay: parse_relay_base_url detects proxied relay git session URLs" {
     Some("https://relay.example.com"),
   )
   // Too short session ID (< 6 chars) - not a relay URL
-  @test.assert_eq(parse_relay_base_url("https://relay.example.com/git/Ab12"), None)
+  @test.assert_eq(
+    parse_relay_base_url("https://relay.example.com/git/Ab12"),
+    None,
+  )
   // Too long session ID (> 16 chars) - not a relay URL
   @test.assert_eq(
     parse_relay_base_url("https://relay.example.com/git/AbCdEfGhIjKlMnOpQr"),
@@ -96,9 +102,15 @@ test "relay: parse_relay_base_url detects proxied relay git session URLs" {
     None,
   )
   // Non-alphanumeric chars in session - not a relay URL
-  @test.assert_eq(parse_relay_base_url("https://relay.example.com/git/abc-def"), None)
+  @test.assert_eq(
+    parse_relay_base_url("https://relay.example.com/git/abc-def"),
+    None,
+  )
   // .git suffix contains dot - not a relay URL
-  @test.assert_eq(parse_relay_base_url("https://github.com/git/foobar123.git"), None)
+  @test.assert_eq(
+    parse_relay_base_url("https://github.com/git/foobar123.git"),
+    None,
+  )
   // SSH URL - not a relay URL
   @test.assert_eq(parse_relay_base_url("git@github.com:user/repo.git"), None)
 }

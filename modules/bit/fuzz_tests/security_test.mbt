@@ -75,17 +75,8 @@ test "parse_tree accepts empty entry name" {
 /// minimum set needed to prevent path traversal and `.git/` overwrite
 /// during checkout / clone / fetch.
 let security_hostile_tree_names : Array[String] = [
-  "..",
-  ".",
-  "",
-  "../escape",
-  ".git",
-  ".GIT",
-  ".Git",
-  ".gIt",
-  ".git/hooks/post-checkout",
-  "a/b",
-  "subdir/file",
+  "..", ".", "", "../escape", ".git", ".GIT", ".Git", ".gIt", ".git/hooks/post-checkout",
+  "a/b", "subdir/file",
 ]
 
 ///|
@@ -105,10 +96,10 @@ test "verify_tree_entry_name rejects path-escaping names" {
 test "verify_tree_entry_name accepts ordinary names" {
   // Common legitimate names should NOT raise.
   let ok_names = [
-    "README.md", "src", "Cargo.toml", ".gitignore", ".gitattributes",
-    "a.txt", "longer.file.name.with.dots", "日本語.txt", "GIT",
+    "README.md", "src", "Cargo.toml", ".gitignore", ".gitattributes", "a.txt", "longer.file.name.with.dots",
+    "日本語.txt", "GIT",
     // single-byte non-ASCII is fine (UTF-8 trailing bytes in single name),
-    "x",
+     "x",
   ]
   for name in ok_names {
     @bit.verify_tree_entry_name(name)

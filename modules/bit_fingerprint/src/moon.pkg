@@ -5,18 +5,18 @@ import {
   "mizchi/bit_lib" @bitlib,
   "mizchi/bit_utils" @string_utils,
   "mizchi/bit_osfs" @osfs,
-  "moonbitlang/async" @async,
-  "moonbitlang/async/process" @process,
-  "moonbitlang/core/encoding/utf8" @utf8,
-  "moonbitlang/core/env" @env,
+  "moonbitlang/async",
+  "moonbitlang/async/process",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/env",
 }
 
 warnings = "-29"
 
+import {
+  "moonbitlang/core/test",
+} for "wbtest"
+
 options(
   targets: { "fingerprint_wbtest.mbt": [ "native" ] },
 )
-
-import {
-  "moonbitlang/core/test" @test,
-} for "wbtest"

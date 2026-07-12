@@ -134,7 +134,9 @@ test "bench parse_refs 50 refs" (b : @bench.T) {
 ///|
 test "bench build_fetch_request_v2" (b : @bench.T) {
   b.bench(fn() {
-    let req = @bit_protocol.build_fetch_request_v2("git/moonbit", bench_want_ids, 0)
+    let req = @bit_protocol.build_fetch_request_v2(
+      "git/moonbit", bench_want_ids, 0,
+    )
     b.keep(req.length())
   })
 }

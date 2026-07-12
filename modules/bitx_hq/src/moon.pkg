@@ -4,5 +4,5 @@ import {
 warnings = "-29"
 
 import {
-  "moonbitlang/core/test" @test,
+  "moonbitlang/core/test",
 } for "test"

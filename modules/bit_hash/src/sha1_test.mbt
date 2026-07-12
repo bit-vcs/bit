@@ -34,7 +34,9 @@ test "Sha1State: abc" {
 test "Sha1State: large input matches sha1_raw" {
   // Test with a 200-byte input simulating a hub record blob
   let long_str = "version 1\nkey hub/proposal/pr/abc12345/meta\nkind pr-proposal\nclock local=1\ntimestamp 1706745600\nnode dave@example.com\ndeleted 0\n\nsome payload content here that makes this longer than 64 bytes total"
-  let bytes = Bytes::from_array(long_str.to_array().map(fn(c) { c.to_int().to_byte() }))
+  let bytes = Bytes::from_array(
+    long_str.to_array().map(fn(c) { c.to_int().to_byte() }),
+  )
   let expected = sha1_raw(bytes) |> raw_to_hex
   let state = Sha1State::new()
   state.update(bytes)
@@ -49,10 +51,11 @@ test "sha1_raw: one-shot matches Sha1State across padding boundaries" {
   // tight case where 0x80 plus the 8-byte length still fit in one
   // 64-byte block. Sweep both the 56-byte and 120-byte padding
   // cliffs.
-  for len in [
-    0, 1, 31, 32, 33, 54, 55, 56, 57, 63, 64, 65, 100, 118, 119, 120, 121, 127,
-    128, 129, 200, 256, 511, 512, 513, 1024, 4096,
-  ] {
+  for
+    len in [
+      0, 1, 31, 32, 33, 54, 55, 56, 57, 63, 64, 65, 100, 118, 119, 120, 121, 127,
+      128, 129, 200, 256, 511, 512, 513, 1024, 4096,
+    ] {
     let data : Array[Byte] = []
     for i in 0..<len {
       data.push(((i * 31 + 7) % 251).to_byte())

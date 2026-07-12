@@ -142,8 +142,14 @@ test "commit: read MERGE_HEAD supports multiple parents" {
   )
   let merge_heads = read_merge_head_ids(fs, "/repo/.git")
   @test.assert_eq(merge_heads.length(), 2)
-  @test.assert_eq(merge_heads[0].to_hex(), "1111111111111111111111111111111111111111")
-  @test.assert_eq(merge_heads[1].to_hex(), "2222222222222222222222222222222222222222")
+  @test.assert_eq(
+    merge_heads[0].to_hex(),
+    "1111111111111111111111111111111111111111",
+  )
+  @test.assert_eq(
+    merge_heads[1].to_hex(),
+    "2222222222222222222222222222222222222222",
+  )
 }
 
 ///|

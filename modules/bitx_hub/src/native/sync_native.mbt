@@ -10,19 +10,19 @@ priv struct NativeObjectStore {
 }
 
 ///|
-impl @lib.ObjectStore for NativeObjectStore with get(self, id) {
+impl @lib.ObjectStore for NativeObjectStore with fn get(self, id) {
   self.db.get(self.rfs, id)
 }
 
 ///|
-impl @lib.ObjectStore for NativeObjectStore with put(self, obj_type, content) {
+impl @lib.ObjectStore for NativeObjectStore with fn put(self, obj_type, content) {
   let (id, compressed) = @bit.create_object(obj_type, content)
   @hub.write_object_bytes(self.fs, self.git_dir, id, compressed)
   id
 }
 
 ///|
-impl @lib.ObjectStore for NativeObjectStore with has(self, id) {
+impl @lib.ObjectStore for NativeObjectStore with fn has(self, id) {
   let obj = self.db.get(self.rfs, id)
   obj is Some(_)
 }
@@ -35,12 +35,12 @@ priv struct NativeReadObjectStore {
 }
 
 ///|
-impl @lib.ObjectStore for NativeReadObjectStore with get(self, id) {
+impl @lib.ObjectStore for NativeReadObjectStore with fn get(self, id) {
   self.db.get(self.rfs, id)
 }
 
 ///|
-impl @lib.ObjectStore for NativeReadObjectStore with put(
+impl @lib.ObjectStore for NativeReadObjectStore with fn put(
   _self,
   _obj_type,
   _content,
@@ -49,7 +49,7 @@ impl @lib.ObjectStore for NativeReadObjectStore with put(
 }
 
 ///|
-impl @lib.ObjectStore for NativeReadObjectStore with has(self, id) {
+impl @lib.ObjectStore for NativeReadObjectStore with fn has(self, id) {
   let obj = self.db.get(self.rfs, id)
   obj is Some(_)
 }
@@ -63,12 +63,12 @@ priv struct NativeRefStore {
 }
 
 ///|
-impl @lib.RefStore for NativeRefStore with resolve(self, ref_name) {
+impl @lib.RefStore for NativeRefStore with fn resolve(self, ref_name) {
   @lib.resolve_ref(self.rfs, self.git_dir, ref_name)
 }
 
 ///|
-impl @lib.RefStore for NativeRefStore with update(self, ref_name, id) {
+impl @lib.RefStore for NativeRefStore with fn update(self, ref_name, id) {
   match id {
     Some(commit_id) => {
       let ref_path = join_path(self.git_dir, ref_name)
@@ -81,7 +81,7 @@ impl @lib.RefStore for NativeRefStore with update(self, ref_name, id) {
 }
 
 ///|
-impl @lib.RefStore for NativeRefStore with list(self, _prefix) {
+impl @lib.RefStore for NativeRefStore with fn list(self, _prefix) {
   ignore(self)
   []
 }
@@ -94,17 +94,17 @@ priv struct NativeReadRefStore {
 }
 
 ///|
-impl @lib.RefStore for NativeReadRefStore with resolve(self, ref_name) {
+impl @lib.RefStore for NativeReadRefStore with fn resolve(self, ref_name) {
   @lib.resolve_ref(self.rfs, self.git_dir, ref_name)
 }
 
 ///|
-impl @lib.RefStore for NativeReadRefStore with update(_self, _ref_name, _id) {
+impl @lib.RefStore for NativeReadRefStore with fn update(_self, _ref_name, _id) {
   ()
 }
 
 ///|
-impl @lib.RefStore for NativeReadRefStore with list(self, _prefix) {
+impl @lib.RefStore for NativeReadRefStore with fn list(self, _prefix) {
   ignore(self)
   []
 }

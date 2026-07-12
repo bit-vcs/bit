@@ -5,7 +5,7 @@ pub(all) enum FingerprintMode {
 } derive(Eq, Debug)
 
 ///|
-pub impl Show for FingerprintMode with output(self, logger) {
+pub impl Show for FingerprintMode with fn output(self, logger) {
   match self {
     Fast => logger.write_string("Fast")
     GitCompat => logger.write_string("GitCompat")

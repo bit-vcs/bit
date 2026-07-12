@@ -52,11 +52,7 @@ async fn handle_commit_graph(args : Array[String]) -> Unit raise Error {
       let resolved = resolve_in_cwd(d)
       // Strip trailing "/objects" suffix if present to get git_dir
       if resolved.has_suffix("/objects") {
-        String::unsafe_substring(
-          resolved,
-          start=0,
-          end=resolved.length() - 8,
-        )
+        String::unsafe_substring(resolved, start=0, end=resolved.length() - 8)
       } else {
         // Assume it IS the git_dir (e.g. bare repo)
         resolved
@@ -65,7 +61,7 @@ async fn handle_commit_graph(args : Array[String]) -> Unit raise Error {
     None => git_dir
   }
   match subcommand {
-    None | Some("write") => {
+    None | Some("write") =>
       if stdin_commits {
         write_commit_graph_from_stdin_commits(fs, effective_git_dir)
       } else if stdin_packs {
@@ -75,7 +71,6 @@ async fn handle_commit_graph(args : Array[String]) -> Unit raise Error {
       } else {
         write_commit_graph(fs, effective_git_dir, false)
       }
-    }
     Some("verify") => cgraph_verify(fs, effective_git_dir)
     Some(other) => {
       eprint_line("error: unknown subcommand: " + other)
@@ -130,7 +125,9 @@ async fn cgraph_verify(fs : OsFs, git_dir : String) -> Unit raise Error {
   }
   let body_len = data.length() - hash_size
   let stored_trailer = @bitcore.ObjectId::from_bytes_at(
-    data, body_len, hash_size~,
+    data,
+    body_len,
+    hash_size~,
   )
   let expected_trailer = @bitcore.hash_prefix(data, body_len, hash_size~)
   if stored_trailer != expected_trailer {

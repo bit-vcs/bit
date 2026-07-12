@@ -6,7 +6,10 @@ test "parse_config_value simple" {
 
 ///|
 test "parse_config_value quoted" {
-  @test.assert_eq(@bit_config.parse_config_value("\"hello world\""), "hello world")
+  @test.assert_eq(
+    @bit_config.parse_config_value("\"hello world\""),
+    "hello world",
+  )
   @test.assert_eq(
     @bit_config.parse_config_value("\"with \\n newline\""),
     "with \n newline",

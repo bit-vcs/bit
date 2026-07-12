@@ -9,7 +9,8 @@
 ///     "~" truncation mark.
 /// The truncation logic itself is a faithful port of git 2.55's graph.c.
 
-///| Drive the ported graph renderer over `commits` (newest-first, each entry is
+///|
+/// Drive the ported graph renderer over `commits` (newest-first, each entry is
 /// (hex, parents_hex)) in the oneline layout and return the pure graph-art rows
 /// (each padded to the current graph width; no commit content appended).
 fn gll_render_art(
@@ -63,7 +64,8 @@ fn gll_max_width(lines : Array[String]) -> Int {
   m
 }
 
-///| Linear history renders as one "* " lane per commit, and a limit is a no-op.
+///|
+/// Linear history renders as one "* " lane per commit, and a limit is a no-op.
 test "graph-lane-limit: linear history unaffected" {
   let commits : Array[(String, Array[String])] = [
     ("c1", ["c2"]),
@@ -77,7 +79,8 @@ test "graph-lane-limit: linear history unaffected" {
   @test.assert_eq(gll_render_art(commits, 5), no_limit)
 }
 
-///| A limit larger than the graph's actual lane count must not change output.
+///|
+/// A limit larger than the graph's actual lane count must not change output.
 test "graph-lane-limit: non-triggering limit is idempotent (merge)" {
   // M is a 2-way merge; the graph never exceeds 2 lanes.
   let commits : Array[(String, Array[String])] = [
@@ -96,7 +99,8 @@ test "graph-lane-limit: non-triggering limit is idempotent (merge)" {
   assert_true(!gll_any_contains_tilde(gll_render_art(commits, 3)))
 }
 
-///| A limit that DOES trigger caps the art width at n*2+2 and inserts "~".
+///|
+/// A limit that DOES trigger caps the art width at n*2+2 and inserts "~".
 test "graph-lane-limit: second lane truncated with ~" {
   // A 2-way merge opens a second lane (index 1). With --graph-lane-limit=1
   // that lane is at/above the limit and must be replaced with the "~" mark.

@@ -5,7 +5,7 @@ import {
   "mizchi/bit_pack" @pack,
   "mizchi/bit_protocol" @protocol,
   "mizchi/bit_ignore" @ignore,
-  "moonbitlang/core/encoding/utf8" @utf8,
+  "moonbitlang/core/encoding/utf8",
   "mizchi/bit_config" @config_parse,
   "mizchi/bit_date" @date_parse,
   "mizchi/bit_repo" @repo,

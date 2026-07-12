@@ -180,7 +180,6 @@ test "grep pattern: collect match spans returns repeated fixed matches" {
       #|  { start_column: 5, end_column: 8 },
       #|  { start_column: 14, end_column: 17 },
       #|]
-
     ),
   )
 }
@@ -199,7 +198,6 @@ test "grep pattern: collect match spans stays non-overlapping" {
       #|  { start_column: 1, end_column: 2 },
       #|  { start_column: 3, end_column: 4 },
       #|]
-
     ),
   )
 }

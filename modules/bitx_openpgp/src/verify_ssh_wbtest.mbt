@@ -1,5 +1,7 @@
 ///| Whitebox test for native SSH (SSHSIG) verification, exercised against a
-///| real `ssh-keygen -Y sign -n git` signature (fixture from OpenSSH).
+
+///|
+/// real `ssh-keygen -Y sign -n git` signature (fixture from OpenSSH).
 test "verify real ssh-keygen ed25519 git signature" {
   let msg = "hello git signing"
   let payload : Bytes = Bytes::makei(msg.length(), fn(i) {

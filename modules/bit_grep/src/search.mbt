@@ -35,7 +35,7 @@ fn grep_search_show_string(value : String) -> String {
 }
 
 ///|
-pub impl Show for GrepLineMatch with output(self, logger) {
+pub impl Show for GrepLineMatch with fn output(self, logger) {
   logger.write_string(
     "{line_number: " +
     self.line_number.to_string() +
@@ -48,7 +48,7 @@ pub impl Show for GrepLineMatch with output(self, logger) {
 }
 
 ///|
-pub impl Show for GrepFileMatch with output(self, logger) {
+pub impl Show for GrepFileMatch with fn output(self, logger) {
   logger.write_string(
     "{path: " +
     grep_search_show_string(self.path) +

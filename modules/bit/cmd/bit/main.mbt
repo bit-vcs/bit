@@ -880,7 +880,8 @@ fn missing_global_cwd_error(
   }
 }
 
-///| Returns true when the user passed `--no-git-fallback`, forbidding any
+///|
+/// Returns true when the user passed `--no-git-fallback`, forbidding any
 /// delegation to a real `git` binary. The flag is recorded as an environment
 /// variable by `run_main_for_args` so per-command handlers can consult it
 /// without threading global options through every dispatch path.
@@ -891,7 +892,8 @@ fn git_fallback_disabled() -> Bool {
   }
 }
 
-///| Abort with an explicit standalone-mode error instead of delegating to a
+///|
+/// Abort with an explicit standalone-mode error instead of delegating to a
 /// real `git` binary. Called from per-command delegation paths when
 /// `--no-git-fallback` forbids fallback.
 async fn exit_no_git_fallback(what : String) -> Unit {
@@ -1041,9 +1043,7 @@ fn should_delegate_to_real_git(
       // config/status are handled natively by default; like every other
       // command they only fall back when global config injection (-c /
       // GIT_CONFIG_*) is present and the shim cannot apply it itself.
-      if cmd == "worktree" ||
-        cmd == "submodule" ||
-        cmd == "submodule--helper" {
+      if cmd == "worktree" || cmd == "submodule" || cmd == "submodule--helper" {
         false
       } else if shim_handles_config {
         false

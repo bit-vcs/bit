@@ -3,11 +3,11 @@ import {
   "mizchi/bit_object" @object,
   "mizchi/bit_types" @types,
   "mizchi/bit_io" @bitio,
-  "moonbitlang/core/encoding/utf8" @utf8,
+  "moonbitlang/core/encoding/utf8",
 }
 
 warnings = "-29"
 
 import {
-  "moonbitlang/core/test" @test,
+  "moonbitlang/core/test",
 } for "test"

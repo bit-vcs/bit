@@ -19,10 +19,7 @@ fn setup_loose_refs_repo(branch_count : Int) -> @bit.TestFs {
   fs.write_string(git_dir + "/HEAD", "ref: refs/heads/main\n")
   let fake_id = "0123456789abcdef0123456789abcdef01234567"
   for i in 0..<branch_count {
-    fs.write_string(
-      git_dir + "/refs/heads/branch_\{i}",
-      fake_id + "\n",
-    )
+    fs.write_string(git_dir + "/refs/heads/branch_\{i}", fake_id + "\n")
     fs.write_string(
       git_dir + "/refs/remotes/origin/branch_\{i}",
       fake_id + "\n",
@@ -78,7 +75,9 @@ test "bench list_refs_with_ids loose 200 branches + 200 remotes" (b : @bench.T) 
 }
 
 ///|
-test "bench list_refs_with_ids loose 200+200 filtered refs/heads/" (b : @bench.T) {
+test "bench list_refs_with_ids loose 200+200 filtered refs/heads/" (
+  b : @bench.T,
+) {
   // Filter that excludes refs/remotes — exercises the new
   // subtree-pruning early exit.
   let git_dir = bench_refs_root + "/.git"

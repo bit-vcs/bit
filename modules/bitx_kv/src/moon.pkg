@@ -5,16 +5,16 @@ import {
   "mizchi/bit_repo" @repo,
   "mizchi/bit_io" @io,
   "mizchi/bit_lib" @lib,
-  "moonbitlang/core/buffer" @buffer,
-  "moonbitlang/core/encoding/utf8" @utf8,
+  "moonbitlang/core/buffer",
+  "moonbitlang/core/encoding/utf8",
 }
 
 import {
-  "moonbitlang/core/bench" @bench,
+  "moonbitlang/core/bench",
   "mizchi/bit_vfs" @fs,
   "mizchi/bit_osfs" @osfs,
   "moonbitlang/x/fs" @nfs,
-  "moonbitlang/core/test" @test,
+  "moonbitlang/core/test",
 } for "test"
 
 warnings = "-29"

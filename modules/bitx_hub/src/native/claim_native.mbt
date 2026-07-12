@@ -146,7 +146,9 @@ let default_relay_http_timeout_ms : Int = 30000
 fn relay_http_timeout_ms() -> Int {
   match @sys.get_env_var("BIT_RELAY_TIMEOUT_MS") {
     Some(value) =>
-      @string.parse_int(value) catch { _ => default_relay_http_timeout_ms }
+      @string.parse_int(value) catch {
+        _ => default_relay_http_timeout_ms
+      }
     None => default_relay_http_timeout_ms
   }
 }
@@ -183,13 +185,11 @@ async fn relay_http_get_timed(
   if ms <= 0 {
     return @bitnative.native_http_get(url, headers)
   }
-  let outcome = @async.with_timeout_opt(ms, () => @bitnative.native_http_get(
-      url,
-      headers,
-    ))
-    catch {
-      e => raise relay_coerce_git_error(e)
-    }
+  let outcome = @async.with_timeout_opt(ms, () => {
+    @bitnative.native_http_get(url, headers)
+  }) catch {
+    e => raise relay_coerce_git_error(e)
+  }
   match outcome {
     Some(result) => result
     None =>
@@ -210,14 +210,11 @@ async fn relay_http_post_timed(
   if ms <= 0 {
     return @bitnative.native_http_post(url, body, headers)
   }
-  let outcome = @async.with_timeout_opt(ms, () => @bitnative.native_http_post(
-      url,
-      body,
-      headers,
-    ))
-    catch {
-      e => raise relay_coerce_git_error(e)
-    }
+  let outcome = @async.with_timeout_opt(ms, () => {
+    @bitnative.native_http_post(url, body, headers)
+  }) catch {
+    e => raise relay_coerce_git_error(e)
+  }
   match outcome {
     Some(result) => result
     None =>
@@ -406,24 +403,24 @@ pub async fn relay_watch_claims_ws(
     None => ()
   }
   let connect_timeout_ms = relay_http_timeout_ms()
-  let conn = (
-      if connect_timeout_ms <= 0 {
-        @xws.Conn::connect(ws_url, headers~)
-      } else {
-        @async.with_timeout(connect_timeout_ms, () => @xws.Conn::connect(
-          ws_url,
-          headers~,
-        ), error=@bit.GitError::ProtocolError(
+  let conn = try {
+    if connect_timeout_ms <= 0 {
+      @xws.Conn::connect(ws_url, headers~)
+    } else {
+      @async.with_timeout(
+        connect_timeout_ms,
+        () => @xws.Conn::connect(ws_url, headers~),
+        error=@bit.GitError::ProtocolError(
           "WebSocket connect timed out after \{connect_timeout_ms}ms",
-        ))
-      }
-    )
-    catch {
-      err =>
-        raise @bit.GitError::ProtocolError(
-          "WebSocket connect failed: \{err.to_string()}",
-        )
+        ),
+      )
     }
+  } catch {
+    err =>
+      raise @bit.GitError::ProtocolError(
+        "WebSocket connect failed: \{err.to_string()}",
+      )
+  }
   // Read ready message
   let _ = conn.recv() catch {
     err =>

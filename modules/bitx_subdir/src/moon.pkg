@@ -6,11 +6,11 @@ import {
   "mizchi/bit_io" @io,
   "mizchi/bit_lib" @lib,
   "mizchi/bit_vfs" @fs,
-  "mizchi/zlib" @zlib,
+  "mizchi/zlib",
 }
 
 warnings = "-unused_constructor-29"
 
 import {
-  "moonbitlang/core/test" @test,
+  "moonbitlang/core/test",
 } for "test"

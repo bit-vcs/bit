@@ -808,7 +808,10 @@ test "submodule add: existing index conflict requires force for gitlinks only" {
     "dir-tracked",
     false,
   )
-  @test.assert_eq(plain, Some("fatal: 'dir-tracked' already exists in the index"))
+  @test.assert_eq(
+    plain,
+    Some("fatal: 'dir-tracked' already exists in the index"),
+  )
   let existing_gitlink = submodule_add_existing_index_error(
     [submodule_wbtest_entry("submod", 0o160000)],
     "submod",
@@ -871,7 +874,10 @@ test "submodule update blocker: git entry is allowed" {
 
 ///|
 test "submodule add blocker: file path rejects" {
-  @test.assert_eq(submodule_add_path_blocker_kind(true, [], false), Some("path"))
+  @test.assert_eq(
+    submodule_add_path_blocker_kind(true, [], false),
+    Some("path"),
+  )
 }
 
 ///|
@@ -889,7 +895,10 @@ test "submodule add blocker: existing repo is allowed" {
 
 ///|
 test "submodule add blocker: occupied dir rejects" {
-  @test.assert_eq(submodule_add_path_blocker_kind(false, ["a"], false), Some("path"))
+  @test.assert_eq(
+    submodule_add_path_blocker_kind(false, ["a"], false),
+    Some("path"),
+  )
 }
 
 ///|

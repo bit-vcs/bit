@@ -1,9 +1,9 @@
 import {
-  "bobzhang/toml" @toml,
-  "moonbitlang/x/sys" @sys,
-  "moonbitlang/x/fs" @fs,
+  "bobzhang/toml",
+  "moonbitlang/x/sys",
+  "moonbitlang/x/fs",
 }
 
 import {
-  "moonbitlang/core/test" @test,
+  "moonbitlang/core/test",
 } for "wbtest"

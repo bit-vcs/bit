@@ -25,9 +25,7 @@ let bench_small_config : String =
 /// a repo with lots of upstreams (e.g. an aggregator).
 fn bench_make_large_config(num_remotes : Int) -> String {
   let sb = StringBuilder::new()
-  sb.write_string(
-    "[core]\n\trepositoryformatversion = 0\n\tfilemode = true\n",
-  )
+  sb.write_string("[core]\n\trepositoryformatversion = 0\n\tfilemode = true\n")
   for i in 0..<num_remotes {
     sb.write_string("[remote \"r\{i}\"]\n")
     sb.write_string("\turl = https://example.com/repo\{i}.git\n")
@@ -59,7 +57,10 @@ test "bench config_lines_from_content 100 remotes" (b : @bench.T) {
 test "bench get_config_value_from_content small" (b : @bench.T) {
   b.bench(fn() {
     let v = get_config_value_from_content(
-      bench_small_config, "remote.origin.url", None, false,
+      bench_small_config,
+      "remote.origin.url",
+      None,
+      false,
     )
     b.keep(v is Some(_))
   })
@@ -70,7 +71,10 @@ test "bench get_config_value_from_content miss" (b : @bench.T) {
   // Worst case: scan the entire file without finding the key.
   b.bench(fn() {
     let v = get_config_value_from_content(
-      bench_large_config, "branch.does-not-exist.remote", None, false,
+      bench_large_config,
+      "branch.does-not-exist.remote",
+      None,
+      false,
     )
     b.keep(v is Some(_))
   })
@@ -80,7 +84,10 @@ test "bench get_config_value_from_content miss" (b : @bench.T) {
 test "bench get_all_config_values_from_content remote.*.url" (b : @bench.T) {
   b.bench(fn() {
     let values = get_all_config_values_from_content(
-      bench_large_config, "remote.url", None, false,
+      bench_large_config,
+      "remote.url",
+      None,
+      false,
     )
     b.keep(values.length())
   })

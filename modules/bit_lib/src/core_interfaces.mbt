@@ -1,25 +1,25 @@
 ///|
 pub(open) trait ObjectStore {
-  get(Self, @bit.ObjectId) -> @bit.PackObject? raise @bit.GitError
-  put(Self, @bit.ObjectType, Bytes) -> @bit.ObjectId raise @bit.GitError
-  has(Self, @bit.ObjectId) -> Bool raise @bit.GitError
+  fn get(Self, @bit.ObjectId) -> @bit.PackObject? raise @bit.GitError
+  fn put(Self, @bit.ObjectType, Bytes) -> @bit.ObjectId raise @bit.GitError
+  fn has(Self, @bit.ObjectId) -> Bool raise @bit.GitError
 }
 
 ///|
 pub(open) trait RefStore {
-  resolve(Self, String) -> @bit.ObjectId? raise @bit.GitError
-  update(Self, String, @bit.ObjectId?) -> Unit raise @bit.GitError
-  list(Self, String) -> Array[String] raise @bit.GitError
+  fn resolve(Self, String) -> @bit.ObjectId? raise @bit.GitError
+  fn update(Self, String, @bit.ObjectId?) -> Unit raise @bit.GitError
+  fn list(Self, String) -> Array[String] raise @bit.GitError
 }
 
 ///|
 pub(open) trait Clock {
-  now(Self) -> Int64
+  fn now(Self) -> Int64
 }
 
 ///|
 pub(open) trait Random {
-  short(Self) -> String
+  fn short(Self) -> String
 }
 
 ///|
@@ -31,21 +31,21 @@ pub struct PushUpdate {
 
 ///|
 pub(open) trait Transport {
-  fetch(Self, String, Array[@bit.ObjectId]) -> Bytes raise @bit.GitError
-  push(Self, String, Array[PushUpdate]) -> Result[Unit, String] raise @bit.GitError
+  fn fetch(Self, String, Array[@bit.ObjectId]) -> Bytes raise @bit.GitError
+  fn push(Self, String, Array[PushUpdate]) -> Result[Unit, String] raise @bit.GitError
 }
 
 ///|
 pub(open) trait WorkingTree {
-  read_file(Self, String) -> Bytes raise @bit.GitError
-  write_file(Self, String, Bytes) -> Unit
-  remove_file(Self, String) -> Unit
-  is_file(Self, String) -> Bool
-  is_dir(Self, String) -> Bool
-  readdir(Self, String) -> Array[String] raise @bit.GitError
-  is_dirty(Self) -> Bool
-  rollback(Self) -> Unit
-  get_working_files(Self) -> Array[String]
-  snapshot(Self, String, String, Int64) -> @bit.ObjectId raise @bit.GitError
-  checkout(Self, @bit.ObjectId) -> Unit raise @bit.GitError
+  fn read_file(Self, String) -> Bytes raise @bit.GitError
+  fn write_file(Self, String, Bytes) -> Unit
+  fn remove_file(Self, String) -> Unit
+  fn is_file(Self, String) -> Bool
+  fn is_dir(Self, String) -> Bool
+  fn readdir(Self, String) -> Array[String] raise @bit.GitError
+  fn is_dirty(Self) -> Bool
+  fn rollback(Self) -> Unit
+  fn get_working_files(Self) -> Array[String]
+  fn snapshot(Self, String, String, Int64) -> @bit.ObjectId raise @bit.GitError
+  fn checkout(Self, @bit.ObjectId) -> Unit raise @bit.GitError
 }

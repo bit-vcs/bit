@@ -1,9 +1,9 @@
 import {
-  "moonbitlang/core/encoding/utf8" @utf8,
-  "moonbitlang/core/string" @string,
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/string",
   "moonbitlang/core/strconv",
 }
 
 import {
-  "moonbitlang/core/test" @test,
+  "moonbitlang/core/test",
 } for "test"

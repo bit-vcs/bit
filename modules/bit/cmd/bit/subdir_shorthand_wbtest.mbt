@@ -101,7 +101,10 @@ test "shorthand: mizchi/bit" {
 ///|
 test "shorthand: user/repo:src" {
   let result = parse_github_shorthand("user/repo:src")
-  @test.assert_eq(result, Some(Subdir("https://github.com/user/repo", "src", None)))
+  @test.assert_eq(
+    result,
+    Some(Subdir("https://github.com/user/repo", "src", None)),
+  )
 }
 
 ///|
@@ -135,7 +138,10 @@ test "shorthand: gitlab.com/user/repo" {
 ///|
 test "shorthand: gitlab.com/user/repo:src" {
   let result = parse_github_shorthand("gitlab.com/user/repo:src")
-  @test.assert_eq(result, Some(Subdir("https://gitlab.com/user/repo", "src", None)))
+  @test.assert_eq(
+    result,
+    Some(Subdir("https://gitlab.com/user/repo", "src", None)),
+  )
 }
 
 ///|
@@ -217,7 +223,10 @@ test "shorthand: colon with empty subdir user/repo:" {
 ///|
 test "shorthand: user/repo@main" {
   let result = parse_github_shorthand("user/repo@main")
-  @test.assert_eq(result, Some(Repo("https://github.com/user/repo", Some("main"))))
+  @test.assert_eq(
+    result,
+    Some(Repo("https://github.com/user/repo", Some("main"))),
+  )
 }
 
 ///|

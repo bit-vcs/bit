@@ -208,8 +208,14 @@ test "pull: rebase mode parses interactive and rejects invalid config" {
       #|
     ),
   )
-  @test.assert_eq(pull_resolve_rebase_behavior(fs, git_dir, None, None), (true, true))
-  @test.assert_eq(pull_parse_rebase_behavior_value("i", "--rebase"), (true, true))
+  @test.assert_eq(
+    pull_resolve_rebase_behavior(fs, git_dir, None, None),
+    (true, true),
+  )
+  @test.assert_eq(
+    pull_parse_rebase_behavior_value("i", "--rebase"),
+    (true, true),
+  )
   fs.write_string(
     git_dir + "/config",
     (

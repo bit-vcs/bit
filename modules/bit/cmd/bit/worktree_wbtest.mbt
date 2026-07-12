@@ -119,7 +119,10 @@ test "worktree: branch display distinguishes bare and broken" {
 ///|
 test "worktree: parse expire days ago" {
   let now = get_current_timestamp()
-  @test.assert_eq(worktree_parse_expire_before_sec("2.days.ago"), Some(now - 172800L))
+  @test.assert_eq(
+    worktree_parse_expire_before_sec("2.days.ago"),
+    Some(now - 172800L),
+  )
   @test.assert_eq(worktree_parse_expire_before_sec("days.ago"), None)
   @test.assert_eq(worktree_parse_expire_before_sec("2.hours.ago"), None)
 }

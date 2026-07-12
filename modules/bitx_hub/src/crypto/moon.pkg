@@ -2,18 +2,18 @@ import {
   "mizchi/bit_core" @bit,
   "mizchi/bit_object" @object,
   "mizchi/bit_types" @types,
-  "moonbitlang/async/process" @process,
-  "moonbitlang/async/js_async" @js_async,
-  "moonbitlang/core/env" @env,
-  "moonbitlang/core/encoding/base64" @base64,
-  "moonbitlang/core/encoding/utf8" @utf8,
-  "moonbitlang/core/json" @json,
+  "moonbitlang/async/process",
+  "moonbitlang/async/js_async",
+  "moonbitlang/core/env",
+  "moonbitlang/core/encoding/base64",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/json",
   "moonbitlang/x/crypto" @mbcrypto,
-  "moonbitlang/x/sys" @sys,
+  "moonbitlang/x/sys",
 }
 
 import {
-  "moonbitlang/async" @async,
+  "moonbitlang/async",
 } for "wbtest"
 
 warnings = "-29-67"

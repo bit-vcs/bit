@@ -769,7 +769,7 @@ fn submodule_info_show_string(value : String) -> String {
 }
 
 ///|
-pub impl Show for SubmoduleInfo with output(self, logger) {
+pub impl Show for SubmoduleInfo with fn output(self, logger) {
   logger.write_string(
     "{name: " +
     submodule_info_show_string(self.name) +
@@ -935,11 +935,7 @@ fn ls_files_submodule_is_active(
 /// Mirrors the subset of git's CVE-2018-11235 / -17456 / -1387 /
 /// 2022-39253 defenses that matters when `bit submodule init/update`
 /// consumes attacker-controlled `.gitmodules`.
-fn validate_submodule_entry(
-  name : String,
-  path : String,
-  url : String,
-) -> Bool {
+fn validate_submodule_entry(name : String, path : String, url : String) -> Bool {
   // name: reject empty, traversal patterns, and dangerous chars.
   // Slash IS allowed (git permits names like "nested/sub" to match
   // the path) — we only reject names that begin with "." (matches
@@ -980,8 +976,7 @@ fn validate_submodule_entry(
       return false
     }
     // .git (case-insensitive ASCII)
-    if comp.length() == 4 &&
-      comp.unsafe_get(0).to_int() == 0x2E { // '.'
+    if comp.length() == 4 && comp.unsafe_get(0).to_int() == 0x2E { // '.'
       let lower = fn(c : Int) -> Int {
         if c >= 0x41 && c <= 0x5A {
           c + 32
@@ -1037,9 +1032,7 @@ fn parse_gitmodules(
     if line.has_prefix("[submodule \"") && line.has_suffix("\"]") {
       if current_name.length() > 0 &&
         current_path.length() > 0 &&
-        validate_submodule_entry(
-          current_name, current_path, current_url,
-        ) {
+        validate_submodule_entry(current_name, current_path, current_url) {
         result.push({ name: current_name, path: current_path, url: current_url })
       }
       current_name = String::unsafe_substring(

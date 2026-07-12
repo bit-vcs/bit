@@ -3,13 +3,11 @@ import {
 }
 
 import {
-  "moonbitlang/core/bench" @bench,
+  "moonbitlang/core/bench",
 } for "test"
 
 warnings = "-29"
 
 options(
-  targets: {
-    "bench_test.mbt": [ "native" ],
-  },
+  targets: { "bench_test.mbt": [ "native" ] },
 )

@@ -498,31 +498,63 @@ pub fn Hub::add_dep(
     let new_blocked_by = src.blocked_by.copy()
     new_blocked_by.push(target_id)
     let updated_src = Issue::new(
-      src.id, src.title, src.body, src.author,
-      src.created_at, clock.now(), src.state,
-      labels=src.labels, assignees=src.assignees,
-      linked_prs=src.linked_prs, linked_issues=src.linked_issues,
+      src.id,
+      src.title,
+      src.body,
+      src.author,
+      src.created_at,
+      clock.now(),
+      src.state,
+      labels=src.labels,
+      assignees=src.assignees,
+      linked_prs=src.linked_prs,
+      linked_issues=src.linked_issues,
       parent_id=src.parent_id,
-      blocked_by=new_blocked_by, blocking=src.blocking,
+      blocked_by=new_blocked_by,
+      blocking=src.blocking,
     )
-    ignore(self.store.put_record(objects, refs, clock,
-      work_item_meta_key(source_id), canonical_work_item_record_kind(),
-      updated_src.to_work_item().serialize(), src.author))
+    ignore(
+      self.store.put_record(
+        objects,
+        refs,
+        clock,
+        work_item_meta_key(source_id),
+        canonical_work_item_record_kind(),
+        updated_src.to_work_item().serialize(),
+        src.author,
+      ),
+    )
   }
   if !tgt.blocking.contains(source_id) {
     let new_blocking = tgt.blocking.copy()
     new_blocking.push(source_id)
     let updated_tgt = Issue::new(
-      tgt.id, tgt.title, tgt.body, tgt.author,
-      tgt.created_at, clock.now(), tgt.state,
-      labels=tgt.labels, assignees=tgt.assignees,
-      linked_prs=tgt.linked_prs, linked_issues=tgt.linked_issues,
+      tgt.id,
+      tgt.title,
+      tgt.body,
+      tgt.author,
+      tgt.created_at,
+      clock.now(),
+      tgt.state,
+      labels=tgt.labels,
+      assignees=tgt.assignees,
+      linked_prs=tgt.linked_prs,
+      linked_issues=tgt.linked_issues,
       parent_id=tgt.parent_id,
-      blocked_by=tgt.blocked_by, blocking=new_blocking,
+      blocked_by=tgt.blocked_by,
+      blocking=new_blocking,
     )
-    ignore(self.store.put_record(objects, refs, clock,
-      work_item_meta_key(target_id), canonical_work_item_record_kind(),
-      updated_tgt.to_work_item().serialize(), tgt.author))
+    ignore(
+      self.store.put_record(
+        objects,
+        refs,
+        clock,
+        work_item_meta_key(target_id),
+        canonical_work_item_record_kind(),
+        updated_tgt.to_work_item().serialize(),
+        tgt.author,
+      ),
+    )
   }
 }
 
@@ -547,26 +579,58 @@ pub fn Hub::remove_dep(
   }
   let new_blocked_by = src.blocked_by.filter(fn(id) { id != target_id })
   let updated_src = Issue::new(
-    src.id, src.title, src.body, src.author,
-    src.created_at, clock.now(), src.state,
-    labels=src.labels, assignees=src.assignees,
-    linked_prs=src.linked_prs, linked_issues=src.linked_issues,
+    src.id,
+    src.title,
+    src.body,
+    src.author,
+    src.created_at,
+    clock.now(),
+    src.state,
+    labels=src.labels,
+    assignees=src.assignees,
+    linked_prs=src.linked_prs,
+    linked_issues=src.linked_issues,
     parent_id=src.parent_id,
-    blocked_by=new_blocked_by, blocking=src.blocking,
+    blocked_by=new_blocked_by,
+    blocking=src.blocking,
   )
-  ignore(self.store.put_record(objects, refs, clock,
-    work_item_meta_key(source_id), canonical_work_item_record_kind(),
-    updated_src.to_work_item().serialize(), src.author))
+  ignore(
+    self.store.put_record(
+      objects,
+      refs,
+      clock,
+      work_item_meta_key(source_id),
+      canonical_work_item_record_kind(),
+      updated_src.to_work_item().serialize(),
+      src.author,
+    ),
+  )
   let new_blocking = tgt.blocking.filter(fn(id) { id != source_id })
   let updated_tgt = Issue::new(
-    tgt.id, tgt.title, tgt.body, tgt.author,
-    tgt.created_at, clock.now(), tgt.state,
-    labels=tgt.labels, assignees=tgt.assignees,
-    linked_prs=tgt.linked_prs, linked_issues=tgt.linked_issues,
+    tgt.id,
+    tgt.title,
+    tgt.body,
+    tgt.author,
+    tgt.created_at,
+    clock.now(),
+    tgt.state,
+    labels=tgt.labels,
+    assignees=tgt.assignees,
+    linked_prs=tgt.linked_prs,
+    linked_issues=tgt.linked_issues,
     parent_id=tgt.parent_id,
-    blocked_by=tgt.blocked_by, blocking=new_blocking,
+    blocked_by=tgt.blocked_by,
+    blocking=new_blocking,
   )
-  ignore(self.store.put_record(objects, refs, clock,
-    work_item_meta_key(target_id), canonical_work_item_record_kind(),
-    updated_tgt.to_work_item().serialize(), tgt.author))
+  ignore(
+    self.store.put_record(
+      objects,
+      refs,
+      clock,
+      work_item_meta_key(target_id),
+      canonical_work_item_record_kind(),
+      updated_tgt.to_work_item().serialize(),
+      tgt.author,
+    ),
+  )
 }

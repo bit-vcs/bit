@@ -7,6 +7,7 @@
 // Graph renderer state constants — a faithful port of git's `enum graph_state`
 // (graph.c). The algorithm below mirrors graph.c so that `bit log --graph`
 // output is byte-for-byte identical to git's for arbitrary topologies.
+///|
 let graph_state_padding = 0
 
 ///|
@@ -24,10 +25,12 @@ let graph_state_post_merge = 4
 ///|
 let graph_state_collapsing = 5
 
-///| merge_chars[] from graph.c: index 0 = '/', 1 = '|', 2 = '\\'.
+///|
+/// merge_chars[] from graph.c: index 0 = '/', 1 = '|', 2 = '\\'.
 let graph_merge_chars : Array[Char] = ['/', '|', '\\']
 
-///| Port of git's `struct git_graph` (graph.c). Columns hold commit hexes (""
+///|
+/// Port of git's `struct git_graph` (graph.c). Columns hold commit hexes (""
 /// means an unused slot); colors are omitted since `bit log` never colorizes
 /// the graph. See third_party/git/graph.c for the field documentation.
 struct GitGraph {
@@ -59,7 +62,8 @@ struct GitGraph {
   graph_max_lanes : Int
 }
 
-///| Port of git's graph_needs_truncation(): true when `lane` is at or beyond
+///|
+/// Port of git's graph_needs_truncation(): true when `lane` is at or beyond
 /// the configured lane limit. Values <= 0 mean no limit.
 fn graph_needs_truncation(g : GitGraph, lane : Int) -> Bool {
   g.graph_max_lanes > 0 && lane >= g.graph_max_lanes
@@ -98,7 +102,8 @@ fn GitGraph::new(
   }
 }
 
-///| A parent is "interesting" (gets a graph lane drawn to it) if it is part of
+///|
+/// A parent is "interesting" (gets a graph lane drawn to it) if it is part of
 /// the walk — i.e. present in the full reachable `shown` set. This mirrors git's
 /// graph_is_interesting(), which keys off the revision walk rather than the `-n`
 /// output limit: the walk gathers the whole history, so a merge parent just past
@@ -192,7 +197,8 @@ fn graph_is_mapping_correct(g : GitGraph) -> Bool {
   true
 }
 
-///| Port of git's graph_insert_into_new_columns().
+///|
+/// Port of git's graph_insert_into_new_columns().
 fn graph_insert_into_new_columns(
   g : GitGraph,
   commit : String,
@@ -212,9 +218,7 @@ fn graph_insert_into_new_columns(
     g.edges_added = g.num_parents + g.merge_layout - 2
     mapping_idx = g.width + (g.merge_layout - 1) * shift
     g.width += 2 * g.merge_layout
-  } else if g.edges_added > 0 &&
-    g.width >= 2 &&
-    i == g.mapping[g.width - 2] {
+  } else if g.edges_added > 0 && g.width >= 2 && i == g.mapping[g.width - 2] {
     mapping_idx = g.width - 2
     g.edges_added = -1
   } else {
@@ -224,7 +228,8 @@ fn graph_insert_into_new_columns(
   g.mapping[mapping_idx] = i
 }
 
-///| Port of git's graph_update_columns().
+///|
+/// Port of git's graph_update_columns().
 fn graph_update_columns(g : GitGraph) -> Unit {
   let tmp = g.columns
   g.columns = g.new_columns
@@ -279,7 +284,8 @@ fn graph_update_columns(g : GitGraph) -> Unit {
   }
 }
 
-///| Port of git's graph_update(): advance the graph to the next commit.
+///|
+/// Port of git's graph_update(): advance the graph to the next commit.
 fn graph_update(
   g : GitGraph,
   commit_hex : String,
@@ -389,7 +395,8 @@ fn graph_output_commit_char(g : GitGraph, line : Array[Char]) -> Unit {
   }
 }
 
-///| Port of git's graph_draw_octopus_merge().
+///|
+/// Port of git's graph_draw_octopus_merge().
 fn graph_draw_octopus_merge(g : GitGraph, line : Array[Char]) -> Unit {
   let dashed = graph_num_dashed_parents(g)
   let mut i = 0
@@ -406,7 +413,8 @@ fn graph_draw_octopus_merge(g : GitGraph, line : Array[Char]) -> Unit {
   }
 }
 
-///| Port of git's graph_output_commit_line().
+///|
+/// Port of git's graph_output_commit_line().
 fn graph_output_commit_line(g : GitGraph, line : Array[Char]) -> Unit {
   let mut seen_this = false
   let mut i = 0
@@ -477,7 +485,8 @@ fn graph_output_commit_line(g : GitGraph, line : Array[Char]) -> Unit {
   }
 }
 
-///| Port of git's graph_output_post_merge_line().
+///|
+/// Port of git's graph_output_post_merge_line().
 fn graph_output_post_merge_line(g : GitGraph, line : Array[Char]) -> Unit {
   let mut seen_this = false
   let first_parent_hex = g.cur_parents[0]
@@ -514,8 +523,7 @@ fn graph_output_post_merge_line(g : GitGraph, line : Array[Char]) -> Unit {
         }
         if idx == 2 {
           // Check if the next lane needs truncation to avoid doubled padding.
-          if graph_needs_truncation(g, (j + 1) / 2 + i) &&
-            j < g.num_parents - 1 {
+          if graph_needs_truncation(g, (j + 1) / 2 + i) && j < g.num_parents - 1 {
             line.push('~')
             line.push(' ')
             truncated = true
@@ -570,7 +578,8 @@ fn graph_output_post_merge_line(g : GitGraph, line : Array[Char]) -> Unit {
   }
 }
 
-///| Port of git's graph_output_collapsing_line().
+///|
+/// Port of git's graph_output_collapsing_line().
 fn graph_output_collapsing_line(g : GitGraph, line : Array[Char]) -> Unit {
   let mut used_horizontal = false
   let mut horizontal_edge = -1
@@ -659,7 +668,8 @@ fn graph_output_collapsing_line(g : GitGraph, line : Array[Char]) -> Unit {
   }
 }
 
-///| Port of git's graph_next_line(): emit one graph line for the current state.
+///|
+/// Port of git's graph_next_line(): emit one graph line for the current state.
 /// Returns the padded line and whether it was the commit (`*`) line.
 fn graph_next_line(g : GitGraph) -> (String, Bool) {
   let line : Array[Char] = []
@@ -682,7 +692,8 @@ fn graph_next_line(g : GitGraph) -> (String, Bool) {
   (graph_chars_to_string(line), shown)
 }
 
-///| Port of git's graph_padding_line(): the inter-entry separator row. When the
+///|
+/// Port of git's graph_padding_line(): the inter-entry separator row. When the
 /// current state is GRAPH_COMMIT this draws the special padding that keeps merge
 /// columns aligned; otherwise it falls through to graph_next_line().
 fn graph_padding_line(g : GitGraph) -> String {
