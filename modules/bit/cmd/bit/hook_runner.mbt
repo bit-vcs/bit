@@ -24,7 +24,9 @@ fn read_hook_config(
   if !rfs.is_file(config_path) {
     return { commands, parallel }
   }
-  let raw = rfs.read_file(config_path) catch { _ => return { commands, parallel } }
+  let raw = rfs.read_file(config_path) catch {
+    _ => return { commands, parallel }
+  }
   let content = decode_bytes(raw)
   let blocks = @bitlib.parse_config_blocks(content)
   let lower_name = hook_name.to_lower()
@@ -66,7 +68,9 @@ async fn run_hook_command_streaming(
   args : Array[String],
   cwd : String,
 ) -> Int {
-  @process.run(command, args, inherit_env=true, cwd~) catch { _ => 1 }
+  @process.run(command, args, inherit_env=true, cwd~) catch {
+    _ => 1
+  }
 }
 
 ///|
@@ -80,7 +84,10 @@ async fn run_hook_command_buffered(
   cwd : String,
 ) -> (Int, Bytes) {
   let result = try? @process.collect_output_merged(
-    command, args, inherit_env=true, cwd~,
+    command,
+    args,
+    inherit_env=true,
+    cwd~,
   )
   match result {
     Ok((code, data)) => (code, data.binary())
@@ -116,7 +123,7 @@ async fn run_hook(
   git_dir : String,
   hook_name : String,
   cwd : String,
-  args~ : Array[String] = [],
+  args? : Array[String] = [],
 ) -> Int {
   let cfg = read_hook_config(rfs, git_dir, hook_name)
   if cfg.commands.length() == 0 {

@@ -28,7 +28,9 @@ async fn handle_describe(args : Array[String]) -> Unit raise Error {
     } else if arg == "--dirty" {
       dirty_mark = "-dirty"
     } else if arg.has_prefix("--abbrev=") {
-      abbrev = parse_int(String::unsafe_substring(arg, start=9, end=arg.length()))
+      abbrev = parse_int(
+        String::unsafe_substring(arg, start=9, end=arg.length()),
+      )
     } else if arg.has_prefix("--dirty=") {
       dirty_mark = String::unsafe_substring(arg, start=8, end=arg.length())
     } else if arg == "--match" {
@@ -37,7 +39,9 @@ async fn handle_describe(args : Array[String]) -> Unit raise Error {
         match_patterns.push(args[i])
       }
     } else if arg.has_prefix("--match=") {
-      match_patterns.push(String::unsafe_substring(arg, start=8, end=arg.length()))
+      match_patterns.push(
+        String::unsafe_substring(arg, start=8, end=arg.length()),
+      )
     } else if arg == "--exclude" {
       i = i + 1
       if i < args.length() {

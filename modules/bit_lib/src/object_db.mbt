@@ -124,11 +124,7 @@ pub fn PackIndex::hex_ids(self : PackIndex) -> Array[String] {
 /// Compare the id at position `mid` against `target` (exactly `hash_size`
 /// bytes), unsigned byte order — identical ordering to hex lexicographic
 /// comparison, since hex is a monotonic per-byte encoding.
-fn PackIndex::compare_id_at(
-  self : PackIndex,
-  mid : Int,
-  target : Bytes,
-) -> Int {
+fn PackIndex::compare_id_at(self : PackIndex, mid : Int, target : Bytes) -> Int {
   let base = mid * self.hash_size
   for j in 0..<self.hash_size {
     let a = self.id_bytes[base + j].to_int()
@@ -171,9 +167,7 @@ pub fn PackIndex::find_offset_hex(self : PackIndex, hex : String) -> Int64? {
   if hex.length() != self.hash_size * 2 {
     return None
   }
-  let id = @bit.ObjectId::from_hex(hex) catch {
-    _ => return None
-  }
+  let id = @bit.ObjectId::from_hex(hex) catch { _ => return None }
   self.find_offset_bytes(id.to_bytes())
 }
 
@@ -631,7 +625,10 @@ fn get_loose_by_hex(
   match loose_path {
     Some(path) => {
       let compressed = fs.read_file(path)
-      let raw = @zlib.zlib_decompress(compressed, max_size=MAX_LOOSE_OBJECT_SIZE) catch {
+      let raw = @zlib.zlib_decompress(
+        compressed,
+        max_size=MAX_LOOSE_OBJECT_SIZE,
+      ) catch {
         e => raise @bit.GitError::InvalidObject("Zlib error: \{e}")
       }
       check_loose_object_size(raw)
@@ -847,7 +844,10 @@ fn get_by_hex(
   match loose_path {
     Some(path) => {
       let compressed = fs.read_file(path)
-      let raw = @zlib.zlib_decompress(compressed, max_size=MAX_LOOSE_OBJECT_SIZE) catch {
+      let raw = @zlib.zlib_decompress(
+        compressed,
+        max_size=MAX_LOOSE_OBJECT_SIZE,
+      ) catch {
         e => raise @bit.GitError::InvalidObject("Zlib error: \{e}")
       }
       check_loose_object_size(raw)
@@ -1209,9 +1209,7 @@ fn read_pack_object_at(
     data, offset_i,
   )
   if size < 0 || size > MAX_LOOSE_OBJECT_SIZE {
-    raise @bit.GitError::PackfileError(
-      "Pack object size out of range: \{size}",
-    )
+    raise @bit.GitError::PackfileError("Pack object size out of range: \{size}")
   }
   match type_id {
     1 | 2 | 3 | 4 => {

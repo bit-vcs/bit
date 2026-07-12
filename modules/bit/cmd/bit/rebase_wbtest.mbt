@@ -118,9 +118,7 @@ async test "rebase: -S stores gpgsig header on rewritten commit" {
   // runner's JSON summary stream and breaks the parser, so redirect
   // fd 1 to /dev/null for the duration of the call.
   bench_stdout_suppress()
-  let rebase_result : Result[Unit, Error] = try? handle_rebase([
-    "-S", "main",
-  ])
+  let rebase_result : Result[Unit, Error] = try? handle_rebase(["-S", "main"])
   bench_stdout_restore()
   match rebase_result {
     Ok(_) => ()

@@ -367,23 +367,22 @@ fn repo_format_info(
   let content = @bitlib.read_config_content(fs, git_dir)
   let is_reftable = reftable_dir ||
     (
-      @bitlib.read_config_value_from_content(content, "extensions", "refstorage") is
-        Some(v) && v.to_lower() == "reftable"
+      @bitlib.read_config_value_from_content(
+        content, "extensions", "refstorage",
+      )
+      is Some(v) &&
+      v.to_lower() == "reftable"
     )
   let object_format = match
     @bitlib.read_config_value_from_content(
-      content,
-      "extensions",
-      "objectformat",
+      content, "extensions", "objectformat",
     ) {
     Some(value) => if value.to_lower() == "sha256" { "sha256" } else { "sha1" }
     None => "sha1"
   }
   let compat_object_format = match
     @bitlib.read_config_value_from_content(
-      content,
-      "extensions",
-      "compatobjectformat",
+      content, "extensions", "compatobjectformat",
     ) {
     Some(value) => {
       let normalized = @bitlib.config_strip_quotes(value).to_lower()

@@ -1,6 +1,0 @@
-{
-  "import": [
-    "mizchi/experimental_crypto/pgp",
-    "mizchi/experimental_crypto/ssh"
-  ]
-}

@@ -1,5 +1,5 @@
 import {
-  "moonbitlang/core/bench" @bench,
+  "moonbitlang/core/bench",
 } for "test"
 
 warnings = "-29"

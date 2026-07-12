@@ -151,7 +151,10 @@ async test "format_patch: range excludes main history on OsFs" {
 ///|
 test "format_patch: signature suffix handles text file and none" {
   @test.assert_eq(format_patch_signature_suffix(None), "")
-  @test.assert_eq(format_patch_signature_suffix(Some("my sig")), "-- \nmy sig\n\n")
+  @test.assert_eq(
+    format_patch_signature_suffix(Some("my sig")),
+    "-- \nmy sig\n\n",
+  )
   @test.assert_eq(
     format_patch_signature_suffix(Some("\nline1\nline2\n")),
     "-- \n\nline1\nline2\n\n",

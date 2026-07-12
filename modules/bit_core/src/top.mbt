@@ -1,4 +1,5 @@
-///| Stable core facade for workspace modules.
+///|
+/// Stable core facade for workspace modules.
 pub using @types {
   type ObjectId,
   type ObjectType,

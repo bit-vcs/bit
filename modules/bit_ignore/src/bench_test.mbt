@@ -17,7 +17,9 @@ test "bench match_glob no match" (b : @bench.T) {
 ///|
 test "bench match_glob double star" (b : @bench.T) {
   b.bench(fn() {
-    b.keep(@bit_ignore.match_glob("**/*.test.js", "src/components/Button.test.js"))
+    b.keep(
+      @bit_ignore.match_glob("**/*.test.js", "src/components/Button.test.js"),
+    )
   })
 }
 

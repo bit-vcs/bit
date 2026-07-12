@@ -128,7 +128,7 @@ test "fuzz: parse_packfile_stream with biased header" {
 test "fuzz: decode_type_and_size_at" {
   let rng = Lcg::new(0xBADC0DE)
   for _ in 0..<128 {
-    let len = (rng.next_int() % 64) + 1
+    let len = rng.next_int() % 64 + 1
     let bytes = random_bytes(rng, len)
     let off = rng.next_int() % len
     ignore(try? @pack.decode_type_and_size_at(bytes, off))
@@ -304,4 +304,3 @@ test "fuzz: parse_index_pathspec with random spec" {
     ignore(@bitlib.parse_index_pathspec(sb.to_string()))
   }
 }
-

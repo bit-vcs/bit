@@ -8,52 +8,52 @@ priv struct TestWorkingTree {
 }
 
 ///|
-impl @lib.WorkingTree for TestWorkingTree with read_file(self, path) {
+impl @lib.WorkingTree for TestWorkingTree with fn read_file(self, path) {
   self.fs.read_file(self.backing_fs, path)
 }
 
 ///|
-impl @lib.WorkingTree for TestWorkingTree with write_file(self, path, data) {
+impl @lib.WorkingTree for TestWorkingTree with fn write_file(self, path, data) {
   self.fs.write_file(path, data)
 }
 
 ///|
-impl @lib.WorkingTree for TestWorkingTree with remove_file(self, path) {
+impl @lib.WorkingTree for TestWorkingTree with fn remove_file(self, path) {
   self.fs.remove_file(path)
 }
 
 ///|
-impl @lib.WorkingTree for TestWorkingTree with is_file(self, path) {
+impl @lib.WorkingTree for TestWorkingTree with fn is_file(self, path) {
   self.fs.is_file(self.backing_fs, path)
 }
 
 ///|
-impl @lib.WorkingTree for TestWorkingTree with is_dir(self, path) {
+impl @lib.WorkingTree for TestWorkingTree with fn is_dir(self, path) {
   self.fs.is_dir(self.backing_fs, path)
 }
 
 ///|
-impl @lib.WorkingTree for TestWorkingTree with readdir(self, path) {
+impl @lib.WorkingTree for TestWorkingTree with fn readdir(self, path) {
   self.fs.readdir(self.backing_fs, path)
 }
 
 ///|
-impl @lib.WorkingTree for TestWorkingTree with is_dirty(self) {
+impl @lib.WorkingTree for TestWorkingTree with fn is_dirty(self) {
   self.fs.is_dirty()
 }
 
 ///|
-impl @lib.WorkingTree for TestWorkingTree with rollback(self) {
+impl @lib.WorkingTree for TestWorkingTree with fn rollback(self) {
   self.fs.rollback()
 }
 
 ///|
-impl @lib.WorkingTree for TestWorkingTree with get_working_files(self) {
+impl @lib.WorkingTree for TestWorkingTree with fn get_working_files(self) {
   self.fs.get_working_files()
 }
 
 ///|
-impl @lib.WorkingTree for TestWorkingTree with snapshot(
+impl @lib.WorkingTree for TestWorkingTree with fn snapshot(
   self,
   message,
   author,
@@ -70,7 +70,7 @@ impl @lib.WorkingTree for TestWorkingTree with snapshot(
 }
 
 ///|
-impl @lib.WorkingTree for TestWorkingTree with checkout(self, commit_id) {
+impl @lib.WorkingTree for TestWorkingTree with fn checkout(self, commit_id) {
   self.fs.checkout_snapshot(self.backing_fs, commit_id)
 }
 
@@ -82,18 +82,18 @@ priv struct TestObjectStore {
 }
 
 ///|
-impl @lib.ObjectStore for TestObjectStore with get(self, id) {
+impl @lib.ObjectStore for TestObjectStore with fn get(self, id) {
   let db = @lib.ObjectDb::load(self.backing_fs, self.git_dir)
   db.get(self.backing_fs, id)
 }
 
 ///|
-impl @lib.ObjectStore for TestObjectStore with put(self, obj_type, data) {
+impl @lib.ObjectStore for TestObjectStore with fn put(self, obj_type, data) {
   @lib.write_loose_object(self.write_fs, self.git_dir, obj_type, data)
 }
 
 ///|
-impl @lib.ObjectStore for TestObjectStore with has(self, id) {
+impl @lib.ObjectStore for TestObjectStore with fn has(self, id) {
   let db = @lib.ObjectDb::load(self.backing_fs, self.git_dir) catch {
     _ => return false
   }

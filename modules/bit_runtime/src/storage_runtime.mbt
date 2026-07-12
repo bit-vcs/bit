@@ -273,7 +273,11 @@ fn storage_parse_iso_date_timestamp(raw : String) -> Int64? {
   }
   let days = storage_days_from_epoch(year, month, day)
   let mut ts = days * 86400L + hour * 3600L + minute * 60L + second
-  let after_time = String::unsafe_substring(s, start=11 + time_end, end=s.length())
+  let after_time = String::unsafe_substring(
+    s,
+    start=11 + time_end,
+    end=s.length(),
+  )
   ts = ts - storage_parse_iso_tz_offset_seconds(after_time)
   Some(ts)
 }

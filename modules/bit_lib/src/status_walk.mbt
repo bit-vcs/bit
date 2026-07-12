@@ -544,7 +544,13 @@ async fn check_file_against_index(
           let stat_matches = stat_matches_entry(info, entry, check_size=true)
           if !stat_matches || racy_git {
             let id = hash_regular_for_compare(
-              fs, root, git_dir, abs, path, autocrlf, run_filter_cmd?,
+              fs,
+              root,
+              git_dir,
+              abs,
+              path,
+              autocrlf,
+              run_filter_cmd?,
             )
             if id != entry.id {
               unstaged_modified.push(path)

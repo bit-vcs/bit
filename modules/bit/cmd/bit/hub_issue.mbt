@@ -1376,7 +1376,9 @@ async fn handle_hub_issue_dep(args : Array[String]) -> Unit raise Error {
       let (objects, refs, clock) = make_hub_stores(git_dir)
       let hub = load_hub_store(objects, refs)
       hub.remove_dep(objects, refs, clock, source_id, target_id)
-      print_line("Removed dependency: #\{source_id} is no longer blocked by #\{target_id}")
+      print_line(
+        "Removed dependency: #\{source_id} is no longer blocked by #\{target_id}",
+      )
     }
     "list" | "ls" => {
       if rest.length() < 1 {

@@ -16,27 +16,27 @@ import {
   "mizchi/bit_date" @date_parse,
   "mizchi/bit_diff_core" @diff_core,
   "mizchi/bit_diff3" @diff3,
-  "mizchi/zlib" @zlib,
-  "moonbitlang/async/js_async" @js_async,
-  "moonbitlang/core/bench" @bench,
+  "mizchi/zlib",
+  "moonbitlang/async/js_async",
+  "moonbitlang/core/bench",
   "moonbitlang/core/encoding/utf8",
-  "moonbitlang/core/string" @string,
+  "moonbitlang/core/string",
   "moonbitlang/core/strconv",
 }
 
 import {
-  "moonbitlang/async" @async,
-  "moonbitlang/core/bench" @bench,
+  "moonbitlang/async",
+  "moonbitlang/core/bench",
   "moonbitlang/x/fs",
   "mizchi/bit_osfs" @osfs,
-  "moonbitlang/core/test" @test,
+  "moonbitlang/core/test",
 } for "test"
 
 import {
-  "moonbitlang/async" @async,
-  "moonbitlang/core/bench" @bench,
+  "moonbitlang/async",
+  "moonbitlang/core/bench",
   "mizchi/bit_osfs" @osfs,
-  "moonbitlang/core/test" @test,
+  "moonbitlang/core/test",
 } for "wbtest"
 
 warnings = "-29"
@@ -63,10 +63,17 @@ options(
         "js_verify_git_payload_ssh_ed25519_promise:verifyGitPayloadSshEd25519",
         "js_verify_commit_ssh_ed25519_promise:verifyCommitSshEd25519",
         "js_log:log",
+        "js_log_oneline:logOneline",
         "js_status_text_promise:statusText",
         "js_rev_parse:revParse",
         "js_show_ref:showRef",
+        "js_reflog:reflog",
         "js_merge:merge",
+        "js_merge_base:mergeBase",
+        "js_merge_base_is_ancestor:isAncestor",
+        "js_gc:gc",
+        "js_fsck:fsck",
+        "js_worktree_list:worktreeList",
         "js_checkout:checkout",
         "js_checkout_b:checkoutB",
         "js_switch_branch:switchBranch",

@@ -178,7 +178,9 @@ async test "storage runtime cmd wrapper: delegates error path" {
     err => cmd_error = "\{err}"
   }
   assert_true(cmd_error.length() > 0)
-  @test.assert_eq(cmd_error, "InvalidObject(\"unsupported storage command: clone\")")
+  @test.assert_eq(
+    cmd_error, "InvalidObject(\"unsupported storage command: clone\")",
+  )
 }
 
 ///|

@@ -34,7 +34,10 @@ test "midx stdin pack selection keeps include order and applies excludes" {
     ["pack-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.idx"],
   )
   @test.assert_eq(selected.length(), 1)
-  @test.assert_eq(selected[0], "pack-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.pack")
+  @test.assert_eq(
+    selected[0],
+    "pack-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.pack",
+  )
 }
 
 ///|
@@ -97,8 +100,14 @@ test "midx build writes BTMP chunk only when --bitmap is requested" {
   @test.assert_eq(midx_read_u32(with_bitmap, btmp_offset + 20), 1)
   let without_bitmap = midx_build(pack_files, entries, false, 1, None)
   let without_chunk_count = without_bitmap[6].to_int()
-  @test.assert_eq(midx_find_chunk(without_bitmap, without_chunk_count, "RIDX"), 0)
-  @test.assert_eq(midx_find_chunk(without_bitmap, without_chunk_count, "BTMP"), 0)
+  @test.assert_eq(
+    midx_find_chunk(without_bitmap, without_chunk_count, "RIDX"),
+    0,
+  )
+  @test.assert_eq(
+    midx_find_chunk(without_bitmap, without_chunk_count, "BTMP"),
+    0,
+  )
 }
 
 ///|

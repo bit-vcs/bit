@@ -60,7 +60,7 @@ fn grep_pattern_show_string(value : String) -> String {
 }
 
 ///|
-pub impl Show for GrepPatternType with output(self, logger) {
+pub impl Show for GrepPatternType with fn output(self, logger) {
   match self {
     Fixed => logger.write_string("Fixed")
     Basic => logger.write_string("Basic")
@@ -70,7 +70,7 @@ pub impl Show for GrepPatternType with output(self, logger) {
 }
 
 ///|
-pub impl Show for GrepMatchSpan with output(self, logger) {
+pub impl Show for GrepMatchSpan with fn output(self, logger) {
   logger.write_string(
     "{start_column: " +
     self.start_column.to_string() +
@@ -81,7 +81,7 @@ pub impl Show for GrepMatchSpan with output(self, logger) {
 }
 
 ///|
-pub impl Show for GrepExprToken with output(self, logger) {
+pub impl Show for GrepExprToken with fn output(self, logger) {
   match self {
     Pattern(pattern) =>
       logger.write_string("Pattern(" + grep_pattern_show_string(pattern) + ")")
@@ -94,7 +94,7 @@ pub impl Show for GrepExprToken with output(self, logger) {
 }
 
 ///|
-pub impl Show for GrepExpr with output(self, logger) {
+pub impl Show for GrepExpr with fn output(self, logger) {
   match self {
     Pattern(pattern) =>
       logger.write_string("Pattern(" + grep_pattern_show_string(pattern) + ")")
@@ -111,7 +111,7 @@ pub impl Show for GrepExpr with output(self, logger) {
 }
 
 ///|
-pub impl Show for GrepExprMatch with output(self, logger) {
+pub impl Show for GrepExprMatch with fn output(self, logger) {
   logger.write_string(
     "{matched: " +
     self.matched.to_string() +

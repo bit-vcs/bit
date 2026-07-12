@@ -205,7 +205,10 @@ test "lfs clean: add_paths stores pointer blob and caches content" {
   let ptr = parse_lfs_pointer(blob).unwrap()
   @test.assert_eq(ptr.size, content.length().to_int64())
   assert_true(lfs_verify_oid(content, ptr.oid))
-  @test.assert_eq(lfs_get_cached_content(fs, "/repo/.git", ptr.oid), Some(content))
+  @test.assert_eq(
+    lfs_get_cached_content(fs, "/repo/.git", ptr.oid),
+    Some(content),
+  )
   @test.assert_eq(fs.read_file("/repo/asset.bin"), content)
 }
 
@@ -223,7 +226,10 @@ async test "lfs clean: add_paths_async stores pointer blob and caches content" {
   let ptr = parse_lfs_pointer(blob).unwrap()
   @test.assert_eq(ptr.size, content.length().to_int64())
   assert_true(lfs_verify_oid(content, ptr.oid))
-  @test.assert_eq(lfs_get_cached_content(fs, "/repo/.git", ptr.oid), Some(content))
+  @test.assert_eq(
+    lfs_get_cached_content(fs, "/repo/.git", ptr.oid),
+    Some(content),
+  )
   @test.assert_eq(fs.read_file("/repo/asset.bin"), content)
 }
 

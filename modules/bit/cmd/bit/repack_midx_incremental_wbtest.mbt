@@ -5,7 +5,8 @@
 /// `multi-pack-index-chain` file plus per-layer `.midx` files), whereas plain
 /// `--write-midx` still writes a single monolithic `multi-pack-index` file.
 
-///| Build a tiny repo with a couple of commits and pack it into one packfile.
+///|
+/// Build a tiny repo with a couple of commits and pack it into one packfile.
 fn repack_midx_inc_setup_repo(root : String) -> Unit raise Error {
   let fs = OsFs::new()
   cleanup_tree(fs, root)
@@ -50,7 +51,8 @@ test "repack --write-midx=incremental writes a midx chain" {
   cleanup_tree(fs, root)
 }
 
-///| Commit a new file, pack the new loose objects into their own packfile
+///|
+/// Commit a new file, pack the new loose objects into their own packfile
 /// (keeping existing packs), then add them to the incremental multi-pack-index.
 fn midx_inc_commit_and_pack(root : String, tag : String) -> Unit {
   let fs = OsFs::new()
@@ -62,7 +64,12 @@ fn midx_inc_commit_and_pack(root : String, tag : String) -> Unit {
   })
   ignore(
     try? @bitlib.commit(
-      fs, fs, root, "c\{tag}\n", "Test <t@example.com>", 1700000000L,
+      fs,
+      fs,
+      root,
+      "c\{tag}\n",
+      "Test <t@example.com>",
+      1700000000L,
     ),
   )
   @async.run_async_main(async fn() {

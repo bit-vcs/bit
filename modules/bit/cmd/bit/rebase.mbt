@@ -66,7 +66,9 @@ fn rebase_signing_override(args : Array[String]) -> Bool? {
 ///|
 fn rebase_uses_rebase_merges_mode(args : Array[String]) -> Bool {
   for arg in args {
-    if arg == "--rebase-merges" || arg == "--preserve-merges" || arg.has_prefix("--rebase-merges=") {
+    if arg == "--rebase-merges" ||
+      arg == "--preserve-merges" ||
+      arg.has_prefix("--rebase-merges=") {
       return true
     }
   }
@@ -633,7 +635,9 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
       }
       // Silently accepted compat flags
       "--reschedule-failed-exec" | "--no-reschedule-failed-exec" => i += 1
-      "--reset-author-date" | "--ignore-date" | "--committer-date-is-author-date" => i += 1
+      "--reset-author-date"
+      | "--ignore-date"
+      | "--committer-date-is-author-date" => i += 1
       "--signoff" | "--no-signoff" => i += 1
       "--ignore-whitespace" => i += 1
       _ if arg.has_prefix("--whitespace=") => i += 1
@@ -821,9 +825,7 @@ async fn handle_rebase(args : Array[String]) -> Unit raise Error {
     @bitlib.read_config_value(rfs, git_dir + "/config", "rebase", "backend"),
   )
   // rebase.stat: bit does not yet show diffstats, accept config for compat
-  ignore(
-    @bitlib.read_config_value(rfs, git_dir + "/config", "rebase", "stat"),
-  )
+  ignore(@bitlib.read_config_value(rfs, git_dir + "/config", "rebase", "stat"))
   // Also check rebase.autoStash config
   if !autostash {
     match

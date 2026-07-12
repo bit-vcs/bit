@@ -124,7 +124,8 @@ async test "cgraph: write_commit_graph uses sha256 trailer in sha256 repo" {
 async test "cgraph: verify passes for valid commit-graph" {
   @bitnative.init_native_io()
   let fs = OsFs::new()
-  let root = "/tmp/bit-test-cgraph-verify-" + get_current_timestamp().to_string()
+  let root = "/tmp/bit-test-cgraph-verify-" +
+    get_current_timestamp().to_string()
   cleanup_tree(fs, root)
   let (git_dir, _commit_id) = cgraph_setup_sha256_repo(fs, root)
   write_commit_graph(fs, git_dir, true)
@@ -143,7 +144,12 @@ async test "cgraph: handle_commit_graph write --reachable" {
   let graph_path = git_dir + "/objects/info/commit-graph"
   assert_false(fs.is_file(graph_path))
   // simulate: git commit-graph write --reachable --object-dir <git_dir>/objects
-  handle_commit_graph(["write", "--reachable", "--object-dir", git_dir + "/objects"])
+  handle_commit_graph([
+    "write",
+    "--reachable",
+    "--object-dir",
+    git_dir + "/objects",
+  ])
   assert_true(fs.is_file(graph_path))
   cleanup_tree(fs, root)
 }

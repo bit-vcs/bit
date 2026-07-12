@@ -7,11 +7,11 @@ import {
   "mizchi/bit_lib" @bitlib,
   "mizchi/bit_repo_ops" @bitrepo,
   "mizchi/bit_utils" @string_utils,
-  "moonbitlang/core/encoding/utf8" @utf8,
-  "moonbitlang/core/env" @env,
-  "moonbitlang/core/string" @string,
-  "moonbitlang/core/strconv" @strconv,
-  "moonbitlang/x/sys" @sys,
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/env",
+  "moonbitlang/core/string",
+  "moonbitlang/core/strconv",
+  "moonbitlang/x/sys",
 }
 
 warnings = "-29"

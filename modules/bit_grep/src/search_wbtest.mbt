@@ -26,7 +26,6 @@ test "grep search: searches tracked worktree files only" {
       #|    matches: [{ line_number: 1, column: 1, line: "hello" }],
       #|  },
       #|]
-
     ),
   )
 }
@@ -58,7 +57,6 @@ test "grep search: path filter and ignore-case both apply" {
       #|    matches: [{ line_number: 1, column: 1, line: "HELLO" }],
       #|  },
       #|]
-
     ),
   )
 }
@@ -87,7 +85,6 @@ test "grep search: matches any pattern in the list" {
       #|    matches: [{ line_number: 1, column: 1, line: "world" }],
       #|  },
       #|]
-
     ),
   )
 }
@@ -111,7 +108,6 @@ test "grep search: cached reads index blob instead of worktree file" {
       #|    matches: [{ line_number: 1, column: 1, line: "cached" }],
       #|  },
       #|]
-
     ),
   )
 }
@@ -136,7 +132,6 @@ test "grep search: treeish reads committed tree instead of worktree file" {
       #|    matches: [{ line_number: 1, column: 1, line: "head" }],
       #|  },
       #|]
-
     ),
   )
 }
@@ -169,7 +164,6 @@ test "grep search: max depth limits treeish path traversal" {
       #|    matches: [{ line_number: 1, column: 1, line: "vvv" }],
       #|  },
       #|]
-
     ),
   )
 }
@@ -210,7 +204,6 @@ test "grep search: wildcard pathspec keeps recursive treeish matches" {
       #|    matches: [{ line_number: 1, column: 1, line: "vvv" }],
       #|  },
       #|]
-
     ),
   )
 }
@@ -247,7 +240,6 @@ test "grep search: word regexp keeps whole-word matches and reports first column
       #|    ],
       #|  },
       #|]
-
     ),
   )
 }
@@ -279,7 +271,6 @@ test "grep search: plain worktree search includes ignored files unless excluded"
       #|    matches: [{ line_number: 1, column: 1, line: "hello" }],
       #|  },
       #|]
-
     ),
   )
 
@@ -299,7 +290,6 @@ test "grep search: plain worktree search includes ignored files unless excluded"
       #|    matches: [{ line_number: 1, column: 1, line: "hello" }],
       #|  },
       #|]
-
     ),
   )
 }
@@ -332,7 +322,6 @@ test "grep search: plain worktree descends into nested repos but skips .git" {
       #|    matches: [{ line_number: 1, column: 1, line: "magic" }],
       #|  },
       #|]
-
     ),
   )
 }
@@ -366,7 +355,6 @@ test "grep search: untracked search respects ignore rules" {
       #|    matches: [{ line_number: 1, column: 2, line: "world" }],
       #|  },
       #|]
-
     ),
   )
 }

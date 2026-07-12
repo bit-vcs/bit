@@ -277,7 +277,8 @@ async test "js exports: clone clones ssh remote via https smart transport" {
   let result = js_exports_unwrap_ok(
     "clone",
     js_clone_remote(
-      host_id, "/repo-clone", "git@github.com:user/repo.git", transport_id, true, 0,
+      host_id, "/repo-clone", "git@github.com:user/repo.git", transport_id, true,
+      0,
     ),
   )
   assert_eq(result.status, "cloned")
@@ -1464,5 +1465,163 @@ test "js exports: sparse checkout flow" {
     "skip\n",
   )
 
+  js_destroy_host(host_id)
+}
+
+///|
+test "js exports: log oneline returns short hash and subject" {
+  let host_id = js_create_memory_host()
+  js_exports_unwrap_ok("init", js_git_init(host_id, "/repo", "main"))
+  js_exports_unwrap_ok(
+    "hostWriteString",
+    js_host_write_string(host_id, "/repo/a.txt", "a\n"),
+  )
+  js_exports_unwrap_ok("add", js_add_paths(host_id, "/repo", ["a.txt"]))
+  let _ = js_exports_unwrap_ok(
+    "commit",
+    js_commit(
+      host_id, "/repo", "first subject", "Tester <t@example.com>", 1700000000,
+    ),
+  )
+  let lines = js_exports_unwrap_ok(
+    "logOneline",
+    js_log_oneline(host_id, "/repo", 10),
+  )
+  assert_eq(lines.length(), 1)
+  // "<7-hex-short> first subject"
+  assert_true(lines[0].has_suffix(" first subject"))
+  assert_eq(lines[0].length(), 7 + 1 + 13)
+  js_destroy_host(host_id)
+}
+
+///|
+test "js exports: merge-base finds common ancestor and reports is-ancestor" {
+  let host_id = js_create_memory_host()
+  js_exports_unwrap_ok("init", js_git_init(host_id, "/repo", "main"))
+  js_exports_unwrap_ok(
+    "w1",
+    js_host_write_string(host_id, "/repo/a.txt", "a\n"),
+  )
+  js_exports_unwrap_ok("add1", js_add_paths(host_id, "/repo", ["a.txt"]))
+  let a = js_exports_unwrap_ok(
+    "commit A",
+    js_commit(host_id, "/repo", "A", "T <t@e.com>", 1700000000),
+  )
+  js_exports_unwrap_ok("checkoutB", js_checkout_b(host_id, "/repo", "feature"))
+  js_exports_unwrap_ok(
+    "w2",
+    js_host_write_string(host_id, "/repo/b.txt", "b\n"),
+  )
+  js_exports_unwrap_ok("add2", js_add_paths(host_id, "/repo", ["b.txt"]))
+  let b = js_exports_unwrap_ok(
+    "commit B",
+    js_commit(host_id, "/repo", "B", "T <t@e.com>", 1700000100),
+  )
+  js_exports_unwrap_ok("checkout main", js_checkout(host_id, "/repo", "main"))
+  js_exports_unwrap_ok(
+    "w3",
+    js_host_write_string(host_id, "/repo/c.txt", "c\n"),
+  )
+  js_exports_unwrap_ok("add3", js_add_paths(host_id, "/repo", ["c.txt"]))
+  let c = js_exports_unwrap_ok(
+    "commit C",
+    js_commit(host_id, "/repo", "C", "T <t@e.com>", 1700000200),
+  )
+  let bases = js_exports_unwrap_ok(
+    "mergeBase",
+    js_merge_base(host_id, "/repo", "feature", "main"),
+  )
+  assert_eq(bases.length(), 1)
+  assert_eq(bases[0], a)
+  assert_true(
+    js_exports_unwrap_ok(
+      "isAncestor A->B",
+      js_merge_base_is_ancestor(host_id, "/repo", a, b),
+    ),
+  )
+  assert_false(
+    js_exports_unwrap_ok(
+      "isAncestor B->C",
+      js_merge_base_is_ancestor(host_id, "/repo", b, c),
+    ),
+  )
+  js_destroy_host(host_id)
+}
+
+///|
+test "js exports: reflog reads HEAD log after commit" {
+  let host_id = js_create_memory_host()
+  js_exports_unwrap_ok("init", js_git_init(host_id, "/repo", "main"))
+  js_exports_unwrap_ok("w", js_host_write_string(host_id, "/repo/a.txt", "a\n"))
+  js_exports_unwrap_ok("add", js_add_paths(host_id, "/repo", ["a.txt"]))
+  let cid = js_exports_unwrap_ok(
+    "commit",
+    js_commit(host_id, "/repo", "first", "Tester <t@example.com>", 1700000000),
+  )
+  let entries = js_exports_unwrap_ok(
+    "reflog",
+    js_reflog(host_id, "/repo", "HEAD"),
+  )
+  assert_true(entries.length() >= 1)
+  let last = entries[entries.length() - 1]
+  assert_eq(last.new_id, cid)
+  assert_true(last.message.has_prefix("commit"))
+  js_destroy_host(host_id)
+}
+
+///|
+test "js exports: gc repacks reachable objects" {
+  let host_id = js_create_memory_host()
+  js_exports_unwrap_ok("init", js_git_init(host_id, "/repo", "main"))
+  js_exports_unwrap_ok("w", js_host_write_string(host_id, "/repo/a.txt", "a\n"))
+  js_exports_unwrap_ok("add", js_add_paths(host_id, "/repo", ["a.txt"]))
+  let _ = js_exports_unwrap_ok(
+    "commit",
+    js_commit(host_id, "/repo", "first", "Tester <t@example.com>", 1700000000),
+  )
+  let result = js_exports_unwrap_ok("gc", js_gc(host_id, "/repo"))
+  // one commit → commit + tree + blob are reachable and get packed
+  assert_true(result.object_count >= 1)
+  assert_eq(result.pack_id.length(), 40)
+  js_destroy_host(host_id)
+}
+
+///|
+test "js exports: fsck reports connectivity from refs" {
+  let host_id = js_create_memory_host()
+  js_exports_unwrap_ok("init", js_git_init(host_id, "/repo", "main"))
+  js_exports_unwrap_ok("w", js_host_write_string(host_id, "/repo/a.txt", "a\n"))
+  js_exports_unwrap_ok("add", js_add_paths(host_id, "/repo", ["a.txt"]))
+  let _ = js_exports_unwrap_ok(
+    "commit",
+    js_commit(host_id, "/repo", "first", "Tester <t@example.com>", 1700000000),
+  )
+  let result = js_exports_unwrap_ok("fsck", js_fsck(host_id, "/repo"))
+  assert_eq(result.errors, 0)
+  assert_eq(result.missing.length(), 0)
+  // commit + tree + blob reachable from HEAD
+  assert_true(result.reachable >= 1)
+  js_destroy_host(host_id)
+}
+
+///|
+test "js exports: worktree list returns main worktree" {
+  let host_id = js_create_memory_host()
+  js_exports_unwrap_ok("init", js_git_init(host_id, "/repo", "main"))
+  js_exports_unwrap_ok("w", js_host_write_string(host_id, "/repo/a.txt", "a\n"))
+  js_exports_unwrap_ok("add", js_add_paths(host_id, "/repo", ["a.txt"]))
+  let cid = js_exports_unwrap_ok(
+    "commit",
+    js_commit(host_id, "/repo", "first", "Tester <t@example.com>", 1700000000),
+  )
+  let worktrees = js_exports_unwrap_ok(
+    "worktreeList",
+    js_worktree_list(host_id, "/repo"),
+  )
+  assert_eq(worktrees.length(), 1)
+  let main = worktrees[0]
+  assert_true(main.is_main)
+  assert_eq(main.branch, "main")
+  assert_eq(main.head_id, cid)
   js_destroy_host(host_id)
 }

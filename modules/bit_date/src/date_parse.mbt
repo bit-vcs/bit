@@ -261,7 +261,8 @@ pub fn parse_approxidate_relative(s : String, now : Int64) -> Int64? {
   None
 }
 
-///| Parse git's raw epoch date form `@<seconds>`, optionally followed by a
+///|
+/// Parse git's raw epoch date form `@<seconds>`, optionally followed by a
 /// timezone such as ` +0000`. The timezone offset does not change the epoch
 /// value git reports, so it is accepted but ignored. Returns None when the
 /// string is not in this form.

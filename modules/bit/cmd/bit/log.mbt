@@ -2735,7 +2735,8 @@ fn log_merge_pathspec_visibility(
   Some(true)
 }
 
-///| Whether a merge is visible under --full-history for a path-limited log.
+///|
+/// Whether a merge is visible under --full-history for a path-limited log.
 /// Returns None for non-merge commits. git keeps a merge whenever it differs
 /// from any parent on the pathspec (not only its first parent).
 fn log_full_history_merge_visible(
@@ -2773,7 +2774,8 @@ fn log_full_history_merge_visible(
   Some(false)
 }
 
-///| Whether a tree contains any path matching the pathspec. Used to decide if a
+///|
+/// Whether a tree contains any path matching the pathspec. Used to decide if a
 /// root commit introduces the path under --show-pulls.
 fn log_tree_has_pathspec(
   rfs : &@bitcore.RepoFileSystem,
@@ -2790,7 +2792,8 @@ fn log_tree_has_pathspec(
   false
 }
 
-///| Classify a commit for the --show-pulls simplified walk. Returns whether the
+///|
+/// Classify a commit for the --show-pulls simplified walk. Returns whether the
 /// commit is shown and the simplified parent set to continue from. Mirrors git's
 /// try_to_simplify_commit: TREESAME to the first parent => follow it (hidden);
 /// otherwise the first later parent it is TREESAME to is a "pull" merge that we
@@ -2825,7 +2828,8 @@ fn log_show_pulls_classify(
   (true, parents)
 }
 
-///| Compute the set of commits visible under --show-pulls for a path-limited log,
+///|
+/// Compute the set of commits visible under --show-pulls for a path-limited log,
 /// by walking the simplified-parent graph from the start commits.
 fn log_compute_show_pulls_visible(
   rfs : &@bitcore.RepoFileSystem,
@@ -2855,7 +2859,11 @@ fn log_compute_show_pulls_visible(
     let info = @bitcore.parse_commit(o.data)
     let parents = log_resolve_parents(rfs, git_dir, id, info.parents)
     let (shown, next_parents) = log_show_pulls_classify(
-      rfs, db, info.tree, parents, pathspecs,
+      rfs,
+      db,
+      info.tree,
+      parents,
+      pathspecs,
     )
     if shown {
       visible[hex] = true
@@ -2881,7 +2889,7 @@ fn log_commit_matches_history_filters(
   detect_renames : Bool,
   detect_copies : Bool,
   simplify_merges : Bool,
-  full_history~ : Bool = false,
+  full_history? : Bool = false,
   show_pulls_visible? : Map[String, Bool]? = None,
 ) -> Bool raise Error {
   if !log_commit_matches_simplify_merges(
@@ -2899,8 +2907,7 @@ fn log_commit_matches_history_filters(
           return false
         }
         return log_commit_matches_diff_filter(
-          rfs, git_dir, db, commit_id, include_bits, exclude, detect_renames,
-          detect_copies,
+          rfs, git_dir, db, commit_id, include_bits, exclude, detect_renames, detect_copies,
         )
       }
     None => ()
@@ -2916,8 +2923,7 @@ fn log_commit_matches_history_filters(
           return false
         }
         return log_commit_matches_diff_filter(
-          rfs, git_dir, db, commit_id, include_bits, exclude, detect_renames,
-          detect_copies,
+          rfs, git_dir, db, commit_id, include_bits, exclude, detect_renames, detect_copies,
         )
       }
       None => ()
@@ -2934,8 +2940,7 @@ fn log_commit_matches_history_filters(
           return false
         }
         return log_commit_matches_diff_filter(
-          rfs, git_dir, db, commit_id, include_bits, exclude, detect_renames,
-          detect_copies,
+          rfs, git_dir, db, commit_id, include_bits, exclude, detect_renames, detect_copies,
         )
       }
       None => ()
@@ -3801,7 +3806,8 @@ fn log_format_commit_identity(
   out.to_string()
 }
 
-///| Restrict per-commit diff files to the pathspec for path-limited log output.
+///|
+/// Restrict per-commit diff files to the pathspec for path-limited log output.
 /// git shows only the diff of the matched paths unless --full-diff is given (or
 /// there is no pathspec).
 fn log_restrict_diff_files(
@@ -3821,7 +3827,8 @@ fn log_restrict_diff_files(
   out
 }
 
-///| Same as log_restrict_diff_files but for `--raw` rows (keyed on the new/old
+///|
+/// Same as log_restrict_diff_files but for `--raw` rows (keyed on the new/old
 /// path so renames matching on either side are kept).
 fn log_restrict_raw_results(
   results : Array[LogRawResult],
@@ -4373,11 +4380,10 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         branch_patterns.push(string_slice_from(arg, 11))
         saw_revision_input = true
       }
-      _ if arg.has_prefix("--graph-lane-limit=") => {
+      _ if arg.has_prefix("--graph-lane-limit=") =>
         graph_lane_limit = @string.parse_int(
           String::unsafe_substring(arg, start=19, end=arg.length()),
         )
-      }
       _ if arg.has_prefix("--glob=") => {
         log_append_glob_targets(
           rfs,
@@ -4809,8 +4815,16 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
           continue
         }
         if !log_commit_matches_history_filters(
-            rfs, git_dir, db, id, pathspecs, diff_filter_include, diff_filter_exclude,
-            detect_renames, detect_copies, simplify_merges,
+            rfs,
+            git_dir,
+            db,
+            id,
+            pathspecs,
+            diff_filter_include,
+            diff_filter_exclude,
+            detect_renames,
+            detect_copies,
+            simplify_merges,
             full_history~,
           ) {
           continue
@@ -4999,7 +5013,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
             detect_copies,
             simplify_merges,
             full_history~,
-            show_pulls_visible=show_pulls_visible,
+            show_pulls_visible~,
           ) {
           continue
         }
@@ -5096,9 +5110,8 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
     log_with_graph(
       rfs, git_dir, max_count, oneline, all_refs, show_decorations, since_ts, until_ts,
       revs, range_excludes, first_parent, show_parents, abbrev_len, abbrev_commit,
-      show_boundary, pathspecs, simplify_merges, full_history, show_pulls,
-      detect_renames, detect_copies, diff_filter_include, diff_filter_exclude,
-      graph_lane_limit,
+      show_boundary, pathspecs, simplify_merges, full_history, show_pulls, detect_renames,
+      detect_copies, diff_filter_include, diff_filter_exclude, graph_lane_limit,
     )
   } else if no_walk {
     let resolved_targets = log_resolve_targets(
@@ -5155,8 +5168,16 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
           continue
         }
         if !log_commit_matches_history_filters(
-            rfs, git_dir, db, id, pathspecs, diff_filter_include, diff_filter_exclude,
-            detect_renames, detect_copies, simplify_merges,
+            rfs,
+            git_dir,
+            db,
+            id,
+            pathspecs,
+            diff_filter_include,
+            diff_filter_exclude,
+            detect_renames,
+            detect_copies,
+            simplify_merges,
             full_history~,
           ) {
           continue
@@ -5220,8 +5241,16 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
           continue
         }
         if !log_commit_matches_history_filters(
-            rfs, git_dir, db, id, pathspecs, diff_filter_include, diff_filter_exclude,
-            detect_renames, detect_copies, simplify_merges,
+            rfs,
+            git_dir,
+            db,
+            id,
+            pathspecs,
+            diff_filter_include,
+            diff_filter_exclude,
+            detect_renames,
+            detect_copies,
+            simplify_merges,
             full_history~,
           ) {
           continue
@@ -5282,9 +5311,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
               log_emit_output(body_line, true, line_prefix)
             }
             log_emit_output("", true, line_prefix)
-            log_emit_notes_for_commit(
-              rfs, git_dir, db, entry.id, line_prefix,
-            )
+            log_emit_notes_for_commit(rfs, git_dir, db, entry.id, line_prefix)
             if show_stat || show_patch {
               let diff_files = log_restrict_diff_files(
                 diff_apply_rotate_skip_files(
@@ -5561,7 +5588,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
             detect_copies,
             simplify_merges,
             full_history~,
-            show_pulls_visible=show_pulls_visible,
+            show_pulls_visible~,
           ) {
           continue
         }
@@ -5648,7 +5675,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
             detect_copies,
             simplify_merges,
             full_history~,
-            show_pulls_visible=show_pulls_visible,
+            show_pulls_visible~,
           ) {
           continue
         }
@@ -5704,11 +5731,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         }
         // A trailing diff/stat/raw/name block (or notes) still needs its leading
         // blank; the inter-entry separator is handled before the next commit.
-        if show_stat ||
-          show_patch ||
-          show_raw ||
-          name_only ||
-          name_status {
+        if show_stat || show_patch || show_raw || name_only || name_status {
           log_emit_output("", true, line_prefix)
         }
         log_emit_notes_for_commit(rfs, git_dir, walk_db, entry.id, line_prefix)
@@ -6125,7 +6148,6 @@ fn log_get_commit_tree(
   }
 }
 
-
 ///|
 /// Parse author line "Name <email> TIMESTAMP +TZ" into (name, timestamp, tz).
 fn log_parse_author_parts(rest : String) -> (String, Int64, String) {
@@ -6164,7 +6186,9 @@ fn log_parse_author_parts(rest : String) -> (String, Int64, String) {
 }
 
 ///|
-///| Indent a commit message body the way git's default format does: prefix
+
+///|
+/// Indent a commit message body the way git's default format does: prefix
 /// every line with four spaces (so a blank line becomes exactly four spaces).
 fn log_indent_body_lines(body_lines : Array[String]) -> Array[String] {
   let out : Array[String] = []
@@ -6305,7 +6329,9 @@ async fn log_with_graph(
       // Peel tags (and anything else) down to a commit; refs that don't
       // resolve to a commit are skipped, exactly as git does.
       let commit_id = match
-        (@bitrepo.rev_parse(rfs, git_dir, name + "^{commit}") catch { _ => None }) {
+        (@bitrepo.rev_parse(rfs, git_dir, name + "^{commit}") catch {
+          _ => None
+        }) {
         Some(c) => c
         None => continue
       }
@@ -6407,9 +6433,18 @@ async fn log_with_graph(
     let visible : Map[String, Bool] = {}
     for e in walked {
       if log_commit_matches_history_filters(
-          rfs, git_dir, db, e.id, pathspecs, diff_filter_include,
-          diff_filter_exclude, detect_renames, detect_copies, simplify_merges,
-          full_history~, show_pulls_visible=show_pulls_visible,
+          rfs,
+          git_dir,
+          db,
+          e.id,
+          pathspecs,
+          diff_filter_include,
+          diff_filter_exclude,
+          detect_renames,
+          detect_copies,
+          simplify_merges,
+          full_history~,
+          show_pulls_visible~,
         ) {
         visible[e.id.to_hex()] = true
       }
@@ -6421,7 +6456,14 @@ async fn log_with_graph(
     for e in walked {
       if visible.contains(e.id.to_hex()) {
         let rp = log_graph_simplified_parents(
-          rfs, git_dir, db, e.tree, e.parents, visible, memo, pathspecs,
+          rfs,
+          git_dir,
+          db,
+          e.tree,
+          e.parents,
+          visible,
+          memo,
+          pathspecs,
         )
         simplified.push({ ..e, parents: rp, parent_count: rp.length() })
       }
@@ -6440,19 +6482,22 @@ async fn log_with_graph(
     shown[e.id.to_hex()] = true
   }
   let entries : Array[LogWalkEntry] = []
-  let limit = if max_count < sorted.length() { max_count } else {
+  let limit = if max_count < sorted.length() {
+    max_count
+  } else {
     sorted.length()
   }
   for i in 0..<limit {
     entries.push(sorted[i])
   }
   log_emit_commit_graph(
-    entries, shown, db, rfs, oneline, abbrev_len, abbrev_commit, show_parents,
-    first_parent, ref_names, graph_max_lanes,
+    entries, shown, db, rfs, oneline, abbrev_len, abbrev_commit, show_parents, first_parent,
+    ref_names, graph_max_lanes,
   )
 }
 
-///| Nearest visible ancestors of `commit` (itself if visible), memoised. For a
+///|
+/// Nearest visible ancestors of `commit` (itself if visible), memoised. For a
 /// hidden commit we follow its *simplified* parents (git's try_to_simplify:
 /// TREESAME to a parent => follow only that parent), so a hidden merge collapses
 /// to a single lane instead of fanning out into every ancestor branch.
@@ -6488,12 +6533,17 @@ fn log_graph_nearest_visible(
   let info = @bitcore.parse_commit(o.data)
   let parents = log_resolve_parents(rfs, git_dir, commit, info.parents)
   let (_, next_parents) = log_show_pulls_classify(
-    rfs, db, info.tree, parents, pathspecs,
+    rfs,
+    db,
+    info.tree,
+    parents,
+    pathspecs,
   )
   let result : Array[@bitcore.ObjectId] = []
   let seen : Map[String, Bool] = {}
   for p in next_parents {
-    for anc in log_graph_nearest_visible(
+    for
+      anc in log_graph_nearest_visible(
         rfs, git_dir, db, p, visible, memo, pathspecs,
       ) {
       let h = anc.to_hex()
@@ -6507,7 +6557,8 @@ fn log_graph_nearest_visible(
   result
 }
 
-///| Rewrite a shown commit's parents for the path-simplified graph: reduce to the
+///|
+/// Rewrite a shown commit's parents for the path-simplified graph: reduce to the
 /// simplified parent set (git's try_to_simplify_commit), then map each to its
 /// nearest visible ancestors, deduplicated and order-preserving.
 fn log_graph_simplified_parents(
@@ -6526,7 +6577,8 @@ fn log_graph_simplified_parents(
   let result : Array[@bitcore.ObjectId] = []
   let seen : Map[String, Bool] = {}
   for p in next_parents {
-    for anc in log_graph_nearest_visible(
+    for
+      anc in log_graph_nearest_visible(
         rfs, git_dir, db, p, visible, memo, pathspecs,
       ) {
       let h = anc.to_hex()
@@ -6539,7 +6591,8 @@ fn log_graph_simplified_parents(
   result
 }
 
-///| Byte-lexicographic "less than" for ref names, matching git's refname
+///|
+/// Byte-lexicographic "less than" for ref names, matching git's refname
 /// ordering (shorter is smaller only when it is a prefix of the longer).
 fn log_string_lex_less(a : String, b : String) -> Bool {
   let ca = a.to_array()
@@ -6553,7 +6606,8 @@ fn log_string_lex_less(a : String, b : String) -> Bool {
   ca.length() < cb.length()
 }
 
-///| Reorder a date-ordered commit list into git's `--graph` order, which is
+///|
+/// Reorder a date-ordered commit list into git's `--graph` order, which is
 /// `REV_SORT_IN_GRAPH_ORDER` from commit.c: an in-degree topological sort where
 /// the initial tips are kept in traversal order and the work queue behaves as a
 /// LIFO stack (git collects tips, reverses them, then pops with a NULL-compare
@@ -6608,7 +6662,8 @@ fn log_graph_order_sort(entries : Array[LogWalkEntry]) -> Array[LogWalkEntry] {
   out
 }
 
-///| git-compatible `--graph` renderer. Drives the ported graph.c state machine
+///|
+/// git-compatible `--graph` renderer. Drives the ported graph.c state machine
 /// over the (already topo-ordered) commit list, interleaving graph art with the
 /// commit content exactly as git's show_log() does.
 async fn log_emit_commit_graph(
@@ -6658,20 +6713,24 @@ async fn log_emit_commit_graph(
     }
     if oneline {
       let identity = log_format_commit_identity(
-        id, e.parents, abbrev_len, true, show_parents,
+        id,
+        e.parents,
+        abbrev_len,
+        true,
+        show_parents,
       )
       let subject = get_commit_subject(db, rfs, id)
       print_line(commit_prefix + identity + deco + " " + subject)
     } else {
       let identity = log_format_commit_identity(
-        id, e.parents, abbrev_len, abbrev_commit, show_parents,
+        id,
+        e.parents,
+        abbrev_len,
+        abbrev_commit,
+        show_parents,
       )
-      let date_str = format_date_by_mode(
-        e.timestamp, e.date_tz, "",
-      )
-      let content = [
-        "commit " + identity + deco,
-      ]
+      let date_str = format_date_by_mode(e.timestamp, e.date_tz, "")
+      let content = ["commit " + identity + deco]
       // Merge commits carry a "Merge: <p1> <p2> ..." line (abbreviated parents,
       // always at abbrev_len even when the commit id is shown in full).
       if e.parents.length() > 1 {

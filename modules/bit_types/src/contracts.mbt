@@ -2,19 +2,19 @@
 
 ///|
 pub(open) trait FileSystem {
-  mkdir_p(Self, String) -> Unit raise GitError
-  write_file(Self, String, Bytes) -> Unit raise GitError
-  write_string(Self, String, String) -> Unit raise GitError
-  remove_file(Self, String) -> Unit raise GitError
-  remove_dir(Self, String) -> Unit raise GitError
+  fn mkdir_p(Self, String) -> Unit raise GitError
+  fn write_file(Self, String, Bytes) -> Unit raise GitError
+  fn write_string(Self, String, String) -> Unit raise GitError
+  fn remove_file(Self, String) -> Unit raise GitError
+  fn remove_dir(Self, String) -> Unit raise GitError
 }
 
 ///|
 pub(open) trait RepoFileSystem {
-  read_file(Self, String) -> Bytes raise GitError
-  readdir(Self, String) -> Array[String] raise GitError
-  is_dir(Self, String) -> Bool
-  is_file(Self, String) -> Bool
+  fn read_file(Self, String) -> Bytes raise GitError
+  fn readdir(Self, String) -> Array[String] raise GitError
+  fn is_dir(Self, String) -> Bool
+  fn is_file(Self, String) -> Bool
 }
 
 ///|
@@ -38,8 +38,8 @@ pub fn HttpResponse::with_headers(
 
 ///|
 pub(open) trait HttpClient {
-  get(Self, String, Map[String, String]) -> (HttpResponse, Bytes) raise GitError
-  post(Self, String, Bytes, Map[String, String]) -> (HttpResponse, Bytes) raise GitError
+  fn get(Self, String, Map[String, String]) -> (HttpResponse, Bytes) raise GitError
+  fn post(Self, String, Bytes, Map[String, String]) -> (HttpResponse, Bytes) raise GitError
 }
 
 ///|
@@ -63,7 +63,7 @@ pub fn MockHttpClient::add_response(
 }
 
 ///|
-pub impl HttpClient for MockHttpClient with get(self, url, _headers) {
+pub impl HttpClient for MockHttpClient with fn get(self, url, _headers) {
   match self.responses.get(url) {
     Some((code, body)) => (HttpResponse::new(code), body)
     None => raise GitError::IoError("Mock: No response for URL: " + url)
@@ -71,7 +71,7 @@ pub impl HttpClient for MockHttpClient with get(self, url, _headers) {
 }
 
 ///|
-pub impl HttpClient for MockHttpClient with post(self, url, _body, _headers) {
+pub impl HttpClient for MockHttpClient with fn post(self, url, _body, _headers) {
   match self.responses.get(url) {
     Some((code, body)) => (HttpResponse::new(code), body)
     None => raise GitError::IoError("Mock: No response for URL: " + url)

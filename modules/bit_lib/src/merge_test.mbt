@@ -481,6 +481,9 @@ test "merge: rename/add-source - rename a->b with new file at a" {
   }
   // b.txt should have original content, a.txt should have new content
   @test.assert_eq(fs.read_string("/repo/b.txt"), "line1\nline2\nline3\n")
-  @test.assert_eq(fs.read_string("/repo/a.txt"), "something completely different\n")
+  @test.assert_eq(
+    fs.read_string("/repo/a.txt"),
+    "something completely different\n",
+  )
   @test.assert_eq(fs.read_string("/repo/c.txt"), "other\n")
 }

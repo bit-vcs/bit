@@ -5,7 +5,7 @@ import {
   "mizchi/bit_hash" @bithash,
   "mizchi/bit_object" @object,
   "mizchi/bit_utils" @string_utils,
-  "moonbitlang/core/encoding/utf8" @utf8,
+  "moonbitlang/core/encoding/utf8",
 }
 
 warnings = "-29"

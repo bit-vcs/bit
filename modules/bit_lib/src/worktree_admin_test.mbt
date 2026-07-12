@@ -935,7 +935,10 @@ test "worktree admin: repair respects configured relative paths for missing gitf
   let result = repair_worktree_detailed(fs, fs, "/repo")
 
   assert_true(result.warnings.contains(".git file broken: /repo/wt"))
-  @test.assert_eq(fs.read_string("/repo/wt/.git"), "gitdir: ../.git/worktrees/wt\n")
+  @test.assert_eq(
+    fs.read_string("/repo/wt/.git"),
+    "gitdir: ../.git/worktrees/wt\n",
+  )
 }
 
 ///|

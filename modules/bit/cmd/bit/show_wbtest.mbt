@@ -332,7 +332,10 @@ async test "show: command path prints graft deprecation advice and honors config
     "show", "HEAD",
   ])
   @test.assert_eq(code, 0)
-  @test.assert_eq(stderr, show_graft_deprecation_advice_lines().join("\n") + "\n")
+  @test.assert_eq(
+    stderr,
+    show_graft_deprecation_advice_lines().join("\n") + "\n",
+  )
 
   fs.write_string(
     repo_dir + "/.git/config",

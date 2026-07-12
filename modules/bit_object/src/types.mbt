@@ -119,17 +119,17 @@ fn int_to_hex_char(i : Int) -> Char {
 }
 
 ///|
-pub impl Show for ObjectId with output(self, logger) {
+pub impl Show for ObjectId with fn output(self, logger) {
   logger.write_string(self.to_hex())
 }
 
 ///|
-pub impl @debug.Debug for ObjectId with to_repr(self) {
+pub impl @debug.Debug for ObjectId with fn to_repr(self) {
   @debug.Repr::string(self.to_hex())
 }
 
 ///|
-pub impl Eq for ObjectId with equal(self, other) {
+pub impl Eq for ObjectId with fn equal(self, other) {
   if self.bytes.length() != other.bytes.length() {
     return false
   }
@@ -150,7 +150,7 @@ pub fn ObjectId::is_zero_hex(hex : String) -> Bool {
 
 ///|
 /// Hash implementation for using ObjectId as Map key
-pub impl Hash for ObjectId with hash_combine(self, hasher) {
+pub impl Hash for ObjectId with fn hash_combine(self, hasher) {
   // Use first 8 bytes as hash (sufficient for distribution)
   for i in 0..<8 {
     self.bytes[i].hash_combine(hasher)
@@ -187,7 +187,7 @@ pub fn ObjectType::to_packfile_type(self : ObjectType) -> Int {
 }
 
 ///|
-pub impl Show for ObjectType with output(self, logger) {
+pub impl Show for ObjectType with fn output(self, logger) {
   logger.write_string(self.to_string())
 }
 
@@ -225,7 +225,7 @@ fn git_error_show_string(value : String) -> String {
 }
 
 ///|
-pub impl Show for GitError with output(self, logger) {
+pub impl Show for GitError with fn output(self, logger) {
   match self {
     InvalidObject(message) =>
       logger.write_string(

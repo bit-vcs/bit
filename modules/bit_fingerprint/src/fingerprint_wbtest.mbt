@@ -139,7 +139,10 @@ async fn assert_git_add_all_equivalent(fs : @osfs.OsFs, root : String) -> Unit {
 ///|
 async test "fingerprint: parse mode aliases" {
   @test.assert_eq(parse_fingerprint_mode("fast"), Some(FingerprintMode::Fast))
-  @test.assert_eq(parse_fingerprint_mode("git"), Some(FingerprintMode::GitCompat))
+  @test.assert_eq(
+    parse_fingerprint_mode("git"),
+    Some(FingerprintMode::GitCompat),
+  )
   @test.assert_eq(
     parse_fingerprint_mode("git-compat"),
     Some(FingerprintMode::GitCompat),

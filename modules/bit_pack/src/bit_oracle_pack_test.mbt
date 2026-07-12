@@ -214,8 +214,8 @@ async test "git oracle: parse pack-objects output" {
   }
   let (commit_code, _, _) = run_git(
     [
-      "-c", "user.name=Test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false", "commit", "-m",
-      "init",
+      "-c", "user.name=Test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false",
+      "-c", "tag.gpgsign=false", "commit", "-m", "init",
     ],
     None,
     Some(repo_dir),
@@ -303,8 +303,8 @@ async test "git oracle: parse delta packfile from git" {
   }
   let (commit1_code, _, _) = run_git(
     [
-      "-c", "user.name=Test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false", "commit", "-m",
-      "base",
+      "-c", "user.name=Test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false",
+      "-c", "tag.gpgsign=false", "commit", "-m", "base",
     ],
     None,
     Some(repo_dir),
@@ -326,8 +326,8 @@ async test "git oracle: parse delta packfile from git" {
   }
   let (commit2_code, _, _) = run_git(
     [
-      "-c", "user.name=Test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false", "commit", "-m",
-      "modified",
+      "-c", "user.name=Test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false",
+      "-c", "tag.gpgsign=false", "commit", "-m", "modified",
     ],
     None,
     Some(repo_dir),
@@ -593,8 +593,8 @@ async test "git oracle: parse tree matches git cat-file" {
   }
   let (commit_code, _, _) = run_git(
     [
-      "-c", "user.name=Test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false", "commit", "-m",
-      "test",
+      "-c", "user.name=Test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false",
+      "-c", "tag.gpgsign=false", "commit", "-m", "test",
     ],
     None,
     Some(repo_dir),
@@ -675,8 +675,8 @@ async test "git oracle: parse tree with subdirectory" {
   assert_true(add_code == 0)
   let (commit_code, _, _) = run_git(
     [
-      "-c", "user.name=Test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false", "commit", "-m",
-      "nested",
+      "-c", "user.name=Test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false",
+      "-c", "tag.gpgsign=false", "commit", "-m", "nested",
     ],
     None,
     Some(repo_dir),
@@ -754,8 +754,8 @@ async test "git oracle: parse commit matches git format" {
   }
   let (commit_code, _, _) = run_git(
     [
-      "-c", "user.name=Test User", "-c", "user.email=test@example.com", "-c",
-      "commit.gpgsign=false", "-c", "tag.gpgsign=false", "commit", "-m", "Test message",
+      "-c", "user.name=Test User", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false",
+      "-c", "tag.gpgsign=false", "commit", "-m", "Test message",
     ],
     None,
     Some(repo_dir),
@@ -833,8 +833,8 @@ async test "git oracle: parse commit with parent" {
   }
   let (commit1_code, _, _) = run_git(
     [
-      "-c", "user.name=Test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false", "commit", "-m",
-      "first",
+      "-c", "user.name=Test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false",
+      "-c", "tag.gpgsign=false", "commit", "-m", "first",
     ],
     None,
     Some(repo_dir),
@@ -865,8 +865,8 @@ async test "git oracle: parse commit with parent" {
   }
   let (commit2_code, _, _) = run_git(
     [
-      "-c", "user.name=Test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false", "commit", "-m",
-      "second",
+      "-c", "user.name=Test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false",
+      "-c", "tag.gpgsign=false", "commit", "-m", "second",
     ],
     None,
     Some(repo_dir),
@@ -936,8 +936,8 @@ async test "git oracle: parse merge commit with two parents" {
   }
   let (commit_code, _, _) = run_git(
     [
-      "-c", "user.name=Test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false", "commit", "-m",
-      "init",
+      "-c", "user.name=Test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false",
+      "-c", "tag.gpgsign=false", "commit", "-m", "init",
     ],
     None,
     Some(repo_dir),
@@ -969,8 +969,8 @@ async test "git oracle: parse merge commit with two parents" {
   }
   let (commit2_code, _, _) = run_git(
     [
-      "-c", "user.name=Test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false", "commit", "-m",
-      "feature",
+      "-c", "user.name=Test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false",
+      "-c", "tag.gpgsign=false", "commit", "-m", "feature",
     ],
     None,
     Some(repo_dir),
@@ -1018,8 +1018,8 @@ async test "git oracle: parse merge commit with two parents" {
   }
   let (commit3_code, _, _) = run_git(
     [
-      "-c", "user.name=Test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false", "commit", "-m",
-      "main update",
+      "-c", "user.name=Test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false",
+      "-c", "tag.gpgsign=false", "commit", "-m", "main update",
     ],
     None,
     Some(repo_dir),
@@ -1119,8 +1119,8 @@ async test "git oracle: executable file mode 100755" {
   }
   let (commit_code, _, _) = run_git(
     [
-      "-c", "user.name=Test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false", "commit", "-m",
-      "exec",
+      "-c", "user.name=Test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false",
+      "-c", "tag.gpgsign=false", "commit", "-m", "exec",
     ],
     None,
     Some(repo_dir),
@@ -1199,8 +1199,8 @@ async test "git oracle: symlink mode 120000" {
   assert_true(add_code == 0)
   let (commit_code, _, _) = run_git(
     [
-      "-c", "user.name=Test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false", "commit", "-m",
-      "symlink",
+      "-c", "user.name=Test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false",
+      "-c", "tag.gpgsign=false", "commit", "-m", "symlink",
     ],
     None,
     Some(repo_dir),
@@ -1571,8 +1571,8 @@ async test "git oracle: diff-tree compatibility" {
   }
   let (commit1_code, _, _) = run_git(
     [
-      "-c", "user.name=Test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false", "commit", "-m",
-      "first",
+      "-c", "user.name=Test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false",
+      "-c", "tag.gpgsign=false", "commit", "-m", "first",
     ],
     None,
     Some(repo_dir),
@@ -1604,8 +1604,8 @@ async test "git oracle: diff-tree compatibility" {
   }
   let (commit2_code, _, _) = run_git(
     [
-      "-c", "user.name=Test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false", "commit", "-m",
-      "second",
+      "-c", "user.name=Test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false",
+      "-c", "tag.gpgsign=false", "commit", "-m", "second",
     ],
     None,
     Some(repo_dir),

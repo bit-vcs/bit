@@ -123,8 +123,8 @@ async fn handle_symbolic_ref(args : Array[String]) -> Unit raise Error {
         let timestamp = get_current_timestamp()
         let (author, email) = get_author_info(fs, git_dir)
         @bitrepo.append_reflog(
-          wfs, rfs, git_dir, name, old_id, new_id, author, email, timestamp,
-          "+0000", msg,
+          wfs, rfs, git_dir, name, old_id, new_id, author, email, timestamp, "+0000",
+          msg,
         )
       }
       None => ()

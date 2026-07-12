@@ -2757,9 +2757,7 @@ fn midx_repack_split_factor(pack_dir : String) -> Int {
   let git_dir = parent_dir(parent_dir(pack_dir))
   match bit_config_get(git_dir, "repack", "midxsplitfactor") {
     Some(v) => {
-      let n = @string.parse_int(v.trim()) catch {
-        _ => 2
-      }
+      let n = @string.parse_int(v.trim()) catch { _ => 2 }
       if n < 2 {
         2
       } else {
@@ -2778,9 +2776,7 @@ fn midx_repack_new_layer_threshold(pack_dir : String) -> Int {
   let git_dir = parent_dir(parent_dir(pack_dir))
   match bit_config_get(git_dir, "repack", "midxnewlayerthreshold") {
     Some(v) => {
-      let n = @string.parse_int(v.trim()) catch {
-        _ => 8
-      }
+      let n = @string.parse_int(v.trim()) catch { _ => 8 }
       if n < 1 {
         1
       } else {
@@ -2887,7 +2883,13 @@ async fn midx_compact_chain(
           }
       }
     }
-    let merged_bytes = midx_build(merged_packs, unique, false, oid_version, None)
+    let merged_bytes = midx_build(
+      merged_packs,
+      unique,
+      false,
+      oid_version,
+      None,
+    )
     let merged_hash = midx_checksum_hex(merged_bytes)
     // Remove the two merged layers (and any sidecars), write the merged layer.
     for h in [hashes[k - 1], hashes[k]] {
@@ -2898,7 +2900,8 @@ async fn midx_compact_chain(
       }
     }
     fs.write_file(
-      inc_dir + "/multi-pack-index-" + merged_hash + ".midx", merged_bytes,
+      inc_dir + "/multi-pack-index-" + merged_hash + ".midx",
+      merged_bytes,
     )
     let new_hashes : Array[String] = []
     for i in 0..<(k - 1) {

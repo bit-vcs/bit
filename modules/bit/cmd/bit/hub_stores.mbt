@@ -29,14 +29,14 @@ fn OsObjectStore::object_db(
 }
 
 ///|
-impl @bitlib.ObjectStore for OsObjectStore with get(self, id) {
+impl @bitlib.ObjectStore for OsObjectStore with fn get(self, id) {
   let fs = OsFs::new()
   let db = self.object_db(fs)
   db.get(fs, id)
 }
 
 ///|
-impl @bitlib.ObjectStore for OsObjectStore with put(self, obj_type, content) {
+impl @bitlib.ObjectStore for OsObjectStore with fn put(self, obj_type, content) {
   let fs = OsFs::new()
   let (id, compressed) = @bitcore.create_object(obj_type, content)
   let hex = id.to_hex()
@@ -50,7 +50,7 @@ impl @bitlib.ObjectStore for OsObjectStore with put(self, obj_type, content) {
 }
 
 ///|
-impl @bitlib.ObjectStore for OsObjectStore with has(self, id) {
+impl @bitlib.ObjectStore for OsObjectStore with fn has(self, id) {
   let fs = OsFs::new()
   let db = self.object_db(fs)
   let obj = db.get(fs, id)
@@ -63,13 +63,13 @@ struct OsRefStore {
 }
 
 ///|
-impl @bitlib.RefStore for OsRefStore with resolve(self, ref_name) {
+impl @bitlib.RefStore for OsRefStore with fn resolve(self, ref_name) {
   let fs = OsFs::new()
   @bitlib.resolve_ref(fs, self.git_dir, ref_name)
 }
 
 ///|
-impl @bitlib.RefStore for OsRefStore with update(self, ref_name, id) {
+impl @bitlib.RefStore for OsRefStore with fn update(self, ref_name, id) {
   let fs = OsFs::new()
   match id {
     Some(commit_id) => {
@@ -83,7 +83,7 @@ impl @bitlib.RefStore for OsRefStore with update(self, ref_name, id) {
 }
 
 ///|
-impl @bitlib.RefStore for OsRefStore with list(self, _prefix) {
+impl @bitlib.RefStore for OsRefStore with fn list(self, _prefix) {
   ignore(self)
   []
 }
@@ -103,7 +103,7 @@ struct OsClock {
 }
 
 ///|
-impl @bitlib.Clock for OsClock with now(self) {
+impl @bitlib.Clock for OsClock with fn now(self) {
   self.time
 }
 

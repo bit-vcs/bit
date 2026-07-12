@@ -19,7 +19,7 @@ pub fn PrWorkflowStatus::to_string(self : PrWorkflowStatus) -> String {
 }
 
 ///|
-pub impl Show for PrWorkflowStatus with output(self, logger) {
+pub impl Show for PrWorkflowStatus with fn output(self, logger) {
   logger.write_string(self.to_string())
 }
 

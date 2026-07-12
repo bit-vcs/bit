@@ -135,7 +135,16 @@ fn parse_log_entry(
   for i in 0..<body_end {
     body_lines.push(message_lines[i])
   }
-  { id, message, body_lines, author, timestamp, date_tz, tree, parent_tree: None }
+  {
+    id,
+    message,
+    body_lines,
+    author,
+    timestamp,
+    date_tz,
+    tree,
+    parent_tree: None,
+  }
 }
 
 ///|
@@ -146,7 +155,11 @@ fn parse_author_line(line : String) -> (String, Int64, String) {
     return (line, 0L, "+0000")
   }
   let tz_idx = last_space.unwrap()
-  let tz_str = String::unsafe_substring(line, start=tz_idx + 1, end=line.length())
+  let tz_str = String::unsafe_substring(
+    line,
+    start=tz_idx + 1,
+    end=line.length(),
+  )
   let tz = if tz_str.length() >= 4 &&
     (tz_str.has_prefix("+") || tz_str.has_prefix("-")) {
     tz_str

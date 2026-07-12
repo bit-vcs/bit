@@ -42,13 +42,13 @@ fn HubJsObjectStore::object_db(
 }
 
 ///|
-impl @lib.ObjectStore for HubJsObjectStore with get(self, id) {
+impl @lib.ObjectStore for HubJsObjectStore with fn get(self, id) {
   let db = self.object_db()
   db.get(self.fs, id)
 }
 
 ///|
-impl @lib.ObjectStore for HubJsObjectStore with put(self, obj_type, content) {
+impl @lib.ObjectStore for HubJsObjectStore with fn put(self, obj_type, content) {
   let (id, compressed) = @bit.create_object(obj_type, content)
   let hex = id.to_hex()
   let dir = self.git_dir +
@@ -61,7 +61,7 @@ impl @lib.ObjectStore for HubJsObjectStore with put(self, obj_type, content) {
 }
 
 ///|
-impl @lib.ObjectStore for HubJsObjectStore with has(self, id) {
+impl @lib.ObjectStore for HubJsObjectStore with fn has(self, id) {
   let db = self.object_db()
   let obj = db.get(self.fs, id)
   obj is Some(_)
@@ -74,12 +74,12 @@ priv struct HubJsRefStore {
 }
 
 ///|
-impl @lib.RefStore for HubJsRefStore with resolve(self, ref_name) {
+impl @lib.RefStore for HubJsRefStore with fn resolve(self, ref_name) {
   @lib.resolve_ref(self.fs, self.git_dir, ref_name)
 }
 
 ///|
-impl @lib.RefStore for HubJsRefStore with update(self, ref_name, id) {
+impl @lib.RefStore for HubJsRefStore with fn update(self, ref_name, id) {
   match id {
     Some(commit_id) => {
       let ref_path = self.git_dir + "/" + ref_name
@@ -95,7 +95,7 @@ impl @lib.RefStore for HubJsRefStore with update(self, ref_name, id) {
 }
 
 ///|
-impl @lib.RefStore for HubJsRefStore with list(self, prefix) {
+impl @lib.RefStore for HubJsRefStore with fn list(self, prefix) {
   let result : Array[String] = []
   let refs_dir = self.git_dir + "/refs"
   hub_collect_refs(self.fs, refs_dir, "refs", prefix, result)
@@ -128,7 +128,7 @@ priv struct HubJsClock {
 }
 
 ///|
-impl @lib.Clock for HubJsClock with now(self) {
+impl @lib.Clock for HubJsClock with fn now(self) {
   self.timestamp
 }
 

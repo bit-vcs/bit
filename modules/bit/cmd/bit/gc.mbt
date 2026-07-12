@@ -40,7 +40,10 @@ async fn handle_gc(args : Array[String]) -> Unit raise Error {
   let rfs : &@bitcore.RepoFileSystem = fs
   let write_cgraph = match
     @bitlib.read_config_value(
-      rfs, git_dir + "/config", "gc", "writeCommitGraph",
+      rfs,
+      git_dir + "/config",
+      "gc",
+      "writeCommitGraph",
     ) {
     Some(v) => v.to_lower() != "false"
     None => true

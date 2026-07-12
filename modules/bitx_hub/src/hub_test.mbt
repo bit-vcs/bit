@@ -8,13 +8,13 @@ struct TestObjectStore {
 }
 
 ///|
-impl @lib.ObjectStore for TestObjectStore with get(self, id) {
+impl @lib.ObjectStore for TestObjectStore with fn get(self, id) {
   let db = @lib.ObjectDb::load_lazy(self.fs, self.git_dir)
   db.get(self.fs, id)
 }
 
 ///|
-impl @lib.ObjectStore for TestObjectStore with put(self, obj_type, content) {
+impl @lib.ObjectStore for TestObjectStore with fn put(self, obj_type, content) {
   let (id, compressed) = @bit.create_object(obj_type, content)
   let hex = id.to_hex()
   let dir = self.git_dir +
@@ -27,7 +27,7 @@ impl @lib.ObjectStore for TestObjectStore with put(self, obj_type, content) {
 }
 
 ///|
-impl @lib.ObjectStore for TestObjectStore with has(self, id) {
+impl @lib.ObjectStore for TestObjectStore with fn has(self, id) {
   let db = @lib.ObjectDb::load_lazy(self.fs, self.git_dir)
   let obj = db.get(self.fs, id)
   obj is Some(_)
@@ -41,12 +41,12 @@ struct TestRefStore {
 }
 
 ///|
-impl @lib.RefStore for TestRefStore with resolve(self, ref_name) {
+impl @lib.RefStore for TestRefStore with fn resolve(self, ref_name) {
   @lib.resolve_ref(self.fs, self.git_dir, ref_name)
 }
 
 ///|
-impl @lib.RefStore for TestRefStore with update(self, ref_name, id) {
+impl @lib.RefStore for TestRefStore with fn update(self, ref_name, id) {
   match id {
     Some(commit_id) => {
       let ref_path = self.git_dir + "/" + ref_name
@@ -59,7 +59,7 @@ impl @lib.RefStore for TestRefStore with update(self, ref_name, id) {
 }
 
 ///|
-impl @lib.RefStore for TestRefStore with list(self, _prefix) {
+impl @lib.RefStore for TestRefStore with fn list(self, _prefix) {
   ignore(self)
   []
 }
@@ -80,7 +80,7 @@ struct TestClock {
 }
 
 ///|
-impl @lib.Clock for TestClock with now(self) {
+impl @lib.Clock for TestClock with fn now(self) {
   let t = self.time
   self.time = self.time + 1L
   t
@@ -204,7 +204,6 @@ test "pr: init creates notes ref on first write" {
 test "work item: meta key uses canonical namespace" {
   @test.assert_eq(work_item_meta_key("abc"), "hub/work-item/abc/meta")
 }
-
 
 ///|
 test "pr: create and get PR" {
@@ -355,7 +354,10 @@ test "pr proposal: classify as notify-only trigger" {
   let proposal_key = pr_proposal_meta_key(proposed.id())
   let proposal_record = hub.store.get_record(objects, proposal_key)
   guard proposal_record is Some(record) else { panic() }
-  @test.assert_eq(classify_record_trigger(record), RecordTriggerClass::NotifyOnly)
+  @test.assert_eq(
+    classify_record_trigger(record),
+    RecordTriggerClass::NotifyOnly,
+  )
   @test.assert_eq(record_notify_topic(record), Some("hub.pr.proposal"))
 }
 
@@ -1858,13 +1860,7 @@ test "hub: find sync_link by remote number" {
     objects,
     refs,
     clock,
-    SyncLink::new(
-      "id-1",
-      "issue",
-      "github",
-      "owner/repo",
-      remote_number=42,
-    ),
+    SyncLink::new("id-1", "issue", "github", "owner/repo", remote_number=42),
   )
   let found = hub.find_sync_link_by_remote(objects, "github", "owner/repo", 42)
   assert_true(found is Some(_))

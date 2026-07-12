@@ -1,9 +1,9 @@
 import {
-  "mizchi/simd/src/simdhash" @simdhash,
+  "mizchi/simd/src/simdhash",
 }
 
 import {
-  "moonbitlang/core/bench" @bench,
+  "moonbitlang/core/bench",
 } for "test"
 
 warnings = "-29"
@@ -11,11 +11,11 @@ warnings = "-29"
 options(
   "native-stub": [ "sha1_ni.c", "sha256_ni.c" ],
   targets: {
-    "sha1_ni_ffi.mbt":        [ "native" ],
-    "sha1_native_impl.mbt":   [ "native" ],
+    "sha1_ni_ffi.mbt": [ "native" ],
+    "sha1_native_impl.mbt": [ "native" ],
     "sha256_native_impl.mbt": [ "native" ],
-    "sha1_impl.mbt":          [ "wasm", "wasm-gc", "js" ],
-    "sha256_impl.mbt":        [ "wasm", "wasm-gc", "js" ],
-    "bench_test.mbt":         [ "native" ],
+    "sha1_impl.mbt": [ "wasm", "wasm-gc", "js" ],
+    "sha256_impl.mbt": [ "wasm", "wasm-gc", "js" ],
+    "bench_test.mbt": [ "native" ],
   },
 )

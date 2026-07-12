@@ -22,6 +22,17 @@ pub struct JsRefInfo {
 } derive(Debug, Eq)
 
 ///|
+pub struct JsReflogEntry {
+  old_id : String
+  new_id : String
+  author : String
+  email : String
+  timestamp : Int
+  timezone : String
+  message : String
+} derive(Debug, Eq)
+
+///|
 pub struct JsStashEntry {
   id : String
   message : String
@@ -67,4 +78,31 @@ pub struct JsCloneResult {
   status : String
   commit_id : String
   refname : String
+} derive(Debug, Eq)
+
+///|
+pub struct JsGcResult {
+  pack_id : String
+  object_count : Int
+  pack_bytes : Int
+  dangling : Array[String]
+} derive(Debug, Eq)
+
+///|
+pub struct JsFsckResult {
+  errors : Int
+  reachable : Int
+  missing : Array[String]
+  root_commits : Array[String]
+  tag_objects : Array[String]
+} derive(Debug, Eq)
+
+///|
+pub struct JsWorktreeInfo {
+  path : String
+  head_id : String
+  branch : String
+  locked : Bool
+  is_main : Bool
+  is_bare : Bool
 } derive(Debug, Eq)

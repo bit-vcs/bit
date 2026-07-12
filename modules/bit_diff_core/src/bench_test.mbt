@@ -51,9 +51,7 @@ let bench_blob_text_100kb : Bytes = {
   }
   // String → Bytes (UTF-8 ASCII so length matches).
   let s = sb.to_string()
-  Bytes::makei(s.length(), fn(i) {
-    s.unsafe_get(i).to_int().to_byte()
-  })
+  Bytes::makei(s.length(), fn(i) { s.unsafe_get(i).to_int().to_byte() })
 }
 
 ///|

@@ -36,25 +36,33 @@ import {
   "mizchi/bit_reftable" @reftable,
   "mizchi/bit_runtime" @runtime,
   "mizchi/bit_utils" @string_utils,
-  "mizchi/zlib" @zlib,
-  "moonbitlang/async" @async,
-  "moonbitlang/async/js_async" @js_async,
+  "mizchi/zlib",
+  "moonbitlang/async",
+  "moonbitlang/async/js_async",
   "moonbitlang/async/fs" @asyncfs,
-  "moonbitlang/async/process" @process,
-  "moonbitlang/async/stdio" @stdio,
-  "moonbitlang/core/bench" @bench,
-  "moonbitlang/core/encoding/utf8" @utf8,
-  "moonbitlang/core/env" @env,
-  "moonbitlang/core/json" @json,
-  "moonbitlang/core/string" @string,
-  "moonbitlang/core/strconv" @strconv,
-  "moonbitlang/x/encoding" @encoding,
-  "moonbitlang/x/fs" @fs,
-  "moonbitlang/x/path" @path,
-  "moonbitlang/x/sys" @sys,
+  "moonbitlang/async/process",
+  "moonbitlang/async/stdio",
+  "moonbitlang/core/bench",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+  "moonbitlang/core/string",
+  "moonbitlang/core/strconv",
+  "moonbitlang/x/encoding",
+  "moonbitlang/x/fs",
+  "moonbitlang/x/path",
+  "moonbitlang/x/sys",
 }
 
 warnings = "-4-12-29-67"
+
+import {
+  "moonbitlang/core/test",
+} for "test"
+
+import {
+  "moonbitlang/core/test",
+} for "wbtest"
 
 options(
   "native-stub": [
@@ -331,10 +339,3 @@ options(
     "write_tree_wbtest.mbt": [ "native" ],
   },
 )
-import {
-  "moonbitlang/core/test" @test,
-} for "test"
-
-import {
-  "moonbitlang/core/test" @test,
-} for "wbtest"

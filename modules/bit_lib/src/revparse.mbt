@@ -467,9 +467,7 @@ fn revparse_read_graft_parents(
   if !fs.is_file(graft_path) {
     return None
   }
-  let raw = fs.read_file(graft_path) catch {
-    _ => return None
-  }
+  let raw = fs.read_file(graft_path) catch { _ => return None }
   let content = @utf8.decode_lossy(raw[:])
   let commit_hex = commit_id.to_hex()
   for line_view in content.split("\n") {

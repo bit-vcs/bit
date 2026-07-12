@@ -161,14 +161,26 @@ test "helpers: parse_run_git_invocation keeps unknown command token for dispatch
 
 ///|
 test "helpers: parse_git_env_timestamp supports timezone suffix" {
-  @test.assert_eq(parse_git_env_timestamp("1234567890 -0700"), Some(1234567890L))
-  @test.assert_eq(parse_git_env_timestamp("@1234567890 +0900"), Some(1234567890L))
+  @test.assert_eq(
+    parse_git_env_timestamp("1234567890 -0700"),
+    Some(1234567890L),
+  )
+  @test.assert_eq(
+    parse_git_env_timestamp("@1234567890 +0900"),
+    Some(1234567890L),
+  )
 }
 
 ///|
 test "helpers: parse_git_env_timestamp parses human ISO date" {
-  @test.assert_eq(parse_iso_date_timestamp("2005-05-26 23:30"), Some(1117150200L))
-  @test.assert_eq(parse_git_env_timestamp("2005-05-26 23:30"), Some(1117150200L))
+  @test.assert_eq(
+    parse_iso_date_timestamp("2005-05-26 23:30"),
+    Some(1117150200L),
+  )
+  @test.assert_eq(
+    parse_git_env_timestamp("2005-05-26 23:30"),
+    Some(1117150200L),
+  )
 }
 
 ///|
@@ -441,7 +453,9 @@ test "ai: parse_ai_merge_options keeps merge args and user instructions" {
   @test.assert_eq(options.model, "gpt-4")
   assert_true(options.use_agent_loop)
   @test.assert_eq(merge_args, ["origin/main"])
-  @test.assert_eq(user_instructions, ["Prefer ours", "Keep changes grouped by file"])
+  @test.assert_eq(user_instructions, [
+    "Prefer ours", "Keep changes grouped by file",
+  ])
 }
 
 ///|

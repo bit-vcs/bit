@@ -24,17 +24,17 @@ pub fn NodeId::new(id : String) -> NodeId {
 }
 
 ///|
-pub impl Show for NodeId with output(self, logger) {
+pub impl Show for NodeId with fn output(self, logger) {
   logger.write_string(self.id)
 }
 
 ///|
-pub impl Eq for NodeId with equal(self, other) {
+pub impl Eq for NodeId with fn equal(self, other) {
   self.id == other.id
 }
 
 ///|
-pub impl Hash for NodeId with hash_combine(self, hasher) {
+pub impl Hash for NodeId with fn hash_combine(self, hasher) {
   self.id.hash_combine(hasher)
 }
 

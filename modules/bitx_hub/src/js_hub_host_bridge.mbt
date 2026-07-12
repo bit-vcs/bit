@@ -113,7 +113,7 @@ fn bytes_from_array(arr : Array[Byte]) -> Bytes {
 }
 
 ///|
-impl @bit.FileSystem for HubJsHostFs with mkdir_p(self, path) {
+impl @bit.FileSystem for HubJsHostFs with fn mkdir_p(self, path) {
   match hub_js_host_mkdir_p(self.host_id, path) {
     Some(e) => raise @bit.GitError::IoError(e)
     None => ()
@@ -121,7 +121,7 @@ impl @bit.FileSystem for HubJsHostFs with mkdir_p(self, path) {
 }
 
 ///|
-impl @bit.FileSystem for HubJsHostFs with write_file(self, path, content) {
+impl @bit.FileSystem for HubJsHostFs with fn write_file(self, path, content) {
   let arr = Array::new(capacity=content.length())
   for i in 0..<content.length() {
     arr.push(content[i])
@@ -133,7 +133,7 @@ impl @bit.FileSystem for HubJsHostFs with write_file(self, path, content) {
 }
 
 ///|
-impl @bit.FileSystem for HubJsHostFs with write_string(self, path, content) {
+impl @bit.FileSystem for HubJsHostFs with fn write_string(self, path, content) {
   match hub_js_host_write_string(self.host_id, path, content) {
     Some(e) => raise @bit.GitError::IoError(e)
     None => ()
@@ -141,17 +141,17 @@ impl @bit.FileSystem for HubJsHostFs with write_string(self, path, content) {
 }
 
 ///|
-impl @bit.FileSystem for HubJsHostFs with remove_file(_self, _path) {
+impl @bit.FileSystem for HubJsHostFs with fn remove_file(_self, _path) {
   // Not needed for hub reads
 }
 
 ///|
-impl @bit.FileSystem for HubJsHostFs with remove_dir(_self, _path) {
+impl @bit.FileSystem for HubJsHostFs with fn remove_dir(_self, _path) {
   // Not needed for hub reads
 }
 
 ///|
-impl @bit.RepoFileSystem for HubJsHostFs with read_file(self, path) {
+impl @bit.RepoFileSystem for HubJsHostFs with fn read_file(self, path) {
   match hub_js_host_read_file(self.host_id, path) {
     Some(arr) => bytes_from_array(arr)
     None => raise @bit.GitError::IoError(hub_js_host_last_error())
@@ -159,7 +159,7 @@ impl @bit.RepoFileSystem for HubJsHostFs with read_file(self, path) {
 }
 
 ///|
-impl @bit.RepoFileSystem for HubJsHostFs with readdir(self, path) {
+impl @bit.RepoFileSystem for HubJsHostFs with fn readdir(self, path) {
   match hub_js_host_readdir(self.host_id, path) {
     Some(arr) => arr
     None => raise @bit.GitError::IoError(hub_js_host_last_error())
@@ -167,11 +167,11 @@ impl @bit.RepoFileSystem for HubJsHostFs with readdir(self, path) {
 }
 
 ///|
-impl @bit.RepoFileSystem for HubJsHostFs with is_dir(self, path) {
+impl @bit.RepoFileSystem for HubJsHostFs with fn is_dir(self, path) {
   hub_js_host_is_dir(self.host_id, path)
 }
 
 ///|
-impl @bit.RepoFileSystem for HubJsHostFs with is_file(self, path) {
+impl @bit.RepoFileSystem for HubJsHostFs with fn is_file(self, path) {
   hub_js_host_is_file(self.host_id, path)
 }

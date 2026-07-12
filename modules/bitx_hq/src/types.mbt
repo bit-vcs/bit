@@ -43,7 +43,7 @@ fn hq_show_string_option(value : String?) -> String {
 }
 
 ///|
-pub impl Show for RepoPath with output(self, logger) {
+pub impl Show for RepoPath with fn output(self, logger) {
   logger.write_string(
     "{host: " +
     hq_show_string_option(self.host) +
@@ -169,7 +169,7 @@ pub(all) enum HqGetResult {
 } derive(Debug, Eq)
 
 ///|
-pub impl Show for HqGetResult with output(self, logger) {
+pub impl Show for HqGetResult with fn output(self, logger) {
   match self {
     Cloned(path) => logger.write_string("Cloned(" + hq_show_string(path) + ")")
     Updated(path) =>

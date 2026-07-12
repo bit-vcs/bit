@@ -8,21 +8,25 @@ import {
   "mizchi/bit_io" @io,
   "mizchi/bit_lib" @lib,
   "mizchi/bitx_hub" @hub,
-  "mizchi/bitx_hub/crypto" @crypto,
-  "moonbitlang/async" @async,
-  "moonbitlang/async/process" @process,
-  "moonbitlang/core/bench" @bench,
-  "moonbitlang/core/env" @env,
-  "moonbitlang/core/encoding/base64" @base64,
-  "moonbitlang/core/encoding/utf8" @utf8,
-  "moonbitlang/core/json" @json,
-  "moonbitlang/core/string" @string,
-  "moonbitlang/x/sys" @sys,
-  "moonbitlang/core/strconv" @strconv,
+  "mizchi/bitx_hub/crypto",
+  "moonbitlang/async",
+  "moonbitlang/async/process",
+  "moonbitlang/core/bench",
+  "moonbitlang/core/env",
+  "moonbitlang/core/encoding/base64",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/json",
+  "moonbitlang/core/string",
+  "moonbitlang/x/sys",
+  "moonbitlang/core/strconv",
   "mizchi/x/websocket" @xws,
 }
 
 warnings = "-24-29"
+
+import {
+  "moonbitlang/core/test",
+} for "wbtest"
 
 options(
   targets: {
@@ -35,7 +39,3 @@ options(
     "sync_native_wbtest.mbt": [ "native" ],
   },
 )
-
-import {
-  "moonbitlang/core/test" @test,
-} for "wbtest"

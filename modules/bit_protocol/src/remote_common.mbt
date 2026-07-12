@@ -227,7 +227,11 @@ pub fn sanitize_sideband_text(data : Bytes) -> Bytes {
       i = if j < data.length() { j + 1 } else { data.length() }
       continue
     }
-    if b == 0x09 || b == 0x0A || b == 0x0D || (b >= 0x20 && b < 0x7F) || b >= 0x80 {
+    if b == 0x09 ||
+      b == 0x0A ||
+      b == 0x0D ||
+      (b >= 0x20 && b < 0x7F) ||
+      b >= 0x80 {
       out.push(data[i])
     } else {
       // C0 (other than tab/LF/CR), DEL, lone ESC.

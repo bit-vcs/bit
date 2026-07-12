@@ -1,18 +1,16 @@
 import {
-  "mizchi/zlib" @zlib,
+  "mizchi/zlib",
   "mizchi/bit_hash" @hash,
-  "moonbitlang/core/debug" @debug,
-  "moonbitlang/core/encoding/utf8" @utf8,
+  "moonbitlang/core/debug",
+  "moonbitlang/core/encoding/utf8",
 }
 
 import {
-  "moonbitlang/core/bench" @bench,
+  "moonbitlang/core/bench",
 } for "test"
 
 warnings = "-29"
 
 options(
-  targets: {
-    "bench_test.mbt": [ "native" ],
-  },
+  targets: { "bench_test.mbt": [ "native" ] },
 )

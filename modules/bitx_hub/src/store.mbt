@@ -126,7 +126,7 @@ pub(all) enum RecordTriggerClass {
 } derive(Eq, Debug)
 
 ///|
-pub impl Show for RecordTriggerClass with output(self, logger) {
+pub impl Show for RecordTriggerClass with fn output(self, logger) {
   match self {
     Full => logger.write_string("Full")
     NotifyOnly => logger.write_string("NotifyOnly")

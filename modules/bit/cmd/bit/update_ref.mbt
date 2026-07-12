@@ -118,7 +118,9 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
   }
   // -z only makes sense together with --stdin.
   if z_mode && !stdin_mode {
-    eprint_line("usage: git update-ref [<options>]    <refname> <new-oid> [<old-oid>]")
+    eprint_line(
+      "usage: git update-ref [<options>]    <refname> <new-oid> [<old-oid>]",
+    )
     @sys.exit(129)
   }
   let actual_git_dir = git_dir
@@ -149,8 +151,8 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
     let mut txn_started = false
     if z_mode {
       update_ref_parse_stdin_z(
-        fs, actual_git_dir, input, ops, seen_refs, noderef_referents,
-        stdin_no_deref, stdin_create_reflog,
+        fs, actual_git_dir, input, ops, seen_refs, noderef_referents, stdin_no_deref,
+        stdin_create_reflog,
       )
     } else {
       // A trailing newline terminates the final command (it does not introduce
@@ -180,201 +182,210 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
           @sys.exit(128)
         }
         let fields = update_ref_stdin_split_fields(line)
-      // Unquote C-style quoted arguments, reporting git's exact errors on
-      // malformed quoting (before any command is applied).
-      for fi = 0; fi < fields.length(); fi = fi + 1 {
-        if fields[fi].has_prefix("\"") {
-          fields[fi] = update_ref_unquote_arg(fields[fi])
+        // Unquote C-style quoted arguments, reporting git's exact errors on
+        // malformed quoting (before any command is applied).
+        for fi = 0; fi < fields.length(); fi = fi + 1 {
+          if fields[fi].has_prefix("\"") {
+            fields[fi] = update_ref_unquote_arg(fields[fi])
+          }
         }
-      }
-      let cmd = fields[0]
-      let ref_tok = if fields.length() >= 2 { fields[1] } else { "" }
-      // A ref command issued after a closed transaction implicitly begins a
-      // new (un-started) transaction.
-      if txn_state == 2 &&
-        (
-          cmd == "create" ||
-          cmd == "update" ||
-          cmd == "delete" ||
-          cmd == "verify"
-        ) {
-        txn_state = 0
-        txn_started = false
-        seen_refs.clear()
-        noderef_referents.clear()
-      }
-      match cmd {
-        "option" => {
-          let name = ref_tok
-          match name {
-            "no-deref" => stdin_no_deref = true
-            "create-reflog" => stdin_create_reflog = true
-            _ => {
-              eprint_line("fatal: option unknown: " + name)
+        let cmd = fields[0]
+        let ref_tok = if fields.length() >= 2 { fields[1] } else { "" }
+        // A ref command issued after a closed transaction implicitly begins a
+        // new (un-started) transaction.
+        if txn_state == 2 &&
+          (
+            cmd == "create" ||
+            cmd == "update" ||
+            cmd == "delete" ||
+            cmd == "verify"
+          ) {
+          txn_state = 0
+          txn_started = false
+          seen_refs.clear()
+          noderef_referents.clear()
+        }
+        match cmd {
+          "option" => {
+            let name = ref_tok
+            match name {
+              "no-deref" => stdin_no_deref = true
+              "create-reflog" => stdin_create_reflog = true
+              _ => {
+                eprint_line("fatal: option unknown: " + name)
+                @sys.exit(128)
+              }
+            }
+          }
+          "start" =>
+            if txn_state == 1 {
+              eprint_line("fatal: prepared transactions can only be closed")
+              @sys.exit(128)
+            } else if txn_state == 0 && txn_started {
+              // A transaction is already open and explicitly started.
+              eprint_line("fatal: transaction already in progress")
+              @sys.exit(128)
+            } else {
+              // A fresh start (initial open or after a prior commit/abort).
+              ops.clear()
+              seen_refs.clear()
+              noderef_referents.clear()
+              txn_state = 0
+              txn_started = true
+              print_line("start: ok")
+            }
+          "prepare" =>
+            if txn_state == 2 {
+              eprint_line("fatal: transaction is closed")
+              @sys.exit(128)
+            } else {
+              for op in ops {
+                update_ref_stdin_validate_op(fs, actual_git_dir, op)
+              }
+              print_line("prepare: ok")
+              txn_state = 1
+            }
+          "commit" =>
+            if txn_state == 2 {
+              eprint_line("fatal: transaction is closed")
+              @sys.exit(128)
+            } else {
+              update_ref_stdin_flush(fs, actual_git_dir, ops, message)
+              ops.clear()
+              seen_refs.clear()
+              noderef_referents.clear()
+              print_line("commit: ok")
+              txn_state = 2
+            }
+          "abort" =>
+            if txn_state == 2 {
+              eprint_line("fatal: transaction is closed")
+              @sys.exit(128)
+            } else {
+              ops.clear()
+              seen_refs.clear()
+              noderef_referents.clear()
+              print_line("abort: ok")
+              txn_state = 2
+            }
+          "create" => {
+            if ref_tok.length() == 0 {
+              eprint_line("fatal: create: missing <ref>")
               @sys.exit(128)
             }
-          }
-        }
-        "start" =>
-          if txn_state == 1 {
-            eprint_line("fatal: prepared transactions can only be closed")
-            @sys.exit(128)
-          } else if txn_state == 0 && txn_started {
-            // A transaction is already open and explicitly started.
-            eprint_line("fatal: transaction already in progress")
-            @sys.exit(128)
-          } else {
-            // A fresh start (initial open or after a prior commit/abort).
-            ops.clear()
-            seen_refs.clear()
-            noderef_referents.clear()
-            txn_state = 0
-            txn_started = true
-            print_line("start: ok")
-          }
-        "prepare" =>
-          if txn_state == 2 {
-            eprint_line("fatal: transaction is closed")
-            @sys.exit(128)
-          } else {
-            for op in ops {
-              update_ref_stdin_validate_op(fs, actual_git_dir, op)
+            if fields.length() < 3 {
+              eprint_line("fatal: create \{ref_tok}: missing <new-oid>")
+              @sys.exit(128)
             }
-            print_line("prepare: ok")
-            txn_state = 1
-          }
-        "commit" =>
-          if txn_state == 2 {
-            eprint_line("fatal: transaction is closed")
-            @sys.exit(128)
-          } else {
-            update_ref_stdin_flush(fs, actual_git_dir, ops, message)
-            ops.clear()
-            seen_refs.clear()
-            noderef_referents.clear()
-            print_line("commit: ok")
-            txn_state = 2
-          }
-        "abort" =>
-          if txn_state == 2 {
-            eprint_line("fatal: transaction is closed")
-            @sys.exit(128)
-          } else {
-            ops.clear()
-            seen_refs.clear()
-            noderef_referents.clear()
-            print_line("abort: ok")
-            txn_state = 2
-          }
-        "create" => {
-          if ref_tok.length() == 0 {
-            eprint_line("fatal: create: missing <ref>")
-            @sys.exit(128)
-          }
-          if fields.length() < 3 {
-            eprint_line("fatal: create \{ref_tok}: missing <new-oid>")
-            @sys.exit(128)
-          }
-          if fields.length() > 3 {
-            eprint_line(
-              "fatal: create \{ref_tok}: extra input: " +
-              update_ref_extra_input(fields, 3),
+            if fields.length() > 3 {
+              eprint_line(
+                "fatal: create \{ref_tok}: extra input: " +
+                update_ref_extra_input(fields, 3),
+              )
+              @sys.exit(128)
+            }
+            update_ref_stdin_check_dup(
+              fs, actual_git_dir, ref_tok, stdin_no_deref, seen_refs, noderef_referents,
             )
-            @sys.exit(128)
+            ops.push({
+              kind: "create",
+              refname: ref_tok,
+              new_tok: Some(fields[2]),
+              old_tok: None,
+              no_deref: stdin_no_deref,
+              create_reflog: stdin_create_reflog,
+            })
           }
-          update_ref_stdin_check_dup(
-            fs, actual_git_dir, ref_tok, stdin_no_deref, seen_refs,
-            noderef_referents,
-          )
-          ops.push({
-            kind: "create",
-            refname: ref_tok,
-            new_tok: Some(fields[2]),
-            old_tok: None,
-            no_deref: stdin_no_deref,
-            create_reflog: stdin_create_reflog,
-          })
-        }
-        "update" => {
-          if ref_tok.length() == 0 {
-            eprint_line("fatal: update: missing <ref>")
-            @sys.exit(128)
-          }
-          if fields.length() < 3 {
-            eprint_line("fatal: update \{ref_tok}: missing <new-oid>")
-            @sys.exit(128)
-          }
-          if fields.length() > 4 {
-            eprint_line(
-              "fatal: update \{ref_tok}: extra input: " +
-              update_ref_extra_input(fields, 4),
+          "update" => {
+            if ref_tok.length() == 0 {
+              eprint_line("fatal: update: missing <ref>")
+              @sys.exit(128)
+            }
+            if fields.length() < 3 {
+              eprint_line("fatal: update \{ref_tok}: missing <new-oid>")
+              @sys.exit(128)
+            }
+            if fields.length() > 4 {
+              eprint_line(
+                "fatal: update \{ref_tok}: extra input: " +
+                update_ref_extra_input(fields, 4),
+              )
+              @sys.exit(128)
+            }
+            update_ref_stdin_check_dup(
+              fs, actual_git_dir, ref_tok, stdin_no_deref, seen_refs, noderef_referents,
             )
-            @sys.exit(128)
+            ops.push({
+              kind: "update",
+              refname: ref_tok,
+              new_tok: Some(fields[2]),
+              old_tok: if fields.length() >= 4 {
+                Some(fields[3])
+              } else {
+                None
+              },
+              no_deref: stdin_no_deref,
+              create_reflog: stdin_create_reflog,
+            })
           }
-          update_ref_stdin_check_dup(
-            fs, actual_git_dir, ref_tok, stdin_no_deref, seen_refs,
-            noderef_referents,
-          )
-          ops.push({
-            kind: "update",
-            refname: ref_tok,
-            new_tok: Some(fields[2]),
-            old_tok: if fields.length() >= 4 { Some(fields[3]) } else { None },
-            no_deref: stdin_no_deref,
-            create_reflog: stdin_create_reflog,
-          })
-        }
-        "delete" => {
-          if ref_tok.length() == 0 {
-            eprint_line("fatal: delete: missing <ref>")
-            @sys.exit(128)
-          }
-          if fields.length() > 3 {
-            eprint_line(
-              "fatal: delete \{ref_tok}: extra input: " +
-              update_ref_extra_input(fields, 3),
+          "delete" => {
+            if ref_tok.length() == 0 {
+              eprint_line("fatal: delete: missing <ref>")
+              @sys.exit(128)
+            }
+            if fields.length() > 3 {
+              eprint_line(
+                "fatal: delete \{ref_tok}: extra input: " +
+                update_ref_extra_input(fields, 3),
+              )
+              @sys.exit(128)
+            }
+            update_ref_stdin_check_dup(
+              fs, actual_git_dir, ref_tok, stdin_no_deref, seen_refs, noderef_referents,
             )
+            ops.push({
+              kind: "delete",
+              refname: ref_tok,
+              new_tok: None,
+              old_tok: if fields.length() >= 3 {
+                Some(fields[2])
+              } else {
+                None
+              },
+              no_deref: stdin_no_deref,
+              create_reflog: stdin_create_reflog,
+            })
+          }
+          "verify" => {
+            if ref_tok.length() == 0 {
+              eprint_line("fatal: verify: missing <ref>")
+              @sys.exit(128)
+            }
+            if fields.length() > 3 {
+              eprint_line(
+                "fatal: verify \{ref_tok}: extra input: " +
+                update_ref_extra_input(fields, 3),
+              )
+              @sys.exit(128)
+            }
+            ops.push({
+              kind: "verify",
+              refname: ref_tok,
+              new_tok: None,
+              old_tok: if fields.length() >= 3 {
+                Some(fields[2])
+              } else {
+                None
+              },
+              no_deref: stdin_no_deref,
+              create_reflog: stdin_create_reflog,
+            })
+          }
+          _ => {
+            eprint_line("fatal: unknown command: " + line)
             @sys.exit(128)
           }
-          update_ref_stdin_check_dup(
-            fs, actual_git_dir, ref_tok, stdin_no_deref, seen_refs,
-            noderef_referents,
-          )
-          ops.push({
-            kind: "delete",
-            refname: ref_tok,
-            new_tok: None,
-            old_tok: if fields.length() >= 3 { Some(fields[2]) } else { None },
-            no_deref: stdin_no_deref,
-            create_reflog: stdin_create_reflog,
-          })
         }
-        "verify" => {
-          if ref_tok.length() == 0 {
-            eprint_line("fatal: verify: missing <ref>")
-            @sys.exit(128)
-          }
-          if fields.length() > 3 {
-            eprint_line(
-              "fatal: verify \{ref_tok}: extra input: " +
-              update_ref_extra_input(fields, 3),
-            )
-            @sys.exit(128)
-          }
-          ops.push({
-            kind: "verify",
-            refname: ref_tok,
-            new_tok: None,
-            old_tok: if fields.length() >= 3 { Some(fields[2]) } else { None },
-            no_deref: stdin_no_deref,
-            create_reflog: stdin_create_reflog,
-          })
-        }
-        _ => {
-          eprint_line("fatal: unknown command: " + line)
-          @sys.exit(128)
-        }
-      }
       }
     }
     // At end of input the implicit transaction commits, but an explicitly
@@ -926,7 +937,9 @@ async fn update_ref_stdin_validate_op(
         update_ref_resolve_oid(fs, git_dir, tok)
       }
       guard new_id is Some(nid) else {
-        eprint_line("fatal: \{op.kind} \{op.refname}: invalid <new-oid>: \{tok}")
+        eprint_line(
+          "fatal: \{op.kind} \{op.refname}: invalid <new-oid>: \{tok}",
+        )
         @sys.exit(128)
       }
       if op.kind == "create" && nid.to_hex() == zero.to_hex() {
@@ -1016,7 +1029,9 @@ async fn update_ref_stdin_flush(
       continue
     }
     let cmd_args = update_ref_stdin_base_args(
-      op.no_deref, op.create_reflog, message,
+      op.no_deref,
+      op.create_reflog,
+      message,
     )
     // Resolve the old value to a concrete oid hex; the regular handler's
     // old-value check expects a hex string, not a ref name or revision.
@@ -1161,9 +1176,8 @@ async fn update_ref_parse_stdin_z(
           @sys.exit(128)
         }
         update_ref_stdin_check_dup(
-            fs, git_dir, ref_tok, no_deref, seen_refs,
-            noderef_referents,
-          )
+          fs, git_dir, ref_tok, no_deref, seen_refs, noderef_referents,
+        )
         ops.push({
           kind: "create",
           refname: ref_tok,
@@ -1200,14 +1214,17 @@ async fn update_ref_parse_stdin_z(
           )
         }
         update_ref_stdin_check_dup(
-            fs, git_dir, ref_tok, no_deref, seen_refs,
-            noderef_referents,
-          )
+          fs, git_dir, ref_tok, no_deref, seen_refs, noderef_referents,
+        )
         ops.push({
           kind: "update",
           refname: ref_tok,
           new_tok: Some(new_val),
-          old_tok: if old_val.length() == 0 { None } else { Some(old_val) },
+          old_tok: if old_val.length() == 0 {
+            None
+          } else {
+            Some(old_val)
+          },
           no_deref,
           create_reflog,
         })
@@ -1226,14 +1243,17 @@ async fn update_ref_parse_stdin_z(
         let old_val = records[ri]
         ri = ri + 1
         update_ref_stdin_check_dup(
-            fs, git_dir, ref_tok, no_deref, seen_refs,
-            noderef_referents,
-          )
+          fs, git_dir, ref_tok, no_deref, seen_refs, noderef_referents,
+        )
         ops.push({
           kind: "delete",
           refname: ref_tok,
           new_tok: None,
-          old_tok: if old_val.length() == 0 { None } else { Some(old_val) },
+          old_tok: if old_val.length() == 0 {
+            None
+          } else {
+            Some(old_val)
+          },
           no_deref,
           create_reflog,
         })
@@ -1255,7 +1275,11 @@ async fn update_ref_parse_stdin_z(
           kind: "verify",
           refname: ref_tok,
           new_tok: None,
-          old_tok: if old_val.length() == 0 { None } else { Some(old_val) },
+          old_tok: if old_val.length() == 0 {
+            None
+          } else {
+            Some(old_val)
+          },
           no_deref,
           create_reflog,
         })
@@ -1300,7 +1324,7 @@ fn update_ref_stdin_split_fields(line : String) -> Array[String] {
         i = i + 1
       }
     }
-    fields.push(String::unsafe_substring(line, start=start, end=i))
+    fields.push(String::unsafe_substring(line, start~, end=i))
     // A single space separates fields; consuming it and continuing means a
     // trailing space yields a trailing empty field (git treats `create R ` as
     // an empty <new-oid>, distinct from `create R`).
@@ -1429,9 +1453,7 @@ async fn update_ref_stdin_check_dup(
       }
     None => {
       if seen.get(ref_tok).unwrap_or(false) {
-        eprint_line(
-          "fatal: multiple updates for ref '\{ref_tok}' not allowed",
-        )
+        eprint_line("fatal: multiple updates for ref '\{ref_tok}' not allowed")
         @sys.exit(128)
       }
       // A prior --no-deref symref update may have claimed this ref as referent.

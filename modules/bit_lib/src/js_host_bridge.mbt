@@ -400,7 +400,7 @@ pub fn js_host_read_string(
 }
 
 ///|
-impl @bit.FileSystem for LibJsHostFs with mkdir_p(self, path) {
+impl @bit.FileSystem for LibJsHostFs with fn mkdir_p(self, path) {
   match lib_js_host_mkdir_p(self.host_id, path) {
     Some(error) => raise @bit.GitError::IoError(error)
     None => ()
@@ -408,7 +408,7 @@ impl @bit.FileSystem for LibJsHostFs with mkdir_p(self, path) {
 }
 
 ///|
-impl @bit.FileSystem for LibJsHostFs with write_file(self, path, content) {
+impl @bit.FileSystem for LibJsHostFs with fn write_file(self, path, content) {
   match lib_js_host_write_file(self.host_id, path, js_bytes_to_array(content)) {
     Some(error) => raise @bit.GitError::IoError(error)
     None => ()
@@ -416,7 +416,7 @@ impl @bit.FileSystem for LibJsHostFs with write_file(self, path, content) {
 }
 
 ///|
-impl @bit.FileSystem for LibJsHostFs with write_string(self, path, content) {
+impl @bit.FileSystem for LibJsHostFs with fn write_string(self, path, content) {
   match lib_js_host_write_string(self.host_id, path, content) {
     Some(error) => raise @bit.GitError::IoError(error)
     None => ()
@@ -424,7 +424,7 @@ impl @bit.FileSystem for LibJsHostFs with write_string(self, path, content) {
 }
 
 ///|
-impl @bit.FileSystem for LibJsHostFs with remove_file(self, path) {
+impl @bit.FileSystem for LibJsHostFs with fn remove_file(self, path) {
   match lib_js_host_remove_file(self.host_id, path) {
     Some(error) => raise @bit.GitError::IoError(error)
     None => ()
@@ -432,7 +432,7 @@ impl @bit.FileSystem for LibJsHostFs with remove_file(self, path) {
 }
 
 ///|
-impl @bit.FileSystem for LibJsHostFs with remove_dir(self, path) {
+impl @bit.FileSystem for LibJsHostFs with fn remove_dir(self, path) {
   match lib_js_host_remove_dir(self.host_id, path) {
     Some(error) => raise @bit.GitError::IoError(error)
     None => ()
@@ -440,7 +440,7 @@ impl @bit.FileSystem for LibJsHostFs with remove_dir(self, path) {
 }
 
 ///|
-impl @bit.RepoFileSystem for LibJsHostFs with read_file(self, path) {
+impl @bit.RepoFileSystem for LibJsHostFs with fn read_file(self, path) {
   match lib_js_host_read_file(self.host_id, path) {
     Some(content) => Bytes::from_array(content)
     None => raise @bit.GitError::IoError(js_host_error_message())
@@ -448,7 +448,7 @@ impl @bit.RepoFileSystem for LibJsHostFs with read_file(self, path) {
 }
 
 ///|
-impl @bit.RepoFileSystem for LibJsHostFs with readdir(self, path) {
+impl @bit.RepoFileSystem for LibJsHostFs with fn readdir(self, path) {
   match lib_js_host_readdir(self.host_id, path) {
     Some(entries) => entries
     None => raise @bit.GitError::IoError(js_host_error_message())
@@ -456,11 +456,11 @@ impl @bit.RepoFileSystem for LibJsHostFs with readdir(self, path) {
 }
 
 ///|
-impl @bit.RepoFileSystem for LibJsHostFs with is_dir(self, path) {
+impl @bit.RepoFileSystem for LibJsHostFs with fn is_dir(self, path) {
   lib_js_host_is_dir(self.host_id, path)
 }
 
 ///|
-impl @bit.RepoFileSystem for LibJsHostFs with is_file(self, path) {
+impl @bit.RepoFileSystem for LibJsHostFs with fn is_file(self, path) {
   lib_js_host_is_file(self.host_id, path)
 }

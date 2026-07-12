@@ -883,7 +883,9 @@ async fn signing_verify_payload(
         let (verified, message) = signing_openpgp_native_result(
           payload, signature, keys,
         )
-        signing_emit_stderr_text(message) catch { _ => () }
+        signing_emit_stderr_text(message) catch {
+          _ => ()
+        }
         return verified
       }
       None => ()
@@ -897,7 +899,9 @@ async fn signing_verify_payload(
         let (verified, message) = signing_ssh_native_result(
           payload, signature, allowed_text,
         )
-        signing_emit_stderr_text(message) catch { _ => () }
+        signing_emit_stderr_text(message) catch {
+          _ => ()
+        }
         return verified
       }
       None => ()

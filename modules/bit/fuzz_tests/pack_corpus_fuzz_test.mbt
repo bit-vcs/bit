@@ -34,14 +34,16 @@ fn build_corpus_pack_small() -> Bytes {
 ///|
 fn build_corpus_pack_with_delta() -> Bytes {
   @pack.create_packfile_with_delta(
-    make_test_blobs(8), @bit.PackDeltaMode::RefDelta,
+    make_test_blobs(8),
+    @bit.PackDeltaMode::RefDelta,
   )
 }
 
 ///|
 fn build_corpus_pack_ofs_delta() -> Bytes {
   @pack.create_packfile_with_delta(
-    make_test_blobs(8), @bit.PackDeltaMode::OfsDelta,
+    make_test_blobs(8),
+    @bit.PackDeltaMode::OfsDelta,
   )
 }
 
@@ -190,9 +192,7 @@ test "fuzz: packfile truncation across valid corpus" {
 /// huge arrays. Verify the parser refuses gracefully.
 test "fuzz: packfile object-count field with extreme values" {
   let pack = build_corpus_pack_small()
-  let test_counts : Array[Int] = [
-    0, 1, 100, 1_000_000, 0x7fff_ffff,
-  ]
+  let test_counts : Array[Int] = [0, 1, 100, 1_000_000, 0x7fff_ffff]
   for n in test_counts {
     let b0 = ((n >> 24) & 0xff).to_byte()
     let b1 = ((n >> 16) & 0xff).to_byte()

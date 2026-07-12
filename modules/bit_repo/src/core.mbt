@@ -366,15 +366,17 @@ pub fn verify_tree_entry_name(name : String) -> Unit raise @object.GitError {
     let c2 = name.unsafe_get(2).to_int()
     let c3 = name.unsafe_get(3).to_int()
     let lower = fn(c : Int) -> Int {
-      if c >= 0x41 && c <= 0x5A { c + 32 } else { c }
+      if c >= 0x41 && c <= 0x5A {
+        c + 32
+      } else {
+        c
+      }
     }
     if c0 == 0x2E && // '.'
       lower(c1) == 0x67 && // 'g'
       lower(c2) == 0x69 && // 'i'
       lower(c3) == 0x74 { // 't'
-      raise @object.GitError::InvalidObject(
-        "tree entry: name aliases '.git'",
-      )
+      raise @object.GitError::InvalidObject("tree entry: name aliases '.git'")
     }
   }
 }

@@ -6,19 +6,19 @@ import {
   "mizchi/bit_io" @bitio,
   "mizchi/bit_pack" @pack,
   "mizchi/bit_protocol" @protocol,
-  "moonbitlang/async" @async,
+  "moonbitlang/async",
   "moonbitlang/async/fs" @afs,
-  "moonbitlang/async/http" @http,
-  "moonbitlang/async/process" @process,
-  "moonbitlang/core/encoding/utf8" @utf8,
-  "moonbitlang/core/env" @env,
-  "moonbitlang/x/codec/base64" @base64,
+  "moonbitlang/async/http",
+  "moonbitlang/async/process",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/env",
+  "moonbitlang/x/codec/base64",
   "moonbitlang/x/fs",
-  "moonbitlang/x/sys" @sys,
+  "moonbitlang/x/sys",
 }
 
 import {
-  "moonbitlang/core/test" @test,
+  "moonbitlang/core/test",
 } for "wbtest"
 
 warnings = "-29"

@@ -16,15 +16,24 @@ test "hub parser: parse_issue_state handles known and unknown values" {
 ///|
 test "hub parser: parse_work_item_state handles known and unknown values" {
   @test.assert_eq(parse_work_item_state("open"), Some(@hub.WorkItemState::Open))
-  @test.assert_eq(parse_work_item_state("closed"), Some(@hub.WorkItemState::Closed))
-  @test.assert_eq(parse_work_item_state("merged"), Some(@hub.WorkItemState::Merged))
+  @test.assert_eq(
+    parse_work_item_state("closed"),
+    Some(@hub.WorkItemState::Closed),
+  )
+  @test.assert_eq(
+    parse_work_item_state("merged"),
+    Some(@hub.WorkItemState::Merged),
+  )
   @test.assert_eq(parse_work_item_state("draft"), None)
 }
 
 ///|
 test "hub parser: parse_work_item_kind handles known and unknown values" {
   @test.assert_eq(parse_work_item_kind("issue"), Some(@hub.WorkItemKind::Issue))
-  @test.assert_eq(parse_work_item_kind("pr"), Some(@hub.WorkItemKind::PullRequest))
+  @test.assert_eq(
+    parse_work_item_kind("pr"),
+    Some(@hub.WorkItemKind::PullRequest),
+  )
   @test.assert_eq(
     parse_work_item_kind("pull-request"),
     Some(@hub.WorkItemKind::PullRequest),
@@ -38,7 +47,10 @@ test "hub parser: parse_review_verdict handles known and unknown values" {
     parse_review_verdict("approved"),
     Some(@hub.ReviewVerdict::Approved),
   )
-  @test.assert_eq(parse_review_verdict("comment"), Some(@hub.ReviewVerdict::Comment))
+  @test.assert_eq(
+    parse_review_verdict("comment"),
+    Some(@hub.ReviewVerdict::Comment),
+  )
   @test.assert_eq(
     parse_review_verdict("request-changes"),
     Some(@hub.ReviewVerdict::RequestChanges),
@@ -149,7 +161,10 @@ test "hub parser: parse_pr_state_flag handles gh-style flags" {
 ///|
 test "hub parser: parse_issue_state_flag handles gh-style flags" {
   @test.assert_eq(parse_issue_state_flag("--open"), Some(@hub.IssueState::Open))
-  @test.assert_eq(parse_issue_state_flag("--closed"), Some(@hub.IssueState::Closed))
+  @test.assert_eq(
+    parse_issue_state_flag("--closed"),
+    Some(@hub.IssueState::Closed),
+  )
   @test.assert_eq(parse_issue_state_flag("--all"), None)
 }
 
@@ -185,7 +200,10 @@ test "hub parser: parse_work_item_kind_flag handles flags" {
 
 ///|
 test "hub parser: parse_head_branch_name handles symbolic and detached head" {
-  @test.assert_eq(parse_head_branch_name("ref: refs/heads/main\n"), Some("main"))
+  @test.assert_eq(
+    parse_head_branch_name("ref: refs/heads/main\n"),
+    Some("main"),
+  )
   @test.assert_eq(
     parse_head_branch_name("ref: refs/heads/feature/topic\n"),
     Some("feature/topic"),
@@ -847,7 +865,10 @@ test "hub sync clone announce parser: parse clone url and runtime options" {
   )
   @test.assert_eq(options.clone_url, "http://127.0.0.1:9418/repo.git")
   @test.assert_eq(options.repo, Some("repo-a"))
-  @test.assert_eq(options.runtime.remote_url, Some("relay+http://127.0.0.1:8787"))
+  @test.assert_eq(
+    options.runtime.remote_url,
+    Some("relay+http://127.0.0.1:8787"),
+  )
   @test.assert_eq(options.runtime.auth_token, Some("token-1"))
 }
 
@@ -877,7 +898,10 @@ test "hub sync clone peers parser: include-self and runtime options" {
     default_remote_url=Some("https://origin.example/repo.git"),
   )
   assert_true(options.include_self)
-  @test.assert_eq(options.runtime.remote_url, Some("relay+https://relay.example.com"))
+  @test.assert_eq(
+    options.runtime.remote_url,
+    Some("relay+https://relay.example.com"),
+  )
   @test.assert_eq(options.runtime.auth_token, Some("token-2"))
 }
 

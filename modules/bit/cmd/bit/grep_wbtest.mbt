@@ -172,7 +172,10 @@ async fn grep_wbtest_case_multiline_pattern_argument() -> Unit raise Error {
   grep_test_run_git(repo_dir, ["add", "file", "v"])
 
   let stdout = grep_test_git_stdout(repo_dir, ["grep", "mmap\nvvv"])
-  @test.assert_eq(grep_trim_trailing_newline(stdout), "file:foo mmap bar\nv:vvv")
+  @test.assert_eq(
+    grep_trim_trailing_newline(stdout),
+    "file:foo mmap bar\nv:vvv",
+  )
 
   cleanup_tree(fs, root)
 }
@@ -194,7 +197,10 @@ async fn grep_wbtest_case_pattern_file_ignores_empty_lines() -> Unit raise Error
   grep_test_run_git(repo_dir, ["add", "file", "v"])
 
   let stdout = grep_test_git_stdout(repo_dir, ["grep", "-f", "patterns"])
-  @test.assert_eq(grep_trim_trailing_newline(stdout), "file:foo mmap bar\nv:vvv")
+  @test.assert_eq(
+    grep_trim_trailing_newline(stdout),
+    "file:foo mmap bar\nv:vvv",
+  )
 
   cleanup_tree(fs, root)
 }
@@ -261,7 +267,10 @@ async fn grep_wbtest_case_subdir_paths_are_relative() -> Unit raise Error {
   let full_name_stdout = grep_test_git_stdout(repo_dir + "/t", [
     "grep", "--full-name", "-n", "-e", "test", "HEAD",
   ])
-  @test.assert_eq(grep_trim_trailing_newline(full_name_stdout), "HEAD:t/t:1:test")
+  @test.assert_eq(
+    grep_trim_trailing_newline(full_name_stdout),
+    "HEAD:t/t:1:test",
+  )
 
   cleanup_tree(fs, root)
 }
@@ -445,12 +454,18 @@ async fn grep_wbtest_case_max_depth_limits_treeish_search() -> Unit raise Error 
   let max_depth_stdout = grep_test_git_stdout(repo_dir, [
     "grep", "--max-depth", "0", "-n", "vvv", "HEAD", "--", "t",
   ])
-  @test.assert_eq(grep_trim_trailing_newline(max_depth_stdout), "HEAD:t/v:1:vvv")
+  @test.assert_eq(
+    grep_trim_trailing_newline(max_depth_stdout),
+    "HEAD:t/v:1:vvv",
+  )
 
   let no_recursive_stdout = grep_test_git_stdout(repo_dir, [
     "grep", "--no-recursive", "-n", "vvv", "HEAD", "--", "t",
   ])
-  @test.assert_eq(grep_trim_trailing_newline(no_recursive_stdout), "HEAD:t/v:1:vvv")
+  @test.assert_eq(
+    grep_trim_trailing_newline(no_recursive_stdout),
+    "HEAD:t/v:1:vvv",
+  )
 
   cleanup_tree(fs, root)
 }
@@ -711,7 +726,10 @@ async fn grep_wbtest_case_files_without_match_respects_intent_to_add_modes() -> 
   grep_test_run_git(repo_dir, ["add", "-N", "intend.txt"])
 
   let worktree_stdout = grep_test_git_stdout(repo_dir, ["grep", "-L", "hello"])
-  @test.assert_eq(grep_trim_trailing_newline(worktree_stdout), "b.txt\nintend.txt")
+  @test.assert_eq(
+    grep_trim_trailing_newline(worktree_stdout),
+    "b.txt\nintend.txt",
+  )
 
   let cached_stdout = grep_test_git_stdout(repo_dir, [
     "grep", "-L", "--cached", "hello",
@@ -1095,8 +1113,14 @@ async fn grep_wbtest_case_function_context_whole_function() -> Unit raise Error 
     repo_dir + "/.git",
     "hello.c",
   )
-  @test.assert_eq(grep_compute_whole_function_range(lines, 6, function_spec), (4, 9))
-  @test.assert_eq(grep_compute_whole_function_range(lines, 2, function_spec), (1, 2))
+  @test.assert_eq(
+    grep_compute_whole_function_range(lines, 6, function_spec),
+    (4, 9),
+  )
+  @test.assert_eq(
+    grep_compute_whole_function_range(lines, 2, function_spec),
+    (1, 2),
+  )
 
   cleanup_tree(fs, root)
 }
@@ -1140,7 +1164,10 @@ async fn grep_wbtest_case_function_context_whole_function_uses_xfuncname() -> Un
   )
   @test.assert_eq(function_spec.header_pattern, Some("^function .*$"))
   assert_true(function_spec.include_leading_comments)
-  @test.assert_eq(grep_compute_whole_function_range(lines, 6, function_spec), (4, 8))
+  @test.assert_eq(
+    grep_compute_whole_function_range(lines, 6, function_spec),
+    (4, 8),
+  )
 
   cleanup_tree(fs, root)
 }
@@ -1298,7 +1325,10 @@ async fn grep_wbtest_case_dashdash_can_introduce_pattern() -> Unit raise Error {
   let scoped_stdout = grep_test_git_stdout(repo_dir, [
     "grep", "--", "->", "--", "double-dash",
   ])
-  @test.assert_eq(grep_trim_trailing_newline(scoped_stdout), "double-dash:a -> b")
+  @test.assert_eq(
+    grep_trim_trailing_newline(scoped_stdout),
+    "double-dash:a -> b",
+  )
 
   cleanup_tree(fs, root)
 }
@@ -1406,7 +1436,10 @@ async fn grep_wbtest_case_untracked_search_respects_ignore() -> Unit raise Error
   fs.write_string(repo_dir + "/.gitignore", ".*o*\n")
 
   let stdout = grep_test_git_stdout(repo_dir, ["grep", "--untracked", "o"])
-  @test.assert_eq(grep_trim_trailing_newline(stdout), "file1:hello\nsub/file2:world")
+  @test.assert_eq(
+    grep_trim_trailing_newline(stdout),
+    "file1:hello\nsub/file2:world",
+  )
 
   cleanup_tree(fs, root)
 }

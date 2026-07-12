@@ -1,5 +1,3 @@
-
-
 import {
-  "moonbitlang/core/test" @test,
+  "moonbitlang/core/test",
 } for "test"

@@ -118,7 +118,10 @@ test "inject_from_bit_table injects all sections" {
     @sys.get_env_var("BIT_RELAY_URL"),
     Some("relay+https://relay.sprites.dev"),
   )
-  @test.assert_eq(@sys.get_env_var("BIT_RELAY_AUTH_TOKEN"), Some("secret-token"))
+  @test.assert_eq(
+    @sys.get_env_var("BIT_RELAY_AUTH_TOKEN"),
+    Some("secret-token"),
+  )
   @test.assert_eq(
     @sys.get_env_var("BIT_RELAY_SIGN_PRIVATE_KEY_FILE"),
     Some("/home/test/.config/bit/keys/ed25519.pem"),

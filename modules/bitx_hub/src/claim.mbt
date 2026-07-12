@@ -15,7 +15,7 @@ pub fn ClaimAction::to_string(self : ClaimAction) -> String {
 }
 
 ///|
-pub impl Show for ClaimAction with output(self, logger) {
+pub impl Show for ClaimAction with fn output(self, logger) {
   logger.write_string(self.to_string())
 }
 
@@ -60,7 +60,7 @@ fn claim_show_string(value : String) -> String {
 }
 
 ///|
-pub impl Show for ClaimMessage with output(self, logger) {
+pub impl Show for ClaimMessage with fn output(self, logger) {
   logger.write_string(
     "{issue_id: " +
     claim_show_string(self.issue_id) +

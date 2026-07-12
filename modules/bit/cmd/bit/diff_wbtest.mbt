@@ -1,8 +1,17 @@
 ///|
 test "diff: apply relative path strips literal prefix" {
-  @test.assert_eq(diff_apply_relative_path("subdir/file2", "subdir/"), Some("file2"))
-  @test.assert_eq(diff_apply_relative_path("subdir/file2", "subdir"), Some("file2"))
-  @test.assert_eq(diff_apply_relative_path("subdir/file2", "sub"), Some("dir/file2"))
+  @test.assert_eq(
+    diff_apply_relative_path("subdir/file2", "subdir/"),
+    Some("file2"),
+  )
+  @test.assert_eq(
+    diff_apply_relative_path("subdir/file2", "subdir"),
+    Some("file2"),
+  )
+  @test.assert_eq(
+    diff_apply_relative_path("subdir/file2", "sub"),
+    Some("dir/file2"),
+  )
   @test.assert_eq(diff_apply_relative_path("file1", "subdir"), None)
 }
 

@@ -32,7 +32,10 @@ test "check-ignore: repo path resolves cwd-relative input" {
   @test.assert_eq(check_ignore_repo_relative_path("./file", ""), "file")
   @test.assert_eq(check_ignore_repo_relative_path("file", "a/b"), "a/b/file")
   @test.assert_eq(check_ignore_repo_relative_path("../file", "a/b"), "../file")
-  @test.assert_eq(check_ignore_repo_relative_path("/tmp/file", "a/b"), "/tmp/file")
+  @test.assert_eq(
+    check_ignore_repo_relative_path("/tmp/file", "a/b"),
+    "/tmp/file",
+  )
 }
 
 ///|

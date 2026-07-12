@@ -39,10 +39,7 @@ test "bench read_config_value small config single key" (b : @bench.T) {
   let config_path = bench_config_root + "/.git/config"
   b.bench(fn() {
     let v = read_config_value(
-      bench_config_fs_small,
-      config_path,
-      "core",
-      "autocrlf",
+      bench_config_fs_small, config_path, "core", "autocrlf",
     )
     b.keep(v is Some(_))
   })
@@ -55,30 +52,18 @@ test "bench read_config_value 4 keys (sequential, re-reads each)" (b : @bench.T)
   let config_path = bench_config_root + "/.git/config"
   b.bench(fn() {
     let v1 = read_config_value(
-      bench_config_fs_small,
-      config_path,
-      "extensions",
-      "objectformat",
+      bench_config_fs_small, config_path, "extensions", "objectformat",
     )
     let v2 = read_config_value(
-      bench_config_fs_small,
-      config_path,
-      "extensions",
-      "compatobjectformat",
+      bench_config_fs_small, config_path, "extensions", "compatobjectformat",
     )
     let v3 = read_config_value(
-      bench_config_fs_small,
-      config_path,
-      "extensions",
-      "refstorage",
+      bench_config_fs_small, config_path, "extensions", "refstorage",
     )
     let v4 = read_config_value(
-      bench_config_fs_small,
-      config_path,
-      "core",
-      "repositoryformatversion",
+      bench_config_fs_small, config_path, "core", "repositoryformatversion",
     )
-    b.keep((v1 is Some(_)) || (v2 is Some(_)) || (v3 is Some(_)) || (v4 is Some(_)))
+    b.keep(v1 is Some(_) || v2 is Some(_) || v3 is Some(_) || v4 is Some(_))
   })
 }
 
@@ -87,30 +72,18 @@ test "bench read_config_value 4 keys on 100-remote config" (b : @bench.T) {
   let config_path = bench_config_root + "/.git/config"
   b.bench(fn() {
     let v1 = read_config_value(
-      bench_config_fs_large,
-      config_path,
-      "extensions",
-      "objectformat",
+      bench_config_fs_large, config_path, "extensions", "objectformat",
     )
     let v2 = read_config_value(
-      bench_config_fs_large,
-      config_path,
-      "extensions",
-      "compatobjectformat",
+      bench_config_fs_large, config_path, "extensions", "compatobjectformat",
     )
     let v3 = read_config_value(
-      bench_config_fs_large,
-      config_path,
-      "extensions",
-      "refstorage",
+      bench_config_fs_large, config_path, "extensions", "refstorage",
     )
     let v4 = read_config_value(
-      bench_config_fs_large,
-      config_path,
-      "core",
-      "repositoryformatversion",
+      bench_config_fs_large, config_path, "core", "repositoryformatversion",
     )
-    b.keep((v1 is Some(_)) || (v2 is Some(_)) || (v3 is Some(_)) || (v4 is Some(_)))
+    b.keep(v1 is Some(_) || v2 is Some(_) || v3 is Some(_) || v4 is Some(_))
   })
 }
 
@@ -119,24 +92,24 @@ test "bench read_config_value 4 keys on 100-remote config" (b : @bench.T) {
 /// content across all four key lookups — the pattern used by
 /// `repo_format_info` in `cmd/bit/helpers.mbt`. Should be roughly
 /// the cost of one read + four (cheap) parses.
-test "bench read_config_value_from_content 4 keys on 100-remote config" (b : @bench.T) {
+test "bench read_config_value_from_content 4 keys on 100-remote config" (
+  b : @bench.T,
+) {
   b.bench(fn() {
     let content = read_config_content(
       bench_config_fs_large,
       bench_config_root + "/.git",
     )
-    let v1 = read_config_value_from_content(content, "extensions", "objectformat")
+    let v1 = read_config_value_from_content(
+      content, "extensions", "objectformat",
+    )
     let v2 = read_config_value_from_content(
-      content,
-      "extensions",
-      "compatobjectformat",
+      content, "extensions", "compatobjectformat",
     )
     let v3 = read_config_value_from_content(content, "extensions", "refstorage")
     let v4 = read_config_value_from_content(
-      content,
-      "core",
-      "repositoryformatversion",
+      content, "core", "repositoryformatversion",
     )
-    b.keep((v1 is Some(_)) || (v2 is Some(_)) || (v3 is Some(_)) || (v4 is Some(_)))
+    b.keep(v1 is Some(_) || v2 is Some(_) || v3 is Some(_) || v4 is Some(_))
   })
 }

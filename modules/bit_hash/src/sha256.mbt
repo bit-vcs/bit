@@ -1,5 +1,5 @@
-///| SHA-256 pure-MoonBit implementation
-
+///|
+/// SHA-256 pure-MoonBit implementation
 let sha256_k : FixedArray[Int] = [
   0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4,
   0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe,
@@ -13,13 +13,28 @@ let sha256_k : FixedArray[Int] = [
   0xc67178f2,
 ]
 
+///|
 let sha256_h0 : Int = 0x6a09e667
+
+///|
 let sha256_h1 : Int = 0xbb67ae85
+
+///|
 let sha256_h2 : Int = 0x3c6ef372
+
+///|
 let sha256_h3 : Int = 0xa54ff53a
+
+///|
 let sha256_h4 : Int = 0x510e527f
+
+///|
 let sha256_h5 : Int = 0x9b05688c
+
+///|
 let sha256_h6 : Int = 0x1f83d9ab
+
+///|
 let sha256_h7 : Int = 0x5be0cd19
 
 ///|

@@ -158,9 +158,12 @@ test "parse_upload_pack_request_v2: simple fetch" {
     @protocol.pktline_flush(),
   ])
   let req = parse_upload_pack_request_v2(req_bytes)
-  debug_inspect(req.command, content=(
-    #|"fetch"
-  ))
+  debug_inspect(
+    req.command,
+    content=(
+      #|"fetch"
+    ),
+  )
   debug_inspect(req.wants.length(), content="1")
   debug_inspect(req.done, content="true")
 }
@@ -176,12 +179,18 @@ test "parse_upload_pack_request_v2: with packfile-uris" {
     @protocol.pktline_flush(),
   ])
   let req = parse_upload_pack_request_v2(req_bytes)
-  debug_inspect(req.command, content=(
-    #|"fetch"
-  ))
-  debug_inspect(req.packfile_uris, content=(
-    #|Some("https")
-  ))
+  debug_inspect(
+    req.command,
+    content=(
+      #|"fetch"
+    ),
+  )
+  debug_inspect(
+    req.packfile_uris,
+    content=(
+      #|Some("https")
+    ),
+  )
 }
 
 ///|
@@ -195,9 +204,12 @@ test "parse_upload_pack_request_v2: with filter" {
     @protocol.pktline_flush(),
   ])
   let req = parse_upload_pack_request_v2(req_bytes)
-  debug_inspect(req.filter, content=(
-    #|Some("blob:none")
-  ))
+  debug_inspect(
+    req.filter,
+    content=(
+      #|Some("blob:none")
+    ),
+  )
 }
 
 ///|
@@ -212,9 +224,12 @@ test "parse_upload_pack_request_v2: want-ref" {
   ])
   let req = parse_upload_pack_request_v2(req_bytes)
   debug_inspect(req.want_refs.length(), content="1")
-  debug_inspect(req.want_refs[0], content=(
-    #|"refs/heads/main"
-  ))
+  debug_inspect(
+    req.want_refs[0],
+    content=(
+      #|"refs/heads/main"
+    ),
+  )
 }
 
 ///|

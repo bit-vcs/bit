@@ -48,6 +48,6 @@ pub fn HashAlgorithm::from_string(s : String) -> HashAlgorithm raise GitError {
 }
 
 ///|
-pub impl Show for HashAlgorithm with output(self, logger) {
+pub impl Show for HashAlgorithm with fn output(self, logger) {
   logger.write_string(self.name())
 }
