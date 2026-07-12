@@ -1530,6 +1530,19 @@ pub fn js_log(
 }
 
 ///|
+pub fn js_log_oneline(
+  host_id : Int,
+  root : String,
+  max_count : Int,
+) -> Result[Array[String], String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error(() => {
+    let git_dir = js_resolve_git_dir(fs, root)
+    log_head_oneline(fs, git_dir, max_count~)
+  })
+}
+
+///|
 pub fn js_rev_parse(
   host_id : Int,
   root : String,
@@ -1564,6 +1577,106 @@ pub fn js_show_ref(
 }
 
 ///|
+pub fn js_reflog(
+  host_id : Int,
+  root : String,
+  refname : String,
+) -> Result[Array[JsReflogEntry], String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error(() => {
+    let git_dir = js_resolve_git_dir(fs, root)
+    let entries = read_reflog(fs, git_dir, refname)
+    let result : Array[JsReflogEntry] = []
+    for entry in entries {
+      result.push({
+        old_id: entry.old_id.to_hex(),
+        new_id: entry.new_id.to_hex(),
+        author: entry.author,
+        email: entry.email,
+        timestamp: entry.timestamp.to_int(),
+        timezone: entry.timezone,
+        message: entry.message,
+      })
+    }
+    result
+  })
+}
+
+///|
+pub fn js_gc(host_id : Int, root : String) -> Result[JsGcResult, String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error(() => {
+    let gc_result = gc_repo(fs, fs, root)
+    let dangling : Array[String] = []
+    for id in gc_result.dangling {
+      dangling.push(id.to_hex())
+    }
+    match gc_result.pack {
+      Some(pack) =>
+        {
+          pack_id: pack.pack_id.to_hex(),
+          object_count: pack.object_count,
+          pack_bytes: pack.pack_bytes,
+          dangling,
+        }
+      None => { pack_id: "", object_count: 0, pack_bytes: 0, dangling }
+    }
+  })
+}
+
+///|
+pub fn js_fsck(host_id : Int, root : String) -> Result[JsFsckResult, String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error(() => {
+    let git_dir = js_resolve_git_dir(fs, root)
+    let db = ObjectDb::load(fs, git_dir)
+    let tips : Array[@bit.ObjectId] = []
+    for item in show_ref(fs, git_dir) {
+      let (_, id) = item
+      tips.push(id)
+    }
+    let fsck_result = fsck_connectivity_check(db, fs, tips, collect_extra=true)
+    let missing : Array[String] = []
+    for hex in fsck_result.missing.keys() {
+      missing.push(hex)
+    }
+    {
+      errors: fsck_result.errors,
+      reachable: fsck_result.reachable.size(),
+      missing,
+      root_commits: fsck_result.root_commits,
+      tag_objects: fsck_result.tag_objects,
+    }
+  })
+}
+
+///|
+pub fn js_worktree_list(
+  host_id : Int,
+  root : String,
+) -> Result[Array[JsWorktreeInfo], String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error(() => {
+    let worktrees = list_worktrees(fs, root)
+    let result : Array[JsWorktreeInfo] = []
+    for info in worktrees {
+      result.push({
+        path: info.path,
+        head_id: match info.head_id {
+          Some(id) => id.to_hex()
+          None => ""
+        },
+        branch: info.branch.unwrap_or(""),
+        locked: info.locked,
+        is_main: info.is_main,
+        is_bare: info.is_bare,
+      })
+    }
+    result
+  })
+}
+
+///|
 pub fn js_merge(
   host_id : Int,
   root : String,
@@ -1585,6 +1698,45 @@ pub fn js_merge(
       timestamp_secs.to_int64(),
     )
     js_convert_merge_result(merged)
+  })
+}
+
+///|
+pub fn js_merge_base(
+  host_id : Int,
+  root : String,
+  a_spec : String,
+  b_spec : String,
+) -> Result[Array[String], String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error(() => {
+    let git_dir = js_resolve_git_dir(fs, root)
+    let a = js_resolve_revision(fs, root, a_spec)
+    let b = js_resolve_revision(fs, root, b_spec)
+    let db = ObjectDb::load(fs, git_dir)
+    let bases = merge_base_all(db, fs, a, b)
+    let result : Array[String] = []
+    for base in bases {
+      result.push(base.to_hex())
+    }
+    result
+  })
+}
+
+///|
+pub fn js_merge_base_is_ancestor(
+  host_id : Int,
+  root : String,
+  ancestor_spec : String,
+  descendant_spec : String,
+) -> Result[Bool, String] {
+  let fs = js_make_host_fs(host_id)
+  js_wrap_error(() => {
+    let git_dir = js_resolve_git_dir(fs, root)
+    let ancestor = js_resolve_revision(fs, root, ancestor_spec)
+    let descendant = js_resolve_revision(fs, root, descendant_spec)
+    let db = ObjectDb::load(fs, git_dir)
+    merge_base_is_ancestor(db, fs, ancestor, descendant)
   })
 }
 
@@ -2566,7 +2718,9 @@ pub fn js_fetch_remote_promise(
   depth : Int,
 ) -> @js_async.Promise[Result[JsFetchResult, String]] {
   js_export_promise(async fn() {
-    js_fetch_remote(host_id, root, remote_url, transport_id, refspec, prefer_v2, depth)
+    js_fetch_remote(
+      host_id, root, remote_url, transport_id, refspec, prefer_v2, depth,
+    )
   })
 }
 

@@ -172,6 +172,37 @@ function runRepoFlow(bitGit, api, root, author) {
   const head = bitGit.readString(api, `${root}/.git/HEAD`);
   assert.equal(head, "ref: refs/heads/feature\n");
 
+  const onelineEntries = bitGit.logOneline(api, root, 10);
+  assert.equal(onelineEntries.length, 1);
+  assert.ok(onelineEntries[0].endsWith(" initial commit"));
+
+  const reflogEntries = bitGit.reflog(api, root, "HEAD");
+  assert.ok(reflogEntries.length >= 1);
+  assert.equal(reflogEntries[reflogEntries.length - 1].newId, commitId);
+
+  // feature diverges from main here — merge-base of the two is the initial commit
+  bitGit.writeString(api, `${root}/feature.txt`, "feature\n");
+  bitGit.add(api, root, ["feature.txt"]);
+  const featureId = bitGit.commit(api, root, "feature work", author, 1700000100);
+  assert.ok(bitGit.isAncestor(api, root, commitId, featureId));
+  assert.ok(!bitGit.isAncestor(api, root, featureId, commitId));
+  const bases = bitGit.mergeBase(api, root, "main", "feature");
+  assert.deepEqual(bases, [commitId]);
+
+  const worktrees = bitGit.worktreeList(api, root);
+  assert.equal(worktrees.length, 1);
+  assert.equal(worktrees[0].isMain, true);
+  assert.equal(worktrees[0].branch, "feature");
+
+  const fsckResult = bitGit.fsck(api, root);
+  assert.equal(fsckResult.errors, 0);
+  assert.deepEqual(fsckResult.missing, []);
+  assert.ok(fsckResult.reachable >= 1);
+
+  const gcResult = bitGit.gc(api, root);
+  assert.ok(gcResult.objectCount >= 1);
+  assert.equal(gcResult.packId.length, 40);
+
   return { commitId, branches, logEntries, head };
 }
 

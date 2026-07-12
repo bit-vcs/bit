@@ -26,6 +26,13 @@ import {
   listRemotes as rawListRemotes,
   listRemotesVerbose as rawListRemotesVerbose,
   log as rawLog,
+  logOneline as rawLogOneline,
+  reflog as rawReflog,
+  mergeBase as rawMergeBase,
+  isAncestor as rawIsAncestor,
+  gc as rawGc,
+  fsck as rawFsck,
+  worktreeList as rawWorktreeList,
   merge as rawMerge,
   mv as rawMv,
   push as rawPush,
@@ -399,6 +406,40 @@ const toLogEntry = (value) => ({
 const toRefInfo = (value) => ({
   name: value.name,
   id: value.id,
+});
+
+const toReflogEntry = (value) => ({
+  oldId: value.old_id,
+  newId: value.new_id,
+  author: value.author,
+  email: value.email,
+  timestamp: value.timestamp,
+  timezone: value.timezone,
+  message: value.message,
+});
+
+const toGcResult = (value) => ({
+  packId: toMaybeString(value.pack_id),
+  objectCount: value.object_count,
+  packBytes: value.pack_bytes,
+  dangling: Array.from(value.dangling),
+});
+
+const toFsckResult = (value) => ({
+  errors: value.errors,
+  reachable: value.reachable,
+  missing: Array.from(value.missing),
+  rootCommits: Array.from(value.root_commits),
+  tagObjects: Array.from(value.tag_objects),
+});
+
+const toWorktreeInfo = (value) => ({
+  path: value.path,
+  headId: toMaybeString(value.head_id),
+  branch: toMaybeString(value.branch),
+  locked: value.locked,
+  isMain: value.is_main,
+  isBare: value.is_bare,
 });
 
 const toRemoteVerboseEntry = (value) => ({
@@ -798,12 +839,40 @@ export const log = (backend, root, maxCount = 32) => (
   Array.from(unwrap("log", rawLog(toHostId(backend), root, Math.trunc(maxCount)))).map(toLogEntry)
 );
 
+export const logOneline = (backend, root, maxCount = 32) => (
+  Array.from(unwrap("logOneline", rawLogOneline(toHostId(backend), root, Math.trunc(maxCount))))
+);
+
 export const revParse = (backend, root, spec) => (
   toMaybeString(unwrap("revParse", rawRevParse(toHostId(backend), root, spec)))
 );
 
 export const showRef = (backend, root) => (
   Array.from(unwrap("showRef", rawShowRef(toHostId(backend), root))).map(toRefInfo)
+);
+
+export const reflog = (backend, root, refname = "HEAD") => (
+  Array.from(unwrap("reflog", rawReflog(toHostId(backend), root, refname))).map(toReflogEntry)
+);
+
+export const mergeBase = (backend, root, a, b) => (
+  Array.from(unwrap("mergeBase", rawMergeBase(toHostId(backend), root, a, b)))
+);
+
+export const isAncestor = (backend, root, ancestor, descendant) => (
+  unwrap("isAncestor", rawIsAncestor(toHostId(backend), root, ancestor, descendant))
+);
+
+export const gc = (backend, root) => (
+  toGcResult(unwrap("gc", rawGc(toHostId(backend), root)))
+);
+
+export const fsck = (backend, root) => (
+  toFsckResult(unwrap("fsck", rawFsck(toHostId(backend), root)))
+);
+
+export const worktreeList = (backend, root) => (
+  Array.from(unwrap("worktreeList", rawWorktreeList(toHostId(backend), root))).map(toWorktreeInfo)
 );
 
 export const merge = (

@@ -39,6 +39,40 @@ export interface BitRefInfo {
   id: string;
 }
 
+export interface BitReflogEntry {
+  oldId: string;
+  newId: string;
+  author: string;
+  email: string;
+  timestamp: number;
+  timezone: string;
+  message: string;
+}
+
+export interface BitGcResult {
+  packId: string | null;
+  objectCount: number;
+  packBytes: number;
+  dangling: string[];
+}
+
+export interface BitFsckResult {
+  errors: number;
+  reachable: number;
+  missing: string[];
+  rootCommits: string[];
+  tagObjects: string[];
+}
+
+export interface BitWorktreeInfo {
+  path: string;
+  headId: string | null;
+  branch: string | null;
+  locked: boolean;
+  isMain: boolean;
+  isBare: boolean;
+}
+
 export interface BitRemoteVerboseEntry {
   name: string;
   value: string;
@@ -321,6 +355,40 @@ export declare function showRef(
   backend: BitBackend,
   root: string,
 ): BitRefInfo[];
+export declare function logOneline(
+  backend: BitBackend,
+  root: string,
+  maxCount?: number,
+): string[];
+export declare function reflog(
+  backend: BitBackend,
+  root: string,
+  refname?: string,
+): BitReflogEntry[];
+export declare function mergeBase(
+  backend: BitBackend,
+  root: string,
+  a: string,
+  b: string,
+): string[];
+export declare function isAncestor(
+  backend: BitBackend,
+  root: string,
+  ancestor: string,
+  descendant: string,
+): boolean;
+export declare function gc(
+  backend: BitBackend,
+  root: string,
+): BitGcResult;
+export declare function fsck(
+  backend: BitBackend,
+  root: string,
+): BitFsckResult;
+export declare function worktreeList(
+  backend: BitBackend,
+  root: string,
+): BitWorktreeInfo[];
 export declare function merge(
   backend: BitBackend,
   root: string,
