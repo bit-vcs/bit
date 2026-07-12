@@ -1299,6 +1299,7 @@ async fn dispatch_known_command(
     "switch" => handle_switch(rest)
     "reset" => handle_reset(rest)
     "rebase" => handle_rebase(rest)
+    "history" => handle_history(rest)
     "ai" => handle_ai(rest)
     "rebase-ai" => handle_rebase_ai(rest)
     "stash" => handle_stash(rest)
