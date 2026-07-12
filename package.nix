@@ -8,7 +8,7 @@
   moonRegistryIndex,
 }:
 let
-  bitMod = builtins.fromJSON (builtins.readFile ./modules/bit/moon.mod.json);
+  bitMod = (import ./nix/parse-moon-mod.nix { inherit lib; }) ./modules/bit/moon.mod;
   # buildCachedRegistry reads moon.mod.json to know which packages to fetch
   # from mooncakes.io. Workspace-local deps (mizchi/bit_* and mizchi/bitx_*)
   # aren't published there, so drop them and keep only registry deps.
