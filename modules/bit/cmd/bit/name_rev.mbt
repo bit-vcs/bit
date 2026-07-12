@@ -7,6 +7,7 @@ async fn handle_name_rev(args : Array[String]) -> Unit raise Error {
   let mut read_stdin = false
   let mut refs_pattern : String? = None
   let mut all = false
+  let excludes : Array[String] = []
   let positional : Array[String] = []
   let mut i = 0
   while i < args.length() {
@@ -14,14 +15,15 @@ async fn handle_name_rev(args : Array[String]) -> Unit raise Error {
     match arg {
       "-h" | "--help" => {
         show_simple_command_help(
-          "git name-rev [--tags] [--refs=<pattern>] [--name-only] [--stdin] <commit-ish>...",
+          "git name-rev [--tags] [--refs=<pattern>] [--exclude=<pattern>] [--name-only] [--annotate-stdin] <commit-ish>...",
           summary="Find symbolic names for given revs.",
         )
         return
       }
       "--tags" => tags_only = true
       "--name-only" => name_only = true
-      "--stdin" => read_stdin = true
+      // `--annotate-stdin` is the current name for the historical `--stdin`.
+      "--stdin" | "--annotate-stdin" => read_stdin = true
       "--all" => all = true
       _ if arg.has_prefix("--refs=") =>
         refs_pattern = Some(
@@ -31,6 +33,14 @@ async fn handle_name_rev(args : Array[String]) -> Unit raise Error {
         i += 1
         if i < args.length() {
           refs_pattern = Some(args[i])
+        }
+      }
+      _ if arg.has_prefix("--exclude=") =>
+        excludes.push(String::unsafe_substring(arg, start=10, end=arg.length()))
+      "--exclude" => {
+        i += 1
+        if i < args.length() {
+          excludes.push(args[i])
         }
       }
       "--no-undefined" | "--always" | "--undefined" => ()
@@ -44,7 +54,9 @@ async fn handle_name_rev(args : Array[String]) -> Unit raise Error {
   let rfs : &@bitcore.RepoFileSystem = fs
   let git_dir = resolve_git_dir(rfs, root)
   // Build ref->commit map
-  let ref_map = name_rev_build_ref_map(rfs, git_dir, tags_only, refs_pattern)
+  let ref_map = name_rev_build_ref_map(
+    rfs, git_dir, tags_only, refs_pattern, excludes,
+  )
   // Build reverse map: commit OID -> (name, distance)
   let db = @bitlib.ObjectDb::load(rfs, git_dir)
   let name_map = name_rev_build_name_map(rfs, git_dir, db, ref_map)
@@ -68,7 +80,7 @@ async fn handle_name_rev(args : Array[String]) -> Unit raise Error {
         continue
       }
       // Try to find and replace hex OIDs in the line
-      let output = name_rev_replace_oids(line, name_map)
+      let output = name_rev_replace_oids(line, name_map, name_only)
       print_line(output)
     }
     return
@@ -108,6 +120,7 @@ fn name_rev_build_ref_map(
   git_dir : String,
   tags_only : Bool,
   refs_pattern : String?,
+  excludes : Array[String],
 ) -> Array[(String, @bitcore.ObjectId)] {
   let all_refs = @bitrepo.show_ref(rfs, git_dir) catch { _ => [] }
   let result : Array[(String, @bitcore.ObjectId)] = []
@@ -122,9 +135,26 @@ fn name_rev_build_ref_map(
       Some(pattern) => if !name_rev_match_pattern(name, pattern) { continue }
       None => ()
     }
-    // Shorten the ref name for display
+    // Drop refs matching any --exclude pattern.
+    let mut excluded = false
+    for pattern in excludes {
+      if name_rev_match_pattern(name, pattern) {
+        excluded = true
+        break
+      }
+    }
+    if excluded {
+      continue
+    }
+    // Shorten the ref name for display. With --tags, tags use their bare name
+    // (git drops the `tags/` prefix); otherwise they keep it.
     let display_name = if name.has_prefix("refs/tags/") {
-      "tags/" + String::unsafe_substring(name, start=10, end=name.length())
+      let bare = String::unsafe_substring(name, start=10, end=name.length())
+      if tags_only {
+        bare
+      } else {
+        "tags/" + bare
+      }
     } else if name.has_prefix("refs/heads/") {
       String::unsafe_substring(name, start=11, end=name.length())
     } else if name.has_prefix("refs/remotes/") {
@@ -235,8 +265,10 @@ fn name_rev_deref_tag(
 fn name_rev_replace_oids(
   line : String,
   name_map : Map[String, String],
+  name_only : Bool,
 ) -> String {
-  // Find 40-char hex strings and replace with names
+  // Find 40-char hex strings and replace with names. With --name-only the oid
+  // is replaced by just the name; otherwise it becomes `<oid> (<name>)`.
   let chars = line.to_array()
   let result = StringBuilder::new()
   let mut i = 0
@@ -248,10 +280,14 @@ fn name_rev_replace_oids(
       if all_hex {
         match name_map.get(candidate) {
           Some(name) => {
-            result.write_string(candidate)
-            result.write_string(" (")
-            result.write_string(name)
-            result.write_string(")")
+            if name_only {
+              result.write_string(name)
+            } else {
+              result.write_string(candidate)
+              result.write_string(" (")
+              result.write_string(name)
+              result.write_string(")")
+            }
             i += 40
             continue
           }
