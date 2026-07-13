@@ -153,15 +153,33 @@ async fn handle_history_fixup(args : Array[String]) -> Unit raise Error {
     return
   }
 
-  // Apply the ref updates.
+  // Apply the ref updates, recording a reflog entry for each.
   let mut new_head : @bitcore.ObjectId? = None
   let head_branch = match head_ref {
     Branch(name) => Some("refs/heads/" + name)
     Detached(_) => None
   }
+  let (rl_author, rl_email, rl_ts, rl_tz) = get_committer_identity()
+  let reflog_msg = "fixup: updating " + spec
   for u in result.updates {
     history_write_ref_cmd(ffs, git_dir, u.refname, u.new_id)
+    try
+      @bitlib.append_reflog(
+        ffs, rfs, git_dir, u.refname, u.old_id, u.new_id, rl_author, rl_email,
+        rl_ts, rl_tz, reflog_msg,
+      )
+    catch {
+      _ => ()
+    }
     if head_branch is Some(hb) && hb == u.refname {
+      try
+        @bitlib.append_reflog(
+          ffs, rfs, git_dir, "HEAD", u.old_id, u.new_id, rl_author, rl_email,
+          rl_ts, rl_tz, reflog_msg,
+        )
+      catch {
+        _ => ()
+      }
       new_head = Some(u.new_id)
     }
   }
