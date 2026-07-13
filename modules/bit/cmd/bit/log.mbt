@@ -5082,8 +5082,15 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         }
         formatted_lines.push(rendered)
         if show_numstat || show_stat {
+          // Diff against the first parent (entry.parent_tree isn't populated on
+          // this walk path); a root commit diffs against the empty tree.
+          let old_tree = if entry.parents.length() > 0 {
+            log_get_commit_tree(db, rfs, entry.parents[0])
+          } else {
+            None
+          }
           let diff_files = @bitdiff.diff_trees(
-            rfs, git_dir, entry.parent_tree, entry.tree, db~,
+            rfs, git_dir, old_tree, entry.tree, db~,
           )
           if show_numstat {
             for line in diff_format_numstat(diff_files) {

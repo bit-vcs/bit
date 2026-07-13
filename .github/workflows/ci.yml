@@ -231,8 +231,7 @@ jobs:
             SHIM_CMDS="init add diff diff-files diff-index ls-files tag branch checkout switch commit log show reflog reset update-ref update-index status merge rebase clone push fetch pull mv notes stash rm submodule worktree config show-ref for-each-ref rev-parse symbolic-ref cherry-pick remote cat-file hash-object ls-tree write-tree commit-tree receive-pack upload-pack pack-objects index-pack format-patch describe gc clean sparse-checkout restore blame grep shell rev-list bisect diff-tree read-tree fsck am apply bundle cherry revert prune pack-refs mktree shortlog verify-pack unpack-objects maintenance range-diff show-branch repack multi-pack-index pack-redundant send-pack request-pull merge-base var stripspace ls-remote fmt-merge-msg patch-id count-objects name-rev update-server-info check-ref-format mktag interpret-trailers column merge-tree merge-file fast-import fast-export verify-tag fetch-pack difftool rerere mailinfo archive check-attr check-ignore show-index get-tar-commit-id verify-commit annotate last-modified history" \
             SHIM_STRICT=1 GIT_TEST_INSTALLED="$shim_dir" GIT_TEST_EXEC_PATH="$exec_path"
           cd third_party/git/t
-          # Only the simple fixup cases, full verbose output.
-          ./t3453-history-fixup.sh -v -x --run=7,8,9 2>&1 || true
+          ./t3453-history-fixup.sh 2>&1 | tail -40 || true
 
   git-compat:
     runs-on: ubuntu-latest
