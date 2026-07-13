@@ -315,7 +315,11 @@ fn history_commit_is_empty(
   tree : @bit.ObjectId,
 ) -> Bool raise @bit.GitError {
   match parents.get(0) {
-    None => false // root commit: never "empty" for our purposes
+    None => {
+      // Root commit: "empty" means its tree is the empty tree.
+      let (empty_tree, _) = @bit.create_tree([])
+      tree == empty_tree
+    }
     Some(parent) => {
       let pobj = db.get(rfs, parent)
       guard pobj is Some(o) && o.obj_type == @bit.ObjectType::Commit else {

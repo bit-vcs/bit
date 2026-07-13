@@ -17,6 +17,81 @@ fn hf_write(host : Int, path : String, content : String) -> Unit {
 }
 
 ///|
+/// Replicate the CLI's exact flow (index->tree, list_branches tips,
+/// history_fixup) to find which step diverges from the direct-core wbtests.
+test "history fixup: full CLI flow (tip) replicates end to end" {
+  let host = js_create_memory_host()
+  guard js_git_init(host, "/repo", "main") is Ok(_) else { abort("init") }
+  hf_write(host, "/repo/initial.t", "initial\n")
+  hf_add(host, ["initial.t"])
+  let _c1 = hf_commit(host, "initial", 1700000000)
+  hf_write(host, "/repo/file.txt", "content\n")
+  hf_add(host, ["file.txt"])
+  let c2 = hf_commit(host, "add file", 1700000100)
+  hf_write(host, "/repo/file.txt", "content\nfix\n")
+  hf_add(host, ["file.txt"])
+
+  let fs = js_make_host_fs(host)
+  let rfs : &@bit.RepoFileSystem = fs
+  let ffs : &@bit.FileSystem = fs
+  let git_dir = js_resolve_git_dir(fs, "/repo")
+  let db = ObjectDb::load(rfs, git_dir)
+
+  // Step 1: index -> tree (staged detection).
+  let entries = read_index_entries(rfs, git_dir)
+  let index_tree = write_tree_from_index(ffs, rfs, git_dir, entries)
+  guard rev_parse(rfs, git_dir, "HEAD") is Some(head) else { abort("rev HEAD") }
+  let head_tree = history_commit_tree(db, rfs, head)
+  if index_tree == head_tree {
+    abort("STEP1: staged change not detected (index_tree == head_tree)")
+  }
+  if head.to_hex() != c2 {
+    abort("STEP1b: HEAD != c2")
+  }
+
+  // Step 2: list_branches tips.
+  let (head_ref, branches) = list_branches(rfs, git_dir)
+  let head_branch = match head_ref {
+    Branch(name) => name
+    Detached(_) => abort("STEP2: HEAD detached, expected branch")
+  }
+  if head_branch != "main" {
+    abort("STEP2b: head branch = \{head_branch}, want main")
+  }
+  let mut found_main = false
+  for b in branches {
+    if b.name == "main" {
+      found_main = true
+      if b.id != head {
+        abort("STEP2c: main id \{b.id.to_hex()} != HEAD \{head.to_hex()}")
+      }
+    }
+  }
+  if !found_main {
+    abort("STEP2d: main branch not in list_branches (\{branches.length()} branches)")
+  }
+
+  // Step 3: history_fixup produces an update for main.
+  let tips : Array[HistoryRefUpdate] = [
+    { refname: "refs/heads/main", old_id: head, new_id: head },
+  ]
+  let result = history_fixup(
+    db, ffs, rfs, git_dir, head, index_tree, head, tips,
+    HistoryEmptyAction::Drop, None,
+  )
+  if result.updates.length() != 1 {
+    abort("STEP3: updates = \{result.updates.length()}, want 1")
+  }
+  let rewritten = result.updates[0].new_id
+  // Step 4: rewritten commit carries the fix.
+  let content = hf_file_content(db, fs, rewritten, "file.txt")
+  if content != "content\nfix\n" {
+    abort("STEP4: rewritten file.txt = \{content}")
+  }
+  js_destroy_host(host)
+}
+
+///|
 fn hf_add(host : Int, paths : Array[String]) -> Unit {
   guard js_add_paths(host, "/repo", paths) is Ok(_) else { abort("add") }
 }
