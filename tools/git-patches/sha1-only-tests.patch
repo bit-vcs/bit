@@ -1,18 +1,3 @@
-From 17e1677a39d172bd6c7ba556cdda4f66c2511bb8 Mon Sep 17 00:00:00 2001
-From: mizchi <miz404@gmail.com>
-Date: Mon, 2 Feb 2026 00:57:02 +0900
-Subject: [PATCH] tests: gate sha256 subtests for moongit
-
----
- t/t0000-basic.sh       | 13 +++++++----
- t/t0001-init.sh        | 53 ++++++++++++++++++++++++++----------------
- t/t1500-rev-parse.sh   |  2 +-
- t/t5300-pack-object.sh |  8 +++++++
- t/t5700-protocol-v1.sh | 11 +++++----
- t/t5702-protocol-v2.sh |  2 +-
- t/test-lib.sh          |  4 ++++
- 7 files changed, 62 insertions(+), 31 deletions(-)
-
 diff --git a/t/t0000-basic.sh b/t/t0000-basic.sh
 index 2b63e1c86c..c73fdd4352 100755
 --- a/t/t0000-basic.sh
@@ -45,7 +30,7 @@ index 2b63e1c86c..c73fdd4352 100755
  
  test_expect_success 'test_bool_env' '
 diff --git a/t/t0001-init.sh b/t/t0001-init.sh
-index e4d32bb4d2..c4d1d7b81b 100755
+index e89feca544..0b6e393557 100755
 --- a/t/t0001-init.sh
 +++ b/t/t0001-init.sh
 @@ -522,10 +522,13 @@ test_expect_success 'init honors GIT_DEFAULT_HASH' '
@@ -156,15 +141,15 @@ index e4d32bb4d2..c4d1d7b81b 100755
  	test_must_fail git -C sha256 init --object-format=sha1
  '
 diff --git a/t/t1500-rev-parse.sh b/t/t1500-rev-parse.sh
-index 7739ab611b..11177eccf9 100755
+index 38067d95f7..fb731dd9f7 100755
 --- a/t/t1500-rev-parse.sh
 +++ b/t/t1500-rev-parse.sh
 @@ -208,7 +208,7 @@ test_expect_success 'rev-parse --show-object-format in repo' '
  '
  
  
--test_expect_success 'rev-parse --show-object-format in repo with compat mode' '
-+test_expect_success BIT_SHA256 'rev-parse --show-object-format in repo with compat mode' '
+-test_expect_success RUST 'rev-parse --show-object-format in repo with compat mode' '
++test_expect_success RUST,BIT_SHA256 'rev-parse --show-object-format in repo with compat mode' '
  	mkdir repo &&
  	(
  		sane_unset GIT_DEFAULT_HASH &&
@@ -231,7 +216,7 @@ index a73b4d4ff6..7e0c055e36 100755
  		clone "$HTTPD_URL/smart/sha256" sha256 2>log &&
  
 diff --git a/t/t5702-protocol-v2.sh b/t/t5702-protocol-v2.sh
-index f826ac46a5..ea99a138ba 100755
+index 9f6cf4142d..e2479e29f1 100755
 --- a/t/t5702-protocol-v2.sh
 +++ b/t/t5702-protocol-v2.sh
 @@ -314,7 +314,7 @@ test_expect_success 'clone propagates unborn HEAD from non-empty repo' '
@@ -244,10 +229,10 @@ index f826ac46a5..ea99a138ba 100755
  
  	echo sha256 >expect &&
 diff --git a/t/test-lib.sh b/t/test-lib.sh
-index 0fb76f7d11..204fa8913e 100644
+index ceefb99bff..e7f2048e4a 100644
 --- a/t/test-lib.sh
 +++ b/t/test-lib.sh
-@@ -1918,6 +1918,10 @@ test_lazy_prereq SHA1 '
+@@ -1978,6 +1978,10 @@ test_lazy_prereq SHA1 '
  	esac
  '
  
@@ -258,6 +243,3 @@ index 0fb76f7d11..204fa8913e 100644
  test_lazy_prereq DEFAULT_HASH_ALGORITHM '
  	test "$GIT_TEST_BUILTIN_HASH" = "$GIT_DEFAULT_HASH"
  '
--- 
-2.50.1 (Apple Git-155)
-

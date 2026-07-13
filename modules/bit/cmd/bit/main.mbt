@@ -1370,6 +1370,7 @@ async fn dispatch_known_command(
     "update-index" => handle_update_index(rest)
     "commit-tree" => handle_commit_tree(rest)
     "diff-tree" => handle_diff_tree(rest)
+    "last-modified" => handle_last_modified(rest)
     "mktree" => handle_mktree(rest)
     "mktag" => handle_mktag(rest)
     "check-ref-format" => handle_check_ref_format(rest)

@@ -51,7 +51,7 @@
 
           # Strip workspace-local deps so buildCachedRegistry only resolves
           # packages that actually exist on mooncakes.io.
-          bitMod = builtins.fromJSON (builtins.readFile ./modules/bit/moon.mod.json);
+          bitMod = (import ./nix/parse-moon-mod.nix { inherit (pkgs) lib; }) ./modules/bit/moon.mod;
           registryOnlyMod = bitMod // {
             deps = pkgs.lib.filterAttrs (
               name: _: !(pkgs.lib.hasPrefix "mizchi/bit_" name || pkgs.lib.hasPrefix "mizchi/bitx_" name)
