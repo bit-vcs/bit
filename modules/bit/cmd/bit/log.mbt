@@ -3857,6 +3857,7 @@ async fn log_emit_default_commit_entry(
   date_format : String,
   line_prefix : String,
   show_stat : Bool,
+  show_numstat : Bool,
   show_patch : Bool,
   show_raw : Bool,
   raw_detect_renames : Bool,
@@ -3908,7 +3909,7 @@ async fn log_emit_default_commit_entry(
   }
   log_emit_output("", true, line_prefix)
   log_emit_notes_for_commit(rfs, git_dir, db, entry.id, line_prefix)
-  if show_stat || show_patch {
+  if show_stat || show_patch || show_numstat {
     let diff_files = log_restrict_diff_files(
       diff_apply_rotate_skip_files(
         @bitdiff.diff_trees(rfs, git_dir, entry.parent_tree, entry.tree, db~),
@@ -3922,6 +3923,12 @@ async fn log_emit_default_commit_entry(
     if show_stat {
       let stat_lines = @bitdiff.diff_stat(diff_files)
       for line in stat_lines {
+        log_emit_output(line, true, line_prefix)
+      }
+      log_emit_output("", true, line_prefix)
+    }
+    if show_numstat {
+      for line in diff_format_numstat(diff_files) {
         log_emit_output(line, true, line_prefix)
       }
       log_emit_output("", true, line_prefix)
@@ -4054,6 +4061,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
   let mut all_refs = false
   let mut decorate_mode_override : LogDecorationDisplayMode? = None
   let mut show_stat = false
+  let mut show_numstat = false
   let mut show_patch = false
   let mut name_only = false
   let mut name_status = false
@@ -4203,6 +4211,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
       "--exclude-first-parent-only" => exclude_first_parent_only = true
       "--raw" => show_raw = true
       "--stat" => show_stat = true
+      "--numstat" => show_numstat = true
       "-p" | "--patch" => show_patch = true
       "--name-only" => name_only = true
       "--name-status" => name_status = true
@@ -4623,7 +4632,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
               rfs,
               git_dir,
               entry.new_id,
-              show_stat || show_patch || show_raw,
+              show_stat || show_patch || show_raw || show_numstat,
             ) {
             Some(log_entry) => {
               log_emit_default_commit_entry(
@@ -4634,6 +4643,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
                 date_format,
                 line_prefix,
                 show_stat,
+                show_numstat,
                 show_patch,
                 show_raw,
                 raw_detect_renames,
@@ -4650,7 +4660,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
                 pathspecs~,
                 full_diff~,
               )
-              if (show_stat || show_patch || show_raw) &&
+              if (show_stat || show_patch || show_raw || show_numstat) &&
                 reflog_index + 1 < entries.length() &&
                 emitted + 1 < max_count {
                 log_emit_output("", true, line_prefix)
@@ -5262,7 +5272,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
             rfs,
             git_dir,
             id,
-            show_stat || show_patch || show_raw || name_only || name_status,
+            show_stat || show_patch || show_raw || name_only || name_status || show_numstat,
           ) {
           Some(entry) => {
             if no_merges && entry.parent_count > 1 {
@@ -5312,7 +5322,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
             }
             log_emit_output("", true, line_prefix)
             log_emit_notes_for_commit(rfs, git_dir, db, entry.id, line_prefix)
-            if show_stat || show_patch {
+            if show_stat || show_patch || show_numstat {
               let diff_files = log_restrict_diff_files(
                 diff_apply_rotate_skip_files(
                   @bitdiff.diff_trees(
@@ -5332,6 +5342,12 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
               if show_stat {
                 let stat_lines = @bitdiff.diff_stat(diff_files)
                 for line in stat_lines {
+                  log_emit_output(line, true, line_prefix)
+                }
+                log_emit_output("", true, line_prefix)
+              }
+              if show_numstat {
+                for line in diff_format_numstat(diff_files) {
                   log_emit_output(line, true, line_prefix)
                 }
                 log_emit_output("", true, line_prefix)
@@ -5516,7 +5532,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
       },
       since_ts,
       until_ts,
-      show_stat || show_patch || show_raw || name_only || name_status,
+      show_stat || show_patch || show_raw || name_only || name_status || show_numstat,
       first_parent~,
       topo_order~,
       show_boundary~,
@@ -5731,11 +5747,11 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
         }
         // A trailing diff/stat/raw/name block (or notes) still needs its leading
         // blank; the inter-entry separator is handled before the next commit.
-        if show_stat || show_patch || show_raw || name_only || name_status {
+        if show_stat || show_patch || show_raw || name_only || name_status || show_numstat {
           log_emit_output("", true, line_prefix)
         }
         log_emit_notes_for_commit(rfs, git_dir, walk_db, entry.id, line_prefix)
-        if show_stat || show_patch {
+        if show_stat || show_patch || show_numstat {
           let diff_files = log_restrict_diff_files(
             diff_apply_rotate_skip_files(
               @bitdiff.diff_trees(
@@ -5755,6 +5771,12 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
           if show_stat {
             let stat_lines = @bitdiff.diff_stat(diff_files)
             for line in stat_lines {
+              log_emit_output(line, true, line_prefix)
+            }
+            log_emit_output("", true, line_prefix)
+          }
+          if show_numstat {
+            for line in diff_format_numstat(diff_files) {
               log_emit_output(line, true, line_prefix)
             }
             log_emit_output("", true, line_prefix)

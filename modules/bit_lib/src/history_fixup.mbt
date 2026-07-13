@@ -240,7 +240,7 @@ pub fn history_fixup(
     }
     if becomes_empty && empty is Abort {
       raise @bit.GitError::InvalidObject(
-        "fixup makes replayed commit \{c.to_hex()} empty",
+        "commit \{c.to_hex()} became empty after replay",
       )
     }
     let new_commit = @bit.Commit::new(
