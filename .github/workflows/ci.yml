@@ -186,6 +186,54 @@ jobs:
       - name: Smoke test
         run: test -x ./result/bin/bit
 
+  # TEMPORARY debug job: run t3453 verbosely through the bit shim to capture the
+  # actual stderr/diff of the failing history-fixup cases (native cannot be built
+  # locally due to the aarch64 codegen bug). Remove once the CLI is fixed.
+  t3453-debug:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-depth: 0
+      - name: Apply git test patches
+        run: tools/apply-git-test-patches.sh
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gettext libcurl4-openssl-dev libexpat1-dev
+      - name: Build git from source
+        run: |
+          cd third_party/git
+          make -j$(nproc)
+      - name: Install MoonBit CLI
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+      - name: Moon update
+        run: moon update
+      - name: Build bit
+        run: |
+          set -euo pipefail
+          moon build --target native --release modules/bit
+          bin_path=$(find _build/native -maxdepth 8 -type f -name 'bit.exe' | head -1)
+          cp "$bin_path" tools/git-shim/moon
+          chmod +x tools/git-shim/moon
+      - name: Run t3453 verbosely
+        run: |
+          real_git="$(pwd)/third_party/git/git"
+          exec_path="$(pwd)/third_party/git"
+          shim_dir="$(pwd)/tools/git-shim/bin"
+          echo "$real_git" > tools/git-shim/real-git-path
+          export SHIM_REAL_GIT="$real_git" SHIM_EXEC_PATH="$exec_path" \
+            SHIM_MOON="$(pwd)/tools/git-shim/moon" \
+            SHIM_CMDS="init add diff diff-files diff-index ls-files tag branch checkout switch commit log show reflog reset update-ref update-index status merge rebase clone push fetch pull mv notes stash rm submodule worktree config show-ref for-each-ref rev-parse symbolic-ref cherry-pick remote cat-file hash-object ls-tree write-tree commit-tree receive-pack upload-pack pack-objects index-pack format-patch describe gc clean sparse-checkout restore blame grep shell rev-list bisect diff-tree read-tree fsck am apply bundle cherry revert prune pack-refs mktree shortlog verify-pack unpack-objects maintenance range-diff show-branch repack multi-pack-index pack-redundant send-pack request-pull merge-base var stripspace ls-remote fmt-merge-msg patch-id count-objects name-rev update-server-info check-ref-format mktag interpret-trailers column merge-tree merge-file fast-import fast-export verify-tag fetch-pack difftool rerere mailinfo archive check-attr check-ignore show-index get-tar-commit-id verify-commit annotate last-modified history" \
+            SHIM_STRICT=1 GIT_TEST_INSTALLED="$shim_dir" GIT_TEST_EXEC_PATH="$exec_path"
+          cd third_party/git/t
+          # -v: verbose (show commands + output); -x: trace; keep going on failure.
+          ./t3453-history-fixup.sh -v -x 2>&1 | tail -300 || true
+
   git-compat:
     runs-on: ubuntu-latest
     strategy:
