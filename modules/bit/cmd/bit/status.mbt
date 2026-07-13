@@ -80,6 +80,7 @@ async fn handle_status(args : Array[String]) -> Unit raise Error {
   let mut porcelain = false
   let mut short = false
   let mut show_branch = false
+  let mut hide_untracked = false
   for arg in args {
     match arg {
       "--porcelain" | "--porcelain=v1" => porcelain = true
@@ -89,6 +90,13 @@ async fn handle_status(args : Array[String]) -> Unit raise Error {
         short = true
         show_branch = true
       }
+      "--untracked-files=no" | "-uno" | "--untracked-files=n" =>
+        hide_untracked = true
+      "--untracked-files=all"
+      | "--untracked-files=normal"
+      | "-uall"
+      | "-unormal"
+      | "--untracked-files" => ()
       _ if arg.has_prefix("-") => warn_unimplemented_arg("status", arg)
       _ => ()
     }
@@ -118,6 +126,9 @@ async fn handle_status(args : Array[String]) -> Unit raise Error {
     }
     let lines = @bitlib.status_porcelain(fs, root)
     for line in lines {
+      if hide_untracked && line.has_prefix("??") {
+        continue
+      }
       print_line(line)
     }
   } else {

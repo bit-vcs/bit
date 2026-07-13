@@ -5092,6 +5092,7 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
           let diff_files = @bitdiff.diff_trees(
             rfs, git_dir, old_tree, entry.tree, db~,
           )
+          diff_files.sort_by(fn(a, b) { String::compare(a.path, b.path) })
           if show_numstat {
             for line in diff_format_numstat(diff_files) {
               formatted_lines.push(line)
