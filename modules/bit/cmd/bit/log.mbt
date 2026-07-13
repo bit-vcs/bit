@@ -5081,6 +5081,21 @@ async fn handle_log(args : Array[String]) -> Unit raise Error {
           )
         }
         formatted_lines.push(rendered)
+        if show_numstat || show_stat {
+          let diff_files = @bitdiff.diff_trees(
+            rfs, git_dir, entry.parent_tree, entry.tree, db~,
+          )
+          if show_numstat {
+            for line in diff_format_numstat(diff_files) {
+              formatted_lines.push(line)
+            }
+          }
+          if show_stat {
+            for line in @bitdiff.diff_stat(diff_files) {
+              formatted_lines.push(line)
+            }
+          }
+        }
         if !entry.boundary {
           emitted += 1
         }
