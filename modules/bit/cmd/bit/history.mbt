@@ -48,7 +48,7 @@ async fn handle_history_fixup(args : Array[String]) -> Unit raise Error {
             "abort" => @bitlib.HistoryEmptyAction::Abort
             _ =>
               raise @bitcore.GitError::InvalidObject(
-                "invalid --empty value: \{v}",
+                "unrecognized value for --empty: \{v}",
               )
           }
         } else if arg.has_prefix("--update-refs=") {
@@ -168,11 +168,16 @@ async fn handle_history_fixup(args : Array[String]) -> Unit raise Error {
 
   // Reset the index to the new HEAD so staged changes are consumed, while
   // leaving unstaged worktree changes in place (mixed reset semantics).
+  // Best-effort: a failure here must not abort the (already applied) rewrite.
   match new_head {
     Some(nh) =>
-      ignore(
-        @bitlib.reset(ffs, rfs, root, nh.to_hex(), @bitlib.ResetMode::Mixed),
-      )
+      try
+        ignore(
+          @bitlib.reset(ffs, rfs, root, nh.to_hex(), @bitlib.ResetMode::Mixed),
+        )
+      catch {
+        _ => ()
+      }
     None => ()
   }
 }
