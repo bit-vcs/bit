@@ -137,8 +137,21 @@ async fn handle_history_fixup(args : Array[String]) -> Unit raise Error {
   }
 
   let reedit_message : String? = if reedit {
-    // Non-interactive: keep the original message (editor is not available here).
-    None
+    // Open the target's message in the editor and use whatever comes back.
+    let orig_msg = history_commit_message_cmd(db, rfs, target)
+    let msg_path = git_dir + "/COMMIT_EDITMSG"
+    ffs.write_string(msg_path, orig_msg)
+    match resolve_commit_editor() {
+      Some(editor) => {
+        let code = run_editor_on_path(editor, msg_path)
+        if code != 0 {
+          raise @bitcore.GitError::InvalidObject("editor exited with \{code}")
+        }
+        let edited = decode_bytes(rfs.read_file(msg_path))
+        Some(history_clean_editmsg(edited))
+      }
+      None => None
+    }
   } else {
     None
   }
@@ -197,6 +210,57 @@ async fn handle_history_fixup(args : Array[String]) -> Unit raise Error {
         _ => ()
       }
     None => ()
+  }
+}
+
+///|
+///|
+fn history_is_blank_line(s : String) -> Bool {
+  for c in s {
+    if c != ' ' && c != '\t' && c != '\r' {
+      return false
+    }
+  }
+  true
+}
+
+///|
+/// Extract a commit's message (everything after the header's blank line).
+fn history_commit_message_cmd(
+  db : @bitlib.ObjectDb,
+  rfs : &@bitcore.RepoFileSystem,
+  commit_id : @bitcore.ObjectId,
+) -> String raise Error {
+  let obj = db.get(rfs, commit_id)
+  guard obj is Some(o) && o.obj_type == @bitcore.ObjectType::Commit else {
+    raise @bitcore.GitError::InvalidObject("not a commit \{commit_id.to_hex()}")
+  }
+  let text = decode_bytes(o.data)
+  match text.find("\n\n") {
+    Some(idx) => String::unsafe_substring(text, start=idx + 2, end=text.length())
+    None => ""
+  }
+}
+
+///|
+/// Strip `#` comment lines and trailing blank lines from an edited message.
+fn history_clean_editmsg(raw : String) -> String {
+  let out : Array[String] = []
+  for line_view in raw.split("\n") {
+    let line = line_view.to_owned()
+    if line.has_prefix("#") {
+      continue
+    }
+    out.push(line)
+  }
+  // Drop trailing blank lines.
+  while out.length() > 0 && history_is_blank_line(out[out.length() - 1]) {
+    out.pop() |> ignore
+  }
+  if out.length() == 0 {
+    ""
+  } else {
+    out.join("\n") + "\n"
   }
 }
 
