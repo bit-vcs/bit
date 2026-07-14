@@ -4,7 +4,7 @@
 pub(all) enum HashAlgorithm {
   Sha1
   Sha256
-} derive(Eq)
+} derive(Eq, Debug)
 
 ///|
 pub fn HashAlgorithm::hash_size(self : HashAlgorithm) -> Int {
