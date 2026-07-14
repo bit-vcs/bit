@@ -1,17 +1,17 @@
 name = "mizchi/bitx_hub"
 
-version = "0.43.1"
+version = "0.44.0"
 
 import {
-  "mizchi/bit_core@0.43.1",
-  "mizchi/bit_object@0.43.1",
-  "mizchi/bit_repo@0.43.1",
-  "mizchi/bit_io@0.43.1",
-  "mizchi/bit_io_native@0.43.1",
-  "mizchi/bit_lib@0.43.1",
-  "mizchi/bit_types@0.43.1",
-  "mizchi/bit_pack@0.43.1",
-  "mizchi/bit_protocol@0.43.1",
+  "mizchi/bit_core@0.44.0",
+  "mizchi/bit_object@0.44.0",
+  "mizchi/bit_repo@0.44.0",
+  "mizchi/bit_io@0.44.0",
+  "mizchi/bit_io_native@0.44.0",
+  "mizchi/bit_lib@0.44.0",
+  "mizchi/bit_types@0.44.0",
+  "mizchi/bit_pack@0.44.0",
+  "mizchi/bit_protocol@0.44.0",
   "mizchi/x@0.2.0",
   "moonbitlang/async@0.19.4",
   "moonbitlang/x@0.4.40",

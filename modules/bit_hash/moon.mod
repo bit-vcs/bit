@@ -1,6 +1,6 @@
 name = "mizchi/bit_hash"
 
-version = "0.43.1"
+version = "0.44.0"
 
 import {
   "mizchi/simd@0.4.1",
