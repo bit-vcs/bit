@@ -38,7 +38,7 @@ pub(all) enum RefValue {
   Val1(@object.ObjectId)
   Val2(@object.ObjectId, @object.ObjectId)
   Symref(String)
-} derive(Eq)
+} derive(Eq, Debug)
 
 ///|
 pub(all) struct RefRecord {

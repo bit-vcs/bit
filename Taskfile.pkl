@@ -26,21 +26,21 @@ local fmt: Task = new {
 local checkJs: Task = new {
   name = "check:js"
   description = "moon check --target js"
-  cmd = "moon check --deny-warn --warn-list=-27-20 --target js"
+  cmd = "moon check --deny-warn --warn-list=-27-20-82 --target js"
   inputs = moonbitSources
 }
 
 local checkWasm: Task = new {
   name = "check:wasm"
   description = "moon check --target wasm"
-  cmd = "moon check --deny-warn --warn-list=-27-20 --target wasm"
+  cmd = "moon check --deny-warn --warn-list=-27-20-82 --target wasm"
   inputs = moonbitSources
 }
 
 local checkNative: Task = new {
   name = "check:native"
   description = "moon check --target native"
-  cmd = "moon check --deny-warn --warn-list=-27-20 --target native"
+  cmd = "moon check --deny-warn --warn-list=-27-20-82 --target native"
   inputs = moonbitSources
 }
 

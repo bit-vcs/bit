@@ -1,15 +1,15 @@
 name = "mizchi/bitx_workspace"
 
-version = "0.43.1"
+version = "0.44.0"
 
 import {
-  "mizchi/bit_core@0.43.1",
-  "mizchi/bit_object@0.43.1",
-  "mizchi/bit_lib@0.43.1",
-  "mizchi/bit_types@0.43.1",
-  "mizchi/bit_fingerprint@0.43.1",
-  "mizchi/bit_osfs@0.43.1",
-  "mizchi/bit_utils@0.43.1",
+  "mizchi/bit_core@0.44.0",
+  "mizchi/bit_object@0.44.0",
+  "mizchi/bit_lib@0.44.0",
+  "mizchi/bit_types@0.44.0",
+  "mizchi/bit_fingerprint@0.44.0",
+  "mizchi/bit_osfs@0.44.0",
+  "mizchi/bit_utils@0.44.0",
   "mizchi/bitflow@0.4.1",
   "moonbitlang/async@0.19.4",
   "moonbitlang/x@0.4.40",

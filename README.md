@@ -16,6 +16,31 @@ curl -fsSL https://raw.githubusercontent.com/mizchi/bit-vcs/main/install.sh | ba
 moon install mizchi/bit
 ```
 
+### Nix
+
+The repository is a flake, so no cloning is required:
+
+```bash
+# Run without installing
+nix run github:bit-vcs/bit -- --version
+
+# Pin a released version
+nix run github:bit-vcs/bit/v0.44.0 -- --version
+
+# Install into your profile
+nix profile install github:bit-vcs/bit
+```
+
+To add `bit` to another flake, use the exported overlay or package:
+
+```nix
+{
+  inputs.bit.url = "github:bit-vcs/bit";
+  # then: inputs.bit.overlays.default  (adds pkgs.bit)
+  #   or: inputs.bit.packages.${system}.bit
+}
+```
+
 ## Shell Completion
 
 ```bash
