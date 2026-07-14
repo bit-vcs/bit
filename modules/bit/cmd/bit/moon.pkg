@@ -168,6 +168,7 @@ options(
     "handlers_shell_wbtest.mbt": [ "native" ],
     "handlers_subdir_wbtest.mbt": [ "native" ],
     "hash_object.mbt": [ "native" ],
+    "history.mbt": [ "native" ],
     "hash_object_wbtest.mbt": [ "native" ],
     "helpers.mbt": [ "native" ],
     "helpers_js.mbt": [ "js" ],
