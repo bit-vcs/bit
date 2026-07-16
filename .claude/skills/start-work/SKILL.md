@@ -9,6 +9,13 @@ Coordinate coding sessions using `bit issue`. Each session declares its Target F
 
 This protocol works with any workflow — single-repo, worktrees, or branches.
 
+Issue storage/sync details and label conventions live in the **bit-issue** skill. In fresh clones (e.g. Claude Code web sessions) fetch the issue notes first, and push them when you update issues:
+
+```bash
+git fetch origin '+refs/notes/bit-hub:refs/notes/bit-hub'   # before reading
+git push origin 'refs/notes/bit-hub:refs/notes/bit-hub'     # after writing
+```
+
 ## Decide: New Session or Resume
 
 ```bash
