@@ -372,7 +372,7 @@ Timestamps are Unix epoch seconds. `parent_id` is `null` for top-level issues.
 - **`comment list` is oldest-first**: Comments are returned in chronological order (oldest first).
 - **Issues don't sync on plain `git push` unless refspecs are configured**: With bit ≤ v0.44.0, non-interactive `bit issue init` never applies the refspecs (fixed after v0.44.0 for explicit init). Use the explicit fetch/push commands in [Syncing issues](#syncing-issues) when unsure.
 - **`GIT_CONFIG_*` env vars break `bit issue` on bit ≤ v0.44.0**: The shim delegates to real git when config-injection env vars are present (fixed after v0.44.0). Pass `--no-git-fallback` when the binary may be older (see top of this doc).
-- **CLI `--help` misses some flags**: `--format json`, `--body-append`, and `--label` filtering on `list` work but are not shown in `--help`. This skill doc is the authoritative reference.
+- **CLI `--help` misses some flags on bit ≤ v0.44.0**: `--format json`, `--body-append`, and `--label` filtering on `list` work but are not shown in `--help` (fixed after v0.44.0). This skill doc is the authoritative reference.
 - **`dep` is informational only**: `close` does not check for open blockers.
 
 ## Data Model

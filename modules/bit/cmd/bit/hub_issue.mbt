@@ -4,7 +4,7 @@ fn print_hub_issue_usage() -> Unit {
   println("")
   println("Subcommands:")
   println(
-    "  list [--state <open|closed> | --open | --closed] [--limit <n>] [--all | --tree | --parent <id>]",
+    "  list [--state <open|closed> | --open | --closed] [--label <name>...] [--limit <n>] [--all | --tree | --parent <id>] [--format json]",
   )
   println(
     "  import [--repo <owner/repo>] [--state <open|closed|all>] [--limit <n>]",
@@ -12,10 +12,10 @@ fn print_hub_issue_usage() -> Unit {
   println("  get <id>")
   println("  view <id>                             (alias: get)")
   println(
-    "  create --title <title> [--body <body>] [--label <label>...] [--assignee <user>...]",
+    "  create --title <title> [--body <body>] [--label <label>...] [--assignee <user>...] [--parent <id>] [--link <url>] [--repo <alias>]",
   )
   println(
-    "  update <id> [--title <title>] [--body <body>] [--label <label>...] [--assignee <user>...]",
+    "  update <id> [--title <title>] [--body <body>] [--body-append <text>] [--label <label>...] [--assignee <user>...]",
   )
   println("  edit <id> ...                         (alias: update)")
   println("  close <id>")
@@ -35,7 +35,9 @@ fn print_hub_issue_usage() -> Unit {
     "  claims [--stale-hours <n>] [--remote <url>] [--auth-token <token>]",
   )
   println("  watch [--stale-hours <n>] [--remote <url>] [--auth-token <token>]")
-  println("  search [<query>...] [<options>]")
+  println(
+    "  search [<query>...] [--type <issue|issue-comment>] [--state <s> | --open | --closed] [--author <a>] [--label <name>] [--limit <n>] [--format json]",
+  )
   println("  note <subcommand> [<args>]")
   println("  start <ref>                           (add to working set)")
   println("  stop <ref>                            (remove from working set)")
