@@ -7,7 +7,7 @@ description: "Manage tasks with bit issue — Git-native issue tracking without 
 
 `bit issue` is a Git-native issue tracker. Issues are stored as Git notes (`refs/notes/bit-hub`) inside the repository — no external service required.
 
-**Agent environments: invoke as `bit --no-git-fallback issue …`.** When any `GIT_CONFIG_*` environment variable is set (Claude Code sessions set `GIT_CONFIG_COUNT`/`GIT_CONFIG_KEY_n`), the `bit` shim delegates to real git, which fails with `git: 'issue' is not a git command`. `--no-git-fallback` forces native handling. Examples below omit the flag for brevity.
+**Agent environments (bit ≤ v0.44.0): invoke as `bit --no-git-fallback issue …`.** When any `GIT_CONFIG_*` environment variable is set (Claude Code sessions set `GIT_CONFIG_COUNT`/`GIT_CONFIG_KEY_n`), the `bit` shim delegates to real git, which fails with `git: 'issue' is not a git command`. `--no-git-fallback` forces native handling. Fixed after v0.44.0 (bit-only commands never delegate), but keep the flag when the installed binary may be older. Examples below omit the flag for brevity.
 
 ## Agent Workflow (TL;DR)
 
@@ -28,7 +28,7 @@ bit issue init
 
 Creates hub metadata and `.git/hub/policy.toml`, and offers to configure `refs/notes/bit-hub` refspecs on origin so issues travel with `git push`/`git fetch`.
 
-**Agent gotcha**: the refspec configuration is an interactive `[y/N]` prompt, gated by TTY (`BIT_HUB_INIT_PROMPT=1` forces the prompt, `=0` suppresses it). In non-interactive sessions the prompt is skipped and **the refspecs are NOT configured** — metadata is initialized, but issues will not sync automatically. Use the explicit refspec commands below instead.
+**Agent gotcha (bit ≤ v0.44.0)**: the refspec configuration is an interactive `[y/N]` prompt, gated by TTY (`BIT_HUB_INIT_PROMPT=1` forces the prompt, `=0` suppresses it). In non-interactive sessions the prompt is skipped and **the refspecs are NOT configured** — metadata is initialized, but issues will not sync automatically. Fixed after v0.44.0: an explicit `bit issue init` applies the refspecs directly in non-interactive sessions (implicit auto-init on first `issue create` still skips them). With older binaries, use the explicit refspec commands below instead.
 
 ## Syncing issues
 
@@ -42,7 +42,10 @@ git fetch origin '+refs/notes/bit-hub:refs/notes/bit-hub'
 git push origin 'refs/notes/bit-hub:refs/notes/bit-hub'
 ```
 
-Caveat: the notes ref is a single history — if two machines update issues concurrently, the push is rejected as non-fast-forward (and a `+` fetch overwrites local-only changes). Fetch before you write, push soon after. For real multi-machine coordination use the **relay-sync** skill.
+Caveats:
+
+- The notes ref is a single history — if two machines update issues concurrently, the push is rejected as non-fast-forward, and a `+` fetch **overwrites local-only changes** (recover via `git fsck --unreachable` if this bites). Fetch **before** you write locally, not after, and push soon after writing. For real multi-machine coordination use the **relay-sync** skill.
+- Claude Code web sessions can usually **fetch** the notes ref but get HTTP 403 on **push** (the session proxy only allows pushing the designated branch). Record issue updates locally anyway and hand them off: `git bundle create issues.bundle refs/notes/bit-hub`, send the bundle to the user, who imports with `git fetch <bundle> '+refs/notes/bit-hub:refs/notes/bit-hub'` and pushes from their machine.
 
 ## Label conventions
 
@@ -161,7 +164,7 @@ bit issue dep list <id>                     # show blockers
 bit issue dep remove <id> <blocked-by-id>   # remove dependency
 ```
 
-`get` shows a `blocked-by <id>` line. Dependencies are informational only — `close` does **not** check for open blockers, and `list`/JSON output do not surface them. Check `dep list` before picking up an issue.
+`get` shows a `blocked-by <id>` line, and JSON output (after v0.44.0) includes a `blocked_by` array. Dependencies are informational only — `close` does **not** check for open blockers, and plain `list` lines do not mark blocked issues. Check `dep list` (or the JSON field) before picking up an issue.
 
 ## Search
 
@@ -350,6 +353,7 @@ bit issue watch                         # stream claim/unclaim events in real-ti
   "labels": ["bug", "P1"],
   "assignees": [],
   "linked_prs": [],
+  "blocked_by": [],
   "parent_id": null
 }]
 ```
@@ -366,8 +370,8 @@ Timestamps are Unix epoch seconds. `parent_id` is `null` for top-level issues.
 - **Closing a parent does not close children**: Each sub-issue must be closed individually.
 - **`close` is idempotent but messages differ**: First call prints `Closed issue #<id>`, subsequent calls print `Issue #<id> is already closed`. Both are success (exit 0).
 - **`comment list` is oldest-first**: Comments are returned in chronological order (oldest first).
-- **Issues don't sync on plain `git push` unless refspecs are configured**: In non-interactive sessions `bit issue init` never applies the refspecs. Use the explicit fetch/push commands in [Syncing issues](#syncing-issues).
-- **`GIT_CONFIG_*` env vars break `bit issue`**: The shim delegates to real git when config-injection env vars are present. Always pass `--no-git-fallback` in agent environments (see top of this doc).
+- **Issues don't sync on plain `git push` unless refspecs are configured**: With bit ≤ v0.44.0, non-interactive `bit issue init` never applies the refspecs (fixed after v0.44.0 for explicit init). Use the explicit fetch/push commands in [Syncing issues](#syncing-issues) when unsure.
+- **`GIT_CONFIG_*` env vars break `bit issue` on bit ≤ v0.44.0**: The shim delegates to real git when config-injection env vars are present (fixed after v0.44.0). Pass `--no-git-fallback` when the binary may be older (see top of this doc).
 - **CLI `--help` misses some flags**: `--format json`, `--body-append`, and `--label` filtering on `list` work but are not shown in `--help`. This skill doc is the authoritative reference.
 - **`dep` is informational only**: `close` does not check for open blockers.
 
