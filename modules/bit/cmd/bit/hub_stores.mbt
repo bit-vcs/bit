@@ -295,6 +295,28 @@ async fn print_hub_init_metadata_prompt(
 }
 
 ///|
+async fn print_hub_init_sync_applied(
+  command_name : String,
+  plan : HubOriginSyncPlan,
+) -> Unit {
+  eprint_line(
+    "bit \{command_name}: configured local git sync for hub metadata on 'origin'",
+  )
+  if plan.add_fetch_notes {
+    eprint_line("  remote.origin.fetch += " + hub_notes_fetch_refspec())
+  }
+  if plan.add_default_push_refspec {
+    eprint_line("  remote.origin.push += " + hub_default_push_refspec())
+    eprint_line(
+      "  note: this makes plain `git push origin` use explicit refspecs",
+    )
+  }
+  if plan.add_push_notes {
+    eprint_line("  remote.origin.push += " + hub_notes_push_refspec())
+  }
+}
+
+///|
 async fn print_hub_init_sync_prompt(
   command_name : String,
   plan : HubOriginSyncPlan,
@@ -350,6 +372,14 @@ async fn ensure_hub_initialized(
     return ()
   }
   if !interactive {
+    // Explicit `bit issue init` / `bit pr init` in a non-interactive session
+    // (CI, agents): apply the sync config directly — prompting is impossible,
+    // and skipping silently would leave hub metadata unsynced even though the
+    // user asked for init. Implicit auto-init keeps skipping as before.
+    if explicit {
+      apply_hub_origin_sync_plan(fs, git_dir, plan)
+      print_hub_init_sync_applied(command_name, plan)
+    }
     return ()
   }
   print_hub_init_sync_prompt(command_name, plan)

@@ -93,6 +93,20 @@ test "main: config and status stay native without config injection" {
 }
 
 ///|
+test "main: bit-only commands stay native under config injection" {
+  let prev = @sys.get_env_var("GIT_CONFIG_PARAMETERS")
+  @sys.set_env_var("GIT_CONFIG_PARAMETERS", "'core.editor'='vim'")
+  for cmd in ["issue", "pr", "hub", "relay", "workspace", "ws", "hq"] {
+    let opts = parse_global_options(["bit", cmd, "list"])
+    assert_false(should_delegate_to_real_git(["bit", cmd, "list"], opts))
+  }
+  match prev {
+    Some(value) => @sys.set_env_var("GIT_CONFIG_PARAMETERS", value)
+    None => @sys.unset_env_var("GIT_CONFIG_PARAMETERS")
+  }
+}
+
+///|
 test "main: config and status still delegate under config injection" {
   let prev = @sys.get_env_var("GIT_CONFIG_PARAMETERS")
   @sys.set_env_var("GIT_CONFIG_PARAMETERS", "'core.editor'='vim'")
