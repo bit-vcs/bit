@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# The new native backend exceeds moonc's layout limit for cmd/bit tests.
-# Match CI by using the classic backend with a system C compiler and shards.
+# cmd/bit's full whitebox suite exceeds the new backend's layout limit. Use
+# the classic backend with the system C compiler, matching the sharded CI job.
 unset MOONBIT_NEW_NATIVE
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  # Keep the linker target aligned with the SDK used to compile MoonBit C stubs.
+  export MACOSX_DEPLOYMENT_TARGET="$(xcrun --sdk macosx --show-sdk-platform-version)"
+fi
 if [[ -z "${MOON_CC:-}" ]]; then
   if [[ "$(uname -s)" == "Darwin" ]]; then
     export MOON_CC=/usr/bin/clang
