@@ -1,6 +1,6 @@
 name = "mizchi/bit_diff3"
 
-version = "0.44.0"
+version = "0.45.0"
 
 repository = "https://github.com/mizchi/bit-vcs"
 

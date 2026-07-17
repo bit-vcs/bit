@@ -1,16 +1,16 @@
 name = "mizchi/bit_diff"
 
-version = "0.44.0"
+version = "0.45.0"
 
 import {
-  "mizchi/bit_core@0.44.0",
-  "mizchi/bit_diff_core@0.44.0",
-  "mizchi/bit_io@0.44.0",
-  "mizchi/bit_lib@0.44.0",
-  "mizchi/bit_object@0.44.0",
-  "mizchi/bit_repo@0.44.0",
-  "mizchi/bit_types@0.44.0",
-  "mizchi/bit_utils@0.44.0",
+  "mizchi/bit_core@0.45.0",
+  "mizchi/bit_diff_core@0.45.0",
+  "mizchi/bit_io@0.45.0",
+  "mizchi/bit_lib@0.45.0",
+  "mizchi/bit_object@0.45.0",
+  "mizchi/bit_repo@0.45.0",
+  "mizchi/bit_types@0.45.0",
+  "mizchi/bit_utils@0.45.0",
 }
 
 repository = "https://github.com/mizchi/bit-vcs"
