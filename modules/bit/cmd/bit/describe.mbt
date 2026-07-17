@@ -114,7 +114,7 @@ fn get_all_tags(
   git_dir : String,
   include_lightweight : Bool,
 ) -> Map[String, @bitcore.ObjectId] raise Error {
-  let tags : Map[String, @bitcore.ObjectId] = {}
+  let tags : Map[String, @bitcore.ObjectId] = Map([])
   let tags_dir = git_dir + "/refs/tags"
   if !rfs.is_dir(tags_dir) {
     return tags
@@ -205,7 +205,7 @@ fn filter_tags(
   if match_patterns.length() == 0 && exclude_patterns.length() == 0 {
     return tags
   }
-  let filtered : Map[String, @bitcore.ObjectId] = {}
+  let filtered : Map[String, @bitcore.ObjectId] = Map([])
   for name, cid in tags {
     let included = match_patterns.length() == 0 ||
       matches_any(match_patterns, name)
@@ -226,7 +226,7 @@ fn find_closest_tag(
   // BFS from target to find closest tag
   // Queue entries: (commit_id, distance)
   let db = @bitlib.ObjectDb::load(rfs, git_dir)
-  let visited : Map[String, Bool] = {}
+  let visited : Map[String, Bool] = Map([])
   let queue : Array[(@bitcore.ObjectId, Int)] = [(target, 0)]
   while queue.length() > 0 {
     // Dequeue from front (FIFO for BFS)

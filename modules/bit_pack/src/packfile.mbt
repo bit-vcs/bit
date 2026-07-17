@@ -678,7 +678,7 @@ pub fn create_packfile_with_delta_stats_compression(
   // Pack each object with sliding window for delta base selection.
   // Window keeps recent objects of same type for better delta matches.
   let mut offset = 12
-  let window_by_type : Map[Int, Array[DeltaWindowEntry]] = {}
+  let window_by_type : Map[Int, Array[DeltaWindowEntry]] = Map([])
   let window_size = 10
   let mut delta_count = 0
   for obj in objects {
@@ -846,7 +846,7 @@ pub fn create_packfiles_with_size_limit(
   write_pack_header(result)
   let mut offset = 12
   let mut nr_written = 0
-  let window_by_type : Map[Int, Array[DeltaWindowEntry]] = {}
+  let window_by_type : Map[Int, Array[DeltaWindowEntry]] = Map([])
   for obj in objects {
     let key = obj.obj_type.to_packfile_type()
     let entries = match window_by_type.get(key) {
@@ -1014,7 +1014,7 @@ pub fn create_packfile_with_delta_stats_compression_reuse(
   // Pack each object with sliding window delta search
   let window_size = if window > 0 { window } else { 1 }
   let mut offset = 12
-  let window_by_type : Map[Int, Array[DeltaWindowEntry]] = {}
+  let window_by_type : Map[Int, Array[DeltaWindowEntry]] = Map([])
   let mut delta_count = 0
   for obj in sorted {
     let obj_offset = offset

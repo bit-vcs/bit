@@ -679,7 +679,7 @@ fn js_resolve_git_dir(
   root : String,
 ) -> String raise @bit.GitError {
   let git_path = join_path(root, ".git")
-  if fs.is_file(git_path) {
+  if @bit.RepoFileSystem::is_file(fs, git_path) {
     resolve_gitdir(fs, git_path)
   } else {
     resolve_worktree_git_dir(fs, root)
@@ -869,7 +869,7 @@ fn js_signature_lines(signature : String) -> Array[String] raise @bit.GitError {
   let lines : Array[String] = []
   let normalized = js_normalize_newlines(signature)
   for line_view in normalized.split("\n") {
-    lines.push(line_view.to_string())
+    lines.push(line_view.to_owned())
   }
   while lines.length() > 0 && lines[lines.length() - 1] == "" {
     ignore(lines.pop())
@@ -1204,13 +1204,13 @@ pub fn js_status(host_id : Int, root : String) -> Result[Status, String] {
   js_wrap_error(() => {
     let git_dir = js_resolve_git_dir(fs, root)
     let entries = read_index_entries(fs, git_dir)
-    let index_map : Map[String, IndexEntry] = {}
+    let index_map : Map[String, IndexEntry] = Map([])
     for entry in entries {
       index_map[entry.path] = entry
     }
     let files = list_working_files(fs, root)
     files.sort()
-    let visited : Map[String, Bool] = {}
+    let visited : Map[String, Bool] = Map([])
     let untracked : Array[String] = []
     let unstaged_modified : Array[String] = []
     for rel_path in files {
@@ -1235,17 +1235,17 @@ pub fn js_status(host_id : Int, root : String) -> Result[Status, String] {
         continue
       }
       let abs_path = join_path(root, entry.path)
-      if !fs.is_file(abs_path) {
+      if !@bit.RepoFileSystem::is_file(fs, abs_path) {
         unstaged_deleted.push(entry.path)
       }
     }
-    let staged_index_map : Map[String, IndexEntry] = {}
+    let staged_index_map : Map[String, IndexEntry] = Map([])
     for entry in entries {
       staged_index_map[entry.path] = entry
     }
     let staged_modified : Array[String] = []
     let staged_deleted : Array[String] = []
-    let skip_worktree_paths : Map[String, Bool] = {}
+    let skip_worktree_paths : Map[String, Bool] = Map([])
     collect_staged_changes_from_head(
       fs, git_dir, staged_index_map, skip_worktree_paths, staged_modified, staged_deleted,
     )
@@ -1642,7 +1642,7 @@ pub fn js_fsck(host_id : Int, root : String) -> Result[JsFsckResult, String] {
     }
     {
       errors: fsck_result.errors,
-      reachable: fsck_result.reachable.size(),
+      reachable: fsck_result.reachable.length(),
       missing,
       root_commits: fsck_result.root_commits,
       tag_objects: fsck_result.tag_objects,
@@ -2510,11 +2510,19 @@ fn js_write_clone_remote_tracking_ref(
     Some(branch) => {
       let remote_ref = "refs/remotes/origin/" + branch
       let remote_ref_path = join_path(git_dir, remote_ref)
-      fs.mkdir_p(rebase_parent_dir(remote_ref_path))
-      fs.write_string(remote_ref_path, commit_id.to_hex() + "\n")
+      @bit.FileSystem::mkdir_p(fs, rebase_parent_dir(remote_ref_path))
+      @bit.FileSystem::write_string(
+        fs,
+        remote_ref_path,
+        commit_id.to_hex() + "\n",
+      )
       let remote_head_path = join_path(git_dir, "refs/remotes/origin/HEAD")
-      fs.mkdir_p(rebase_parent_dir(remote_head_path))
-      fs.write_string(remote_head_path, "ref: " + remote_ref + "\n")
+      @bit.FileSystem::mkdir_p(fs, rebase_parent_dir(remote_head_path))
+      @bit.FileSystem::write_string(
+        fs,
+        remote_head_path,
+        "ref: " + remote_ref + "\n",
+      )
       js_set_clone_branch_tracking(fs, git_dir, branch)
     }
     None => ()
@@ -2583,7 +2591,7 @@ pub async fn js_clone_remote(
           )
           let objects = @pack.parse_packfile(pack)
           let git_dir = join_path(root, ".git")
-          fs.mkdir_p(join_path(git_dir, "objects/pack"))
+          @bit.FileSystem::mkdir_p(fs, join_path(git_dir, "objects/pack"))
           @pack.write_packfile_with_index(fs, git_dir, pack, objects)
           let store = @bit.ObjectStore::from_pack(objects)
           @bit.materialize_clone_to_fs(
@@ -2683,13 +2691,18 @@ pub async fn js_fetch_remote(
           },
         )
         let objects = @pack.parse_packfile(pack)
-        fs.mkdir_p(join_path(git_dir, "objects/pack"))
+        @bit.FileSystem::mkdir_p(fs, join_path(git_dir, "objects/pack"))
         @pack.write_packfile_with_index(fs, git_dir, pack, objects)
         let remote_ref = js_remote_tracking_refname(refname)
         let remote_ref_path = join_path(git_dir, remote_ref)
-        fs.mkdir_p(rebase_parent_dir(remote_ref_path))
-        fs.write_string(remote_ref_path, commit_id.to_hex() + "\n")
-        fs.write_string(
+        @bit.FileSystem::mkdir_p(fs, rebase_parent_dir(remote_ref_path))
+        @bit.FileSystem::write_string(
+          fs,
+          remote_ref_path,
+          commit_id.to_hex() + "\n",
+        )
+        @bit.FileSystem::write_string(
+          fs,
           join_path(git_dir, "FETCH_HEAD"),
           commit_id.to_hex() +
           "\t\t" +

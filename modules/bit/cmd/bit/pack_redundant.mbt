@@ -33,7 +33,7 @@ fn load_pack_idx_entries(
       Some(ids) => ids
       None => continue
     }
-    let remaining : Map[String, Bool] = {}
+    let remaining : Map[String, Bool] = Map([])
     for id in ids {
       remaining[id] = true
     }
@@ -41,7 +41,7 @@ fn load_pack_idx_entries(
       pack_path,
       ids,
       remaining,
-      unique: {},
+      unique: Map([]),
       all_objects_size: ids.length(),
     })
   }
@@ -115,7 +115,7 @@ async fn handle_pack_redundant(args : Array[String]) -> Unit raise Error {
     }
   }
   // Build all_objects = union of local pack objects
-  let all_objects : Map[String, Bool] = {}
+  let all_objects : Map[String, Bool] = Map([])
   for pack in local_packs {
     for id in pack.ids {
       all_objects[id] = true
@@ -155,7 +155,7 @@ async fn handle_pack_redundant(args : Array[String]) -> Unit raise Error {
     }
   }
   // Compute unique objects per pack
-  let object_pack_count : Map[String, Int] = {}
+  let object_pack_count : Map[String, Int] = Map([])
   for pack in local_packs {
     for item in pack.remaining {
       let (id, _) = item
@@ -166,7 +166,7 @@ async fn handle_pack_redundant(args : Array[String]) -> Unit raise Error {
     }
   }
   for pack in local_packs {
-    let unique : Map[String, Bool] = {}
+    let unique : Map[String, Bool] = Map([])
     for item in pack.remaining {
       let (id, _) = item
       if object_pack_count.get(id) == Some(1) {
@@ -177,7 +177,7 @@ async fn handle_pack_redundant(args : Array[String]) -> Unit raise Error {
   }
   // Minimize: find minimum set of packs covering all_objects
   let min_set = pack_redundant_minimize(local_packs, all_objects)
-  let min_paths : Map[String, Bool] = {}
+  let min_paths : Map[String, Bool] = Map([])
   for pack in min_set {
     min_paths[pack.pack_path] = true
   }
@@ -237,7 +237,7 @@ fn pack_redundant_minimize(
     }
   }
   // Find objects not yet covered by essential packs
-  let missing : Map[String, Bool] = {}
+  let missing : Map[String, Bool] = Map([])
   for item in all_objects {
     let (id, _) = item
     missing[id] = true
@@ -252,7 +252,7 @@ fn pack_redundant_minimize(
     return essential
   }
   // Remove objects covered by essential packs from non-essential remaining
-  let covered_by_essential : Map[String, Bool] = {}
+  let covered_by_essential : Map[String, Bool] = Map([])
   for item in all_objects {
     let (id, _) = item
     if !missing.contains(id) {
@@ -301,7 +301,7 @@ fn pack_redundant_get_redundancy(min_set : Array[PackRedundantEntry]) -> Int {
     for j in (i + 1)..<min_set.length() {
       let p1 = min_set[i]
       let p2 = min_set[j]
-      let p2_set : Map[String, Bool] = {}
+      let p2_set : Map[String, Bool] = Map([])
       for id in p2.ids {
         p2_set[id] = true
       }

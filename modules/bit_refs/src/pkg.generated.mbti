@@ -4,6 +4,7 @@ package "mizchi/bit_refs"
 import {
   "mizchi/bit_object",
   "mizchi/bit_types",
+  "moonbitlang/core/debug",
 }
 
 // Values
@@ -15,6 +16,8 @@ pub fn list_refs_with_ids(&@bit_types.RepoFileSystem, String, String?) -> Map[St
 
 pub fn list_remote_tracking_refs(&@bit_types.RepoFileSystem, String, String) -> Map[String, @bit_object.ObjectId]
 
+pub fn parse_packed_refs_text(String) -> Array[PackedRefEntry]
+
 pub fn remove_packed_ref(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String) -> Unit raise @bit_object.GitError
 
 pub fn remove_packed_refs_with_prefix(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, String, String) -> Unit raise @bit_object.GitError
@@ -25,9 +28,16 @@ pub fn rename_packed_refs_prefix(&@bit_types.FileSystem, &@bit_types.RepoFileSys
 
 pub fn rewrite_packed_refs(&@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, (String) -> String?) -> Unit raise @bit_object.GitError
 
+pub fn serialize_packed_refs_entries(Array[PackedRefEntry]) -> String
+
 // Errors
 
 // Types and methods
+pub(all) struct PackedRefEntry {
+  refname : String
+  oid : String
+  peeled : String?
+} derive(Eq, @debug.Debug)
 
 // Type aliases
 

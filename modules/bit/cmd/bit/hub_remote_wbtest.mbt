@@ -69,14 +69,14 @@ test "resolve_repo_ref_to_path: alias match" {
 ///|
 test "resolve_repo_ref_to_path: ghq path" {
   // This tests the ghq path resolution logic (owner/repo format)
-  let aliases : Map[String, String] = {}
+  let aliases : Map[String, String] = Map([])
   let result = resolve_repo_ref_to_path("bit-vcs/bit", "/home/user", aliases~)
   assert_eq(result, "/home/user/ghq/github.com/bit-vcs/bit")
 }
 
 ///|
 test "resolve_repo_ref_to_path: unknown raises error" {
-  let aliases : Map[String, String] = {}
+  let aliases : Map[String, String] = Map([])
   let result = resolve_repo_ref_to_path("unknown-alias", "/home/user", aliases~) catch {
     e => {
       assert_true(e.to_string().contains("Cannot resolve"))

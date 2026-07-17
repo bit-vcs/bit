@@ -30,7 +30,14 @@ pub struct LruCache[V] {
 
 ///|
 pub fn[V] LruCache::new(max_bytes : Int, size_fn : (V) -> Int) -> LruCache[V] {
-  { hot: {}, cold: {}, hot_bytes: 0, cold_bytes: 0, max_bytes, size_fn }
+  {
+    hot: Map([]),
+    cold: Map([]),
+    hot_bytes: 0,
+    cold_bytes: 0,
+    max_bytes,
+    size_fn,
+  }
 }
 
 ///|
@@ -91,7 +98,7 @@ fn[V] LruCache::evict(self : LruCache[V]) -> Unit {
     // Swap hot to cold
     let old_hot = self.hot
     let old_hot_bytes = self.hot_bytes
-    self.hot = {}
+    self.hot = Map([])
     self.hot_bytes = 0
     self.cold = old_hot
     self.cold_bytes = old_hot_bytes

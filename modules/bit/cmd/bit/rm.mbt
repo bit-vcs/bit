@@ -66,8 +66,8 @@ async fn handle_rm(args : Array[String]) -> Unit raise Error {
   }
   if opts.cached && !opts.force && head_exists {
     let st = @bitlib.status(fs, root)
-    let staged_but_not_head : Map[String, Bool] = {}
-    let intent_to_add_paths : Map[String, Bool] = {}
+    let staged_but_not_head : Map[String, Bool] = Map([])
+    let intent_to_add_paths : Map[String, Bool] = Map([])
     for entry in entries {
       if entry.intent_to_add {
         intent_to_add_paths[entry.path] = true
@@ -79,7 +79,7 @@ async fn handle_rm(args : Array[String]) -> Unit raise Error {
     for path in st.staged_modified {
       staged_but_not_head[path] = true
     }
-    let unstaged_modified : Map[String, Bool] = {}
+    let unstaged_modified : Map[String, Bool] = Map([])
     for path in st.unstaged_modified {
       unstaged_modified[path] = true
     }
@@ -96,7 +96,7 @@ async fn handle_rm(args : Array[String]) -> Unit raise Error {
   }
   if !opts.cached && !opts.force {
     let st = @bitlib.status(fs, root)
-    let missing_worktree_paths : Map[String, Bool] = {}
+    let missing_worktree_paths : Map[String, Bool] = Map([])
     for path in removed_paths {
       let abs_path = root + "/" + path
       if !fs.is_file(abs_path) && !fs.is_dir(abs_path) {
@@ -279,7 +279,7 @@ fn rm_partition_target_paths(
   let target_paths : Array[String] = []
   let sparse_only_specs : Array[String] = []
   let unmatched_specs : Array[String] = []
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   for raw_path in raw_paths {
     let matched = rm_collect_matching_paths(
       raw_path, entries, recursive, cwd_prefix, root_abs,
@@ -634,9 +634,9 @@ fn rm_collect_conflict_paths(
   missing_worktree_paths : Map[String, Bool],
   head_exists : Bool,
 ) -> (Array[String], Array[String], Array[String]) {
-  let staged_modified : Map[String, Bool] = {}
-  let staged_added : Map[String, Bool] = {}
-  let unstaged_modified : Map[String, Bool] = {}
+  let staged_modified : Map[String, Bool] = Map([])
+  let staged_added : Map[String, Bool] = Map([])
+  let unstaged_modified : Map[String, Bool] = Map([])
   if head_exists {
     for path in status.staged_modified {
       staged_modified[path] = true

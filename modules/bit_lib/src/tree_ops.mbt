@@ -35,7 +35,7 @@ fn detect_case_insensitive_collision_skips(
   git_dir : String,
   paths : Array[String],
 ) -> Map[String, Bool] raise @bit.GitError {
-  let skip : Map[String, Bool] = {}
+  let skip : Map[String, Bool] = Map([])
   if !worktree_is_case_insensitive(fs, rfs, git_dir) {
     return skip
   }
@@ -335,7 +335,7 @@ pub fn collect_tree_files(
   fs : &@bit.RepoFileSystem,
   tree_id : @bit.ObjectId,
 ) -> Map[String, TreeFileEntry] raise @bit.GitError {
-  let out : Map[String, TreeFileEntry] = {}
+  let out : Map[String, TreeFileEntry] = Map([])
   collect_tree_files_inner(db, fs, tree_id, "", out)
   out
 }

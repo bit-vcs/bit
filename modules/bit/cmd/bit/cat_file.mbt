@@ -1174,7 +1174,7 @@ fn cat_file_collect_batch_all_objects(
   object_dirs : Array[String],
   unordered : Bool,
 ) -> Array[@bitcore.ObjectId] {
-  let seen_ids : Map[String, Bool] = {}
+  let seen_ids : Map[String, Bool] = Map([])
   for scan_object_dir in object_dirs {
     let db = @bitlib.ObjectDb::load_from_objects_dir(fs, scan_object_dir) catch {
       _ => continue
@@ -1301,7 +1301,7 @@ fn cat_file_compute_pack_entry_disk_size(
 fn cat_file_collect_object_dirs(fs : OsFs, git_dir : String) -> Array[String] {
   let primary_objects_dir = git_dir + "/objects"
   let out : Array[String] = [primary_objects_dir]
-  let seen_object_dirs : Map[String, Bool] = {}
+  let seen_object_dirs : Map[String, Bool] = Map([])
   seen_object_dirs[normalize_path(primary_objects_dir)] = true
   let alt_object_dirs = cat_file_read_alternate_object_dirs(fs, git_dir)
   for alt_object_dir in alt_object_dirs {
@@ -1327,7 +1327,7 @@ fn cat_file_read_alternate_object_dirs(
   }
   let data = fs.read_file(alt_path) catch { _ => return out }
   let base_dir = git_dir + "/objects/info"
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   let text = decode_bytes(data)
   for line_view in text.split("\n") {
     let line = trim_string(line_view.to_owned())
@@ -1550,7 +1550,7 @@ fn cat_file_resolve_replace_object_id(
   id : @bitcore.ObjectId,
 ) -> @bitcore.ObjectId {
   let mut current = id
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   while true {
     let hex = current.to_hex()
     if seen.contains(hex) {
@@ -1872,7 +1872,7 @@ fn cat_file_find_reachable_commit_by_message(
   needle : String,
 ) -> @bitcore.ObjectId? {
   let queue : Array[@bitcore.ObjectId] = [start]
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   while queue.length() > 0 {
     let current = queue.unsafe_pop()
     let hex = current.to_hex()
@@ -2566,7 +2566,7 @@ fn cat_file_resolve_tree_entry_follow_symlinks(
   let mut followed_symlink = false
   let mut symlink_hops = 0
   let mut outside_trailing_slash = false
-  let seen_paths : Map[String, Bool] = {}
+  let seen_paths : Map[String, Bool] = Map([])
   seen_paths[parts.join("/")] = true
   while true {
     if parts.length() == 0 {

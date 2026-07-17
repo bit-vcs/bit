@@ -183,7 +183,7 @@ fn reset_mixed_paths(
     }
   }
   let current_entries = @bitlib.read_index_entries(rfs, git_dir)
-  let out_map : Map[String, @bitlib.IndexEntry] = {}
+  let out_map : Map[String, @bitlib.IndexEntry] = Map([])
   for entry in current_entries {
     if !reset_pathspec_matches_any(normalized_paths, entry.path) {
       out_map[entry.path] = entry
@@ -295,7 +295,7 @@ fn reset_apply_intent_to_add(
   before_entries : Array[@bitlib.IndexEntry],
 ) -> Unit raise Error {
   let after_entries = @bitlib.read_index_entries(rfs, git_dir)
-  let after_map : Map[String, Bool] = {}
+  let after_map : Map[String, Bool] = Map([])
   for entry in after_entries {
     after_map[entry.path] = true
   }
@@ -349,7 +349,7 @@ async fn reset_refresh_index_entries(
     None => ()
   }
   let updated : Array[@bitlib.IndexEntry] = []
-  let changed_map : Map[String, Bool] = {}
+  let changed_map : Map[String, Bool] = Map([])
   for entry in entries {
     let abs = root + "/" + entry.path
     let mut out_entry = entry
@@ -368,16 +368,12 @@ async fn reset_refresh_index_entries(
         if id == entry.id {
           let mut mtime_sec = entry.mtime_sec
           let mut mtime_nsec = entry.mtime_nsec
-          let mtime_result : Result[(Int64, Int), Error] = try? @asyncfs.mtime(
-            abs,
-            follow_symlink=false,
-          )
-          match mtime_result {
-            Ok((sec, nsec)) => {
-              mtime_sec = sec.to_int()
-              mtime_nsec = nsec
-            }
-            Err(_) => ()
+          try {
+            let (sec, nsec) = @asyncfs.mtime(abs, follow_symlink=false)
+            mtime_sec = sec.to_int()
+            mtime_nsec = nsec
+          } catch {
+            _ => ()
           }
           out_entry = @bitlib.IndexEntry::new(
             entry.path,
@@ -413,7 +409,7 @@ fn reset_read_skip_worktree_paths(
   fs : &@bitcore.RepoFileSystem,
   git_dir : String,
 ) -> Map[String, Bool] {
-  let out : Map[String, Bool] = {}
+  let out : Map[String, Bool] = Map([])
   let sidecar_path = git_dir + "/bit-skip-worktree"
   if fs.is_file(sidecar_path) {
     let text = decode_bytes(

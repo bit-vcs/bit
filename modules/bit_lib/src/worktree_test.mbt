@@ -3,7 +3,9 @@
 ///|
 fn setup_repo() -> @bit.TestFs {
   let fs = @bit.TestFs::new()
-  ignore(try? init_repo(fs, "/repo"))
+  ignore(init_repo(fs, "/repo")) catch {
+    _ => ()
+  }
   fs
 }
 
@@ -11,7 +13,7 @@ fn setup_repo() -> @bit.TestFs {
 fn setup_sha256_compat_repo() -> @bit.TestFs {
   let fs = @bit.TestFs::new()
   ignore(
-    try? init_repo_with_options(fs, "/repo", {
+    init_repo_with_options(fs, "/repo", {
       default_branch: "main",
       bare: false,
       separate_git_dir: None,
@@ -23,7 +25,9 @@ fn setup_sha256_compat_repo() -> @bit.TestFs {
       work_tree: None,
       shared: None,
     }),
-  )
+  ) catch {
+    _ => ()
+  }
   fs.write_string(
     "/repo/.git/config", "[core]\n\trepositoryformatversion = 1\n\tfilemode = true\n\tbare = false\n\tlogallrefupdates = true\n[extensions]\n\tobjectFormat = sha256\n\tcompatObjectFormat = sha1\n",
   )

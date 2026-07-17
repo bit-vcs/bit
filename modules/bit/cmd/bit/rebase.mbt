@@ -1861,7 +1861,7 @@ fn find_subdir_affecting_commits(
   }
   // Walk from target to base, collect commits
   let commits_to_check : Array[@bitcore.ObjectId] = []
-  let visited : Map[String, Bool] = {}
+  let visited : Map[String, Bool] = Map([])
   let mut current = target_id
   while true {
     let hex = current.to_hex()

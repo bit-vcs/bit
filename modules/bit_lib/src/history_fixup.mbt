@@ -59,7 +59,8 @@ fn history_merge_three_trees(
     let theirs_content = merge_get_blob_text(db, rfs, candidate.theirs_id)
     let ours_data = merge_get_blob_data(db, rfs, candidate.ours_id)
     let theirs_data = merge_get_blob_data(db, rfs, candidate.theirs_id)
-    if @diff3.is_binary_content(ours_data) || @diff3.is_binary_content(theirs_data) {
+    if @diff3.is_binary_content(ours_data) ||
+      @diff3.is_binary_content(theirs_data) {
       clean = false
       continue
     }
@@ -77,7 +78,7 @@ fn history_merge_three_trees(
       merged[candidate.path] = { id: blob_id, mode: candidate.mode }
     }
   }
-  if !(clean) {
+  if !clean {
     return (@bit.ObjectId::zero(), false)
   }
   let entries : Array[IndexEntry] = []
@@ -139,16 +140,29 @@ pub fn history_fixup(
   // Fold staged changes into the target: base=HEAD tree, ours=target tree,
   // theirs=index tree.
   let (merged_tree, clean) = history_merge_three_trees(
-    db, fs, rfs, git_dir, head_tree, target.tree, index_tree,
+    db,
+    fs,
+    rfs,
+    git_dir,
+    head_tree,
+    target.tree,
+    index_tree,
   )
-  if !(clean) {
-    raise @bit.GitError::InvalidObject("fixup would produce conflicts; aborting")
+  if !clean {
+    raise @bit.GitError::InvalidObject(
+      "fixup would produce conflicts; aborting",
+    )
   }
 
   // rewrite_map: original commit hex -> rewritten commit id.
-  let rewrite_map : Map[String, @bit.ObjectId] = {}
+  let rewrite_map : Map[String, @bit.ObjectId] = Map([])
   let mut rewritten_target : @bit.ObjectId? = None
-  let target_empty = history_commit_is_empty(db, rfs, target.parents, merged_tree)
+  let target_empty = history_commit_is_empty(
+    db,
+    rfs,
+    target.parents,
+    merged_tree,
+  )
   if target_empty {
     match empty {
       Abort =>
@@ -165,7 +179,13 @@ pub fn history_fixup(
         }
       Keep => {
         let id = history_write_commit(
-          db, fs, git_dir, merged_tree, target.parents, target, reedit_message,
+          db,
+          fs,
+          git_dir,
+          merged_tree,
+          target.parents,
+          target,
+          reedit_message,
         )
         rewritten_target = Some(id)
         rewrite_map[target_id.to_hex()] = id
@@ -173,7 +193,13 @@ pub fn history_fixup(
     }
   } else {
     let id = history_write_commit(
-      db, fs, git_dir, merged_tree, target.parents, target, reedit_message,
+      db,
+      fs,
+      git_dir,
+      merged_tree,
+      target.parents,
+      target,
+      reedit_message,
     )
     rewritten_target = Some(id)
     rewrite_map[target_id.to_hex()] = id
@@ -201,15 +227,28 @@ pub fn history_reword(
 ) -> HistoryFixupResult raise @bit.GitError {
   let target = rebase_parse_commit_full(db, rfs, target_id)
   let new_id = history_write_commit(
-    db, fs, git_dir, target.tree, target.parents, target, Some(new_message),
+    db,
+    fs,
+    git_dir,
+    target.tree,
+    target.parents,
+    target,
+    Some(new_message),
   )
-  let rewrite_map : Map[String, @bit.ObjectId] = {}
+  let rewrite_map : Map[String, @bit.ObjectId] = Map([])
   rewrite_map[target_id.to_hex()] = new_id
   // Trees are untouched by a reword, so descendants can never become empty
   // during replay; Keep preserves commits that were already empty.
   let updates = history_replay_descendants(
-    db, fs, rfs, git_dir, target_id, rewrite_map, tips,
-    HistoryEmptyAction::Keep, "reword",
+    db,
+    fs,
+    rfs,
+    git_dir,
+    target_id,
+    rewrite_map,
+    tips,
+    HistoryEmptyAction::Keep,
+    "reword",
   )
   { updates, rewritten: Some(new_id) }
 }
@@ -233,9 +272,9 @@ fn history_replay_descendants(
   // Collect descendants of target reachable from the tips (linear chains only;
   // merges are rejected by the caller). Each chain is walked tip -> target.
   let descendants : Array[@bit.ObjectId] = []
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   for tip in tips {
-    if !(merge_base_is_ancestor(db, rfs, target_id, tip.new_id)) {
+    if !merge_base_is_ancestor(db, rfs, target_id, tip.new_id) {
       continue
     }
     // Walk from tip down to target collecting the chain (child-first).
@@ -254,13 +293,13 @@ fn history_replay_descendants(
         Some(p) => cur = p
       }
     }
-    if !(reached) {
+    if !reached {
       continue
     }
     // Record in parent-first order, de-duplicating shared prefixes.
     for k = chain.length() - 1; k >= 0; k = k - 1 {
       let c = chain[k]
-      if !(seen.contains(c.to_hex())) {
+      if !seen.contains(c.to_hex()) {
         seen[c.to_hex()] = true
         descendants.push(c)
       }
@@ -277,9 +316,15 @@ fn history_replay_descendants(
     let new_parent_tree = history_commit_tree(db, rfs, new_parent)
     let orig_parent_tree = history_commit_tree(db, rfs, orig_parent)
     let (replayed_tree, ok) = history_merge_three_trees(
-      db, fs, rfs, git_dir, orig_parent_tree, new_parent_tree, info.tree,
+      db,
+      fs,
+      rfs,
+      git_dir,
+      orig_parent_tree,
+      new_parent_tree,
+      info.tree,
     )
-    if !(ok) {
+    if !ok {
       raise @bit.GitError::InvalidObject(
         "\{op} would produce conflicts while replaying \{c.to_hex()}",
       )

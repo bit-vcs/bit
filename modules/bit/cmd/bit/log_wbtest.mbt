@@ -52,7 +52,9 @@ test "log: raw rotate uses first path after target when absent" {
 ///|
 test "log: config reader handles inline section key" {
   let fs = @bitcore.TestFs::new()
-  ignore(try? @bitlib.init_repo(fs, "/repo"))
+  @bitlib.init_repo(fs, "/repo") catch {
+    _ => ()
+  }
   let base_config = fs.read_string("/repo/.git/config")
   fs.write_string("/repo/.git/config", base_config + "\n[log] decorate\n")
 
@@ -102,7 +104,9 @@ test "log: revision input handles caret and not-mode excludes" {
 ///|
 test "log: stdin parser reads revisions, excludes, and pathspecs" {
   let fs = @bitcore.TestFs::new()
-  ignore(try? @bitlib.init_repo(fs, "/repo"))
+  @bitlib.init_repo(fs, "/repo") catch {
+    _ => ()
+  }
   let revs : Array[String] = []
   let excludes : Array[String] = []
   let symmetric : Array[(String, String)] = []
@@ -210,8 +214,8 @@ async test "log: simplify-merges drops path merge that is TREESAME to a parent" 
   guard merge_id is Some(merge_commit) else { fail("expected merge commit") }
   guard side_id is Some(side_commit) else { fail("expected side commit") }
   guard base_id is Some(base_commit) else { fail("expected base commit") }
-  let include_bits : Map[String, Bool] = {}
-  let exclude_bits : Map[String, Bool] = {}
+  let include_bits : Map[String, Bool] = Map([])
+  let exclude_bits : Map[String, Bool] = Map([])
   // Default path-limited history simplification also drops the merge: it is
   // TREESAME to its second parent (side) on `target`, so history follows that
   // parent. (--full-history would keep it; that is covered by the git oracle
@@ -322,7 +326,9 @@ fn log_wbtest_write_commit_object(
 test "log: ancestry path keeps commits descended from bottom commits" {
   let fs = @bitcore.TestFs::new()
   let git_dir = "/repo/.git"
-  ignore(try? @bitlib.init_repo(fs, "/repo"))
+  @bitlib.init_repo(fs, "/repo") catch {
+    _ => ()
+  }
 
   let root = log_wbtest_write_commit_object(
     fs,
@@ -361,7 +367,7 @@ test "log: ancestry path keeps commits descended from bottom commits" {
     "merge",
   )
 
-  let exclude_ids : Map[String, Bool] = {}
+  let exclude_ids : Map[String, Bool] = Map([])
   exclude_ids[root.to_hex()] = true
   exclude_ids[bottom.to_hex()] = true
   let entries = log_walk_commits(
@@ -391,7 +397,9 @@ test "log: ancestry path keeps commits descended from bottom commits" {
 ///|
 test "log: boundary walk appends excluded parent with marker flag" {
   let fs = @bitcore.TestFs::new()
-  ignore(try? @bitlib.init_repo(fs, "/repo"))
+  @bitlib.init_repo(fs, "/repo") catch {
+    _ => ()
+  }
 
   fs.write_string("/repo/file.txt", "a\n")
   @bitlib.add_paths(fs, fs, "/repo", ["file.txt"])
@@ -411,7 +419,7 @@ test "log: boundary walk appends excluded parent with marker flag" {
     fs, fs, "/repo", "third\n", "Test <t@example.com>", 1700000002L,
   )
 
-  let exclude_ids : Map[String, Bool] = {}
+  let exclude_ids : Map[String, Bool] = Map([])
   exclude_ids[first.to_hex()] = true
   exclude_ids[second.to_hex()] = true
   let entries = log_walk_commits(
@@ -651,7 +659,7 @@ fn log_test_format_data(
     subject,
     body,
     message,
-    ref_names: {},
+    ref_names: Map([]),
     date_format: "",
     left_right_marker: "",
     reflog_selector_short: Some("HEAD@{0}"),
@@ -703,7 +711,7 @@ test "log: format_commit_string honors left-right marker" {
     subject: "sixth",
     body: "",
     message: "sixth",
-    ref_names: {},
+    ref_names: Map([]),
     date_format: "",
     left_right_marker: ">",
     reflog_selector_short: None,
@@ -878,7 +886,7 @@ test "log: grep reflog requires walk_reflogs" {
 
 ///|
 test "log: format_decoration" {
-  let ref_names : Map[String, Array[String]] = {}
+  let ref_names : Map[String, Array[String]] = Map([])
   // No decoration
   @test.assert_eq(format_decoration(ref_names, "abc1234"), "")
   // Single decoration
@@ -1002,39 +1010,43 @@ fn log_test_commit(
 ///|
 test "log: build ref names peels nested annotated tags" {
   let fs = @bitcore.TestFs::new()
-  ignore(try? @bitlib.init_repo(fs, "/repo"))
-  ignore(try? log_test_commit(fs, "/repo", "file.txt", "one\n", "one", 1L))
+  @bitlib.init_repo(fs, "/repo") catch {
+    _ => ()
+  }
+  ignore(log_test_commit(fs, "/repo", "file.txt", "one\n", "one", 1L)) catch {
+    _ => ()
+  }
   let head = log_test_commit(fs, "/repo", "file.txt", "two\n", "two", 2L) catch {
     err => fail("unexpected commit error: \{err}")
   }
 
-  ignore(
-    try? @bitlib.create_lightweight_tag(
-      fs, fs, "/repo/.git", "lightweight", head,
-    ),
-  )
-  ignore(
-    try? @bitlib.create_annotated_tag(
-      fs, fs, "/repo/.git", "annotated", head, "annotated", "Test User <test@example.com>",
-      3L,
-    ),
-  )
-  ignore(try? @bitlib.create_branch_at(fs, fs, "/repo", "reach", head))
-  ignore(
-    try? @bitlib.create_annotated_tag(
-      fs, fs, "/repo/.git", "double-0", head, "double-0", "Test User <test@example.com>",
-      4L,
-    ),
-  )
+  @bitlib.create_lightweight_tag(fs, fs, "/repo/.git", "lightweight", head) catch {
+    _ => ()
+  }
+  @bitlib.create_annotated_tag(
+    fs, fs, "/repo/.git", "annotated", head, "annotated", "Test User <test@example.com>",
+    3L,
+  ) catch {
+    _ => ()
+  }
+  @bitlib.create_branch_at(fs, fs, "/repo", "reach", head) catch {
+    _ => ()
+  }
+  @bitlib.create_annotated_tag(
+    fs, fs, "/repo/.git", "double-0", head, "double-0", "Test User <test@example.com>",
+    4L,
+  ) catch {
+    _ => ()
+  }
   let double_0 = @bitrepo.rev_parse(fs, "/repo/.git", "refs/tags/double-0").unwrap_or(
     @bitcore.ObjectId::from_hex("0000000000000000000000000000000000000000"),
   )
-  ignore(
-    try? @bitlib.create_annotated_tag(
-      fs, fs, "/repo/.git", "double-1", double_0, "double-1", "Test User <test@example.com>",
-      5L,
-    ),
-  )
+  @bitlib.create_annotated_tag(
+    fs, fs, "/repo/.git", "double-1", double_0, "double-1", "Test User <test@example.com>",
+    5L,
+  ) catch {
+    _ => ()
+  }
 
   let ref_names = log_build_ref_names(fs, "/repo/.git", {
     mode: LogDecorationDisplayMode::Short,
@@ -1042,7 +1054,7 @@ test "log: build ref names peels nested annotated tags" {
     exclude_patterns: [],
     include_all_refs: false,
   }) catch {
-    _ => {}
+    _ => Map([])
   }
   match ref_names.get(head.to_hex()) {
     Some(names) =>
@@ -1059,7 +1071,7 @@ test "log: build ref names peels nested annotated tags" {
     exclude_patterns: [],
     include_all_refs: false,
   }) catch {
-    _ => {}
+    _ => Map([])
   }
   match full_ref_names.get(head.to_hex()) {
     Some(names) =>
@@ -1074,17 +1086,21 @@ test "log: build ref names peels nested annotated tags" {
 ///|
 test "log: resolve targets preserves tag revision names" {
   let fs = @bitcore.TestFs::new()
-  ignore(try? @bitlib.init_repo(fs, "/repo"))
+  @bitlib.init_repo(fs, "/repo") catch {
+    _ => ()
+  }
   let head = log_test_commit(fs, "/repo", "file.txt", "one\n", "one", 1L) catch {
     err => fail("unexpected commit error: \{err}")
   }
-  ignore(try? @bitlib.create_branch_at(fs, fs, "/repo", "source-a", head))
-  ignore(
-    try? @bitlib.create_annotated_tag(
-      fs, fs, "/repo/.git", "source-tag", head, "source-tag", "Test User <test@example.com>",
-      2L,
-    ),
-  )
+  @bitlib.create_branch_at(fs, fs, "/repo", "source-a", head) catch {
+    _ => ()
+  }
+  @bitlib.create_annotated_tag(
+    fs, fs, "/repo/.git", "source-tag", head, "source-tag", "Test User <test@example.com>",
+    2L,
+  ) catch {
+    _ => ()
+  }
 
   let targets = log_resolve_targets(
     fs,
@@ -1104,7 +1120,9 @@ test "log: resolve targets preserves tag revision names" {
 ///|
 test "log: grafts affect fast-path history in main and linked worktrees" {
   let fs = @bitcore.TestFs::new()
-  ignore(try? @bitlib.init_repo(fs, "/repo"))
+  @bitlib.init_repo(fs, "/repo") catch {
+    _ => ()
+  }
   let abc = log_test_commit(fs, "/repo", "file.txt", "abc\n", "abc", 1L) catch {
     err => fail("unexpected commit error: \{err}")
   }
@@ -1128,17 +1146,17 @@ test "log: grafts affect fast-path history in main and linked worktrees" {
   assert_true(main_lines[0].has_suffix(" xyz"))
   assert_true(main_lines[1].has_suffix(" abc"))
 
-  ignore(
-    try? @bitlib.create_worktree(
-      fs,
-      fs,
-      "/repo",
-      "/grafted",
-      Some("main"),
-      detach=true,
-      new_branch=None,
-    ),
-  )
+  @bitlib.create_worktree(
+    fs,
+    fs,
+    "/repo",
+    "/grafted",
+    Some("main"),
+    detach=true,
+    new_branch=None,
+  ) catch {
+    _ => ()
+  }
   let linked_lines = @bitlib.log_head_oneline(
     fs,
     "/repo/.git/worktrees/grafted",
@@ -1186,7 +1204,7 @@ test "log: format_commit_string honors %w prefix" {
     subject: "sixth",
     body: "",
     message: "sixth",
-    ref_names: {},
+    ref_names: Map([]),
     date_format: "",
     left_right_marker: "",
     reflog_selector_short: None,
@@ -1222,7 +1240,7 @@ test "log: format_commit_string honors %w prefix" {
     subject: "Merge tag 'reach'",
     body: "",
     message: "Merge tag 'reach'",
-    ref_names: {},
+    ref_names: Map([]),
     date_format: "",
     left_right_marker: "",
     reflog_selector_short: None,
@@ -1249,8 +1267,8 @@ test "log: abbrev helpers respect bool and numeric config" {
 
 ///|
 test "log: diff-filter parser splits include and exclude bits" {
-  let include_bits : Map[String, Bool] = {}
-  let exclude : Map[String, Bool] = {}
+  let include_bits : Map[String, Bool] = Map([])
+  let exclude : Map[String, Bool] = Map([])
   log_add_diff_filter_chars("Ra", include_bits, exclude)
   log_add_diff_filter_chars("d", include_bits, exclude)
   assert_true(include_bits.contains("R"))
@@ -1279,7 +1297,7 @@ test "log: diff-filter matching respects positive and negative bits" {
   )
 
   let negative_only_statuses : Map[String, Bool] = { "A": true, "D": true }
-  let negative_only_include : Map[String, Bool] = {}
+  let negative_only_include : Map[String, Bool] = Map([])
   let negative_only_exclude : Map[String, Bool] = { "D": true }
   assert_true(
     log_commit_matches_diff_filter_with_statuses(

@@ -95,8 +95,8 @@ pub fn cherry_pick(
   let commit_files = collect_tree_files(db, rfs, commit_info.tree)
   let parent_files = collect_tree_files_from_commit(db, rfs, parent_id)
   // Compute the patch (diff between parent and commit)
-  let added_files : Map[String, TreeFileEntry] = {}
-  let modified_files : Map[String, TreeFileEntry] = {}
+  let added_files : Map[String, TreeFileEntry] = Map([])
+  let modified_files : Map[String, TreeFileEntry] = Map([])
   let deleted_files : Array[String] = []
   // Find added and modified files
   for entry in commit_files.iter() {
@@ -117,7 +117,7 @@ pub fn cherry_pick(
     }
   }
   // Apply the patch to head_files
-  let result_files : Map[String, TreeFileEntry] = {}
+  let result_files : Map[String, TreeFileEntry] = Map([])
   let conflicts : Array[String] = []
   // Copy head files
   for entry in head_files.iter() {

@@ -327,7 +327,7 @@ fn serve_parse_poll_response(body : Bytes) -> Array[ServePollRequest]? {
       Some(s) => s
       None => continue
     }
-    let headers : Map[String, String] = {}
+    let headers : Map[String, String] = Map([])
     match obj.get("headers") {
       Some(Json::Object(hobj)) =>
         for key, value in hobj {
@@ -362,7 +362,7 @@ async fn serve_poll(
   } else {
     "\{base_url}/api/v1/serve/poll?session=\{session_id}&timeout=\{timeout}"
   }
-  let headers : Map[String, String] = {}
+  let headers : Map[String, String] = Map([])
   let (status_code, body) = serve_http_get(url, headers)
   if status_code != 200 {
     raise @bitcore.GitError::ProtocolError("Poll failed: HTTP \{status_code}")
@@ -401,12 +401,12 @@ async fn serve_respond(
   } else {
     "\{base_url}/api/v1/serve/respond?session=\{session_id}"
   }
-  let headers_obj : Map[String, Json] = {}
+  let headers_obj : Map[String, Json] = Map([])
   for entry in response_headers.to_array() {
     let (key, value) = entry
     headers_obj[key] = Json::string(value)
   }
-  let payload_obj : Map[String, Json] = {}
+  let payload_obj : Map[String, Json] = Map([])
   payload_obj["request_id"] = Json::string(request_id)
   payload_obj["status"] = Json::number(status.to_double())
   payload_obj["headers"] = Json::object(headers_obj)
@@ -518,7 +518,7 @@ fn serve_lfs_external_base(req : ServePollRequest) -> String {
 
 ///|
 fn serve_lfs_json_body(message : String) -> Bytes {
-  let obj : Map[String, Json] = {}
+  let obj : Map[String, Json] = Map([])
   obj["message"] = Json::string(message)
   @utf8.encode(Json::object(obj).stringify())
 }
@@ -596,10 +596,10 @@ fn serve_lfs_object_error(
   code : Int,
   message : String,
 ) -> Json {
-  let item : Map[String, Json] = {}
+  let item : Map[String, Json] = Map([])
   item["oid"] = Json::string(oid)
   item["size"] = Json::number(size.to_double())
-  let err : Map[String, Json] = {}
+  let err : Map[String, Json] = Map([])
   err["code"] = Json::number(code.to_double())
   err["message"] = Json::string(message)
   item["error"] = Json::object(err)
@@ -612,13 +612,13 @@ fn serve_lfs_object_action(
   obj : ServeLfsObject,
   action_name : String,
 ) -> Json {
-  let item : Map[String, Json] = {}
+  let item : Map[String, Json] = Map([])
   item["oid"] = Json::string(obj.oid)
   item["size"] = Json::number(obj.size.to_double())
-  let action : Map[String, Json] = {}
+  let action : Map[String, Json] = Map([])
   action["href"] = Json::string(serve_lfs_object_href(req, obj.oid))
-  action["header"] = Json::object({})
-  let actions : Map[String, Json] = {}
+  action["header"] = Json::object(Map([]))
+  let actions : Map[String, Json] = Map([])
   actions[action_name] = Json::object(action)
   item["actions"] = Json::object(actions)
   Json::object(item)
@@ -676,7 +676,7 @@ fn serve_lfs_batch_response(
         )
       }
     } else if cached {
-      let item : Map[String, Json] = {}
+      let item : Map[String, Json] = Map([])
       item["oid"] = Json::string(obj.oid)
       item["size"] = Json::number(obj.size.to_double())
       items.push(Json::object(item))
@@ -684,7 +684,7 @@ fn serve_lfs_batch_response(
       items.push(serve_lfs_object_action(req, obj, "upload"))
     }
   }
-  let root : Map[String, Json] = {}
+  let root : Map[String, Json] = Map([])
   root["objects"] = Json::array(items)
   (
     200,
@@ -818,7 +818,7 @@ async fn serve_handle_git_request(
             @encoding.Encoding::UTF8,
             "receive-pack not enabled",
           )
-          return (403, {}, error_body, [])
+          return (403, Map([]), error_body, [])
         }
         let fs = OsFs::new()
         let root = normalize_repo_root(repo_root)
@@ -853,7 +853,7 @@ async fn serve_handle_git_request(
         @encoding.Encoding::UTF8,
         "receive-pack not enabled",
       )
-      return (403, {}, error_body, [])
+      return (403, Map([]), error_body, [])
     }
     let input_bytes = match req.body_base64 {
       Some(b64) => serve_base64_decode(b64)
@@ -902,7 +902,7 @@ async fn serve_handle_git_request(
     (200, headers, out, [])
   } else {
     let error_body = @encoding.encode(@encoding.Encoding::UTF8, "not found")
-    (404, {}, error_body, [])
+    (404, Map([]), error_body, [])
   }
 }
 
@@ -925,10 +925,10 @@ fn serve_rewrite_receive_pack_refs(
   fs : &@bitcore.RepoFileSystem,
   git_dir : String,
 ) -> (Bytes, Map[String, String]) raise @bitcore.GitError {
-  let rewrite_map : Map[String, String] = {}
+  let rewrite_map : Map[String, String] = Map([])
   // Build a lookup of the current ref state so we can resynthesize old_id
   // for each rewritten ref. Missing refs resolve to the zero id.
-  let current_ref_ids : Map[String, String] = {}
+  let current_ref_ids : Map[String, String] = Map([])
   let existing_refs = @bitrepo.show_ref(fs, git_dir)
   for item in existing_refs {
     let (refname, id) = item
@@ -1199,7 +1199,7 @@ async fn handle_hub_serve(args : Array[String]) -> Unit raise Error {
             @encoding.Encoding::UTF8,
             "internal server error",
           )
-          (500, {}, error_body, [])
+          (500, Map([]), error_body, [])
         }
       }
       // Broadcast feature notification on successful receive-pack
@@ -1283,13 +1283,13 @@ async fn serve_broadcast_push_notification(
     return
   }
   // Publish broadcast to relay
-  let payload_obj : Map[String, Json] = {}
+  let payload_obj : Map[String, Json] = Map([])
   payload_obj["type"] = Json::string("feature-broadcast")
   payload_obj["session_id"] = Json::string(session_id)
   let refs_arr : Array[Json] = []
   for item in incoming_refs {
     let (refname, hex) = item
-    let ref_obj : Map[String, Json] = {}
+    let ref_obj : Map[String, Json] = Map([])
     ref_obj["ref"] = Json::string(refname)
     ref_obj["commit"] = Json::string(hex)
     refs_arr.push(Json::object(ref_obj))
@@ -1392,7 +1392,7 @@ async fn serve_auto_fetch_from_room(
   cursor : Int,
 ) -> Int raise Error {
   let url = "\{base_url}/api/v1/poll?room=\{room}&after=\{cursor}&limit=50"
-  let headers : Map[String, String] = {}
+  let headers : Map[String, String] = Map([])
   let (status_code, body) = serve_http_get(url, headers)
   if status_code != 200 {
     return cursor
@@ -1435,7 +1435,7 @@ async fn serve_fetch_from_session(
   )
   // Build wants from refs_info commit OIDs that exist on the remote
   let wants : Array[@bitcore.ObjectId] = []
-  let ref_map : Map[String, String] = {} // commit_hex -> refname
+  let ref_map : Map[String, String] = Map([]) // commit_hex -> refname
   for item in refs_info {
     let (refname, commit_hex) = item
     ref_map[commit_hex] = refname

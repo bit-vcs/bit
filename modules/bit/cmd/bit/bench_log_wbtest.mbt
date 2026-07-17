@@ -61,7 +61,9 @@ fn bench_log_ensure_repo(
   ensure_bench_dir(bench_log_root)
   bench_log_cleanup_tree(fs, repo_root)
   ensure_bench_dir(repo_root)
-  ignore(try? @bitrepo.init_repo(fs, repo_root))
+  @bitrepo.init_repo(fs, repo_root) catch {
+    _ => ()
+  }
   // Create initial files
   for i in 0..<file_count {
     @fs.write_string_to_file(
@@ -72,13 +74,17 @@ fn bench_log_ensure_repo(
     }
   }
   @async.run_async_main(async fn() {
-    ignore(try? @bitlib.add_paths_async(fs, fs, repo_root, ["."]))
+    @bitlib.add_paths_async(fs, fs, repo_root, ["."]) catch {
+      _ => ()
+    }
   })
   ignore(
-    try? @bitlib.commit(
+    @bitlib.commit(
       fs, fs, repo_root, "initial commit\n", "Bench <bench@example.com>", 1700000000L,
     ),
-  )
+  ) catch {
+    _ => ()
+  }
   // Create remaining commits, each modifying one file
   for c in 1..<commit_count {
     let file_idx = c % file_count
@@ -87,10 +93,12 @@ fn bench_log_ensure_repo(
       _ => ()
     }
     @async.run_async_main(async fn() {
-      ignore(try? @bitlib.add_paths_async(fs, fs, repo_root, [path]))
+      @bitlib.add_paths_async(fs, fs, repo_root, [path]) catch {
+        _ => ()
+      }
     })
     ignore(
-      try? @bitlib.commit(
+      @bitlib.commit(
         fs,
         fs,
         repo_root,
@@ -98,7 +106,9 @@ fn bench_log_ensure_repo(
         "Bench <bench@example.com>",
         1700000000L + c.to_int64(),
       ),
-    )
+    ) catch {
+      _ => ()
+    }
   }
   @fs.write_string_to_file(marker, "ok\n") catch {
     _ => ()

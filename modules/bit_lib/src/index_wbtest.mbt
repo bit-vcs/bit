@@ -1,7 +1,7 @@
 ///|
 fn index_wbtest_init_sha256_repo(fs : @bit.TestFs) -> Unit {
   ignore(
-    try? init_repo_with_options(fs, "/repo", {
+    init_repo_with_options(fs, "/repo", {
       default_branch: "main",
       bare: false,
       separate_git_dir: None,
@@ -13,7 +13,9 @@ fn index_wbtest_init_sha256_repo(fs : @bit.TestFs) -> Unit {
       work_tree: None,
       shared: None,
     }),
-  )
+  ) catch {
+    _ => ()
+  }
 }
 
 ///|
@@ -85,7 +87,7 @@ test "index: write_index_entries_with_flags preserves sha256 paths" {
   )
   let entries = [IndexEntry::new("hello", blob_id, 0o100644, content.length())]
 
-  write_index_entries_with_flags(fs, "/repo/.git", entries, {}, {})
+  write_index_entries_with_flags(fs, "/repo/.git", entries, Map([]), Map([]))
 
   let actual = read_index_entries(fs, "/repo/.git")
   assert_eq(actual.length(), 1)

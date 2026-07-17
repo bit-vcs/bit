@@ -275,7 +275,7 @@ pub fn github_sync_plan_push(
   let issues = hub.list_issues(objects)
   let links = hub.list_sync_links(objects, repo~)
   // Build lookup: local_id -> SyncLink
-  let link_map : Map[String, @hub.SyncLink] = {}
+  let link_map : Map[String, @hub.SyncLink] = Map([])
   for link in links {
     if link.local_kind() == "issue" {
       link_map.set(link.local_id(), link)
@@ -438,7 +438,7 @@ pub fn github_sync_plan_push_prs(
   let prs = hub.list_prs(objects)
   let links = hub.list_sync_links(objects, repo~)
   // Build lookup: local_id -> SyncLink
-  let link_map : Map[String, @hub.SyncLink] = {}
+  let link_map : Map[String, @hub.SyncLink] = Map([])
   for link in links {
     if link.local_kind() == "pr" {
       link_map.set(link.local_id(), link)
@@ -623,7 +623,7 @@ pub async fn github_sync_pull_comments(
   let mut deleted = 0
   let errors : Array[String] = []
   // Track which remote comment ids we've seen (for full mode delete)
-  let seen_remote_ids : Map[Int, Bool] = {}
+  let seen_remote_ids : Map[Int, Bool] = Map([])
   for gh_comment in gh_comments {
     seen_remote_ids[gh_comment.id] = true
     let existing_link = find_comment_sync_link_by_remote_id(

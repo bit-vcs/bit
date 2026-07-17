@@ -942,7 +942,11 @@ async fn clone_run_recurse_submodules(
   @sys.unset_env_var("GIT_DIR")
   @sys.unset_env_var("GIT_WORK_TREE")
   let args = clone_build_recurse_submodules_args(filters, quiet)
-  let result : Result[Unit, Error] = try? handle_submodule(args)
+  let result : Result[Unit, Error] = try handle_submodule(args) catch {
+    e => Err(e)
+  } noraise {
+    v => Ok(v)
+  }
   clone_restore_env("GIT_SHIM_CWD", prev_shim_cwd)
   clone_restore_env("GIT_SHIM_PWD", prev_shim_pwd)
   clone_restore_env("GIT_DIR", prev_git_dir)
@@ -1432,9 +1436,9 @@ fn parse_bundle_uri_response_loose_for_clone(data : Bytes) -> Array[String] {
 ///|
 fn parse_bundle_uri_lines_for_clone(lines : Array[String]) -> Array[String] {
   let names_in_order : Array[String] = []
-  let seen_name : Map[String, Bool] = {}
-  let uri_by_name : Map[String, String] = {}
-  let token_by_name : Map[String, Int] = {}
+  let seen_name : Map[String, Bool] = Map([])
+  let uri_by_name : Map[String, String] = Map([])
+  let token_by_name : Map[String, Int] = Map([])
   let mut heuristic = ""
   for raw_line in lines {
     let line = trim_string(raw_line)
@@ -1572,7 +1576,7 @@ fn clone_has_missing_parent_history(
   let db = @bitlib.ObjectDb::load_lazy(fs, git_dir)
   db.set_skip_verify(true)
   let stack : Array[@bitcore.ObjectId] = [start_commit]
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   while stack.length() > 0 {
     let id = stack.pop().unwrap_or(start_commit)
     let hex = id.to_hex()
@@ -1745,7 +1749,7 @@ async fn checkout_with_promisor_retry_clone(
   match prefetch_target {
     Some(target_id) =>
       if @bitlib.has_any_filter_attributes(fs, root) {
-        let _prefetch_result : Result[Unit, Error] = try? ({
+        try {
           let object_git_dir = @bitlib.resolve_checkout_common_git_dir(
             fs, git_dir,
           )
@@ -1753,18 +1757,18 @@ async fn checkout_with_promisor_retry_clone(
           @bitlibnative.lfs_prefetch_for_checkout(
             db, fs, fs, root, git_dir, target_id, "origin",
           )
-        })
+        } catch {
+          _ => ()
+        }
       }
     None => ()
   }
   let mut attempts = 0
   while attempts < 16 {
-    let result : Result[@bitcore.ObjectId, Error] = try? run_checkout_with_sensitive_hooks(
-      fs, fs, root, spec,
-    )
-    match result {
-      Ok(id) => return id
-      Err(err) =>
+    try {
+      return run_checkout_with_sensitive_hooks(fs, fs, root, spec)
+    } catch {
+      err =>
         match parse_checkout_missing_object_id_for_clone(err) {
           Some(missing_id) => {
             let pdb = match promisor_db {
@@ -1849,7 +1853,7 @@ fn collect_case_collision_paths(paths : Array[String]) -> Array[String] {
     sorted_paths.push(path)
   }
   sorted_paths.sort_by((a, b) => String::compare(a, b))
-  let collided : Map[String, Bool] = {}
+  let collided : Map[String, Bool] = Map([])
   let mut i = 0
   while i < sorted_paths.length() {
     let left = sorted_paths[i]

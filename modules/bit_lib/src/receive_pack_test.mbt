@@ -24,8 +24,12 @@ fn build_receive_request(
 ///|
 test "receive-pack: push to empty repo" {
   let fs = @bit.TestFs::new()
-  ignore(try? init_repo(fs, "/src"))
-  ignore(try? init_repo(fs, "/dst"))
+  ignore(init_repo(fs, "/src")) catch {
+    _ => ()
+  }
+  ignore(init_repo(fs, "/dst")) catch {
+    _ => ()
+  }
   fs.write_string("/src/a.txt", "hello\n")
   add_paths(fs, fs, "/src", ["a.txt"])
   let commit_id = commit(
@@ -54,7 +58,9 @@ test "receive-pack: push to empty repo" {
 ///|
 test "receive-pack: advertise empty repo" {
   let fs = @bit.TestFs::new()
-  ignore(try? init_repo(fs, "/repo"))
+  ignore(init_repo(fs, "/repo")) catch {
+    _ => ()
+  }
   let adv = build_receive_pack_advertisement(fs, "/repo")
   let decoded = @protocol.pktline_decode(adv) catch { _ => [] }
   assert_true(decoded.length() > 0)
@@ -67,8 +73,12 @@ test "receive-pack: advertise empty repo" {
 ///|
 test "receive-pack: reject non-fast-forward" {
   let fs = @bit.TestFs::new()
-  ignore(try? init_repo(fs, "/src"))
-  ignore(try? init_repo(fs, "/dst"))
+  ignore(init_repo(fs, "/src")) catch {
+    _ => ()
+  }
+  ignore(init_repo(fs, "/dst")) catch {
+    _ => ()
+  }
   fs.write_string("/src/a.txt", "one\n")
   add_paths(fs, fs, "/src", ["a.txt"])
   let commit_src = commit(
@@ -97,7 +107,9 @@ test "receive-pack: reject non-fast-forward" {
 ///|
 test "receive-pack: reject invalid refname" {
   let fs = @bit.TestFs::new()
-  ignore(try? init_repo(fs, "/dst"))
+  ignore(init_repo(fs, "/dst")) catch {
+    _ => ()
+  }
   let req = build_receive_request(
     @bit.ObjectId::zero(),
     @bit.ObjectId::zero(),
@@ -112,7 +124,9 @@ test "receive-pack: reject invalid refname" {
 test "receive-pack: reject path traversal from /tmp repo" {
   let fs = @bit.TestFs::new()
   let tmp_repo = "/tmp/bit-receive-pack-poc"
-  ignore(try? init_repo(fs, tmp_repo))
+  ignore(init_repo(fs, tmp_repo)) catch {
+    _ => ()
+  }
   let bad_req = build_receive_request(
     @bit.ObjectId::zero(),
     @bit.ObjectId::zero(),

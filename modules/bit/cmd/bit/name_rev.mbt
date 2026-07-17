@@ -189,7 +189,7 @@ fn name_rev_build_name_map(
   db : @bitlib.ObjectDb,
   ref_map : Array[(String, @bitcore.ObjectId)],
 ) -> Map[String, String] {
-  let name_map : Map[String, String] = {}
+  let name_map : Map[String, String] = Map([])
   // For each ref, BFS backward to assign names
   for item in ref_map {
     let (ref_name, ref_id) = item
@@ -202,7 +202,7 @@ fn name_rev_build_name_map(
     }
     // Walk parents with BFS up to a depth limit
     let queue : Array[(@bitcore.ObjectId, Int)] = [(commit_id, 0)]
-    let visited : Map[String, Unit] = {}
+    let visited : Map[String, Unit] = Map([])
     visited.set(hex, ())
     let max_depth = 256
     while queue.length() > 0 {

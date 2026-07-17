@@ -568,7 +568,7 @@ async fn hash_object_validate_tree(
     @sys.exit(128)
   }
   let mut pos = 0
-  let seen_names : Map[String, Bool] = {}
+  let seen_names : Map[String, Bool] = Map([])
   while pos < len {
     // Parse mode (digits followed by space)
     let mode_start = pos

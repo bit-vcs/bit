@@ -13,7 +13,7 @@ pub fn merge_base_is_ancestor(
   if ancestor_hex == descendant_hex {
     return true
   }
-  let visited : Map[String, Bool] = {}
+  let visited : Map[String, Bool] = Map([])
   let queue : Array[@bit.ObjectId] = [descendant]
   while queue.length() > 0 {
     let current = queue.unsafe_pop()
@@ -50,7 +50,7 @@ pub fn merge_base_all(
   b : @bit.ObjectId,
 ) -> Array[@bit.ObjectId] raise @bit.GitError {
   // Collect all ancestors of A (including A itself)
-  let ancestors_a : Map[String, Bool] = {}
+  let ancestors_a : Map[String, Bool] = Map([])
   let q1 : Array[@bit.ObjectId] = [a]
   while q1.length() > 0 {
     let current = q1.unsafe_pop()
@@ -73,8 +73,8 @@ pub fn merge_base_all(
   }
   // BFS from B, collect all common ancestors
   let common : Array[@bit.ObjectId] = []
-  let common_set : Map[String, Bool] = {}
-  let seen : Map[String, Bool] = {}
+  let common_set : Map[String, Bool] = Map([])
+  let seen : Map[String, Bool] = Map([])
   let q2 : Array[@bit.ObjectId] = [b]
   while q2.length() > 0 {
     let current = q2.unsafe_pop()
@@ -122,7 +122,7 @@ pub fn merge_base_all(
         continue
       }
       // BFS from other to see if candidate is reachable
-      let visited2 : Map[String, Bool] = {}
+      let visited2 : Map[String, Bool] = Map([])
       let q3 : Array[@bit.ObjectId] = [other]
       while q3.length() > 0 {
         let cur = q3.unsafe_pop()

@@ -979,11 +979,11 @@ test "hub notify: select_notify_records filters notify-only records" {
 
 ///|
 test "hub notify: collect_changed_notify_records detects new and updated" {
-  let before : Map[String, @hub.HubRecord] = {}
+  let before : Map[String, @hub.HubRecord] = Map([])
   before["hub/proposal/pr/p1/meta"] = @hub.HubRecord::new(
     "hub/proposal/pr/p1/meta", "pr-proposal", "old", "node-a", 1L,
   )
-  let after : Map[String, @hub.HubRecord] = {}
+  let after : Map[String, @hub.HubRecord] = Map([])
   after["hub/proposal/pr/p1/meta"] = @hub.HubRecord::new(
     "hub/proposal/pr/p1/meta", "pr-proposal", "new", "node-a", 2L,
   )

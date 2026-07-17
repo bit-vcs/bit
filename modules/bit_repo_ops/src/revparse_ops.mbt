@@ -173,7 +173,7 @@ fn resolve_commit_message_search_all_refs(
     return None
   }
   let starts : Array[@object.ObjectId] = []
-  let seen_start : Map[String, Bool] = {}
+  let seen_start : Map[String, Bool] = Map([])
   let refs = show_ref(fs, git_dir)
   for item in refs {
     let (_, id) = item
@@ -223,7 +223,7 @@ fn find_reachable_commit_by_message_from_many(
   for start in starts {
     queue.push(start)
   }
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   let mut best_id : @object.ObjectId? = None
   let mut best_time = -1L
   while queue.length() > 0 {
@@ -773,7 +773,7 @@ fn resolve_abbrev_ref_id(
   let refs = show_ref(fs, git_dir)
   let db = @bitlib.ObjectDb::load(fs, git_dir)
   let queue : Array[@object.ObjectId] = []
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   for item in refs {
     let (_, id) = item
     queue.push(id)
@@ -1241,7 +1241,7 @@ pub fn show_ref(
   fs : &@types.RepoFileSystem,
   git_dir : String,
 ) -> Array[(String, @object.ObjectId)] raise @object.GitError {
-  let out : Map[String, @object.ObjectId] = {}
+  let out : Map[String, @object.ObjectId] = Map([])
   let refs_dir = @repo.join_path(git_dir, "refs")
   if fs.is_dir(refs_dir) {
     ref_collect_loose(fs, git_dir, refs_dir, "refs", out)

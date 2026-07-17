@@ -82,10 +82,10 @@ let security_hostile_tree_names : Array[String] = [
 ///|
 test "verify_tree_entry_name rejects path-escaping names" {
   for name in security_hostile_tree_names {
-    let rejected = try? @bit.verify_tree_entry_name(name)
-    match rejected {
-      Err(_) => () // expected
-      Ok(_) =>
+    try @bit.verify_tree_entry_name(name) catch {
+      _ => () // expected
+    } noraise {
+      _ =>
         // Make the offending name visible in the assertion message.
         assert_true(false)
     }
@@ -113,10 +113,10 @@ test "checkout: collect_tree_files rejects '../escape' entry at materialization"
   let entries = @bit.parse_tree(bytes)
   // Simulate what collect_tree_files_inner does internally:
   // it calls verify_tree_entry_name on each entry before pushing.
-  let result = try? @bit.verify_tree_entry_name(entries[0].name)
-  match result {
-    Err(_) => () // expected: materializer refuses to write outside
-    Ok(_) => assert_true(false)
+  try @bit.verify_tree_entry_name(entries[0].name) catch {
+    _ => () // expected: materializer refuses to write outside
+  } noraise {
+    _ => assert_true(false)
   }
 }
 
@@ -127,10 +127,10 @@ test "checkout: collect_tree_files rejects '.git/...' entry at materialization" 
     "100644", ".git/hooks/post-checkout", blob_id,
   )
   let entries = @bit.parse_tree(bytes)
-  let result = try? @bit.verify_tree_entry_name(entries[0].name)
-  match result {
-    Err(_) => () // expected
-    Ok(_) => assert_true(false)
+  try @bit.verify_tree_entry_name(entries[0].name) catch {
+    _ => () // expected
+  } noraise {
+    _ => assert_true(false)
   }
 }
 
@@ -160,10 +160,10 @@ test "pack: oversized object size header is rejected" {
   // then 7-bit groups with continue-bit until size is exhausted.
   // 0x7fff_ffff_ff = 8 groups; pack 0xff * 7 then a final 0x7f.
   let bytes = b"PACK\x00\x00\x00\x02\x00\x00\x00\x01\x9f\xff\xff\xff\xff\xff\xff\x7f"
-  let parsed = try? @pack.parse_packfile_stream(bytes, fn(_obj) { () })
-  match parsed {
-    Err(_) => () // expected: size cap fires before zlib touches it
-    Ok(_) => assert_true(false)
+  try @pack.parse_packfile_stream(bytes, fn(_obj) { () }) catch {
+    _ => () // expected: size cap fires before zlib touches it
+  } noraise {
+    _ => assert_true(false)
   }
 }
 
@@ -198,10 +198,10 @@ test "pack: apply_delta rejects oversized varint header" {
   // base_size byte 0 (so base_len 0 matches), then result_size = the
   // overlong varint, then no body.
   let delta = b"\x00\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff"
-  let parsed = try? @pack.apply_delta(b"", delta)
-  match parsed {
-    Err(_) => () // expected: shift cap fires
-    Ok(_) => assert_true(false)
+  try ignore(@pack.apply_delta(b"", delta)) catch {
+    _ => () // expected: shift cap fires
+  } noraise {
+    _ => assert_true(false)
   }
   // Silence the unused binding lint — the comment above describes
   // what shape we're avoiding.
@@ -224,10 +224,10 @@ test "pack: apply_delta rejects copy-op with overflowing bounds" {
   //   cp_size = 0x10
   // Pre-fix: cp_off + cp_size wraps to negative; bounds check passes.
   let delta = b"\x10\x10\xff\xff\xff\xff\xff\x10\x00\x00"
-  let parsed = try? @pack.apply_delta(base, delta)
-  match parsed {
-    Err(_) => () // expected
-    Ok(_) => assert_true(false)
+  try ignore(@pack.apply_delta(base, delta)) catch {
+    _ => () // expected
+  } noraise {
+    _ => assert_true(false)
   }
 }
 
@@ -277,23 +277,23 @@ test "sideband: tab/LF/CR pass through" {
 /// in this batch by rejecting sub-header lengths up front.
 test "pktline_decode rejects sub-header length 0002" {
   let bytes = b"0002"
-  let parsed = try? @protocol.pktline_decode(bytes)
   // After the fix this is an error; before the fix it would have
   // returned an `Ok([])`-style value (or eventually raised on a
   // different mismatch). The new contract is: explicit raise.
-  match parsed {
-    Err(_) => ()
-    Ok(_) => assert_true(false)
+  try ignore(@protocol.pktline_decode(bytes)) catch {
+    _ => ()
+  } noraise {
+    _ => assert_true(false)
   }
 }
 
 ///|
 test "pktline_decode rejects sub-header length 0003" {
   let bytes = b"0003"
-  let parsed = try? @protocol.pktline_decode(bytes)
-  match parsed {
-    Err(_) => ()
-    Ok(_) => assert_true(false)
+  try ignore(@protocol.pktline_decode(bytes)) catch {
+    _ => ()
+  } noraise {
+    _ => assert_true(false)
   }
 }
 

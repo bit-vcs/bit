@@ -41,9 +41,13 @@ test "check-ignore: repo path resolves cwd-relative input" {
 ///|
 test "check-ignore: tracked paths are suppressed unless no-index is set" {
   let fs = @bitcore.TestFs::new()
-  ignore(try? @bitlib.init_repo(fs, "/repo"))
+  @bitlib.init_repo(fs, "/repo") catch {
+    _ => ()
+  }
   fs.write_string("/repo/ignored", "tracked\n")
-  ignore(try? @bitlib.add_paths(fs, fs, "/repo", ["ignored"]))
+  @bitlib.add_paths(fs, fs, "/repo", ["ignored"]) catch {
+    _ => ()
+  }
 
   let tracked = check_ignore_tracked_paths(fs, "/repo/.git", false)
   assert_true(tracked.contains("ignored"))
@@ -55,7 +59,9 @@ test "check-ignore: tracked paths are suppressed unless no-index is set" {
 ///|
 test "check-ignore: standard rules include configured global excludes" {
   let fs = @bitcore.TestFs::new()
-  ignore(try? @bitlib.init_repo(fs, "/repo"))
+  @bitlib.init_repo(fs, "/repo") catch {
+    _ => ()
+  }
   fs.write_string(
     "/repo/.git/config", "[core]\n\texcludesfile = global-excludes\n",
   )
@@ -74,7 +80,9 @@ test "check-ignore: standard rules include configured global excludes" {
 ///|
 test "check-ignore: verbose rule lookup reports negation matches" {
   let fs = @bitcore.TestFs::new()
-  ignore(try? @bitlib.init_repo(fs, "/repo"))
+  @bitlib.init_repo(fs, "/repo") catch {
+    _ => ()
+  }
   fs.write_string("/repo/.gitignore", "one\n!on*\n")
 
   let matcher = @ignore.Matcher::new()

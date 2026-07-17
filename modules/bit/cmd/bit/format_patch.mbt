@@ -457,12 +457,12 @@ fn collect_commits_in_range(
   base : @bitcore.ObjectId,
   end : @bitcore.ObjectId,
 ) -> Array[@bitcore.ObjectId] raise Error {
-  let excluded : Map[String, Bool] = {}
+  let excluded : Map[String, Bool] = Map([])
   let base_entries = log_walk_commits(
     rfs,
     git_dir,
     [base],
-    {},
+    Map([]),
     2147483647,
     0L,
     9223372036854775807L,

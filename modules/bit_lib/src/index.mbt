@@ -129,7 +129,7 @@ pub fn read_index_entries(
     }
   }
   if has_conflicts {
-    let selected : Map[String, (Int, IndexEntry)] = {}
+    let selected : Map[String, (Int, IndexEntry)] = Map([])
     for item in staged_entries {
       let prio = index_stage_priority(item.stage)
       let entry = item.entry
@@ -259,7 +259,7 @@ pub fn expand_sparse_skip_worktree_paths(
     return skip_worktree_paths
   }
   let db = ObjectDb::load(fs, git_dir)
-  let expanded : Map[String, Bool] = {}
+  let expanded : Map[String, Bool] = Map([])
   for path in skip_worktree_paths.keys() {
     expanded[path] = true
   }
@@ -777,16 +777,16 @@ fn index_collect_changed_paths(
   old_entries : Array[IndexEntry],
   new_entries : Array[IndexEntry],
 ) -> Array[String] {
-  let old_by_path : Map[String, String] = {}
+  let old_by_path : Map[String, String] = Map([])
   for entry in old_entries {
     old_by_path[entry.path] = index_entry_signature(entry)
   }
-  let new_by_path : Map[String, String] = {}
+  let new_by_path : Map[String, String] = Map([])
   for entry in new_entries {
     new_by_path[entry.path] = index_entry_signature(entry)
   }
   let changed : Array[String] = []
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   for path, old_sig in old_by_path {
     match new_by_path.get(path) {
       Some(new_sig) if new_sig == old_sig => ()
@@ -846,7 +846,7 @@ fn index_build_cache_tree_from_entries(
   name? : String = "",
 ) -> IndexCacheTree {
   let file_entries : Array[@bit.TreeEntry] = []
-  let dir_map : Map[String, Array[IndexEntry]] = {}
+  let dir_map : Map[String, Array[IndexEntry]] = Map([])
   let subtrees : Array[IndexCacheTree] = []
   let mut entry_count = 0
   for entry in entries {
@@ -980,7 +980,7 @@ pub fn read_skip_worktree_paths(
   } else {
     hash_size
   }
-  let out : Map[String, Bool] = {}
+  let out : Map[String, Bool] = Map([])
   let sidecar_path = join_path(git_dir, "bit-skip-worktree")
   if fs.is_file(sidecar_path) {
     let text = @utf8.decode_lossy(
@@ -1055,7 +1055,7 @@ pub fn read_assume_unchanged_paths(
   } else {
     hash_size
   }
-  let out : Map[String, Bool] = {}
+  let out : Map[String, Bool] = Map([])
   let index_path = join_path(git_dir, "index")
   if !fs.is_file(index_path) {
     return out
@@ -1105,7 +1105,7 @@ pub fn read_unmerged_paths(
   fs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> Map[String, Bool] {
-  let out : Map[String, Bool] = {}
+  let out : Map[String, Bool] = Map([])
   let entries = read_index_stage_entries(fs, git_dir) catch { _ => return out }
   for item in entries {
     if item.stage != 0 {
@@ -1122,7 +1122,7 @@ pub fn write_skip_worktree_paths(
   paths : Array[String],
 ) -> Unit raise @bit.GitError {
   let state_path = join_path(git_dir, "bit-skip-worktree")
-  let by_path : Map[String, Bool] = {}
+  let by_path : Map[String, Bool] = Map([])
   for path in paths {
     if path.length() > 0 {
       by_path[path] = true
@@ -1287,8 +1287,8 @@ fn index_preserved_flag_paths(
 ) -> (Map[String, Bool], Map[String, Bool]) {
   let existing_skip = read_skip_worktree_paths(fs, git_dir, hash_size~)
   let existing_assume = read_assume_unchanged_paths(fs, git_dir, hash_size~)
-  let skip_worktree_paths : Map[String, Bool] = {}
-  let assume_unchanged_paths : Map[String, Bool] = {}
+  let skip_worktree_paths : Map[String, Bool] = Map([])
+  let assume_unchanged_paths : Map[String, Bool] = Map([])
   for entry in entries {
     if existing_skip.contains(entry.path) {
       skip_worktree_paths[entry.path] = true

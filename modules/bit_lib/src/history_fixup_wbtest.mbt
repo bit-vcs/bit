@@ -68,7 +68,9 @@ test "history fixup: full CLI flow (tip) replicates end to end" {
     }
   }
   if !found_main {
-    abort("STEP2d: main branch not in list_branches (\{branches.length()} branches)")
+    abort(
+      "STEP2d: main branch not in list_branches (\{branches.length()} branches)",
+    )
   }
 
   // Step 3: history_fixup produces an update for main.
@@ -76,8 +78,16 @@ test "history fixup: full CLI flow (tip) replicates end to end" {
     { refname: "refs/heads/main", old_id: head, new_id: head },
   ]
   let result = history_fixup(
-    db, ffs, rfs, git_dir, head, index_tree, head, tips,
-    HistoryEmptyAction::Drop, None,
+    db,
+    ffs,
+    rfs,
+    git_dir,
+    head,
+    index_tree,
+    head,
+    tips,
+    HistoryEmptyAction::Drop,
+    None,
   )
   if result.updates.length() != 1 {
     abort("STEP3: updates = \{result.updates.length()}, want 1")
@@ -126,7 +136,16 @@ fn hf_run(
     { refname: "refs/heads/main", old_id: main_tip, new_id: main_tip },
   ]
   let result = history_fixup(
-    db, ffs, rfs, git_dir, target, index_tree, head, tips, empty, None,
+    db,
+    ffs,
+    rfs,
+    git_dir,
+    target,
+    index_tree,
+    head,
+    tips,
+    empty,
+    None,
   )
   (result, fs, git_dir, db)
 }

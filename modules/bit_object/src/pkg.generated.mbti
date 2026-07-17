@@ -86,7 +86,7 @@ pub fn Commit::new(ObjectId, Array[ObjectId], String, Int64, String, String, Int
 pub(all) enum HashAlgorithm {
   Sha1
   Sha256
-} derive(Eq)
+} derive(Eq, @debug.Debug)
 pub fn HashAlgorithm::from_string(String) -> Self raise GitError
 pub fn HashAlgorithm::hash_size(Self) -> Int
 pub fn HashAlgorithm::hex_size(Self) -> Int

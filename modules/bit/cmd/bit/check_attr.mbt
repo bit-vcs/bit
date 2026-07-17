@@ -230,7 +230,7 @@ fn check_attr_resolve(
   rules : Array[CheckAttrRule],
   path : String,
 ) -> Array[(String, String)] {
-  let resolved : Map[String, String] = {}
+  let resolved : Map[String, String] = Map([])
   let order : Array[String] = []
   let normalized = if path.has_prefix("./") {
     String::unsafe_substring(path, start=2, end=path.length())

@@ -884,7 +884,7 @@ async fn midx_repack(
       return
     }
   }
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   let repack_objects : Array[@bitcore.PackObject] = []
   for pack_name in selected_packs {
     let idx_path = pack_dir + "/" + midx_pack_stem(pack_name) + ".idx"
@@ -1174,12 +1174,12 @@ fn midx_select_pack_files_from_stdin(
   include_names : Array[String],
   exclude_names : Array[String],
 ) -> Array[String] {
-  let all_pack_set : Map[String, Bool] = {}
+  let all_pack_set : Map[String, Bool] = Map([])
   for pack_name in all_pack_files {
     all_pack_set[pack_name] = true
   }
   let selected : Array[String] = []
-  let selected_set : Map[String, Bool] = {}
+  let selected_set : Map[String, Bool] = Map([])
   for name in include_names {
     match midx_normalize_stdin_pack_name(name) {
       Some(pack_name) =>
@@ -1193,7 +1193,7 @@ fn midx_select_pack_files_from_stdin(
   if exclude_names.length() == 0 {
     return selected
   }
-  let excluded_set : Map[String, Bool] = {}
+  let excluded_set : Map[String, Bool] = Map([])
   for name in exclude_names {
     match midx_normalize_stdin_pack_name(name) {
       Some(pack_name) => excluded_set[pack_name] = true
@@ -1285,7 +1285,7 @@ async fn midx_write_bitmap(
   let checksum_offset = midx_bytes.length() - 20
   let checksum = FixedArray::makei(20, i => midx_bytes[checksum_offset + i])
   let object_count = entries.length()
-  let midx_pos_by_oid : Map[String, Int] = {}
+  let midx_pos_by_oid : Map[String, Int] = Map([])
   for midx_pos, entry in entries {
     midx_pos_by_oid[entry.id.to_hex()] = midx_pos
   }
@@ -1494,7 +1494,7 @@ fn midx_collect_name_hashes_from_pack_bitmaps(
   pack_dir : String,
   pack_files : Array[String],
 ) -> Map[String, Int] {
-  let out : Map[String, Int] = {}
+  let out : Map[String, Int] = Map([])
   for pack_name in pack_files {
     let hashes = midx_read_pack_bitmap_name_hashes(fs, pack_dir, pack_name)
     for oid_hex, hash in hashes {
@@ -1513,7 +1513,7 @@ fn midx_read_pack_bitmap_name_hashes(
   pack_dir : String,
   pack_name : String,
 ) -> Map[String, Int] {
-  let out : Map[String, Int] = {}
+  let out : Map[String, Int] = Map([])
   let stem = midx_pack_stem(pack_name)
   let bitmap_path = pack_dir + "/" + stem + ".bitmap"
   let bitmap_data = fs.read_file(bitmap_path) catch { _ => return out }
@@ -1713,7 +1713,7 @@ fn midx_collect_bitmap_tips(
   refs_snapshot : String?,
 ) -> Array[MidxBitmapTip] {
   let candidates : Array[MidxBitmapCandidate] = []
-  let seen_idx_by_hex : Map[String, Int] = {}
+  let seen_idx_by_hex : Map[String, Int] = Map([])
   match refs_snapshot {
     Some(path) => {
       let specs = midx_collect_snapshot_specs(fs, path)
@@ -2595,7 +2595,7 @@ fn midx_read_packs_from_midx_data(data : Bytes) -> Array[String] {
 
 ///|
 fn midx_read_oids_from_midx_data(data : Bytes) -> Map[String, Bool] {
-  let out : Map[String, Bool] = {}
+  let out : Map[String, Bool] = Map([])
   if data.length() < 12 {
     return out
   }
@@ -2819,7 +2819,7 @@ async fn midx_compact_chain(
     for h in hashes {
       let p = inc_dir + "/multi-pack-index-" + h + ".midx"
       let d = fs.read_file(p) catch { _ => Bytes::new(0) }
-      sizes.push(midx_read_oids_from_midx_data(d).size())
+      sizes.push(midx_read_oids_from_midx_data(d).length())
       layer_packs.push(midx_read_packs_from_midx_data(d))
     }
     let k = hashes.length() - 1
@@ -2829,7 +2829,7 @@ async fn midx_compact_chain(
       return
     }
     // Merge layers[k-1] and layers[k]; base layers are [0, k-1).
-    let base_oids : Map[String, Bool] = {}
+    let base_oids : Map[String, Bool] = Map([])
     for i in 0..<(k - 1) {
       let p = inc_dir + "/multi-pack-index-" + hashes[i] + ".midx"
       let d = fs.read_file(p) catch { _ => Bytes::new(0) }
@@ -2957,8 +2957,8 @@ async fn midx_write_incremental(
     }
   }
   // Build set of known packs from existing layers
-  let known_packs : Map[String, Bool] = {}
-  let existing_oids : Map[String, Bool] = {}
+  let known_packs : Map[String, Bool] = Map([])
+  let existing_oids : Map[String, Bool] = Map([])
   for hash in hashes {
     let layer_path = inc_dir + "/multi-pack-index-" + hash + ".midx"
     let layer_data = fs.read_file(layer_path) catch { _ => continue }

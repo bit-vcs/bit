@@ -329,7 +329,7 @@ test "blob_none: filter simulates no blob fetch" {
   }
   let db = ObjectDb::load(fs, "/repo/.git") catch { _ => return () }
   // collect_object_ids_only should work even if some objects are missing
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   collect_object_ids_only(db, fs, commit1, seen)
   // Should have collected IDs for commit, tree, and blob (even if blob might be missing)
   assert_true(seen.length() > 0)
@@ -389,7 +389,7 @@ test "subdir_shallow: clone subdirectory with depth=1" {
     _ => return ()
   }
   // Should include commit, tree (root), tree (lib), blob
-  let types : Map[String, Int] = {}
+  let types : Map[String, Int] = Map([])
   for obj in objects {
     let key = obj.obj_type.to_string()
     types[key] = types.get(key).unwrap_or(0) + 1

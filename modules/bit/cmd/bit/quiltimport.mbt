@@ -40,7 +40,9 @@ async fn handle_quiltimport(args : Array[String]) -> Unit raise Error {
   let series_path = patches_dir + "/series"
   let series_data = @fs.read_file_to_bytes(series_path) catch {
     err => {
-      eprint_line("fatal: cannot read \{series_path}: \{err}")
+      eprint_line(
+        "fatal: cannot read \{series_path}: \{@debug.render(@debug.to_repr(err))}",
+      )
       @sys.exit(1)
       return
     }

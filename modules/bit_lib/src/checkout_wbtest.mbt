@@ -204,7 +204,7 @@ test "tree_ops: write_worktree_from_files preserves initialized submodule on rem
   write_index_entries(fs, "/repo/.git", entries)
 
   let db = ObjectDb::load_lazy(fs, "/repo/.git")
-  let files : Map[String, TreeFileEntry] = {}
+  let files : Map[String, TreeFileEntry] = Map([])
   write_worktree_from_files(
     db,
     fs,

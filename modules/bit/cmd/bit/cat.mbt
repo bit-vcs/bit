@@ -24,7 +24,7 @@ async fn handle_cat(args : Array[String]) -> Unit raise Error {
   let shorthand = parse_github_shorthand(spec)
   match shorthand {
     Some(File(raw_url, _filename)) => {
-      let headers : Map[String, String] = {}
+      let headers : Map[String, String] = Map([])
       let (response, content) = @bitnative.native_http_get(raw_url, headers)
       if response.code != 200 {
         raise @bitcore.GitError::InvalidObject(

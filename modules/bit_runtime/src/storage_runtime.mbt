@@ -892,13 +892,13 @@ fn storage_collect_status_snapshot(
 ) -> StorageStatusSnapshot raise Error {
   let git_dir = storage_resolve_git_dir(rfs, root)
   let entries = @bitlib.read_index_entries(rfs, git_dir)
-  let index_map : Map[String, @bitlib.IndexEntry] = {}
+  let index_map : Map[String, @bitlib.IndexEntry] = Map([])
   for entry in entries {
     index_map[entry.path] = entry
   }
   let files = @bitlib.list_working_files(rfs, root)
   files.sort()
-  let visited : Map[String, Bool] = {}
+  let visited : Map[String, Bool] = Map([])
   let untracked : Array[String] = []
   let unstaged_modified : Array[String] = []
   for rel_path in files {
@@ -925,7 +925,7 @@ fn storage_collect_status_snapshot(
       unstaged_deleted.push(entry.path)
     }
   }
-  let staged_index_map : Map[String, @bitlib.IndexEntry] = {}
+  let staged_index_map : Map[String, @bitlib.IndexEntry] = Map([])
   for entry in entries {
     staged_index_map[entry.path] = entry
   }
@@ -981,8 +981,8 @@ fn storage_status_porcelain_lines(
     out.push(storage_status_porcelain_branch_line(rfs, git_dir))
   }
   let status = storage_collect_status_snapshot(rfs, root)
-  let xmap : Map[String, Char] = {}
-  let ymap : Map[String, Char] = {}
+  let xmap : Map[String, Char] = Map([])
+  let ymap : Map[String, Char] = Map([])
   for p in status.staged_added {
     xmap[p] = 'A'
   }
@@ -998,7 +998,7 @@ fn storage_status_porcelain_lines(
   for p in status.unstaged_deleted {
     ymap[p] = 'D'
   }
-  let paths : Map[String, Bool] = {}
+  let paths : Map[String, Bool] = Map([])
   for p in status.staged_added {
     paths[p] = true
   }

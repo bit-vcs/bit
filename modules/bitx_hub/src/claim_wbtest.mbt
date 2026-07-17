@@ -54,7 +54,7 @@ test "parse_claim_message returns None for invalid JSON" {
 
 ///|
 test "parse_claim_message returns None for wrong type" {
-  let obj : Map[String, Json] = {}
+  let obj : Map[String, Json] = Map([])
   obj["type"] = Json::string("something-else")
   obj["issue_id"] = Json::string("issue-0001")
   obj["action"] = Json::string("claim")
@@ -65,7 +65,7 @@ test "parse_claim_message returns None for wrong type" {
 
 ///|
 test "parse_claim_message returns None for missing fields" {
-  let obj : Map[String, Json] = {}
+  let obj : Map[String, Json] = Map([])
   obj["type"] = Json::string("work-item.claim")
   obj["issue_id"] = Json::string("issue-0001")
   // missing action, claimer, timestamp
@@ -74,7 +74,7 @@ test "parse_claim_message returns None for missing fields" {
 
 ///|
 test "parse_claim_message returns None for invalid action" {
-  let obj : Map[String, Json] = {}
+  let obj : Map[String, Json] = Map([])
   obj["type"] = Json::string("work-item.claim")
   obj["issue_id"] = Json::string("issue-0001")
   obj["action"] = Json::string("invalid")
@@ -115,7 +115,7 @@ test "parse_claims_from_envelopes skips non-claim envelopes" {
     "mizchi",
     1708700000L,
   )
-  let other_payload : Map[String, Json] = {}
+  let other_payload : Map[String, Json] = Map([])
   other_payload["kind"] = Json::string("hub.record")
   let envelopes : Array[Json] = [
     make_test_envelope(claim.to_json()),
@@ -219,7 +219,7 @@ test "parse_claim_action" {
 
 ///|
 fn make_test_envelope(payload : Json) -> Json {
-  let obj : Map[String, Json] = {}
+  let obj : Map[String, Json] = Map([])
   obj["payload"] = payload
   obj["topic"] = Json::string("work-item.claim")
   obj["sender"] = Json::string("test")

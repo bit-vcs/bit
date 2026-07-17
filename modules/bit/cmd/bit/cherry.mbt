@@ -72,7 +72,7 @@ async fn handle_cherry(args : Array[String]) -> Unit raise Error {
   let upstream_commits = cherry_collect_commits(db, fs, upstream_id, limit_id)
   let head_commits = cherry_collect_commits(db, fs, head_id, limit_id)
   // Compute patch-ids for upstream commits
-  let upstream_patch_ids : Map[String, @bitcore.ObjectId] = {}
+  let upstream_patch_ids : Map[String, @bitcore.ObjectId] = Map([])
   for commit_id in upstream_commits {
     let patch_id = cherry_compute_patch_id(db, fs, commit_id)
     upstream_patch_ids[patch_id] = commit_id
@@ -232,7 +232,7 @@ fn cherry_compute_tree_diff(
   current : Array[(String, String)],
 ) -> Array[(String, String)] {
   // Build map of parent entries
-  let parent_map : Map[String, String] = {}
+  let parent_map : Map[String, String] = Map([])
   for item in parent {
     let (path, id) = item
     parent_map[path] = id
@@ -253,7 +253,7 @@ fn cherry_compute_tree_diff(
     }
   }
   // Find deleted files
-  let current_map : Map[String, String] = {}
+  let current_map : Map[String, String] = Map([])
   for item in current {
     let (path, id) = item
     current_map[path] = id

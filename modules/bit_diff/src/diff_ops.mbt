@@ -33,7 +33,7 @@ pub async fn diff_worktree(
   let db = @bitlib.ObjectDb::load_lazy(fs, git_dir)
   t0 = profile_lap(profile, "diff_worktree load_db", t0)
   let cached_files = @bitlib.working_files_cache(root)
-  let cache_map : Map[String, Bool] = {}
+  let cache_map : Map[String, Bool] = Map([])
   let mut cache_ready = false
   match cached_files {
     Some(files) => {
@@ -282,7 +282,7 @@ pub fn diff_index(
 ) -> Array[DiffFile] raise @bit.GitError {
   let git_dir = @bit.join_path(root, ".git")
   let index_entries = @bitlib.read_index_entries(fs, git_dir)
-  let index_map : Map[String, @bitlib.IndexEntry] = {}
+  let index_map : Map[String, @bitlib.IndexEntry] = Map([])
   for e in index_entries {
     index_map[e.path] = e
   }
@@ -550,7 +550,7 @@ fn diff_read_head_entries(
   fs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> Map[String, DiffHeadEntry] raise @bit.GitError {
-  let result : Map[String, DiffHeadEntry] = {}
+  let result : Map[String, DiffHeadEntry] = Map([])
   let head = @bitlib.resolve_head_commit(fs, git_dir)
   match head {
     None => return result
@@ -623,8 +623,8 @@ pub fn diff_trees(
     None => @bitlib.ObjectDb::load(fs, git_dir)
   }
   let out : Array[DiffFile] = []
-  let old_entries : Map[String, DiffHeadEntry] = {}
-  let new_entries : Map[String, DiffHeadEntry] = {}
+  let old_entries : Map[String, DiffHeadEntry] = Map([])
+  let new_entries : Map[String, DiffHeadEntry] = Map([])
   match old_tree {
     Some(ot) => diff_collect_tree(db, fs, ot, "", old_entries)
     None => ()

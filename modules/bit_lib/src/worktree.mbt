@@ -42,7 +42,7 @@ pub async fn status(
   )
   t0 = profile_lap(profile, "status index_guided_walk", t0)
   // Build index_map for staged changes detection
-  let index_map : Map[String, IndexEntry] = {}
+  let index_map : Map[String, IndexEntry] = Map([])
   for e in index_entries {
     if skip_worktree_paths.contains(e.path) {
       continue
@@ -159,7 +159,7 @@ pub fn add_paths(
   }
   let autocrlf = read_autocrlf_setting(rfs, actual_git_dir)
   let entries = read_index_entries(rfs, actual_git_dir)
-  let map : Map[String, IndexEntry] = {}
+  let map : Map[String, IndexEntry] = Map([])
   for e in entries {
     map[e.path] = e
   }
@@ -237,7 +237,7 @@ pub async fn add_paths_async(
   let autocrlf = read_autocrlf_setting(rfs, actual_git_dir)
   let core_filemode = read_core_filemode_setting(rfs, actual_git_dir)
   let entries = read_index_entries(rfs, actual_git_dir)
-  let map : Map[String, IndexEntry] = {}
+  let map : Map[String, IndexEntry] = Map([])
   for e in entries {
     map[e.path] = e
   }
@@ -1318,7 +1318,7 @@ fn write_tree_from_entries(
     _ => algo
   }
   let file_entries : Array[@bit.TreeEntry] = []
-  let dir_map : Map[String, Array[IndexEntry]] = {}
+  let dir_map : Map[String, Array[IndexEntry]] = Map([])
   for e in entries {
     if worktree_is_zero_object_id(e.id) {
       continue
@@ -1746,7 +1746,7 @@ pub fn rm_paths(
   }
   let entries = read_index_entries(rfs, actual_git_dir)
   let skip_worktree_paths = read_skip_worktree_paths(rfs, actual_git_dir)
-  let map : Map[String, IndexEntry] = {}
+  let map : Map[String, IndexEntry] = Map([])
   for e in entries {
     map[e.path] = e
   }
@@ -1783,7 +1783,7 @@ pub fn rm_paths(
     }
   }
   let out : Array[IndexEntry] = Array::new(capacity=map.length())
-  let remaining_skip_worktree_paths : Map[String, Bool] = {}
+  let remaining_skip_worktree_paths : Map[String, Bool] = Map([])
   let remaining_skip_paths : Array[String] = []
   for path, entry in map {
     out.push(entry)
@@ -1817,7 +1817,7 @@ fn rm_update_gitmodules_after_submodule_removal(
   if !rfs.is_file(gitmodules_path) {
     return
   }
-  let removed_paths : Map[String, Bool] = {}
+  let removed_paths : Map[String, Bool] = Map([])
   for path in removed_submodule_paths {
     removed_paths[path] = true
   }
@@ -1986,7 +1986,7 @@ pub fn mv_path(
   }
   // Read index
   let entries = read_index_entries(rfs, actual_git_dir)
-  let map : Map[String, IndexEntry] = {}
+  let map : Map[String, IndexEntry] = Map([])
   for e in entries {
     map[e.path] = e
   }

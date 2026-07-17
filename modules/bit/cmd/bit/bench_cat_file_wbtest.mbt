@@ -33,7 +33,9 @@ fn ensure_catfile_bench_repo() -> Array[String] {
   }
   if !@fs.path_exists(marker) {
     let fs = OsFs::new()
-    ignore(try? @bitrepo.init_repo(fs, bench_catfile_repo))
+    @bitrepo.init_repo(fs, bench_catfile_repo) catch {
+      _ => ()
+    }
     for i in 0..<50 {
       @fs.write_string_to_file(
         bench_catfile_repo + "/file_\{i}.txt",
@@ -43,14 +45,18 @@ fn ensure_catfile_bench_repo() -> Array[String] {
       }
     }
     @async.run_async_main(async fn() {
-      ignore(try? @bitlib.add_paths_async(fs, fs, bench_catfile_repo, ["."]))
+      @bitlib.add_paths_async(fs, fs, bench_catfile_repo, ["."]) catch {
+        _ => ()
+      }
     })
     ignore(
-      try? @bitlib.commit(
+      @bitlib.commit(
         fs, fs, bench_catfile_repo, "bench commit\n", "Bench <bench@example.com>",
         1700000000L,
       ),
-    )
+    ) catch {
+      _ => ()
+    }
     @fs.write_string_to_file(marker, "ok\n") catch {
       _ => ()
     }

@@ -50,7 +50,7 @@ fn parse_fetch_response(result_json : String) -> (Int, Bytes) raise Error {
 
 ///|
 fn headers_to_json(headers : Map[String, String]) -> String {
-  let obj : Map[String, Json] = {}
+  let obj : Map[String, Json] = Map([])
   for entry in headers.to_array() {
     let (key, value) = entry
     obj[key] = Json::string(value)

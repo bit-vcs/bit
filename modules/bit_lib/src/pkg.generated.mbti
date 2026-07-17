@@ -181,6 +181,10 @@ pub fn get_worktree_prunable_reason(&@bit_types.RepoFileSystem, String, String) 
 
 pub fn has_any_filter_attributes(&@bit_types.RepoFileSystem, String) -> Bool
 
+pub fn history_fixup(ObjectDb, &@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, @bit_object.ObjectId, @bit_object.ObjectId, @bit_object.ObjectId, Array[HistoryRefUpdate], HistoryEmptyAction, String?) -> HistoryFixupResult raise @bit_object.GitError
+
+pub fn history_reword(ObjectDb, &@bit_types.FileSystem, &@bit_types.RepoFileSystem, String, @bit_object.ObjectId, String, Array[HistoryRefUpdate]) -> HistoryFixupResult raise @bit_object.GitError
+
 pub fn init_repo(&@bit_types.FileSystem, String, default_branch? : String, bare? : Bool) -> Unit raise @bit_object.GitError
 
 pub fn init_repo_with_options(&@bit_types.FileSystem, String, InitOptions) -> Unit raise @bit_object.GitError
@@ -226,6 +230,16 @@ pub fn is_sparse_checkout_enabled(&@bit_types.RepoFileSystem, String) -> Bool
 pub fn is_subdir_clone(&@bit_types.RepoFileSystem, String) -> Bool
 
 pub fn is_valid_remote_name(String) -> Bool
+
+pub fn last_modified_collect_entries(ObjectDb, &@bit_types.RepoFileSystem, @bit_object.ObjectId, String, Int, Int, Bool, Array[String], Array[LmPath]) -> Unit raise @bit_object.GitError
+
+pub fn last_modified_committer_ts(Bytes) -> Int64
+
+pub fn last_modified_compute(ObjectDb, &@bit_types.RepoFileSystem, @bit_object.ObjectId, String, Int, Bool, Int, Array[@bit_object.ObjectId], Array[String]) -> Array[LmResult] raise @bit_object.GitError
+
+pub fn last_modified_pathspec_matches(String, Array[String]) -> Bool
+
+pub fn last_modified_resolve_commitish(ObjectDb, &@bit_types.RepoFileSystem, @bit_object.ObjectId, String) -> LmCommit raise @bit_object.GitError
 
 pub fn legacy_remote_exists(&@bit_types.RepoFileSystem, String, String) -> Bool
 
@@ -783,6 +797,23 @@ pub enum HeadRef {
   Detached(@bit_object.ObjectId)
 }
 
+pub(all) enum HistoryEmptyAction {
+  Drop
+  Keep
+  Abort
+} derive(Eq)
+
+pub(all) struct HistoryFixupResult {
+  updates : Array[HistoryRefUpdate]
+  rewritten : @bit_object.ObjectId?
+}
+
+pub(all) struct HistoryRefUpdate {
+  refname : String
+  old_id : @bit_object.ObjectId
+  new_id : @bit_object.ObjectId
+} derive(Eq)
+
 pub struct HttpResponse {
   status : Int
   headers : Map[String, String]
@@ -871,6 +902,23 @@ pub struct LfsPointer {
   oid : String
   size : Int64
 } derive(Eq, @debug.Debug)
+
+pub(all) struct LmCommit {
+  id : @bit_object.ObjectId
+  tree : @bit_object.ObjectId
+  parents : Array[@bit_object.ObjectId]
+  timestamp : Int64
+}
+
+pub(all) struct LmPath {
+  path : String
+}
+
+pub(all) struct LmResult {
+  oid : @bit_object.ObjectId
+  path : String
+  boundary : Bool
+}
 
 pub struct LogEntry {
   id : @bit_object.ObjectId

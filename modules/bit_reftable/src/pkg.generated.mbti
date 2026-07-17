@@ -53,7 +53,7 @@ pub(all) enum RefValue {
   Val1(@bit_object.ObjectId)
   Val2(@bit_object.ObjectId, @bit_object.ObjectId)
   Symref(String)
-} derive(Eq)
+} derive(Eq, @debug.Debug)
 pub impl Show for RefValue
 
 type ReftableFooter derive(Eq, @debug.Debug)

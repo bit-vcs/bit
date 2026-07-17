@@ -70,11 +70,10 @@ test "packfile fixture: oracle_delta.pack" {
 ///|
 test "packfile fixture: oracle_thin.pack (missing base)" {
   let packfile = load_fixture("oracle_thin.pack", oracle_thin_hex)
-  let result : Result[Array[@bit.PackObject], @bit.GitError] = try? parse_packfile(
-    packfile,
-  )
-  match result {
-    Err(@bit.GitError::PackfileError(_)) => ()
+  try ignore(parse_packfile(packfile)) catch {
+    @bit.GitError::PackfileError(_) => ()
+    _ => assert_true(false)
+  } noraise {
     _ => assert_true(false)
   }
 }
@@ -111,7 +110,7 @@ test "packfile fixture: oracle_after_delta.pack (base after delta)" {
 
 ///|
 fn collect_object_ids(objects : Array[@bit.PackObject]) -> Map[String, Bool] {
-  let ids : Map[String, Bool] = {}
+  let ids : Map[String, Bool] = Map([])
   for obj in objects {
     let id = hash_object_content(obj.obj_type, obj.data)
     ids[id.to_hex()] = true
@@ -121,7 +120,7 @@ fn collect_object_ids(objects : Array[@bit.PackObject]) -> Map[String, Bool] {
 
 ///|
 fn collect_blob_sizes(objects : Array[@bit.PackObject]) -> Map[Int, Bool] {
-  let sizes : Map[Int, Bool] = {}
+  let sizes : Map[Int, Bool] = Map([])
   for obj in objects {
     if obj.obj_type == @bit.ObjectType::Blob {
       sizes[obj.data.length()] = true

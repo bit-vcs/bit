@@ -63,9 +63,15 @@ async fn handle_show_branches(args : Array[String]) -> Unit raise Error {
   }
   print_line("---")
   // Print commits with branch indicators
-  let displayed : Map[String, Bool] = {}
+  let displayed : Map[String, Bool] = Map([])
   for branch_idx, branch in branches_to_show {
-    let commits = show_branch_collect_commits(db, fs, branch.id, max_count, {})
+    let commits = show_branch_collect_commits(
+      db,
+      fs,
+      branch.id,
+      max_count,
+      Map([]),
+    )
     for commit_pair in commits {
       let (commit_id, msg) = commit_pair
       let hex = commit_id.to_hex()

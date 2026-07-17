@@ -175,7 +175,9 @@ fn ensure_native_bench_repo(
   bench_ensure_dir(bench_native_root_base)
   bench_ensure_dir(root)
   let fs = @osfs.OsFs::new()
-  ignore(try? @lib.init_repo(fs, root))
+  ignore(@lib.init_repo(fs, root)) catch {
+    _ => ()
+  }
   let git_dir = bench_join_path(root, ".git")
   let bitfs = @fs.Fs::empty(git_dir)
   let tree : TestWorkingTree = { fs: bitfs, backing_fs: fs, write_fs: fs }

@@ -283,7 +283,7 @@ fn parse_hub_work_item_list_options(
 
 ///|
 fn build_issue_child_counts(issues : Array[@hub.Issue]) -> Map[String, Int] {
-  let counts : Map[String, Int] = {}
+  let counts : Map[String, Int] = Map([])
   for issue in issues {
     match issue.parent_id {
       Some(pid) => counts[pid] = counts.get(pid).unwrap_or(0) + 1
@@ -297,7 +297,7 @@ fn build_issue_child_counts(issues : Array[@hub.Issue]) -> Map[String, Int] {
 fn build_issue_children_map(
   issues : Array[@hub.Issue],
 ) -> Map[String, Array[@hub.Issue]] {
-  let children : Map[String, Array[@hub.Issue]] = {}
+  let children : Map[String, Array[@hub.Issue]] = Map([])
   for issue in issues {
     match issue.parent_id {
       Some(pid) =>

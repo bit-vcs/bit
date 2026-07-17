@@ -34,7 +34,7 @@ async fn fetch_raw_file(url : String, target : String) -> Unit raise Error {
     root + "/" + target
   }
   // Use HTTP fetch
-  let headers : Map[String, String] = {}
+  let headers : Map[String, String] = Map([])
   let (response, content) = @bitnative.native_http_get(url, headers)
   if response.code != 200 {
     raise @bitcore.GitError::InvalidObject(
@@ -1386,7 +1386,7 @@ fn remote_update_collect_targets(
   targets : Array[String],
 ) -> (Array[String], Bool, String?) {
   let names : Array[String] = []
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   let mut default_update = false
   let add_name = fn(name : String) {
     if !seen.contains(name) {
@@ -1818,7 +1818,7 @@ fn write_clone_alternates(
     return
   }
   let unique : Array[String] = []
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   for alt in alternates {
     if seen.contains(alt) {
       continue
@@ -2722,7 +2722,7 @@ async fn fetch_local_repo(
   let fetch_hide_refs = read_hide_refs(fs, src_git_dir, [
     "transfer", "uploadpack",
   ])
-  let fetch_head_merge_refs : Map[String, Bool] = {}
+  let fetch_head_merge_refs : Map[String, Bool] = Map([])
   match @bitlib.read_head_ref(fs, git_dir) {
     @bitlib.HeadRef::Branch(current_branch_name) =>
       match branches.get(current_branch_name) {
@@ -2752,8 +2752,8 @@ async fn fetch_local_repo(
     "2",
   )
   let enforce_unadvertised_oid = protocol_version == "0"
-  let visible_advertised_oids : Map[String, Bool] = {}
-  let all_tip_oids : Map[String, Bool] = {}
+  let visible_advertised_oids : Map[String, Bool] = Map([])
+  let all_tip_oids : Map[String, Bool] = Map([])
   let visible_tip_commits : Array[@bitcore.ObjectId] = []
   for refname, id in remote_refs {
     let hex = id.to_hex()
@@ -2779,7 +2779,7 @@ async fn fetch_local_repo(
     }
   }
   let fetched_heads : Array[@bitcore.ObjectId] = []
-  let mapped_refs : Map[String, @bitcore.ObjectId] = {}
+  let mapped_refs : Map[String, @bitcore.ObjectId] = Map([])
   let bare_oid_fetches : Array[@bitcore.ObjectId] = []
   let fetch_head_entries : Array[FetchHeadEntry] = []
   for spec_entry in positive_specs {
@@ -2941,7 +2941,7 @@ async fn fetch_local_repo(
       }
     }
   }
-  let transferred_object_ids : Map[String, Bool] = {}
+  let transferred_object_ids : Map[String, Bool] = Map([])
   let rfs : &@bitcore.RepoFileSystem = fs
   let wanted_object_ids : Array[@bitcore.ObjectId] = []
   for _, id in mapped_refs {
@@ -3300,7 +3300,7 @@ fn push_destination_has_object(
   dst_git_dir : String,
   id : @bitcore.ObjectId,
 ) -> Bool {
-  let seen_objects_dirs : Map[String, Bool] = {}
+  let seen_objects_dirs : Map[String, Bool] = Map([])
   push_objects_dir_has_object(
     fs,
     dst_git_dir + "/objects",
@@ -3536,7 +3536,7 @@ async fn remote_show(
   if no_query || remote_git_dir is None {
     print_line("  Remote branches: (status not queried)")
     let local_refs = @bitlib.list_remote_tracking_refs(fs, git_dir, name)
-    let names : Map[String, Bool] = {}
+    let names : Map[String, Bool] = Map([])
     for k, _ in local_refs {
       names[k] = true
     }
@@ -3561,7 +3561,7 @@ async fn remote_show(
   } else {
     let rgd = remote_git_dir.unwrap_or("")
     let (_rhead, remote_branches) = @bitlib.list_branches(fs, rgd)
-    let remote_map : Map[String, @bitcore.ObjectId] = {}
+    let remote_map : Map[String, @bitcore.ObjectId] = Map([])
     for b in remote_branches {
       remote_map[b.name] = b.id
     }
@@ -3583,7 +3583,7 @@ async fn remote_show(
         remote_names.push(rname)
       }
       @bitlib.sort_strings_lex(remote_names)
-      let emitted : Map[String, Bool] = {}
+      let emitted : Map[String, Bool] = Map([])
       for rname in remote_names {
         let full_ref = "refs/heads/" + rname
         let mut excluded = false

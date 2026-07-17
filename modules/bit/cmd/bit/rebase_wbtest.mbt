@@ -118,11 +118,13 @@ async test "rebase: -S stores gpgsig header on rewritten commit" {
   // runner's JSON summary stream and breaks the parser, so redirect
   // fd 1 to /dev/null for the duration of the call.
   bench_stdout_suppress()
-  let rebase_result : Result[Unit, Error] = try? handle_rebase(["-S", "main"])
-  bench_stdout_restore()
-  match rebase_result {
-    Ok(_) => ()
-    Err(err) => fail("handle_rebase failed: \{err}")
+  try handle_rebase(["-S", "main"]) catch {
+    err => {
+      bench_stdout_restore()
+      fail("handle_rebase failed: \{err}")
+    }
+  } noraise {
+    _ => bench_stdout_restore()
   }
 
   let git_dir = repo_dir + "/.git"

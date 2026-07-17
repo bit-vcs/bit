@@ -8,6 +8,4 @@ import {
 
 warnings = "-29"
 
-options(
-  is_main: true,
-)
+pkgtype(kind: "executable")

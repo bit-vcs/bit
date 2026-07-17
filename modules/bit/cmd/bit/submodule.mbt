@@ -1595,7 +1595,7 @@ fn submodule_resolve_target_paths(
     return (selected, true, unmatched)
   }
   let active_filters = submodule_active_filters(fs, git_dir, root_abs)
-  let named_active : Map[String, Bool] = {}
+  let named_active : Map[String, Bool] = Map([])
   let mut has_named_active = false
   for sub in submodules {
     match read_submodule_config_value(fs, git_dir, sub.name, "active") {
@@ -2645,10 +2645,10 @@ async fn fetch_submodule_local_repo_shallow(
   let rfs : &@bitcore.RepoFileSystem = fs
   let src_db = @bitlib.ObjectDb::load(fs, src_git_dir)
   let objects : Array[@bitcore.PackObject] = []
-  let seen_commits : Map[String, Bool] = {}
-  let seen_objects : Map[String, Bool] = {}
+  let seen_commits : Map[String, Bool] = Map([])
+  let seen_objects : Map[String, Bool] = Map([])
   let boundary_ids : Array[@bitcore.ObjectId] = []
-  let seen_boundaries : Map[String, Bool] = {}
+  let seen_boundaries : Map[String, Bool] = Map([])
   let (head_branch, ref_targets) = submodule_shallow_ref_targets(
     rfs, src_git_dir, target_id, branch,
   )
@@ -2702,7 +2702,7 @@ fn ensure_submodule_local_target_objects(
     raise @bitcore.GitError::InvalidObject("Not a git repository: \{src_path}")
   }
   let src_db = @bitlib.ObjectDb::load(fs, src_git_dir)
-  let transferred_object_ids : Map[String, Bool] = {}
+  let transferred_object_ids : Map[String, Bool] = Map([])
   copy_wanted_object_graph(
     fs, rfs, src_db, modules_dir, target_id, transferred_object_ids,
   )

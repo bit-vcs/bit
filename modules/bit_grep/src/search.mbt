@@ -408,7 +408,7 @@ pub fn list_untracked_worktree_candidate_paths(
   max_depth? : Int = -1,
 ) -> Array[String] raise @bit.GitError {
   let tracked_entries = @bitlib.read_index_entries(fs, git_dir)
-  let tracked : Map[String, Bool] = {}
+  let tracked : Map[String, Bool] = Map([])
   for entry in tracked_entries {
     tracked[entry.path] = true
   }
@@ -632,7 +632,7 @@ fn collect_index_blob_sources(
   max_depth : Int,
 ) -> Array[GrepBlobSource] {
   let selected_paths = collect_index_paths(index_entries, paths, max_depth)
-  let selected : Map[String, Bool] = {}
+  let selected : Map[String, Bool] = Map([])
   for path in selected_paths {
     selected[path] = true
   }

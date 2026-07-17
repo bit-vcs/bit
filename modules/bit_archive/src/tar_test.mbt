@@ -173,7 +173,7 @@ test "tar_parse_committer_timestamp: no committer line" {
 ///|
 test "tar_emit_parent_dirs: creates directory entries" {
   let out : Array[Byte] = []
-  let emitted : Map[String, Bool] = {}
+  let emitted : Map[String, Bool] = Map([])
   tar_emit_parent_dirs(out, "a/b/c/file.txt", 0L, emitted)
   // Should emit 3 directory entries: a/, a/b/, a/b/c/
   // Each directory entry is 512 bytes
@@ -186,7 +186,7 @@ test "tar_emit_parent_dirs: creates directory entries" {
 ///|
 test "tar_emit_parent_dirs: skips already emitted" {
   let out : Array[Byte] = []
-  let emitted : Map[String, Bool] = {}
+  let emitted : Map[String, Bool] = Map([])
   emitted["a/"] = true
   emitted["a/b/"] = true
   tar_emit_parent_dirs(out, "a/b/c/file.txt", 0L, emitted)

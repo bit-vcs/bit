@@ -15,9 +15,9 @@ pub fn Kv::new(
     clock: VectorClock::new(),
     head,
     sync_engine: SyncEngine::new(),
-    pending_objects: {},
-    snapshot_cache: {},
-    snapshot_bytes_cache: {},
+    pending_objects: Map([]),
+    snapshot_cache: Map([]),
+    snapshot_bytes_cache: Map([]),
   }
 }
 

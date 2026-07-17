@@ -393,7 +393,7 @@ pub async fn relay_watch_claims_ws(
     endpoint.room,
     room_token=endpoint.room_token,
   )
-  let headers : Map[String, String] = {}
+  let headers : Map[String, String] = Map([])
   let effective_auth_token = match auth_token {
     Some(value) => Some(value)
     None => relay_auth_token()

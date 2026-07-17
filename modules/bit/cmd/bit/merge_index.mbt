@@ -52,7 +52,7 @@ async fn handle_merge_index(args : Array[String]) -> Unit raise Error {
   // Read index with stage info
   let entries = @bitlib.read_index_stage_entries(fs, git_dir)
   // Group entries by path to find unmerged files (stage > 0)
-  let unmerged : Map[String, Array[@bitlib.IndexStageEntry]] = {}
+  let unmerged : Map[String, Array[@bitlib.IndexStageEntry]] = Map([])
   for entry in entries {
     if entry.stage != 0 {
       match unmerged.get(entry.entry.path) {

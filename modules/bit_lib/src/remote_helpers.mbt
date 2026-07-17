@@ -215,28 +215,25 @@ pub fn read_local_remote_head_state(
   if !fs.is_file(head_path) {
     return RemoteHeadState::Missing
   }
-  let content = try? fs.read_file(head_path)
-  match content {
-    Err(_) => RemoteHeadState::Missing
-    Ok(data) => {
-      let line = data |> remote_decode_bytes_lossy |> remote_trim_string
-      if line.has_prefix("ref: ") {
-        let target = String::unsafe_substring(line, start=5, end=line.length())
-        let prefix = "refs/remotes/" + remote_name + "/"
-        if target.has_prefix(prefix) {
-          let branch = String::unsafe_substring(
-            target,
-            start=prefix.length(),
-            end=target.length(),
-          )
-          RemoteHeadState::Symref(branch)
-        } else {
-          RemoteHeadState::Other(target)
-        }
-      } else {
-        RemoteHeadState::Detached(line)
-      }
+  let data = fs.read_file(head_path) catch {
+    _ => return RemoteHeadState::Missing
+  }
+  let line = data |> remote_decode_bytes_lossy |> remote_trim_string
+  if line.has_prefix("ref: ") {
+    let target = String::unsafe_substring(line, start=5, end=line.length())
+    let prefix = "refs/remotes/" + remote_name + "/"
+    if target.has_prefix(prefix) {
+      let branch = String::unsafe_substring(
+        target,
+        start=prefix.length(),
+        end=target.length(),
+      )
+      RemoteHeadState::Symref(branch)
+    } else {
+      RemoteHeadState::Other(target)
     }
+  } else {
+    RemoteHeadState::Detached(line)
   }
 }
 
@@ -249,24 +246,17 @@ pub fn read_remote_head_branch(
   if !fs.is_file(head_path) {
     return None
   }
-  let content = try? fs.read_file(head_path)
-  match content {
-    Err(_) => None
-    Ok(data) => {
-      let line = data |> remote_decode_bytes_lossy |> remote_trim_string
-      if line.has_prefix("ref: ") {
-        let refname = String::unsafe_substring(line, start=5, end=line.length())
-        if refname.has_prefix("refs/heads/") {
-          Some(
-            String::unsafe_substring(refname, start=11, end=refname.length()),
-          )
-        } else {
-          None
-        }
-      } else {
-        None
-      }
+  let data = fs.read_file(head_path) catch { _ => return None }
+  let line = data |> remote_decode_bytes_lossy |> remote_trim_string
+  if line.has_prefix("ref: ") {
+    let refname = String::unsafe_substring(line, start=5, end=line.length())
+    if refname.has_prefix("refs/heads/") {
+      Some(String::unsafe_substring(refname, start=11, end=refname.length()))
+    } else {
+      None
     }
+  } else {
+    None
   }
 }
 
@@ -317,11 +307,8 @@ pub fn read_config_content(
 ) -> String {
   let config_path = git_dir + "/config"
   if rfs.is_file(config_path) {
-    let content = try? rfs.read_file(config_path)
-    match content {
-      Ok(data) => remote_decode_bytes_lossy(data)
-      Err(_) => ""
-    }
+    let data = rfs.read_file(config_path) catch { _ => return "" }
+    remote_decode_bytes_lossy(data)
   } else {
     ""
   }
@@ -459,8 +446,7 @@ pub fn read_config_value(
   name : String,
 ) -> String? {
   guard fs.is_file(config_path) else { return None }
-  let content = try? fs.read_file(config_path)
-  guard content is Ok(content) else { return None }
+  let content = fs.read_file(config_path) catch { _ => return None }
   let content_str = remote_decode_bytes_lossy(content)
   // Simple config parsing - look for key = value in section
   let section_lower = section.to_lower()
@@ -510,8 +496,7 @@ pub fn read_config_values(
 ) -> Array[String] {
   let result : Array[String] = []
   guard fs.is_file(config_path) else { return result }
-  let content = try? fs.read_file(config_path)
-  guard content is Ok(content) else { return result }
+  let content = fs.read_file(config_path) catch { _ => return result }
   let content_str = remote_decode_bytes_lossy(content)
   let section_lower = section.to_lower()
   let name_lower = name.to_lower()
@@ -575,7 +560,7 @@ pub fn read_config_bool(
 ///|
 /// Parse config overrides from GIT_CONFIG_OVERRIDES environment variable
 pub fn parse_config_overrides() -> Map[String, String] {
-  let config : Map[String, String] = {}
+  let config : Map[String, String] = Map([])
   let overrides = @bitio.env_get("GIT_CONFIG_OVERRIDES")
   guard overrides is Some(env_value) else { return config }
   // Parse key=value pairs separated by newlines

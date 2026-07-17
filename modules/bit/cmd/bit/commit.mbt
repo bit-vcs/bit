@@ -1083,7 +1083,7 @@ async fn commit_with_merge_heads(
     )
   }
   let parents : Array[@bitcore.ObjectId] = []
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   match head_parent {
     Some(parent_id) => {
       parents.push(parent_id)
@@ -1293,7 +1293,7 @@ async fn commit_show_diffstat(
   let new_entries = commit_collect_tree_entries(rfs, db, tree_id)
   let old_entries = match parent_tree_id {
     Some(pid) => commit_collect_tree_entries(rfs, db, pid)
-    None => {}
+    None => Map([])
   }
   let mut files_changed = 0
   let mut insertions = 0
@@ -1364,7 +1364,7 @@ fn commit_collect_tree_entries(
   db : @bitlib.ObjectDb,
   tree_id : @bitcore.ObjectId,
 ) -> Map[String, @bitcore.ObjectId] raise Error {
-  let result : Map[String, @bitcore.ObjectId] = {}
+  let result : Map[String, @bitcore.ObjectId] = Map([])
   commit_collect_tree_entries_recursive(rfs, db, tree_id, "", result)
   result
 }
@@ -1437,7 +1437,7 @@ async fn commit_handle_pathspec_staging(
   }
   // Validate pathspecs exist in index or working tree
   let entries = @bitlib.read_index_entries(fs, git_dir)
-  let index_paths : Map[String, Bool] = {}
+  let index_paths : Map[String, Bool] = Map([])
   for e in entries {
     index_paths[e.path] = true
   }

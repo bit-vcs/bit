@@ -401,7 +401,7 @@ pub fn read_sparse_display_patterns(
     return patterns
   }
   let positive : Array[String] = []
-  let exclude_children : Map[String, Bool] = {}
+  let exclude_children : Map[String, Bool] = Map([])
   for pattern in patterns {
     if pattern == "/*" || pattern == "!/*/" {
       continue
@@ -863,7 +863,7 @@ fn sparse_build_sparse_index_entries(
   all_files : Map[String, TreeFileEntry],
   skip_paths : Array[String],
 ) -> (Array[IndexEntry], Map[String, Bool]) raise @bit.GitError {
-  let tree_ids : Map[String, @bit.ObjectId] = {}
+  let tree_ids : Map[String, @bit.ObjectId] = Map([])
   let commit_obj = db.get(rfs, commit_id)
   match commit_obj {
     None => raise @bit.GitError::InvalidObject("Missing commit object")
@@ -923,13 +923,13 @@ fn sparse_build_sparse_index_entries(
     }
   }
 
-  let sparse_dir_set : Map[String, Bool] = {}
+  let sparse_dir_set : Map[String, Bool] = Map([])
   for dir in sparse_dirs {
     sparse_dir_set[dir] = true
   }
 
-  let kept_files : Map[String, TreeFileEntry] = {}
-  let skip_set : Map[String, Bool] = {}
+  let kept_files : Map[String, TreeFileEntry] = Map([])
+  let skip_set : Map[String, Bool] = Map([])
   for path, entry in all_files {
     let mut collapsed = false
     for dir in sparse_dirs {
@@ -983,7 +983,7 @@ fn sparse_update_worktree(
       let current_entries = expand_sparse_index_entries(
         rfs, git_dir, current_raw_entries,
       )
-      let protected_skip_paths : Map[String, Bool] = {}
+      let protected_skip_paths : Map[String, Bool] = Map([])
       for entry in current_entries {
         if matches_sparse_pattern(entry.path, patterns) {
           continue
@@ -1006,7 +1006,7 @@ fn sparse_update_worktree(
         protected_skip_paths[entry.path] = true
       }
       let all_files : Map[String, TreeFileEntry] = if preserve_index {
-        let files : Map[String, TreeFileEntry] = {}
+        let files : Map[String, TreeFileEntry] = Map([])
         for entry in current_entries {
           files[entry.path] = { id: entry.id, mode: entry.mode }
         }
@@ -1015,7 +1015,7 @@ fn sparse_update_worktree(
         collect_tree_files_from_commit(db, rfs, commit_id)
       }
       // Filter files based on sparse patterns
-      let sparse_files : Map[String, TreeFileEntry] = {}
+      let sparse_files : Map[String, TreeFileEntry] = Map([])
       let skip_paths : Array[String] = []
       for path, entry in all_files {
         if matches_sparse_pattern(path, patterns) {
@@ -1044,10 +1044,10 @@ fn sparse_update_worktree(
         let (entries, skip_set) = sparse_build_sparse_index_entries(
           db, rfs, commit_id, all_files, skip_paths,
         )
-        write_index_entries_with_flags(fs, git_dir, entries, skip_set, {})
+        write_index_entries_with_flags(fs, git_dir, entries, skip_set, Map([]))
       } else {
         // Update index with sparse skip-worktree entries.
-        let skip_set : Map[String, Bool] = {}
+        let skip_set : Map[String, Bool] = Map([])
         for path in skip_paths {
           skip_set[path] = true
         }

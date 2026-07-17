@@ -8,7 +8,7 @@ pub struct TestFs {
 
 ///|
 pub fn TestFs::new() -> TestFs {
-  let fs : TestFs = { files: {}, dirs: {} }
+  let fs : TestFs = { files: Map([]), dirs: Map([]) }
   fs.dirs.set("/", true)
   fs
 }
@@ -102,7 +102,7 @@ pub fn TestFs::readdir(
   if !self.dirs.contains(path) {
     raise @types.GitError::IoError("Directory not found: \{path}")
   }
-  let entries : Map[String, Bool] = {}
+  let entries : Map[String, Bool] = Map([])
   for item in self.files.to_array() {
     let (file_path, _) = item
     if testfs_parent_dir(file_path) == path {

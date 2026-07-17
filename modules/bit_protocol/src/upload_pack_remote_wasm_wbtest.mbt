@@ -1,12 +1,13 @@
 ///|
 async test "upload-pack wasm remote: direct api errors without configured client" {
   clear_wasm_http_client()
-  let result : Result[Bytes, Error] = try? upload_pack_info_refs(
-    "https://github.com/user/repo.git", true,
-  )
-  match result {
-    Err(@bit.GitError::ProtocolError(msg)) =>
+  try
+    ignore(upload_pack_info_refs("https://github.com/user/repo.git", true))
+  catch {
+    @bit.GitError::ProtocolError(msg) =>
       assert_true(msg.contains("configure_wasm_http_client"))
+    _ => assert_true(false)
+  } noraise {
     _ => assert_true(false)
   }
 }

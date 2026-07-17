@@ -465,7 +465,7 @@ async fn handle_pull(args : Array[String]) -> Unit raise Error {
       @bitlib.HeadRef::Detached(_) => resolve_initial_pull_head_target(None)
     }
     let preserved_entries : Array[@bitlib.IndexEntry] = []
-    let preserved_files : Map[String, Bytes] = {}
+    let preserved_files : Map[String, Bytes] = Map([])
     if !bare_repo {
       let current_status = match initial_unborn_status {
         Some(status) => status
@@ -810,11 +810,11 @@ async fn pull_apply_autostash(
     None => return
     Some(state) => {
       @bitlib.stash_drop(fs, rfs, root, 0)
-      let restored_index_paths : Map[String, Bool] = {}
+      let restored_index_paths : Map[String, Bool] = Map([])
       for entry in state.index_entries {
         restored_index_paths[entry.path] = true
       }
-      let deleted_paths : Map[String, Bool] = {}
+      let deleted_paths : Map[String, Bool] = Map([])
       for path in state.deleted_paths {
         deleted_paths[path] = true
       }
@@ -894,9 +894,9 @@ fn pull_capture_autostash_state(
   git_dir : String,
   status : @bitlib.Status,
 ) -> PullAutostashState raise Error {
-  let staged_paths : Map[String, Bool] = {}
-  let worktree_paths : Map[String, Bool] = {}
-  let deleted_paths : Map[String, Bool] = {}
+  let staged_paths : Map[String, Bool] = Map([])
+  let worktree_paths : Map[String, Bool] = Map([])
+  let deleted_paths : Map[String, Bool] = Map([])
   for path in status.staged_added {
     staged_paths[path] = true
     worktree_paths[path] = true
@@ -1100,7 +1100,7 @@ fn pull_collect_initial_conflicting_paths(
   status : @bitlib.Status,
   target_modes : Map[String, Int],
 ) -> Array[String] {
-  let conflicts : Map[String, Bool] = {}
+  let conflicts : Map[String, Bool] = Map([])
   for path in status.untracked {
     if target_modes.contains(path) {
       conflicts[path] = true
@@ -1165,7 +1165,7 @@ fn pull_snapshot_worktree_files(
   root : String,
   paths : Array[String],
 ) -> Map[String, Bytes] {
-  let snapshot : Map[String, Bytes] = {}
+  let snapshot : Map[String, Bytes] = Map([])
   for path in paths {
     let full_path = root + "/" + path
     if fs.is_file(full_path) {
@@ -2548,7 +2548,7 @@ fn ensure_consistent_alias_updates(
   git_dir : String,
   rows : Array[PushResolvedUpdate],
 ) -> Unit raise @bitcore.GitError {
-  let canonical_updates : Map[String, (@bitcore.ObjectId, String)] = {}
+  let canonical_updates : Map[String, (@bitcore.ObjectId, String)] = Map([])
   for row in rows {
     let canonical = resolve_ref_canonical_name(fs, git_dir, row.refname)
     match canonical_updates.get(canonical) {
@@ -2742,7 +2742,7 @@ async fn run_push_to_checkout_hook(
     Some((dir, _)) => resolve_push_hook_git_dir(dir)
     None => hook_git_dir
   }
-  let extra_env : Map[String, String] = {}
+  let extra_env : Map[String, String] = Map([])
   extra_env["GIT_SHIM_PWD"] = worktree_path
   extra_env["GIT_SHIM_CWD"] = worktree_path
   extra_env["GIT_DIR"] = worktree_git_dir

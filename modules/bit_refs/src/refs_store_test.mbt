@@ -67,4 +67,3 @@ test "refs/store: parse_packed_refs_text attaches peel lines and skips header" {
   @test.assert_eq(entries[1].refname, "refs/heads/main")
   @test.assert_eq(entries[1].peeled, None)
 }
-

@@ -88,9 +88,9 @@ pub fn max_delta_chain_length(
   let resolved : Array[Bool] = []
   let depths : Array[Int] = []
   let pending : Array[PendingDelta] = []
-  let by_offset : Map[Int, Int] = {}
-  let by_id : Map[@bit.ObjectId, @bit.PackObject] = {}
-  let by_id_depth : Map[@bit.ObjectId, Int] = {}
+  let by_offset : Map[Int, Int] = Map([])
+  let by_id : Map[@bit.ObjectId, @bit.PackObject] = Map([])
+  let by_id_depth : Map[@bit.ObjectId, Int] = Map([])
   let mut max_depth = 0
   for _ in 0..<count {
     let obj_offset = offset
@@ -378,8 +378,8 @@ pub fn parse_packfile_with_bases(
   verify_checksum? : Bool = true,
   hash_size? : Int = 20,
 ) -> Array[@bit.PackObject] raise @bit.GitError {
-  let by_offset : Map[Int, Int] = {}
-  let by_id : Map[@bit.ObjectId, @bit.PackObject] = {}
+  let by_offset : Map[Int, Int] = Map([])
+  let by_id : Map[@bit.ObjectId, @bit.PackObject] = Map([])
   for obj in bases {
     let id = @bit.hash_object_content_with_algo(
       hash_algo_from_size(hash_size),
@@ -418,8 +418,8 @@ pub fn parse_packfile_stream_with_bases(
   verify_checksum? : Bool = true,
   hash_size? : Int = 20,
 ) -> Unit raise @bit.GitError {
-  let by_offset : Map[Int, @bit.PackObject] = {}
-  let by_id : Map[@bit.ObjectId, @bit.PackObject] = {}
+  let by_offset : Map[Int, @bit.PackObject] = Map([])
+  let by_id : Map[@bit.ObjectId, @bit.PackObject] = Map([])
   for obj in bases {
     let id = @bit.hash_object_content_with_algo(
       hash_algo_from_size(hash_size),
@@ -785,8 +785,8 @@ fn parse_packfile_stream_internal(
   // depth tracking — see MAX_DELTA_DEPTH (parse_packfile_with_bases
   // does the same). Stream variant emits objects as they resolve, so
   // we keep depth side-tables keyed by offset and id.
-  let depth_by_offset : Map[Int, Int] = {}
-  let depth_by_id : Map[@bit.ObjectId, Int] = {}
+  let depth_by_offset : Map[Int, Int] = Map([])
+  let depth_by_id : Map[@bit.ObjectId, Int] = Map([])
   for _ in 0..<count {
     let obj_offset = offset
     let (type_id, size, next_offset) = decode_type_and_size_at(data, offset)

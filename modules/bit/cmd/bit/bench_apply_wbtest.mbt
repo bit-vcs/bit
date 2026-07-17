@@ -16,7 +16,9 @@ fn bench_apply_ensure_repo() -> Unit {
   let repo = bench_apply_root + "/repo"
   ensure_bench_dir(repo)
   let fs = OsFs::new()
-  ignore(try? @bitrepo.init_repo(fs, repo))
+  @bitrepo.init_repo(fs, repo) catch {
+    _ => ()
+  }
   // Create base files
   for i in 0..<100 {
     let content = StringBuilder::new()
@@ -28,13 +30,17 @@ fn bench_apply_ensure_repo() -> Unit {
     }
   }
   @async.run_async_main(async fn() {
-    ignore(try? @bitlib.add_paths_async(fs, fs, repo, ["."]))
+    @bitlib.add_paths_async(fs, fs, repo, ["."]) catch {
+      _ => ()
+    }
   })
   ignore(
-    try? @bitlib.commit(
+    @bitlib.commit(
       fs, fs, repo, "base\n", "Bench <bench@example.com>", 1700000000L,
     ),
-  )
+  ) catch {
+    _ => ()
+  }
   // Generate patch file directly (unified diff format)
   let diff_buf = StringBuilder::new()
   for i in 0..<20 {

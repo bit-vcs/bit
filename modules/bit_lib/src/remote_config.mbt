@@ -187,8 +187,8 @@ pub fn config_has_remote_section(
 pub fn parse_remote_config(
   content : String,
 ) -> (Map[String, RemoteConfig], Map[String, BranchConfig]) {
-  let remotes : Map[String, RemoteConfig] = {}
-  let branches : Map[String, BranchConfig] = {}
+  let remotes : Map[String, RemoteConfig] = Map([])
+  let branches : Map[String, BranchConfig] = Map([])
   let mut current_section : String? = None
   let mut current_name : String? = None
   for line_view in content.split("\n") {
@@ -458,11 +458,11 @@ pub fn read_repo_config(
 ) -> (Map[String, RemoteConfig], Map[String, BranchConfig]) {
   let config_path = git_dir + "/config"
   if !fs.is_file(config_path) {
-    return ({}, {})
+    return (Map([]), Map([]))
   }
   let content = decode_bytes_lossy(
     fs.read_file(config_path) catch {
-      _ => return ({}, {})
+      _ => return (Map([]), Map([]))
     },
   )
   let (remotes, branches) = parse_remote_config(content)

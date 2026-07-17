@@ -12,7 +12,7 @@ pub fn OsFs::new() -> OsFs {
 
 ///|
 fn io_error(err : @fs.IOError) -> @bit.GitError {
-  @bit.GitError::IoError(err.to_string())
+  @bit.GitError::IoError(@debug.render(@debug.to_repr(err)))
 }
 
 ///|

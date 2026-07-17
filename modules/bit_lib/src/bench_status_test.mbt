@@ -13,7 +13,9 @@ fn setup_status_repo(
   dirty_count : Int,
 ) -> @bit.TestFs raise @bit.GitError {
   let fs = @bit.TestFs::new()
-  ignore(try? init_repo(fs, bench_root))
+  ignore(init_repo(fs, bench_root)) catch {
+    _ => ()
+  }
   for i in 0..<file_count {
     fs.write_string(bench_root + "/file_\{i}.txt", "content\n")
   }
@@ -96,7 +98,9 @@ test "bench status_porcelain_from dirty small" (b : @bench.T) {
 ///|
 async test "racy_git: unchanged file is not reported" {
   let fs = @bit.TestFs::new()
-  ignore(try? init_repo(fs, "/repo"))
+  ignore(init_repo(fs, "/repo")) catch {
+    _ => ()
+  }
   fs.write_string("/repo/a.txt", "hello\n")
   add_paths(fs, fs, "/repo", ["a.txt"])
   ignore(commit(fs, fs, "/repo", "msg\n", "Test <t@example.com>", 1700000000L))

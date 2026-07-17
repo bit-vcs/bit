@@ -80,7 +80,7 @@ pub fn parse_v0_advertised_caps(
 pub fn parse_symrefs_from_capabilities(
   caps : Array[String],
 ) -> Map[String, String] {
-  let symrefs : Map[String, String] = {}
+  let symrefs : Map[String, String] = Map([])
   for cap in caps {
     if cap.has_prefix("symref=") {
       let raw = String::unsafe_substring(cap, start=7, end=cap.length())
@@ -133,7 +133,7 @@ pub struct LsRefsResult {
 ///|
 pub fn parse_ls_refs_response(data : Bytes) -> LsRefsResult raise @bit.GitError {
   let refs : Array[(@bit.ObjectId, String)] = []
-  let symrefs : Map[String, String] = {}
+  let symrefs : Map[String, String] = Map([])
   let lines = pktline_decode(data)
   for item in lines {
     let (line_bytes, is_flush) = item

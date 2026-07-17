@@ -9,7 +9,9 @@ fn restore_env_var_for_push_wbtest(name : String, prev : String?) -> Unit {
 ///|
 fn setup_force_if_includes_push_wbtest_repo() -> @bitcore.TestFs {
   let fs = @bitcore.TestFs::new()
-  ignore(try? @bitlib.init_repo(fs, "/repo"))
+  @bitlib.init_repo(fs, "/repo") catch {
+    _ => ()
+  }
   fs
 }
 
@@ -631,8 +633,12 @@ test "push deny-current: no checked-out worktree allows update" {
 ///|
 test "push transfer: tag that points to blob copies tagged blob object" {
   let fs = @bitcore.TestFs::new()
-  ignore(try? @bitrepo.init_repo(fs, "/src", bare=true))
-  ignore(try? @bitrepo.init_repo(fs, "/dst", bare=true))
+  @bitrepo.init_repo(fs, "/src", bare=true) catch {
+    _ => ()
+  }
+  @bitrepo.init_repo(fs, "/dst", bare=true) catch {
+    _ => ()
+  }
   let blob_id = @bitlib.write_loose_object(
     fs,
     "/src",
@@ -656,7 +662,7 @@ test "push transfer: tag that points to blob copies tagged blob object" {
     tag_data,
   )
   let src_db = @bitlib.ObjectDb::load(fs, "/src")
-  let transferred_object_ids : Map[String, Bool] = {}
+  let transferred_object_ids : Map[String, Bool] = Map([])
   copy_wanted_object_graph(
     fs, fs, src_db, "/dst", tag_id, transferred_object_ids,
   ) catch {
@@ -672,9 +678,15 @@ test "push transfer: tag that points to blob copies tagged blob object" {
 ///|
 test "push transfer: alternates avoid copying reachable parent commits" {
   let fs = @bitcore.TestFs::new()
-  ignore(try? @bitrepo.init_repo(fs, "/src"))
-  ignore(try? @bitrepo.init_repo(fs, "/alt", bare=true))
-  ignore(try? @bitrepo.init_repo(fs, "/dst", bare=true))
+  @bitrepo.init_repo(fs, "/src") catch {
+    _ => ()
+  }
+  @bitrepo.init_repo(fs, "/alt", bare=true) catch {
+    _ => ()
+  }
+  @bitrepo.init_repo(fs, "/dst", bare=true) catch {
+    _ => ()
+  }
   fs.write_string("/src/file", "one\n")
   @bitlib.add_paths(fs, fs, "/src", ["file"])
   let first = @bitlib.commit(
@@ -686,13 +698,13 @@ test "push transfer: alternates avoid copying reachable parent commits" {
     fs, fs, "/src", "second\n", "Test <test@example.com>", 1700000001L,
   )
   let src_db = @bitlib.ObjectDb::load(fs, "/src/.git")
-  let warmup_ids : Map[String, Bool] = {}
+  let warmup_ids : Map[String, Bool] = Map([])
   copy_wanted_object_graph(fs, fs, src_db, "/alt", first, warmup_ids) catch {
     _ => fail("copy_wanted_object_graph warmup failed")
   }
   fs.mkdir_p("/dst/objects/info")
   fs.write_string("/dst/objects/info/alternates", "../../alt/objects\n")
-  let transferred_object_ids : Map[String, Bool] = {}
+  let transferred_object_ids : Map[String, Bool] = Map([])
   copy_wanted_object_graph(
     fs, fs, src_db, "/dst", second, transferred_object_ids,
   ) catch {
@@ -761,7 +773,9 @@ test "push-progress: quiet and no-progress suppress output" {
 ///|
 test "push-lease: parse empty explicit expectation" {
   let fs = @bitcore.TestFs::new()
-  ignore(try? @bitrepo.init_repo(fs, "/repo"))
+  @bitrepo.init_repo(fs, "/repo") catch {
+    _ => ()
+  }
   let (refname, expectation) = push_parse_force_with_lease_value(
     fs, "/repo/.git", "branch:",
   )
@@ -832,7 +846,9 @@ async test "serve lfs: upload batch advertises relay object URL" {
   let root = "/tmp/bit-test-serve-lfs-batch-" +
     get_current_timestamp().to_string()
   cleanup_tree(fs, root)
-  ignore(try? @bitlib.init_repo(fs, root))
+  @bitlib.init_repo(fs, root) catch {
+    _ => ()
+  }
   let data = @utf8.encode("large blob\n")
   let oid = serve_lfs_wbtest_sha256_hex(data)
   let batch = @utf8.encode(
@@ -881,7 +897,9 @@ async test "serve lfs: put caches object and get downloads it" {
   let root = "/tmp/bit-test-serve-lfs-put-get-" +
     get_current_timestamp().to_string()
   cleanup_tree(fs, root)
-  ignore(try? @bitlib.init_repo(fs, root))
+  @bitlib.init_repo(fs, root) catch {
+    _ => ()
+  }
   let data = @utf8.encode("large blob\n")
   let oid = serve_lfs_wbtest_sha256_hex(data)
   let object_path = @bitlib.lfs_object_path(root + "/.git", oid)
@@ -917,16 +935,20 @@ async test "serve lfs: download batch reports cached and missing objects" {
   let root = "/tmp/bit-test-serve-lfs-download-" +
     get_current_timestamp().to_string()
   cleanup_tree(fs, root)
-  ignore(try? @bitlib.init_repo(fs, root))
+  @bitlib.init_repo(fs, root) catch {
+    _ => ()
+  }
   let data = @utf8.encode("large blob\n")
   let oid = serve_lfs_wbtest_sha256_hex(data)
   ignore(
-    try? serve_handle_git_request(
+    serve_handle_git_request(
       root,
       serve_lfs_wbtest_request("PUT", "/info/lfs/objects/\{oid}", body=data),
       allow_push=true,
     ),
-  )
+  ) catch {
+    _ => ()
+  }
   let missing = "0000000000000000000000000000000000000000000000000000000000000000"
   let batch = @utf8.encode(
     "{\"operation\":\"download\",\"objects\":[{\"oid\":\"\{oid}\",\"size\":\{data.length()}},{\"oid\":\"\{missing}\",\"size\":1}]}",

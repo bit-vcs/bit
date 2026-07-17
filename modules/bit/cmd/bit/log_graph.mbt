@@ -7,6 +7,7 @@
 // Graph renderer state constants — a faithful port of git's `enum graph_state`
 // (graph.c). The algorithm below mirrors graph.c so that `bit log --graph`
 // output is byte-for-byte identical to git's for arbitrary topologies.
+
 ///|
 let graph_state_padding = 0
 

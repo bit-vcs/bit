@@ -178,7 +178,7 @@ fn PackIndex::offset_index(self : PackIndex) -> Map[Int64, Int] {
   match self.offset_index_cache {
     Some(m) => m
     None => {
-      let m : Map[Int64, Int] = {}
+      let m : Map[Int64, Int] = Map([])
       for i in 0..<self.offsets.length() {
         m[self.offsets[i]] = i
       }
@@ -338,7 +338,7 @@ pub fn ObjectDb::load_from_objects_dir(
   let loose_paths = if fs.is_dir(objects_dir) {
     collect_loose_paths(fs, objects_dir)
   } else {
-    {}
+    Map([])
   }
   let packs = if fs.is_dir(objects_dir) {
     let pack_dir = join_path(objects_dir, "pack")
@@ -356,7 +356,7 @@ pub fn ObjectDb::load_from_objects_dir(
     loose_paths,
     packs,
     lazy_packs: [],
-    pack_cache: {},
+    pack_cache: Map([]),
     pack_cache_order: [],
     pack_cache_limit,
     prefer_packed: false,
@@ -399,10 +399,10 @@ pub fn ObjectDb::load_lazy_from_objects_dir(
   let pack_cache_limit = pack_cache_limit_from_env()
   {
     objects_dir,
-    loose_paths: {},
+    loose_paths: Map([]),
     packs: [],
     lazy_packs,
-    pack_cache: {},
+    pack_cache: Map([]),
     pack_cache_order: [],
     pack_cache_limit,
     prefer_packed: false,
@@ -455,7 +455,7 @@ pub fn ObjectDb::get(
       None => ()
     }
   }
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   seen[hex] = true
   // prefer_packed: try packs first, then loose (already tried above if !prefer_packed)
   if self.prefer_packed {
@@ -955,7 +955,7 @@ fn collect_loose_paths(
   fs : &@bit.RepoFileSystem,
   objects_dir : String,
 ) -> Map[String, String] raise @bit.GitError {
-  let result : Map[String, String] = {}
+  let result : Map[String, String] = Map([])
   let entries = fs.readdir(objects_dir)
   for entry in entries {
     if entry.length() != 2 {

@@ -424,7 +424,7 @@ pub fn receive_build_status_response_with_proc(
   receive_push_bytes(out, @protocol.pktline_encode(unpack_line))
   if original_updates.length() > 0 {
     // Output status in original push order
-    let seen : Map[String, Bool] = {}
+    let seen : Map[String, Bool] = Map([])
     for upd in original_updates {
       let refname = upd.refname
       // Check if this ref was updated (regular or fall-through)
@@ -513,7 +513,7 @@ fn receive_is_ancestor_commit(
     return true
   }
   let stack : Array[@bit.ObjectId] = [commit_id]
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   while stack.length() > 0 {
     let id = match stack.pop() {
       None => raise @bit.GitError::InvalidObject("Empty stack")
@@ -698,7 +698,7 @@ fn receive_connectivity_check(
   git_dir : String,
   pack_objects : Array[@bit.PackObject],
 ) -> String? raise @bit.GitError {
-  let pack_ids : Map[String, Bool] = {}
+  let pack_ids : Map[String, Bool] = Map([])
   for obj in pack_objects {
     pack_ids[obj.id.to_hex()] = true
   }
@@ -708,7 +708,7 @@ fn receive_connectivity_check(
   } else {
     None
   }
-  let repo_cache : Map[String, Bool] = {}
+  let repo_cache : Map[String, Bool] = Map([])
   for obj in pack_objects {
     if obj.obj_type == @bit.ObjectType::Commit {
       let info = @bit.parse_commit(obj.data)

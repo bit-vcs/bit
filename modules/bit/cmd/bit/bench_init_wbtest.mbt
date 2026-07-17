@@ -44,7 +44,9 @@ fn ensure_status_bench_repo() -> Unit {
   ensure_bench_dir(bench_status_root_base)
   ensure_bench_dir(bench_status_repo_root)
   let fs = OsFs::new()
-  ignore(try? @bitrepo.init_repo(fs, bench_status_repo_root))
+  @bitrepo.init_repo(fs, bench_status_repo_root) catch {
+    _ => ()
+  }
   for d in 0..<40 {
     let dir = bench_status_repo_root + "/dir_\{d}"
     ensure_bench_dir(dir)
@@ -63,14 +65,18 @@ fn ensure_status_bench_repo() -> Unit {
     }
   }
   @async.run_async_main(async fn() {
-    ignore(try? @bitlib.add_paths_async(fs, fs, bench_status_repo_root, ["."]))
+    @bitlib.add_paths_async(fs, fs, bench_status_repo_root, ["."]) catch {
+      _ => ()
+    }
   })
   ignore(
-    try? @bitlib.commit(
+    @bitlib.commit(
       fs, fs, bench_status_repo_root, "bench init\n", "Bench <bench@example.com>",
       1700000000L,
     ),
-  )
+  ) catch {
+    _ => ()
+  }
   @fs.write_string_to_file(marker, "ok\n") catch {
     _ => ()
   }

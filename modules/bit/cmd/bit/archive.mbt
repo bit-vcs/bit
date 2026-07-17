@@ -115,7 +115,7 @@ async fn handle_archive(args : Array[String]) -> Unit raise Error {
   // Build tar output
   let out : Array[Byte] = []
   // Track emitted directories for prefix directory entries
-  let emitted_dirs : Map[String, Bool] = {}
+  let emitted_dirs : Map[String, Bool] = Map([])
   // If prefix ends with '/', emit a directory entry for it
   if prefix.length() > 0 && prefix[prefix.length() - 1] == '/' {
     let hdr = @tar.tar_make_header(prefix, 0o40755, 0, mtime, b'5', "")

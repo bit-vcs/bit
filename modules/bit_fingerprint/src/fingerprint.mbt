@@ -242,7 +242,7 @@ fn tree_id_from_entries(entries : Array[@bitlib.IndexEntry]) -> @bit.ObjectId {
     return @bit.create_tree([]).0
   }
   let file_entries : Array[@bit.TreeEntry] = []
-  let dir_map : Map[String, Array[@bitlib.IndexEntry]] = {}
+  let dir_map : Map[String, Array[@bitlib.IndexEntry]] = Map([])
   for e in entries {
     match split_first(e.path) {
       (name, None) => {
@@ -296,7 +296,7 @@ fn index_entries_after_add_all(
 ) -> Array[@bitlib.IndexEntry] {
   let git_dir = resolve_git_dir(fs, root)
   let existing = @bitlib.read_index_entries(fs, git_dir) catch { _ => [] }
-  let staged : Map[String, @bitlib.IndexEntry] = {}
+  let staged : Map[String, @bitlib.IndexEntry] = Map([])
   for e in existing {
     if fingerprint_path_ignored(e.path, ignore_entries) {
       continue
@@ -304,7 +304,7 @@ fn index_entries_after_add_all(
     staged[e.path] = e
   }
   let working_files = @bitlib.list_working_files(fs, root) catch { _ => [] }
-  let present : Map[String, Bool] = {}
+  let present : Map[String, Bool] = Map([])
   for rel in working_files {
     if fingerprint_path_ignored(rel, ignore_entries) {
       continue

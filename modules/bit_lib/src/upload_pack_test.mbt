@@ -14,7 +14,9 @@ fn test_concat_bytes(chunks : Array[Bytes]) -> Bytes {
 ///|
 test "build_upload_pack_advertisement: empty repo" {
   let fs = @bit.TestFs::new()
-  ignore(try? init_repo(fs, "/repo"))
+  ignore(init_repo(fs, "/repo")) catch {
+    _ => ()
+  }
   let adv = build_upload_pack_advertisement(fs, "/repo")
   // Should have capabilities^{} line for empty repo
   let text = @utf8.decode_lossy(adv[:])
@@ -25,7 +27,9 @@ test "build_upload_pack_advertisement: empty repo" {
 ///|
 test "build_upload_pack_advertisement: with refs" {
   let fs = @bit.TestFs::new()
-  ignore(try? init_repo(fs, "/repo"))
+  ignore(init_repo(fs, "/repo")) catch {
+    _ => ()
+  }
   // Create a commit to get a real ref
   fs.write_string("/repo/a.txt", "hello\n")
   add_paths(fs, fs, "/repo", ["a.txt"])
@@ -240,16 +244,14 @@ test "parse_upload_pack_request_v2: extra delimiter" {
     test_delimiter(),
     test_delimiter(),
   ])
-  let res : Result[UploadPackRequestV2, Error] = try? parse_upload_pack_request_v2(
-    req_bytes,
-  )
-  match res {
-    Ok(_) => fail("expected protocol error")
-    Err(err) =>
+  try parse_upload_pack_request_v2(req_bytes) catch {
+    err =>
       debug_inspect(
         err.to_string().contains("expected flush after fetch arguments"),
         content="true",
       )
+  } noraise {
+    _ => fail("expected protocol error")
   }
 }
 

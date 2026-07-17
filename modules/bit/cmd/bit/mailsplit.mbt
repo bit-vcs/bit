@@ -50,7 +50,9 @@ async fn handle_mailsplit(args : Array[String]) -> Unit raise Error {
     for path in positional {
       let data = @fs.read_file_to_bytes(path) catch {
         err => {
-          eprint_line("fatal: cannot open \{path}: \{err}")
+          eprint_line(
+            "fatal: cannot open \{path}: \{@debug.render(@debug.to_repr(err))}",
+          )
           @sys.exit(1)
           return
         }
@@ -95,7 +97,9 @@ async fn handle_mailsplit(args : Array[String]) -> Unit raise Error {
     let content = msg.to_string()
     @fs.write_string_to_file(path, content) catch {
       err => {
-        eprint_line("fatal: cannot write \{path}: \{err}")
+        eprint_line(
+          "fatal: cannot write \{path}: \{@debug.render(@debug.to_repr(err))}",
+        )
         @sys.exit(1)
         return
       }

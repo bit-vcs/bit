@@ -114,18 +114,18 @@ fn Kv::do_merge(
     }
   }
   // Collect files from each tree
-  let base_files : Map[String, @bit.ObjectId] = {}
-  let their_files : Map[String, @bit.ObjectId] = {}
+  let base_files : Map[String, @bit.ObjectId] = Map([])
+  let their_files : Map[String, @bit.ObjectId] = Map([])
   collect_tree_files_flat(store, base_tree, "", base_files)
   collect_tree_files_flat(store, their_tree, "", their_files)
   // Get our current files
   let our_files = self.tree.get_working_files()
-  let our_file_set : Map[String, Bool] = {}
+  let our_file_set : Map[String, Bool] = Map([])
   for f in our_files {
     our_file_set[f] = true
   }
   // Find all paths
-  let all_paths : Map[String, Bool] = {}
+  let all_paths : Map[String, Bool] = Map([])
   for entry in base_files {
     all_paths[entry.0] = true
   }
@@ -320,8 +320,8 @@ fn Kv::create_merge_commit(
   sb.write_string(" +0000\n")
   sb.write_char('\n')
   sb.write_string(message)
-  let buf = @buffer.new()
-  buf.write_string(sb.to_string())
+  let buf = Buffer()
+  buf.write_string_utf16le(sb.to_string())
   let commit_bytes = buf.to_bytes()
   let merge_id = store.put(@bit.ObjectType::Commit, commit_bytes)
   self.head = merge_id
@@ -339,7 +339,7 @@ fn find_merge_base(
     return None
   }
   // Collect ancestors of commit1
-  let ancestors1 : Map[String, Int] = {} // hex -> depth
+  let ancestors1 : Map[String, Int] = Map([]) // hex -> depth
   collect_ancestors(store, commit1, 0, ancestors1)
   // Find first common ancestor from commit2
   find_common_ancestor(store, commit2, 0, ancestors1)

@@ -257,10 +257,10 @@ fn Kv::find_missing_objects(
   }
   let store : &@lib.ObjectStore = self.store
   // Collect objects reachable from our HEAD
-  let our_objects : Map[String, Bool] = {}
+  let our_objects : Map[String, Bool] = Map([])
   collect_reachable_objects(store, self.head, our_objects)
   // Collect objects reachable from their HEAD
-  let their_objects : Map[String, Bool] = {}
+  let their_objects : Map[String, Bool] = Map([])
   if their_head != @bit.ObjectId::zero() {
     collect_reachable_objects(store, their_head, their_objects)
   }

@@ -21,7 +21,7 @@ test "parse alias section from gitconfig" {
 
 ///|
 test "resolve alias expands args" {
-  let aliases : Map[String, String] = {}
+  let aliases : Map[String, String] = Map([])
   aliases.set("st", "status -sb")
   match resolve_alias(aliases, "st", ["-u"]) {
     Resolved(cmd, rest) => {
@@ -36,7 +36,7 @@ test "resolve alias expands args" {
 
 ///|
 test "resolve alias keeps quoted args together" {
-  let aliases : Map[String, String] = {}
+  let aliases : Map[String, String] = Map([])
   aliases.set("pretty", "log --pretty=\"%h %s\"")
   match resolve_alias(aliases, "pretty", []) {
     Resolved(cmd, rest) => {
@@ -50,7 +50,7 @@ test "resolve alias keeps quoted args together" {
 
 ///|
 test "resolve alias reports shell alias" {
-  let aliases : Map[String, String] = {}
+  let aliases : Map[String, String] = Map([])
   aliases.set("sh", "!echo hi")
   match resolve_alias(aliases, "sh", []) {
     Resolved(_, _) => fail("expected shell alias")

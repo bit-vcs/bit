@@ -191,7 +191,7 @@ fn scalar_remove_repo_candidates(fs : OsFs, target_abs : String) -> Unit {
   candidates.push(
     normalize_path(scalar_resolve_register_repo_path(fs, target_abs)),
   )
-  let removed : Map[String, Bool] = {}
+  let removed : Map[String, Bool] = Map([])
   for candidate in candidates {
     if candidate.length() == 0 {
       continue

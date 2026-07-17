@@ -106,7 +106,7 @@ pub fn ClaimMessage::timestamp(self : ClaimMessage) -> Int64 {
 
 ///|
 pub fn ClaimMessage::to_json(self : ClaimMessage) -> Json {
-  let obj : Map[String, Json] = {}
+  let obj : Map[String, Json] = Map([])
   obj["type"] = Json::string("work-item.claim")
   obj["issue_id"] = Json::string(self.issue_id)
   obj["action"] = Json::string(self.action.to_string())
@@ -172,7 +172,7 @@ pub fn parse_claims_from_envelopes(
 pub fn resolve_active_claims(
   claims : Array[ClaimMessage],
 ) -> Array[ClaimMessage] {
-  let latest : Map[String, ClaimMessage] = {}
+  let latest : Map[String, ClaimMessage] = Map([])
   for claim in claims {
     match latest.get(claim.issue_id) {
       Some(existing) =>

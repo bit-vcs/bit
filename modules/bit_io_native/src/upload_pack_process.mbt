@@ -622,10 +622,18 @@ async fn run_process_with_files(
   let stderr_path = "\{base}.err"
   let stdin_path = "\{base}.in"
   let cleanup_paths = [stdout_path, stderr_path, stdin_path]
-  let stdout = @process.redirect_to_file(stdout_path, truncate=true, create=420) catch {
+  let stdout = @process.redirect_to_file(
+    stdout_path,
+    create_mode=CreateOrTruncate,
+    permission=420,
+  ) catch {
     e => raise @bit.GitError::IoError("failed to open stdout file: \{e}")
   }
-  let stderr = @process.redirect_to_file(stderr_path, truncate=true, create=420) catch {
+  let stderr = @process.redirect_to_file(
+    stderr_path,
+    create_mode=CreateOrTruncate,
+    permission=420,
+  ) catch {
     e => raise @bit.GitError::IoError("failed to open stderr file: \{e}")
   }
   let stdin_bytes = match stdin_data {
@@ -633,7 +641,10 @@ async fn run_process_with_files(
     None => Bytes::default()
   }
   @fs.write_bytes_to_file(stdin_path, stdin_bytes) catch {
-    e => raise @bit.GitError::IoError("failed to write stdin temp file: \{e}")
+    e =>
+      raise @bit.GitError::IoError(
+        "failed to write stdin temp file: \{@debug.render(@debug.to_repr(e))}",
+      )
   }
   let stdin = @process.redirect_from_file(stdin_path) catch {
     e => raise @bit.GitError::IoError("process stdin failed: \{e}")
@@ -704,13 +715,17 @@ async fn run_process_with_files(
   let out = @fs.read_file_to_bytes(stdout_path) catch {
     e => {
       cleanup_temp_files(cleanup_paths)
-      raise @bit.GitError::IoError("failed to read stdout: \{e}")
+      raise @bit.GitError::IoError(
+        "failed to read stdout: \{@debug.render(@debug.to_repr(e))}",
+      )
     }
   }
   let err = @fs.read_file_to_bytes(stderr_path) catch {
     e => {
       cleanup_temp_files(cleanup_paths)
-      raise @bit.GitError::IoError("failed to read stderr: \{e}")
+      raise @bit.GitError::IoError(
+        "failed to read stderr: \{@debug.render(@debug.to_repr(e))}",
+      )
     }
   }
   cleanup_temp_files(cleanup_paths)
@@ -771,7 +786,11 @@ async fn run_ssh_upload_pack_info_refs(
   }
   let nonce = @async.now()
   let stderr_path = ".moonbit-ssh-info-refs-\{nonce}.err"
-  let stderr = @process.redirect_to_file(stderr_path, truncate=true, create=420) catch {
+  let stderr = @process.redirect_to_file(
+    stderr_path,
+    create_mode=CreateOrTruncate,
+    permission=420,
+  ) catch {
     err => raise @bit.GitError::IoError("SSH stderr file failed: \{err}")
   }
   let run_cwd = resolve_process_cwd()
@@ -963,7 +982,11 @@ async fn run_ssh_upload_pack_interactive(
   }
   let nonce = @async.now()
   let stderr_path = ".moonbit-ssh-upload-pack-\{nonce}.err"
-  let stderr = @process.redirect_to_file(stderr_path, truncate=true, create=420) catch {
+  let stderr = @process.redirect_to_file(
+    stderr_path,
+    create_mode=CreateOrTruncate,
+    permission=420,
+  ) catch {
     err => raise @bit.GitError::IoError("SSH stderr file failed: \{err}")
   }
   let run_cwd = resolve_process_cwd()
@@ -1216,7 +1239,7 @@ pub async fn clone_process_to_fs(
   }
   if depth > 0 {
     let shallow_ids : Array[String] = []
-    let seen : Map[String, Bool] = {}
+    let seen : Map[String, Bool] = Map([])
     for id in wants {
       let hex = id.to_hex()
       if seen.contains(hex) {
@@ -1266,7 +1289,7 @@ fn write_pack_promisor_marker(
 ) -> Unit raise @bit.GitError {
   let pack_dir = @bit.join_path(git_dir, "objects/pack")
   let marker_lines : Array[String] = []
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   for item in refs {
     let (id, name) = item
     let line = id.to_hex() + " " + name

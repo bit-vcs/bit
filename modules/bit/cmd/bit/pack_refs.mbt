@@ -28,7 +28,10 @@ fn handle_pack_refs(args : Array[String]) -> Unit raise Error {
   for r in refs_to_pack {
     entries.push({ refname: r.0, oid: r.1, peeled: None })
   }
-  fs.write_string(packed_refs_path, @bitrefs.serialize_packed_refs_entries(entries))
+  fs.write_string(
+    packed_refs_path,
+    @bitrefs.serialize_packed_refs_entries(entries),
+  )
   // Prune loose refs if requested
   if prune {
     for r in refs_to_pack {

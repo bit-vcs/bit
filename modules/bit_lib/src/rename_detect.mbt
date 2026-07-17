@@ -24,7 +24,7 @@ fn merge_detect_renames(
 ) -> SideRenames {
   // Potential rename sources: paths whose base content disappeared from that path
   let sources : Array[(String, TreeFileEntry)] = []
-  let replaced_paths : Map[String, Bool] = {}
+  let replaced_paths : Map[String, Bool] = Map([])
   for path, entry in base {
     if !side.contains(path) {
       sources.push((path, entry))
@@ -46,12 +46,12 @@ fn merge_detect_renames(
       added.push((path, entry))
     }
   }
-  let old_to_new : Map[String, String] = {}
-  let add_source_paths : Map[String, Bool] = {}
-  let matched_source : Map[String, Bool] = {}
-  let matched_added : Map[String, Bool] = {}
+  let old_to_new : Map[String, String] = Map([])
+  let add_source_paths : Map[String, Bool] = Map([])
+  let matched_source : Map[String, Bool] = Map([])
+  let matched_added : Map[String, Bool] = Map([])
   // Phase 1: Build OID index for exact matching
-  let source_by_oid : Map[String, Array[String]] = {}
+  let source_by_oid : Map[String, Array[String]] = Map([])
   for item in sources {
     let (path, entry) = item
     let hex = entry.id.to_hex()
@@ -171,7 +171,7 @@ fn rename_similarity_score(a : String, b : String) -> Int {
     return 0
   }
   // Count common lines using a set
-  let b_set : Map[String, Int] = {}
+  let b_set : Map[String, Int] = Map([])
   for line in b_lines {
     b_set[line] = b_set.get(line).unwrap_or(0) + 1
   }

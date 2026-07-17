@@ -119,7 +119,7 @@ async fn handle_fast_export(args : Array[String]) -> Unit raise Error {
     target_refs
   }
   // Load import marks if provided
-  let mark_map : Map[String, Int] = {} // oid-hex -> mark
+  let mark_map : Map[String, Int] = Map([]) // oid-hex -> mark
   let mut next_mark = 1
   if import_marks_file is Some(path) {
     let content = fs.read_file(path) catch { _ => b"" }
@@ -161,7 +161,7 @@ async fn handle_fast_export(args : Array[String]) -> Unit raise Error {
     commit_tips.push(id)
   }
   // Topological sort via DFS post-order, then reverse for oldest-first
-  let visited : Map[String, Bool] = {}
+  let visited : Map[String, Bool] = Map([])
   let topo_order : Array[@bitcore.ObjectId] = []
   for tip in commit_tips {
     fast_export_topo_dfs(db, fs, tip, visited, topo_order)
@@ -169,7 +169,7 @@ async fn handle_fast_export(args : Array[String]) -> Unit raise Error {
   let topo_order = topo_order.rev()
   // Output stream
   let buf = StringBuilder::new()
-  let blob_marks : Map[String, Int] = {} // blob oid hex -> mark
+  let blob_marks : Map[String, Int] = Map([]) // blob oid hex -> mark
   for oid_hex, mark_val in mark_map {
     blob_marks[oid_hex] = mark_val
   }

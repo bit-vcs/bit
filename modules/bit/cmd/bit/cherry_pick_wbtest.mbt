@@ -20,7 +20,9 @@ fn cherry_pick_wbtest_setup_linear_repo() -> (
   @bitcore.ObjectId,
 ) raise Error {
   let fs = @bitcore.TestFs::new()
-  ignore(try? @bitlib.init_repo(fs, "/repo"))
+  @bitlib.init_repo(fs, "/repo") catch {
+    _ => ()
+  }
 
   fs.write_string("/repo/file.txt", "a\n")
   @bitlib.add_paths(fs, fs, "/repo", ["file.txt"])
@@ -76,7 +78,9 @@ fn cherry_pick_wbtest_make_unborn(fs : @bitcore.TestFs) -> Unit {
 ///|
 test "cherry-pick: initial commit can be picked onto unborn branch with empty index" {
   let fs = @bitcore.TestFs::new()
-  ignore(try? @bitlib.init_repo(fs, "/repo"))
+  @bitlib.init_repo(fs, "/repo") catch {
+    _ => ()
+  }
   fs.write_string("/repo/oops", "aaa\n")
   @bitlib.add_paths(fs, fs, "/repo", ["oops"])
   let initial = @bitlib.commit(
@@ -102,7 +106,9 @@ test "cherry-pick: initial commit can be picked onto unborn branch with empty in
 ///|
 test "cherry-pick: initial commit can be picked onto unborn branch with matching index" {
   let fs = @bitcore.TestFs::new()
-  ignore(try? @bitlib.init_repo(fs, "/repo"))
+  @bitlib.init_repo(fs, "/repo") catch {
+    _ => ()
+  }
   fs.write_string("/repo/oops", "aaa\n")
   @bitlib.add_paths(fs, fs, "/repo", ["oops"])
   let initial = @bitlib.commit(

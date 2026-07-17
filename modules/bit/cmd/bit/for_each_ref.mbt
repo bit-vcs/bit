@@ -434,7 +434,7 @@ async fn handle_for_each_ref(args : Array[String]) -> Unit raise Error {
   // Load object db for object lookups
   let db = @bitlib.ObjectDb::load(fs, git_dir)
   // Pre-compute is-base values if format uses %(is-base:...)
-  let is_base_results : Map[String, String] = {}
+  let is_base_results : Map[String, String] = Map([])
   let is_base_atoms = for_each_ref_extract_is_base_atoms(format)
   if is_base_atoms.length() > 0 {
     for_each_ref_compute_is_base(
@@ -591,7 +591,7 @@ async fn for_each_ref_collect_refs_safe(
   fs : OsFs,
   git_dir : String,
 ) -> Array[(String, @bitcore.ObjectId)] {
-  let out : Map[String, @bitcore.ObjectId] = {}
+  let out : Map[String, @bitcore.ObjectId] = Map([])
   let refs_dir = git_dir + "/refs"
   if fs.is_dir(refs_dir) {
     for_each_ref_collect_loose_safe(fs, git_dir, refs_dir, "refs", out)
@@ -3142,7 +3142,7 @@ async fn for_each_ref_find_base(
     return None
   }
   // Build set of commit OIDs -> refname (first ref wins)
-  let commit_set : Map[String, String] = {}
+  let commit_set : Map[String, String] = Map([])
   for item in commit_refs {
     let (refname, cid) = item
     let hex = cid.to_hex()
@@ -3152,7 +3152,7 @@ async fn for_each_ref_find_base(
   }
   // BFS from tip through parent chain
   let queue : Array[@bitcore.ObjectId] = [tip_id]
-  let visited : Map[String, Bool] = {}
+  let visited : Map[String, Bool] = Map([])
   visited[tip_id.to_hex()] = true
   while queue.length() > 0 {
     let current = queue.remove(0)
@@ -3929,9 +3929,9 @@ fn for_each_ref_ahead_behind_commits(
     return (0, 0)
   }
   // Walk from both sides to find merge base
-  let local_ancestors : Map[String, Bool] = {}
+  let local_ancestors : Map[String, Bool] = Map([])
   for_each_ref_walk_ancestors(fs, db, local_id, local_ancestors)
-  let upstream_ancestors : Map[String, Bool] = {}
+  let upstream_ancestors : Map[String, Bool] = Map([])
   for_each_ref_walk_ancestors(fs, db, upstream_id, upstream_ancestors)
   // Count ahead: commits reachable from local but not upstream
   let mut ahead = 0

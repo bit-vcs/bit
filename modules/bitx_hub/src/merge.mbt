@@ -85,7 +85,7 @@ pub fn PrMergeResult::message(self : PrMergeResult) -> String {
 
 ///|
 fn summarize_latest_review_state(reviews : Array[PrReview]) -> (Int, Bool) {
-  let latest_verdicts : Map[String, ReviewVerdict] = {}
+  let latest_verdicts : Map[String, ReviewVerdict] = Map([])
   for review in reviews {
     latest_verdicts[review.author] = review.verdict
   }
@@ -358,7 +358,7 @@ pub fn Hub::merge_pr(
   let base = find_merge_base(objects, target_id, source_id)
   // Collect files from each tree
   let base_files = match base {
-    None => {}
+    None => Map([])
     Some(id) => collect_files_from_commit(objects, id)
   }
   let target_files = collect_files_from_commit(objects, target_id)
@@ -423,7 +423,7 @@ fn is_ancestor(
     return true
   }
   let stack : Array[@bit.ObjectId] = [commit_id]
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   while stack.length() > 0 {
     let id = stack.pop()
     guard id is Some(current) else { break }
@@ -454,7 +454,7 @@ fn find_merge_base(
   a : @bit.ObjectId,
   b : @bit.ObjectId,
 ) -> @bit.ObjectId? raise @bit.GitError {
-  let seen_a : Map[String, Bool] = {}
+  let seen_a : Map[String, Bool] = Map([])
   let stack_a : Array[@bit.ObjectId] = [a]
   while stack_a.length() > 0 {
     let id = stack_a.pop()
@@ -506,7 +506,7 @@ fn collect_files_from_commit(
   objects : &@lib.ObjectStore,
   commit_id : @bit.ObjectId,
 ) -> Map[String, FileEntry] raise @bit.GitError {
-  let result : Map[String, FileEntry] = {}
+  let result : Map[String, FileEntry] = Map([])
   let obj = objects.get(commit_id)
   guard obj is Some(commit_obj) else { return result }
   if commit_obj.obj_type != @bit.ObjectType::Commit {
@@ -550,9 +550,9 @@ fn three_way_merge(
   ours : Map[String, FileEntry],
   theirs : Map[String, FileEntry],
 ) -> (Map[String, FileEntry], Array[String]) {
-  let merged : Map[String, FileEntry] = {}
+  let merged : Map[String, FileEntry] = Map([])
   let conflicts : Array[String] = []
-  let all_paths : Map[String, Bool] = {}
+  let all_paths : Map[String, Bool] = Map([])
   for path in base.keys() {
     all_paths[path] = true
   }
@@ -602,7 +602,7 @@ fn create_tree_from_files(
   objects : &@lib.ObjectStore,
   files : Map[String, FileEntry],
 ) -> @bit.ObjectId raise @bit.GitError {
-  let tree_map : Map[String, Array[(String, FileEntry)]] = {}
+  let tree_map : Map[String, Array[(String, FileEntry)]] = Map([])
   for path, entry in files {
     let slash = path.rev_find("/")
     let (dir, name) = match slash {
@@ -622,7 +622,7 @@ fn create_tree_from_files(
       None => ()
     }
   }
-  let tree_ids : Map[String, @bit.ObjectId] = {}
+  let tree_ids : Map[String, @bit.ObjectId] = Map([])
   let dirs = tree_map.keys().to_array()
   dirs.sort_by(fn(a, b) {
     let a_depth = count_slashes(a)

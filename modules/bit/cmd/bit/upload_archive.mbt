@@ -156,7 +156,7 @@ async fn handle_upload_archive(args : Array[String]) -> Unit raise Error {
   }
   // Build tar archive
   let out : Array[Byte] = []
-  let emitted_dirs : Map[String, Bool] = {}
+  let emitted_dirs : Map[String, Bool] = Map([])
   if prefix.length() > 0 && prefix[prefix.length() - 1] == '/' {
     let hdr = @tar.tar_make_header(prefix, 0o40755, 0, mtime, b'5', "")
     for b in hdr {

@@ -233,13 +233,13 @@ fn workspace_new_node() -> WorkspaceNode {
     remote: None,
     branch: None,
     depends_on: [],
-    tasks: {},
+    tasks: Map([]),
   }
 }
 
 ///|
 fn workspace_new_task(cmd? : String = "") -> WorkspaceTask {
-  { cmd, srcs: [], outs: [], env: {}, cwd: "", trigger_mode: "auto" }
+  { cmd, srcs: [], outs: [], env: Map([]), cwd: "", trigger_mode: "auto" }
 }
 
 ///|
@@ -1101,7 +1101,7 @@ fn write_workspace_lock_snapshot(
     let dir_hash = workspace_node_directory_signature(fs, node_root).unwrap_or(
       "",
     )
-    let node_obj : Map[String, Json] = {}
+    let node_obj : Map[String, Json] = Map([])
     node_obj["id"] = Json::string(node.id)
     node_obj["path"] = Json::string(node.path)
     node_obj["required"] = Json::boolean(node.required)
@@ -1117,7 +1117,7 @@ fn write_workspace_lock_snapshot(
     }
     nodes_json.push(Json::object(node_obj))
   }
-  let root_obj : Map[String, Json] = {}
+  let root_obj : Map[String, Json] = Map([])
   root_obj["snapshot_id"] = Json::string(get_current_timestamp().to_string())
   root_obj["generated_at"] = Json::number(
     get_current_timestamp().to_double(),
@@ -1135,11 +1135,11 @@ fn read_workspace_lock_commits(
 ) -> Map[String, String] {
   let path = workspace_lock_path(fs, workspace_root)
   if !fs.is_file(path) {
-    return {}
+    return Map([])
   }
-  let text = decode_bytes(fs.read_file(path)) catch { _ => return {} }
-  let parsed = @json.parse(text) catch { _ => return {} }
-  let result : Map[String, String] = {}
+  let text = decode_bytes(fs.read_file(path)) catch { _ => return Map([]) }
+  let parsed = @json.parse(text) catch { _ => return Map([]) }
+  let result : Map[String, String] = Map([])
   guard parsed is Json::Object(root_obj) else { return result }
   guard root_obj.get("nodes") is Some(Json::Array(nodes)) else { return result }
   for node in nodes {
@@ -1160,11 +1160,11 @@ fn read_workspace_lock_signatures(
 ) -> Map[String, String] {
   let path = workspace_lock_path(fs, workspace_root)
   if !fs.is_file(path) {
-    return {}
+    return Map([])
   }
-  let text = decode_bytes(fs.read_file(path)) catch { _ => return {} }
-  let parsed = @json.parse(text) catch { _ => return {} }
-  let result : Map[String, String] = {}
+  let text = decode_bytes(fs.read_file(path)) catch { _ => return Map([]) }
+  let parsed = @json.parse(text) catch { _ => return Map([]) }
+  let result : Map[String, String] = Map([])
   guard parsed is Json::Object(root_obj) else { return result }
   guard root_obj.get("nodes") is Some(Json::Array(nodes)) else { return result }
   for node in nodes {
@@ -1190,11 +1190,11 @@ fn read_workspace_flow_cache(
 ) -> Map[String, String] {
   let path = workspace_flow_cache_path(fs, workspace_root)
   if !fs.is_file(path) {
-    return {}
+    return Map([])
   }
-  let text = decode_bytes(fs.read_file(path)) catch { _ => return {} }
-  let parsed = @json.parse(text) catch { _ => return {} }
-  let result : Map[String, String] = {}
+  let text = decode_bytes(fs.read_file(path)) catch { _ => return Map([]) }
+  let parsed = @json.parse(text) catch { _ => return Map([]) }
+  let result : Map[String, String] = Map([])
   guard parsed is Json::Object(root_obj) else { return result }
   guard root_obj.get("entries") is Some(Json::Object(entries)) else {
     return result
@@ -1213,11 +1213,11 @@ fn write_workspace_flow_cache(
   workspace_root : String,
   cache : Map[String, String],
 ) -> Unit raise Error {
-  let entries : Map[String, Json] = {}
+  let entries : Map[String, Json] = Map([])
   for key, fingerprint in cache {
     entries[key] = Json::string(fingerprint)
   }
-  let obj : Map[String, Json] = {}
+  let obj : Map[String, Json] = Map([])
   obj["schema"] = Json::string("bit.workspace.flow-cache.v1")
   obj["generated_at"] = Json::number(
     get_current_timestamp().to_double(),
@@ -1232,7 +1232,7 @@ fn write_workspace_flow_cache(
 
 ///|
 fn workspace_step_to_json(step : WorkspaceTxnStep) -> Json {
-  let obj : Map[String, Json] = {}
+  let obj : Map[String, Json] = Map([])
   obj["node_id"] = Json::string(step.node_id)
   obj["path"] = Json::string(step.path)
   obj["command"] = Json::string(step.command)
@@ -1255,7 +1255,7 @@ fn write_workspace_txn(
   for step in steps {
     step_json.push(workspace_step_to_json(step))
   }
-  let obj : Map[String, Json] = {}
+  let obj : Map[String, Json] = Map([])
   obj["txn_id"] = Json::string(txn_id)
   obj["type"] = Json::string(txn_type)
   obj["state"] = Json::string(state)
@@ -1279,13 +1279,15 @@ fn read_successful_push_nodes(
 ) -> Map[String, Bool] {
   let path = workspace_txn_path(fs, workspace_root, txn_id)
   if !fs.is_file(path) {
-    return {}
+    return Map([])
   }
-  let text = decode_bytes(fs.read_file(path)) catch { _ => return {} }
-  let parsed = @json.parse(text) catch { _ => return {} }
-  guard parsed is Json::Object(root_obj) else { return {} }
-  guard root_obj.get("steps") is Some(Json::Array(steps)) else { return {} }
-  let completed : Map[String, Bool] = {}
+  let text = decode_bytes(fs.read_file(path)) catch { _ => return Map([]) }
+  let parsed = @json.parse(text) catch { _ => return Map([]) }
+  guard parsed is Json::Object(root_obj) else { return Map([]) }
+  guard root_obj.get("steps") is Some(Json::Array(steps)) else {
+    return Map([])
+  }
+  let completed : Map[String, Bool] = Map([])
   for step in steps {
     guard step is Json::Object(step_obj) else { continue }
     let command = workspace_json_string(step_obj, "command", "")
@@ -1305,7 +1307,7 @@ fn read_successful_push_nodes(
 fn workspace_node_map(
   manifest : WorkspaceManifest,
 ) -> Map[String, WorkspaceNode] {
-  let node_map : Map[String, WorkspaceNode] = {}
+  let node_map : Map[String, WorkspaceNode] = Map([])
   for node in manifest.nodes {
     node_map[node.id] = node
   }
@@ -1388,7 +1390,7 @@ fn workspace_topological_nodes(
   let ordered_flow_nodes = @bitflow.topological_nodes(flow_nodes)
   let node_map = workspace_node_map(manifest)
   let ordered : Array[WorkspaceNode] = []
-  let visited : Map[String, Bool] = {}
+  let visited : Map[String, Bool] = Map([])
   for flow_node in ordered_flow_nodes {
     if node_map.get(flow_node.id) is Some(node) {
       ordered.push(node)
@@ -1408,12 +1410,8 @@ async fn workspace_is_node_dirty(fs : @osfs.OsFs, node_root : String) -> Bool {
   if workspace_node_git_dir(fs, node_root) is None {
     return false
   }
-  let lines : Result[Array[String], Error] = try? @bitlib.status_porcelain(
-    fs, node_root,
-  )
-  let lines = match lines {
-    Ok(entries) => entries
-    Err(_) => []
+  let lines : Array[String] = @bitlib.status_porcelain(fs, node_root) catch {
+    _ => []
   }
   lines.length() > 0
 }
@@ -1426,7 +1424,7 @@ fn collect_changed_node_ids(
   lock_signatures : Map[String, String],
   fingerprint_mode : @fingerprint.FingerprintMode,
 ) -> Map[String, Bool] {
-  let changed : Map[String, Bool] = {}
+  let changed : Map[String, Bool] = Map([])
   for node in manifest.nodes {
     let node_root = workspace_node_abs_path(workspace_root, node.path)
     let current_signature = workspace_node_directory_signature_with_mode(
@@ -1630,11 +1628,8 @@ fn workspace_bitflow_fs_adapter(fs : @osfs.OsFs) -> @bitflow.FsAdapter {
       if !fs.is_file(path) {
         return None
       }
-      let content : Result[Bytes, Error] = try? fs.read_file(path)
-      match content {
-        Ok(bytes) => Some(decode_bytes(bytes))
-        Err(_) => None
-      }
+      let bytes = fs.read_file(path) catch { _ => return None }
+      Some(decode_bytes(bytes))
     },
     fn(_path : String, _text : String) { false },
     fn(path : String) { fs.is_file(path) },
@@ -1681,7 +1676,7 @@ fn workspace_scope_flow_ir_by_nodes(
       scoped_nodes.push(node)
     }
   }
-  let selected_task_ids : Map[String, Bool] = {}
+  let selected_task_ids : Map[String, Bool] = Map([])
   for task in flow_ir.tasks {
     if selected_nodes.get(task.node) is Some(_) {
       selected_task_ids[task.id] = true
@@ -2103,7 +2098,7 @@ async fn handle_workspace_run(args : Array[String]) -> Unit raise Error {
   let selected = if affected_only {
     expand_affected_node_ids(manifest, changed)
   } else {
-    let all_ids : Map[String, Bool] = {}
+    let all_ids : Map[String, Bool] = Map([])
     for node in manifest.nodes {
       all_ids[node.id] = true
     }
@@ -2121,16 +2116,14 @@ async fn handle_workspace_run(args : Array[String]) -> Unit raise Error {
     match workspace_task_for(node, task) {
       Some(task_spec) => {
         println("workspace run[\{node.id}]: \{task_spec.cmd}")
-        let code : Result[Int, Error] = try? @process.run(
+        let code = @process.run(
           "sh",
           ["-lc", task_spec.cmd],
           extra_env=task_spec.env,
           inherit_env=true,
           cwd=workspace_task_run_cwd(node_root, task_spec),
-        )
-        let code = match code {
-          Ok(exit_code) => exit_code
-          Err(err) =>
+        ) catch {
+          err =>
             if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
               raise err
             } else {
@@ -2362,7 +2355,7 @@ async fn handle_workspace_flow(
     let star_selected_nodes = if affected_only {
       @bitflow.expand_affected_nodes(flow_ir_base.nodes, changed)
     } else {
-      let all_ids : Map[String, Bool] = {}
+      let all_ids : Map[String, Bool] = Map([])
       for node in flow_ir_base.nodes {
         all_ids[node.id] = true
       }
@@ -2381,7 +2374,7 @@ async fn handle_workspace_flow(
       node.id
     })
     let node_map = workspace_node_map(manifest)
-    let node_signatures : Map[String, String] = {}
+    let node_signatures : Map[String, String] = Map([])
     let root_signature = workspace_directory_hash_with_mode(
       fs, workspace_root, fingerprint_mode,
     )
@@ -2409,7 +2402,7 @@ async fn handle_workspace_flow(
       }
     }
     let flow_cache = if no_cache {
-      {}
+      Map([])
     } else {
       read_workspace_flow_cache(fs, workspace_root)
     }
@@ -2424,11 +2417,11 @@ async fn handle_workspace_flow(
         "workspace flow cache plan invalid: " + cache_plan.issues[0],
       )
     }
-    let decision_by_task : Map[String, @bitflow.FlowTaskCacheDecision] = {}
+    let decision_by_task : Map[String, @bitflow.FlowTaskCacheDecision] = Map([])
     for decision in cache_plan.decisions {
       decision_by_task[decision.id] = decision
     }
-    let task_map : Map[String, @bitflow.FlowTask] = {}
+    let task_map : Map[String, @bitflow.FlowTask] = Map([])
     for task_spec in flow_ir.tasks {
       task_map[task_spec.id] = task_spec
     }
@@ -2445,14 +2438,14 @@ async fn handle_workspace_flow(
     let ordered_task_ids = @bitflow.topological_nodes(task_graph_nodes).map(node => {
       node.id
     })
-    let task_ran : Map[String, Bool] = {}
+    let task_ran : Map[String, Bool] = Map([])
     let flow_label = match star_target {
       Some(target) => "star/" + target
       None => "star"
     }
     let txn_id = workspace_txn_id("flow-" + workspace_slug(flow_label))
     let steps : Array[WorkspaceTxnStep] = []
-    let task_success : Map[String, Bool] = {}
+    let task_success : Map[String, Bool] = Map([])
     let mut required_failed = false
     for task_id in ordered_task_ids {
       guard task_map.get(task_id) is Some(task_spec) else { continue }
@@ -2523,16 +2516,14 @@ async fn handle_workspace_flow(
         }
       }
       println("workspace flow[\{task_spec.id}]: \{task_spec.cmd}")
-      let run_code : Result[Int, Error] = try? @process.run(
+      let code = @process.run(
         "sh",
         ["-lc", task_spec.cmd],
         extra_env=task_spec.env,
         inherit_env=true,
         cwd=workspace_star_task_run_cwd(workspace_root, node_map, task_spec),
-      )
-      let code = match run_code {
-        Ok(exit_code) => exit_code
-        Err(err) =>
+      ) catch {
+        err =>
           if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
             raise err
           } else {
@@ -2636,7 +2627,7 @@ async fn handle_workspace_flow(
   let selected = if affected_only {
     expand_affected_node_ids(manifest, changed)
   } else {
-    let all_ids : Map[String, Bool] = {}
+    let all_ids : Map[String, Bool] = Map([])
     for node in manifest.nodes {
       all_ids[node.id] = true
     }
@@ -2653,8 +2644,8 @@ async fn handle_workspace_flow(
     node.id
   })
   let node_map = workspace_node_map(manifest)
-  let node_signatures : Map[String, String] = {}
-  let node_repo_exists : Map[String, Bool] = {}
+  let node_signatures : Map[String, String] = Map([])
+  let node_repo_exists : Map[String, Bool] = Map([])
   for node in manifest.nodes {
     let node_root = workspace_node_abs_path(workspace_root, node.path)
     match
@@ -2672,7 +2663,7 @@ async fn handle_workspace_flow(
     }
   }
   let flow_cache = if no_cache {
-    {}
+    Map([])
   } else {
     read_workspace_flow_cache(fs, workspace_root)
   }
@@ -2687,9 +2678,9 @@ async fn handle_workspace_flow(
       "workspace flow cache plan invalid: " + cache_plan.issues[0],
     )
   }
-  let cache_hit_by_node : Map[String, Bool] = {}
-  let cache_key_by_node : Map[String, String] = {}
-  let cache_fingerprint_by_node : Map[String, String] = {}
+  let cache_hit_by_node : Map[String, Bool] = Map([])
+  let cache_key_by_node : Map[String, String] = Map([])
+  let cache_fingerprint_by_node : Map[String, String] = Map([])
   for decision in cache_plan.decisions {
     cache_hit_by_node[decision.id] = decision.hit
     cache_key_by_node[decision.id] = decision.cache_key
@@ -2697,8 +2688,8 @@ async fn handle_workspace_flow(
   }
   let txn_id = workspace_txn_id("flow-" + task)
   let steps : Array[WorkspaceTxnStep] = []
-  let node_success : Map[String, Bool] = {}
-  let node_ran : Map[String, Bool] = {}
+  let node_success : Map[String, Bool] = Map([])
+  let node_ran : Map[String, Bool] = Map([])
   let mut required_failed = false
   for node_id in ordered_ids {
     guard node_map.get(node_id) is Some(node) else { continue }
@@ -2767,16 +2758,14 @@ async fn handle_workspace_flow(
           continue
         }
         println("workspace flow[\{node.id}]: \{task_spec.cmd}")
-        let code : Result[Int, Error] = try? @process.run(
+        let code = @process.run(
           "sh",
           ["-lc", task_spec.cmd],
           extra_env=task_spec.env,
           inherit_env=true,
           cwd=workspace_task_run_cwd(node_root, task_spec),
-        )
-        let code = match code {
-          Ok(exit_code) => exit_code
-          Err(err) =>
+        ) catch {
+          err =>
             if @async.is_being_cancelled() || @async.is_cancellation_error(err) {
               raise err
             } else {
@@ -2902,7 +2891,7 @@ async fn handle_workspace_export(args : Array[String]) -> Unit raise Error {
   let lock_commits = read_workspace_lock_commits(fs, workspace_root)
   let nodes_json : Array[Json] = []
   for node in manifest.nodes {
-    let obj : Map[String, Json] = {}
+    let obj : Map[String, Json] = Map([])
     obj["id"] = Json::string(node.id)
     obj["path"] = Json::string(node.path)
     obj["required"] = Json::boolean(node.required)
@@ -2920,7 +2909,7 @@ async fn handle_workspace_export(args : Array[String]) -> Unit raise Error {
     }
     nodes_json.push(Json::object(obj))
   }
-  let out_obj : Map[String, Json] = {}
+  let out_obj : Map[String, Json] = Map([])
   out_obj["schema"] = Json::string("bit.workspace.git-interop.v1")
   out_obj["workspace_root"] = Json::string(workspace_root)
   out_obj["generated_at"] = Json::number(

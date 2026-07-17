@@ -3,7 +3,9 @@
 ///|
 test "smart http: info/refs auth" {
   let fs = @bit.TestFs::new()
-  ignore(try? init_repo(fs, "/repo"))
+  ignore(init_repo(fs, "/repo")) catch {
+    _ => ()
+  }
   let bad = receive_pack_info_refs_response(fs, "/repo", None, "token")
   assert_true(bad.status == 401)
   let ok = receive_pack_info_refs_response(

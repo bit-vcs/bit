@@ -1,8 +1,8 @@
 ///|
 test "pull: detect submodule replaced by file" {
-  let from_modes : Map[String, Int] = {}
+  let from_modes : Map[String, Int] = Map([])
   from_modes["sub1"] = 0o160000
-  let to_modes : Map[String, Int] = {}
+  let to_modes : Map[String, Int] = Map([])
   to_modes["sub1"] = 0o100644
   let replaced = find_submodule_replaced_with_non_submodule(
     from_modes, to_modes,
@@ -12,9 +12,9 @@ test "pull: detect submodule replaced by file" {
 
 ///|
 test "pull: do not flag submodule removal" {
-  let from_modes : Map[String, Int] = {}
+  let from_modes : Map[String, Int] = Map([])
   from_modes["sub1"] = 0o160000
-  let to_modes : Map[String, Int] = {}
+  let to_modes : Map[String, Int] = Map([])
   let replaced = find_submodule_replaced_with_non_submodule(
     from_modes, to_modes,
   )
@@ -236,7 +236,7 @@ test "pull: rebase mode parses interactive and rejects invalid config" {
 }
 
 ///|
-let handlers_remote_pull_wbtest_shim_lock : @async.Semaphore = @async.Semaphore::new(
+let handlers_remote_pull_wbtest_shim_lock : @async.Semaphore = @async.Semaphore(
   1,
   initial_value=1,
 )
@@ -866,7 +866,7 @@ async test "pull: unborn conflict detection only keeps colliding paths" {
     @bitlib.IndexEntry::new("newfile", newfile_id, 0o100644, 8),
   ])
   let status = @bitlib.status(fs, "/repo")
-  let target_modes : Map[String, Int] = {}
+  let target_modes : Map[String, Int] = Map([])
   target_modes["file"] = 0o100644
   target_modes["extra"] = 0o100644
   let conflicts = pull_collect_initial_conflicting_paths(status, target_modes)
@@ -887,7 +887,7 @@ test "pull: unborn preserve index entries outside target tree" {
     @bitlib.IndexEntry::new("keep", keep_id, 0o100644, 1),
     @bitlib.IndexEntry::new("drop", drop_id, 0o100644, 1),
   ]
-  let target_modes : Map[String, Int] = {}
+  let target_modes : Map[String, Int] = Map([])
   target_modes["drop"] = 0o100644
   let preserved = pull_collect_initial_preserved_index_entries(
     entries, target_modes,

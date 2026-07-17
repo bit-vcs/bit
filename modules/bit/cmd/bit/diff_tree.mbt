@@ -301,8 +301,8 @@ async fn diff_tree_output(
   git_dir : String,
   abbrev : Int?,
 ) -> Unit raise Error {
-  let old_entries : Map[String, DiffTreeEntry] = {}
-  let new_entries : Map[String, DiffTreeEntry] = {}
+  let old_entries : Map[String, DiffTreeEntry] = Map([])
+  let new_entries : Map[String, DiffTreeEntry] = Map([])
   match old_tree {
     Some(ot) =>
       diff_tree_collect_entries(

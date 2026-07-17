@@ -420,7 +420,7 @@ pub fn lookup_ref_in_stack(
 /// Iterate all refs with a given prefix across stacked tables.
 /// Latest table wins for duplicate refnames.
 pub fn iter_refs(tables : Array[Bytes], prefix : String) -> Array[RefRecord] {
-  let merged : Map[String, RefRecord] = {}
+  let merged : Map[String, RefRecord] = Map([])
   // Process oldest to newest so newest wins
   for table in tables {
     match read_refs(table) {

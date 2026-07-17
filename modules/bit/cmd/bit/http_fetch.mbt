@@ -40,7 +40,7 @@ async fn handle_http_fetch(args : Array[String]) -> Unit raise Error {
   let fs = OsFs::new()
   let git_dir = resolve_git_dir(fs, root)
   let objects_dir = git_dir + "/objects"
-  let headers : Map[String, String] = {}
+  let headers : Map[String, String] = Map([])
   // Try to fetch the pack list
   let packs_url = url + "/objects/info/packs"
   if verbose {
@@ -77,7 +77,9 @@ async fn handle_http_fetch(args : Array[String]) -> Unit raise Error {
         ensure_dir(objects_dir + "/pack")
         @fs.write_bytes_to_file(pack_path, pack_data) catch {
           err => {
-            eprint_line("error: cannot write \{pack_path}: \{err}")
+            eprint_line(
+              "error: cannot write \{pack_path}: \{@debug.render(@debug.to_repr(err))}",
+            )
             continue
           }
         }
@@ -133,7 +135,9 @@ async fn http_fetch_loose_object(
   let path = dir + "/" + suffix
   @fs.write_bytes_to_file(path, data) catch {
     err => {
-      eprint_line("error: cannot write \{path}: \{err}")
+      eprint_line(
+        "error: cannot write \{path}: \{@debug.render(@debug.to_repr(err))}",
+      )
       @sys.exit(1)
       return
     }
@@ -157,6 +161,8 @@ fn http_fetch_write_ref(
   )
   @fs.write_bytes_to_file(ref_path, content_bytes) catch {
     err =>
-      raise @bitcore.GitError::IoError("cannot write ref \{ref_path}: \{err}")
+      raise @bitcore.GitError::IoError(
+        "cannot write ref \{ref_path}: \{@debug.render(@debug.to_repr(err))}",
+      )
   }
 }
