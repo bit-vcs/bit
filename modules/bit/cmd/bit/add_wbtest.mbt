@@ -13,7 +13,7 @@ test "add: storage runtime routing only for add-all without pathspecs" {
 ///|
 test "add: intent-to-add stages empty blob entries" {
   let fs = @bitcore.TestFs::new()
-  ignore(try? @bitlib.init_repo(fs, "/repo"))
+  @bitlib.init_repo(fs, "/repo") catch { _ => () }
   fs.write_string("/repo/file", "hello\n")
 
   let staged = add_apply_intent_to_add(fs, fs, "/repo", "/repo/.git", ["file"])
@@ -31,9 +31,9 @@ test "add: intent-to-add stages empty blob entries" {
 ///|
 test "add: intent-to-add does not clobber existing index entries" {
   let fs = @bitcore.TestFs::new()
-  ignore(try? @bitlib.init_repo(fs, "/repo"))
+  @bitlib.init_repo(fs, "/repo") catch { _ => () }
   fs.write_string("/repo/file", "hello\n")
-  ignore(try? @bitlib.add_paths(fs, fs, "/repo", ["file"]))
+  @bitlib.add_paths(fs, fs, "/repo", ["file"]) catch { _ => () }
 
   let before = @bitlib.read_index_entries(fs, "/repo/.git")
   assert_eq(before.length(), 1)
@@ -56,7 +56,7 @@ test "add: no-all ignores removed tracked paths" {
     fs,
     "/repo",
     ["file", "gone"],
-    {},
+    Map([]),
   )
   match filtered {
     Ok(paths) => {
