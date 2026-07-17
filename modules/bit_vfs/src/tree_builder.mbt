@@ -15,7 +15,7 @@ fn TreeNode::new_file(id : @bit.ObjectId, mode : Int) -> TreeNode {
   {
     blob_id: Some(id),
     mode,
-    children: {},
+    children: Map([]),
     base_tree_id: None,
     loaded: true,
     dirty: false,
@@ -27,7 +27,7 @@ fn TreeNode::new_dir() -> TreeNode {
   {
     blob_id: None,
     mode: 0o040000,
-    children: {},
+    children: Map([]),
     base_tree_id: None,
     loaded: true,
     dirty: false,
@@ -39,7 +39,7 @@ fn TreeNode::new_base_dir(id : @bit.ObjectId) -> TreeNode {
   {
     blob_id: None,
     mode: 0o040000,
-    children: {},
+    children: Map([]),
     base_tree_id: Some(id),
     loaded: false,
     dirty: false,

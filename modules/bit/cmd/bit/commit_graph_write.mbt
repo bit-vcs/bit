@@ -64,7 +64,7 @@ async fn write_commit_graph(
       Some(id) => tip_ids.push(id)
       None => ()
     }
-    let seen : Map[String, Bool] = {}
+    let seen : Map[String, Bool] = Map([])
     for tip_id in tip_ids {
       cgraph_walk_commits(db, rfs, tip_id, seen, commit_ids)
     }
@@ -93,7 +93,7 @@ async fn write_commit_graph(
   // Build commit entries with parsed data
   let hash_size = cgraph_repo_hash_size(rfs, git_dir)
   let entries : Array[CgraphCommitEntry] = []
-  let seen_hex : Map[String, Bool] = {}
+  let seen_hex : Map[String, Bool] = Map([])
   for cid in commit_ids {
     let hex = cid.to_hex()
     if seen_hex.contains(hex) {
@@ -124,7 +124,7 @@ async fn write_commit_graph(
     cgraph_compare_oid_bytes(a.oid.bytes, b.oid.bytes, hash_size)
   })
   // Build position map
-  let pos_map : Map[String, Int] = {}
+  let pos_map : Map[String, Int] = Map([])
   for i, entry in entries {
     pos_map[entry.oid.to_hex()] = i
   }
@@ -209,7 +209,7 @@ async fn write_commit_graph(
   }
   // Compute topological generation numbers
   // gen(root) = 1, gen(commit) = max(gen(parent) for parent in parents) + 1
-  let gen_map : Map[String, Int] = {}
+  let gen_map : Map[String, Int] = Map([])
   // Iterative computation: keep passing until all generations are resolved
   let mut changed = true
   while changed {

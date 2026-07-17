@@ -210,7 +210,7 @@ fn check_ignore_tracked_paths(
   git_dir : String,
   no_index : Bool,
 ) -> Map[String, Bool] {
-  let tracked : Map[String, Bool] = {}
+  let tracked : Map[String, Bool] = Map([])
   if no_index {
     return tracked
   }

@@ -9,7 +9,7 @@ async fn handle_history(args : Array[String]) -> Unit raise Error {
     raise @bitcore.GitError::InvalidObject("git history: missing subcommand")
   }
   let sub = args[0]
-  let rest = args[1:].to_array()
+  let rest = args[1:].to_owned()
   match sub {
     "fixup" => handle_history_fixup(rest)
     "reword" => handle_history_reword(rest)
@@ -74,7 +74,9 @@ async fn handle_history_fixup(args : Array[String]) -> Unit raise Error {
         } else if target_spec is None {
           target_spec = Some(arg)
         } else {
-          raise @bitcore.GitError::InvalidObject("command expects a single revision")
+          raise @bitcore.GitError::InvalidObject(
+            "command expects a single revision",
+          )
         }
     }
     i += 1
@@ -85,7 +87,9 @@ async fn handle_history_fixup(args : Array[String]) -> Unit raise Error {
 
   // fixup needs a worktree/index; refuse in a bare repository.
   if is_bare_repo_dir(root) {
-    raise @bitcore.GitError::InvalidObject("cannot run fixup in a bare repository")
+    raise @bitcore.GitError::InvalidObject(
+      "cannot run fixup in a bare repository",
+    )
   }
   let db = @bitlib.ObjectDb::load(rfs, git_dir)
 
@@ -102,7 +106,9 @@ async fn handle_history_fixup(args : Array[String]) -> Unit raise Error {
   let index_tree = @bitlib.write_tree_from_index(ffs, rfs, git_dir, entries)
   let head_tree = history_commit_tree_cmd(db, rfs, head)
   if index_tree == head_tree {
-    raise @bitcore.GitError::InvalidObject("nothing to fixup: no staged changes")
+    raise @bitcore.GitError::InvalidObject(
+      "nothing to fixup: no staged changes",
+    )
   }
 
   let (head_ref, tips) = history_collect_tips_cmd(
@@ -134,14 +140,21 @@ async fn handle_history_fixup(args : Array[String]) -> Unit raise Error {
 
   if dry_run {
     for u in result.updates {
-      print_line("update \{u.refname} \{u.new_id.to_hex()} \{u.old_id.to_hex()}")
+      print_line(
+        "update \{u.refname} \{u.new_id.to_hex()} \{u.old_id.to_hex()}",
+      )
     }
     return
   }
 
   // Apply the ref updates, recording a reflog entry for each.
   let new_head = history_apply_updates_cmd(
-    ffs, rfs, git_dir, result.updates, head_ref, "fixup: updating " + spec,
+    ffs,
+    rfs,
+    git_dir,
+    result.updates,
+    head_ref,
+    "fixup: updating " + spec,
   )
 
   // Reset the index to the new HEAD so staged changes are consumed, while
@@ -149,11 +162,9 @@ async fn handle_history_fixup(args : Array[String]) -> Unit raise Error {
   // Best-effort: a failure here must not abort the (already applied) rewrite.
   match new_head {
     Some(nh) =>
-      try
-        ignore(
-          @bitlib.reset(ffs, rfs, root, nh.to_hex(), @bitlib.ResetMode::Mixed),
-        )
-      catch {
+      ignore(
+        @bitlib.reset(ffs, rfs, root, nh.to_hex(), @bitlib.ResetMode::Mixed),
+      ) catch {
         _ => ()
       }
     None => ()
@@ -251,13 +262,20 @@ async fn handle_history_reword(args : Array[String]) -> Unit raise Error {
 
   if dry_run {
     for u in result.updates {
-      print_line("update \{u.refname} \{u.new_id.to_hex()} \{u.old_id.to_hex()}")
+      print_line(
+        "update \{u.refname} \{u.new_id.to_hex()} \{u.old_id.to_hex()}",
+      )
     }
     return
   }
   ignore(
     history_apply_updates_cmd(
-      ffs, rfs, git_dir, result.updates, head_ref, "reword: updating " + spec,
+      ffs,
+      rfs,
+      git_dir,
+      result.updates,
+      head_ref,
+      "reword: updating " + spec,
     ),
   )
 }
@@ -278,27 +296,19 @@ fn history_collect_tips_cmd(
   let tips : Array[@bitlib.HistoryRefUpdate] = []
   if only_head {
     // Only rewrite HEAD's branch; error if target is not in HEAD ancestry.
-    if not(@bitlib.merge_base_is_ancestor(db, rfs, target, head)) {
+    if !@bitlib.merge_base_is_ancestor(db, rfs, target, head) {
       raise @bitcore.GitError::InvalidObject(
         "rewritten commit must be an ancestor of HEAD when using --update-refs=head",
       )
     }
     match head_ref {
       Branch(name) =>
-        tips.push({
-          refname: "refs/heads/" + name,
-          old_id: head,
-          new_id: head,
-        })
+        tips.push({ refname: "refs/heads/" + name, old_id: head, new_id: head })
       Detached(_) => tips.push({ refname: "HEAD", old_id: head, new_id: head })
     }
   } else {
     for b in branches {
-      tips.push({
-        refname: "refs/heads/" + b.name,
-        old_id: b.id,
-        new_id: b.id,
-      })
+      tips.push({ refname: "refs/heads/" + b.name, old_id: b.id, new_id: b.id })
     }
   }
 
@@ -330,21 +340,35 @@ async fn history_apply_updates_cmd(
   let (rl_author, rl_email, rl_ts, rl_tz) = get_committer_identity()
   for u in updates {
     history_write_ref_cmd(ffs, git_dir, u.refname, u.new_id)
-    try
-      @bitlib.append_reflog(
-        ffs, rfs, git_dir, u.refname, u.old_id, u.new_id, rl_author, rl_email,
-        rl_ts, rl_tz, reflog_msg,
-      )
-    catch {
+    @bitlib.append_reflog(
+      ffs,
+      rfs,
+      git_dir,
+      u.refname,
+      u.old_id,
+      u.new_id,
+      rl_author,
+      rl_email,
+      rl_ts,
+      rl_tz,
+      reflog_msg,
+    ) catch {
       _ => ()
     }
     if head_branch is Some(hb) && hb == u.refname {
-      try
-        @bitlib.append_reflog(
-          ffs, rfs, git_dir, "HEAD", u.old_id, u.new_id, rl_author, rl_email,
-          rl_ts, rl_tz, reflog_msg,
-        )
-      catch {
+      @bitlib.append_reflog(
+        ffs,
+        rfs,
+        git_dir,
+        "HEAD",
+        u.old_id,
+        u.new_id,
+        rl_author,
+        rl_email,
+        rl_ts,
+        rl_tz,
+        reflog_msg,
+      ) catch {
         _ => ()
       }
       new_head = Some(u.new_id)
@@ -376,7 +400,8 @@ fn history_commit_message_cmd(
   }
   let text = decode_bytes(o.data)
   match text.find("\n\n") {
-    Some(idx) => String::unsafe_substring(text, start=idx + 2, end=text.length())
+    Some(idx) =>
+      String::unsafe_substring(text, start=idx + 2, end=text.length())
     None => ""
   }
 }

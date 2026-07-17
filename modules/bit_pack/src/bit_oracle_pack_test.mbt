@@ -20,8 +20,8 @@ async fn run_git(
     }
   let stdout_path = stdout_file.path()
   let stderr_path = stderr_file.path()
-  let stdout = @process.redirect_to_file(stdout_path, truncate=true, create=420)
-  let stderr = @process.redirect_to_file(stderr_path, truncate=true, create=420)
+  let stdout = @process.redirect_to_file(stdout_path, create_mode=CreateOrTruncate, permission=420)
+  let stderr = @process.redirect_to_file(stderr_path, create_mode=CreateOrTruncate, permission=420)
   let stdin_file : @tempfile.NamedTempFile? = match stdin_data {
     None => None
     Some(data) => {

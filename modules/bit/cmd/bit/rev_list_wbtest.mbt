@@ -607,12 +607,12 @@ async test "rev-list: negated indexed-objects suppresses clean head tree" {
   let commit_obj = db.get(fs, commit_id)
   guard commit_obj is Some(obj) else { fail("expected commit object") }
   let info = @bitcore.parse_commit(obj.data)
-  let copied_path_ids : Map[String, String] = {}
+  let copied_path_ids : Map[String, String] = Map([])
   for item in result.1.to_array() {
     copied_path_ids[item.0] = item.1
   }
   let out : Array[(@bitcore.ObjectId, String)] = []
-  let visited : Map[String, Bool] = {}
+  let visited : Map[String, Bool] = Map([])
   collect_tree_objects_excluding_index(
     db,
     fs,
@@ -657,12 +657,12 @@ async test "rev-list: negated indexed-objects suppresses clean trees after empty
   let commit_obj = db.get(fs, commit_id)
   guard commit_obj is Some(obj) else { fail("expected commit object") }
   let info = @bitcore.parse_commit(obj.data)
-  let copied_path_ids : Map[String, String] = {}
+  let copied_path_ids : Map[String, String] = Map([])
   for item in result.1.to_array() {
     copied_path_ids[item.0] = item.1
   }
   let out : Array[(@bitcore.ObjectId, String)] = []
-  let visited : Map[String, Bool] = {}
+  let visited : Map[String, Bool] = Map([])
   collect_tree_objects_excluding_index(
     db,
     fs,

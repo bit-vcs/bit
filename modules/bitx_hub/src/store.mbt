@@ -164,7 +164,7 @@ pub fn HubRecord::new(
   payload : String,
   node : String,
   timestamp : Int64,
-  clock? : Map[String, Int64] = {},
+  clock? : Map[String, Int64] = Map([]),
   deleted? : Bool = false,
   version? : Int = 1,
   signature? : String? = None,
@@ -224,7 +224,7 @@ pub fn parse_hub_record(text : String) -> HubRecord {
   let mut version = 0
   let mut key = ""
   let mut kind = ""
-  let mut clock = {}
+  let mut clock = Map([])
   let mut timestamp : Int64 = 0
   let mut node = ""
   let mut deleted = false
@@ -276,7 +276,7 @@ pub fn parse_hub_record(text : String) -> HubRecord {
 
 ///|
 fn parse_clock(s : String) -> Map[String, Int64] {
-  let result : Map[String, Int64] = {}
+  let result : Map[String, Int64] = Map([])
   if s.length() == 0 {
     return result
   }
@@ -509,7 +509,7 @@ pub fn HubStore::load(
   let key = signing_key
   let require_signed_val = require_signed
   let commit = refs.resolve(hub_notes_ref)
-  let entries : Map[String, @bit.ObjectId] = {}
+  let entries : Map[String, @bit.ObjectId] = Map([])
   let head = match commit {
     Some(cid) => {
       let obj = objects.get(cid)
@@ -619,7 +619,7 @@ pub fn HubStore::put_record(
   let existing = self.get_record(objects, key)
   let base_clock = match existing {
     Some(r) => r.clock
-    None => {}
+    None => Map([])
   }
   let next_clock = increment_clock(base_clock, node)
   let unsigned_record = HubRecord::new(
@@ -663,7 +663,7 @@ pub fn HubStore::delete_record(
   let existing = self.get_record(objects, key)
   let base_clock = match existing {
     Some(r) => r.clock
-    None => {}
+    None => Map([])
   }
   let next_clock = increment_clock(base_clock, node)
   let unsigned_record = HubRecord::new(

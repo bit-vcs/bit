@@ -15,8 +15,8 @@ fn build_dir_index(
   entries : Array[IndexEntry],
   skip_worktree : Map[String, Bool],
 ) -> DirIndex {
-  let dir_files : Map[String, Array[(Int, String)]] = {}
-  let dir_has_descendants : Map[String, Bool] = {}
+  let dir_files : Map[String, Array[(Int, String)]] = Map([])
+  let dir_has_descendants : Map[String, Bool] = Map([])
   for i, entry in entries {
     if skip_worktree.contains(entry.path) {
       continue

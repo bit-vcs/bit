@@ -54,7 +54,7 @@ fn parse_object_type(value : String) -> @bit.ObjectType? {
 
 ///|
 fn vector_clock_to_json(clock : @kv.VectorClock) -> Json {
-  let obj : Map[String, Json] = {}
+  let obj : Map[String, Json] = Map([])
   for entry in clock.clocks {
     obj[entry.0] = Json::number(entry.1.to_double())
   }
@@ -66,7 +66,7 @@ fn parse_vector_clock(value : Json) -> Result[@kv.VectorClock, String] {
   guard value is Json::Object(obj) else {
     return Err("clock must be an object")
   }
-  let clocks : Map[String, Int64] = {}
+  let clocks : Map[String, Int64] = Map([])
   for entry in obj {
     let key = entry.0
     match entry.1 {
@@ -123,7 +123,7 @@ fn parse_object_id_array(
 
 ///|
 fn bit_object_to_json(obj : @kv.GitObject) -> Json {
-  let json_obj : Map[String, Json] = {}
+  let json_obj : Map[String, Json] = Map([])
   json_obj["id"] = Json::string(obj.id.to_hex())
   json_obj["obj_type"] = Json::string(object_type_to_string(obj.obj_type))
   json_obj["data"] = Json::string(@base64.encode(obj.data, padding=true))
@@ -159,7 +159,7 @@ fn parse_git_object(value : Json) -> Result[@kv.GitObject, String] {
 
 ///|
 fn gossip_state_to_json(state : @kv.GossipState) -> Json {
-  let obj : Map[String, Json] = {}
+  let obj : Map[String, Json] = Map([])
   obj["node_id"] = Json::string(state.node_id.id)
   obj["head"] = Json::string(state.head.to_hex())
   obj["clock"] = vector_clock_to_json(state.clock)
@@ -200,7 +200,7 @@ fn parse_gossip_state(value : Json) -> Result[@kv.GossipState, String] {
 
 ///|
 fn gossip_message_to_json(msg : @kv.GossipMessage) -> Json {
-  let obj : Map[String, Json] = {}
+  let obj : Map[String, Json] = Map([])
   match msg {
     @kv.GossipMessage::Announce(state) => {
       obj["type"] = Json::string("announce")
@@ -498,7 +498,7 @@ pub async fn sync_round_http(
   count : Int,
   seed : Int64,
   timestamp : Int64,
-  headers? : Map[String, String] = {},
+  headers? : Map[String, String] = Map([]),
 ) -> @kv.SyncRoundResult {
   sync_round_with_exchange(kv, count, seed, timestamp, async fn(peer, msg) {
     exchange_http_peer(peer, msg, headers)
@@ -511,7 +511,7 @@ pub async fn sync_round_websocket(
   count : Int,
   seed : Int64,
   timestamp : Int64,
-  headers? : Map[String, String] = {},
+  headers? : Map[String, String] = Map([]),
 ) -> @kv.SyncRoundResult {
   sync_round_with_exchange(kv, count, seed, timestamp, async fn(peer, msg) {
     exchange_websocket_peer(peer, msg, headers)
@@ -524,7 +524,7 @@ pub async fn sync_round_native(
   count : Int,
   seed : Int64,
   timestamp : Int64,
-  headers? : Map[String, String] = {},
+  headers? : Map[String, String] = Map([]),
 ) -> @kv.SyncRoundResult {
   sync_round_with_exchange(kv, count, seed, timestamp, async fn(peer, msg) {
     if is_http_endpoint(peer.endpoint) {

@@ -147,7 +147,7 @@ fn build_test_commit_graph(entries : Array[TestCommitEntry]) -> Bytes {
     }
     0
   })
-  let pos_map : Map[String, Int] = {}
+  let pos_map : Map[String, Int] = Map([])
   for i = 0; i < num; i = i + 1 {
     pos_map[entries[i].oid.to_hex()] = i
   }

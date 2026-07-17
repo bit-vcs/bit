@@ -212,10 +212,10 @@ fn find_merge_base(
   commit2 : @bit.ObjectId,
 ) -> @bit.ObjectId? raise @bit.GitError {
   // Collect all ancestors of commit1
-  let ancestors1 : Map[String, Bool] = {}
+  let ancestors1 : Map[String, Bool] = Map([])
   collect_ancestors(db, fs, commit1, ancestors1)
   // Walk commit2's history and find first common ancestor
-  let visited : Map[String, Bool] = {}
+  let visited : Map[String, Bool] = Map([])
   let queue : Array[@bit.ObjectId] = [commit2]
   while queue.length() > 0 {
     let c = queue.remove(0)
@@ -282,7 +282,7 @@ fn rebase_tree_map(
   fs : &@bit.RepoFileSystem,
   commit_id : @bit.ObjectId,
 ) -> Map[String, TreeEntryInfo] raise @bit.GitError {
-  let result : Map[String, TreeEntryInfo] = {}
+  let result : Map[String, TreeEntryInfo] = Map([])
   let commit_obj = db.get(fs, commit_id)
   match commit_obj {
     None => raise @bit.GitError::InvalidObject("Missing commit object")
@@ -304,7 +304,7 @@ fn rebase_tree_map_from_tree(
   fs : &@bit.RepoFileSystem,
   tree_id : @bit.ObjectId,
 ) -> Map[String, TreeEntryInfo] raise @bit.GitError {
-  let result : Map[String, TreeEntryInfo] = {}
+  let result : Map[String, TreeEntryInfo] = Map([])
   rebase_collect_tree(db, fs, tree_id, "", result)
   result
 }
@@ -348,7 +348,7 @@ fn rebase_diff_maps(
   commit_map : Map[String, TreeEntryInfo],
 ) -> Array[Change] {
   let changes : Array[Change] = []
-  let paths : Map[String, Bool] = {}
+  let paths : Map[String, Bool] = Map([])
   for p in parent_map.keys() {
     paths[p] = true
   }
@@ -450,7 +450,7 @@ fn rebase_write_tree_recursive(
   entries : Array[IndexEntry],
 ) -> @bit.ObjectId raise @bit.GitError {
   let file_entries : Array[@bit.TreeEntry] = []
-  let dir_map : Map[String, Array[IndexEntry]] = {}
+  let dir_map : Map[String, Array[IndexEntry]] = Map([])
   for e in entries {
     match rebase_split_first(e.path) {
       (name, None) => {
@@ -527,7 +527,7 @@ fn rebase_write_worktree_except(
 ) -> Unit raise @bit.GitError {
   let autocrlf = read_autocrlf_setting(rfs, git_dir)
   let core_eol = read_core_eol_setting(rfs, git_dir)
-  let except_set : Map[String, Bool] = {}
+  let except_set : Map[String, Bool] = Map([])
   for path in except {
     except_set[path] = true
   }
@@ -1364,7 +1364,7 @@ fn rebase_compute_patch_tree_diff(
   parent : Array[(String, String)],
   current : Array[(String, String)],
 ) -> Array[(String, String)] {
-  let parent_map : Map[String, String] = {}
+  let parent_map : Map[String, String] = Map([])
   for item in parent {
     let (path, id) = item
     parent_map[path] = id
@@ -1377,7 +1377,7 @@ fn rebase_compute_patch_tree_diff(
       None => diff.push((path, "A:" + id))
     }
   }
-  let current_map : Map[String, String] = {}
+  let current_map : Map[String, String] = Map([])
   for item in current {
     let (path, id) = item
     current_map[path] = id
@@ -1399,7 +1399,7 @@ fn rebase_patch_id_exists_in_ancestors(
   head_id : @bit.ObjectId,
 ) -> Bool raise @bit.GitError {
   let target_patch_id = rebase_compute_patch_id(db, fs, commit_id)
-  let visited : Map[String, Bool] = {}
+  let visited : Map[String, Bool] = Map([])
   let queue : Array[@bit.ObjectId] = [head_id]
   while queue.length() > 0 {
     let current = queue.remove(0)

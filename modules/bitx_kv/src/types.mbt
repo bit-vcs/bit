@@ -46,7 +46,7 @@ pub(all) struct VectorClock {
 
 ///|
 pub fn VectorClock::new() -> VectorClock {
-  { clocks: {} }
+  { clocks: Map([]) }
 }
 
 ///|
@@ -62,7 +62,7 @@ pub fn VectorClock::merge(
   self : VectorClock,
   other : VectorClock,
 ) -> VectorClock {
-  let clocks : Map[String, Int64] = {}
+  let clocks : Map[String, Int64] = Map([])
   for entry in self.clocks {
     clocks[entry.0] = entry.1
   }
@@ -81,7 +81,7 @@ pub fn VectorClock::compare(self : VectorClock, other : VectorClock) -> Int {
   let mut dominated = false
   let mut dominates = false
   // Check all keys from both clocks
-  let all_keys : Map[String, Bool] = {}
+  let all_keys : Map[String, Bool] = Map([])
   for entry in self.clocks {
     all_keys[entry.0] = true
   }

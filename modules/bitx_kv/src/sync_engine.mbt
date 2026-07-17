@@ -4,7 +4,7 @@
 pub fn SyncEngine::new(
   config? : SyncEngineConfig = SyncEngineConfig::default(),
 ) -> SyncEngine {
-  { config, peers: {} }
+  { config, peers: Map([]) }
 }
 
 ///|
@@ -175,7 +175,7 @@ fn select_random_unique(
   }
   let selected : Array[PeerInfo] = []
   let mut current_seed = seed
-  let used : Map[Int, Bool] = {}
+  let used : Map[Int, Bool] = Map([])
   while selected.length() < count && used.length() < peers.length() {
     current_seed = (current_seed * 1103515245L + 12345L) % 2147483648L
     let idx = (current_seed % peers.length().to_int64()).to_int()

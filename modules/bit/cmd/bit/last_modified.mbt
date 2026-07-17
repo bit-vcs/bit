@@ -83,7 +83,9 @@ async fn handle_last_modified(args : Array[String]) -> Unit raise Error {
         let left = String::unsafe_substring(arg, start=0, end=pos)
         let right_start = pos + (if three { 3 } else { 2 })
         let right = String::unsafe_substring(
-          arg, start=right_start, end=arg.length(),
+          arg,
+          start=right_start,
+          end=arg.length(),
         )
         let left_spec = if left.length() == 0 { "HEAD" } else { left }
         let right_spec = if right.length() == 0 { "HEAD" } else { right }
@@ -114,7 +116,7 @@ async fn handle_last_modified(args : Array[String]) -> Unit raise Error {
       _ =>
         if arg.has_prefix("--max-depth=") {
           let v = String::unsafe_substring(arg, start=12, end=arg.length())
-          max_depth = @strconv.parse_int(v) catch {
+          max_depth = @string.parse_int(v) catch {
             _ =>
               raise @bitcore.GitError::InvalidObject(
                 "invalid --max-depth value: \{v}",
@@ -122,18 +124,17 @@ async fn handle_last_modified(args : Array[String]) -> Unit raise Error {
           }
         } else if arg.has_prefix("--max-count=") {
           let v = String::unsafe_substring(arg, start=12, end=arg.length())
-          max_count = @strconv.parse_int(v) catch { _ => -1 }
+          max_count = @string.parse_int(v) catch { _ => -1 }
         } else if arg.length() > 1 &&
           arg[0] == '-' &&
           lm_is_all_digits(
             String::unsafe_substring(arg, start=1, end=arg.length()),
           ) {
-          max_count = @strconv.parse_int(
-              String::unsafe_substring(arg, start=1, end=arg.length()),
-            )
-            catch {
-              _ => -1
-            }
+          max_count = @string.parse_int(
+            String::unsafe_substring(arg, start=1, end=arg.length()),
+          ) catch {
+            _ => -1
+          }
         } else if arg.has_prefix("--") {
           raise @bitcore.GitError::InvalidObject(
             "unknown last-modified argument: \{arg}",

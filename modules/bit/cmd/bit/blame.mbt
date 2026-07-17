@@ -456,7 +456,7 @@ async fn compute_blame_with_opts(
   // Build commit history for this file
   let history = build_file_history(db, rfs, tid, file_path)
   // For -M/-C: also collect other files in commits
-  let other_files : Map[String, Array[(String, @bitcore.ObjectId)]] = {}
+  let other_files : Map[String, Array[(String, @bitcore.ObjectId)]] = Map([])
   if opts.detect_moves || opts.detect_copies {
     collect_other_files(db, rfs, history, file_path, other_files)
   }
@@ -677,7 +677,7 @@ fn build_file_history(
 ) -> Array[@bitcore.ObjectId] raise Error {
   // Walk commit history, collecting commits that touch the file
   let result : Array[@bitcore.ObjectId] = []
-  let visited : Map[String, Bool] = {}
+  let visited : Map[String, Bool] = Map([])
   let queue : Array[@bitcore.ObjectId] = [start]
   while queue.length() > 0 {
     let current = queue.pop()
@@ -959,7 +959,7 @@ async fn output_blame_porcelain(lines : Array[BlameLine]) -> Unit raise Error {
 async fn output_blame_incremental(lines : Array[BlameLine]) -> Unit raise Error {
   // Incremental format: each entry is immediately flushed
   // Track which commits we've already output headers for
-  let seen_commits : Map[String, Bool] = {}
+  let seen_commits : Map[String, Bool] = Map([])
   for line in lines {
     let sha = line.commit_id.to_hex()
     print_line("\{sha} \{line.line_no} \{line.line_no} 1")

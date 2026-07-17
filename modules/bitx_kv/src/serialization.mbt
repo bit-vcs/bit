@@ -322,7 +322,7 @@ fn collect_tree_and_blob_objects(
 ///     4 bytes: data length
 ///     N bytes: data
 pub fn SerializedSnapshot::to_bytes(self : SerializedSnapshot) -> Bytes {
-  let buf = @buffer.new(size_hint=self.byte_size())
+  let buf = Buffer(size_hint=self.byte_size())
   // Version
   buf.write_int_le(self.version)
   // Node ID

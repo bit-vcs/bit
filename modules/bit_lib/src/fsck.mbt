@@ -19,8 +19,8 @@ pub fn fsck_connectivity_check(
   tips : Array[@bit.ObjectId],
   collect_extra? : Bool = false,
 ) -> FsckResult {
-  let reachable : Map[String, Bool] = {}
-  let missing : Map[String, Bool] = {}
+  let reachable : Map[String, Bool] = Map([])
+  let missing : Map[String, Bool] = Map([])
   let root_commits : Array[String] = []
   let tag_objects : Array[String] = []
   let mut errors = 0
@@ -133,7 +133,7 @@ fn fsck_walk_tag(
 /// Enumerate all object hex IDs from ObjectDb (loose + packed).
 pub fn fsck_enumerate_objects(db : ObjectDb) -> Array[String] {
   let all : Array[String] = []
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   for hex, _ in db.loose_paths {
     if !seen.contains(hex) {
       seen[hex] = true

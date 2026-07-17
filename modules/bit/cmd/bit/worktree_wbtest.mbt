@@ -1,5 +1,5 @@
 ///|
-let worktree_wbtest_shim_lock : @async.Semaphore = @async.Semaphore::new(
+let worktree_wbtest_shim_lock : @async.Semaphore = @async.Semaphore(
   1,
   initial_value=1,
 )

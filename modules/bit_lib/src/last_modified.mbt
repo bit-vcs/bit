@@ -42,7 +42,7 @@ pub fn last_modified_committer_ts(data : Bytes) -> Int64 {
       // timestamp is the second-to-last token.
       if toks.length() >= 2 {
         let ts_str = toks[toks.length() - 2]
-        return @strconv.parse_int64(ts_str) catch { _ => 0L }
+        return @string.parse_int64(ts_str) catch { _ => 0L }
       }
     }
   }
@@ -101,7 +101,14 @@ pub fn last_modified_collect_entries(
           out.push({ path, })
         }
         last_modified_collect_entries(
-          db, fs, entry.id, path, depth + 1, max_depth, show_trees, pathspecs,
+          db,
+          fs,
+          entry.id,
+          path,
+          depth + 1,
+          max_depth,
+          show_trees,
+          pathspecs,
           out,
         )
       } else {
@@ -172,11 +179,15 @@ fn last_modified_one_pathspec(path : String, spec : String) -> Bool {
   if spec.has_suffix("/*") {
     let base = String::unsafe_substring(spec, start=0, end=spec.length() - 2)
     // Match direct children of base (one extra segment).
-    if !(path.has_prefix(base + "/")) {
+    if !path.has_prefix(base + "/") {
       return false
     }
-    let rest = String::unsafe_substring(path, start=base.length() + 1, end=path.length())
-    return !(rest.contains("/"))
+    let rest = String::unsafe_substring(
+      path,
+      start=base.length() + 1,
+      end=path.length(),
+    )
+    return !rest.contains("/")
   }
   if spec.has_suffix("*") {
     let base = String::unsafe_substring(spec, start=0, end=spec.length() - 1)
@@ -265,7 +276,15 @@ pub fn last_modified_compute(
   let start = last_modified_resolve_commitish(db, fs, start_id, spec)
   let all_entries : Array[LmPath] = []
   last_modified_collect_entries(
-    db, fs, start.tree, "", 0, max_depth, show_trees, pathspecs, all_entries,
+    db,
+    fs,
+    start.tree,
+    "",
+    0,
+    max_depth,
+    show_trees,
+    pathspecs,
+    all_entries,
   )
   let all_paths : Array[LmPath] = []
   for e in all_entries {
@@ -275,7 +294,7 @@ pub fn last_modified_compute(
   }
   // Commits reachable from any `bottom` (e.g. `A` in `A..B`) are excluded; the
   // walk treats them as boundaries and emits remaining paths with a `^` prefix.
-  let bottom_set : Map[String, Bool] = {}
+  let bottom_set : Map[String, Bool] = Map([])
   let bstack : Array[@bit.ObjectId] = []
   for b in bottoms {
     let peeled = last_modified_resolve_commitish(db, fs, b, spec)
@@ -316,7 +335,7 @@ fn last_modified_walk(
   }
   let resolved = Array::make(n, false)
   let mut resolved_count = 0
-  let commits : Map[String, LmCommit] = {}
+  let commits : Map[String, LmCommit] = Map([])
   let stack = [start.id]
   commits[start.id.to_hex()] = start
   while stack.length() > 0 {
@@ -347,9 +366,9 @@ fn last_modified_walk(
       }
     }
   }
-  let active : Map[String, Array[Bool]] = {}
+  let active : Map[String, Array[Bool]] = Map([])
   active[start.id.to_hex()] = Array::make(n, true)
-  let processed : Map[String, Bool] = {}
+  let processed : Map[String, Bool] = Map([])
   let mut popped = 0
   fn pick_next() -> String? {
     let mut best : String? = None
@@ -360,7 +379,7 @@ fn last_modified_walk(
         continue
       }
       let c = commits.get(hex).unwrap()
-      if !(have) || c.timestamp > best_ts {
+      if !have || c.timestamp > best_ts {
         best_ts = c.timestamp
         best = Some(hex)
         have = true
@@ -377,7 +396,7 @@ fn last_modified_walk(
     popped += 1
     if (max_count >= 0 && popped > max_count) || bottom_set.contains(chex) {
       for idx in 0..<n {
-        if act[idx] && !(resolved[idx]) {
+        if act[idx] && !resolved[idx] {
           resolved[idx] = true
           resolved_count += 1
           results.push({ oid: c.id, path: all_paths[idx].path, boundary: true })
@@ -387,7 +406,7 @@ fn last_modified_walk(
     }
     if c.parents.length() == 0 {
       for idx in 0..<n {
-        if act[idx] && !(resolved[idx]) {
+        if act[idx] && !resolved[idx] {
           resolved[idx] = true
           resolved_count += 1
           results.push({ oid: c.id, path: all_paths[idx].path, boundary: false })
@@ -408,7 +427,7 @@ fn last_modified_walk(
         }
       }
       for idx in 0..<n {
-        if !(act[idx]) || passed[idx] {
+        if !act[idx] || passed[idx] {
           continue
         }
         let path = all_paths[idx].path
@@ -426,7 +445,7 @@ fn last_modified_walk(
       }
     }
     for idx in 0..<n {
-      if act[idx] && !(passed[idx]) && !(resolved[idx]) {
+      if act[idx] && !passed[idx] && !resolved[idx] {
         resolved[idx] = true
         resolved_count += 1
         results.push({ oid: c.id, path: all_paths[idx].path, boundary: false })

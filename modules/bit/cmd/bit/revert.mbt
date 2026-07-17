@@ -182,7 +182,7 @@ async fn handle_revert(args : Array[String]) -> Unit raise Error {
     let commit_files = @bitlib.collect_tree_files_from_commit(db, rfs, cid)
     let parent_files : Map[String, @bitlib.TreeFileEntry] = match parent_id {
       Some(pid) => @bitlib.collect_tree_files_from_commit(db, rfs, pid)
-      None => {}
+      None => Map([])
     }
     // Apply reverse changes
     let mut has_conflicts = false

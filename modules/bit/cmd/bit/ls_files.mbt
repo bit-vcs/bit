@@ -189,7 +189,7 @@ async fn handle_ls_files(args : Array[String]) -> Unit raise Error {
     }
     // Untracked files (show_others)
     if show_others {
-      let tracked : Map[String, Bool] = {}
+      let tracked : Map[String, Bool] = Map([])
       for e in entries {
         tracked[e.path] = true
       }
@@ -219,7 +219,7 @@ async fn handle_ls_files(args : Array[String]) -> Unit raise Error {
     return ()
   }
   if show_ignored && !show_others {
-    let entry_map : Map[String, @bitlib.IndexEntry] = {}
+    let entry_map : Map[String, @bitlib.IndexEntry] = Map([])
     for entry in entries {
       entry_map[entry.path] = entry
     }
@@ -245,9 +245,9 @@ async fn handle_ls_files(args : Array[String]) -> Unit raise Error {
   }
   if show_others {
     // Build set of tracked paths and their parent directories
-    let tracked : Map[String, Bool] = {}
-    let entry_map : Map[String, @bitlib.IndexEntry] = {}
-    let tracked_dirs : Map[String, Bool] = {}
+    let tracked : Map[String, Bool] = Map([])
+    let entry_map : Map[String, @bitlib.IndexEntry] = Map([])
+    let tracked_dirs : Map[String, Bool] = Map([])
     for e in entries {
       tracked[e.path] = true
       entry_map[e.path] = e
@@ -276,7 +276,7 @@ async fn handle_ls_files(args : Array[String]) -> Unit raise Error {
       exclude_from_files,
       exclude_per_directory,
     )
-    let untracked_file_set : Map[String, Bool] = {}
+    let untracked_file_set : Map[String, Bool] = Map([])
     for path in all_files {
       untracked_file_set[path] = true
     }
@@ -300,7 +300,7 @@ async fn handle_ls_files(args : Array[String]) -> Unit raise Error {
       let disable_directory_compression = show_ignored &&
         path_filters.length() == 0 &&
         ignore_file_filters.length() > 0
-      let explicit_file_filters : Map[String, Bool] = {}
+      let explicit_file_filters : Map[String, Bool] = Map([])
       for filter in path_filters {
         let (_raw, is_exclude, _is_icase) = parse_pathspec_magic(filter)
         if !is_exclude &&
@@ -310,7 +310,7 @@ async fn handle_ls_files(args : Array[String]) -> Unit raise Error {
         }
       }
       let outputs : Array[String] = []
-      let output_set : Map[String, Bool] = {}
+      let output_set : Map[String, Bool] = Map([])
       let compress_dirs : Array[String] = []
       for
         dir in ls_files_collect_candidate_dirs(
@@ -424,7 +424,7 @@ async fn handle_ls_files(args : Array[String]) -> Unit raise Error {
   }
   if show_modified || show_killed {
     let outputs : Array[String] = []
-    let output_set : Map[String, Bool] = {}
+    let output_set : Map[String, Bool] = Map([])
     if show_modified {
       let modified_paths = ls_files_collect_modified_paths(fs, root, entries)
       for path in modified_paths {
@@ -545,7 +545,7 @@ async fn ls_files_collect_killed_paths(
   root : String,
   entries : Array[@bitlib.IndexEntry],
 ) -> Array[String] raise Error {
-  let tracked_modes : Map[String, Int] = {}
+  let tracked_modes : Map[String, Int] = Map([])
   let tracked_paths : Array[String] = []
   for entry in entries {
     tracked_modes[entry.path] = entry.mode
@@ -553,7 +553,7 @@ async fn ls_files_collect_killed_paths(
   }
   let visible_paths = @bitlib.list_working_files_async(fs, root)
   let killed : Array[String] = []
-  let killed_set : Map[String, Bool] = {}
+  let killed_set : Map[String, Bool] = Map([])
   for path in visible_paths {
     if tracked_modes.contains(path) {
       continue
@@ -601,7 +601,7 @@ async fn ls_files_collect_modified_paths(
   entries : Array[@bitlib.IndexEntry],
 ) -> Array[String] raise Error {
   let modified : Array[String] = []
-  let modified_set : Map[String, Bool] = {}
+  let modified_set : Map[String, Bool] = Map([])
   let diffs = @bitdiff.diff_worktree(fs, root)
   for diff in diffs {
     if !modified_set.contains(diff.path) {
@@ -1726,7 +1726,7 @@ fn ls_files_collect_candidate_dirs(
   explicit_dirs : Array[String],
   tracked_dirs : Map[String, Bool],
 ) -> Array[String] {
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   for file in files {
     let mut current = file
     while true {

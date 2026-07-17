@@ -62,7 +62,7 @@ async fn handle_merge_tree(args : Array[String]) -> Unit raise Error {
       merge_tree_convert_files(
         @bitlib.collect_tree_files_from_commit(db, fs, id),
       )
-    None => {}
+    None => Map([])
   }
   let ours_files = merge_tree_convert_files(
     @bitlib.collect_tree_files_from_commit(db, fs, ours_id),
@@ -146,7 +146,7 @@ async fn handle_merge_tree(args : Array[String]) -> Unit raise Error {
 fn merge_tree_convert_files(
   files : Map[String, @bitlib.TreeFileEntry],
 ) -> Map[String, MergeTreeEntry] {
-  let out : Map[String, MergeTreeEntry] = {}
+  let out : Map[String, MergeTreeEntry] = Map([])
   for path, entry in files {
     out[path] = { id: entry.id, mode: entry.mode }
   }
@@ -179,7 +179,7 @@ fn merge_tree_find_base(
   b : @bitcore.ObjectId,
 ) -> @bitcore.ObjectId? raise Error {
   // BFS from a to collect all ancestors
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   let stack_a : Array[@bitcore.ObjectId] = [a]
   while stack_a.length() > 0 {
     let id = stack_a.pop().unwrap()
@@ -195,7 +195,7 @@ fn merge_tree_find_base(
   }
   // BFS from b to find first ancestor in a's set
   let stack_b : Array[@bitcore.ObjectId] = [b]
-  let seen_b : Map[String, Bool] = {}
+  let seen_b : Map[String, Bool] = Map([])
   while stack_b.length() > 0 {
     let id = stack_b.pop().unwrap()
     let hex = id.to_hex()
@@ -254,10 +254,10 @@ fn merge_tree_merge_files(
   ours : Map[String, MergeTreeEntry],
   theirs : Map[String, MergeTreeEntry],
 ) -> MergeTreeFilesResult {
-  let merged : Map[String, MergeTreeEntry] = {}
+  let merged : Map[String, MergeTreeEntry] = Map([])
   let conflicts : Array[String] = []
   let needs_content_merge : Array[MergeTreeContentCandidate] = []
-  let all_paths : Map[String, Bool] = {}
+  let all_paths : Map[String, Bool] = Map([])
   for path in base.keys() {
     all_paths[path] = true
   }
@@ -369,7 +369,7 @@ fn merge_tree_write_tree(
 ) -> @bitcore.ObjectId raise Error {
   // Build hierarchical tree structure from flat path map
   let file_entries : Array[@bitcore.TreeEntry] = []
-  let dir_map : Map[String, Map[String, MergeTreeEntry]] = {}
+  let dir_map : Map[String, Map[String, MergeTreeEntry]] = Map([])
   let items = files.to_array()
   for item in items {
     let (path, info) = item
@@ -388,7 +388,7 @@ fn merge_tree_write_tree(
         match dir_map.get(dir_name) {
           Some(sub) => sub[rest] = info
           None => {
-            let sub : Map[String, MergeTreeEntry] = {}
+            let sub : Map[String, MergeTreeEntry] = Map([])
             sub[rest] = info
             dir_map[dir_name] = sub
           }

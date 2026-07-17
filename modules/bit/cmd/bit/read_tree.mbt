@@ -82,7 +82,7 @@ async fn handle_read_tree(args : Array[String]) -> Unit raise Error {
   } else {
     // Multi-tree overlay read: union of all trees' files
     // Later trees take precedence for conflicting paths
-    let merged_files : Map[String, @bitlib.TreeFileEntry] = {}
+    let merged_files : Map[String, @bitlib.TreeFileEntry] = Map([])
     for tree_ref in tree_refs {
       let tree_id = match @bitrepo.rev_parse(fs, git_dir, tree_ref) {
         Some(id) => plumb_resolve_to_tree(fs, git_dir, id)

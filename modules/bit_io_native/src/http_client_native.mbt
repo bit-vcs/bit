@@ -25,7 +25,7 @@ async fn apply_auth_header(
   match auth {
     None => headers
     Some(value) => {
-      let out : Map[String, String] = {}
+      let out : Map[String, String] = Map([])
       for k, v in headers {
         out[k] = v
       }

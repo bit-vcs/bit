@@ -214,7 +214,7 @@ async fn handle_update_index(args : Array[String]) -> Unit raise Error {
   // Check D/F conflicts for --cacheinfo entries
   if direct_updates.length() > 0 && !replace {
     let existing_entries_for_df = @bitlib.read_index_entries(fs, git_dir)
-    let existing_paths : Map[String, Bool] = {}
+    let existing_paths : Map[String, Bool] = Map([])
     for entry in existing_entries_for_df {
       existing_paths[normalize_update_index_path(entry.path)] = true
     }
@@ -253,8 +253,8 @@ async fn handle_update_index(args : Array[String]) -> Unit raise Error {
     }
   }
   if direct_stage_updates.length() > 0 {
-    let remove_set : Map[String, Bool] = {}
-    let replace_set : Map[String, Bool] = {}
+    let remove_set : Map[String, Bool] = Map([])
+    let replace_set : Map[String, Bool] = Map([])
     let merged_stage_entries : Array[@bitlib.IndexStageEntry] = []
     for path in direct_remove_paths {
       remove_set[path] = true
@@ -526,11 +526,11 @@ fn apply_update_index_entries(
   removals : Array[String],
 ) -> Unit raise Error {
   let existing = @bitlib.read_index_entries(fs, git_dir)
-  let update_map : Map[String, @bitlib.IndexEntry] = {}
+  let update_map : Map[String, @bitlib.IndexEntry] = Map([])
   for entry in updates {
     update_map[normalize_update_index_path(entry.path)] = entry
   }
-  let removal_set : Map[String, Bool] = {}
+  let removal_set : Map[String, Bool] = Map([])
   for p in removals {
     removal_set[normalize_update_index_path(p)] = true
   }
@@ -558,7 +558,7 @@ fn apply_update_index_entries(
 fn dedupe_index_entries_by_path(
   entries : Array[@bitlib.IndexEntry],
 ) -> Array[@bitlib.IndexEntry] raise @bitcore.GitError {
-  let by_path : Map[String, @bitlib.IndexEntry] = {}
+  let by_path : Map[String, @bitlib.IndexEntry] = Map([])
   for entry in entries {
     by_path[normalize_update_index_path(entry.path)] = entry
   }
@@ -632,7 +632,7 @@ fn update_skip_worktree_state(
   enabled : Bool,
 ) -> Unit raise Error {
   let state_path = git_dir + "/bit-skip-worktree"
-  let state : Map[String, Bool] = {}
+  let state : Map[String, Bool] = Map([])
   if fs.is_file(state_path) {
     let text = decode_bytes(fs.read_file(state_path))
     for line_view in text.split("\n") {
@@ -664,7 +664,7 @@ fn update_skip_worktree_state(
     fs.write_string(state_path, out.join("\n") + "\n")
   }
   let entries = @bitlib.read_index_entries(fs, git_dir)
-  let skip_worktree_paths : Map[String, Bool] = {}
+  let skip_worktree_paths : Map[String, Bool] = Map([])
   for path in out {
     skip_worktree_paths[path] = true
   }
@@ -777,7 +777,7 @@ async fn update_index_apply_chmod(
   verbose : Bool,
 ) -> Unit raise Error {
   let stage_paths : Array[String] = []
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   for op in ops {
     let (raw_path, _) = op
     let normalized = normalize_update_index_path(raw_path)
@@ -788,7 +788,7 @@ async fn update_index_apply_chmod(
   }
   if stage_paths.length() > 0 {
     let existing_entries = @bitlib.read_index_entries(fs, git_dir)
-    let stage_set : Map[String, Bool] = {}
+    let stage_set : Map[String, Bool] = Map([])
     for path in stage_paths {
       stage_set[path] = true
     }
@@ -802,7 +802,7 @@ async fn update_index_apply_chmod(
     @bitlib.add_paths_async(fs, fs, root, stage_paths)
   }
   let entries = @bitlib.read_index_entries(fs, git_dir)
-  let mode_by_path : Map[String, String] = {}
+  let mode_by_path : Map[String, String] = Map([])
   for op in ops {
     let (raw_path, mode) = op
     mode_by_path[normalize_update_index_path(raw_path)] = mode
@@ -956,7 +956,7 @@ fn update_index_preserve_existing_symlink_modes(
   before : Array[@bitlib.IndexEntry],
   after : Array[@bitlib.IndexEntry],
 ) -> Array[@bitlib.IndexEntry] {
-  let previous_modes : Map[String, Int] = {}
+  let previous_modes : Map[String, Int] = Map([])
   for entry in before {
     previous_modes[normalize_update_index_path(entry.path) catch {
       _ => entry.path
@@ -1074,7 +1074,7 @@ async fn update_index_stage_paths(
       None => regular_paths.push(path)
     }
   }
-  let add_set : Map[String, Bool] = {}
+  let add_set : Map[String, Bool] = Map([])
   for p in add_paths {
     add_set[normalize_update_index_path(p)] = true
   }
@@ -1093,7 +1093,7 @@ async fn update_index_stage_paths(
     dedupe_index_entries_by_path(@bitlib.read_index_entries(fs, git_dir)),
   )
   let merged_entries : Array[@bitlib.IndexEntry] = []
-  let gitlink_paths : Map[String, @bitlib.IndexEntry] = {}
+  let gitlink_paths : Map[String, @bitlib.IndexEntry] = Map([])
   for entry in gitlink_updates {
     gitlink_paths[normalize_update_index_path(entry.path)] = entry
   }
@@ -1124,7 +1124,7 @@ fn update_index_remove_paths(
     return
   }
   let entries = @bitlib.read_index_entries(fs, git_dir)
-  let remove_set : Map[String, Bool] = {}
+  let remove_set : Map[String, Bool] = Map([])
   for p in remove_paths {
     remove_set[normalize_update_index_path(p)] = true
   }
@@ -1151,7 +1151,7 @@ async fn handle_update_index_paths(
   quiet : Bool,
 ) -> Unit raise Error {
   let existing_entries = @bitlib.read_index_entries(fs, git_dir)
-  let tracked : Map[String, Bool] = {}
+  let tracked : Map[String, Bool] = Map([])
   for entry in existing_entries {
     tracked[normalize_update_index_path(entry.path)] = true
   }
@@ -1226,13 +1226,13 @@ async fn handle_update_index_refresh(
   let stage_entries = @bitlib.read_index_stage_entries(fs, git_dir)
   let entries = @bitlib.read_index_entries(fs, git_dir)
   let index_mtime = update_index_read_index_mtime(git_dir)
-  let requested : Map[String, Bool] = {}
+  let requested : Map[String, Bool] = Map([])
   for path in raw_paths {
     requested[normalize_update_index_path(path)] = true
   }
   let status = @bitlib.status(fs, root)
-  let modified : Map[String, Bool] = {}
-  let deleted : Map[String, Bool] = {}
+  let modified : Map[String, Bool] = Map([])
+  let deleted : Map[String, Bool] = Map([])
   for path in status.unstaged_modified {
     modified[path] = true
   }
@@ -1241,7 +1241,7 @@ async fn handle_update_index_refresh(
   }
   let unmerged_paths = @bitlib.read_unmerged_paths(fs, git_dir)
   if !allow_unmerged {
-    let selected_unmerged_paths : Map[String, Bool] = {}
+    let selected_unmerged_paths : Map[String, Bool] = Map([])
     for item in stage_entries {
       let normalized_path = normalize_update_index_path(item.entry.path)
       if item.stage != 0 &&
@@ -1392,7 +1392,7 @@ async fn handle_update_index_again(
     fs, root, effective_raw_paths,
   )
   let status = @bitlib.status(fs, root)
-  let requested : Map[String, Bool] = {}
+  let requested : Map[String, Bool] = Map([])
   for path in requested_paths {
     requested[path] = true
   }
@@ -1413,7 +1413,7 @@ async fn handle_update_index_again(
   }
   if modified_paths.length() > 0 {
     let existing_entries = @bitlib.read_index_entries(fs, git_dir)
-    let add_set : Map[String, Bool] = {}
+    let add_set : Map[String, Bool] = Map([])
     for path in modified_paths {
       add_set[path] = true
     }
@@ -1428,7 +1428,7 @@ async fn handle_update_index_again(
   }
   if deleted_paths.length() > 0 {
     let entries = @bitlib.read_index_entries(fs, git_dir)
-    let deleted_set : Map[String, Bool] = {}
+    let deleted_set : Map[String, Bool] = Map([])
     for path in deleted_paths {
       deleted_set[path] = true
     }

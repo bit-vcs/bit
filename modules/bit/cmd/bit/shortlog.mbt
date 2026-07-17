@@ -49,8 +49,8 @@ async fn handle_shortlog(args : Array[String]) -> Unit raise Error {
   let db = @bitlib.ObjectDb::load(rfs, git_dir)
   let head = @bitrepo.rev_parse(rfs, git_dir, "HEAD")
   guard head is Some(h) else { return }
-  let author_commits : Map[String, Array[String]] = {}
-  let visited : Map[String, Bool] = {}
+  let author_commits : Map[String, Array[String]] = Map([])
+  let visited : Map[String, Bool] = Map([])
   let queue : Array[@bitcore.ObjectId] = [h]
   let mut count = 0
   while queue.length() > 0 {

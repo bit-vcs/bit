@@ -8,7 +8,7 @@ priv struct CountingFs {
 
 ///|
 fn CountingFs::new(fs : @bit.TestFs) -> CountingFs {
-  { fs, read_counts: {}, write_counts: {} }
+  { fs, read_counts: Map([]), write_counts: Map([]) }
 }
 
 ///|

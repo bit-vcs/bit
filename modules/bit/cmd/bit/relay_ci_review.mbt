@@ -60,7 +60,7 @@ async fn handle_relay_ci_push(args : Array[String]) -> Unit raise Error {
     Some(s) => s
     None => "ci"
   }
-  let payload : Map[String, Json] = {}
+  let payload : Map[String, Json] = Map([])
   payload["kind"] = Json::string("ci.status")
   payload["ref"] = Json::string(ref_name)
   payload["status"] = Json::string(status)
@@ -107,7 +107,7 @@ async fn handle_relay_ci_pull(args : Array[String]) -> Unit raise Error {
   }
   let (base_url, room) = relay_resolve_room_arg(room_arg)
   let poll_url = "\{base_url}/api/v1/poll?room=\{room}&after=0&limit=200"
-  let (res, data) = @bitnative.native_http_get(poll_url, {})
+  let (res, data) = @bitnative.native_http_get(poll_url, Map([]))
   if res.code != 200 {
     eprint_line("Failed to fetch CI status: HTTP \{res.code}")
     @sys.exit(1)
@@ -115,7 +115,7 @@ async fn handle_relay_ci_pull(args : Array[String]) -> Unit raise Error {
   let text = @utf8.decode_lossy(data[:])
   let parsed = @json.parse(text) catch { _ => Json::null() }
   // Collect latest CI status per ref
-  let ci_statuses : Map[String, (String, String)] = {} // ref → (status, url)
+  let ci_statuses : Map[String, (String, String)] = Map([]) // ref → (status, url)
   match parsed {
     Object(obj) =>
       match obj.get("envelopes") {
@@ -231,7 +231,7 @@ async fn handle_relay_review_request(args : Array[String]) -> Unit raise Error {
   }
   let (base_url, room) = relay_resolve_room_arg(room_arg)
   let sender = relay_safe_sender()
-  let payload : Map[String, Json] = {}
+  let payload : Map[String, Json] = Map([])
   payload["kind"] = Json::string("review.request")
   payload["pr_id"] = Json::string(pr_id)
   payload["requester"] = Json::string(sender)
@@ -297,7 +297,7 @@ async fn handle_relay_review_submit(args : Array[String]) -> Unit raise Error {
   let (base_url, room) = relay_resolve_room_arg(room_arg)
   let sender = relay_safe_sender()
   // Publish review as a relay message (avoids signature requirement on review API)
-  let payload : Map[String, Json] = {}
+  let payload : Map[String, Json] = Map([])
   payload["kind"] = Json::string("review.verdict")
   payload["pr_id"] = Json::string(pr_id)
   payload["verdict"] = Json::string(verdict)
@@ -346,7 +346,7 @@ async fn handle_relay_review_list(args : Array[String]) -> Unit raise Error {
   let (base_url, room) = relay_resolve_room_arg(room_arg)
   // Fetch reviews from poll API (review.verdict topic messages)
   let poll_url = "\{base_url}/api/v1/poll?room=\{room}&after=0&limit=200"
-  let (res, data) = @bitnative.native_http_get(poll_url, {})
+  let (res, data) = @bitnative.native_http_get(poll_url, Map([]))
   if res.code != 200 {
     eprint_line("Failed: HTTP \{res.code}")
     @sys.exit(1)

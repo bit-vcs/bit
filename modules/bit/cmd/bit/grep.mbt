@@ -611,7 +611,7 @@ async fn handle_grep(args : Array[String]) -> Unit raise Error {
           )
         }
     }
-    let matched : Map[String, Bool] = {}
+    let matched : Map[String, Bool] = Map([])
     for file_match in matches {
       matched[file_match.path] = true
     }
@@ -1234,7 +1234,7 @@ async fn grep_print_file_match_with_context(
     git_dir,
     file_match.path,
   )
-  let matched_columns : Map[Int, Int] = {}
+  let matched_columns : Map[Int, Int] = Map([])
   for item in file_match.matches {
     if !matched_columns.contains(item.line_number) {
       matched_columns[item.line_number] = item.column
@@ -1390,7 +1390,7 @@ async fn grep_print_whole_function_match(
       printed_ranges.push(range)
     }
   }
-  let matched_columns : Map[Int, Int] = {}
+  let matched_columns : Map[Int, Int] = Map([])
   for item in file_match.matches {
     if !matched_columns.contains(item.line_number) {
       matched_columns[item.line_number] = item.column
@@ -1936,7 +1936,7 @@ fn grep_merge_file_matches(
   secondary : Array[@bitgrep.GrepFileMatch],
 ) -> Array[@bitgrep.GrepFileMatch] {
   let merged : Array[@bitgrep.GrepFileMatch] = []
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   for item in primary {
     merged.push(item)
     seen[item.path] = true
@@ -2108,7 +2108,7 @@ fn grep_merge_candidate_paths(
   secondary : Array[String],
 ) -> Array[String] {
   let merged : Array[String] = []
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   for path in primary {
     merged.push(path)
     seen[path] = true

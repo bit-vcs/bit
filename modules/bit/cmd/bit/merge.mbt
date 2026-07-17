@@ -936,7 +936,7 @@ fn is_ancestor(
   // Check if ancestor is an ancestor of descendant
   let db = @bitlib.ObjectDb::load(rfs, git_dir) catch { _ => return false }
   let ancestor_hex = ancestor.to_hex()
-  let visited : Map[String, Bool] = {}
+  let visited : Map[String, Bool] = Map([])
   let queue : Array[@bitcore.ObjectId] = [descendant]
   while queue.length() > 0 {
     let current = queue.pop()

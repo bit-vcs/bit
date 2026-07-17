@@ -75,7 +75,7 @@ test "relay_watch_print_envelope: formats ci status" {
 
 ///|
 test "relay_watch_summarize_hub_record: extracts title" {
-  let payload : Map[String, Json] = {}
+  let payload : Map[String, Json] = Map([])
   payload["record"] = Json::string(
     "version: 1\ntitle: My Issue Title\nstate: open",
   )
@@ -85,7 +85,7 @@ test "relay_watch_summarize_hub_record: extracts title" {
 
 ///|
 test "relay_watch_summarize_hub_record: no title" {
-  let payload : Map[String, Json] = {}
+  let payload : Map[String, Json] = Map([])
   payload["record"] = Json::string("version: 1\nstate: open")
   let summary = relay_watch_summarize_hub_record(payload)
   assert_eq(summary, "hub.record")

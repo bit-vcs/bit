@@ -45,7 +45,7 @@ async fn handle_checkout_index(args : Array[String]) -> Unit raise Error {
   let git_dir = resolve_git_dir(fs, root)
   let entries = @bitlib.read_index_entries(fs, git_dir)
   // Build index map: path -> entry
-  let index_map : Map[String, @bitlib.IndexEntry] = {}
+  let index_map : Map[String, @bitlib.IndexEntry] = Map([])
   for e in entries {
     index_map[e.path] = e
   }
@@ -82,7 +82,7 @@ async fn handle_checkout_index(args : Array[String]) -> Unit raise Error {
   // Process each file
   let mut updated_entries = false
   let new_entries : Array[@bitlib.IndexEntry] = []
-  let entry_index_by_path : Map[String, Int] = {}
+  let entry_index_by_path : Map[String, Int] = Map([])
   if update_index {
     for i, e in entries {
       new_entries.push(e)

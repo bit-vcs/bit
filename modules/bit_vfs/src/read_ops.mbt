@@ -44,7 +44,7 @@ pub fn Fs::readdir(
   path : String,
 ) -> Array[String] raise @bit.GitError {
   let norm = normalize_path(path)
-  let entries : Map[String, Bool] = {}
+  let entries : Map[String, Bool] = Map([])
   // Collect entries from working files/dirs under `norm`.
   for path in self.working.files.keys() {
     match readdir_relative_name(path, norm) {

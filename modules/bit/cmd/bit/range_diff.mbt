@@ -74,7 +74,7 @@ async fn handle_range_diff(args : Array[String]) -> Unit raise Error {
   let mut idx1 = 1
   let mut idx2 = 1
   // Simple matching by commit message
-  let matched : Map[String, Int] = {}
+  let matched : Map[String, Int] = Map([])
   for c in commits2 {
     let msg = plumb_get_commit_subject(db, fs, c)
     matched[msg] = idx2

@@ -86,7 +86,7 @@ pub fn Hub::is_approved(
   if reviews.length() == 0 {
     return false
   }
-  let latest_verdicts : Map[String, ReviewVerdict] = {}
+  let latest_verdicts : Map[String, ReviewVerdict] = Map([])
   for review in reviews {
     latest_verdicts[review.author] = review.verdict
   }

@@ -193,15 +193,15 @@ fn merge_notes_trees_store(
 ) -> @bit.ObjectId raise @bit.GitError {
   let local_entries = read_tree_entries_store(objects, local_tree)
   let remote_entries = read_tree_entries_store(objects, remote_tree)
-  let local_map : Map[String, @bit.ObjectId] = {}
+  let local_map : Map[String, @bit.ObjectId] = Map([])
   for entry in local_entries {
     local_map[entry.name] = entry.id
   }
-  let remote_map : Map[String, @bit.ObjectId] = {}
+  let remote_map : Map[String, @bit.ObjectId] = Map([])
   for entry in remote_entries {
     remote_map[entry.name] = entry.id
   }
-  let keys : Map[String, Bool] = {}
+  let keys : Map[String, Bool] = Map([])
   for key in local_map.keys() {
     keys[key] = true
   }

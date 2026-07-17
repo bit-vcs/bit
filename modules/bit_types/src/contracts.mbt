@@ -25,7 +25,7 @@ pub struct HttpResponse {
 
 ///|
 pub fn HttpResponse::new(code : Int) -> HttpResponse {
-  { code, headers: {} }
+  { code, headers: Map([]) }
 }
 
 ///|
@@ -49,7 +49,7 @@ pub struct MockHttpClient {
 
 ///|
 pub fn MockHttpClient::new() -> MockHttpClient {
-  { responses: {} }
+  { responses: Map([]) }
 }
 
 ///|

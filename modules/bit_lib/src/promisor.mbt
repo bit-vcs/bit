@@ -56,7 +56,7 @@ pub fn PromisorDb::new(
     ObjectDb::load(fs, git_dir)
   }
   let promisor_remote = read_promisor_remote(fs, git_dir)
-  { db, git_dir, promisor_remote, fetched: {}, fetch_fn }
+  { db, git_dir, promisor_remote, fetched: Map([]), fetch_fn }
 }
 
 ///|

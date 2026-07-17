@@ -90,7 +90,7 @@ fn gc_git_dir(
   collect_reachable_tag_objects(db, rfs, ref_ids, reachable)
   // Also include objects referenced by reflogs (intermediate merge commits etc.)
   collect_reflog_referenced_objects(db, rfs, git_dir, reachable)
-  let reachable_hex : Map[String, Bool] = {}
+  let reachable_hex : Map[String, Bool] = Map([])
   for obj in reachable {
     let id = @bit.hash_object_content(obj.obj_type, obj.data)
     reachable_hex[id.to_hex()] = true
@@ -136,7 +136,7 @@ fn prune_git_dir(
   }
   let reachable = collect_reachable_objects_from_commits(db, rfs, roots)
   collect_reachable_tag_objects(db, rfs, ref_ids, reachable)
-  let reachable_hex : Map[String, Bool] = {}
+  let reachable_hex : Map[String, Bool] = Map([])
   for obj in reachable {
     let id = @bit.hash_object_content(obj.obj_type, obj.data)
     reachable_hex[id.to_hex()] = true
@@ -190,7 +190,7 @@ fn collect_ref_ids(
   fs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> Array[@bit.ObjectId] raise @bit.GitError {
-  let refs : Map[String, @bit.ObjectId] = {}
+  let refs : Map[String, @bit.ObjectId] = Map([])
   let heads_dir = join_path(git_dir, "refs/heads")
   if fs.is_dir(heads_dir) {
     collect_loose_refs(fs, heads_dir, "refs/heads", refs)
@@ -309,7 +309,7 @@ fn collect_reflog_referenced_objects(
   git_dir : String,
   objects : Array[@bit.PackObject],
 ) -> Unit raise @bit.GitError {
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   for obj in objects {
     seen[@bit.hash_object_content(obj.obj_type, obj.data).to_hex()] = true
   }
@@ -396,7 +396,7 @@ fn collect_reachable_tag_objects(
   ref_ids : Array[@bit.ObjectId],
   objects : Array[@bit.PackObject],
 ) -> Unit raise @bit.GitError {
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   for obj in objects {
     seen[@bit.hash_object_content(obj.obj_type, obj.data).to_hex()] = true
   }
@@ -421,10 +421,10 @@ fn resolve_commit_roots(
   fs : &@bit.RepoFileSystem,
   ref_ids : Array[@bit.ObjectId],
 ) -> Array[@bit.ObjectId] raise @bit.GitError {
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   let roots : Array[@bit.ObjectId] = []
   for id in ref_ids {
-    let local_seen : Map[String, Bool] = {}
+    let local_seen : Map[String, Bool] = Map([])
     match resolve_commit_from_ref(db, fs, id, local_seen) {
       None => ()
       Some(commit_id) => {

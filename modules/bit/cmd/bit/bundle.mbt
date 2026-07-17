@@ -72,7 +72,7 @@ async fn handle_bundle_create(args : Array[String]) -> Unit raise Error {
     refs.push("HEAD")
   }
   let prereq_hexes : Array[String] = []
-  let prereq_seen : Map[String, Bool] = {}
+  let prereq_seen : Map[String, Bool] = Map([])
   let add_prereq = fn(hex : String) -> Unit {
     if !prereq_seen.contains(hex) {
       prereq_seen[hex] = true
@@ -94,7 +94,7 @@ async fn handle_bundle_create(args : Array[String]) -> Unit raise Error {
       None => ()
     }
   }
-  let exclude_ids : Map[String, Bool] = {}
+  let exclude_ids : Map[String, Bool] = Map([])
   for spec in excludes {
     match @bitrepo.rev_parse(fs, git_dir, spec) {
       Some(id) => walk_commits_to_map(fs, git_dir, id, exclude_ids)
@@ -146,7 +146,7 @@ fn collect_bundle_objects(
   exclude_ids : Map[String, Bool],
 ) -> Array[@bitcore.PackObject] raise Error {
   let db = @bitlib.ObjectDb::load(fs, git_dir)
-  let visited : Map[String, Bool] = {}
+  let visited : Map[String, Bool] = Map([])
   let objects : Array[@bitcore.PackObject] = []
   let queue : Array[@bitcore.ObjectId] = []
   for id in start_ids {

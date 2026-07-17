@@ -668,7 +668,7 @@ fn load_hub_record_store(
 fn select_notify_records(
   records : Array[@hub.HubRecord],
 ) -> Map[String, @hub.HubRecord] {
-  let selected : Map[String, @hub.HubRecord] = {}
+  let selected : Map[String, @hub.HubRecord] = Map([])
   for record in records {
     if @hub.record_notify_topic(record) is Some(_) {
       selected[record.key] = record

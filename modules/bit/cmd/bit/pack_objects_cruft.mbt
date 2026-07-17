@@ -79,7 +79,7 @@ fn read_mtimes_file(
   mtimes_path : String,
   idx_path : String,
 ) -> Map[String, Int] {
-  let result : Map[String, Int] = {}
+  let result : Map[String, Int] = Map([])
   let mtimes_data = fs.read_file(mtimes_path) catch { _ => return result }
   // Parse header: magic (4) + version (4) + hash_id (4) = 12 bytes
   if mtimes_data.length() < 12 {
@@ -192,7 +192,7 @@ async fn collect_cruft_objects(
   let objects_dir = git_dir + "/objects"
   let alt_dirs = read_alternate_object_dirs(fs, git_dir)
   // Collect all object IDs from keep packs
-  let kept_ids : Map[String, Bool] = {}
+  let kept_ids : Map[String, Bool] = Map([])
   for name in keep_names {
     match resolve_pack_path(fs, pack_dir, alt_dirs, name) {
       Some(path) => {
@@ -209,8 +209,8 @@ async fn collect_cruft_objects(
     }
   }
   // Collect cruft objects from discard packs with mtimes
-  let mtime_map : Map[String, Int] = {}
-  let cruft_ids : Map[String, Bool] = {}
+  let mtime_map : Map[String, Int] = Map([])
+  let cruft_ids : Map[String, Bool] = Map([])
   for name in discard_names {
     match resolve_pack_path(fs, pack_dir, alt_dirs, name) {
       Some(path) => {
@@ -307,7 +307,7 @@ async fn collect_cruft_objects(
       }
     }
     // Rescue traversal: objects reachable from recent tips are also kept
-    let rescued : Map[String, Bool] = {}
+    let rescued : Map[String, Bool] = Map([])
     for tip in recent_tips {
       rescued[tip] = true
       cruft_rescue_walk(

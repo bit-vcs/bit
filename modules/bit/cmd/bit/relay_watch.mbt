@@ -107,7 +107,7 @@ async fn handle_relay_watch(args : Array[String]) -> Unit raise Error {
   let mut cursor = 0
   // Initial fetch to get current position
   let init_url = "\{base_url}/api/v1/poll?room=\{room}&after=0&limit=100"
-  let (init_res, init_data) = @bitnative.native_http_get(init_url, {})
+  let (init_res, init_data) = @bitnative.native_http_get(init_url, Map([]))
   if init_res.code == 200 {
     let text = @utf8.decode_lossy(init_data[:])
     let parsed = @json.parse(text) catch { _ => Json::null() }
@@ -133,7 +133,7 @@ async fn handle_relay_watch(args : Array[String]) -> Unit raise Error {
   ignore(interval_sec)
   while true {
     let poll_url = "\{base_url}/api/v1/poll?room=\{room}&after=\{cursor}&limit=50"
-    let (res, data) = @bitnative.native_http_get(poll_url, {})
+    let (res, data) = @bitnative.native_http_get(poll_url, Map([]))
     if res.code != 200 {
       continue
     }
@@ -246,7 +246,7 @@ async fn handle_relay_status(args : Array[String]) -> Unit raise Error {
   let (base_url, room) = relay_resolve_room_arg(room_arg)
   // Presence
   let presence_url = "\{base_url}/api/v1/presence?room=\{room}"
-  let (pres_res, pres_data) = @bitnative.native_http_get(presence_url, {})
+  let (pres_res, pres_data) = @bitnative.native_http_get(presence_url, Map([]))
   if pres_res.code == 200 {
     let text = @utf8.decode_lossy(pres_data[:])
     let parsed = @json.parse(text) catch { _ => Json::null() }
@@ -284,7 +284,7 @@ async fn handle_relay_status(args : Array[String]) -> Unit raise Error {
   }
   // Recent activity summary
   let poll_url = "\{base_url}/api/v1/poll?room=\{room}&after=0&limit=5"
-  let (poll_res, poll_data) = @bitnative.native_http_get(poll_url, {})
+  let (poll_res, poll_data) = @bitnative.native_http_get(poll_url, Map([]))
   if poll_res.code == 200 {
     let text = @utf8.decode_lossy(poll_data[:])
     let parsed = @json.parse(text) catch { _ => Json::null() }

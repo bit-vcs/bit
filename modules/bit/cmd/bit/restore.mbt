@@ -243,7 +243,7 @@ fn restore_collect_conflict_records(
   rfs : &@bitcore.RepoFileSystem,
   git_dir : String,
 ) -> Map[String, RestoreConflictRecord] raise Error {
-  let records : Map[String, RestoreConflictRecord] = {}
+  let records : Map[String, RestoreConflictRecord] = Map([])
   for entry in @bitlib.read_resolve_undo_entries(rfs, git_dir) {
     records[entry.path] = {
       base: restore_conflict_stage_from_resolve_undo(entry.base),
@@ -387,7 +387,7 @@ fn restore_expand_cli_paths(
 ) -> Array[String] raise Error {
   let tracked_paths = restore_collect_tracked_paths(rfs, git_dir)
   let expanded : Array[String] = []
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   for path in raw_paths {
     let matched = restore_expand_single_cli_path(path, tracked_paths)
     for item in matched {
@@ -406,7 +406,7 @@ fn restore_collect_tracked_paths(
   git_dir : String,
 ) -> Array[String] raise Error {
   let tracked : Array[String] = []
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   for entry in @bitlib.read_index_entries(rfs, git_dir) {
     if !seen.contains(entry.path) {
       tracked.push(entry.path)

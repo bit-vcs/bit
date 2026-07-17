@@ -24,7 +24,7 @@ fn bitmap_collect_tips(
   pos_by_oid : Map[String, Int],
 ) -> Array[BitmapTip] {
   let tips : Array[BitmapTip] = []
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   let refs = @bitlib.list_refs_with_ids(fs, git_dir, Some("refs/"))
   let refnames : Array[String] = []
   for refname, _ in refs {
@@ -86,7 +86,7 @@ async fn write_pack_bitmap(
     return
   }
   // Build OID → pack position map (position = sorted order in index)
-  let pos_by_oid : Map[String, Int] = {}
+  let pos_by_oid : Map[String, Int] = Map([])
   for pack_pos, obj in idx_objects {
     pos_by_oid[obj.id.to_hex()] = pack_pos
   }

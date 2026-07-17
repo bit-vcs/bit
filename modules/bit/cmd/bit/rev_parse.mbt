@@ -84,11 +84,11 @@ async fn handle_rev_parse(args : Array[String]) -> Unit raise Error {
   let mut symbolic_full_name = false
   let mut symbolic_full_name_index : Int? = None
   let exclude_patterns : Array[String] = []
-  let exclude_hidden : Map[String, Bool] = {} // section -> seen
+  let exclude_hidden : Map[String, Bool] = Map([]) // section -> seen
   let mut path_format : String? = None // "absolute" or "relative"
   let mut prefix : String? = None // --prefix <dir>
   let mut output_object_format : String? = None
-  let output_object_format_arg_indices : Map[Int, Bool] = {}
+  let output_object_format_arg_indices : Map[Int, Bool] = Map([])
   let mut arg_index = 0
   while arg_index < args.length() {
     let arg = args[arg_index]
@@ -3277,7 +3277,7 @@ async fn rev_parse_find_merge_base(
 ) -> @bitcore.ObjectId? raise Error {
   let db = @bitlib.ObjectDb::load(fs, git_dir)
   // Collect ancestors of A
-  let ancestors_a : Map[String, Bool] = {}
+  let ancestors_a : Map[String, Bool] = Map([])
   let queue : Array[@bitcore.ObjectId] = [a]
   while queue.length() > 0 {
     let current = queue.unsafe_pop()
@@ -3300,7 +3300,7 @@ async fn rev_parse_find_merge_base(
   }
   // BFS from B, find first ancestor of A
   let queue2 : Array[@bitcore.ObjectId] = [b]
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   while queue2.length() > 0 {
     let current = queue2.unsafe_pop()
     let hex = current.to_hex()

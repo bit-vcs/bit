@@ -547,7 +547,7 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
   }
   // Resolve starting commits (deduplicate)
   let start_ids : Array[@bitcore.ObjectId] = []
-  let start_seen : Map[String, Bool] = {}
+  let start_seen : Map[String, Bool] = Map([])
   for spec in refs {
     match @bitrepo.rev_parse(fs, git_dir, spec) {
       Some(id) => {
@@ -561,7 +561,7 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
     }
   }
   // Resolve exclude commits
-  let exclude_ids : Map[String, Bool] = {}
+  let exclude_ids : Map[String, Bool] = Map([])
   for spec in excludes {
     match @bitrepo.rev_parse(fs, git_dir, spec) {
       Some(id) =>
@@ -598,9 +598,9 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
     symmetric_ranges.length() > 0 {
     rev_list_build_left_right_markers(fs, git_dir, db, symmetric_ranges)
   } else {
-    {}
+    Map([])
   }
-  let visited : Map[String, Bool] = {}
+  let visited : Map[String, Bool] = Map([])
   let result : Array[@bitcore.ObjectId] = []
   // BFS/DFS traversal — collect ALL reachable commits, then sort/slice
   let queue : Array[@bitcore.ObjectId] = []
@@ -666,7 +666,7 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
   let cherry_equal = if cherry_pick || cherry_mark {
     rev_list_build_cherry_equal(db, fs, git_dir, result, left_right_markers)
   } else {
-    {}
+    Map([])
   }
   if left_only || right_only || cherry_pick {
     let filtered : Array[@bitcore.ObjectId] = []
@@ -760,9 +760,9 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
     result_idx += 1
   }
   let object_ids : Array[(@bitcore.ObjectId, String)] = []
-  let indexed_path_ids : Map[String, String] = {}
+  let indexed_path_ids : Map[String, String] = Map([])
   if objects {
-    let object_seen : Map[String, Bool] = {}
+    let object_seen : Map[String, Bool] = Map([])
     let indexed_visible_objects = if indexed_objects {
       let index_entries = @bitlib.read_index_entries(fs, git_dir) catch {
         _ => []
@@ -837,7 +837,7 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
       } else {
         false
       }
-      let ref_names : Map[String, Array[String]] = {}
+      let ref_names : Map[String, Array[String]] = Map([])
       let output_encoding = rev_list_resolve_output_encoding(git_dir)
       for idx, id in sliced_result {
         let prefix = rev_list_output_prefix(
@@ -916,7 +916,7 @@ async fn handle_rev_list(args : Array[String]) -> Unit raise Error {
   }
   // Output objects (trees, blobs) if --objects
   if objects {
-    let commit_set : Map[String, Bool] = {}
+    let commit_set : Map[String, Bool] = Map([])
     for r in sliced_result {
       commit_set[r.to_hex()] = true
     }
@@ -1070,7 +1070,7 @@ fn rev_list_build_left_right_markers(
   db : @bitlib.ObjectDb,
   symmetric_ranges : Array[(String, String)],
 ) -> Map[String, String] raise Error {
-  let markers : Map[String, String] = {}
+  let markers : Map[String, String] = Map([])
   for pair in symmetric_ranges {
     match
       (
@@ -1084,9 +1084,9 @@ fn rev_list_build_left_right_markers(
         let right_commit = rev_list_peel_to_commit(db, fs, right_id).unwrap_or(
           right_id,
         )
-        let left_seen : Map[String, Bool] = {}
-        let right_seen : Map[String, Bool] = {}
-        let merge_base_seen : Map[String, Bool] = {}
+        let left_seen : Map[String, Bool] = Map([])
+        let right_seen : Map[String, Bool] = Map([])
+        let merge_base_seen : Map[String, Bool] = Map([])
         walk_commits_to_map(fs, git_dir, left_commit, left_seen)
         walk_commits_to_map(fs, git_dir, right_commit, right_seen)
         let bases = @bitlib.merge_base_all(db, fs, left_commit, right_commit)
@@ -1190,8 +1190,8 @@ fn rev_list_build_cherry_equal(
   commits : Array[@bitcore.ObjectId],
   left_right_markers : Map[String, String],
 ) -> Map[String, Bool] {
-  let left_patches : Map[String, Array[String]] = {}
-  let right_patches : Map[String, Array[String]] = {}
+  let left_patches : Map[String, Array[String]] = Map([])
+  let right_patches : Map[String, Array[String]] = Map([])
   for id in commits {
     let hex = id.to_hex()
     let side = left_right_markers.get(hex).unwrap_or("")
@@ -1208,7 +1208,7 @@ fn rev_list_build_cherry_equal(
       None => ()
     }
   }
-  let equal : Map[String, Bool] = {}
+  let equal : Map[String, Bool] = Map([])
   for pid, left_ids in left_patches {
     match right_patches.get(pid) {
       Some(right_ids) => {
@@ -1439,9 +1439,9 @@ fn rev_list_collect_index_objects(
   entries : Array[@bitlib.IndexEntry],
 ) -> (Array[(@bitcore.ObjectId, String)], Map[String, String]) raise Error {
   let visible : Array[(@bitcore.ObjectId, String)] = []
-  let unique_ids : Map[String, Bool] = {}
-  let path_ids : Map[String, String] = {}
-  let index_by_path : Map[String, @bitlib.IndexEntry] = {}
+  let unique_ids : Map[String, Bool] = Map([])
+  let path_ids : Map[String, String] = Map([])
+  let index_by_path : Map[String, @bitlib.IndexEntry] = Map([])
   for entry in entries {
     let hex = entry.id.to_hex()
     if rev_list_is_zero_object_id_hex(hex) {
@@ -1459,7 +1459,7 @@ fn rev_list_collect_index_objects(
     Some(id) =>
       match rev_list_commit_tree(db, fs, id) {
         Some(tree) => {
-          let matched_paths : Map[String, Bool] = {}
+          let matched_paths : Map[String, Bool] = Map([])
           ignore(
             rev_list_collect_matching_index_trees(
               db, fs, tree, index_by_path, matched_paths, visible, unique_ids, path_ids,
@@ -1726,13 +1726,13 @@ fn rev_list_topo_sort_impl(
     return
   }
   // Build commit set and lookup maps
-  let commit_set : Map[String, Int] = {} // hex -> index in commits
+  let commit_set : Map[String, Int] = Map([]) // hex -> index in commits
   for idx, id in commits {
     commit_set[id.to_hex()] = idx
   }
   // Parse all commits: parents and timestamps
-  let parents_map : Map[String, Array[String]] = {} // hex -> parent hexes (in set)
-  let timestamps : Map[String, Int64] = {} // hex -> sort timestamp
+  let parents_map : Map[String, Array[String]] = Map([]) // hex -> parent hexes (in set)
+  let timestamps : Map[String, Int64] = Map([]) // hex -> sort timestamp
   for id in commits {
     let hex = id.to_hex()
     parents_map[hex] = []
@@ -1758,7 +1758,7 @@ fn rev_list_topo_sort_impl(
   // Build in-degree: number of children in the result set for each commit.
   // A commit's in-degree is incremented for each other commit that lists it
   // as a parent.
-  let in_degree : Map[String, Int] = {}
+  let in_degree : Map[String, Int] = Map([])
   for id in commits {
     in_degree[id.to_hex()] = 0
   }
@@ -1799,7 +1799,7 @@ fn rev_list_topo_sort_impl(
   for hex in tips {
     stack.push(hex)
   }
-  let emitted : Map[String, Bool] = {}
+  let emitted : Map[String, Bool] = Map([])
   let sorted : Array[@bitcore.ObjectId] = []
   while stack.length() > 0 {
     let hex = stack.unsafe_pop()
@@ -1912,7 +1912,7 @@ fn rev_list_date_sort(
   if commits.length() <= 1 {
     return
   }
-  let timestamps : Map[String, Int64] = {}
+  let timestamps : Map[String, Int64] = Map([])
   for id in commits {
     timestamps[id.to_hex()] = rev_list_commit_committer_timestamp(db, rfs, id)
   }

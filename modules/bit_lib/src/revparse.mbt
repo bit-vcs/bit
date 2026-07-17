@@ -105,7 +105,7 @@ fn resolve_commit_message_search_all_refs(
     return None
   }
   let starts : Array[@bit.ObjectId] = []
-  let seen_start : Map[String, Bool] = {}
+  let seen_start : Map[String, Bool] = Map([])
   let refs = show_ref(fs, git_dir)
   for item in refs {
     let (_, id) = item
@@ -143,7 +143,7 @@ fn find_reachable_commit_by_message_from_many(
   for start in starts {
     queue.push(start)
   }
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   let mut best_id : @bit.ObjectId? = None
   let mut best_time = -1L
   while queue.length() > 0 {
@@ -523,7 +523,7 @@ fn resolve_abbrev_ref_id(
   let refs = show_ref(fs, git_dir)
   let db = ObjectDb::load(fs, git_dir)
   let queue : Array[@bit.ObjectId] = []
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   for item in refs {
     let (_, id) = item
     queue.push(id)
@@ -642,7 +642,7 @@ pub fn show_ref(
   fs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> Array[(String, @bit.ObjectId)] raise @bit.GitError {
-  let out : Map[String, @bit.ObjectId] = {}
+  let out : Map[String, @bit.ObjectId] = Map([])
   // Collect from reftable if present
   if fs.is_dir(join_path(git_dir, "reftable")) {
     let reftable_refs = @reftable.collect_reftable_refs(fs, git_dir)

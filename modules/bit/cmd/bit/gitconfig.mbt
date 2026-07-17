@@ -8,7 +8,7 @@ pub enum AliasResolution {
 
 ///|
 pub fn load_global_aliases(fs : OsFs) -> Map[String, String] {
-  let empty : Map[String, String] = {}
+  let empty : Map[String, String] = Map([])
   let path = find_global_gitconfig_path()
   match path {
     Some(p) => {
@@ -41,7 +41,7 @@ pub fn apply_alias_overrides(
 
 ///|
 pub fn parse_gitconfig_aliases(content : String) -> Map[String, String] {
-  let aliases : Map[String, String] = {}
+  let aliases : Map[String, String] = Map([])
   let mut in_alias_section = false
   for line_view in content.split("\n") {
     let line = trim_string(line_view.to_owned())

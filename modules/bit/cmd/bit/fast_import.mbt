@@ -44,8 +44,8 @@ async fn handle_fast_import(args : Array[String]) -> Unit raise Error {
   let git_dir = resolve_git_dir(rfs, root)
   let db = @bitlib.ObjectDb::load(fs, git_dir)
   // State
-  let marks : Map[Int, @bitcore.ObjectId] = {}
-  let branch_heads : Map[String, @bitcore.ObjectId] = {}
+  let marks : Map[Int, @bitcore.ObjectId] = Map([])
+  let branch_heads : Map[String, @bitcore.ObjectId] = Map([])
   // Load import marks if specified
   if import_marks_file is Some(path) {
     let abs_path = if path.has_prefix("/") { path } else { root + "/" + path }
@@ -495,7 +495,7 @@ async fn fast_import_parse_commit(
   }
   // File operations — build tree state
   // Start from parent tree if we have one
-  let tree_state : Map[String, (String, @bitcore.ObjectId)] = {}
+  let tree_state : Map[String, (String, @bitcore.ObjectId)] = Map([])
   if parents.length() > 0 {
     // Load tree from first parent
     fast_import_load_tree_recursive(db, rfs, parents[0], tree_state)
@@ -701,8 +701,8 @@ async fn fast_import_build_tree(
 ) -> @bitcore.ObjectId {
   // Group entries by top-level directory component
   // For each directory, recursively build subtrees
-  let top_entries : Map[String, (String, @bitcore.ObjectId)] = {} // direct files
-  let subtrees : Map[String, Map[String, (String, @bitcore.ObjectId)]] = {} // dir → sub-entries
+  let top_entries : Map[String, (String, @bitcore.ObjectId)] = Map([]) // direct files
+  let subtrees : Map[String, Map[String, (String, @bitcore.ObjectId)]] = Map([]) // dir → sub-entries
   for path, entry in tree_state {
     match path.find("/") {
       Some(slash) => {
@@ -715,7 +715,7 @@ async fn fast_import_build_tree(
         match subtrees.get(dir) {
           Some(sub) => sub[rest] = entry
           None => {
-            let sub : Map[String, (String, @bitcore.ObjectId)] = {}
+            let sub : Map[String, (String, @bitcore.ObjectId)] = Map([])
             sub[rest] = entry
             subtrees[dir] = sub
           }

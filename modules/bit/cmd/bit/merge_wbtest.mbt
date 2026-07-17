@@ -79,7 +79,7 @@ async test "merge: -S stores gpgsig header on merge commit" {
 }
 
 ///|
-let merge_wbtest_shim_lock : @async.Semaphore = @async.Semaphore::new(
+let merge_wbtest_shim_lock : @async.Semaphore = @async.Semaphore(
   1,
   initial_value=1,
 )

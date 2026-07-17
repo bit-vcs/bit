@@ -17,7 +17,7 @@ fn gll_render_art(
   commits : Array[(String, Array[String])],
   max_lanes : Int,
 ) -> Array[String] {
-  let shown : Map[String, Bool] = {}
+  let shown : Map[String, Bool] = Map([])
   for c in commits {
     shown[c.0] = true
   }

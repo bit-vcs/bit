@@ -71,7 +71,7 @@ pub fn list_branches(
   git_dir : String,
 ) -> (HeadRef, Array[BranchInfo]) raise @bit.GitError {
   let head = read_head_ref(fs, git_dir)
-  let map : Map[String, @bit.ObjectId] = {}
+  let map : Map[String, @bit.ObjectId] = Map([])
   let heads_dir = join_path(git_dir, "refs/heads")
   if fs.is_dir(heads_dir) {
     collect_loose_heads(fs, heads_dir, "", map)
@@ -1207,7 +1207,7 @@ pub fn is_ancestor_of(
   }
   let db = ObjectDb::load(fs, git_dir) catch { _ => return false }
   let ancestor_hex = ancestor.to_hex()
-  let visited : Map[String, Bool] = {}
+  let visited : Map[String, Bool] = Map([])
   let queue : Array[@bit.ObjectId] = [descendant]
   while queue.length() > 0 {
     let current = queue.pop()

@@ -37,7 +37,7 @@ test "remote: update resolves repeated group entries" {
 ///|
 test "remote: update reports missing group or remote" {
   let blocks = @bitlib.parse_config_blocks("")
-  let remotes : Map[String, @bitlib.RemoteConfig] = {}
+  let remotes : Map[String, @bitlib.RemoteConfig] = Map([])
   let (names, default_update, missing) = remote_update_collect_targets(
     remotes,
     blocks,

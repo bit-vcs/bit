@@ -8,7 +8,7 @@ pub fn collect_commit_tree_only(
   fs : &@bit.RepoFileSystem,
   commit_id : @bit.ObjectId,
 ) -> Array[@bit.PackObject] raise @bit.GitError {
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   let out : Array[@bit.PackObject] = []
   let hex = commit_id.to_hex()
   seen[hex] = true
@@ -39,7 +39,7 @@ pub fn collect_diff_objects(
   new_commit : @bit.ObjectId,
 ) -> Array[@bit.PackObject] raise @bit.GitError {
   // First, collect all object IDs reachable from base (without fetching data)
-  let base_ids : Map[String, Bool] = {}
+  let base_ids : Map[String, Bool] = Map([])
   collect_object_ids_only(db, fs, base_commit, base_ids)
   // Now collect new commit's objects, skipping those in base_ids
   let out : Array[@bit.PackObject] = []
@@ -203,7 +203,7 @@ pub fn collect_reachable_objects(
   fs : &@bit.RepoFileSystem,
   commit_id : @bit.ObjectId,
 ) -> Array[@bit.PackObject] raise @bit.GitError {
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   let out : Array[@bit.PackObject] = []
   collect_commit_objects(db, fs, commit_id, seen, out)
   out
@@ -216,7 +216,7 @@ pub fn collect_reachable_objects_from_commits(
   fs : &@bit.RepoFileSystem,
   commits : Array[@bit.ObjectId],
 ) -> Array[@bit.PackObject] raise @bit.GitError {
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   let out : Array[@bit.PackObject] = []
   for commit_id in commits {
     collect_commit_objects(db, fs, commit_id, seen, out)

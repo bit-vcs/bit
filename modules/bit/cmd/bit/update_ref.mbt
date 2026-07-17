@@ -134,10 +134,10 @@ async fn handle_update_ref(args : Array[String]) -> Unit raise Error {
     let input = decode_bytes(read_all_stdin())
     let mut stdin_no_deref = no_deref
     let mut stdin_create_reflog = create_reflog
-    let seen_refs : Map[String, Bool] = {}
+    let seen_refs : Map[String, Bool] = Map([])
     // Maps a --no-deref symref's referent to the symref name, so a later update
     // of that referent is detected as a duplicate.
-    let noderef_referents : Map[String, String] = {}
+    let noderef_referents : Map[String, String] = Map([])
     // git applies a --stdin batch as one transaction: every command is parsed
     // into a structured op, the whole batch is validated against the current
     // repo state, and only then is anything written.

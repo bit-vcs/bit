@@ -731,7 +731,7 @@ fn show_render_commit_block(
           data,
           commit_info.tree,
           commit_info.parents,
-          {},
+          Map([]),
         )
         return Some(
           show_prefix_signature_lines(
@@ -922,7 +922,7 @@ async fn handle_show(args : Array[String]) -> Unit raise Error {
       let (_, id) = target
       start_ids.push(id)
     }
-    let exclude_ids : Map[String, Bool] = {}
+    let exclude_ids : Map[String, Bool] = Map([])
     let exclude_targets = log_resolve_targets(
       fs,
       git_dir,

@@ -16,7 +16,7 @@ pub fn restore_paths(
   }
   let object_git_dir = resolve_checkout_common_git_dir(rfs, actual_git_dir)
   let index_entries = read_index_entries(rfs, actual_git_dir)
-  let index_map : Map[String, IndexEntry] = {}
+  let index_map : Map[String, IndexEntry] = Map([])
   for e in index_entries {
     let safe_path = normalize_checkout_path(e.path)
     index_map[safe_path] = e

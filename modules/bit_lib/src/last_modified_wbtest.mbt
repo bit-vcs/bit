@@ -62,7 +62,15 @@ fn lm_query(
     abort("rev-parse \{spec}")
   }
   let results = last_modified_compute(
-    db, rfs, start, spec, max_depth, show_trees, max_count, [], pathspecs,
+    db,
+    rfs,
+    start,
+    spec,
+    max_depth,
+    show_trees,
+    max_count,
+    [],
+    pathspecs,
   )
   let out : Array[(String, String)] = []
   for r in results {
@@ -86,7 +94,10 @@ fn lm_labels(ids : Array[String]) -> Map[String, String] {
 }
 
 ///|
-fn lm_assert(actual : Array[(String, String)], expected : Array[(String, String)]) -> Unit {
+fn lm_assert(
+  actual : Array[(String, String)],
+  expected : Array[(String, String)],
+) -> Unit {
   if actual.length() != expected.length() {
     abort("length: got \{actual.length()} want \{expected.length()}: \{actual}")
   }
@@ -227,10 +238,20 @@ test "last-modified: limit traversal by commit (range bottom)" {
   let rfs : &@bit.RepoFileSystem = fs
   let git_dir = js_resolve_git_dir(fs, "/repo")
   let db = ObjectDb::load(rfs, git_dir)
-  guard rev_parse(rfs, git_dir, "HEAD") is Some(start) else { abort("rev-parse") }
+  guard rev_parse(rfs, git_dir, "HEAD") is Some(start) else {
+    abort("rev-parse")
+  }
   let bottom = @bit.ObjectId::from_hex(ids[0]) // commit 1 = HEAD~2
   let results = last_modified_compute(
-    db, rfs, start, "HEAD", 0, false, -1, [bottom], [],
+    db,
+    rfs,
+    start,
+    "HEAD",
+    0,
+    false,
+    -1,
+    [bottom],
+    [],
   )
   let out : Array[(String, String)] = []
   for r in results {
@@ -279,15 +300,16 @@ test "last-modified: subdirectory modified via merge" {
   let _c_left = commit("left", 1700000100)
   // right branch from base: subdir/right
   guard js_checkout(host, "/repo", "main") is Ok(_) else { abort("co main") }
-  guard js_checkout_b(host, "/repo", "right") is Ok(_) else { abort("cob right") }
+  guard js_checkout_b(host, "/repo", "right") is Ok(_) else {
+    abort("cob right")
+  }
   w("/repo/subdir/right", "right\n")
   add(["subdir/right"])
   let _c_right = commit("right", 1700000200)
   // merge right into left
   guard js_checkout(host, "/repo", "left") is Ok(_) else { abort("co left") }
-  let c_merge = match js_merge(
-      host, "/repo", "right", "merge", "T <t@e.com>", 1700000300,
-    ) {
+  let c_merge = match
+    js_merge(host, "/repo", "right", "merge", "T <t@e.com>", 1700000300) {
     Ok(r) => r.commit_id
     Err(e) => abort("merge: \{e}")
   }
@@ -340,9 +362,8 @@ test "last-modified: merge attributes each path to its own branch" {
   add(["file"])
   let c_main = commit("mainchg", 1700000200)
   // merge side into main (no conflict)
-  let _c_merge = match js_merge(
-      host, "/repo", "side", "merge", "T <t@e.com>", 1700000300,
-    ) {
+  let _c_merge = match
+    js_merge(host, "/repo", "side", "merge", "T <t@e.com>", 1700000300) {
     Ok(r) => r.commit_id
     Err(e) => abort("merge: \{e}")
   }
@@ -384,7 +405,15 @@ test "last-modified: shallow boundary (missing parent object) does not abort" {
   write_object_bytes(ffs, git_dir, tip_id, compressed)
   // Must not raise; every path is attributed to the boundary commit itself.
   let results = last_modified_compute(
-    db, rfs, tip_id, "shallow-tip", -1, false, -1, [], [],
+    db,
+    rfs,
+    tip_id,
+    "shallow-tip",
+    -1,
+    false,
+    -1,
+    [],
+    [],
   )
   assert_true(results.length() > 0)
   for r in results {

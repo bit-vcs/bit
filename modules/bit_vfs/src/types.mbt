@@ -64,7 +64,7 @@ pub(all) struct WorkingLayer {
 
 ///|
 pub fn WorkingLayer::new() -> WorkingLayer {
-  { files: {}, deleted: {}, dirs: {}, dirty: false }
+  { files: Map([]), deleted: Map([]), dirs: Map([]), dirty: false }
 }
 
 ///|
@@ -98,8 +98,8 @@ pub(all) struct ObjectCache {
 pub fn ObjectCache::new(max_bytes : Int) -> ObjectCache {
   {
     blob_cache: LruCache::new(max_bytes, fn(b : Bytes) { b.length() }),
-    trees: {},
-    path_cache: {},
+    trees: Map([]),
+    path_cache: Map([]),
   }
 }
 

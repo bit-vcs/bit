@@ -534,7 +534,7 @@ fn collect_commit_tree_modes(
   commit_id : @bitcore.ObjectId,
 ) -> Map[String, Int] raise @bitcore.GitError {
   let files = @bitlib.collect_tree_files_from_commit(db, fs, commit_id)
-  let modes : Map[String, Int] = {}
+  let modes : Map[String, Int] = Map([])
   for path, entry in files {
     modes[path] = entry.mode
   }

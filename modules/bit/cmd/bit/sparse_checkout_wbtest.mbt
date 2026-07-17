@@ -1,5 +1,5 @@
 ///|
-let sparse_checkout_wbtest_shim_lock : @async.Semaphore = @async.Semaphore::new(
+let sparse_checkout_wbtest_shim_lock : @async.Semaphore = @async.Semaphore(
   1,
   initial_value=1,
 )

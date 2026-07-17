@@ -1,5 +1,5 @@
 ///|
-let cmd_bit_wbtest_env_lock : @async.Semaphore = @async.Semaphore::new(
+let cmd_bit_wbtest_env_lock : @async.Semaphore = @async.Semaphore(
   1,
   initial_value=1,
 )

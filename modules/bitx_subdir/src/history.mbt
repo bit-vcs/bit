@@ -144,7 +144,7 @@ fn filter_subdir_history(
     _ => raise IoError("failed to load object db")
   }
   let result : Array[SubdirCommit] = []
-  let visited : Map[String, Bool] = {}
+  let visited : Map[String, Bool] = Map([])
   let queue : Array[@bit.ObjectId] = [start_commit]
   let mut prev_tree : @bit.ObjectId? = None
   while queue.length() > 0 && result.length() < max_count {

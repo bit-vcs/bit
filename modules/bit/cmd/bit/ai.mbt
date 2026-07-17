@@ -60,7 +60,7 @@ fn merge_index_and_worktree_diffs(
   index_diffs : Array[@bitdiff.DiffFile],
   worktree_diffs : Array[@bitdiff.DiffFile],
 ) -> Array[@bitdiff.DiffFile] {
-  let merged : Map[String, @bitdiff.DiffFile] = {}
+  let merged : Map[String, @bitdiff.DiffFile] = Map([])
   for item in worktree_diffs {
     merged[item.path] = item
   }
@@ -98,7 +98,7 @@ fn build_diff_units_for_ai(diffs : Array[@bitdiff.DiffFile]) -> String {
 
 ///|
 fn split_diff_units(diffs : Array[@bitdiff.DiffFile]) -> Array[AiDiffUnit] {
-  let grouped : Map[String, Array[@bitdiff.DiffFile]] = {}
+  let grouped : Map[String, Array[@bitdiff.DiffFile]] = Map([])
   for item in diffs {
     let unit = diff_unit_name(item.path)
     match grouped.get(unit) {
@@ -714,7 +714,7 @@ async fn handle_ai_commit(args : Array[String]) -> Unit raise Error {
   }
   for unit in units {
     ignore(@bitlib.reset(fs, rfs, root, "HEAD", @bitlib.ResetMode::Mixed))
-    let path_map : Map[String, Bool] = {}
+    let path_map : Map[String, Bool] = Map([])
     let unit_paths : Array[String] = []
     for file in unit.diffs {
       if !path_map.contains(file.path) {

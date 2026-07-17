@@ -23,17 +23,17 @@ pub fn bisect_get_candidates(
   goods : Array[@bit.ObjectId],
   skips : Array[@bit.ObjectId],
 ) -> Array[@bit.ObjectId] raise Error {
-  let good_set : Map[String, Bool] = {}
+  let good_set : Map[String, Bool] = Map([])
   for g in goods {
     bisect_mark_ancestors(db, rfs, g, good_set)
   }
   // Pre-build skip set for O(1) lookup
-  let skip_set : Map[String, Bool] = {}
+  let skip_set : Map[String, Bool] = Map([])
   for s in skips {
     skip_set[s.to_hex()] = true
   }
   let candidates : Array[@bit.ObjectId] = []
-  let visited : Map[String, Bool] = {}
+  let visited : Map[String, Bool] = Map([])
   let queue : Array[@bit.ObjectId] = [bad]
   while queue.length() > 0 {
     let current = queue.pop()

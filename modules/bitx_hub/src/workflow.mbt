@@ -142,7 +142,7 @@ fn with_workflow_timestamp(
 
 ///|
 pub fn PrWorkflowResult::serialize(self : PrWorkflowResult) -> String {
-  let obj : Map[String, Json] = {}
+  let obj : Map[String, Json] = Map([])
   obj["pr_id"] = Json::string(self.pr_id)
   obj["task"] = Json::string(self.task)
   obj["status"] = Json::string(self.status.to_string())
@@ -274,7 +274,7 @@ pub fn Hub::list_pr_workflows(
 ) -> Array[PrWorkflowResult] {
   let prefix = pr_workflow_prefix(pr_id)
   let records = self.store.list_records(objects, prefix)
-  let latest_by_task : Map[String, PrWorkflowResult] = {}
+  let latest_by_task : Map[String, PrWorkflowResult] = Map([])
   for record in records {
     if record.kind != "hub.pr.workflow" {
       continue

@@ -153,7 +153,7 @@ pub fn list_refs_with_ids(
   git_dir : String,
   filter_prefix : String?,
 ) -> Map[String, @bit.ObjectId] {
-  let out : Map[String, @bit.ObjectId] = {}
+  let out : Map[String, @bit.ObjectId] = Map([])
   // Collect from reftable if present
   if fs.is_dir(git_dir + "/reftable") {
     let reftable_refs = @reftable.collect_reftable_refs(fs, git_dir) catch {
@@ -177,12 +177,14 @@ pub fn list_refs_with_ids(
 }
 
 ///|
-///| A single packed-refs entry with its optional peeled (`^<oid>`) line.
+
+///|
+/// A single packed-refs entry with its optional peeled (`^<oid>`) line.
 pub(all) struct PackedRefEntry {
   refname : String
   oid : String
   peeled : String?
-} derive(Show, Eq)
+} derive(Debug, Eq)
 
 ///|
 /// Parse packed-refs text into entries. Header (`#`) and blank lines are
@@ -232,10 +234,8 @@ pub fn parse_packed_refs_text(text : String) -> Array[PackedRefEntry] {
 /// header. Every packed-refs write MUST go through this (or produce the same
 /// invariants): real git trusts the `sorted` trait and binary-searches the
 /// file, so an unsorted or duplicated file breaks ref resolution in real git.
-pub fn serialize_packed_refs_entries(
-  entries : Array[PackedRefEntry],
-) -> String {
-  let dedup : Map[String, PackedRefEntry] = {}
+pub fn serialize_packed_refs_entries(entries : Array[PackedRefEntry]) -> String {
+  let dedup : Map[String, PackedRefEntry] = Map([])
   for e in entries {
     dedup[e.refname] = e
   }
@@ -354,7 +354,7 @@ pub fn list_remote_tracking_refs(
 ) -> Map[String, @bit.ObjectId] {
   let prefix = "refs/remotes/" + remote_name + "/"
   let refs = list_refs_with_ids(fs, git_dir, Some(prefix))
-  let out : Map[String, @bit.ObjectId] = {}
+  let out : Map[String, @bit.ObjectId] = Map([])
   for refname, id in refs {
     if !refname.has_prefix(prefix) {
       continue

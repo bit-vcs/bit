@@ -110,8 +110,8 @@ fn compare_trees(
   let entries_a = get_tree_entries(db, rfs, tree_a)
   let entries_b = get_tree_entries(db, rfs, tree_b)
   // Build maps
-  let map_a : Map[String, @bitcore.TreeEntry] = {}
-  let map_b : Map[String, @bitcore.TreeEntry] = {}
+  let map_a : Map[String, @bitcore.TreeEntry] = Map([])
+  let map_b : Map[String, @bitcore.TreeEntry] = Map([])
   for e in entries_a {
     map_a[e.name] = e
   }

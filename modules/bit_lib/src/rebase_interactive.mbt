@@ -291,7 +291,7 @@ pub fn autosquash_interactive_todo(
       normal.push(entry)
     }
   }
-  let inserts : Map[Int, Array[InteractiveTodoEntry]] = {}
+  let inserts : Map[Int, Array[InteractiveTodoEntry]] = Map([])
   for item in fixups {
     let (idx, entry) = item
     match inserts.get(idx) {
@@ -437,7 +437,7 @@ pub fn load_interactive_rebase_state(
     join_path(rebase_dir, "message-squash"),
   )
   // Load labels state (for --rebase-merges)
-  let labels : Map[String, String] = {}
+  let labels : Map[String, String] = Map([])
   let labels_text = interactive_read_file_or_empty(
     rfs,
     join_path(rebase_dir, "labels"),
@@ -456,8 +456,8 @@ pub fn load_interactive_rebase_state(
     }
   }
   // Load update-refs state
-  let update_refs : Map[String, String] = {}
-  let commit_map : Map[String, String] = {}
+  let update_refs : Map[String, String] = Map([])
+  let commit_map : Map[String, String] = Map([])
   let update_refs_text = interactive_read_file_or_empty(
     rfs,
     join_path(rebase_dir, "update-refs"),
@@ -632,7 +632,7 @@ fn rebase_collect_dag(
     raise @bit.GitError::InvalidObject("No common ancestor found")
   }
   // BFS to collect all ancestors of base (stop set)
-  let base_ancestors : Map[String, Bool] = {}
+  let base_ancestors : Map[String, Bool] = Map([])
   base_ancestors[base.to_hex()] = true
   let bfs_queue : Array[@bit.ObjectId] = [base]
   let mut qi = 0
@@ -654,7 +654,7 @@ fn rebase_collect_dag(
     }
   }
   // BFS from head, collecting commits not in base_ancestors
-  let visited : Map[String, Bool] = {}
+  let visited : Map[String, Bool] = Map([])
   let result : Array[@bit.ObjectId] = []
   let queue : Array[@bit.ObjectId] = [head]
   visited[head.to_hex()] = true
@@ -706,13 +706,13 @@ fn generate_rebase_merges_todo_text(
     None => upstream.to_hex()
   }
   // Build set for quick lookup
-  let commit_set : Map[String, Bool] = {}
+  let commit_set : Map[String, Bool] = Map([])
   for c in commits {
     commit_set[c.to_hex()] = true
   }
   // Build children map and parent info
-  let parents_map : Map[String, Array[@bit.ObjectId]] = {}
-  let is_merge : Map[String, Bool] = {}
+  let parents_map : Map[String, Array[@bit.ObjectId]] = Map([])
+  let is_merge : Map[String, Bool] = Map([])
   for c in commits {
     let obj = db.get(rfs, c)
     match obj {
@@ -727,7 +727,7 @@ fn generate_rebase_merges_todo_text(
     }
   }
   // Find which commits are referenced as second+ parent of merges (need labels)
-  let needs_label : Map[String, String] = {} // commit_hex → label_name
+  let needs_label : Map[String, String] = Map([]) // commit_hex → label_name
   let mut label_counter = 0
   for c in commits {
     let hex = c.to_hex()
@@ -784,13 +784,13 @@ fn generate_rebase_merges_todo_text(
   // HEAD is always the main branch
   branch_tips.push((head_hex, ""))
   // Sort so that earlier commits in the topo order come first
-  let commit_order : Map[String, Int] = {}
+  let commit_order : Map[String, Int] = Map([])
   for i, c in commits {
     commit_order[c.to_hex()] = i
   }
   // Process each branch: trace first-parent chain, collect picks
   let branch_entries : Array[(String, Array[InteractiveTodoEntry])] = []
-  let processed : Map[String, Bool] = {}
+  let processed : Map[String, Bool] = Map([])
   // Process branches in reverse topological order of their tips
   // so that dependencies (labels) are defined before they're needed
   let sorted_tips = branch_tips.copy()
@@ -1065,9 +1065,9 @@ pub async fn interactive_rebase_start(
   // Resolve short hex to full hex in entries
   let resolved_entries = interactive_resolve_entries(rfs, git_dir, entries)
   // Collect refs to update if --update-refs is enabled
-  let update_refs_map : Map[String, String] = {}
+  let update_refs_map : Map[String, String] = Map([])
   if update_refs {
-    let commit_set : Map[String, Bool] = {}
+    let commit_set : Map[String, Bool] = Map([])
     for entry in resolved_entries {
       if entry.commit_hex.length() > 0 {
         commit_set[entry.commit_hex] = true
@@ -1108,8 +1108,8 @@ pub async fn interactive_rebase_start(
     amend: false,
     squash_msg: "",
     update_refs: update_refs_map,
-    commit_map: {},
-    labels: {},
+    commit_map: Map([]),
+    labels: Map([]),
   }
   save_interactive_rebase_state(fs, git_dir, state)
   // Execute the todo
@@ -1546,7 +1546,7 @@ pub async fn execute_interactive_todo(
       let base = find_merge_base(db, rfs, head_id, label_id)
       let base_files : Map[String, TreeFileEntry] = match base {
         Some(bid) => collect_tree_files_from_commit(db, rfs, bid)
-        None => {}
+        None => Map([])
       }
       let ours_files = collect_tree_files_from_commit(db, rfs, head_id)
       let theirs_files = collect_tree_files_from_commit(db, rfs, label_id)
@@ -1769,7 +1769,7 @@ fn interactive_cherry_pick(
   let base_map = rebase_tree_map(db, rfs, base_id)
   let parent_map : Map[String, TreeEntryInfo] = match parent_id {
     Some(pid) => rebase_tree_map(db, rfs, pid)
-    None => {} // Empty map for root commit (empty tree parent)
+    None => Map([]) // Empty map for root commit (empty tree parent)
   }
   let commit_map = rebase_tree_map_from_tree(db, rfs, info.tree)
   let changes = rebase_diff_maps(parent_map, commit_map)

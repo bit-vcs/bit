@@ -300,7 +300,7 @@ fn push_write_upstream_config_updates(
   remote_name : String,
   updates : Array[PushUpstreamConfigUpdate],
 ) -> Array[String] raise @bitcore.GitError {
-  let merge_by_branch : Map[String, String] = {}
+  let merge_by_branch : Map[String, String] = Map([])
   let ordered_branches : Array[String] = []
   let messages : Array[String] = []
   for update in updates {
@@ -900,7 +900,7 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
     Some(plan) => auto_set_upstream_needed = plan.auto_set_upstream
     None => ()
   }
-  let force_with_lease_rules : Map[String, PushLeaseExpectation] = {}
+  let force_with_lease_rules : Map[String, PushLeaseExpectation] = Map([])
   for value in force_with_lease_values {
     let (refname, expectation) = push_parse_force_with_lease_value(
       fs, git_dir, value,
@@ -1175,7 +1175,7 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
               }
             }
             if prune_patterns.length() > 0 {
-              let planned_dest_refs : Map[String, Bool] = {}
+              let planned_dest_refs : Map[String, Bool] = Map([])
               for plan in push_plans {
                 planned_dest_refs[plan.dest_ref] = true
               }
@@ -1217,7 +1217,7 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
             }
           }
           if follow_tags {
-            let planned_dest_refs : Map[String, Bool] = {}
+            let planned_dest_refs : Map[String, Bool] = Map([])
             for plan in push_plans {
               planned_dest_refs[plan.dest_ref] = true
             }
@@ -1782,7 +1782,7 @@ async fn handle_push(args : Array[String]) -> Unit raise Error {
                 eprint_line("Writing objects: 100% (1/1), done.")
               }
               let rfs : &@bitcore.RepoFileSystem = fs
-              let transferred_object_ids : Map[String, Bool] = {}
+              let transferred_object_ids : Map[String, Bool] = Map([])
               for row in resolved_updates {
                 if row.should_apply && !row.delete_ref {
                   copy_wanted_object_graph(

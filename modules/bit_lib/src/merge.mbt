@@ -144,7 +144,7 @@ pub fn merge(
             status: FastForward,
             commit_id: Some(target),
             conflicts: [],
-            conflict_types: {},
+            conflict_types: Map([]),
           }
         }
         Detached(_) => raise @bit.GitError::InvalidObject("HEAD not found")
@@ -156,7 +156,7 @@ pub fn merge(
       status: AlreadyUpToDate,
       commit_id: Some(head),
       conflicts: [],
-      conflict_types: {},
+      conflict_types: Map([]),
     }
   }
   let db = ObjectDb::load(rfs, git_dir)
@@ -166,7 +166,7 @@ pub fn merge(
       status: FastForward,
       commit_id: Some(target),
       conflicts: [],
-      conflict_types: {},
+      conflict_types: Map([]),
     }
   }
   if merge_is_ancestor(db, rfs, target, head) {
@@ -174,12 +174,12 @@ pub fn merge(
       status: AlreadyUpToDate,
       commit_id: Some(head),
       conflicts: [],
-      conflict_types: {},
+      conflict_types: Map([]),
     }
   }
   let base = merge_find_base(db, rfs, head, target)
   let base_files = match base {
-    None => {}
+    None => Map([])
     Some(id) => collect_tree_files_from_commit(db, rfs, id)
   }
   let ours = collect_tree_files_from_commit(db, rfs, head)
@@ -188,7 +188,7 @@ pub fn merge(
   let merged = file_result.merged
   let conflicts = file_result.conflicts
   let all_conflict_types = file_result.conflict_types
-  let rename_conflict_stages : Map[String, (TreeFileEntry, TreeFileEntry)] = {}
+  let rename_conflict_stages : Map[String, (TreeFileEntry, TreeFileEntry)] = Map([])
   // Try content-level merge for files modified on both sides
   for candidate in file_result.needs_content_merge {
     let base_content = match candidate.base_id {
@@ -354,7 +354,7 @@ pub fn merge(
     }
   }
   // Detect file/directory conflicts: a file path that collides with a directory
-  let file_dir_renames : Map[String, String] = {}
+  let file_dir_renames : Map[String, String] = Map([])
   let merged_paths : Array[String] = []
   for path, _ in merged {
     merged_paths.push(path)
@@ -444,7 +444,7 @@ pub fn merge(
     status: Merged,
     commit_id: Some(commit_id),
     conflicts: [],
-    conflict_types: {},
+    conflict_types: Map([]),
   }
 }
 
@@ -455,7 +455,7 @@ fn merge_tree_file_to_index_entry(
   path : String,
   info : TreeFileEntry,
 ) -> IndexEntry raise @bit.GitError {
-  let files : Map[String, TreeFileEntry] = {}
+  let files : Map[String, TreeFileEntry] = Map([])
   files[path] = info
   let entries = tree_files_to_index(db, fs, files)
   if entries.length() == 0 {
@@ -481,7 +481,7 @@ fn merge_find_base(
   a : @bit.ObjectId,
   b : @bit.ObjectId,
 ) -> @bit.ObjectId? raise @bit.GitError {
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   let stack_a : Array[@bit.ObjectId] = [a]
   while stack_a.length() > 0 {
     let id = match stack_a.pop() {
@@ -574,19 +574,19 @@ fn merge_files(
   db : ObjectDb,
   rfs : &@bit.RepoFileSystem,
 ) -> MergeFilesResult {
-  let merged : Map[String, TreeFileEntry] = {}
+  let merged : Map[String, TreeFileEntry] = Map([])
   let conflicts : Array[String] = []
   let needs_content_merge : Array[ContentMergeCandidate] = []
   let rename_2to1 : Array[Rename2to1Candidate] = []
-  let conflict_types : Map[String, String] = {}
+  let conflict_types : Map[String, String] = Map([])
   let removed_paths : Array[String] = []
   // Step 1: Detect renames on each side
   let ours_renames = merge_detect_renames(base, ours, db, rfs)
   let theirs_renames = merge_detect_renames(base, theirs, db, rfs)
   // Paths that are handled by rename logic (skip in normal processing)
-  let handled_paths : Map[String, Bool] = {}
+  let handled_paths : Map[String, Bool] = Map([])
   // Step 1b: Detect rename/rename(2to1) - different files renamed to same target
-  let ours_new_to_old : Map[String, String] = {}
+  let ours_new_to_old : Map[String, String] = Map([])
   for old_path, new_path in ours_renames.old_to_new {
     ours_new_to_old[new_path] = old_path
   }
@@ -798,7 +798,7 @@ fn merge_files(
     }
   }
   // Step 4: Process remaining paths with standard logic
-  let all_paths : Map[String, Bool] = {}
+  let all_paths : Map[String, Bool] = Map([])
   for path, _ in base {
     if !handled_paths.contains(path) {
       all_paths[path] = true
@@ -1005,7 +1005,7 @@ fn merge_conflicted_index_entries_with_renames(
   rename_conflict_stages : Map[String, (TreeFileEntry, TreeFileEntry)],
 ) -> Array[IndexStageEntry] raise @bit.GitError {
   let out : Array[IndexStageEntry] = []
-  let conflict_set : Map[String, Bool] = {}
+  let conflict_set : Map[String, Bool] = Map([])
   for path in conflicts {
     conflict_set[path] = true
   }

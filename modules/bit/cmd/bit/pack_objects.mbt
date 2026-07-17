@@ -664,7 +664,7 @@ fn apply_sparse_oid_filter(
   }
   // Build a set of blob IDs that match the sparse patterns
   // We need to walk all commits' trees to determine which blobs match
-  let matching_blob_ids : Map[String, Bool] = {}
+  let matching_blob_ids : Map[String, Bool] = Map([])
   for obj in objects {
     if obj.obj_type == @bitcore.ObjectType::Commit {
       let info = @bitcore.parse_commit(obj.data) catch { _ => continue }
@@ -856,7 +856,7 @@ fn resolve_tag_chain(
   start : @bitcore.ObjectId,
 ) -> (Array[@bitcore.PackObject], @bitcore.ObjectId?) {
   let chain : Array[@bitcore.PackObject] = []
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   let mut current = start
   let mut resolved : @bitcore.ObjectId? = None
   while true {
@@ -905,12 +905,12 @@ fn collect_include_tag_objects(
   db : @bitlib.ObjectDb,
   objects : Array[@bitcore.PackObject],
 ) -> Array[@bitcore.PackObject] {
-  let included : Map[String, Bool] = {}
+  let included : Map[String, Bool] = Map([])
   for obj in objects {
     included[object_hex(obj)] = true
   }
   let refs = @bitrepo.show_ref(fs, git_dir) catch { _ => [] }
-  let added : Map[String, Bool] = {}
+  let added : Map[String, Bool] = Map([])
   let out : Array[@bitcore.PackObject] = []
   for pair in refs {
     let (_name, id) = pair
@@ -1021,7 +1021,7 @@ fn collect_pack_index_ids(fs : OsFs, idx_path : String) -> Array[String] {
 
 ///|
 fn collect_pack_ids_from_dir(fs : OsFs, pack_dir : String) -> Map[String, Bool] {
-  let out : Map[String, Bool] = {}
+  let out : Map[String, Bool] = Map([])
   if !fs.is_dir(pack_dir) {
     return out
   }
@@ -1049,7 +1049,7 @@ fn collect_pack_ids_from_marker(
   pack_dir : String,
   suffix : String,
 ) -> Map[String, Bool] {
-  let out : Map[String, Bool] = {}
+  let out : Map[String, Bool] = Map([])
   if !fs.is_dir(pack_dir) {
     return out
   }
@@ -1080,7 +1080,7 @@ fn collect_pack_ids_from_names(
   pack_dir : String,
   names : Array[String],
 ) -> Map[String, Bool] {
-  let out : Map[String, Bool] = {}
+  let out : Map[String, Bool] = Map([])
   for name in names {
     // The name might be just "pack-HASH.pack" or a full path
     let stem = if name.has_suffix(".pack") {
@@ -1105,7 +1105,7 @@ fn collect_loose_object_ids(
   fs : OsFs,
   objects_dir : String,
 ) -> Map[String, Bool] {
-  let out : Map[String, Bool] = {}
+  let out : Map[String, Bool] = Map([])
   if !fs.is_dir(objects_dir) {
     return out
   }
@@ -1173,7 +1173,7 @@ fn load_object_lookup_dbs(
   primary : @bitlib.ObjectDb,
 ) -> Array[@bitlib.ObjectDb] {
   let out : Array[@bitlib.ObjectDb] = [primary]
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   seen[normalize_path(primary.objects_dir)] = true
   let alt_dirs = read_alternate_object_dirs(fs, git_dir)
   for alt_dir in alt_dirs {
@@ -1260,7 +1260,7 @@ fn object_hex(
 fn dedup_objects(
   objects : Array[@bitcore.PackObject],
 ) -> Array[@bitcore.PackObject] {
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   let out : Array[@bitcore.PackObject] = []
   for obj in objects {
     let hex = object_hex(obj)
@@ -1415,7 +1415,7 @@ fn get_pack_reuse_mode(git_dir : String) -> PackReuseMode {
 fn midx_read_object_pack_mapping_with_offsets(
   data : Bytes,
 ) -> Map[String, (Int, Int)] {
-  let out : Map[String, (Int, Int)] = {}
+  let out : Map[String, (Int, Int)] = Map([])
   if data.length() < 12 {
     return out
   }
@@ -1492,7 +1492,7 @@ fn count_pack_reused_objects(
         // Read object -> (pack_idx, offset) mapping from MIDX
         let obj_to_pack = midx_read_object_pack_mapping_with_offsets(midx_data)
         // Determine eligible pack indices based on reuse mode
-        let eligible : Map[Int, Bool] = {}
+        let eligible : Map[Int, Bool] = Map([])
         match reuse_mode {
           Single => {
             let preferred = midx_read_preferred_pack_idx(
@@ -1511,14 +1511,14 @@ fn count_pack_reused_objects(
           Disabled => ()
         }
         // Build per-pack set of offsets assigned by MIDX
-        let pack_assigned_offsets : Map[Int, Map[Int, Bool]] = {}
+        let pack_assigned_offsets : Map[Int, Map[Int, Bool]] = Map([])
         for entry in obj_to_pack {
           let (_, (pidx, off)) = entry
           if eligible.contains(pidx) {
             match pack_assigned_offsets.get(pidx) {
               Some(offsets) => offsets[off] = true
               None => {
-                let m : Map[Int, Bool] = {}
+                let m : Map[Int, Bool] = Map([])
                 m[off] = true
                 pack_assigned_offsets[pidx] = m
               }
@@ -1526,10 +1526,10 @@ fn count_pack_reused_objects(
           }
         }
         // Cache pack file data for eligible packs (lazy load)
-        let pack_data_cache : Map[Int, Bytes] = {}
+        let pack_data_cache : Map[Int, Bytes] = Map([])
         // Count reused objects, excluding OFS_DELTA with cross-pack base
         let mut reused = 0
-        let packs_used : Map[Int, Bool] = {}
+        let packs_used : Map[Int, Bool] = Map([])
         for obj in objects {
           let hex = obj.id.to_hex()
           match obj_to_pack.get(hex) {
@@ -1611,7 +1611,7 @@ fn find_pack_with_bitmap(fs : OsFs, pack_dir : String) -> String? {
   }
   let entries = fs.readdir(pack_dir) catch { _ => return None }
   // Collect .bitmap files that are NOT multi-pack-index bitmaps
-  let bitmap_stems : Map[String, Bool] = {}
+  let bitmap_stems : Map[String, Bool] = Map([])
   for entry in entries {
     let name = normalize_dir_entry(entry)
     if name.has_suffix(".bitmap") && !name.has_prefix("multi-pack-index") {
@@ -1660,7 +1660,7 @@ fn count_single_pack_reused_objects(
   if bitmap.object_count != entries.length() {
     return (0, 0)
   }
-  let pack_oids : Map[String, Bool] = {}
+  let pack_oids : Map[String, Bool] = Map([])
   for entry in entries {
     pack_oids[entry.id.to_hex()] = true
   }
@@ -1825,7 +1825,7 @@ fn collect_reachable_objects_from_commits_allow_missing(
   commits : Array[@bitcore.ObjectId],
   blocked : Map[String, Bool],
 ) -> Array[@bitcore.PackObject] {
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   let out : Array[@bitcore.PackObject] = []
   for commit_id in commits {
     collect_commit_objects_allow_missing(db, fs, commit_id, blocked, seen, out)
@@ -1964,26 +1964,26 @@ fn collect_objects_sparse_algorithm(
   allow_missing_for_local : Bool,
 ) -> Array[@bitcore.PackObject] {
   // Step 1: Collect all exclude-side commit IDs via BFS
-  let exclude_set : Map[String, Bool] = {}
+  let exclude_set : Map[String, Bool] = Map([])
   collect_exclude_commit_ids(db, fs, exclude_commits, exclude_set)
   // Step 2: Walk include commits to find interesting and boundary commits
   let interesting_commits : Array[@bitcore.ObjectId] = []
   let boundary_tree_ids : Array[@bitcore.ObjectId] = []
   let interesting_tree_ids : Array[@bitcore.ObjectId] = []
-  let commit_seen : Map[String, Bool] = {}
+  let commit_seen : Map[String, Bool] = Map([])
   find_interesting_and_boundary_commits(
     db, fs, include_commits, exclude_set, commit_seen, interesting_commits, interesting_tree_ids,
     boundary_tree_ids,
   )
   // Step 3: Phase 1 - sparse UNINTERESTING marking
   // Build initial tree OID set with their interesting/uninteresting status
-  let uninteresting : Map[String, Bool] = {}
+  let uninteresting : Map[String, Bool] = Map([])
   for tid in boundary_tree_ids {
     uninteresting[tid.to_hex()] = true
   }
   // Collect all root tree OIDs for the sparse marking pass
   let root_tree_oids : Array[String] = []
-  let root_tree_set : Map[String, Bool] = {}
+  let root_tree_set : Map[String, Bool] = Map([])
   for tid in interesting_tree_ids {
     let hex = tid.to_hex()
     if !root_tree_set.contains(hex) {
@@ -2000,7 +2000,7 @@ fn collect_objects_sparse_algorithm(
   }
   mark_trees_uninteresting_sparse(db, fs, root_tree_oids, uninteresting)
   // Step 4: Phase 2 - collect objects skipping UNINTERESTING subtrees
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   let out : Array[@bitcore.PackObject] = []
   // Add commit objects
   for commit_id in interesting_commits {
@@ -2160,7 +2160,7 @@ fn mark_trees_uninteresting_sparse(
   }
   // Group children by path name across all trees
   // path_groups: Map[name, Array[child_tree_oid_hex]]
-  let path_groups : Map[String, Array[String]] = {}
+  let path_groups : Map[String, Array[String]] = Map([])
   for oid in tree_oids {
     let is_uninteresting = uninteresting.contains(oid)
     let obj_id = @bitcore.ObjectId::from_hex(oid) catch { _ => continue }
@@ -2344,7 +2344,7 @@ async fn collect_objects_from_stdin_packs(
   if cfg.stdin_packs_follow {
     append_commit_ids_from_objects(include_objects, seed_commits)
   }
-  let exclude_ids : Map[String, Bool] = {}
+  let exclude_ids : Map[String, Bool] = Map([])
   for path in exclude_paths {
     let idx_path = pack_idx_path(path)
     let ids = collect_pack_index_ids(fs, idx_path)
@@ -2352,7 +2352,7 @@ async fn collect_objects_from_stdin_packs(
       exclude_ids[id] = true
     }
   }
-  let mut promisor_ids : Map[String, Bool] = {}
+  let mut promisor_ids : Map[String, Bool] = Map([])
   if cfg.exclude_promisor_objects {
     promisor_ids = collect_pack_ids_from_marker(fs, pack_dir, ".promisor")
     for alt_dir in alt_dirs {
@@ -2699,8 +2699,8 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
             na.compare(nb)
           }
         })
-        let blocked : Map[String, Bool] = {}
-        let seen : Map[String, Bool] = {}
+        let blocked : Map[String, Bool] = Map([])
+        let seen : Map[String, Bool] = Map([])
         let out : Array[@bitcore.PackObject] = []
         for pair in refs {
           let (_name, id) = pair
@@ -2872,7 +2872,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
         } else {
           // Non-sparse path (original behavior)
           let include_objects = if allow_missing_for_local {
-            let blocked : Map[String, Bool] = {}
+            let blocked : Map[String, Bool] = Map([])
             collect_reachable_objects_from_commits_allow_missing(
               db, fs, include_commits, blocked,
             )
@@ -2890,11 +2890,11 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
           if exclude_commits.length() == 0 {
             objects = include_objects
           } else {
-            let blocked : Map[String, Bool] = {}
+            let blocked : Map[String, Bool] = Map([])
             let exclude_objects = collect_reachable_objects_from_commits_allow_missing(
               db, fs, exclude_commits, blocked,
             )
-            let exclude_set : Map[String, Bool] = {}
+            let exclude_set : Map[String, Bool] = Map([])
             for obj in exclude_objects {
               let id = @bitobject.hash_object_content_with_algo(
                 hash_algo,
@@ -3004,7 +3004,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
       // Add back user-given objects that bypass filters (e.g., explicitly
       // specified trees/blobs in --revs input)
       if filter_exempt_objects.length() > 0 {
-        let existing : Map[String, Bool] = {}
+        let existing : Map[String, Bool] = Map([])
         for obj in objects {
           existing[@bitobject.hash_object_content_with_algo(
             hash_algo,
@@ -3026,7 +3026,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
       }
       if cfg.local_only {
         let alt_dirs = read_alternate_object_dirs(fs, git_dir)
-        let non_local_ids : Map[String, Bool] = {}
+        let non_local_ids : Map[String, Bool] = Map([])
         for alt_dir in alt_dirs {
           let alt_pack_dir = alt_dir + "/pack"
           let alt_pack_ids = collect_pack_ids_from_dir(fs, alt_pack_dir)
@@ -3256,7 +3256,7 @@ async fn handle_pack_objects(args : Array[String]) -> Unit raise Error {
         @sys.exit(0)
       }
       if cfg.unpack_unreachable {
-        let new_pack_ids : Map[String, Bool] = {}
+        let new_pack_ids : Map[String, Bool] = Map([])
         for obj in objects {
           new_pack_ids[obj.id.to_hex()] = true
         }
@@ -3348,7 +3348,7 @@ async fn loosen_unused_packed_objects(
   }
   let entries = fs.readdir(pack_dir) catch { _ => return }
   // Build a set of .keep pack base names to skip
-  let keep_bases : Map[String, Bool] = {}
+  let keep_bases : Map[String, Bool] = Map([])
   for entry in entries {
     let name = normalize_dir_entry(entry)
     if name.has_suffix(".keep") {

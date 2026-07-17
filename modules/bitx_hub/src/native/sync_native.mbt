@@ -256,7 +256,7 @@ fn relay_conflict_policy() -> @hub.RecordMergePolicy {
 
 ///|
 fn relay_copy_headers(headers : Map[String, String]) -> Map[String, String] {
-  let out : Map[String, String] = {}
+  let out : Map[String, String] = Map([])
   for entry in headers.to_array() {
     let (key, value) = entry
     out[key] = value
@@ -481,7 +481,7 @@ fn json_get_int(obj : Map[String, Json], key : String, fallback : Int) -> Int {
 
 ///|
 fn parse_relay_publish_accepted(text : String) -> Bool {
-  let parsed = @json.parse(text) catch { _ => Json::object({}) }
+  let parsed = @json.parse(text) catch { _ => Json::object(Map([])) }
   match parsed {
     Json::Object(obj) =>
       match obj.get("accepted") {
@@ -553,7 +553,7 @@ fn parse_relay_poll_clone_peers(
     )
   }
   let next_cursor = json_get_int(root, "next_cursor", 0)
-  let peers_by_sender : Map[String, (String, String, String?)] = {}
+  let peers_by_sender : Map[String, (String, String, String?)] = Map([])
   match root.get("envelopes") {
     Some(Json::Array(items)) =>
       for item in items {
@@ -892,7 +892,7 @@ fn relay_build_clone_announce_payload(
   clone_url : String,
   repo~ : String?,
 ) -> Json {
-  let payload_obj : Map[String, Json] = {}
+  let payload_obj : Map[String, Json] = Map([])
   payload_obj["kind"] = Json::string(relay_clone_announce_kind())
   payload_obj["clone_url"] = Json::string(clone_url)
   match repo {
@@ -1065,7 +1065,7 @@ async fn relay_push_with_http(
   let relay_signing = @crypto.relay_http_signing_config()
   let mut accepted = 0
   for record in records {
-    let payload_obj : Map[String, Json] = {}
+    let payload_obj : Map[String, Json] = Map([])
     payload_obj["kind"] = Json::string("hub.record")
     payload_obj["record"] = Json::string(record.serialize())
     let payload_json = Json::object(payload_obj)

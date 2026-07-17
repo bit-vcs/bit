@@ -301,7 +301,7 @@ fn write_pack_promisor_marker_http(
   let pack_dir = @bit.join_path(git_dir, "objects/pack")
   fs.mkdir_p(pack_dir)
   let marker_lines : Array[String] = []
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   for item in refs {
     let (id, name) = item
     if name.length() == 0 {
