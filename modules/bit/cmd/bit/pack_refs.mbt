@@ -15,39 +15,20 @@ fn handle_pack_refs(args : Array[String]) -> Unit raise Error {
   let refs_dir = git_dir + "/refs"
   let packed_refs_path = git_dir + "/packed-refs"
   // Read existing packed-refs
-  let packed : Map[String, String] = {}
+  let entries : Array[@bitrefs.PackedRefEntry] = []
   if fs.is_file(packed_refs_path) {
     let content = decode_bytes(fs.read_file(packed_refs_path))
-    for line_view in content.split("\n") {
-      let line = line_view.to_owned()
-      if line.length() > 0 && !line.has_prefix("#") && !line.has_prefix("^") {
-        let parts : Array[String] = line
-          .split(" ")
-          .map(v => v.to_owned())
-          .collect()
-        if parts.length() >= 2 {
-          let sha = parts[0]
-          let ref_name = parts[1]
-          packed[ref_name] = sha
-        }
-      }
+    for e in @bitrefs.parse_packed_refs_text(content) {
+      entries.push(e)
     }
   }
-  // Collect refs to pack
+  // Collect refs to pack (loose values appended last, so they win dedupe)
   let refs_to_pack : Array[(String, String)] = []
   collect_refs_to_pack(fs, refs_dir, "refs", refs_to_pack, all)
-  // Update packed-refs
   for r in refs_to_pack {
-    packed[r.0] = r.1
+    entries.push({ refname: r.0, oid: r.1, peeled: None })
   }
-  // Write packed-refs
-  let lines : Array[String] = ["# pack-refs with: peeled fully-peeled sorted"]
-  let sorted_refs : Array[(String, String)] = packed.iter().collect()
-  sorted_refs.sort_by((a, b) => a.0.compare(b.0))
-  for entry in sorted_refs {
-    lines.push("\{entry.1} \{entry.0}")
-  }
-  fs.write_string(packed_refs_path, lines.join("\n") + "\n")
+  fs.write_string(packed_refs_path, @bitrefs.serialize_packed_refs_entries(entries))
   // Prune loose refs if requested
   if prune {
     for r in refs_to_pack {

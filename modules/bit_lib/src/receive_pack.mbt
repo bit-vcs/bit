@@ -575,49 +575,11 @@ fn receive_delete_ref(
   }
   let data = rfs.read_file(packed)
   let text = @utf8.decode_lossy(data[:])
-  let out : Array[String] = []
-  let mut removed = false
-  let mut skip_peeled = false
-  for line_view in text.split("\n") {
-    let line = line_view.to_owned()
-    if line.length() == 0 {
-      continue
-    }
-    if skip_peeled {
-      if line.has_prefix("^") {
-        skip_peeled = false
-        continue
-      }
-      skip_peeled = false
-    }
-    if line.has_prefix("#") || line.has_prefix("^") {
-      out.push(line)
-      continue
-    }
-    match line.find(" ") {
-      None => out.push(line)
-      Some(idx) => {
-        let name = String::unsafe_substring(
-          line,
-          start=idx + 1,
-          end=line.length(),
-        )
-        if name == normalized {
-          removed = true
-          skip_peeled = true
-        } else {
-          out.push(line)
-        }
-      }
-    }
-  }
+  let entries = @bitrefs.parse_packed_refs_text(text)
+  let kept = entries.filter(e => e.refname != normalized)
+  let removed = kept.length() != entries.length()
   if removed {
-    let buf = StringBuilder::new()
-    for l in out {
-      buf.write_string(l)
-      buf.write_char('\n')
-    }
-    fs.write_string(packed, buf.to_string())
+    fs.write_string(packed, @bitrefs.serialize_packed_refs_entries(kept))
   }
   removed
 }

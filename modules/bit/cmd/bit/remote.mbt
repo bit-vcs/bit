@@ -1653,40 +1653,17 @@ fn upsert_packed_refs(
     return
   }
   let packed_path = git_dir + "/packed-refs"
-  let packed : Map[String, String] = {}
+  let entries : Array[@bitrefs.PackedRefEntry] = []
   if fs.is_file(packed_path) {
     let content = decode_bytes(fs.read_file(packed_path))
-    for line_view in content.split("\n") {
-      let line = line_view.trim().to_owned()
-      if line.length() == 0 || line.has_prefix("#") || line.has_prefix("^") {
-        continue
-      }
-      let space = line.find(" ")
-      match space {
-        Some(i) =>
-          if i > 0 && i + 1 < line.length() {
-            let oid = String::unsafe_substring(line, start=0, end=i)
-            let refname = String::unsafe_substring(
-              line,
-              start=i + 1,
-              end=line.length(),
-            )
-            packed[refname] = oid
-          }
-        None => ()
-      }
+    for e in @bitrefs.parse_packed_refs_text(content) {
+      entries.push(e)
     }
   }
   for entry in refs {
-    packed[entry.0] = entry.1.to_hex()
+    entries.push({ refname: entry.0, oid: entry.1.to_hex(), peeled: None })
   }
-  let entries : Array[(String, String)] = packed.iter().collect()
-  entries.sort_by(fn(a, b) { a.0.compare(b.0) })
-  let lines : Array[String] = ["# pack-refs with: peeled fully-peeled sorted"]
-  for entry in entries {
-    lines.push(entry.1 + " " + entry.0)
-  }
-  fs.write_string(packed_path, lines.join("\n") + "\n")
+  fs.write_string(packed_path, @bitrefs.serialize_packed_refs_entries(entries))
 }
 
 ///|

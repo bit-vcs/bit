@@ -177,6 +177,86 @@ pub fn list_refs_with_ids(
 }
 
 ///|
+///| A single packed-refs entry with its optional peeled (`^<oid>`) line.
+pub(all) struct PackedRefEntry {
+  refname : String
+  oid : String
+  peeled : String?
+} derive(Show, Eq)
+
+///|
+/// Parse packed-refs text into entries. Header (`#`) and blank lines are
+/// dropped; a `^` line is attached to the entry that precedes it.
+pub fn parse_packed_refs_text(text : String) -> Array[PackedRefEntry] {
+  let entries : Array[PackedRefEntry] = []
+  for line_view in text.split("\n") {
+    let line = line_view.to_owned()
+    if line.length() == 0 || line.has_prefix("#") {
+      continue
+    }
+    if line.has_prefix("^") {
+      if entries.length() > 0 {
+        let last = entries[entries.length() - 1]
+        entries[entries.length() - 1] = {
+          refname: last.refname,
+          oid: last.oid,
+          peeled: Some(
+            String::unsafe_substring(line, start=1, end=line.length()),
+          ),
+        }
+      }
+      continue
+    }
+    match line.find(" ") {
+      Some(idx) =>
+        if idx > 0 && idx + 1 < line.length() {
+          entries.push({
+            refname: String::unsafe_substring(
+              line,
+              start=idx + 1,
+              end=line.length(),
+            ),
+            oid: String::unsafe_substring(line, start=0, end=idx),
+            peeled: None,
+          })
+        }
+      None => ()
+    }
+  }
+  entries
+}
+
+///|
+/// Serialize entries into canonical packed-refs text: exactly one entry per
+/// refname (later duplicates win), sorted by refname, with git's standard
+/// header. Every packed-refs write MUST go through this (or produce the same
+/// invariants): real git trusts the `sorted` trait and binary-searches the
+/// file, so an unsorted or duplicated file breaks ref resolution in real git.
+pub fn serialize_packed_refs_entries(
+  entries : Array[PackedRefEntry],
+) -> String {
+  let dedup : Map[String, PackedRefEntry] = {}
+  for e in entries {
+    dedup[e.refname] = e
+  }
+  let unique : Array[PackedRefEntry] = dedup.iter().map(kv => kv.1).collect()
+  // NOTE: String::compare is length-first in MoonBit; git requires plain
+  // byte order (memcmp) for the `sorted` trait, which lexical_compare gives.
+  unique.sort_by((a, b) => String::lexical_compare(a.refname, b.refname))
+  let buf = StringBuilder::new()
+  // Trailing space after "sorted" matches real git's header byte-for-byte.
+  buf.write_string("# pack-refs with: peeled fully-peeled sorted \n")
+  for e in unique {
+    buf.write_string(e.oid + " " + e.refname + "\n")
+    match e.peeled {
+      Some(p) => buf.write_string("^" + p + "\n")
+      None => ()
+    }
+  }
+  buf.to_string()
+}
+
+///|
 pub fn rewrite_packed_refs(
   fs : &@bit.FileSystem,
   rfs : &@bit.RepoFileSystem,
@@ -189,58 +269,21 @@ pub fn rewrite_packed_refs(
   }
   let data = rfs.read_file(packed_path) catch { _ => Bytes::default() }
   let text = @utf8.decode_lossy(data[:])
-  let lines : Array[String] = []
-  let mut skip_peeled = false
-  for line_view in text.split("\n") {
-    let line = line_view.to_owned()
-    if line.length() == 0 {
-      continue
-    }
-    if line.has_prefix("#") {
-      lines.push(line)
-      skip_peeled = false
-      continue
-    }
-    if line.has_prefix("^") {
-      if !skip_peeled {
-        lines.push(line)
-      }
-      continue
-    }
-    let space = line.find(" ")
-    match space {
-      None => {
-        lines.push(line)
-        skip_peeled = false
-      }
-      Some(idx) => {
-        if idx + 1 >= line.length() {
-          lines.push(line)
-          skip_peeled = false
-          continue
-        }
-        let oid = String::unsafe_substring(line, start=0, end=idx)
-        let refname = String::unsafe_substring(
-          line,
-          start=idx + 1,
-          end=line.length(),
-        )
-        match transform(refname) {
-          Some(new_ref) => {
-            lines.push(oid + " " + new_ref)
-            skip_peeled = false
-          }
-          None => skip_peeled = true
-        }
-      }
+  let entries = parse_packed_refs_text(text)
+  let kept : Array[PackedRefEntry] = []
+  for e in entries {
+    match transform(e.refname) {
+      Some(new_ref) =>
+        kept.push({ refname: new_ref, oid: e.oid, peeled: e.peeled })
+      None => ()
     }
   }
-  if lines.length() == 0 {
+  if kept.length() == 0 {
     fs.remove_file(packed_path) catch {
       _ => ()
     }
   } else {
-    fs.write_string(packed_path, lines.join("\n") + "\n")
+    fs.write_string(packed_path, serialize_packed_refs_entries(kept))
   }
 }
 

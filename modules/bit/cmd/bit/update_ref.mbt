@@ -700,39 +700,13 @@ fn delete_packed_ref_entry(
   let content = decode_bytes(fs.read_file(packed_refs_path)) catch {
     _ => return ()
   }
-  let lines : Array[String] = []
-  let mut removed = false
-  let mut skip_peeled = false
-  for line_view in content.split("\n") {
-    let line = line_view.to_owned()
-    if skip_peeled && line.has_prefix("^") {
-      skip_peeled = false
-      removed = true
-      continue
-    }
-    skip_peeled = false
-    if line.length() > 0 && !line.has_prefix("#") && !line.has_prefix("^") {
-      let space_idx = line.find(" ")
-      match space_idx {
-        Some(i) => {
-          let packed_ref = String::unsafe_substring(
-            line,
-            start=i + 1,
-            end=line.length(),
-          )
-          if packed_ref == refname {
-            removed = true
-            skip_peeled = true
-            continue
-          }
-        }
-        None => ()
-      }
-    }
-    lines.push(line)
-  }
-  if removed {
-    fs.write_string(packed_refs_path, lines.join("\n"))
+  let entries = @bitrefs.parse_packed_refs_text(content)
+  let kept = entries.filter(e => e.refname != refname)
+  if kept.length() != entries.length() {
+    fs.write_string(
+      packed_refs_path,
+      @bitrefs.serialize_packed_refs_entries(kept),
+    )
   }
 }
 
