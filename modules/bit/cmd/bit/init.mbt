@@ -297,13 +297,13 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
   // the target file through the dangling symlink (POSIX behavior).
   if resolved_sep_git_dir is Some(sep_dir) && !bare {
     let dot_git = path + "/.git"
-    let readlink_result = try? @process.collect_output(
-      "readlink",
-      [dot_git],
-      inherit_env=true,
-    )
-    match readlink_result {
-      Ok((0, stdout, _)) => {
+    try {
+      let (code, stdout, _) = @process.collect_output(
+        "readlink",
+        [dot_git],
+        inherit_env=true,
+      )
+      if code == 0 {
         let target = (stdout.text() catch { _ => "" }).trim().to_owned()
         if target != "" {
           let abs_target = if target.has_prefix("/") {
@@ -319,6 +319,7 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
           }
         }
       }
+    } catch {
       _ => () // Not a symlink or readlink failed
     }
   }
@@ -330,7 +331,9 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
     let mut resolved = dot_git_path
     // Follow gitdir: pointer if it's a file
     if !fs.is_dir(resolved) && fs.is_file(resolved) {
-      let content = decode_bytes((try? fs.read_file(resolved)).unwrap_or(b""))
+      let content = decode_bytes(
+        (fs.read_file(resolved) catch { _ => b"" }),
+      )
       let trimmed = content.trim_end(chars="\r\n").to_owned()
       if trimmed.has_prefix("gitdir: ") {
         let linked = string_slice_from(trimmed, 8)
@@ -349,7 +352,7 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
       let commondir_file = resolved + "/commondir"
       if fs.is_file(commondir_file) {
         let cd_val = decode_bytes(
-            (try? fs.read_file(commondir_file)).unwrap_or(b""),
+            (fs.read_file(commondir_file) catch { _ => b"" }),
           )
           .trim_end(chars="\r\n")
           .to_owned()
@@ -632,7 +635,7 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
       fs.is_file(dot_git_for_premove) {
       // Follow gitdir: pointer to check for commondir
       let gf = decode_bytes(
-          (try? fs.read_file(dot_git_for_premove)).unwrap_or(b""),
+          (fs.read_file(dot_git_for_premove) catch { _ => b"" }),
         )
         .trim_end(chars="\r\n")
         .to_owned()

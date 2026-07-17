@@ -476,12 +476,12 @@ fn checkout_restore_paths_from_spec_mode(
   let db = @bitlib.ObjectDb::load(rfs, object_git_dir)
   let files = @bitlib.collect_tree_files(db, rfs, tree_id)
   let current_entries = @bitlib.read_index_entries(rfs, git_dir)
-  let tracked_paths : Map[String, Bool] = {}
+  let tracked_paths : Map[String, Bool] = Map([])
   for entry in current_entries {
     tracked_paths[entry.path] = true
   }
-  let selected : Map[String, @bitlib.TreeFileEntry] = {}
-  let removed_paths : Map[String, Bool] = {}
+  let selected : Map[String, @bitlib.TreeFileEntry] = Map([])
+  let removed_paths : Map[String, Bool] = Map([])
   for path in paths {
     let safe_path = @bitlib.normalize_repo_path(path)
     match files.get(safe_path) {
@@ -506,7 +506,7 @@ fn checkout_restore_paths_from_spec_mode(
   }
   if update_index {
     let restored_entries = @bitlib.tree_files_to_index(db, rfs, selected)
-    let selected_paths : Map[String, Bool] = {}
+    let selected_paths : Map[String, Bool] = Map([])
     for path, _ in selected {
       selected_paths[path] = true
     }
@@ -630,7 +630,7 @@ async fn checkout_with_promisor_retry(
   match prefetch_target {
     Some(target_id) =>
       if @bitlib.has_any_filter_attributes(fs, root) {
-        let _prefetch_result : Result[Unit, Error] = try? ({
+        try {
           let object_git_dir = @bitlib.resolve_checkout_common_git_dir(
             fs, git_dir,
           )
@@ -638,27 +638,22 @@ async fn checkout_with_promisor_retry(
           @bitlibnative.lfs_prefetch_for_checkout(
             db, fs, fs, root, git_dir, target_id, "origin",
           )
-        })
+        } catch {
+          _ => ()
+        }
       }
     None => ()
   }
   let mut attempts = 0
   while attempts < 16 {
-    let result : Result[@bitcore.ObjectId, Error] = try? run_checkout_with_sensitive_hooks(
+    let id = run_checkout_with_sensitive_hooks(
       fs,
       fs,
       root,
       checkout_spec,
       detach=checkout_detach,
-    )
-    match result {
-      Ok(id) => {
-        if @bitlib.is_sparse_checkout_enabled(fs, git_dir) {
-          @bitlib.sparse_checkout_reapply(fs, fs, root)
-        }
-        return id
-      }
-      Err(err) =>
+    ) catch {
+      err => {
         match parse_checkout_missing_object_id(err) {
           Some(missing_id) => {
             let pdb = match promisor_db {
@@ -684,7 +679,13 @@ async fn checkout_with_promisor_retry(
           }
           None => raise err
         }
+        continue
+      }
     }
+    if @bitlib.is_sparse_checkout_enabled(fs, git_dir) {
+      @bitlib.sparse_checkout_reapply(fs, fs, root)
+    }
+    return id
   }
   raise @bitcore.GitError::InvalidObject(
     "checkout lazy-fetch retry limit exceeded",
@@ -703,7 +704,7 @@ fn collect_missing_checkout_blob_ids(
     _ => return []
   }
   let missing : Array[@bitcore.ObjectId] = []
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   for entry in files.values() {
     if entry.mode == 0o160000 {
       continue

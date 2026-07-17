@@ -116,7 +116,7 @@ fn detect_case_insensitive_collision_skips(
   git_dir : String,
   paths : Array[String],
 ) -> Map[String, Bool] raise @bit.GitError {
-  let skip : Map[String, Bool] = {}
+  let skip : Map[String, Bool] = Map([])
   if !worktree_is_case_insensitive(fs, rfs, git_dir) {
     return skip
   }
@@ -173,26 +173,19 @@ async fn remove_path_if_exists(path : String) -> Unit raise @bit.GitError {
   if !exists {
     return
   }
-  let kind_result : Result[@afs.FileKind, Error] = try? @afs.kind(
-    path,
-    follow_symlink=false,
-  )
-  match kind_result {
-    Ok(kind) =>
-      match kind {
-        @afs.FileKind::Directory =>
-          @afs.rmdir(path, recursive=true) catch {
-            err => raise @bit.GitError::IoError(err.to_string())
-          }
-        _ =>
-          @afs.remove(path) catch {
-            err => raise @bit.GitError::IoError(err.to_string())
-          }
-      }
-    Err(_) =>
-      @afs.remove(path) catch {
-        err => raise @bit.GitError::IoError(err.to_string())
-      }
+  let is_dir = try {
+    @afs.kind(path, follow_symlink=false) is @afs.FileKind::Directory
+  } catch {
+    _ => false
+  }
+  if is_dir {
+    @afs.rmdir(path, recursive=true) catch {
+      err => raise @bit.GitError::IoError(err.to_string())
+    }
+  } else {
+    @afs.remove(path) catch {
+      err => raise @bit.GitError::IoError(err.to_string())
+    }
   }
 }
 

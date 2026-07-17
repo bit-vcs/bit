@@ -309,7 +309,7 @@ pub fn prune_worktrees_detailed(
   if !rfs.is_dir(worktrees_dir) {
     return pruned
   }
-  let seen_worktree_roots : Map[String, Bool] = {}
+  let seen_worktree_roots : Map[String, Bool] = Map([])
   seen_worktree_roots[resolve_main_worktree_root(git_dir)] = true
   let entries = rfs.readdir(worktrees_dir)
   entries.sort_by(fn(a, b) { String::lexical_compare(a, b) })
@@ -739,7 +739,7 @@ fn worktree_repair_target_is_repository(
   if !fs.is_file(join_path(target, "HEAD")) {
     return false
   }
-  let common = (try? resolve_commondir(fs, target)).unwrap_or(target)
+  let common = resolve_commondir(fs, target) catch { _ => target }
   fs.is_dir(join_path(common, "objects"))
 }
 
@@ -818,7 +818,7 @@ fn worktree_repair_relative_paths_enabled(
   fs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> Bool {
-  let common_git_dir = (try? resolve_commondir(fs, git_dir)).unwrap_or(git_dir)
+  let common_git_dir = resolve_commondir(fs, git_dir) catch { _ => git_dir }
   let config_path = join_path(common_git_dir, "config")
   read_config_bool(fs, config_path, "worktree", "useRelativePaths").unwrap_or(
     false,
@@ -1645,7 +1645,7 @@ fn worktree_use_relative_paths_enabled(
   fs : &@bit.RepoFileSystem,
   git_dir : String,
 ) -> Bool {
-  let common_git_dir = (try? resolve_commondir(fs, git_dir)).unwrap_or(git_dir)
+  let common_git_dir = resolve_commondir(fs, git_dir) catch { _ => git_dir }
   let config_path = join_path(common_git_dir, "config")
   if read_config_bool(fs, config_path, "worktree", "useRelativePaths").unwrap_or(
       false,

@@ -7,7 +7,7 @@ pub struct ObjectStore {
 
 ///|
 pub fn ObjectStore::new() -> ObjectStore {
-  { objects: {} }
+  { objects: Map([]) }
 }
 
 ///|
@@ -147,16 +147,11 @@ pub fn parse_tree(
   if content.length() == 0 {
     return []
   }
-  match
-    (
-      try? parse_tree_with_hash_size(content, 20),
-      try? parse_tree_with_hash_size(content, 32),
-    ) {
-    (Ok(entries), Err(_)) => entries
-    (Err(_), Ok(entries)) => entries
-    (Ok(entries), Ok(_)) => entries
-    (Err(_), Err(_)) =>
-      raise @object.GitError::InvalidObject("Invalid tree object")
+  parse_tree_with_hash_size(content, 20) catch {
+    _ =>
+      parse_tree_with_hash_size(content, 32) catch {
+        _ => raise @object.GitError::InvalidObject("Invalid tree object")
+      }
   }
 }
 
@@ -173,7 +168,7 @@ pub fn checkout_commit(
         raise @object.GitError::InvalidObject("Object is not a commit")
       }
       let info = parse_commit(obj.data)
-      let files : Map[String, Bytes] = {}
+      let files : Map[String, Bytes] = Map([])
       walk_tree(store, info.tree, "", files)
       files
     }

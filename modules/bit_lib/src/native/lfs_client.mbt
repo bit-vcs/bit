@@ -37,13 +37,13 @@ fn lfs_build_batch_request_json_for_operation(
 ) -> String {
   let obj_arr : Array[Json] = []
   for ptr in objects {
-    let m : Map[String, Json] = {}
+    let m : Map[String, Json] = Map([])
     m["oid"] = Json::string(ptr.oid)
     m["size"] = Json::number(ptr.size.to_double())
     obj_arr.push(Json::object(m))
   }
   let transfers : Array[Json] = [Json::string("basic")]
-  let root : Map[String, Json] = {}
+  let root : Map[String, Json] = Map([])
   root["operation"] = Json::string(operation)
   root["transfers"] = Json::array(transfers)
   root["objects"] = Json::array(obj_arr)
@@ -108,7 +108,7 @@ pub fn lfs_parse_batch_response(
       Some(Json::String(s)) => s
       _ => continue
     }
-    let headers : Map[String, String] = {}
+    let headers : Map[String, String] = Map([])
     match dl.get("header") {
       Some(Json::Object(hdr)) =>
         for key, value in hdr {
@@ -166,7 +166,7 @@ pub fn lfs_parse_upload_batch_response(
       Some(Json::String(s)) => s
       _ => continue
     }
-    let headers : Map[String, String] = {}
+    let headers : Map[String, String] = Map([])
     match upload.get("header") {
       Some(Json::Object(hdr)) =>
         for key, value in hdr {
@@ -213,7 +213,7 @@ pub async fn lfs_batch_request(
   let batch_url = lfs_url + "/objects/batch"
   let body_str = lfs_build_batch_request_json(objects)
   let body = @utf8.encode(body_str)
-  let headers : Map[String, String] = {}
+  let headers : Map[String, String] = Map([])
   headers["Content-Type"] = "application/vnd.git-lfs+json"
   headers["Accept"] = "application/vnd.git-lfs+json"
   let (response, data) = @bitnative.native_http_post(batch_url, body, headers)
@@ -242,7 +242,7 @@ async fn lfs_batch_upload_request_with_http(
   let batch_url = lfs_url + "/objects/batch"
   let body_str = lfs_build_batch_upload_request_json(objects)
   let body = @utf8.encode(body_str)
-  let headers : Map[String, String] = {}
+  let headers : Map[String, String] = Map([])
   headers["Content-Type"] = "application/vnd.git-lfs+json"
   headers["Accept"] = "application/vnd.git-lfs+json"
   let (response, data) = http_post(batch_url, body, headers)
@@ -289,46 +289,43 @@ pub async fn lfs_download_single_object(
   let dir = lfs_parent_dir(dest)
   fs.mkdir_p(dir)
   // Security: only forward Authorization header, not arbitrary server headers
-  let headers : Map[String, String] = {}
+  let headers : Map[String, String] = Map([])
   match action.headers.get("Authorization") {
     Some(v) => headers["Authorization"] = v
     None => ()
   }
-  let result = try? @bitnative.native_http_get(action.href, headers)
-  match result {
-    Err(err) =>
+  let (response, data) = @bitnative.native_http_get(action.href, headers) catch {
+    err =>
       return Some({
         oid: action.oid,
         code: 0,
         message: "Download failed: \{err}",
       })
-    Ok((response, data)) => {
-      if response.code >= 400 {
-        return Some({
-          oid: action.oid,
-          code: response.code,
-          message: "HTTP \{response.code}",
-        })
-      }
-      // Security: verify SHA-256 integrity
-      if !@bitlib.lfs_verify_oid(data, action.oid) {
-        return Some({
-          oid: action.oid,
-          code: 0,
-          message: "SHA-256 integrity check failed",
-        })
-      }
-      // Security: verify size matches
-      if action.size > 0L && data.length().to_int64() != action.size {
-        return Some({
-          oid: action.oid,
-          code: 0,
-          message: "Size mismatch: expected \{action.size}, got \{data.length()}",
-        })
-      }
-      fs.write_file(dest, data)
-    }
   }
+  if response.code >= 400 {
+    return Some({
+      oid: action.oid,
+      code: response.code,
+      message: "HTTP \{response.code}",
+    })
+  }
+  // Security: verify SHA-256 integrity
+  if !@bitlib.lfs_verify_oid(data, action.oid) {
+    return Some({
+      oid: action.oid,
+      code: 0,
+      message: "SHA-256 integrity check failed",
+    })
+  }
+  // Security: verify size matches
+  if action.size > 0L && data.length().to_int64() != action.size {
+    return Some({
+      oid: action.oid,
+      code: 0,
+      message: "Size mismatch: expected \{action.size}, got \{data.length()}",
+    })
+  }
+  fs.write_file(dest, data)
   None
 }
 
@@ -371,7 +368,7 @@ fn lfs_collect_upload_pointers_from_pack_objects(
   objects : Array[@bit.PackObject],
 ) -> Array[@bitlib.LfsPointer] {
   let pointers : Array[@bitlib.LfsPointer] = []
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   for obj in objects {
     if obj.obj_type != @bit.ObjectType::Blob {
       continue
@@ -431,7 +428,7 @@ async fn lfs_upload_single_object_with_http(
       message: "Size mismatch: expected \{action.size}, got \{data.length()}",
     })
   }
-  let headers : Map[String, String] = {}
+  let headers : Map[String, String] = Map([])
   for key, value in action.headers {
     headers[key] = value
   }

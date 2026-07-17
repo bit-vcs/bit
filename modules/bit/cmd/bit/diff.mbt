@@ -1281,7 +1281,7 @@ fn diff_format_dirstat(
   cumulative? : Bool = false,
 ) -> Array[String] {
   let lines : Array[String] = []
-  let weights : Map[String, Int] = {}
+  let weights : Map[String, Int] = Map([])
   let mut total = 0
   for file in files {
     let file_weight = if by_file {
@@ -1415,7 +1415,7 @@ fn diff_extra_unmerged_name_only_paths(
   filters : Array[String],
   relative_prefix : String?,
 ) -> Array[String] {
-  let displayed : Map[String, Bool] = {}
+  let displayed : Map[String, Bool] = Map([])
   for file in displayed_files {
     displayed[file.path] = true
   }
@@ -2324,7 +2324,7 @@ async fn handle_diff_index(args : Array[String]) -> Unit raise Error {
   }
   let staged_all = diff_cached_against_ref(fs, rfs, root, git_dir, target)
   let staged : Array[@bitdiff.DiffFile] = []
-  let staged_paths : Map[String, Bool] = {}
+  let staged_paths : Map[String, Bool] = Map([])
   for file in staged_all {
     if diff_path_matches_filters(file.path, filters) {
       staged.push(file)
@@ -2638,7 +2638,7 @@ async fn diff_collect_raw_changes_against_tree(
   }
   let tree_entries = @bitlib.collect_tree_files(db, rfs, old_tree_id)
   let index_entries = @bitlib.read_index_entries(rfs, git_dir)
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   let paths : Array[String] = []
   for entry in tree_entries {
     let path = entry.0
@@ -2691,22 +2691,21 @@ async fn collect_diff_index_stale_entries(
     let mut is_stale = entry.mtime_sec == 0 && entry.mtime_nsec == 0
     if !is_stale {
       let abs = root + "/" + entry.path
-      let mtime_result : Result[(Int64, Int), Error] = try? @asyncfs.mtime(
-        abs,
-        follow_symlink=false,
-      )
-      match mtime_result {
-        Ok((sec, nsec)) =>
-          if sec.to_int() != entry.mtime_sec || nsec != entry.mtime_nsec {
-            is_stale = true
-          }
-        Err(_) => is_stale = true
+      try {
+        let (sec, nsec) = @asyncfs.mtime(abs, follow_symlink=false)
+        if sec.to_int() != entry.mtime_sec || nsec != entry.mtime_nsec {
+          is_stale = true
+        }
+      } catch {
+        _ => is_stale = true
       }
       if !is_stale && entry.mode != 0o120000 {
-        let size_result : Result[Bytes, Error] = try? fs.read_file(abs)
-        match size_result {
-          Ok(content) => if content.length() != entry.size { is_stale = true }
-          Err(_) => ()
+        try {
+          if fs.read_file(abs).length() != entry.size {
+            is_stale = true
+          }
+        } catch {
+          _ => ()
         }
       }
     }
@@ -2828,16 +2827,16 @@ async fn diff_worktree_against_ref(
   let cached = diff_cached_against_ref(fs, rfs, root, git_dir, spec)
   let worktree = @bitdiff.diff_worktree(rfs, root)
   // Build maps for efficient lookup
-  let cached_map : Map[String, @bitdiff.DiffFile] = {}
+  let cached_map : Map[String, @bitdiff.DiffFile] = Map([])
   for file in cached {
     cached_map[file.path] = file
   }
-  let worktree_map : Map[String, @bitdiff.DiffFile] = {}
+  let worktree_map : Map[String, @bitdiff.DiffFile] = Map([])
   for file in worktree {
     worktree_map[file.path] = file
   }
   let result : Array[@bitdiff.DiffFile] = []
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   // Process all paths from both diffs
   for file in cached {
     seen[file.path] = true
@@ -2962,7 +2961,7 @@ fn diff_combined_against_parents(
     db~,
   )
   let out : Array[@bitdiff.DiffFile] = []
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   for file in first {
     seen[file.path] = true
     out.push(file)
@@ -3936,8 +3935,8 @@ async fn diff_no_index_dirs(
 ) -> Unit raise Error {
   let items_a = fs.readdir(dir_a) catch { _ => [] }
   let items_b = fs.readdir(dir_b) catch { _ => [] }
-  let set_a : Map[String, Bool] = {}
-  let set_b : Map[String, Bool] = {}
+  let set_a : Map[String, Bool] = Map([])
+  let set_b : Map[String, Bool] = Map([])
   let all_names : Array[String] = []
   for name in items_a {
     if name == "." || name == ".." || name == ".git" {

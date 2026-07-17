@@ -1,10 +1,6 @@
 ///|
 fn parse_object_id_hex(text : String) -> @bit.ObjectId? {
-  let parsed : Result[@bit.ObjectId, Error] = try? @bit.ObjectId::from_hex(text)
-  match parsed {
-    Ok(id) => Some(id)
-    Err(_) => None
-  }
+  Some(@bit.ObjectId::from_hex(text) catch { _ => return None })
 }
 
 ///|

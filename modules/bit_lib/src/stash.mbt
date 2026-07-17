@@ -159,7 +159,7 @@ pub async fn stash_push_patch(
   if total == 0 {
     return None
   }
-  let selected_by_path : Map[String, Array[Bool]] = {}
+  let selected_by_path : Map[String, Array[Bool]] = Map([])
   let mut selected_count = 0
   let mut hunk_index = 0
   for file in patch_files {
@@ -179,8 +179,8 @@ pub async fn stash_push_patch(
   if selected_count == 0 {
     return None
   }
-  let selected_overrides : Map[String, StashPatchContent] = {}
-  let remaining_overrides : Map[String, StashPatchContent] = {}
+  let selected_overrides : Map[String, StashPatchContent] = Map([])
+  let remaining_overrides : Map[String, StashPatchContent] = Map([])
   for file in patch_files {
     let selected = selected_by_path[file.path]
     let selected_content = stash_patch_apply_selection(
@@ -270,13 +270,7 @@ fn stash_store_entry(
   let old_id = if rfs.is_file(stash_ref_path) {
     let content = @utf8.decode_lossy(rfs.read_file(stash_ref_path)[:])
     let hex = content.trim_end(chars="\n\r ").to_owned()
-    let parsed : Result[@bit.ObjectId, Error] = try? @bit.ObjectId::from_hex(
-      hex,
-    )
-    match parsed {
-      Ok(id) => id
-      Err(_) => @bit.ObjectId::zero()
-    }
+    @bit.ObjectId::from_hex(hex) catch { _ => @bit.ObjectId::zero() }
   } else {
     @bit.ObjectId::zero()
   }
@@ -336,7 +330,7 @@ fn stash_collect_patch_files(
   head_files : Map[String, TreeFileEntry],
   index_entries : Array[IndexEntry],
 ) -> Array[StashPatchFile] raise @bit.GitError {
-  let path_set : Map[String, Bool] = {}
+  let path_set : Map[String, Bool] = Map([])
   for path in head_files.keys() {
     path_set[path] = true
   }
@@ -693,7 +687,7 @@ fn stash_build_patch_tree_entries(
   head_files : Map[String, TreeFileEntry],
   overrides : Map[String, StashPatchContent],
 ) -> Array[IndexEntry] raise @bit.GitError {
-  let path_set : Map[String, Bool] = {}
+  let path_set : Map[String, Bool] = Map([])
   for path in head_files.keys() {
     path_set[path] = true
   }
@@ -900,7 +894,7 @@ pub fn stash_collect_paths(
   parent_files : Map[String, TreeFileEntry],
   stash_files : Map[String, TreeFileEntry],
 ) -> Array[String] {
-  let all_paths : Map[String, Bool] = {}
+  let all_paths : Map[String, Bool] = Map([])
   for key, _ in parent_files {
     all_paths[key] = true
   }

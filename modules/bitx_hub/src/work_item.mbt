@@ -29,11 +29,8 @@ pub fn Hub::get_work_item(
       if !is_work_item_record_kind(r.kind) {
         return None
       }
-      let result : Result[WorkItem, PrError] = try? parse_work_item(r.payload)
-      match result {
-        Ok(item) => Some(item)
-        Err(_) => None
-      }
+      let item = parse_work_item(r.payload) catch { _ => return None }
+      Some(item)
     }
   }
 }
@@ -54,10 +51,7 @@ pub fn Hub::list_work_items(
     if !is_work_item_record_kind(record.kind) {
       continue
     }
-    let parsed : Result[WorkItem, PrError] = try? parse_work_item(
-      record.payload,
-    )
-    guard parsed is Ok(item) else { continue }
+    let item = parse_work_item(record.payload) catch { _ => continue }
     if !include_kind(item.kind(), kind) {
       continue
     }

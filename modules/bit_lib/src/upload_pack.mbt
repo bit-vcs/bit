@@ -419,7 +419,7 @@ pub fn upload_pack(
 
   // If client has some objects, filter them out
   if req.haves.length() > 0 {
-    let have_set : Map[String, Bool] = {}
+    let have_set : Map[String, Bool] = Map([])
     let have_objects = collect_reachable_objects_from_commits(db, fs, req.haves)
     for obj in have_objects {
       let id = @bit.hash_object_content(obj.obj_type, obj.data)
@@ -517,10 +517,8 @@ fn collect_have_acks_v0(
 ) -> Array[@bit.ObjectId] {
   let out : Array[@bit.ObjectId] = []
   for id in haves {
-    let res : Result[@bit.PackObject?, Error] = try? db.get(fs, id)
-    match res {
-      Ok(Some(_)) => out.push(id)
-      _ => ()
+    if (db.get(fs, id) catch { _ => None }) is Some(_) {
+      out.push(id)
     }
   }
   out
@@ -533,19 +531,15 @@ fn collect_have_acks_v2(
   haves : Array[@bit.ObjectId],
 ) -> Array[@bit.ObjectId] {
   let out : Array[@bit.ObjectId] = []
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   for id in haves {
     let hex = id.to_hex()
     if seen.contains(hex) {
       continue
     }
-    let res : Result[@bit.PackObject?, Error] = try? db.get(fs, id)
-    match res {
-      Ok(Some(_)) => {
-        out.push(id)
-        seen[hex] = true
-      }
-      _ => ()
+    if (db.get(fs, id) catch { _ => None }) is Some(_) {
+      out.push(id)
+      seen[hex] = true
     }
   }
   out
@@ -729,7 +723,7 @@ pub fn upload_pack_v2(
   let git_dir = join_path(root, ".git")
   let db = ObjectDb::load(fs, git_dir)
   let refs = show_ref(fs, git_dir)
-  let ref_map : Map[String, @bit.ObjectId] = {}
+  let ref_map : Map[String, @bit.ObjectId] = Map([])
   for item in refs {
     let (name, id) = item
     ref_map[name] = id
@@ -753,7 +747,7 @@ pub fn upload_pack_v2(
       }
     }
   }
-  let seen_wants : Map[String, Bool] = {}
+  let seen_wants : Map[String, Bool] = Map([])
   let wants : Array[@bit.ObjectId] = []
   for id in all_wants {
     let hex = id.to_hex()
@@ -782,7 +776,7 @@ pub fn upload_pack_v2(
 
   // If client has some objects, filter them out
   let filtered_objects = if req.haves.length() > 0 {
-    let have_set : Map[String, Bool] = {}
+    let have_set : Map[String, Bool] = Map([])
     let have_objects = collect_reachable_objects_from_commits(db, fs, req.haves)
     for obj in have_objects {
       let id = @bit.hash_object_content(obj.obj_type, obj.data)

@@ -274,22 +274,21 @@ async fn handle_add(args : Array[String]) -> Unit raise Error {
         let succeeded : Array[String] = []
         for p in stage_paths {
           let crlf_warnings : Array[String] = []
-          let single_result : Result[Unit, Error] = try? @bitlib.add_paths_async(
-            fs,
-            fs,
-            root,
-            [p],
-            run_filter_cmd=filter_cmd,
-            warnings=crlf_warnings,
-          )
-          match single_result {
-            Ok(_) => {
-              succeeded.push(p)
-              if verbose {
-                eprint_line("add '\{p}'")
-              }
+          try {
+            @bitlib.add_paths_async(
+              fs,
+              fs,
+              root,
+              [p],
+              run_filter_cmd=filter_cmd,
+              warnings=crlf_warnings,
+            )
+            succeeded.push(p)
+            if verbose {
+              eprint_line("add '\{p}'")
             }
-            Err(_) => had_error = true
+          } catch {
+            _ => had_error = true
           }
           for msg in crlf_warnings {
             eprint_line(msg)
@@ -375,7 +374,7 @@ fn add_apply_intent_to_add(
 ) -> Array[String] raise Error {
   let algo = @bitlib.repo_hash_algorithm(rfs, git_dir)
   let entries = @bitlib.read_index_entries(rfs, git_dir)
-  let map : Map[String, @bitlib.IndexEntry] = {}
+  let map : Map[String, @bitlib.IndexEntry] = Map([])
   for entry in entries {
     map[entry.path] = entry
   }
@@ -442,7 +441,7 @@ async fn add_collect_update_requested_paths(
   if raw_paths.length() == 0 {
     return tracked_paths
   }
-  let selected : Map[String, Bool] = {}
+  let selected : Map[String, Bool] = Map([])
   for raw in raw_paths {
     let (pattern_raw, icase) = add_parse_refresh_pathspec(raw)
     let pattern = add_normalize_input_path(root, pattern_raw)
@@ -479,7 +478,7 @@ async fn add_collect_update_stage_paths(
     out.append(status.unstaged_deleted)
     return out
   }
-  let requested : Map[String, Bool] = {}
+  let requested : Map[String, Bool] = Map([])
   for path in requested_paths {
     requested[path] = true
   }
@@ -536,7 +535,7 @@ async fn handle_add_dry_run(
     eprint_line("fatal: pathspec '\{unmatched[0]}' did not match any files")
     @sys.exit(1)
   }
-  let printed : Map[String, Bool] = {}
+  let printed : Map[String, Bool] = Map([])
   for path in stage_paths {
     if printed.contains(path) {
       continue
@@ -581,8 +580,8 @@ async fn add_collect_unmatched_pathspecs(
   let out : Array[String] = []
   let git_dir = resolve_git_dir(fs, root)
   let tracked_entries = @bitlib.read_index_entries(fs, git_dir)
-  let tracked : Map[String, Bool] = {}
-  let tracked_folded : Map[String, String] = {}
+  let tracked : Map[String, Bool] = Map([])
+  let tracked_folded : Map[String, String] = Map([])
   for entry in tracked_entries {
     let normalized = normalize_add_path(entry.path)
     tracked[normalized] = true
@@ -596,8 +595,8 @@ async fn add_collect_unmatched_pathspecs(
   } else {
     @bitlib.list_working_files_async(fs, root)
   }
-  let visible_map : Map[String, Bool] = {}
-  let visible_folded : Map[String, String] = {}
+  let visible_map : Map[String, Bool] = Map([])
+  let visible_folded : Map[String, String] = Map([])
   for p in visible_paths {
     visible_map[p] = true
     let folded = p.to_lower()
@@ -658,7 +657,7 @@ async fn add_refresh_index_entries(
   for entry in entries {
     tracked_paths.push(entry.path)
   }
-  let selected : Map[String, Bool] = {}
+  let selected : Map[String, Bool] = Map([])
   if raw_specs.length() == 0 {
     for path in tracked_paths {
       selected[path] = true
@@ -694,23 +693,19 @@ async fn add_refresh_index_entries(
       continue
     }
     let mut size = entry.size
-    let size_result : Result[Bytes, Error] = try? fs.read_file(abs)
-    match size_result {
-      Ok(content) => size = content.length()
-      Err(_) => ()
+    try {
+      size = fs.read_file(abs).length()
+    } catch {
+      _ => ()
     }
     let mut mtime_sec = entry.mtime_sec
     let mut mtime_nsec = entry.mtime_nsec
-    let mtime_result : Result[(Int64, Int), Error] = try? @asyncfs.mtime(
-      abs,
-      follow_symlink=false,
-    )
-    match mtime_result {
-      Ok((sec, nsec)) => {
-        mtime_sec = sec.to_int()
-        mtime_nsec = nsec
-      }
-      Err(_) => ()
+    try {
+      let (sec, nsec) = @asyncfs.mtime(abs, follow_symlink=false)
+      mtime_sec = sec.to_int()
+      mtime_nsec = nsec
+    } catch {
+      _ => ()
     }
     refreshed.push(
       @bitlib.IndexEntry::new(
@@ -926,7 +921,7 @@ async fn expand_add_stage_paths(
   force : Bool,
 ) -> Array[String] raise Error {
   let out : Array[String] = []
-  let seen : Map[String, Bool] = {}
+  let seen : Map[String, Bool] = Map([])
   let visible_paths = if force {
     []
   } else {
@@ -934,8 +929,8 @@ async fn expand_add_stage_paths(
   }
   let git_dir = resolve_git_dir(fs, root)
   let tracked_entries = @bitlib.read_index_entries(fs, git_dir)
-  let tracked_map : Map[String, Bool] = {}
-  let tracked_folded : Map[String, String] = {}
+  let tracked_map : Map[String, Bool] = Map([])
+  let tracked_folded : Map[String, String] = Map([])
   for entry in tracked_entries {
     let normalized = normalize_add_path(entry.path)
     tracked_map[normalized] = true
@@ -944,8 +939,8 @@ async fn expand_add_stage_paths(
       tracked_folded[folded] = normalized
     }
   }
-  let visible_map : Map[String, Bool] = {}
-  let visible_folded : Map[String, String] = {}
+  let visible_map : Map[String, Bool] = Map([])
+  let visible_folded : Map[String, String] = Map([])
   for p in visible_paths {
     visible_map[p] = true
     let folded = p.to_lower()
@@ -1142,7 +1137,7 @@ fn add_has_explicit_ignored_path(
 ) -> Bool raise Error {
   let git_dir = resolve_git_dir(fs, root)
   let tracked_entries = @bitlib.read_index_entries(fs, git_dir)
-  let tracked : Map[String, Bool] = {}
+  let tracked : Map[String, Bool] = Map([])
   for entry in tracked_entries {
     tracked[normalize_add_path(entry.path)] = true
   }
@@ -1332,7 +1327,7 @@ fn add_resolve_chmod_paths(
   paths : Array[String],
   entries : Array[@bitlib.IndexEntry],
 ) -> Map[String, Bool] {
-  let result : Map[String, Bool] = {}
+  let result : Map[String, Bool] = Map([])
   for raw_path in paths {
     let path = add_normalize_input_path(root, raw_path)
     if path == "." || path.length() == 0 {

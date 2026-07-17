@@ -83,16 +83,15 @@ async fn run_hook_command_buffered(
   args : Array[String],
   cwd : String,
 ) -> (Int, Bytes) {
-  let result = try? @process.collect_output_merged(
+  let (code, data) = @process.collect_output_merged(
     command,
     args,
     inherit_env=true,
     cwd~,
-  )
-  match result {
-    Ok((code, data)) => (code, data.binary())
-    Err(_) => (1, b"")
+  ) catch {
+    _ => return (1, b"")
   }
+  (code, data.binary())
 }
 
 ///|
