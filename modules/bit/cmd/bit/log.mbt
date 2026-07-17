@@ -1837,13 +1837,10 @@ async fn log_emit_notes_for_commit(
   commit_id : @bitcore.ObjectId,
   line_prefix : String,
 ) -> Unit raise Error {
-  let notes_ref_path = git_dir + "/refs/notes/commits"
-  if !rfs.is_file(notes_ref_path) {
+  guard @bitlib.resolve_ref(rfs, git_dir, "refs/notes/commits")
+    is Some(notes_commit_id) else {
     return
   }
-  let ref_content = decode_bytes(rfs.read_file(notes_ref_path))
-  let commit_hex = trim_string(ref_content)
-  let notes_commit_id = @bitcore.ObjectId::from_hex(commit_hex)
   let obj = db.get(rfs, notes_commit_id)
   guard obj is Some(o) else { return }
   let commit_info = @bitcore.parse_commit(o.data)
