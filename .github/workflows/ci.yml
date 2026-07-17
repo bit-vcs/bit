@@ -4,12 +4,53 @@ on:
   push:
     branches:
       - main
+    tags:
+      - "v*"
   pull_request:
   workflow_dispatch:
 
+# Test selection: PRs and main pushes only run the moon/git-compat tests
+# affected by the change (tools/select-affected-tests.mjs, driven by the
+# module -> git-test map in tools/flaker-affected-rules.mjs). Full runs are
+# the pre-release check: trigger via workflow_dispatch or a v* tag push.
+
 jobs:
+  select:
+    runs-on: ubuntu-latest
+    outputs:
+      full: ${{ steps.sel.outputs.full }}
+      cmd_bit: ${{ steps.sel.outputs.cmd_bit }}
+      moon_targets: ${{ steps.sel.outputs.moon_targets }}
+      git_test_count: ${{ steps.sel.outputs.git_test_count }}
+      git_tests: ${{ steps.sel.outputs.git_tests }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Select affected tests
+        id: sel
+        run: |
+          set -euo pipefail
+          full=false
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then full=true; fi
+          case "${{ github.ref }}" in refs/tags/*) full=true ;; esac
+          if [ "$full" = "true" ]; then
+            echo "Full run (pre-release check trigger)"
+            node tools/select-affected-tests.mjs --full --github
+          else
+            base="${{ github.event.pull_request.base.sha || github.event.before }}"
+            if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+              base="origin/main"
+            fi
+            echo "Selecting affected tests vs base $base"
+            node tools/select-affected-tests.mjs --base "$base" --head HEAD --github
+          fi
+
   test:
     runs-on: ubuntu-latest
+    needs: select
+    if: needs.select.outputs.moon_targets != ''
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -43,36 +84,66 @@ jobs:
           git config --global protocol.file.allow always
       - name: Run JS and WASM tests
         run: |
-          moon test --target js -p mizchi/bit -p mizchi/bit_lib
-          moon test --target wasm -p mizchi/bit_runtime -f storage_runtime_wbtest.mbt
-          moon test --target wasm -p mizchi/bit_diff3
-          moon test --target wasm -p mizchi/bit_repo
-          moon test --target wasm -p mizchi/bit_grep
+          set -euo pipefail
+          full="${{ needs.select.outputs.full }}"
+          targets=" ${{ needs.select.outputs.moon_targets }} "
+          affected() { [ "$full" = "true" ] || case "$targets" in *" $1 "*) true ;; *) false ;; esac; }
+          if affected mizchi/bit/tests || affected mizchi/bit_lib; then
+            moon test --target js -p mizchi/bit -p mizchi/bit_lib
+          fi
+          if affected mizchi/bit_runtime; then
+            moon test --target wasm -p mizchi/bit_runtime -f storage_runtime_wbtest.mbt
+          fi
+          if affected mizchi/bit_diff3; then
+            moon test --target wasm -p mizchi/bit_diff3
+          fi
+          if affected mizchi/bit_repo; then
+            moon test --target wasm -p mizchi/bit_repo
+          fi
+          if affected mizchi/bit_grep; then
+            moon test --target wasm -p mizchi/bit_grep
+          fi
           # Kill any orphan moon processes and remove stale lock before native tests
           pkill -f "moon" || true
           rm -f _build/.moon-lock
       - name: Run native tests (non-cmd modules)
         timeout-minutes: 30
         run: |
-          # Test extracted bit_* and bitx_* modules + mizchi/bit (without cmd).
-          # cmd/bit native tests run in the separate cmd-native-test job because
-          # they dominate runtime (~50 min for the linker pass).
-          modules=$(awk '/members = \[/,/\]/' moon.work | grep -oE '"[^"]+"' | tr -d '"' | sed 's|^\./||')
-          for m in $modules; do
-            case "$m" in
-              modules/bit) continue ;; # cmd lives here — handled separately
-            esac
-            mod_name="mizchi/$(basename "$m")"
-            echo "::group::moon test --target native -p $mod_name"
-            moon test --target native -p "$mod_name"
-            echo "::endgroup::"
-          done
-          # Test mizchi/bit's non-cmd packages (tests + fuzz_tests).
-          moon test --target native -p mizchi/bit/tests
-          moon test --target native -p mizchi/bit/fuzz_tests || true
+          set -euo pipefail
+          full="${{ needs.select.outputs.full }}"
+          if [ "$full" = "true" ]; then
+            # Test every extracted bit_* / bitx_* module + mizchi/bit (without cmd).
+            # cmd/bit native tests run in the separate cmd-native-test job because
+            # they dominate runtime (~50 min for the linker pass).
+            modules=$(awk '/members = \[/,/\]/' moon.work | grep -oE '"[^"]+"' | tr -d '"' | sed 's|^\./||')
+            for m in $modules; do
+              case "$m" in
+                modules/bit) continue ;; # cmd lives here — handled separately
+              esac
+              mod_name="mizchi/$(basename "$m")"
+              echo "::group::moon test --target native -p $mod_name"
+              moon test --target native -p "$mod_name"
+              echo "::endgroup::"
+            done
+            moon test --target native -p mizchi/bit/tests
+            moon test --target native -p mizchi/bit/fuzz_tests || true
+          else
+            for t in ${{ needs.select.outputs.moon_targets }}; do
+              echo "::group::moon test --target native -p $t"
+              if [ "$t" = "mizchi/bit/tests" ]; then
+                moon test --target native -p mizchi/bit/tests
+                moon test --target native -p mizchi/bit/fuzz_tests || true
+              else
+                moon test --target native -p "$t"
+              fi
+              echo "::endgroup::"
+            done
+          fi
 
   cmd-native-test:
     runs-on: ubuntu-latest
+    needs: select
+    if: needs.select.outputs.cmd_bit == 'true'
     # The bundled `tcc` backend hangs compiling cmd/bit's large test binary, so
     # override the native C compiler with gcc (MOON_CC). gcc at -O0 (the debug
     # default) compiles it quickly and never hangs, unlike tcc; using gcc -O
@@ -154,6 +225,11 @@ jobs:
 
   distributed-test:
     runs-on: ubuntu-latest
+    needs: select
+    if: >-
+      needs.select.outputs.full == 'true' ||
+      contains(needs.select.outputs.moon_targets, 'bitx_hub') ||
+      contains(needs.select.outputs.moon_targets, 'bitx_kv')
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -173,6 +249,8 @@ jobs:
 
   nix-build:
     runs-on: ubuntu-latest
+    needs: select
+    if: needs.select.outputs.moon_targets != ''
     timeout-minutes: 30
     steps:
       - name: Checkout
@@ -188,6 +266,8 @@ jobs:
 
   git-compat:
     runs-on: ubuntu-latest
+    needs: select
+    if: needs.select.outputs.git_test_count != '0'
     strategy:
       fail-fast: false
       matrix:
@@ -199,28 +279,49 @@ jobs:
           submodules: true
           fetch-depth: 0
 
+      - name: Compute shard test list
+        id: shardtests
+        run: |
+          set -euo pipefail
+          printf '%s\n' "${{ needs.select.outputs.git_tests }}" > /tmp/selected-git-tests.txt
+          tests=$(tools/select-git-tests.sh "${{ matrix.shard }}" 10 /tmp/selected-git-tests.txt)
+          count=$(echo "$tests" | wc -w | tr -d ' ')
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          {
+            echo "tests<<SHARD_TESTS_EOF"
+            echo "$tests"
+            echo "SHARD_TESTS_EOF"
+          } >> "$GITHUB_OUTPUT"
+          echo "Shard ${{ matrix.shard }}: $count of ${{ needs.select.outputs.git_test_count }} selected tests"
+
       - name: Apply git test patches
+        if: steps.shardtests.outputs.count != '0'
         run: tools/apply-git-test-patches.sh
 
       - name: Install dependencies
+        if: steps.shardtests.outputs.count != '0'
         run: |
           sudo apt-get update
           sudo apt-get install -y gettext libcurl4-openssl-dev libexpat1-dev
 
       - name: Build git from source
+        if: steps.shardtests.outputs.count != '0'
         run: |
           cd third_party/git
           make -j$(nproc)
 
       - name: Install MoonBit CLI
+        if: steps.shardtests.outputs.count != '0'
         run: |
           curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
           echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
 
       - name: Moon update
+        if: steps.shardtests.outputs.count != '0'
         run: moon update
 
       - name: Build bit
+        if: steps.shardtests.outputs.count != '0'
         run: |
           set -euo pipefail
           moon --version
@@ -236,13 +337,14 @@ jobs:
           chmod +x tools/git-shim/moon
 
       - name: Run git compatibility tests
+        if: steps.shardtests.outputs.count != '0'
         run: |
           real_git="$(pwd)/third_party/git/git"
           exec_path="$(pwd)/third_party/git"
           shim_dir="$(pwd)/tools/git-shim/bin"
           echo "$real_git" > tools/git-shim/real-git-path
 
-          tests=$(tools/select-git-tests.sh "${{ matrix.shard }}" 10 tools/git-test-allowlist.txt)
+          tests="${{ steps.shardtests.outputs.tests }}"
           echo "Shard ${{ matrix.shard }}: $(echo "$tests" | wc -w | tr -d ' ') tests"
 
           export SHIM_REAL_GIT="$real_git" SHIM_EXEC_PATH="$exec_path" \
@@ -297,30 +399,33 @@ jobs:
           if [ -n "$failed_tests" ]; then
             echo "Failed tests:$failed_tests"
           fi
-          # Regression check: fail only if pass count drops below baseline.
+          # Regression check (full runs only — the absolute baseline is
+          # meaningless for a selected subset).
           # Baseline: 191 passes across 10 shards (~19 per shard).
           # Per-shard minimum: 12 (allows natural variance across shards).
-          shard_min=12
-          if [ "$passed" -lt "$shard_min" ]; then
-            echo "REGRESSION: only $passed tests passed (minimum: $shard_min)"
-            exit 1
+          if [ "${{ needs.select.outputs.full }}" = "true" ]; then
+            shard_min=12
+            if [ "$passed" -lt "$shard_min" ]; then
+              echo "REGRESSION: only $passed tests passed (minimum: $shard_min)"
+              exit 1
+            fi
           fi
 
       - name: Upload test timing
-        if: always()
+        if: always() && steps.shardtests.outputs.count != '0'
         uses: actions/upload-artifact@v4
         with:
           name: test-timing-shard-${{ matrix.shard }}
           path: test-timing-shard-${{ matrix.shard }}.tsv
 
       - name: Generate compat table
-        if: always()
+        if: always() && steps.shardtests.outputs.count != '0'
         run: |
           bash tools/generate-compat-table.sh > "compat-results-shard-${{ matrix.shard }}.md"
           cat "compat-results-shard-${{ matrix.shard }}.md"
 
       - name: Upload compat results
-        if: always()
+        if: always() && steps.shardtests.outputs.count != '0'
         uses: actions/upload-artifact@v4
         with:
           name: compat-results-shard-${{ matrix.shard }}

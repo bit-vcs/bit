@@ -1,64 +1,169 @@
 [[rules]]
-changed = ["modules/bit/moon.mod.json", "modules/bit/top.mbt", "modules/bit/cmd/bit/main*.mbt", "modules/bit/cmd/bit/helpers*.mbt", "modules/bit/cmd/bit/fallback*.mbt", "tools/git-shim/**", "tools/run-git-test.sh", "tools/apply-git-test-patches.sh", "tools/select-git-tests.sh", "tools/flaker-run-git-compat-tests.mjs"]
+changed = ["modules/bit/moon.mod", "modules/bit/moon.pkg", "modules/bit/top.mbt", "modules/bit/main.mbt", "modules/bit/cmd/bit/main*.mbt", "modules/bit/cmd/bit/helpers*.mbt", "modules/bit/cmd/bit/fallback*.mbt", "tools/git-shim/**", "tools/run-git-test.sh", "tools/apply-git-test-patches.sh", "tools/select-git-tests.sh", "tools/flaker-run-git-compat-tests.mjs"]
 select = ["third_party/git/t/*.sh"]
 reason = "infrastructure"
 
 [[rules]]
-changed = ["modules/bit/cmd/bit/init*.mbt", "modules/bit/cmd/bit/config*.mbt", "modules/bit/cmd/bit/gitconfig*.mbt", "modules/bit/cmd/bit/show_ref.mbt", "modules/bit/cmd/bit/symbolic_ref.mbt", "modules/bit/cmd/bit/rev_parse*.mbt", "modules/bit/cmd/bit/hash_object*.mbt", "modules/bit/cmd/bit/cat_file*.mbt", "modules/bit/src/object/**", "modules/bit/src/hash/**", "modules/bit/src/refs/**", "modules/bit/src/repo_ops/revparse_ops.mbt"]
+changed = ["modules/bit_core/**", "modules/bit_types/**", "modules/bit_object/**", "modules/bit_hash/**", "modules/bit_io/**", "modules/bit_io_native/**", "modules/bit_osfs/**", "modules/bit_vfs/**", "modules/bit_runtime/**", "modules/bit_utils/**", "modules/bit_bootstrap/**"]
+select = ["third_party/git/t/*.sh"]
+reason = "module:foundation"
+
+[[rules]]
+changed = ["modules/bit_config/**", "modules/bitx_bitconfig/**"]
+select = ["third_party/git/t/t13*.sh", "third_party/git/t/t0007-git-var.sh"]
+reason = "module:config"
+
+[[rules]]
+changed = ["modules/bit_refs/**", "modules/bit_reftable/**"]
+select = ["third_party/git/t/t14*.sh", "third_party/git/t/t32*.sh", "third_party/git/t/t63*.sh", "third_party/git/t/t1401-symbolic-ref.sh", "third_party/git/t/t1403-show-ref.sh"]
+reason = "module:refs"
+
+[[rules]]
+changed = ["modules/bit_repo/**", "modules/bit_repo_ops/**"]
+select = ["third_party/git/t/t15*.sh", "third_party/git/t/t60*.sh", "third_party/git/t/t61*.sh"]
+reason = "module:repo"
+
+[[rules]]
+changed = ["modules/bit_diff/**", "modules/bit_diff_core/**", "modules/bit_diff3/**"]
+select = ["third_party/git/t/t40*.sh", "third_party/git/t/t6427-diff3-conflict-markers.sh"]
+reason = "module:diff"
+
+[[rules]]
+changed = ["modules/bit_apply/**"]
+select = ["third_party/git/t/t41*.sh", "third_party/git/t/t3400-rebase.sh", "third_party/git/t/t4254-am-corrupt.sh"]
+reason = "module:apply"
+
+[[rules]]
+changed = ["modules/bit_pack/**", "modules/bit_pack_ops/**", "modules/bit_fingerprint/**"]
+select = ["third_party/git/t/t53*.sh", "third_party/git/t/t6113-rev-list-bitmap-filters.sh", "third_party/git/t/t6114-keep-packs.sh", "third_party/git/t/t7700-repack.sh"]
+reason = "module:pack"
+
+[[rules]]
+changed = ["modules/bit_protocol/**", "modules/bit_remote/**", "modules/bit_fast_import/**"]
+select = ["third_party/git/t/t55*.sh", "third_party/git/t/t57*.sh", "third_party/git/t/t93*.sh"]
+reason = "module:transport"
+
+[[rules]]
+changed = ["modules/bit_worktree/**"]
+select = ["third_party/git/t/t24*.sh", "third_party/git/t/t74*.sh"]
+reason = "module:worktree"
+
+[[rules]]
+changed = ["modules/bit_grep/**"]
+select = ["third_party/git/t/t781*.sh"]
+reason = "module:grep"
+
+[[rules]]
+changed = ["modules/bit_ignore/**"]
+select = ["third_party/git/t/t0008-ignores.sh", "third_party/git/t/t7011-skip-worktree-reading.sh", "third_party/git/t/t7012-skip-worktree-writing.sh", "third_party/git/t/t7061-wtstatus-ignore.sh"]
+reason = "module:ignore"
+
+[[rules]]
+changed = ["modules/bit_archive/**"]
+select = ["third_party/git/t/t500*.sh"]
+reason = "module:archive"
+
+[[rules]]
+changed = ["modules/bit_trailers/**"]
+select = ["third_party/git/t/t7513-interpret-trailers.sh"]
+reason = "module:trailers"
+
+[[rules]]
+changed = ["modules/bit_date/**"]
+select = ["third_party/git/t/t0006-date.sh"]
+reason = "module:date"
+
+[[rules]]
+changed = ["modules/bitx_openpgp/**"]
+select = ["third_party/git/t/t7004-tag.sh", "third_party/git/t/t7030-verify-tag.sh", "third_party/git/t/t7031-verify-tag-signed-ssh.sh", "third_party/git/t/t7510-signed-commit.sh", "third_party/git/t/t7528-signed-commit-ssh.sh"]
+reason = "module:signing"
+
+[[rules]]
+changed = ["modules/bitx_hub/**", "modules/bitx_kv/**", "modules/bitx_workspace/**", "modules/bitx_doc/**", "modules/bitx_hq/**", "modules/bitx_subdir/**", "modules/bitx_rebase_ai/**", "modules/bit/cmd/git-bit/**", "modules/bit/tests/**", "modules/bit/fuzz_tests/**"]
+select = []
+reason = "module:bit-only"
+
+[[rules]]
+changed = ["modules/bit/cmd/bit/init*.mbt", "modules/bit/cmd/bit/config*.mbt", "modules/bit/cmd/bit/gitconfig*.mbt", "modules/bit/cmd/bit/show_ref.mbt", "modules/bit/cmd/bit/symbolic_ref.mbt", "modules/bit/cmd/bit/rev_parse*.mbt", "modules/bit/cmd/bit/hash_object*.mbt", "modules/bit/cmd/bit/cat_file*.mbt"]
 select = ["third_party/git/t/t0000-basic.sh", "third_party/git/t/t0001-init.sh", "third_party/git/t/t0012-help.sh", "third_party/git/t/t0450-txt-doc-vs-help.sh", "third_party/git/t/t1006-cat-file.sh", "third_party/git/t/t1007-hash-object.sh", "third_party/git/t/t1300-config.sh", "third_party/git/t/t1401-symbolic-ref.sh", "third_party/git/t/t1403-show-ref.sh", "third_party/git/t/t1500-rev-parse.sh"]
 reason = "command:setup"
 
 [[rules]]
-changed = ["modules/bit/cmd/bit/checkout*.mbt", "modules/bit/cmd/bit/switch*.mbt", "modules/bit/cmd/bit/restore*.mbt", "modules/bit/cmd/bit/checkout_index.mbt", "modules/bit/src/lib/checkout*.mbt", "modules/bit/src/lib/path.mbt", "modules/bit/src/worktree/**"]
+changed = ["modules/bit/cmd/bit/update_ref.mbt", "modules/bit/cmd/bit/pack_refs.mbt", "modules/bit/cmd/bit/reflog*.mbt", "modules/bit/cmd/bit/for_each_ref.mbt", "modules/bit/cmd/bit/check_ref_format.mbt"]
+select = ["third_party/git/t/t14*.sh", "third_party/git/t/t63*.sh", "third_party/git/t/t32*.sh"]
+reason = "command:refs"
+
+[[rules]]
+changed = ["modules/bit/cmd/bit/checkout*.mbt", "modules/bit/cmd/bit/switch*.mbt", "modules/bit/cmd/bit/restore*.mbt", "modules/bit/cmd/bit/checkout_index.mbt", "modules/bit_lib/src/checkout*.mbt", "modules/bit_lib/src/path.mbt"]
 select = ["third_party/git/t/t2006-checkout-index-basic.sh", "third_party/git/t/t2014-checkout-switch.sh", "third_party/git/t/t2060-switch.sh", "third_party/git/t/t7201-co.sh"]
 reason = "command:checkout"
 
 [[rules]]
-changed = ["modules/bit/cmd/bit/ls_files*.mbt", "modules/bit/cmd/bit/ls_tree.mbt", "modules/bit/cmd/bit/read_tree.mbt", "modules/bit/cmd/bit/update_index*.mbt", "modules/bit/cmd/bit/sparse_checkout*.mbt", "modules/bit/cmd/bit/check_attr.mbt", "modules/bit/cmd/bit/check_ignore.mbt", "modules/bit/src/lib/gitattributes.mbt", "modules/bit/src/lib/tree_ops.mbt", "modules/bit/src/worktree/**"]
+changed = ["modules/bit/cmd/bit/ls_files*.mbt", "modules/bit/cmd/bit/ls_tree.mbt", "modules/bit/cmd/bit/read_tree.mbt", "modules/bit/cmd/bit/update_index*.mbt", "modules/bit/cmd/bit/sparse_checkout*.mbt", "modules/bit/cmd/bit/check_attr.mbt", "modules/bit/cmd/bit/check_ignore*.mbt", "modules/bit_lib/src/gitattributes.mbt", "modules/bit_lib/src/tree_ops.mbt", "modules/bit_lib/src/index*.mbt"]
 select = ["third_party/git/t/t300*.sh", "third_party/git/t/t310*.sh", "third_party/git/t/t613*.sh", "third_party/git/t/t7011-skip-worktree-reading.sh", "third_party/git/t/t7012-skip-worktree-writing.sh"]
 reason = "command:index"
 
 [[rules]]
-changed = ["modules/bit/cmd/bit/branch*.mbt", "modules/bit/cmd/bit/check_ref_format.mbt", "modules/bit/cmd/bit/show_branches.mbt", "modules/bit/cmd/bit/for_each_ref.mbt", "modules/bit/cmd/bit/show_ref.mbt", "modules/bit/src/refs/**"]
-select = ["third_party/git/t/t320*.sh", "third_party/git/t/t630*.sh", "third_party/git/t/t7419-submodule-set-branch.sh"]
+changed = ["modules/bit/cmd/bit/branch*.mbt", "modules/bit/cmd/bit/show_branches.mbt", "modules/bit_lib/src/branch*.mbt"]
+select = ["third_party/git/t/t32*.sh", "third_party/git/t/t63*.sh", "third_party/git/t/t7419-submodule-set-branch.sh"]
 reason = "command:branch"
 
 [[rules]]
-changed = ["modules/bit/cmd/bit/diff*.mbt", "modules/bit/cmd/bit/difftool.mbt", "modules/bit/src/diff/**", "modules/bit/src/diff_core/**"]
-select = ["third_party/git/t/t400*.sh", "third_party/git/t/t6427-diff3-conflict-markers.sh"]
+changed = ["modules/bit/cmd/bit/diff*.mbt", "modules/bit/cmd/bit/difftool.mbt"]
+select = ["third_party/git/t/t40*.sh", "third_party/git/t/t6427-diff3-conflict-markers.sh"]
 reason = "command:diff"
 
 [[rules]]
-changed = ["modules/bit/cmd/bit/log*.mbt", "modules/bit/cmd/bit/rev_list*.mbt", "modules/bit/cmd/bit/merge_base.mbt", "modules/bit/cmd/bit/name_rev.mbt", "modules/bit/cmd/bit/describe.mbt", "modules/bit/cmd/bit/bisect*.mbt", "modules/bit/cmd/bit/bundle.mbt", "modules/bit/cmd/bit/fmt_merge_msg.mbt", "modules/bit/src/lib/merge_base.mbt", "modules/bit/src/repo/**", "modules/bit/src/repo_ops/**"]
-select = ["third_party/git/t/t60*.sh", "third_party/git/t/t610*.sh", "third_party/git/t/t611*.sh", "third_party/git/t/t6120-describe.sh", "third_party/git/t/t6200-fmt-merge-msg.sh"]
+changed = ["modules/bit/cmd/bit/log*.mbt", "modules/bit/cmd/bit/rev_list*.mbt", "modules/bit/cmd/bit/merge_base.mbt", "modules/bit/cmd/bit/name_rev.mbt", "modules/bit/cmd/bit/describe.mbt", "modules/bit/cmd/bit/bisect*.mbt", "modules/bit/cmd/bit/bundle.mbt", "modules/bit/cmd/bit/fmt_merge_msg.mbt", "modules/bit/cmd/bit/last_modified.mbt", "modules/bit_lib/src/merge_base.mbt", "modules/bit_lib/src/last_modified.mbt", "modules/bit_lib/src/log*.mbt", "modules/bit_lib/src/revwalk*.mbt"]
+select = ["third_party/git/t/t60*.sh", "third_party/git/t/t61*.sh", "third_party/git/t/t42*.sh", "third_party/git/t/t6120-describe.sh", "third_party/git/t/t6200-fmt-merge-msg.sh", "third_party/git/t/t8020-last-modified.sh"]
 reason = "command:history"
 
 [[rules]]
-changed = ["modules/bit/cmd/bit/merge*.mbt", "modules/bit/cmd/bit/cherry_pick*.mbt", "modules/bit/cmd/bit/rebase*.mbt", "modules/bit/cmd/bit/revert.mbt", "modules/bit/src/lib/cherry_pick.mbt", "modules/bit/src/lib/rebase.mbt", "modules/bit/src/lib/merge*.mbt"]
-select = ["third_party/git/t/t640*.sh", "third_party/git/t/t641*.sh", "third_party/git/t/t642*.sh", "third_party/git/t/t643*.sh", "third_party/git/t/t7402-submodule-rebase.sh", "third_party/git/t/t760*.sh", "third_party/git/t/t761*.sh"]
+changed = ["modules/bit/cmd/bit/merge*.mbt", "modules/bit/cmd/bit/cherry_pick*.mbt", "modules/bit/cmd/bit/rebase*.mbt", "modules/bit/cmd/bit/revert.mbt", "modules/bit/cmd/bit/history.mbt", "modules/bit_lib/src/cherry_pick.mbt", "modules/bit_lib/src/rebase*.mbt", "modules/bit_lib/src/merge*.mbt", "modules/bit_lib/src/history_*.mbt"]
+select = ["third_party/git/t/t34*.sh", "third_party/git/t/t64*.sh", "third_party/git/t/t76*.sh", "third_party/git/t/t7402-submodule-rebase.sh"]
 reason = "command:merge"
 
 [[rules]]
-changed = ["modules/bit/cmd/bit/pack*.mbt", "modules/bit/cmd/bit/index_pack.mbt", "modules/bit/cmd/bit/unpack_objects.mbt", "modules/bit/cmd/bit/verify_pack.mbt", "modules/bit/cmd/bit/multi_pack_index*.mbt", "modules/bit/cmd/bit/commit_graph*.mbt", "modules/bit/src/pack/**", "modules/bit/src/pack_ops/**"]
-select = ["third_party/git/t/t530*.sh", "third_party/git/t/t531*.sh", "third_party/git/t/t532*.sh", "third_party/git/t/t533*.sh", "third_party/git/t/t5351-unpack-large-objects.sh", "third_party/git/t/t6113-rev-list-bitmap-filters.sh", "third_party/git/t/t6114-keep-packs.sh"]
+changed = ["modules/bit/cmd/bit/pack*.mbt", "modules/bit/cmd/bit/index_pack.mbt", "modules/bit/cmd/bit/unpack_objects.mbt", "modules/bit/cmd/bit/verify_pack.mbt", "modules/bit/cmd/bit/multi_pack_index*.mbt", "modules/bit/cmd/bit/commit_graph*.mbt", "modules/bit/cmd/bit/repack*.mbt", "modules/bit/cmd/bit/gc.mbt", "modules/bit/cmd/bit/maintenance.mbt", "modules/bit/cmd/bit/prune*.mbt", "modules/bit/cmd/bit/fsck*.mbt"]
+select = ["third_party/git/t/t53*.sh", "third_party/git/t/t1450-fsck.sh", "third_party/git/t/t6113-rev-list-bitmap-filters.sh", "third_party/git/t/t6114-keep-packs.sh", "third_party/git/t/t7700-repack.sh"]
 reason = "command:pack"
 
 [[rules]]
-changed = ["modules/bit/cmd/bit/fetch*.mbt", "modules/bit/cmd/bit/pull.mbt", "modules/bit/cmd/bit/push.mbt", "modules/bit/cmd/bit/clone*.mbt", "modules/bit/cmd/bit/remote*.mbt", "modules/bit/cmd/bit/receive_pack.mbt", "modules/bit/cmd/bit/upload_pack.mbt", "modules/bit/cmd/bit/fetch_pack.mbt", "modules/bit/cmd/bit/send_pack.mbt", "modules/bit/cmd/bit/http_fetch.mbt", "modules/bit/cmd/bit/http_serve_*.mbt", "modules/bit/cmd/bit/fetch_serve_*.mbt", "modules/bit/src/lib/remote*.mbt", "modules/bit/src/protocol/**", "modules/bit/src/io/http_client.mbt", "modules/bit/src/io/native/http_client_native.mbt", "modules/bit/src/io/native/upload_pack*.mbt", "modules/bit/src/io/native/remote.mbt", "modules/bit/src/remote/**"]
-select = ["third_party/git/t/t550*.sh", "third_party/git/t/t551*.sh", "third_party/git/t/t552*.sh", "third_party/git/t/t553*.sh", "third_party/git/t/t570*.sh", "third_party/git/t/t5710-promisor-remote-capability.sh", "third_party/git/t/t573*.sh", "third_party/git/t/t5750-bundle-uri-parse.sh"]
+changed = ["modules/bit/cmd/bit/fetch*.mbt", "modules/bit/cmd/bit/pull.mbt", "modules/bit/cmd/bit/push.mbt", "modules/bit/cmd/bit/clone*.mbt", "modules/bit/cmd/bit/remote*.mbt", "modules/bit/cmd/bit/receive_pack.mbt", "modules/bit/cmd/bit/upload_pack.mbt", "modules/bit/cmd/bit/fetch_pack.mbt", "modules/bit/cmd/bit/send_pack.mbt", "modules/bit/cmd/bit/http_fetch.mbt", "modules/bit/cmd/bit/http_serve_*.mbt", "modules/bit/cmd/bit/fetch_serve_*.mbt", "modules/bit/cmd/bit/ls_remote.mbt", "modules/bit/cmd/bit/serve.mbt", "modules/bit_lib/src/remote*.mbt", "modules/bit_lib/src/upload_pack*.mbt", "modules/bit_lib/src/receive_pack*.mbt", "modules/bit_lib/src/smart_http*.mbt"]
+select = ["third_party/git/t/t55*.sh", "third_party/git/t/t57*.sh", "third_party/git/t/t5750-bundle-uri-parse.sh"]
 reason = "command:transport"
 
 [[rules]]
-changed = ["modules/bit/cmd/bit/add*.mbt", "modules/bit/cmd/bit/commit*.mbt", "modules/bit/cmd/bit/reset*.mbt", "modules/bit/cmd/bit/status*.mbt", "modules/bit/cmd/bit/show*.mbt", "modules/bit/cmd/bit/rm*.mbt", "modules/bit/cmd/bit/mv.mbt", "modules/bit/cmd/bit/stash.mbt", "modules/bit/cmd/bit/clean.mbt", "modules/bit/src/lib/reset.mbt"]
-select = ["third_party/git/t/t7001-mv.sh", "third_party/git/t/t7002-mv-sparse-checkout.sh", "third_party/git/t/t7007-show.sh", "third_party/git/t/t706*.sh", "third_party/git/t/t710*.sh", "third_party/git/t/t711*.sh", "third_party/git/t/t730*.sh", "third_party/git/t/t750*.sh", "third_party/git/t/t751*.sh", "third_party/git/t/t752*.sh"]
+changed = ["modules/bit/cmd/bit/add*.mbt", "modules/bit/cmd/bit/commit*.mbt", "modules/bit/cmd/bit/reset*.mbt", "modules/bit/cmd/bit/status*.mbt", "modules/bit/cmd/bit/show*.mbt", "modules/bit/cmd/bit/rm*.mbt", "modules/bit/cmd/bit/mv.mbt", "modules/bit/cmd/bit/stash.mbt", "modules/bit/cmd/bit/clean.mbt", "modules/bit_lib/src/reset.mbt", "modules/bit_lib/src/stash*.mbt", "modules/bit_lib/src/status*.mbt", "modules/bit_lib/src/add*.mbt", "modules/bit_lib/src/commit*.mbt"]
+select = ["third_party/git/t/t39*.sh", "third_party/git/t/t7001-mv.sh", "third_party/git/t/t7002-mv-sparse-checkout.sh", "third_party/git/t/t7007-show.sh", "third_party/git/t/t706*.sh", "third_party/git/t/t710*.sh", "third_party/git/t/t711*.sh", "third_party/git/t/t730*.sh", "third_party/git/t/t750*.sh", "third_party/git/t/t751*.sh", "third_party/git/t/t752*.sh"]
 reason = "command:porcelain"
 
 [[rules]]
-changed = ["modules/bit/cmd/bit/mktag_cmd.mbt", "modules/bit/cmd/bit/tag*.mbt", "modules/bit/cmd/bit/verify_tag.mbt"]
+changed = ["modules/bit/cmd/bit/mktag_cmd.mbt", "modules/bit/cmd/bit/tag*.mbt", "modules/bit/cmd/bit/verify_tag.mbt", "modules/bit_lib/src/tag*.mbt"]
 select = ["third_party/git/t/t7004-tag.sh", "third_party/git/t/t7030-verify-tag.sh", "third_party/git/t/t7031-verify-tag-signed-ssh.sh"]
 reason = "command:tag"
 
 [[rules]]
-changed = ["modules/bit/cmd/bit/submodule*.mbt", "modules/bit/cmd/bit/worktree*.mbt", "modules/bit/cmd/bit/sparse_checkout*.mbt", "modules/bitx_subdir/src/**"]
-select = ["third_party/git/t/t6437-submodule-merge.sh", "third_party/git/t/t6438-submodule-directory-file-conflicts.sh", "third_party/git/t/t740*.sh", "third_party/git/t/t741*.sh", "third_party/git/t/t742*.sh", "third_party/git/t/t7450-bad-git-dotfiles.sh"]
+changed = ["modules/bit/cmd/bit/submodule*.mbt", "modules/bit/cmd/bit/worktree*.mbt", "modules/bit_lib/src/worktree*.mbt", "modules/bit_lib/src/submodule*.mbt"]
+select = ["third_party/git/t/t24*.sh", "third_party/git/t/t74*.sh", "third_party/git/t/t6437-submodule-merge.sh", "third_party/git/t/t6438-submodule-directory-file-conflicts.sh"]
 reason = "command:submodule"
+
+[[rules]]
+changed = ["modules/bit/cmd/bit/blame.mbt", "modules/bit/cmd/bit/annotate.mbt", "modules/bit/cmd/bit/shortlog.mbt"]
+select = ["third_party/git/t/t80*.sh"]
+reason = "command:blame"
+
+[[rules]]
+changed = ["modules/bit/cmd/bit/format_patch.mbt", "modules/bit/cmd/bit/am.mbt", "modules/bit/cmd/bit/apply.mbt", "modules/bit/cmd/bit/mailsplit.mbt", "modules/bit/cmd/bit/mailinfo.mbt", "modules/bit/cmd/bit/quiltimport.mbt", "modules/bit/cmd/bit/patch_id.mbt", "modules/bit/cmd/bit/range_diff.mbt"]
+select = ["third_party/git/t/t41*.sh", "third_party/git/t/t51*.sh", "third_party/git/t/t3206-range-diff.sh"]
+reason = "command:patch"
+
+[[rules]]
+changed = ["modules/bit/cmd/bit/grep.mbt"]
+select = ["third_party/git/t/t781*.sh"]
+reason = "command:grep"
+
+[[rules]]
+changed = ["modules/bit/cmd/bit/notes.mbt"]
+select = ["third_party/git/t/t33*.sh"]
+reason = "command:notes"

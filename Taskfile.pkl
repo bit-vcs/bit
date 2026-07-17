@@ -300,7 +300,7 @@ local testUpdate: Task = new {
 local testJsBuild: Task = new {
   name = "test-js-build"
   description = "Node-side smoke tests for the published JS lib + npm wrapper"
-  cmd = "node --test tools/js-build.test.mjs tools/npm-lib.test.mjs tools/npm-cli.test.mjs tools/demo-relay.test.mjs tools/demo-editor-link.test.mjs tools/playground-commands.test.mjs tools/playground-view.test.mjs"
+  cmd = "node --test tools/js-build.test.mjs tools/npm-lib.test.mjs tools/npm-cli.test.mjs tools/demo-relay.test.mjs tools/demo-editor-link.test.mjs tools/playground-commands.test.mjs tools/playground-view.test.mjs tools/flaker-affected-rules.test.mjs tools/select-affected-tests.test.mjs"
   deps {
     syncNpmLibRaw
     syncNpmBitCjs
@@ -370,6 +370,14 @@ local compatRandomRun: Task = new {
 //   tools/compare-real-git.sh [REPO_URL=...]
 //   tools/bench-save.sh <name>
 //   tools/bench-compare.sh <args>
+
+// -- affected-test selection ----------------------------------------------
+
+local testAffected: Task = new {
+  name = "test:affected"
+  description = "Show moon targets + git-compat suites affected vs origin/main (CI uses the same selector)"
+  cmd = "node tools/select-affected-tests.mjs --base origin/main"
+}
 
 // -- upstream Git test suite ---------------------------------------------
 
@@ -658,6 +666,7 @@ tasks {
   bundleJsLibGitOps
 
   test
+  testAffected
   testUpdate
   testJsBuild
   testJsLib

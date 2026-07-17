@@ -1,11 +1,36 @@
 import { pathToFileURL } from "node:url";
 
+// Mapping from changed paths to the git-compat suites they can affect.
+//
+// Two layers of rules:
+//   1. Module-level rules (`modules/<name>/**`) — every workspace module maps
+//      to the git test areas its subsystem implements. Foundational modules
+//      (object store, IO, core types) map to the full suite.
+//   2. File-level rules for the two kitchen-sink packages
+//      (`modules/bit/cmd/bit/*.mbt`, `modules/bit_lib/src/*.mbt`) — these
+//      carve command areas out of packages that would otherwise select
+//      everything.
+//
+// Matching is additive: a changed file selects the union of all rules it
+// matches. Changed files under `modules/**` that match NO rule are treated by
+// the selector (tools/select-affected-tests.mjs) as "run the full suite" — a
+// safety net for new modules and unmapped files, so an incomplete map fails
+// towards over-testing, never under-testing.
+//
+// tools/flaker-affected-rules.toml is generated from this file:
+//   node tools/flaker-affected-rules.mjs > tools/flaker-affected-rules.toml
+
+const FULL_SUITE = ["third_party/git/t/*.sh"];
+
 export const GIT_COMPAT_AFFECTED_RULES = [
+  // ---- infrastructure: anything here invalidates every suite -------------
   {
     reason: "infrastructure",
     changed: [
-      "modules/bit/moon.mod.json",
+      "modules/bit/moon.mod",
+      "modules/bit/moon.pkg",
       "modules/bit/top.mbt",
+      "modules/bit/main.mbt",
       "modules/bit/cmd/bit/main*.mbt",
       "modules/bit/cmd/bit/helpers*.mbt",
       "modules/bit/cmd/bit/fallback*.mbt",
@@ -15,8 +40,167 @@ export const GIT_COMPAT_AFFECTED_RULES = [
       "tools/select-git-tests.sh",
       "tools/flaker-run-git-compat-tests.mjs",
     ],
-    select: ["third_party/git/t/*.sh"],
+    select: FULL_SUITE,
   },
+  {
+    reason: "module:foundation",
+    changed: [
+      "modules/bit_core/**",
+      "modules/bit_types/**",
+      "modules/bit_object/**",
+      "modules/bit_hash/**",
+      "modules/bit_io/**",
+      "modules/bit_io_native/**",
+      "modules/bit_osfs/**",
+      "modules/bit_vfs/**",
+      "modules/bit_runtime/**",
+      "modules/bit_utils/**",
+      "modules/bit_bootstrap/**",
+    ],
+    select: FULL_SUITE,
+  },
+
+  // ---- module-level areas -------------------------------------------------
+  {
+    reason: "module:config",
+    changed: ["modules/bit_config/**", "modules/bitx_bitconfig/**"],
+    select: ["third_party/git/t/t13*.sh", "third_party/git/t/t0007-git-var.sh"],
+  },
+  {
+    reason: "module:refs",
+    changed: ["modules/bit_refs/**", "modules/bit_reftable/**"],
+    select: [
+      "third_party/git/t/t14*.sh",
+      "third_party/git/t/t32*.sh",
+      "third_party/git/t/t63*.sh",
+      "third_party/git/t/t1401-symbolic-ref.sh",
+      "third_party/git/t/t1403-show-ref.sh",
+    ],
+  },
+  {
+    reason: "module:repo",
+    changed: ["modules/bit_repo/**", "modules/bit_repo_ops/**"],
+    select: [
+      "third_party/git/t/t15*.sh",
+      "third_party/git/t/t60*.sh",
+      "third_party/git/t/t61*.sh",
+    ],
+  },
+  {
+    reason: "module:diff",
+    changed: [
+      "modules/bit_diff/**",
+      "modules/bit_diff_core/**",
+      "modules/bit_diff3/**",
+    ],
+    select: [
+      "third_party/git/t/t40*.sh",
+      "third_party/git/t/t6427-diff3-conflict-markers.sh",
+    ],
+  },
+  {
+    reason: "module:apply",
+    changed: ["modules/bit_apply/**"],
+    select: [
+      "third_party/git/t/t41*.sh",
+      "third_party/git/t/t3400-rebase.sh",
+      "third_party/git/t/t4254-am-corrupt.sh",
+    ],
+  },
+  {
+    reason: "module:pack",
+    changed: [
+      "modules/bit_pack/**",
+      "modules/bit_pack_ops/**",
+      "modules/bit_fingerprint/**",
+    ],
+    select: [
+      "third_party/git/t/t53*.sh",
+      "third_party/git/t/t6113-rev-list-bitmap-filters.sh",
+      "third_party/git/t/t6114-keep-packs.sh",
+      "third_party/git/t/t7700-repack.sh",
+    ],
+  },
+  {
+    reason: "module:transport",
+    changed: [
+      "modules/bit_protocol/**",
+      "modules/bit_remote/**",
+      "modules/bit_fast_import/**",
+    ],
+    select: [
+      "third_party/git/t/t55*.sh",
+      "third_party/git/t/t57*.sh",
+      "third_party/git/t/t93*.sh",
+    ],
+  },
+  {
+    reason: "module:worktree",
+    changed: ["modules/bit_worktree/**"],
+    select: ["third_party/git/t/t24*.sh", "third_party/git/t/t74*.sh"],
+  },
+  {
+    reason: "module:grep",
+    changed: ["modules/bit_grep/**"],
+    select: ["third_party/git/t/t781*.sh"],
+  },
+  {
+    reason: "module:ignore",
+    changed: ["modules/bit_ignore/**"],
+    select: [
+      "third_party/git/t/t0008-ignores.sh",
+      "third_party/git/t/t7011-skip-worktree-reading.sh",
+      "third_party/git/t/t7012-skip-worktree-writing.sh",
+      "third_party/git/t/t7061-wtstatus-ignore.sh",
+    ],
+  },
+  {
+    reason: "module:archive",
+    changed: ["modules/bit_archive/**"],
+    select: ["third_party/git/t/t500*.sh"],
+  },
+  {
+    reason: "module:trailers",
+    changed: ["modules/bit_trailers/**"],
+    select: ["third_party/git/t/t7513-interpret-trailers.sh"],
+  },
+  {
+    reason: "module:date",
+    changed: ["modules/bit_date/**"],
+    select: ["third_party/git/t/t0006-date.sh"],
+  },
+  {
+    reason: "module:signing",
+    changed: ["modules/bitx_openpgp/**"],
+    select: [
+      "third_party/git/t/t7004-tag.sh",
+      "third_party/git/t/t7030-verify-tag.sh",
+      "third_party/git/t/t7031-verify-tag-signed-ssh.sh",
+      "third_party/git/t/t7510-signed-commit.sh",
+      "third_party/git/t/t7528-signed-commit-ssh.sh",
+    ],
+  },
+  {
+    reason: "module:bit-only",
+    // bit-specific extension modules and non-git-compat test trees: no
+    // git-compat impact. An explicit empty selection keeps the selector's
+    // safety net from escalating these to a full run.
+    changed: [
+      "modules/bitx_hub/**",
+      "modules/bitx_kv/**",
+      "modules/bitx_workspace/**",
+      "modules/bitx_doc/**",
+      "modules/bitx_hq/**",
+      "modules/bitx_subdir/**",
+      "modules/bitx_rebase_ai/**",
+      "modules/bit/cmd/git-bit/**",
+      "modules/bit/tests/**",
+      "modules/bit/fuzz_tests/**",
+    ],
+    select: [],
+  },
+
+  // ---- file-level rules: modules/bit/cmd/bit + modules/bit_lib -----------
   {
     reason: "command:setup",
     changed: [
@@ -28,10 +212,6 @@ export const GIT_COMPAT_AFFECTED_RULES = [
       "modules/bit/cmd/bit/rev_parse*.mbt",
       "modules/bit/cmd/bit/hash_object*.mbt",
       "modules/bit/cmd/bit/cat_file*.mbt",
-      "modules/bit/src/object/**",
-      "modules/bit/src/hash/**",
-      "modules/bit/src/refs/**",
-      "modules/bit/src/repo_ops/revparse_ops.mbt",
     ],
     select: [
       "third_party/git/t/t0000-basic.sh",
@@ -47,15 +227,29 @@ export const GIT_COMPAT_AFFECTED_RULES = [
     ],
   },
   {
+    reason: "command:refs",
+    changed: [
+      "modules/bit/cmd/bit/update_ref.mbt",
+      "modules/bit/cmd/bit/pack_refs.mbt",
+      "modules/bit/cmd/bit/reflog*.mbt",
+      "modules/bit/cmd/bit/for_each_ref.mbt",
+      "modules/bit/cmd/bit/check_ref_format.mbt",
+    ],
+    select: [
+      "third_party/git/t/t14*.sh",
+      "third_party/git/t/t63*.sh",
+      "third_party/git/t/t32*.sh",
+    ],
+  },
+  {
     reason: "command:checkout",
     changed: [
       "modules/bit/cmd/bit/checkout*.mbt",
       "modules/bit/cmd/bit/switch*.mbt",
       "modules/bit/cmd/bit/restore*.mbt",
       "modules/bit/cmd/bit/checkout_index.mbt",
-      "modules/bit/src/lib/checkout*.mbt",
-      "modules/bit/src/lib/path.mbt",
-      "modules/bit/src/worktree/**",
+      "modules/bit_lib/src/checkout*.mbt",
+      "modules/bit_lib/src/path.mbt",
     ],
     select: [
       "third_party/git/t/t2006-checkout-index-basic.sh",
@@ -73,10 +267,10 @@ export const GIT_COMPAT_AFFECTED_RULES = [
       "modules/bit/cmd/bit/update_index*.mbt",
       "modules/bit/cmd/bit/sparse_checkout*.mbt",
       "modules/bit/cmd/bit/check_attr.mbt",
-      "modules/bit/cmd/bit/check_ignore.mbt",
-      "modules/bit/src/lib/gitattributes.mbt",
-      "modules/bit/src/lib/tree_ops.mbt",
-      "modules/bit/src/worktree/**",
+      "modules/bit/cmd/bit/check_ignore*.mbt",
+      "modules/bit_lib/src/gitattributes.mbt",
+      "modules/bit_lib/src/tree_ops.mbt",
+      "modules/bit_lib/src/index*.mbt",
     ],
     select: [
       "third_party/git/t/t300*.sh",
@@ -90,15 +284,12 @@ export const GIT_COMPAT_AFFECTED_RULES = [
     reason: "command:branch",
     changed: [
       "modules/bit/cmd/bit/branch*.mbt",
-      "modules/bit/cmd/bit/check_ref_format.mbt",
       "modules/bit/cmd/bit/show_branches.mbt",
-      "modules/bit/cmd/bit/for_each_ref.mbt",
-      "modules/bit/cmd/bit/show_ref.mbt",
-      "modules/bit/src/refs/**",
+      "modules/bit_lib/src/branch*.mbt",
     ],
     select: [
-      "third_party/git/t/t320*.sh",
-      "third_party/git/t/t630*.sh",
+      "third_party/git/t/t32*.sh",
+      "third_party/git/t/t63*.sh",
       "third_party/git/t/t7419-submodule-set-branch.sh",
     ],
   },
@@ -107,11 +298,9 @@ export const GIT_COMPAT_AFFECTED_RULES = [
     changed: [
       "modules/bit/cmd/bit/diff*.mbt",
       "modules/bit/cmd/bit/difftool.mbt",
-      "modules/bit/src/diff/**",
-      "modules/bit/src/diff_core/**",
     ],
     select: [
-      "third_party/git/t/t400*.sh",
+      "third_party/git/t/t40*.sh",
       "third_party/git/t/t6427-diff3-conflict-markers.sh",
     ],
   },
@@ -126,16 +315,19 @@ export const GIT_COMPAT_AFFECTED_RULES = [
       "modules/bit/cmd/bit/bisect*.mbt",
       "modules/bit/cmd/bit/bundle.mbt",
       "modules/bit/cmd/bit/fmt_merge_msg.mbt",
-      "modules/bit/src/lib/merge_base.mbt",
-      "modules/bit/src/repo/**",
-      "modules/bit/src/repo_ops/**",
+      "modules/bit/cmd/bit/last_modified.mbt",
+      "modules/bit_lib/src/merge_base.mbt",
+      "modules/bit_lib/src/last_modified.mbt",
+      "modules/bit_lib/src/log*.mbt",
+      "modules/bit_lib/src/revwalk*.mbt",
     ],
     select: [
       "third_party/git/t/t60*.sh",
-      "third_party/git/t/t610*.sh",
-      "third_party/git/t/t611*.sh",
+      "third_party/git/t/t61*.sh",
+      "third_party/git/t/t42*.sh",
       "third_party/git/t/t6120-describe.sh",
       "third_party/git/t/t6200-fmt-merge-msg.sh",
+      "third_party/git/t/t8020-last-modified.sh",
     ],
   },
   {
@@ -145,18 +337,17 @@ export const GIT_COMPAT_AFFECTED_RULES = [
       "modules/bit/cmd/bit/cherry_pick*.mbt",
       "modules/bit/cmd/bit/rebase*.mbt",
       "modules/bit/cmd/bit/revert.mbt",
-      "modules/bit/src/lib/cherry_pick.mbt",
-      "modules/bit/src/lib/rebase.mbt",
-      "modules/bit/src/lib/merge*.mbt",
+      "modules/bit/cmd/bit/history.mbt",
+      "modules/bit_lib/src/cherry_pick.mbt",
+      "modules/bit_lib/src/rebase*.mbt",
+      "modules/bit_lib/src/merge*.mbt",
+      "modules/bit_lib/src/history_*.mbt",
     ],
     select: [
-      "third_party/git/t/t640*.sh",
-      "third_party/git/t/t641*.sh",
-      "third_party/git/t/t642*.sh",
-      "third_party/git/t/t643*.sh",
+      "third_party/git/t/t34*.sh",
+      "third_party/git/t/t64*.sh",
+      "third_party/git/t/t76*.sh",
       "third_party/git/t/t7402-submodule-rebase.sh",
-      "third_party/git/t/t760*.sh",
-      "third_party/git/t/t761*.sh",
     ],
   },
   {
@@ -168,17 +359,18 @@ export const GIT_COMPAT_AFFECTED_RULES = [
       "modules/bit/cmd/bit/verify_pack.mbt",
       "modules/bit/cmd/bit/multi_pack_index*.mbt",
       "modules/bit/cmd/bit/commit_graph*.mbt",
-      "modules/bit/src/pack/**",
-      "modules/bit/src/pack_ops/**",
+      "modules/bit/cmd/bit/repack*.mbt",
+      "modules/bit/cmd/bit/gc.mbt",
+      "modules/bit/cmd/bit/maintenance.mbt",
+      "modules/bit/cmd/bit/prune*.mbt",
+      "modules/bit/cmd/bit/fsck*.mbt",
     ],
     select: [
-      "third_party/git/t/t530*.sh",
-      "third_party/git/t/t531*.sh",
-      "third_party/git/t/t532*.sh",
-      "third_party/git/t/t533*.sh",
-      "third_party/git/t/t5351-unpack-large-objects.sh",
+      "third_party/git/t/t53*.sh",
+      "third_party/git/t/t1450-fsck.sh",
       "third_party/git/t/t6113-rev-list-bitmap-filters.sh",
       "third_party/git/t/t6114-keep-packs.sh",
+      "third_party/git/t/t7700-repack.sh",
     ],
   },
   {
@@ -196,22 +388,16 @@ export const GIT_COMPAT_AFFECTED_RULES = [
       "modules/bit/cmd/bit/http_fetch.mbt",
       "modules/bit/cmd/bit/http_serve_*.mbt",
       "modules/bit/cmd/bit/fetch_serve_*.mbt",
-      "modules/bit/src/lib/remote*.mbt",
-      "modules/bit/src/protocol/**",
-      "modules/bit/src/io/http_client.mbt",
-      "modules/bit/src/io/native/http_client_native.mbt",
-      "modules/bit/src/io/native/upload_pack*.mbt",
-      "modules/bit/src/io/native/remote.mbt",
-      "modules/bit/src/remote/**",
+      "modules/bit/cmd/bit/ls_remote.mbt",
+      "modules/bit/cmd/bit/serve.mbt",
+      "modules/bit_lib/src/remote*.mbt",
+      "modules/bit_lib/src/upload_pack*.mbt",
+      "modules/bit_lib/src/receive_pack*.mbt",
+      "modules/bit_lib/src/smart_http*.mbt",
     ],
     select: [
-      "third_party/git/t/t550*.sh",
-      "third_party/git/t/t551*.sh",
-      "third_party/git/t/t552*.sh",
-      "third_party/git/t/t553*.sh",
-      "third_party/git/t/t570*.sh",
-      "third_party/git/t/t5710-promisor-remote-capability.sh",
-      "third_party/git/t/t573*.sh",
+      "third_party/git/t/t55*.sh",
+      "third_party/git/t/t57*.sh",
       "third_party/git/t/t5750-bundle-uri-parse.sh",
     ],
   },
@@ -227,9 +413,14 @@ export const GIT_COMPAT_AFFECTED_RULES = [
       "modules/bit/cmd/bit/mv.mbt",
       "modules/bit/cmd/bit/stash.mbt",
       "modules/bit/cmd/bit/clean.mbt",
-      "modules/bit/src/lib/reset.mbt",
+      "modules/bit_lib/src/reset.mbt",
+      "modules/bit_lib/src/stash*.mbt",
+      "modules/bit_lib/src/status*.mbt",
+      "modules/bit_lib/src/add*.mbt",
+      "modules/bit_lib/src/commit*.mbt",
     ],
     select: [
+      "third_party/git/t/t39*.sh",
       "third_party/git/t/t7001-mv.sh",
       "third_party/git/t/t7002-mv-sparse-checkout.sh",
       "third_party/git/t/t7007-show.sh",
@@ -248,6 +439,7 @@ export const GIT_COMPAT_AFFECTED_RULES = [
       "modules/bit/cmd/bit/mktag_cmd.mbt",
       "modules/bit/cmd/bit/tag*.mbt",
       "modules/bit/cmd/bit/verify_tag.mbt",
+      "modules/bit_lib/src/tag*.mbt",
     ],
     select: [
       "third_party/git/t/t7004-tag.sh",
@@ -260,17 +452,52 @@ export const GIT_COMPAT_AFFECTED_RULES = [
     changed: [
       "modules/bit/cmd/bit/submodule*.mbt",
       "modules/bit/cmd/bit/worktree*.mbt",
-      "modules/bit/cmd/bit/sparse_checkout*.mbt",
-      "modules/bitx_subdir/src/**",
+      "modules/bit_lib/src/worktree*.mbt",
+      "modules/bit_lib/src/submodule*.mbt",
     ],
     select: [
+      "third_party/git/t/t24*.sh",
+      "third_party/git/t/t74*.sh",
       "third_party/git/t/t6437-submodule-merge.sh",
       "third_party/git/t/t6438-submodule-directory-file-conflicts.sh",
-      "third_party/git/t/t740*.sh",
-      "third_party/git/t/t741*.sh",
-      "third_party/git/t/t742*.sh",
-      "third_party/git/t/t7450-bad-git-dotfiles.sh",
     ],
+  },
+  {
+    reason: "command:blame",
+    changed: [
+      "modules/bit/cmd/bit/blame.mbt",
+      "modules/bit/cmd/bit/annotate.mbt",
+      "modules/bit/cmd/bit/shortlog.mbt",
+    ],
+    select: ["third_party/git/t/t80*.sh"],
+  },
+  {
+    reason: "command:patch",
+    changed: [
+      "modules/bit/cmd/bit/format_patch.mbt",
+      "modules/bit/cmd/bit/am.mbt",
+      "modules/bit/cmd/bit/apply.mbt",
+      "modules/bit/cmd/bit/mailsplit.mbt",
+      "modules/bit/cmd/bit/mailinfo.mbt",
+      "modules/bit/cmd/bit/quiltimport.mbt",
+      "modules/bit/cmd/bit/patch_id.mbt",
+      "modules/bit/cmd/bit/range_diff.mbt",
+    ],
+    select: [
+      "third_party/git/t/t41*.sh",
+      "third_party/git/t/t51*.sh",
+      "third_party/git/t/t3206-range-diff.sh",
+    ],
+  },
+  {
+    reason: "command:grep",
+    changed: ["modules/bit/cmd/bit/grep.mbt"],
+    select: ["third_party/git/t/t781*.sh"],
+  },
+  {
+    reason: "command:notes",
+    changed: ["modules/bit/cmd/bit/notes.mbt"],
+    select: ["third_party/git/t/t33*.sh"],
   },
 ];
 
@@ -278,14 +505,26 @@ function escapeRegex(value) {
   return value.replace(/[.+^${}()|[\]\\]/g, "\\$&");
 }
 
+// Escape character-by-character so glob tokens are substituted before any
+// regex escaping can mangle them. (The previous implementation escaped the
+// expansion of `**` into `\\.*` -- "zero or more dots" -- which silently
+// broke every `**` rule.)
 function compileGlob(glob) {
-  const escaped = glob
-    .replaceAll("\\", "/")
-    .replaceAll("**", "\u0000")
-    .replaceAll("*", "[^/]*")
-    .replaceAll("?", "[^/]")
-    .replaceAll("\u0000", ".*");
-  return new RegExp(`^${escapeRegex(escaped).replace(/\\\[\\\^\/\\\]\\\*/g, "[^/]*").replace(/\\\[\\\^\/\\\]/g, "[^/]")}$`);
+  const normalized = glob.replaceAll("\\", "/");
+  let out = "";
+  for (let i = 0; i < normalized.length; i++) {
+    if (normalized.startsWith("**", i)) {
+      out += ".*";
+      i += 1;
+    } else if (normalized[i] === "*") {
+      out += "[^/]*";
+    } else if (normalized[i] === "?") {
+      out += "[^/]";
+    } else {
+      out += escapeRegex(normalized[i]);
+    }
+  }
+  return new RegExp(`^${out}$`);
 }
 
 function compileRule(rule) {
@@ -334,6 +573,14 @@ export function selectSuitesForChanges(changedFiles, suites, rules) {
   }
 
   return suites.filter((suite) => selected.has(suite));
+}
+
+/// True when `file` matches at least one rule's `changed` globs.
+export function fileHasRule(file, rules) {
+  const normalized = file.replaceAll("\\", "/");
+  return rules.some((rule) =>
+    rule.changed.some((glob) => compileGlob(glob).test(normalized)),
+  );
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
