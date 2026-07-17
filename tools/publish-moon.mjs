@@ -86,7 +86,7 @@ for (const layer of layers) {
       continue;
     }
     console.log(`[${completed}/${modules.length}] publishing ${module.name}@${module.version}`);
-    run("moon", ["-C", path.relative(root, module.directory), "publish", "--frozen"]);
+    run("moon", ["-C", path.relative(root, module.directory), "publish"]);
     changed = true;
   }
   if (changed) {
