@@ -131,6 +131,7 @@ options(
     "js_api_exports.mbt": [ "js" ],
     "js_export_types.mbt": [ "js" ],
     "history_fixup_wbtest.mbt": [ "js" ],
+    "history_reword_wbtest.mbt": [ "js" ],
     "js_exports_wbtest.mbt": [ "js" ],
     "last_modified_wbtest.mbt": [ "js" ],
     "js_host_bridge.mbt": [ "js" ],
