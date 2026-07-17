@@ -34,6 +34,7 @@ import {
   "mizchi/bitx_bitconfig" @bitconfig,
   "mizchi/bitx_workspace" @workspace,
   "mizchi/bit_reftable" @reftable,
+  "mizchi/bit_refs" @bitrefs,
   "mizchi/bit_runtime" @runtime,
   "mizchi/bit_utils" @string_utils,
   "mizchi/zlib",

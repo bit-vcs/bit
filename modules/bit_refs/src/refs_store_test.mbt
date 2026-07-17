@@ -25,3 +25,46 @@ test "refs/store: remove remote refs drops refs and logs trees" {
   assert_false(fs.is_dir("/repo/.git/refs/remotes/origin"))
   assert_false(fs.is_dir("/repo/.git/logs/refs/remotes/origin"))
 }
+
+///|
+test "refs/store: serialize_packed_refs_entries sorts, dedupes, and keeps peel lines" {
+  // Unsorted input with a duplicate refname (old value first, new value last)
+  // and a peeled tag: the canonical form must be sorted, last-wins, with
+  // git's exact header.
+  let entries = parse_packed_refs_text(
+    "# pack-refs with: peeled fully-peeled sorted \n" +
+    "1111111111111111111111111111111111111111 refs/tags/v1\n" +
+    "^2222222222222222222222222222222222222222\n" +
+    "3333333333333333333333333333333333333333 refs/notes/bit-hub\n" +
+    "4444444444444444444444444444444444444444 refs/heads/main\n" +
+    "5555555555555555555555555555555555555555 refs/notes/bit-hub\n",
+  )
+  let out = serialize_packed_refs_entries(entries)
+  @test.assert_eq(
+    out,
+    "# pack-refs with: peeled fully-peeled sorted \n" +
+    "4444444444444444444444444444444444444444 refs/heads/main\n" +
+    "5555555555555555555555555555555555555555 refs/notes/bit-hub\n" +
+    "1111111111111111111111111111111111111111 refs/tags/v1\n" +
+    "^2222222222222222222222222222222222222222\n",
+  )
+}
+
+///|
+test "refs/store: parse_packed_refs_text attaches peel lines and skips header" {
+  let entries = parse_packed_refs_text(
+    "# pack-refs with: peeled fully-peeled sorted \n" +
+    "1111111111111111111111111111111111111111 refs/tags/v1\n" +
+    "^2222222222222222222222222222222222222222\n" +
+    "4444444444444444444444444444444444444444 refs/heads/main\n",
+  )
+  @test.assert_eq(entries.length(), 2)
+  @test.assert_eq(entries[0].refname, "refs/tags/v1")
+  @test.assert_eq(
+    entries[0].peeled,
+    Some("2222222222222222222222222222222222222222"),
+  )
+  @test.assert_eq(entries[1].refname, "refs/heads/main")
+  @test.assert_eq(entries[1].peeled, None)
+}
+

@@ -684,38 +684,10 @@ fn remove_from_packed_refs(
   refname : String,
 ) -> Unit raise @bit.GitError {
   let text = @utf8.decode_lossy(rfs.read_file(packed_path)[:])
-  let lines : Array[String] = []
-  let mut found = false
-  for line_view in text.split("\n") {
-    let line = line_view.to_owned()
-    if line.length() == 0 {
-      continue
-    }
-    // Check if this line is for the ref we want to remove
-    let space = line.find(" ")
-    match space {
-      None => lines.push(line)
-      Some(idx) => {
-        if idx + 1 >= line.length() {
-          lines.push(line)
-          continue
-        }
-        let name = String::unsafe_substring(
-          line,
-          start=idx + 1,
-          end=line.length(),
-        )
-        if name == refname {
-          found = true
-        } else {
-          lines.push(line)
-        }
-      }
-    }
-  }
-  if found {
-    let new_content = lines.join("\n") + "\n"
-    fs.write_string(packed_path, new_content)
+  let entries = @bitrefs.parse_packed_refs_text(text)
+  let kept = entries.filter(e => e.refname != refname)
+  if kept.length() != entries.length() {
+    fs.write_string(packed_path, @bitrefs.serialize_packed_refs_entries(kept))
   }
 }
 
