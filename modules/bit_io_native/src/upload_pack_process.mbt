@@ -622,10 +622,18 @@ async fn run_process_with_files(
   let stderr_path = "\{base}.err"
   let stdin_path = "\{base}.in"
   let cleanup_paths = [stdout_path, stderr_path, stdin_path]
-  let stdout = @process.redirect_to_file(stdout_path, create_mode=CreateOrTruncate, permission=420) catch {
+  let stdout = @process.redirect_to_file(
+    stdout_path,
+    create_mode=CreateOrTruncate,
+    permission=420,
+  ) catch {
     e => raise @bit.GitError::IoError("failed to open stdout file: \{e}")
   }
-  let stderr = @process.redirect_to_file(stderr_path, create_mode=CreateOrTruncate, permission=420) catch {
+  let stderr = @process.redirect_to_file(
+    stderr_path,
+    create_mode=CreateOrTruncate,
+    permission=420,
+  ) catch {
     e => raise @bit.GitError::IoError("failed to open stderr file: \{e}")
   }
   let stdin_bytes = match stdin_data {
@@ -778,7 +786,11 @@ async fn run_ssh_upload_pack_info_refs(
   }
   let nonce = @async.now()
   let stderr_path = ".moonbit-ssh-info-refs-\{nonce}.err"
-  let stderr = @process.redirect_to_file(stderr_path, create_mode=CreateOrTruncate, permission=420) catch {
+  let stderr = @process.redirect_to_file(
+    stderr_path,
+    create_mode=CreateOrTruncate,
+    permission=420,
+  ) catch {
     err => raise @bit.GitError::IoError("SSH stderr file failed: \{err}")
   }
   let run_cwd = resolve_process_cwd()
@@ -970,7 +982,11 @@ async fn run_ssh_upload_pack_interactive(
   }
   let nonce = @async.now()
   let stderr_path = ".moonbit-ssh-upload-pack-\{nonce}.err"
-  let stderr = @process.redirect_to_file(stderr_path, create_mode=CreateOrTruncate, permission=420) catch {
+  let stderr = @process.redirect_to_file(
+    stderr_path,
+    create_mode=CreateOrTruncate,
+    permission=420,
+  ) catch {
     err => raise @bit.GitError::IoError("SSH stderr file failed: \{err}")
   }
   let run_cwd = resolve_process_cwd()

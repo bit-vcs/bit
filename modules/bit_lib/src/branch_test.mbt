@@ -179,13 +179,15 @@ test "branch: create_branch_at rejects checked out branch" {
   fs.write_string(
     "/repo/.git/refs/heads/topic", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
   )
-  try create_branch_at(
-    fs,
-    fs,
-    "/repo",
-    "topic",
-    @bit.ObjectId::from_hex("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
-  ) catch {
+  try
+    create_branch_at(
+      fs,
+      fs,
+      "/repo",
+      "topic",
+      @bit.ObjectId::from_hex("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+    )
+  catch {
     _ => () // expected
   } noraise {
     _ => fail("expected create_branch_at to raise")
@@ -210,13 +212,15 @@ test "branch: create_branch_at rejects branch checked out in linked worktree" {
   fs.write_string("/repo/.git/worktrees/wt1/gitdir", "/worktree1/.git\n")
   fs.write_string("/repo/.git/worktrees/wt1/HEAD", "ref: refs/heads/topic\n")
   fs.write_string("/repo/.git/worktrees/wt1/commondir", "../..\n")
-  try create_branch_at(
-    fs,
-    fs,
-    "/repo",
-    "topic",
-    @bit.ObjectId::from_hex("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
-  ) catch {
+  try
+    create_branch_at(
+      fs,
+      fs,
+      "/repo",
+      "topic",
+      @bit.ObjectId::from_hex("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+    )
+  catch {
     _ => () // expected
   } noraise {
     _ => fail("expected create_branch_at to raise")
@@ -423,13 +427,15 @@ test "branch: create_lightweight_tag rejects conflicting parent ref path" {
   fs.write_string(
     "/repo/.git/refs/tags/foo/bar", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
   )
-  try create_lightweight_tag(
-    fs,
-    fs,
-    "/repo/.git",
-    "foo",
-    @bit.ObjectId::from_hex("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
-  ) catch {
+  try
+    create_lightweight_tag(
+      fs,
+      fs,
+      "/repo/.git",
+      "foo",
+      @bit.ObjectId::from_hex("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+    )
+  catch {
     _ => () // expected
   } noraise {
     _ => fail("expected create_lightweight_tag to raise")
@@ -444,13 +450,15 @@ test "branch: create_lightweight_tag rejects conflicting packed ref path" {
   fs.write_string(
     "/repo/.git/packed-refs", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa refs/tags/foo/bar\n",
   )
-  try create_lightweight_tag(
-    fs,
-    fs,
-    "/repo/.git",
-    "foo",
-    @bit.ObjectId::from_hex("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
-  ) catch {
+  try
+    create_lightweight_tag(
+      fs,
+      fs,
+      "/repo/.git",
+      "foo",
+      @bit.ObjectId::from_hex("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+    )
+  catch {
     _ => () // expected
   } noraise {
     _ => fail("expected create_lightweight_tag to raise")

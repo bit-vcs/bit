@@ -52,7 +52,9 @@ test "log: raw rotate uses first path after target when absent" {
 ///|
 test "log: config reader handles inline section key" {
   let fs = @bitcore.TestFs::new()
-  @bitlib.init_repo(fs, "/repo") catch { _ => () }
+  @bitlib.init_repo(fs, "/repo") catch {
+    _ => ()
+  }
   let base_config = fs.read_string("/repo/.git/config")
   fs.write_string("/repo/.git/config", base_config + "\n[log] decorate\n")
 
@@ -102,7 +104,9 @@ test "log: revision input handles caret and not-mode excludes" {
 ///|
 test "log: stdin parser reads revisions, excludes, and pathspecs" {
   let fs = @bitcore.TestFs::new()
-  @bitlib.init_repo(fs, "/repo") catch { _ => () }
+  @bitlib.init_repo(fs, "/repo") catch {
+    _ => ()
+  }
   let revs : Array[String] = []
   let excludes : Array[String] = []
   let symmetric : Array[(String, String)] = []
@@ -322,7 +326,9 @@ fn log_wbtest_write_commit_object(
 test "log: ancestry path keeps commits descended from bottom commits" {
   let fs = @bitcore.TestFs::new()
   let git_dir = "/repo/.git"
-  @bitlib.init_repo(fs, "/repo") catch { _ => () }
+  @bitlib.init_repo(fs, "/repo") catch {
+    _ => ()
+  }
 
   let root = log_wbtest_write_commit_object(
     fs,
@@ -391,7 +397,9 @@ test "log: ancestry path keeps commits descended from bottom commits" {
 ///|
 test "log: boundary walk appends excluded parent with marker flag" {
   let fs = @bitcore.TestFs::new()
-  @bitlib.init_repo(fs, "/repo") catch { _ => () }
+  @bitlib.init_repo(fs, "/repo") catch {
+    _ => ()
+  }
 
   fs.write_string("/repo/file.txt", "a\n")
   @bitlib.add_paths(fs, fs, "/repo", ["file.txt"])
@@ -1002,7 +1010,9 @@ fn log_test_commit(
 ///|
 test "log: build ref names peels nested annotated tags" {
   let fs = @bitcore.TestFs::new()
-  @bitlib.init_repo(fs, "/repo") catch { _ => () }
+  @bitlib.init_repo(fs, "/repo") catch {
+    _ => ()
+  }
   ignore(log_test_commit(fs, "/repo", "file.txt", "one\n", "one", 1L)) catch {
     _ => ()
   }
@@ -1019,7 +1029,9 @@ test "log: build ref names peels nested annotated tags" {
   ) catch {
     _ => ()
   }
-  @bitlib.create_branch_at(fs, fs, "/repo", "reach", head) catch { _ => () }
+  @bitlib.create_branch_at(fs, fs, "/repo", "reach", head) catch {
+    _ => ()
+  }
   @bitlib.create_annotated_tag(
     fs, fs, "/repo/.git", "double-0", head, "double-0", "Test User <test@example.com>",
     4L,
@@ -1074,11 +1086,15 @@ test "log: build ref names peels nested annotated tags" {
 ///|
 test "log: resolve targets preserves tag revision names" {
   let fs = @bitcore.TestFs::new()
-  @bitlib.init_repo(fs, "/repo") catch { _ => () }
+  @bitlib.init_repo(fs, "/repo") catch {
+    _ => ()
+  }
   let head = log_test_commit(fs, "/repo", "file.txt", "one\n", "one", 1L) catch {
     err => fail("unexpected commit error: \{err}")
   }
-  @bitlib.create_branch_at(fs, fs, "/repo", "source-a", head) catch { _ => () }
+  @bitlib.create_branch_at(fs, fs, "/repo", "source-a", head) catch {
+    _ => ()
+  }
   @bitlib.create_annotated_tag(
     fs, fs, "/repo/.git", "source-tag", head, "source-tag", "Test User <test@example.com>",
     2L,
@@ -1104,7 +1120,9 @@ test "log: resolve targets preserves tag revision names" {
 ///|
 test "log: grafts affect fast-path history in main and linked worktrees" {
   let fs = @bitcore.TestFs::new()
-  @bitlib.init_repo(fs, "/repo") catch { _ => () }
+  @bitlib.init_repo(fs, "/repo") catch {
+    _ => ()
+  }
   let abc = log_test_commit(fs, "/repo", "file.txt", "abc\n", "abc", 1L) catch {
     err => fail("unexpected commit error: \{err}")
   }

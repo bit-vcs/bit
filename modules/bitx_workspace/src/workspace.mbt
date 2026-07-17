@@ -1284,7 +1284,9 @@ fn read_successful_push_nodes(
   let text = decode_bytes(fs.read_file(path)) catch { _ => return Map([]) }
   let parsed = @json.parse(text) catch { _ => return Map([]) }
   guard parsed is Json::Object(root_obj) else { return Map([]) }
-  guard root_obj.get("steps") is Some(Json::Array(steps)) else { return Map([]) }
+  guard root_obj.get("steps") is Some(Json::Array(steps)) else {
+    return Map([])
+  }
   let completed : Map[String, Bool] = Map([])
   for step in steps {
     guard step is Json::Object(step_obj) else { continue }

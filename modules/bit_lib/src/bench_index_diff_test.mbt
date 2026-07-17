@@ -54,7 +54,9 @@ fn bench_index_ensure_repo(root : String, file_count : Int) -> Unit {
   add_paths(fs, fs, root, paths) catch {
     _ => ()
   }
-  ignore(try? commit(fs, fs, root, "init", "Author <a@b.com>", 1700000000L))
+  ignore(commit(fs, fs, root, "init", "Author <a@b.com>", 1700000000L)) catch {
+    _ => ()
+  }
   @fs.write_string_to_file(marker, "ok\n") catch {
     _ => ()
   }

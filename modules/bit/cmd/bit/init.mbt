@@ -331,9 +331,7 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
     let mut resolved = dot_git_path
     // Follow gitdir: pointer if it's a file
     if !fs.is_dir(resolved) && fs.is_file(resolved) {
-      let content = decode_bytes(
-        (fs.read_file(resolved) catch { _ => b"" }),
-      )
+      let content = decode_bytes(fs.read_file(resolved) catch { _ => b"" })
       let trimmed = content.trim_end(chars="\r\n").to_owned()
       if trimmed.has_prefix("gitdir: ") {
         let linked = string_slice_from(trimmed, 8)
@@ -352,7 +350,9 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
       let commondir_file = resolved + "/commondir"
       if fs.is_file(commondir_file) {
         let cd_val = decode_bytes(
-            (fs.read_file(commondir_file) catch { _ => b"" }),
+            fs.read_file(commondir_file) catch {
+              _ => b""
+            },
           )
           .trim_end(chars="\r\n")
           .to_owned()
@@ -635,7 +635,9 @@ async fn handle_init(args : Array[String]) -> Unit raise Error {
       fs.is_file(dot_git_for_premove) {
       // Follow gitdir: pointer to check for commondir
       let gf = decode_bytes(
-          (fs.read_file(dot_git_for_premove) catch { _ => b"" }),
+          fs.read_file(dot_git_for_premove) catch {
+            _ => b""
+          },
         )
         .trim_end(chars="\r\n")
         .to_owned()

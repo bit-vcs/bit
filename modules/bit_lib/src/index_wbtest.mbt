@@ -1,20 +1,19 @@
 ///|
 fn index_wbtest_init_sha256_repo(fs : @bit.TestFs) -> Unit {
-  try ignore(
-      init_repo_with_options(fs, "/repo", {
-        default_branch: "main",
-        bare: false,
-        separate_git_dir: None,
-        template_dir: None,
-        ref_format: "files",
-        object_format: "sha256",
-        is_reinit: false,
-        git_dir: None,
-        work_tree: None,
-        shared: None,
-      }),
-    )
-    catch {
+  ignore(
+    init_repo_with_options(fs, "/repo", {
+      default_branch: "main",
+      bare: false,
+      separate_git_dir: None,
+      template_dir: None,
+      ref_format: "files",
+      object_format: "sha256",
+      is_reinit: false,
+      git_dir: None,
+      work_tree: None,
+      shared: None,
+    }),
+  ) catch {
     _ => ()
   }
 }

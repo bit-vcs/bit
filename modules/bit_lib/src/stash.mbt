@@ -270,7 +270,9 @@ fn stash_store_entry(
   let old_id = if rfs.is_file(stash_ref_path) {
     let content = @utf8.decode_lossy(rfs.read_file(stash_ref_path)[:])
     let hex = content.trim_end(chars="\n\r ").to_owned()
-    @bit.ObjectId::from_hex(hex) catch { _ => @bit.ObjectId::zero() }
+    @bit.ObjectId::from_hex(hex) catch {
+      _ => @bit.ObjectId::zero()
+    }
   } else {
     @bit.ObjectId::zero()
   }

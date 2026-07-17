@@ -14,7 +14,9 @@ fn bench_repack_create_repo(
 ) -> Unit {
   ensure_bench_dir(repo_path)
   let fs = OsFs::new()
-  @bitrepo.init_repo(fs, repo_path) catch { _ => () }
+  @bitrepo.init_repo(fs, repo_path) catch {
+    _ => ()
+  }
   for commit_idx in 0..<num_commits {
     for file_idx in 0..<files_per_commit {
       let dir = repo_path + "/dir_\{commit_idx}"
@@ -27,16 +29,20 @@ fn bench_repack_create_repo(
       }
     }
     @async.run_async_main(async fn() {
-      @bitlib.add_paths_async(fs, fs, repo_path, ["."]) catch { _ => () }
+      @bitlib.add_paths_async(fs, fs, repo_path, ["."]) catch {
+        _ => ()
+      }
     })
-    ignore(@bitlib.commit(
-      fs,
-      fs,
-      repo_path,
-      "commit \{commit_idx}\n",
-      "Bench <bench@example.com>",
-      1700000000L + commit_idx.to_int64(),
-    )) catch {
+    ignore(
+      @bitlib.commit(
+        fs,
+        fs,
+        repo_path,
+        "commit \{commit_idx}\n",
+        "Bench <bench@example.com>",
+        1700000000L + commit_idx.to_int64(),
+      ),
+    ) catch {
       _ => ()
     }
   }

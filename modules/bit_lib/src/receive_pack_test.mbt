@@ -24,10 +24,10 @@ fn build_receive_request(
 ///|
 test "receive-pack: push to empty repo" {
   let fs = @bit.TestFs::new()
-  try ignore(init_repo(fs, "/src")) catch {
+  ignore(init_repo(fs, "/src")) catch {
     _ => ()
   }
-  try ignore(init_repo(fs, "/dst")) catch {
+  ignore(init_repo(fs, "/dst")) catch {
     _ => ()
   }
   fs.write_string("/src/a.txt", "hello\n")
@@ -58,7 +58,7 @@ test "receive-pack: push to empty repo" {
 ///|
 test "receive-pack: advertise empty repo" {
   let fs = @bit.TestFs::new()
-  try ignore(init_repo(fs, "/repo")) catch {
+  ignore(init_repo(fs, "/repo")) catch {
     _ => ()
   }
   let adv = build_receive_pack_advertisement(fs, "/repo")
@@ -73,10 +73,10 @@ test "receive-pack: advertise empty repo" {
 ///|
 test "receive-pack: reject non-fast-forward" {
   let fs = @bit.TestFs::new()
-  try ignore(init_repo(fs, "/src")) catch {
+  ignore(init_repo(fs, "/src")) catch {
     _ => ()
   }
-  try ignore(init_repo(fs, "/dst")) catch {
+  ignore(init_repo(fs, "/dst")) catch {
     _ => ()
   }
   fs.write_string("/src/a.txt", "one\n")
@@ -107,7 +107,7 @@ test "receive-pack: reject non-fast-forward" {
 ///|
 test "receive-pack: reject invalid refname" {
   let fs = @bit.TestFs::new()
-  try ignore(init_repo(fs, "/dst")) catch {
+  ignore(init_repo(fs, "/dst")) catch {
     _ => ()
   }
   let req = build_receive_request(
@@ -124,7 +124,7 @@ test "receive-pack: reject invalid refname" {
 test "receive-pack: reject path traversal from /tmp repo" {
   let fs = @bit.TestFs::new()
   let tmp_repo = "/tmp/bit-receive-pack-poc"
-  try ignore(init_repo(fs, tmp_repo)) catch {
+  ignore(init_repo(fs, tmp_repo)) catch {
     _ => ()
   }
   let bad_req = build_receive_request(

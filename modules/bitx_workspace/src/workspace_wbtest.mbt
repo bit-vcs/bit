@@ -621,7 +621,7 @@ async test "workspace: node signature changes by fingerprint mode" {
   let fs = @osfs.OsFs::new()
   let root = "/tmp/bit-test-workspace-signature-mode-" +
     get_current_timestamp().to_string()
-  try ignore(@process.run("rm", ["-rf", root], inherit_env=true)) catch {
+  ignore(@process.run("rm", ["-rf", root], inherit_env=true)) catch {
     _ => ()
   }
   fs.mkdir_p(root)
@@ -638,7 +638,7 @@ async test "workspace: node signature changes by fingerprint mode" {
     (code, _, _) => code
   }
   if init_code != 0 {
-    try ignore(@process.run("rm", ["-rf", root], inherit_env=true)) catch {
+    ignore(@process.run("rm", ["-rf", root], inherit_env=true)) catch {
       _ => ()
     }
     return
@@ -658,7 +658,7 @@ async test "workspace: node signature changes by fingerprint mode" {
     (Some(fast_sig), Some(bit_sig)) => assert_eq(fast_sig == bit_sig, false)
     _ => fail("workspace signature should exist for initialized repository")
   }
-  try ignore(@process.run("rm", ["-rf", root], inherit_env=true)) catch {
+  ignore(@process.run("rm", ["-rf", root], inherit_env=true)) catch {
     _ => ()
   }
 }

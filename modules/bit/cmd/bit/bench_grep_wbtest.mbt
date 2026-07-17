@@ -80,7 +80,9 @@ fn bench_grep_ensure_repo(
   ensure_bench_dir(bench_grep_root)
   bench_grep_cleanup_tree(fs, repo_root)
   ensure_bench_dir(repo_root)
-  @bitrepo.init_repo(fs, repo_root) catch { _ => () }
+  @bitrepo.init_repo(fs, repo_root) catch {
+    _ => ()
+  }
   let mut file_idx = 0
   for dir_idx in 0..<dir_count {
     let dir = repo_root + "/dir_\{dir_idx}"
@@ -97,11 +99,15 @@ fn bench_grep_ensure_repo(
     }
   }
   @async.run_async_main(async fn() {
-    @bitlib.add_paths_async(fs, fs, repo_root, ["."]) catch { _ => () }
+    @bitlib.add_paths_async(fs, fs, repo_root, ["."]) catch {
+      _ => ()
+    }
   })
-  ignore(@bitlib.commit(
-    fs, fs, repo_root, "bench grep seed\n", "Bench <bench@example.com>", 1700000000L,
-  )) catch {
+  ignore(
+    @bitlib.commit(
+      fs, fs, repo_root, "bench grep seed\n", "Bench <bench@example.com>", 1700000000L,
+    ),
+  ) catch {
     _ => ()
   }
   @fs.write_string_to_file(marker, "ok\n") catch {

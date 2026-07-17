@@ -3,7 +3,7 @@
 ///|
 fn setup_repo() -> @bit.TestFs {
   let fs = @bit.TestFs::new()
-  try ignore(init_repo(fs, "/repo")) catch {
+  ignore(init_repo(fs, "/repo")) catch {
     _ => ()
   }
   fs
@@ -12,21 +12,20 @@ fn setup_repo() -> @bit.TestFs {
 ///|
 fn setup_sha256_compat_repo() -> @bit.TestFs {
   let fs = @bit.TestFs::new()
-  try ignore(
-      init_repo_with_options(fs, "/repo", {
-        default_branch: "main",
-        bare: false,
-        separate_git_dir: None,
-        template_dir: None,
-        ref_format: "files",
-        object_format: "sha256",
-        is_reinit: false,
-        git_dir: None,
-        work_tree: None,
-        shared: None,
-      }),
-    )
-    catch {
+  ignore(
+    init_repo_with_options(fs, "/repo", {
+      default_branch: "main",
+      bare: false,
+      separate_git_dir: None,
+      template_dir: None,
+      ref_format: "files",
+      object_format: "sha256",
+      is_reinit: false,
+      git_dir: None,
+      work_tree: None,
+      shared: None,
+    }),
+  ) catch {
     _ => ()
   }
   fs.write_string(

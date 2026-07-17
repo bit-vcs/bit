@@ -11,18 +11,22 @@ fn repack_midx_inc_setup_repo(root : String) -> Unit raise Error {
   let fs = OsFs::new()
   cleanup_tree(fs, root)
   fs.mkdir_p(root)
-  @bitrepo.init_repo(fs, root) catch { _ => () }
+  @bitrepo.init_repo(fs, root) catch {
+    _ => ()
+  }
   for i in 0..<3 {
     @fs.write_string_to_file(root + "/f\{i}.txt", "content \{i}\n") catch {
       _ => ()
     }
   }
   @async.run_async_main(async fn() {
-    @bitlib.add_paths_async(fs, fs, root, ["."]) catch { _ => () }
+    @bitlib.add_paths_async(fs, fs, root, ["."]) catch {
+      _ => ()
+    }
   })
-  ignore(@bitlib.commit(
-    fs, fs, root, "c0\n", "Test <t@example.com>", 1700000000L,
-  )) catch {
+  ignore(
+    @bitlib.commit(fs, fs, root, "c0\n", "Test <t@example.com>", 1700000000L),
+  ) catch {
     _ => ()
   }
   // Pack the loose objects into a single packfile.
@@ -60,16 +64,20 @@ fn midx_inc_commit_and_pack(root : String, tag : String) -> Unit {
     _ => ()
   }
   @async.run_async_main(async fn() {
-    @bitlib.add_paths_async(fs, fs, root, ["."]) catch { _ => () }
+    @bitlib.add_paths_async(fs, fs, root, ["."]) catch {
+      _ => ()
+    }
   })
-  ignore(@bitlib.commit(
-    fs,
-    fs,
-    root,
-    "c\{tag}\n",
-    "Test <t@example.com>",
-    1700000000L,
-  )) catch {
+  ignore(
+    @bitlib.commit(
+      fs,
+      fs,
+      root,
+      "c\{tag}\n",
+      "Test <t@example.com>",
+      1700000000L,
+    ),
+  ) catch {
     _ => ()
   }
   @async.run_async_main(async fn() {
@@ -87,7 +95,9 @@ test "midx repack config readers honor git config with clamping" {
   let root = "/tmp/bit-test-midx-cfg-" + get_current_timestamp().to_string()
   cleanup_tree(fs, root)
   fs.mkdir_p(root)
-  @bitrepo.init_repo(fs, root) catch { _ => () }
+  @bitrepo.init_repo(fs, root) catch {
+    _ => ()
+  }
   let pack_dir = root + "/.git/objects/pack"
   @async.run_async_main(async fn() {
     run_main_for_args([
@@ -124,7 +134,9 @@ test "repack --write-midx=incremental keeps the chain compacted" {
   let root = "/tmp/bit-test-midx-compact-" + get_current_timestamp().to_string()
   cleanup_tree(fs, root)
   fs.mkdir_p(root)
-  @bitrepo.init_repo(fs, root) catch { _ => () }
+  @bitrepo.init_repo(fs, root) catch {
+    _ => ()
+  }
   let pack_dir = root + "/.git/objects/pack"
   // Five rounds, each creating a new pack + incremental midx write. With the
   // default new-layer threshold (8), each tiny layer folds into the tip, so

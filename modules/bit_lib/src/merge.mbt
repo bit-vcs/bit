@@ -188,7 +188,8 @@ pub fn merge(
   let merged = file_result.merged
   let conflicts = file_result.conflicts
   let all_conflict_types = file_result.conflict_types
-  let rename_conflict_stages : Map[String, (TreeFileEntry, TreeFileEntry)] = Map([])
+  let rename_conflict_stages : Map[String, (TreeFileEntry, TreeFileEntry)] = Map([],
+  )
   // Try content-level merge for files modified on both sides
   for candidate in file_result.needs_content_merge {
     let base_content = match candidate.base_id {

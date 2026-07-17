@@ -16,7 +16,9 @@ fn bench_stash_ensure_repo() -> Unit {
   let repo = bench_stash_root + "/repo"
   ensure_bench_dir(repo)
   let fs = OsFs::new()
-  @bitrepo.init_repo(fs, repo) catch { _ => () }
+  @bitrepo.init_repo(fs, repo) catch {
+    _ => ()
+  }
   // Create base files
   for i in 0..<50 {
     @fs.write_string_to_file(repo + "/file_\{i}.txt", "base content \{i}\n") catch {
@@ -24,11 +26,15 @@ fn bench_stash_ensure_repo() -> Unit {
     }
   }
   @async.run_async_main(async fn() {
-    @bitlib.add_paths_async(fs, fs, repo, ["."]) catch { _ => () }
+    @bitlib.add_paths_async(fs, fs, repo, ["."]) catch {
+      _ => ()
+    }
   })
-  ignore(@bitlib.commit(
-    fs, fs, repo, "base commit\n", "Bench <bench@example.com>", 1700000000L,
-  )) catch {
+  ignore(
+    @bitlib.commit(
+      fs, fs, repo, "base commit\n", "Bench <bench@example.com>", 1700000000L,
+    ),
+  ) catch {
     _ => ()
   }
   // Modify some files and stash
@@ -38,7 +44,9 @@ fn bench_stash_ensure_repo() -> Unit {
     }
   }
   @async.run_async_main(async fn() {
-    @bitlib.add_paths_async(fs, fs, repo, ["."]) catch { _ => () }
+    @bitlib.add_paths_async(fs, fs, repo, ["."]) catch {
+      _ => ()
+    }
   })
   @async.run_async_main(async fn() {
     run_main_for_args(["bit", "-C", repo, "stash", "push", "-m", "bench stash"])

@@ -419,7 +419,7 @@ test "js exports: signed commit stores gpgsig header" {
     join_path("/repo/.git/objects", object_dir),
     object_file,
   )
-  let compressed = fs.read_file(object_path)
+  let compressed = @bit.RepoFileSystem::read_file(fs, object_path)
   let raw = @zlib.zlib_decompress(compressed)
   let (obj_type, content_start) = js_exports_parse_loose_header(raw)
   assert_eq(obj_type, "commit")
@@ -475,7 +475,7 @@ test "js exports: checked signed commit stores gpgsig header" {
     join_path("/repo/.git/objects", object_dir),
     object_file,
   )
-  let compressed = fs.read_file(object_path)
+  let compressed = @bit.RepoFileSystem::read_file(fs, object_path)
   let raw = @zlib.zlib_decompress(compressed)
   let (obj_type, content_start) = js_exports_parse_loose_header(raw)
   assert_eq(obj_type, "commit")
@@ -650,7 +650,7 @@ async test "js exports: ssh ed25519 signing composes with checked commit" {
     join_path("/repo/.git/objects", object_dir),
     object_file,
   )
-  let compressed = fs.read_file(object_path)
+  let compressed = @bit.RepoFileSystem::read_file(fs, object_path)
   let raw = @zlib.zlib_decompress(compressed)
   let (obj_type, content_start) = js_exports_parse_loose_header(raw)
   assert_eq(obj_type, "commit")

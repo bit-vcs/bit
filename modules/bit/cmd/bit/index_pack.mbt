@@ -794,8 +794,8 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
           err if @async.is_cancellation_error(err) => raise err
           err => {
             @stdio.stderr.write(
-            "fatal: " + @debug.render(@debug.to_repr(err)) + "\n",
-          )
+              "fatal: " + @debug.render(@debug.to_repr(err)) + "\n",
+            )
             @sys.exit(1)
             Bytes::default()
           }
@@ -804,8 +804,8 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
           err if @async.is_cancellation_error(err) => raise err
           err => {
             @stdio.stderr.write(
-            "fatal: " + @debug.render(@debug.to_repr(err)) + "\n",
-          )
+              "fatal: " + @debug.render(@debug.to_repr(err)) + "\n",
+            )
             @sys.exit(1)
             0
           }
@@ -828,8 +828,8 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
           err if @async.is_cancellation_error(err) => raise err
           err => {
             @stdio.stderr.write(
-            "fatal: " + @debug.render(@debug.to_repr(err)) + "\n",
-          )
+              "fatal: " + @debug.render(@debug.to_repr(err)) + "\n",
+            )
             @sys.exit(1)
             Bytes::default()
           }
@@ -844,8 +844,8 @@ async fn handle_index_pack(args : Array[String]) -> Unit raise Error {
           err if @async.is_cancellation_error(err) => raise err
           err => {
             @stdio.stderr.write(
-            "fatal: " + @debug.render(@debug.to_repr(err)) + "\n",
-          )
+              "fatal: " + @debug.render(@debug.to_repr(err)) + "\n",
+            )
             @sys.exit(1)
             Bytes::default()
           }

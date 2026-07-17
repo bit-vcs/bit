@@ -3,7 +3,9 @@
 ///|
 fn setup_stash_repo() -> @bit.TestFs {
   let fs = @bit.TestFs::new()
-  ignore(try? init_repo(fs, "/repo"))
+  ignore(init_repo(fs, "/repo")) catch {
+    _ => ()
+  }
   fs
 }
 

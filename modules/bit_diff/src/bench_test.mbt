@@ -13,7 +13,7 @@ fn setup_diff_repo(
   changed_pct : Int,
 ) -> (@bit.TestFs, @bit.ObjectId, @bit.ObjectId) raise @bit.GitError {
   let fs = @bit.TestFs::new()
-  try ignore(@bitlib.init_repo(fs, bench_diff_root)) catch {
+  ignore(@bitlib.init_repo(fs, bench_diff_root)) catch {
     _ => ()
   }
   let git_dir = bench_diff_root + "/.git"

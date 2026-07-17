@@ -5,7 +5,7 @@ async test "lib pure runtime: status/add_paths_async without native init" {
   @bitio.set_env_provider(@bitio.EnvProvider::none())
   @bitio.set_worktree_probe(@bitio.WorktreeProbeProvider::none())
   let fs = @bit.TestFs::new()
-  try ignore(init_repo(fs, "/repo")) catch {
+  ignore(init_repo(fs, "/repo")) catch {
     _ => ()
   }
   fs.write_string("/repo/a.txt", "hello\n")

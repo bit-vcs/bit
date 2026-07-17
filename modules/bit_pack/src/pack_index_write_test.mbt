@@ -24,7 +24,9 @@ fn read_fixture_bytes(path : String) -> Bytes raise {
   let resolved = resolve_fixture(path)
   @fs.read_file_to_bytes(resolved) catch {
     e =>
-      fail("failed to read fixture: \{path} (\{@debug.render(@debug.to_repr(e))})")
+      fail(
+        "failed to read fixture: \{path} (\{@debug.render(@debug.to_repr(e))})",
+      )
   }
 }
 

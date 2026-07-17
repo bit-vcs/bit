@@ -86,7 +86,7 @@ fn lm_query(
 
 ///|
 fn lm_labels(ids : Array[String]) -> Map[String, String] {
-  let m : Map[String, String] = {}
+  let m : Map[String, String] = Map([])
   for k in 0..<ids.length() {
     m[ids[k]] = (k + 1).to_string()
   }
@@ -99,11 +99,16 @@ fn lm_assert(
   expected : Array[(String, String)],
 ) -> Unit {
   if actual.length() != expected.length() {
-    abort("length: got \{actual.length()} want \{expected.length()}: \{actual}")
+    abort(
+      "length: got \{actual.length()} want \{expected.length()}: " +
+      actual.map(x => "(\{x.0}, \{x.1})").join(", "),
+    )
   }
   for k in 0..<actual.length() {
     if actual[k].0 != expected[k].0 || actual[k].1 != expected[k].1 {
-      abort("at \{k}: got \{actual[k]} want \{expected[k]} (full: \{actual})")
+      abort(
+        "at \{k}: got (\{actual[k].0}, \{actual[k].1}) want (\{expected[k].0}, \{expected[k].1})",
+      )
     }
   }
 }
@@ -313,7 +318,7 @@ test "last-modified: subdirectory modified via merge" {
     Ok(r) => r.commit_id
     Err(e) => abort("merge: \{e}")
   }
-  let labels : Map[String, String] = {}
+  let labels : Map[String, String] = Map([])
   labels[c_base] = "base"
   labels[c_merge] = "merge"
   let got = lm_query(host, "HEAD", labels, 0, false, -1, [])
@@ -367,7 +372,7 @@ test "last-modified: merge attributes each path to its own branch" {
     Ok(r) => r.commit_id
     Err(e) => abort("merge: \{e}")
   }
-  let labels : Map[String, String] = {}
+  let labels : Map[String, String] = Map([])
   labels[c_main] = "main"
   labels[c_side] = "side"
   let got = lm_query(host, "HEAD", labels, -1, false, -1, [])

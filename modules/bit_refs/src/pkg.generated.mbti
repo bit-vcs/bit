@@ -4,6 +4,7 @@ package "mizchi/bit_refs"
 import {
   "mizchi/bit_object",
   "mizchi/bit_types",
+  "moonbitlang/core/debug",
 }
 
 // Values
@@ -36,7 +37,7 @@ pub(all) struct PackedRefEntry {
   refname : String
   oid : String
   peeled : String?
-} derive(Eq, Show)
+} derive(Eq, @debug.Debug)
 
 // Type aliases
 

@@ -28,7 +28,7 @@ test "fuzz: parse_refs (v0 advertised refs)" {
   let rng = Lcg::new(0xA11CE)
   for _ in 0..<128 {
     let len = rng.next_int() % 1024
-    try ignore(@protocol.parse_refs(random_bytes(rng, len))) catch {
+    ignore(@protocol.parse_refs(random_bytes(rng, len))) catch {
       _ => ()
     }
   }
@@ -42,7 +42,7 @@ test "fuzz: parse_v0_advertised_caps" {
   let rng = Lcg::new(0xB0B)
   for _ in 0..<128 {
     let len = rng.next_int() % 1024
-    try ignore(@protocol.parse_v0_advertised_caps(random_bytes(rng, len))) catch {
+    ignore(@protocol.parse_v0_advertised_caps(random_bytes(rng, len))) catch {
       _ => ()
     }
   }
@@ -54,7 +54,7 @@ test "fuzz: parse_v2_advertised_caps" {
   let rng = Lcg::new(0xCAFE)
   for _ in 0..<128 {
     let len = rng.next_int() % 1024
-    try ignore(@protocol.parse_v2_advertised_caps(random_bytes(rng, len))) catch {
+    ignore(@protocol.parse_v2_advertised_caps(random_bytes(rng, len))) catch {
       _ => ()
     }
   }
@@ -66,7 +66,7 @@ test "fuzz: parse_ls_refs_response" {
   let rng = Lcg::new(0xDEAD)
   for _ in 0..<128 {
     let len = rng.next_int() % 1024
-    try ignore(@protocol.parse_ls_refs_response(random_bytes(rng, len))) catch {
+    ignore(@protocol.parse_ls_refs_response(random_bytes(rng, len))) catch {
       _ => ()
     }
   }
@@ -125,7 +125,7 @@ test "fuzz: parse_packfile_stream with biased header" {
     } else {
       raw
     }
-    try ignore(@pack.parse_packfile_stream(prefixed, fn(_obj) { () })) catch {
+    ignore(@pack.parse_packfile_stream(prefixed, fn(_obj) { () })) catch {
       _ => ()
     }
   }
@@ -141,7 +141,7 @@ test "fuzz: decode_type_and_size_at" {
     let len = rng.next_int() % 64 + 1
     let bytes = random_bytes(rng, len)
     let off = rng.next_int() % len
-    try ignore(@pack.decode_type_and_size_at(bytes, off)) catch {
+    ignore(@pack.decode_type_and_size_at(bytes, off)) catch {
       _ => ()
     }
   }
@@ -170,7 +170,7 @@ test "fuzz: parse_tree with path-byte-biased payload" {
         _ => rng.next_byte()
       }
     })
-    try ignore(@bit.parse_tree(bytes)) catch {
+    ignore(@bit.parse_tree(bytes)) catch {
       _ => ()
     }
   }

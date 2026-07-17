@@ -14,7 +14,7 @@ fn test_concat_bytes(chunks : Array[Bytes]) -> Bytes {
 ///|
 test "build_upload_pack_advertisement: empty repo" {
   let fs = @bit.TestFs::new()
-  try ignore(init_repo(fs, "/repo")) catch {
+  ignore(init_repo(fs, "/repo")) catch {
     _ => ()
   }
   let adv = build_upload_pack_advertisement(fs, "/repo")
@@ -27,7 +27,7 @@ test "build_upload_pack_advertisement: empty repo" {
 ///|
 test "build_upload_pack_advertisement: with refs" {
   let fs = @bit.TestFs::new()
-  try ignore(init_repo(fs, "/repo")) catch {
+  ignore(init_repo(fs, "/repo")) catch {
     _ => ()
   }
   // Create a commit to get a real ref

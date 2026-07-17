@@ -30,7 +30,14 @@ pub struct LruCache[V] {
 
 ///|
 pub fn[V] LruCache::new(max_bytes : Int, size_fn : (V) -> Int) -> LruCache[V] {
-  { hot: Map([]), cold: Map([]), hot_bytes: 0, cold_bytes: 0, max_bytes, size_fn }
+  {
+    hot: Map([]),
+    cold: Map([]),
+    hot_bytes: 0,
+    cold_bytes: 0,
+    max_bytes,
+    size_fn,
+  }
 }
 
 ///|

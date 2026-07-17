@@ -14,7 +14,9 @@ fn bench_fsck_create_repo(
 ) -> Unit {
   ensure_bench_dir(repo_path)
   let fs = OsFs::new()
-  ignore(try? @bitrepo.init_repo(fs, repo_path))
+  ignore(@bitrepo.init_repo(fs, repo_path)) catch {
+    _ => ()
+  }
   for commit_idx in 0..<num_commits {
     let dir = repo_path + "/dir_\{commit_idx}"
     ensure_bench_dir(dir)
@@ -27,10 +29,12 @@ fn bench_fsck_create_repo(
       }
     }
     @async.run_async_main(async fn() {
-      ignore(try? @bitlib.add_paths_async(fs, fs, repo_path, ["."]))
+      ignore(@bitlib.add_paths_async(fs, fs, repo_path, ["."])) catch {
+        _ => ()
+      }
     })
     ignore(
-      try? @bitlib.commit(
+      @bitlib.commit(
         fs,
         fs,
         repo_path,
@@ -38,7 +42,9 @@ fn bench_fsck_create_repo(
         "Bench <bench@example.com>",
         1700000000L + commit_idx.to_int64(),
       ),
-    )
+    ) catch {
+      _ => ()
+    }
   }
 }
 

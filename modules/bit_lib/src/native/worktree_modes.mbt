@@ -173,9 +173,9 @@ async fn remove_path_if_exists(path : String) -> Unit raise @bit.GitError {
   if !exists {
     return
   }
-  let is_dir = try {
+  let is_dir = try (
     @afs.kind(path, follow_symlink=false) is @afs.FileKind::Directory
-  } catch {
+  ) catch {
     _ => false
   }
   if is_dir {
